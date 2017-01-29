@@ -28,6 +28,7 @@ Orion Sky Lawlor, olawlor@acm.org
 
 #include "cklocation.h"
 #include "ckmulticast.h"
+#include "ckcollectives.h"
 #include "ckmemcheckpoint.h" // for CkArrayCheckPTReqMessage
 #include "ckarrayindex.h"
 
@@ -163,7 +164,8 @@ class CkArrayOptions {
 	CkArrayIndex bounds;
 	CkGroupID map;///< Array location map object
 	CkGroupID locMgr;///< Location manager to bind to
-        CkGroupID mCastMgr;/// <ckmulticast mgr to bind to, for sections
+	CkNodeGroupID collMgr;///< Collectives manager to bind to
+	CkGroupID mCastMgr;/// <ckmulticast mgr to bind to, for sections
 	CkPupAblePtrVec<CkArrayListener> arrayListeners; //CkArrayListeners for this array
 	CkCallback reductionClient; // Default target of reductions
 	bool anytimeMigration; // Elements are allowed to move freely
@@ -252,6 +254,10 @@ class CkArrayOptions {
 	CkArrayOptions &setLocationManager(const CkGroupID &l)
 		{locMgr=l; return *this;}
 
+	/// Use this collective manager
+	CkArrayOptions &setCollectiveManager(const CkNodeGroupID &c)
+		{collMgr=c; return *this;}
+
 	/// Use this ckmulticast manager
 	CkArrayOptions &setMcastManager(const CkGroupID &m)
 		{mCastMgr=m; return *this;}
@@ -274,6 +280,7 @@ class CkArrayOptions {
 	const CkArrayIndex &getBounds(void) const {return bounds;}
 	const CkGroupID &getMap(void) const {return map;}
 	const CkGroupID &getLocationManager(void) const {return locMgr;}
+	const CkNodeGroupID &getCollectiveManager(void) const {return collMgr;}
 	const CkGroupID &getMcastManager(void) const {return mCastMgr;}
 	bool isSectionAutoDelegated(void) const {return sectionAutoDelegate;}
 	int getListeners(void) const {return arrayListeners.size();}
@@ -330,6 +337,8 @@ public:
 	void ckBroadcast(CkArrayMessage *m, int ep, int opts=0) const;
 	void ckScatter(CkArrayMessage *m, int ep, int opts=0) const;
 	CkArrayID ckGetArrayID(void) const { return _aid; }
+	CkGroupID getmCastMgr(void) const;
+	CkGroupID getCollMgr(void) const;
 	CkArray *ckLocalBranch(void) const { return _aid.ckLocalBranch(); }
 	CkLocMgr *ckLocMgr(void) const;
 	inline operator CkArrayID () const {return ckGetArrayID();}
@@ -640,6 +649,7 @@ class CkArray : public CkReductionMgr {
   CkMagicNumber<ArrayElement> magic; //To detect heap corruption
   CkLocMgr *locMgr;
   CkGroupID locMgrID;
+  CkNodeGroupID collMgrID;
   CkGroupID mCastMgrID;
   bool sectionAutoDelegate;
   CProxy_CkArray thisProxy;
@@ -659,6 +669,7 @@ public:
   CkArray(CkMigrateMessage *m);
   ~CkArray();
   CkGroupID &getGroupID(void) {return thisgroup;}
+  CkNodeGroupID &getCollMgr(void) {return collMgrID;}
   CkGroupID &getmCastMgr(void) {return mCastMgrID;}
   bool isSectionAutoDelegated(void) {return sectionAutoDelegate;}
 

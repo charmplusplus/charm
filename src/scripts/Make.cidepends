@@ -61,6 +61,7 @@ CkArrayReductionMgr.decl.h CkArrayReductionMgr.def.h: ckarrayreductionmgr.ci.sta
 CkCallback.decl.h CkCallback.def.h: ckcallback.ci.stamp
 CkCheckpoint.decl.h CkCheckpoint.def.h: ckcheckpoint.ci.stamp
 CkCheckpointStatus.decl.h CkCheckpointStatus.def.h: ckcheckpointstatus.ci.stamp
+CkCollectives.decl.h CkCollectives.def.h: ckcollectives.ci.stamp
 CkFutures.decl.h CkFutures.def.h: ckfutures.ci.stamp
 CkLocation.decl.h CkLocation.def.h: cklocation.ci.stamp
 CkMarshall.decl.h CkMarshall.def.h: ckmarshall.ci.stamp

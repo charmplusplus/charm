@@ -1,0 +1,9 @@
+module CkCollectives {
+  
+  nodegroup [migratable] CkCollectiveMgr {
+    entry CkCollectiveMgr();
+    entry void scatterSendAll(CkMessage *msg); 
+  };
+
+  initnode void _ckCollectivesInit(void);
+};

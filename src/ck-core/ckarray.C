@@ -526,6 +526,15 @@ void CkArray::setupSpringCleaning() {
 CProxy_ArrayBase::CProxy_ArrayBase(const ArrayElement *e)
 	:CProxy(), _aid(e->ckGetArrayID())
 	{}
+
+CkGroupID CProxy_ArrayBase::getmCastMgr(void) const{
+    return (ckLocalBranch())->getmCastMgr();
+}
+
+CkGroupID CProxy_ArrayBase::getCollMgr(void) const{
+    return (ckLocalBranch())->getCollMgr();
+}
+
 CProxyElement_ArrayBase::CProxyElement_ArrayBase(const ArrayElement *e)
 	:CProxy_ArrayBase(e), _idx(e->ckGetArrayIndex())
 	{}
@@ -654,6 +663,7 @@ CkArrayOptions::CkArrayOptions(CkArrayIndex s, CkArrayIndex e, CkArrayIndex step
 void CkArrayOptions::init()
 {
     locMgr.setZero();
+    collMgr.setZero();
     mCastMgr.setZero();
     anytimeMigration = _isAnytimeMigration;
     staticInsertion = _isStaticInsertion;
@@ -746,6 +756,7 @@ void CkArrayOptions::pup(PUP::er &p) {
 	p|bounds;
 	p|map;
 	p|locMgr;
+	p|collMgr;
 	p|mCastMgr;
 	p|sectionAutoDelegate;
 	p|arrayListeners;
@@ -787,11 +798,21 @@ static CkArrayID CkCreateArray(CkArrayMessage *m, int ctor, CkArrayOptions opts)
     locMgr = CProxy_CkLocMgr::ckNew(opts, &e_opts);
     opts.setLocationManager(locMgr);
   }
+
+  CkNodeGroupID collMgr = opts.getCollectiveManager();
+  if (collMgr.isZero())
+  { //Create a new collective manager
+    CkEntryOptions  e_opts;
+    e_opts.setGroupDepID(locMgr);       // node group creation dependence
+    collMgr = CProxy_CkCollectiveMgr::ckNew(&e_opts);
+    opts.setCollectiveManager(collMgr);
+  }
+
   CkGroupID mCastMgr = opts.getMcastManager();
   if (opts.isSectionAutoDelegated() && mCastMgr.isZero())
   { //Create a new multicast manager
     CkEntryOptions  e_opts;
-    e_opts.setGroupDepID(locMgr);       // group creation dependence
+    e_opts.setGroupDepID(collMgr);       // group creation dependence
     //call with default parameters, since the last parameter has to be e_opts
     mCastMgr = CProxy_CkMulticastMgr::ckNew(2, 8192, 8192, &e_opts);
     opts.setMcastManager(mCastMgr);
@@ -800,7 +821,7 @@ static CkArrayID CkCreateArray(CkArrayMessage *m, int ctor, CkArrayOptions opts)
   m->array_ep()=ctor;
   CkMarshalledMessage marsh(m);
   CkEntryOptions  e_opts;
-  e_opts.setGroupDepID(locMgr);       // group creation dependence
+  e_opts.setGroupDepID(collMgr);       // group creation dependence
   if(opts.isSectionAutoDelegated())
   {
     e_opts.setGroupDepID(mCastMgr);
@@ -995,6 +1016,7 @@ CkArray::CkArray(CkArrayOptions &opts,
     locMgr(CProxy_CkLocMgr::ckLocalBranch(opts.getLocationManager())),
     locMgrID(opts.getLocationManager()),
     sectionAutoDelegate(opts.isSectionAutoDelegated()),
+    collMgrID(opts.getCollectiveManager()),
     mCastMgrID(opts.getMcastManager()),
     thisProxy(thisgroup),
     stableLocations(opts.staticInsertion && !opts.anytimeMigration),
@@ -1094,6 +1116,7 @@ void CkArray::pup(PUP::er &p){
 	CkReductionMgr::pup(p);
 	p|numInitial;
 	p|locMgrID;
+	p|collMgrID;
 	p|mCastMgrID;
 	p|sectionAutoDelegate;
 	p|listeners;
@@ -1554,7 +1577,14 @@ void CProxy_ArrayBase::ckScatter(CkArrayMessage *msg, int ep, int opts) const
 	envelope *env = UsrToEnv(msg);
 	env->setMsgtype(ForBocMsg);
 	msg->array_ep_bcast()=ep;
-        //!Optimize
+
+#if CMK_COLLECTIVE_MGR
+	CkGroupID collMgrID = getCollMgr();
+	CkCollectiveMgr *collGrp = CProxy_CkCollectiveMgr(collMgrID).ckLocalBranch();
+	DEBUG(CkPrintf("CkCollectiveMgr, ID: %d, ptr: %p ... \n", collMgrID, collGrp));
+	collGrp->ckScatter(msg, ckGetArrayID());
+#else 
+    //send point to point messages
 	void *newMsg;
 	CkScatterWrapper w;
 	getScatterInfo(msg, &w);
@@ -1568,6 +1598,7 @@ void CProxy_ArrayBase::ckScatter(CkArrayMessage *msg, int ep, int opts) const
              //CkPrintf("[%d] Arraybase::ckscatter, sending msg# %d \n", CkMyPe(), i);
 	     ap.ckSend((CkArrayMessage *)newMsg,ep,opts);
 	}
+#endif
 }
 
 
