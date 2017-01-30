@@ -2422,15 +2422,19 @@ void handle_MPI_BOTTOM(void* &buf1, MPI_Datatype type1, void* &buf2, MPI_Datatyp
   }
 }
 
-AmpiMsg *ampi::makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count,
+AmpiMsg *ampi::makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
                            MPI_Datatype type,MPI_Comm destcomm, int sync)
 {
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
   int sIdx=thisIndex;
   int seq = -1;
-  if (destIdx>=0 && destcomm<=MPI_COMM_WORLD && t<=MPI_ATA_SEQ_TAG) //Not cross-module: set seqno
-    seq = oorder.nextOutgoing(destIdx);
+  if (destRank>=0 && destcomm<=MPI_COMM_WORLD && t<=MPI_ATA_SEQ_TAG) { //Not cross-module: set seqno
+    if (destcomm == MPI_COMM_SELF) {
+      destRank = getRank(MPI_COMM_WORLD);
+    }
+    seq = oorder.nextOutgoing(destRank);
+  }
   AmpiMsg *msg = new (len, 0) AmpiMsg(seq, t, sRank, len, destcomm);
   if (sync) UsrToEnv(msg)->setRef(sync);
   ddt->serialize((char*)buf, msg->getData(), count, 1);
@@ -2495,7 +2499,7 @@ void ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Datatype t
     CkPrintf("AMPI vp %d send: tag=%d, src=%d, comm=%d (to %d)\n",thisIndex,t,sRank,destcomm,destIdx);
   )
 
-  arrproxy[destIdx].generic(makeAmpiMsg(destIdx,t,sRank,buf,count,type,destcomm,sync));
+  arrproxy[destIdx].generic(makeAmpiMsg(rank,t,sRank,buf,count,type,destcomm,sync));
 }
 void ampi::processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count)
 {

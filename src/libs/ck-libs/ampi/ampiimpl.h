@@ -1159,8 +1159,8 @@ public:
   AmpiMsg *getOutOfOrder(int srcRank);
 
   /// Return the next outgoing sequence number, and increment it.
-  int nextOutgoing(int srcRank) {
-    return elements[srcRank].seqOutgoing++;
+  inline int nextOutgoing(int destRank) {
+    return elements[destRank].seqOutgoing++;
   }
 };
 PUPmarshall(AmpiSeqQ)
@@ -1600,7 +1600,7 @@ class ampi : public CBase_ampi {
   inline ampi* blockOnRedn(AmpiRequest *req);
   MPI_Request postReq(AmpiRequest* newreq);
 
-  AmpiMsg *makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count,
+  AmpiMsg *makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
                        MPI_Datatype type,MPI_Comm destcomm, int sync=0);
 
   void send(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
