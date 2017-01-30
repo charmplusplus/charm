@@ -1029,6 +1029,8 @@ inline void pupFromBuf(const void *data,T &t) {
   PUP::fromMem p(data); p|t;
 }
 
+#define COMM_SELF_SEQ_IDX -1
+
 class AmpiMsg : public CMessage_AmpiMsg {
  private:
   int seq; //Sequence number (for message ordering)
@@ -1057,6 +1059,10 @@ class AmpiMsg : public CMessage_AmpiMsg {
     if (comm == MPI_COMM_SELF) tag *= (-1);
   }
   inline int getSeq(void) const { return seq; }
+  inline int getSeqIdx(void) const {
+    // seqIdx is srcRank, unless this message was sent over MPI_COMM_SELF.
+    return (tag >= 0) ? srcRank : COMM_SELF_SEQ_IDX;
+  }
   inline int getSrcRank(void) const { return srcRank; }
   inline int getLength(void) const { return length; }
   inline char* getData(void) const { return data; }
@@ -1128,9 +1134,9 @@ typedef std::unordered_map<int, AmpiOtherElement> AmpiElements;
 
 class AmpiSeqQ : private CkNoncopyable {
   CkMsgQ<AmpiMsg> out; // all out of order messages
-  AmpiElements elements; // element info
+  AmpiElements elements; // element info: indexed by seqIdx (comm rank, except for MPI_COMM_SELF)
 
-  void putOutOfOrder(int srcRank, AmpiMsg *msg);
+  void putOutOfOrder(int seqIdx, AmpiMsg *msg);
 
 public:
   AmpiSeqQ() {}
@@ -1143,21 +1149,21 @@ public:
   ///   If 1, this message can be immediately processed.
   ///   If >1, this message can be immediately processed,
   ///     and you should call "getOutOfOrder" repeatedly.
-  inline int put(int srcRank, AmpiMsg *msg) {
-    AmpiOtherElement &el=elements[srcRank];
+  inline int put(int seqIdx, AmpiMsg *msg) {
+    AmpiOtherElement &el=elements[seqIdx];
     if (msg->getSeq()==el.seqIncoming) { // In order:
       el.seqIncoming++;
       return 1+el.nOut;
     }
     else { // Out of order: stash message
-      putOutOfOrder(srcRank, msg);
+      putOutOfOrder(seqIdx, msg);
       return 0;
     }
   }
 
   /// Get an out-of-order message from the table.
   /// (in-order messages never go into the table)
-  AmpiMsg *getOutOfOrder(int srcRank);
+  AmpiMsg *getOutOfOrder(int seqIdx);
 
   /// Return the next outgoing sequence number, and increment it.
   inline int nextOutgoing(int destRank) {

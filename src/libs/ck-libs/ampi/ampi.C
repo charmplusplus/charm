@@ -2344,13 +2344,12 @@ void ampi::generic(AmpiMsg* msg)
 #endif
 
   if(msg->getSeq() != -1) {
-    // If message was sent over MPI_COMM_SELF, srcRank needs to be this rank in MPI_COMM_WORLD:
-    int srcRank = (msg->getComm(this->getComm()) == MPI_COMM_SELF) ? this->getRank(MPI_COMM_WORLD) : msg->getSrcRank();
-    int n=oorder.put(srcRank,msg);
+    int seqIdx = msg->getSeqIdx();
+    int n=oorder.put(seqIdx,msg);
     if (n>0) { // This message was in-order
       inorder(msg);
       if (n>1) { // It enables other, previously out-of-order messages
-        while((msg=oorder.getOutOfOrder(srcRank))!=0) {
+        while((msg=oorder.getOutOfOrder(seqIdx))!=0) {
           inorder(msg);
         }
       }
@@ -2435,12 +2434,14 @@ AmpiMsg *ampi::makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int coun
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
   int sIdx=thisIndex;
+  int seqIdx = destRank;
   int seq = -1;
   if (destRank>=0 && destcomm<=MPI_COMM_WORLD && t<=MPI_ATA_SEQ_TAG) { //Not cross-module: set seqno
     if (destcomm == MPI_COMM_SELF) {
-      destRank = getRank(MPI_COMM_WORLD);
+      seqIdx = COMM_SELF_SEQ_IDX;
+      sRank  = 0;
     }
-    seq = oorder.nextOutgoing(destRank);
+    seq = oorder.nextOutgoing(seqIdx);
   }
   AmpiMsg *msg = new (len, 0) AmpiMsg(seq, t, sRank, len, destcomm);
   if (sync) UsrToEnv(msg)->setRef(sync);
@@ -2876,9 +2877,9 @@ void AmpiSeqQ::pup(PUP::er &p) {
   p|elements;
 }
 
-void AmpiSeqQ::putOutOfOrder(int srcRank, AmpiMsg *msg)
+void AmpiSeqQ::putOutOfOrder(int seqIdx, AmpiMsg *msg)
 {
-  AmpiOtherElement &el=elements[srcRank];
+  AmpiOtherElement &el=elements[seqIdx];
 #if CMK_ERROR_CHECKING
   if (msg->getSeq() < el.seqIncoming)
     CkAbort("AMPI Logic error: received late out-of-order message!\n");
@@ -2887,14 +2888,14 @@ void AmpiSeqQ::putOutOfOrder(int srcRank, AmpiMsg *msg)
   el.nOut++; // We have another message in the out-of-order queue
 }
 
-AmpiMsg *AmpiSeqQ::getOutOfOrder(int srcRank)
+AmpiMsg *AmpiSeqQ::getOutOfOrder(int seqIdx)
 {
-  AmpiOtherElement &el=elements[srcRank];
+  AmpiOtherElement &el=elements[seqIdx];
   if (el.nOut==0) return 0; // No more out-of-order left.
   // Walk through our out-of-order queue, searching for our next message:
   for (int i=0;i<out.length();i++) {
     AmpiMsg *msg=out.deq();
-    if (msg->getSrcRank()==srcRank && msg->getSeq()==el.seqIncoming) {
+    if (msg->getSeqIdx()==seqIdx && msg->getSeq()==el.seqIncoming) {
       el.seqIncoming++;
       el.nOut--; // We have one less message out-of-order
       return msg;
