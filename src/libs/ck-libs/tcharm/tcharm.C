@@ -766,6 +766,7 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
     mapID = CkCreatePropMap();
   }
   opts.setMap(mapID);
+  opts.setSectionAutoDelegate(false);
   return CProxy_TCharm::ckNew(msg,opts);
 }
 
