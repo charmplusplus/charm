@@ -2,6 +2,7 @@
 COMMON_LDBS=\
    $(L)/libmoduleDummyLB.a \
    $(L)/libmoduleGreedyLB.a \
+   $(L)/libmoduleGreedyRefineLB.a \
    $(L)/libmoduleCommLB.a \
    $(L)/libmoduleRandCentLB.a \
    $(L)/libmoduleRefineLB.a \
@@ -21,6 +22,7 @@ COMMON_LDBS=\
 ALL_LDBS=\
    $(L)/libmoduleDummyLB.a \
    $(L)/libmoduleGreedyLB.a \
+   $(L)/libmoduleGreedyRefineLB.a \
    $(L)/libmoduleCommLB.a \
    $(L)/libmoduleRandCentLB.a \
    $(L)/libmoduleRefineLB.a \
@@ -66,6 +68,14 @@ $(L)/libmoduleGreedyLB.a: GreedyLB.o
 	$(CHARMC) -o $(L)/libmoduleGreedyLB.a GreedyLB.o 
 	
 LBHEADERS += GreedyLB.h GreedyLB.decl.h
+
+GreedyRefineLB: GreedyRefineLB.o 
+	$(CHARMC) -o $(L)/libmoduleGreedyRefineLB.a GreedyRefineLB.o 
+
+$(L)/libmoduleGreedyRefineLB.a: GreedyRefineLB.o 
+	$(CHARMC) -o $(L)/libmoduleGreedyRefineLB.a GreedyRefineLB.o 
+	
+LBHEADERS += GreedyRefineLB.h GreedyRefineLB.decl.h
 
 CommLB: CommLB.o 
 	$(CHARMC) -o $(L)/libmoduleCommLB.a CommLB.o 
@@ -392,6 +402,7 @@ ALL_LB_OBJS=EveryLB.o \
     CommonLBs.o \
     DummyLB.o \
     GreedyLB.o \
+    GreedyRefineLB.o \
     CommLB.o \
     RandCentLB.o \
     RefineLB.o \
@@ -441,6 +452,7 @@ ALL_LB_OBJS=EveryLB.o \
 EVERYLB_DEPS=EveryLB.o \
     DummyLB.o \
     GreedyLB.o \
+    GreedyRefineLB.o \
     CommLB.o \
     RandCentLB.o \
     RefineLB.o \
@@ -478,6 +490,7 @@ EVERYLB_DEPS=EveryLB.o \
 COMMONLBS_DEPS=CommonLBs.o \
     DummyLB.o \
     GreedyLB.o \
+    GreedyRefineLB.o \
     CommLB.o \
     RandCentLB.o \
     RefineLB.o \

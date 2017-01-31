@@ -3,6 +3,7 @@
 module EveryLB {
   extern module DummyLB;
   extern module GreedyLB;
+  extern module GreedyRefineLB;
   extern module CommLB;
   extern module RandCentLB;
   extern module RefineLB;

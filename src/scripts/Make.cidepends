@@ -17,6 +17,7 @@ GraphPartLB.decl.h GraphPartLB.def.h: GraphPartLB.ci.stamp
 GreedyAgentLB.decl.h GreedyAgentLB.def.h: GreedyAgentLB.ci.stamp
 GreedyCommLB.decl.h GreedyCommLB.def.h: GreedyCommLB.ci.stamp
 GreedyLB.decl.h GreedyLB.def.h: GreedyLB.ci.stamp
+GreedyRefineLB.decl.h GreedyRefineLB.def.h: GreedyRefineLB.ci.stamp
 GridCommLB.decl.h GridCommLB.def.h: GridCommLB.ci.stamp
 GridCommRefineLB.decl.h GridCommRefineLB.def.h: GridCommRefineLB.ci.stamp
 GridHybridLB.decl.h GridHybridLB.def.h: GridHybridLB.ci.stamp
