@@ -131,7 +131,7 @@ int win_obj::accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
                         MPI_Datatype targtype, MPI_Op op, ampiParent* pptr){
   //when called from winRemote entry methods, pptr must be taken from the ampi instance, not getAmpiParent().
   CkAssert(pptr != NULL);
-  pptr->applyOp(targtype, op, targcnt, (void*)((int*)baseAddr+targdisp), (void*)orgaddr);
+  pptr->applyOp(targtype, op, targcnt, (void*)orgaddr,(void*)((int*)baseAddr+targdisp));
   return WIN_SUCCESS;
 }
 
