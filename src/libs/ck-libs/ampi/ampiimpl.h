@@ -738,6 +738,7 @@ class IReq : public AmpiRequest {
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
     p|length;
+    p|cancelled;
   }
   virtual void print();
 };
