@@ -1,5 +1,10 @@
 
 #define AMPIMSGLOG    0
+
+#ifndef AMPI_WORLDS
+#define AMPI_WORLDS   0 // Support for multiple MPI "worlds" (modules)
+#endif
+
 #define exit exit /*Supress definition of exit in ampi.h*/
 #include "ampiimpl.h"
 #include "tcharm.h"
@@ -1031,6 +1036,7 @@ static ampi *ampiInit(char **argv)
     CProxy_ampi::ckNew(parent, worldComm, opts, CkCallbackResumeThread((void*&)m));
     arr = CProxy_ampi(m->aid);
 
+#if AMPI_WORLDS
     //Broadcast info. to the mpi_worlds array
     // FIXME: remove race condition from MPI_COMM_UNIVERSE broadcast
     ampiCommStruct newComm(new_world,arr,_nchunks);
@@ -1038,6 +1044,7 @@ static ampi *ampiInit(char **argv)
       ampiWorldsGroup=CProxy_ampiWorlds::ckNew(newComm);
     else
       ampiWorldsGroup.add(newComm);
+#endif
     STARTUP_DEBUG("ampiInit> arrays created")
   }
 
@@ -2226,6 +2233,9 @@ void ampiParent::intraChildRegister(const ampiCommStruct &s) {
 //------------------------ communication -----------------------
 const ampiCommStruct &universeComm2CommStruct(MPI_Comm universeNo)
 {
+#if !AMPI_WORLDS
+  CkAbort("AMPI must be built with -DAMPI_WORLDS=1 to enable multiple module support");
+#endif
   if (universeNo>MPI_COMM_WORLD) {
     int worldDex=universeNo-MPI_COMM_WORLD-1;
     if (worldDex>=_mpi_nworlds)

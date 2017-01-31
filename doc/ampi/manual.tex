@@ -1152,6 +1152,14 @@ ierr = MPI_Recv(InitialTime, 1, MPI_DOUBLE, tag,
                 \emph{36, MPI_Comm_Universe(Solids_Comm)}, &stat);
 \end{alltt}
 
+Note that in order to use these extensions, you must build AMPI
+with ``-DAMPI\_WORLDS=1'', as in:
+
+\begin{alltt}
+> ./build AMPI netlrts-linux-x86_64 -DAMPI_WORLDS=1
+\end{alltt}
+
+
 \subsection{Extensions for Sequential Re-run of a Parallel Node}
 In some scenarios, a sequential re-run of a parallel node is desired. One
 example is instruction-level accurate architecture simulations, in which case
