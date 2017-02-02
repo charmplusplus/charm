@@ -1575,6 +1575,10 @@ static bool AmmMatch(const int tags1[AMM_NTAGS], const int tags2[AMM_NTAGS])
     // src matches, tag is MPI_ANY_TAG
     return true;
   }
+  else if ((tags1[AMM_SRC]==MPI_ANY_SOURCE || tags2[AMM_SRC]==MPI_ANY_SOURCE) && (tags1[AMM_TAG]==MPI_ANY_TAG || tags2[AMM_TAG]==MPI_ANY_TAG)) {
+    // src and tag are MPI_ANY
+    return true;
+  }
   else {
     // no match
     return false;
