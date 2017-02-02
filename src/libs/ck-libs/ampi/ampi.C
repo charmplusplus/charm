@@ -1108,6 +1108,9 @@ ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_)
   myDDT=&myDDTsto;
   prepareCtv();
 
+  // Allocate an empty groupStruct to represent MPI_EMPTY_GROUP
+  groups.push_back(new groupStruct);
+
   init();
 
   thread->semaPut(AMPI_BARRIER_SEMAID,&barrier);
@@ -1166,8 +1169,6 @@ void ampiParent::prepareCtv(void) {
 }
 
 void ampiParent::init(){
-  CkAssert(groups.size() == 0);
-  groups.push_back(new groupStruct);
   resumeOnRecv = false;
   resumeOnColl = false;
   numBlockedReqs = 0;
