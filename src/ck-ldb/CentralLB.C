@@ -556,8 +556,10 @@ void CentralLB::depositData(CLBStatsMsg *m)
 }
 
 void CentralLB::ReceiveStatsFromRoot(CkMarshalledCLBStatsMessage &msg) {
+#if CMK_LBDB_ON
   if (CkMyPe() == cur_ld_balancer) return;
   else ReceiveStats(msg);
+#endif
 }
 
 void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
@@ -1474,6 +1476,7 @@ void CentralLB::preprocess(LDStats* stats)
 }
 
 void CentralLB::printStrategyStats(LBMigrateMsg *msg) {
+#if CMK_LBDB_ON
   envelope *env = UsrToEnv(msg);
 
   double strat_end_time = CkWallTimer();
@@ -1483,6 +1486,7 @@ void CentralLB::printStrategyStats(LBMigrateMsg *msg) {
   CkPrintf("CharmLB> %s: PE [%d] #Objects migrating: %d, LBMigrateMsg size: %.2f MB\n", lbname, CkMyPe(), msg->n_moves, env->getTotalsize()/1024.0/1024.0);
   CkPrintf("CharmLB> %s: PE [%d] strategy finished at %f duration %f s\n",
       lbname, CkMyPe(), strat_end_time, strat_end_time-strat_start_time);
+#endif
 }
 
 // default load balancing strategy
