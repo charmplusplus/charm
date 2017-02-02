@@ -672,6 +672,10 @@ void CentralLB::ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &msg)
 #endif
 }
 
+#if CMK_REPLAYSYSTEM
+static LDHandle *loadBalancer_pointers;
+#endif
+
 void CentralLB::LoadBalance()
 {
 #if CMK_LBDB_ON
@@ -722,8 +726,7 @@ void CentralLB::LoadBalance()
   }
 
 #if CMK_REPLAYSYSTEM
-  LDHandle *loadBalancer_pointers;
-  if (_replaySystem) {
+  if (_replaySystem && !concurrent) {
     loadBalancer_pointers = (LDHandle*)malloc(CkNumPes()*sizeof(LDHandle));
     for (int i=0; i<statsData->n_objs; ++i) loadBalancer_pointers[statsData->from_proc[i]] = statsData->objData[i].handle.omhandle.ldb;
   }
@@ -754,7 +757,7 @@ void CentralLB::ApplyDecision() {
 
 #if CMK_REPLAYSYSTEM
   CpdHandleLBMessage(&migrateMsg);
-  if (_replaySystem) {
+  if (_replaySystem && !concurrent) {
     for (int i=0; i<migrateMsg->n_moves; ++i) migrateMsg->moves[i].obj.omhandle.ldb = loadBalancer_pointers[migrateMsg->moves[i].from_pe];
     free(loadBalancer_pointers);
   }
