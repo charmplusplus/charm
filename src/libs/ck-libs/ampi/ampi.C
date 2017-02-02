@@ -2146,6 +2146,10 @@ void ampi::intercommCreate(const groupStruct remoteVec, const int root, MPI_Comm
   }
   thread->suspend(); //Not resumed by ampiParent::interChildRegister. Resumed by ExchangeProxy.
   *ncomm = parent->getNextInter()-1;
+
+  // set the localComm for new inter-communicator
+  ampi *ptr = getAmpiInstance(*ncomm);
+  ptr->myComm.setLocalComm(tcomm);
 }
 
 void ampi::intercommCreatePhase1(MPI_Comm nextInterComm){
@@ -2574,7 +2578,16 @@ void ampi::processGatherMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, i
   int contributionSize   = ddt->getSize(recvCount);
   int contributionExtent = ddt->getExtent()*recvCount;
 
-  for (int i=0; i<getSize(getComm()); i++) {
+  int commSize;
+  if (isInter()) {
+    // if gather is over intercomm, number of contributors is remote group size
+    commSize = getRemoteIndices().size();
+  }
+  else {
+    commSize = getSize(getComm());
+  }
+
+  for (int i=0; i<commSize; i++) {
     CkAssert(currentSrc && currentData);
     int srcRank = *((int*)currentSrc->data);
     CkAssert(currentData->dataSize == contributionSize);
@@ -2825,6 +2838,70 @@ AmpiMsg* ampi::Alltoall_RemoteIget(MPI_Aint disp, int cnt, MPI_Datatype type, in
   char* addr = (char*)Alltoallbuff+disp*unit;
   ddt->serialize(msg->getData(), addr, cnt, (-1));
   return msg;
+}
+
+// declare helper method to make gather messages, defined later in code
+static CkReductionMsg *makeGatherMsg(const void *inbuf, int count, MPI_Datatype type, int rank);
+
+int ampi::intercomm_gather(int root, void* sendbuf, int sendcount, MPI_Datatype sendtype,
+        void* recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm intercomm)
+{
+  if(root!=MPI_PROC_NULL && root!=MPI_ROOT) {
+    // remote group ranks
+    // do a local gather to rank 0 in remote group
+
+    if (getRank(getComm()) == 0) {
+      int local_recvbuf_size = getDDT()->getSize(sendtype) * sendcount * getSize(getComm());
+      vector<char> local_recvbuf(local_recvbuf_size);
+      AMPI_Gather(sendbuf,sendcount,sendtype,&local_recvbuf[0],sendcount,sendtype,0,myComm.getLocalComm());
+      // rank 0 also sends gather result to root
+      send(MPI_REDN_TAG, getRank(intercomm), &local_recvbuf[0], sendcount*getSize(getComm()), sendtype, root, intercomm);
+    }
+    else {
+      AMPI_Gather(sendbuf,sendcount,sendtype,NULL,0,0,0,myComm.getLocalComm());
+    }
+  }
+
+  if(root==MPI_ROOT) {
+    // root does a blocking recv with rank 0 in remote group as src
+    int remote_size = getRemoteIndices().size();
+    recv(MPI_REDN_TAG, 0, recvbuf, recvcount*remote_size, recvtype, intercomm);
+  }
+  return MPI_SUCCESS;
+}
+
+int ampi::intercomm_igather(int root, void* sendbuf, int sendcount, MPI_Datatype sendtype,
+        void* recvbuf, int recvcount, MPI_Datatype recvtype,
+        MPI_Comm intercomm, MPI_Request* request)
+{
+  if(root!=MPI_PROC_NULL && root!=MPI_ROOT) {
+    // remote group ranks
+    // do a local igather to rank 0 in remote group
+
+    MPI_Request tmpReq;
+    if (getRank(getComm()) == 0) {
+      int local_recvbuf_size = getDDT()->getSize(sendtype) * sendcount * getSize(getComm());
+      vector<char> local_recvbuf(local_recvbuf_size);
+      AMPI_Igather(sendbuf,sendcount,sendtype,&local_recvbuf[0],sendcount,sendtype,0,myComm.getLocalComm(),&tmpReq);
+      // rank 0 waits for local igather and then sends to root
+      MPI_Status sts;
+      AMPI_Wait(&tmpReq, &sts);
+      send(MPI_SCATTER_TAG, getRank(intercomm), &local_recvbuf[0], sendcount*getSize(getComm()), sendtype, root, intercomm);
+    }
+    else {
+      AMPI_Igather(sendbuf,sendcount,sendtype,NULL,0,0,0,myComm.getLocalComm(),&tmpReq);
+    }
+  }
+
+  if(root==MPI_ROOT) {
+    // root does a non-blocking recv with rank 0 in remote group as src
+    int remote_size = getRemoteIndices().size();
+    irecv(recvbuf, recvcount*remote_size, recvtype, myComm.getIndexForRemoteRank(0), MPI_SCATTER_TAG, intercomm, request);
+  }
+  else {
+    *request = MPI_REQUEST_NULL;
+  }
+  return MPI_SUCCESS;
 }
 
 int MPI_comm_null_copy_fn(MPI_Comm comm, int keyval, void *extra_state,
@@ -5808,10 +5885,13 @@ int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
 #endif
 
+  ampi *ptr = getAmpiInstance(comm);
+
   if(comm==MPI_COMM_SELF)
     return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
-  if(getAmpiParent()->isInter(comm))
-    CkAbort("AMPI does not implement MPI_Gather for Inter-communicators!");
+  if(getAmpiParent()->isInter(comm)) {
+    return ptr->intercomm_gather(root,sendbuf,sendcount,sendtype,recvbuf,recvcount,recvtype,comm);
+  }
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();
@@ -5822,7 +5902,6 @@ int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
 #endif
 
-  ampi *ptr = getAmpiInstance(comm);
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
   int rank = ptr->getRank(comm);
 
@@ -5879,8 +5958,9 @@ int AMPI_Igather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     *request = ptr->postReq(new GatherReq(recvbuf, recvcount, recvtype, comm, AMPI_REQ_COMPLETED));
     return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
   }
-  if(getAmpiParent()->isInter(comm))
-    CkAbort("AMPI does not implement MPI_Igather for Inter-communicators!");
+  if(getAmpiParent()->isInter(comm)) {
+    return ptr->intercomm_igather(root,sendbuf,sendcount,sendtype,recvbuf,recvcount,recvtype,comm,request);
+  }
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();

@@ -290,7 +290,6 @@ class ampiCommStruct {
   CkArrayID ampiID; //ID of corresponding ampi array
   int size; //Number of processes in communicator
   bool isWorld; //true if ranks are 0..size-1?
-  bool isInter; // false: intra-communicator; true: inter-communicator
   vector<int> indices;  //indices[r] gives the array index for rank r
   vector<int> remoteIndices;  // remote group for inter-communicator
 
@@ -314,24 +313,27 @@ class ampiCommStruct {
   char commName[MPI_MAX_OBJECT_NAME];
   int commNameLen;
 
+  // For inter-communicators
+  MPI_Comm localComm;
+
   // Lazily fill world communicator indices
   void makeWorldIndices(void) const {
     vector<int> *ind=const_cast<vector<int> *>(&indices);
     for (int i=0;i<size;i++) ind->push_back(i);
   }
  public:
-  ampiCommStruct(int ignored=0) {size=-1;isWorld=false;isInter=false;commNameLen=0;}
+  ampiCommStruct(int ignored=0) {size=-1;isWorld=false;commNameLen=0;localComm=MPI_COMM_NULL;}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,int size_)
-    :comm(comm_), ampiID(id_),size(size_), isWorld(true), isInter(false), commNameLen(0) {}
+    :comm(comm_), ampiID(id_),size(size_), isWorld(true), commNameLen(0), localComm(MPI_COMM_NULL) {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
                  int size_,const vector<int> &indices_)
                 :comm(comm_), ampiID(id_),size(size_),isWorld(false),
-                 isInter(false), indices(indices_), commNameLen(0) {}
+                 indices(indices_), commNameLen(0), localComm(MPI_COMM_NULL) {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
                  int size_,const vector<int> &indices_,
                  const vector<int> &remoteIndices_)
-                :comm(comm_),ampiID(id_),size(size_),isWorld(false),isInter(true),
-                 indices(indices_),remoteIndices(remoteIndices_),commNameLen(0) {}
+                :comm(comm_),ampiID(id_),size(size_),isWorld(false),indices(indices_),
+                 remoteIndices(remoteIndices_),commNameLen(0),localComm(MPI_COMM_NULL) {}
   void setArrayID(const CkArrayID &nID) {ampiID=nID;}
 
   MPI_Comm getComm(void) const {return comm;}
@@ -381,7 +383,6 @@ class ampiCommStruct {
 
   int getSize(void) const {return size;}
 
-  inline bool isinter(void) const { return isInter; }
   inline const vector<int> &getdims() const {return dims;}
   inline const vector<int> &getperiods() const {return periods;}
   inline int getndims() const {return ndims;}
@@ -402,12 +403,26 @@ class ampiCommStruct {
   inline const vector<int> &getnbors() const {return nbors;}
   inline void setnbors(const vector<int> &nbors_) { nbors = nbors_; }
 
+  bool isinter(void) const {
+    return (localComm != MPI_COMM_NULL);
+  }
+
+  /* localComm handlers for inter-communicators */
+  inline void setLocalComm(MPI_Comm localComm_) { localComm = localComm_; }
+
+  MPI_Comm getLocalComm() {
+    if (isinter()) return localComm;
+    else {
+      CkAbort("localComm requested for non-inter communicators\n");
+      return -1;
+    }
+  }
+
   void pup(PUP::er &p) {
     p|comm;
     p|ampiID;
     p|size;
     p|isWorld;
-    p|isInter;
     p|indices;
     p|remoteIndices;
     p|ndims;
@@ -419,6 +434,7 @@ class ampiCommStruct {
     p|nbors;
     p|commNameLen;
     p(commName,MPI_MAX_OBJECT_NAME);
+    p|localComm;
   }
 };
 PUPmarshall(ampiCommStruct)
@@ -1699,6 +1715,11 @@ class ampi : public CBase_ampi {
                     int targcnt, MPI_Datatype targtype, int winIndex);
   AmpiMsg* winRemoteIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
                          int targcnt, MPI_Datatype targtype, int winIndex);
+  int intercomm_gather(int root, void* sendbuf, int sendcount, MPI_Datatype sendtype,
+                       void* recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm intercomm);
+  int intercomm_igather(int root, void* sendbuf, int sendcount, MPI_Datatype sendtype,
+                        void* recvbuf, int recvcount, MPI_Datatype recvtype,
+                        MPI_Comm intercomm, MPI_Request* request);
   int winLock(int lock_type, int rank, WinStruct *win);
   int winUnlock(int rank, WinStruct *win);
   void winRemoteLock(int lock_type, int winIndex, int requestRank);

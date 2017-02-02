@@ -275,16 +275,16 @@ int main(int argc, char **argv) {
   intercomm_bcast_test(myFirstComm, global_rank, root, false); /* Intercomm bcast test */
   intercomm_bcast_test(myFirstComm, global_rank, root, true); /* Intercomm ibcast test */
 
+  /* Intercommunicator gather collective tests */
+  if (global_rank == 0) printf("[0] Testing intercomm gather\n");
+  intercomm_gather_test(myFirstComm, global_rank, root, false); /* Intercomm gather test */
+  intercomm_gather_test(myFirstComm, global_rank, root, true); /* Intercomm igather test */
+
 #if 0
   /* Intercommunicator barrier collective tests */
   if (global_rank == 0) printf("[0] Testing intercomm barrier\n");
   intercomm_barrier_test(myFirstComm, global_rank, false); /* Intercomm barrier test */
   intercomm_barrier_test(myFirstComm, global_rank, true); /* Intercomm ibarrier test */
-
-  /* Intercommunicator gather collective tests */
-  if (global_rank == 0) printf("[0] Testing intercomm gather\n");
-  intercomm_gather_test(myFirstComm, global_rank, root, false); /* Intercomm gather test */
-  intercomm_gather_test(myFirstComm, global_rank, root, true); /* Intercomm igather test */
 
   /* Intercommunicator gatherv collective tests */
   if (global_rank == 0) printf("[0] Testing intercomm gatherv\n");
