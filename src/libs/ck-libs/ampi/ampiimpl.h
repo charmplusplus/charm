@@ -885,6 +885,7 @@ extern int _mpi_nworlds;
 #define MPI_EPOCH_END_TAG   MPI_TAG_UB_VALUE+12
 
 #define AMPI_COLL_SOURCE 0
+#define AMPI_COLL_DEST   -1
 #define AMPI_COLL_COMM   MPI_COMM_WORLD
 
 #define MPI_I_REQ       1
@@ -1347,6 +1348,8 @@ inline void pupFromBuf(const void *data,T &t) {
   PUP::fromMem p(data); p|t;
 }
 
+#define COLL_SEQ_IDX      -1
+
 class AmpiMsg : public CMessage_AmpiMsg {
  private:
   int ssendReq; //Index to the sender's request
@@ -1371,7 +1374,15 @@ class AmpiMsg : public CMessage_AmpiMsg {
   { CkSetRefNum(this, _s); }
   inline CMK_REFNUM_TYPE getSeq(void) const { return UsrToEnv(this)->getRef(); }
   inline int getSsendReq(void) const { return ssendReq; }
-  inline int getSeqIdx(void) const { return srcRank; }
+  inline int getSeqIdx(void) const {
+    // seqIdx is srcRank, unless this message was part of a collective
+    if (tag >= MPI_BCAST_TAG && tag <= MPI_ATA_TAG) {
+      return COLL_SEQ_IDX;
+    }
+    else {
+      return srcRank;
+    }
+  }
   inline int getSrcRank(void) const { return srcRank; }
   inline int getLength(void) const { return length; }
   inline char* getData(void) const { return data; }
@@ -1474,6 +1485,13 @@ public:
 
   /// Stash an out-of-order message
   void putOutOfOrder(int seqIdx, AmpiMsg *msg);
+
+  /// Increment the outgoing sequence number.
+  inline void incCollSeqOutgoing(void) {
+    CMK_REFNUM_TYPE& seqOutgoing = elements[COLL_SEQ_IDX].seqOutgoing;
+    seqOutgoing++;
+    if (seqOutgoing == 0) seqOutgoing++;
+  }
 
   /// Return the next outgoing sequence number, and increment it.
   /// Handle wrap around of unsigned type CMK_REFNUM_TYPE.

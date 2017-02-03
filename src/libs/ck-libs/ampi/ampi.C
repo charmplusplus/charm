@@ -2796,9 +2796,9 @@ void ampi::sendraw(int t, int sRank, void* buf, int len, CkArrayID aid, int idx)
 }
 
 CMK_REFNUM_TYPE ampi::getSeqNo(int destRank, MPI_Comm destcomm, int tag) {
-  int seqIdx = destRank;
+  int seqIdx = (destRank == AMPI_COLL_DEST) ? COLL_SEQ_IDX : destRank;
   CMK_REFNUM_TYPE seq = 0;
-  if (destRank>=0 && destcomm<=MPI_COMM_WORLD && tag<=MPI_ATA_SEQ_TAG) { //Not cross-module: set seqno
+  if (destcomm<=MPI_COMM_WORLD && tag<=MPI_BCAST_TAG) { //Not cross-module: set seqno
     seq = oorder.nextOutgoing(seqIdx);
   }
   return seq;
@@ -3194,7 +3194,10 @@ void ampi::bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm des
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
-    thisProxy.generic(makeAmpiMsg(0, MPI_BCAST_TAG, root, buf, count, type, destcomm));
+    thisProxy.generic(makeAmpiMsg(AMPI_COLL_DEST, MPI_BCAST_TAG, root, buf, count, type, destcomm));
+  }
+  else { // Non-root ranks need to increment the outgoing sequence number for collectives
+    oorder.incCollSeqOutgoing();
   }
 
   if (-1==recv(MPI_BCAST_TAG, root, buf, count, type, destcomm)) CkAbort("AMPI> Error in broadcast");
@@ -3206,7 +3209,10 @@ int ampi::intercomm_bcast(int root, void* buf, int count, MPI_Datatype type, MPI
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
-    remoteProxy.generic(makeAmpiMsg(0, MPI_BCAST_TAG, getRank(), buf, count, type, intercomm));
+    remoteProxy.generic(makeAmpiMsg(AMPI_COLL_DEST, MPI_BCAST_TAG, getRank(), buf, count, type, intercomm));
+  }
+  else { // Non-root ranks need to increment the outgoing sequence number for collectives
+    oorder.incCollSeqOutgoing();
   }
 
   if (root!=MPI_PROC_NULL && root!=MPI_ROOT) {
@@ -3222,7 +3228,10 @@ void ampi::ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm de
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
-    thisProxy.generic(makeAmpiMsg(0, MPI_BCAST_TAG, root, buf, count, type, destcomm));
+    thisProxy.generic(makeAmpiMsg(AMPI_COLL_DEST, MPI_BCAST_TAG, root, buf, count, type, destcomm));
+  }
+  else { // Non-root ranks need to increment the outgoing sequence number for collectives
+    oorder.incCollSeqOutgoing();
   }
 
   // call irecv to post an IReq and check for any pending messages
@@ -3235,7 +3244,10 @@ int ampi::intercomm_ibcast(int root, void* buf, int count, MPI_Datatype type, MP
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
-    remoteProxy.generic(makeAmpiMsg(0, MPI_BCAST_TAG, getRank(), buf, count, type, intercomm));
+    remoteProxy.generic(makeAmpiMsg(AMPI_COLL_DEST, MPI_BCAST_TAG, getRank(), buf, count, type, intercomm));
+  }
+  else { // Non-root ranks need to increment the outgoing sequence number for collectives
+    oorder.incCollSeqOutgoing();
   }
 
   if (root!=MPI_PROC_NULL && root!=MPI_ROOT) {
