@@ -20,6 +20,11 @@
 
 #include <map>
 #include <vector>
+#if CMK_USING_XLC
+#include <tr1/unordered_map>
+#else
+#include <unordered_map>
+#endif
 
 #define DEBUGF(x)  // CkPrintf x;
 
@@ -216,18 +221,38 @@ public:
 
 
 
-/// multicast tree setup message
+/**
+ * Multicast tree setup message.
+ * Message is directed to a set of PEs with the purpose of building a spanning
+ * tree of them.
+ */
 class multicastSetupMsg: public CMessage_multicastSetupMsg {
 public:
+  /**
+   * number of PEs in this subtree
+   */
   int  nIdx;
+  /**
+   * for array sections: list of array section elements in this subtree
+   * for group sections: NULL
+   */
   CkArrayIndex *arrIdx;
-  int      *lastKnown;
+  /**
+   * for array sections:
+   * peElems contains list of PEs that are in this subtree, and
+   * for each PE, the index to its array section elements, i.e:
+   * peElems[2*i] is the i-th PE
+   * peElems[2*i+1] is the index in arrIdx of the first element in i-th PE
+   *
+   * for group sections: list of PEs in this subtree
+   */
+  int *peElems;
   CkSectionInfo parent;
   CkSectionInfo rootSid;
   int redNo;
   int forGrpSec(){
     CkAssert(nIdx);
-    return ((void *)arrIdx == (void *)lastKnown);
+    return ((void *)arrIdx == (void *)peElems);
   }
   int bfactor;
 };
@@ -481,27 +506,40 @@ void CkMulticastMgr::recvCookieInfo(CkSectionInfo s, int red)
 
 void CkMulticastMgr::initCookie(CkSectionInfo s)
 {
-    mCastEntry *entry = (mCastEntry *)s.get_val();
-    int n = entry->allElem.length();
-    DEBUGF(("init: %d elems %p\n", n, s.get_val()));
-    // Create and initialize a setup message
-    multicastSetupMsg *msg = new (n, n, 0) multicastSetupMsg;
-    msg->nIdx = n;
-    msg->parent = CkSectionInfo(entry->getAid());
-    msg->rootSid = s;
-    msg->redNo = entry->red.redNo;
-    msg->bfactor = entry->bfactor;
-    // Fill the message with the section member indices and their last known locations
-    CkArray *array = CProxy_ArrayBase(s.get_aid()).ckLocalBranch();
-    for (int i=0; i<n; i++) {
-      msg->arrIdx[i] = entry->allElem[i];
-      int ape = array->lastKnown(entry->allElem[i]);
-      CmiAssert(ape >=0 && ape < CkNumPes());
-      msg->lastKnown[i] = ape;
+  mCastEntry *entry = (mCastEntry *)s.get_val();
+  const int n = entry->allElem.length();
+  DEBUGF(("init: %d elems %p at %f\n", n, s.get_val(), CkWallTimer()));
+  // might want to consider using unordered_map, but some spanning tree
+  // algorithms could rely on initial list of PEs being ordered
+  std::map<int, std::vector<int>> elemBins;
+  CkArray *array = CProxy_ArrayBase(s.get_aid()).ckLocalBranch();
+  for (int i=0; i < n; i++) {
+    int ape = array->lastKnown(entry->allElem[i]);
+    CmiAssert(ape >=0 && ape < CkNumPes());
+    elemBins[ape].push_back(i);
+  }
+  // Create and initialize a setup message
+  multicastSetupMsg *msg = new (n, (elemBins.size()+1)*2, 0) multicastSetupMsg;
+  msg->nIdx = elemBins.size();
+  msg->parent = CkSectionInfo(entry->getAid());
+  msg->rootSid = s;
+  msg->redNo = entry->red.redNo;
+  msg->bfactor = entry->bfactor;
+  int cntElems=0, idx=0;
+  for (std::map<int, std::vector<int> >::iterator itr = elemBins.begin();
+       itr != elemBins.end(); ++itr) {
+    msg->peElems[idx++] = itr->first;
+    msg->peElems[idx++] = cntElems;
+    std::vector<int> &elems = itr->second;
+    for (int j=0; j < elems.size(); j++) {
+      msg->arrIdx[cntElems++] = entry->allElem[elems[j]];
     }
-    // Trigger the spanning tree build
-    CProxy_CkMulticastMgr  mCastGrp(thisgroup);
-    mCastGrp[CkMyPe()].setup(msg);
+  }
+  msg->peElems[idx++] = -1;
+  msg->peElems[idx] = cntElems;
+  // Trigger the spanning tree build
+  CProxy_CkMulticastMgr  mCastGrp(thisgroup);
+  mCastGrp[CkMyPe()].setup(msg);
 }
 
 
@@ -521,7 +559,7 @@ void CkMulticastMgr::initGrpCookie(CkSectionInfo s)
    msg->bfactor = entry->bfactor;
    // Fill the message with the section member indices and their last known locations
    for (int i=0; i<n; i++) {
-     msg->lastKnown[i] = entry->allGrpElem[i];
+     msg->peElems[i] = entry->allGrpElem[i];
    }
    // Trigger the spanning tree build
    CProxy_CkMulticastMgr  mCastGrp(thisgroup);
@@ -590,7 +628,6 @@ void CkMulticastMgr::freeup(CkSectionInfo cookie)
 
 void CkMulticastMgr::setup(multicastSetupMsg *msg)
 {
-    int i,j;
     mCastEntry *entry;
     CkArrayID aid = msg->rootSid.get_aid();
     if (msg->parent.get_pe() == CkMyPe()) 
@@ -610,44 +647,38 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
     DEBUGF(("[%d] setup: %p redNo: %d => %d with %d elems, grpSec: %d, factor: %d\n", CkMyPe(), entry, entry->red.redNo, msg->redNo, msg->nIdx, entry->isGrpSec(), factor));
     entry->red.redNo = msg->redNo;
 
-    // Create a numPE sized array of vectors to hold the array elements in each PE
-    int numpes = CkNumPes();
-    std::map<int, std::vector<CkArrayIndex> > elemBins;
-    
-    if(!entry->isGrpSec()){
-      // Sort each array index in the setup message based on last known location
-      for (i=0; i<msg->nIdx; i++) 
-      {
-        int lastKnown = msg->lastKnown[i];
-        // If msg->arrIdx[i] local, add it to a special local element list
-        if (lastKnown == CkMyPe())
-            entry->localElem.insertAtEnd(msg->arrIdx[i]);
-        // else, add it to the list corresponding to its PE
-        else
-            elemBins[lastKnown].push_back(msg->arrIdx[i]);
-      }
-   }
-
-    CkVec<int> mySubTreePEs;
+    const int numpes = msg->nIdx;
+#if CMK_USING_XLC
+    std::tr1::unordered_map<int, int> peIdx;    // pe -> idx in msg->peElems
+#else
+    std::unordered_map<int, int> peIdx;    // pe -> idx in msg->peElems
+    if (!entry->isGrpSec()) peIdx.reserve(numpes);
+#endif
+    std::vector<int> mySubTreePEs;
     mySubTreePEs.reserve(numpes);
     // The first PE in my subtree should be me, the tree root (as required by the spanning tree builder)
     mySubTreePEs.push_back(CkMyPe());
-    
-    if(!entry->isGrpSec()){
-      // Identify the child PEs in the tree, ie the PEs with section members on them
-      for (std::map<int, std::vector<CkArrayIndex> >::iterator itr = elemBins.begin();
-         itr != elemBins.end(); ++itr)
-         mySubTreePEs.push_back(itr->first);
-    }
-    else{
-      for(i=0; i<msg->nIdx; i++){
-          if(msg->lastKnown[i] != CkMyPe())
-            mySubTreePEs.push_back(msg->lastKnown[i]);
-          else
-            entry->setLocalGrpElem();
-      }
-    }    
 
+    for (int i1=0; i1 < numpes; i1++) { // nIdx is now number of PEs
+      if (entry->isGrpSec()) {
+        // group sections
+        if (msg->peElems[i1] != CkMyPe())
+          mySubTreePEs.push_back(msg->peElems[i1]);
+        else
+          entry->setLocalGrpElem();
+      } else {
+        // array sections
+        int i2 = i1*2;
+        int pe = msg->peElems[i2];
+        peIdx[pe] = i2;
+        if (pe != CkMyPe()) {
+          mySubTreePEs.push_back(pe);
+        } else {
+          for (int j=msg->peElems[i2+1]; j < msg->peElems[i2+3]; j++)
+            entry->localElem.insertAtEnd(msg->arrIdx[j]);
+        }
+      }
+    }
 
     // The number of multicast children can be limited by the spanning tree factor 
     int num = mySubTreePEs.size() - 1, numchild = 0;
@@ -660,7 +691,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
     if (numchild) 
     {
         // Build the next generation of the spanning tree rooted at my PE
-        int *peListPtr = mySubTreePEs.getVec();
+        int *peListPtr = &mySubTreePEs[0];
         topo::SpanningTreeVertex *nextGenInfo;
         nextGenInfo = topo::buildSpanningTreeGeneration(peListPtr,peListPtr + mySubTreePEs.size(),numchild);
         numchild = nextGenInfo->childIndex.size();
@@ -669,7 +700,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
         CProxy_CkMulticastMgr  mCastGrp(thisgroup);
 
         // Ask each direct child to setup its subtree
-        for (i=0; i < numchild; i++)
+        for (int i=0; i < numchild; i++)
         {
             // Determine the indices of the first and last PEs in this branch of my sub-tree
             int childStartIndex = nextGenInfo->childIndex[i], childEndIndex;
@@ -680,37 +711,43 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
 
             // Find the total number of section member elements on this subtree
             int numSubTreeElems = 0;
+            int numSubTreePes = childEndIndex - childStartIndex;
             multicastSetupMsg *m;
-  
-            if(entry->isGrpSec()){
-              numSubTreeElems = childEndIndex - childStartIndex;
-              m = new (0, numSubTreeElems, 0) multicastSetupMsg;
-            }
-            else{
-             for (j = childStartIndex; j < childEndIndex; j++)
-                numSubTreeElems += elemBins[ mySubTreePEs[j] ].size();
-             m = new (numSubTreeElems, numSubTreeElems, 0) multicastSetupMsg;
+
+            if (entry->isGrpSec()) {
+              m = new (0, numSubTreePes, 0) multicastSetupMsg;
+            } else {
+              for (int j=childStartIndex; j < childEndIndex; j++) {
+                  int idx = peIdx[mySubTreePEs[j]];
+                  numSubTreeElems += (msg->peElems[idx+3] - msg->peElems[idx+1]);
+              }
+              m = new (numSubTreeElems, (numSubTreePes+1)*2, 0) multicastSetupMsg;
             }
 
             // Prepare the setup msg intended for the child
             m->parent = CkSectionInfo(aid, entry);
-            m->nIdx = numSubTreeElems;
+            m->nIdx = numSubTreePes;
             m->rootSid = msg->rootSid;
             m->redNo = msg->redNo;
             m->bfactor = msg->bfactor;
 
             // Give each child the number, indices and location of its children
-            for (int j = childStartIndex, cnt = 0; j < childEndIndex; j++)
+            int cntElems = 0, i2 = 0;
+            for (int j = childStartIndex; j < childEndIndex; j++)
             {
                 int childPE = mySubTreePEs[j];
-                if(!entry->isGrpSec()){
-                  for (int k = 0; k < elemBins[childPE].size(); k++, cnt++) {
-                    m->arrIdx[cnt]  = elemBins[childPE][k];
-                    m->lastKnown[cnt] = childPE;
+                m->peElems[i2++] = childPE;
+                if (!entry->isGrpSec()) {
+                  m->peElems[i2++] = cntElems;
+                  int i1 = peIdx[childPE];  // get index to pe in parent message
+                  for (int k=msg->peElems[i1+1]; k < msg->peElems[i1+3]; k++) {
+                    m->arrIdx[cntElems++] = msg->arrIdx[k];
                   }
                 }
-                else
-                  m->lastKnown[cnt++] = childPE;
+            }
+            if (!entry->isGrpSec()) {
+              m->peElems[i2++] = -1;
+              m->peElems[i2] = cntElems;
             }
 
             int childroot = mySubTreePEs[childStartIndex];
