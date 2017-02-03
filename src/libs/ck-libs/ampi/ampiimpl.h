@@ -1349,7 +1349,7 @@ inline void pupFromBuf(const void *data,T &t) {
 
 class AmpiMsg : public CMessage_AmpiMsg {
  private:
-  int seq; //Sequence number (for message ordering)
+  int ssendReq; //Index to the sender's request
   int tag; //MPI tag
   int srcRank; //Communicator rank for source
   int length; //Number of bytes in this message
@@ -1363,9 +1363,14 @@ class AmpiMsg : public CMessage_AmpiMsg {
 
  public:
   AmpiMsg(void) { data = NULL; }
-  AmpiMsg(int _s, int t, int sRank, int l) :
-    seq(_s), tag(t), srcRank(sRank), length(l) {}
-  inline int getSeq(void) const { return seq; }
+  AmpiMsg(int sreq, int t, int sRank, int l) :
+    ssendReq(sreq), tag(t), srcRank(sRank), length(l)
+  { /* only called from AmpiMsg::pup() since the refnum (seq) will get pup'ed by the runtime */ }
+  AmpiMsg(CMK_REFNUM_TYPE _s, int sreq, int t, int sRank, int l) :
+    ssendReq(sreq), tag(t), srcRank(sRank), length(l)
+  { CkSetRefNum(this, _s); }
+  inline CMK_REFNUM_TYPE getSeq(void) const { return UsrToEnv(this)->getRef(); }
+  inline int getSsendReq(void) const { return ssendReq; }
   inline int getSeqIdx(void) const { return srcRank; }
   inline int getSrcRank(void) const { return srcRank; }
   inline int getLength(void) const { return length; }
@@ -1373,16 +1378,16 @@ class AmpiMsg : public CMessage_AmpiMsg {
   inline int getTag(void) const { return tag; }
   static AmpiMsg* pup(PUP::er &p, AmpiMsg *m)
   {
-    int seq, length, tag, srcRank;
+    int ssendReq, length, tag, srcRank;
     if(p.isPacking() || p.isSizing()) {
-      seq = m->seq;
+      ssendReq = m->ssendReq;
       tag = m->tag;
       srcRank = m->srcRank;
       length = m->length;
     }
-    p(seq); p(tag); p(srcRank); p(length);
+    p(ssendReq); p(tag); p(srcRank); p(length);
     if(p.isUnpacking()) {
-      m = new (length, 0) AmpiMsg(seq, tag, srcRank, length);
+      m = new (length, 0) AmpiMsg(ssendReq, tag, srcRank, length);
     }
     p(m->data, length);
     if(p.isDeleting()) {
@@ -1402,15 +1407,14 @@ class AmpiMsg : public CMessage_AmpiMsg {
 class AmpiOtherElement {
 public:
   /// Next incoming and outgoing message sequence number
-  int seqIncoming, seqOutgoing;
+  CMK_REFNUM_TYPE seqIncoming, seqOutgoing;
 
   /// Number of elements in out-of-order queue. (normally 0)
   int nOut;
 
-  AmpiOtherElement(void) {
-    seqIncoming=0; seqOutgoing=0;
-    nOut=0;
-  }
+  /// seqIncoming starts from 1, b/c 0 means unsequenced
+  /// seqOutgoing starts from 0, b/c this will be incremented for the first real seq #
+  AmpiOtherElement(void) : seqIncoming(1), seqOutgoing(0), nOut(0) {}
 
   void pup(PUP::er &p) {
     p|seqIncoming; p|seqOutgoing;
@@ -1427,7 +1431,7 @@ public:
   AmpiSeqQ(int commSize) {
     elements.reserve(std::min(commSize, 64));
   }
-  ~AmpiSeqQ ();
+  ~AmpiSeqQ () {}
   void pup(PUP::er &p);
 
   /// Insert this message in the table.  Returns the number
@@ -1440,6 +1444,7 @@ public:
     AmpiOtherElement &el=elements[seqIdx];
     if (msg->getSeq()==el.seqIncoming) { // In order:
       el.seqIncoming++;
+      if (el.seqIncoming == 0) el.seqIncoming++;
       return 1+el.nOut;
     }
     else { // Out of order: stash message
@@ -1451,10 +1456,11 @@ public:
   /// Is this message in order (return >0) or not (return 0)?
   /// Same as put() except we don't call putOutOfOrder() here,
   /// so the caller should do that separately
-  inline int isInOrder(int srcRank, int seq) {
+  inline int isInOrder(int srcRank, CMK_REFNUM_TYPE seq) {
     AmpiOtherElement &el = elements[srcRank];
     if (seq == el.seqIncoming) { // In order:
       el.seqIncoming++;
+      if (el.seqIncoming == 0) el.seqIncoming++;
       return 1+el.nOut;
     }
     else { // Out of order: caller should stash message
@@ -1470,8 +1476,12 @@ public:
   void putOutOfOrder(int seqIdx, AmpiMsg *msg);
 
   /// Return the next outgoing sequence number, and increment it.
-  inline int nextOutgoing(int destRank) {
-    return elements[destRank].seqOutgoing++;
+  /// Handle wrap around of unsigned type CMK_REFNUM_TYPE.
+  inline CMK_REFNUM_TYPE nextOutgoing(int destRank) {
+    CMK_REFNUM_TYPE& seqOutgoing = elements[destRank].seqOutgoing;
+    seqOutgoing++;
+    if (seqOutgoing == 0) seqOutgoing++;
+    return seqOutgoing;
   }
 };
 PUPmarshall(AmpiSeqQ)
@@ -1900,7 +1910,7 @@ class ampi : public CBase_ampi {
 
   AmpiSeqQ oorder;
   void inorder(AmpiMsg *msg);
-  void inorderRdma(char* buf, int size, int seq, int tag, int srcRank,
+  void inorderRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank,
                    MPI_Comm comm, int ssendReq);
 
   void init(void);
@@ -1921,7 +1931,7 @@ class ampi : public CBase_ampi {
 
   void unblock(void);
   void generic(AmpiMsg *);
-  void genericRdma(char* buf, int size, int seq, int tag, int srcRank,
+  void genericRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank,
                    MPI_Comm destcomm, int ssendReq);
   void completedRdmaSend(CkDataMsg *msg);
   void ssend_ack(int sreq);
@@ -1951,7 +1961,7 @@ class ampi : public CBase_ampi {
   inline ampi* blockOnRedn(AmpiRequest *req);
   MPI_Request postReq(AmpiRequest* newreq);
 
-  inline int getSeqNo(int destRank, MPI_Comm destcomm, int tag);
+  inline CMK_REFNUM_TYPE getSeqNo(int destRank, MPI_Comm destcomm, int tag);
   AmpiMsg *makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
                        MPI_Datatype type,MPI_Comm destcomm, int ssendReq=0);
 

@@ -329,7 +329,7 @@ AmpiMsg* ampi::winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
   winobj->get(targaddr, orgcnt, orgunit, targdisp, targcnt, targunit);
 
   AMPI_DEBUG("    Rank[%d] get win  [%d] \n", thisIndex, *(int*)(targaddr));
-  AmpiMsg *msg = new (targtotalsize, 0) AmpiMsg(-1, MPI_RMA_TAG, thisIndex, targtotalsize);
+  AmpiMsg *msg = new (targtotalsize, 0) AmpiMsg(0, 0, MPI_RMA_TAG, thisIndex, targtotalsize);
   tddt->serialize(targaddr, msg->getData(), targcnt, 1);
   return msg;
 }
@@ -355,7 +355,7 @@ AmpiMsg* ampi::winRemoteIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype,
 
   winobj->iget(orgcnt, orgunit, targdisp, targcnt, targunit);
 
-  AmpiMsg *msg = new (targtotalsize, 0) AmpiMsg(-1, MPI_RMA_TAG, thisIndex, targtotalsize);
+  AmpiMsg *msg = new (targtotalsize, 0) AmpiMsg(0, 0, MPI_RMA_TAG, thisIndex, targtotalsize);
 
   char* targaddr = (char*)(winobj->baseAddr) + targdisp*winobj->disp_unit;
   AMPI_DEBUG("    Rank[%d] iget win  [%d] \n", thisIndex, *(int*)(targaddr));
@@ -533,7 +533,7 @@ AmpiMsg* ampi::winRemoteGetAccumulate(int orgtotalsize, char* sorgaddr, int orgc
 
   // Send back the targaddr buffer before it is accumulated into
   winobj->get(targaddr, orgcnt, orgunit, targdisp, targcnt, targunit);
-  AmpiMsg *msg = new (targtotalsize, 0) AmpiMsg(-1, MPI_RMA_TAG, thisIndex, targtotalsize);
+  AmpiMsg *msg = new (targtotalsize, 0) AmpiMsg(0, 0, MPI_RMA_TAG, thisIndex, targtotalsize);
   tddt->serialize(targaddr, msg->getData(), targcnt, 1);
 
   // Accumulate sorgaddr into targaddr
@@ -594,7 +594,7 @@ AmpiMsg* ampi::winRemoteCompareAndSwap(int size, char* sorgaddr, char* compaddr,
   CkDDT_DataType *ddt = getDDT()->getType(type);
   char* targaddr = ((char*)(winobj->baseAddr)) + ddt->getSize(targdisp);
 
-  AmpiMsg *msg = new (size, 0) AmpiMsg(-1, MPI_RMA_TAG, thisIndex, size);
+  AmpiMsg *msg = new (size, 0) AmpiMsg(0, 0, MPI_RMA_TAG, thisIndex, size);
   ddt->serialize(targaddr, msg->getData(), 1, 1);
 
   if (*targaddr == *compaddr) {
