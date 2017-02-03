@@ -5489,6 +5489,11 @@ void ampi::irecv(void *buf, int count, MPI_Datatype type, int src,
     *request = MPI_REQUEST_NULL;
     return;
   }
+
+  if (isInter()) {
+    src = myComm.getIndexForRemoteRank(src);
+  }
+
   AmpiRequestList* reqs = getReqs();
   IReq *newreq = new IReq(buf, count, type, src, tag, comm);
   *request = reqs->insert(newreq);
