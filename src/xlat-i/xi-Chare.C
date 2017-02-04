@@ -73,7 +73,7 @@ Chare::genRegisterMethodDef(XStr& str)
   if(list)
     list->genReg(str);
   if (hasSdagEntry) {
-      str << "  " << baseName() << "::__sdag_register(); \n";
+      str << "  " << baseName() << "::__sdag_register(); // Potentially missing " << baseName() << "_SDAG_CODE in your class definition?\n";
   }
   str << "}\n";
   templateGuardEnd(str);

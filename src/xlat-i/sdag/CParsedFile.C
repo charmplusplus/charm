@@ -156,7 +156,8 @@ void CParsedFile::generatePupFunction(XStr& decls, XStr& defs)
 
   templateGuardBegin(false, defs);
   defs << container->tspec()
-       << "void " << container->baseName() << "::" << signature << " {\n"
+       << "void " << container->baseName() << "::" << signature << " {"
+       << " // Potentially missing " << container->baseName() << "_SDAG_CODE in your class definition?\n"
        << "#if CMK_USING_XLC\n"
        << "    bool hasSDAG = __dep.get();\n"
        << "    p|hasSDAG;\n"

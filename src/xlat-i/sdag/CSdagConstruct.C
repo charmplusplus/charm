@@ -372,7 +372,7 @@ namespace xi {
     op << ")";
 
     decls << op << ";\n";
-    defs << op << " {\n";
+    defs << op << " { // Potentially missing " << chare->baseName() << "_SDAG_CODE in your class definition?\n";
   }
   void endMethod(XStr& op) {
     op << "}\n";
