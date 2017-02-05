@@ -1,5 +1,9 @@
+#ifndef AMPI_PRINT_MSG_SIZES
+#define AMPI_PRINT_MSG_SIZES 0 // Record and print comm routines used & message sizes
+#endif
 
 #define AMPIMSGLOG    0
+
 #include "ampiimpl.h"
 #include "tcharm.h"
 #if CMK_TRACE_ENABLED && CMK_PROJECTOR
@@ -52,6 +56,51 @@ inline int ampiErrhandler(const char* func, int errcode) {
   return errcode;
 }
 #endif
+
+#if AMPI_PRINT_MSG_SIZES
+#if !AMPI_ERROR_CHECKING
+#error "AMPI_PRINT_MSG_SIZES requires AMPI error checking to be enabled!\n"
+#endif
+#include <string>
+#include <sstream>
+#include "ckliststring.h"
+CkpvDeclare(CkListString, msgSizesRanks);
+
+bool ampiParent::isRankRecordingMsgSizes(void) {
+  return (!CkpvAccess(msgSizesRanks).isEmpty() && CkpvAccess(msgSizesRanks).includes(thisIndex));
+}
+
+void ampiParent::recordMsgSize(const char* func, int msgSize) {
+  if (isRankRecordingMsgSizes()) {
+    msgSizes[func][msgSize]++;
+  }
+}
+
+#if CMK_USING_XLC
+#include <tr1/unordered_map>
+typedef std::tr1::unordered_map<std::string, std::map<int, int> >::iterator outer_itr_t;
+#else
+typedef std::unordered_map<std::string, std::map<int, int> >::iterator outer_itr_t;
+#endif
+typedef std::map<int, int>::iterator inner_itr_t;
+
+void ampiParent::printMsgSizes(void) {
+  if (isRankRecordingMsgSizes()) {
+    // Prints msgSizes in the form: "AMPI_Routine: [ (num_msgs: msg_size) ... ]".
+    // Each routine has its messages sorted by size, smallest to largest.
+    std::stringstream ss;
+    ss << std::endl << "Rank " << thisIndex << ":" << std::endl;
+    for (outer_itr_t i = msgSizes.begin(); i != msgSizes.end(); ++i) {
+      ss << i->first << ": [ ";
+      for (inner_itr_t j = i->second.begin(); j != i->second.end(); ++j) {
+        ss << "(" << j->second << ": " << j->first << " B) ";
+      }
+      ss << "]" << std::endl;
+    }
+    CkPrintf("%s", ss.str().c_str());
+  }
+}
+#endif //AMPI_PRINT_MSG_SIZES
 
 inline int checkCommunicator(const char* func, MPI_Comm comm) {
   if (comm == MPI_COMM_NULL)
@@ -134,6 +183,9 @@ inline int errorCheck(const char* func, MPI_Comm comm, int ifComm, int count,
     if (ret != MPI_SUCCESS)
       return ampiErrhandler(func, ret);
   }
+#if AMPI_PRINT_MSG_SIZES
+  getAmpiParent()->recordMsgSize(func, getDDT()->getSize(data) * count);
+#endif
   return MPI_SUCCESS;
 }
 
@@ -892,6 +944,17 @@ static void ampiProcInit(void){
     if (msgLogRead) CkPrintf("Reading AMPI messages of rank %s from log: %s\n", procs?procs:"", msgLogFilename);
   }
 #endif
+
+#if AMPI_PRINT_MSG_SIZES
+  // Only record and print message sizes if this option is given, and only for those ranks.
+  // Running with the '+syncprint' option is recommended if printing from multiple ranks.
+  char *ranks = NULL;
+  CkpvInitialize(CkListString, msgSizesRanks);
+  if (CmiGetArgStringDesc(CkGetArgv(), "+msgSizesRanks", &ranks,
+      "A list of AMPI ranks to record and print message sizes on, e.g. 0,10,20-30")) {
+    CkpvAccess(msgSizesRanks).set(ranks);
+  }
+#endif
 }
 
 #if AMPIMSGLOG
@@ -1164,6 +1227,10 @@ void ampiParent::pup(PUP::er &p) {
   p|resumeOnRecv;
   p|resumeOnColl;
   p|numBlockedReqs;
+
+#if AMPI_PRINT_MSG_SIZES
+  p|msgSizes;
+#endif
 }
 
 void ampiParent::prepareCtv(void) {
@@ -3424,6 +3491,10 @@ int AMPI_Finalize(void)
   CkPrintf("[%d] Idle time %fs.\n", CkMyPe(), totalidle);
 #endif
   CtvAccess(ampiFinalized)=true;
+
+#if AMPI_PRINT_MSG_SIZES
+  getAmpiParent()->printMsgSizes();
+#endif
 
 #if CMK_BIGSIM_CHARM && CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn)) traceSuspend();

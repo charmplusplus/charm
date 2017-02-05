@@ -1516,6 +1516,20 @@ class ampiParent : public CBase_ampiParent {
   }
 
  public:
+#if AMPI_PRINT_MSG_SIZES
+// Map of AMPI routine names to message sizes and number of messages:
+// ["AMPI_Routine"][ [msg_size][num_msgs] ]
+#if CMK_USING_XLC
+#include <tr1/unordered_map>
+  std::tr1::unordered_map<std::string, std::map<int, int> > msgSizes;
+#else
+  std::unordered_map<std::string, std::map<int, int> > msgSizes;
+#endif
+  inline bool isRankRecordingMsgSizes(void);
+  inline void recordMsgSize(const char* func, int msgSize);
+  void printMsgSizes(void);
+#endif
+
 #if AMPIMSGLOG
   /* message logging */
   int pupBytes;
