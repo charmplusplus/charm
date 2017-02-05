@@ -72,17 +72,12 @@ can bootstrap before invoking the user's main function:
 Incompatibilities and Extensions
 --------------------------------
 AMPI has some known flaws and incompatibilities with other MPI implementations:
-    * MPI_Cancel does not actually cancel pending communication.
-    * MPI_Sendrecv_replace gives incorrect results.
-    * Persistent sends with Irsend don't work.
-    * Isend/Irecv do not work when using MPI_LONG_DOUBLE.
-    * MPI_Get_elements returns the expected number of elements instead of the 
-      actual number received.
-    * MPI_Unpack gives incorrect results.
-    * Data alignment in user defined types does not match the MPI standard.
-    * Scatter/gather using noncontiguous types gives incorrect results.
+    * MPI_Get_elements gives incorrect results for receives of partial derived datatypes.
+    * RMA routines do not have support for derived datatypes.
     * Datatypes are not reused, freed, or reference counted.
-    * The PMPI profiling interface is not implemented in AMPI.
+    * Not all collectives are supported on intercommunicators.
+    * MPI_Comm_free does not actually free any of the runtime's memory.
+    * The PMPI profiling interface and generalized requests are not yet implemented in AMPI.
 
 AMPI also has extensions to the MPI standard to enable use of the high-level
 features provided by the Charm++ adaptive runtime system. All extensions are
