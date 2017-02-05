@@ -552,6 +552,7 @@ int AMPI_Win_free(MPI_Win *win){
   ptr->deleteWinInstance(*win);
   /* Need a barrier here: to ensure that every process participates */
   ptr->barrier();
+  *win = MPI_WIN_NULL;
   return MPI_SUCCESS;
 }
 
