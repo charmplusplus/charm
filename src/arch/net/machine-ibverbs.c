@@ -447,7 +447,7 @@ static void checkAllQps(){
 		if(i != _Cmi_mynode){
 			if(!checkQp(nodes[i].infiData->qp)){
 				pollSendCq(0);
-				CmiEnforce(0);
+				CmiAbort("Queue pair check failed");
 			}
 		}
 	}
@@ -1046,7 +1046,7 @@ void postInitialRecvs(struct infiBufferPool *recvBufferPool,int numRecvs,int siz
 	workRequests[numRecvs-1].next = NULL;
 	MACHSTATE(3,"About to call ibv_post_srq_recv");
 	if(ibv_post_srq_recv(context->srq,workRequests,&bad_wr)){
-		CmiEnforce(0);
+		CmiAbort("ibv_post_srq_recv failed");
 	}
 #else 
 // create a pool per processor and post initial receives to processor queue similar to send, split the buffer pool Equi-partitioning recv pool
@@ -1066,7 +1066,9 @@ void postInitialRecvs(struct infiBufferPool *recvBufferPool,int numRecvs,int siz
 					workRequests[numRecvs-1].next = NULL;
 				else
 					workRequests[(k+1)*perNodeRecvs-1].next = NULL;
-				if(ibv_post_recv(context->qp[n],&workRequests[k*perNodeRecvs],&bad_wr)){CmiEnforce(0);}
+				if(ibv_post_recv(context->qp[n],&workRequests[k*perNodeRecvs],&bad_wr)){
+					CmiAbort("ibv_post_recv failed");
+				}
 				k++;
 				}
           }
@@ -1495,14 +1497,14 @@ static inline int pollRecvCq(const int toBuffer){
 	
 	for(i=0;i<ne;i++){
 		if(wc[i].status != IBV_WC_SUCCESS){
-			CmiEnforce(0);
+			CmiAbort("Work completion error in recvCq");
 		}
 		switch(wc[i].opcode){
 			case IBV_WC_RECV:
 					processRecvWC(&wc[i],toBuffer);
 				break;
 			default:
-				CmiAbort("Wrong type of work completion object in recvq");
+				CmiAbort("Wrong type of work completion object in recvCq");
 				break;
 		}
 			
@@ -1529,7 +1531,7 @@ static inline int pollSendCq(const int toBuffer){
 #if CMK_IBVERBS_STATS
 	printf("[%d] msgCount %d pktCount %d packetSize %d total Time %.6lf s processBufferedCount %d processBufferedTime %.6lf s maxTokens %d tokensLeft %d minTokensLeft %d \n",_Cmi_mynode,msgCount,pktCount,packetSize,CmiTimer(),processBufferedCount,processBufferedTime,maxTokens,context->tokensLeft,minTokensLeft);
 #endif
-			CmiEnforce(0);
+			CmiAbort("Work completion error in sendCq");
 		}
 		switch(wc[i].opcode){
 			case IBV_WC_SEND:{
@@ -1880,7 +1882,7 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		if(ibv_post_recv(node1->infiData->qp,&wr,&bad_wr))
 #endif 
 		{
-			CmiEnforce(0);
+			CmiAbort("ibv_post_recv failed");
 		}
 	}
 
@@ -1980,7 +1982,7 @@ static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket,int fro
 		};
 		/** post and rdma_read that is a rdma get*/
 		if(ibv_post_send(node->infiData->qp,&wr,&bad_wr)){
-			CmiEnforce(0);
+			CmiAbort("ibv_post_send failed");
 		}
 	}
 
@@ -2275,7 +2277,7 @@ static inline void increaseTokens(OtherNode node){
 	currentCqSize = context->sendCqSize;
 	if(ibv_resize_cq(context->sendCq,currentCqSize+increase)){
 		fprintf(stderr,"[%d] failed to increase cq by %d from %d totalTokens %d \n",_Cmi_mynode,increase,currentCqSize, node->infiData->totalTokens);
-		CmiEnforce(0);
+		CmiAbort("ibv_resize_cq failed");
 	}
 	context->sendCqSize+= increase;
 };
@@ -2299,7 +2301,7 @@ static void increasePostedRecvs(int nodeNo){
 	//increase the size of the recvCq
 	currentCqSize = context->recvCqSize;
 	if(ibv_resize_cq(context->recvCq,currentCqSize+tokenIncrease)){
-		CmiEnforce(0);
+		CmiAbort("ibv_resize_cq failed");
 	}
 	context->recvCqSize += tokenIncrease;
 	if(recvIncrease > 0){
@@ -2561,7 +2563,7 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 		return res;
 	}
 
-	CmiEnforce(0);
+	CmiAbort("getInfiCmiChunkThread failed");
 
 	
 };
@@ -2659,7 +2661,7 @@ static inline void *getInfiCmiChunk(int dataSize){
                 return res;
         }
 
-        CmiEnforce(0);
+        CmiAbort("getInfiCmiChunk failed");
 
 
 };
@@ -3248,7 +3250,7 @@ void CmiDirect_put(struct infiDirectUserHandle *userHandle){
 			};
 			/** post and rdma_read that is a rdma get*/
 			if(ibv_post_send(node->infiData->qp,&wr,&bad_wr)){
-				CmiEnforce(0);
+				CmiAbort("ibv_post_send failed");
 			}
 		}
 

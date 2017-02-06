@@ -418,7 +418,7 @@ static void checkAllQps(){
 		if(i != CmiMyNodeGlobal()){
 			if(!checkQp(nodes[i].infiData->qp)){
 				pollSendCq(0);
-				CmiEnforce(0);
+				CmiAbort("Queue pair check failed");
 			}
 		}
 	}
@@ -973,7 +973,7 @@ void postInitialRecvs(struct infiBufferPool *recvBufferPool,int numRecvs,int siz
 	workRequests[numRecvs-1].next = NULL;
 	MACHSTATE(3,"About to call ibv_post_srq_recv");
 	if(ibv_post_srq_recv(context->srq,workRequests,&bad_wr)){
-		CmiEnforce(0);
+		CmiAbort("ibv_post_srq_recv failed");
 	}
 
 	free(workRequests);
@@ -1061,7 +1061,7 @@ static void inline EnqueuePacket(OtherNode node,infiPacket packet,int size,struc
 	struct ibv_send_wr *bad_wr=NULL;
 	if(retval = ibv_post_send(node->infiData->qp,&(packet->wr),&bad_wr)){
 		CmiPrintf("[%d] Sending to node %d failed with return value %d\n",Lrts_myNode,node->infiData->nodeNo,retval);
-		CmiEnforce(0);
+		CmiAbort("ibv_post_send failed");
 	}
 #if	CMK_IBVERBS_TOKENS_FLOW
 	context->tokensLeft--;
@@ -1369,14 +1369,14 @@ static inline int pollRecvCq(const int toBuffer){
 	
 	for(i=0;i<ne;i++){
 		if(wc[i].status != IBV_WC_SUCCESS){
-			CmiEnforce(0);
+			CmiAbort("Work completion error in recvCq");
 		}
 		switch(wc[i].opcode){
 			case IBV_WC_RECV:
 					processRecvWC(&wc[i],toBuffer);
 				break;
 			default:
-				CmiAbort("Wrong type of work completion object in recvq");
+				CmiAbort("Wrong type of work completion object in recvCq");
 				break;
 		}
 			
@@ -1403,7 +1403,7 @@ static inline int pollSendCq(const int toBuffer){
 #if CMK_IBVERBS_STATS
 	printf("[%d] msgCount %d pktCount %d packetSize %d total Time %.6lf s processBufferedCount %d processBufferedTime %.6lf s maxTokens %d tokensLeft %d minTokensLeft %d \n",CmiMyNodeGlobal(),msgCount,pktCount,packetSize,CmiTimer(),processBufferedCount,processBufferedTime,maxTokens,context->tokensLeft,minTokensLeft);
 #endif
-			CmiEnforce(0);
+			CmiAbort("Work completion error in sendCq");
 		}
 		switch(wc[i].opcode){
 			case IBV_WC_SEND:{
@@ -1425,7 +1425,7 @@ static inline int pollSendCq(const int toBuffer){
 				break;
 			}
 			default:
-				CmiAbort("Wrong type of work completion object in recvq");
+				CmiAbort("Wrong type of work completion object in sendCq");
 				break;
 		}
 			
@@ -1710,7 +1710,7 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		struct ibv_recv_wr *bad_wr;
 	
 		if(ibv_post_srq_recv(context->srq,&wr,&bad_wr)){
-			CmiEnforce(0);
+			CmiAbort("ibv_post_srq_recv failed");
 		}
 	}
 
@@ -1810,7 +1810,7 @@ static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket,int fro
 		};
 		/** post and rdma_read that is a rdma get*/
 		if(ibv_post_send(node->infiData->qp,&wr,&bad_wr)){
-			CmiEnforce(0);
+			CmiAbort("ibv_post_send failed");
 		}
 	}
 
@@ -2088,7 +2088,7 @@ static inline void increaseTokens(OtherNode node){
 	int currentCqSize = context->sendCqSize;
 	if(ibv_resize_cq(context->sendCq,currentCqSize+increase)){
 		fprintf(stderr,"[%d] failed to increase cq by %d from %d totalTokens %d \n",CmiMyNodeGlobal() ,increase,currentCqSize, node->infiData->totalTokens);
-		CmiEnforce(0);
+		CmiAbort("ibv_resize_cq failed");
 	}
 	context->sendCqSize+= increase;
 };
@@ -2109,7 +2109,7 @@ static void increasePostedRecvs(int nodeNo){
 	//increase the size of the recvCq
 	int currentCqSize = context->recvCqSize;
 	if(ibv_resize_cq(context->recvCq,currentCqSize+tokenIncrease)){
-		CmiEnforce(0);
+		CmiAbort("ibv_resize_cq failed");
 	}
 	context->recvCqSize += tokenIncrease;
 	if(recvIncrease > 0){
@@ -2372,7 +2372,7 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 		return res;
 	}
 
-	CmiEnforce(0);
+	CmiAbort("getInfiCmiChunkThread failed");
 
 	
 };
@@ -2470,7 +2470,7 @@ static inline void *getInfiCmiChunk(int dataSize){
                 return res;
         }
 
-        CmiEnforce(0);
+        CmiAbort("getInfiCmiChunk failed");
 
 
 };
@@ -3057,7 +3057,7 @@ void CmiDirect_put(struct infiDirectUserHandle *userHandle){
 			};
 			/** post and rdma_read that is a rdma get*/
 			if(ibv_post_send(node->infiData->qp,&wr,&bad_wr)){
-				CmiEnforce(0);
+				CmiAbort("ibv_post_send failed");
 			}
 		}
 
