@@ -835,7 +835,7 @@ static void ampiNodeInit(void)
   }
   TCHARM_Set_fallback_setup(AMPI_Setup_Switch);
 
-  AmpiReducer = CkReduction::addReducer(AmpiReducerFunc);
+  AmpiReducer = CkReduction::addReducer(AmpiReducerFunc, true /*streamable*/);
 
   CkAssert(AMPI_threadstart_idx == -1);    // only initialize once
   AMPI_threadstart_idx = TCHARM_Register_thread_function(AMPI_threadstart);
