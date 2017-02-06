@@ -177,13 +177,14 @@ void CkArrayOptions::pup(PUP::er& p) {
   p | map;
   p | locMgr;
   p | mCastMgr;
-  p | sectionAutoDelegate;
   p | arrayListeners;
   p | reductionClient;
+  p | initCallback;
   p | anytimeMigration;
   p | disableNotifyChildInRed;
   p | staticInsertion;
   p | broadcastViaScheduler;
+  p | sectionAutoDelegate;
 }
 
 CkArrayListener::CkArrayListener(int nInts_) : nInts(nInts_) { dataOffset = -1; }

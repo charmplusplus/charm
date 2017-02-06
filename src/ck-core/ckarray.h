@@ -454,6 +454,7 @@ class CkArray : public CkReductionMgr {
   CkGroupID locMgrID;
   CkGroupID mCastMgrID;
   bool sectionAutoDelegate;
+  CkCallback initCallback;
   CProxy_CkArray thisProxy;
   // Separate mapping and storing the element pointers to speed iteration in broadcast
   std::map<CmiUInt8, unsigned int> localElems;
@@ -549,6 +550,7 @@ public:
   virtual void beginInserting(void);
   void remoteDoneInserting(void);
   void remoteBeginInserting(void);
+  void initDone(void);
 
   /// Create manually:
   bool insertElement(CkArrayMessage *, const CkArrayIndex &idx, int listenerData[CK_ARRAYLISTENER_MAXLEN]);
@@ -576,6 +578,7 @@ public:
 private:
   CkArrayIndex numInitial;/// Number of initial array elements
   bool isInserting;/// Are we currently inserting elements?
+  int numPesInited;
 
 /// Allocate space for a new array element
   ArrayElement *allocate(int elChareType, CkMessage *msg, bool fromMigration, int *listenerData);

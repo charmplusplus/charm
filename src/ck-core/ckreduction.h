@@ -684,10 +684,6 @@ private:
 	void init_BinaryTree();
 	enum {TREE_WID=2};
 	int treeRoot(void);//Root PE
-	bool hasParent(void);
-	int treeParent(void);//My parent PE
-	int firstKid(void);//My first child PE
-	int treeKids(void);//Number of children in tree
 
 	//Combine (& free) the current message vector.
 	CkReductionMsg *reduceMessages(void);
@@ -707,6 +703,11 @@ private:
 	void shiftAdjVec(void);
 
 protected:
+	bool hasParent(void);
+	int treeParent(void);//My parent PE
+	int firstKid(void);//My first child PE
+	int treeKids(void);//Number of children in tree
+
 	//whether to notify children that reduction starts
 	bool disableNotifyChildrenStart;
 	void resetCountersWhenFlushingStates() { gcount = lcount = 0; }

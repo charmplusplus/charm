@@ -2,7 +2,8 @@ DIRS=3darray fancyarray \
 	darray dgroup \
 	group local \
 	stl_array sdag \
-	4darray nodegroup
+	4darray nodegroup \
+	1darray
 
 all:
 	for d in $(DIRS); do \

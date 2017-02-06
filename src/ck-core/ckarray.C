@@ -801,10 +801,11 @@ CkArray::CkArray(CkArrayOptions &opts,
   : locMgr(CProxy_CkLocMgr::ckLocalBranch(opts.getLocationManager())),
     locMgrID(opts.getLocationManager()),
     sectionAutoDelegate(opts.isSectionAutoDelegated()),
+    initCallback(opts.getInitCallback()),
     mCastMgrID(opts.getMcastManager()),
     thisProxy(thisgroup),
     stableLocations(opts.staticInsertion && !opts.anytimeMigration),
-    numInitial(opts.getNumInitial()), isInserting(true)
+    numInitial(opts.getNumInitial()), isInserting(true), numPesInited(0)
 {
   // Register with our location manager
   locMgr->addManager(thisgroup,this);
@@ -833,6 +834,8 @@ CkArray::CkArray(CkArrayOptions &opts,
 
   ///Set up initial elements (if any)
   locMgr->populateInitial(opts,initMsg.getMessage(),this);
+  if (opts.staticInsertion)
+    initDone();
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	// creating the spanning tree to be used for broadcast
@@ -902,9 +905,11 @@ void CkArray::pup(PUP::er &p){
 	p|locMgrID;
 	p|mCastMgrID;
 	p|sectionAutoDelegate;
+	p|initCallback;
 	p|listeners;
 	p|listenerDataOffset;
         p|stableLocations;
+	p|numPesInited;
 	testPup(p,1234);
 	if(p.isUnpacking()){
 		thisProxy=thisgroup;
@@ -1005,6 +1010,24 @@ bool CkArray::insertElement(CkArrayMessage *me, const CkArrayIndex &idx, int lis
   return true;
 }
 
+void CkArray::initDone(void) {
+  if (initCallback.isInvalid())
+    return;
+
+  numPesInited++;
+  DEBC(("PE %d initDone, numPesInited %d, treeKids %d, parent %d\n",
+       CkMyPe(), numPesInited, treeKids(), treeParent()));
+
+  // Re-use the spanning tree for reductions over the array elements
+  // The "+1" is for the PE itself
+  if (numPesInited == treeKids() + 1) {
+    if (hasParent())
+      thisProxy[treeParent()].initDone();
+    else
+      initCallback.send();
+  }
+}
+
 void CProxy_ArrayBase::doneInserting(void)
 {
   DEBC((AA "Broadcasting a doneInserting request\n" AB));
@@ -1037,6 +1060,7 @@ void CkArray::remoteDoneInserting(void)
     DEBC((AA "Done inserting objects\n" AB));
     for (int l=0;l<listeners.size();l++) listeners[l]->ckEndInserting();
     locMgr->doneInserting();
+    initDone();
   }
 }
 

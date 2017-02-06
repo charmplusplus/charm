@@ -78,6 +78,7 @@ class CkArrayOptions {
   CkGroupID mCastMgr;  /// <ckmulticast mgr to bind to, for sections
   CkPupAblePtrVec<CkArrayListener> arrayListeners;  // CkArrayListeners for this array
   CkCallback reductionClient;                       // Default target of reductions
+  CkCallback initCallback; // Callback to be invoked after chare array creation is complete
   bool anytimeMigration;                            // Elements are allowed to move freely
   bool disableNotifyChildInRed;  // Child elements are not notified when reduction starts
   bool staticInsertion;          // Elements are only inserted at construction
@@ -239,6 +240,10 @@ class CkArrayOptions {
     reductionClient = cb;
     return *this;
   }
+  CkArrayOptions &setInitCallback(CkCallback cb) {
+    initCallback = cb;
+    return *this;
+  }
 
   // Used by the array manager:
   const CkArrayIndex& getStart(void) const { return start; }
@@ -250,6 +255,7 @@ class CkArrayOptions {
   const CkGroupID& getLocationManager(void) const { return locMgr; }
   const CkGroupID& getMcastManager(void) const { return mCastMgr; }
   bool isSectionAutoDelegated(void) const { return sectionAutoDelegate; }
+  const CkCallback &getInitCallback(void) const {return initCallback;}
   int getListeners(void) const { return arrayListeners.size(); }
   CkArrayListener* getListener(int listenerNum) {
     CkArrayListener* ret = arrayListeners[listenerNum];
