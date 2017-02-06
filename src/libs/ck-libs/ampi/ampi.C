@@ -576,14 +576,11 @@ CkReductionMsg *AmpiReducerFunc(int nMsg, CkReductionMsg **msgs){
   len = hdr->len;
   szhdr = sizeof(AmpiOpHeader);
 
-  //Assuming extent == size
-  vector<char> ret(szhdr+szdata);
-  char *retPtr = &ret[0];
-  memcpy(retPtr,msgs[0]->getData(),szhdr+szdata);
+  CkReductionMsg *retmsg = CkReductionMsg::buildNew(szhdr+szdata,NULL,AmpiReducer,msgs[0]);
+  void *retPtr = (char *)retmsg->getData() + szhdr;
   for(int i=1;i<nMsg;i++){
-    (*func)((void *)((char *)msgs[i]->getData()+szhdr),(void *)(retPtr+szhdr),&len,&dtype);
+    (*func)((void *)((char *)msgs[i]->getData()+szhdr),retPtr,&len,&dtype);
   }
-  CkReductionMsg *retmsg = CkReductionMsg::buildNew(szhdr+szdata,retPtr);
   return retmsg;
 }
 
