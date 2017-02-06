@@ -728,6 +728,7 @@ static void CommunicationServerNet(int sleepTime, int where)
         if (0!=(writeableAcks=TransmitAcknowledgement())) again=1;
       CmiLock(Cmi_comm_var_mutex);
       if (writeableDgrams) {
+        writeableDgrams = 0;
         CmiUnlock(Cmi_comm_var_mutex);
         int temp;
         if (0!=(temp=TransmitDatagram())) {
