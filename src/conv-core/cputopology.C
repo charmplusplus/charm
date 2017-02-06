@@ -138,6 +138,10 @@ public:
   static CkVec<int> *bynodes;
   static int supported;
 
+  ~CpuTopology() {
+    delete [] bynodes;
+  }
+
     // return -1 when not supported
   int numUniqNodes() {
 #if 0
