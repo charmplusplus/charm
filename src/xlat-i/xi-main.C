@@ -239,8 +239,8 @@ int processAst(AstChildren<Module> *m, const bool chareNames,
 
 int main(int argc, char *argv[])
 {
-  char* origFile = NULL;
-  char* fname = NULL;
+  origFile = NULL;
+  fname = NULL;
   int fortranMode = 0;
   int internalMode = 0;
   bool dependsMode = false;
