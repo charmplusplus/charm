@@ -6,7 +6,12 @@
 
 void multisectiontest_init()
 {
+  //CkPrintf("[%d]multisectiontest_init \n", CkMyPe());
+  CProxy_multisectiontest_main mainproxy = CProxy_multisectiontest_main::ckNew(CkMyPe()); 
+}
 
+multisectiontest_main::multisectiontest_main()
+{
   int numgroups=NUMGROUPS;
   int numarrays=NUMARRAYS;
     
@@ -16,8 +21,7 @@ void multisectiontest_init()
     return;
   }
 
-  CProxy_multisectiontest_master masterproxy=CProxy_multisectiontest_master::ckNew(numgroups);
-
+  masterproxy=CProxy_multisectiontest_master::ckNew(numgroups);
 	  
   //	      CkPrintf("[%d]made group %d\n",gSectGproxy.ckGetGroupID());
 
@@ -69,7 +73,7 @@ void multisectiontest_init()
   }
   //	  CProxySection_multisectiontest_grp
   //	  groupLowProxy=CProxySection_multisectiontest_grp(numgroups,gidArr,elems,nelems);
-  CProxySection_multisectiontest_grp groupLowProxy(numgroups, gidArr,elems,nelems);
+  groupLowProxy = CProxySection_multisectiontest_grp(numgroups, gidArr,elems,nelems);
   //  CkPrintf("[%d] section of groupid %d from %d to %d size
   //  %d\n",CkMyPe(), thisgroup,  floor, ceiling,
   //  sectionSize);
@@ -90,7 +94,7 @@ void multisectiontest_init()
   //	  arrayLowProxy=CProxySection_multisectiontest_array1d(numarrays,aidArr,aelems,naelems);
   //	  CProxySection_multisectiontest_array1d
   //	  arrayLowProxy(numarrays,aidArr,constaelems,naelems);
-  CProxySection_multisectiontest_array1d arrayLowProxy(numarrays,aidArr,aelems,naelems);
+  arrayLowProxy = CProxySection_multisectiontest_array1d(numarrays,aidArr,aelems,naelems);
   // cross section other half of each group
   floor=0;
   ceiling=boundary-1;
@@ -112,7 +116,7 @@ void multisectiontest_init()
     for(int i=floor,j=0;i<=ceiling;i++,j++)
       elemsH[k][j]=i;
   }
-  CProxySection_multisectiontest_grp groupHighProxy(numgroups,gidArr,elemsH,nelems);
+  groupHighProxy = CProxySection_multisectiontest_grp(numgroups,gidArr,elemsH,nelems);
 
   // cross section upper half of each array
   // cross section lower half of each array
@@ -126,43 +130,51 @@ void multisectiontest_init()
     for(int i=afloor,j=0;i<=aceiling;i++,j++)
       aelemsH[k][j]=CkArrayIndex1D(i);
   }
-  CProxySection_multisectiontest_array1d arrayHighProxy(numarrays,aidArr, aelemsH, naelems);
+  arrayHighProxy = CProxySection_multisectiontest_array1d(numarrays,aidArr, aelemsH, naelems);
 
-  // send IDs to master
-  multisectionGID_msg *mmsg= new (numgroups) multisectionGID_msg;
+  //create message for sending IDs to master
+  mmsg= new (numgroups) multisectionGID_msg;
   for(int i=0;i<numgroups;++i)
     mmsg->IDs[i]=gidArr[i];
   mmsg->numIDs=numgroups;
-  masterproxy[0].recvID(mmsg);
-  // send IDs to sections
-  multisectionAID_msg *amsg= new (numarrays) multisectionAID_msg;
+  //create message for sending IDs to sections
+  amsg= new (numarrays) multisectionAID_msg;
   for(int i=0;i<numarrays;++i)
     amsg->IDs[i]=aidArr[i];
   amsg->numIDs=numarrays;
   UsrToEnv(amsg)->setMsgtype(ForBocMsg);
   UsrToEnv(amsg)->setGroupDep(aidArr[numarrays-1]);
-  groupLowProxy.recvID(amsg);
 
-  multisectionAID_msg *amsg2= new (numarrays) multisectionAID_msg;
+  amsg2= new (numarrays) multisectionAID_msg;
   for(int i=0;i<numarrays;++i)
     amsg2->IDs[i]=aidArr[i];
   amsg2->numIDs=numarrays;
   UsrToEnv(amsg2)->setMsgtype(ForBocMsg);
   UsrToEnv(amsg2)->setGroupDep(aidArr[numarrays-1]);
-  groupHighProxy.recvID(amsg2);
 	 
-	  
-  multisectionGID_msg *gmsg= new (numgroups) multisectionGID_msg;
+  gmsg= new (numgroups) multisectionGID_msg;
   for(int i=0;i<numgroups;++i)
     gmsg->IDs[i]=gidArr[i];
   gmsg->numIDs=numgroups;
-  arrayLowProxy.recvID(gmsg);
-  multisectionGID_msg *gmsg2= new (numgroups) multisectionGID_msg;
+  gmsg2= new (numgroups) multisectionGID_msg;
   for(int i=0;i<numgroups;++i)
     gmsg2->IDs[i]=gidArr[i];
   gmsg2->numIDs=numgroups;
+
+  //callback to send all messages once creation is complete
+  CkStartQD(CkCallback(CkIndex_multisectiontest_main::sendMsgs(), thisProxy));
+}
+
+
+/* send messages after creation of all chare arrays and groups are finished */
+void multisectiontest_main::sendMsgs(){
+  masterproxy[0].recvID(mmsg);
+  groupLowProxy.recvID(amsg);
+  groupHighProxy.recvID(amsg2);
+  arrayLowProxy.recvID(gmsg);
   arrayHighProxy.recvID(gmsg2);
 }
+
 
 void multisectiontest_moduleinit(void) {
   /*

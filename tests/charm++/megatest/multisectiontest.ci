@@ -8,6 +8,12 @@ module multisectiontest {
 	CkGroupID IDs[];
 	};
  message multisection_proxymsg;
+
+ chare multisectiontest_main {
+    entry multisectiontest_main();
+    entry void sendMsgs();
+ };
+
   group multisectiontest_master {
     entry multisectiontest_master(int groups);
     entry void recvID(multisectionGID_msg *);
