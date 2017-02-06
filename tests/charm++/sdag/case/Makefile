@@ -15,13 +15,13 @@ clean:
 	-rm -rf *.o *~ core *.decl.h *.def.h *.txt charmrun $(ALL)
 
 caseTest.decl.h: caseTest.ci
-	$(CHARMC) $(OPTS) caseTest.ci
+	$(CHARMC) caseTest.ci
 
 caseTest.o: caseTest.C caseTest.decl.h
-	$(CHARMC) $(OPTS) -c $<
+	$(CHARMC) -c $<
 
 caseTest: caseTest.o
-	$(CHARMC) -language charm++ $(OPTS) $^ -o $@
+	$(CHARMC) -language charm++ $^ -o $@
 
 test: caseTest
 	$(call run, +p$(PROCS) ./$< )
