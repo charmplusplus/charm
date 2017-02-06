@@ -13,6 +13,7 @@ test:
 
 bgtest:
 	for d in $(DIRS); do \
+		if [ "$$d" = "intercomm_coll" ]; then continue; fi; \
 		(cd $$d && $(MAKE) bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
 	done
 
