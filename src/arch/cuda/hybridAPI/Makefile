@@ -1,8 +1,6 @@
-#CUDA_DIR=/usr/local/cuda
 CHARMDIR=../..
-CHARMC=$(CHARMDIR)/bin/charmc
 CUDA_PATH=$(shell CHARMINC=../.; . $$CHARMINC/conv-mach-opt.sh; echo $$CUDA_DIR;  )
-NVCC = $(CUDA_PATH)/bin/nvcc
+NVCC = $(CUDA_PATH)/bin/nvcc $(OPTS)
 NVCC_FLAGS = -c -use_fast_math -DGPU_MEMPOOL #-DGPU_PROFILE -DGPU_TRACE #-DGPU_MEMPOOL_DEBUG -DGPU_WRQ_VERBOSE #-device-debug -deviceemu
 NVCC_INC = -I$(CUDA_PATH)/include -I..
 
@@ -13,7 +11,6 @@ libs: libcudahybridapi.a
 
 install: libcudahybridapi.a
 	cp libcudahybridapi.a $(CHARMDIR)/lib
-#	cp hybridapi.o wrqueue.o $(CHARMDIR)/tmp
 
 libcudahybridapi.a: hybridapi.o wrqueue.o
 	-rm -f $@
