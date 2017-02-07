@@ -1,7 +1,12 @@
 #ifndef __CkDDT_H_
 #define __CkDDT_H_
 
+#include <string>
+#include <vector>
 #include "pup.h"
+
+using std::vector;
+using std::string;
 
 #define CkDDT_MAXTYPE           100
 
@@ -48,6 +53,8 @@
 #define CkDDT_FLOAT_COMPLEX       39
 #define CkDDT_LONG_DOUBLE_COMPLEX 40
 #define CkDDT_AINT                41
+
+#define CkDDT_MAX_PRIMITIVE_TYPE  41
 
 #define CkDDT_CONTIGUOUS          42
 #define CkDDT_VECTOR              43
@@ -105,7 +112,6 @@ class CkDDT ;
   baseSize - size of Base Datatype
   baseExtent - extent of Base dataType
   name - user specified name for datatype
-  nameLen - length of user specified name for datatype
 
   Methods:
 
@@ -147,8 +153,7 @@ class CkDDT_DataType {
     CkDDT_DataType *baseType;
     int baseIndex;
     int numElements;
-    char name[CkDDT_MAX_NAME_LEN];
-    int nameLen;
+    string name;
     bool isAbsolute;
 
   public:
@@ -287,8 +292,8 @@ class CkDDT_HVector : public CkDDT_Vector {
 class CkDDT_Indexed : public CkDDT_DataType {
 
   protected:
-    int* arrayBlockLength ;
-    CkDDT_Aint* arrayDisplacements ;
+    vector<int> arrayBlockLength;
+    vector<CkDDT_Aint> arrayDisplacements;
 
   private:
     CkDDT_Indexed& operator=(const CkDDT_Indexed& obj) ;
@@ -351,7 +356,7 @@ class CkDDT_Indexed_Block : public CkDDT_DataType
 
   protected:
     int BlockLength;
-    CkDDT_Aint *arrayDisplacements;
+    vector<CkDDT_Aint> arrayDisplacements;
 
   private:
     CkDDT_Indexed_Block& operator=(const CkDDT_Indexed_Block &obj);
@@ -415,10 +420,10 @@ class CkDDT_HIndexed_Block : public CkDDT_Indexed_Block
 class CkDDT_Struct : public CkDDT_DataType {
 
   protected:
-    int* arrayBlockLength ;
-    CkDDT_Aint* arrayDisplacements ;
-    int* index;
-    CkDDT_DataType** arrayDataType;
+    vector<int> arrayBlockLength;
+    vector<CkDDT_Aint> arrayDisplacements;
+    vector<int> index;
+    vector<CkDDT_DataType*> arrayDataType;
 
   private:
     CkDDT_Struct& operator=(const CkDDT_Struct& obj);
@@ -453,19 +458,14 @@ class CkDDT_Struct : public CkDDT_DataType {
 
 class CkDDT {
   private:
-    CkDDT_DataType**  typeTable;
-    int*  types; //used for pup
-    int max_types;
-    int num_types;
+    vector<CkDDT_DataType*> typeTable;
+    vector<int> types; //used for pup
 
   public:
 
   CkDDT(void*) {} // emulates migration constructor
-  CkDDT()
+  CkDDT(void) : typeTable(CkDDT_MAX_PRIMITIVE_TYPE+1, NULL), types(CkDDT_MAX_PRIMITIVE_TYPE+1, CkDDT_TYPE_NULL)
   {
-    max_types = CkDDT_MAXTYPE;
-    typeTable = new CkDDT_DataType*[max_types];
-    types = new int[max_types];
     typeTable[0] = new CkDDT_DataType(CkDDT_DOUBLE);
     types[0] = CkDDT_DOUBLE;
     typeTable[1] = new CkDDT_DataType(CkDDT_INT);
@@ -550,14 +550,6 @@ class CkDDT {
     types[40] = CkDDT_LONG_DOUBLE_COMPLEX;
     typeTable[41] = new CkDDT_DataType(CkDDT_AINT);
     types[41] = CkDDT_AINT;
-    num_types = 42;
-
-    int i;
-    for(i=num_types ; i < max_types; i++)
-    {
-      typeTable[i] = NULL;
-      types[i] = CkDDT_TYPE_NULL ;
-    }
   }
 
   void newContiguous(int count, CkDDT_Type  oldType, CkDDT_Type* newType);
@@ -576,7 +568,6 @@ class CkDDT {
   void newStruct(int count, const int* arrbLength, const CkDDT_Aint* arrDisp , const CkDDT_Type *oldtype,
                 CkDDT_Type* newtype);
   void  freeType(int* index);
-  int   getNextFreeIndex(void);
   void  pup(PUP::er &p);
   CkDDT_DataType*  getType(int nIndex) const;
 
