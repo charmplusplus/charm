@@ -6,10 +6,10 @@
 #include <ostream>
 #include <functional>
 
-#if CMK_HAS_STD_UNORDERED_MAP
-#include <unordered_map>
+#if CMK_USING_XLC
+#include <tr1/unordered_map>
 #else
-#include <map>
+#include <unordered_map>
 #endif
 
 namespace conv {
@@ -80,10 +80,10 @@ class msgQ
         /// A key-val pair of a priority value and a handle to the bucket of msgs of that priority
         typedef typename std::pair<prio_t, bkt_t*> prioidx_t;
         /// A type for mapping between priority values and msg buckets
-        #if CMK_HAS_STD_UNORDERED_MAP
-        typedef typename std::unordered_map<prio_t, bkt_t> bktmap_t;
+        #if CMK_USING_XLC
+        typedef typename std::tr1::unordered_map<prio_t, bkt_t> bktmap_t;
         #else
-        typedef typename std::map<prio_t, bkt_t> bktmap_t;
+        typedef typename std::unordered_map<prio_t, bkt_t> bktmap_t;
         #endif
 
         /// The size of this message queue
