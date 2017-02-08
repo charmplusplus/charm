@@ -1526,11 +1526,6 @@ double CmiTimer()
 
 #if CMK_TIMER_USE_RTC
 
-#if __crayx1
- /* For _rtc() on Cray X1 */
-#include <intrinsics.h>
-#endif
-
 static double clocktick;
 CpvStaticDeclare(long long, inittime_wallclock);
 
