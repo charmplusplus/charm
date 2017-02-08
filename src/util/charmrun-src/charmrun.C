@@ -63,13 +63,6 @@
 
 #else /*Use SSH to start node-programs*/
 #define CMK_USE_SSH 1
-#ifdef __MINGW_H
-#include <rpc.h>
-#elif !defined(__CYGWIN__)
-#include <rpc/rpc.h>
-#else
-#include <w32api/rpc.h>
-#endif
 #if CMK_SSH_IS_A_COMMAND
 #define SSH_CMD "ssh"
 #endif
@@ -1017,9 +1010,12 @@ void arg_init(int argc, const char **argv)
       arg_shell = getenv_ssh();
   }
 
+#if !defined(_WIN32) || defined(__CYGWIN__)
   /* Find the current value of the DISPLAY variable */
   if (!arg_display)
     arg_display = getenv_display_no_tamper();
+#endif
+
   if ((arg_debug || arg_debug_no_pause || arg_in_xterm) && (arg_display == 0)) {
     fprintf(stderr, "ERROR> DISPLAY must be set to use debugging mode\n");
     exit(1);
