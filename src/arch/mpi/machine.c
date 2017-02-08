@@ -1162,7 +1162,7 @@ void LrtsExit() {
     
    if(!CharmLibInterOperate || userDrivenMode) {
 #if ! CMK_AUTOBUILD
-      sigaction(SIGINT, signal_int, NULL);
+      sigaction(SIGINT, &signal_int, NULL);
       MPI_Finalize();
 #endif
       exit(0);
