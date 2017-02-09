@@ -31,7 +31,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#if CMK_BLUEGENEL || CMK_BLUEGENEP || CMK_BLUEGENEQ
+#if CMK_BLUEGENEP || CMK_BLUEGENEQ
 #include "TopoManager.h"
 #endif
 
@@ -465,7 +465,7 @@ extern "C" void LrtsInitCpuTopo(char **argv)
       strcpy(hostname, "");
   }
 #endif
-#if CMK_BLUEGENEL || CMK_BLUEGENEP
+#if CMK_BLUEGENEP
   if (CmiMyRank() == 0) {
     TopoManager tmgr;
 

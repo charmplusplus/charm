@@ -97,11 +97,16 @@ TopoManager::TopoManager() {
   dimY = 1;
   dimZ = 1;
 
-  dimNX = dimX;
+  dimNX = CmiNumPhysicalNodes();
   dimNY = 1;
   dimNZ = 1;
 
-  dimNT = procsPerNode = 1;
+  dimNT = 0;
+  for (int i=0; i < dimNX; i++) {
+    int n = CmiNumPesOnPhysicalNode(i);
+    if (n > dimNT) dimNT = n;
+  }
+  procsPerNode = dimNT;
   torusX = true;
   torusY = true;
   torusZ = true;
@@ -159,7 +164,7 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) const {
     z = pe / (dimX * dimY);
   }
   else {
-    x = pe; 
+    x = CmiPhysicalNodeID(pe);
     y = 0; 
     z = 0;
   }
@@ -195,8 +200,8 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) cons
     y = (pe % (dimNT*dimNX*dimNY)) / (dimNT*dimNX);
     z = pe / (dimNT*dimNX*dimNY);
   } else {
-    t = pe % dimNT;
-    x = (pe % (dimNT*dimNX)) / dimNT;
+    t = CmiPhysicalRank(pe);
+    x = CmiPhysicalNodeID(pe);
     y = 0;
     z = 0;
   }
@@ -243,7 +248,7 @@ int TopoManager::coordinatesToRank(int x, int y, int z) const {
   if(dimY > 1)
     return x + y*dimX + z*dimX*dimY;
   else
-    return x;
+    return CmiGetFirstPeOnPhysicalNode(x);
 #endif
 }
 
@@ -266,8 +271,10 @@ int TopoManager::coordinatesToRank(int x, int y, int z, int t) const {
 #else
   if(dimNY > 1)
     return t + (x + (y + z*dimNY) * dimNX) * dimNT;
-  else
-    return t + x * dimNT;
+  else {
+    if (t >= CmiNumPesOnPhysicalNode(x)) return -1;
+    else return CmiGetFirstPeOnPhysicalNode(x)+t;
+  }
 #endif
 }
 
