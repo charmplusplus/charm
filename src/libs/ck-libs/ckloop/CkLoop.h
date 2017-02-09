@@ -27,7 +27,7 @@ class CurLoopInfo {
     friend class FuncSingleHelper;
 
 private:
-    volatile int curChunkIdx;
+    int curChunkIdx; // Should become std::atomic<int>
     int numChunks;
     HelperFn fnPtr;
     int lowerIndex;
@@ -89,21 +89,9 @@ public:
         CmiUnlock(loop_info_inited_lock);
     }
     int getNextChunkIdx() {
-#if defined(_WIN32)
-#if CMK_SMP
         int next_chunk_id;
-        CmiLock(cmiMemoryLock);
-        curChunkIdx=curChunkIdx+1;
-        next_chunk_id = curChunkIdx;
-        CmiUnlock(cmiMemoryLock);
-        return next_chunk_id;
-#else
-        curChunkIdx++;
-        return curChunkIdx;
-#endif
-#else
-        return __sync_add_and_fetch(&curChunkIdx, 1);
-#endif
+        CmiMemoryAtomicFetchAndInc(curChunkIdx, next_chunk_id);
+        return next_chunk_id+1;
     }
     void reportFinished(int counter) {
         if (counter==0) return;
