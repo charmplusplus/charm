@@ -2842,6 +2842,43 @@ then
   add_flag CMK_HAS_INT16=1
 fi
 
+### Check if we have C++11 <atomic> ###
+cat > $t <<EOT
+#include <atomic>
+int main(int argc, char** argv) {
+  return 0;
+}
+EOT
+test_cxx "whether C++ library has <atomic> " "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_CXX11_ATOMIC $pass
+_ACEOF
+
+
+if test $pass -ne 1
+then
+### Check if we have pre-C++11 <cstdatomic> ###
+cat > $t <<EOT
+#include <cstdatomic>
+int main(int argc, char** argv) {
+  return 0;
+}
+EOT
+test_cxx "whether C++ library has <cstdatomic> " "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_CXX0X_CSTDATOMIC $pass
+_ACEOF
+
+fi
+
+if test $pass -ne 1 -a -z "$CMK_USING_BGXLC"
+then
+	echo "Charm++ requires C++11 atomic support"
+	test_finish 1
+fi
+
 #### Check long double ####
 cat > $t <<EOT
 #include <stdlib.h>

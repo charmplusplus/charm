@@ -42,9 +42,6 @@
 /* Disables conflicting macros. */
 #undef CMK_CXX_MPI_BINDINGS
 
-/* whether Xfence intrinsics works in C */
-#undef CMK_C_BUILTIN_IA32_XFENCE
-
 /* whether C inline works in C */
 #undef CMK_C_INLINE
 
@@ -104,6 +101,12 @@
 
 /* whether PAPI exists */
 #undef CMK_HAS_COUNTER_PAPI
+
+/* whether C++ library has <cstdatomic> */
+#undef CMK_HAS_CXX0X_CSTDATOMIC
+
+/* whether C++ library has <atomic> */
+#undef CMK_HAS_CXX11_ATOMIC
 
 /* whether has elf.h */
 #undef CMK_HAS_ELF_H

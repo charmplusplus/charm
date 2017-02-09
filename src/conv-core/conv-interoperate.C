@@ -10,7 +10,15 @@
 #if CMK_USING_XLC
 static volatile int interopCommThdExit = 0;
 #else
+
+#if CMK_HAS_CXX11_ATOMIC
 #include <atomic>
+#elif CMK_HAS_CXX0X_CSTDATOMIC
+#include <cstdatomic>
+#else
+#error "Configure should have errored on missing C++11 atomic library support"
+#endif
+
 static std::atomic<int> interopCommThdExit{0};
 #endif
 
