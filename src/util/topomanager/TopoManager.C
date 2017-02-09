@@ -18,7 +18,7 @@
 struct CompareRankDist {
   std::vector<int> peDist;
 
-  CompareRankDist(int *root, int *pes, int n, TopoManager *tmgr) : peDist(n) {
+  CompareRankDist(int *root, int *pes, int n, const TopoManager *tmgr) : peDist(n) {
     for(int p = 0; p < n; p++) {
       peDist[p] = tmgr->getHopsBetweenRanks(root, pes[p]);
     }
@@ -144,14 +144,7 @@ TopoManager::TopoManager(int NX, int NY, int NZ, int NT) : dimNX(NX), dimNY(NY),
   numPes = dimNX * dimNY * dimNZ * dimNT;
 }
 
-int TopoManager::hasMultipleProcsPerNode() const {
-  if(procsPerNode == 1)
-    return 0;
-  else
-    return 1;
-}
-
-void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) {
+void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) const {
   CmiAssert( pe >= 0 && pe < numPes );
 #if CMK_BLUEGENEP
   bgptm.rankToCoordinates(pe, x, y, z);
@@ -187,7 +180,7 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) {
 #endif
 }
 
-void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
+void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) const {
   CmiAssert( pe >= 0 && pe < numPes );
 #if CMK_BLUEGENEP
   bgptm.rankToCoordinates(pe, x, y, z, t);
@@ -225,13 +218,13 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
 }
 
 #if CMK_BLUEGENEQ
-void TopoManager::rankToCoordinates(int pe, int &a, int &b, int &c, int &d, int &e, int &t) {
+void TopoManager::rankToCoordinates(int pe, int &a, int &b, int &c, int &d, int &e, int &t) const {
   CmiAssert( pe >= 0 && pe < numPes );
   bgqtm.rankToCoordinates(pe, a, b, c, d, e, t);
 }
 #endif
 
-int TopoManager::coordinatesToRank(int x, int y, int z) {
+int TopoManager::coordinatesToRank(int x, int y, int z) const {
   if(!( x>=0 && x<dimX && y>=0 && y<dimY && z>=0 && z<dimZ ))
     return -1;
 #if CMK_BIGSIM_CHARM
@@ -254,7 +247,7 @@ int TopoManager::coordinatesToRank(int x, int y, int z) {
 #endif
 }
 
-int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
+int TopoManager::coordinatesToRank(int x, int y, int z, int t) const {
   if(!( x>=0 && x<dimNX && y>=0 && y<dimNY && z>=0 && z<dimNZ && t>=0 && t<dimNT ))
     return -1;
 #if CMK_BIGSIM_CHARM
@@ -279,14 +272,14 @@ int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
 }
 
 #if CMK_BLUEGENEQ
-int TopoManager::coordinatesToRank(int a, int b, int c, int d, int e, int t) {
+int TopoManager::coordinatesToRank(int a, int b, int c, int d, int e, int t) const {
   if(!( a>=0 && a<dimNA && b>=0 && b<dimNB && c>=0 && c<dimNC && d>=0 && d<dimND && e>=0 && e<dimNE && t>=0 && t<dimNT ))
     return -1;
   return bgqtm.coordinatesToRank(a, b, c, d, e, t);
 }
 #endif
 
-int TopoManager::getHopsBetweenRanks(int pe1, int pe2) {
+int TopoManager::getHopsBetweenRanks(int pe1, int pe2) const {
   CmiAssert( pe1 >= 0 && pe1 < numPes );
   CmiAssert( pe2 >= 0 && pe2 < numPes );
 #if CMK_BLUEGENEQ
@@ -302,7 +295,7 @@ int TopoManager::getHopsBetweenRanks(int pe1, int pe2) {
 #endif
 }
 
-int TopoManager::getHopsBetweenRanks(int *pe1, int pe2) {
+int TopoManager::getHopsBetweenRanks(int *pe1, int pe2) const {
   CmiAssert( pe2 >= 0 && pe2 < numPes );
 #if CMK_BLUEGENEQ
   int a2, b2, c2, d2, e2, t2; 
@@ -316,7 +309,7 @@ int TopoManager::getHopsBetweenRanks(int *pe1, int pe2) {
 #endif
 }
 
-void TopoManager::sortRanksByHops(int pe, int *pes, int *idx, int n) {
+void TopoManager::sortRanksByHops(int pe, int *pes, int *idx, int n) const {
 #if CMK_BLUEGENEQ
   int root_coords[6];
   rankToCoordinates(pe, root_coords[0], root_coords[1], root_coords[2],
@@ -329,14 +322,14 @@ void TopoManager::sortRanksByHops(int pe, int *pes, int *idx, int n) {
   sortRanksByHops(root_coords, pes, idx, n);
 }
 
-void TopoManager::sortRanksByHops(int* root_coords, int *pes, int *idx, int n) {
+void TopoManager::sortRanksByHops(int* root_coords, int *pes, int *idx, int n) const {
   for(int i=0;i<n;i++)
     idx[i] = i;
   CompareRankDist comparator(root_coords, pes, n, this);
   std::sort(&idx[0], idx + n, comparator);
 }
 
-int TopoManager::pickClosestRank(int mype, int *pes, int n){
+int TopoManager::pickClosestRank(int mype, int *pes, int n) const {
   int minHops = getHopsBetweenRanks(mype, pes[0]);
   int minIdx=0;
   int nowHops; 
@@ -350,7 +343,7 @@ int TopoManager::pickClosestRank(int mype, int *pes, int n){
   return minIdx;
 }
 
-int TopoManager::areNeighbors(int pe1, int pe2, int pe3, int distance) {
+int TopoManager::areNeighbors(int pe1, int pe2, int pe3, int distance) const {
 #if CMK_BLUEGENEQ
   int pe1_a, pe1_b, pe1_c, pe1_d, pe1_e, pe1_t;
   int pe2_a, pe2_b, pe2_c, pe2_d, pe2_e, pe2_t;
@@ -380,7 +373,7 @@ int TopoManager::areNeighbors(int pe1, int pe2, int pe3, int distance) {
 }
 
 #if CMK_BLUEGENEQ
-void TopoManager::printAllocation(FILE *fp)
+void TopoManager::printAllocation(FILE *fp) const
 {
 	int i,a,b,c,d,e,t;
 	fprintf(fp, "Topology Info-\n");
@@ -393,7 +386,7 @@ void TopoManager::printAllocation(FILE *fp)
 	}
 }
 #else
-void TopoManager::printAllocation(FILE *fp)
+void TopoManager::printAllocation(FILE *fp) const
 {
 	int i,x,y,z,t;
 	fprintf(fp, "Topology Info-\n");
@@ -556,13 +549,12 @@ void TopoManager_getRanks(int *rank_cnt, int *ranks, int *coords) {
   if(_tmgr == NULL) { printf("ERROR: TopoManager NOT initialized. Aborting...\n"); exit(1); }
 #endif
 
-  int rank, numRanks = _tmgr->getDimNT()/CmiMyNodeSize();
   *rank_cnt = 0;
   for(int t = 0; t < _tmgr->getDimNT(); t += CmiMyNodeSize()) {
 #if CMK_BLUEGENEQ
-    rank = _tmgr->coordinatesToRank(coords[0],coords[1],coords[2],coords[3],coords[4],t);
+    int rank = _tmgr->coordinatesToRank(coords[0],coords[1],coords[2],coords[3],coords[4],t);
 #else
-    rank = _tmgr->coordinatesToRank(coords[0],coords[1],coords[2],t);
+    int rank = _tmgr->coordinatesToRank(coords[0],coords[1],coords[2],t);
 #endif
     if(rank != -1) {
       ranks[*rank_cnt] = CmiNodeOf(rank);

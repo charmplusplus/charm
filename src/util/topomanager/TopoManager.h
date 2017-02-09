@@ -18,7 +18,7 @@
 #include "converse.h"
 #else
 #include "tpm_standalone.h"
-#include "string.h"
+#include <string.h>
 #endif
 
 #if defined(__cplusplus)
@@ -99,28 +99,34 @@ class TopoManager {
 
     inline int getProcsPerNode() const { return procsPerNode; }
 
-    int hasMultipleProcsPerNode() const;
-    void rankToCoordinates(int pe, int &x, int &y, int &z, int &t);
-    void rankToCoordinates(int pe, int &a, int &b, int &c, int &d, int &e, int &t);
-    int coordinatesToRank(int x, int y, int z, int t);
-    int coordinatesToRank(int a, int b, int c, int d, int e, int t);
-    int getHopsBetweenRanks(int pe1, int pe2);
-    int getHopsBetweenRanks(int *pe1, int pe2);
-    void sortRanksByHops(int pe, int *pes, int *idx, int n);
-    void sortRanksByHops(int *pe, int *pes, int *idx, int n);
-    int pickClosestRank(int mype, int *pes, int n);
-    int areNeighbors(int pe1, int pe2, int pe3, int distance);
-    void printAllocation(FILE *fp);
+    inline bool hasMultipleProcsPerNode() const { return (procsPerNode > 1); }
+    void rankToCoordinates(int pe, int &x, int &y, int &z, int &t) const;
+    void rankToCoordinates(int pe, int &a, int &b, int &c, int &d, int &e, int &t) const;
+    /**
+     * Return pe at specified coordinates, or -1 if doesn't exist
+     */
+    int coordinatesToRank(int x, int y, int z, int t) const;
+    /**
+     * Return pe at specified coordinates, or -1 if doesn't exist
+     */
+    int coordinatesToRank(int a, int b, int c, int d, int e, int t) const;
+    int getHopsBetweenRanks(int pe1, int pe2) const;
+    int getHopsBetweenRanks(int *pe1, int pe2) const;
+    void sortRanksByHops(int pe, int *pes, int *idx, int n) const;
+    void sortRanksByHops(int *pe, int *pes, int *idx, int n) const;
+    int pickClosestRank(int mype, int *pes, int n) const;
+    int areNeighbors(int pe1, int pe2, int pe3, int distance) const;
+    void printAllocation(FILE *fp) const;
 
     /** The next 5 functions are only there for backward compatibility
     and should not be used */
-    inline int getDimX() { return dimX; }
-    inline int getDimY() { return dimY; }
-    inline int getDimZ() { return dimZ; }
-    void rankToCoordinates(int pe, int &x, int &y, int &z);
-    int coordinatesToRank(int x, int y, int z);
+    inline int getDimX() const { return dimX; }
+    inline int getDimY() const { return dimY; }
+    inline int getDimZ() const { return dimZ; }
+    void rankToCoordinates(int pe, int &x, int &y, int &z) const;
+    int coordinatesToRank(int x, int y, int z) const;
 
-    inline int absX(int x) {
+    inline int absX(int x) const {
       int px = abs(x);
       int sx = dimNX - px;
       CmiAssert(sx>=0);
@@ -130,7 +136,7 @@ class TopoManager {
         return px;
     }
     
-    inline int absY(int y) {
+    inline int absY(int y) const {
       int py = abs(y);
       int sy = dimNY - py;
       CmiAssert(sy>=0);
@@ -140,7 +146,7 @@ class TopoManager {
         return py;
     }
 
-    inline int absZ(int z) {
+    inline int absZ(int z) const {
       int pz = abs(z);
       int sz = dimNZ - pz;
       CmiAssert(sz>=0);
@@ -150,7 +156,7 @@ class TopoManager {
         return pz;
     }
 #if CMK_BLUEGENEQ
-    inline int absA(int a) {
+    inline int absA(int a) const {
       int pa = abs(a);
       int sa = dimNA - pa;
       CmiAssert(sa>=0);
@@ -160,7 +166,7 @@ class TopoManager {
         return pa;
     }
 
-    inline int absB(int b) {
+    inline int absB(int b) const {
       int pb = abs(b);
       int sb = dimNB - pb;
       CmiAssert(sb>=0);
@@ -170,7 +176,7 @@ class TopoManager {
         return pb;
     }
 
-    inline int absC(int c) {
+    inline int absC(int c) const {
       int pc = abs(c);
       int sc = dimNC - pc;
       CmiAssert(sc>=0);
@@ -180,7 +186,7 @@ class TopoManager {
         return pc;
     }
 
-    inline int absD(int d) {
+    inline int absD(int d) const {
       int pd = abs(d);
       int sd = dimND - pd;
       CmiAssert(sd>=0);
@@ -190,7 +196,7 @@ class TopoManager {
         return pd;
     }
 
-    inline int absE(int e) {
+    inline int absE(int e) const {
       int pe = abs(e);
       int se = dimNE - pe;
       CmiAssert(se>=0);
