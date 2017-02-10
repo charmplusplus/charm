@@ -136,9 +136,12 @@ class Participant : public CBase_Participant{
 private:
   int *neighbors;
   DataItem myItem;
+  int nIters, receiveCounter;
 public:
   Participant() {
 
+    nIters = 0;
+    receiveCounter = 0;
     int numPes = CkNumPes();
     neighbors = new int[numPes];
     for (int i = 0; i < numPes; i++) {
@@ -157,6 +160,7 @@ public:
   }
 
   void communicate(int iters, bool useTram) {
+    nIters = iters;
     GroupMeshStreamer<DataItem, Participant, SimpleMeshRouter> *localStreamer;
     if (useTram) {
       localStreamer = aggregator.ckLocalBranch();
@@ -183,9 +187,6 @@ public:
     if (useTram) {
       localStreamer->done();
     }
-    else {
-      contribute(CkCallback(CkReductionTarget(Main, allDone), mainProxy));
-    }
   }
 
   void process(const DataItem &item) {
@@ -193,7 +194,10 @@ public:
   }
 
   void receive(DataItem item) {
-    // nothing here - we only care about communication
+    if(++receiveCounter >= (CkNumPes()*nIters)) {
+        receiveCounter = 0;
+        contribute(CkCallback(CkReductionTarget(Main, allDone), mainProxy));
+    }
   }
 
 };
