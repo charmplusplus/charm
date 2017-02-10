@@ -1999,8 +1999,11 @@ void ConverseCleanup(void)
 
       skt_close(Cmi_charmrun_fd);
       // Avoid crash by SIGALRM
+#if _POSIX_C_SOURCE
       sigaction(SIGALRM, SIG_IGN, NULL);
-
+#else
+      signal(SIGALRM, SIG_IGN);
+#endif
 #if CMK_USE_IBVERBS
       CmiMachineCleanup();
 #endif
@@ -2040,6 +2043,7 @@ void ConverseCleanup(void)
 static void set_signals(void)
 {
   if(!Cmi_truecrash) {
+#if _POSIX_C_SOURCE
     struct sigaction sa;
     sa.sa_handler = KillOnAllSigs;
     sigemptyset(&sa.sa_mask);    
@@ -2051,7 +2055,14 @@ static void set_signals(void)
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
     sigaction(SIGABRT, &sa, NULL);
-
+#else
+    signal(SIGSEGV, KillOnAllSigs);
+    signal(SIGFPE, KillOnAllSigs);
+    signal(SIGILL, KillOnAllSigs);
+    signal(SIGINT, KillOnAllSigs);
+    signal(SIGTERM, KillOnAllSigs);
+    signal(SIGABRT, KillOnAllSigs);
+#endif
 #   if !defined(_WIN32) || defined(__CYGWIN__) /*UNIX-only signals*/
     sigaction(SIGQUIT, &sa, NULL);
     sigaction(SIGBUS, &sa, NULL);

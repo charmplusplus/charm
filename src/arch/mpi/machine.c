@@ -282,7 +282,11 @@ static int checksum_flag = 0;
 
 /* =====Beginning of Declarations of Machine Specific Variables===== */
 #include <signal.h>
+#if _POSIX_C_SOURCE
 struct sigaction signal_int;
+#else
+void (*signal_int)(int);
+#endif
 static int _thread_provided = -1; /* Indicating MPI thread level */
 static int idleblock = 0;
 
@@ -1162,7 +1166,11 @@ void LrtsExit() {
     
    if(!CharmLibInterOperate || userDrivenMode) {
 #if ! CMK_AUTOBUILD
+#if _POSIX_C_SOURCE
       sigaction(SIGINT, &signal_int, NULL);
+#else
+      signal(SIGINT, signal_int);
+#endif
       MPI_Finalize();
 #endif
       exit(0);
@@ -1394,6 +1402,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 
 #if CMK_CHARMDEBUG
     /* setup signal handlers */
+#if _POSIX_C_SOURCE
     struct sigaction sa;
     sa.sa_handler = KillOnAllSigs;
     sigemptyset(&sa.sa_mask);
@@ -1405,7 +1414,14 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     sigaction(SIGINT, &sa, &signal_int);
     sigaction(SIGTERM, &sa, NULL);
     sigaction(SIGABRT, &sa, NULL);
-
+#else
+    signal(SIGSEGV, KillOnAllSigs);
+    signal(SIGFPE, KillOnAllSigs);
+    signal(SIGILL, KillOnAllSigs);
+    signal_int = signal(SIGINT, KillOnAllSigs);
+    signal(SIGTERM, KillOnAllSigs);
+    signal(SIGABRT, KillOnAllSigs);
+#endif
 #if defined(_WIN32) && ! defined(__CYGWIN__) /*UNIX-only signals*/
     sigaction(SIGQUIT, &sa, NULL);
     sigaction(SIGBUS, &sa, NULL);

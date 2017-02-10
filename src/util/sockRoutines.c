@@ -85,7 +85,7 @@ static struct sigaction sa;
 static void skt_SIGPIPE_handler(int sig) {
 	if (skt_ignore_SIGPIPE) {
 		fprintf(stderr,"Caught SIGPIPE.\n");
-		signal(SIGPIPE,skt_SIGPIPE_handler);
+		sigaction(SIGPIPE, &sa, NULL);
 	}
 	else
 		skt_fallback_SIGPIPE(sig);
