@@ -282,7 +282,7 @@ static int checksum_flag = 0;
 
 /* =====Beginning of Declarations of Machine Specific Variables===== */
 #include <signal.h>
-#if _POSIX_C_SOURCE
+#if !defined(_WIN32) || defined(__CYGWIN__)
 struct sigaction signal_int;
 #else
 void (*signal_int)(int);
@@ -1166,7 +1166,7 @@ void LrtsExit() {
     
    if(!CharmLibInterOperate || userDrivenMode) {
 #if ! CMK_AUTOBUILD
-#if _POSIX_C_SOURCE
+#if !defined(_WIN32) || defined(__CYGWIN__)
       sigaction(SIGINT, &signal_int, NULL);
 #else
       signal(SIGINT, signal_int);
@@ -1402,7 +1402,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 
 #if CMK_CHARMDEBUG
     /* setup signal handlers */
-#if _POSIX_C_SOURCE
+#if !defined(_WIN32) || defined(__CYGWIN__)
     struct sigaction sa;
     sa.sa_handler = KillOnAllSigs;
     sigemptyset(&sa.sa_mask);
@@ -1422,7 +1422,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     signal(SIGTERM, KillOnAllSigs);
     signal(SIGABRT, KillOnAllSigs);
 #endif
-#if defined(_WIN32) && ! defined(__CYGWIN__) /*UNIX-only signals*/
+#if !defined(_WIN32) || defined(__CYGWIN__) /*UNIX-only signals*/
     sigaction(SIGQUIT, &sa, NULL);
     sigaction(SIGBUS, &sa, NULL);
 #endif /*UNIX*/

@@ -1903,7 +1903,7 @@ void LrtsExit()
 static void set_signals(void)
 {
   if(!Cmi_truecrash) {
-#if _POSIX_C_SOURCE
+#if !defined(_WIN32) || defined(__CYGWIN__)
     struct sigaction sa;
     sa.sa_handler = KillOnAllSigs;
     sigemptyset(&sa.sa_mask);    
