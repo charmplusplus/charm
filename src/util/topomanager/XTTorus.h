@@ -167,14 +167,14 @@ class XTTorusManager {
 
     inline int* isTorus() { return torus; }
 
-    inline void rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
+    inline void rankToCoordinates(int pe, int &x, int &y, int &z, int &t) const {
       x = pid2coords[pe].x;
       y = pid2coords[pe].y;
       z = pid2coords[pe].z;
       t = pid2coords[pe].t;
     }
 
-    inline int coordinatesToRank(int x, int y, int z, int t) {
+    inline int coordinatesToRank(int x, int y, int z, int t) const {
       return coords2pid[x][y][z][t];
     }
 };
