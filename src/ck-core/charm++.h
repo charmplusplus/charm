@@ -749,7 +749,6 @@ PUPbytes(CkReductionClientBundle)
 
 
 class CProxy_NodeGroup;
-class CProxy_CkArrayReductionMgr;
 class CProxy_Group : public CProxy {
   private:
     CkGroupID _ck_gid;
@@ -1052,7 +1051,6 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #include "sdag.h"
 #include "ckcheckpoint.h"
 #include "ckevacuation.h"
-#include "ckarrayreductionmgr.h"
 #include "trace.h"
 #include "envelope.h"
 #include "pathHistory.h"

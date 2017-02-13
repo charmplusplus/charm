@@ -19,11 +19,6 @@ The calls needed to use the reduction manager are:
 #define _CKREDUCTION_H
 
 #include "CkReduction.decl.h"
-#include "CkArrayReductionMgr.decl.h"
-
-#if CMK_BIGSIM_CHARM || CMK_MULTICORE || !CMK_SMP
-#define GROUP_LEVEL_REDUCTION           1
-#endif
 
 #ifdef _PIPELINED_ALLREDUCE_
 #define FRAG_SIZE 131072
@@ -97,11 +92,10 @@ public:
 
 class countAdjustment {
 public:
-	int gcount;//Adjustment to global count (applied at reduction end)
-	int lcount;//Adjustment to local count (applied continually)
-	bool mainRecvd;
-    countAdjustment(int ignored=0) {(void)ignored; gcount=0; lcount=0; mainRecvd=false;}
-	void pup(PUP::er& p){ p|gcount; p|lcount; p|mainRecvd; }
+  int gcount;//Adjustment to global count (applied at reduction end)
+  int lcount;//Adjustment to local count (applied continually)
+  countAdjustment(int ignored=0) {(void)ignored; gcount=0; lcount=0;}
+  void pup(PUP::er& p){ p|gcount; p|lcount; }
 };
 
 /** @todo: Fwd decl for a temporary class. Remove after
@@ -247,7 +241,6 @@ public:
 private:
 	friend class CkReductionMgr;
  	friend class CkNodeReductionMgr;
-	friend class CkArrayReductionMgr;
 	friend class CkMulticastMgr;
     friend class ck::impl::XArraySectionReducer;
 //System-level interface
@@ -272,7 +265,6 @@ class CkReductionMsg : public CMessage_CkReductionMsg
 	friend class CkReduction;
 	friend class CkReductionMgr;
 	friend class CkNodeReductionMgr;
-	friend class CkArrayReductionMgr;
 	friend class CkMulticastMgr;
 #ifdef _PIPELINED_ALLREDUCE_
 	friend class ArrayElement;
@@ -332,7 +324,6 @@ private:
 	void *data;//Reduction data
 	CMK_REFNUM_TYPE userFlag; //Some sort of identifying flag, for client use
 	CkCallback callback; //What to do when done
-	CkCallback secondaryCallback; // the group callback is piggybacked on the nodegrp reduction
 	bool migratableContributor; // are the contributors migratable
 
 	int sourceFlag;/*Flag:
@@ -408,18 +399,12 @@ public:
 	void contribute(contributorInfo *ci,CkReductionMsg *msg);
 	void contributeWithCounter(contributorInfo *ci,CkReductionMsg *m,int count);
 //Communication (library-private)
-        void restartLocalGroupReductions(int number);
-	//Sent down the reduction tree (used by barren PEs)
-	void ReductionStarting(CkReductionNumberMsg *m);
 	//Sent up the reduction tree with reduced data
 	void RecvMsg(CkReductionMsg *m);
 	void doRecvMsg(CkReductionMsg *m);
 	void LateMigrantMsg(CkReductionMsg *m);
 
 	virtual void flushStates();	// flush state varaibles
-    virtual int startLocalGroupReductions(int number){ (void)number; return 1;} // can be used to start reductions on all the
-	//CkReductionMgrs on a particular node. It is overwritten by CkArrayReductionMgr to make the actual calls
-	// since it knows the CkReductionMgrs on a node.
 
 	virtual int getTotalGCount(){return 0;};
 
@@ -548,13 +533,12 @@ class NodeGroup : public CkNodeReductionMgr {
 };
 
 
-class CProxy_CkArrayReductionMgr;
 class CkReductionMgr : public CkGroupInitCallback {
 public:
         CProxy_CkReductionMgr thisProxy;
 
 public:
-	CkReductionMgr(CProxy_CkArrayReductionMgr groupRednMgr);
+	CkReductionMgr();
 	CkReductionMgr(CkMigrateMessage *m);
         ~CkReductionMgr();
 
@@ -600,10 +584,6 @@ public:
 	void RecvMsg(CkReductionMsg *m);
   void AddToInactiveList(CkReductionInactiveMsg *m);
 
-	//Call back for using Node added by Sayantan
-	void ArrayReductionHandler(CkReductionMsg *m);
-	void endArrayReduction();
-
 // simple barrier for FT
         void barrier(CkReductionMsg * msg);
         void Barrier_RecvMsg(CkReductionMsg *m);
@@ -645,15 +625,9 @@ private:
 	int numEmigrantRecObjs;
 #endif
 
-#if !GROUP_LEVEL_REDUCTION
-	CProxy_CkArrayReductionMgr nodeProxy; //holds the local branch of the nodegroup tree
-#endif
-
 //Data members
 	//Stored callback function (may be NULL if none has been set)
 	CkCallback storedCallback;
-	// calback that came along with the contribute
- 	CkCallback *secondaryStoredCallback;
 
 	int redNo;//Number of current reduction (incremented at end) to be deposited with NodeGroups
 	int completedRedNo;//Number of reduction Completed ie recieved callback from NodeGroups

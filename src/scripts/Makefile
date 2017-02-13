@@ -227,7 +227,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h ckIgetControl.h cktiming.h debug-charm.h\
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
-	  ckarrayreductionmgr.h cksection.h ckmessage.h cklocrec.h ckmigratable.h \
+	  cksection.h ckmessage.h cklocrec.h ckmigratable.h \
 	  ckarrayindex.h ckarray.h cklocation.h ckmulticast.h ckreduction.h \
 	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h\
           ckmessagelogging.h ckcausalmlog.h ckobjid.h\
@@ -242,7 +242,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  NeighborLBMsg.h \
 	  BlueGene.h middle.h middle-conv.h middle-blue.h \
           CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h CkMulticast.decl.h	\
-          CkReduction.decl.h CkArrayReductionMgr.decl.h\
+          CkReduction.decl.h \
           tempo.decl.h waitqd.decl.h \
           CkFutures.decl.h CkCheckpoint.decl.h CkCheckpointStatus.decl.h CkMemCheckpoint.decl.h \
           LBDatabase.decl.h MetaBalancer.decl.h CentralLB.decl.h NullLB.decl.h \
@@ -607,7 +607,7 @@ CK_LIBS_CORE=$(L)/libck.a
 
 LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o cktaskQ.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
-	   cklocation.o ckmulticast.o ckarray.o ckreduction.o ckarrayreductionmgr.o \
+	   cklocation.o ckmulticast.o ckarray.o ckreduction.o \
            tempo.o waitqd.o LBDatabase.o MetaBalancer.o lbdb.o lbdbf.o ckobjQ.o \
 	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckmessagelogging.o ckcausalmlog.o ckobjid.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
@@ -676,14 +676,14 @@ libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
   middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
   ckhashtable.h debug-charm.h CkMarshall.decl.h cksection.h ckcallback.h \
   conv-ccs.h sockRoutines.h ccs-server.h ckobjQ.h ckreduction.h \
-  CkReduction.decl.h CkArrayReductionMgr.decl.h \
+  CkReduction.decl.h \
   ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h cklocrec.h ckmigratable.h \
   cklocation.h ckmulticast.h LBDatabase.h MetaBalancer.h lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h \
   LBMachineUtil.h lbdb++.h LBDatabase.decl.h MetaBalancer.decl.h NullLB.decl.h BaseLB.decl.h \
   CkLocation.decl.h CkMulticast.decl.h CkArray.decl.h objid.h envelope.h envelope-path.h XArraySectionReducer.h CkFutures.decl.h \
   tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
-  ckarrayreductionmgr.h trace.h trace-bluegene.h trace-simple.h \
+  trace.h trace-bluegene.h trace-simple.h \
   register.h trace-common.h trace-simpleBOC.h TraceSimple.decl.h \
   TraceSimple.def.h
 	$(CHARMC) -c -I. $(TAU_INCLUDE) $(TAU_DEFS) trace-Tau.C -o libtrace-Tau.o

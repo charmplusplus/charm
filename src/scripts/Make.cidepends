@@ -58,7 +58,6 @@ TreeMatchLB.decl.h TreeMatchLB.def.h: TreeMatchLB.ci.stamp
 WSLB.decl.h WSLB.def.h: WSLB.ci.stamp
 ZoltanLB.decl.h ZoltanLB.def.h: ZoltanLB.ci.stamp
 CkArray.decl.h CkArray.def.h: ckarray.ci.stamp
-CkArrayReductionMgr.decl.h CkArrayReductionMgr.def.h: ckarrayreductionmgr.ci.stamp
 CkCallback.decl.h CkCallback.def.h: ckcallback.ci.stamp
 CkCheckpoint.decl.h CkCheckpoint.def.h: ckcheckpoint.ci.stamp
 CkCheckpointStatus.decl.h CkCheckpointStatus.def.h: ckcheckpointstatus.ci.stamp

@@ -805,14 +805,7 @@ static CkArrayID CkCreateArray(CkArrayMessage *m, int ctor, CkArrayOptions opts)
   {
     e_opts.setGroupDepID(mCastMgr);
   }
-#if !GROUP_LEVEL_REDUCTION
-  CProxy_CkArrayReductionMgr nodereductionProxy = CProxy_CkArrayReductionMgr::ckNew();
-  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,nodereductionProxy, &e_opts);
-  nodereductionProxy.setAttachedGroup(ag);
-#else
-  CkNodeGroupID dummyid;
-  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,dummyid, &e_opts);
-#endif
+  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,&e_opts);
   return (CkArrayID)ag;
 }
 
@@ -990,10 +983,8 @@ void _ckArrayInit(void)
 }
 
 CkArray::CkArray(CkArrayOptions &opts,
-		 CkMarshalledMessage &initMsg,
-		 CkNodeGroupID nodereductionID)
-  : CkReductionMgr(nodereductionID),
-    locMgr(CProxy_CkLocMgr::ckLocalBranch(opts.getLocationManager())),
+		 CkMarshalledMessage &initMsg)
+  : locMgr(CProxy_CkLocMgr::ckLocalBranch(opts.getLocationManager())),
     locMgrID(opts.getLocationManager()),
     sectionAutoDelegate(opts.isSectionAutoDelegated()),
     mCastMgrID(opts.getMcastManager()),

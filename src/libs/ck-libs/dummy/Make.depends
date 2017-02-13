@@ -26,7 +26,6 @@ ckdummy.o: ckdummy.C ../../../../tmp/charm++.h \
   ../../../../tmp/conv-ccs.h ../../../../tmp/sockRoutines.h \
   ../../../../tmp/ccs-server.h ../../../../tmp/ckobjQ.h \
   ../../../../tmp/ckreduction.h ../../../../tmp/CkReduction.decl.h \
-  ../../../../tmp/CkArrayReductionMgr.decl.h \
   ../../../../tmp/ckmemcheckpoint.h \
   ../../../../tmp/CkMemCheckpoint.decl.h ../../../../tmp/readonly.h \
   ../../../../tmp/ckarray.h ../../../../tmp/cklocation.h \
@@ -43,7 +42,7 @@ ckdummy.o: ckdummy.C ../../../../tmp/charm++.h \
   ../../../../tmp/tempo.decl.h ../../../../tmp/waitqd.h \
   ../../../../tmp/waitqd.decl.h ../../../../tmp/ckcheckpoint.h \
   ../../../../tmp/ckcallback.h ../../../../tmp/ckevacuation.h \
-  ../../../../tmp/ckarrayreductionmgr.h ../../../../tmp/trace.h \
+  ../../../../tmp/trace.h \
   ../../../../tmp/trace-bluegene.h ../../../../tmp/register.h \
   ckdummy.h CkDummy.decl.h ../../../../tmp/sdag.h \
   ../../../../tmp/spanningTreeStrategy.h \

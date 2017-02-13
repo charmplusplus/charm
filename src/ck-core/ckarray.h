@@ -617,7 +617,6 @@ typedef ArrayElementT<CkIndexMax> ArrayElementMax;
 /*@{*/
 
 #include "CkArray.decl.h"
-#include "CkArrayReductionMgr.decl.h"
 
 void CkSendAsyncCreateArray(int ctor, CkCallback cb, CkArrayOptions opts, void *ctorMsg);
 
@@ -654,7 +653,7 @@ private:
 
 public:
 //Array Creation:
-  CkArray(CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID nodereductionProxy);
+  CkArray(CkArrayOptions &c,CkMarshalledMessage &initMsg);
   CkArray(CkMigrateMessage *m);
   ~CkArray();
   CkGroupID &getGroupID(void) {return thisgroup;}

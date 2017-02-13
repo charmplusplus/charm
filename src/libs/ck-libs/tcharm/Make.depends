@@ -29,7 +29,6 @@ tcharm.o: tcharm.C tcharm_impl.h ../../../../include/pup.h \
   ../../../../include/sockRoutines.h ../../../../include/ccs-server.h \
   ../../../../include/ckobjQ.h ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -48,7 +47,7 @@ tcharm.o: tcharm.C tcharm_impl.h ../../../../include/pup.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   tcharm.h ../../../../include/ckcheckpoint.h \
   ../../../../include/mempool.h ../../../../include/ckevacuation.h \
@@ -84,7 +83,6 @@ tcharmmain.o: tcharmmain.C tcharm_impl.h ../../../../include/pup.h \
   ../../../../include/sockRoutines.h ../../../../include/ccs-server.h \
   ../../../../include/ckobjQ.h ../../../../include/ckreduction.h \
   ../../../../include/CkReduction.decl.h \
-  ../../../../include/CkArrayReductionMgr.decl.h \
   ../../../../include/ckmemcheckpoint.h \
   ../../../../include/CkMemCheckpoint.decl.h \
   ../../../../include/readonly.h ../../../../include/ckarray.h \
@@ -103,7 +101,7 @@ tcharmmain.o: tcharmmain.C tcharm_impl.h ../../../../include/pup.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
-  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
+  ../../../../include/trace.h \
   ../../../../include/trace-bluegene.h ../../../../include/sdag.h \
   tcharm.h ../../../../include/ckcheckpoint.h tcharmmain.decl.h \
   tcharmmain.def.h
