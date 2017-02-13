@@ -5607,6 +5607,9 @@ int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI
     // use a RednReq to non-block the caller and get a request ptr
     *request = ptr->postReq(new RednReq(recvbuf,count,type,comm,op));
   }
+  else {
+    *request = ptr->postReq(new RednReq(recvbuf,count,type,comm,op,AMPI_REQ_COMPLETED));
+  }
 
   return MPI_SUCCESS;
 }
@@ -5923,7 +5926,7 @@ int AMPI_Igather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     *request = ptr->postReq(new GatherReq(recvbuf, recvcount, recvtype, comm));
   }
   else {
-    *request = MPI_REQUEST_NULL;
+    *request = ptr->postReq(new GatherReq(recvbuf, recvcount, recvtype, comm, AMPI_REQ_COMPLETED));
   }
 
 #if AMPIMSGLOG
@@ -6070,7 +6073,8 @@ int AMPI_Igatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                                            comm, recvcounts, displs));
   }
   else {
-    *request = MPI_REQUEST_NULL;
+    *request = ptr->postReq(new GathervReq(recvbuf, ptr->getSize(comm), recvtype,
+                                           comm, recvcounts, displs, AMPI_REQ_COMPLETED));
   }
 
 #if AMPIMSGLOG
