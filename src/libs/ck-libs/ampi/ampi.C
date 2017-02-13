@@ -4156,6 +4156,9 @@ int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
     return ret;
 #endif
 
+  if (comm == MPI_COMM_SELF)
+    return copyDatatype(datatype, count, datatype, count, sendbuf, recvbuf);
+
   MPI_Status sts;
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
@@ -4202,6 +4205,9 @@ int AMPI_Exscan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
+
+  if (comm == MPI_COMM_SELF)
+    return MPI_SUCCESS;
 
   MPI_Status sts;
   ampi *ptr = getAmpiInstance(comm);
