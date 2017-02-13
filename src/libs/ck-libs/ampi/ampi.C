@@ -6354,6 +6354,7 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   AMPIAPI("AMPI_Alltoall");
 
   handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_IN_PLACE(sendbuf, recvbuf);
 
 #if AMPI_ERROR_CHECKING
   int ret;
@@ -6367,8 +6368,6 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   if(comm==MPI_COMM_SELF)
     return copyDatatype(comm,sendtype,sendcount,sendbuf,recvbuf);
-  if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
-    CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Alltoall!");
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Alltoall for Inter-communicators!");
 
@@ -6501,7 +6500,11 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                    ((char*)recvbuf + p*recvcount*recvtype_extent));
     }
 
-  }else if ( itemsize <= AMPI_ALLTOALL_MEDIUM_MSG ) {
+  }
+  /* For MPI_IN_PLACE (sendbuf==recvbuf), prevent using the algorithm for
+     large message sizes, since it might lead to overwriting data before
+     it gets sent in the  non-power-of-two communicator size case. */
+  else if ( itemsize <= AMPI_ALLTOALL_MEDIUM_MSG  || recvbuf == sendbuf) {
     for(i=0;i<size;i++) {
       int dst = (rank+i) % size;
       ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*dst), sendcount,
