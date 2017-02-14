@@ -361,8 +361,6 @@ private:
                          // value = 0 to nFrags-1
 	double dataStorage;//Start of data array (so it's double-aligned)
 
-	int no;
-
 	//Default constructor is private so you must use "buildNew", above
     CkReductionMsg();
 };
