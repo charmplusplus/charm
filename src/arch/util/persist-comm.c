@@ -266,7 +266,7 @@ static void persistentDecompressHandler(void *msg)
     //  recover message based on previousRecvMsg
     PersistentReceivesTable *slot = (PersistentReceivesTable *) (((CmiMsgHeaderExt*)msg)-> persistRecvHandler);
     int     historyIndex;
-    register int i;
+    int i;
     char    *cmsg = (char*)msg;
     int     size = ((CmiMsgHeaderExt*)msg)->size;
     int     compressSize = *(int*)(msg+slot->compressStart);

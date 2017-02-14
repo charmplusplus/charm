@@ -60,10 +60,10 @@ double get_clock()
 /** compress char is the general algorithm   for any data*/
 void compressChar(void *src, void *dst, int size, int *compressSize, void *bData)
 {
-    register char *source = (char*)src;
-    register char *dest = (char*)dst;
-    register char *baseData = (char*)bData;
-    register int i;
+    char *source = (char*)src;
+    char *dest = (char*)dst;
+    char *baseData = (char*)bData;
+    int i;
 #if DEBUG
     double t1 = get_clock();
 #endif
@@ -72,7 +72,7 @@ void compressChar(void *src, void *dst, int size, int *compressSize, void *bData
     memcpy(dest, source, size*sizeof(char)); 
     *compressSize = size;
 #else
-    register int _dataIndex = (size+7)/8;
+    int _dataIndex = (size+7)/8;
     memset(dest, 0, (size+7)/8 );
     for (i = 0; i < size&&_dataIndex<size; ++i) {
         // Bitmask everything but the exponents, then check if they match.
@@ -105,10 +105,10 @@ void decompressChar(void *cData, void *dData, int size, int compressSize, void *
 #else
     char *compressData = (char*)cData;
     char *baseData = (char*)bData;
-    register char *decompressData =(char*)dData;
-    register int sdataIndex = (size+7)/8;
-    register char *src = (char*)compressData;
-    register int i;
+    char *decompressData =(char*)dData;
+    int sdataIndex = (size+7)/8;
+    char *src = (char*)compressData;
+    int i;
     for(i=0; i<size; ++i)
     {
        if(TESTBIT(src, i)) // same 
@@ -137,10 +137,10 @@ void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void 
     float *source = (float*)src;
     float *dest = (float*)dst;
     float *baseData = (float*)bData;
-    register unsigned int *bptr = (unsigned int*) baseData;
-    register unsigned int  *uptr = (unsigned int *) source;
-    register char *uchar;
-    register int i, j;
+    unsigned int *bptr = (unsigned int*) baseData;
+    unsigned int  *uptr = (unsigned int *) source;
+    char *uchar;
+    int i, j;
 #if DEBUG
     double t1 = get_clock();
 #endif
@@ -152,15 +152,15 @@ void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void 
     assert(baseData != NULL);
     {
         // Create message to receive the compressed buffer.
-        register unsigned char *cdst = (unsigned char*)dest; 
-        register int _dataIndex = (size+7)/8;
-        register unsigned int diff;
+        unsigned char *cdst = (unsigned char*)dest; 
+        int _dataIndex = (size+7)/8;
+        unsigned int diff;
 	memset(cdst, 0, (size+7)/8 );
         
-        register const __m128i* b_ptr = (__m128i*)bptr;
-        register const __m128i* u_ptr = (__m128i*)uptr;
+        const __m128i* b_ptr = (__m128i*)bptr;
+        const __m128i* u_ptr = (__m128i*)uptr;
         
-        register __m128i xmm_f = _mm_set1_epi32(0xFF000000);
+        __m128i xmm_f = _mm_set1_epi32(0xFF000000);
         for (i = 0; i < size; i+=4) {
             // Bitmask everything but the exponents, then check if they match.
             __m128i xmm_b = _mm_load_si128(b_ptr);
@@ -221,10 +221,10 @@ void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void 
     float *source = (float*)src;
     float *dest = (float*)dst;
     float *baseData = (float*)bData;
-    register unsigned int *bptr = (unsigned int*) baseData;
-    register unsigned int  *uptr = (unsigned int *) source;
-    register char *uchar;
-    register int i;
+    unsigned int *bptr = (unsigned int*) baseData;
+    unsigned int  *uptr = (unsigned int *) source;
+    char *uchar;
+    int i;
 #if DEBUG
     double t1 = get_clock();
 #endif
@@ -237,9 +237,9 @@ void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void 
     // Is this the first time we're sending stuff to this node?
     {
         // Create message to receive the compressed buffer.
-        register unsigned char *cdst = (unsigned char*)dest; 
-        register int _dataIndex = (size+7)/8;
-        register unsigned int diff;
+        unsigned char *cdst = (unsigned char*)dest; 
+        int _dataIndex = (size+7)/8;
+        unsigned int diff;
 	memset(cdst, 0, (size+7)/8 );
         for (i = 0; i < size; ++i) {
             // Bitmask everything but the exponents, then check if they match.
@@ -277,13 +277,13 @@ void decompressFloatingPoint(void *cData, void *dData, int s, int compressSize, 
 #else
     float *compressData = (float*)cData;
     float *baseData = (float*)bData;
-    register unsigned int *decompressData =(unsigned int*)dData;
-    register int _sdataIndex = (size+7)/8;
-    register char *src = (char*)compressData;
-    register int exponent;
-    register unsigned int mantissa;
-    register unsigned int *bptr = (unsigned int*)baseData;
-    register int i;
+    unsigned int *decompressData =(unsigned int*)dData;
+    int _sdataIndex = (size+7)/8;
+    char *src = (char*)compressData;
+    int exponent;
+    unsigned int mantissa;
+    unsigned int *bptr = (unsigned int*)baseData;
+    int i;
     for(i=0; i<size; ++i)
     {
        if(TESTBIT(src, i)) // different
@@ -311,9 +311,9 @@ void decompressFloatingPoint(void *cData, void *dData, int s, int compressSize, 
 #else
 void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void *bData)
 {
-    register unsigned int *dest = (unsigned int*)dst;
-    register unsigned int *bptr = (unsigned int*) bData;
-    register unsigned int  *uptr = (unsigned int *) src;
+    unsigned int *dest = (unsigned int*)dst;
+    unsigned int *bptr = (unsigned int*) bData;
+    unsigned int  *uptr = (unsigned int *) src;
     int size = s/sizeof(float);
 #if DEBUG
     double t1 = get_clock();
@@ -323,13 +323,13 @@ void compressFloatingPoint(void *src, void *dst, int s, int *compressSize, void 
     memcpy(dest, src, size*sizeof(float));
     *compressSize = s;
 #else
-    register unsigned int comp_data = 0;
-    register int f_index = 0;
-    register int i;
-    register int j;
-    register int b;
-    register int zers;
-    register unsigned int xor_data;
+    unsigned int comp_data = 0;
+    int f_index = 0;
+    int i;
+    int j;
+    int b;
+    int zers;
+    unsigned int xor_data;
     memset(dest, 0, s);
     for (i = 0; i < size; ++i) {
         xor_data = (uptr[i])^(bptr[i]);
@@ -373,18 +373,18 @@ void decompressFloatingPoint(void *cData, void *dData, int s, int compressSize, 
 #if !COMPRESS
     memcpy(dData, cData, size*sizeof(float));
 #else
-    register unsigned int *compressData = (unsigned int*)cData;
-    register unsigned int *decompressData = (unsigned int*)dData;
-    register unsigned int *baseData = (unsigned int*)bData;
+    unsigned int *compressData = (unsigned int*)cData;
+    unsigned int *decompressData = (unsigned int*)dData;
+    unsigned int *baseData = (unsigned int*)bData;
     memset(decompressData, 0, s);
-    register int index;
-    register unsigned int xor_data;
-    register int data = 0;
-    register int d_index=0;
-    register int compp = 0;
-    register int i;
-    register int j;
-    register int f;
+    int index;
+    unsigned int xor_data;
+    int data = 0;
+    int d_index=0;
+    int compp = 0;
+    int i;
+    int j;
+    int f;
     for (i=0; i<size; i++) {
         index = FLOAT_BIT-1;
         data = 0;
@@ -433,10 +433,10 @@ void compressDouble(void *src, void *dst, int s, int *compressSize, void *bData)
     double *source = (double*)src;
     double *dest = (double*)dst;
     double *baseData = (double*)bData;
-    register unsigned long *bptr = (unsigned long*) baseData;
-    register unsigned long *uptr = (unsigned long*) source;
-    register char *uchar;
-    register int i;
+    unsigned long *bptr = (unsigned long*) baseData;
+    unsigned long *uptr = (unsigned long*) source;
+    char *uchar;
+    int i;
 #if DEBUG
     double t1 = get_clock();
 #endif
@@ -450,8 +450,8 @@ void compressDouble(void *src, void *dst, int s, int *compressSize, void *bData)
     {
         *compressSize = s;
         // Create message to receive the compressed buffer.
-        register unsigned char *cdst = (unsigned char*)dest; 
-        register int _dataIndex = (2*size+7)/8;
+        unsigned char *cdst = (unsigned char*)dest; 
+        int _dataIndex = (2*size+7)/8;
         memset(cdst, 0, (2*size+7)/8 );
         for (i = 0; i < size; ++i) {
             // Bitmask everything but the exponents, then check if they match.
@@ -497,13 +497,13 @@ void decompressDouble(void *cData, void *dData, int s, int compressSize, void *b
 #else
     double *compressData = (double*)cData;
     double *baseData = (double*)bData;
-    register unsigned long *decompressData =(unsigned long*)dData;
-    register int _sdataIndex = (2*size+7)/8;
-    register char *src = (char*)compressData;
-    register unsigned long exponent;
-    register unsigned long mantissa;
-    register unsigned long *bptr = (unsigned long*)baseData;
-    register int i;
+    unsigned long *decompressData =(unsigned long*)dData;
+    int _sdataIndex = (2*size+7)/8;
+    char *src = (char*)compressData;
+    unsigned long exponent;
+    unsigned long mantissa;
+    unsigned long *bptr = (unsigned long*)baseData;
+    int i;
     for(i=0; i<size; ++i)
     {
         int bitss = TESTBIT(src, i<<1);
@@ -541,9 +541,9 @@ void decompressDouble(void *cData, void *dData, int s, int compressSize, void *b
 
 void compressDouble(void *src, void *dst, int s, int *compressSize, void *bData)
 {
-    register unsigned long *dest = (unsigned long*)dst;
-    register unsigned long *bptr = (unsigned long*) bData;
-    register unsigned long  *uptr = (unsigned long*) src;
+    unsigned long *dest = (unsigned long*)dst;
+    unsigned long *bptr = (unsigned long*) bData;
+    unsigned long  *uptr = (unsigned long*) src;
     int size = s/sizeof(double);
 #if DEBUG
     double t1 = get_clock();
@@ -553,12 +553,12 @@ void compressDouble(void *src, void *dst, int s, int *compressSize, void *bData)
     memcpy(dest, src, size*sizeof(double));
     *compressSize = s;
 #else
-    register int f_index = 0;
-    register int i;
-    register int j;
-    register int b;
-    register int zers;
-    register unsigned long xor_data;
+    int f_index = 0;
+    int i;
+    int j;
+    int b;
+    int zers;
+    unsigned long xor_data;
     memset(dest, 0, s);
     for (i = 0; i < size; ++i) {
         xor_data = (uptr[i])^(bptr[i]);
@@ -608,22 +608,22 @@ void decompressDouble(void *cData, void *dData, int s, int compressSize, void *b
 #if !COMPRESS
     memcpy(dData, cData, size*sizeof(double));
 #else
-    register unsigned long *compressData = (unsigned long*)cData;
-    register unsigned long *decompressData = (unsigned long*)dData;
-    register unsigned long *baseData = (unsigned long*)bData;
+    unsigned long *compressData = (unsigned long*)cData;
+    unsigned long *decompressData = (unsigned long*)dData;
+    unsigned long *baseData = (unsigned long*)bData;
     /*for (int k=0; k<size; k++) {
         printf("d: %d ",compressData[k]);
     }*/
     
     memset(decompressData, 0, s);
-    register int index;
-    register unsigned long xor_data;
-    register unsigned long data = 0;
-    register int d_index=0;
-    register int compp = 0;
-    register int i;
-    register int j;
-    register int f;
+    int index;
+    unsigned long xor_data;
+    unsigned long data = 0;
+    int d_index=0;
+    int compp = 0;
+    int i;
+    int j;
+    int f;
     for (i=0; i<size; i++) {
         index = BITS_DOUBLE-1;
         data = 0; int zers=0;

@@ -19,14 +19,14 @@ inline void *bg_dcopy128 ( void * dest, const void *src, size_t n )
   size_t size = n >> 7;
   size_t remainder = n & 0x7f;
   
-  register double r0;
-  register double r1;
-  register double r2;
-  register double r3;
-  register double r4;
-  register double r5;
-  register double r6;
-  register double r7;
+  double r0;
+  double r1;
+  double r2;
+  double r3;
+  double r4;
+  double r5;
+  double r6;
+  double r7;
 
   if (size > 0) {
     size --;   

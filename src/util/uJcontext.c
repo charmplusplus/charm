@@ -69,7 +69,7 @@ char *_dummyAllocaSetJcontext;
 /* Set user context from information of variable pointed to by UCP.  */
 int setJcontext (const uJcontext_t *u)
 {
-	register uJcontext_t *mu=(uJcontext_t *)u;
+	uJcontext_t *mu=(uJcontext_t *)u;
 	
 	CmiAssert (mu != NULL);
 
@@ -123,7 +123,7 @@ int setJcontext (const uJcontext_t *u)
 			asm __volatile__ ("mr 1,%0" :: "r"(new_sp));
 #else /* Portable alloca version */
 			char *old_sp = NULL;
-			register CmiInt8 allocLen;
+			CmiInt8 allocLen;
 			old_sp =  (char *)&old_sp;
 			allocLen=old_sp-new_sp;
                   
@@ -170,7 +170,7 @@ int setJcontext (const uJcontext_t *u)
 int swapJcontext (uJcontext_t *o,
                         const uJcontext_t *u)
 {
-	register uJcontext_t *mu=(uJcontext_t *)u;
+	uJcontext_t *mu=(uJcontext_t *)u;
 	VERBOSE( printf("swapJcontext(%p,%p)",o,u); printStack(); )
 	if (0==SETJMP(o->_uc_jmp_buf))
 		setJcontext(mu); /* direct path-- switch to new thread */

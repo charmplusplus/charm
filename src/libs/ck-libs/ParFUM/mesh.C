@@ -725,7 +725,7 @@ inline void setTableData(const void *user, int firstItem, int length,
 	IDXL_LAYOUT_PARAM, AllocTable2d<T> *table)
 {
 	for (int r=0;r<length;r++) {
-		register T *tableRow=table->getRow(firstItem+r);
+		T *tableRow=table->getRow(firstItem+r);
 		for (int c=0;c<width;c++)
 			tableRow[c]=IDXL_LAYOUT_DEREF(T,user,r,c);
 	}
@@ -737,7 +737,7 @@ inline void getTableData(void *user, int firstItem, int length,
 	IDXL_LAYOUT_PARAM, const AllocTable2d<T> *table)
 {
 	for (int r=0;r<length;r++) {
-		register const T *tableRow=table->getRow(firstItem+r);
+		const T *tableRow=table->getRow(firstItem+r);
 		for (int c=0;c<width;c++)
 			IDXL_LAYOUT_DEREF(T,user,r,c)=tableRow[c];
 	}
@@ -949,7 +949,7 @@ void setIndexTableData(const void *user, int firstItem, int length,
 	IDXL_LAYOUT_PARAM, AllocTable2d<int> *table,int indexBase)
 {
 	for (int r=0;r<length;r++) {
-		register int *tableRow=table->getRow(firstItem+r);
+		int *tableRow=table->getRow(firstItem+r);
 		for (int c=0;c<width;c++)
 			tableRow[c]=IDXL_LAYOUT_DEREF(int,user,r,c)-indexBase;
 	}
@@ -960,7 +960,7 @@ void getIndexTableData(void *user, int firstItem, int length,
 	IDXL_LAYOUT_PARAM, const AllocTable2d<int> *table,int indexBase)
 {
 	for (int r=0;r<length;r++) {
-		register const int *tableRow=table->getRow(firstItem+r);
+		const int *tableRow=table->getRow(firstItem+r);
 		for (int c=0;c<width;c++)
 			IDXL_LAYOUT_DEREF(int,user,r,c)=tableRow[c]+indexBase;
 	}

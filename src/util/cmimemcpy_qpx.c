@@ -21,17 +21,17 @@
 
 //Copy 512 bytes from a 32b aligned pointers
 static inline size_t quad_copy_512( char* dest, char* src ) {
-    register double *fpp1_1, *fpp1_2;
-    register double *fpp2_1, *fpp2_2;
+    double *fpp1_1, *fpp1_2;
+    double *fpp2_1, *fpp2_2;
 
-    register double f0 FP_REG(0);
-    register double f1 FP_REG(1);
-    register double f2 FP_REG(2);
-    register double f3 FP_REG(3);
-    register double f4 FP_REG(4);
-    register double f5 FP_REG(5);
-    register double f6 FP_REG(6);
-    register double f7 FP_REG(7);
+    double f0 FP_REG(0);
+    double f1 FP_REG(1);
+    double f2 FP_REG(2);
+    double f3 FP_REG(3);
+    double f4 FP_REG(4);
+    double f5 FP_REG(5);
+    double f6 FP_REG(6);
+    double f7 FP_REG(7);
 
     int r0;
     int r1;

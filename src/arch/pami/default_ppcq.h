@@ -44,7 +44,7 @@ static inline ppc_atomic_type_t PPC_AtomicLoadReserved ( volatile ppc_atomic_t *
 
 static inline int PPC_AtomicStoreConditional( volatile ppc_atomic_t *ptr, ppc_atomic_type_t val )
 {
-  register int rc = 1; // assume success
+  int rc = 1; // assume success
   __asm__ __volatile__ ("stdcx. %[val],0,%[ptr];\n"
                         "beq 1f;\n"
                         "li %[rc], 0;\n"
@@ -57,7 +57,7 @@ static inline int PPC_AtomicStoreConditional( volatile ppc_atomic_t *ptr, ppc_at
 
 static inline ppc_atomic_type_t PPC_AtomicLoadIncrementBounded (volatile ppc_atomic_t *counter)
 {
-  register ppc_atomic_type_t old_val, tmp_val, bound;
+  ppc_atomic_type_t old_val, tmp_val, bound;
   bound = counter[1].val;
   do
   {

@@ -49,7 +49,7 @@ void compressZlib(void *src, void *dst, int size, int *compressSize, void *bData
         initDone = 1;
     }
     char *xor=malloc(size);
-    register int i;
+    int i;
     for(i=0; i<size; i++)
         xor[i] = (src_ptr[i])^(bdata_ptr[i]);       
     zlib_compress(xor, dst, size, compressSize);
@@ -66,7 +66,7 @@ void decompressZlib(void *cData, void *dData, int size, int compressSize, void *
 #endif
     char *xor=(char*)malloc(size);
     zlib_decompress(cData, xor, compressSize, size);
-    register int i;
+    int i;
     char *dptr = (char*)dData;
     char *bptr = (char*)bData; 
     for(i=0; i<size; i++)
@@ -91,7 +91,7 @@ void compressLz4(void *src, void *dst, int size, int *compressSize, void *bData)
         initDone = 1;
     }
     char *xor=malloc(size);
-    register int i;
+    int i;
     for(i=0; i<size; i++)
         xor[i] = (src_ptr[i])^(bdata_ptr[i]);       
     lz4_wrapper_compress(xor, dst, size, compressSize);
@@ -108,7 +108,7 @@ void decompressLz4(void *cData, void *dData, int size, int compressSize, void *b
 #endif
     char *xor=(char*)malloc(size);
     lz4_wrapper_decompress(cData, xor, compressSize, size);
-    register int i;
+    int i;
     char *dptr = (char*)dData;
     char *bptr = (char*)bData; 
     for(i=0; i<size; i++)

@@ -97,7 +97,7 @@ int PPCAtomicEnqueue (PPCAtomicQueue          * queue,
 {
   //fprintf(stderr,"Insert message %p\n", element);
 
-  register int qsize_1 = queue->_qsize - 1;
+  int qsize_1 = queue->_qsize - 1;
   ppc_atomic_type_t index = PPC_AtomicLoadIncrementBounded(&queue->_state->Producer);
   PPC_AtomicWriteFence();
   if (index != CMI_PPC_ATOMIC_FAIL) {
@@ -120,7 +120,7 @@ void * PPCAtomicDequeue (PPCAtomicQueue    *queue)
   ppc_atomic_type_t head, tail;
   tail = PPC_AQVal(queue->_state->Producer);
   head = queue->_consumer;
-  register int qsize_1 = queue->_qsize-1;
+  int qsize_1 = queue->_qsize-1;
 
   volatile void *e = NULL;
   if (head < tail) {

@@ -69,8 +69,8 @@ template <int d>
 void rm_constraint(rational* A, int *LastPlane_, int rm_index)
 /* removes the constraints given in rm_index and adjusts *LastPlane */
 
-{   register rational *p1, *p2; 
-    register int i;
+{   rational *p1, *p2; 
+    int i;
 
     p1=A+rm_index*(d+1);
     p2=A+(rm_index+1)*(d+1);
@@ -88,7 +88,7 @@ void rm_constraint(rational* A, int *LastPlane_, int rm_index)
 
 
 bool notInPivot(int * pivot, int col, int i)
-{ register int h;
+{ int h;
   for (h=0;h<col;h++)
    if (pivot[h]==i) return false;
   return true;
@@ -99,8 +99,8 @@ void shift_P(rational *A, int LastPlane_)
 /*  shift one vertex of the polytope into the origin, that
     is, make at least d components of b equal zero */
 
-{   register rational  *p1, *p2, *p3, d1, d2, d3;
-    register int col, i, j;
+{   rational  *p1, *p2, *p3, d1, d2, d3;
+    int col, i, j;
     int pivot[d+1]; /* contains the pivot row of each column */
 
     #ifdef STATISTICS
@@ -218,8 +218,8 @@ int norm_and_clean_constraints(rational* A, int *LastPlane_)
    is reduced accordingly to the elimination process as well as insertion of the
    corresponding original indices into Del_index if Index_needed is true. */
 
-{   register int i, j, row = 0;
-    register rational r0, *p1, *p2;
+{   int i, j, row = 0;
+    rational r0, *p1, *p2;
 
     /* find nonzero[][] and maximal elements and normalize */
     p1=A;                                  /* begin of first constraint */

@@ -77,7 +77,7 @@ int LRTSQueuePush(LRTSQueue queue,
 		     void                   * element) 
 {
   //fprintf(stderr,"Insert message %p\n", element);
-  register int qsize_1 = queue->_qsize - 1;
+  int qsize_1 = queue->_qsize - 1;
   uint64_t index = L2_AtomicLoadIncrementBounded(&queue->_l2state->Producer);
   L1P_FlushRequests();
   if (index != L2_ATOMIC_FULL) {
@@ -102,7 +102,7 @@ void * LRTSQueuePop(LRTSQueue    queue)
   uint64_t head, tail;
   tail = queue->_l2state->Producer;
   head = queue->_l2state->Consumer;
-  register int qsize_1 = queue->_qsize-1;
+  int qsize_1 = queue->_qsize-1;
 
   volatile void *e = NULL;
   if (head < tail) {    
