@@ -1418,7 +1418,6 @@ bool ampiParent::kv_set_builtin(int keyval, void* attribute_val) {
 }
 
 bool ampiParent::kv_get_builtin(int keyval) {
-  int tmp;
   switch(keyval) {
     case MPI_TAG_UB:            kv_builtin_storage = &(CkpvAccess(bikvs).tag_ub);             return true;
     case MPI_HOST:              kv_builtin_storage = &(CkpvAccess(bikvs).host);               return true;
@@ -1431,10 +1430,6 @@ bool ampiParent::kv_get_builtin(int keyval) {
     case MPI_WIN_DISP_UNIT:     kv_builtin_storage = &(CkpvAccess(bikvs).win_disp_unit);      return true;
     case MPI_WIN_CREATE_FLAVOR: kv_builtin_storage = &(CkpvAccess(bikvs).win_create_flavor);  return true;
     case MPI_WIN_MODEL:         kv_builtin_storage = &(CkpvAccess(bikvs).win_model);          return true;
-    case AMPI_MY_WTH:           tmp = CkMyPe();      kv_builtin_storage = &tmp;               return true;
-    case AMPI_NUM_WTHS:         tmp = CkNumPes();    kv_builtin_storage = &tmp;               return true;
-    case AMPI_MY_PROCESS:       tmp = CkMyNode();    kv_builtin_storage = &tmp;               return true;
-    case AMPI_NUM_PROCESSES:    tmp = CkNumNodes();  kv_builtin_storage = &tmp;               return true;
     default: return false;
   };
 }
@@ -1452,6 +1447,13 @@ bool ampiParent::getBuiltinKeyval(int keyval, void *attribute_val) {
     else
       *(int **)attribute_val = kv_builtin_storage;
     return true;
+  } else {
+    switch(keyval) {
+      case AMPI_MY_WTH: *(int *)attribute_val = CkMyPe(); return true;
+      case AMPI_NUM_WTHS: *(int *)attribute_val = CkNumPes(); return true;
+      case AMPI_MY_PROCESS: *(int *)attribute_val = CkMyNode(); return true;
+      case AMPI_NUM_PROCESSES: *(int *)attribute_val = CkNumNodes(); return true;
+    }
   }
   return false;
 }
