@@ -1894,6 +1894,7 @@ extern int _immRunning;
 #define CmiMemoryAtomicFetchAndInc(...) ImplSelect3(__VA_ARGS__, CmiMemoryAtomicFetchAndIncMemOrder, CmiMemoryAtomicFetchAndIncSimple, Dummy)(__VA_ARGS__)
 
 #if __GNUC__ && __STDC_VERSION__ >= 201112L && !__STDC_NO_ATOMICS__
+#include <stdatomic.h>
 #define CmiMemoryAtomicIncrementMemOrder(someInt, MemModel) __atomic_fetch_add(&(someInt),1, MemModel);
 #define CmiMemoryAtomicDecrementMemOrder(someInt, MemModel) __atomic_fetch_sub(&(someInt),1, MemModel);
 #define CmiMemoryAtomicFetchAndIncMemOrder(input,output, MemModel) (output) = __atomic_fetch_add(&(input),1, MemModel);
