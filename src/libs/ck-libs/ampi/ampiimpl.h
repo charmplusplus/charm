@@ -62,11 +62,10 @@ class fromzDisk : public zdisk {
 #endif
 #endif // AMPIMSGLOG
 
-#define AMPI_ALLTOALL_SHORT_MSG   32
 #if CMK_CONVERSE_LAPI ||  CMK_BIGSIM_CHARM
-#define AMPI_ALLTOALL_MEDIUM_MSG   4194304
+#define AMPI_ALLTOALL_LONG_MSG   4194304
 #else
-#define AMPI_ALLTOALL_MEDIUM_MSG   32768
+#define AMPI_ALLTOALL_LONG_MSG   32768
 #endif
 
 typedef void (*MPI_MigrateFn)(void);
