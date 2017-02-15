@@ -731,7 +731,7 @@ if (  MSG_STATISTIC)
 #endif
 
 // functions related to partition
-#if defined(_WIN32) && ! defined(__CYGWIN__)
+#if defined(_WIN32)
   /* strtok is thread safe in VC++ */
 #define strtok_r(x,y,z) strtok(x,y)
 #endif

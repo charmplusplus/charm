@@ -328,9 +328,7 @@ inline SpanningTreeStrategy<Iterator>* getSpanningTreeStrategy(const Iterator fi
                                                                const Iterator beyondLastVtx,
                                                                const int maxBranches)
 {
-    #if CMK_BLUEGENEL || CMK_BLUEGENEP
-        return ( new SpanningTreeStrategy_3dTorus_minBytesHops<Iterator>() );
-    #elif XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY
+    #if XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY
         return ( new SpanningTreeStrategy_3dTorus_minBytesHops<Iterator>() );
     #else
         /// Nested, utility class to let us to use the parent PE for different Iterator::value_types

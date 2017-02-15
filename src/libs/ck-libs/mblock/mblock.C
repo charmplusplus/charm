@@ -81,11 +81,6 @@ void sum(const int len, d* lhs, const d* rhs)
   }
 }
 
-#ifdef __CYGWIN__
-#undef max 
-#undef min
-#endif
-
 template<class d>
 void max(const int len, d* lhs, const d* rhs)
 {

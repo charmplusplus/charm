@@ -455,7 +455,7 @@ static void cpuAffinityRecvHandler(void *msg)
   CmiFree(m);
 }
 
-#if defined(_WIN32) && ! defined(__CYGWIN__)
+#if defined(_WIN32)
   /* strtok is thread safe in VC++ */
 #define strtok_r(x,y,z) strtok(x,y)
 #endif
@@ -548,7 +548,7 @@ static int search_pemap(char *pecoremap, int pe)
   return i;
 }
 
-#if CMK_CRAYXT || CMK_CRAYXE || CMK_CRAYXC
+#if CMK_CRAYXE || CMK_CRAYXC
 extern int getXTNodeID(int mpirank, int nummpiranks);
 #endif
 
@@ -611,14 +611,14 @@ void CmiInitCPUAffinity(char **argv)
      affLock = CmiCreateLock();
   }
 
-#if CMK_BLUEGENEP || CMK_BLUEGENEQ
+#if CMK_BLUEGENEQ
   if(affinity_flag){
       affinity_flag = 0;
-      if(CmiMyPe()==0) CmiPrintf("Charm++> cpu affinity setting is not needed on Blue Gene, thus ignored.\n");
+      if(CmiMyPe()==0) CmiPrintf("Charm++> cpu affinity setting is not needed on Blue Gene/Q, thus ignored.\n");
   }
   if(show_affinity_flag){
       show_affinity_flag = 0;
-      if(CmiMyPe()==0) CmiPrintf("Charm++> printing cpu affinity is not supported on Blue Gene.\n");
+      if(CmiMyPe()==0) CmiPrintf("Charm++> printing cpu affinity is not supported on Blue Gene/Q.\n");
   }
 #endif
 
@@ -653,7 +653,7 @@ void CmiInitCPUAffinity(char **argv)
     }
     else {
     /* if (CmiSetCPUAffinity(CmiNumCores()-1) == -1) CmiAbort("set_cpu_affinity abort!"); */
-#if !CMK_CRAYXT && !CMK_CRAYXE && !CMK_CRAYXC && !CMK_BLUEGENEQ && !CMK_PAMI_LINUX_PPC8
+#if !CMK_CRAYXE && !CMK_CRAYXC && !CMK_BLUEGENEQ && !CMK_PAMI_LINUX_PPC8
       if (pemap == NULL) {
 #if CMK_MACHINE_PROGRESS_DEFINED
         while (affinity_doneflag < CmiMyNodeSize())  CmiNetworkProgress();
@@ -664,7 +664,7 @@ void CmiInitCPUAffinity(char **argv)
 #endif
       }
 #endif
-#if CMK_CRAYXT || CMK_CRAYXE || CMK_CRAYXC
+#if CMK_CRAYXE || CMK_CRAYXC
       /* if both pemap and commmap are NULL, will compute one */
       if (pemap != NULL)      
 #endif
@@ -690,7 +690,7 @@ void CmiInitCPUAffinity(char **argv)
     return;
   }
 
-#if CMK_CRAYXT || CMK_CRAYXE || CMK_CRAYXC
+#if CMK_CRAYXE || CMK_CRAYXC
   {
     int numCores = CmiNumCores();
 

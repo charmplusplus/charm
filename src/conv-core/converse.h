@@ -334,9 +334,7 @@ extern __thread int32_t _cmi_bgq_incommthread;
 
 #include "string.h"
 
-#if CMK_BLUEGENEL || CMK_BLUEGENEP
-#include "cmimemcpy.h"
-#elif CMK_BLUEGENEQ && CMK_BLUEGENEQ_OPTCOPY  
+#if CMK_BLUEGENEQ && CMK_BLUEGENEQ_OPTCOPY
 void CmiMemcpy_qpx (void *dst, const void *src, size_t n);
 #define CmiMemcpy(_dst, _src, _n)                                        \
   do {                                                                   \
@@ -471,15 +469,6 @@ for each processor in the node.
 */
 #ifdef CMK_CPV_IS_SMP
 
-/* buggy xlc compiler on bluegene/p does not like memory fence in Cpvs */
-#if CMK_BLUEGENEP && ( defined(__xlC__) || defined(__xlc__) )
-#define CpvMemoryReadFence()
-#define CpvMemoryWriteFence()
-#else
-#define CpvMemoryReadFence() CmiMemoryReadFence()
-#define CpvMemoryWriteFence() CmiMemoryWriteFence()
-#endif
-
 #if CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD
 #define CpvDeclare(t,v) __thread t* CMK_TAG(Cpv_,v) = NULL;   \
                         int CMK_TAG(Cpv_inited_,v) = 0;  \
@@ -530,11 +519,11 @@ for each processor in the node.
 #define CpvInitialize(t,v)\
     do { \
        if (CmiMyRank()) { \
-               CpvMemoryReadFence(); \
-		       while (!CpvInitialized(v)) { CMK_CPV_IS_SMP ; CpvMemoryReadFence(); } \
+               CmiMemoryReadFence(); \
+		       while (!CpvInitialized(v)) { CMK_CPV_IS_SMP ; CmiMemoryReadFence(); } \
        } else { \
                t* tmp = CpvInit_Alloc(t,1+CmiMyNodeSize());\
-               CpvMemoryWriteFence();   \
+               CmiMemoryWriteFence();   \
                CMK_TAG(Cpv_,v)=tmp;   \
 	       /* CMK_TAG(Cpv_,v)=CpvInit_Alloc(t,1+CmiMyNodeSize()); */\
        } \

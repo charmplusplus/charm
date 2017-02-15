@@ -55,7 +55,6 @@
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
-#define CMK_TIMER_USE_BLUEGENEL                            0
 
 
 /* In order to have a type with a fixed length across machines, these define the

@@ -58,7 +58,7 @@ skt_abortFn skt_set_abort(skt_abortFn f)
  * This lets us only handle SIGPIPEs we generated. */
 static int skt_ignore_SIGPIPE=0;
 
-#if defined(_WIN32) && !defined(__CYGWIN__) /*Windows systems:*/
+#if defined(_WIN32) /*Windows systems:*/
 static void doCleanup(void)
 { WSACleanup();}
 static int skt_inited=0;
@@ -128,7 +128,7 @@ by, e.g., an alarm and should be retried.
 static int skt_should_retry(void)
 {
 	int isinterrupt=0,istransient=0,istimeout=0;
-#if defined(_WIN32) && !defined(__CYGWIN__) /*Windows systems-- check Windows Sockets Error*/
+#if defined(_WIN32) /*Windows systems-- check Windows Sockets Error*/
 	int err=WSAGetLastError();
 	if (err==WSAEINTR) isinterrupt=1;
 	if (err==WSATRY_AGAIN||err==WSAECONNREFUSED)
@@ -139,9 +139,7 @@ static int skt_should_retry(void)
 	if (err==ETIMEDOUT) istimeout=1;
 	if (err==EAGAIN||err==ECONNREFUSED
                ||err==EWOULDBLOCK||err==ENOBUFS
-#ifndef __CYGWIN__
                ||err==ECONNRESET
-#endif
         )
 		istransient=1;
 #endif
@@ -475,7 +473,7 @@ SOCKET skt_connect(skt_ip_t ip, int port, int timeout)
 	  skt_close(ret);
 	  if (skt_should_retry()) continue;
 	  else {
-#if ! defined(_WIN32) || defined(__CYGWIN__)
+#if ! defined(_WIN32)
             if (ERRNO == ETIMEDOUT) continue;      /* time out is fine */
 #endif
             return skt_abort(-1, 93515, "Error connecting to socket\n");

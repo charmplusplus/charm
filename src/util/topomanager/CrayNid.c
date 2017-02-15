@@ -15,7 +15,7 @@
 #include "tpm_standalone.h"
 #endif
 
-#if CMK_CRAYXT || CMK_CRAYXE || CMK_CRAYXC
+#if CMK_CRAYXE || CMK_CRAYXC
 
 #if XT3_TOPOLOGY
 #else	/* if it is a XT4/5 or XE */
@@ -40,7 +40,7 @@ int getXTNodeID(int mpirank, int nummpiranks) {
   return nid;
 }
 
-#endif /* CMK_CRAYXT || CMK_CRAYXE || CMK_CRAYXC */
+#endif /* CMK_CRAYXE || CMK_CRAYXC */
 
 #if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 

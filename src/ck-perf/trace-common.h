@@ -8,7 +8,7 @@
 
 
 #include <stdlib.h>
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32)
 #include <direct.h>
 #define CHDIR _chdir
 #define GETCWD _getcwd

@@ -239,7 +239,7 @@ int _kq = -1;
 #include "ccs-server.h"
 #include "sockRoutines.h"
 
-#if defined(_WIN32) && ! defined(__CYGWIN__)
+#if defined(_WIN32)
 /*For windows systems:*/
 #  include <windows.h>
 #  include <wincon.h>
@@ -421,7 +421,7 @@ static void machine_atexit_check(void)
 #endif
 }
 
-#if !defined(_WIN32) || defined(__CYGWIN__)
+#if !defined(_WIN32)
 static void HandleUserSignals(int signum)
 {
   int condnum = ((signum==SIGUSR1) ? CcdSIGUSR1 : CcdSIGUSR2);
@@ -492,7 +492,7 @@ Horrific #defines to hide the differences between select() and poll().
 #endif
 
 static void CMK_PIPE_CHECKERR(void) {
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32)
 /* Win32 socket seems to randomly return inexplicable errors
 here-- WSAEINVAL, WSAENOTSOCK-- yet everything is actually OK. 
         int err=WSAGetLastError();
@@ -515,7 +515,7 @@ static void CmiStdoutCheck(CMK_PIPE_PARAM);
 
 double GetClock(void)
 {
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32)
   struct _timeb tv; 
   _ftime(&tv);
   return (tv.time * 1.0 + tv.millitm * 1.0E-3);
@@ -587,7 +587,7 @@ void CmiEnableAsyncIO(int fd) { }
 #endif
 
 /* We should probably have a set of "CMK_NONBLOCK_USE_..." defines here:*/
-#if !defined(_WIN32) || defined(__CYGWIN__)
+#if !defined(_WIN32)
 void CmiEnableNonblockingIO(int fd) {
   int on=1;
   if (fcntl(fd,F_SETFL,O_NONBLOCK,&on)<0) {
@@ -1284,7 +1284,7 @@ static void CmiStdoutInit(void) {
 	if (Cmi_charmrun_fd==-1) return; /* standalone mode */
 
 /*There's some way to do this same thing in windows, but I don't know how*/
-#if !defined(_WIN32) || defined(__CYGWIN__)
+#if !defined(_WIN32)
 	/*Prevent buffering in stdio library:*/
 	setbuf(stdout,NULL); setbuf(stderr,NULL);
 
@@ -1999,7 +1999,7 @@ void ConverseCleanup(void)
 
       skt_close(Cmi_charmrun_fd);
       // Avoid crash by SIGALRM
-#if !defined(_WIN32) || defined(__CYGWIN__)
+#if !defined(_WIN32)
       sigaction(SIGALRM, SIG_IGN, NULL);
 #else
       signal(SIGALRM, SIG_IGN);
@@ -2043,7 +2043,7 @@ void ConverseCleanup(void)
 static void set_signals(void)
 {
   if(!Cmi_truecrash) {
-#if !defined(_WIN32) || defined(__CYGWIN__)
+#if !defined(_WIN32)
     struct sigaction sa;
     sa.sa_handler = KillOnAllSigs;
     sigemptyset(&sa.sa_mask);    
@@ -2063,7 +2063,7 @@ static void set_signals(void)
     signal(SIGTERM, KillOnAllSigs);
     signal(SIGABRT, KillOnAllSigs);
 #endif
-#   if !defined(_WIN32) || defined(__CYGWIN__) /*UNIX-only signals*/
+#   if !defined(_WIN32) /*UNIX-only signals*/
     sigaction(SIGQUIT, &sa, NULL);
     sigaction(SIGBUS, &sa, NULL);
 #     if CMK_HANDLE_SIGUSR

@@ -340,10 +340,6 @@ public:
   }
 };
 
-#ifndef __CYGWIN__
-#include <rpc/rpc.h>
-#endif
-
 size_t hostInfoLength(void *) {return 1;}
 
 void hostInfo(void *itemIter, pup_er pp, CpdListItemsRequest *req) {
@@ -974,7 +970,7 @@ CpvExtern(char *, displayArgument);
 
 void CpdStartGdb(void)
 {
-#if !defined(_WIN32) || defined(__CYGWIN__)
+#if !defined(_WIN32)
   FILE *f;
   char gdbScript[200];
   int pid;

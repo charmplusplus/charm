@@ -3,13 +3,6 @@
 /* This file provides an interface for users to the CmiDirect functionality.
 
 */
-#ifdef CMK_BLUEGENEP
-typedef struct {
-    CmiFloat8 space[2];
-} cmkquad;  
-/* is equivalent to DCQUAD, but without including dmcf.h */
-#endif
-
 
 /* handle type definition */
 /* sender is the one who initiates the request.
@@ -17,28 +10,12 @@ typedef struct {
    Put: sender=source recver=target of the one-sided buffer operation
    Get: sender=target recver=source of the one-sided buffer operation
 */
-#ifdef CMK_BLUEGENEP
-#include "dcmf.h"
-#elif  CMK_CONVERSE_UGNI
+#if  CMK_CONVERSE_UGNI
 #include "gni_pub.h"
 #endif
 typedef struct infiDirectUserHandle{
     int handle;
-#ifdef CMK_BLUEGENEP
-    int senderNode;
-    int recverNode;
-    void *recverBuf;
-    int recverBufSize;
-    void *senderBuf;
-    void (*callbackFnPtr)(void *);
-    void *callbackData;
-    void *DCMF_notify_buf;
-    DCMF_Request_t *DCMF_rq_trecv;
-    DCMF_Request_t *DCMF_rq_tsend;
-    DCMF_Memregion_t DCMF_recverMemregion;
-    DCMF_Memregion_t DCMF_senderMemregion;
-    DCMF_Callback_t DCMF_notify_cb;
-#elif  CMK_CONVERSE_UGNI
+#if  CMK_CONVERSE_UGNI
     int localNode;
     int remoteRank;
     int remoteNode;

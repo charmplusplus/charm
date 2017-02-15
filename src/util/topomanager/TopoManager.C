@@ -31,25 +31,7 @@ struct CompareRankDist {
 
 
 TopoManager::TopoManager() {
-#if CMK_BLUEGENEP
-  dimX = bgptm.getDimX();
-  dimY = bgptm.getDimY();
-  dimZ = bgptm.getDimZ();
-
-  dimNX = bgptm.getDimNX();
-  dimNY = bgptm.getDimNY();
-  dimNZ = bgptm.getDimNZ();
-  dimNT = bgptm.getDimNT();
-
-  procsPerNode = bgptm.getProcsPerNode();
-  int *torus;
-  torus = bgptm.isTorus();
-  torusX = torus[0];
-  torusY = torus[1];
-  torusZ = torus[2];
-  torusT = torus[3];
-
-#elif CMK_BLUEGENEQ
+#if CMK_BLUEGENEQ
   dimX = bgqtm.getDimX();
   dimY = bgqtm.getDimY();
   dimZ = bgqtm.getDimZ();
@@ -151,9 +133,7 @@ TopoManager::TopoManager(int NX, int NY, int NZ, int NT) : dimNX(NX), dimNY(NY),
 
 void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) const {
   CmiAssert( pe >= 0 && pe < numPes );
-#if CMK_BLUEGENEP
-  bgptm.rankToCoordinates(pe, x, y, z);
-#elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+#if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 	int t;
   xttm.rankToCoordinates(pe, x, y, z, t);
 #else
@@ -187,9 +167,7 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) const {
 
 void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) const {
   CmiAssert( pe >= 0 && pe < numPes );
-#if CMK_BLUEGENEP
-  bgptm.rankToCoordinates(pe, x, y, z, t);
-#elif CMK_BLUEGENEQ
+#if CMK_BLUEGENEQ
   bgqtm.rankToCoordinates(pe, x, y, z, t);
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
   xttm.rankToCoordinates(pe, x, y, z, t);
@@ -240,9 +218,7 @@ int TopoManager::coordinatesToRank(int x, int y, int z) const {
 #endif
 
 
-#if CMK_BLUEGENEP
-  return bgptm.coordinatesToRank(x, y, z);
-#elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+#if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
   return xttm.coordinatesToRank(x, y, z, 0);
 #else
   if(dimY > 1)
@@ -262,9 +238,7 @@ int TopoManager::coordinatesToRank(int x, int y, int z, int t) const {
     return t + x * dimNT;
 #endif
 
-#if CMK_BLUEGENEP
-  return bgptm.coordinatesToRank(x, y, z, t);
-#elif CMK_BLUEGENEQ
+#if CMK_BLUEGENEQ
   return bgqtm.coordinatesToRank(x, y, z, t);
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
   return xttm.coordinatesToRank(x, y, z, t);

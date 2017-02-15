@@ -382,7 +382,7 @@ INLINE static CMK_TYPEDEF_UINT8 MemusageMallinfo(){
     CMK_TYPEDEF_UINT8 memtotal2 = (CMK_TYPEDEF_UINT8) mi.usmblks;   /* unused */
     memtotal2 += (CMK_TYPEDEF_UINT8) mi.hblkhd;               /* mmap */
     /* printf("%lld %lld %lld %lld %lld\n", mi.uordblks, mi.usmblks,mi.hblkhd,mi.arena,mi.keepcost); */
-#if ! CMK_CRAYXT && ! CMK_CRAYXE && !CMK_CRAYXC
+#if !CMK_CRAYXE && !CMK_CRAYXC
     if(memtotal2 > memtotal) memtotal = memtotal2;
 #endif
     return memtotal;
@@ -408,7 +408,7 @@ INLINE static CMK_TYPEDEF_UINT8 MemusagePS(){
 #endif	
 }
 
-#if defined(_WIN32) && ! defined(__CYGWIN__)
+#if defined(_WIN32)
 #include <windows.h>
 #include <psapi.h>
 
@@ -423,21 +423,6 @@ INLINE static CMK_TYPEDEF_UINT8 MemusageWindows(){
 }
 #else
 static CMK_TYPEDEF_UINT8 MemusageWindows(){
-    return 0;
-}
-#endif
-
-#if CMK_BLUEGENEP
-/* Report the memory usage according to the following wiki page i
-* https://wiki.alcf.anl.gov/index.php/Debugging#How_do_I_get_information_on_used.2Favailable_memory_in_my_code.3F
-*/
-#include <malloc.h>
-INLINE static CMK_TYPEDEF_UINT8 MemusageBGP(){
-    struct mallinfo m = mallinfo();
-    return m.hblkhd + m.uordblks;
-}
-#else
-static CMK_TYPEDEF_UINT8 MemusageBGP(){
     return 0;
 }
 #endif
@@ -463,7 +448,6 @@ struct CmiMemUsageStruct {
     char *name;
 } memtest_order[] = {
     {MemusageBGQ, "BlueGene/Q"},
-    {MemusageBGP, "BlueGene/P"},
     {MemusageWindows, "Windows"},
     {MemusageMstats, "Mstats"},
     {MemusageMallinfo, "Mallinfo"},

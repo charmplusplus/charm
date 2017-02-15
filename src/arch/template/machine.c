@@ -274,7 +274,6 @@ int    CmiTimerIsSynchronized();
 /* If one of the following is set to 1, barriers are needed:
    CMK_TIMER_USE_GETRUSAGE
    CMK_TIMER_USE_RDTSC
-   CMK_TIMER_USE_BLUEGENEL
 */
 
 int CmiBarrier();

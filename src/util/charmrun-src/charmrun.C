@@ -32,7 +32,7 @@
 #include <vector>
 #include <utility>
 
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32)
 /*Win32 has screwy names for the standard UNIX calls:*/
 #define getcwd _getcwd
 #define strdup _strdup
@@ -117,7 +117,7 @@ int *ssh_pids = NULL;
 
 double GetClock(void)
 {
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32)
   struct _timeb tv;
   _ftime(&tv);
   return (tv.time * 1.0 + tv.millitm * 1.0E-3);
@@ -144,7 +144,7 @@ int probefile(const char *path)
 
 const char *mylogin(void)
 {
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32)
   static char name[100] = {'d', 'u', 'n', 'n', 'o', 0};
   unsigned int len = 100;
   GetUserName(name, (LPDWORD) &len);
@@ -349,7 +349,7 @@ const char *getenv_ssh()
 }
 #endif
 
-#if !defined(_WIN32) || defined(__CYGWIN__)
+#if !defined(_WIN32)
 char *getenv_display()
 {
   static char result[100], ipBuf[200];
@@ -1010,7 +1010,7 @@ void arg_init(int argc, const char **argv)
       arg_shell = getenv_ssh();
   }
 
-#if !defined(_WIN32) || defined(__CYGWIN__)
+#if !defined(_WIN32)
   /* Find the current value of the DISPLAY variable */
   if (!arg_display)
     arg_display = getenv_display_no_tamper();
@@ -1051,7 +1051,7 @@ void arg_init(int argc, const char **argv)
     exit(1);
   }
 
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32)
   if (argv[1][1] == ':' ||
       argv[1][0] == '\\' && argv[1][1] == '\\') { /*E.g.: "C:\foo\bar.exe*/
 #else
@@ -1140,7 +1140,7 @@ char *nodetab_file_find()
   /* Find a nodes-file by looking under 'nodelist' in the current directory */
   if (probefile("./nodelist"))
     return strdup("./nodelist");
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32)
   tmpnam(buffer);
   nodetab_tempName = strdup(buffer);
 #else /*UNIX*/
@@ -4003,7 +4003,7 @@ int main(int argc, const char **argv, char **envp)
 #endif
 
   if (arg_charmdebug) {
-#if (defined(_WIN32) && !defined(__CYGWIN__)) || CMK_BPROC
+#if defined(_WIN32) || CMK_BPROC
     /* Gdb stream (and charmdebug) currently valid only with ssh subsystem */
     fprintf(stderr,
             "Charmdebug is supported currently only with the ssh subsystem\n");
@@ -4171,7 +4171,7 @@ void start_nodes_daemon(void)
   }
 }
 
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32)
 /*Sadly, interprocess communication on Win32 is quite
   different, so we can't use Ssh on win32 yet.
   Fall back to the daemon.*/

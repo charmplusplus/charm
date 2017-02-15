@@ -31,7 +31,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#if CMK_BLUEGENEP || CMK_BLUEGENEQ
+#if CMK_BLUEGENEQ
 #include "TopoManager.h"
 #endif
 
@@ -39,7 +39,7 @@
 #include "spi/include/kernel/process.h"
 #endif
 
-#if CMK_CRAYXT || CMK_CRAYXE || CMK_CRAYXC
+#if CMK_CRAYXE || CMK_CRAYXC
 extern "C" int getXTNodeID(int mpirank, int nummpiranks);
 #endif
 
@@ -465,25 +465,7 @@ extern "C" void LrtsInitCpuTopo(char **argv)
       strcpy(hostname, "");
   }
 #endif
-#if CMK_BLUEGENEP
-  if (CmiMyRank() == 0) {
-    TopoManager tmgr;
-
-    int numPes = cpuTopo.numPes = CmiNumPes();
-    cpuTopo.nodeIDs = new int[numPes];
-    CpuTopology::supported = 1;
-
-    int x, y, z, t, nid;
-    for(int i=0; i<numPes; i++) {
-      tmgr.rankToCoordinates(i, x, y, z, t);
-      nid = tmgr.coordinatesToRank(x, y, z, 0);
-      cpuTopo.nodeIDs[i] = nid;
-    }
-    cpuTopo.sort();
-    if (CmiMyPe()==0)  CmiPrintf("Charm++> Running on %d unique compute nodes (%d-way SMP).\n", cpuTopo.numNodes, CmiNumCores());
-  }
-  CmiNodeAllBarrier();
-#elif CMK_BLUEGENEQ
+#if CMK_BLUEGENEQ
   if (CmiMyRank() == 0) {
    TopoManager tmgr;
 
@@ -501,7 +483,7 @@ extern "C" void LrtsInitCpuTopo(char **argv)
     if (CmiMyPe()==0)  CmiPrintf("Charm++> Running on %d unique compute nodes (%d-way SMP).\n", cpuTopo.numNodes, CmiNumCores());
   }
   CmiNodeAllBarrier();
-#elif CMK_CRAYXT || CMK_CRAYXE || CMK_CRAYXC
+#elif CMK_CRAYXE || CMK_CRAYXC
   if(CmiMyRank() == 0) {
     int numPes = cpuTopo.numPes = CmiNumPes();
     int numNodes = CmiNumNodes();
@@ -538,14 +520,12 @@ extern "C" void LrtsInitCpuTopo(char **argv)
   if (CmiMyPe() >= CmiNumPes()) {
     CmiNodeAllBarrier();         // comm thread waiting
 #if CMK_MACHINE_PROGRESS_DEFINED
-#if ! CMK_CRAYXT
     while (topoInProgress) {
       CmiNetworkProgress();
       CmiLock(topoLock);
       topoInProgress = done < CmiMyNodeSize();
       CmiUnlock(topoLock);
     }
-#endif
 #endif
     return;    /* comm thread return */
   }

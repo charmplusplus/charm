@@ -60,9 +60,7 @@ void TopoManager_createPartitions(int scheme, int numparts, int *nodeMap);
 #if defined(__cplusplus)
 }
 
-#if CMK_BLUEGENEP
-#include "BGPTorus.h"
-#elif CMK_BLUEGENEQ
+#if CMK_BLUEGENEQ
 #include "BGQTorus.h"
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 #include "XTTorus.h"
@@ -218,9 +216,7 @@ class TopoManager {
     int torusA, torusB, torusC, torusD, torusE;
 #endif
     int procsPerNode;
-#if CMK_BLUEGENEP
-    BGPTorusManager bgptm;
-#elif CMK_BLUEGENEQ
+#if CMK_BLUEGENEQ
     BGQTorusManager bgqtm;
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
     XTTorusManager xttm;

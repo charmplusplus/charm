@@ -109,7 +109,7 @@ extern CkArrayID armciVPAid;
   _ARMCI_TEMPLATE_REDUCTION(opName##_float,float,reductionWork) \
   _ARMCI_TEMPLATE_REDUCTION(opName##_double,double,reductionWork)
 
-#if defined(_WIN32) && ! defined(__CYGWIN__)
+#if defined(_WIN32)
 #define llabs(x) abs(x)
 #endif
 

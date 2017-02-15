@@ -13,7 +13,7 @@
 #include <MACHNAME.h>
 
 /*Support for ++debug: */
-#if defined(_WIN32) && ! defined(__CYGWIN__)
+#if defined(_WIN32)
 #include <windows.h>
 #include <wincon.h>
 #include <sys/types.h>

@@ -1111,136 +1111,6 @@ double CmiCpuTimer()
 
 #endif
 
-#if CMK_BLUEGENEL || CMK_BLUEGENEP
-#include "dcopy.h"
-#endif
-
-#if CMK_TIMER_USE_BLUEGENEL
-
-#include "rts.h"
-
-#if 0 
-#define SPRN_TBRL 0x10C  /* Time Base Read Lower Register (user & sup R/O) */
-#define SPRN_TBRU 0x10D  /* Time Base Read Upper Register (user & sup R/O) */
-#define SPRN_PIR  0x11E  /* CPU id */
-
-static inline unsigned long long BGLTimebase(void)
-{
-  unsigned volatile u1, u2, lo;
-  union
-  {
-    struct { unsigned hi, lo; } w;
-    unsigned long long d;
-  } result;
-                                                                                
-  do {
-    asm volatile ("mfspr %0,%1" : "=r" (u1) : "i" (SPRN_TBRU));
-    asm volatile ("mfspr %0,%1" : "=r" (lo) : "i" (SPRN_TBRL));
-    asm volatile ("mfspr %0,%1" : "=r" (u2) : "i" (SPRN_TBRU));
-  } while (u1!=u2);
-                                                                                
-  result.w.lo = lo;
-  result.w.hi = u2;
-  return result.d;
-}
-#endif
-
-static unsigned long long inittime_wallclock = 0;
-CpvStaticDeclare(double, clocktick);
-
-int CmiTimerIsSynchronized()
-{
-  return 0;
-}
-
-int CmiTimerAbsolute()
-{
-  return 1;
-}
-
-double CmiStartTimer()
-{
-  return 0.0;
-}
-
-double CmiInitTime()
-{
-  return inittime_wallclock;
-}
-
-void CmiTimerInit(char **argv)
-{
-  BGLPersonality dst;
-  CpvInitialize(double, clocktick);
-  int size = sizeof(BGLPersonality);
-  rts_get_personality(&dst, size);
-  CpvAccess(clocktick) = 1.0 / dst.clockHz;
-
-  /* try to synchronize calling barrier */
-  CmiBarrier();
-  CmiBarrier();
-  CmiBarrier();
-
-  /* inittime_wallclock = rts_get_timebase(); */
-  inittime_wallclock = 0.0;    /* use bgl absolute time */
-}
-
-double CmiWallTimer()
-{
-  unsigned long long currenttime;
-  currenttime = rts_get_timebase();
-  return CpvAccess(clocktick)*(currenttime-inittime_wallclock);
-}
-
-double CmiCpuTimer()
-{
-  return CmiWallTimer();
-}
-
-double CmiTimer()
-{
-  return CmiWallTimer();
-}
-
-#endif
-
-#if CMK_TIMER_USE_BLUEGENEP  /* This module just compiles with GCC charm. */
-
-int CmiTimerAbsolute()
-{
-  return 0;
-}
-
-double CmiStartTimer()
-{
-  return 0.0;
-}
-
-double CmiInitTime()
-{
-  return 0.0;
-}
-
-void CmiTimerInit(char **argv) {}
-
-#include "dcmf.h"
-
-double CmiWallTimer () {
-  return DCMF_Timer();
-}
-
-double CmiCpuTimer()
-{
-  return CmiWallTimer();
-}
-
-double CmiTimer()
-{
-  return CmiWallTimer();
-}
-#endif
-
-
 #if CMK_TIMER_USE_BLUEGENEQ  /* This module just compiles with GCC charm. */
 
 CpvStaticDeclare(unsigned long, inittime);
@@ -1475,11 +1345,7 @@ double CmiInitTime()
 
 void CmiTimerInit(char **argv)
 {
-#ifdef __CYGWIN__
-	struct timeb tv;
-#else
 	struct _timeb tv;
-#endif
 	clock_t       ru;
 
 	CpvInitialize(double, inittime_wallclock);
@@ -1503,11 +1369,7 @@ double CmiCpuTimer()
 
 double CmiWallTimer()
 {
-#ifdef __CYGWIN__
-	struct timeb tv;
-#else
 	struct _timeb tv;
-#endif
 	double currenttime;
 
 	ftime(&tv);

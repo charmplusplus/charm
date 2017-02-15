@@ -21,7 +21,7 @@
  * @{
  */
 
-#if !defined(_WIN32) || defined(__CYGWIN__)
+#if !defined(_WIN32)
 #include <netinet/tcp.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -159,7 +159,7 @@ int CheckSocketsReady(int withDelayMs, int output)
     return nreadable;
   }
   if (nreadable==-1) {
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32)
 /* Win32 socket seems to randomly return inexplicable errors
 here-- WSAEINVAL, WSAENOTSOCK-- yet everything is actually OK. 
 	int err=WSAGetLastError();
@@ -573,7 +573,7 @@ static void open_tcp_sockets()
     skt_setSockBuf(skt, PACKET_MAX*4);
 #endif
 #if 0
-#if !defined(_WIN32) || defined(__CYGWIN__)
+#if !defined(_WIN32)
     if ((val = fcntl(skt, F_GETFL, 0)) < 0) KillEveryoneCode(98246557);
     if (fcntl(skt, F_SETFL, val|O_NONBLOCK) < 0) KillEveryoneCode(98246558);
 #endif
@@ -592,7 +592,7 @@ static void open_tcp_sockets()
     skt_setSockBuf(skt, PACKET_MAX*4);
 #endif
 #if 0
-#if !defined(_WIN32) || defined(__CYGWIN__)
+#if !defined(_WIN32)
     if ((val = fcntl(skt, F_GETFL, 0)) < 0) KillEveryoneCode(98246557);
     if (fcntl(skt, F_SETFL, val|O_NONBLOCK) < 0) KillEveryoneCode(98246558);
 #endif

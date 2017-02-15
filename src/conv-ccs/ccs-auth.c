@@ -228,7 +228,7 @@ Randomness routines: return a good 32-bit random number.
 */
 #include <stdlib.h>
 
-#if defined(_WIN32) && ! defined(__CYGWIN__)
+#if defined(_WIN32)
 #include <sys/timeb.h>
 #else /*UNIX machine*/
 #include <sys/time.h>
@@ -247,7 +247,7 @@ void CCS_RAND_new(CCS_RAND_state *s)
 
 /*Fill the state buffer with random noise*/
 
-#if defined(_WIN32) && ! defined(__CYGWIN__)
+#if defined(_WIN32)
   _ftime((struct _timeb *)tmp);
   for (i=0;i<sizeof(s->state);i++)
     s->state[i]^=tmp[i];

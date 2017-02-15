@@ -8,7 +8,7 @@
 #define BUF_MAXLEN  16384
 #define TBUF_MAXLEN   128
 
-#if defined(_WIN32) && ! defined(__CYGWIN__)
+#if defined(_WIN32)
 #define snprintf _snprintf
 #endif
 

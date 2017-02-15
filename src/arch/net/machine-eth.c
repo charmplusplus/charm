@@ -708,7 +708,7 @@ void ReceiveDatagram()
     FreeExplicitDgram(dg);
     if (errno == EINTR) return;  /* A SIGIO interrupted the receive */
     if (errno == EAGAIN) return; /* Just try again later */
-#if !defined(_WIN32) || defined(__CYGWIN__) 
+#if !defined(_WIN32)
     if (errno == EWOULDBLOCK) return; /* No more messages on that socket. */
     if (errno == ECONNREFUSED) return;  /* A "Host unreachable" ICMP packet came in */
 #endif

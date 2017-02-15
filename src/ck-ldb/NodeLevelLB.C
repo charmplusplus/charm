@@ -11,7 +11,7 @@ extern LBAllocFn getLBAllocFn(const char *lbname);
 
 CreateLBFunc_Def(NodeLevelLB, "Node level load balancer")
 
-#if defined(_WIN32) && ! defined(__CYGWIN__)
+#if defined(_WIN32)
   /* strtok is thread safe in Windows */
 #define strtok_r(x,y,z) strtok(x,y)
 #endif

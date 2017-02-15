@@ -113,7 +113,7 @@ skt_ip_t skt_my_ip(void);
 #else /*Use actual sockets*/
 
 /*Preliminaries*/
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32)
 /*For windows systems:*/
 #include <winsock.h>
 static void sleep(int secs) { Sleep(1000 * secs); }

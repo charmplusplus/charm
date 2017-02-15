@@ -235,7 +235,7 @@ void LogPool::closeLog(void)
     return;
   }
 #endif
-#if !defined(_WIN32) || defined(__CYGWIN__)
+#if !defined(_WIN32)
   fsync(fileno(fp)); 
 #endif
   fclose(fp);
