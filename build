@@ -472,6 +472,12 @@ fi
 
 [ "x$VERSION" = "x" ] && syntax && exit 1
 
+#Check if building verbs on OmniPath 
+if [ "x_$ARCH" = "x_verbs" ] && type /usr/sbin/opafabricinfo >/dev/null 2>&1; then
+  echo "WARNING: Verbs on OmniPath architectures is not well supported, please use an MPI build instead.";
+  exit 1;
+fi 
+
 if test -n "$WITH_PRODUCTION" -a $BUILD_EMULATOR -eq 1 -a -z "$ENABLE_TRACING"
 then
   echo "Error: bigemulator requires tracing modules, --with-production must be used with --enable-tracing"
