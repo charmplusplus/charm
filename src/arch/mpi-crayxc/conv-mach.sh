@@ -6,49 +6,29 @@
 #  #  Do not set this env variable when building charm++. This will cause charm++ to fail.
 #  #     setenv CRAYPE_LINK_TYPE dynamic
 #
-#  #  Use these modules to build charm++ on the Cray XC.
-#  module load craype-ivybridge    # craype-haswell,broadwell not tested
+#  #  Use 8M hugepages unless explicitly building with charm++'s regularpages option.
 #  module load craype-hugepages8M
-#  module load rca
 #
-#  #  Then choose a compiler:
+#  #  Then load a compiler's PrgEnv module.
+#  #  Do not add 'craycc', 'icc', or 'gcc' to your build options or this will fail to build.
 #
 #  CRAY COMPILER (CCE) BUILD
 #  ========================================
 #  module load PrgEnv-cray         # typically default
 #  module swap cce cce/8.5.4       # cce/8.5.4 or later required
 #
-#  # uGNI build
-#  ./build charm++ gni-crayxc craycc smp
-#  # MPI build
-#  ./build charm++ mpi-crayxc craycc smp
-#
-#
 #  INTEL BUILD
 #  ================================
 #  module swap PrgEnv-cray PrgEnv-intel
-#  module swap intel intel/16.0.3.210   # intel/16.0.3.210, intel/17.0.0.098 tested
-#
-#  #  Do not add 'icc' to your build options or this will fail to build.
-#
-#  # uGNI build
-#  ./build charm++ gni-crayxc smp -optimize
-#  # MPI build
-#  ./build charm++ mpi-crayxc smp -optimize
-#
 #
 #  GCC BUILD
 #  ================================
 #  module swap PrgEnv-cray PrgEnv-gnu
-#  module swap gcc gcc/6.1.0       # gcc/6.1.0, 6.2.0 tested
 #
-#  #  Do not add 'gcc' to your build options or this will fail to build.
+#  # Build command is the same regardless of compiler environment:
 #
-#  # uGNI build
-#  ./build charm++ gni-crayxc smp -optimize
 #  # MPI build
-#  ./build charm++ mpi-crayxc smp -optimize
-
+#  ./build charm++ mpi-crayxc smp --with-production
 
 CMK_BUILD_CRAY=1
 PMI_LIBS="$CRAY_PMI_POST_LINK_OPTS"
