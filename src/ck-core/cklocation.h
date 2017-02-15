@@ -264,6 +264,7 @@ typedef std::tr1::unordered_map<CmiUInt8, std::vector<CkArrayMessage*> > MsgBuff
 typedef std::tr1::unordered_map<CkArrayIndex, std::vector<CkArrayMessage *>, IndexHasher> IndexMsgBuffer;
 typedef std::tr1::unordered_map<CkArrayIndex, std::vector<std::pair<int, bool> >, IndexHasher > LocationRequestBuffer;
 typedef std::tr1::unordered_map<CkArrayIndex, CmiUInt8, IndexHasher> IdxIdMap;
+typedef std::tr1::unordered_map<CmiUInt8, CkLocRec*> LocRecHash;
 #else
 typedef std::unordered_map<CkArrayID, CkArray*, ArrayIDHasher> ArrayIdMap;
 typedef std::unordered_map<CmiUInt8, int> IdPeMap;
@@ -271,6 +272,7 @@ typedef std::unordered_map<CmiUInt8, std::vector<CkArrayMessage*> > MsgBuffer;
 typedef std::unordered_map<CkArrayIndex, std::vector<CkArrayMessage *>, IndexHasher> IndexMsgBuffer;
 typedef std::unordered_map<CkArrayIndex, std::vector<std::pair<int, bool> >, IndexHasher > LocationRequestBuffer;
 typedef std::unordered_map<CkArrayIndex, CmiUInt8, IndexHasher> IdxIdMap;
+typedef std::unordered_map<CmiUInt8, CkLocRec*> LocRecHash;
 #endif
 
 	CkLocMgr(CkArrayOptions opts);
@@ -506,7 +508,7 @@ public:
 
 private:
 	/// The core of the location manager: map array index to element representative
-	CkHashtableT<CkHashtableAdaptorT<CmiUInt8>, CkLocRec *> hash;
+	LocRecHash hash;
 	CmiImmediateLockType hashImmLock;
 
 	//Map object

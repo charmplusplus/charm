@@ -2068,61 +2068,38 @@ void CkLocRec::Migrated(){
 #endif
 
 
-//doesn't delete if there is extra pe
+// Call ckDestroy for each record, which deletes the record, and ~CkLocRec()
+// removes it from the hash table, which would invalidate an iterator.
 void CkLocMgr::flushLocalRecs(void)
 {
-  void *objp;
-  void *keyp;
-  CkHashtableIterator *it=hash.iterator();
   CmiImmediateLock(hashImmLock);
-  while (NULL!=(objp=it->next(&keyp))) {
-    CkLocRec *rec=*(CkLocRec **)objp;
-    CkArrayIndex &idx=*(CkArrayIndex *)keyp;
-    callMethod((CkLocRec*)rec, &CkMigratable::ckDestroy);
-    it->seek(-1);//retry this hash slot
+  while (hash.size()) {
+    CkLocRec* rec = hash.begin()->second;
+    callMethod(rec, &CkMigratable::ckDestroy);
   }
-  delete it;
   CmiImmediateUnlock(hashImmLock);
 }
 
-// clean all buffer'ed messages and also free local objects
+// All records are local records after the 64bit ID update
 void CkLocMgr::flushAllRecs(void)
 {
-  void *objp;
-  void *keyp;
-  CkHashtableIterator *it=hash.iterator();
-  CmiImmediateLock(hashImmLock);
-  while (NULL!=(objp=it->next(&keyp))) {
-    CkLocRec *rec=*(CkLocRec **)objp;
-    callMethod(rec, &CkMigratable::ckDestroy);
-    it->seek(-1);//retry this hash slot
-  }
-  delete it;
-  CmiImmediateUnlock(hashImmLock);
+  flushLocalRecs();
 }
 
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 void CkLocMgr::callForAllRecords(CkLocFn fnPointer,CkArray *arr,void *data){
-	void *objp;
-	void *keyp;
-
-	CkHashtableIterator *it = hash.iterator();
-	while (NULL!=(objp=it->next(&keyp))) {
-		CkLocRec *rec=*(CkLocRec **)objp;
-		CkArrayIndex &idx=*(CkArrayIndex *)keyp;
-		fnPointer(arr,data,rec,&idx);
-	}
-
-	// releasing iterator memory
-	delete it;
+  CmiImmediateLock(hashImmLock);
+  for (LocRecHash::iterator it = hash.begin(); it != hash.end(); it++) {
+    fnPointer(arr,data,it->second,it->second->idx);
+  }
+  CmiImmediateUnlock(hashImmLock);
 }
 #endif
 
 /*************************** LocMgr: CREATION *****************************/
 CkLocMgr::CkLocMgr(CkArrayOptions opts)
-	:thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe()),
-	 hash(17,0.3)
+	:thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe())
 	, idCounter(1)
         , bounds(opts.getBounds())
 {
@@ -2151,7 +2128,7 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
 }
 
 CkLocMgr::CkLocMgr(CkMigrateMessage* m)
-	:IrrGroup(m),thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe()),hash(17,0.3)
+	:IrrGroup(m),thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe())
 {
 	duringMigration = false;
 	hashImmLock = CmiCreateImmediateLock();
@@ -2590,9 +2567,9 @@ void CkLocMgr::removeFromTable(const CmiUInt8 id) {
 	if (NULL==elementNrec(id))
 		CkAbort("CkLocMgr::removeFromTable called on invalid index!");
 #endif
-        CmiImmediateLock(hashImmLock);
-	hash.remove(id);
-        CmiImmediateUnlock(hashImmLock);
+		CmiImmediateLock(hashImmLock);
+		hash.erase(id);
+		CmiImmediateUnlock(hashImmLock);
 #if CMK_ERROR_CHECKING
 	//Make sure it's really gone
 	if (NULL!=elementNrec(id))
@@ -2889,17 +2866,12 @@ CkLocIterator::~CkLocIterator() {}
 /// Iterate over our local elements:
 void CkLocMgr::iterate(CkLocIterator &dest) {
   //Poke through the hash table for local ArrayRecs.
-  void *objp;
-  CkHashtableIterator *it=hash.iterator();
   CmiImmediateLock(hashImmLock);
-
-  while (NULL!=(objp=it->next())) {
-    CkLocRec *rec=*(CkLocRec **)objp;
-    CkLocation loc(this,(CkLocRec *)rec);
+  for (LocRecHash::iterator it = hash.begin(); it != hash.end(); it++) {
+    CkLocation loc(this,it->second);
     dest.addLocation(loc);
   }
   CmiImmediateUnlock(hashImmLock);
-  delete it;
 }
 
 
@@ -3363,11 +3335,9 @@ void CkLocMgr::setDuringDestruction(bool _duringDestruction) {
 //Add given element array record at idx, replacing the existing record
 void CkLocMgr::insertRec(CkLocRec *rec, const CmiUInt8 &id) {
     CkLocRec *old_rec = elementNrec(id);
-
     CmiImmediateLock(hashImmLock);
-    hash.put(id) = rec;
+    hash[id] = rec;
     CmiImmediateUnlock(hashImmLock);
-
     delete old_rec;
 }
 
@@ -3379,10 +3349,11 @@ static void abort_out_of_bounds(const CkArrayIndex &idx)
 }
 
 //Look up array element in hash table.  Index out-of-bounds if not found.
+// TODO: Could this take an ID instead?
 CkLocRec *CkLocMgr::elementRec(const CkArrayIndex &idx) {
 #if ! CMK_ERROR_CHECKING
 //Assume the element will be found
-  return hash.getRef(lookupID(idx));
+  return hash.at(lookupID(idx));
 #else
 //Include an out-of-bounds check if the element isn't found
   CmiUInt8 id;
@@ -3398,7 +3369,8 @@ CkLocRec *CkLocMgr::elementRec(const CkArrayIndex &idx) {
 
 //Look up array element in hash table.  Return NULL if not there.
 CkLocRec *CkLocMgr::elementNrec(const CmiUInt8 id) {
-  return hash.get(id);
+  LocRecHash::iterator it = hash.find(id);
+  return it == hash.end() ? NULL : it->second;
 }
 
 struct LocalElementCounter :  public CkLocIterator
