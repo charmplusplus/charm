@@ -1,26 +1,21 @@
 GNI_CRAYXE=1
 
 PMI_CFLAGS=
-PMI_LIBS=
-if test -z "$CRAY_PMI_INCLUDE_OPTS"
-then
-  PMI_CFLAGS=`pkg-config --cflags cray-pmi`
-  PMI_LIBS=`pkg-config --libs cray-pmi`
-fi
-UGNI_CFLAGS=`pkg-config --cflags cray-ugni`
-UGNI_LIBS=`pkg-config --libs cray-ugni`
+PMI_LIBS="$CRAY_PMI_POST_LINK_OPTS"
 
 PGCC=`CC -V 2>&1 | grep pgCC`
 ICPC=`CC -V 2>&1 | grep Intel`
+GNU=`CC -V 2>&1 | grep 'g++'`
+CCE=`CC -V 2>&1 | grep 'Cray'`
 
 CMK_CPP_CHARM='/lib/cpp -P'
 CMK_CPP_C="cc -E"
-CMK_CC="cc $PMI_CFLAGS $UGNI_CFLAGS "
-CMK_CXX="CC $PMI_CFLAGS $UGNI_CFLAGS"
+CMK_CC="cc "
+CMK_CXX="CC "
 CMK_CXXPP="$CMK_CXX -x c++ -E  "
 CMK_LD="eval $CMK_CC "
 CMK_LIBS='-lckqt'
-CMK_LD_LIBRARY_PATH="-rpath $CHARMLIBSO/ $PMI_LIBS $UGNI_LIBS"
+CMK_LD_LIBRARY_PATH="-rpath $CHARMLIBSO/ $PMI_LIBS"
 
 CMK_QT="generic64-light"
 
@@ -32,11 +27,16 @@ CMK_CXX="$CMK_CXX -DCMK_FIND_FIRST_OF_PREDICATE=1 --no_using_std "
 # gcc is needed for building QT
 CMK_SEQ_CC="gcc "
 CMK_SEQ_CXX="pgCC  --no_using_std "
+elif test -n "$CCE"
+then
+CMK_CXX_OPTIMIZE=" -hipa4"   # For improved C++ performance
+CMK_SEQ_CC="gcc "
+CMK_SEQ_CXX="g++ "
 elif test -n "$ICPC"
 then
 CMK_SEQ_CC="icc -fPIC "
 CMK_SEQ_CXX="icpc -fPIC "
-else
+else   # gcc
 CMK_SEQ_CC="gcc "
 CMK_SEQ_CXX="g++ "
 fi
