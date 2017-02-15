@@ -17,17 +17,15 @@ syntax() {
   echo ''
   echo 'Usage: build <target> <version> <options> [charmc-options ...]'
   echo ''
-  echo '<targets>: converse charm++ LIBS AMPI FEM bigemulator pose msa'
+  echo '<targets>: converse charm++ LIBS AMPI bigemulator msa'
   echo '<targets>: doc ps-doc pdf-doc html-doc'
   if test $more = 1
   then
   echo ''
   echo '  charm++         compile Charm++ core only'
   echo '  AMPI            compile Adaptive MPI on top of Charm++'
-  echo '  FEM             compile FEM framework'
   echo '  LIBS            compile additional parallel libraries with Charm++ core'
   echo '  bigemulator     build additional BigSim libraries'
-  echo '  pose            build POSE parallel discrete event simulator'
   echo '  msa             build Multiphase Shared Arrays(MSA) library'
   echo '  Tau             build the TAU tracing library for generating TAU performance data' 
   echo '  ChaNGa          compile Charm++ core and necessary libraries for ChaNGa'
@@ -38,41 +36,33 @@ syntax() {
   ( cd $src ; ls -1 | egrep -v '(^shmem$)|(^mpi$)|(^sim$)|(^net(lrts)?$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win64$)|(^(gemini_)?gni$)|(^pami(lrts)?$)|(^verbs$)|(^template$)|(^cuda$)' | pr -3 -t )
   echo ''
   echo '<options>: compiler and platform specific options'
-  echo 'icc iccstatic xlc xlc64 gcc clang craycc pgcc pathscale cc cc64 mpcc gcc64 mpicxx'
-  echo 'help smp gm tcp scyld clustermatic bigemulator ooc syncft mlogft causalft'
-  echo 'papi pthreads lam'
+  echo 'icc iccstatic xlc xlc64 gcc clang pgcc cc mpicxx'
+  echo 'help smp omp tcp bigemulator ooc syncft mlogft causalft papi pthreads'
   echo '--incdir --libdir --basedir --build-shared --destination --suffix -j'
   if test $more = 1
   then
   echo ''
   echo 'For platform specific options, use help option:'
-  echo '  help		  platform specific help, e.g. ./build charm++ net-linux-x86_64 help'
+  echo '  help		  platform specific help, e.g. ./build charm++ netlrts-linux-x86_64 help'
   echo ''
   echo 'Choose a compiler (only one option is allowed from this section):'
   echo '  icc, iccstatic  Intel compilers (default or static linking)'
   echo '  xlc, xlc64      IBM XL compilers (with 64-bit option on architectures with 32-bit modes)'
   echo '  gcc             GNU compiler collection (on platforms where the default differs)'
-  echo '  clang           Clang C/C++ compiler'
-  echo '  craycc          Cray compilers'
+  echo '  clang           Clang C/C++ compiler (including bgclang)'
   echo '  pgcc            Portland Group compilers'
-  echo '  pathscale       Pathscale compiler suite'
-  echo '  cc, cc64        For Sun WorkShop C++ 32/64 bit compilers'
-  echo '  mpcc            SUN Solaris C++ compiler for MPI'
   echo ''
   echo 'Choose an alternative fortran compiler (only one option is allowed from this section):'
-  echo '  g95             G95 at http://ww.g95.org'
-  echo "  pgf90           Portland Group Fortran compiler"
+  echo '  gfortran        GNU Fortran compiler'
+  echo '  xlf             IBM XL Fortran compiler'
   echo '  ifort           Intel Fortran compiler'
+  echo "  pgf90           Portland Group Fortran compiler"
   echo ''
   echo 'Platform specific options (choose multiple if apply):'
   echo '  smp             support for SMP, multithreaded charm on each node'
-  echo '  ibverbs         use Infiniband Verbs for communication (only for net-linux-x86_64; prefer verbs-*)'
-  echo '  lam             Use LAM MPI'
-  echo '  mpt             use SGI Message Passing Toolkit (only for mpi version)'
-  echo '  gm              use Myrinet for communication'
+  echo '  omp             support for the integrated LLVM OpenMP runtime'
+  echo '  ibverbs         use Infiniband Verbs for communication (only for netlrts-linux-x86_64; prefer verbs-*)'
   echo '  tcp             use TCP sockets for communication (only for net version)'
-  echo '  scyld           compile for Scyld Beowulf cluster based on bproc'
-  echo '  clustermatic    compile for Clustermatic (support version 3 and 4) '
   echo '  pthreads        compile with pthreads Converse threads'
   echo ''
   echo 'Advanced options:'
@@ -107,18 +97,18 @@ syntax() {
   then
   echo ''
   echo 'Examples:'
-  echo "1. display all supported options for net-linux-x86_64 using 'help':"
-  echo '  ./build charm++ net-linux-x86_64 help'
+  echo "1. display all supported options for netlrts-linux-x86_64 using 'help':"
+  echo '  ./build charm++ netlrts-linux-x86_64 help'
   echo '2. compile Charm++ on Linux with all available tuning:'
-  echo '  ./build charm++ net-linux-x86_64 --with-production'
-  echo '3. compile Charm++ for Linux (32bit) clustermatic Beowulf cluster with Intel compiler and optimizations:'
-  echo '  ./build charm++ net-linux clustermatic icc -optimize'
-  echo '4. compile Charm++ for Windows with VC++ (Cygwin required):'
-  echo '  ./build charm++ net-win64 -optimize'
+  echo '  ./build charm++ netlrts-linux-x86_64 --with-production'
+  echo '3. compile Charm++ for Linux with Intel compiler and optimizations:'
+  echo '  ./build charm++ netlrts-linux-x86_64 icc -optimize'
+  echo '4. compile Charm++ for Windows with VC++:'
+  echo '  ./build charm++ netlrts-win-x86_64 -optimize'
   echo '5. compile Charm++ with MPI that is installed at /usr/local/mpich:'
-  echo '  ./build charm++ mpi-linux --incdir /usr/local/mpich/include --libdir /usr/local/mpich/lib -optimize'
+  echo '  ./build charm++ mpi-linux-x86_64 --incdir /usr/local/mpich/include --libdir /usr/local/mpich/lib -optimize'
   echo '   or in short,'
-  echo '  ./build charm++ mpi-linux --basedir /usr/local/mpich -optimize'
+  echo '  ./build charm++ mpi-linux-x86_64 --basedir /usr/local/mpich -optimize'
   echo '  ./build Tau --tau-makefile=/usr/local/packages/TAU/x86_64/lib/Makefile.tau-mpi'
   echo ''
   echo 'Note: This script:'
@@ -505,7 +495,7 @@ then
   if test -n "$COMPILER" -a `echo "$BASEVERSION" | grep -c "cray\|gni\|gemini"` -gt 0
   then
     echo "Inserted explicit compiler options on Cray systems. Use compiler wrappers by loading PrgEnv-*"
-    echo "e.g.) module load PrgEnv-* (e.g. gnu for gcc, intel for icc, and pgi for pgcc)"
+    echo "e.g.) module load PrgEnv-* (e.g. cray for cce, gnu for gcc, intel for icc, and pgi for pgcc)"
     echo "      ./build charm++ $BASEVERSION <other build options>"
     echo "Charm++ uses the compiler wrapper 'CC' specified by the Cray system. Don't use explicit compiler options on Cray systems."
     exit 1

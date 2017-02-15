@@ -60,11 +60,6 @@ if ($os eq "Linux") {
   $arch_os = "linux";
 } elsif ($os =~ m/OSF1/ ) {
   $arch_os = "linux";
-} elsif ($os =~ m/CYGWIN/ ) {
-  print "Detected a Cygwin system\n";
-  print "This uses the gnu compiler by default,\n";
-  print "To build with Microsoft Visual C++ compiler, use net-win32. Please refer to README.win32 for the details on setting up VC++ under cygwin.\n\n";
-  $arch_os = "cygwin";
 }
 
 
@@ -189,9 +184,7 @@ if($arch eq "netlrts-darwin"){
 	$arch = "netlrts-darwin-x86_64";
 } elsif($arch eq "multicore-linux-arm7"){
 	$arch = "multicore-arm7";
-} elsif($arch eq "multicore-linux-x86_64"){
-	$arch = "multicore-linux64";
-} 
+}
 
 
 #================ Choose SMP/PXSHM =================================
