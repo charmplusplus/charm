@@ -339,7 +339,6 @@ void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
     entry->bfactor = dfactor;
   else
     entry->bfactor = proxy.ckGetBfactor();
-  _id.get_type() = MulticastMsg;
   _id.get_aid() = aid;
   _id.get_val() = entry;		// allocate table for this section
   initCookie(_id);
@@ -394,7 +393,6 @@ void CkMulticastMgr::prepareCookie(mCastEntry *entry, CkSectionID &sid, const Ck
   else
     entry->bfactor = sid.bfactor;
 
-  sid._cookie.get_type() = MulticastMsg;
   sid._cookie.get_aid() = aid;
   sid._cookie.get_val() = entry;	// allocate table for this section
   sid._cookie.get_pe() = CkMyPe();
@@ -413,7 +411,6 @@ void CkMulticastMgr::prepareGrpCookie(mCastEntry *entry, CkSectionID &sid, const
   else
     entry->bfactor = sid.bfactor;
 
-  sid._cookie.get_type() = MulticastMsg;
   sid._cookie.get_aid() = gid;
   sid._cookie.get_val() = entry;  // allocate table for this section
   sid._cookie.get_pe() = CkMyPe();
@@ -1121,15 +1118,14 @@ void CkMulticastMgr::sendToLocal(multicastGrpMsg *msg)
 void CkGetSectionInfo(CkSectionInfo &id, void *msg)
 {
   CkMcastBaseMsg *m = (CkMcastBaseMsg *)msg;
-  if (CkMcastBaseMsg::checkMagic(m) == 0) {
+  if (!CkMcastBaseMsg::checkMagic(m)) {
     CmiPrintf("ERROR: This is not a CkMulticast message!\n");
     CmiAbort("Did you remember to do CkMulticast delegation, and inherit multicast message from CkMcastBaseMsg in correct order?");
   }
   // ignore invalid cookie sent by SimpleSend
   if (m->gpe() != -1) {
-    id.get_type() = MulticastMsg;
     id.get_pe() = m->gpe();
-    id.get_val() = m->cookie();
+    id.get_val() = m->entry();
     id.get_aid() = m->_cookie.get_aid();
   }
   // note: retain old redNo

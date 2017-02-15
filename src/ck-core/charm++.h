@@ -892,7 +892,7 @@ public:
   inline CkSectionID *ckGetSectionIDs() {return _sid; }
   inline CkSectionID &ckGetSectionID() {return _sid[0]; }
   inline CkSectionID &ckGetSectionID(int i) {return _sid[i]; }
-  inline CkGroupID ckGetGroupIDn(int i) const {return (CkGroupID)_sid[i]._cookie.info.aid;}
+  inline CkGroupID ckGetGroupIDn(int i) const {return _sid[i]._cookie.get_aid();}
   inline int *ckGetElements() const {return _sid[0].pelist;}
   inline int *ckGetElements(int i) const {return _sid[i].pelist;}
   inline int ckGetNumElements() const { return _sid[0].npes; }

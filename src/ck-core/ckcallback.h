@@ -89,8 +89,8 @@ private:
 		CMK_REFNUM_TYPE refnum; // Reference number to set on the message
 		bool hasRefnum;
 	} array;
-	struct s_section{
-		CkSectionInfoStruct sinfo;
+	struct s_section {
+		CkSectionInfo::CkSectionInfoStruct sinfo;
                 CkArrayIndex *_elems;
                 int _nElems;
                 int *pelist;
