@@ -340,6 +340,8 @@ public:
   }
 };
 
+#include <rpc/rpc.h>
+
 size_t hostInfoLength(void *) {return 1;}
 
 void hostInfo(void *itemIter, pup_er pp, CpdListItemsRequest *req) {
