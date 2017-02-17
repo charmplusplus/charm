@@ -51,17 +51,11 @@ class msgQ
         /// Pop (and return) the next message to deliver
         const msg_t* deq();
 
-        /// Return ptr to message that is next in line for delivery. Does not deq() the msg
-        inline const msg_t* front() const { return empty() ? NULL : prioQ.top().second->front(); }
-
         /// Number of messages in the queue
         inline size_t size() const { return qSize; }
 
         /// Is the queue empty?
         inline bool empty() const { return (0 == qSize); }
-
-        /// Returns the value of the highest priority amongst all the messages in the queue
-        inline prio_t top_priority() const { return prioQ.top().first; }
 
         /// Just so that we can support CqsEnumerateQueue()
         void enumerate(msg_t **first, msg_t **last) const;
@@ -75,6 +69,11 @@ class msgQ
         }
 
     private:
+#if CMK_RANDOMIZED_MSGQ
+        /// All the messages go in one bin when we're picking them out randomly
+        std::vector<const msg_t*> randQ;
+#endif
+
         /// Message bucket type
         typedef std::deque<const msg_t*> bkt_t;
         /// A key-val pair of a priority value and a handle to the bucket of msgs of that priority
@@ -99,15 +98,18 @@ class msgQ
 template <typename P>
 void msgQ<P>::enq(const msg_t *msg, const prio_t &prio, const bool isFifo)
 {
+    #if ! CMK_RANDOMIZED_MSGQ
     // Find / create the bucket holding msgs of this priority
     bkt_t &bkt = msgbuckets[prio];
-    #if ! CMK_RANDOMIZED_MSGQ
     // If this deq is empty, insert corresponding priority into prioQ
     if (bkt.empty())
         prioQ.push( std::make_pair(prio, &bkt) );
-    #endif
     // Enq msg either at front or back of deq
     isFifo ? bkt.push_back(msg) : bkt.push_front(msg);
+    #else
+    randQ.push_back(msg);
+    #endif
+
     // Increment the total number of msgs in this container
     qSize++;
 }
@@ -179,18 +181,11 @@ const msg_t* msgQ<P>::deq()
     if (empty())
         return NULL;
 
-    // Randomly select a bucket and a msg within it
-    int rnd          = rand();
-    typename bktmap_t::iterator itr = msgbuckets.begin();
-    std::advance(itr, rnd % msgbuckets.size());
-    bkt_t &bkt       = itr->second;
-    int idx          = rnd % bkt.size();
-    // Retrieve msg and remove it from bucket
-    const msg_t *msg = bkt[idx];
-    bkt.erase(bkt.begin() + idx);
-    // Remove bucket if its empty
-    if (bkt.empty())
-        msgbuckets.erase(itr);
+    long rnd = lrand48() % randQ.size();
+    const msg_t *msg = randQ[rnd];
+    randQ[rnd] = randQ[randQ.size()-1];
+    randQ.pop_back();
+
     // Decrement the total number of msgs in this container
     qSize--;
     return msg;
@@ -207,6 +202,8 @@ void msgQ<P>::enumerate(msg_t **first, msg_t **last) const
         return;
 
     msg_t **ptr = first;
+
+#if !CMK_RANDOMIZED_MSGQ
     for (typename bktmap_t::const_iterator bktitr = msgbuckets.begin();
             ptr != last && bktitr != msgbuckets.end(); bktitr++)
     {
@@ -214,6 +211,10 @@ void msgQ<P>::enumerate(msg_t **first, msg_t **last) const
         while (ptr != last && msgitr != bktitr->second.end())
             *ptr++ = (msg_t*) *msgitr++;
     }
+#else
+    for (size_t i = 0; i < randQ.size() && ptr != last; ++i, ++ptr)
+      *ptr = (msg_t*) randQ[i];
+#endif
 }
 
 } // end namespace conv
