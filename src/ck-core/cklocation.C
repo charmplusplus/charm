@@ -3353,7 +3353,7 @@ static void abort_out_of_bounds(const CkArrayIndex &idx)
 CkLocRec *CkLocMgr::elementRec(const CkArrayIndex &idx) {
 #if ! CMK_ERROR_CHECKING
 //Assume the element will be found
-  return hash.at(lookupID(idx));
+  return hash[lookupID(idx)];
 #else
 //Include an out-of-bounds check if the element isn't found
   CmiUInt8 id;
