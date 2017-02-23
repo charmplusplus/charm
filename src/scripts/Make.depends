@@ -130,6 +130,8 @@ CentralPredictor.o: CentralPredictor.C charm++.h charm.h converse.h \
  BaseLB.h LBDatabase.h CentralLB.decl.h charm++.h envelope.h sdag.h \
  BaseLB.decl.h LBDatabase.decl.h CentralLBMsg.h pup_stl.h manager.h
 
+memory-darwin-clang.o: memory-darwin-clang.C converse.h
+
 ComboCentLB.o: ComboCentLB.C ComboCentLB.h CentralLB.h BaseLB.h \
  LBDatabase.h lbdb.h converse.h conv-config.h conv-autoconfig.h \
  conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h pup_c.h lrtslock.h \
