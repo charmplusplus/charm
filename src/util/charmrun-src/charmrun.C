@@ -176,36 +176,6 @@ const char *mylogin(void)
 
 /**************************************************************************
  *
- * ping_developers
- *
- * Sends a single UDP packet to the charm developers notifying them
- * that charm is in use.
- *
- **************************************************************************/
-
-void ping_developers()
-{
-#ifdef NOTIFY
-  char info[1000];
-  /*This is the resolved IP address of elegance.cs.uiuc.edu */
-  skt_ip_t destination_ip = skt_lookup_ip("128.174.241.211");
-  unsigned int destination_port = 6571;
-  struct sockaddr_in addr = skt_build_addr(destination_ip, destination_port);
-  SOCKET skt;
-
-  skt = socket(AF_INET, SOCK_DGRAM, 0);
-  if (skt == INVALID_SOCKET)
-    return;
-
-  sprintf(info, "%s", mylogin());
-
-  sendto(skt, info, strlen(info), 0, (struct sockaddr *) &addr, sizeof(addr));
-  skt_close(skt);
-#endif /* NOTIFY */
-}
-
-/**************************************************************************
- *
  * Pathfix : alters a path according to a set of rewrite rules
  *
  *************************************************************************/
@@ -3916,12 +3886,10 @@ int main(int argc, const char **argv, char **envp)
   skt_init();
   skt_set_idle(fast_idleFn);
 /* CrnSrand((int) time(0)); */
-/* notify charm developers that charm is in use */
 
 #ifdef HSTART
   if (!arg_child_charmrun)
 #endif
-    ping_developers();
   /* Compute the values of all constants */
   arg_init(argc, argv);
   if (arg_verbose)
