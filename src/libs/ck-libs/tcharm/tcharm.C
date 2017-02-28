@@ -248,7 +248,7 @@ void TCharm::pup(PUP::er &p) {
     if(_BgOutOfCoreFlag==0) //not doing out-of-core scheduling
 	CkAbort("Cannot pup a running thread.  You must suspend before migrating.\n");
   }	
-  if (tcharm_nomig) CkAbort("Cannot migrate with the +tcharm_nomig option!\n");
+  if (tcharm_nomig && !p.isSizing()) CkAbort("Cannot migrate with the +tcharm_nomig option!\n");
 #endif
 
   //This seekBlock allows us to reorder the packing/unpacking--
