@@ -218,6 +218,7 @@ int main(int ac, char** av)
     if (thisIndex == 0)
       printf("Usage: jacobi DIM X Y Z [nIter].\n");
     MPI_Finalize();
+    return 1;
   }
   DIM = atoi(av[1]);
   NX = atoi(av[2]);
@@ -227,6 +228,7 @@ int main(int ac, char** av)
     if (thisIndex == 0) 
       printf("%d x %d x %d != %d\n", NX,NY,NZ, nblocks);
     MPI_Finalize();
+    return 2;
   }
   if (ac == 6)
     niter = atoi(av[5]);

@@ -122,6 +122,7 @@ int main(int ac, char** av)
     if (thisIndex == 0)
       printf("Usage: jacobi X Y Z [nIter].\n");
     MPI_Finalize();
+    return 1;
   }
   NX = atoi(av[1]);
   NY = atoi(av[2]);
@@ -130,6 +131,7 @@ int main(int ac, char** av)
     if (thisIndex == 0) 
       printf("%d x %d x %d != %d\n", NX,NY,NZ, nblocks);
     MPI_Finalize();
+    return 2;
   }
   if (ac == 5)
     niter = atoi(av[4]);
