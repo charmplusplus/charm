@@ -14,6 +14,7 @@
 
 #include "limits.h"
 #include <limits>
+#include <algorithm>
 
 #define VEC_SIZE 50
 #define IMB_TOLERANCE 1.1
