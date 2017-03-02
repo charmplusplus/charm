@@ -3824,6 +3824,10 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
   int szdata = ddt->getSize(count);
   CkReduction::reducerType reducer = getBuiltinReducerType(type, op);
 
+  if (!ddt->isContig()) {
+    CkAbort("AMPI does not yet support reductions on non-contiguous derived datatypes!\n");
+  }
+
   if (reducer != CkReduction::invalid) {
     // MPI predefined op matches a Charm++ builtin reducer type
     AMPI_DEBUG("[%d] In makeRednMsg, using Charm++ built-in reducer type for a predefined op\n", thisIndex);
