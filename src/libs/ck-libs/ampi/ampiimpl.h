@@ -1727,6 +1727,12 @@ class ampi : public CBase_ampi {
   int getNewSemaId();
 
   AmpiMsg* Alltoall_RemoteIget(MPI_Aint disp, int targcnt, MPI_Datatype targtype, int tag);
+  int intercomm_scatter(int root, void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                        void *recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm intercomm);
+  int intercomm_iscatter(int root, void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                         void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                         MPI_Comm intercomm, MPI_Request *request);
+
  private:
   bool AlltoallGetFlag;
   void *Alltoallbuff;

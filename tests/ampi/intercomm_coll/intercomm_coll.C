@@ -275,6 +275,11 @@ int main(int argc, char **argv) {
   intercomm_bcast_test(myFirstComm, global_rank, root, false); /* Intercomm bcast test */
   intercomm_bcast_test(myFirstComm, global_rank, root, true); /* Intercomm ibcast test */
 
+  /* Intercommunicator scatter collective tests */
+  if (global_rank == 0) printf("[0] Testing intercomm scatter\n");
+  intercomm_scatter_test(myFirstComm, global_rank, root, false); /* Intercomm scatter test */
+  intercomm_scatter_test(myFirstComm, global_rank, root, true); /* Intercomm iscatter test */
+
 #if 0
   /* Intercommunicator barrier collective tests */
   if (global_rank == 0) printf("[0] Testing intercomm barrier\n");
@@ -291,10 +296,6 @@ int main(int argc, char **argv) {
   intercomm_gatherv_test(myFirstComm, global_rank, root, false); /* Intercomm gatherv test */
   intercomm_gatherv_test(myFirstComm, global_rank, root, true); /* Intercomm igatherv test */
 
-  /* Intercommunicator scatter collective tests */
-  if (global_rank == 0) printf("[0] Testing intercomm scatter\n");
-  intercomm_scatter_test(myFirstComm, global_rank, root, false); /* Intercomm scatter test */
-  intercomm_scatter_test(myFirstComm, global_rank, root, true); /* Intercomm iscatter test */
 #endif
 
   MPI_Comm_free(&myComm);
