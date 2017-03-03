@@ -3887,9 +3887,6 @@ int main(int argc, const char **argv, char **envp)
   skt_set_idle(fast_idleFn);
 /* CrnSrand((int) time(0)); */
 
-#ifdef HSTART
-  if (!arg_child_charmrun)
-#endif
   /* Compute the values of all constants */
   arg_init(argc, argv);
   if (arg_verbose)
