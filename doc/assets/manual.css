@@ -46,7 +46,7 @@ body {
 		background: #efefef; color: black;
 		margin:5em auto 20px;
 		padding:30px;
-		width: 900px;
+		max-width: 900px;
 		-moz-border-radius: 20px; -webkit-border-radius: 20px; border-radius: 20px;
 		box-shadow: 0px 2px #aaa;
 		border: 1px solid #ccc;
@@ -122,7 +122,7 @@ pre {
 		padding: 8px;
 		margin: 10px auto;
 		display: block;
-		width: 750px;
+		max-width: 750px;
 		overflow-x: auto;
 		border-radius: 3px;
 		font-size: 95%;
