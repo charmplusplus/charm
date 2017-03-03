@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Get a string describing the current code, and compare it to the
 # recorded value in VERSION. Copy over that if it's changed, so that
@@ -10,8 +10,15 @@ then
     VOLD=`cat VERSION`
 fi
 
-#git describe --long --dirty --always > VERSION.new || touch VERSION.new
-(cd $SRCBASE && git describe --long --always) > VERSION.new || touch VERSION.new
+# Potentially set by the higher-level package-tarball.sh script
+if [ "$RELEASE" = "1" ]
+then
+    echo Release mode
+    (cd $SRCBASE && git describe --exact-match) > VERSION.new || exit 1
+else
+    echo Dev mode
+    (cd $SRCBASE && git describe --long --always) > VERSION.new || touch VERSION.new
+fi
 
 VNEW=`cat VERSION.new`
 
