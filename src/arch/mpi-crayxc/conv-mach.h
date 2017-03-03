@@ -28,7 +28,7 @@
 #define CMK_SIGNAL_USE_SIGACTION                           0
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              1
 
-#define CMK_THREADS_USE_CONTEXT                            0
+#define CMK_THREADS_USE_CONTEXT                            1
 #define CMK_THREADS_USE_PTHREADS                           0
 
 #define CMK_TIMER_USE_GETRUSAGE                            0
