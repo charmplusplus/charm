@@ -1011,16 +1011,16 @@ void Group::genSubDecls(XStr& str)
   }
   else if (forElement==forSection)
   {//For a section of the group
-    str << "    "<<ptype<<"(const CkGroupID &_gid,const int *_pelist,int _npes,CK_DELCTOR_PARAM) : ";
+    str << "    "<<ptype<<"(const CkGroupID &_gid,const int *_pelist,int _npes, CK_DELCTOR_PARAM) : ";
     genProxyNames(str, "", NULL,"(_gid,_pelist,_npes,CK_DELCTOR_ARGS)", ", ");
     str << "{  }\n";
-    str << "    "<<ptype<<"(const CkGroupID &_gid,const int *_pelist,int _npes) : ";
-    genProxyNames(str, "", NULL,"(_gid,_pelist,_npes)", ", ");
+    str << "    "<<ptype<<"(const CkGroupID &_gid,const int *_pelist,int _npes, int factor = USE_DEFAULT_BRANCH_FACTOR) : ";
+    genProxyNames(str, "", NULL,"(_gid,_pelist,_npes,factor)", ", ");
     str << "{  }\n";
-    str << "    "<<ptype<<"(int n,const CkGroupID *_gid, int const * const *_pelist,const int *_npes) : ";
-    genProxyNames(str, "", NULL,"(n,_gid,_pelist,_npes)", ", ");
+    str << "    "<<ptype<<"(int n,const CkGroupID *_gid, int const * const *_pelist,const int *_npes, int factor = USE_DEFAULT_BRANCH_FACTOR) : ";
+    genProxyNames(str, "", NULL,"(n,_gid,_pelist,_npes,factor)", ", ");
     str << "{  }\n";
-    str << "    "<<ptype<<"(int n,const CkGroupID *_gid, int const * const *_pelist,const int *_npes,CK_DELCTOR_PARAM) : ";
+    str << "    "<<ptype<<"(int n,const CkGroupID *_gid, int const * const *_pelist,const int *_npes, CK_DELCTOR_PARAM) : ";
     genProxyNames(str, "", NULL,"(n,_gid,_pelist,_npes,CK_DELCTOR_ARGS)", ", ");
     str << "{  }\n";
     

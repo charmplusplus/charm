@@ -407,6 +407,12 @@ void CkMulticastMgr::prepareGrpCookie(mCastEntry *entry, CkSectionID &sid, const
   for (int i=0; i<count; i++) {
     entry->allGrpElem.push_back(pelist[i]);
   }
+
+  if(sid.bfactor == USE_DEFAULT_BRANCH_FACTOR)
+    entry->bfactor = dfactor;
+  else
+    entry->bfactor = sid.bfactor;
+
   sid._cookie.get_type() = MulticastMsg;
   sid._cookie.get_aid() = gid;
   sid._cookie.get_val() = entry;  // allocate table for this section
@@ -515,6 +521,7 @@ void CkMulticastMgr::initGrpCookie(CkSectionInfo s)
    msg->parent = CkSectionInfo(entry->getAid());
    msg->rootSid = s;
    msg->redNo = entry->red.redNo;
+   msg->bfactor = entry->bfactor;
    // Fill the message with the section member indices and their last known locations
    for (int i=0; i<n; i++) {
      msg->lastKnown[i] = entry->allGrpElem[i];
@@ -603,7 +610,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
     entry->parentGrp = msg->parent;
     int factor = entry->bfactor = msg->bfactor;
 
-    DEBUGF(("[%d] setup: %p redNo: %d => %d with %d elems, grpSec: %d\n", CkMyPe(), entry, entry->red.redNo, msg->redNo, msg->nIdx, entry->isGrpSec()));
+    DEBUGF(("[%d] setup: %p redNo: %d => %d with %d elems, grpSec: %d, factor: %d\n", CkMyPe(), entry, entry->red.redNo, msg->redNo, msg->nIdx, entry->isGrpSec(), factor));
     entry->red.redNo = msg->redNo;
 
     // Create a numPE sized array of vectors to hold the array elements in each PE

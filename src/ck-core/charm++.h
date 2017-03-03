@@ -834,9 +834,9 @@ private:
   CkSectionID *_sid;
 public:
   CProxySection_Group() { }
-  CProxySection_Group(const CkGroupID &gid, const int *elems, const int nElems)
-      :CProxy_Group(gid), _nsid(1) { _sid = new CkSectionID(gid, elems, nElems); }
-  CProxySection_Group(const CkGroupID &gid, const int *elems, const int nElems,CK_DELCTOR_PARAM)
+  CProxySection_Group(const CkGroupID &gid, const int *elems, const int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR)
+      :CProxy_Group(gid), _nsid(1) { _sid = new CkSectionID(gid, elems, nElems, factor); }
+  CProxySection_Group(const CkGroupID &gid, const int *elems, const int nElems, CK_DELCTOR_PARAM)
       :CProxy_Group(gid,CK_DELCTOR_ARGS), _nsid(1) { _sid = new CkSectionID(gid, elems, nElems); }
   CProxySection_Group(const CProxySection_Group &cs)
       :CProxy_Group(cs.ckGetGroupID()), _nsid(cs._nsid) {
@@ -856,10 +856,10 @@ public:
   }
   CProxySection_Group(const IrrGroup *g)
       :CProxy_Group(g), _nsid(0) {}
-  CProxySection_Group(const int n, const CkGroupID *gid,  int const * const *elems, const int *nElems)
+  CProxySection_Group(const int n, const CkGroupID *gid,  int const * const *elems, const int *nElems, int factor=USE_DEFAULT_BRANCH_FACTOR)
       :CProxy_Group(gid[0]), _nsid(n) {
     _sid = new CkSectionID[n];
-    for (int i=0; i<n; ++i) _sid[i] = CkSectionID(gid[i], elems[i], nElems[i]);
+    for (int i=0; i<n; ++i) _sid[i] = CkSectionID(gid[i], elems[i], nElems[i], factor);
   }
   CProxySection_Group(const int n, const CkGroupID *gid, int const * const *elems, const int *nElems,CK_DELCTOR_PARAM)
       :CProxy_Group(gid[0],CK_DELCTOR_ARGS), _nsid(n) {
@@ -897,6 +897,7 @@ public:
   inline int *ckGetElements(int i) const {return _sid[i].pelist;}
   inline int ckGetNumElements() const { return _sid[0].npes; }
   inline int ckGetNumElements(int i) const { return _sid[i].npes; }
+  inline int ckGetBfactor() const { return _sid[0].bfactor; }
   void pup(PUP::er &p) {
     CProxy_Group::pup(p);
     p | _nsid;
