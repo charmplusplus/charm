@@ -2557,12 +2557,25 @@ void ampi::processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Data
     currentData = currentData->next();
   }
 
-  // Copy rank 0's contribution into buf first
-  memcpy(buf, contributionData[0], contributionSize);
+  if (ddt->isContig()) {
+    // Copy rank 0's contribution into buf first
+    memcpy(buf, contributionData[0], contributionSize);
 
-  // Invoke the MPI_User_function on the contributions in 'rank' order
-  for (int i=1; i<commSize; i++) {
-    (*func)(contributionData[i], buf, &count, &type);
+    // Invoke the MPI_User_function on the contributions in 'rank' order
+    for (int i=1; i<commSize; i++) {
+      (*func)(contributionData[i], buf, &count, &type);
+    }
+  }
+  else {
+    // Deserialize rank 0's contribution into buf first
+    ddt->serialize((char*)contributionData[0], (char*)buf, count, -1);
+
+    // Invoke the MPI_User_function on the deserialized contributions in 'rank' order
+    vector<char> deserializedBuf(ddt->getExtent() * count);
+    for (int i=1; i<commSize; i++) {
+      ddt->serialize((char*)contributionData[i], &deserializedBuf[0], count, -1);
+      (*func)(&deserializedBuf[0], buf, &count, &type);
+    }
   }
 }
 
@@ -3824,19 +3837,15 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
   int szdata = ddt->getSize(count);
   CkReduction::reducerType reducer = getBuiltinReducerType(type, op);
 
-  if (!ddt->isContig()) {
-    CkAbort("AMPI does not yet support reductions on non-contiguous derived datatypes!\n");
-  }
-
   if (reducer != CkReduction::invalid) {
     // MPI predefined op matches a Charm++ builtin reducer type
     AMPI_DEBUG("[%d] In makeRednMsg, using Charm++ built-in reducer type for a predefined op\n", thisIndex);
     msg = CkReductionMsg::buildNew(szdata, NULL, reducer);
     ddt->serialize((char*)inbuf, (char*)msg->getData(), count, 1);
   }
-  else if (parent->opIsCommutative(op)) {
-    // Either an MPI predefined reducer operation with no Charm++ builtin
-    // reducer type equivalent, or a commutative user-defined reducer operation
+  else if (parent->opIsCommutative(op) && ddt->isContig()) {
+    // Either an MPI predefined reducer operation with no Charm++ builtin reducer type equivalent, or
+    // a commutative user-defined reducer operation on a contiguous datatype
     AMPI_DEBUG("[%d] In makeRednMsg, using custom AmpiReducer type for a commutative op\n", thisIndex);
     AmpiOpHeader newhdr = parent->op2AmpiOpHeader(op, type, count);
     int szhdr = sizeof(AmpiOpHeader);
@@ -3845,7 +3854,8 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
     ddt->serialize((char*)inbuf, (char*)msg->getData()+szhdr, count, 1);
   }
   else {
-    // Non-commutative user-defined reducer operation
+    // Non-commutative user-defined reducer operation, or
+    // a commutative user-defined reduction on a non-contiguous datatype
     AMPI_DEBUG("[%d] In makeRednMsg, using a non-commutative user-defined operation\n", thisIndex);
     const int tupleSize = 2;
     CkReduction::tupleElement tupleRedn[tupleSize];
@@ -4943,7 +4953,7 @@ void IReq::receive(ampi *ptr, AmpiMsg *msg)
 
 void RednReq::receive(ampi *ptr, CkReductionMsg *msg)
 {
-  if (ptr->opIsCommutative(op)) {
+  if (ptr->opIsCommutative(op) && ptr->getDDT()->isContig(type)) {
     ptr->processRednMsg(msg, buf, type, count);
   } else {
     MPI_User_function* func = ptr->op2User_function(op);
