@@ -519,8 +519,8 @@ void GreedyRefineLB::receiveSolutions(CkReductionMsg *msg)
       // (same as lowest migration and better load).  Since we know a feasible
       // solution exists and we only minimize here, we guarantee that we'll end
       // with a feasible solution.
-      if ((r.migrations < bestMigrations) && (r.max_load <= lowest_max_load_f*LOAD_MIG_BAL) ||
-         (r.migrations == bestMigrations) && (r.max_load < bestSol->max_load)) {
+      if ((r.migrations < bestMigrations && r.max_load <= lowest_max_load_f*LOAD_MIG_BAL) ||
+          (r.migrations == bestMigrations && r.max_load < bestSol->max_load)) {
         bestMigrations = r.migrations;
         bestSol = &r;
       }
