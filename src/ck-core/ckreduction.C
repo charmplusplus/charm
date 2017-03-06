@@ -2500,7 +2500,9 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
     ret=CkReductionMsg::buildNew(0,NULL);
   else
   {//Use the reducer to reduce the messages
-    if(nMsgs == 1){
+    if(nMsgs == 1 &&
+      msgArr[0]->reducer != CkReduction::set &&
+      msgArr[0]->reducer != CkReduction::tuple) {
       ret = msgArr[0];
     }else{
       if (msgArr[0]->reducer == CkReduction::nop) {
