@@ -25,9 +25,9 @@ fi
 CMK_F90MAINLIBS="$F90MAIN "
 if test -z "$ICC_STATIC"
 then
-CMK_F90LIBS="-L$F90LIBDIR -lifcore -lifport "
+CMK_F90LIBS="-L$F90LIBDIR -lifcore -lifport -lifcore "
 else
-CMK_F90LIBS="$F90LIBDIR/libifcore.a $F90LIBDIR/libifport.a "
+CMK_F90LIBS="$F90LIBDIR/libifcore.a $F90LIBDIR/libifport.a $F90LIBDIR/libifcore.a "
 fi
 CMK_F77LIBS="$CMK_F90LIBS"
 

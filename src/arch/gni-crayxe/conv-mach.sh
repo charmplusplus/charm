@@ -58,7 +58,7 @@ if test -n "$ICPC"
 then
 CMK_CF77="ftn -auto "
 CMK_CF90="ftn -auto "
-CMK_F90LIBS="-lifcore -lifport "
+CMK_F90LIBS="-lifcore -lifport -lifcore  "
 else
 CMK_CF77="ftn "
 CMK_CF90="ftn "

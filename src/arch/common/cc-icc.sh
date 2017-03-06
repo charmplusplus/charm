@@ -71,7 +71,7 @@ then
 fi
 # for_main.o is important for main() in f90 code
 CMK_F90MAINLIBS="$F90MAIN "
-CMK_F90LIBS="-L$F90LIBDIR -lifcore -lifport "
+CMK_F90LIBS="-L$F90LIBDIR -lifcore -lifport -lifcore "
 CMK_F77LIBS="$CMK_F90LIBS"
 
 CMK_F90_USE_MODDIR=""
