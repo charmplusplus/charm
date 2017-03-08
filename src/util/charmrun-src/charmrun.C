@@ -3170,7 +3170,7 @@ int client_connect_problem(SOCKET skt, int code, const char *msg)
   return -1;
 }
 
-/** return 1 if connection is openned succesfully with client**/
+/** return 1 if connection is opened succesfully with client**/
 int errorcheck_one_client_connect(int client)
 {
 #ifdef HSTART
