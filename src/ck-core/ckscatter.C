@@ -29,15 +29,13 @@ void* createScatterMsg(void *msg, CkScatterWrapper &w, int ind){
 
   char* buf = (char *)copyenv + CK_ALIGN(msgsize, 16);
   memcpy(buf, ((char *)w.buf) + w.disp[ind], w.cnt[ind]);
-  //ckout<<"createScattermsg: "<<*((int *)((char *)w.buf + w.disp[ind]))<<endl;
-
   PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf));
   PUP::fromMem up((void *)(((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf));
   CkScatterWrapper _w;
   up|_w;
   _w.setsize(w.cnt[ind]);
-  size_t offset = buf - (((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf);
-  _w.setoffset(offset);
+  _w.buf = buf;
+  _w.packInfo(((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf);
   p|_w;
   return EnvToUsr(copyenv); 
 }
@@ -49,10 +47,11 @@ void* createScatterMsg(void *msg, CkScatterWrapper &w, int ind){
 **/
 void* createScatterMsg(void *msg, CkScatterWrapper &w, std::vector<int> &indices){
 
+/*
        for(int i=0; i<indices.size(); i++){
             CkPrintf("In createScatterMsg, i:%d, index: %d \n", i, indices[i]);
        }
-
+*/
        envelope *env = UsrToEnv(msg);
        int msgsize = env->getTotalsize();
        int *disp = (int *) w.disp;
@@ -81,8 +80,7 @@ void* createScatterMsg(void *msg, CkScatterWrapper &w, std::vector<int> &indices
        si.ndest = ndest;
        //copy scatterv buffer
        char* buf = (char *)copyenv + CK_ALIGN(msgsize, 16);
-       size_t offset = buf - (((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf);
-       si.setoffset(offset);
+       si.buf = buf;
        int tbufsize = 0;
        for(int k=0; k<ndest; k++){
             int ind = indices[k];
@@ -92,8 +90,7 @@ void* createScatterMsg(void *msg, CkScatterWrapper &w, std::vector<int> &indices
        }
        //update displacement array
        int *mdisp = (int *)(buf + tbufsize);
-       offset = ((char*) mdisp) - (((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf);
-       si.setoffset_disp(offset);
+       si.disp = mdisp;
        tbufsize = 0;
        for(int k=0; k<ndest; k++){
             int ind = indices[k];
@@ -103,26 +100,22 @@ void* createScatterMsg(void *msg, CkScatterWrapper &w, std::vector<int> &indices
        }
        //update destination array
        CkArrayIndex *mdest = (CkArrayIndex *)(&mdisp[ndest]);
-       offset = ((char*) mdest) - (((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf);
-       si.setoffset_dest(offset);
+       si.dest = mdest;
        for(int k=0; k<ndest; k++){
             int ind = indices[k];
             mdest[k] = dest[ind];
        }
        //update count array
        int *mcnt = (int *)(&mdest[ndest]);
-       offset = ((char*) mcnt) - (((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf);
-       si.setoffset_cnt(offset);
+       si.cnt = mcnt;
        for(int k=0; k<ndest; k++){
             int ind = indices[k];
             mcnt[k] = cnt[ind];
        }
-
+       void* msgBuf = ((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf;
+       si.packInfo(msgBuf);
        PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf));
        p|si;
        return EnvToUsr(copyenv);
 }
-
-
-
 

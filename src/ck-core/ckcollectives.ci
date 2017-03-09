@@ -2,7 +2,8 @@ module CkCollectives {
   
   nodegroup [migratable] CkCollectiveMgr {
     entry CkCollectiveMgr();
-    entry void scatterSendAll(CkMessage *msg); 
+    entry void ckScatterSpanningTreeEntry(CkMessage *msg);
+    entry void scatterSendAllEntry(CkMessage *msg); 
   };
 
   initnode void _ckCollectivesInit(void);

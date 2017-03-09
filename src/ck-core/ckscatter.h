@@ -21,7 +21,7 @@ class CkScatterWrapper{
 			size = _size;
 		}
 
-		void setoffset(size_t _offset) {
+		void setoffset_buf(size_t _offset) {
 			buf = (void *)(_offset);
 		}
 
@@ -63,6 +63,14 @@ class CkScatterWrapper{
 		   dest = (void *)getdest(impl_buf);
 		   cnt = (int *)getcnt(impl_buf);
 		}
+
+        void packInfo(void *impl_buf){
+            //CkPrintf("CkScatterWrapper, packInfo, buf: %p, disp: %p, dest: %p, cnt: %p \n", buf, disp, dest, cnt);
+            buf = (void *) ((size_t)(((char *)buf) - ((char *)impl_buf)));
+            disp = (int *) ((size_t)(((char *)disp) - ((char *)impl_buf)));
+            dest = (void *)((size_t)(((char *)dest) - ((char *)impl_buf)));
+            cnt = (int *)  ((size_t)(((char *)cnt) - ((char *)impl_buf)));
+        }
 
 		CkScatterWrapper() : buf(NULL), disp(NULL), dest(NULL), cnt(NULL), ndest(0) {}
 		CkScatterWrapper(void *_buf, int _ndest, int *_disp, void *_dest, int *_cnt) : buf(_buf), disp(_disp), dest(_dest), cnt(_cnt), ndest(_ndest){}
