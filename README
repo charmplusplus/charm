@@ -185,7 +185,7 @@ need to choose <options> from the following list:
          running:
          > ./build charm++ netlrts-linux help
          will give:
-Supported compilers: clang craycc gcc icc icc8 iccstatic pgcc xlc xlc64
+Supported compilers: clang craycc gcc icc iccstatic pgcc xlc xlc64
 Supported options: bigemulator bigsim causalft clustermatic g95 gfortran ifort lcs local mlogft omp ooc papi persistent pgf90 pxshm scyld smp syncft sysvshm tcp tsan turing
 
 
