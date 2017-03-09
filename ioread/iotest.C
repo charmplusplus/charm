@@ -31,6 +31,9 @@ class Main : public CBase_Main {
 public:
   Main(CkArgMsg *m) {
     numdone = 0;
+    if (m->argc < 3) {
+      CkAbort("Call with <num readers> <filename>\n");
+    }
     n = atoi(m->argv[1]);
 
     sprintf(fileName,"%s", m->argv[m->argc - 1]);
@@ -62,7 +65,6 @@ public:
 
     CkPrintf("Main ran\n");
     delete m;
-
   }
 
   void iterDone(CkReductionMsg *m) { // checks all the files  are done
