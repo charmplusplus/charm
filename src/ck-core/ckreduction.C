@@ -85,7 +85,7 @@ waits for the migrant contributions to straggle in.
 
 extern bool _inrestart;
 
-Group::Group()
+Group::Group():thisIndex(CkMyPe())
 {
 	if (_inrestart) CmiAbort("A Group object did not call the migratable constructor of its base class!");
 
@@ -95,7 +95,7 @@ Group::Group()
 	doneCreatingContributors();
 }
 
-Group::Group(CkMigrateMessage *msg):CkReductionMgr(msg)
+Group::Group(CkMigrateMessage *msg):CkReductionMgr(msg),thisIndex(CkMyPe())
 {
 	creatingContributors();
 	contributorStamped(&reductionInfo);
@@ -1909,7 +1909,7 @@ std::vector<CkReduction::reducerStruct>& CkReduction::reducerTable()
  ****/
  
 /**nodegroup reduction manager . Most of it is similar to the guy above***/
-NodeGroup::NodeGroup(void) {
+NodeGroup::NodeGroup(void):thisIndex(CkMyNode()) {
   __nodelock=CmiCreateLock();
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     mlogData->objID.type = TypeNodeGroup;

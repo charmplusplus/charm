@@ -1,9 +1,10 @@
 DIRS=3darray fancyarray \
 	darray dgroup \
 	group local \
-	stl_array sdag 4darray
+	stl_array sdag \
+	4darray nodegroup
 
-all: 
+all:
 	for d in $(DIRS); do \
 		(cd $$d; $(MAKE) all OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done

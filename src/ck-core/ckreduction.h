@@ -514,8 +514,9 @@ class NodeGroup : public CkNodeReductionMgr {
     contributorInfo reductionInfo;//My reduction information
   public:
     CmiNodeLock __nodelock;
+    const int thisIndex;
     NodeGroup();
-    NodeGroup(CkMigrateMessage* m):CkNodeReductionMgr(m) { __nodelock=CmiCreateLock(); }
+    NodeGroup(CkMigrateMessage* m):CkNodeReductionMgr(m),thisIndex(CkMyNode()) { __nodelock=CmiCreateLock(); }
     
     ~NodeGroup();
     inline const CkGroupID &ckGetGroupID(void) const {return thisgroup;}
@@ -796,6 +797,7 @@ class Group : public CkReductionMgr
 {
 	contributorInfo reductionInfo;//My reduction information
  public:
+    const int thisIndex;
 	Group();
 	Group(CkMigrateMessage *msg);
 	virtual bool isNodeGroup() { return false; }

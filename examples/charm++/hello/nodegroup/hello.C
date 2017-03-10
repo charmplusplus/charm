@@ -13,14 +13,13 @@ public:
     delete m;
 
     //Start the computation
-    CkPrintf("Running Hello on %d processors\n",
-	     CkNumPes());
-    if(CkNumPes()<2) {
-      CkAbort("This program should be run on at least 2 processors.\n");
-    }
+    CkPrintf("Running Hello on %d nodes\n",
+	     CkNumNodes());
     mainProxy = thisProxy;
 
-    CProxy_Other::ckNew(1);
+    CProxy_Hello nodegrp = CProxy_Hello::ckNew();
+
+    nodegrp[0].SayHi(17);
   };
 
   void done(void)
@@ -30,32 +29,21 @@ public:
   };
 };
 
-class Other : public CBase_Other
-{
-  public:
-    Other(void)
-    {
-      CProxy_Hello grp = CProxy_Hello::ckNew();
-      grp[0].SayHi(17);
-    }
-};
-
-/*group*/
+/*nodegroup*/
 class Hello : public CBase_Hello
 {
 public:
   Hello()
   {
-    CkPrintf("Hello %d created\n",CkMyPe());
+    CkPrintf("Hello %d created\n",thisIndex);
   }
 
   void SayHi(int hiNo)
   {
-    int ind=thisIndex;
-    CkPrintf("Hi[%d] from element %d\n",hiNo,ind);
-    if (ind+1<CkNumPes())
+    CkPrintf("Hi[%d] from element %d\n",hiNo,thisIndex);
+    if (thisIndex+1<CkNumNodes())
       //Pass the hello on:
-      thisProxy[ind+1].SayHi(hiNo+1);
+      thisProxy[thisIndex+1].SayHi(hiNo+1);
     else 
       //We've been around once-- we're done.
       mainProxy.done();

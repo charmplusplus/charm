@@ -233,7 +233,7 @@ class PingG : public CBase_PingG
 public:
   PingG()
   {
-    me = CkMyPe();    
+    me = thisIndex;
     nbr = (me+1)%CkNumPes();
     pp = new CProxyElement_PingG(thisgroup,nbr);
     niter = 0;
@@ -464,7 +464,7 @@ class PingN : public CBase_PingN
 public:
   PingN()
   {
-    me = CkMyNode();    
+    me = thisIndex;
     nbr = (me+1)%CkNumNodes();
 
     // note: for RMDA in ping you can only have 1 nbr who is both your
