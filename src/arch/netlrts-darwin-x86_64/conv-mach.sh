@@ -13,6 +13,8 @@ CMK_QT="generic64-light"
 CMK_LIBS="-lckqt"
 CMK_RANLIB="ranlib"
 
+CMK_WARNINGS_ARE_ERRORS="-Werror"
+
 # Assumes GNU fortran compiler:
 CMK_CF77="g95 -arch x86_64 -mmacosx-version-min=10.7"
 CMK_CF90="g95 -arch x86_64 -mmacosx-version-min=10.7"
