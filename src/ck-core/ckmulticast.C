@@ -652,7 +652,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
     std::tr1::unordered_map<int, int> peIdx;    // pe -> idx in msg->peElems
 #else
     std::unordered_map<int, int> peIdx;    // pe -> idx in msg->peElems
-    if (!entry->isGrpSec()) peIdx.reserve(numpes);
+    //if (!entry->isGrpSec()) peIdx.reserve(numpes);   // requires full C++11 support (hold off until 6.8.0 release)
 #endif
     std::vector<int> mySubTreePEs;
     mySubTreePEs.reserve(numpes);
