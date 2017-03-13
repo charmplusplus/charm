@@ -10,9 +10,9 @@ void StealTask() {
 #if CMK_TRACE_ENABLED
   double _start = CmiWallTimer();
 #endif
-  int random_rank = CrnRand() % CkMyNodeSize();
-  while (random_rank == CkMyRank())
-    random_rank = CrnRand() % CkMyNodeSize();
+  int random_rank = CrnRand() % (CkMyNodeSize()-1);
+  if (random_rank >= CkMyRank())
+    ++random_rank;
 #if CMK_TRACE_ENABLED
   char s[10];
   sprintf( s, "%d", random_rank );
@@ -28,7 +28,8 @@ void StealTask() {
 }
 
 static void TaskStealBeginIdle(void *dummy) {
-  StealTask();
+  if (CkMyNodeSize() > 1)
+    StealTask();
 }
 
 void _taskqInit() {
