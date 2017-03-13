@@ -1802,7 +1802,6 @@ void CkMigratable::CkAddThreadListeners(CthThread tid, void *msg)
 		       thisIndexMax.data()[2]);
 	CkArrayThreadListener *a=new CkArrayThreadListener;
 	a->base.suspend=CkArrayThreadListener_suspend;
-	a->base.awaken=NULL;
 	a->base.resume=CkArrayThreadListener_resume;
 	a->base.free=CkArrayThreadListener_free;
 	a->mig=this;

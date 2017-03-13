@@ -10,8 +10,6 @@
 #include <stdlib.h>
 #include "conv-trace.h"
 
-struct envelope;
-
 CpvDeclare(int, traceOn); /* For threads.c */
 #if CMK_TRACE_ENABLED && CMK_PROJECTOR
 CpvExtern(int, _traceCoreOn);   /* For cursed projector core */
@@ -34,7 +32,6 @@ void traceEndIdle(void) {}
 void traceResume(CmiObjId *t) {}
 void traceSuspend(void) {}
 void traceAwaken(CthThread t) {}
-void traceAddThreadListeners(CthThread tid, struct envelope *e) {}
 void traceUserEvent(int i) {}
 void traceUserBracketEvent(int a, double b, double c) {}
 int traceRegisterUserEvent(const char* e, int f) { return -1; }

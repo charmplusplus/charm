@@ -736,6 +736,7 @@ Suspend: finds the next thread to execute, and resumes it
 */
 void CthSuspend(void)
 {
+
   CthThread next;
   struct CthThreadListener *l;
   CthThreadBase *cur=B(CthCpvAccess(CthCurrent));
@@ -768,6 +769,12 @@ void CthSuspend(void)
     CmiAbort("A thread's scheduler should not be less than 0!\n");
 #endif    
 
+#if CMK_TRACE_ENABLED
+#if !CMK_TRACE_IN_CHARM
+  if(CpvAccess(traceOn))
+    traceSuspend();
+#endif
+#endif
   CthResume(next);
 }
 
@@ -781,11 +788,12 @@ void CthAwaken(CthThread th)
     return;
     } */
 
-  struct CthThreadListener *l;
-  for(l=B(th)->listener;l!=NULL;l=l->next){
-    if (l->awaken) l->awaken(l);
-  }
-
+#if CMK_TRACE_ENABLED
+#if ! CMK_TRACE_IN_CHARM
+  if(CpvAccess(traceOn))
+    traceAwaken(th);
+#endif
+#endif
   B(th)->awakenfn(B(th)->token, CQS_QUEUEING_FIFO, 0, 0);
   /*B(th)->scheduled = 1; */
   /*changed due to out-of-core emulation in BigSim */
@@ -801,12 +809,12 @@ void CthYield()
 void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
 {
   if (B(th)->awakenfn == 0) CthNoStrategy();
-
-  struct CthThreadListener *l;
-  for(l=B(th)->listener;l!=NULL;l=l->next){
-    if (l->awaken) l->awaken(l);
-  }
-
+#if CMK_TRACE_ENABLED
+#if ! CMK_TRACE_IN_CHARM
+  if(CpvAccess(traceOn))
+    traceAwaken(th);
+#endif
+#endif
   B(th)->awakenfn(B(th)->token, s, pb, prio);
   /*B(th)->scheduled = 1; */
   /*changed due to out-of-core emulation in BigSim */

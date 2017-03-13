@@ -2063,9 +2063,6 @@ CthThread CthSuspendSchedulingThread()
     CthSetStrategy(succ,
 		   CthEnqueueSchedulingThread,
 		   CthSuspendSchedulingThread);
-#if CMK_TRACE_ENABLED
-    traceAddThreadListeners(succ, NULL);
-#endif
   }
   
   CpvAccess(CthSchedulingThread) = succ;
@@ -2085,6 +2082,14 @@ void CthResumeNormalThread(CthThreadToken* token)
     free(token);
     return;
   }
+#if CMK_TRACE_ENABLED
+#if ! CMK_TRACE_IN_CHARM
+  if(CpvAccess(traceOn))
+    CthTraceResume(t);
+/*    if(CpvAccess(_traceCoreOn)) 
+	        resumeTraceCore();*/
+#endif
+#endif
   
   /* BIGSIM_OOC DEBUGGING
   CmiPrintf("In CthResumeNormalThread:   ");
@@ -2105,7 +2110,14 @@ void CthResumeSchedulingThread(CthThreadToken  *token)
     CpvAccess(CthSleepingStandins) = me;
   }
   CpvAccess(CthSchedulingThread) = t;
-
+#if CMK_TRACE_ENABLED
+#if ! CMK_TRACE_IN_CHARM
+  if(CpvAccess(traceOn))
+    CthTraceResume(t);
+/*    if(CpvAccess(_traceCoreOn)) 
+	        resumeTraceCore();*/
+#endif
+#endif
   CthResume(t);
 }
 
@@ -2148,9 +2160,6 @@ void CthSchedInit()
   CthSetStrategy(CthSelf(),
 		 CthEnqueueSchedulingThread,
 		 CthSuspendSchedulingThread);
-#if CMK_TRACE_ENABLED && !CMK_BIGSIM_CHARM
-  traceAddThreadListeners(CthSelf(), NULL);
-#endif
 }
 
 void CsdInit(char **argv)

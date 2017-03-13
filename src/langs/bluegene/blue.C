@@ -2285,7 +2285,6 @@ void BgSetStrategyBigSimDefault(CthThread t)
   a->suspend = bigsimThreadListener_suspend;
   a->resume = bigsimThreadListener_resume;
   a->free = NULL;
-  a->awaken = NULL;
   CthAddListener(t, a);
 }
 
