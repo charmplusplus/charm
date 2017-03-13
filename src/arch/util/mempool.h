@@ -18,8 +18,6 @@ typedef CmiInt8   mem_handle_t;
 typedef void * (* mempool_newblockfn)(size_t *size, mem_handle_t *mem_hndl, int expand_flag);
 typedef void (* mempool_freeblock)(void *ptr, mem_handle_t mem_hndl);
 
-#define cutOffNum 25 
-
 //given x as mptr get
 #define   MEMPOOL_GetBlockHead(x)   (block_header*)&(x->block_head)	
 //given x as block header, get ...
@@ -42,7 +40,7 @@ typedef void (* mempool_freeblock)(void *ptr, mem_handle_t mem_hndl);
 #define   MEMPOOL_DecMsgInSend(x) (MEMPOOL_GetBlockPtr(x)->msgs_in_send)--
 #define   MEMPOOL_GetSlotGNext(x)     (x->gnext)
 #define   MEMPOOL_GetSlotStatus(x)    (x->status)
-#define	  MEMPOOL_GetSlotSize(x)      (cutOffPoints[x->size])
+#define	  MEMPOOL_GetSlotSize(x)      (MEMPOOL_GetMempoolPtr(x)->cutOffPoints[x->size])
 struct block_header;
 struct mempool_type;
 
@@ -79,7 +77,7 @@ typedef struct block_header
   mem_handle_t        mem_hndl;
   size_t              size, used;
   size_t              block_prev,block_next;   // offset to next memblock
-  size_t              freelists[cutOffNum];
+  size_t*             freelists;
   struct mempool_type  *mptr;               // mempool_type
 #if CMK_CONVERSE_UGNI
   int                 msgs_in_send;
@@ -87,6 +85,8 @@ typedef struct block_header
 #endif
   size_t              padding;
 } block_header;
+
+typedef enum {MEMPOOL_NOLOCK = 0, MEMPOOL_USELOCK = 1} mempool_lock_flag;
 
 // only at beginning of first block of mempool, representing the mempool
 typedef struct mempool_type
@@ -97,9 +97,10 @@ typedef struct mempool_type
   size_t                 block_tail;
   size_t                 limit;
   size_t                 size;
-#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
-  CmiNodeLock		 mempoolLock;
-#endif
+  CmiNodeLock            mempoolLock;
+  mempool_lock_flag      useMempoolLock;
+  int                    cutOffNum;
+  size_t*                cutOffPoints;
 } mempool_type;
 
 #ifdef __cplusplus
@@ -107,12 +108,15 @@ extern "C" {
 #endif
 
 mempool_type *mempool_init(size_t pool_size, mempool_newblockfn newfn, mempool_freeblock freefn, size_t limit);
+mempool_type *mempool_init_lock(size_t pool_size, mempool_newblockfn newfn,
+    mempool_freeblock freefn, size_t limit, mempool_lock_flag useLock);
+mempool_type *mempool_init_all(size_t pool_size, mempool_newblockfn newfn,
+    mempool_freeblock freefn, size_t limit, mempool_lock_flag useLock,
+    int cutOffPwr, int basePwr);
 void  mempool_destroy(mempool_type *mptr);
 void*  mempool_malloc(mempool_type *mptr, size_t size, int expand);
 void mempool_free(mempool_type *mptr, void *ptr_free);
-#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
 void mempool_free_thread(void *ptr_free);
-#endif
 
 #if defined(__cplusplus)
 }

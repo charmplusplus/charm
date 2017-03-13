@@ -72,7 +72,6 @@ added by Ryan Mokos in July 2008.
 
 #if CMK_USE_MEMPOOL_ISOMALLOC
 #include "mempool.h"
-extern int cutOffPoints[cutOffNum];
 #endif 
 
 int _sync_iso = 0;
@@ -2431,7 +2430,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
         currSlot = (slot_header*)((char*)current+sizeof(block_header));
       }
       while(currSlot != NULL) {
-        pup_int(p,&cutOffPoints[currSlot->size]);
+        pup_size_t(p,&(mptr->cutOffPoints[currSlot->size]));
         if(MEMPOOL_GetSlotStatus(currSlot)) {
           pup_int(p,&flags[0]);
           pup_bytes(p,(void*)currSlot,sizeof(slot_header));
@@ -2473,9 +2472,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
         newblock = (char*)newblock + flags[0];
       }
     }
-#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
     mptr->mempoolLock = CmiCreateLock();
-#endif  
   }
   pup_bytes(p,lp,sizeof(int*));
   if(pup_isDeleting(p)) {

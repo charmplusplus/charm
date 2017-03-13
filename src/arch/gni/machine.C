@@ -4093,11 +4093,18 @@ void free_mempool_block(void *ptr, gni_mem_handle_t mem_hndl)
 
 void LrtsPreCommonInit(int everReturn){
 #if USE_LRTS_MEMPOOL
+
+#if CMK_SMP
+    mempool_lock_flag mlf = MEMPOOL_USELOCK;
+#else
+    mempool_lock_flag mlf = MEMPOOL_NOLOCK;
+#endif // CMK_SMP
+
     CpvInitialize(mempool_type*, mempool);
-    CpvAccess(mempool) = mempool_init(_mempool_size, alloc_mempool_block, free_mempool_block, _mempool_size_limit);
+    CpvAccess(mempool) = mempool_init_lock(_mempool_size, alloc_mempool_block, free_mempool_block, _mempool_size_limit, mlf);
 #if CMK_PERSISTENT_COMM_PUT
     CpvInitialize(mempool_type*, persistent_mempool);
-    CpvAccess(persistent_mempool) = mempool_init(_mempool_size, alloc_persistent_mempool_block, free_mempool_block, _mempool_size_limit);
+    CpvAccess(persistent_mempool) = mempool_init_lock(_mempool_size, alloc_persistent_mempool_block, free_mempool_block, _mempool_size_limit, mlf);
 #endif
     MACHSTATE2(8, "mempool_init %d %p\n", CmiMyRank(), CpvAccess(mempool)) ; 
 #endif
