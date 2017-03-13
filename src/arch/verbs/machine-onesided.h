@@ -63,7 +63,7 @@ int LrtsGetRdmaRecvInfoSize(int numOps){
   return sizeof(CmiVerbsRdmaRecv_t) + numOps * sizeof(CmiVerbsRdmaRecvOp_t);
 }
 
-void LrtsSetRdmaRecvInfo(void *rdmaRecv, int numOps, void *msg, void *rdmaSend){
+void LrtsSetRdmaRecvInfo(void *rdmaRecv, int numOps, void *msg, void *rdmaSend, int msgSize){
   CmiVerbsRdmaRecv_t *rdmaRecvInfo = (CmiVerbsRdmaRecv_t *)rdmaRecv;
   CmiVerbsRdma_t *rdmaSendInfo = (CmiVerbsRdma_t *)rdmaSend;
 
@@ -92,7 +92,7 @@ void LrtsSetRdmaInfo(void *dest, int destPE, int numOps){
   rdma->peNum = CmiMyPe();
 }
 
-void LrtsSetRdmaOpInfo(void *dest, const void *ptr, int size){
+void LrtsSetRdmaOpInfo(void *dest, const void *ptr, int size, void *ack, int destPE){
   struct ibv_mr *mr;
 
   CmiVerbsRdmaOp_t *rdmaOp = (CmiVerbsRdmaOp_t *)dest;

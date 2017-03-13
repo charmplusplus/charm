@@ -70,11 +70,11 @@ envelope* CkRdmaCreateMetadataMsg(envelope *env, int pe){
   p|numops;
   for(int i=0; i<numops; i++){
     CkRdmaWrapper w; up|w;
-    CmiSetRdmaOpInfo(md, w.ptr, w.cnt);
     CkRdmaWrapper *wack = new CkRdmaWrapper(w);
     void *ack = CmiSetRdmaAck(CkHandleRdmaCookie, wack);
     w.callback = (CkCallback *)ack;
     p|w;
+    CmiSetRdmaOpInfo(md, w.ptr, w.cnt, w.callback, pe);
     md += CmiGetRdmaOpInfoSize();
   }
   CkPackMessage(&copyenv);
@@ -211,7 +211,7 @@ void CkUpdateRdmaPtrs(envelope *env, int msgsize, char *recv_md, char *src_md){
 
   //Use the metadata info to set the machine info for receiver
   //generic info for all RDMA operations
-  CmiSetRdmaRecvInfo(recv_md, numops, env, src_md);
+  CmiSetRdmaRecvInfo(recv_md, numops, env, src_md, env->getTotalsize());
   recv_md += CmiGetRdmaGenRecvInfoSize();
   char *buf = ((char *)env) + CK_ALIGN(msgsize, 16);
   for(int i=0; i<numops; i++){

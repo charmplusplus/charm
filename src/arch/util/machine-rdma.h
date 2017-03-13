@@ -15,11 +15,11 @@ typedef struct _cmi_rdma_ack{
 
 /*Sender Functions*/
 void LrtsSetRdmaInfo(void *dest, int destPE, int numOps);
-void LrtsSetRdmaOpInfo(void *dest, const void *ptr, int size);
+void LrtsSetRdmaOpInfo(void *dest, const void *ptr, int size, void *ack, int destPE);
 int LrtsGetRdmaOpInfoSize();
 int LrtsGetRdmaGenInfoSize();
 int LrtsGetRdmaInfoSize(int numOps);
-void LrtsSetRdmaRecvInfo(void *dest, int numOps, void *charmMsg, void *rdmaInfo);
+void LrtsSetRdmaRecvInfo(void *dest, int numOps, void *charmMsg, void *rdmaInfo, int msgSize);
 
 /*Receiver Functions*/
 void LrtsSetRdmaRecvOpInfo(void *dest, void *buffer, void *src_ref, int size, int opIndex, void *rdmaRecv);
@@ -40,8 +40,8 @@ void CmiSetRdmaInfo(void *dest, int destPE, int numOps){
 }
 
 /* Set the machine layer info specific to RDMA op*/
-void CmiSetRdmaOpInfo(void *dest, const void *ptr, int size){
-  LrtsSetRdmaOpInfo(dest, ptr, size);
+void CmiSetRdmaOpInfo(void *dest, const void *ptr, int size, void *ack, int destPE){
+  LrtsSetRdmaOpInfo(dest, ptr, size, ack, destPE);
 }
 
 /* Getter for size help upper layers allocate space for machine layer info
@@ -74,8 +74,8 @@ void *CmiSetRdmaAck(RdmaAckHandlerFn fn, void *token){
 /* Receiver side functions */
 
 /* Set the receiver specific machine layer info generic to RDMA ops*/
-void CmiSetRdmaRecvInfo(void *dest, int numOps, void *charmMsg, void *rdmaInfo){
-  LrtsSetRdmaRecvInfo(dest, numOps, charmMsg, rdmaInfo);
+void CmiSetRdmaRecvInfo(void *dest, int numOps, void *charmMsg, void *rdmaInfo, int msgSize){
+  LrtsSetRdmaRecvInfo(dest, numOps, charmMsg, rdmaInfo, msgSize);
 }
 
 /* Set the receiver specific machine layer info specific to RDMA ops*/

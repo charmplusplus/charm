@@ -54,6 +54,7 @@ static int CMI_DYNAMIC_RECV_CAPSIZE=3;
 static int dynamicSendCap = CMI_DYNAMIC_MAXCAPSIZE;
 static int dynamicRecvCap = CMI_DYNAMIC_MAXCAPSIZE;
 MPI_Comm charmComm;
+int tagUb;
 
 #if CMI_EXERT_SEND_CAP
 static int SEND_CAP=3;
@@ -299,21 +300,40 @@ CpvDeclare(crashedRankList *, crashedRankHdr);
 CpvDeclare(crashedRankList *, crashedRankPtr);
 int isRankDie(int rank);
 #endif
+
+#if CMK_ONESIDED_IMPL
+int srcRank;
+#if CMK_SMP
+//Lock used for incrementing rdmaTag in SMP mode
+static CmiNodeLock rdmaTagLock = 0;
+#endif
+
+#define RDMA_BASE_TAG     TAG+2
+#define RDMA_ACK_TAG      TAG-2
+int rdmaTag=RDMA_BASE_TAG;
+#include "machine-onesided.h"
+#endif //end of CMK_ONESIDED_IMPL
+
 /* A simple list for msgs that have been sent by MPI_Isend */
 typedef struct msg_list {
     char *msg;
     struct msg_list *next;
     int size, destpe, mode;
     MPI_Request req;
+#if CMK_ONESIDED_IMPL
+    CmiMPIRzvRdmaOpInfo_t *rdmaOpInfo;
+    //this field stores the pointer to rdma buffer specific information (ack, tag)
+    //for rdma messages, tag is greater than RDMA_BASE_TAG; regular messages, it is 0
+#endif
 #if __FAULT__ 
     int dstrank; //used in fault tolerance protocol, if the destination is the died rank, delete the msg
 #endif
 } SMSG_LIST;
 
-CpvStaticDeclare(SMSG_LIST *, sent_msgs);
-CpvStaticDeclare(SMSG_LIST *, end_sent);
+CpvDeclare(SMSG_LIST *, sent_msgs);
+CpvDeclare(SMSG_LIST *, end_sent);
 
-CpvStaticDeclare(int, MsgQueueLen);
+CpvDeclare(int, MsgQueueLen);
 static int request_max;
 /*FLAG: consume outstanding Isends in scheduler loop*/
 static int no_outstanding_sends=0;
@@ -331,7 +351,7 @@ typedef struct ProcState {
 static ProcState  *procState;
 
 #if CMK_SMP && !MULTI_SENDQUEUE
-static PCQueue sendMsgBuf;
+PCQueue sendMsgBuf;
 static CmiNodeLock  sendMsgBufLock = NULL;        /* for sendMsgBuf */
 #endif
 /* =====End of Declarations of Machine Specific Variables===== */
@@ -377,6 +397,10 @@ void CmiNotifyIdleForMPI(void);
 #include "machine-lrts.h"
 #include "machine-common-core.c"
 
+#if CMK_ONESIDED_IMPL
+#include "machine-onesided.c"
+#endif
+
 #if USE_MPI_CTRLMSG_SCHEME
 #include "machine-ctrlmsg.c"
 #endif
@@ -393,6 +417,9 @@ static void EnqueueMsg(void *m, int size, int node, int mode) {
     msg_tmp->destpe = node;
     msg_tmp->next = 0;
     msg_tmp->mode = mode;
+#if CMK_ONESIDED_IMPL
+    msg_tmp->rdmaOpInfo = NULL;
+#endif
 
 #if MULTI_SENDQUEUE
     PCQueuePush(procState[CmiMyRank()].sendMsgBuf,(char *)msg_tmp);
@@ -500,6 +527,9 @@ CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mo
     msg_tmp->size = size;
     msg_tmp->next = 0;
     msg_tmp->mode = mode;
+#if CMK_ONESIDED_IMPL
+    msg_tmp->rdmaOpInfo = NULL;
+#endif
     return MPISendOneMsg(msg_tmp);
 }
 
@@ -577,7 +607,19 @@ static void ReleaseSentMessages(void) {
                 CpvAccess(sent_msgs) = temp;
             else
                 prev->next = temp;
-            CmiFree(msg_tmp->msg);
+#if CMK_ONESIDED_IMPL
+            //if rdma msg, call the callback
+            if(msg_tmp->rdmaOpInfo !=NULL) {
+                CmiMPIRzvRdmaOpInfo_t *rdmaOpInfo = (CmiMPIRzvRdmaOpInfo_t *)msg_tmp->rdmaOpInfo;
+                CmiRdmaAck *ack = (CmiRdmaAck *) rdmaOpInfo->ack;
+                ack->fnPtr(ack->token);
+                free(msg_tmp->rdmaOpInfo);
+            }
+            else
+#endif
+            {
+              CmiFree(msg_tmp->msg);
+            }
             /* CmiFree(msg_tmp); */
             free(msg_tmp);
             msg_tmp = temp;
@@ -603,6 +645,13 @@ static int PumpMsgs(void) {
     MPI_Status sts;
     int recd=0;
 
+#if CMK_ONESIDED_IMPL
+    CmiMPIRzvRdmaRecvList_t *recvBufferTmp = CpvAccess(recvRdmaBuffers);
+    CmiMPIRzvRdmaRecvList_t *prev = 0;
+    CmiMPIRzvRdmaRecvList_t *temp;
+    int opDone, allOpsDone, i;
+#endif
+
 #if CMI_EXERT_RECV_CAP || CMI_DYNAMIC_EXERT_CAP
     int recvCnt=0;
 #endif
@@ -614,6 +663,43 @@ static int PumpMsgs(void) {
 #endif
 
     while (1) {
+#if CMK_ONESIDED_IMPL
+        //Wait for the completion of rdma buffers (recvs posted in LrtsIssueRgets)
+        while(recvBufferTmp != 0){
+          allOpsDone=1;
+
+          for(i=0; i<recvBufferTmp->numOps; i++){
+            if(recvBufferTmp->rdmaOp[i].hasCompleted == 0){
+
+              if(MPI_Test(&(recvBufferTmp->rdmaOp[i].req), &opDone, MPI_STATUS_IGNORE) != MPI_SUCCESS)
+                CmiAbort("ReleaseSentMessages: MPI_Test for Rdma buffers failed!\n");
+              //recv has completed
+              if(opDone)
+                recvBufferTmp->rdmaOp[i].hasCompleted = 1;
+              else
+                allOpsDone = 0;
+            }
+          }
+          //all recvs for this message have completed i.e numops number of recvs
+          if(allOpsDone){
+            handleOneRecvedMsg(recvBufferTmp->msgLen, recvBufferTmp->msg);
+            //remove from the list
+            CpvAccess(RdmaRecvQueueLen)--;
+            temp = recvBufferTmp->next;
+            if(prev==0)
+              CpvAccess(recvRdmaBuffers)=temp;
+            else
+              prev->next = temp;
+
+            recvBufferTmp = temp;
+          }
+          else{
+            prev = recvBufferTmp;
+            recvBufferTmp = recvBufferTmp->next;
+          }
+        }
+        CpvAccess(endRdmaBuffer) = prev;
+#endif
         int doSyncRecv = 1;
 #if CMI_EXERT_RECV_CAP
         if (recvCnt==RECV_CAP) break;
@@ -939,7 +1025,15 @@ static int SendMsgBuf() {
     /* CmiUnlock(sendMsgBufLock); */
     while (NULL != msg_tmp) {
 #endif
-            MPISendOneMsg(msg_tmp);
+
+#if CMK_ONESIDED_IMPL
+            if(msg_tmp->rdmaOpInfo !=NULL)
+                MPISendOneRdmaBuffer(msg_tmp);
+            else
+#endif
+            {
+                MPISendOneMsg(msg_tmp);
+            }
             sent=1;
 
 #if CMI_EXERT_SEND_CAP
@@ -1255,6 +1349,8 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     int myNID;
     int largc=*argc;
     char** largv=*argv;
+    int tagUbGetResult;
+    void *tagUbVal;
 
     if (CmiGetArgFlag(largv, "+comm_thread_only_recv")) {
 #if CMK_SMP
@@ -1292,6 +1388,15 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     }
     MPI_Comm_size(charmComm, numNodes);
     MPI_Comm_rank(charmComm, myNodeID);
+
+#if CMK_ONESIDED_IMPL
+    /* srcRank stores the rank of the sender MPI process
+     * and is a global variable used for rdma md messages */
+    srcRank = *myNodeID;
+    MPI_Comm_get_attr(MPI_COMM_WORLD, MPI_TAG_UB, &tagUbVal, &tagUbGetResult);
+    CmiAssert(tagUbGetResult);
+    tagUb = *(int *)tagUbVal;
+#endif
 
     MPI_Bcast(&_Cmi_mynodesize, 1, MPI_INT, 0, charmComm);
 
@@ -1518,6 +1623,10 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     sendMsgBuf = PCQueueCreate();
     sendMsgBufLock = CmiCreateLock();
 #endif
+
+#if CMK_ONESIDED_IMPL && CMK_SMP
+    rdmaTagLock = CmiCreateLock();
+#endif
 #endif
 }
 
@@ -1644,6 +1753,16 @@ void LrtsPostCommonInit(int everReturn) {
     CpvAccess(sent_msgs) = NULL;
     CpvAccess(end_sent) = NULL;
     CpvAccess(MsgQueueLen) = 0;
+
+#if CMK_ONESIDED_IMPL
+    //List for storing the receiver's rdma request information
+    CpvInitialize(CmiMPIRzvRdmaRecvList_t *, recvRdmaBuffers);
+    CpvInitialize(CmiMPIRzvRdmaRecvList_t *, endRdmaBuffer);
+    CpvInitialize(int, RdmaRecvQueueLen);
+    CpvAccess(recvRdmaBuffers) = NULL;
+    CpvAccess(endRdmaBuffer) = NULL;
+    CpvAccess(RdmaRecvQueueLen) = 0;
+#endif
 
     machine_exit_idx = CmiRegisterHandler((CmiHandler)machine_exit);
 
