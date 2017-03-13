@@ -70,6 +70,8 @@ void TopoManager_createPartitions(int scheme, int numparts, int *nodeMap);
 #include "blue.h"
 #endif
 
+#include <vector>
+
 class TopoManager {
   public:
     TopoManager();
@@ -94,10 +96,44 @@ class TopoManager {
     inline int getDimNE() const { return dimNE; }
 #endif
     inline int getDimNT() const { return dimNT; }
+    inline int getNumDims() const {
+#if CMK_BLUEGENEQ
+      return 5;
+#else
+      return 3;
+#endif
+    }
+    inline int getDimSize(unsigned int i) const {
+#if CMK_BLUEGENEQ
+      CmiAssert(i < 5);
+      switch (i) {
+        case 0: return getDimNA();
+        case 1: return getDimNB();
+        case 2: return getDimNC();
+        case 3: return getDimND();
+        case 4: return getDimNE();
+      }
+#else
+      CmiAssert(i < 3);
+      switch (i) {
+        case 0: return getDimNX();
+        case 1: return getDimNY();
+        case 2: return getDimNZ();
+      }
+#endif
+    }
+    inline bool haveTopologyInfo() const {
+#if CMK_BLUEGENEQ || XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+      return true;
+#else
+      return false;
+#endif
+    }
 
     inline int getProcsPerNode() const { return procsPerNode; }
 
     inline bool hasMultipleProcsPerNode() const { return (procsPerNode > 1); }
+    void rankToCoordinates(int pe, std::vector<int> &coords) const;
     void rankToCoordinates(int pe, int &x, int &y, int &z, int &t) const;
     void rankToCoordinates(int pe, int &a, int &b, int &c, int &d, int &e, int &t) const;
     /**

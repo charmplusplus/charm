@@ -12,7 +12,6 @@
 #ifndef __TPM_STANDALONE__
 #include "partitioning_strategies.h"
 #endif
-#include <vector>
 #include <algorithm>
 
 struct CompareRankDist {
@@ -129,6 +128,15 @@ TopoManager::TopoManager(int NX, int NY, int NZ, int NT) : dimNX(NX), dimNY(NY),
   torusE = true;
 #endif
   numPes = dimNX * dimNY * dimNZ * dimNT;
+}
+
+void TopoManager::rankToCoordinates(int pe, std::vector<int> &coords) const {
+  coords.resize(getNumDims()+1);
+#if CMK_BLUEGENEQ
+  rankToCoordinates(pe,coords[0],coords[1],coords[2],coords[3],coords[4],coords[5]);
+#else
+  rankToCoordinates(pe,coords[0],coords[1],coords[2],coords[3]);
+#endif
 }
 
 void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) const {
