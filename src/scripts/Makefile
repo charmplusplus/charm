@@ -430,7 +430,8 @@ LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 	pup_xlater.o pup_c.o pup_paged.o pup_cmialloc.o			\
 	ckimage.o ckdll.o ckhashtable.o sockRoutines.o			\
 	conv-lists.o persist-comm.o mempool.o graph.o \
-	crc32.o  lz4.o partitioning_strategies.o hilbert.o
+	crc32.o  lz4.o partitioning_strategies.o hilbert.o \
+	spanningTree.o
 
 LIBCONV_UTILF=pup_f.o
 
