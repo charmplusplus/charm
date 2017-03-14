@@ -10,7 +10,7 @@
 
 class CkRdmaWrapper{
   public:
-  void* ptr;
+  const void* ptr;
   CkCallback *callback;
 
   //this field is used for handling rdma acks called by comm thread
@@ -26,11 +26,11 @@ class CkRdmaWrapper{
   CkRdmaWrapper() : ptr(NULL), callback(NULL) {
     srcPe = -1;
   }
-  CkRdmaWrapper(void *address) : ptr(address){
+  CkRdmaWrapper(const void *address) : ptr(address){
     srcPe = CkMyPe();
     callback = new CkCallback(CkCallback::ignore);
   }
-  CkRdmaWrapper(void *address, CkCallback cb) : ptr(address) {
+  CkRdmaWrapper(const void *address, CkCallback cb) : ptr(address) {
     srcPe = CkMyPe();
     callback = new CkCallback(cb);
   }
