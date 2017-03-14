@@ -301,6 +301,11 @@ typedef std::unordered_map<CmiUInt8, CkLocRec*> LocRecHash;
 	int lastKnown(const CkArrayIndex &idx);
 	int lastKnown(CmiUInt8 id);
 
+        inline void insertID(const CkArrayIndex& idx, const CmiUInt8 id) {
+          if (compressor) return;
+          idx2id[idx] = id;
+        }
+
         inline CmiUInt8 lookupID(const CkArrayIndex &idx) const {
           if (compressor) {
             return compressor->compress(idx);

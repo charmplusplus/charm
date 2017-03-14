@@ -680,11 +680,12 @@ public:
   inline ArrayElement *lookup(const CmiUInt8 id) { return (ArrayElement*) getEltFromArrMgr(id); }
   /// Fetch a local element via its index (return NULL if not local)
   inline ArrayElement *lookup(const CkArrayIndex &idx) { 
-    CkLocMgr::IdxIdMap::iterator itr = locMgr->idx2id.find(idx);
-    if (itr == locMgr->idx2id.end())
+    CmiUInt8 id;
+    if (locMgr->lookupID(idx,id)) {
+      return (ArrayElement*) getEltFromArrMgr(id);
+    } else {
       return NULL;
-    else
-      return (ArrayElement*) getEltFromArrMgr(itr->second);
+    }
   }
 
   virtual CkMigratable* getEltFromArrMgr(const CmiUInt8 id) {

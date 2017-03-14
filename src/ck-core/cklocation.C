@@ -2177,7 +2177,7 @@ void CkLocMgr::pup(PUP::er &p){
             idx.pup(p);
             p | pe;
   //          CmiPrintf("[%d] idx %s is a home element exisiting on pe %d\n",CmiMyPe(),idx2str(idx),pe);
-            inform(idx, idx2id[idx], pe);
+            inform(idx, lookupID(idx), pe);
             CmiUInt8 id = lookupID(idx);
             CkLocRec *rec = elementNrec(id);
             CmiAssert(rec!=NULL);
@@ -2317,19 +2317,9 @@ void CkLocMgr::deliverAnyBufferedMsgs(CmiUInt8 id, MsgBuffer &buffer)
 CmiUInt8 CkLocMgr::getNewObjectID(const CkArrayIndex &idx)
 {
   CmiUInt8 id;
-
-  if (compressor) {
-    id = compressor->compress(idx);
-    idx2id[idx] = id;
-    return id;
-  }
-
-  auto itr = idx2id.find(idx);
-  if (itr == idx2id.end()) {
+  if (!lookupID(idx, id)) {
     id = idCounter++ + ((CmiUInt8)CkMyPe() << 24);
-    idx2id[idx] = id;
-  } else {
-    id = itr->second;
+    insertID(idx,id);
   }
   return id;
 }
@@ -2399,6 +2389,8 @@ bool CkLocMgr::addElementToRec(CkLocRec *rec,CkArray *mgr,
 	return true;
 }
 
+// TODO: suppressIfHere doesn't seem to be useful anymore because we return
+// early when peToTell == CkMyPe()
 void CkLocMgr::requestLocation(const CkArrayIndex &idx, const int peToTell,
                                bool suppressIfHere, int ifNonExistent, int chareType, CkArrayID mgr) {
   int onPe = -1;
@@ -2407,8 +2399,13 @@ void CkLocMgr::requestLocation(const CkArrayIndex &idx, const int peToTell,
   if (peToTell == CkMyPe())
     return;
 
-  auto itr = idx2id.find(idx);
-  if (itr == idx2id.end()) {
+  CmiUInt8 id;
+  if (lookupID(idx,id)) {
+    // We found the ID so update the location for peToTell
+    onPe = lastKnown(idx);
+    thisProxy[peToTell].updateLocation(idx, id, onPe);
+  } else {
+    // We don't know the ID so buffer the location request
     DEBN(("%d Buffering ID/location req for %s\n", CkMyPe(), idx2str(idx)));
     bufferedLocationRequests[idx].push_back(make_pair(peToTell, suppressIfHere));
 
@@ -2422,16 +2419,7 @@ void CkLocMgr::requestLocation(const CkArrayIndex &idx, const int peToTell,
     default:
       break;
     }
-
-    return;
   }
-
-  onPe = lastKnown(idx);
-
-  if (suppressIfHere && peToTell == CkMyPe())
-    return;
-
-  thisProxy[peToTell].updateLocation(idx, idx2id[idx], onPe);
 }
 
 void CkLocMgr::requestLocation(CmiUInt8 id, const int peToTell,
@@ -2478,7 +2466,7 @@ void CkLocMgr::inform(const CkArrayIndex &idx, CmiUInt8 id, int nowOnPe) {
     }
   }
 
-  idx2id[idx] = id;
+  insertID(idx,id);
   id2pe[id] = nowOnPe;
 
   auto itr = bufferedLocationRequests.find(idx);
@@ -3140,7 +3128,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 		return;
 	}
 
-        idx2id[idx] = msg->id;
+	insertID(idx,msg->id);
 
 	//Create a record for this element
 //#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))    
@@ -3196,7 +3184,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 
 void CkLocMgr::restore(const CkArrayIndex &idx, CmiUInt8 id, PUP::er &p)
 {
-	idx2id[idx] = id;
+	insertID(idx,id);
 
 	//This is in broughtIntoMem during out-of-core emulation in BigSim,
 	//informHome should not be called since such information is already
@@ -3221,7 +3209,7 @@ void CkLocMgr::restore(const CkArrayIndex &idx, CmiUInt8 id, PUP::er &p)
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 void CkLocMgr::resume(const CkArrayIndex &idx, CmiUInt8 id, PUP::er &p, bool create, int dummy)
 {
-	idx2id[idx] = id;
+	insertID(idx,id);
 
 	CkLocRec *rec;
 
@@ -3242,7 +3230,7 @@ void CkLocMgr::resume(const CkArrayIndex &idx, CmiUInt8 id, PUP::er &p, bool cre
 #else
 void CkLocMgr::resume(const CkArrayIndex &idx, CmiUInt8 id, PUP::er &p, bool notify,bool rebuild)
 {
-	idx2id[idx] = id;
+	insertID(idx,id);
 
 	CkLocRec *rec=createLocal(idx,false,false,notify /* home doesn't know yet */ );
 
