@@ -2128,8 +2128,11 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool uses
   else { //Normal case: call regular method
     if (isArgcArgv) str<<"  CkArgMsg *m=(CkArgMsg *)impl_msg;\n"; //Hack!
 
-    if(isConstructor()) {//Constructor: call "new (obj) foo(parameters)"
-  	str << "  new (impl_obj) "<<container->baseName();
+    if (isMigrationConstructor()) {
+      str << "  call_migration_constructor<" << container->baseName() << "> c = impl_obj_void;\n"
+          << "  c";
+    } else if(isConstructor()) {//Constructor: call "new (obj) foo(parameters)"
+      str << "  new (impl_obj) "<<container->baseName();
     } else {//Regular entry method: call "obj->bar(parameters)"
       str << "  impl_obj->" << (tspec ? "template " : "") << name;
       if (tspec) {

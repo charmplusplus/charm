@@ -50,7 +50,6 @@ several fields:
 class A : public CBase\_A \{
   public:
     A(\uw{parameters1});
-    A(CkMigrateMessage *);
 
     void someEntry(\uw{parameters2});
 \};
@@ -65,8 +64,6 @@ A::A(void)
 \{
   //... constructor code ...
 \}
-
-A::A(CkMigrateMessage *m) \{ /* the migration constructor */ \}
 
 A::someEntry(\uw{parameters2})
 \{

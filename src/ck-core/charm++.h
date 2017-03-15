@@ -261,6 +261,51 @@ class Chare {
 #endif
 };
 
+#if CMK_HAS_ALIGNMENT_OF
+#include <type_traits>
+
+template <typename T, bool has_migration_constructor = std::is_constructible<T, CkMigrateMessage*>::value>
+struct call_migration_constructor
+{
+  call_migration_constructor(void* t);
+  void operator()(void* impl_msg);
+};
+
+template <typename T>
+struct call_migration_constructor<T, true>
+{
+  void *impl_obj;
+  call_migration_constructor(void* t) : impl_obj(t) { }
+  void operator()(void* impl_msg)
+  {
+    new (impl_obj) T((CkMigrateMessage *)impl_msg);
+  }
+};
+
+template <typename T>
+struct call_migration_constructor<T, false>
+{
+  void *impl_obj;
+  call_migration_constructor(void* t) : impl_obj(t) { }
+  void operator()(void* impl_msg)
+  {
+    CkAbort("Attempted to migrate a type that lacks a migration constructor");
+  }
+};
+#else
+template <typename T>
+struct call_migration_constructor
+{
+  void *impl_obj;
+  call_migration_constructor(void* t) : impl_obj(t) { }
+  void operator()(void* impl_msg)
+  {
+    new (impl_obj) T((CkMigrateMessage *)impl_msg);
+  }
+};
+#endif
+
+
 //Superclass of all Groups that cannot participate in reductions.
 //  Undocumented: should only be used inside Charm++.
 /*forward*/ class Group;
