@@ -2595,7 +2595,7 @@ int Entry::isNoTrace(void) { return (attribs & SNOTRACE); }
 int Entry::isAppWork(void) { return (attribs & SAPPWORK); }
 int Entry::isNoKeep(void) { return (attribs & SNOKEEP); }
 int Entry::isSdag(void) { return (sdagCon!=0); }
-int Entry::isTramTarget(void) { return (attribs & SAGGREGATE); }
+bool Entry::isTramTarget(void) { return (attribs & SAGGREGATE) != 0; }
 
 // DMK - Accel support
 int Entry::isAccel(void) { return (attribs & SACCEL); }

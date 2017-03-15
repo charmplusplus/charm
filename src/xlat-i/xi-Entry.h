@@ -186,7 +186,7 @@ class Entry : public Member {
     int isAppWork(void);
     int isNoKeep(void);
     int isSdag(void);
-    int isTramTarget(void);
+    bool isTramTarget(void);
 
     // DMK - Accel support
     int isAccel(void);

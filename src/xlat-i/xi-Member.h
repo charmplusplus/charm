@@ -36,6 +36,7 @@ class Member : public Construct {
   virtual void genPythonStaticDocs(XStr&) {}
   virtual void lookforCEntry(CEntry *)  {}
   virtual void genTramTypes() {}
+  virtual bool isTramTarget() { return false; }
 };
 
 class Readonly : public Member {

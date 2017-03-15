@@ -1974,6 +1974,8 @@ then
 	MIDDLE_LIBS="$MIDDLE_LIBS $MEM_OBJ $THREAD_OBJ"
 fi
 
+POST_LIBRARIES="$POST_LIBRARIES -lmoduleNDMeshStreamer -lmodulecompletion"
+
 if [ "$CHARM_SHARED" = "1" ]
 then
   [ -z "$CHARMLIBSO" ] &&  Abort "Charm++ lib_so directory not found!"

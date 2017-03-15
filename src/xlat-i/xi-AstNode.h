@@ -78,6 +78,7 @@ class AstChildren : public virtual AstNode {
   void genReg(XStr& str);
   void genGlobalCode(XStr scope, XStr &decls, XStr &defs);
 
+  bool isTramTarget();
   void genTramTypes();
   void genTramRegs(XStr& str);
   void genTramPups(XStr& scope, XStr &decls, XStr &defs);
@@ -348,6 +349,16 @@ template <typename Child>
 void AstChildren<Child>::printChareNames()
 {
   details::perElem(children, &Child::printChareNames);
+}
+
+template <typename Child>
+bool
+AstChildren<Child>::isTramTarget() {
+  for (typename std::list<Child*>::iterator i = children.begin(); i != children.end(); ++i)
+    if ((*i)->isTramTarget())
+      return true;
+
+  return false;
 }
 
 template <typename Child>

@@ -103,6 +103,7 @@ class Chare : public TEntity {
    void genRecursivePup(XStr &scopedName, XStr templateSpec, XStr &decls, XStr &defs);
    void preprocess();
 
+   bool isTramTarget();
    void genTramTypes();
    void genTramDecls(XStr &str);
    void genTramInits(XStr &str);

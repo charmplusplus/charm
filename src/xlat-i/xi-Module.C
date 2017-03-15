@@ -58,6 +58,9 @@ void Module::generate()
   "#include \"envelope.h\"\n"
   "#include <memory>\n"
   "#include \"sdag.h\"\n";
+
+  if (isTramTarget())
+      declstr << "#include \"NDMeshStreamer.h\"\n";
   if (fortranMode) declstr << "#include \"charm-api.h\"\n";
   if (clist) clist->genDecls(declstr);
   if (clist) clist->outputClosuresDecl(declstr);
@@ -75,6 +78,8 @@ void Module::generate()
   "void _register"<<name<<"(void)\n"
   "{\n"
   "  static int _done = 0; if(_done) return; _done = 1;\n";
+  if (isTramTarget())
+    defstr << "  _registerNDMeshStreamer();\n";
   if (clist) clist->genReg(defstr);
   defstr << "}\n";
   if(isMain()) {
@@ -261,6 +266,13 @@ void Module::genReg(XStr& str)
   }
 }
 
+bool Module::isTramTarget()
+{
+  if (clist)
+    return clist->isTramTarget();
+  else
+    return false;
+}
 
 int Module::genAccels_spe_c_funcBodies(XStr& str) {
 

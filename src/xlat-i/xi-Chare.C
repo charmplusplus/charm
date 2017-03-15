@@ -907,6 +907,14 @@ void Chare::lookforCEntry(CEntry *centry)
     list->recurse(centry, &Member::lookforCEntry);
 }
 
+bool Chare::isTramTarget()
+{
+  if (list)
+    return list->isTramTarget();
+  else
+    return false;
+}
+
 void Chare::genTramTypes() {
   if (list) {
     list->genTramTypes();

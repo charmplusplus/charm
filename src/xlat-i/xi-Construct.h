@@ -17,12 +17,14 @@ class Construct : public virtual AstNode {
   explicit Construct();
   void setExtern(int& e);
   void setModule(Module *m);
+  virtual bool isTramTarget() { return false; }
 };
 
 // FIXME?: shouldn't the "public virtual" be here instead of in the Construct baseclass?
 class ConstructList : public AstChildren<Construct>, public Construct {
  public:
   ConstructList(int l, Construct *c, ConstructList *n=0);
+  using AstChildren<Construct>::isTramTarget;
 };
 
 /******************** AccelBlock : Block of code for accelerator **********************/
