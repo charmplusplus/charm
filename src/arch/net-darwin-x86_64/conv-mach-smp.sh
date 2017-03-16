@@ -9,3 +9,5 @@ CMK_LD="$CMK_LD $CMK_DEFS "
 CMK_LDXX="$CMK_LDXX $CMK_DEFS "
 CMK_LIBS="-lpthread $CMK_LIBS "
 CMK_QT='generic64-light'
+
+CMK_SMP="1"

@@ -41,3 +41,5 @@ else
 fi
 
 CMK_QT='generic64-light'
+
+CMK_SMP="1"

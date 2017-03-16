@@ -28,4 +28,5 @@ CMK_LD_SHARED=" -dynamic -dynamiclib -undefined dynamic_lookup "
 CMK_LD_SHARED_LIBS="-lc++"
 CMK_LD_SHARED_ABSOLUTE_PATH=true
 
+CMK_SMP="1"
 CMK_USING_CLANG="1"
