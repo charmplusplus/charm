@@ -195,7 +195,7 @@ namespace Ck { namespace IO {
 
         struct CallerTable{
           CkCallback myCB;  // callback of the caller
-          long dataPtr; // DataPtr of the caller
+          char* dataPtr; // DataPtr of the caller
           long totalReads; // Total number of reads
           long CompletedReads; // This will tell how many reads are completed so far  
         };
@@ -303,28 +303,21 @@ namespace Ck { namespace IO {
             data   += bytesToSend;
             offset += bytesToSend;
             bytes  -= bytesToSend;
-            
           }
         }
 
         /// Read the file into the data pointer that is passed to the read function
         /// version 1: Just for testing let's just define the function, let the input be the same
-        /// function 
-
-        void read(Session session, char *data, size_t bytes, size_t offset, CkCallback readCompleted){
-          
-          
+        /// function
+        void read(Session session, char *data, size_t bytes, size_t offset, CkCallback readCompleted)
+        {
           Options &opts = files[session.file].opts;
-          size_t Bytes = bytes;
-          size_t Offset = offset;
-          
-
 
           size_t stripe = opts.peStripe;
 
-          int key = genKeyID;
+          int key = genKeyID++;
 
-          int offsetToWrite = 0;
+          size_t offsetToWrite = 0;
 
           CkAssert(offset >= session.offset);
           CkAssert(offset + bytes <= session.offset + session.bytes);
@@ -333,52 +326,30 @@ namespace Ck { namespace IO {
 
           int i = 0;
 
-          genKeyID++;
-
           CallerTableData.myCB = readCompleted;
-          CallerTableData.dataPtr = (long)data;
+          CallerTableData.dataPtr = data;
           CallerTableData.totalReads =  0; // TODO : This needs to be updated 
           CallerTableData.CompletedReads = 0;
-        
-      
-          while(Bytes > 0){
-            size_t stripeIndex = (Offset - sessionStripeBase) / stripe;
-            size_t bytesToRead = min(Bytes, stripe - Offset % stripe);
 
-            CallerTableData.totalReads++;
-            
-            Offset += bytesToRead;
-            Bytes -= bytesToRead;          
-
-          }
-         
-          MapTable[key] = CallerTableData;
-           
-
-           while (bytes > 0) {
-
+          while (bytes > 0) {
             size_t stripeIndex = (offset - sessionStripeBase) / stripe;
             size_t bytesToRead = min(bytes, stripe - offset % stripe);
 
             CProxy_ReadSession(session.sessionID)[stripeIndex]
               .readData(key, CkMyPe(), bytesToRead, offset, offsetToWrite, thisProxy); // use thisProxy in the code to send the message back
-
-              offset += bytesToRead;
-              bytes -= bytesToRead;
-              offsetToWrite++;
-                 
-           }
-
+            
+            CallerTableData.totalReads++;
+            
+            offset += bytesToRead;
+            bytes -= bytesToRead;
+            offsetToWrite += bytesToRead;
+          }
+           
+          MapTable[key] = CallerTableData;
         }
 
         void readDone(int key, int size, int offsetToWrite, char *data){
-
-          
-          int offset = offsetToWrite * size;
-
-          for(int count = 0 ; count < size; count++){
-            *(unsigned char *)(MapTable[key].dataPtr + offset + count) = data[count];
-          }
+          memcpy(MapTable[key].dataPtr + offsetToWrite, data, size);
 
 
           MapTable[key].CompletedReads++;
@@ -587,7 +558,7 @@ namespace Ck { namespace IO {
           : file(CkpvAccess(manager)->get(file_))
           , token(file_)
           , sessionOffset(offset_)
-          , myOffset((sessionOffset / file->opts.peStripe )
+          , myOffset((sessionOffset / file->opts.peStripe + thisIndex)
                      * file->opts.peStripe)
           , sessionBytes(bytes_)
           , myBytes(min(file->opts.peStripe, sessionOffset + sessionBytes - myOffset))
@@ -618,6 +589,8 @@ namespace Ck { namespace IO {
           if (readBytes < 0){
             fatalError("Call to pread failed", file->name);
           }
+
+          delete [] data;
           
         }
       };

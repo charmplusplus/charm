@@ -26,9 +26,7 @@ mainmodule iotest {
         CkCallback sessionEnd(CkIndex_Main::closed(0), thisProxy);
         
         sessionEnd.setRefnum(iter + 3);
-        std::string h = "hello\n";
-        Ck::IO::startSession(f.at(iter/4), 10*n, 0, sessionStart,
-                             h.c_str(), h.size(), 10*n,
+        Ck::IO::startSession(f.at(iter/4), fileSize, 0, sessionStart,
                              sessionEnd);
         delete m;
         CkPrintf("Main saw file ready\n");

@@ -61,7 +61,7 @@ public:
       thisProxy.run(4*i);
     }
 
-    mainProxy= thisProxy;
+    mainProxy = thisProxy;
 
     CkPrintf("Main ran\n");
     delete m;
@@ -80,28 +80,25 @@ public:
       char ReadDataFromFile[fileSize];
 
       size_t readData = pread(fd, ReadDataFromFile, fileSize, 0);
-
+      CkPrintf("%s\n", ReadArray);
+//      CkPrintf("%s", ReadDataFromFile);
       for(int i = 0; i < readData; i++){
-        //CkPrintf ("%d %d %d %d\n", ReadArray[i], ReadDataFromFile[i], readData, numdone);
+//        CkPrintf ("%c %c %d %d\n", ReadArray[i], ReadDataFromFile[i], readData, numdone);
         if(ReadArray[i] != ReadDataFromFile[i]){
-          CkPrintf("ReadData is not Valid \n");  
+          CkPrintf("%c vs %c at %d\n", ReadArray[i], ReadDataFromFile[i], i);
+          CkPrintf("ReadData is not Valid\n");
           CkExit(); 
         }
       }
 
       CkPrintf("ReadData is Corrrect \n");
-      CkExit();   
-      
-
+      CkExit();
     }
   }
 
   void testReadFiles(int offset, int size, char data[]){
-  
-      memcpy(ReadArray + offset, data,size);
- 
-  } 
-
+    memcpy(ReadArray + offset, data,size);
+  }
 };
 
 struct test : public CBase_test {
@@ -119,9 +116,6 @@ struct test : public CBase_test {
   test(Ck::IO::Session token,int n, int fixedBytesToRead, int remainingBytes) { // Pass the number of chare elements in our case they are n elements
     
     readData = new char[fixedBytesToRead];
-    int fd;
-    int i = 0;
-    int bytes = 20;
 
     fixedReadBytes = fixedBytesToRead;
     remainingReadBytes = remainingBytes;
@@ -135,7 +129,7 @@ struct test : public CBase_test {
       Ck::IO::read(token, readData, remainingReadBytes, remainingReadBytes*thisIndex, myCB);
      
       
-    }else{
+    } else {
     
       Ck::IO::read(token, readData, fixedReadBytes, fixedReadBytes*thisIndex + remainingReadBytes, myCB);
     
@@ -154,9 +148,9 @@ struct test : public CBase_test {
   void readCompleted(Ck::IO::SessionReadyMsg* m) {
 
     if (remainingReadBytes > 0 && thisIndex == 0)
-      mainProxy.testReadFiles(remainingReadBytes*thisIndex, remainingReadBytes,readData);
+      mainProxy.testReadFiles(remainingReadBytes*thisIndex, remainingReadBytes, readData);
     else
-      mainProxy.testReadFiles(fixedReadBytes*thisIndex + remainingReadBytes, fixedReadBytes,readData);
+      mainProxy.testReadFiles(fixedReadBytes*thisIndex + remainingReadBytes, fixedReadBytes, readData);
 
     thisProxy[0].done(savedToken,numChares);   
   }
