@@ -745,6 +745,15 @@ loadbalancers: $(COMMON_LDBS) $(L)/libmoduleCommonLBs.a
 everylb: $(ALL_LDBS) $(L)/libmoduleEveryLB.a
 
 
+%LB: $(L)/libmodule%LB.a
+	@true
+$(L)/libmodule%LB.a: %LB.o
+	$(CHARMC) -o $@ $^
+	( [ -r libmodule$*LB.dep ] && cp -f libmodule$*LB.dep $(L)/ ) || true
+$(L)/libmoduleCommonLBs.a:
+	$(CHARMC) -o $@ $^
+	( [ -r libmoduleCommobLBs.dep ] && cp -f libmoduleCommonLBs.dep $(L)/ ) || true
+
 ###############################################################################
 #
 # BlueGene Emulator
