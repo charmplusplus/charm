@@ -737,6 +737,21 @@ test_cxx "whether compiler generates code for 64-bit" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_SIZET_64BIT, $strictpass, [whether size_t 64bit])
 in64bit=$strictpass
 
+### Check if compiler supports std::is_constructible<> ###
+cat > $t <<EOT
+#include <type_traits>
+
+struct s {
+       s(int a) { }
+};
+
+bool foo()
+{
+  return std::is_constructible<s, int>::value;
+}
+EOT
+test_cxx "whether compiler supports std::is_constructible" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_IS_CONSTRUCTIBLE, $strictpass, [whether compiler supports std::is_constructible])
 
 ### Check if compiler supports std::alignment_of<> ###
 cat > $t <<EOT

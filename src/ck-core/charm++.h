@@ -261,7 +261,7 @@ class Chare {
 #endif
 };
 
-#if CMK_HAS_ALIGNMENT_OF
+#if CMK_HAS_IS_CONSTRUCTIBLE
 #include <type_traits>
 
 template <typename T, bool has_migration_constructor = std::is_constructible<T, CkMigrateMessage*>::value>

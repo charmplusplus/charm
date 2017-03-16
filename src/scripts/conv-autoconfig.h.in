@@ -135,6 +135,9 @@
 /* whether has get_myaddress */
 #undef CMK_HAS_GET_MYADDRESS
 
+/* whether compiler supports std::is_constructible */
+#undef CMK_HAS_IS_CONSTRUCTIBLE
+
 /* whether iterator_traits works */
 #undef CMK_HAS_ITERATOR_TRAITS
 

@@ -2683,6 +2683,25 @@ _ACEOF
 
 in64bit=$strictpass
 
+### Check if compiler supports std::is_constructible<> ###
+cat > $t <<EOT
+#include <type_traits>
+
+struct s {
+       s(int a) { }
+};
+
+bool foo()
+{
+  return std::is_constructible<s, int>::value;
+}
+EOT
+test_cxx "whether compiler supports std::is_constructible" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_IS_CONSTRUCTIBLE $strictpass
+_ACEOF
+
 
 ### Check if compiler supports std::alignment_of<> ###
 cat > $t <<EOT
