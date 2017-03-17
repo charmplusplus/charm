@@ -92,7 +92,7 @@ void LrtsSetRdmaInfo(void *dest, int destPE, int numOps){
   rdma->peNum = CmiMyPe();
 }
 
-void LrtsSetRdmaOpInfo(void *dest, void *ptr, int size){
+void LrtsSetRdmaOpInfo(void *dest, const void *ptr, int size){
   struct ibv_mr *mr;
 
   CmiVerbsRdmaOp_t *rdmaOp = (CmiVerbsRdmaOp_t *)dest;
