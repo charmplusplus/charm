@@ -32,6 +32,8 @@ module EveryLB {
   extern module RecBipartLB;
   extern module CommAwareRefineLB;
   extern module AdaptiveLB;
+  extern module MetisLB;
+  extern module GridMetisLB;
 
   initnode void initEveryLB(void);
 };

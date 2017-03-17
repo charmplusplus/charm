@@ -3,9 +3,9 @@
 #Typical load balancers
 COMMON_LDBS="DummyLB GreedyLB GreedyRefineLB CommLB RandCentLB RefineLB RefineCommLB RotateLB DistributedLB HybridLB ComboCentLB RefineSwapLB NeighborLB OrbLB BlockLB GreedyCommLB NodeLevelLB"
 #Load balancers for more specialized circumstances
-SPECIALIZED_LDBS="GraphPartLB GraphBFTLB GridCommLB GridCommRefineLB HbmLB RefineKLB  TempAwareCommLB TreeMatchLB GreedyAgentLB NeighborCommLB PhasebyArrayLB RecBipartLB CommAwareRefineLB AdaptiveLB"
+SPECIALIZED_LDBS="GraphPartLB GraphBFTLB GridCommLB GridCommRefineLB HbmLB RefineKLB  TempAwareCommLB TreeMatchLB GreedyAgentLB NeighborCommLB PhasebyArrayLB RecBipartLB CommAwareRefineLB AdaptiveLB MetisLB GridMetisLB"
 #Load balanders which have an external dependency, or require some other kind of intervention
-UNCOMMON_LDBS="MetisLB ScotchLB TeamLB WSLB GridMetisLB TempAwareGreedyLB GridHybridSeedLB TopoCentLB GridHybridLB TopoLB RefineTopoLB TempAwareRefineLB"
+UNCOMMON_LDBS="ScotchLB TeamLB WSLB TempAwareGreedyLB GridHybridSeedLB TopoCentLB GridHybridLB TopoLB RefineTopoLB TempAwareRefineLB"
 
 ALL_LDBS="$COMMON_LDBS $SPECIALIZED_LDBS"
 
