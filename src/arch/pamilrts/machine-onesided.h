@@ -113,7 +113,7 @@ void LrtsSetRdmaInfo(void *dest, int destPE, int numOps){
   rdma->numOps = numOps;
 }
 
-void LrtsSetRdmaOpInfo(void *dest, void *ptr, int size){
+void LrtsSetRdmaOpInfo(void *dest, const void *ptr, int size){
   CmiPAMIRzvRdmaOp_t *rdmaOp = (CmiPAMIRzvRdmaOp_t *)dest;
   rdmaOp->offset = (size_t)(ptr) - (size_t)cmi_pami_memregion[0].baseVA;
   rdmaOp->size = size;
