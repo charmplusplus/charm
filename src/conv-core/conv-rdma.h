@@ -5,7 +5,7 @@ typedef void (*RdmaAckCallerFn)(void *token);
 
 void *CmiSetRdmaAck(RdmaAckCallerFn fn, void *token);
 void CmiSetRdmaInfo(void *dest, int destPE, int numOps);
-void CmiSetRdmaOpInfo(void *dest, void *ptr, int size);
+void CmiSetRdmaOpInfo(void *dest, const void *ptr, int size);
 int CmiGetRdmaOpInfoSize();
 int CmiGetRdmaGenInfoSize();
 

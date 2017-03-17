@@ -15,7 +15,7 @@ typedef struct _cmi_rdma_ack{
 
 /*Sender Functions*/
 void LrtsSetRdmaInfo(void *dest, int destPE, int numOps);
-void LrtsSetRdmaOpInfo(void *dest, void *ptr, int size);
+void LrtsSetRdmaOpInfo(void *dest, const void *ptr, int size);
 int LrtsGetRdmaOpInfoSize();
 int LrtsGetRdmaGenInfoSize();
 int LrtsGetRdmaInfoSize(int numOps);
@@ -40,7 +40,7 @@ void CmiSetRdmaInfo(void *dest, int destPE, int numOps){
 }
 
 /* Set the machine layer info specific to RDMA op*/
-void CmiSetRdmaOpInfo(void *dest, void *ptr, int size){
+void CmiSetRdmaOpInfo(void *dest, const void *ptr, int size){
   LrtsSetRdmaOpInfo(dest, ptr, size);
 }
 
