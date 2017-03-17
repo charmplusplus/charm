@@ -112,6 +112,7 @@ class TopoManager {
         case 2: return getDimNC();
         case 3: return getDimND();
         case 4: return getDimNE();
+        default: return -1;
       }
 #else
       CmiAssert(i < 3);
@@ -119,6 +120,7 @@ class TopoManager {
         case 0: return getDimNX();
         case 1: return getDimNY();
         case 2: return getDimNZ();
+        default: return -1;
       }
 #endif
     }
