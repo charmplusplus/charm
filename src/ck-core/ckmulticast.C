@@ -15,7 +15,7 @@
 #include "register.h"
 
 #include "ckmulticast.h"
-#include "spanningTreeStrategy.h"
+#include "spanningTree.h"
 #include "XArraySectionReducer.h"
 
 #include <map>
@@ -691,10 +691,9 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
     if (numchild) 
     {
         // Build the next generation of the spanning tree rooted at my PE
-        int *peListPtr = &mySubTreePEs[0];
-        topo::SpanningTreeVertex *nextGenInfo;
-        nextGenInfo = topo::buildSpanningTreeGeneration(peListPtr,peListPtr + mySubTreePEs.size(),numchild);
-        numchild = nextGenInfo->childIndex.size();
+        std::vector<int> children;
+        bool isRoot = (msg->parent.get_pe() == CkMyPe());
+        numchild = ST_RecursivePartition(false,!isRoot).buildSpanningTree(mySubTreePEs, numchild, children);
         entry->numChild = numchild;
 
         CProxy_CkMulticastMgr  mCastGrp(thisgroup);
@@ -703,11 +702,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
         for (int i=0; i < numchild; i++)
         {
             // Determine the indices of the first and last PEs in this branch of my sub-tree
-            int childStartIndex = nextGenInfo->childIndex[i], childEndIndex;
-            if (i < numchild-1)
-                childEndIndex = nextGenInfo->childIndex[i+1];
-            else
-                childEndIndex = mySubTreePEs.size();
+            int childStartIndex = children[i], childEndIndex = children[i+1];
 
             // Find the total number of section member elements on this subtree
             int numSubTreeElems = 0;
@@ -755,7 +750,6 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
             // Send the message to the child
             mCastGrp[childroot].setup(m);
         }
-        delete nextGenInfo;
     }
     // else, tell yourself that your children are ready
     else 
