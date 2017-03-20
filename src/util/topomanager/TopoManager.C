@@ -399,6 +399,7 @@ extern void bgq_topo_reset();
 extern void bgq_topo_free();
 #endif
 
+static bool _topoInitialized = false;
 CmiNodeLock _topoLock = 0;
 TopoManager *_tmgr = NULL;
 #ifdef __TPM_STANDALONE__
@@ -407,7 +408,7 @@ int _tpm_numthreads = 1;
 #endif
 
 TopoManager *TopoManager::getTopoManager() {
-  CmiAssert(_topoLock != 0);
+  CmiAssert(_topoInitialized);
   if (_tmgr == NULL) TopoManager_reset();
   return _tmgr;
 }
@@ -418,13 +419,14 @@ extern "C" void TopoManager_init() {
 extern "C" void TopoManager_init(int numpes) {
   _tpm_numpes = numpes;
 #endif
-  if(_topoLock == 0) {
+  if(!_topoInitialized) {
     _topoLock = CmiCreateLock();
 #if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
     craynid_init();
 #elif CMK_BLUEGENEQ
     bgq_topo_init();
 #endif
+    _topoInitialized = true;
   }
 #ifdef __TPM_STANDALONE__
   if(_tmgr) delete _tmgr;
