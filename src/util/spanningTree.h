@@ -8,7 +8,7 @@
 #include <vector>
 
 /**
- * Abstract class (interface) to generate a spanning tree from a set of logical
+ * Abstract class (interface) to generate a spanning tree from a set of pes or logical
  * (Charm++) nodes. These will be referred to simply as nodes, physical nodes will
  * be referred to as phynodes.
  */
@@ -20,7 +20,7 @@ public:
    * Tree algorithm will reorganize nodes vector, so that nodes are grouped by
    * subtree.
    *
-   * \param[in] nodes List of IDs of nodes to form a spanning tree, with root in position 0
+   * \param[in] nodes List of IDs of pes/nodes to form a spanning tree, with root in position 0
    * \param[out] nodes For output, nodes list is reorganized, such that they
    * are grouped by subtree, with the first node of each subtree being its root.
    *
@@ -43,7 +43,7 @@ public:
 class TopoManager;
 
 /**
- * This strategy is phynode aware.
+ * This strategy is phynode aware, and can form a tree of pes or logical nodes.
  * Will benefit from topology information (coordinates of hosts in the machine,
  * and distance between hosts), but can be used without topology information
  * (and will still be phynode aware).
@@ -62,10 +62,12 @@ class ST_RecursivePartition : public SpanningTreeGenerator {
 public:
 
   /**
+   * \param nodeTree true if forming tree of nodes, false if tree of pes.
+   *
    * \param preSorted true if nodes will be provided grouped by phynode. Allows
    * using slightly more efficient implementation.
    */
-  ST_RecursivePartition(bool preSorted=false);
+  ST_RecursivePartition(bool nodeTree=true, bool preSorted=false);
 
   /**
    * \param maxBranches Max number of children in different phynode as root
@@ -102,6 +104,7 @@ private:
   void translateCoordinates(std::vector<PhyNode> &nodes) const;
 #endif
 
+  bool nodeTree;
   bool preSorted;
   TopoManager *tmgr;
 };

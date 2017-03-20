@@ -70,7 +70,8 @@ private:
 
 // ----------------- ST_RecursivePartition -----------------
 
-ST_RecursivePartition::ST_RecursivePartition(bool preSorted) : preSorted(preSorted)
+ST_RecursivePartition::ST_RecursivePartition(bool nodeTree, bool preSorted) 
+  : nodeTree(nodeTree), preSorted(preSorted)
 {
   tmgr = TopoManager::getTopoManager();
   for (int i=0; i < tmgr->getNumDims(); i++) {
@@ -126,7 +127,9 @@ void ST_RecursivePartition::initPhyNodes(std::vector<int> &nodes,
                                          std::vector<ST_RecursivePartition::PhyNode> &phynodes) const
 {
 #if _DEBUG_SPANNING_TREE_
-  int rootPhyNodeId = CmiPhysicalNodeID(CmiNodeFirst(nodes[0]));
+  int rootPhyNodeId;
+  if (nodeTree) rootPhyNodeId = CmiPhysicalNodeID(CmiNodeFirst(nodes[0]));
+  else rootPhyNodeId = CmiPhysicalNodeID(nodes[0]);   // nodes contains pes
   CkPrintf("[%d] Root phynode is %d\n", CkMyNode(), rootPhyNodeId);
 #endif
 
@@ -135,7 +138,8 @@ void ST_RecursivePartition::initPhyNodes(std::vector<int> &nodes,
   int last = -1;
   for (int i=0; i < nodes.size(); i++) {
     int n = nodes[i];
-    int pe = CmiNodeFirst(n);
+    int pe = n;
+    if (nodeTree) pe = CmiNodeFirst(n);
     int phyNodeId = CmiPhysicalNodeID(pe);
 #if _DEBUG_SPANNING_TREE_
     if (phyNodeId == rootPhyNodeId) CkPrintf("[%d] Node %d is in root phynode\n", CkMyNode(), n);
