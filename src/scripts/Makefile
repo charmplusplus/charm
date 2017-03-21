@@ -281,11 +281,17 @@ headers: dirs+sources
 	$(MAKE) charmxi
 	$(MAKE) headerlinks
 
-conv-autoconfig.h: configure config_opts.sh
+configure: configure.ac
+	autoreconf
+
+conv-autoconfig.h.in: configure.ac
+	autoheader
+
+conv-autoconfig.h: configure conv-autoconfig.h.in config_opts.sh
 	@. ./config_opts.sh; echo ./configure $(QUIET) $$CONFIG_OPTS;  \
 	./configure $(QUIET) $$CONFIG_OPTS && touch conv-autoconfig.h
 
-.PHONY: clean veryclean VERSION.new
+.PHONY: clean veryclean VERSION.new config
 
 VERSION: VERSION.new
 	SRCBASE=$(SRCBASE) ./commitid.sh
@@ -928,8 +934,7 @@ veryclean:
 	rm -rf .[a-z]* .[A-Z]*
 
 
-config: configure.ac
-	autoconf && autoheader
+config: configure conv-autoconfig.h.in
 
 cidepends: charmxi
 	echo "Creating " $(CIDEPENDFILE) " ...";
