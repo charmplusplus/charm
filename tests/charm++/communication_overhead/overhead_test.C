@@ -22,6 +22,7 @@ void idleEndHandlerArray(void *timingGroupObj, double cur);
 class SimpleMessage: public CMessage_SimpleMessage {
 public:
   char *data;
+  size_t size = -1;
 };
 
 class TestDriver: public CBase_TestDriver {
@@ -123,12 +124,14 @@ public:
         startTime = CkWallTimer();
         for (int i = 0; i < kFactor; i++) {
           SimpleMessage *msg = new (msgSize) SimpleMessage();
+	  msg->size = msgSize;
           thisProxy[neighbor].receiveMessage(msg);
         }
       }
       else {
         for (int i = 0; i < kFactor; i++) {
           SimpleMessage *msg = new (msgSize) SimpleMessage();
+	  msg->size = msgSize;
           sentMessages.push_back(msg);
         }
         startTime = CkWallTimer();
@@ -144,12 +147,16 @@ public:
   }
 
   void receiveMessage(SimpleMessage *msg) {
+      if (msg->size != msgSize) {
+	CkAbort("Out of order message in receiveMessage");
+      }
     if (timeAllocation) {
       delete msg;
       if (++nReceived == kFactor) {
         nReceived = 0;
         operationFinished(NULL);
         msg = new (msgSize) SimpleMessage();
+	msg->size = msgSize;
         thisProxy[neighbor].operationFinished(msg);
       }
     }
@@ -165,6 +172,12 @@ public:
   }
 
   void operationFinished(SimpleMessage *msg) {
+    if (msg) {
+      if (msg->size != msgSize) {
+	CkPrintf("Expected message of size %d, got message of size %ld\n", msgSize, msg->size);
+	CkAbort("Out of order message");
+      }
+    }
     double endTime = CkWallTimer();
     totalTime += endTime - startTime;
     totalIdleTime += iterationIdleTime;
@@ -178,11 +191,11 @@ public:
     if (cycleNum == nCycles) {
       double numIterations =
         msg == NULL ? nCycles * kFactor : nCycles * (kFactor + 1);
-      delete msg;
       double cycleTime = 1e6 * totalTime / numIterations;
       double idleTimePerCycle = 1e6 * totalIdleTime / numIterations;
       double computeTime = cycleTime - idleTimePerCycle;
       double bandwidth = msgSize * 1e6 / cycleTime / 1024.0 / 1024.0;
+      delete msg;
       CkPrintf("[%d] %20d %20.3lf %20.3lf %20.3lf\n",
                CmiMyPe(), msgSize, cycleTime, bandwidth, computeTime);
       totalIdleTime = 0.0;
