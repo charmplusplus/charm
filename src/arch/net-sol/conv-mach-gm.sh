@@ -1,8 +1,0 @@
-test -z "$CMK_INCDIR" && CMK_INCDIR='-I/usr/local/gm-1.4/include'
-test -z "$CMK_LIBDIR" && CMK_LIBDIR='-L/usr/local/gm-1.4/lib'
-CMK_CC="$CMK_CC $CMK_INCDIR"
-CMK_CXX="$CMK_CXX $CMK_INCDIR"
-CMK_CXXPP="$CMK_CXXPP $CMK_INCDIR"
-CMK_LD="$CMK_LD $CMK_LIBDIR"
-CMK_LDXX="$CMK_LDXX $CMK_LIBDIR"
-CMK_LIBS="$CMK_LIBS -lgm"
