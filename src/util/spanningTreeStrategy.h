@@ -169,6 +169,7 @@ template <typename Iterator,typename ValueType>
 class SpanningTreeStrategy
 {
     public:
+        virtual ~SpanningTreeStrategy(){}
         /// Concrete builders should implement this (preferably only for the appropriate specializations)
         virtual SpanningTreeVertex* buildNextGen(const Iterator firstVtx, const Iterator beyondLastVtx, const int maxBranches=2) = 0;
 };
