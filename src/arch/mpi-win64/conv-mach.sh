@@ -15,6 +15,11 @@ CMK_CXXPP=$CMK_CC
 CMK_LD="$CMK_CC -L `cygpath -u "$HPC_SDK\Lib\amd64"` -lmsmpi"
 CMK_LDXX="$CMK_CXX -L `cygpath -u "$HPC_SDK\Lib\amd64"` -lmsmpi"
 
+if test "$NO_WIN_HPC_HEADERS_FOR_AMPI" = "1" ; then
+	CMK_CC="$CHARMBIN/unix2nt_cc -D_CRT_SECURE_NO_DEPRECATE "
+	CMK_CXX="$CHARMBIN/unix2nt_cc -D_CRT_SECURE_NO_DEPRECATE "
+fi
+
 CMK_SEQ_CC="$CMK_CC"
 CMK_SEQ_CXX="$CMK_CXX"
 CMK_SEQ_LD="$CMK_LD"

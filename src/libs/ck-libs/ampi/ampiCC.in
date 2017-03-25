@@ -47,11 +47,16 @@ if test "$charmarch" = "mpi"
 then
     dirName=ampicc.inc.$$
     mkdir $dirName
-    ln $CHARMBIN/../include/mpi.h $dirname/mpi.h   2>/dev/null
+    ln $CHARMBIN/../include/mpi.h $dirName/mpi.h   2>/dev/null
     AMPICC_EXTRA_OPTIONS="-I./$dirName"
 fi
+
+export NO_WIN_HPC_HEADERS_FOR_AMPI=1
+
 $CHARMBIN/charmc -language ampi -default-to-aout -lampiromio $AMPICC_EXTRA_OPTIONS $@
 status=$?
+
+unset NO_WIN_HPC_HEADERS_FOR_AMPI
 
 if test "$charmarch" = "mpi"
 then
