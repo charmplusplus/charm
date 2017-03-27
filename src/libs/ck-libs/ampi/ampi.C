@@ -9158,6 +9158,4 @@ int AMPI_GPU_Invoke(workRequest *to_call)
   return MPI_SUCCESS;
 }
 #endif // CMK_CUDA
-
 #include "ampi.def.h"
-

@@ -2,6 +2,7 @@
 #define _AMPIIMPL_H
 
 #include <string.h> /* for strlen */
+#include <queue>    /* for the BFS in packDataTypeMessage */
 
 #include "ampi.h"
 #include "ddt.h"
@@ -211,8 +212,8 @@ class win_obj {
 
   int get(void *orgaddr, int orgcnt, int orgunit,
           MPI_Aint targdisp, int targcnt, int targunit);
-  int accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
-                 MPI_Datatype targtype, MPI_Op op, ampiParent* pptr);
+  int accumulate(void *orgaddr, int count, MPI_Aint targdisp, MPI_Aint structDisp, MPI_Datatype targtype,
+                 MPI_Op op, ampiParent* pptr);
 
   int iget(int orgcnt, MPI_Datatype orgtype,
           MPI_Aint targdisp, int targcnt, MPI_Datatype targtype);
@@ -1512,7 +1513,7 @@ class ampiParent : public CBase_ampiParent {
   inline void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* invec, void* inoutvec) const {
     // inoutvec[i] = invec[i] op inoutvec[i]
     MPI_User_function *func = op2User_function(op);
-    (func)(invec, inoutvec, &count, &datatype);
+    (func)(invec,inoutvec,&count,&datatype);
   }
 
  public:
@@ -1685,6 +1686,154 @@ class ampi : public CBase_ampi {
   //------------------------ Added by YAN ---------------------
  private:
   CkPupPtrVec<win_obj> winObjects;
+
+  void packDataTypeMessage(MPI_Datatype index, std::vector<int> &typeIndices, std::vector<char> &typeData)
+  {
+    int counter = -1;
+    std::queue<CkDDT_DataType*> typeQueue;
+    std::vector<CkDDT_DataType*> saveTypes;
+    CkDDT_DataType *startDDT = getDDT()->getType(index);
+    typeQueue.push(startDDT);
+
+    while (!typeQueue.empty())
+    {
+      counter++;
+      CkDDT_DataType *ddt = typeQueue.front();
+      typeQueue.pop();
+      if (counter > 0)						// corner case on the root of the DDT tree
+      {
+        // index into saveTypes and call method setOffset
+        int parentIndex = ddt->getParentIndex();
+        saveTypes[parentIndex]->setEndOffset(counter);
+      }
+      ddt->setStartOffset(counter);					// create this method in DDT, to be used by all DDTs
+      saveTypes.push_back(ddt);
+
+      if (ddt->getType() == CkDDT_STRUCT)
+      {
+        std::vector<int> myIndices = ddt->getIndices();
+        int negCounter = 0;
+        for (int i=0; i<myIndices.size(); i++)                           // I originally had this iterate from end of indices to front, but I think it makes more sense with the negCounter to stat from front. Debug this!
+        {
+          if (!getDDT()->isPrimitive(myIndices[i]))
+          {
+            CkDDT_DataType *baseDDT = getDDT()->getType(myIndices[i]);
+            baseDDT->setParentIndex(counter);
+            typeQueue.push(baseDDT);                  // add it to queue AND modify the struct's type vector to get an offset, since the actual index into the typeTable, which is what these indices are, is useless on the remote side.
+            myIndices[i] = negCounter--;				// make sure this is same order as its being unpacked in
+            
+           /*
+             one caveat that I thought of was what if there are duplicate typemaps. Does DDT curently support recognizing these? It would make sense that we shouldnt want to send the same bytes twice, so we should try to use a lookUp structure or something based on if we have packed the type before, I could use a map for this and then attain an offset that can be used on the remote side by subtracting what its mapped to and my curent index into the guy. Map is logarithmic lookUp, so maybe a better data structure could be used?? This can be a later optimization.
+           */
+          
+          }
+          // else, ignore the primitive type
+        }
+        ddt->setIndices(myIndices);	
+      }
+      else if (!getDDT()->isPrimitive(ddt->getType()))
+      {
+        typeIndices.push_back(ddt->getType());
+        if (!getDDT()->isPrimitive(ddt->getBaseIndex()))
+        {
+          CkDDT_DataType *baseDDT = ddt->getBaseType();
+          baseDDT->setParentIndex(counter);
+          typeQueue.push(baseDDT);
+        }
+      }
+      // else its a primitive type and we don't need to send it over or enqueue it.
+    }
+
+    // We have to Pup all at once at the very end due to the data dependencies in the ordering
+    // We can start from the back to make this easier on the unpack side, so on the unpack side we can begin from the front
+    for (int i=saveTypes.size()-1; i>=0; i--)
+    {
+      int saveSize = typeData.size();				// sets the new offsets into the member vector before PUP
+      typeData.resize(saveSize+sizeof(*saveTypes[i]));				// this should not effect the first typeData.size() bytes!!!
+      PUP::fromMem p(&typeData[saveSize]);
+      // Note: to use the pupType, I need the instance of the CkDDT_DataType, so I need to save that into a vector
+      saveTypes[i]->pupType(p, getDDT());							// Is this really all that is needed? No need to push the ddt->getBaseType() to queue 
+    }
+  }
+
+  void unPackDataTypeMessage(int typeSize, char *newDataType, int numTypes, int *derivedDataType, MPI_Datatype *targtype)
+  {
+    // isPrimitive check was deleted, can be added back later in a new context.
+
+    std::vector<char> byteHolder(newDataType, newDataType + typeSize);
+    int prevIndex = 0;
+    int currIndex = 0;
+    std::vector<char>::iterator start = byteHolder.begin();
+    std::vector<char>::iterator end = byteHolder.begin();
+    // build the datatype up backwards, starting with the DDT that is built purely from primitive types
+    for (int i=0; i<numTypes; i++)		// start from the front due to way we ordered it in packDataTypeMessage
+    {
+
+      switch(derivedDataType[i])
+      {
+        case CkDDT_CONTIGUOUS:
+        {
+          getDDT()->newContiguous(0, 0, &currIndex);
+          break;
+        }
+        case CkDDT_VECTOR:
+        {
+          getDDT()->newVector(0, 0, 0, 0, &currIndex);
+          break;
+        }
+        case CkDDT_HVECTOR:
+        {
+          getDDT()->newHVector(0, 0, 0, 0, &currIndex);
+          break;
+        }
+        case CkDDT_INDEXED:
+        {
+          getDDT()->newIndexed(0, NULL, NULL, 0, &currIndex);
+          break;
+        }
+        case CkDDT_HINDEXED:
+        {
+          getDDT()->newHIndexed(0, NULL, NULL, 0, &currIndex);
+          break;
+        }
+        case CkDDT_INDEXED_BLOCK:
+        {
+          getDDT()->newIndexedBlock(0, 0, NULL, 0, &currIndex);
+          break;
+        }
+        case CkDDT_HINDEXED_BLOCK:
+        {
+          getDDT()->newHIndexedBlock(0, 0, NULL, 0, &currIndex);
+          break;
+        }
+        case CkDDT_STRUCT:
+        {
+          getDDT()->newStruct(0, NULL, NULL, NULL, &currIndex);
+          break;
+        }
+      }
+      size_t len = sizeof(*(getDDT()->getType(currIndex)));
+      std::vector<char> byteType(start, start+len);
+      PUP::toMem p2(&byteType[0]);
+      getDDT()->getType(currIndex)->pupType(p2, getDDT());
+
+      if (i > 0)				// Don't need to mess with the bottom-most DDT (Except if its a struct). Wait, maybe we still need to change its baseType pointer? It should just be a 'new' call to CkDDT_DataType. Go back to this if there is a seg fault.
+      {
+        getDDT()->setBase(currIndex);	// sets correct baseType and baseIndex in new typeTable
+      }
+      if (derivedDataType[i] == CkDDT_STRUCT)
+      {
+        getDDT()->setStructBase(currIndex);	// sets correct baseType and baseIndex in new typeTable based on the manually-set offsets in its current types vector set on the origin side.
+      }
+      prevIndex = currIndex;
+      start += len;
+      end += len;
+    }
+
+    *targtype = prevIndex;				// last iteration will be the top-level derived datatype built in the typeTable
+    return;
+  }
+
  public:
   MPI_Win createWinInstance(void *base, MPI_Aint size, int disp_unit, MPI_Info info);
   int deleteWinInstance(MPI_Win win);
@@ -1700,8 +1849,25 @@ class ampi : public CBase_ampi {
   int winIgetFree(MPI_Request *request, MPI_Status *status);
   void winRemotePut(int orgtotalsize, char* orgaddr, int orgcnt, MPI_Datatype orgtype,
                     MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex);
+  void winRemotePutNewDataType(int orgtotalsize, char *orgaddr, int orgcnt,
+                               MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                               MPI_Datatype targtype, int winIndex, int typeSize, char *newDataType,
+                               int numTypes, int *derivedDataType)
+  {
+    win_obj *winobj = winObjects[winIndex];			// is this even used or needed?
+    unPackDataTypeMessage(typeSize, newDataType, numTypes, derivedDataType, &targtype);
+    // Will the below method be ok if targtype is built from other DDTs?
+    winRemotePut(orgtotalsize,orgaddr,orgcnt,orgtype,targdisp,targcnt,targtype,winIndex);
+  }
   AmpiMsg* winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
-                    int targcnt, MPI_Datatype targtype, int winIndex);
+                        int targcnt, MPI_Datatype targtype, int winIndex);
+  AmpiMsg *winRemoteGetNewDataType(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                   MPI_Datatype targtype, int winIndex, int typeSize, char *newDataType,
+                                   int numTypes, int *derivedDataType)
+  {
+    unPackDataTypeMessage(typeSize, newDataType, numTypes, derivedDataType, &targtype);
+    return winRemoteGet(orgcnt, orgtype,targdisp,targcnt,targtype,winIndex);
+  }
   AmpiMsg* winRemoteIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
                          int targcnt, MPI_Datatype targtype, int winIndex);
   int winLock(int lock_type, int rank, WinStruct *win);
@@ -1714,9 +1880,88 @@ class ampi : public CBase_ampi {
   void winRemoteAccumulate(int orgtotalsize, char* orgaddr, int orgcnt, MPI_Datatype orgtype,
                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                            MPI_Op op, int winIndex);
+
+  void winRemoteAccumulateNewDataType(int orgtotalsize, char* sorgaddr, int orgcnt,
+                                      MPI_Datatype orgtype, MPI_Aint targdisp,
+                                      int targcnt, MPI_Datatype targtype, MPI_Op op,
+                                      int winIndex, int typeSize, char *newDataType,
+                                      int numTypes, int *derivedDataType)
+  {
+/*
+    win_obj *winobj = winObjects[winIndex];
+    unPackDataTypeMessage(typeSize, newDataType, numTypes, derivedDataType, &targtype);
+    CkDDT_DataType *tddt = getDDT()->getType(targtype);
+    if (tddt->getType() == CkDDT_STRUCT)
+    {
+      int newTargetSize = tddt->getExtent()*targcnt;
+      std::vector<char> getdata(newTargetSize);
+      bool isStructContig = true;
+      if (!tddt->isContig())
+      {
+        isStructContig = false;
+        tddt->serialize(&getdata[0], sorgaddr, targcnt, (-1));
+      }
+
+      const int* arrayBlockLen = tddt->getArrayBlockLength();
+      const MPI_Aint* arrayDisp = tddt->getArrayDisps();
+      const MPI_Datatype* arrayType = tddt->getTypes();
+      int count = tddt->getCount();
+      MPI_Aint jumpSize = tddt->getExtent();
+      MPI_Aint saveDisp = targdisp;
+
+      for (int i=0; i<targcnt; i++)  // for each struct
+      {
+        MPI_Aint tempDisp = targdisp;
+        for (int j=0; j<count; j++)  // for each of the blocks of a single primitive type in each single struct
+        {
+          tempDisp = targdisp + arrayDisp[j];
+          winobj->accumulate((isStructContig ? sorgaddr : &getdata[0])+tempDisp,arrayBlockLen[j],saveDisp,tempDisp,arrayType[j],op,parent);
+        }
+        targdisp += jumpSize;
+      }
+      return;
+    }
+
+    
+      Note: Accumulate will only be called once, but it will accumulate some garbage values contained in the strides of the derived datatypes
+		I could possibely use a for loop to iterate over each chunk of valid data and skip over the strides using multiple calls
+			to winobj->accumulate.
+    
+
+    int newCount = targcnt*tddt->getExtent()/tddt->getBaseExtent();
+    if (newDataType.isContig()) {
+      winobj->accumulate(sorgaddr, newCount, targdisp, 0, newDataType.getBaseIndex(), op, parent);
+    }
+    else {
+      vector<char> getdata(targcnt*tddt->getExtent());
+      tddt->serialize(&getdata[0], sorgaddr, targcnt, (-1));
+      winobj->accumulate(&getdata[0], newCount, targdisp, 0, newDataType.getBaseIndex(), op, parent);
+    }
+    return;
+*/
+  }
+
+ public:
   int winGetAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, void *resaddr,
                        int rescnt, MPI_Datatype restype, int rank, MPI_Aint targdisp,
                        int targcnt, MPI_Datatype targtype, MPI_Op op, WinStruct *win);
+  AmpiMsg* winRemoteGetAccumulate(int orgTotalSize, char *sorgaddr, int orgcnt,
+                                  MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                  MPI_Datatype targtype, MPI_Op op, int winIndex);
+  AmpiMsg* winRemoteGetAccumulateNewDataType(int orgTotalSize, char* orgaddr, int orgcnt,
+                                  MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                  MPI_Datatype targtype, MPI_Op op, int winIndex,
+                                  int typeSize, char *newDataType, int numTypes, int *derivedDataType)
+  {
+    unPackDataTypeMessage(typeSize, newDataType, numTypes, derivedDataType, &targtype);
+    AmpiMsg *msg = winRemoteGet(orgcnt, orgtype,targdisp,targcnt,targtype,winIndex);
+
+    // This call is not a true entry method. Also, only problem with this is that unPackDataTypeMessage is called twice
+        // Maybe work around this by using CkDDT method to see if targtype is <= current size of typeTable?
+    winRemoteAccumulateNewDataType(orgTotalSize, orgaddr, orgcnt, orgtype, targdisp,
+                                      targcnt, targtype, op, winIndex, typeSize, newDataType, numTypes, derivedDataType);
+    return msg;
+  }
   int winCompareAndSwap(void *orgaddr, void *compaddr, void *resaddr, MPI_Datatype type,
                         int rank, MPI_Aint targdisp, WinStruct *win);
   AmpiMsg* winRemoteCompareAndSwap(int size, char *sorgaddr, char *compaddr, MPI_Datatype type,

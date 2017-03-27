@@ -1,7 +1,12 @@
 #ifndef __CkDDT_H_
 #define __CkDDT_H_
 
+#include <string>
+#include <vector>
 #include "pup.h"
+
+using std::vector;
+using std::string;
 
 #define CkDDT_MAXTYPE           100
 
@@ -49,6 +54,8 @@
 #define CkDDT_LONG_DOUBLE_COMPLEX 40
 #define CkDDT_AINT                41
 
+#define CkDDT_MAX_PRIMITIVE_TYPE  41
+
 #define CkDDT_CONTIGUOUS          42
 #define CkDDT_VECTOR              43
 #define CkDDT_HVECTOR             44
@@ -95,33 +102,30 @@ class CkDDT ;
 
   Members:
 
-  datatype - Used for primitive datatypes for size calculations
-  refCount - to keep track of how many references are present to this type.
-
-  size - size of one unit of datatype
-  extent - extent is different from size in that it also counts
-           displacements between blocks.
-  count -  count of base datatype present in this datatype
-  baseSize - size of Base Datatype
-  baseExtent - extent of Base dataType
-  name - user specified name for datatype
-  nameLen - length of user specified name for datatype
+  datatype         - Identifies the datatype based on the identification system above.
+  refCount         - to keep track of how many references are present to this type.
+  size             - size of one unit of datatype
+  extent           - extent is different from size in that it also counts displacements between blocks.
+  count            - count of base datatype present in this datatype
+  baseSize         - size of Base Datatype
+  baseExtent       - extent of Base dataType
+  name             - user specified name for datatype
+  nameLen          - length of user specified name for datatype
 
   Methods:
 
-  getSize -  returns the size of the datatype. 
-  getExtent - returns the extent of the datatype.
+  getSize          -  returns the size of the datatype. 
+  getExtent        - returns the extent of the datatype.
 
-  inrRefCount - increament the reference count.
-  getRefCount - returns the RefCount
+  inrRefCount      - increament the reference count.
+  getRefCount      - returns the RefCount
 
-  serialize - This is the function which actually copies the contents from
-    user's space to buffer if dir=1 or reverse if dir=-1
-    according to the datatype.
-
-  setName - set the name of datatype
-  getName - get the name of datatype
-  setAbsolute - tells DDT's serialize methods that we are dealing with absolute addresses
+  serialize        - This is the function which actually copies the contents from
+                      user's space to buffer if dir=1 or reverse if dir=-1
+                      according to the datatype.
+  setName          - set the name of datatype
+  getName          - get the name of datatype
+  setAbsolute      - tells DDT's serialize methods that we are dealing with absolute addresses
 
   Reference Counting currently disabled. To add this feature back in, the refcount variable
     cannot be copied when making a duplicate.
@@ -147,9 +151,12 @@ class CkDDT_DataType {
     CkDDT_DataType *baseType;
     int baseIndex;
     int numElements;
-    char name[CkDDT_MAX_NAME_LEN];
+    string name;
     int nameLen;
     bool isAbsolute;
+    bool isOffsetSet;
+    int saveParentPosition;
+    int holdStartOffset;
 
   private:
     CkDDT_DataType& operator=(const CkDDT_DataType& obj);
@@ -181,6 +188,15 @@ class CkDDT_DataType {
     virtual void inrRefCount(void) ;
     virtual int getRefCount(void) const;
     virtual void pupType(PUP::er &p, CkDDT* ddt) ;
+    virtual void setBase(int index, CkDDT_DataType *type);
+    virtual void setStructBase(int index, std::vector<CkDDT_DataType*> &newTypes);
+    virtual std::vector<int> getIndices(void);
+    virtual void setIndices(std::vector<int> &indices);
+    virtual void setParentIndex(int parent);
+    virtual void setStartOffset(int offset);
+    virtual void setEndOffset(int offset);
+    virtual int getParentIndex(void) const;
+    virtual int getOffset(void) const;
 
     virtual int getEnvelope(int *num_integers, int *num_addresses, int *num_datatypes, int *combiner) const;
     virtual int getContents(int max_integers, int max_addresses, int max_datatypes,
@@ -190,6 +206,7 @@ class CkDDT_DataType {
     void setName(const char *src);
     void getName(char *dest, int *len) const;
     void setAbsolute(bool arg);
+
 };
 
 /*
@@ -201,16 +218,20 @@ class CkDDT_DataType {
 class CkDDT_Contiguous : public CkDDT_DataType {
 
  private:
-  CkDDT_Contiguous(const CkDDT_Contiguous& obj);
   CkDDT_Contiguous& operator=(const CkDDT_Contiguous& obj);
 
  public:
   CkDDT_Contiguous() { };
   CkDDT_Contiguous(int count, int index, CkDDT_DataType* oldType);
+  CkDDT_Contiguous(const CkDDT_Contiguous& obj);
   virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
   virtual void pupType(PUP::er &p, CkDDT* ddt) ;
   virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
   virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+  // Dummy method below
+  virtual void setStructBase(int index, std::vector<CkDDT_DataType*> &newTypes);
+  virtual std::vector<int> getIndices(void);						// return by reference, not copy?
+  virtual void setIndices(std::vector<int> &indices);
 };
 
 /*
@@ -230,18 +251,22 @@ class CkDDT_Vector : public CkDDT_DataType {
     int strideLength ;
 
   private:
-    CkDDT_Vector(const CkDDT_Vector& obj);
     CkDDT_Vector& operator=(const CkDDT_Vector& obj);
 
   public:
     CkDDT_Vector(int count, int blklen, int stride, int index,
                 CkDDT_DataType* type);
     CkDDT_Vector() { } ;
+    CkDDT_Vector(const CkDDT_Vector& obj);
     ~CkDDT_Vector() { } ;
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+    // Dummy method below
+    virtual void setStructBase(int index, std::vector<CkDDT_DataType*> &newTypes);
+    virtual std::vector<int> getIndices(void);						// return by reference, not copy?
+    virtual void setIndices(std::vector<int> &indices);
 };
 
 /*
@@ -259,18 +284,22 @@ class CkDDT_Vector : public CkDDT_DataType {
 class CkDDT_HVector : public CkDDT_Vector {
 
   private:
-    CkDDT_HVector(const CkDDT_HVector& obj) ;
     CkDDT_HVector& operator=(const CkDDT_HVector& obj);
 
   public:
     CkDDT_HVector() { } ;
     CkDDT_HVector(int nCount,int blength,int strideLen,int index,
                 CkDDT_DataType* type);
+    CkDDT_HVector(const CkDDT_HVector& obj);
     ~CkDDT_HVector() { } ;
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual void pupType(PUP::er &p, CkDDT* ddt);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+    // Dummy method below
+    virtual void setStructBase(int index, std::vector<CkDDT_DataType*> &newTypes);
+    virtual std::vector<int> getIndices(void);						// return by reference, not copy?
+    virtual void setIndices(std::vector<int> &indices);
 };
 
 /*
@@ -288,22 +317,26 @@ class CkDDT_HVector : public CkDDT_Vector {
 class CkDDT_Indexed : public CkDDT_DataType {
 
   protected:
-    int* arrayBlockLength ;
-    CkDDT_Aint* arrayDisplacements ;
+    vector<int> arrayBlockLength;
+    vector<CkDDT_Aint> arrayDisplacements;
 
   private:
-    CkDDT_Indexed(const CkDDT_Indexed& obj);
     CkDDT_Indexed& operator=(const CkDDT_Indexed& obj) ;
 
   public:
-    CkDDT_Indexed(int count, int* arrBlock, CkDDT_Aint* arrDisp, int index,
+    CkDDT_Indexed(int count, const int* arrBlock, const CkDDT_Aint* arrDisp, int index,
                 CkDDT_DataType* type);
     CkDDT_Indexed() { } ;
+    CkDDT_Indexed(const CkDDT_Indexed& obj);
     ~CkDDT_Indexed() ;
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+    // Dummy method below
+    virtual void setStructBase(int index, std::vector<CkDDT_DataType*> &newTypes);
+    virtual std::vector<int> getIndices(void);						// return by reference, not copy?
+    virtual void setIndices(std::vector<int> &indices);
 };
 
 /*
@@ -321,17 +354,21 @@ class CkDDT_Indexed : public CkDDT_DataType {
 class CkDDT_HIndexed : public CkDDT_Indexed {
 
   private:
-    CkDDT_HIndexed(const CkDDT_HIndexed& obj);
     CkDDT_HIndexed& operator=(const CkDDT_HIndexed& obj);
 
   public:
     CkDDT_HIndexed() { } ;
-    CkDDT_HIndexed(int count, int* arrBlock, CkDDT_Aint* arrDisp, int index,
+    CkDDT_HIndexed(int count, const int* arrBlock, const CkDDT_Aint* arrDisp, int index,
                  CkDDT_DataType* type);
+    CkDDT_HIndexed(const CkDDT_HIndexed& obj);
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual void pupType(PUP::er &p, CkDDT* ddt);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+    // Dummy method below
+    virtual void setStructBase(int index, std::vector<CkDDT_DataType*> &newTypes);
+    virtual std::vector<int> getIndices(void);						// return by reference, not copy?
+    virtual void setIndices(std::vector<int> &indices);
 };
 
 /*
@@ -353,20 +390,24 @@ class CkDDT_Indexed_Block : public CkDDT_DataType
 
   protected:
     int BlockLength;
-    CkDDT_Aint *arrayDisplacements;
+    vector<CkDDT_Aint> arrayDisplacements;
 
   private:
-    CkDDT_Indexed_Block(const CkDDT_Indexed_Block &obj);
     CkDDT_Indexed_Block& operator=(const CkDDT_Indexed_Block &obj);
 
   public:
-    CkDDT_Indexed_Block(int count, int Blength, CkDDT_Aint *ArrDisp, int index, CkDDT_DataType *type);
+    CkDDT_Indexed_Block(int count, int Blength, const CkDDT_Aint *ArrDisp, int index, CkDDT_DataType *type);
     CkDDT_Indexed_Block() { };
+    CkDDT_Indexed_Block(const CkDDT_Indexed_Block &obj);
     ~CkDDT_Indexed_Block() ;
     virtual size_t serialize(char *userdata, char *buffer, int num, int dir) const;
     virtual void pupType(PUP::er &p, CkDDT *ddt);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+    // Dummy method below
+    virtual void setStructBase(int index, std::vector<CkDDT_DataType*> &newTypes);
+    virtual std::vector<int> getIndices(void);						// return by reference, not copy?
+    virtual void setIndices(std::vector<int> &indices);
 };
 
 /*
@@ -388,17 +429,21 @@ class CkDDT_HIndexed_Block : public CkDDT_Indexed_Block
 {
   
   private:
-    CkDDT_HIndexed_Block(const CkDDT_Indexed_Block &obj);
     CkDDT_HIndexed_Block& operator=(const CkDDT_Indexed_Block &obj);
 
   public:
-    CkDDT_HIndexed_Block(int count, int Blength, CkDDT_Aint *ArrDisp, int index, CkDDT_DataType *type);
+    CkDDT_HIndexed_Block(int count, int Blength, const CkDDT_Aint *ArrDisp, int index, CkDDT_DataType *type);
     CkDDT_HIndexed_Block() { };
+    CkDDT_HIndexed_Block(const CkDDT_HIndexed_Block &obj);
     ~CkDDT_HIndexed_Block() ;
     virtual size_t serialize(char *userdata, char *buffer, int num, int dir) const;
     virtual void pupType(PUP::er &p, CkDDT *ddt);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+    // Dummy method below
+    virtual void setStructBase(int index, std::vector<CkDDT_DataType*> &newTypes);
+    virtual std::vector<int> getIndices(void);						// return by reference, not copy?
+    virtual void setIndices(std::vector<int> &indices);
 };
 
 /*
@@ -417,23 +462,26 @@ class CkDDT_HIndexed_Block : public CkDDT_Indexed_Block
 class CkDDT_Struct : public CkDDT_DataType {
 
   protected:
-    int* arrayBlockLength ;
-    CkDDT_Aint* arrayDisplacements ;
-    int* index;
-    CkDDT_DataType** arrayDataType;
+    vector<int> arrayBlockLength;
+    vector<CkDDT_Aint> arrayDisplacements;
+    vector<int> index;
+    vector<CkDDT_DataType*> arrayDataType;
 
   private:
-    CkDDT_Struct(const CkDDT_Struct& obj);
     CkDDT_Struct& operator=(const CkDDT_Struct& obj);
 
   public:
     CkDDT_Struct() { } ;
-    CkDDT_Struct(int count, int* arrBlock, CkDDT_Aint* arrDisp, int *index,
+    CkDDT_Struct(int count, const int* arrBlock, const CkDDT_Aint* arrDisp, const int *index,
                CkDDT_DataType **type);
+    CkDDT_Struct(const CkDDT_Struct& obj);
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+    virtual void setStructBase(int index, std::vector<CkDDT_DataType*> &newTypes);
+    virtual std::vector<int> getIndices(void);						// return by reference, not copy?
+    virtual void setIndices(std::vector<int> &indices);
 };
 
 /*
@@ -455,8 +503,8 @@ class CkDDT_Struct : public CkDDT_DataType {
 
 class CkDDT {
   private:
-    CkDDT_DataType**  typeTable;
-    int*  types; //used for pup
+    vector<CkDDT_DataType*> typeTable;
+    vector<int> types;
     int max_types;
     int num_types;
 
@@ -466,8 +514,8 @@ class CkDDT {
   CkDDT()
   {
     max_types = CkDDT_MAXTYPE;
-    typeTable = new CkDDT_DataType*[max_types];
-    types = new int[max_types];
+    typeTable.resize(max_types);
+    types.resize(max_types);
     typeTable[0] = new CkDDT_DataType(CkDDT_DOUBLE);
     types[0] = CkDDT_DOUBLE;
     typeTable[1] = new CkDDT_DataType(CkDDT_INT);
@@ -567,21 +615,22 @@ class CkDDT {
                 CkDDT_Type* newtype);
   void newHVector(int count, int blocklength, int stride, CkDDT_Type oldtype,
                  CkDDT_Type* newtype);
-  void newIndexed(int count, int* arrbLength, CkDDT_Aint* arrDisp , CkDDT_Type oldtype,
+  void newIndexed(int count, const int* arrbLength, const CkDDT_Aint* arrDisp , CkDDT_Type oldtype,
                  CkDDT_Type* newtype);
-  void newHIndexed(int count, int* arrbLength, CkDDT_Aint* arrDisp , CkDDT_Type oldtype,
+  void newHIndexed(int count, const int* arrbLength, const CkDDT_Aint* arrDisp , CkDDT_Type oldtype,
                   CkDDT_Type* newtype);
-  void newIndexedBlock(int count, int Blocklength, CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
+  void newIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
                       CkDDT_Type *newtype);
-  void newHIndexedBlock(int count, int Blocklength, CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
+  void newHIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
                        CkDDT_Type *newtype);
-  void newStruct(int count, int* arrbLength, CkDDT_Aint* arrDisp , CkDDT_Type *oldtype,
+  void newStruct(int count, const int* arrbLength, const CkDDT_Aint* arrDisp , const CkDDT_Type *oldtype,
                 CkDDT_Type* newtype);
   void  freeType(int* index);
   int   getNextFreeIndex(void);
   void  pup(PUP::er &p);
   CkDDT_DataType*  getType(int nIndex) const;
-
+  int getTypeTag(int nIndex) const;
+  bool isPrimitive(int nIndex) const;
   bool isContig(int nIndex) const;
   int getSize(int nIndex, int count=1) const;
   CkDDT_Aint getExtent(int nIndex) const;
@@ -589,6 +638,8 @@ class CkDDT {
   CkDDT_Aint getUB(int nIndex) const;
   CkDDT_Aint getTrueExtent(int nIndex) const;
   CkDDT_Aint getTrueLB(int nIndex) const;
+  void setBase(int currIndex);
+  void setStructBase(int currIndex);
   void createDup(int nIndexOld, int *nIndexNew);
   int getEnvelope(int nIndex, int *num_integers, int *num_addresses, int *num_datatypes, int *combiner) const;
   int getContents(int nIndex, int max_integers, int max_addresses, int max_datatypes,

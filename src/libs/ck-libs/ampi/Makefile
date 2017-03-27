@@ -7,7 +7,7 @@ COMPAT=compat_ampius.o compat_ampifus.o compat_ampi.o \
        compat_ampim.o compat_ampifm.o compat_ampicm.o \
 	   compat_ampicpp.o
 OBJS=ampi.o ampif.o ampiProjections.o ampiOneSided.o \
-     ampiMisc.o mpich-alltoall.o  
+     ampiMisc.o mpich-alltoall.o 
 ROMIOMAKE=romio/adio/ad_hfs/Makefile romio/adio/ad_nfs/Makefile romio/adio/ad_pfs/Makefile romio/adio/ad_piofs/Makefile \
 	  romio/adio/ad_pvfs/Makefile romio/adio/ad_sfs/Makefile romio/adio/ad_testfs/Makefile romio/adio/ad_ufs/Makefile \
 	  romio/adio/ad_xfs/Makefile romio/adio/common/Makefile romio/adio/include/romioconf.h romio/Makefile \

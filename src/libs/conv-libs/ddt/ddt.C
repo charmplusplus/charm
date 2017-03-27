@@ -1,4 +1,5 @@
 #include "ddt.h"
+#include "pup_stl.h"
 #include <algorithm>
 #include <limits>
 
@@ -29,17 +30,22 @@ CkDDT::getType(int nIndex) const
     return 0 ;
 }
 
+int
+CkDDT::getTypeTag(int nIndex) const
+{
+  return getType(nIndex)->getType();
+}
+
 void
 CkDDT::pup(PUP::er &p)
 {
   p(max_types);
   p(num_types);
-  if(p.isUnpacking())
+  p|types;
+  if (p.isUnpacking())
   {
-    typeTable = new CkDDT_DataType*[max_types];
-    types = new int[max_types];
+    typeTable.resize(max_types);
   }
-  p(types,max_types);
   int i;
   //unPacking
   if(p.isUnpacking())
@@ -95,8 +101,8 @@ CkDDT::getNextFreeIndex(void)
     if(typeTable[i] == 0)
       return i ;
   int newmax = max_types*2;
-  CkDDT_DataType** newtable = new CkDDT_DataType*[newmax];
-  int *newtype = new int[newmax];
+  vector<CkDDT_DataType*> newtable(newmax);
+  vector<int> newtype(newmax);
   for(i=0;i<max_types;i++)
   {
     newtable[i] = typeTable[i];
@@ -107,8 +113,6 @@ CkDDT::getNextFreeIndex(void)
     newtable[i] = 0;
     newtype[i] = CkDDT_TYPE_NULL;
   }
-  delete[] typeTable;
-  delete[] types;
   typeTable = newtable;
   types = newtype;
   num_types = max_types;
@@ -136,8 +140,6 @@ CkDDT::~CkDDT()
        delete typeTable[i];
     }
   }
-  delete[] typeTable ;
-  delete[] types;
 }
 
 
@@ -145,6 +147,12 @@ bool
 CkDDT::isContig(int nIndex) const
 {
   return getType(nIndex)->isContig();
+}
+
+bool
+CkDDT::isPrimitive(int nIndex) const
+{
+  return nIndex <= CkDDT_MAX_PRIMITIVE_TYPE;
 }
 
 int
@@ -187,6 +195,35 @@ CkDDT::getTrueLB(int nIndex) const
 {
   CkDDT_DataType *dttype = getType(nIndex);
   return dttype->getTrueLB();
+}
+
+void
+CkDDT::setBase(int currIndex)
+{
+  CkDDT_DataType *dttype = getType(currIndex);
+  int offset = dttype->getOffset();
+  offset = currIndex + offset;					// offset is negative
+  dttype->setBase(offset, getType(offset));
+  return;
+}
+
+void
+CkDDT::setStructBase(int currIndex)
+{
+  // first get the array of types
+  CkDDT_DataType *dttype = getType(currIndex);
+  std::vector<int> offsets = dttype->getIndices();		// Note that it returns a reference to the member vector, not a copy
+  std::vector<CkDDT_DataType*> newTypes(offsets.size());
+  int offset = dttype->getOffset();
+  for (int i=0; i<newTypes.size(); i++)
+  {
+    if (!isPrimitive(offsets[i]))
+    {
+      newTypes[i] = getType(currIndex+offset+offsets[i]);
+    }
+    // else, leave the primitive type index alone
+  }
+  dttype->setStructBase(currIndex, newTypes);		// check for correctness?
 }
 
 void
@@ -262,7 +299,7 @@ CkDDT::newHVector(int count, int blocklength, int stride,
 }
 
 void
-CkDDT::newIndexed(int count, int* arrbLength, CkDDT_Aint* arrDisp,
+CkDDT::newIndexed(int count, const int* arrbLength, const CkDDT_Aint* arrDisp,
                   CkDDT_Type oldtype, CkDDT_Type* newType)
 {
   int index = *newType =  getNextFreeIndex() ;
@@ -273,7 +310,7 @@ CkDDT::newIndexed(int count, int* arrbLength, CkDDT_Aint* arrDisp,
 }
 
 void
-CkDDT::newHIndexed(int count, int* arrbLength, CkDDT_Aint* arrDisp,
+CkDDT::newHIndexed(int count, const int* arrbLength, const CkDDT_Aint* arrDisp,
                    CkDDT_Type oldtype, CkDDT_Type* newType)
 {
   int index = *newType =  getNextFreeIndex() ;
@@ -284,7 +321,7 @@ CkDDT::newHIndexed(int count, int* arrbLength, CkDDT_Aint* arrDisp,
 }
 
 void
-CkDDT::newIndexedBlock(int count, int Blocklength, CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
+CkDDT::newIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
                   CkDDT_Type *newtype)
 {
   int index = *newtype = getNextFreeIndex();
@@ -294,7 +331,7 @@ CkDDT::newIndexedBlock(int count, int Blocklength, CkDDT_Aint *arrDisp, CkDDT_Ty
 }
 
 void
-CkDDT::newHIndexedBlock(int count, int Blocklength, CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
+CkDDT::newHIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
                   CkDDT_Type *newtype)
 {
   int index = *newtype = getNextFreeIndex();
@@ -304,8 +341,8 @@ CkDDT::newHIndexedBlock(int count, int Blocklength, CkDDT_Aint *arrDisp, CkDDT_T
 }
 
 void
-CkDDT::newStruct(int count, int* arrbLength, CkDDT_Aint* arrDisp,
-                 CkDDT_Type *oldtype, CkDDT_Type* newType)
+CkDDT::newStruct(int count, const int* arrbLength, const CkDDT_Aint* arrDisp,
+                 const CkDDT_Type *oldtype, CkDDT_Type* newType)
 {
   int index = *newType =  getNextFreeIndex() ;
   CkDDT_DataType **olddatatypes = new CkDDT_DataType*[count];
@@ -482,7 +519,7 @@ CkDDT_DataType::CkDDT_DataType(int datatype, int size, CkDDT_Aint extent, int co
             bool iscontig, int baseSize, CkDDT_Aint baseExtent, CkDDT_DataType* baseType, int numElements, int baseIndex,
             CkDDT_Aint trueExtent, CkDDT_Aint trueLB) :
     datatype(datatype), size(size), extent(extent), count(count), lb(lb), ub(ub), trueExtent(trueExtent),
-    trueLB(trueLB), iscontig(iscontig), baseSize(baseSize), baseExtent(baseExtent), baseType(baseType),
+    trueLB(trueLB), iscontig(iscontig), baseSize(baseSize), baseExtent(baseExtent), baseType(baseType),	// isnt this a shallow copy?
     numElements(numElements), baseIndex(baseIndex), nameLen(0), isAbsolute(false)
 {}
 
@@ -520,7 +557,7 @@ CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType &obj, CkDDT_Aint _lb, CkDDT_
   count       = obj.count;
   isAbsolute  = obj.isAbsolute;
   nameLen     = obj.nameLen;
-  memcpy(name, obj.name, nameLen+1);
+  name        = obj.name;
 
   extent = _extent;
   lb     = _lb;
@@ -560,14 +597,14 @@ CkDDT_DataType::serialize(char* userdata, char* buffer, int num, int dir) const
 void
 CkDDT_DataType::setName(const char *src)
 {
-  CkDDT_SetName(name, src, &nameLen);
+  CkDDT_SetName(&name[0], src, &nameLen);
 }
 
 void
 CkDDT_DataType::getName(char *dest, int *len) const
 {
   *len = nameLen;
-  memcpy(dest, name, *len+1);
+  memcpy(dest,name.c_str(),*len+1);
 }
 
 bool
@@ -673,6 +710,47 @@ CkDDT_DataType::getRefCount(void) const
 }
 
 void
+CkDDT_DataType::setBase(int index, CkDDT_DataType *type)
+{
+  // set both baseIndex and baseType
+  this->baseIndex = index;
+  this->baseType = type;
+}
+
+void
+CkDDT_DataType::setParentIndex(int parent)
+{
+  this->saveParentPosition = parent;
+}
+
+void
+CkDDT_DataType::setStartOffset(int offset)
+{
+  this->holdStartOffset = offset;
+}
+
+void
+CkDDT_DataType::setEndOffset(int offset)
+{
+  if (!this->isOffsetSet)					// we only need to set it once in the case of a struct where there are multiple children
+  {
+    this->holdStartOffset -= offset;				// should be negative
+  }
+}
+
+int
+CkDDT_DataType::getParentIndex(void) const
+{
+  return this->saveParentPosition;
+}
+
+int
+CkDDT_DataType::getOffset(void) const
+{
+  return this->holdStartOffset;
+}
+
+void
 CkDDT_DataType::pupType(PUP::er  &p, CkDDT* ddt)
 {
   p(datatype);
@@ -691,7 +769,7 @@ CkDDT_DataType::pupType(PUP::er  &p, CkDDT* ddt)
   p(isAbsolute);
   p(numElements);
   p(nameLen);
-  p(name,CkDDT_MAX_NAME_LEN);
+  p|name;
 }
 
 int
@@ -709,6 +787,24 @@ CkDDT_DataType::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int
 {
   CmiPrintf("CkDDT_DataType::getContents: Shouldn't call getContents on primitive datatypes!\n");
   return -1;
+}
+
+void
+CkDDT_DataType::setStructBase(int currIndex, std::vector<CkDDT_DataType*> &newTypes)
+{
+  CmiAbort("CkDDT: Invalid call to setStructBase for regular datatype\n");
+}
+
+std::vector<int>
+CkDDT_DataType::getIndices(void)
+{
+  CmiAbort("CkDDT: Invalid call to getIndices for regular datatype\n");
+  return vector<int>();
+}
+void
+CkDDT_DataType::setIndices(std::vector<int> &indices)
+{
+  CmiAbort("CkDDT: Invalid call to getIndices for regular datatype\n");
 }
 
 CkDDT_Contiguous::CkDDT_Contiguous(int nCount, int bindex, CkDDT_DataType* oldType)
@@ -733,6 +829,24 @@ CkDDT_Contiguous::CkDDT_Contiguous(int nCount, int bindex, CkDDT_DataType* oldTy
   else {
     iscontig = baseType->isContig();
   }
+}
+
+CkDDT_Contiguous::CkDDT_Contiguous(const CkDDT_Contiguous& obj)
+{
+  this->datatype = obj.datatype;
+  this->count = obj.count;
+  this->baseIndex = obj.baseIndex;
+  this->baseType =  obj.baseType;	// deep copy problem?
+  this->baseSize = obj.baseSize;
+  this->baseExtent = obj.baseExtent;
+  this->numElements = obj.numElements;
+  this->size = obj.size;
+  this->extent = obj.extent;
+  this->ub = obj.ub;
+  this->lb = obj.lb;
+  this->iscontig = obj.iscontig;
+  this->trueLB = obj.trueLB;
+  this->trueExtent = obj.trueExtent;
 }
 
 size_t
@@ -792,6 +906,25 @@ CkDDT_Contiguous::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], i
   return 0;
 }
 
+void
+CkDDT_Contiguous::setStructBase(int currIndex, std::vector<CkDDT_DataType*> &newTypes)
+{
+  CmiAbort("CkDDT: Invalid call to setStructBase for type Contiguous\n");
+}
+
+std::vector<int>
+CkDDT_Contiguous::getIndices(void)
+{
+  CmiAbort("CkDDT: Invalid call to getIndices for type Contiguous\n");
+  return vector<int>();
+}
+
+void
+CkDDT_Contiguous::setIndices(std::vector<int> &indices)
+{
+  CmiAbort("CkDDT: Invalid call to setIndices for Contiguous type\n");
+}
+
 CkDDT_Vector::CkDDT_Vector(int nCount, int blength, int stride, int bindex, CkDDT_DataType* oldType)
 {
   datatype = CkDDT_VECTOR;
@@ -829,6 +962,26 @@ CkDDT_Vector::CkDDT_Vector(int nCount, int blength, int stride, int bindex, CkDD
     else
       iscontig = false;
   }
+}
+
+CkDDT_Vector::CkDDT_Vector(const CkDDT_Vector& obj)
+{
+  this->datatype = obj.datatype;
+  this->count = obj.count;
+  this->blockLength = obj.blockLength;
+  this->strideLength = obj.strideLength;
+  this->baseIndex = obj.baseIndex;
+  this->baseType =  obj.baseType;	// deep copy problem?
+  this->baseSize = obj.baseSize;
+  this->baseExtent = obj.baseExtent;
+  this->numElements = obj.numElements;
+  this->size = obj.size;
+  this->extent = obj.extent;
+  this->ub = obj.ub;
+  this->lb = obj.lb;
+  this->iscontig = obj.iscontig;
+  this->trueLB = obj.trueLB;
+  this->trueExtent = obj.trueExtent;
 }
 
 size_t
@@ -896,6 +1049,25 @@ CkDDT_Vector::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d
   return 0;
 }
 
+void
+CkDDT_Vector::setStructBase(int currIndex, std::vector<CkDDT_DataType*> &newTypes)
+{
+  CmiAbort("CkDDT: Invalid call to setStructBase for type Vector\n");
+}
+
+std::vector<int>
+CkDDT_Vector::getIndices(void)
+{
+  CmiAbort("CkDDT: Invalid call to getIndices for type Vector\n");
+  return vector<int>();
+}
+
+void
+CkDDT_Vector::setIndices(std::vector<int> &indices)
+{
+  CmiAbort("CkDDT: Invalid call to setIndices for Vector type\n");
+}
+
 CkDDT_HVector::CkDDT_HVector(int nCount, int blength, int stride,  int bindex,
                          CkDDT_DataType* oldType)
 {
@@ -934,6 +1106,26 @@ CkDDT_HVector::CkDDT_HVector(int nCount, int blength, int stride,  int bindex,
     else
       iscontig = false;
   }
+}
+
+CkDDT_HVector::CkDDT_HVector(const CkDDT_HVector& obj)
+{
+  this->datatype = obj.datatype;
+  this->count = obj.count;
+  this->blockLength = obj.blockLength;
+  this->strideLength = obj.strideLength;
+  this->baseIndex = obj.baseIndex;
+  this->baseType =  obj.baseType;	// deep copy problem?
+  this->baseSize = obj.baseSize;
+  this->baseExtent = obj.baseExtent;
+  this->numElements = obj.numElements;
+  this->size = obj.size;
+  this->extent = obj.extent;
+  this->ub = obj.ub;
+  this->lb = obj.lb;
+  this->iscontig = obj.iscontig;
+  this->trueLB = obj.trueLB;
+  this->trueExtent = obj.trueExtent;
 }
 
 size_t
@@ -986,12 +1178,31 @@ CkDDT_HVector::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int 
   return 0;
 }
 
-CkDDT_Indexed::CkDDT_Indexed(int nCount, int* arrBlock, CkDDT_Aint* arrDisp, int bindex,
+void
+CkDDT_HVector::setStructBase(int currIndex, std::vector<CkDDT_DataType*> &newTypes)
+{
+  CmiAbort("CkDDT: Invalid call to setStructBase for type HVector\n");
+}
+
+std::vector<int>
+CkDDT_HVector::getIndices(void)
+{
+  CmiAbort("CkDDT: Invalid call to getIndices for type HVector\n");
+  return vector<int>();
+}
+
+void
+CkDDT_HVector::setIndices(std::vector<int> &indices)
+{
+  CmiAbort("CkDDT: Invalid call to setIndices for type HVector\n");
+}
+
+CkDDT_Indexed::CkDDT_Indexed(int nCount, const int* arrBlock, const CkDDT_Aint* arrDisp, int bindex,
                          CkDDT_DataType* base)
     : CkDDT_DataType(CkDDT_INDEXED, 0, 0, nCount, numeric_limits<CkDDT_Aint>::max(),
 		     numeric_limits<CkDDT_Aint>::min(), 0, base->getSize(), base->getExtent(),
 		     base, nCount* base->getNumElements(), bindex, 0, 0),
-    arrayBlockLength(new int[nCount]), arrayDisplacements(new CkDDT_Aint[nCount])
+      arrayBlockLength(nCount), arrayDisplacements(nCount)
 {
     CkDDT_Aint positiveExtent = 0;
     CkDDT_Aint negativeExtent = 0;
@@ -1034,6 +1245,26 @@ CkDDT_Indexed::CkDDT_Indexed(int nCount, int* arrBlock, CkDDT_Aint* arrDisp, int
     }
 }
 
+CkDDT_Indexed::CkDDT_Indexed(const CkDDT_Indexed& obj)
+{
+  this->datatype = obj.datatype;
+  this->count = obj.count;
+  this->arrayBlockLength = obj.arrayBlockLength;
+  this->arrayDisplacements = obj.arrayDisplacements;
+  this->baseIndex = obj.baseIndex;
+  this->baseType =  obj.baseType;	// deep copy problem?
+  this->baseSize = obj.baseSize;
+  this->baseExtent = obj.baseExtent;
+  this->numElements = obj.numElements;
+  this->size = obj.size;
+  this->extent = obj.extent;
+  this->ub = obj.ub;
+  this->lb = obj.lb;
+  this->iscontig = obj.iscontig;
+  this->trueLB = obj.trueLB;
+  this->trueExtent = obj.trueExtent;
+}
+
 size_t
 CkDDT_Indexed::serialize(char* userdata, char* buffer, int num, int dir) const
 {
@@ -1064,10 +1295,7 @@ CkDDT_Indexed::serialize(char* userdata, char* buffer, int num, int dir) const
 }
 
 CkDDT_Indexed::~CkDDT_Indexed()
-{
-  delete [] arrayBlockLength ;
-  delete [] arrayDisplacements ;
-}
+{}
 
 void
 CkDDT_Indexed::pupType(PUP::er &p, CkDDT* ddt)
@@ -1085,12 +1313,8 @@ CkDDT_Indexed::pupType(PUP::er &p, CkDDT* ddt)
   p(trueLB);
   p(iscontig);
   p(numElements);
-
-  if(p.isUnpacking() )  arrayBlockLength = new int[count] ;
-  p(arrayBlockLength, count);
-
-  if(p.isUnpacking() )  arrayDisplacements = new CkDDT_Aint[count] ;
-  p(arrayDisplacements, count);
+  p|arrayBlockLength;
+  p|arrayDisplacements;
 
   if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
 }
@@ -1117,7 +1341,26 @@ CkDDT_Indexed::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int 
   return 0;
 }
 
-CkDDT_HIndexed::CkDDT_HIndexed(int nCount, int* arrBlock, CkDDT_Aint* arrDisp,  int bindex,
+void
+CkDDT_Indexed::setStructBase(int currIndex, std::vector<CkDDT_DataType*> &newTypes)
+{
+  CmiAbort("CkDDT: Invalid call to setStructBase for type Indexed\n");
+}
+
+std::vector<int>
+CkDDT_Indexed::getIndices(void)
+{
+  CmiAbort("CkDDT: Invalid call to getIndices for type Indexed\n");
+  return vector<int>();
+}
+
+void
+CkDDT_Indexed::setIndices(std::vector<int> &indices)
+{
+  CmiAbort("CkDDT: Invalid call to setIndices for type Indexed\n");
+}
+
+CkDDT_HIndexed::CkDDT_HIndexed(int nCount, const int* arrBlock, const CkDDT_Aint* arrDisp,  int bindex,
                            CkDDT_DataType* base)
     : CkDDT_Indexed(nCount, arrBlock, arrDisp, bindex, base)
 {
@@ -1129,7 +1372,7 @@ CkDDT_HIndexed::CkDDT_HIndexed(int nCount, int* arrBlock, CkDDT_Aint* arrDisp,  
       ub = std::max(arrBlock[i]*baseExtent + baseType->getLB() + arrayDisplacements[i], ub);
   }
 
-  lb = baseType->getLB() + *std::min_element(arrDisp, arrDisp+nCount+1);
+  lb = baseType->getLB() + *std::min_element(&arrDisp[0],&arrDisp[0]+nCount+1);
   extent = ub - lb;
 
   trueExtent = extent;
@@ -1152,6 +1395,26 @@ CkDDT_HIndexed::CkDDT_HIndexed(int nCount, int* arrBlock, CkDDT_Aint* arrDisp,  
     }
     iscontig = (contig && baseType->isContig());
   }
+}
+
+CkDDT_HIndexed::CkDDT_HIndexed(const CkDDT_HIndexed& obj)
+{
+  this->datatype = obj.datatype;
+  this->count = obj.count;
+  this->arrayBlockLength = obj.arrayBlockLength;
+  this->arrayDisplacements = obj.arrayDisplacements;
+  this->baseIndex = obj.baseIndex;
+  this->baseType =  obj.baseType;	// deep copy problem?
+  this->baseSize = obj.baseSize;
+  this->baseExtent = obj.baseExtent;
+  this->numElements = obj.numElements;
+  this->size = obj.size;
+  this->extent = obj.extent;
+  this->ub = obj.ub;
+  this->lb = obj.lb;
+  this->iscontig = obj.iscontig;
+  this->trueLB = obj.trueLB;
+  this->trueExtent = obj.trueExtent;
 }
 
 size_t
@@ -1211,11 +1474,30 @@ CkDDT_HIndexed::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int
   return 0;
 }
 
-CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, CkDDT_Aint *ArrDisp, int index,
+void
+CkDDT_HIndexed::setStructBase(int currIndex, std::vector<CkDDT_DataType*> &newTypes)
+{
+  CmiAbort("CkDDT: Invalid call to setStructBase for type HIndexed\n");
+}
+
+std::vector<int>
+CkDDT_HIndexed::getIndices(void)
+{
+  CmiAbort("CkDDT: Invalid call to getIndices for type HIndexed\n");
+  return vector<int>();
+}
+
+void
+CkDDT_HIndexed::setIndices(std::vector<int> &indices)
+{
+  CmiAbort("CkDDT: Invalid call to setIndices for type HIndexed\n");
+}
+
+CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, const CkDDT_Aint *ArrDisp, int index,
   CkDDT_DataType *type)     : CkDDT_DataType(CkDDT_INDEXED_BLOCK, 0, 0, count, numeric_limits<CkDDT_Aint>::max(),
          numeric_limits<CkDDT_Aint>::min(), 0, type->getSize(), type->getExtent(),
          type, count * type->getNumElements(), index, 0, 0),
-    BlockLength(Blength), arrayDisplacements(new CkDDT_Aint[count])
+    BlockLength(Blength), arrayDisplacements(count)
 {
   CkDDT_Aint positiveExtent = 0;
   CkDDT_Aint negativeExtent = 0;
@@ -1232,7 +1514,7 @@ CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, CkDDT_Aint *Arr
   }
 
   extent = positiveExtent + (-1)*negativeExtent;
-  lb = baseType->getLB() + *std::min_element(arrayDisplacements, arrayDisplacements + count+1)*baseExtent;
+  lb = baseType->getLB() + *std::min_element(&arrayDisplacements[0], &arrayDisplacements[0] + count+1)*baseExtent;
   ub = lb + extent;
 
   trueExtent = extent;
@@ -1260,10 +1542,28 @@ CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, CkDDT_Aint *Arr
   }
 }
 
-CkDDT_Indexed_Block::~CkDDT_Indexed_Block()
+CkDDT_Indexed_Block::CkDDT_Indexed_Block(const CkDDT_Indexed_Block& obj)
 {
-  delete [] arrayDisplacements;
+  this->datatype = obj.datatype;
+  this->count = obj.count;
+  this->BlockLength = obj.BlockLength;
+  this->arrayDisplacements = obj.arrayDisplacements;
+  this->baseIndex = obj.baseIndex;
+  this->baseType =  obj.baseType;	// deep copy problem?
+  this->baseSize = obj.baseSize;
+  this->baseExtent = obj.baseExtent;
+  this->numElements = obj.numElements;
+  this->size = obj.size;
+  this->extent = obj.extent;
+  this->ub = obj.ub;
+  this->lb = obj.lb;
+  this->iscontig = obj.iscontig;
+  this->trueLB = obj.trueLB;
+  this->trueExtent = obj.trueExtent;
 }
+
+CkDDT_Indexed_Block::~CkDDT_Indexed_Block()
+{}
 
 size_t
 CkDDT_Indexed_Block::serialize(char *userdata, char *buffer, int num, int dir) const
@@ -1310,9 +1610,7 @@ CkDDT_Indexed_Block::pupType(PUP::er &p, CkDDT *ddt)
   p(iscontig);
   p(numElements);
   p(BlockLength);
-
-  if(p.isUnpacking() )  arrayDisplacements = new CkDDT_Aint[count] ;
-  p(arrayDisplacements, count);
+  p|arrayDisplacements;
 
   if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
 }
@@ -1339,7 +1637,26 @@ CkDDT_Indexed_Block::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[]
   return 0;
 }
 
-CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, CkDDT_Aint *ArrDisp, int index,
+void
+CkDDT_Indexed_Block::setStructBase(int currIndex, std::vector<CkDDT_DataType*> &newTypes)
+{
+  CmiAbort("CkDDT: Invalid call to setStructBase for type Indexed Block\n");
+}
+
+std::vector<int>
+CkDDT_Indexed_Block::getIndices(void)
+{
+  CmiAbort("CkDDT: Invalid call to getIndices for type Indexed_Block\n");
+  return vector<int>();
+}
+
+void
+CkDDT_Indexed_Block::setIndices(std::vector<int> &indices)
+{
+  CmiAbort("CkDDT: Invalid call to setIndices for type Indexed_Block\n");
+}
+
+CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, const CkDDT_Aint *ArrDisp, int index,
   CkDDT_DataType *type)     : CkDDT_Indexed_Block(count, Blength,ArrDisp,index,type)
 {
   CkDDT_Aint positiveExtent = 0;
@@ -1357,7 +1674,7 @@ CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, CkDDT_Aint *A
   }
 
   extent = positiveExtent + (-1)*negativeExtent;
-  lb = baseType->getLB() + *std::min_element(arrayDisplacements, arrayDisplacements + count+1);
+  lb = baseType->getLB() + *std::min_element(&arrayDisplacements[0], &arrayDisplacements[0] + count+1);
   ub = lb + extent;
 
   trueExtent = extent;
@@ -1385,10 +1702,28 @@ CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, CkDDT_Aint *A
   }
 }
 
-CkDDT_HIndexed_Block::~CkDDT_HIndexed_Block()
+CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(const CkDDT_HIndexed_Block& obj)
 {
-  delete [] arrayDisplacements;
+  this->datatype = obj.datatype;
+  this->count = obj.count;
+  this->BlockLength = obj.BlockLength;
+  this->arrayDisplacements = obj.arrayDisplacements;
+  this->baseIndex = obj.baseIndex;
+  this->baseType =  obj.baseType;	// deep copy problem?
+  this->baseSize = obj.baseSize;
+  this->baseExtent = obj.baseExtent;
+  this->numElements = obj.numElements;
+  this->size = obj.size;
+  this->extent = obj.extent;
+  this->ub = obj.ub;
+  this->lb = obj.lb;
+  this->iscontig = obj.iscontig;
+  this->trueLB = obj.trueLB;
+  this->trueExtent = obj.trueExtent;
 }
+
+CkDDT_HIndexed_Block::~CkDDT_HIndexed_Block()
+{}
 
 size_t
 CkDDT_HIndexed_Block::serialize(char *userdata, char *buffer, int num, int dir) const
@@ -1435,9 +1770,7 @@ CkDDT_HIndexed_Block::pupType(PUP::er &p, CkDDT *ddt)
   p(iscontig);
   p(numElements);
   p(BlockLength);
-
-  if(p.isUnpacking() )  arrayDisplacements = new CkDDT_Aint[count] ;
-  p(arrayDisplacements, count);
+  p|arrayDisplacements;
 
   if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
 }
@@ -1464,12 +1797,31 @@ CkDDT_HIndexed_Block::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[
   return 0;
 }
 
-CkDDT_Struct::CkDDT_Struct(int nCount, int* arrBlock,
-                       CkDDT_Aint* arrDisp, int *bindex, CkDDT_DataType** arrBase)
+void
+CkDDT_HIndexed_Block::setStructBase(int currIndex, std::vector<CkDDT_DataType*> &newTypes)
+{
+  CmiAbort("CkDDT: Invalid call to setStructBase for type HIndexed Block\n");
+}
+
+std::vector<int>
+CkDDT_HIndexed_Block::getIndices(void)
+{
+  CmiAbort("CkDDT: Invalid call to getIndices for type HIndexed_Block\n");
+  return vector<int>();
+}
+
+void
+CkDDT_HIndexed_Block::setIndices(std::vector<int> &indices)
+{
+  CmiAbort("CkDDT: Invalid call to setIndices for type HIndexed_Block\n");
+}
+
+CkDDT_Struct::CkDDT_Struct(int nCount, const int* arrBlock,
+                       const CkDDT_Aint* arrDisp, const int *bindex, CkDDT_DataType** arrBase)
     : CkDDT_DataType(CkDDT_STRUCT, 0, 0, nCount, numeric_limits<CkDDT_Aint>::max(),
     numeric_limits<CkDDT_Aint>::min(), 0, 0, 0, NULL, 0, 0, 0, 0),
-    arrayBlockLength(new int[nCount]), arrayDisplacements(new CkDDT_Aint[nCount]),
-    index(new int[nCount]), arrayDataType(new CkDDT_DataType*[nCount])
+    arrayBlockLength(nCount), arrayDisplacements(nCount),
+    index(nCount), arrayDataType(nCount)
 {
   int saveExtent = 0;
   for (int i=0; i<count; i++) {
@@ -1542,6 +1894,28 @@ CkDDT_Struct::CkDDT_Struct(int nCount, int* arrBlock,
   DDTDEBUG("type %d: ub=%ld, lb=%ld, extent=%ld, size=%d, iscontig=%d\n",datatype,ub,lb,extent,size,iscontig);
 }
 
+CkDDT_Struct::CkDDT_Struct(const CkDDT_Struct& obj)
+{
+  this->datatype = obj.datatype;
+  this->count = obj.count;
+  this->arrayBlockLength = obj.arrayBlockLength;
+  this->arrayDisplacements = obj.arrayDisplacements;
+  this->index = obj.index;
+  this->arrayDataType = obj.arrayDataType;	// deep copy problem?
+  this->baseIndex = obj.baseIndex;
+  this->baseType =  obj.baseType;	        // deep copy problem?
+  this->baseSize = obj.baseSize;
+  this->baseExtent = obj.baseExtent;
+  this->numElements = obj.numElements;
+  this->size = obj.size;
+  this->extent = obj.extent;
+  this->ub = obj.ub;
+  this->lb = obj.lb;
+  this->iscontig = obj.iscontig;
+  this->trueLB = obj.trueLB;
+  this->trueExtent = obj.trueExtent;
+}
+
 size_t
 CkDDT_Struct::serialize(char* userdata, char* buffer, int num, int dir) const
 {
@@ -1597,20 +1971,16 @@ CkDDT_Struct::pupType(PUP::er &p, CkDDT* ddt)
   p(trueLB);
   p(iscontig);
   p(numElements);
-  if(p.isUnpacking())
-  {
-    arrayBlockLength = new int[count] ;
-    arrayDisplacements = new CkDDT_Aint[count] ;
-    index = new int[count] ;
-    arrayDataType = new CkDDT_DataType*[count] ;
-  }
-  p(arrayBlockLength, count);
-  p(arrayDisplacements, count);
-  p(index, count);
+  p|arrayBlockLength;
+  p|arrayDisplacements;
+  p|index;
 
   if(p.isUnpacking())
+  {
+    arrayDataType.resize(count);
     for(int i=0 ; i < count; i++)
       arrayDataType[i] = ddt->getType(index[i]);
+  }
 }
 
 int
@@ -1635,3 +2005,27 @@ CkDDT_Struct::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d
   return 0;
 }
 
+void
+CkDDT_Struct::setStructBase(int currIndex, std::vector<CkDDT_DataType*> &newTypes)
+{
+  for (int i=0; i<newTypes.size(); i++)
+  {
+    if (this->index[i] > CkDDT_MAX_PRIMITIVE_TYPE)
+    {
+      this->index[i] += (currIndex+holdStartOffset);
+    }
+    this->arrayDataType[i] = newTypes[i];
+  }
+}
+
+std::vector<int>
+CkDDT_Struct::getIndices(void)
+{
+  return this->index;
+}
+
+void
+CkDDT_Struct::setIndices(std::vector<int> &indices)
+{
+  this->index = indices;
+}
