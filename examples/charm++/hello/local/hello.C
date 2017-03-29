@@ -52,8 +52,6 @@ public:
     CkPrintf("Hello %d created\n",thisIndex);
   }
 
-  Hello(CkMigrateMessage *m) {}
-  
   void SayHi(int hiNo)
   {
     int groupValue;

@@ -46,8 +46,6 @@ public:
     CkPrintf("Hello %d created\n",thisIndex);
   }
 
-  Hello(CkMigrateMessage *m) {}
-  
   void SayHi(int hiNo)
   {
     typedef char *(*sayHiFn)(int hiNo);

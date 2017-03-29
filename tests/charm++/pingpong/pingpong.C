@@ -99,7 +99,6 @@ class main : public CBase_main
   CProxy_PingMarshall arrM;
   bool warmupRun; 
 public:
-  main(CkMigrateMessage *m) {}
   main(CkArgMsg* m)
   {
     if(CkNumPes()>2) {
@@ -244,7 +243,6 @@ public:
     // uses a character buffer
     rdmaMsg = new char[payload];
   }
-  PingG(CkMigrateMessage *m) {}
   void start(bool reportTime, bool isPipelined, bool copy, bool allocate, int fragSize)
   {
     niter = 0;
@@ -486,7 +484,6 @@ public:
     thisProxy[nbr].recvHandle((char*) &rhandle,sizeof(struct infiDirectUserHandle));
 #endif
   }
-  PingN(CkMigrateMessage *m) {}
   void recvHandle(char *ptr,int size)
   {
 
@@ -623,7 +620,6 @@ public:
     rdmaMsg = new char[payload];
     niter = 0;
   }
-  Ping1(CkMigrateMessage *m) {}
   void start(bool reportTime)
   {
     niter = 0;
@@ -710,7 +706,6 @@ public:
     pp = new CProxy_Ping2(thisArrayID);
     niter = 0;
   }
-  Ping2(CkMigrateMessage *m) {}
   void start(bool reportTime)
   {
     niter = 0;
@@ -750,7 +745,6 @@ public:
     pp = new CProxy_Ping3(thisArrayID);
     niter = 0;
   }
-  Ping3(CkMigrateMessage *m) {}
   void start(bool reportTime)
   {
     niter = 0;
@@ -792,7 +786,6 @@ public:
     niter = 0;
     first = thisIndex.equals("first") ? 1 : 0;
   }
-  PingF(CkMigrateMessage *m) {}
   void start(bool reportTime)
   {
     niter = 0;
@@ -851,7 +844,6 @@ class PingC : public CBase_PingC
     // Allocate on the other chare
     rdmaMsg = new char[payload];
   }
-  PingC(CkMigrateMessage *m) {}
   void start(bool reportTime)
   {
     niter = 0;
@@ -973,7 +965,6 @@ public:
     data = new unsigned char[payload];
     memset(data, 0, payload);
   }
-  PingMarshall(CkMigrateMessage *m) {}
   void start(bool reportTime)
   {
     niter = 0;

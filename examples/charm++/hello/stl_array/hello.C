@@ -56,8 +56,6 @@ public:
     CkPrintf("Hello %d created\n",thisIndex);
   }
 
-  Hello(CkMigrateMessage *m) {}
-  
   void SayHi(int hiNo,const foo &f)
   {
     int i=0;

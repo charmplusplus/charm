@@ -45,8 +45,6 @@ public:
     CkPrintf("Hello %d created\n",thisIndex.y);
   }
 
-  Hello(CkMigrateMessage *m) {}
-  
   void SayHi(int hiNo)
   {
     CkPrintf("Hi[%d] from element (%d,%d,%d)\n",hiNo,

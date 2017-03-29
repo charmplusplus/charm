@@ -47,8 +47,6 @@ public:
     CkPrintf("[%d] Hello %d created\n", CkMyPe(), thisIndex);
   }
 
-  Hello(CkMigrateMessage *m) {}
-  
   void SayHi(int hiNo)
   {
     for (int i = 0; i < 3; ++i)

@@ -71,8 +71,6 @@ public:
     //CkPrintf("Hello %d created\n",thisIndex);
   }
 
-  Hello(CkMigrateMessage *m) {}
-  
   void SayHi(dataMsg *dm)
   {
     //CkPrintf("Hi[%d] from element \n",thisIndex);
