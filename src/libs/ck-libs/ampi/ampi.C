@@ -3767,8 +3767,9 @@ int AMPI_Barrier(MPI_Comm comm)
 
   if(comm==MPI_COMM_SELF)
     return MPI_SUCCESS;
-  if(getAmpiParent()->isInter(comm))
-    CkAbort("AMPI does not implement MPI_Barrier for Inter-communicators!");
+
+  // implementation of intercomm barrier is equivalent to that for intracomm barrier
+  // thus a condition to check and handle intercomms is not needed
 
 #if CMK_BIGSIM_CHARM
   TRACE_BG_AMPI_LOG(MPI_BARRIER, 0);
@@ -3788,7 +3789,7 @@ void ampi::ibarrier(MPI_Request *request)
   contribute(ibarrierCB);
 
   // use an IReq to non-block the caller and get a request ptr
-  *request = postReq(new IReq(NULL, 0, MPI_INT, AMPI_COLL_SOURCE, MPI_ATA_TAG, AMPI_COLL_COMM));
+  *request = postReq(new IReq(NULL, 0, MPI_INT, AMPI_COLL_SOURCE, MPI_ATA_TAG, myComm.getComm()));
 }
 
 void ampi::ibarrierResult(void)
@@ -3817,8 +3818,9 @@ int AMPI_Ibarrier(MPI_Comm comm, MPI_Request *request)
                             AMPI_REQ_COMPLETED));
     return MPI_SUCCESS;
   }
-  if(getAmpiParent()->isInter(comm))
-    CkAbort("AMPI does not implement MPI_Ibarrier for Inter-communicators!");
+
+  // implementation of intercomm ibarrier is equivalent to that for intracomm ibarrier
+  // thus a condition to check and handle intercomms is not needed
 
 #if CMK_BIGSIM_CHARM
   TRACE_BG_AMPI_LOG(MPI_BARRIER, 0);
