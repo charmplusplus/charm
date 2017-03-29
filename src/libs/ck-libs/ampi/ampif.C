@@ -275,7 +275,7 @@ FDECL {
 #define ampi_load_set_value FTN_NAME( AMPI_SET_LOAD_VALUE, ampi_load_set_value )
 #define ampi_evacuate FTN_NAME ( AMPI_EVACUATE , ampi_evacuate )
 #define ampi_migrate_to_pe FTN_NAME( AMPI_MIGRATE_TO_PE , ampi_migrate_to_pe )
-#define ampi_comm_set_migratable FTN_NAME ( AMPI_COMM_SET_MIGRATABLE , ampi_comm_set_migratable )
+#define ampi_set_migratable FTN_NAME ( AMPI_SET_MIGRATABLE , ampi_set_migratable )
 #define ampi_init_universe FTN_NAME( AMPI_INIT_UNIVERSE , ampi_init_universe )
 #define ampi_register_main FTN_NAME( AMPI_REGISTER_MAIN , ampi_register_main )
 #define ampi_register_pup FTN_NAME( AMPI_REGISTER_PUP , ampi_register_pup )
