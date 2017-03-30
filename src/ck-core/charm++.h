@@ -1096,7 +1096,6 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #include "ckarray.h"
 #include "ckstream.h"
 #include "ckfutures.h"
-#include "tempo.h"
 #include "waitqd.h"
 #include "sdag.h"
 #include "ckcheckpoint.h"

@@ -1262,7 +1262,6 @@ void _initCharm(int unused_argc, char **argv)
 		_registerLBDatabase();
     _registerMetaBalancer();
 		_registerCkCallback();
-		_registertempo();
 		_registerwaitqd();
 		_registerCkCheckpoint();
                 _registerCkMulticast();

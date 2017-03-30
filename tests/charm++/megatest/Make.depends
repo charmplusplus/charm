@@ -96,13 +96,6 @@ arrayring.o: \
 	megatest.h \
 	arrayring.def.h
 	$(CHARMC) -o arrayring.o arrayring.C
-tempotest.o: \
-	tempotest.C \
-	tempotest.h \
-	megatest.h \
-	tempotest.decl.h \
-	tempotest.def.h
-	$(CHARMC) -o tempotest.o tempotest.C
 packtest.o: \
 	packtest.C \
 	packtest.h \

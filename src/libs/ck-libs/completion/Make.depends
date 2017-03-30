@@ -39,8 +39,7 @@ completion.o: completion.C completion.h completion.decl.h \
   ../../../../tmp/MetaBalancer.decl.h ../../../../tmp/CkLocation.decl.h \
   ../../../../tmp/cklocrec.h ../../../../tmp/ckmigratable.h \
   ../../../../tmp/CkArray.decl.h ../../../../tmp/ckfutures.h \
-  ../../../../tmp/CkFutures.decl.h ../../../../tmp/tempo.h \
-  ../../../../tmp/tempo.decl.h ../../../../tmp/waitqd.h \
+  ../../../../tmp/CkFutures.decl.h ../../../../tmp/waitqd.h \
   ../../../../tmp/waitqd.decl.h ../../../../tmp/ckcheckpoint.h \
   ../../../../tmp/ckcallback.h ../../../../tmp/ckevacuation.h \
   ../../../../tmp/trace.h \

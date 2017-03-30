@@ -43,7 +43,6 @@ tcharm.o: tcharm.C tcharm_impl.h ../../../../include/pup.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \
@@ -97,7 +96,6 @@ tcharmmain.o: tcharmmain.C tcharm_impl.h ../../../../include/pup.h \
   ../../../../include/CkLocation.decl.h ../../../../include/cklocrec.h \
   ../../../../include/ckmigratable.h ../../../../include/CkArray.decl.h \
   ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
-  ../../../../include/tempo.h ../../../../include/tempo.decl.h \
   ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
   ../../../../include/ckcheckpoint.h ../../../../include/ckcallback.h \
   ../../../../include/ckevacuation.h \

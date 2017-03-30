@@ -18,7 +18,6 @@ OBJS=megatest.o \
      synctest.o \
      fib.o \
      arrayring.o \
-     tempotest.o \
      packtest.o \
      queens.o \
      migration.o \
@@ -55,7 +54,6 @@ OBJS_REV=megatest.o \
      migration.o \
      queens.o \
      packtest.o \
-     tempotest.o \
      arrayring.o \
      fib.o \
      synctest.o \
@@ -76,7 +74,7 @@ CIFILES =  \
       arrayring.def.h  immediatering.def.h  nodering.def.h   rotest.def.h  \
       bitvector.def.h  inherit.def.h        packtest.def.h   synctest.def.h  \
       callback.def.h   marshall.def.h       priomsg.def.h    templates.def.h \
-      fib.def.h        megatest.def.h       priotest.def.h   tempotest.def.h  \
+      fib.def.h        megatest.def.h       priotest.def.h   \
       groupcast.def.h  migration.def.h      queens.def.h     varraystest.def.h\
       groupring.def.h  nodecast.def.h       reduction.def.h  varsizetest.def.h\
       groupsectiontest.def.h multisectiontest.def.h inlineem.def.h varsizetest2.def.h\

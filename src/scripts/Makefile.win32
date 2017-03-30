@@ -57,7 +57,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h trace.h conv-ccs.h \
       HeapCentLB.decl.h NborBaseLB.decl.h NeighborLB.decl.h \
       WSLB.decl.h GridCommLB.decl.h GridCommRefineLB.decl.h GridMetisLB.decl.h \
       GridHybridLB.decl.h GridHybridSeedLB.decl.h GreedyRefLB.decl.h RandRefLB.decl.h \
-      tempo.decl.h waitqd.decl.h \
+      waitqd.decl.h \
 	  CommLB.decl.h Comm1LB.decl.h  \
 	  ampi.decl.h ampimain.decl.h BlueGene.decl.h blue.h
 
@@ -68,7 +68,7 @@ UTILHEADERS=pup.h pup_c.h ckhashtable.h cklists.h conv-lists.h \
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h ckarray.h ckreduction.h readonly.h $(UTILHEADERS) \
-	  tempo.h waitqd.h LBDatabase.h lbdb.h \
+	  waitqd.h LBDatabase.h lbdb.h \
 	  LBDBManager.h LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	  Refiner.h ObjGraph.h heap.h elements.h CommLBHeap.h \
 	  CentralLB.h RandCentLB.h RecBisectBfLB.h \
@@ -296,7 +296,7 @@ CK_LIBS_CORE=$(LIBS_DIR)\libck.a
 
 LIBCK_CORE=init.obj register.obj qd.obj ck.obj main.obj msgalloc.obj ckfutures.obj \
            ckarray.obj ckreduction.obj \
-           tempo.obj waitqd.obj LBDatabase.obj lbdb.obj \
+           waitqd.obj LBDatabase.obj lbdb.obj \
 	   LBDBManager.obj LBComm.obj LBObj.obj LBMachineUtil.obj Refiner.obj \
 	   ObjGraph.obj \
 	   CentralLB.obj RandCentLB.obj \
@@ -345,9 +345,6 @@ ampimain.decl.h ampimain.def.h : ampimain.ci $(CHARMXI)
 
 CkFutures.decl.h CkFutures.def.h : ckfutures.ci $(CHARMXI)
 	$(CHARMXI) -ansi ckfutures.ci                      
-
-tempo.decl.h tempo.def.h : tempo.ci $(CHARMXI)
-	$(CHARMXI) -ansi tempo.ci                         
 
 waitqd.decl.h waitqd.def.h : waitqd.ci $(CHARMXI)
 	$(CHARMXI) -ansi waitqd.ci     
@@ -429,9 +426,6 @@ register.obj: register.C $(CKHEADERS)
 
 ckfutures.obj: ckfutures.C $(CKHEADERS)
 	$(CPP) $(CPP_PROJ) /TP ckfutures.C
-
-tempo.obj: tempo.C $(CKHEADERS)
-	$(CPP) $(CPP_PROJ) /TP tempo.C
 
 waitqd.obj: waitqd.C $(CKHEADERS)
 	$(CPP) $(CPP_PROJ) /TP waitqd.C

@@ -13,13 +13,13 @@ LINK_OTHER = libldb-rand.o libck.a libconv-core.a \
 	libtrace-none.a libconv-cplus-y.a ws2_32.lib kernel32.lib 
 
 
-OBJS = megatest.obj groupring.obj nodering.obj varsizetest.obj  groupcast.obj nodecast.obj synctest.obj fib.obj arrayring.obj tempotest.obj packtest.obj queens.obj migration.obj priomsg.obj priotest.obj templates.obj varraystest.obj
+OBJS = megatest.obj groupring.obj nodering.obj varsizetest.obj  groupcast.obj nodecast.obj synctest.obj fib.obj arrayring.obj packtest.obj queens.obj migration.obj priomsg.obj priotest.obj templates.obj varraystest.obj
 
-MODULES = megatest groupring nodering varsizetest groupcast nodecast synctest fib arrayring tempotest packtest queens migration priomsg priotest templates varraystest
+MODULES = megatest groupring nodering varsizetest groupcast nodecast synctest fib arrayring packtest queens migration priomsg priotest templates varraystest
 
-DECLS = megatest.decl.h groupring.decl.h nodering.decl.h varsizetest.decl.h  groupcast.decl.h nodecast.decl.h synctest.decl.h fib.decl.h arrayring.decl.h tempotest.decl.h packtest.decl.h queens.decl.h migration.decl.h priomsg.decl.h priotest.decl.h templates.decl.h varraystest.decl.h
+DECLS = megatest.decl.h groupring.decl.h nodering.decl.h varsizetest.decl.h  groupcast.decl.h nodecast.decl.h synctest.decl.h fib.decl.h arrayring.decl.h packtest.decl.h queens.decl.h migration.decl.h priomsg.decl.h priotest.decl.h templates.decl.h varraystest.decl.h
 
-DEFS  = megatest.def.h groupring.def.h nodering.def.h varsizetest.def.h  groupcast.def.h nodecast.def.h synctest.def.h fib.def.h arrayring.def.h tempotest.def.h packtest.def.h queens.def.h migration.def.h priomsg.def.h priotest.def.h templates.def.h varraystest.def.h
+DEFS  = megatest.def.h groupring.def.h nodering.def.h varsizetest.def.h  groupcast.def.h nodecast.def.h synctest.def.h fib.def.h arrayring.def.h packtest.def.h queens.def.h migration.def.h priomsg.def.h priotest.def.h templates.def.h varraystest.def.h
 
 #.SILENT:
 
@@ -32,7 +32,7 @@ pgm: $(OBJS)
 
 megatest.h: megatest.decl.h
 
-megatest.C: megatest.h megatest.def.h groupring.h nodering.h varsizetest.h groupcast.h nodecast.h synctest.h fib.h arrayring.h tempotest.h packtest.h queens.h migration.h priomsg.h priotest.h templates.h varraystest.h
+megatest.C: megatest.h megatest.def.h groupring.h nodering.h varsizetest.h groupcast.h nodecast.h synctest.h fib.h arrayring.h packtest.h queens.h migration.h priomsg.h priotest.h templates.h varraystest.h
 
 groupring.h: groupring.decl.h
 
@@ -65,10 +65,6 @@ fib.C: fib.h fib.def.h megatest.h
 arrayring.h: arrayring.decl.h
 
 arrayring.C: arrayring.h arrayring.def.h megatest.h
-
-tempotest.h: tempotest.decl.h
-
-tempotest.C: tempotest.h tempotest.def.h megatest.h
 
 packtest.h: packtest.decl.h
 
