@@ -105,6 +105,8 @@ public:
     //CkPrintf("Hello %d %d %d %d created\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z);
   }
 
+  Hello(CkMigrateMessage *m) {}
+  
   void SayHi(int hiNo)
   {
     char *name=(char *)malloc(sizeof(char)*1000);

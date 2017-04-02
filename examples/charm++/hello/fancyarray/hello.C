@@ -91,6 +91,8 @@ public:
 	thisIndex.getA(),thisIndex.getB(),CkMyPe());
   }
 
+  Hello(CkMigrateMessage *m) {}
+  
   void SayHi(int hiNo)
   {
     CkPrintf("Hi[%d] from element %d\n",hiNo,thisIndex.cardinality());

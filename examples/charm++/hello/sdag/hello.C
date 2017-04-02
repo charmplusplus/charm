@@ -49,6 +49,7 @@ public:
     sum=0;
     CkPrintf("Hello %d created\n",thisIndex);
   }
+  Hello(CkMigrateMessage *m) {}
 };
 
 #include "hello.def.h"

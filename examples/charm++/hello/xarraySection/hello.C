@@ -115,6 +115,8 @@ public:
     mcastMgr = CProxy_CkMulticastMgr(mcastMgrGID).ckLocalBranch();
   }
 
+  Hello(CkMigrateMessage *m) {}
+
   void mcastPing(pingMsg *msg)
   {
     // Say hello world
