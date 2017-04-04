@@ -4,19 +4,19 @@ DIRS= loadlog buildlog
 
 all:
 	for d in $(DIRS); do \
-		(cd $$d; $(MAKE) all OPTS='$(OPTS)' || exit 1) || exit 1; \
+		($(MAKE) -C $$d all OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
 ifeq "$(TEST_TOOLS)" ""
 test:
 	for d in $(DIRS); do \
-		(cd $$d; $(MAKE) test OPTS='$(OPTS)' || exit 1) || exit 1; \
+		($(MAKE) -C $$d test OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 else
 test:
 endif
 
 clean:
-	for d in $(DIRS); do (cd $$d; $(MAKE) clean OPTS='$(OPTS)'); done
+	for d in $(DIRS); do ($(MAKE) -C $$d clean OPTS='$(OPTS)'); done
 	rm -f TAGS #*#
 	rm -f core *~
