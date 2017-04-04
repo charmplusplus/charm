@@ -6,7 +6,7 @@ PGCC=`CC -V 2>/dev/null | grep pgCC`
 CMK_INC="-I/opt/cray/mpt/5.2.0/xt/gemini/sma/include/"
 CMK_LD_PATH="-L/opt/cray/mpt/5.2.0/xt/gemini/sma/lib64/"
 
-CMK_CPP_CHARM="/lib/cpp -P"
+CMK_CPP_CHARM="cpp -P"
 CMK_CPP_C="cc -E $CMK_DEFS $CMK_INC"
 CMK_CXXPP="CC -E $CMK_DEFS $CMK_INC"
 CMK_CC="cc $CMK_DEFS $CMK_INC"

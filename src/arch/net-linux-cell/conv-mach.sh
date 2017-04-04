@@ -1,7 +1,7 @@
 #CELL_SDK_DIR="/opt/IBM/cell-sdk-1.1"
 #CELL_SDK_DIR="/opt/ibm/cell-sdk/prototype"
 
-CMK_CPP_CHARM='/usr/lib/cpp'
+CMK_CPP_CHARM='cpp'
 CMK_CPP_C='ppu32-gcc -E'
 CMK_CXXPP='ppu32-g++ -E'
 #CMK_CC="ppu32-gcc -fPIC -w -I$CELL_SDK_DIR/sysroot/usr/include -L$CELL_SDK_DIR/sysroot/usr/lib"

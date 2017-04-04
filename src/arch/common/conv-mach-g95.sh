@@ -14,7 +14,7 @@ CMK_F90FLAGS="$CMK_F90FLAGS -fno-common"
 fi
 
 CMK_CF90=`which g95 2>/dev/null`
-CMK_FPP="/lib/cpp -P -CC"
+CMK_FPP="cpp -P -CC"
 CMK_CF90="$CMK_CF90 $CMK_F90FLAGS -fPIC -fno-second-underscore -fdollar-ok"
 CMK_CF90_FIXED="$CMK_CF90 -ffixed-form "
 # find f90 library:

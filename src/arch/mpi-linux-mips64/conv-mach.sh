@@ -1,7 +1,7 @@
 CMK_INCDIR='/sicortex/software/gentoo/buildroot/default/usr/include'
 CMK_LIBDIR='-L/sicortex/software/gentoo/buildroot/default/lib64 -L/sicortex/software/gentoo/buildroot/default/usr/lib64'
 
-CMK_CPP_CHARM='/lib/cpp -P'
+CMK_CPP_CHARM='cpp -P'
 CMK_CPP_C='mpicc -G0 -E '
 CMK_CC='mpicc -G0 -mips64 -march=5kf -mtune=5kf '
 CMK_CXX='mpicxx -G0 -mips64 -march=5kf -mtune=5kf '

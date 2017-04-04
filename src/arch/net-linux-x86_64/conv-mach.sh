@@ -2,7 +2,7 @@
 CMK_AMD64="-m64"
 
 CMK_PIC="-fPIC"
-CMK_CPP_CHARM="/lib/cpp -P"
+CMK_CPP_CHARM="cpp -P"
 CMK_CPP_C="gcc -E $CMK_AMD64 "
 CMK_CC="gcc $CMK_AMD64 "
 CMK_CXX="g++ $CMK_AMD64 "
@@ -34,7 +34,7 @@ CMK_QT='generic64-light'
 CMK_CF90=`which f95 2>/dev/null`
 if test -n "$CMK_CF90"
 then
-#    CMK_FPP="/lib/cpp -P -CC"
+#    CMK_FPP="cpp -P -CC"
 #    CMK_CF90="$CMK_CF90 -fpic -fautomatic -fdollar-ok "
 #    CMK_CF90_FIXED="$CMK_CF90 -ffixed-form "
 #    CMK_F90LIBS="-lgfortran "

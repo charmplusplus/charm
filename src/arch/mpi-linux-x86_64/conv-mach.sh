@@ -28,7 +28,7 @@ pgCC)  CMK_AMD64_CC="-fPIC"; CMK_AMD64_CXX="-fPIC -DCMK_FIND_FIRST_OF_PREDICATE=
 charmc)  echo "Error> charmc can not call AMPI's mpicxx/mpiCC wrapper! Please fix your PATH."; exit 1 ;;
 esac
 
-CMK_CPP_CHARM="/lib/cpp -P"
+CMK_CPP_CHARM="cpp -P"
 CMK_CPP_C="$MPICC -E"
 CMK_CC="$MPICC $CMK_AMD64_CC "
 CMK_CXX="$MPICXX $CMK_AMD64_CXX "
@@ -48,7 +48,7 @@ CMK_NATIVE_LIBS=""
 CMK_CF90=`which f95 2>/dev/null`
 if test -n "$CMK_CF90"
 then
-#    CMK_FPP="/lib/cpp -P -CC"
+#    CMK_FPP="cpp -P -CC"
 #    CMK_CF90="$CMK_CF90 -fpic -fautomatic -fdollar-ok "
 #    CMK_CF90_FIXED="$CMK_CF90 -ffixed-form "
 #    CMK_F90LIBS="-lgfortran "

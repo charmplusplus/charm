@@ -23,7 +23,7 @@ CMK_REAL_C_COMPILER=`$MPICC -show 2>/dev/null | cut -d' ' -f1 `
 
 
 
-CMK_CPP_CHARM="/lib/cpp -P"
+CMK_CPP_CHARM="cpp -P"
 CMK_CPP_C="$MPICC -E"
 CMK_CC="$MPICC $CMK_AMD64 "
 CMK_CXX="$MPICXX $CMK_AMD64 "

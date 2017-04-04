@@ -5,7 +5,7 @@ PAMI_LIB=/opt/ibmhpc/pecurrent/ppe.pami/gnu/lib64/pami64
 CXX=xlC_r
 CC=xlc_r
 
-CMK_CPP_CHARM='/lib/cpp -P'
+CMK_CPP_CHARM='cpp -P'
 CMK_CPP_C="$CC -E"
 CMK_CC="$CC "
 CMK_CXX="$CXX "

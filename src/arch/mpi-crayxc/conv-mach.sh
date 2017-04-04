@@ -38,7 +38,7 @@ ICPC=`CC -V 2>&1 | grep Intel`
 GNU=`CC -V 2>&1 | grep 'g++'`
 CCE=`CC -V 2>&1 | grep 'Cray'`
 
-CMK_CPP_CHARM="/lib/cpp -P"
+CMK_CPP_CHARM="cpp -P"
 CMK_CPP_C="cc -E"
 CMK_CXXPP="CC -x c++ -E  "
 CMK_CC="cc "

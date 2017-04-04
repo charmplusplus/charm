@@ -1,4 +1,4 @@
-CMK_CPP_CHARM='/lib/cpp -P'
+CMK_CPP_CHARM='cpp -P'
 CMK_CPP_C='mpicc -E'
 CMK_CC='mpicc '
 CMK_CXX='mpicxx '

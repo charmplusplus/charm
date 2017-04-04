@@ -17,7 +17,7 @@ case "$CMK_REAL_COMPILER" in
 g++) CMK_AMD64="-fPIC" ;;
 esac
 
-CMK_CPP_CHARM="/lib/cpp -P"
+CMK_CPP_CHARM="cpp -P"
 CMK_CPP_C="$MPICC -E"
 CMK_CC="$MPICC $CMK_AMD64 "
 CMK_CXX="$MPICXX $CMK_AMD64 "
