@@ -140,9 +140,6 @@ time. For backwards compatibility, this option is also available as {\tt ++maxrs
 
 \item[{\tt ++nodelist}] File containing list of nodes.
 
-
-\item[{\tt ++ppn}]              Number of pes per node
-
 \item[{\tt ++help}]             Print help messages
 
 \item[{\tt ++runscript}]        Script to run node-program with. The specified run script is invoked with the node program and parameter. For example:
@@ -202,6 +199,8 @@ the same runtime options can be used for all flavors of Charm++ versions
 including network and MPI versions, smp and non-smp versions.
 
 \begin{description}
+
+\item[{\tt ++ppn}]                       Number of PEs (or worker threads) per logical node (OS process). This option should be specified even when using platform specific launchers (e.g., aprun, ibrun).
 
 \item[{\tt +setcpuaffinity}]             Set cpu affinity automatically for processes (when Charm++ is based on non-smp versions) or threads (when smp). This option is the default on platforms that support it.
 
