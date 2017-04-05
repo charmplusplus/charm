@@ -274,6 +274,11 @@ int getDestHandler;
 #endif
 #endif
 
+#if CMK_ONESIDED_IMPL
+#include "machine-rdma.h"
+#include "machine-onesided.h"
+#endif
+
 #if CMK_SHRINK_EXPAND
 extern void resumeAfterRealloc();
 extern char willContinue;
