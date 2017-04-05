@@ -432,6 +432,36 @@ created elements.
 A simple example of demand creation
 \testrefdir{demand\_creation}
 
+\subsection{Asynchronous Array Creation}
+\label{asynchronous_array_creation}
+
+Normally, \kw{CProxy\_Array::ckNew} call must always be made from PE 0. However, asynchronous
+array creation can be used to lift this restriction and let the array creation be made from any PE.
+To do this, \kw{CkCallback} must be given as an argument for \kw{ckNew} to provide the created
+chare array's \kw{CkArrayID} to the callback function.
+
+\begin{alltt}
+CProxy_SomeProxy::ckNew(\uw{parameters}, \uw{nElements}, CkCallback(CkIndex_MyClass::someFunction(NULL), thisProxy));
+
+void someFunction(CkArrayCreatedMsg *m) \{
+    CProxy_AnotherProxy(m->aid)[\uw{index}].myFunction();    // m->aid is \kw{CkArrayID}
+    delete m;
+\}
+\end{alltt}
+Similar to the standard array creation method, arguments to the array element constructor calls are
+taken first, followed by the dimensions of the array. Note that the \kw{parameters} field can be
+optional, if the default constructor is expected to be used.
+
+Alternatively, CkArrayOptions can be used in place of \kw{nElements} to further configure array characteristics.
+\begin{alltt}
+// Creating a 3-dimensional chare array with 2 parameters
+
+CkArrayOptions options(\uw{dimX}, \uw{dimY}, \uw{dimZ});
+CProxy_AnotherProxy::ckNew(\uw{param1}, \uw{param2}, options, CkCallback(CkIndex_SomeClass::anotherFunction(NULL), thisProxy));
+\end{alltt}
+
+A demonstration of asynchronous array creation can be found in \examplerefdir{hello/darray}
+
 \section{User-defined Array Indices}
 \label{user-defined array index type}
 \index{Array index type, user-defined}

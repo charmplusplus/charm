@@ -128,10 +128,12 @@ the chare array:
 \section{Creating an Array}
 \label{basic array creation}
 
-An array is created using the \kw{CProxy\_Array::ckNew} routine. This returns a
-proxy object, which can be kept, copied, or sent in messages. The following
-creates a 1D \index{array}array containing elements indexed (0, 1, \ldots,
-\uw{dimX}-1):
+An array is created using the \kw{CProxy\_Array::ckNew} routine, which must
+be called from PE 0. To create an array from any PE, asynchronous array creation
+using a callback can be used. See section~\ref{asynchronous_array_creation} for
+asynchronous array creation. \kw{CProxy\_Array::ckNew} returns a proxy object,
+which can be kept, copied, or sent in messages. The following creates a
+1D \index{array}array containing elements indexed (0, 1, \ldots, \uw{dimX}-1):
 %
 \begin{alltt}
 CProxy_ArrayA a1 = CProxy_ArrayA::ckNew(\uw{params}, dimX);
