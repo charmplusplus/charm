@@ -507,6 +507,8 @@ void mpi_waitall(int *count, int *request, int *status, int *ierr)
 void mpi_waitany(int *count, int *request, int *index, int *status, int *ierr)
 {
   *ierr = AMPI_Waitany(*count, (MPI_Request*) request, index, (MPI_Status*) status);
+  if (*index != MPI_UNDEFINED)
+    (*index)++;
 }
 
 void mpi_wait(int *request, int *status, int *ierr)
@@ -524,6 +526,11 @@ void mpi_waitsome(int *incount, int *array_of_requests, int *outcount, int *arra
 {
   *ierr = AMPI_Waitsome(*incount, (MPI_Request *)array_of_requests, outcount, array_of_indices,
                         (MPI_Status*) array_of_statuses);
+  if (*outcount != MPI_UNDEFINED) {
+    for (int i = 0; i < *outcount; ++i) {
+      array_of_indices[i]++;
+    }
+  }
 }
 
 void mpi_testsome(int *incount, int *array_of_requests, int *outcount, int *array_of_indices,
@@ -531,12 +538,19 @@ void mpi_testsome(int *incount, int *array_of_requests, int *outcount, int *arra
 {
   *ierr = AMPI_Testsome(*incount, (MPI_Request *)array_of_requests, outcount, array_of_indices,
                         (MPI_Status*) array_of_statuses);
+  if (*outcount != MPI_UNDEFINED) {
+    for (int i = 0; i < *outcount; ++i) {
+      array_of_indices[i]++;
+    }
+  }
 }
 
 void mpi_testany(int *count, int *request, int *index, int *flag, int *status, int *ierr)
 {
   *ierr = AMPI_Testany(*count, (MPI_Request*) request, index, flag,
                        (MPI_Status*) status);
+  if (*index != MPI_UNDEFINED)
+    (*index)++;
 }
 
 void mpi_test(int *request, int *flag, int *status, int *ierr)
