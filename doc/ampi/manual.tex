@@ -299,6 +299,21 @@ splitting a communicator into disjoint sets of ranks that share the same operati
 and \texttt{AMPI\_COMM\_TYPE\_WTH}, for splitting a communicator into disjoint sets
 of ranks that share the same worker thread.
 
+For parsing Fortran command line arguments, AMPI Fortran programs should use
+our extension APIs, which are similar to Fortran 2003's standard APIs. For example:
+
+\begin{alltt}
+integer :: i, argc, ierr
+integer, parameter :: arg_len = 128
+character(len=arg_len), dimension(:), allocatable :: raw_arguments
+
+call AMPI_Command_argument_count(argc)
+allocate(raw_arguments(argc))
+do i = 1, size(raw_arguments)
+    call AMPI_Get_command_argument(i, raw_arguments(i), arg_len, ierr)
+end do
+\end{alltt}
+
 \subsection{Name for Main Program}
 
 To convert an existing program to use AMPI, the main function or program
