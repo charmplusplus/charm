@@ -1989,6 +1989,10 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   }
 #endif
 
+#if CMK_SMP
+  Cmi_smp_mode_setting = COMM_THREAD_ONLY_RECV;
+#endif
+
   skt_init();
   /* use special abort handler instead of default_skt_abort to 
      prevent exit trapped by atexit_check() due to the exit() call  */
