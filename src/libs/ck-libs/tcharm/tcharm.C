@@ -62,7 +62,10 @@ public:
 };
 static TCharmTraceLibList tcharm_tracelibs;
 static bool tcharm_nomig=false, tcharm_nothreads=false;
-static int tcharm_stacksize=1*1024*1024; /*Default stack size is 1MB*/
+#ifndef TCHARM_STACKSIZE_DEFAULT
+#define TCHARM_STACKSIZE_DEFAULT 1048576 /*Default stack size is 1MB*/
+#endif
+static int tcharm_stacksize=TCHARM_STACKSIZE_DEFAULT;
 static bool tcharm_initted=false;
 CkpvDeclare(bool, mapCreated);
 static CkGroupID mapID;
