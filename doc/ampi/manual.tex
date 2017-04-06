@@ -1318,6 +1318,14 @@ linux and ethernet environment, with MPI-level error checking in AMPI turned off
 > build AMPI netlrts-linux-x86_64 --with-production --disable-ampi-error-checking
 \end{alltt}
 
+\ampi{} ranks are implemented as user-level threads with a stack size default of 1MB.
+If the default is not correct for your program, you can specify a different default
+stack size (in bytes) at build time:
+
+\begin{alltt}
+> build AMPI netlrts-linux-x86_64 --with-production -DTCHARM_STACKSIZE_DEFAULT=16777216
+\end{alltt}
+
 \section{Building and Running AMPI Programs}
 \subsection{Building}
 \charmpp{} provides a compiler called charmc in your charm/bin/ directory.
