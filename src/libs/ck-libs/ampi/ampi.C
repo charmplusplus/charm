@@ -2896,6 +2896,52 @@ int ampi::intercomm_iscatter(int root, void *sendbuf, int sendcount, MPI_Datatyp
   return MPI_SUCCESS;
 }
 
+int ampi::intercomm_scatterv(int root, void* sendbuf, int* sendcounts, int* displs,
+                             MPI_Datatype sendtype, void* recvbuf, int recvcount,
+                             MPI_Datatype recvtype, MPI_Comm intercomm)
+{
+  if (root == MPI_ROOT) {
+    int remote_size = getRemoteIndices().size();
+
+    CkDDT_DataType* dttype = getDDT()->getType(sendtype);
+    int itemsize = dttype->getSize();
+    for (int i = 0; i < remote_size; i++) {
+        send(MPI_SCATTER_TAG, getRank(intercomm), ((char*)sendbuf)+(itemsize*displs[i]),
+             sendcounts[i], sendtype, i, intercomm);
+    }
+  }
+
+  if (root != MPI_PROC_NULL && root != MPI_ROOT) { // remote group ranks
+    if (-1 == recv(MPI_SCATTER_TAG, root, recvbuf, recvcount, recvtype, intercomm))
+      CkAbort("AMPI> Error in intercomm MPI_Scatterv recv");
+  }
+
+  return MPI_SUCCESS;
+}
+
+int ampi::intercomm_iscatterv(int root, void* sendbuf, int* sendcounts, int* displs,
+                              MPI_Datatype sendtype, void* recvbuf, int recvcount,
+                              MPI_Datatype recvtype, MPI_Comm intercomm, MPI_Request* request)
+{
+  if (root == MPI_ROOT) {
+    int remote_size = getRemoteIndices().size();
+
+    CkDDT_DataType* dttype = getDDT()->getType(sendtype);
+    int itemsize = dttype->getSize();
+    for (int i = 0; i < remote_size; i++) {
+        send(MPI_SCATTER_TAG, getRank(intercomm), ((char*)sendbuf)+(itemsize*displs[i]),
+             sendcounts[i], sendtype, i, intercomm);
+    }
+  }
+
+  if (root != MPI_PROC_NULL && root != MPI_ROOT) { // remote group ranks
+    // call irecv to post an IReq and process any pending messages
+    irecv(recvbuf, recvcount, recvtype, root, MPI_SCATTER_TAG, intercomm, request);
+  }
+
+  return MPI_SUCCESS;
+}
+
 int MPI_comm_null_copy_fn(MPI_Comm comm, int keyval, void *extra_state,
                           void *attr_in, void *attr_out, int *flag){
   (*flag) = 0;
@@ -6314,10 +6360,13 @@ int AMPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype send
     return ret;
 #endif
 
+  ampi* ptr = getAmpiInstance(comm);
+
   if(comm==MPI_COMM_SELF)
     return copyDatatype(sendtype,sendcounts[0],recvtype,recvcount,sendbuf,recvbuf);
-  if(getAmpiParent()->isInter(comm))
-    CkAbort("AMPI does not implement MPI_Scatterv for Inter-communicators!");
+  if (getAmpiParent()->isInter(comm)) {
+    return ptr->intercomm_scatterv(root, sendbuf, sendcounts, displs, sendtype, recvbuf, recvcount, recvtype, comm);
+  }
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();
@@ -6328,7 +6377,6 @@ int AMPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype send
   }
 #endif
 
-  ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
   int i;
 
@@ -6381,15 +6429,16 @@ int AMPI_Iscatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sen
   }
 #endif
 
-  ampi *ptr = getAmpiInstance(comm);
+  ampi* ptr = getAmpiInstance(comm);
 
   if(comm==MPI_COMM_SELF){
     *request = ptr->postReq(new IReq(recvbuf,recvcount,recvtype,root,MPI_SCATTER_TAG,comm,
                             AMPI_REQ_COMPLETED));
     return copyDatatype(sendtype,sendcounts[0],recvtype,recvcount,sendbuf,recvbuf);
   }
-  if(getAmpiParent()->isInter(comm))
-    CkAbort("AMPI does not implement MPI_Iscatterv for Inter-communicators!");
+  if (getAmpiParent()->isInter(comm)) {
+    return ptr->intercomm_iscatterv(root, sendbuf, sendcounts, displs, sendtype, recvbuf, recvcount, recvtype, comm, request);
+  }
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();

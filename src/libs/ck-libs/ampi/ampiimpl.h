@@ -1732,6 +1732,12 @@ class ampi : public CBase_ampi {
   int intercomm_iscatter(int root, void *sendbuf, int sendcount, MPI_Datatype sendtype,
                          void *recvbuf, int recvcount, MPI_Datatype recvtype,
                          MPI_Comm intercomm, MPI_Request *request);
+  int intercomm_scatterv(int root, void* sendbuf, int* sendcounts, int* displs,
+                         MPI_Datatype sendtype, void* recvbuf, int recvcount,
+                         MPI_Datatype recvtype, MPI_Comm intercomm);
+  int intercomm_iscatterv(int root, void* sendbuf, int* sendcounts, int* displs,
+                          MPI_Datatype sendtype, void* recvbuf, int recvcount,
+                          MPI_Datatype recvtype, MPI_Comm intercomm, MPI_Request* request);
 
  private:
   bool AlltoallGetFlag;

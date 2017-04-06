@@ -254,6 +254,74 @@ void intercomm_scatter_test(MPI_Comm myFirstComm, int global_rank, int root, boo
   }
 }
 
+void intercomm_scatterv_test(MPI_Comm myFirstComm, int global_rank, int root, bool non_blocking) {
+  int local_rank, remote_size;
+  MPI_Comm_rank(myFirstComm, &local_rank);
+  // each remote rank receives its local_rank number of elements
+  int* recvbuf = (int*) malloc(local_rank * sizeof(int));
+  MPI_Comm_remote_size(myFirstComm, &remote_size);
+  MPI_Status sts;
+  MPI_Request req = MPI_REQUEST_NULL;
+
+  int sendbuf_size = 0;
+  int* send_counts = (int*) malloc(remote_size * sizeof(int));
+  int* displacements = (int*) malloc(remote_size * sizeof(int));
+  for (int i = 0; i < remote_size; i++) {
+    sendbuf_size += i;
+    send_counts[i] = i;
+    if (i == 0) {
+      displacements[i] = 0;
+    }
+    else {
+      displacements[i] = displacements[i-1] + send_counts[i-1];
+    }
+  }
+  int* sendbuf = (int*) malloc(sendbuf_size * sizeof(int));
+
+  if (global_rank == 0) { // root for scatterv
+    int idx = 0;
+    for (int i = 0; i < remote_size; i++) {
+      for (int j = 0; j < send_counts[i]; j++) {
+        sendbuf[idx] = i;
+        idx++;
+      }
+    }
+
+    if (non_blocking) {
+      MPI_Iscatterv(sendbuf, send_counts, displacements, MPI_INT, recvbuf, local_rank, MPI_INT, MPI_ROOT, myFirstComm, &req);
+      MPI_Wait(&req, &sts);
+    }
+    else {
+      MPI_Scatterv(sendbuf, send_counts, displacements, MPI_INT, recvbuf, local_rank, MPI_INT, MPI_ROOT, myFirstComm);
+    }
+  }
+  else if (global_rank%2 == 0) { // local group
+    if (non_blocking) {
+      MPI_Iscatterv(sendbuf, send_counts, displacements, MPI_INT, recvbuf, local_rank, MPI_INT, MPI_PROC_NULL, myFirstComm, &req);
+    }
+    else {
+      MPI_Scatterv(sendbuf, send_counts, displacements, MPI_INT, recvbuf, local_rank, MPI_INT, MPI_PROC_NULL, myFirstComm);
+    }
+  }
+  else if (global_rank%2 == 1) { // remote group
+    if (non_blocking) {
+      MPI_Iscatterv(sendbuf, send_counts, displacements, MPI_INT, recvbuf, local_rank, MPI_INT, root, myFirstComm, &req);
+      MPI_Wait(&req, &sts);
+    }
+    else {
+      MPI_Scatterv(sendbuf, send_counts, displacements, MPI_INT, recvbuf, local_rank, MPI_INT, root, myFirstComm);
+    }
+
+    // assert and print recvbuf here
+    for (int i = 0; i < local_rank; i++) {
+      assert(recvbuf[i] == local_rank);
+      if (verboseLevel > 10 && i == 0) printf("[%d]", local_rank);
+      if (verboseLevel > 10) printf(" %d", recvbuf[i]);
+    }
+    if (verboseLevel > 10 && local_rank > 0) printf("\n");
+  }
+}
+
 int main(int argc, char **argv) {
   int size, global_rank;
   MPI_Comm myComm;
@@ -280,6 +348,11 @@ int main(int argc, char **argv) {
   intercomm_scatter_test(myFirstComm, global_rank, root, false); /* Intercomm scatter test */
   intercomm_scatter_test(myFirstComm, global_rank, root, true); /* Intercomm iscatter test */
 
+  /* Intercommunicator scatterv collective tests */
+  if (global_rank == 0) printf("[0] Testing intercomm scatterv\n");
+  intercomm_scatterv_test(myFirstComm, global_rank, root, false); /* Intercomm scatterv test */
+  intercomm_scatterv_test(myFirstComm, global_rank, root, true); /* Intercomm iscatterv test */
+
 #if 0
   /* Intercommunicator barrier collective tests */
   if (global_rank == 0) printf("[0] Testing intercomm barrier\n");
@@ -295,7 +368,6 @@ int main(int argc, char **argv) {
   if (global_rank == 0) printf("[0] Testing intercomm gatherv\n");
   intercomm_gatherv_test(myFirstComm, global_rank, root, false); /* Intercomm gatherv test */
   intercomm_gatherv_test(myFirstComm, global_rank, root, true); /* Intercomm igatherv test */
-
 #endif
 
   MPI_Comm_free(&myComm);
