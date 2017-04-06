@@ -5,7 +5,7 @@ This file describes the most significant changes. For more detail, use
 What's new in Charm++ 6.8.0
 ================================================================================
 
-Over 400 bug fixes, improvements, and cleanups have been applied
+Over 600 bug fixes, improvements, and cleanups have been applied
 across the entire system. Major changes are described below:
 
 Charm++ Features
@@ -14,6 +14,10 @@ Charm++ Features
   automatically be aggregated and routed through the TRAM library by
   marking them with the [aggregate] attribute.
 
+- Calls to parameter-marshalled entry methods with large array
+  arguments can ask for asynchronous zero-copy send behavior with an
+  `rdma' tag in the parameter's declaration.
+
 - The runtime system now integrates an OpenMP runtime library so that
   code using OpenMP parallelism will dispatch work to idle worker
   threads within the Charm++ process.
@@ -21,6 +25,14 @@ Charm++ Features
 - Applications can ask the runtime system to perform automatic
   high-level end-of-run performance analysis by linking with the
   `-tracemode perfReport' option.
+
+- Added a new dynamic remapping/load-balancing strategy,
+  GreedyRefineLB, that offers high result quality and well bounded
+  execution time.
+
+- Improved and expanded topology-aware spanning tree generation
+  strategies, including support for runs on a torus with holes, such
+  as Blue Waters and other Cray XE/XK systems.
 
 - Charm++ programs can now define their own main() function, rather
   than using a generated implementation from a mainmodule/mainchare
@@ -79,6 +91,15 @@ Charm++ Features
 - Deprecated setReductionClient and CkSetReductionClient in favor of
   explicitly passing callbacks to contribute calls.
 
+- On C++ standard library implementations with support for
+  std::is_constructible (e.g. GCC libstdc++ >4.5), chare array
+  elements only need to define a constructor taking CkMigrateMessage*
+  if it will actually be migrated.
+
+- The PUP serialization framework gained support for some C++11
+  library classes, including unique_ptr and unordered_map, when the
+  underlying types have PUP operators.
+
 AMPI Features
 
 - More efficient implementations of message matching infrastructure, multiple
@@ -113,6 +134,8 @@ Platforms and Portability
 
 - Charm++ can now be built on Cray's CCE 8.5.4+.
 
+- Charm++ will now build without custom configuration on Arch Linux
+
 - Charmrun can automatically detect rank and node count from
   Slurm/srun environment variables.
 
@@ -126,6 +149,7 @@ Platforms and Portability
   * Cygwin for Windows
   * Older IBM AIX/POWER configurations
   * GCC 3 and KAI compilers
+  * Sun/Oracle Solaris
 
 ================================================================================
 What's new in Charm++ 6.7.1
