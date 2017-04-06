@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <limits.h>
 
 #include "converse.h"
 #include "ckhashtable.h"
@@ -666,7 +667,7 @@ extern "C" void CcsBuiltinsInit(char **argv)
 
 #endif /*CMK_CCS_AVAILABLE*/
 
-void PUP_fmt::fieldHeader(typeCode_t typeCode,size_t nItems) {
+void PUP_fmt::fieldHeader(typeCode_t typeCode,int nItems) {
     // Compute and write intro byte:
     lengthLen_t ll;
     if (nItems==1) ll=lengthLen_single;
@@ -698,6 +699,8 @@ void PUP_fmt::synchronize(unsigned int m) {
 	p(m);
 }
 void PUP_fmt::bytes(void *ptr,size_t n,size_t itemSize,PUP::dataType t) {
+	if(itemSize > INT_MAX || n > INT_MAX || itemSize*n > INT_MAX)
+		CmiAbort("Ccs does not support messages greater than INT_MAX...\n");
 	switch(t) {
 	case PUP::Tchar:
 	case PUP::Tuchar:

@@ -27,7 +27,7 @@ class PUP_fmt : public PUP::wrap_er {
         typeCode_sync=11, // synchronization code
         typeCode_pointer=12 // 32 or 64 bit pointer, depending on the machine architecture
     } typeCode_t;
-    void fieldHeader(typeCode_t typeCode,size_t nItems);
+    void fieldHeader(typeCode_t typeCode,int nItems);
 public:
     PUP_fmt(PUP::er &parent_) 
         :PUP::wrap_er(parent_,PUP::er::IS_COMMENTS) {}
