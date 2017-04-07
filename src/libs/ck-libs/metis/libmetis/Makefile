@@ -18,7 +18,7 @@ OBJS = auxapi.o balance.o bucketsort.o checkgraph.o \
 .o:
 	$(CC) -c $*.c
 
-DEST=$(LIBDIR)/libmetis.a
+DEST=$(LIBDIR)/libckmetis.a
 
 GKlib = ../GKlib/*.o
 
