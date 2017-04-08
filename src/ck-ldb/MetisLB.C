@@ -102,7 +102,7 @@ void MetisLB::work(LDStats* stats)
   idx_t ncon = 1;
   // number of partitions
   idx_t numPes = parr->procs.size();
-  real_t ubvec[ncon];
+  real_t* ubvec = new real_t[ncon];
   // allow 10% imbalance
   ubvec[0] = 1.1;
 
@@ -139,6 +139,7 @@ void MetisLB::work(LDStats* stats)
   METIS_PartGraphRecursive(&numVertices, &ncon,  xadj, adjncy, vwgt, vsize, adjwgt,
       &numPes, tpwgts, ubvec, options, &edgecut, pemap);
 
+  delete[] ubvec;
   delete[] xadj;
   delete[] adjncy;
   delete[] vwgt;
