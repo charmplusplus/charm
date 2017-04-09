@@ -10,13 +10,19 @@ can be used to define other memory allocation routines.
 \date   Started 4/3/2007
 \author George
 \version\verbatim $Id: memory.c 10783 2011-09-21 23:19:56Z karypis $ \endverbatim
+
+This file in metis was modified by Kavitha Chandrasekar at UIUC
 */
 
 
 #include <GKlib.h>
 
 /* This is for the global mcore that tracks all heap allocations */
+#ifdef __MSC__
+static __declspec(thread) gk_mcore_t *gkmcore = NULL;
+#else
 static __thread gk_mcore_t *gkmcore = NULL;
+#endif
 
 
 /*************************************************************************/

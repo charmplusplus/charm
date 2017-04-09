@@ -5,6 +5,8 @@
 \date   Started 3/27/2007
 \author George
 \version\verbatim $Id: gk_externs.h 10711 2011-08-31 22:23:04Z karypis $ \endverbatim
+
+This file in metis was modified by Kavitha Chandrasekar at UIUC
 */
 
 #ifndef _GK_EXTERNS_H_
@@ -16,9 +18,15 @@
 **************************************************************************/
 #ifndef _GK_ERROR_C_
 /* declared in error.c */
+#ifdef __MSC__
+extern __declspec(thread) int gk_cur_jbufs;
+extern __declspec(thread) jmp_buf gk_jbufs[];
+extern __declspec(thread) jmp_buf gk_jbuf;
+#else
 extern __thread int gk_cur_jbufs;
 extern __thread jmp_buf gk_jbufs[];
 extern __thread jmp_buf gk_jbuf;
+#endif
 
 #endif
 

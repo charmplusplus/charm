@@ -16,10 +16,15 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
 implied. See the License for the specific language governing 
 permissions and limitations under the License.
 
-The followin files were modified by Kavitha Chandrasekar at UIUC
+The following files were modified by Kavitha Chandrasekar at UIUC
 to integrate METIS library:
 
 Modified metis/GKlib/Makefile
 Modified metis/Makefile
+Modified GKlib/GKlib.h
+Modified GKlib/error.c
+Modified GKlib/gk_arch.h
+Modified GKlib/gk_externs.h
+Modified GKlib/memory.c
 Added metis/libmetis/Makefile
 Moved metis/include/metis.h to metis/libmetis/metis.h

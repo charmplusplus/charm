@@ -5,6 +5,8 @@
 \date   Started 3/27/2007
 \author George
 \version\verbatim $Id: gk_arch.h 10711 2011-08-31 22:23:04Z karypis $ \endverbatim
+
+This file in metis was modified by Kavitha Chandrasekar at UIUC
 */
 
 #ifndef _GK_ARCH_H_
@@ -60,7 +62,7 @@ typedef ptrdiff_t ssize_t;
 
 #ifdef __MSC__
 /* MSC does not have rint() function */
-#define rint(x) ((int)((x)+0.5))  
+//#define rint(x) ((int)((x)+0.5))
 
 /* MSC does not have INFINITY defined */
 #ifndef INFINITY

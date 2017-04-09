@@ -5,6 +5,7 @@
  *
  * $Id: GKlib.h 13005 2012-10-23 22:34:36Z karypis $
  *
+ * This file in metis was modified by Kavitha Chandrasekar at UIUC
  */
 
 #ifndef _GKLIB_H_
@@ -14,6 +15,8 @@
 
 #if defined(_MSC_VER)
 #define __MSC__
+#define USE_GKREGEX
+#define WIN32
 #endif
 #if defined(__ICC)
 #define __ICC__
