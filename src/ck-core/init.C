@@ -911,42 +911,6 @@ static void _initHandler(void *msg, CkCoreState *ck)
   }
 }
 
-#if 0
-/*****************************************
- *          no longer needed
- * ***************************************/
-extern "C"
-void _CkExit(void) 
-{
-  CmiAssert(CkMyPe() == 0);
-  // Shuts down Converse handlers for the upper layers on this processor
-  //
-  CkNumberHandler(_charmHandlerIdx,_discardHandler);
-  CkNumberHandler(_bocHandlerIdx, _discardHandler);
-  DEBUGF(("[%d] CkExit - _exitStarted:%d %d\n", CkMyPe(), _exitStarted, _exitHandlerIdx));
-
-  if(CkMyPe()==0) {
-    if(_exitStarted)
-      CsdScheduler(-1);
-    envelope *env = _allocEnv(ReqStatMsg);
-    env->setSrcPe(CkMyPe());
-    CmiSetHandler(env, _exitHandlerIdx);
-		/*FAULT_EVAC*/
-    CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char *)env);
-  } else {
-    envelope *env = _allocEnv(ExitMsg);
-    env->setSrcPe(CkMyPe());
-    CmiSetHandler(env, _exitHandlerIdx);
-    CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
-  }
-#if ! CMK_BIGSIM_THREAD
-  _TRACE_END_EXECUTE();
-  //Wait for stats, which will call ConverseExit when finished:
-  CsdScheduler(-1);
-#endif
-}
-#endif
-
 #if CMK_SHRINK_EXPAND
 extern "C"
 void CkCleanup()
