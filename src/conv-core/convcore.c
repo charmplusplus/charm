@@ -498,7 +498,7 @@ int CmiGetArgLongDesc(char **argv,const char *arg,CmiInt8 *optDest,const char *d
 				continue; /*False alarm-- skip it*/
 			}
 			if (opt==NULL) continue; /*False alarm*/
-			if (sscanf(opt,"%ld",optDest)<1) {
+			if (sscanf(opt,"%lld",optDest)<1) {
 			/*Bad command line argument-- die*/
 				fprintf(stderr,"Cannot parse %s option '%s' "
 					"as a long integer.\n",arg,opt);

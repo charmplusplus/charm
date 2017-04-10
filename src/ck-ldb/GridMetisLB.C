@@ -29,13 +29,13 @@ GridMetisLB::GridMetisLB (const CkLBOptions &opt) : CBase_GridMetisLB (opt)
     CkPrintf ("[%d] GridMetisLB created.\n", CkMyPe());
   }
 
-  if (value = getenv ("CK_LDB_GRIDMETISLB_MODE")) {
+  if ((value = getenv ("CK_LDB_GRIDMETISLB_MODE"))) {
     CK_LDB_GridMetisLB_Mode = atoi (value);
   } else {
     CK_LDB_GridMetisLB_Mode = CK_LDB_GRIDMETISLB_MODE;
   }
 
-  if (value = getenv ("CK_LDB_GRIDMETISLB_BACKGROUND_LOAD")) {
+  if ((value = getenv ("CK_LDB_GRIDMETISLB_BACKGROUND_LOAD"))) {
     CK_LDB_GridMetisLB_Background_Load = atoi (value);
   } else {
     CK_LDB_GridMetisLB_Background_Load = CK_LDB_GRIDMETISLB_BACKGROUND_LOAD;
@@ -56,13 +56,13 @@ GridMetisLB::GridMetisLB (CkMigrateMessage *msg) : CBase_GridMetisLB (msg)
 
   lbname = (char *) "GridMetisLB";
 
-  if (value = getenv ("CK_LDB_GRIDMETISLB_MODE")) {
+  if ((value = getenv ("CK_LDB_GRIDMETISLB_MODE"))) {
     CK_LDB_GridMetisLB_Mode = atoi (value);
   } else {
     CK_LDB_GridMetisLB_Mode = CK_LDB_GRIDMETISLB_MODE;
   }
 
-  if (value = getenv ("CK_LDB_GRIDMETISLB_BACKGROUND_LOAD")) {
+  if ((value = getenv ("CK_LDB_GRIDMETISLB_BACKGROUND_LOAD"))) {
     CK_LDB_GridMetisLB_Background_Load = atoi (value);
   } else {
     CK_LDB_GridMetisLB_Background_Load = CK_LDB_GRIDMETISLB_BACKGROUND_LOAD;

@@ -141,9 +141,6 @@ void PUP::sizer::bytes(void * /*p*/,size_t n,size_t itemSize,dataType /*t*/)
 #ifdef CK_CHECK_PUP
 	nBytes+=sizeof(pupCheckRec);
 #endif
-#if CMK_ERROR_CHECKING
-	if (n<0) CmiAbort("PUP::sizer> Tried to pup a negative number of items!");
-#endif
 	nBytes+=n*itemSize;
 }
 

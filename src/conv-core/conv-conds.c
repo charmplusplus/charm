@@ -158,7 +158,7 @@ static void call_cblist_keep(ccd_cblist *l,double curWallTime)
   for(i=0, idx=l->first;i<len;i++) {
     int old = CmiSwitchToPE(l->elems[idx].cb.pe);
     (*(l->elems[idx].cb.fn))(l->elems[idx].cb.arg,curWallTime);
-    CmiSwitchToPE(old);
+    int unused = CmiSwitchToPE(old);
     idx = l->elems[idx].next;
   }
 }
@@ -183,14 +183,14 @@ static void call_cblist_remove(ccd_cblist *l,double curWallTime)
   for(i=0, idx=l->first;i<len;i++) {
     int old = CmiSwitchToPE(l->elems[idx].cb.pe);
     (*(l->elems[idx].cb.fn))(l->elems[idx].cb.arg,curWallTime);
-    CmiSwitchToPE(old);
+    int unused = CmiSwitchToPE(old);
     idx = l->elems[idx].next;
   }
 #else
   for(i=0, idx=l->last;i<len;i++) {
     int old = CmiSwitchToPE(l->elems[idx].cb.pe);
     (*(l->elems[idx].cb.fn))(l->elems[idx].cb.arg,curWallTime);
-    CmiSwitchToPE(old);
+    int unused = CmiSwitchToPE(old);
     idx = l->elems[idx].prev;
   }
 #endif
@@ -394,7 +394,7 @@ static void ccd_heap_update(double curWallTime)
 */
       int old = CmiSwitchToPE(e[i].cb.pe);
       (*(e[i].cb.fn))(e[i].cb.arg,curWallTime);
-      CmiSwitchToPE(old);
+      int unused = CmiSwitchToPE(old);
   }
 }
 

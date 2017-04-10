@@ -685,7 +685,8 @@ void PUP_fmt::fieldHeader(typeCode_t typeCode,int nItems) {
         } break;
     case lengthLen_int: {
         p(nItems); 
-        } break; 
+        } break;
+    case lengthLen_long: CmiAbort("Should not have reached here!"); break;
     };
 }
 

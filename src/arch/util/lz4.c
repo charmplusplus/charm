@@ -870,6 +870,7 @@ int lz4_wrapper_decompress(void *src, void *dst, int in_size, int out_size)
     int sinkint;
     sinkint = LZ4_uncompress_unknownOutputSize(src, dst, in_size, out_size);
     if(sinkint < 0) CmiAbort("decode fails\n");
+    return sinkint;
 }
 
 void lz4_init() {}

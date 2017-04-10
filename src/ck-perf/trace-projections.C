@@ -1418,7 +1418,7 @@ void TraceProjections::traceSetMsgID(char *msg, int pe, int event)
     envelope *e = (envelope *)msg;
     int ep = e->getEpIdx();
     if(ep<=0 || ep>=_entryTable.size()) return;
-    if (e->getSrcPe()<0 || e->getSrcPe()>=CkNumPes()+CkNumNodes()) return;
+    if (e->getSrcPe()>=CkNumPes()+CkNumNodes()) return;
     if (e->getMsgtype()<=0 || e->getMsgtype()>=LAST_CK_ENVELOPE_TYPE) return;
     if(_entryTable[ep]->traceEnabled) {
         e->setSrcPe(pe);

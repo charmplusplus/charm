@@ -361,7 +361,7 @@ INLINE static CMK_TYPEDEF_UINT8 MemusageProcSelfStat(){
     f = fopen("/proc/self/stat", "r");
     if(!f) { failed_once = 1; return 0; }
     for(i=0; i<22; i++) ret = fscanf(f, "%*s");
-    ret = fscanf(f, "%lu", &vsz);
+    ret = fscanf(f, "%llu", &vsz);
     fclose(f);
     if(!vsz) failed_once=1;
     return vsz;
@@ -401,7 +401,7 @@ INLINE static CMK_TYPEDEF_UINT8 MemusagePS(){
     sprintf(pscmd, "/bin/ps -o vsz= -p %d", getpid());
     p = popen(pscmd, "r");
     if(p){
-	ret = fscanf(p, "%ld", &vsz);
+	ret = fscanf(p, "%lld", &vsz);
 	pclose(p);
     }
     return (vsz * (CMK_TYPEDEF_UINT8)1024);
@@ -498,6 +498,7 @@ void CmiResetMaxMemory() {}
 CMK_TYPEDEF_UINT8 CmiMinMemoryUsage() { return 0; }
 void CmiResetMinMemory() {}
 
+#undef MEM_LOCK_AROUND
 #define MEM_LOCK_AROUND(code)   code
 
 #else       /* of CMK_MEMORY_BUILD_OS */

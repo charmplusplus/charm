@@ -185,7 +185,7 @@ void RefineKLB::performGreedyMoves(int count, BaseLB::LDStats* stats,int *from_p
   {
     delete procObjs[i];
   }
-  delete procObjs;
+  delete[] procObjs;
   delete unassignedComputes;
   delete leastLoadedP;
 }

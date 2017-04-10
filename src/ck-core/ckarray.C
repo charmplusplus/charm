@@ -264,9 +264,7 @@ void ArrayElement::initBasics(void)
   thisArray=info.thisArray;
   thisArrayID=info.thisArrayID;
   numInitialElements=info.numInitial.getCombinedCount();
-  if (info.listenerData) {
-    memcpy(listenerData,info.listenerData,sizeof(listenerData));
-  }
+  memcpy(listenerData,info.listenerData,sizeof(listenerData));
   if (!info.fromMigration) {
     CK_ARRAYLISTENER_LOOP(thisArray->listeners,
 			  l->ckElementCreating(this));

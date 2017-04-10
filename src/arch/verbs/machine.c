@@ -541,7 +541,8 @@ void LrtsAbort(const char *message)
   
   if(Cmi_truecrash) {
     printf("CHARM++ FATAL ERROR: %s\n", message);
-    *(int *)NULL = 0; /*Write to null, causing bus error*/
+    volatile int* ptr = NULL;
+    *ptr = 0; /*Write to null, causing bus error*/
   } else {
     charmrun_abort(message);
     machine_exit(1);

@@ -10,7 +10,7 @@ void* operator new(std::size_t bytes)
   return malloc(bytes);
 }
 
-void operator delete(void* ptr)
+void operator delete(void* ptr) throw()
 {
   free(ptr);
 }

@@ -4,6 +4,10 @@ because it does not store signal mask, which is not a problem for netpoll
 versions of charm.
 */
 
+#include <stdlib.h>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 #include "qt.h"
 #include <setjmp.h>
@@ -59,7 +63,7 @@ static void qt_args_1(qt_t *rjb, void *u, void *t,
   rhelp = (struct helpdesc *)pbuf[index];
   if (rhelp == 0) {
     SHIFTSP(rjb);
-    _longjmp((unsigned long*)rjb, push_buf((void *)jb));
+    _longjmp((int*)rjb, push_buf((void *)jb));
   }
   rhelp->hfn(rhelp->jb, rhelp->old, rhelp->new);
   only(u, t, userf);
@@ -96,9 +100,10 @@ void *qt_block(qt_helper_t *hfn, void *old, void *new, qt_t *sp)
   rhelp = (struct helpdesc *)pbuf[index];
   if (rhelp==0) {
     SHIFTSP(sp);
-    _longjmp((unsigned long*)sp, push_buf((void *)&help));
+    _longjmp((int*)sp, push_buf((void *)&help));
   }
   rhelp->hfn(rhelp->jb, rhelp->old, rhelp->new);
+  return NULL;
 }
 
 void *qt_abort(qt_helper_t *hfn, void *old, void *new, qt_t *sp)
@@ -109,5 +114,5 @@ void *qt_abort(qt_helper_t *hfn, void *old, void *new, qt_t *sp)
   help.old = old;
   help.new = new;
   SHIFTSP(sp);
-  _longjmp((unsigned long*)sp, push_buf((void *)&help));
+  _longjmp((int*)sp, push_buf((void *)&help));
 }
