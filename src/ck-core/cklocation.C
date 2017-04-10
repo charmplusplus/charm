@@ -1669,9 +1669,14 @@ void CkMigratable::AtSync(int waitForMigration)
   // model-based load balancing, ask user to provide cpu load
   if (usesAutoMeasure == false) UserSetLBLoad();
 
-  PUP::sizer ps;
-  this->virtual_pup(ps);
-  setPupSize(ps.size());
+  if(_lb_psizer_on || _lb_args.metaLbOn()){
+    PUP::sizer ps;
+    this->virtual_pup(ps);
+    if(_lb_psizer_on)
+      setPupSize(ps.size());
+    if(_lb_args.metaLbOn())
+      myRec->getMetaBalancer()->SetCharePupSize(ps.size());
+  }
 
   if (!_lb_args.metaLbOn()) {
     myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
@@ -1679,7 +1684,6 @@ void CkMigratable::AtSync(int waitForMigration)
   }
 
   // When MetaBalancer is turned on
-  myRec->getMetaBalancer()->SetCharePupSize(ps.size());
 
   if (atsync_iteration == -1) {
     can_reset = false;

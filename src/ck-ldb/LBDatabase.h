@@ -79,6 +79,7 @@ extern CkLBArgs _lb_args;
 extern int _lb_predict;
 extern int _lb_predict_delay;
 extern int _lb_predict_window;
+extern bool _lb_psizer_on;
 #ifndef PREDICT_DEBUG
 #define PREDICT_DEBUG  0   // 0 = No debug, 1 = Debug info on
 #endif

@@ -29,6 +29,7 @@ CkLBArgs _lb_args;
 int _lb_predict=0;
 int _lb_predict_delay=10;
 int _lb_predict_window=20;
+bool _lb_psizer_on = false;
 
 // registry class stores all load balancers linked and created at runtime
 class LBDBRegistry {
