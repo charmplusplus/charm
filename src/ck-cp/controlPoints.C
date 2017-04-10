@@ -925,8 +925,8 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
   void controlPointManager::doExitNow(){
           _TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _threadEP,CkMyPe(), 0, NULL, this);
 	  writeOutputToDisk();
-	  //	  CkPrintf("[%d] Control point manager calling CkExit()\n", CkMyPe());
-	  CkExit();
+    // CkPrintf("[%d] Control point manager calling CkContinueExit()\n", CkMyPe());
+    CkContinueExit();
   }
 
   void controlPointManager::writeOutputToDisk(){

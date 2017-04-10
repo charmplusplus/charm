@@ -1019,7 +1019,7 @@ void TraceSummaryBOC::sumData(double *sumData, int totalsize) {
     }
    fclose(sumfp);
    //CkPrintf("done with analysis\n");
-   CkExit();
+   CkContinueExit();
 }
 
 /// for TraceSummaryBOC
@@ -1223,8 +1223,6 @@ void TraceSummaryBOC::askSummary(int size)
   delete [] reductionBuffer;
 }
 
-//extern "C" void _CkExit();
-
 void TraceSummaryBOC::sendSummaryBOC(double *results, int n)
 {
   if (CkpvAccess(_trace) == NULL) return;
@@ -1238,7 +1236,7 @@ void TraceSummaryBOC::sendSummaryBOC(double *results, int n)
 
   write();
 
-  CkExit();
+  CkContinueExit();
 }
 
 void TraceSummaryBOC::write(void) 
@@ -1302,10 +1300,10 @@ extern "C" void CombineSummary()
   }
   else {
     _TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _threadEP,CkMyPe(), 0, NULL, NULL);
-    CkExit();
+    CkContinueExit();
   }
 #else
-  CkExit();
+  CkContinueExit();
 #endif
 }
 
@@ -1320,32 +1318,6 @@ void initTraceSummaryBOC()
   }
 }
 
-
-
-
-
-
 #include "TraceSummary.def.h"
 
-
 /*@}*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

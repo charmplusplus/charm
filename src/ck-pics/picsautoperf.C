@@ -561,7 +561,7 @@ void TraceAutoPerfBOC::tuneDone() {
   {
     recvGroups=0;
     if(CkpvAccess(isExit))
-      CkExit();
+      CkContinueExit();
     else
     {
       resume();
@@ -735,7 +735,6 @@ extern "C" void traceAutoPerfExitFunction() {
     fflush(CkpvAccess(fpSummary));
     fclose(CkpvAccess(fpSummary));
   }
-  CkExit();
 }
 
 void _initTraceAutoPerfBOC()

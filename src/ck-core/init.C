@@ -176,7 +176,7 @@ int    _exitHandlerIdx;
 #if CMK_WITH_STATS
 static Stats** _allStats = 0;
 #endif
-static bool   _exitStarted = 0;
+static bool   _exitStarted = false;
 
 static InitCallTable _initCallTable;
 
@@ -544,19 +544,22 @@ static void _exitHandler(envelope *env)
   switch(env->getMsgtype()) {
     case StartExitMsg:
       CkAssert(CkMyPe()==0);
-      if (!_CkExitFnVec.isEmpty()) {
-        CkExitFn fn = _CkExitFnVec.deq();
-        fn();
-        break;
-      }
-      // else goto next
-    case ExitMsg:
-      CkAssert(CkMyPe()==0);
       if(_exitStarted) {
         CmiFree(env);
         return;
       }
       _exitStarted = true;
+
+      // else fall through
+    case ExitMsg:
+      CkAssert(CkMyPe()==0);
+      if (!_CkExitFnVec.isEmpty()) {
+        CmiFree(env);
+        CkExitFn fn = _CkExitFnVec.deq();
+        fn();
+        break;
+      }
+
       CkNumberHandler(_charmHandlerIdx,_discardHandler);
       CkNumberHandler(_bocHandlerIdx, _discardHandler);
 #if !CMK_BIGSIM_THREAD
@@ -945,6 +948,14 @@ void CkExit(void)
 	if(!CharmLibInterOperate)
   CsdScheduler(-1);
 #endif
+}
+
+void CkContinueExit()
+{
+  envelope *env = _allocEnv(ExitMsg);
+  env->setSrcPe(CkMyPe());
+  CmiSetHandler(env, _exitHandlerIdx);
+  CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
 }
 
 /* This is a routine called in case the application is closing due to a signal.
@@ -1571,7 +1582,7 @@ extern "C" void fmain_(int *argc,char _argv[][80],int length[])
 
 // user callable function to register an exit function, this function
 // will perform task of collecting of info from all pes to pe0, and call
-// CkExit() on pe0 again to recursively traverse the registered exitFn.
+// CkContinueExit() on pe0 again to recursively traverse the registered exitFn.
 // see trace-summary for an example.
 void registerExitFn(CkExitFn fn)
 {

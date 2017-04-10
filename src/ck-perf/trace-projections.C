@@ -1901,7 +1901,7 @@ void registerOutlierReduction() {
  * shutdown. This is called exactly once on processor 0. Module shutdown
  * is initiated as a result of a CkExit() call by the application code
  * 
- * The exit function must ultimately call CkExit() again to
+ * The exit function must ultimately call CkContinueExit() again to
  * so that other module exit functions may proceed after this module is
  * done.
  *
@@ -1916,7 +1916,7 @@ extern "C" void TraceProjectionsExitHandler()
   CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
   bocProxy.traceProjectionsParallelShutdown(CkMyPe());
 #else
-  CkExit();
+  CkContinueExit();
 #endif
 }
 
@@ -2928,13 +2928,12 @@ void TraceProjectionsBOC::closingTraces() {
 }
 
 // The sole purpose of this reduction is to decide whether or not
-//   Projections as a module needs to call CkExit() to get other
+//   Projections as a module needs to call CkContinueExit() to get other
 //   modules to shutdown.
 void TraceProjectionsBOC::closeParallelShutdown(void) {
   CkAssert(endPe == -1 && CkMyPe() ==0 || CkMyPe() == endPe);
-  // decide if CkExit() needs to be called
   if (!CkpvAccess(_trace)->converseExit) {
-    CkExit();
+    CkContinueExit();
   }
 }
 /*

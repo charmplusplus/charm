@@ -787,7 +787,10 @@ public:
   /// Check to see if we are in the shutdown process, and handle it appropriately.
   void checkForShutdown();
 
-  /// Start shutdown procedures for the controlPoints module(s). CkExit will be called once all outstanding operations have completed (e.g. waiting for idle time & memory usage to be gathered)
+  /// Start shutdown procedures for the controlPoints
+  /// module(s). CkContinueExit will be called once all outstanding
+  /// operations have completed (e.g. waiting for idle time & memory
+  /// usage to be gathered)
   void exitIfReady();
 
   /// All outstanding operations have completed, so do the shutdown now. First write files to disk, and then call CkExit().

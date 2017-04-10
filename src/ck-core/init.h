@@ -167,6 +167,9 @@ typedef  void  (*CkExitFn) (void);
 
 extern CkQ<CkExitFn> _CkExitFnVec;
 extern void registerExitFn(CkExitFn);
+// Each registered exit function must eventually lead to a single call
+// being made to CkContinueExit()
+extern void CkContinueExit();
 
 extern "C" void EmergencyExit(void);
 

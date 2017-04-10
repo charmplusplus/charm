@@ -398,13 +398,10 @@ void TraceTau::traceClose(void)
 
 extern "C" void traceTauExitFunction() {
   dprintf("traceTauExitFunction called.\n");
-  // The exit function of any Charm++ module must call CkExit() or
-  // the entire exit process will hang if multiple modules are linked.
-  // FIXME: This is NOT a feature. Something needs to be done about this.
   //TAU_PROFILE_EXIT("exiting...");
   //TAU_PROFILE_EXIT("done");
   //eventStack.push(NULL);
-  CkExit();
+  CkContinueExit();
 }
 
 // Initialization of the parallel trace module.

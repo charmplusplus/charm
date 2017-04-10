@@ -18,10 +18,7 @@ if expression is 0.}
   the function that calls it will not execute. Other processors will
   continue executing until they receive notification to stop, so it is
   a good idea to ensure through synchronization that all useful work
-  has finished before calling CkExit(). Application code should be
-  structured so that it makes only a single call to CkExit() across
-  the entire system, such as by selecting a designated object to make
-  the call. Multiple calls can lead to undefined behavior. }
+  has finished before calling CkExit().}
 
 \function{double CkWallTimer()} \index{CkWallTimer} \index{timers}
 \desc{Returns the elapsed time in seconds since the start of the program.}
