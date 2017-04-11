@@ -1739,8 +1739,10 @@ void CkArray::ckDestroy() {
   // to send messages to remote PEs with reclaimRemote messages.
   locMgr->setDuringDestruction(true);
 
-  for (unsigned int i = 0; i < localElemVec.size(); ++i)
-    localElemVec[i]->ckDestroy();
+  // ckDestroy deletes the CkMigratable, which also removes it from this vector
+  while (localElemVec.size()) {
+    localElemVec.front()->ckDestroy();
+  }
 
   locMgr->deleteManager(CkGroupID(thisProxy), this);
   delete this;
