@@ -313,6 +313,11 @@ public:
                 :CProxy(), _aid(aid) { }
 	CProxy_ArrayBase(const ArrayElement *e);
 	CProxy_ArrayBase(const CProxy_ArrayBase &cs): CProxy(cs), _aid(cs.ckGetArrayID()) {}
+
+	bool operator==(const CProxy_ArrayBase& other) {
+		return ckGetArrayID() == other.ckGetArrayID();
+	}
+
 #if CMK_ERROR_CHECKING
 	inline void ckCheck(void) const{  //Make sure this proxy has a value
 	  if (_aid.isZero())
@@ -354,6 +359,11 @@ public:
         CProxyElement_ArrayBase(const CkArrayID &aid, const CkArrayIndex &idx)
                 :CProxy_ArrayBase(aid), _idx(idx) { }
 	CProxyElement_ArrayBase(const ArrayElement *e);
+
+	bool operator==(const CProxyElement_ArrayBase& other) {
+		return ckGetArrayID() == other.ckGetArrayID() &&
+				ckGetIndex() == other.ckGetIndex();
+	}
 
 	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
 	void ckSend(CkArrayMessage *m, int ep, int opts = 0) const;

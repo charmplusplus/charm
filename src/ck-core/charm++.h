@@ -824,6 +824,10 @@ class CProxy_Group : public CProxy {
 /*    CProxy_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
         :CProxy(), _ck_gid(g->ckGetGroupID()) {}*/
 
+    bool operator==(const CProxy_Group& other) {
+      return ckGetGroupID() == other.ckGetGroupID();
+    }
+
 #if CMK_ERROR_CHECKING
     inline void ckCheck(void) const {   //Make sure this proxy has a value
 	if (_ck_gid.isZero())
@@ -863,6 +867,11 @@ class CProxyElement_Group : public CProxy_Group {
         :CProxy_Group(g), _onPE(CkMyPe()) {}
     /*CProxyElement_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
         :CProxy_Group(g), _onPE(CkMyPe()) {}*/
+
+    bool operator==(const CProxyElement_Group& other) {
+      return ckGetGroupID() == other.ckGetGroupID() &&
+             ckGetGroupPe() == other.ckGetGroupPe();
+    }
 
     int ckGetGroupPe(void) const {return _onPE;}
     void pup(PUP::er &p) {
@@ -992,6 +1001,10 @@ class CProxy_NodeGroup : public CProxy{
         :CProxy(), _ck_gid(g->ckGetGroupID()) {/*CkPrintf("In CProxy_NodeGroup3 Constructor %d\n",CkLocalNodeBranch(_ck_gid));*/}
 /*    CProxy_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
         :CProxy(), _ck_gid(g->ckGetGroupID()) {}*/
+
+    bool operator==(const CProxy_NodeGroup& other) {
+      return ckGetGroupID() == other.ckGetGroupID();
+    }
 
 #if CMK_ERROR_CHECKING
     inline void ckCheck(void) const {   //Make sure this proxy has a value
