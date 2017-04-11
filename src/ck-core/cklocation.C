@@ -3321,8 +3321,10 @@ void CkLocMgr::setDuringMigration(bool _duringMigration){
 }
 #endif
 
+// If we are deleting our last array manager set duringDestruction to true to
+// avoid sending out unneeded reclaimRemote messages.
 void CkLocMgr::setDuringDestruction(bool _duringDestruction) {
-  duringDestruction = _duringDestruction;
+  duringDestruction = (_duringDestruction && managers.size() == 1);
 }
 
 //Add given element array record at idx, replacing the existing record
