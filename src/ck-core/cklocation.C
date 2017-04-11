@@ -2537,18 +2537,26 @@ void CkLocMgr::reclaim(CkLocRec* rec) {
 	delete rec;
 }
 
-// TODO: I think this is always a no-op and not behaving as intended?
+// The location record associated with idx has been deleted on a remote PE, so
+// we should free all of our caching associated with that index.
 void CkLocMgr::reclaimRemote(const CkArrayIndex &idx,int deletedOnPe) {
 	DEBC((AA "Our element %s died on PE %d\n" AB,idx2str(idx),deletedOnPe));
 
-        CmiUInt8 id;
-        if (!lookupID(idx, id)) return;
+	CmiUInt8 id;
+	if (!lookupID(idx, id)) CkAbort("Cannot find ID for the given index\n");
 
-	CkLocRec *rec=elementNrec(id);
-	if (rec==NULL) return; //We never knew him
-	removeFromTable(id);
-	delete rec;
+	// Delete the id and index from our location caching
+	id2pe.erase(id);
+	idx2id.erase(idx);
+
+	// Assert that there were no undelivered messages for the dying element
+	CkAssert(bufferedMsgs.count(id) == 0);
+	CkAssert(bufferedRemoteMsgs.count(id) == 0);
+	CkAssert(bufferedShadowElemMsgs.count(id) == 0);
+	CkAssert(bufferedLocationRequests.count(idx) == 0);
+	CkAssert(bufferedIndexMsgs.count(idx) == 0);
 }
+
 void CkLocMgr::removeFromTable(const CmiUInt8 id) {
 #if CMK_ERROR_CHECKING
 	//Make sure it's actually in the table before we delete it
