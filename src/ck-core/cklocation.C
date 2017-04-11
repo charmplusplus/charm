@@ -1510,11 +1510,7 @@ void CkMigratable::pup(PUP::er &p) {
 	ckFinishConstruction();
 }
 
-void CkMigratable::ckDestroy(void) {
-	DEBC((AA "In CkMigratable::ckDestroy %s\n" AB,idx2str(thisIndexMax)));
-	myRec->destroy();
-}
-
+void CkMigratable::ckDestroy(void) {}
 void CkMigratable::ckAboutToMigrate(void) { }
 void CkMigratable::ckJustMigrated(void) { }
 void CkMigratable::ckJustRestored(void) { }
@@ -1874,7 +1870,6 @@ CkLocRec::CkLocRec(CkLocMgr *mgr,bool fromMigration,
 CkLocRec::~CkLocRec()
 {
 	if (deletedMarker!=NULL) *deletedMarker=true;
-	myLocMgr->reclaim(idx);
 #if CMK_LBDB_ON
 	stopTiming();
 	DEBL((AA "Unregistering element %s from load balancer\n" AB,idx2str(idx)));
@@ -1914,10 +1909,10 @@ void* CkLocRec::getObjUserData(int idx) {
 #endif
 #endif
 
-void CkLocRec::destroy(void) //User called destructor
-{
-	//Our destructor does all the needed work
-	delete this;
+// Attempt to destroy this record. If the location manager is done with the
+// record (because all array elements were destroyed) then it will be deleted.
+void CkLocRec::destroy(void) {
+	myLocMgr->reclaim(this);
 }
 
 /**********Added for cosmology (inline function handling without parameter marshalling)***********/
@@ -2508,19 +2503,17 @@ void CkLocMgr::inform(CmiUInt8 id, int nowOnPe) {
 
 
 /*************************** LocMgr: DELETION *****************************/
-/// This index will no longer be used-- delete the associated elements
-void CkLocMgr::reclaim(const CkArrayIndex &idx) {
+// This index may no longer be used -- check if any of our managers are still
+// using it, and if not delete it and clean up all traces of it on other PEs.
+void CkLocMgr::reclaim(CkLocRec* rec) {
 	CK_MAGICNUMBER_CHECK
-	DEBC((AA "Destroying element %s\n" AB,idx2str(idx)));
-	//Delete, and mark as empty, each array element
-        CmiUInt8 id = lookupID(idx);
-    for (auto itr = managers.begin();
-            itr != managers.end(); ++itr) {
-      itr->second->deleteElt(id);
-    }
+	// Return early if the record is still in use by any of our arrays
+	for (auto itr = managers.begin(); itr != managers.end(); ++itr) {
+		if (itr->second->lookup(rec->getID())) return;
+	}
+	removeFromTable(rec->getID());
 	
-	removeFromTable(id);
-	
+	DEBC((AA "Destroying record for element %s\n" AB,idx2str(rec->getIndex())));
 	if (!duringMigration) 
 	{ //This is a local element dying a natural death
 #if CMK_BIGSIM_CHARM
@@ -2533,16 +2526,18 @@ void CkLocMgr::reclaim(const CkArrayIndex &idx) {
 		//msg chain) and causes the program no progress
 		if(_BgOutOfCoreFlag==1) return; 
 #endif
-		int home=homePe(idx);
+		int home=homePe(rec->getIndex());
 		if (home!=CkMyPe())
 #if CMK_MEM_CHECKPOINT
 	        if (!CkInRestarting()) // all array elements are removed anyway
 #endif
 	        if (!duringDestruction)
-	            thisProxy[home].reclaimRemote(idx,CkMyPe());
+	            thisProxy[home].reclaimRemote(rec->getIndex(),CkMyPe());
 	}
+	delete rec;
 }
 
+// TODO: I think this is always a no-op and not behaving as intended?
 void CkLocMgr::reclaimRemote(const CkArrayIndex &idx,int deletedOnPe) {
 	DEBC((AA "Our element %s died on PE %d\n" AB,idx2str(idx),deletedOnPe));
 
@@ -3084,10 +3079,11 @@ void CkLocMgr::emigrate(CkLocRec *rec,int toPe)
 //#endif
 
 	duringMigration=true;
-	delete rec; //Removes elements, hashtable entries, local index
-	
-	
+	for (auto itr = managers.begin(); itr != managers.end(); ++itr) {
+		itr->second->deleteElt(id);
+	}
 	duringMigration=false;
+
 	//The element now lives on another processor-- tell ourselves and its home
 	inform(idx, id, toPe);
 //#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))    

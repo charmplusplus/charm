@@ -704,8 +704,8 @@ public:
     std::map<CmiUInt8, unsigned int>::iterator itr = localElems.find(id);
     if (itr != localElems.end()) {
       unsigned int offset = itr->second;
-      delete localElemVec[offset];
       localElems.erase(itr);
+      delete localElemVec[offset];
 
       if (offset != localElemVec.size() - 1) {
         CkMigratable *moved = localElemVec[localElemVec.size()-1];

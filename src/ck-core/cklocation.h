@@ -411,7 +411,7 @@ typedef std::unordered_map<CmiUInt8, CkLocRec*> LocRecHash;
 #endif
 
 	//This index will no longer be used-- delete the associated elements
-	void reclaim(const CkArrayIndex &idx);
+	void reclaim(CkLocRec* rec);
 
 	bool demandCreateElement(CkArrayMessage *msg, const CkArrayIndex &idx, int onPe, CkDeliver_t type);
         void demandCreateElement(const CkArrayIndex &idx, int chareType, int onPe, CkArrayID mgr);
