@@ -121,4 +121,11 @@ keyword \kw{python}. Refer to chapter~\ref{python} for more details.
 target of reductions, despite not taking CkReductionMsg as an argument.
 See section~\ref{reductions} for more references.
 
+\index{aggregate}\item[aggregate] data sent to this entry method will be
+aggregated into larger messages before being sent, to reduce fine-grained
+overhead. The aggregation is handled by the Topological Routing and Aggregation
+Module (TRAM). The argument to this entry method must be a single fixed-size
+object. More details on TRAM are given in the Converse and Charm++ Libraries
+Manual (http://charm.cs.illinois.edu/manuals/html/libraries/5.html).
+
 \end{description}
