@@ -1288,6 +1288,12 @@ extern "C" void CombineSummary()
 {
 #if CMK_TRACE_ENABLED
   CmiPrintf("[%d] CombineSummary called!\n", CkMyPe());
+
+  if ((sumonly || sumDetail) && traceSummaryGID.isZero()) {
+    CkContinueExit();
+    return;
+  }
+
   if (sumonly) {
     CmiPrintf("[%d] Sum Only start!\n", CkMyPe());
       // pe 0 start the sumonly process

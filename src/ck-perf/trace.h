@@ -221,7 +221,7 @@ protected:
     virtual ~Trace() {} /* for whining compilers */
 };
 
-#define ALLDO(x) for (int i=0; i<length(); i++) if (traces[i]->traceOnPE()) traces[i]->x
+#define ALLDO(x) for (int i=0; i<length(); i++) if (traces[i] && traces[i]->traceOnPE()) traces[i]->x
 #define ALLREVERSEDO(x) for (int i=length()-1; i>=0; i--) if (traces[i]->traceOnPE()) traces[i]->x
 
 /// Array of Traces modules,  every event raised will go through every Trace module.

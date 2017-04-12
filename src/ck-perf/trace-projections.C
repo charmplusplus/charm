@@ -1913,8 +1913,12 @@ extern "C" void TraceProjectionsExitHandler()
 #if DEBUG_KMEANS
   CkPrintf("[%d] TraceProjectionsExitHandler called!\n", CkMyPe());
 #endif
-  CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
-  bocProxy.traceProjectionsParallelShutdown(CkMyPe());
+  if (!traceProjectionsGID.isZero()) {
+    CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
+    bocProxy.traceProjectionsParallelShutdown(CkMyPe());
+  } else {
+    CkContinueExit();
+  }
 #else
   CkContinueExit();
 #endif

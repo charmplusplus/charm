@@ -722,6 +722,11 @@ TraceAutoPerfInit::TraceAutoPerfInit(CkArgMsg* args)
 }
 
 extern "C" void traceAutoPerfExitFunction() {
+  if (autoPerfProxy.ckGetGroupID().isZero()) {
+    CkContinueExit();
+    return;
+  }
+
   /* Starts copying of data */
   if(user_call == 0){  // Do not call them by default if the user is calling them
     autoPerfProxy.endPhase();

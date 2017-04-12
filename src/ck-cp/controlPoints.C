@@ -1231,9 +1231,12 @@ FDECL void FTN_NAME(SETFRAMEWORKADVANCEPHASEF,setframeworkadvancephasef)(CMK_TYP
 extern "C" void controlPointShutdown(){
   if(CkMyPe() == 0){
 
-    // wait for gathering of idle time & memory usage to complete
-    controlPointManagerProxy.ckLocalBranch()->exitIfReady();
-
+    if (!controlPointManagerProxy.ckGetGroupID().isZero()) {
+      // wait for gathering of idle time & memory usage to complete
+      controlPointManagerProxy.ckLocalBranch()->exitIfReady();
+    } else {
+      CkContinueExit();
+    }
   }
 }
 

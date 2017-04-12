@@ -298,8 +298,10 @@ void TraceAutoPerf::free(void *where, int size) { }
 
 void TraceAutoPerf::traceClose(void)
 {
-  CkpvAccess(_traces)->endComputation();
-  CkpvAccess(_traces)->removeTrace(this);
+  if (CkpvAccess(_traces)) {
+    CkpvAccess(_traces)->endComputation();
+    CkpvAccess(_traces)->removeTrace(this);
+  }
 }
 
 
