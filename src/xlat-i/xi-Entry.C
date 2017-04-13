@@ -1051,7 +1051,7 @@ void Entry::genGroupStaticConstructorDefs(XStr& str)
   str << makeDecl("CkGroupID",1)<<"::ckNew("<<paramType(0,1)<<")\n";
   str << "{\n"<<marshallMsg();
   str << "  UsrToEnv(impl_msg)->setMsgtype(" << node << "BocInitMsg);\n";
-  if (param->isMarshalled()) {
+  if (param->isMarshalled() || param->isVoid()) {
     str << "  if (impl_e_opts)\n";
     str << "    UsrToEnv(impl_msg)->setGroupDep(impl_e_opts->getGroupDepID());\n";
   }
