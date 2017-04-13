@@ -60,8 +60,12 @@ int upperRange, /* upper range of the loop-like parallelization [lowerRange, upp
 int sync=1, /* toggle implicit barrier after each parallelized loop */ \\
 void *redResult=NULL, /* the reduction result, ONLY SUPPORT SINGLE VAR of TYPE int/float/double */ \\
 REDUCTION\_TYPE type=CKLOOP\_NONE /* type of the reduction result */ \\
+CallerFn cfunc=NULL, /* caller PE will call this function before ckloop is done and before starting to work on its chunks */ \\
+int cparamNum=0, void *cparam=NULL /* the input parameters to the above function */ \\
 ) \\
-The ``HelperFn'' is defined as ``typedef void (*HelperFn)(int first,int last, void *result, int paramNum, void *param);'' The ``result'' is the buffer for reduction result on a single simple-type variable.
+The ``HelperFn'' is defined as ``typedef void (*HelperFn)(int first, int last, void *result, int paramNum, void *param);''
+and the ``result'' is the buffer for reduction result on a single simple-type variable.
+The ``CallerFn'' is defined as ``typedef void (*CallerFn)(int paramNum, void *param);''
 \end{itemize}
 
 Examples using this library can be found in \examplerefdir{ckloop} and the
