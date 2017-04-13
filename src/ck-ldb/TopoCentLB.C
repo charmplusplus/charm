@@ -37,6 +37,8 @@ TopoCentLB::TopoCentLB(const CkLBOptions &opt) : CBase_TopoCentLB (opt)
   if (CkMyPe () == 0) {
     CkPrintf ("[%d] TopoCentLB created\n",CkMyPe());
   }
+
+  theLbdb->CollectCommStatsOn();
 }
 
 

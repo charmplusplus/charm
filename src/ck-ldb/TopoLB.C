@@ -36,6 +36,8 @@ TopoLB::TopoLB(const CkLBOptions &opt) : CBase_TopoLB (opt)
   if (CkMyPe () == 0) {
     CkPrintf ("[%d] TopoLB created\n",CkMyPe());
   }
+
+  theLbdb->CollectCommStatsOn();
 }
 
 bool TopoLB::QueryBalanceNow (int _step)

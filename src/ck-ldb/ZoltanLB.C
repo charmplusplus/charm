@@ -61,6 +61,8 @@ ZoltanLB::ZoltanLB(const CkLBOptions &opt): CBase_ZoltanLB(opt)
   lbname = "ZoltanLB";
   if (CkMyPe() == 0)
     CkPrintf("[%d] ZoltanLB created\n",CkMyPe());
+
+  theLbdb->CollectCommStatsOn();
 }
 
 void ZoltanLB::work(LDStats* stats)

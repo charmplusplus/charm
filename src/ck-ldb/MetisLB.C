@@ -20,6 +20,8 @@ MetisLB::MetisLB(const CkLBOptions &opt): CBase_MetisLB(opt)
   lbname = "MetisLB";
   if (CkMyPe() == 0)
     CkPrintf("[%d] MetisLB created\n",CkMyPe());
+
+  theLbdb->CollectCommStatsOn();
 }
 
 void MetisLB::work(LDStats* stats)

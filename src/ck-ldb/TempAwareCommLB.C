@@ -108,6 +108,8 @@ TempAwareCommLB::TempAwareCommLB(const CkLBOptions &opt): CBase_TempAwareCommLB(
   if (CkMyPe()==0)
     CkPrintf("[%d] TempAwareCommLB created\n",CkMyPe());
 
+  theLbdb->CollectCommStatsOn();
+
 	starting=CmiWallTimer();
 	migFile=fopen("migInfo","w");
   numAvailFreqs = 11;

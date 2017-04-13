@@ -41,6 +41,7 @@ GridMetisLB::GridMetisLB (const CkLBOptions &opt) : CBase_GridMetisLB (opt)
     CK_LDB_GridMetisLB_Background_Load = CK_LDB_GRIDMETISLB_BACKGROUND_LOAD;
   }
 
+  theLbdb->CollectCommStatsOn();
   manager_init ();
 }
 

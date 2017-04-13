@@ -29,6 +29,8 @@ PhasebyArrayLB::PhasebyArrayLB(const CkLBOptions &opt): CBase_PhasebyArrayLB(opt
   	CmiAbort("");
   }
   lb = (CentralLB *)fn();
+
+  theLbdb->CollectCommStatsOn();
 }
 
 bool PhasebyArrayLB::QueryBalanceNow(int _step)

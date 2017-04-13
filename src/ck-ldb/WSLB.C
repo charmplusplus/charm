@@ -44,6 +44,8 @@ WSLB::WSLB(const CkLBOptions &opt) : CBase_WSLB(opt)
   if (CkMyPe() == 0)
     CkPrintf("[%d] WSLB created\n",CkMyPe());
 
+  theLbdb->CollectCommStatsOn();
+
   mystep = 0;
   theLbdb->
     AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),(void*)(this));

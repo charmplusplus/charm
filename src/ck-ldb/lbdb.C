@@ -229,6 +229,20 @@ extern "C" void LDCollectStatsOff(LDHandle _db)
   db->TurnStatsOff();
 }
 
+extern "C" void LDCollectCommStatsOn(LDHandle _db)
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+
+  if (!db->CommStatsOn())
+    db->TurnCommStatsOn();
+}
+
+extern "C" void LDCollectCommStatsOff(LDHandle _db)
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+  db->TurnCommStatsOff();
+}
+
 extern "C" int CLDCollectingStats(LDHandle _db)
 {
 //  LBDB *const db = (LBDB*)(_db.handle);
@@ -273,14 +287,14 @@ extern "C" void LDObjectStop(const LDObjHandle &_h)
 extern "C" void LDSend(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes, int destObjProc, int force)
 {
   LBDB *const db = (LBDB*)(destOM.ldb.handle);
-  if (force || (db->StatsOn() && _lb_args.traceComm()))
+  if (force || (db->StatsOn() && db->CommStatsOn()))
     db->Send(destOM,destid,bytes, destObjProc);
 }
 
 extern "C" void LDMulticastSend(const LDOMHandle &destOM, LDObjid *destids, int ndests, unsigned int bytes, int nMsgs)
 {
   LBDB *const db = (LBDB*)(destOM.ldb.handle);
-  if (db->StatsOn() && _lb_args.traceComm())
+  if (db->StatsOn() && db->CommStatsOn())
     db->MulticastSend(destOM,destids,ndests,bytes,nMsgs);
 }
 

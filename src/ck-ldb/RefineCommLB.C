@@ -14,6 +14,8 @@ RefineCommLB::RefineCommLB(const CkLBOptions &opt): CBase_RefineCommLB(opt)
   lbname = (char *)"RefineCommLB";
   if (CkMyPe() == 0)
     CkPrintf("[%d] RefineCommLB created\n",CkMyPe());
+
+  theLbdb->CollectCommStatsOn();
 }
 
 bool RefineCommLB::QueryBalanceNow(int _step)

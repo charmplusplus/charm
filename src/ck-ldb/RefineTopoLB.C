@@ -30,6 +30,8 @@ RefineTopoLB::RefineTopoLB(const CkLBOptions &opt) : CBase_RefineTopoLB (opt)
   if (CkMyPe () == 0) {
     CkPrintf ("[%d] RefineTopoLB created\n",CkMyPe());
   }
+
+  theLbdb->CollectCommStatsOn();
 }
 
 bool RefineTopoLB::QueryBalanceNow (int _step)

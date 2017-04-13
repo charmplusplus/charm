@@ -23,6 +23,8 @@ TeamLB::TeamLB(const CkLBOptions &opt): CBase_TeamLB(opt)
   // setting number of teams and team size
   teamSize = _lb_args.teamSize();
   numberTeams = CkNumPes() / teamSize;
+
+  theLbdb->CollectCommStatsOn();
 }
 
 /**

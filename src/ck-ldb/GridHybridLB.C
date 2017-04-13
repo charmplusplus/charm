@@ -47,6 +47,7 @@ GridHybridLB::GridHybridLB (const CkLBOptions &opt) : CBase_GridHybridLB (opt)
     CK_LDB_GridHybridLB_Load_Tolerance = CK_LDB_GRIDHYBRIDLB_LOAD_TOLERANCE;
   }
 
+  theLbdb->CollectCommStatsOn();
   manager_init ();
 }
 

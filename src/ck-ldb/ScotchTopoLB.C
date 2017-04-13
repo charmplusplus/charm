@@ -22,6 +22,8 @@ ScotchTopoLB::ScotchTopoLB(const CkLBOptions &opt) : CBase_ScotchTopoLB(opt) {
   lbname = "ScotchTopoLB";
   if(CkMyPe() == 0)
     CkPrintf("ScotchTopoLB created\n");
+
+  theLbdb->CollectCommStatsOn();
 }
 
 bool ScotchTopoLB::QueryBalanceNow(int _step) {

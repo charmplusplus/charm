@@ -30,6 +30,8 @@ GreedyAgentLB::GreedyAgentLB(const CkLBOptions &opt): CBase_GreedyAgentLB(opt)
   lbname = "GreedyAgentLB";
   if (CkMyPe()==0)
     CkPrintf("[%d] GreedyAgentLB created\n",CkMyPe());
+
+  theLbdb->CollectCommStatsOn();
 }
 
 bool GreedyAgentLB::QueryBalanceNow(int _step)

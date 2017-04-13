@@ -30,6 +30,7 @@ CommLB::CommLB(const CkLBOptions &opt): CBase_CommLB(opt)
   if (CkMyPe() == 0)
     CkPrintf("[%d] CommLB created\n",CkMyPe());
   lbname = "CommLB";
+  theLbdb->CollectCommStatsOn();
 }
 
 bool CommLB::QueryBalanceNow(int _step)

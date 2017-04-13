@@ -373,6 +373,8 @@ void LDTurnPredictorOff(LDHandle _lbdb);
 void LDChangePredictor(LDHandle _lbdb, void *model);
 void LDCollectStatsOn(LDHandle _lbdb);
 void LDCollectStatsOff(LDHandle _lbdb);
+void LDCollectCommStatsOn(LDHandle _lbdb);
+void LDCollectCommStatsOff(LDHandle _lbdb);
 int  CLDCollectingStats(LDHandle _lbdb);
 void LDQueryEstLoad(LDHandle bdb);
 void LDGetObjLoad(LDObjHandle &h, LBRealType *wallT, LBRealType *cpuT);

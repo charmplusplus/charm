@@ -129,6 +129,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   use_thread = false;
 
   if (_lb_args.statsOn()) theLbdb->CollectStatsOn();
+  if (LBSimulation::doSimulation) theLbdb->CollectCommStatsOn();
 
   load_balancer_created = true;
 #endif

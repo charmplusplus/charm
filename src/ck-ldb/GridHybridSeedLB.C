@@ -47,6 +47,7 @@ GridHybridSeedLB::GridHybridSeedLB (const CkLBOptions &opt) : CBase_GridHybridSe
     CK_LDB_GridHybridSeedLB_Load_Tolerance = CK_LDB_GRIDHYBRIDSEEDLB_LOAD_TOLERANCE;
   }
   
+  theLbdb->CollectCommStatsOn();
   manager_init ();
 }
 

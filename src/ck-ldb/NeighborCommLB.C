@@ -20,6 +20,8 @@ NeighborCommLB::NeighborCommLB(const CkLBOptions &opt):CBase_NeighborCommLB(opt)
   lbname = "NeighborCommLB";
   if (CkMyPe() == 0)
     CkPrintf("[%d] NeighborCommLB created\n",CkMyPe());
+
+  theLbdb->CollectCommStatsOn();
 }
 
 LBMigrateMsg* NeighborCommLB::Strategy(NborBaseLB::LDStats* stats, int n_nbrs)

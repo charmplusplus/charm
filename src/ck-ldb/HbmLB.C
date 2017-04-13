@@ -55,6 +55,7 @@ HbmLB::HbmLB(const CkLBOptions &opt): CBase_HbmLB(opt)
   maxCommBytes = 0.0;
 
   if (_lb_args.statsOn()) theLbdb->CollectStatsOn();
+  theLbdb->CollectCommStatsOn();
 #endif
 }
 

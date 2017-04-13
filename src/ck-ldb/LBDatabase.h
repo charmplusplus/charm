@@ -32,7 +32,6 @@ private:
   int _lb_testPeSpeed;		// test cpu speed
   int _lb_useCpuTime;           // use cpu instead of wallclock time
   int _lb_statson;		// stats collection
-  int _lb_traceComm;		// stats collection for comm
   int _lb_central_pe;           // processor number for centralized startegy
   int _lb_percentMovesAllowed; //Specifies restriction on num of chares to be moved(as a percentage of total number of chares). Used by RefineKLB
   int _lb_teamSize;		// specifies the team size for TeamLB
@@ -46,7 +45,7 @@ public:
 #endif
     _lb_debug = _lb_ignoreBgLoad = _lb_syncResume = _lb_useCpuTime = 0;
     _lb_printsumamry = _lb_migObjOnly = 0;
-    _lb_statson = _lb_traceComm = 1;
+    _lb_statson = 1;
     _lb_percentMovesAllowed=100;
     _lb_loop = 0;
     _lb_central_pe = 0;
@@ -66,7 +65,6 @@ public:
   inline int & testPeSpeed() { return _lb_testPeSpeed; }
   inline int & useCpuTime() { return _lb_useCpuTime; }
   inline int & statsOn() { return _lb_statson; }
-  inline int & traceComm() { return _lb_traceComm; }
   inline int & central_pe() { return _lb_central_pe; }
   inline double & alpha() { return _lb_alpha; }
   inline double & beta() { return _lb_beta; }
@@ -312,13 +310,15 @@ public:
   inline void CollectStatsOn(void) { LDCollectStatsOn(myLDHandle); };
   inline void CollectStatsOff(void) { LDCollectStatsOff(myLDHandle); };
   inline int  CollectingStats(void) { return LDCollectingStats(myLDHandle); };
-  inline int  CollectingCommStats(void) { return LDCollectingStats(myLDHandle) && _lb_args.traceComm(); };
+  inline int  CollectCommStatsOn(void) { LDCollectCommStatsOn(myLDHandle); };
+  inline int  CollectCommStatsOff(void) { LDCollectCommStatsOff(myLDHandle); };
+  inline int  CollectingCommStats(void) { return LDCollectingStats(myLDHandle) && LDCollectingCommStats(myLDHandle); };
   inline void QueryEstLoad(void) { LDQueryEstLoad(myLDHandle); };
 
   inline int GetObjDataSz(void) { return LDGetObjDataSz(myLDHandle); };
   inline void GetObjData(LDObjData *data) { LDGetObjData(myLDHandle,data); };
   inline int GetCommDataSz(void) { return LDGetCommDataSz(myLDHandle); };
-  inline void GetCommData(LDCommData *data) { LDGetCommData(myLDHandle,data); };
+  inline void GetCommData(LDCommData *data) { if(LDCollectingStats(myLDHandle) && LDCollectingCommStats(myLDHandle)) LDGetCommData(myLDHandle,data); }
   
   inline void GetCommInfo(int& bytes, int& msgs, int& withinbytes, int& outsidebytes, int& num_ngh, int& hops, int& hopbytes) {
     return LDGetCommInfo(myLDHandle, bytes, msgs, withinbytes, outsidebytes, num_ngh, hops, hopbytes);

@@ -99,6 +99,13 @@ public:
   inline bool StatsOn(void) const 
        { return statsAreOn; };
 
+  inline void TurnCommStatsOn(void)
+       {commStatsAreOn = true;}
+  inline void TurnCommStatsOff(void)
+       {commStatsAreOn = false;}
+  inline bool CommStatsOn(void) const
+       { return commStatsAreOn; };
+
   void SetupPredictor(LDPredictModelFn on, LDPredictWindowFn onWin, LDPredictFn off, LDPredictModelFn change, void* data);
   inline void TurnPredictorOn(void *model) {
     if (predictCBFn!=NULL) predictCBFn->on(predictCBFn->data, model);
@@ -272,6 +279,7 @@ private:
   int objCount;
 
   bool statsAreOn;
+  bool commStatsAreOn;
   MigrateCBList migrateCBList;
 
   MigrationDoneCBList migrationDoneCBList;

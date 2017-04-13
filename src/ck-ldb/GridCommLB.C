@@ -79,6 +79,7 @@ GridCommLB::GridCommLB (const CkLBOptions &opt) : CBase_GridCommLB (opt)
     CK_LDB_GridCommLB_Load_Tolerance = CK_LDB_GRIDCOMMLB_LOAD_TOLERANCE;
   }
 
+  theLbdb->CollectCommStatsOn();
   manager_init ();
 }
 

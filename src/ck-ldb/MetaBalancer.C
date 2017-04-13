@@ -315,7 +315,7 @@ void MetaBalancer::ContributeStats(int it_n) {
 
   int bytes, msgs, outsidepemsgs, outsidepebytes, num_nghbors, hops, hopbytes;
   bytes = msgs = outsidepemsgs = outsidepebytes = num_nghbors = hops = hopbytes = 0;
-  if(_lb_args.traceComm())
+  if(lbdatabase->CollectingCommStats())
     lbdatabase->getLBDB()->GetCommInfo(bytes, msgs, outsidepemsgs,
       outsidepebytes, num_nghbors, hops, hopbytes);
 

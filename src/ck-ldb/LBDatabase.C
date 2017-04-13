@@ -278,10 +278,6 @@ void _loadbalancerInit()
   _lb_args.statsOn() = !CmiGetArgFlagDesc(argv, "+LBOff",
 			"Turn load balancer instrumentation off");
 
-  // turn instrumentation of communicatin off at startup
-  _lb_args.traceComm() = !CmiGetArgFlagDesc(argv, "+LBCommOff",
-		"Turn load balancer instrumentation of communication off");
-
 	// turn on MetaBalancer if set
 	_lb_args.metaLbOn() = CmiGetArgFlagDesc(argv, "+MetaLB",
 		"Turn on MetaBalancer");
@@ -313,8 +309,6 @@ void _loadbalancerInit()
       CmiPrintf("CharmLB> Load balancer running in simulation mode on file '%s' version %d.\n", LBSimulation::dumpFile, _lb_args.lbversion());
     if (_lb_args.statsOn()==0)
       CkPrintf("CharmLB> Load balancing instrumentation is off.\n");
-    if (_lb_args.traceComm()==0)
-      CkPrintf("CharmLB> Load balancing instrumentation for communication is off.\n");
     if (_lb_args.migObjOnly())
       CkPrintf("LB> Load balancing strategy ignores non-migratable objects.\n");
   }
@@ -366,7 +360,6 @@ void LBDatabase::initnodeFn()
   _registerCommandLineOpt("+LBSameCpus");
   _registerCommandLineOpt("+LBUseCpuTime");
   _registerCommandLineOpt("+LBOff");
-  _registerCommandLineOpt("+LBCommOff");
   _registerCommandLineOpt("+MetaLB");
   _registerCommandLineOpt("+LBAlpha");
   _registerCommandLineOpt("+LBBeta");
@@ -640,18 +633,6 @@ extern "C" void LBTurnInstrumentOff() {
     LBDatabase::Object()->CollectStatsOff();
   else
     _lb_args.statsOn() = 0;
-#endif
-}
-
-extern "C" void LBTurnCommOn() {
-#if CMK_LBDB_ON
-  _lb_args.traceComm() = 1;
-#endif
-}
-
-extern "C" void LBTurnCommOff() {
-#if CMK_LBDB_ON
-  _lb_args.traceComm() = 0;
 #endif
 }
 

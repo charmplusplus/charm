@@ -24,6 +24,8 @@ TempAwareGreedyLB::TempAwareGreedyLB(const CkLBOptions &opt): CBase_TempAwareGre
   lbname = "TempAwareGreedyLB";
   if (CkMyPe()==0)
     CkPrintf("[%d] TempAwareGreedyLB created\n",CkMyPe());
+
+  theLbdb->CollectCommStatsOn();
 }
 
 bool TempAwareGreedyLB::QueryBalanceNow(int _step)

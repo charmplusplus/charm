@@ -26,6 +26,7 @@ void GreedyCommLB::init()
     lbname = (char*)"GreedyCommLB";
     alpha = _lb_args.alpha();
     beta = _lb_args.beta();
+    theLbdb->CollectCommStatsOn();
     manager_init();
 }
 

@@ -156,6 +156,8 @@ RecBipartLB::RecBipartLB(const CkLBOptions &opt) : CBase_RecBipartLB(opt) {
   lbname = "RecBipartLB";
   if(CkMyPe() == 0)
     CkPrintf("RecBipartLB created\n");
+
+  theLbdb->CollectCommStatsOn();
 }
 
 bool RecBipartLB::QueryBalanceNow(int _step) {

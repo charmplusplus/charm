@@ -62,6 +62,7 @@ void LBDB::batsyncer::init(LBDB *_db,double initPeriod)
 LBDB::LBDB(): useBarrier(true)
 {
     statsAreOn = false;
+    commStatsAreOn = false;
     omCount = objCount = oms_registering = 0;
     obj_running = false;
     commTable = new LBCommTable;

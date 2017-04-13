@@ -73,6 +73,7 @@ GridCommRefineLB::GridCommRefineLB (const CkLBOptions &opt) : CBase_GridCommRefi
     CK_LDB_GridCommRefineLB_Tolerance = CK_LDB_GRIDCOMMREFINELB_TOLERANCE;
   }
 
+  theLbdb->CollectCommStatsOn();
   manager_init ();
 }
 

@@ -21,6 +21,8 @@ TreeMatchLB::TreeMatchLB(const CkLBOptions &opt): CBase_TreeMatchLB(opt)
   lbname = (char*)"TreeMatchLB";
   if (CkMyPe() == 0)
     CkPrintf("[%d] TreeMatchLB created\n",CkMyPe());
+
+  theLbdb->CollectCommStatsOn();
 }
 
 bool TreeMatchLB::QueryBalanceNow(int _step)
