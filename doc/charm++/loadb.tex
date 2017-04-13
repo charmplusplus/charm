@@ -111,12 +111,20 @@ and their brief descriptions:
 \begin{itemize}
 \item {\bf RandCentLB}:   Randomly assigns objects to processors;
 %\item {\bf RecBisectBfLB}:        Recursively partition with Breadth first enumeration;
-\item {\bf MetisLB}:      Uses METIS\texttrademark\hspace{0mm} to partitioning object communication graph.
+\item {\bf MetisLB}:
+Uses \href{http://glaros.dtc.umn.edu/gkhome/metis/metis/overview}{METIS\texttrademark\hspace{0mm}}
+to partition the object communication graph.
+\item {\bf ScotchLB}:
+Uses the \href{http://www.labri.fr/perso/pelegrin/scotch/}{SCOTCH}
+library for partitioning the object communication graph, while also taking
+object load imbalance into account.
 \item {\bf GreedyLB}:   Uses a greedy algorithm that always assigns the heaviest object to the least loaded processor.
 \item {\bf GreedyRefineLB}:   Uses a greedy algorithm that assigns the
 heaviest object to the least loaded processor when the benefit
 outweighs the migration cost, otherwise leaves the object on its
-current processor.
+current processor. It takes an optional command-line argument {\em
++LBNumMoves},which specifies the percentage of migrations that can be
+tolerated.
 \item {\bf GreedyCommLB}:  Extends the greedy algorithm to take the communication graph into account.
 \item {\bf TopoCentLB}:    Extends the greedy algorithm to take processor topology into account.
 \item {\bf RefineLB}:     Moves objects away from the most overloaded processors to reach average, limits the number of objects migrated.
@@ -128,6 +136,9 @@ the overloaded processor. This strategy limits the number of objects migrated.
 \item {\bf RefineTopoLB}:       Same idea as in RefineLB, but takes processor topology into account.
 \item {\bf BlockLB}: This strategy does a blocked distribution of objects to
 processors.
+\item {\bf RotateLB}: This strategy moves objects to the next
+available PE every time it is called. It is useful for debugging PUP
+routines and other migration related bugs.
 \item {\bf ComboCentLB}:  A special load balancer that can be used to combine any number of centralized load balancers mentioned above.
 \end{itemize}
 
