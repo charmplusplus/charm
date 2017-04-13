@@ -184,7 +184,112 @@ In this case, the {\tt set\_env\_script} is invoked on each node before launchin
 
 \end{description}
 
-\subsection{SMP and Multicore Options}
+\subsection{SMP Options}
+
+SMP mode in \charmpp{} spawns one OS process per logical node. Within this
+process there are two types of threads:
+
+\begin{enumerate}
+
+\item Worker Threads that have objects mapped to them and execute entry methods
+
+\item Communication Thread that sends and receives data (depending on the
+network layer)
+
+\end{enumerate}
+
+\charmpp{} always spawns one communication thread per process when using SMP
+mode and as many worker threads as the user specifies (see the options below).
+In general, the worker threads produce messages and hand them to the communication
+thread, which receives messages and schedules them on worker threads. \\
+
+
+To use SMP mode in \charmpp{}, build charm with the \texttt{smp} option, e.g.:
+
+\begin{alltt}
+./build charm++ netlrts-linux-x86\_64 smp
+\end{alltt}
+
+There are various trade-offs associated with SMP mode. For instance, when using
+SMP mode there is no waiting to receive messages due to
+long running entry methods. There is also no time spent in sending messages by
+the worker threads and memory is limited by the node instead of per core.
+In SMP mode, intra-node messages use simple pointer passing, which
+bypasses the overhead associated with the network and extraneous copies.
+Another benefit is that the runtime will not pollute the caches of worker
+threads with communication-related data in SMP mode.
+
+However, there are also some drawbacks associated with using SMP mode. First and
+foremost, you sacrifice one core to the communication thread. This is not ideal
+for compute bound applications. Additionally, this communication thread may
+become a serialization bottleneck in applications with large amounts of
+communication. Keep these trade-offs in mind when evaluating whether to use SMP
+mode for your application or deciding how many processes to launch per physical
+node when using SMP mode.
+Finally, any library code the application may call needs to be thread-safe.
+
+\charmpp{} provides the following options to control
+the number of worker threads spawned and the placement of both worker and
+communication threads:
+
+\begin{description}
+
+\item[{\tt ++ppn}] Number of PEs (or worker threads) per logical node (OS process).
+  This option should be specified even when using platform specific launchers
+  (e.g., aprun, ibrun).
+
+\item[{\tt +pemap L[-U[:S[.R]+O]][,...]}] Bind the execution threads to
+  the sequence of cores described by the arguments using the operating
+  system's CPU affinity functions. Can be used outside SMP mode.
+
+A single number identifies a particular core. Two numbers separated by
+a dash identify an inclusive range (\emph{lower bound} and \emph{upper
+bound}). If they are followed by a colon and another number (a
+\emph{stride}), that range will be stepped through in increments of
+the additional number. Within each stride, a dot followed by a
+\emph{run} will indicate how many cores to use from that starting
+point. A plus represents the offset to the previous core number.
+Multiple {\tt +offset} flags are supported, e.g., 0-7+8+16 equals 0,8,16,1,9,17.
+
+For example, the sequence {\tt 0-8:2,16,20-24} includes cores 0, 2, 4,
+6, 8, 16, 20, 21, 22, 23, 24. On a 4-way quad-core system, if one
+wanted to use 3 cores from each socket, one could write this as {\tt
+0-15:4.3}. {\tt ++ppn 10 +pemap 0-11:6.5+12} equals {\tt ++ppn 10 +pemap
+0,12,1,13,2,14,3,15,4,16,6,18,7,19,8,20,9,21,10,22}
+
+\item[{\tt +commap p[,q,...]}] Bind communication threads to the
+  listed cores, one per process.
+
+\end{description}
+
+To run applications in SMP mode, we generally recommend using one logical node
+per socket or NUMA domain.
+\texttt{++ppn} will spawn N threads in addition to 1 thread spawned
+by the runtime for the communication threads, so the total number of threads
+will be N+1 per node. Consequently, you should map both the worker and communication
+threads to separate cores. Depending on your system and application, it may be
+necessary to spawn one thread less than the number of cores in order to leave
+one free for the OS to run on. An example run command might look like:
+
+\begin{alltt}
+./charmrun ++ppn 3 +p6 +pemap 1-3,5-7 +commap 0,4 ./app <args>
+\end{alltt}
+
+This will create two logical nodes/OS processes (2 = 6 PEs/3 PEs per node),
+each with three worker threads/PEs (\texttt{++ppn 3}). The worker threads/PEs
+will be mapped thusly: PE 0 to core 1, PE 1 to core 2, PE 2 to core 3 and
+PE 4 to core 5, PE 5 to core 6, and PE 6 to core 7. PEs/worker threads 0-2
+compromise the first logical node and 3-5 are the second logical node.
+Additionally, the communication threads will be mapped to core 0, for the
+communication thread of the first logical node, and to core 4, for the
+communication thread of the second logical node.
+
+Please keep in mind that \texttt{+p} always specifies the total number of PEs
+created by \charmpp{}, regardless of mode (the same number as returned by
+\texttt{CkNumPes()}). The \texttt{+p} option does not include the communication
+thread, there will always be exactly one of those per logical node.
+
+\subsection{Multicore Options}
 
 On multicore platforms, operating systems (by default) are free to move
 processes and threads among cores to balance load. This however sometimes can
@@ -200,8 +305,6 @@ including network and MPI versions, smp and non-smp versions.
 
 \begin{description}
 
-\item[{\tt ++ppn}]                       Number of PEs (or worker threads) per logical node (OS process). This option should be specified even when using platform specific launchers (e.g., aprun, ibrun).
-
 \item[{\tt +setcpuaffinity}]             Set cpu affinity
   automatically for processes (when Charm++ is based on non-smp
   versions) or threads (when smp). This option is recommended, as it
@@ -209,28 +312,6 @@ including network and MPI versions, smp and non-smp versions.
   the processors of a physical node.
 
 \item[{\tt +excludecore <core \#>}]       Do not set cpu affinity for the given core number. One can use this option multiple times to provide a list of core numbers to avoid.
-
-\item[{\tt +pemap L[-U[:S[.R]+O]][,...]}] Bind the execution threads to
-  the sequence of cores described by the arguments using the operating
-  system's CPU affinity functions.
-
-A single number identifies a particular core. Two numbers separated by
-a dash identify an inclusive range (\emph{lower bound} and \emph{upper
-  bound}). If they are followed by a colon and another number (a
-\emph{stride}), that range will be stepped through in increments of
-the additional number. Within each stride, a dot followed by a
-\emph{run} will indicate how many cores to use from that starting
-point. A plus represents the offset to the previous core number. 
-Multiple {\tt +offset} flags are supported, e.g., 0-7+8+16 equals 0,8,16,1,9,17.
-
-For example, the sequence {\tt 0-8:2,16,20-24} includes cores 0, 2, 4,
-6, 8, 16, 20, 21, 22, 23, 24. On a 4-way quad-core system, if one
-wanted to use 3 cores from each socket, one could write this as {\tt
-0-15:4.3}. {\tt +ppn 10 +pemap 0-11:6.5+12} equals {\tt +ppn 10 +pemap 
-0,12,1,13,2,14,3,15,4,16,6,18,7,19,8,20,9,21,10,22}
-
-\item[{\tt +commap p[,q,...]}] Bind communication threads to the
-  listed cores, one per process.
 
 \end{description}
 
