@@ -2625,6 +2625,15 @@ static void ConverseRunPE(int everReturn)
 
   /* better to show the status here */
   if (CmiMyPe() == 0) {
+#if CHARM_VERSION >= 60800
+#if CMK_USE_IBVERBS
+#pragma message ("Warning! net-* deprecated (Charm >= 6.8.0), please use verbs-*\n")
+    CmiPrintf("Warning> net-* deprecated (Charm >= 6.8.0), please use verbs-*\n");
+#else
+#pragma message ("Warning! net-* deprecated (Charm >= 6.8.0), please use netlrts\n")
+    CmiPrintf("Warning> net-* deprecated (Charm >= 6.8.0), please use netlrts\n");
+#endif
+#endif
     if (Cmi_netpoll == 1) {
       CmiPrintf("Charm++> scheduler running in netpoll mode.\n");
     }
