@@ -376,7 +376,7 @@ void TraceAutoPerfBOC::formatPerfData(PerfData *perfdata, int subStep, int phase
 
   data[AVG_NumObjectsPerPE] = data[AVG_NumObjectsPerPE]/numpes/steps;
 
-  CkPrintf("format data :  PE %d PEs in group %d [IDLE, OVERHEAD, UTIL, ENTRY ] %.2f, %.2f, %.2f %f \n", CkMyPe(), numpes, data[AVG_IdlePercentage], data[AVG_OverheadPercentage], data[AVG_UtilizationPercentage], data[AVG_EntryMethodDuration]);
+  CkPrintf("\nPICS Data: PEs in group: %d\nIDLE%: %.2f\nOVERHEAD%: %.2f\nUTIL%: %.2f\nAVG_ENTRY_DURATION: %f\n", numpes, data[AVG_IdlePercentage], data[AVG_OverheadPercentage], data[AVG_UtilizationPercentage], data[AVG_EntryMethodDuration]);
 }
 
 void TraceAutoPerfBOC::getPerfData(int reductionPE, CkCallback cb) {
@@ -458,7 +458,6 @@ void TraceAutoPerfBOC::globalPerfAnalyze(CkReductionMsg *msg )
   else
     isBest = false;
   currentTimeStep = data->timeStep = timestep/(currentAppStep-lastAnalyzeStep);
-  CkPrintf("-------------------- current timestep is %f step %d after ldb %d \n", currentTimeStep, currentAppStep, CkpvAccess(cntAfterLdb));
   if(CkpvAccess(cntAfterLdb) == 1)
     CkpvAccess(currentTimeStep) = currentTimeStep;
   lastAnalyzeStep = currentAppStep;
@@ -520,16 +519,6 @@ void TraceAutoPerfBOC::analyzeAndTune(){
   else
     numOfSets = numGroups;
   autoPerfProxy[CkpvAccess(myInterGroupParent)].tuneDone();
-  //output results to screen or files
-  for(int idx=0; idx<solutions.size(); idx++)
-  {
-    fprintf(stdout, "\nnumber of solutions is %lu\n", solutions[idx].size());
-      for(IntDoubleMap::iterator iter=solutions[idx].begin(); iter!=solutions[idx].end(); iter++){
-          int effect = iter->first;
-          int value = effect >0 ? effect : -effect;
-          fprintf(stdout, "%s %s \n", effect>0?"UP":"DOWN", EffectName[value]); 
-      }
-  }
 }
 
 void TraceAutoPerfBOC::analyzePerfData(PerfData *perfdata, int subStep, int phaseID) {
