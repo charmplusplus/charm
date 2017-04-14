@@ -22,6 +22,11 @@
 #define __ICC__
 #endif
 
+#ifdef __MSC__
+#define CMK_THREADLOCAL __declspec(thread)
+#else
+#define CMK_THREADLOCAL __thread
+#endif
 
 #include "gk_arch.h" /*!< This should be here, prior to the includes */
 

@@ -18,15 +18,9 @@ This file in metis was modified by Kavitha Chandrasekar at UIUC
 **************************************************************************/
 #ifndef _GK_ERROR_C_
 /* declared in error.c */
-#ifdef __MSC__
-extern __declspec(thread) int gk_cur_jbufs;
-extern __declspec(thread) jmp_buf gk_jbufs[];
-extern __declspec(thread) jmp_buf gk_jbuf;
-#else
-extern __thread int gk_cur_jbufs;
-extern __thread jmp_buf gk_jbufs[];
-extern __thread jmp_buf gk_jbuf;
-#endif
+extern CMK_THREADLOCAL int gk_cur_jbufs;
+extern CMK_THREADLOCAL jmp_buf gk_jbufs[];
+extern CMK_THREADLOCAL jmp_buf gk_jbuf;
 
 #endif
 

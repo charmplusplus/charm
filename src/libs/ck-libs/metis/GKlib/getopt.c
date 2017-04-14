@@ -30,6 +30,8 @@ So, do read the documentation here.
    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
    02111-1307 USA.  
 \endverbatim
+
+This file in metis was modified by Kavitha Chandrasekar at UIUC
 */
 /*************************************************************************/
 
@@ -53,7 +55,7 @@ This variable is set by getopt to point at the value of the option argument,
 for those options that accept arguments.
 */
 /*************************************************************************/
-char *gk_optarg;
+CMK_THREADLOCAL char *gk_optarg;
 
 
 /*************************************************************************/
@@ -65,7 +67,7 @@ you can use this variable to determine where the remaining non-option arguments
 begin. 
 */
 /*************************************************************************/
-int gk_optind = 1; 
+CMK_THREADLOCAL int gk_optind = 1;
 
 
 /*************************************************************************/
@@ -78,7 +80,7 @@ behavior. If you set this variable to zero, getopt does not print any messages,
 but it still returns the character ? to indicate an error.
 */
 /*************************************************************************/
-int gk_opterr = 1;
+CMK_THREADLOCAL int gk_opterr = 1;
 
 
 /*************************************************************************/
@@ -89,7 +91,7 @@ missing required argument, it stores that option character in this
 variable. You can use this for providing your own diagnostic messages.
 */
 /*************************************************************************/
-int gk_optopt = '?';
+CMK_THREADLOCAL int gk_optopt = '?';
 
 
 /*************************************************************************/
@@ -97,7 +99,7 @@ int gk_optopt = '?';
 Records that the getopt facility has been initialized.
 */
 /*************************************************************************/
-int gk_getopt_initialized;
+CMK_THREADLOCAL int gk_getopt_initialized;
 
 
 /*************************************************************************/
@@ -110,7 +112,7 @@ If this is zero, or a null string, it means resume the scan by advancing
 to the next ARGV-element.  
 */
 /*************************************************************************/
-static char *nextchar;
+static CMK_THREADLOCAL char *nextchar;
 
 
 /*************************************************************************/
@@ -118,7 +120,7 @@ static char *nextchar;
 Value of POSIXLY_CORRECT environment variable.  
 */
 /*************************************************************************/
-static char *posixly_correct;
+static CMK_THREADLOCAL char *posixly_correct;
 
 
 /*************************************************************************/
@@ -165,8 +167,8 @@ been skipped.  `first_nonopt' is the index in ARGV of the first of them;
 `last_nonopt' is the index after the last of them.  
 */
 /*************************************************************************/
-static int first_nonopt;
-static int last_nonopt;
+static CMK_THREADLOCAL int first_nonopt;
+static CMK_THREADLOCAL int last_nonopt;
 
 
 

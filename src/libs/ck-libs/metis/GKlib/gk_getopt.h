@@ -5,6 +5,8 @@
 \date   Started 3/27/2007
 \author George
 \version\verbatim $Id: gk_getopt.h 10711 2011-08-31 22:23:04Z karypis $ \endverbatim
+
+This file in metis was modified by Kavitha Chandrasekar at UIUC
 */
 
 #ifndef _GK_GETOPT_H_
@@ -12,10 +14,10 @@
 
 
 /* Externals from getopt.c */
-extern char *gk_optarg;
-extern int gk_optind;
-extern int gk_opterr;
-extern int gk_optopt;
+extern CMK_THREADLOCAL char *gk_optarg;
+extern CMK_THREADLOCAL int gk_optind;
+extern CMK_THREADLOCAL int gk_opterr;
+extern CMK_THREADLOCAL int gk_optopt;
 
 
 /*! \brief The structure that stores the information about the command-line options 

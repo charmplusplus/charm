@@ -18,11 +18,7 @@ This file in metis was modified by Kavitha Chandrasekar at UIUC
 #include <GKlib.h>
 
 /* This is for the global mcore that tracks all heap allocations */
-#ifdef __MSC__
-static __declspec(thread) gk_mcore_t *gkmcore = NULL;
-#else
-static __thread gk_mcore_t *gkmcore = NULL;
-#endif
+static CMK_THREADLOCAL gk_mcore_t *gkmcore = NULL;
 
 
 /*************************************************************************/

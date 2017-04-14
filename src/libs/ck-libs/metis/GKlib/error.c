@@ -21,34 +21,21 @@ This file in metis was modified by Kavitha Chandrasekar at UIUC
 /* These are the jmp_buf for the graceful exit in case of severe errors.
    Multiple buffers are defined to allow for recursive invokation. */
 #define MAX_JBUFS 128
-#ifdef __MSC__
-__declspec(thread) int gk_cur_jbufs=-1;
-__declspec(thread) jmp_buf gk_jbufs[MAX_JBUFS];
-__declspec(thread) jmp_buf gk_jbuf;
-#else
-__thread int gk_cur_jbufs=-1;
-__thread jmp_buf gk_jbufs[MAX_JBUFS];
-__thread jmp_buf gk_jbuf;
-#endif
+CMK_THREADLOCAL int gk_cur_jbufs=-1;
+CMK_THREADLOCAL jmp_buf gk_jbufs[MAX_JBUFS];
+CMK_THREADLOCAL jmp_buf gk_jbuf;
 
 typedef void (*gksighandler_t)(int);
 
 /* These are the holders of the old singal handlers for the trapped signals */
-#ifdef __MSC__
-static __declspec(thread) gksighandler_t old_SIGMEM_handler;  /* Custom signal */
-static __declspec(thread) gksighandler_t old_SIGERR_handler;  /* Custom signal */
-static __declspec(thread) gksighandler_t old_SIGMEM_handlers[MAX_JBUFS];  /* Custom signal */
-static __declspec(thread) gksighandler_t old_SIGERR_handlers[MAX_JBUFS];  /* Custom signal */
-#else
-static __thread gksighandler_t old_SIGMEM_handler;  /* Custom signal */
-static __thread gksighandler_t old_SIGERR_handler;  /* Custom signal */
-static __thread gksighandler_t old_SIGMEM_handlers[MAX_JBUFS];  /* Custom signal */
-static __thread gksighandler_t old_SIGERR_handlers[MAX_JBUFS];  /* Custom signal */
-#endif
+static CMK_THREADLOCAL gksighandler_t old_SIGMEM_handler;  /* Custom signal */
+static CMK_THREADLOCAL gksighandler_t old_SIGERR_handler;  /* Custom signal */
+static CMK_THREADLOCAL gksighandler_t old_SIGMEM_handlers[MAX_JBUFS];  /* Custom signal */
+static CMK_THREADLOCAL gksighandler_t old_SIGERR_handlers[MAX_JBUFS];  /* Custom signal */
 
 /* The following is used to control if the gk_errexit() will actually abort or not.
    There is always a single copy of this variable */
-static int gk_exit_on_error = 1;
+static CMK_THREADLOCAL int gk_exit_on_error = 1;
 
 
 /*************************************************************************/
