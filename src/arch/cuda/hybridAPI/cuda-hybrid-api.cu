@@ -112,6 +112,8 @@ public:
 #define GPU_MEMPOOL_MIN_BUFFER_SIZE 256
 // Scale the amount of memory each node pins
 #define GPU_MEMPOOL_SCALE 1.0
+// Largest number of bytes that will initially be allocated for the GPU Mempool
+#define GPU_MEMPOOL_MAX_INIT_SIZE static_cast<size_t>(1 << 30) // 1 << 30 = 1073741824 bytes = 1 GiB
 
   CkVec<BufferPool> memPoolFreeBufs;
   CkVec<size_t> memPoolBoundaries;
@@ -883,7 +885,8 @@ void createPool(int *nbuffers, int nslots, CkVec<BufferPool> &pools){
   cudaChk(cudaGetDeviceProperties(&prop, getMyCudaDevice(CmiMyPe())));
 
   // Divide by #pes and multiply by #pes in nodes
-  size_t availableMemory = prop.totalGlobalMem / CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(CmiMyPe()))
+  size_t maxMemAlloc = std::min(GPU_MEMPOOL_MAX_INIT_SIZE, prop.totalGlobalMem);
+  size_t availableMemory = maxMemAlloc / CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(CmiMyPe()))
                             * CmiMyNodeSize() * GPU_MEMPOOL_SCALE;
 
   // Pre-calculate memory per size
