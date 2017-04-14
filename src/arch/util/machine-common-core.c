@@ -382,11 +382,12 @@ INLINE_KEYWORD int CmiMyPeGlobal() {
 INLINE_KEYWORD int CmiMyRank() {
     return CmiGetState()->rank;
 }
-INLINE_KEYWORD int CmiNodeFirst(int node) {
-    return node*_Cmi_mynodesize;
-}
 INLINE_KEYWORD int CmiNodeSize(int node) {
     return _Cmi_mynodesize;
+}
+#if !CMK_MULTICORE // these are defined in converse.h
+INLINE_KEYWORD int CmiNodeFirst(int node) {
+    return node*_Cmi_mynodesize;
 }
 INLINE_KEYWORD int CmiNodeOf(int pe) {
     return (pe/_Cmi_mynodesize);
@@ -394,7 +395,8 @@ INLINE_KEYWORD int CmiNodeOf(int pe) {
 INLINE_KEYWORD int CmiRankOf(int pe) {
     return pe%_Cmi_mynodesize;
 }
-#endif
+#endif // end of !CMK_MULTICORE
+#endif // end of CMK_SMP
 
 static int CmiState_hasMessage() {
   CmiState cs = CmiGetState();

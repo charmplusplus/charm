@@ -286,12 +286,20 @@ extern int CmiMyPe();
 extern int CmiMyRank();
 #define CmiNumPes()         _Cmi_numpes
 #define CmiMyNodeSize()     _Cmi_mynodesize
+extern int CmiNodeSize(int node);
+#if CMK_MULTICORE
+#define CmiMyNode()         0
+#define CmiNumNodes()       1
+#define CmiNodeFirst(node)  0
+#define CmiNodeOf(pe)       0
+#define CmiRankOf(pe)       pe
+#else
 #define CmiMyNode()         _Cmi_mynode
 #define CmiNumNodes()       _Cmi_numnodes
 extern int CmiNodeFirst(int node);
-extern int CmiNodeSize(int node);
 extern int CmiNodeOf(int pe);
 extern int CmiRankOf(int pe);
+#endif
 
 #define CMK_CPV_IS_SMP sched_yield();
 
@@ -414,12 +422,20 @@ extern int CmiMyPe();
 extern int CmiMyRank();
 #define CmiNumPes()         _Cmi_numpes
 #define CmiMyNodeSize()     _Cmi_mynodesize
+extern int CmiNodeSize(int node);
+#if CMK_MULTICORE
+#define CmiMyNode()         0
+#define CmiNumNodes()       1
+#define CmiNodeFirst(node)  0
+#define CmiNodeOf(pe)       0
+#define CmiRankOf(pe)       pe
+#else
 #define CmiMyNode()         _Cmi_mynode
 #define CmiNumNodes()       _Cmi_numnodes
 extern int CmiNodeFirst(int node);
-extern int CmiNodeSize(int node);
 extern int CmiNodeOf(int pe);
 extern int CmiRankOf(int pe);
+#endif
 
 #define CMK_CPV_IS_SMP Sleep(0);
 
