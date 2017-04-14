@@ -288,6 +288,23 @@ AddList() {
     echo $ret
 }
 
+# Drop the first argument anywhere it appears in the subsequent list
+DropList() {
+    drop="$1"
+    shift
+
+    ret=""
+    while [ $# -gt 1 ]
+    do
+        if [ "$1" != "$drop" ]; then
+            ret="$ret $1"
+        fi
+        shift
+    done
+
+    echo $ret
+}
+
 # TEMP_BASE is appended with this script's process ID (PID),
 # so multiple charmcs can run in parallel without overwriting
 # each other's temporary files.
@@ -1691,9 +1708,19 @@ Debug "About to check TRACEMODE=$TRACEMODE and BALANCE=$BALANCE..."
 if [ x"$TRACEMODE" != x ]
 then
 for trace in $TRACEMODE; do
-[ ! -r "$CHARMLIB/libtrace-$trace.a" ] && Abort "charmc : No such tracemode $trace"
-TRACE_OBJ="$TRACE_OBJ -ltrace-$trace"
+    [ ! -r "$CHARMLIB/libtrace-$trace.a" ] && Abort "charmc : No such tracemode $trace"
+
+    if [ "$LANGUAGE" = "converse" -o "$LANGUAGE" = "converse++" ]; then
+        if [ "$trace" != "counter" ]; then
+            Warning "Tracemode $trace isn't supported in Converse-level programs; Dropping it"
+            TRACEMODE=`DropList $trace $TRACEMODE`
+            continue
+        fi
+    fi
+
+    TRACE_OBJ="$TRACE_OBJ -ltrace-$trace"
 done
+
 TRACE_OBJ="$TRACE_OBJ $CMK_LIBZ"
 fi
 
