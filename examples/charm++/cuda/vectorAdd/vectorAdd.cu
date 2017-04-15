@@ -23,9 +23,9 @@ void run_vecAdd(workRequest *wr, cudaStream_t kernel_stream, void **devBuffers)
        (float *) devBuffers[wr->bufferInfo[A_INDEX].bufferID],
        (float *) devBuffers[wr->bufferInfo[B_INDEX].bufferID],
        *((int *) wr->userData));
-  hapi_poolFree(wr->bufferInfo[C_INDEX].hostBuffer);
-  hapi_poolFree(wr->bufferInfo[B_INDEX].hostBuffer);
-  hapi_poolFree(wr->bufferInfo[A_INDEX].hostBuffer);
+  hapi_hostFree(wr->bufferInfo[C_INDEX].hostBuffer);
+  hapi_hostFree(wr->bufferInfo[B_INDEX].hostBuffer);
+  hapi_hostFree(wr->bufferInfo[A_INDEX].hostBuffer);
 }
 
 void createWorkRequest(int vectorSize, float *h_A, float *h_B,
@@ -45,7 +45,7 @@ void createWorkRequest(int vectorSize, float *h_A, float *h_B,
   AInfo->transferToDevice = YES;
   AInfo->transferFromDevice = NO;
   AInfo->freeBuffer = YES;
-  AInfo->hostBuffer = hapi_poolMalloc(size);
+  AInfo->hostBuffer = hapi_hostMalloc(size);
   memcpy(AInfo->hostBuffer, h_A, size);
   AInfo->size = size;
 
@@ -53,7 +53,7 @@ void createWorkRequest(int vectorSize, float *h_A, float *h_B,
   BInfo->transferToDevice = YES;
   BInfo->transferFromDevice = YES;
   BInfo->freeBuffer = YES;
-  BInfo->hostBuffer = hapi_poolMalloc(size);
+  BInfo->hostBuffer = hapi_hostMalloc(size);
   memcpy(BInfo->hostBuffer, h_B, size);
   BInfo->size = size;
 
@@ -61,7 +61,7 @@ void createWorkRequest(int vectorSize, float *h_A, float *h_B,
   CInfo->transferToDevice = NO;
   CInfo->transferFromDevice = YES;
   CInfo->freeBuffer = YES;
-  CInfo->hostBuffer = hapi_poolMalloc(size);
+  CInfo->hostBuffer = hapi_hostMalloc(size);
   *h_C = (float *)CInfo->hostBuffer ;
   CInfo->size = size;
 

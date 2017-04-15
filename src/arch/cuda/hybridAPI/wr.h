@@ -32,16 +32,33 @@ typedef struct pinnedMemReq {
 void delayedFree(void* ptr);
 
 
+/* hybrid API wrappers to call appropriate malloc/free functions
+ *
+ * Their behavior is controlled by the following user defined
+ * variables:
+ *
+ * CUDA_MEMPOOL - toggle use of mempool functions
+ *   when enabled, makes calls to the appropriate hapi_*
+ *   functions which draw memory from a preallocated pool
+ *   if disabled (and cuda functions are enabled) we use the blocking
+ *   cuda memory allocators (cuda*Host) directly
+ *
+ * CUDA_USE_CUDA_MALLOCHOST - toggle use of the cuda memory allocators,
+ *   if not defined then these functions fallback to regular
+ *   malloc and free
+ */
 #ifdef CUDA_USE_CUDAMALLOCHOST /* <- user define */
 #  ifdef CUDA_MEMPOOL
-#    define hapi_hostFree hapi_poolFree
+#    define hapi_hostMalloc hapi_poolMalloc
+#    define hapi_hostFree   hapi_poolFree
 #  else
-#    define hapi_hostFree delayedFree
-#  endif
+#    define hapi_hostMalloc hapi_cudaMallocHost
+#    define hapi_hostFree   delayedFree
+#  endif // CUDA_MEMPOOL
 #else
-#  define hapi_hostFree free
-#endif
-
+#  define hapi_hostMalloc malloc
+#  define hapi_hostFree   free
+#endif // CUDA_USE_CUDAMALLOCHOST
 
 /* pinnedMallocHost
  *
@@ -51,6 +68,8 @@ void delayedFree(void* ptr);
  */
 void pinnedMallocHost(pinnedMemReq* reqs);
 
+// Provide funtion to work with macro
+void* hapi_cudaMallocHost(size_t size);
 
 /* struct bufferInfo
  *

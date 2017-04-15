@@ -4,7 +4,7 @@ OBJS = vectorAdd.o vectorAddCU.o
 
 CUDA_LEVEL=35
 NVCC = /usr/local/cuda/bin/nvcc
-NVCC_FLAGS = -O3 -c -use_fast_math -DGPU_MEMPOOL #-device-debug -deviceemu
+NVCC_FLAGS = -O3 -c -use_fast_math -DGPU_MEMPOOL -DCUDA_USE_CUDAMALLOCHOST #-device-debug -deviceemu
 NVCC_FLAGS += -arch=compute_$(CUDA_LEVEL) -code=sm_$(CUDA_LEVEL)
 NVCC_INC = -I/usr/local/cuda/include  -I../../../../../src/arch/cuda/hybridAPI
 CHARMINC = -I../../../../include

@@ -292,6 +292,12 @@ void pinnedMallocHost(pinnedMemReq* reqs) {
   }
 }
 
+void* hapi_cudaMallocHost(size_t size) {
+  void* ret;
+  cudaChk(cudaMallocHost(&ret, size));
+  return ret;
+}
+
 void delayedFree(void* ptr){
   CsvAccess(gpuManager).delayedFreeReqs[getNextDelayedFreeReqIndex()] = ptr;
 }
