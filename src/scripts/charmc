@@ -1759,6 +1759,12 @@ BAL_OBJ="-lldb-$BALANCE -lconv-ldb"
 
 # Check for valid choice of MEMORY
 
+# Isomalloc does not work on BGQ:
+if [ "$CMK_BLUEGENEQ" = "1" ] && [ "$MEMORY" = "isomalloc" -o "$MEMORY" = "os-isomalloc" ]
+then
+  Abort "Isomalloc is not supported on BlueGene/Q."
+fi
+
 # Isomalloc does not work on Clang in non-SMP mode, so use os-isomalloc instead:
 if [ "$MEMORY" = "isomalloc" -a "$CMK_USING_CLANG" = "1" -a "$CMK_SMP" != "1" ]
 then
