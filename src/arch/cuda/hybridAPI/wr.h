@@ -214,7 +214,7 @@ void hapi_poolFree(void*);
  Allocate host pinned memory from the pool.
 */
 void *hapi_poolMalloc(int size);
-#endif
+#endif // GPU_MEMPOOL
 /* external declarations needed by the user */
 
 void** getdevBuffers();

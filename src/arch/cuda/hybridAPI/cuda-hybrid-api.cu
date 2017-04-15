@@ -16,6 +16,7 @@
 
 #include "wrqueue.h"
 #include "cuda-hybrid-api.h"
+#include "converse.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <algorithm>
@@ -492,10 +493,12 @@ void GPUManager::runKernel(workRequest *wr) {
 
 #ifdef GPU_MEMPOOL
 void createPool(int *nbuffers, int nslots, CkVec<BufferPool> &pools);
-#endif
+#endif // GPU_MEMPOOL
 
 void initHybridAPI() {
   CsvInitialize(GPUManager, gpuManager);
+
+#ifdef GPU_MEMPOOL
 
 #ifndef GPU_DUMMY_MEMPOOL
   int sizes[GPU_MEMPOOL_NUM_SLOTS];
@@ -525,7 +528,9 @@ void initHybridAPI() {
   printf("[%d] done creating buffer pool\n", CmiMyPe());
 #endif
 
-#endif
+#endif // GPU_DUMMY_MEMPOOL
+
+#endif // GPU_MEMPOOL
 }
 
 inline int getMyCudaDevice(int myPe) {
@@ -1074,7 +1079,7 @@ void hapi_poolFree(void* ptr) {
 }
 
 
-#endif
+#endif // GPU_MEMPOOL
 
 #ifdef GPU_INSTRUMENT_WRS
 void hapi_initInstrument(int numChares, char types){
