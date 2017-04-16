@@ -1710,13 +1710,17 @@ then
 for trace in $TRACEMODE; do
     [ ! -r "$CHARMLIB/libtrace-$trace.a" ] && Abort "charmc : No such tracemode $trace"
 
-    if [ "$LANGUAGE" = "converse" -o "$LANGUAGE" = "converse++" ]; then
-        if [ "$trace" != "counter" ]; then
-            Warning "Tracemode $trace isn't supported in Converse-level programs; Dropping it"
-            TRACEMODE=`DropList $trace $TRACEMODE`
-            continue
-        fi
-    fi
+    case "$LANGUAGE" in
+        "converse"|"converse++"|"bgconverse++"|"bigsim"|"bluegene")
+            if [ "$trace" != "counter" ]; then
+                Warning "Tracemode $trace isn't supported in Converse-level programs; Dropping it"
+                TRACEMODE=`DropList $trace $TRACEMODE`
+                continue
+            fi
+            ;;
+        *)
+            ;;
+    esac
 
     TRACE_OBJ="$TRACE_OBJ -ltrace-$trace"
 done
