@@ -2042,7 +2042,9 @@ static int
 __kmp_get_xproc( void ) {
 
     int r = 0;
-
+#if CHARM_OMP
+    r = CmiMyNodeSize();
+#else
     #if KMP_OS_LINUX || KMP_OS_FREEBSD || KMP_OS_NETBSD
 
         r = sysconf( _SC_NPROCESSORS_ONLN );
@@ -2070,7 +2072,7 @@ __kmp_get_xproc( void ) {
         #error "Unknown or unsupported OS."
 
     #endif
-
+#endif
     return r > 0 ? r : 2; /* guess value of 2 if OS told us 0 */
 
 } // __kmp_get_xproc

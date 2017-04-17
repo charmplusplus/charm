@@ -153,6 +153,9 @@ int      __kmp_adjust_gtid_mode = FALSE;
 #elif KMP_OS_WINDOWS
 int             __kmp_gtid_mode = 2; /* use TLS functions to store gtid */
 int      __kmp_adjust_gtid_mode = FALSE;
+#elif KMP_OS_DARWIN && CHARM_OMP
+int             __kmp_gtid_mode = 2; /* select method to get gtid based on #threads */
+int      __kmp_adjust_gtid_mode = FALSE;
 #else
 int             __kmp_gtid_mode = 0; /* select method to get gtid based on #threads */
 int      __kmp_adjust_gtid_mode = TRUE;

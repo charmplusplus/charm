@@ -13,10 +13,10 @@ typedef union KMP_ALIGN_CACHE ompConverseMsg {
   double convMsg_align;
   char pad[KMP_PAD(ompConvMsg_base_t , CACHE_LINE)];
 } OmpConverseMsg;
-
+CpvExtern(int, curNumThreads);
 CpvExtern(int, OmpHandlerIdx);
 #define CharmOMPDebug(...) //CmiPrintf(__VA_ARGS__)
 // the intial ratio of OpenMP tasks in local list and work-stealing taskqueue
 #define INITIAL_RATIO 2
-#define windowSize 4
+#define windowSize 8
 #endif

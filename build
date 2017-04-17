@@ -501,6 +501,16 @@ then
     exit 1
   fi
 
+  if test `echo "$BOPTS" | grep -c "omp"` -gt 0 -a `echo "$BASEVERSION" | grep -c "darwin"` -gt 0
+  then
+    if test -z "$COMPILER" -o "$COMPILER" != "gcc"
+    then
+      echo "The integrated OpenMP runtime library is supported on Mac only with the normal gcc"
+      echo "You need to install this normal(non-clang) gcc via MacPorts or HomeBrew"
+      echo "Read the instructions on the Charm++ manual."
+      exit 1
+    fi
+  fi
   echo "Selected Options: $BOPTS"
   SORTED=`echo $BOPTS | awk  '{ for (i = 1; i <= NF; ++i) print $i }' | sort`
   BOPTS_WITHCOMPILER=`echo $SORTED $COMPILER`

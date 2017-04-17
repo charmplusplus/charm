@@ -1902,7 +1902,17 @@ extern int _immRunning;
 #define CmiMemoryAtomicFetchAndInc(...) ImplSelect3(__VA_ARGS__, CmiMemoryAtomicFetchAndIncMemOrder, CmiMemoryAtomicFetchAndIncSimple, Dummy)(__VA_ARGS__)
 
 #if __GNUC__ && __STDC_VERSION__ >= 201112L && !__STDC_NO_ATOMICS__
-#include <stdatomic.h>
+#ifndef _STDATOMIC_H
+typedef enum
+  {
+    memory_order_relaxed = __ATOMIC_RELAXED,
+    memory_order_consume = __ATOMIC_CONSUME,
+    memory_order_acquire = __ATOMIC_ACQUIRE,
+    memory_order_release = __ATOMIC_RELEASE,
+    memory_order_acq_rel = __ATOMIC_ACQ_REL,
+    memory_order_seq_cst = __ATOMIC_SEQ_CST
+  } memory_order;
+#endif
 #define CmiMemoryAtomicIncrementMemOrder(someInt, MemModel) __atomic_fetch_add(&(someInt),1, MemModel);
 #define CmiMemoryAtomicDecrementMemOrder(someInt, MemModel) __atomic_fetch_sub(&(someInt),1, MemModel);
 #define CmiMemoryAtomicFetchAndIncMemOrder(input,output, MemModel) (output) = __atomic_fetch_add(&(input),1, MemModel);
@@ -2143,6 +2153,13 @@ extern int CmiIsMyNodeIdle();
 
 #define CsdTaskEnqueue(x) TaskQueuePush((TaskQueue)CpvAccess(CsdTaskQueue),x)
 #define CsdTaskPop() TaskQueuePop((TaskQueue)CpvAccess(CsdTaskQueue))
+#if CMK_OMP
+#if defined(__cplusplus)
+extern "C" int CmiGetCurKnownOmpThreads();
+#else
+extern int CmiGetCurKnownOmpThreads();
+#endif
+#endif
 #endif
 #endif /* CONVERSE_H */
 

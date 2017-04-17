@@ -861,7 +861,11 @@ __kmp_reserve_threads( kmp_root_t *root, kmp_team_t *parent_team,
     unsigned int idleThreadsCnt = TCR_4(CsvAccess(idleThreadsCnt));
     unsigned int currLocalRatio = CpvAccess(localRatio);
     new_nthreads = (idleThreadsCnt + 1) > currLocalRatio ? idleThreadsCnt+1 : currLocalRatio;
-    CharmOMPDebug("[%f][%d] idle threads: %d, localRatio: %d, new_thread:%d \n",CmiWallTimer(), CmiMyPe(), idleThreadsCnt, currLocalRatio, new_nthreads);
+
+    if (new_nthreads >= set_nthreads)
+      new_nthreads = set_nthreads; // set_nthreads is the default number of threads speficied by users.
+
+    CharmOMPDebug("[%f][%d] idle threads: %d, localRatio: %d, new_thread:%d, set_nthreads: %d \n",CmiWallTimer(), CmiMyPe(), idleThreadsCnt, currLocalRatio, new_nthreads, set_nthreads);
 #else
     new_nthreads = set_nthreads;
 
@@ -1661,6 +1665,7 @@ __kmp_fork_call(
 #if OMP_40_ENABLED
         int enter_teams = ((ap==NULL && active_level==0)||(ap && teams_level>0 && teams_level==level));
 #endif
+
         nthreads = master_set_numthreads ?
             master_set_numthreads : get__nproc_2( parent_team, master_tid ); // TODO: get nproc directly from current task
 
@@ -1698,7 +1703,10 @@ __kmp_fork_call(
         }
     }
     KMP_DEBUG_ASSERT( nthreads > 0 );
-
+#if CHARM_OMP
+    /* The number of threads for this OpenMP region */
+    CpvAccess(curNumThreads) = nthreads;
+#endif
     /* If we temporarily changed the set number of threads then restore it now */
     master_th->th.th_set_nproc = 0;
 
@@ -3607,6 +3615,7 @@ __kmp_register_root( int initial_thread )
     CpvInitialize(bool, ratioInit);
     CpvInitialize(unsigned int*, localRatioArray);
     CpvInitialize(OmpConverseMsg*, ompConvMsg);
+    CpvInitialize(int, curNumThreads);
     CpvAccess(localRatioArray) = (unsigned int*) __kmp_allocate(sizeof(unsigned int) * windowSize);
     memset(CpvAccess(localRatioArray), 0, sizeof (unsigned int) * windowSize);
     CpvAccess(localRatio) = 0;

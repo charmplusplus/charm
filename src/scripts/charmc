@@ -911,7 +911,7 @@ then
     fi
 fi
 
-if [ "$USE_OPENMP" = "yes" ]
+if [ "$USE_OPENMP" = "yes" -o "$CMK_OMP" = "1" -a -z "$SEQUENTIAL" -a -z "$NATIVE" ]
 then
     [ -n "$VERBOSE" ] && echo OpenMP support enabled
     OPTS_CC="$OPTS_CC $CMK_C_OPENMP"
