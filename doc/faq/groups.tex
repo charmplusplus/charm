@@ -8,7 +8,7 @@ They are used for optimizations at the processor and node level respectively.
 
 Probably not. People with an MPI background often overuse groups, which
 results in MPI-like Charm++ programs. Arrays should generally be used
-instead, because arrays can be migrated to acheive load balance.
+instead, because arrays can be migrated to achieve load balance.
 
 Groups tend to be most useful in constructing communication optimization
 libraries. For example, all the array elements on a processor can
@@ -40,7 +40,7 @@ normal execution, but only to disk for checkpointing purposes.
 
 Migratable groups must declare a migration constructor (taking
 {\tt CkMigrateMessage *} as a parameter) and a pup routine. The migration
-construtor {\em must} call the superclass migration constructor as in this
+constructor {\em must} call the superclass migration constructor as in this
 example:
 \begin{alltt}
 class MyGroup : public CBase\_MyGroup \{

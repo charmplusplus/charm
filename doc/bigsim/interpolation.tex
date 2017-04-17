@@ -18,7 +18,7 @@ The interpolation tool of this section handles only the prediction of SEB durati
 using currently three types of implemented models:
 
 \begin{enumerate}
-\item \textbf{Scaling of SEB durations} observed on an available (existing) processor, via multiplcation of
+\item \textbf{Scaling of SEB durations} observed on an available (existing) processor, via multiplication of
 the original durations by a constant factor.
 \item \textbf{Parameterizations of SEBs}: each SEB is augmented with user-defined parameters that
 influence the duration of the SEB. An extrapolation model based on those parameters can
@@ -95,7 +95,7 @@ for the SEB. The end time is then modified to be $T_{end}\leftarrow  T_{start}+d
 \begin{figure}
 \centering
 \includegraphics[width=5in]{figures/event_diagram}
-\caption{SEBs in the bgTrace file have a start and end time. Only a portion of the SEB, e.g. the important compuational kernel, is timed when performing cycle accurate simulation. The duration of the middle portion of the SEB can be estimated in a different manner than the rest of the SEB. For example, the begin and end pieces can be scaled by some constant factor, while the bracketed middle region's duration can be estimated based on a more
+\caption{SEBs in the bgTrace file have a start and end time. Only a portion of the SEB, e.g. the important computational kernel, is timed when performing cycle accurate simulation. The duration of the middle portion of the SEB can be estimated in a different manner than the rest of the SEB. For example, the begin and end pieces can be scaled by some constant factor, while the bracketed middle region's duration can be estimated based on a more
 sophisticated model.
 \label{event_diagram}}
 \end{figure}

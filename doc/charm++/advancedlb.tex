@@ -18,7 +18,7 @@ accepts the following command line options:
 \item {\em +LBDumpFile FileName}\\
         This option specifies the base name of the file created with the load balancing data. If this
 	option is not specified, the framework uses the default file {\tt lbdata.dat}. Since multiple steps are allowed,
-	a number correspoding to the step number is appended to the filename in the form {\tt Filename.\#};
+	a number corresponding to the step number is appended to the filename in the form {\tt Filename.\#};
   this applies to both dump and simulation.
 \item {\em +LBSim StepStart}\\
 	This option instructs the framework to do the simulation starting from {\em StepStart} step.
@@ -83,7 +83,7 @@ An example for the {\em predict} function is given below.
 double predict(double x, double *param) {return (param[0]*x + param[1]);}
 \end{verbatim}
 \item {\tt print} is useful for debugging and it can be re-implemented to have a meaningful
-print of the learnt model
+print of the learned model
 \item {\tt function} is a function internally needed to learn the parameters, {\tt x} and
 {\tt param} are input, {\tt y} and {\tt dyda} are output (the computed function and
 all its derivatives with respect to the parameters, respectively).
@@ -115,7 +115,7 @@ approximation of the workload will be, but more memory is required to store
 the intermediate information. The default is 20.
 \item {\em +LBPredictorDelay steps}\\
 This will tell how many load balancer steps to wait before considering the
-function parameters learnt and starting to use the mode. The load balancer will
+function parameters learned and starting to use the mode. The load balancer will
 collect statistics for a {\em +LBPredictorWindow} steps, but it will start using
 the model as soon as {\em +LBPredictorDelay} information are collected. The
 default is 10.

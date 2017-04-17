@@ -75,7 +75,7 @@ the size of the data contained in a message is not known until runtime.
 %use packed\index{packed messages} messages to alleviate this problem.  However,
 %it requires multiple memory allocations (one for the message, and another for
 %the buffer.) 
-For such scenarious, you can use variable-size (\emph{varsize}) messages.
+For such scenarios, you can use variable-size (\emph{varsize}) messages.
 A {\em varsize} message can encapsulate several arrays,
 each of whose size is determined at run time. 
 %In \emph{varsize} messages, 
@@ -500,7 +500,7 @@ Typically, the following tasks are done in \kw{pack} method:
 takes in two parameters: input message, and size of the buffer needed, and
 returns the buffer.
 
-\item Serialize message data into buffer (alongwith any control information
+\item Serialize message data into buffer (along with any control information
 needed to de-serialize it on the receiving side.
 
 \item Free resources occupied by message (including message itself.)  

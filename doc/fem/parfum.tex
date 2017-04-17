@@ -11,7 +11,7 @@ not readily support. It is important to note that ParFUM adaptivity
 at the moment has some limitations. It works only for meshes which 
 are two-dimensional. The other limitation is that the mesh on which 
 it works on must have one layer of node-deep ghosts. Most applications 
-reqire no or one layer ghosts, so it is really not a limitation,
+require no or one layer ghosts, so it is really not a limitation,
 but for applications that need multiple layers of ghost information,
 the adaptivity operations cannot be used.
 
@@ -42,7 +42,7 @@ actually use these metrics to maintain quality. Though there is another metric
 which is computer for each element and maintained on the fly and that 
 is the ratio of the largest length to the smallest altitude and this value 
 during mesh adaptivity is not allowed to go beyond a certain limit. Because
-the larger this value after a cecrtain limit, the worse the element quality.
+the larger this value after a certain limit, the worse the element quality.
 
 \function{void FEM\_ADAPT\_SetElementSizeField(int meshID, int elem, double size);}
 \index{femAdaptSetElementSizeField1}
@@ -52,7 +52,7 @@ we set the desired size for each element to be {\it size}.}
 \function{void FEM\_ADAPT\_SetElementSizeField(int meshID, double *sizes);}
 \index{femAdaptSetElementSizeField2}
 \desc{For the mesh specified by {\it meshID}, for the element {\it elem},
-we set the desired size for each element from the corresonponding entry in
+we set the desired size for each element from the corresponding entry in
 the {\it sizes} array.}
 
 \function{void FEM\_ADAPT\_SetReferenceMesh(int meshID);}
@@ -74,9 +74,9 @@ Mesh Gradation Control, Borouchaki et al.}
 \subsection{Modifying the Mesh}
 Once the elements in the mesh has been prepared by specifying their desired
 sizes, we are ready to use the actual adaptivity operations. Currently we
-provide delauney flip operations, edge bisect operations and edge-coarsen 
+provide Delaunay flip operations, edge bisect operations and edge-coarsen 
 operations all of which are implemented in parallel, but the user has 
-access to these wrapper functions which interlligently decide when 
+access to these wrapper functions which intelligently decide when 
 and in which region of the mesh to use the adaptivity operations to 
 generate a mesh with higher quality elements while achieving the
 desired size (which is usually average edge length per element), or it
@@ -108,7 +108,7 @@ Negative entries in sizes array indicate no coarsening. }
 namely refine and coarsen. This function keeps using the above two functions till
 we have all elements in the mesh with as close to the desired quality. Apart from
 using the above two operations, it also performs a mesh repair operation where it
-gets rid of some bad quality elements by delauney flip or coarsening as the
+gets rid of some bad quality elements by Delaunay flip or coarsening as the
 geometry in the area demands.}
 
 \function{int FEM\_ADAPT\_SimpleRefineMesh(int meshID, double targetA, double xmin, double ymin, double xmax, double ymax);}
@@ -129,7 +129,7 @@ If the area is smaller, then no refinement is done.}
 
 
 
-\subsection{Verifiy correctness of the Mesh}
+\subsection{Verify correctness of the Mesh}
 After adaptivity operations are performed and even before adaptivity operations, 
 it is important to first verify that we are working on a mesh that is consistent
 geometrically with the types of mesh that the adaptivity algorithms are designed
@@ -147,5 +147,5 @@ to use the adaptivity features of ParFUM.
 
 \subsection{ParFUM developers}
 This manual is meant for ParFUM users, so developers should look at the source code
-and the doxygen generated documentaion.
+and the doxygen generated documentation.
 

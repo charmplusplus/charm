@@ -239,7 +239,7 @@ that wants the CPU, eg, a thread that has been awakened using the {\tt
 awakefn}.  If no such thread exists, if the {\tt choosefn} cannot
 return an awakened thread, then it must not return at all: instead, it
 must wait until, by means of some pending IO event, a thread becomes
-awakened (pending events could be asynchonous disk reads, networked
+awakened (pending events could be asynchronous disk reads, networked
 message receptions, signal handlers, etc).  For this reason, many
 schedulers perform the task of polling the IO devices as a side
 effect.  If handling the IO event causes a thread to be awakened, then

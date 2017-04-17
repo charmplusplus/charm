@@ -411,7 +411,7 @@ or from whatever TCHARM code executes before the \kw{FEM\_Attach}.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Old Communication Routines}
 
-(This section is for backward compatability only.  The IDXL routines
+(This section is for backward compatibility only.  The IDXL routines
 are the new, more flexible way to perform communication.)
 
 The FEM framework handles the updating of the values of shared nodes-- that
@@ -448,7 +448,7 @@ reduction over node values), or one of the other routines described below.
      After this routine returns, the given field of each shared node
      will be the same across all processors that share the node.
      
-     This routine is eqivalent to an \kw{IDXL\_Comm\_Sendsum} operation.
+     This routine is equivalent to an \kw{IDXL\_Comm\_Sendsum} operation.
 
 \prototype{FEM\_Read\_field}
 \function{void FEM\_Read\_field(int Fid,void *nodes,char *fName);}
@@ -516,7 +516,7 @@ value among the corresponding field of all nodes
   \args{varies, INTENT(IN) :: inVal}
   \args{varies, INTENT(OUT) :: outVal}
 
-     Combine one record of this field from each chunk, acoording to \kw{op}, 
+     Combine one record of this field from each chunk, according to \kw{op}, 
  across all chunks.
 \kw{Fid} is only used for the \kw{base\_type} and \kw{vec\_len}-- offset and
 \kw{dist} are not used.  After this call returns, all chunks will have

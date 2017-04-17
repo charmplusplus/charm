@@ -161,7 +161,7 @@ options when creating the array, see section~\ref{advanced array create}.
 
 To obtain a proxy to a specific element in chare array, the chare array proxy
 (e.g. \kw{thisProxy}) must be indexed by the appropriate index call depending
-on the dimentionality of the array:
+on the dimensionality of the array:
 %
 \begin{itemize}
 \item 1D array, to obtain a proxy to element $i$: \kw{thisProxy[$i$]} or
@@ -194,7 +194,7 @@ created.
 %a 3-minute buffering period).}
 \footnote{However, the element must eventually be created.}
 
-Messages are not guarenteed to be delivered in order. For instance, if a method
+Messages are not guaranteed to be delivered in order. For instance, if a method
 is invoked on method \kw{A} and then method \kw{B}; it is possible that \kw{B}
 is executed before \kw{A}.
 %
@@ -387,7 +387,7 @@ or reductions.  To extract the data from each element, see the description
 below.
 
 \item \kw{CkReduction::concat} : the result will be a byte-by-byte
-concatentation of all the contributed data.  The contributed elements
+concatenation of all the contributed data.  The contributed elements
 are not delimiter-separated. 
 
 \end{enumerate}
@@ -451,7 +451,7 @@ needs.
 
 If the outcome of your reduction is dependent on the order in which 
 data elements are processed, or if your data is just too
-heterogenous to be handled elegantly by the predefined types and you
+heterogeneous to be handled elegantly by the predefined types and you
 don't want to undertake multiple reductions, you can use a tuple
 reduction or define your own custom reduction type.
 

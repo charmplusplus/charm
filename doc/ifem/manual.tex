@@ -102,14 +102,14 @@ and the entire matrix expresses the combination of all these element relations.
 For example, in a structural statics problem, we know the net force at
 each node, $f$, and seek the displacements of each node, $u$.  Elements 
 provide the relationship, often called a stiffness matrix $K$, between 
-a nodes' displacments and its net forces:
+a nodes' displacements and its net forces:
 
 \[
 	f=K u
 \]
 
 We normally label the known vector $b$ (in the example, the forces), the unknown
-vector $x$ (in the example, the displacments), and the matrix $A$:
+vector $x$ (in the example, the displacements), and the matrix $A$:
 
 \[
 	b=A x
@@ -290,7 +290,7 @@ END SUBROUTINE
         \args{double precision, intent(in) :: b(width,length)}
         \args{double precision, intent(inout) :: x(width,length)}
 
-Like \kw{IFEM\_Solve\_shared}, this routine solves the linear system $A x = b$ for the unknown vector $x$.  This routine, however, adds support for boundary conditions associated with $x$. These so-called "essential" boundary conditions restrict the values of some unknowns. For example, in structural dynamics, a fixed displacment is such an essential boundary condition.  
+Like \kw{IFEM\_Solve\_shared}, this routine solves the linear system $A x = b$ for the unknown vector $x$.  This routine, however, adds support for boundary conditions associated with $x$. These so-called "essential" boundary conditions restrict the values of some unknowns. For example, in structural dynamics, a fixed displacement is such an essential boundary condition.  
 
 The only form of boundary condition currently supported is to impose a fixed value on certain unknowns, listed by their degree of freedom--that is, their entry in the unknown vector.  In general, the $i$'th DOF of node $n$ has DOF number $n*width+i$ in C and $(n-1)*width+i$ in Fortran.  The framework guarantees that, on output, for all $bcCount$ boundary conditions, $x(bcDOF(f))=bcValue(f)$.  
 

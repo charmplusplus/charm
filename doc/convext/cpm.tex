@@ -177,7 +177,7 @@ with the argument 5.
 
 \section{CPM Packing and Unpacking}
 
-Functions preceeded by the word {\bf CpmInvokable} must have simple
+Functions preceded by the word {\bf CpmInvokable} must have simple
 argument lists.  In particular, the argument list of a CpmInvokable
 function can only contain cpm-single-arguments and cpm-array-arguments,
 as defined by this grammar:
@@ -192,7 +192,7 @@ being a pointer to an array.  In this case, CPM attempts to pack an
 entire array into the message, whereas it only attempts to pack a
 single element in the case of the cpm-single-argument notation.
 
-Each cpm-array-argument must be preceeded by a cpm-single-argument of
+Each cpm-array-argument must be preceded by a cpm-single-argument of
 type {\tt CpmDim}.  {\tt CpmDim} is simply an alias for {\tt int}, but
 when CPM sees an argument declared {\tt CpmDim}, it knows that the
 next argument will be a cpm-array-argument, and it interprets the {\tt
@@ -242,7 +242,7 @@ which prints them out.
 Thus far, we have only shown functions whose prototypes contain
 builtin CPM types.  CPM has built-in knowledge of the following types:
 char, short, int, long, float, double, CpmDim, and CpmStr (pointer to
-a null-terminated string).  However, you may also also transmit
+a null-terminated string).  However, you may also transmit
 user-defined types in a CPM message.
 
 For each (non-builtin) type the user wishes to pack, the user must
@@ -487,7 +487,7 @@ void *CpmEnqueueFIFO1(CpmDestinationSend dest, int len, void *msg)
 \end{alltt}
 
 The send-function CpmEnqueueFIFO1 starts by switching the handler.
-The original handler is removed using using {\tt CmiGetHandler}.  It
+The original handler is removed using {\tt CmiGetHandler}.  It
 is set aside in the message buffer in the ``envelope'' space described
 earlier --- notice the use of {\tt CpmEnv} to obtain the envelope.
 This is the purpose of the envelope in the message --- it is a place

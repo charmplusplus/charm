@@ -26,7 +26,7 @@ is running on, and for finding how many total processors are there.
 However, for implementing lower level libraries, and certain optimizations,
 programmers need to be aware of processors. In any case, it is useful
 to understand how the \charmpp{} implementation works under the hood. So,
-we describe the machine model, and some associoated terminology here.
+we describe the machine model, and some associated terminology here.
 
 In terms of physical resources, we assume the parallel machine
 consists of one or more {\em nodes}, where a node is a largest unit
@@ -40,7 +40,7 @@ each core may support multiple hardware threads (SMT for example).
 a ``node''.   In a \charmpp{} program, a PE is a
 unit of mapping and scheduling: each PE has a scheduler with an
 associated pool of messages. Each chare is assumed to reside on one PE
-at a time. Depending on the runtime command-line parmeters, a PE may
+at a time. Depending on the runtime command-line parameters, a PE may
 be associated with a subset of cores or hardware threads. One or more PEs
 make up of a logical ``node'', the unit that one may partition a physical node
 into. In the implementation, a separate
@@ -64,5 +64,5 @@ physical cores or hardware threads on each node. In other words, a
 are physical cores or hardware threads allocated to it. More information about
 these launch time options are provided in Appendix~\ref{sec:run}.
 And utility functions to retrieve the information about those
-\charmpp{} logical machine entities in user programs can be refered
+\charmpp{} logical machine entities in user programs can be referred
 in section~\ref{basic utility fns}.

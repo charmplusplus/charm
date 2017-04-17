@@ -2,7 +2,7 @@ To better utilize the multicore chip, it has become increasingly popular to
 adopt shared-memory multithreading programming methods to exploit parallelism
 on a node. For example, in hybrid MPI programs, OpenMP is the most popular
 choice.  When launching such hybrid programs, users have to make sure there are
-spare physical cores allocated to the shared-memory mulithreading runtime.
+spare physical cores allocated to the shared-memory multithreading runtime.
 Otherwise, the runtime that handles distributed-memory programming may
 interfere with resource contention because the two independent runtime systems
 are not coordinated.  If spare cores are allocated, in the same way of
@@ -13,7 +13,7 @@ program can be controlled with the {\tt OMP\_NUM\_THREADS} environment
 variable.  See Sec.~\ref{charmrun} for details on how to propagate such
 environment variables.
 
-If there are no spare cores allocated, to avoid resouce contention, a
+If there are no spare cores allocated, to avoid resource contention, a
 \emph{unified runtime} is needed to support both intra-node shared-memory
 multithreading parallelism and inter-node distributed-memory
 message-passing parallelism. Additionally, considering that a parallel
@@ -40,7 +40,7 @@ follows:
 \begin{itemize}
 \item CProxy\_FuncCkLoop \textbf{CkLoop\_Init}(int
 numThreads=0): This function initializes the CkLoop library, and it only needs
-to be called once on a single PE during the initilization phase of the
+to be called once on a single PE during the initialization phase of the
 application.  The argument ``numThreads'' is only used in non-SMP mode,
 specifying the number of threads to be created for the single-node shared-memory
 parallelism. It will be ignored in SMP mode.

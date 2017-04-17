@@ -1,6 +1,6 @@
 
 \section{Introduction and Motivation}
-The 3D FFT library provides an interface to do paralle FFT computation
+The 3D FFT library provides an interface to do parallel FFT computation
 in a scalable fashion. 
 
 The parallelization is achieved by splitting the 3D transform into
@@ -13,7 +13,7 @@ fft in the third direction is performed. This approach takes two
 computation phases and one 'transform' phase. The second way for
 splitting is dividing the data into collections of pencils. First, 1D
 FFTs are computed over the pencils; then a 'transform' is performed
-and 1D FFTs are done over second dimention; again a 'transform' is
+and 1D FFTs are done over second dimension; again a 'transform' is
 performed and FFTs are computed over the last dimension. So this
 approach takes three computation phases and two 'transform' phases. In
 first approach, the parallelism is limited by the number of
@@ -111,11 +111,11 @@ For pencil-based version, the struct is called: LineFFTinfo.
 
 In both cases, data is deposited by passing in a pointer to the data
 field, and the pointer will be stored in 'complex *dataptr' in the
-struct. Memory allocation and initializtion of data field needs to be
+struct. Memory allocation and initialization of data field needs to be
 done by user before pointer is passed in. The library doesn't allocate
 any memory for data field. Also note that FFT's done internally in the
 library are in-place FFTs, which means that data field will be
-overwriten with results.
+overwritten with results.
 
 \section{Library Interfaces}
 There are two types of interfaces provided by the library: Charm++
@@ -126,7 +126,7 @@ based and AMPI based.
 The Charm++ interface is the raw interface of the library and slightly
 more difficult to use but gives more flexibility. To use the charm++
 based library, user has to create their own charm arrays which derive
-from predefined arrays in library. By overiding default methods, user
+from predefined arrays in library. By overriding default methods, user
 can add in additional functions.
 
 
@@ -134,7 +134,7 @@ For the plane-based library, there are several relevant member
 functions:{\it 'doFFT', 'doIFFT', 'doneFFT'} and {\it
 'doneIFFT'}. {\it 'doFFT'} and {\it 'doIFFT'} need to be called to
 start the computation. {\it 'doneFFT'} and {\it 'doneIFFT'} are
-callback functions, and they need to be inheritated.
+callback functions, and they need to be inherited.
 
 The sample codes below should shed more light on this. For complete
 sample programs, refer to file under
@@ -147,7 +147,7 @@ the computation.
 %(sample code here)
 
 For initializing, a NormalFFTinfo struct will be used. Keep in mind
-that data storage needs to be allocated and initalized by the
+that data storage needs to be allocated and initialized by the
 user. Since in-place FFT will occur, user should also make duplicate
 copies of data when needed.
 \begin{alltt}

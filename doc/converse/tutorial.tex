@@ -78,7 +78,7 @@ send and free: a version that returns almost instantaneously, and then continues
 node: a version that send a message to a node instead of a specific processor. This means that when the message is received, any ``free'' processor within than node can handle it. 
 \end{itemize}
 
-On the receiver, appropiate handler function is called and a pointer to the message (starting from the header) is provided to the user. User must free the message after using the data using \texttt{CmiFree} call. Finally we also illustrate a broadcast message using \texttt{CmiSyncBroadcastAllAndFree}
+On the receiver, appropriate handler function is called and a pointer to the message (starting from the header) is provided to the user. User must free the message after using the data using \texttt{CmiFree} call. Finally we also illustrate a broadcast message using \texttt{CmiSyncBroadcastAllAndFree}
 
 TODO: Examples of other modes
 

@@ -103,9 +103,9 @@ with the {\em +LBPeriod} option). In this load balancing
 mode, users have to make sure all migratable objects are always ready to
 migrate (e.g. not depending on a global variable which cannot be migrated).
 
-\subsubsection{Should I use AtSync explicitely, or leave it to the system?}
+\subsubsection{Should I use AtSync explicitly, or leave it to the system?}
 
-You almost certaintly want to use AtSync directly. In most cases there are
+You almost certainly want to use AtSync directly. In most cases there are
 points in the execution where the memory in use by a chare is bigger due to
 transitory data, which does not need to be transferred if the migration happens
 at predefined points.

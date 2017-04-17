@@ -6,7 +6,7 @@ defined in public scope within the class definition.
 Entry methods typically do not return data and have a ``void'' return type.
 An entry method with the same name as its enclosing class is a constructor entry method
 and is used to create or spawn chare objects during execution.
-Class member functions are annotated as entry methods by declaring them in the
+Class member functions are annotated as entry methods by declaring them in
 the interface file as:
 \begin{alltt}
 entry void \uw{Entry1}(\uw{parameters});
@@ -83,7 +83,7 @@ before including the ``.decl.h'' file.
 Any user-defined types must be fully defined before the entry
 method declaration that consumes it.  This is typically done by
 including the header defining the type in the {\tt .ci} file.
-Alternatively, one may define it before inlcuding the
+Alternatively, one may define it before including the
 {\tt .decl.h} file.  As usual in \CC, it is often dramatically
  more efficient to pass a large structure by reference than by value.
 

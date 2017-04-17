@@ -138,7 +138,7 @@ will use a reduction to collect back the results after they have been computed.
 
 \end{itemize}
 
-\subsubsection{How does the initializazion in Charm work?}
+\subsubsection{How does the initialization in Charm work?}
 
 Each processor executes the following operations strictly in order:
 \begin{enumerate}
@@ -186,7 +186,7 @@ done using proxies.
 A proxy class for each of your classes is generated based on the methods
 you list in the .ci file.
 
-\subsubsection{What are the different ways one can can create proxies?}
+\subsubsection{What are the different ways one can create proxies?}
 
 Proxies can be:
 \begin{itemize}
@@ -251,7 +251,7 @@ This is why we recommend including the {\em def.h} file at the end.
 \subsubsection{How can I use a global variable across different processors?}
 
 Make the global variable ``readonly'' by declaring it in the .ci file.
-Remember also that read-onlies can be safely set only in che mainchare
+Remember also that read-onlies can be safely set only in the mainchare
 constructor. Any change after the mainchare constructor has finished will be
 local to the processor that made the change. To change a global variable later
 in the program, every processor must modify it accordingly (e.g by using a chare
@@ -270,7 +270,7 @@ chare someChare \{
 \};
 \end{alltt}
 is fine. In the {\em .h} declaration for {\em class someChare},
-you will have have to put {\em someGroup} as a public static variable,
+you will have to put {\em someGroup} as a public static variable,
 and you are done.
 
 You then refer to the variable in your program as {\em someChare::someGroup}.

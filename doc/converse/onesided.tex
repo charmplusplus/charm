@@ -80,14 +80,14 @@ automatically invoked when the operation completes.
 to create a suitable data structure for this purpose. This is the reason this
 has been kept opaque from the programmer.
 
-\function{void *CmiPut(unsinged int sourceId, unsigned int targetId, void *Saddr, void *Taadr, unsigned int size);}
+\function{void *CmiPut(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Taadr, unsigned int size);}
 \index{CmiPut}
 \desc{This function is pretty self explanatory. It puts the memory location 
 at {\it Saddr} on the machine specified by {\it sourceId} to {\it Taddr} on
 the machine specified by {\it targetId}. The memory region being RDMA'ed is
 of length {\it size} bytes.}
 
-\function{void *CmiGet(unsinged int sourceId, unsigned int targetId, void *Saddr, void *Taadr, unsigned int size);}
+\function{void *CmiGet(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Taadr, unsigned int size);}
 \index{CmiGet}
 \desc{Similar to {\it CmiPut} except the direction of the data transfer
 is opposite; from target to source.}

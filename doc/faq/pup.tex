@@ -92,7 +92,7 @@ for efficiently PUPing arrays).
 The bar syntax will be able to copy {\em any} structure, whether it
 has a pup method or not. If there is no pup method, the C++ operator overloading
 rules decay the bar operator into packing the {\em bytes} of the structure,
-which will work fine for simple types on homogenous machines. For dynamically
+which will work fine for simple types on homogeneous machines. For dynamically
 allocated structures or heterogeneous migration, you'll need to define
 a pup method for all packed classes/structures. As an added benefit, the
 same pup methods will get called during parameter marshalling.

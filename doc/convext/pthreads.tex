@@ -23,7 +23,7 @@ have a pthreads implementation in the standard library.  This may
 cause some name-conflicts as we define the pthreads functions, and the
 system include files do too.  To avoid such conflicts, we provide an
 alternative set of names beginning with the word Cpthread.  These
-names are interchangable with their pthread equivalents.  In addition,
+names are interchangeable with their pthread equivalents.  In addition,
 you may prevent \converse{} from defining the pthread names at all with
 the preprocessor symbol SUPPRESS\_PTHREADS:
 
@@ -66,10 +66,10 @@ In particular, the main function, \converse{} handlers, and the \converse{}
 startup function (see ConverseInit) may not block.  You must be aware
 of this when using the POSIX threads functions with \converse{}.
 
-There is a contradition here --- the POSIX standard requires that the
+There is a contradiction here --- the POSIX standard requires that the
 pthreads functions work from inside {\tt main}.  However, many of them
 block, and \converse{} forbids blocking inside {\tt main}.  This
-contradition can be resolved by renaming your posix-compliant {\tt
+contradiction can be resolved by renaming your posix-compliant {\tt
 main} to something else: for example, {\tt mymain}.  Then, through the
 normal \converse{} startup procedure, create a POSIX thread to run {\tt
 mymain}.  We provide a convenience function to do this, called

@@ -53,7 +53,7 @@ greatly surpass equivalent-generation CPUs but with limited control logic that
 constraints them to use as accelerator devices controlled by code executing on
 the CPU.
 
-The GPU's dependendce on the CPU for dispatch and synchronization of
+The GPU's dependence on the CPU for dispatch and synchronization of
 coarse-grained data transfer and kernel execution has traditionally required
 programmers to either (a) halt the execution of work on the CPU whenever issuing
 GPU work to simplify synchronization or (b) issue GPU work asynchronously and
@@ -123,11 +123,11 @@ function specifies the CUDA kernel call for your work request.
 
 Under steady state execution with multiple concurrent work requests, as
 one \code{workRequest} progresses to the execution stage, GPU Manager will
-initate the data transfer for the second
+initiate the data transfer for the second
 \code{workRequest} in the queue, and so on.
 
 In a typical application, the work request definition,
-kernel run functions, CUDA kernel defitinions, and code for submission
+kernel run functions, CUDA kernel definitions, and code for submission
 of work requests would all go in a \code{.cu} file that is compiled with
 \code{nvcc} separately from the other files (e.g. \code{.C}, \code{.ci}) in the
 \charmpp{} application.
@@ -141,7 +141,7 @@ together into the final executable.
 
 Using GPU Manager involves:
 \begin{enumerate}
-\item Definining CUDA kernels as in a regular CUDA application
+\item Defining CUDA kernels as in a regular CUDA application
 \item Defining work requests and their callback functions
 \item Defining the \code{void runMyKernel(workRequest *wr, cudaStream\_t kernelStream, void **deviceBuffers)} functions, used by the GPU Manager to issue a kernel call based on the kernel identifier defined in the work request
 \item Submitting work requests to the GPU Manager

@@ -199,8 +199,8 @@ cross-linked data structures that contain pointers still work properly.
 The limitations of isomalloc are:
 \begin{itemize}
 \item Wasted memory.  Isomalloc uses a special interface\footnote{
-The interface used is \kw{mmap}.} to aquire memory, and the finest granularity
-that can be aquired is one page, typically 4KB.  This means if you allocate
+The interface used is \kw{mmap}.} to acquire memory, and the finest granularity
+that can be acquired is one page, typically 4KB.  This means if you allocate
 a 2-entry array, isomalloc will waste an entire 4KB page.  We should eventually 
 be able to reduce this overhead for small allocations.
 
@@ -217,7 +217,7 @@ must use 64-bit machines or avoid isomalloc.
 
 
 \section{Advanced \tcharm{} Programming}
-The preceeding features are enough to write simple programs
+The preceding features are enough to write simple programs
 that use \tcharm{}-based frameworks.  These more advanced techniques
 provide the user with additional capabilities or flexibility.
 
@@ -524,8 +524,8 @@ access all of Charm++, including arrays and groups.
 
 \item Compared to using plain Charm++,
 using TCharm with your library automatically provides your users with a 
-clean C/F90 API (described in the preceeding chapters) for basic thread
-memory  managment, I/O, and migration.  It also allows you to use a convenient
+clean C/F90 API (described in the preceding chapters) for basic thread
+memory  management, I/O, and migration.  It also allows you to use a convenient
 "thread->suspend()" and "thread->resume()" API for blocking a thread,
 and works properly with the load balancer, unlike CthSuspend/CthAwaken.
 \end{itemize}

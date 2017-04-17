@@ -107,7 +107,7 @@ Like \kw{IDXL\_Combine}, but only shifts the indices within a single list.
     \args{INTEGER, INTENT(IN) :: newIdx,nBetween}
     \args{INTEGER, INTENT(IN) :: between(nBetween)}
 
-This call adds a new entity, with local index \kw{newIdx}, to this Index List.  The new entity is sent or received by each chunk that sends or receives all the entites listed in the between array.  For example, when adding a new node along an edge, nBetween is 2 and between lists the endpoints of the edge; this way if the edge is shared with some chunk, the new node will be shared with that chunk.
+This call adds a new entity, with local index \kw{newIdx}, to this Index List.  The new entity is sent or received by each chunk that sends or receives all the entities listed in the between array.  For example, when adding a new node along an edge, nBetween is 2 and between lists the endpoints of the edge; this way if the edge is shared with some chunk, the new node will be shared with that chunk.
 
 This routine only affects the current chunk-- no other chunks are affected.  To ensure the communication lists match, \kw{IDXL\_Add\_entity} must be called on all the chunks that send or receive the entity, to create the local copies of the entity.
 
@@ -250,17 +250,17 @@ entity's data items.
 
 
 
-\subsubsection{Layout Compatability Routines}
+\subsubsection{Layout Compatibility Routines}
 
 Before IDXL was made a separate library, FEM included these routines,
-which are still preserved for backward compatability.
+which are still preserved for backward compatibility.
 
 \prototype{FEM\_Create\_simple\_field}
 \function{IDXL\_Layout\_t FEM\_Create\_simple\_field(int type,int width);}
 \function{INTEGER function FEM\_Create\_simple\_field(type,width)}
   \args{INTEGER, INTENT(IN)  :: type,width}
 
-This routine is completely interchangable to \kw{IDXL\_Layout\_create}.
+This routine is completely interchangeable to \kw{IDXL\_Layout\_create}.
 
 
 \prototype{FEM\_Create\_field}
@@ -287,7 +287,7 @@ This section brings together all the pieces of IDXL: Index Lists are used to det
   \args{INTEGER, INTENT(IN)  :: comm,indices,layout}
   \args{varies, INTENT(INOUT) :: data}
 
-Sum these \kw{indices} of shared entites across all chunks that share them.
+Sum these \kw{indices} of shared entities across all chunks that share them.
 The user \kw{data} array is interpreted according to the given \kw{layout}.
 
 If \kw{comm} is zero, this routine is blocking and finishes the communication immediately.
@@ -432,7 +432,7 @@ This routine is typically non-blocking, and may only be issued at most once per 
 \function{SUBROUTINE IDXL\_Comm\_wait(comm)}
   \args{INTEGER, INTENT(IN)  :: comm}
 
-Finish this communication operation. This call must be issued exactly once per \kw{IDXL\_Comm\_begin}.  This call inclues \kw{IDXL\_Comm\_flush} if it has not yet been called.
+Finish this communication operation. This call must be issued exactly once per \kw{IDXL\_Comm\_begin}.  This call includes \kw{IDXL\_Comm\_flush} if it has not yet been called.
 
 This routine always blocks until all incoming data is received, and is the last call that can be made on this \kw{comm}.
 

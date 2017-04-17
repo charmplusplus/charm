@@ -192,7 +192,7 @@ user-level threads, and can block waiting for data in a variety of
 ways. Again, only the particular thread of a particular chare is
 blocked, while the PE continues executing other chares.
 
-The normal entry methods, being asynchronus, are not allowed to return
+The normal entry methods, being asynchronous, are not allowed to return
 any value, and are declared with a void return type. However, the {\em
 sync} methods are an exception to this. They must be called from a
 threaded method, and so are allowed to return (certain types of)
@@ -203,7 +203,7 @@ values.
 
 To support asynchronous method invocation and global object space, the
 RTS needs to be able to serialize (``marshall'') the parameters, and
-be able to generate global ``names'' for chares. For this purprpose,
+be able to generate global ``names'' for chares. For this purpose,
 programmers have to declare the chare classes and the signature of
 their entry methods in a special ``\verb#.ci#'' file, called an
 interface file. Other than the interface file, the rest of a \charm
@@ -259,7 +259,7 @@ chapters of this part involve the notion of physical processors
 application developers, beginners and experts alike, try to stick to
 the basic language to the extent possible, and use features from the
 advanced sections only when you are convinced they are
-essential. (They are are useful in specific situations; but a common
+essential. (They are useful in specific situations; but a common
 mistake we see when we examine programs written by beginners is the
 inclusion of complex features that are not necessary for their
 purpose. Hence the caution). The advanced concepts in the Part II of

@@ -27,7 +27,7 @@ In an implicit computation a global matrix, which represents the entire
 problem domain, is formed and solved.  Implicit computations require
 a fast sparse matrix solver, and are typically used for steady-state
 problems.  In an explicit computation, the solution proceeds locally,
-computing new values based on the values of nearby points. Explict
+computing new values based on the values of nearby points. Explicit
 computations often have stability criteria, and are typically used for
 time-dependent problems.
 
@@ -127,7 +127,7 @@ A Multiblock framework program consists of several subroutines: \kw{init}, \kw{d
 
 \kw{init} and \kw{finalize} are called by the Multiblock framework only on the first processor -- these routines typically do specialized I/O, startup and shutdown tasks.  
 
-A separate \kw{driver} subroutine runs for each block, and does the main work of the program.  Because there may be several blocks per processor, several \kw{driver} routines may be executing as threads simultaniously.  
+A separate \kw{driver} subroutine runs for each block, and does the main work of the program.  Because there may be several blocks per processor, several \kw{driver} routines may be executing as threads simultaneously.  
 
 The boundary condition subroutines are called by the framework after a 
 request from \kw{driver}.
@@ -473,7 +473,7 @@ is the block interior boundary-- this is the lower left portion of the block.}
 \args{integer, intent(out) :: status,err}
      \kw{MBLK\_Test\_update} is a call that is used in association with 
      \kw{MBLK\_Iupdate\_field} from the driver sub routine.  It tests whether
-      the preceeding iupdate has completed or not.
+      the preceding iupdate has completed or not.
      \kw{status} is returned as MBLK\_DONE if the update was completed or 
       MBLK\_NOTDONE if the update is still pending.
      Rather than looping if the update is still pending, call \kw{MBLK\_Wait\_update}
@@ -482,7 +482,7 @@ is the block interior boundary-- this is the lower left portion of the block.}
 \vspace{0.2in}
 \function{void MBLK\_Wait\_update(void);}
 \function{subroutine MBLK\_Wait\_update()}
-     \kw{MBLK\_Wait\_update} call is a blocking call and is used in assoication 
+     \kw{MBLK\_Wait\_update} call is a blocking call and is used in association 
      with \kw{MBLK\_Iupdate\_field} call. It blocks until the update is completed.
 
 \vspace{0.2 in}
@@ -549,9 +549,9 @@ written by you, to a boundary condition number.
 \kw{MBLK\_Register\_bc} should only be called from the driver.
 
 \begin{itemize}
-	\item \kw{bcnum} The boundry condtion number to be associated with the 
+	\item \kw{bcnum} The boundary condition number to be associated with the 
 	function.
-	\item \kw{ghostWidth} The width of the ghost cells where this boundry
+	\item \kw{ghostWidth} The width of the ghost cells where this boundary
 	condition is to be applied.
 	\item \kw{bcfn} The user subroutine to be called to apply this
 	boundry condition.
@@ -612,7 +612,7 @@ boundary, with a 2-deep ghost region, would be:
   \args{varies,intent(inout)::param1}
   \args{varies,intent(inout)::param2}
   \args{integer,intent(out)::err}
-\kw{MBLK\_Apply\_bc} call is made to apply all boundry condition functions
+\kw{MBLK\_Apply\_bc} call is made to apply all boundary condition functions
 of type \kw{bcnum} to the block.  \kw{param1} and \kw{param2} are passed unmodified
 to the boundary condition function.
 

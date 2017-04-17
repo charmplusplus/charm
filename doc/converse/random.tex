@@ -1,6 +1,6 @@
 \chapter{Random Number Generation}
 
-Converse includes support for random number generation using a 64-bit Linear Congruential Generator (LCG).  The user can choose between using a supplied default stream shared amonst all chares on the processor, or creating a private stream.  Note that there is a limit on the number of private streams, which at the the time of writing was 15,613.
+Converse includes support for random number generation using a 64-bit Linear Congruential Generator (LCG).  The user can choose between using a supplied default stream shared amongst all chares on the processor, or creating a private stream.  Note that there is a limit on the number of private streams, which at the time of writing was 15,613.
 
 \function{struct CrnStream;}
 \index{CrnStream}
@@ -10,7 +10,7 @@ Converse includes support for random number generation using a 64-bit Linear Con
 
 \function{void CrnSrand(int seed);}
 \index{CrnSrand}
-\desc{Seeds the default randon number generator with {\tt seed}.}
+\desc{Seeds the default random number generator with {\tt seed}.}
 
 \function{int CrnRand(void);}
 \index{CrnRand}

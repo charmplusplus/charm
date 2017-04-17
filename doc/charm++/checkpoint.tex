@@ -79,7 +79,7 @@ the restart is complete. Here is an example of a typical use:
 A chare array usually has a PUP routine for the sake of migration.
 The PUP routine is also used in the checkpointing and restarting
 process.  Therefore, it is up to the programmer what to save and
-restore for the application. One illustration of this flexbility is a
+restore for the application. One illustration of this flexibility is a
 complicated scientific computation application with 9 matrices, 8 of
 which hold intermediate results and 1 that holds the final results
 of each timestep.  To save resources, the PUP routine can well omit
@@ -305,7 +305,7 @@ targets in \testrefdir{jacobi3d}.
 \label{ft:inject}
 For HPC clusters, the job-schedulers usually kills a job if a node goes down. To demonstrate
 restarting after failures on such clusters, \texttt{CkDieNow()} function can be used. You just need to place it at any place
-in the code. When it is called by a processor, the processor will hang and stop responding to any communicataion.
+in the code. When it is called by a processor, the processor will hang and stop responding to any communication.
 A spare processor will replace the crashed processor and continue execution after getting the checkpoint of the crashed processor. 
 To make it work, you need to add the command line option
 \emph{+wp}, the number following that option is the working processors and the remaining 

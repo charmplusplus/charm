@@ -10,7 +10,7 @@
 
 Charm++ is a parallel object language based on C++. The f90charm module is to
 provide Fortran90 programs a f90 interface to Charm++. Using the F90Charm interface,
-users can write Fortran90 programs in a fashion simliar to Charm++, which allows
+users can write Fortran90 programs in a fashion similar to Charm++, which allows
 creation of parallel object arrays (Chare Arrays) and sending messages between 
 them.
 
@@ -51,7 +51,7 @@ represented as a Fortran type structure. Here is an example:
       END MODULE
 \end{verbatim}
 You can think of this module as a Chare declaration. Type [Hello] defines 
-arbitary user program data and HelloPtr defines the Chare pointer which the
+arbitrary user program data and HelloPtr defines the Chare pointer which the
 Fortran program will use later to communicate with the F90Charm runtime 
 library, the [aid] is the handle of the array returned by the F90Charm library, user 
 shouldn't change it.
@@ -222,7 +222,7 @@ e.g. \{ChareName\}Mod.
       END MODULE
 \end{verbatim}
 
-In the Fortran file you must write an allocate funtion for this chare
+In the Fortran file you must write an allocate function for this chare
 with the name: Hello\_allocate.
 
 \begin{verbatim}

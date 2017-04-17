@@ -56,7 +56,7 @@ open for the selected processor elements}
 \label{sec:memory}
 
 The menu option Action~$\rightarrow$~Memory allows the user to display the
-entire memory layout of a secific processor. An example is shown in
+entire memory layout of a specific processor. An example is shown in
 figure~\ref{fig:memory}. This layout is colored and the colors have the
 following meaning:
 
@@ -71,7 +71,7 @@ following meaning:
 
 \item[red] memory allocated by the \charmpp{} Runtime System;
 
-\item[blue] memory allocatded directly by the user in its code;
+\item[blue] memory allocated directly by the user in its code;
 
 \item[pink] memory used by messages;
 
@@ -79,7 +79,7 @@ following meaning:
 
 \item[black] memory not allocated;
 
-\item[gray] a big jump in memory addresses due to the memory pooling system, it represent a large portion of virtual space not used between two differnt zones of used virtual space address;
+\item[gray] a big jump in memory addresses due to the memory pooling system, it represent a large portion of virtual space not used between two different zones of used virtual space address;
 
 \item[yellow] the currently selected memory slot;
 
@@ -101,9 +101,9 @@ one in Figure~\ref{fig:memory-stat}.
 \label{fig:memory-stat}
 \end{figure}
 
-A useful tool of this view is the memroy leak search. This is located in the
+A useful tool of this view is the memory leak search. This is located in the
 menu Action~$\rightarrow$~Search~Leaks. The processor under inspection runs a
-reacheability test on every memory slot allocated to find if there is a pointer
+reachability test on every memory slot allocated to find if there is a pointer
 to it. If there is none, the slot is partially colored in green, to indicate its
 status of leak. The user can the inspect further these slots. 
 Figure~\ref{fig:memory-leak} shows some leaks being detected.

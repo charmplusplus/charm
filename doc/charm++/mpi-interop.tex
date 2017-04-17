@@ -31,7 +31,7 @@ Arguments {\em argc and argv} should contain the information required by
 
 During the initialization, the control is transferred from MPI to \charmpp{}
 RTS on the MPI ranks that made the call. Along with basic setup, \charmpp{} RTS also invokes
-the constructors of all mainchares during initialization. Once the intial set up
+the constructors of all mainchares during initialization. Once the initial set up
 is done, control is transferred back to MPI as if returning from a function call.
 Since \charmpp{} initialization is made via a function call from the pure MPI
 program, \charmpp{} resides in the same memory space as the pure MPI program. This

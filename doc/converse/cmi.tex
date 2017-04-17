@@ -293,7 +293,7 @@ The \uw{sizes[]} array is an array of sizes of each of these messages.
 The \uw{msgComps[]} array is the array of the messages. 
 The indexing in each array is from 0 to len - 1.
 \note{
-Before calling this function, the program needs to initialise the system
+Before calling this function, the program needs to initialize the system
 to be able to provide this service. This is done by calling the function
 \kw{CmiInitMultipleSendRoutine}. Unless this function is
 called, the system will not be able to provide the service to the user.}
@@ -555,7 +555,7 @@ the return of the merge function. It will be called for sizing and packing.
 
 \function{void (*deleteFn)(void *ptr)}
 \desc{Prototype for a \kw{CmiReduceDeleteFn} function pointer argument.
-This function is used to delete either the data stucture passed in as first
+This function is used to delete either the data structure passed in as first
 parameter of any ``Struct'' function, or the return of the merge
 function. It can be as simple as ``free'' or as complicated as needed to delete
 complex structures. If this function is NULL, the data structure will not be
@@ -588,7 +588,7 @@ can set aside some CmiReductionIDs for later use.}
 
 \function{CmiReductionID CmiGetDynamicReduction()}
 \desc{This function may be called only on processor zero. It returns a unique
-ID, and it is up to the user to distrubute this ID to any processor that needs
+ID, and it is up to the user to distribute this ID to any processor that needs
 it.}
 
 \function{void CmiGetDynamicReductionRemote(int handlerIdx, int pe, int dataSize, void *data)}
@@ -888,13 +888,13 @@ a positive integer on success.}
 memory pointed to by global pointer \param{gptr}
 to local memory pointed to by \param{lptr}. 
 This function returns a  communication handle which could be used
-to  enquire about the status of this operation.}
+to  inquire about the status of this operation.}
 
 \function{CommHandle CmiPut(GlobalPtr *gptr, void *lptr, unsigned int size)}
 \desc{Initiates copying of \param{size} bytes from a processor's local
 memory pointed to by \param{lptr} to the memory pointed to by global
 pointer \param{gptr}.  This function returns a  communication handle
-which could be used to  enquire about the status of this operation.}
+which could be used to  inquire about the status of this operation.}
 }
 
 \section{The Timer}
@@ -948,7 +948,7 @@ layer using asynchronous sends.}
 \section{Processor Groups}
 
 \function{void CmiPgrpCreate(Pgrp *group)}
-\desc{Creates a processor-group with calling processsor as the root processor.}
+\desc{Creates a processor-group with calling processor as the root processor.}
 
 \function{void CmiPgrpDestroy(Pgrp *group)}
 \desc{Frees resources associated with a processor group \param{group}.}

@@ -82,7 +82,7 @@
 
 {\it SAYANTAN}
 
-\subsubsection{Backward Compatability}
+\subsubsection{Backward Compatibility}
 
 {\it SAYANTAN}
 
@@ -171,7 +171,7 @@ we set the desired size for each element to be {\it size}.}
 \function{void FEM\_ADAPT\_SetElementSizeField(int meshID, double *sizes);}
 \index{femAdaptSetElementSizeField2}
 \desc{For the mesh specified by {\it meshID}, for the element {\it elem},
-we set the desired size for each element from the corresonponding entry in
+we set the desired size for each element from the corresponding entry in
 the {\it sizes} array.}
 
 \function{void FEM\_ADAPT\_SetReferenceMesh(int meshID);}
@@ -190,7 +190,7 @@ Mesh Gradation Control, Borouchaki et al.}
 \subsubsection{Modifying the Mesh}
 Once the elements in the mesh have been prepared by specifying their desired
 sizes, we are ready to use the actual adaptivity operations. Currently we
-provide delaunay flip operations, edge bisect operations and edge coarsen 
+provide Delaunay flip operations, edge bisect operations and edge coarsen 
 operations, all of which are implemented in parallel. We provide several higher level 
 functions which use these basic operations to 
 generate a mesh with higher quality elements while achieving the
@@ -222,7 +222,7 @@ Negative entries in sizes array indicate no coarsening. }
 namely refine and coarsen. This function keeps using the above two functions until
 we have all elements in the mesh with as close to the desired quality. Apart from
 using the above two operations, it also performs a mesh repair operation which
-gets rid of some bad quality elements by delaunay flip or coarsening as the
+gets rid of some bad quality elements by Delaunay flip or coarsening as the
 geometry in the area demands.}
 
 \function{int FEM\_ADAPT\_SimpleRefineMesh(int meshID, double targetA, double xmin, double ymin, double xmax, double ymax);}

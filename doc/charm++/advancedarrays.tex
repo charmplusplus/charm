@@ -1,7 +1,7 @@
 The basic array features described previously (creation, messaging,
 broadcasts, and reductions) are needed in almost every
 \charmpp{} program.  The more advanced techniques that follow
-are not universally needed, but represent many useful optimisations.
+are not universally needed, but represent many useful optimizations.
 
 \section{Local Access}
 
@@ -126,7 +126,7 @@ In addition to controlling how many elements and at which indices to create
 them, \kw{CkArrayOptions} contains a few flags that the runtime can use to
 optimize handling of a given array. If the array elements will only
 migrate at controlled points (such as periodic load balancing with
-{\tt AtASync()}), this is signalled to the runtime by calling {\tt
+{\tt AtASync()}), this is signaled to the runtime by calling {\tt
   opts.setAnytimeMigration(false)}\footnote{At present, this optimizes
 broadcasts to not save old messages for immigrating chares.}. If all
 array elements will be inserted by bulk creation or by {\tt
@@ -205,7 +205,7 @@ For example, if you've declared a map object named ``BlockMap'':
   a1=CProxy_A1::ckNew(\uw{parameters},opts);
 \end{alltt}
 
-An example which contructs one element per physical node may be found in
+An example which constructs one element per physical node may be found in
 \examplerefdir{PUP/pupDisk}
 
 Other 3D Torus network oriented map examples are in
@@ -307,7 +307,7 @@ For example, an array {\it Alibrary} is implemented as a library module.
 It implements a certain functionality by operating on a data array {\it dest}
 which is just a pointer to some user provided data.
 A user defined array {\it UserArray} is created and bound to 
-the array {\it Alibrary} to take advanatage of the functionality provided 
+the array {\it Alibrary} to take advantage of the functionality provided 
 by the library.
 When bound array element migrated, the {\it data} pointer in {\it UserArray}
 is re-allocated in {\it pup()}, thus {\it UserArray} is responsible to refresh
@@ -410,7 +410,7 @@ A demonstration of dynamic insertion is available:
 
 \subsection{Demand Creation}
 
-Demand Creation is a specialized form of dynamic insertion. Normally, invoking an entry method on a nonexistant array
+Demand Creation is a specialized form of dynamic insertion. Normally, invoking an entry method on a nonexistent array
 element is an error.  But if you add the attribute
 \index{createhere} \index{createhome}
 \kw{[createhere]} or \kw{[createhome]} to an entry method,

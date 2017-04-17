@@ -1,7 +1,7 @@
 \section{Mesh Nodes and Elements}
 \label{sec:entities}
 
-These routines describe and retreive the finite element mesh for this
+These routines describe and retrieve the finite element mesh for this
 computation.  A \term{mesh}, from the framework's perspective, is a list of
 elements, nodes, and other data that describes the computational domain.
 The FEM framework provides extensive support for creating, manipulating,
@@ -34,7 +34,7 @@ always stored in regular arrays indexed by the entity's local number.
 This table lists the different attributes that can be read or
 written for each type of entity.
 
-A \term{shared entity} is a boundary entitity that two or more chunks 
+A \term{shared entity} is a boundary entity that two or more chunks 
 can both update---currently, only nodes can be shared.  Shared nodes
 are mixed in with regular nodes, and the framework currently provides
 no way to identify which nodes are shared.
@@ -907,7 +907,7 @@ This call can only be issued from \kw{driver()}.
 
 \subsection{Advanced Symmetries and Ghosts--Lower Layer}
 
-The geometric symmetry layer in the preceeding section is actually
+The geometric symmetry layer in the preceding section is actually
 a thin wrapper around this lower, more difficult to use layer.
 
 \prototype{FEM\_Set\_sym\_nodes}
@@ -1019,7 +1019,7 @@ These routines always use the default mesh, as returned by
   \args{INTEGER, INTENT(IN)  :: elType}
   \args{INTEGER, INTENT(OUT) :: nEl,doublePerEl,nodePerEl}
 
-     Describe/retreive the number and type of elements.  \kw{ElType} is a
+     Describe/retrieve the number and type of elements.  \kw{ElType} is a
 user-defined small, unique element type tag.  \kw{nEl} is the number of elements 
 being registered.  \kw{doublesPerEl} and \kw{nodePerEl} are the number of doubles of user data, and nodes (respectively) associated with each element.
 
@@ -1047,7 +1047,7 @@ to make them in linearly increasing order.  However, for a given type of element
   \args{INTEGER, INTENT(IN)  :: elType}
   \args{INTEGER, INTENT(OUT), dimension(nEl,nodePerEl) :: conn}
 
-     Describe/retreive the element connectivity array for this element
+     Describe/retrieve the element connectivity array for this element
      type.  The connectivity array is indexed by the element number,
      and gives the indices of the nodes surrounding the element.  It is
      hence \kw{nodePerEl*nEl} integers long.
@@ -1070,7 +1070,7 @@ to make them in linearly increasing order.  However, for a given type of element
 \function{SUBROUTINE FEM\_Get\_node(nNode,doublePerNode)}
   \args{INTEGER, INTENT(OUT) :: nNode,doublePerNode}
 
-     Describe/retreive the number of nodes and doubles of user data
+     Describe/retrieve the number of nodes and doubles of user data
      associated with each node.  There is only one type of node, so no
      \kw{nodeType} identifier is needed.
 
@@ -1166,7 +1166,7 @@ Fortran version:
 
 
 
-\subsection{Old Backward Compatability}
+\subsection{Old Backward Compatibility}
 \prototype{FEM\_Set\_mesh}
 \function{void FEM\_Set\_mesh(int nElem, int nNodes, int nodePerEl,const int* conn);}
 
