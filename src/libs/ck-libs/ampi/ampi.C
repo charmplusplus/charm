@@ -915,7 +915,16 @@ class MPI_threadstart_t {
     // This is used for roughly estimating the stack usage later.
     CtvAccess(stackBottom) = &argv;
 
-#if CMK_AMPI_FNPTR_HACK
+#if !CMK_NO_BUILD_SHARED
+    // If charm++ is built with shared libraries, it does not support
+    // a custom AMPI_Setup method and always uses AMPI_Fallback_Main.
+    // Works around bug #1508.
+    if (_ampi_fallback_setup_count != 2 && CkMyPe() == 0) {
+      CkAbort("AMPI> The application provided a custom AMPI_Setup() method, "
+      "but AMPI is built with shared library support. This is an unsupported "
+      "configuration. Please recompile charm++/AMPI without `-build-shared` or "
+      "remove the AMPI_Setup() function from your application.\n");
+    }
     AMPI_Fallback_Main(argc,argv);
 #else
     (fn)(argc,argv);
