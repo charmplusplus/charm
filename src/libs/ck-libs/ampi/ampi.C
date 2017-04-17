@@ -1,6 +1,5 @@
 
 #define AMPIMSGLOG    0
-#define exit exit /*Supress definition of exit in ampi.h*/
 #include "ampiimpl.h"
 #include "tcharm.h"
 #if CMK_TRACE_ENABLED && CMK_PROJECTOR
