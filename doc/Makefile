@@ -6,7 +6,7 @@ DIRS	= converse convext charm++ libraries f90charm pose \
 	ampi bigsim projections tcharm debugger faq \
 	bignetsim charj
 #	charisma ## uncomment once the manual is updated
-#	fem ifem netfem mblock ## dont build regularly. dormant manuals
+#	fem ifem netfem mblock armci jade parfum ## dont build regularly. dormant manuals
 
 all: pdf ps html
 
