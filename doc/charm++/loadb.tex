@@ -113,6 +113,10 @@ and their brief descriptions:
 %\item {\bf RecBisectBfLB}:        Recursively partition with Breadth first enumeration;
 \item {\bf MetisLB}:      Uses METIS\texttrademark\hspace{0mm} to partitioning object communication graph.
 \item {\bf GreedyLB}:   Uses a greedy algorithm that always assigns the heaviest object to the least loaded processor.
+\item {\bf GreedyRefineLB}:   Uses a greedy algorithm that assigns the
+heaviest object to the least loaded processor when the benefit
+outweighs the migration cost, otherwise leaves the object on its
+current processor.
 \item {\bf GreedyCommLB}:  Extends the greedy algorithm to take the communication graph into account.
 \item {\bf TopoCentLB}:    Extends the greedy algorithm to take processor topology into account.
 \item {\bf RefineLB}:     Moves objects away from the most overloaded processors to reach average, limits the number of objects migrated.
@@ -386,7 +390,7 @@ runtime options.
 \item {\em -module CommonLBs} \\
   links a special module CommonLBs which includes some commonly used \charmpp{}
 built-in load balancers. The commonly used load balancers include {\tt
-DummyLB, GreedyLB, CommLB, RandCentLB, RefineLB, RefineCommLB, RotateLB, DistributedLB, HybridLB, ComboCentLB, RefineSwapLB, NeighborLB, OrbLB, BlockLB, GreedyCommLB}
+DummyLB, GreedyLB, GreedyRefineLB, CommLB, RandCentLB, RefineLB, RefineCommLB, RotateLB, DistributedLB, HybridLB, ComboCentLB, RefineSwapLB, NeighborLB, OrbLB, BlockLB, GreedyCommLB}
 \item {\em -balancer GreedyCommLB} \\
   links the load balancer GreedyCommLB and invokes it at runtime.
 \item {\em -balancer GreedyCommLB -balancer RefineLB} \\
