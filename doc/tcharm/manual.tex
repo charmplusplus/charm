@@ -526,7 +526,7 @@ access all of Charm++, including arrays and groups.
 using TCharm with your library automatically provides your users with a 
 clean C/F90 API (described in the preceding chapters) for basic thread
 memory  management, I/O, and migration.  It also allows you to use a convenient
-"thread->suspend()" and "thread->resume()" API for blocking a thread,
+"thread-\textgreater suspend()" and "thread-\textgreater resume()" API for blocking a thread,
 and works properly with the load balancer, unlike CthSuspend/CthAwaken.
 \end{itemize}
 
@@ -619,8 +619,8 @@ protected:
 \end{alltt}
 
 
-\item Block a thread for communication using thread->suspend and
-thread->resume
+\item Block a thread for communication using thread-\textgreater suspend and
+thread-\textgreater resume
 
 \begin{alltt}
 int FooChunk::doCommunicate(...)

@@ -40,4 +40,4 @@ This section presents functions that uses persistent handler for communications.
 
 \function{void CmiUsePersistentHandle(PersistentHandle *p, int n)}
 \index{CmiUse}
-\desc{This function will ask Charm machine layer to use an array of PersistentHandle "p"(array size of n) for all the following communication. Calling with p=NULL will cancel the persistent communication. n=1 is for sending message to each Chare, n>1 is for message in multicast-one PersistentHandle for each PE.}
+\desc{This function will ask Charm machine layer to use an array of PersistentHandle "p"(array size of n) for all the following communication. Calling with p=NULL will cancel the persistent communication. n=1 is for sending message to each Chare, n\textgreater 1 is for message in multicast-one PersistentHandle for each PE.}

@@ -102,13 +102,13 @@ There is usually at least one routing strategy that needs to be defined
 for every topology, Usually we have many more. The following functions need
 to be defined for every routing strategy.
 
-\function{int selectRoute(int current, int dest, int numP, Topology* top, Packet *p, map<int,int> \&bufsize, unsigned short *xsubi)}
+\function{int selectRoute(int current, int dest, int numP, Topology* top, Packet *p, map\textless int,int\textgreater{} \&bufsize, unsigned short *xsubi)}
 \index{selectRoute}
 \desc{Returns the portid that should be taken on switch {\it current} if the destination
 is {\it dest}. The number of ports on a switch is {\it numP}. We also pass the pointer 
 to the topology and to the Packet.}
 
-\function{int selectRoute(int current, int dest, int numP, Topology* top, Packet *p, map<int,int> \&bufsize, map<int,int> \&portContention, unsigned short *xsubi)}
+\function{int selectRoute(int current, int dest, int numP, Topology* top, Packet *p, map\textless int,int\textgreater{} \&bufsize, map\textless int,int\textgreater{} \&portContention, unsigned short *xsubi)}
 \index{selectRouteCont}
 \desc{Returns the portid that should be taken on switch {\it current} if the destination
 is {\it dest}. The number of ports on a switch is {\it numP}. We also pass the pointer 
@@ -132,7 +132,7 @@ For every switch, we need to know the mechanism it uses to choose input virtual 
 There are a few different input virtual channel selection strategies, and a switch
 can choose among them. Each should implement the following function.
 
-\function{int selectInputVc(map<int,int> \&availBuffer, map<int,int> \&request, map<int,vector<Header> > \&inBuffer, int globalVc, int curSwitch)}
+\function{int selectInputVc(map\textless int,int\textgreater{} \&availBuffer, map\textless int,int\textgreater{} \&request, map\textless int,vector\textless Header\textgreater{} \textgreater{} \&inBuffer, int globalVc, int curSwitch)}
 \index{selectInputVc}
 \desc{Returns the input virtual channel to be used depending on the strategy and
 the input parameters.}
@@ -143,7 +143,7 @@ For every switch, we need to know the mechanism it uses to choose output virtual
 There are a few different output virtual channel selection strategies, and a switch
 can choose among them. Each should implement the following function.
 
-\function{int selectOutputVc(map<int,int> \&bufsize, Packet *p, int unused)}
+\function{int selectOutputVc(map\textless int,int\textgreater{} \&bufsize, Packet *p, int unused)}
 \index{selectOutputVc}
 \desc{Returns the output virtual channel to be used depending on the strategy and
 the input parameters.}
