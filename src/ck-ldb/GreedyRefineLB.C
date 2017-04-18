@@ -8,9 +8,9 @@
  * Greedy algorithm to minimize cpu max_load and object migrations.
  * Can find solution equal or close to regular Greedy with less (sometimes much less) migrations.
  * The amount of migrations that the user can tolerate is passed via the command-line
- * option +LBNumMoves (as percentage of chares that can be moved).
+ * option +LBPercentMoves (as percentage of chares that can be moved).
  *
- * If LBNumMoves is not passed, strategy assumes it can move all objects.
+ * If LBPercentMoves is not passed, strategy assumes it can move all objects.
  * In this case, the algorithm will give preference to minimizing cpu max_load.
  * It will still move less than greedy, but the amount of migrations
  * will depend very much on the particular case (object load distribution and processor background loads),

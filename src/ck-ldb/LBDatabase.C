@@ -184,8 +184,8 @@ void _loadbalancerInit()
   // now called in cldb.c: CldModuleGeneralInit()
   // registerLBTopos();
   CmiGetArgStringDesc(argv, "+LBTopo", &_lbtopo, "define load balancing topology");
-  //Read the K parameter for RefineKLB
-  CmiGetArgIntDesc(argv, "+LBNumMoves", &_lb_args.percentMovesAllowed() , "Percentage of chares to be moved (used by RefineKLB) [0-100]");
+  //Read the percentage parameter for RefineKLB and GreedyRefineLB
+  CmiGetArgIntDesc(argv, "+LBPercentMoves", &_lb_args.percentMovesAllowed() , "Percentage of chares to be moved (used by RefineKLB and GreedyRefineLB) [0-100]");
 
   /**************** FUTURE PREDICTOR ****************/
   _lb_predict = CmiGetArgFlagDesc(argv, "+LBPredictor", "Turn on LB future predictor");
@@ -343,7 +343,7 @@ void LBDatabase::initnodeFn()
   _registerCommandLineOpt("+LBPeriod");
   _registerCommandLineOpt("+LBLoop");
   _registerCommandLineOpt("+LBTopo");
-  _registerCommandLineOpt("+LBNumMoves");
+  _registerCommandLineOpt("+LBPercentMoves");
   _registerCommandLineOpt("+LBPredictor");
   _registerCommandLineOpt("+LBPredictorDelay");
   _registerCommandLineOpt("+LBPredictorWindow");
