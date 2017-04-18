@@ -112,12 +112,12 @@ and their brief descriptions:
 \item {\bf RandCentLB}:   Randomly assigns objects to processors;
 %\item {\bf RecBisectBfLB}:        Recursively partition with Breadth first enumeration;
 \item {\bf MetisLB}:
-Uses \href{http://glaros.dtc.umn.edu/gkhome/metis/metis/overview}{METIS\texttrademark\hspace{0mm}}
+Uses \htmladdnormallink{METIS\texttrademark\hspace{0mm}}{http://glaros.dtc.umn.edu/gkhome/metis/metis/overview}
 to partition the object communication graph.
-\item {\bf ScotchLB}:
-Uses the \href{http://www.labri.fr/perso/pelegrin/scotch/}{SCOTCH}
-library for partitioning the object communication graph, while also taking
-object load imbalance into account.
+\item {\bf ScotchLB}:   Uses
+the \htmladdnormallink{SCOTCH}{http://www.labri.fr/perso/pelegrin/scotch/}
+library for partitioning the object communication graph, while also
+taking object load imbalance into account.
 \item {\bf GreedyLB}:   Uses a greedy algorithm that always assigns the heaviest object to the least loaded processor.
 \item {\bf GreedyRefineLB}:   Uses a greedy algorithm that assigns the
 heaviest object to the least loaded processor when the benefit
