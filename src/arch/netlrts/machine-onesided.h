@@ -14,7 +14,7 @@ void LrtsSetRdmaInfo(void *dest, int destPE, int numOps) {
   CmiAbort("Should never reach here!");
 }
 
-void LrtsSetRdmaOpInfo(void *dest, const void *ptr, int size, void *ack, int destPE) {
+void LrtsSetRdmaOpInfo(void *dest, const void *ptr, int size) {
   CmiAbort("Should never reach here!");
 }
 
@@ -30,7 +30,7 @@ int LrtsGetRdmaInfoSize(int numOps) {
   CmiAbort("Should never reach here!");
 }
 
-void LrtsSetRdmaRecvInfo(void *dest, int numOps, void *charmMsg, void *rdmaInfo, int msgSize) {
+void LrtsSetRdmaRecvInfo(void *dest, int numOps, void *charmMsg, void *rdmaInfo) {
   CmiAbort("Should never reach here!");
 }
 
