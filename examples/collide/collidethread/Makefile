@@ -1,12 +1,12 @@
 -include ../../common.mk
-CHARMC=../../../bin/charmc $(OPTS)
+CHARMC=../../../bin/ampicxx $(OPTS)
 
 OBJS = hello.o
 
 all:	cifiles hello
 
 hello: $(OBJS)
-	$(CHARMC) -language ampi -module collide -o hello $(OBJS)
+	$(CHARMC)  -module collide -o hello $(OBJS)
 
 cifiles: hello.ci
 	$(CHARMC)  hello.ci
