@@ -17,8 +17,9 @@
 #include "TopoManager.h"
 #include <vector>
 #include <algorithm>
-#include<sstream>
+#include <sstream>
 #include <limits>
+#include "pup_stl.h"
 
 #if CMK_LBDB_ON
 #include "LBDatabase.h"
@@ -267,21 +268,52 @@ void CkArrayMap::populateInitial(int arrayHdl,CkArrayOptions& options,void *ctor
 	CkFreeMsg(ctorMsg);
 }
 
+void CkArrayMap::storeCkArrayOpts(CkArrayOptions options) {
+//options will not be used on demand_creation arrays
+  storeOpts = options;
+}
+
+void CkArrayMap::pup(PUP::er &p) {
+  p|storeOpts;
+  p|dynamicIns;
+}
+
 CkGroupID _defaultArrayMapID;
 CkGroupID _fastArrayMapID;
 
 class RRMap : public CkArrayMap
 {
+private:
+  CkArrayIndex maxIndex;
+  uint64_t products[2*CK_ARRAYINDEX_MAXLEN];
+  bool productsInit;
+
 public:
   RRMap(void)
   {
     DEBC((AA "Creating RRMap\n" AB));
+    productsInit = false;
   }
   RRMap(CkMigrateMessage *m):CkArrayMap(m){}
-  int procNum(int /*arrayHdl*/, const CkArrayIndex &i)
+
+  void indexInit() {
+    productsInit = true;
+    maxIndex = storeOpts.getEnd();
+    products[maxIndex.dimension - 1] = 1;
+    if(maxIndex.dimension <= CK_ARRAYINDEX_MAXLEN) {
+      for(int dim = maxIndex.dimension - 2; dim >= 0; dim--) {
+        products[dim] = products[dim + 1] * maxIndex.index[dim + 1];
+      }
+    } else {
+      for(int dim = maxIndex.dimension - 2; dim >= 0; dim--) {
+        products[dim] = products[dim + 1] * maxIndex.indexShorts[dim + 1];
+      }
+    }
+  } // End of indexInit
+
+  int procNum(int arrayHdl, const CkArrayIndex &i)
   {
-#if 1
-    if (i.dimension==1) {
+    if (i.dimension == 1) {
       //Map 1D integer indices in simple round-robin fashion
       int ans = (i.data()[0])%CkNumPes();
       while(!CmiNodeAlive(ans) || (ans == CkMyPe() && CkpvAccess(startedEvac))){
@@ -289,17 +321,39 @@ public:
       }
       return ans;
     }
-    else 
-#endif
-    {
-	//Map other indices based on their hash code, mod a big prime.
-	unsigned int hash=(i.hash()+739)%1280107;
-	int ans = (hash % CkNumPes());
-	while(!CmiNodeAlive(ans)){
-	  ans = (ans+1)%CkNumPes();
-	}
-	return ans;
+    else {
+      if(dynamicIns.find(arrayHdl) != dynamicIns.end()) {
+        //Finding indicates that current array uses dynamic insertion
+        //Map other indices based on their hash code, mod a big prime.
+        unsigned int hash=(i.hash()+739)%1280107;
+        int ans = (hash % CkNumPes());
+        while(!CmiNodeAlive(ans)){
+          ans = (ans+1)%CkNumPes();
+        }
+        return ans;
+      } else {
+        if(!productsInit) { indexInit(); }
+
+        int indexOffset = 0;
+        if(i.dimension <= CK_ARRAYINDEX_MAXLEN) {
+          for(int dim = i.dimension - 1; dim >= 0; dim--) {
+            indexOffset += (i.index[dim] * products[dim]);
+          }
+        } else {
+          for(int dim = maxIndex.dimension - 1; dim >= 0; dim--) {
+            indexOffset += (i.indexShorts[dim] * products[dim]);
+          }
+        }
+        return indexOffset % CkNumPes();
+      }
     }
+  }
+
+  void pup(PUP::er& p) {
+    CkArrayMap::pup(p);
+    p|maxIndex;
+    p|productsInit;
+    PUParray(p, products, 2*CK_ARRAYINDEX_MAXLEN);
   }
 };
 
@@ -417,6 +471,7 @@ public:
   int procNum(int arrayHdl, const CkArrayIndex &i) {
     int flati;
     if (amaps[arrayHdl]->_nelems.dimension == 0) {
+      dynamicIns[arrayHdl] = true;
       return RRMap::procNum(arrayHdl, i);
     }
 

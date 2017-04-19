@@ -93,6 +93,13 @@ class CkArrayIndex: public CkArrayIndexBase
         /// Return a const pointer to the actual index data
         const int *data(void) const {return index; }
 
+        /// Return the dimension size
+        short getDimension(void)             { return dimension; }
+        /// Return a pointer to the short index data
+        short *shortData(void)             { return indexShorts; }
+        /// Return a const pointer to the short index data
+        const short *shortData(void) const { return indexShorts; }
+
         /// Return the total number of elements (assuming a dense chare array)
         int getCombinedCount(void) const
         {
