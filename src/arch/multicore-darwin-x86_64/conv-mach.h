@@ -2,7 +2,7 @@
 #define _CONV_MACH_H
 
 // specify the version of the UNIX APIs that we want to use (for ucontext headers)
-#define _XOPEN_SOURCE                                      600
+#define _XOPEN_SOURCE
 
 #define CMK_SMP                                            1
 #define CMK_MULTICORE                                      1
