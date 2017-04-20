@@ -1251,7 +1251,7 @@ void          CmiReleaseCommHandle(CmiCommHandle);
 /* support for rest may come later if required */
 
 #if CMK_NODE_QUEUE_AVAILABLE
-static void          CmiSyncNodeSendFn(int, int, char *);
+void          CmiSyncNodeSendFn(int, int, char *);
 CmiCommHandle CmiAsyncNodeSendFn(int, int, char *);
 void          CmiFreeNodeSendFn(int, int, char *);
 
