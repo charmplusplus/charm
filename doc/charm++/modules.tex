@@ -20,6 +20,18 @@ classes, utility classes, wrapper functions etc.) that facilitates the
 interaction of the user program's entities with the framework.  A program may
 have several interface description files.
 
+To enable Vim syntax highlighting of .ci files, do the following:
+
+\begin{alltt}
+$ cp charm/contrib/ci.vim ~/.vim/syntax/.
+$ vi ~/.vim/filetype.vim
+\end{alltt}
+
+And paste the following line in that file:
+\begin{alltt}
+au! BufRead,BufNewFile *.ci set filetype=ci
+\end{alltt}
+
 
 \section{Modules}
 \index{module}
