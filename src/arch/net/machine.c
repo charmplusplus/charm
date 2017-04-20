@@ -3027,10 +3027,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   }
 #endif
 
-#if CMK_SMP && CMK_USE_IBVERBS
-  Cmi_smp_mode_setting = COMM_THREAD_ONLY_RECV;
-#endif
-
   skt_init();
   /* use special abort handler instead of default_skt_abort to 
      prevent exit trapped by atexit_check() due to the exit() call  */
