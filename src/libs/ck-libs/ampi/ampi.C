@@ -15,6 +15,10 @@
 #include "bigsim_logs.h"
 #endif
 
+#if CMK_TRACE_ENABLED
+#include "register.h" // for _chareTable, _entryTable
+#endif
+
 /* change this to MPI_ERRORS_RETURN to not abort on errors */
 #define AMPI_ERRHANDLER MPI_ERRORS_ARE_FATAL
 
@@ -879,8 +883,32 @@ CDECL
 void AMPI_threadstart(void *data);
 static int AMPI_threadstart_idx = -1;
 
+#if CMK_TRACE_ENABLED
+CsvExtern(funcmap*, tcharm_funcmap);
+#endif
+
 static void ampiNodeInit(void)
 {
+#if CMK_TRACE_ENABLED
+  TCharm::nodeInit(); // make sure tcharm_funcmap is set up
+  int funclength = sizeof(funclist)/sizeof(char*);
+  for (int i=0; i<funclength; i++) {
+    CsvAccess(tcharm_funcmap)->insert(std::pair<std::string, int>(funclist[i], AMPI_EVENTID_BASE+i));
+    traceRegisterUserEvent(funclist[i], AMPI_EVENTID_BASE+i);
+  }
+
+  // rename chare & function to something reasonable
+  // TODO: find a better way to do this
+  for (int i=0; i<_chareTable.size(); i++){
+    if (strcmp(_chareTable[i]->name, "dummy_thread_chare") == 0)
+      _chareTable[0]->name = "AMPI";
+  }
+  for (int i=0; i<_entryTable.size(); i++){
+    if (strcmp(_entryTable[i]->name, "dummy_thread_ep") == 0)
+      _entryTable[0]->name = "rank";
+  }
+#endif
+
   _mpi_nworlds=0;
   for(int i=0;i<MPI_MAX_COMM_WORLDS; i++)
   {

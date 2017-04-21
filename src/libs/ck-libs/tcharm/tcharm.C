@@ -71,8 +71,18 @@ CkpvDeclare(bool, mapCreated);
 static CkGroupID mapID;
 static char* mapping = NULL;
 
+#if CMK_TRACE_ENABLED
+CsvDeclare(funcmap*, tcharm_funcmap);
+#endif
+
 void TCharm::nodeInit(void)
 {
+#if CMK_TRACE_ENABLED
+  if (CsvAccess(tcharm_funcmap) == NULL) {
+    CsvInitialize(funcmap*, tcharm_funcmap);
+    CsvAccess(tcharm_funcmap) = new funcmap();
+  }
+#endif
 }
 
 void TCharm::procInit(void)

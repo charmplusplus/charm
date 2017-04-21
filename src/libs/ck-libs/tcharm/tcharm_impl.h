@@ -261,6 +261,22 @@ class TCharm: public CBase_TCharm
 
 void TCHARM_Api_trace(const char *routineName, const char *libraryName);
 
+#if CMK_TRACE_ENABLED
+typedef std::map<std::string, int> funcmap;
+CsvExtern(funcmap*, tcharm_funcmap);
+
+static
+int tcharm_routineNametoID(char const *routineName)
+{
+  funcmap::iterator it;
+  it = CsvAccess(tcharm_funcmap)->find(routineName);
+
+  if (it != CsvAccess(tcharm_funcmap)->end())
+    return it->second;
+
+  return -1;
+}
+#endif
 
 // Created in all API routines:
 // - Disables/enables migratable malloc
@@ -270,6 +286,10 @@ class TCharmAPIRoutine {
 	CtgGlobals oldGlobals;	// this is actually a pointer
         tlsseg_t   oldtlsseg;   // for TLS globals
 	bool actLikeMainThread; // Whether memory allocation and globals should switch away from the application thread
+#if CMK_TRACE_ENABLED
+	double start; // starting time of trace event
+	int tcharm_routineID; // TCharm routine ID that is traced
+#endif
 #if CMK_BIGSIM_CHARM
 	void *callEvent; // The BigSim-level event that called into the library
         int pe;          // in case thread migrates
@@ -287,6 +307,10 @@ class TCharmAPIRoutine {
 		_TRACE_BG_END_EXECUTE(0);
 		pe = CmiMyPe();
 		_TRACE_BG_BEGIN_EXECUTE_NOMSG(routineName, &callEvent, 0);
+#endif
+#if CMK_TRACE_ENABLED
+		start = CmiWallTimer();
+		tcharm_routineID = tcharm_routineNametoID(routineName);
 #endif
 
 		if (actLikeMainThread) {
@@ -313,6 +337,9 @@ class TCharmAPIRoutine {
 
 	// Returning to user code from Charm++
 	~TCharmAPIRoutine() {
+#if CMK_TRACE_ENABLED
+		double stop = CmiWallTimer();
+#endif
 		if (actLikeMainThread) {
 			CmiIsomallocBlockList *oldHeapBlock; 
 			TCharm *tc=CtvAccess(_curTCharm);
@@ -348,6 +375,10 @@ class TCharmAPIRoutine {
 		_TRACE_BG_END_EXECUTE(0);
 		_TRACE_BG_BEGIN_EXECUTE_NOMSG("user_code", &log, 0);
 		if (CmiMyPe() == pe) _TRACE_BG_ADD_BACKWARD_DEP(callEvent);
+#endif
+#if CMK_TRACE_ENABLED
+		if (tcharm_routineID > -1) // is it a routine we care about?
+			traceUserBracketEvent(tcharm_routineID, start, stop);
 #endif
 	}
 };
