@@ -18,6 +18,7 @@
 #include <vector>
 #include <algorithm>
 #include<sstream>
+#include <limits>
 
 #if CMK_LBDB_ON
 #include "LBDatabase.h"
@@ -3051,6 +3052,12 @@ void CkLocMgr::emigrate(CkLocRec *rec,int toPe)
 		pupElementsFor(p,rec,CkElementCreation_migrate);
 		bufSize=p.size(); 
 	}
+#if CMK_ERROR_CHECKING
+	if (bufSize > std::numeric_limits<int>::max()) {
+		CmiPrintf("Cannot migrate an object with size greater than %zu bytes!\n", std::numeric_limits<int>::max());
+		CmiAbort("");
+	}
+#endif
 
 //Allocate and pack into message
 	CkArrayElementMigrateMessage *msg = new (bufSize, 0) CkArrayElementMigrateMessage(idx, id,
