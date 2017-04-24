@@ -2,7 +2,8 @@ CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 HEADERS=ampi.h ampif.h mpio.h mpiof.h ampiimpl.h ampiProjections.h
-HEADDEP=$(HEADERS) ampiimpl.h ampi.decl.h ampiEvents.h
+HEADDEP=$(HEADERS) ampiimpl.h ampi.decl.h ampiEvents.h \
+		../tcharm/tcharm.h ../tcharm/tcharm_impl.h
 COMPAT=compat_ampius.o compat_ampifus.o compat_ampi.o \
        compat_ampim.o compat_ampifm.o compat_ampicm.o \
 	   compat_ampicpp.o
