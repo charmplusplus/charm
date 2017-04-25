@@ -6784,57 +6784,50 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     CkAbort("AMPI does not implement MPI_Alltoall for Inter-communicators!");
 
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize(comm);
-  CkDDT_DataType *dttype;
-  int itemsize;
-  int i;
 
-  dttype = ptr->getDDT()->getType(sendtype) ;
-  itemsize = dttype->getSize(sendcount) ;
+  CkDDT_DataType *dttype = ptr->getDDT()->getType(sendtype);
+  int itemsize = dttype->getSize(sendcount);
+  int size = ptr->getSize(comm);
   int rank = ptr->getRank(comm);
-  int comm_size = size;
-  MPI_Status status;
 
 #if CMK_BIGSIM_CHARM
   TRACE_BG_AMPI_LOG(MPI_ALLTOALL, itemsize);
 #endif
 
   /* For MPI_IN_PLACE (sendbuf==recvbuf), prevent using the algorithm for
-     large message sizes, since it might lead to overwriting data before
-     it gets sent in the  non-power-of-two communicator size case. */
-  if ( itemsize <= AMPI_ALLTOALL_LONG_MSG  || recvbuf == sendbuf) {
-    for(i=0;i<size;i++) {
+   * large message sizes, since it might lead to overwriting data before
+   * it gets sent in the non-power-of-two communicator size case. */
+  if (itemsize <= AMPI_ALLTOALL_LONG_MSG || recvbuf == sendbuf) {
+    for (int i=0; i<size; i++) {
       int dst = (rank+i) % size;
       ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*dst), sendcount,
                 sendtype, dst, comm);
     }
-    dttype = ptr->getDDT()->getType(recvtype) ;
-    itemsize = dttype->getSize(recvcount) ;
-    for(i=0;i<size;i++) {
-      int dst = (rank+i) % size;
-      if(-1==ptr->recv(MPI_ATA_TAG, dst, ((char*)recvbuf)+(itemsize*dst), recvcount,
-                       recvtype, comm))
-        CkAbort("AMPI> Error in MPI_Alltoall");
+    dttype = ptr->getDDT()->getType(recvtype);
+    itemsize = dttype->getSize(recvcount);
+    vector<MPI_Request> recvReqs(size, MPI_REQUEST_NULL);
+    for (int i=0; i<size; i++) {
+      int src = (rank+i) % size;
+      ptr->irecv(((char*)recvbuf)+(itemsize*src), recvcount, recvtype,
+                 src, MPI_ATA_TAG, comm, &recvReqs[i]);
     }
-  } else { // large messages
+    AMPI_Waitall(size, &recvReqs[0], MPI_STATUSES_IGNORE);
+  }
+  else {
     /* Long message. Use pairwise exchange. If comm_size is a
        power-of-two, use exclusive-or to create pairs. Else send
        to rank+i, receive from rank-i. */
-
-    int pof2;
     int src, dst;
+
     /* Is comm_size a power-of-two? */
-    i = 1;
-    while (i < size)
-      i *= 2;
-    if (i == size)
-      pof2 = 1;
-    else
-      pof2 = 0;
+    int pof2 = 1;
+    while (pof2 < size)
+      pof2 *= 2;
+    bool isPof2 = (pof2 == size);
 
     /* The i=0 case takes care of moving local data into recvbuf */
-    for (i=0; i<size; i++) {
-      if (pof2 == 1) {
+    for (int i=0; i<size; i++) {
+      if (isPof2) {
         /* use exclusive-or algorithm */
         src = dst = rank ^ i;
       }
@@ -6843,10 +6836,9 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
         dst = (rank + i) % size;
       }
 
-     MPI_Status status;
-     ptr->sendrecv(((char *)sendbuf + dst*itemsize), sendcount, sendtype, dst, MPI_ATA_TAG,
-                   ((char *)recvbuf + src*itemsize), recvcount, recvtype, src, MPI_ATA_TAG,
-                   comm, &status);
+      ptr->sendrecv(((char *)sendbuf + dst*itemsize), sendcount, sendtype, dst, MPI_ATA_TAG,
+                    ((char *)recvbuf + src*itemsize), recvcount, recvtype, src, MPI_ATA_TAG,
+                    comm, MPI_STATUS_IGNORE);
     } // end of large message
   }
 
@@ -6951,19 +6943,21 @@ int AMPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     CkAbort("AMPI does not implement MPI_Ialltoall for Inter-communicators!");
 
   int size = ptr->getSize(comm);
+  int rank = ptr->getRank(comm);
   CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype);
   int itemsize = dttype->getSize(sendcount);
-  int i;
-  for(i=0;i<size;i++) {
-    ptr->send(MPI_ATA_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i), sendcount,
-              sendtype, i, comm);
+
+  for (int i=0; i<size; i++) {
+    int dst = (rank+i) % size;
+    ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*dst), sendcount,
+              sendtype, dst, comm);
   }
 
   // use an IATAReq to non-block the caller and get a request ptr
   AmpiRequestList* reqs = getReqs();
   IATAReq *newreq = new IATAReq(size);
-  for(i=0;i<size;i++){
-    if(newreq->addReq(((char*)recvbuf)+(itemsize*i),recvcount,recvtype,i,MPI_ATA_TAG,comm)!=(i+1))
+  for (int i=0; i<size; i++) {
+    if (newreq->addReq(((char*)recvbuf)+(itemsize*i),recvcount,recvtype,i,MPI_ATA_TAG,comm)!=(i+1))
       CkAbort("MPI_Ialltoall: Error adding requests into IATAReq!");
   }
   *request = ptr->postReq(newreq);
@@ -6998,20 +6992,25 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
 
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
-  CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
-  int itemsize = dttype->getSize() ;
-  int i;
-  for(i=0;i<size;i++)  {
-    ptr->send(MPI_ATA_TAG,ptr->getRank(comm),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
-              sendtype, i, comm);
-  }
-  dttype = ptr->getDDT()->getType(recvtype) ;
-  itemsize = dttype->getSize() ;
+  int rank = ptr->getRank(comm);
+  CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype);
+  int itemsize = dttype->getSize();
 
-  for(i=0;i<size;i++) {
-    if(-1==ptr->recv(MPI_ATA_TAG,i,((char*)recvbuf)+(itemsize*rdispls[i]),recvcounts[i],recvtype, comm))
-      CkAbort("AMPI> Error in MPI_Alltoallv");
+  for (int i=0; i<size; i++) {
+    int dst = (rank+i) % size;
+    ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*sdispls[dst]), sendcounts[dst],
+              sendtype, dst, comm);
   }
+
+  dttype = ptr->getDDT()->getType(recvtype);
+  itemsize = dttype->getSize();
+  vector<MPI_Request> recvReqs(size, MPI_REQUEST_NULL);
+  for (int i=0; i<size; i++) {
+    int src = (rank+i) % size;
+    ptr->irecv(((char*)recvbuf)+(itemsize*rdispls[src]), recvcounts[src], recvtype,
+               src, MPI_ATA_TAG, comm, &recvReqs[i]);
+  }
+  AMPI_Waitall(size, &recvReqs[0], MPI_STATUSES_IGNORE);
 
   return MPI_SUCCESS;
 }
@@ -7051,22 +7050,24 @@ int AMPI_Ialltoallv(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype s
     CkAbort("AMPI does not implement MPI_Ialltoallv for Inter-communicators!");
 
   int size = ptr->getSize(comm);
-  CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
-  int itemsize = dttype->getSize() ;
-  int i;
-  for(i=0;i<size;i++)  {
-    ptr->send(MPI_ATA_TAG,ptr->getRank(comm),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
-              sendtype, i, comm);
+  int rank = ptr->getRank(comm);
+  CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype);
+  int itemsize = dttype->getSize();
+
+  for (int i=0; i<size; i++) {
+    int dst = (rank+i) % size;
+    ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*sdispls[dst]), sendcounts[dst],
+              sendtype, dst, comm);
   }
 
-  dttype = ptr->getDDT()->getType(recvtype) ;
-  itemsize = dttype->getSize() ;
+  dttype = ptr->getDDT()->getType(recvtype);
+  itemsize = dttype->getSize();
 
   // use an IATAReq to non-block the caller and get a request ptr
   AmpiRequestList* reqs = getReqs();
   IATAReq *newreq = new IATAReq(size);
-  for(i=0;i<size;i++){
-    if(newreq->addReq((void*)(((char*)recvbuf)+(itemsize*rdispls[i])),recvcounts[i],recvtype,i,MPI_ATA_TAG,comm)!=(i+1))
+  for (int i=0; i<size; i++) {
+    if (newreq->addReq((void*)(((char*)recvbuf)+(itemsize*rdispls[i])),recvcounts[i],recvtype,i,MPI_ATA_TAG,comm)!=(i+1))
       CkAbort("MPI_Ialltoallv: Error adding requests into IATAReq!");
   }
   *request = ptr->postReq(newreq);
@@ -7102,17 +7103,22 @@ int AMPI_Alltoallw(void *sendbuf, int *sendcounts, int *sdispls,
 
   /* displs are in terms of bytes for Alltoallw (unlike Alltoallv) */
   ampi *ptr = getAmpiInstance(comm);
-  int i, size = ptr->getSize(comm);
-  for(i=0;i<size;i++){
-    ptr->send(MPI_ATA_TAG, ptr->getRank(comm), ((char*)sendbuf)+sdispls[i],
-              sendcounts[i], sendtypes[i], i, comm);
+  int size = ptr->getSize(comm);
+  int rank = ptr->getRank(comm);
+
+  for (int i=0; i<size; i++) {
+    int dst = (rank+i) % size;
+    ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+sdispls[dst],
+              sendcounts[dst], sendtypes[dst], dst, comm);
   }
 
-  for(i=0;i<size;i++){
-    if(-1==ptr->recv(MPI_ATA_TAG, i, ((char*)recvbuf)+rdispls[i], recvcounts[i],
-                     recvtypes[i], comm))
-      CkAbort("MPI_Alltoallw failed in recv\n");
+  vector<MPI_Request> recvReqs(size, MPI_REQUEST_NULL);
+  for (int i=0; i<size; i++) {
+    int src = (rank+i) % size;
+    ptr->irecv(((char*)recvbuf)+rdispls[src], recvcounts[src], recvtypes[src],
+               src, MPI_ATA_TAG, comm, &recvReqs[i]);
   }
+  AMPI_Waitall(size, &recvReqs[0], MPI_STATUSES_IGNORE);
 
   return MPI_SUCCESS;
 }
@@ -7153,18 +7159,21 @@ int AMPI_Ialltoallw(void *sendbuf, int *sendcounts, int *sdispls,
     CkAbort("AMPI does not implement MPI_Ialltoallw for Inter-communicators!");
 
   /* displs are in terms of bytes for Alltoallw (unlike Alltoallv) */
-  int i, size = ptr->getSize(comm);
-  for(i=0;i<size;i++){
-    ptr->send(MPI_ATA_TAG, ptr->getRank(comm), ((char*)sendbuf)+sdispls[i],
-              sendcounts[i], sendtypes[i], i, comm);
+  int size = ptr->getSize(comm);
+  int rank = ptr->getRank(comm);
+
+  for (int i=0; i<size; i++) {
+    int dst = (rank+i) % size;
+    ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+sdispls[dst],
+              sendcounts[dst], sendtypes[dst], dst, comm);
   }
 
   // use an IATAReq to non-block the caller and get a request ptr
   AmpiRequestList* reqs = getReqs();
   IATAReq *newreq = new IATAReq(size);
-  for(i=0;i<size;i++){
-    if(newreq->addReq((void*)(((char*)recvbuf)+rdispls[i]), recvcounts[i],
-                      recvtypes[i], i, MPI_ATA_TAG, comm) != (i+1))
+  for (int i=0; i<size; i++) {
+    if (newreq->addReq((void*)(((char*)recvbuf)+rdispls[i]), recvcounts[i],
+                       recvtypes[i], i, MPI_ATA_TAG, comm) != (i+1))
       CkAbort("MPI_Ialltoallw: Error adding requests into IATAReq!");
   }
   *request = ptr->postReq(newreq);
@@ -7209,11 +7218,13 @@ int AMPI_Neighbor_alltoall(void* sendbuf, int sendcount, MPI_Datatype sendtype,
     ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+(itemsize*i)),
               sendcount, sendtype, neighbors[i], comm);
   }
+
+  vector<MPI_Request> recvReqs(num_neighbors, MPI_REQUEST_NULL);
   for (int j=0; j<num_neighbors; j++) {
-    if (-1==ptr->recv(MPI_NBOR_TAG, neighbors[j], (void*)(((char*)recvbuf)+(itemsize*j)),
-                      recvcount, recvtype, comm))
-      CkAbort("AMPI> Error in MPI_Neighbor_alltoall recv");
+    ptr->irecv(((char*)recvbuf)+(itemsize*j), recvcount, recvtype,
+               neighbors[j], MPI_NBOR_TAG, comm, &recvReqs[j]);
   }
+  AMPI_Waitall(num_neighbors, &recvReqs[0], MPI_STATUSES_IGNORE);
 
   return MPI_SUCCESS;
 }
@@ -7313,11 +7324,13 @@ int AMPI_Neighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
     ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+(itemsize*sdispls[i])),
               sendcounts[i], sendtype, neighbors[i], comm);
   }
+
+  vector<MPI_Request> recvReqs(num_neighbors, MPI_REQUEST_NULL);
   for (int j=0; j<num_neighbors; j++) {
-    if (-1==ptr->recv(MPI_NBOR_TAG, neighbors[j], (void*)(((char*)recvbuf)+(itemsize*rdispls[j])),
-                      recvcounts[j], recvtype, comm))
-      CkAbort("AMPI> Error in MPI_Neighbor_alltoallv recv");
+    ptr->irecv(((char*)recvbuf)+(itemsize*rdispls[j]), recvcounts[j], recvtype,
+               neighbors[j], MPI_NBOR_TAG, comm, &recvReqs[j]);
   }
+  AMPI_Waitall(num_neighbors, &recvReqs[0], MPI_STATUSES_IGNORE);
 
   return MPI_SUCCESS;
 }
@@ -7417,11 +7430,13 @@ int AMPI_Neighbor_alltoallw(void* sendbuf, int *sendcounts, MPI_Aint *sdispls,
     ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+sdispls[i]),
               sendcounts[i], sendtypes[i], neighbors[i], comm);
   }
+
+  vector<MPI_Request> recvReqs(num_neighbors, MPI_REQUEST_NULL);
   for (int j=0; j<num_neighbors; j++) {
-    if (-1==ptr->recv(MPI_NBOR_TAG, neighbors[j], (void*)((char*)recvbuf+rdispls[j]),
-                      recvcounts[j], recvtypes[j], comm))
-      CkAbort("AMPI> Error in MPI_Neighbor_alltoallv recv");
+    ptr->irecv(((char*)recvbuf)+rdispls[j], recvcounts[j], recvtypes[j],
+               neighbors[j], MPI_NBOR_TAG, comm, &recvReqs[j]);
   }
+  AMPI_Waitall(num_neighbors, &recvReqs[0], MPI_STATUSES_IGNORE);
 
   return MPI_SUCCESS;
 }
@@ -7519,12 +7534,14 @@ int AMPI_Neighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype,
   for (int i=0; i<num_neighbors; i++) {
     ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount, sendtype, neighbors[i], comm);
   }
+
   int itemsize = getDDT()->getType(recvtype)->getSize(recvcount);
+  vector<MPI_Request> recvReqs(num_neighbors, MPI_REQUEST_NULL);
   for (int j=0; j<num_neighbors; j++) {
-    if (-1==ptr->recv(MPI_NBOR_TAG, neighbors[j], (void*)(((char*)recvbuf)+(itemsize*j)),
-                      recvcount, recvtype, comm))
-      CkAbort("AMPI> Error in MPI_Neighbor_allgather recv");
+    ptr->irecv(((char*)recvbuf)+(itemsize*j), recvcount, recvtype,
+               neighbors[j], MPI_NBOR_TAG, comm, &recvReqs[j]);
   }
+  AMPI_Waitall(num_neighbors, &recvReqs[0], MPI_STATUSES_IGNORE);
 
   return MPI_SUCCESS;
 }
@@ -7621,12 +7638,14 @@ int AMPI_Neighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtype
   for (int i=0; i<num_neighbors; i++) {
     ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount, sendtype, neighbors[i], comm);
   }
+
   int itemsize = getDDT()->getType(recvtype)->getSize();
+  vector<MPI_Request> recvReqs(num_neighbors, MPI_REQUEST_NULL);
   for (int j=0; j<num_neighbors; j++) {
-    if (-1==ptr->recv(MPI_NBOR_TAG, neighbors[j], (void*)(((char*)recvbuf)+(itemsize*displs[j])),
-                      recvcounts[j], recvtype, comm))
-      CkAbort("AMPI> Error in MPI_Neighbor_allgatherv recv");
+    ptr->irecv(((char*)recvbuf)+(itemsize*displs[j]), recvcounts[j], recvtype,
+               neighbors[j], MPI_NBOR_TAG, comm, &recvReqs[j]);
   }
+  AMPI_Waitall(num_neighbors, &recvReqs[0], MPI_STATUSES_IGNORE);
 
   return MPI_SUCCESS;
 }
