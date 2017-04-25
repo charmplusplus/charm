@@ -3889,10 +3889,19 @@ void ampi::sendrecv(void *sbuf, int scount, MPI_Datatype stype, int dest, int st
                     void *rbuf, int rcount, MPI_Datatype rtype, int src, int rtag,
                     MPI_Comm comm, MPI_Status *sts)
 {
-  send(stag, getRank(comm), sbuf, scount, stype, dest, comm);
+  MPI_Request reqs[2];
+  reqs[0] = send(stag, getRank(comm), sbuf, scount, stype, dest, comm, 0, I_SEND);
 
-  if(-1==recv(rtag, src, rbuf, rcount, rtype, comm, sts))
-    CkAbort("AMPI> Error in MPI_Sendrecv!\n");
+  irecv(rbuf, rcount, rtype, src, rtag, comm, &reqs[1]);
+
+  if (sts == MPI_STATUS_IGNORE) {
+    AMPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
+  }
+  else {
+    MPI_Status statuses[2];
+    AMPI_Waitall(2, reqs, statuses);
+    *sts = statuses[1];
+  }
 }
 
 CDECL
@@ -3916,8 +3925,6 @@ int AMPI_Sendrecv(void *sbuf, int scount, MPI_Datatype stype, int dest,
     return ret;
 #endif
 
-  MPI_Status tempStatus;
-  if(!sts) sts = &tempStatus;
   ampi *ptr = getAmpiInstance(comm);
 
   ptr->sendrecv(sbuf, scount, stype, dest, stag,
@@ -3933,8 +3940,25 @@ int AMPI_Sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
                           MPI_Comm comm, MPI_Status *status)
 {
   AMPIAPI("AMPI_Sendrecv_replace");
-  return AMPI_Sendrecv(buf, count, datatype, dest, sendtag,
-      buf, count, datatype, source, recvtag, comm, status);
+
+  handle_MPI_BOTTOM(buf, datatype, buf, datatype);
+
+#if AMPI_ERROR_CHECKING
+  int ret;
+  ret = errorCheck("AMPI_Sendrecv_replace", comm, 1, count, 1, datatype, 1, sendtag, 1, dest, 1, buf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+  ret = errorCheck("AMPI_Sendrecv_replace", comm, 1, count, 1, datatype, 1, recvtag, 1, source, 1, buf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+#endif
+
+  ampi* ptr = getAmpiInstance(comm);
+
+  ptr->send(sendtag, ptr->getRank(comm), buf, count, datatype, dest, comm);
+
+  if (-1==ptr->recv(recvtag, source, buf, count, datatype, comm, status))
+    CkAbort("AMPI> Error in MPI_Sendrecv_replace!\n");
 }
 
 void ampi::barrier()
