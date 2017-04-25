@@ -612,6 +612,8 @@ VarList		: Var
 
 Message		: MESSAGE MAttribs NamedType
 		{ $$ = new Message(lineno, $3); }
+		| MESSAGE MAttribs NamedType '{' '}'
+		{ $$ = new Message(lineno, $3); }
 		| MESSAGE MAttribs NamedType '{' VarList '}'
 		{ $$ = new Message(lineno, $3, $5); }
 		;
