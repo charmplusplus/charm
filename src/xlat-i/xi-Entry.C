@@ -2342,9 +2342,12 @@ void Entry::genDefs(XStr& str)
 
   //Generate the call-method body
   str << makeDecl("void")<<"::_call_"<<epStr()<<"(void* impl_msg, void* impl_obj_void)\n";
-  str << "{\n"
-      << "  " << container->baseName() << "* impl_obj = static_cast<"
-      << container->baseName() << " *>(impl_obj_void);\n";
+  str << "{\n";
+  // Do not create impl_obj for migration constructor as compiler throws an unused variable warning otherwise
+  if(!isMigrationConstructor()){
+    str << "  " << container->baseName() << "* impl_obj = static_cast<"
+        << container->baseName() << " *>(impl_obj_void);\n";
+  }
   if (!isLocal()) {
     if(isThreaded()) str << callThread(epStr());
     str << preMarshall;
