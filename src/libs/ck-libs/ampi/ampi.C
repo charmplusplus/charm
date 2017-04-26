@@ -2851,6 +2851,7 @@ void ampi::processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Data
       (*func)(&deserializedBuf[0], buf, &count, &type);
     }
   }
+  delete [] results;
 }
 
 void ampi::processGatherMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int recvCount)
@@ -2874,6 +2875,7 @@ void ampi::processGatherMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, i
     currentSrc  = currentSrc->next();
     currentData = currentData->next();
   }
+  delete [] results;
 }
 
 void ampi::processGathervMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type,
@@ -2898,6 +2900,7 @@ void ampi::processGathervMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type,
     currentSrc  = currentSrc->next();
     currentData = currentData->next();
   }
+  delete [] results;
 }
 
 int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm comm, MPI_Status *sts)
