@@ -98,10 +98,14 @@ CkReductionMsg *sumTwoShorts(int nMsg,CkReductionMsg **msgs)
 \end{alltt}
 
 The reduction function must be registered with \charmpp{} 
-using \kw{CkReduction::addReducer} from
+using \kw{CkReduction::addReducer(reducerFn fn, bool streamable)} from
 an \kw{initnode} routine (see section~\ref{initnode} for details
-on the \kw{initnode} mechanism).   \kw{CkReduction::addReducer}
-returns a \kw{CkReduction::reducerType} which you can later 
+on the \kw{initnode} mechanism). It takes a required parameter,
+\kw{reducerFn fn}, a function pointer to the reduction function, and
+an optional parameter \kw{bool streamable}, which indicates if the
+function is streamable or not (see section~\ref{streamable_reductions}
+for more information). \kw{CkReduction::addReducer} returns a
+\kw{CkReduction::reducerType} which you can later
 pass to \kw{contribute}.  Since \kw{initnode} routines are executed
 once on every node, you can safely store the \kw{CkReduction::reducerType}
 in a global or class-static variable.  For the example above, the reduction
@@ -129,4 +133,50 @@ will be defined as explained above.\\
 Note that you cannot call \kw{CkReduction::addReducer}
 from anywhere but an \kw{initnode} routine.\\
 (See \examplerefdir{barnes-charm} for a complete example).
+
+
+\subsection{Streamable Reductions}
+
+\label{streamable_reductions}
+
+For custom reductions over fixed sized messages, it is often desirable
+that the runtime process each contribution in a streaming fashion,
+i.e. as soon as a contribution is received from a chare array element,
+that data should be combined with the current aggregation of other
+contributions on that PE. This results in a smaller memory footprint
+because contributions are immediately combined as they come in rather
+than waiting for all contributions to be received. Users can write
+their own custom streamable reducers by reusing the message memory of
+the zeroth message in their reducer function by passing it as the last
+argument to \kw{CkReduction::buildNew}:
+
+\begin{alltt}
+CkReductionMsg *sumTwoShorts(int nMsg,CkReductionMsg **msgs)
+\{
+  // reuse msgs[0]'s memory:
+  short *retData = (short*)msgs[0]->getData();
+  for (int i=1;i<nMsg;i++) \{
+    //Sanity check:
+    CkAssert(msgs[i]->getSize()==2*sizeof(short));
+    //Extract this message's data
+    short *m=(short *)msgs[i]->getData();
+    retData[0]+=m[0];
+    retData[1]+=m[1];
+  \}
+  return CkReductionMsg::buildNew(2*sizeof(short), retData, sumTwoShortsReducer, msgs[0]);
+\}
+\end{alltt}
+
+Note that \emph{only message zero} is allowed to be reused.
+For reducer functions that do not operate on fixed sized messages,
+such as set and concat, streaming would result in quadratic memory
+allocation and so is not desirable. Users can specify that a custom
+reducer is streamable when calling \kw{CkReduction::addReducer} by
+specifying an optional boolean parameter (default is false):
+
+\begin{alltt}
+static void initNodeFn(void) {
+    sumTwoShorts = CkReduction::addReducer(sumTwoShorts, /* streamable = */ true);
+}
+\end{alltt}
 
