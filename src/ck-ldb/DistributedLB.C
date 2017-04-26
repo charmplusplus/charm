@@ -188,9 +188,10 @@ void DistributedLB::SendLoadInfo() {
     rand_nbor1 = rand() % CkNumPes();
   } while (rand_nbor1 == CkMyPe());
   // Pick the second neighbor which is not the same as the first one.
-  do {
-    rand_nbor2 = rand() % CkNumPes();
-  } while ((rand_nbor2 == CkMyPe()) || (rand_nbor2 == rand_nbor1));
+  if(CkNumPes() > 2)
+    do {
+      rand_nbor2 = rand() % CkNumPes();
+    } while ((rand_nbor2 == CkMyPe()) || (rand_nbor2 == rand_nbor1));
 
   // kPartialInfoCount indicates how much information is send in gossip. If it
   // is set to -1, it means use all the information available.
@@ -203,7 +204,9 @@ void DistributedLB::SendLoadInfo() {
   }
 
   thisProxy[rand_nbor1].GossipLoadInfo(req_hop, CkMyPe(), info_count, p, l);
-  thisProxy[rand_nbor2].GossipLoadInfo(req_hop, CkMyPe(), info_count, p, l);
+
+  if(CkNumPes() > 2)
+    thisProxy[rand_nbor2].GossipLoadInfo(req_hop, CkMyPe(), info_count, p, l);
 
   // Increment the outgoind msg count
   gossip_msg_count++;
