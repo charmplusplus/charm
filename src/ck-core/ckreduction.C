@@ -1826,12 +1826,14 @@ std::vector<CkReduction::reducerStruct> CkReduction::initReducerTable()
 
   //Compute the logical AND of the values passed by each element.
   // The resulting value will be zero if any source value is zero.
+    // logical_and deprecated in favor of logical_and_int
   vec.push_back(CkReduction::reducerStruct(::logical_and, true));
   vec.push_back(CkReduction::reducerStruct(::logical_and_int, true));
   vec.push_back(CkReduction::reducerStruct(::logical_and_bool, true));
 
   //Compute the logical OR of the values passed by each element.
   // The resulting value will be 1 if any source value is nonzero.
+    // logical_or deprecated in favor of logical_or_int
   vec.push_back(CkReduction::reducerStruct(::logical_or, true));
   vec.push_back(CkReduction::reducerStruct(::logical_or_int, true));
   vec.push_back(CkReduction::reducerStruct(::logical_or_bool, true));
@@ -1842,11 +1844,13 @@ std::vector<CkReduction::reducerStruct> CkReduction::initReducerTable()
   vec.push_back(CkReduction::reducerStruct(::logical_xor_bool, true));
 
   // Compute the logical bitvector AND of the values passed by each element.
+    // bitvec_and deprecated in favor of bitvec_and_int
   vec.push_back(CkReduction::reducerStruct(::bitvec_and, true));
   vec.push_back(CkReduction::reducerStruct(::bitvec_and_int, true));
   vec.push_back(CkReduction::reducerStruct(::bitvec_and_bool, true));
 
   // Compute the logical bitvector OR of the values passed by each element.
+    // bitvec_or deprecated in favor of bitvec_or_int
   vec.push_back(CkReduction::reducerStruct(::bitvec_or, true));
   vec.push_back(CkReduction::reducerStruct(::bitvec_or_int, true));
   vec.push_back(CkReduction::reducerStruct(::bitvec_or_bool, true));
@@ -1870,7 +1874,10 @@ std::vector<CkReduction::reducerStruct> CkReduction::initReducerTable()
   // work required to stream it
   vec.push_back(CkReduction::reducerStruct(::set, false));
 
+  // Computes a count, mean, and variance for the contributed values
   vec.push_back(CkReduction::reducerStruct(::statistics, true));
+
+  // Allows multiple reductions to be done in the same message
   vec.push_back(CkReduction::reducerStruct(CkReduction::tupleReduction, false));
 
   return vec;

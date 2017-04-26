@@ -350,17 +350,61 @@ pass the correct number of bytes to \kw{contribute}.
 
 \item \kw{CkReduction::nop} : no operation performed.
 
-\item \kw{CkReduction::sum\_int}, \kw{sum\_long}, \kw{sum\_float}, \kw{sum\_double} : the
-result will be the sum of the given numbers.
 
-\item \kw{CkReduction::product\_int}, \kw{product\_long}, \kw{product\_float},
-\kw{product\_double} : the result will be the product of the given numbers.
+\item \kw{CkReduction::sum\_char},
+  \kw{sum\_short},
+  \kw{sum\_int},
+  \kw{sum\_long},
+  \kw{sum\_long\_long},
+  \kw{sum\_uchar},
+  \kw{sum\_ushort},
+  \kw{sum\_uint},
+  \kw{sum\_ulong},
+  \kw{sum\_ulong\_long},
+  \kw{sum\_float},
+  \kw{sum\_double} :
+  the result will be the sum of the given numbers.
 
-\item \kw{CkReduction::max\_int}, \kw{max\_long}, \kw{max\_float}, \kw{max\_double} : the
-result will be the largest of the given numbers.
+\item \kw{CkReduction::product\_char},
+  \kw{product\_short},
+  \kw{product\_int},
+  \kw{product\_long},
+  \kw{product\_long\_long},
+  \kw{product\_uchar},
+  \kw{product\_ushort},
+  \kw{product\_uint},
+  \kw{product\_ulong},
+  \kw{product\_ulong\_long},
+  \kw{product\_float},
+  \kw{product\_double} : the result will be the product of the given numbers.
 
-\item \kw{CkReduction::min\_int}, \kw{min\_long}, \kw{min\_float}, \kw{min\_double} : the
-result will be the smallest of the given numbers.
+\item \kw{CkReduction::max\_char},
+  \kw{max\_short},
+  \kw{max\_int},
+  \kw{max\_long},
+  \kw{max\_long\_long},
+  \kw{max\_uchar},
+  \kw{max\_ushort},
+  \kw{max\_uint},
+  \kw{max\_ulong},
+  \kw{max\_ulong\_long},
+  \kw{max\_float},
+  \kw{max\_double} :
+  the result will be the largest of the given numbers.
+
+\item \kw{CkReduction::min\_char},
+  \kw{min\_short},
+  \kw{min\_int},
+  \kw{min\_long},
+  \kw{min\_long\_long},
+  \kw{min\_uchar},
+  \kw{min\_ushort},
+  \kw{min\_uint},
+  \kw{min\_ulong},
+  \kw{min\_ulong\_long},
+  \kw{min\_float},
+  \kw{min\_double} :
+  the result will be the smallest of the given numbers.
 
 \item \kw{CkReduction::logical\_and\_bool}, \kw{logical\_and\_int} : the result will be the logical AND of the given
 values.
@@ -388,7 +432,17 @@ below.
 
 \item \kw{CkReduction::concat} : the result will be a byte-by-byte
 concatenation of all the contributed data.  The contributed elements
-are not delimiter-separated. 
+are not delimiter-separated.
+
+\item \kw{CkReduction::random} : the result will be a single randomly
+selected value of all of the contributed values.
+
+\item \kw{CkReduction::statistics} : returns
+a \kw{CkReduction::statisticsElement} struct, containing summary
+statistics of the contributed data.  Specifically, the struct
+contains the following fields: \kw{int count}, \kw{double
+mean}, and \kw{double m2}, and the following functions: \kw {double
+variance()} and \kw{double stddev()}.
 
 \end{enumerate}
 

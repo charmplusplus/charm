@@ -11,9 +11,9 @@ The important members of \kw{CkReductionMsg} are
 \kw{getSize()}, which returns the number of bytes of reduction data; and
 \kw{getData()}, which returns a ``void *'' to the actual reduced data.
 
-You may pass the client callback as an additional parameter to \kw{contribute}.
-If different \kw{contribute} calls pass different callbacks, some (unspecified,
-unreliable) callback will be chosen for use.
+The callback to be invoked when the reduction is complete is specified
+as an additional parameter to \kw{contribute}. It is an error for chare array elements
+to specify different callbacks to the same reduction contribution.
 \begin{alltt}
     double forces[2]=get_my_forces();
     // When done, broadcast the CkReductionMsg to ``myReductionEntry''
