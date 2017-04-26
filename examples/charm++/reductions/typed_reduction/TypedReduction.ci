@@ -5,17 +5,19 @@ mainmodule TypedReduction {
         entry Driver(CkArgMsg*);
         entry void untyped_done(CkReductionMsg* msg);
         entry [reductiontarget] void typed_done(int x);
-        entry [reductiontarget] void typed_array_done(int results[n], int n);
-        entry [reductiontarget] void typed_array_done2(int x, int y, int z);
-        entry [reductiontarget] void typed_array_done3(int n, double results[n]);
-        entry [reductiontarget] void set_done(CkReductionMsg* msg);
-        entry [reductiontarget] void tuple_reducer_done(CkReductionMsg* msg);
+        entry [reductiontarget] void typed_array_ints_done(int results[n], int n);
+        entry [reductiontarget] void typed_indiv_ints_done(int x, int y, int z);
+        entry [reductiontarget] void typed_array_doubles_done(int n, double results[n]);
+        entry void set_done(CkReductionMsg* msg);
+        entry void tuple_reducer_done(CkReductionMsg* msg);
     }
 
     array [1d] Worker {
         entry Worker(void);
-        entry void reduce(void);
-        entry void reduce_array(void);
+        entry void untyped_reduce(void);
+        entry void typed_reduce(void);
+        entry void reduce_array_ints(void);
+        entry void reduce_indiv_ints(void);
         entry void reduce_array_doubles(void);
         entry void reduce_set(void);
         entry void reduce_tuple(void);
