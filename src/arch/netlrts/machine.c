@@ -2005,7 +2005,11 @@ void ConverseCleanup(void)
       skt_close(Cmi_charmrun_fd);
       // Avoid crash by SIGALRM
 #if !defined(_WIN32)
-      sigaction(SIGALRM, SIG_IGN, NULL);
+      struct sigaction act;
+      memset(&act, 0, sizeof(act));
+      act.sa_handler = SIG_IGN;
+      act.sa_flags = SA_RESETHAND;
+      sigaction(SIGALRM, &act, 0);
 #else
       signal(SIGALRM, SIG_IGN);
 #endif
@@ -2017,7 +2021,6 @@ void ConverseCleanup(void)
       dup2(writeStdout[0], 1);
       dup2(writeStdout[1], 2);
 
-#if CMK_SHRINK_EXPAND
       // Close any old file descriptors.
       // FDs carry over execv, so these have to be closed at some point.
       // Since some of them are async pipes, however, doing so flushes the buffer,
@@ -2028,7 +2031,6 @@ void ConverseCleanup(void)
       for (b = 3; b < 20; b++) {
         close(b);
       }
-#endif
 
       // TODO: check variant of execv that takes file descriptor
       execv(ret[0], ret); // Need to check if the process name is always first arg

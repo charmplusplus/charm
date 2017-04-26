@@ -2905,7 +2905,11 @@ void ConverseCleanup(void)
       skt_close(Cmi_charmrun_fd);
       // Avoid crash by SIGALRM
 #if !defined(_WIN32)
-      sigaction(SIGALRM, SIG_IGN, NULL);
+      struct sigaction act;
+      memset(&act, 0, sizeof(act));
+      act.sa_handler = SIG_IGN;
+      act.sa_flags = SA_RESETHAND;
+      sigaction(SIGALRM, &act, 0);
 #else
       signal(SIGALRM, SIG_IGN);
 #endif
