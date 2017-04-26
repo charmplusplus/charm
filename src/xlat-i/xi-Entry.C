@@ -245,6 +245,15 @@ void Entry::collectSdagCode(SdagCollection *sc)
   }
 }
 
+/* Method to add static_cast<void> to impl_e_opts to avoid unused variable warning
+ * Called by entry methods that have CkEntryOptions *impl_e_opts as a parameter*/
+XStr Entry::addDummyStaticCastIfVoid(void){
+  XStr ret;
+  if(param->isVoid())
+    ret << "  static_cast<void>(impl_e_opts);\n";
+  return ret;
+}
+
 XStr Entry::marshallMsg(void)
 {
   XStr ret;
@@ -361,7 +370,9 @@ void Entry::genChareDefs(XStr& str)
     // entry method definition
     XStr retStr; retStr<<retType;
     str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0,1)<<")\n";
-    str << "{\n  ckCheck();\n"<<marshallMsg();
+    str << "{\n  ckCheck();\n";
+    str << addDummyStaticCastIfVoid();
+    str << marshallMsg();
     if(isSync()) {
       str <<  syncPreCall() << "CkRemoteCall("<<params<<");\n";
       str << syncPostCall(); 
@@ -399,20 +410,26 @@ void Entry::genChareStaticConstructorDecl(XStr& str)
 void Entry::genChareStaticConstructorDefs(XStr& str)
 {
   str << makeDecl("CkChareID",1)<<"::ckNew("<<paramComma(0)<<"int impl_onPE"<<eo(0)<<")\n";
-  str << "{\n"<<marshallMsg();
+  str << "{\n";
+  str << addDummyStaticCastIfVoid();
+  str << marshallMsg();
   str << "  CkChareID impl_ret;\n";
   str << "  CkCreateChare("<<chareIdx()<<", "<<epIdx()<<", impl_msg, &impl_ret, impl_onPE);\n";
   str << "  return impl_ret;\n";
   str << "}\n";
 
   str << makeDecl("void",1)<<"::ckNew("<<paramComma(0)<<"CkChareID* pcid, int impl_onPE"<<eo(0)<<")\n";
-  str << "{\n"<<marshallMsg();
+  str << "{\n";
+  str << addDummyStaticCastIfVoid();
+  str << marshallMsg();
   str << "  CkCreateChare("<<chareIdx()<<", "<<epIdx()<<", impl_msg, pcid, impl_onPE);\n";
   str << "}\n";
 
   if (!param->isVoid()) {
     str << makeDecl(" ",1)<<"::"<<container->proxyName(0)<<"("<<paramComma(0)<<"int impl_onPE"<<eo(0)<<")\n";
-    str << "{\n"<<marshallMsg();
+    str << "{\n";
+    str << addDummyStaticCastIfVoid();
+    str << marshallMsg();
     str << "  CkChareID impl_ret;\n";
     str << "  CkCreateChare("<<chareIdx()<<", "<<epIdx()<<", impl_msg, &impl_ret, impl_onPE);\n";
     str << "  ckSetChareID(impl_ret);\n";
@@ -461,6 +478,7 @@ void Entry::genArrayDefs(XStr& str)
     else
       str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0,1)<<") \n"; //no const
     str << "{\n";
+    str << addDummyStaticCastIfVoid();
     //regular broadcast and section broadcast for an entry method with rdma
     if (param->hasRdma() && !container->isForElement()) {
       str << "  CkAbort(\"Broadcast not supported for entry methods with rdma parameters\");\n";
@@ -598,7 +616,7 @@ void Entry::genArrayStaticConstructorDefs(XStr& str)
   if (container->getForWhom() == forIndividual)
       str<<
       makeDecl("void",1)<<"::insert("<<paramComma(0,0)<<"int onPE"<<eo(0)<<")\n"
-      "{ \n"<<marshallMsg()<<
+      "{ \n "<<addDummyStaticCastIfVoid()<<marshallMsg()<<
       "   UsrToEnv(impl_msg)->setMsgtype(ArrayEltInitMsg);\n"
       "   ckInsert((CkArrayMessage *)impl_msg,"<<epIdx()<<",onPE);\n}\n";
   else if (container->getForWhom() == forAll) {
@@ -607,6 +625,7 @@ void Entry::genArrayStaticConstructorDefs(XStr& str)
     asyncPrototype << makeDecl("void", 1) << "::ckNew";
 
     head << "{\n"
+         << addDummyStaticCastIfVoid()
          << marshallMsg();
 
     syncTail << "  UsrToEnv(impl_msg)->setMsgtype(ArrayEltInitMsg);\n"
@@ -719,6 +738,7 @@ void Entry::genGroupDefs(XStr& str)
       msgTypeStr<<paramType(0,1);
     str << makeDecl(retStr,1)<<"::"<<name<<"("<<msgTypeStr<<")\n";
     str << "{\n";
+    str << addDummyStaticCastIfVoid();
     //regular broadcast and section broadcast for an entry method with rdma
     if (param->hasRdma() && !container->isForElement()) {
       str << "  CkAbort(\"Broadcast not supported for entry methods with rdma parameters\");\n";
@@ -808,6 +828,7 @@ void Entry::genGroupDefs(XStr& str)
     // entry method on multiple PEs declaration
     if(!forElement && !container->isForSection() && !isSync() && !isLocal() && !container->isNodeGroup()) {
       str << ""<<makeDecl(retStr,1)<<"::"<<name<<"("<<paramComma(1,0)<<"int npes, int *pes"<<eo(0)<<") {\n";
+      str << addDummyStaticCastIfVoid();
       if (param->hasRdma()) {
         str << "  CkAbort(\"Broadcast not supported for entry methods with rdma parameters\");\n";
       } else {
@@ -816,6 +837,7 @@ void Entry::genGroupDefs(XStr& str)
       }
       str << "}\n";
       str << ""<<makeDecl(retStr,1)<<"::"<<name<<"("<<paramComma(1,0)<<"CmiGroup &grp"<<eo(0)<<") {\n";
+      str << addDummyStaticCastIfVoid();
       if (param->hasRdma()) {
         str << "  CkAbort(\"Broadcast not supported for entry methods with rdma parameters\");\n";
       } else {
@@ -1049,7 +1071,9 @@ void Entry::genGroupStaticConstructorDefs(XStr& str)
   //Selects between NodeGroup and Group
   char *node = (char *)(container->isNodeGroup()?"Node":"");
   str << makeDecl("CkGroupID",1)<<"::ckNew("<<paramType(0,1)<<")\n";
-  str << "{\n"<<marshallMsg();
+  str << "{\n";
+  str << addDummyStaticCastIfVoid();
+  str << marshallMsg();
   str << "  UsrToEnv(impl_msg)->setMsgtype(" << node << "BocInitMsg);\n";
   if (param->isMarshalled() || param->isVoid()) {
     str << "  if (impl_e_opts)\n";
@@ -1064,7 +1088,9 @@ void Entry::genGroupStaticConstructorDefs(XStr& str)
 
   if (!param->isVoid()) {
     str << makeDecl(" ",1)<<"::"<<container->proxyName(0)<<"("<<paramType(0,1)<<")\n";
-    str << "{\n"<<marshallMsg();
+    str << "{\n";
+    str << addDummyStaticCastIfVoid();
+    str << marshallMsg();
     str << "  UsrToEnv(impl_msg)->setMsgtype(" << node << "BocInitMsg);\n";
     if (param->isMarshalled()) {
       str << "  if (impl_e_opts)\n";
