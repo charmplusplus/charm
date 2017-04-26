@@ -404,8 +404,8 @@ void ArrayElement::defrag(CkReductionMsg *msg)
 }
 
 // Remote method: This removes the array element from its array manager which
-// also calls delete on this element. The destructor then handles cleanup of the
-// associated location record from CkLocMgr.
+// also calls delete on this element. The superclass destructor then handles
+// cleanup of the associated location record from CkLocMgr.
 void ArrayElement::ckDestroy(void)
 {
 	if(_BgOutOfCoreFlag!=1){ //in case of taking core out of memory
@@ -418,7 +418,6 @@ void ArrayElement::ckDestroy(void)
 //Destructor (virtual)
 ArrayElement::~ArrayElement()
 {
-  myRec->destroy(); /* Attempt to delete myRec if it's no longer in use */
 #if CMK_OUT_OF_CORE
   if (CkpvAccess(CkSaveRestorePrefetch)) 
     return; /* Just saving to disk--don't trash anything. */

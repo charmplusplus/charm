@@ -1528,9 +1528,6 @@ CkMigratable::~CkMigratable() {
 		prefetchObjID=-1;
 	}
 #endif
-	/*Might want to tell myRec about our doom here--
-	it's difficult to avoid some kind of circular-delete, though.
-	*/
 #if CMK_LBDB_ON 
 	if (barrierRegistered) {
 	  DEBL((AA "Removing barrier for element %s\n" AB,idx2str(thisIndexMax)));
@@ -1544,6 +1541,7 @@ CkMigratable::~CkMigratable() {
     myRec->getMetaBalancer()->AdjustCountForDeadContributor(atsync_iteration);
   }
 #endif
+	myRec->destroy(); /* Attempt to delete myRec if it's no longer in use */
 	//To detect use-after-delete
 	thisIndexMax.nInts=-12345;
 	thisIndexMax.dimension=-12345;
