@@ -56,6 +56,8 @@ static __thread int isomalloc_thread = 0;
 #endif
 
 static int meta_inited = 0;
+extern int _sync_iso;
+extern int _sync_iso_warned;
 
 static void meta_init(char **argv)
 {
@@ -67,6 +69,12 @@ static void meta_init(char **argv)
 #endif
    if (CmiMyRank()==0) meta_inited = 1;
    CmiNodeAllBarrier();
+#if CMK_SMP
+    if (_sync_iso == 0 && _sync_iso_warned == 0) {
+        _sync_iso_warned = 1;
+        printf("Warning> Using Isomalloc in SMP mode, you may need to run with '+isomalloc_sync'.\n");
+    }
+#endif
 }
 
 static void *meta_malloc(size_t size)

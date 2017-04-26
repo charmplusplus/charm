@@ -61,7 +61,7 @@ added by Ryan Mokos in July 2008.
 extern int cutOffPoints[cutOffNum];
 #endif 
 
-static int _sync_iso = 0;
+int _sync_iso = 0;
 #if __FAULT__
 static int _restart = 0;
 #endif
@@ -2296,6 +2296,8 @@ int CmiIsomallocInRange(void *addr)
     pointer_lt((char*)addr,isomallocEnd));
 }
 
+int _sync_iso_warned = 0;
+
 void CmiIsomallocInit(char **argv)
 {
 #if CMK_NO_ISO_MALLOC
@@ -2325,21 +2327,15 @@ void CmiIsomallocInit(char **argv)
     disable_isomalloc("mmap() does not work");
   }
   else {
-    if (CmiMyPe() == 0) {
-      int _sync_iso_warned = 0;
-      if (read_randomflag() == 1) {    /* randomization stack pointer */
-        if (_sync_iso == 1)
-          printf("Warning> Randomization of stack pointer is turned on in kernel.\n");
-        else {
-          _sync_iso_warned = 1;
-          printf("Warning> Randomization of stack pointer is turned on in kernel, thread migration may not work! Run 'echo 0 > /proc/sys/kernel/randomize_va_space' as root to disable it, or try run with '+isomalloc_sync'.  \n");
-        }
-      }
-#if CMK_SMP
-      if (_sync_iso == 0 && _sync_iso_warned == 0)
-        printf("Warning> using Isomalloc in SMP mode, you may need to run with '+isomalloc_sync'.\n");
-#endif
+    /* Warn user if ASLR is enabled and '+isomalloc_sync' is missing */
+    if (CmiMyPe() == 0 && read_randomflag() == 1 && _sync_iso == 0 && _sync_iso_warned == 0) {
+      _sync_iso_warned = 1;
+      printf("Warning> Randomization of virtual memory (ASLR) is turned "
+        "on in the kernel, thread migration may not work! Run 'echo 0 > "
+        "/proc/sys/kernel/randomize_va_space' as root to disable it, "
+        "or try running with '+isomalloc_sync'.\n");
     }
+
     init_ranges(argv);
   }
 #endif
