@@ -541,6 +541,10 @@ void Foo::allgathervResult (CkReductionMsg* msg)
   msg->toTuple(\&results, \&numReductions);
   CkReduction::setElement* currSrc  = (CkReduction::setElement*)results[0].data;
   CkReduction::setElement* currData = (CkReduction::setElement*)results[1].data;
+
+  // ... process currSrc and currData
+
+  delete [] results;
 \}
 \end{alltt}
 
