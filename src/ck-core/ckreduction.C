@@ -1690,6 +1690,7 @@ CkReductionMsg* CkReduction::tupleReduction(int num_messages, CkReductionMsg** m
   // imagine the given data in a 2D layout where the messages are rows and reductions are columns
   // here we grab each column and run that reduction
 
+  std::vector<CkReductionMsg *> msgs_to_delete;
   for (int reduction_idx = 0; reduction_idx < num_reductions; ++reduction_idx)
   {
     DEB_TUPLE(("  reduction_idx=%d {\n", reduction_idx));
@@ -1723,8 +1724,11 @@ CkReductionMsg* CkReduction::tupleReduction(int num_messages, CkReductionMsg** m
     CkReductionMsg* result = reducerFp(num_messages, simulated_messages);
     DEB_TUPLE(("    result_len=%d\n  },\n", result->getLength()));
     return_data[reduction_idx] = CkReduction::tupleElement(result->getLength(), result->getData(), reducerType);
-    // TODO - leak - the built in reducers all reuse message memory, so this is not safe to delete
-    // delete result;
+    // reducers are allowed to reuse the zeroth message's memory, so it is not safe to delete this
+    // all the time, and, even if it is, deletion must be deferred until after processing is complete.
+    if (result != simulated_messages[0]) {
+      msgs_to_delete.push_back(result);
+    }
   }
 
   CkReductionMsg* retval = CkReductionMsg::buildFromTuple(return_data, num_reductions);
@@ -1738,6 +1742,8 @@ CkReductionMsg* CkReduction::tupleReduction(int num_messages, CkReductionMsg** m
   // note that although this is a 2d array, we don't need to delete the inner objects,
   //  their memory is tracked in simulated_messages_buffer
   delete[] simulated_messages;
+  for (int i = 0; i < msgs_to_delete.size(); ++i)
+    delete msgs_to_delete[i];
   return retval;
 }
 
