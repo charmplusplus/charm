@@ -97,6 +97,18 @@ public:
     contribute(CkCallback(CkReductionTarget(TestDriver, start), driverProxy));
   }
 
+  void pup(PUP::er &p) {
+    if (p.isUnpacking()) {
+      HPCC_Table = (CmiUInt8*)malloc(sizeof(CmiUInt8) * localTableSize);
+    }
+
+    for (int i = 0; i < localTableSize; i++) {
+      p|HPCC_Table[i];
+    }
+
+    p|globalStartmyProc;
+  }
+
   Updater(CkMigrateMessage *msg) {}
 
   // Communication library calls this to deliver each randomly generated key

@@ -11,8 +11,16 @@ public:
   int sourcePe;
   dtype dataItem;
 
+  ArrayDataItem(){}
+
   ArrayDataItem(itype i, int srcPe, const dtype d)
     : arrayIndex(i), sourcePe(srcPe), dataItem(d) {}
+
+  void pup(PUP::er &p) {
+    p|arrayIndex;
+    p|sourcePe;
+    p|dataItem;
+  }
 };
 
 class ChunkDataItem {

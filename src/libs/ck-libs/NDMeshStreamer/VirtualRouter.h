@@ -21,6 +21,12 @@ struct CompletionStatus {
   int stageIndex;
   int numContributors;
   std::vector<int> dimensionsToFlush;
+
+  void pup(PUP::er &p) {
+    p|stageIndex;
+    p|numContributors;
+    p|dimensionsToFlush;
+  }
 };
 
 // use CRTP to avoid overhead of virtual functions
@@ -84,6 +90,16 @@ public:
 #endif
 
     static_cast<Derived*>(this)->additionalInitialization();
+  }
+
+  void pup(PUP::er &p) {
+    p|numDimensions_;
+    p|myIndex_;
+    p|numMembers_;
+    p|individualDimensionSizes_;
+    p|combinedDimensionSizes_;
+    p|myLocationIndex_;
+    p|initialRoutingDimension_;
   }
 
   // // skeleton for defining a new routing class:

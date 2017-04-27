@@ -10,6 +10,8 @@
 #include "completion.h"
 #include "ckarray.h"
 #include "VirtualRouter.h"
+#include "pup_stl.h"
+#include "debug-charm.h"
 
 // limit total number of buffered data items to
 // maxNumDataItemsBuffered_ (flush when limit is reached) but allow
@@ -244,6 +246,8 @@ public:
       }
     }
   }
+
+  virtual void pup(PUP::er &p);
 };
 
 template <class dtype, class RouterType>
@@ -794,6 +798,73 @@ void MeshStreamer<dtype, RouterType>::registerPeriodicProgressFunction() {
                  progressPeriodInMs_);
 }
 
+template <class dtype, class RouterType>
+void MeshStreamer<dtype, RouterType>::pup(PUP::er &p) {
+  // private members
+  p|bufferSize_;
+  p|maxNumDataItemsBuffered_;
+  p|numDataItemsBuffered_;
+
+  p|userCallback_;
+  p|yieldFlag_;
+
+  p|progressPeriodInMs_;
+  p|isPeriodicFlushEnabled_;
+  p|hasSentRecently_;
+
+  p|detector_;
+  p|prio_;
+  p|yieldCount_;
+
+  // only used for staged completion
+  p|cntMsgSent_;
+  p|cntMsgReceived_;
+  p|cntMsgExpected_;
+  p|cntFinished_;
+
+  p|numLocalDone_;
+  p|numLocalContributors_;
+  p|myCompletionStatus_;
+
+  // protected members
+  p|myRouter_;
+  p|numMembers_;
+  p|myIndex_;
+  p|numDimensions_;
+  p|useStagedCompletion_;
+  p|stagedCompletionStarted_;
+  p|useCompletionDetection_;
+  if (p.isUnpacking()) detectorLocalObj_ = detector_.ckLocalBranch();
+
+  size_t outervec_size;
+  std::vector<size_t> innervec_sizes;
+
+  if (p.isPacking()) {
+    outervec_size = dataBuffers_.size();
+    for (int i = 0; i < outervec_size; i++) {
+      innervec_sizes.push_back(dataBuffers_[i].size());
+    }
+  }
+
+  p|outervec_size;
+  p|innervec_sizes;
+
+  if (p.isUnpacking()) {
+    dataBuffers_.resize(outervec_size);
+    for (int i = 0; i < outervec_size; i++) {
+      dataBuffers_[i].resize(innervec_sizes[i]);
+    }
+  }
+
+  // pup each message element
+  for (int i = 0; i < outervec_size; i++) {
+    for (int j = 0; j < innervec_sizes[i]; j++) {
+      CkPupMessage(p, (void**) &dataBuffers_[i][j]);
+    }
+  }
+
+}
+
 template <class dtype, class ClientType, class RouterType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype, ClientType> >
 class GroupMeshStreamer :
   public CBase_GroupMeshStreamer<dtype, ClientType, RouterType, EntryMethod> {
@@ -862,6 +933,13 @@ public:
     clientGID_ = clientGID;
     clientObj_ = (ClientType *) CkLocalBranch(clientGID_);
 
+  }
+
+  void pup(PUP::er &p) {
+    p|clientGID_;
+    if (p.isUnpacking()) {
+      clientObj_ = (ClientType*) CkLocalBranch(clientGID_);
+    }
   }
 };
 
@@ -1156,12 +1234,51 @@ public:
     }
   }
 
+  void pup(PUP::er &p) {
+    p|clientAID_;
+    if (p.isUnpacking()) {
+      clientArrayMgr_ = clientAID_.ckLocalBranch();
+      clientLocMgr_ = clientArrayMgr_->getLocMgr();
+    }
+
+    p|numArrayElements_;
+    p|numLocalArrayElements_;
+    p|misdeliveredItems;
+#ifdef CMK_TRAM_CACHE_ARRAY_METADATA
+    size_t clientObjsSize;
+
+    if (p.isPacking()) {
+      clientObjsSize = clientObjs_.size();
+    }
+    p|clientObjsSize;
+
+    if (p.isUnpacking()) {
+      clientObjs_.resize(clientObjsSize);
+    }
+    for (int i = 0; i < clientObjsSize; i++) {
+      p|*clientObjs_[i];
+    }
+
+    p|destinationPes_;
+    p|isCachedArrayMetadata_;
+#endif
+  }
+
 };
 
 struct ChunkReceiveBuffer {
   int bufferNumber;
   int receivedChunks;
   char *buffer;
+
+  void pup(PUP::er &p) {
+    p|bufferNumber;
+    p|receivedChunks;
+    if(p.isUnpacking()) {
+      buffer = new char[receivedChunks * CHUNK_SIZE];
+    }
+    PUParray(p, buffer, receivedChunks*CHUNK_SIZE);
+  }
 };
 
 struct ChunkOutOfOrderBuffer {
@@ -1169,6 +1286,8 @@ struct ChunkOutOfOrderBuffer {
   int receivedChunks;
   int sourcePe;
   char *buffer;
+
+  ChunkOutOfOrderBuffer() {}
 
   ChunkOutOfOrderBuffer(int b, int r, int s, char *buf)
     : bufferNumber(b), receivedChunks(r), sourcePe(s), buffer(buf) {}
@@ -1178,6 +1297,15 @@ struct ChunkOutOfOrderBuffer {
              (chunk.sourcePe == sourcePe) );
   }
 
+  void pup(PUP::er &p) {
+    p|bufferNumber;
+    p|receivedChunks;
+    p|sourcePe;
+    if(p.isUnpacking()) {
+      buffer = new char[receivedChunks * CHUNK_SIZE];
+    }
+    PUParray(p, buffer, receivedChunks*CHUNK_SIZE);
+  }
 };
 
 template <class dtype, class ClientType, class RouterType, int (*EntryMethod)(char *, void *) = defaultMeshStreamerDeliver<dtype,ClientType> >
@@ -1386,6 +1514,18 @@ public:
 
   inline void initLocalClients() {
     // no action required
+  }
+
+  void pup(PUP::er &p) {
+    p|outOfOrderBuffers_;
+    p|lastReceived_;
+    p|currentBufferNumbers_;
+
+    p|clientGID_;
+    if (p.isUnpacking())
+      clientObj_ = (ClientType *) CkLocalBranch(clientGID_);
+
+    p|userHandlesFreeing_;
   }
 
 };
