@@ -1756,6 +1756,8 @@ class ampi : public CBase_ampi {
   int winIgetFree(MPI_Request *request, MPI_Status *status);
   void winRemotePut(int orgtotalsize, char* orgaddr, int orgcnt, MPI_Datatype orgtype,
                     MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex);
+  char* winLocalGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                    MPI_Datatype targtype, int winIndex);
   AmpiMsg* winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
                     int targcnt, MPI_Datatype targtype, int winIndex);
   AmpiMsg* winRemoteIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
@@ -1770,14 +1772,19 @@ class ampi : public CBase_ampi {
   void winRemoteAccumulate(int orgtotalsize, char* orgaddr, int orgcnt, MPI_Datatype orgtype,
                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                            MPI_Op op, int winIndex);
-  AmpiMsg* winRemoteGetAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt, MPI_Datatype orgtype,
-                                  MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Op op,
-                                  int winIndex);
   int winGetAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, void *resaddr,
                        int rescnt, MPI_Datatype restype, int rank, MPI_Aint targdisp,
                        int targcnt, MPI_Datatype targtype, MPI_Op op, WinStruct *win);
+  void winLocalGetAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt, MPI_Datatype orgtype,
+                             MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Op op,
+                             char *resaddr, int winIndex);
+  AmpiMsg* winRemoteGetAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt, MPI_Datatype orgtype,
+                                  MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Op op,
+                                  int winIndex);
   int winCompareAndSwap(const void *orgaddr, const void *compaddr, void *resaddr, MPI_Datatype type,
                         int rank, MPI_Aint targdisp, WinStruct *win);
+  char* winLocalCompareAndSwap(int size, char* sorgaddr, char* compaddr, MPI_Datatype type,
+                               MPI_Aint targdisp, int winIndex);
   AmpiMsg* winRemoteCompareAndSwap(int size, char *sorgaddr, char *compaddr, MPI_Datatype type,
                                    MPI_Aint targdisp, int winIndex);
   void winSetName(WinStruct *win, const char *name);
