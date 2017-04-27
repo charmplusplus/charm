@@ -1681,6 +1681,8 @@ class ampi : public CBase_ampi {
   MPI_Request send(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
                    MPI_Comm destcomm, int ssendReq=0, AmpiSendType sendType=BLOCKING_SEND);
   static void sendraw(int t, int s, void* buf, int len, CkArrayID aid, int idx);
+  inline MPI_Request sendLocalMsg(int t, int sRank, const void* buf, int size, int destRank,
+                                  MPI_Comm destcomm, ampi* destPtr, int ssendReq, AmpiSendType sendType);
   inline MPI_Request sendRdmaMsg(int t, int sRank, const void* buf, int size, int destIdx,
                                  int destRank, MPI_Comm destcomm, CProxy_ampi arrProxy, int ssendReq);
   inline bool destLikelyWithinProcess(CProxy_ampi arrProxy, int destIdx) const {
@@ -1689,7 +1691,7 @@ class ampi : public CBase_ampi {
     return (CkNodeOf(destPe) == CkMyNode());
   }
   MPI_Request delesend(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
-                       MPI_Comm destcomm, CProxy_ampi arrproxy, int ssend=0);
+                       MPI_Comm destcomm, CProxy_ampi arrproxy, int ssend, AmpiSendType sendType);
   inline void processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count);
   inline void processRdmaMsg(void *sbuf, int slength, int ssendReq, int srank, void* rbuf,
                              int rcount, MPI_Datatype rtype, MPI_Comm comm);
