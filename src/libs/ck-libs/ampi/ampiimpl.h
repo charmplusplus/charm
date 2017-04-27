@@ -234,8 +234,8 @@ class win_obj {
 
   int get(void *orgaddr, int orgcnt, int orgunit,
           MPI_Aint targdisp, int targcnt, int targunit);
-  int accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
-                 MPI_Datatype targtype, MPI_Op op, ampiParent* pptr);
+  int accumulate(void *orgaddr, int count, MPI_Aint targdisp, MPI_Datatype targtype,
+                 MPI_Op op, ampiParent* pptr);
 
   int iget(int orgcnt, MPI_Datatype orgtype,
           MPI_Aint targdisp, int targcnt, MPI_Datatype targtype);

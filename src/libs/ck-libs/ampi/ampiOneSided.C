@@ -129,12 +129,12 @@ int win_obj::iget(int orgcnt, int orgunit, MPI_Aint targdisp,
   return WIN_SUCCESS;
 }
 
-int win_obj::accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
-                        MPI_Aint targdisp, int targcnt,
-                        MPI_Datatype targtype, MPI_Op op, ampiParent* pptr){
+int win_obj::accumulate(void *orgaddr, int count, MPI_Aint targdisp, MPI_Datatype targtype,
+                        MPI_Op op, ampiParent* pptr)
+{
   //when called from winRemote entry methods, pptr must be taken from the ampi instance, not getAmpiParent().
   CkAssert(pptr != NULL);
-  pptr->applyOp(targtype, op, targcnt, (void*)orgaddr,(void*)((int*)baseAddr+targdisp));
+  pptr->applyOp(targtype, op, count, orgaddr, (void*)((char*)baseAddr+disp_unit*targdisp));
   return WIN_SUCCESS;
 }
 
@@ -395,12 +395,12 @@ void ampi::winRemoteAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt,
   win_obj *winobj = winObjects[winIndex];
   CkDDT_DataType *ddt = getDDT()->getType(targtype);
   if (ddt->isContig()) {
-    winobj->accumulate(sorgaddr, targcnt, targtype, targdisp, targcnt, targtype, op, parent);
+    winobj->accumulate(sorgaddr, targcnt, targdisp, targtype, op, parent);
   }
   else {
     vector<char> getdata(orgtotalsize);
     ddt->serialize(&getdata[0], sorgaddr, targcnt, (-1));
-    winobj->accumulate(&getdata[0], targcnt, targtype, targdisp, targcnt, targtype, op, parent);
+    winobj->accumulate(&getdata[0], targcnt, targdisp, targtype, op, parent);
   }
 }
 
