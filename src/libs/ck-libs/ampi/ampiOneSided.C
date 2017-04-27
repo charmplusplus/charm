@@ -253,7 +253,7 @@ void ampi::winRemotePut(int orgtotalsize, char* sorgaddr, int orgcnt, MPI_Dataty
   int orgunit = getDDT()->getSize(orgtype);
 
   winobj->put(sorgaddr, orgcnt, orgunit, targdisp, targcnt, targunit);
-  char* targaddr = ((char*)(winobj->baseAddr)) + targunit*targdisp;
+  char* targaddr = ((char*)(winobj->baseAddr)) + winobj->disp_unit*targdisp;
   tddt->serialize(targaddr, (char*)sorgaddr, targcnt, (-1));
 }
 
@@ -281,12 +281,12 @@ AmpiMsg* ampi::winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
                             MPI_Datatype targtype, int winIndex) {
   AMPI_DEBUG("    RemoteGet invoked at Rank[%d:%d]\n", thisIndex, myRank);
 
+  win_obj *winobj = winObjects[winIndex];
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
   int targunit = tddt->getSize();
-  int targtotalsize = targunit*targcnt;
+  int targtotalsize = winobj->disp_unit*targcnt;
   int orgunit = getDDT()->getSize(orgtype);
-  win_obj *winobj = winObjects[winIndex];
-  char* targaddr = (char*)(winobj->baseAddr) + targunit*targdisp;
+  char* targaddr = (char*)(winobj->baseAddr) + winobj->disp_unit*targdisp;
 
   winobj->get(targaddr, orgcnt, orgunit, targdisp, targcnt, targunit);
 
@@ -309,19 +309,19 @@ AmpiMsg* ampi::winRemoteIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype,
                              MPI_Aint targdisp, int targcnt,
                              MPI_Datatype targtype, int winIndex) {
   AMPI_DEBUG("    RemoteIget invoked at Rank[%d:%d]\n", thisIndex, myRank);
+  win_obj *winobj = winObjects[winIndex];
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
   int targunit = tddt->getSize();
-  int targtotalsize = targunit*targcnt;
+  int targtotalsize = winobj->disp_unit*targcnt;
   int orgunit = getDDT()->getSize(orgtype);
 
-  win_obj *winobj = winObjects[winIndex];
   winobj->iget(orgcnt, orgunit, targdisp, targcnt, targunit);
 
   AMPI_DEBUG("    Rank[%d] iget win  [%d] \n", thisIndex, *(int*)(targaddr));
 
   AmpiMsg *msg = new (targtotalsize, 0) AmpiMsg(-1, MPI_RMA_TAG, thisIndex, targtotalsize);
 
-  char* targaddr = (char*)(winobj->baseAddr) + targdisp*targunit;
+  char* targaddr = (char*)(winobj->baseAddr) + targdisp*winobj->disp_unit;
   tddt->serialize(targaddr, msg->getData(), targcnt, 1);
   AMPI_DEBUG("    Rank[%d] copy win  [%d] \n", thisIndex, *(int*)msg->getData());
   return msg;
