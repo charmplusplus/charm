@@ -185,7 +185,7 @@ typedef struct ExplicitDgramStruct
   unsigned int len, dummy; /* dummy to fix bug in rs6k alignment */
   double data[1];
 }
-*ExplicitDgram;
+CMK_SMP_volatile *ExplicitDgram;
 
 typedef struct ImplicitDgramStruct
 {
@@ -196,7 +196,7 @@ typedef struct ImplicitDgramStruct
   int    datalen;
   OutgoingMsg ogm;
 }
-*ImplicitDgram;
+CMK_SMP_volatile *ImplicitDgram;
 
 struct PendingMsgStruct;
 

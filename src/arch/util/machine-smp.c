@@ -389,6 +389,8 @@ static void *call_startfn(void *vindex)
 }
 */
 
+extern void StartInteropScheduler();
+
 static void *call_startfn(void *vindex)
 {
   size_t index = (size_t)vindex;

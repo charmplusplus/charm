@@ -112,7 +112,7 @@ void FuncCkLoop::createPThreads() {
     numPhysicalPEs = CmiNumCores();
     if (mainHelperPhyRank == -1) mainHelperPhyRank = 0;
     for (int i=1; i<=numThreads; i++) {
-        pthread_create(ndhThreads+i, &attr, ndhThreadWork, (void *)i);
+        pthread_create(ndhThreads+i, &attr, ndhThreadWork, (void *)(intptr_t)i);
     }
     while (gCrtCnt != numThreads); //wait for all threads to finish creation
 #endif

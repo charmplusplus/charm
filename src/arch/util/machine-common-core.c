@@ -673,7 +673,7 @@ static void CmiSendNodeSelf(char *msg) {
 
 //I think this #if is incorrect - should be SYNC_P2P
 #if USE_COMMON_SYNC_P2P
-INLINE_KEYWORD void CmiSyncNodeSendFn(int destNode, int size, char *msg) {
+void CmiSyncNodeSendFn(int destNode, int size, char *msg) {
     char *dupmsg = CopyMsg(msg, size);
     CmiFreeNodeSendFn(destNode, size, dupmsg);
 }

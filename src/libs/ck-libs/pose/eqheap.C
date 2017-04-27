@@ -103,12 +103,9 @@ HeapNode *HeapNode::conjoin(HeapNode *h)
 {
 #ifdef EH_SANITIZE
   sanitize();
-#endif
-#ifdef EH_SANITIZE
   if (h) h->sanitize();
 #endif
-  if (!this) return h;
-  else if (!h) return this;
+  if (!h) return this;
   else if ((pose_config.deterministic && e->timestamp < h->e->timestamp) ||
 	       (e->timestamp == h->e->timestamp && e->evID <= h->e->evID) ||
 	       e->timestamp < h->e->timestamp ||

@@ -34,7 +34,7 @@ void ADIOI_Get_position(ADIO_File fd, ADIO_Offset *offset)
 	MPI_Type_size(fd->filetype, &filetype_size);
 	MPI_Type_extent(fd->filetype, &filetype_extent);
 
-	printf("filetype is not contig: fd->filetype=%d,size=%d,extent=%d,etypesize=%d\n",fd->filetype,filetype_size,filetype_extent,fd->etype_size);
+	printf("filetype is not contig: fd->filetype=%d,size=%d,extent=%ld,etypesize=%d\n",fd->filetype,filetype_size,filetype_extent,fd->etype_size);
 
 	disp = fd->disp;
 	byte_offset = fd->fp_ind;
