@@ -1386,7 +1386,7 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration)
     } else if (isIntra(comm)) {
       intraChildRegister(s);
     }else
-      CkAbort("ampiParent recieved child with bad communicator");
+      CkAbort("ampiParent received child with bad communicator");
   }
 
   return thread;
@@ -8000,7 +8000,7 @@ CDECL
 int AMPI_Abort(MPI_Comm comm, int errorcode)
 {
   AMPIAPI("AMPI_Abort");
-  CkAbort("AMPI: User called MPI_Abort!\n");
+  CkAbort("AMPI: Application called MPI_Abort()!\n");
   return errorcode;
 }
 
