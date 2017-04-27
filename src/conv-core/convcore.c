@@ -2040,7 +2040,7 @@ CpvStaticDeclare(int      , CthResumeSchedulingThreadIdx);
 
 void CthStandinCode()
 {
-  while (1) CsdScheduler(0);
+  CsdScheduler(-1);
 }
 
 /* this fix the function pointer for thread migration and pup */
