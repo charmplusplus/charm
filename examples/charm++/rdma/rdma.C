@@ -86,9 +86,9 @@ class rdmaObject : public CBase_rdmaObject{
 
     void rdmaSent(CkDataMsg *m){
       //to get access to the array sent via rdma
-      //do not free the CkDataMsg as it belongs to Charm++ Runtime
       void *ptr = *((void **)(m->data));
       free(ptr);
+      delete m;
     }
 
     void testRdma(){

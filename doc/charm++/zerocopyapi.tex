@@ -41,18 +41,16 @@ arrayProxy[0].foo(500000, rdma(arrPtr, cb));
 The callback will be invoked on completion of the RDMA operation associated with the
 corresponding array. Inside the callback, it is safe to overwrite the buffer sent
 via the zero copy API and this buffer can be accessed by dereferencing the CkDataMsg
-received in the callback. It should be noted that the received CkDataMsg should not be
-deallocated by the user as it belongs to the Charm++ Runtime. It will be deallocated
-by the runtime after the execution of the entry method.
+received in the callback.
 
 \begin{alltt}
 //called when RDMA operation is completed
 void rdmaSent(CkDataMsg *m)
 \{
   //get access to the pointer and free the allocated buffer
-  //do not free the CkDataMsg as it belongs to Charm++ Runtime
   void *ptr = *((void **)(m->data));
   free(ptr);
+  delete m;
 \}
 \end{alltt}
 
