@@ -1131,6 +1131,7 @@ static ampi *ampiInit(char **argv)
     CkArrayCreatedMsg *m;
     CProxy_ampiParent::ckNew(new_world, threads, opts, CkCallbackResumeThread((void*&)m));
     parent = CProxy_ampiParent(m->aid);
+    delete m;
     STARTUP_DEBUG("ampiInit> array size "<<_nchunks);
   }
   int *barrier = (int *)TCharm::get()->semaGet(AMPI_BARRIER_SEMAID);
@@ -1147,6 +1148,7 @@ static ampi *ampiInit(char **argv)
     CkArrayCreatedMsg *m;
     CProxy_ampi::ckNew(parent, worldComm, opts, CkCallbackResumeThread((void*&)m));
     arr = CProxy_ampi(m->aid);
+    delete m;
 
     //Broadcast info. to the mpi_worlds array
     // FIXME: remove race condition from MPI_COMM_UNIVERSE broadcast
