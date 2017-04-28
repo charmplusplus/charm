@@ -15,18 +15,23 @@ shared.  For these reasons, we added ``pseudoglobals'' to \converse{}.
 These act much like C global and static variables, except that you have
 explicit control over the degree of sharing.
 
+In this section we use the terms Node, PE, and User-level thread as they are used in Charm++,
+to refer to an OS process, a worker/communication thread, and a user-level thread, respectively.
+In the SMP mode of Charm++ all three of these are separate entities, whereas in non-SMP mode Node
+and PE have the same scope.
+
 \subsection{\converse{} PseudoGlobals}
 
-Three classes of pseudoglobal variables are supported: node-private,
-process-private, and thread-private variables.
+Three classes of pseudoglobal variables are supported: node-shared,
+processor-private, and thread-private variables.
 
 \begin{description}
-\item[Node-private global variables] are specific to a node. They are
-     shared among all the processes within the node.
-\item[Process-private global variables]  are specific to a process. They are
-     shared among all the threads within the process.
-\item[Thread-private global variables] are specific to a thread. They are 
-     truely private.
+    \item[Node-shared variables (Csv)] are specific to a node. They are
+     shared among all the PEs within the node.
+ \item[PE-private variables (Cpv)] are specific to a PE. They are
+     shared by all the objects and Converse user-level threads on a PE.
+\item[Thread-private variables (Ctv)] are specific to a Converse user-level thread. They are
+     truly private.
 \end{description}
 
 There are five macros for each class. These macros are for
@@ -41,7 +46,7 @@ Initialize and Access macros hide these details from the user.  It is
 possible to use global variables without these macros, as supported by
 the underlying machine, but at the expense of portability.
 
-Macros for node-private variables:
+Macros for node-shared variables:
 
 \function{CsvDeclare(type,variable)}
 \function{CsvStaticDeclare(type,variable)}
@@ -55,7 +60,7 @@ Macros for node-private variables:
 \index{CsvInitialize}
 \index{CsvAccess}
 
-Macros for process-private variables:
+Macros for PE-private variables:
 
 \function{CpvDeclare(type,variable)}
 \function{CpvStaticDeclare(type,variable)}

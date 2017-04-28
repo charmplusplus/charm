@@ -18,9 +18,10 @@
      Not the same as Charm++ QD. (qd.C)
   
   Globally accessible variables in Converse can be shared as:
+  - Ctv, Converse thread-private variable.
+     one copy per Converse user-level thread.
   - Cpv, Converse processor-private variable.  Very common;
      one copy per processor of each node.
-  - Ctv, Converse thread-private variable.  One copy per Converse thread. 
   - Csv, Converse node-shared variable.  Global variables 
      shared by all processors of a node (beware of thread safety!)
 
