@@ -1453,11 +1453,37 @@ void CentralLB::removeCommDataOfDeletedObjs(LDStats* stats) {
   int n_comm = 0;
   for (int i=0; i<stats->n_comm; i++) {
     LDCommData& cdata = stats->commData[i];
-    if (!cdata.from_proc()) {
-      int sidx = stats->getSendHash(cdata);
-      int ridx = stats->getRecvHash(cdata);
-      if (sidx == -1 || ridx == -1) continue;
+    switch (cdata.receiver.get_type()) {
+      case LD_PROC_MSG:
+        break;
+      case LD_OBJ_MSG:  {
+        if (!cdata.from_proc()) {
+          int sidx = stats->getSendHash(cdata);
+          int ridx = stats->getRecvHash(cdata);
+          if (sidx == -1 || ridx == -1) continue;
+        }
+        break;
+      }
+      case LD_OBJLIST_MSG:  {
+        int sidx = stats->getSendHash(cdata);
+        if (sidx == -1) continue;
+        int nobjs;
+        LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
+        for (int id=0; id<nobjs; id++) {
+          int idx = stats->getHash(objs[id]);
+          if (idx == -1)
+          {
+            objs[id] = objs[nobjs-1];
+            id--;
+            nobjs--;
+          }
+        }
+        if(nobjs == 0) continue;
+        cdata.receiver.dest.destObjs.len = nobjs;
+        break;
+      }
     }
+
     stats->commData[n_comm] = cdata;
     n_comm++;
   }
