@@ -47,7 +47,7 @@ module ampi {
     entry EXPEDITED void generic(AmpiMsg *);
     entry EXPEDITED void genericRdma(rdma char buf[size], int size, int seq, int tag,
                                      int srcRank, MPI_Comm destcomm, int ssendReq);
-    entry EXPEDITED void completedRdmaSend(CkDataMsg *msg);
+    entry EXPEDITED_NOKEEP void completedRdmaSend(CkDataMsg *msg);
     entry EXPEDITED_REDN void barrierResult(void);
     entry EXPEDITED_REDN void ibarrierResult(void);
     entry EXPEDITED_NOKEEP void rednResult(CkReductionMsg *msg);
