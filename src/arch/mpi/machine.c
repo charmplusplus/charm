@@ -613,7 +613,9 @@ static void ReleaseSentMessages(void) {
                 CmiMPIRzvRdmaOpInfo_t *rdmaOpInfo = (CmiMPIRzvRdmaOpInfo_t *)msg_tmp->rdmaOpInfo;
                 CmiRdmaAck *ack = (CmiRdmaAck *) rdmaOpInfo->ack;
                 ack->fnPtr(ack->token);
-                free(msg_tmp->rdmaOpInfo);
+
+                //free callback structure, CmiRdmaAck allocated in CmiSetRdmaAck
+                free(ack);
             }
             else
 #endif
@@ -691,6 +693,8 @@ static int PumpMsgs(void) {
             else
               prev->next = temp;
 
+            // free the receiver's machine specific information, CmiMPIRzvRdmaRecvList_t allocated inside CkRdmaIssueRgets
+            free(recvBufferTmp);
             recvBufferTmp = temp;
           }
           else{

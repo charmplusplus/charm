@@ -23,6 +23,8 @@ void verbsOnesidedOpDone(CmiVerbsRdmaRecvOp_t *recvOpInfo) {
   recvInfo->comOps++;
   if (recvInfo->comOps == recvInfo->numOps) {
     verbsOnesidedAllOpsDone(recvInfo->msg);
+    // free the receiver's machine specific information, CmiVerbsRdmaRecv_t allocated inside CkRdmaIssueRgets
+    free(recvInfo);
   }
 }
 
@@ -121,4 +123,7 @@ void verbsOnesidedReceivedAck(struct infiRdmaPacket *rdmaPacket) {
 
   CmiRdmaAck *ack = rdmaPacket->localBuffer;
   ack->fnPtr(ack->token);
+
+  //free callback structure, CmiRdmaAck allocated in CmiSetRdmaAck
+  free(ack);
 }
