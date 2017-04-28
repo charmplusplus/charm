@@ -1861,7 +1861,7 @@ static const char *funclist[] = {"AMPI_Abort", "AMPI_Add_error_class", "AMPI_Add
 "AMPI_Comm_set_attr", "AMPI_Comm_set_errhandler", "AMPI_Comm_set_info", "AMPI_Comm_set_name",
 "AMPI_Comm_size", "AMPI_Comm_split", "AMPI_Comm_split_type", "AMPI_Comm_test_inter",
 "AMPI_Dims_create", "AMPI_Errhandler_create", "AMPI_Errhandler_free", "AMPI_Errhandler_get",
-"AMPI_Errhandler_set", "AMPI_Error_class", "AMPI_Error_string", "AMPI_Exscan", "AMPI_Finalize",
+"AMPI_Errhandler_set", "AMPI_Error_class", "AMPI_Error_string", "AMPI_Exscan",
 "AMPI_Finalized", "AMPI_Gather", "AMPI_Gatherv", "AMPI_Get_address", "AMPI_Get_count",
 "AMPI_Get_elements", "AMPI_Get_library_version", "AMPI_Get_processor_name", "AMPI_Get_version",
 "AMPI_Graph_create", "AMPI_Graph_get", "AMPI_Graph_map", "AMPI_Graph_neighbors",
@@ -1904,7 +1904,7 @@ static const char *funclist[] = {"AMPI_Abort", "AMPI_Add_error_class", "AMPI_Add
 "AMPI_Win_get_group", "AMPI_Win_get_info", "AMPI_Win_get_name", "AMPI_Win_lock",
 "AMPI_Win_post", "AMPI_Win_set_attr", "AMPI_Win_set_errhandler", "AMPI_Win_set_info",
 "AMPI_Win_set_name", "AMPI_Win_start", "AMPI_Win_test", "AMPI_Win_unlock",
-"AMPI_Win_wait", "AMPI_Exit" /*AMPI extensions:*/, "AMPI_Migrate",
+"AMPI_Win_wait", /*AMPI extensions:*/ "AMPI_Migrate",
 "AMPI_Load_start_measure", "AMPI_Load_stop_measure",
 "AMPI_Load_set_value", "AMPI_Migrate_to_pe", "AMPI_Set_migratable",
 "AMPI_Register_pup", "AMPI_Get_pup_data", "AMPI_Register_main",
@@ -1913,6 +1913,7 @@ static const char *funclist[] = {"AMPI_Abort", "AMPI_Add_error_class", "AMPI_Add
 "AMPI_Type_is_contiguous", "AMPI_Evacuate", "AMPI_Yield", "AMPI_Suspend",
 "AMPI_Resume", "AMPI_Print", "AMPI_Alltoall_iget", "AMPI_Alltoall_medium",
 "AMPI_Alltoall_long", /*CUDA:*/ "AMPI_GPU_Iinvoke", "AMPI_GPU_Invoke", "AMPI_System"};
+// NOTE: AMPI_Finalize and AMPI_Exit are not traced because TCHARM_Done() deletes the tracing funcmap.
 
 #endif // CMK_TRACE_ENABLED
 

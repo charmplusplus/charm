@@ -636,6 +636,11 @@ void TCharm::done(void) {
 	if (exitWhenDone) {
 		//Contribute to a synchronizing reduction
 		contribute(CkCallback(CkReductionTarget(TCharm, atExit), thisProxy[0]));
+#if CMK_TRACE_ENABLED
+		if (CmiMyPe() == CmiNodeFirst(CmiMyNode())) {
+		    delete CsvAccess(tcharm_funcmap);
+		}
+#endif
 	}
 	isSelfDone = true;
 	stop();
