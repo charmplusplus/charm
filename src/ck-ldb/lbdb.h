@@ -254,13 +254,22 @@ typedef struct _LDCommDesc {
   inline void pup(PUP::er &p);
 } LDCommDesc;
 
-typedef struct {
+typedef struct _LDCommData {
   int src_proc;			// sender can either be a proc or an obj
   LDObjKey  sender;		// 
   LDCommDesc   receiver;
   int  sendHash, recvHash;
   int messages;
   int bytes;
+  inline _LDCommData &operator=(const _LDCommData &o) {
+    if (&o == this) return *this;
+    src_proc = o.src_proc;
+    sender = o.sender; receiver = o.receiver;
+    sendHash = o.sendHash; recvHash = o.recvHash;
+    messages = o.messages;
+    bytes = o.bytes;
+    return *this;
+  }
   inline int from_proc() const { return (src_proc != -1); }
   inline int recv_type() const { return receiver.get_type(); }
   inline void pup(PUP::er &p);
