@@ -100,8 +100,8 @@ void CkHandleRdmaCookie(void *cookie){
   cb->send(sizeof(void *), &w->ptr);
 #endif
 
-  free(cb);
-  free(cookie);
+  delete cb;
+  delete (CkRdmaWrapper *)cookie;
 }
 
 
@@ -141,7 +141,7 @@ envelope* CkRdmaCopyMsg(envelope *env){
 
     //Invoke callback as it is safe to rewrite into the source buffer
     (w.callback)->send(sizeof(void *), &w.ptr);
-    free(w.callback);
+    delete w.callback;
 
     //Update the CkRdmaWrapper pointer of the new message
     w.ptr = buf;
