@@ -37,6 +37,7 @@ class Other : public CBase_Other {
 
   void created(CkArrayCreatedMsg *m) {
     CProxy_Hello(m->aid)[0].SayHi(17);
+    delete m;
   }
 };
 

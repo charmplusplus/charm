@@ -944,6 +944,7 @@ void CkSendAsyncCreateArray(int ctor, CkCallback cb, CkArrayOptions opts, void *
   CkCreateArrayAsyncMsg *msg = new (ps.size()) CkCreateArrayAsyncMsg(ctor, cb, opts);
   PUP::toMem p(msg->ctorPayload);
   CkPupMessage(p, &ctorMsg);
+  CkFreeMsg(ctorMsg);
   envelope *env = UsrToEnv(msg);
   CmiSetHandler(env, ckArrayCreationHdl);
   CkPackMessage(&env);
@@ -967,6 +968,7 @@ static void CkCreateArrayAsync(void *vmsg)
   // Does the caller care about the constructed array ID?
   if (!msg->cb.isInvalid())
     msg->cb.send(new CkArrayCreatedMsg(aid));
+  delete msg;
 }
 
 /*********************** CkArray Creation *************************/
