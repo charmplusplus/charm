@@ -691,6 +691,7 @@ static int PumpMsgs(void) {
             else
               prev->next = temp;
 
+            free(recvBufferTmp);
             recvBufferTmp = temp;
           }
           else{
