@@ -1843,9 +1843,8 @@ int ampiErrhandler(const char* func, int errcode);
 
 
 #if CMK_TRACE_ENABLED
-// Start AMPI EventIDs with this value
-#define AMPI_EVENTID_BASE  256
-// List of AMPI functions to trace
+
+// List of AMPI functions to trace:
 static const char *funclist[] = {"AMPI_Abort", "AMPI_Add_error_class", "AMPI_Add_error_code", "AMPI_Add_error_string",
 "AMPI_Address", "AMPI_Allgather", "AMPI_Allgatherv", "AMPI_Allreduce", "AMPI_Alltoall",
 "AMPI_Alltoallv", "AMPI_Alltoallw", "AMPI_Attr_delete", "AMPI_Attr_get",
@@ -1913,6 +1912,8 @@ static const char *funclist[] = {"AMPI_Abort", "AMPI_Add_error_class", "AMPI_Add
 "AMPI_Type_is_contiguous", "AMPI_Evacuate", "AMPI_Yield", "AMPI_Suspend",
 "AMPI_Resume", "AMPI_Print", "AMPI_Alltoall_iget", "AMPI_Alltoall_medium",
 "AMPI_Alltoall_long", /*CUDA:*/ "AMPI_GPU_Iinvoke", "AMPI_GPU_Invoke", "AMPI_System"};
+
+// not traced: AMPI_Trace_begin, AMPI_Trace_end
 
 #endif // CMK_TRACE_ENABLED
 

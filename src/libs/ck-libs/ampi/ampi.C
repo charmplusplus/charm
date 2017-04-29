@@ -893,8 +893,8 @@ static void ampiNodeInit(void)
   TCharm::nodeInit(); // make sure tcharm_funcmap is set up
   int funclength = sizeof(funclist)/sizeof(char*);
   for (int i=0; i<funclength; i++) {
-    CsvAccess(tcharm_funcmap)->insert(std::pair<std::string, int>(funclist[i], AMPI_EVENTID_BASE+i));
-    traceRegisterUserEvent(funclist[i], AMPI_EVENTID_BASE+i);
+    int event_id = traceRegisterUserEvent(funclist[i], -1);
+    CsvAccess(tcharm_funcmap)->insert(std::pair<std::string, int>(funclist[i], event_id));
   }
 
   // rename chare & function to something reasonable
