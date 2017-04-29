@@ -4017,6 +4017,8 @@ int AMPI_Sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
 
   if (-1==ptr->recv(recvtag, source, buf, count, datatype, comm, status))
     CkAbort("AMPI> Error in MPI_Sendrecv_replace!\n");
+
+  return MPI_SUCCESS;
 }
 
 void ampi::barrier()
