@@ -22,7 +22,31 @@ _ARMCI_GENERATE_ABS_REDUCTION()
 
 static int armciLibStart_idx = -1;
 
+#if CMK_TRACE_ENABLED
+#include "register.h" // for _chareTable, _entryTable
+CsvExtern(funcmap*, tcharm_funcmap);
+#endif
+
 void armciNodeInit(void) {
+#if CMK_TRACE_ENABLED
+  TCharm::nodeInit(); // make sure tcharm_funcmap is set up
+  int funclength = sizeof(funclist)/sizeof(char*);
+  for (int i=0; i<funclength; i++) {
+    int event_id = traceRegisterUserEvent(funclist[i], -1);
+    CsvAccess(tcharm_funcmap)->insert(std::pair<std::string, int>(funclist[i], event_id));
+  }
+
+  // rename chare & function to something reasonable
+  // TODO: find a better way to do this
+  for (int i=0; i<_chareTable.size(); i++){
+    if (strcmp(_chareTable[i]->name, "dummy_thread_chare") == 0)
+      _chareTable[i]->name = "ARMCI";
+  }
+  for (int i=0; i<_entryTable.size(); i++){
+    if (strcmp(_entryTable[i]->name, "dummy_thread_ep") == 0)
+      _entryTable[i]->name = "thread";
+  }
+#endif
   CmiAssert(armciLibStart_idx == -1);
   armciLibStart_idx = TCHARM_Register_thread_function((TCHARM_Thread_data_start_fn)armciLibStart);
 

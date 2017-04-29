@@ -330,4 +330,36 @@ class AddressMsg : public CMessage_AddressMsg {
 // getting called by user.
 CtvExtern(ArmciVirtualProcessor *, _armci_ptr);
 
-#endif
+
+#if CMK_TRACE_ENABLED
+// List of ARMCI functions to trace:
+static const char *funclist[] = {"ARMCI_Init", "ARMCI_Finalize",
+ "ARMCI_Error", "ARMCI_Cleanup", "ARMCI_Procs", "ARMCI_Myid",
+ "ARMCI_GetV", "ARMCI_NbGetV", "ARMCI_PutV", "ARMCI_NbPutV",
+ "ARMCI_AccV", "ARMCI_NbAccV", "ARMCI_Put", "ARMCI_NbPut",
+ "ARMCI_Get", "ARMCI_NbGet", "ARMCI_Acc", "ARMCI_NbAcc",
+ "ARMCI_PutS", "ARMCI_NbPutS", "ARMCI_GetS", "ARMCI_NbGetS",
+ "ARMCI_AccS", "ARMCI_NbAccS", "ARMCI_PutValueLong",
+ "ARMCI_PutValueInt", "ARMCI_PutValueFloat", "ARMCI_PutValueDouble",
+ "ARMCI_NbPutValueLong", "ARMCI_NbPutValueInt",
+ "ARMCI_NbPutValueFloat", "ARMCI_NbPutValueDouble",
+ "ARMCI_GetValueLong", "ARMCI_GetValueInt", "ARMCI_GetValueFloat",
+ "ARMCI_GetValueDouble", "ARMCI_NbGetValueLong",
+ "ARMCI_NbGetValueInt", "ARMCI_NbGetValueFloat",
+ "ARMCI_NbGetValueDouble", "ARMCI_Wait", "ARMCI_WaitProc",
+ "ARMCI_WaitAll", "ARMCI_Test", "ARMCI_Barrier", "ARMCI_Fence",
+ "ARMCI_AllFence", "ARMCI_Malloc", "ARMCI_Free",
+ "ARMCI_Malloc_local", "ARMCI_Free_local",
+ "ARMCI_SET_AGGREGATE_HANDLE", "ARMCI_UNSET_AGGREGATE_HANDLE",
+ "ARMCI_Rmw", "ARMCI_Create_mutexes", "ARMCI_Destroy_mutexes",
+ "ARMCI_Lock", "ARMCI_Unlock", "armci_notify", "armci_notify_wait",
+ "ARMCI_Migrate", "ARMCI_Async_Migrate", "ARMCI_Checkpoint",
+ "ARMCI_MemCheckpoint", "armci_msg_brdcst", "armci_msg_bcast",
+ "armci_msg_gop2", "armci_msg_igop", "armci_msg_lgop",
+ "armci_msg_fgop", "armci_msg_dgop", "armci_msg_barrier",
+ "armci_msg_reduce", "armci_domain_nprocs", "armci_domain_count",
+ "armci_domain_id", "armci_domain_glob_proc_id",
+ "armci_domain_my_id"};
+#endif // CMK_TRACE_ENABLED
+
+#endif // _ARMCI_IMPL_H
