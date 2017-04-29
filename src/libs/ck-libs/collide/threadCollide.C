@@ -368,4 +368,33 @@ CDECL void COLLIDE_Destroy(collide_t c) {
 FORTRAN_AS_C(COLLIDE_DESTROY,COLLIDE_Destroy,collide_destroy,
 	(int *c),(*c))
 
+
+#if CMK_TRACE_ENABLED
+#include "register.h" // for _chareTable, _entryTable
+CsvExtern(funcmap*, tcharm_funcmap);
+#endif
+
+static void collideNodeInit(void)
+{
+#if CMK_TRACE_ENABLED
+  TCharm::nodeInit(); // make sure tcharm_funcmap is set up
+  int funclength = sizeof(funclist)/sizeof(char*);
+  for (int i=0; i<funclength; i++) {
+    int event_id = traceRegisterUserEvent(funclist[i], -1);
+    CsvAccess(tcharm_funcmap)->insert(std::pair<std::string, int>(funclist[i], event_id));
+  }
+
+  // rename chare & function to something reasonable
+  // TODO: find a better way to do this
+  for (int i=0; i<_chareTable.size(); i++){
+    if (strcmp(_chareTable[i]->name, "dummy_thread_chare") == 0)
+      _chareTable[i]->name = "Collide";
+  }
+  for (int i=0; i<_entryTable.size(); i++){
+    if (strcmp(_entryTable[i]->name, "dummy_thread_ep") == 0)
+      _entryTable[i]->name = "thread";
+  }
+#endif
+}
+
 #include "collide.def.h"
