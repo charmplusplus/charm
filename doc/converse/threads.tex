@@ -136,11 +136,11 @@ together into queues.  This function sets the contents of the next field.}
 
 \converse{} threads use a scheduler queue, like any other threads
 package.  We chose to use the same queue as the one used for \converse{}
-messages (see section \ref{schedqueue}).  Because of this, thread
+messages (see Section~\ref{schedqueue}).  Because of this, thread
 context-switching will not work unless there is a thread polling for
 messages.  A rule of thumb, with \converse{}, it is best to have a thread
 polling for messages at all times.  In \converse{}'s normal mode (see
-section \ref{initial}), this happens automatically.  However, in
+Section~\ref{initial}), this happens automatically.  However, in
 user-calls-scheduler mode, you must be aware of it.
 
 There is a second caution associated with this design.  There is a
@@ -151,8 +151,8 @@ blocking operations in these places:
 
 \begin{itemize}
 
-\item{In the code of a \converse{} handler (see sections \ref{handler1}
-and \ref{handler2}).}
+\item{In the code of a \converse{} handler (see Sections~\ref{handler1}
+and~\ref{handler2}).}
 
 \item{In the code of the \converse{} start-function (see section
 \ref{initial}).}
@@ -168,8 +168,8 @@ that the handler originally did.
 \section{Thread Scheduling Hooks}
 
 Normally, when you CthAwaken a thread, it goes into the primary
-ready-queue: namely, the main \converse{} queue described in section
-\ref{schedqueue}.  However, it is possible to hook a thread to make
+ready-queue: namely, the main \converse{} queue described in Section~\ref{schedqueue}.
+However, it is possible to hook a thread to make
 it go into a different ready-queue.  That queue doesn't have to be
 priority-queue: it could be FIFO, or LIFO, or in fact it could handle
 its threads in any complicated order you desire.  This is a powerful
