@@ -1345,11 +1345,11 @@ stack size (in bytes) at build time:
 > build AMPI netlrts-linux-x86_64 --with-production -DTCHARM_STACKSIZE_DEFAULT=16777216
 \end{alltt}
 
-The same can be done for AMPI's RDMA messaging threshold using AMPI_RDMA_THRESHOLD_DEFAULT and,
+The same can be done for AMPI's RDMA messaging threshold using \texttt{AMPI\_RDMA\_THRESHOLD\_DEFAULT} and,
 for messages sent within the same address space (ranks on the same worker thread or ranks
-on different worker threads in the same process in SMP builds), using AMPI_SMP_RDMA_THRESHOLD_DEFAULT.
+on different worker threads in the same process in SMP builds), using \texttt{AMPI\_SMP\_RDMA\_THRESHOLD\_DEFAULT}.
 Contiguous messages with sizes larger than the threshold are sent via RDMA on communication layers that
-support this capability. You can also set the environment variables AMPI_RDMA_THRESHOLD and AMPI_SMP_RDMA_THRESHOLD
+support this capability. You can also set the environment variables \texttt{AMPI\_RDMA\_THRESHOLD} and \texttt{AMPI\_SMP\_RDMA\_THRESHOLD}
 before running a job to override the default specified at build time.
 
 \section{Building and Running AMPI Programs}
