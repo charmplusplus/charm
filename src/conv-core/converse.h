@@ -40,6 +40,14 @@
 # define CMI_EXTERNC_VARIABLE extern
 #endif
 
+#if defined _MSC_VER
+# define CMI_FORCE_INLINE __forceinline
+#elif defined __GNUC__
+# define CMI_FORCE_INLINE inline __attribute__((always_inline))
+#else
+# define CMI_FORCE_INLINE inline
+#endif
+
 #include "conv-config.h"
 
 #define CMIALIGN(x,n)       (size_t)((~((size_t)n-1))&((x)+(n-1)))
