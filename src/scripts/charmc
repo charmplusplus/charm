@@ -726,7 +726,7 @@ do
 	-shared|-G)
 		BUILD_SHARE="1"
 		;;
-	-L*|-shared|-G)
+	-L*|-shared|-G) # note that this is not executed if $arg == -shared|-G, due to the case above; might be a bug
 		OPTS_LD="$OPTS_LD $arg"
 		;;
 	-charm-shared|-cs)
@@ -1208,6 +1208,22 @@ then
 	TRACEMODE=`AddList $TRACEMODE bluegene`
 fi
 
+if [ $USE_F77_LIBRARIES = "1" ]
+then
+	POST_LIBRARIES="$POST_LIBRARIES $CMK_F77LIBS"
+fi
+
+if [ $USE_F90_LIBRARIES = "1" ]
+then
+
+	if [ ! -r $CHARMLIB/libconv-utilf.a ]
+	then
+		Abort "Error: Fortran support library $CHARMLIB/libconv-utilf.a missing. Is your Fortran compiler working?"
+	fi
+
+	POST_LIBRARIES="$POST_LIBRARIES -lconv-utilf $CMK_F90LIBS"
+fi
+
 ########################################################################
 #
 # We've parsed and verified the command-line parameters.
@@ -1414,6 +1430,10 @@ do
 		Abort "I'm not yet smart enough to compile $FILE"
 		;;
 	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co)
+		# make sure to link against shared charm library if creating a shared object:
+		case $FILE in
+			*.so|*.so.*|*.dylib) CHARM_SHARED=1 ;;
+		esac
 		[ ! -s $FILE ] && Abort "$FILE: file not recognized: File truncated"
 		OBJECTFILES="$OBJECTFILES $FILE"
 		;;
@@ -1460,7 +1480,6 @@ MakeSO() {
 	dir=`cd $dir; pwd`
 	OBJECT=$dir/$fname
 	fi
-	Warning "Warning: creating $OBJECT "
 	if test "$MAKE_LDXX" = "1"
 	then
  	  soCmd="$CMK_LDXX -o $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES $PRE_LIBRARIES $POST_LIBRARIES $CMK_LD_SHARED_LIBS"
@@ -1518,7 +1537,7 @@ case "$OBJECT" in
 	# if no build share is set, exit normally.
 	if [ "$BUILD_SHARE" = 0 ]
 	then
-		echo "Warning: building shared library is skipped, possibly due to not supported, check configuration files."
+		Warning "Warning: building shared library is not supported, recompile charm++ with '--build-shared'."
 		End 0
 	elif [ "$CHARM_SHARED" = "0" ]
 	then
@@ -1640,22 +1659,6 @@ then
 	exit 1
 fi
 
-if [ $USE_F77_LIBRARIES = "1" ]
-then
-	POST_LIBRARIES="$POST_LIBRARIES $CMK_F77LIBS"
-fi
-
-if [ $USE_F90_LIBRARIES = "1" ]
-then
-	if [ ! -r $CHARMLIB/libconv-utilf.a ]
-	then
-		echo "Fortran support library $CHARMLIB/libconv-utilf.a missing"
-		echo "Is your Fortran compiler working?"
-		exit 1
-	fi
-	
-	POST_LIBRARIES="$POST_LIBRARIES -lconv-utilf $CMK_F90LIBS"
-fi
 
 # dummy main module
 if [ "$MPI_INTEROPERATE" != "" -a "$NO_MAIN_MODULE" = "" ]
@@ -2106,5 +2109,3 @@ fi
 [ -z "$SAVE" ] && DoNoErrCheck $RM $modInitSrc $modInitObj > /dev/null 2>&1
 
 Copyobj
-
-
