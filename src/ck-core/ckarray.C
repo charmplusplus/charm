@@ -1411,15 +1411,15 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep, int opts) const
 	  ckDelegatedTo()->ArrayBroadcast(ckDelegatedPtr(),ep,msg,_aid);
 	else 
 	{ //Broadcast message via serializer node
+	  CProxy_CkArray ap(_aid);
 	  _TRACE_CREATION_DETAILED(UsrToEnv(msg), ep);
  	  int skipsched = opts & CK_MSG_EXPEDITED; 
 	  //int serializer=0;//1623802937%CkNumPes();
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-                CProxy_CkArray ap(_aid);
                 ap[CpvAccess(serializer)].sendBroadcast(msg);
                 CkGroupID _id = _aid;
 //              printf("[%d] At ckBroadcast in CProxy_ArrayBase id %d epidx %d \n",CkMyPe(),_id.idx,ep);
-#else
+#elif 0
 	  if (CkMyPe()==CpvAccess(serializer))
 	  {
 		DEBB((AA "Sending array broadcast\n" AB));
@@ -1429,12 +1429,13 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep, int opts) const
 			CProxy_CkArray(_aid).recvBroadcast(msg);
 	  } else {
 		DEBB((AA "Forwarding array broadcast to serializer node %d\n" AB,CpvAccess(serializer)));
-		CProxy_CkArray ap(_aid);
 		if (skipsched)
 			ap[CpvAccess(serializer)].sendExpeditedBroadcast(msg);
 		else
 			ap[CpvAccess(serializer)].sendBroadcast(msg);
 	  }
+#else
+	  ap.recvBroadcast(msg);
 #endif
 	}
 }
