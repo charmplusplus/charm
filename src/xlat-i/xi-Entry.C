@@ -2181,11 +2181,11 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool uses
           param->unmarshall(str);
           //} else if (param->isVoid()) {
           // no parameter
-        } else if (!param->isVoid()) {
+        } else if (!param->isVoid() || redn_wrapper) {
 	  str << "genClosure";
         }
         str << ");\n";
-	if (!param->isMessage() && !param->isVoid())
+	if (!param->isMessage() && (!param->isVoid() || redn_wrapper))
 	  str << "  genClosure->deref();\n";
       } else {
         str<<"("; param->unmarshall(str); str<<");\n";

@@ -78,10 +78,7 @@ namespace xi {
 
     XStr newSig;
 
-    if (isVoid) {
-      newSig << *entry << "()";
-      decls << "  void " <<  newSig << ";\n";
-    } else if (needsParamMarshalling) {
+    if (isVoid || needsParamMarshalling) {
       newSig << *entry << "(" << *decl_entry->genClosureTypeNameProxyTemp << "* genClosure)";
       decls << "  void " <<  newSig << ";\n";
       // generate local wrapper decls
@@ -110,17 +107,14 @@ namespace xi {
       defs << "  SDAG::Buffer* cmsgbuf = ";
 #endif
 
+      // If the genClosure doesn't have a refnum yet, then assign the first
+      // parameter as its refnum
+      if (refNumNeeded && !isVoid)
+        defs << "  if (!genClosure->hasRefnum) genClosure->setRefnum(genClosure->getP0());\n";
       // note that there will always be a closure even when the method has no
       // parameters for consistency
-      defs << "  __dep->pushBuffer(" << entryNum << ", " << (isVoid ? "0" : "genClosure") << ", " <<
-        (refNumNeeded ? "genClosure->getP0()" : "0") <<");\n";
+      defs << "  __dep->pushBuffer(" << entryNum << ", genClosure);\n";
     } else {
-      defs << "  CMK_REFNUM_TYPE refnum = ";
-      if (refNumNeeded)
-        defs << "CkGetRefNum(" << sv->name << "_msg);\n";
-      else
-        defs << "0;\n";
-
       // possible memory pressure problem: this message will be kept as long as
       // it is a state parameter! there are ways to remediate this, but it
       // involves either live variable analysis (which is not feasible) or
@@ -132,8 +126,8 @@ namespace xi {
 #if CMK_BIGSIM_CHARM
       defs << "  SDAG::Buffer* cmsgbuf = ";
 #endif
-
-      defs << "  __dep->pushBuffer(" << entryNum << ", new SDAG::MsgClosure(" << sv->name << "_msg" << "), refnum);\n";
+      // refnum automatically extracted from msg by MsgClosure::MsgClosure(...)
+      defs << "  __dep->pushBuffer(" << entryNum << ", new SDAG::MsgClosure(" << sv->name << "_msg" << "));\n";
     }
     // @todo write the code to fetch the message with the ref num
 

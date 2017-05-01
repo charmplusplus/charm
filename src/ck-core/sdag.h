@@ -8,14 +8,32 @@ namespace SDAG {
     virtual void pup(PUP::er& p) = 0;
     PUPable_abstract(Closure);
     int continuations;
+    bool hasRefnum;
+    CMK_REFNUM_TYPE refnum;
     // reference count and self-destruct when no continuations have a reference
     void ref() { continuations++; }
     void deref() { if (--continuations <= 0) delete this; }
     // done this way to keep Closure abstract for PUP reasons
     // these must be called by descendents of Closure
-    void packClosure(PUP::er& p) { p | continuations; }
-    void init() { continuations = 1; }
+    void packClosure(PUP::er& p) { p | continuations; p | hasRefnum; p | refnum; }
+    void init() { continuations = 1; hasRefnum = false; refnum = 0; }
     virtual ~Closure() { }
+    // Handles refnum setting for generated code by allowing calls to setRefnum
+    // regardless of the type of the first parameter to an entry method
+    // TODO: With C++11 support, remove overloading in favor of enable_if
+    template <typename T>
+    inline void setRefnum(T t) {}
+    inline void setRefnum(char c) { hasRefnum = true; refnum = c; }
+    inline void setRefnum(int i) { hasRefnum = true; refnum = i; }
+    inline void setRefnum(short s) { hasRefnum = true; refnum = s; }
+    inline void setRefnum(long l) { hasRefnum = true; refnum = l; }
+    inline void setRefnum(unsigned char c) { hasRefnum = true; refnum = c; }
+    inline void setRefnum(unsigned int i) { hasRefnum = true; refnum = i; }
+    inline void setRefnum(unsigned short s) { hasRefnum = true; refnum = s; }
+    inline void setRefnum(unsigned long l) { hasRefnum = true; refnum = l; }
+    inline void setRefnum(float f) { hasRefnum = true; refnum = f; }
+    inline void setRefnum(double d) { hasRefnum = true; refnum = d; }
+    void unsetRefnum() { hasRefnum = false; refnum = 0; }
   };
 }
 
@@ -74,6 +92,7 @@ namespace SDAG {
     MsgClosure(void* msg)
       : msg(msg) {
       init();
+      setRefnum(CkGetRefNum(msg));
       continuations = 0;
       CmiReference(UsrToEnv(msg));
     }
@@ -176,7 +195,6 @@ namespace SDAG {
 
   struct Buffer : public PUP::able {
     int entry;
-    CMK_REFNUM_TYPE refnum;
     Closure* cl;
 #if USE_CRITICAL_PATH_HEADER_ARRAY
     MergeablePathHistory *savedPath;
@@ -187,9 +205,8 @@ namespace SDAG {
 
     Buffer(CkMigrateMessage*) { }
 
-    Buffer(int entry, Closure* cl, CMK_REFNUM_TYPE refnum)
+    Buffer(int entry, Closure* cl)
       : entry(entry)
-      , refnum(refnum)
       , cl(cl)
 #if CMK_BIGSIM_CHARM
       , bgLog1(0)
@@ -199,7 +216,7 @@ namespace SDAG {
       ,savedPath(NULL)
 #endif
     {
-      if (cl) cl->ref();
+      cl->ref();
     }
 
 #if USE_CRITICAL_PATH_HEADER_ARRAY
@@ -215,13 +232,7 @@ namespace SDAG {
 #endif
     void pup(PUP::er& p) {
       p | entry;
-      p | refnum;
-      bool hasCl = cl;
-      p | hasCl;
-      if (hasCl)
-        p | cl;
-      else
-        cl = 0;
+      p | cl;
 #if CMK_BIGSIM_CHARM
       if (p.isUnpacking())
         bgLog1 = bgLog2 = 0;
@@ -231,7 +242,7 @@ namespace SDAG {
     }
 
     virtual ~Buffer() {
-      if (cl) cl->deref();
+      cl->deref();
     }
 
     PUPable_decl(Buffer);
@@ -299,8 +310,8 @@ namespace SDAG {
       lst.remove(c);
     }
 
-    Buffer* pushBuffer(int entry, Closure *cl, CMK_REFNUM_TYPE refnum) {
-      Buffer* buf = new Buffer(entry, cl, refnum);
+    Buffer* pushBuffer(int entry, Closure *cl) {
+      Buffer* buf = new Buffer(entry, cl);
       buffer[entry].push_back(buf);
       return buf;
     }
@@ -345,7 +356,7 @@ namespace SDAG {
       for (std::list<Buffer*>::iterator iter = buffer[entry].begin();
            iter != buffer[entry].end();
            ++iter) {
-        if ((!hasRef || (*iter)->refnum == refnum) &&
+        if ((!hasRef || ((*iter)->cl->hasRefnum && (*iter)->cl->refnum == refnum)) &&
             (!ignore || ignore->find(*iter) == ignore->end()))
           return *iter;
       }

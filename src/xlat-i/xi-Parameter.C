@@ -482,6 +482,9 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen) {
               callEach(&Parameter::unmarshallArrayDataSDAGCall,str);
         }
     }
+  if (isSDAGGen) {
+    str << "  genClosure->setRefnum(CkGetRefNum((CkReductionMsg*)impl_msg));\n";
+  }
 }
 
 /** unmarshalling: unpack fields from flat buffer **/
