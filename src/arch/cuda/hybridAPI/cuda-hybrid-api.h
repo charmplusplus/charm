@@ -58,12 +58,6 @@ typedef struct _bufferPool {
 
 #endif // GPU_MEMPOOL
 
-extern void cudaErrorDie(int err, const char* code, const char* file, int line);
-
-#define cudaChk(code)                                                  \
-  do { int e = (code); if (cudaSuccess != e) {                         \
-    cudaErrorDie(e, #code, __FILE__, __LINE__); } } while (0)
-
 #ifdef __cplusplus
 }
 #endif

@@ -54,10 +54,14 @@
 #include "cklists.h"
 #endif
 
-void cudaErrorDie(int err, const char* code, const char* file, int line) {
-  fprintf(stderr, "Fatal CUDA Error %s at %s:%d.\nReturn value %d from '%s'.",
-      cudaGetErrorString((cudaError_t) err), file, line, err, code);
-  CmiAbort(" Exiting!\n");
+#define cudaChk(code) cudaErrorDie(code, #code, __FILE__, __LINE__)
+inline void cudaErrorDie(cudaError_t retCode, const char* code,
+                                              const char* file, int line) {
+  if (retCode != cudaSuccess) {
+    fprintf(stderr, "Fatal CUDA Error %s at %s:%d.\nReturn value %d from '%s'.",
+        cudaGetErrorString(retCode), file, line, retCode, code);
+    CmiAbort(" Exiting!\n");
+  }
 }
 
 #if defined GPU_TRACE || defined GPU_INSTRUMENT_WRS
