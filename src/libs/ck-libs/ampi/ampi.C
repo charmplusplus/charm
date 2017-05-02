@@ -901,11 +901,11 @@ static void ampiNodeInit(void)
   // TODO: find a better way to do this
   for (int i=0; i<_chareTable.size(); i++){
     if (strcmp(_chareTable[i]->name, "dummy_thread_chare") == 0)
-      _chareTable[0]->name = "AMPI";
+      _chareTable[i]->name = "AMPI";
   }
   for (int i=0; i<_entryTable.size(); i++){
     if (strcmp(_entryTable[i]->name, "dummy_thread_ep") == 0)
-      _entryTable[0]->name = "rank";
+      _entryTable[i]->name = "rank";
   }
 #endif
 
