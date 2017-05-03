@@ -249,6 +249,27 @@ Prevents the runtime from tracing events (including all user events) on the loca
 
 \end{itemize}
 
+\subsection{Explicit Flushing}
+\label{sec::explicit flushing}
+
+By default, when linking with {\tt -tracemode projections}, logs files
+are flushed to disk whenever the number of entries on a processor
+reaches the logsize limit (see Section~\ref{sec::trace module
+projections}). However, this can occur at any time during the execution
+of the program, potentially causing performance perturbations. To
+address this, users can explicitly flush to disk using the {\tt
+traceFlushLog()} function.  Note that automatic flushing will
+still occur if the logsize limit is reached, but sufficiently frequent
+explicit flushes should prevent that from happening.
+
+\begin{itemize}
+\item
+{\tt void traceFlushLog()}
+
+Explicitly flushes the collected logs to disk.
+
+\end{itemize}
+
 \subsection{User Events}
 \label{sec::user events}
 

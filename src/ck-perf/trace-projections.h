@@ -601,12 +601,9 @@ void disableTraceLogOutput();
 /// Enable the outputting of the trace logs
 void enableTraceLogOutput();
 
-/// Force the log file to be flushed
-void flushTraceLog();
 #else
 static inline void disableTraceLogOutput() { }
 static inline void enableTraceLogOutput() { }
-static inline void flushTraceLog() { }
 #endif
 
 #endif
