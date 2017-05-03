@@ -1,10 +1,10 @@
 -include ../../common.mk
-CHARMC=../../../bin/charmc $(OPTS)
+CHARMC=../../../bin/ampif90 $(OPTS)
 
 all: pgm
 
 pgm: pgm.o
-	$(CHARMC) -o pgm pgm.o -language ampif
+	$(CHARMC) -o pgm pgm.o
 
 pgm.o: pgm.f90
 	$(CHARMC) -c pgm.f90

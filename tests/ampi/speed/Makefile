@@ -1,12 +1,12 @@
 -include ../../common.mk
-CHARMC=../../../bin/charmc $(OPTS)
+CHARMC=../../../bin/ampicxx $(OPTS)
 
 OBJS = hello.o msgspeed.o test_mpi.o
 
 all: hello
 
 hello: $(OBJS)
-	$(CHARMC) -language charm++ -module ampi -o hello $(OBJS)
+	$(CHARMC) -language charm++ -o hello $(OBJS)
 
 hello.decl.h: hello.ci
 	$(CHARMC)  hello.ci

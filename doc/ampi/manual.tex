@@ -1273,21 +1273,21 @@ See the Projections manual for information on how to visualize traces.
 
 \subsection{Compiling AMPI Programs}
 
-\charmpp{} provides a cross-platform compile-and-link script called \charmc{}
-to compile C, \CC{}, Fortran, \charmpp{} and \ampi{} programs.  This script
+\ampi{} provides a cross-platform compile-and-link script called \emph{ampicc}
+to compile C, \CC{}, and Fortran \ampi{} programs.  This script
 resides in the \texttt{bin} subdirectory in the \charmpp{} installation
 directory. The main purpose of this script is to deal with the differences of
 various compiler names and command-line options across various machines on
-which \charmpp{} runs. It is recommended that \charmc{} or the \ampi{} compiler
+which \ampi{} runs. It is recommended that the \ampi{} compiler
 scripts be used to compile and link \ampi{} programs. One major advantage of
 using these is that one does not have to specify which libraries are to be
 linked for ensuring that \CC{} and Fortran90 codes are linked together
 correctly. Appropriate libraries required for linking such modules together
-are known to \charmc{} for various machines.
+are known to \emph{ampicc} for various machines.
 
-In spite of the platform-neutral syntax of \charmc{}, one may have to specify
+In spite of the platform-neutral syntax of \emph{ampicc}, one may have to specify
 some platform-specific options for compiling and building \ampi{} codes.
-Fortunately, if \charmc{} does not recognize any particular options on its
+Fortunately, if \emph{ampicc} does not recognize any particular options on its
 command line, it promptly passes it to all the individual compilers and linkers
 it invokes to compile the program. See the appendix for more details on
 building and running AMPI programs.
@@ -1354,18 +1354,16 @@ before running a job to override the default specified at build time.
 
 \section{Building and Running AMPI Programs}
 \subsection{Building}
-\charmpp{} provides a compiler called charmc in your charm/bin/ directory.
+\ampi{} provides a compiler called \emph{ampicc} in your charm/bin/ directory.
 You can use this compiler to build your AMPI program the same way as other
-compilers like cc. To build an AMPI program, the command line option
-\emph{-language ampi} should be applied, which the \ampi{} compiler wrappers
-in charm/bin do automatically. All the command line flags that you would use
+compilers like cc. All the command line flags that you would use
 for other compilers can be used with the \ampi{} compilers the same way.
 For example:
 
 \begin{alltt}
 > ampicc -c pgm.c -O3
 > ampif90 -c pgm.f90 -O0 -g
-> charmc -language ampi -o pgm pgm.o -lm -O3 
+> ampicc -o pgm pgm.o -lm -O3 
 \end{alltt}
 
 To use Isomalloc for transparently migrating user heap data, link with
@@ -1381,7 +1379,7 @@ or a suite of strategies in with \emph{-module \textless LB\textgreater}. For ex
 The \charmpp{} distribution contains a script called \texttt{charmrun} that
 makes the job of running \ampi{} programs portable and easier across all
 parallel machines supported by \charmpp{}. \texttt{charmrun} is copied to a
-directory where an \ampi{} program is built using \charmc{}. It takes a command
+directory where an \ampi{} program is built using \emph{ampicc}. It takes a command
 line parameter specifying number of processors, and the name of the program
 followed by \ampi{} options (such as number of ranks to create, and the stack size
 of every user-level thread) and the program arguments. A typical invocation of an \ampi{}

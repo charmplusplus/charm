@@ -1,5 +1,6 @@
 OPTS = -O3
-CHARMC = ../../../bin/charmc -language ampi
+CHARMC = ../../../bin/ampicc
+CHARMF = ../../../bin/ampif90
 MPICC = mpicc
 
 all: mpibench mpibench.mpi
@@ -33,8 +34,8 @@ alltoall_VPtest: alltoall_VPtest.c
 	$(CHARMC) -o alltoall_VPtest alltoall_VPtest.o $(OPTS) $(LIBS)
 
 alltoall_VPtest_f: alltoall_VPtest.f
-	$(CHARMC) -c alltoall_VPtest.f  -language ampif -swapglobals  $(OPTS)
-	$(CHARMC) -o alltoall_VPtest_f alltoall_VPtest.o -language ampif -swapglobals $(OPTS) $(LIBS)
+	$(CHARMF) -c alltoall_VPtest.f -swapglobals  $(OPTS)
+	$(CHARMF) -o alltoall_VPtest_f alltoall_VPtest.o -swapglobals $(OPTS) $(LIBS)
 
 clean:
 	rm -rf *~ *.o alltoall mpibench charmrun conv-host allgather

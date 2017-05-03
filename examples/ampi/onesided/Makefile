@@ -1,17 +1,17 @@
 -include ../../common.mk
 OPTS=-O3
 CHARMBASE=../../../
-CHARMC=../../../bin/charmc -language ampi $(OPTS)
+CHARMC=../../../bin/ampicxx $(OPTS)
 MPICC=mpicc $(OPTS)
 TOKENS=6
 
 all: GetPutTest IgetTest
 
 GetPutTest: GetPutTest.C
-	$(CHARMC) GetPutTest.C -language ampi  -o GetPutTest
+	$(CHARMC) GetPutTest.C -o GetPutTest
 #	$(MPICC) GetPutTest.C -o GetPutTest-mpi
 IgetTest: IgetTest.C
-	$(CHARMC) IgetTest.C -language ampi  -o IgetTest
+	$(CHARMC) IgetTest.C -o IgetTest
 
 IgetTest-tokens:
 	cd $(CHARMBASE)/tmp; touch machine.c; touch ckfutures.C; make AMPI OPTS="-DIGET_FLOWCONTROL=1 -DIGET_TOKENNUM=$(TOKENS) $(OPTS)"; cd -;

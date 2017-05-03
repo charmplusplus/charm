@@ -23,8 +23,7 @@ For example:
 Compiling and Linking AMPI Programs
 -----------------------------------
 AMPI source files can be compiled and linked with the wrappers found
-in bin/, such as ampicc, ampicxx, ampif77, and ampif90, or with
-"charmc -language ampi". For example:
+in bin/, such as ampicc, ampicxx, ampif77, and ampif90:
 
     ampif90 pgm.f90 -o pgm
 

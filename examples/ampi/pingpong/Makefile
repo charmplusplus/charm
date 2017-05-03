@@ -1,6 +1,6 @@
 -include ../../common.mk
 OPTS=-O3 
-CHARMC=../../../bin/charmc -language ampi $(OPTS)
+CHARMC=../../../bin/ampicxx $(OPTS)
 MPICC=mpicc $(OPTS)
 
 #all : pingpong-2way.c

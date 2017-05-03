@@ -1,5 +1,5 @@
 -include ../../common.mk
-CHARMC=../../../bin/charmc
+CHARMC=../../../bin/ampicc
 
 all: hello
 
