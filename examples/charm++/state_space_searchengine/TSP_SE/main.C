@@ -167,7 +167,7 @@ void readinput(char* filename)
 
 extern void set_statesize(int);
 
-class Main
+class Main : public CBase_Main
 {
 public:
     Main(CkArgMsg* m )
