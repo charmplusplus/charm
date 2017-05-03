@@ -60,6 +60,7 @@ available. Zero or more tracemodes may be specified at link-time. When
 no tracemodes are specified, no trace data is generated.
 
 \subsection{Tracemode {\tt projections}}
+\label{sec::trace module projections}
 
 Link time option: {\tt -tracemode projections}
 
@@ -83,7 +84,8 @@ The following is a list of runtime options available under this tracemode:
 \begin{itemize}
 \item
 {\tt +logsize NUM}: keep only NUM log entries in the memory of each
-processor. The logs are emptied and flushed to disk when filled.
+processor. The logs are emptied and flushed to disk when
+filled. (defaults to 1,000,000)
 \item
 {\tt +binary-trace}:  generate projections log in binary form.
 \item
@@ -100,6 +102,7 @@ while recorded and issue a warning immediately.
 \end{itemize}
 
 \subsection{Tracemode {\tt summary}}
+\label{sec::trace module summary}
 
 Compile option: {\tt -tracemode summary}
 
@@ -180,7 +183,7 @@ perturbation of the application.
 
 As applications are scaled to thousands or hundreds of thousands of
 processors, the amount of data generated becomes extremely large and
-potentially unmanageable by the visualization tool. At the time of this{\tt +traceWarn}
+potentially unmanageable by the visualization tool. At the time of
 documentation, \projections{} is capable of handling data from 8000+
 processors but with somewhat severe tool responsiveness issues. We
 have developed an approach to mitigate this data size problem with
@@ -218,7 +221,7 @@ contact the developers if you have input or suggestions.
 \subsection{Selective Tracing}
 \label{sec::selective tracing}
 
-\charmpp{} allows user to start/stop tracing the execution at certain
+\charmpp{} allows users to start/stop tracing the execution at certain
 points in time on the local processor. Users are advised to make these
 calls on all processors and at well-defined points in the application.
 
