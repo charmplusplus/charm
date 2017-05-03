@@ -141,6 +141,8 @@ printUsage() {
     echo
     echo "  Charmc compiles C, C++, f77, f90, AMPI, Converse, Converse++, Charm, "
     echo "and Charm++ programs.  The flags generally match those of cc or f77."
+    echo "  Other options that are not listed here will be passed directly to the"
+    echo "underlying compiler and/or linker."
     echo "Parallel Programming Lab, UIUC, 2017."
     echo $*
     exit 1

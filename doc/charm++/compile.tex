@@ -19,7 +19,7 @@ syntax shown below.  The options are described next.
 \end{alltt}
 % * CPM preprocessing                charmc -gen-cpm file.c
 
-Charmc automatically figures out where the charm lib and include
+Charmc automatically determines where the charm lib and include
 directories are --- at no point do you have to configure this
 information.  However, the code that finds the lib and include
 directories can be confused if you remove charmc from its normal
@@ -37,7 +37,7 @@ Output file name.  Note: charmc only ever produces one output file at
 a time.  Because of this, you cannot compile multiple source files at
 once, unless you then link or archive them into a single output-file.
 If exactly one source-file is specified, then an output file will be
-selected by default using the obvious rule (eg, if the input file if
+selected by default using the obvious rule (e.g., if the input file if
 pgm.c, the output file is pgm.o).  If multiple input files are
 specified, you must manually specify the name of the output file,
 which must be a library or executable.
@@ -78,8 +78,8 @@ Causes files to be compiled with maximum optimization.
 
 \item[{\tt -no-optimize}:]
 
-If this follows -O on the command line, it turns optimization back off.
-This is just a convenience for simple-minded makefiles.
+If this follows {\tt -optimize} on the command line, it turns optimization back off.
+This can be used to override options specified in makefiles.
 
 \item[{\tt -production}:]
 
@@ -136,7 +136,7 @@ library.  There are currently three to choose from: {\tt rand}, {\tt
 test}, and {\tt neighbor} are supported.  Default is {\tt -balance rand}.
 
 When linking with {\tt neighbor} seed load balancer, one can also specify
-a virtual tolpogy for constructing neighbors during run-time using 
+a virtual topology for constructing neighbors during run-time using
 {\tt +LBTopo topo}, where {\em topo} can be one of (a) ring, (b) mesh2d,
 (c) mesh3d and (d) graph. The default is mesh2d.
 
@@ -210,5 +210,6 @@ Options passed to the linker for {\tt -language converse}.
 
 Options passes to the linker when linking {\tt .o} files.
 
-
 \end{description}
+
+Other options that are not listed here will be passed directly to the underlying compiler and/or linker.
