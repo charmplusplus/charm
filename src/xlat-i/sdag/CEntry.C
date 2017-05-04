@@ -101,16 +101,16 @@ namespace xi {
 #endif
 
     if (needsParamMarshalling || isVoid) {
-      // add the incoming message to a buffer
-
-#if CMK_BIGSIM_CHARM
-      defs << "  SDAG::Buffer* cmsgbuf = ";
-#endif
-
       // If the genClosure doesn't have a refnum yet, then assign the first
       // parameter as its refnum
       if (refNumNeeded && !isVoid)
         defs << "  if (!genClosure->hasRefnum) genClosure->setRefnum(genClosure->getP0());\n";
+
+      // add the incoming message to a buffer
+#if CMK_BIGSIM_CHARM
+      defs << "  SDAG::Buffer* cmsgbuf = ";
+#endif
+
       // note that there will always be a closure even when the method has no
       // parameters for consistency
       defs << "  __dep->pushBuffer(" << entryNum << ", genClosure);\n";
