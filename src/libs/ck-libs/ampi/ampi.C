@@ -2793,11 +2793,11 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
     CkPrintf("AMPI vp %d send: tag=%d, src=%d, comm=%d (to %d)\n",thisIndex,t,sRank,destcomm,destIdx);
   )
 
+  ampi *destPtr = arrProxy[destIdx].ckLocal();
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int size = ddt->getSize(count);
   if (ddt->isContig()) {
 #if !CMK_BIGSIM_CHARM
-    ampi *destPtr = arrProxy[destIdx].ckLocal();
     if (destPtr != NULL) {
       return sendLocalMsg(t, sRank, buf, size, rank, destcomm, destPtr, ssendReq, sendType);
     }
@@ -2810,8 +2810,16 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
     }
 #endif
   }
-  arrProxy[destIdx].generic(makeAmpiMsg(rank, t, sRank, buf, count, type, destcomm, ssendReq));
-  return MPI_REQUEST_NULL;
+#if !CMK_BIGSIM_CHARM
+  if (destPtr != NULL) {
+    destPtr->generic(makeAmpiMsg(rank, t, sRank, buf, count, type, destcomm, ssendReq));
+    return MPI_REQUEST_NULL;
+  } else
+#endif
+  {
+    arrProxy[destIdx].generic(makeAmpiMsg(rank, t, sRank, buf, count, type, destcomm, ssendReq));
+    return MPI_REQUEST_NULL;
+  }
 }
 
 void ampi::processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count)
