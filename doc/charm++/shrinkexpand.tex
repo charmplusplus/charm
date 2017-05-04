@@ -16,7 +16,7 @@ with the new processor count quickly and without leaving residual processes behi
 \end{itemize}
 
 An example program with a CCS client to send shrink/expand commands
-can be found in \texttt{examples/charm++/shrink_expand}
+can be found in \texttt{examples/charm++/shrink\_expand}
 in the charm distribution.
 
 To enable shrink expand, \charmpp{} needs to be built with the \texttt{--enable-shrinkexpand}
@@ -36,13 +36,13 @@ The CCS client to send shrink/expand commands needs to specify the hostname,
 port number, the old(current) number of processor and the new(future) number of
 processors:
 \begin{alltt}
-	./client <hostname> <port> <oldprocs> <newprocs>\\
+	./client <hostname> <port> <oldprocs> <newprocs>
 	(./client valor 1234 4 8 //This will increase from 4 to 8 processors.)
 \end{alltt}
 
 To make a \charm{} application malleable, first, pup routines for
 all of the constructs in the application need to be written. This includes
-writing a pup routine for the \texttt{mainchare} and marking it migratable:\\
+writing a pup routine for the \texttt{mainchare} and marking it migratable:
 \begin{alltt}
 	mainchare [migratable]  Main { ... }
 \end{alltt}
@@ -53,7 +53,7 @@ for more info on load balancing).
 Shrink/expand will happen at the next load balancing step after the receipt
 of the shrink/expand command.
 
-\texbf{NOTE:} If you want to shrink your application, for example, from two physical nodes to one
+\textbf{NOTE:} If you want to shrink your application, for example, from two physical nodes to one
 node where each node has eight cores, then you should have eight entries in the nodelist file for
 each node, one per processor. Otherwise, the application will shrink in a way that will use four
 cores from each node, whereas what you likely want is to use eight cores on only one of the
@@ -85,7 +85,7 @@ the nodelist should be like this:
 
 \textbf{Warning: this is an experimental feature and not supported in all charm
 builds and applications.}
-Currently, it is tested on \texttt{netlrts-\{linux\/darwin\}-x86_64} builds.
+Currently, it is tested on \texttt{netlrts-\{linux/darwin\}-x86\_64} builds.
 Support for other \charmpp{} builds and AMPI applications are under development.
 It is only tested with \texttt{RefineLB} and \texttt{GreedyLB} load balancing
 strategies; use other strategies with caution.
