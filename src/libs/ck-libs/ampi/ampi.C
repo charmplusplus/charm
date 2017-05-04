@@ -2661,15 +2661,9 @@ AmpiMsg *ampi::makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int coun
 {
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
-  int sIdx=thisIndex;
-  int seqIdx = destRank;
-  int seq = -1;
-  if (destRank>=0 && destcomm<=MPI_COMM_WORLD && t<=MPI_ATA_SEQ_TAG) { //Not cross-module: set seqno
-    if (destcomm == MPI_COMM_SELF) {
-      seqIdx = COMM_SELF_SEQ_IDX;
-      sRank  = 0;
-    }
-    seq = oorder.nextOutgoing(seqIdx);
+  int seq = getSeqNo(destRank, destcomm, t);
+  if (destcomm == MPI_COMM_SELF) {
+    sRank = 0;
   }
   AmpiMsg *msg = new (len, 0) AmpiMsg(seq, t, sRank, len, destcomm);
   if (ssendReq) UsrToEnv(msg)->setRef(ssendReq);
@@ -2729,17 +2723,24 @@ void ampi::sendraw(int t, int sRank, void* buf, int len, CkArrayID aid, int idx)
   pa[idx].generic(msg);
 }
 
+int ampi::getSeqNo(int destRank, MPI_Comm destcomm, int tag) {
+  int seqIdx = destRank;
+  int seq    = -1;
+  if (destRank>=0 && destcomm<=MPI_COMM_WORLD && tag<=MPI_ATA_SEQ_TAG) { //Not cross-module: set seqno
+    if (destcomm == MPI_COMM_SELF) {
+      seqIdx = COMM_SELF_SEQ_IDX;
+    }
+    seq = oorder.nextOutgoing(seqIdx);
+  }
+  return seq;
+}
+
 MPI_Request ampi::sendRdmaMsg(int t, int sRank, const void* buf, int size, int destIdx,
                               int destRank, MPI_Comm destcomm, CProxy_ampi arrProxy, int ssendReq)
 {
-  int seqIdx = destRank;
-  int seq    = -1;
-  if (destRank>=0 && destcomm<=MPI_COMM_WORLD && t<=MPI_ATA_SEQ_TAG) { //Not cross-module: set seqno
-    if (destcomm == MPI_COMM_SELF) {
-      seqIdx = COMM_SELF_SEQ_IDX;
-      sRank  = 0;
-    }
-    seq = oorder.nextOutgoing(seqIdx);
+  int seq = getSeqNo(destRank, destcomm, t);
+  if (destcomm == MPI_COMM_SELF) {
+    sRank = 0;
   }
 
   if (ssendReq) { // Using a SsendReq to track matching receive, so no need for SendReq here
@@ -2760,14 +2761,9 @@ MPI_Request ampi::sendRdmaMsg(int t, int sRank, const void* buf, int size, int d
 MPI_Request ampi::sendLocalMsg(int t, int sRank, const void* buf, int size, int destRank,
                                MPI_Comm destcomm, ampi* destPtr, int ssendReq, AmpiSendType sendType)
 {
-  int seqIdx = destRank;
-  int seq    = -1;
-  if (destRank>=0 && destcomm<=MPI_COMM_WORLD && t<=MPI_ATA_SEQ_TAG) { //Not cross-module: set seqno
-    if (destcomm == MPI_COMM_SELF) {
-      seqIdx = COMM_SELF_SEQ_IDX;
-      sRank  = 0;
-    }
-    seq = oorder.nextOutgoing(seqIdx);
+  int seq = getSeqNo(destRank, destcomm, t);
+  if (destcomm == MPI_COMM_SELF) {
+    sRank = 0;
   }
 
   destPtr->genericRdma((char*)buf, size, seq, t, sRank, destcomm, ssendReq);

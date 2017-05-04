@@ -1675,6 +1675,7 @@ class ampi : public CBase_ampi {
   inline ampi* blockOnRedn(AmpiRequest *req);
   MPI_Request postReq(AmpiRequest* newreq);
 
+  inline int getSeqNo(int destRank, MPI_Comm destcomm, int tag);
   AmpiMsg *makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
                        MPI_Datatype type,MPI_Comm destcomm, int ssendReq=0);
 
