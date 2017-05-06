@@ -389,8 +389,8 @@ void Parameter::copyPtr(XStr &str)
   }
 }
 
-void ParamList::beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen) {
-  if (isSDAGGen) {
+void ParamList::beginRednWrapperUnmarshall(XStr &str, bool needsClosure) {
+  if (needsClosure) {
     str << *entry->genClosureTypeNameProxyTemp << "*"
         << " genClosure = new " << *entry->genClosureTypeNameProxyTemp << "()" << ";\n";
   }
@@ -402,7 +402,7 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen) {
         if (next != NULL && next->next == NULL) {
 	  // 2 argument case - special cases for an array and its length, in either order
 	  if (isArray() && !next->isArray()) {
-              if (!isSDAGGen) {
+              if (!needsClosure) {
                 Type* dtLen = next->param->type->deref();
                 str << "  " << dtLen << " " << next->param->name << "; "
                     << next->param->name << " = "
@@ -419,7 +419,7 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen) {
                 str << "  genClosure->" << param->name << " = (" << dt << "*)impl_buf;\n";
               }
 	  } else if (!isArray() && next->isArray()) {
-              if (!isSDAGGen) {
+              if (!needsClosure) {
                 Type* dt = param->type->deref();
                 str << "  " << dt << " " << param->name << "; "
                     << param->name << " = "
@@ -436,7 +436,7 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen) {
                 str << "  genClosure->" << next->param->name << " = (" << dt << "*)impl_buf;\n";
               }
           } else {
-               if (!isSDAGGen){
+               if (!needsClosure){
                  if(hasRdma()){
                    str<<"#if CMK_ONESIDED_IMPL\n";
                    str<<"  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
@@ -453,7 +453,7 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen) {
         } else if (next == NULL && isArray()) {
 	  // 1 argument case - special case for a standalone array
 	  Type *dt = param->type->deref();
-	  if (!isSDAGGen) {
+	  if (!needsClosure) {
 	    str << "  " << dt << "* " << param->name << "; "
 		<< param->name << " = (" << dt << "*)impl_buf;\n";
 	  } else {
@@ -461,7 +461,7 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen) {
 	  }
 	} else {
             str << "  /* non two-param case */\n";
-            if (!isSDAGGen){
+            if (!needsClosure){
               if(hasRdma()){
                 str<<"#if CMK_ONESIDED_IMPL\n";
                 str<<"  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
@@ -476,13 +476,13 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen) {
               callEach(&Parameter::beginUnmarshallSDAGCall,str);
             str<<"  impl_buf+=CK_ALIGN(implP.size(),16);\n";
             str<<"  /*Unmarshall arrays:*/\n";
-            if (!isSDAGGen)
+            if (!needsClosure)
               callEach(&Parameter::unmarshallRegArrayData,str);
             else
               callEach(&Parameter::unmarshallArrayDataSDAGCall,str);
         }
     }
-  if (isSDAGGen) {
+  if (needsClosure) {
     str << "  genClosure->setRefnum(CkGetRefNum((CkReductionMsg*)impl_msg));\n";
   }
 }

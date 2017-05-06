@@ -2081,6 +2081,7 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool uses
   bool isArgcArgv=false;
   bool isMigMain=false;
   bool isSDAGGen = sdagCon || isWhenEntry;
+  bool needsClosure = isSDAGGen && (param->isMarshalled() || (param->isVoid() && isWhenEntry && redn_wrapper));
 
   if (isConstructor() && container->isMainChare() &&
       (!param->isVoid()) && (!param->isCkArgMsgPtr())){
@@ -2088,7 +2089,7 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool uses
 	else isArgcArgv = true;
   } else {
     //Normal case: Unmarshall variables
-    if (redn_wrapper) param->beginRednWrapperUnmarshall(str, isSDAGGen);
+    if (redn_wrapper) param->beginRednWrapperUnmarshall(str, needsClosure);
     else {
       if (isSDAGGen)
         param->beginUnmarshallSDAGCall(str, usesImplBuf);
@@ -2179,14 +2180,13 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool uses
         str << "(";
         if (param->isMessage()) {
           param->unmarshall(str);
-          //} else if (param->isVoid()) {
-          // no parameter
-        } else if (!param->isVoid() || redn_wrapper) {
-	  str << "genClosure";
+        } else if (needsClosure) {
+          str << "genClosure";
         }
         str << ");\n";
-	if (!param->isMessage() && (!param->isVoid() || redn_wrapper))
-	  str << "  genClosure->deref();\n";
+        if (needsClosure) {
+          str << "  genClosure->deref();\n";
+        }
       } else {
         str<<"("; param->unmarshall(str); str<<");\n";
       }
