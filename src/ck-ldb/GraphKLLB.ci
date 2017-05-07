@@ -1,0 +1,9 @@
+module GraphKLLB {
+
+  extern module CentralLB;
+  initnode void lbinit(void);
+  group [migratable] GraphKLLB : CentralLB {
+    entry void GraphKLLB(const CkLBOptions &);  
+  };
+
+};
