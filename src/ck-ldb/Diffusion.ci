@@ -1,0 +1,86 @@
+module Diffusion {
+
+  extern module DistBaseLB;
+  initnode void lbinit(void);
+
+  group [migratable] Diffusion : DistBaseLB {
+    entry void Diffusion(const CkLBOptions &);
+    entry [reductiontarget] void PEStarted();
+    entry void AddNeighbor(int node);
+    entry void AtSync(void);
+    entry void ProcessAtSync(void);
+    entry void ReceiveLoadInfo(int itr, double load, int node);
+    entry void ReceiveStats(CkMarshalledCLBStatsMessage &data);
+    //entry void LoadTransfer(double load, int initPE, int objId);
+    entry void LoadReceived(int objId, int fromPE);
+    //entry [reductiontarget] void DoneNodeLB();
+    entry void MigratedHelper(LDObjHandle h, int waitBarrier);
+    entry void MigrationEnded();
+    entry void LoadMetaInfo(LDObjHandle h, double load);
+    entry void MigrationDone();  // Call when migration is complete
+
+    //entry void MigrationInfo(int to, int from);
+    entry void ResumeClients(CkReductionMsg *msg);
+    entry void ResumeClients(int balancing);
+    
+    entry void PseudoLoad(int itr, double load, int node); 
+    entry void CallResumeClients();
+    entry void PrintDebugMessage(int len, double result[len]);
+    
+    entry void iterate() {
+
+        //TODO: Currently fixed iterations
+        for(itr = 0; itr < ITERATIONS; itr++) {
+            // Send its load
+            serial "Send loadInfo" {
+                for(int i = 0; i < sendToNeighbors.size(); i++) {
+                    DEBUGR(("[%d] Sending to %d \n", CkMyPe(), nodes[sendToNeighbors[i]]));
+                    thisProxy[nodes[sendToNeighbors[i]]].ReceiveLoadInfo(itr, my_load, peNodes[nodeFirst]);
+                }         
+                 
+            }
+             
+            // Wait for all its neighbors load
+            for(temp_itr = 0; temp_itr < neighborCount; temp_itr++) {
+                when ReceiveLoadInfo[itr](int itr, double load, int node) serial {
+                    int pos = neighborPos[node];
+                    loadNeighbors[pos] = load; 
+                }
+            }
+
+            // Calculate average and do pseudo load balancing
+            serial "Pseudo LB" {
+                avgLoadNeighbor = average();
+                DEBUGR(("[%d] GRD Received all loads of node, avg is %f and my_load %f \n", CkMyPe(), avgLoadNeighbor, my_load));
+                PseudoLoadBalancing();
+            }
+
+            for(temp_itr = 0; temp_itr < toSend; temp_itr++) {
+                when PseudoLoad[itr](int itr, double load, int node) serial {
+                    if(load > 0) {
+                        DEBUGR(("[%d] GRD itr %d : Pseudo load received %f from node %d \n", CkMyPe(), itr, load, node));
+                    }
+                    my_load += load;
+                    int pos = neighborPosReceive[node];
+                    toReceiveLoad[pos] += load;
+                }
+            }
+            
+        }
+
+        // Calculate the aggregate load that has to be sent.
+        serial {
+            bool res = AggregateToSend();
+            actualSend = 0;
+            // Only if this node should send load, call load balancing
+            if(res || _lb_args.debug()) {
+                LoadBalancing();
+            }
+            DoneNodeLB();
+            my_load = my_loadB;
+        }
+    }
+  };
+
+};
+
