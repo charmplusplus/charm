@@ -742,6 +742,13 @@ void LogPool::add(UChar type,double time,UShort funcID,int lineNum,char *fileNam
 #endif	
 }
 
+void LogPool::addUserBracketEventNestedID(double time, UShort mIdx, int event, int nestedID){
+  new (&pool[numEntries++])
+  LogEntry(time, USER_EVENT_PAIR, mIdx, 0, event, CkMyPe(), 0, 0, 0, 0, 0, 0, nestedID);
+  if(poolSize == numEntries){
+    flushLogBuffer();
+  }
+}
 
   
 void LogPool::addMemoryUsage(unsigned char type,double time,double memUsage){
@@ -766,7 +773,7 @@ void LogPool::addUserSupplied(int data){
 
 	// set the user supplied value for the previously created event 
 	pool[numEntries-1].setUserSuppliedData(data);
-  }
+}
 
 
 void LogPool::addUserSuppliedNote(char *note){
@@ -775,7 +782,7 @@ void LogPool::addUserSuppliedNote(char *note){
 
 	// set the user supplied note for the previously created event 
 	pool[numEntries-1].setUserSuppliedNote(note);
-  }
+}
 
 void LogPool::addUserSuppliedBracketedNote(char *note, int eventID, double bt, double et){
   //CkPrintf("LogPool::addUserSuppliedBracketedNote eventID=%d\n", eventID);
@@ -883,7 +890,7 @@ void LogEntry::pup(PUP::er &p)
   switch (type) {
     case USER_EVENT:
     case USER_EVENT_PAIR:
-      p|mIdx; p|itime; p|event; p|pe;
+      p|mIdx; p|itime; p|event; p|pe; p|nestedID;
       break;
     case BEGIN_IDLE:
     case END_IDLE:
@@ -1293,12 +1300,12 @@ void TraceProjections::userEvent(int e)
   _logPool->add(USER_EVENT, e, 0, TraceTimer(),curevent++,CkMyPe());
 }
 
-void TraceProjections::userBracketEvent(int e, double bt, double et)
+void TraceProjections::userBracketEvent(int e, double bt, double et, int nestedID=0)
 {
   if (!computationStarted) return;
   // two events record Begin/End of event e.
-  _logPool->add(USER_EVENT_PAIR, e, 0, TraceTimer(bt), curevent, CkMyPe());
-  _logPool->add(USER_EVENT_PAIR, e, 0, TraceTimer(et), curevent++, CkMyPe());
+  _logPool->addUserBracketEventNestedID(TraceTimer(bt), e, curevent, nestedID);
+  _logPool->addUserBracketEventNestedID(TraceTimer(et), e, curevent++, nestedID);
 }
 
 void TraceProjections::userSuppliedData(int d)

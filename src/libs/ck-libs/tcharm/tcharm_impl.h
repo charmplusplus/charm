@@ -383,7 +383,7 @@ class TCharmAPIRoutine {
 #endif
 #if CMK_TRACE_ENABLED
 		if (tcharm_routineID > -1) // is it a routine we care about?
-			traceUserBracketEvent(tcharm_routineID, start, stop);
+			traceUserBracketEventNestedID(tcharm_routineID, start, stop, TCHARM_Element());
 #endif
 	}
 };

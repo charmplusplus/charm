@@ -619,6 +619,16 @@ void traceUserBracketEvent(int e, double beginT, double endT)
 #endif
 }
 
+// trace a UserBracketEvent that is coming from a "nested" thread, e.g. a virtual AMPI rank
+extern "C"
+void traceUserBracketEventNestedID(int e, double beginT, double endT, int nestedID)
+{
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->userBracketEvent(e, beginT, endT, nestedID);
+#endif
+}
+
 //common version of User Stat Functions
 extern "C"
 int traceRegisterUserStat(const char*x, int e)

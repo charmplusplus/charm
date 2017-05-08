@@ -80,11 +80,11 @@ protected:
        (void)eventName; (void)e;
        return 0;
      }
-     // a user event has just occured
+     // a user event has just occurred
      virtual void userEvent(int eventID) { (void)eventID; }
-     // a pair of begin/end user event has just occured
-     virtual void userBracketEvent(int eventID, double bt, double et) {
-       (void)eventID; (void)bt; (void)et;
+     // a pair of begin/end user event has just occurred
+     virtual void userBracketEvent(int eventID, double bt, double et, int nestedID=0) {
+       (void)eventID; (void)bt; (void)et; (void) nestedID;
      }
 
     //Register user stat trace module returns int identifier
@@ -218,7 +218,7 @@ protected:
       (void)tid; (void)e;
     }
 
-    virtual ~Trace() {} /* for whining compilers */
+    virtual ~Trace() {}
 };
 
 #define ALLDO(x) for (int i=0; i<length(); i++) if (traces[i] && traces[i]->traceOnPE()) traces[i]->x
@@ -254,7 +254,7 @@ public:
     inline int length() const { return n; }
 
     inline void userEvent(int e) { ALLDO(userEvent(e));}
-    inline void userBracketEvent(int e,double bt, double et) {ALLDO(userBracketEvent(e,bt,et));}
+    inline void userBracketEvent(int e,double bt, double et, int nestedID=0) {ALLDO(userBracketEvent(e,bt,et,nestedID));}
     
     inline void beginAppWork() { ALLDO(beginAppWork());}
     inline void endAppWork() { ALLDO(endAppWork());}

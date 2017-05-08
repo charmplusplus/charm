@@ -62,6 +62,7 @@ class LogEntry {
     unsigned char type; 
     char *fName;
     int flen;
+    int nestedID; // Nested thread ID, e.g. virtual AMPI rank number
 
   public:
     
@@ -71,9 +72,9 @@ class LogEntry {
 
     LogEntry(double tm, unsigned char t, unsigned short m=0, 
 	     unsigned short e=0, int ev=0, int p=0, int ml=0, 
-	     CmiObjId *d=NULL, double rt=0., double cputm=0., int numPe=0, double statVal=0.) {
+	     CmiObjId *d=NULL, double rt=0., double cputm=0., int numPe=0, double statVal=0., int _nestedID=0) {
       type = t; mIdx = m; eIdx = e; event = ev; pe = p; 
-      time = tm; msglen = ml;
+      time = tm; msglen = ml; nestedID=_nestedID;
       if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=id.id[3]=0; };
       recvTime = rt; cputime = cputm;
       // initialize for papi as well as non papi versions.
@@ -366,6 +367,8 @@ class LogPool {
 	/** add a record for a user supplied piece of data */
 	void addUserSuppliedNote(char *note);
 
+    void addUserBracketEventNestedID(double time, UShort mIdx, int event, int nestedID);
+
 
 	void add(unsigned char type,double time,unsigned short funcID,int lineNum,char *fileName);
   
@@ -487,7 +490,7 @@ public:
 
     TraceProjections(char **argv);
     void userEvent(int e);
-    void userBracketEvent(int e, double bt, double et);
+    void userBracketEvent(int e, double bt, double et, int nestedID /*=0*/);
     void userSuppliedBracketedNote(char*, int, double, double);
 
     void userSuppliedData(int e);

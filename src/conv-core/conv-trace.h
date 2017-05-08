@@ -22,6 +22,7 @@ void endAppWork();
 void beginTuneOverhead();
 void endTuneOverhead();
 void traceUserBracketEvent(int, double, double);
+void traceUserBracketEventNestedID(int, double, double, int nestedID);
 void traceUserSuppliedData(int);
 void traceUserSuppliedBracketedNote(const char *note, int eventID, double bt, double et);
 void traceUserSuppliedNote(const char*);
