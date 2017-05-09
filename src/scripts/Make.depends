@@ -351,7 +351,8 @@ EveryLB.o: EveryLB.C LBDatabase.h lbdb.h converse.h conv-config.h \
  GridCommLB.decl.h GridCommRefineLB.decl.h HbmLB.decl.h RefineKLB.decl.h \
  TempAwareCommLB.decl.h TreeMatchLB.decl.h GreedyAgentLB.decl.h \
  NeighborCommLB.decl.h PhasebyArrayLB.decl.h RecBipartLB.decl.h \
- CommAwareRefineLB.decl.h AdaptiveLB.decl.h EveryLB.def.h
+ CommAwareRefineLB.decl.h AdaptiveLB.decl.h MetisLB.decl.h \
+ GridMetisLB.decl.h EveryLB.def.h
 
 GraphBFTLB.o: GraphBFTLB.C GraphBFTLB.h CentralLB.h BaseLB.h LBDatabase.h \
  lbdb.h converse.h conv-config.h conv-autoconfig.h conv-common.h \
@@ -1568,8 +1569,11 @@ arrayRedistributor.o: arrayRedistributor.C charm++.h charm.h converse.h \
  ckcallback.h CkCheckpointStatus.decl.h ckevacuation.h trace.h \
  trace-bluegene.h pathHistory.h PathHistory.decl.h ckcallback-ccs.h \
  CkCallback.decl.h trace-controlPoints.h trace.h envelope.h register.h \
- trace-common.h LBDatabase.h controlPoints.h conv-config.h pathHistory.h \
- arrayRedistributor.h
+ trace-common.h LBDatabase.h controlPoints.h conv-config.h \
+ ControlPoints.decl.h charm++.h sdag.h charm-api.h arrayRedistributor.h \
+ pathHistory.h cp_effects.h ck.h qd.h register.h stats.h \
+ ../include/TopoManager.h ../include/topomanager_config.h \
+ ../include/converse.h ckarray.h
 
 bigsim_api.o: bigsim_api.C blue.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
@@ -2074,12 +2078,8 @@ ckmulticast.o: ckmulticast.C charm++.h charm.h converse.h conv-config.h \
  ckfutures.h CkFutures.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h \
  ckcallback.h CkCheckpointStatus.decl.h ckevacuation.h trace.h \
  trace-bluegene.h pathHistory.h PathHistory.decl.h ckcallback-ccs.h \
- CkCallback.decl.h register.h spanningTreeStrategy.h spanningTreeVertex.h \
- ../include/TopoManager.h ../include/topomanager_config.h \
- ../include/converse.h treeStrategy_topoUnaware.h \
- treeStrategy_nodeAware_minGens.h treeStrategy_nodeAware_minBytes.h \
- treeStrategy_3dTorus_minHops.h treeStrategy_3dTorus_minBytesHops.h \
- XArraySectionReducer.h CkMulticast.def.h
+ CkCallback.decl.h register.h spanningTree.h XArraySectionReducer.h \
+ CkMulticast.def.h
 
 ckobjQ.o: ckobjQ.C charm++.h charm.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
@@ -2251,11 +2251,13 @@ controlPoints.o: controlPoints.C charm++.h charm.h converse.h \
  ckfutures.h CkFutures.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h \
  ckcallback.h CkCheckpointStatus.decl.h ckevacuation.h trace.h \
  trace-bluegene.h pathHistory.h PathHistory.decl.h ckcallback-ccs.h \
- CkCallback.decl.h controlPoints.h conv-config.h trace-controlPoints.h \
- trace.h envelope.h register.h trace-common.h LBDatabase.h charm++.h \
- trace-projections.h ckhashtable.h pup.h pathHistory.h cp_effects.h ck.h \
- qd.h register.h stats.h ../include/TopoManager.h \
- ../include/topomanager_config.h ../include/converse.h ckarray.h
+ CkCallback.decl.h controlPoints.h conv-config.h ControlPoints.decl.h \
+ charm++.h envelope.h sdag.h charm-api.h LBDatabase.h \
+ arrayRedistributor.h pathHistory.h cp_effects.h ck.h qd.h register.h \
+ stats.h ../include/TopoManager.h ../include/topomanager_config.h \
+ ../include/converse.h ckarray.h trace-controlPoints.h trace.h register.h \
+ trace-common.h trace-projections.h ckhashtable.h pup.h pathHistory.h \
+ cp_effects.h ControlPoints.def.h
 
 conv-ccs.o: conv-ccs.c converse.h conv-config.h conv-autoconfig.h \
  conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h pup_c.h lrtslock.h \
@@ -2372,7 +2374,22 @@ debug-charm.o: debug-charm.C converse.h conv-config.h conv-autoconfig.h \
  queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
  conv-trace.h persistent.h conv-rdma.h debug-conv.h ckhashtable.h pup.h \
  conv-ccs.h sockRoutines.h ccs-server.h debug-charm.h debug-conv++.h \
- cklists.h charm.h middle.h middle-conv.h register.h
+ cklists.h charm.h middle.h middle-conv.h register.h ck.h charm++.h \
+ ckbitvector.h ckstream.h init.h simd.h ckmessage.h pup.h \
+ CkMarshall.decl.h envelope.h charm.h middle.h cklists.h objid.h charm.h \
+ converse.h pup.h sdag.h pup_stl.h conv-config.h envelope.h debug-charm.h \
+ ckarrayindex.h objid.h cksection.h ckcallback.h ckrdmawrapper.h ckrdma.h \
+ ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
+ CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
+ lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h \
+ LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h MetaBalancer.h \
+ MetaBalancer.decl.h CkLocation.decl.h cklocrec.h ckmigratable.h \
+ ckmulticast.h CkMulticast.decl.h CkArray.decl.h ckfutures.h \
+ CkFutures.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
+ CkCheckpointStatus.decl.h ckevacuation.h trace.h trace-bluegene.h \
+ pathHistory.h PathHistory.decl.h ckcallback-ccs.h CkCallback.decl.h qd.h \
+ stats.h ../include/TopoManager.h ../include/topomanager_config.h \
+ ../include/converse.h
 
 debug-conv++.o: debug-conv++.C converse.h conv-config.h conv-autoconfig.h \
  conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h pup_c.h lrtslock.h \
