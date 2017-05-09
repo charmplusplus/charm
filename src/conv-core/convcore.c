@@ -238,7 +238,7 @@ CpvDeclare(void *, CkGridObject);
 CpvDeclare(void *, CsdGridQueue);
 #endif
 
-#if CMK_CRAYXE || CMK_CRAYXC
+#if CMK_CRAYXE || CMK_CRAYXC || CMK_OFI
 void* LrtsAlloc(int, int);
 void  LrtsFree(void*);
 #endif
@@ -2923,7 +2923,7 @@ void *CmiAlloc(int size)
   res = (char*) arena_malloc(size+sizeof(CmiChunkHeader));
 #elif CMK_USE_IBVERBS | CMK_USE_IBUD
   res = (char *) infi_CmiAlloc(size+sizeof(CmiChunkHeader));
-#elif CMK_CONVERSE_UGNI
+#elif CMK_CONVERSE_UGNI || CMK_OFI
   res =(char *) LrtsAlloc(size, sizeof(CmiChunkHeader));
 #elif CONVERSE_POOL
   res =(char *) CmiPoolAlloc(size+sizeof(CmiChunkHeader));
@@ -3028,7 +3028,7 @@ void CmiFree(void *blk)
       }
 #endif
     infi_CmiFree(BLKSTART(parentBlk));
-#elif CMK_CONVERSE_UGNI
+#elif CMK_CONVERSE_UGNI || CMK_OFI
     LrtsFree(BLKSTART(parentBlk));
 #elif CONVERSE_POOL
     CmiPoolFree(BLKSTART(parentBlk));

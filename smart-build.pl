@@ -142,6 +142,7 @@ Choose an interconnect from below: [1-10]
 	 3) Cray XE, XK
 	 4) Cray XC
 	 5) Blue Gene/Q
+	 6) Intel Omni-Path (ofi)
 
 EOF
 	
@@ -161,6 +162,9 @@ EOF
 	        last;
 	  } elsif($line eq "5"){
 		$arch = "pamilrts-bluegeneq";
+		last;
+	  } elsif($line eq "6"){
+		$converse_network_type = "ofi";
 		last;
 	  } else {
 		print "Invalid option, please try again :P\n"

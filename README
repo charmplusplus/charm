@@ -101,6 +101,7 @@ mpi-darwin-x86_64          MacOS X          MPI            Clang C++ compiler
 pamilrts-bluegeneq         CNK              PAMI           XLC
 gni-crayxe                 Linux            GNI            GNU compiler
 verbs-linux-x86_64         Linux            IB Verbs       GNU compiler
+ofi-linux-x86_64           Linux            OFI            GNU compiler
 net-win64                  Windows          UDP            MS Visual C++
 net-cygwin                 Cygwin           UDP            GNU compiler
 
@@ -114,7 +115,7 @@ To choose <version>, your choice is determined by two options:
 option for networks of workstations, clusters, or single-machine
 development and testing.
 
-        "gni-", "pamilrts-", "verbs-" Charm++
+        "gni-", "pamilrts-", "verbs-", "ofi-" Charm++
 communicates using direct calls to the machine's communication primitives.
 Use these versions on machines that support them for best performance.
 

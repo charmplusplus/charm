@@ -1,0 +1,309 @@
+#!/bin/sh
+#
+# Conv-host for MPI:
+#  Translates +pN-style conv-host options into 
+# mpirun -npN options.
+
+args=""
+pes=1
+ppn=1
+machinefile=""
+QUIET=0
+
+while [ $# -gt 0 ]
+do
+	case $1 in
+	+ppn|++ppn)
+		args=$args" +ppn "$2
+		ppn=$2
+		shift
+		;;
+	+ppn[0-9]*)
+		args=$args" "$1
+		ppn=`echo $1 | awk '{print substr($1,5)}'`
+		;;
+	++ppn[0-9]*)
+		args=$args" "$1
+		ppn=`echo $1 | awk '{print substr($1,6)}'`
+		;;
+	+p)
+		pes=$2
+		shift
+		;;
+	+pemap)
+		args=$args" "$1" "$2
+		shift
+		;;
+	+p[0-9]*)
+		pes=`echo $1 | awk '{print substr($1,3)}'`
+		;;
+        -machinefile)
+		machinefile=$2
+		args=" "$1" "$2" "$args
+		shift
+		;;
+	++quiet)
+		QUIET=1
+		args=$args" "$1
+		;;
+	*) 
+		args=$args" "$1
+		;;
+	esac
+	shift
+done
+
+rem=`expr $pes % $ppn`
+quot=`expr $pes / $ppn`
+if [ $rem -ne 0 ];
+then
+  printf "p = $pes should be a multiple of ppn = $ppn\n"
+  exit 1
+else
+  pes=$quot
+fi 
+
+test $QUIET -eq 0 && printf "\nRunning on $pes processors: $args\n"
+
+
+if [ -n "$PBS_NODEFILE" ]
+then
+# we are in a job shell
+  aprun=`which aprun 2>/dev/null`
+  if test -n "$aprun"
+  then
+    test $QUIET -eq 0 && echo aprun -n $pes $args
+    $aprun -n $pes $args
+  else
+    mpirun_cmd=`which mpirun 2>/dev/null`
+    if test -n "$mpirun_cmd"
+    then
+      if echo $mpirun_cmd | grep 'mvapich2'  > /dev/null 2>/dev/null
+      then
+        # if daemon not started, start it
+        if ! mpdtrace > /dev/null 2>/dev/null
+        then
+          mvapich2-start-mpd
+        fi
+        mpirun -np $pes $args
+        #    mpdallexit
+      else   # normal case
+        test -z "$machinefile" && args=-machinefile" "$PBS_NODEFILE" "$args
+        test $QUIET -eq 0 && echo mpirun -np $pes $args
+        mpirun -np $pes $args
+      fi
+    else
+      echo "Charmrun> can not locate mpirun in order to run the program."
+      exit 1
+    fi
+  fi
+elif [ -n "$LSB_HOSTS" ]
+then
+# Tungsten
+  test $QUIET -eq 0 && echo cmpirun -lsf -poll -no_smp -gm_long 200000 $args
+  cmpirun -lsf -poll -no_smp -gm_long 200000 $args 
+elif [ -n "$PBS_QUEUE" -o -n "$LSF_QUEUE" ]
+then
+# Interactive mode: create, and submit a batch job
+        script="charmrun_script.$$.sh"
+        indir=`pwd`
+        output="$indir/charmrun_script.$$.stdout"
+        result="$indir/charmrun_script.$$.result"
+	rm -f $result
+# Some machine specific 
+	USE_LSF=0
+# 10 minutes	
+	walllimit=10
+	queue_stat=qstat
+	queue_qsub=qsub
+	queue_kill=qdel
+	hostname=`hostname`
+	case "$hostname" in
+	turing*.turing.uiuc.edu) 
+		ppn='#PBS -l nodes='$pes':ppn=1'
+		extra='-machinefile $PBS_NODEFILE'
+		;;
+	tg-login*|honest*.ncsa.uiuc.edu)
+		# always ppn=2
+		nodes=`expr \( $pes + 1 \) / 2`
+ 		test $pes -eq 1 && ppns=1 || ppns=2
+		ppn='#PBS -l nodes='$nodes':ppn='$ppns
+		extra='-machinefile $PBS_NODEFILE'
+		;;
+	co-login*.ncsa.uiuc.edu)
+		mem='#PBS -l mem=500mb'
+		ncpus="#PBS -l ncpus=$pes"
+		;;
+	tun*)
+		USE_LSF=1
+		queue_stat=bjobs
+		queue_qsub=bsub
+		queue_kill=bkill
+		;;
+	abe*)
+		# always ppn=2
+		nodes=`expr \( $pes + 1 \) / 2`
+ 		test $pes -eq 1 && ppns=1 || ppns=2
+		ppn='#PBS -l nodes='$nodes':ppn='$ppns
+		extra='-machinefile $PBS_NODEFILE'
+		;;
+        kraken*)
+                ncores=`expr \( $pes + 11 \) / 12 \* 12`
+		ncpus="#PBS -l size=$ncores"
+		ppn=''
+		;;
+	*)
+		ncpus="#PBS -l ncpus=$pes"
+		;;
+	esac
+	if test $USE_LSF -eq 0
+	then
+          mpirun=`which aprun 2>/dev/null`
+          npcmd="-n "
+          if test -z "$mpirun"
+          then
+	    mpirun=`which mpirun 2>/dev/null`
+            npcmd="-np "
+          fi
+          cat > $script << EOF
+#!/bin/sh
+# This is a charmrun-generated PBS batch job script.
+# The lines starting with #PBS are queuing system flags:
+#
+$ppn
+#
+$ncpus
+#
+#PBS -l walltime=$walllimit:00
+#
+$mem
+#
+#PBS -q $PBS_QUEUE
+#
+#PBS -N autobuild
+#
+#PBS -j oe
+#
+#PBS -o $output
+
+cd $indir
+
+cat \$PBS_NODEFILE
+echo $mpirun $npcmd $pes $extra $args
+$mpirun $npcmd $pes $extra $args
+
+# Save mpirun exit status
+status=\$?
+echo \$status > $result
+EOF
+	else
+#  use LSF
+	  mpirun="cmpirun -lsf -poll -no_smp -gm_long 200000"
+          cat > $script << EOF
+#!/bin/sh
+# This is a charmrun-generated PBS batch job script.
+# The lines starting with #PBS are queuing system flags:
+#
+#BSUB -J autobuild
+#BSUB -W 0:$walllimit
+#BSUB -n $pes
+#BSUB -o $output
+
+cd $indir
+echo \$LSB_MCPU_HOSTS
+$mpirun $args
+# Save mpirun exit status
+status=\$?
+echo \$status > $result
+EOF
+	fi
+
+End() {
+	echo "Charmrun> $queue_kill $jobid ..."
+	$queue_kill $jobid
+	rm -f $script
+	exit $1
+}
+
+        echo "Submitting batch job for> $mpirun -np $pes $args"
+        echo " using the command> $queue_qsub $script"
+        chmod 755 $script
+	while [ -z "$jobid" ]
+	do
+	  [ $USE_LSF = 0 ] && jobid=`$queue_qsub $script|tail -1`
+	  [ $USE_LSF = 1 ] && jobid=`$queue_qsub < $script|tail -1|sed -e 's/[^0-9]*//g'`
+	done
+	echo "Job enqueued under job ID $jobid"
+# kill job if interrupted
+	trap 'End 1' 2 3
+	retry=0
+# Wait for the job to complete, by checking its status
+        while [ true ]
+        do
+                $queue_stat $jobid > tmp.$$
+		exitstatus=$?
+                if test -f $output
+                then
+# The job is done-- print its output
+                        rm tmp.$$
+# When job hangs, result file does not exist
+			test -f $result && status=`cat $result` || status=1
+			test $status -eq 0 && status=`grep 'End of program' $output > /dev/null 2>&1`
+			cat $output
+			rm -f $result
+			test -f $status && rm -f $script $output
+			exit $status
+                fi
+# The job is still queued or running-- print status and wait
+                tail -1 tmp.$$
+                rm tmp.$$
+# Job ID may not exist now
+		if test $exitstatus -ne 0
+		then
+# retry a few times when error occurs
+			retry=`expr $retry + 1`
+			if test $retry -gt 6
+			then
+				echo "Charmrun> too many errors, abort!"
+				exit 1
+			else
+				sleep 15
+			fi
+		else
+# job still in queue
+			retry=0
+                	sleep 20
+		fi
+        done
+else
+  mpirun_cmd=`which mpirun 2>/dev/null`
+  if test -n "$mpirun_cmd"
+  then
+    [ -n "$MPI_MACHINEFILE" ] && args=" -machinefile $MPI_MACHINEFILE $args"
+    setarch_cmd=`which setarch 2>/dev/null`
+    if [ -n "$setarch_cmd" -a -x "$setarch_cmd" ]
+    then
+      # Disables randomization of the virtual address  space  (turns  on
+      #          ADDR_NO_RANDOMIZE).
+      cur_arch=`uname -m`
+      test $QUIET -eq 0 && echo "charmrun>  $setarch_cmd $cur_arch -R  mpirun -np $pes $args"
+      $setarch_cmd $cur_arch -R  mpirun -np $pes $args
+    else
+      test $QUIET -eq 0 && echo "charmrun> mpirun -np $pes $args"
+      mpirun -np $pes $args
+    fi
+  else
+    mpiexec_cmd=`which mpiexec 2>/dev/null`
+    if test -n "$mpiexec_cmd"
+    then
+      test $QUIET -eq 0 && echo "charmrun> $mpiexec_cmd -n $pes $args"
+      test $QUIET -eq 0 && echo
+      "$mpiexec_cmd" -n $pes $args
+    else
+      echo "Don't know how to run MPI program."
+      exit 1
+    fi
+  fi
+fi
+
+

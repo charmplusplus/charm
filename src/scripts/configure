@@ -3367,6 +3367,56 @@ _ACEOF
 
 fi
 
+#### test if we can build OFI ####
+if test "$CMK_BUILD_OFI" = 1
+then
+cat > $tc <<EOT
+#include <rdma/fabric.h>
+int main(int argc, char **argv)
+{
+  struct fi_info *providers;
+  int ret = fi_getinfo(FI_VERSION(1,0), NULL, NULL, 0ULL, NULL, &providers);
+  return 0;
+}
+EOT
+test_cc "whether build on OFI" "yes" "no" "-lfabric"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_BUILD_ON_OFI $strictpass
+_ACEOF
+
+BUILD_OFI=$strictpass
+
+if test $BUILD_OFI -eq 0
+then
+  echo "Error: Unable to compile OFI"
+  test_finish 1
+else
+  test_linkc "whether -lfabric" "ok" "no" "-lfabric"
+  if test $pass -eq 0
+  then
+    #test for psm incompatibility
+    PSM_COMPAT_DIR=/usr/lib64/psm2-compat
+    if test -d $PSM_COMPAT_DIR
+    then
+      add_flag CMK_LIBDIR='"$CMK_LIBDIR -Wl,-rpath=/usr/lib64/psm2-compat"' "psm2-compat lib"
+      CMK_LIBDIR="$CMK_LIBDIR -Wl,-rpath=/usr/lib64/psm2-compat"
+      test_linkc "whether -lfabric after adding psm2-compatible library" "ok" "no" "-lfabric"
+      if test $pass -eq 0
+      then
+        echo "Error: -lfabric not found or not working. Pass '--basedir=/path/to/dir/' if -lfabric is located in a different directory"
+        test_finish 1
+      fi
+    else
+      echo "Error: -lfabric not working, $PSM_COMPAT_DIR not found"
+      echo "Pass '--basedir=/path/to/dir/' if -lfabric is located in a different directory"
+      test_finish 1
+    fi
+  fi
+fi
+
+fi
+
 #### test if we can build MPI ####
 if test "$CMK_BUILD_MPI" = 1
 then

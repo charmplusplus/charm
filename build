@@ -33,7 +33,7 @@ syntax() {
   echo ''
   fi
   echo '<versions>: ' 
-  ( cd $src ; ls -1 | egrep -v '(^shmem$)|(^mpi$)|(^sim$)|(^net(lrts)?$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win64$)|(^(gemini_)?gni$)|(^pami(lrts)?$)|(^verbs$)|(^template$)|(^cuda$)' | pr -3 -t )
+  ( cd $src ; ls -1 | egrep -v '(^shmem$)|(^mpi$)|(^sim$)|(^net(lrts)?$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win64$)|(^(gemini_)?gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^template$)|(^cuda$)' | pr -3 -t )
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'icc iccstatic xlc xlc64 gcc clang pgcc cc mpicxx'
@@ -466,9 +466,9 @@ fi
 
 [ "x$VERSION" = "x" ] && syntax && exit 1
 
-#Check if building verbs on OmniPath 
+#Check if building verbs on Omni-Path 
 if [ "x_$ARCH" = "x_verbs" ] && type /usr/sbin/opafabricinfo >/dev/null 2>&1; then
-  echo "WARNING: Verbs on OmniPath architectures is not well supported, please use an MPI build instead.";
+  echo "WARNING: Verbs on Omni-Path architectures is not well supported, please use an OFI build instead.";
   exit 1;
 fi 
 
