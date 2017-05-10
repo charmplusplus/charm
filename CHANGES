@@ -196,7 +196,7 @@ Over 120 bugs fixed, spanning areas across the entire system
 
 Charm++ Features
 
-- New API for efficient formula-based distributed spare array creation
+- New API for efficient formula-based distributed sparse array creation
 
 - CkLoop is now built by default
 
@@ -214,7 +214,7 @@ AMPI Enhancements
 - Further MPI standard compliance in AMPI allows users to build and run
   Hypre-2.10.1 on AMPI with virtualization, migration, etc.
 
-- Improved AMPI Fortran2003 PUP interface 'apup', similiar to C++'s STL PUP
+- Improved AMPI Fortran2003 PUP interface 'apup', similar to C++'s STL PUP
 
 Platforms and Portability
 
