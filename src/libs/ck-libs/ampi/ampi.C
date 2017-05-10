@@ -2562,6 +2562,8 @@ void ampi::genericRdma(char* buf, int size, int seq, int tag, int srcRank, MPI_C
     } else { // This message was out-of-order: stash it (as an AmpiMsg)
       AmpiMsg *msg = rdma2AmpiMsg(buf, size, seq, tag, srcRank, destcomm, ssendReq);
       oorder.putOutOfOrder(seqIdx, msg);
+      int tags[2] = { tag, srcRank };
+      AmmPut(msgs, tags, msg);
     }
   } else { // Cross-world or system messages are unordered
     inorderRdma(buf, size, seq, tag, srcRank, destcomm, ssendReq);
