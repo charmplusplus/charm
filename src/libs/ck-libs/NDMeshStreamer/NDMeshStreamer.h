@@ -86,10 +86,10 @@ private:
   int numLocalContributors_;
   CompletionStatus myCompletionStatus_;
 
-  virtual void localDeliver(const dtype& dataItem) = 0;
-  virtual void localBroadcast(const dtype& dataItem) = 0;
+  virtual void localDeliver(const dtype& dataItem) { CkAbort("Called what should be a pure virtual base method"); }
+  virtual void localBroadcast(const dtype& dataItem) { CkAbort("Called what should be a pure virtual base method"); }
 
-  virtual void initLocalClients() = 0;
+  virtual void initLocalClients() { CkAbort("Called what should be a pure virtual base method"); }
 
   void sendLargestBuffer();
   void flushToIntermediateDestinations();
@@ -154,7 +154,7 @@ public:
 
   void syncInit();
 
-  virtual void receiveAtDestination(MeshStreamerMessage<dtype> *msg) = 0;
+  virtual void receiveAtDestination(MeshStreamerMessage<dtype> *msg) { CkAbort("Called what should be a pure virtual base method"); }
 
   // non entry
   void flushIfIdle();
