@@ -2155,11 +2155,14 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool uses
   else { //Normal case: call regular method
     if (isArgcArgv) str<<"  CkArgMsg *m=(CkArgMsg *)impl_msg;\n"; //Hack!
 
-    if (isMigrationConstructor()) {
+    if (isMigrationConstructor() && container->isArray()) {
+      // Make definition of CkMigrateMessage constructor optional for chare
+      // array elements, but not for chare/group/nodegroup types that are
+      // explicitly marked [migratable]
       str << "  call_migration_constructor<" << container->baseName() << "> c = impl_obj_void;\n"
           << "  c";
     } else if(isConstructor()) {//Constructor: call "new (obj) foo(parameters)"
-      str << "  new (impl_obj) "<<container->baseName();
+      str << "  new (impl_obj_void) "<<container->baseName();
     } else {//Regular entry method: call "obj->bar(parameters)"
       str << "  impl_obj->" << (tspec ? "template " : "") << name;
       if (tspec) {
