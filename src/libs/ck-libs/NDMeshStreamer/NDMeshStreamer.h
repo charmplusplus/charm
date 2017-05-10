@@ -122,6 +122,7 @@ protected:
 public:
 
   MeshStreamer() {}
+  MeshStreamer(CkMigrateMessage *) {}
   MeshStreamer(int maxNumDataItemsBuffered, int numDimensions,
                int *dimensionSizes, int bufferSize,
                bool yieldFlag = 0, double progressPeriodInMs = -1.0);
@@ -935,6 +936,8 @@ public:
 
   }
 
+  GroupMeshStreamer(CkMigrateMessage *) {}
+
   void pup(PUP::er &p) {
     p|clientGID_;
     if (p.isUnpacking()) {
@@ -1080,6 +1083,8 @@ public:
     clientArrayMgr_ = clientAID_.ckLocalBranch();
     clientLocMgr_ = clientArrayMgr_->getLocMgr();
   }
+
+  ArrayMeshStreamer(CkMigrateMessage *) {}
 
   void receiveAtDestination(
        MeshStreamerMessage<ArrayDataItem<dtype, itype> > *msg) {
@@ -1350,6 +1355,8 @@ public:
     userHandlesFreeing_ = userHandlesFreeing;
     commonInit();
   }
+
+  GroupChunkMeshStreamer(CkMigrateMessage *) {}
 
   inline void commonInit() {
     lastReceived_.resize(this->numMembers_);
