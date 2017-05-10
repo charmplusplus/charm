@@ -27,7 +27,6 @@ void _registerInit(void)
 {
   if(__registerDone)
     return;
-  __registerDone = 1;
 }
 
 extern "C"
@@ -46,6 +45,10 @@ extern "C"
 int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx,
 	int ck_ep_flags)
 {
+  if (__registerDone) {
+    CkPrintf("Charm++: late entry method registration happened after init\nEntry point: %s, addr: %p\n", name, call);
+    CkAbort("Did you forget to instantiate a templated entry method in a .ci file?\n");
+  }
   EntryInfo *e = new EntryInfo(name, call?call:ckInvalidCallFn, msgIdx, chareIdx);
   if (ck_ep_flags & CK_EP_NOKEEP) e->noKeep=true;
   if (ck_ep_flags & CK_EP_INTRINSIC) e->inCharm=true;
@@ -213,15 +216,17 @@ extern void CpdCharmInit(void);
 
 void _registerDone(void)
 {
+  __registerDone = 1;
 #if CMK_CHARMDEBUG
-  CpdListRegister(new CpdSimpleListAccessor("charm/entries",_entryTable.size(),pupEntry));
-  CpdListRegister(new CpdSimpleListAccessor("charm/messages",_msgTable.size(),pupMsg));
-  CpdListRegister(new CpdSimpleListAccessor("charm/chares",_chareTable.size(),pupChare));
-  CpdListRegister(new CpdSimpleListAccessor("charm/mains",_mainTable.size(),pupMain));
-  CpdListRegister(new CpdSimpleListAccessor("charm/readonly",_readonlyTable.size(),pupReadonly));
-  CpdListRegister(new CpdSimpleListAccessor("charm/readonlyMsg",_readonlyMsgs.size(),pupReadonlyMsg));
-
-  CpdCharmInit();
+  if (CkMyRank() == 0) {
+    CpdListRegister(new CpdSimpleListAccessor("charm/entries",_entryTable.size(),pupEntry));
+    CpdListRegister(new CpdSimpleListAccessor("charm/messages",_msgTable.size(),pupMsg));
+    CpdListRegister(new CpdSimpleListAccessor("charm/chares",_chareTable.size(),pupChare));
+    CpdListRegister(new CpdSimpleListAccessor("charm/mains",_mainTable.size(),pupMain));
+    CpdListRegister(new CpdSimpleListAccessor("charm/readonly",_readonlyTable.size(),pupReadonly));
+    CpdListRegister(new CpdSimpleListAccessor("charm/readonlyMsg",_readonlyMsgs.size(),pupReadonlyMsg));
+    CpdCharmInit();
+  }
 #endif
 }
 

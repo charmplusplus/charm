@@ -1263,9 +1263,8 @@ void _initCharm(int unused_argc, char **argv)
 		  no other way to control the _register process.
 		*/
 		_registerExternalModules(argv);
-		
-		_registerDone();
 	}
+
 	/* The following will happen on every virtual processor in BigEmulator, not just on once per real processor */
 	if (CkMyRank() == 0) {
 	  CpdBreakPointInit();
@@ -1278,8 +1277,9 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_CHARMDEBUG
 	CpdFinishInitialization();
 #endif
-
-	//CmiNodeAllBarrier();
+	if (CkMyRank() == 0)
+	  _registerDone();
+	CmiNodeAllBarrier();
 
 	CkpvAccess(_myStats) = new Stats();
 	CkpvAccess(_msgPool) = new MsgPool();
