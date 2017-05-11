@@ -19,6 +19,10 @@ void automaticallySetMessagePriority(envelope *env); // in control point framewo
 #include "LBDatabase.h"
 #endif // CMK_LBDB_ON
 
+#if CMK_WITH_ENERGY_OPT
+#include "energyOpt.h"
+#endif
+
 #ifndef CMK_CHARE_USE_PTR
 #include <map>
 CkpvDeclare(CkVec<void *>, chare_objs);
@@ -591,18 +595,27 @@ extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
   CpdBeforeEp(epIdx, obj, msg);
 #endif
 #if CMK_WITH_ENERGY_OPT
-	EnergyOptimizer *the_energyOptimizer = (EnergyOptimizer *)CkLocalBranch(_energyOptimizer);
-	the_energyOptimizer->powerCounterReset();
-
-	double startTime = CkWallTimer();
-	CkPrintf("[%d] Starting..\n", CkMyNode());
+	int chareIdx = CkpvAccess(currentChareIdx);
+	CkPrintf("[%d] HERE\n", CkMyNode());
+	double startTime, startEnergy=0;
+	EnergyOptimizer *energyOptimizer=NULL;
+	if(_energyOptimizer.idx != 0){
+		energyOptimizer = (EnergyOptimizer *)CkLocalBranch(_energyOptimizer);
+		CkPrintf("[%d] HERE2\n", CkMyNode());
+		energyOptimizer->adjustFrequency(epIdx, chareIdx);
+		startTime = CkWallTimer();
+		startEnergy = energyOptimizer->freqController->cpuPower();
+		CkPrintf("[%d] Starting.. epIdx: %u\n", CkMyNode(), epIdx);
+	}
 #endif
   _entryTable[epIdx]->call(msg, obj);
 
 #if CMK_WITH_ENERGY_OPT
-    int chareIdx = CkpvAccess(currentChareIdx);
-	the_energyOptimizer->addEntryStat(CkWallTimer()-startTime, epIdx, chareIdx);
-	//CkpvAccess(_freqController)->changeFreq(16);
+	if(_energyOptimizer.idx != 0){
+		double energy = (startEnergy-energyOptimizer->freqController->cpuPower())
+							/ energyOptimizer->freqController->getPowUnit();
+		energyOptimizer->addEntryStat(CkWallTimer()-startTime, energy, epIdx, chareIdx);
+	}
 #endif
 
 #if CMK_CHARMDEBUG

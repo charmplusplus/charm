@@ -102,10 +102,6 @@ NDMeshStreamer: charm-core completion
 $(L)/libmpi-mainmodule.a: mpi-mainmodule.o
 	$(CHARMC) -o $@ $<
 
-#energy optimization module
-$(L)/libmoduleenergyOpt.a: energyOpt.o
-	$(CHARMC) -o $@ $<
-
 $(L)/libckmain.a: main.o
 	$(CHARMC) -o $@ $^
 
@@ -728,6 +724,12 @@ TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-simple.o \
 	      trace-counter.o trace-utilization.o	\
 	      trace-bluegene.o trace-projector.o trace-converse.o trace-all.o \
           trace-memory.o 
+
+#energy optimization module
+energyOpt: $(L)/libmoduleenergyOpt.a
+
+$(L)/libmoduleenergyOpt.a: energyOpt.o
+	$(CHARMC) -o $(L)/libmoduleenergyOpt.a energyOpt.o
 
 
 ###############################################################################

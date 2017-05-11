@@ -6,6 +6,7 @@
 #ifndef ENERGYOPT_H
 #define ENERGYOPT_H
 
+#include <vector>
 #include "freqController.h"
 #include "energyOpt.decl.h"
 
@@ -28,12 +29,19 @@ class EntryEnergyInfo{
     int num_trials;                     //number of different frequency level trials
     int optFreqFound;                   //if the optimal frequency is found yet
   public:
-    EntryEnergyInfo(): optimize(false), optimalFrequency(0), optFreqFound(0) {};
+    EntryEnergyInfo(): optimize(false), optimalFrequency(0), optFreqFound(0), num_trials(0) {
+        for(int i=0; i<NUM_AVAIL_FREQS; ++i){
+            freqCallCount[i]=0;
+            freqTime[i]=0;
+            freqPow[i]=0;
+        }
+    }
+    //save information about the entry method
     void addEntryInfo(int duration, int freqLevel, double pow){
-        freqCallCount[freqLevel]++;
-        num_trials++;
-        freqPow[freqLevel] = pow;
-        freqTime[freqLevel] = duration;
+        int count = freqCallCount[freqLevel]; //previous info count
+        freqPow[freqLevel] = (freqPow[freqLevel]*count+pow)/(count+1); //calculate the avg value with the past value
+        freqTime[freqLevel] = (freqTime[freqLevel]*count+duration)/(count+1); // "
+        freqCallCount[freqLevel] = count+1; //update call count
     }
     //find the energy minimal frequency
     //energy = power * time
@@ -41,7 +49,7 @@ class EntryEnergyInfo{
         double minEnergy = -1;
         int optFreqLevel = -1;
         for(int l=0; l<NUM_AVAIL_FREQS; l++){
-            int energy = freqPow[l] * freqTime[l];
+            double energy = freqPow[l] * freqTime[l]; //what if it's 0?
             if(minEnergy == -1){
                 minEnergy = energy;
                 optFreqLevel = l;
@@ -54,54 +62,51 @@ class EntryEnergyInfo{
         optimalFrequency = optFreqLevel;
         optFreqFound = 1;
     }
+    int getOptimalFreqLevel(){
+        return optimalFrequency;
+    }
+    double getAvgExecTime(int freqLevel){
+        return freqTime[freqLevel];
+    }
 
 };
 
 //collect entry method statistics for entry in each chare
 class ChareEntry {
-  private:
-    int numEntries;
-    EntryEnergyInfo **entryStats;
   public:
+    int numEntries;
+    std::vector<EntryEnergyInfo> entryStats;
     ChareEntry(int entries): numEntries(entries){
-        entryStats = new EntryEnergyInfo*[numEntries];
-        for(int i=0; i<numEntries; i++)
-            entryStats[i] = new EntryEnergyInfo();
+        entryStats.resize(entries); 
     };
-    ~ChareEntry(){
-        delete entryStats;
-    };
+    ~ChareEntry(){};
     void addChareEntryStat(int duration, int freqLevel, double pow, int epIdx){
-        entryStats[epIdx]->addEntryInfo(duration, freqLevel, pow);
+        entryStats[epIdx].addEntryInfo(duration, freqLevel, pow);
     }
     void calculateOptimalFreqLevel(){
-        for(int i=0; i<numEntries; i++)
-            entryStats[i]->calculateOptimalFreqLevel();
+        for(int i=0; i<numEntries; i++){
+            entryStats[i].calculateOptimalFreqLevel();
+            CkPrintf("[%d] Entry[%d], optimal freq level found: %d\n", CkMyPe(),
+                i, entryStats[i].getOptimalFreqLevel());
+        }
     }
 };
 
-//collect entry method statistics for each chare
+//collect entry method statistics for chares
 class ChareStats {
-  private:
-    int numChares, numEntries;
-    ChareEntry **chareStats;
   public:
+    int numChares, numEntries;
+    std::vector<ChareEntry> chareStats;
     ChareStats(int chares, int entries): numChares(chares), numEntries(entries){
-        chareStats = new ChareEntry*[numChares];
-        for(int i=0; i<numChares; i++)
-            chareStats[i] = new ChareEntry(numEntries);
+        chareStats.resize(chares, ChareEntry(entries));
     };
-    ~ChareStats(){
-        for(int i=0; i<numChares; i++)
-            delete chareStats[i];
-        delete chareStats;
-    };
+    ~ChareStats(){};
     void addChareStat(double duration, int freqLevel, double pow, int epIdx, int objIdx){
-        chareStats[objIdx]->addChareEntryStat(duration, freqLevel, pow, epIdx);
+        chareStats[objIdx].addChareEntryStat(duration, freqLevel, pow, epIdx);
     }
     void calculateOptimalFreqLevel(){
         for(int i=0; i<numChares; i++)
-            chareStats[i]->calculateOptimalFreqLevel();
+            chareStats[i].calculateOptimalFreqLevel();
     }
 };
 
@@ -110,6 +115,7 @@ class EnergyOptMain : public Chare {
     EnergyOptMain(CkArgMsg *m){
         delete m;
         _energyOptimizer = CProxy_EnergyOptimizer::ckNew();
+        CkPrintf("EnergyOptMain CONSTRUCTOR\n");
     };
     EnergyOptMain(CkMigrateMessage *m):Chare(m) {};
 };
@@ -117,10 +123,12 @@ class EnergyOptMain : public Chare {
 //EnergyOptimizer is responsible for collecting entry method statistics
 //and applying frequency changes for optimal energy point for each entry method
 
-#define TRIAL_TIMEOUT   30 //try every freq level for this many seconds
+#define TRIAL_TIMEOUT           30 //try every freq level for this many seconds
+#define FREQ_CHANGE_LATENCY     0.00001 //seconds
+#define ENTRY_THRESHOLD         FREQ_CHANGE_LATENCY*10
 
 //Periodically log power
-void powerCounterAdd(void *EO, double curWallTime);
+//void powerCounterAdd(void *EO, double curWallTime);
 
 class EnergyOptimizer : public IrrGroup {
 
@@ -157,9 +165,7 @@ class EnergyOptimizer : public IrrGroup {
         //Read the power periodically
         powerCounter = 0;
         powerSum = 0;
-        CcdCallOnConditionKeep(CcdPERIODIC_100ms, &powerCounterAdd, this);
-        //CcdCancelCallOnConditionKeep(int condnum, int idx)
-
+        //CcdCallOnConditionKeep(CcdPERIODIC_100ms, &powerCounterAdd, this);
     }
 
     EnergyOptimizer(CkMigrateMessage *m){};
@@ -171,6 +177,14 @@ class EnergyOptimizer : public IrrGroup {
     //caculate the average power based on the counter data
     double powerCounterGetAvgPow(){
         return powerSum / powerCounter;
+    }
+
+    //Periodically log power
+    static void powerCounterAdd(void *EO, double curWallTime){
+        EnergyOptimizer *eo = static_cast<EnergyOptimizer *>(EO);
+        double curPow = eo->freqController->cpuPower() + eo->freqController->memPower();
+        eo->powerCounter += 1;
+        eo->powerSum += curPow;
     }
 
     void addEntryStat(double duration, int epIdx, int objIdx){
@@ -190,16 +204,38 @@ class EnergyOptimizer : public IrrGroup {
                 timer = now;
             }
         }
-    };
+    }
+    void addEntryStat(double duration, double energy, int epIdx, int objIdx){
+        CkPrintf("[%d] Adding entry stats!\n", CkMyNode());
+        energyStats->addChareStat(duration, freqController->getCurFreqLevel(),
+                energy/duration, epIdx, objIdx);
+    }
+    void adjustFrequency(int epIdx, int objIdx){
+        if(statsOn){
+            //is it time to move to the next freq level?
+            double now = CkWallTimer();
+            if(timer - now > TRIAL_TIMEOUT){
+                if(!freqController->decrementFreqLevel()){
+                    //stats collection done, calculate optimal frequency
+                    CkPrintf("[%d] Stats collection done!\n", CkMyNode());
+                    statsOn = false;
+                    energyStats->calculateOptimalFreqLevel();
+                }
+                timer = now;
+            }
+        }else{
+            //set the calculated optimal frequency
+            //if the optimal freq is the same with current freq,
+            //do not do anything
+            int optFreq = energyStats->chareStats[objIdx].entryStats[epIdx].getOptimalFreqLevel();
+            int curFreq = freqController->getCurFreqLevel();
+            int duration = energyStats->chareStats[objIdx].entryStats[epIdx].getAvgExecTime(curFreq);
+            if(optFreq != curFreq && duration > ENTRY_THRESHOLD){ //100us
+                freqController->changeFreq(optFreq);
+            }
+        }
+    }
 
 }; //end of EnergyOptimizer
-
-//Periodically log power
-void powerCounterAdd(void *EO, double curWallTime){
-    EnergyOptimizer *eo = static_cast<EnergyOptimizer *>(EO);
-    double curPow = eo->freqController->cpuPower() + eo->freqController->memPower();
-    eo->powerCounter += 1;
-    eo->powerSum += curPow;
-}
 
 #endif /* ENERGYOPT_H */
