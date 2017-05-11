@@ -595,13 +595,12 @@ extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
   CpdBeforeEp(epIdx, obj, msg);
 #endif
 #if CMK_WITH_ENERGY_OPT
-	int chareIdx = CkpvAccess(currentChareIdx);
-	CkPrintf("[%d] HERE\n", CkMyNode());
+	//int chareIdx = CkpvAccess(currentChareIdx);
+	int chareIdx = _entryTable[epIdx]->chareIdx;
 	double startTime, startEnergy=0;
 	EnergyOptimizer *energyOptimizer=NULL;
-	if(_energyOptimizer.idx != 0){
+	if(_energyOptimizer.idx != 0 && !_entryTable[epIdx]->inCharm ){ //user function
 		energyOptimizer = (EnergyOptimizer *)CkLocalBranch(_energyOptimizer);
-		CkPrintf("[%d] HERE2\n", CkMyNode());
 		energyOptimizer->adjustFrequency(epIdx, chareIdx);
 		startTime = CkWallTimer();
 		startEnergy = energyOptimizer->freqController->cpuPower();
@@ -611,7 +610,7 @@ extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
   _entryTable[epIdx]->call(msg, obj);
 
 #if CMK_WITH_ENERGY_OPT
-	if(_energyOptimizer.idx != 0){
+	if(_energyOptimizer.idx != 0 && !_entryTable[epIdx]->inCharm ){ //user function
 		double energy = (startEnergy-energyOptimizer->freqController->cpuPower())
 							/ energyOptimizer->freqController->getPowUnit();
 		energyOptimizer->addEntryStat(CkWallTimer()-startTime, energy, epIdx, chareIdx);

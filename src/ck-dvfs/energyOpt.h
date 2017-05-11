@@ -38,6 +38,8 @@ class EntryEnergyInfo{
     }
     //save information about the entry method
     void addEntryInfo(int duration, int freqLevel, double pow){
+        CkAssert(freqLevel < NUM_AVAIL_FREQS && freqLevel >= 0);
+        //CkPrintf("addEntryInfo. %d-%d\n", NUM_AVAIL_FREQS, freqLevel);
         int count = freqCallCount[freqLevel]; //previous info count
         freqPow[freqLevel] = (freqPow[freqLevel]*count+pow)/(count+1); //calculate the avg value with the past value
         freqTime[freqLevel] = (freqTime[freqLevel]*count+duration)/(count+1); // "
@@ -77,14 +79,19 @@ class ChareEntry {
     int numEntries;
     std::vector<EntryEnergyInfo> entryStats;
     ChareEntry(int entries): numEntries(entries){
-        entryStats.resize(entries); 
-    };
-    ~ChareEntry(){};
+        entryStats.resize(numEntries);
+    }
+    ~ChareEntry(){}
+    ChareEntry(const ChareEntry& ce): numEntries(ce.numEntries){
+        entryStats.resize(numEntries);
+    }
     void addChareEntryStat(int duration, int freqLevel, double pow, int epIdx){
+        //CkPrintf("epIdx: %d, numEntries: %d\n", epIdx, numEntries);
+        CkAssert(epIdx<numEntries && epIdx >= 0);
         entryStats[epIdx].addEntryInfo(duration, freqLevel, pow);
     }
     void calculateOptimalFreqLevel(){
-        for(int i=0; i<numEntries; i++){
+        for(int i=0; i<numEntries; ++i){
             entryStats[i].calculateOptimalFreqLevel();
             CkPrintf("[%d] Entry[%d], optimal freq level found: %d\n", CkMyPe(),
                 i, entryStats[i].getOptimalFreqLevel());
@@ -98,10 +105,16 @@ class ChareStats {
     int numChares, numEntries;
     std::vector<ChareEntry> chareStats;
     ChareStats(int chares, int entries): numChares(chares), numEntries(entries){
-        chareStats.resize(chares, ChareEntry(entries));
-    };
-    ~ChareStats(){};
+        CkPrintf("[%d] ChareStats chares: %d, entries: %d\n", CkMyPe(), chares, entries);
+        chareStats.resize(numChares, ChareEntry(numEntries));
+    }
+    ~ChareStats(){}
+    ChareStats(const ChareStats& c): numChares(c.numChares), numEntries(c.numEntries){
+        chareStats.resize(numChares, ChareEntry(numEntries));
+    }
     void addChareStat(double duration, int freqLevel, double pow, int epIdx, int objIdx){
+        //CkPrintf("objIdx: %d, numChares: %d\n", objIdx, numChares);
+        CkAssert(objIdx<numChares && objIdx >= 0);
         chareStats[objIdx].addChareEntryStat(duration, freqLevel, pow, epIdx);
     }
     void calculateOptimalFreqLevel(){
@@ -142,10 +155,9 @@ class EnergyOptimizer : public IrrGroup {
     int powerCounter;
     int powerSum;
     EnergyOptimizer(void){
-
+        //BILGE TODO: track stats of all funtions or only user functions?
         energyStats = new ChareStats(_chareTable.size(), _entryTable.size());
         freqController = new FreqController();
-
         CkPrintf("[%d] EnergyOptimizer created for %d chares and %d entries!\n", CkMyNode(), _chareTable.size(), _entryTable.size());
 
         //start collecting stats from the beginning, it'll be turned of once
@@ -169,6 +181,9 @@ class EnergyOptimizer : public IrrGroup {
     }
 
     EnergyOptimizer(CkMigrateMessage *m){};
+    ~EnergyOptimizer(){
+        delete energyStats;
+    }
 
     bool isStatsOn(){ return statsOn; }
 
@@ -188,7 +203,7 @@ class EnergyOptimizer : public IrrGroup {
     }
 
     void addEntryStat(double duration, int epIdx, int objIdx){
-        CkPrintf("[%d] Adding entry stats!\n", CkMyNode());
+        CkPrintf("[%d] Done.. Adding entry stats!\n", CkMyNode());
 
         energyStats->addChareStat(duration, freqController->getCurFreqLevel(),
                 powerCounterGetAvgPow(), epIdx, objIdx);
@@ -206,7 +221,7 @@ class EnergyOptimizer : public IrrGroup {
         }
     }
     void addEntryStat(double duration, double energy, int epIdx, int objIdx){
-        CkPrintf("[%d] Adding entry stats!\n", CkMyNode());
+        //CkPrintf("[%d] Adding entry stats! epIdx: %d, objIdx: %d...\n", CkMyNode(), epIdx, objIdx);
         energyStats->addChareStat(duration, freqController->getCurFreqLevel(),
                 energy/duration, epIdx, objIdx);
     }

@@ -1,7 +1,6 @@
 module energyOpt{
 
   readonly CkGroupID _energyOptimizer;
-  //readonly CProxy_EnergyOptimizer _energyOptimizer;
 
   mainchare EnergyOptMain {
     entry EnergyOptMain(CkArgMsg*);
