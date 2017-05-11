@@ -39,6 +39,23 @@ Charm++ Features
   combination. This extends the existing Charm++/MPI interoperation
   feature.
 
+- Improvements to Sections:
+
+  * Array sections API has been simplified, with array sections being
+  automatically delegated to CkMulticastMgr (the most efficient implementation
+  in Charm++). Changes are reflected in Chapter 14 of the manual.
+
+  * Group sections can now be delegated to CkMulticastMgr (improved performance
+  compared to default implementation). Note that they have to be manually
+  delegated. Documentation is in Chapter 14 of Charm++ manual.
+
+  * Group section reductions are now supported for delegated sections
+  via CkMulticastMgr.
+
+  * Improved performance of section creation in CkMulticastMgr.
+
+  * CkMulticastMgr uses the improved spanning tree strategies. See above.
+
 - GPU manager now creates one instance per OS process and scales the
   pre-allocated memory pool size according to the GPU memory size and
   number of GPU manager instances on a physical node.
