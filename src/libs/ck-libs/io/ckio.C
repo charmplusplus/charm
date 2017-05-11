@@ -36,6 +36,7 @@ namespace Ck { namespace IO {
         CkCallback opened;
         Options opts;
         int fd;
+        int sessionID;
         CProxy_WriteSession session;
         CkCallback complete;
 
@@ -107,9 +108,10 @@ namespace Ck { namespace IO {
           files[file].opened.send(new FileReadyMsg(file));
         }
 
-        void prepareWriteSession(FileToken file, size_t bytes, size_t offset,
-                                 CkCallback ready, CkCallback complete) {
+        void prepareWriteSession_helper(FileToken file, size_t bytes, size_t offset,
+                                        CkCallback ready, CkCallback complete) {
           Options &opts = files[file].opts;
+          files[file].sessionID = sessionID;
 
 	  int numStripes = 0;
 	  size_t bytesLeft = bytes, delta = opts.peStripe - offset % opts.peStripe;
@@ -123,13 +125,17 @@ namespace Ck { namespace IO {
 	    numStripes++;
 
           CkArrayOptions sessionOpts(numStripes);
+          sessionOpts.setStaticInsertion(true);
+
+          CkCallback sessionInitDone(CkIndex_Director::sessionReady(NULL), thisProxy);
+          sessionInitDone.setRefnum(sessionID);
+          sessionOpts.setInitCallback(sessionInitDone);
+
           //sessionOpts.setMap(managers);
           files[file].session =
             CProxy_WriteSession::ckNew(file, offset, bytes, sessionOpts);
           CkAssert(files[file].complete.isInvalid());
           files[file].complete = complete;
-          ready.send(new SessionReadyMsg(Session(file, bytes, offset,
-                                                 files[file].session)));
         }
 
         void sessionComplete(FileToken token) {

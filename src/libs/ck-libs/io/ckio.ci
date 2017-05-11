@@ -28,7 +28,16 @@ module CkIO_impl {
           entry [reductiontarget] void sessionComplete(FileToken file);
 
           entry void prepareWriteSession(FileToken file, size_t bytes, size_t offset,
-                                         CkCallback ready, CkCallback complete);
+                                         CkCallback ready, CkCallback complete) {
+            serial {
+              prepareWriteSession_helper(file, bytes, offset, ready, complete);
+            }
+            when sessionReady[files[file].sessionID](CkReductionMsg *m) serial {
+              delete m;
+              ready.send(new SessionReadyMsg(Session(file, bytes, offset,
+                                                     files[file].session)));
+            }
+          };
           entry void prepareWriteSession(FileToken file, size_t bytes, size_t offset,
                                          CkCallback ready, const char commitData[commitBytes],
                                          size_t commitBytes, size_t commitOffset,
@@ -36,9 +45,14 @@ module CkIO_impl {
             serial {
               CkCallback committed(CkIndex_Director::sessionDone(NULL), thisProxy);
               committed.setRefnum(++sessionID);
-              prepareWriteSession(file, bytes, offset, ready, committed);
+              prepareWriteSession_helper(file, bytes, offset, ready, committed);
             }
-            when sessionDone[sessionID](CkReductionMsg *m) serial {
+            when sessionReady[files[file].sessionID](CkReductionMsg *m) serial {
+              delete m;
+              ready.send(new SessionReadyMsg(Session(file, bytes, offset,
+                                                     files[file].session)));
+            }
+            when sessionDone[files[file].sessionID](CkReductionMsg *m) serial {
               delete m;
               impl::FileInfo* info = CkpvAccess(manager)->get(file);
               CmiInt8 ret = CmiPwrite(info->fd, commitData, commitBytes, commitOffset);
@@ -47,6 +61,7 @@ module CkIO_impl {
               complete.send(CkReductionMsg::buildNew(0, NULL));
             }
           };
+          entry void sessionReady(CkReductionMsg *);
           entry void sessionDone(CkReductionMsg *);
           entry void close(FileToken token, CkCallback closed);
         }
