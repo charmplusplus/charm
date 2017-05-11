@@ -1644,9 +1644,9 @@ void CmiHandleMessage(void *msg)
  	CpvAccess(cQdState)->mProcessed++;
 */
 	CmiHandlerInfo *h;
+        CmiUInt2 handlerIdx=CmiGetHandler(msg); /* Save handler for use after msg is gone */
 #if CMK_TRACE_ENABLED && CMK_PROJECTOR
-	CmiUInt2 handler=CmiGetHandler(msg); /* Save handler for use after msg is gone */
-	_LOG_E_HANDLER_BEGIN(handler); /* projector */
+	_LOG_E_HANDLER_BEGIN(handlerIdx); /* projector */
 	/* setMemoryStatus(1) */ /* charmdebug */
 #endif
 
@@ -1658,12 +1658,21 @@ void CmiHandleMessage(void *msg)
 	}*/
 	
         MESSAGE_PHASE_CHECK(msg)
-
-	h=&CmiGetHandlerInfo(msg);
+#if CMK_ERROR_CHECKING
+        if (handlerIdx >= CpvAccess(CmiHandlerCount)) {
+          CmiAbort("Msg handler does not exist, possible race condition during init\n");
+        }
+#endif
+	h=&CmiHandlerToInfo(handlerIdx);
+#if CMK_ERROR_CHECKING
+	if (h->hdlr == NULL) {
+          CmiAbort("Msg handler does not exist, possible race condition during init\n");
+        }
+#endif
 	(h->hdlr)(msg,h->userPtr);
 #if CMK_TRACE_ENABLED
 	/* setMemoryStatus(0) */ /* charmdebug */
-	//_LOG_E_HANDLER_END(handler); 	/* projector */
+	//_LOG_E_HANDLER_END(handlerIdx); 	/* projector */
 #endif
 }
 
