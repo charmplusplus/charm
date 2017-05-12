@@ -180,7 +180,12 @@ void CkRdmaIssueRgets(envelope *env){
 #endif
 
   char *recv_md = (char *) malloc(CmiGetRdmaRecvInfoSize(numops));
+
+  CkUnpackMessage(&copyenv);
   CkUpdateRdmaPtrs(copyenv, msgsize, recv_md, ((char *)env) + msgsize);
+  CkPackRdmaPtrs(((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf);
+  CkPackMessage(&copyenv);
+
   //Set the total size of the message
   copyenv->setTotalsize(CK_ALIGN(msgsize, 16) + bufsize);
 
@@ -200,9 +205,9 @@ void CkRdmaIssueRgets(envelope *env){
  * Method called to update machine specific information for receiver
  * using the metadata message given by the sender along with updating
  * pointers of the CkRdmawrappers
+ * - assumes that the msg is unpacked
  */
 void CkUpdateRdmaPtrs(envelope *env, int msgsize, char *recv_md, char *src_md){
-  CkUnpackMessage(&env);
   PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
   PUP::fromMem up((void *)(((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
   int numops;
@@ -224,8 +229,51 @@ void CkUpdateRdmaPtrs(envelope *env, int msgsize, char *recv_md, char *src_md){
     buf += CK_ALIGN(w.cnt, 16);
     p|w;
   }
-  CkPackMessage(&env);
 }
+
+
+/*
+ * Method called to pack rdma pointers inside CkRdmaWrappers in the message
+ * Assumes that msg is unpacked
+ */
+void CkPackRdmaPtrs(char *msgBuf){
+  envelope *env = UsrToEnv(env);
+  PUP::toMem p((void *)msgBuf);
+  PUP::fromMem up((void *)msgBuf);
+  int numops;
+  up|numops;
+  p|numops;
+
+  //Pack Rdma pointers in CkRdmaWrappers
+  for(int i=0; i<numops; i++){
+    CkRdmaWrapper w;
+    up|w;
+    w.ptr = (void *)((char *)w.ptr - (char *)msgBuf);
+    p|w;
+  }
+}
+
+
+/*
+ * Method called to unpack rdma pointers inside CkRdmaWrappers in the message
+ * Assumes that msg is unpacked
+ */
+void CkUnpackRdmaPtrs(char *msgBuf){
+  PUP::toMem p((void *)msgBuf);
+  PUP::fromMem up((void *)msgBuf);
+  int numops;
+  up|numops;
+  p|numops;
+
+  //Unpack Rdma pointers in CkRdmaWrappers
+  for(int i=0; i<numops; i++){
+    CkRdmaWrapper w;
+    up|w;
+    w.ptr = (void *)((char *)msgBuf + (size_t)w.ptr);
+    p|w;
+  }
+}
+
 
 //Determine the number of rdma ops from the message
 int getRdmaNumOps(envelope *env){

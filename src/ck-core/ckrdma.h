@@ -52,6 +52,18 @@ void CkRdmaIssueRgets(envelope *env);
  */
 void CkUpdateRdmaPtrs(envelope *msg, int msgsize, char *recv_md, char *src_md);
 
+/*
+ * Method called to pack rdma pointers
+ * inside Ckrdmawrappers
+ */
+void CkPackRdmaPtrs(char *msgBuf);
+
+/*
+ * Method called to unpack rdma pointers
+ * inside Ckrdmawrappers
+ */
+void CkUnpackRdmaPtrs(char *msgBuf);
+
 //Get the number of rdma ops using the metadata message
 int getRdmaNumOps(envelope *env);
 

@@ -439,6 +439,7 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool needsClosure) {
                if (!needsClosure){
                  if(hasRdma()){
                    str<<"#if CMK_ONESIDED_IMPL\n";
+                   str<<"  CkUnpackRdmaPtrs(impl_buf);\n";
                    str<<"  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
                    callEach(&Parameter::beginUnmarshallRdma,str,true);
                    str<<"#else\n";
@@ -464,6 +465,7 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool needsClosure) {
             if (!needsClosure){
               if(hasRdma()){
                 str<<"#if CMK_ONESIDED_IMPL\n";
+                str<<"  CkUnpackRdmaPtrs(impl_buf);\n";
                 str<<"  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
                 callEach(&Parameter::beginUnmarshallRdma,str,true);
                 str<<"#else\n";
@@ -496,6 +498,7 @@ void ParamList::beginUnmarshall(XStr &str)
         str<<"  PUP::fromMem implP(impl_buf);\n";
         if(hasRdma()){
             str<<"#if CMK_ONESIDED_IMPL\n";
+            str<<"  CkUnpackRdmaPtrs(impl_buf);\n";
             str<<"  int impl_num_rdma_fields; implP|impl_num_rdma_fields; \n";
             callEach(&Parameter::beginUnmarshallRdma,str,true);
             str<<"#else\n";
