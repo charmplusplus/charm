@@ -181,7 +181,11 @@ const msg_t* msgQ<P>::deq()
     if (empty())
         return NULL;
 
+#if defined(_WIN64) || defined(_WIN32)
+    long rnd = rand() % randQ.size();
+#else
     long rnd = lrand48() % randQ.size();
+#endif
     const msg_t *msg = randQ[rnd];
     randQ[rnd] = randQ[randQ.size()-1];
     randQ.pop_back();
