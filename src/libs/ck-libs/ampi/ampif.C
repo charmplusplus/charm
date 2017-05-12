@@ -334,6 +334,24 @@ static void ampif_str_c2f(char* dst, const char* src, int max_len){
     dst[i] = ' ';
 }
 
+static MPI_Status* handle_MPI_STATUS_IGNORE(int *sts) {
+  if (sts[0]==-9 && sts[1]==-9 && sts[2]==-9 && sts[3]==-9 &&
+      sts[4]==-9 && sts[5]==-9 && sts[6]==-9 && sts[7]==-9) {
+    return MPI_STATUS_IGNORE;
+  } else {
+    return (MPI_Status *)sts;
+  }
+}
+
+static MPI_Status* handle_MPI_STATUSES_IGNORE(int *sts) {
+  if (sts[0]==-9 && sts[1]==-9 && sts[2]==-9 && sts[3]==-9 &&
+      sts[4]==-9 && sts[5]==-9 && sts[6]==-9 && sts[7]==-9) {
+    return MPI_STATUSES_IGNORE;
+  } else {
+    return (MPI_Status *)sts;
+  }
+}
+
 static void handle_MPI_IN_PLACE_f(void* inbuf, void* outbuf){
   if (inbuf == NULL) inbuf = MPI_IN_PLACE;
   if (outbuf == NULL) outbuf = MPI_IN_PLACE;
@@ -389,7 +407,8 @@ void mpi_send(void *msg, int *count, int *type, int *dest,
 void mpi_recv(void *msg, int *count, int *type, int *src,
               int *tag, int *comm, int *status, int *ierr)
 {
-  *ierr = AMPI_Recv(msg, *count, *type, *src, *tag, *comm, (MPI_Status*) status);
+  MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
+  *ierr = AMPI_Recv(msg, *count, *type, *src, *tag, *comm, s);
 }
 
 void mpi_bsend(void *msg, int *count, int *type, int *dest,
@@ -418,12 +437,14 @@ void mpi_issend(void *buf, int *count, int *datatype, int *dest,
 
 void mpi_probe(int *src, int *tag, int *comm, int *status, int *ierr)
 {
-  *ierr = AMPI_Probe(*src, *tag, *comm, (MPI_Status*) status);
+  MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
+  *ierr = AMPI_Probe(*src, *tag, *comm, s);
 }
 
 void mpi_iprobe(int *src,int *tag,int *comm,int *flag,int *status,int *ierr)
 {
-  *ierr = AMPI_Iprobe(*src, *tag, *comm, flag, (MPI_Status*) status);
+  MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
+  *ierr = AMPI_Iprobe(*src, *tag, *comm, flag, s);
 }
 
 void mpi_sendrecv(void *sndbuf, int *sndcount, int *sndtype,
@@ -431,17 +452,19 @@ void mpi_sendrecv(void *sndbuf, int *sndcount, int *sndtype,
                   int *rcvcount, int *rcvtype, int *src,
                   int *rcvtag, int *comm, int *status, int *ierr)
 {
+  MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
   *ierr = AMPI_Sendrecv(sndbuf, *sndcount, *sndtype, *dest, *sndtag,
                         rcvbuf, *rcvcount, *rcvtype, *src, *rcvtag,
-                        *comm, (MPI_Status*) status);
+                        *comm, s);
 }
 
 void mpi_sendrecv_replace(void *buf, int* count, int* datatype,
                           int* dest, int* sendtag, int* source, int* recvtag,
                           int* comm, int* status, int *ierr)
 {
+  MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
   *ierr = AMPI_Sendrecv_replace(buf, *count, *datatype, *dest, *sendtag,
-                                *source, *recvtag, *comm, (MPI_Status*) status);
+                                *source, *recvtag, *comm, s);
 }
 
 void mpi_barrier(int *comm, int *ierr)
@@ -501,31 +524,35 @@ void mpi_startall(int *count, int *reqnum, int *ierr)
 
 void mpi_waitall(int *count, int *request, int *status, int *ierr)
 {
-  *ierr = AMPI_Waitall(*count, (MPI_Request*) request, (MPI_Status*) status);
+  MPI_Status* s = handle_MPI_STATUSES_IGNORE(status);
+  *ierr = AMPI_Waitall(*count, (MPI_Request*) request, s);
 }
 
 void mpi_waitany(int *count, int *request, int *index, int *status, int *ierr)
 {
-  *ierr = AMPI_Waitany(*count, (MPI_Request*) request, index, (MPI_Status*) status);
+  MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
+  *ierr = AMPI_Waitany(*count, (MPI_Request*) request, index, s);
   if (*index != MPI_UNDEFINED)
     (*index)++;
 }
 
 void mpi_wait(int *request, int *status, int *ierr)
 {
-  *ierr = AMPI_Wait((MPI_Request*) request, (MPI_Status*) status);
+  MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
+  *ierr = AMPI_Wait((MPI_Request*) request, s);
 }
 
 void mpi_testall(int *count, int *request, int *flag, int *status, int *ierr)
 {
-  *ierr = AMPI_Testall(*count, (MPI_Request*) request, flag, (MPI_Status*) status);
+  MPI_Status* s = handle_MPI_STATUSES_IGNORE(status);
+  *ierr = AMPI_Testall(*count, (MPI_Request*) request, flag, s);
 }
 
 void mpi_waitsome(int *incount, int *array_of_requests, int *outcount, int *array_of_indices,
                   int *array_of_statuses, int *ierr)
 {
-  *ierr = AMPI_Waitsome(*incount, (MPI_Request *)array_of_requests, outcount, array_of_indices,
-                        (MPI_Status*) array_of_statuses);
+  MPI_Status* s = handle_MPI_STATUSES_IGNORE(array_of_statuses);
+  *ierr = AMPI_Waitsome(*incount, (MPI_Request *)array_of_requests, outcount, array_of_indices, s);
   if (*outcount != MPI_UNDEFINED) {
     for (int i = 0; i < *outcount; ++i) {
       array_of_indices[i]++;
@@ -536,8 +563,8 @@ void mpi_waitsome(int *incount, int *array_of_requests, int *outcount, int *arra
 void mpi_testsome(int *incount, int *array_of_requests, int *outcount, int *array_of_indices,
                   int *array_of_statuses, int *ierr)
 {
-  *ierr = AMPI_Testsome(*incount, (MPI_Request *)array_of_requests, outcount, array_of_indices,
-                        (MPI_Status*) array_of_statuses);
+  MPI_Status* s = handle_MPI_STATUSES_IGNORE(array_of_statuses);
+  *ierr = AMPI_Testsome(*incount, (MPI_Request *)array_of_requests, outcount, array_of_indices, s);
   if (*outcount != MPI_UNDEFINED) {
     for (int i = 0; i < *outcount; ++i) {
       array_of_indices[i]++;
@@ -547,20 +574,22 @@ void mpi_testsome(int *incount, int *array_of_requests, int *outcount, int *arra
 
 void mpi_testany(int *count, int *request, int *index, int *flag, int *status, int *ierr)
 {
-  *ierr = AMPI_Testany(*count, (MPI_Request*) request, index, flag,
-                       (MPI_Status*) status);
+  MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
+  *ierr = AMPI_Testany(*count, (MPI_Request*) request, index, flag, s);
   if (*index != MPI_UNDEFINED)
     (*index)++;
 }
 
 void mpi_test(int *request, int *flag, int *status, int *ierr)
 {
-  *ierr = AMPI_Test((MPI_Request*) request, flag, (MPI_Status*) status);
+  MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
+  *ierr = AMPI_Test((MPI_Request*) request, flag, s);
 }
 
 void mpi_request_get_status(int *request, int *flag, int *status, int *ierr)
 {
-  *ierr = AMPI_Request_get_status(*((MPI_Request*)request), flag, (MPI_Status*) status);
+  MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
+  *ierr = AMPI_Request_get_status(*((MPI_Request*)request), flag, s);
 }
 
 void mpi_request_free(int *request, int *ierr)
@@ -575,12 +604,14 @@ void mpi_cancel(int *request, int *ierr)
 
 void mpi_test_cancelled(int *status, int *flag, int *ierr)
 {
-  *ierr = AMPI_Test_cancelled((MPI_Status *)status, flag);
+  MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
+  *ierr = AMPI_Test_cancelled(s, flag);
 }
 
 void mpi_status_set_cancelled(int *status, int *flag, int *ierr)
 {
-  *ierr = AMPI_Status_set_cancelled((MPI_Status *)status, *flag);
+  MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
+  *ierr = AMPI_Status_set_cancelled(s, *flag);
 }
 
 void mpi_recv_init(void *buf, int *count, int *type, int *srcpe,
@@ -768,12 +799,14 @@ void mpi_address(void* location, MPI_Aint *address, int* ierr)
 
 void mpi_status_set_elements(int *status, int* datatype, int *count, int* ierr)
 {
-  *ierr = AMPI_Status_set_elements((MPI_Status*) status, *datatype, *count);
+  MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
+  *ierr = AMPI_Status_set_elements(s, *datatype, *count);
 }
 
 void mpi_get_elements(int *status, int* datatype, int *count, int* ierr)
 {
-  *ierr = AMPI_Get_elements((MPI_Status*) status, *datatype, count);
+  MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
+  *ierr = AMPI_Get_elements(s, *datatype, count);
 }
 
 void mpi_pack(void *inbuf, int *incount, int *datatype, void *outbuf,
@@ -1409,7 +1442,8 @@ void mpi_abort(int *comm, int *errorcode, int *ierr)
 
 void mpi_get_count(int *sts, int *dtype, int *cnt, int *ierr)
 {
-  *ierr = AMPI_Get_count((MPI_Status*) sts, *dtype, cnt);
+  MPI_Status* s = handle_MPI_STATUS_IGNORE(sts);
+  *ierr = AMPI_Get_count(s, *dtype, cnt);
 }
 
 void mpi_comm_remote_size(int *comm, int *size, int *ierr){

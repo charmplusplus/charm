@@ -665,7 +665,7 @@ class AmpiRequest {
   virtual int start(void){ return -1; }
 
   /// Return true if this request is finished (progress):
-  virtual bool test(MPI_Status *sts=NULL) =0;
+  virtual bool test(MPI_Status *sts=MPI_STATUS_IGNORE) =0;
 
   /// Block until this request is finished,
   ///  returning a valid MPI error code.
@@ -731,7 +731,7 @@ class PersReq : public AmpiRequest {
   PersReq(){};
   ~PersReq(){}
   int start();
-  bool test(MPI_Status *sts=NULL);
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE);
   int wait(MPI_Status *sts);
   void cancel() {}
   void receive(ampi *ptr, AmpiMsg *msg) {}
@@ -758,7 +758,7 @@ class IReq : public AmpiRequest {
   }
   IReq(){}
   ~IReq(){}
-  bool test(MPI_Status *sts=NULL);
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE);
   int wait(MPI_Status *sts);
   void cancel() {
     if (!statusIreq) {
@@ -790,7 +790,7 @@ class RednReq : public AmpiRequest {
   }
   RednReq(){};
   ~RednReq(){}
-  bool test(MPI_Status *sts=NULL);
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE);
   int wait(MPI_Status *sts);
   void cancel() {}
   inline int getType(void) const { return MPI_REDN_REQ; }
@@ -815,7 +815,7 @@ class GatherReq : public AmpiRequest {
   }
   GatherReq(){}
   ~GatherReq(){}
-  bool test(MPI_Status *sts=NULL);
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE);
   int wait(MPI_Status *sts);
   void cancel() {}
   inline int getType(void) const { return MPI_GATHER_REQ; }
@@ -845,7 +845,7 @@ class GathervReq : public AmpiRequest {
   }
   GathervReq(){}
   ~GathervReq(){}
-  bool test(MPI_Status *sts=NULL);
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE);
   int wait(MPI_Status *sts);
   void cancel() {}
   inline int getType(void) const { return MPI_GATHERV_REQ; }
@@ -867,7 +867,7 @@ class SendReq : public AmpiRequest {
   }
   SendReq(){}
   ~SendReq(){ }
-  bool test(MPI_Status *sts=NULL);
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE);
   int wait(MPI_Status *sts);
   void cancel() {}
   void receive(ampi *ptr, AmpiMsg *msg) {}
@@ -886,7 +886,7 @@ class SsendReq : public AmpiRequest {
   }
   SsendReq() {}
   ~SsendReq(){ }
-  bool test(MPI_Status *sts=NULL);
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE);
   int wait(MPI_Status *sts);
   void cancel() {}
   void receive(ampi *ptr, AmpiMsg *msg) {}
@@ -902,7 +902,7 @@ class GPUReq : public AmpiRequest {
  public:
   GPUReq();
   inline int getType(void) const { return MPI_GPU_REQ; }
-  bool test(MPI_Status *sts=NULL);
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE);
   int wait(MPI_Status *sts);
   void cancel() {}
   void receive(ampi *ptr, AmpiMsg *msg);
@@ -924,7 +924,7 @@ class IATAReq : public AmpiRequest {
     myreqs[idx].tag=tag_;   myreqs[idx].comm=comm_;
     return (++idx);
   }
-  bool test(MPI_Status *sts=NULL);
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE);
   int wait(MPI_Status *sts);
   void cancel() {}
   void receive(ampi *ptr, AmpiMsg *msg) {}
