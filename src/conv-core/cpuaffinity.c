@@ -718,8 +718,10 @@ void CmiInitCPUAffinity(char **argv)
 
   if (CmiMyRank() ==0) {
      affLock = CmiCreateLock();
+#ifndef _WIN32
      aff_is_set = affinity_flag;
      CPU_ZERO(&core_usage);
+#endif
   }
 
 #if CMK_BLUEGENEQ
@@ -961,6 +963,9 @@ int CmiPrintCPUAffinity()
 {
   CmiPrintf("Warning: CmiPrintCPUAffinity not supported.\n");
   return -1;
+}
+
+void CmiCheckAffinity() {
 }
 
 void CmiInitCPUAffinity(char **argv)
