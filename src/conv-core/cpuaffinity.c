@@ -507,7 +507,7 @@ static void cpuAffinityRecvHandler(void *msg)
 static void cpuPhyNodeAffinityRecvHandler(void *msg)
 {
   affMsg *m = (affMsg *)msg;
-#ifndef _WIN32
+#if !defined(_WIN32) && defined(CPU_OR)
   CPU_OR(&core_usage, &core_usage, &m->affinity);
   affMsgsRecvd++;
 #endif
@@ -620,7 +620,7 @@ extern int getXTNodeID(int mpirank, int nummpiranks);
  */
 void CmiCheckAffinity()
 {
-#if !defined(_WIN32) && CMK_SMP && CMK_HAS_PTHREAD_SETAFFINITY
+#if !defined(_WIN32) && CMK_SMP && CMK_HAS_PTHREAD_SETAFFINITY && defined(CPU_OR)
 
   if (!CmiCpuTopologyEnabled()) return;  // only works if cpu topology enabled
 
