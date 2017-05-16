@@ -400,17 +400,30 @@ public:
 \end{alltt}
 \end{center}
 
-Another construct offered by SDAG is the {\tt forall} loop. These loops are
-used when the iterations of a loop can be performed independently and in any
-order. This is in contrast to a regular {\tt for} loop, in which each iteration
-is executed sequentially. The {\tt forall} loop can be seen as an overlap with
-an indexed set of otherwise identical statements in the body. Its syntax is 
+Another construct offered by SDAG is the {\tt forall} loop. These
+loops are used when the iterations of a loop can be performed
+independently and in any order. This is in contrast to a regular {\tt
+for} loop, in which each iteration is executed sequentially. The loop
+iterations are executed entirely on the calling PE, so they do not run
+in parallel. However, they are executed concurrently, in that
+execution of different iterations can interleave at {\tt when}
+statements, like any other SDAG code. SDAG statements following the
+{\tt forall} loop will not execute until all iterations have
+completed. The {\tt forall} loop can be seen as an {\tt overlap} with
+an indexed set of otherwise identical statements in the body.
+
+The syntax of {\tt forall} is
 \begin{center}
 \begin{alltt}
 forall [IDENT] (MIN:MAX,STRIDE) BODY
 \end{alltt}
 \end{center}
-The range from MIN to MAX is inclusive. Its use is demonstrated through
+The range from MIN to MAX is inclusive. In each iteration instance of
+{\tt BODY}, the {\tt IDENT} variable will take on one of the values in
+the specified range. The {\tt IDENT} variable must be declared in the
+application C++ code as a member of the enclosing chare class.
+
+Use of {\tt forall} is demonstrated through
 distributed parallel matrix-matrix multiply shown in
 \examplereffile{matmul/matmul.ci}
 
