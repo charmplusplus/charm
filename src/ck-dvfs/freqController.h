@@ -40,10 +40,10 @@ class FreqController {
     FreqController(){
 #if HASWELL
         num_cores = 4;
-        freqs = new int[NUM_AVAIL_FREQS] {3501000, 3500000, 3300000, 3200000,
-                                          3000000, 2800000, 2700000, 2500000,
-                                          2300000, 2200000, 2000000, 1900000,
-                                          1700000, 1500000, 1400000, 1200000};
+        freqs = new int[NUM_AVAIL_FREQS] {1200000, 1400000, 1500000, 1700000,
+										  1900000, 2000000, 2200000, 2300000,
+										  2500000, 2700000, 2800000, 3000000,
+										  3200000, 3300000, 3500000, 3501000};
         cur_freq_level = -1;
 #else
         //fill in for other architectues

@@ -589,7 +589,7 @@ extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 //      printf("[%d] CurrentObj set to %p\n",CkMyPe(),obj);
 #endif
   //BIGSIM_OOC DEBUGGING
-  CkPrintf("CkDeliverMessageFree: name of entry fn: %s\n", _entryTable[epIdx]->name);
+  CkPrintf("[%d] CkDeliverMessageFree: entry ID:%d name: %s\n", CkMyPe(), epIdx, _entryTable[epIdx]->name);
   //fflush(stdout);
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, msg);
@@ -600,18 +600,18 @@ extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 	double startTime, startEnergy=0;
 	EnergyOptimizer *energyOptimizer=NULL;
 	if(_energyOptimizer.idx != 0 && !_entryTable[epIdx]->inCharm ){ //user function
+		//CkPrintf("[%d] Starting.. epIdx: %u\n", CkMyNode(), epIdx);
 		energyOptimizer = (EnergyOptimizer *)CkLocalBranch(_energyOptimizer);
 		energyOptimizer->adjustFrequency(epIdx, chareIdx);
 		startTime = CkWallTimer();
 		startEnergy = energyOptimizer->freqController->cpuPower();
-		CkPrintf("[%d] Starting.. epIdx: %u\n", CkMyNode(), epIdx);
 	}
 #endif
   _entryTable[epIdx]->call(msg, obj);
 
 #if CMK_WITH_ENERGY_OPT
 	if(_energyOptimizer.idx != 0 && !_entryTable[epIdx]->inCharm ){ //user function
-		double energy = (startEnergy-energyOptimizer->freqController->cpuPower())
+		double energy = (energyOptimizer->freqController->cpuPower()-startEnergy)
 							/ energyOptimizer->freqController->getPowUnit();
 		energyOptimizer->addEntryStat(CkWallTimer()-startTime, energy, epIdx, chareIdx);
 	}

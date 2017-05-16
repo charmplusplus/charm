@@ -37,7 +37,8 @@ class EntryEnergyInfo{
         }
     }
     //save information about the entry method
-    void addEntryInfo(int duration, int freqLevel, double pow){
+    void addEntryInfo(double duration, int freqLevel, double pow){
+        num_trials++;
         CkAssert(freqLevel < NUM_AVAIL_FREQS && freqLevel >= 0);
         //CkPrintf("addEntryInfo. %d-%d\n", NUM_AVAIL_FREQS, freqLevel);
         int count = freqCallCount[freqLevel]; //previous info count
@@ -48,9 +49,10 @@ class EntryEnergyInfo{
     //find the energy minimal frequency
     //energy = power * time
     void calculateOptimalFreqLevel(){
+        if(num_trials<=0) return;
         double minEnergy = -1;
         int optFreqLevel = -1;
-        for(int l=0; l<NUM_AVAIL_FREQS; l++){
+        for(int l=0; l<NUM_AVAIL_FREQS; ++l){
             double energy = freqPow[l] * freqTime[l]; //what if it's 0?
             if(minEnergy == -1){
                 minEnergy = energy;
@@ -64,11 +66,22 @@ class EntryEnergyInfo{
         optimalFrequency = optFreqLevel;
         optFreqFound = 1;
     }
+    void printOptimalFreqInfo(){
+        if(num_trials<=0) return;
+        for(int l=0; l<NUM_AVAIL_FREQS; ++l){
+            CkPrintf("[%d] - %d - Pow:%f, Time:%f, Enrgy:%f" , CkMyNode(), l, freqPow[l], freqTime[l], freqPow[l] * freqTime[l]);
+            if(optimalFrequency==l) CkPrintf(" - OPT\n");
+            else CkPrintf("\n");
+        }
+    }
     int getOptimalFreqLevel(){
         return optimalFrequency;
     }
     double getAvgExecTime(int freqLevel){
         return freqTime[freqLevel];
+    }
+    int isOptimalFreqFound(){
+        return optFreqFound;
     }
 
 };
@@ -85,7 +98,7 @@ class ChareEntry {
     ChareEntry(const ChareEntry& ce): numEntries(ce.numEntries){
         entryStats.resize(numEntries);
     }
-    void addChareEntryStat(int duration, int freqLevel, double pow, int epIdx){
+    void addChareEntryStat(double duration, int freqLevel, double pow, int epIdx){
         //CkPrintf("epIdx: %d, numEntries: %d\n", epIdx, numEntries);
         CkAssert(epIdx<numEntries && epIdx >= 0);
         entryStats[epIdx].addEntryInfo(duration, freqLevel, pow);
@@ -93,8 +106,9 @@ class ChareEntry {
     void calculateOptimalFreqLevel(){
         for(int i=0; i<numEntries; ++i){
             entryStats[i].calculateOptimalFreqLevel();
-            CkPrintf("[%d] Entry[%d], optimal freq level found: %d\n", CkMyPe(),
-                i, entryStats[i].getOptimalFreqLevel());
+            //CkPrintf("[%d] Entry[%d], optimal freq level found: %d\n", CkMyPe(),
+            //    i, entryStats[i].getOptimalFreqLevel());
+            if(i==164) entryStats[i].printOptimalFreqInfo(); //BILGE
         }
     }
 };
@@ -120,6 +134,8 @@ class ChareStats {
     void calculateOptimalFreqLevel(){
         for(int i=0; i<numChares; i++)
             chareStats[i].calculateOptimalFreqLevel();
+        CkPrintf("[%d] optimal freqs found...\n", CkMyPe());
+
     }
 };
 
@@ -136,7 +152,7 @@ class EnergyOptMain : public Chare {
 //EnergyOptimizer is responsible for collecting entry method statistics
 //and applying frequency changes for optimal energy point for each entry method
 
-#define TRIAL_TIMEOUT           30 //try every freq level for this many seconds
+#define TRIAL_TIMEOUT           5 //try every freq level for this many seconds
 #define FREQ_CHANGE_LATENCY     0.00001 //seconds
 #define ENTRY_THRESHOLD         FREQ_CHANGE_LATENCY*10
 
@@ -168,8 +184,8 @@ class EnergyOptimizer : public IrrGroup {
         freqController->changeGovernor("userspace");
         //disable turbo-boost
         freqController->changeBoost(0);
-        //set the frequency to be non-boost max level
-        freqController->changeFreq(1);
+        //set the frequency to be max level
+        freqController->changeFreq(15);
 
         //start the timer
         timer = CkWallTimer();
@@ -226,10 +242,12 @@ class EnergyOptimizer : public IrrGroup {
                 energy/duration, epIdx, objIdx);
     }
     void adjustFrequency(int epIdx, int objIdx){
+        CkPrintf("[%d] adjustFrequency!\n", CkMyNode());
         if(statsOn){
             //is it time to move to the next freq level?
             double now = CkWallTimer();
-            if(timer - now > TRIAL_TIMEOUT){
+            CkPrintf("[%d] adjustFrequency: %f s!\n", now-timer );
+            if(now-timer > TRIAL_TIMEOUT){
                 if(!freqController->decrementFreqLevel()){
                     //stats collection done, calculate optimal frequency
                     CkPrintf("[%d] Stats collection done!\n", CkMyNode());
@@ -242,11 +260,16 @@ class EnergyOptimizer : public IrrGroup {
             //set the calculated optimal frequency
             //if the optimal freq is the same with current freq,
             //do not do anything
-            int optFreq = energyStats->chareStats[objIdx].entryStats[epIdx].getOptimalFreqLevel();
-            int curFreq = freqController->getCurFreqLevel();
-            int duration = energyStats->chareStats[objIdx].entryStats[epIdx].getAvgExecTime(curFreq);
-            if(optFreq != curFreq && duration > ENTRY_THRESHOLD){ //100us
-                freqController->changeFreq(optFreq);
+            int optFreqFound = energyStats->chareStats[objIdx].entryStats[epIdx].isOptimalFreqFound();
+            if(optFreqFound){
+                CkPrintf("[%d] OPT freq found.\n", CkMyNode());
+                int optFreq = energyStats->chareStats[objIdx].entryStats[epIdx].getOptimalFreqLevel();
+                int curFreq = freqController->getCurFreqLevel();
+                double duration = energyStats->chareStats[objIdx].entryStats[epIdx].getAvgExecTime(curFreq);
+                if(optFreq != curFreq && duration > ENTRY_THRESHOLD){
+                    CkPrintf("[%d] Changing to OPT freq: %d.\n", CkMyNode(), optFreq);
+                    freqController->changeFreq(optFreq);
+                }
             }
         }
     }
