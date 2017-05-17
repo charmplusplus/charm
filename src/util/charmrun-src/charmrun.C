@@ -774,17 +774,17 @@ void arg_init(int argc, const char **argv)
   local_def = 1; /*++local is the default*/
 #endif
 
-  pparam_int(&arg_requested_pes, 1, "p", "number of processes to create");
+  pparam_int(&arg_requested_pes, 1, "p", "Number of processes to create");
   pparam_int(&arg_timeout, 60, "timeout",
-             "seconds to wait per host connection");
+             "Seconds to wait per host connection");
   pparam_flag(&arg_verbose, 0, "verbose", "Print diagnostic messages");
   pparam_flag(&arg_quiet, 0, "quiet", "Omit non-error runtime messages");
-  pparam_str(&arg_nodelist, 0, "nodelist", "file containing list of nodes");
+  pparam_str(&arg_nodelist, 0, "nodelist", "File containing list of physical nodes");
   pparam_str(&arg_nodegroup, "main", "nodegroup",
-             "which group of nodes to use");
+             "Which group of physical nodes to use");
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   pparam_int(&arg_read_pes, 0, "readpe",
-             "number of host names to read into the host table");
+             "Number of host names to read into the host table");
 #endif
 
 #if CMK_CCS_AVAILABLE
@@ -797,25 +797,25 @@ void arg_init(int argc, const char **argv)
               "Start node programs locally without daemon");
   pparam_int(&arg_batch_spawn, 0, "batch", "Launch connections to this many "
                                            "node programs at a time, avoiding "
-                                           "overloading charmrun pe");
-  pparam_flag(&arg_scalable_start, 1, "scalable-start", "scalable start");
+                                           "overloading charmrun PE");
+  pparam_flag(&arg_scalable_start, 1, "scalable-start", "Enable scalable start");
 #ifdef HSTART
   pparam_flag(&arg_hierarchical_start, 0, "hierarchical-start",
               "hierarchical start");
   pparam_flag(&arg_child_charmrun, 0, "child-charmrun", "child charmrun");
 #endif
 #if CMK_SHRINK_EXPAND
-  pparam_int(&arg_realloc_pes, 1, "newp", "new number of processes to create");
-  pparam_int(&arg_old_pes, 1, "oldp", "old number of processes to create");
-  pparam_flag(&arg_shrinkexpand, 0, "shrinkexpand", "shrink expand");
-  pparam_int(&arg_charmrun_port, 0, "charmrun_port", "make charmrun listen on this port");
+  pparam_int(&arg_realloc_pes, 1, "newp", "New number of processes to create");
+  pparam_int(&arg_old_pes, 1, "oldp", "Old number of processes to create");
+  pparam_flag(&arg_shrinkexpand, 0, "shrinkexpand", "Enable shrink/expand support");
+  pparam_int(&arg_charmrun_port, 0, "charmrun_port", "Make charmrun listen on this port");
 #endif
   pparam_flag(&arg_usehostname, 0, "usehostname",
               "Send nodes our symbolic hostname instead of IP address");
   pparam_str(&arg_charmrunip, 0, "useip",
              "Use IP address provided for charmrun IP");
-  pparam_flag(&arg_mpiexec, 0, "mpiexec", "use mpiexec to start jobs");
-  pparam_flag(&arg_mpiexec_no_n, 0, "mpiexec-no-n", "use mpiexec to start jobs without -n procs");
+  pparam_flag(&arg_mpiexec, 0, "mpiexec", "Use mpiexec to start jobs");
+  pparam_flag(&arg_mpiexec_no_n, 0, "mpiexec-no-n", "Use mpiexec to start jobs without -n procs");
 #if CMK_USE_SSH
   pparam_flag(&arg_debug, 0, "debug",
               "Run each node under gdb in an xterm window");
@@ -838,31 +838,33 @@ void arg_init(int argc, const char **argv)
   pparam_int(&arg_maxssh, 16, "maxssh",
              "Maximum number of ssh's to run at a time");
   pparam_str(&arg_shell, 0, "remote-shell",
-             "which remote shell to use (default $CONV_RSH or " SSH_CMD);
-  pparam_str(&arg_debugger, 0, "debugger", "which debugger to use");
+             "Which remote shell to use (default $CONV_RSH or " SSH_CMD ")");
+  pparam_str(&arg_debugger, 0, "debugger", "Which debugger to use");
   pparam_str(&arg_display, 0, "display", "X Display for xterm");
   pparam_flag(&arg_ssh_display, 0, "ssh-display",
-              "use own X Display for each ssh session");
+              "Use own X Display for each ssh session");
   pparam_flag(&arg_in_xterm, 0, "in-xterm", "Run each node in an xterm window");
-  pparam_str(&arg_xterm, 0, "xterm", "which xterm to use");
+  pparam_str(&arg_xterm, 0, "xterm", "Which xterm to use");
 #endif
 #ifdef CMK_BPROC
   /* options for Scyld */
-  pparam_int(&arg_startpe, 0, "startpe", "first pe to start job(SCYLD)");
-  pparam_int(&arg_endpe, 1000000, "endpe", "last pe to start job(SCYLD)");
+  pparam_int(&arg_startpe, 0, "startpe", "First PE to start job(SCYLD)");
+  pparam_int(&arg_endpe, 1000000, "endpe", "Last PE to start job(SCYLD)");
   pparam_flag(&arg_singlemaster, 0, "singlemaster",
               "Only assign one process to master node(SCYLD)");
   pparam_flag(&arg_skipmaster, 0, "skipmaster",
-              "Donot assign any process to master node(SCYLD)");
+              "Do not assign any process to master node(SCYLD)");
   if (arg_skipmaster && arg_singlemaster) {
     PRINT(("Charmrun> 'singlemaster' is ignored due to 'skipmaster'. \n"));
     arg_singlemaster = 0;
   }
-  pparam_flag(&arg_debug, 0, "debug", "turn on more verbose debug print");
+  pparam_flag(&arg_debug, 0, "debug", "Turn on more verbose debug prints");
 #endif
-  pparam_str(&arg_runscript, 0, "runscript", "script to run node-program with");
-  pparam_flag(&arg_help, 0, "help", "print help messages");
-  pparam_int(&arg_ppn, 0, "ppn", "number of pes per node");
+  pparam_str(&arg_runscript, 0, "runscript", "Script to run node-program with");
+  pparam_flag(&arg_help, 0, "help", "Print help messages");
+#if CMK_SMP
+  pparam_int(&arg_ppn, 0, "ppn", "Number of PEs per Charm++ node (=OS process)");
+#endif
   pparam_flag(&arg_no_va_rand, 0, "no-va-randomization",
               "Disables randomization of the virtual address  space");
 #ifdef HSTART
@@ -1071,7 +1073,7 @@ void arg_init(int argc, const char **argv)
 	{
 	  fprintf(
 		  stderr,
-		  "Charmrun> Error: ++ppn (number of pes per node) does not divide +p (number of pes) \n");
+		  "Charmrun> Error: ++ppn (number of PEs per node) does not divide +p (number of PEs) \n");
 	  exit(1);
 	}
     }
