@@ -1305,7 +1305,6 @@ extern "C" void CombineSummary()
       sumProxy.traceSummaryParallelShutdown(-1);
   }
   else {
-    _TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _threadEP,CkMyPe(), 0, NULL, NULL);
     CkContinueExit();
   }
 #else
