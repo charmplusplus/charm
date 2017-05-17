@@ -2634,20 +2634,22 @@ int CkLocMgr::deliverMsg(CkArrayMessage *msg, CkArrayID mgr, CmiUInt8 id, const 
   CkLocRec *rec = elementNrec(id);
 
 #if CMK_LBDB_ON
-  LDObjid ldid;
-  if (idx)
-    ldid = idx2LDObjid(*idx);
-  else if (compressor)
-    ldid = idx2LDObjid(compressor->decompress(id));
-#if CMK_GLOBAL_LOCATION_UPDATE
-  ldid.locMgrGid = thisgroup.idx;
-#endif        
   if ((idx || compressor) && type==CkDeliver_queue && !(opts & CK_MSG_LB_NOTRACE) && the_lbdb->CollectingCommStats())
+  {
+    LDObjid ldid;
+    if (idx)
+      ldid = idx2LDObjid(*idx);
+    else if (compressor)
+      ldid = idx2LDObjid(compressor->decompress(id));
+#if CMK_GLOBAL_LOCATION_UPDATE
+    ldid.locMgrGid = thisgroup.idx;
+#endif
     the_lbdb->Send(myLBHandle
                    , ldid
                    , UsrToEnv(msg)->getTotalsize()
                    , lastKnown(id)
                    , 1);
+  }
 #endif
 
   // Known, remote location or unknown location
