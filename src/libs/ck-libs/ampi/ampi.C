@@ -2455,7 +2455,10 @@ void ampi::ssend_ack(int sreq_idx){
     AmpiRequestList *reqs = &(parent->ampiReqs);
     SsendReq *sreq = (SsendReq *)(*reqs)[sreq_idx];
     sreq->statusIreq = true;
-    if (parent->resumeOnRecv) {
+    if (sreq->isBlocked()) {
+      parent->numBlockedReqs--;
+    }
+    if (parent->resumeOnRecv && parent->numBlockedReqs == 0) {
       thread->resume();
     }
   }
