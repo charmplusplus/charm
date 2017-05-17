@@ -993,13 +993,6 @@ static inline void _processForPlainChareMsg(CkCoreState *ck,envelope *env)
   _invokeEntry(epIdx,env,obj);
 }
 
-static inline void _processForChareMsg(CkCoreState *ck,envelope *env)
-{
-  int epIdx = env->getEpIdx();
-  void *obj = env->getObjPtr();
-  _invokeEntry(epIdx,env,obj);
-}
-
 static inline void _processFillVidMsg(CkCoreState *ck,envelope *env)
 {
 #ifndef CMK_CHARE_USE_PTR
@@ -1101,8 +1094,7 @@ static inline void _processForBocMsg(CkCoreState *ck,envelope *env)
 static inline void _deliverForNodeBocMsg(CkCoreState *ck,envelope *env,void *obj)
 {
   env->setMsgtype(ForChareMsg);
-  env->setObjPtr(obj);
-  _processForChareMsg(ck,env);
+  _invokeEntry(env->getEpIdx(), env, obj);
   _STATS_RECORD_PROCESS_NODE_BRANCH_1();
 }
 
@@ -1133,8 +1125,7 @@ static inline void _processForNodeBocMsg(CkCoreState *ck,envelope *env)
   CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
   ck->process();
   env->setMsgtype(ForChareMsg);
-  env->setObjPtr(obj);
-  _processForChareMsg(ck,env);
+  _invokeEntry(env->getEpIdx(), env, obj);
   _STATS_RECORD_PROCESS_NODE_BRANCH_1();
 }
 
