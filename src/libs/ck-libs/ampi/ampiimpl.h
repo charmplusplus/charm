@@ -644,9 +644,11 @@ enum AmpiReqSts : char {
   AMPI_REQ_COMPLETED = 2
 };
 
-enum AmpiSendType : bool {
-  BLOCKING_SEND = false,
-  I_SEND = true
+enum AmpiSendType : char {
+  BLOCKING_SEND = 0,
+  I_SEND = 1,
+  BLOCKING_SSEND = 2,
+  I_SSEND = 3
 };
 
 #define MyAlign8(x) (((x)+7)&(~7))
@@ -702,14 +704,16 @@ class AmpiRequest {
   virtual bool isPersistent(void) const { return false; }
 
   /// Receive an AmpiMsg
-  virtual void receive(ampi *ptr, AmpiMsg *msg) = 0;
+  /// Returns true if the msg payload is recv'ed, otherwise return false
+  /// (if the msg is a sync msg, it can't be recv'ed until the caller
+  /// acks the sender to get the real payload)
+  virtual bool receive(ampi *ptr, AmpiMsg *msg) = 0;
 
   /// Receive a CkReductionMsg
   virtual void receive(ampi *ptr, CkReductionMsg *msg) = 0;
 
   /// Receive an Rdma message
-  virtual void receiveRdma(ampi *ptr, char *sbuf, int slength, int ssendReq,
-                           int srcRank, MPI_Comm scomm) {
+  virtual void receiveRdma(ampi *ptr, char *sbuf, int slength, int srcRank) {
     CkAbort("AMPI> RDMA receive attempted on an incompatible type of request!");
   }
 
@@ -779,9 +783,9 @@ class IReq : public AmpiRequest {
   inline void setPersistent(bool p) { persistent = p; }
   inline bool isPersistent(void) const { return persistent; }
   void start(MPI_Request reqIdx);
-  void receive(ampi *ptr, AmpiMsg *msg);
+  bool receive(ampi *ptr, AmpiMsg *msg);
   void receive(ampi *ptr, CkReductionMsg *msg) {}
-  void receiveRdma(ampi *ptr, char *sbuf, int slength, int ssendReq, int srcRank, MPI_Comm scomm);
+  void receiveRdma(ampi *ptr, char *sbuf, int slength, int srcRank);
   virtual int getNumReceivedBytes(CkDDT *ptr) const {
     return length;
   }
@@ -811,7 +815,7 @@ class RednReq : public AmpiRequest {
   int wait(MPI_Status *sts);
   void cancel() {}
   inline int getType(void) const { return MPI_REDN_REQ; }
-  void receive(ampi *ptr, AmpiMsg *msg) {}
+  bool receive(ampi *ptr, AmpiMsg *msg) { return true; }
   void receive(ampi *ptr, CkReductionMsg *msg);
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
@@ -836,7 +840,7 @@ class GatherReq : public AmpiRequest {
   int wait(MPI_Status *sts);
   void cancel() {}
   inline int getType(void) const { return MPI_GATHER_REQ; }
-  void receive(ampi *ptr, AmpiMsg *msg) {}
+  bool receive(ampi *ptr, AmpiMsg *msg) { return true; }
   void receive(ampi *ptr, CkReductionMsg *msg);
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
@@ -866,7 +870,7 @@ class GathervReq : public AmpiRequest {
   int wait(MPI_Status *sts);
   void cancel() {}
   inline int getType(void) const { return MPI_GATHERV_REQ; }
-  void receive(ampi *ptr, AmpiMsg *msg) {}
+  bool receive(ampi *ptr, AmpiMsg *msg) { return true; }
   void receive(ampi *ptr, CkReductionMsg *msg);
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
@@ -895,7 +899,7 @@ class SendReq : public AmpiRequest {
   inline void setPersistent(bool p) { persistent = p; }
   inline bool isPersistent(void) const { return persistent; }
   void start(MPI_Request reqIdx);
-  void receive(ampi *ptr, AmpiMsg *msg) {}
+  bool receive(ampi *ptr, AmpiMsg *msg) { return true; }
   void receive(ampi *ptr, CkReductionMsg *msg) {}
   inline int getType(void) const { return MPI_SEND_REQ; }
   virtual void pup(PUP::er &p){
@@ -908,12 +912,20 @@ class SendReq : public AmpiRequest {
 class SsendReq : public AmpiRequest {
   bool persistent; // is this a persistent Ssend request?
  public:
+  int destRank;
   SsendReq(MPI_Comm comm_) {
     comm = comm_; isvalid=true; persistent=false;
   }
   SsendReq(void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_, MPI_Comm comm_) {
     buf=buf_;  count=count_;  type=type_;  src=dest_;  tag=tag_;
     comm=comm_;  isvalid=true; blocked=false; statusIreq=false; persistent=false;
+  }
+  SsendReq(MPI_Comm comm_, int destRank_, void* buf_, int src_, MPI_Datatype type_,
+           int count_, int tag_, AmpiReqSts sts_=AMPI_REQ_PENDING) {
+    comm = comm_; isvalid=true; destRank = destRank_; buf = buf_;
+    src = src_; type = type_; count = count_; tag = tag_;
+    if (sts_ == AMPI_REQ_BLOCKED) blocked=true;
+    else if (sts_ == AMPI_REQ_COMPLETED) statusIreq=true;
   }
   SsendReq() {}
   ~SsendReq(){ }
@@ -923,12 +935,13 @@ class SsendReq : public AmpiRequest {
   inline void setPersistent(bool p) { persistent = p; }
   inline bool isPersistent(void) const { return persistent; }
   void start(MPI_Request reqIdx);
-  void receive(ampi *ptr, AmpiMsg *msg) {}
+  bool receive(ampi *ptr, AmpiMsg *msg) { return true; }
   void receive(ampi *ptr, CkReductionMsg *msg) {}
   inline int getType(void) const { return MPI_SSEND_REQ; }
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
     p|persistent;
+    p|destRank;
   }
   virtual void print();
 };
@@ -940,7 +953,7 @@ class GPUReq : public AmpiRequest {
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE);
   int wait(MPI_Status *sts);
   void cancel() {}
-  void receive(ampi *ptr, AmpiMsg *msg);
+  bool receive(ampi *ptr, AmpiMsg *msg);
   void receive(ampi *ptr, CkReductionMsg *msg) {}
   void setComplete();
 };
@@ -955,7 +968,7 @@ class ATAReq : public AmpiRequest {
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE);
   int wait(MPI_Status *sts);
   void cancel() {}
-  void receive(ampi *ptr, AmpiMsg *msg) {}
+  bool receive(ampi *ptr, AmpiMsg *msg) { return true; }
   void receive(ampi *ptr, CkReductionMsg *msg) {}
   inline int getCount(void) const { return reqs.size(); }
   inline int getType(void) const { return MPI_ATA_REQ; }
@@ -1107,6 +1120,8 @@ class AmpiMsg : public CMessage_AmpiMsg {
   AmpiMsg(void) { data = NULL; }
   AmpiMsg(int _s, int t, int sRank, int l) :
     seq(_s), tag(t), srcRank(sRank), length(l) {}
+  inline bool isSsend(void) const { return (UsrToEnv(this)->getRef() > 0); }
+  inline int getSsendReq(void) const { return UsrToEnv(this)->getRef() - 1; }
   inline int getSeq(void) const { return seq; }
   inline int getSeqIdx(void) const { return srcRank; }
   inline int getSrcRank(void) const { return srcRank; }
@@ -1633,9 +1648,8 @@ class ampi : public CBase_ampi {
   CProxy_ampi remoteProxy; // valid only for intercommunicator
 
   AmpiSeqQ oorder;
-  void inorder(AmpiMsg *msg);
-  void inorderRdma(char* buf, int size, int seq, int tag, int srcRank,
-                   MPI_Comm comm, int ssendReq);
+  bool inorder(AmpiMsg *msg);
+  void inorderRdma(char* buf, int size, int seq, int tag, int srcRank);
 
   void init(void);
 
@@ -1654,11 +1668,11 @@ class ampi : public CBase_ampi {
   void setInitDoneFlag();
 
   void unblock(void);
+  void genericSync(AmpiMsg *);
   void generic(AmpiMsg *);
-  void genericRdma(char* buf, int size, int seq, int tag, int srcRank,
-                   MPI_Comm destcomm, int ssendReq);
+  void genericRdma(char* buf, int size, int seq, int tag, int srcRank);
   void completedRdmaSend(CkDataMsg *msg);
-  void ssend_ack(int sreq);
+  void ssendAck(int sreqIdx);
   void barrierResult(void);
   void ibarrierResult(void);
   void rednResult(CkReductionMsg *msg);
@@ -1680,31 +1694,42 @@ class ampi : public CBase_ampi {
     return parent->comm2CommStruct(comm);
   }
 
+  inline ampi* blockOnIReq(void* buf, int count, MPI_Datatype type, int s,
+                           int t, MPI_Comm comm, MPI_Status* sts);
   inline ampi* blockOnRecv(void);
   inline ampi* blockOnColl(void);
   inline ampi* blockOnRedn(AmpiRequest *req);
   MPI_Request postReq(AmpiRequest* newreq);
+  inline void waitOnBlockingSend(MPI_Request* req, AmpiSendType sendType);
+  inline void requestSsendMsg(AmpiMsg* msg);
 
   inline int getSeqNo(int destRank, MPI_Comm destcomm, int tag);
+  AmpiMsg *makeSyncMsg(int destRank,int t,int sRank,const void *buf,int count,
+                       MPI_Datatype type,MPI_Comm destcomm,int ssendReq,int seq);
   AmpiMsg *makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
-                       MPI_Datatype type,MPI_Comm destcomm, int ssendReq=0);
+                       MPI_Datatype type,MPI_Comm destcomm);
 
   MPI_Request send(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
-                   MPI_Comm destcomm, int ssendReq=0, AmpiSendType sendType=BLOCKING_SEND);
+                   MPI_Comm destcomm, AmpiSendType sendType=BLOCKING_SEND, MPI_Request=MPI_REQUEST_NULL);
   static void sendraw(int t, int s, void* buf, int len, CkArrayID aid, int idx);
+  MPI_Request sendSyncMsg(int t, int sRank, const void* buf, MPI_Datatype type, int count,
+                          int rank, MPI_Comm destcomm, CProxyElement_ampi destElem,
+                          AmpiSendType sendType, MPI_Request req);
   inline MPI_Request sendLocalMsg(int t, int sRank, const void* buf, int size, int destRank,
-                                  MPI_Comm destcomm, ampi* destPtr, int ssendReq, AmpiSendType sendType);
+                                  MPI_Comm destcomm, ampi* destPtr, AmpiSendType sendType,
+                                  MPI_Request req);
   inline MPI_Request sendRdmaMsg(int t, int sRank, const void* buf, int size, int destIdx,
-                                 int destRank, MPI_Comm destcomm, CProxy_ampi arrProxy, int ssendReq);
+                                 int destRank, MPI_Comm destcomm, CProxy_ampi arrProxy,
+                                 MPI_Request req);
   inline bool destLikelyWithinProcess(CProxy_ampi arrProxy, int destIdx) const {
     CkArray* localBranch = arrProxy.ckLocalBranch();
     int destPe = localBranch->lastKnown(CkArrayIndex1D(destIdx));
     return (CkNodeOf(destPe) == CkMyNode());
   }
   MPI_Request delesend(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
-                       MPI_Comm destcomm, CProxy_ampi arrproxy, int ssend, AmpiSendType sendType);
-  inline void processAmpiMsg(AmpiMsg *msg, const void* buf, MPI_Datatype type, int count);
-  inline void processRdmaMsg(const void *sbuf, int slength, int ssendReq, int srank, void* rbuf,
+                       MPI_Comm destcomm, CProxy_ampi arrproxy, AmpiSendType sendType, MPI_Request req);
+  inline bool processAmpiMsg(AmpiMsg *msg, const void* buf, MPI_Datatype type, int count);
+  inline void processRdmaMsg(const void *sbuf, int slength, int srank, void* rbuf,
                              int rcount, MPI_Datatype rtype, MPI_Comm comm);
   inline void processRednMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype type, int count);
   inline void processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count,
