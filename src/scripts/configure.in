@@ -560,6 +560,16 @@ fi
 # R-value and move semantics
 # auto
 cat > $t <<EOT
+// Check for Intel compiler incompatibility with the active g++/libstdc++ by
+// including an arbitrary standard library header (cf bug #1560)
+#include <map>
+
+// Check for an excessively old g++/libstdc++ that can't handle features we use
+#if !CMK_USING_XLC
+#include <memory>
+std::unique_ptr<int> i;
+#endif
+
 class CkMigrateMessage;
 
 struct base {
@@ -602,6 +612,10 @@ fi
 if test -z $got_cpp11
 then
   echo "Charm++ requires some C++11 support, but doesn't know the flag to enable it"
+  echo
+  echo "For Intel's compiler please see"
+  echo "https://charm.cs.illinois.edu/redmine/issues/1560"
+  echo "about making a suitable version of gcc/g++/libstdc++ available"
   test_finish 1
 fi
 
