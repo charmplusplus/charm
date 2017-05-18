@@ -2614,22 +2614,72 @@ CMI_WARN_UNUSED_RESULT ampi* ampi::static_blockOnColl(ampi *dis) noexcept {
   return dis;
 }
 
-void ampi::ssend_ack(int sreq_idx) noexcept {
-  if (sreq_idx == 1)
-    thread->resume();           // MPI_Ssend
-  else {
-    sreq_idx -= 2;              // start from 2
-    AmpiRequestList& reqs = getReqs();
-    AmpiRequest *sreq = reqs[sreq_idx];
-    sreq->complete = true;
-    handleBlockedReq(sreq);
-    resumeThreadIfReady();
+// The recv'er invokes this on the sender when it has matched the sync message and
+// wants the sender to now send over the real message payload
+void ampi::ssendAck(int sreqIdx) noexcept
+{
+  MSG_ORDER_DEBUG(
+    CkPrintf("AMPI vp %d in ssendAck for reqIdx %d\n", parent->thisIndex, sreqIdx);
+  )
+
+  AmpiRequestList& reqs = getReqs();
+  SsendReq& sreq = (SsendReq&)*reqs[sreqIdx];
+  int destIdx = getIndexForRank(sreq.destRank);
+
+#if AMPI_RDMA_IMPL
+  CkDDT_DataType* ddt = getDDT()->getType(sreq.type);
+  if (ddt->isContig()) {
+    int size = ddt->getSize(sreq.count);
+    if (size >= AMPI_RDMA_THRESHOLD) {
+      int seq = getSeqNo(sreq.destRank, sreq.comm, sreq.tag);
+      CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
+      completedSendCB.setRefnum(sreqIdx);
+      thisProxy[destIdx].genericRdma(CkSendBuffer(sreq.buf, completedSendCB), size, seq, sreq.tag, sreq.src);
+      return;
+    }
   }
+#endif //AMPI_RDMA_IMPL
+
+  thisProxy[destIdx].generic(makeAmpiMsg(sreq.destRank, sreq.tag, sreq.src, sreq.buf, sreq.count, sreq.type, sreq.comm));
+
+  sreq.complete = true;
+  handleBlockedReq(&sreq);
+  resumeThreadIfReady();
+}
+
+// Only "sync" messages (the first message in the rendezvous protocol)
+// from (I)Ssend are delivered here
+void ampi::genericSync(AmpiMsg* msg) noexcept
+{
+  MSG_ORDER_DEBUG(
+    CkPrintf("AMPI vp %d sync arrival: tag=%d, src=%d, comm=%d, ssendReq=%d (seq %d) resumeOnRecv %d\n",
+             thisIndex, msg->getTag(), msg->getSrcRank(), getComm(), CkGetRefNum(msg), msg->getSeq(), parent->resumeOnRecv);
+  )
+  CkAssert(CkGetRefNum(msg));
+#if CMK_BIGSIM_CHARM
+  TRACE_BG_ADD_TAG("AMPI_generic");
+  msg->event = NULL;
+#endif
+
+  if(msg->getSeq() != 0) {
+    int seqIdx = msg->getSeqIdx();
+    int n=oorder.put(seqIdx,msg);
+    if (n>0) { // This message was in-order
+      inorder(msg);
+      // Sync messages don't immediately get processed:
+      // if in-order, the recv'er will invoke ampi::ssendAck to get the real payload back
+    }
+  } else { //Cross-world or system messages are unordered
+    inorder(msg);
+  }
+  // msg may be free'ed from calling inorder()
+
+  resumeThreadIfReady();
 }
 
 void ampi::injectMsg(int size, char* buf) noexcept
 {
-  generic(makeAmpiMsg(thisIndex, 0, thisIndex, (void*)buf, size, MPI_CHAR, MPI_COMM_WORLD, 0));
+  generic(makeAmpiMsg(thisIndex, 0, thisIndex, (void*)buf, size, MPI_CHAR, MPI_COMM_WORLD));
 }
 
 void ampi::generic(AmpiMsg* msg) noexcept
@@ -2650,7 +2700,7 @@ void ampi::generic(AmpiMsg* msg) noexcept
       inorder(msg);
       if (n>1) { // It enables other, previously out-of-order messages
         while((msg=oorder.getOutOfOrder(seqIdx))!=0) {
-          inorder(msg);
+          if (!inorder(msg)) break; // Returns false if msg is a sync message
         }
       }
     }
@@ -2707,7 +2757,7 @@ void AmpiRequestList::free(AmpiRequestPool &reqPool, int idx, CkDDT *ddt) noexce
   startIdx = std::min(idx, startIdx);
 }
 
-void ampi::inorder(AmpiMsg* msg) noexcept
+bool ampi::inorder(AmpiMsg* msg) noexcept
 {
   MSG_ORDER_DEBUG(
     CkPrintf("AMPI vp %d inorder: tag=%d, src=%d, comm=%d (seq %d)\n",
@@ -2722,13 +2772,25 @@ void ampi::inorder(AmpiMsg* msg) noexcept
   //Check posted recvs:
   int tag = msg->getTag();
   int srcRank = msg->getSrcRank();
-  AmpiRequest* req = postedReqs.get(tag, srcRank);
-  if (req) { // receive posted
-    handleBlockedReq(req);
-    req->receive(this, msg);
+  AmpiRequest* ireq = postedReqs.get(tag, srcRank);
+  if (ireq) { // receive posted
+    bool resetNumBlockedReqs = false;
+    if (ireq->isBlocked() && parent->numBlockedReqs != 0) {
+      resetNumBlockedReqs = true;
+      parent->numBlockedReqs--;
+    }
+    if (!ireq->receive(this, msg)) { // Returns false if msg is a sync message
+      // Repost the req for the real message, undo any state changed by the SyncMsg
+      postedReqs.put(tag, srcRank, ireq);
+      if (resetNumBlockedReqs) {
+        parent->numBlockedReqs++;
+      }
+      return false;
+    }
   } else {
     unexpectedMsgs.put(msg);
   }
+  return true;
 }
 
 void ampi::inorderBcast(AmpiMsg* msg, bool deleteMsg) noexcept
@@ -2757,61 +2819,59 @@ void ampi::inorderBcast(AmpiMsg* msg, bool deleteMsg) noexcept
   }
 }
 
-static inline AmpiMsg* rdma2AmpiMsg(char *buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank,
-                                    int ssendReq) noexcept
+static inline AmpiMsg* rdma2AmpiMsg(char *buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank) noexcept
 {
   // Convert an Rdma message (parameter marshalled buffer) to an AmpiMsg
-  AmpiMsg* msg = new (size, 0) AmpiMsg(seq, ssendReq, tag, srcRank, size);
-  memcpy(msg->data, buf, size); // Assumes the buffer is contiguous
+  AmpiMsg* msg = new (size, 0) AmpiMsg(seq, MPI_REQUEST_NULL, tag, srcRank, size);
+  memcpy(msg->getData(), buf, size); // Assumes the buffer is contiguous
   return msg;
 }
 
 // RDMA version of ampi::generic
-void ampi::genericRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank, MPI_Comm destcomm, int ssendReq) noexcept
+void ampi::genericRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank) noexcept
 {
   MSG_ORDER_DEBUG(
-    CkPrintf("[%d] in ampi::genericRdma on index %d, size=%d, seq=%d, srcRank=%d, tag=%d, comm=%d, ssendReq=%d\n",
-             CkMyPe(), getIndexForRank(getRank()), size, seq, srcRank, tag, destcomm, ssendReq);
+    CkPrintf("[%d] in ampi::genericRdma on index %d, size=%d, seq=%d, srcRank=%d, tag=%d, comm=%d\n",
+             CkMyPe(), getIndexForRank(getRank()), size, seq, srcRank, tag, getComm());
   )
 
   if (seq != 0) {
     int seqIdx = srcRank;
     int n = oorder.isInOrder(seqIdx, seq);
     if (n > 0) { // This message was in-order
-      inorderRdma(buf, size, seq, tag, srcRank, destcomm, ssendReq);
+      inorderRdma(buf, size, seq, tag, srcRank);
       if (n > 1) { // It enables other, previously out-of-order messages
         AmpiMsg *msg = NULL;
         while ((msg = oorder.getOutOfOrder(seqIdx)) != 0) {
-          inorder(msg);
+          if (!inorder(msg)) break; // Returns false if msg is a sync message
         }
       }
     } else { // This message was out-of-order: stash it (as an AmpiMsg)
-      AmpiMsg *msg = rdma2AmpiMsg(buf, size, seq, tag, srcRank, ssendReq);
+      AmpiMsg *msg = rdma2AmpiMsg(buf, size, seq, tag, srcRank);
       oorder.putOutOfOrder(seqIdx, msg);
     }
   } else { // Cross-world or system messages are unordered
-    inorderRdma(buf, size, seq, tag, srcRank, destcomm, ssendReq);
+    inorderRdma(buf, size, seq, tag, srcRank);
   }
 
   resumeThreadIfReady();
 }
 
 // RDMA version of ampi::inorder
-void ampi::inorderRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank,
-                       MPI_Comm comm, int ssendReq) noexcept
+void ampi::inorderRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank) noexcept
 {
   MSG_ORDER_DEBUG(
     CkPrintf("AMPI vp %d inorderRdma: tag=%d, src=%d, comm=%d  (seq %d)\n",
-             thisIndex, tag, srcRank, comm, seq);
+             thisIndex, tag, srcRank, getComm(), seq);
   )
 
   //Check posted recvs:
-  AmpiRequest* req = postedReqs.get(tag, srcRank);
-  if (req) { // receive posted
-    handleBlockedReq(req);
-    req->receiveRdma(this, buf, size, ssendReq, srcRank, comm);
+  AmpiRequest* ireq = postedReqs.get(tag, srcRank);
+  if (ireq) { // receive posted
+    handleBlockedReq(ireq);
+    ireq->receiveRdma(this, buf, size, srcRank);
   } else {
-    AmpiMsg* msg = rdma2AmpiMsg(buf, size, seq, tag, srcRank, ssendReq);
+    AmpiMsg* msg = rdma2AmpiMsg(buf, size, seq, tag, srcRank);
     unexpectedMsgs.put(msg);
   }
 }
@@ -2867,19 +2927,43 @@ AmpiMsg *ampi::makeBcastMsg(const void *buf,int count,MPI_Datatype type,int root
   return msg;
 }
 
+// Create an empty AmpiMsg to be matched on the recv side
+AmpiMsg *ampi::makeSyncMsg(int destRank,int t,int sRank,const void *buf,int count, MPI_Datatype type,
+                           MPI_Comm destcomm,int ssendReq,CMK_REFNUM_TYPE seq) noexcept
+{
+  CkAssert(ssendReq >= 0);
+  CkDDT_DataType *ddt = getDDT()->getType(type);
+  int len = ddt->getSize(count);
+  AmpiMsg *msg = CkpvAccess(msgPool).newAmpiMsg(seq, ssendReq, t, sRank, 0);
+  msg->setLength(len); // set AmpiMsg's length to be that of the real msg payload
+  return msg;
+}
+
 AmpiMsg *ampi::makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
-                           MPI_Datatype type,MPI_Comm destcomm, int ssendReq/*=0*/) noexcept
+                           MPI_Datatype type,MPI_Comm destcomm) noexcept
 {
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
   CMK_REFNUM_TYPE seq = getSeqNo(destRank, destcomm, t);
-  AmpiMsg *msg = CkpvAccess(msgPool).newAmpiMsg(seq, ssendReq, t, sRank, len);
+  AmpiMsg *msg = CkpvAccess(msgPool).newAmpiMsg(seq, MPI_REQUEST_NULL, t, sRank, len);
   ddt->serialize((char*)buf, msg->getData(), count, msg->getLength(), PACK);
   return msg;
 }
 
+void ampi::waitOnBlockingSend(MPI_Request* req, AmpiSendType sendType) noexcept
+{
+  if (*req != MPI_REQUEST_NULL && (sendType == BLOCKING_SEND || sendType == BLOCKING_SSEND)) {
+    AmpiRequestList& reqList = getReqs();
+    AmpiRequest& sreq = *reqList[*req];
+    sreq.wait(MPI_STATUS_IGNORE);
+    reqList.free(parent->reqPool, *req, parent->getDDT());
+    *req = MPI_REQUEST_NULL;
+  }
+}
+
 MPI_Request ampi::send(int t, int sRank, const void* buf, int count, MPI_Datatype type,
-                       int rank, MPI_Comm destcomm, int ssendReq/*=0*/, AmpiSendType sendType/*=BLOCKING_SEND*/) noexcept
+                       int rank, MPI_Comm destcomm, AmpiSendType sendType/*=BLOCKING_SEND*/,
+                       MPI_Request reqIdx/*=MPI_REQUEST_NULL*/) noexcept
 {
 #if CMK_TRACE_IN_CHARM
   TRACE_BG_AMPI_BREAK(thread->getThread(), "AMPI_SEND", NULL, 0, 1);
@@ -2892,31 +2976,19 @@ MPI_Request ampi::send(int t, int sRank, const void* buf, int count, MPI_Datatyp
 #endif
 
   const ampiCommStruct &dest=comm2CommStruct(destcomm);
-  MPI_Request req = delesend(t,sRank,buf,count,type,rank,destcomm,dest.getProxy(),ssendReq,sendType);
-  if (sendType == BLOCKING_SEND && req != MPI_REQUEST_NULL) {
-    AmpiRequestList& reqList = getReqs();
-    AmpiRequest *sreq = reqList[req];
-    sreq->wait(MPI_STATUS_IGNORE);
-    reqList.free(parent->reqPool, req, parent->getDDT());
-    req = MPI_REQUEST_NULL;
-  }
+  MPI_Request req = delesend(t,sRank,buf,count,type,rank,destcomm,dest.getProxy(),sendType,reqIdx);
+  waitOnBlockingSend(&req, sendType);
 
 #if CMK_TRACE_IN_CHARM
   TRACE_BG_AMPI_BREAK(thread->getThread(), "AMPI_SEND_END", NULL, 0, 1);
 #endif
-
-  if (ssendReq == 1) {
-    // waiting for receiver side
-    parent->resumeOnRecv = false;            // so no one else awakes it
-    parent = parent->block();
-  }
 
   return req;
 }
 
 void ampi::sendraw(int t, int sRank, void* buf, int len, CkArrayID aid, int idx) noexcept
 {
-  AmpiMsg *msg = new (len, 0) AmpiMsg(0, 0, t, sRank, len);
+  AmpiMsg *msg = new (len, 0) AmpiMsg(0, MPI_REQUEST_NULL, t, sRank, len);
   memcpy(msg->getData(), buf, len);
   CProxy_ampi pa(aid);
   pa[idx].generic(msg);
@@ -2932,43 +3004,66 @@ CMK_REFNUM_TYPE ampi::getSeqNo(int destRank, MPI_Comm destcomm, int tag) noexcep
 }
 
 MPI_Request ampi::sendRdmaMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type, int destIdx,
-                              int destRank, MPI_Comm destcomm, CProxy_ampi arrProxy, int ssendReq) noexcept
+                              int destRank, MPI_Comm destcomm, CProxy_ampi arrProxy, MPI_Request reqIdx) noexcept
 {
   CMK_REFNUM_TYPE seq = getSeqNo(destRank, destcomm, t);
 
-  if (ssendReq) { // Using a SsendReq to track matching receive, so no need for SendReq here
-    arrProxy[destIdx].genericRdma(CkSendBuffer(buf), size, seq, t, sRank, destcomm, ssendReq);
-    return MPI_REQUEST_NULL;
+  // Set up a SendReq to track completion of the send buffer
+  if (reqIdx == MPI_REQUEST_NULL) {
+    reqIdx = postReq(parent->reqPool.newReq<SendReq>(type, destcomm, getDDT()));
   }
-  else { // Set up a SendReq to track completion of the send buffer
-    MPI_Request req = postReq(parent->reqPool.newReq<SendReq>(type, destcomm, getDDT()));
-    CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
-    completedSendCB.setRefnum(req);
+  CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
+  completedSendCB.setRefnum(reqIdx);
 
-    arrProxy[destIdx].genericRdma(CkSendBuffer(buf, completedSendCB), size, seq, t, sRank, destcomm, ssendReq);
-    return req;
-  }
+  arrProxy[destIdx].genericRdma(CkSendBuffer(buf, completedSendCB), size, seq, t, sRank);
+  return reqIdx;
 }
 
 // Call genericRdma inline on the local destination object
 MPI_Request ampi::sendLocalMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type, int destRank,
-                               MPI_Comm destcomm, ampi* destPtr, int ssendReq, AmpiSendType sendType) noexcept
+                               MPI_Comm destcomm, ampi* destPtr, AmpiSendType sendType, MPI_Request reqIdx) noexcept
 {
   CMK_REFNUM_TYPE seq = getSeqNo(destRank, destcomm, t);
 
-  destPtr->genericRdma((char*)buf, size, seq, t, sRank, destcomm, ssendReq);
+  destPtr->genericRdma((char*)buf, size, seq, t, sRank);
 
-  if (ssendReq || sendType == BLOCKING_SEND) {
+  if (sendType == BLOCKING_SEND) {
     return MPI_REQUEST_NULL;
+  }
+  else if (reqIdx != MPI_REQUEST_NULL) {
+    return reqIdx;
   }
   else { // SendReq is pre-completed since we directly copied the send buffer
     return postReq(parent->reqPool.newReq<SendReq>(type, destcomm, getDDT(), AMPI_REQ_COMPLETED));
   }
 }
 
+MPI_Request ampi::sendSyncMsg(int t, int sRank, const void* buf, MPI_Datatype type, int count,
+                              int rank, MPI_Comm destcomm, CProxyElement_ampi destElem,
+                              AmpiSendType sendType, MPI_Request reqIdx) noexcept
+{
+  int seq = getSeqNo(rank, destcomm, t);
+  if (reqIdx == MPI_REQUEST_NULL) {
+    reqIdx = postReq(parent->reqPool.newReq<SsendReq>(buf, count, type, rank, t, destcomm, sRank, getDDT(),
+                                                      (sendType == BLOCKING_SSEND) ?
+                                                      AMPI_REQ_BLOCKED : AMPI_REQ_PENDING));
+  }
+  // All sync messages go thru ampi::genericSync (not generic or genericRdma)
+#if AMPI_LOCAL_IMPL
+  ampi* destPtr = destElem.ckLocal();
+  if (destPtr != nullptr) {
+    destPtr->genericSync(makeSyncMsg(rank, t, sRank, buf, count, type, destcomm, reqIdx, seq));
+  } else
+#endif
+  {
+    destElem.genericSync(makeSyncMsg(rank, t, sRank, buf, count, type, destcomm, reqIdx, seq));
+  }
+  return reqIdx;
+}
+
 MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Datatype type,
-                           int rank, MPI_Comm destcomm, CProxy_ampi arrProxy, int ssendReq,
-                           AmpiSendType sendType) noexcept
+                           int rank, MPI_Comm destcomm, CProxy_ampi arrProxy, AmpiSendType sendType,
+                           MPI_Request reqIdx) noexcept
 {
   if (rank==MPI_PROC_NULL) return MPI_REQUEST_NULL;
   const ampiCommStruct &dest=comm2CommStruct(destcomm);
@@ -2982,61 +3077,75 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
   }
 
   MSG_ORDER_DEBUG(
-    CkPrintf("AMPI vp %d send: tag=%d, src=%d, comm=%d (to %d)\n",thisIndex,t,sRank,destcomm,destIdx);
+    CkPrintf("AMPI vp %d send: tag=%d, src=%d, comm=%d (to %d)\n",parent->thisIndex,t,sRank,destcomm,destIdx);
   )
 
+  if (sendType == BLOCKING_SSEND || sendType == I_SSEND) {
+    return sendSyncMsg(t, sRank, buf, type, count, rank, destcomm, arrProxy[destIdx], sendType, reqIdx);
+  }
   ampi *destPtr = arrProxy[destIdx].ckLocal();
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int size = ddt->getSize(count);
   if (ddt->isContig()) {
 #if AMPI_LOCAL_IMPL
     if (destPtr != NULL) {
-      return sendLocalMsg(t, sRank, buf, size, type, rank, destcomm, destPtr, ssendReq, sendType);
+      return sendLocalMsg(t, sRank, buf, size, type, rank, destcomm, destPtr, sendType, reqIdx);
     }
 #endif
 #if AMPI_RDMA_IMPL
     if (size >= AMPI_RDMA_THRESHOLD ||
        (size >= AMPI_SMP_RDMA_THRESHOLD && destLikelyWithinProcess(arrProxy, destIdx)))
     {
-      return sendRdmaMsg(t, sRank, buf, size, type, destIdx, rank, destcomm, arrProxy, ssendReq);
+      return sendRdmaMsg(t, sRank, buf, size, type, destIdx, rank, destcomm, arrProxy, reqIdx);
     }
 #endif
   }
 #if AMPI_LOCAL_IMPL
   if (destPtr != NULL) {
-    destPtr->generic(makeAmpiMsg(rank, t, sRank, buf, count, type, destcomm, ssendReq));
+    destPtr->generic(makeAmpiMsg(rank, t, sRank, buf, count, type, destcomm));
     return MPI_REQUEST_NULL;
   } else
 #endif
   {
-    arrProxy[destIdx].generic(makeAmpiMsg(rank, t, sRank, buf, count, type, destcomm, ssendReq));
+    arrProxy[destIdx].generic(makeAmpiMsg(rank, t, sRank, buf, count, type, destcomm));
+    if (reqIdx != MPI_REQUEST_NULL) {
+      AmpiRequestList& reqList = parent->ampiReqs;
+      AmpiRequest& sreq = (*reqList[reqIdx]);
+      sreq.complete = true;
+      return reqIdx;
+    }
     return MPI_REQUEST_NULL;
   }
 }
 
-void ampi::processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count) noexcept
+// Ask the sender to send us the real message back
+void ampi::requestSsendMsg(AmpiMsg* msg) noexcept
 {
   int ssendReq = msg->getSsendReq();
-  if (ssendReq > 0) { // send an ack to sender
-    int srcRank = msg->getSrcRank();
-    int srcIdx = getIndexForRank(srcRank);
-    thisProxy[srcIdx].ssend_ack(ssendReq);
+  CkAssert(ssendReq >= 0);
+  MSG_ORDER_DEBUG(
+    CkPrintf("AMPI vp %d calling ssendAck with sreqIdx %d\n", parent->thisIndex, ssendReq);
+  )
+  int srcIdx = getIndexForRank(msg->getSrcRank());
+  thisProxy[srcIdx].ssendAck(ssendReq);
+}
+
+bool ampi::processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count) noexcept
+{
+  if (msg->isSsend()) { // this is a sync msg, send an ack to sender to get the real one
+    requestSsendMsg(msg);
+    return false;
   }
 
   CkDDT_DataType *ddt = getDDT()->getType(type);
-
   ddt->serialize((char*)buf, msg->getData(), count, msg->getLength(), UNPACK);
+  return true;
 }
 
 // RDMA version of ampi::processAmpiMsg
-void ampi::processRdmaMsg(const void *sbuf, int slength, int ssendReq, int srank, void* rbuf,
+void ampi::processRdmaMsg(const void *sbuf, int slength, int srank, void* rbuf,
                           int rcount, MPI_Datatype rtype, MPI_Comm comm) noexcept
 {
-  if (ssendReq > 0) { // send an ack to sender
-    int srcIdx = getIndexForRank(srank);
-    thisProxy[srcIdx].ssend_ack(ssendReq);
-  }
-
   CkDDT_DataType *ddt = getDDT()->getType(rtype);
 
   ddt->serialize((char*)rbuf, (char*)sbuf, rcount, slength, UNPACK);
@@ -3184,6 +3293,27 @@ void ampi::processGathervMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type,
   delete [] results;
 }
 
+ampi* ampi::blockOnIReq(void* buf, int count, MPI_Datatype type, int src,
+                        int tag, MPI_Comm comm, MPI_Status* sts) noexcept
+{
+  MPI_Request request = postReq(parent->reqPool.newReq<IReq>(buf, count, type, src, tag, comm, getDDT(),
+                                                             AMPI_REQ_BLOCKED));
+  CkAssert(parent->numBlockedReqs == 0);
+  parent->numBlockedReqs = 1;
+  ampi* dis = blockOnRecv(); // "dis" is updated in case an ampi thread is migrated
+  AmpiRequestList& reqs = dis->getReqs();
+  if (sts != MPI_STATUS_IGNORE) {
+    AmpiRequest& req = *reqs[request];
+    sts->MPI_SOURCE = req.src;
+    sts->MPI_TAG    = req.tag;
+    sts->MPI_COMM   = req.comm;
+    sts->MPI_LENGTH = req.getNumReceivedBytes(dis->getDDT());
+    sts->MPI_CANCEL = 0;
+  }
+  reqs.freeNonPersReq(request);
+  return dis;
+}
+
 static inline void clearStatus(MPI_Status *sts) noexcept {
   if (sts != MPI_STATUS_IGNORE) {
     sts->MPI_TAG    = MPI_ANY_TAG;
@@ -3242,28 +3372,19 @@ int ampi::static_recv(ampi *dis, int t, int s, void* buf, int count, MPI_Datatyp
       sts->MPI_LENGTH = msg->getLength();
       sts->MPI_CANCEL = 0;
     }
-    dis->processAmpiMsg(msg, buf, type, count);
 #if CMK_BIGSIM_CHARM
-    TRACE_BG_AMPI_BREAK(thread->getThread(), "RECV_RESUME", NULL, 0, 0);
+    TRACE_BG_AMPI_BREAK(dis->thread->getThread(), "RECV_RESUME", NULL, 0, 0);
     if (msg->eventPe == CkMyPe()) _TRACE_BG_ADD_BACKWARD_DEP(msg->event);
 #endif
-    CkpvAccess(msgPool).deleteAmpiMsg(msg);
+    if (dis->processAmpiMsg(msg, buf, type, count)) {
+      CkpvAccess(msgPool).deleteAmpiMsg(msg);
+    }
+    else { // msg was a sync msg, so now block on the real msg
+      dis = dis->blockOnIReq(buf, count, type, s, t, comm, sts);
+    }
   }
   else { // post a request and block until the matching message arrives
-    int request = dis->postReq(dis->parent->reqPool.newReq<IReq>(buf, count, type, s, t, comm, dis->getDDT(), AMPI_REQ_BLOCKED));
-    CkAssert(dis->parent->numBlockedReqs == 0);
-    dis->parent->numBlockedReqs = 1;
-    dis = dis->blockOnRecv(); // "dis" is updated in case an ampi thread is migrated while waiting for a message
-    AmpiRequestList& reqs = dis->parent->getReqs();
-    if (sts != MPI_STATUS_IGNORE) {
-      AmpiRequest& req = *reqs[request];
-      sts->MPI_SOURCE = req.src;
-      sts->MPI_TAG    = req.tag;
-      sts->MPI_COMM   = req.comm;
-      sts->MPI_LENGTH = req.getNumReceivedBytes(dis->getDDT());
-      sts->MPI_CANCEL = 0;
-    }
-    reqs.freeNonPersReq(request);
+    dis = dis->blockOnIReq(buf, count, type, s, t, comm, sts);
   }
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -3491,7 +3612,7 @@ int ampi::intercomm_ibcast(int root, void* buf, int count, MPI_Datatype type, MP
 
 void ampi::bcastraw(void* buf, int len, CkArrayID aid) noexcept
 {
-  AmpiMsg *msg = new (len, 0) AmpiMsg(0, 0, MPI_BCAST_TAG, 0, len);
+  AmpiMsg *msg = new (len, 0) AmpiMsg(0, MPI_REQUEST_NULL, MPI_BCAST_TAG, 0, len);
   memcpy(msg->getData(), buf, len);
   CProxy_ampi pa(aid);
   pa.generic(msg);
@@ -3532,7 +3653,7 @@ int ampi::intercomm_iscatter(int root, const void *sendbuf, int sendcount, MPI_D
     ATAReq *newreq = new ATAReq(remote_size);
     for(int i = 0; i < remote_size; i++) {
       newreq->reqs[i] = send(MPI_SCATTER_TAG, getRank(), ((char*)sendbuf)+(itemsize*i),
-                             sendcount, sendtype, i, intercomm, 0, I_SEND);
+                             sendcount, sendtype, i, intercomm, I_SEND);
     }
     *request = postReq(newreq);
   }
@@ -3581,7 +3702,7 @@ int ampi::intercomm_iscatterv(int root, const void* sendbuf, const int* sendcoun
     ATAReq *newreq = new ATAReq(remote_size);
     for (int i = 0; i < remote_size; i++) {
       newreq->reqs[i] = send(MPI_SCATTER_TAG, getRank(), ((char*)sendbuf)+(itemsize*displs[i]),
-                             sendcounts[i], sendtype, i, intercomm, 0, I_SEND);
+                             sendcounts[i], sendtype, i, intercomm, I_SEND);
     }
     *request = postReq(newreq);
   }
@@ -4197,7 +4318,7 @@ AMPI_API_IMPL(int, MPI_Ssend, const void *msg, int count, MPI_Datatype type,
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  ptr->send(tag, ptr->getRank(), msg, count, type, dest, comm, 1);
+  ptr->send(tag, ptr->getRank(), msg, count, type, dest, comm, BLOCKING_SSEND);
 
   return MPI_SUCCESS;
 }
@@ -4226,12 +4347,8 @@ AMPI_API_IMPL(int, MPI_Issend, const void *buf, int count, MPI_Datatype type, in
 #endif
 
   USER_CALL_DEBUG("AMPI_Issend("<<type<<","<<dest<<","<<tag<<","<<comm<<")");
-  ampiParent* pptr = getAmpiParent();
-  ampi *ptr = getAmpiInstance(comm);
-  *request = ptr->postReq(pptr->reqPool.newReq<SsendReq>(type, comm, pptr->getDDT()));
-  // 1:  blocking now  - used by MPI_Ssend
-  // >=2:  the index of the requests - used by MPI_Issend
-  ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm, *request+2, I_SEND);
+  ampi* ptr = getAmpiInstance(comm);
+  *request = ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm, I_SSEND);
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -4469,7 +4586,7 @@ void ampi::sendrecv(const void *sbuf, int scount, MPI_Datatype stype, int dest, 
   MPI_Request reqs[2];
   irecv(rbuf, rcount, rtype, src, rtag, comm, &reqs[0]);
 
-  reqs[1] = send(stag, getRank(), sbuf, scount, stype, dest, comm, 0, I_SEND);
+  reqs[1] = send(stag, getRank(), sbuf, scount, stype, dest, comm, I_SEND);
 
   if (sts == MPI_STATUS_IGNORE) {
     MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
@@ -4522,7 +4639,7 @@ void ampi::sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
   irecv(buf, count, datatype, source, recvtag, comm, &reqs[0]);
 
   // FIXME: this send may do a copy internally! If we knew now that it would, we could avoid double copying:
-  reqs[1] = send(sendtag, getRank(), tmpBuf.data(), count, datatype, dest, comm, 0, I_SEND);
+  reqs[1] = send(sendtag, getRank(), tmpBuf.data(), count, datatype, dest, comm, I_SEND);
 
   if (status == MPI_STATUS_IGNORE) {
     MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
@@ -5055,7 +5172,7 @@ AMPI_API_IMPL(int, MPI_Reduce, const void *inbuf, void *outbuf, int count, MPI_D
     ptr = ptr->blockOnColl();
 
 #if AMPI_SYNC_REDUCE
-    AmpiMsg *msg = new (0, 0) AmpiMsg(0, 0, MPI_REDN_TAG, -1, rootIdx, 0);
+    AmpiMsg *msg = new (0, 0) AmpiMsg(0, MPI_REQUEST_NULL, MPI_REDN_TAG, -1, rootIdx, 0);
     CProxy_ampi pa(ptr->getProxy());
     pa.generic(msg);
 #endif
@@ -5522,7 +5639,7 @@ void SendReq::start(MPI_Request reqIdx) noexcept {
   CkAssert(persistent);
   complete = false;
   ampi* ptr = getAmpiInstance(comm);
-  ptr->send(tag, ptr->getRank(), buf, count, type, src /*really, the destination*/, comm);
+  ptr->send(tag, ptr->getRank(), buf, count, type, src /*really, the destination*/, comm, I_SEND, reqIdx);
   complete = true;
 }
 
@@ -5530,7 +5647,7 @@ void SsendReq::start(MPI_Request reqIdx) noexcept {
   CkAssert(persistent);
   complete = false;
   ampi* ptr = getAmpiInstance(comm);
-  ptr->send(tag, ptr->getRank(), buf, count, type, src /*really, the destination*/, comm, reqIdx+2, I_SEND);
+  ptr->send(tag, ptr->getRank(), buf, count, type, src /*really, the destination*/, comm, I_SSEND, reqIdx);
 }
 
 int IReq::wait(MPI_Status *sts) noexcept {
@@ -5691,11 +5808,15 @@ int SendReq::wait(MPI_Status *sts) noexcept {
 }
 
 int SsendReq::wait(MPI_Status *sts) noexcept {
-  ampiParent *parent = getAmpiParent();
+  ampiParent *disParent = getAmpiParent();
   while (!complete) {
-    // "dis" is updated in case an ampi thread is migrated while waiting for a message
-    parent = parent->blockOnRecv();
+    disParent->resumeOnRecv = true;
+    disParent->numBlockedReqs = 1;
+    setBlocked(true);
+    disParent = disParent->block();
+    setBlocked(false);
   }
+  disParent->resumeOnRecv = false;
   if (sts != MPI_STATUS_IGNORE) {
     sts->MPI_COMM = comm;
     sts->MPI_CANCEL = 0;
@@ -6098,9 +6219,12 @@ bool ATAReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept {
   return complete;
 }
 
-void IReq::receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg/*=true*/) noexcept
+bool IReq::receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg/*=true*/) noexcept
 {
-  ptr->processAmpiMsg(msg, buf, type, count);
+  if (!ptr->processAmpiMsg(msg, buf, type, count)) { // Returns false if msg is a sync message
+    CkpvAccess(msgPool).deleteAmpiMsg(msg);
+    return false;
+  }
   complete = true;
   length = msg->getLength();
   this->tag = msg->getTag(); // Although not required, we also extract tag from msg
@@ -6115,14 +6239,15 @@ void IReq::receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg/*=true*/) noexcept
   if (deleteMsg) {
     CkpvAccess(msgPool).deleteAmpiMsg(msg);
   }
+  return true;
 }
 
-void IReq::receiveRdma(ampi *ptr, char *sbuf, int slength, int ssendReq, int srcRank, MPI_Comm scomm) noexcept
+void IReq::receiveRdma(ampi *ptr, char *sbuf, int slength, int srcRank) noexcept
 {
-  ptr->processRdmaMsg(sbuf, slength, ssendReq, srcRank, buf, count, type, scomm);
+  ptr->processRdmaMsg(sbuf, slength, srcRank, buf, count, type, ptr->getComm());
   complete = true;
   length = slength;
-  comm = scomm;
+  comm = ptr->getComm();
   // ampi::genericRdma is parameter marshalled, so there is no msg to delete
 }
 
@@ -6893,7 +7018,7 @@ AMPI_API_IMPL(int, MPI_Isend, const void *buf, int count, MPI_Datatype type, int
   USER_CALL_DEBUG("AMPI_Isend("<<type<<","<<dest<<","<<tag<<","<<comm<<")");
 
   ampi *ptr = getAmpiInstance(comm);
-  *request = ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm, 0, I_SEND);
+  *request = ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm, I_SEND);
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -6965,7 +7090,9 @@ void ampi::irecv(void *buf, int count, MPI_Datatype type, int src,
   AmpiMsg* msg = unexpectedMsgs.get(tag, src);
   // if msg has already arrived, do the receive right away
   if (msg) {
-    newreq->receive(this, msg);
+    if (!newreq->receive(this, msg)) { // Returns false if msg is a sync message
+      postedReqs.put(tag, src, newreq);
+    }
   }
   else { // ... otherwise post the receive
     postedReqs.put(newreq);
@@ -7731,7 +7858,7 @@ AMPI_API_IMPL(int, MPI_Iscatter, const void *sendbuf, int sendcount, MPI_Datatyp
     for(i=0;i<size;i++) {
       if (i != rank) {
         newreq->reqs[i] = ptr->send(MPI_SCATTER_TAG, rank, (char*)sendbuf+(itemextent*i),
-                                    sendcount, sendtype, i, comm, 0, I_SEND);
+                                    sendcount, sendtype, i, comm, I_SEND);
       }
     }
     newreq->reqs[rank] = MPI_REQUEST_NULL;
@@ -7889,7 +8016,7 @@ AMPI_API_IMPL(int, MPI_Iscatterv, const void *sendbuf, const int *sendcounts, co
     for(i=0;i<size;i++) {
       if (i != rank) {
         newreq->reqs[i] = ptr->send(MPI_SCATTER_TAG, rank, ((char*)sendbuf)+(itemextent*displs[i]),
-                                    sendcounts[i], sendtype, i, comm, 0, I_SEND);
+                                    sendcounts[i], sendtype, i, comm, I_SEND);
       }
     }
     newreq->reqs[rank] = MPI_REQUEST_NULL;
@@ -7982,7 +8109,7 @@ AMPI_API_IMPL(int, MPI_Alltoall, const void *sendbuf, int sendcount, MPI_Datatyp
     for (int i=0; i<size; i++) {
       int dst = (rank+i) % size;
       reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemextent*dst),
-                               sendcount, sendtype, dst, comm, 0, I_SEND);
+                               sendcount, sendtype, dst, comm, I_SEND);
     }
     MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
   }
@@ -8085,7 +8212,7 @@ AMPI_API_IMPL(int, MPI_Ialltoall, const void *sendbuf, int sendcount, MPI_Dataty
   for (int i=0; i<size; i++) {
     int dst = (rank+i) % size;
     newreq->reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*dst), sendcount,
-                                     sendtype, dst, comm, 0, I_SEND);
+                                     sendtype, dst, comm, I_SEND);
   }
   *request = ptr->postReq(newreq);
 
@@ -8153,7 +8280,7 @@ AMPI_API_IMPL(int, MPI_Alltoallv, const void *sendbuf, const int *sendcounts, co
     for (int i=0; i<size; i++) {
       int dst = (rank+i) % size;
       reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemextent*sdispls[dst]),
-                               sendcounts[dst], sendtype, dst, comm, 0, I_SEND);
+                               sendcounts[dst], sendtype, dst, comm, I_SEND);
     }
     MPI_Waitall(size*2, reqs.data(), MPI_STATUSES_IGNORE);
   }
@@ -8230,7 +8357,7 @@ AMPI_API_IMPL(int, MPI_Ialltoallv, void *sendbuf, int *sendcounts, int *sdispls,
   for (int i=0; i<size; i++) {
     int dst = (rank+i) % size;
     newreq->reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemextent*sdispls[dst]),
-                                     sendcounts[dst], sendtype, dst, comm, 0, I_SEND);
+                                     sendcounts[dst], sendtype, dst, comm, I_SEND);
   }
   *request = ptr->postReq(newreq);
 
@@ -8302,7 +8429,7 @@ AMPI_API_IMPL(int, MPI_Alltoallw, const void *sendbuf, const int *sendcounts, co
     for (int i=0; i<size; i++) {
       int dst = (rank+i) % size;
       reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+sdispls[dst],
-                               sendcounts[dst], sendtypes[dst], dst, comm, 0, I_SEND);
+                               sendcounts[dst], sendtypes[dst], dst, comm, I_SEND);
     }
     MPI_Waitall(size*2, reqs.data(), MPI_STATUSES_IGNORE);
   }
@@ -8384,7 +8511,7 @@ AMPI_API_IMPL(int, MPI_Ialltoallw, const void *sendbuf, const int *sendcounts, c
   for (int i=0; i<size; i++) {
     int dst = (rank+i) % size;
     newreq->reqs[i] = ptr->send(MPI_ATA_TAG, rank, (char*)sendbuf+sdispls[dst],
-                                sendcounts[dst], sendtypes[dst], dst, comm, 0, I_SEND);
+                                sendcounts[dst], sendtypes[dst], dst, comm, I_SEND);
   }
   *request = ptr->postReq(newreq);
 
@@ -8432,7 +8559,7 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoall, const void* sendbuf, int sendcount, MP
 
   for (int i=0; i<num_neighbors; i++) {
     reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+(itemsize*i)),
-                                      sendcount, sendtype, neighbors[i], comm, 0, I_SEND);
+                                      sendcount, sendtype, neighbors[i], comm, I_SEND);
   }
 
   MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
@@ -8489,7 +8616,7 @@ AMPI_API_IMPL(int, MPI_Ineighbor_alltoall, const void* sendbuf, int sendcount, M
 
   for (int i=0; i<num_neighbors; i++) {
     newreq->reqs[num_neighbors+i] = ptr->send(MPI_ATA_TAG, rank_in_comm, ((char*)sendbuf)+(i*itemsize),
-                                              sendcount, sendtype, neighbors[i], comm, 0, I_SEND);
+                                              sendcount, sendtype, neighbors[i], comm, I_SEND);
   }
   *request = ptr->postReq(newreq);
 
@@ -8537,7 +8664,7 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoallv, const void* sendbuf, const int *sendc
 
   for (int i=0; i<num_neighbors; i++) {
     reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+(itemsize*sdispls[i])),
-                                      sendcounts[i], sendtype, neighbors[i], comm, 0, I_SEND);
+                                      sendcounts[i], sendtype, neighbors[i], comm, I_SEND);
   }
 
   MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
@@ -8595,7 +8722,7 @@ AMPI_API_IMPL(int, MPI_Ineighbor_alltoallv, const void* sendbuf, const int *send
 
   for (int i=0; i<num_neighbors; i++) {
     newreq->reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, (char*)sendbuf+(itemsize*sdispls[i]),
-                                              sendcounts[i], sendtype, neighbors[i], comm, 0, I_SEND);
+                                              sendcounts[i], sendtype, neighbors[i], comm, I_SEND);
   }
   *request = ptr->postReq(newreq);
 
@@ -8641,7 +8768,7 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoallw, const void* sendbuf, const int *sendc
 
   for (int i=0; i<num_neighbors; i++) {
     reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+sdispls[i]),
-                                      sendcounts[i], sendtypes[i], neighbors[i], comm, 0, I_SEND);
+                                      sendcounts[i], sendtypes[i], neighbors[i], comm, I_SEND);
   }
 
   MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
@@ -8697,7 +8824,7 @@ AMPI_API_IMPL(int, MPI_Ineighbor_alltoallw, const void* sendbuf, const int *send
 
   for (int i=0; i<num_neighbors; i++) {
     newreq->reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+sdispls[i]),
-                                              sendcounts[i], sendtypes[i], neighbors[i], comm, 0, I_SEND);
+                                              sendcounts[i], sendtypes[i], neighbors[i], comm, I_SEND);
   }
   *request = ptr->postReq(newreq);
 
@@ -8744,7 +8871,7 @@ AMPI_API_IMPL(int, MPI_Neighbor_allgather, const void* sendbuf, int sendcount, M
 
   for (int i=0; i<num_neighbors; i++) {
     reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount,
-                                      sendtype, neighbors[i], comm, 0, I_SEND);
+                                      sendtype, neighbors[i], comm, I_SEND);
   }
 
   MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
@@ -8800,7 +8927,7 @@ AMPI_API_IMPL(int, MPI_Ineighbor_allgather, const void* sendbuf, int sendcount, 
 
   for (int i=0; i<num_neighbors; i++) {
     newreq->reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount,
-                                              sendtype, neighbors[i], comm, 0, I_SEND);
+                                              sendtype, neighbors[i], comm, I_SEND);
   }
   *request = ptr->postReq(newreq);
 
@@ -8845,7 +8972,7 @@ AMPI_API_IMPL(int, MPI_Neighbor_allgatherv, const void* sendbuf, int sendcount, 
   }
   for (int i=0; i<num_neighbors; i++) {
     reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount,
-                                      sendtype, neighbors[i], comm, 0, I_SEND);
+                                      sendtype, neighbors[i], comm, I_SEND);
   }
 
   MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
@@ -8901,7 +9028,7 @@ AMPI_API_IMPL(int, MPI_Ineighbor_allgatherv, const void* sendbuf, int sendcount,
 
   for (int i=0; i<num_neighbors; i++) {
     newreq->reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount,
-                                              sendtype, neighbors[i], comm, 0, I_SEND);
+                                              sendtype, neighbors[i], comm, I_SEND);
   }
   *request = ptr->postReq(newreq);
 
@@ -9124,7 +9251,7 @@ AMPI_API_IMPL(int, MPI_Intercomm_merge, MPI_Comm intercomm, int high, MPI_Comm *
   first = 0;
 
   if(lrank==0){
-    MPI_Request req = ptr->send(MPI_ATA_TAG, ptr->getRank(), &lhigh, 1, MPI_INT, 0, intercomm, 0, I_SEND);
+    MPI_Request req = ptr->send(MPI_ATA_TAG, ptr->getRank(), &lhigh, 1, MPI_INT, 0, intercomm, I_SEND);
     if(-1==ptr->recv(MPI_ATA_TAG,0,&rhigh,1,MPI_INT,intercomm))
       CkAbort("AMPI> Error in MPI_Intercomm_create");
     MPI_Wait(&req, MPI_STATUS_IGNORE);
