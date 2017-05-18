@@ -998,17 +998,17 @@ void Entry::genTramInstantiation(XStr& str) {
         << "  int tramBufferSize = " << tramBufferSize <<";\n";
     for (int i = 0; i < container->tramInstances.size(); i++) {
       str << "  {\n"
-          << "  int itemsPerBuffer = tramBufferSize / sizeof("
+          << "    int itemsPerBuffer = tramBufferSize / sizeof("
           << container->tramInstances[i].itemType.c_str() <<");\n"
-          << "  if (itemsPerBuffer == 0) {\n"
-          << "    itemsPerBuffer = 1;\n"
-          << "  };\n"
-          << "  CProxy_" << container->tramInstances[i].type.c_str()
+          << "    if (itemsPerBuffer == 0) {\n"
+          << "      itemsPerBuffer = 1;\n"
+          << "    }\n"
+          << "    CProxy_" << container->tramInstances[i].type.c_str()
           << " tramProxy =\n"
-          << "  CProxy_" << container->tramInstances[i].type.c_str()
+          << "    CProxy_" << container->tramInstances[i].type.c_str()
           << "::ckNew(2, dims, gId, itemsPerBuffer, false, 10.0);\n"
-          << "  tramProxy.enablePeriodicFlushing();\n"
-          << "  }";
+          << "    tramProxy.enablePeriodicFlushing();\n"
+          << "  }\n";
     }
   }
 }
