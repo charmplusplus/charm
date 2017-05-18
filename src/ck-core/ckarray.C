@@ -1024,7 +1024,7 @@ void CkArray::initDone(void) {
     if (hasParent())
       thisProxy[treeParent()].initDone();
     else
-      initCallback.send();
+      initCallback.send(CkReductionMsg::buildNew(0, NULL));
   }
 }
 
