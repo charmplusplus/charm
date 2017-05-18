@@ -127,6 +127,9 @@ extern unsigned int   _numInitMsgs;
 
 CksvExtern(unsigned int,  _numInitNodeMsgs);
 CksvExtern(CmiNodeLock, _nodeLock);
+#if CMK_WITH_ENERGY_OPT
+CksvExtern(CmiNodeLock, _entryLock);
+#endif
 CksvExtern(GroupTable*,  _nodeGroupTable);
 CksvExtern(GroupIDTable, _nodeGroupIDTable);
 CksvExtern(CmiImmediateLockType, _nodeGroupTableImmLock);

@@ -599,21 +599,34 @@ extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 	int chareIdx = _entryTable[epIdx]->chareIdx;
 	double startTime, startEnergy=0;
 	EnergyOptimizer *energyOptimizer=NULL;
+    bool optFound;
 	if(_energyOptimizer.idx != 0 && !_entryTable[epIdx]->inCharm ){ //user function
 		//CkPrintf("[%d] Starting.. epIdx: %u\n", CkMyNode(), epIdx);
 		energyOptimizer = (EnergyOptimizer *)CkLocalBranch(_energyOptimizer);
 		energyOptimizer->adjustFrequency(epIdx, chareIdx);
-		startTime = CkWallTimer();
-		startEnergy = energyOptimizer->freqController->cpuPower();
+
+        //if the optimal frequency of this entry method is not determined yet,
+        //we need to ensure that only this entry method is running on the chip
+        //therefore take the node lock and then execute the entry method
+        //if(!optFound){
+            CmiLock(CksvAccess(_entryLock));
+            startTime = CkWallTimer();
+            startEnergy = energyOptimizer->freqController->cpuPower();
+        //}
 	}
 #endif
   _entryTable[epIdx]->call(msg, obj);
 
 #if CMK_WITH_ENERGY_OPT
 	if(_energyOptimizer.idx != 0 && !_entryTable[epIdx]->inCharm ){ //user function
-		double energy = (energyOptimizer->freqController->cpuPower()-startEnergy)
-							/ energyOptimizer->freqController->getPowUnit();
-		energyOptimizer->addEntryStat(CkWallTimer()-startTime, energy, epIdx, chareIdx);
+        //if(!optFound){
+            //entry method is done, unlock the node lock
+            CmiUnlock(CksvAccess(_entryLock));
+
+            double energy = (energyOptimizer->freqController->cpuPower()-startEnergy)
+                                / energyOptimizer->freqController->getPowUnit();
+            energyOptimizer->addEntryStat(CkWallTimer()-startTime, energy, epIdx, chareIdx);
+        //}
 	}
 #endif
 

@@ -52,23 +52,28 @@ class FreqController {
 
     //change the frequency of the processor to the specified freq level
     //return 1 on success, 0 on failure to change
+    //change the frequency of sibling smp proc as well
     int changeFreq(int level){
         //check if current frequency is already at the desired level
         if(cur_freq_level == level) return 1;
 
-        CkPrintf("[%d]: Change freq to level %d : %d\n", CkMyNode(), level, freqs[level]);
-        FILE *f;
-        char path[300];
-        sprintf(path,"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_setspeed",CkMyNode()%num_cores);
+        CkPrintf("[%d,%d]: Change freq to level %d : %d\n", CkMyPe(),CkMyPe()+num_cores, level, freqs[level]);
+        FILE *f, *f2;
+        char path[300], sibling_path[300];
+        sprintf(path,"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_setspeed",CkMyPe()%num_cores);
+        sprintf(sibling_path,"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_setspeed",CkMyPe()%num_cores+num_cores);
         f=fopen(path,"w");
-        if (f==NULL) {
-            printf("[%d] FILE OPEN ERROR: %s\n", CkMyNode(), path);
+        f2=fopen(sibling_path,"w");
+        if (f==NULL || f2==NULL) {
+            printf("[%d] FILE OPEN ERROR: %s\n", CkMyPe(), path);
             return 0;
         } else {
             char write_freq[10];
             sprintf(write_freq, "%d", freqs[level]);
             fputs(write_freq,f);
+            fputs(write_freq,f2);
             fclose(f);
+            fclose(f2);
             cur_freq_level = level;
             return 1;
         }
@@ -87,17 +92,22 @@ class FreqController {
 
     //change the frequency governor
     //options are: conservative ondemand userspace powersave performance 
-    int changeGovernor(char* governor){
-        FILE *f;
-        char path[300];
-        sprintf(path,"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_governor",CkMyNode()%num_cores);
+    //change the governor of sibling smp proc as well
+    int changeGovernor(const char* governor){
+        FILE *f, *f2;
+        char path[300], sibling_path[300];
+        sprintf(path,"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_governor",CkMyPe()%num_cores);
+        sprintf(sibling_path,"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_governor",CkMyPe()%num_cores+num_cores);
         f=fopen(path,"w");
-        if (f==NULL) {
-            printf("[%d] FILE OPEN ERROR: %s\n", CkMyNode(), path);
+        f2=fopen(sibling_path,"w");
+        if (f==NULL || f2==NULL) {
+            printf("[%d] FILE OPEN ERROR: %s\n", CkMyPe(), path);
             return 0;
         } else {
             fputs(governor,f);
+            fputs(governor,f2);
             fclose(f);
+            fclose(f2);
             return 1;
         }
     }
@@ -109,7 +119,7 @@ class FreqController {
         sprintf(path,"/sys/devices/system/cpu/cpufreq/boost");
         f=fopen(path,"w");
         if (f==NULL) {
-            printf("[%d] FILE OPEN ERROR: %s\n", CkMyNode(), path);
+            printf("[%d] FILE OPEN ERROR: %s\n", CkMyPe(), path);
             return 0;
         } else {
             char option[10];
@@ -137,7 +147,7 @@ class FreqController {
     //returns cpu power
     double cpuPower(){
         char path[100];
-        sprintf(path, "/dev/cpu/%d/msr", CkMyNode());
+        sprintf(path, "/dev/cpu/%d/msr", CkMyPe());
         uint64_t msr_value=-1;
         int retval = 0;
 
@@ -151,7 +161,7 @@ class FreqController {
     //returns memory power
     double memPower(){
         char path[100];
-        sprintf(path, "/dev/cpu/%d/msr", CkMyNode());
+        sprintf(path, "/dev/cpu/%d/msr", CkMyPe());
         uint64_t msr_value=-1;
         int retval = 0;
 

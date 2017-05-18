@@ -136,6 +136,9 @@ CksvDeclare(GroupTable*, _nodeGroupTable);
 CksvDeclare(GroupIDTable, _nodeGroupIDTable);
 CksvDeclare(CmiImmediateLockType, _nodeGroupTableImmLock);
 CksvDeclare(CmiNodeLock, _nodeLock);
+#if CMK_WITH_ENERGY_OPT
+CksvDeclare(CmiNodeLock, _entryLock);
+#endif
 CksvStaticDeclare(PtrVec*,_nodeBocInitVec);
 CkpvDeclare(int, _charmEpoch);
 
@@ -1074,6 +1077,9 @@ void _initCharm(int unused_argc, char **argv)
 	CksvInitialize(GroupIDTable, _nodeGroupIDTable);
 	CksvInitialize(CmiImmediateLockType, _nodeGroupTableImmLock);
 	CksvInitialize(CmiNodeLock, _nodeLock);
+#if CMK_WITH_ENERGY_OPT
+	CksvInitialize(CmiNodeLock, _entryLock);
+#endif
 	CksvInitialize(PtrVec*,_nodeBocInitVec);
 	CksvInitialize(UInt,_numInitNodeMsgs);
 	CkpvInitialize(int,_charmEpoch);
@@ -1100,6 +1106,9 @@ void _initCharm(int unused_argc, char **argv)
 	  	CksvAccess(_numNodeGroups) = 1; //make 0 an invalid group number
           	CksvAccess(_numInitNodeMsgs) = 0;
 		CksvAccess(_nodeLock) = CmiCreateLock();
+#if CMK_WITH_ENERGY_OPT
+		CksvAccess(_entryLock) = CmiCreateLock();
+#endif
 		CksvAccess(_nodeGroupTable) = new GroupTable();
 		CksvAccess(_nodeGroupTable)->init();
 		CksvAccess(_nodeGroupTableImmLock) = CmiCreateImmediateLock();
