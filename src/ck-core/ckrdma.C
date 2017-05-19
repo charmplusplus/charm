@@ -150,6 +150,7 @@ envelope* CkRdmaCopyMsg(envelope *env){
     buf += CK_ALIGN(w.cnt, 16);
     p|w;
   }
+  CkPackRdmaPtrs(((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf);
   CkPackMessage(&copyenv);
   return copyenv;
 }
