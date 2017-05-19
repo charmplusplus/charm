@@ -21,6 +21,11 @@ void automaticallySetMessagePriority(envelope *env); // in control point framewo
 
 #if CMK_WITH_ENERGY_OPT
 #include "energyOpt.h"
+#define TRIAL_TIMEOUT 1
+CkpvDeclare(int, colllectStats);
+CkpvDeclare(double, timer);
+CkpvDeclare(int, freqLevels);
+CkpvDeclare(int, moveToNextFreqLevel);
 #endif
 
 #ifndef CMK_CHARE_USE_PTR
@@ -49,6 +54,16 @@ extern int _defaultObjectQ;
 
 void _initChareTables()
 {
+#ifdef CMK_WITH_ENERGY_OPT
+  CkpvInitialize(int, colllectStats);
+  CkpvAccess(colllectStats)=1;
+  CkpvInitialize(double, timer);
+  CkpvAccess(timer)=CkWallTimer();
+  CkpvInitialize(int, freqLevels);
+  CkpvAccess(freqLevels)=0;
+  CkpvInitialize(int, moveToNextFreqLevel);
+  CkpvAccess(moveToNextFreqLevel)=0;
+#endif
 #ifndef CMK_CHARE_USE_PTR
           /* chare and vidblock table */
   CkpvInitialize(CkVec<void *>, chare_objs);
@@ -595,38 +610,51 @@ extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
   CpdBeforeEp(epIdx, obj, msg);
 #endif
 #if CMK_WITH_ENERGY_OPT
-	//int chareIdx = CkpvAccess(currentChareIdx);
 	int chareIdx = _entryTable[epIdx]->chareIdx;
 	double startTime, startEnergy=0;
 	EnergyOptimizer *energyOptimizer=NULL;
-    bool optFound;
+	double now;
+    if(CkpvAccess(colllectStats)){
+        now=CkWallTimer();
+        if(now-CkpvAccess(timer) > TRIAL_TIMEOUT){
+            CkPrintf("[%d]\t\t\t\ttimer %f!\n", CkMyPe(), now-CkpvAccess(timer));
+            CkpvAccess(moveToNextFreqLevel)=1;
+            CkpvAccess(freqLevels)++;
+            if(CkpvAccess(freqLevels)>NUM_AVAIL_FREQS) CkpvAccess(colllectStats)=0;
+            CkpvAccess(timer)=now;
+        }
+        else CkpvAccess(moveToNextFreqLevel)=0;
+   }
 	if(_energyOptimizer.idx != 0 && !_entryTable[epIdx]->inCharm ){ //user function
 		//CkPrintf("[%d] Starting.. epIdx: %u\n", CkMyNode(), epIdx);
 		energyOptimizer = (EnergyOptimizer *)CkLocalBranch(_energyOptimizer);
-		energyOptimizer->adjustFrequency(epIdx, chareIdx);
-
+		energyOptimizer->adjustFrequency(epIdx, chareIdx,
+						CkpvAccess(colllectStats), CkpvAccess(moveToNextFreqLevel));
         //if the optimal frequency of this entry method is not determined yet,
         //we need to ensure that only this entry method is running on the chip
         //therefore take the node lock and then execute the entry method
-        //if(!optFound){
+        if(CkpvAccess(colllectStats)){
             CmiLock(CksvAccess(_entryLock));
             startTime = CkWallTimer();
             startEnergy = energyOptimizer->freqController->cpuPower();
-        //}
+        }
 	}
 #endif
   _entryTable[epIdx]->call(msg, obj);
 
 #if CMK_WITH_ENERGY_OPT
 	if(_energyOptimizer.idx != 0 && !_entryTable[epIdx]->inCharm ){ //user function
-        //if(!optFound){
+        if(CkpvAccess(colllectStats)){
             //entry method is done, unlock the node lock
             CmiUnlock(CksvAccess(_entryLock));
 
             double energy = (energyOptimizer->freqController->cpuPower()-startEnergy)
                                 / energyOptimizer->freqController->getPowUnit();
             energyOptimizer->addEntryStat(CkWallTimer()-startTime, energy, epIdx, chareIdx);
-        //}
+            CkPrintf("[%d] OPT NOT FOUND - locking !\n", CkMyPe());
+        }
+        else
+            CkPrintf("[%d] OPT FOUND - Not locking anymore!\n", CkMyPe());
 	}
 #endif
 

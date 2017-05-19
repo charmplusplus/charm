@@ -8,7 +8,8 @@ module energyOpt{
 
   group [migratable] EnergyOptimizer {
     entry EnergyOptimizer();
-    entry void adjustFrequency(int epIdx, int objIdx);
+    //entry void adjustFrequency(int epIdx, int objIdx);
+    entry void adjustFrequency(int epIdx, int objIdx, int statsOn, int timeOut);
     entry void addEntryStat(double duration, double energy, int epIdx, int objIdx);
     //initnode void energyOptInitNode();
 

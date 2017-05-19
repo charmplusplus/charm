@@ -108,7 +108,7 @@ class ChareEntry {
             entryStats[i].calculateOptimalFreqLevel();
             //CkPrintf("[%d] Entry[%d], optimal freq level found: %d\n", CkMyPe(),
             //    i, entryStats[i].getOptimalFreqLevel());
-            if(i==164 || i==163 ) entryStats[i].printOptimalFreqInfo(); //BILGE
+            if(i==164) entryStats[i].printOptimalFreqInfo(); //BILGE
         }
     }
 };
@@ -243,7 +243,41 @@ class EnergyOptimizer : public IrrGroup {
         energyStats->addChareStat(duration, freqController->getCurFreqLevel(),
                 energy/duration, epIdx, objIdx);
     }
-    bool adjustFrequency(int epIdx, int objIdx){
+    void adjustFrequency(int epIdx, int objIdx, int collectStats, int timeOut){
+        CkPrintf("[%d] adjustFrequency!\n", CkMyPe());
+        if(collectStats){
+            //is it time to move to the next freq level?
+            if(timeOut){
+                if(!freqController->decrementFreqLevel()){
+                    //stats collection done, calculate optimal frequency
+                    CkPrintf("[%d] Stats collection done!\n", CkMyPe());
+                    statsOn = false;
+                    energyStats->calculateOptimalFreqLevel();
+                }
+            }
+        }else{
+            //set the calculated optimal frequency
+            //if the optimal freq is the same with current freq,
+            //do not do anything
+            int optFreqFound = energyStats->chareStats[objIdx].entryStats[epIdx].isOptimalFreqFound();
+            if(optFreqFound){
+                //CkPrintf("[%d] OPT freq found.\n", CkMyPe());
+                int optFreq = energyStats->chareStats[objIdx].entryStats[epIdx].getOptimalFreqLevel();
+                int curFreq = freqController->getCurFreqLevel();
+                double duration = energyStats->chareStats[objIdx].entryStats[epIdx].getAvgExecTime(curFreq);
+                if(optFreq != curFreq && duration > ENTRY_THRESHOLD){
+                    CkPrintf("[%d] Changing to OPT freq: %d.\n", CkMyPe(), optFreq);
+                    freqController->changeFreq(optFreq);
+                }
+            }
+            else CkPrintf("Something is wrong, optimal freq should have been found by now.\
+                           Is this a new entry method?\n");
+        }
+    }
+/*
+    //old method which controls keeps track of the timer
+    //now that mechanism is moved to ck.C
+    void adjustFrequency(int epIdx, int objIdx){
         CkPrintf("[%d] adjustFrequency!\n", CkMyPe());
         if(statsOn){
             //is it time to move to the next freq level?
@@ -276,9 +310,9 @@ class EnergyOptimizer : public IrrGroup {
             else CkPrintf("Something is wrong, optimal freq should have been found by now.\
                            Is this a new entry method?\n");
         }
-        return statsOn;
     }
 
+*/
 }; //end of EnergyOptimizer
 
 #endif /* ENERGYOPT_H */
