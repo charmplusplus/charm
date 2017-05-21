@@ -262,7 +262,12 @@ class TCharm: public CBase_TCharm
 void TCHARM_Api_trace(const char *routineName, const char *libraryName);
 
 #if CMK_TRACE_ENABLED
-typedef std::map<std::string, int> funcmap;
+#if CMK_USING_XLC
+#include <tr1/unordered_map>
+typedef std::tr1::unordered_map<std::string, int> funcmap;
+#else
+typedef std::unordered_map<std::string, int> funcmap;
+#endif
 CsvExtern(funcmap*, tcharm_funcmap);
 
 static
