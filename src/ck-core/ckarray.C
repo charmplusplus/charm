@@ -278,6 +278,8 @@ void ArrayElement::initBasics(void)
 #ifdef _PIPELINED_ALLREDUCE_
 	allredMgr = NULL;
 #endif
+  DEBC((AA "Inserting %llu into PE level hashtable\n" AB, ckGetID().getID()));
+  CkpvAccess(array_objs)[ckGetID().getID()] = this;
 }
 
 ArrayElement::ArrayElement(void) 
@@ -422,6 +424,9 @@ ArrayElement::~ArrayElement()
   if (CkpvAccess(CkSaveRestorePrefetch)) 
     return; /* Just saving to disk--don't trash anything. */
 #endif
+  // Erase from PE level hashtable for quick receives
+  DEBC((AA "Removing %llu from PE level hashtable\n" AB, ckGetID().getID()));
+  CkpvAccess(array_objs).erase(ckGetID().getID());
   //To detect use-after-delete: 
   thisArray=(CkArray *)0xDEADa7a1;
 }

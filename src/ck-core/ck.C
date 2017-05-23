@@ -27,6 +27,8 @@ CkpvDeclare(Vidblockmap, vmap);      // remote VidBlock to notify upon deletion
 CkpvDeclare(int, currentChareIdx);
 #endif
 
+// Map of array IDs to array elements for fast message delivery
+CkpvDeclare(ArrayObjMap, array_objs);
 
 #define CK_MSG_SKIP_OR_IMM    (CK_MSG_EXPEDITED | CK_MSG_IMMEDIATE)
 
@@ -51,6 +53,8 @@ void _initChareTables()
   CkpvInitialize(int, currentChareIdx);
   CkpvAccess(currentChareIdx) = -1;
 #endif
+
+  CkpvInitialize(ArrayObjMap, array_objs);
 }
 
 //Charm++ virtual functions: declaring these here results in a smaller executable
@@ -1161,11 +1165,22 @@ void _processNodeBocInitMsg(CkCoreState *ck,envelope *env)
 
 /************** Receive: Arrays *************/
 static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
-  CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getArrayMgr());
-  if (mgr) {
+  ArrayObjMap& object_map = CkpvAccess(array_objs);
+  auto iter = object_map.find(env->getRecipientID());
+  if (iter != object_map.end()) {
+    // First see if we already have a direct pointer to the object
     _SET_USED(env, 0);
     ck->process();
-    mgr->deliver((CkArrayMessage *)EnvToUsr(env), CkDeliver_inline);
+    int opts = 0;
+    iter->second->ckInvokeEntry(env->getEpIdx(), EnvToUsr(env), !(opts & CK_MSG_KEEP));
+  } else {
+    // Otherwise fallback to delivery through the array manager
+    CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getArrayMgr());
+    if (mgr) {
+      _SET_USED(env, 0);
+      ck->process();
+      mgr->deliver((CkArrayMessage *)EnvToUsr(env), CkDeliver_inline);
+    }
   }
 }
 
