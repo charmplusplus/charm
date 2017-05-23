@@ -643,11 +643,17 @@ do
 		SKIPLINK="yes"
 		OPTS="$OPTS $arg"
 		;;
-	"-M")
+#------ Dependency generation ---------
+	"-M" | "-MM" | "-MMD" | "-MG")
 		SKIPLINK="yes"
 		OPTS="$OPTS $arg"
 		GENDEPENDS="yes"
 		;;
+	"-MF" | "-MT" | "-MQ" | "-MD")	#-MP will pass through automatically
+		OPTS="$OPTS $arg $1"
+		shift
+		;;
+#--------------------------------------
     "-count-tokens")
 		OPTS="$OPTS $arg"
         COUNTTOKENS="yes"
