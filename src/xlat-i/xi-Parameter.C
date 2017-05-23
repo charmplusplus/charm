@@ -448,8 +448,17 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool needsClosure) {
                  }
                  callEach(&Parameter::beginUnmarshall,str);
 	       }
-               else
+               else {
+                 if(hasRdma()) {
+                   str<<"#if CMK_ONESIDED_IMPL\n";
+                   str<<"  CkUnpackRdmaPtrs(impl_buf);\n";
+                   callEach(&Parameter::beginUnmarshallSDAGCallRdma,str,true);
+                   str<<"#else\n";
+                   callEach(&Parameter::beginUnmarshallSDAGCallRdma,str,false);
+                   str<<"#endif\n";
+                 }
                  callEach(&Parameter::beginUnmarshallSDAGCall,str);
+               }
 	  }
         } else if (next == NULL && isArray()) {
 	  // 1 argument case - special case for a standalone array
@@ -555,12 +564,30 @@ void Parameter::beginUnmarshall(XStr &str)
 	        str<<"  "<<dt<<" "<<name<<"; implP|"<<name<<";\n";
 }
 
+void Parameter::beginUnmarshallSDAGCallRdma(XStr &str, bool genRdma) {
+  if(isRdma()) {
+    if(genRdma) {
+      if(isFirstRdma()) {
+        str << "  implP|genClosure->num_rdma_fields;\n";
+      }
+      str << "  implP|genClosure->rdmawrapper_"<< name <<";\n";
+    }
+    else {
+      beginUnmarshallArray(str);
+    }
+  }
+}
+
 void Parameter::beginUnmarshallSDAGCall(XStr &str) {
   Type *dt=type->deref();
-  if (isArray() || isRdma()) {
+  if (isArray()) {
     beginUnmarshallArray(str);
-  } else
+  } else if(isRdma()) {
+    // unmarshalled before regular parameters
+  }
+  else {
     str << "  implP|" << (podType ? "" : "*") << "genClosure->" << name << ";\n";
+  }
 }
 
 
@@ -568,17 +595,27 @@ void Parameter::beginUnmarshallSDAGCall(XStr &str) {
 void ParamList::beginUnmarshallSDAGCall(XStr &str, bool usesImplBuf) {
   bool hasArray = false;
   for (ParamList* pl = this; pl != NULL; pl = pl->next) {
-    hasArray = hasArray || pl->param->isArray() || pl->param->isRdma();
+    hasArray = hasArray || pl->param->isArray();
   }
 
   if (isMarshalled()) {
     str << "  PUP::fromMem implP(impl_buf);\n";
     str << "  " << *entry->genClosureTypeNameProxyTemp << "*" <<
       " genClosure = new " << *entry->genClosureTypeNameProxyTemp << "()" << ";\n";
+    if(hasRdma()) {
+      str<<"#if CMK_ONESIDED_IMPL\n";
+      str<<"  CkUnpackRdmaPtrs(impl_buf);\n";
+      callEach(&Parameter::beginUnmarshallSDAGCallRdma,str,true);
+      str<<"#else\n";
+      callEach(&Parameter::beginUnmarshallSDAGCallRdma,str,false);
+      str<<"#endif\n";
+    }
     callEach(&Parameter::beginUnmarshallSDAGCall, str);
     str << "  impl_buf+=CK_ALIGN(implP.size(),16);\n";
+    if(hasRdma() && !hasArray)
+      str<<"#if !CMK_ONESIDED_IMPL\n";
     callEach(&Parameter::unmarshallArrayDataSDAGCall,str);
-    if (hasArray) {
+    if (hasArray || hasRdma()) {
       if (!usesImplBuf) {
         str << "  genClosure->_impl_marshall = impl_msg_typed;\n";
         str << "  CmiReference(UsrToEnv(genClosure->_impl_marshall));\n";
@@ -587,13 +624,17 @@ void ParamList::beginUnmarshallSDAGCall(XStr &str, bool usesImplBuf) {
         str << "  genClosure->_impl_buf_size = implP.size();\n";
       }
     }
+    if(hasRdma() && !hasArray)
+      str<<"#endif\n";
   }
 }
 void ParamList::beginUnmarshallSDAG(XStr &str) {
   if (isMarshalled()) {
     str << "          PUP::fromMem implP(impl_buf);\n";
     if(hasRdma()){
+      str<<"#if !CMK_ONESIDED_IMPL\n";
       callEach(&Parameter::beginUnmarshallSDAGRdma,str);
+      str<<"#endif\n";
     }
     callEach(&Parameter::beginUnmarshall,str);
     str << "          impl_buf+=CK_ALIGN(implP.size(),16);\n";
@@ -602,8 +643,12 @@ void ParamList::beginUnmarshallSDAG(XStr &str) {
 }
 void Parameter::unmarshallArrayDataSDAG(XStr &str) {
   if (isArray() || isRdma()) {
+    if(isRdma())
+      str<<"#if !CMK_ONESIDED_IMPL\n";
     Type *dt=type->deref();//Type, without &
     str << "          " << name << " = ("<<dt<<" *)(impl_buf+impl_off_" << name << ");\n";
+    if(isRdma())
+      str<<"#endif\n";
   }
 }
 void Parameter::unmarshallArrayDataSDAGCall(XStr &str) {
@@ -750,7 +795,7 @@ int Parameter::isCkMigMsgPtr(void) const {return type->isCkMigMsgPtr();}
 int Parameter::isArray(void) const {return (arrLen!=NULL && !isRdma()) ;}
 int Parameter::isConditional(void) const {return conditional;}
 int Parameter::isRdma(void) const {return rdma;}
-
+int Parameter::isFirstRdma(void) const {return firstRdma;}
 
 int Parameter::operator==(const Parameter &parm) const {
   return *type == *parm.type;
@@ -759,6 +804,8 @@ int Parameter::operator==(const Parameter &parm) const {
 void Parameter::setConditional(int c) { conditional = c; if (c) byReference = false; }
 
 void Parameter::setRdma(bool r){ rdma = r; }
+
+void Parameter::setFirstRdma(bool fr){ firstRdma = fr; }
 
 void Parameter::setAccelBufferType(int abt) {
   accelBufferType = ((abt < ACCEL_BUFFER_TYPE_MIN || abt > ACCEL_BUFFER_TYPE_MAX) ? (ACCEL_BUFFER_TYPE_UNKNOWN) : (abt));
@@ -782,6 +829,8 @@ int ParamList::isMessage(void) const {
     return (next==NULL) && param->isMessage();
 }
 int ParamList::hasRdma(void) {return orEach(&Parameter::isRdma);}
+int ParamList::isRdma(void) {return param->isRdma();}
+int ParamList::isFirstRdma(void) {return param->isFirstRdma();}
 const char *ParamList::getArrayLen(void) const {return param->getArrayLen();}
 int ParamList::isArray(void) const {return param->isArray();}
 int ParamList::isReference(void) const {return param->type->isReference() || param->byReference;}

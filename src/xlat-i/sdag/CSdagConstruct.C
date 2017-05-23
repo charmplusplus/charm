@@ -283,14 +283,34 @@ namespace xi {
         // if the var is one of the following it a system state var that should
         // not be brought into scope
         if (!var.isCounter && !var.isSpeculator && !var.isBgParentLog) {
-          indentBy(defs, cur + 2);
-
-          defs << var.type << (var.arrayLength || var.isMsg ? "*" : "") << "& " << var.name << " = ";
-          state.name ? (defs << *state.name) : (defs << "gen" << cur);
-          if (!var.isMsg)
-            defs << "->" << "getP" << i << "();\n";
-          else
-            defs << ";\n";
+          if(var.isRdma) {
+            defs << "#if CMK_ONESIDED_IMPL\n";
+            if(var.isFirstRdma) {
+              indentBy(defs, cur + 2);
+              defs << "int " << "& num_rdma_fields = ";
+              defs << "gen" << cur;
+              defs << "->" << "getP" << i++ << "();\n";
+            }
+            indentBy(defs, cur + 2);
+            defs << "CkRdmaWrapper " << "& rdmawrapper_" << var.name << " = ";
+            defs << "gen" << cur << "->" << "getP" << i <<"();\n";
+            indentBy(defs, cur + 2);
+            defs << var.type << "* " << var.name << " = " << "(" << var.type << "*) (rdmawrapper_" << var.name << ".ptr);\n";
+            defs << "#else\n";
+            indentBy(defs, cur + 2);
+            defs << var.type << "*" << "& "<< var.name << " = ";
+            defs << "gen" << cur << "->" << "getP" << i << "();\n";
+            defs << "#endif\n";
+          }
+          else {
+            indentBy(defs, cur + 2);
+            defs << var.type << (var.arrayLength || var.isMsg ? "*" : "") << "& " << var.name << " = ";
+            state.name ? (defs << *state.name) : (defs << "gen" << cur);
+            if (!var.isMsg)
+              defs << "->" << "getP" << i << "();\n";
+            else
+              defs << ";\n";
+          }
         }
       }
     }

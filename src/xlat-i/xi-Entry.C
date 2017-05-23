@@ -1916,9 +1916,9 @@ void Entry::genClosureEntryDefs(XStr& str) {
 void Entry::genClosure(XStr& decls, bool isDef) {
   if (isConstructor() || (isLocal() && !sdagCon)) return;
 
-  bool hasArray = false, isMessage = false;
+  bool hasArray = false, isMessage = false, hasRdma = false;
   XStr messageType;
-  int i = 0;
+  int i = 0, addNumRdmaFields = 1;
   XStr structure, toPup, alloc, getter, dealloc;
   for(ParamList* pl = param; pl != NULL; pl = pl->next, i++) {
     Parameter* sv = pl->param;
@@ -1929,30 +1929,62 @@ void Entry::genClosure(XStr& decls, bool isDef) {
     getter << "      ";
 
     if ((sv->isMessage() != 1) && (sv->isVoid() != 1)) {
-       structure << sv->type << " ";
-       getter << sv->type << " ";
-       if (sv->isArray() != 0 || sv->isRdma() != 0) {
+       if(sv->isRdma()) {
+         hasRdma = hasRdma || true;
+         structure << "\n#if CMK_ONESIDED_IMPL\n";
+         if(sv->isFirstRdma())
+           structure << "      " << "int num_rdma_fields;\n";
+         structure << "      " << "CkRdmaWrapper "<< "rdmawrapper_"<<sv->name << ";\n";
+         structure << "#else\n";
+         structure << "      " << sv->type << " " << "*" << sv->name << ";\n";
+         structure << "#endif\n";
+         getter << "#if CMK_ONESIDED_IMPL\n";
+         if(sv->isFirstRdma())
+           getter << "      " << "int "<< "& " << "getP" << i++ << "() { return " << " num_rdma_fields;}\n";
+         getter << "      " << "CkRdmaWrapper "<< "& " << "getP" << i << "() { return " << "rdmawrapper_" << sv->name << ";}\n";
+         getter << "#else\n";
+         getter << sv->type << " " << "*";
+         getter << "& " << "getP" << i << "() { return " << sv->name << ";}\n";
+         getter << "#endif\n";
+         toPup << "#if CMK_ONESIDED_IMPL\n";
+         if(sv->isFirstRdma())
+           toPup << "        " << "__p | " << "num_rdma_fields;\n";
+         toPup << "        " << "__p | " << "rdmawrapper_" << sv->name << ";\n";
+         toPup << "#endif\n";
+       } else {
+         structure << "      ";
+         getter << "      ";
+         structure << sv->type << " ";
+         getter << sv->type << " ";
+       }
+
+       if (sv->isArray() != 0 ){
          structure << "*";
          getter << "*";
        }
-
-       if (sv->isArray() != 0 || sv->isRdma() != 0) {
+       if (sv->isArray() != 0 ) {
          hasArray = hasArray || true;
-       } else {
+       } else if (!sv->isRdma()) {
          toPup << "        " << "__p | " << sv->name << ";\n";
          sv->podType = true;
        }
 
        if (sv->name != 0) {
-         structure << sv->name << ";\n";
-         getter << "& " << "getP" << i << "() { return " << sv->name << ";}\n";
+         if(!sv->isRdma()){
+           structure << sv->name << ";\n";
+           getter << "& " << "getP" << i << "() { return " << sv->name << ";}\n";
+         }
        }
 
     }
     else if (sv->isVoid() != 1){
       if (sv->isMessage()) {
         isMessage = true;
-        structure << sv->type << " " << sv->name << ";\n";
+        if( sv->isRdma()){
+          structure << "CkRdmaWrapper" << " " << "rdmawrapper_" << sv->name << ";\n";
+        } else {
+          structure << sv->type << " " << sv->name << ";\n";
+        }
         toPup << "        " << "CkPupMessage(__p, (void**)&" << sv->name << ");\n";
         messageType << sv->type->deref();
       }
@@ -1966,7 +1998,14 @@ void Entry::genClosure(XStr& decls, bool isDef) {
   XStr initCode;
   initCode << "        init();\n";
 
-  if (hasArray) {
+  if (hasArray || hasRdma) {
+
+    if(hasRdma && !hasArray) {
+      structure << "#if !CMK_ONESIDED_IMPL\n";
+      initCode << "#if !CMK_ONESIDED_IMPL\n";
+      dealloc << "#if !CMK_ONESIDED_IMPL\n";
+      toPup << "#if !CMK_ONESIDED_IMPL\n";
+    }
     structure << "      " << "CkMarshallMsg* _impl_marshall;\n";
     structure << "      " << "char* _impl_buf_in;\n";
     structure << "      " << "int _impl_buf_size;\n";
@@ -1984,6 +2023,12 @@ void Entry::genClosure(XStr& decls, bool isDef) {
     toPup << "          char *impl_buf = _impl_marshall ? _impl_marshall->msgBuf : _impl_buf_in;\n";
     param->beginUnmarshallSDAG(toPup);
     toPup << "        }\n";
+    if(hasRdma && !hasArray) {
+      structure << "#endif\n";
+      initCode << "#endif\n";
+      dealloc << "#endif\n";
+      toPup << "#endif\n";
+    }
   }
 
   // Generate code for ensuring we don't migrate active local closures

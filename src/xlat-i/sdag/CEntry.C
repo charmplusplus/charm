@@ -14,6 +14,12 @@ namespace xi {
 
   void generateLocalWrapper(XStr& decls, XStr& defs, int isVoid, XStr& signature, Entry* entry,
                             std::list<CStateVar*>* params, XStr* next) {
+    int numRdmaParams = 0;
+    for (std::list<CStateVar*>::iterator it = params->begin(); it != params->end(); ++it) {
+      CStateVar& var = **it;
+      if(var.isRdma)
+        numRdmaParams++;
+    }
     // generate wrapper for local calls to the function
     templateGuardBegin(false, defs);
     defs << entry->getContainer()->tspec() << "void " << entry->getContainer()->baseName() << "::" << signature << "{\n";
@@ -23,8 +29,19 @@ namespace xi {
       int i = 0;
       for (std::list<CStateVar*>::iterator it = params->begin(); it != params->end(); ++it, ++i) {
         CStateVar& var = **it;
-        if (var.name)
-          defs << "  genClosure->getP" << i << "() = " << var.name << ";\n";
+        if (var.name) {
+          if (var.isRdma) {
+            defs << "#if CMK_ONESIDED_IMPL\n";
+            if(var.isFirstRdma)
+              defs << "  genClosure->getP" << i++ << "() = " << numRdmaParams <<";\n";
+            defs << "  genClosure->getP" << i << "() = " << "rdmawrapper_" << var.name << ";\n";
+            defs << "#else\n";
+            defs << "  genClosure->getP" << i << "() = " << "(" << var.type << "*)" << "rdmawrapper_" << var.name << ".ptr" << ";\n";
+            defs << "#endif\n";
+          }
+          else
+            defs << "  genClosure->getP" << i << "() = " << var.name << ";\n";
+        }
       }
     }
 
@@ -51,7 +68,11 @@ namespace xi {
           signature <<", ";
         if (sv->byConst)
           signature << "const ";
-        signature << sv->type << " ";
+
+        if(sv->isRdma)
+          signature << "CkRdmaWrapper ";
+        else
+          signature << sv->type << " ";
         if (sv->arrayLength != 0)
           signature << "*";
         else if (sv->declaredRef) {
@@ -61,8 +82,14 @@ namespace xi {
           for(int k = 0; k< sv->numPtrs; k++)
 	    signature << "*";
         }
-        if (sv->name != 0)
-          signature << sv->name;
+        if (sv->name != 0) {
+          if (sv->isRdma){
+            signature << "rdmawrapper_" << sv->name;
+          }
+          else {
+            signature << sv->name;
+          }
+        }
       }
       else if (sv->isVoid != 1){
         if (i < 1) 

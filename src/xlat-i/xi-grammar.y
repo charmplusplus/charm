@@ -35,6 +35,7 @@ namespace xi {
 
 const int MAX_NUM_ERRORS = 10;
 int num_errors = 0;
+bool firstRdma = true;
 
 bool enable_warnings = true;
 
@@ -333,6 +334,7 @@ ConstructSemi   : USING NAMESPACE QualName
                   e->label = new XStr;
                   $4->print(*e->label);
                   $$ = e;
+                  firstRdma = true;
                 }
                 ;
 
@@ -872,6 +874,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
                     $7->setEntry($$);
                     $7->param = new ParamList($5);
                   }
+                  firstRdma = true;
 		}
 		| ENTRY EAttribs Name EParameters OptSdagCode /*Constructor*/
 		{ 
@@ -881,6 +884,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
                     $5->setEntry($$);
                     $5->param = new ParamList($4);
                   }
+                  firstRdma = true;
 		  if (e->param && e->param->isCkMigMsgPtr()) {
 		    WARNING("CkMigrateMsg chare constructor is taken for granted",
 		            @$.first_column, @$.last_column);
@@ -902,6 +906,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
                   $$->setAccelParam(accelParamList);
                   $$->setAccelCodeBody(codeBody);
                   $$->setAccelCallbackName(new XStr(callbackName));
+                  firstRdma = true;
                 }
 		;
 
@@ -1073,6 +1078,10 @@ Parameter	: Type
 			in_bracket=0;
 			$$ = new Parameter(lineno, $2->getType(), $2->getName() ,$3);
 			$$->setRdma(true);
+			if(firstRdma) {
+				$$->setFirstRdma(true);
+				firstRdma = false;
+			}
 		}
 		;
 
@@ -1296,10 +1305,12 @@ StartIntExpr	: '('
 SEntry		: IDENT EParameters
 		{
 		  $$ = new Entry(lineno, 0, 0, $1, $2, 0, 0, 0, @$.first_line, @$.last_line);
+		  firstRdma = true;
 		}
 		| IDENT SParamBracketStart CCode SParamBracketEnd EParameters 
 		{
 		  $$ = new Entry(lineno, 0, 0, $1, $5, 0, 0, $3, @$.first_line, @$.last_line);
+		  firstRdma = true;
 		}
 		;
 

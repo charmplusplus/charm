@@ -18,6 +18,8 @@ namespace xi {
     bool byConst;
     XStr *arrayLength;
     int isMsg;
+    bool isRdma;
+    bool isFirstRdma;
     bool isCounter, isSpeculator, isBgParentLog;
 
     CStateVar(int v, const char *t, int np, const char *n, XStr *r, const char *a, int m);

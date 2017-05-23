@@ -1,20 +1,21 @@
--include ../../common.mk
-CHARMC=../../../bin/charmc $(OPTS)
+DIRS	= simpleRdma stencil3d
 
-all: rdma
+all:
+	for d in $(DIRS); do \
+		($(MAKE) -C $$d all OPTS='$(OPTS)' || exit 1) || exit 1; \
+	done
 
-rdma:  rdma.o
-	$(CHARMC) rdma.o -o rdma -language charm++
+test:
+	for d in $(DIRS); do \
+		($(MAKE) -C $$d test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
+	done
 
-cifiles: rdma.ci
-	$(CHARMC) -c rdma.ci
-	touch cifiles
-
-rdma.o : rdma.C cifiles
-	$(CHARMC) -c rdma.C
-
-test: all
-	$(call run, +p4 ./rdma 10)
+bgtest:
+	for d in $(DIRS); do \
+		($(MAKE) -C $$d bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
+	done
 
 clean:
-	rm -f *.def.h *.decl.h *.o *~ cifiles charmrun rdma
+	for d in $(DIRS); do ($(MAKE) -C $$d clean OPTS='$(OPTS)'); done
+	rm -f TAGS #*#
+	rm -f core *~

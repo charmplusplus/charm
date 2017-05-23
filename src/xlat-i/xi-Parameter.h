@@ -12,6 +12,7 @@ class Value;
 /**************** Parameter types & lists (for marshalling) ************/
 class Parameter {
     bool rdma;
+    bool firstRdma;
  public:
     Type *type;
     const char *name; /*The name of the variable, if any*/
@@ -47,6 +48,7 @@ class Parameter {
     void beginUnmarshallRdma(XStr &str, bool genRdma);
     void beginUnmarshallSDAGRdma(XStr &str);
     void beginUnmarshallSDAGCall(XStr &str);
+    void beginUnmarshallSDAGCallRdma(XStr &str, bool genRdma);
     void unmarshallArrayData(XStr &str);
     void unmarshallRegArrayData(XStr &str);
     void unmarshallRdmaArrayData(XStr &str, bool genRegArray);
@@ -60,6 +62,7 @@ class Parameter {
     	const char *NarrLen=0,Value *Nvalue=0);
     void setConditional(int c);
     void setRdma(bool r);
+    void setFirstRdma(bool fr);
     void print(XStr &str,int withDefaultValues=0,int useConst=1);
     void printAddress(XStr &str);
     void printValue(XStr &str);
@@ -69,6 +72,7 @@ class Parameter {
     int isCkMigMsgPtr(void) const;
     int isArray(void) const;
     int isRdma(void) const;
+    int isFirstRdma(void) const;
     int isConditional(void) const;
     Type *getType(void) {return type;}
     const char *getArrayLen(void) const {return arrLen;}
@@ -125,6 +129,8 @@ class ParamList {
     int isVoid(void) const;
     int isPointer(void) const;
     int hasRdma(void);
+    int isRdma(void);
+    int isFirstRdma(void);
     const char *getGivenName(void) const;
     void setGivenName(const char* s);
     const char *getName(void) const;
