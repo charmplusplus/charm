@@ -3749,7 +3749,11 @@ void FTN_NAME(MPI_EXIT,mpi_exit)(int *exitCode)
 CDECL
 int AMPI_Finalize(void)
 {
+  { // This brace is necessary here to make sure the object created on the stack
+    // by the AMPIAPI call gets destroyed before the call to AMPI_Exit(), since
+    // AMPI_Exit() never returns.
   AMPIAPI("AMPI_Finalize");
+
 #if PRINT_IDLE
   CkPrintf("[%d] Idle time %fs.\n", CkMyPe(), totalidle);
 #endif
@@ -3762,8 +3766,9 @@ int AMPI_Finalize(void)
 #if CMK_BIGSIM_CHARM && CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn)) traceSuspend();
 #endif
+  }
 
-  AMPI_Exit(0);
+  AMPI_Exit(0); // Never returns
   return MPI_SUCCESS;
 }
 
