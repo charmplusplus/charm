@@ -64,14 +64,14 @@ $n*2^n$ virtual processors on any number of physical ones using \ampi{}.
 \label{fig_virt}
 \end{figure}
 
-\ampi{}'s execution model consists of multiple user-level threads per process and,
-typically, one process per physical processor. The \charmpp{} scheduler coordinates
-execution of these threads (also called Virtual Processors or VPs) and controls
+\ampi{}'s execution model consists of multiple user-level threads per Processing Element (PE).
+The \charmpp{} scheduler coordinates
+execution of these user-level threads (also called Virtual Processors or VPs) and controls
 execution as shown in Figure \ref{fig_ratio}. These VPs can also migrate between
-processors for the purpose of load balancing or other reasons. The number of VPs
-per processor specifies the virtualization ratio (degree of over-decomposition).
+PEs for the purpose of load balancing or other reasons. The number of VPs
+per PE specifies the virtualization ratio (degree of over-decomposition).
 For example, in Figure \ref{fig_ratio} virtualization ratio is four (there are
-four VPs per each processor). Figure \ref{fig_prac} show how the problem domain
+four VPs per each PE). Figure \ref{fig_prac} show how the problem domain
 is over-decomposed in \ampi{}'s VPs as opposed to other MPI implementations.
 
 \begin{figure}[h]
