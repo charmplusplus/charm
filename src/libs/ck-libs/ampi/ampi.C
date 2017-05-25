@@ -3734,9 +3734,14 @@ int AMPI_Comm_compare(MPI_Comm comm1,MPI_Comm comm2, int *result)
 }
 
 CDECL
-void AMPI_Exit(int /*exitCode*/)
+void AMPI_Exit(int exitCode)
 {
   AMPIAPI("AMPI_Exit");
+  if (exitCode) {
+    char err[64];
+    sprintf(err, "Application terminated with exit code %d.\n", exitCode);
+    CkAbort(err);
+  }
   TCHARM_Done();
 }
 

@@ -1,12 +1,18 @@
 #ifndef _MPI_H
 #define _MPI_H
 
+#include <stdlib.h> /* for redefinition of exit() below */
 #include <inttypes.h> /* for intptr_t */
 #include "conv-config.h"
+#include "charm-api.h" /* for CLINKAGE */
 
 /* NON-standard define: this lets people #ifdef on
    AMPI, e.g. for our bizarre AMPI_Main. */
 #define AMPI
+
+/* Allow applications to terminate cleanly with exit() */
+CLINKAGE void AMPI_Exit(int exitCode);
+#define exit(status) AMPI_Exit(status)
 
 /*
 Silently rename the user's main routine.
@@ -91,7 +97,7 @@ typedef int MPI_Fint;
 #define MPI_ERR_WIN                    53
 #define MPI_ERR_LASTCODE               53
 #define MPI_LASTUSEDCODE               53
-/* 0=MPI_SUCCESS<MPI_ERRs(...)<MPI_ERR<=MPI_ERR_LASTCODE<=MPI_LASTCODEUSED */
+/* 0=MPI_SUCCESS<MPI_ERRs(...)<MPI_ERR<=MPI_ERR_LASTCODE<=MPI_LASTUSEDCODE */
 
 #define MPI_MAX_PROCESSOR_NAME         256
 #define MPI_MAX_ERROR_STRING           256
