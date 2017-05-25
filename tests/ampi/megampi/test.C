@@ -129,8 +129,9 @@ void MPI_Tester::test(void)
 	int tag=12387, recvVal=-1;
 	
 	// Forward around ring:
-	TEST_MPI(MPI_Send,(&rank,1,MPI_INT,next,tag,comm));
+	MPI_Isend(&rank,1,MPI_INT,next,tag,comm,&req);
 	testEqual(recv(prev,tag),prev,"Received rank (using prev as source)");
+	MPI_Wait(&req, MPI_STATUS_IGNORE);
 	
 	// Forward around ring:
         if (size >= 2) {
@@ -141,12 +142,6 @@ void MPI_Tester::test(void)
 	  else if (rank == 1)
 	    testEqual(recv(prev,tag),prev,"Received rank (using prev as source)");
 	}
-
-	// Simultanious forward and backward:
-	TEST_MPI(MPI_Send,(&rank,1,MPI_INT,next,tag,comm));
-	TEST_MPI(MPI_Send,(&rank,1,MPI_INT,prev,tag,comm));
-	testEqual(recv(next,tag),next,"Received rank (specifying next as source)");
-	testEqual(recv(prev,tag),prev,"Received rank (specifying prev as source)");
 
 	// Simultaneous forward and backward (large messages):
 	const int msgSize = 32768;
@@ -282,23 +277,12 @@ void MPI_Tester::testMigrate(void) {
 	MPI_Info_create(&hints);
 	MPI_Info_set(hints, "ampi_load_balance", "sync");
 	
-	// Before migrating, send a message to the next guy:
-	//    this tests out migration with pending messages
-	int dest=(rank+1)%size;
-	int tag=8383210;
-	TEST_MPI(MPI_Send,(&dest,1,MPI_INT, dest,tag,comm));
 	TEST_MPI(MPI_Barrier,(comm));
 	
 	AMPI_Migrate(hints);
 	
 	TEST_MPI(MPI_Barrier,(comm));
-	int recv=-1; MPI_Status sts;
-	TEST_MPI(MPI_Recv,(&recv,1,MPI_INT, MPI_ANY_SOURCE,tag,comm, &sts));
-	if (recv!=rank) {
-		printf("Message corrupted during migration!\n");
-		MPI_Abort(MPI_COMM_WORLD, MPI_ERR_UNKNOWN);
-	}
-	
+
 	int destPe;
 	MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &destPe, &flag);
 	if (!flag) {
