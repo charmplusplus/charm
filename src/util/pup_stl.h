@@ -185,19 +185,13 @@ namespace PUP {
   inline void PUP_stl_container(er &p,container &c) {
     p.syncComment(sync_begin_array);
     size_t nElem=PUP_stl_container_size(p,c);
-    if (p.isUnpacking()) 
-      { //Unpacking: Extract each element and push_back:
-	c.resize(0);
-	for (size_t i=0;i<nElem;i++) {
-	  p.syncComment(sync_item);
-	  dtype n;
-	  p|n;
-	  c.push_back(n);
-	} 
-      }
-    else PUP_stl_container_items<container, dtype>(p,c);
+    if (p.isUnpacking()) {
+      c.resize(nElem);
+    }
+    PUP_stl_container_items<container, dtype>(p,c);
     p.syncComment(sync_end_array);
   }
+
   //Map objects don't have a "push_back", while vector and list
   //  don't have an "insert", so PUP_stl_map isn't PUP_stl_container
   template <class container,class dtype>
