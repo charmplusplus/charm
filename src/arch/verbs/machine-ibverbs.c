@@ -447,6 +447,9 @@ static void CmiMachineInit(char **argv){
 	infiPacket *pktPtrs;
 	struct infiRdmaPacket **rdmaPktPtrs;
         int num_devices, idev;
+#define MAX_DEVICE_NAME 120
+        char *usr_ibv_device_name=NULL;
+        int ibv_device_name_set=0;
 
 #if CMK_SMP
         ibv_fork_init();
@@ -461,6 +464,11 @@ static void CmiMachineInit(char **argv){
 	devList =  ibv_get_device_list(&num_devices);
         CmiEnforce(num_devices > 0);
 	CmiEnforce(devList != NULL);
+	if (CmiGetArgStringDesc(argv,"+IBVDeviceName",&usr_ibv_device_name,"User set IBV device name"))
+          {
+	    MACHSTATE1(3,"IBVDeviceName set %s",usr_ibv_device_name);
+	    ibv_device_name_set=1;
+          }
 
 	context = (struct infiContext *)malloc(sizeof(struct infiContext));
 	MACHSTATE1(3,"context allocated %p",context);
@@ -500,6 +508,18 @@ loop:
           else
             goto loop;
         }
+	if(ibv_device_name_set)
+	  {
+	    if(strcmp(usr_ibv_device_name,ibv_get_device_name(dev))==0)
+	      {
+		MACHSTATE2(3, "device %d selected for user requested IBVDeviceName %s\n",idev, ibv_get_device_name(dev));
+	      }
+	    else
+	      { // force increment to next device
+		if(ibPort != MAXPORT) ++idev;
+		goto loop;
+	      }
+	  }
 	context->ibPort = ibPort;
 	MACHSTATE1(3,"use port %d", ibPort);
 	
