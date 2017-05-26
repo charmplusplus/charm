@@ -58,6 +58,18 @@ namespace PUP {
   template <class container, class dtype>
   inline void PUP_stl_container_items(er &p,container &c);
   template <> inline void PUP_stl_container_items<std::vector<bool>,bool>(er &p, std::vector<bool> &c);
+  template <> inline void PUP_stl_container_items<std::vector<char>,char>(er &p, std::vector<char> &c);
+  template <> inline void PUP_stl_container_items<std::vector<unsigned char>,unsigned char>(er &p, std::vector<unsigned char> &c);
+  template <> inline void PUP_stl_container_items<std::vector<short>,short>(er &p, std::vector<short> &c);
+  template <> inline void PUP_stl_container_items<std::vector<unsigned short>,unsigned short>(er &p, std::vector<unsigned short> &c);
+  template <> inline void PUP_stl_container_items<std::vector<int>,int>(er &p, std::vector<int> &c);
+  template <> inline void PUP_stl_container_items<std::vector<unsigned int>,unsigned int>(er &p, std::vector<unsigned int> &c);
+  template <> inline void PUP_stl_container_items<std::vector<long>,long>(er &p, std::vector<long> &c);
+  template <> inline void PUP_stl_container_items<std::vector<unsigned long>,unsigned long>(er &p, std::vector<unsigned long> &c);
+  template <> inline void PUP_stl_container_items<std::vector<long long>,long long>(er &p, std::vector<long long> &c);
+  template <> inline void PUP_stl_container_items<std::vector<unsigned long long>,unsigned long long>(er &p, std::vector<unsigned long long> &c);
+  template <> inline void PUP_stl_container_items<std::vector<float>,float>(er &p, std::vector<float> &c);
+  template <> inline void PUP_stl_container_items<std::vector<double>,double>(er &p, std::vector<double> &c);
   template <class container,class dtype>
   inline void PUP_stl_container(er &p,container &c);
   template <class container,class dtype>
@@ -180,6 +192,27 @@ namespace PUP {
       p|*it;
     }
   }
+
+// Specialize for vectors of common types
+#define PUP_STL_CONTAINER_ITEMS_ARRAY(dtype) \
+  template<> \
+  inline void PUP_stl_container_items<std::vector<dtype>, dtype>(er &p, std::vector<dtype> &c) \
+  { \
+    PUParray(p, &c[0], c.size()); \
+  }
+
+  PUP_STL_CONTAINER_ITEMS_ARRAY(char)
+  PUP_STL_CONTAINER_ITEMS_ARRAY(unsigned char)
+  PUP_STL_CONTAINER_ITEMS_ARRAY(short)
+  PUP_STL_CONTAINER_ITEMS_ARRAY(unsigned short)
+  PUP_STL_CONTAINER_ITEMS_ARRAY(int)
+  PUP_STL_CONTAINER_ITEMS_ARRAY(unsigned int)
+  PUP_STL_CONTAINER_ITEMS_ARRAY(long)
+  PUP_STL_CONTAINER_ITEMS_ARRAY(unsigned long)
+  PUP_STL_CONTAINER_ITEMS_ARRAY(long long)
+  PUP_STL_CONTAINER_ITEMS_ARRAY(unsigned long long)
+  PUP_STL_CONTAINER_ITEMS_ARRAY(float)
+  PUP_STL_CONTAINER_ITEMS_ARRAY(double)
 
   template <class container,class dtype>
   inline void PUP_stl_container(er &p,container &c) {
