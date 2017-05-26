@@ -850,8 +850,10 @@ void AMPI_Setup_Switch(void) {
   }
 }
 
+int AMPI_LOCAL_THRESHOLD = AMPI_LOCAL_THRESHOLD_DEFAULT;
 int AMPI_RDMA_THRESHOLD = AMPI_RDMA_THRESHOLD_DEFAULT;
 int AMPI_SMP_RDMA_THRESHOLD = AMPI_SMP_RDMA_THRESHOLD_DEFAULT;
+
 static bool nodeinit_has_been_called=false;
 CtvDeclare(ampiParent*, ampiPtr);
 CtvDeclare(bool, ampiInitDone);
@@ -918,6 +920,16 @@ static void ampiNodeInit(void)
 
   /* read AMPI environment variables */
   char *value;
+  if ((value = getenv("AMPI_LOCAL_THRESHOLD"))) {
+    AMPI_LOCAL_THRESHOLD = atoi(value);
+    if (CkMyNode() == 0) {
+#if AMPI_LOCAL_IMPL
+      CkPrintf("AMPI> local messaging threshold is %d Bytes.\n", AMPI_LOCAL_THRESHOLD);
+#else
+      CkPrintf("Warning: AMPI local messaging threshold ignored since local sends are disabled.\n");
+#endif
+    }
+  }
   bool rdmaSet = false;
   if ((value = getenv("AMPI_RDMA_THRESHOLD"))) {
     AMPI_RDMA_THRESHOLD = atoi(value);
@@ -2486,13 +2498,13 @@ void ampi::ssendAck(int sreqIdx)
   AmpiRequestList& reqs = parent->ampiReqs;
   SsendReq& sreq = (SsendReq &)(*reqs[sreqIdx]);
   int destIdx = getIndexForRank(sreq.destRank);
+  int seq = getSeqNo(sreq.destRank, sreq.comm, sreq.tag);
 
 #if AMPI_RDMA_IMPL
   CkDDT_DataType* ddt = getDDT()->getType(sreq.type);
   if (ddt->isContig()) {
     int size = ddt->getSize(sreq.count);
     if (size >= AMPI_RDMA_THRESHOLD) {
-      int seq = getSeqNo(sreq.destRank, sreq.comm, sreq.tag);
       CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
       completedSendCB.setRefnum(sreqIdx);
       thisProxy[destIdx].genericRdma(CkSendBuffer(sreq.buf, completedSendCB), size, seq, sreq.tag, sreq.src);
@@ -2501,7 +2513,7 @@ void ampi::ssendAck(int sreqIdx)
   }
 #endif //AMPI_RDMA_IMPL
 
-  thisProxy[destIdx].generic(makeAmpiMsg(sreq.destRank, sreq.tag, sreq.src, sreq.buf, sreq.count, sreq.type, sreq.comm));
+  thisProxy[destIdx].generic(makeAmpiMsg(sreq.destRank, sreq.tag, sreq.src, sreq.buf, sreq.count, sreq.type, sreq.comm, seq));
 
   sreq.statusIreq = true;
   if (sreq.isBlocked() && parent->numBlockedReqs != 0) {
@@ -2518,9 +2530,9 @@ void ampi::genericSync(AmpiMsg* msg)
 {
   MSG_ORDER_DEBUG(
     CkPrintf("AMPI vp %d sync arrival: tag=%d, src=%d, comm=%d, ssendReq=%d (seq %d) resumeOnRecv %d\n",
-             thisIndex, msg->getTag(), msg->getSrcRank(), getComm(), CkGetRefNum(msg), msg->getSeq(), parent->resumeOnRecv);
+             thisIndex, msg->getTag(), msg->getSrcRank(), getComm(), msg->getSsendReq(), msg->getSeq(), parent->resumeOnRecv);
   )
-  CkAssert(CkGetRefNum(msg));
+  CkAssert(msg->isSsend());
 #if CMK_BIGSIM_CHARM
   TRACE_BG_ADD_TAG("AMPI_generic");
   msg->event = NULL;
@@ -2641,7 +2653,7 @@ void ampi::genericRdma(char* buf, int size, int seq, int tag, int srcRank)
 
   if (seq != -1) {
     int seqIdx = srcRank;
-    int n = oorder.isInOrder(seqIdx, seq);
+    int n = oorder.putIfInOrder(seqIdx, seq);
     if (n > 0) { // This message was in-order
       inorderRdma(buf, size, seq, tag, srcRank);
       if (n > 1) { // It enables other, previously out-of-order messages
@@ -2695,15 +2707,11 @@ void ampi::inorderRdma(char* buf, int size, int seq, int tag, int srcRank)
   }
 }
 
-// Callback from ampi::genericRdma() signaling that the send buffer is now safe to re-use
-void ampi::completedRdmaSend(CkDataMsg *msg)
+void ampi::completedSend(MPI_Request reqIdx)
 {
-  // refnum is the index into reqList for this SendReq
-  int reqIdx = CkGetRefNum(msg);
-
-  MSG_ORDER_DEBUG(
-    CkPrintf("[%d] in ampi::completedRdmaSend on index %d, reqIdx = %d\n",
-             CkMyPe(), parent->thisIndex, reqIdx);
+   MSG_ORDER_DEBUG(
+     CkPrintf("[%d] send completed on vp %d, reqIdx = %d\n",
+              CkMyPe(), parent->thisIndex, reqIdx);
   )
 
   AmpiRequestList& reqList = parent->ampiReqs;
@@ -2716,7 +2724,15 @@ void ampi::completedRdmaSend(CkDataMsg *msg)
   if (parent->resumeOnRecv && parent->numBlockedReqs == 0) {
     thread->resume();
   }
-  // CkDataMsg is allocated & freed by the runtime, so do not delete msg
+}
+
+// Callback from ampi::genericRdma() signaling that the send buffer is now safe to re-use
+void ampi::completedRdmaSend(CkDataMsg *msg)
+{
+  // refnum is the index into reqList for this SendReq
+  int reqIdx = CkGetRefNum(msg);
+  completedSend(reqIdx);
+  // [nokeep] entry method, so do not delete msg
 }
 
 AmpiMsg *ampi::getMessage(int t, int s, MPI_Comm comm, int *sts) const
@@ -2754,16 +2770,22 @@ AmpiMsg *ampi::makeSyncMsg(int destRank,int t,int sRank,const void *buf,int coun
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
   AmpiMsg *msg = new (0, 0) AmpiMsg(seq, t, sRank, len);
-  UsrToEnv(msg)->setRef(ssendReq+1);
+  msg->setSsendReq(ssendReq);
   return msg;
 }
 
 AmpiMsg *ampi::makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
                            MPI_Datatype type,MPI_Comm destcomm)
 {
+  int seq = getSeqNo(destRank, destcomm, t);
+  return makeAmpiMsg(destRank, t, sRank, buf, count, type, destcomm, seq);
+}
+
+AmpiMsg *ampi::makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
+                           MPI_Datatype type,MPI_Comm destcomm,int seq)
+{
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
-  int seq = getSeqNo(destRank, destcomm, t);
   AmpiMsg *msg = new (len, 0) AmpiMsg(seq, t, sRank, len);
   ddt->serialize((char*)buf, msg->getData(), count, 1);
   return msg;
@@ -2831,11 +2853,9 @@ int ampi::getSeqNo(int destRank, MPI_Comm destcomm, int tag) {
 }
 
 MPI_Request ampi::sendRdmaMsg(int t, int sRank, const void* buf, int size, int destIdx,
-                              int destRank, MPI_Comm destcomm, CProxy_ampi arrProxy,
+                              int destRank, MPI_Comm destcomm, int seq, CProxy_ampi arrProxy,
                               MPI_Request reqIdx)
 {
-  int seq = getSeqNo(destRank, destcomm, t);
-
   // Set up a SendReq to track completion of the send buffer
   if (reqIdx == MPI_REQUEST_NULL) {
     reqIdx = postReq(new SendReq(destcomm));
@@ -2847,31 +2867,119 @@ MPI_Request ampi::sendRdmaMsg(int t, int sRank, const void* buf, int size, int d
   return reqIdx;
 }
 
-// Call genericRdma inline on the local destination object
-MPI_Request ampi::sendLocalMsg(int t, int sRank, const void* buf, int size, int destRank,
-                               MPI_Comm destcomm, ampi* destPtr, AmpiSendType sendType,
-                               MPI_Request reqIdx)
+inline IReq* ampi::getLocalRecvReq(int tag, int srcRank) {
+  int tags[2] = { tag, srcRank };
+  MPI_Status sts;
+  AmpiRequestList *reqL = &(parent->ampiReqs);
+  int ireqIdx = (int)((long)AmmGet(posted_ireqs, tags, (int*)&sts));
+  IReq *ireq = NULL;
+  if (reqL->size()>0 && ireqIdx>0)
+    ireq = (IReq *)(*reqL)[ireqIdx-1];
+  return ireq;
+}
+
+// Local version of ampi::generic but assumes msg is in-order & ireq is the matching recv req
+void ampi::localInorder(char* buf, int size, int seqIdx, int seq, int tag,
+                        int srcRank, IReq* ireq)
 {
-  int seq = getSeqNo(destRank, destcomm, t);
+  MSG_ORDER_DEBUG(
+    CkPrintf("[%d] in ampi::localInorder on index %d, size=%d, seq=%d, srcRank=%d, tag=%d, comm=%d\n",
+             CkMyPe(), getIndexForRank(getRank()), size, seq, srcRank, tag, getComm());
+  )
 
-  destPtr->genericRdma((char*)buf, size, seq, t, sRank);
+  if (seq != -1) {
+    int n = oorder.putIfInOrder(seqIdx, seq);
+    CkAssert(n > 0); // This message must be in-order
+    if (ireq->isBlocked() && parent->numBlockedReqs != 0) {
+      parent->numBlockedReqs--;
+    }
+    ireq->receiveRdma(this, buf, size, srcRank);
+    if (n > 1) { // It enables other, previously out-of-order messages
+      AmpiMsg *msg = NULL;
+      while ((msg = oorder.getOutOfOrder(seqIdx)) != 0) {
+        if (!inorder(msg)) break;
+      }
+    }
+  } else { // Cross-world or system messages are unordered
+    if (ireq->isBlocked() && parent->numBlockedReqs != 0) {
+      parent->numBlockedReqs--;
+    }
+    ireq->receiveRdma(this, buf, size, srcRank);
+  }
 
-  if (sendType == BLOCKING_SEND) {
-    return MPI_REQUEST_NULL;
+  if (parent->resumeOnRecv && parent->numBlockedReqs == 0) {
+    thread->resume();
   }
-  else if (reqIdx != MPI_REQUEST_NULL) {
-    return reqIdx;
+}
+
+// Call genericRdma inline on the local destination object
+MPI_Request ampi::sendLocalMsg(int tag, int srcRank, const void* buf, MPI_Datatype type,
+                               int count, int destRank, MPI_Comm destComm, int seq, ampi* destPtr,
+                               MPI_Request* req, AmpiSendType sendType)
+{
+  int seqIdx = srcRank;
+  CkDDT_DataType* sddt = getDDT()->getType(type);
+  int size = sddt->getSize(count);
+
+  if (seq == -1 || destPtr->isInOrder(seqIdx, seq)) {
+    IReq* ireq = destPtr->getLocalRecvReq(tag, srcRank);
+    if (ireq != NULL) {
+      MSG_ORDER_DEBUG(
+        CkPrintf("[%d] AMPI vp %d sending local, in-order, matched msg inline to vp %d\n",
+                 CkMyPe(), parent->thisIndex, destPtr->parent->thisIndex);
+      )
+      if (sddt->isContig()) {
+        destPtr->localInorder((char*)buf, size, seqIdx, seq, tag, srcRank, ireq);
+      }
+      else {
+        vector<char> sbuf(size);
+        sddt->serialize((char*)buf, &sbuf[0], count, 1);
+        destPtr->localInorder(&sbuf[0], size, seqIdx, seq, tag, srcRank, ireq);
+      }
+
+      if (*req != MPI_REQUEST_NULL) {
+        AmpiRequestList& reqList = parent->ampiReqs;
+        AmpiRequest& sreq = (*reqList[*req]);
+        sreq.statusIreq = true;
+      }
+      else if (sendType == BLOCKING_SEND || sendType == BLOCKING_SSEND) {
+        *req = MPI_REQUEST_NULL;
+      }
+      else if (sendType == I_SEND) {
+        *req = postReq(new SendReq(destComm, AMPI_REQ_COMPLETED));
+      }
+      else {
+        CkAssert(sendType == I_SSEND);
+        *req = postReq(new SsendReq(destComm, AMPI_REQ_COMPLETED));
+      }
+      return true;
+    }
   }
-  else { // SendReq is pre-completed since we directly copied the send buffer
-    return postReq(new SendReq(destcomm, AMPI_REQ_COMPLETED));
+
+  if (size >= AMPI_LOCAL_THRESHOLD ||
+     (sendType == BLOCKING_SSEND || sendType == I_SSEND)) {
+    // Block on the matching request to avoid making an intermediate copy
+    MSG_ORDER_DEBUG(
+      CkPrintf("[%d] AMPI vp %d sending local, out-of-order/unexpected msg inline using a Sync send from to vp %d\n",
+               CkMyPe(), parent->thisIndex, destPtr->parent->thisIndex);
+    )
+    if (*req == MPI_REQUEST_NULL) {
+      *req = postReq(new SsendReq(destComm, destRank, (void*)buf, srcRank, type, count, tag,
+                                  (sendType == BLOCKING_SEND || sendType == BLOCKING_SSEND) ?
+                                  AMPI_REQ_BLOCKED : AMPI_REQ_PENDING));
+    }
+    destPtr->genericSync(makeSyncMsg(destRank, tag, srcRank, buf, count, type, destComm, *req, seq));
+    return true;
+  }
+  else {
+    return false;
   }
 }
 
 MPI_Request ampi::sendSyncMsg(int t, int sRank, const void* buf, MPI_Datatype type, int count,
-                              int rank, MPI_Comm destcomm, CProxyElement_ampi destElem,
+                              int rank, MPI_Comm destcomm, int seq, CProxyElement_ampi destElem,
                               AmpiSendType sendType, MPI_Request reqIdx)
 {
-  int seq = getSeqNo(rank, destcomm, t);
   if (reqIdx == MPI_REQUEST_NULL) {
     reqIdx = postReq(new SsendReq(destcomm, rank, (void*)buf, sRank, type,
                                   count, t, (sendType == BLOCKING_SSEND) ?
@@ -2894,47 +3002,41 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
     destIdx = dest.getIndexForRemoteRank(rank);
     arrProxy = remoteProxy;
   }
+  int seq = getSeqNo(rank, destcomm, t);
 
   MSG_ORDER_DEBUG(
     CkPrintf("AMPI vp %d send: tag=%d, src=%d, comm=%d (to %d)\n",parent->thisIndex,t,sRank,destcomm,destIdx);
   )
 
-  if (sendType == BLOCKING_SSEND || sendType == I_SSEND) {
-    return sendSyncMsg(t, sRank, buf, type, count, rank, destcomm, arrProxy[destIdx], sendType, reqIdx);
-  }
-  ampi *destPtr = arrProxy[destIdx].ckLocal();
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int size = ddt->getSize(count);
-  if (ddt->isContig()) {
 #if AMPI_LOCAL_IMPL
-    if (destPtr != NULL) {
-      return sendLocalMsg(t, sRank, buf, size, rank, destcomm, destPtr, sendType, reqIdx);
-    }
-#endif
-#if AMPI_RDMA_IMPL
-    if (size >= AMPI_RDMA_THRESHOLD ||
-       (size >= AMPI_SMP_RDMA_THRESHOLD && destLikelyWithinProcess(arrProxy, destIdx)))
-    {
-      return sendRdmaMsg(t, sRank, buf, size, destIdx, rank, destcomm, arrProxy, reqIdx);
-    }
-#endif
-  }
-#if AMPI_LOCAL_IMPL
+  ampi *destPtr = arrProxy[destIdx].ckLocal();
   if (destPtr != NULL) {
-    destPtr->generic(makeAmpiMsg(rank, t, sRank, buf, count, type, destcomm));
-    return MPI_REQUEST_NULL;
-  } else
-#endif
-  {
-    arrProxy[destIdx].generic(makeAmpiMsg(rank, t, sRank, buf, count, type, destcomm));
-    if (reqIdx != MPI_REQUEST_NULL) {
-      AmpiRequestList& reqList = parent->ampiReqs;
-      AmpiRequest& sreq = (*reqList[reqIdx]);
-      sreq.statusIreq = true;
+    if (sendLocalMsg(t, sRank, buf, type, count, rank, destcomm, seq, destPtr, &reqIdx, sendType)) {
       return reqIdx;
     }
-    return MPI_REQUEST_NULL;
   }
+#endif
+  if (sendType == BLOCKING_SSEND || sendType == I_SSEND) {
+    return sendSyncMsg(t, sRank, buf, type, count, rank, destcomm, seq, arrProxy[destIdx], sendType, reqIdx);
+  }
+#if AMPI_RDMA_IMPL
+  if (ddt->isContig() &&
+      (size >= AMPI_RDMA_THRESHOLD ||
+      (size >= AMPI_SMP_RDMA_THRESHOLD && destLikelyWithinProcess(arrProxy, destIdx))))
+  {
+    return sendRdmaMsg(t, sRank, buf, size, destIdx, rank, seq, destcomm, arrProxy, reqIdx);
+  }
+#endif
+  arrProxy[destIdx].generic(makeAmpiMsg(rank, t, sRank, buf, count, type, destcomm, seq));
+  if (reqIdx != MPI_REQUEST_NULL) {
+    AmpiRequestList& reqList = parent->ampiReqs;
+    AmpiRequest& sreq = (*reqList[reqIdx]);
+    sreq.statusIreq = true;
+    return reqIdx;
+  }
+  return MPI_REQUEST_NULL;
 }
 
 // Ask the sender to send us the real message back
@@ -2949,21 +3051,48 @@ void ampi::requestSsendMsg(AmpiMsg* msg)
   thisProxy[srcIdx].ssendAck(ssendReq);
 }
 
-bool ampi::processAmpiMsg(AmpiMsg *msg, const void* buf, MPI_Datatype type, int count)
-{
-  if (msg->isSsend()) { // this is a sync msg, send an ack to sender to get the real one
+bool ampi::processSsendMsg(AmpiMsg* msg, int* msgLen, char** msgData) {
+  int srcRank = msg->getSrcRank();
+  int srcIdx = getIndexForRank(srcRank);
+  ampi* srcPtr = thisProxy[srcIdx].ckLocal();
+  if (srcPtr != NULL) {
+    MPI_Request sreqIdx = msg->getSsendReq();
+    ampiParent* srcParent = srcPtr->parent;
+    AmpiRequestList& reqs = srcParent->ampiReqs;
+    SsendReq& sreq = (SsendReq &)*(reqs[sreqIdx]);
+    *msgData = (char*)sreq.buf;
+    *msgLen = srcParent->myDDT->getSize(sreq.type) * sreq.count;
+    MSG_ORDER_DEBUG(
+      CkPrintf("AMPI vp %d in processSsendMsg, src is local so completing Ssend inline (req %d)\n", parent->thisIndex, sreqIdx);
+    )
+    srcPtr->completedSend(sreqIdx);
+    return true;
+  }
+  else {
     requestSsendMsg(msg);
     return false;
+  }
+}
+
+bool ampi::processAmpiMsg(AmpiMsg *msg, const void* buf, MPI_Datatype type, int count)
+{
+  char* msgData = msg->getData();
+  int msgLen = msg->getLength();
+
+  if (msg->isSsend()) { // this is a sync msg, send an ack to sender to get the real one
+    if (!processSsendMsg(msg, &msgLen, &msgData)) {
+      return false;
+    }
   }
 
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
 
-  if(msg->getLength() < len){ // only at rare case shall we reset count by using divide
-    count = msg->getLength()/(ddt->getSize(1));
+  if (msgLen < len) { // only at rare case shall we reset count by using divide
+    count = msgLen / ddt->getSize(1);
   }
 
-  ddt->serialize((char*)buf, msg->getData(), count, (-1));
+  ddt->serialize((char*)buf, msgData, count, (-1));
   return true;
 }
 
@@ -3511,7 +3640,8 @@ AmpiMsg *AmpiSeqQ::getOutOfOrder(int seqIdx)
 }
 
 void AmpiRequest::print(){
-  CkPrintf("In AmpiRequest: buf=%p, count=%d, type=%d, src=%d, tag=%d, comm=%d, isvalid=%d\n", buf, count, type, src, tag, comm, isvalid);
+  CkPrintf("In AmpiRequest: buf=%p, count=%d, type=%d, src=%d, tag=%d, comm=%d, isvalid=%d, blocked=%d, status=%d\n",
+           buf, count, type, src, tag, comm, isvalid, blocked, statusIreq);
 }
 
 void IReq::print(){

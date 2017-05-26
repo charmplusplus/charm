@@ -69,6 +69,11 @@ class fromzDisk : public zdisk {
 #define AMPI_LOCAL_IMPL ( !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
 #endif
 
+/* messages larger than or equal to this threshold may block on a matching recv if local */
+#ifndef AMPI_LOCAL_THRESHOLD_DEFAULT
+#define AMPI_LOCAL_THRESHOLD_DEFAULT 4096
+#endif
+
 /* AMPI uses RDMA sends if BigSim is not being used and the underlying comm
  * layer supports it (except for GNI, which has experimental RDMA support). */
 #ifndef AMPI_RDMA_IMPL
@@ -887,9 +892,12 @@ class SendReq : public AmpiRequest {
     if (sts_ == AMPI_REQ_BLOCKED) blocked=true;
     else if (sts_ == AMPI_REQ_COMPLETED) statusIreq=true;
   }
-  SendReq(void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_, MPI_Comm comm_) {
+  SendReq(void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_, MPI_Comm comm_,
+          AmpiReqSts sts_=AMPI_REQ_PENDING) {
     buf=buf_;  count=count_;  type=type_;  src=dest_;  tag=tag_;
     comm=comm_;  isvalid=true; blocked=false; statusIreq=false; persistent=false;
+    if (sts_ == AMPI_REQ_BLOCKED) blocked=true;
+    else if (sts_ == AMPI_REQ_COMPLETED) statusIreq=true;
   }
   SendReq(){}
   ~SendReq(){ }
@@ -913,8 +921,10 @@ class SsendReq : public AmpiRequest {
   bool persistent; // is this a persistent Ssend request?
  public:
   int destRank;
-  SsendReq(MPI_Comm comm_) {
+  SsendReq(MPI_Comm comm_, AmpiReqSts sts_=AMPI_REQ_PENDING) {
     comm = comm_; isvalid=true; persistent=false;
+    if (sts_ == AMPI_REQ_BLOCKED) blocked=true;
+    else if (sts_ == AMPI_REQ_COMPLETED) statusIreq=true;
   }
   SsendReq(void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_, MPI_Comm comm_) {
     buf=buf_;  count=count_;  type=type_;  src=dest_;  tag=tag_;
@@ -923,7 +933,7 @@ class SsendReq : public AmpiRequest {
   SsendReq(MPI_Comm comm_, int destRank_, void* buf_, int src_, MPI_Datatype type_,
            int count_, int tag_, AmpiReqSts sts_=AMPI_REQ_PENDING) {
     comm = comm_; isvalid=true; destRank = destRank_; buf = buf_;
-    src = src_; type = type_; count = count_; tag = tag_;
+    src = src_; type = type_; count = count_; tag = tag_; persistent = false;
     if (sts_ == AMPI_REQ_BLOCKED) blocked=true;
     else if (sts_ == AMPI_REQ_COMPLETED) statusIreq=true;
   }
@@ -1122,6 +1132,7 @@ class AmpiMsg : public CMessage_AmpiMsg {
     seq(_s), tag(t), srcRank(sRank), length(l) {}
   inline bool isSsend(void) const { return (UsrToEnv(this)->getRef() > 0); }
   inline int getSsendReq(void) const { return UsrToEnv(this)->getRef() - 1; }
+  inline void setSsendReq(int sreqIdx) { CkAssert(sreqIdx >= 0); UsrToEnv(this)->setRef(sreqIdx + 1); }
   inline int getSeq(void) const { return seq; }
   inline int getSeqIdx(void) const { return srcRank; }
   inline int getSrcRank(void) const { return srcRank; }
@@ -1212,7 +1223,7 @@ public:
   /// Is this message in order (return >0) or not (return 0)?
   /// Same as put() except we don't call putOutOfOrder() here,
   /// so the caller should do that separately
-  inline int isInOrder(int srcRank, int seq) {
+  inline int putIfInOrder(int srcRank, int seq) {
     AmpiOtherElement &el = elements[srcRank];
     if (seq == el.seqIncoming) { // In order:
       el.seqIncoming++;
@@ -1221,6 +1232,12 @@ public:
     else { // Out of order: caller should stash message
       return 0;
     }
+  }
+
+  /// Is this in-order?
+  inline int isInOrder(int seqIdx, int seq) {
+    AmpiOtherElement &el = elements[seqIdx];
+    return (seq == el.seqIncoming);
   }
 
   /// Get an out-of-order message from the table.
@@ -1233,6 +1250,11 @@ public:
   /// Return the next outgoing sequence number, and increment it.
   inline int nextOutgoing(int destRank) {
     return elements[destRank].seqOutgoing++;
+  }
+
+  /// Reset the outgoing sequence number to its previous value.
+  inline void resetOutgoing(int destRank) {
+    elements[destRank].seqOutgoing--;
   }
 };
 PUPmarshall(AmpiSeqQ)
@@ -1647,9 +1669,14 @@ class ampi : public CBase_ampi {
   groupStruct tmpVec; // stores temp group info
   CProxy_ampi remoteProxy; // valid only for intercommunicator
 
+  inline bool isInOrder(int seqIdx, int seq) { return oorder.isInOrder(seqIdx, seq); }
+  inline IReq* getLocalRecvReq(int tag, int srcRank);
+
   AmpiSeqQ oorder;
   bool inorder(AmpiMsg *msg);
   void inorderRdma(char* buf, int size, int seq, int tag, int srcRank);
+  inline void localInorder(char* buf, int size, int seqIdx, int seq, int tag,
+                           int srcRank, IReq* ireq);
 
   void init(void);
 
@@ -1702,24 +1729,27 @@ class ampi : public CBase_ampi {
   MPI_Request postReq(AmpiRequest* newreq);
   inline void waitOnBlockingSend(MPI_Request* req, AmpiSendType sendType);
   inline void requestSsendMsg(AmpiMsg* msg);
+  inline void completedSend(MPI_Request req);
 
   inline int getSeqNo(int destRank, MPI_Comm destcomm, int tag);
   AmpiMsg *makeSyncMsg(int destRank,int t,int sRank,const void *buf,int count,
                        MPI_Datatype type,MPI_Comm destcomm,int ssendReq,int seq);
   AmpiMsg *makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
                        MPI_Datatype type,MPI_Comm destcomm);
+  AmpiMsg *makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
+                       MPI_Datatype type,MPI_Comm destcomm,int seq);
 
   MPI_Request send(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
                    MPI_Comm destcomm, AmpiSendType sendType=BLOCKING_SEND, MPI_Request=MPI_REQUEST_NULL);
   static void sendraw(int t, int s, void* buf, int len, CkArrayID aid, int idx);
-  MPI_Request sendSyncMsg(int t, int sRank, const void* buf, MPI_Datatype type, int count,
-                          int rank, MPI_Comm destcomm, CProxyElement_ampi destElem,
-                          AmpiSendType sendType, MPI_Request req);
-  inline MPI_Request sendLocalMsg(int t, int sRank, const void* buf, int size, int destRank,
-                                  MPI_Comm destcomm, ampi* destPtr, AmpiSendType sendType,
-                                  MPI_Request req);
+  inline MPI_Request sendSyncMsg(int t, int sRank, const void* buf, MPI_Datatype type, int count,
+                                 int rank, MPI_Comm destcomm, int seq, CProxyElement_ampi destElem,
+                                 AmpiSendType sendType, MPI_Request req);
+  inline MPI_Request sendLocalMsg(int t, int sRank, const void* buf, MPI_Datatype type,
+                                  int count, int destRank, MPI_Comm destcomm, int seq,
+                                  ampi* destPtr, MPI_Request* req, AmpiSendType sendType);
   inline MPI_Request sendRdmaMsg(int t, int sRank, const void* buf, int size, int destIdx,
-                                 int destRank, MPI_Comm destcomm, CProxy_ampi arrProxy,
+                                 int destRank, MPI_Comm destcomm, int seq, CProxy_ampi arrProxy,
                                  MPI_Request req);
   inline bool destLikelyWithinProcess(CProxy_ampi arrProxy, int destIdx) const {
     CkArray* localBranch = arrProxy.ckLocalBranch();
@@ -1728,6 +1758,7 @@ class ampi : public CBase_ampi {
   }
   MPI_Request delesend(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
                        MPI_Comm destcomm, CProxy_ampi arrproxy, AmpiSendType sendType, MPI_Request req);
+  inline bool processSsendMsg(AmpiMsg* msg, int* msgLen, char** msgData);
   inline bool processAmpiMsg(AmpiMsg *msg, const void* buf, MPI_Datatype type, int count);
   inline void processRdmaMsg(const void *sbuf, int slength, int srank, void* rbuf,
                              int rcount, MPI_Datatype rtype, MPI_Comm comm);
