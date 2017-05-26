@@ -65,6 +65,7 @@ void traceSendMsgComm(char *msg) {}
 void traceChangeLastTimestamp(double ts) {}
 void registerMachineUserEventsFunction(void (*eventRegistrationFunc)()) {}
 void traceCommSetMsgID(char *msg) {}
+double TraceTimerCommon(){return CmiWallTimer();}
 #endif
 
 void traceGetMsgID(char *msg, int *pe, int *event) {}
