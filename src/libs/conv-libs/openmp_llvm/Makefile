@@ -11,7 +11,7 @@ llvm_omp: omp
 omp:
 	if [ ! -d runtime/build ]; then mkdir runtime/build; fi;\
 	cd runtime/build;\
-	if [ ! -f ./Makefile ]; then cmake ../ -DCMAKE_C_COMPILER="$(CHARMC)" -DCMAKE_CXX_COMPILER="$(CHARMC)" -DCMAKE_C_FLAGS="$(OPTS)" -DCMAKE_CXX_FLAGS="$(OPTS)"; fi; cd ../../; \
+	if [ ! -f ./Makefile ]; then cmake ../ -DCMAKE_C_COMPILER="$(CHARMC)" -DCMAKE_CXX_COMPILER="$(CHARMC)" -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="$(OPTS)" -DCMAKE_CXX_FLAGS="$(OPTS)"; fi; cd ../../; \
 	make $(MFLAGS) -C runtime/build
 
 ompcharm: llvm_omp

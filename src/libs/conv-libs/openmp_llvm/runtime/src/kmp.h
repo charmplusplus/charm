@@ -1241,10 +1241,15 @@ struct kmp_region_info {
     typedef DWORD               kmp_key_t;
 #endif /* KMP_OS_WINDOWS */
 
-#if KMP_OS_UNIX
+#if KMP_OS_UNIX && !CHARM_OMP
     typedef pthread_t           kmp_thread_t;
     typedef pthread_key_t       kmp_key_t;
+#elif CHARM_OMP
+    #include "ompcharm.h"
+    typedef CthThread           kmp_thread_t;
+    typedef pthread_key_t       kmp_key_t;
 #endif
+
 
 extern kmp_key_t  __kmp_gtid_threadprivate_key;
 
@@ -2604,6 +2609,10 @@ typedef struct KMP_ALIGN_CACHE kmp_base_team {
 #if CHARM_OMP
     kmp_int32 t_num_shared_tasks;
     kmp_int32 t_num_local_tasks;
+#ifdef KMP_DEBUG
+    kmp_int32 t_num_arrived_barrier_counts;
+#endif
+    kmp_int32 t_num_barrier_counts;
 #endif
 } kmp_base_team_t;
 

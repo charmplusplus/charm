@@ -184,6 +184,13 @@ static enum MACHINE_SMP_MODE Cmi_smp_mode_setting = COMM_THREAD_SEND_RECV;
 
 /* Machine layer dependent specific modes of the smp charm runtime are set in individual machine layers */
 
+#if CMK_OMP
+/* Suspended tasks should be in a separate queue 
+ * They are pushed by the master thread who generated the tasks. When they are stolen by other PEs and suspended on the other PEs, they should be reinserted to the PEs local Queue so that the locality of resumed tasks can be maintained 
+ * */
+void CmiSuspendedTaskEnqueue(int targetRank, void *data);
+void* CmiSuspendedTaskPop();
+#endif
 #if CMK_SMP
 volatile int commThdExit = 0;
 CmiNodeLock  commThdExitLock = 0;
@@ -439,6 +446,16 @@ void CmiPushPE(int rank,void *msg) {
     CmiIdleLock_addMessage(&cs->idle);
     MACHSTATE1(3,"} Pushing message into rank %d's queue done",rank);
 }
+
+#if CMK_OMP
+void CmiSuspendedTaskEnqueue(int targetRank, void *msg) {
+  CMIQueuePush(CpvAccessOther(CmiSuspendedTaskQueue, targetRank), msg);
+}
+
+void* CmiSuspendedTaskPop() {
+  return CMIQueuePop((CMIQueue)CpvAccess(CmiSuspendedTaskQueue));
+}
+#endif
 
 #if CMK_NODE_QUEUE_AVAILABLE
 /*Add a message to this processor's receive queue */
@@ -1254,7 +1271,9 @@ static void ConverseRunPE(int everReturn) {
         CmiMyArgv=Cmi_argv;
 
     CthInit(CmiMyArgv);
-
+#if CMK_OMP
+    CmiNodeAllBarrier();
+#endif
     /* initialize the network progress counter*/
     /* Network progress function is used to poll the network when for
        messages. This flushes receive buffers on some  implementations*/
@@ -1262,7 +1281,11 @@ static void ConverseRunPE(int everReturn) {
     CpvAccess(networkProgressCount) = 0;
 
     ConverseCommonInit(CmiMyArgv);
-    
+#if CMK_OMP
+    CpvAccess(CmiSuspendedTaskQueue) = (void *)CMIQueueCreate();
+    CmiNodeAllBarrier();
+#endif
+   
     // register idle events
 
 #if CMK_SMP

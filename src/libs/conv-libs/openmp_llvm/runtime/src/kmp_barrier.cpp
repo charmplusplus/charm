@@ -170,6 +170,24 @@ __kmp_linear_barrier_release(enum barrier_type bt, kmp_info_t *this_thr, int gti
                               &other_threads[i]->th.th_bar[bt].bb.b_go,
                               other_threads[i]->th.th_bar[bt].bb.b_go,
                               other_threads[i]->th.th_bar[bt].bb.b_go + KMP_BARRIER_STATE_BUMP));
+#if CHARM_OMP
+                    CthThread t = team->t.t_threads[i]->th.th_info.ds.ds_thread;
+                    int sched;
+                    do {
+                      CmiMemoryReadFence();
+                      sched = TCR_4(CthScheduled(t));
+                      if (sched <=0) break;
+                      KF_TRACE(5, ("T#%d waking up thread T#%d CthScheduled: %d\n", gtid,__kmp_gtid_from_tid(i,team) , TCR_4(CthScheduled(t))));
+                    } while (1);
+#endif
+            }
+            CmiMemoryReadFence();
+#ifdef KMP_DEBUG
+            if (team->t.t_num_arrived_barrier_counts != nproc -1)
+              CmiAbort("threads haven't arrived\n");
+            TCW_4(team->t.t_num_arrived_barrier_counts, 0);
+#endif
+            for (i=1; i<nproc; ++i) {
                 kmp_flag_64 flag(&other_threads[i]->th.th_bar[bt].bb.b_go, other_threads[i]);
                 flag.release();
             }
@@ -178,6 +196,10 @@ __kmp_linear_barrier_release(enum barrier_type bt, kmp_info_t *this_thr, int gti
         KA_TRACE(20, ("__kmp_linear_barrier_release: T#%d wait go(%p) == %u\n",
                       gtid, &thr_bar->b_go, KMP_BARRIER_STATE_BUMP));
         kmp_flag_64 flag(&thr_bar->b_go, KMP_BARRIER_STATE_BUMP);
+#ifdef KMP_DEBUG
+        KMP_TEST_THEN_INC32((kmp_int32 *)&(this_thr->th.th_team->t.t_num_arrived_barrier_counts));
+        CmiMemoryWriteFence();
+#endif
         flag.wait(this_thr, TRUE
                   USE_ITT_BUILD_ARG(itt_sync_obj) );
 #if USE_ITT_BUILD && USE_ITT_NOTIFY
@@ -206,6 +228,7 @@ __kmp_linear_barrier_release(enum barrier_type bt, kmp_info_t *this_thr, int gti
 #endif
         KMP_DEBUG_ASSERT(team != NULL);
         TCW_4(thr_bar->b_go, KMP_INIT_BARRIER_STATE);
+
         KA_TRACE(20, ("__kmp_linear_barrier_release: T#%d(%d:%d) set go(%p) = %u\n",
                       gtid, team->t.t_id, tid, &thr_bar->b_go, KMP_INIT_BARRIER_STATE));
         KMP_MB();  // Flush all pending memory write invalidates.
@@ -1129,9 +1152,9 @@ __kmp_barrier(enum barrier_type bt, int gtid, int is_split, size_t reduce_size,
             this_thr->th.th_local.reduce_data = reduce_data;
         }
 
+#if !CHARM_OMP
         if (KMP_MASTER_TID(tid) && __kmp_tasking_mode != tskm_immediate_exec)
             __kmp_task_team_setup(this_thr, team, 0); // use 0 to only setup the current team if nthreads > 1
-#if !CHARM_OMP
         switch (__kmp_barrier_gather_pattern[bt]) {
         case bp_hyper_bar: {
             KMP_ASSERT(__kmp_barrier_gather_branch_bits[bt]); // don't set branch bits to 0; use linear
@@ -1160,10 +1183,12 @@ __kmp_barrier(enum barrier_type bt, int gtid, int is_split, size_t reduce_size,
 
         if (KMP_MASTER_TID(tid)) {
             status = 0;
+#if !CHARM_OMP
             if (__kmp_tasking_mode != tskm_immediate_exec) {
-                __kmp_task_team_wait(this_thr, team
+              __kmp_task_team_wait(this_thr, team
                                      USE_ITT_BUILD_ARG(itt_sync_obj) );
             }
+#endif
 #if USE_DEBUGGER
             // Let the debugger know: All threads are arrived and starting leaving the barrier.
             team->t.t_bar[bt].b_team_arrived += 1;
@@ -1222,7 +1247,47 @@ __kmp_barrier(enum barrier_type bt, int gtid, int is_split, size_t reduce_size,
 #endif /* USE_ITT_BUILD */
         }
         if (status == 1 || ! is_split) {
-#if !CHARM_OMP
+#if CHARM_OMP
+//Check whether all the worker theads have been arrived by 
+// using an atomic counter in the openmp team structure.
+         void *msg=NULL;
+         
+         if (KMP_MASTER_TID(tid)) {
+           int barrierCounts;
+           do {
+             CmiMemoryReadFence();
+             barrierCounts = TCR_4(this_thr->th.th_team->t.t_num_barrier_counts); 
+             if (barrierCounts <=0) break;
+             msg = TaskQueuePop((TaskQueue)CpvAccess(CsdTaskQueue));
+             if (msg) {
+               CmiHandleMessage(msg);
+             }
+             else {
+               msg = CmiSuspendedTaskPop();
+               if (msg) 
+                 CmiHandleMessage(msg);
+               else
+                 StealTask();
+             }
+             KF_TRACE( 5, ( "__kmp_barrier: T#%d is waiting: %d \n",
+                       __kmp_gtid, this_thr->th.th_team->t.t_num_barrier_counts) );
+           } while (1);
+           
+           KMP_MB();
+           
+           TCW_4(team->t.t_num_barrier_counts, team->t.t_nproc-1);
+           CmiMemoryWriteFence();
+           KF_TRACE( 5, ( "__kmp_barrier: T#%d reset barrier counts: %d, %p \n",
+                       __kmp_gtid, this_thr->th.th_team->t.t_num_barrier_counts, &(this_thr->th.th_team->t.t_num_barrier_counts)));
+         }
+         else
+           KF_TRACE( 5, ( "__kmp_barrier: T#%d barrier counts: %d, %p \n",
+                       __kmp_gtid, this_thr->th.th_team->t.t_num_barrier_counts, &(this_thr->th.th_team->t.t_num_barrier_counts)));
+         KF_TRACE(5, ("linear_release start: %d\n", this_thr->th.th_team->t.t_num_barrier_counts));
+         
+         __kmp_linear_barrier_release(bt, this_thr, gtid, tid, FALSE
+                                             USE_ITT_BUILD_ARG(itt_sync_obj) );
+#else
             switch (__kmp_barrier_release_pattern[bt]) {
             case bp_hyper_bar: {
                 KMP_ASSERT(__kmp_barrier_release_branch_bits[bt]);
@@ -1246,10 +1311,11 @@ __kmp_barrier(enum barrier_type bt, int gtid, int is_split, size_t reduce_size,
                                              USE_ITT_BUILD_ARG(itt_sync_obj) );
             }
             }
-#endif
             if (__kmp_tasking_mode != tskm_immediate_exec) {
                 __kmp_task_team_sync(this_thr, team);
             }
+#endif
+
         }
 
 #if USE_ITT_BUILD
@@ -1272,10 +1338,12 @@ __kmp_barrier(enum barrier_type bt, int gtid, int is_split, size_t reduce_size,
                 }
 #endif
 
+#if !CHARM_OMP
                 KMP_DEBUG_ASSERT(this_thr->th.th_task_team->tt.tt_found_proxy_tasks == TRUE);
                 __kmp_task_team_wait(this_thr, team
                                                USE_ITT_BUILD_ARG(itt_sync_obj));
                 __kmp_task_team_setup(this_thr, team, 0);
+#endif
 
 #if USE_ITT_BUILD
                 if (__itt_sync_create_ptr || KMP_ITT_DEBUG)
@@ -1289,7 +1357,7 @@ __kmp_barrier(enum barrier_type bt, int gtid, int is_split, size_t reduce_size,
 #endif
         }
     }
-    KA_TRACE(15, ("__kmp_barrier: T#%d(%d:%d) is leaving with return value %d\n",
+    KA_TRACE(5, ("__kmp_barrier: T#%d(%d:%d) is leaving with return value %d\n",
                   gtid, __kmp_team_from_gtid(gtid)->t.t_id, __kmp_tid_from_gtid(gtid), status));
 
 #if OMPT_SUPPORT
@@ -1435,7 +1503,7 @@ __kmp_join_barrier(int gtid)
     if (__itt_sync_create_ptr || KMP_ITT_DEBUG)
         __kmp_itt_barrier_starting(gtid, itt_sync_obj);
 #endif /* USE_ITT_BUILD */
-
+#if !CHARM_OMP
     switch (__kmp_barrier_gather_pattern[bs_forkjoin_barrier]) {
     case bp_hyper_bar: {
         KMP_ASSERT(__kmp_barrier_gather_branch_bits[bs_forkjoin_barrier]);
@@ -1459,7 +1527,7 @@ __kmp_join_barrier(int gtid)
                                     USE_ITT_BUILD_ARG(itt_sync_obj) );
     }
     }
-
+#endif
     /* From this point on, the team data structure may be deallocated at any time by the
        master thread - it is unsafe to reference it in any of the worker threads. Any per-team
        data items that need to be referenced before the end of the barrier should be moved to
@@ -1604,11 +1672,11 @@ __kmp_fork_barrier(int gtid, int tid)
             KMP_DEBUG_ASSERT(other_threads[i]->th.th_team == team);
         }
 #endif
-
+#if !CHARM_OMP
         if (__kmp_tasking_mode != tskm_immediate_exec) {
             __kmp_task_team_setup(this_thr, team, 0);  // 0 indicates setup current task team if nthreads > 1
         }
-
+#endif
         /* The master thread may have changed its blocktime between the join barrier and the
            fork barrier. Copy the blocktime info to the thread, where __kmp_wait_template() can
            access it when the team struct is not guaranteed to exist. */
@@ -1618,7 +1686,7 @@ __kmp_fork_barrier(int gtid, int tid)
             this_thr->th.th_team_bt_set = team->t.t_implicit_task_taskdata[tid].td_icvs.bt_set;
         }
     } // master
-
+#if !CHARM_OMP
     switch (__kmp_barrier_release_pattern[bs_forkjoin_barrier]) {
     case bp_hyper_bar: {
         KMP_ASSERT(__kmp_barrier_release_branch_bits[bs_forkjoin_barrier]);
@@ -1642,7 +1710,7 @@ __kmp_fork_barrier(int gtid, int tid)
                                      USE_ITT_BUILD_ARG(itt_sync_obj) );
     }
     }
-
+#endif
     // Early exit for reaping threads releasing forkjoin barrier
     if (TCR_4(__kmp_global.g.g_done)) {
         this_thr->th.th_task_team = NULL;
@@ -1666,7 +1734,6 @@ __kmp_fork_barrier(int gtid, int tid)
     team = (kmp_team_t *)TCR_PTR(this_thr->th.th_team);
     KMP_DEBUG_ASSERT(team != NULL);
     tid = __kmp_tid_from_gtid(gtid);
-
 
 #if KMP_BARRIER_ICV_PULL
     /* Master thread's copy of the ICVs was set up on the implicit taskdata in

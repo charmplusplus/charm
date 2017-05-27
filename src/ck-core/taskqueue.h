@@ -1,6 +1,5 @@
 #ifndef _CKTASKQUEUE_H
 #define _CKTASKQUEUE_H
-
 #define TaskQueueSize 1024
 //Uncomment for debug print statements
 #define TaskQueueDebug(...) //CmiPrintf(__VA_ARGS__)
@@ -14,18 +13,17 @@ typedef struct TaskQueueStruct {
   void *data[TaskQueueSize];
 } *TaskQueue;
 
-inline static void* TaskQueueCreate() {
+inline static TaskQueue TaskQueueCreate() {
   TaskQueue t = (TaskQueue)malloc(sizeof(struct TaskQueueStruct));
   t->head = 0;
   t->tail = 0;
-  return (void *)t;
+  return t;
 }
 
 inline static void TaskQueuePush(TaskQueue Q, void *data) {
-  int t = Q->tail;
-  Q->data[t % TaskQueueSize] = data;
+  Q->data[ Q->tail % TaskQueueSize] = data;
   CmiMemoryWriteFence();
-  Q->tail = t+1;
+  Q->tail +=1;
 }
 
 inline static void* TaskQueuePop(TaskQueue Q) { // Pop happens in the same worker thread which pushed the task before.

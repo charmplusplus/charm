@@ -98,14 +98,16 @@ __kmp_wait_template(kmp_info_t *this_thr, C *flag, int final_spin
     int th_gtid;
     int tasks_completed = FALSE;
     int oversubscribed;
-
+#if !CHARM_OMP
     KMP_FSYNC_SPIN_INIT(spin, NULL);
     if (flag->done_check()) {
         KMP_FSYNC_SPIN_ACQUIRED(spin);
         return;
     }
+#endif
     th_gtid = this_thr->th.th_info.ds.ds_gtid;
     KA_TRACE(20, ("__kmp_wait_sleep: T#%d waiting for flag(%p)\n", th_gtid, flag));
+#if !CHARM_OMP
 #if KMP_STATS_ENABLED
     stats_state_e thread_state = KMP_GET_THREAD_STATE();
 #endif
@@ -249,11 +251,11 @@ __kmp_wait_template(kmp_info_t *this_thr, C *flag, int final_spin
         // If we have waited a bit more, fall asleep
         if (TCR_4(__kmp_global.g.g_time.dt.t_value) < hibernate)
             continue;
-
+#endif
         KF_TRACE(50, ("__kmp_wait_sleep: T#%d suspend time reached\n", th_gtid));
 
         flag->suspend(th_gtid);
-
+#if !CHARM_OMP
         if (TCR_4(__kmp_global.g.g_done)) {
             if (__kmp_global.g.g_abort)
                 __kmp_abort_thread();
@@ -261,7 +263,7 @@ __kmp_wait_template(kmp_info_t *this_thr, C *flag, int final_spin
         }
         // TODO: If thread is done with work and times out, disband/free
     }
-
+#endif
 #if OMPT_SUPPORT && OMPT_BLAME
     if (ompt_enabled &&
         ompt_state != ompt_state_undefined) {
@@ -296,8 +298,9 @@ __kmp_wait_template(kmp_info_t *this_thr, C *flag, int final_spin
         this_thr->th.th_stats->resetIdleFlag();
     }
 #endif
-
+#if !CHARM_OMP
     KMP_FSYNC_SPIN_ACQUIRED(spin);
+#endif
 }
 
 /* Release any threads specified as waiting on the flag by releasing the flag and resume the waiting thread
@@ -321,6 +324,7 @@ __kmp_release_template(C *flag)
     if (__kmp_dflt_blocktime != KMP_MAX_BLOCKTIME) {
         // Only need to check sleep stuff if infinite block time not set
         if (flag->is_any_sleeping()) { // Are *any* of the threads that wait on this flag sleeping?
+          if (flag->get_num_waiters() > 1) CmiAbort("more than two threads are waiting here\n");
             for (unsigned int i=0; i<flag->get_num_waiters(); ++i) {
                 kmp_info_t * waiter = flag->get_waiter(i); // if a sleeping waiter exists at i, sets current_waiter to i inside the flag
                 if (waiter) {
@@ -328,10 +332,20 @@ __kmp_release_template(C *flag)
                     // Wake up thread if needed
                     KF_TRACE(50, ("__kmp_release: T#%d waking up thread T#%d since sleep flag(%p) set\n",
                                   gtid, wait_gtid, flag->get()));
+#if CHARM_OMP
+                    flag->unset_sleeping();
+                    KMP_MB();
+                    CthAwaken(waiter->th.th_info.ds.ds_thread);
+#else
                     flag->resume(wait_gtid); // unsets flag's current_waiter when done
+#endif
                 }
             }
         }
+#if CHARM_OMP
+        else
+          CmiAbort("There should be sleeping thread here\n");
+#endif
     }
 }
 

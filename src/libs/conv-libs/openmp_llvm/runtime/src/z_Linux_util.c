@@ -61,6 +61,7 @@
 
 #if CHARM_OMP
 #include "ompcharm.h"
+CpvExtern(int, prevGtid);
 #endif
 
 /* ------------------------------------------------------------------------ */
@@ -596,6 +597,7 @@ __kmp_test_then_and64( volatile kmp_int64 *p, kmp_int64 d )
 void
 __kmp_terminate_thread( int gtid )
 {
+#if !CHARM_OMP
     int status;
     kmp_info_t  *th = __kmp_threads[ gtid ];
 
@@ -614,6 +616,7 @@ __kmp_terminate_thread( int gtid )
         }; // if
     #endif
     __kmp_yield( TRUE );
+#endif
 } //
 
 /* ------------------------------------------------------------------------ */
@@ -645,7 +648,7 @@ __kmp_set_stack_info( int gtid, kmp_info_t *th )
        thread stack range can be reduced by sibling thread creation so pthread_attr_getstack
        may cause thread gtid aliasing */
     if ( ! KMP_UBER_GTID(gtid) ) {
-
+#if !CHARM_OMP
         /* Fetch the real thread attributes */
         status = pthread_attr_init( &attr );
         KMP_CHECK_SYSFAIL( "pthread_attr_init", status );
@@ -664,6 +667,7 @@ __kmp_set_stack_info( int gtid, kmp_info_t *th )
 
         status = pthread_attr_destroy( &attr );
         KMP_CHECK_SYSFAIL( "pthread_attr_destroy", status );
+#endif
     }
 
     if ( size != 0 && addr != 0 ) {     /* was stack parameter determination successful? */
@@ -680,17 +684,9 @@ __kmp_set_stack_info( int gtid, kmp_info_t *th )
     TCW_4(th->th.th_info.ds.ds_stackgrow, TRUE);
     return FALSE;
 }
-#if CHARM_OMP
-void*
-__kmp_launch_worker( void *data )
-#else
 static void*
 __kmp_launch_worker( void *thr )
-#endif
 {
-#if CHARM_OMP
-    void *thr = ((OmpConverseMsg*)(data))->convMsg.data;
-#endif
     int status, old_type, old_state;
 #if KMP_BLOCK_SIGNALS && !CHARM_OMP
     sigset_t    new_set, old_set;
@@ -702,17 +698,13 @@ __kmp_launch_worker( void *thr )
     int gtid;
 
     gtid = ((kmp_info_t*)thr) -> th.th_info.ds.ds_gtid;
-#if CHARM_OMP
-    int prev_gtid;
-    prev_gtid=__kmp_gtid_get_specific();
-#ifdef KMP_TDATA_GTID
-    prev_gtid=__kmp_gtid;
-#endif
-#endif
+#if !CHARM_OMP
     __kmp_gtid_set_specific( gtid );
 #ifdef KMP_TDATA_GTID
     __kmp_gtid = gtid;
 #endif
+#endif
+
 #if KMP_STATS_ENABLED
     // set __thread local index to point to thread-specific stats
     __kmp_stats_thread_ptr = ((kmp_info_t*)thr)->th.th_stats;
@@ -754,7 +746,7 @@ __kmp_launch_worker( void *thr )
     KMP_CHECK_SYSFAIL( "pthread_sigmask", status );
 #endif /* KMP_BLOCK_SIGNALS && !CHARM_OMP */
 
-#if KMP_OS_LINUX || KMP_OS_FREEBSD || KMP_OS_NETBSD
+#if !CHARM_OMP && (KMP_OS_LINUX || KMP_OS_FREEBSD || KMP_OS_NETBSD)
     if ( __kmp_stkoffset > 0 && gtid > 0 ) {
         padding = KMP_ALLOCA( gtid * __kmp_stkoffset );
     }
@@ -771,13 +763,6 @@ __kmp_launch_worker( void *thr )
     status = pthread_sigmask( SIG_SETMASK, & old_set, NULL );
     KMP_CHECK_SYSFAIL( "pthread_sigmask", status );
 #endif /* KMP_BLOCK_SIGNALS && !CHARM_OMP */
-
-#if CHARM_OMP
-    __kmp_gtid_set_specific(prev_gtid);
-#ifdef KMP_TDATA_GTID
-    __kmp_gtid = prev_gtid;
-#endif
-#endif
     return exit_val;
 }
 
@@ -984,12 +969,18 @@ __kmp_create_worker( int gtid, kmp_info_t *th, size_t stack_size )
 #if !CHARM_OMP
     pthread_t      handle;
     pthread_attr_t thread_attr;
-#endif
     int            status;
-
-
+#endif
     th->th.th_info.ds.ds_gtid = gtid;
-#if !CHARM_OMP
+#if CHARM_OMP
+    th->th.th_info.ds.ds_thread = CthCreate((CthVoidFn)__kmp_launch_worker, (void *)th, stack_size);
+    
+    if (th->th.th_info.ds.ds_tid == 0)
+      CthSetSuspendable(th->th.th_info.ds.ds_thread,0);
+
+    CthSetStrategyWorkStealing(th->th.th_info.ds.ds_thread);
+    KA_TRACE(10, ("Thread created: %p\n", th->th.th_info.ds.ds_thread));
+#else // !CHARM_OMP
 #if KMP_STATS_ENABLED
     // sets up worker thread stats
     __kmp_acquire_tas_lock(&__kmp_stats_lock, gtid);
@@ -1105,6 +1096,7 @@ __kmp_create_worker( int gtid, kmp_info_t *th, size_t stack_size )
 void
 __kmp_create_monitor( kmp_info_t *th )
 {
+#if !CHARM_OMP
     pthread_t           handle;
     pthread_attr_t      thread_attr;
     size_t              size;
@@ -1260,7 +1252,7 @@ __kmp_create_monitor( kmp_info_t *th )
     KMP_MB();       /* Flush all pending memory write invalidates.  */
 
     KA_TRACE( 10, ( "__kmp_create_monitor: monitor created %#.8lx\n", th->th.th_info.ds.ds_thread ) );
-
+#endif
 } // __kmp_create_monitor
 
 void
@@ -1275,6 +1267,7 @@ void __kmp_resume_monitor();
 void
 __kmp_reap_monitor( kmp_info_t *th )
 {
+#if !CHARM_OMP
     int          status;
     void        *exit_val;
 
@@ -1319,12 +1312,15 @@ __kmp_reap_monitor( kmp_info_t *th )
                    th->th.th_info.ds.ds_thread ) );
 
     KMP_MB();       /* Flush all pending memory write invalidates.  */
-
+#endif
 }
 
 void
 __kmp_reap_worker( kmp_info_t *th )
 {
+#if CHARM_OMP
+    CthFree(th->th.th_info.ds.ds_thread);
+#else
     int          status;
     void        *exit_val;
 
@@ -1347,6 +1343,7 @@ __kmp_reap_worker( kmp_info_t *th )
     KA_TRACE( 10, ("__kmp_reap_worker: done reaping T#%d\n", th->th.th_info.ds.ds_gtid ) );
 
     KMP_MB();       /* Flush all pending memory write invalidates.  */
+#endif
 }
 
 
@@ -1669,12 +1666,12 @@ static inline void __kmp_suspend_template( int th_gtid, C *flag )
     typename C::flag_t old_spin;
 
     KF_TRACE( 30, ("__kmp_suspend_template: T#%d enter for flag = %p\n", th_gtid, flag->get() ) );
-
+#if !CHARM_OMP
     __kmp_suspend_initialize_thread( th );
 
     status = pthread_mutex_lock( &th->th.th_suspend_mx.m_mutex );
     KMP_CHECK_SYSFAIL( "pthread_mutex_lock", status );
-
+#endif
     KF_TRACE( 10, ( "__kmp_suspend_template: T#%d setting sleep bit for spin(%p)\n",
                     th_gtid, flag->get() ) );
 
@@ -1684,13 +1681,38 @@ static inline void __kmp_suspend_template( int th_gtid, C *flag )
     old_spin = flag->set_sleeping();
 
     KF_TRACE( 5, ( "__kmp_suspend_template: T#%d set sleep bit for spin(%p)==%x, was %x\n",
-                   th_gtid, flag->get(), *(flag->get()), old_spin ) );
+                   __kmp_gtid, flag->get(), *(flag->get()), old_spin ) );
+#if CHARM_OMP
+    CthSetStrategySuspendedWorkStealing(th->th.th_info.ds.ds_thread);
+    KMP_TEST_THEN_DEC32((kmp_int32 *) &(th->th.th_team->t.t_num_barrier_counts));
+    //CmiMemoryAtomicDecrement(th->th.th_team->t.t_num_barrier_counts, memory_order_release); 
+    //CmiMemoryWriteFence();
 
+    KF_TRACE( 5, ( "__kmp_suspend_template: [%d] T#%d reduced barrier counts: %d, %p \n",CmiMyRank(),
+                       th_gtid, th->th.th_team->t.t_num_barrier_counts, &(th->th.th_team->t.t_num_barrier_counts)) );
+    KMP_MB();
+
+    if (CpvAccess(prevGtid) >=0) {
+#if KMP_TDATA_GTID
+      __kmp_gtid = CpvAccess(prevGtid);
+#endif
+      __kmp_gtid_set_specific(CpvAccess(prevGtid));
+    }
+    CthSuspend();
+    __kmp_gtid_set_specific(th_gtid);
+#if KMP_TDATA_GTID
+    __kmp_gtid = th_gtid;
+#endif
+
+    KF_TRACE( 5, ( "__kmp_suspend_template: T#%d is resumed \n",
+                       __kmp_gtid) );
+#else
     if ( flag->done_check_val(old_spin) ) {
         old_spin = flag->unset_sleeping();
         KF_TRACE( 5, ( "__kmp_suspend_template: T#%d false alarm, reset sleep bit for spin(%p)\n",
                        th_gtid, flag->get()) );
-    } else {
+    }
+    else {
         /* Encapsulate in a loop as the documentation states that this may
          * "with low probability" return when the condition variable has
          * not been signaled or broadcast
@@ -1754,7 +1776,6 @@ static inline void __kmp_suspend_template( int th_gtid, C *flag )
             }
 #endif
         } // while
-
         // Mark the thread as active again (if it was previous marked as inactive)
         if ( deactivated ) {
             th->th.th_active = TRUE;
@@ -1764,7 +1785,7 @@ static inline void __kmp_suspend_template( int th_gtid, C *flag )
             }
         }
     }
-
+#endif
 #ifdef DEBUG_SUSPEND
     {
         char buffer[128];
@@ -1772,10 +1793,10 @@ static inline void __kmp_suspend_template( int th_gtid, C *flag )
         __kmp_printf( "__kmp_suspend_template: T#%d has awakened: %s\n", th_gtid, buffer );
     }
 #endif
-
+#if !CHARM_OMP
     status = pthread_mutex_unlock( &th->th.th_suspend_mx.m_mutex );
     KMP_CHECK_SYSFAIL( "pthread_mutex_unlock", status );
-
+#endif
     KF_TRACE( 30, ("__kmp_suspend_template: T#%d exit\n", th_gtid ) );
 }
 

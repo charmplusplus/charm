@@ -657,6 +657,7 @@ CpvExtern(int,         CmiHandlerMax);
 CpvExtern(void*,       CsdSchedQueue);
 #if CMK_SMP && CMK_TASKQUEUE
 CpvExtern(void*,       CsdTaskQueue);
+CpvExtern(void*,       CmiSuspendedTaskQueue);
 #endif
 #if CMK_GRID_QUEUE_AVAILABLE
 CpvExtern(void *,      CsdGridQueue);
@@ -928,9 +929,6 @@ char *CmiPrintDate();
 #define CsdEnqueue(x)         (CqsEnqueueFifo((Queue)CpvAccess(CsdSchedQueue),(x)))
 #define CsdEmpty()            (CqsEmpty((Queue)CpvAccess(CsdSchedQueue)))
 #define CsdLength()           (CqsLength((Queue)CpvAccess(CsdSchedQueue)))
-#if CMK_SMP && CMK_TASKQUEUE
-#define CsdEnqueueTask(x) (CdsFifo_Enqueue((Queue)CpvAccess(CsdTaskQueue),(x)))
-#endif
 #if CMK_CMIPRINTF_IS_A_BUILTIN /* these are implemented in machine.c */
 void  CmiPrintf(const char *, ...);
 void  CmiError(const char *, ...);
@@ -1013,6 +1011,7 @@ typedef struct {
 #endif
 #if CMK_SMP && CMK_TASKQUEUE
   void *taskQ;
+  void *suspendedTaskQ;
 #endif
 } CsdSchedulerState_t;
 extern void CsdSchedulerState_new(CsdSchedulerState_t *state);
@@ -1132,7 +1131,10 @@ void     CmiLookupGroup(CmiGroup grp, int *npes, int **pes);
 }
 
 void CmiPushPE(int, void*);
-
+#if CMK_OMP
+void          CmiSuspendedTaskEnqueue(int targetRank, void *msg);
+void      *   CmiSuspendedTaskPop();
+#endif
 void          CmiSyncSendFn(int, int, char *);
 CmiCommHandle CmiAsyncSendFn(int, int, char *);
 void          CmiFreeSendFn(int, int, char *);
@@ -1408,6 +1410,13 @@ void       CthAwaken(CthThread);
 void       CthAwakenPrio(CthThread, int, int, unsigned int *);
 void       CthSetStrategy(CthThread, CthAwkFn, CthThFn);
 void       CthSetStrategyDefault(CthThread);
+#if CMK_OMP
+void       CthSetStrategyWorkStealing(CthThread);
+void       CthSetStrategySuspendedWorkStealing(CthThread);
+int        CthScheduled(CthThread t);
+CthThread  CthGetCurrentThread();
+CpvExtern(int, prevGtid);
+#endif
 void       CthYield(void);
 void       CthYieldPrio(int,int,unsigned int*);
 
@@ -1889,7 +1898,6 @@ extern int _immRunning;
 /******** Memory Fence ********/
 
 #if  CMK_SMP
-#if CMK_C_SYNC_ADD_AND_FETCH_PRIMITIVE
 /* ImplSelect<num> selects one of two implementations for the atomic operations depending on the number of parameters
  * e.g.) CmiMemoryAtomicIncrement(input)
  *       -> ImplSelect2(input, CmiMemoryAtomicIncrementMemOrder, CmiMemoryAtomiIncrementSimple) CmiMemoryAtomicIncrementSimple
@@ -1899,6 +1907,8 @@ extern int _immRunning;
  *       -> ImplSelect2(input, memory_order_relaxed, CmiMemoryAtomicIncrementMemOrder, CmiMemoryAtomicIncrementSimple) CmiMemoryAtomicIncrementMemOrder
  *       -> __atomic_fetch_and_add(&input, 1, memory_order_relaxed) (if the underlying compiler supports C11)
  *       -> CmiMemoryAtomicSimple(input) -> __sync_fetch_and_add(&input, 1) (if the compiler doesn't support C11, the memory consistency keyword ignored)
+ *                                       -> __asm__ __volatile__("lock incl (%0)" :: "r" (&(someInt))) (CMK_GCC_X86_ASM on)
+ *                                       -> CmiLock(cmiMemoryLock); someInt=someInt+1; CmiUnlock(cmiMemoryLock); ( Sync primitives and GCC asm not supported)
  * */
 #define ImplSelect2(_1, _2, NAME, ...) NAME
 #define ImplSelect3(_1, _2, _3, NAME, ...) NAME
@@ -1906,6 +1916,7 @@ extern int _immRunning;
 #define CmiMemoryAtomicDecrement(...) ImplSelect2(__VA_ARGS__, CmiMemoryAtomicDecrementMemOrder, CmiMemoryAtomicDecrementSimple, Dummy)(__VA_ARGS__)
 #define CmiMemoryAtomicFetchAndInc(...) ImplSelect3(__VA_ARGS__, CmiMemoryAtomicFetchAndIncMemOrder, CmiMemoryAtomicFetchAndIncSimple, Dummy)(__VA_ARGS__)
 
+#if CMK_C_SYNC_ADD_AND_FETCH_PRIMITIVE
 #if __GNUC__ && __STDC_VERSION__ >= 201112L && !__STDC_NO_ATOMICS__
 #ifndef _STDATOMIC_H
 typedef enum
@@ -1921,7 +1932,8 @@ typedef enum
 #define CmiMemoryAtomicIncrementMemOrder(someInt, MemModel) __atomic_fetch_add(&(someInt),1, MemModel);
 #define CmiMemoryAtomicDecrementMemOrder(someInt, MemModel) __atomic_fetch_sub(&(someInt),1, MemModel);
 #define CmiMemoryAtomicFetchAndIncMemOrder(input,output, MemModel) (output) = __atomic_fetch_add(&(input),1, MemModel);
-#else
+
+#else /* Mem ordering is not supported */
 #define CmiMemoryAtomicIncrementMemOrder(someInt, MemModel) CmiMemoryAtomicIncrementSimple(someInt);
 #define CmiMemoryAtomicDecrementMemOrder(someInt, MemModel) CmiMemoryAtomicDecrementSimple(someInt);
 #define CmiMemoryAtomicFetchAndIncMemOrder(input,output, MemModel) CmiMemoryAtomicFetchAndIncSimple(input, output);
@@ -1929,25 +1941,31 @@ typedef enum
 #define CmiMemoryAtomicIncrementSimple(someInt)    __sync_fetch_and_add(&(someInt), 1)
 #define CmiMemoryAtomicDecrementSimple(someInt)    __sync_fetch_and_sub(&(someInt), 1)
 #define CmiMemoryAtomicFetchAndIncSimple(input,output)   (output) =__sync_fetch_and_add(&(input), 1)
-#elif CMK_GCC_X86_ASM /*SYNC_PRIM*/
+
+#else /* !CMK_C_SYNC_ADD_AND_FETCH_PRIMITIVE */
+#define CmiMemoryAtomicIncrementMemOrder(someInt, MemModel) CmiMemoryAtomicIncrementSimple(someInt);
+#define CmiMemoryAtomicDecrementMemOrder(someInt, MemModel) CmiMemoryAtomicDecrementSimple(someInt);
+#define CmiMemoryAtomicFetchAndIncMemOrder(input,output, MemModel) CmiMemoryAtomicFetchAndIncSimple(input, output);
+#if CMK_GCC_X86_ASM /*SYNC_PRIM*/
 #if 1
-#define CmiMemoryAtomicIncrement(someInt)  __asm__ __volatile__("lock incl (%0)" :: "r" (&(someInt)))
-#define CmiMemoryAtomicDecrement(someInt)  __asm__ __volatile__("lock decl (%0)" :: "r" (&(someInt)))
+#define CmiMemoryAtomicIncrementSimple(someInt)  __asm__ __volatile__("lock incl (%0)" :: "r" (&(someInt)))
+#define CmiMemoryAtomicDecrementSimple(someInt)  __asm__ __volatile__("lock decl (%0)" :: "r" (&(someInt)))
 #else /* 1 */
 /* this might be slightly faster, but does not compile with -O3 on net-darwin-x86_64 */
 #define CmiMemoryAtomicIncrement(someInt)  __asm__ __volatile__("lock incl %0" :: "m" (someInt))
 #define CmiMemoryAtomicDecrement(someInt)  __asm__ __volatile__("lock decl %0" :: "m" (someInt))
 #endif /* 1 */
-#define CmiMemoryAtomicFetchAndInc(input,output) __asm__ __volatile__( \
+#define CmiMemoryAtomicFetchAndIncSimple(input,output) __asm__ __volatile__( \
         "movl $1, %1\n\t" \
         "lock xaddl %1, %0" \
         : "=m"(input), "=r"(output) : "m"(input) : "memory")
 #else
 #define CMK_NO_ASM_AVAILABLE    1
 extern CmiNodeLock cmiMemoryLock;
-#define CmiMemoryAtomicIncrement(someInt)  { CmiLock(cmiMemoryLock); someInt=someInt+1; CmiUnlock(cmiMemoryLock); }
-#define CmiMemoryAtomicDecrement(someInt)  { CmiLock(cmiMemoryLock); someInt=someInt-1; CmiUnlock(cmiMemoryLock); }
-#define CmiMemoryAtomicFetchAndInc(input,output) { CmiLock(cmiMemoryLock); output=input; input=output+1; CmiUnlock(cmiMemoryLock); }
+#define CmiMemoryAtomicIncrementSimple(someInt)  { CmiLock(cmiMemoryLock); someInt=someInt+1; CmiUnlock(cmiMemoryLock); }
+#define CmiMemoryAtomicDecrementSimple(someInt)  { CmiLock(cmiMemoryLock); someInt=someInt-1; CmiUnlock(cmiMemoryLock); }
+#define CmiMemoryAtomicFetchAndIncSimple(input,output) { CmiLock(cmiMemoryLock); output=input; input=output+1; CmiUnlock(cmiMemoryLock); }
+#endif
 #endif /* CMK_C_SYNC_ADD_AND_FETCH_PRIMITIVE */
 
 #if CMK_C_SYNC_SYNCHRONIZE_PRIMITIVE

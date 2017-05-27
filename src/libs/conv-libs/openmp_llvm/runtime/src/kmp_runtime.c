@@ -29,13 +29,14 @@
 #if CHARM_OMP
 #include "ompcharm.h"
 #include <math.h>
-CpvDeclare(OmpConverseMsg*, ompConvMsg);
-CpvDeclare(unsigned int, localRatio);
-CpvDeclare(unsigned int*, localRatioArray);
-CpvDeclare(unsigned int, ratioIdx);
-CpvDeclare(bool, ratioInit);
-CpvDeclare(unsigned int, ratioSum);
+CpvExtern(unsigned int, localRatio);
+CpvExtern(unsigned int*, localRatioArray);
+CpvExtern(unsigned int, ratioIdx);
+CpvExtern(bool, ratioInit);
+CpvExtern(unsigned int, ratioSum);
+CpvExtern(int, prevGtid);
 CsvExtern(unsigned int, idleThreadsCnt);
+extern void* __kmp_launch_worker(void *);
 #endif
 
 #if OMPT_SUPPORT
@@ -865,7 +866,7 @@ __kmp_reserve_threads( kmp_root_t *root, kmp_team_t *parent_team,
     if (new_nthreads >= set_nthreads)
       new_nthreads = set_nthreads; // set_nthreads is the default number of threads speficied by users.
 
-    CharmOMPDebug("[%f][%d] idle threads: %d, localRatio: %d, new_thread:%d, set_nthreads: %d \n",CmiWallTimer(), CmiMyPe(), idleThreadsCnt, currLocalRatio, new_nthreads, set_nthreads);
+    KF_TRACE(10, ("[%f][%d] idle threads: %d, localRatio: %d, new_thread:%d \n",CmiWallTimer(), CmiMyPe(), idleThreadsCnt, currLocalRatio, new_nthreads));
 #else
     new_nthreads = set_nthreads;
 
@@ -1300,7 +1301,12 @@ __kmp_serialized_parallel(ident_t *loc, kmp_int32 global_tid)
         serial_team->t.t_sched         = this_thr->th.th_team->t.t_sched;
         this_thr->th.th_team           = serial_team;
         serial_team->t.t_master_tid    = this_thr->th.th_info.ds.ds_tid;
-
+#if CHARM_OMP
+#ifdef KMP_DEBUG
+        serial_team->t.t_num_arrived_barrier_counts = 0;
+#endif
+        serial_team->t.t_num_barrier_counts = serial_team->t.t_num_local_tasks =serial_team->t.t_num_shared_tasks = 0;
+#endif
         KF_TRACE( 10, ( "__kmpc_serialized_parallel: T#d curtask=%p\n",
                         global_tid, this_thr->th.th_current_task ) );
         KMP_ASSERT( this_thr->th.th_current_task->td_flags.executing == 1 );
@@ -3605,25 +3611,8 @@ __kmp_register_root( int initial_thread )
     int         gtid;
     int         capacity;
     __kmp_acquire_bootstrap_lock( &__kmp_forkjoin_lock );
-    KA_TRACE( 20, ("__kmp_register_root: entered\n"));
+    KA_TRACE( 1, ("__kmp_register_root: entered\n"));
     KMP_MB();
-
-#if CHARM_OMP
-    CpvInitialize(unsigned int, localRatio);
-    CpvInitialize(unsigned int, ratioIdx);
-    CpvInitialize(unsigned int, ratioSum);
-    CpvInitialize(bool, ratioInit);
-    CpvInitialize(unsigned int*, localRatioArray);
-    CpvInitialize(OmpConverseMsg*, ompConvMsg);
-    CpvInitialize(int, curNumThreads);
-    CpvAccess(localRatioArray) = (unsigned int*) __kmp_allocate(sizeof(unsigned int) * windowSize);
-    memset(CpvAccess(localRatioArray), 0, sizeof (unsigned int) * windowSize);
-    CpvAccess(localRatio) = 0;
-    CpvAccess(ratioIdx) = 0;
-    CpvAccess(ratioSum) = 0;
-    CpvAccess(ratioInit) = false;
-    CpvAccess(ompConvMsg) = NULL;
-#endif
 
     /*
         2007-03-02:
@@ -3668,11 +3657,28 @@ __kmp_register_root( int initial_thread )
     /* find an available thread slot */
     /* Don't reassign the zero slot since we need that to only be used by initial
        thread */
+
+#if CHARM_OMP
+    /* setup new root thread structure */
+    root_thread = (kmp_info_t*) __kmp_allocate( sizeof(kmp_info_t) );
+    int candidate_gtid = initial_thread ? -1 : 0;
+    bool result = false;
+    while (!result) {
+      candidate_gtid ++;
+      result = KMP_COMPARE_AND_STORE_PTR(&__kmp_threads[candidate_gtid], NULL, root_thread);
+      KMP_DEBUG_ASSERT( candidate_gtid < __kmp_threads_capacity );
+    }
+
+    gtid = candidate_gtid;
+#else
     for( gtid=(initial_thread ? 0 : 1) ; TCR_PTR(__kmp_threads[gtid]) != NULL ; gtid++ )
         ;
+#endif
     KA_TRACE( 1, ("__kmp_register_root: found slot in threads array: T#%d\n", gtid ));
     KMP_ASSERT( gtid < __kmp_threads_capacity );
-
+#if CHARM_OMP
+    CpvAccess(prevGtid) = gtid;
+#endif
     /* update global accounting */
     __kmp_all_nth ++;
     TCW_4(__kmp_nth, __kmp_nth + 1);
@@ -3715,9 +3721,14 @@ __kmp_register_root( int initial_thread )
 
     /* setup new root thread structure */
     if( root->r.r_uber_thread ) {
+#if CHARM_OMP
+        __kmp_free(root_thread);
+#endif
         root_thread = root->r.r_uber_thread;
     } else {
+#if !CHARM_OMP
         root_thread = (kmp_info_t*) __kmp_allocate( sizeof(kmp_info_t) );
+#endif
         if ( __kmp_storage_map ) {
             __kmp_print_thread_storage_map( root_thread, gtid );
         }
@@ -3736,7 +3747,6 @@ __kmp_register_root( int initial_thread )
         #endif
         __kmp_init_random( root_thread );  // Initialize random number generator
     }
-
     /* setup the serial team held in reserve by the root thread */
     if( ! root_thread->th.th_serial_team ) {
         kmp_internal_control_t r_icvs = __kmp_get_global_icvs();
@@ -4027,6 +4037,10 @@ __kmp_initialize_info( kmp_info_t *this_thr, kmp_team_t *team, int tid, int gtid
     TCW_SYNC_PTR(this_thr->th.th_team, team);
 
     this_thr->th.th_info.ds.ds_tid  = tid;
+    
+    if (tid == 0 && this_thr->th.th_info.ds.ds_thread)
+      CthSetSuspendable(this_thr->th.th_info.ds.ds_thread,0);
+
     this_thr->th.th_set_nproc       = 0;
 #if OMP_40_ENABLED
     this_thr->th.th_set_proc_bind   = proc_bind_default;
@@ -4239,15 +4253,30 @@ __kmp_allocate_thread( kmp_root_t *root, kmp_team_t *team, int new_tid )
     }
 #endif
     KMP_MB();
+#if CHARM_OMP /*should be reconsidered */
+    /* start from team master's gtid */
+    new_thr = (kmp_info_t*) __kmp_allocate( sizeof(kmp_info_t) );
+
+    //TCW_SYNC_PTR(__kmp_threads[new_gtid], new_thr);
+
+    int candidate_gtid =__kmp_gtid_from_tid(0, team);
+    bool result = false;
+    while (!result) {
+      candidate_gtid ++;
+      result = KMP_COMPARE_AND_STORE_PTR(&__kmp_threads[candidate_gtid], NULL, new_thr);
+      KMP_DEBUG_ASSERT( candidate_gtid < __kmp_threads_capacity );
+    }
+
+    new_gtid = candidate_gtid;
+#else
     for( new_gtid=1 ; TCR_PTR(__kmp_threads[new_gtid]) != NULL; ++new_gtid ) {
         KMP_DEBUG_ASSERT( new_gtid < __kmp_threads_capacity );
     }
-
     /* allocate space for it. */
     new_thr = (kmp_info_t*) __kmp_allocate( sizeof(kmp_info_t) );
 
     TCW_SYNC_PTR(__kmp_threads[new_gtid], new_thr);
-
+#endif
     if ( __kmp_storage_map ) {
         __kmp_print_thread_storage_map( new_thr, new_gtid );
     }
@@ -4382,6 +4411,13 @@ __kmp_reinitialize_team( kmp_team_t *team, kmp_internal_control_t *new_icvs, ide
 
     KF_TRACE( 10, ( "__kmp_reinitialize_team: exit this_thread=%p team=%p\n",
                     team->t.t_threads[0], team ) );
+#if CHARM_OMP
+    team->t.t_num_barrier_counts=team->t.t_num_local_tasks = team->t.t_num_shared_tasks = (team->t.t_nproc-1);
+#if KMP_DEBUG
+    team->t.t_num_arrived_barrier_counts= 0 ;
+#endif
+    CmiMemoryWriteFence();
+#endif
 }
 
 
@@ -5466,7 +5502,6 @@ __kmp_launch_thread( kmp_info_t *this_thr )
     if( __kmp_env_consistency_check ) {
         this_thr->th.th_cons = __kmp_allocate_cons_stack( gtid );  // ATT: Memory leak?
     }
-
 #if OMPT_SUPPORT
     if (ompt_enabled) {
         this_thr->th.ompt_thread_info.state = ompt_state_overhead;
@@ -5479,11 +5514,20 @@ __kmp_launch_thread( kmp_info_t *this_thr )
 #endif
 
     /* This is the place where threads wait for work */
-
     while( ! TCR_4(__kmp_global.g.g_done) ) {
-#if !CHARM_OMP
-        KMP_DEBUG_ASSERT( this_thr == __kmp_threads[ gtid ] );
+#if CHARM_OMP
+        CpvAccess(prevGtid)=__kmp_gtid_get_specific();
+#ifdef KMP_TDATA_GTID
+        CpvAccess(prevGtid)=__kmp_gtid;
 #endif
+        KMP_MB();
+        __kmp_gtid_set_specific(gtid);
+#ifdef KMP_TDATA_GTID
+        __kmp_gtid = gtid;
+#endif
+        CharmOMPDebug("[%f][%d] start, thread: %p, __kmp_gtid: %d, gtid: %d, prev_gtid: %d\n",CmiWallTimer(), CmiMyPe(), this_thr, __kmp_gtid, gtid, CpvAccess(prevGtid));         
+#endif
+        KMP_DEBUG_ASSERT( this_thr == __kmp_threads[ gtid ] );
         KMP_MB();
 
         /* wait for work to do */
@@ -5505,7 +5549,6 @@ __kmp_launch_thread( kmp_info_t *this_thr )
             this_thr->th.ompt_thread_info.state = ompt_state_overhead;
         }
 #endif
-
         pteam = (kmp_team_t *(*))(& this_thr->th.th_team);
 
         /* have we been allocated? */
@@ -5540,11 +5583,18 @@ __kmp_launch_thread( kmp_info_t *this_thr )
                     KMP_TIME_DEVELOPER_BLOCK(USER_worker_invoke);
                     KMP_TIME_PARTITIONED_BLOCK(OMP_parallel);
                     KMP_SET_THREAD_STATE_BLOCK(IMPLICIT_TASK);
+                    KA_TRACE(20, ("[%f] Beginning invoke task, thread: %p, PE: %d, gtid: %d, master_tid: %d, t_invoke: %p,t_num_shared_tasks:%d\n", CmiWallTimer(), this_thr, CmiMyPe(), gtid, __kmp_tid_from_gtid(gtid),(*pteam)->t.t_invoke ,(*pteam)->t.t_num_shared_tasks));
+
                     rc = (*pteam)->t.t_invoke( gtid );
 #if CHARM_OMP
-                    if (__kmp_tid_from_gtid(gtid) > (*pteam)->t.t_num_local_tasks)
-                      KMP_TEST_THEN_DEC32(&(*pteam)->t.t_num_shared_tasks);
-                    CharmOMPDebug("gtid: %d, master_tid: %d, t_num_shared_tasks:%d\n", gtid, __kmp_tid_from_gtid(gtid), (*pteam)->t.t_num_shared_tasks);
+#if KMP_DEBUG
+                    if ((*pteam)->t.t_num_shared_tasks > (*pteam)->t.t_nproc-1)
+                      CmiAbort("num_shared_tasks should not be less than number of threads in the team");
+#endif
+                    KMP_TEST_THEN_DEC32(&(*pteam)->t.t_num_shared_tasks);
+                    //CmiMemoryWriteFence();
+                    //CmiMemoryAtomicDecrement((*pteam)->t.t_num_shared_tasks, memory_order_release);
+                    KA_TRACE(20, ("[%f] thread: %p, PE: %d, gtid: %d, master_tid: %d, t_num_shared_tasks:%d\n", CmiWallTimer(), this_thr, CmiMyPe(), gtid, __kmp_tid_from_gtid(gtid), (*pteam)->t.t_num_shared_tasks));
 #endif
                 }
                 KMP_START_DEVELOPER_EXPLICIT_TIMER(USER_launch_thread_loop);
@@ -5563,7 +5613,7 @@ __kmp_launch_thread( kmp_info_t *this_thr )
                               gtid, (*pteam)->t.t_id, __kmp_tid_from_gtid(gtid), (*pteam)->t.t_pkfn));
             }
             /* join barrier after parallel region */
-#if !CHARM_OMP
+#if! CHARM_OMP
             __kmp_join_barrier( gtid );
 #endif
 #if OMPT_SUPPORT && OMPT_TRACE
@@ -5580,7 +5630,13 @@ __kmp_launch_thread( kmp_info_t *this_thr )
 #endif
         }
 #if CHARM_OMP
-        break;
+          __kmp_gtid_set_specific(CpvAccess(prevGtid));
+#ifdef KMP_TDATA_GTID
+          __kmp_gtid = CpvAccess(prevGtid);
+#endif
+        KA_TRACE(20, ("[%f][%d] end, thread: %p, __kmp_gtid: %d, gtid: %d, prev_gtid: %d\n",CmiWallTimer(), CmiMyPe(), this_thr, __kmp_gtid, gtid, CpvAccess(prevGtid)));
+        KMP_MB();
+        CthSuspend();
 #endif
     }
     TCR_SYNC_PTR((intptr_t)__kmp_global.g.g_done);
@@ -5707,18 +5763,17 @@ __kmp_reap_thread(
     gtid = thread->th.th_info.ds.ds_gtid;
 
     if ( ! is_root ) {
-
+#if !CHARM_OMP
         if ( __kmp_dflt_blocktime != KMP_MAX_BLOCKTIME ) {
             /* Assume the threads are at the fork barrier here */
             KA_TRACE( 20, ("__kmp_reap_thread: releasing T#%d from fork barrier for reap\n", gtid ) );
             /* Need release fence here to prevent seg faults for tree forkjoin barrier (GEH) */
             kmp_flag_64 flag(&thread->th.th_bar[ bs_forkjoin_barrier ].bb.b_go, thread);
             __kmp_release_64(&flag);
-        }; // if
-#if !CHARM_OMP
-        // Terminate OS thread.
+        };
+#endif // if
+        // Terminate OS thread. For Charm++, free user-level threads
         __kmp_reap_worker( thread );
-#endif
 
         //
         // The thread was killed asynchronously.  If it was actively
@@ -6569,9 +6624,7 @@ __kmp_do_serial_initialize( void )
 
     /* we have finished the serial initialization */
     __kmp_init_counter ++;
-
     __kmp_init_serial = TRUE;
-
     if (__kmp_settings) {
         __kmp_env_print();
     }
@@ -7084,21 +7137,14 @@ __kmp_internal_fork( ident_t *id, int gtid, kmp_team_t *team )
     KMP_ASSERT( this_thr->th.th_team  ==  team );
 
 #if CHARM_OMP
-    CpvAccess(ompConvMsg)= (OmpConverseMsg*)__kmp_fast_allocate(this_thr, sizeof(OmpConverseMsg) * (team->t.t_nproc-1));
-    OmpConverseMsg *currentMsg = CpvAccess(ompConvMsg);
-    team->t.t_num_local_tasks = (team->t.t_nproc-1) / (CpvAccess(localRatio) > 0 ? CpvAccess(localRatio): INITIAL_RATIO);
-    team->t.t_num_shared_tasks = (team->t.t_nproc-1) - team->t.t_num_local_tasks; //team->t.t_nproc-1;
-    int i;
-    CharmOMPDebug("PE: %d, team: %p, local: %d, shared: %d\n", CmiMyPe(), team, team->t.t_num_local_tasks, team->t.t_num_shared_tasks);
-    CharmOMPDebug("PE: %d, team: %p, convMsg:%p, internal_fork starts\n", CmiMyPe(), currentMsg, team);
-    for ( i=1 ; i< team->t.t_nproc ; i++ ) {
-//      currentMsg = (OmpConverseMsg*)__kmp_allocate(sizeof(OmpConverseMsg));
-      currentMsg[i-1].convMsg.data = team->t.t_threads[i];
-      CmiSetHandler(&currentMsg[i-1], CpvAccess(OmpHandlerIdx));
-      if ( i > team->t.t_num_local_tasks)
-        CsdTaskEnqueue((void *)&currentMsg[i-1]);
-      CharmOMPDebug("[%f][%d] inserted thread: %p, team:%p, msg:%p \n",CmiWallTimer(), CmiMyPe(), &(currentMsg[i-1].convMsg.data), team, &currentMsg[i-1]);
+    KF_TRACE( 5, ( "__kmp_runtime: T#%d reset barrier counts: %d \n",
+                       __kmp_gtid, team->t.t_num_barrier_counts) );
+    KMP_MB();
+     for (int i = 1; i < team->t.t_nproc ; i++) {
+      CharmOMPDebug("[%e] thread: %p, %p inserted\n", CmiWallTimer(), team->t.t_threads[i], team->t.t_threads[i]->th.th_info.ds.ds_thread);
+      CthAwaken(team->t.t_threads[i]->th.th_info.ds.ds_thread);
     }
+    CharmOMPDebug("PE: %d, team: %p,shared: %d\n", CmiMyPe(), team, team->t.t_num_shared_tasks);
 #endif
 
 #ifdef KMP_DEBUG
@@ -7140,9 +7186,8 @@ __kmp_internal_join( ident_t *id, int gtid, kmp_team_t *team )
 
 #if CHARM_OMP
     void * msg;
-    int num_local = team->t.t_num_local_tasks;
-    int i, j, temp_shared, splitPoint;
-
+    int num_local = 1; 
+/*
     for (i = 0; i < num_local; i++) {
       CmiHandleMessage((void*)(CpvAccess(ompConvMsg)+i));
       KMP_MB();
@@ -7158,31 +7203,37 @@ __kmp_internal_join( ident_t *id, int gtid, kmp_team_t *team )
         num_local = splitPoint;
       }
     }
-
-    int isIdle = 0;
-    while (TCR_4(team->t.t_num_shared_tasks)) {
+*/
+    int num_tasks;
+    do {
+      CmiMemoryReadFence();
+      num_tasks = TCR_4(team->t.t_num_shared_tasks);
+      if (num_tasks <= 0) break;
       msg = TaskQueuePop((TaskQueue)CpvAccess(CsdTaskQueue));
       if (msg) {
         CmiHandleMessage(msg);
         num_local++;
       }
       else {
-        if (!isIdle) {
-          isIdle=1;
-          CsdBeginIdle();
-        }
+        msg = CmiSuspendedTaskPop();
+        if (msg) 
+          CmiHandleMessage(msg);
         else
-          CsdStillIdle();
-        CharmOMPDebug("[%f][%d] OpenMP section waiting start\n", CmiWallTimer(), CmiMyPe());
+          StealTask();
       }
-      KMP_MB();
-      CharmOMPDebug("team:%p, t_num_shared_tasks:%d\n",team, team->t.t_num_shared_tasks);
+    } while(1);
+    
+    for (int i = 1; i< team->t.t_nproc; i++) {
+      int sched;
+      CthThread t = team->t.t_threads[i]->th.th_info.ds.ds_thread;
+      do {
+        CmiMemoryReadFence(); 
+        sched = TCR_4(CthScheduled(t));
+        if (sched <=0) break;
+      }
+      while (1);
     }
 
-    if (isIdle) {
-      isIdle = 0;
-      CsdEndIdle();
-    }
     /* Start to update the history vector */
     CharmOMPDebug("team:%p, num_local: %d, t_num_shared_tasks: %d\n", team, num_local, team->t.t_nproc - num_local);
     unsigned int currentRatio = (unsigned int)(ceil((double)(team->t.t_nproc)/num_local));
@@ -7204,7 +7255,6 @@ __kmp_internal_join( ident_t *id, int gtid, kmp_team_t *team )
     CpvAccess(localRatio) = CpvAccess(ratioSum) / numEntries;
     CpvAccess(ratioIdx)+=1;
 
-    __kmp_fast_free(this_thr, CpvAccess(ompConvMsg));
 #else
     __kmp_join_barrier( gtid );  /* wait for everyone */
 #endif

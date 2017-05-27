@@ -247,6 +247,7 @@ CpvStaticDeclare(int, cmiMyPeIdle);
 #if CMK_SMP && CMK_TASKQUEUE
 CsvDeclare(unsigned int, idleThreadsCnt);
 CpvDeclare(void *, CsdTaskQueue);
+CpvDeclare(void *, CmiSuspendedTaskQueue);
 #endif
 int CmiIsMyNodeIdle();
 
@@ -1655,6 +1656,7 @@ void CsdSchedulerState_new(CsdSchedulerState_t *s)
 #endif
 #if CMK_SMP && CMK_TASKQUEUE
 	s->taskQ = CpvAccess(CsdTaskQueue);
+	s->suspendedTaskQ = CpvAccess(CmiSuspendedTaskQueue);
 #endif
 }
 
@@ -1738,6 +1740,10 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	}
 #endif
 #if CMK_SMP && CMK_TASKQUEUE
+	msg = CmiSuspendedTaskPop();
+	if (msg != NULL) {
+	  return (msg);
+	}
 	msg = TaskQueuePop(s->taskQ);
 	if (msg != NULL) {
 	  return (msg);
@@ -1993,6 +1999,10 @@ CpvStaticDeclare(CthThread, CthSleepingStandins);
 CpvDeclare(int      , CthResumeNormalThreadIdx);
 CpvStaticDeclare(int      , CthResumeSchedulingThreadIdx);
 
+#if CMK_OMP
+CpvDeclare (int, CthResumeStealableThreadIdx);
+CpvDeclare (int, CthResumeSuspendedStealableThreadIdx);
+#endif
 
 void CthStandinCode(void)
 {
@@ -2097,15 +2107,82 @@ void CthSetStrategyDefault(CthThread t)
 		 CthEnqueueNormalThread,
 		 CthSuspendNormalThread);
 }
+#if CMK_OMP
+/* Use work-stealing queue for scheduling threads
+  We use the previous scheduling handlers while we push the message into the work-stealing queue
+*/
+void CthResumeStealableThread(CthThreadToken *token)
+{
+  CthThread t = token->thread;
+  CthSetNext(t, CthSelf());
+#if CMK_TRACE_ENABLED
+#if ! CMK_TRACE_IN_CHARM
+  if(CpvAccess(traceOn))
+    CthTraceResume(t);
+#endif
+#endif
+  CthSetPrev(t, CthSelf());
+  CthResume(t);
+  CthScheduledDecrement();
+  CthSetPrev(CthSelf(), 0);
+}
 
-void CthSchedInit(void)
+void CthEnqueueStealableThread(CthThreadToken * token, int s, int pb, unsigned int *prio) {
+  CmiSetHandler(token, CpvAccess(CthResumeStealableThreadIdx));
+  CsdTaskEnqueue((void*)token);
+}
+
+
+void CthEnqueueSuspendedStealableThread(CthThreadToken * token, int s, int pb, unsigned int *prio)
+{
+  CthThread t = token->thread;
+  int targetRank = CthGetThreadID(t)->id[2];
+  CthSetStrategyWorkStealing(t);
+  if (targetRank == CmiMyRank()) {
+    CthEnqueueStealableThread(token,s,pb,prio);
+  }
+  else {
+    CmiSetHandler(token, CpvAccess(CthResumeSuspendedStealableThreadIdx));
+    CmiSuspendedTaskEnqueue(targetRank ,(void*)token);
+  }
+}
+
+void CthResumeSuspendedStealableThread(CthThreadToken *token) {
+  CthEnqueueStealableThread(token, 0, 0, NULL);
+}
+
+CthThread CthSuspendStealableThread()
+{
+  CthThread succ = CthGetNext(CthSelf());
+#if CMK_ERROR_CHECKING
+  if (!succ)
+    CmiAbort("successor is invalid\n");
+#endif
+  return succ;
+}
+
+void CthSetStrategyWorkStealing(CthThread t)
+{
+  CthSetStrategy(t, CthEnqueueStealableThread, CthSuspendStealableThread);
+}
+
+void CthSetStrategySuspendedWorkStealing(CthThread t)
+{
+  CthSetStrategy(t, CthEnqueueSuspendedStealableThread, CthSuspendStealableThread);
+}
+
+#endif
+void CthSchedInit()
 {
   CpvInitialize(CthThread, CthMainThread);
   CpvInitialize(CthThread, CthSchedulingThread);
   CpvInitialize(CthThread, CthSleepingStandins);
   CpvInitialize(int      , CthResumeNormalThreadIdx);
   CpvInitialize(int      , CthResumeSchedulingThreadIdx);
-
+#if CMK_SMP && CMK_TASKQUEUE
+  CpvInitialize(int      , CthResumeStealableThreadIdx);
+  CpvInitialize(int      , CthResumeSuspendedStealableThreadIdx);
+#endif
   CpvAccess(CthMainThread) = CthSelf();
   CpvAccess(CthSchedulingThread) = CthSelf();
   CpvAccess(CthSleepingStandins) = 0;
@@ -2116,6 +2193,11 @@ void CthSchedInit(void)
   CthSetStrategy(CthSelf(),
 		 CthEnqueueSchedulingThread,
 		 CthSuspendSchedulingThread);
+
+#if CMK_OMP
+  CpvAccess(CthResumeStealableThreadIdx) = CmiRegisterHandler((CmiHandler)CthResumeStealableThread);
+  CpvAccess(CthResumeSuspendedStealableThreadIdx) = CmiRegisterHandler((CmiHandler)CthResumeSuspendedStealableThread);
+#endif
 }
 
 void CsdInit(char **argv)
@@ -2161,7 +2243,8 @@ void CsdInit(char **argv)
 
 #if CMK_SMP && CMK_TASKQUEUE
   CpvInitialize(void *, CsdTaskQueue);
-  CpvAccess(CsdTaskQueue) = TaskQueueCreate();
+  CpvInitialize(void *, CmiSuspendedTaskQueue);
+  CpvAccess(CsdTaskQueue) = (void *)TaskQueueCreate();
 #endif
   CpvAccess(CsdStopFlag)  = 0;
 }

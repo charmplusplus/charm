@@ -137,6 +137,7 @@
 #if CMK_THREADS_BUILD_TLS
 #include "cmitls.h"
 #endif
+#define CthDebug(...)  //CmiPrintf(__VA_ARGS__)
 
   /**************************** Shared Base Thread Class ***********************/
   /*
@@ -153,12 +154,15 @@
   typedef struct CthThreadBase
 {
   CthThreadToken *token; /* token that shall be enqueued into the ready queue*/
-  int scheduled;	 /* has this thread been added to the ready queue ? */
+  int scheduled;         /* has this thread been added to the ready queue ? */
 
   CmiObjId   tid;        /* globally unique tid */
   CthAwkFn   awakenfn;   /* Insert this thread into the ready queue */
   CthThFn    choosefn;   /* Return the next ready thread */
   CthThread  next; /* Next active thread */
+#if CMK_OMP
+  CthThread  prev; /* Previous active thread */
+#endif
   int        suspendable; /* Can this thread be blocked */
   int        exiting;    /* Is this thread finished */
 
@@ -411,7 +415,11 @@ static void CthThreadBaseInit(CthThreadBase *th)
 
   th->tid.id[0] = CmiMyPe();
   CmiMemoryAtomicFetchAndInc(serialno, th->tid.id[1]);
+#if CMK_OMP
+  th->tid.id[2] = -1;
+#else
   th->tid.id[2] = 0;
+#endif
 
   th->listener = NULL;
 
@@ -684,6 +692,9 @@ int CthIsSuspendable(CthThread t) { return B(t)->suspendable; }
 
 void CthSetNext(CthThread t, CthThread v) { B(t)->next = v; }
 CthThread CthGetNext(CthThread t) { return B(t)->next; }
+#if CMK_OMP
+void CthSetPrev(CthThread t, CthThread v) { B(t)->prev = v;}
+#endif
 
 static void CthNoStrategy(void)
 {
@@ -695,6 +706,27 @@ void CthSetStrategy(CthThread t, CthAwkFn awkfn, CthThFn chsfn)
   B(t)->awakenfn = awkfn;
   B(t)->choosefn = chsfn;
 }
+
+#if CMK_OMP
+inline int CthScheduled(CthThread t) {
+  return B(t)->scheduled;
+}
+
+/* The next scheduled thread decrements 'scheduled' of the previous thread.*/
+void CthScheduledDecrement() {
+    CthThread prevCurrent = B(CthSelf())->prev;
+    CthDebug("[%f][%d] scheduled before decremented: %d\n", CmiWallTimer(), CmiMyRank(), B(prevCurrent)->scheduled);
+    /* CthMainThread should have empty stack(stack == NULL) and never scheduled(scheduled == 0) */
+    if (B(prevCurrent)->stack && B(prevCurrent)->scheduled > 0) {
+        CmiMemoryAtomicDecrement(B(prevCurrent)->scheduled, memory_order_release);
+        CthDebug("[%f][%d] scheduled decremented: %d\n", CmiWallTimer(), CmiMyRank(), B(prevCurrent)->scheduled);
+    }
+#if CMK_ERROR_CHECKING
+    if(B(prevCurrent)->scheduled < 0)
+      CmiAbort("A thread's scheduler should not be less than 0!\n");
+#endif
+}
+#endif
 
 #if CMK_C_INLINE
 inline
@@ -772,6 +804,9 @@ void CthSuspend(void)
   }
   if (cur->choosefn == 0) CthNoStrategy();
   next = cur->choosefn();
+#if CMK_SMP && CMK_TASKQUEUE
+  cur->tid.id[2] = CmiMyRank();
+#else
   /*cur->scheduled=0;*/
   /*changed due to out-of-core emulation in BigSim*/
   /** Sometimes, a CthThread is running without ever being awakened
@@ -784,14 +819,22 @@ void CthSuspend(void)
   if(cur->scheduled<0)
     CmiAbort("A thread's scheduler should not be less than 0!\n");
 #endif    
-
+#endif
 #if CMK_TRACE_ENABLED
 #if !CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     traceSuspend();
 #endif
 #endif
+  CthDebug("[%f] next(%p) resumed\n",CmiWallTimer(), next);
+#if CMK_OMP
+  CthSetPrev(next,CthCpvAccess(CthCurrent));
+#endif
   CthResume(next);
+#if CMK_OMP
+  CthScheduledDecrement();
+  CthSetPrev(B(CthSelf()), 0);
+#endif
 }
 
 void CthAwaken(CthThread th)
@@ -810,10 +853,21 @@ void CthAwaken(CthThread th)
     traceAwaken(th);
 #endif
 #endif
+#if CMK_OMP
+  if (B(th)->scheduled > 0) {
+    CmiAbort("this thread is already scheduled\n");
+  }
+#endif
+
+#if CMK_OMP
+  CmiMemoryAtomicIncrement(B(th)->scheduled, memory_order_release);
+#else
+  B(th)->scheduled++;
+#endif
   B(th)->awakenfn(B(th)->token, CQS_QUEUEING_FIFO, 0, 0);
   /*B(th)->scheduled = 1; */
   /*changed due to out-of-core emulation in BigSim */
-  B(th)->scheduled++;
+
 }
 
 void CthYield()
@@ -1666,8 +1720,7 @@ void CthFree(CthThread t)
 void CthResume(CthThread) __attribute__((optimize(0)));
 #endif
 
-void CthResume(t)
-  CthThread t;
+void CthResume(CthThread t)
 {
   CthThread tc;
   tc = CthCpvAccess(CthCurrent);
@@ -1678,17 +1731,20 @@ void CthResume(t)
 
   if (t != tc) { /* Actually switch threads */
     CthBaseResume(t);
-    if (!tc->base.exiting) 
+    if (!tc->base.exiting)
     {
-      if (0 != swapJcontext(&tc->context, &t->context)) 
+      CthDebug("[%d][%f] swap starts from %p to %p\n",CmiMyRank(), CmiWallTimer() ,tc, t);
+      if (0 != swapJcontext(&tc->context, &t->context)) {
         CmiAbort("CthResume: swapcontext failed.\n");
-    } 
+      }
+    }
     else /* tc->base.exiting, so jump directly to next context */ 
     {
       CthThreadFree(tc);
       setJcontext(&t->context);
     }
   }
+
   /*This check will mistakenly fail if the thread migrates (changing tc)
     if (tc!=CthCpvAccess(CthCurrent)) { CmiAbort("Stack corrupted?\n"); }
     */
@@ -1701,6 +1757,7 @@ void CthStartThread(CmiUInt4 fn1, CmiUInt4 fn2, CmiUInt4 arg1, CmiUInt4 arg2)
   CmiUInt8 arg0 = (((CmiUInt8)arg1) << 32) | arg2;
   void *arg = (void *)arg0;
   qt_userf_t *fn = (qt_userf_t*)fn0;
+  CthDebug("[%f] thread: %p resumed, arg: %p, fn: %p\n", CmiWallTimer(), CthSelf(), arg, fn);
   (*fn)(arg);
   CthThreadFinished(CthSelf());
 }

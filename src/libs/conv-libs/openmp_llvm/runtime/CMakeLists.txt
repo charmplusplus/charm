@@ -205,7 +205,7 @@ elseif("${libomp_build_type_lowercase}" STREQUAL "minsizerel")
 endif()
 
 # Include itt notify interface?
-set(LIBOMP_USE_ITT_NOTIFY TRUE CACHE BOOL
+set(LIBOMP_USE_ITT_NOTIFY FALSE CACHE BOOL
   "Enable ITT notify?")
 
 # normal, profile, stubs library.
@@ -303,9 +303,9 @@ set(LIBOMP_OMPT_DEBUG FALSE CACHE BOOL
   "Trace OMPT initialization?")
 set(LIBOMP_OMPT_SUPPORT FALSE CACHE BOOL
   "OMPT-support?")
-set(LIBOMP_OMPT_BLAME TRUE CACHE BOOL
+set(LIBOMP_OMPT_BLAME FALSE CACHE BOOL
   "OMPT-blame?")
-set(LIBOMP_OMPT_TRACE TRUE CACHE BOOL
+set(LIBOMP_OMPT_TRACE FALSE CACHE BOOL
   "OMPT-trace?")
 if(LIBOMP_OMPT_SUPPORT AND (NOT LIBOMP_HAVE_OMPT_SUPPORT))
   libomp_error_say("OpenMP Tools Interface requested but not available")

@@ -23,7 +23,9 @@
 #include "kmp_i18n.h"
 #include "kmp_lock.h"
 #include "kmp_io.h"
-
+#if CHARM_OMP
+#include "ompcharm.h"
+#endif
 static int __kmp_env_toPrint( char const * name, int flag );
 
 bool __kmp_env_format = 0; // 0 - old format; 1 - new format
@@ -513,6 +515,9 @@ __kmp_stg_parse_par_range(
 int
 __kmp_initial_threads_capacity( int req_nproc )
 {
+#if CHARM_OMP
+    int nth = CmiMyNodeSize() * CmiMyNodeSize() * 2;
+#else
     int nth = 32;
 
     /* MIN( MAX( 32, 4 * $OMP_NUM_THREADS, 4 * omp_get_num_procs() ), __kmp_max_nth) */
@@ -523,7 +528,7 @@ __kmp_initial_threads_capacity( int req_nproc )
 
     if (nth > __kmp_max_nth)
         nth = __kmp_max_nth;
-
+#endif
     return nth;
 }
 

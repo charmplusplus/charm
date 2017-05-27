@@ -2619,9 +2619,11 @@ __kmp_task_team_wait( kmp_info_t *this_thr, kmp_team_t *team
                           __kmp_gtid_from_thread(this_thr), task_team));
             // Worker threads may have dropped through to release phase, but could still be executing tasks. Wait
             // here for tasks to complete. To avoid memory contention, only master thread checks termination condition.
+#if !CHARM_OMP
             kmp_flag_32 flag(&task_team->tt.tt_unfinished_threads, 0U);
             flag.wait(this_thr, TRUE
                       USE_ITT_BUILD_ARG(itt_sync_obj));
+#endif
         }
         // Deactivate the old task team, so that the worker threads will stop referencing it while spinning.
         KA_TRACE(20, ("__kmp_task_team_wait: Master T#%d deactivating task_team %p: "

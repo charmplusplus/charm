@@ -6,7 +6,7 @@
 #include "taskqueue.h"
 #include "cktaskQ.h"
 
-void StealTask() {
+extern "C" void StealTask() {
 #if CMK_TRACE_ENABLED
   double _start = CmiWallTimer();
 #endif
@@ -33,8 +33,7 @@ static void TaskStealBeginIdle(void *dummy) {
 }
 
 void _taskqInit() {
-
-  if(CmiMyNodeSize() > 1) {
+  if(CkMyNodeSize() > 1) {
     CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
         (CcdVoidFn) TaskStealBeginIdle, NULL);
 
