@@ -69,9 +69,14 @@ class fromzDisk : public zdisk {
 #define AMPI_LOCAL_IMPL ( !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
 #endif
 
-/* messages larger than or equal to this threshold may block on a matching recv if local */
-#ifndef AMPI_LOCAL_THRESHOLD_DEFAULT
-#define AMPI_LOCAL_THRESHOLD_DEFAULT 4096
+/* messages larger than or equal to this threshold may block on a matching recv if local to the PE*/
+#ifndef AMPI_PE_LOCAL_THRESHOLD_DEFAULT
+#define AMPI_PE_LOCAL_THRESHOLD_DEFAULT 4096
+#endif
+
+/* messages larger than or equal to this threshold may block on a matching recv if local to the Node */
+#ifndef AMPI_NODE_LOCAL_THRESHOLD_DEFAULT
+#define AMPI_NODE_LOCAL_THRESHOLD_DEFAULT 4096
 #endif
 
 /* AMPI uses RDMA sends if BigSim is not being used and the underlying comm
@@ -89,14 +94,7 @@ class fromzDisk : public zdisk {
 #endif
 #endif
 
-/* contiguous messages larger than or equal to this threshold that are being sent
- * within a process are sent via RDMA. */
-#ifndef AMPI_SMP_RDMA_THRESHOLD_DEFAULT
-#define AMPI_SMP_RDMA_THRESHOLD_DEFAULT 16384
-#endif
-
 extern int AMPI_RDMA_THRESHOLD;
-extern int AMPI_SMP_RDMA_THRESHOLD;
 
 #define AMPI_ALLTOALL_THROTTLE   64
 #define AMPI_ALLTOALL_SHORT_MSG  256
@@ -169,6 +167,35 @@ class AmpiOpHeader {
   AmpiOpHeader(MPI_User_function* f,MPI_Datatype d,int l,int szd):
     func(f),dtype(d),len(l),szdata(szd) { }
 };
+
+/*
+ * For within-node Ssend's: used in ampi::processSsendMsg()
+ */
+class SsendInfo {
+ private:
+  int node;
+  int idx;
+  int count;
+  char* buf;
+  CkDDT_DataType* ddt;
+
+ public:
+  SsendInfo(void) {}
+  SsendInfo(int idx_, int count_, char* buf_, CkDDT_DataType* ddt_) {
+    node = CkMyNode();
+    idx = idx_;
+    count = count_;
+    buf = buf_;
+    ddt = ddt_;
+  }
+  ~SsendInfo(void) {}
+  inline int getNode(void) const { return node; }
+  inline int getIdx(void) const { return idx; }
+  inline int getCount(void) const { return count; }
+  inline char* getBuf(void) const { CkAssert(node == CkMyNode()); return buf; }
+  inline CkDDT_DataType* getDDT(void) const { CkAssert(node == CkMyNode()); return ddt; }
+};
+PUPbytes(SsendInfo); // PUP as bytes b/c buf & ddt are only meant to be accessed from within shared memory
 
 //------------------- added by YAN for one-sided communication -----------
 /* the index is unique within a communicator */
@@ -1752,9 +1779,16 @@ class ampi : public CBase_ampi {
                                  int destRank, MPI_Comm destcomm, int seq, CProxy_ampi arrProxy,
                                  MPI_Request req);
   inline bool destLikelyWithinProcess(CProxy_ampi arrProxy, int destIdx) const {
+#if CMK_MULTICORE
+    return true;
+#elif CMK_SMP
     CkArray* localBranch = arrProxy.ckLocalBranch();
     int destPe = localBranch->lastKnown(CkArrayIndex1D(destIdx));
     return (CkNodeOf(destPe) == CkMyNode());
+#else // non-SMP
+    ampi* destPtr = arrProxy[destIdx].ckLocal();
+    return (destPtr != NULL);
+#endif
   }
   MPI_Request delesend(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
                        MPI_Comm destcomm, CProxy_ampi arrproxy, AmpiSendType sendType, MPI_Request req);

@@ -850,9 +850,9 @@ void AMPI_Setup_Switch(void) {
   }
 }
 
-int AMPI_LOCAL_THRESHOLD = AMPI_LOCAL_THRESHOLD_DEFAULT;
+int AMPI_PE_LOCAL_THRESHOLD = AMPI_PE_LOCAL_THRESHOLD_DEFAULT;
+int AMPI_NODE_LOCAL_THRESHOLD = AMPI_NODE_LOCAL_THRESHOLD_DEFAULT;
 int AMPI_RDMA_THRESHOLD = AMPI_RDMA_THRESHOLD_DEFAULT;
-int AMPI_SMP_RDMA_THRESHOLD = AMPI_SMP_RDMA_THRESHOLD_DEFAULT;
 
 static bool nodeinit_has_been_called=false;
 CtvDeclare(ampiParent*, ampiPtr);
@@ -920,31 +920,40 @@ static void ampiNodeInit(void)
 
   /* read AMPI environment variables */
   char *value;
-  if ((value = getenv("AMPI_LOCAL_THRESHOLD"))) {
-    AMPI_LOCAL_THRESHOLD = atoi(value);
-    if (CkMyNode() == 0) {
-#if AMPI_LOCAL_IMPL
-      CkPrintf("AMPI> local messaging threshold is %d Bytes.\n", AMPI_LOCAL_THRESHOLD);
-#else
-      CkPrintf("Warning: AMPI local messaging threshold ignored since local sends are disabled.\n");
-#endif
-    }
+  bool localThresholdSet = false;
+  if ((value = getenv("AMPI_PE_LOCAL_THRESHOLD"))) {
+    AMPI_PE_LOCAL_THRESHOLD = atoi(value);
+    localThresholdSet = true;
   }
-  bool rdmaSet = false;
+  if ((value = getenv("AMPI_NODE_LOCAL_THRESHOLD"))) {
+    AMPI_NODE_LOCAL_THRESHOLD = atoi(value);
+    localThresholdSet = true;
+  }
+  if (CkMyNode() == 0 && localThresholdSet) {
+#if AMPI_LOCAL_IMPL
+#if CMK_SMP
+    CkPrintf("AMPI> PE-local messaging threshold is %d Bytes and Node-local messaging threshold is %d Bytes.\n",
+             AMPI_PE_LOCAL_THRESHOLD, AMPI_NODE_LOCAL_THRESHOLD);
+#else
+    CkPrintf("AMPI> PE-local messaging threshold is %d Bytes.\n",
+             AMPI_PE_LOCAL_THRESHOLD);
+    if (AMPI_NODE_LOCAL_THRESHOLD != AMPI_NODE_LOCAL_THRESHOLD_DEFAULT) {
+      CkPrintf("Warning: AMPI Node-local messaging threshold ignored on non-SMP build.\n");
+    }
+#endif //CMK_SMP
+#else
+    CkPrintf("Warning: AMPI local messaging threshold ignored since local sends are disabled.\n");
+#endif //AMPI_LOCAL_IMPL
+  }
   if ((value = getenv("AMPI_RDMA_THRESHOLD"))) {
     AMPI_RDMA_THRESHOLD = atoi(value);
-    rdmaSet = true;
-  }
-  if ((value = getenv("AMPI_SMP_RDMA_THRESHOLD"))) {
-    AMPI_SMP_RDMA_THRESHOLD = atoi(value);
-    rdmaSet = true;
-  }
-  if (rdmaSet && CkMyNode() == 0) {
+    if (CkMyNode() == 0) {
 #if AMPI_RDMA_IMPL
-    CkPrintf("AMPI> RDMA threshold is %d Bytes and SMP RDMA threshold is %d Bytes.\n", AMPI_RDMA_THRESHOLD, AMPI_SMP_RDMA_THRESHOLD);
+      CkPrintf("AMPI> RDMA threshold is %d Bytes.\n", AMPI_RDMA_THRESHOLD);
 #else
-    CkPrintf("Warning: AMPI RDMA threshold ignored since AMPI RDMA is disabled.\n");
+      CkPrintf("Warning: AMPI RDMA threshold ignored since AMPI RDMA is disabled.\n");
 #endif
+    }
   }
 
   AmpiReducer = CkReduction::addReducer(AmpiReducerFunc, true /*streamable*/);
@@ -2762,15 +2771,21 @@ void handle_MPI_BOTTOM(void* &buf1, MPI_Datatype type1, void* &buf2, MPI_Datatyp
   }
 }
 
-// Create an empty AmpiMsg to be matched on the recv side
+// Create a AmpiMsg with a SsendInfo struct as the msg payload
 AmpiMsg *ampi::makeSyncMsg(int destRank,int t,int sRank,const void *buf,int count,
                            MPI_Datatype type,MPI_Comm destcomm,int ssendReq,int seq)
 {
   CkAssert(ssendReq >= 0);
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
-  AmpiMsg *msg = new (0, 0) AmpiMsg(seq, t, sRank, len);
+  SsendInfo srcInfo(thisIndex, count, (char*)buf, ddt);
+  PUP::sizer pupSizer;
+  pupSizer | srcInfo;
+  int srcInfoLen = pupSizer.size();
+  AmpiMsg *msg = new (srcInfoLen, 0) AmpiMsg(seq, t, sRank, len /*length of real msg payload*/);
   msg->setSsendReq(ssendReq);
+  PUP::toMem pupPacker(msg->getData());
+  pupPacker | srcInfo;
   return msg;
 }
 
@@ -2956,7 +2971,7 @@ MPI_Request ampi::sendLocalMsg(int tag, int srcRank, const void* buf, MPI_Dataty
     }
   }
 
-  if (size >= AMPI_LOCAL_THRESHOLD ||
+  if (size >= AMPI_PE_LOCAL_THRESHOLD ||
      (sendType == BLOCKING_SSEND || sendType == I_SSEND)) {
     // Block on the matching request to avoid making an intermediate copy
     MSG_ORDER_DEBUG(
@@ -3017,18 +3032,20 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
       return reqIdx;
     }
   }
-#endif
+#if CMK_SMP
+  if (size >= AMPI_NODE_LOCAL_THRESHOLD && destLikelyWithinProcess(arrProxy, destIdx)) {
+    return sendSyncMsg(t, sRank, buf, type, count, rank, destcomm, seq, arrProxy[destIdx], sendType, reqIdx);
+  }
+#endif //CMK_SMP
+#endif //AMPI_LOCAL_IMPL
   if (sendType == BLOCKING_SSEND || sendType == I_SSEND) {
     return sendSyncMsg(t, sRank, buf, type, count, rank, destcomm, seq, arrProxy[destIdx], sendType, reqIdx);
   }
 #if AMPI_RDMA_IMPL
-  if (ddt->isContig() &&
-      (size >= AMPI_RDMA_THRESHOLD ||
-      (size >= AMPI_SMP_RDMA_THRESHOLD && destLikelyWithinProcess(arrProxy, destIdx))))
-  {
-    return sendRdmaMsg(t, sRank, buf, size, destIdx, rank, seq, destcomm, arrProxy, reqIdx);
+  if (ddt->isContig() && size >= AMPI_RDMA_THRESHOLD) {
+    return sendRdmaMsg(t, sRank, buf, size, destIdx, rank, destcomm, seq, arrProxy, reqIdx);
   }
-#endif
+#endif //AMPI_RDMA_IMPL
   arrProxy[destIdx].generic(makeAmpiMsg(rank, t, sRank, buf, count, type, destcomm, seq));
   if (reqIdx != MPI_REQUEST_NULL) {
     AmpiRequestList& reqList = parent->ampiReqs;
@@ -3052,23 +3069,30 @@ void ampi::requestSsendMsg(AmpiMsg* msg)
 }
 
 bool ampi::processSsendMsg(AmpiMsg* msg, int* msgLen, char** msgData) {
-  int srcRank = msg->getSrcRank();
-  int srcIdx = getIndexForRank(srcRank);
-  ampi* srcPtr = thisProxy[srcIdx].ckLocal();
-  if (srcPtr != NULL) {
+  SsendInfo srcInfo;
+  PUP::fromMem p(msg->getData());
+  p | srcInfo;
+#if AMPI_LOCAL_IMPL
+  if (srcInfo.getNode() == CkMyNode()) {
+    *msgData = srcInfo.getBuf();
+    *msgLen = srcInfo.getDDT()->getSize(srcInfo.getCount());
+    int srcIdx = srcInfo.getIdx();
     MPI_Request sreqIdx = msg->getSsendReq();
-    ampiParent* srcParent = srcPtr->parent;
-    AmpiRequestList& reqs = srcParent->ampiReqs;
-    SsendReq& sreq = (SsendReq &)*(reqs[sreqIdx]);
-    *msgData = (char*)sreq.buf;
-    *msgLen = srcParent->myDDT->getSize(sreq.type) * sreq.count;
     MSG_ORDER_DEBUG(
       CkPrintf("AMPI vp %d in processSsendMsg, src is local so completing Ssend inline (req %d)\n", parent->thisIndex, sreqIdx);
     )
-    srcPtr->completedSend(sreqIdx);
+    ampi* srcPtr = thisProxy[srcIdx].ckLocal();
+    if (srcPtr != NULL) {
+      srcPtr->completedSend(sreqIdx);
+    }
+    else {
+      thisProxy[srcIdx].completedSend(sreqIdx);
+    }
     return true;
   }
-  else {
+  else
+#endif //AMPI_LOCAL_IMPL
+  {
     requestSsendMsg(msg);
     return false;
   }

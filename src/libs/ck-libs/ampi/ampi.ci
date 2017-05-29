@@ -47,6 +47,7 @@ module ampi {
     entry EXPEDITED void genericSync(AmpiMsg *);
     entry EXPEDITED void generic(AmpiMsg *);
     entry EXPEDITED void genericRdma(nocopy char buf[size], int size, int seq, int tag, int srcRank);
+    entry EXPEDITED void completedSend(int sreqIdx);
     entry EXPEDITED_NOKEEP void completedRdmaSend(CkDataMsg *msg);
     entry EXPEDITED_REDN void barrierResult(void);
     entry EXPEDITED_REDN void ibarrierResult(void);
