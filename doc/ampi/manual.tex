@@ -1796,11 +1796,15 @@ for an Intel Omni-Path system:
 > build AMPI ofi-linux-x86_64 --with-production -DTCHARM_STACKSIZE_DEFAULT=16777216
 \end{alltt}
 
-The same can be done for AMPI's RDMA messaging threshold using \texttt{AMPI\_RDMA\_THRESHOLD\_DEFAULT} and,
-for messages sent within the same address space (ranks on the same worker thread or ranks
-on different worker threads in the same process in SMP builds), using \texttt{AMPI\_SMP\_RDMA\_THRESHOLD\_DEFAULT}.
-Contiguous messages with sizes larger than the threshold are sent via RDMA on communication layers that
-support this capability. You can also set the environment variables \texttt{AMPI\_RDMA\_THRESHOLD} and \texttt{AMPI\_SMP\_RDMA\_THRESHOLD}
+The same can be done for AMPI's various messaging protocols.
+For messages on the same PE or within the same Node (OS process), the threshold
+at which AMPI will use a rendezvous protocol to avoid making any intermediate copies
+can be set at build time with \texttt{AMPI\_PE\_LOCAL\_THRESHOLD\_DEFAULT} and
+\texttt{AMPI\_NODE\_LOCAL\_THRESHOLD\_DEFAULT}.
+AMPI also optimizes for large messages between processes using RDMA for contiguous messages
+on networks that support it. The RDMA threshold can be set using \texttt{AMPI\_RDMA\_THRESHOLD\_DEFAULT}.
+You can also set the environment variables \texttt{AMPI\_PE\_LOCAL\_THRESHOLD},
+\texttt{AMPI\_NODE\_LOCAL\_THRESHOLD}, and \texttt{AMPI\_RDMA\_THRESHOLD}.
 before running a job to override the default specified at build time.
 
 \section{Building and Running AMPI Programs}

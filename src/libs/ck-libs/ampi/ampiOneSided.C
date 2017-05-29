@@ -14,7 +14,6 @@
 #define WIN_ERROR   (-1)
 
 extern int AMPI_RDMA_THRESHOLD;
-extern int AMPI_SMP_RDMA_THRESHOLD;
 
 win_obj::win_obj() noexcept {
   baseAddr = NULL;
@@ -221,9 +220,7 @@ int ampi::winPut(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank
                             targcnt, targtype, win->index);
     }
 #if AMPI_RDMA_IMPL
-    else if (orgtotalsize >= AMPI_RDMA_THRESHOLD ||
-            (orgtotalsize >= AMPI_SMP_RDMA_THRESHOLD && destLikelyWithinProcess(thisProxy, rank)))
-    {
+    else if (orgtotalsize >= AMPI_RDMA_THRESHOLD) {
       AmpiRequestList& reqs = getReqs();
       SendReq* ampiReq = parent->reqPool.newSendReq(orgtype, myComm.getComm(), getDDT());
       MPI_Request req = reqs.insert(ampiReq);
@@ -408,9 +405,7 @@ int ampi::winAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, i
                                    targcnt, targtype, op, win->index);
     }
 #if AMPI_RDMA_IMPL
-    else if (orgtotalsize >= AMPI_RDMA_THRESHOLD ||
-            (orgtotalsize >= AMPI_SMP_RDMA_THRESHOLD && destLikelyWithinProcess(thisProxy, rank)))
-    {
+    else if (ddt->isContig() && orgtotalsize >= AMPI_RDMA_THRESHOLD) {
       AmpiRequestList& reqs = getReqs();
       SendReq* ampiReq = parent->reqPool.newSendReq(orgtype, myComm.getComm(), getDDT());
       MPI_Request req = reqs.insert(ampiReq);
@@ -473,9 +468,7 @@ int ampi::winGetAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype
       return MPI_SUCCESS;
     }
 #if AMPI_RDMA_IMPL
-    else if (orgtotalsize >= AMPI_RDMA_THRESHOLD ||
-            (orgtotalsize >= AMPI_SMP_RDMA_THRESHOLD && destLikelyWithinProcess(thisProxy, rank)))
-    {
+    else if (orgtotalsize >= AMPI_RDMA_THRESHOLD) {
       AmpiRequestList& reqs = getReqs();
       SendReq* ampiReq = parent->reqPool.newSendReq(orgtype, myComm.getComm(), getDDT());
       MPI_Request req = reqs.insert(ampiReq);
