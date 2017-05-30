@@ -58,6 +58,9 @@ remove_flag() {
      /bin/rm -f tmp.$$
 }
 
+add_flag "OPTS_CC='$OPTS_CC'"   'Pass through user-provided C compiler options'
+add_flag "OPTS_CXX='$OPTS_CXX'" 'Pass through user-provided C++ compiler options'
+
 # enable/disable error checking
 AC_ARG_ENABLE([error-checking],
             [AS_HELP_STRING([--enable-error-checking],

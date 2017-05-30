@@ -1771,6 +1771,9 @@ remove_flag() {
      /bin/rm -f tmp.$$
 }
 
+add_flag "OPTS_CC='$OPTS_CC'"   'Pass through user-provided C compiler options'
+add_flag "OPTS_CXX='$OPTS_CXX'" 'Pass through user-provided C++ compiler options'
+
 # enable/disable error checking
 # Check whether --enable-error-checking was given.
 if test "${enable_error_checking+set}" = set; then :
