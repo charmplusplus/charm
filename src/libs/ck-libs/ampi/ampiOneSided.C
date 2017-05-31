@@ -417,11 +417,11 @@ int ampi::winGetAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
 
   ddt->serialize((char*)resaddr, msg->getData(), orgcnt, (-1));
   if (ddt->isContig()) {
-    parent->applyOp(orgtype, op, orgcnt, resaddr, orgaddr);
+    parent->applyOp(orgtype, op, orgcnt, orgaddr, resaddr);
   } else {
     vector<char> sorgaddr(orgtotalsize);
     ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, 1);
-    parent->applyOp(orgtype, op, orgcnt, resaddr, &sorgaddr[0]);
+    parent->applyOp(orgtype, op, orgcnt, &sorgaddr[0], resaddr);
     ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, -1);
   }
 
