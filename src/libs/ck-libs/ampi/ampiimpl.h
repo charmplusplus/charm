@@ -105,8 +105,14 @@ class fromzDisk : public zdisk {
 
 /* AMPI sends messages inline to PE-local destination VPs if: BigSim is not being used and
  * if tracing is not being used (see bug #1640 for more details on the latter). */
-#ifndef AMPI_LOCAL_IMPL
-#define AMPI_LOCAL_IMPL ( !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
+#ifndef AMPI_PE_LOCAL_IMPL
+#define AMPI_PE_LOCAL_IMPL ( !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
+#endif
+
+/* AMPI sends messages using a zero copy protocol to Node-local destination VPs if:
+ * BigSim is not being used and if tracing is not being used (such msgs are currently untraced). */
+#ifndef AMPI_NODE_LOCAL_IMPL
+#define AMPI_NODE_LOCAL_IMPL ( !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
 #endif
 
 /* messages larger than or equal to this threshold may block on a matching recv if local to the PE*/
@@ -116,7 +122,16 @@ class fromzDisk : public zdisk {
 
 /* messages larger than or equal to this threshold may block on a matching recv if local to the Node */
 #ifndef AMPI_NODE_LOCAL_THRESHOLD_DEFAULT
-#define AMPI_NODE_LOCAL_THRESHOLD_DEFAULT 16384
+#define AMPI_NODE_LOCAL_THRESHOLD_DEFAULT 12288
+#endif
+
+/* messages larger than or equal to this threshold will always block on a matching recv */
+#ifndef AMPI_SSEND_THRESHOLD_DEFAULT
+#if CMK_USE_IBVERBS || CMK_CONVERSE_UGNI
+#define AMPI_SSEND_THRESHOLD_DEFAULT 262144
+#else
+#define AMPI_SSEND_THRESHOLD_DEFAULT 102400
+#endif
 #endif
 
 /* AMPI uses RDMA sends if BigSim is not being used. */
@@ -126,7 +141,7 @@ class fromzDisk : public zdisk {
 
 /* contiguous messages larger than or equal to this threshold are sent via RDMA */
 #ifndef AMPI_RDMA_THRESHOLD_DEFAULT
-#if CMK_USE_IBVERBS || CMK_OFI || CMK_CONVERSE_UGNI
+#if CMK_USE_IBVERBS || CMK_CONVERSE_UGNI
 #define AMPI_RDMA_THRESHOLD_DEFAULT 65536
 #else
 #define AMPI_RDMA_THRESHOLD_DEFAULT 32768
