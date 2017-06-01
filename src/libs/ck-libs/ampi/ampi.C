@@ -852,6 +852,7 @@ void AMPI_Setup_Switch(void) {
 
 int AMPI_PE_LOCAL_THRESHOLD = AMPI_PE_LOCAL_THRESHOLD_DEFAULT;
 int AMPI_NODE_LOCAL_THRESHOLD = AMPI_NODE_LOCAL_THRESHOLD_DEFAULT;
+int AMPI_SSEND_THRESHOLD = AMPI_SSEND_THRESHOLD_DEFAULT;
 int AMPI_RDMA_THRESHOLD = AMPI_RDMA_THRESHOLD_DEFAULT;
 
 static bool nodeinit_has_been_called=false;
@@ -944,6 +945,12 @@ static void ampiNodeInit(void)
 #else
     CkPrintf("Warning: AMPI local messaging threshold ignored since local sends are disabled.\n");
 #endif //AMPI_LOCAL_IMPL
+  }
+  if ((value = getenv("AMPI_SSEND_THRESHOLD"))) {
+    AMPI_SSEND_THRESHOLD = atoi(value);
+    if (CkMyNode() == 0) {
+      CkPrintf("AMPI> Synchronous messaging threshold is %d Bytes.\n", AMPI_SSEND_THRESHOLD);
+    }
   }
   if ((value = getenv("AMPI_RDMA_THRESHOLD"))) {
     AMPI_RDMA_THRESHOLD = atoi(value);
@@ -3052,7 +3059,7 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
 #if AMPI_RDMA_IMPL
       (ddt->isContig() && size >= AMPI_RDMA_THRESHOLD) ||
 #endif
-      (sendType == BLOCKING_SSEND || sendType == I_SSEND))
+      (size >= AMPI_SSEND_THRESHOLD || sendType == BLOCKING_SSEND || sendType == I_SSEND))
   {
     return sendSyncMsg(t, sRank, buf, type, count, rank, destcomm, seq, arrProxy, destIdx, sendType, reqIdx);
   }

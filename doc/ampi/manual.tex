@@ -1363,14 +1363,19 @@ stack size (in bytes) at build time:
 \end{alltt}
 
 The same can be done for AMPI's various messaging protocols.
+All values passed to these size thresholds are in terms of Bytes.
 For messages on the same PE or within the same Node (OS process), the threshold
 at which AMPI will use a rendezvous protocol to avoid making any intermediate copies
 can be set at build time with \texttt{AMPI\_PE\_LOCAL\_THRESHOLD\_DEFAULT} and
 \texttt{AMPI\_NODE\_LOCAL\_THRESHOLD\_DEFAULT}.
 AMPI also optimizes for large messages between processes using RDMA for contiguous messages
 on networks that support it. The RDMA threshold can be set using \texttt{AMPI\_RDMA\_THRESHOLD\_DEFAULT}.
+Further, AMPI provides a mechanism to minimize its memory footprint. Users can set the
+\texttt{AMPI\_SSEND\_THRESHOLD\_DEFAULT}, which specifies that all messages with size greater than
+or equal to it will block on the matching receive operation. This can also be set to zero to test
+that an application will not deadlock based on the underlying message protocol and message matching semantics.
 You can also set the environment variables \texttt{AMPI\_PE\_LOCAL\_THRESHOLD},
-\texttt{AMPI\_NODE\_LOCAL\_THRESHOLD}, and \texttt{AMPI\_RDMA\_THRESHOLD}.
+\texttt{AMPI\_NODE\_LOCAL\_THRESHOLD}, \texttt{AMPI\_RDMA\_THRESHOLD}, and \texttt{AMPI\_SSEND\_THRESHOLD}.
 before running a job to override the default specified at build time.
 
 \section{Building and Running AMPI Programs}

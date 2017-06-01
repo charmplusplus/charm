@@ -79,6 +79,11 @@ class fromzDisk : public zdisk {
 #define AMPI_NODE_LOCAL_THRESHOLD_DEFAULT 4096
 #endif
 
+/* messages larger than or equal to this threshold will always block on a matching recv */
+#ifndef AMPI_SSEND_THRESHOLD_DEFAULT
+#define AMPI_SSEND_THRESHOLD_DEFAULT 65536
+#endif
+
 /* AMPI uses RDMA sends if BigSim is not being used and the underlying comm
  * layer supports it (except for GNI, which has experimental RDMA support). */
 #ifndef AMPI_RDMA_IMPL
