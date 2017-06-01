@@ -3137,6 +3137,47 @@ void ampi::probe(int t, int s, MPI_Comm comm, MPI_Status *sts)
 #endif
 }
 
+void ampi::mprobe(int t, int s, MPI_Comm comm, MPI_Status *sts, MPI_Message *message)
+{
+  if (handle_MPI_PROC_NULL(s, comm, sts)) {
+    *message = MPI_MESSAGE_NO_PROC;
+    return;
+  }
+
+#if CMK_BIGSIM_CHARM
+  void *curLog; // store current log in timeline
+  _TRACE_BG_TLINE_END(&curLog);
+#endif
+
+  ampi *dis = this;
+  AmpiMsg *msg = NULL;
+  while(1) {
+    MPI_Status tmpStatus;
+    // We call get() rather than probe() here because we want to remove this msg
+    // from ampi::unexpectedMsgs and then insert it into ampiParent::matchedMsgs
+    msg = unexpectedMsgs.get(t, s, (sts == MPI_STATUS_IGNORE) ? (int*)&tmpStatus : (int*)sts);
+    if (msg)
+      break;
+    // "dis" is updated in case an ampi thread is migrated while waiting for a message
+    dis = dis->blockOnRecv();
+  }
+
+  msg->setComm(comm);
+  *message = parent->putMatchedMsg(msg);
+
+  if (sts != MPI_STATUS_IGNORE) {
+    sts->MPI_SOURCE = msg->getSrcRank();
+    sts->MPI_TAG    = msg->getTag();
+    sts->MPI_COMM   = msg->getComm();
+    sts->MPI_LENGTH = msg->getLength();
+    sts->MPI_CANCEL = 0;
+  }
+
+#if CMK_BIGSIM_CHARM
+  _TRACE_BG_SET_INFO((char *)msg, "MPROBE_RESUME",  &curLog, 1);
+#endif
+}
+
 int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts)
 {
   if (handle_MPI_PROC_NULL(s, comm, sts)) return 1;
@@ -3144,10 +3185,11 @@ int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts)
   MPI_Status tmpStatus;
   AmpiMsg* msg = unexpectedMsgs.probe(t, s, (sts == MPI_STATUS_IGNORE) ? (int*)&tmpStatus : (int*)sts);
   if (msg) {
+    msg->setComm(comm);
     if (sts != MPI_STATUS_IGNORE) {
       sts->MPI_SOURCE = msg->getSrcRank();
       sts->MPI_TAG    = msg->getTag();
-      sts->MPI_COMM   = comm;
+      sts->MPI_COMM   = msg->getComm();
       sts->MPI_LENGTH = msg->getLength();
       sts->MPI_CANCEL = 0;
     }
@@ -3160,6 +3202,42 @@ int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts)
   thread->schedule();
 #if CMK_BIGSIM_CHARM
   _TRACE_BG_SET_INFO(NULL, "IPROBE_RESUME",  &curLog, 1);
+#endif
+  return 0;
+}
+
+int ampi::improbe(int tag, int source, MPI_Comm comm, MPI_Status *sts,
+                  MPI_Message *message)
+{
+  if (handle_MPI_PROC_NULL(source, comm, sts)) {
+    *message = MPI_MESSAGE_NO_PROC;
+    return 1;
+  }
+
+  MPI_Status tmpStatus;
+  // We call get() rather than probe() here because we want to remove this msg
+  // from ampi::unexpectedMsgs and then insert it into ampiParent::matchedMsgs
+  AmpiMsg* msg = unexpectedMsgs.get(tag, source, (sts == MPI_STATUS_IGNORE) ? (int*)&tmpStatus : (int*)sts);
+  if (msg) {
+    msg->setComm(comm);
+    *message = parent->putMatchedMsg(msg);
+    if (sts != MPI_STATUS_IGNORE) {
+      sts->MPI_SOURCE = msg->getSrcRank();
+      sts->MPI_TAG    = msg->getTag();
+      sts->MPI_COMM   = comm;
+      sts->MPI_LENGTH = msg->getLength();
+      sts->MPI_CANCEL = 0;
+    }
+    return 1;
+  }
+
+#if CMK_BIGSIM_CHARM
+  void *curLog; // store current log in timeline
+  _TRACE_BG_TLINE_END(&curLog);
+#endif
+  thread->schedule();
+#if CMK_BIGSIM_CHARM
+  _TRACE_BG_SET_INFO(NULL, "IMPROBE_RESUME",  &curLog, 1);
 #endif
   return 0;
 }
@@ -4038,6 +4116,158 @@ AMPI_API_IMPL(int, MPI_Iprobe, int src, int tag, MPI_Comm comm, int *flag, MPI_S
 
   ampi *ptr = getAmpiInstance(comm);
   *flag = ptr->iprobe(tag, src, comm, status);
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_Improbe, int source, int tag, MPI_Comm comm, int *flag,
+                                MPI_Message *message, MPI_Status *status)
+{
+  AMPI_API("AMPI_Improbe");
+
+#if AMPI_ERROR_CHECKING
+  int ret = errorCheck("AMPI_Improbe", comm, 1, 0, 0, 0, 0, tag, 1, source, 1, 0, 0);
+  if(ret != MPI_SUCCESS)
+    return ret;
+#endif
+
+  ampi *ptr = getAmpiInstance(comm);
+  *flag = ptr->improbe(tag, source, comm, status, message);
+
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_Imrecv, void* buf, int count, MPI_Datatype datatype, MPI_Message *message,
+                               MPI_Request *request)
+{
+  AMPI_API("AMPI_Imrecv");
+
+#if AMPI_ERROR_CHECKING
+  if (*message == MPI_MESSAGE_NULL) {
+    return ampiErrhandler("AMPI_Imrecv", MPI_ERR_REQUEST);
+  }
+#endif
+
+  if (*message == MPI_MESSAGE_NO_PROC) {
+    *message = MPI_MESSAGE_NULL;
+    IReq *newreq = getAmpiParent()->reqPool.newIReq(buf, count, datatype, MPI_PROC_NULL, MPI_ANY_TAG,
+                                                    MPI_COMM_NULL, getDDT(), AMPI_REQ_COMPLETED);
+    *request = getReqs().insert(newreq);
+    return MPI_SUCCESS;
+  }
+
+  handle_MPI_BOTTOM(buf, datatype);
+
+#if AMPI_ERROR_CHECKING
+  int ret = errorCheck("AMPI_Imrecv", 0, 0, count, 1, datatype, 1, 0, 0, 0, 0, buf, 1);
+  if(ret != MPI_SUCCESS){
+    *request = MPI_REQUEST_NULL;
+    return ret;
+  }
+#endif
+
+  USER_CALL_DEBUG("AMPI_Imrecv("<<datatype<<","<<src<<","<<tag<<","<<comm<<")");
+  ampiParent* parent = getAmpiParent();
+  AmpiMsg* msg = parent->getMatchedMsg(*message);
+  CkAssert(msg);
+  MPI_Comm comm = msg->getComm();
+  int tag = msg->getTag();
+  int src = msg->getSrcRank();
+
+  ampi *ptr = getAmpiInstance(comm);
+  AmpiRequestList& reqs = getReqs();
+  IReq *newreq = parent->reqPool.newIReq(buf, count, datatype, src, tag, comm, parent->getDDT());
+  *request = reqs.insert(newreq);
+
+  newreq->receive(ptr, msg);
+  *message = MPI_MESSAGE_NULL;
+
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_Mprobe, int source, int tag, MPI_Comm comm, MPI_Message *message,
+                               MPI_Status *status)
+{
+  AMPI_API("AMPI_Mprobe");
+
+#if AMPI_ERROR_CHECKING
+  int ret = errorCheck("AMPI_Mprobe", comm, 1, 0, 0, 0, 0, tag, 1, source, 1, 0, 0);
+  if(ret != MPI_SUCCESS)
+    return ret;
+#endif
+
+  ampi *ptr = getAmpiInstance(comm);
+  ptr->mprobe(tag, source, comm, status, message);
+
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_Mrecv, void* buf, int count, MPI_Datatype datatype, MPI_Message *message,
+                              MPI_Status *status)
+{
+  AMPI_API("AMPI_Mrecv");
+
+#if AMPI_ERROR_CHECKING
+  if (*message == MPI_MESSAGE_NULL) {
+    return ampiErrhandler("AMPI_Mrecv", MPI_ERR_REQUEST);
+  }
+#endif
+
+  if (*message == MPI_MESSAGE_NO_PROC) {
+    if (status != MPI_STATUS_IGNORE) {
+      status->MPI_SOURCE = MPI_PROC_NULL;
+      status->MPI_TAG = MPI_ANY_TAG;
+      status->MPI_LENGTH = 0;
+    }
+    *message = MPI_MESSAGE_NULL;
+    return MPI_SUCCESS;
+  }
+
+#if AMPI_ERROR_CHECKING
+  int ret = errorCheck("AMPI_Mrecv", 0, 0, count, 1, datatype, 1, 0, 0, 0, 0, buf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+#endif
+
+  handle_MPI_BOTTOM(buf, datatype);
+
+  ampiParent* parent = getAmpiParent();
+  AmpiMsg *msg = parent->getMatchedMsg(*message);
+  CkAssert(msg); // the matching message has already arrived
+  MPI_Comm comm = msg->getComm();
+  int src = msg->getSrcRank();
+  int tag = msg->getTag();
+
+#if AMPIMSGLOG
+  ampiParent* pptr = getAmpiParent();
+  if(msgLogRead){
+    (*(pptr->fromPUPer))|(pptr->pupBytes);
+    PUParray(*(pptr->fromPUPer), (char *)buf, (pptr->pupBytes));
+    PUParray(*(pptr->fromPUPer), (char *)status, sizeof(MPI_Status));
+    return MPI_SUCCESS;
+  }
+#endif
+
+  ampi *ptr = getAmpiInstance(comm);
+  if (status != MPI_STATUS_IGNORE) {
+    status->MPI_SOURCE = msg->getSrcRank();
+    status->MPI_TAG    = msg->getTag();
+    status->MPI_COMM   = comm;
+    status->MPI_LENGTH = msg->getLength();
+    status->MPI_CANCEL = 0;
+  }
+  ptr->processAmpiMsg(msg, buf, datatype, count);
+  CkpvAccess(msgPool).deleteAmpiMsg(msg);
+  *message = MPI_MESSAGE_NULL;
+
+#if AMPIMSGLOG
+  if(msgLogWrite && record_msglog(pptr->thisIndex)){
+    (pptr->pupBytes) = getDDT()->getSize(datatype) * count;
+    (*(pptr->toPUPer))|(pptr->pupBytes);
+    PUParray(*(pptr->toPUPer), (char *)buf, (pptr->pupBytes));
+    PUParray(*(pptr->toPUPer), (char *)status, sizeof(MPI_Status));
+  }
+#endif
+
   return MPI_SUCCESS;
 }
 

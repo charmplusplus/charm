@@ -313,6 +313,11 @@ typedef struct {
 #define MPI_STATUS_IGNORE   (MPI_Status *)0
 #define MPI_STATUSES_IGNORE (MPI_Status *)0
 
+/* type for MPI messages used in MPI_Mprobe, MPI_Mrecv, MPI_Improbe, MPI_Imrecv */
+typedef int MPI_Message;
+#define MPI_MESSAGE_NULL    -1
+#define MPI_MESSAGE_NO_PROC -2
+
 typedef int MPI_Errhandler;
 #define MPI_ERRHANDLER_NULL  0
 #define MPI_ERRORS_RETURN    1
@@ -388,6 +393,8 @@ typedef void (*MPI_MigrateFn)(void);
 #define PMPI_Ssend APMPI_Ssend
 #define  MPI_Recv  AMPI_Recv
 #define PMPI_Recv APMPI_Recv
+#define  MPI_Mrecv  AMPI_Mrecv
+#define PMPI_Mrecv APMPI_Mrecv
 #define  MPI_Get_count  AMPI_Get_count
 #define PMPI_Get_count APMPI_Get_count
 #define  MPI_Bsend  AMPI_Bsend
@@ -408,6 +415,8 @@ typedef void (*MPI_MigrateFn)(void);
 #define PMPI_Irsend APMPI_Irsend
 #define  MPI_Irecv  AMPI_Irecv
 #define PMPI_Irecv APMPI_Irecv
+#define  MPI_Imrecv  AMPI_Imrecv
+#define PMPI_Imrecv APMPI_Imrecv
 #define  MPI_Waitany  AMPI_Waitany
 #define PMPI_Waitany APMPI_Waitany
 #define  MPI_Test  AMPI_Test
@@ -438,6 +447,10 @@ typedef void (*MPI_MigrateFn)(void);
 #define PMPI_Iprobe APMPI_Iprobe
 #define  MPI_Probe AMPI_Probe
 #define PMPI_Probe APMPI_Probe
+#define  MPI_Improbe AMPI_Improbe
+#define PMPI_Improbe APMPI_Improbe
+#define  MPI_Mprobe AMPI_Mprobe
+#define PMPI_Mprobe APMPI_Mprobe
 #define  MPI_Send_init  AMPI_Send_init
 #define PMPI_Send_init APMPI_Send_init
 #define  MPI_Ssend_init  AMPI_Ssend_init
@@ -939,6 +952,8 @@ AMPI_API_DEF(int, MPI_Ssend, const void *msg, int count, MPI_Datatype type, int 
                int tag, MPI_Comm comm)
 AMPI_API_DEF(int, MPI_Recv, void *msg, int count, MPI_Datatype type, int src, int tag,
               MPI_Comm comm, MPI_Status *status)
+AMPI_API_DEF(int, MPI_Mrecv, void* buf, int count, MPI_Datatype datatype, MPI_Message *message,
+                  MPI_Status *status)
 AMPI_API_DEF(int, MPI_Get_count, const MPI_Status *sts, MPI_Datatype dtype, int *count)
 AMPI_API_DEF(int, MPI_Bsend, const void *buf, int count, MPI_Datatype datatype,
              int dest, int tag,MPI_Comm comm)
@@ -956,6 +971,8 @@ AMPI_API_DEF(int, MPI_Irsend, const void *buf, int count, MPI_Datatype datatype,
              int tag, MPI_Comm comm, MPI_Request *request)
 AMPI_API_DEF(int, MPI_Irecv, void *buf, int count, MPI_Datatype datatype, int src,
                int tag, MPI_Comm comm, MPI_Request *request)
+AMPI_API_DEF(int, MPI_Imrecv, void* buf, int count, MPI_Datatype datatype, MPI_Message *message,
+                  MPI_Request *request)
 AMPI_API_DEF(int, MPI_Wait, MPI_Request *request, MPI_Status *sts)
 AMPI_API_DEF(int, MPI_Test, MPI_Request *request, int *flag, MPI_Status *sts)
 AMPI_API_DEF(int, MPI_Waitany, int count, MPI_Request *request, int *index, MPI_Status *sts)
@@ -973,6 +990,10 @@ AMPI_API_DEF(int, MPI_Test_cancelled, const MPI_Status *status, int *flag) /* FI
 AMPI_API_DEF(int, MPI_Status_set_cancelled, MPI_Status *status, int flag)
 AMPI_API_DEF(int, MPI_Iprobe, int src, int tag, MPI_Comm comm, int *flag, MPI_Status *sts)
 AMPI_API_DEF(int, MPI_Probe, int source, int tag, MPI_Comm comm, MPI_Status *sts)
+AMPI_API_DEF(int, MPI_Improbe, int source, int tag, MPI_Comm comm, int *flag,
+                  MPI_Message *message, MPI_Status *status)
+AMPI_API_DEF(int, MPI_Mprobe, int source, int tag, MPI_Comm comm, MPI_Message *message,
+                  MPI_Status *status)
 AMPI_API_DEF(int, MPI_Send_init, const void *buf, int count, MPI_Datatype type, int dest, int tag,
                   MPI_Comm comm, MPI_Request *req)
 AMPI_API_DEF(int, MPI_Ssend_init, const void *buf, int count, MPI_Datatype type, int dest, int tag,
@@ -1498,12 +1519,6 @@ extern long ampiCurrentStackUsage(void);
 */
 
 /* A.2.1 Point-to-Point Communication C Bindings */
-/*
-int MPI_Improbe(int source, int tag, MPI_Comm comm, int *flag, MPI_Message *message, MPI_Status *status);
-int MPI_Imrecv(void* buf, int count, MPI_Datatype datatype, MPI_Message *message, MPI_Request *request);
-int MPI_Mprobe(int source, int tag, MPI_Comm comm, MPI_Message *message, MPI_Status *status);
-int MPI_Mrecv(void* buf, int count, MPI_Datatype datatype, MPI_Message *message, MPI_Status *status);
-*/
 
 /* A.2.2 Datatypes C Bindings */
 /*

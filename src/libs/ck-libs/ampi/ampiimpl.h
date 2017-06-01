@@ -1484,6 +1484,7 @@ class AmpiMsg : public CMessage_AmpiMsg {
   int tag; //MPI tag
   int srcRank; //Communicator rank for source
   int length; //Number of bytes in this message
+  MPI_Comm comm; // Communicator
  public:
   char *data; //Payload
 #if CMK_BIGSIM_CHARM
@@ -1505,6 +1506,7 @@ class AmpiMsg : public CMessage_AmpiMsg {
   inline void setSrcRank(int sr) { srcRank = sr; }
   inline void setLength(int l) { length = l; }
   inline void setTag(int t) { tag = t; }
+  inline void setComm(MPI_Comm c) { comm = c; }
   inline CMK_REFNUM_TYPE getSeq(void) const { return UsrToEnv(this)->getRef(); }
   inline int getSsendReq(void) const { return ssendReq; }
   inline int getSeqIdx(void) const {
@@ -1520,18 +1522,20 @@ class AmpiMsg : public CMessage_AmpiMsg {
   inline int getLength(void) const { return length; }
   inline char* getData(void) const { return data; }
   inline int getTag(void) const { return tag; }
+  inline MPI_Comm getComm(void) const { return comm; }
   static AmpiMsg* pup(PUP::er &p, AmpiMsg *m)
   {
-    int ssendReq, length, tag, srcRank;
+    int ssendReq, length, tag, srcRank, comm;
     if(p.isPacking() || p.isSizing()) {
       ssendReq = m->ssendReq;
       tag = m->tag;
       srcRank = m->srcRank;
       length = m->length;
+      comm = m->comm;
     }
-    p(ssendReq); p(tag); p(srcRank); p(length);
+    p(ssendReq); p(tag); p(srcRank); p(length); p(comm);
     if(p.isUnpacking()) {
-      m = new (length, 0) AmpiMsg(ssendReq, tag, srcRank, length);
+      m = new (length, 0) AmpiMsg(ssendReq, tag, srcRank, length, comm);
     }
     p(m->data, length);
     if(p.isDeleting()) {
@@ -1941,6 +1945,7 @@ class ampiParent : public CBase_ampiParent {
   CkPupPtrVec<WinStruct> winStructList; //List of windows for one-sided communication
   CkPupPtrVec<InfoStruct> infos; // list of all MPI_Infos
   vector<OpStruct> ops; // list of all MPI_Ops
+  vector<AmpiMsg *> matchedMsgs; // for use with MPI_Mprobe and MPI_Mrecv
 
   /* MPI_*_get_attr C binding returns a *pointer* to an integer,
    *  so there needs to be some storage somewhere to point to.
@@ -1968,6 +1973,32 @@ class ampiParent : public CBase_ampiParent {
 
  public:
   void prepareCtv(void);
+
+  MPI_Message putMatchedMsg(AmpiMsg* msg) {
+    // Search thru matchedMsgs for any NULL ones first:
+    for (int i=0; i<matchedMsgs.size(); i++) {
+      if (matchedMsgs[i] == NULL) {
+        matchedMsgs[i] = msg;
+        return i;
+      }
+    }
+    // No NULL entries, so create a new one:
+    matchedMsgs.push_back(msg);
+    return matchedMsgs.size() - 1;
+  }
+  AmpiMsg* getMatchedMsg(MPI_Message message) {
+    if (message == MPI_MESSAGE_NO_PROC || message == MPI_MESSAGE_NULL) {
+      return NULL;
+    }
+    CkAssert(message >= 0 && message < matchedMsgs.size());
+    AmpiMsg* msg = matchedMsgs[message];
+    // Mark this matchedMsg index NULL and free from back of vector:
+    matchedMsgs[message] = NULL;
+    while (matchedMsgs.back() == NULL) {
+      matchedMsgs.pop_back();
+    }
+    return msg;
+  }
 
   inline void attachBuffer(void *buffer, int size) {
     bsendBuffer = buffer;
@@ -2438,6 +2469,10 @@ class ampi : public CBase_ampi {
   int recv(int t,int s,void* buf,int count,MPI_Datatype type,MPI_Comm comm,MPI_Status *sts=NULL);
   void irecv(void *buf, int count, MPI_Datatype type, int src,
              int tag, MPI_Comm comm, MPI_Request *request);
+  void mrecv(int tag, int src, void* buf, int count, MPI_Datatype datatype, MPI_Comm comm,
+             MPI_Status* status, MPI_Message* message);
+  void imrecv(void* buf, int count, MPI_Datatype datatype, int src, int tag, MPI_Comm comm,
+              MPI_Request* request, MPI_Message* message);
   void sendrecv(const void *sbuf, int scount, MPI_Datatype stype, int dest, int stag,
                 void *rbuf, int rcount, MPI_Datatype rtype, int src, int rtag,
                 MPI_Comm comm, MPI_Status *sts);
@@ -2445,7 +2480,9 @@ class ampi : public CBase_ampi {
                         int dest, int sendtag, int source, int recvtag,
                         MPI_Comm comm, MPI_Status *status);
   void probe(int t,int s,MPI_Comm comm,MPI_Status *sts);
+  void mprobe(int t, int s, MPI_Comm comm, MPI_Status *sts, MPI_Message *message);
   int iprobe(int t,int s,MPI_Comm comm,MPI_Status *sts);
+  int improbe(int t, int s, MPI_Comm comm, MPI_Status *sts, MPI_Message *message);
   void barrier(void);
   void ibarrier(MPI_Request *request);
   void bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm comm);

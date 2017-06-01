@@ -247,4 +247,7 @@
        integer(KIND=MPI_ADDRESS_KIND), external :: MPI_AINT_ADD
        integer(KIND=MPI_ADDRESS_KIND), external :: MPI_AINT_DIFF
 
+       integer, parameter :: MPI_MESSAGE_NULL = -1
+       integer, parameter :: MPI_MESSAGE_NO_PROC = -2
+
        include 'mpiof.h'

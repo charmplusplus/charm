@@ -4,6 +4,7 @@
 FDECL {
 #define mpi_send FTN_NAME( MPI_SEND , mpi_send )
 #define mpi_recv FTN_NAME( MPI_RECV , mpi_recv )
+#define mpi_mrecv FTN_NAME( MPI_MRECV , mpi_mrecv )
 #define mpi_get_count FTN_NAME( MPI_GET_COUNT , mpi_get_count )
 #define mpi_isend FTN_NAME( MPI_ISEND , mpi_isend )
 #define mpi_bsend FTN_NAME( MPI_BSEND , mpi_bsend )
@@ -13,6 +14,7 @@ FDECL {
 #define mpi_ssend FTN_NAME( MPI_SSEND , mpi_ssend )
 #define mpi_issend FTN_NAME( MPI_ISSEND , mpi_issend )
 #define mpi_irecv FTN_NAME( MPI_IRECV , mpi_irecv )
+#define mpi_imrecv FTN_NAME( MPI_IMRECV , mpi_imrecv )
 #define mpi_buffer_attach FTN_NAME( MPI_BUFFER_ATTACH , mpi_buffer_attach )
 #define mpi_buffer_detach FTN_NAME( MPI_BUFFER_DETACH , mpi_buffer_detach )
 #define mpi_wait FTN_NAME( MPI_WAIT , mpi_wait )
@@ -30,6 +32,8 @@ FDECL {
 #define mpi_status_set_cancelled FTN_NAME( MPI_STATUS_SET_CANCELLED , mpi_status_set_cancelled )
 #define mpi_iprobe FTN_NAME( MPI_IPROBE , mpi_iprobe )
 #define mpi_probe FTN_NAME( MPI_PROBE , mpi_probe )
+#define mpi_improbe FTN_NAME( MPI_IMPROBE , mpi_improbe )
+#define mpi_mprobe FTN_NAME( MPI_MPROBE , mpi_mprobe )
 #define mpi_send_init FTN_NAME( MPI_SEND_INIT , mpi_send_init )
 #define mpi_rsend_init FTN_NAME( MPI_RSEND_INIT , mpi_rsend_init )
 #define mpi_bsend_init FTN_NAME( MPI_BSEND_INIT , mpi_bsend_init )
@@ -473,10 +477,22 @@ void mpi_probe(int *src, int *tag, int *comm, int *status, int *ierr)
   *ierr = MPI_Probe(*src, *tag, *comm, s);
 }
 
-void mpi_iprobe(int *src,int *tag,int *comm,int *flag,int *status,int *ierr)
+void mpi_iprobe(int *src, int *tag, int *comm, int *flag, int *status, int *ierr)
 {
   MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
   *ierr = MPI_Iprobe(*src, *tag, *comm, flag, s);
+}
+
+void mpi_mprobe(int *src, int *tag, int *comm, int *message, int *status, int *ierr)
+{
+  MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
+  *ierr = MPI_Mprobe(*src, *tag, *comm, message, s);
+}
+
+void mpi_improbe(int *src, int *tag, int *comm, int *flag, int *message, int* status, int *ierr)
+{
+  MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
+  *ierr = MPI_Improbe(*src, *tag, *comm, flag, message, s);
 }
 
 void mpi_sendrecv(void *sndbuf, int *sndcount, int *sndtype,
@@ -931,6 +947,18 @@ void mpi_irecv(void *buf, int *count, int *datatype, int *src,
                int *tag, int *comm, int *request, int *ierr)
 {
   *ierr = MPI_Irecv(buf, *count, *datatype, *src, *tag, *comm, (MPI_Request *)request);
+}
+
+void mpi_mrecv(void *buf, int *count, int *datatype, int *message,
+               int *status, int *ierr)
+{
+  *ierr = MPI_Mrecv(buf, *count, *datatype, message, (MPI_Status*) status);
+}
+
+void mpi_imrecv(void *buf, int *count, int *datatype, int *message,
+                int *request, int *ierr)
+{
+  *ierr = MPI_Imrecv(buf, *count, *datatype, message, (MPI_Request*) request);
 }
 
 void mpi_allgatherv(void *sendbuf, int *sendcount, int *sendtype,
