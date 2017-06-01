@@ -408,25 +408,71 @@ int ampi::winGetAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype
                            void *resaddr, int rescnt, MPI_Datatype restype, int rank,
                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                            MPI_Op op, WinStruct *win) {
-  CkDDT_DataType *ddt = getDDT()->getType(orgtype);
-  int orgtotalsize = ddt->getSize(orgcnt);
-  AmpiMsg *msg = new AmpiMsg();
+  CkDDT_DataType *orgddt = getDDT()->getType(orgtype);
+  CkDDT_DataType *resddt = getDDT()->getType(restype);
+  int orgtotalsize = orgddt->getSize(orgcnt);
   AMPI_DEBUG("    Rank[%d:%d] invoke Remote get at [%d]\n", thisIndex, myRank, rank);
 
-  msg = thisProxy[rank].winRemoteGet(orgcnt, orgtype, targdisp, targcnt, targtype, win->index);
-
-  ddt->serialize((char*)resaddr, msg->getData(), orgcnt, (-1));
-  if (ddt->isContig()) {
-    parent->applyOp(orgtype, op, orgcnt, orgaddr, resaddr);
-  } else {
+  AmpiMsg *msg;
+  if (orgddt->isContig()) {
+#if AMPI_RDMA_IMPL
+    if (orgtotalsize >= AMPI_RDMA_THRESHOLD) {
+      AmpiRequestList* reqs = &(getAmpiParent()->ampiReqs);
+      SendReq* ampiReq = new SendReq(myComm.getComm());
+      MPI_Request req = reqs->insert(ampiReq);
+      CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
+      completepdSendCB.setRefnum(req);
+      msg = thisProxy[rank].winRemoteGetAccumulate(orgtotalsize, rdma(orgaddr, completedSendCB), orgcnt,
+                                                   orgtype, targdisp, targcnt, targtype, op, win->index);
+      ampiReq->wait(MPI_STATUS_IGNORE);
+      reqs->free(req);
+    }
+    else
+#endif
+    {
+      msg = thisProxy[rank].winRemoteGetAccumulate(orgtotalsize, orgaddr, orgcnt, orgtype, targdisp,
+                                                   targcnt, targtype, op, win->index);
+    }
+  }
+  else {
     vector<char> sorgaddr(orgtotalsize);
-    ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, 1);
-    parent->applyOp(orgtype, op, orgcnt, &sorgaddr[0], resaddr);
-    ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, -1);
+    orgddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, 1);
+    msg = thisProxy[rank].winRemoteGetAccumulate(orgtotalsize, &sorgaddr[0], orgcnt, orgtype, targdisp,
+                                                 targcnt, targtype, op, win->index);
   }
 
+  resddt->serialize((char*)resaddr, msg->getData(), rescnt, (-1));
   delete msg;
+
   return MPI_SUCCESS;
+}
+
+AmpiMsg* ampi::winRemoteGetAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt, MPI_Datatype orgtype,
+                                      MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Op op,
+                                      int winIndex) {
+  win_obj *winobj = winObjects[winIndex];
+  CkDDT_DataType *tddt = getDDT()->getType(targtype);
+  int targunit = tddt->getSize();
+  int targtotalsize = winobj->disp_unit*targcnt;
+  int orgunit = getDDT()->getSize(orgtype);
+  char* targaddr = (char*)(winobj->baseAddr) + winobj->disp_unit*targdisp;
+
+  // Send back the targaddr buffer before it is accumulated into
+  winobj->get(targaddr, orgcnt, orgunit, targdisp, targcnt, targunit);
+  AmpiMsg *msg = new (targtotalsize, 0) AmpiMsg(-1, MPI_RMA_TAG, thisIndex, targtotalsize);
+  tddt->serialize(targaddr, msg->getData(), targcnt, 1);
+
+  // Accumulate sorgaddr into targaddr
+  if (tddt->isContig()) {
+    winobj->accumulate(sorgaddr, targcnt, targdisp, targtype, op, parent);
+  }
+  else {
+    vector<char> getdata(orgtotalsize);
+    tddt->serialize(&getdata[0], sorgaddr, targcnt, (-1));
+    winobj->accumulate(&getdata[0], targcnt, targdisp, targtype, op, parent);
+  }
+
+  return msg;
 }
 
 int ampi::winCompareAndSwap(const void *orgaddr, const void *compaddr, void *resaddr, MPI_Datatype type,

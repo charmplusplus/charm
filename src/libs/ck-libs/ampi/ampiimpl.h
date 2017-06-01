@@ -1803,6 +1803,9 @@ class ampi : public CBase_ampi {
   void winRemoteAccumulate(int orgtotalsize, char* orgaddr, int orgcnt, MPI_Datatype orgtype,
                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                            MPI_Op op, int winIndex);
+  AmpiMsg* winRemoteGetAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt, MPI_Datatype orgtype,
+                                  MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Op op,
+                                  int winIndex);
   int winGetAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, void *resaddr,
                        int rescnt, MPI_Datatype restype, int rank, MPI_Aint targdisp,
                        int targcnt, MPI_Datatype targtype, MPI_Op op, WinStruct *win);

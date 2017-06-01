@@ -75,6 +75,12 @@ module ampi {
                                                   int orgcnt, MPI_Datatype orgtype,
                                                   MPI_Aint targdisp, int targcnt,
                                                   MPI_Datatype targtype, MPI_Op op, int winIndex);
+    entry EXPEDITED_SYNC AmpiMsg *winRemoteGetAccumulate(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt,
+                                                         MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                                                         MPI_Datatype targtype, MPI_Op op, int winIndex);
+    entry EXPEDITED_SYNC AmpiMsg *winRemoteGetAccumulate(int orgtotalsize, /**/rdma/**/ char orgaddr[orgtotalsize],
+                                                         int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
+                                                         int targcnt, MPI_Datatype targtype, MPI_Op, int winIndex);
     entry EXPEDITED_SYNC AmpiMsg *winRemoteCompareAndSwap(int size, char sorgaddr[size],
                                                           char compaddr[size], MPI_Datatype type,
                                                           MPI_Aint targdisp, int winIndex);
