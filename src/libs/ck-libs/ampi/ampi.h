@@ -1113,3 +1113,170 @@ extern long ampiCurrentStackUsage(void);
 #endif
 
 #endif
+
+/* MPI 3.1 standards compliance overview
+ * This overview contains all MPI 3.1 sections and lists all MPI functions not
+ * supported in AMPI currently.
+*/
+
+/* A.2.1 Point-to-Point Communication C Bindings */
+/*
+int MPI_Improbe(int source, int tag, MPI_Comm comm, int *flag, MPI_Message *message, MPI_Status *status);
+int MPI_Imrecv(void* buf, int count, MPI_Datatype datatype, MPI_Message *message, MPI_Request *request);
+int MPI_Mprobe(int source, int tag, MPI_Comm comm, MPI_Message *message, MPI_Status *status);
+int MPI_Mrecv(void* buf, int count, MPI_Datatype datatype, MPI_Message *message, MPI_Status *status);
+*/
+
+/* A.2.2 Datatypes C Bindings */
+/*
+int MPI_Get_elements_x(const MPI_Status *status, MPI_Datatype datatype, MPI_Count *count);
+int MPI_Pack_external(const char datarep[], const void *inbuf, int incount, MPI_Datatype datatype, void *outbuf, MPI_Aint outsize, MPI_Aint *position);
+int MPI_Pack_external_size(const char datarep[], int incount, MPI_Datatype datatype, MPI_Aint *size);
+int MPI_Type_create_darray(int size, int rank, int ndims, const int array_of_gsizes[], const int array_of_distribs[], const int array_of_dargs[], const int array_of_psizes[], int order, MPI_Datatype oldtype, MPI_Datatype *newtype); //provided by ROMIO
+int MPI_Type_create_subarray(int ndims, const int array_of_sizes[], const int array_of_subsizes[], const int array_of_starts[], int order, MPI_Datatype oldtype, MPI_Datatype *newtype); //provided by ROMIO
+int MPI_Type_get_extent_x(MPI_Datatype datatype, MPI_Count *lb, MPI_Count *extent);
+int MPI_Type_get_true_extent_x(MPI_Datatype datatype, MPI_Count *true_lb, MPI_Count *true_extent);
+int MPI_Type_size_x(MPI_Datatype datatype, MPI_Count *size);
+int MPI_Unpack_external(const char datarep[], const void *inbuf, MPI_Aint insize, MPI_Aint *position, void *outbuf, int outcount, MPI_Datatype datatype);
+*/
+
+/* A.2.3 Collective Communication C Bindings */
+/*
+int MPI_Iexscan(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm, MPI_Request *request);
+int MPI_Ireduce_scatter(const void* sendbuf, void* recvbuf, const int recvcounts[], MPI_Datatype datatype, MPI_Op op, MPI_Comm comm, MPI_Request *request);
+int MPI_Ireduce_scatter_block(const void* sendbuf, void* recvbuf, int recvcount, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm, MPI_Request *request);
+int MPI_Iscan(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm, MPI_Request *request);
+*/
+
+/* A.2.4 Groups, Contexts, Communicators, and Caching C Bindings */
+/*
+int MPI_Comm_create_group(MPI_Comm comm, MPI_Group group, int tag, MPI_Comm *newcomm);
+int MPI_Comm_idup(MPI_Comm comm, MPI_Comm *newcomm, MPI_Request *request);
+*/
+
+/* A.2.5 Process Topologies C Bindings */
+/*
+int MPI_Dist_graph_create(MPI_Comm comm_old, int n, const int sources[], const int degrees[], const int destinations[], const int weights[], MPI_Info info, int reorder, MPI_Comm *comm_dist_graph);
+int MPI_Dist_graph_create_adjacent(MPI_Comm comm_old, int indegree, const int sources[], const int sourceweights[], int outdegree, const int destinations[], const int destweights[], MPI_Info info, int reorder, MPI_Comm *comm_dist_graph);
+int MPI_Dist_graph_neighbors(MPI_Comm comm, int maxindegree, int sources[], int sourceweights[], int maxoutdegree, int destinations[], int destweights[]);
+int MPI_Dist_graph_neighbors_count(MPI_Comm comm, int *indegree, int *outdegree, int *weighted);
+*/
+
+
+/* A.2.6 MPI Environmental Management C Bindings */
+/*
+int MPI_File_call_errhandler(MPI_File fh, int errorcode);
+int MPI_File_create_errhandler(MPI_File_errhandler_function *file_errhandler_fn, MPI_Errhandler *errhandler);
+int MPI_File_get_errhandler(MPI_File file, MPI_Errhandler *errhandler);
+int MPI_File_set_errhandler(MPI_File file, MPI_Errhandler errhandler);
+int MPI_Win_call_errhandler(MPI_Win win, int errorcode);
+*/
+
+/* A.2.7 The Info Object C Bindings */
+
+/* A.2.8 Process Creation and Management C Bindings */
+/*
+int MPI_Close_port(const char *port_name);
+int MPI_Comm_accept(const char *port_name, MPI_Info info, int root, MPI_Comm comm, MPI_Comm *newcomm);
+int MPI_Comm_connect(const char *port_name, MPI_Info info, int root, MPI_Comm comm, MPI_Comm *newcomm);
+int MPI_Comm_disconnect(MPI_Comm *comm);
+int MPI_Comm_get_parent(MPI_Comm *parent);
+int MPI_Comm_join(int fd, MPI_Comm *intercomm);
+int MPI_Comm_spawn(const char *command, char *argv[], int maxprocs, MPI_Info info, int root, MPI_Comm comm, MPI_Comm *intercomm, int array_of_errcodes[]);
+int MPI_Comm_spawn_multiple(int count, char *array_of_commands[], char **array_of_argv[], const int array_of_maxprocs[], const MPI_Info array_of_info[], int root, MPI_Comm comm, MPI_Comm *intercomm, int array_of_errcodes[]);
+int MPI_Lookup_name(const char *service_name, MPI_Info info, char *port_name);
+int MPI_Open_port(MPI_Info info, char *port_name);
+int MPI_Publish_name(const char *service_name, MPI_Info info, const char *port_name);
+int MPI_Unpublish_name(const char *service_name, MPI_Info info, const char *port_name);
+*/
+
+/* A.2.9 One-Sided Communications C Bindings */
+/*
+int MPI_Win_allocate(MPI_Aint size, int disp_unit, MPI_Info info, MPI_Comm comm, void *baseptr, MPI_Win *win);
+int MPI_Win_allocate_shared(MPI_Aint size, int disp_unit, MPI_Info info, MPI_Comm comm, void *baseptr, MPI_Win *win);
+int MPI_Win_attach(MPI_Win win, void *base, MPI_Aint size);
+int MPI_Win_create_dynamic(MPI_Info info, MPI_Comm comm, MPI_Win *win);
+int MPI_Win_detach(MPI_Win win, const void *base);
+int MPI_Win_flush(int rank, MPI_Win win);
+int MPI_Win_flush_all(MPI_Win win);
+int MPI_Win_flush_local(int rank, MPI_Win win);
+int MPI_Win_flush_local_all(MPI_Win win);
+
+int MPI_Win_lock_all(int assert, MPI_Win win);
+int MPI_Win_shared_query(MPI_Win win, int rank, MPI_Aint *size, int *disp_unit, void *baseptr);
+int MPI_Win_sync(MPI_Win win);
+int MPI_Win_unlock_all(MPI_Win win);
+*/
+
+/* A.2.10 External Interfaces C Bindings */
+/*
+int MPI_Grequest_complete(MPI_Request request);
+int MPI_Grequest_start(MPI_Grequest_query_function *query_fn, MPI_Grequest_free_function *free_fn, MPI_Grequest_cancel_function *cancel_fn, void *extra_state, MPI_Request *request);
+int MPI_Status_set_elements_x(MPI_Status *status, MPI_Datatype datatype, MPI_Count count);
+*/
+
+/* A.2.11 I/O C Bindings */
+/*
+int MPI_CONVERSION_FN_NULL(void *userbuf, MPI_Datatype datatype, int count, void *filebuf, MPI_Offset position, void *extra_state);
+int MPI_File_iread_all(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Request *request);
+int MPI_File_iread_at_all(MPI_File fh, MPI_Offset offset, void *buf, int count, MPI_Datatype datatype, MPI_Request *request);
+int MPI_File_iwrite_all(MPI_File fh, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request);
+int MPI_File_iwrite_at_all(MPI_File fh, MPI_Offset offset, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request);
+int MPI_Register_datarep(const char *datarep, MPI_Datarep_conversion_function *read_conversion_fn, MPI_Datarep_conversion_function *write_conversion_fn, MPI_Datarep_extent_function *dtype_file_extent_fn, void *extra_state);
+*/
+
+/* A.2.12 Language Bindings C Bindings */
+/*
+int MPI_Status_f082f(MPI_F08_status *f08_status, MPI_Fint *f_status);
+int MPI_Status_f2f08(MPI_Fint *f_status, MPI_F08_status *f08_status);
+int MPI_Type_create_f90_complex(int p, int r, MPI_Datatype *newtype);
+int MPI_Type_create_f90_integer(int r, MPI_Datatype *newtype);
+int MPI_Type_create_f90_real(int p, int r, MPI_Datatype *newtype);
+int MPI_Type_match_size(int typeclass, int size, MPI_Datatype *datatype);
+MPI_Fint MPI_Message_c2f(MPI_Message message);
+MPI_Message MPI_Message_f2c(MPI_Fint message);
+int MPI_Status_c2f(const MPI_Status *c_status, MPI_Fint *f_status);
+int MPI_Status_c2f08(const MPI_Status *c_status, MPI_F08_status *f08_status);
+int MPI_Status_f082c(const MPI_F08_status *f08_status, MPI_Status *c_status);
+int MPI_Status_f2c(const MPI_Fint *f_status, MPI_Status *c_status);
+*/
+
+/* A.2.13 Tools / Profiling Interface C Bindings */
+/* NB: PMPI is not yet supported */
+
+/* A.2.14 Tools / MPI Tool Information Interface C Bindings */
+/*
+int MPI_T_category_changed(int *stamp);
+int MPI_T_category_get_categories(int cat_index, int len, int indices[]);
+int MPI_T_category_get_cvars(int cat_index, int len, int indices[]);
+int MPI_T_category_get_index(const char *name, int *cat_index);
+int MPI_T_category_get_info(int cat_index, char *name, int *name_len, char *desc, int *desc_len, int *num_cvars, int *num_pvars, int *num_categories);
+int MPI_T_category_get_num(int *num_cat);
+int MPI_T_category_get_pvars(int cat_index, int len, int indices[]);
+int MPI_T_cvar_get_index(const char *name, int *cvar_index);
+int MPI_T_cvar_get_info(int cvar_index, char *name, int *name_len, int *verbosity, MPI_Datatype *datatype, MPI_T_enum *enumtype, char *desc, int *desc_len, int *bind, int *scope);
+int MPI_T_cvar_get_num(int *num_cvar);
+int MPI_T_cvar_handle_alloc(int cvar_index, void *obj_handle, MPI_T_cvar_handle *handle, int *count);
+int MPI_T_cvar_handle_free(MPI_T_cvar_handle *handle);
+int MPI_T_cvar_read(MPI_T_cvar_handle handle, void* buf);
+int MPI_T_cvar_write(MPI_T_cvar_handle handle, const void* buf);
+int MPI_T_enum_get_info(MPI_T_enum enumtype, int *num, char *name, int *name_len);
+int MPI_T_enum_get_item(MPI_T_enum enumtype, int index, int *value, char *name, int *name_len);
+int MPI_T_finalize(void);
+int MPI_T_init_thread(int required, int *provided);
+int MPI_T_pvar_get_index(const char *name, int var_class, int *pvar_index);
+int MPI_T_pvar_get_info(int pvar_index, char *name, int *name_len, int *verbosity, int *var_class, MPI_Datatype *datatype, MPI_T_enum *enumtype, char *desc, int *desc_len, int *bind, int *readonly, int *continuous, int *atomic);
+int MPI_T_pvar_get_num(int *num_pvar);
+int MPI_T_pvar_handle_alloc(MPI_T_pvar_session session, int pvar_index, void *obj_handle, MPI_T_pvar_handle *handle, int *count);
+int MPI_T_pvar_handle_free(MPI_T_pvar_session session,MPI_T_pvar_handle *handle);
+int MPI_T_pvar_read(MPI_T_pvar_session session, MPI_T_pvar_handle handle,void* buf);
+int MPI_T_pvar_readreset(MPI_T_pvar_session session,MPI_T_pvar_handle handle, void* buf);
+int MPI_T_pvar_reset(MPI_T_pvar_session session, MPI_T_pvar_handle handle);
+int MPI_T_pvar_session_create(MPI_T_pvar_session *session);
+int MPI_T_pvar_session_free(MPI_T_pvar_session *session);
+int MPI_T_pvar_start(MPI_T_pvar_session session, MPI_T_pvar_handle handle);
+int MPI_T_pvar_stop(MPI_T_pvar_session session, MPI_T_pvar_handle handle);
+int MPI_T_pvar_write(MPI_T_pvar_session session, MPI_T_pvar_handle handle, const void* buf);
+*/
+
+/* A.2.15 Deprecated C Bindings */
