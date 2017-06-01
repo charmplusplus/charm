@@ -296,7 +296,7 @@ class CkDDT_Indexed : public CkDDT_DataType {
     CkDDT_Indexed& operator=(const CkDDT_Indexed& obj) ;
 
   public:
-    CkDDT_Indexed(int count, int* arrBlock, CkDDT_Aint* arrDisp, int index,
+    CkDDT_Indexed(int count, const int* arrBlock, const CkDDT_Aint* arrDisp, int index,
                 CkDDT_DataType* type);
     CkDDT_Indexed() { } ;
     ~CkDDT_Indexed() ;
@@ -326,7 +326,7 @@ class CkDDT_HIndexed : public CkDDT_Indexed {
 
   public:
     CkDDT_HIndexed() { } ;
-    CkDDT_HIndexed(int count, int* arrBlock, CkDDT_Aint* arrDisp, int index,
+    CkDDT_HIndexed(int count, const int* arrBlock, const CkDDT_Aint* arrDisp, int index,
                  CkDDT_DataType* type);
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual void pupType(PUP::er &p, CkDDT* ddt);
@@ -360,7 +360,7 @@ class CkDDT_Indexed_Block : public CkDDT_DataType
     CkDDT_Indexed_Block& operator=(const CkDDT_Indexed_Block &obj);
 
   public:
-    CkDDT_Indexed_Block(int count, int Blength, CkDDT_Aint *ArrDisp, int index, CkDDT_DataType *type);
+    CkDDT_Indexed_Block(int count, int Blength, const CkDDT_Aint *ArrDisp, int index, CkDDT_DataType *type);
     CkDDT_Indexed_Block() { };
     ~CkDDT_Indexed_Block() ;
     virtual size_t serialize(char *userdata, char *buffer, int num, int dir) const;
@@ -392,7 +392,7 @@ class CkDDT_HIndexed_Block : public CkDDT_Indexed_Block
     CkDDT_HIndexed_Block& operator=(const CkDDT_Indexed_Block &obj);
 
   public:
-    CkDDT_HIndexed_Block(int count, int Blength, CkDDT_Aint *ArrDisp, int index, CkDDT_DataType *type);
+    CkDDT_HIndexed_Block(int count, int Blength, const CkDDT_Aint *ArrDisp, int index, CkDDT_DataType *type);
     CkDDT_HIndexed_Block() { };
     ~CkDDT_HIndexed_Block() ;
     virtual size_t serialize(char *userdata, char *buffer, int num, int dir) const;
@@ -428,7 +428,7 @@ class CkDDT_Struct : public CkDDT_DataType {
 
   public:
     CkDDT_Struct() { } ;
-    CkDDT_Struct(int count, int* arrBlock, CkDDT_Aint* arrDisp, int *index,
+    CkDDT_Struct(int count, const int* arrBlock, const CkDDT_Aint* arrDisp, const int *index,
                CkDDT_DataType **type);
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
@@ -567,15 +567,15 @@ class CkDDT {
                 CkDDT_Type* newtype);
   void newHVector(int count, int blocklength, int stride, CkDDT_Type oldtype,
                  CkDDT_Type* newtype);
-  void newIndexed(int count, int* arrbLength, CkDDT_Aint* arrDisp , CkDDT_Type oldtype,
+  void newIndexed(int count, const int* arrbLength, CkDDT_Aint* arrDisp , CkDDT_Type oldtype,
                  CkDDT_Type* newtype);
-  void newHIndexed(int count, int* arrbLength, CkDDT_Aint* arrDisp , CkDDT_Type oldtype,
+  void newHIndexed(int count, const int* arrbLength, const CkDDT_Aint* arrDisp , CkDDT_Type oldtype,
                   CkDDT_Type* newtype);
-  void newIndexedBlock(int count, int Blocklength, CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
+  void newIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
                       CkDDT_Type *newtype);
-  void newHIndexedBlock(int count, int Blocklength, CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
+  void newHIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
                        CkDDT_Type *newtype);
-  void newStruct(int count, int* arrbLength, CkDDT_Aint* arrDisp , CkDDT_Type *oldtype,
+  void newStruct(int count, const int* arrbLength, const CkDDT_Aint* arrDisp , const CkDDT_Type *oldtype,
                 CkDDT_Type* newtype);
   void  freeType(int* index);
   int   getNextFreeIndex(void);

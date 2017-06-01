@@ -208,7 +208,7 @@ WinStruct *ampiParent::getWinStruct(MPI_Win win) const {
 
 void ampiParent::removeWinStruct(WinStruct *win) {/*winStructList.remove(win);*/}
 
-int ampi::winPut(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+int ampi::winPut(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
                  MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct *win){
   CkDDT_DataType *ddt = getDDT()->getType(orgtype);
   int orgtotalsize = ddt->getSize(orgcnt);
@@ -350,7 +350,7 @@ int ampi::winIgetFree(MPI_Request *request, MPI_Status *status) {
   }
 }
 
-int ampi::winAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+int ampi::winAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
                         MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                         MPI_Op op, WinStruct *win) {
   CkDDT_DataType *ddt = getDDT()->getType(orgtype);
@@ -404,7 +404,7 @@ void ampi::winRemoteAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt,
   }
 }
 
-int ampi::winGetAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
+int ampi::winGetAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype,
                            void *resaddr, int rescnt, MPI_Datatype restype, int rank,
                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                            MPI_Op op, WinStruct *win) {
@@ -429,7 +429,7 @@ int ampi::winGetAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
   return MPI_SUCCESS;
 }
 
-int ampi::winCompareAndSwap(void *orgaddr, void *compaddr, void *resaddr, MPI_Datatype type,
+int ampi::winCompareAndSwap(const void *orgaddr, const void *compaddr, void *resaddr, MPI_Datatype type,
                             int rank, MPI_Aint targdisp, WinStruct *win){
   CkDDT_DataType *ddt = getDDT()->getType(type);
   AmpiMsg* msg = new AmpiMsg();
@@ -600,10 +600,10 @@ int AMPI_Win_free(MPI_Win *win){
  * ---correctness of the operation
  */
 CDECL
-int AMPI_Put(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+int AMPI_Put(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
              MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win){
   AMPIAPI("AMPI_Put");
-  handle_MPI_BOTTOM(orgaddr, orgtype);
+  handle_MPI_BOTTOM((void*&)orgaddr, orgtype);
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
   return ptr->winPut(orgaddr, orgcnt, orgtype, rank, targdisp, targcnt, targtype, winStruct);
@@ -636,11 +636,11 @@ int AMPI_Get(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
  * ---Many accumulate can be made from many origins to one target
  */
 CDECL
-int AMPI_Accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+int AMPI_Accumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
                     MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                     MPI_Op op, MPI_Win win) {
   AMPIAPI("AMPI_Accumulate");
-  handle_MPI_BOTTOM(orgaddr, orgtype);
+  handle_MPI_BOTTOM((void*&)orgaddr, orgtype);
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
   return ptr->winAccumulate(orgaddr, orgcnt, orgtype, rank,
@@ -655,12 +655,12 @@ int AMPI_Accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
  *   Perform an atomic, one-sided read-and-accumulate operation.
  */
 CDECL
-int AMPI_Get_accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
+int AMPI_Get_accumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype,
                         void *resaddr, int rescnt, MPI_Datatype restype,
                         int rank, MPI_Aint targdisp, int targcnt,
                         MPI_Datatype targtype, MPI_Op op, MPI_Win win) {
   AMPIAPI("AMPI_Get_accumulate");
-  handle_MPI_BOTTOM(orgaddr, orgtype);
+  handle_MPI_BOTTOM((void*&)orgaddr, orgtype);
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
   return ptr->winGetAccumulate(orgaddr, orgcnt, orgtype, resaddr, rescnt, restype,
@@ -676,7 +676,7 @@ int AMPI_Get_accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
  *   return a request handle for the operation.
  */
 CDECL
-int AMPI_Rput(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+int AMPI_Rput(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
               MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win,
               MPI_Request *request){
   AMPIAPI("AMPI_Rput");
@@ -713,7 +713,7 @@ int AMPI_Rget(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
  *   return a request handle for the operation.
  */
 CDECL
-int AMPI_Raccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+int AMPI_Raccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
                      MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                      MPI_Op op, MPI_Win win, MPI_Request *request) {
   AMPIAPI("AMPI_Raccumulate");
@@ -733,7 +733,7 @@ int AMPI_Raccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
  *   return a request handle for the operation.
  */
 CDECL
-int AMPI_Rget_accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
+int AMPI_Rget_accumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype,
                          void *resaddr, int rescnt, MPI_Datatype restype,
                          int rank, MPI_Aint targdisp, int targcnt,
                          MPI_Datatype targtype, MPI_Op op, MPI_Win win,
@@ -752,10 +752,10 @@ int AMPI_Rget_accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
  *   Perform one-sided read-modify-write.
  */
 CDECL
-int AMPI_Fetch_and_op(void *orgaddr, void *resaddr, MPI_Datatype type,
+int AMPI_Fetch_and_op(const void *orgaddr, void *resaddr, MPI_Datatype type,
                       int rank, MPI_Aint targdisp, MPI_Op op, MPI_Win win) {
   AMPIAPI("AMPI_Fetch_and_op");
-  handle_MPI_BOTTOM(orgaddr, type);
+  handle_MPI_BOTTOM((void*&)orgaddr, type);
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
   // HACK: use GetAccumulate for FetchAndOp
@@ -769,10 +769,10 @@ int AMPI_Fetch_and_op(void *orgaddr, void *resaddr, MPI_Datatype type,
  *   Perform one-sided atomic compare-and-swap.
  */
 CDECL
-int AMPI_Compare_and_swap(void *orgaddr, void *compaddr, void *resaddr, MPI_Datatype type,
+int AMPI_Compare_and_swap(const void *orgaddr, const void *compaddr, void *resaddr, MPI_Datatype type,
                           int rank, MPI_Aint targdisp, MPI_Win win) {
   AMPIAPI("AMPI_Compare_and_swap");
-  handle_MPI_BOTTOM(orgaddr, type);
+  handle_MPI_BOTTOM((void*&)orgaddr, type);
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
   return ptr->winCompareAndSwap(orgaddr, compaddr, resaddr, type, rank, targdisp, winStruct);

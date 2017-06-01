@@ -141,7 +141,7 @@ inline int checkRank(const char* func, int rank, MPI_Comm comm) {
   return ampiErrhandler(func, MPI_ERR_RANK);
 }
 
-inline int checkBuf(const char* func, void *buf, int count) {
+inline int checkBuf(const char* func, const void *buf, int count) {
   if ((count != 0 && buf == NULL) || buf == MPI_IN_PLACE)
     return ampiErrhandler(func, MPI_ERR_BUFFER);
   return MPI_SUCCESS;
@@ -149,8 +149,8 @@ inline int checkBuf(const char* func, void *buf, int count) {
 
 inline int errorCheck(const char* func, MPI_Comm comm, int ifComm, int count,
                       int ifCount, MPI_Datatype data, int ifData, int tag,
-                      int ifTag, int rank, int ifRank, void *buf1, int ifBuf1,
-                      void *buf2=0, int ifBuf2=0) {
+                      int ifTag, int rank, int ifRank, const void *buf1, int ifBuf1,
+                      const void *buf2=0, int ifBuf2=0) {
   int ret;
   if (ifComm) {
     ret = checkCommunicator(func, comm);
@@ -2827,7 +2827,7 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
   }
 }
 
-void ampi::processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count)
+void ampi::processAmpiMsg(AmpiMsg *msg, const void* buf, MPI_Datatype type, int count)
 {
   int ssendReq = UsrToEnv(msg)->getRef();
   if (ssendReq > 0) { // send an ack to sender
@@ -2847,7 +2847,7 @@ void ampi::processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count)
 }
 
 // RDMA version of ampi::processAmpiMsg
-void ampi::processRdmaMsg(void *sbuf, int slength, int ssendReq, int srank, void* rbuf,
+void ampi::processRdmaMsg(const void *sbuf, int slength, int ssendReq, int srank, void* rbuf,
                           int rcount, MPI_Datatype rtype, MPI_Comm comm)
 {
   if (ssendReq > 0) { // send an ack to sender
@@ -2866,7 +2866,7 @@ void ampi::processRdmaMsg(void *sbuf, int slength, int ssendReq, int srank, void
   ddt->serialize((char*)rbuf, (char*)sbuf, rcount, (-1));
 }
 
-void ampi::processRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count)
+void ampi::processRednMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype type, int count)
 {
   // The first sizeof(AmpiOpHeader) bytes in the redn msg data are reserved
   // for an AmpiOpHeader if our custom AmpiReducer type was used.
@@ -2921,7 +2921,7 @@ void ampi::processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Data
   delete [] results;
 }
 
-void ampi::processGatherMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int recvCount)
+void ampi::processGatherMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype type, int recvCount)
 {
   CkReduction::tupleElement* results = NULL;
   int numReductions = 0;
@@ -2945,7 +2945,7 @@ void ampi::processGatherMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, i
   delete [] results;
 }
 
-void ampi::processGathervMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type,
+void ampi::processGathervMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype type,
                              int* recvCounts, int* displs)
 {
   CkReduction::tupleElement* results = NULL;
@@ -3189,7 +3189,7 @@ AmpiMsg* ampi::Alltoall_RemoteIget(MPI_Aint disp, int cnt, MPI_Datatype type, in
   return msg;
 }
 
-int ampi::intercomm_scatter(int root, void *sendbuf, int sendcount, MPI_Datatype sendtype,
+int ampi::intercomm_scatter(int root, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                             void *recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm intercomm)
 {
   if (root == MPI_ROOT) {
@@ -3211,7 +3211,7 @@ int ampi::intercomm_scatter(int root, void *sendbuf, int sendcount, MPI_Datatype
   return MPI_SUCCESS;
 }
 
-int ampi::intercomm_iscatter(int root, void *sendbuf, int sendcount, MPI_Datatype sendtype,
+int ampi::intercomm_iscatter(int root, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                              void *recvbuf, int recvcount, MPI_Datatype recvtype,
                              MPI_Comm intercomm, MPI_Request *request)
 {
@@ -3234,7 +3234,7 @@ int ampi::intercomm_iscatter(int root, void *sendbuf, int sendcount, MPI_Datatyp
   return MPI_SUCCESS;
 }
 
-int ampi::intercomm_scatterv(int root, void* sendbuf, int* sendcounts, int* displs,
+int ampi::intercomm_scatterv(int root, const void* sendbuf, const int* sendcounts, const int* displs,
                              MPI_Datatype sendtype, void* recvbuf, int recvcount,
                              MPI_Datatype recvtype, MPI_Comm intercomm)
 {
@@ -3257,7 +3257,7 @@ int ampi::intercomm_scatterv(int root, void* sendbuf, int* sendcounts, int* disp
   return MPI_SUCCESS;
 }
 
-int ampi::intercomm_iscatterv(int root, void* sendbuf, int* sendcounts, int* displs,
+int ampi::intercomm_iscatterv(int root, const void* sendbuf, const int* sendcounts, const int* displs,
                               MPI_Datatype sendtype, void* recvbuf, int recvcount,
                               MPI_Datatype recvtype, MPI_Comm intercomm, MPI_Request* request)
 {
@@ -3794,10 +3794,10 @@ MPI_Request ampi::postReq(AmpiRequest* newreq)
 }
 
 CDECL
-int AMPI_Send(void *msg, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm) {
+int AMPI_Send(const void *msg, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm) {
   AMPIAPI("AMPI_Send");
 
-  handle_MPI_BOTTOM(msg, type);
+  handle_MPI_BOTTOM((void*&)msg, type);
 
 #if AMPI_ERROR_CHECKING
   int ret;
@@ -3819,11 +3819,11 @@ int AMPI_Send(void *msg, int count, MPI_Datatype type, int dest, int tag, MPI_Co
 }
 
 CDECL
-int AMPI_Ssend(void *msg, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm)
+int AMPI_Ssend(const void *msg, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Ssend");
 
-  handle_MPI_BOTTOM(msg, type);
+  handle_MPI_BOTTOM((void*&)msg, type);
 
 #if AMPI_ERROR_CHECKING
   int ret = errorCheck("AMPI_Ssend", comm, 1, count, 1, type, 1, tag, 1, dest, 1, msg, 1);
@@ -3844,12 +3844,12 @@ int AMPI_Ssend(void *msg, int count, MPI_Datatype type, int dest, int tag, MPI_C
 }
 
 CDECL
-int AMPI_Issend(void *buf, int count, MPI_Datatype type, int dest,
+int AMPI_Issend(const void *buf, int count, MPI_Datatype type, int dest,
                 int tag, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("AMPI_Issend");
 
-  handle_MPI_BOTTOM(buf, type);
+  handle_MPI_BOTTOM((void*&)buf, type);
 
 #if AMPI_ERROR_CHECKING
   int ret = errorCheck("AMPI_Issend", comm, 1, count, 1, type, 1, tag, 1, dest, 1, buf, 1);
@@ -3962,7 +3962,7 @@ int AMPI_Iprobe(int src,int tag,MPI_Comm comm,int *flag,MPI_Status *status)
   return MPI_SUCCESS;
 }
 
-void ampi::sendrecv(void *sbuf, int scount, MPI_Datatype stype, int dest, int stag,
+void ampi::sendrecv(const void *sbuf, int scount, MPI_Datatype stype, int dest, int stag,
                     void *rbuf, int rcount, MPI_Datatype rtype, int src, int rtag,
                     MPI_Comm comm, MPI_Status *sts)
 {
@@ -3982,13 +3982,13 @@ void ampi::sendrecv(void *sbuf, int scount, MPI_Datatype stype, int dest, int st
 }
 
 CDECL
-int AMPI_Sendrecv(void *sbuf, int scount, MPI_Datatype stype, int dest,
+int AMPI_Sendrecv(const void *sbuf, int scount, MPI_Datatype stype, int dest,
                   int stag, void *rbuf, int rcount, MPI_Datatype rtype,
                   int src, int rtag, MPI_Comm comm, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Sendrecv");
 
-  handle_MPI_BOTTOM(sbuf, stype, rbuf, rtype);
+  handle_MPI_BOTTOM((void*&)sbuf, stype, rbuf, rtype);
 
 #if AMPI_ERROR_CHECKING
   if(sbuf == MPI_IN_PLACE || rbuf == MPI_IN_PLACE)
@@ -4381,12 +4381,12 @@ static void handle_MPI_IN_PLACE(void* &inbuf, void* &outbuf)
 #define SYNCHRONOUS_REDUCE                           0
 
 CDECL
-int AMPI_Reduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_Op op, int root, MPI_Comm comm)
+int AMPI_Reduce(const void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_Op op, int root, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Reduce");
 
-  handle_MPI_BOTTOM(inbuf, type, outbuf, type);
-  handle_MPI_IN_PLACE(inbuf, outbuf);
+  handle_MPI_BOTTOM((void*&)inbuf, type, outbuf, type);
+  handle_MPI_IN_PLACE((void*&)inbuf, outbuf);
 
 #if AMPI_ERROR_CHECKING
   if(op == MPI_OP_NULL)
@@ -4446,12 +4446,12 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_Op 
 }
 
 CDECL
-int AMPI_Allreduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_Op op, MPI_Comm comm)
+int AMPI_Allreduce(const void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_Op op, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Allreduce");
 
-  handle_MPI_BOTTOM(inbuf, type, outbuf, type);
-  handle_MPI_IN_PLACE(inbuf, outbuf);
+  handle_MPI_BOTTOM((void*&)inbuf, type, outbuf, type);
+  handle_MPI_IN_PLACE((void*&)inbuf, outbuf);
 
 #if AMPI_ERROR_CHECKING
   if(op == MPI_OP_NULL)
@@ -4500,13 +4500,13 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_
 }
 
 CDECL
-int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_Op op,
+int AMPI_Iallreduce(const void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_Op op,
                     MPI_Comm comm, MPI_Request* request)
 {
   AMPIAPI("AMPI_Iallreduce");
 
-  handle_MPI_BOTTOM(inbuf, type, outbuf, type);
-  handle_MPI_IN_PLACE(inbuf, outbuf);
+  handle_MPI_BOTTOM((void*&)inbuf, type, outbuf, type);
+  handle_MPI_IN_PLACE((void*&)inbuf, outbuf);
 
 #if AMPI_ERROR_CHECKING
   if(op == MPI_OP_NULL)
@@ -4539,11 +4539,11 @@ int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI
 }
 
 CDECL
-int AMPI_Reduce_local(void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_Op op)
+int AMPI_Reduce_local(const void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_Op op)
 {
   AMPIAPI("AMPI_Reduce_local");
 
-  handle_MPI_BOTTOM(inbuf, type, outbuf, type);
+  handle_MPI_BOTTOM((void*&)inbuf, type, outbuf, type);
 
 #if AMPI_ERROR_CHECKING
   if(op == MPI_OP_NULL)
@@ -4560,13 +4560,13 @@ int AMPI_Reduce_local(void *inbuf, void *outbuf, int count, MPI_Datatype type, M
 }
 
 CDECL
-int AMPI_Reduce_scatter_block(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
+int AMPI_Reduce_scatter_block(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
                               MPI_Op op, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Reduce_scatter_block");
 
-  handle_MPI_BOTTOM(sendbuf, datatype, recvbuf, datatype);
-  handle_MPI_IN_PLACE(sendbuf, recvbuf);
+  handle_MPI_BOTTOM((void*&)sendbuf, datatype, recvbuf, datatype);
+  handle_MPI_IN_PLACE((void*&)sendbuf, recvbuf);
 
 #if AMPI_ERROR_CHECKING
   if(op == MPI_OP_NULL)
@@ -4592,13 +4592,13 @@ int AMPI_Reduce_scatter_block(void* sendbuf, void* recvbuf, int count, MPI_Datat
 }
 
 CDECL
-int AMPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts, MPI_Datatype datatype,
+int AMPI_Reduce_scatter(const void* sendbuf, void* recvbuf, const int *recvcounts, MPI_Datatype datatype,
                         MPI_Op op, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Reduce_scatter");
 
-  handle_MPI_BOTTOM(sendbuf, datatype, recvbuf, datatype);
-  handle_MPI_IN_PLACE(sendbuf, recvbuf);
+  handle_MPI_BOTTOM((void*&)sendbuf, datatype, recvbuf, datatype);
+  handle_MPI_IN_PLACE((void*&)sendbuf, recvbuf);
 
 #if AMPI_ERROR_CHECKING
   if(op == MPI_OP_NULL)
@@ -4682,12 +4682,12 @@ int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
 }
 
 CDECL
-int AMPI_Exscan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
+int AMPI_Exscan(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
                 MPI_Op op, MPI_Comm comm){
   AMPIAPI("AMPI_Exscan");
 
-  handle_MPI_BOTTOM(sendbuf, datatype, recvbuf, datatype);
-  handle_MPI_IN_PLACE(sendbuf,recvbuf);
+  handle_MPI_BOTTOM((void*&)sendbuf, datatype, recvbuf, datatype);
+  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
 
 #if AMPI_ERROR_CHECKING
   if(op == MPI_OP_NULL)
@@ -5655,7 +5655,7 @@ int AMPI_Cancel(MPI_Request *request){
 }
 
 CDECL
-int AMPI_Test_cancelled(MPI_Status* status, int* flag) {
+int AMPI_Test_cancelled(const MPI_Status* status, int* flag) {
   AMPIAPI("AMPI_Test_cancelled");
   // NOTE : current implementation requires AMPI_{Wait,Test}{any,some,all}
   // to be invoked before AMPI_Test_cancelled
@@ -5691,12 +5691,12 @@ int AMPI_Recv_init(void *buf, int count, MPI_Datatype type, int src, int tag,
 }
 
 CDECL
-int AMPI_Send_init(void *buf, int count, MPI_Datatype type, int dest, int tag,
+int AMPI_Send_init(const void *buf, int count, MPI_Datatype type, int dest, int tag,
                    MPI_Comm comm, MPI_Request *req)
 {
   AMPIAPI("AMPI_Send_init");
 
-  handle_MPI_BOTTOM(buf, type);
+  handle_MPI_BOTTOM((void*&)buf, type);
 
 #if AMPI_ERROR_CHECKING
   int ret = errorCheck("AMPI_Send_init", comm, 1, count, 1, type, 1, tag, 1, dest, 1, buf, 1);
@@ -5706,17 +5706,17 @@ int AMPI_Send_init(void *buf, int count, MPI_Datatype type, int dest, int tag,
   }
 #endif
 
-  *req = getAmpiInstance(comm)->postReq(new PersReq(buf,count,type,dest,tag,comm,1));
+  *req = getAmpiInstance(comm)->postReq(new PersReq(const_cast<void*>(buf),count,type,dest,tag,comm,1));
   return MPI_SUCCESS;
 }
 
 CDECL
-int AMPI_Ssend_init(void *buf, int count, MPI_Datatype type, int dest, int tag,
+int AMPI_Ssend_init(const void *buf, int count, MPI_Datatype type, int dest, int tag,
                     MPI_Comm comm, MPI_Request *req)
 {
   AMPIAPI("AMPI_Ssend_init");
 
-  handle_MPI_BOTTOM(buf, type);
+  handle_MPI_BOTTOM((void*&)buf, type);
 
 #if AMPI_ERROR_CHECKING
   int ret = errorCheck("AMPI_Ssend_init", comm, 1, count, 1, type, 1, tag, 1, dest, 1, buf, 1);
@@ -5726,7 +5726,7 @@ int AMPI_Ssend_init(void *buf, int count, MPI_Datatype type, int dest, int tag,
   }
 #endif
 
-  *req = getAmpiInstance(comm)->postReq(new PersReq(buf,count,type,dest,tag,comm,3));
+  *req = getAmpiInstance(comm)->postReq(new PersReq(const_cast<void*>(buf),count,type,dest,tag,comm,3));
   return MPI_SUCCESS;
 }
 
@@ -5766,7 +5766,7 @@ int AMPI_Type_hvector(int count, int blocklength, MPI_Aint stride,
 }
 
 CDECL
-int AMPI_Type_indexed(int count, int* arrBlength, int* arrDisp,
+int AMPI_Type_indexed(int count, const int* arrBlength, const int* arrDisp,
                       MPI_Datatype oldtype, MPI_Datatype*  newtype)
 {
   AMPIAPI("AMPI_Type_indexed");
@@ -5779,7 +5779,7 @@ int AMPI_Type_indexed(int count, int* arrBlength, int* arrDisp,
 }
 
 CDECL
-int AMPI_Type_create_hindexed(int count, int* arrBlength, MPI_Aint* arrDisp,
+int AMPI_Type_create_hindexed(int count, const int* arrBlength, const MPI_Aint* arrDisp,
                               MPI_Datatype oldtype, MPI_Datatype*  newtype)
 {
   AMPIAPI("AMPI_Type_create_hindexed");
@@ -5796,7 +5796,7 @@ int AMPI_Type_hindexed(int count, int* arrBlength, MPI_Aint* arrDisp,
 }
 
 CDECL
-int AMPI_Type_create_indexed_block(int count, int Blength, MPI_Aint *arr,
+int AMPI_Type_create_indexed_block(int count, int Blength, const MPI_Aint *arr,
                                    MPI_Datatype oldtype, MPI_Datatype *newtype)
 {
   AMPIAPI("AMPI_Type_create_indexed_block");
@@ -5805,7 +5805,7 @@ int AMPI_Type_create_indexed_block(int count, int Blength, MPI_Aint *arr,
 }
 
 CDECL
-int AMPI_Type_create_hindexed_block(int count, int Blength, MPI_Aint *arr,
+int AMPI_Type_create_hindexed_block(int count, int Blength, const MPI_Aint *arr,
                                     MPI_Datatype oldtype, MPI_Datatype *newtype)
 {
   AMPIAPI("AMPI_Type_create_hindexed_block");
@@ -5814,8 +5814,8 @@ int AMPI_Type_create_hindexed_block(int count, int Blength, MPI_Aint *arr,
 }
 
 CDECL
-int AMPI_Type_create_struct(int count, int* arrBlength, MPI_Aint* arrDisp,
-                            MPI_Datatype* oldtype, MPI_Datatype*  newtype)
+int AMPI_Type_create_struct(int count, const int* arrBlength, const MPI_Aint* arrDisp,
+                            const MPI_Datatype* oldtype, MPI_Datatype*  newtype)
 {
   AMPIAPI("AMPI_Type_create_struct");
   getDDT()->newStruct(count, arrBlength, arrDisp, oldtype, newtype);
@@ -5953,12 +5953,12 @@ int AMPI_Type_free_keyval(int *type_keyval)
 }
 
 CDECL
-int AMPI_Isend(void *buf, int count, MPI_Datatype type, int dest,
+int AMPI_Isend(const void *buf, int count, MPI_Datatype type, int dest,
                int tag, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("AMPI_Isend");
 
-  handle_MPI_BOTTOM(buf, type);
+  handle_MPI_BOTTOM((void*&)buf, type);
 
 #if AMPI_ERROR_CHECKING
   int ret = errorCheck("AMPI_Isend", comm, 1, count, 1, type, 1, tag, 1, dest, 1, buf, 1);
@@ -6068,13 +6068,13 @@ int AMPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
 }
 
 CDECL
-int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI_Op op,
+int AMPI_Ireduce(const void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI_Op op,
                  int root, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("AMPI_Ireduce");
 
-  handle_MPI_BOTTOM(sendbuf, type, recvbuf, type);
-  handle_MPI_IN_PLACE(sendbuf, recvbuf);
+  handle_MPI_BOTTOM((void*&)sendbuf, type, recvbuf, type);
+  handle_MPI_IN_PLACE((void*&)sendbuf, recvbuf);
 
 #if AMPI_ERROR_CHECKING
   if(op == MPI_OP_NULL)
@@ -6134,14 +6134,14 @@ static CkReductionMsg *makeGatherMsg(const void *inbuf, int count, MPI_Datatype 
 }
 
 CDECL
-int AMPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+int AMPI_Allgather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                    void *recvbuf, int recvcount, MPI_Datatype recvtype,
                    MPI_Comm comm)
 {
   AMPIAPI("AMPI_Allgather");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE(sendbuf,recvbuf);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
 
 #if AMPI_ERROR_CHECKING
   int ret;
@@ -6174,14 +6174,14 @@ int AMPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 CDECL
-int AMPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+int AMPI_Iallgather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                     void *recvbuf, int recvcount, MPI_Datatype recvtype,
                     MPI_Comm comm, MPI_Request* request)
 {
   AMPIAPI("AMPI_Iallgather");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE(sendbuf,recvbuf);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
 
 #if AMPI_ERROR_CHECKING
   int ret;
@@ -6221,14 +6221,14 @@ int AMPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 CDECL
-int AMPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
-                    void *recvbuf, int *recvcounts, int *displs,
+int AMPI_Allgatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                    void *recvbuf, const int *recvcounts, const int *displs,
                     MPI_Datatype recvtype, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Allgatherv");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE(sendbuf,recvbuf);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
 
 #if AMPI_ERROR_CHECKING
   int ret;
@@ -6260,14 +6260,14 @@ int AMPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 CDECL
-int AMPI_Iallgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
-                     void *recvbuf, int *recvcounts, int *displs,
+int AMPI_Iallgatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                     void *recvbuf, const int *recvcounts, const int *displs,
                      MPI_Datatype recvtype, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("AMPI_Iallgatherv");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE(sendbuf,recvbuf);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
 
 #if AMPI_ERROR_CHECKING
   int ret;
@@ -6308,14 +6308,14 @@ int AMPI_Iallgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 CDECL
-int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+int AMPI_Gather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                 void *recvbuf, int recvcount, MPI_Datatype recvtype,
                 int root, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Gather");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE(sendbuf,recvbuf);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
 
 #if AMPI_ERROR_CHECKING
   int ret;
@@ -6369,14 +6369,14 @@ int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 CDECL
-int AMPI_Igather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+int AMPI_Igather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
                  int root, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("AMPI_Igather");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE(sendbuf,recvbuf);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
 
 #if AMPI_ERROR_CHECKING
   int ret;
@@ -6441,14 +6441,14 @@ int AMPI_Igather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 CDECL
-int AMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
-                 void *recvbuf, int *recvcounts, int *displs,
+int AMPI_Gatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                 void *recvbuf, const int *recvcounts, const int *displs,
                  MPI_Datatype recvtype, int root, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Gatherv");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE(sendbuf,recvbuf);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
 
 #if AMPI_ERROR_CHECKING
   int ret;
@@ -6509,14 +6509,14 @@ int AMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 CDECL
-int AMPI_Igatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
-                  void *recvbuf, int *recvcounts, int *displs,
+int AMPI_Igatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
+                  void *recvbuf, const int *recvcounts, const int *displs,
                   MPI_Datatype recvtype, int root, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("AMPI_Igatherv");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE(sendbuf,recvbuf);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
 
 #if AMPI_ERROR_CHECKING
   int ret;
@@ -6591,14 +6591,14 @@ int AMPI_Igatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 CDECL
-int AMPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+int AMPI_Scatter(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
                  int root, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Scatter");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE(sendbuf,recvbuf);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
 
 #if AMPI_ERROR_CHECKING
   int ret;
@@ -6656,14 +6656,14 @@ int AMPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 CDECL
-int AMPI_Iscatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+int AMPI_Iscatter(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                   void *recvbuf, int recvcount, MPI_Datatype recvtype,
                   int root, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("AMPI_Iscatter");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE(sendbuf,recvbuf);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
 
 #if AMPI_ERROR_CHECKING
   int ret;
@@ -6728,14 +6728,14 @@ int AMPI_Iscatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 CDECL
-int AMPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sendtype,
+int AMPI_Scatterv(const void *sendbuf, const int *sendcounts, const int *displs, MPI_Datatype sendtype,
                   void *recvbuf, int recvcount, MPI_Datatype recvtype,
                   int root, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Scatterv");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE(sendbuf, recvbuf);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_IN_PLACE((void*&)sendbuf, recvbuf);
 
 #if AMPI_ERROR_CHECKING
   int ret;
@@ -6793,14 +6793,14 @@ int AMPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype send
 }
 
 CDECL
-int AMPI_Iscatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sendtype,
+int AMPI_Iscatterv(const void *sendbuf, const int *sendcounts, const int *displs, MPI_Datatype sendtype,
                    void *recvbuf, int recvcount, MPI_Datatype recvtype,
                    int root, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("AMPI_Iscatterv");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE(sendbuf,recvbuf);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
 
 #if AMPI_ERROR_CHECKING
   int ret;
@@ -6865,14 +6865,14 @@ int AMPI_Iscatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sen
 }
 
 CDECL
-int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+int AMPI_Alltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                   void *recvbuf, int recvcount, MPI_Datatype recvtype,
                   MPI_Comm comm)
 {
   AMPIAPI("AMPI_Alltoall");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE(sendbuf, recvbuf);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_IN_PLACE((void*&)sendbuf, recvbuf);
 
 #if AMPI_ERROR_CHECKING
   int ret;
@@ -7013,14 +7013,14 @@ int AMPI_Alltoall_iget(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 CDECL
-int AMPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+int AMPI_Ialltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                    void *recvbuf, int recvcount, MPI_Datatype recvtype,
                    MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("AMPI_Ialltoall");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE(sendbuf,recvbuf);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
 
 #if AMPI_ERROR_CHECKING
   int ret;
@@ -7070,14 +7070,14 @@ int AMPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 CDECL
-int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
-                   MPI_Datatype sendtype, void *recvbuf, int *recvcounts,
-                   int *rdispls, MPI_Datatype recvtype, MPI_Comm comm)
+int AMPI_Alltoallv(const void *sendbuf, const int *sendcounts, const int *sdispls,
+                   MPI_Datatype sendtype, void *recvbuf, const int *recvcounts,
+                   const int *rdispls, MPI_Datatype recvtype, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Alltoallv");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE(sendbuf,recvbuf);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
 
 #if AMPI_ERROR_CHECKING
   int ret;
@@ -7176,14 +7176,14 @@ int AMPI_Ialltoallv(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype s
 }
 
 CDECL
-int AMPI_Alltoallw(void *sendbuf, int *sendcounts, int *sdispls,
-                   MPI_Datatype *sendtypes, void *recvbuf, int *recvcounts,
-                   int *rdispls, MPI_Datatype *recvtypes, MPI_Comm comm)
+int AMPI_Alltoallw(const void *sendbuf, const int *sendcounts, const int *sdispls,
+                   const MPI_Datatype *sendtypes, void *recvbuf, const int *recvcounts,
+                   const int *rdispls, const MPI_Datatype *recvtypes, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Alltoallw");
 
-  handle_MPI_BOTTOM(sendbuf, sendtypes[0], recvbuf, recvtypes[0]);
-  handle_MPI_IN_PLACE(sendbuf,recvbuf);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtypes[0], recvbuf, recvtypes[0]);
+  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
 
 #if AMPI_ERROR_CHECKING
   int ret;
@@ -7223,15 +7223,15 @@ int AMPI_Alltoallw(void *sendbuf, int *sendcounts, int *sdispls,
 }
 
 CDECL
-int AMPI_Ialltoallw(void *sendbuf, int *sendcounts, int *sdispls,
-                    MPI_Datatype *sendtypes, void *recvbuf, int *recvcounts,
-                    int *rdispls, MPI_Datatype *recvtypes, MPI_Comm comm,
+int AMPI_Ialltoallw(const void *sendbuf, const int *sendcounts, const int *sdispls,
+                    const MPI_Datatype *sendtypes, void *recvbuf, const int *recvcounts,
+                    const int *rdispls, const MPI_Datatype *recvtypes, MPI_Comm comm,
                     MPI_Request *request)
 {
   AMPIAPI("AMPI_Ialltoallw");
 
-  handle_MPI_BOTTOM(sendbuf, sendtypes[0], recvbuf, recvtypes[0]);
-  handle_MPI_IN_PLACE(sendbuf,recvbuf);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtypes[0], recvbuf, recvtypes[0]);
+  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
 
 #if AMPI_ERROR_CHECKING
   int ret;
@@ -7281,13 +7281,13 @@ int AMPI_Ialltoallw(void *sendbuf, int *sendcounts, int *sdispls,
 }
 
 CDECL
-int AMPI_Neighbor_alltoall(void* sendbuf, int sendcount, MPI_Datatype sendtype,
+int AMPI_Neighbor_alltoall(const void* sendbuf, int sendcount, MPI_Datatype sendtype,
                            void* recvbuf, int recvcount, MPI_Datatype recvtype,
                            MPI_Comm comm)
 {
   AMPIAPI("AMPI_Neighbor_alltoall");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
 
 #if AMPI_ERROR_CHECKING
   if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
@@ -7330,13 +7330,13 @@ int AMPI_Neighbor_alltoall(void* sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 CDECL
-int AMPI_Ineighbor_alltoall(void* sendbuf, int sendcount, MPI_Datatype sendtype,
+int AMPI_Ineighbor_alltoall(const void* sendbuf, int sendcount, MPI_Datatype sendtype,
                             void* recvbuf, int recvcount, MPI_Datatype recvtype,
                             MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("AMPI_Ineighbor_alltoall");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
 
 #if AMPI_ERROR_CHECKING
   if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
@@ -7389,13 +7389,13 @@ int AMPI_Ineighbor_alltoall(void* sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 CDECL
-int AMPI_Neighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
-                            MPI_Datatype sendtype, void* recvbuf, int *recvcounts,
-                            int *rdispls, MPI_Datatype recvtype, MPI_Comm comm)
+int AMPI_Neighbor_alltoallv(const void* sendbuf, const int *sendcounts, const int *sdispls,
+                            MPI_Datatype sendtype, void* recvbuf, const int *recvcounts,
+                            const int *rdispls, MPI_Datatype recvtype, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Neighbor_alltoallv");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
 
 #if AMPI_ERROR_CHECKING
   if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
@@ -7438,14 +7438,14 @@ int AMPI_Neighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
 }
 
 CDECL
-int AMPI_Ineighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
-                             MPI_Datatype sendtype, void* recvbuf, int *recvcounts,
-                             int *rdispls, MPI_Datatype recvtype, MPI_Comm comm,
+int AMPI_Ineighbor_alltoallv(const void* sendbuf, const int *sendcounts, const int *sdispls,
+                             MPI_Datatype sendtype, void* recvbuf, const int *recvcounts,
+                             const int *rdispls, MPI_Datatype recvtype, MPI_Comm comm,
                              MPI_Request *request)
 {
   AMPIAPI("AMPI_Ineighbor_alltoallv");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
 
 #if AMPI_ERROR_CHECKING
   if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
@@ -7498,13 +7498,13 @@ int AMPI_Ineighbor_alltoallv(void* sendbuf, int *sendcounts, int *sdispls,
 }
 
 CDECL
-int AMPI_Neighbor_alltoallw(void* sendbuf, int *sendcounts, MPI_Aint *sdispls,
-                            MPI_Datatype *sendtypes, void* recvbuf, int *recvcounts,
-                            MPI_Aint *rdispls, MPI_Datatype *recvtypes, MPI_Comm comm)
+int AMPI_Neighbor_alltoallw(const void* sendbuf, const int *sendcounts, const MPI_Aint *sdispls,
+                            const MPI_Datatype *sendtypes, void* recvbuf, const int *recvcounts,
+                            const MPI_Aint *rdispls, const MPI_Datatype *recvtypes, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Neighbor_alltoallw");
 
-  handle_MPI_BOTTOM(sendbuf, sendtypes[0], recvbuf, recvtypes[0]);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtypes[0], recvbuf, recvtypes[0]);
 
 #if AMPI_ERROR_CHECKING
   if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
@@ -7545,14 +7545,14 @@ int AMPI_Neighbor_alltoallw(void* sendbuf, int *sendcounts, MPI_Aint *sdispls,
 }
 
 CDECL
-int AMPI_Ineighbor_alltoallw(void* sendbuf, int *sendcounts, MPI_Aint *sdispls,
-                             MPI_Datatype *sendtypes, void* recvbuf, int *recvcounts,
-                             MPI_Aint *rdispls, MPI_Datatype *recvtypes, MPI_Comm comm,
+int AMPI_Ineighbor_alltoallw(const void* sendbuf, const int *sendcounts, const MPI_Aint *sdispls,
+                             const MPI_Datatype *sendtypes, void* recvbuf, const int *recvcounts,
+                             const MPI_Aint *rdispls, const MPI_Datatype *recvtypes, MPI_Comm comm,
                              MPI_Request *request)
 {
   AMPIAPI("AMPI_Ineighbor_alltoallw");
 
-  handle_MPI_BOTTOM(sendbuf, sendtypes[0], recvbuf, recvtypes[0]);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtypes[0], recvbuf, recvtypes[0]);
 
 #if AMPI_ERROR_CHECKING
   if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
@@ -7603,13 +7603,13 @@ int AMPI_Ineighbor_alltoallw(void* sendbuf, int *sendcounts, MPI_Aint *sdispls,
 }
 
 CDECL
-int AMPI_Neighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype,
+int AMPI_Neighbor_allgather(const void* sendbuf, int sendcount, MPI_Datatype sendtype,
                             void* recvbuf, int recvcount, MPI_Datatype recvtype,
                             MPI_Comm comm)
 {
   AMPIAPI("AMPI_Neighbor_allgather");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
 
 #if AMPI_ERROR_CHECKING
   if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
@@ -7650,13 +7650,13 @@ int AMPI_Neighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 CDECL
-int AMPI_Ineighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype,
+int AMPI_Ineighbor_allgather(const void* sendbuf, int sendcount, MPI_Datatype sendtype,
                              void* recvbuf, int recvcount, MPI_Datatype recvtype,
                              MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("AMPI_Ineighbor_allgather");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
 
 #if AMPI_ERROR_CHECKING
   if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
@@ -7707,13 +7707,13 @@ int AMPI_Ineighbor_allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype
 }
 
 CDECL
-int AMPI_Neighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtype,
-                             void* recvbuf, int *recvcounts, int *displs,
+int AMPI_Neighbor_allgatherv(const void* sendbuf, int sendcount, MPI_Datatype sendtype,
+                             void* recvbuf, const int *recvcounts, const int *displs,
                              MPI_Datatype recvtype, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Neighbor_allgatherv");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
 
 #if AMPI_ERROR_CHECKING
   if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
@@ -7754,13 +7754,13 @@ int AMPI_Neighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtype
 }
 
 CDECL
-int AMPI_Ineighbor_allgatherv(void* sendbuf, int sendcount, MPI_Datatype sendtype,
-                              void* recvbuf, int* recvcounts, int* displs,
+int AMPI_Ineighbor_allgatherv(const void* sendbuf, int sendcount, MPI_Datatype sendtype,
+                              void* recvbuf, const int* recvcounts, const int* displs,
                               MPI_Datatype recvtype, MPI_Comm comm, MPI_Request *request)
 {
   AMPIAPI("AMPI_Ineighbor_allgatherv");
 
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
+  handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
 
 #if AMPI_ERROR_CHECKING
   if (sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
@@ -8056,7 +8056,7 @@ int AMPI_Abort(MPI_Comm comm, int errorcode)
 }
 
 CDECL
-int AMPI_Get_count(MPI_Status *sts, MPI_Datatype dtype, int *count){
+int AMPI_Get_count(const MPI_Status *sts, MPI_Datatype dtype, int *count){
   AMPIAPI("AMPI_Get_count");
   CkDDT_DataType* dttype = getDDT()->getType(dtype);
   int itemsize = dttype->getSize() ;
@@ -8108,7 +8108,7 @@ int AMPI_Status_set_elements(MPI_Status *sts, MPI_Datatype dtype, int count){
 }
 
 CDECL
-int AMPI_Get_elements(MPI_Status *sts, MPI_Datatype dtype, int *count){
+int AMPI_Get_elements(const MPI_Status *sts, MPI_Datatype dtype, int *count){
   AMPIAPI("AMPI_Get_elements");
   CkDDT_DataType* dttype = getDDT()->getType(dtype) ;
   *count = dttype->getNumElements();
@@ -8116,7 +8116,7 @@ int AMPI_Get_elements(MPI_Status *sts, MPI_Datatype dtype, int *count){
 }
 
 CDECL
-int AMPI_Pack(void *inbuf, int incount, MPI_Datatype dtype, void *outbuf,
+int AMPI_Pack(const void *inbuf, int incount, MPI_Datatype dtype, void *outbuf,
               int outsize, int *position, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Pack");
@@ -8128,7 +8128,7 @@ int AMPI_Pack(void *inbuf, int incount, MPI_Datatype dtype, void *outbuf,
 }
 
 CDECL
-int AMPI_Unpack(void *inbuf, int insize, int *position, void *outbuf,
+int AMPI_Unpack(const void *inbuf, int insize, int *position, void *outbuf,
                 int outcount, MPI_Datatype dtype, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Unpack");
@@ -8296,7 +8296,7 @@ int AMPI_Error_string(int errorcode, char *errorstring, int *resultlen)
     case MPI_ERR_ARG:
       r="MPI_ERR_ARG: invalid argument of some other kind"; break;
     case MPI_ERR_TRUNCATE:
-      r="MPI_ERR_TRUNCATE: message truncated in recieve"; break;
+      r="MPI_ERR_TRUNCATE: message truncated in receive"; break;
     case MPI_ERR_OTHER:
       r="MPI_ERR_OTHER: known error not in this list"; break;
     case MPI_ERR_INTERN:
@@ -8449,7 +8449,7 @@ int AMPI_Group_rank(MPI_Group group, int *rank)
 }
 
 CDECL
-int AMPI_Group_translate_ranks (MPI_Group group1, int n, int *ranks1, MPI_Group group2, int *ranks2)
+int AMPI_Group_translate_ranks (MPI_Group group1, int n, const int *ranks1, MPI_Group group2, int *ranks2)
 {
   AMPIAPI("AMPI_Group_translate_ranks");
   ampiParent *ptr = getAmpiParent();
@@ -8473,7 +8473,7 @@ int AMPI_Group_compare(MPI_Group group1,MPI_Group group2, int *result)
 }
 
 CDECL
-int AMPI_Group_incl(MPI_Group group, int n, int *ranks, MPI_Group *newgroup)
+int AMPI_Group_incl(MPI_Group group, int n, const int *ranks, MPI_Group *newgroup)
 {
   AMPIAPI("AMPI_Group_incl");
   groupStruct vec, newvec;
@@ -8485,7 +8485,7 @@ int AMPI_Group_incl(MPI_Group group, int n, int *ranks, MPI_Group *newgroup)
 }
 
 CDECL
-int AMPI_Group_excl(MPI_Group group, int n, int *ranks, MPI_Group *newgroup)
+int AMPI_Group_excl(MPI_Group group, int n, const int *ranks, MPI_Group *newgroup)
 {
   AMPIAPI("AMPI_Group_excl");
   groupStruct vec, newvec;
@@ -8678,19 +8678,19 @@ int AMPI_Attr_delete(MPI_Comm comm, int keyval){
 }
 
 CDECL
-int AMPI_Cart_map(MPI_Comm comm, int ndims, int *dims, int *periods, int *newrank) {
+int AMPI_Cart_map(MPI_Comm comm, int ndims, const int *dims, const int *periods, int *newrank) {
   AMPIAPI("AMPI_Cart_map");
   return AMPI_Comm_rank(comm, newrank);
 }
 
 CDECL
-int AMPI_Graph_map(MPI_Comm comm, int nnodes, int *index, int *edges, int *newrank) {
+int AMPI_Graph_map(MPI_Comm comm, int nnodes, const int *index, const int *edges, int *newrank) {
   AMPIAPI("AMPI_Graph_map");
   return AMPI_Comm_rank(comm, newrank);
 }
 
 CDECL
-int AMPI_Cart_create(MPI_Comm comm_old, int ndims, int *dims, int *periods,
+int AMPI_Cart_create(MPI_Comm comm_old, int ndims, const int *dims, const int *periods,
                      int reorder, MPI_Comm *comm_cart) {
 
   AMPIAPI("AMPI_Cart_create");
@@ -8731,7 +8731,7 @@ int AMPI_Cart_create(MPI_Comm comm_old, int ndims, int *dims, int *periods,
 }
 
 CDECL
-int AMPI_Graph_create(MPI_Comm comm_old, int nnodes, int *index, int *edges,
+int AMPI_Graph_create(MPI_Comm comm_old, int nnodes, const int *index, const int *edges,
                       int reorder, MPI_Comm *comm_graph) {
   AMPIAPI("AMPI_Graph_create");
 
@@ -8829,7 +8829,7 @@ int AMPI_Cart_get(MPI_Comm comm, int maxdims, int *dims, int *periods, int *coor
 }
 
 CDECL
-int AMPI_Cart_rank(MPI_Comm comm, int *coords, int *rank) {
+int AMPI_Cart_rank(MPI_Comm comm, const int *coords, int *rank) {
   AMPIAPI("AMPI_Cart_rank");
 
 #if AMPI_ERROR_CHECKING
@@ -8842,20 +8842,23 @@ int AMPI_Cart_rank(MPI_Comm comm, int *coords, int *rank) {
   const vector<int> &dims = c.getdims();
   const vector<int> &periods = c.getperiods();
 
+  //create a copy of coords since we are not allowed to modify it
+  vector<int> ncoords(coords, coords+ndims);
+
   int prod = 1;
   int r = 0;
 
   for (int i = ndims - 1; i >= 0; i--) {
-    if ((coords[i] < 0) || (coords[i] >= dims[i])) {
+    if ((ncoords[i] < 0) || (ncoords[i] >= dims[i])) {
       if (periods[i] != 0) {
-        if (coords[i] > 0) {
-          coords[i] %= dims[i];
+        if (ncoords[i] > 0) {
+          ncoords[i] %= dims[i];
         } else {
-          while (coords[i] < 0) coords[i]+=dims[i];
+          while (ncoords[i] < 0) ncoords[i]+=dims[i];
         }
       }
     }
-    r += prod * coords[i];
+    r += prod * ncoords[i];
     prod *= dims[i];
   }
 
@@ -9145,7 +9148,7 @@ int AMPI_Dims_create(int nnodes, int ndims, int *dims) {
    of the subgraphs.
  */
 CDECL
-int AMPI_Cart_sub(MPI_Comm comm, int *remain_dims, MPI_Comm *newcomm) {
+int AMPI_Cart_sub(MPI_Comm comm, const int *remain_dims, MPI_Comm *newcomm) {
   AMPIAPI("AMPI_Cart_sub");
 
   int i, ndims;

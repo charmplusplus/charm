@@ -262,7 +262,7 @@ CkDDT::newHVector(int count, int blocklength, int stride,
 }
 
 void
-CkDDT::newIndexed(int count, int* arrbLength, CkDDT_Aint* arrDisp,
+CkDDT::newIndexed(int count, const int* arrbLength, CkDDT_Aint* arrDisp,
                   CkDDT_Type oldtype, CkDDT_Type* newType)
 {
   int index = *newType =  getNextFreeIndex() ;
@@ -273,7 +273,7 @@ CkDDT::newIndexed(int count, int* arrbLength, CkDDT_Aint* arrDisp,
 }
 
 void
-CkDDT::newHIndexed(int count, int* arrbLength, CkDDT_Aint* arrDisp,
+CkDDT::newHIndexed(int count, const int* arrbLength, const CkDDT_Aint* arrDisp,
                    CkDDT_Type oldtype, CkDDT_Type* newType)
 {
   int index = *newType =  getNextFreeIndex() ;
@@ -284,7 +284,7 @@ CkDDT::newHIndexed(int count, int* arrbLength, CkDDT_Aint* arrDisp,
 }
 
 void
-CkDDT::newIndexedBlock(int count, int Blocklength, CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
+CkDDT::newIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
                   CkDDT_Type *newtype)
 {
   int index = *newtype = getNextFreeIndex();
@@ -294,7 +294,7 @@ CkDDT::newIndexedBlock(int count, int Blocklength, CkDDT_Aint *arrDisp, CkDDT_Ty
 }
 
 void
-CkDDT::newHIndexedBlock(int count, int Blocklength, CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
+CkDDT::newHIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
                   CkDDT_Type *newtype)
 {
   int index = *newtype = getNextFreeIndex();
@@ -304,8 +304,8 @@ CkDDT::newHIndexedBlock(int count, int Blocklength, CkDDT_Aint *arrDisp, CkDDT_T
 }
 
 void
-CkDDT::newStruct(int count, int* arrbLength, CkDDT_Aint* arrDisp,
-                 CkDDT_Type *oldtype, CkDDT_Type* newType)
+CkDDT::newStruct(int count, const int* arrbLength, const CkDDT_Aint* arrDisp,
+                 const CkDDT_Type *oldtype, CkDDT_Type* newType)
 {
   int index = *newType =  getNextFreeIndex() ;
   CkDDT_DataType **olddatatypes = new CkDDT_DataType*[count];
@@ -986,7 +986,7 @@ CkDDT_HVector::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int 
   return 0;
 }
 
-CkDDT_Indexed::CkDDT_Indexed(int nCount, int* arrBlock, CkDDT_Aint* arrDisp, int bindex,
+CkDDT_Indexed::CkDDT_Indexed(int nCount, const int* arrBlock, const CkDDT_Aint* arrDisp, int bindex,
                          CkDDT_DataType* base)
     : CkDDT_DataType(CkDDT_INDEXED, 0, 0, nCount, numeric_limits<CkDDT_Aint>::max(),
 		     numeric_limits<CkDDT_Aint>::min(), 0, base->getSize(), base->getExtent(),
@@ -1117,7 +1117,7 @@ CkDDT_Indexed::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int 
   return 0;
 }
 
-CkDDT_HIndexed::CkDDT_HIndexed(int nCount, int* arrBlock, CkDDT_Aint* arrDisp,  int bindex,
+CkDDT_HIndexed::CkDDT_HIndexed(int nCount, const int* arrBlock, const CkDDT_Aint* arrDisp,  int bindex,
                            CkDDT_DataType* base)
     : CkDDT_Indexed(nCount, arrBlock, arrDisp, bindex, base)
 {
@@ -1211,7 +1211,7 @@ CkDDT_HIndexed::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int
   return 0;
 }
 
-CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, CkDDT_Aint *ArrDisp, int index,
+CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, const CkDDT_Aint *ArrDisp, int index,
   CkDDT_DataType *type)     : CkDDT_DataType(CkDDT_INDEXED_BLOCK, 0, 0, count, numeric_limits<CkDDT_Aint>::max(),
          numeric_limits<CkDDT_Aint>::min(), 0, type->getSize(), type->getExtent(),
          type, count * type->getNumElements(), index, 0, 0),
@@ -1339,7 +1339,7 @@ CkDDT_Indexed_Block::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[]
   return 0;
 }
 
-CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, CkDDT_Aint *ArrDisp, int index,
+CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, const CkDDT_Aint *ArrDisp, int index,
   CkDDT_DataType *type)     : CkDDT_Indexed_Block(count, Blength,ArrDisp,index,type)
 {
   CkDDT_Aint positiveExtent = 0;
@@ -1464,8 +1464,8 @@ CkDDT_HIndexed_Block::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[
   return 0;
 }
 
-CkDDT_Struct::CkDDT_Struct(int nCount, int* arrBlock,
-                       CkDDT_Aint* arrDisp, int *bindex, CkDDT_DataType** arrBase)
+CkDDT_Struct::CkDDT_Struct(int nCount, const int* arrBlock,
+                       const CkDDT_Aint* arrDisp, const int *bindex, CkDDT_DataType** arrBase)
     : CkDDT_DataType(CkDDT_STRUCT, 0, 0, nCount, numeric_limits<CkDDT_Aint>::max(),
     numeric_limits<CkDDT_Aint>::min(), 0, 0, 0, NULL, 0, 0, 0, 0),
     arrayBlockLength(new int[nCount]), arrayDisplacements(new CkDDT_Aint[nCount]),

@@ -501,7 +501,7 @@ inline groupStruct diffOp(groupStruct vec1, groupStruct vec2){
   return newvec;
 }
 
-inline int* translateRanksOp(int n,groupStruct vec1,int* ranks1,groupStruct vec2, int *ret){
+inline int* translateRanksOp(int n,groupStruct vec1,const int* ranks1,groupStruct vec2, int *ret){
   for(int i=0;i<n;i++){
     ret[i] = getPosOp(vec1[ranks1[i]],vec2);
   }
@@ -519,7 +519,7 @@ inline int compareVecOp(groupStruct vec1,groupStruct vec2){
   return ret;
 }
 
-inline groupStruct inclOp(int n,int* ranks,groupStruct vec){
+inline groupStruct inclOp(int n,const int* ranks,groupStruct vec){
   groupStruct retvec;
   for(int i=0;i<n;i++){
     retvec.push_back(vec[ranks[i]]);
@@ -527,7 +527,7 @@ inline groupStruct inclOp(int n,int* ranks,groupStruct vec){
   return retvec;
 }
 
-inline groupStruct exclOp(int n,int* ranks,groupStruct vec){
+inline groupStruct exclOp(int n,const int* ranks,groupStruct vec){
   groupStruct retvec;
   int add=1;
   for(int j=0;j<vec.size();j++){
@@ -831,7 +831,7 @@ class GathervReq : public AmpiRequest {
  public:
   vector<int> recvCounts;
   vector<int> displs;
-  GathervReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_, int *rc, int *d,
+  GathervReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_, const int *rc, const int *d,
              AmpiReqSts sts_=AMPI_REQ_PENDING)
   {
     buf=buf_;  count=count_;  type=type_;  src=AMPI_COLL_SOURCE;  tag=MPI_REDN_TAG;
@@ -1559,10 +1559,10 @@ class ampiParent : public CBase_ampiParent {
     int size = myDDT->getType(type)->getSize(count);
     return AmpiOpHeader(ops[op].func, type, count, size);
   }
-  inline void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* invec, void* inoutvec) const {
+  inline void applyOp(MPI_Datatype datatype, MPI_Op op, int count, const void* invec, void* inoutvec) const {
     // inoutvec[i] = invec[i] op inoutvec[i]
     MPI_User_function *func = op2User_function(op);
-    (func)(invec, inoutvec, &count, &datatype);
+    (func)((void*)invec, inoutvec, &count, &datatype);
   }
 
  public:
@@ -1693,20 +1693,20 @@ class ampi : public CBase_ampi {
   }
   MPI_Request delesend(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
                        MPI_Comm destcomm, CProxy_ampi arrproxy, int ssend, AmpiSendType sendType);
-  inline void processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count);
-  inline void processRdmaMsg(void *sbuf, int slength, int ssendReq, int srank, void* rbuf,
+  inline void processAmpiMsg(AmpiMsg *msg, const void* buf, MPI_Datatype type, int count);
+  inline void processRdmaMsg(const void *sbuf, int slength, int ssendReq, int srank, void* rbuf,
                              int rcount, MPI_Datatype rtype, MPI_Comm comm);
-  inline void processRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count);
+  inline void processRednMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype type, int count);
   inline void processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count,
                                            MPI_User_function* func);
-  inline void processGatherMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int recvCount);
-  inline void processGathervMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type,
+  inline void processGatherMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype type, int recvCount);
+  inline void processGathervMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype type,
                                int* recvCounts, int* displs);
   inline AmpiMsg * getMessage(int t, int s, MPI_Comm comm, int *sts) const;
   int recv(int t,int s,void* buf,int count,MPI_Datatype type,MPI_Comm comm,MPI_Status *sts=NULL);
   void irecv(void *buf, int count, MPI_Datatype type, int src,
              int tag, MPI_Comm comm, MPI_Request *request);
-  void sendrecv(void *sbuf, int scount, MPI_Datatype stype, int dest, int stag,
+  void sendrecv(const void *sbuf, int scount, MPI_Datatype stype, int dest, int stag,
                 void *rbuf, int rcount, MPI_Datatype rtype, int src, int rtag,
                 MPI_Comm comm, MPI_Status *sts);
   void probe(int t,int s,MPI_Comm comm,MPI_Status *sts);
@@ -1769,7 +1769,7 @@ class ampi : public CBase_ampi {
   MPI_Win createWinInstance(void *base, MPI_Aint size, int disp_unit, MPI_Info info);
   int deleteWinInstance(MPI_Win win);
   int winGetGroup(WinStruct *win, MPI_Group *group) const;
-  int winPut(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+  int winPut(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
              MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct *win);
   int winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
              MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct *win);
@@ -1788,16 +1788,16 @@ class ampi : public CBase_ampi {
   int winUnlock(int rank, WinStruct *win);
   void winRemoteLock(int lock_type, int winIndex, int requestRank);
   void winRemoteUnlock(int winIndex, int requestRank);
-  int winAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+  int winAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
                     MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                     MPI_Op op, WinStruct *win);
   void winRemoteAccumulate(int orgtotalsize, char* orgaddr, int orgcnt, MPI_Datatype orgtype,
                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                            MPI_Op op, int winIndex);
-  int winGetAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, void *resaddr,
+  int winGetAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, void *resaddr,
                        int rescnt, MPI_Datatype restype, int rank, MPI_Aint targdisp,
                        int targcnt, MPI_Datatype targtype, MPI_Op op, WinStruct *win);
-  int winCompareAndSwap(void *orgaddr, void *compaddr, void *resaddr, MPI_Datatype type,
+  int winCompareAndSwap(const void *orgaddr, const void *compaddr, void *resaddr, MPI_Datatype type,
                         int rank, MPI_Aint targdisp, WinStruct *win);
   AmpiMsg* winRemoteCompareAndSwap(int size, char *sorgaddr, char *compaddr, MPI_Datatype type,
                                    MPI_Aint targdisp, int winIndex);
@@ -1807,15 +1807,15 @@ class ampi : public CBase_ampi {
   int getNewSemaId();
 
   AmpiMsg* Alltoall_RemoteIget(MPI_Aint disp, int targcnt, MPI_Datatype targtype, int tag);
-  int intercomm_scatter(int root, void *sendbuf, int sendcount, MPI_Datatype sendtype,
+  int intercomm_scatter(int root, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                         void *recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm intercomm);
-  int intercomm_iscatter(int root, void *sendbuf, int sendcount, MPI_Datatype sendtype,
+  int intercomm_iscatter(int root, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                          void *recvbuf, int recvcount, MPI_Datatype recvtype,
                          MPI_Comm intercomm, MPI_Request *request);
-  int intercomm_scatterv(int root, void* sendbuf, int* sendcounts, int* displs,
+  int intercomm_scatterv(int root, const void* sendbuf, const int* sendcounts, const int* displs,
                          MPI_Datatype sendtype, void* recvbuf, int recvcount,
                          MPI_Datatype recvtype, MPI_Comm intercomm);
-  int intercomm_iscatterv(int root, void* sendbuf, int* sendcounts, int* displs,
+  int intercomm_iscatterv(int root, const void* sendbuf, const int* sendcounts, const int* displs,
                           MPI_Datatype sendtype, void* recvbuf, int recvcount,
                           MPI_Datatype recvtype, MPI_Comm intercomm, MPI_Request* request);
 
