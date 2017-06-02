@@ -24,7 +24,8 @@
 #include <sstream>
 #endif
 
-class ST_RecursivePartition::PhyNode {
+template <typename Iterator>
+class ST_RecursivePartition<Iterator>::PhyNode {
 public:
   PhyNode(int id, int pe, TopoManager *tmgr) : id(id), pe(pe) {
     if (tmgr->haveTopologyInfo()) tmgr->rankToCoordinates(pe, coords);
@@ -56,7 +57,8 @@ public:
   std::vector<int> coords; /// coordinates of this phynode
 };
 
-class ST_RecursivePartition::PhyNodeCompare {
+template <typename Iterator>
+class ST_RecursivePartition<Iterator>::PhyNodeCompare {
 public:
   PhyNodeCompare(int dim): dim(dim) {}
   inline bool operator()(const ST_RecursivePartition::PhyNode *a,
@@ -70,7 +72,8 @@ private:
 
 // ----------------- ST_RecursivePartition -----------------
 
-ST_RecursivePartition::ST_RecursivePartition(bool nodeTree, bool preSorted) 
+template <typename Iterator>
+ST_RecursivePartition<Iterator>::ST_RecursivePartition(bool nodeTree, bool preSorted)
   : nodeTree(nodeTree), preSorted(preSorted)
 {
   tmgr = TopoManager::getTopoManager();
@@ -87,35 +90,36 @@ ST_RecursivePartition::ST_RecursivePartition(bool nodeTree, bool preSorted)
 #endif
 }
 
-int ST_RecursivePartition::buildSpanningTree(std::vector<int> &nodes,
-                                              int maxBranches,
-                                              std::vector<int> &children)
+template <typename Iterator>
+int ST_RecursivePartition<Iterator>::buildSpanningTree(Iterator start, Iterator end,
+                                                       unsigned int maxBranches)
 {
-  if (nodes.size() <= 1) CkAbort("Error: requested spanning tree but no nodes\n");
   children.clear();
+  const int numNodes = std::distance(start, end);
+  if (numNodes == 0) CkAbort("Error: requested spanning tree but no nodes\n");
+  else if (numNodes == 1) return 0;
 
 #if _DEBUG_SPANNING_TREE_
   CkPrintf("[%d] ST_RecursivePartition:: Root is %d, being requested %d children, Num nodes incl root is %d\n",
-           CkMyNode(), nodes[0], maxBranches, int(nodes.size()));
+           CkMyNode(), *start, maxBranches, numNodes);
 #endif
 
   // group nodes into phynodes
-  std::vector<ST_RecursivePartition::PhyNode> phynodes;
-  initPhyNodes(nodes, phynodes);
-  std::vector<ST_RecursivePartition::PhyNode*> pphynodes(phynodes.size());
+  std::vector<ST_RecursivePartition<Iterator>::PhyNode> phynodes;
+  initPhyNodes(start, end, phynodes);
+  std::vector<ST_RecursivePartition<Iterator>::PhyNode*> pphynodes(phynodes.size());
   for (int i=0; i < phynodes.size(); i++) pphynodes[i] = &phynodes[i];
 
   // build the spanning tree of physical nodes
-  build(pphynodes, nodes, children, maxBranches);
+  build(pphynodes, start, maxBranches);
 
 #if _DEBUG_SPANNING_TREE_
   // print this node and children
   for (int i=0; i < children.size()-1; i++) {
-    int start = children[i], end = children[i+1];
     std::ostringstream oss;
-    for (int j=start; j < end; j++) {
-      if (j == start) oss << "[" << CkMyNode() << "] subtree " << nodes[j] << ": ";
-      else oss << nodes[j] << " ";
+    for (Iterator j=children[i]; j != children[i+1]; j++) {
+      if (j == children[i]) oss << "[" << CkMyNode() << "] subtree " << *j << ": ";
+      else oss << *j << " ";
     }
     CkPrintf("%s\n", oss.str().c_str());
   }
@@ -123,21 +127,23 @@ int ST_RecursivePartition::buildSpanningTree(std::vector<int> &nodes,
   return (children.size() - 1);
 }
 
-void ST_RecursivePartition::initPhyNodes(std::vector<int> &nodes,
-                                         std::vector<ST_RecursivePartition::PhyNode> &phynodes) const
+template <typename Iterator>
+void ST_RecursivePartition<Iterator>::initPhyNodes(Iterator start, Iterator end,
+                                                   std::vector<PhyNode> &phynodes) const
 {
 #if _DEBUG_SPANNING_TREE_
   int rootPhyNodeId;
-  if (nodeTree) rootPhyNodeId = CmiPhysicalNodeID(CmiNodeFirst(nodes[0]));
-  else rootPhyNodeId = CmiPhysicalNodeID(nodes[0]);   // nodes contains pes
+  if (nodeTree) rootPhyNodeId = CmiPhysicalNodeID(CmiNodeFirst(*start));
+  else rootPhyNodeId = CmiPhysicalNodeID(*start);   // contains pes
   CkPrintf("[%d] Root phynode is %d\n", CkMyNode(), rootPhyNodeId);
 #endif
 
-  phynodes.reserve(std::min(CmiNumPhysicalNodes(), int(nodes.size())));
+  const int numNodes = std::distance(start, end);
+  phynodes.reserve(std::min(CmiNumPhysicalNodes(), numNodes));
   intMap phyNodeMap;
   int last = -1;
-  for (int i=0; i < nodes.size(); i++) {
-    int n = nodes[i];
+  for (Iterator i=start; i != end; i++) {
+    int n = *i;
     int pe = n;
     if (nodeTree) pe = CmiNodeFirst(n);
     int phyNodeId = CmiPhysicalNodeID(pe);
@@ -173,18 +179,18 @@ void ST_RecursivePartition::initPhyNodes(std::vector<int> &nodes,
 #endif
 }
 
-void ST_RecursivePartition::build(std::vector<PhyNode*> &phyNodes,
-                                  std::vector<int> &result,
-                                  std::vector<int> &children,
-                                  int maxBranches) const
+template <typename Iterator>
+void ST_RecursivePartition<Iterator>::build(std::vector<PhyNode*> &phyNodes,
+                                            Iterator start,
+                                            unsigned int maxBranches)
 {
-  ST_RecursivePartition::PhyNode *rootPhyNode = phyNodes[0];
+  ST_RecursivePartition<Iterator>::PhyNode *rootPhyNode = phyNodes[0];
   children.reserve(rootPhyNode->size() + maxBranches); // reserve for max number of children
 
-  int pos = 1;
+  Iterator pos = start+1;
   // make each node in same phynode as root a direct child
   for (int i=1; i < rootPhyNode->size(); i++) {
-    result[pos] = rootPhyNode->getNode(i);
+    *pos = rootPhyNode->getNode(i);
     children.push_back(pos++);
   }
 
@@ -213,7 +219,8 @@ void ST_RecursivePartition::build(std::vector<PhyNode*> &phyNodes,
     children.push_back(pos);
     for (int j=phyNodeChildren[i]; j < phyNodeChildren[i+1]; j++) {  // for each phynode in subtree
       for (int k=0; k < phyNodes[j]->size(); k++) {    // for each node in phynode
-        result[pos++] = phyNodes[j]->getNode(k);
+        *pos = phyNodes[j]->getNode(k);
+        pos++;
       }
     }
   }
@@ -224,8 +231,9 @@ void ST_RecursivePartition::build(std::vector<PhyNode*> &phyNodes,
  * phyNodes is list of phyNodes, grouped by subtrees (rootPhyNode in position 0)
  * phyNodeChildren contains the indices (in phyNodes) of first node of each subtree
  */
-void ST_RecursivePartition::chooseSubtreeRoots(std::vector<ST_RecursivePartition::PhyNode*> &phyNodes,
-                                               std::vector<int> &children) const
+template <typename Iterator>
+void ST_RecursivePartition<Iterator>::chooseSubtreeRoots(std::vector<PhyNode*> &phyNodes,
+                                                         std::vector<int> &children) const
 {
   for (int i=0; i < children.size() - 1; i++) { // for each subtree
     int start = children[i];  // subtree start
@@ -247,7 +255,8 @@ void ST_RecursivePartition::chooseSubtreeRoots(std::vector<ST_RecursivePartition
 }
 
 /// recursive partitioning of phynodes into numPartitions
-void ST_RecursivePartition::partition(std::vector<PhyNode*> &nodes,
+template <typename Iterator>
+void ST_RecursivePartition<Iterator>::partition(std::vector<PhyNode*> &nodes,
                                       int start, int end, int numPartitions,
                                       std::vector<int> &children) const
 {
@@ -275,7 +284,8 @@ void ST_RecursivePartition::partition(std::vector<PhyNode*> &nodes,
   }
 }
 
-void ST_RecursivePartition::bisect(std::vector<PhyNode*> &nodes,
+template <typename Iterator>
+void ST_RecursivePartition<Iterator>::bisect(std::vector<PhyNode*> &nodes,
                                    int start, int end, int numPartitions,
                                    std::vector<int> &children) const
 {
@@ -285,7 +295,7 @@ void ST_RecursivePartition::bisect(std::vector<PhyNode*> &nodes,
     // Find the dimension along which to bisect the bounding box
     int maxSpreadDim = maxSpreadDimension(nodes,start,end);
     // Bisect the vertex list at the median element
-    std::vector<PhyNode*>::iterator itr = nodes.begin();
+    typename std::vector<PhyNode*>::iterator itr = nodes.begin();
     std::nth_element(itr+start, itr+median, itr+end, ST_RecursivePartition::PhyNodeCompare(maxSpreadDim));
 #if _DEBUG_SPANNING_TREE_
     CkPrintf("Bisecting, maxSpreadDim=%d\n", maxSpreadDim);
@@ -297,7 +307,8 @@ void ST_RecursivePartition::bisect(std::vector<PhyNode*> &nodes,
   partition(nodes, median, end, numPartitions - numLeft, children);
 }
 
-void ST_RecursivePartition::trisect(std::vector<PhyNode*> &nodes,
+template <typename Iterator>
+void ST_RecursivePartition<Iterator>::trisect(std::vector<PhyNode*> &nodes,
                                    int start, int end, int numPartitions,
                                    std::vector<int> &children) const
 {
@@ -307,8 +318,7 @@ void ST_RecursivePartition::trisect(std::vector<PhyNode*> &nodes,
   int twoThird = oneThird + (numNodes / 3);
   if (tmgr->haveTopologyInfo()) {
     int maxSpreadDim = maxSpreadDimension(nodes,start,end);
-    /// Trisect the vertex list at the median element
-    std::vector<PhyNode*>::iterator itr = nodes.begin();
+    typename std::vector<PhyNode*>::iterator itr = nodes.begin();
     std::nth_element(itr+start,    itr+oneThird, itr+end, ST_RecursivePartition::PhyNodeCompare(maxSpreadDim));
     std::nth_element(itr+oneThird, itr+twoThird, itr+end, ST_RecursivePartition::PhyNodeCompare(maxSpreadDim));
 #if _DEBUG_SPANNING_TREE_
@@ -322,8 +332,9 @@ void ST_RecursivePartition::trisect(std::vector<PhyNode*> &nodes,
   partition(nodes, twoThird, end,      numLeft, children);
 }
 
-int ST_RecursivePartition::maxSpreadDimension(std::vector<PhyNode*> &nodes,
-                                              int start, int end) const
+template <typename Iterator>
+int ST_RecursivePartition<Iterator>::maxSpreadDimension(std::vector<PhyNode*> &nodes,
+                                                        int start, int end) const
 {
   const int nDims = tmgr->getNumDims();
   if (!tmgr->haveTopologyInfo() || (nDims <= 1)) return 0;
@@ -356,7 +367,8 @@ inline static int modulo(int k, int n) { return ((k %= n) < 0) ? k+n : k; }
  * includes minimum number of coordinates, which implies that adjacent nodes won't go through torus edges.
  * Works for any number of dimensions (N-d torus)
  */
-void ST_RecursivePartition::translateCoordinates(std::vector<ST_RecursivePartition::PhyNode> &nodes) const
+template <typename Iterator>
+void ST_RecursivePartition<Iterator>::translateCoordinates(std::vector<PhyNode> &nodes) const
 {
   const int nDims = tmgr->getNumDims();
   std::vector<std::bitset<DIM_SET_SIZE> > usedCoordinates(nDims);
@@ -468,3 +480,7 @@ void ST_RecursivePartition::translateCoordinates(std::vector<ST_RecursivePartiti
   }
 }
 #endif
+
+template class ST_RecursivePartition<int*>;
+template class ST_RecursivePartition<std::vector<int>::iterator>;
+
