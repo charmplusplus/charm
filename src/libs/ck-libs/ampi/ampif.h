@@ -112,12 +112,15 @@
        integer, parameter :: MPI_COMBINER_INDEXED_BLOCK  = 11
        integer, parameter :: MPI_COMBINED_HINDEXED_BLOCK = 12
 
+       integer, parameter :: MPI_TAG_UB_VALUE = 1073741824
+
        integer, parameter :: MPI_PROC_NULL      = -2
        integer, parameter :: MPI_ROOT           = -3
        integer, parameter :: MPI_ANY_SOURCE     = -1
-       integer, parameter :: MPI_ANY_TAG        = -1
+       integer, parameter :: MPI_ANY_TAG        = MPI_TAG_UB_VALUE+1
        integer, parameter :: MPI_REQUEST_NULL   = -1
        integer, parameter :: MPI_GROUP_NULL     = -1
+       integer, parameter :: MPI_GROUP_EMPTY    = 0
        integer, parameter :: MPI_COMM_NULL      = -1
        integer, parameter :: MPI_TYPE_NULL      = -1
        integer, parameter :: MPI_KEYVAL_INVALID = -1
@@ -157,8 +160,6 @@
        integer, parameter :: AMPI_NUM_WTHS         = -13
        integer, parameter :: AMPI_MY_PROCESS       = -14
        integer, parameter :: AMPI_NUM_PROCESSES    = -15
-
-       integer, parameter :: MPI_TAG_UB_VALUE = 1073741824
 
        integer, parameter :: MPI_STATUS_SIZE = 8
 
@@ -221,6 +222,12 @@
 
        integer, parameter :: MPI_WIN_UNIFIED  = 0
        integer, parameter :: MPI_WIN_SEPARATE = 1
+
+       integer, parameter :: MPI_MODE_NOCHECK   =  1
+       integer, parameter :: MPI_MODE_NOPRECEDE =  2
+       integer, parameter :: MPI_MODE_NOPUT     =  4
+       integer, parameter :: MPI_MODE_NOSTORE   =  8
+       integer, parameter :: MPI_MODE_NOSUCCEED = 16
 
        logical, parameter :: MPI_SUBARRAYS_SUPPORTED = .FALSE.
        logical, parameter :: MPI_ASYNC_PROTECTS_NONBLOCKING = .FALSE.

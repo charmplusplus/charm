@@ -215,8 +215,8 @@ typedef void (MPI_User_function)(void *invec, void *inoutvec,
 #define MPI_CART  2
 
 /* This is one less than the system-tags defined in ampiimpl.h.
- * This is so that the tags used by the system dont clash with user-tags.
- * MPI standard requires this to be at least 2^15.
+ * This is so that the tags used by the system don't clash with user-tags.
+ * The MPI 3.1 standard requires this to be at least 32767 (2^15 -1).
  */
 #define MPI_TAG_UB_VALUE  1073741824
 
