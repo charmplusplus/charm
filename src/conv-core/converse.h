@@ -693,7 +693,7 @@ extern void CmiNumberHandlerEx(int n, CmiHandlerEx h,void *userPtr);
 #define CmiSetInfo(m,v)     do {((((CmiMsgHeaderExt*)m)->info)=(v));} while(0)
 #define CmiSetRoot(m,v)     do {((((CmiMsgHeaderExt*)m)->root)=(v));} while(0)
 #define CmiSetRedID(m,v)    do {((((CmiMsgHeaderExt*)m)->redID)=(v));} while(0)
-#define CmiSetStrategy(m,v) do {((((CmiMsgHeaderExt*)m)->stratid)=(v);} while(0)
+#define CmiSetStrategy(m,v) do {((((CmiMsgHeaderExt*)m)->stratid)=(v));} while(0)
 
 #define CmiHandlerToInfo(n) (CpvAccess(CmiHandlerTable)[n])
 #define CmiHandlerToFunction(n) (CmiHandlerToInfo(n).hdlr)

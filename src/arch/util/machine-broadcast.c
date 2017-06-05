@@ -97,12 +97,29 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
     int i, oldRank;
     char *newmsg;
 
+#if CMK_ERROR_CHECKING
+    CmiUInt2 strategy = 0;
+    if (startNode == CmiMyNode()) { // I'm the root
+      if (_topoTree != NULL) strategy = 1;
+      CmiSetStrategy(msg, strategy);
+    } else {
+      strategy = CmiGetStrategy(msg);
+      if ((strategy == 0) && (_topoTree != NULL)) {
+        CmiAbort("ERROR: root not switched to topotree but intermediate node has topo info");
+      }
+      if ((strategy == 1) && (_topoTree == NULL)) {
+        CmiAbort("ERROR: root switched to topotree but intermediate node has no topo info yet");
+      }
+    }
+#endif
+
     oldRank = CMI_DEST_RANK(msg);
     /* doing this is to avoid the multiple assignment in the following for loop */
     CMI_DEST_RANK(msg) = rankToAssign;
     /* first send msgs to other nodes */
     CmiAssert(startNode >=0 &&  startNode<CmiNumNodes());
-    for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
+    if (_topoTree == NULL) {
+      for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
         int nd = CmiMyNode()-startNode;
         if (nd<0) nd+=CmiNumNodes();
         nd = BROADCAST_SPANNING_FACTOR*nd + i;
@@ -117,6 +134,26 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
         newmsg = CopyMsg(msg, size);
         CmiSendNetworkFunc(CmiNodeFirst(nd), size, newmsg, BCAST_SYNC);
 #endif
+      }
+    } else {
+      int parent, child_count;
+      int *children = NULL;
+      if (startNode == 0) {
+        child_count = _topoTree->child_count;
+        children    = _topoTree->children;
+      } else {
+        get_topo_tree_nbs(startNode, &parent, &child_count, &children);
+      }
+      for (i=0; i < child_count; i++) {
+        int nd = children[i];
+#if CMK_BROADCAST_USE_CMIREFERENCE
+        CmiReference(msg);
+        CmiSendNetworkFunc(CmiNodeFirst(nd), size, msg, BCAST_SYNC);
+#else
+        newmsg = CopyMsg(msg, size);
+        CmiSendNetworkFunc(CmiNodeFirst(nd), size, newmsg, BCAST_SYNC);
+#endif
+      }
     }
     CMI_DEST_RANK(msg) = oldRank;
 #endif
