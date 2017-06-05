@@ -181,7 +181,7 @@ CkReductionMgr::CkReductionMgr()
 #ifdef BINOMIAL_TREE
   init_BinomialTree();
 #else
-  init_BinaryTree();
+  init_TopoTree();
 #endif
   redNo=0;
   completedRedNo = -1;
@@ -1048,7 +1048,7 @@ void CkReductionMgr::pup(PUP::er &p)
 #ifdef BINOMIAL_TREE
     init_BinomialTree();
 #else
-    init_BinaryTree();
+    init_TopoTree();
 #endif
     is_inactive = false;
     checkIsActive();
@@ -1072,6 +1072,32 @@ void CkReductionMgr::init_BinaryTree(){
     for (int i = 0; i < numKids; i++) {
       kids.push_back(CkNodeFirst(firstKid+i));
       newKids.push_back(CkNodeFirst(firstKid+i));
+    }
+
+    // Add PEs on my node, which are also my children
+    numKids += CkNodeSize(CkMyNode())-1;
+    for (int i = 1; i < CkNodeSize(CkMyNode()); i++) {
+      kids.push_back(CkMyPe()+i);
+      newKids.push_back(CkMyPe()+i);
+    }
+  }
+}
+
+void CkReductionMgr::init_TopoTree() {
+  if (CkNodeSize(CkMyNode()) > 1 && CkNodeFirst(CkMyNode()) != CkMyPe()) {
+    parent = CkNodeFirst(CkMyNode());
+    numKids = 0;
+  } else {
+    if (_topoTree == NULL) CkAbort("CkReductionMgr:: topo tree has not been calculated\n");
+
+    CmiSpanningTreeInfo &t = *_topoTree;
+    if (t.parent != -1) parent = CkNodeFirst(t.parent);
+    else parent = -1;
+    numKids = t.child_count;
+    for (int i=0; i < numKids; i++) {
+      int child = CkNodeFirst(t.children[i]);
+      kids.push_back(child);
+      newKids.push_back(child);
     }
 
     // Add PEs on my node, which are also my children
@@ -1967,7 +1993,7 @@ CkNodeReductionMgr::CkNodeReductionMgr()//Constructor
 #ifdef BINOMIAL_TREE
   init_BinomialTree();
 #else
-  init_BinaryTree();
+  init_TopoTree();
 #endif
   storedCallback=NULL;
   redNo=0;
@@ -2378,6 +2404,17 @@ void CkNodeReductionMgr::init_BinaryTree(){
 	}
 }
 
+void CkNodeReductionMgr::init_TopoTree() {
+  if (_topoTree == NULL) CkAbort("CkNodeReductionMgr:: topo tree has not been calculated\n");
+  CmiSpanningTreeInfo &t = *_topoTree;
+  parent = t.parent;
+  numKids = t.child_count;
+  for (int i=0; i < numKids; i++) {
+    kids.push_back(t.children[i]);
+    newKids.push_back(t.children[i]);
+  }
+}
+
 void CkNodeReductionMgr::init_BinomialTree(){
 	int depth = (int )ceil((log((double )CkNumNodes())/log((double)2)));
 	/*upperSize = (unsigned )pow((double)2,depth);*/
@@ -2597,7 +2634,7 @@ void CkNodeReductionMgr::pup(PUP::er &p)
 #ifdef BINOMIAL_TREE
     init_BinomialTree();
 #else
-    init_BinaryTree();
+    init_TopoTree();
 #endif		
   }
   p | blocked;

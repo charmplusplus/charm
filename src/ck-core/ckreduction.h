@@ -457,7 +457,7 @@ private:
 //	int *kids;
 	void init_BinomialTree();
 
-	
+	void init_TopoTree();
 	void init_BinaryTree();
 	enum {TREE_WID=2};
 	int treeRoot(void);//Root PE
@@ -681,6 +681,7 @@ private:
 	CkVec<int> kids;
 	void init_BinomialTree();
 
+	void init_TopoTree();
 	void init_BinaryTree();
 	enum {TREE_WID=2};
 	int treeRoot(void);//Root PE
