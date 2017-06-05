@@ -757,7 +757,7 @@ void CmiInitCPUAffinity(char **argv)
     CmiNodeAllBarrier();
     if (commap != NULL) {
       int mycore = search_pemap(commap, CmiMyPeGlobal()-CmiNumPesGlobal());
-      if(CmiMyPe()-CmiNumPes()==0) printf("Charm++> set comm %d on node %d to core #%d\n", CmiMyPe()-CmiNumPes(), CmiMyNode(), mycore); 
+      if(CmiMyPe()-CmiNumPes()==0) CmiPrintf("Charm++> set comm %d on node %d to core #%d\n", CmiMyPe()-CmiNumPes(), CmiMyNode(), mycore); 
       if (-1 == CmiSetCPUAffinity(mycore))
         CmiAbort("set_cpu_affinity abort!");
       CmiNodeAllBarrier();
@@ -879,7 +879,7 @@ void CmiInitCPUAffinity(char **argv)
 
   sched_yield();
   if(CmiMyPe() == 0)
-    printf("Setting default affinity\n");
+    CmiPrintf("Setting default affinity\n");
   return;
 #else
     /* get my ip address */
