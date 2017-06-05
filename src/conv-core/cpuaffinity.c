@@ -647,7 +647,7 @@ void CmiCheckAffinity()
         "interference.\n");
       }
     }
-  } else if ((CmiPhysicalNodeID(CmiMyPe()) == 0) && (CmiMyPe() < CmiNumPes())) {
+  } else if ((CmiMyPe() < CmiNumPes()) && (CmiPhysicalNodeID(CmiMyPe()) == 0)) {
     // send my affinity to first PE on physical node (only done on phy node 0 for now)
     affMsg *m = (affMsg*)CmiAlloc(sizeof(affMsg));
     CmiSetHandler((char *)m, cpuPhyNodeAffinityRecvHandlerIdx);
