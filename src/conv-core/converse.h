@@ -147,6 +147,12 @@ typedef struct {
   char *partsizes;
 } PartitionInfo;
 
+typedef struct {
+  int parent;
+  int child_count;
+  int *children;
+} CmiSpanningTreeInfo;
+
 void CmiCreatePartitions(char **argv);
 #if defined(__cplusplus)
 extern "C" {

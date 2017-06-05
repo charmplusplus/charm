@@ -1,9 +1,19 @@
-#ifndef __SPANNING_TREE_H_
-#define __SPANNING_TREE_H_
-
 /**
  * Author: jjgalvez@illinois.edu (Juan Galvez)
  */
+#ifndef __SPANNING_TREE_H_
+#define __SPANNING_TREE_H_
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
+/// C API to ST_RecursivePartition_getTreeInfo
+void get_topo_tree_nbs(int root, int *parent, int *child_count, int **children);
+
+#if defined(__cplusplus)
+}
+
 #include "charm++.h"
 #include <vector>
 
@@ -46,6 +56,13 @@ public:
 // ------------- ST_RecursivePartition -------------
 
 class TopoManager;
+
+/**
+ * obtain TreeInfo (parent and children) of CkMyNode() for tree rooted at
+ * specified node using ST_RecursivePartition. Tree is assumed to cover all nodes.
+ * This function allocates and caches the TreeInfo structure.
+ */
+CmiSpanningTreeInfo *ST_RecursivePartition_getTreeInfo(int root);
 
 /**
  * This strategy is phynode aware, and can form a tree of pes or logical nodes.
@@ -133,4 +150,5 @@ private:
   TopoManager *tmgr;
 };
 
+#endif
 #endif
