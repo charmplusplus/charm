@@ -603,6 +603,7 @@ CDECL
 int AMPI_Put(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
              MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win){
   AMPIAPI("AMPI_Put");
+  if (targtype > MPI_MAX_PRIMITIVE_TYPE) {CkAbort("AMPI does not currently support RMA with derived datatypes.");}
   handle_MPI_BOTTOM((void*&)orgaddr, orgtype);
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
@@ -618,6 +619,7 @@ CDECL
 int AMPI_Get(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
              MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win){
   AMPIAPI("AMPI_Get");
+  if (targtype > MPI_MAX_PRIMITIVE_TYPE) {CkAbort("AMPI does not currently support RMA with derived datatypes.");}
   handle_MPI_BOTTOM(orgaddr, orgtype);
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
@@ -640,6 +642,7 @@ int AMPI_Accumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int r
                     MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                     MPI_Op op, MPI_Win win) {
   AMPIAPI("AMPI_Accumulate");
+  if (targtype > MPI_MAX_PRIMITIVE_TYPE) {CkAbort("AMPI does not currently support RMA with derived datatypes.");}
   handle_MPI_BOTTOM((void*&)orgaddr, orgtype);
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
@@ -660,6 +663,7 @@ int AMPI_Get_accumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype,
                         int rank, MPI_Aint targdisp, int targcnt,
                         MPI_Datatype targtype, MPI_Op op, MPI_Win win) {
   AMPIAPI("AMPI_Get_accumulate");
+  if (targtype > MPI_MAX_PRIMITIVE_TYPE) {CkAbort("AMPI does not currently support RMA with derived datatypes.");}
   handle_MPI_BOTTOM((void*&)orgaddr, orgtype);
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
@@ -680,6 +684,7 @@ int AMPI_Rput(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
               MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win,
               MPI_Request *request){
   AMPIAPI("AMPI_Rput");
+  if (targtype > MPI_MAX_PRIMITIVE_TYPE) {CkAbort("AMPI does not currently support RMA with derived datatypes.");}
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
   *request = ptr->postReq(new SendReq(winStruct->comm, AMPI_REQ_COMPLETED));
@@ -698,6 +703,7 @@ int AMPI_Rget(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
               MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win,
               MPI_Request *request){
   AMPIAPI("AMPI_Rget");
+  if (targtype > MPI_MAX_PRIMITIVE_TYPE) {CkAbort("AMPI does not currently support RMA with derived datatypes.");}
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
   *request = ptr->postReq(new SendReq(winStruct->comm, AMPI_REQ_COMPLETED));
@@ -717,6 +723,7 @@ int AMPI_Raccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int 
                      MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                      MPI_Op op, MPI_Win win, MPI_Request *request) {
   AMPIAPI("AMPI_Raccumulate");
+  if (targtype > MPI_MAX_PRIMITIVE_TYPE) {CkAbort("AMPI does not currently support RMA with derived datatypes.");}
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
   *request = ptr->postReq(new SendReq(winStruct->comm, AMPI_REQ_COMPLETED));
@@ -739,6 +746,7 @@ int AMPI_Rget_accumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype,
                          MPI_Datatype targtype, MPI_Op op, MPI_Win win,
                          MPI_Request *request) {
   AMPIAPI("AMPI_Rget_accumulate");
+  if (targtype > MPI_MAX_PRIMITIVE_TYPE) {CkAbort("AMPI does not currently support RMA with derived datatypes.");}
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
   *request = ptr->postReq(new SendReq(winStruct->comm, AMPI_REQ_COMPLETED));
@@ -755,6 +763,12 @@ CDECL
 int AMPI_Fetch_and_op(const void *orgaddr, void *resaddr, MPI_Datatype type,
                       int rank, MPI_Aint targdisp, MPI_Op op, MPI_Win win) {
   AMPIAPI("AMPI_Fetch_and_op");
+  #if AMPI_ERROR_CHECKING
+    if (type > MPI_MAX_PRIMITIVE_TYPE)
+    {
+      return ampiErrhandler("AMPI_Fetch_and_op", MPI_ERR_UNSUPPORTED_OPERATION);
+    }
+  #endif
   handle_MPI_BOTTOM((void*&)orgaddr, type);
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
@@ -772,6 +786,12 @@ CDECL
 int AMPI_Compare_and_swap(const void *orgaddr, const void *compaddr, void *resaddr, MPI_Datatype type,
                           int rank, MPI_Aint targdisp, MPI_Win win) {
   AMPIAPI("AMPI_Compare_and_swap");
+  #if AMPI_ERROR_CHECKING
+    if (type > MPI_MAX_PRIMITIVE_TYPE)
+    {
+      return ampiErrhandler("AMPI_Compare_and_swap", MPI_ERR_UNSUPPORTED_OPERATION);
+    }
+  #endif
   handle_MPI_BOTTOM((void*&)orgaddr, type);
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
