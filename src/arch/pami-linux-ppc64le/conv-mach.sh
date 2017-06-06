@@ -31,14 +31,14 @@ CMK_NATIVE_CXX="$CXX -q64"
 CMK_NATIVE_LDXX="$CXX -q64"
 
 # fortran compiler
-CMK_CF77="xlf_r -q64 -fPIC "
-CMK_CF90="xlf90_r -q64 -fPIC -qsuffix=f=f90"
-CMK_CF90_FIXED="xlf90_r -q64 -fPIC"
+CMK_CF77='xlf_r -q64 -fPIC '
+CMK_CF90='xlf90_r -q64 -fPIC -qsuffix=f=f90'
+CMK_CF90_FIXED='xlf90_r -q64 -fPIC'
 
 CMK_MOD_NAME_ALLCAPS=1
-CMK_MOD_EXT="mod"
-CMK_F90_MODINC="-p"
-CMK_F90_USE_MODDIR=""
+CMK_MOD_EXT='mod'
+CMK_F90_MODINC='-p'
+CMK_F90_USE_MODDIR=''
 
 F90DIR=`which ifort 2> /dev/null`
 if test -h "$F90DIR"
