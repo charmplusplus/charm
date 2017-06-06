@@ -2,9 +2,9 @@
 
 CMK_PIC="-fPIC"
 CMK_CPP_CHARM="cpp -P"
-CMK_CPP_C="gcc -E "
-CMK_CC="gcc "
-CMK_CXX="g++ "
+CMK_CPP_C="gcc -E"
+CMK_CC="gcc"
+CMK_CXX="g++"
 CMK_CXXPP="$CMK_CXX -x c++ -E "
 CMK_XIOPTS=""
 CMK_LD="$CMK_CC "
