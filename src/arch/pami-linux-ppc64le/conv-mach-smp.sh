@@ -1,1 +1,1 @@
-CMK_SMP="1"
+CMK_SMP='1'
