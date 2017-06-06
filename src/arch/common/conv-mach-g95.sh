@@ -1,12 +1,5 @@
-# g95.org
-
 CMK_CC="$CMK_CC -DCMK_G95"
 CMK_CXX="$CMK_CXX -DCMK_G95"
-
-if test -n "$CMK_MACOSX64" 
-then
-CMK_F90FLAGS="$CMK_F90FLAGS -m64"
-fi
 
 if test -n "$CMK_MACOSX"
 then
