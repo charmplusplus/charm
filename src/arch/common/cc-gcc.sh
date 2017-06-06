@@ -7,8 +7,7 @@ CMK_LDXX="g++ "
 
 if [ $CMK_MACOSX -eq 1 ]; then
   # find real gcc (not Apple's clang) in $PATH on darwin, works with homebrew/macports
-  FINDPATH=$(echo $PATH | sed s,:,\ ,g)
-  candidates=$(find $FINDPATH -type f -name gcc -o -name gcc-? -o -name gcc-mp-? 2>/dev/null)
+  candidates=$(which gcc gcc-{4..19} gcc-mp-{4..19} 2>/dev/null)
   for cand in $candidates; do
     $cand -v 2>&1 | grep -q clang
     if [ $? -eq 1 ]; then
