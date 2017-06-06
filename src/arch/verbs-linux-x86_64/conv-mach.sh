@@ -12,7 +12,7 @@ CMK_LD="$CMK_CC $CMK_AMD64 "
 CMK_LDXX="$CMK_CXX $CMK_AMD64 "
 CMK_LD_SHARED="-shared"
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
-CMK_LIBS="-lckqt"
+CMK_LIBS="-lckqt -libverbs"
 CMK_RANLIB="ranlib"
 CMK_WARNINGS_ARE_ERRORS="-Werror"
 CMK_CXX_OPTIMIZE="-O3"
@@ -68,6 +68,3 @@ then
     CMK_LIBDIR="-L/usr/local/ofed/lib64"
 	fi
 fi
-
-CMK_LIBS="$CMK_LIBS -libverbs"
-
