@@ -1,6 +1,6 @@
 \section{\charmpp{} and \converse{} Internals}
 
-\subsubsection{How is the Charm++ source code organized and built?}
+\subsection{How is the Charm++ source code organized and built?}
 
 All the Charm++ core source code is soft-linked into the
 {\tt charm/<archname>/tmp}
@@ -8,13 +8,13 @@ directory when you run the build script. The libraries and frameworks are
 under {\tt charm/<archname>/tmp/libs}, in either {\tt ck-libs} or
 {\tt conv-libs}.
 
-\subsubsection{I just changed the Charm++ core. How do I recompile Charm++?}
+\subsection{I just changed the Charm++ core. How do I recompile Charm++?}
 
 cd into the {\tt charm/<archname>/tmp} directory and make. If you want to
 compile only a subset of the entire set of libraries, you can specify it to
 make. For example, to compile only the Charm++ RTS, type {\em make charm++}.
 
-\subsubsection{Do we have a {\em \#define charm\_version} somewhere? If not,
+\subsection{Do we have a {\em \#define charm\_version} somewhere? If not,
 which version number should I use for the current version?}
 
 Yes, there is a Charm++ version number defined in the macro {\tt CHARM\_VERSION}.

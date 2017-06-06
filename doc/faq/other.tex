@@ -1,6 +1,6 @@
 \section{Other PPL Tools, Libraries and Applications}
 
-\subsubsection{What is Structured Dagger?}
+\subsection{What is Structured Dagger?}
 
 {\em Structured Dagger} is a structured notation for specifying intra-process
 control dependencies in message-driven programs. It combines the efficiency
@@ -10,7 +10,7 @@ and computations and also among computations within the same object using
 {\tt when-blocks}
 and various structured constructs. See the Charm++ manual for the details.
 
-\subsubsection{What are the performance problems with AMPI packing and unpacking?}
+\subsection{What are the performance problems with AMPI packing and unpacking?}
 
 There is an extra copy involved, because the AMPI message is reusable
 immediately after the AMPI call returns. Since Charm++ messages are to
@@ -27,7 +27,7 @@ of a Charm++ message) while sending.
 %with collective operations can be done this way, so I have changed AMPI
 %to be a standalone Charm++ library, rather than being dependent on Tempo.
 
-\subsubsection{Is {\tt TempoArray::ckTempoSendElem()} the only way for non-AMPI
+\subsection{Is {\tt TempoArray::ckTempoSendElem()} the only way for non-AMPI
 code to communicate with running AMPI code?}
 
 A static method {\tt sendraw} is added to the AMPI class, that allows
@@ -35,10 +35,10 @@ you to send a message to AMPI threads from outside AMPI. So, instead of
 using the {\tt TempoArray} method, you can use:
 {\tt ampi::sendraw(tag1,tag2,msg,len,arrayid,index);}
 
-\subsubsection{What is Charisma?}
+\subsection{What is Charisma?}
 
 Charisma++ is a prototype language for describing global view of control in a parallel program. It is designed to solve the problem of obscured control flow in the object-based model with Charm++.
 
-\subsubsection{Does Projections use wall time or CPU time?}
+\subsection{Does Projections use wall time or CPU time?}
 
 Wall time.

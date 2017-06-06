@@ -1,6 +1,6 @@
-\section{\charmpp{} Programming}
+\section{Basic \charmpp{} Programming}
 
-\subsubsection{What's the basic programming model for Charm++?}
+\subsection{What's the basic programming model for Charm++?}
 
 Parallel objects using "Asynchronous Remote Method Invocation":
 
@@ -14,13 +14,13 @@ caller continues immediately.
 methods.
 \end{description}
 
-\subsubsection{What is an ``entry method''?}
+\subsection{What is an ``entry method''?}
 
 Entry methods are all the methods of a chare where messages can be sent by other chares.
 They are declared in the .ci files, and they must be defined as public methods
 of the C++ object representing the chare.
 
-\subsubsection{When I invoke a remote method, do I block until that method returns?}
+\subsection{When I invoke a remote method, do I block until that method returns?}
 
 No! This is one of the biggest differences between Charm++ and most
 other ``remote procedure call'' systems like, Java RMI, or RPC.
@@ -29,7 +29,7 @@ semantics and implementation.
 Since the invoking method does not wait for the remote method to terminate, it
 normally cannot receive any return value. (see later for a way to return values)
 
-\subsubsection{Why does Charm++ use asynchronous methods?}
+\subsection{Why does Charm++ use asynchronous methods?}
 
 Asynchronous method invocation is more efficient because it can be
 implemented as a single message send. Unlike with synchronous methods,
@@ -44,14 +44,14 @@ b->bar();
 Now foo and bar can run at the same time; there's no reason bar has
 to wait for foo.
 
-\subsubsection{Can I make a method synchronous? Can I then return a value?}
+\subsection{Can I make a method synchronous? Can I then return a value?}
 
 Yes. If you want synchronous methods, so the caller will block, use the {\tt [sync]}
 keyword before the method in the .ci file. This requires the sender to be a threaded
 entry method, as it will be suspended until the callee finishes.
 Sync entry methods are allowed to return values to the caller.
 
-\subsubsection{What is a threaded entry method? How does one make an entry method threaded?}
+\subsection{What is a threaded entry method? How does one make an entry method threaded?}
 
 A threaded entry method is an entry method for a chare that executes
 in a separate user-level thread. It is useful when the entry method wants
@@ -71,7 +71,7 @@ module M \{
 \};
 \end{alltt}
 
-\subsubsection{If I don't want to use threads, how can an asynchronous method return a value?}
+\subsection{If I don't want to use threads, how can an asynchronous method return a value?}
 
 The usual way to get data back to
 your caller is via another invocation in the opposite direction:
@@ -91,7 +91,7 @@ The difficulty of accessing remote data encourages programmers to use local
 data, bundle outgoing requests, and develop higher-level abstractions,
 which leads to good performance and good code.
 
-\subsubsection{Isn't there a better way to send data back to whoever called me?}
+\subsection{Isn't there a better way to send data back to whoever called me?}
 
 The above example is very non-modular, because {\em b} has to know
 that {\em a} called it, and what method to call a back on. For
@@ -111,7 +111,7 @@ void A::hereIsTheData(myclass_t data) \{
 Now {\em b} can be called from several different places in {\em a},
 or from several different modules.
 
-\subsubsection{Why should I prefer the callback way to return data rather than using {\tt [sync]} entry methods?}
+\subsection{Why should I prefer the callback way to return data rather than using {\tt [sync]} entry methods?}
 
 There are a few reasons for that:
 
@@ -138,7 +138,7 @@ will use a reduction to collect back the results after they have been computed.
 
 \end{itemize}
 
-\subsubsection{How does the initialization in Charm work?}
+\subsection{How does the initialization in Charm work?}
 
 Each processor executes the following operations strictly in order:
 \begin{enumerate}
@@ -170,13 +170,13 @@ each element can be constructed at any time on its home processor, and not
 necessarily before other regular communication messages have been delivered to
 other chares (including other array elements part of the same array).
 
-\subsubsection{Does Charm++ support C and Fortran?}
+\subsection{Does Charm++ support C and Fortran?}
 
 C and Fortran routines can be called from Charm++ using the usual API conventions for accessing them from C++.  AMPI supports Fortran directly, but direct use 
 of Charm++ semantics from Fortran is at an immature stage, contact us \htmladdnormallink{charm AT cs.uiuc.edu}{mailto:charm AT cs.uiuc.edu} if you are interested in pursuing this further. 
 
 
-\subsubsection{What is a proxy?}
+\subsection{What is a proxy?}
 
 A proxy is a local C++ class that represents a remote C++ class. When
 you invoke a method on a proxy, it sends the request across the network
@@ -186,7 +186,7 @@ done using proxies.
 A proxy class for each of your classes is generated based on the methods
 you list in the .ci file.
 
-\subsubsection{What are the different ways one can create proxies?}
+\subsection{What are the different ways one can create proxies?}
 
 Proxies can be:
 \begin{itemize}
@@ -208,7 +208,7 @@ You'll get a runtime error ``proxy has not been initialized'' if you try
 to use an uninitialized proxy.
 \end{itemize}
 
-\subsubsection{What is wrong if I do {\tt A *ap = new CProxy\_A(handle)}?}
+\subsection{What is wrong if I do {\tt A *ap = new CProxy\_A(handle)}?}
 
 This will not compile, because a {\em CProxy\_A} is not an {\em A}.
 What you want is {\em CProxy\_A *ap = new CProxy\_A(handle)}.
@@ -236,7 +236,7 @@ What you want is {\em CProxy\_A *ap = new CProxy\_A(handle)}.
 %A's handle from the message, and invokes a method on A using that proxy.
 %<br>&nbsp;
 
-\subsubsection{Why is the {\em def.h} usually included at the end? Is it
+\subsection{Why is the {\em def.h} usually included at the end? Is it
 necessary or can I just include it at the beginning?}
 
 You can include the {\em def.h} file once you've actually declared
@@ -248,7 +248,7 @@ However, if the class declaration for a chare isn't visible when you
 include the {\em def.h} file, you'll get a confusing compiler error.
 This is why we recommend including the {\em def.h} file at the end.
 
-\subsubsection{How can I use a global variable across different processors?}
+\subsection{How can I use a global variable across different processors?}
 
 Make the global variable ``readonly'' by declaring it in the .ci file.
 Remember also that read-onlies can be safely set only in the mainchare
@@ -257,7 +257,7 @@ local to the processor that made the change. To change a global variable later
 in the program, every processor must modify it accordingly (e.g by using a chare
 group. Note that chare arrays are not guaranteed to cover all processors)
 
-\subsubsection{Can I have a class static read-only variable?}
+\subsection{Can I have a class static read-only variable?}
 
 One can have class-static variables as read-onlies. Inside a chare,
 group or array declaration in the {\em .ci} file, one can have a readonly
@@ -275,14 +275,14 @@ and you are done.
 
 You then refer to the variable in your program as {\em someChare::someGroup}.
 
-\subsubsection{How do I measure the time taken by a program or operation?}
+\subsection{How do I measure the time taken by a program or operation?}
 
 You can use {\tt CkWallTimer()} to determine the time on some particular
 processor. To time some parallel computation, you need to call CkWallTimer
 on some processor, do the parallel computation, then call CkWallTimer again
 on the same processor and subtract.
 
-\subsubsection{What do {\tt CmiAssert} and
+\subsection{What do {\tt CmiAssert} and
 {\tt CkAssert} do?}
 
 These are just like the standard C++ {\em assert} calls in {\em \textless assert.h\textgreater}--
@@ -292,7 +292,7 @@ We use our own version rather than the standard version because we have
 to call {\em CkAbort}, and because we can turn our asserts off when
 {\em CMK\_OPTIMIZE} is defined, as it is when {\em --with-production} is used on the build line.
 
-\subsubsection{Can I know how many messages are being sent to a chare?}
+\subsection{Can I know how many messages are being sent to a chare?}
 
 No.
 
@@ -305,7 +305,7 @@ receipts for the messages sent have arrived, then go to a barrier;
 \item Do all the sends, then wait for quiescence.
 \end{itemize}
 
-\subsubsection{What is "quiescence"? How does it work?}
+\subsection{What is "quiescence"? How does it work?}
 
 Quiescence is When nothing is happening anywhere on the parallel machine.
 
@@ -313,7 +313,7 @@ A low-level background task counts sent and received messages.
 When, across the machine, all the messages that have been sent have been
 received, and nothing is being processed, quiescence is triggered.
 
-\subsubsection{Should I use quiescence detection?}
+\subsection{Should I use quiescence detection?}
 
 Probably not.
 

@@ -1,10 +1,10 @@
 \section{Versions and Ports}
 
-\subsubsection{Is Charm++/Converse etc. available on CD or as an RPM?}
+\subsection{Is Charm++/Converse etc. available on CD or as an RPM?}
 
 No, and there are no plans.
 
-\subsubsection{Has charm been ported to use MPI underneath? What about OpenMP?}
+\subsection{Has charm been ported to use MPI underneath? What about OpenMP?}
 
 Charm++ supports MPI and can use it as the underlying communication
 library. We have tested on MPICH and LAM, and also most vendor MPI
@@ -12,12 +12,12 @@ variants.  Charm++ also has explicit support for SMP nodes in MPI
 version. Charm++ hasn't been ported to use OpenMP, but OpenMP can be
 used from Charm++.
 
-\subsubsection{How complicated is porting Charm++/Converse?}
+\subsection{How complicated is porting Charm++/Converse?}
 
 Depends. Hopefully, the porting only involves fixing compiler compatibility
 issues.  The LRTS abstraction layer was designed to simplify this process and has been used for the MPI, uGNI, and PAMI layers.  User level threads and Isomalloc support may require special platform specific support.  Otherwise Charm++ is generally platform independent.
 
-\subsubsection{If the source is available how feasible would it be for us to do ports
+\subsection{If the source is available how feasible would it be for us to do ports
 ourselves?}
 
 The source is always available, and you're welcome to make it run anywhere.
@@ -27,11 +27,11 @@ issues) and possibly
 a new {\em machine.c} (if there's a new communication system involved).
 However, porting to a Lisp machine, a vector architecture, or embedded hardware with a proprietary OS, may be fairly difficult.
 
-\subsubsection{To what platform has Charm++/Converse been ported to?}
+\subsection{To what platform has Charm++/Converse been ported to?}
 
 Charm++/Converse has been ported to most UNIX and Linux OS, Windows, and MacOS.
 
-\subsubsection{Is it hard to port Charm++ programs to different machines?}
+\subsection{Is it hard to port Charm++ programs to different machines?}
 
 \label{porting}
 Charm++ itself it fully portable, and should provide exactly 
@@ -64,7 +64,7 @@ are C++ templates, the STL, new-style C++ system headers,
 and the other features listed in the C++ question below.
 \end{itemize}
 
-\subsubsection{Which C language features cause porting problems?}
+\subsection{Which C language features cause porting problems?}
 
 Our suggestions for Charm++ developers are:
 
@@ -82,7 +82,7 @@ This will not compile under many compilers. %including the IBM SP C compiler.
 Use memset and memcpy for portable programs.
 \end{itemize}
 
-\subsubsection{Which C++ language features cause porting problems?}
+\subsection{Which C++ language features cause porting problems?}
 
 Our suggestions for Charm++ developers are:
 
@@ -165,7 +165,7 @@ Luckily, C++ support, especially STL support, is improving
 rapidly.  Hopefully soon several of the above features will
 become widely supported enough to use everywhere.
 
-\subsubsection{Why do I get a link error when mixing Fortran and C/C++?}
+\subsection{Why do I get a link error when mixing Fortran and C/C++?}
 
 \label{f2c}
 
@@ -211,7 +211,7 @@ should take different parameters.  A routine named ``Foo'' does
 not suffer from this problem, because the C version is ``Foo,
 while the Fortran version is ``foo\_'', ``foo'', or ``FOO''.
 
-\subsubsection{How does parameter passing work between Fortran and C?}
+\subsection{How does parameter passing work between Fortran and C?}
 
 Fortran and C have rather different parameter-passing 
 conventions, but it is possible to pass simple objects 

@@ -1,10 +1,10 @@
-\subsection{\charmpp{} Groups and Nodegroups}
+\section{\charmpp{} Groups and Nodegroups}
 
-\subsubsection{What are groups and nodegroups used for?}
+\subsection{What are groups and nodegroups used for?}
 
 They are used for optimizations at the processor and node level respectively.
 
-\subsubsection{Should I use groups?}
+\subsection{Should I use groups?}
 
 Probably not. People with an MPI background often overuse groups, which
 results in MPI-like Charm++ programs. Arrays should generally be used
@@ -16,7 +16,7 @@ contribute something to their local group, which can then send a combined
 message to another processor. This can be much more efficient than
 having each array element send a separate message.
 
-\subsubsection{Is it safe to use a local pointer to a group, such as from ckLocalBranch?}
+\subsection{Is it safe to use a local pointer to a group, such as from ckLocalBranch?}
 
 Yes. Groups never migrate, so a local pointer is safe. The only caveat
 is to make sure {\em you} don't migrate without updating the pointer.
@@ -32,7 +32,7 @@ a group.
 %<br>Yes. Groups may create other groups in their constructor.</ol>
 
 
-\subsubsection{What are migratable groups?}
+\subsection{What are migratable groups?}
 
 Migratable groups are declared so by adding the ``[migratable]'' attribute in
 the .ci file. They {\em cannot} migrate from one processor to another during
@@ -50,13 +50,13 @@ class MyGroup : public CBase\_MyGroup \{
 \}
 \end{alltt}
 
-\subsubsection{Should I use nodegroups?}
+\subsection{Should I use nodegroups?}
 
 Almost certainly not. You should use arrays for most computation, and
 even quite low-level communication optimizations are often best handled
 by groups. Nodegroups are very difficult to get right.
 
-\subsubsection{What's the difference between groups and nodegroups?}
+\subsection{What's the difference between groups and nodegroups?}
 
 There's one group element per processor (CkNumPes() elements); and
 one nodegroup element per node (CkNumNodes() elements). Because they
@@ -66,18 +66,18 @@ of Charm++.
 Note that on a non-SMP machine, groups and nodegroups are identical.
 
 
-\subsubsection{Do nodegroup entry methods execute on one fixed processor of the node,
+\subsection{Do nodegroup entry methods execute on one fixed processor of the node,
 or on the next available processor?}
 
 Entries in node groups execute on the next available processor. Thus,
 if two messages were sent to a branch of a nodegroup, two processors could
 execute one each simultaneously.
 
-\subsubsection{Are nodegroups single-threaded?}
+\subsection{Are nodegroups single-threaded?}
 
 No. They {\em can} be accessed by multiple threads at once.
 
-\subsubsection{Do we have to worry about two entry methods in an object executing simultaneously?}
+\subsection{Do we have to worry about two entry methods in an object executing simultaneously?}
 
 Yes, which makes nodegroups different from everything else in Charm++.
 

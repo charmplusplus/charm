@@ -1,16 +1,16 @@
 \section{Installation and Usage}
 
-\subsubsection{How do I get Charm++?}
+\subsection{How do I get Charm++?}
 
 See our \htmladdnormallink{download}{http://charm.cs.uiuc.edu/download/} page.
 
-\subsubsection{Should I use the GIT version of Charm++?}
+\subsection{Should I use the GIT version of Charm++?}
 
 The developers of Charm++ routinely use the latest GIT versions, and most of the
 time this is the best case. Occasionally something breaks, but the GIT version
 will likely contain bug fixes not found in the releases.
 
-\subsubsection{How do I compile Charm++?}
+\subsection{How do I compile Charm++?}
 
 Run the interactive build script {\tt ./build} with no extra arguments If this fails,
 email \htmladdnormallink{charm AT cs.uiuc.edu}{mailto:charm AT cs.uiuc.edu} with the
@@ -25,16 +25,16 @@ you develop a significantly different platform, send the modified files to
 \htmladdnormallink{charm AT cs.uiuc.edu}{mailto:charm AT cs.uiuc.edu} so we can include it
 in the distribution.
 
-\subsubsection{How do I compile AMPI?}
+\subsection{How do I compile AMPI?}
 
 Run the interactive build script {\tt ./build} and choose the option for building
 ``Charm++, AMPI, ParFUM, FEM and other libraries''.
 
-\subsubsection{Can I remove part of charm tree after compilation to free disk space?}
+\subsection{Can I remove part of charm tree after compilation to free disk space?}
 
 Yes.  Keep src, bin, lib, lib\_so, include, tmp.  You will not need tests, examples, doc, contrib for normal usage once you have verified that your build is functional.
 
-\subsubsection{If the interactive script fails, how do I compile Charm++?}
+\subsection{If the interactive script fails, how do I compile Charm++?}
 
 %<p>First, on a typical Linux machine, unpack the tarball, cd into "charm",
 %and type <tt>./build AMPI net-linux -g</tt>.
@@ -232,7 +232,7 @@ Yes.  Keep src, bin, lib, lib\_so, include, tmp.  You will not need tests, examp
 See Appendix V of the Charm manual for \htmladdnormallink{Installation and Usage}{http://charm.cs.illinois.edu/manuals/html/charm++/V.html}.
 
 
-\subsubsection{How do I specify the processors I want to use?}
+\subsection{How do I specify the processors I want to use?}
 
 On machines where MPI has already been wired into the job system, use the --mpiexec flag and -np arguments.
 
@@ -252,7 +252,7 @@ group main
 For the MPI version, you need to set up an MPI configuration for available
 machines as for normal MPI applications.
 
-\subsubsection{How do I use {\em ssh} instead of the deprecated {\em rsh}?}
+\subsection{How do I use {\em ssh} instead of the deprecated {\em rsh}?}
 
 You need to set up your {\tt .ssh/authorized\_keys} file
 correctly. Setup no-password logins using ssh by putting the correct host
@@ -268,7 +268,7 @@ group main ++shell ssh
   host foo3
 \end{alltt}
 
-\subsubsection{Can I use the serial library X from a Charm program?}
+\subsection{Can I use the serial library X from a Charm program?}
 
 Yes.  Some of the known working serial libraries include:
 \begin{itemize}
@@ -281,7 +281,7 @@ Yes.  Some of the known working serial libraries include:
 
 In general, any serial library should work fine with Charm++.
 
-\subsubsection{How do I get the command-line switches available for a specific
+\subsection{How do I get the command-line switches available for a specific
 program?}
 
 Try \begin{alltt}./charmrun ./pgm --help\end{alltt} to see a list of parameters
@@ -320,7 +320,7 @@ the arguments for the installed libraries are listed in the library manuals.
 %See speedshop(1) for more details.
 %<br>&nbsp;</ol>
 
-\subsubsection{What should I do if my program hangs while gathering
+\subsection{What should I do if my program hangs while gathering
   CPU topology information at startup?}
 
 This is an indication that your cluster's DNS server is not responding

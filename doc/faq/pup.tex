@@ -1,6 +1,6 @@
-\subsection{PUP Framework}
+\section{PUP Framework}
 
-\subsubsection{How does one write a pup for a dynamically allocated 2-dimensional array?}
+\subsection{How does one write a pup for a dynamically allocated 2-dimensional array?}
 
 The usual way: pup the size(s), allocate the array if unpacking, and
 then pup all the elements.
@@ -55,7 +55,7 @@ class foo \{
 \};
 \end{alltt}
 
-\subsubsection{When using automatic allocation via PUP::able, what do these calls mean?
+\subsection{When using automatic allocation via PUP::able, what do these calls mean?
 {\tt PUPable\_def(parent); PUPable\_def(child);}}
 
 For the automatic allocation described in {\em Automatic allocation via
@@ -77,7 +77,7 @@ typically use the {\em initproc} mechanism to call these.
 See {\tt charm/tests/charm++/megatest/marshall.[hC]} for an executable
 example.
 
-\subsubsection{What is the difference between {\tt p|data;} and
+\subsection{What is the difference between {\tt p|data;} and
 {\tt p(data);}? Which one should I use?}
 
 For most system- and user-defined structure {\em someHandle}, you want
