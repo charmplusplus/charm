@@ -1,7 +1,6 @@
 . $CHARMINC/cc-gcc.sh
 
 CMK_DEFS=' -D_REENTRANT '
-CMK_CPP_CHARM='cpp -P'
 CMK_CPP_C='gcc -E'
 CMK_CC="gcc -fPIC $CMK_DEFS "
 CMK_CXX="g++ -fPIC $CMK_DEFS "

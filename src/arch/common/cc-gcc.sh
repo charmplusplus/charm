@@ -3,6 +3,7 @@ CMK_CC="gcc -fPIC "
 CMK_LD="gcc "
 CMK_CXX="g++ -fPIC -Wno-deprecated "
 CMK_LDXX="g++ "
+CMK_CPP_CHARM='cpp -P'
 
 CMK_LD_SHARED='-shared'
 CMK_RANLIB='ranlib'

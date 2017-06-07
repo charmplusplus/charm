@@ -1,6 +1,5 @@
 . $CHARMINC/cc-gcc.sh
 
-CMK_CPP_CHARM='cpp'
 CMK_CPP_C='gcc -E'
 CMK_CC='gcc'
 CMK_CXX='g++ -Wno-deprecated'
