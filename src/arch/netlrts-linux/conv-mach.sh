@@ -4,7 +4,6 @@ CMK_CPP_CHARM='cpp -P'
 CMK_CPP_C='gcc -m32 -E'
 CMK_CC='gcc -m32'
 CMK_CXX='g++ -m32'
-CMK_LIBS='-lckqt'
 #CMK_LD="$CMK_CC -Wl,--allow-multiple-definition "
 #CMK_LDXX="$CMK_CXX -Wl,--allow-multiple-definition "
 CMK_LD="$CMK_CC "

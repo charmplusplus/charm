@@ -6,6 +6,7 @@ CMK_LDXX="g++ "
 
 CMK_LD_SHARED='-shared'
 CMK_RANLIB='ranlib'
+CMK_LIBS='-lckqt'
 
 if [ $CMK_MACOSX -eq 1 ]; then
   # find real gcc (not Apple's clang) in $PATH on darwin, works with homebrew/macports
