@@ -1,3 +1,5 @@
+. $CHARMINC/cc-gcc.sh
+
 isLinux=true
 
 CMK_CPP_CHARM='cpp -P'

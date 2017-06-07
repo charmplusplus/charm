@@ -1,3 +1,5 @@
+. $CHARMINC/cc-gcc.sh
+
 CMK_DEFS=' -D_REENTRANT '
 CMK_PIC='-fPIC'
 

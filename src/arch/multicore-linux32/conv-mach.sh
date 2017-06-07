@@ -1,3 +1,5 @@
+. $CHARMINC/cc-gcc.sh
+
 CMK_DEFS=' -D_REENTRANT -m32 '
 
 CMK_CPP_CHARM='cpp -P'
