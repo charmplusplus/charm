@@ -1,6 +1,5 @@
 . $CHARMINC/cc-gcc.sh
 
-CMK_CC='gcc'
 CMK_CXX='g++'
 CMK_CF77='f77'
 CMK_CF90='f90'
