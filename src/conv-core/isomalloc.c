@@ -2330,7 +2330,7 @@ void CmiIsomallocInit(char **argv)
     /* Warn user if ASLR is enabled and '+isomalloc_sync' is missing */
     if (CmiMyPe() == 0 && read_randomflag() == 1 && _sync_iso == 0 && _sync_iso_warned == 0) {
       _sync_iso_warned = 1;
-      printf("Warning> Randomization of virtual memory (ASLR) is turned "
+      CmiPrintf("Warning> Randomization of virtual memory (ASLR) is turned "
         "on in the kernel, thread migration may not work! Run 'echo 0 > "
         "/proc/sys/kernel/randomize_va_space' as root to disable it, "
         "or try running with '+isomalloc_sync'.\n");
