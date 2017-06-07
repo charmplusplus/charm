@@ -1,8 +1,8 @@
 . $CHARMINC/cc-gcc.sh
 
 CMK_DEFS=' -D_REENTRANT '
-CMK_CXX="g++ -fPIC $CMK_DEFS "
 CMK_CC="$CMK_CC -fPIC $CMK_DEFS "
+CMK_CXX="$CMK_CXX -fPIC $CMK_DEFS "
 CMK_LIBS="$CMK_LIBS -lpthread"
 #CMK_LD="$CMK_CC -Wl,--allow-multiple-definition "
 #CMK_LDXX="$CMK_CXX -Wl,--allow-multiple-definition "
