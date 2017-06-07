@@ -2,8 +2,8 @@
 
 isLinux=true
 
-CMK_CC="$CMK_CC -fPIC -m32"
-CMK_CXX="$CMK_CXX -fPIC -m32"
+CMK_CC="$CMK_CC -m32"
+CMK_CXX="$CMK_CXX -m32"
 #CMK_LD="$CMK_CC -Wl,--allow-multiple-definition "
 #CMK_LDXX="$CMK_CXX -Wl,--allow-multiple-definition "
 CMK_LD="$CMK_CC -m32"

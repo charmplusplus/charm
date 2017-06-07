@@ -7,10 +7,10 @@ CMK_WARNINGS_ARE_ERRORS='-Werror'
 CMK_CXX_OPTIMIZE='-O3'
 
 # native compiler for compiling charmxi, etc
-CMK_NATIVE_CC="$CMK_CC -fPIC $CMK_DEFS "
-CMK_NATIVE_CXX="$CMK_CXX -fPIC $CMK_DEFS "
-CMK_NATIVE_LD="$CMK_CC -fPIC "
-CMK_NATIVE_LDXX="$CMK_CXX -fPIC "
+CMK_NATIVE_CC="$CMK_CC $CMK_DEFS "
+CMK_NATIVE_CXX="$CMK_CXX $CMK_DEFS "
+CMK_NATIVE_LD="$CMK_CC "
+CMK_NATIVE_LDXX="$CMK_CXX "
 
 # native compiler for compiling charmxi, etc
 CMK_SEQ_CC="$CMK_NATIVE_CC"
