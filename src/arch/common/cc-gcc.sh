@@ -2,7 +2,6 @@ CMK_CPP_C="gcc -E "
 CMK_CC="gcc -fPIC "
 CMK_LD="gcc "
 CMK_CXX="g++ -fPIC -Wno-deprecated "
-CMK_CXXPP="g++ -E "
 CMK_LDXX="g++ "
 
 if [ $CMK_MACOSX -eq 1 ]; then
@@ -16,7 +15,6 @@ if [ $CMK_MACOSX -eq 1 ]; then
       CMK_CC="$cand -fPIC "
       CMK_LD="$cand "
       CMK_CXX="$cppcand -fPIC -Wno-deprecated "
-      CMK_CXXPP="$cppcand -E "
       CMK_LDXX="$cppcand "
       found=1
       break

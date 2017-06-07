@@ -1,6 +1,5 @@
 CMK_CPP_CHARM='cpp'
 CMK_CPP_C='gcc -E'
-CMK_CXXPP='g++ -x c++ -E'
 CMK_CC='gcc'
 CMK_CXX='g++'
 CMK_CF77='f77'

@@ -5,7 +5,6 @@ CMK_CPP_CHARM='cpp -P'
 CMK_CPP_C='mpicc -G0 -E '
 CMK_CC='mpicc -G0 -mips64 -march=5kf -mtune=5kf '
 CMK_CXX='mpicxx -G0 -mips64 -march=5kf -mtune=5kf '
-CMK_CXXPP='mpicxx -G0 -E '
 CMK_RANLIB='ranlib'
 CMK_LIBS='-lckqt -lscdma -lpmi '
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"

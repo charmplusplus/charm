@@ -1,7 +1,6 @@
 CMK_CPP_C='icc -E '
 CMK_CC="icc -fpic "
 CMK_CXX="icpc -fpic "
-CMK_CXXPP="icpc -E "
 
 CMK_LD="icc -shared-intel "
 CMK_LDXX="icpc -shared-intel "

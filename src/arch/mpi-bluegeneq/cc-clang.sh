@@ -2,7 +2,6 @@ CMK_CPP_CHARM="$BGQ_BIN/powerpc64-bgq-linux-cpp -P"
 CMK_CPP_C="mpic++ -E "
 CMK_CXX="mpic++ -Wno-deprecated-declarations "
 CMK_CC="mpicc -Wno-deprecated-declarations "
-CMK_CXXPP="mpic++ -E "
 CMK_LD="$CMK_CC"
 CMK_LDXX="$CMK_CXX"
 

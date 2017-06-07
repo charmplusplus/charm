@@ -5,7 +5,6 @@ ICCOPTS="-static-intel"
 CMK_CPP_C='icc -E '
 CMK_CC='icc '
 CMK_CXX='icpc '
-CMK_CXXPP='icpc -E '
 CMK_LD="icc $ICCOPTS"
 CMK_LDXX="icpc $ICCOPTS"
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"

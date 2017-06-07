@@ -2,7 +2,7 @@ BGQ_BIN=$BGQ_FLOOR/gnu-linux/bin
 BGQ_ZLIB=/soft/libraries/alcf/current/gcc/ZLIB/
 
 BGQ_INC="-I$BGQ_ZLIB/include"
-BGQ_LIB="-L$BGQ_ZLIB/lib -lpthread -lrt" 
+BGQ_LIB="-L$BGQ_ZLIB/lib -lpthread -lrt"
 
 if [[ -z `command -v mpicxx` ]]
 then
@@ -27,7 +27,6 @@ CMK_CPP_C="$BGQ_BIN/powerpc64-bgq-linux-cpp -E "
 CMK_CXX="mpicxx $GCC_OPTS "
 CMK_GCXX="mpicxx $GCC_OPTS "
 CMK_CC="mpicc $GCC_OPTS "
-CMK_CXXPP="mpicxx -E "
 CMK_CF77="mpif77 "
 CMK_CF90='mpif90'
 CMK_RANLIB="$BGQ_BIN/powerpc64-bgq-linux-ranlib "

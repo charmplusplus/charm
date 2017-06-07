@@ -28,7 +28,6 @@ CMK_CPP_CHARM="/usr/bin/cpp -P"
 CMK_CPP_C="$MPICC -E -mmacosx-version-min=10.7"
 CMK_CC="$MPICC $CMK_AMD64 "
 CMK_CXX="$MPICXX $CMK_AMD64 "
-CMK_CXXPP="$MPICXX -E $CMK_AMD64 "
 
 CMK_XIOPTS=""
 CMK_QT="generic64-light"
@@ -56,7 +55,7 @@ else
 fi
 
 # setting for shared lib
-# need -lc++ for c++ reference, and it needs to be put at very last 
+# need -lc++ for c++ reference, and it needs to be put at very last
 # of command line.
 # Mac environment variable
 test -z "$MACOSX_DEPLOYMENT_TARGET" && export MACOSX_DEPLOYMENT_TARGET=10.5

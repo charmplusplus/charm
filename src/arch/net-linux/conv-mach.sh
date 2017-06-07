@@ -2,7 +2,6 @@ CMK_CPP_CHARM='cpp -P'
 CMK_CPP_C='gcc -m32 -E'
 CMK_CC='gcc -m32'
 CMK_CXX='g++ -m32'
-CMK_CXXPP="$CMK_CXX -x c++ -E "
 CMK_RANLIB='ranlib'
 CMK_LIBS='-lckqt'
 #CMK_LD="$CMK_CC -Wl,--allow-multiple-definition "

@@ -10,7 +10,6 @@ CMK_CC="pgcc -fPIC $CMK_DEFS  -DCMK_FIND_FIRST_OF_PREDICATE=1 "
 CMK_CC_RELIABLE="gcc "
 #CMK_CXX="pgCC --instantiate=used "
 CMK_CXX="pgCC -fPIC $CMK_DEFS  -DCMK_FIND_FIRST_OF_PREDICATE=1 --no_using_std "
-CMK_CXXPP="pgCC -E  -DCMK_FIND_FIRST_OF_PREDICATE=1 "
 CMK_LD="$CMK_CC "
 CMK_LDXX="$CMK_CXX "
 
@@ -41,4 +40,3 @@ then
 fi
 CMK_F90LIBS="-L$f90libdir  -lpgf90 -lpgf90_rpm1 -lpgf902 -lpgf90rtl -lpgftnrtl "
 CMK_F90_USE_MODDIR=""
-

@@ -27,7 +27,6 @@ CMK_CPP_CHARM="cpp -P"
 CMK_CPP_C="$MPICC -E"
 CMK_CC="$MPICC $CMK_AMD64 "
 CMK_CXX="$MPICXX $CMK_AMD64 "
-CMK_CXXPP="$MPICXX -E $CMK_AMD64 "
 CMK_LD="$CMK_CC "
 CMK_LDXX="$CMK_CXX "
 
@@ -43,7 +42,7 @@ esac
 
 
 
-# fortran compiler 
+# fortran compiler
 # for Intel Fortran compiler 8.0 and higher which is renamed to ifort from ifc
 # does not work for ifc 7.0
 CMK_CF77="mpif77 -auto -fPIC "
@@ -65,5 +64,3 @@ CMK_F90LIBS="-L$F90LIBDIR -lifcore -lifport -lifcore "
 CMK_F77LIBS="$CMK_F90LIBS"
 
 CMK_F90_USE_MODDIR=""
-
-

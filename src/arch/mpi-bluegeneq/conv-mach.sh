@@ -16,7 +16,7 @@ BGQ_BIN=$BGQ_FLOOR/gnu-linux/bin
 BGQ_ZLIB=/soft/libraries/alcf/current/xl/ZLIB/
 
 BGQ_INC="-I$BGQ_ZLIB/include"
-BGQ_LIB="-L$BGQ_ZLIB/lib -lpthread -lrt" 
+BGQ_LIB="-L$BGQ_ZLIB/lib -lpthread -lrt"
 
 usesGCC=`cat $CHARMINC/conv-mach-opt.h  | grep "cc-gcc"`;
 if [[ -z $usesGCC ]]
@@ -46,7 +46,6 @@ CMK_CPP_C="$BGQ_BIN/powerpc64-bgq-linux-cpp -E "
 CMK_CXX="mpixlcxx_r -qhalt=e $BGQ_INC -qnokeyword=__int128 -qtls=local-exec -DCMK_USING_XLC=1"
 CMK_GCXX="mpicxx $GCC_OPTS "
 CMK_CC="mpixlc_r -qcpluscmt -qhalt=e $BGQ_INC -qnokeyword=__int128 -qtls=local-exec"
-CMK_CXXPP="mpicxx -E -DCMK_USING_XLC=1"
 CMK_CF77="mpixlf77_r "
 CMK_CF90="mpixlf90_r  -qsuffix=f=f90"
 CMK_CF90_FIXED="mpixlf90_r "

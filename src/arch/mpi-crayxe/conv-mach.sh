@@ -9,7 +9,6 @@ CCE=`CC -V 2>&1 | grep 'Cray'`
 
 CMK_CPP_CHARM="cpp -P"
 CMK_CPP_C="cc -E "
-CMK_CXXPP="CC -x c++ -E"
 CMK_CC="cc "
 CMK_CXX="CC "
 CMK_LD="$CMK_CC "
@@ -77,4 +76,3 @@ fi
 CMK_F90_USE_MODDIR=1
 CMK_F90_MODINC="-I"
 CMK_MOD_EXT="mod"
-

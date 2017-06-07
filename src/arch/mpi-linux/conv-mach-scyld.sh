@@ -6,7 +6,6 @@ mpicc*)
 	CMK_CC_RELIABLE="gcc  -fPIC"
 	CMK_CC_FASTEST="gcc  -fPIC"
 	CMK_CXX="g++ -fPIC"
-	CMK_CXXPP="gcc -E "
 	CMK_LD="gcc"
 	CMK_LDXX="g++"
 
@@ -22,6 +21,5 @@ mpicc*)
 	CMK_SEQ_LD="$CMK_CC"
 	CMK_SEQ_LDXX="$CMK_CXX"
 	;;
-esac   
+esac
 CMK_LIBS="$CMK_LIBS -lmpi"
-

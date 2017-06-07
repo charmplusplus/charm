@@ -9,7 +9,6 @@ CMK_CPP_CHARM='cpp -P'
 CMK_CPP_C="$CC -E"
 CMK_CC="$CC "
 CMK_CXX="$CXX "
-CMK_CXXPP="$CXX -E "
 CMK_LD="$CMK_CC"
 CMK_LDXX="$CMK_CXX "
 

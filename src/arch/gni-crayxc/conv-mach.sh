@@ -42,7 +42,6 @@ CMK_CPP_CHARM='cpp -P'
 CMK_CPP_C="cc -E"
 CMK_CC="cc "
 CMK_CXX="CC "
-CMK_CXXPP="$CMK_CXX -x c++ -E  "
 CMK_LD="eval $CMK_CC "
 CMK_LIBS='-lckqt'
 CMK_LD_LIBRARY_PATH="-rpath $CHARMLIBSO/ $PMI_LIBS"
@@ -98,4 +97,3 @@ fi
 CMK_F90_USE_MODDIR=1
 CMK_F90_MODINC="-I"
 CMK_MOD_EXT="mod"
-
