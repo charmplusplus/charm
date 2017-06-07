@@ -19,7 +19,7 @@ then
   chmod +x $CHARMINC/MPIOPTS
 fi
 
-CMK_GCC64='-m64 -fPIC'
+CMK_GCC64='-fPIC'
 
 CMK_REAL_COMPILER=`$MPICXX -show 2>/dev/null | cut -d' ' -f1 `
 case "$CMK_REAL_COMPILER" in

@@ -3,10 +3,10 @@ CMK_DEFS=' -D_REENTRANT '
 
 # Assumes Clang C/C++ compiler:
 CMK_CPP_CHARM="/usr/bin/cpp -P "
-CMK_CPP_C="clang -arch x86_64 -m64 -fPIC -E -mmacosx-version-min=10.7 "
-CMK_CC="clang -arch x86_64 -m64 -dynamic -fno-common -mmacosx-version-min=10.7 -Wno-deprecated-declarations $CMK_DEFS "
+CMK_CPP_C="clang -arch x86_64 -fPIC -E -mmacosx-version-min=10.7 "
+CMK_CC="clang -arch x86_64 -dynamic -fno-common -mmacosx-version-min=10.7 -Wno-deprecated-declarations $CMK_DEFS "
 CMK_LD="clang -mmacosx-version-min=10.7 -Wl,-no_pie "
-CMK_CXX="clang++ -arch x86_64 -m64 -fPIC -dynamic -fno-common -mmacosx-version-min=10.7 -Wno-deprecated-declarations $CMK_DEFS -stdlib=libc++ "
+CMK_CXX="clang++ -arch x86_64 -fPIC -dynamic -fno-common -mmacosx-version-min=10.7 -Wno-deprecated-declarations $CMK_DEFS -stdlib=libc++ "
 CMK_LDXX="$CMK_CXX -multiply_defined suppress -mmacosx-version-min=10.7 -Wl,-no_pie $CMK_DEFS -stdlib=libc++ "
 CMK_XIOPTS=""
 CMK_QT="generic64-light"
