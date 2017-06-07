@@ -9,7 +9,6 @@ CMK_CXX='g++'
 CMK_XIOPTS=''
 CMK_LD="$CMK_CC"
 CMK_LDXX="$CMK_CXX"
-CMK_LD_SHARED='-shared'
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 CMK_LIBS='-lckqt'
 CMK_RANLIB='ranlib'

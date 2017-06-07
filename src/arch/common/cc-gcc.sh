@@ -4,6 +4,8 @@ CMK_LD="gcc "
 CMK_CXX="g++ -fPIC -Wno-deprecated "
 CMK_LDXX="g++ "
 
+CMK_LD_SHARED='-shared'
+
 if [ $CMK_MACOSX -eq 1 ]; then
   # find real gcc (not Apple's clang) in $PATH on darwin, works with homebrew/macports
   candidates=$(which gcc gcc-{4..19} gcc-mp-{4..19} 2>/dev/null)

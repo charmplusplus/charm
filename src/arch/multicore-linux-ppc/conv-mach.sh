@@ -11,7 +11,6 @@ CMK_LIBS='-lckqt -lpthread'
 #CMK_LDXX="$CMK_CXX -Wl,--allow-multiple-definition "
 CMK_LD="$CMK_CC  $CMK_DEFS "
 CMK_LDXX="$CMK_CXX  $CMK_DEFS "
-CMK_LD_SHARED='-shared'
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 CMK_XIOPTS=''
 CMK_QT='generic64-light'
