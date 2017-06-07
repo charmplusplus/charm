@@ -2,7 +2,6 @@
 
 isLinux=true
 
-CMK_CPP_C='gcc -E'
 CMK_CC='gcc -fPIC -m32'
 CMK_CXX='g++ -fPIC -m32'
 #CMK_LD="$CMK_CC -Wl,--allow-multiple-definition "
