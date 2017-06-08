@@ -45,7 +45,7 @@ CMK_CXX="CC "
 CMK_LD="$CMK_CC "
 CMK_LDXX="$CMK_CXX "
 CMK_LIBS='-lckqt'
-CMK_LD_LIBRARY_PATH="-WL,-rpath,$CHARMLIBSO/,$PMI_LIBS "
+CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/,$PMI_LIBS "
 
 # compiler for compiling sequential programs
 if test -n "$PGCC"

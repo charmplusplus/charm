@@ -44,7 +44,7 @@ CMK_CC="cc "
 CMK_CXX="CC "
 CMK_LD="eval $CMK_CC "
 CMK_LIBS='-lckqt'
-CMK_LD_LIBRARY_PATH="-rpath $CHARMLIBSO/ $PMI_LIBS"
+CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/,$PMI_LIBS "
 
 
 CMK_QT="generic64-light"
