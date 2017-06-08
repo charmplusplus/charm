@@ -1,3 +1,5 @@
+. $CHARMINC/cc-clang.sh
+
 CMK_MACOSX=1
 
 # Assumes Clang C/C++ compiler:

@@ -4,16 +4,4 @@ CMK_LD="clang "
 CMK_CXX="clang++ -Wno-deprecated-declarations "
 CMK_LDXX="clang++ "
 
-# native compiler for compiling charmxi, etc
-CMK_NATIVE_CC="$CMK_CC"
-CMK_NATIVE_CXX="$CMK_CXX"
-CMK_NATIVE_LD="$CMK_CC"
-CMK_NATIVE_LDXX="$CMK_CXX"
-
-# native compiler for compiling charmxi, etc
-CMK_SEQ_CC="$CMK_CC"
-CMK_SEQ_CXX="$CMK_CXX"
-CMK_SEQ_LD="$CMK_CC"
-CMK_SEQ_LDXX="$CMK_CXX"
-
 CMK_USING_CLANG="1"
