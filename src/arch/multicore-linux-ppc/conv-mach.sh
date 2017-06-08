@@ -1,13 +1,9 @@
 . $CHARMINC/cc-gcc.sh
 
 CMK_DEFS=' -D_REENTRANT '
-CMK_CC="$CMK_CC $CMK_DEFS "
-CMK_CXX="$CMK_CXX $CMK_DEFS "
 CMK_LIBS="$CMK_LIBS -lpthread"
 #CMK_LD="$CMK_CC -Wl,--allow-multiple-definition "
 #CMK_LDXX="$CMK_CXX -Wl,--allow-multiple-definition "
-CMK_LD="$CMK_CC $CMK_DEFS "
-CMK_LDXX="$CMK_CXX $CMK_DEFS "
 CMK_XIOPTS=''
 CMK_QT='generic64-light'
 

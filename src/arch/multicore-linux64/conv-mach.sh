@@ -2,12 +2,7 @@
 
 CMK_DEFS=' -D_REENTRANT '
 
-CMK_CPP_C="$CMK_CPP_C $CMK_DEFS "
-CMK_CC="$CMK_CC $CMK_DEFS "
-CMK_CXX="$CMK_CXX $CMK_DEFS "
 CMK_XIOPTS=''
-CMK_LD="$CMK_CC $CMK_DEFS "
-CMK_LDXX="$CMK_CXX $CMK_DEFS "
 CMK_LIBS="-lpthread $CMK_LIBS"
 
 # native compiler for compiling charmxi, etc

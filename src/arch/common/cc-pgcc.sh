@@ -6,10 +6,10 @@ case `hostname` in
 esac
 
 CMK_CPP_C="pgcc -E "
-CMK_CC="pgcc -fPIC $CMK_DEFS  -DCMK_FIND_FIRST_OF_PREDICATE=1 "
+CMK_CC="pgcc -fPIC -DCMK_FIND_FIRST_OF_PREDICATE=1 "
 CMK_CC_RELIABLE="gcc "
 #CMK_CXX="pgCC --instantiate=used "
-CMK_CXX="pgCC -fPIC $CMK_DEFS  -DCMK_FIND_FIRST_OF_PREDICATE=1 --no_using_std "
+CMK_CXX="pgCC -fPIC -DCMK_FIND_FIRST_OF_PREDICATE=1 --no_using_std "
 CMK_LD="$CMK_CC "
 CMK_LDXX="$CMK_CXX "
 
