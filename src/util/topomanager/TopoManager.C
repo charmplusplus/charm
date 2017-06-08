@@ -409,11 +409,12 @@ int _tpm_numthreads = 1;
 
 TopoManager *TopoManager::getTopoManager() {
   CmiAssert(_topoInitialized);
-  if (_tmgr == NULL) TopoManager_reset();
+  CmiAssert(_tmgr != NULL);
   return _tmgr;
 }
 
 #ifndef __TPM_STANDALONE__
+// NOTE: this is not thread-safe
 extern "C" void TopoManager_init() {
 #else
 extern "C" void TopoManager_init(int numpes) {

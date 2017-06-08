@@ -1362,6 +1362,8 @@ void _initCharm(int unused_argc, char **argv)
 #endif
         }
         CmiInitCPUTopology(argv);
+        if (CkMyRank() == 0) TopoManager_reset(); // initialize TopoManager singleton
+        CmiNodeAllBarrier();
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
         if (CmiCpuTopologyEnabled()) {
             int *pelist;
