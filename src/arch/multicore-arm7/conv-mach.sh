@@ -1,26 +1,18 @@
+. $CHARMINC/cc-gcc.sh
+
 #CMK_DEFS="$CMK_DEFS -DHAVE_USR_INCLUDE_MALLOC_H=1 "
 CMK_DEFS=' -D_REENTRANT '
 
-CMK_PIC="-fPIC"
-CMK_CPP_CHARM="cpp -P"
-CMK_CPP_C="gcc -E "
-CMK_CC="gcc "
-CMK_CXX="g++ "
 CMK_XIOPTS=""
-CMK_LD="$CMK_CC "
-CMK_LDXX="$CMK_CXX "
-CMK_LD_SHARED="-shared"
-CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
-CMK_LIBS="-lpthread -lckqt"
-CMK_RANLIB="ranlib"
+CMK_LIBS="-lpthread $CMK_LIBS"
 CMK_WARNINGS_ARE_ERRORS="-Werror"
 CMK_CXX_OPTIMIZE="-O3"
 
 # native compiler for compiling charmxi, etc
-CMK_NATIVE_CC="$CMK_CC -fPIC $CMK_DEFS "
-CMK_NATIVE_CXX="$CMK_CXX -fPIC $CMK_DEFS "
-CMK_NATIVE_LD="$CMK_CC -fPIC "
-CMK_NATIVE_LDXX="$CMK_CXX -fPIC "
+CMK_NATIVE_CC="$CMK_CC $CMK_DEFS "
+CMK_NATIVE_CXX="$CMK_CXX $CMK_DEFS "
+CMK_NATIVE_LD="$CMK_CC "
+CMK_NATIVE_LDXX="$CMK_CXX "
 
 # native compiler for compiling charmxi, etc
 CMK_SEQ_CC="$CMK_NATIVE_CC"
