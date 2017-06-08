@@ -6,6 +6,7 @@ CMK_LD='gcc'
 CMK_LDXX='g++'
 
 CMK_LD_SHARED='-shared'
+CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 CMK_RANLIB='ranlib'
 CMK_LIBS='-lckqt'
 CMK_PIC='-fPIC'
