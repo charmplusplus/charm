@@ -9,7 +9,7 @@ CMK_LD_SHARED='-shared'
 CMK_RANLIB='ranlib'
 CMK_LIBS='-lckqt'
 
-if [ $CMK_MACOSX -eq 1 ]; then
+if [[ $CMK_MACOSX -eq 1 ]]; then
   # find real gcc (not Apple's clang) in $PATH on darwin, works with homebrew/macports
   candidates=$(which gcc gcc-{4..19} gcc-mp-{4..19} 2>/dev/null)
   for cand in $candidates; do
@@ -25,7 +25,7 @@ if [ $CMK_MACOSX -eq 1 ]; then
       break
     fi
   done
-  if [ $found -ne 1 ]; then
+  if [[ $found -ne 1 ]]; then
     echo "No suitable non-clang gcc found, exiting"
     exit 1
   fi
