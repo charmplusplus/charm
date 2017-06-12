@@ -37,6 +37,7 @@ typedef void (*MPI_MainFn) (int,char**);
 typedef int MPI_Datatype;
 typedef intptr_t MPI_Aint;
 typedef int MPI_Fint;
+typedef MPI_Aint MPI_Count;
 
 /********************** MPI-1.1 prototypes and defines ***************************/
 /* MPI-1 Errors */
@@ -508,6 +509,8 @@ int AMPI_Address(void* location, MPI_Aint *address);
 int AMPI_Status_set_elements(MPI_Status *status, MPI_Datatype datatype, int count);
 #define MPI_Get_elements AMPI_Get_elements
 int AMPI_Get_elements(const MPI_Status *status, MPI_Datatype datatype, int *count);
+#define MPI_Get_elements_x AMPI_Get_elements_x
+int AMPI_Get_elements_x(const MPI_Status *status, MPI_Datatype datatype, MPI_Count *count);
 #define MPI_Pack AMPI_Pack
 int AMPI_Pack(const void *inbuf, int incount, MPI_Datatype dtype, void *outbuf,
               int outsize, int *position, MPI_Comm comm);
@@ -1131,7 +1134,6 @@ int MPI_Mrecv(void* buf, int count, MPI_Datatype datatype, MPI_Message *message,
 
 /* A.2.2 Datatypes C Bindings */
 /*
-int MPI_Get_elements_x(const MPI_Status *status, MPI_Datatype datatype, MPI_Count *count);
 int MPI_Pack_external(const char datarep[], const void *inbuf, int incount, MPI_Datatype datatype, void *outbuf, MPI_Aint outsize, MPI_Aint *position);
 int MPI_Pack_external_size(const char datarep[], int incount, MPI_Datatype datatype, MPI_Aint *size);
 int MPI_Type_create_darray(int size, int rank, int ndims, const int array_of_gsizes[], const int array_of_distribs[], const int array_of_dargs[], const int array_of_psizes[], int order, MPI_Datatype oldtype, MPI_Datatype *newtype); //provided by ROMIO

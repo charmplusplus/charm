@@ -64,6 +64,7 @@ FDECL {
 #define mpi_address FTN_NAME( MPI_ADDRESS , mpi_address )
 #define mpi_status_set_elements FTN_NAME( MPI_STATUS_SET_ELEMENTS , mpi_status_set_elements )
 #define mpi_get_elements FTN_NAME( MPI_GET_ELEMENTS , mpi_get_elements )
+#define mpi_get_elements_x FTN_NAME( MPI_GET_ELEMENTS_X , mpi_get_elements_x )
 #define mpi_pack FTN_NAME( MPI_PACK , mpi_pack )
 #define mpi_unpack FTN_NAME( MPI_UNPACK , mpi_unpack )
 #define mpi_pack_size FTN_NAME( MPI_PACK_SIZE , mpi_pack_size )
@@ -807,6 +808,12 @@ void mpi_get_elements(int *status, int* datatype, int *count, int* ierr)
 {
   MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
   *ierr = AMPI_Get_elements(s, *datatype, count);
+}
+
+void mpi_get_elements_x(int *status, int* datatype, MPI_Count *count, int* ierr)
+{
+  MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
+  *ierr = AMPI_Get_elements_x(s, *datatype, count);
 }
 
 void mpi_pack(void *inbuf, int *incount, int *datatype, void *outbuf,

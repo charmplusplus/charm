@@ -8120,6 +8120,20 @@ int AMPI_Get_elements(const MPI_Status *sts, MPI_Datatype dtype, int *count){
 }
 
 CDECL
+int AMPI_Get_elements_x(const MPI_Status *sts, MPI_Datatype dtype, MPI_Count *count){
+  AMPIAPI("AMPI_Get_elements_x");
+  if (dtype <= MPI_MAX_PRIMITIVE_TYPE) { // Is it a basic datatype?
+    CkDDT_DataType* dttype = getDDT()->getType(dtype);
+    int itemsize = dttype->getSize();
+    *count = itemsize==0 ? 0 : sts->MPI_LENGTH/itemsize;
+  } else {
+    CkDDT_DataType* dttype = getDDT()->getType(dtype);
+    *count = dttype->getNumElements();
+  }
+  return MPI_SUCCESS;
+}
+
+CDECL
 int AMPI_Pack(const void *inbuf, int incount, MPI_Datatype dtype, void *outbuf,
               int outsize, int *position, MPI_Comm comm)
 {
