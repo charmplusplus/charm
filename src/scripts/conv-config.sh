@@ -58,14 +58,6 @@ CMK_LD_SHARED="-shared"
 [ -z "$CMK_CF77" ] && CMK_CF77_FIXED="$CMK_CF90"
 [ -z "$CMK_CF77_FIXED" ] && CMK_CF77_FIXED="$CMK_CF77"
 
-# set default earlier because option configs may need these value
-[ -z "$CMK_NATIVE_CC" ] && CMK_NATIVE_CC="$CMK_CC"
-[ -z "$CMK_NATIVE_CXX" ] && CMK_NATIVE_CXX="$CMK_CXX"
-[ -z "$CMK_NATIVE_LD" ] && CMK_NATIVE_LD="$CMK_LD"
-[ -z "$CMK_NATIVE_LDXX" ] && CMK_NATIVE_LDXX="$CMK_LDXX"
-[ -z "$CMK_NATIVE_F90" ] && CMK_NATIVE_F90="$CMK_CF90"
-[ -z "$CMK_NATIVE_AR" ] && CMK_NATIVE_AR="$CMK_AR"
-
 if [ -r $CHARMINC/conv-mach-opt.sh ]
 then
 . $CHARMINC/conv-mach-opt.sh
@@ -86,6 +78,13 @@ OPTS_LD="$OPTS_LD $USER_OPTS_LD"
 OPTS_LDXX="$OPTS_LDXX $USER_OPTS_LDXX"
 
 [ -z "$CMK_PIC" ] && CMK_PIC='-fpic'
+
+[ -z "$CMK_NATIVE_CC" ] && CMK_NATIVE_CC="$CMK_CC"
+[ -z "$CMK_NATIVE_CXX" ] && CMK_NATIVE_CXX="$CMK_CXX"
+[ -z "$CMK_NATIVE_LD" ] && CMK_NATIVE_LD="$CMK_LD"
+[ -z "$CMK_NATIVE_LDXX" ] && CMK_NATIVE_LDXX="$CMK_LDXX"
+[ -z "$CMK_NATIVE_F90" ] && CMK_NATIVE_F90="$CMK_CF90"
+[ -z "$CMK_NATIVE_AR" ] && CMK_NATIVE_AR="$CMK_AR"
 
 [ -z "$CMK_SEQ_CC" ] && CMK_SEQ_CC="$CMK_CC"
 [ -z "$CMK_SEQ_CXX" ] && CMK_SEQ_CXX="$CMK_CXX"
