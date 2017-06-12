@@ -1,4 +1,9 @@
 Tests if errors are reported correctly...
 Should say "Invalid displacement argument"
 
-Invalid displacement argument
+MPI_File_set_view: Invalid disp argument
+------------- Processor 0 Exiting: Called CmiAbort ------------
+Reason: AMPI: Application called MPI_Abort()!
+
+Fatal error on PE 0> AMPI: Application called MPI_Abort()!
+

@@ -1,5 +1,6 @@
 #! /bin/sh
-mpirun="@MPIRUN@"
+mpirun="./charmrun ++local ++quiet "
+PARALLEL="+p" # How to specify the number of ranks (-np in a normal mpirun command)
 STOPFILE=$HOME/.stopmpichtests
 #
 # If the programs are not available, run make.
@@ -139,7 +140,7 @@ RunTest() {
       MakeExe simple
       rm -rf $FILENAME*
       echo "**** Testing ${1}.c ****"
-      mpirun -np 4 ./${1} -fname $FILENAME "$@" >>${1}.out 2>1
+      mpirun $PARALLEL 4 ./${1} -fname $FILENAME "$@" >>${1}.out 2>1
       CheckOutput ${1}
       CleanExe ${1}
 }
@@ -159,7 +160,7 @@ testfiles="$testfiles simple.out"
 MakeExe simple
 \rm -f $FILENAME*
 echo '**** Testing simple.c ****'
-$mpirun -np 4 ./simple -fname $FILENAME "$@" >> simple.out 2>&1
+$mpirun $PARALLEL 4 ./simple -fname $FILENAME "$@" >> simple.out 2>&1
 CheckOutput simple
 CleanExe simple
 #
@@ -169,7 +170,7 @@ testfiles="$testfiles async.out"
 MakeExe async
 \rm -f $FILENAME*
 echo '**** Testing async.c ****'
-$mpirun -np 4 ./async -fname $FILENAME "$@" >> async.out 2>&1
+$mpirun $PARALLEL 4 ./async -fname $FILENAME "$@" >> async.out 2>&1
 CheckOutput async
 CleanExe async
 #
@@ -179,7 +180,7 @@ testfiles="$testfiles atomicity.out"
 MakeExe atomicity
 \rm -f $FILENAME*
 echo '**** Testing atomicity.c ****'
-$mpirun -np 4 ./atomicity -fname $FILENAME "$@" >> atomicity.out 2>&1
+$mpirun $PARALLEL 4 ./atomicity -fname $FILENAME "$@" >> atomicity.out 2>&1
 CheckOutput atomicity
 CleanExe atomicity
 #
@@ -189,7 +190,7 @@ testfiles="$testfiles coll_test.out"
 MakeExe coll_test
 \rm -f $FILENAME*
 echo '**** Testing coll_test.c ****'
-$mpirun -np 4 ./coll_test -fname $FILENAME "$@" >> coll_test.out 2>&1
+$mpirun $PARALLEL 4 ./coll_test -fname $FILENAME "$@" >> coll_test.out 2>&1
 CheckOutput coll_test
 CleanExe coll_test
 #
@@ -199,7 +200,7 @@ testfiles="$testfiles excl.out"
 MakeExe excl
 \rm -f $FILENAME*
 echo '**** Testing excl.c ****'
-$mpirun -np 4 ./excl -fname $FILENAME "$@" >> excl.out 2>&1
+$mpirun $PARALLEL 4 ./excl -fname $FILENAME "$@" >> excl.out 2>&1
 CheckOutput excl
 CleanExe excl
 #
@@ -209,7 +210,7 @@ testfiles="$testfiles file_info.out"
 MakeExe file_info
 \rm -f $FILENAME*
 echo '**** Testing file_info.c ****'
-$mpirun -np 4 ./file_info -fname $FILENAME "$@" >> file_info.out 2>&1
+$mpirun $PARALLEL 4 ./file_info -fname $FILENAME "$@" >> file_info.out 2>&1
 CheckOutput file_info
 CleanExe file_info
 #
@@ -219,7 +220,7 @@ testfiles="$testfiles i_noncontig.out"
 MakeExe i_noncontig
 \rm -f $FILENAME*
 echo '**** Testing i_noncontig.c ****'
-$mpirun -np 2 ./i_noncontig -fname $FILENAME "$@" >> i_noncontig.out 2>&1
+$mpirun $PARALLEL 2 ./i_noncontig -fname $FILENAME "$@" >> i_noncontig.out 2>&1
 CheckOutput i_noncontig
 CleanExe i_noncontig
 #
@@ -229,7 +230,7 @@ testfiles="$testfiles noncontig.out"
 MakeExe noncontig
 \rm -f $FILENAME*
 echo '**** Testing noncontig.c ****'
-$mpirun -np 2 ./noncontig -fname $FILENAME "$@" >> noncontig.out 2>&1
+$mpirun $PARALLEL 2 ./noncontig -fname $FILENAME "$@" >> noncontig.out 2>&1
 CheckOutput noncontig
 CleanExe noncontig
 #
@@ -239,7 +240,7 @@ testfiles="$testfiles noncontig_coll.out"
 MakeExe noncontig_coll
 \rm -f $FILENAME*
 echo '**** Testing noncontig_coll.c ****'
-$mpirun -np 2 ./noncontig_coll -fname $FILENAME "$@" >> noncontig_coll.out 2>&1
+$mpirun $PARALLEL 2 ./noncontig_coll -fname $FILENAME "$@" >> noncontig_coll.out 2>&1
 CheckOutput noncontig_coll
 CleanExe noncontig_coll
 #
@@ -249,7 +250,7 @@ testfiles="$testfiles noncontig_coll2.out"
 MakeExe noncontig_coll2
 \rm -f $FILENAME*
 echo '**** Testing noncontig_coll2.c ****'
-$mpirun -np 4 ./noncontig_coll2 -fname $FILENAME "$@" >> noncontig_coll2.out 2>&1
+$mpirun $PARALLEL 4 ./noncontig_coll2 -fname $FILENAME "$@" >> noncontig_coll2.out 2>&1
 CheckOutput noncontig_coll2
 CleanExe noncontig_coll2
 #
@@ -259,7 +260,7 @@ testfiles="$testfiles misc.out"
 MakeExe misc
 \rm -f $FILENAME*
 echo '**** Testing misc.c ****'
-$mpirun -np 4 ./misc -fname $FILENAME "$@" >> misc.out 2>&1
+$mpirun $PARALLEL 4 ./misc -fname $FILENAME "$@" >> misc.out 2>&1
 CheckOutput misc
 CleanExe misc
 #
@@ -269,7 +270,7 @@ testfiles="$testfiles shared_fp.out"
 MakeExe shared_fp
 \rm -f $FILENAME*
 echo '**** Testing shared_fp.c ****'
-$mpirun -np 4 ./shared_fp -fname $FILENAME "$@" >> shared_fp.out 2>&1
+$mpirun $PARALLEL 4 ./shared_fp -fname $FILENAME "$@" >> shared_fp.out 2>&1
 CheckOutput shared_fp
 CleanExe shared_fp
 #
@@ -279,18 +280,18 @@ testfiles="$testfiles split_coll.out"
 MakeExe split_coll
 \rm -f $FILENAME*
 echo '**** Testing split_coll.c ****'
-$mpirun -np 4 ./split_coll -fname $FILENAME "$@" >> split_coll.out 2>&1
+$mpirun $PARALLEL 4 ./split_coll -fname $FILENAME "$@" >> split_coll.out 2>&1
 CheckOutput split_coll
 CleanExe split_coll
 #
 OutTime
-# disabled test: psimple (no PMPI support in AMPI yet)
+# psimple is not supported in AMPI 6.8.0 (no PMPI support)
 # testfiles="$testfiles psimple.out"
 # \rm -f psimple.out
 # MakeExe psimple
 # \rm -f $FILENAME*
 # echo '**** Testing psimple.c ****'
-# $mpirun -np 4 ./psimple -fname $FILENAME "$@" >> psimple.out 2>&1
+# $mpirun $PARALLEL 4 ./psimple -fname $FILENAME "$@" >> psimple.out 2>&1
 # CheckOutput psimple
 # CleanExe psimple
 # #
@@ -300,7 +301,7 @@ testfiles="$testfiles error.out"
 MakeExe error
 \rm -f $FILENAME*
 echo '**** Testing error.c ****'
-$mpirun -np 1 ./error -fname $FILENAME "$@" >> error.out 2>&1
+$mpirun $PARALLEL 1 ./error -fname $FILENAME "$@" >> error.out 2>&1
 CheckOutput error
 CleanExe error
 #
@@ -311,7 +312,7 @@ MakeExe status
 \rm -f $FILENAME*
 echo '**** Testing status.c ****'
 # Some systems have a status program.
-$mpirun -np 1 ./status -fname $FILENAME "$@" >> status.out 2>&1
+$mpirun $PARALLEL 1 ./status -fname $FILENAME "$@" >> status.out 2>&1
 CheckOutput status
 CleanExe status
 #
@@ -324,7 +325,7 @@ if [ @NOF77@ = 0 ] ; then
     MakeExe fmisc
     \rm -f $FILENAME*
     echo '**** Testing fmisc.f ****'
-    $mpirun -np 4 ./fmisc -fname $FILENAME "$@" >> fmisc.out 2>&1
+    $mpirun $PARALLEL 4 ./fmisc -fname $FILENAME "$@" >> fmisc.out 2>&1
     CheckOutput fmisc
     CleanExe fmisc
 #
@@ -334,7 +335,7 @@ if [ @NOF77@ = 0 ] ; then
     MakeExe fcoll_test
     \rm -f $FILENAME*
     echo '**** Testing fcoll_test.f ****'
-    $mpirun -np 4 ./fcoll_test -fname $FILENAME "$@" >> fcoll_test.out 2>&1
+    $mpirun $PARALLEL 4 ./fcoll_test -fname $FILENAME "$@" >> fcoll_test.out 2>&1
     CheckOutput fcoll_test
     CleanExe fcoll_test
 #
@@ -344,7 +345,7 @@ if [ @NOF77@ = 0 ] ; then
     MakeExe pfcoll_test
     \rm -f $FILENAME*
     echo '**** Testing pfcoll_test.f ****'
-    $mpirun -np 4 ./pfcoll_test -fname $FILENAME "$@" >> pfcoll_test.out 2>&1
+    $mpirun $PARALLEL 4 ./pfcoll_test -fname $FILENAME "$@" >> pfcoll_test.out 2>&1
     CheckOutput pfcoll_test
     CleanExe pfcoll_test
 #
