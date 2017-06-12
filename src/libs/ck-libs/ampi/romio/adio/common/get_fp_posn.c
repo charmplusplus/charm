@@ -23,18 +23,14 @@ void ADIOI_Get_position(ADIO_File fd, ADIO_Offset *offset)
     ADIOI_Datatype_iscontig(fd->filetype, &filetype_is_contig);
     etype_size = fd->etype_size;
 
-    if (filetype_is_contig){
-	printf("filetype is contig: fd->filetype=%d, etypesize=%d\n",fd->filetype,fd->etype_size);
-	*offset = (fd->fp_ind - fd->disp)/etype_size;
-    } else {
-	/* filetype already flattened in ADIO_Open */
+    if (filetype_is_contig) *offset = (fd->fp_ind - fd->disp)/etype_size;
+    else {
+/* filetype already flattened in ADIO_Open */
         flat_file = ADIOI_Flatlist;
         while (flat_file->type != fd->filetype) flat_file = flat_file->next;
 
 	MPI_Type_size(fd->filetype, &filetype_size);
 	MPI_Type_extent(fd->filetype, &filetype_extent);
-
-	printf("filetype is not contig: fd->filetype=%d,size=%d,extent=%ld,etypesize=%d\n",fd->filetype,filetype_size,filetype_extent,fd->etype_size);
 
 	disp = fd->disp;
 	byte_offset = fd->fp_ind;

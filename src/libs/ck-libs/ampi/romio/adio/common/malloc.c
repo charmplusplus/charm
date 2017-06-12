@@ -22,7 +22,7 @@
 #include "mpi.h"
 #include <stdlib.h>
 #include <stdio.h>
-/* #include "mpipr.h" */
+#include "mpipr.h"
 
 #define FPRINTF fprintf
 void *ADIOI_Malloc_fn(size_t size, int lineno, char *fname);

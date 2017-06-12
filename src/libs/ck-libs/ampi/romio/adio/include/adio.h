@@ -370,5 +370,5 @@ void ADIO_Set_view(ADIO_File fd, ADIO_Offset disp, MPI_Datatype etype,
 #include "adioi.h"
 #include "adioi_fs_proto.h"
 #include "mpio_error.h"
-/* #include "mpipr.h" */
+#include "mpipr.h"
 #endif

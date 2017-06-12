@@ -13,8 +13,8 @@
 #ifndef MPIOIMPL_INCLUDE
 #define MPIOIMPL_INCLUDE
 
-#include "mpio.h"
 #include "adio.h"
+#include "mpio.h"
 
 /* info is a linked list of these structures */
 struct MPIR_Info {

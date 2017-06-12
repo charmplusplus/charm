@@ -111,11 +111,10 @@ int ADIOI_cb_gather_name_array(MPI_Comm comm,
     int commsize, commrank, found;
     ADIO_cb_name_array array = NULL;
 
-    int a=100;
     if (cb_config_list_keyval == MPI_KEYVAL_INVALID) {
 	MPI_Keyval_create((MPI_Copy_function *) ADIOI_cb_copy_name_array, 
 			  (MPI_Delete_function *) ADIOI_cb_delete_name_array,
-			  &cb_config_list_keyval, &a);
+			  &cb_config_list_keyval, NULL);
     }
     else {
 	MPI_Attr_get(comm, cb_config_list_keyval, (void *) &array, &found);

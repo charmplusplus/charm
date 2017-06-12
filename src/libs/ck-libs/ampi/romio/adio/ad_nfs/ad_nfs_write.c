@@ -42,7 +42,7 @@ void ADIOI_NFS_WriteContig(ADIO_File fd, void *buf, int count,
     }
 
 #ifdef HAVE_STATUS_SET_BYTES
-    if (err != -1) MPIR_Status_set_bytes(status, datatype, len);
+    if (err != -1) MPIR_Status_set_bytes(status, datatype, err);
 #endif
 
 #ifdef PRINT_ERR_MSG

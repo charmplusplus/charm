@@ -9,6 +9,11 @@
    application code without interference from MPI functions used by 
    MPI-IO. */
 
+/* AMPI has no PMPI support yet */
+#ifdef AMPI
+#define USE_MPI_VERSIONS
+#endif
+
 #ifndef USE_MPI_VERSIONS
 
 #undef MPI_Abort
