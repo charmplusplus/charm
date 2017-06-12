@@ -64,7 +64,9 @@ void gengraph(int pV, int pC, int pseed, int *pes, int *npe, int tofile)
   if (tofile && CmiMyPe() == 0) {
   sprintf(dirname, "graph%d", V);
   sprintf(dircmd, "mkdir %s", dirname);
-  system(dircmd);
+  if (system(dircmd) == -1) {
+    CmiAbort("CLD> call to system() failed!");
+  }
   }
   
   /* for (i=0; i<seed; i++) rand(); */

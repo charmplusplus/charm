@@ -87,7 +87,9 @@ static int read_randomflag(void)
   int random_flag;
   fp = fopen("/proc/sys/kernel/randomize_va_space", "r");
   if (fp != NULL) {
-    fscanf(fp, "%d", &random_flag);
+    if (fscanf(fp, "%d", &random_flag) != 1) {
+      CmiAbort("Isomalloc> fscanf failed reading /proc/sys/kernel/randomize_va_space!");
+    }
     fclose(fp);
     if(random_flag) random_flag = 1;
 #if CMK_HAS_ADDR_NO_RANDOMIZE
@@ -1888,7 +1890,9 @@ static void init_ranges(char **argv)
         /* remove file before writing for safe */
         unlink(fname);
 #if CMK_HAS_SYNC && ! CMK_DISABLE_SYNC
-        system("sync");
+        if (system("sync") == -1) {
+          CmiAbort("Isomalloc> call to system(\"sync\") failed while synchronizing memory regions!");
+        }
 #endif
 
         CmiBarrier();
@@ -1899,12 +1903,18 @@ static void init_ranges(char **argv)
           CMK_CPV_IS_SMP
 #endif
             ;
-        write(fd, &s, sizeof(CmiUInt8));
-        write(fd, &e, sizeof(CmiUInt8));
+        if (write(fd, &s, sizeof(CmiUInt8)) != sizeof(CmiUInt8)) {
+          CmiAbort("Isomalloc> call to write() failed while synchronizing memory regions!");
+        }
+        if (write(fd, &e, sizeof(CmiUInt8)) != sizeof(CmiUInt8)) {
+          CmiAbort("Isomalloc> call to write() failed while synchronizing memory regions!");
+        }
         close(fd);
 
 #if CMK_HAS_SYNC && ! CMK_DISABLE_SYNC
-        system("sync");
+        if (system("sync") == -1) {
+          CmiAbort("Isomalloc> call to system(\"sync\") failed while synchronizing memory regions!");
+        }
 #endif
 
         CmiBarrier();
@@ -1927,8 +1937,12 @@ static void init_ranges(char **argv)
           if (fd == -1) {
             CmiAbort("isomalloc_sync failed, make sure you have a shared file system.");
           }
-          read(fd, &ss, sizeof(CmiUInt8));
-          read(fd, &ee, sizeof(CmiUInt8));
+          if (read(fd, &ss, sizeof(CmiUInt8)) != sizeof(CmiUInt8)) {
+            CmiAbort("Isomalloc> call to read() failed while synchronizing memory regions!");
+          }
+          if (read(fd, &ee, sizeof(CmiUInt8)) != sizeof(CmiUInt8)) {
+            CmiAbort("Isomalloc> call to read() failed while synchronizing memory regions!");
+          }
 #if ISOMALLOC_DEBUG
           if (CmiMyPe() == 0)
             DEBUG_PRINT("[%d] load node %d isomalloc region: %lx %lx.\n", CmiMyPe(), i, ss, ee);
@@ -1942,7 +1956,9 @@ static void init_ranges(char **argv)
 
         unlink(fname);
 #if CMK_HAS_SYNC && ! CMK_DISABLE_SYNC
-        system("sync");
+        if (system("sync") == -1) {
+          CmiAbort("Isomalloc> call to system(\"sync\") failed while synchronizing memory regions!");
+        }
 #endif
 
         /* update */

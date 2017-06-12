@@ -537,13 +537,17 @@ void CldReadNeighborData(void)
       CmiError("Error opening graph init file on PE: %d\n", CmiMyPe());
       return;
     }
-  fscanf(fp, "%d", &CpvAccess(numNeighbors));
+  if (fscanf(fp, "%d", &CpvAccess(numNeighbors)) != 1) {
+    CmiAbort("CLD> reading neighbor data failed!");
+  }
   CpvAccess(neighbors) = 
     (struct CldNeighborData_s *)calloc(CpvAccess(numNeighbors),
 				     sizeof(struct CldNeighborData_s));
   pes = (int *)calloc(CpvAccess(numNeighbors), sizeof(int));
   for (i=0; i<CpvAccess(numNeighbors); i++) {
-    fscanf(fp, "%d", &(CpvAccess(neighbors)[i].pe));
+    if (fscanf(fp, "%d", &(CpvAccess(neighbors)[i].pe)) != 1) {
+      CmiAbort("CLD> reading neighbor data failed!");
+    }
     pes[i] = CpvAccess(neighbors)[i].pe;
     CpvAccess(neighbors)[i].load = 0;
   }

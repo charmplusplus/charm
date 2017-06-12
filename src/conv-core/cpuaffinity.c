@@ -649,8 +649,10 @@ int CmiOnCore(void) {
   }
   fseek(fp, 0, SEEK_SET);
   for (n=0; n<TASK_CPU_POS; n++)  {
-    fscanf(fp, "%127s", str);
-  }  
+    if (fscanf(fp, "%127s", str) != 1) {
+      CmiAbort("CPU affinity> reading from /proc/<PID>/[task/<TID>]/stat failed!");
+    }
+  }
   return atoi(str);
 #else
   printf("WARNING: CmiOnCore IS NOT SUPPORTED ON THIS PLATFORM\n");

@@ -131,7 +131,9 @@ static void readBlacklist()
   printf("Loading blacklist from file \"%s\" ... \n", fname);
   while (!feof(bl)){
     char name[512];
-    fscanf(bl, "%511s\n", name);
+    if (fscanf(bl, "%511s\n", name) != 1) {
+      CmiAbort("Swapglobals> reading blacklist file failed!");
+    }
      _blacklist.push_back(strdup(name));
   }
   fclose(bl);

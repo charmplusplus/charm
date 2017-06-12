@@ -286,7 +286,9 @@ void ampiParent::defineInfoEnv(int nRanks_){
   }
 #endif
 
-  getcwd(work_dir, sizeof(work_dir));
+  if (getcwd(work_dir, sizeof(work_dir)) == NULL) {
+    CkAbort("AMPI> call to getcwd() for MPI_INFO_ENV failed!");
+  }
   setInfo(envInfo, "wdir", work_dir);
 
   //TODO: file, thread_level

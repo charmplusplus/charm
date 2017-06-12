@@ -122,7 +122,9 @@ void PUP_fromPagedDisk::bytes(void *p,size_t n,size_t itemSize,PUP::dataType ){
 	while(size > bytes_unread){
 		long next = current_block*PUP_BLOCK + PUP_BLOCK - bytes_unread;
 		fseek(fp,next,SEEK_SET);
-		fread(c,1,bytes_unread,fp);
+		if (fread(c,1,bytes_unread,fp) != bytes_unread) {
+			CmiAbort("PUP> reading bytes from disk failed!");
+		}
 		size -= bytes_unread;
 		c += bytes_unread;
 		bytes_unread = 0;
@@ -130,7 +132,9 @@ void PUP_fromPagedDisk::bytes(void *p,size_t n,size_t itemSize,PUP::dataType ){
 	}
 	long next = current_block*PUP_BLOCK + PUP_BLOCK - bytes_unread;
 	fseek(fp,next,SEEK_SET);
-	fread(c,1,size,fp);
+	if (fread(c,1,size,fp) != size) {
+		CmiAbort("PUP> reading bytes from disk failed!");
+	}
 	bytes_unread -= size;
 }
 

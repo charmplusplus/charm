@@ -137,7 +137,10 @@ static const char *mylogin(void)
     sprintf(cmd, "id -u -n");
     p = popen(cmd, "r");
     if (p) {
-      fscanf(p, "%63s", uname);
+      if (fscanf(p, "%63s", uname) != 1) {
+        fprintf(stderr, "charmrun> fscanf() failed!\n");
+        exit(1);
+      }
       pclose(p);
       return strdup(uname);
     } else
@@ -1030,7 +1033,10 @@ static void arg_init(int argc, const char **argv)
 #endif
 
   /* find the current directory, absolute version */
-  getcwd(buf, 1023);
+  if (getcwd(buf, 1023) == NULL) {
+    fprintf(stderr, "charmrun> getcwd() failed!\n");
+    exit(1);
+  }
   arg_currdir_a = strdup(buf);
 
   /* find the node-program, absolute version */
@@ -1686,7 +1692,10 @@ static char *input_scanf_chars(char *fmt)
 #if CMK_USE_MKSTEMP
     char tmp[128];
     strcpy(tmp, "/tmp/fnordXXXXXX");
-    mkstemp(tmp);
+    if (mkstemp(tmp) == -1) {
+      fprintf(stderr, "charmrun> mkstemp() failed!\n");
+      exit(1);
+    }
 #else
     char *tmp = tmpnam(NULL); /*This was once /tmp/fnord*/
 #endif
@@ -1706,9 +1715,15 @@ static char *input_scanf_chars(char *fmt)
     fwrite(input_buffer, len, 1, file);
     fflush(file);
     rewind(file);
-    ftruncate(fd, len);
-    fscanf(file, fmt, buf, buf, buf, buf, buf, buf, buf, buf, buf, buf, buf,
-           buf, buf, buf, buf, buf, buf, buf);
+    if (ftruncate(fd, len)) {
+      fprintf(stderr, "charmrun> ftruncate() failed!\n");
+      exit(1);
+    }
+    if (fscanf(file, fmt, buf, buf, buf, buf, buf, buf, buf, buf, buf, buf, buf,
+           buf, buf, buf, buf, buf, buf, buf) <= 0) {
+      fprintf(stderr, "charmrun> fscanf() failed!\n");
+      exit(1);
+    }
     pos = ftell(file);
     if (pos < len)
       break;
@@ -2950,7 +2965,10 @@ static void req_poll()
         while (read(0, &c, 1) != -1) {
           buf[num++] = c;
           if (c == '\n' || num >= 2045) {
-            write(gdb_info_std[0], buf, num);
+            if (write(gdb_info_std[0], buf, num) != num) {
+              fprintf(stderr, "charmrun> writing info command to gdb failed!\n");
+              exit(1);
+            }
             if (c == '\n')
               break;
           }
@@ -3072,7 +3090,10 @@ static void req_poll_hierarchical()
         while (read(0, &c, 1) != -1) {
           buf[num++] = c;
           if (c == '\n' || num >= 2045) {
-            write(gdb_info_std[0], buf, num);
+            if (write(gdb_info_std[0], buf, num) != num) {
+              fprintf(stderr, "charmrun> writing info command to gdb failed!\n");
+              exit(1);
+            }
             if (c == '\n')
               break;
           }
@@ -5069,9 +5090,18 @@ static void open_gdb_info()
   int fdin[2];
   int fdout[2];
   int fderr[2];
-  pipe(fdin);
-  pipe(fdout);
-  pipe(fderr);
+  if (pipe(fdin) == -1) {
+    fprintf(stderr, "charmrun> pipe() failed!\n");
+    exit(1);
+  }
+  if (pipe(fdout) == -1) {
+    fprintf(stderr, "charmrun> pipe() failed!\n");
+    exit(1);
+  }
+  if (pipe(fderr) == -1) {
+    fprintf(stderr, "charmrun> pipe() failed!\n");
+    exit(1);
+  }
 
   gdb_info_pid = fork();
   if (gdb_info_pid < 0) {

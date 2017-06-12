@@ -1347,7 +1347,9 @@ static void CmiStdoutInit(void) {
 /*Sends data to original stdout (e.g., for ++debug or ++in-xterm)*/
 static void InternalWriteToTerminal(int isStdErr,const char *str,int len)
 {
-	write(writeStdout[isStdErr],str,len);	
+	if (write(writeStdout[isStdErr],str,len) != len) {
+		CmiAbort("Writing to terminal failed!");
+	}
 }
 
 /*

@@ -12,7 +12,9 @@ int CmiInitCma(int cma_min_threshold, int cma_max_threshold) {
   // determine permissions
   fd = open("/proc/sys/kernel/yama/ptrace_scope", O_RDONLY);
   if (0 <= fd) {
-    read (fd, &buffer, 1);
+    if (read (fd, &buffer, 1) != 1) {
+      CmiAbort("CMA> reading /proc/sys/kernel/yama/ptrace_scope failed!");
+    }
     close(fd);
   }
 

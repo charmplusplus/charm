@@ -283,8 +283,12 @@ void CpdFreezeModeScheduler(void)
       if (conditionalPipe[1]!=0 && _conditionalDelivery==0) {
         // Since we are conditionally delivering, forward all messages to the child
         int bytes = SIZEFIELD(msg); // reqLen+((int)(reqData-((char*)hdr)))+CmiReservedHeaderSize;
-        write(conditionalPipe[1], &bytes, 4);
-        write(conditionalPipe[1], msg, bytes);
+        if (write(conditionalPipe[1], &bytes, 4) != 4) {
+          CmiAbort("Writing msg len to child failed!");
+        }
+        if (write(conditionalPipe[1], msg, bytes) != bytes) {
+          CmiAbort("Writing msg data to child failed!");
+        }
       }
       if (CpdIsDebugMessage(msg)) {
         CmiHandleMessage(msg);

@@ -267,7 +267,9 @@ int CthAliasCreate(int stackSize)
 
   /* Make file big enough for stack, by writing one byte at end */
   lseek(fd,stackSize-sizeof(lastByte),SEEK_SET);
-  write(fd,&lastByte,sizeof(lastByte));
+  if (write(fd,&lastByte,sizeof(lastByte)) != sizeof(lastByte)) {
+     CmiAbort("CthThread> writing thread stack to file failed!");
+  }
 
   return fd;
 }

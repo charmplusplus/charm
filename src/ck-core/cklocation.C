@@ -929,7 +929,9 @@ public:
       int x, y, z, t;
 
       for(int i=0; i<numChares; i++) {
-        (void) fscanf(mapf, "%d %d %d %d", &x, &y, &z, &t);
+        if (fscanf(mapf, "%d %d %d %d", &x, &y, &z, &t) != 4) {
+          CkAbort("ReadFileMap> reading from mapfile failed!");
+        }
         mapping[i] = tmgr.coordinatesToRank(x, y, z, t);
       }
       fclose(mapf);

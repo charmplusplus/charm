@@ -80,8 +80,12 @@ extern "C" int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
     if (_conditionalDelivery == 0) CcsImpl_reply(rep, repLen, repData);
     else {
       /* We are the child of a conditional delivery, write to the parent the reply */
-      write(conditionalPipe[1], &repLen, 4);
-      write(conditionalPipe[1], repData, repLen);
+      if (write(conditionalPipe[1], &repLen, 4) != 4) {
+        CmiAbort("CCS> writing reply length to parent failed!");
+      }
+      if (write(conditionalPipe[1], repData, repLen) != repLen) {
+        CmiAbort("CCS> writing reply data to parent failed!");
+      }
     }
   }
   return 0;
