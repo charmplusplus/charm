@@ -94,11 +94,17 @@ order of message arrival. Therefore, they may still suffer from delays caused
 by long running entry methods. An example can be found in 
 \examplerefdir{satisfiability}.
 
-\index{inline}\item[inline] entry methods will be immediately invoked if the
-message recipient happens to be on the same PE. These entry methods need to be
-re-entrant as they could be called multiple times recursively. If the recipient
-resides on a non-local PE, a regular message is sent, and \kw{inline} has no
-effect. An example ``inlineem'' can be found in \testrefdir{megatest}.
+\index{inline}\item[inline] entry methods will be called as a normal C++ member function
+if the message recipient happens to be on the same PE. The call to the function
+will happen inline, and control will return to the calling function after the
+inline method completes. Because of this, these entry methods need to be
+re-entrant as they could be called multiple times recursively. Parameters to the
+inline method will be passed by const reference to avoid any copying, packing,
+or unpacking of the parameters. This makes inline calls effective when large
+amounts of data are being passed, and copying or packing the data would be an
+expensive operation. If the recipient resides on a different PE, a regular
+message is sent with the message arguments packed up using PUP, and \kw{inline}
+has no effect. An example ``inlineem'' can be found in \testrefdir{megatest}.
 
 \index{local}\item[local] entry methods are equivalent to normal function
 calls: the entry method is always executed immediately. This feature is
