@@ -8,7 +8,8 @@ USER_CFLAGS = @USER_CFLAGS@ $(INCLUDE_DIR)
 USER_FFLAGS = @USER_FFLAGS@ $(INCLUDE_DIR)
 CTESTS = simple perf async coll_test coll_perf misc file_info excl large_array \
      atomicity noncontig i_noncontig noncontig_coll split_coll shared_fp \
-     large_file psimple error status noncontig_coll2
+     large_file error status noncontig_coll2
+# disabled test: psimple (no PMPI support in AMPI yet)
 FTESTS = fcoll_test fperf fmisc pfcoll_test
 srcdir=@srcdir@
 

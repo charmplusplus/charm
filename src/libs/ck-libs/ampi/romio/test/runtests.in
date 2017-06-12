@@ -284,16 +284,17 @@ CheckOutput split_coll
 CleanExe split_coll
 #
 OutTime
-testfiles="$testfiles psimple.out"
-\rm -f psimple.out
-MakeExe psimple
-\rm -f $FILENAME*
-echo '**** Testing psimple.c ****'
-$mpirun -np 4 ./psimple -fname $FILENAME "$@" >> psimple.out 2>&1
-CheckOutput psimple
-CleanExe psimple
-#
-OutTime
+# disabled test: psimple (no PMPI support in AMPI yet)
+# testfiles="$testfiles psimple.out"
+# \rm -f psimple.out
+# MakeExe psimple
+# \rm -f $FILENAME*
+# echo '**** Testing psimple.c ****'
+# $mpirun -np 4 ./psimple -fname $FILENAME "$@" >> psimple.out 2>&1
+# CheckOutput psimple
+# CleanExe psimple
+# #
+# OutTime
 testfiles="$testfiles error.out"
 \rm -f error.out
 MakeExe error
