@@ -406,6 +406,9 @@ int ADIOI_Set_lock64(FDTYPE fd_sys, int cmd, int type, ADIO_Offset offset, int w
 
 #define FPRINTF fprintf
 
+#ifdef AMPI
+#define PRINT_ERR_MSG
+#else
 #ifndef HAVE_STRERROR
 #  ifdef HAVE_SYSERRLIST
       extern char *sys_errlist[];
@@ -414,8 +417,8 @@ int ADIOI_Set_lock64(FDTYPE fd_sys, int cmd, int type, ADIO_Offset offset, int w
 #     define PRINT_ERR_MSG
 #  endif
 #endif
+#endif //AMPI
 
 #include "adioi_error.h"
 
 #endif
-
