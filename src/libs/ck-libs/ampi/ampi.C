@@ -8108,8 +8108,14 @@ int AMPI_Status_set_elements(MPI_Status *sts, MPI_Datatype dtype, int count){
 CDECL
 int AMPI_Get_elements(const MPI_Status *sts, MPI_Datatype dtype, int *count){
   AMPIAPI("AMPI_Get_elements");
-  CkDDT_DataType* dttype = getDDT()->getType(dtype) ;
-  *count = dttype->getNumElements();
+  if (dtype <= MPI_MAX_PRIMITIVE_TYPE) { // Is it a basic datatype?
+    CkDDT_DataType* dttype = getDDT()->getType(dtype);
+    int itemsize = dttype->getSize();
+    *count = itemsize==0 ? 0 : sts->MPI_LENGTH/itemsize;
+  } else {
+    CkDDT_DataType* dttype = getDDT()->getType(dtype);
+    *count = dttype->getNumElements();
+  }
   return MPI_SUCCESS;
 }
 
