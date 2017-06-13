@@ -1055,6 +1055,25 @@ nested. The view currently displays information based on raw data
 without regard to the way the events are nested. Memory usage is
 proportional to the number of processors to be displayed.
 
+\subsection{Performance Counters}
+
+This view is enabled when \charmpp{} is compiled with the {\tt papi}
+option, which enables the collection of performance counter data using
+PAPI. Currently, this collects {\tt PAPI\_L1\_TCM}, {\tt PAPI\_L1\_TCA},
+{\tt PAPI\_L2\_TCM}, and {\tt PAPI\_L2\_TCA} on all platforms except
+Cray, where it collects {\tt PAPI\_FP\_OPS}, {\tt PAPI\_TOT\_INS},
+{\tt perf::PERF\_COUNT\_HW\_CACHE\_LL:MISS}, {\tt DATA\_PREFETCHER:ALL},
+{\tt PAPI\_L1\_DCA} and {\tt PAPI\_TOT\_CYC}. This tool shows the
+values of the collected performance counters on different PEs, broken
+down by entry point.  An example is show in Figure \ref{performance counters}.
+
+\begin{figure}[!ht]
+\center
+\includegraphics[width=4.0in]{fig/performancecounters}
+\caption{Performance Counters View}
+\label{performance counters}
+\end{figure}
+
 \subsection{Outlier Analysis}
 \input{View_Outlier}
 
