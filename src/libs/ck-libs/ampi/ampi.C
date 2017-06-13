@@ -2552,7 +2552,7 @@ void ampi::genericRdma(char* buf, int size, int seq, int tag, int srcRank, MPI_C
   )
 
   if (seq != -1) {
-    int seqIdx = (destcomm == MPI_COMM_SELF) ? seqIdx = COMM_SELF_SEQ_IDX : seqIdx = srcRank;
+    int seqIdx = (destcomm == MPI_COMM_SELF) ? COMM_SELF_SEQ_IDX : srcRank;
     int n = oorder.isInOrder(seqIdx, seq);
     if (n > 0) { // This message was in-order
       inorderRdma(buf, size, seq, tag, srcRank, destcomm, ssendReq);
