@@ -279,15 +279,15 @@ int AMPI_Info_delete(MPI_Info info, const char *key){
 CDECL
 int AMPI_Info_get(MPI_Info info, const char *key, int valuelen, char *value, int *flag){
   AMPIAPI("AMPI_Info_get");
-  int ret = getAmpiParent()->getInfo(info, key, valuelen, value, flag);
-  return ampiErrhandler("AMPI_Info_get", ret);
+  getAmpiParent()->getInfo(info, key, valuelen, value, flag);
+  return MPI_SUCCESS; // It is not an error if the requested key does not exist
 }
 
 CDECL
 int AMPI_Info_get_valuelen(MPI_Info info, const char *key, int *valuelen, int *flag){
   AMPIAPI("AMPI_Info_get_valuelen");
-  int ret = getAmpiParent()->getInfoValuelen(info, key, valuelen, flag);
-  return ampiErrhandler("AMPI_Info_get_valuelen", ret);
+  getAmpiParent()->getInfoValuelen(info, key, valuelen, flag);
+  return MPI_SUCCESS; // It is not an error if the requested key does not exist
 }
 
 CDECL
