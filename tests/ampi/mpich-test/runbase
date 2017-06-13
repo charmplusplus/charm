@@ -204,7 +204,7 @@ RunTest() {
         # tokenized.  The ./$1 ensures that the program will be found,
         # even if . is not in the PATH.
         
-        eval ./charmrun ./$pgm $4 +quiet +p$np  </dev/null >> $pgm.out 2>&1
+        eval ./charmrun ./$pgm $4 ++local ++quiet +p$np  </dev/null >> $pgm.out 2>&1
         if [ -n "$5" ] ; then 
             for file in $5 ; do 
                 if [ -s $file ] ; then 
