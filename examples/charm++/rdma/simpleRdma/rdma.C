@@ -55,7 +55,6 @@ void copyArray(T *&dest, T *&src, int size){
 template<class T>
 void assignValues(T *&arr, int size){
   arr = new T[size];
-  srand(time(NULL));
   for(int i=0; i<size; i++)
      arr[i] = rand() % 100 + 1;
 }

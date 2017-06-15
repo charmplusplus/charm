@@ -38,7 +38,6 @@ load_balancing \
 piArray \
 PUP \
 NQueen \
-rdma \
 reductions \
 ring \
 rings \
