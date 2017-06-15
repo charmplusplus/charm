@@ -699,6 +699,12 @@ class AmpiRequest {
   ///  MPI_REDN_REQ, MPI_GATHER_REQ, MPI_GATHERV_REQ, MPI_GPU_REQ
   virtual int getType(void) const =0;
 
+  /// Return the actual number of bytes that were received.
+  virtual int getNumReceivedBytes(CkDDT *ddt) const {
+    // by default, return number of bytes requested
+    return count * ddt->getSize(type);
+  }
+
   virtual void pup(PUP::er &p) {
     p((char *)&buf,sizeof(void *)); //supposed to work only with isomalloc
     p(count);
@@ -746,7 +752,7 @@ class PersReq : public AmpiRequest {
 
 class IReq : public AmpiRequest {
  public:
-  int length; // recv'ed length
+  int length; // recv'ed length in bytes
   bool cancelled; // track if request is cancelled
   IReq(void *buf_, int count_, MPI_Datatype type_, int src_, int tag_, MPI_Comm comm_,
        AmpiReqSts sts_=AMPI_REQ_PENDING)
@@ -769,6 +775,9 @@ class IReq : public AmpiRequest {
   void receive(ampi *ptr, AmpiMsg *msg);
   void receive(ampi *ptr, CkReductionMsg *msg) {}
   void receiveRdma(ampi *ptr, char *sbuf, int slength, int ssendReq, int srcRank, MPI_Comm scomm);
+  virtual int getNumReceivedBytes(CkDDT *ptr) const {
+    return length;
+  }
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
     p|length;

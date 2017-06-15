@@ -3028,7 +3028,7 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
       sts->MPI_SOURCE = req.src;
       sts->MPI_TAG    = req.tag;
       sts->MPI_COMM   = req.comm;
-      sts->MPI_LENGTH = req.count * getDDT()->getSize(type);
+      sts->MPI_LENGTH = req.getNumReceivedBytes(getDDT());
       sts->MPI_CANCEL = 0;
     }
     freeNonPersReq(request);
