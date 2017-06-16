@@ -5233,9 +5233,8 @@ int AMPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
       CkAssert(getAmpiParent()->numBlockedReqs == 0);
       return MPI_SUCCESS;
     }
-    else {
-     req.setBlocked(true);
-    }
+
+    req.setBlocked(true);
   }
 
   if (nullReqs == count) {
@@ -5244,33 +5243,33 @@ int AMPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
     CkAssert(getAmpiParent()->numBlockedReqs == 0);
     return MPI_SUCCESS;
   }
-  else { // block until one of the requests is completed
-    getAmpiParent()->numBlockedReqs = 1;
-    getAmpiParent()->blockOnRecv();
-    reqs = getReqs(); // update pointer in case of migration while suspended
 
-    for (int i=0; i<count; i++) {
-      if (request[i] == MPI_REQUEST_NULL) {
-        continue;
-      }
-      AmpiRequest& req = *(*reqs)[request[i]];
-      if (req.test()) {
-        req.wait(sts);
-        reqs->unblockReqs(&request[i], count-i);
-        freeNonPersReq(request[i]);
-        *idx = i;
-        CkAssert(getAmpiParent()->numBlockedReqs == 0);
-        return MPI_SUCCESS;
-      }
-      else {
-        req.setBlocked(false);
-      }
+  // block until one of the requests is completed
+  getAmpiParent()->numBlockedReqs = 1;
+  getAmpiParent()->blockOnRecv();
+  reqs = getReqs(); // update pointer in case of migration while suspended
+
+  for (int i=0; i<count; i++) {
+    if (request[i] == MPI_REQUEST_NULL) {
+      continue;
     }
-#if CMK_ERROR_CHECKING
-    CkAbort("In AMPI_Waitany, a request should have completed by now!");
-#endif
-    return MPI_SUCCESS;
+    AmpiRequest& req = *(*reqs)[request[i]];
+    if (req.test()) {
+      req.wait(sts);
+      reqs->unblockReqs(&request[i], count-i);
+      freeNonPersReq(request[i]);
+      *idx = i;
+      CkAssert(getAmpiParent()->numBlockedReqs == 0);
+      return MPI_SUCCESS;
+    }
+
+    req.setBlocked(false);
   }
+#if CMK_ERROR_CHECKING
+  CkAbort("In AMPI_Waitany, a request should have completed by now!");
+#endif
+  return MPI_SUCCESS;
+
 }
 
 CDECL
