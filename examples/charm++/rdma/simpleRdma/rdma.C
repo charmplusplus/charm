@@ -61,7 +61,6 @@ void assignValues(T *&arr, int size){
 
 void assignCharValues(char *&arr, int size){
   arr = new char[size];
-  srand(time(NULL));
   for(int i=0; i<size; i++)
      arr[i] = (char)(rand() % 125 + 1);
 }
