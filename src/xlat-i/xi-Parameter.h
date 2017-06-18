@@ -53,7 +53,8 @@ class Parameter {
     void unmarshallRegArrayData(XStr &str);
     void unmarshallRdmaArrayData(XStr &str, bool genRegArray);
     void unmarshallArrayDataSDAG(XStr &str);
-    void unmarshallArrayDataSDAGCall(XStr &str);
+    void unmarshallRegArrayDataSDAGCall(XStr &str);
+    void unmarshallRdmaArrayDataSDAGCall(XStr &str);
     void pupAllValues(XStr &str);
 
   public:

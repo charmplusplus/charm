@@ -2000,18 +2000,18 @@ void Entry::genClosure(XStr& decls, bool isDef) {
 
   if (hasArray || hasRdma) {
 
+    structure << "      " << "CkMarshallMsg* _impl_marshall;\n";
+    dealloc << "        if (_impl_marshall) CmiFree(UsrToEnv(_impl_marshall));\n";
+    initCode << "        _impl_marshall = 0;\n";
+
     if(hasRdma && !hasArray) {
       structure << "#if !CMK_ONESIDED_IMPL\n";
       initCode << "#if !CMK_ONESIDED_IMPL\n";
-      dealloc << "#if !CMK_ONESIDED_IMPL\n";
       toPup << "#if !CMK_ONESIDED_IMPL\n";
     }
-    structure << "      " << "CkMarshallMsg* _impl_marshall;\n";
     structure << "      " << "char* _impl_buf_in;\n";
     structure << "      " << "int _impl_buf_size;\n";
-    dealloc << "        if (_impl_marshall) CmiFree(UsrToEnv(_impl_marshall));\n";
 
-    initCode << "        _impl_marshall = 0;\n";
     initCode << "        _impl_buf_in = 0;\n";
     initCode << "        _impl_buf_size = 0;\n";
 
@@ -2026,7 +2026,6 @@ void Entry::genClosure(XStr& decls, bool isDef) {
     if(hasRdma && !hasArray) {
       structure << "#endif\n";
       initCode << "#endif\n";
-      dealloc << "#endif\n";
       toPup << "#endif\n";
     }
   }

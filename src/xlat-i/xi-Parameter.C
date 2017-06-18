@@ -490,7 +490,7 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool needsClosure) {
             if (!needsClosure)
               callEach(&Parameter::unmarshallRegArrayData,str);
             else
-              callEach(&Parameter::unmarshallArrayDataSDAGCall,str);
+              callEach(&Parameter::unmarshallRegArrayDataSDAGCall,str);
         }
     }
   if (needsClosure) {
@@ -612,20 +612,25 @@ void ParamList::beginUnmarshallSDAGCall(XStr &str, bool usesImplBuf) {
     }
     callEach(&Parameter::beginUnmarshallSDAGCall, str);
     str << "  impl_buf+=CK_ALIGN(implP.size(),16);\n";
-    if(hasRdma() && !hasArray)
+    if(hasRdma())
       str<<"#if !CMK_ONESIDED_IMPL\n";
-    callEach(&Parameter::unmarshallArrayDataSDAGCall,str);
+    callEach(&Parameter::unmarshallRdmaArrayDataSDAGCall,str);
+    if(hasRdma())
+      str<<"#endif\n";
+    callEach(&Parameter::unmarshallRegArrayDataSDAGCall,str);
     if (hasArray || hasRdma()) {
       if (!usesImplBuf) {
         str << "  genClosure->_impl_marshall = impl_msg_typed;\n";
         str << "  CmiReference(UsrToEnv(genClosure->_impl_marshall));\n";
       } else {
+        if(hasRdma() && !hasArray)
+          str<<"#if !CMK_ONESIDED_IMPL\n";
         str << "  genClosure->_impl_buf_in = impl_buf;\n";
         str << "  genClosure->_impl_buf_size = implP.size();\n";
+        if(hasRdma() && !hasArray)
+          str<<"#endif\n";
       }
     }
-    if(hasRdma() && !hasArray)
-      str<<"#endif\n";
   }
 }
 void ParamList::beginUnmarshallSDAG(XStr &str) {
@@ -651,8 +656,15 @@ void Parameter::unmarshallArrayDataSDAG(XStr &str) {
       str<<"#endif\n";
   }
 }
-void Parameter::unmarshallArrayDataSDAGCall(XStr &str) {
-  if (isArray() || isRdma()) {
+void Parameter::unmarshallRegArrayDataSDAGCall(XStr &str) {
+  if (isArray()) {
+    Type *dt=type->deref();//Type, without &
+    str << "  genClosure->" << name << " = (" << dt << " *)(impl_buf+impl_off_" << name << ");\n";
+  }
+}
+
+void Parameter::unmarshallRdmaArrayDataSDAGCall(XStr &str) {
+  if (isRdma()) {
     Type *dt=type->deref();//Type, without &
     str << "  genClosure->" << name << " = (" << dt << " *)(impl_buf+impl_off_" << name << ");\n";
   }
