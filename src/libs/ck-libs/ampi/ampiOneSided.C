@@ -421,7 +421,7 @@ int ampi::winGetAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype
       SendReq* ampiReq = new SendReq(myComm.getComm());
       MPI_Request req = reqs->insert(ampiReq);
       CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
-      completepdSendCB.setRefnum(req);
+      completedSendCB.setRefnum(req);
       msg = thisProxy[rank].winRemoteGetAccumulate(orgtotalsize, rdma(orgaddr, completedSendCB), orgcnt,
                                                    orgtype, targdisp, targcnt, targtype, op, win->index);
       ampiReq->wait(MPI_STATUS_IGNORE);
