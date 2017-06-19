@@ -1009,7 +1009,7 @@ CkDDT_Indexed::CkDDT_Indexed(int nCount, const int* arrBlock, const CkDDT_Aint* 
     }
 
     extent = positiveExtent + (-1)*negativeExtent;
-    lb = baseType->getLB() + *std::min_element(&arrayDisplacements[0],&arrayDisplacements[0] + nCount+1)*baseExtent;
+    lb = baseType->getLB() + *std::min_element(&arrayDisplacements[0],&arrayDisplacements[0] + nCount)*baseExtent;
     ub = lb + extent;
 
     trueExtent = extent;
@@ -1129,7 +1129,7 @@ CkDDT_HIndexed::CkDDT_HIndexed(int nCount, const int* arrBlock, const CkDDT_Aint
       ub = std::max(arrBlock[i]*baseExtent + baseType->getLB() + arrayDisplacements[i], ub);
   }
 
-  lb = baseType->getLB() + *std::min_element(arrDisp, arrDisp+nCount+1);
+  lb = baseType->getLB() + *std::min_element(arrDisp, arrDisp+nCount);
   extent = ub - lb;
 
   trueExtent = extent;
@@ -1232,7 +1232,7 @@ CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, const CkDDT_Ain
   }
 
   extent = positiveExtent + (-1)*negativeExtent;
-  lb = baseType->getLB() + *std::min_element(arrayDisplacements, arrayDisplacements + count+1)*baseExtent;
+  lb = baseType->getLB() + *std::min_element(arrayDisplacements, arrayDisplacements + count)*baseExtent;
   ub = lb + extent;
 
   trueExtent = extent;
@@ -1357,7 +1357,7 @@ CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, const CkDDT_A
   }
 
   extent = positiveExtent + (-1)*negativeExtent;
-  lb = baseType->getLB() + *std::min_element(arrayDisplacements, arrayDisplacements + count+1);
+  lb = baseType->getLB() + *std::min_element(arrayDisplacements, arrayDisplacements + count);
   ub = lb + extent;
 
   trueExtent = extent;
