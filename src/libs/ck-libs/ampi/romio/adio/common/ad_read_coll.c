@@ -324,7 +324,7 @@ void ADIOI_Calc_my_off_len(ADIO_File fd, int bufcount, MPI_Datatype
        /* First calculate what size of offset_list and len_list to allocate */
    
        /* filetype already flattened in ADIO_Open or ADIO_Fcntl */
-	flat_file = ADIOI_Flatlist;
+	flat_file = CtvAccess(ADIOI_Flatlist);
 	while (flat_file->type != fd->filetype) flat_file = flat_file->next;
 	disp = fd->disp;
 
@@ -553,7 +553,7 @@ static void ADIOI_Read_and_exch(ADIO_File fd, void *buf, MPI_Datatype
     ADIOI_Datatype_iscontig(datatype, &buftype_is_contig);
     if (!buftype_is_contig) {
 	ADIOI_Flatten_datatype(datatype);
-	flat_buf = ADIOI_Flatlist;
+	flat_buf = CtvAccess(ADIOI_Flatlist);
         while (flat_buf->type != datatype) flat_buf = flat_buf->next;
     }
     MPI_Type_extent(datatype, &buftype_extent);

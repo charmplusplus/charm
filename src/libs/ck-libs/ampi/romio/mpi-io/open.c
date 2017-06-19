@@ -24,7 +24,9 @@
 #include "mpioprof.h"
 #endif
 
-extern int ADIO_Init_keyval;
+CtvExtern(int, ADIO_Init_keyval);
+// AMPI: was ADIO_Init_keyval initialized already?
+CtvExtern(int, ADIO_Init_keyval_done);
 
 /*@
     MPI_File_open - Opens a file
@@ -127,9 +129,13 @@ int MPI_File_open(MPI_Comm comm, char *filename, int amode,
 	MPI_Abort(MPI_COMM_WORLD, 1);
     }
 */
+    CtvInitialize(int, ADIO_Init_keyval);
+    CtvInitialize(int, ADIO_Init_keyval_done);
 
 /* check if ADIO has been initialized. If not, initialize it */
-    if (ADIO_Init_keyval == MPI_KEYVAL_INVALID) {
+    if (CtvAccess(ADIO_Init_keyval) == MPI_KEYVAL_INVALID || CtvAccess(ADIO_Init_keyval_done) != 1) {
+        CtvAccess(ADIO_Init_keyval_done) = 1;
+
 
 /* check if MPI itself has been initialized. If not, flag an error.
    Can't initialize it here, because don't know argc, argv */
@@ -139,15 +145,16 @@ int MPI_File_open(MPI_Comm comm, char *filename, int amode,
 	    MPI_Abort(MPI_COMM_WORLD, 1);
 	}
 
-	MPI_Keyval_create(MPI_NULL_COPY_FN, ADIOI_End_call, &ADIO_Init_keyval,
+	MPI_Keyval_create(MPI_NULL_COPY_FN, ADIOI_End_call, &CtvAccess(ADIO_Init_keyval),
 			  (void *) 0);  
+
 
 /* put a dummy attribute on MPI_COMM_WORLD, because we want the delete
    function to be called when MPI_COMM_WORLD is freed. Hopefully the
    MPI library frees MPI_COMM_WORLD when MPI_Finalize is called,
    though the standard does not mandate this. */
 
-	MPI_Attr_put(MPI_COMM_WORLD, ADIO_Init_keyval, (void *) 0);
+	MPI_Attr_put(MPI_COMM_WORLD, CtvAccess(ADIO_Init_keyval), (void *) 0);
 
 /* initialize ADIO */
 

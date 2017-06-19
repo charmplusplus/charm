@@ -5,10 +5,10 @@
 #include <string.h>
 #include <stdlib.h>
 
-static int verbose = 0;
 
 int main(int argc, char **argv)
 {
+    int verbose = 0; //Privatized for AMPI
     int i, len, nkeys, flag, mynod, default_striping_factor=0, nprocs, errs = 0;
     MPI_File fh;
     MPI_Info info, info_used;

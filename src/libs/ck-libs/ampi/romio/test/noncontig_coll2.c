@@ -5,6 +5,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "converse.h" // For Ctv*
+
 /* tests noncontiguous reads/writes using collective I/O */
 
 /* this test is almost exactly like noncontig_coll.c with the following changes:
@@ -22,7 +24,8 @@
 int test_file(char *filename, int mynod, int nprocs, char * cb_hosts,
 		char *msg, int verbose);
 
-static int cb_config_list_keyval = MPI_KEYVAL_INVALID;
+// cb_config_list_keyval will be initialized in main()
+CtvStaticDeclare(int, cb_config_list_keyval); //= MPI_KEYVAL_INVALID;
 
 #define ADIOI_Free free
 #define ADIOI_Malloc malloc
@@ -111,13 +114,13 @@ int cb_gather_name_array(MPI_Comm comm, ADIO_cb_name_array *arrayp)
     int commsize, commrank, found;
     ADIO_cb_name_array array = NULL;
 
-    if (cb_config_list_keyval == MPI_KEYVAL_INVALID) {
+    if (CtvAccess(cb_config_list_keyval) == MPI_KEYVAL_INVALID) {
 	MPI_Keyval_create((MPI_Copy_function *) cb_copy_name_array,
 			  (MPI_Delete_function *) cb_delete_name_array,
-			  &cb_config_list_keyval, NULL);
+			  &CtvAccess(cb_config_list_keyval), NULL);
     }
     else {
-	MPI_Attr_get(comm, cb_config_list_keyval, (void *) &array, &found);
+	MPI_Attr_get(comm, CtvAccess(cb_config_list_keyval), (void *) &array, &found);
 	if (found) {
 	    *arrayp = array;
 	    return 0;
@@ -225,7 +228,7 @@ int cb_gather_name_array(MPI_Comm comm, ADIO_cb_name_array *arrayp)
      * so that they can all tell if we have gone through this procedure
      * or not for the given communicator.
      */
-    MPI_Attr_put(comm, cb_config_list_keyval, array);
+    MPI_Attr_put(comm, CtvAccess(cb_config_list_keyval), array);
     *arrayp = array;
     return 0;
 }
@@ -308,6 +311,8 @@ int main(int argc, char **argv)
     int cb_config_len;
     ADIO_cb_name_array array;
 
+    CtvInitialize(int, cb_config_list_keyval);
+    CtvAccess(cb_config_list_keyval) = MPI_KEYVAL_INVALID;
 
     MPI_Init(&argc,&argv);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);

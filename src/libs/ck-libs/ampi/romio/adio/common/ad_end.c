@@ -18,7 +18,7 @@ void ADIO_End(int *error_code)
 /*    FPRINTF(stderr, "reached end\n"); */
 
 /* delete the flattened datatype list */
-    curr = ADIOI_Flatlist;
+    curr = CtvAccess(ADIOI_Flatlist);
     while (curr) {
 	if (curr->blocklens) ADIOI_Free(curr->blocklens);
 	if (curr->indices) ADIOI_Free(curr->indices);
@@ -26,35 +26,35 @@ void ADIO_End(int *error_code)
 	ADIOI_Free(curr);
 	curr = next;
     }
-    ADIOI_Flatlist = NULL;
+    CtvAccess(ADIOI_Flatlist) = NULL;
 
-    if (ADIOI_Async_list_head) {
+    if (CtvAccess(ADIOI_Async_list_head)) {
 	FPRINTF(stderr, "ADIO_End: Error! There are outstanding nonblocking I/O operations!\n");
 	MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
 /* free list of available ADIOI_Async_nodes. */
-    while (ADIOI_Malloc_async_head) {
-	ADIOI_Free(ADIOI_Malloc_async_head->ptr);
-	tmp = ADIOI_Malloc_async_head;
-	ADIOI_Malloc_async_head = ADIOI_Malloc_async_head->next;
+    while (CtvAccess(ADIOI_Malloc_async_head)) {
+	ADIOI_Free(CtvAccess(ADIOI_Malloc_async_head)->ptr);
+	tmp = CtvAccess(ADIOI_Malloc_async_head);
+	CtvAccess(ADIOI_Malloc_async_head) = CtvAccess(ADIOI_Malloc_async_head)->next;
 	ADIOI_Free(tmp);
     }
-    ADIOI_Async_avail_head = ADIOI_Async_avail_tail = NULL;
-    ADIOI_Malloc_async_head = ADIOI_Malloc_async_tail = NULL;
+    CtvAccess(ADIOI_Async_avail_head) = CtvAccess(ADIOI_Async_avail_tail) = NULL;
+    CtvAccess(ADIOI_Malloc_async_head) = CtvAccess(ADIOI_Malloc_async_tail) = NULL;
 
 /* free all available request objects */
-    while (ADIOI_Malloc_req_head) {
-	ADIOI_Free(ADIOI_Malloc_req_head->ptr);
-	tmp1 = ADIOI_Malloc_req_head;
-	ADIOI_Malloc_req_head = ADIOI_Malloc_req_head->next;
+    while (CtvAccess(ADIOI_Malloc_req_head)) {
+	ADIOI_Free(CtvAccess(ADIOI_Malloc_req_head)->ptr);
+	tmp1 = CtvAccess(ADIOI_Malloc_req_head);
+	CtvAccess(ADIOI_Malloc_req_head) = CtvAccess(ADIOI_Malloc_req_head)->next;
 	ADIOI_Free(tmp1);
     }
-    ADIOI_Malloc_req_head = ADIOI_Malloc_req_tail = NULL;
+    CtvAccess(ADIOI_Malloc_req_head) = CtvAccess(ADIOI_Malloc_req_tail) = NULL;
 
 /* free file, request, and info tables used for Fortran interface */
-    if (ADIOI_Ftable) ADIOI_Free(ADIOI_Ftable);
-    if (ADIOI_Reqtable) ADIOI_Free(ADIOI_Reqtable);
+    if (CtvAccess(ADIOI_Ftable)) ADIOI_Free(CtvAccess(ADIOI_Ftable));
+    if (CtvAccess(ADIOI_Reqtable)) ADIOI_Free(CtvAccess(ADIOI_Reqtable));
 #ifndef HAVE_MPI_INFO
     if (MPIR_Infotable) ADIOI_Free(MPIR_Infotable);
 #endif

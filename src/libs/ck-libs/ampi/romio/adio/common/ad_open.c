@@ -57,7 +57,7 @@ ADIO_File ADIO_Open(MPI_Comm orig_comm,
     fd->iomode = iomode;
     fd->async_count = 0;
 
-    fd->err_handler = ADIOI_DFLT_ERR_HANDLER;
+    fd->err_handler = CtvAccess(ADIOI_DFLT_ERR_HANDLER);
 
 /* set I/O function pointers */
     ADIOI_SetFunctions(fd);

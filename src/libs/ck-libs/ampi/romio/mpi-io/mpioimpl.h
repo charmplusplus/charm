@@ -15,6 +15,7 @@
 
 #include "adio.h"
 #include "mpio.h"
+#include "converse.h" //For Ctv*
 
 /* info is a linked list of these structures */
 struct MPIR_Info {

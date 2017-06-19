@@ -43,7 +43,7 @@ int MPI_File_get_errhandler(MPI_File fh, MPI_Errhandler *errhandler)
     static char myname[] = "MPI_FILE_GET_ERRHANDLER";
 #endif
 
-    if (fh == MPI_FILE_NULL) *errhandler = ADIOI_DFLT_ERR_HANDLER;
+    if (fh == MPI_FILE_NULL) *errhandler = CtvAccess(ADIOI_DFLT_ERR_HANDLER);
     else if (fh->cookie != ADIOI_FILE_COOKIE) {
 #ifdef PRINT_ERR_MSG
 	FPRINTF(stderr, "MPI_File_close: Invalid file handle\n");

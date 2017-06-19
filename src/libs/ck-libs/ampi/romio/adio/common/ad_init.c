@@ -7,25 +7,42 @@
  */
 
 #include "adio.h"
+#include "converse.h" //For Ctv*
 
-ADIOI_Flatlist_node *ADIOI_Flatlist;
-ADIOI_Async_node *ADIOI_Async_list_head, *ADIOI_Async_list_tail;
+CtvDeclare(ADIOI_Flatlist_node*, ADIOI_Flatlist);
+
+CtvDeclare(ADIOI_Async_node*, ADIOI_Async_list_head);
+CtvDeclare(ADIOI_Async_node*, ADIOI_Async_list_tail);
+
+CtvDeclare(ADIOI_Async_node*, ADIOI_Async_avail_head);
+CtvDeclare(ADIOI_Async_node*, ADIOI_Async_avail_tail);
+
+CtvDeclare(ADIOI_Malloc_async*, ADIOI_Malloc_async_head);
+CtvDeclare(ADIOI_Malloc_async*, ADIOI_Malloc_async_tail);
+// ADIOI_Async_node *ADIOI_Async_list_head, *ADIOI_Async_list_tail;
     /* list of outstanding asynchronous requests */
-ADIOI_Async_node *ADIOI_Async_avail_head, *ADIOI_Async_avail_tail;
+// ADIOI_Async_node *ADIOI_Async_avail_head, *ADIOI_Async_avail_tail;
     /* list of available (already malloced) nodes for above async list */
-ADIOI_Malloc_async *ADIOI_Malloc_async_head, *ADIOI_Malloc_async_tail;
+// ADIOI_Malloc_async *ADIOI_Malloc_async_head, *ADIOI_Malloc_async_tail;
   /* list of malloced areas for async_list, which must be freed in ADIO_End */
 
-ADIOI_Req_node *ADIOI_Req_avail_head, *ADIOI_Req_avail_tail;
+CtvDeclare(ADIOI_Req_node*, ADIOI_Req_avail_head);
+CtvDeclare(ADIOI_Req_node*, ADIOI_Req_avail_tail);
+
+CtvDeclare(ADIOI_Malloc_req*, ADIOI_Malloc_req_head);
+CtvDeclare(ADIOI_Malloc_req*, ADIOI_Malloc_req_tail);
+// ADIOI_Req_node *ADIOI_Req_avail_head, *ADIOI_Req_avail_tail;
     /* list of available (already malloced) request objects */
-ADIOI_Malloc_req *ADIOI_Malloc_req_head, *ADIOI_Malloc_req_tail;
+// ADIOI_Malloc_req *ADIOI_Malloc_req_head, *ADIOI_Malloc_req_tail;
     /* list of malloced areas for requests, which must be freed in ADIO_End */
 
 /* for f2c and c2f conversion */
-ADIO_File *ADIOI_Ftable;
-int ADIOI_Ftable_ptr, ADIOI_Ftable_max;
-ADIO_Request *ADIOI_Reqtable;
-int ADIOI_Reqtable_ptr, ADIOI_Reqtable_max;
+CtvDeclare(ADIO_File*, ADIOI_Ftable);
+CtvDeclare(int, ADIOI_Ftable_ptr);
+CtvDeclare(int, ADIOI_Ftable_max);
+CtvDeclare(ADIO_Request*, ADIOI_Reqtable);
+CtvDeclare(int, ADIOI_Reqtable_ptr);
+CtvDeclare(int, ADIOI_Reqtable_max);
 #ifndef HAVE_MPI_INFO
 MPI_Info *MPIR_Infotable;
 int MPIR_Infotable_ptr, MPIR_Infotable_max;
@@ -35,35 +52,67 @@ int MPIR_Infotable_ptr, MPIR_Infotable_max;
 int ADIOI_Direct_read, ADIOI_Direct_write;
 #endif
 
-int ADIO_Init_keyval=MPI_KEYVAL_INVALID;
+CtvDeclare(int, ADIO_Init_keyval); //=MPI_KEYVAL_INVALID;
+CtvDeclare(int, ADIO_Init_keyval_done); // accessed in open.c, delete.c
 
-MPI_Errhandler ADIOI_DFLT_ERR_HANDLER = MPI_ERRORS_RETURN;
+CtvDeclare(MPI_Errhandler, ADIOI_DFLT_ERR_HANDLER); // = MPI_ERRORS_RETURN;
 
 void ADIO_Init(int *argc, char ***argv, int *error_code)
 {
 #ifdef XFS
     char *c;
 #endif
+    CtvInitialize(ADIOI_Flatlist_node*, ADIOI_Flatlist);
+
+    CtvInitialize(ADIOI_Async_node*, ADIOI_Async_list_head);
+    CtvInitialize(ADIOI_Async_node*, ADIOI_Async_list_tail);
+
+    CtvInitialize(ADIOI_Async_node*, ADIOI_Async_avail_head);
+    CtvInitialize(ADIOI_Async_node*, ADIOI_Async_avail_tail);
+
+    CtvInitialize(ADIOI_Malloc_async*, ADIOI_Malloc_async_head);
+    CtvInitialize(ADIOI_Malloc_async*, ADIOI_Malloc_async_tail);
+
+    CtvInitialize(ADIOI_Req_node*, ADIOI_Req_avail_head);
+    CtvInitialize(ADIOI_Req_node*, ADIOI_Req_avail_tail);
+
+    CtvInitialize(ADIOI_Malloc_req*, ADIOI_Malloc_req_head);
+    CtvInitialize(ADIOI_Malloc_req*, ADIOI_Malloc_req_tail);
+
+    CtvInitialize(ADIO_File*, ADIOI_Ftable);
+    CtvInitialize(int, ADIOI_Ftable_ptr);
+    CtvInitialize(int, ADIOI_Ftable_max);
+    CtvInitialize(ADIO_Request*, ADIOI_Reqtable);
+    CtvInitialize(int, ADIOI_Reqtable_ptr);
+    CtvInitialize(int, ADIOI_Reqtable_max);
+
+    CtvInitialize(int, ADIO_Init_keyval);
+    // ADIO_Init_keyval is initialized to MPI_KEYVAL_INVALID in open.c/delete.c
+
+    CtvInitialize(int, ADIO_Init_keyval_done);
+
+    CtvInitialize(MPI_Errhandler, ADIOI_DFLT_ERR_HANDLER);
+    CtvAccess(ADIOI_DFLT_ERR_HANDLER) = MPI_ERRORS_RETURN;
 
 /* initialize the linked list containing flattened datatypes */
-    ADIOI_Flatlist = (ADIOI_Flatlist_node *) ADIOI_Malloc(sizeof(ADIOI_Flatlist_node));
-    ADIOI_Flatlist->type = (MPI_Datatype) NULL;
-    ADIOI_Flatlist->next = NULL;
-    ADIOI_Flatlist->blocklens = NULL;
-    ADIOI_Flatlist->indices = NULL;
+    CtvAccess(ADIOI_Flatlist) = (ADIOI_Flatlist_node *) ADIOI_Malloc(sizeof(ADIOI_Flatlist_node));
+    CtvAccess(ADIOI_Flatlist)->type = (MPI_Datatype) NULL;
+    CtvAccess(ADIOI_Flatlist)->next = NULL;
+    CtvAccess(ADIOI_Flatlist)->blocklens = NULL;
+    CtvAccess(ADIOI_Flatlist)->indices = NULL;
 
-    ADIOI_Async_list_head = ADIOI_Async_list_tail = NULL;
-    ADIOI_Async_avail_head = ADIOI_Async_avail_tail = NULL;
-    ADIOI_Malloc_async_head = ADIOI_Malloc_async_tail = NULL;
+    CtvAccess(ADIOI_Async_list_head) = CtvAccess(ADIOI_Async_list_tail) = NULL;
+    CtvAccess(ADIOI_Async_avail_head) = CtvAccess(ADIOI_Async_avail_tail) = NULL;
+    CtvAccess(ADIOI_Malloc_async_head) = CtvAccess(ADIOI_Malloc_async_tail) = NULL;
 
-    ADIOI_Req_avail_head = ADIOI_Req_avail_tail = NULL;
-    ADIOI_Malloc_req_head = ADIOI_Malloc_req_tail = NULL;
+    CtvAccess(ADIOI_Req_avail_head) = CtvAccess(ADIOI_Req_avail_tail) = NULL;
+    CtvAccess(ADIOI_Malloc_req_head) = CtvAccess(ADIOI_Malloc_req_tail) = NULL;
 
-    ADIOI_Ftable = NULL;
-    ADIOI_Ftable_ptr = ADIOI_Ftable_max = 0;
+    CtvAccess(ADIOI_Ftable) = NULL;
+    CtvAccess(ADIOI_Ftable_ptr) = CtvAccess(ADIOI_Ftable_max) = 0;
 
-    ADIOI_Reqtable = NULL;
-    ADIOI_Reqtable_ptr = ADIOI_Reqtable_max = 0;
+    CtvAccess(ADIOI_Reqtable) = NULL;
+    CtvAccess(ADIOI_Reqtable_ptr) = CtvAccess(ADIOI_Reqtable_max) = 0;
 
 #ifndef HAVE_MPI_INFO
     MPIR_Infotable = NULL;

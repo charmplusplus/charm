@@ -42,10 +42,10 @@ MPIO_Request MPIO_Request_f2c(MPI_Fint request)
     return (MPIO_Request) request;
 #else
     if (!request) return MPIO_REQUEST_NULL;
-    if ((request < 0) || (request > ADIOI_Reqtable_ptr)) {
+    if ((request < 0) || (request > CtvAccess(ADIOI_Reqtable_ptr))) {
 	FPRINTF(stderr, "MPIO_Request_f2c: Invalid request\n");
 	MPI_Abort(MPI_COMM_WORLD, 1);
     }
-    return ADIOI_Reqtable[request];
+    return CtvAccess(ADIOI_Reqtable)[request];
 #endif
 }

@@ -44,10 +44,10 @@ MPI_File MPI_File_f2c(MPI_Fint fh)
        may not be 8-byte aligned.*/
 #else
     if (!fh) return MPI_FILE_NULL;
-    if ((fh < 0) || (fh > ADIOI_Ftable_ptr)) {
+    if ((fh < 0) || (fh > CtvAccess(ADIOI_Ftable_ptr))) {
 	FPRINTF(stderr, "MPI_File_f2c: Invalid file handle\n");
 	MPI_Abort(MPI_COMM_WORLD, 1);
     }
-    return ADIOI_Ftable[fh];
+    return CtvAccess(ADIOI_Ftable)[fh];
 #endif
 }

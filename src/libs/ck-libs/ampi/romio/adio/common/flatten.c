@@ -27,7 +27,7 @@ void ADIOI_Flatten_datatype(MPI_Datatype datatype)
     if (is_contig) return;
 
     /* has it already been flattened? */
-    flat = ADIOI_Flatlist;
+    flat = CtvAccess(ADIOI_Flatlist);
     while (flat) {
 	if (flat->type == datatype) return;
 	else {
@@ -652,7 +652,7 @@ void ADIOI_Delete_flattened(MPI_Datatype datatype)
 {
     ADIOI_Flatlist_node *flat, *prev;
 
-    prev = flat = ADIOI_Flatlist;
+    prev = flat = CtvAccess(ADIOI_Flatlist);
     while (flat && (flat->type != datatype)) {
 	prev = flat;
 	flat = flat->next;

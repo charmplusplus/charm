@@ -22,37 +22,37 @@ ADIOI_Async_node *ADIOI_Malloc_async_node(void)
     ADIOI_Async_node *curr, *ptr;
     int i;
 
-    if (!ADIOI_Async_avail_head) {
-	ADIOI_Async_avail_head = (ADIOI_Async_node *)
+    if (!CtvAccess(ADIOI_Async_avail_head)) {
+	CtvAccess(ADIOI_Async_avail_head) = (ADIOI_Async_node *)
 	              ADIOI_Malloc(NUM*sizeof(ADIOI_Async_node));  
-	curr = ADIOI_Async_avail_head;
+	curr = CtvAccess(ADIOI_Async_avail_head);
 	for (i=1; i<NUM; i++) {
-	    curr->next = ADIOI_Async_avail_head+i;
+	    curr->next = CtvAccess(ADIOI_Async_avail_head)+i;
 	    curr = curr->next;
 	}
 	curr->next = NULL;
-	ADIOI_Async_avail_tail = curr;
+	CtvAccess(ADIOI_Async_avail_tail) = curr;
 
 	/* keep track of malloced area that needs to be freed later */
-	if (!ADIOI_Malloc_async_tail) {
-	    ADIOI_Malloc_async_tail = (ADIOI_Malloc_async *)
+	if (!CtvAccess(ADIOI_Malloc_async_tail)) {
+	    CtvAccess(ADIOI_Malloc_async_tail) = (ADIOI_Malloc_async *)
 		ADIOI_Malloc(sizeof(ADIOI_Malloc_async)); 
-	    ADIOI_Malloc_async_head = ADIOI_Malloc_async_tail;
-	    ADIOI_Malloc_async_head->ptr = ADIOI_Async_avail_head;
-	    ADIOI_Malloc_async_head->next = NULL;
+	    CtvAccess(ADIOI_Malloc_async_head) = CtvAccess(ADIOI_Malloc_async_tail);
+	    CtvAccess(ADIOI_Malloc_async_head)->ptr = CtvAccess(ADIOI_Async_avail_head);
+	    CtvAccess(ADIOI_Malloc_async_head)->next = NULL;
 	}
 	else {
-	    ADIOI_Malloc_async_tail->next = (ADIOI_Malloc_async *)
+	    CtvAccess(ADIOI_Malloc_async_tail)->next = (ADIOI_Malloc_async *)
 		ADIOI_Malloc(sizeof(ADIOI_Malloc_async));
-	    ADIOI_Malloc_async_tail = ADIOI_Malloc_async_tail->next;
-	    ADIOI_Malloc_async_tail->ptr = ADIOI_Async_avail_head;
-	    ADIOI_Malloc_async_tail->next = NULL;
+	    CtvAccess(ADIOI_Malloc_async_tail) = CtvAccess(ADIOI_Malloc_async_tail)->next;
+	    CtvAccess(ADIOI_Malloc_async_tail)->ptr = CtvAccess(ADIOI_Async_avail_head);
+	    CtvAccess(ADIOI_Malloc_async_tail)->next = NULL;
 	}
     }
 
-    ptr = ADIOI_Async_avail_head;
-    ADIOI_Async_avail_head = ADIOI_Async_avail_head->next;
-    if (!ADIOI_Async_avail_head) ADIOI_Async_avail_tail = NULL;
+    ptr = CtvAccess(ADIOI_Async_avail_head);
+    CtvAccess(ADIOI_Async_avail_head) = CtvAccess(ADIOI_Async_avail_head)->next;
+    if (!CtvAccess(ADIOI_Async_avail_head)) CtvAccess(ADIOI_Async_avail_tail) = NULL;
 
     return ptr;
 }
@@ -62,11 +62,11 @@ void ADIOI_Free_async_node(ADIOI_Async_node *node)
 {
 /* moves this node to available pool. does not actually free it. */
 
-    if (!ADIOI_Async_avail_tail)
-	ADIOI_Async_avail_head = ADIOI_Async_avail_tail = node;
+    if (!CtvAccess(ADIOI_Async_avail_tail))
+	CtvAccess(ADIOI_Async_avail_head) = CtvAccess(ADIOI_Async_avail_tail) = node;
     else {
-	ADIOI_Async_avail_tail->next = node;
-	ADIOI_Async_avail_tail = node;
+	CtvAccess(ADIOI_Async_avail_tail)->next = node;
+	CtvAccess(ADIOI_Async_avail_tail) = node;
     }
     node->next = NULL;
 }
@@ -78,21 +78,21 @@ void ADIOI_Add_req_to_list(ADIO_Request *request)
 
     ADIOI_Async_node *curr;
 
-    if (!ADIOI_Async_list_head) {
-	ADIOI_Async_list_head = ADIOI_Malloc_async_node();
-	ADIOI_Async_list_head->request = request;
-	ADIOI_Async_list_head->prev = ADIOI_Async_list_head->next = NULL;
-	ADIOI_Async_list_tail = ADIOI_Async_list_head;
-	(*request)->ptr_in_async_list = ADIOI_Async_list_head;
+    if (!CtvAccess(ADIOI_Async_list_head)) {
+	CtvAccess(ADIOI_Async_list_head) = ADIOI_Malloc_async_node();
+	CtvAccess(ADIOI_Async_list_head)->request = request;
+	CtvAccess(ADIOI_Async_list_head)->prev = CtvAccess(ADIOI_Async_list_head)->next = NULL;
+	CtvAccess(ADIOI_Async_list_tail) = CtvAccess(ADIOI_Async_list_head);
+	(*request)->ptr_in_async_list = CtvAccess(ADIOI_Async_list_head);
     }
     else {
-	curr = ADIOI_Async_list_tail;
+	curr = CtvAccess(ADIOI_Async_list_tail);
 	curr->next = ADIOI_Malloc_async_node();
-	ADIOI_Async_list_tail = curr->next;
-	ADIOI_Async_list_tail->request = request;
-	ADIOI_Async_list_tail->prev = curr;
-	ADIOI_Async_list_tail->next = NULL;
-	(*request)->ptr_in_async_list = ADIOI_Async_list_tail;
+	CtvAccess(ADIOI_Async_list_tail) = curr->next;
+	CtvAccess(ADIOI_Async_list_tail)->request = request;
+	CtvAccess(ADIOI_Async_list_tail)->prev = curr;
+	CtvAccess(ADIOI_Async_list_tail)->next = NULL;
+	(*request)->ptr_in_async_list = CtvAccess(ADIOI_Async_list_tail);
     }
 }
 	
@@ -106,9 +106,9 @@ void ADIOI_Complete_async(int *error_code)
     ADIO_Request *request;
     ADIOI_Async_node *tmp;
 
-    if (!ADIOI_Async_list_head) *error_code = MPI_SUCCESS;
-    while (ADIOI_Async_list_head) {
-	request = ADIOI_Async_list_head->request;
+    if (!CtvAccess(ADIOI_Async_list_head)) *error_code = MPI_SUCCESS;
+    while (CtvAccess(ADIOI_Async_list_head)) {
+	request = CtvAccess(ADIOI_Async_list_head)->request;
 	(*request)->queued = -1; /* ugly internal hack that prevents
                   ADIOI_xxxComplete from freeing the request object. 
                   This is required, because the user will call MPI_Wait
@@ -131,11 +131,11 @@ void ADIOI_Complete_async(int *error_code)
 	(*request)->queued = 0;  /* dequeued, but request object not
 				    freed */
 
-	tmp = ADIOI_Async_list_head;
-	ADIOI_Async_list_head = ADIOI_Async_list_head->next;
+	tmp = CtvAccess(ADIOI_Async_list_head);
+	CtvAccess(ADIOI_Async_list_head) = CtvAccess(ADIOI_Async_list_head)->next;
 	ADIOI_Free_async_node(tmp);
     }
-    ADIOI_Async_list_tail = NULL;
+    CtvAccess(ADIOI_Async_list_tail) = NULL;
 }
 
 
@@ -151,11 +151,11 @@ void ADIOI_Del_req_from_list(ADIO_Request *request)
     prev = curr->prev;
 
     if (prev) prev->next = curr->next;
-    else ADIOI_Async_list_head = curr->next;
+    else CtvAccess(ADIOI_Async_list_head) = curr->next;
 
     next = curr->next;
     if (next) next->prev = prev;
-    else ADIOI_Async_list_tail = prev;
+    else CtvAccess(ADIOI_Async_list_tail) = prev;
 
     ADIOI_Free_async_node(curr);
 }

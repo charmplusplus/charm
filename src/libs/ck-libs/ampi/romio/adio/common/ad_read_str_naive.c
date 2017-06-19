@@ -53,7 +53,7 @@ void ADIOI_GEN_ReadStrided_naive(ADIO_File fd, void *buf, int count,
 	/* noncontiguous in memory, contiguous in file. */
 
 	ADIOI_Flatten_datatype(buftype);
-	flat_buf = ADIOI_Flatlist;
+	flat_buf = CtvAccess(ADIOI_Flatlist);
 	while (flat_buf->type != buftype) flat_buf = flat_buf->next;
 
         off = (file_ptr_type == ADIO_INDIVIDUAL) ? fd->fp_ind : 
@@ -123,7 +123,7 @@ void ADIOI_GEN_ReadStrided_naive(ADIO_File fd, void *buf, int count,
 	 */
 
 	/* filetype already flattened in ADIO_Open */
-	flat_file = ADIOI_Flatlist;
+	flat_file = CtvAccess(ADIOI_Flatlist);
 	while (flat_file->type != fd->filetype) flat_file = flat_file->next;
 	disp = fd->disp;
 
@@ -282,7 +282,7 @@ void ADIOI_GEN_ReadStrided_naive(ADIO_File fd, void *buf, int count,
 	    /* noncontiguous in memory as well as in file */
 
 	    ADIOI_Flatten_datatype(buftype);
-	    flat_buf = ADIOI_Flatlist;
+	    flat_buf = CtvAccess(ADIOI_Flatlist);
 	    while (flat_buf->type != buftype) flat_buf = flat_buf->next;
 
 	    b_index = buf_count = 0;

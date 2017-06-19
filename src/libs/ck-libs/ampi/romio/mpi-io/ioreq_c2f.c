@@ -44,23 +44,23 @@ MPI_Fint MPIO_Request_c2f(MPIO_Request request)
 
     if ((request <= (MPIO_Request) 0) || (request->cookie != ADIOI_REQ_COOKIE))
 	return (MPI_Fint) 0;
-    if (!ADIOI_Reqtable) {
-	ADIOI_Reqtable_max = 1024;
-	ADIOI_Reqtable = (MPIO_Request *)
-	    ADIOI_Malloc(ADIOI_Reqtable_max*sizeof(MPIO_Request)); 
-        ADIOI_Reqtable_ptr = 0;  /* 0 can't be used though, because 
+    if (!CtvAccess(ADIOI_Reqtable)) {
+	CtvAccess(ADIOI_Reqtable_max) = 1024;
+	CtvAccess(ADIOI_Reqtable) = (MPIO_Request *)
+	    ADIOI_Malloc(CtvAccess(ADIOI_Reqtable_max)*sizeof(MPIO_Request)); 
+        CtvAccess(ADIOI_Reqtable_ptr) = 0;  /* 0 can't be used though, because 
                                   MPIO_REQUEST_NULL=0 */
-	for (i=0; i<ADIOI_Reqtable_max; i++) ADIOI_Reqtable[i] = MPIO_REQUEST_NULL;
+	for (i=0; i<CtvAccess(ADIOI_Reqtable_max); i++) CtvAccess(ADIOI_Reqtable)[i] = MPIO_REQUEST_NULL;
     }
-    if (ADIOI_Reqtable_ptr == ADIOI_Reqtable_max-1) {
-	ADIOI_Reqtable = (MPIO_Request *) ADIOI_Realloc(ADIOI_Reqtable, 
-                           (ADIOI_Reqtable_max+1024)*sizeof(MPIO_Request));
-	for (i=ADIOI_Reqtable_max; i<ADIOI_Reqtable_max+1024; i++) 
-	    ADIOI_Reqtable[i] = MPIO_REQUEST_NULL;
-	ADIOI_Reqtable_max += 1024;
+    if (CtvAccess(ADIOI_Reqtable_ptr) == CtvAccess(ADIOI_Reqtable_max)-1) {
+	CtvAccess(ADIOI_Reqtable) = (MPIO_Request *) ADIOI_Realloc(CtvAccess(ADIOI_Reqtable), 
+                           (CtvAccess(ADIOI_Reqtable_max)+1024)*sizeof(MPIO_Request));
+	for (i=CtvAccess(ADIOI_Reqtable_max); i<CtvAccess(ADIOI_Reqtable_max)+1024; i++) 
+	    CtvAccess(ADIOI_Reqtable)[i] = MPIO_REQUEST_NULL;
+	CtvAccess(ADIOI_Reqtable_max) += 1024;
     }
-    ADIOI_Reqtable_ptr++;
-    ADIOI_Reqtable[ADIOI_Reqtable_ptr] = request;
-    return (MPI_Fint) ADIOI_Reqtable_ptr;
+    CtvAccess(ADIOI_Reqtable_ptr)++;
+    CtvAccess(ADIOI_Reqtable)[CtvAccess(ADIOI_Reqtable_ptr)] = request;
+    return (MPI_Fint) CtvAccess(ADIOI_Reqtable_ptr);
 #endif
 }

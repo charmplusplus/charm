@@ -71,7 +71,7 @@ void ADIOI_UFS_Fcntl(ADIO_File fd, int flag, ADIO_Fcntl_t *fcntl_struct, int *er
         ADIOI_Datatype_iscontig(fd->filetype, &filetype_is_contig);
 	if (filetype_is_contig) fd->fp_ind = fcntl_struct->disp;
 	else {
-	    flat_file = ADIOI_Flatlist;
+	    flat_file = CtvAccess(ADIOI_Flatlist);
 	    while (flat_file->type != fd->filetype) 
 		flat_file = flat_file->next;
 	    for (i=0; i<flat_file->count; i++) {

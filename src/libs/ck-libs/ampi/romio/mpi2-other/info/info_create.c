@@ -24,7 +24,7 @@
 #include "mpioprof.h"
 #endif
 
-extern int ADIO_Init_keyval;
+CtvExtern(int, ADIO_Init_keyval);
 
 /*@
     MPI_Info_create - Creates a new info object
@@ -39,7 +39,7 @@ int MPI_Info_create(MPI_Info *info)
     int flag, error_code;
 
     /* first check if ADIO has been initialized. If not, initialize it */
-    if (ADIO_Init_keyval == MPI_KEYVAL_INVALID) {
+    if (CtvAccess(ADIO_Init_keyval) == MPI_KEYVAL_INVALID) {
 
    /* check if MPI itself has been initialized. If not, flag an error.
    Can't initialize it here, because don't know argc, argv */
@@ -49,7 +49,7 @@ int MPI_Info_create(MPI_Info *info)
             MPI_Abort(MPI_COMM_WORLD, 1);
         }
 
-        MPI_Keyval_create(MPI_NULL_COPY_FN, ADIOI_End_call, &ADIO_Init_keyval,
+        MPI_Keyval_create(MPI_NULL_COPY_FN, ADIOI_End_call, &CtvAccess(ADIO_Init_keyval),
                           (void *) 0);  
 
    /* put a dummy attribute on MPI_COMM_WORLD, because we want the delete
@@ -57,7 +57,7 @@ int MPI_Info_create(MPI_Info *info)
    MPI library frees MPI_COMM_WORLD when MPI_Finalize is called,
    though the standard does not mandate this. */
 
-        MPI_Attr_put(MPI_COMM_WORLD, ADIO_Init_keyval, (void *) 0);
+        MPI_Attr_put(MPI_COMM_WORLD, CtvAccess(ADIO_Init_keyval), (void *) 0);
 
 /* initialize ADIO */
 
