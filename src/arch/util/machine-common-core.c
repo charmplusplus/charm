@@ -355,31 +355,31 @@ static void CmiStartThreads(char **argv) {
     _Cmi_mype_global = _Cmi_mynode_global;
 }
 
-INLINE_KEYWORD int CmiNodeSpan() {
+INLINE_KEYWORD int CmiNodeSpan(void) {
   return 1;
 }
 #else
 /************** SMP *******************/
-INLINE_KEYWORD CMIQueue CmiMyRecvQueue() {
+INLINE_KEYWORD CMIQueue CmiMyRecvQueue(void) {
     return CmiGetState()->recv;
 }
 
 #if CMK_NODE_QUEUE_AVAILABLE
-INLINE_KEYWORD CMIQueue CmiMyNodeQueue() {
+INLINE_KEYWORD CMIQueue CmiMyNodeQueue(void) {
     return CsvAccess(NodeState).NodeRecv;
 }
 #endif
 
-INLINE_KEYWORD int CmiMyPe() {
+INLINE_KEYWORD int CmiMyPe(void) {
     return CmiGetState()->pe;
 }
-INLINE_KEYWORD int CmiNodeSpan() {
+INLINE_KEYWORD int CmiNodeSpan(void) {
   return (CmiMyNodeSize() + 1);
 }
-INLINE_KEYWORD int CmiMyPeGlobal() {
+INLINE_KEYWORD int CmiMyPeGlobal(void) {
     return CmiGetPeGlobal(CmiGetState()->pe,CmiMyPartition());
 }
-INLINE_KEYWORD int CmiMyRank() {
+INLINE_KEYWORD int CmiMyRank(void) {
     return CmiGetState()->rank;
 }
 INLINE_KEYWORD int CmiNodeSize(int node) {
@@ -398,7 +398,7 @@ INLINE_KEYWORD int CmiRankOf(int pe) {
 #endif // end of !CMK_MULTICORE
 #endif // end of CMK_SMP
 
-static int CmiState_hasMessage() {
+static int CmiState_hasMessage(void) {
   CmiState cs = CmiGetState();
   return CmiIdleLock_hasMessage(cs);
 }
@@ -740,9 +740,9 @@ if (  MSG_STATISTIC)
 
 #include "TopoManager.h"
 extern void createCustomPartitions(int numparts, int *partitionSize, int *nodeMap);
-extern void setDefaultPartitionParams();
+extern void setDefaultPartitionParams(void);
 
-void create_topoaware_partitions() {
+void create_topoaware_partitions(void) {
   int i, j, numparts_bak;
   Partition_Type type_bak;
   int *testMap;
@@ -797,7 +797,7 @@ void CmiSetNumPartitions(int nump) {
   _partitionInfo.numPartitions = nump;
 }
 
-void CmiSetMasterPartition() {
+void CmiSetMasterPartition(void) {
   if(!CmiMyNodeGlobal() && _partitionInfo.type != PARTITION_DEFAULT) {
     CmiAbort("setMasterPartition used with incompatible option\n");
   }
@@ -822,7 +822,7 @@ void CmiSetPartitionScheme(int scheme) {
   _partitionInfo.isTopoaware = 1;
 }
 
-void CmiSetCustomPartitioning() {
+void CmiSetCustomPartitioning(void) {
   _partitionInfo.scheme = 100;
   _partitionInfo.isTopoaware = 1;
 }
@@ -1588,7 +1588,7 @@ static char *CopyMsg(char *msg, int len) {
 
 /************Barrier Related Functions****************/
 /* must be called on all ranks including comm thread in SMP */
-int CmiBarrier() {
+int CmiBarrier(void) {
 #if CMK_SMP
     /* make sure all ranks reach here, otherwise comm threads may reach barrier ignoring other ranks  */
     CmiNodeAllBarrier();

@@ -309,7 +309,7 @@ int CldPresentPE(int pe)
   return CpvAccess(CldPEBitVector)[pe];
 }
 
-void CldMoveAllSeedsAway()
+void CldMoveAllSeedsAway(void)
 {
   char *msg;
   int len, queueing, priobits, pe;
@@ -534,7 +534,7 @@ void CldSimpleMultipleSend(int pe, int numToSend, int rank)
   }
 }
 
-void seedBalancerExit()
+void seedBalancerExit(void)
 {
   if (_cldb_cs)
     CmiPrintf("[%d] Relocate message number is %d\n", CmiMyPe(), CpvAccess(CldRelocatedMessages));

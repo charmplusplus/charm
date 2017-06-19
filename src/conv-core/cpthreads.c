@@ -393,7 +393,7 @@ int Cpthread_once(Cpthread_once_t *once, void (*fn)(void))
  *
  *****************************************************************************/
 
-static void errspan()
+static void errspan(void)
 {
   CmiPrintf("Error: Cpthreads sync primitives do not work across processor boundaries.\n");
   exit(1);
@@ -580,12 +580,12 @@ int Cpthread_cond_broadcast(Cpthread_cond_t *cond)
 
 typedef void (*mainfn)(int argc, char **argv);
 
-int Cpthread_init()
+int Cpthread_init(void)
 {
   return 0;
 }
 
-void CpthreadModuleInit()
+void CpthreadModuleInit(void)
 {
   CtvInitialize(Cpthread_t, Cpthread_current);
   CtvInitialize(int,        Cpthread_errcode);

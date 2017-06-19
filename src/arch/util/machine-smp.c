@@ -264,7 +264,7 @@ extern void CharmScheduler();
 static __thread struct CmiStateStruct     Cmi_mystate;
 static CmiState     *Cmi_state_vector;
 
-CmiState CmiGetState() {
+CmiState CmiGetState(void) {
 	return &Cmi_mystate;
 }
 #define CmiGetStateN(n) Cmi_state_vector[n]
@@ -516,7 +516,7 @@ static void CmiStartThreads(char **argv)
   MACHSTATE(4,"CmiStartThreads done")
 }
 
-static void CmiDestroyLocks()
+static void CmiDestroyLocks(void)
 {
   CmiDestroyLock(comm_mutex);
   comm_mutex = 0;

@@ -873,4 +873,4 @@ int lz4_wrapper_decompress(void *src, void *dst, int in_size, int out_size)
     return sinkint;
 }
 
-void lz4_init() {}
+void lz4_init(void) {}

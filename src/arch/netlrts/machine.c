@@ -348,8 +348,7 @@ static void KillEveryone(const char *msg)
   machine_exit(1);
 }
 
-static void KillEveryoneCode(n)
-int n;
+static void KillEveryoneCode(int n)
 {
   char _s[100];
   sprintf(_s, "[%d] Fatal error #%d\n", CmiMyPe(), n);
@@ -1684,14 +1683,14 @@ void LrtsFreeListSendFn(int npes, int *pes, int len, char *msg)
 
 #endif
 
-void LrtsDrainResources(){}
-void LrtsPostNonLocal() {}
+void LrtsDrainResources(void){}
+void LrtsPostNonLocal(void) {}
 
 /* Network progress function is used to poll the network when for
    messages. This flushes receive buffers on some implementations*/
     
 #if CMK_MACHINE_PROGRESS_DEFINED
-void CmiMachineProgressImpl(){
+void CmiMachineProgressImpl(void){
 #if CMK_SMP && !CMK_MULTICORE
   if (CmiMyRank() == CmiMyNodeSize())
 #endif
@@ -1719,7 +1718,7 @@ void LrtsAdvanceCommunication(int whileidle)
 
 /* happen at node level */
 /* must be called on every PE including communication processors */
-void LrtsBarrier()
+void LrtsBarrier(void)
 {
   int numnodes = CmiNumNodesGlobal();
   static int barrier_phase = 0;
@@ -1739,7 +1738,7 @@ void LrtsBarrier()
   barrier_phase ++;
 }
 
-int CmiBarrierZero()
+int CmiBarrierZero(void)
 {
   int i;
   int numnodes = CmiNumNodesGlobal();
@@ -1882,7 +1881,7 @@ void LrtsPostCommonInit(int everReturn)
     
 }
 
-void LrtsExit()
+void LrtsExit(void)
 {
   int i;
   machine_initiated_shutdown=1;

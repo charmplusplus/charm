@@ -99,7 +99,7 @@ static int    Cmi_comm_periodic_delay;
 static int    Cmi_comm_clock_delay;
 static int CMK_SMP_volatile writeableAcks,writeableDgrams;/*Write-queue counts (to know when to sleep)*/
 
-static void setspeed_atm()
+static void setspeed_atm(void)
 {
   Cmi_max_dgram_size   = 2048;
   Cmi_os_buffer_size   = 50000;
@@ -108,7 +108,7 @@ static void setspeed_atm()
   Cmi_ack_delay        = 0.0035;
 }
 
-static void setspeed_eth()
+static void setspeed_eth(void)
 {
   Cmi_max_dgram_size   = 1400;
   Cmi_window_size      = 32;	    /*40*/
@@ -117,7 +117,7 @@ static void setspeed_eth()
   Cmi_ack_delay        = 0.0050;
 }
 
-static void setspeed_gigabit()
+static void setspeed_gigabit(void)
 {
   /* for gigabit net */
   Cmi_max_dgram_size   = 9000;

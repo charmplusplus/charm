@@ -281,7 +281,7 @@ static void ccd_heap_swap(int index1, int index2)
  *
  * Had a bug previously due to late expansion, should work now - Gengbin 12/4/03
 */
-static void expand_ccd_heap()
+static void expand_ccd_heap(void)
 {
   int i;
   int oldlen = CpvAccess(ccd_heapmaxlen);
@@ -529,7 +529,7 @@ void CcdRaiseCondition(int condnum)
  * Trigger callbacks periodically, and also the time-indexed
  * functions if their time has arrived
  */
-void CcdCallBacks()
+void CcdCallBacks(void)
 {
   int i;
   ccd_periodic_callbacks *o=&CpvAccess(pcb);

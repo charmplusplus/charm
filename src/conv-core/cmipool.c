@@ -152,7 +152,7 @@ void CmiPoolFree(void * p)
     CmiAbort("CmiPoolFree: Invalid Bin");
 }
 
-void  CmiPoolAllocStats()
+void  CmiPoolAllocStats(void)
 {
   int i;
   CmiPrintf("numKallocs: %d\n", CpvAccess(numKallocs));

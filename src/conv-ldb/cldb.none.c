@@ -113,4 +113,4 @@ void CldModuleInit(char **argv)
   CldModuleGeneralInit(argv);
 }
 
-void CldCallback(){}
+void CldCallback(void){}

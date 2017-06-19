@@ -25,7 +25,7 @@ static void handleOneBcastMsg(int size, char *msg) {
 #endif
 }
 
-static void processBcastQs() {
+static void processBcastQs(void) {
 #if CMK_OFFLOAD_BCAST_PROCESS
     char *msg;
     do {

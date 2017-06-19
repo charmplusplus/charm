@@ -193,7 +193,7 @@ void CcsSendDelayedReply(CcsDelayedReply d,int replyLen, const void *replyData)
   free(h);
 }
 
-void CcsNoReply()
+void CcsNoReply(void)
 {
   if (CpvAccess(ccsReq)==NULL) return;
   CpvAccess(ccsReq)->len = ChMessageInt_new(0);
@@ -320,7 +320,7 @@ static void bg_req_fw_handler(char *msg) {
 #endif
 extern void req_fw_handler(char *msg);
 
-void CcsReleaseMessages() {
+void CcsReleaseMessages(void) {
 #if ! NODE_0_IS_CONVHOST || CMK_BIGSIM_CHARM
 #if CMK_BIGSIM_CHARM
   if (CpvAccess(_bgCcsAck) == 0 || CpvAccess(_bgCcsAck) < BgNodeSize()) return;

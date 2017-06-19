@@ -959,13 +959,13 @@ int CmiSetCPUAffinity(int mycore)
   return -1;
 }
 
-int CmiPrintCPUAffinity()
+int CmiPrintCPUAffinity(void)
 {
   CmiPrintf("Warning: CmiPrintCPUAffinity not supported.\n");
   return -1;
 }
 
-void CmiCheckAffinity() {
+void CmiCheckAffinity(void) {
 }
 
 void CmiInitCPUAffinity(char **argv)
@@ -993,7 +993,7 @@ void CmiInitCPUAffinity(char **argv)
 }
 
 /* called in ConverseCommonInit to initialize basic variables */
-void CmiInitCPUAffinityUtil(){
+void CmiInitCPUAffinityUtil(void){
     CpvInitialize(int, myCPUAffToCore);
     CpvAccess(myCPUAffToCore) = -1;
 #if CMK_OS_IS_LINUX	
@@ -1002,7 +1002,7 @@ void CmiInitCPUAffinityUtil(){
  #endif
 }
 
-int CmiOnCore(){
+int CmiOnCore(void){
   printf("WARNING: CmiOnCore IS NOT SUPPORTED ON THIS PLATFORM\n");
   return -1;
 }

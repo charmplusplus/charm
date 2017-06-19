@@ -46,7 +46,7 @@ void traceBegin(void) {}
 void traceEnd(void) {}
 void traceWriteSts(void) {}
 void traceFlushLog(void) {}
-int  traceAvailable() {return 0;}
+int  traceAvailable(void) {return 0;}
 
 int traceRegisterFunction(const char *name, int idx) { return -1; }
 void traceBeginFuncIndexProj(int idx, const char* name, int lineNo) {}
@@ -56,7 +56,7 @@ void traceEndFuncProj(const char *name){}
 void traceUserSuppliedNote(const char *note) {}
 void traceUserSuppliedData(int data) {}
 void traceUserSuppliedBracketedNote(const char *note, int eventID, double bt, double et) {}
-void traceMemoryUsage() {}
+void traceMemoryUsage(void) {}
 
 #if CMK_SMP_TRACE_COMMTHREAD
 int traceBeginCommOp(char *msg){}
@@ -65,7 +65,7 @@ void traceSendMsgComm(char *msg) {}
 void traceChangeLastTimestamp(double ts) {}
 void registerMachineUserEventsFunction(void (*eventRegistrationFunc)()) {}
 void traceCommSetMsgID(char *msg) {}
-double TraceTimerCommon(){return CmiWallTimer();}
+double TraceTimerCommon(void){return CmiWallTimer();}
 #endif
 
 void traceGetMsgID(char *msg, int *pe, int *event) {}
@@ -74,7 +74,7 @@ void traceSetMsgID(char *msg, int pe, int event) {}
 /* This routine, included in Charm++ programs from init.C, needs to be present in converse as well.
    Here is a place where it gets included only in converse, and not in Charm++ (thus not generating conflicts). */
 void EmergencyExit(void) {}
-void CpdEndConditionalDeliver_master() {}
+void CpdEndConditionalDeliver_master(void) {}
 
 
 int _lb_version;

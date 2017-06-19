@@ -1,1 +1,1 @@
-void setDefaultPartitionParams() { }
+void setDefaultPartitionParams(void) { }

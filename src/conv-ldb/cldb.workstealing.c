@@ -34,7 +34,7 @@ char *CldGetStrategy(void)
 }
 
 
-static void StealLoad()
+static void StealLoad(void)
 {
   int i;
   double now;
@@ -365,5 +365,5 @@ void CldModuleInit(char **argv)
   CpvAccess(isStealing) = 0;
 }
 
-void CldCallback()
+void CldCallback(void)
 {}

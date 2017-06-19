@@ -626,7 +626,7 @@ void CmiPrintStackTrace(int nSkip) {
 #endif
 }
 
-int CmiIsFortranLibraryCall() {
+int CmiIsFortranLibraryCall(void) {
 #if CMK_USE_BACKTRACE
   int ret = 0;
   int nLevels=9;
@@ -709,12 +709,12 @@ int CstatMemory(int i)
   return 0;
 }
 
-int CstatPrintQueueStats()
+int CstatPrintQueueStats(void)
 {
   return CpvAccess(CstatPrintQueueStatsFlag);
 }
 
-int CstatPrintMemStats()
+int CstatPrintMemStats(void)
 {
   return CpvAccess(CstatPrintMemStatsFlag);
 }
@@ -811,7 +811,7 @@ static void _cmiZeroHandler(void *msg) {
 	CmiAbort("Converse zero handler executed-- was a message corrupted?\n");
 }
 
-static void CmiHandlerInit()
+static void CmiHandlerInit(void)
 {
   CpvInitialize(CmiHandlerInfo *, CmiHandlerTable);
   CpvInitialize(int         , CmiHandlerCount);
@@ -838,7 +838,7 @@ static void CmiHandlerInit()
 
 #if CMK_HAS_ASCTIME
 
-char *CmiPrintDate()
+char *CmiPrintDate(void)
 {
   struct tm *local;
   time_t t;
@@ -941,22 +941,22 @@ double CmiTimer()
 static double inittime_wallclock;
 CpvStaticDeclare(double, inittime_virtual);
 
-int CmiTimerIsSynchronized()
+int CmiTimerIsSynchronized(void)
 {
   return 0;
 }
 
-int CmiTimerAbsolute()
+int CmiTimerAbsolute(void)
 {
   return _absoluteTime;
 }
 
-double CmiStartTimer()
+double CmiStartTimer(void)
 {
   return 0.0;
 }
 
-double CmiInitTime()
+double CmiInitTime(void)
 {
   return inittime_wallclock;
 }
@@ -995,7 +995,7 @@ if(CmiMyRank() == 0) /* initialize only  once */
 #endif
 }
 
-double CmiCpuTimer()
+double CmiCpuTimer(void)
 {
 #ifndef RUSAGE_WHO
   return CmiWallTimer();
@@ -1014,7 +1014,7 @@ double CmiCpuTimer()
 
 static double lastT = -1.0;
 
-double CmiWallTimer()
+double CmiWallTimer(void)
 {
   struct timeval tv;
   double currenttime;
@@ -1030,7 +1030,7 @@ double CmiWallTimer()
   return _absoluteTime?currenttime:currenttime - inittime_wallclock;
 }
 
-double CmiTimer()
+double CmiTimer(void)
 {
   return CmiCpuTimer();
 }
@@ -1072,7 +1072,7 @@ double  CmiStartTimer(void)
   return CpvAccess(inittime_walltime);
 }
 
-double CmiInitTime()
+double CmiInitTime(void)
 {
   return CpvAccess(inittime_walltime);
 }
@@ -1097,7 +1097,7 @@ void CmiTimerInit(char **argv)
   CmiBarrierZero();
 }
 
-double CmiCpuTimer()
+double CmiCpuTimer(void)
 {
   struct rusage ru;
   double currenttime;
@@ -1116,12 +1116,12 @@ double CmiCpuTimer()
 CpvStaticDeclare(unsigned long, inittime);
 CpvStaticDeclare(double, clocktick);
 
-int CmiTimerIsSynchronized()
+int CmiTimerIsSynchronized(void)
 {
   return 1;
 }
 
-int CmiTimerAbsolute()
+int CmiTimerAbsolute(void)
 {
   return 0;
 }
@@ -1129,12 +1129,12 @@ int CmiTimerAbsolute()
 #include "hwi/include/bqc/A2_inlines.h"
 #include "spi/include/kernel/process.h"
 
-double CmiStartTimer()
+double CmiStartTimer(void)
 {
   return 0.0;
 }
 
-double CmiInitTime()
+double CmiInitTime(void)
 {
   return CpvAccess(inittime);
 }
@@ -1160,19 +1160,19 @@ void CmiTimerInit(char **argv)
   CpvAccess(inittime) = GetTimeBase (); 
 }
 
-double CmiWallTimer()
+double CmiWallTimer(void)
 {
   unsigned long long currenttime;
   currenttime = GetTimeBase();
   return CpvAccess(clocktick)*(currenttime-CpvAccess(inittime));
 }
 
-double CmiCpuTimer()
+double CmiCpuTimer(void)
 {
   return CmiWallTimer();
 }
 
-double CmiTimer()
+double CmiTimer(void)
 {
   return CmiWallTimer();
 }
@@ -1536,9 +1536,7 @@ void CmiSignal(int sig1, int sig2, int sig3, void (*handler)())
 
 #if CMK_SIGNAL_USE_SIGACTION_WITH_RESTART
 #include <signal.h>
-void CmiSignal(sig1, sig2, sig3, handler)
-int sig1, sig2, sig3;
-void (*handler)();
+void CmiSignal(int sig1, int sig2, int sig3, void (*handler)())
 {
   struct sigaction in, out ;
   in.sa_handler = handler;
@@ -1678,7 +1676,7 @@ void CmiHandleMessage(void *msg)
 
 #if CMK_CMIDELIVERS_USE_COMMON_CODE
 
-void CmiDeliversInit()
+void CmiDeliversInit(void)
 {
 }
 
@@ -2047,21 +2045,21 @@ CpvDeclare(int      , CthResumeNormalThreadIdx);
 CpvStaticDeclare(int      , CthResumeSchedulingThreadIdx);
 
 
-void CthStandinCode()
+void CthStandinCode(void)
 {
   CsdScheduler(-1);
 }
 
 /* this fix the function pointer for thread migration and pup */
-static CthThread CthSuspendNormalThread()
+static CthThread CthSuspendNormalThread(void)
 {
   return CpvAccess(CthSchedulingThread);
 }
 
 void CthEnqueueSchedulingThread(CthThreadToken *token, int, int, unsigned int*);
-CthThread CthSuspendSchedulingThread();
+CthThread CthSuspendSchedulingThread(void);
 
-CthThread CthSuspendSchedulingThread()
+CthThread CthSuspendSchedulingThread(void)
 {
   CthThread succ = CpvAccess(CthSleepingStandins);
 
@@ -2151,7 +2149,7 @@ void CthSetStrategyDefault(CthThread t)
 		 CthSuspendNormalThread);
 }
 
-void CthSchedInit()
+void CthSchedInit(void)
 {
   CpvInitialize(CthThread, CthMainThread);
   CpvInitialize(CthThread, CthSchedulingThread);
@@ -2369,11 +2367,11 @@ CmiReduction* CmiGetNextReduction(short int numChildren) {
   return CmiGetReductionCreate(id, numChildren);
 }
 
-CmiReductionID CmiGetGlobalReduction() {
+CmiReductionID CmiGetGlobalReduction(void) {
   return CpvAccess(_reduce_seqID_request)+=CmiReductionID_multiplier;
 }
 
-CmiReductionID CmiGetDynamicReduction() {
+CmiReductionID CmiGetDynamicReduction(void) {
   if (CmiMyPe() != 0) CmiAbort("Cannot call CmiGetDynamicReduction on processors other than zero!\n");
   return CpvAccess(_reduce_seqID_dynamic)+=CmiReductionID_multiplier;
 }
@@ -2452,7 +2450,7 @@ void *CmiReduceMergeFn_random(int *size, void *data, void** remote, int n) {
   return data;
 }
 
-void CmiResetGlobalReduceSeqID(){
+void CmiResetGlobalReduceSeqID(void) {
 	CpvAccess(_reduce_seqID_global) = 0;
 }
 
@@ -2631,7 +2629,7 @@ void CmiHandleReductionMessage(void *msg) {
   / *else CmiPrintf("CmiHandleReductionMessage(%d): %d - %d\n",CmiMyPe(),CpvAccess(_reduce_received),CpvAccess(_reduce_num_children));*/
 }
 
-void CmiReductionsInit() {
+void CmiReductionsInit(void) {
   int i;
   CpvInitialize(int, CmiReductionMessageHandler);
   CpvAccess(CmiReductionMessageHandler) = CmiRegisterHandler((CmiHandler)CmiHandleReductionMessage);
@@ -2720,7 +2718,7 @@ void CmiLookupGroup(CmiGroup grp, int *npes, int **pes)
   *npes = 0; *pes = 0;
 }
 
-void CmiGroupInit()
+void CmiGroupInit(void)
 {
   CpvInitialize(int, CmiGroupHandlerIndex);
   CpvInitialize(int, CmiGroupCounter);
@@ -2879,7 +2877,7 @@ CmiCommHandle CmiAsyncMulticastFn(CmiGroup grp, int len, char *msg)
   return (CmiCommHandle) 0;
 }
 
-void CmiMulticastInit()
+void CmiMulticastInit(void)
 {
   CpvInitialize(int, CmiMulticastHandlerIndex);
   CpvAccess(CmiMulticastHandlerIndex) =
@@ -3535,7 +3533,7 @@ static void CmiProcessPriority(char **argv)
   }
 }
 
-void CommunicationServerInit()
+void CommunicationServerInit(void)
 {
 #if CMK_IMMEDIATE_MSG
   CQdCpvInit();
@@ -3557,7 +3555,7 @@ static int testEndian(void)
         return -2;  /*Unknown integer type */
 }
 
-int CmiEndianness()
+int CmiEndianness(void)
 {
   static int _cmi_endianness = -1;
   if (_cmi_endianness == -1) _cmi_endianness = testEndian();
@@ -3906,7 +3904,7 @@ double CmiLog2(double x) {
 #endif
 
 /* for bigsim */
-int CmiMyRank_()
+int CmiMyRank_(void)
 {
   return CmiMyRank();
 }
@@ -3934,7 +3932,7 @@ double CmiReadSize(const char *str)
     return val;
 }
 
-int CmiIsMyNodeIdle(){
+int CmiIsMyNodeIdle(void){
     int i;
     for(i=0; i<CmiMyNodeSize(); i++){
         if(CpvAccessOther(cmiMyPeIdle, i)) return 1;

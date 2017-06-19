@@ -22,7 +22,7 @@ struct CmmTableStruct
 };
 
 
-CmmTable CmmNew()
+CmmTable CmmNew(void)
 {
   CmmTable result = (CmmTable)CmiAlloc(sizeof(struct CmmTableStruct));
   result->first = 0;

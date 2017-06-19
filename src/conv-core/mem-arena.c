@@ -145,7 +145,7 @@ static void list_move(slotset *ss, dllnode *dlln, CmiInt8 old_nslots) {
  * Creates a new b-tree node
  *****************************************************************/
 
-static btreenode *create_btree_node() {
+static btreenode *create_btree_node(void) {
   int i;
   btreenode *btn = (btreenode *)malloc(sizeof(btreenode));
   btn->num_blocks = 0;

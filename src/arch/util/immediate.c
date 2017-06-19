@@ -52,7 +52,7 @@ void CmiPushImmediateMsg(void *msg)
 
 SMP: This routine must be called holding immRecvLock
 */
-void CmiDelayImmediate()
+void CmiDelayImmediate(void)
 {
   MACHLOCK_ASSERT(_immRunning,"CmiDelayImmediate");
 
@@ -93,7 +93,7 @@ void CmiHandleImmediateMessage(void *msg) {
 
 SMP: This routine must be called holding no locks, not even the comm. lock.
  */
-void CmiHandleImmediate()
+void CmiHandleImmediate(void)
 {
    void *msg;
 

@@ -309,7 +309,7 @@ static void list_move(slotset *ss, dllnode *dlln, CmiInt8 old_nslots) {
  * Creates a new b-tree node
  *****************************************************************/
 
-static btreenode *create_btree_node() {
+static btreenode *create_btree_node(void) {
   int i;
   btreenode *btn = (btreenode *)malloc_reentrant(sizeof(btreenode));
   btn->num_blocks = 0;
@@ -2214,7 +2214,7 @@ void *CmiIsomallocAlign(size_t align, size_t size, CthThread t)
   return _isomallocAlign(align, size, 0, t);
 }
 
-int CmiIsomallocEnabled()
+int CmiIsomallocEnabled(void)
 {
   return (isomallocStart!=NULL);
 }
@@ -2578,7 +2578,7 @@ void CmiIsomallocBlockListFree(void *block)
 }
 
 /* BIGSIM_OOC DEBUGGING */
-static void print_myslots(){
+static void print_myslots(void) {
   CmiPrintf("[%d] my slot set=%p\n", CmiMyPe(), CpvAccess(myss));
   print_slots(CpvAccess(myss));
 }

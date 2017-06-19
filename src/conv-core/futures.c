@@ -24,7 +24,7 @@ typedef struct CfutureValue_s
 
 CpvDeclare(int, CfutureStoreIndex);
 
-Cfuture CfutureCreate()
+Cfuture CfutureCreate(void)
 {
   futdata data = (futdata)malloc(sizeof(struct Cfuture_data_s));
   Cfuture result;
@@ -116,7 +116,7 @@ void CfutureDestroy(Cfuture f)
   free(f.data);
 }
 
-void CfutureModuleInit()
+void CfutureModuleInit(void)
 {
   CpvInitialize(int, CfutureStoreIndex);
   CpvAccess(CfutureStoreIndex) = CmiRegisterHandler((CmiHandler)CfutureStore);

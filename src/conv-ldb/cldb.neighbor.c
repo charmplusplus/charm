@@ -45,7 +45,7 @@ static
 #if CMK_C_INLINE
 inline 
 #endif
-loadmsg *getPool(){
+loadmsg *getPool(void){
   loadmsg *msg;
   if (CpvAccess(msgpool)!=NULL)  {
     msg = CpvAccess(msgpool);
@@ -175,7 +175,7 @@ static void CldAskLoadHandler(requestmsg *msg)
 
 /* balancing by exchanging load among neighbors */
 
-void CldSendLoad()
+void CldSendLoad(void)
 {
 #if CMK_MULTICORE
   /* directly send load to neighbors */
@@ -218,7 +218,7 @@ void CldSendLoad()
 #endif
 }
 
-int CldMinAvg()
+int CldMinAvg(void)
 {
   int sum=0, i;
   int myload;
@@ -522,7 +522,7 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
   }
 }
 
-void CldReadNeighborData()
+void CldReadNeighborData(void)
 {
   FILE *fp;
   char filename[25];
@@ -550,7 +550,7 @@ void CldReadNeighborData()
   CpvAccess(neighborGroup) = CmiEstablishGroup(CpvAccess(numNeighbors), pes);
 }
 
-static void CldComputeNeighborData()
+static void CldComputeNeighborData(void)
 {
   int i, npes;
   int *pes;
@@ -598,7 +598,7 @@ static void CldComputeNeighborData()
   free(pes);
 }
 
-static void topo_callback()
+static void topo_callback(void)
 {
   CldComputeNeighborData();
 #if CMK_MULTICORE

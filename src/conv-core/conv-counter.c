@@ -24,7 +24,7 @@ int read_counters(int e0, long long *c0, int e1, long long *c1);
 #include <papi.h>
 #endif
 
-void CmiInitCounters()
+void CmiInitCounters(void)
 {
 #if CMK_HAS_COUNTER_PAPI
   int retval = PAPI_library_init(PAPI_VER_CURRENT);

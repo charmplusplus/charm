@@ -52,7 +52,7 @@ int CldEstimate(void)
   return CldLoad();
 }
 
-void CldInitiateReduction()
+void CldInitiateReduction(void)
 {
   double load = CldEstimate();
   peinfo *pinf = &(CpvAccess(peinf));
@@ -252,5 +252,5 @@ void CldModuleInit(char **argv)
   CldModuleGeneralInit(argv);
   CldInitiateReduction();
 }
-void CldCallback()
+void CldCallback(void)
 {}
