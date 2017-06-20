@@ -147,12 +147,6 @@ typedef struct {
   char *partsizes;
 } PartitionInfo;
 
-typedef struct {
-  int parent;
-  int child_count;
-  int *children;
-} CmiSpanningTreeInfo;
-
 void CmiCreatePartitions(char **argv);
 #if defined(__cplusplus)
 extern "C" {
@@ -220,6 +214,12 @@ extern int _Cmi_mynodesize;
 #define CmiGetPeLocal(pe)               (pe)
 #define CmiGetNodeLocal(node)           (node)
 #endif
+
+typedef struct {
+  int parent;
+  int child_count;
+  int *children;
+} CmiSpanningTreeInfo;
 
 #if CMK_SHARED_VARS_UNAVAILABLE /* Non-SMP version of shared vars. */
 extern int _Cmi_mype;

@@ -61,8 +61,8 @@ template <typename Iterator>
 class ST_RecursivePartition<Iterator>::PhyNodeCompare {
 public:
   PhyNodeCompare(int dim): dim(dim) {}
-  inline bool operator()(const ST_RecursivePartition::PhyNode *a,
-                         const ST_RecursivePartition::PhyNode *b) const {
+  inline bool operator()(const typename ST_RecursivePartition::PhyNode *a,
+                         const typename ST_RecursivePartition::PhyNode *b) const {
     if (a->coords[dim] == b->coords[dim]) return (a->id < b->id);
     else return (a->coords[dim] < b->coords[dim]);
   }
