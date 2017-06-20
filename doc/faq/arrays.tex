@@ -40,9 +40,11 @@ contribute to B, then contribute to A.
 \subsection{Does Charm++ do automatic load balancing without the user asking
 for it?}
 
-No. You only get load balancing if you explicitly ask for it either at link-time
-with the {\em +balancer} option, or at runtime with the {\em -balancer} option.
-In addition, you can use Metabalancer with the {\em +MetaLB} option to
+No. You only get load balancing if you explicitly ask for it by
+linking in one or more load balancers with {\em -balancer} link-time
+option. If you link in more than one load balancer, you can select
+from the available load balancers at runtime with the {\em +balancer}
+option. In addition, you can use Metabalancer with the {\em +MetaLB} option to
 automatically decide when to invoke the load balancer, as described in
 \htmladdnormallink{Load Balancing Strategies}{http://charm.cs.illinois.edu/manuals/html/charm++/7.html\#lbStrategy}
 section.
