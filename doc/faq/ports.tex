@@ -342,3 +342,16 @@ pass f90 POINTER variables into C/C++, since different compilers
 represent POINTER variables differently.  
 
 \end{itemize}
+
+\subsection{How do I use Charm++ on Xeon Phi?}
+
+In general, no changes are required to use Charm++ on Xeon Phis. To
+compile code for Knights Landing, no special flags are required. To
+compile code for Knights Corner, one should build Charm++ with the
+{\tt mic} option. In terms of network layers, we currently recommend
+building the MPI layer ({\tt mpi-linux-x86\_64}) except for machines with
+custom network layers, such as Cray systems, on which we recommend
+building for the custom layer ({\tt gni-crayxc} for Cray XC machines,
+for example). To enable AVX-512 vector instructions, Charm++ can be
+built with {\tt -xMIC-AVX512} on Intel compilers or {\tt -mavx512f
+  -mavx512er -mavx512cd -mavx512pf} for GNU compilers.
