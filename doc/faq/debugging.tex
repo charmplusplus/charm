@@ -80,9 +80,7 @@ First, make sure the program at least starts to run properly without {\em ++debu
 (i.e. charmrun is working and there are no problems with the program startup
 phase). You need to make sure that gdb or dbx, and xterm are installed
 on all the machines you are using (not the one that is running {\tt charmrun}).
-If you are working on remote machines from Linux, you may need to run ``xhost +''
-locally to give the remote machines permission to display an xterm on
-your desktop. If you are working from a Windows machine, you need an X-win
+If you are working from a Windows machine, you need an X-win
 application such as exceed. You need to set this up to give the right permissions
 for X windows. You need to make sure the DISPLAY environment variable on
 the remote machine is set correctly to your local machine. I recommend
@@ -91,8 +89,7 @@ and you can set up ssh to use tunnels so that it even works from a private
 subnet(e.g. 192.168.0.8). Since the xterm is displayed from the node machines,
 you have to make sure they have the correct DISPLAY set. Again, setting
 up ssh in the nodelist file to spawn node programs should take care of
-that. If you are using rsh, you need to set DISPLAY in {\em ~/.charmrunrc}
-which will be read at start up time by each node program.
+that.
 
 %<li>
 %<b>I've been having some trouble using </b><tt>charmrun</tt><b> with the
