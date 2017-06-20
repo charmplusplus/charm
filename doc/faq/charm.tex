@@ -289,8 +289,12 @@ These are just like the standard C++ {\em assert} calls in {\em \textless assert
 they call abort if the condition passed to them is false.
 
 We use our own version rather than the standard version because we have
-to call {\em CkAbort}, and because we can turn our asserts off when
-{\em CMK\_OPTIMIZE} is defined, as it is when {\em --with-production} is used on the build line.
+to call {\em CkAbort}, and because we can turn our asserts off
+when {\em --with-production} is used on the build line.  These
+assertions are specifically controlled by {\em --enable-error-checking
+} or {\em --disable-error-checking}. The {\em --with-production} flag
+implies {\em --disable-error-checking}, but it can still be explicitly
+enabled with {\em --enable-error-checking}.
 
 \subsection{Can I know how many messages are being sent to a chare?}
 
