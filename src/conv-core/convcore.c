@@ -3586,6 +3586,7 @@ int ccsRunning;
 
 int quietModeRequested;  // user has requested quiet mode
 int quietMode; // quiet mode active (CmiPrintf's are disabled)
+CmiSpanningTreeInfo* _topoTree = NULL;
 
 /**
   Main Converse initialization routine.  This routine is 

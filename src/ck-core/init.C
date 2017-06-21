@@ -70,6 +70,7 @@ never be excluded...
 #include "ckmulticast.h"
 #include <sstream>
 #include <limits.h>
+#include "spanningTree.h"
 
 #if CMK_CUDA
 #include "cuda-hybrid-api.h"
@@ -1362,8 +1363,11 @@ void _initCharm(int unused_argc, char **argv)
 #endif
         }
         CmiInitCPUTopology(argv);
-        if (CkMyRank() == 0) TopoManager_reset(); // initialize TopoManager singleton
-        CmiNodeAllBarrier();
+        if (CkMyRank() == 0) {
+          TopoManager_reset(); // initialize TopoManager singleton
+          _topoTree = ST_RecursivePartition_getTreeInfo(0);
+        }
+        CmiNodeAllBarrier(); // threads wait until _topoTree has been generated
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
         if (CmiCpuTopologyEnabled()) {
             int *pelist;

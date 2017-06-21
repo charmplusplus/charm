@@ -221,6 +221,8 @@ typedef struct {
   int *children;
 } CmiSpanningTreeInfo;
 
+extern CmiSpanningTreeInfo* _topoTree; // this node's parent and children in topo-tree rooted at 0
+
 #if CMK_SHARED_VARS_UNAVAILABLE /* Non-SMP version of shared vars. */
 extern int _Cmi_mype;
 extern int _Cmi_numpes;
