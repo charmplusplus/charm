@@ -180,6 +180,53 @@ void ST_RecursivePartition<Iterator>::initPhyNodes(Iterator start, Iterator end,
 }
 
 template <typename Iterator>
+void ST_RecursivePartition<Iterator>::withinPhyNodeTree(PhyNode &rootPhyNode, int bfactor, Iterator &pos)
+{
+  if (rootPhyNode.size() == 1) return; // only one element in physical node
+
+  std::vector<int> nodes; // nodes in this phynode (root is ignored)
+  std::map<int, std::vector<int>> nodePes; // PEs in each node (used when building PE tree)
+  if (nodeTree) nodes.assign(rootPhyNode.nodes.begin()+1, rootPhyNode.nodes.end());
+  else {
+    // group PEs into nodes
+    for (int i=1; i < rootPhyNode.size(); i++) {
+      int pe = rootPhyNode.getNode(i);
+      nodePes[CkNodeOf(pe)].push_back(pe);
+    }
+    std::map<int, std::vector<int>>::iterator it;
+    for (it = nodePes.begin(); it != nodePes.end(); it++) nodes.push_back(it->first);
+  }
+
+  const int numNodes = nodes.size();
+  if (!nodeTree && (numNodes == 1)) {
+    // make all PEs in node direct children
+    std::vector<int> &pes = nodePes.begin()->second;
+    for (int i=0; i < pes.size(); i++) {
+      children.push_back(pos);
+      *pos = pes[i]; pos++;
+    }
+  } else {
+    int numChildren = std::min(bfactor, numNodes);
+    int partSize = numNodes / numChildren, parts=0;
+    for (std::vector<int>::iterator i=nodes.begin(); parts < numChildren; i += partSize, parts++) {
+      children.push_back(pos);
+      std::vector<int>::iterator end;
+      if (parts == numChildren-1) end = nodes.end();
+      else end = i + partSize;
+      for (std::vector<int>::iterator j=i; j != end; j++) {
+        int n = *j;
+        if (!nodeTree) {
+          std::vector<int> &pes = nodePes[n];
+          for (int k=0; k < pes.size(); k++) { *pos = pes[k]; pos++; }
+        } else {
+          *pos = n; pos++;
+        }
+      }
+    }
+  }
+}
+
+template <typename Iterator>
 void ST_RecursivePartition<Iterator>::build(std::vector<PhyNode*> &phyNodes,
                                             Iterator start,
                                             unsigned int maxBranches)
@@ -188,11 +235,7 @@ void ST_RecursivePartition<Iterator>::build(std::vector<PhyNode*> &phyNodes,
   children.reserve(rootPhyNode->size() + maxBranches); // reserve for max number of children
 
   Iterator pos = start+1;
-  // make each node in same phynode as root a direct child
-  for (int i=1; i < rootPhyNode->size(); i++) {
-    *pos = rootPhyNode->getNode(i);
-    children.push_back(pos++);
-  }
+  withinPhyNodeTree(*rootPhyNode, maxBranches, pos);
 
   // TODO another option, don't know if better, is if
   // I'm the root node of a phynode (and phynodes.size() > 1), only have one other node
@@ -578,4 +621,3 @@ void get_topo_tree_nbs(int root, int *parent, int *child_count, int **children) 
   *child_count = t->child_count;
   *children = t->children;
 }
-

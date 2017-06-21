@@ -143,6 +143,7 @@ private:
 #if XE6_TOPOLOGY
   void translateCoordinates(std::vector<PhyNode> &nodes) const;
 #endif
+  void withinPhyNodeTree(PhyNode &rootPhyNode, int bfactor, Iterator &pos);
 
   std::vector<Iterator> children;
   bool nodeTree;
