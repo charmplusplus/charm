@@ -1,4 +1,4 @@
-DIRS	= simpleRdma stencil3d
+DIRS	= pingpong simpleRdma stencil3d
 
 all:
 	for d in $(DIRS); do \

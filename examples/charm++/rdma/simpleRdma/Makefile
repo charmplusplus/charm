@@ -17,4 +17,4 @@ test: all
 	$(call run, +p4 ./rdma 10)
 
 clean:
-	rm -f *.def.h *.decl.h *.o *~ cifiles charmrun rdma
+	rm -f *.def.h *.decl.h *.o *~ *.exe cifiles charmrun rdma

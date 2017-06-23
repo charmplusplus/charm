@@ -1,0 +1,14 @@
+mainmodule pingpong {
+  readonly CProxy_main mainProxy;
+  mainchare main {
+    entry main(CkArgMsg *m);
+    entry void maindone(void);
+  };
+  array [1D] Ping1 {
+    entry Ping1();
+    entry void start(int size);
+    entry void freeBuffer();
+    entry void recv(char msg[size], int size);
+    entry void recv_rdma(rdma char msg[size], int size);
+  };
+};
