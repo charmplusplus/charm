@@ -318,6 +318,7 @@ class Stencil: public CBase_Stencil {
 
       if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
         double endTime = CkWallTimer();
+        CkPrintf("[%d] Time per iteration: %f %f\n", iterations, (endTime - startTime), endTime);
       }
 
       if(iterations == MAX_ITER)

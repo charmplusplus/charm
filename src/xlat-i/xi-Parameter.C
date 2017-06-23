@@ -545,13 +545,6 @@ void Parameter::beginUnmarshallRdma(XStr &str, bool genRdma)
 	}
 }
 
-void Parameter::beginUnmarshallSDAGRdma(XStr &str)
-{ //First pass: unpack pup'd entries
-	Type *dt=type->deref();//Type, without &
-	if(isRdma()){
-		beginUnmarshallArray(str);
-	}
-}
 
 void Parameter::beginUnmarshall(XStr &str)
 { //First pass: unpack pup'd entries
@@ -637,25 +630,50 @@ void ParamList::beginUnmarshallSDAG(XStr &str) {
   if (isMarshalled()) {
     str << "          PUP::fromMem implP(impl_buf);\n";
     if(hasRdma()){
-      str<<"#if !CMK_ONESIDED_IMPL\n";
-      callEach(&Parameter::beginUnmarshallSDAGRdma,str);
+      str<<"#if CMK_ONESIDED_IMPL\n";
+      /* Before migration of the closure structure, Rdmawrapper pointers
+       * store the offset to the actual buffer from the msgBuf
+       * After migration, the Rdmawrapper pointer needs to be adjusted
+       * to point to the msgBuf + offset. As the actual buffer is within
+       * the message, the adjusting should happen after the message is
+       * unpacked. (see code in Entry::genClosure)
+       */
+      callEach(&Parameter::adjustUnmarshalledRdmaPtrsSDAG,str);
+      str<<"  implP|num_rdma_fields;\n";
+      callEach(&Parameter::beginUnmarshallRdma,str,true);
+      str<<"#else\n";
+      callEach(&Parameter::beginUnmarshallRdma,str,false);
       str<<"#endif\n";
     }
     callEach(&Parameter::beginUnmarshall,str);
     str << "          impl_buf+=CK_ALIGN(implP.size(),16);\n";
-    callEach(&Parameter::unmarshallArrayDataSDAG,str);
+    callEach(&Parameter::unmarshallRegArrayDataSDAG,str);
   }
 }
-void Parameter::unmarshallArrayDataSDAG(XStr &str) {
-  if (isArray() || isRdma()) {
-    if(isRdma())
-      str<<"#if !CMK_ONESIDED_IMPL\n";
+
+void Parameter::unmarshallRegArrayDataSDAG(XStr &str) {
+  if(isArray()) {
     Type *dt=type->deref();//Type, without &
     str << "          " << name << " = ("<<dt<<" *)(impl_buf+impl_off_" << name << ");\n";
-    if(isRdma())
-      str<<"#endif\n";
   }
 }
+
+void Parameter::adjustUnmarshalledRdmaPtrsSDAG(XStr &str) {
+  if(isRdma()) {
+    str << "  rdmawrapper_" << name << ".ptr = ";
+    str << "(void *)(impl_buf + (size_t)(rdmawrapper_" << name << ".ptr));\n";
+  }
+}
+
+void Parameter::unmarshallRdmaArrayDataSDAG(XStr &str) {
+  if(isRdma()) {
+    str<<"#if !CMK_ONESIDED_IMPL\n";
+    Type *dt=type->deref();//Type, without &
+    str << "          " << name << " = ("<<dt<<" *)(impl_buf+impl_off_" << name << ");\n";
+    str<<"#endif\n";
+  }
+}
+
 void Parameter::unmarshallRegArrayDataSDAGCall(XStr &str) {
   if (isArray()) {
     Type *dt=type->deref();//Type, without &

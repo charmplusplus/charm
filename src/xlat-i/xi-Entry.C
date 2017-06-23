@@ -1939,16 +1939,28 @@ void Entry::genClosure(XStr& decls, bool isDef) {
          structure << "      " << sv->type << " " << "*" << sv->name << ";\n";
          structure << "#endif\n";
          getter << "#if CMK_ONESIDED_IMPL\n";
-         if(sv->isFirstRdma())
+         if(sv->isFirstRdma()) {
            getter << "      " << "int "<< "& " << "getP" << i++ << "() { return " << " num_rdma_fields;}\n";
+         }
          getter << "      " << "CkRdmaWrapper "<< "& " << "getP" << i << "() { return " << "rdmawrapper_" << sv->name << ";}\n";
          getter << "#else\n";
          getter << sv->type << " " << "*";
          getter << "& " << "getP" << i << "() { return " << sv->name << ";}\n";
          getter << "#endif\n";
          toPup << "#if CMK_ONESIDED_IMPL\n";
-         if(sv->isFirstRdma())
+         if(sv->isFirstRdma()) {
+           toPup << "          char *impl_buf = _impl_marshall ? _impl_marshall->msgBuf : _impl_buf_in;\n";
            toPup << "        " << "__p | " << "num_rdma_fields;\n";
+         }
+         /* The Rdmawrapper's pointer stores the offset to the actual buffer
+          * from the beginning of the msgBuf while packing (as the pointer itself is invalid
+          * upon migration). During unpacking (after migration), the offset is used to adjust
+          * the pointer back to the actual buffer that exists within the message.
+          */
+         toPup << "        if (__p.isPacking()) {\n";
+         toPup << "          rdmawrapper_" << sv->name << ".ptr = ";
+         toPup << "(void *)((char *)(rdmawrapper_" << sv->name << ".ptr) - impl_buf);\n";
+         toPup << "        }\n";
          toPup << "        " << "__p | " << "rdmawrapper_" << sv->name << ";\n";
          toPup << "#endif\n";
        } else {
@@ -2001,17 +2013,10 @@ void Entry::genClosure(XStr& decls, bool isDef) {
   if (hasArray || hasRdma) {
 
     structure << "      " << "CkMarshallMsg* _impl_marshall;\n";
-    dealloc << "        if (_impl_marshall) CmiFree(UsrToEnv(_impl_marshall));\n";
-    initCode << "        _impl_marshall = 0;\n";
-
-    if(hasRdma && !hasArray) {
-      structure << "#if !CMK_ONESIDED_IMPL\n";
-      initCode << "#if !CMK_ONESIDED_IMPL\n";
-      toPup << "#if !CMK_ONESIDED_IMPL\n";
-    }
     structure << "      " << "char* _impl_buf_in;\n";
     structure << "      " << "int _impl_buf_size;\n";
-
+    dealloc << "        if (_impl_marshall) CmiFree(UsrToEnv(_impl_marshall));\n";
+    initCode << "        _impl_marshall = 0;\n";
     initCode << "        _impl_buf_in = 0;\n";
     initCode << "        _impl_buf_size = 0;\n";
 
@@ -2023,11 +2028,6 @@ void Entry::genClosure(XStr& decls, bool isDef) {
     toPup << "          char *impl_buf = _impl_marshall ? _impl_marshall->msgBuf : _impl_buf_in;\n";
     param->beginUnmarshallSDAG(toPup);
     toPup << "        }\n";
-    if(hasRdma && !hasArray) {
-      structure << "#endif\n";
-      initCode << "#endif\n";
-      toPup << "#endif\n";
-    }
   }
 
   // Generate code for ensuring we don't migrate active local closures
