@@ -2455,7 +2455,7 @@ void ampi::ssend_ack(int sreq_idx){
     AmpiRequestList *reqs = &(parent->ampiReqs);
     SsendReq *sreq = (SsendReq *)(*reqs)[sreq_idx];
     sreq->statusIreq = true;
-    if (sreq->isBlocked()) {
+    if (sreq->isBlocked() && parent->numBlockedReqs != 0) {
       parent->numBlockedReqs--;
     }
     if (parent->resumeOnRecv && parent->numBlockedReqs == 0) {
@@ -2524,7 +2524,7 @@ void ampi::inorder(AmpiMsg* msg)
   if(reqL->size()>0 && ireqIdx>0)
     ireq = (IReq *)(*reqL)[ireqIdx-1];
   if (ireq) { // receive posted
-    if (ireq->isBlocked()) {
+    if (ireq->isBlocked() && parent->numBlockedReqs != 0) {
       parent->numBlockedReqs--;
     }
     ireq->receive(this, msg);
@@ -2598,7 +2598,7 @@ void ampi::inorderRdma(char* buf, int size, int seq, int tag, int srcRank,
   if (reqL->size()>0 && ireqIdx>0)
     ireq = (IReq *)(*reqL)[ireqIdx-1];
   if (ireq) { // receive posted
-    if (ireq->isBlocked()) {
+    if (ireq->isBlocked() && parent->numBlockedReqs != 0) {
       parent->numBlockedReqs--;
     }
     ireq->receiveRdma(this, buf, size, ssendReq, srcRank, comm);
@@ -2623,7 +2623,7 @@ void ampi::completedRdmaSend(CkDataMsg *msg)
   SendReq& sreq = (SendReq&)(*reqList[reqIdx]);
   sreq.statusIreq = true;
 
-  if (sreq.isBlocked()) {
+  if (sreq.isBlocked() && parent->numBlockedReqs != 0) {
     parent->numBlockedReqs--;
   }
   if (parent->resumeOnRecv && parent->numBlockedReqs == 0) {
@@ -4288,7 +4288,7 @@ void ampi::irednResult(CkReductionMsg *msg)
   }
 #endif
 
-  if (rednReq->isBlocked()) {
+  if (rednReq->isBlocked() && parent->numBlockedReqs != 0) {
     parent->numBlockedReqs--;
   }
   rednReq->receive(this, msg);
