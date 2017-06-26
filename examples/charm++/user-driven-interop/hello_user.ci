@@ -1,15 +1,22 @@
 mainmodule hello_user {
-  readonly CProxy_Main main_proxy;
-  readonly CProxy_Hello hello_array; 
+
+#ifdef HELLO_USE_MAINCHARE
+  readonly CProxy_Main mainProxy;
 
   mainchare Main {
     entry Main(CkArgMsg*);
     entry [reductiontarget] void done();
   };
+#endif
+
+  readonly CProxy_Hello helloProxy;
 
   array[1D] Hello {
     entry Hello();
     entry void sayHello();
     entry void rankReportingIn(int);
+#ifndef HELLO_USE_MAINCHARE
+    entry [reductiontarget] void done();
+#endif
   };
 };

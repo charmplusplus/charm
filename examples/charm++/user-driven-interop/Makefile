@@ -10,4 +10,4 @@ clean:
 	rm -f hello_user *.o charmrun *.decl.h *.def.h
 
 test: all
-
+	charmrun +p2 ++local ./hello_user 8

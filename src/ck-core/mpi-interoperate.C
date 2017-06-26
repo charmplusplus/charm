@@ -28,9 +28,16 @@ extern "C" int userDrivenMode;
 extern "C" void StartInteropScheduler();
 extern "C" void StopInteropScheduler();
 
+static bool firstPass = true;
+
 extern "C"
 void StartCharmScheduler() {
-  CmiNodeAllBarrier();
+  if (firstPass) {
+    firstPass = false;
+  } else {
+    CmiNodeAllBarrier();
+  }
+
   StartInteropScheduler();
 }
 
@@ -131,7 +138,6 @@ void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
 
   CharmLibInterOperate = true;
   ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
-  StartInteropScheduler();
 }
 
 #undef CkExit

@@ -5,7 +5,7 @@
 
 #to run on BG/Q, add this argument to the runjob command: --envs PAMI_CLIENTS=MPI,Converse
 
-OPTS = -O3 
+OPTS := $(OPTS) -O3 -fopenmp 
 CHARMDIR=../../..
 CHARMC=$(CHARMDIR)/bin/charmc $(OPTS)
 
