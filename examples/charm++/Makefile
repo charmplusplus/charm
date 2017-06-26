@@ -30,6 +30,7 @@ DIRS = \
   sync_square \
   threaded_ring \
   TRAM \
+  user-driven-interop \
   zerocopy \
 
 BGDIRS = \

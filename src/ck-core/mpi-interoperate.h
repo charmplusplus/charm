@@ -12,7 +12,9 @@ extern "C" void CharmLibInit(MPI_Comm userComm, int argc, char **argv);
 extern "C" void CharmLibInit(int userComm, int argc, char **argv);
 #endif
 
-extern "C" void CharmInit(int argc, char **argv);
+extern "C" void CharmBeginInit(int argc, char** argv);
+extern "C" void CharmFinishInit();
+extern "C" void CharmInit(int argc, char** argv);
 
 extern "C" void CharmLibExit();
 
@@ -23,10 +25,5 @@ extern "C" void StopCharmScheduler();
 
 #undef CkExit
 #define CkExit LibCkExit
-
-#if defined(AMPI)
-#error "Trying to compile Charm++/MPI interoperation against AMPI built atop Charm++"
-#endif
-
 
 #endif //_MPI_INTEROPERATE_

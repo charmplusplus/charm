@@ -172,9 +172,11 @@ CkpvStaticDeclare(PtrQ*, _buffQ);
 CkpvStaticDeclare(PtrVec*, _bocInitVec);
 
 //for interoperability
+extern int userDrivenMode;
 extern void _libExitHandler(envelope *env);
 extern int _libExitHandlerIdx;
 CpvCExtern(int,interopExitFlag);
+extern "C" void StopInteropScheduler();
 
 #if CMK_SHRINK_EXPAND
 //for shrink expand cleanup
@@ -881,6 +883,9 @@ void _initDone(void)
   DEBUGF(("Crossed CmiNodeBarrier(), pe = %d, rank = %d\n", CkMyPe(), CkMyRank()));
   _processBufferedMsgs();
   CkpvAccess(_charmEpoch)=1;
+  if (userDrivenMode) {
+    StopInteropScheduler();
+  }
 }
 
 /**
@@ -1222,6 +1227,72 @@ void CpdBgInit();
 void CpdBreakPointInit();
 
 extern void (*CkRegisterMainModuleCallback)();
+
+void _sendReadonlies() {
+  for(int i=0;i<_readonlyMsgs.size();i++) /* Send out readonly messages */
+  {
+    void *roMsg = (void *) *((char **)(_readonlyMsgs[i]->pMsg));
+    if(roMsg==0)
+      continue;
+    //Pack the message and send it to all other processors
+    envelope *env = UsrToEnv(roMsg);
+    env->setSrcPe(CkMyPe());
+    env->setMsgtype(ROMsgMsg);
+    env->setRoIdx(i);
+    CmiSetHandler(env, _initHandlerIdx);
+    CkPackMessage(&env);
+    CmiSyncBroadcast(env->getTotalsize(), (char *)env);
+    CpvAccess(_qd)->create(CkNumPes()-1);
+
+    //For processor 0, unpack and re-set the global
+    CkUnpackMessage(&env);
+    _processROMsgMsg(env);
+    _numInitMsgs++;
+  }
+
+#if CMK_ONESIDED_IMPL
+  numZerocopyROops = 0;
+  curROIndex = 0;
+#endif
+
+  //Determine the size of the RODataMessage
+  PUP::sizer ps;
+
+#if CMK_ONESIDED_IMPL
+  ps|numZerocopyROops;
+#endif
+
+  for(int i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(ps);
+
+#if CMK_ONESIDED_IMPL
+  if(numZerocopyROops > 0) {
+    readonlyAllocateOnSource();
+  }
+#endif
+
+  //Allocate and fill out the RODataMessage
+  envelope *env = _allocEnv(RODataMsg, ps.size());
+  PUP::toMem pp((char *)EnvToUsr(env));
+#if CMK_ONESIDED_IMPL
+  pp|numZerocopyROops;
+#endif
+  for(int i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pp);
+
+  env->setCount(++_numInitMsgs);
+  env->setSrcPe(CkMyPe());
+  CmiSetHandler(env, _initHandlerIdx);
+  DEBUGF(("[%d,%.6lf] RODataMsg being sent of size %d \n",CmiMyPe(),CmiWallTimer(),env->getTotalsize()));
+  CmiSyncBroadcast(env->getTotalsize(), (char *)env);
+#if CMK_ONESIDED_IMPL && CMK_SMP
+  if(numZerocopyROops > 0) {
+    // Send message to peers
+    CmiForwardMsgToPeers(env->getTotalsize(), (char *)env);
+  }
+#endif
+  CmiFree(env);
+  CpvAccess(_qd)->create(CkNumPes()-1);
+  _initDone();
+}
 
 /**
   This is the main charm setup routine.  It's called
@@ -1731,71 +1802,9 @@ void _initCharm(int unused_argc, char **argv)
 		_STATS_RECORD_CREATE_CHARE_N(nMains);
 		_STATS_RECORD_PROCESS_CHARE_N(nMains);
 
-
-
-
-		for(i=0;i<_readonlyMsgs.size();i++) /* Send out readonly messages */
-		{
-			void *roMsg = (void *) *((char **)(_readonlyMsgs[i]->pMsg));
-			if(roMsg==0)
-				continue;
-			//Pack the message and send it to all other processors
-			envelope *env = UsrToEnv(roMsg);
-			env->setSrcPe(CkMyPe());
-			env->setMsgtype(ROMsgMsg);
-			env->setRoIdx(i);
-			CmiSetHandler(env, _initHandlerIdx);
-			CkPackMessage(&env);
-			CmiSyncBroadcast(env->getTotalsize(), (char *)env);
-			CpvAccess(_qd)->create(CkNumPes()-1);
-
-			//For processor 0, unpack and re-set the global
-			CkUnpackMessage(&env);
-			_processROMsgMsg(env);
-			_numInitMsgs++;
+		if (!userDrivenMode) {
+			_sendReadonlies();
 		}
-
-#if CMK_ONESIDED_IMPL
-		numZerocopyROops = 0;
-		curROIndex = 0;
-#endif
-
-		//Determine the size of the RODataMessage
-		PUP::sizer ps;
-
-#if CMK_ONESIDED_IMPL
-		ps|numZerocopyROops;
-#endif
-
-		for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(ps);
-
-#if CMK_ONESIDED_IMPL
-		if(numZerocopyROops > 0)
-			readonlyAllocateOnSource();
-#endif
-
-		//Allocate and fill out the RODataMessage
-		envelope *env = _allocEnv(RODataMsg, ps.size());
-		PUP::toMem pp((char *)EnvToUsr(env));
-#if CMK_ONESIDED_IMPL
-		pp|numZerocopyROops;
-#endif
-		for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pp);
-
-		env->setCount(++_numInitMsgs);
-		env->setSrcPe(CkMyPe());
-		CmiSetHandler(env, _initHandlerIdx);
-		DEBUGF(("[%d,%.6lf] RODataMsg being sent of size %d \n",CmiMyPe(),CmiWallTimer(),env->getTotalsize()));
-		CmiSyncBroadcast(env->getTotalsize(), (char *)env);
-#if CMK_ONESIDED_IMPL && CMK_SMP
-		if(numZerocopyROops > 0) {
-			// Send message to peers
-			CmiForwardMsgToPeers(env->getTotalsize(), (char *)env);
-		}
-#endif
-		CmiFree(env);
-		CpvAccess(_qd)->create(CkNumPes()-1);
-		_initDone();
 	} else {
 		// check for thread oversubscription
 		CmiCheckAffinity();

@@ -159,6 +159,7 @@ static inline IrrGroup *_localBranch(CkGroupID gID)
 
 extern void _registerCommandLineOpt(const char* opt);
 extern void _initCharm(int argc, char **argv);
+extern void _sendReadonlies();
 
 extern "C" int charm_main(int argc, char **argv);
 FLINKAGE void FTN_NAME(CHARM_MAIN_FORTRAN_WRAPPER, charm_main_fortran_wrapper)(int *argc, char **argv);

@@ -8543,8 +8543,9 @@ rank:
 **void CharmInit(int argc, char **argv)**
 
 ``CharmInit`` starts the Charm++ runtime in user driven mode, and
-executes the constructor of the main chare. Control returns to user
-code when a call to ``CkExit`` is made. Once control is returned, user
+executes the constructor of any main chares, and sends out messages for
+readonly variables and group creation. Control returns to user
+code after this initialization completes. Once control is returned, user
 code can do other work as needed, including creating chares, and
 invoking entry methods on proxies. Any messages created by the user
 code will be sent/received the next time the user calls
@@ -8553,7 +8554,20 @@ Charm++ runtime to resume sending and processing messages, and control
 returns to user code when ``CkExit`` is called. The Charm++ scheduler
 can be started and stopped in this fashion as many times as necessary.
 ``CharmLibExit`` should be called by the user code at the end of
-execution.
+execution to exit the entire application.
+
+Applications which wish to use readonlies, and/or create groups before
+the rest of the application runs without using a mainchare can do a split
+initialization. ``CharmBeginInit`` initializes the runtime system and
+immediately returns control to the user after any mainchares are created.
+At this point, user code can create groups, and set readonly variables on
+PE 0. Then, a call to ``CharmFinishInit`` does the rest of the initialization
+by sending out messages from PE 0 to the rest of the PEs for creating groups
+and setting readonlies. ``CharmInit`` is just a shortcut for calling these
+two functions one after another.
+
+**void CharmBeginInit(int argc, char **argv)**
+**void CharmFinishInit()**
 
 A small example of user driven interoperation can be found in
 ``examples/charm++/user-driven-interop``.
