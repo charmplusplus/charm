@@ -4,16 +4,54 @@ mainmodule simpleRdma {
 
   mainchare Main {
     entry Main(CkArgMsg *m);
-    entry void done();
+    entry [reductiontarget] void done();
   };
 
   array [1D] rdmaObject{
     entry rdmaObject();
-    entry void testRdma();
+    entry void testRdma(CProxy_Main mProxy);
     entry void rdmaSent(CkDataMsg *msg);
     entry void send(int n1, int ptr1[n1], int n2, double ptr2[n2], int n3, char ptr3[n3]);
     entry void rdmaSend(int n1, rdma int ptr1[n1], int n2, rdma double ptr2[n2], int n3, rdma char ptr3[n3]);
     entry void mixedSend(int n1, int ptr1[n1], int n2, rdma double ptr2[n2], int n3, rdma int ptr3[n3], int n4, double ptr4[n4]);
+
+    entry void sdagRun() {
+      serial {
+        // send num arrays to its partner
+        for(int i = 1; i <= num; i++)
+          thisProxy[destIndex].sdagRecv(iter, iSize1, rdma(iArr1), dSize2, dArr2);
+      }
+
+      // wait for num arrays from partner
+      for (j = 1; j <= num; j++){
+        when sdagRecv[iter] (int iter, int n1, rdma int ptr1[n1], int n2, rdma double ptr2[n2]){
+          serial {
+            compareArray(ptr1, iArr1, n1);
+            compareArray(ptr2, dArr2, n2);
+          }
+        }
+      }
+
+      serial {
+        if(thisIndex == 0)
+          CkPrintf("sdagRun: Iteration %d completed\n", iter);
+
+        //increase iteration and continue
+        iter++;
+
+        //load balance
+        if(iter % LBPERIOD_ITER == 0)
+          AtSync();
+        else if(iter<=100)
+          thisProxy[thisIndex].sdagRun();
+        else {
+          CkCallback reductionCb(CkReductionTarget(Main, done), mainProxy);
+          contribute(reductionCb);
+        }
+      }
+    }
+
+    entry void sdagRecv(int iter, int n1, rdma int ptr1[n1], int n2, rdma double ptr2[n2]);
   };
 
 }
