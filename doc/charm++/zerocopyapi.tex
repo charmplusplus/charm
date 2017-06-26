@@ -93,4 +93,6 @@ requests.
 It should also be noted that the benefit of this API can be seen for large arrays on
 only RDMA enabled networks. On networks which do not support RDMA, the API is functional
 but doesn't show any performance benefit as it behaves like a regular entry method that
-copies its arguments.
+copies its arguments. Currently, the benefit of the API is mostly in terms of reducing
+application memory footprint as the API is largely unoptimized. Optimized versions of this
+API are expected to be released in the future.
