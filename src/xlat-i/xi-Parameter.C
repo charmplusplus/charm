@@ -647,6 +647,10 @@ void ParamList::beginUnmarshallSDAG(XStr &str) {
     }
     callEach(&Parameter::beginUnmarshall,str);
     str << "          impl_buf+=CK_ALIGN(implP.size(),16);\n";
+    // If there's no rdma support, unmarshall as a regular array
+    str<<"#if !CMK_ONESIDED_IMPL\n";
+    callEach(&Parameter::unmarshallRdmaArrayDataSDAG,str);
+    str<<"#endif\n";
     callEach(&Parameter::unmarshallRegArrayDataSDAG,str);
   }
 }
@@ -667,10 +671,8 @@ void Parameter::adjustUnmarshalledRdmaPtrsSDAG(XStr &str) {
 
 void Parameter::unmarshallRdmaArrayDataSDAG(XStr &str) {
   if(isRdma()) {
-    str<<"#if !CMK_ONESIDED_IMPL\n";
     Type *dt=type->deref();//Type, without &
     str << "          " << name << " = ("<<dt<<" *)(impl_buf+impl_off_" << name << ");\n";
-    str<<"#endif\n";
   }
 }
 
