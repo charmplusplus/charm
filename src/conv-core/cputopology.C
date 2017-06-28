@@ -228,7 +228,7 @@ int CpuTopology::supported = 0;
 static CpuTopology cpuTopo;
 static CmiNodeLock topoLock = 0; /* Not spelled 'NULL' to quiet warnings when CmiNodeLock is just 'int' */
 static int done = 0;
-static bool topoDone = false; // true on node 0 when received topoDone reduction from all PEs
+static int topoDone = 0;
 
 /* called on PE 0 */
 static void cpuTopoHandler(void *m)
@@ -291,7 +291,7 @@ static void cpuTopoHandler(void *m)
 /* called on PE 0 */
 static void topoDoneHandler(void *m) {
   CmiLock(topoLock);
-  topoDone = true;
+  topoDone++;
   CmiUnlock(topoLock);
 }
 
@@ -344,6 +344,11 @@ static void * combineMessage(int *size, void *data, void **remote, int count)
 // reduction function
 static void *emptyReduction(int *size, void *data, void **remote, int count)
 {
+  if (CmiMyPe() != 0) {
+    CmiLock(topoLock);
+    topoDone++;
+    CmiUnlock(topoLock);
+  }
   *size = sizeof(topoDoneMsg);
   topoDoneMsg *msg = (topoDoneMsg *)CmiAlloc(sizeof(topoDoneMsg));
   CmiSetHandler((char *)msg, CpvAccess(topoDoneHandlerIdx));
@@ -545,11 +550,11 @@ extern "C" void LrtsInitCpuTopo(char **argv)
   if (CmiMyPe() >= CmiNumPes()) {
     CmiNodeAllBarrier();         // comm thread waiting
 #if CMK_MACHINE_PROGRESS_DEFINED
-    bool waitForSecondReduction = ((CmiNumNodes() > 1) && (CmiMyNode() == 0));
+    bool waitForSecondReduction = (CmiNumNodes() > 1);
     while (topoInProgress) {
       CmiNetworkProgress();
       CmiLock(topoLock);
-      if (waitForSecondReduction) topoInProgress = !topoDone;
+      if (waitForSecondReduction) topoInProgress = topoDone < CmiMyNodeSize();
       else topoInProgress = done < CmiMyNodeSize();
       CmiUnlock(topoLock);
     }
@@ -600,15 +605,19 @@ extern "C" void LrtsInitCpuTopo(char **argv)
     topoDoneMsg *msg2 = (topoDoneMsg *)CmiAlloc(sizeof(topoDoneMsg));
     CmiSetHandler((char *)msg2, CpvAccess(topoDoneHandlerIdx));
     CmiReduce(msg2, sizeof(topoDoneMsg), emptyReduction);
-    if (CmiMyPe() == 0) {
+    if ((CmiMyPe() == 0) || (CmiNumSpanTreeChildren(CmiMyPe()) > 0)) {
       // wait until everyone else has topo info
       topoInProgress = true;
       while (topoInProgress) {
         CsdSchedulePoll();
         CmiLock(topoLock);
-        topoInProgress = !topoDone;
+        topoInProgress = topoDone < CmiMyNodeSize();
         CmiUnlock(topoLock);
       }
+    } else {
+      CmiLock(topoLock);
+      topoDone++;
+      CmiUnlock(topoLock);
     }
   }
 
