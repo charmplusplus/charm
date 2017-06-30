@@ -71,10 +71,11 @@ class rdmaObject : public CBase_rdmaObject{
   double *dArr1, *dArr2;
   char *cArr1;
   int iSize1, iSize2, dSize1, dSize2, cSize1, iOffset1, cOffset1;
-  int destIndex, iter, num, j, counter;
+  int destIndex, iter, num, j;
+  int mixedRdmaSentCounter, sdagRdmaSentCounter, sdagRdmaRecvCounter;
   bool firstMigrationPending;
-  CkCallback cb;
-  int idx_rdmaSent;
+  CkCallback cb, sdagCb;
+  int idx_rdmaSent, idx_sdagRdmaSent;;
   CProxy_Main mainProxy;
 
   public:
@@ -83,7 +84,14 @@ class rdmaObject : public CBase_rdmaObject{
       usesAtSync = true;
       destIndex = numElements - 1 - thisIndex;
       DEBUG(CkPrintf("[%d]  me - %d, my neighbour- %d \n", CkMyNode(), thisIndex, destIndex);)
-      counter = 0;
+      //counter for tracking mixedSend completions to initiate sdagRun
+      mixedRdmaSentCounter = 0;
+
+      //counter for tracking sdagRecv send completions
+      sdagRdmaSentCounter = 0;
+
+      //counter for tracking sdagRecv completions
+      sdagRdmaRecvCounter = 0;
       iArr1 = NULL;
       iArr2 = NULL;
       dArr1 = NULL;
@@ -94,6 +102,9 @@ class rdmaObject : public CBase_rdmaObject{
       j = 0;
       firstMigrationPending = true;
       idx_rdmaSent = CkIndex_rdmaObject::rdmaSent(NULL);
+      idx_sdagRdmaSent = CkIndex_rdmaObject::sdagRdmaSent(NULL);
+      cb = CkCallback(idx_rdmaSent, thisProxy[thisIndex]);
+      sdagCb = CkCallback(idx_sdagRdmaSent, thisProxy[thisIndex]);
     }
 
     void pup(PUP::er &p){
@@ -103,8 +114,11 @@ class rdmaObject : public CBase_rdmaObject{
       p|num;
       p|iSize1;
       p|dSize2;
-      p|counter;
+      p|mixedRdmaSentCounter;
+      p|sdagRdmaSentCounter;
+      p|sdagRdmaRecvCounter;
       p|mainProxy;
+      p|sdagCb;
 
       // sdagRun only uses iArr1 and dArr2
       // other others needn't be pupped/unpupped
@@ -144,8 +158,18 @@ class rdmaObject : public CBase_rdmaObject{
       free(ptr);
       delete m;
 
-      if(++counter == 2)
+      if(++mixedRdmaSentCounter == 2)
         thisProxy[thisIndex].sdagRun();
+    }
+
+    void sdagRdmaSent(CkDataMsg *m){
+      delete m;
+      // increment on completing the send of an rdma parameter in sdagRecv
+      sdagRdmaSentCounter++;
+
+      // check that all sends and recvs have completed and then advance
+      if(sdagRdmaSentCounter == 2*num && sdagRdmaRecvCounter == num)
+        nextStep();
     }
 
     void testRdma(CProxy_Main mProxy){
@@ -167,7 +191,6 @@ class rdmaObject : public CBase_rdmaObject{
         assignCharValues(cArr1, cSize1);
         thisProxy[destIndex].send(iSize1, iArr1, dSize1, dArr1, cSize1, cArr1);
       }
-      cb = CkCallback(idx_rdmaSent, thisProxy[thisIndex]);
     }
 
     void send(int n1, int *ptr1, int n2, double *ptr2, int n3, char *ptr3){
@@ -220,6 +243,28 @@ class rdmaObject : public CBase_rdmaObject{
         copyArray(iArr2, ptr3, n3);
         copyArray(dArr2, ptr4, n4);
         thisProxy[destIndex].mixedSend(n1, iArr1, n2, rdma(dArr1, cb), n3, rdma(iArr2, cb), n4, dArr2);
+      }
+    }
+
+    void nextStep() {
+      // reset the completion counters
+      sdagRdmaRecvCounter = 0;
+      sdagRdmaSentCounter = 0;
+
+      if(thisIndex == 0)
+          CkPrintf("sdagRun: Iteration %d completed\n", iter);
+
+      //increase iteration and continue
+      iter++;
+
+      //load balance
+      if(iter % LBPERIOD_ITER == 0)
+        AtSync();
+      else if(iter<=100)
+        thisProxy[thisIndex].sdagRun();
+      else {
+        CkCallback reductionCb(CkReductionTarget(Main, done), mainProxy);
+        contribute(reductionCb);
       }
     }
 

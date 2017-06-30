@@ -19,38 +19,27 @@ mainmodule simpleRdma {
       serial {
         // send num arrays to its partner
         for(int i = 1; i <= num; i++)
-          thisProxy[destIndex].sdagRecv(iter, iSize1, rdma(iArr1), dSize2, dArr2);
+          thisProxy[destIndex].sdagRecv(iter, iSize1, rdma(iArr1, sdagCb), dSize2, rdma(dArr2, sdagCb));
       }
 
       // wait for num arrays from partner
       for (j = 1; j <= num; j++){
         when sdagRecv[iter] (int iter, int n1, rdma int ptr1[n1], int n2, rdma double ptr2[n2]){
           serial {
+            // increment counter on receiving a sdagRecv
+            sdagRdmaRecvCounter++;
             compareArray(ptr1, iArr1, n1);
             compareArray(ptr2, dArr2, n2);
+
+            // check that all sends and recvs have completed and then advance
+            if(sdagRdmaSentCounter == 2*num && sdagRdmaRecvCounter == num)
+              nextStep();
           }
-        }
-      }
-
-      serial {
-        if(thisIndex == 0)
-          CkPrintf("sdagRun: Iteration %d completed\n", iter);
-
-        //increase iteration and continue
-        iter++;
-
-        //load balance
-        if(iter % LBPERIOD_ITER == 0)
-          AtSync();
-        else if(iter<=100)
-          thisProxy[thisIndex].sdagRun();
-        else {
-          CkCallback reductionCb(CkReductionTarget(Main, done), mainProxy);
-          contribute(reductionCb);
         }
       }
     }
 
+    entry void sdagRdmaSent(CkDataMsg *msg);
     entry void sdagRecv(int iter, int n1, rdma int ptr1[n1], int n2, rdma double ptr2[n2]);
   };
 
