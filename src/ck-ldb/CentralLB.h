@@ -100,6 +100,7 @@ public:
 
   void SetPESpeed(int);
   int GetPESpeed();
+  inline void setConcurrent(bool c) { concurrent = c; }
 
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
