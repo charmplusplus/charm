@@ -96,7 +96,19 @@ void vars_moduleinit()
 {
   CpmInitializeThisModule();
   CtvInitialize(int, ctv1);
+  if (!CtvInitialized(ctv1)) {
+      CmiPrintf("ctv initialization test failed.\n");
+      exit(1);
+  }
   CpvInitialize(int, cpv1);
+  if (!CpvInitialized(cpv1)) {
+      CmiPrintf("cpv initialization test failed.\n");
+      exit(1);
+  }
   CsvInitialize(int, csv1);
+  if (!CsvInitialized(csv1)) {
+      CmiPrintf("csv initialization test failed.\n");
+      exit(1);
+  }
 }
 

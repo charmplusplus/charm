@@ -564,6 +564,7 @@ for each processor in the node.
 #define CsvStaticDeclare(t,v) static t CMK_TAG(Csv_,v)
 #define CsvExtern(t,v) extern t CMK_TAG(Csv_,v)
 #define CsvInitialize(t,v) do{}while(0)
+#define CsvInitialized(v) 1
 #define CsvAccess(v) CMK_TAG(Csv_,v)
 #endif
 
@@ -1568,6 +1569,8 @@ extern char *CthGetData(CthThread t);
 		CsvAccess(CtvOffs##v)=CthRegister(sizeof(CtvType##v));\
 	else CthRegistered(CsvAccess(CtvOffs##v)+sizeof(CtvType##v));\
 } while(0)
+
+#define CtvInitialized(v) (CsvAccess(CtvOffs##v)!=(-1))
 
 /****** CFUTURE: CONVERSE FUTURES ******/
 
