@@ -2295,14 +2295,15 @@ static void PumpNetworkSmsg()
             case RDMA_ACK_TAG:
             {
                 CmiGNIAckOp_t *ack_data = (CmiGNIAckOp_t *)header;
+                CmiRdmaAck * ack = ack_data->ack;
+                gni_mem_handle_t mem_hndl = ack_data->mem_hndl;
                 GNI_SmsgRelease(ep_hndl_array[inst_id]);
                 CMI_GNI_UNLOCK(smsg_mailbox_lock)
 
-                CmiRdmaAck * ack = ack_data->ack;
-                gni_mem_handle_t mem_hndl = ack_data->mem_hndl;
+                // call the fnPtr to handle the ack
                 ack->fnPtr(ack->token);
 
-                //free callback structure, CmiRdmaAck allocated in CmiSetRdmaAck
+                // free callback structure, CmiRdmaAck allocated in CmiSetRdmaAck
                 free(ack);
 
                 // Deregister registered sender memory used for GET
