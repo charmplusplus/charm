@@ -1,4 +1,4 @@
-      program main
+      subroutine mpi_main
       implicit none
 
       include 'mpif.h'
@@ -36,12 +36,12 @@
 !     broadcasts it to other processes
 
       if (mynod .eq. 0) then
-         argc = @F77IARGC@
+         call AMPI_Command_argument_count(argc)
          i = 0
-         @F77GETARG@
+         call AMPI_Get_command_argument(i, str, 1024, ierr)
          do while ((i .lt. argc) .and. (str .ne. '-fname'))
             i = i + 1
-            @F77GETARG@
+            call AMPI_Get_command_argument(i, str, 1024, ierr)
          end do
          if (i .ge. argc) then
 	    print *
@@ -51,7 +51,7 @@
          end if
 
          i = i + 1
-         @F77GETARG@
+         call AMPI_Get_command_argument(i, str, 1024, ierr)
          call MPI_BCAST(str, 1024, MPI_CHARACTER, 0,                    &
      &        MPI_COMM_WORLD, ierr)
       else
@@ -159,4 +159,4 @@
       call MPI_FINALIZE(ierr)
 
       stop
-      end
+      end subroutine
