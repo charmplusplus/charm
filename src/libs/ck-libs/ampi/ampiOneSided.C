@@ -429,7 +429,7 @@ int ampi::winGetAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype
     else
 #endif
     {
-      msg = thisProxy[rank].winRemoteGetAccumulate(orgtotalsize, orgaddr, orgcnt, orgtype, targdisp,
+      msg = thisProxy[rank].winRemoteGetAccumulate(orgtotalsize, rdma(orgaddr), orgcnt, orgtype, targdisp,
                                                    targcnt, targtype, op, win->index);
     }
   }

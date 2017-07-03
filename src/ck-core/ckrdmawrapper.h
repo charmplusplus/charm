@@ -26,7 +26,7 @@ class CkRdmaWrapper{
   CkRdmaWrapper() : ptr(NULL), callback(NULL) {
     srcPe = -1;
   }
-  CkRdmaWrapper(const void *address) : ptr(address){
+  explicit CkRdmaWrapper(const void *address) : ptr(address){
     srcPe = CkMyPe();
     callback = new CkCallback(CkCallback::ignore);
   }
