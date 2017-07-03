@@ -4621,7 +4621,8 @@ fi
 if test $NOF77 = 1 ; then
    F77=":"
 else
-   FORTRAN_TEST="fperf fcoll_test fmisc pfcoll_test" 
+   FORTRAN_TEST="fperf fcoll_test fmisc"
+   # Disabled FORTRAN_TEST: pfcoll_test (no PMPI support in AMPI yet)
 fi
 #
 if test $FROM_MPICH = 0 ; then

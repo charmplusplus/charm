@@ -1,5 +1,5 @@
 CC = @TEST_CC@
-F77 = @TEST_F77@
+F77 = @TEST_F77@ -ffree-form
 INCLUDE_DIR = @ROMIO_INCLUDE@
 # because := is not universally avalible, we have to play games to use the
 # user-specificed LDFLAGS and OUR_LIBS env. variables (if set)
@@ -10,7 +10,8 @@ CTESTS = simple perf async coll_test coll_perf misc file_info excl large_array \
      atomicity noncontig i_noncontig noncontig_coll split_coll shared_fp \
      large_file error status noncontig_coll2
 # disabled test: psimple (no PMPI support in AMPI yet)
-FTESTS = fcoll_test fperf fmisc pfcoll_test
+FTESTS = fcoll_test fperf fmisc
+# disabled FTEST: pfcoll_test (no PMPI support in AMPI yet)
 srcdir=@srcdir@
 
 @VPATH@

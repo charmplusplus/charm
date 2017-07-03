@@ -340,14 +340,15 @@ if [ @NOF77@ = 0 ] ; then
     CleanExe fcoll_test
 #
     OutTime
-    testfiles="$testfiles pfcoll_test.out"
-    \rm -f pfcoll_test.out
-    MakeExe pfcoll_test
-    \rm -f $FILENAME*
-    echo '**** Testing pfcoll_test.f ****'
-    $mpirun $PARALLEL 4 ./pfcoll_test -fname $FILENAME "$@" >> pfcoll_test.out 2>&1
-    CheckOutput pfcoll_test
-    CleanExe pfcoll_test
+    # pfcoll_test is not supported in AMPI 6.8.0 (no PMPI support)
+    # testfiles="$testfiles pfcoll_test.out"
+    # \rm -f pfcoll_test.out
+    # MakeExe pfcoll_test
+    # \rm -f $FILENAME*
+    # echo '**** Testing pfcoll_test.f ****'
+    # $mpirun $PARALLEL 4 ./pfcoll_test -fname $FILENAME "$@" >> pfcoll_test.out 2>&1
+    # CheckOutput pfcoll_test
+    # CleanExe pfcoll_test
 #
 echo ""
 fi
