@@ -202,7 +202,11 @@ including network and MPI versions, smp and non-smp versions.
 
 \item[{\tt ++ppn}]                       Number of PEs (or worker threads) per logical node (OS process). This option should be specified even when using platform specific launchers (e.g., aprun, ibrun).
 
-\item[{\tt +setcpuaffinity}]             Set cpu affinity automatically for processes (when Charm++ is based on non-smp versions) or threads (when smp). This option is the default on platforms that support it.
+\item[{\tt +setcpuaffinity}]             Set cpu affinity
+  automatically for processes (when Charm++ is based on non-smp
+  versions) or threads (when smp). This option is recommended, as it
+  prevents the OS from unnecessarily moving processes/threads around
+  the processors of a physical node.
 
 \item[{\tt +excludecore <core \#>}]       Do not set cpu affinity for the given core number. One can use this option multiple times to provide a list of core numbers to avoid.
 
