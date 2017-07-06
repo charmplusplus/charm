@@ -179,7 +179,7 @@ void ReservedWord(int token, int fCol, int lCol);
      APPWORK = 291,
      VOID = 292,
      CONST = 293,
-     RDMA = 294,
+     NOCOPY = 294,
      PACKED = 295,
      VARSIZE = 296,
      ENTRY = 297,
@@ -254,7 +254,7 @@ void ReservedWord(int token, int fCol, int lCol);
 #define APPWORK 291
 #define VOID 292
 #define CONST 293
-#define RDMA 294
+#define NOCOPY 294
 #define PACKED 295
 #define VARSIZE 296
 #define ENTRY 297
@@ -879,7 +879,7 @@ static const char *const yytname[] =
   "CLASS", "INCLUDE", "STACKSIZE", "THREADED", "TEMPLATE", "SYNC", "IGET",
   "EXCLUSIVE", "IMMEDIATE", "SKIPSCHED", "INLINE", "VIRTUAL", "MIGRATABLE",
   "AGGREGATE", "CREATEHERE", "CREATEHOME", "NOKEEP", "NOTRACE", "APPWORK",
-  "VOID", "CONST", "RDMA", "PACKED", "VARSIZE", "ENTRY", "FOR", "FORALL",
+  "VOID", "CONST", "NOCOPY", "PACKED", "VARSIZE", "ENTRY", "FOR", "FORALL",
   "WHILE", "WHEN", "OVERLAP", "SERIAL", "IF", "ELSE", "PYTHON", "LOCAL",
   "NAMESPACE", "USING", "IDENT", "NUMBER", "LITERAL", "CPROGRAM", "HASHIF",
   "HASHIFDEF", "INT", "LONG", "SHORT", "CHAR", "FLOAT", "DOUBLE",
@@ -2705,7 +2705,7 @@ yyreduce:
 
 /* Line 1806 of yacc.c  */
 #line 252 "xi-grammar.y"
-    { ReservedWord(RDMA, (yyloc).first_column, (yyloc).last_column); YYABORT; }
+    { ReservedWord(NOCOPY, (yyloc).first_column, (yyloc).last_column); YYABORT; }
     break;
 
   case 33:

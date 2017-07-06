@@ -1,6 +1,6 @@
 /** \file stencil3d.C
 
- *  This example is the rdma verison of the stencil example
+ *  This example is the nocopy verison of the stencil example
  *  in examples/charm++/load_balancing/stencil3d *
  *	      *****************
  *	   *		   *  *
@@ -240,22 +240,22 @@ class Stencil: public CBase_Stencil {
 
       // Send my left face
       thisProxy(wrap_x(thisIndex.x-1), thisIndex.y, thisIndex.z)
-        .receiveGhosts(iterations, RIGHT, blockDimY, blockDimZ, rdma(leftGhost, cb));
+        .receiveGhosts(iterations, RIGHT, blockDimY, blockDimZ, CkSendBuffer(leftGhost, cb));
       // Send my right face
       thisProxy(wrap_x(thisIndex.x+1), thisIndex.y, thisIndex.z)
-        .receiveGhosts(iterations, LEFT, blockDimY, blockDimZ, rdma(rightGhost, cb));
+        .receiveGhosts(iterations, LEFT, blockDimY, blockDimZ, CkSendBuffer(rightGhost, cb));
       // Send my bottom face
       thisProxy(thisIndex.x, wrap_y(thisIndex.y-1), thisIndex.z)
-        .receiveGhosts(iterations, TOP, blockDimX, blockDimZ, rdma(bottomGhost, cb));
+        .receiveGhosts(iterations, TOP, blockDimX, blockDimZ, CkSendBuffer(bottomGhost, cb));
       // Send my top face
       thisProxy(thisIndex.x, wrap_y(thisIndex.y+1), thisIndex.z)
-        .receiveGhosts(iterations, BOTTOM, blockDimX, blockDimZ, rdma(topGhost, cb));
+        .receiveGhosts(iterations, BOTTOM, blockDimX, blockDimZ, CkSendBuffer(topGhost, cb));
       // Send my front face
       thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z-1))
-        .receiveGhosts(iterations, BACK, blockDimX, blockDimY, rdma(frontGhost, cb));
+        .receiveGhosts(iterations, BACK, blockDimX, blockDimY, CkSendBuffer(frontGhost, cb));
       // Send my back face
       thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z+1))
-        .receiveGhosts(iterations, FRONT, blockDimX, blockDimY, rdma(backGhost, cb));
+        .receiveGhosts(iterations, FRONT, blockDimX, blockDimY, CkSendBuffer(backGhost, cb));
 
       // control flow continues in completedSendingGhost
     }

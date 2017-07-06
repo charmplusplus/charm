@@ -20,14 +20,14 @@ namespace \
 piArray \
 PUP \
 NQueen \
-rdma \
 reductions \
 ring \
 rings \
 speeds \
 sync_square \
 threaded_ring \
-TRAM
+TRAM \
+zerocopy
 
 BGDIRS=\
 hello \

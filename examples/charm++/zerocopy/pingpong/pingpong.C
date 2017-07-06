@@ -47,12 +47,12 @@ class Ping1 : public CBase_Ping1
   int niter;
   int iterations;
   double start_time, end_time, reg_time, zerocpy_time;
-  char *rdmaMsg;
+  char *nocopyMsg;
 
 public:
   Ping1()
   {
-    rdmaMsg = new char[MAX_PAYLOAD];
+    nocopyMsg = new char[MAX_PAYLOAD];
     niter = 0;
   }
   Ping1(CkMigrateMessage *m) {}
@@ -65,11 +65,11 @@ public:
     else
       iterations = BIG_ITER;
     start_time = CkWallTimer();
-    thisProxy[1].recv(rdmaMsg, size);
+    thisProxy[1].recv(nocopyMsg, size);
   }
 
   void freeBuffer(){
-    delete [] rdmaMsg;
+    delete [] nocopyMsg;
     if(thisIndex == 0){
       thisProxy[1].freeBuffer();
     }
@@ -87,16 +87,16 @@ public:
         reg_time = 1.0e6*(end_time-start_time)/iterations;
         niter = 0;
         start_time = CkWallTimer();
-        thisProxy[1].recv_rdma(rdma(rdmaMsg), size);
+        thisProxy[1].recv_zerocopy(CkSendBuffer(nocopyMsg), size);
       } else {
-        thisProxy[1].recv(rdmaMsg, size);
+        thisProxy[1].recv(nocopyMsg, size);
       }
     } else {
-      thisProxy[0].recv(rdmaMsg, size);
+      thisProxy[0].recv(nocopyMsg, size);
     }
   }
 
-  void recv_rdma(char* msg, int size)
+  void recv_zerocopy(char* msg, int size)
   {
     if(thisIndex==0) {
       niter++;
@@ -110,10 +110,10 @@ public:
         niter=0;
         mainProxy.maindone();
       } else {
-        thisProxy[1].recv_rdma(rdma(rdmaMsg), size);
+        thisProxy[1].recv_zerocopy(CkSendBuffer(nocopyMsg), size);
       }
     } else {
-      thisProxy[0].recv_rdma(rdma(rdmaMsg), size);
+      thisProxy[0].recv_zerocopy(CkSendBuffer(nocopyMsg), size);
     }
   }
 };

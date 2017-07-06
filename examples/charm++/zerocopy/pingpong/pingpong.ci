@@ -9,6 +9,6 @@ mainmodule pingpong {
     entry void start(int size);
     entry void freeBuffer();
     entry void recv(char msg[size], int size);
-    entry void recv_rdma(rdma char msg[size], int size);
+    entry void recv_zerocopy(nocopy char msg[size], int size);
   };
 };

@@ -1,4 +1,4 @@
-#include "simpleRdma.decl.h"
+#include "simpleZeroCopy.decl.h"
 #include <assert.h>
 
 //Set DEBUG(x) to x to see the debug messages
@@ -13,7 +13,7 @@ class Main : public CBase_Main{
   public:
     Main(CkArgMsg *m){
       if(m->argc!=2){
-        ckout<<"Usage: rdma <numelements>"<<endl;
+        ckout<<"Usage: zerocopy <numelements>"<<endl;
         CkExit();
       }
       numElements = atoi(m->argv[1]);
@@ -26,8 +26,8 @@ class Main : public CBase_Main{
       CProxy_RRMap rrMap = CProxy_RRMap::ckNew();
       CkArrayOptions opts(numElements);
       opts.setMap(rrMap);
-      CProxy_rdmaObject rdmaObj = CProxy_rdmaObject::ckNew(opts);
-      rdmaObj.testRdma(thisProxy);
+      CProxy_zerocopyObject zerocopyObj = CProxy_zerocopyObject::ckNew(opts);
+      zerocopyObj.testZeroCopy(thisProxy);
     }
 
     void done(){
@@ -65,33 +65,33 @@ void assignCharValues(char *&arr, int size){
      arr[i] = (char)(rand() % 125 + 1);
 }
 
-//rdma object chare
-class rdmaObject : public CBase_rdmaObject{
+//zerocopy object chare
+class zerocopyObject : public CBase_zerocopyObject{
   int *iArr1, *iArr2;
   double *dArr1, *dArr2;
   char *cArr1;
   int iSize1, iSize2, dSize1, dSize2, cSize1, iOffset1, cOffset1;
   int destIndex, iter, num, j;
-  int mixedRdmaSentCounter, sdagRdmaSentCounter, sdagRdmaRecvCounter;
+  int mixedZeroCopySentCounter, sdagZeroCopySentCounter, sdagZeroCopyRecvCounter;
   bool firstMigrationPending;
   CkCallback cb, sdagCb;
-  int idx_rdmaSent, idx_sdagRdmaSent;;
+  int idx_zerocopySent, idx_sdagZeroCopySent;;
   CProxy_Main mainProxy;
 
   public:
-    rdmaObject_SDAG_CODE
-    rdmaObject(){
+    zerocopyObject_SDAG_CODE
+    zerocopyObject(){
       usesAtSync = true;
       destIndex = numElements - 1 - thisIndex;
       DEBUG(CkPrintf("[%d]  me - %d, my neighbour- %d \n", CkMyNode(), thisIndex, destIndex);)
       //counter for tracking mixedSend completions to initiate sdagRun
-      mixedRdmaSentCounter = 0;
+      mixedZeroCopySentCounter = 0;
 
       //counter for tracking sdagRecv send completions
-      sdagRdmaSentCounter = 0;
+      sdagZeroCopySentCounter = 0;
 
       //counter for tracking sdagRecv completions
-      sdagRdmaRecvCounter = 0;
+      sdagZeroCopyRecvCounter = 0;
       iArr1 = NULL;
       iArr2 = NULL;
       dArr1 = NULL;
@@ -101,10 +101,10 @@ class rdmaObject : public CBase_rdmaObject{
       num = 4;
       j = 0;
       firstMigrationPending = true;
-      idx_rdmaSent = CkIndex_rdmaObject::rdmaSent(NULL);
-      idx_sdagRdmaSent = CkIndex_rdmaObject::sdagRdmaSent(NULL);
-      cb = CkCallback(idx_rdmaSent, thisProxy[thisIndex]);
-      sdagCb = CkCallback(idx_sdagRdmaSent, thisProxy[thisIndex]);
+      idx_zerocopySent = CkIndex_zerocopyObject::zerocopySent(NULL);
+      idx_sdagZeroCopySent = CkIndex_zerocopyObject::sdagZeroCopySent(NULL);
+      cb = CkCallback(idx_zerocopySent, thisProxy[thisIndex]);
+      sdagCb = CkCallback(idx_sdagZeroCopySent, thisProxy[thisIndex]);
     }
 
     void pup(PUP::er &p){
@@ -114,9 +114,9 @@ class rdmaObject : public CBase_rdmaObject{
       p|num;
       p|iSize1;
       p|dSize2;
-      p|mixedRdmaSentCounter;
-      p|sdagRdmaSentCounter;
-      p|sdagRdmaRecvCounter;
+      p|mixedZeroCopySentCounter;
+      p|sdagZeroCopySentCounter;
+      p|sdagZeroCopyRecvCounter;
       p|mainProxy;
       p|sdagCb;
 
@@ -132,7 +132,7 @@ class rdmaObject : public CBase_rdmaObject{
       p(dArr2, dSize2);
     }
 
-    ~rdmaObject() {
+    ~zerocopyObject() {
       if(firstMigrationPending) {
         // delete on first migration on all chares
         delete [] cArr1;
@@ -150,29 +150,29 @@ class rdmaObject : public CBase_rdmaObject{
       delete [] iArr1;
     }
 
-    rdmaObject(CkMigrateMessage *m){}
+    zerocopyObject(CkMigrateMessage *m){}
 
-    void rdmaSent(CkDataMsg *m){
-      //to get access to the array sent via rdma
+    void zerocopySent(CkDataMsg *m){
+      //to get access to the array sent via zerocopy
       void *ptr = *((void **)(m->data));
       free(ptr);
       delete m;
 
-      if(++mixedRdmaSentCounter == 2)
+      if(++mixedZeroCopySentCounter == 2)
         thisProxy[thisIndex].sdagRun();
     }
 
-    void sdagRdmaSent(CkDataMsg *m){
+    void sdagZeroCopySent(CkDataMsg *m){
       delete m;
-      // increment on completing the send of an rdma parameter in sdagRecv
-      sdagRdmaSentCounter++;
+      // increment on completing the send of an zerocopy parameter in sdagRecv
+      sdagZeroCopySentCounter++;
 
       // check that all sends and recvs have completed and then advance
-      if(sdagRdmaSentCounter == 2*num && sdagRdmaRecvCounter == num)
+      if(sdagZeroCopySentCounter == 2*num && sdagZeroCopyRecvCounter == num)
         nextStep();
     }
 
-    void testRdma(CProxy_Main mProxy){
+    void testZeroCopy(CProxy_Main mProxy){
       iSize1 = 210;
       iSize2 = 11;
       dSize1 = 4700;
@@ -201,28 +201,28 @@ class rdmaObject : public CBase_rdmaObject{
         DEBUG(ckout<<"["<<CkMyPe()<<"] "<<thisIndex<<"->"<<destIndex<<": Regular send completed"<<endl;)
         if(thisIndex == 0)
           CkPrintf("send: completed\n");
-        thisProxy[destIndex].rdmaSend(iSize1-iOffset1, rdma(iArr1+iOffset1), dSize1, rdma(dArr1), cSize1-cOffset1, rdma(cArr1 + cOffset1));
+        thisProxy[destIndex].zerocopySend(iSize1-iOffset1, CkSendBuffer(iArr1+iOffset1), dSize1, CkSendBuffer(dArr1), cSize1-cOffset1, CkSendBuffer(cArr1 + cOffset1));
       }
       else{
         thisProxy[destIndex].send(n1, ptr1, n2, ptr2, n3, ptr3);
       }
     }
 
-    void rdmaSend(int n1, int *ptr1, int n2, double *ptr2, int n3, char *ptr3){
+    void zerocopySend(int n1, int *ptr1, int n2, double *ptr2, int n3, char *ptr3){
       if(thisIndex < numElements/2){
         compareArray(ptr1, iArr1, n1, iOffset1);
         compareArray(ptr2, dArr1, n2);
         compareArray(ptr3, cArr1, n3, cOffset1);
-        DEBUG(ckout<<"["<<CkMyPe()<<"] "<<thisIndex<<"->"<<destIndex<<": Rdma send completed"<<endl;)
+        DEBUG(ckout<<"["<<CkMyPe()<<"] "<<thisIndex<<"->"<<destIndex<<": ZeroCopy send completed"<<endl;)
         if(thisIndex == 0)
-          CkPrintf("rdmaSend: completed\n");
-        thisProxy[destIndex].mixedSend(iSize1, iArr1, dSize1, rdma(dArr1), iSize2, rdma(iArr2), dSize2, dArr2);
+          CkPrintf("zerocopySend: completed\n");
+        thisProxy[destIndex].mixedSend(iSize1, iArr1, dSize1, CkSendBuffer(dArr1), iSize2, CkSendBuffer(iArr2), dSize2, dArr2);
       }
       else{
         copyArray(iArr1, ptr1, n1);
         copyArray(dArr1, ptr2, n2);
         copyArray(cArr1, ptr3, n3);
-        thisProxy[destIndex].rdmaSend(n1, rdma(iArr1), n2, rdma(dArr1), n3, rdma(cArr1));
+        thisProxy[destIndex].zerocopySend(n1, CkSendBuffer(iArr1), n2, CkSendBuffer(dArr1), n3, CkSendBuffer(cArr1));
       }
     }
 
@@ -242,14 +242,14 @@ class rdmaObject : public CBase_rdmaObject{
         copyArray(dArr1, ptr2, n2);
         copyArray(iArr2, ptr3, n3);
         copyArray(dArr2, ptr4, n4);
-        thisProxy[destIndex].mixedSend(n1, iArr1, n2, rdma(dArr1, cb), n3, rdma(iArr2, cb), n4, dArr2);
+        thisProxy[destIndex].mixedSend(n1, iArr1, n2, CkSendBuffer(dArr1, cb), n3, CkSendBuffer(iArr2, cb), n4, dArr2);
       }
     }
 
     void nextStep() {
       // reset the completion counters
-      sdagRdmaRecvCounter = 0;
-      sdagRdmaSentCounter = 0;
+      sdagZeroCopyRecvCounter = 0;
+      sdagZeroCopySentCounter = 0;
 
       if(thisIndex == 0)
           CkPrintf("sdagRun: Iteration %d completed\n", iter);
@@ -273,4 +273,4 @@ class rdmaObject : public CBase_rdmaObject{
     }
 };
 
-#include "simpleRdma.def.h"
+#include "simpleZeroCopy.def.h"

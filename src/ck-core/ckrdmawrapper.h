@@ -1,12 +1,12 @@
 /*This class is a wrapper class for binding
- * the data specific to one rdma operation*/
+ * the data specific to one zero copy operation*/
 
 #ifndef __CKRDMAWRAPPER_H
 #define __CKRDMAWRAPPER_H
 
 #include "ckcallback.h"
 
-#define rdma(...) CkRdmaWrapper(__VA_ARGS__)
+#define CkSendBuffer(...) CkRdmaWrapper(__VA_ARGS__)
 
 class CkRdmaWrapper{
   public:

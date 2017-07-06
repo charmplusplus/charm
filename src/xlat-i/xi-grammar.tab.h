@@ -73,7 +73,7 @@
      APPWORK = 291,
      VOID = 292,
      CONST = 293,
-     RDMA = 294,
+     NOCOPY = 294,
      PACKED = 295,
      VARSIZE = 296,
      ENTRY = 297,
@@ -148,7 +148,7 @@
 #define APPWORK 291
 #define VOID 292
 #define CONST 293
-#define RDMA 294
+#define NOCOPY 294
 #define PACKED 295
 #define VARSIZE 296
 #define ENTRY 297

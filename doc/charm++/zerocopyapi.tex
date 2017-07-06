@@ -16,26 +16,26 @@ to a drop in performance due to the overhead associated with onesided communicat
 \vspace{0.1in}
 \noindent
 To send an array using the zero copy message send API, specify the array parameter
-in the .ci file with the rdma specifier.
+in the .ci file with the nocopy specifier.
 
 \begin{alltt}
-entry void foo (int size, rdma int arr[size]);
+entry void foo (int size, nocopy int arr[size]);
 \end{alltt}
 
 While calling the entry method from the .C file, wrap the array i.e the
-pointer in an rdma wrapper.
+pointer in a CkSendBuffer wrapper.
 
 \begin{alltt}
-arrayProxy[0].foo(500000, rdma(arrPtr));
+arrayProxy[0].foo(500000, CkSendBuffer(arrPtr));
 \end{alltt}
 
 Until the RDMA operation is completed, it is not safe to modify the buffer.
 To be notified on completion of the RDMA operation, pass an optional callback object
-in the rdma wrapper associated with the specific rdma array.
+in the CkSendBuffer wrapper associated with the specific nocopy array.
 
 \begin{alltt}
-CkCallback cb(CkIndex_Foo::rdmaSent(NULL), thisProxy[thisIndex]);
-arrayProxy[0].foo(500000, rdma(arrPtr, cb));
+CkCallback cb(CkIndex_Foo::zerocopySent(NULL), thisProxy[thisIndex]);
+arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb));
 \end{alltt}
 
 The callback will be invoked on completion of the RDMA operation associated with the
@@ -45,7 +45,7 @@ received in the callback.
 
 \begin{alltt}
 //called when RDMA operation is completed
-void rdmaSent(CkDataMsg *m)
+void zerocopySent(CkDataMsg *m)
 \{
   //get access to the pointer and free the allocated buffer
   void *ptr = *((void **)(m->data));
@@ -54,36 +54,36 @@ void rdmaSent(CkDataMsg *m)
 \}
 \end{alltt}
 
-The RDMA call is associated with an rdma array rather than the entry method.
-In the case of sending multiple rdma arrays, each RDMA call is independent of the other.
-Hence, the callback applies to only the array it is attached to and not to all the rdma
+The RDMA call is associated with a nocopy array rather than the entry method.
+In the case of sending multiple nocopy arrays, each RDMA call is independent of the other.
+Hence, the callback applies to only the array it is attached to and not to all the nocopy
 arrays passed in an entry method invocation. On completion of the RDMA call for each
 array, the corresponding callback is separately invoked.
 
-As an example, for an entry method with two rdma array parameters, each called with the same
-callback, the callback will be invoked twice : on completing the transfer of each of the two
-RDMA parameters.
+As an example, for an entry method with two nocopy array parameters, each called with the same
+callback, the callback will be invoked twice: on completing the transfer of each of the two
+nocopy parameters.
 
 \vspace{0.1in}
 \noindent
 For multiple arrays to be sent via RDMA, declare the entry method in the .ci file as:
 
 \begin{alltt}
-entry void foo (int size1, rdma int arr1[size1], int size2, rdma double arr2[size2]);
+entry void foo (int size1, nocopy int arr1[size1], int size2, nocopy double arr2[size2]);
 \end{alltt}
 
-In the .C file, it is also possible to have different callbacks associated with each rdma array.
+In the .C file, it is also possible to have different callbacks associated with each nocopy array.
 \begin{alltt}
-CkCallback cb1(CkIndex_Foo::rdmaSent1(NULL), thisProxy[thisIndex]);
-CkCallback cb2(CkIndex_Foo::rdmaSent2(NULL), thisProxy[thisIndex]);
-arrayProxy[0].foo(500000, rdma(arrPtr1, cb1), 1024000, rdma(arrPtr2, cb2));
+CkCallback cb1(CkIndex_Foo::zerocopySent1(NULL), thisProxy[thisIndex]);
+CkCallback cb2(CkIndex_Foo::zerocopySent2(NULL), thisProxy[thisIndex]);
+arrayProxy[0].foo(500000, CkSendBuffer(arrPtr1, cb1), 1024000, CkSendBuffer(arrPtr2, cb2));
 \end{alltt}
 
-This API is demonstrated in \examplerefdir{rdma/simpleRdma} and \testrefdir{pingpong}
+This API is demonstrated in \examplerefdir{zerocopy} and \testrefdir{pingpong}
 
 \vspace{0.1in}
 \noindent
-It should be noted that calls to entry methods with rdma specified parameters are
+It should be noted that calls to entry methods with nocopy specified parameters are
 currently only supported for point to point operations and not for collective operations.
 Additionally, there is also no support for migration of chares that have pending RDMA transfer
 requests.
@@ -91,8 +91,8 @@ requests.
 \vspace{0.1in}
 \noindent
 It should also be noted that the benefit of this API can be seen for large arrays on
-only RDMA enabled networks. On networks which do not support RDMA, the API is functional
-but doesn't show any performance benefit as it behaves like a regular entry method that
-copies its arguments. Currently, the benefit of the API is mostly in terms of reducing
-application memory footprint as the API is largely unoptimized. Optimized versions of this
-API are expected to be released in the future.
+only RDMA enabled networks. On networks which do not support RDMA and for within process sends
+(which uses shared memory), the API is functional but doesn't show any performance benefit as it
+behaves like a regular entry method that copies its arguments. Currently, the benefit of the API
+is mostly in terms of reducing application memory footprint as the API is largely unoptimized.
+Optimized versions of this API are expected to be released in the future.

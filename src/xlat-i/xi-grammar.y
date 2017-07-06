@@ -113,7 +113,7 @@ void ReservedWord(int token, int fCol, int lCol);
 %token CREATEHERE CREATEHOME NOKEEP NOTRACE APPWORK
 %token VOID
 %token CONST
-%token RDMA
+%token NOCOPY
 %token PACKED
 %token VARSIZE
 %token ENTRY
@@ -249,7 +249,7 @@ Name		: IDENT
 		| EXCLUSIVE { ReservedWord(EXCLUSIVE, @$.first_column, @$.last_column); YYABORT; }
 		| IMMEDIATE { ReservedWord(IMMEDIATE, @$.first_column, @$.last_column); YYABORT; }
 		| SKIPSCHED { ReservedWord(SKIPSCHED, @$.first_column, @$.last_column); YYABORT; }
-		| RDMA { ReservedWord(RDMA, @$.first_column, @$.last_column); YYABORT; }
+		| NOCOPY { ReservedWord(NOCOPY, @$.first_column, @$.last_column); YYABORT; }
 		| INLINE { ReservedWord(INLINE, @$.first_column, @$.last_column); YYABORT; }
 		| VIRTUAL { ReservedWord(VIRTUAL, @$.first_column, @$.last_column); YYABORT; }
 		| MIGRATABLE { ReservedWord(MIGRATABLE, @$.first_column, @$.last_column); YYABORT; }
@@ -1073,7 +1073,7 @@ Parameter	: Type
 			in_bracket=0;
 			$$ = new Parameter(lineno, $1->getType(), $1->getName() ,$2);
 		} 
-		| RDMA ParamBracketStart CCode ']'
+		| NOCOPY ParamBracketStart CCode ']'
 		{ /*Stop grabbing CPROGRAM segments*/
 			in_bracket=0;
 			$$ = new Parameter(lineno, $2->getType(), $2->getName() ,$3);

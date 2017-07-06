@@ -18,8 +18,8 @@ mainmodule pingpong {
     entry void recv(PingMsg *);
     entry [threaded] void trecv(PingMsg *);
 
-    //charm++ rdma zero copy message send api for parameters marked "rdma"
-    entry void recv_rdma(rdma char msg[size], int size);
+    //charm++ zero copy message send api for parameters marked "nocopy"
+    entry void recv_zerocopy(nocopy char msg[size], int size);
   };        	
   array [2D] Ping2 {
     entry Ping2();
@@ -40,16 +40,16 @@ mainmodule pingpong {
     entry void recv(PingMsg *);
     entry [threaded] void trecv(PingMsg *);
 
-    //charm++ rdma zero copy message send api for parameters marked "rdma"
-    entry void recv_rdma(rdma char msg[size], int size);
+    //charm++ zero copy message send api for parameters marked "nocopy"
+    entry void recv_zerocopy(nocopy char msg[size], int size);
   };
   group PingG {
     entry PingG(void);
     entry void start(bool reportTime, bool isPipelined, bool copy, bool allocate, int fragSize);
     entry void recv(PingMsg *);
 
-    //charm++ rdma zero copy message send api for parameters marked "rdma"
-    entry void recv_rdma(rdma char msg[size], int size);
+    //charm++ zero copy message send api for parameters marked "nocopy"
+    entry void recv_zerocopy(nocopy char msg[size], int size);
     entry void pipelinedRecv(FragMsg *); 
   }
   nodegroup PingN {
@@ -58,10 +58,10 @@ mainmodule pingpong {
     entry void startRDMA(bool reportTime);
     entry [exclusive] void recv(PingMsg *);
 
-    //charm++ rdma zero copy message send api for parameters marked "rdma"
-    entry [exclusive] void recv_rdma(rdma char msg[size], int size);
+    //charm++ zero copy message send api for parameters marked "nocopy"
+    entry [exclusive] void recv_zerocopy(nocopy char msg[size], int size);
 
-    //old charm++ api using rdma
+    //old charm++ api using RDMA
     entry [exclusive] void recvRDMA();
     entry [exclusive] void recvHandle(char ptr[size], int size);
   }

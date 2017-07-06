@@ -2738,7 +2738,7 @@ MPI_Request ampi::sendRdmaMsg(int t, int sRank, const void* buf, int size, int d
   int seq = getSeqNo(destRank, destcomm, t);
 
   if (ssendReq) { // Using a SsendReq to track matching receive, so no need for SendReq here
-    arrProxy[destIdx].genericRdma(rdma(buf), size, seq, t, sRank, destcomm, ssendReq);
+    arrProxy[destIdx].genericRdma(CkSendBuffer(buf), size, seq, t, sRank, destcomm, ssendReq);
     return MPI_REQUEST_NULL;
   }
   else { // Set up a SendReq to track completion of the send buffer
@@ -2746,7 +2746,7 @@ MPI_Request ampi::sendRdmaMsg(int t, int sRank, const void* buf, int size, int d
     CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
     completedSendCB.setRefnum(req);
 
-    arrProxy[destIdx].genericRdma(rdma(buf, completedSendCB), size, seq, t, sRank, destcomm, ssendReq);
+    arrProxy[destIdx].genericRdma(CkSendBuffer(buf, completedSendCB), size, seq, t, sRank, destcomm, ssendReq);
     return req;
   }
 }

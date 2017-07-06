@@ -229,7 +229,7 @@ int ampi::winPut(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank
       MPI_Request req = reqs->insert(ampiReq);
       CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
       completedSendCB.setRefnum(req);
-      thisProxy[rank].winRemotePut(orgtotalsize, rdma(orgaddr, completedSendCB), orgcnt, orgtype,
+      thisProxy[rank].winRemotePut(orgtotalsize, CkSendBuffer(orgaddr, completedSendCB), orgcnt, orgtype,
                                    targdisp, targcnt, targtype, win->index);
       ampiReq->wait(MPI_STATUS_IGNORE);
       reqs->free(req);
@@ -410,7 +410,7 @@ int ampi::winAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, i
       MPI_Request req = reqs->insert(ampiReq);
       CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
       completedSendCB.setRefnum(req);
-      thisProxy[rank].winRemoteAccumulate(orgtotalsize, rdma(orgaddr, completedSendCB), orgcnt,
+      thisProxy[rank].winRemoteAccumulate(orgtotalsize, CkSendBuffer(orgaddr, completedSendCB), orgcnt,
                                           orgtype, targdisp, targcnt, targtype,  op, win->index);
       ampiReq->wait(MPI_STATUS_IGNORE);
       reqs->free(req);
@@ -473,14 +473,14 @@ int ampi::winGetAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype
       MPI_Request req = reqs->insert(ampiReq);
       CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
       completedSendCB.setRefnum(req);
-      msg = thisProxy[rank].winRemoteGetAccumulate(orgtotalsize, rdma(orgaddr, completedSendCB), orgcnt,
+      msg = thisProxy[rank].winRemoteGetAccumulate(orgtotalsize, CkSendBuffer(orgaddr, completedSendCB), orgcnt,
                                                    orgtype, targdisp, targcnt, targtype, op, win->index);
       ampiReq->wait(MPI_STATUS_IGNORE);
       reqs->free(req);
     }
 #endif
     else {
-      msg = thisProxy[rank].winRemoteGetAccumulate(orgtotalsize, (char*)orgaddr, orgcnt, orgtype, targdisp,
+      msg = thisProxy[rank].winRemoteGetAccumulate(orgtotalsize, CkSendBuffer(orgaddr), orgcnt, orgtype, targdisp,
                                                    targcnt, targtype, op, win->index);
     }
   }
