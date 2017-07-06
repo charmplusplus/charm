@@ -412,7 +412,7 @@ int AMPI_Alltoall_medium(
 	dst = (rank+i) % comm_size;
 	/*mpi_errno = AMPI_Isend((char *)sendbuf + dst*sendcount*sendtype_extent,
 	    sendcount, sendtype, dst, MPI_ATA_TAG, comm, &reqarray[i+comm_size]);*/
-	ptr->send(MPI_ATA_TAG, getAmpiInstance(comm)->getRank(comm),
+	ptr->send(MPI_ATA_TAG, getAmpiInstance(comm)->getRank(),
               (char *)sendbuf + dst*sendcount*sendtype_extent,
 		      sendcount, sendtype, dst, comm);
 	reqarray[i+comm_size] = MPI_REQUEST_NULL;

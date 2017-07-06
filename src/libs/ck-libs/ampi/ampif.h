@@ -171,6 +171,7 @@
        integer, dimension(MPI_STATUS_SIZE), parameter :: MPI_STATUS_IGNORE   = (/-9,-9,-9,-9,-9,-9,-9,-9/)
        integer, dimension(MPI_STATUS_SIZE), parameter :: MPI_STATUSES_IGNORE = (/-9,-9,-9,-9,-9,-9,-9,-9/)
 
+       integer, parameter :: MPI_COMM_SELF        = 1000000
        integer, parameter :: MPI_COMM_FIRST_SPLIT = 1000000
        integer, parameter :: MPI_COMM_FIRST_GROUP = 2000000
        integer, parameter :: MPI_COMM_FIRST_CART  = 3000000
@@ -178,7 +179,6 @@
        integer, parameter :: MPI_COMM_FIRST_INTER = 5000000
        integer, parameter :: MPI_COMM_FIRST_INTRA = 6000000
        integer, parameter :: MPI_COMM_FIRST_RESVD = 7000000
-       integer, parameter :: MPI_COMM_SELF        = 8000000
        integer, parameter :: MPI_COMM_WORLD       = 9000000
        integer, parameter :: MPI_MAX_COMM_WORLDS  = 8
        integer :: MPI_COMM_UNIVERSE(1:MPI_MAX_COMM_WORLDS)

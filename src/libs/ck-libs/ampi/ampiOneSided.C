@@ -947,7 +947,7 @@ int AMPI_Win_post(MPI_Group group, int assertion, MPI_Win win){
   for (int i=0; i<subsetGroupRanks.size(); i++) { // If subsetGroupRanks is large, multicast would be more efficient
     if (subsetGroupRanks[i] != MPI_UNDEFINED) {
       subsetGroupRanks[actualRanks++] = i;
-      ptr->send(MPI_EPOCH_START_TAG, ptr->getRank(winStruct->comm), NULL, 0, MPI_INT, subsetGroupRanks[actualRanks-1], winStruct->comm);
+      ptr->send(MPI_EPOCH_START_TAG, ptr->getRank(), NULL, 0, MPI_INT, subsetGroupRanks[actualRanks-1], winStruct->comm);
     }
   }
 
@@ -1043,7 +1043,7 @@ int AMPI_Win_complete(MPI_Win win){
   ampi *ptr = getAmpiInstance(winStruct->comm);
 
   for (int i=0; i<accessGroupRanks.size(); i++) {
-    ptr->send(MPI_EPOCH_END_TAG, ptr->getRank(winStruct->comm), NULL, 0, MPI_INT, accessGroupRanks[i], winStruct->comm);
+    ptr->send(MPI_EPOCH_END_TAG, ptr->getRank(), NULL, 0, MPI_INT, accessGroupRanks[i], winStruct->comm);
   }
   winStruct->clearEpochAccess();
 

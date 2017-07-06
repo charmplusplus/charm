@@ -185,7 +185,6 @@ public:
   void setInEpoch(bool arg) {inEpoch = arg;}
 };
 
-class ampi;
 class lockQueueEntry {
  public:
   int requestRank;
@@ -1072,8 +1071,6 @@ inline void pupFromBuf(const void *data,T &t) {
   PUP::fromMem p(data); p|t;
 }
 
-#define COMM_SELF_SEQ_IDX -1
-
 class AmpiMsg : public CMessage_AmpiMsg {
  private:
   int seq; //Sequence number (for message ordering)
@@ -1092,35 +1089,12 @@ class AmpiMsg : public CMessage_AmpiMsg {
   AmpiMsg(void) { data = NULL; }
   AmpiMsg(int _s, int t, int sRank, int l) :
     seq(_s), tag(t), srcRank(sRank), length(l) {}
-  AmpiMsg(int _s, int t, int sRank, int l, MPI_Comm comm) :
-    seq(_s), tag(t), srcRank(sRank), length(l)
-  { //We do not store comm, since it can be gotten from the ampi instance.
-    //The exception is messages for MPI_COMM_SELF:
-    // We make tag negative if the message is for MPI_COMM_SELF, because
-    // such messages are sent over the ampi instance corresponding to MPI_COMM_WORLD.
-    CkAssert(tag >= 0);
-    if (comm == MPI_COMM_SELF) tag *= (-1);
-  }
   inline int getSeq(void) const { return seq; }
-  inline int getSeqIdx(void) const {
-    // seqIdx is srcRank, unless this message was sent over MPI_COMM_SELF.
-    return (tag >= 0) ? srcRank : COMM_SELF_SEQ_IDX;
-  }
+  inline int getSeqIdx(void) const { return srcRank; }
   inline int getSrcRank(void) const { return srcRank; }
   inline int getLength(void) const { return length; }
   inline char* getData(void) const { return data; }
-  inline int getTag(void) const
-  { //Tag is negative if message is sent over MPI_COMM_SELF.
-    if (tag >= 0) return tag;
-    else return (-1)*tag;
-  }
-  inline MPI_Comm getComm(MPI_Comm comm) const
-  { //If ampi instance is MPI_COMM_WORLD, need to check if the message is for MPI_COMM_SELF.
-    if (comm == MPI_COMM_WORLD && tag < 0)
-      return MPI_COMM_SELF;
-    else
-      return comm;
-  }
+  inline int getTag(void) const { return tag; }
   static AmpiMsg* pup(PUP::er &p, AmpiMsg *m)
   {
     int seq, length, tag, srcRank;
@@ -1177,7 +1151,7 @@ typedef std::unordered_map<int, AmpiOtherElement> AmpiElements;
 
 class AmpiSeqQ : private CkNoncopyable {
   CkMsgQ<AmpiMsg> out; // all out of order messages
-  AmpiElements elements; // element info: indexed by seqIdx (comm rank, except for MPI_COMM_SELF)
+  AmpiElements elements; // element info: indexed by seqIdx (comm rank)
 
 public:
   AmpiSeqQ() {}
@@ -1259,8 +1233,8 @@ class ampiParent : public CBase_ampiParent {
 
   MPI_Comm worldNo; //My MPI_COMM_WORLD
   ampi *worldPtr; //AMPI element corresponding to MPI_COMM_WORLD
-  // Note: we do not explicitly create an AMPI element corresponding to MPI_COMM_SELF
   ampiCommStruct worldStruct;
+  ampi *selfPtr; //AMPI element corresponding to MPI_COMM_SELF
   ampiCommStruct selfStruct;
 
   CkPupPtrVec<ampiCommStruct> splitComm; //Communicators from MPI_Comm_split
@@ -1344,6 +1318,7 @@ class ampiParent : public CBase_ampiParent {
   ~ampiParent();
 
   ampi *lookupComm(MPI_Comm comm) const {
+    if (comm==MPI_COMM_SELF) return selfPtr;
     if (comm!=worldStruct.getComm())
       CkAbort("ampiParent::lookupComm> Bad communicator!");
     return worldPtr;
@@ -1418,10 +1393,9 @@ class ampiParent : public CBase_ampiParent {
     return universeComm2CommStruct(comm);
   }
 
-  //ampi *comm2ampi(MPI_Comm comm);
   inline ampi *comm2ampi(MPI_Comm comm) const {
     if (comm==MPI_COMM_WORLD) return worldPtr;
-    if (comm==MPI_COMM_SELF) return worldPtr;
+    if (comm==MPI_COMM_SELF) return selfPtr;
     if (comm==worldNo) return worldPtr;
     if (isSplit(comm)) {
       const ampiCommStruct &st=getSplit(comm);
@@ -1666,7 +1640,6 @@ class ampi : public CBase_ampi {
   void splitPhaseInter(CkReductionMsg *msg);
   void commCreatePhase1(MPI_Comm nextGroupComm);
   void intercommCreatePhase1(MPI_Comm nextInterComm);
-  void intercommCreatePhaseSelf(MPI_Comm nextInterComm);
   void intercommMergePhase1(MPI_Comm nextIntraComm);
 
  private: // Used by the above entry methods that create new MPI_Comm objects
@@ -1738,14 +1711,8 @@ class ampi : public CBase_ampi {
 
   inline int getWorldRank(void) const {return parent->thisIndex;}
   /// Return our rank in this communicator
-  inline int getRank(MPI_Comm comm) const {
-    if (comm==MPI_COMM_SELF) return 0;
-    else return myRank;
-  }
-  inline int getSize(MPI_Comm comm) const {
-    if (comm==MPI_COMM_SELF) return 1;
-    else return myComm.getSize();
-  }
+  inline int getRank(void) const {return myRank;}
+  inline int getSize(void) const {return myComm.getSize();}
   inline MPI_Comm getComm(void) const {return myComm.getComm();}
   inline void setCommName(const char *name){myComm.setName(name);}
   inline void getCommName(char *name, int *len) const {myComm.getName(name,len);}

@@ -250,6 +250,7 @@ typedef int MPI_Group;
 
 typedef int MPI_Info;
 
+#define MPI_COMM_SELF        (MPI_Comm)(1000000) /*MPI_COMM_SELF is the first split comm */
 #define MPI_COMM_FIRST_SPLIT (MPI_Comm)(1000000) /*Communicator from MPI_Comm_split */
 #define MPI_COMM_FIRST_GROUP (MPI_Comm)(2000000) /*Communicator from MPI_Comm_group */
 #define MPI_COMM_FIRST_CART  (MPI_Comm)(3000000) /*Communicator from MPI_Cart_create */
@@ -257,7 +258,6 @@ typedef int MPI_Info;
 #define MPI_COMM_FIRST_INTER (MPI_Comm)(5000000) /*Communicator from MPI_Intercomm_create*/
 #define MPI_COMM_FIRST_INTRA (MPI_Comm)(6000000) /*Communicator from MPI_Intercomm_merge*/
 #define MPI_COMM_FIRST_RESVD (MPI_Comm)(7000000) /*Communicator reserved for now*/
-#define MPI_COMM_SELF        (MPI_Comm)(8000000)
 #define MPI_COMM_WORLD       (MPI_Comm)(9000000) /*Start of universe*/
 #define MPI_MAX_COMM_WORLDS  8
 extern MPI_Comm MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS];

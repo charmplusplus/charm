@@ -1096,6 +1096,22 @@ void ampiParent::initOps(void)
   ops[MPI_NO_OP]   = OpStruct(MPI_NO_OP_USER_FN);
 }
 
+// Create MPI_COMM_SELF from MPI_COMM_WORLD
+static void createCommSelf(void) {
+  STARTUP_DEBUG("ampiInit> creating MPI_COMM_SELF")
+  MPI_Comm selfComm;
+  MPI_Group worldGroup, selfGroup;
+  int ranks[1] = { getAmpiInstance(MPI_COMM_WORLD)->getRank() };
+
+  AMPI_Comm_group(MPI_COMM_WORLD, &worldGroup);
+  AMPI_Group_incl(worldGroup, 1, ranks, &selfGroup);
+  AMPI_Comm_create(MPI_COMM_WORLD, selfGroup, &selfComm);
+  AMPI_Comm_set_name(selfComm, "MPI_COMM_SELF");
+
+  CkAssert(selfComm == MPI_COMM_SELF);
+  STARTUP_DEBUG("ampiInit> created MPI_COMM_SELF")
+}
+
 /*
    Called from MPI_Init, a collective initialization call:
    creates a new AMPI array and attaches it to the current
@@ -1190,6 +1206,8 @@ static ampi *ampiInit(char **argv)
     thisParent = getAmpiParent();
   }
 
+  createCommSelf();
+
 #if CMK_BIGSIM_CHARM
   BgSetStartOutOfCore();
 #endif
@@ -1222,6 +1240,7 @@ ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_)
   STARTUP_DEBUG("ampiParent> starting up")
   thread=NULL;
   worldPtr=NULL;
+  selfPtr=NULL;
   userAboutToMigrateFn=NULL;
   userJustMigratedFn=NULL;
   myDDT=&myDDTsto;
@@ -1239,6 +1258,7 @@ ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_)
 ampiParent::ampiParent(CkMigrateMessage *msg):CBase_ampiParent(msg) {
   thread=NULL;
   worldPtr=NULL;
+  selfPtr=NULL;
   myDDT=&myDDTsto;
 
   init();
@@ -1252,6 +1272,7 @@ void ampiParent::pup(PUP::er &p) {
   p|threads;
   p|worldNo;
   p|worldStruct;
+  p|selfStruct;
   myDDT->pup(p);
   p|splitComm;
   p|groupComm;
@@ -1388,12 +1409,11 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration)
     if (worldPtr!=NULL) CkAbort("One ampiParent has two MPI_COMM_WORLDs");
     worldPtr=ptr;
     worldStruct=s;
-
-    //MPI_COMM_SELF has the same member as MPI_COMM_WORLD, but it's alone:
-    vector<int> _indices;
-    _indices.push_back(thisIndex);
-    selfStruct = ampiCommStruct(MPI_COMM_SELF,s.getProxy(),1,_indices);
-    selfStruct.setName("MPI_COMM_SELF");
+  }
+  else if (s.getComm()==MPI_COMM_SELF) {
+    if (selfPtr!=NULL) CkAbort("One ampiParent has two MPI_COMM_SELFs");
+    selfPtr=ptr;
+    selfStruct=s;
   }
 
   if (!forMigration)
@@ -2266,18 +2286,12 @@ void ampiParent::graphChildRegister(const ampiCommStruct &s) {
 
 void ampi::intercommCreate(const groupStruct remoteVec, const int root, MPI_Comm tcomm, MPI_Comm *ncomm){
 
-  if (tcomm == MPI_COMM_SELF) {
+  if(thisIndex==root) { // not everybody gets the valid rvec
     tmpVec = remoteVec;
-    intercommCreatePhaseSelf(parent->getNextInter());
   }
-  else {
-    if(thisIndex==root) { // not everybody gets the valid rvec
-      tmpVec = remoteVec;
-    }
-    CkCallback cb(CkReductionTarget(ampi, intercommCreatePhase1),CkArrayIndex1D(root),myComm.getProxy());
-    MPI_Comm nextinter = parent->getNextInter();
-    contribute(sizeof(nextinter), &nextinter,CkReduction::max_int,cb);
-  }
+  CkCallback cb(CkReductionTarget(ampi, intercommCreatePhase1),CkArrayIndex1D(root),myComm.getProxy());
+  MPI_Comm nextinter = parent->getNextInter();
+  contribute(sizeof(nextinter), &nextinter,CkReduction::max_int,cb);
   thread->suspend(); //Not resumed by ampiParent::interChildRegister. Resumed by ExchangeProxy.
   *ncomm = parent->getNextInter()-1;
 }
@@ -2286,20 +2300,6 @@ void ampi::intercommCreatePhase1(MPI_Comm nextInterComm){
 
   CProxy_ampi newAmpi = createNewChildAmpiSync();
   groupStruct lgroup = myComm.getIndices();
-  ampiCommStruct newCommstruct = ampiCommStruct(nextInterComm,newAmpi,lgroup.size(),lgroup,tmpVec);
-  for(int i=0;i<lgroup.size();i++){
-    int newIdx=lgroup[i];
-    newAmpi[newIdx].insert(parentProxy,newCommstruct);
-  }
-  newAmpi.doneInserting();
-
-  parentProxy[0].ExchangeProxy(newAmpi);
-}
-
-void ampi::intercommCreatePhaseSelf(MPI_Comm nextInterComm) {
-  CProxy_ampi newAmpi = createNewChildAmpiSync();
-  std::vector<int> vec(1,0);
-  groupStruct lgroup = vec;
   ampiCommStruct newCommstruct = ampiCommStruct(nextInterComm,newAmpi,lgroup.size(),lgroup,tmpVec);
   for(int i=0;i<lgroup.size();i++){
     int newIdx=lgroup[i];
@@ -2468,7 +2468,7 @@ void ampi::generic(AmpiMsg* msg)
 {
   MSG_ORDER_DEBUG(
     CkPrintf("AMPI vp %d arrival: tag=%d, src=%d, comm=%d (seq %d) resumeOnRecv %d\n",
-             thisIndex, msg->getTag(), msg->getSrcRank(), msg->getComm(this->getComm()), msg->getSeq(), parent->resumeOnRecv);
+             thisIndex, msg->getTag(), msg->getSrcRank(), getComm(), msg->getSeq(), parent->resumeOnRecv);
   )
 #if CMK_BIGSIM_CHARM
   TRACE_BG_ADD_TAG("AMPI_generic");
@@ -2502,7 +2502,7 @@ void ampi::inorder(AmpiMsg* msg)
 {
   MSG_ORDER_DEBUG(
     CkPrintf("AMPI vp %d inorder: tag=%d, src=%d, comm=%d (seq %d)\n",
-             thisIndex, msg->getTag(), msg->getSrcRank(), msg->getComm(this->getComm()), msg->getSeq());
+             thisIndex, msg->getTag(), msg->getSrcRank(), getComm(), msg->getSeq());
   )
 
   // check posted recvs
@@ -2534,10 +2534,10 @@ void ampi::inorder(AmpiMsg* msg)
 }
 
 static inline AmpiMsg* rdma2AmpiMsg(char *buf, int size, int seq, int tag, int srcRank,
-                                    MPI_Comm destcomm, int ssendReq)
+                                    int ssendReq)
 {
   // Convert an Rdma message (parameter marshalled buffer) to an AmpiMsg
-  AmpiMsg* msg = new (size, 0) AmpiMsg(seq, tag, srcRank, size, destcomm);
+  AmpiMsg* msg = new (size, 0) AmpiMsg(seq, tag, srcRank, size);
   if (ssendReq) UsrToEnv(msg)->setRef(ssendReq);
   memcpy(msg->data, buf, size); // Assumes the buffer is contiguous
   return msg;
@@ -2548,11 +2548,11 @@ void ampi::genericRdma(char* buf, int size, int seq, int tag, int srcRank, MPI_C
 {
   MSG_ORDER_DEBUG(
     CkPrintf("[%d] in ampi::genericRdma on index %d, size=%d, seq=%d, srcRank=%d, tag=%d, comm=%d, ssendReq=%d\n",
-             CkMyPe(), getIndexForRank(getRank(destcomm)), size, seq, srcRank, tag, destcomm, ssendReq);
+             CkMyPe(), getIndexForRank(getRank()), size, seq, srcRank, tag, destcomm, ssendReq);
   )
 
   if (seq != -1) {
-    int seqIdx = (destcomm == MPI_COMM_SELF) ? COMM_SELF_SEQ_IDX : srcRank;
+    int seqIdx = srcRank;
     int n = oorder.isInOrder(seqIdx, seq);
     if (n > 0) { // This message was in-order
       inorderRdma(buf, size, seq, tag, srcRank, destcomm, ssendReq);
@@ -2563,7 +2563,7 @@ void ampi::genericRdma(char* buf, int size, int seq, int tag, int srcRank, MPI_C
         }
       }
     } else { // This message was out-of-order: stash it (as an AmpiMsg)
-      AmpiMsg *msg = rdma2AmpiMsg(buf, size, seq, tag, srcRank, destcomm, ssendReq);
+      AmpiMsg *msg = rdma2AmpiMsg(buf, size, seq, tag, srcRank, ssendReq);
       oorder.putOutOfOrder(seqIdx, msg);
     }
   } else { // Cross-world or system messages are unordered
@@ -2603,7 +2603,7 @@ void ampi::inorderRdma(char* buf, int size, int seq, int tag, int srcRank,
     }
     ireq->receiveRdma(this, buf, size, ssendReq, srcRank, comm);
   } else {
-    AmpiMsg* msg = rdma2AmpiMsg(buf, size, seq, tag, srcRank, comm, ssendReq);
+    AmpiMsg* msg = rdma2AmpiMsg(buf, size, seq, tag, srcRank, ssendReq);
     AmmPut(msgs, tags, msg);
   }
 }
@@ -2665,10 +2665,7 @@ AmpiMsg *ampi::makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int coun
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
   int seq = getSeqNo(destRank, destcomm, t);
-  if (destcomm == MPI_COMM_SELF) {
-    sRank = 0;
-  }
-  AmpiMsg *msg = new (len, 0) AmpiMsg(seq, t, sRank, len, destcomm);
+  AmpiMsg *msg = new (len, 0) AmpiMsg(seq, t, sRank, len);
   if (ssendReq) UsrToEnv(msg)->setRef(ssendReq);
   ddt->serialize((char*)buf, msg->getData(), count, 1);
   return msg;
@@ -2730,9 +2727,6 @@ int ampi::getSeqNo(int destRank, MPI_Comm destcomm, int tag) {
   int seqIdx = destRank;
   int seq    = -1;
   if (destRank>=0 && destcomm<=MPI_COMM_WORLD && tag<=MPI_ATA_SEQ_TAG) { //Not cross-module: set seqno
-    if (destcomm == MPI_COMM_SELF) {
-      seqIdx = COMM_SELF_SEQ_IDX;
-    }
     seq = oorder.nextOutgoing(seqIdx);
   }
   return seq;
@@ -2742,9 +2736,6 @@ MPI_Request ampi::sendRdmaMsg(int t, int sRank, const void* buf, int size, int d
                               int destRank, MPI_Comm destcomm, CProxy_ampi arrProxy, int ssendReq)
 {
   int seq = getSeqNo(destRank, destcomm, t);
-  if (destcomm == MPI_COMM_SELF) {
-    sRank = 0;
-  }
 
   if (ssendReq) { // Using a SsendReq to track matching receive, so no need for SendReq here
     arrProxy[destIdx].genericRdma(rdma(buf), size, seq, t, sRank, destcomm, ssendReq);
@@ -2765,9 +2756,6 @@ MPI_Request ampi::sendLocalMsg(int t, int sRank, const void* buf, int size, int 
                                MPI_Comm destcomm, ampi* destPtr, int ssendReq, AmpiSendType sendType)
 {
   int seq = getSeqNo(destRank, destcomm, t);
-  if (destcomm == MPI_COMM_SELF) {
-    sRank = 0;
-  }
 
   destPtr->genericRdma((char*)buf, size, seq, t, sRank, destcomm, ssendReq);
 
@@ -2829,7 +2817,7 @@ void ampi::processAmpiMsg(AmpiMsg *msg, const void* buf, MPI_Datatype type, int 
 {
   int ssendReq = UsrToEnv(msg)->getRef();
   if (ssendReq > 0) { // send an ack to sender
-    int srcRank = (msg->getComm(this->getComm()) == MPI_COMM_SELF) ? this->getRank(MPI_COMM_WORLD) : msg->getSrcRank();
+    int srcRank = msg->getSrcRank();
     int srcIdx = getIndexForRank(srcRank);
     thisProxy[srcIdx].ssend_ack(ssendReq);
   }
@@ -2849,8 +2837,7 @@ void ampi::processRdmaMsg(const void *sbuf, int slength, int ssendReq, int srank
                           int rcount, MPI_Datatype rtype, MPI_Comm comm)
 {
   if (ssendReq > 0) { // send an ack to sender
-    int srcRank = (comm == MPI_COMM_SELF) ? this->getRank(MPI_COMM_WORLD) : srank;
-    int srcIdx = getIndexForRank(srcRank);
+    int srcIdx = getIndexForRank(srank);
     thisProxy[srcIdx].ssend_ack(ssendReq);
   }
 
@@ -2883,7 +2870,7 @@ void ampi::processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Data
   CkReduction::setElement *currentData = (CkReduction::setElement*)results[1].data;
   CkDDT_DataType *ddt  = getDDT()->getType(type);
   int contributionSize = ddt->getSize(count);
-  int commSize = getSize(getComm());
+  int commSize = getSize();
 
   // Store pointers to each contribution's data at index 'srcRank' in contributionData
   vector<void *> contributionData(commSize);
@@ -2932,7 +2919,7 @@ void ampi::processGatherMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype t
   int contributionSize   = ddt->getSize(recvCount);
   int contributionExtent = ddt->getExtent()*recvCount;
 
-  for (int i=0; i<getSize(getComm()); i++) {
+  for (int i=0; i<getSize(); i++) {
     CkAssert(currentSrc && currentData);
     int srcRank = *((int*)currentSrc->data);
     CkAssert(currentData->dataSize == contributionSize);
@@ -2957,7 +2944,7 @@ void ampi::processGathervMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype 
   int contributionSize   = ddt->getSize();
   int contributionExtent = ddt->getExtent();
 
-  for (int i=0; i<getSize(getComm()); i++) {
+  for (int i=0; i<getSize(); i++) {
     CkAssert(currentSrc && currentData);
     int srcRank = *((int*)currentSrc->data);
     CkAssert(currentData->dataSize == contributionSize*recvCounts[srcRank]);
@@ -3006,7 +2993,7 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
     if (sts != MPI_STATUS_IGNORE) {
       sts->MPI_SOURCE = msg->getSrcRank();
       sts->MPI_TAG    = msg->getTag();
-      sts->MPI_COMM   = msg->getComm(comm);
+      sts->MPI_COMM   = comm;
       sts->MPI_LENGTH = msg->getLength();
       sts->MPI_CANCEL = 0;
     }
@@ -3071,7 +3058,7 @@ void ampi::probe(int t, int s, MPI_Comm comm, MPI_Status *sts)
   if (sts != MPI_STATUS_IGNORE) {
     sts->MPI_SOURCE = msg->getSrcRank();
     sts->MPI_TAG    = msg->getTag();
-    sts->MPI_COMM   = msg->getComm(comm);
+    sts->MPI_COMM   = comm;
     sts->MPI_LENGTH = msg->getLength();
     sts->MPI_CANCEL = 0;
   }
@@ -3091,7 +3078,7 @@ int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts)
     if (sts != MPI_STATUS_IGNORE) {
       sts->MPI_SOURCE = msg->getSrcRank();
       sts->MPI_TAG    = msg->getTag();
-      sts->MPI_COMM   = msg->getComm(comm);
+      sts->MPI_COMM   = comm;
       sts->MPI_LENGTH = msg->getLength();
       sts->MPI_CANCEL = 0;
     }
@@ -3110,7 +3097,7 @@ int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts)
 
 void ampi::bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm destcomm)
 {
-  if (root==getRank(destcomm)) {
+  if (root==getRank()) {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
@@ -3126,7 +3113,7 @@ int ampi::intercomm_bcast(int root, void* buf, int count, MPI_Datatype type, MPI
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
-    remoteProxy.generic(makeAmpiMsg(-1, MPI_BCAST_TAG, getRank(intercomm), buf, count, type, intercomm));
+    remoteProxy.generic(makeAmpiMsg(-1, MPI_BCAST_TAG, getRank(), buf, count, type, intercomm));
   }
 
   if (root!=MPI_PROC_NULL && root!=MPI_ROOT) {
@@ -3138,7 +3125,7 @@ int ampi::intercomm_bcast(int root, void* buf, int count, MPI_Datatype type, MPI
 
 void ampi::ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm destcomm, MPI_Request* request)
 {
-  if (root==getRank(destcomm)) {
+  if (root==getRank()) {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
@@ -3155,7 +3142,7 @@ int ampi::intercomm_ibcast(int root, void* buf, int count, MPI_Datatype type, MP
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
-    remoteProxy.generic(makeAmpiMsg(-1, MPI_BCAST_TAG, getRank(intercomm), buf, count, type, intercomm));
+    remoteProxy.generic(makeAmpiMsg(-1, MPI_BCAST_TAG, getRank(), buf, count, type, intercomm));
   }
 
   if (root!=MPI_PROC_NULL && root!=MPI_ROOT) {
@@ -3196,7 +3183,7 @@ int ampi::intercomm_scatter(int root, const void *sendbuf, int sendcount, MPI_Da
     CkDDT_DataType* dttype = getDDT()->getType(sendtype) ;
     int itemsize = dttype->getSize(sendcount) ;
     for(int i = 0; i < remote_size; i++) {
-        send(MPI_SCATTER_TAG, getRank(intercomm), ((char*)sendbuf)+(itemsize*i),
+        send(MPI_SCATTER_TAG, getRank(), ((char*)sendbuf)+(itemsize*i),
              sendcount, sendtype, i, intercomm);
     }
   }
@@ -3219,7 +3206,7 @@ int ampi::intercomm_iscatter(int root, const void *sendbuf, int sendcount, MPI_D
     CkDDT_DataType* dttype = getDDT()->getType(sendtype) ;
     int itemsize = dttype->getSize(sendcount) ;
     for(int i = 0; i < remote_size; i++) {
-        send(MPI_SCATTER_TAG, getRank(intercomm), ((char*)sendbuf)+(itemsize*i),
+        send(MPI_SCATTER_TAG, getRank(), ((char*)sendbuf)+(itemsize*i),
              sendcount, sendtype, i, intercomm);
     }
   }
@@ -3242,7 +3229,7 @@ int ampi::intercomm_scatterv(int root, const void* sendbuf, const int* sendcount
     CkDDT_DataType* dttype = getDDT()->getType(sendtype);
     int itemsize = dttype->getSize();
     for (int i = 0; i < remote_size; i++) {
-        send(MPI_SCATTER_TAG, getRank(intercomm), ((char*)sendbuf)+(itemsize*displs[i]),
+        send(MPI_SCATTER_TAG, getRank(), ((char*)sendbuf)+(itemsize*displs[i]),
              sendcounts[i], sendtype, i, intercomm);
     }
   }
@@ -3265,7 +3252,7 @@ int ampi::intercomm_iscatterv(int root, const void* sendbuf, const int* sendcoun
     CkDDT_DataType* dttype = getDDT()->getType(sendtype);
     int itemsize = dttype->getSize();
     for (int i = 0; i < remote_size; i++) {
-        send(MPI_SCATTER_TAG, getRank(intercomm), ((char*)sendbuf)+(itemsize*displs[i]),
+        send(MPI_SCATTER_TAG, getRank(), ((char*)sendbuf)+(itemsize*displs[i]),
              sendcounts[i], sendtype, i, intercomm);
     }
   }
@@ -3649,7 +3636,7 @@ int AMPI_Comm_rank(MPI_Comm comm, int *rank)
   }
 #endif
 
-  *rank = getAmpiInstance(comm)->getRank(comm);
+  *rank = getAmpiInstance(comm)->getRank();
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -3678,7 +3665,7 @@ int AMPI_Comm_size(MPI_Comm comm, int *size)
   }
 #endif
 
-  *size = getAmpiInstance(comm)->getSize(comm);
+  *size = getAmpiInstance(comm)->getSize();
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -3811,7 +3798,7 @@ int AMPI_Send(const void *msg, int count, MPI_Datatype type, int dest, int tag, 
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  ptr->send(tag, ptr->getRank(comm), msg, count, type, dest, comm);
+  ptr->send(tag, ptr->getRank(), msg, count, type, dest, comm);
 
   return MPI_SUCCESS;
 }
@@ -3836,7 +3823,7 @@ int AMPI_Ssend(const void *msg, int count, MPI_Datatype type, int dest, int tag,
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  ptr->send(tag, ptr->getRank(comm), msg, count, type, dest, comm, 1);
+  ptr->send(tag, ptr->getRank(), msg, count, type, dest, comm, 1);
 
   return MPI_SUCCESS;
 }
@@ -3870,7 +3857,7 @@ int AMPI_Issend(const void *buf, int count, MPI_Datatype type, int dest,
   *request = ptr->postReq(new SsendReq(comm));
   // 1:  blocking now  - used by MPI_Ssend
   // >=2:  the index of the requests - used by MPI_Issend
-  ptr->send(tag, ptr->getRank(comm), buf, count, type, dest, comm, *request+2, I_SEND);
+  ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm, *request+2, I_SEND);
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -3965,7 +3952,7 @@ void ampi::sendrecv(const void *sbuf, int scount, MPI_Datatype stype, int dest, 
                     MPI_Comm comm, MPI_Status *sts)
 {
   MPI_Request reqs[2];
-  reqs[0] = send(stag, getRank(comm), sbuf, scount, stype, dest, comm, 0, I_SEND);
+  reqs[0] = send(stag, getRank(), sbuf, scount, stype, dest, comm, 0, I_SEND);
 
   irecv(rbuf, rcount, rtype, src, rtag, comm, &reqs[1]);
 
@@ -4030,7 +4017,7 @@ int AMPI_Sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
 
   ampi* ptr = getAmpiInstance(comm);
 
-  ptr->send(sendtag, ptr->getRank(comm), buf, count, datatype, dest, comm);
+  ptr->send(sendtag, ptr->getRank(), buf, count, datatype, dest, comm);
 
   if (-1==ptr->recv(recvtag, source, buf, count, datatype, comm, status))
     CkAbort("AMPI> Error in MPI_Sendrecv_replace!\n");
@@ -4390,7 +4377,7 @@ int AMPI_Reduce(const void *inbuf, void *outbuf, int count, MPI_Datatype type, M
   if(op == MPI_OP_NULL)
     return ampiErrhandler("AMPI_Reduce", MPI_ERR_OP);
   int ret = errorCheck("AMPI_Reduce", comm, 1, count, 1, type, 1, 0, 0, root, 1, inbuf, 1,
-                       outbuf, getAmpiInstance(comm)->getRank(comm) == root);
+                       outbuf, getAmpiInstance(comm)->getRank() == root);
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
@@ -4412,7 +4399,7 @@ int AMPI_Reduce(const void *inbuf, void *outbuf, int count, MPI_Datatype type, M
   ampi *ptr = getAmpiInstance(comm);
   int rootIdx=ptr->comm2CommStruct(comm).getIndexForRank(root);
 
-  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,ptr->getRank(comm),op);
+  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,ptr->getRank(),op);
 
   CkCallback reduceCB(CkIndex_ampi::rednResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy());
   msg->setCallback(reduceCB);
@@ -4423,7 +4410,7 @@ int AMPI_Reduce(const void *inbuf, void *outbuf, int count, MPI_Datatype type, M
     ptr = ptr->blockOnRedn(new RednReq(outbuf, count, type, comm, op));
 
 #if SYNCHRONOUS_REDUCE
-    AmpiMsg *msg = new (0, 0) AmpiMsg(-1, MPI_REDN_TAG, -1, rootIdx, 0, comm);
+    AmpiMsg *msg = new (0, 0) AmpiMsg(-1, MPI_REDN_TAG, -1, rootIdx, 0);
     CProxy_ampi pa(ptr->getProxy());
     pa.generic(msg);
 #endif
@@ -4479,7 +4466,7 @@ int AMPI_Allreduce(const void *inbuf, void *outbuf, int count, MPI_Datatype type
 
   ampi *ptr = getAmpiInstance(comm);
 
-  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type), inbuf, count, type, ptr->getRank(comm), op);
+  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type), inbuf, count, type, ptr->getRank(), op);
   CkCallback allreduceCB(CkIndex_ampi::rednResult(0),ptr->getProxy());
   msg->setCallback(allreduceCB);
   ptr->contribute(msg);
@@ -4525,7 +4512,7 @@ int AMPI_Iallreduce(const void *inbuf, void *outbuf, int count, MPI_Datatype typ
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Iallreduce for Inter-communicators!");
 
-  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,ptr->getRank(comm),op);
+  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,ptr->getRank(),op);
   CkCallback allreduceCB(CkIndex_ampi::irednResult(0),ptr->getProxy());
   msg->setCallback(allreduceCB);
   ptr->contribute(msg);
@@ -4580,7 +4567,7 @@ int AMPI_Reduce_scatter_block(const void* sendbuf, void* recvbuf, int count, MPI
     CkAbort("AMPI does not implement MPI_Reduce_scatter_block for Inter-communicators!");
 
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize(comm);
+  int size = ptr->getSize();
   vector<char> tmpbuf(ptr->getDDT()->getType(datatype)->getSize(count)*size);
 
   AMPI_Reduce(sendbuf, &tmpbuf[0], count*size, datatype, op, AMPI_COLL_SOURCE, comm);
@@ -4612,7 +4599,7 @@ int AMPI_Reduce_scatter(const void* sendbuf, void* recvbuf, const int *recvcount
     CkAbort("AMPI does not implement MPI_Reduce_scatter for Inter-communicators!");
 
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize(comm);
+  int size = ptr->getSize();
   int count=0;
   vector<int> displs(size);
   int len;
@@ -4625,7 +4612,7 @@ int AMPI_Reduce_scatter(const void* sendbuf, void* recvbuf, const int *recvcount
   vector<char> tmpbuf(ptr->getDDT()->getType(datatype)->getSize(count));
   AMPI_Reduce(sendbuf, &tmpbuf[0], count, datatype, op, AMPI_COLL_SOURCE, comm);
   AMPI_Scatterv(&tmpbuf[0], recvcounts, &displs[0], datatype,
-      recvbuf, recvcounts[ptr->getRank(comm)], datatype, AMPI_COLL_SOURCE, comm);
+      recvbuf, recvcounts[ptr->getRank()], datatype, AMPI_COLL_SOURCE, comm);
   return MPI_SUCCESS;
 }
 
@@ -4650,9 +4637,9 @@ int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
 
   MPI_Status sts;
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize(comm);
+  int size = ptr->getSize();
   int blklen = ptr->getDDT()->getType(datatype)->getSize(count);
-  int rank = ptr->getRank(comm);
+  int rank = ptr->getRank();
   int mask = 0x1;
   int dst;
   vector<char> tmp_buf(blklen);
@@ -4700,9 +4687,9 @@ int AMPI_Exscan(const void* sendbuf, void* recvbuf, int count, MPI_Datatype data
 
   MPI_Status sts;
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize(comm);
+  int size = ptr->getSize();
   int blklen = ptr->getDDT()->getType(datatype)->getSize(count);
-  int rank = ptr->getRank(comm);
+  int rank = ptr->getRank();
   int mask = 0x1;
   int dst, flag;
   vector<char> tmp_buf(blklen);
@@ -4795,7 +4782,7 @@ double AMPI_Wtick(void){
 int PersReq::start(){
   if(sndrcv == 1 || sndrcv == 3) { // send or ssend request
     ampi *ptr=getAmpiInstance(comm);
-    ptr->send(tag, ptr->getRank(comm), buf, count, type, src, comm, sndrcv==3?1:0);
+    ptr->send(tag, ptr->getRank(), buf, count, type, src, comm, sndrcv==3?1:0);
   }
   return 0;
 }
@@ -5416,7 +5403,7 @@ void IReq::receive(ampi *ptr, AmpiMsg *msg)
   length = msg->getLength();
   this->tag = msg->getTag(); // Although not required, we also extract tag from msg
   src = msg->getSrcRank();   // Although not required, we also extract src from msg
-  comm = msg->getComm(ptr->getComm());
+  comm = ptr->getComm();
   AMPI_DEBUG("Setting this->tag to %d in IReq::receive this=%p\n", tag, this);
 #if CMK_BIGSIM_CHARM
   event = msg->event;
@@ -5976,7 +5963,7 @@ int AMPI_Isend(const void *buf, int count, MPI_Datatype type, int dest,
   USER_CALL_DEBUG("AMPI_Isend("<<type<<","<<dest<<","<<tag<<","<<comm<<")");
 
   ampi *ptr = getAmpiInstance(comm);
-  *request = ptr->send(tag, ptr->getRank(comm), buf, count, type, dest, comm, 0, I_SEND);
+  *request = ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm, 0, I_SEND);
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -6077,7 +6064,7 @@ int AMPI_Ireduce(const void *sendbuf, void *recvbuf, int count, MPI_Datatype typ
   if(op == MPI_OP_NULL)
     return ampiErrhandler("AMPI_Ireduce", MPI_ERR_OP);
   int ret = errorCheck("AMPI_Ireduce", comm, 1, count, 1, type, 1, 0, 0, root, 1, sendbuf, 1,
-                       recvbuf, getAmpiInstance(comm)->getRank(comm) == root);
+                       recvbuf, getAmpiInstance(comm)->getRank() == root);
   if(ret != MPI_SUCCESS){
     *request = MPI_REQUEST_NULL;
     return ret;
@@ -6093,7 +6080,7 @@ int AMPI_Ireduce(const void *sendbuf, void *recvbuf, int count, MPI_Datatype typ
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Ireduce for Inter-communicators!");
 
-  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),sendbuf,count,type,ptr->getRank(comm),op);
+  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),sendbuf,count,type,ptr->getRank(),op);
   int rootIdx=ptr->comm2CommStruct(comm).getIndexForRank(root);
 
   CkCallback reduceCB(CkIndex_ampi::irednResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy());
@@ -6156,7 +6143,7 @@ int AMPI_Allgather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
     CkAbort("AMPI does not implement MPI_Allgather for Inter-communicators!");
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank = ptr->getRank(comm);
+  int rank = ptr->getRank();
   int sendSize = ptr->getDDT()->getType(sendtype)->getSize(sendcount);
 
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
@@ -6203,7 +6190,7 @@ int AMPI_Iallgather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Iallgather for Inter-communicators!");
 
-  int rank = ptr->getRank(comm);
+  int rank = ptr->getRank();
 
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback allgatherCB(CkIndex_ampi::irednResult(0), ptr->getProxy());
@@ -6243,7 +6230,7 @@ int AMPI_Allgatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
     CkAbort("AMPI does not implement MPI_Allgatherv for Inter-communicators!");
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank = ptr->getRank(comm);
+  int rank = ptr->getRank();
 
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback allgathervCB(CkIndex_ampi::rednResult(0), ptr->getProxy());
@@ -6251,7 +6238,7 @@ int AMPI_Allgatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Allgatherv called on comm %d\n", ptr->thisIndex, comm));
   ptr->contribute(msg);
 
-  ptr->blockOnRedn(new GathervReq(recvbuf, ptr->getSize(comm), recvtype, comm, recvcounts, displs));
+  ptr->blockOnRedn(new GathervReq(recvbuf, ptr->getSize(), recvtype, comm, recvcounts, displs));
 
   return MPI_SUCCESS;
 }
@@ -6281,7 +6268,7 @@ int AMPI_Iallgatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank = ptr->getRank(comm);
+  int rank = ptr->getRank();
 
   if(comm==MPI_COMM_SELF){
     *request = ptr->postReq(new GathervReq(recvbuf, rank, recvtype, comm, recvcounts, displs,
@@ -6298,7 +6285,7 @@ int AMPI_Iallgatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ptr->contribute(msg);
 
   // use a GathervReq to non-block the caller and get a request ptr
-  *request = ptr->postReq(new GathervReq(recvbuf, ptr->getSize(comm), recvtype,
+  *request = ptr->postReq(new GathervReq(recvbuf, ptr->getSize(), recvtype,
                                          comm, recvcounts, displs));
 
   return MPI_SUCCESS;
@@ -6319,7 +6306,7 @@ int AMPI_Gather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ret = errorCheck("AMPI_Gather", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
-  if (getAmpiInstance(comm)->getRank(comm) == root) {
+  if (getAmpiInstance(comm)->getRank() == root) {
     ret = errorCheck("AMPI_Gather", comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
     if(ret != MPI_SUCCESS)
       return ret;
@@ -6342,7 +6329,7 @@ int AMPI_Gather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   ampi *ptr = getAmpiInstance(comm);
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
-  int rank = ptr->getRank(comm);
+  int rank = ptr->getRank();
 
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback gatherCB(CkIndex_ampi::rednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
@@ -6382,7 +6369,7 @@ int AMPI_Igather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
     *request = MPI_REQUEST_NULL;
     return ret;
   }
-  if (getAmpiInstance(comm)->getRank(comm) == root) {
+  if (getAmpiInstance(comm)->getRank() == root) {
     ret = errorCheck("AMPI_Igather", comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
     if(ret != MPI_SUCCESS){
       *request = MPI_REQUEST_NULL;
@@ -6410,7 +6397,7 @@ int AMPI_Igather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif
 
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
-  int rank = ptr->getRank(comm);
+  int rank = ptr->getRank();
 
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback gatherCB(CkIndex_ampi::irednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
@@ -6452,7 +6439,7 @@ int AMPI_Gatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ret = errorCheck("AMPI_Gatherv", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
-  if (getAmpiInstance(comm)->getRank(comm) == root) {
+  if (getAmpiInstance(comm)->getRank() == root) {
     ret = errorCheck("AMPI_Gatherv", comm, 1, recvcounts[0], 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
     if(ret != MPI_SUCCESS)
       return ret;
@@ -6480,7 +6467,7 @@ int AMPI_Gatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   ampi *ptr = getAmpiInstance(comm);
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
-  int rank = ptr->getRank(comm);
+  int rank = ptr->getRank();
 
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback gathervCB(CkIndex_ampi::rednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
@@ -6489,7 +6476,7 @@ int AMPI_Gatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ptr->contribute(msg);
 
   if(rank==root) {
-    ptr->blockOnRedn(new GathervReq(recvbuf, ptr->getSize(comm), recvtype, comm, recvcounts, displs));
+    ptr->blockOnRedn(new GathervReq(recvbuf, ptr->getSize(), recvtype, comm, recvcounts, displs));
   }
 
 #if AMPIMSGLOG
@@ -6522,7 +6509,7 @@ int AMPI_Igatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
     *request = MPI_REQUEST_NULL;
     return ret;
   }
-  if (getAmpiInstance(comm)->getRank(comm) == root) {
+  if (getAmpiInstance(comm)->getRank() == root) {
     ret = errorCheck("AMPI_Igatherv", comm, 1, recvcounts[0], 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
     if(ret != MPI_SUCCESS){
       *request = MPI_REQUEST_NULL;
@@ -6532,7 +6519,7 @@ int AMPI_Igatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank = ptr->getRank(comm);
+  int rank = ptr->getRank();
 
   if(comm==MPI_COMM_SELF){
     *request = ptr->postReq(new GathervReq(recvbuf, rank, recvtype, comm, recvcounts, displs,
@@ -6566,11 +6553,11 @@ int AMPI_Igatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   if(rank==root) {
     // use a GathervReq to non-block the caller and get a request ptr
-    *request = ptr->postReq(new GathervReq(recvbuf, ptr->getSize(comm), recvtype,
+    *request = ptr->postReq(new GathervReq(recvbuf, ptr->getSize(), recvtype,
                                            comm, recvcounts, displs));
   }
   else {
-    *request = ptr->postReq(new GathervReq(recvbuf, ptr->getSize(comm), recvtype,
+    *request = ptr->postReq(new GathervReq(recvbuf, ptr->getSize(), recvtype,
                                            comm, recvcounts, displs, AMPI_REQ_COMPLETED));
   }
 
@@ -6599,7 +6586,7 @@ int AMPI_Scatter(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
 #if AMPI_ERROR_CHECKING
   int ret;
-  if (getAmpiInstance(comm)->getRank(comm) == root) {
+  if (getAmpiInstance(comm)->getRank() == root) {
     ret = errorCheck("AMPI_Scatter", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
     if(ret != MPI_SUCCESS)
       return ret;
@@ -6626,14 +6613,14 @@ int AMPI_Scatter(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
 #endif
 
-  int size = ptr->getSize(comm);
+  int size = ptr->getSize();
   int i;
 
-  if(ptr->getRank(comm)==root) {
+  if(ptr->getRank()==root) {
     CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
     int itemsize = dttype->getSize(sendcount) ;
     for(i=0;i<size;i++) {
-      ptr->send(MPI_SCATTER_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i),
+      ptr->send(MPI_SCATTER_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*i),
                 sendcount, sendtype, i, comm);
     }
   }
@@ -6664,7 +6651,7 @@ int AMPI_Iscatter(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
 #if AMPI_ERROR_CHECKING
   int ret;
-  if (getAmpiInstance(comm)->getRank(comm) == root) {
+  if (getAmpiInstance(comm)->getRank() == root) {
     ret = errorCheck("AMPI_Iscatter", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
     if(ret != MPI_SUCCESS){
       *request = MPI_REQUEST_NULL;
@@ -6698,14 +6685,14 @@ int AMPI_Iscatter(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
 #endif
 
-  int size = ptr->getSize(comm);
+  int size = ptr->getSize();
   int i;
 
-  if(ptr->getRank(comm)==root) {
+  if(ptr->getRank()==root) {
     CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
     int itemsize = dttype->getSize(sendcount) ;
     for(i=0;i<size;i++) {
-      ptr->send(MPI_SCATTER_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*i),
+      ptr->send(MPI_SCATTER_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*i),
                 sendcount, sendtype, i, comm);
     }
   }
@@ -6736,7 +6723,7 @@ int AMPI_Scatterv(const void *sendbuf, const int *sendcounts, const int *displs,
 
 #if AMPI_ERROR_CHECKING
   int ret;
-  if (getAmpiInstance(comm)->getRank(comm) == root) {
+  if (getAmpiInstance(comm)->getRank() == root) {
     ret = errorCheck("AMPI_Scatterv", comm, 1, 0, 0, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
     if(ret != MPI_SUCCESS)
       return ret;
@@ -6763,14 +6750,14 @@ int AMPI_Scatterv(const void *sendbuf, const int *sendcounts, const int *displs,
   }
 #endif
 
-  int size = ptr->getSize(comm);
+  int size = ptr->getSize();
   int i;
 
-  if(ptr->getRank(comm) == root) {
+  if(ptr->getRank() == root) {
     CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
     int itemsize = dttype->getSize() ;
     for(i=0;i<size;i++) {
-      ptr->send(MPI_SCATTER_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*displs[i]),
+      ptr->send(MPI_SCATTER_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*displs[i]),
                 sendcounts[i], sendtype, i, comm);
     }
   }
@@ -6801,7 +6788,7 @@ int AMPI_Iscatterv(const void *sendbuf, const int *sendcounts, const int *displs
 
 #if AMPI_ERROR_CHECKING
   int ret;
-  if (getAmpiInstance(comm)->getRank(comm) == root) {
+  if (getAmpiInstance(comm)->getRank() == root) {
     ret = errorCheck("AMPI_Iscatterv", comm, 1, 0, 0, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
     if(ret != MPI_SUCCESS){
       *request = MPI_REQUEST_NULL;
@@ -6835,14 +6822,14 @@ int AMPI_Iscatterv(const void *sendbuf, const int *sendcounts, const int *displs
   }
 #endif
 
-  int size = ptr->getSize(comm);
+  int size = ptr->getSize();
   int i;
 
-  if(ptr->getRank(comm) == root) {
+  if(ptr->getRank() == root) {
     CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
     int itemsize = dttype->getSize() ;
     for(i=0;i<size;i++) {
-      ptr->send(MPI_SCATTER_TAG, ptr->getRank(comm), ((char*)sendbuf)+(itemsize*displs[i]),
+      ptr->send(MPI_SCATTER_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*displs[i]),
                 sendcounts[i], sendtype, i, comm);
     }
   }
@@ -6890,8 +6877,8 @@ int AMPI_Alltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   int itemsize = getDDT()->getSize(sendtype) * sendcount;
   int extent = getDDT()->getExtent(recvtype) * recvcount;
-  int size = ptr->getSize(comm);
-  int rank = ptr->getRank(comm);
+  int size = ptr->getSize();
+  int rank = ptr->getRank();
 
 #if CMK_BIGSIM_CHARM
   TRACE_BG_AMPI_LOG(MPI_ALLTOALL, itemsize);
@@ -6974,7 +6961,7 @@ int AMPI_Alltoall_iget(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
   ampi *ptr = getAmpiInstance(comm);
   CProxy_ampi pa(ptr->ckGetArrayID());
-  int size = ptr->getSize(comm);
+  int size = ptr->getSize();
   CkDDT_DataType *dttype;
   int itemsize;
   int recvdisp;
@@ -7036,15 +7023,15 @@ int AMPI_Ialltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ampi *ptr = getAmpiInstance(comm);
 
   if(comm==MPI_COMM_SELF){
-    *request = ptr->postReq(new IReq(recvbuf,recvcount,recvtype,ptr->getRank(comm),MPI_ATA_TAG,comm,
+    *request = ptr->postReq(new IReq(recvbuf,recvcount,recvtype,ptr->getRank(),MPI_ATA_TAG,comm,
                             AMPI_REQ_COMPLETED));
     return copyDatatype(sendtype,sendcount,recvtype,recvcount,sendbuf,recvbuf);
   }
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Ialltoall for Inter-communicators!");
 
-  int size = ptr->getSize(comm);
-  int rank = ptr->getRank(comm);
+  int size = ptr->getSize();
+  int rank = ptr->getRank();
   int itemsize = getDDT()->getSize(sendtype) * sendcount;
   int extent = getDDT()->getExtent(recvtype) * recvcount;
 
@@ -7092,8 +7079,8 @@ int AMPI_Alltoallv(const void *sendbuf, const int *sendcounts, const int *sdispl
     CkAbort("AMPI does not implement MPI_Alltoallv for Inter-communicators!");
 
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize(comm);
-  int rank = ptr->getRank(comm);
+  int size = ptr->getSize();
+  int rank = ptr->getRank();
   int itemsize = getDDT()->getSize(sendtype);
   int extent = getDDT()->getExtent(recvtype);
 
@@ -7141,15 +7128,15 @@ int AMPI_Ialltoallv(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype s
   ampi *ptr = getAmpiInstance(comm);
 
   if(comm==MPI_COMM_SELF){
-    *request = ptr->postReq(new IReq(recvbuf,recvcounts[0],recvtype,ptr->getRank(comm),MPI_ATA_TAG,comm,
+    *request = ptr->postReq(new IReq(recvbuf,recvcounts[0],recvtype,ptr->getRank(),MPI_ATA_TAG,comm,
                             AMPI_REQ_COMPLETED));
     return copyDatatype(sendtype,sendcounts[0],recvtype,recvcounts[0],sendbuf,recvbuf);
   }
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Ialltoallv for Inter-communicators!");
 
-  int size = ptr->getSize(comm);
-  int rank = ptr->getRank(comm);
+  int size = ptr->getSize();
+  int rank = ptr->getRank();
   int itemsize = getDDT()->getSize(sendtype);
   int extent = getDDT()->getExtent(recvtype);
 
@@ -7199,8 +7186,8 @@ int AMPI_Alltoallw(const void *sendbuf, const int *sendcounts, const int *sdispl
 
   /* displs are in terms of bytes for Alltoallw (unlike Alltoallv) */
   ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize(comm);
-  int rank = ptr->getRank(comm);
+  int size = ptr->getSize();
+  int rank = ptr->getRank();
 
   for (int i=0; i<size; i++) {
     int dst = (rank+i) % size;
@@ -7247,7 +7234,7 @@ int AMPI_Ialltoallw(const void *sendbuf, const int *sendcounts, const int *sdisp
   ampi *ptr = getAmpiInstance(comm);
 
   if(comm==MPI_COMM_SELF){
-    *request = ptr->postReq(new IReq(recvbuf,recvcounts[0],recvtypes[0],ptr->getRank(comm),MPI_ATA_TAG,comm,
+    *request = ptr->postReq(new IReq(recvbuf,recvcounts[0],recvtypes[0],ptr->getRank(),MPI_ATA_TAG,comm,
                             AMPI_REQ_COMPLETED));
     return copyDatatype(sendtypes[0],sendcounts[0],recvtypes[0],recvcounts[0],sendbuf,recvbuf);
   }
@@ -7255,8 +7242,8 @@ int AMPI_Ialltoallw(const void *sendbuf, const int *sendcounts, const int *sdisp
     CkAbort("AMPI does not implement MPI_Ialltoallw for Inter-communicators!");
 
   /* displs are in terms of bytes for Alltoallw (unlike Alltoallv) */
-  int size = ptr->getSize(comm);
-  int rank = ptr->getRank(comm);
+  int size = ptr->getSize();
+  int rank = ptr->getRank();
 
   for (int i=0; i<size; i++) {
     int dst = (rank+i) % size;
@@ -7304,7 +7291,7 @@ int AMPI_Neighbor_alltoall(const void* sendbuf, int sendcount, MPI_Datatype send
     return copyDatatype(sendtype, sendcount, recvtype, recvcount, sendbuf, recvbuf);
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank_in_comm = ptr->getRank(comm);
+  int rank_in_comm = ptr->getRank();
 
   const vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
@@ -7354,7 +7341,7 @@ int AMPI_Ineighbor_alltoall(const void* sendbuf, int sendcount, MPI_Datatype sen
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank_in_comm = ptr->getRank(comm);
+  int rank_in_comm = ptr->getRank();
 
   if (comm == MPI_COMM_SELF) {
     *request = ptr->postReq(new IReq(recvbuf,recvcount,recvtype,rank_in_comm,MPI_NBOR_TAG,comm,
@@ -7412,7 +7399,7 @@ int AMPI_Neighbor_alltoallv(const void* sendbuf, const int *sendcounts, const in
     return copyDatatype(sendtype, sendcounts[0], recvtype, recvcounts[0], sendbuf, recvbuf);
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank_in_comm = ptr->getRank(comm);
+  int rank_in_comm = ptr->getRank();
 
   const vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
@@ -7463,7 +7450,7 @@ int AMPI_Ineighbor_alltoallv(const void* sendbuf, const int *sendcounts, const i
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank_in_comm = ptr->getRank(comm);
+  int rank_in_comm = ptr->getRank();
 
   if (comm == MPI_COMM_SELF) {
     *request = ptr->postReq(new IReq(recvbuf,recvcounts[0],recvtype,rank_in_comm,MPI_NBOR_TAG,comm,
@@ -7521,7 +7508,7 @@ int AMPI_Neighbor_alltoallw(const void* sendbuf, const int *sendcounts, const MP
     return copyDatatype(sendtypes[0], sendcounts[0], recvtypes[0], recvcounts[0], sendbuf, recvbuf);
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank_in_comm = ptr->getRank(comm);
+  int rank_in_comm = ptr->getRank();
 
   const vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
@@ -7570,7 +7557,7 @@ int AMPI_Ineighbor_alltoallw(const void* sendbuf, const int *sendcounts, const M
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank_in_comm = ptr->getRank(comm);
+  int rank_in_comm = ptr->getRank();
 
   if (comm == MPI_COMM_SELF) {
     *request = ptr->postReq(new IReq(recvbuf,recvcounts[0],recvtypes[0],rank_in_comm,MPI_NBOR_TAG,comm,
@@ -7626,7 +7613,7 @@ int AMPI_Neighbor_allgather(const void* sendbuf, int sendcount, MPI_Datatype sen
     return copyDatatype(sendtype, sendcount, recvtype, recvcount, sendbuf, recvbuf);
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank_in_comm = ptr->getRank(comm);
+  int rank_in_comm = ptr->getRank();
 
   const vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
@@ -7674,7 +7661,7 @@ int AMPI_Ineighbor_allgather(const void* sendbuf, int sendcount, MPI_Datatype se
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank_in_comm = ptr->getRank(comm);
+  int rank_in_comm = ptr->getRank();
 
   if (comm == MPI_COMM_SELF) {
     *request = ptr->postReq(new IReq(recvbuf,recvcount,recvtype,rank_in_comm,MPI_NBOR_TAG,comm,
@@ -7730,7 +7717,7 @@ int AMPI_Neighbor_allgatherv(const void* sendbuf, int sendcount, MPI_Datatype se
     return copyDatatype(sendtype, sendcount, recvtype, recvcounts[0], sendbuf, recvbuf);
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank_in_comm = ptr->getRank(comm);
+  int rank_in_comm = ptr->getRank();
 
   const vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
@@ -7778,7 +7765,7 @@ int AMPI_Ineighbor_allgatherv(const void* sendbuf, int sendcount, MPI_Datatype s
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank_in_comm = ptr->getRank(comm);
+  int rank_in_comm = ptr->getRank();
 
   if (comm == MPI_COMM_SELF) {
     *request = ptr->postReq(new IReq(recvbuf,recvcounts[0],recvtype,rank_in_comm,MPI_NBOR_TAG,comm,
@@ -7813,7 +7800,7 @@ int AMPI_Comm_dup(MPI_Comm comm, MPI_Comm *newcomm)
   AMPIAPI("AMPI_Comm_dup");
   int topol;
   ampi *ptr = getAmpiInstance(comm);
-  int rank = ptr->getRank(comm);
+  int rank = ptr->getRank();
 
   AMPI_Topo_test(comm, &topol);
   if (topol == MPI_CART) {
@@ -7967,15 +7954,8 @@ int AMPI_Intercomm_create(MPI_Comm localComm, int localLeader, MPI_Comm peerComm
   int rootIndex = localPtr->getIndexForRank(localLeader);
   int localSize, localRank;
 
-  if (localComm == MPI_COMM_SELF) {
-    localSize = 1;
-    localRank = 0;
-    rootIndex = 0; // Note: there is no explicit ampi class instance for MPI_COMM_SELF
-  }
-  else {
-    localSize = localPtr->getSize(localComm);
-    localRank = localPtr->getRank(localComm);
-  }
+  localSize = localPtr->getSize();
+  localRank = localPtr->getRank();
 
   vector<int> remoteVec;
 
@@ -7983,14 +7963,9 @@ int AMPI_Intercomm_create(MPI_Comm localComm, int localLeader, MPI_Comm peerComm
     int remoteSize;
     MPI_Status sts;
     vector<int> localVec;
-    if (localComm == MPI_COMM_SELF) {
-      localVec.push_back(0);
-    }
-    else {
-      localVec = localPtr->getIndices();
-    }
+    localVec = localPtr->getIndices();
     // local leader exchanges groupStruct with remote leader
-    peerPtr->send(tag, peerPtr->getRank(peerComm), &localVec[0], localVec.size(), MPI_INT, remoteLeader, peerComm);
+    peerPtr->send(tag, peerPtr->getRank(), &localVec[0], localVec.size(), MPI_INT, remoteLeader, peerComm);
     peerPtr->probe(tag, remoteLeader, peerComm, &sts);
     AMPI_Get_count(&sts, MPI_INT, &remoteSize);
     remoteVec.resize(remoteSize);
@@ -8004,8 +7979,6 @@ int AMPI_Intercomm_create(MPI_Comm localComm, int localLeader, MPI_Comm peerComm
     }
   }
 
-  /* Note: if localComm == MPI_COMM_SELF, then localPtr represents MPI_COMM_WORLD.
-   * Extra care needs to be taken in ampi::intercommCreate. */
   localPtr->intercommCreate(remoteVec,rootIndex,localComm,newintercomm);
 
   return MPI_SUCCESS;
@@ -8025,11 +7998,11 @@ int AMPI_Intercomm_merge(MPI_Comm intercomm, int high, MPI_Comm *newintracomm){
   lroot = ptr->getIndexForRank(0);
   rroot = ptr->getIndexForRemoteRank(0);
   lhigh = high;
-  lrank = ptr->getRank(intercomm);
+  lrank = ptr->getRank();
   first = 0;
 
   if(lrank==0){
-    ptr->send(MPI_ATA_TAG, ptr->getRank(intercomm), &lhigh, 1, MPI_INT, 0, intercomm);
+    ptr->send(MPI_ATA_TAG, ptr->getRank(), &lhigh, 1, MPI_INT, 0, intercomm);
     if(-1==ptr->recv(MPI_ATA_TAG,0,&rhigh,1,MPI_INT,intercomm))
       CkAbort("AMPI> Error in MPI_Intercomm_create");
 
@@ -8826,7 +8799,7 @@ int AMPI_Cart_get(MPI_Comm comm, int maxdims, int *dims, int *periods, int *coor
 
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   ndims = c.getndims();
-  int rank = getAmpiInstance(comm)->getRank(comm);
+  int rank = getAmpiInstance(comm)->getRank();
 
   const vector<int> &dims_ = c.getdims();
   const vector<int> &periods_ = c.getperiods();
@@ -8952,7 +8925,7 @@ int AMPI_Cart_shift(MPI_Comm comm, int direction, int disp,
   const vector<int> &periods = c.getperiods();
   vector<int> coords(ndims);
 
-  int mype = getAmpiInstance(comm)->getRank(comm);
+  int mype = getAmpiInstance(comm)->getRank();
   AMPI_Cart_coords(comm, mype, ndims, &coords[0]);
 
   cart_clamp_coord(comm, dims, periods, &coords[0], direction,  disp, rank_dest);
@@ -9176,7 +9149,7 @@ int AMPI_Cart_sub(MPI_Comm comm, const int *remain_dims, MPI_Comm *newcomm) {
     return ampiErrhandler("AMPI_Cart_sub", MPI_ERR_TOPOLOGY);
 #endif
 
-  int rank = getAmpiInstance(comm)->getRank(comm);
+  int rank = getAmpiInstance(comm)->getRank();
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   ndims = c.getndims();
   const vector<int> &dims = c.getdims();
@@ -9544,7 +9517,7 @@ int AMPI_Set_start_event(MPI_Comm comm)
 
   CkDDT_DataType *ddt_type = ptr->getDDT()->getType(MPI_INT);
 
-  CkReductionMsg *msg=makeRednMsg(ddt_type, NULL, 0, MPI_INT, ptr->getRank(comm), MPI_SUM);
+  CkReductionMsg *msg=makeRednMsg(ddt_type, NULL, 0, MPI_INT, ptr->getRank(), MPI_SUM);
   if (CkMyPe() == 0) {
     CkCallback allreduceCB(startCFnCall, ptr);
     msg->setCallback(allreduceCB);
