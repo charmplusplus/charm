@@ -62,15 +62,16 @@ class fromzDisk : public zdisk {
 #endif
 #endif // AMPIMSGLOG
 
-/* AMPI uses RDMA sends if BigSim is not being used and the underlying comm layer supports it. */
+/* AMPI uses RDMA sends if BigSim is not being used and the underlying comm
+ * layer supports it (except for GNI, which has experimental RDMA support). */
 #ifndef AMPI_RDMA_IMPL
-#define AMPI_RDMA_IMPL ( !CMK_BIGSIM_CHARM && CMK_ONESIDED_IMPL )
+#define AMPI_RDMA_IMPL ( !CMK_BIGSIM_CHARM && CMK_ONESIDED_IMPL && !CMK_CONVERSE_UGNI )
 #endif
 
 /* contiguous messages larger than or equal to this threshold are sent via RDMA */
 #ifndef AMPI_RDMA_THRESHOLD_DEFAULT
-#if CMK_USE_IBVERBS
-#define AMPI_RDMA_THRESHOLD_DEFAULT 65356
+#if CMK_USE_IBVERBS || CMK_CONVERSE_UGNI
+#define AMPI_RDMA_THRESHOLD_DEFAULT 65536
 #else
 #define AMPI_RDMA_THRESHOLD_DEFAULT 32768
 #endif
