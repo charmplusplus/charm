@@ -693,8 +693,6 @@ static int PumpMsgs(void) {
             else
               prev->next = temp;
 
-            // free the receiver's machine specific information, CmiMPIRzvRdmaRecvList_t allocated inside CkRdmaIssueRgets
-            free(recvBufferTmp);
             recvBufferTmp = temp;
           }
           else{

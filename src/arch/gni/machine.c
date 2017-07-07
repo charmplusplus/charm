@@ -3307,7 +3307,7 @@ INLINE_KEYWORD gni_return_t _sendOneBufferedSmsg(SMSG_QUEUE *queue, MSG_LIST *pt
     case RDMA_PUT_MD_TAG:
         numRdmaOps = ((CmiGNIRzvRdmaRecv_t *)(ptr->msg))->numOps;
         recvInfoSize = LrtsGetRdmaRecvInfoSize(numRdmaOps);
-        status = send_smsg_message(queue, ptr->destNode, ptr->msg, recvInfoSize, ptr->tag, 1, ptr, NONCHARM_SMSG, 0);
+        status = send_smsg_message(queue, ptr->destNode, ptr->msg, recvInfoSize, ptr->tag, 1, ptr, NONCHARM_SMSG_DONT_FREE, 0);
         break;
 
      case RDMA_PUT_DONE_TAG:

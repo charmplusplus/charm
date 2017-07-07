@@ -34,8 +34,6 @@ void rzv_rdma_recv_done   (pami_context_t     ctxt,
   recvInfo->comOps++;
   if(recvInfo->comOps == recvInfo->numOps){
     recv_done(ctxt, recvInfo->msg, PAMI_SUCCESS);
-    // free the receiver's machine specific information, CmiPAMIRzvRdmaRecv_t allocated inside CkRdmaIssueRgets
-    free(recvInfo);
   }
 }
 

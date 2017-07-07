@@ -161,17 +161,22 @@ envelope* CkRdmaCopyMsg(envelope *env){
  */
 void CkRdmaIssueRgets(envelope *env){
   /*
-   * Determine the buffer size and the message size from the
-   * metadata message. Message size is the metadata message size without
-   * the machine specific information
+   * Determine the buffer size('bufsize') and the message size('msgsize')
+   * from the metadata message. 'msgSize' is the metadata message size
+   * without the sender's machine specific information.
    */
   int numops, bufsize, msgsize;
   bufsize = getRdmaBufSize(env);
   numops = getRdmaNumOps(env);
   msgsize = env->getTotalsize() - CmiGetRdmaInfoSize(numops);
 
-  //Allocate the buffer on the receiver
-  envelope *copyenv = (envelope *)CmiAlloc(CK_ALIGN(msgsize, 16) + bufsize);
+  /* Allocate the receiver's message, which contains the metadata message sent by the sender
+   * (without its machine specific info) of size 'msgSize', the entire receiver's buffer of
+   * size 'bufsize', and the receiver's machine specific info of size 'CmiGetRdmaRecvInfoSize(numops)'.
+   * The receiver's machine specific info is added to this message to avoid separately freeing it
+   * in the machine layer.
+   */
+  envelope *copyenv = (envelope *)CmiAlloc(CK_ALIGN(msgsize, 16) + bufsize + CmiGetRdmaRecvInfoSize(numops));
 
   //Copy the metadata message(without the machine specific info) into the buffer
   memcpy(copyenv, env, msgsize);
@@ -180,14 +185,17 @@ void CkRdmaIssueRgets(envelope *env){
   CmiResetImmediate(copyenv);
 #endif
 
-  char *recv_md = (char *) malloc(CmiGetRdmaRecvInfoSize(numops));
+  //Receiver's machine specific info is at an offset, after the sender md and the receiver's buffer
+  char *recv_md = ((char *)copyenv) + CK_ALIGN(msgsize, 16) + bufsize;
 
   CkUnpackMessage(&copyenv);
   CkUpdateRdmaPtrs(copyenv, msgsize, recv_md, ((char *)env) + msgsize);
   CkPackRdmaPtrs(((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf);
   CkPackMessage(&copyenv);
 
-  //Set the total size of the message
+  /* Set the total size of the message excluding the receiver's machine specific info
+   * which is not required when the receiver's entry method executes
+   */
   copyenv->setTotalsize(CK_ALIGN(msgsize, 16) + bufsize);
 
   // Set rdma to be false to prevent message handler on the receiver

@@ -42,7 +42,7 @@ int checkFourByteAligned(void *recv){
 
 void rdma_sendMdBackForPut( CmiGNIRzvRdmaRecv_t* recvInfo, int src_pe){
   int size = LrtsGetRdmaRecvInfoSize(recvInfo->numOps);
-  send_smsg_message(&smsg_queue, CmiNodeOf(src_pe), recvInfo, size, RDMA_PUT_MD_TAG, 0, NULL, NONCHARM_SMSG, 0);
+  send_smsg_message(&smsg_queue, CmiNodeOf(src_pe), recvInfo, size, RDMA_PUT_MD_TAG, 0, NULL, NONCHARM_SMSG_DONT_FREE, 0);
   MACH_DEBUG(CmiPrintf("[%d]rdma_sendMdBackForPut: Sent md back to %d for PUT\n", CmiMyPe(), src_pe));
 }
 
@@ -227,8 +227,6 @@ void PumpOneSidedRDMATransactions(gni_cq_handle_t rdma_cq, CmiNodeLock rdma_cq_l
           handleOneRecvedMsg(msg_size, msg);
           MACH_DEBUG(CmiPrintf("[%d]PumpOneSidedTransaction: Final Ack sent to %d\n", CmiMyPe(), CMI_DEST_RANK(msg)));
 
-          // free the receiver's machine specific information, CmiGNIRzvRdmaRecv_t allocated inside CkRdmaIssueRgets
-          free(recvInfo);
         }
         free(tmp_pd);
       }
