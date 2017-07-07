@@ -14,7 +14,7 @@ caller continues immediately.
 methods.
 \end{description}
 
-\subsection{What is an ``entry method''?}
+\subsection{What is an "entry method"?}
 
 Entry methods are all the methods of a chare where messages can be sent by other chares.
 They are declared in the .ci files, and they must be defined as public methods
@@ -23,8 +23,8 @@ of the C++ object representing the chare.
 \subsection{When I invoke a remote method, do I block until that method returns?}
 
 No! This is one of the biggest differences between Charm++ and most
-other ``remote procedure call'' systems like, Java RMI, or RPC.
-``Invoke an asynchronous method'' and ``send a message'' have exactly the same
+other "remote procedure call" systems like, Java RMI, or RPC.
+"Invoke an asynchronous method" and "send a message" have exactly the same
 semantics and implementation.
 Since the invoking method does not wait for the remote method to terminate, it
 normally cannot receive any return value. (see later for a way to return values)
@@ -173,7 +173,7 @@ other chares (including other array elements part of the same array).
 \subsection{Does Charm++ support C and Fortran?}
 
 C and Fortran routines can be called from Charm++ using the usual API conventions for accessing them from C++.  AMPI supports Fortran directly, but direct use 
-of Charm++ semantics from Fortran is at an immature stage, contact us \htmladdnormallink{charm AT cs.uiuc.edu}{mailto:charm AT cs.uiuc.edu} if you are interested in pursuing this further. 
+of Charm++ semantics from Fortran is at an immature stage, contact us \htmladdnormallink{charm AT cs.illinois.edu}{mailto:charm AT cs.illinois.edu} if you are interested in pursuing this further.
 
 
 \subsection{What is a proxy?}
@@ -192,7 +192,7 @@ Proxies can be:
 \begin{itemize}
 \item
 Created using ckNew. This is the only method that actually creates a new
-parallel object. ``CProxy\_A::ckNew(...)'' returns a proxy, as described in
+parallel object. "CProxy\_A::ckNew(...)" returns a proxy, as described in
 the \htmladdnormallink{manual}{http://charm.cs.uiuc.edu/manuals/html/charm++/}.
 
 \item
@@ -200,11 +200,11 @@ Copied from an existing proxy. This happens when you assign two proxies
 or send a proxy in a message.
 
 \item
-Created from a ``handle''. This happens when you say ``CProxy\_A p=thishandle;''
+Created from a "handle". This happens when you say "CProxy\_A p=thishandle;"
 
 \item
-Created uninitialized. This is the default when you say ``CProxy\_A p;''.
-You'll get a runtime error ``proxy has not been initialized'' if you try
+Created uninitialized. This is the default when you say "CProxy\_A p;".
+You'll get a runtime error "proxy has not been initialized" if you try
 to use an uninitialized proxy.
 \end{itemize}
 
@@ -250,7 +250,7 @@ This is why we recommend including the {\em def.h} file at the end.
 
 \subsection{How can I use a global variable across different processors?}
 
-Make the global variable ``readonly'' by declaring it in the .ci file.
+Make the global variable "readonly" by declaring it in the .ci file.
 Remember also that read-onlies can be safely set only in the mainchare
 constructor. Any change after the mainchare constructor has finished will be
 local to the processor that made the change. To change a global variable later

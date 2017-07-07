@@ -13,7 +13,7 @@ will likely contain bug fixes not found in the releases.
 \subsection{How do I compile Charm++?}
 
 Run the interactive build script {\tt ./build} with no extra arguments If this fails,
-email \htmladdnormallink{charm AT cs.uiuc.edu}{mailto:charm AT cs.uiuc.edu} with the
+email \htmladdnormallink{charm AT cs.illinois.edu}{mailto:charm AT cs.illinois.edu} with the
 problem. Include the build line used (this is saved automatically in
 {\tt smart-build.log})
 
@@ -22,13 +22,13 @@ If you have a very unusual machine configuration, you will have to run
 architecture, and then you may have to modify the associated conf-mach.sh and
 conv-mach.h files in src/arch to point to your desired compilers and options. If
 you develop a significantly different platform, send the modified files to
-\htmladdnormallink{charm AT cs.uiuc.edu}{mailto:charm AT cs.uiuc.edu} so we can include it
+\htmladdnormallink{charm AT cs.illinois.edu}{mailto:charm AT cs.illinois.edu} so we can include it
 in the distribution.
 
 \subsection{How do I compile AMPI?}
 
-Run the interactive build script {\tt ./build} and choose the option for building
-``Charm++, AMPI, ParFUM, FEM and other libraries''.
+Run the build script {\tt ./build} and choose the option for building "Charm++ and AMPI," or just
+replace "charm++" in your full build command with "AMPI", as in {\tt ./build AMPI netlrts-linux-x86\_64}.
 
 \subsection{Can I remove part of charm tree after compilation to free disk space?}
 
@@ -236,7 +236,7 @@ See Appendix V of the Charm manual for \htmladdnormallink{Installation and Usage
 
 On machines where MPI has already been wired into the job system, use the --mpiexec flag and -np arguments.
 
-For the net versions, you need to write a nodelist file which lists
+For the netlrts- versions, you need to write a nodelist file which lists
 all the machine hostnames available for parallel runs.
 \begin{alltt}
 group main
@@ -329,7 +329,7 @@ nodes should be able to rapidly map their hostnames to their IP
 addresses. As an immediate workaround, you can run your program with
 the {\tt +skip\_cpu\_topology} flag, at the possible cost of reduced
 performance. Another workaround is installing and running {\tt nscd},
-the ``name service caching daemon'', on your cluster nodes; this may
+the "name service caching daemon", on your cluster nodes; this may
 add some noise on your systems and hence reduce performance. A third
 workaround is adding the addresses and names of all cluster nodes in
 each node's {\tt /etc/hosts} file; this poses maintainability problems

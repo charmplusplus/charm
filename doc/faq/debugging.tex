@@ -22,7 +22,7 @@ attached to specific processors on demand.
 
 \subsection{How do I use charmdebug?}
 
-Currently charmdebug is tested to work only under net- versions. With other versions,
+Currently charmdebug is tested to work only under netlrts- non-SMP versions. With other versions,
 testing is pending. To get the Charm Debug tool, check out the source code from the repository.
 This will create a directory named ccs\_tools. Move to this directory and
 build Charm Debug.
@@ -33,8 +33,8 @@ build Charm Debug.
  ant
 \end{verbatim}
 
-This will create the executable {\tt bin/charmdebug}. To start, simply substitute ``charmdebug'' to
-``charmrun'':
+This will create the executable {\tt bin/charmdebug}. To start, simply substitute "charmdebug" to
+"charmrun":
 
 \begin{alltt}shell> <path>/charmdebug ./myprogram\end{alltt}
 
@@ -50,7 +50,7 @@ difficult to find.
 
 \subsection{How do I use {\em gdb} with Charm++ programs?}
 
-It depends on the machine. On the net- versions of Charm++, like net-linux,
+It depends on the machine. On the netlrts- versions of Charm++, like netlrts-linux-x86\_64,
 you can just run the serial debugger:
 \begin{alltt}shell> gdb myprogram\end{alltt}
 
@@ -128,8 +128,8 @@ void effect(void) \{
 \}
 \end{alltt}
 
-Though you might expect this code to always print ``cause, effect'', you
-may get ``effect, cause''. This can only happen when the cause and
+Though you might expect this code to always print "cause, effect", you
+may get "effect, cause". This can only happen when the cause and
 effect execute on different processors, so cause's output is delayed.
 
 If you pass the extra command-line parameter {\em +syncprint}, then CkPrintf
@@ -173,7 +173,7 @@ from uninitialized data, corrupting the heap, etc. The solution is to never,
 ever send pointers in messages -- you need to send the data the pointer points
 to, not the pointer.
 
-\subsection{I get the error: ``{\tt Group ID is zero-{}- invalid!}''. What does
+\subsection{I get the error: "{\tt Group ID is zero-{}- invalid!}". What does
 this mean?}
 
 The {\em group} it is referring to is the chare group. This
@@ -188,7 +188,7 @@ You are trying to use code from a module that has not been properly
 initialized.
 
 So, in the {\em .ci} file for your {\em mainmodule}, you should
-add an ``extern module'' declaration:
+add an "extern module" declaration:
 \begin{alltt}
 mainmodule whatever \{
   extern module someModule;

@@ -1,13 +1,9 @@
 \section{Versions and Ports}
 
-\subsection{Is Charm++/Converse etc. available on CD or as an RPM?}
-
-No, and there are no plans.
-
-\subsection{Has charm been ported to use MPI underneath? What about OpenMP?}
+\subsection{Has Charm++ been ported to use MPI underneath? What about OpenMP?}
 
 Charm++ supports MPI and can use it as the underlying communication
-library. We have tested on MPICH and LAM, and also most vendor MPI
+library. We have tested on MPICH, OpenMPI, and also most vendor MPI
 variants.  Charm++ also has explicit support for SMP nodes in MPI
 version. Charm++ hasn't been ported to use OpenMP, but OpenMP can be
 used from Charm++.
@@ -15,7 +11,9 @@ used from Charm++.
 \subsection{How complicated is porting Charm++/Converse?}
 
 Depends. Hopefully, the porting only involves fixing compiler compatibility
-issues.  The LRTS abstraction layer was designed to simplify this process and has been used for the MPI, uGNI, and PAMI layers.  User level threads and Isomalloc support may require special platform specific support.  Otherwise Charm++ is generally platform independent.
+issues.  The LRTS abstraction layer was designed to simplify this process and has been used for the
+MPI, Verbs, uGNI, and PAMI layers.  User level threads and Isomalloc support may require special
+platform specific support.  Otherwise Charm++ is generally platform independent.
 
 \subsection{If the source is available how feasible would it be for us to do ports
 ourselves?}
@@ -25,7 +23,7 @@ Any kind of UNIX, Windows, and MacOS machine should be straightforward: just a
 few modifications to {\tt charm/src/arch/.../conv-mach.h} (for compiler
 issues) and possibly
 a new {\em machine.c} (if there's a new communication system involved).
-However, porting to a Lisp machine, a vector architecture, or embedded hardware with a proprietary OS, may be fairly difficult.
+However, porting to embedded hardware with a proprietary OS may be fairly difficult.
 
 \subsection{To what platform has Charm++/Converse been ported to?}
 

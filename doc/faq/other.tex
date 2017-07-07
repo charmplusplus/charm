@@ -10,30 +10,13 @@ and computations and also among computations within the same object using
 {\tt when-blocks}
 and various structured constructs. See the Charm++ manual for the details.
 
-\subsection{What are the performance problems with AMPI packing and unpacking?}
+\subsection{What is Adaptive MPI?}
 
-There is an extra copy involved, because the AMPI message is reusable
-immediately after the AMPI call returns. Since Charm++ messages are to
-be handed over to the system, there is an extra copy involved (plus creation
-of a Charm++ message) while sending.
-
-%<li>
-%<b>Why does AMPI now derive from </b><tt>ArrayElement1D</tt><b> rather
-%than </b><tt>TempoArray</tt><b>?</b></li>
-
-%<br>Deriving it from <tt>TempoArray</tt> was causing some inefficiencies
-%because of the introduction of derived data types. Basically, it was causing
-%multiple copies. Also, I felt that some more optimizations, especially
-%with collective operations can be done this way, so I have changed AMPI
-%to be a standalone Charm++ library, rather than being dependent on Tempo.
-
-\subsection{Is {\tt TempoArray::ckTempoSendElem()} the only way for non-AMPI
-code to communicate with running AMPI code?}
-
-A static method {\tt sendraw} is added to the AMPI class, that allows
-you to send a message to AMPI threads from outside AMPI. So, instead of
-using the {\tt TempoArray} method, you can use:
-{\tt ampi::sendraw(tag1,tag2,msg,len,arrayid,index);}
+Adaptive MPI (AMPI) is an implementation of the MPI standard on top of Charm++.
+This allows MPI users recompile their existing MPI applications on AMPI's compiler
+wrappers to take advantage of Charm++'s high level features, such as overdecomposition,
+overlap of communication and computation, dynamic load balancing, and fault tolerance.
+See the AMPI manual for more details on how AMPI works and how to use it.
 
 \subsection{What is Charisma?}
 
