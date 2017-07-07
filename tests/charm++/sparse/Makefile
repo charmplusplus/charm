@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 SRC=../../../src
 CHARMC=../../../bin/charmc $(OPTS)
@@ -19,6 +20,6 @@ clean:
 sparse.o: sparse.C sparse.h cifiles
 	$(CHARMC) sparse.C
 
-test: all
+test-local: all
 	@echo "Testing bulk construction of sparse arrays..."
 	$(call run, ./sparse +p4 )

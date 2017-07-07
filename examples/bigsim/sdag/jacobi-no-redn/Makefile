@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../../common.mk
 OPTS=-g
 CHARMC=../../../../bin/charmc $(OPTS)
@@ -30,8 +31,8 @@ medium: jacobi
 testnocorr:jacobi
 	$(call run, +p8 ./jacobi 2000 4 1000 +x10 +y5 +z2 +cth1 +wth1 +bglog +stacksize 4000 +logsize 20000)
 
-test: jacobi
-	$(call run, +p4 ./jacobi 64 10 32 )
+test-local: jacobi
+	$(call run, ./jacobi +p4 64 10 32 )
 
 big: jacobi
 	$(call run, +p10 ./jacobi 8000 4 4000 +x10 +y50 +z2 +cth1 +wth1 +bgcorrect +stacksize 4000 +logsize 20000)

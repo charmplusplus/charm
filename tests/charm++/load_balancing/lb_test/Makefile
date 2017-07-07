@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../../common.mk
 # Makefile for load-balancing test program
 
@@ -27,12 +28,12 @@ lb_test.o: lb_test.C lb_test.decl.h Topo.decl.h
 Topo.o: Topo.C Topo.h Topo.decl.h
 	$(CHARMC) -c Topo.C
 
-test:  lb_test
-	$(call run, +p4 ./lb_test 100 100 10 40 10 1000 ring +balancer GreedyLB +LBDebug 1 )
-	$(call run, +p4 ./lb_test 100 100 10 40 10 1000 ring +balancer CommLB +LBDebug 1 )
+test-local:  lb_test
+	$(call run, ./lb_test +p4 100 100 10 40 10 1000 ring +balancer GreedyLB +LBDebug 1 )
+	$(call run, ./lb_test +p4 100 100 10 40 10 1000 ring +balancer CommLB +LBDebug 1 )
 
-test_every:  lb_test.every
-	$(call run, +p4 ./lb_test.every 100 100 10 40 10 1000 ring +balancer RecBipartLB +LBDebug 1 )
+test_every-local:  lb_test.every
+	$(call run, ./lb_test.every +p4 100 100 10 40 10 1000 ring +balancer RecBipartLB +LBDebug 1 )
 
 bgtest:  lb_test
 	$(call run, +p4 ./lb_test 100 100 10 40 10 1000 ring +balancer CommLB +LBDebug 1 +x2 +y2 +z1 +cth1 +wth1 )

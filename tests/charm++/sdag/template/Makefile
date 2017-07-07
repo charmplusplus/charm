@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../../common.mk
 CHARMC = ../../../../bin/charmc
 CXX = $(CHARMC)
@@ -21,7 +22,5 @@ pgm.o: pgm.decl.h
 pgm: pgm.o
 	$(CHARMC) $(OPTS) -o $@ $^
 
-test: $(BIN)
-	$(call run, +p$(PROCS) ./$< )
-
-.PHONY: all clean test
+test-local: $(BIN)
+	$(call run, ./$< +p$(PROCS) )

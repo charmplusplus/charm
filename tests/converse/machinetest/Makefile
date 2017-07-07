@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -9,13 +10,13 @@ pingall: pingall.C
 multiping: multiping.C
 	$(CHARMC) -o multiping multiping.C -language converse++ -no-charmrun
 
-test: all
-	$(call run, +p2 ./pingall 0)
-	$(call run, +p2 ./pingall 1)
-	$(call run, +p2 ./multiping 0 8)
-	$(call run, +p2 ./multiping 0 32)
-	$(call run, +p2 ./multiping 1 8)
-	$(call run, +p2 ./multiping 1 32)
+test-local: all
+	$(call run, ./pingall +p2 0)
+	$(call run, ./pingall +p2 1)
+	$(call run, ./multiping +p2 0 8)
+	$(call run, ./multiping +p2 0 32)
+	$(call run, ./multiping +p2 1 8)
+	$(call run, ./multiping +p2 1 32)
 
 clean:
 	rm -f core *.cpm.h *~

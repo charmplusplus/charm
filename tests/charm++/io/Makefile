@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -7,7 +8,7 @@ pgm: iotest.ci iotest.C
 	$(CHARMC) iotest.ci
 	$(CHARMC) iotest.C -o $@ -module CkIO
 
-test: pgm
+test-local: all
 	$(call run, ./pgm +p4 4 )
 
 clean:

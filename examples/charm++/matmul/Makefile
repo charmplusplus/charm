@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc
 
@@ -15,8 +16,8 @@ matmul.o: matmul.C matmul.decl.h
 matmul.decl.h: matmul.ci
 	$(CHARMC) $<
 
-test: $(BINARY)
-	$(call run, +p4 ./matmul 50 5 )
+test-local: $(BINARY)
+	$(call run, ./matmul +p4 50 5 )
 
 clean:
 	rm -f *.o *.decl.h *.def.h $(BINARY) charmrun

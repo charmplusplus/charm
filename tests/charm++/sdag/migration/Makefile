@@ -1,4 +1,4 @@
--include ../../../common.mk
+CHARMRUN=./charmrun
 -include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 DEFAULT=test1
@@ -24,5 +24,5 @@ test1.o: test1.C test1.decl.h
 test1: test1.o
 	$(CHARMC) -language charm++ $(OPTS) $^ -o $@
 
-test: test1
-	$(call run, +p$(PROCS) ./test1 )
+test-local: test1
+	$(call run, ./test1 +p$(PROCS) )

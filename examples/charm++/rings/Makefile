@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -9,8 +10,8 @@ pgm:  rings.o
 rings.o : rings.C rings.h rings.ci
 	$(CHARMC) -c rings.ci rings.C
 
-test: pgm
-	$(call run, +p4 ./pgm )
+test-local: pgm
+	$(call run, ./pgm +p4 )
 
 bgtest: pgm
 	$(call run, +p4 ./pgm +x2 +y2 +z2 )

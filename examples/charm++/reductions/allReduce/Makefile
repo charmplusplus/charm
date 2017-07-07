@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS) $(MOPTS) 
 
@@ -17,7 +18,7 @@ clean:
 AllReduce.o: AllReduce.C AllReduce.decl.h AllReduce.h
 	$(CHARMC) -c AllReduce.C
 
-test: all
+test-local: all
 	$(call run, ./AllReduce 20 100000 +p4 )
 
 bgtest: all

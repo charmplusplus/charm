@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/ampicxx $(OPTS)
 
@@ -9,7 +10,7 @@ intercomm_coll: intercomm_coll.o
 intercomm_coll.o: intercomm_coll.C
 	$(CHARMC) -c intercomm_coll.C
 
-test: intercomm_coll
+test-local: intercomm_coll
 	$(call run, ./intercomm_coll +p1 +vp4)
 #	$(call run, ./intercomm_coll +p2 +vp4)
 

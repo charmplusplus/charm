@@ -1,3 +1,5 @@
+CHARMRUN=../../bin/./charmrun
+-include ../common.mk
 DIRS=simpletest simpleTestVarsize 
 
 all:
@@ -5,7 +7,7 @@ all:
 		(cd $$d; make all OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
-test:
+test-local:
 	for d in $(DIRS); do \
 		(cd $$d; make test OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done

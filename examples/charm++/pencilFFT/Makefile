@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 #Set FFTW_HOME home to the fftw-2.1.5 local installation
 
@@ -27,7 +28,7 @@ clean:
 testpencil.o: testpencil.C
 	$(CHARMC) -c testpencil.C ${INCLUDES}
 
-test: all
+test-local: all
 	@echo "Intra-processor Testpencil.."
 	$(call run, ./testpencil +p1)
 	@echo "Inter-processor Testpencil.."

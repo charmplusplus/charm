@@ -6,6 +6,7 @@ you want it to start a process.
 #define DAEMON_MAXPATHLEN 512
 #define DAEMON_MAXENV 256
 typedef struct {
+	int forks, cpus;
 	char pgm[DAEMON_MAXPATHLEN]; /*Name of executable to run (no ".exe" needed)*/
 	char cwd[DAEMON_MAXPATHLEN];/*Directory in which to start program*/
 

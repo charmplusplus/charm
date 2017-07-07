@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -17,7 +18,7 @@ clean:
 migrateHello.o: migrateHello.C migrateHello.decl.h
 	$(CHARMC) -c migrateHello.C
 
-test: all
+test-local: all
 	$(call run, ./migrateHello +p2 10000 1 )
 	$(call run, ./migrateHello +p2 10000 4096 )
 	$(call run, ./migrateHello +p2 10000 65536 )

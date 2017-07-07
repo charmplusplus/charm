@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 
 HEADERS=nepp.h params.h 
@@ -48,13 +49,13 @@ t1:
 	$(call run, ++nodegroup one +p1 t2d 1 200000000 2000 5000 300 1 1)
 
 # quick test on 1 cpu
-test: opt
-	$(call run, +p1 $(PGM) 2 1048576 100 500 100 1)
-	$(call run, +p1 $(PGM) 4 1048576 100 500 100 2)
-	$(call run, +p1 $(PGM) 8 1048576 100 500 100 3)
-	$(call run, +p1 $(PGM) 2 1048576 100 500 100 4)
-	$(call run, +p1 $(PGM) 4 1048576 100 500 100 5)
-	$(call run, +p1 $(PGM) 8 1048576 100 500 100 6)
+test-local: opt
+	$(call run, $(PGM) +p1 2 1048576 100 500 100 1)
+	$(call run, $(PGM) +p1 4 1048576 100 500 100 2)
+	$(call run, $(PGM) +p1 8 1048576 100 500 100 3)
+	$(call run, $(PGM) +p1 2 1048576 100 500 100 4)
+	$(call run, $(PGM) +p1 4 1048576 100 500 100 5)
+	$(call run, $(PGM) +p1 8 1048576 100 500 100 6)
 
 # quick test on 2 cpus
 test2: opt

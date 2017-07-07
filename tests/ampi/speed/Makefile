@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/ampicxx $(OPTS)
 
@@ -23,8 +24,8 @@ test_mpi.o: test_mpi.c
 msgspeed.o: msgspeed.c
 	$(CHARMC) -c $<
 
-test: all
-	$(call run, hello +p2)
+test-local: all
+	$(call run, ./hello +p2)
 
 
 # Various stand-alone (non-charm) API calls:

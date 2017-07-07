@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 
@@ -13,9 +14,9 @@ cifiles: simpleZeroCopy.ci
 simpleZeroCopy.o : simpleZeroCopy.C cifiles
 	$(CHARMC) -c simpleZeroCopy.C
 
-test: all
-	$(call run, +p4 ./simpleZeroCopy 32 +balancer RotateLB)
-	$(call run, +p4 ./simpleZeroCopy 32 +balancer GreedyLB)
+test-local: all
+	$(call run, ./simpleZeroCopy +p4 32 +balancer RotateLB)
+	$(call run, ./simpleZeroCopy +p4 32 +balancer GreedyLB)
 
 clean:
 	rm -f *.def.h *.decl.h *.o *~ *.exe cifiles charmrun simpleZeroCopy

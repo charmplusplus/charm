@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC = ../../../bin/charmc -O3 $(OPTS) 
 default: all
@@ -49,8 +50,8 @@ counter.o: counter.C  Counter.decl.h Counter.def.h
 main.decl.h main.def.h : main.ci.stamp
 Counter.decl.h Counter.def.h : counter.ci.stamp
 
-test: nqueen
-	$(call run, +p 4 ./nqueen 16 4 )
+test-local: nqueen
+	$(call run, ./nqueen +p4 16 4 )
 
 bgtest: all
 	$(call run, +p 4 ./nqueen 16 4 +x2 +y2 +z2 +bgstacksize 102400 )

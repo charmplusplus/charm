@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/ampif90 $(OPTS)
 
@@ -15,5 +16,5 @@ pgm.o: pgm.f90
 clean:
 	rm -f *.o *.mod pgm *~ conv-host charmrun
 
-test: pgm
+test-local: pgm
 	$(call run, ./pgm +p2 +vp4 )

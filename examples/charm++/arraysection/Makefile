@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -13,8 +14,8 @@ check.o: check.C check.decl.h
 check.decl.h: check.ci
 	$(CHARMC) $(OPTS) -language charm++ check.ci
 
-test: check
-	$(call run, +p4 ./check 20 )
+test-local: check
+	$(call run, ./check +p4 20 )
 
 clean:
 	rm -f *.decl.h *.def.h *.o check charmrun

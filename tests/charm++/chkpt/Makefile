@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -19,7 +20,7 @@ clean:
 hello.o: hello.C hello.decl.h
 	$(CHARMC) -c hello.C
 
-test: all
+test-local: all
 	-rm -fr log
 	$(call run, ./hello +p4 )
 	-sync
@@ -29,7 +30,7 @@ test: all
 	-rm -fr log
 	$(call run, ./hello +p2 )
 	-sync
-	$(call run, ./hello +p4 +restart log )
+	$(call run, ./hello +p4 +restart log )	
 
 bgtest: all
 	-rm -fr log

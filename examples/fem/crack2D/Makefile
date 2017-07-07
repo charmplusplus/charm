@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 COMMON_OBJS=	config.o mesh.o node.o \
@@ -42,7 +43,7 @@ serial: $(SERIAL_OBJS)
 	$(CHARMC) -o serial $(SERIAL_OBJS) -seq -language c++
 
 
-test: pgm
+test-local: pgm
 	$(call run, ./pgm +p2 +vp4 )
 
 bgtest: pgm

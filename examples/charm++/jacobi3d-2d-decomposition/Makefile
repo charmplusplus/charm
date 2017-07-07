@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 OPTS	= -O3
 CHARMC	= ../../../bin/charmc $(OPTS)
@@ -24,5 +25,5 @@ clean:
 jacobi3d.o: jacobi3d.C jacobi3d.decl.h
 	$(CHARMC) -c jacobi3d.C
 
-test: jacobi3d
-	$(call run, +p2 ./jacobi3d 32 16 )
+test-local: jacobi3d
+	$(call run, ./jacobi3d +p2 32 16 )

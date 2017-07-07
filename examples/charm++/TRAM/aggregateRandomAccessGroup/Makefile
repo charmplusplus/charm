@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../../common.mk
 CHARMC = ../../../../bin/charmc
 BINARY = random_access
@@ -21,8 +22,8 @@ randomAccess.ci.stamp: randomAccess.ci
 randomAccess.o: randomAccess.C randomAccess.decl.h randomAccess.def.h
 	$(CHARMC) $(CHARMCFLAGS) -c randomAccess.C
 
-test: $(BINARY)
-	$(call run, +p4 ./random_access 14 8 )
+test-local: $(BINARY)
+	$(call run, ./random_access +p4 14 8 )
 
 clean:
 	rm -f *.o *.decl.h *.def.h $(BINARY) charmrun* *.stamp

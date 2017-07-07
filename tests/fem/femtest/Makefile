@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS) 
 
@@ -18,7 +19,7 @@ fpgm.o: fpgm.f90
 clean:
 	rm -f pgm fpgm *.o conv-host charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk FEMVERSION
 
-test: pgm
+test-local: pgm
 	$(call run, ./pgm +p1 +vp1 )
 	$(call run, ./pgm +p1 +vp2 )
 	$(call run, ./pgm +p2 +vp1 )

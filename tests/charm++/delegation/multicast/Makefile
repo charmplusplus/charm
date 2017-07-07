@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 
@@ -15,8 +16,8 @@ hello.ci.stamp: hello.ci
 	$(CHARMC) $<
 	touch $@
 
-test: all
-	$(call run, +p3 ./hello 10 )
+test-local: all
+	$(call run, ./hello +p3 10 )
 
 bgtest: all
 	$(call run, +p3 ./hello 10 +x1 +y1 +z3 )

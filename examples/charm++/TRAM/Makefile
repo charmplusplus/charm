@@ -1,3 +1,5 @@
+CHARMRUN=../../../bin/./charmrun
+-include ../../common.mk
 DIRS = randomAccessGroup randomAccessArray aggregateRandomAccessGroup aggregateRandomAccessArray
 
 all:
@@ -10,7 +12,7 @@ all:
 		($(MAKE) -C $$d all OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
-test:
+test-local:
 	CHARMINC=../../../include . ../../../tmp/conv-config.sh ; \
 	if [ "$$CMK_COMPILER" = "bgxlc" ] ; \
 	then \

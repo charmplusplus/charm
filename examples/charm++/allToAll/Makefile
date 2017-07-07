@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -17,6 +18,6 @@ clean:
 allToAll.o: allToAll.C allToAll.decl.h
 	$(CHARMC) -c allToAll.C
 
-test: all
+test-local: all
 	$(call run, ./allToAll +p4 1024 )
 

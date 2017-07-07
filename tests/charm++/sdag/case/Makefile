@@ -1,4 +1,4 @@
--include ../../../common.mk
+CHARMRUN=./charmrun
 -include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 ALL=caseTest
@@ -23,5 +23,5 @@ caseTest.o: caseTest.C caseTest.decl.h
 caseTest: caseTest.o
 	$(CHARMC) -language charm++ $^ -o $@
 
-test: caseTest
-	$(call run, +p$(PROCS) ./$< )
+test-local: caseTest
+	$(call run, ./$< +p$(PROCS) )

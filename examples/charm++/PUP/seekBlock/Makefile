@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 
@@ -17,7 +18,7 @@ clean:
 seek_block.o: seek_block.C seek_block.h seek_block.decl.h
 	$(CHARMC) -c $<
 
-test: all
+test-local: all
 	$(call run, ./seek_block +p4  )
 	$(call run, ./seek_block +p4  )
 

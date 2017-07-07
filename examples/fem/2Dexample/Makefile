@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS) 
 
@@ -9,7 +10,7 @@ pgm: pgm.o
 pgm.o: pgm.C
 	$(CHARMC) -I../../../src/libs/ck-libs/fem -c pgm.C
 
-test: pgm
+test-local: pgm
 	$(call run, ./pgm +vp4 +p2)
 
 bgtest: pgm

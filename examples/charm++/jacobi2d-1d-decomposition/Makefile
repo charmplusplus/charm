@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -20,6 +21,6 @@ jacobi1d.decl.h: jacobi1d.ci
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o jacobi1d jacobi1d.prj charmrun *~ *log *projrc *sts
 
-test: all
-	$(call run, +p4 ./jacobi1d 32 32 4 )
+test-local: all
+	$(call run, ./jacobi1d +p4 32 32 4 )
 

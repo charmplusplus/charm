@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 OPTS=-O3 
 CHARMC=../../../bin/ampicxx $(OPTS)
@@ -15,8 +16,8 @@ pipe: pingpong-pipeline.c
 	$(CHARMC) pingpong-pipeline.c -o pgm-pipe
 	$(MPICC) pingpong-pipeline.c -o pgm-pipe-mpi
 
-test: all
-	$(call run, +p2 ./pgm 100000 16 +vp2)
+test-local: all
+	$(call run, ./pgm +p2 100000 16 +vp2)
 
 clean:
 	rm -rf charmrun conv-host moduleinit* *.o pingpong pgm pgm-mpi pgm-pipe pgm-pipe-mpi *~ *.sts core

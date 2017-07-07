@@ -1,3 +1,5 @@
+CHARMRUN=./charmrun
+-include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 
 OBJS = vectorAdd.o vectorAddCU.o
@@ -26,5 +28,5 @@ vectorAdd.o: vectorAdd.C vectorAdd.decl.h
 vectorAddCU.o: vectorAdd.cu
 	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) $(CHARMINC) -o vectorAddCU.o vectorAdd.cu
 
-test: all
-	./charmrun ./vectorAdd +p2 2 8  #++local ++verbose
+test-local: all
+	$(call run, ./vectorAdd +p2 2 8)

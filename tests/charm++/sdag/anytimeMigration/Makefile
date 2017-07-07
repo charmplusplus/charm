@@ -1,4 +1,4 @@
--include ../../../common.mk
+CHARMRUN=./charmrun
 -include ../../../common.mk
 CHARMC = ../../../../bin/charmc $(OPTS)
 CXX = $(CHARMC)
@@ -19,5 +19,5 @@ $(TARGET).C: $(TARGET).decl.h
 clean:
 	-rm -rf $(wildcard *.decl.h *.def.h *.o $(TARGET) charmrun *~)
 
-test: migration
-	$(call run, +p$(PROCS) ./$< )
+test-local: migration
+	$(call run, ./$< +p$(PROCS) )

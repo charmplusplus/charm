@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 ALL=sdagCase
@@ -22,5 +23,5 @@ sdagCase.o: sdagCase.C sdagCase.decl.h
 sdagCase: sdagCase.o
 	$(CHARMC) -language charm++ $(OPTS) $^ -o $@
 
-test: $(ALL)
-	$(call run, +p$(PROCS) ./$< )
+test-local: $(ALL)
+	$(call run, ./$< +p$(PROCS) )

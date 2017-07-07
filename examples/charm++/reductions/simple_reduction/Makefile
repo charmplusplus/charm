@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS) $(MOPTS) 
 
@@ -17,7 +18,7 @@ clean:
 simple_reduction.o: simple_reduction.C simple_reduction.decl.h simple_reduction.h
 	$(CHARMC) -c simple_reduction.C
 
-test: all
+test-local: all
 	$(call run, ./simple_reduction 20 4.5 10.3 +p4 )
 
 bgtest: all

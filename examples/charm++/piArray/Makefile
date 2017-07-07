@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -6,8 +7,8 @@ all: pgm
 pgm: pgm.o
 	$(CHARMC) pgm.o  -o pgm -language charm++
 
-test: pgm
-	$(call run, +p4 ./pgm 100000 100 )
+test-local: pgm
+	$(call run, ./pgm +p4 100000 100 )
 
 bgtest: pgm
 	$(call run, +p4 ./pgm 100000 100 +x2 +y2 +z1 )

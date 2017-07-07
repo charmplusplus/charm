@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -17,5 +18,5 @@ clean:
 alignmentCheck.o: alignmentCheck.C alignmentCheck.decl.h
 	$(CHARMC) -c alignmentCheck.C
 
-test: all
-	$(call run, +p2 ./alignmentCheck )
+test-local: all
+	$(call run, ./alignmentCheck +p2 )

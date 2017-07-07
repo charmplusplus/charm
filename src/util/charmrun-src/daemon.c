@@ -32,7 +32,7 @@ int abort_writelog(SOCKET skt,int code,const char *msg) {
 }
 
 char startProgram(const char *exeName, const char *args, 
-				const char *cwd, char *env);
+				const char *cwd, char *env, char *forksEnv, char *cpusEnv);
 
 void goFaceless(void);
 
@@ -47,6 +47,7 @@ int main()
   unsigned int remotePortNumber; /* Port on which remote port is connecting */
   
   taskStruct task;      /* Information about the task to be performed */
+  char forksEnv[20], cpusEnv[20];
   time_t curTime;
 
   int doNext = 1;
@@ -109,8 +110,16 @@ int main()
     /* Recv the task to be done */
     skt_recvN(remotefd, (BYTE *)&task, sizeof(task));
     task.pgm[DAEMON_MAXPATHLEN-1]=0; /*null terminate everything in sight*/
+	  if(!strcmp(task.pgm, "quit")) {
+		  statusCode = 'G';
+		  skt_sendN(remotefd,(BYTE *)&statusCode,sizeof(char));
+      skt_close(remotefd);
+		  exit(0);
+	  }
     task.cwd[DAEMON_MAXPATHLEN-1]=0;
     task.env[DAEMON_MAXENV-1]=0;
+    sprintf(forksEnv, "CmiMyForks=%d", task.forks);
+	  sprintf(cpusEnv, "CmiMyNodeSize=%d", task.cpus);
 
     /* Check magic number */
     if (ChMessageInt(task.magic)!=DAEMON_MAGIC) {
@@ -149,11 +158,13 @@ int main()
     fprintf(logfile,"Invoking '%s'\n"
 	    "and argLine '%s'\n"
 	    "and environment '%s'\n"
-	    "in '%s'\n",
-	    task.pgm,argLine,task.env,task.cwd);fflush(logfile);
+	    "in '%s'\n"
+      "with '%d' forks\n"
+      "and '%d' cpus\n",
+	    task.pgm,argLine,task.env,task.cwd, task.forks, task.cpus);fflush(logfile);
     
     /* Finally, create the process*/
-    statusCode=startProgram(task.pgm,argLine,task.cwd,task.env);
+    statusCode=startProgram(task.pgm,argLine,task.cwd,task.env, forksEnv, cpusEnv);
 
     /*Send status byte back to requestor*/
     skt_sendN(remotefd,(BYTE *)&statusCode,sizeof(char));
@@ -293,7 +304,7 @@ const char ** args2argv(const char *args,const char **argv,const char *exe) {
 }
 
 char startProgram(const char *exeName, const char *args, 
-				const char *cwd, char *env)
+				const char *cwd, char *env, char *forksEnv, char *cpusEnv)
 {
 	int ret=0,fd;
 	if (0!=access(cwd,F_OK)) return 'D';
@@ -306,6 +317,9 @@ char startProgram(const char *exeName, const char *args,
 		const char **argv=(const char **)malloc(sizeof(char *)*1000);
 		ret|=chdir(cwd);
 		putenv(env);
+    putenv(forksEnv);
+    putenv(cpusEnv);
+    fprintf(logfile, "Got here\n");fflush(logfile);
 #if 1
 		/*Redirect program's stdin, out, err to /dev/null*/
 		fd=open("/dev/null",O_RDWR);

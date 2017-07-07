@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC = ../../../bin/charmc
 BINARY = inherit
@@ -22,7 +23,7 @@ B.o: A.decl.h A.def.h
 %.decl.h %.def.h: %.ci
 	$(CHARMC) $(CHARMCFLAGS) $<
 
-test: $(BINARY)
+test-local: $(BINARY)
 	$(call run, ./$(BINARY) $(TESTFLAGS))
 
 clean:

@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 SRC=../../../src
 CHARMC=../../../bin/charmc $(OPTS)
@@ -22,7 +23,7 @@ clean:
 pingpong.o: pingpong.C cifiles
 	$(CHARMC) -I$(SRC)/conv-core pingpong.C
 
-test: all
+test-local: all
 	@echo "Intra-processor Pingpong.."
 	$(call run, ./pgm +p1 )
 	@echo "Inter-processor Pingpong.."

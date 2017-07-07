@@ -1,4 +1,4 @@
--include ../../common.mk
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMINC=../../../include
 CHARMBIN=../../../bin
@@ -101,7 +101,7 @@ include $(DEPENDFILE)
 clean:
 	rm -r -f conv-host pgm pgm.exe pgm.pdb pgm.ilk *.o *.decl.h *.def.h *.log *.sts *~ *.bak charmrun SunWS_cache
 
-test: pgm
+test-local: pgm
 	$(call run, ./pgm +p1 )
 	$(call run, ./pgm +p2 )
 	$(call run, ./pgm +p3 )

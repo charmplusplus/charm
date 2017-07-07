@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS) 
 
@@ -13,7 +14,7 @@ cst_nl.o: cst_nl.C
 	$(CHARMC) -c cst_nl.C
 
 
-test: pgm
+test-local: pgm
 	$(call run, ./pgm +vp4 +p2 )
 
 bgtest: pgm

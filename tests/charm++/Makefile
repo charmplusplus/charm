@@ -1,11 +1,13 @@
-DIRS=megatest alignment pingpong simplearrayhello load_balancing chkpt delegation queue sdag ckAllocSysMsgTest method_templates xcastredn demand_creation migrate taskSpawn taskSpawnRecursive streamingAllToAll startupTest kNeighbor topology io sparse reductionTesting
+CHARMRUN=../../bin/./charmrun
+-include ../common.mk
+DIRS=megatest alignment pingpong simplearrayhello chkpt delegation queue sdag ckAllocSysMsgTest method_templates xcastredn demand_creation migrate taskSpawn taskSpawnRecursive streamingAllToAll startupTest kNeighbor topology io sparse reductionTesting
 
 all:
 	for d in $(DIRS); do \
 		($(MAKE) -C $$d all OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
 	done
 
-test:
+test-local:
 	for d in $(DIRS); do \
 		($(MAKE) -C $$d test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
 	done

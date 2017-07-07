@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -9,8 +10,8 @@ pgm:  speed.o
 speed.o : speed.C speed.h speed.ci
 	$(CHARMC) -c speed.ci speed.C
 
-test: pgm
-	$(call run, +p4 ./pgm 8 )
+test-local: pgm
+	$(call run, ./pgm +p4 8 )
 
 bgtest: pgm
 	$(call run, +p4 ./pgm 8 +x2 +y2 +z1 )

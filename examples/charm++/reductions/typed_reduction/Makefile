@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../../common.mk
 CHARMC = ../../../../bin/charmc
 BINARY = typed_reduction
@@ -21,7 +22,7 @@ $(BINARY): $(patsubst %.C,%.o,$(wildcard *.C))
 %.decl.h %.def.h: %.ci
 	$(CHARMC) $(CHARMCFLAGS) $<
 
-test: $(BINARY)
+test-local: $(BINARY)
 	$(call run, ./typed_reduction +p1 )
 	$(call run, ./typed_reduction +p4 )
 

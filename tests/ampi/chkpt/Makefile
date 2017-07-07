@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/ampicc
 
@@ -8,17 +9,17 @@ ampi: hello
 hello: hello.c
 	$(CHARMC) -o hello hello.c -language ampi $(OPTS)
 
-test: hello
+test-local: hello
 	rm -rf log
-	$(call run, +p4 ./hello +vp8 )
+	$(call run, ./hello +p4 +vp8 )
 	-sync
-	$(call run, +p4 ./hello +vp8 +restart log )
-	$(call run, +p2 ./hello +vp8 +restart log )
+	$(call run, ./hello +p4 +vp8 +restart log )
+	$(call run, ./hello +p2 +vp8 +restart log )
 	-sync
 	-rm -fr log
-	$(call run, +p2 ./hello +vp8 )
+	$(call run, ./hello +p2 +vp8 )
 	-sync
-	$(call run, +p4 ./hello +vp8 +restart log )
+	$(call run, ./hello +p4 +vp8 +restart log )
 
 bgtest: clean ampi
 	$(call run, +p4 ./hello +vp8 +x4 +y1 +z1)

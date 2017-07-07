@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 AMPICXX=../../../bin/ampicxx $(OPTS)
@@ -18,5 +19,5 @@ clean:
 hello.o: hello.C
 	$(AMPICXX) -c hello.C
 
-test: all
+test-local: all
 	$(call run, ./hello +p4 +vp10 )

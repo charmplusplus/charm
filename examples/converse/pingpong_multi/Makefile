@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -9,7 +10,7 @@ pingpong: pingpong.o
 pingpong.o: pingpong.C
 	$(CHARMC) -language converse++ -c pingpong.C
 
-test: pingpong
+test-local: pingpong
 	$(call run, ./pingpong +p2 )
 
 clean:

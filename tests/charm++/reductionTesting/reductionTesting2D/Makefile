@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../../common.mk
 CHARMDIR = ../../../..
 OPTS = -g -Wno-deprecated
@@ -20,7 +21,7 @@ main.decl.h main.def.h: main.ci
 sectionReduction.decl.h sectionReduction.def.h: sectionReduction.ci
 	$(CHARMC) sectionReduction.ci
 
-test: all
+test-local: all
 	$(call run, ./pgm +p4 20 10 5 )
 
 clean:

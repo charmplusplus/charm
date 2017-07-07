@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -17,6 +18,6 @@ clean:
 manyToMany.o: manyToMany.C manyToMany.decl.h
 	$(CHARMC) -c manyToMany.C
 
-test: all
+test-local: all
 	$(call run, ./manyToMany +p4 1024 )
 

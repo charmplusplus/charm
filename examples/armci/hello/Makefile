@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -6,8 +7,8 @@ all: hello
 hello: hello.c
 	$(CHARMC) -o hello hello.c -language armci
 
-test: hello
-	$(call run, +p2 ./hello )
+test-local: hello
+	$(call run, ./hello +p2 )
 
 bgtest: hello
 	$(call run, +p1 ./hello +vp2 +x2 +y1 +z1 )

@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -9,7 +10,7 @@ all: pgm
 pgm: $(OBJS)
 	$(CHARMC) -o pgm $(OBJS) -language converse++
 
-test: pgm
+test-local: pgm
 	$(call run, ./pgm +p4 )
 
 memoryAccess.o: memoryAccess.c

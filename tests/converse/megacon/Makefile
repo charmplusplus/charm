@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -87,7 +88,7 @@ clean:
 	rm -f pgm
 	rm -f conv-host charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
 
-test: pgm
+test-local: pgm
 	$(call run, ./pgm +p1 )
 	$(call run, ./pgm +p2 )
 	$(call run, ./pgm +p3 )

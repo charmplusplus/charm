@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 LINKOPTS=-memory os
 CHARMC=../../../bin/charmc $(OPTS)
@@ -36,11 +37,11 @@ kNeighbor.o: kNeighbor.C kNeighbor.decl.h
 kNeighbor.comp.o: kNeighbor.C kNeighbor.decl.h
 	$(CHARMC) -c -DDOCOMP kNeighbor.C -o kNeighbor.comp.o
 
-test: all
-	$(call run, +p5 ./kNeighbor 5 10 64 )
-	$(call run, +p5 ./kNeighbor 5 10 256 )
-	$(call run, +p5 ./kNeighbor 5 10 1024 )
-	$(call run, +p5 ./kNeighbor 5 10 16384 )
+test-local: all
+	$(call run, ./kNeighbor +p5 5 10 64 )
+	$(call run, ./kNeighbor +p5 5 10 256 )
+	$(call run, ./kNeighbor +p5 5 10 1024 )
+	$(call run, ./kNeighbor +p5 5 10 16384 )
 
 test-smp: all
 	$(call run, +p5 ./kNeighbor.memos +setcpuaffinity 5 10000 64 ++ppn 5)

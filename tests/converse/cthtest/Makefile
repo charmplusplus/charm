@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -11,7 +12,7 @@ pgm: pgm.o
 pgm.o: pgm.C
 	$(CHARMC) -c pgm.C
 
-test: pgm
+test-local: pgm
 	$(call run, ./pgm +p1 )
 #	-$(LINKLINE) -thread context && ./charmrun ./pgm +p1  $(TESTOPTS)&& ps -u `whoami`
 #	-$(LINKLINE) -thread pthreads -lpthread && ./charmrun ./pgm +p1  $(TESTOPTS)&& ps -u `whoami`

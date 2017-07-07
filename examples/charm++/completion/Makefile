@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CXX = ../../../bin/charmc
 CXXFLAGS = $(OPTS)
@@ -27,6 +28,6 @@ $(EXEC_NAME): $(OBJ)
 comp.o: comp.C $(DECLS)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-test: all
-	$(call run, +p1 ./$(EXEC_NAME) )
-	$(call run, +p4 ./$(EXEC_NAME) )
+test-local: all
+	$(call run, ./$(EXEC_NAME) +p1 )
+	$(call run, ./$(EXEC_NAME) +p4 )

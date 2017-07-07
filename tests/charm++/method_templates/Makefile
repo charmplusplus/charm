@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 # Point this to your charm installation
 CHARMHOME = ../../..
@@ -43,10 +44,9 @@ clean:
 again: 
 	$(MAKE) clean; $(MAKE)
 
-test: all
+test-local: all
 	@echo "########################################################################################"
-	$(call run, $(EXECFLAGS) ./$(TARGET) $(ARGS))
-
+	$(call run, ./$(TARGET) $(EXECFLAGS) $(ARGS))
 
 mylib.o: mylib.C mylib.h mylib.decl.h mylib.def.h
 pgm.o: pgm.C client.decl.h mylib.h mylib.decl.h mylib.def.h utils.h client.def.h

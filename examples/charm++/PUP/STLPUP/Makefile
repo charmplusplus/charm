@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 
@@ -17,7 +18,7 @@ clean:
 SimplePUP.o: SimplePUP.C SimplePUP.h HeapObjectSTL.h SimplePUP.decl.h
 	$(CHARMC) -c SimplePUP.C
 
-test: all
+test-local: all
 	$(call run, ./SimplePUP +p4  )
 	$(call run, ./SimplePUP +p4  )
 

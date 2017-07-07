@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS) 
 OBJS=pgm.o ctests.o 
@@ -27,7 +28,7 @@ ftests_fallback.o: ftests_fallback.C
 clean:
 	rm -f pgm fpgm *.o *.MOD *.mod charmrun
 
-test: pgm
+test-local: pgm
 	$(call run, ./pgm +p1 +vp1)
 	$(call run, ./pgm +p1 +vp2)
 	$(call run, ./pgm +p2 +vp1)

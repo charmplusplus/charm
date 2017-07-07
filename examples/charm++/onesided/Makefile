@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -10,7 +11,7 @@ onesided.o : onesided.C onesided.h onesided.ci
 	$(CHARMC) -c onesided.ci 
 	$(CHARMC) -c onesided.C
 
-test: pgm
+test-local: pgm
 	$(call run, ./onesidedtest 0 0 +p2)
 	$(call run, ./onesidedtest 1 0 +p2)
 	$(call run, ./onesidedtest 0 1 +p2)

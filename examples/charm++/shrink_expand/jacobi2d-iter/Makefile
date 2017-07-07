@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../../common.mk
 CHARMC=../../../../bin/charmc -O3 $(OPTS)
 
@@ -17,5 +18,5 @@ clean:
 jacobi2d.o: jacobi2d.C jacobi2d.decl.h
 	$(CHARMC) -c jacobi2d.C
 
-test: all
+test-local: all
 	$(call run, ./jacobi2d +p4 200 20 +balancer GreedyLB +LBDebug 3 ++server ++server-port 1234)

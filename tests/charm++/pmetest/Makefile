@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 FFTW_HOME=/bgl/local/fftw-2.1.5/
 OPTS=-g -O3 
@@ -27,7 +28,7 @@ testpme.o: testpme.C
 patch.o: patch.C
 	$(CHARMC) -c patch.C ${INCLUDES}
 
-test: all
+test-local: all
 	@echo "Intra-processor TestPME.."
 	$(call run, ./testpme +p1)
 	@echo "Inter-processor TestPME.."

@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 
@@ -17,7 +18,7 @@ clean:
 pupDisk.o: pupDisk.C pupDisk.h someData.h pupDisk.decl.h
 	$(CHARMC) -c pupDisk.C
 
-test: all
+test-local: all
 	$(call run, ./pupDisk +p4 10 20 4 )
 	$(call run, ./pupDisk +p4 10 20 4 r )
 

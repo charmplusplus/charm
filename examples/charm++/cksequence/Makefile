@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -17,5 +18,5 @@ clean:
 cksequence_test.o: cksequence_test.C cksequence_test.decl.h
 	$(CHARMC) -c cksequence_test.C
 
-test: all
+test-local: all
 	$(call run, ./cksequence_test +p4 10 )

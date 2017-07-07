@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -17,6 +18,5 @@ clean:
 rtc.o: rtc.C topo.decl.h
 	$(CHARMC) -c rtc.C
 
-test: all
+test-local: all
 	$(call run, ./rtc +p4 )
-

@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../../common.mk
 # Point this to your charm installation
 CHARM ?= ../../../..
@@ -46,9 +47,9 @@ clean:
 again:
 	$(MAKE) clean; $(MAKE)
 
-test: all
+test-local: all
 	@echo "########################################################################################"
-	$(call run, $(EXECFLAGS) $(TARGET) $(ARGS))
+	$(call run, $(TARGET) $(EXECFLAGS) $(ARGS))
 
 ####### Pattern rules
 # Rule to generate dependency information for C++ source files

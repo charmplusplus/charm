@@ -1,17 +1,19 @@
+CHARMRUN=../bin/./charmrun
+-include common.mk
 # Temporary hack that needs to be removed / replaced
 -include ../tmp/buildopts.mk
 OPTS += $(OPTSATBUILDTIME)
 
-DIRS=util charm++ converse ampi
+DIRS=util charm++
 
 all:
 	for d in $(DIRS); do \
-		($(MAKE) -C $$d all OPTS='$(OPTS)' || exit 1) || exit 1; \
+		($(MAKE) -C $$d all OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
 	done
 
-test:
+test-local:
 	for d in $(DIRS); do \
-		($(MAKE) -C $$d test OPTS='$(OPTS)' || exit 1) || exit 1; \
+		($(MAKE) -C $$d test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
 	done
 
 bgtest:

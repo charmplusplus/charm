@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -17,6 +18,5 @@ clean:
 taskSpawn.o: taskSpawn.C taskSpawn.decl.h
 	$(CHARMC) -c taskSpawn.C
 
-test: all
+test-local: all
 	$(call run, ./taskSpawn +p4 500000 1000 )
-

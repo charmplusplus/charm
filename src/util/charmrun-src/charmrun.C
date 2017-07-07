@@ -84,6 +84,12 @@ const int MAX_NUM_RETRIES = 3;
 std::map<SOCKET, int> skt_client_table;
 std::map<std::string, int> host_sizes;
 
+char*** all_commands;
+int *size_commands;
+int num_programs, prog_done, totalPassed = 0;
+int useCommands = 1, useDaemon = 0, useArgv = 0, useSSH = 0;
+FILE *logfile;
+
 const char *nodetab_name(int i);
 const char *skt_to_name(SOCKET skt)
 {
@@ -230,6 +236,7 @@ char *pathextfix(const char *path, pathfixlist fixes, char *ext)
   strcpy(ret, newpath);
   strcat(ret, ext);
   free(newpath);
+  newpath = NULL;
   return ret;
 }
 
@@ -551,6 +558,8 @@ void pparam_printdocs()
 
 void pparam_delarg(int i)
 {
+  if(useCommands && !useArgv)
+    free((char*)pparam_argv[i]);
   int j;
   for (j = i; pparam_argv[j]; j++)
     pparam_argv[j] = pparam_argv[j + 1];
@@ -765,6 +774,39 @@ int arg_singlemaster;
 int arg_skipmaster;
 #endif
 
+void set_dir_a(const char *prog, char **dir) {
+  int i, first_slash = 0;
+  // printf("%s\n", prog);
+  for(i = strlen(prog) - 1; i >= 0; i--) {
+    if(prog[i] == '/') {
+      if(first_slash) {
+        i++;
+        break;
+      } else {
+        first_slash++;
+      }
+    }
+  }
+  *dir = (char *)malloc(i + 1);
+  strncpy(*dir, prog, i);
+  (*dir)[i] = '\0';
+}
+
+const char* get_nodeprog(const char *prog) {
+  int i, first_slash = 0;
+  for(i = strlen(prog) - 1; i >= 0; i--) {
+    if(prog[i] == '/') {
+      if(first_slash) {
+        i++;
+        break;
+      } else {
+        first_slash++;
+      }
+    }
+  }
+  return &(prog[i]);
+}
+
 void arg_init(int argc, const char **argv)
 {
   static char buf[1024];
@@ -943,7 +985,7 @@ void arg_init(int argc, const char **argv)
 
   if (arg_verbose) arg_quiet = 0;
 
-  if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
+  if ((arg_debug || arg_debug_no_pause || arg_in_xterm) && !useDaemon) {
     fprintf(stderr, "Charmrun> scalable start disabled under ++debug and ++in-xterm:\n"
                     "NOTE: will make an SSH connection per process launched,"
                     " instead of per physical node.\n");
@@ -1006,8 +1048,12 @@ void arg_init(int argc, const char **argv)
 #endif
 
   /* find the current directory, absolute version */
-  getcwd(buf, 1023);
-  arg_currdir_a = strdup(buf);
+  if(useCommands)
+    set_dir_a(argv[1], &arg_currdir_a);
+  else {
+    getcwd(buf, 1023);
+    arg_currdir_a = strdup(buf);
+  }
 
   /* find the node-program, absolute version */
   arg_nodeprog_r = argv[1];
@@ -1164,11 +1210,12 @@ typedef struct nodetab_host {
 
 } nodetab_host;
 
-nodetab_host **nodetab_table;
-int nodetab_max;
-int nodetab_size;
-int *nodetab_rank0_table;
-int nodetab_rank0_size;
+nodetab_host **nodetab_table, **max_nodetab_table;
+int nodetab_max, max_nodetab_max;
+int nodetab_size, max_nodetab_size;
+int *nodetab_rank0_table, *max_nodetab_rank0_table;
+int nodetab_rank0_size, max_nodetab_rank0_size;
+std::vector< std::pair<int, nodetab_host> > hosts;
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 int loaded_max_pe;
@@ -1379,7 +1426,6 @@ void nodetab_init()
   /* Store the previous host so we can make sure we aren't mixing localhost and
    * non-localhost */
   char *prevHostName = NULL;
-  std::vector< std::pair<int, nodetab_host> > hosts;
   std::multimap<int, nodetab_host> binned_hosts;
 
   /* if arg_local is set, ignore the nodelist file */
@@ -1422,6 +1468,7 @@ void nodetab_init()
   if (arg_ppn == 0)
     arg_ppn = 1;
 
+if(hosts.size() == 0) {
   lineNo = 1;
   while (fgets(input_line, sizeof(input_line) - 1, f) != 0) {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -1465,7 +1512,10 @@ void nodetab_init()
           for (host.rank = 0; host.rank < host.cpus; host.rank++)
 #endif
           {
-            nodetab_makehost(substr(b2, e2), &host);
+            char *res = substr(b2, e2);
+            nodetab_makehost(res, &host);
+            free(res);
+            res = NULL;
             hosts.push_back(std::make_pair(lineNo, host));
           }
           free(prevHostName);
@@ -1483,6 +1533,7 @@ void nodetab_init()
     }
     lineNo++;
   }
+}
   fclose(f);
   if (nodetab_tempName != NULL)
     unlink(nodetab_tempName);
@@ -1491,10 +1542,15 @@ void nodetab_init()
     fprintf(stderr, "ERROR> No hosts in group %s\n", arg_nodegroup);
     exit(1);
   }
+  
+  // for(int i = 0; i < hosts.size(); i++) {
+  //    printf("hosts[%d] = %s\n", i, hosts[i].second.name);
+  // }
 
   /*Wrap nodes in table around if there aren't enough yet*/
   for (int i = 0; binned_hosts.size() < arg_requested_pes; ++i) {
     binned_hosts.insert(hosts[i % hosts.size()]);
+    // printf("binned_hosts[%d] = (%d, %s)\n", i, hosts[i % hosts.size()].first, hosts[i % hosts.size()].second.name);
     host_sizes[hosts[i % hosts.size()].second.name]++;
   }
 
@@ -1597,11 +1653,16 @@ const char *nodetab_passwd(int i) { return nodetab_getinfo(i)->passwd; }
  *
  ****************************************************************************/
 
-static ChNodeinfo *nodeinfo_arr; /*Indexed by node number.*/
+static ChNodeinfo *nodeinfo_arr = NULL; /*Indexed by node number.*/
 
 void nodeinfo_allocate(void)
 {
   nodeinfo_arr = (ChNodeinfo *) malloc(nodetab_rank0_size * sizeof(ChNodeinfo));
+}
+void nodeinfo_free(void)
+{
+  free(nodeinfo_arr);
+  nodeinfo_arr = NULL;
 }
 void nodeinfo_add(const ChSingleNodeinfo *in, SOCKET ctrlfd)
 {
@@ -2196,6 +2257,23 @@ int req_handle_ending(ChMessage *msg, SOCKET fd)
   if (req_ending == arg_requested_pes)
 #endif
   {
+    for (i = 0; i < req_nClients; i++)
+      skt_close(req_clients[i]);
+    free(req_clients);
+    if(msg != NULL && useCommands) {
+      char *print = strstr(all_commands[prog_done][1], "tests");
+      if(print == NULL) {
+        print = strstr(all_commands[prog_done][1], "examples");
+        if(print == NULL)
+          print = strstr(all_commands[prog_done][1], "./") + 2;
+      }
+      fprintf(logfile, "Passed Test: %s\n", print);
+      print = NULL;
+      totalPassed++;
+    }
+    prog_done++;
+    req_ending = 0;
+    if(prog_done == num_programs) {
 #if CMK_SHRINK_EXPAND
     ChMessage ackmsg;
     ChMessage_new("realloc_ack", 0, &ackmsg);
@@ -2204,12 +2282,89 @@ int req_handle_ending(ChMessage *msg, SOCKET fd)
     }
 #endif
 
-    for (i = 0; i < req_nClients; i++)
-      skt_close(req_clients[i]);
+    if(useDaemon) {
+      if(max_nodetab_table != nodetab_table) {
+        for(int i = 0; i < nodetab_size; i++) {
+          if(nodetab_table[i] != NULL) {
+            free(nodetab_table[i]);
+            nodetab_table[i] = NULL;
+          }
+        }
+        free(nodetab_table);
+        nodetab_table = NULL;
+        free(nodetab_rank0_table);
+        nodetab_rank0_table = NULL;
+      }
+      
+      nodetab_table = max_nodetab_table;
+      nodetab_max = max_nodetab_max;
+      nodetab_size = max_nodetab_size;
+      nodetab_rank0_table = max_nodetab_rank0_table;
+      nodetab_rank0_size = max_nodetab_rank0_size;
+      
+      taskStruct task;
+      int nodeNumber, index;
+      
+      memset(&task, '\0', sizeof(task));
+      strcpy(task.pgm, "quit");
+      task.magic = ChMessageInt_new(DAEMON_MAGIC);
+      int prevIndex = -1;
+      for (nodeNumber = 0, index = 0; nodeNumber < hosts.size() && index < nodetab_rank0_size; nodeNumber++, index++)
+      {
+        char statusCode = 'N'; /*Default error code-- network problem*/
+        int fd;
+        int pe0 = nodetab_rank0_table[index];
+        if(prevIndex != -1) {
+          while(!strcmp(nodetab_name(prevIndex), nodetab_name(index))) {
+            index++;
+            if(index >= nodetab_rank0_size)
+              break;
+          }
+        }
+        if(index >= nodetab_rank0_size)
+          break;
+        prevIndex = index;
+        pe0 = nodetab_rank0_table[index];
+        fd = skt_connect(nodetab_ip(pe0), DAEMON_IP_PORT, 30);
+        if (fd !=
+            INVALID_SOCKET) { /*Contact!  Ask the daemon to start the program*/
+          skt_sendN(fd, (const char *) &task, sizeof(task));
+          skt_recvN(fd, &statusCode, sizeof(char));
+        }
+        if (statusCode != 'G') { /*Something went wrong--*/
+          fprintf(stderr, "Error '%c' ending remote node program on %s--\n%s\n",
+                  statusCode, nodetab_name(pe0), daemon_status2msg(statusCode));
+          // exit(1);
+        } else if (arg_verbose)
+          printf("Charmrun> Node program %d ended.\n", nodeNumber);
+      }
+      
+      for(int i = 0; i < hosts.size(); i++)
+        free((char *)hosts[i].second.name);
+      
+      for(int i = 0; i < nodetab_size; i++) {
+        if(nodetab_table[i] != NULL) {
+          free(nodetab_table[i]);
+          nodetab_table[i] = NULL;
+        }
+      }
+      free(nodetab_table);
+      nodetab_table = NULL;
+      free(nodetab_rank0_table);
+      nodetab_rank0_table = NULL;
+    }
+
     if (arg_verbose)
       printf("Charmrun> Graceful exit.\n");
-    exit(0);
+    if(useCommands)
+      fprintf(logfile, "Total Programs: %d\nTotal Passed: %d\nTotal Failed: %d", num_programs, totalPassed, num_programs - totalPassed);
+    
+    if(useCommands && totalPassed != num_programs)
+      exit(1);
+    else
+      exit(0);
   }
+}
   return REQ_OK;
 }
 
@@ -2257,14 +2412,24 @@ int req_handle_barrier0(ChMessage *msg, SOCKET fd)
   return REQ_OK;
 }
 
-void req_handle_abort(ChMessage *msg, SOCKET fd)
+int req_handle_abort(ChMessage *msg, SOCKET fd)
 {
   /*fprintf(stderr,"req_handle_abort called \n");*/
   if (msg->len == 0)
     fprintf(stderr, "Aborting!\n");
   else
     fprintf(stderr, "%s\n", msg->data);
-  exit(1);
+  if(useCommands)
+    fprintf(logfile, "\nFailed test: %s\n", strstr(all_commands[prog_done][1], "tests"));
+  if(msg->len != 0 && useCommands)
+    fprintf(logfile, "Reason: %s\n", msg->data);
+  if(useCommands) {
+    req_ending = arg_requested_pes - 1;
+    return req_handle_ending(NULL, fd);
+  } else {
+    exit(1);
+    return REQ_FAILED;
+  }
 }
 
 int req_handle_scanf(ChMessage *msg, SOCKET fd)
@@ -2646,8 +2811,7 @@ int req_handler_dispatch(ChMessage *msg, SOCKET replyFd)
   else if (strcmp(cmd, "ending") == 0)
     return req_handle_ending(msg, replyFd);
   else if (strcmp(cmd, "abort") == 0) {
-    req_handle_abort(msg, replyFd);
-    return REQ_FAILED;
+    return req_handle_abort(msg, replyFd);
   }
 #ifdef __FAULT__
   else if (strcmp(cmd, "crash_ack") == 0)
@@ -2844,7 +3008,8 @@ int ignore_socket_errors(SOCKET skt, int c, const char *m)
 { /*Abandon on further socket errors during error shutdown*/
 
 #ifndef __FAULT__
-  exit(2);
+  if(!useCommands)
+    exit(2);
 #endif
   return -1;
 }
@@ -2865,7 +3030,15 @@ int socket_error_in_poll(SOCKET skt, int code, const char *msg)
 #ifndef __FAULT__
   for (i = 0; i < req_nClients; i++)
     skt_close(req_clients[i]);
-  exit(1);
+  if(!useCommands)
+    exit(1);
+  if(useCommands) {
+    fprintf(logfile, "\nFailed test: %s\n", strstr(all_commands[prog_done][1], "tests"));
+    fprintf(logfile, "Error on request socket to node %d '%s'--\n"
+                    "%s\n", skt_to_node(skt), name, msg);
+  }
+  req_ending = arg_requested_pes - 1;
+  return req_handle_ending(NULL, skt);
 #endif
   ftTimer = GetClock();
   return -1;
@@ -2934,7 +3107,8 @@ void req_poll()
 {
   int status, i;
   int readcount;
-
+  int temp = prog_done;
+  
   CMK_PIPE_DECL(req_nClients + 5, 1000);
   for (i = 0; i < req_nClients; i++)
     CMK_PIPE_ADDREAD(req_clients[i]);
@@ -2962,15 +3136,18 @@ void req_poll()
     fflush(stderr);
     socket_error_in_poll(-1, 1359, "Node program terminated unexpectedly!\n");
   }
-  for (i = 0; i < req_nClients; i++)
+  for (i = 0; i < req_nClients && prog_done == temp; i++)
     if (CMK_PIPE_CHECKREAD(req_clients[i])) {
       readcount = 10; /*number of successive reads we serve per socket*/
       /*This client is ready to read*/
       do {
         req_serve_client(req_clients[i]);
         readcount--;
-      } while (1 == skt_select1(req_clients[i], 0) && readcount > 0);
+      } while (prog_done == temp && 1 == skt_select1(req_clients[i], 0) && readcount > 0);
     }
+    
+    if(prog_done != temp)
+      return;
 
   if (CcsServer_fd() != INVALID_SOCKET)
     if (CMK_PIPE_CHECKREAD(CcsServer_fd())) {
@@ -3168,7 +3345,16 @@ int client_connect_problem(SOCKET skt, int code, const char *msg)
 { /*Called when something goes wrong during a client connect*/
   const char *name = skt_to_name(skt);
   fprintf(stderr, "Charmrun> error attaching to node '%s':\n%s\n", name, msg);
-  exit(1);
+  if(!useCommands)
+    exit(1);
+  else {
+    if(useCommands) {
+      fprintf(logfile, "\nFailed test: %s\n", strstr(all_commands[prog_done][1], "tests"));
+      fprintf(logfile, "Error attaching to node '%s':\n%s\n", name, msg);
+    }
+    req_ending = arg_requested_pes - 1;
+    return req_handle_ending(NULL, skt);
+  }
   return -1;
 }
 
@@ -3316,6 +3502,8 @@ void req_set_client_connect(int start, int end)
           req_handle_initnode(&msg, req_clients[client]);
           finished[client - start] = 
             ChMessageInt(((ChSingleNodeinfo *)msg.data)->nodeNo);
+            free(msg.data);
+            msg.data = 0;
         }
       }
 
@@ -3497,6 +3685,8 @@ void req_client_connect(void)
 #ifdef HSTART
   if (!arg_hierarchical_start)
 #endif
+if(nodeinfo_arr != NULL)
+  nodeinfo_free();
     nodeinfo_allocate();
   req_nClients = nodetab_rank0_size;
   req_clients = (SOCKET *) malloc(req_nClients * sizeof(SOCKET));
@@ -3553,6 +3743,8 @@ void req_charmrun_connect(void)
 {
   //	double t1, t2, t3, t4;
   int client;
+  if(nodeinfo_arr != NULL)
+    nodeinfo_free();
   nodeinfo_allocate();
   req_nClients = branchfactor;
   req_clients = (SOCKET *) malloc(req_nClients * sizeof(SOCKET));
@@ -3629,6 +3821,8 @@ void req_client_start_and_connect(void)
 #ifdef HSTART
   if (!arg_hierarchical_start)
 #endif
+if(nodeinfo_arr != NULL)
+  nodeinfo_free();
     nodeinfo_allocate();
   req_nClients = nodetab_rank0_size;
   req_clients = (SOCKET *) malloc(req_nClients * sizeof(SOCKET));
@@ -3696,6 +3890,7 @@ void req_client_start_and_connect(void)
   if (arg_verbose)
     printf("Charmrun> IP tables sent.\n");
   free(ssh_pids); /* done with ssh_pids */
+  ssh_pids = NULL;
 }
 
 #endif
@@ -3859,12 +4054,114 @@ void init_mynodes(void)
 }
 #endif
 
+int numLines(const char* command_path) {
+    FILE* f = fopen(command_path, "r");
+    if(f == NULL) {
+      printf("File failed\n");
+      return -1;
+    }
+    int num = 0;
+    char* lineptr = NULL;
+    size_t n = 0;
+    while(getline(&lineptr, &n, f) != -1) {
+        num++;
+        free(lineptr);
+        lineptr = NULL;
+        n = 0;
+    }
+    free(lineptr);
+    lineptr = NULL;
+    fclose(f);
+    return num;
+}
+
+char*** parse_commands(const char* command_path, int num_prog) {
+    FILE* f_commands = fopen(command_path, "r");
+    if(f_commands == NULL)
+      printf("File failed\n");
+    num_prog = numLines(command_path);
+    if(num_prog == -1)
+      return NULL;
+    // printf("Num: %d\n", num_prog);
+    char*** commands = (char***)malloc(sizeof(char**) * (num_prog + 1));
+    commands[num_prog] = NULL;
+    size_commands = (int*)malloc(sizeof(int) * num_prog);
+    char* lineptr = NULL;
+    size_t n = 0;
+    int i = 0;
+    while(getline(&lineptr, &n, f_commands) != -1) {
+      if(lineptr[strlen(lineptr) - 1] == '\n')
+        lineptr[strlen(lineptr) - 1] = '\0';
+      int count = 0;
+      for(int j = 0; lineptr[j] != '\0'; j++)
+      {
+        if(lineptr[j] == ' ') {
+          count++;
+          if(lineptr[j + 1] == ' ') {
+            j++;
+            while(lineptr[j] == ' ')
+              j++;
+            j--;
+          }
+        }
+      }
+      count++;
+      // printf("Line: %s, Count: %d\n", lineptr, count);
+      size_commands[i] = count + 1;
+      commands[i] = (char**)malloc(sizeof(char*) * (count + 2));
+      commands[i][count + 1] = NULL;
+      int prevSpace = 0, index = 1;
+      commands[i][0] = (char*)malloc(11);
+      commands[i][0] = strcpy(commands[i][0], "./charmrun\0");
+      for(int j = 0; lineptr[j] != '\0'; j++) {
+        if(lineptr[j] == ' ') {
+          if(prevSpace == j) {
+            prevSpace++;
+            continue;
+          }
+          commands[i][index] = (char*)malloc(j - prevSpace + 1);
+          commands[i][index] = strncpy(commands[i][index], &(lineptr[prevSpace]), j - prevSpace);
+          commands[i][index][j - prevSpace] = '\0';
+          prevSpace = j + 1;
+          index++;
+        }
+      }
+      commands[i][index] = (char*)malloc(strlen(lineptr) - prevSpace + 1);
+      commands[i][index] = strncpy(commands[i][index], &(lineptr[prevSpace]), strlen(lineptr) - prevSpace + 1);
+      // for(int j = 0; commands[i][j] != 0; j++) {
+      //   printf("%d %d %s\n",i, j, commands[i][j]);
+      // }
+      free(lineptr);
+      lineptr = NULL;
+      n = 0;
+      i++;
+    }
+    free(lineptr);
+    lineptr = NULL;
+    fclose(f_commands);
+    return commands;
+  }
+  
+  int findMaxRequestedPEs(char ***prog) {
+    int maxp = -1;
+    for(int i = 0; prog[i] != NULL; i++) {
+      for(int j = 0; prog[i][j] != NULL; j++) {
+        if(strstr(prog[i][j], "+p") != NULL) {
+          int curr_requested_pes = atoi((prog[i][j] + 2));
+          if(maxp < curr_requested_pes)
+            maxp = curr_requested_pes;
+        }
+      }
+    }
+    return maxp;
+  }
+
 /****************************************************************************
  *
  *  The Main Program
  *
  ****************************************************************************/
-void start_nodes_daemon(void);
+void start_nodes_daemon(const char **prog);
 void start_nodes_ssh(void);
 void start_nodes_mpiexec();
 #ifdef HSTART
@@ -3889,11 +4186,69 @@ int main(int argc, const char **argv, char **envp)
   skt_set_idle(fast_idleFn);
 /* CrnSrand((int) time(0)); */
 
+  if(strstr(argv[1], "commands.txt") == NULL)
+    useCommands = 0;
+  else
+    useArgv = 1;
+  char *daemon = getenv("CONV_DAEMON");
+  if(daemon != NULL && !strcmp(daemon, "1"))
+    useDaemon = 1;
+  // printf("useDaemon: %d\n", useDaemon);
+  
+  char **argv_copy;
+  if(useCommands) {
+    num_programs = numLines(argv[1]);
+    all_commands = parse_commands(argv[1], num_programs);
+    if(all_commands == NULL)
+      return -1;
+    // for(int i = 0; i < num_programs; i++) {
+    //   printf("%s\n", all_commands[0][i]);
+    // }
+    
+    argv_copy = (char**) malloc(sizeof(char*) * (size_commands[0] + 1));
+    for(int i = 0; i < size_commands[0]; i++) {
+      argv_copy[i] = strdup(all_commands[0][i]);
+    }
+    argv_copy[size_commands[0]] = NULL;
+  } else {
+    num_programs = 1;
+  }
+  
   /* Compute the values of all constants */
-  arg_init(argc, argv);
+  if(useCommands)
+    arg_init(size_commands[0], (const char**)argv_copy);
+  else
+    arg_init(argc, argv);
+
+  if(useCommands) {
+    useArgv = 1;
+    if(pparam_parsecmd('+', argv) < 0) {
+      fprintf(stderr, "ERROR> syntax: %s\n", pparam_error);
+      pparam_printdocs();
+      exit(1);
+    }
+    useArgv = 0;
+  }
+
   if (arg_verbose)
     fprintf(stderr, "Charmrun> charmrun started...\n");
   start_timer = GetClock();
+  
+  if(useCommands)
+    logfile = fopen("summary.txt", "w");
+
+  if(useCommands) {
+    arg_requested_pes = findMaxRequestedPEs(all_commands);
+    // printf("arg_requested_pes: %d\n", arg_requested_pes);
+  }
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+  arg_read_pes = 0;
+#endif
+  if(useDaemon) {
+    nodetab_rank0_size = 0;
+    nodetab_size = 0;
+  }
+
 #if CMK_BPROC
   /* check scyld configuration */
   if (arg_nodelist)
@@ -3905,6 +4260,13 @@ int main(int argc, const char **argv, char **envp)
   nodetab_init();
 #endif
 
+  if(useDaemon) {
+    max_nodetab_table = nodetab_table;
+    max_nodetab_max = nodetab_max;
+    max_nodetab_size = nodetab_size;
+    max_nodetab_rank0_table = nodetab_rank0_table;
+    max_nodetab_rank0_size = nodetab_rank0_size;
+  }
   /* Start the server port */
   req_start_server();
 
@@ -3918,8 +4280,9 @@ int main(int argc, const char **argv, char **envp)
   }
 #endif
   /* start the node processes */
-  if (0 != getenv("CONV_DAEMON"))
-    start_nodes_daemon();
+  if (useDaemon) {
+    start_nodes_ssh();
+  }
   else
 #if CMK_BPROC
     start_nodes_scyld();
@@ -3988,12 +4351,24 @@ int main(int argc, const char **argv, char **envp)
   if (arg_verbose)
     fprintf(stderr, "Charmrun> node programs all started\n");
 
+  nodeinfo_free();
+  
+  prog_done = 0;
+  
+  while(prog_done < num_programs) {
+  // printf("server_port: %d\n", server_port);
+  if(useDaemon) {
+    if(useCommands)
+      start_nodes_daemon((const char**)all_commands[prog_done]);
+    else
+      start_nodes_daemon(argv);
+  }
 /* Wait for all clients to connect */
 #ifdef HSTART
   /* Hierarchical startup*/
   if (arg_hierarchical_start) {
 #if !CMK_SSH_KILL
-    if (!arg_batch_spawn || (!arg_child_charmrun))
+    if (!arg_batch_spawn || (!arg_child_charmrun) && prog_done == 0)
       finish_nodes();
 #endif
 
@@ -4007,13 +4382,14 @@ int main(int argc, const char **argv, char **envp)
 #endif
   {
 #if !CMK_SSH_KILL
-    if (!arg_batch_spawn)
+    if (!arg_batch_spawn && prog_done == 0)
       finish_nodes();
 #endif
     if (!arg_batch_spawn)
       req_client_connect();
   }
 #if CMK_SSH_KILL
+if(prog_done == 0)
   kill_nodes();
 #endif
   if (arg_verbose)
@@ -4029,8 +4405,10 @@ int main(int argc, const char **argv, char **envp)
       req_poll_hierarchical();
   else
 #endif
-    while (1)
+    int temp = prog_done;
+    while (temp == prog_done)
       req_poll();
+  }
 }
 
 /*This little snippet creates a NETSTART
@@ -4070,52 +4448,134 @@ start nodetab_rank0_size processes on the remote machines.
 */
 
 /*Ask the converse daemon running on each machine to start the node-programs.*/
-void start_nodes_daemon(void)
+void start_nodes_daemon(const char **prog)
 {
   taskStruct task;
   char argBuffer[5000]; /*Buffer to hold assembled program arguments*/
-  int i, nodeNumber;
+  int i, nodeNumber, index, curr_requested_pes = -1;
 
   /*Set the parts of the task structure that will be the same for all nodes*/
   /*Figure out the command line arguments (same for all PEs)*/
+  memset(&task, '\0', sizeof(task));
   argBuffer[0] = 0;
-  for (i = 0; arg_argv[i]; i++) {
-    if (arg_verbose)
-      printf("Charmrun> packing arg: %s\n", arg_argv[i]);
-    strcat(argBuffer, " ");
-    strcat(argBuffer, arg_argv[i]);
+  if(useCommands) {
+    for(i = 2; prog[i] != NULL; i++) {
+      if(strstr(prog[i], "./") != NULL)
+        continue;
+      else if(prog[i][0] == '+' && prog[i][1] == '+') {
+        ppdef def = pparam_find(prog[i] + 2);
+        if(def->type != 'f') {
+          i++;
+        }
+        continue;
+      }
+      else if(prog[i][0] == '+' && prog[i][1] == 'p') {
+        curr_requested_pes = atoi((prog[i] + 2));
+        continue;
+      }
+      if (arg_verbose)
+        printf("Charmrun> packing arg: %s\n", prog[i]);
+      strcat(argBuffer, " ");
+      strcat(argBuffer, prog[i]);
+    }
+  } else {
+     curr_requested_pes = nodetab_rank0_size;
+     for (i = 0; arg_argv[i]; i++) {
+      if (arg_verbose)
+        printf("Charmrun> packing arg: %s\n", arg_argv[i]);
+      strcat(argBuffer, " ");
+      strcat(argBuffer, arg_argv[i]);
+    }
+  }
+  
+  if(curr_requested_pes == -1) {
+    printf("Note: +p not defined - using previous value\n");
+  } else if(arg_requested_pes != curr_requested_pes) {
+    if(max_nodetab_table != nodetab_table) {
+      for(int i = 0; i < nodetab_size; i++) {
+        if(nodetab_table[i] != NULL) {
+          free(nodetab_table[i]);
+          nodetab_table[i] = NULL;
+        }
+      }
+      free(nodetab_table);
+      nodetab_table = NULL;
+      free(nodetab_rank0_table);
+      nodetab_rank0_table = NULL;
+    }
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+    arg_read_pes = 0;
+#endif
+    arg_requested_pes = curr_requested_pes;
+    nodetab_rank0_size = 0;
+    nodetab_size = 0;
+    nodetab_init();
+    if(ssh_pids != NULL) {
+      free(ssh_pids);
+      ssh_pids = NULL;
+    }
+    start_nodes_ssh();
   }
 
   task.magic = ChMessageInt_new(DAEMON_MAGIC);
 
   /*Start up the user program, by sending a message
     to PE 0 on each node.*/
-  for (nodeNumber = 0; nodeNumber < nodetab_rank0_size; nodeNumber++) {
+  //TODO limit this for loop to the value of nodes (nodetab_rank0_size is number of PEs)
+  int prevIndex = -1;
+  for (nodeNumber = 0, index = 0; nodeNumber < hosts.size() && index < nodetab_rank0_size; nodeNumber++, index++)
+  {
     char nodeArgBuffer[5000]; /*Buffer to hold assembled program arguments*/
     char *argBuf;
     char *arg_nodeprog_r, *arg_currdir_r;
     char statusCode = 'N'; /*Default error code-- network problem*/
     int fd;
-    int pe0 = nodetab_rank0_table[nodeNumber];
+    if(prevIndex != -1) {
+      while(!strcmp(nodetab_name(nodetab_rank0_table[prevIndex]), nodetab_name(nodetab_rank0_table[index]))) {
+        index++;
+        if(index >= nodetab_rank0_size)
+          return;
+      }
+    }
+    prevIndex = index;
+    int pe0 = nodetab_rank0_table[index];
+    // printf("pe0 of %d at %d: %d\n", nodeNumber, index, pe0);
+    char dir[1024];
 
-    arg_currdir_r = pathfix(arg_currdir_a, nodetab_pathfixes(nodeNumber));
+    free(arg_currdir_a);
+    if(useCommands)
+      set_dir_a(prog[1], &arg_currdir_a);
+    else {
+      getcwd(dir, 1023);
+      arg_currdir_a = strdup(dir);
+    }
+    arg_currdir_r = pathfix(arg_currdir_a, nodetab_pathfixes(index));
     strcpy(task.cwd, arg_currdir_r);
     free(arg_currdir_r);
-    arg_nodeprog_r = pathextfix(arg_nodeprog_a, nodetab_pathfixes(nodeNumber),
-                                nodetab_ext(nodeNumber));
+    
+    if(useCommands) {
+      arg_nodeprog_a = prog[1];
+    } else {
+      sprintf(dir, "%s%s%s", arg_currdir_a, DIRSEP, prog[1]);
+      arg_nodeprog_a = strdup(dir);
+    }
+    arg_nodeprog_r = pathextfix(arg_nodeprog_a, nodetab_pathfixes(index),
+                                nodetab_ext(index));
     strcpy(task.pgm, arg_nodeprog_r);
 
     if (arg_verbose)
       printf("Charmrun> Starting node program %d on '%s' as %s.\n", nodeNumber,
              nodetab_name(pe0), arg_nodeprog_r);
     free(arg_nodeprog_r);
-    sprintf(task.env, "NETSTART=%s", create_netstart(nodeNumber));
+    sprintf(task.env, "NETSTART=%s", create_netstart(index));
+    task.forks = nodetab_getnodeinfo(index)->forks;
+    task.cpus = nodetab_getnodeinfo(index)->cpus;
 
-    if (nodetab_nice(nodeNumber) != -100) {
+    if (nodetab_nice(index) != -100) {
       if (arg_verbose)
-        fprintf(stderr, "Charmrun> +nice %d\n", nodetab_nice(nodeNumber));
+        fprintf(stderr, "Charmrun> +nice %d\n", nodetab_nice(index));
       sprintf(nodeArgBuffer, "%s +nice %d", argBuffer,
-              nodetab_nice(nodeNumber));
+              nodetab_nice(index));
       argBuf = nodeArgBuffer;
     } else
       argBuf = argBuffer;
@@ -4132,7 +4592,16 @@ void start_nodes_daemon(void)
     if (statusCode != 'G') { /*Something went wrong--*/
       fprintf(stderr, "Error '%c' starting remote node program on %s--\n%s\n",
               statusCode, nodetab_name(pe0), daemon_status2msg(statusCode));
-      exit(1);
+      // exit(1);
+      for(int i = 0; i < req_nClients; i++) {
+          skt_close(req_clients[i]);
+      }
+      if(useCommands)
+        fprintf(logfile, "\nFailed to start up test: %s\n", all_commands[prog_done][1]);
+      req_ending = arg_requested_pes - 1;
+      prog_done = num_programs - 1;
+      req_handle_ending(NULL, fd);
+      break;
     } else if (arg_verbose)
       printf("Charmrun> Node program %d started.\n", nodeNumber);
   }
@@ -4436,16 +4905,24 @@ void removeEnv(const char *doomedEnv)
   *oe = NULL; /*NULL-terminate list*/
 }
 
+void freeVector(std::vector<const char*> v, int count) {
+  for(int i = 0; i < count; i++) {
+    free((char*)v[i]);
+    v[i] = NULL;
+  }
+}
+
 int ssh_fork(int nodeno, const char *startScript)
 {
   std::vector<const char *> sshargv;
-  int pid;
+  int pid, count = 0;
   const char *s, *e;
 
   s = nodetab_shell(nodeno);
   e = skipstuff(s);
   while (*s) {
     sshargv.push_back(substr(s, e));
+    count++;
     s = skipblanks(e);
     e = skipstuff(s);
   }
@@ -4474,6 +4951,7 @@ int ssh_fork(int nodeno, const char *startScript)
   pid = fork();
   if (pid < 0) {
     perror("ERROR> starting remote shell");
+    freeVector(sshargv, count);
     exit(1);
   }
   if (pid == 0) { /*Child process*/
@@ -4486,18 +4964,21 @@ int ssh_fork(int nodeno, const char *startScript)
     execvp(sshargv[0], const_cast<char **>(&sshargv[0]));
     fprintf(stderr, "Charmrun> Couldn't find remote shell program '%s'!\n",
             sshargv[0]);
+    freeVector(sshargv, count);
     exit(1);
   }
   if (arg_verbose)
     fprintf(stderr, "Charmrun> remote shell (%s:%d) started\n",
             nodetab_name(nodeno), nodeno);
+  freeVector(sshargv, count);
   return pid;
 }
 
 void fprint_arg(FILE *f, const char **argv)
 {
   while (*argv) {
-    fprintf(f, " %s", *argv);
+    if(((*argv)[0] == '+' && ((*argv)[1] != 'p' || (*argv)[1] != '+')) || (*argv)[0] != '+')
+      fprintf(f, " %s", *argv);
     argv++;
   }
 }
@@ -4510,6 +4991,11 @@ void ssh_script(FILE *f, int nodeno, int rank0no, const char **argv,
                 int restart)
 {
   char *netstart;
+  char **arg_nodeprog_rs, **arg_currdir_rs;
+  if(useCommands && !useDaemon) {
+    arg_nodeprog_rs = (char **) malloc(sizeof(char *) * num_programs);
+    arg_currdir_rs = (char **) malloc(sizeof(char *) * num_programs);  
+  }
   char *arg_nodeprog_r, *arg_currdir_r;
   const char *dbg = nodetab_debugger(nodeno);
   const char *host = nodetab_name(nodeno);
@@ -4519,32 +5005,32 @@ void ssh_script(FILE *f, int nodeno, int rank0no, const char **argv,
 
   fprintf(f, /*Echo: prints out status message*/
           "Echo() {\n"
-          "  echo 'Charmrun remote shell(%s.%d)>' $*\n"
+          "  echo 'Charmrun remote shell(%s.%d)>' \"$*\"\n"
           "}\n",
           host, nodeno);
   fprintf(f, /*Exit: exits with return code*/
           "Exit() {\n"
-          "  if [ $1 -ne 0 ]\n"
+          "  if [ \"$1\" -ne 0 ]\n"
           "  then\n"
-          "    Echo Exiting with error code $1\n"
+          "    Echo Exiting with error code \"$1\"\n"
           "  fi\n"
 #if CMK_SSH_KILL /*End by killing ourselves*/
           "  sleep 5\n" /*Delay until any error messages are flushed*/
           "  kill -9 $$\n"
 #else            /*Exit normally*/
-          "  exit $1\n"
+          "  exit \"$1\"\n"
 #endif
           "}\n");
   fprintf(f, /*Find: locates a binary program in PATH, sets loc*/
           "Find() {\n"
           "  loc=''\n"
-          "  for dir in `echo $PATH | sed -e 's/:/ /g'`\n"
+          "  for dir in $(echo \"$PATH\" | sed -e 's/:/ /g')\n"
           "  do\n"
           "    test -f \"$dir/$1\" && loc=\"$dir/$1\"\n"
           "  done\n"
           "  if [ \"x$loc\" = x ]\n"
           "  then\n"
-          "    Echo $1 not found in your PATH \"($PATH)\"--\n"
+          "    Echo \"$1\" not found in your PATH \"($PATH)\"--\n"
           "    Echo set your path in your ~/.charmrunrc\n"
           "    Exit 1\n"
           "  fi\n"
@@ -4645,12 +5131,50 @@ void ssh_script(FILE *f, int nodeno, int rank0no, const char **argv,
           "PATH=\"$PATH:/bin:/usr/bin:/usr/X/bin:/usr/X11/bin:/usr/local/bin:"
           "/usr/X11R6/bin:/usr/openwin/bin\"\n");
 
+int numCommands = num_programs;
+if(useDaemon)
+  numCommands = 1;
+
+char buf[1023];
+if(useDaemon) {
+  strcpy(buf, "bin/./charmd\0");
+  while(access(buf, F_OK) == -1) {
+    char *tmp = strdup(buf);
+    strcpy(buf, "../");
+    strcat(buf, tmp);
+    free(tmp);
+    tmp = NULL;
+  }
+}
+char *tmp = strdup(buf);
+getcwd(buf, 1023);
+strcat(buf, "/");
+strcat(buf, tmp);
+free(tmp);
+tmp = NULL;
+
+for(int i = 0; i < numCommands; i++) {
   /* find the node-program */
+  if(useDaemon)
+    arg_nodeprog_a = buf;
+  else if(useCommands)
+    arg_nodeprog_a = all_commands[i][1];
   arg_nodeprog_r = pathextfix(arg_nodeprog_a, nodetab_pathfixes(nodeno),
                               nodetab_ext(nodeno));
+  if(useCommands && !useDaemon)
+    arg_nodeprog_rs[i] = arg_nodeprog_r;
 
   /* find the current directory, relative version */
+  if(useDaemon) {
+    free(arg_currdir_a);
+    set_dir_a(buf, &arg_currdir_a);
+  } else if(useCommands) {
+    free(arg_currdir_a);
+    set_dir_a(all_commands[i][1], &arg_currdir_a);
+  }
   arg_currdir_r = pathfix(arg_currdir_a, nodetab_pathfixes(nodeno));
+  if(useCommands && !useDaemon)
+    arg_currdir_rs[i] = arg_currdir_r;
 
   if (arg_verbose) {
     printf("Charmrun> find the node program \"%s\" at \"%s\" for %d.\n",
@@ -4684,160 +5208,194 @@ void ssh_script(FILE *f, int nodeno, int rank0no, const char **argv,
     fprintf(f, "fi\n");
   }
 
-  fprintf(f, "if test ! -x \"%s\"\nthen\n", arg_nodeprog_r);
-  fprintf(f, "  Echo 'Cannot locate this node-program: %s'\n", arg_nodeprog_r);
-  fprintf(f, "  Exit 1\n");
-  fprintf(f, "fi\n");
-
-  fprintf(f, "cd \"%s\"\n", arg_currdir_r);
-  fprintf(f, "if test $? = 1\nthen\n");
-  fprintf(f, "  Echo 'Cannot propagate this current directory:'\n");
-  fprintf(f, "  Echo '%s'\n", arg_currdir_r);
-  fprintf(f, "  Exit 1\n");
-  fprintf(f, "fi\n");
-
-  if (strcmp(nodetab_setup(nodeno), "*")) {
-    fprintf(f, "%s\n", nodetab_setup(nodeno));
-    fprintf(f, "if test $? = 1\nthen\n");
-    fprintf(f, "  Echo 'this initialization command failed:'\n");
-    fprintf(f, "  Echo '\"%s\"'\n", nodetab_setup(nodeno));
-    fprintf(f, "  Echo 'edit your nodes file to fix it.'\n");
+    fprintf(f, "if test ! -x \"%s\"\nthen\n", arg_nodeprog_r);
+    fprintf(f, "  Echo 'Cannot locate this node-program: %s'\n", arg_nodeprog_r);
     fprintf(f, "  Exit 1\n");
     fprintf(f, "fi\n");
+
+    fprintf(f, "cd \"%s\" || Exit 1\n", arg_currdir_r);
+    fprintf(f, "if test $? = 1\nthen\n");
+    fprintf(f, "  Echo 'Cannot propagate this current directory:'\n");
+    fprintf(f, "  Echo '%s'\n", arg_currdir_r);
+    fprintf(f, "  Exit 1\n");
+    fprintf(f, "fi\n");
+
+    if (strcmp(nodetab_setup(nodeno), "*")) {
+      fprintf(f, "%s\n", nodetab_setup(nodeno));
+      fprintf(f, "if test $? = 1\nthen\n");
+      fprintf(f, "  Echo 'this initialization command failed:'\n");
+      fprintf(f, "  Echo '\"%s\"'\n", nodetab_setup(nodeno));
+      fprintf(f, "  Echo 'edit your nodes file to fix it.'\n");
+      fprintf(f, "  Exit 1\n");
+      fprintf(f, "fi\n");
+    }
   }
 
-  fprintf(f, "rm -f /tmp/charmrun_err.$$\n");
-  if (arg_verbose)
-    fprintf(f, "Echo 'starting node-program...'\n");
-  /* This is the start of the the run-nodeprogram script */
-  fprintf(f, "(");
-
-  if (arg_debug || arg_debug_no_pause) {
-    if (strcmp(dbg, "gdb") == 0 || strcmp(dbg, "idb") == 0) {
-      fprintf(f, "cat > /tmp/charmrun_gdb.$$ << END_OF_SCRIPT\n");
-      if (strcmp(dbg, "idb") == 0) {
-        fprintf(f, "set \\$cmdset=\"gdb\"\n");
-      }
-      fprintf(f, "shell /bin/rm -f /tmp/charmrun_gdb.$$\n");
-      fprintf(f, "handle SIGPIPE nostop noprint\n");
-      fprintf(f, "handle SIGWINCH nostop noprint\n");
-      fprintf(f, "handle SIGWAITING nostop noprint\n");
-      if (arg_debug_commands)
-        fprintf(f, "%s\n", arg_debug_commands);
-      fprintf(f, "set args");
-      fprint_arg(f, argv);
-      fprintf(f, "\n");
-      if (arg_debug_no_pause)
-        fprintf(f, "run\n");
-      fprintf(f, "END_OF_SCRIPT\n");
-      if (arg_runscript)
-        fprintf(f, "\"%s\" ", arg_runscript);
-      fprintf(f, "$F_XTERM");
-      fprintf(f, " -title 'Node %d (%s)' ", nodeno, nodetab_name(nodeno));
-      if (strcmp(dbg, "idb") == 0)
-        fprintf(f, " -e $F_DBG \"%s\" -c /tmp/charmrun_gdb.$$ \n", arg_nodeprog_r);
-      else
-        fprintf(f, " -e $F_DBG \"%s\" -x /tmp/charmrun_gdb.$$ \n", arg_nodeprog_r);
-    } else if (strcmp(dbg, "dbx") == 0) {
-      fprintf(f, "cat > /tmp/charmrun_dbx.$$ << END_OF_SCRIPT\n");
-      fprintf(f, "sh /bin/rm -f /tmp/charmrun_dbx.$$\n");
-      fprintf(f, "dbxenv suppress_startup_message 5.0\n");
-      fprintf(f, "ignore SIGPOLL\n");
-      fprintf(f, "ignore SIGPIPE\n");
-      fprintf(f, "ignore SIGWINCH\n");
-      fprintf(f, "ignore SIGWAITING\n");
-      if (arg_debug_commands)
-        fprintf(f, "%s\n", arg_debug_commands);
-      fprintf(f, "END_OF_SCRIPT\n");
-      if (arg_runscript)
-        fprintf(f, "\"%s\" ", arg_runscript);
-      fprintf(f, "$F_XTERM");
-      fprintf(f, " -title 'Node %d (%s)' ", nodeno, nodetab_name(nodeno));
-      fprintf(f, " -e $F_DBG %s ", arg_debug_no_pause ? "-r" : "");
-      if (arg_debug) {
-        fprintf(f, "-c \'runargs ");
-        fprint_arg(f, argv);
-        fprintf(f, "\' ");
-      }
-      fprintf(f, "-s/tmp/charmrun_dbx.$$ %s", arg_nodeprog_r);
-      if (arg_debug_no_pause)
-        fprint_arg(f, argv);
-      fprintf(f, "\n");
-    } else {
-      fprintf(stderr, "Unknown debugger: %s.\n Exiting.\n",
-              nodetab_debugger(nodeno));
-    }
-  } else if (arg_in_xterm) {
+    fprintf(f, "rm -f /tmp/charmrun_err.$$\n");
     if (arg_verbose)
-      fprintf(stderr, "Charmrun> node %d: xterm is %s\n", nodeno,
-              nodetab_xterm(nodeno));
-    fprintf(f, "cat > /tmp/charmrun_inx.$$ << END_OF_SCRIPT\n");
-    fprintf(f, "#!/bin/sh\n");
-    fprintf(f, "/bin/rm -f /tmp/charmrun_inx.$$\n");
-    fprintf(f, "%s", arg_nodeprog_r);
-    fprint_arg(f, argv);
-    fprintf(f, "\n");
-    fprintf(f, "echo 'program exited with code '\\$?\n");
-    fprintf(f, "read eoln\n");
-    fprintf(f, "END_OF_SCRIPT\n");
-    fprintf(f, "chmod 700 /tmp/charmrun_inx.$$\n");
-    if (arg_runscript)
-      fprintf(f, "\"%s\" ", arg_runscript);
-    fprintf(f, "$F_XTERM -title 'Node %d (%s)' ", nodeno, nodetab_name(nodeno));
-    fprintf(f, " -sl 5000");
-    fprintf(f, " -e /tmp/charmrun_inx.$$\n");
-  } else {
-    if (arg_runscript)
-      fprintf(f, "\"%s\" ", arg_runscript);
-    if (arg_no_va_rand) {
+      fprintf(f, "Echo 'starting node-program...'\n");
+    /* This is the start of the the run-nodeprogram script */
+    fprintf(f, "(");
+    
+    for(int i = 0; i < numCommands; i++) {
+      if(useCommands && !useDaemon) {
+        arg_nodeprog_r = arg_nodeprog_rs[i];
+        arg_currdir_r = arg_currdir_rs[i];
+      }
+    
+    if (arg_debug || arg_debug_no_pause) {
+      if (strcmp(dbg, "gdb") == 0 || strcmp(dbg, "idb") == 0) {
+        fprintf(f, "cat > /tmp/charmrun_gdb.$$ << END_OF_SCRIPT\n");
+        if (strcmp(dbg, "idb") == 0) {
+          fprintf(f, "set \\$cmdset=\"gdb\"\n");
+        }
+        fprintf(f, "shell /bin/rm -f /tmp/charmrun_gdb.$$\n");
+        fprintf(f, "handle SIGPIPE nostop noprint\n");
+        fprintf(f, "handle SIGWINCH nostop noprint\n");
+        fprintf(f, "handle SIGWAITING nostop noprint\n");
+        if (arg_debug_commands)
+          fprintf(f, "%s\n", arg_debug_commands);
+        fprintf(f, "set args");
+        if(useCommands && !useDaemon)
+            fprint_arg(f, (const char **)&(all_commands[i][2]));
+        else
+            fprint_arg(f, argv);
+        fprintf(f, "\n");
+        if (arg_debug_no_pause)
+          fprintf(f, "run\n");
+        fprintf(f, "END_OF_SCRIPT\n");
+        if (arg_runscript)
+          fprintf(f, "\"%s\" ", arg_runscript);
+        fprintf(f, "$F_XTERM");
+        fprintf(f, " -title 'Node %d (%s)' ", nodeno, nodetab_name(nodeno));
+        if (strcmp(dbg, "idb") == 0)
+          fprintf(f, " -e $F_DBG \"%s\" -c /tmp/charmrun_gdb.$$ \n", arg_nodeprog_r);
+        else
+          fprintf(f, " -e $F_DBG \"%s\" -x /tmp/charmrun_gdb.$$ \n", arg_nodeprog_r);
+      } else if (strcmp(dbg, "dbx") == 0) {
+        fprintf(f, "cat > /tmp/charmrun_dbx.$$ << END_OF_SCRIPT\n");
+        fprintf(f, "sh /bin/rm -f /tmp/charmrun_dbx.$$\n");
+        fprintf(f, "dbxenv suppress_startup_message 5.0\n");
+        fprintf(f, "ignore SIGPOLL\n");
+        fprintf(f, "ignore SIGPIPE\n");
+        fprintf(f, "ignore SIGWINCH\n");
+        fprintf(f, "ignore SIGWAITING\n");
+        if (arg_debug_commands)
+          fprintf(f, "%s\n", arg_debug_commands);
+        fprintf(f, "END_OF_SCRIPT\n");
+        if (arg_runscript)
+          fprintf(f, "\"%s\" ", arg_runscript);
+        fprintf(f, "$F_XTERM");
+        fprintf(f, " -title 'Node %d (%s)' ", nodeno, nodetab_name(nodeno));
+        fprintf(f, " -e $F_DBG %s ", arg_debug_no_pause ? "-r" : "");
+        if (arg_debug) {
+          fprintf(f, "-c \'runargs ");
+          if(useCommands && !useDaemon)
+            fprint_arg(f, (const char **)&(all_commands[i][2]));
+          else
+            fprint_arg(f, argv);
+          fprintf(f, "\' ");
+        }
+        fprintf(f, "-s/tmp/charmrun_dbx.$$ %s", arg_nodeprog_r);
+        if (arg_debug_no_pause) {
+          if(useCommands && !useDaemon)
+            fprint_arg(f, (const char **)&(all_commands[i][2]));
+          else
+            fprint_arg(f, argv);
+        }
+        fprintf(f, "\n");
+      } else {
+        fprintf(stderr, "Unknown debugger: %s.\n Exiting.\n",
+                nodetab_debugger(nodeno));
+      }
+    } else if (arg_in_xterm) {
       if (arg_verbose)
-        fprintf(stderr, "Charmrun> setarch -R is used.\n");
-      fprintf(f, "setarch `uname -m` -R ");
+        fprintf(stderr, "Charmrun> node %d: xterm is %s\n", nodeno,
+                nodetab_xterm(nodeno));
+      fprintf(f, "cat > /tmp/charmrun_inx.$$ << END_OF_SCRIPT\n");
+      fprintf(f, "#!/bin/sh\n");
+      fprintf(f, "/bin/rm -f /tmp/charmrun_inx.$$\n");
+      fprintf(f, "%s", arg_nodeprog_r);
+      if(useCommands && !useDaemon)
+        fprint_arg(f, (const char **)&(all_commands[i][2]));
+      else
+        fprint_arg(f, argv);
+      fprintf(f, "\n");
+      fprintf(f, "echo 'program exited with code '\\$?\n");
+      fprintf(f, "read eoln\n");
+      fprintf(f, "END_OF_SCRIPT\n");
+      fprintf(f, "chmod 700 /tmp/charmrun_inx.$$\n");
+      if (arg_runscript)
+        fprintf(f, "\"%s\" ", arg_runscript);
+      fprintf(f, "$F_XTERM -title 'Node %d (%s)' ", nodeno, nodetab_name(nodeno));
+      fprintf(f, " -sl 5000");
+      fprintf(f, " -e /tmp/charmrun_inx.$$\n");
+    } else {
+      if (arg_runscript)
+        fprintf(f, "\"%s\" ", arg_runscript);
+      if (arg_no_va_rand) {
+        if (arg_verbose)
+          fprintf(stderr, "Charmrun> setarch -R is used.\n");
+        fprintf(f, "setarch `uname -m` -R ");
+      }
+      fprintf(f, "\"%s\" ", arg_nodeprog_r);
+      if(useCommands && !useDaemon)
+        fprint_arg(f, (const char **)&(all_commands[i][2]));
+      else
+        fprint_arg(f, argv);
+      if (nodetab_nice(nodeno) != -100) {
+        if (arg_verbose)
+          fprintf(stderr, "Charmrun> nice -n %d\n", nodetab_nice(nodeno));
+        fprintf(f, " +nice %d ", nodetab_nice(nodeno));
+      }
+      fprintf(f, "\nres=$?\n");
+      /* If shared libraries fail to load, the program dies without
+         calling charmrun back.  Since we *have* to close down stdin/out/err,
+         we have to smuggle this failure information out via a file,
+         /tmp/charmrun_err.<pid> */
+      fprintf(f, "if [ $res -eq 127 ]\n"
+                 "then\n"
+                 "  ( \n" /* Re-run, spitting out errors from a subshell: */
+                 "    \"%s\" \n"
+                 "    ldd \"%s\"\n"
+                 "  ) > /tmp/charmrun_err.$$ 2>&1 \n"
+                 "fi\n",
+              arg_nodeprog_r, arg_nodeprog_r);
     }
-    fprintf(f, "\"%s\" ", arg_nodeprog_r);
-    fprint_arg(f, argv);
-    if (nodetab_nice(nodeno) != -100) {
-      if (arg_verbose)
-        fprintf(stderr, "Charmrun> nice -n %d\n", nodetab_nice(nodeno));
-      fprintf(f, " +nice %d ", nodetab_nice(nodeno));
-    }
-    fprintf(f, "\nres=$?\n");
-    /* If shared libraries fail to load, the program dies without
-       calling charmrun back.  Since we *have* to close down stdin/out/err,
-       we have to smuggle this failure information out via a file,
-       /tmp/charmrun_err.<pid> */
-    fprintf(f, "if [ $res -eq 127 ]\n"
-               "then\n"
-               "  ( \n" /* Re-run, spitting out errors from a subshell: */
-               "    \"%s\" \n"
-               "    ldd \"%s\"\n"
-               "  ) > /tmp/charmrun_err.$$ 2>&1 \n"
-               "fi\n",
-            arg_nodeprog_r, arg_nodeprog_r);
   }
+    fprintf(f, ")");
+    fprintf(f, " < /dev/null 1> /dev/null 2> /dev/null");
+    if (!arg_mpiexec)
+      fprintf(f, " &");
+    fprintf(f, "\n");
 
-  /* End the node-program subshell. To minimize the number
-     of open ports on the front-end, we must close down ssh;
-     to do this, we have to close stdin, stdout, stderr, and
-     run the subshell in the background. */
-  fprintf(f, ")");
-  fprintf(f, " < /dev/null 1> /dev/null 2> /dev/null");
-  if (!arg_mpiexec)
-    fprintf(f, " &");
-  fprintf(f, "\n");
-
-  if (arg_verbose)
-    fprintf(f, "Echo 'remote shell phase successful.'\n");
-  fprintf(f, /* Check for startup errors: */
-          "sleep 1\n"
-          "if [ -r /tmp/charmrun_err.$$ ]\n"
-          "then\n"
-          "  cat /tmp/charmrun_err.$$ \n"
-          "  rm -f /tmp/charmrun_err.$$ \n"
-          "  Exit 1\n"
-          "fi\n");
+    /* End the node-program subshell. To minimize the number
+       of open ports on the front-end, we must close down ssh;
+       to do this, we have to close stdin, stdout, stderr, and
+       run the subshell in the background. */
+    if (arg_verbose)
+      fprintf(f, "Echo 'remote shell phase successful.'\n");
+    fprintf(f, /* Check for startup errors: */
+            "sleep 1\n"
+            "if [ -r /tmp/charmrun_err.$$ ]\n"
+            "then\n"
+            "  cat /tmp/charmrun_err.$$ \n"
+            "  rm -f /tmp/charmrun_err.$$ \n"
+            "  Exit 1\n"
+            "fi\n");
   fprintf(f, "Exit 0\n");
-  free(arg_currdir_r);
+  
+  if(useCommands && !useDaemon) {
+    for(int i = 0; i < num_programs; i++) {
+      free(arg_nodeprog_rs[i]);
+      free(arg_currdir_rs[i]);
+    }
+    free(arg_nodeprog_rs);
+    free(arg_currdir_rs);
+  } else {
+    free(arg_currdir_r);
+    free(arg_nodeprog_r);
+  }
 }
 
 /* use the command "size" to get information about the position of the ".data"
@@ -4970,8 +5528,12 @@ void start_next_level_charmruns()
     }
     ssh_script(f, pe, client, arg_argv, 0);
     fclose(f);
-    if (!ssh_pids)
+    if (!ssh_pids) {
       ssh_pids = (int *) malloc(sizeof(int) * branchfactor);
+      for(int i = 0; i < branchfactor; i++) {
+        ssh_pids[i] = -1;
+      }
+    }
     ssh_pids[nextIndex++] = ssh_fork(pe, startScript);
     client += nodes_per_child;
   }
@@ -4997,8 +5559,20 @@ void start_one_node_ssh(int rank0no)
   }
   ssh_script(f, pe, rank0no, arg_argv, 0);
   fclose(f);
-  if (!ssh_pids)
+  // FILE* fptr1 = fopen(startScript, "r");
+  // char c = fgetc(fptr1);
+  // while (c != EOF)
+  // {
+  //   printf("%c", c);
+  //   c = fgetc(fptr1);
+  // }
+  // fclose(fptr1);
+  if (!ssh_pids) {
     ssh_pids = (int *) malloc(sizeof(int) * nodetab_rank0_size);
+    for(int i = 0; i < nodetab_rank0_size; i++) {
+      ssh_pids[i] = -1;
+    }
+  }
   ssh_pids[rank0no] = ssh_fork(pe, startScript);
 }
 
@@ -5033,7 +5607,7 @@ int start_set_node_ssh(int client)
   }
 
 #else
-  if (!arg_scalable_start)
+  if (!arg_scalable_start && !useDaemon)
     clientgroup = client + 1; /* only launch 1 core per ssh call */
   else {
     clientgroup = client;
@@ -5049,7 +5623,10 @@ int start_set_node_ssh(int client)
 #endif
   nodetab_getnodeinfo(client)->forks =
       clientgroup - client - 1; /* already have 1 process launching */
-  start_one_node_ssh(client);
+  if(!useSSH) {
+    start_one_node_ssh(client);
+    useSSH = 1;
+  }
   return clientgroup - client; /* return number of entries in group */
 }
 
@@ -5057,6 +5634,9 @@ void start_nodes_ssh()
 {
   int client, clientgroup;
   ssh_pids = (int *) malloc(sizeof(int) * nodetab_rank0_size);
+  for(int i = 0; i < nodetab_rank0_size; i++) {
+    ssh_pids[i] = -1;
+  }
 
   if (arg_verbose)
     printf("start_nodes_ssh\n");
@@ -5179,7 +5759,7 @@ void finish_set_nodes(int start, int stop)
   while (!done) {
     done = 1;
     for (i = start; i < stop; i++) { /* check all nodes */
-      if (ssh_pids[i] != 0) {
+      if (ssh_pids[i] != 0 && ssh_pids[i] != -1) {
         done = 0; /* we are not finished yet */
         status = 0;
         waitpid(ssh_pids[i], &status, 0); /* check if the process is finished */
@@ -5221,6 +5801,7 @@ void finish_nodes()
 #endif
     finish_set_nodes(0, nodetab_rank0_size);
   free(ssh_pids);
+  ssh_pids = NULL;
 }
 
 void kill_nodes()
@@ -5239,6 +5820,7 @@ void kill_nodes()
     waitpid(ssh_pids[rank0no], &status, 0); /*<- no zombies*/
   }
   free(ssh_pids);
+  ssh_pids = NULL;
 }
 
 

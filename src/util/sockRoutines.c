@@ -504,7 +504,7 @@ int skt_recvN(SOCKET hSocket,void *buff,int nBytes)
     {
        if (nRead==0) return skt_abort(hSocket, 93620, "Socket closed before recv.");
        if (skt_should_retry()) continue;/*Try again*/
-       else return skt_abort(hSocket, 93650+hSocket, "Error on socket recv!");
+       else return skt_abort(hSocket, 93650+hSocket, strerror(errno));
     }
     else
     {
@@ -649,6 +649,8 @@ int ChMessageHeader_recv(SOCKET fd,ChMessage *dst)
 }
 int ChMessageData_recv(SOCKET fd,ChMessage *dst)
 {
+	if(dst->data != NULL)
+		free(dst->data);
   dst->data=(char *)malloc(dst->len);
   /*Get the actual data*/
   if (0!=skt_recvN(fd,dst->data,dst->len)) return -1;

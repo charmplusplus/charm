@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../../common.mk
 OPTS	= -O3
 CHARMC	= ../../../../bin/charmc $(OPTS)
@@ -24,9 +25,9 @@ stencil3d.o: stencil3d.C stencil3d.decl.h
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o stencil3d stencil3d.prj charmrun *~
 
-test: stencil3d
-	$(call run, +p4 ./stencil3d 64 32 +balancer RefineLB )
-	$(call run, +p4 ./stencil3d 64 32 +balancer GreedyLB )
+test-local: stencil3d
+	$(call run, ./stencil3d +p4 64 32 +balancer RefineLB )
+	$(call run, ./stencil3d +p4 64 32 +balancer GreedyLB )
 
 bgtest: stencil3d
 	$(call run, +p4 ./stencil3d 32 16 +balancer CommLB +x2 +y2 +z1 +cth1 +wth1 )

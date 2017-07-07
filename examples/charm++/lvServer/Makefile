@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 LIBS = -lpython2.7 -lpthread -lutil -ldl -lm
 
@@ -19,5 +20,5 @@ clean:
 lvServer.o: lvServer.C lvServer.decl.h
 	$(CHARMC) -c lvServer.C
 
-test: all
+test-local: all
 	$(call run, ./lvServer +p5 ++server ++server-port 1234)

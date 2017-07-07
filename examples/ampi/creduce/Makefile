@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../common.mk
 CHARMC=../../../bin/ampicxx $(OPTS)
 
@@ -15,7 +16,7 @@ mpi: test.C
 clean:
 	rm -f *.o *.mod pgm *~ conv-host charmrun
 
-test: pgm
+test-local: pgm
 	$(call run, ./pgm +p1 +vp1 )
 	$(call run, ./pgm +p1 +vp2 )
 	$(call run, ./pgm +p1 +vp4 )

@@ -1,3 +1,4 @@
+CHARMRUN=./charmrun
 -include ../../../common.mk
 CHARMC=../../../../bin/charmc $(OPTS)
 
@@ -26,7 +27,7 @@ hello.o: hello.C hello.decl.h
 helloCUDA.o: helloCUDA.cu
 	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) $(CHARMINC) helloCUDA.cu
 
-test: all
+test-local: all
 	$(call run, ./hello +p4 10)
 
 bgtest: all
