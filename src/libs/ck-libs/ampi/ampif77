@@ -1,3 +1,6 @@
 #!/bin/sh
 CHARMBIN=`dirname $0`
-$CHARMBIN/charmc -language ampif -default-to-aout $@ -lampiromio
+
+[ -f $CHARMBIN/../lib/libampiromio.a ] && ROMIO=-lampiromio
+
+$CHARMBIN/charmc -language ampif -default-to-aout $@ $ROMIO

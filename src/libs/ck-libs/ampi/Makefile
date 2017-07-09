@@ -1,4 +1,4 @@
-CDIR=../../../..
+CDIR=$(shell cd ../../../.. && pwd)
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 HEADERS=ampi.h ampif.h mpio.h mpiof.h ampiimpl.h ampiProjections.h
@@ -9,18 +9,19 @@ COMPAT=compat_ampius.o compat_ampifus.o compat_ampi.o \
 	   compat_ampicpp.o
 OBJS=ampi.o ampif.o ampiProjections.o ampiOneSided.o \
      ampiMisc.o mpich-alltoall.o  
-ROMIOMAKE=romio/adio/ad_hfs/Makefile romio/adio/ad_nfs/Makefile romio/adio/ad_pfs/Makefile romio/adio/ad_piofs/Makefile \
-	  romio/adio/ad_pvfs/Makefile romio/adio/ad_sfs/Makefile romio/adio/ad_testfs/Makefile romio/adio/ad_ufs/Makefile \
-	  romio/adio/ad_xfs/Makefile romio/adio/common/Makefile romio/adio/include/romioconf.h romio/Makefile \
-	  romio/mpi2-other/array/Makefile romio/mpi2-other/info/Makefile romio/mpi-io/Makefile \
-	  romio/include/mpio.h romio/include/mpiof.h
 
 LIB=libmoduleampi
 LIBDIR=$(CDIR)/lib
 DEST=$(LIBDIR)/$(LIB).a
 DESTF=$(LIBDIR)/$(LIB)f.a
 COMPATLIB=$(LIBDIR)/libampi-compat.a
-DUMMYROMIOLIB=$(LIBDIR)/libampiromio.a
+ROMIOLIB=$(LIBDIR)/libampiromio.a
+
+USE_ROMIO=$(shell CHARMINC=$(CDIR)/tmp ; . $(CDIR)/tmp/conv-config.sh ; echo $$CMK_AMPI_WITH_ROMIO)
+
+ifeq ($(USE_ROMIO),true)
+	ROMIO=$(ROMIOLIB)
+endif
 
 .SUFFIXES:
 .SUFFIXES: .C .o
@@ -28,16 +29,23 @@ DUMMYROMIOLIB=$(LIBDIR)/libampiromio.a
 .C.o:
 	$(CHARMC) -c $<
 
-.NOTPARALLEL:
+all: AMPI AMPIF $(COMPATLIB) $(ROMIO)
 
-all: AMPI AMPIF $(COMPATLIB) $(DUMMYROMIOLIB)
-	-cd $(CDIR)/tmp; if test -f AMPI; then exit; else touch AMPI; CHARMINC=.; . ./conv-config.sh; cd libs/ck-libs/ampi; if test -n "$$CMK_AMPI_WITH_ROMIO" ; then ($(MAKE) AMPI-ROMIO); fi; fi
-
-$(ROMIOMAKE): $(COMPATLIB)
-	cd romio && ./config.sh && cd .. 
-
-AMPI-ROMIO: AMPI AMPIF $(ROMIOMAKE)
-	cd romio && ./install.sh && cd .. 
+# AMPI and AMPIF are order-only dependencies (|), i.e., no up-to-date check
+# is done, in order to prevent ROMIO recompilation when AMPI changes.
+$(ROMIO): | AMPI AMPIF
+	cd romio && ./configure \
+		-mpiincdir=$(CDIR)/include \
+		-mpilib=$(CDIR)/lib/libmoduleampi.a \
+		-mpibindir=$(CDIR)/bin \
+		-cc=$(CDIR)/bin/ampicc \
+		-fc=$(CDIR)/bin/ampif77 \
+		-f90=$(CDIR)/bin/ampif90 \
+		-noprofile \
+		-mpiolib=$@
+	cp romio/include/mpio.h romio/include/mpiof.h $(CDIR)/include
+	$(MAKE) -C romio
+	@echo "ROMIO built successfully"
 
 AMPI: $(DEST) 
 	@echo "AMPI built successfully"
@@ -58,10 +66,6 @@ $(DESTF): $(OBJS) headers
 
 $(COMPATLIB): $(COMPAT)
 	$(CHARMC) $(COMPAT) -o $@
-
-$(DUMMYROMIOLIB): ampiromio.c
-	$(CHARMC) ampiromio.c -c ampiromio.o
-	$(CHARMC) ampiromio.o -o $@
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
