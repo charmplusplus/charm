@@ -13,6 +13,18 @@ Yes! Most of your computation should happen inside array elements.
 Arrays are the main way to automatically balance the load using one of the
 load balancers available.
 
+\subsection{Is there a property similar to {\tt thisIndex} containing the chare
+array's dimensions or total number of elements?}
+
+No. In more sophisticated Charm++ algorithms and programs, array dimensions are
+a dynamic property, and since Charm++ operates in a distributed system context,
+any such value would potentially be stale between access and use.
+
+If the array in question has a fixed size, then that size can be passed to its
+elements as an argument to their constructor or some later entry method call.
+Otherwise, the object(s) creating the chare array elements should perform a
+reduction to count them.
+
 \subsection{How many array elements should I have per processor?}
 
 To do load balancing, you need more than one array element per processor.
