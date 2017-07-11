@@ -52,13 +52,23 @@ void  rdma_sendAck (CmiGNIRzvRdmaRecvOp_t* recvOpInfo, int src_pe)
   ack_data->ack = (CmiRdmaAck *)recvOpInfo->src_info;
   ack_data->mem_hndl = recvOpInfo->remote_mem_hndl;
   MACH_DEBUG(CmiPrintf("[%d]rdma_sendAck: Sent rdma ack to %d\n", CmiMyPe(), src_pe));
-  send_smsg_message(&smsg_queue, CmiNodeOf(src_pe), ack_data, sizeof(CmiGNIAckOp_t), RDMA_ACK_TAG, 0, NULL, NONCHARM_SMSG, 1);
+  gni_return_t status = send_smsg_message(&smsg_queue, CmiNodeOf(src_pe), ack_data, sizeof(CmiGNIAckOp_t), RDMA_ACK_TAG, 0, NULL, NONCHARM_SMSG, 1);
+#if !CMK_SMSGS_FREE_AFTER_EVENT
+  if(status == GNI_RC_SUCCESS) {
+    free(ack_data);
+  }
+#endif
 }
 
 void  rdma_sendMsgForPutCompletion (CmiGNIRzvRdmaRecv_t* recvInfo, int destNode)
 {
   int size = LrtsGetRdmaRecvInfoSize(recvInfo->numOps);
-  send_smsg_message(&smsg_queue, destNode, recvInfo, size, RDMA_PUT_DONE_TAG, 0, NULL, NONCHARM_SMSG, 1);
+  gni_return_t status = send_smsg_message(&smsg_queue, destNode, recvInfo, size, RDMA_PUT_DONE_TAG, 0, NULL, NONCHARM_SMSG, 1);
+#if !CMK_SMSGS_FREE_AFTER_EVENT
+  if(status == GNI_RC_SUCCESS) {
+    free(recvInfo);
+  }
+#endif
   MACH_DEBUG(CmiPrintf("[%d]rdma_sendMsgForPutCompletion: Sent md back to node:%d to indicate PUT completion\n", CmiMyPe(), destNode));
 }
 

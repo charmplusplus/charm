@@ -3302,6 +3302,11 @@ INLINE_KEYWORD gni_return_t _sendOneBufferedSmsg(SMSG_QUEUE *queue, MSG_LIST *pt
 #endif
     case RDMA_ACK_TAG:
         status = send_smsg_message(queue, ptr->destNode, ptr->msg, sizeof(CmiGNIAckOp_t), ptr->tag, 1, ptr, NONCHARM_SMSG, 1);
+#if !CMK_SMSGS_FREE_AFTER_EVENT
+        if(status == GNI_RC_SUCCESS) {
+          free(ptr->msg);
+        }
+#endif
         break;
 
     case RDMA_PUT_MD_TAG:
@@ -3314,6 +3319,11 @@ INLINE_KEYWORD gni_return_t _sendOneBufferedSmsg(SMSG_QUEUE *queue, MSG_LIST *pt
         numRdmaOps = ((CmiGNIRzvRdmaRecv_t *)(ptr->msg))->numOps;
         recvInfoSize = LrtsGetRdmaRecvInfoSize(numRdmaOps);
         status = send_smsg_message(queue, ptr->destNode, ptr->msg, recvInfoSize, ptr->tag, 1, ptr, NONCHARM_SMSG, 1);
+#if !CMK_SMSGS_FREE_AFTER_EVENT
+        if(status == GNI_RC_SUCCESS) {
+          free(ptr->msg);
+        }
+#endif
         break;
 
     default:
