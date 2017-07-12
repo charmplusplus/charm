@@ -13,6 +13,7 @@ extern "C" void CharmLibInit(int userComm, int argc, char **argv);
 #endif
 
 extern "C" void CharmInit(int argc, char **argv);
+extern "C" void CharmOpenMPInit(int argc, char **argv);
 
 extern "C" void CharmLibExit();
 

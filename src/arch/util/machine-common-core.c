@@ -157,6 +157,7 @@ int               _Cmi_mynode;    /* Which address space am I */
 int               _Cmi_numnodes;  /* Total number of address spaces */
 int               _Cmi_numpes;    /* Total number of processors */
 int               userDrivenMode; /* Set by CharmInit for interop in user driven mode */
+int               openMPMode;     /* Set by CharmInit for open mp in user driven mode */
 extern int CharmLibInterOperate;
 
 CpvDeclare(void*, CmiLocalQueue);
@@ -284,7 +285,7 @@ static char     **Cmi_argvcopy;
 static CmiStartFn Cmi_startfn;   /* The start function */
 static int        Cmi_usrsched;  /* Continue after start function finishes? */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret);
-static void ConverseRunPE(int everReturn);
+void ConverseRunPE(int everReturn);
 
 /* Functions regarding machine running on every proc */
 static void AdvanceCommunication(int whenidle);
@@ -1193,14 +1194,17 @@ if (  MSG_STATISTIC)
     CsvInitialize(CMIQueue, notifyCommThdMsgBuffer);
 #endif
 
-    CmiStartThreads(argv);
-
-    ConverseRunPE(initret);
+    if (openMPMode) {
+      CmiInitThreads();
+    } else {
+      CmiStartThreads(argv);
+      ConverseRunPE(initret);
+    }
 }
 
 extern void ConverseCommonInit(char **argv);
 extern void CthInit(char **argv);
-static void ConverseRunPE(int everReturn) {
+void ConverseRunPE(int everReturn) {
     CmiState cs;
     char** CmiMyArgv;
 

@@ -407,7 +407,7 @@ static void *call_startfn(void *vindex)
 
   ConverseRunPE(0);
 
-  if(CharmLibInterOperate) {
+  if(!openMPMode && CharmLibInterOperate) {
     while(1) {
       if(!_cleanUp) {
         StartInteropScheduler();
@@ -436,14 +436,8 @@ static void *call_startfn(void *vindex)
   return 0;
 }
 
-static void CmiStartThreads(char **argv)
+void CmiInitThreads(void)
 {
-  pthread_t pid;
-  size_t i;
-  int ok, tocreate;
-  pthread_attr_t attr;
-  int start, end;
-
   MACHSTATE(4,"CmiStartThreads")
   CmiMemLock_lock=CmiCreateLock();
   _smp_mutex = CmiCreateLock();
@@ -477,6 +471,17 @@ static void CmiStartThreads(char **argv)
     Cmi_state_vector[0] = &Cmi_mystate;
   }
 #endif
+}
+
+static void CmiStartThreads(char **argv)
+{
+  int ok, tocreate;
+  int start, end;
+  pthread_t pid;
+  size_t i;
+  pthread_attr_t attr;
+
+  CmiInitThreads();
 
 #if CMK_MULTICORE || CMK_SMP_NO_COMMTHD
   if (!Cmi_commthread)
@@ -699,6 +704,14 @@ void CmiNodeStateInit(CmiNodeState *nodeState)
   nodeState->NodeRecv = CMIQueueCreate();
 #endif
   MACHSTATE(4,"NodeStateInit done")
+}
+
+void CmiStartThread(int index) {
+#if   CMK_SHARED_VARS_NT_THREADS
+  call_startfn((LPVOID) index);
+#elif CMK_SHARED_VARS_POSIX_THREADS_SMP
+  call_startfn((void*)  index);
+#endif
 }
 
 /*@}*/

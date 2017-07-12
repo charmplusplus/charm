@@ -1,6 +1,13 @@
 extern "C" void CkExit(void);
 
 #include "mpi-interoperate.h"
+
+#ifdef _OPENMP
+  #include <omp.h>
+#else
+  #error OpenMP required, please compile with -fopenmp.
+#endif
+
 //#define PERFORM_DEBUG 1
 #if PERFORM_DEBUG
 #define DEBUG(a) a
@@ -24,9 +31,12 @@ extern void _initCharm(int unused_argc, char **argv);
 extern "C" void CommunicationServerThread(int sleepTime);
 extern int CharmLibInterOperate;
 extern "C" int userDrivenMode;
+extern "C" int openMPMode;
 
 extern "C" void StartInteropScheduler();
 extern "C" void StopInteropScheduler();
+extern "C" void CmiStartThread(int);
+extern "C" void ConverseRunPE(int);
 
 static bool firstPass = true;
 
@@ -34,7 +44,11 @@ extern "C"
 void StartCharmScheduler() {
   if (firstPass) {
     firstPass = false;
-  } else {
+  } else
+#ifdef CMK_USE_LRTS
+  if (!openMPMode)
+#endif
+  {
     CmiNodeAllBarrier();
   }
 
@@ -138,6 +152,26 @@ void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
 
   CharmLibInterOperate = true;
   ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
+}
+
+extern "C"
+void CharmOpenMPInit(int argc, char **argv) {
+  openMPMode = 1;
+
+  int id = omp_get_thread_num();
+
+  #pragma omp master
+  {
+    CharmInit(argc, argv);
+  }
+
+  #pragma omp barrier
+
+  if (id == 0) {
+    ConverseRunPE(0);
+  } else {
+    CmiStartThread(id);
+  }
 }
 
 #undef CkExit
