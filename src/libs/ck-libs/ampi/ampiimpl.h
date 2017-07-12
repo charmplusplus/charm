@@ -1213,6 +1213,8 @@ enum AmpiMsgType : bool {
 };
 PUPbytes(AmpiMsgType);
 
+class AmpiMsgPool;
+
 class AmpiMsg : public CMessage_AmpiMsg {
  private:
   int seq; //Sequence number (for message ordering)
@@ -1245,6 +1247,10 @@ class AmpiMsg : public CMessage_AmpiMsg {
     PUP::fromMem p(((char*)data)+sizeof(bool));
     p | srcInfo;
   }
+  inline void setSeq(int s) { seq = s; }
+  inline void setSrcRank(int sr) { srcRank = sr; }
+  inline void setLength(int l) { length = l; }
+  inline void setTag(int t) { tag = t; }
   inline int getSeq(void) const { return seq; }
   inline int getSeqIdx(void) const { return srcRank; }
   inline int getSrcRank(void) const { return srcRank; }
@@ -1270,6 +1276,71 @@ class AmpiMsg : public CMessage_AmpiMsg {
       m = 0;
     }
     return m;
+  }
+};
+
+class AmpiMsgPool {
+ private:
+  vector<AmpiMsg *> msgs; // pool of free msgs
+  int msgLength; // AmpiMsg::length of messages in the pool
+  int msgUsersize; // usersize of message envelopes in the pool
+  int maxMsgs; // max # of msgs in the pool
+
+ public:
+  AmpiMsgPool(void) { msgLength = 0; msgUsersize = 0; maxMsgs = 0; }
+  AmpiMsgPool(int _numMsgs, int _msgLength) {
+    msgLength = _msgLength;
+    maxMsgs = _numMsgs;
+    msgs.resize(maxMsgs);
+    for (int i=0; i<maxMsgs; i++) {
+      msgs[i] = new (msgLength, 0) AmpiMsg(0, 0, 0, 0);
+    }
+    /* Usersize is the true size of the message envelope, not the length member
+     * of the AmpiMsg. AmpiMsg::length is used by Ssend msgs to convey the real
+     * msg payload's length, and is not the length of the Ssend msg itself, so
+     * it cannot be trusted when returning msgs to the pool. */
+    msgUsersize = (maxMsgs > 0) ? UsrToEnv(msgs[0])->getUsersize() : 0;
+  }
+  ~AmpiMsgPool() {}
+  inline void clear(void) {
+    for (int i=0; i<msgs.size(); i++) {
+      delete msgs[i];
+    }
+    msgs.clear();
+  }
+  inline AmpiMsg* newAmpiMsg(int seq, int tag, int srcRank, int len) {
+    if (len > msgLength || msgs.empty()) {
+      return new (len, 0) AmpiMsg(seq, tag, srcRank, len);
+    } else {
+      AmpiMsg* msg = msgs.back();
+      msgs.pop_back();
+      msg->setSeq(seq);
+      msg->setTag(tag);
+      msg->setSrcRank(srcRank);
+      msg->setLength(len);
+      UsrToEnv(msg)->setRef(0);
+      return msg;
+    }
+  }
+  inline void deleteAmpiMsg(AmpiMsg* msg) {
+    if (msgs.size() != maxMsgs && UsrToEnv(msg)->getUsersize() == msgUsersize) {
+      msgs.push_back(msg);
+    } else {
+      delete msg;
+    }
+  }
+  void pup(PUP::er& p) {
+    p|msgLength;
+    p|msgUsersize;
+    p|maxMsgs;
+    size_t poolSize = msgs.size();
+    p|poolSize;
+    if (p.isUnpacking()) {
+      msgs.resize(poolSize);
+    }
+    for (int i=0; i<poolSize; i++) {
+      AmpiMsg::pup(p, msgs[i]);
+    }
   }
 };
 

@@ -862,6 +862,7 @@ CtvDeclare(void*,stackBottom);
 CtvDeclare(bool, ampiFinalized);
 CkpvDeclare(Builtin_kvs, bikvs);
 CkpvDeclare(int, ampiThreadLevel);
+CkpvDeclare(AmpiMsgPool, msgPool);
 
 CDECL
 long ampiCurrentStackUsage(void){
@@ -999,6 +1000,9 @@ static void ampiProcInit(void){
 
   CkpvInitialize(Builtin_kvs, bikvs); // built-in key-values
   CkpvAccess(bikvs) = Builtin_kvs();
+
+  CkpvInitialize(AmpiMsgPool, msgPool); // pool of small AmpiMsg's, big enough to ensure all sync msg's are pooled
+  CkpvAccess(msgPool) = AmpiMsgPool(32, std::max(sizeof(AmpiNcpyShmSource)+sizeof(bool), sizeof(CkNcpySource)+sizeof(bool)));
 
 #if CMK_TRACE_ENABLED && CMK_PROJECTOR
   REGISTER_AMPI
@@ -2784,7 +2788,8 @@ AmpiMsg* ampi::makeNcpyShmMsg(int t, int sRank, const void* buf, int count,
   pupSizer | msgType;
   pupSizer | srcInfo;
   int srcInfoLen = pupSizer.size();
-  AmpiMsg* msg = new (srcInfoLen, 0) AmpiMsg(seq, t, sRank, len /*length of real msg payload*/);
+  AmpiMsg *msg = CpvAccess(msgPool).newAmpiMsg(seq, t, sRank, srcInfoLen);
+  msg->setLength(len); // length of the real msg payload
   msg->setSsendReq(ssendReq);
   PUP::toMem pupPacker(msg->getData());
   pupPacker | msgType;
@@ -2807,7 +2812,8 @@ AmpiMsg* ampi::makeNcpyMsg(int t, int sRank, const void* buf, int count,
   pupSizer | msgType;
   pupSizer | (*req.srcInfo);
   int srcInfoLen = pupSizer.size();
-  AmpiMsg* msg = new (srcInfoLen, 0) AmpiMsg(seq, t, sRank, len /*length of real msg payload*/);
+  AmpiMsg *msg = CpvAccess(msgPool).newAmpiMsg(seq, t, sRank, srcInfoLen);
+  msg->setLength(len); // length of the real msg payload
   msg->setSsendReq(ssendReq);
   PUP::toMem pupPacker(msg->getData());
   pupPacker | msgType;
@@ -2827,7 +2833,7 @@ AmpiMsg *ampi::makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int coun
 {
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
-  AmpiMsg *msg = new (len, 0) AmpiMsg(seq, t, sRank, len);
+  AmpiMsg *msg = CpvAccess(msgPool).newAmpiMsg(seq, t, sRank, len);
   ddt->serialize((char*)buf, msg->getData(), count, 1);
   return msg;
 }
@@ -3438,7 +3444,7 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
     if (msg->isSsend()) { // msg was a sync msg, so now perform an rget for the real msg data
       MPI_Request request = postReq(new IReq(buf, count, type, s, t, comm, AMPI_REQ_BLOCKED));
       if (processAmpiMsg(msg, buf, type, count, request)) {
-        delete msg;
+        CpvAccess(msgPool).deleteAmpiMsg(msg);
       }
       else {
         CkAssert(parent->numBlockedReqs == 0);
@@ -3458,7 +3464,7 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
     }
     else {
       processAmpiMsg(msg, buf, type, count, MPI_REQUEST_NULL);
-      delete msg;
+      CpvAccess(msgPool).deleteAmpiMsg(msg);
     }
   }
   else { // post a request and block until the matching message arrives
@@ -4164,6 +4170,7 @@ void AMPI_Exit(int exitCode)
   // If we are not actually running AMPI code (e.g., by compiling a serial
   // application with ampicc), exit cleanly when the application calls exit().
   AMPIAPI_INIT("AMPI_Exit");
+  CkpvAccess(msgPool).clear();
   if (exitCode) {
     char err[64];
     sprintf(err, "Application terminated with exit code %d.\n", exitCode);
@@ -5916,7 +5923,7 @@ bool ATAReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/){
 bool IReq::receive(ampi *ptr, AmpiMsg *msg)
 {
   if (!ptr->processAmpiMsg(msg, buf, type, count, getReqIdx())) { // Returns false if msg is an incomplete sync message
-    delete msg;
+    CpvAccess(msgPool).deleteAmpiMsg(msg);
     return false;
   }
   statusIreq = true;
@@ -5929,7 +5936,7 @@ bool IReq::receive(ampi *ptr, AmpiMsg *msg)
   event = msg->event;
   eventPe = msg->eventPe;
 #endif
-  delete msg;
+  CpvAccess(msgPool).deleteAmpiMsg(msg);
   return true;
 }
 
