@@ -850,6 +850,7 @@ CtvDeclare(void*,stackBottom);
 CtvDeclare(bool, ampiFinalized);
 CkpvDeclare(Builtin_kvs, bikvs);
 CkpvDeclare(int, ampiThreadLevel);
+CkpvDeclare(AmpiMsgPool, msgPool);
 
 CDECL
 long ampiCurrentStackUsage(void){
@@ -962,6 +963,9 @@ static void ampiProcInit(void){
 
   CkpvInitialize(Builtin_kvs, bikvs); // built-in key-values
   CkpvAccess(bikvs) = Builtin_kvs();
+
+  CkpvInitialize(AmpiMsgPool, msgPool); // pool of small AmpiMsg's
+  CkpvAccess(msgPool) = AmpiMsgPool(AMPI_MSG_POOL_SIZE, AMPI_POOLED_MSG_SIZE);
 
 #if AMPIMSGLOG
   char **argv=CkGetArgv();
@@ -2679,13 +2683,24 @@ void handle_MPI_BOTTOM(void* &buf1, MPI_Datatype type1, void* &buf2, MPI_Datatyp
   }
 }
 
+AmpiMsg *ampi::makeBcastMsg(const void *buf,int count,MPI_Datatype type,MPI_Comm destcomm)
+{
+  CkDDT_DataType *ddt = getDDT()->getType(type);
+  int len = ddt->getSize(count);
+  CMK_REFNUM_TYPE seq = getSeqNo(AMPI_COLL_DEST, destcomm, MPI_BCAST_TAG);
+  // Do not use the msg pool for bcasts:
+  AmpiMsg *msg = new (len, 0) AmpiMsg(seq, 0, MPI_BCAST_TAG, AMPI_COLL_DEST, len);
+  ddt->serialize((char*)buf, msg->getData(), count, 1);
+  return msg;
+}
+
 AmpiMsg *ampi::makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
                            MPI_Datatype type,MPI_Comm destcomm, int ssendReq/*=0*/)
 {
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
   CMK_REFNUM_TYPE seq = getSeqNo(destRank, destcomm, t);
-  AmpiMsg *msg = new (len, 0) AmpiMsg(seq, ssendReq, t, sRank, len);
+  AmpiMsg *msg = CkpvAccess(msgPool).newAmpiMsg(seq, ssendReq, t, sRank, len);
   ddt->serialize((char*)buf, msg->getData(), count, 1);
   return msg;
 }
@@ -3037,7 +3052,7 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
     TRACE_BG_AMPI_BREAK(thread->getThread(), "RECV_RESUME", NULL, 0, 0);
     if (msg->eventPe == CkMyPe()) _TRACE_BG_ADD_BACKWARD_DEP(msg->event);
 #endif
-    delete msg;
+    CkpvAccess(msgPool).deleteAmpiMsg(msg);
   }
   else { // post a request and block until the matching message arrives
     int request = postReq(new IReq(buf, count, type, s, t, comm, getDDT(), AMPI_REQ_BLOCKED));
@@ -3134,7 +3149,7 @@ void ampi::bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm des
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
-    thisProxy.generic(makeAmpiMsg(AMPI_COLL_DEST, MPI_BCAST_TAG, root, buf, count, type, destcomm));
+    thisProxy.generic(makeBcastMsg(buf, count, type, destcomm));
   }
   else { // Non-root ranks need to increment the outgoing sequence number for collectives
     oorder.incCollSeqOutgoing();
@@ -3149,7 +3164,7 @@ int ampi::intercomm_bcast(int root, void* buf, int count, MPI_Datatype type, MPI
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
-    remoteProxy.generic(makeAmpiMsg(AMPI_COLL_DEST, MPI_BCAST_TAG, getRank(), buf, count, type, intercomm));
+    remoteProxy.generic(makeBcastMsg(buf, count, type, intercomm));
   }
   else { // Non-root ranks need to increment the outgoing sequence number for collectives
     oorder.incCollSeqOutgoing();
@@ -3735,6 +3750,7 @@ void AMPI_Exit(int exitCode)
   // If we are not actually running AMPI code (e.g., by compiling a serial
   // application with ampicc), exit cleanly when the application calls exit().
   AMPI_API_INIT("AMPI_Exit");
+  CkpvAccess(msgPool).clear();
   if (exitCode) {
     char err[64];
     sprintf(err, "Application terminated with exit code %d.\n", exitCode);
@@ -5559,7 +5575,7 @@ void IReq::receive(ampi *ptr, AmpiMsg *msg)
   event = msg->event;
   eventPe = msg->eventPe;
 #endif
-  delete msg;
+  CkpvAccess(msgPool).deleteAmpiMsg(msg);
 }
 
 void IReq::receiveRdma(ampi *ptr, char *sbuf, int slength, int ssendReq, int srcRank, MPI_Comm scomm)

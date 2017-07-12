@@ -4,6 +4,7 @@
 #include <string.h> /* for strlen */
 #include <algorithm>
 #include <numeric>
+#include <forward_list>
 
 #include "ampi.h"
 #include "ddt.h"
@@ -1399,9 +1400,14 @@ class AmpiMsg : public CMessage_AmpiMsg {
   AmpiMsg(int sreq, int t, int sRank, int l) :
     ssendReq(sreq), tag(t), srcRank(sRank), length(l)
   { /* only called from AmpiMsg::pup() since the refnum (seq) will get pup'ed by the runtime */ }
-  AmpiMsg(CMK_REFNUM_TYPE _s, int sreq, int t, int sRank, int l) :
+  AmpiMsg(CMK_REFNUM_TYPE seq, int sreq, int t, int sRank, int l) :
     ssendReq(sreq), tag(t), srcRank(sRank), length(l)
-  { CkSetRefNum(this, _s); }
+  { CkSetRefNum(this, seq); }
+  inline void setSsendReq(int s) { CkAssert(s >= 0); ssendReq = s; }
+  inline void setSeq(CMK_REFNUM_TYPE s) { CkAssert(s >= 0); UsrToEnv(this)->setRef(s); }
+  inline void setSrcRank(int sr) { srcRank = sr; }
+  inline void setLength(int l) { length = l; }
+  inline void setTag(int t) { tag = t; }
   inline CMK_REFNUM_TYPE getSeq(void) const { return UsrToEnv(this)->getRef(); }
   inline int getSsendReq(void) const { return ssendReq; }
   inline int getSeqIdx(void) const {
@@ -1436,6 +1442,80 @@ class AmpiMsg : public CMessage_AmpiMsg {
       m = 0;
     }
     return m;
+  }
+};
+
+#define AMPI_MSG_POOL_SIZE   32 // Max # of AmpiMsg's allowed in the pool
+#define AMPI_POOLED_MSG_SIZE 64 // Max # of Bytes in pooled msgs' payload
+
+class AmpiMsgPool {
+ private:
+  std::forward_list<AmpiMsg *> msgs; // list of free msgs
+  int msgLength; // AmpiMsg::length of messages in the pool
+  int msgUsersize; // usersize of message envelopes in the pool
+  int maxMsgs; // max # of msgs in the pool
+  int currMsgs; // current # of msgs in the pool
+
+ public:
+  AmpiMsgPool() : msgLength(0), msgUsersize(0), maxMsgs(0), currMsgs(0) {}
+  AmpiMsgPool(int _numMsgs, int _msgLength) {
+    msgLength = _msgLength;
+    maxMsgs = _numMsgs;
+    if (maxMsgs > 0 && msgLength > 0) {
+      /* Construct an AmpiMsg to find the usersize (and add it to the pool while it's here).
+       * The rest of the pool can be filled lazily. */
+      AmpiMsg* msg = new (msgLength, 0) AmpiMsg(0, 0, 0, 0, 0);
+      msgs.push_front(msg);
+      currMsgs = 1;
+      /* Usersize is the true size of the message envelope, not the length member
+       * of the AmpiMsg. AmpiMsg::length is used by Ssend msgs to convey the real
+       * msg payload's length, and is not the length of the Ssend msg itself, so
+       * it cannot be trusted when returning msgs to the pool. */
+      msgUsersize = UsrToEnv(msgs.front())->getUsersize();
+    }
+    else {
+      currMsgs = 0;
+      msgUsersize = 0;
+    }
+  }
+  ~AmpiMsgPool() {}
+  inline void clear() {
+    while (!msgs.empty()) {
+      delete msgs.front();
+      msgs.pop_front();
+    }
+    currMsgs = 0;
+  }
+  inline AmpiMsg* newAmpiMsg(CMK_REFNUM_TYPE seq, int ssendReq, int tag, int srcRank, int len) {
+    if (len > msgLength || msgs.empty()) {
+      return new (len, 0) AmpiMsg(seq, ssendReq, tag, srcRank, len);
+    } else {
+      AmpiMsg* msg = msgs.front();
+      CkAssert(msg != NULL);
+      msgs.pop_front();
+      currMsgs--;
+      msg->setSeq(seq);
+      msg->setSsendReq(ssendReq);
+      msg->setTag(tag);
+      msg->setSrcRank(srcRank);
+      msg->setLength(len);
+      return msg;
+    }
+  }
+  inline void deleteAmpiMsg(AmpiMsg* msg) {
+    if (currMsgs != maxMsgs && UsrToEnv(msg)->getUsersize() == msgUsersize) {
+      CkAssert(msg != NULL);
+      msgs.push_front(msg);
+      currMsgs++;
+    } else {
+      delete msg;
+    }
+  }
+  void pup(PUP::er& p) {
+    p|msgLength;
+    p|msgUsersize;
+    p|maxMsgs;
+    // Don't PUP the msgs in the free list or currMsgs, let the pool fill lazily
   }
 };
 
@@ -2024,6 +2104,7 @@ class ampi : public CBase_ampi {
   MPI_Request postReq(AmpiRequest* newreq);
 
   inline CMK_REFNUM_TYPE getSeqNo(int destRank, MPI_Comm destcomm, int tag);
+  AmpiMsg *makeBcastMsg(const void *buf,int count,MPI_Datatype type,MPI_Comm destcomm);
   AmpiMsg *makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
                        MPI_Datatype type,MPI_Comm destcomm, int ssendReq=0);
 
