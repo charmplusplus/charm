@@ -70,7 +70,7 @@ Abort() {
 [ $# -eq 1 ] && exit 0
 [ $# -lt 2 ] && printUsage "Error: Not enough arguments given."
 
-out=$1
+out=$(cygpath -w $1)
 shift
 args="/out:$out $@"
 
