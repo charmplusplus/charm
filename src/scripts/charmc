@@ -1780,11 +1780,11 @@ then
   Abort "Isomalloc is not supported on BlueGene/Q."
 fi
 
-# Isomalloc does not work on Clang in non-SMP mode, so use os-isomalloc instead:
-if [ "$MEMORY" = "isomalloc" -a "$CMK_USING_CLANG" = "1" -a "$CMK_SMP" != "1" ]
+# Isomalloc does not work on all compilers in non-SMP mode, so use os-isomalloc instead:
+if [ "$MEMORY" = "isomalloc" -a "$CMK_SMP" != "1" ]
 then
   MEMORY="os-isomalloc"
-  echo "Warning: changing '-memory isomalloc' to '-memory os-isomalloc' on Clang non-SMP build target."
+  echo "Warning: changing '-memory isomalloc' to '-memory os-isomalloc' on non-SMP build target."
 fi
 
 if [ -f "${CHARMLIB}/libmemory-${MEMORY}.a" ]; then
