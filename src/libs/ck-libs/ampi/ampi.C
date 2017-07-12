@@ -3,6 +3,7 @@
 #endif
 
 #define AMPIMSGLOG    0
+#define AMPI_PRINT_IDLE 0
 
 #include "ampiimpl.h"
 #include "tcharm.h"
@@ -21,8 +22,6 @@
 
 /* change this to MPI_ERRORS_RETURN to not abort on errors */
 #define AMPI_ERRHANDLER MPI_ERRORS_ARE_FATAL
-
-#define AMPI_PRINT_IDLE 0
 
 /* change this define to "x" to trace all send/recv's */
 #define MSG_ORDER_DEBUG(x) //x /* empty */
@@ -947,7 +946,7 @@ static void ampiNodeInit(void)
   _isStaticInsertion = true;
 }
 
-#if PRINT_IDLE
+#if AMPI_PRINT_IDLE
 static double totalidle=0.0, startT=0.0;
 static int beginHandle, endHandle;
 static void BeginIdle(void *dummy,double curWallTime)
@@ -3746,7 +3745,7 @@ int AMPI_Finalize(void)
     // AMPI_Exit() never returns.
   AMPIAPI("AMPI_Finalize");
 
-#if PRINT_IDLE
+#if AMPI_PRINT_IDLE
   CkPrintf("[%d] Idle time %fs.\n", CkMyPe(), totalidle);
 #endif
   CtvAccess(ampiFinalized)=true;
@@ -4301,14 +4300,14 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
 
   if (reducer != CkReduction::invalid) {
     // MPI predefined op matches a Charm++ builtin reducer type
-    AMPI_DEBUG("[%d] In makeRednMsg, using Charm++ built-in reducer type for a predefined op\n", thisIndex);
+    AMPI_DEBUG("[%d] In makeRednMsg, using Charm++ built-in reducer type for a predefined op\n", parent->thisIndex);
     msg = CkReductionMsg::buildNew(szdata, NULL, reducer);
     ddt->serialize((char*)inbuf, (char*)msg->getData(), count, 1);
   }
   else if (parent->opIsCommutative(op) && ddt->isContig()) {
     // Either an MPI predefined reducer operation with no Charm++ builtin reducer type equivalent, or
     // a commutative user-defined reducer operation on a contiguous datatype
-    AMPI_DEBUG("[%d] In makeRednMsg, using custom AmpiReducer type for a commutative op\n", thisIndex);
+    AMPI_DEBUG("[%d] In makeRednMsg, using custom AmpiReducer type for a commutative op\n", parent->thisIndex);
     AmpiOpHeader newhdr = parent->op2AmpiOpHeader(op, type, count);
     int szhdr = sizeof(AmpiOpHeader);
     msg = CkReductionMsg::buildNew(szdata+szhdr, NULL, AmpiReducer);
@@ -4318,7 +4317,7 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
   else {
     // Non-commutative user-defined reducer operation, or
     // a commutative user-defined reduction on a non-contiguous datatype
-    AMPI_DEBUG("[%d] In makeRednMsg, using a non-commutative user-defined operation\n", thisIndex);
+    AMPI_DEBUG("[%d] In makeRednMsg, using a non-commutative user-defined operation\n", parent->thisIndex);
     const int tupleSize = 2;
     CkReduction::tupleElement tupleRedn[tupleSize];
     tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set);
@@ -4363,7 +4362,7 @@ static void handle_MPI_IN_PLACE(void* &inbuf, void* &outbuf)
   CkAssert(inbuf != MPI_IN_PLACE && outbuf != MPI_IN_PLACE);
 }
 
-#define SYNCHRONOUS_REDUCE                           0
+#define AMPI_SYNC_REDUCE 0
 
 CDECL
 int AMPI_Reduce(const void *inbuf, void *outbuf, int count, MPI_Datatype type, MPI_Op op, int root, MPI_Comm comm)
@@ -4409,13 +4408,13 @@ int AMPI_Reduce(const void *inbuf, void *outbuf, int count, MPI_Datatype type, M
   if (ptr->thisIndex == rootIdx){
     ptr = ptr->blockOnRedn(new RednReq(outbuf, count, type, comm, op));
 
-#if SYNCHRONOUS_REDUCE
-    AmpiMsg *msg = new (0, 0) AmpiMsg(-1, MPI_REDN_TAG, -1, rootIdx, 0);
+#if AMPI_SYNC_REDUCE
+    AmpiMsg *msg = new (0, 0) AmpiMsg(-1, MPI_REDN_TAG, rootIdx, 0);
     CProxy_ampi pa(ptr->getProxy());
     pa.generic(msg);
 #endif
   }
-#if SYNCHRONOUS_REDUCE
+#if AMPI_SYNC_REDUCE
   ptr->recv(MPI_REDN_TAG, AMPI_COLL_SOURCE, NULL, 0, type, comm);
 #endif
 

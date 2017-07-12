@@ -355,11 +355,10 @@ AmpiMsg* ampi::winRemoteIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype,
 
   winobj->iget(orgcnt, orgunit, targdisp, targcnt, targunit);
 
-  AMPI_DEBUG("    Rank[%d] iget win  [%d] \n", thisIndex, *(int*)(targaddr));
-
   AmpiMsg *msg = new (targtotalsize, 0) AmpiMsg(-1, MPI_RMA_TAG, thisIndex, targtotalsize);
 
   char* targaddr = (char*)(winobj->baseAddr) + targdisp*winobj->disp_unit;
+  AMPI_DEBUG("    Rank[%d] iget win  [%d] \n", thisIndex, *(int*)(targaddr));
   tddt->serialize(targaddr, msg->getData(), targcnt, 1);
   AMPI_DEBUG("    Rank[%d] copy win  [%d] \n", thisIndex, *(int*)msg->getData());
   return msg;
