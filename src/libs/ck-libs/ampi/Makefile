@@ -10,12 +10,12 @@ COMPAT=compat_ampius.o compat_ampifus.o compat_ampi.o \
 OBJS=ampi.o ampif.o ampiProjections.o ampiOneSided.o \
      ampiMisc.o mpich-alltoall.o  
 
-LIB=libmoduleampi
-LIBDIR=$(CDIR)/lib
-DEST=$(LIBDIR)/$(LIB).a
-DESTF=$(LIBDIR)/$(LIB)f.a
-COMPATLIB=$(LIBDIR)/libampi-compat.a
-ROMIOLIB=$(LIBDIR)/libampiromio.a
+AMPI_LIB=libmoduleampi
+AMPI_LIBDIR=$(CDIR)/lib
+DEST=$(AMPI_LIBDIR)/$(AMPI_LIB).a
+DESTF=$(AMPI_LIBDIR)/$(AMPI_LIB)f.a
+COMPATLIB=$(AMPI_LIBDIR)/libampi-compat.a
+ROMIOLIB=$(AMPI_LIBDIR)/libampiromio.a
 
 USE_ROMIO=$(shell CHARMINC=$(CDIR)/tmp ; . $(CDIR)/tmp/conv-config.sh ; echo $$CMK_AMPI_WITH_ROMIO)
 
@@ -55,14 +55,14 @@ AMPIF: $(DESTF)
 
 $(DEST): $(OBJS) headers
 	$(CHARMC) $(OBJS) -o $@
-	cp $(LIB).dep $(LIBDIR)/$(LIB).dep
+	cp $(AMPI_LIB).dep $(AMPI_LIBDIR)/$(AMPI_LIB).dep
 
 $(DESTF): $(OBJS) headers
 	-$(CHARMC) -c ampifimpl.f90
 	-$(CHARMC) -c ampimod.f90
 	-$(CHARMC) -cpmod ../../../../include mpi.M
 	-$(CHARMC) $(OBJS) ampifimpl.o ampimod.o -o $@
-	-cp $(LIB)f.dep $(LIBDIR)/$(LIB)f.dep
+	-cp $(AMPI_LIB)f.dep $(AMPI_LIBDIR)/$(AMPI_LIB)f.dep
 
 $(COMPATLIB): $(COMPAT)
 	$(CHARMC) $(COMPAT) -o $@
