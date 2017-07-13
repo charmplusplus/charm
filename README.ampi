@@ -91,6 +91,7 @@ prefixed with AMPI_:
     * AMPI_Load_set_value sets the calling rank's load to the given user value.
     * AMPI_Load_start_measure starts load balance information collection.
     * AMPI_Load_stop_measure stops load balance information collection.
+    * AMPI_Load_reset_measure clears the load balance database.
     * AMPI_Migrate_to_pe migrates the calling rank to the given PE.
     * AMPI_Set_migratable sets the migratability of the calling rank.
     * AMPI_Command_argument_count returns the number of command line arguments

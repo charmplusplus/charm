@@ -763,8 +763,9 @@ just actually migrated.
 
 \ampi{} provide routines for starting and stopping load measurements, and for
 users to explicitly set the load value of a rank using the following:
-\texttt{AMPI\_Load\_start\_measure}, \texttt{AMPI\_Load\_stop\_measure}, and
-\texttt{AMPI\_Load\_set\_value}. And since \ampi{} builds on top of \charmpp{},
+\texttt{AMPI\_Load\_start\_measure}, \texttt{AMPI\_Load\_stop\_measure},
+\texttt{AMPI\_Load\_reset\_measure}, and \texttt{AMPI\_Load\_set\_value}.
+And since \ampi{} builds on top of \charmpp{},
 users can experiment with the suite of load balancing strategies included with
 \charmpp{}, as well as write their own strategies based on user-level
 information and heuristics.

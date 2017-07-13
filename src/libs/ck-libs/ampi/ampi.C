@@ -9357,6 +9357,14 @@ int AMPI_Load_stop_measure(void)
 }
 
 CDECL
+int AMPI_Load_reset_measure(void)
+{
+  AMPIAPI("AMPI_Load_reset_measure");
+  LBClearLoads();
+  return MPI_SUCCESS;
+}
+
+CDECL
 int AMPI_Load_set_value(double value)
 {
   AMPIAPI("AMPI_Load_set_value");

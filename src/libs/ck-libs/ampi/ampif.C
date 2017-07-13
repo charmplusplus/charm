@@ -273,6 +273,7 @@ FDECL {
 #define ampi_migrate FTN_NAME( AMPI_MIGRATE , ampi_migrate )
 #define ampi_load_start_measure FTN_NAME( AMPI_LOAD_START_MEASURE, ampi_load_start_measure )
 #define ampi_load_stop_measure FTN_NAME( AMPI_LOAD_STOP_MEASURE, ampi_load_stop_measure )
+#define ampi_load_reset_measure FTN_NAME( AMPI_LOAD_RESET_MEASURE, ampi_load_reset_measure )
 #define ampi_load_set_value FTN_NAME( AMPI_SET_LOAD_VALUE, ampi_load_set_value )
 #define ampi_evacuate FTN_NAME ( AMPI_EVACUATE , ampi_evacuate )
 #define ampi_migrate_to_pe FTN_NAME( AMPI_MIGRATE_TO_PE , ampi_migrate_to_pe )
@@ -1807,6 +1808,10 @@ void ampi_load_start_measure(int *ierr) {
 
 void ampi_load_stop_measure(int *ierr) {
   *ierr = AMPI_Load_stop_measure();
+}
+
+void ampi_load_reset_measure(int *ierr) {
+  *ierr = AMPI_Load_reset_measure();
 }
 
 void ampi_load_set_value(double *value, int *ierr) {

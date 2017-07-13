@@ -1047,6 +1047,7 @@ int AMPI_Info_free(MPI_Info *info);
 int AMPI_Migrate(MPI_Info hints);
 int AMPI_Load_start_measure(void);
 int AMPI_Load_stop_measure(void);
+int AMPI_Load_reset_measure(void);
 int AMPI_Load_set_value(double value);
 int AMPI_Migrate_to_pe(int dest);
 int AMPI_Set_migratable(int mig);
