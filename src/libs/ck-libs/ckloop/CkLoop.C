@@ -214,7 +214,13 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
 
     //for using nodequeue
     TRACE_START(CKLOOP_TOTAL_WORK_EVENTID);
-    if (mode == CKLOOP_USECHARM) {
+    if (mode == CKLOOP_NOOP || numChunks + !!cfunc < 2) {
+      func(lowerRange, upperRange, redResult, paramNum, param);
+      if (cfunc != NULL) {
+        cfunc(cparamNum, cparam);
+      }
+      return;
+    } else if (mode == CKLOOP_USECHARM) {
         FuncSingleHelper *thisHelper = helperPtr[CkMyRank()];
 #if USE_CONVERSE_NOTIFICATION
 #if ALLOW_MULTIPLE_UNSYNC
@@ -297,12 +303,6 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
         //in this mode, it's always synced
         sync = 1;
 #endif
-    } else if (mode == CKLOOP_NOOP) {
-      func(lowerRange, upperRange, redResult, paramNum, param);
-      if (cfunc != NULL) {
-        cfunc(cparamNum, cparam);
-      }
-      return;
     }
 
     // Call the function on the caller PE before it starts working on chunks
