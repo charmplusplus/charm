@@ -64,7 +64,7 @@ MBLOCKC: charm++ LIBS
 
 MBLOCKF: MBLOCKC
 
-AMPI:  charm++ ddt
+AMPI:  charm++ ddt $(BIGSIM)
 	$(MAKE) -C libs/ck-libs/ ampi
 
 ddt:  charm++

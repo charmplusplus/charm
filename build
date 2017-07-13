@@ -743,8 +743,9 @@ echo $BASEVERSION | sed -e 's@-.*@@' > $DESTINATION/tmp/.gdir
 
 if test $BUILD_EMULATOR = 1
 then
+  # export BIGSIM so that make targets can depend on it
+  MAKEOPTS="$MAKEOPTS BIGSIM=bigsim"
   PROGRAM="$PROGRAM bigsim"
-#  CONFIG_OPTS="--disable-charmdebug $CONFIG_OPTS"
 fi
 
 
