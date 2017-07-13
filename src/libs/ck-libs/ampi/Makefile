@@ -43,6 +43,12 @@ $(ROMIO): | AMPI AMPIF
 		-f90=$(CDIR)/bin/ampif90 \
 		-noprofile \
 		-mpiolib=$@
+
+	# Cygwin only supports NTFS
+	if [ $(shell uname -o) == "Cygwin" ]; then \
+		echo -e "#undef UFS\n#undef NFS\n#define ROMIO_NTFS\n" >> romio/adio/include/romioconf.h; \
+		sed -i s,ufs\ nfs,, romio/Makefile; \
+	fi
 	cp romio/include/mpio.h romio/include/mpiof.h $(CDIR)/include
 	$(MAKE) -C romio
 	@echo "ROMIO built successfully"
