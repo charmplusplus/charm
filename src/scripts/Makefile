@@ -623,7 +623,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o cktaskQ.
 charm-core: converse $(L)/libck.a $(L)/libckf.a $(L)/libckmain.a
 charm-target: loadbalancers default_libs $(L)/libmpi-mainmodule.a tmgr
 
-CHARMLIBS: charm++ CONVLIBS 
+CHARMLIBS: charm++ CONVLIBS $(BIGSIM)
 	$(MAKE) -C libs charmlibs
 
 $(L)/libck.a: $(LIBCK_CORE) 
