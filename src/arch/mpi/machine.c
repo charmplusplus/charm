@@ -1786,7 +1786,11 @@ int CmiTimerIsSynchronized() {
     void *v;
 
     /*  check if it using synchronized timer */
+#if MPI_VERSION >= 2
+    if (MPI_SUCCESS != MPI_Comm_get_attr(charmComm, MPI_WTIME_IS_GLOBAL, &v, &flag))
+#else
     if (MPI_SUCCESS != MPI_Attr_get(charmComm, MPI_WTIME_IS_GLOBAL, &v, &flag))
+#endif
         printf("MPI_WTIME_IS_GLOBAL not valid!\n");
     if (flag) {
         _is_global = *(int*)v;
