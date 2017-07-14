@@ -271,6 +271,21 @@ static void reportMsgHistogramInfo(void);
 
 /* =======End of Definitions of Performance-Specific Macros =======*/
 
+/*
+ * MPI-3.0 includes support for matched probe and recv routines. With the usual
+ * MPI_Probe and MPI_Recv, the MPI library has to walk its message matching queues
+ * twice; the matched versions of these routines (MPI_Mprobe, MPI_Mrecv) allow the
+ * MPI library to avoid re-walking the queue a second time.
+ *
+ * However, not all MPI libraries that claim to support the MPI 3.0+ standard actually
+ * implement this interface correctly (i.e. MVAPICH2/2.3 and Intel MPI 2018), so we
+ * add this macro to disable using Mprobe on those MPI libraries. Once this bug in
+ * MVAPICH2 & IMPI is fixed, we'll need to update this macro to check the version.
+ */
+#ifndef MPI_HAS_MPROBE
+#define MPI_HAS_MPROBE ( MPI_VERSION >= 3 && \
+                       ( !defined(MVAPICH2_VERSION) && !defined(I_MPI_VERSION) ) )
+#endif
 
 /* =====Beginning of Definitions of Message-Corruption Related Macros=====*/
 #define CMI_MAGIC(msg)			 ((CmiMsgHeaderBasic *)msg)->magic
@@ -791,9 +806,16 @@ static int PumpMsgs(void) {
             CpvAccess(Cmi_posted_recv_total)++;
         } else {
             START_EVENT();
+#if MPI_HAS_MPROBE
+            MPI_Message mpiMsg;
+            res = MPI_Improbe(MPI_ANY_SOURCE, MPI_ANY_TAG, charmComm, &flg, &mpiMsg, &sts);
+            if (res != MPI_SUCCESS)
+                CmiAbort("MPI_Improbe failed\n");
+#else
             res = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, charmComm, &flg, &sts);
             if (res != MPI_SUCCESS)
                 CmiAbort("MPI_Iprobe failed\n");
+#endif
             if (!flg) break;
             
             CONDITIONAL_TRACE_USER_EVENT(70); /* MPI_Iprobe related user event */
@@ -806,15 +828,25 @@ static int PumpMsgs(void) {
 #endif            
             if(doSyncRecv){
                 START_EVENT();
+#if MPI_HAS_MPROBE
+                if (MPI_SUCCESS != MPI_Mrecv(msg,nbytes,MPI_BYTE,&mpiMsg,&sts))
+                    CmiAbort("PumpMsgs: MPI_Mrecv failed!\n");
+#else
                 if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,sts.MPI_TAG, charmComm,&sts))
-                    CmiAbort("PumpMsgs: MPI_Recv failed!\n");                
+                    CmiAbort("PumpMsgs: MPI_Recv failed!\n");
+#endif
             }
 #if USE_ASYNC_RECV_FUNC        
             else {
                 START_EVENT();
                 IRecvList one = irecvListEntryAllocate();
+#if MPI_HAS_MPROBE
+                if(MPI_SUCCESS != MPI_Imrecv(msg, nbytes, MPI_BYTE, &mpiMsg, &(one->req)))
+                    CmiAbort("PumpMsgs: MPI_Imrecv failed!\n");
+#else
                 if(MPI_SUCCESS != MPI_Irecv(msg, nbytes, MPI_BYTE, sts.MPI_SOURCE, sts.MPI_TAG, charmComm, &(one->req)))
                     CmiAbort("PumpMsgs: MPI_Irecv failed!\n");
+#endif
 		/*printf("[%d]: irecv msg=%p, nbytes=%d, src=%d, tag=%d\n", CmiMyPe(), msg, nbytes, sts.MPI_SOURCE, sts.MPI_TAG);*/
                 one->msg = msg;
                 one->size = nbytes;
@@ -829,9 +861,16 @@ static int PumpMsgs(void) {
 #else
         /* Original version of not using MPI_POST_RECV and USE_MPI_CTRLMSG_SCHEME */
         START_EVENT();
+#if MPI_HAS_MPROBE
+        MPI_Message mpiMsg;
+        res = MPI_Improbe(MPI_ANY_SOURCE, TAG, charmComm, &flg, &mpiMsg, &sts);
+        if (res != MPI_SUCCESS)
+            CmiAbort("MPI_Improbe failed\n");
+#else
         res = MPI_Iprobe(MPI_ANY_SOURCE, TAG, charmComm, &flg, &sts);
         if (res != MPI_SUCCESS)
             CmiAbort("MPI_Iprobe failed\n");
+#endif
 
         if (!flg) break;
         CONDITIONAL_TRACE_USER_EVENT(70); /* MPI_Iprobe related user event */
@@ -845,14 +884,24 @@ static int PumpMsgs(void) {
 #endif        
         if(doSyncRecv){
             START_EVENT();
+#if MPI_HAS_MPROBE
+            if (MPI_SUCCESS != MPI_Mrecv(msg,nbytes,MPI_BYTE,&mpiMsg,&sts))
+                CmiAbort("PumpMsgs: MPI_Mrecv failed!\n");
+#else
             if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,sts.MPI_TAG, charmComm,&sts))
-                CmiAbort("PumpMsgs: MPI_Recv failed!\n");            
+                CmiAbort("PumpMsgs: MPI_Recv failed!\n");
+#endif
         }
 #if USE_ASYNC_RECV_FUNC        
         else {
             IRecvList one = irecvListEntryAllocate();
+#if MPI_HAS_MPROBE
+            if(MPI_SUCCESS != MPI_Imrecv(msg, nbytes, MPI_BYTE, &mpiMsg, &(one->req)))
+                CmiAbort("PumpMsgs: MPI_Imrecv failed!\n");
+#else
             if(MPI_SUCCESS != MPI_Irecv(msg, nbytes, MPI_BYTE, sts.MPI_SOURCE, sts.MPI_TAG, charmComm, &(one->req)))
                 CmiAbort("PumpMsgs: MPI_Irecv failed!\n");
+#endif
             one->msg = msg;
             one->size = nbytes;
             one->next = NULL;
@@ -1473,6 +1522,9 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
       if ((myNID == 0) && (!quietMode)) {
         printf("Charm++> Running on MPI version: %d.%d\n", ver, subver);
         printf("Charm++> level of thread support used: %s (desired: %s)\n", thread_level_tostring(_thread_provided), thread_level_tostring(thread_level));
+#if !MPI_HAS_MPROBE
+        printf("Charm++> using Probe/Recv instead of Mprobe/Mrecv\n");
+#endif
       }
     }
 
