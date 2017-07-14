@@ -153,7 +153,7 @@ void EmergencyExit(void);
 
 //int cur_restart_phase = 1;      /* checkpointing/restarting phase counter */
 CpvDeclare(int,_curRestartPhase);
-static int CsdLocalMax = CSD_LOCAL_MAX_DEFAULT;
+int CsdLocalMax = CSD_LOCAL_MAX_DEFAULT;
 
 int CharmLibInterOperate = 0;
 CpvDeclare(int,interopExitFlag);

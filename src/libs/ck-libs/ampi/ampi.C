@@ -891,6 +891,8 @@ static int AMPI_threadstart_idx = -1;
 CsvExtern(funcmap*, tcharm_funcmap);
 #endif
 
+extern int CsdLocalMax;
+
 static void ampiNodeInit(void)
 {
 #if CMK_TRACE_ENABLED
@@ -974,6 +976,11 @@ static void ampiNodeInit(void)
    // ASSUME NO ANYTIME MIGRATION and STATIC INSERTON
   _isAnytimeMigration = false;
   _isStaticInsertion = true;
+
+  // Change the value of +csdLocalMax from default to 1
+  if (CsdLocalMax == CSD_LOCAL_MAX_DEFAULT) {
+    CsdLocalMax = 1;
+  }
 }
 
 #if AMPI_PRINT_IDLE
