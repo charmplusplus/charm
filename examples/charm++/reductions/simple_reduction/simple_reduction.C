@@ -31,8 +31,6 @@ main::main(CkArgMsg* m)
     CkPrintf("simple_reduction for %d pes on %d units for %f and %f\n",
 	     CkNumPes(),units,dOne, dTwo);
 
-    CkCallback *cb = new CkCallback(CkIndex_main::reportIn(NULL),  mainProxy);
-    arr.ckSetReductionClient(cb);
     arr.dowork();
   }
 

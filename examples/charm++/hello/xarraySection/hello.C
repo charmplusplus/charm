@@ -2,6 +2,8 @@
 #include "ckmulticast.h"
 #include <stdio.h>
 
+/*readonly*/ CProxy_Main mainProxy;
+
 class pingMsg: public CkMcastBaseMsg, public CMessage_pingMsg
 {
     public:
@@ -16,6 +18,12 @@ class Main : public CBase_Main
 public:
   Main(CkArgMsg* m): numArrays(2), numElements(5), sectionSize(numElements), maxIter(3), numIter(0)
   {
+    CkAbort("This test does not currently work and is not expected to work" \
+            " until support for cross array reductions is added to the multicast manager.");
+
+    // Save a proxy to main for use as a reduction target
+    mainProxy = thisProxy;
+
     //Process command-line arguments
     if (m->argc > 1) numElements = atoi(m->argv[1]);
     if (m->argc > 2) numArrays   = atoi(m->argv[2]);
@@ -60,9 +68,6 @@ public:
 
     // Delegate the section comm to the CkMulticast library
     sectionProxy.ckSectionDelegate(mcastMgr);
-    // Configure the client of the section reduction
-    CkCallback *rednCB = new CkCallback(CkIndex_Main::rednPong(NULL), thisProxy); 
-    mcastMgr->setReductionClient(sectionProxy, rednCB);
 
     // Start the test by pinging the section
     pingMsg *msg = new pingMsg(numIter);
@@ -128,7 +133,8 @@ public:
         isCookieSet = true;
     }
     // Contribute to the section reduction
-    mcastMgr->contribute(sizeof(int), &(msg->hiNo), CkReduction::sum_int, sectionCookie);
+    CkCallback cb(CkIndex_Main::rednPong(NULL), mainProxy);
+    mcastMgr->contribute(sizeof(int), &(msg->hiNo), CkReduction::sum_int, sectionCookie, cb);
     delete msg;
   }
 

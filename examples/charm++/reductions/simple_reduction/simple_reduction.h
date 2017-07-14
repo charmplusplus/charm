@@ -58,7 +58,8 @@ class RedExample : public CBase_RedExample
       double outdoubles[2];
       myfloats[0]=outdoubles[0]=   dOne +(double) thisIndex;
       myfloats[1]=outdoubles[1]= dTwo +(double) thisIndex;
-      contribute(2*sizeof(double),outdoubles,CkReduction::sum_double); 
+      CkCallback cb(CkIndex_main::reportIn(NULL), mainProxy);
+      contribute(2*sizeof(double),outdoubles,CkReduction::sum_double, cb); 
       dump();
     }
 };

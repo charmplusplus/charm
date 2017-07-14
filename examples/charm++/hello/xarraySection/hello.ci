@@ -1,6 +1,8 @@
 mainmodule hello {
   message pingMsg;
 
+  readonly CProxy_Main mainProxy;
+
   mainchare Main {
     entry Main(CkArgMsg *m);
     entry void rednPong(CkReductionMsg *msg);

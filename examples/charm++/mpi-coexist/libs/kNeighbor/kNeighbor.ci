@@ -13,7 +13,7 @@ module kNeighbor {
 		entry void beginWork(int numsteps,int msgsize,int lbfreq);
     entry void nextStep(CkReductionMsg *);
     entry void terminate(CkReductionMsg *);
-    entry void resumeIter();
+    entry [reductiontarget] void resumeIter();
   };
 
   array [1D] Block {
