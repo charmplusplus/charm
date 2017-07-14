@@ -546,6 +546,7 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
   baseExtent  = 0;
   baseIndex   = -1;
   numElements = 1;
+  refCount    = 1;
 
   DDTDEBUG("CkDDT_DataType constructor: type=%d, size=%d, extent=%ld, iscontig=%d\n",
            type, size, extent, iscontig);
@@ -555,13 +556,14 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
 CkDDT_DataType::CkDDT_DataType(int datatype, int size, CkDDT_Aint extent, int count, CkDDT_Aint lb, CkDDT_Aint ub,
             bool iscontig, int baseSize, CkDDT_Aint baseExtent, CkDDT_DataType* baseType, int numElements, int baseIndex,
             CkDDT_Aint trueExtent, CkDDT_Aint trueLB) :
-    datatype(datatype), size(size), extent(extent), count(count), lb(lb), ub(ub), trueExtent(trueExtent),
+    datatype(datatype), refCount(1), size(size), extent(extent), count(count), lb(lb), ub(ub), trueExtent(trueExtent),
     trueLB(trueLB), iscontig(iscontig), baseSize(baseSize), baseExtent(baseExtent), baseType(baseType),
     numElements(numElements), baseIndex(baseIndex), nameLen(0), isAbsolute(false)
 {}
 
 CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType &obj)  :
   datatype(obj.datatype)
+  ,refCount(1)
   ,size(obj.size)
   ,extent(obj.extent)
   ,count(obj.count)
@@ -577,12 +579,15 @@ CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType &obj)  :
   ,baseIndex(obj.baseIndex)
   ,nameLen(obj.nameLen)
   ,isAbsolute(obj.isAbsolute)
-{}
+{
+  memcpy(name, obj.name, nameLen+1);
+}
 
+// TODO: this constructor can be combined with the previous one in C++11.
 CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType &obj, CkDDT_Aint _lb, CkDDT_Aint _extent)
 {
   datatype    = obj.datatype;
-  refCount    = obj.refCount;
+  refCount    = 1;
   baseSize    = obj.baseSize;
   baseExtent  = obj.baseExtent;
   baseType    = obj.baseType;
