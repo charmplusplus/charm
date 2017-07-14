@@ -193,7 +193,41 @@ void
 CkDDT::createDup(int nIndexOld, int *nIndexNew)
 {
   CkDDT_DataType *dttype = getType(nIndexOld);
-  nIndexNew = (int*) new CkDDT_DataType(*dttype);
+  CkDDT_DataType *type;
+
+  switch(dttype->getType()) {
+    case CkDDT_CONTIGUOUS:
+      type = new CkDDT_Contiguous(static_cast<CkDDT_Contiguous&> (*dttype));
+      break;
+    case CkDDT_VECTOR:
+      type = new CkDDT_Vector(static_cast<CkDDT_Vector&> (*dttype));
+      break;
+    case CkDDT_HVECTOR:
+      type = new CkDDT_HVector(static_cast<CkDDT_HVector&> (*dttype));
+      break;
+    case CkDDT_INDEXED:
+      type = new CkDDT_Indexed(static_cast<CkDDT_Indexed&> (*dttype));
+      break;
+    case CkDDT_HINDEXED:
+      type = new CkDDT_HIndexed(static_cast<CkDDT_HIndexed&> (*dttype));
+      break;
+    case CkDDT_STRUCT:
+      type = new CkDDT_Struct(static_cast<CkDDT_Struct&> (*dttype));
+      break;
+    case CkDDT_INDEXED_BLOCK:
+      type = new CkDDT_Indexed_Block(static_cast<CkDDT_Indexed_Block&> (*dttype));
+      break;
+    case CkDDT_HINDEXED_BLOCK:
+      type = new CkDDT_HIndexed_Block(static_cast<CkDDT_HIndexed_Block&> (*dttype));
+      break;
+    default:
+      type = new CkDDT_DataType(*dttype);
+      break;
+  }
+
+  *nIndexNew = getNextFreeIndex();
+  typeTable[*nIndexNew] = type;
+  types[*nIndexNew] = types[nIndexOld];
 }
 
 int CkDDT::getEnvelope(int nIndex, int *ni, int *na, int *nd, int *combiner) const
@@ -201,6 +235,7 @@ int CkDDT::getEnvelope(int nIndex, int *ni, int *na, int *nd, int *combiner) con
   CkDDT_DataType* dttype = getType(nIndex);
   return dttype->getEnvelope(ni, na, nd, combiner);
 }
+
 int CkDDT::getContents(int nIndex, int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const
 {
   CkDDT_DataType* dttype = getType(nIndex);
@@ -225,10 +260,49 @@ void
 CkDDT::createResized(CkDDT_Type oldtype, CkDDT_Aint lb, CkDDT_Aint extent, CkDDT_Type *newtype)
 {
   CkDDT_DataType *dttype = getType(oldtype);
-  CkDDT_DataType *type = new CkDDT_DataType(*dttype,lb,extent);
-  int index = *newtype = getNextFreeIndex();
-  typeTable[index] = type;
-  types[index] = types[oldtype];
+  CkDDT_DataType *type;
+
+  switch(dttype->getType()) {
+    case CkDDT_CONTIGUOUS:
+      type = new CkDDT_Contiguous(static_cast<CkDDT_Contiguous&> (*dttype));
+      type->setSize(lb, extent);
+      break;
+    case CkDDT_VECTOR:
+      type = new CkDDT_Vector(static_cast<CkDDT_Vector&> (*dttype));
+      type->setSize(lb, extent);
+      break;
+    case CkDDT_HVECTOR:
+      type = new CkDDT_HVector(static_cast<CkDDT_HVector&> (*dttype));
+      type->setSize(lb, extent);
+      break;
+    case CkDDT_INDEXED:
+      type = new CkDDT_Indexed(static_cast<CkDDT_Indexed&> (*dttype));
+      type->setSize(lb, extent);
+      break;
+    case CkDDT_HINDEXED:
+      type = new CkDDT_HIndexed(static_cast<CkDDT_HIndexed&> (*dttype));
+      type->setSize(lb, extent);
+      break;
+    case CkDDT_STRUCT:
+      type = new CkDDT_Struct(static_cast<CkDDT_Struct&> (*dttype));
+      type->setSize(lb, extent);
+      break;
+    case CkDDT_INDEXED_BLOCK:
+      type = new CkDDT_Indexed_Block(static_cast<CkDDT_Indexed_Block&> (*dttype));
+      type->setSize(lb, extent);
+      break;
+    case CkDDT_HINDEXED_BLOCK:
+      type = new CkDDT_HIndexed_Block(static_cast<CkDDT_HIndexed_Block&> (*dttype));
+      type->setSize(lb, extent);
+      break;
+    default:
+      type = new CkDDT_DataType(*dttype, lb, extent);
+      break;
+  }
+
+  *newtype = getNextFreeIndex();
+  typeTable[*newtype] = type;
+  types[*newtype] = types[oldtype];
 }
 
 void
@@ -522,6 +596,12 @@ CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType &obj, CkDDT_Aint _lb, CkDDT_
   nameLen     = obj.nameLen;
   memcpy(name, obj.name, nameLen+1);
 
+  setSize(_lb, _extent);
+}
+
+void
+CkDDT_DataType::setSize(CkDDT_Aint _lb, CkDDT_Aint _extent)
+{
   extent = _extent;
   lb     = _lb;
   ub     = lb + extent;

@@ -151,10 +151,8 @@ class CkDDT_DataType {
     int nameLen;
     bool isAbsolute;
 
-  private:
-    CkDDT_DataType& operator=(const CkDDT_DataType& obj);
-
   public:
+    CkDDT_DataType& operator=(const CkDDT_DataType& obj);
     CkDDT_DataType() { }
     virtual ~CkDDT_DataType() { }
     CkDDT_DataType(int type);
@@ -190,6 +188,8 @@ class CkDDT_DataType {
     void setName(const char *src);
     void getName(char *dest, int *len) const;
     void setAbsolute(bool arg);
+
+    void setSize(CkDDT_Aint lb, CkDDT_Aint extent);
 };
 
 /*
@@ -201,10 +201,10 @@ class CkDDT_DataType {
 class CkDDT_Contiguous : public CkDDT_DataType {
 
  private:
-  CkDDT_Contiguous(const CkDDT_Contiguous& obj);
   CkDDT_Contiguous& operator=(const CkDDT_Contiguous& obj);
 
  public:
+  CkDDT_Contiguous(const CkDDT_Contiguous& obj) = default;
   CkDDT_Contiguous() { };
   CkDDT_Contiguous(int count, int index, CkDDT_DataType* oldType);
   virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
@@ -230,12 +230,13 @@ class CkDDT_Vector : public CkDDT_DataType {
     int strideLength ;
 
   private:
-    CkDDT_Vector(const CkDDT_Vector& obj);
     CkDDT_Vector& operator=(const CkDDT_Vector& obj);
 
   public:
+    CkDDT_Vector(const CkDDT_Vector& obj) = default;
     CkDDT_Vector(int count, int blklen, int stride, int index,
                 CkDDT_DataType* type);
+    CkDDT_Vector(const CkDDT_Vector &obj, CkDDT_Aint _lb, CkDDT_Aint _extent);
     CkDDT_Vector() { } ;
     ~CkDDT_Vector() { } ;
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
@@ -259,13 +260,14 @@ class CkDDT_Vector : public CkDDT_DataType {
 class CkDDT_HVector : public CkDDT_Vector {
 
   private:
-    CkDDT_HVector(const CkDDT_HVector& obj) ;
     CkDDT_HVector& operator=(const CkDDT_HVector& obj);
 
   public:
+    CkDDT_HVector(const CkDDT_HVector& obj) = default;
     CkDDT_HVector() { } ;
     CkDDT_HVector(int nCount,int blength,int strideLen,int index,
                 CkDDT_DataType* type);
+    CkDDT_HVector(const CkDDT_HVector &obj, CkDDT_Aint _lb, CkDDT_Aint _extent);
     ~CkDDT_HVector() { } ;
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual void pupType(PUP::er &p, CkDDT* ddt);
@@ -292,10 +294,10 @@ class CkDDT_Indexed : public CkDDT_DataType {
     CkDDT_Aint* arrayDisplacements ;
 
   private:
-    CkDDT_Indexed(const CkDDT_Indexed& obj);
     CkDDT_Indexed& operator=(const CkDDT_Indexed& obj) ;
 
   public:
+    CkDDT_Indexed(const CkDDT_Indexed& obj) = default;
     CkDDT_Indexed(int count, const int* arrBlock, const CkDDT_Aint* arrDisp, int index,
                 CkDDT_DataType* type);
     CkDDT_Indexed() { } ;
@@ -321,13 +323,14 @@ class CkDDT_Indexed : public CkDDT_DataType {
 class CkDDT_HIndexed : public CkDDT_Indexed {
 
   private:
-    CkDDT_HIndexed(const CkDDT_HIndexed& obj);
     CkDDT_HIndexed& operator=(const CkDDT_HIndexed& obj);
 
   public:
+    CkDDT_HIndexed(const CkDDT_HIndexed& obj) = default;
     CkDDT_HIndexed() { } ;
     CkDDT_HIndexed(int count, const int* arrBlock, const CkDDT_Aint* arrDisp, int index,
                  CkDDT_DataType* type);
+    CkDDT_HIndexed(const CkDDT_HIndexed &obj, CkDDT_Aint _lb, CkDDT_Aint _extent);
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual void pupType(PUP::er &p, CkDDT* ddt);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
@@ -356,12 +359,13 @@ class CkDDT_Indexed_Block : public CkDDT_DataType
     CkDDT_Aint *arrayDisplacements;
 
   private:
-    CkDDT_Indexed_Block(const CkDDT_Indexed_Block &obj);
     CkDDT_Indexed_Block& operator=(const CkDDT_Indexed_Block &obj);
 
   public:
+    CkDDT_Indexed_Block(const CkDDT_Indexed_Block &obj) = default;
     CkDDT_Indexed_Block(int count, int Blength, const CkDDT_Aint *ArrDisp, int index, CkDDT_DataType *type);
     CkDDT_Indexed_Block() { };
+    CkDDT_Indexed_Block(const CkDDT_Indexed_Block &obj, CkDDT_Aint _lb, CkDDT_Aint _extent);
     ~CkDDT_Indexed_Block() ;
     virtual size_t serialize(char *userdata, char *buffer, int num, int dir) const;
     virtual void pupType(PUP::er &p, CkDDT *ddt);
@@ -388,12 +392,13 @@ class CkDDT_HIndexed_Block : public CkDDT_Indexed_Block
 {
   
   private:
-    CkDDT_HIndexed_Block(const CkDDT_Indexed_Block &obj);
-    CkDDT_HIndexed_Block& operator=(const CkDDT_Indexed_Block &obj);
+    CkDDT_HIndexed_Block& operator=(const CkDDT_HIndexed_Block &obj);
 
   public:
+    CkDDT_HIndexed_Block(const CkDDT_HIndexed_Block &obj) = default;
     CkDDT_HIndexed_Block(int count, int Blength, const CkDDT_Aint *ArrDisp, int index, CkDDT_DataType *type);
     CkDDT_HIndexed_Block() { };
+    CkDDT_HIndexed_Block(const CkDDT_HIndexed_Block &obj, CkDDT_Aint _lb, CkDDT_Aint _extent);
     ~CkDDT_HIndexed_Block() ;
     virtual size_t serialize(char *userdata, char *buffer, int num, int dir) const;
     virtual void pupType(PUP::er &p, CkDDT *ddt);
@@ -423,13 +428,14 @@ class CkDDT_Struct : public CkDDT_DataType {
     CkDDT_DataType** arrayDataType;
 
   private:
-    CkDDT_Struct(const CkDDT_Struct& obj);
     CkDDT_Struct& operator=(const CkDDT_Struct& obj);
 
   public:
+    CkDDT_Struct(const CkDDT_Struct& obj) = default;
     CkDDT_Struct() { } ;
     CkDDT_Struct(int count, const int* arrBlock, const CkDDT_Aint* arrDisp, const int *index,
                CkDDT_DataType **type);
+    CkDDT_Struct(const CkDDT_Struct &obj, CkDDT_Aint _lb, CkDDT_Aint _extent);
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
