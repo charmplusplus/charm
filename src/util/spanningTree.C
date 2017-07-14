@@ -77,9 +77,11 @@ ST_RecursivePartition<Iterator>::ST_RecursivePartition(bool nodeTree, bool preSo
   : nodeTree(nodeTree), preSorted(preSorted)
 {
   tmgr = TopoManager::getTopoManager();
-  for (int i=0; i < tmgr->getNumDims(); i++) {
-    if (tmgr->getDimSize(i) > DIM_SET_SIZE)
-      CkAbort("ST_RecursivePartition:: Increase bitset size to match size of largest topology dimension");
+  if (tmgr->haveTopologyInfo()) {
+    for (int i=0; i < tmgr->getNumDims(); i++) {
+      if (tmgr->getDimSize(i) > DIM_SET_SIZE)
+        CkAbort("ST_RecursivePartition:: Increase bitset size to match size of largest topology dimension");
+    }
   }
 #if _DEBUG_SPANNING_TREE_
   if (CkMyNode() == 0) {
