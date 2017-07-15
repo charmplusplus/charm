@@ -161,7 +161,7 @@ const char *mylogin(void)
     sprintf(cmd, "id -u -n");
     p = popen(cmd, "r");
     if (p) {
-      fscanf(p, "%s", uname);
+      fscanf(p, "%63s", uname);
       pclose(p);
       return strdup(uname);
     } else

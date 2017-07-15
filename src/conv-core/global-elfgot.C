@@ -128,7 +128,7 @@ static void readBlacklist()
   printf("Loading blacklist from file \"%s\" ... \n", fname);
   while (!feof(bl)){
     char name[512];
-    fscanf(bl, "%s\n", name);
+    fscanf(bl, "%511s\n", name);
      _blacklist.push_back(strdup(name));
   }
   fclose(bl);

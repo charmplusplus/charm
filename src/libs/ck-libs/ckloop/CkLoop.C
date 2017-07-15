@@ -44,7 +44,7 @@ static int HelperOnCore() {
     if (ifp == NULL) return -1;
     fseek(ifp, 0, SEEK_SET);
     char str[128];
-    for (int i=0; i<39; i++) fscanf(ifp, "%s", str);
+    for (int i=0; i<39; i++) fscanf(ifp, "%127s", str);
     fclose(ifp);
     return atoi(str);
 #else

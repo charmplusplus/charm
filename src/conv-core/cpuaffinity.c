@@ -379,7 +379,7 @@ int CmiOnCore() {
   }
   fseek(fp, 0, SEEK_SET);
   for (n=0; n<TASK_CPU_POS; n++)  {
-    fscanf(fp, "%s", str);
+    fscanf(fp, "%127s", str);
   }  
   return atoi(str);
 #else
