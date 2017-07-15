@@ -135,7 +135,7 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
  */
 
 #if ! CMK_MULTICAST_DEF_USE_COMMON_CODE
-void     CmiGroupInit();
+void     CmiGroupInit(void);
 CmiGroup CmiEstablishGroup(int npes, int *pes);
 void     CmiLookupGroup(CmiGroup grp, int *npes, int **pes);
 #endif
@@ -154,7 +154,7 @@ void     CmiLookupGroup(CmiGroup grp, int *npes, int **pes);
 #if CMK_CMIDELIVERS_USE_COMMON_CODE /* use the default one */
 
 CpvDeclare(void*, CmiLocalQueue);
-void *CmiGetNonLocal();
+void *CmiGetNonLocal(void);
 
 #elif /* reimplement the scheduler and delivery */
 
@@ -162,7 +162,7 @@ void CsdSchedulerState_new(CsdSchedulerState_t *state);
 void *CsdNextMessage(CsdSchedulerState_t *state);
 int  CsdScheduler(int maxmsgs);
 
-void CmiDeliversInit();
+void CmiDeliversInit(void);
 int  CmiDeliverMsgs(int maxmsgs);
 void CmiDeliverSpecificMsg(int handler);
 
@@ -181,8 +181,8 @@ int _Cmi_mype;
 int _Cmi_numpes;
 int _Cmi_myrank; /* Normally zero; only 1 during SIGIO handling */
 
-void CmiMemLock();
-void CmiMemUnlock();
+void CmiMemLock(void);
+void CmiMemUnlock(void);
 
 #endif
 
@@ -193,8 +193,8 @@ int _Cmi_mynodesize;
 int _Cmi_mynode;
 int _Cmi_numnodes;
 
-int CmiMyPe();
-int CmiMyRank();
+int CmiMyPe(void);
+int CmiMyRank(void);
 int CmiNodeFirst(int node);
 int CmiNodeSize(int node);
 int CmiNodeOf(int pe);
@@ -205,7 +205,7 @@ int CmiRankOf(int pe);
  */
 void CmiNodeBarrier(void);
 void CmiNodeAllBarrier(void);
-CmiNodeLock CmiCreateLock();
+CmiNodeLock CmiCreateLock(void);
 void CmiDestroyLock(CmiNodeLock lock);
 
 #endif
@@ -223,8 +223,8 @@ int          CmiTryLock(CmiNodeLock lock);
 /* optional, these functions are implemented in "machine-smp.c", so including
    this file avoid the necessity to reimplement them.
  */
-void CmiNodeBarrier();
-void CmiNodeAllBarrier();
+void CmiNodeBarrier(void);
+void CmiNodeAllBarrier(void);
 CmiNodeLock  CmiCreateLock(void);
 void         CmiDestroyLock(CmiNodeLock lock);
 
@@ -238,8 +238,8 @@ int _Cmi_mynodesize;
 int _Cmi_mynode;
 int _Cmi_numnodes;
 
-int CmiMyPe();
-int CmiMyRank();
+int CmiMyPe(void);
+int CmiMyRank(void);
 int CmiNodeFirst(int node);
 int CmiNodeSize(int node);
 int CmiNodeOf(int pe);
@@ -266,18 +266,18 @@ void CmiDestroyLock(CmiNodeLock lock);
    needed. */
 
 void   CmiTimerInit(char **argv);
-double CmiTimer();
-double CmiWallTimer();
-double CmiCpuTimer();
-int    CmiTimerIsSynchronized();
+double CmiTimer(void);
+double CmiWallTimer(void);
+double CmiCpuTimer(void);
+int    CmiTimerIsSynchronized(void);
 
 /* If one of the following is set to 1, barriers are needed:
    CMK_TIMER_USE_GETRUSAGE
    CMK_TIMER_USE_RDTSC
 */
 
-int CmiBarrier();
-int CmiBarrierZero();
+int CmiBarrier(void);
+int CmiBarrierZero(void);
 
 
 /** PRINTF FUNCTIONS
@@ -331,7 +331,7 @@ void     CmiNodeSpanTreeChildren(int node, int *children) ;
 #include "immediate.c"
 
 #if ! CMK_MACHINE_PROGRESS_DEFINED /* Hack for some machines */
-void CmiProbeImmediateMsg();
+void CmiProbeImmediateMsg(void);
 #endif
 
 #endif
@@ -350,6 +350,6 @@ void CmiProbeImmediateMsg();
 CpvDeclare(unsigned, networkProgressCount);
 int  networkProgressPeriod;
 
-void CmiMachineProgressImpl();
+void CmiMachineProgressImpl(void);
 
 #endif

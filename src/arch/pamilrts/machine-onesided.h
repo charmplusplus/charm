@@ -49,21 +49,21 @@ void rzv_rdma_recv_done   (
     void             * clientdata,
     pami_result_t      result);
 
-int LrtsGetRdmaOpInfoSize(){
+int LrtsGetRdmaOpInfoSize(void){
   return sizeof(CmiPAMIRzvRdmaOp_t);
 }
-int LrtsGetRdmaGenInfoSize(){
+int LrtsGetRdmaGenInfoSize(void){
   return sizeof(CmiPAMIRzvRdma_t);
 }
 int LrtsGetRdmaInfoSize(int numOps){
   return sizeof(CmiPAMIRzvRdma_t) + numOps * sizeof(CmiPAMIRzvRdmaOp_t);
 }
 
-int LrtsGetRdmaOpRecvInfoSize(){
+int LrtsGetRdmaOpRecvInfoSize(void){
   return sizeof(CmiPAMIRzvRdmaRecvOp_t);
 }
 
-int LrtsGetRdmaGenRecvInfoSize(){
+int LrtsGetRdmaGenRecvInfoSize(void){
   return sizeof(CmiPAMIRzvRdmaRecv_t);
 }
 

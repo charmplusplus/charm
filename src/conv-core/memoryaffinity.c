@@ -37,7 +37,7 @@ static void MEM_MASK_SET(int nid, mem_aff_mask *mem_mask) {
 static void MEM_MASK_CLEAR(int nid, mem_aff_mask *mem_mask) {
     *mem_mask = *mem_mask & (~(1<<nid));
 }
-int print_mem_affinity() {
+int print_mem_affinity(void) {
     mem_aff_mask mask;
     unsigned int len = 8*sizeof(mask);
     char spol[16];

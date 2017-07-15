@@ -95,7 +95,7 @@ extern "C" {
 LBtopoFn LBTopoLookup(char *);
 int getTopoMaxNeighbors(void *topo);
 void getTopoNeighbors(void *topo, int myid, int* na, int *n);
-void printoutTopo();
+void printoutTopo(void);
 #ifdef __cplusplus
 }
 #endif

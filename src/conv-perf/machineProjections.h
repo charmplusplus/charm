@@ -7,8 +7,8 @@ extern "C" {
 #endif
 
 
-void machine_procIdle();
-void machine_procBusy();
+void machine_procIdle(void);
+void machine_procBusy(void);
 
 #ifdef __cplusplus
 }

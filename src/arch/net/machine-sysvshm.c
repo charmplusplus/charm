@@ -126,8 +126,8 @@ SysvshmContext *sysvshmContext=NULL; /* global context */
 
 
 void calculateNodeSizeAndRank(char **);
-void setupSharedBuffers();
-void initAllSendQs();
+void setupSharedBuffers(void);
+void initAllSendQs(void);
 
 /******************
  * 	Initialization routine
@@ -172,9 +172,9 @@ void CmiInitSysvshm(char **argv){
  * shutdown shmem objects and semaphores
  *
  * *******************/
-void tearDownSharedBuffers();
+void tearDownSharedBuffers(void);
 
-void CmiExitSysvshm(){
+void CmiExitSysvshm(void){
 	int i=0;
 	
 	if(sysvshmContext->nodesize != 1){
@@ -285,14 +285,14 @@ void CmiSendMessageSysvshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int 
 
 };
 
-inline void emptyAllRecvBufs();
-inline void flushAllSendQs();
+inline void emptyAllRecvBufs(void);
+inline void flushAllSendQs(void);
 
 /**********
  * Extract all the messages from the recvBuffers you can
  * Flush all sendQs
  * ***/
-inline void CommunicationServerSysvshm(){
+inline void CommunicationServerSysvshm(void){
 	
 #if SYSVSHM_STATS
 	double _startCommServerTime =CmiWallTimer();
@@ -354,7 +354,7 @@ void createShmObjectsAndSems(sharedBufData **bufs, int *bufnames,int issend);
  * 	open these shared objects and semaphores
  * *********/
 
-void setupSharedBuffers(){
+void setupSharedBuffers(void){
 	int i=0;
 
         CmiAssert((sysvshmContext->recvbufnames=(int *)malloc(sizeof(int)*(sysvshmContext->nodesize)))!=NULL);
@@ -456,7 +456,7 @@ void tearDownSharedBuffers(){
 
 void initSendQ(SysvshmSendQ *q,int size);
 
-void initAllSendQs(){
+void initAllSendQs(void){
 	int i=0;
 	sysvshmContext->sendQs = (SysvshmSendQ **) malloc(sizeof(SysvshmSendQ *)*sysvshmContext->nodesize);
 	for(i=0;i<sysvshmContext->nodesize;i++){
@@ -524,7 +524,7 @@ inline int flushSendQ(int dstRank){
 
 inline void emptyRecvBuf(sharedBufData *recvBuf);
 
-inline void emptyAllRecvBufs(){
+inline void emptyAllRecvBufs(void){
 	struct sembuf sb;
 	int i;
 	int j,ret;
@@ -555,7 +555,7 @@ inline void emptyAllRecvBufs(){
 	}
 };
 
-inline void flushAllSendQs(){
+inline void flushAllSendQs(void){
 	struct sembuf sb;
 	int i=0;
 	

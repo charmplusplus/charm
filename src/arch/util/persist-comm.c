@@ -109,7 +109,7 @@ void swapRecvSlotBuffers(PersistentReceivesTable *slot)
   }
 }
 
-PersistentHandle getFreeSendSlot()
+PersistentHandle getFreeSendSlot(void)
 {
   PersistentSendsTable *slot = (PersistentSendsTable *)malloc(sizeof(PersistentSendsTable));
   initSendSlot(slot);
@@ -125,7 +125,7 @@ PersistentHandle getFreeSendSlot()
   return slot;
 }
 
-PersistentHandle getFreeRecvSlot()
+PersistentHandle getFreeRecvSlot(void)
 {
   PersistentReceivesTable *slot = (PersistentReceivesTable *)malloc(sizeof(PersistentReceivesTable));
   initRecvSlot(slot);
@@ -735,7 +735,7 @@ void CmiDestroyPersistent(PersistentHandle h)
 }
 
 
-void CmiDestroyAllPersistent()
+void CmiDestroyAllPersistent(void)
 {
   PersistentSendsTable *sendslot = CpvAccess(persistentSendsTableHead);
   while (sendslot) {
@@ -763,7 +763,7 @@ void CmiDestroyAllPersistent()
 }
 
 
-void CmiPersistentInit()
+void CmiPersistentInit(void)
 {
   int i;
 
@@ -817,7 +817,7 @@ void CmiUsePersistentHandle(PersistentHandle *p, int n)
   CpvAccess(curphs) = 0;
 }
 
-void CmiPersistentOneSend()
+void CmiPersistentOneSend(void)
 {
   if (CpvAccess(phs)) CpvAccess(curphs)++;
 }

@@ -18,12 +18,12 @@ void LrtsSetRdmaOpInfo(void *dest, const void *ptr, int size, void *ack, int des
   CmiAbort("Should never reach here!");
 }
 
-int LrtsGetRdmaOpInfoSize() {
+int LrtsGetRdmaOpInfoSize(void) {
   CmiAbort("Should never reach here!");
   return -1;
 }
 
-int LrtsGetRdmaGenInfoSize() {
+int LrtsGetRdmaGenInfoSize(void) {
   CmiAbort("Should never reach here!");
   return -1;
 }
@@ -41,12 +41,12 @@ void LrtsSetRdmaRecvOpInfo(void *dest, void *buffer, void *src_ref, int size, in
   CmiAbort("Should never reach here!");
 }
 
-int LrtsGetRdmaOpRecvInfoSize() {
+int LrtsGetRdmaOpRecvInfoSize(void) {
   CmiAbort("Should never reach here!");
   return -1;
 }
 
-int LrtsGetRdmaGenRecvInfoSize() {
+int LrtsGetRdmaGenRecvInfoSize(void) {
   CmiAbort("Should never reach here!");
   return -1;
 }

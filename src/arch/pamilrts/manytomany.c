@@ -186,7 +186,7 @@ static void m2m_pkt_dispatch (pami_context_t       context,
 }
 
 
-void * CmiDirect_manytomany_allocate_handle () {  
+void * CmiDirect_manytomany_allocate_handle (void) {
 #if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
     CmiAbort("!!!!!!!!!Please build Charm++ with async in order to use many-to-many interface\n");
 #else 

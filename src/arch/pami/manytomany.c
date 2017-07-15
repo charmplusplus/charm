@@ -220,7 +220,7 @@ static void m2m_pkt_dispatch (pami_context_t       context,
 }
 
 
-void * CmiDirect_manytomany_allocate_handle () {
+void * CmiDirect_manytomany_allocate_handle (void) {
   if (!CpvInitialized(_handle))
     CpvInitialize(PAMICmiDirectM2mHandle*, _handle);
   if (!CpvInitialized(_completion_handler))

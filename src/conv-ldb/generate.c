@@ -18,7 +18,7 @@ Modified from the original: changed output format, and converted main to a param
 int addEdge(VerticesListType *graph, EdgeListType *l,int fm,int to);
 void addspEdge(VerticesListType *graph, EdgeListType *, int, int);
 int edgeExists(VerticesListType *graph, int fm, int to);
-static Q * makeQueue();
+static Q * makeQueue(void);
 static int isEmpty(Q*);
 static int dequeue(Q*);
 
@@ -27,7 +27,7 @@ int V; /* no. of vertices */
 int E; /* no. of edges */
 int C; /* no. of connections per vertex */
 
-VerticesListType * InitVertices();
+VerticesListType * InitVertices(EdgeListType * EdgeList, int V, int E);
 
 
 /* For testing... 

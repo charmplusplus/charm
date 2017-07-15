@@ -282,15 +282,15 @@ int getDestHandler;
 static void CommunicationServerNet(int withDelayMs, int where);
 //static void CommunicationServer(int withDelayMs);
 
-void CmiHandleImmediate();
-extern int CmemInsideMem();
-extern void CmemCallWhenMemAvail();
+void CmiHandleImmediate(void);
+extern int CmemInsideMem(void);
+extern void CmemCallWhenMemAvail(void);
 
 static unsigned int dataport=0;
 static SOCKET       dataskt;
 
-extern void TokenUpdatePeriodic();
-extern void getAvailSysMem();
+extern void TokenUpdatePeriodic(void);
+extern void getAvailSysMem(void);
 
 static int Lrts_numNodes;
 static int Lrts_myNode;
@@ -314,9 +314,9 @@ static int Lrts_myNode;
 static int machine_initiated_shutdown=0;
 static int already_in_signal_handler=0;
 
-static void CmiDestroyLocks();
+static void CmiDestroyLocks(void);
 
-void MachineExit();
+void MachineExit(void);
 
 static void machine_exit(int status)
 {
@@ -338,8 +338,7 @@ static void KillEveryone(const char *msg)
   machine_exit(1);
 }
 
-static void KillEveryoneCode(n)
-int n;
+static void KillEveryoneCode(int n)
 {
   char _s[100];
   sprintf(_s, "[%d] Fatal error #%d\n", CmiMyPe(), n);
@@ -842,8 +841,8 @@ int* inProgress;
 #if !CMK_SMP 
 
 static volatile int memflag=0;
-void CmiMemLockNet() { memflag++; }
-void CmiMemUnlockNet() { memflag--; }
+void CmiMemLockNet(void) { memflag++; }
+void CmiMemUnlockNet(void) { memflag--; }
 
 static volatile int comm_flag=0;
 #define CmiCommLockOrElse(dothis) if (comm_flag!=0) dothis
@@ -887,7 +886,7 @@ static void CommunicationInterrupt(int ignored)
 
 extern void CmiSignal(int sig1, int sig2, int sig3, void (*handler)());
 
-static void CmiDestroyLocks()
+static void CmiDestroyLocks(void)
 {
   comm_flag = 0;
   memflag = 0;
@@ -1428,7 +1427,7 @@ void copyInfiAddr(ChInfiAddr *qpList);
 #endif
 
 #if CMK_USE_IBVERBS && CMK_IBVERBS_FAST_START
-static void send_partial_init()
+static void send_partial_init(void)
 {
   ChMessageInt_t nodeNo = ChMessageInt_new(Lrts_myNode);
 	ctrl_sendone_nolock("partinit",(const char *)&(nodeNo),sizeof(nodeNo),NULL,0);
@@ -1686,9 +1685,9 @@ void LrtsFreeListSendFn(int npes, int *pes, int len, char *msg)
 #endif
 
 
-void LrtsDrainResources() { }
+void LrtsDrainResources(void) { }
 
-void LrtsPostNonLocal() { }
+void LrtsPostNonLocal(void) { }
 
 /* Network progress function is used to poll the network when for
    messages. This flushes receive buffers on some implementations*/
@@ -1718,7 +1717,7 @@ void LrtsAdvanceCommunication(int whileidle)
 
 /* happen at node level */
 /* must be called on every PE including communication processors */
-void LrtsBarrier()
+void LrtsBarrier(void)
 {
   int numnodes = CmiNumNodesGlobal();
   static int barrier_phase = 0;
@@ -1739,7 +1738,7 @@ void LrtsBarrier()
 }
 
 
-int CmiBarrierZero()
+int CmiBarrierZero(void)
 {
   int i;
   int numnodes = CmiNumNodesGlobal();
@@ -1884,7 +1883,7 @@ void LrtsPostCommonInit(int everReturn)
     
 }
 
-void LrtsExit()
+void LrtsExit(void)
 {
   int i;
   machine_initiated_shutdown=1;
@@ -2055,7 +2054,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
 #include "spert_ppu.h"
 
-void machine_OffloadAPIProgress() {
+void machine_OffloadAPIProgress(void) {
   LOCK_IF_AVAILABLE();
   OffloadAPIProgress();
   UNLOCK_IF_AVAILABLE();

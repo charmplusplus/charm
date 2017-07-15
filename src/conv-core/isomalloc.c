@@ -2362,7 +2362,7 @@ CmiIsomallocBlockList *CmiIsomallocBlockListNew(CthThread tid)
 }
 
 /* BIGSIM_OOC DEBUGGING */
-static void print_myslots();
+static void print_myslots(void);
 
 /*Pup all the blocks in this list.  This amounts to two circular
   list traversals.  Because everything's isomalloc'd, we don't even

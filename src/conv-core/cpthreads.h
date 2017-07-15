@@ -108,9 +108,9 @@ int   Cpthread_cond_signal(Cpthread_cond_t *cond);
 int   Cpthread_cond_broadcast(Cpthread_cond_t *cond);
 int   Cpthread_once(Cpthread_once_t *once, void (*fn)(void));
 
-int Cpthread_init();
+int Cpthread_init(void);
 
-void Cpthread_initialize();
+void Cpthread_initialize(void);
 void Cpthread_start_main(CmiStartFn fn, int argc, char **argv);
 
 #define Cpthread_yield() (CthYield())

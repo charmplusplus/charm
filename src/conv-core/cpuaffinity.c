@@ -247,7 +247,7 @@ int CmiSetCPUAffinity(int mycore)
 /* This implementation assumes the default x86 CPU mask size used by Linux */
 /* For a large SMP machine, this code should be changed to use a variable sized   */
 /* CPU affinity mask buffer instead, as the present code will fail beyond 32 CPUs */
-int print_cpu_affinity() {
+int print_cpu_affinity(void) {
 #ifdef _WIN32
   unsigned long pMask, sMask;
   HANDLE hProcess = GetCurrentProcess();
@@ -287,7 +287,7 @@ int print_cpu_affinity() {
 }
 
 #if CMK_SMP
-int print_thread_affinity() {
+int print_thread_affinity(void) {
   unsigned long mask;
   size_t len = sizeof(mask);
 
@@ -316,7 +316,7 @@ int print_thread_affinity() {
 }
 #endif
 
-int CmiPrintCPUAffinity()
+int CmiPrintCPUAffinity(void)
 {
 #if CMK_SMP
   return print_thread_affinity();
@@ -359,7 +359,7 @@ int get_affinity(cpu_set_t *cpuset) {
 }
 #endif
 
-int CmiOnCore() {
+int CmiOnCore(void) {
 #if CMK_OS_IS_LINUX
   /*
    * The info (task_cpu) is read from the Linux /proc virtual file system.
@@ -618,7 +618,7 @@ extern int getXTNodeID(int mpirank, int nummpiranks);
  * has been set explicitly by this module, it will print error and abort if
  * oversubscription detected.
  */
-void CmiCheckAffinity()
+void CmiCheckAffinity(void)
 {
 #if !defined(_WIN32) && CMK_SMP && CMK_HAS_PTHREAD_SETAFFINITY && defined(CPU_OR)
 
@@ -927,7 +927,7 @@ void CmiInitCPUAffinity(char **argv)
 }
 
 /* called in ConverseCommonInit to initialize basic variables */
-void CmiInitCPUAffinityUtil(){
+void CmiInitCPUAffinityUtil(void){
     char fname[64];
     CpvInitialize(int, myCPUAffToCore);
     CpvAccess(myCPUAffToCore) = -1;

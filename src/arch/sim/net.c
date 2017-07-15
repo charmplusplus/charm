@@ -15,7 +15,7 @@ static int latency_flag;
 static REL_TIME latency_f1();
 
 
-static comm_init()
+static comm_init(void)
 {
     float expdev();
 
@@ -32,9 +32,7 @@ static comm_init()
 
 
 
-static REL_TIME latency(cpu_pno,msg)
-int cpu_pno;
-MSG *msg;
+static REL_TIME latency(int cpu_pno, MSG *msg)
 {
     REL_TIME delay;
 
@@ -54,10 +52,7 @@ MSG *msg;
 
 
 
-static REL_TIME broadcast_effect(source,dest,delay)
-int      source; /* source CPU */
-int      dest;   /* dest   CPU */
-REL_TIME delay;
+static REL_TIME broadcast_effect(int source, int dest, REL_TIME delay)
 {
     int          distance;
     unsigned int temp;
@@ -80,8 +75,7 @@ REL_TIME delay;
 
 
 
-static network_ok_l(s,d,l)
-int s,d,l;
+static network_ok_l(int s, int d, int l)
 {
    return (pe_table[d].msg.num_of_elem < threshold.number.rcp);
 }
@@ -89,23 +83,20 @@ int s,d,l;
 
 
 
-static network_ok_s(s,d,l)
-int s,d,l;
+static network_ok_s(int s, int d, int l)
 {
    /* return (pe_table[d].msg.size+l < threshold.size.rcp); */
    return (pe_table[d].msg.size < threshold.size.rcp);
 }
 
 
-static network_ok_l_g(s,d,l)
-int s,d,l;
+static network_ok_l_g(int s, int d, int l)
 {
    return (net_load_l < threshold.number.net);
 }
 
 
-static network_ok_s_g(s,d,l)
-int s,d,l;
+static network_ok_s_g(int s, int d, int l)
 {
    /* return (net_load_s+l < threshold.size.net); */
    return (net_load_s < threshold.size.net);
@@ -113,9 +104,7 @@ int s,d,l;
 
 
 
-static cpu_accepts_l(pno,l)
-int pno;
-int l;
+static cpu_accepts_l(int pno, int l)
 {
    return (pe_table[pno].msg.num_of_elem < threshold.number.cpu);
 }
@@ -123,9 +112,7 @@ int l;
 
 
 
-static cpu_accepts_s(pno,l)
-int pno;
-int l;
+static cpu_accepts_s(int pno, int l)
 {
    return (pe_table[pno].msg.size+l < threshold.size.cpu);
 }
@@ -133,36 +120,30 @@ int l;
 
 
 
-static scp_accepts_l(pno,l)
-int pno;
-int l;
+static scp_accepts_l(int pno, int l)
 {
    return (pe_table[pno].msg.num_of_elem < threshold.number.scp);
 }
 
 
 
-static scp_accepts_s(pno,l)
-int pno;
-int l;
+static scp_accepts_s(int pno, int l)
 {
    return (pe_table[pno].msg.size+l < threshold.size.scp);
 }
 
 
 
-static always_accept() { return 1;}
+static always_accept(void) { return 1;}
 
 
-static increase_net_load(s)
-int s;
+static increase_net_load(int s)
 {
     net_load_l++;
     net_load_s += s;
 }
 
-static decrease_net_load(s)
-int s;
+static decrease_net_load(int s)
 {
     net_load_l--;
     net_load_s -= s;

@@ -41,7 +41,7 @@ typedef struct RecvCtrlMsgEntry{
 
 static RecvCtrlMsgEntry recvCtrlMsgList;
 
-static void createCtrlMsgIrecvBufs(){
+static void createCtrlMsgIrecvBufs(void){
 	int i;
 	MPICtrlMsgEntry *bufPtr = NULL;
 	MPI_Request *reqPtr = NULL;
@@ -83,7 +83,7 @@ static void sendViaCtrlMsg(int node, int size, char *msg, SMSG_LIST *smsg){
 }
 
 /* returns the size of msg to be received. If there's no msg to be received, then -1 is returned */
-static int recvViaCtrlMsg(){
+static int recvViaCtrlMsg(void){
 	int count = recvCtrlMsgList.bufCnt;
 	MPI_Request *ctrlReqs = recvCtrlMsgList.ctrlReqs;
 	MPICtrlMsgEntry *ctrlMsgs = recvCtrlMsgList.bufs;

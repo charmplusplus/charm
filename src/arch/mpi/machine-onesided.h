@@ -42,7 +42,7 @@ CpvDeclare(int, RdmaRecvQueueLen);
 
 void MPIPostRdmaBuffer(const void *buffer, void *ack, int size, int pe, int tag);
 
-int getNewMPITag(){
+int getNewMPITag(void){
 
   /* A local variable is used to avoid a race condition that can occur when
    * the global variable rdmaTag is updated by another thread after the first
@@ -67,11 +67,11 @@ int getNewMPITag(){
   return newRdmaTag;
 }
 
-int LrtsGetRdmaOpInfoSize(){
+int LrtsGetRdmaOpInfoSize(void){
   return sizeof(CmiMPIRzvRdmaOp_t);
 }
 
-int LrtsGetRdmaGenInfoSize(){
+int LrtsGetRdmaGenInfoSize(void){
   return sizeof(CmiMPIRzvRdma_t);
 }
 
@@ -79,11 +79,11 @@ int LrtsGetRdmaInfoSize(int numOps){
   return sizeof(CmiMPIRzvRdma_t) + numOps * sizeof(CmiMPIRzvRdmaOp_t);
 }
 
-int LrtsGetRdmaOpRecvInfoSize(){
+int LrtsGetRdmaOpRecvInfoSize(void){
   return sizeof(CmiMPIRzvRdmaRecvOp_t);
 }
 
-int LrtsGetRdmaGenRecvInfoSize(){
+int LrtsGetRdmaGenRecvInfoSize(void){
   return sizeof(CmiMPIRzvRdmaRecvList_t);
 }
 

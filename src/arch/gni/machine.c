@@ -764,13 +764,13 @@ static int checksum_flag = 0;
 
 static int print_stats = 0;
 static int stats_off = 0;
-void CmiTurnOnStats()
+void CmiTurnOnStats(void)
 {
     stats_off = 0;
     //CmiPrintf("[%d][%d:%d]+++++++++++ turning on stats \n", CmiMyNode(), CmiMyPe(), CmiMyRank());
 }
 
-void CmiTurnOffStats()
+void CmiTurnOffStats(void)
 {
     stats_off = 1;
 }
@@ -832,7 +832,7 @@ static Comm_Thread_Stats   comm_stats;
 
 static char *counters_dirname = "counters";
 
-static void init_comm_stats()
+static void init_comm_stats(void)
 {
   memset(&comm_stats, 0, sizeof(Comm_Thread_Stats));
   if (print_stats){
@@ -944,7 +944,7 @@ static void init_comm_stats()
               comm_stats.max_time_in_PumpDatagramConnection = t;    \
         }
 
-static void print_comm_stats()
+static void print_comm_stats(void)
 {
     fprintf(counterLog, "Node[%d] SMSG time in buffer\t[total:%f\tmax:%f\tAverage:%f](milisecond)\n", myrank, 1000.0*comm_stats.all_time_in_send_buffered_smsg, 1000.0*comm_stats.max_time_in_send_buffered_smsg, 1000.0*comm_stats.all_time_in_send_buffered_smsg/comm_stats.smsg_count);
     fprintf(counterLog, "Node[%d] Smsg  Msgs  \t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld Direct_put_done:%lld\t Persistent_put_done:%lld]\n", myrank, 
@@ -1174,10 +1174,10 @@ void my_free_huge_pages(void *ptr, int size)
 
 static int SendBufferMsg(SMSG_QUEUE *queue, SMSG_QUEUE *urgent_queue);
 static void SendRdmaMsg(PCQueue );
-static void PumpNetworkSmsg();
+static void PumpNetworkSmsg(void);
 static void PumpLocalTransactions(gni_cq_handle_t tx_cqh, CmiNodeLock cq_lock);
 #if CQWRITE
-static void PumpCqWriteTransactions();
+static void PumpCqWriteTransactions(void);
 #endif
 #if REMOTE_EVENT
 static void PumpRemoteTransactions(gni_cq_handle_t);
@@ -1726,11 +1726,11 @@ INLINE_KEYWORD static gni_return_t send_large_messages(SMSG_QUEUE *queue, int de
 #endif
 }
 
-INLINE_KEYWORD void LrtsBeginIdle() {}
+INLINE_KEYWORD void LrtsBeginIdle(void) {}
 
-INLINE_KEYWORD void LrtsStillIdle() {}
+INLINE_KEYWORD void LrtsStillIdle(void) {}
 
-INLINE_KEYWORD void LrtsNotifyIdle() {}
+INLINE_KEYWORD void LrtsNotifyIdle(void) {}
 
 INLINE_KEYWORD void LrtsPrepareEnvelope(char *msg, int size)
 {
@@ -1871,7 +1871,7 @@ void LrtsFreeListSendFn(int npes, int *pes, int len, char *msg)
 }
 #endif
 
-static void    PumpDatagramConnection();
+static void    PumpDatagramConnection(void);
 static      int         event_SetupConnect = 111;
 static      int         event_PumpSmsg = 222 ;
 static      int         event_PumpTransaction = 333;
@@ -1880,7 +1880,7 @@ static      int         event_SendBufferSmsg = 484;
 static      int         event_SendFmaRdmaMsg = 555;
 static      int         event_AdvanceCommunication = 666;
 
-static void registerUserTraceEvents() {
+static void registerUserTraceEvents(void) {
 #if CMI_MPI_TRACE_USEREVENTS && CMK_TRACE_ENABLED && !CMK_TRACE_IN_CHARM
     event_SetupConnect = traceRegisterUserEvent("setting up connections", -1 );
     event_PumpSmsg = traceRegisterUserEvent("Pump network small msgs", -1);
@@ -1892,7 +1892,7 @@ static void registerUserTraceEvents() {
 #endif
 }
 
-static void ProcessDeadlock()
+static void ProcessDeadlock(void)
 {
     static CmiUInt8 *ptr = NULL;
     static CmiUInt8  last = 0, mysum, sum;
@@ -1926,7 +1926,7 @@ static void ProcessDeadlock()
     _detected_hang = 0;
 }
 
-static void CheckProgress()
+static void CheckProgress(void)
 {
     if (smsg_send_count == last_smsg_send_count &&
         smsg_recv_count == last_smsg_recv_count ) 
@@ -1945,7 +1945,7 @@ static void CheckProgress()
     }
 }
 
-static void set_limit()
+static void set_limit(void)
 {
     //if (!user_set_flag && CmiMyRank() == 0) {
     if (CmiMyRank() == 0) {
@@ -1997,7 +1997,7 @@ void LrtsPostCommonInit(int everReturn)
 }
 
 /* this is called by worker thread */
-void LrtsPostNonLocal()
+void LrtsPostNonLocal(void)
 {
 #if 1
 
@@ -2030,7 +2030,7 @@ void LrtsPostNonLocal()
 /* Network progress function is used to poll the network when for
    messages. This flushes receive buffers on some  implementations*/
 #if CMK_MACHINE_PROGRESS_DEFINED
-void CmiMachineProgressImpl() {
+void CmiMachineProgressImpl(void) {
 #if ! CMK_SMP || MULTI_THREAD_SEND
 
     STATS_PUMPNETWORK_TIME(PumpNetworkSmsg());
@@ -2090,7 +2090,7 @@ void CmiMachineProgressImpl() {
 
 
 /* useDynamicSMSG */
-static void    PumpDatagramConnection()
+static void    PumpDatagramConnection(void)
 {
     uint32_t          remote_address;
     uint32_t          remote_id;
@@ -2140,7 +2140,7 @@ static void    PumpDatagramConnection()
 }
 
 /* pooling CQ to receive network message */
-static void PumpNetworkRdmaMsgs()
+static void PumpNetworkRdmaMsgs(void)
 {
     gni_cq_entry_t      event_data;
     gni_return_t        status;
@@ -2765,7 +2765,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id, uint8_t tag, PCQu
 }
 
 #if CQWRITE
-static void PumpCqWriteTransactions()
+static void PumpCqWriteTransactions(void)
 {
 
     gni_cq_entry_t          ev;
@@ -3475,7 +3475,7 @@ static int SendBufferMsg(SMSG_QUEUE *queue, SMSG_QUEUE *prio_queue)
 
 #endif
 
-static void ProcessDeadlock();
+static void ProcessDeadlock(void);
 void LrtsAdvanceCommunication(int whileidle)
 {
     static int count = 0;
@@ -3587,7 +3587,7 @@ void LrtsAdvanceCommunication(int whileidle)
 #endif
 }
 
-static void set_smsg_max()
+static void set_smsg_max(void)
 {
     char *env;
 
@@ -3610,7 +3610,7 @@ static void set_smsg_max()
 }    
 
 /* useDynamicSMSG */
-static void _init_dynamic_smsg()
+static void _init_dynamic_smsg(void)
 {
     gni_return_t status;
     uint32_t     vmdh_index = -1;
@@ -3662,7 +3662,7 @@ static void _init_dynamic_smsg()
     GNI_RC_CHECK("SmsgSetMaxRetrans Init", status);
 }
 
-static void _init_static_smsg()
+static void _init_static_smsg(void)
 {
     gni_smsg_attr_t      *smsg_attr;
     gni_smsg_attr_t      remote_smsg_attr;
@@ -3766,7 +3766,7 @@ static void _init_send_queue(SMSG_QUEUE *queue)
 }
 
 INLINE_KEYWORD
-static void _init_smsg()
+static void _init_smsg(void)
 {
     if(mysize > 1) {
         if (useDynamicSMSG)
@@ -3781,7 +3781,7 @@ static void _init_smsg()
 #endif
 }
 
-static void _init_static_msgq()
+static void _init_static_msgq(void)
 {
     gni_return_t status;
     /* MSGQ is to send and receive short messages for large jobs (exceeding 200,000 ranks). The          performance scales by the node count rather than rank count */
@@ -4294,7 +4294,7 @@ void  LrtsFree(void *msg)
     }
 }
 
-void LrtsExit()
+void LrtsExit(void)
 {
 #if CMK_WITH_STATS
 #if CMK_SMP
@@ -4314,7 +4314,7 @@ void LrtsExit()
     }
 }
 
-void LrtsDrainResources()
+void LrtsDrainResources(void)
 {
     if(mysize == 1) return;
     while (
@@ -4358,19 +4358,19 @@ static int _absoluteTime = 0;
 static int _is_global = 0;
 static struct timespec start_ts;
 
-INLINE_KEYWORD int CmiTimerIsSynchronized() {
+INLINE_KEYWORD int CmiTimerIsSynchronized(void) {
     return 0;
 }
 
-INLINE_KEYWORD int CmiTimerAbsolute() {
+INLINE_KEYWORD int CmiTimerAbsolute(void) {
     return _absoluteTime;
 }
 
-double CmiStartTimer() {
+double CmiStartTimer(void) {
     return 0.0;
 }
 
-double CmiInitTime() {
+double CmiInitTime(void) {
     return (double)(start_ts.tv_sec)+(double)start_ts.tv_nsec/1000000000.0;
 }
 
@@ -4425,7 +4425,7 @@ double CmiCpuTimer(void) {
 #endif
 /************Barrier Related Functions****************/
 
-void LrtsBarrier()
+void LrtsBarrier(void)
 {
     gni_return_t status;
 

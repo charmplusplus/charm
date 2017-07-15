@@ -25,17 +25,17 @@ extern "C" {
 /* initHybridAPI
    initializes the work request queue
 */
-void initHybridAPI();
+void initHybridAPI(void);
 
 /* gpuProgressFn
    called periodically to check if the current kernel has completed,
    and invoke subsequent kernel */
-void gpuProgressFn();
+void gpuProgressFn(void);
 
 /* exitHybridAPI
    cleans up and deletes memory allocated for the queue
 */
-void exitHybridAPI();
+void exitHybridAPI(void);
 
 
 #ifdef GPU_MEMPOOL

@@ -47,20 +47,18 @@ CpvDeclare(void*, CmiLocalQueue);
  *
  *****************************************************************************/
 
-int CmiAsyncMsgSent(c)
-CmiCommHandle c ;
+int CmiAsyncMsgSent(CmiCommHandle c)
 {
   return 1;
 }
 
-void CmiReleaseCommHandle(c)
-CmiCommHandle c ;
+void CmiReleaseCommHandle(CmiCommHandle c)
 {
 }
 
 /********************* CONTEXT-SWITCHING FUNCTIONS ******************/
 
-static void CmiNext()
+static void CmiNext(void)
 {
   CthThread t; int index; int orig;
   index = (CmiMyPe()+1) % CmiNumPes();
@@ -75,27 +73,27 @@ static void CmiNext()
   CthResume(t);
 }
 
-void CmiExit()
+void CmiExit(void)
 {
   CmiThreads[CmiMyPe()] = 0;
   CmiFree(CthSelf());
   CmiNext();
 }
 
-void *CmiGetNonLocal()
+void *CmiGetNonLocal(void)
 {
   CmiThreads[CmiMyPe()] = CthSelf();
   CmiNext();
   return 0;
 }
 
-void CmiNotifyIdle()
+void CmiNotifyIdle(void)
 {
   CmiThreads[CmiMyPe()] = CthSelf();
   CmiNext();
 }
 
-void CmiNodeBarrier()
+void CmiNodeBarrier(void)
 {
   int i;
   CmiNumBarred++;
@@ -107,7 +105,7 @@ void CmiNodeBarrier()
   CmiGetNonLocal();
 }
 
-void CmiNodeAllBarrier()
+void CmiNodeAllBarrier(void)
 {
   int i;
   CmiNumBarred++;
@@ -119,7 +117,7 @@ void CmiNodeAllBarrier()
   CmiGetNonLocal();
 }
 
-CmiNodeLock CmiCreateLock()
+CmiNodeLock CmiCreateLock(void)
 {
   CmiNodeLock lk = (CmiNodeLock)malloc(sizeof(int));
   *lk = 0;
@@ -156,10 +154,7 @@ void CmiDestroyLock(CmiNodeLock lk)
 
 /********************* MESSAGE SEND FUNCTIONS ******************/
 
-void CmiSyncSendFn(destPE, size, msg)
-int destPE;
-int size;
-char * msg;
+void CmiSyncSendFn(int destPE, int size, char *msg)
 {
   char *buf = (char *)CmiAlloc(size);
   memcpy(buf,msg,size);
@@ -167,10 +162,7 @@ char * msg;
   CQdCreate(CpvAccess(cQdState), 1);
 }
 
-CmiCommHandle CmiAsyncSendFn(destPE, size, msg) 
-int destPE;
-int size;
-char * msg;
+CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
 {
   char *buf = (char *)CmiAlloc(size);
   memcpy(buf,msg,size);
@@ -179,60 +171,45 @@ char * msg;
   return 0;
 }
 
-void CmiFreeSendFn(destPE, size, msg)
-int destPE;
-int size;
-char * msg;
+void CmiFreeSendFn(int destPE, int size, char *msg)
 {
   CdsFifo_Enqueue(CmiQueues[destPE], msg);
   CQdCreate(CpvAccess(cQdState), 1);
 }
 
-void CmiSyncBroadcastFn(size, msg)
-int size;
-char * msg;
+void CmiSyncBroadcastFn(int size, char *msg)
 {
   int i;
   for(i=0; i<CmiNumPes(); i++)
     if (i != CmiMyPe()) CmiSyncSendFn(i,size,msg);
 }
 
-CmiCommHandle CmiAsyncBroadcastFn(size, msg)
-int size;
-char * msg;
+CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg)
 {
   CmiSyncBroadcastFn(size, msg);
   return 0;
 }
 
-void CmiFreeBroadcastFn(size, msg)
-int size;
-char * msg;
+void CmiFreeBroadcastFn(int size, char *msg)
 {
   CmiSyncBroadcastFn(size, msg);
   CmiFree(msg);
 }
 
-void CmiSyncBroadcastAllFn(size, msg)
-int size;
-char * msg;
+void CmiSyncBroadcastAllFn(int size, char *msg)
 {
   int i;
   for(i=0; i<CmiNumPes(); i++)
     CmiSyncSendFn(i,size,msg);
 }
 
-CmiCommHandle CmiAsyncBroadcastAllFn(size, msg)
-int size;
-char * msg;
+CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg)
 {
   CmiSyncBroadcastAllFn(size,msg);
   return 0 ;
 }
 
-void CmiFreeBroadcastAllFn(size, msg)
-int size;
-char * msg;
+void CmiFreeBroadcastAllFn(int size, char *msg)
 {
   int i;
   for(i=0; i<CmiNumPes(); i++)
@@ -242,20 +219,19 @@ char * msg;
 }
 
 
-int CmiBarrier()
+int CmiBarrier(void)
 {
   return -1;
 }
 
-int CmiBarrierZero()
+int CmiBarrierZero(void)
 {
   return -1;
 }
 
 /************************** SETUP ***********************************/
 
-static void CmiParseArgs(argv)
-char **argv;
+static void CmiParseArgs(char **argv)
 {
   CmiGetArgInt(argv,"++stacksize",&Cmi_stacksize);
   _Cmi_numpes=1;
@@ -266,7 +242,7 @@ char **argv;
   }
 }
 
-char **CmiInitPE()
+char **CmiInitPE(void)
 {
   int argc; char **argv;
   argv = CmiCopyArgs(CmiArgv);
@@ -277,7 +253,7 @@ char **CmiInitPE()
   return argv;
 }
 
-void CmiCallMain()
+void CmiCallMain(void)
 {
   char **argv;
   argv = CmiInitPE();
@@ -286,7 +262,7 @@ void CmiCallMain()
   ConverseExit();
 }
 
-void ConverseExit()
+void ConverseExit(void)
 {
   ConverseCommonExit();
   CmiThreads[CmiMyPe()] = 0;
@@ -304,11 +280,7 @@ static int CmiSwitchToPEFn(int newpe)
 #endif
 
 
-void ConverseInit(argc,argv,fn,usched,initret)
-int argc;
-char **argv;
-CmiStartFn fn;
-int usched, initret;
+void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
   CthThread t; int stacksize, i;
   

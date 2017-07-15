@@ -28,4 +28,4 @@ void CldRestoreHandler(char *);
 void CldSwitchHandler(char *, int);
 void CldModuleGeneralInit();
 int  CldPresentPE(int pe);
-void seedBalancerExit();
+void seedBalancerExit(void);

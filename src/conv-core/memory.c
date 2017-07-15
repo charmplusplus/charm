@@ -78,7 +78,7 @@ int cpdInSystem=1; /*Start inside the system (until we start executing user code
 #if CMK_MEMORY_BUILD_OS
 #if CMK_MEMORY_BUILD_OS_WRAPPED
 
-void initialize_memory_wrapper();
+void initialize_memory_wrapper(void);
 void * initialize_memory_wrapper_calloc(size_t nelem, size_t size);
 void * initialize_memory_wrapper_malloc(size_t size);
 void * initialize_memory_wrapper_realloc(void *ptr, size_t size);
@@ -299,8 +299,7 @@ void *valloc(size_t size) { return meta_valloc(size); }
 
 static int skip_mallinfo = 0;
 
-void CmiMemoryInit(argv)
-  char **argv;
+void CmiMemoryInit(char ** argv)
 {
   if(CmiMyRank() == 0)   CmiMemoryIs_flag |= CMI_MEMORY_IS_OS;
 #if CMK_MEMORY_BUILD_OS_WRAPPED || CMK_MEMORY_BUILD_GNU_HOOKS
@@ -330,18 +329,18 @@ int sbrk(int s) { return 0; }
 
 #if CMK_HAS_MSTATS
 #include <malloc/malloc.h>
-INLINE static CMK_TYPEDEF_UINT8 MemusageMstats(){
+INLINE static CMK_TYPEDEF_UINT8 MemusageMstats(void){
 	struct mstats ms = mstats();
 	CMK_TYPEDEF_UINT8 memtotal = ms.bytes_used;
 	return memtotal;
 }
 #else
-INLINE static CMK_TYPEDEF_UINT8 MemusageMstats() { return 0; }
+INLINE static CMK_TYPEDEF_UINT8 MemusageMstats(void) { return 0; }
 #endif
 
 static int MemusageInited = 0;
 static CMK_TYPEDEF_UINT8 MemusageInitSbrkval = 0;
-INLINE static CMK_TYPEDEF_UINT8 MemusageSbrk(){
+INLINE static CMK_TYPEDEF_UINT8 MemusageSbrk(void){
 	CMK_TYPEDEF_UINT8 newval;
 	if(MemusageInited==0){
 		MemusageInitSbrkval = (CMK_TYPEDEF_UINT8)sbrk(0);
@@ -351,7 +350,7 @@ INLINE static CMK_TYPEDEF_UINT8 MemusageSbrk(){
 	return (newval - MemusageInitSbrkval);
 }
 
-INLINE static CMK_TYPEDEF_UINT8 MemusageProcSelfStat(){
+INLINE static CMK_TYPEDEF_UINT8 MemusageProcSelfStat(void){
     FILE *f;
     int i, ret;
     static int failed_once = 0;
@@ -369,12 +368,12 @@ INLINE static CMK_TYPEDEF_UINT8 MemusageProcSelfStat(){
 }
 
 #if ! CMK_HAS_MALLINFO || defined(CMK_MALLINFO_IS_BROKEN)
-INLINE static CMK_TYPEDEF_UINT8 MemusageMallinfo(){ return 0;}	
+INLINE static CMK_TYPEDEF_UINT8 MemusageMallinfo(void){ return 0;}
 #else
 #if CMK_HAS_MALLOC_H
 #include <malloc.h>
 #endif
-INLINE static CMK_TYPEDEF_UINT8 MemusageMallinfo(){
+INLINE static CMK_TYPEDEF_UINT8 MemusageMallinfo(void){
     /* IA64 seems to ignore mi.uordblks, but updates mi.hblkhd correctly */
     if (skip_mallinfo) return 0;
     else {
@@ -391,7 +390,7 @@ INLINE static CMK_TYPEDEF_UINT8 MemusageMallinfo(){
 }
 #endif
 
-INLINE static CMK_TYPEDEF_UINT8 MemusagePS(){
+INLINE static CMK_TYPEDEF_UINT8 MemusagePS(void){
 #if ! CMK_HAS_POPEN
     return 0;
 #else	
@@ -413,7 +412,7 @@ INLINE static CMK_TYPEDEF_UINT8 MemusagePS(){
 #include <windows.h>
 #include <psapi.h>
 
-INLINE static CMK_TYPEDEF_UINT8 MemusageWindows(){
+INLINE static CMK_TYPEDEF_UINT8 MemusageWindows(void){
     PROCESS_MEMORY_COUNTERS pmc;
     if ( GetProcessMemoryInfo( GetCurrentProcess(), &pmc, sizeof(pmc)) )
     {
@@ -423,25 +422,25 @@ INLINE static CMK_TYPEDEF_UINT8 MemusageWindows(){
     return 0;
 }
 #else
-static CMK_TYPEDEF_UINT8 MemusageWindows(){
+static CMK_TYPEDEF_UINT8 MemusageWindows(void){
     return 0;
 }
 #endif
 
 #if CMK_BLUEGENEQ
 #include <spi/include/kernel/memory.h>
-INLINE static CMK_TYPEDEF_UINT8 MemusageBGQ(){
+INLINE static CMK_TYPEDEF_UINT8 MemusageBGQ(void){
   CMK_TYPEDEF_UINT8 heapUsed;
   Kernel_GetMemorySize(KERNEL_MEMSIZE_HEAP, &heapUsed);
   return heapUsed;
 }
 #else
-static CMK_TYPEDEF_UINT8 MemusageBGQ(){
+static CMK_TYPEDEF_UINT8 MemusageBGQ(void){
     return 0;
 }
 #endif
 
-typedef CMK_TYPEDEF_UINT8 (*CmiMemUsageFn)();
+typedef CMK_TYPEDEF_UINT8 (*CmiMemUsageFn)(void);
 
 /* this structure defines the order of testing for memory usage functions */
 struct CmiMemUsageStruct {
@@ -457,7 +456,7 @@ struct CmiMemUsageStruct {
     {MemusagePS, "ps"},
 };
 
-CMK_TYPEDEF_UINT8 CmiMemoryUsage(){
+CMK_TYPEDEF_UINT8 CmiMemoryUsage(void){
     int i;
     CMK_TYPEDEF_UINT8 memtotal = 0;
     for (i=0; i<sizeof(memtest_order)/sizeof(struct CmiMemUsageStruct); i++) {
@@ -467,7 +466,7 @@ CMK_TYPEDEF_UINT8 CmiMemoryUsage(){
     return memtotal;
 }
 
-char *CmiMemoryUsageReporter(){
+char *CmiMemoryUsageReporter(void){
     int i;
     CMK_TYPEDEF_UINT8 memtotal = 0;
     char *reporter = NULL;
@@ -483,21 +482,21 @@ char *CmiMemoryUsageReporter(){
 
 #if CMK_HAS_RUSAGE_THREAD
 #include <sys/resource.h>
-CMK_TYPEDEF_UINT8 CmiMaxMemoryUsageR() {
+CMK_TYPEDEF_UINT8 CmiMaxMemoryUsageR(void) {
   struct rusage usage;
   getrusage(RUSAGE_SELF, &usage);
   return usage.ru_maxrss;
 }
 #else
-CMK_TYPEDEF_UINT8 CmiMaxMemoryUsageR() {
+CMK_TYPEDEF_UINT8 CmiMaxMemoryUsageR(void) {
   return 0;
 }
 #endif
 
-CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage() { return 0; }
-void CmiResetMaxMemory() {}
-CMK_TYPEDEF_UINT8 CmiMinMemoryUsage() { return 0; }
-void CmiResetMinMemory() {}
+CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage(void) { return 0; }
+void CmiResetMaxMemory(void) {}
+CMK_TYPEDEF_UINT8 CmiMinMemoryUsage(void) { return 0; }
+void CmiResetMinMemory(void) {}
 
 #undef MEM_LOCK_AROUND
 #define MEM_LOCK_AROUND(code)   code
@@ -693,28 +692,28 @@ void free_reentrant(void *mem)
 }
 
 /** Return number of bytes currently allocated, if possible. */
-CMK_TYPEDEF_UINT8 CmiMemoryUsage()
+CMK_TYPEDEF_UINT8 CmiMemoryUsage(void)
 {
   return _memory_allocated;
 }
 
 /** Return number of maximum number of bytes allocated since the last call to CmiResetMaxMemory(), if possible. */
-CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage()
+CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage(void)
 {
   return _memory_allocated_max;
 }
 
 /** Reset the mechanism that records the highest seen (high watermark) memory usage. */
-void CmiResetMaxMemory() {
+void CmiResetMaxMemory(void) {
   _memory_allocated_max=_memory_allocated;
 }
 
-CMK_TYPEDEF_UINT8 CmiMinMemoryUsage()
+CMK_TYPEDEF_UINT8 CmiMinMemoryUsage(void)
 {
   return _memory_allocated_min;
 }
 
-void CmiResetMinMemory() {
+void CmiResetMinMemory(void) {
   _memory_allocated_min=_memory_allocated;
 }
 
@@ -731,11 +730,11 @@ void free_nomigrate(void *mem) { free(mem); }
 /*Not using isomalloc heaps, so forget about activating block list:*/
 CmiIsomallocBlockList *CmiIsomallocBlockListActivate(CmiIsomallocBlockList *l)
    {return l;}
-CmiIsomallocBlockList *CmiIsomallocBlockListCurrent(){
+CmiIsomallocBlockList *CmiIsomallocBlockListCurrent(void){
 	return NULL;
 }
-void CmiEnableIsomalloc() {}
-void CmiDisableIsomalloc() {}
+void CmiEnableIsomalloc(void) {}
+void CmiDisableIsomalloc(void) {}
 #endif
 
 #ifndef CMI_MEMORY_ROUTINES
@@ -745,7 +744,7 @@ void CmiMemorySweep(const char *where) {}
 void CmiMemoryCheck(void) {}
 #endif
 
-void memory_preallocate_hack()
+void memory_preallocate_hack(void)
 {
 #if CMK_MEMORY_PREALLOCATE_HACK
   /* Work around problems with brk() on some systems (e.g., Blue Gene/L)
@@ -800,13 +799,13 @@ void setMemoryTypeChare(void *ptr) { }
 #undef setMemoryTypeMessage
 #endif
 void setMemoryTypeMessage(void *ptr) { }
-void CpdSystemEnter() { }
-void CpdSystemExit() { }
+void CpdSystemEnter(void) { }
+void CpdSystemExit(void) { }
 
-void CpdResetMemory() { }
-void CpdCheckMemory() { }
+void CpdResetMemory(void) { }
+void CpdCheckMemory(void) { }
 
-int get_memory_allocated_user_total() { return 0; }
+int get_memory_allocated_user_total(void) { return 0; }
 void * MemoryToSlot(void *ptr) { return NULL; }
 int Slot_ChareOwner(void *s) { return 0; }
 int Slot_AllocatedSize(void *s) { return 0; }

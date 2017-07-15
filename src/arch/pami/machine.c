@@ -181,7 +181,7 @@ CsvDeclare(CmiNodeState, NodeState);
 //Immediate messages not supported yet
 #define AdvanceCommunications() 
 #else
-void AdvanceCommunications();
+void AdvanceCommunications(void);
 #endif
 
 #if !CMK_SMP
@@ -964,7 +964,7 @@ unsigned char spin_iter[MAX_BARRIER_THREADS];
 volatile unsigned char done_flag[2];
 
 //slow barrier for ckexit that calls advance while spinning
-void spin_wait_barrier () {
+void spin_wait_barrier (void) {
   int i = 0;
   int iter = spin_iter[CmiMyRank()];
   int iter_1 = (iter + 1) % 2;
@@ -1098,7 +1098,7 @@ char *CmiGetNonLocalNodeQ(void) {
 #endif
 
 
-void *CmiGetNonLocal() {
+void *CmiGetNonLocal(void) {
 
     void *msg = NULL;
     CmiState cs = CmiGetState();
@@ -1497,7 +1497,7 @@ void CmiFreeBroadcastAllFn(int size, char *msg) {
 
 #if !CMK_ENABLE_ASYNC_PROGRESS  
 //threads have to progress contexts themselves   
-void AdvanceCommunications() {
+void AdvanceCommunications(void) {
     pami_context_t my_context = MY_CONTEXT();
 
 #if CMK_TRACE_ENABLED
@@ -1526,7 +1526,7 @@ void AdvanceCommunications() {
 #endif
 
 
-void CmiNotifyIdle() {
+void CmiNotifyIdle(void) {
   AdvanceCommunications();
 #if CMK_BLUEGENEQ && CMK_SMP && CMK_PAMI_MULTI_CONTEXT
 #if !CMK_ENABLE_ASYNC_PROGRESS && CMK_PPC_ATOMIC_QUEUE
@@ -1838,8 +1838,8 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
 
-int CmiMyPe();
-int CmiMyRank();
+int CmiMyPe(void);
+int CmiMyRank(void);
 int CmiNodeFirst(int node);
 int CmiNodeSize(int node);
 int CmiNodeOf(int pe);
@@ -1873,14 +1873,14 @@ int CmiRankOf(int pe)      {
  */
 void CmiNodeBarrier(void);
 void CmiNodeAllBarrier(void);
-CmiNodeLock CmiCreateLock();
+CmiNodeLock CmiCreateLock(void);
 void CmiDestroyLock(CmiNodeLock lock);
 
 #endif
 
 
 /* Dummy implementation */
-extern int CmiBarrier() {
+extern int CmiBarrier(void) {
   CmiNodeBarrier();
   if (CmiMyRank() == 0)
     CmiNetworkBarrier(1);

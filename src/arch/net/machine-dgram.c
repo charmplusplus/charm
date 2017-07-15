@@ -110,7 +110,7 @@ static int    Cmi_comm_periodic_delay;
 static int    Cmi_comm_clock_delay;
 static int writeableAcks,writeableDgrams;/*Write-queue counts (to know when to sleep)*/
 
-static void setspeed_atm()
+static void setspeed_atm(void)
 {
   Cmi_max_dgram_size   = 2048;
   Cmi_os_buffer_size   = 50000;
@@ -119,7 +119,7 @@ static void setspeed_atm()
   Cmi_ack_delay        = 0.0035;
 }
 
-static void setspeed_eth()
+static void setspeed_eth(void)
 {
   Cmi_max_dgram_size   = 1400;
   Cmi_window_size      = 32;	    /*40*/
@@ -128,7 +128,7 @@ static void setspeed_eth()
   Cmi_ack_delay        = 0.0050;
 }
 
-static void setspeed_gigabit()
+static void setspeed_gigabit(void)
 {
   /* for gigabit net */
   Cmi_max_dgram_size   = 9000;
@@ -236,14 +236,14 @@ struct infiOtherNodeData *initinfiData(int node,int lid,int qpn,int psn);
 #if CMK_USE_IBVERBS
 struct infiOtherNodeData;
 struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]);
-void	infiPostInitialRecvs();
+void	infiPostInitialRecvs(void);
 #endif
 
 #if CMK_USE_SYSVSHM
-inline void CommunicationServerSysvshm();
+inline void CommunicationServerSysvshm(void);
 #endif
 #if CMK_USE_PXSHM
-inline void CommunicationServerPxshm();
+inline void CommunicationServerPxshm(void);
 #endif
 
 #if CMK_USE_AMMASSO

@@ -27,7 +27,7 @@ static void commThdHandleNotification(CmiNotifyCommThdMsg *msg){
 }
 
 /* Should be called in ConverseRunPE after ConverseCommonInit */
-void CmiInitNotifyCommThdScheme(){
+void CmiInitNotifyCommThdScheme(void){
     CpvInitialize(int, notifyCommThdHdlr);
     CpvAccess(notifyCommThdHdlr) = CmiRegisterHandler((CmiHandler)commThdHandleNotification);;
     /* init the msg buffer */

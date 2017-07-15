@@ -179,10 +179,10 @@ XpmemContext *xpmemContext=NULL; //global context
 
 
 void calculateNodeSizeAndRank(char **);
-void setupSharedBuffers();
-void initAllSendQs();
+void setupSharedBuffers(void);
+void initAllSendQs(void);
 
-void CmiExitXpmem();
+void CmiExitXpmem(void);
 
 static void cleanupOnAllSigs(int signo)
 {
@@ -267,10 +267,10 @@ void CmiInitXpmem(char **argv){
  *
  * *******************/
 static int pxshm_freed = 0;
-void tearDownSharedBuffers();
-void freeSharedBuffers();
+void tearDownSharedBuffers(void);
+void freeSharedBuffers(void);
 
-void CmiExitXpmem(){
+void CmiExitXpmem(void){
 	int i=0;
 	
         if (xpmemContext == NULL) return;
@@ -424,14 +424,14 @@ void CmiSendMessageXpmem(char *msg, int size, int dstnode, int *refcount)
 
 };
 
-inline void emptyAllRecvBufs();
-inline void flushAllSendQs();
+inline void emptyAllRecvBufs(void);
+inline void flushAllSendQs(void);
 
 /**********
  * Extract all the messages from the recvBuffers you can
  * Flush all sendQs
  * ***/
-inline void CommunicationServerXpmem()
+inline void CommunicationServerXpmem(void)
 {
 #if XPMEM_STATS
 	double _startCommServerTime =CmiWallTimer();
@@ -486,7 +486,7 @@ void calculateNodeSizeAndRank(char **argv)
 void allocBufNameStrings(char ***bufName);
 void createRecvXpmemAndSems(sharedBufData **bufs,char **bufNames);
 void createSendXpmemAndSems(sharedBufData **bufs,char **bufNames);
-void removeXpmemFiles();
+void removeXpmemFiles(void);
 
 /***************
  * 	calculate the name of the shared objects and semaphores
@@ -499,7 +499,7 @@ void removeXpmemFiles();
  *
  * 	open these shared objects and semaphores
  * *********/
-void setupSharedBuffers(){
+void setupSharedBuffers(void){
 	int i=0;
         
 	allocBufNameStrings(&(xpmemContext->recvBufNames));
@@ -689,14 +689,14 @@ void createSendXpmemAndSems(sharedBufData **bufs,char **bufNames)
         }
 }
 
-void removeXpmemFiles()
+void removeXpmemFiles(void)
 {
         char fname[64];
         sprintf(fname, ".xpmem.%d", xpmemContext->nodestart+xpmemContext->noderank);
         unlink(fname);
 }
 
-void freeSharedBuffers(){
+void freeSharedBuffers(void){
 	int i;
 	for(i= 0;i<xpmemContext->nodesize;i++){
 	    if(i != xpmemContext->noderank){
@@ -708,7 +708,7 @@ void freeSharedBuffers(){
 	}
 }
 
-void tearDownSharedBuffers(){
+void tearDownSharedBuffers(void){
 	int i;
 	for(i= 0;i<xpmemContext->nodesize;i++){
 	    if(i != xpmemContext->noderank){
@@ -726,7 +726,7 @@ void tearDownSharedBuffers(){
 
 void initSendQ(XpmemSendQ *q,int size,int rank);
 
-void initAllSendQs(){
+void initAllSendQs(void){
 	int i=0;
 	xpmemContext->sendQs = (XpmemSendQ **) malloc(sizeof(XpmemSendQ *)*xpmemContext->nodesize);
 	for(i=0;i<xpmemContext->nodesize;i++){
@@ -796,7 +796,7 @@ inline int flushSendQ(XpmemSendQ  *dstSendQ){
 
 inline void emptyRecvBuf(sharedBufData *recvBuf);
 
-inline void emptyAllRecvBufs(){
+inline void emptyAllRecvBufs(void){
 	int  i;
         for(i=0;i<xpmemContext->nodesize;i++){
                 if(i != xpmemContext->noderank){
@@ -843,7 +843,7 @@ inline void emptyAllRecvBufs(){
 	}
 };
 
-inline void flushAllSendQs(){
+inline void flushAllSendQs(void){
 	int i;
 #if SENDQ_LIST
         int index_prev = -1;

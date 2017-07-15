@@ -63,21 +63,21 @@ static void LrtsPreCommonInit(int everReturn)
 static void LrtsPostCommonInit(int everReturn)
 {
 }
-static void LrtsAdvanceCommunication()
+static void LrtsAdvanceCommunication(void)
 {
 }
-static void LrtsDrainResources() /* used when exit */
+static void LrtsDrainResources(void) /* used when exit */
 {
 }
-static void LrtsExit()
+static void LrtsExit(void)
 {
 }
-static void LrtsPostNonLocal()
+static void LrtsPostNonLocal(void)
 {
 }
 
 #if CMK_MACHINE_PROGRESS_DEFINED
-void CmiMachineProgressImpl() {
+void CmiMachineProgressImpl(void) {
 }
 #endif
 

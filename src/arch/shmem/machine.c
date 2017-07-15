@@ -68,8 +68,8 @@ typedef struct McMsgHdrS
 /*
  * Mc functions, used in machine.c only.
  */
-static void McInit();
-static void McInitList();
+static void McInit(void);
+static void McInitList(void);
 static void McEnqueueRemote(void *msg, int msg_sz, int dst_pe);
 static void McRetrieveRemote(void);
 static void McCleanUpInTransit(void);
@@ -456,7 +456,7 @@ void CmiAbort(const char *message)
  * This port uses the common CmiDeliver code, so we only provide
  * CmiGetNonLocal()
  */
-void *CmiGetNonLocal()
+void *CmiGetNonLocal(void)
 {
   McRetrieveRemote();
 
@@ -527,7 +527,7 @@ static void ConverseRunPE(int everReturn)
   }
 }
 
-void arena_init();
+void arena_init(void);
 
 void 
 ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
@@ -563,7 +563,7 @@ ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 extern int quietModeRequested;
 extern int quietMode;
 
-void ConverseExit()
+void ConverseExit(void)
 {
   if (quietModeRequested) quietMode = 1;
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
@@ -626,7 +626,7 @@ void clear_lock(long *lock, int pe)
  * Mc functions are used internally in machine.c only
  */
 
-static void McInit()
+static void McInit(void)
 {
   CMK_SHMEM_INIT;
 
@@ -645,7 +645,7 @@ static void McInit()
   McInitList();
 }
 
-static void McInitList()
+static void McInitList(void)
 {
   int i;
 
@@ -1056,7 +1056,7 @@ static int length2slots(int nBytes) {
 
 #define MAX_MEM    (64*1024*1024)        
 
-void arena_init()
+void arena_init(void)
 {
   size_t maxmem = 0;
   int nslots;
@@ -1134,15 +1134,15 @@ void arena_free(void *blockPtr)
 /*          calls reentrant problem. these are only dummy functions */
 
 static volatile int memflag;
-void CmiMemLock() { memflag=1; }
-void CmiMemUnlock() { memflag=0; }
+void CmiMemLock(void) { memflag=1; }
+void CmiMemUnlock(void) { memflag=0; }
 
-int CmiBarrier()
+int CmiBarrier(void)
 {
   return -1;
 }
 
-int CmiBarrierZero()
+int CmiBarrierZero(void)
 {
   return -1;
 }

@@ -85,8 +85,8 @@ extern "C" {
 
 /* Global variables used by charmdebug to maintain information */
 extern void CpdSetInitializeMemory(int v);
-extern void CpdSystemEnter();
-extern void CpdSystemExit();
+extern void CpdSystemEnter(void);
+extern void CpdSystemExit(void);
 #if CMK_CHARMDEBUG
 extern int memory_status_info;
 extern int memory_chare_id;
@@ -124,7 +124,7 @@ void setMemoryOwnedBy(void *p, int id);
 # define CpvInit_Alloc_scalar(t) (t *)calloc(1,sizeof(t))
 #endif
 
-extern int CmiMyRank_();
+extern int CmiMyRank_(void);
 
 #if CMK_HAS_PARTITION
 
@@ -152,10 +152,10 @@ void CmiCreatePartitions(char **argv);
 extern "C" {
 #endif
 void CmiSetNumPartitions(int nump);
-void CmiSetMasterPartition();
+void CmiSetMasterPartition(void);
 void CmiSetPartitionSizes(char *size);
 void CmiSetPartitionScheme(int scheme);
-void CmiSetCustomPartitioning();
+void CmiSetCustomPartitioning(void);
 #if defined(__cplusplus)
 }
 #endif 
@@ -182,7 +182,7 @@ extern int CmiMyPeGlobal();
 #endif
 
 /* we need nodeSpan to find how many pes each node cover */
-int CmiNodeSpan();
+int CmiNodeSpan(void);
 
 /* functions to translate between local and global */
 int node_lToGTranslate(int node, int partition);
@@ -254,8 +254,8 @@ extern int _Cmi_numnodes;
 #define CpvAccess(v) CMK_TAG(Cpv_,v)[_Cmi_myrank]
 #define CpvAccessOther(v, r) CMK_TAG(Cpv_,v)[r]
 
-extern void CmiMemLock();
-extern void CmiMemUnlock();
+extern void CmiMemLock(void);
+extern void CmiMemUnlock(void);
 #define CmiNodeBarrier() /*empty*/
 #define CmiNodeAllBarrier() /*empty*/
 #define CmiSvAlloc CmiAlloc
@@ -291,8 +291,8 @@ extern int _Cmi_numnodes;
 extern int _Cmi_sleepOnIdle;
 extern int _Cmi_forceSpinOnIdle;
 
-extern int CmiMyPe();
-extern int CmiMyRank();
+extern int CmiMyPe(void);
+extern int CmiMyRank(void);
 #define CmiNumPes()         _Cmi_numpes
 #define CmiMyNodeSize()     _Cmi_mynodesize
 extern int CmiNodeSize(int node);
@@ -330,7 +330,7 @@ typedef pthread_mutex_t *CmiNodeLock;
 #define CmiUnlock(lock) (pthread_mutex_unlock(lock))
 #define CmiTryLock(lock) (pthread_mutex_trylock(lock))
 #endif
-extern CmiNodeLock CmiCreateLock();
+extern CmiNodeLock CmiCreateLock(void);
 extern void CmiDestroyLock(CmiNodeLock lock);
 #endif // CMK_USE_LRTS
 
@@ -402,8 +402,8 @@ extern int _Cmi_numpes;
 
 #define CmiMemLock() 0
 #define CmiMemUnlock() 0
-extern void CmiNodeBarrier();
-extern void CmiNodeAllBarrier();
+extern void CmiNodeBarrier(void);
+extern void CmiNodeAllBarrier(void);
 #define CmiSvAlloc CmiAlloc
 
 typedef int *CmiNodeLock;
@@ -427,8 +427,8 @@ extern int _Cmi_numnodes;
 extern int _Cmi_sleepOnIdle;
 extern int _Cmi_forceSpinOnIdle;
 
-extern int CmiMyPe();
-extern int CmiMyRank();
+extern int CmiMyPe(void);
+extern int CmiMyRank(void);
 #define CmiNumPes()         _Cmi_numpes
 #define CmiMyNodeSize()     _Cmi_mynodesize
 extern int CmiNodeSize(int node);
@@ -577,18 +577,18 @@ extern int CmiBarrierZero(void);
 
 /* cpu topology */
 extern int CmiNumCores(void);
-extern int CmiCpuTopologyEnabled();
+extern int CmiCpuTopologyEnabled(void);
 extern int CmiPeOnSamePhysicalNode(int pe1, int pe2);
-extern int CmiNumPhysicalNodes();
+extern int CmiNumPhysicalNodes(void);
 extern int CmiPhysicalNodeID(int pe);
 extern int CmiNumPesOnPhysicalNode(int node);
 extern void CmiGetPesOnPhysicalNode(int node, int **pelist, int *num);
 extern int CmiGetFirstPeOnPhysicalNode(int node);
 extern int CmiPhysicalRank(int pe);
 extern void CmiInitCPUAffinity(char **argv);
-extern int CmiPrintCPUAffinity();
+extern int CmiPrintCPUAffinity(void);
 extern int CmiSetCPUAffinity(int core);
-extern int CmiOnCore();
+extern int CmiOnCore(void);
 
 /** Return 1 if our outgoing message queue 
    for this node is longer than this many bytes. */
@@ -867,15 +867,15 @@ double   CmiInitTime(void);
 
 #else
 void     CmiTimerInit(char **argv);
-int      CmiTimerAbsolute();
+int      CmiTimerAbsolute(void);
 double   CmiStartTimer(void);
 double   CmiInitTime(void);
 double   CmiTimer(void);
 double   CmiWallTimer(void);
-int      CmiTimerIsSynchronized();
+int      CmiTimerIsSynchronized(void);
 #endif
 
-char *CmiPrintDate();
+char *CmiPrintDate(void);
 
 #include "queueing.h" /* for "Queue" */
 
@@ -1076,7 +1076,7 @@ void     CmiNodeSpanTreeChildren(int node, int *children) ;
 
 typedef CMK_MULTICAST_GROUP_TYPE CmiGroup;
 
-void     CmiGroupInit();
+void     CmiGroupInit(void);
 CmiGroup CmiEstablishGroup(int npes, int *pes);
 void     CmiLookupGroup(CmiGroup grp, int *npes, int **pes);
 
@@ -1200,13 +1200,13 @@ void CmiNodeReduce(void *msg, int size, CmiReduceMergeFn mergeFn, int, int, int)
 void CmiNodeReduceStruct(void *data, CmiReducePupFn pupFn,
                          CmiReduceMergeFn mergeFn, CmiHandler dest,
                          CmiReduceDeleteFn deleteFn);
-int CmiGetReductionHandler();
-CmiHandler CmiGetReductionDestination();
-CmiReductionID CmiGetGlobalReduction();
-CmiReductionID CmiGetDynamicReduction();
+int CmiGetReductionHandler(void);
+CmiHandler CmiGetReductionDestination(void);
+CmiReductionID CmiGetGlobalReduction(void);
+CmiReductionID CmiGetDynamicReduction(void);
 void CmiGetDynamicReductionRemote(int handlerIdx, int pe, int dataSize, void *data);
 
-void CmiResetGlobalReduceSeqID();
+void CmiResetGlobalReduceSeqID(void);
 
 /* If the second parameter (the number of chunks to send) is negative, then
  * every message will be started aligned with 8 bytes, and a message header will
@@ -1383,7 +1383,7 @@ typedef CthThread   (*CthThFn)();
 void       CthSetSerialNo(CthThread t, int no);
 int        CthImplemented(void);
 
-int        CthMigratable();
+int        CthMigratable(void);
 CthThread  CthPup(pup_er, CthThread);
 
 CthThread  CthSelf(void);
@@ -1454,8 +1454,8 @@ CtgGlobals CtgCurrentGlobals(void);
 
 /** for TLS globals */
 void CtgInstallTLS(void *cur, void *next);
-void CmiEnableTLS();
-void CmiDisableTLS();
+void CmiEnableTLS(void);
+void CmiDisableTLS(void);
 
 /* The thread listener structure. The user must register one such listener
 	if he wants to find out when a thread is suspended or when it starts running
@@ -1601,7 +1601,7 @@ void          CfutureStoreBuffer(Cfuture f, void *value);
 
 #define       CfuturePE(f) ((f).pe)
 
-void CfutureInit();
+void CfutureInit(void);
 
 /****** CLD: THE LOAD BALANCER ******/
 
@@ -1766,7 +1766,7 @@ void CmiBacktracePrint(void **retPtrs,int nLevels);
    called up to this point. nSkip is the number of routines on the
    top of the stack to *not* print out. */
 void CmiPrintStackTrace(int nSkip);
-int CmiIsFortranLibraryCall();
+int CmiIsFortranLibraryCall(void);
 
 #if CMK_CMIDELIVERS_USE_COMMON_CODE
 CpvExtern(void*, CmiLocalQueue);
@@ -1855,7 +1855,7 @@ void CmiMachineProgressImpl();
    in the Converse handler (x|0x8000). 
 */
 #if CMK_IMMEDIATE_MSG
-void CmiDelayImmediate();
+void CmiDelayImmediate(void);
 #  define CmiBecomeImmediate(msg) do { \
 	CmiSetHandler(msg, (CmiGetHandler(msg))|0x8000); \
      } while (0)
@@ -2031,7 +2031,7 @@ CpvExtern(char *,_validProcessors);
 #define CmiNodeAlive(x)  (CpvAccess(_validProcessors)[x])
 #endif
 
-int CmiEndianness();
+int CmiEndianness(void);
 
 #if CMK_CHARMDEBUG
 extern void setMemoryTypeChare(void*); /* for memory debugging */

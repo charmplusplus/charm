@@ -23,19 +23,19 @@ void LrtsPostCommonInit(int everReturn);
 
 /* ### Beginning of Machine-running Related Functions ### */
 void LrtsAdvanceCommunication(int whileidle);
-void LrtsDrainResources(); /* used when exit */
-void LrtsExit();
+void LrtsDrainResources(void); /* used when exit */
+void LrtsExit(void);
 void LrtsAbort(const char *message);
 /* ### End of Machine-running Related Functions ### */
-void LrtsPostNonLocal();
+void LrtsPostNonLocal(void);
 
 void* LrtsAlloc(int, int);
 void  LrtsFree(void*);
-void  LrtsNotifyIdle();
+void  LrtsNotifyIdle(void);
 
-void  LrtsBeginIdle();
-void  LrtsStillIdle();
-void  LrtsBarrier();
+void  LrtsBeginIdle(void);
+void  LrtsStillIdle(void);
+void  LrtsBarrier(void);
 
 /* ### lock functions ### */
 #include "lrtslock.h"

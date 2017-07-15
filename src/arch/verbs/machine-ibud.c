@@ -382,7 +382,7 @@ void infi_CmiFree(void *ptr){
 }
 
 
-static void initInfiCmiChunkPools(){
+static void initInfiCmiChunkPools(void){
     int i,j;
     int size = firstBinSize;
     int nodeSize;
@@ -470,7 +470,7 @@ struct infiBufferPool * allocateInfiBufferPool(int numRecvs,int sizePerBuffer){
 
 
 
-void infiPostInitialRecvs(){
+void infiPostInitialRecvs(void){
 	//create the pool and post the receives 
 	int numPosts;
     
@@ -591,7 +591,7 @@ int CheckSocketsReady(int withDelayMs)
 
 
 
-static inline infiPacket newPacket(){
+static inline infiPacket newPacket(void){
 	infiPacket pkt=(infiPacket )CmiAlloc(sizeof(struct infiPacketStruct));
 
 	pkt->size = -1;
@@ -732,7 +732,7 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int b
 }
 
 
-static void ServiceCharmrun_nolock() {
+static void ServiceCharmrun_nolock(void) {
 	int again = 1;
 	MACHSTATE(2,"ServiceCharmrun_nolock begin {")
 	while (again) {
@@ -1040,7 +1040,7 @@ struct infiOtherNodeData *initinfiData(int node,int lid,int qpn,int psn) {
  * are ready, the corresponding tasks are called
  *
  ***********************************************************************/
-void CmiHandleImmediate();
+void CmiHandleImmediate(void);
 static void CommunicationServerNet(int sleepTime, int where) {
 /*  0: from smp thread
     1: from interrupt
@@ -1089,7 +1089,7 @@ MACHSTATE2(3,"sending to qpn=%i pe=%i",nodes[pe].infiData->qp.qpn,pe);
 }
 
 // FIXME: haven't looked at yet
-static void recvBarrierMessage() {
+static void recvBarrierMessage(void) {
 	int i;
 	int ne;
 	/*  struct ibv_wc wc[WC_LIST_SIZE];*/
@@ -1180,7 +1180,7 @@ MACHSTATE(3,"recvBarrierMessage 0"); // FIXME: REMOVE this debug
 
 // FIXME: haven't looked at yet
 /* happen at node level */
-int CmiBarrierNet() {
+int CmiBarrierNet(void) {
 	int len, size, i;
 	int status;
 	int count = 0;
@@ -1225,7 +1225,7 @@ MACHSTATE(3,"Barrier e");
 
 // FIXME: haven't looked at yet
 /* everyone sends a message to pe 0 and go on */
-int CmiBarrierZeroNet() {
+int CmiBarrierZeroNet(void) {
 	int i;
 
 	if (CmiMyRank() == 0) {
@@ -1305,7 +1305,7 @@ void createqp(struct ibv_device *dev){
 	MACHSTATE3(4,"qp information (lid=%i qpn=%i psn=%i)",context->localAddr.lid,context->localAddr.qpn,context->localAddr.psn);
 }
 
-void createah() {
+void createah(void) {
 	int i,numnodes;
 
 	numnodes=Lrts_numNodes;
@@ -1399,7 +1399,7 @@ void CmiCommunicationInit(char **argv) {
 	MACHSTATE(3,"} CmiCommunicationInit");
 }
 
-void MachineExit()
+void MachineExit(void)
 {
 	ibv_destroy_qp(context->qp);
 	ibv_dealloc_pd(context->pd); 

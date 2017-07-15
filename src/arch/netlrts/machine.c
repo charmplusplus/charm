@@ -280,7 +280,7 @@ int getDestHandler;
 #endif
 
 #if CMK_SHRINK_EXPAND
-extern void resumeAfterRealloc();
+extern void resumeAfterRealloc(void);
 extern char willContinue;
 extern int mynewpe;
 extern int numProcessAfterRestart;
@@ -291,15 +291,15 @@ extern char *_shrinkexpand_basedir;
 static void CommunicationServerNet(int withDelayMs, int where);
 //static void CommunicationServer(int withDelayMs);
 
-void CmiHandleImmediate();
-extern int CmemInsideMem();
-extern void CmemCallWhenMemAvail();
+void CmiHandleImmediate(void);
+extern int CmemInsideMem(void);
+extern void CmemCallWhenMemAvail(void);
 
 static unsigned int dataport=0;
 static SOCKET       dataskt;
 
-extern void TokenUpdatePeriodic();
-extern void getAvailSysMem();
+extern void TokenUpdatePeriodic(void);
+extern void getAvailSysMem(void);
 
 static int Lrts_numNodes;
 static int Lrts_myNode;
@@ -323,10 +323,10 @@ static int Lrts_myNode;
 static int machine_initiated_shutdown=0;
 static int already_in_signal_handler=0;
 
-static void CmiDestroyLocks();
+static void CmiDestroyLocks(void);
 
 void EmergencyExit(void);
-void MachineExit();
+void MachineExit(void);
 
 static void machine_exit(int status)
 {
@@ -344,6 +344,7 @@ static void charmrun_abort(const char*);
 
 static void KillEveryone(const char *msg)
 {
+  printf("XYZ    FOOBAR exit\n");
   charmrun_abort(msg);
   machine_exit(1);
 }
@@ -351,7 +352,7 @@ static void KillEveryone(const char *msg)
 static void KillEveryoneCode(int n)
 {
   char _s[100];
-  sprintf(_s, "[%d] Fatal error #%d\n", CmiMyPe(), n);
+  sprintf(_s, "[%d] XXX Fatal error #%d\n", CmiMyPe(), n);
   charmrun_abort(_s);
   machine_exit(1);
 }
@@ -870,8 +871,8 @@ int* inProgress;
 #if CMK_SHARED_VARS_UNAVAILABLE
 
 static volatile int memflag=0;
-void CmiMemLockNet() { memflag++; }
-void CmiMemUnlockNet() { memflag--; }
+void CmiMemLockNet(void) { memflag++; }
+void CmiMemUnlockNet(void) { memflag--; }
 
 static volatile int comm_flag=0;
 #define CmiCommLockOrElse(dothis) if (comm_flag!=0) dothis
@@ -914,7 +915,7 @@ static void CommunicationInterrupt(int ignored)
 
 extern void CmiSignal(int sig1, int sig2, int sig3, void (*handler)());
 
-static void CmiDestroyLocks()
+static void CmiDestroyLocks(void)
 {
   comm_flag = 0;
   memflag = 0;
@@ -2219,7 +2220,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
 #include "spert_ppu.h"
 
-void machine_OffloadAPIProgress() {
+void machine_OffloadAPIProgress(void) {
   LOCK_IF_AVAILABLE();
   OffloadAPIProgress();
   UNLOCK_IF_AVAILABLE();

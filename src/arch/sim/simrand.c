@@ -8,8 +8,7 @@
 #define EPS 1.2e-7
 #define RNMX (1.0-EPS)
 
-static float ran1(idum)
-long *idum;
+static float ran1(long *idum)
 {
 	int j;
 	long k;
@@ -50,8 +49,7 @@ long *idum;
 
 
 
-static float expdev(idum)
-long *idum;
+static float expdev(long *idum)
 {
         float ran1();
         float dum;

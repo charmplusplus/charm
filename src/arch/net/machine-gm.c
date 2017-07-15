@@ -144,7 +144,7 @@ static void alarmcallback (void *context) {
   MACHSTATE(4,"GM Alarm callback executed")
 }
 static int processEvent(gm_recv_event_t *e);
-static void send_progress();
+static void send_progress(void);
 static void alarmInterrupt(int arg);
 static int gmExit(int code,const char *msg);
 static char *getErrorMsg(gm_status_t status);
@@ -292,7 +292,7 @@ int CheckSocketsReady(int withDelayMs)
  ***********************************************************************/
 
 /* always called from interrupt */
-static void ServiceCharmrun_nolock()
+static void ServiceCharmrun_nolock(void)
 {
   int again = 1;
   MACHSTATE(2,"ServiceCharmrun_nolock begin {")
@@ -614,7 +614,7 @@ void send_callback(struct gm_port *p, void *context, gm_status_t status)
   send_progress();
 }
 
-static void send_progress()
+static void send_progress(void)
 {
   static int nextnode = 0;
   int skip;
@@ -769,7 +769,7 @@ static void sendBarrierMessage(int pe)
               send_callback_nothing, buf);
 }
 
-static void recvBarrierMessage()
+static void recvBarrierMessage(void)
 {
   gm_recv_event_t *e;
   int size, len;
@@ -796,7 +796,7 @@ static void recvBarrierMessage()
 }
 
 /* happen at node level */
-int CmiBarrier()
+int CmiBarrier(void)
 {
   int len, size, i;
   int status;
@@ -843,7 +843,7 @@ int CmiBarrier()
 }
 
 /* everyone sends a message to pe 0 and go on */
-int CmiBarrierZero()
+int CmiBarrierZero(void)
 {
   int i;
 
@@ -976,7 +976,7 @@ void CmiCommunicationInit(char **argv)
 {
 }
 
-void CmiMachineExit()
+void CmiMachineExit(void)
 {
 #if GM_STATS
   int i;
@@ -1006,7 +1006,7 @@ void CmiGmConvertMachineID(unsigned int *mach_id)
 }
 
 /* make sure other gm nodes are accessible in routing table */
-void CmiCheckGmStatus()
+void CmiCheckGmStatus(void)
 {
   int i;
   int doabort = 0;

@@ -9,7 +9,7 @@ typedef int EVENT;
 
 static EVENT *event;
 
-static adjust_eq()
+static adjust_eq(void)
 {
     unsigned int  i,j,p,n;
     EVENT         R;
@@ -43,8 +43,7 @@ static adjust_eq()
 }
 
 
-static relocate_event(i)
-int i;
+static relocate_event(int i)
 {
     unsigned int p;
     EVENT        R; 
@@ -63,8 +62,7 @@ int i;
 
 
 
-static void *create_event_heap(n)
-int n;
+static void *create_event_heap(int n)
 {
     int i;
   
@@ -78,7 +76,7 @@ int n;
     return event;
 }
 
-static next_event()
+static next_event(void)
 {
     return event[1];
 }

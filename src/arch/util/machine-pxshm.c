@@ -169,10 +169,10 @@ static int sendQ_head_index = -1;
 PxshmContext *pxshmContext = NULL; // global context
 
 void calculateNodeSizeAndRank(char **);
-void setupSharedBuffers();
-void initAllSendQs();
+void setupSharedBuffers(void);
+void initAllSendQs(void);
 
-void CmiExitPxshm();
+void CmiExitPxshm(void);
 
 static void cleanupOnAllSigs(int signo) { CmiExitPxshm(); }
 
@@ -280,10 +280,10 @@ void CmiInitPxshm(char **argv)
  *
  * *******************/
 static int pxshm_freed = 0;
-void tearDownSharedBuffers();
-void freeSharedBuffers();
+void tearDownSharedBuffers(void);
+void freeSharedBuffers(void);
 
-void CmiExitPxshm()
+void CmiExitPxshm(void)
 {
   if (pxshmContext == NULL)
     return;
@@ -458,14 +458,14 @@ insert into q and retain the message*/
   MEMDEBUG(CmiMemoryCheck());
 };
 
-void emptyAllRecvBufs();
-void flushAllSendQs();
+void emptyAllRecvBufs(void);
+void flushAllSendQs(void);
 
 /**********
  * Extract all the messages from the recvBuffers you can
  * Flush all sendQs
  * ***/
-void CommunicationServerPxshm()
+void CommunicationServerPxshm(void)
 {
 
 #if PXSHM_STATS
@@ -549,7 +549,7 @@ void createShmObjectsAndSems(sharedBufData **bufs, char **bufNames);
  *
  * 	open these shared objects and semaphores
  * *********/
-void setupSharedBuffers()
+void setupSharedBuffers(void)
 {
   int i = 0;
 
@@ -680,7 +680,7 @@ void createShmObject(char *name, int size, char **pPtr)
   close(fd);
 }
 
-void freeSharedBuffers()
+void freeSharedBuffers(void)
 {
   int i;
   for (i = 0; i < pxshmContext->nodesize; i++) {
@@ -695,7 +695,7 @@ void freeSharedBuffers()
   }
 };
 
-void tearDownSharedBuffers()
+void tearDownSharedBuffers(void)
 {
   int i;
   for (i = 0; i < pxshmContext->nodesize; i++) {
@@ -716,7 +716,7 @@ void tearDownSharedBuffers()
 
 void initSendQ(PxshmSendQ *q, int size, int rank);
 
-void initAllSendQs()
+void initAllSendQs(void)
 {
   int i = 0;
   pxshmContext->sendQs =
@@ -791,7 +791,7 @@ inline int flushSendQ(PxshmSendQ *dstSendQ)
 
 inline void emptyRecvBuf(sharedBufData *recvBuf);
 
-inline void emptyAllRecvBufs()
+inline void emptyAllRecvBufs(void)
 {
   int i;
   for (i = 0; i < pxshmContext->nodesize; i++) {
@@ -836,7 +836,7 @@ inline void emptyAllRecvBufs()
   }
 };
 
-inline void flushAllSendQs()
+inline void flushAllSendQs(void)
 {
   int i;
 #if SENDQ_LIST

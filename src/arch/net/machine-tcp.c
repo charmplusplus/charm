@@ -160,7 +160,7 @@ static char sockWriteStates[1000] = {0};
 #endif
 
 /* check data sockets and invoking functions */
-static void CmiCheckSocks()
+static void CmiCheckSocks(void)
 {
   int node;
   if (dataskt!=-1) {
@@ -320,7 +320,7 @@ static void CommunicationServer(int sleepTime, int where)
 */
 static char * maxbuf = NULL;
 
-static char * getMaxBuf() {
+static char * getMaxBuf(void) {
   char *buf;
   if (maxbuf == NULL)
     buf = (char *)CmiAlloc(PACKET_MAX);
@@ -605,11 +605,11 @@ void CmiMachineInit(char **argv)
 #endif
 }
 
-void CmiMachineExit()
+void CmiMachineExit(void)
 {
 }
 
-static void open_tcp_sockets()
+static void open_tcp_sockets(void)
 {
   int i, ok, pe, flag;
   int mype, numpes;

@@ -100,7 +100,7 @@ void CmiSyncSendPersistent(int destPE, int size, char *msg, PersistentHandle h)
 }
 
 /* called in PumpMsgs */
-int PumpPersistent()
+int PumpPersistent(void)
 {
   PersistentReceivesTable *slot = persistentReceivesTableHead;
   int status = 0;
@@ -147,7 +147,7 @@ void PerFree(char *msg)
     CmiFree(msg);
 }
 
-void persist_machine_init() 
+void persist_machine_init(void)
 {
   persistentSendMsgHandlerIdx =
        CmiRegisterHandler((CmiHandler)sendPerMsgHandler);

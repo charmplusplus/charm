@@ -25,45 +25,41 @@ CpvDeclare(void*, CmiLocalQueue);
 CpvExtern(int, CcdNumChecks);
 CpvExtern(int, disable_sys_msgs);
 
-double CmiTimer();
+double CmiTimer(void);
 
-static void CsiTimerInit();
-static double CsiTimer();
+static void CsiTimerInit(void);
+static double CsiTimer(void);
 
 
-void CmiDeliversInit()
+void CmiDeliversInit(void)
 {
 }
 
 
-int CsdScheduler(maxmsgs)
-int maxmsgs;
+int CsdScheduler(int maxmsgs)
 {
   CmiError("Cannot call scheduling functions in SIM versions.\n");
   exit(0);
 }
 
-int CmiDeliverMsgs(maxmsgs)
-int maxmsgs;
+int CmiDeliverMsgs(int maxmsgs)
 {
   CmiError("Cannot call scheduling functions in SIM versions.\n");
   exit(1);
 }
 
-void CmiDeliverSpecificMsg(handler)
-int handler;
+void CmiDeliverSpecificMsg(int handler)
 {
   CmiError("Cannot call scheduling functions in SIM versions.\n");
   exit(1);
 }
 
-CmiUniContextSwitch(i)
-int i;
+CmiUniContextSwitch(int i)
 {
   _Cmi_mype = i; 
 }
 
-void CmiNotifyIdle()
+void CmiNotifyIdle(void)
 {
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
   struct timeval tv;
@@ -91,10 +87,7 @@ void ConverseExit(void)
 
 /********************* MESSAGE SEND FUNCTIONS ******************/
 
-void CmiSyncSendFn(destPE, size, msg)
-int destPE;
-int size;
-char * msg;
+void CmiSyncSendFn(int destPE, int size, char *msg)
 {
     char *buf;
 
@@ -106,10 +99,7 @@ char * msg;
 
 
 
-CmiCommHandle CmiAsyncSendFn(destPE, size, msg)
-int destPE;
-int size;
-char * msg;
+CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
 {
      CmiSyncSendFn(destPE, size, msg);
      return 0;
@@ -117,40 +107,35 @@ char * msg;
 
 
 
-void CmiFreeSendFn(destPE, size, msg)
-int destPE;
-int size;
-char * msg;
+void CmiFreeSendFn(int destPE, int size, char *msg)
 {
      sim_send_message(_Cmi_mype,msg,size,FALSE,destPE);
 }
 
 
 
-int CmiAsyncMsgSent(c)
-CmiCommHandle c ;
+int CmiAsyncMsgSent(CmiCommHandle c)
 {
     return 1;
 }
 
 
-void CmiReleaseCommHandle(c)
-CmiCommHandle c ;
+void CmiReleaseCommHandle(CmiCommHandle c)
 {
 }
 
 
-void CmiNodeBarrier()
+void CmiNodeBarrier(void)
 {
 }
 
-void CmiNodeAllBarrier()
+void CmiNodeAllBarrier(void)
 {
 }
 
 /********************* MESSAGE RECEIVE FUNCTIONS ******************/
 
-void *CmiGetNonLocal(){return NULL;}
+void *CmiGetNonLocal(void){return NULL;}
 
 
 
@@ -158,9 +143,7 @@ void *CmiGetNonLocal(){return NULL;}
 /*********************** BROADCAST FUNCTIONS **********************/
 
 
-void CmiFreeBroadcastAllFn(size, msg)
-int size;
-char * msg;
+void CmiFreeBroadcastAllFn(int size,  char *msg)
 {
     int i;
     for(i=0; i<_Cmi_numpes; i++)
@@ -170,9 +153,7 @@ char * msg;
 }
 
 
-void CmiSyncBroadcastFn(size, msg)	/* ALL_EXCEPT_ME  */
-int size;
-char * msg;
+void CmiSyncBroadcastFn(int size,  char *msg)	/* ALL_EXCEPT_ME  */
 {
     int i;
     for(i=0; i<_Cmi_numpes; i++)
@@ -180,9 +161,7 @@ char * msg;
 }
 
 
-void CmiSyncBroadcastAllFn(size, msg)
-int size;
-char * msg;
+void CmiSyncBroadcastAllFn(int size,  char *msg)
 {
      int i;
 
@@ -198,9 +177,7 @@ char * msg;
 
 
 
-void CmiFreeBroadcastFn(size, msg)      /* ALL_EXCEPT_ME  */
-int size;
-char * msg;
+void CmiFreeBroadcastFn(int size,  char *msg)      /* ALL_EXCEPT_ME  */
 {
     CmiSyncBroadcastFn(size, msg);
     CmiFree(msg);
@@ -210,9 +187,7 @@ char * msg;
 
 
 
-CmiCommHandle CmiAsyncBroadcastFn(size, msg)	/* ALL_EXCEPT_ME  */
-int size;
-char * msg;
+CmiCommHandle CmiAsyncBroadcastFn(int size,  char *msg)	/* ALL_EXCEPT_ME  */
 {
         CmiSyncBroadcastFn(size, msg); 
 	return 0 ;
@@ -221,9 +196,7 @@ char * msg;
 
 
 
-CmiCommHandle CmiAsyncBroadcastAllFn(size, msg)
-int size;
-char * msg;
+CmiCommHandle CmiAsyncBroadcastAllFn(int size,  char *msg)
 {
         CmiSyncBroadcastAll(size,msg);
 	return 0 ;
@@ -294,12 +267,12 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int initret)
 
 static struct tms inittime;
 
-static void CsiTimerInit()
+static void CsiTimerInit(void)
 {
   times(&inittime);
 }
 
-static double CsiTimer()
+static double CsiTimer(void)
 {
   double currenttime;
   int clk_tck;
@@ -319,13 +292,13 @@ static double CsiTimer()
 
 static struct rusage inittime;
 
-static void CsiTimerInit()
+static void CsiTimerInit(void)
 {
   getrusage(0, &inittime);
 }
 
 
-static double CsiTimer() {
+static double CsiTimer(void) {
   double currenttime;
 
   struct rusage temp;
@@ -348,22 +321,22 @@ static double Csi_start_time;
 
 void CmiTimerInit(char **argv) { }
 
-double CmiTimer()
+double CmiTimer(void)
 {
   return (CsiTimer() - Csi_start_time  + Csi_global_time);
 }
 
-double CmiWallTimer()
+double CmiWallTimer(void)
 {
   return (CsiTimer() - Csi_start_time  + Csi_global_time);
 }
 
-double CmiCpuTimer()
+double CmiCpuTimer(void)
 {
   return (CsiTimer() - Csi_start_time  + Csi_global_time);
 }
 
-CmiNodeLock CmiCreateLock()
+CmiNodeLock CmiCreateLock(void)
 {
   CmiNodeLock lk = (CmiNodeLock)malloc(sizeof(int));
   *lk = 0;

@@ -198,7 +198,7 @@ int LRTSQueue2QSpinWait (LRTSQueue    queue0,
 }
 
 typedef pami_result_t (*pamix_proc_memalign_fn) (void**, size_t, size_t, const char*);
-void   LRTSQueuePreInit()
+void   LRTSQueuePreInit(void)
 {
     pami_result_t rc;
     int actualNodeSize = 64/Kernel_ProcessCount(); 
@@ -214,7 +214,7 @@ void   LRTSQueuePreInit()
     CmiAssert (rc == 0);    
 }
 
-LRTSQueue  LRTSQueueCreate()
+LRTSQueue  LRTSQueueCreate(void)
 {
     static  int  position=0;
     int place;

@@ -299,9 +299,9 @@ extern char *_shrinkexpand_basedir;
 
 static void CommunicationServer(int withDelayMs, int where);
 
-void CmiHandleImmediate();
-extern int CmemInsideMem();
-extern void CmemCallWhenMemAvail();
+void CmiHandleImmediate(void);
+extern int CmemInsideMem(void);
+extern void CmemCallWhenMemAvail(void);
 static void ConverseRunPE(int everReturn);
 void CmiYield(void);
 void ConverseCommonExit(void);
@@ -310,8 +310,8 @@ static unsigned int dataport=0;
 static int Cmi_mach_id=0; /* Machine-specific identifier (GM-only) */
 static SOCKET       dataskt;
 
-extern void TokenUpdatePeriodic();
-extern void getAvailSysMem();
+extern void TokenUpdatePeriodic(void);
+extern void getAvailSysMem(void);
 
 #define BROADCAST_SPANNING_FACTOR		4
 
@@ -345,12 +345,12 @@ static double         Cmi_check_delay = 3.0;
 static int machine_initiated_shutdown=0;
 static int already_in_signal_handler=0;
 
-static void CmiDestroyLocks();
+static void CmiDestroyLocks(void);
 
-void CmiMachineExit();
+void CmiMachineExit(void);
 
 #if CMK_USE_SYSVSHM /* define teardown function before use */
-void tearDownSharedBuffers();
+void tearDownSharedBuffers(void);
 #endif 
 
 static void machine_exit(int status)
@@ -382,8 +382,7 @@ static void KillEveryone(const char *msg)
   machine_exit(1);
 }
 
-static void KillEveryoneCode(n)
-int n;
+static void KillEveryoneCode(int n)
 {
   char _s[100];
   sprintf(_s, "[%d] Fatal error #%d\n", CmiMyPe(), n);
@@ -957,8 +956,8 @@ int* inProgress;
 #if CMK_SHARED_VARS_UNAVAILABLE
 
 static volatile int memflag=0;
-void CmiMemLock() { memflag++; }
-void CmiMemUnlock() { memflag--; }
+void CmiMemLock(void) { memflag++; }
+void CmiMemUnlock(void) { memflag--; }
 
 static volatile int comm_flag=0;
 #define CmiCommLockOrElse(dothis) if (comm_flag!=0) dothis
@@ -1038,7 +1037,7 @@ static void CmiStartThreads(char **argv)
 #endif
 }
 
-static void CmiDestroyLocks()
+static void CmiDestroyLocks(void)
 {
   comm_flag = 0;
   memflag = 0;
@@ -1056,13 +1055,13 @@ CpvDeclare(void *, CmiLocalQueue);
 
 
 #ifndef CmiMyPe
-int CmiMyPe() 
+int CmiMyPe(void)
 { 
   return CmiGetState()->pe; 
 }
 #endif
 #ifndef CmiMyRank
-int CmiMyRank()
+int CmiMyRank(void)
 {
   return CmiGetState()->rank;
 }
@@ -1693,7 +1692,7 @@ void copyInfiAddr(ChInfiAddr *qpList);
 #endif
 
 #if CMK_IBVERBS_FAST_START
-static void send_partial_init()
+static void send_partial_init(void)
 {
   ChMessageInt_t nodeNo = ChMessageInt_new(_Cmi_mynode);
 	ctrl_sendone_nolock("partinit",(const char *)&(nodeNo),sizeof(nodeNo),NULL,0);
@@ -2482,7 +2481,7 @@ void CmiProbeImmediateMsg()
 
 /* Network progress function is used to poll the network when for
    messages. This flushes receive buffers on some implementations*/ 
-void CmiMachineProgressImpl()
+void CmiMachineProgressImpl(void)
 {
 #if CMK_USE_SYSVSHM
 	CommunicationServerSysvshm();
@@ -2502,7 +2501,7 @@ void CmiMachineProgressImpl()
 
 /* happen at node level */
 /* must be called on every PE including communication processors */
-int CmiBarrier()
+int CmiBarrier(void)
 {
   int len, size, i;
   int status;
@@ -2532,7 +2531,7 @@ int CmiBarrier()
 }
 
 
-int CmiBarrierZero()
+int CmiBarrierZero(void)
 {
   int i;
   int numnodes = CmiNumNodes();
@@ -3235,7 +3234,7 @@ void CmiSyncSendPersistent(int destPE, int size, char *msg, PersistentHandle h)
 }
 
 /* called in PumpMsgs */
-int PumpPersistent()
+int PumpPersistent(void)
 {
   PersistentReceivesTable *slot = persistentReceivesTableHead;
   int status = 0;
@@ -3283,7 +3282,7 @@ void PerFree(char *msg)
     CmiFree(msg);
 }
 
-void persist_machine_init() 
+void persist_machine_init(void)
 {
   persistentSendMsgHandlerIdx =
        CmiRegisterHandler((CmiHandler)sendPerMsgHandler);
@@ -3310,7 +3309,7 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
 
 #include "spert_ppu.h"
 
-void machine_OffloadAPIProgress() {
+void machine_OffloadAPIProgress(void) {
   LOCK_IF_AVAILABLE();
   OffloadAPIProgress();
   UNLOCK_IF_AVAILABLE();

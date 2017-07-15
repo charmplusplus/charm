@@ -20,7 +20,7 @@ void CmiPoolAllocInit(int numBins);
 void * CmiPoolAlloc(unsigned int numBytes);
 
 void  CmiPoolFree(void * p);
-void  CmiPoolAllocStats();
+void  CmiPoolAllocStats(void);
 
 /* theoretically we should put a pool cleanup function in here */
 

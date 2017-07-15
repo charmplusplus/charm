@@ -249,7 +249,7 @@ CsvDeclare(unsigned int, idleThreadsCnt);
 CpvDeclare(void *, CsdTaskQueue);
 CpvDeclare(void *, CmiSuspendedTaskQueue);
 #endif
-int CmiIsMyNodeIdle();
+int CmiIsMyNodeIdle(void);
 
 /*****************************************************************************
  *
@@ -815,8 +815,7 @@ void CmiRegisterHandlerExAssignOnce(CmiHandlerEx h, void *userPtr, int *index)
 }
 
 #if CMI_LOCAL_GLOBAL_AVAILABLE
-int CmiRegisterHandlerLocal(h)
-CmiHandler h;
+int CmiRegisterHandlerLocal(CmiHandler h)
 {
   int Local = CpvAccess(CmiHandlerLocal);
   CmiNumberHandler(Local, h);
@@ -824,8 +823,7 @@ CmiHandler h;
   return Local;
 }
 
-int CmiRegisterHandlerGlobal(h)
-CmiHandler h;
+int CmiRegisterHandlerGlobal(CmiHandler h)
 {
   int Global = CpvAccess(CmiHandlerGlobal);
   if (CmiMyPe()!=0) 
@@ -879,7 +877,7 @@ char *CmiPrintDate(void)
 
 #else
 
-char *CmiPrintDate()
+char *CmiPrintDate(void)
 {
   return "N/A";
 }
@@ -894,22 +892,22 @@ CpvStaticDeclare(double, clocktick);
 CpvStaticDeclare(int,inittime_wallclock);
 CpvStaticDeclare(int,inittime_virtual);
 
-int CmiTimerIsSynchronized()
+int CmiTimerIsSynchronized(void)
 {
   return 0;
 }
 
-int CmiTimerAbsolute()
+int CmiTimerAbsolute(void)
 {
   return 0;
 }
 
-double CmiStartTimer()
+double CmiStartTimer(void)
 {
   return 0.0;
 }
 
-double CmiInitTime()
+double CmiInitTime(void)
 {
   return CpvAccess(inittime_wallclock);
 }
@@ -925,7 +923,7 @@ void CmiTimerInit(char **argv)
   CpvAccess(clocktick) = 1.0 / (sysconf(_SC_CLK_TCK));
 }
 
-double CmiWallTimer()
+double CmiWallTimer(void)
 {
   struct tms temp;
   double currenttime;
@@ -936,7 +934,7 @@ double CmiWallTimer()
   return (currenttime);
 }
 
-double CmiCpuTimer()
+double CmiCpuTimer(void)
 {
   struct tms temp;
   double currenttime;
@@ -948,7 +946,7 @@ double CmiCpuTimer()
   return (currenttime);
 }
 
-double CmiTimer()
+double CmiTimer(void)
 {
   return CmiCpuTimer();
 }
@@ -1218,27 +1216,27 @@ double CmiTimer(void)
 CpvStaticDeclare(uint64_t, inittime);
 CpvStaticDeclare(double, clocktick);
 
-int CmiTimerIsSynchronized()
+int CmiTimerIsSynchronized(void)
 {
   return 1;
 }
 
-int CmiTimerAbsolute()
+int CmiTimerAbsolute(void)
 {
   return 0;
 }
 
-double CmiStartTimer()
+double CmiStartTimer(void)
 {
   return 0.0;
 }
 
-double CmiInitTime()
+double CmiInitTime(void)
 {
   return CpvAccess(inittime);
 }
 
-static inline uint64_t PPC64_TimeBase()
+static inline uint64_t PPC64_TimeBase(void)
 {
   register volatile uint64_t result;
 
@@ -1252,7 +1250,7 @@ static inline uint64_t PPC64_TimeBase()
   return result;
 }
 
-uint64_t __micro_timer () {
+uint64_t __micro_timer (void) {
   struct timeval tv;
   gettimeofday( &tv, 0 );
   return tv.tv_sec * 1000000ULL + tv.tv_usec;
@@ -1273,19 +1271,19 @@ void CmiTimerInit(char **argv)
   CpvAccess(inittime) = PPC64_TimeBase ();
 }
 
-double CmiWallTimer()
+double CmiWallTimer(void)
 {
   uint64_t currenttime;
   currenttime = PPC64_TimeBase();
   return CpvAccess(clocktick)*(currenttime-CpvAccess(inittime));
 }
 
-double CmiCpuTimer()
+double CmiCpuTimer(void)
 {
   return CmiWallTimer();
 }
 
-double CmiTimer()
+double CmiTimer(void)
 {
   return CmiWallTimer();
 }
@@ -1298,17 +1296,17 @@ double CmiTimer()
 CpvStaticDeclare(double, inittime_wallclock);
 CpvStaticDeclare(double, inittime_virtual);
 
-double CmiStartTimer()
+double CmiStartTimer(void)
 {
   return 0.0;
 }
 
-int CmiTimerAbsolute()
+int CmiTimerAbsolute(void)
 {
   return 0;
 }
 
-double CmiInitTime()
+double CmiInitTime(void)
 {
   return CpvAccess(inittime_wallclock);
 }
@@ -1326,7 +1324,7 @@ void CmiTimerInit(char **argv)
 	CpvAccess(inittime_virtual) = ((double) ru)/CLOCKS_PER_SEC;
 }
 
-double CmiCpuTimer()
+double CmiCpuTimer(void)
 {
 	clock_t ru;
 	double currenttime;
@@ -1337,7 +1335,7 @@ double CmiCpuTimer()
 	return currenttime - CpvAccess(inittime_virtual);
 }
 
-double CmiWallTimer()
+double CmiWallTimer(void)
 {
 	struct _timeb tv;
 	double currenttime;
@@ -1349,7 +1347,7 @@ double CmiWallTimer()
 }
 	
 
-double CmiTimer()
+double CmiTimer(void)
 {
 	return CmiCpuTimer();
 }
@@ -1361,12 +1359,12 @@ double CmiTimer()
 static double clocktick;
 CpvStaticDeclare(long long, inittime_wallclock);
 
-double CmiStartTimer()
+double CmiStartTimer(void)
 {
   return 0.0;
 }
 
-double CmiInitTime()
+double CmiInitTime(void)
 {
   return CpvAccess(inittime_wallclock);
 }
@@ -1378,12 +1376,12 @@ void CmiTimerInit(char **argv)
   clocktick = 1.0 / (double)(sysconf(_SC_SV2_USER_TIME_RATE));
 }
 
-int CmiTimerAbsolute()
+int CmiTimerAbsolute(void)
 {
   return 0;
 }
 
-double CmiWallTimer()
+double CmiWallTimer(void)
 {
   long long now;
 
@@ -1391,12 +1389,12 @@ double CmiWallTimer()
   return (clocktick * (now - CpvAccess(inittime_wallclock)));
 }
 
-double CmiCpuTimer()
+double CmiCpuTimer(void)
 {
   return CmiWallTimer();
 }
 
-double CmiTimer()
+double CmiTimer(void)
 {
   return CmiCpuTimer();
 }
@@ -1411,12 +1409,12 @@ static timebasestruct_t inittime_wallclock;
 static double clocktick;
 CpvStaticDeclare(double, inittime_virtual);
 
-double CmiStartTimer()
+double CmiStartTimer(void)
 {
   return 0.0;
 }
 
-double CmiInitTime()
+double CmiInitTime(void)
 {
   return inittime_wallclock;
 }
@@ -1437,12 +1435,12 @@ void CmiTimerInit(char **argv)
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
 }
 
-int CmiTimerAbsolute()
+int CmiTimerAbsolute(void)
 {
   return 0;
 }
 
-double CmiWallTimer()
+double CmiWallTimer(void)
 {
   int secs, n_secs;
   double curt;
@@ -1460,7 +1458,7 @@ double CmiWallTimer()
   return curt;
 }
 
-double CmiCpuTimer()
+double CmiCpuTimer(void)
 {
   struct rusage ru;
   double currenttime;
@@ -1472,7 +1470,7 @@ double CmiCpuTimer()
   return currenttime - CpvAccess(inittime_virtual);
 }
 
-double CmiTimer()
+double CmiTimer(void)
 {
   return CmiWallTimer();
 }
@@ -1848,10 +1846,10 @@ int CsdScheduler(int maxmsgs)
 /*
 	EVAC
 */
-extern void CkClearAllArrayElements();
+extern void CkClearAllArrayElements(void);
 
 
-extern void machine_OffloadAPIProgress();
+extern void machine_OffloadAPIProgress(void);
 
 /** The main scheduler loop that repeatedly executes messages from a queue, forever. */
 void CsdScheduleForever(void)
@@ -3464,7 +3462,7 @@ void CmiIOInit(char **argv);
 #endif
 
 /* defined in cpuaffinity.c */
-extern void CmiInitCPUAffinityUtil();
+extern void CmiInitCPUAffinityUtil(void);
 
 static void CmiProcessPriority(char **argv)
 {
@@ -3565,7 +3563,7 @@ int CmiEndianness(void)
 #if CMK_USE_TSAN
 /* This fixes bug #713, which is caused by tsan deadlocking inside
  * a 'write' syscall inside a mutex. */
-static void checkTSanOptions()
+static void checkTSanOptions(void)
 {
   char *env = getenv("TSAN_OPTIONS");
 
@@ -3742,7 +3740,7 @@ void ConverseCommonExit(void)
 
 extern void register_accel_spe_funcs(void);
 
-void CmiInitCell()
+void CmiInitCell(void)
 {
   // Create a unique string for each PPE to use for the timing
   //   data file's name

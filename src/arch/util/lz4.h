@@ -116,7 +116,7 @@ void  lz4_wrapper_compress(void *src, void *dst, int in_size, int *out_size);
 
 int lz4_wrapper_decompress(void *src, void *dst, int in_size, int out_size);
 
-void lz4_init(); 
+void lz4_init(void);
 #if defined (__cplusplus)
 }
 #endif

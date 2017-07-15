@@ -82,7 +82,7 @@ CmiIdleLock_checkMessage
 #include "sockRoutines.h"
 
 void CmiStateInit(int pe, int rank, CmiState state);
-void CommunicationServerInit();
+void CommunicationServerInit(void);
 
 static struct CmiStateStruct Cmi_default_state; /* State structure to return during startup */
 
@@ -105,7 +105,7 @@ static CmiState     Cmi_state_vector = 0;
 #if 0
 #  define CmiGetState() ((CmiState)TlsGetValue(Cmi_state_key))
 #else
-CmiState CmiGetState()
+CmiState CmiGetState(void)
 {
   CmiState result;
   result = (CmiState)TlsGetValue(Cmi_state_key);
@@ -236,7 +236,7 @@ static void CmiStartThreads(char **argv)
     PerrorExit("TlsSetValue");
 }
 
-static void CmiDestroyLocks()
+static void CmiDestroyLocks(void)
 {
   CloseHandle(comm_mutex);
   comm_mutex = 0;
@@ -258,7 +258,7 @@ CmiNodeLock cmiMemoryLock;
 int _Cmi_sleepOnIdle=0;
 int _Cmi_forceSpinOnIdle=0;
 extern int _cleanUp;
-extern void CharmScheduler();
+extern void CharmScheduler(void);
 
 #if CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD
 static __thread struct CmiStateStruct     Cmi_mystate;
@@ -277,7 +277,7 @@ static CmiState     Cmi_state_vector;
 #if 0
 #define CmiGetState() ((CmiState)pthread_getspecific(Cmi_state_key))
 #else
-CmiState CmiGetState() {
+CmiState CmiGetState(void) {
 	CmiState ret;
 	if (Cmi_state_key == (pthread_key_t)(-1)) return &Cmi_default_state;
 	ret=(CmiState)pthread_getspecific(Cmi_state_key);
@@ -291,7 +291,7 @@ CmiState CmiGetState() {
 
 #if !CMK_USE_LRTS
 #if CMK_HAS_SPINLOCK && CMK_USE_SPINLOCK
-CmiNodeLock CmiCreateLock()
+CmiNodeLock CmiCreateLock(void)
 {
   CmiNodeLock lk = (CmiNodeLock)malloc(sizeof(pthread_spinlock_t));
   _MEMCHECK(lk);
@@ -305,7 +305,7 @@ void CmiDestroyLock(CmiNodeLock lk)
   free((void*)lk);
 }
 #else
-CmiNodeLock CmiCreateLock()
+CmiNodeLock CmiCreateLock(void)
 {
   CmiNodeLock lk = (CmiNodeLock)malloc(sizeof(pthread_mutex_t));
   _MEMCHECK(lk);
@@ -389,7 +389,7 @@ static void *call_startfn(void *vindex)
 }
 */
 
-extern void StartInteropScheduler();
+extern void StartInteropScheduler(void);
 
 static void *call_startfn(void *vindex)
 {

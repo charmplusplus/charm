@@ -10,13 +10,13 @@ extern "C" {
 void initTraceCore(char** argv);
 
 /* End Core Trace Module */
-void closeTraceCore();
+void closeTraceCore(void);
 
 /* Resume Core Trace Module */
-void resumeTraceCore();
+void resumeTraceCore(void);
 
 /* Suspend Core Trace Module */
-void suspendTraceCore();
+void suspendTraceCore(void);
 
 /*Install the beginIdle/endIdle condition handlers.*/
 void beginTraceCore(void);

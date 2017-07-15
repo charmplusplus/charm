@@ -17,10 +17,7 @@ static int          scp_wait_on_list;
 
 /***********************************************************************/
 
-static int sim_read_parameters(filename,num,threshold)
-char *filename;
-PARAMETERS *num;
-THRESHOLD  *threshold;
+static int sim_read_parameters(char *filename, PARAMETERS *num, THRESHOLD  *threshold)
 {
 #define MAXLINE 100
     char line[100];
@@ -139,7 +136,7 @@ THRESHOLD  *threshold;
 
 CsvExtern(int, CsdStopCount);
 
-static void simulate()
+static void simulate(void)
 {
     int pno;
     
@@ -648,9 +645,7 @@ int pno;
 /*  *************************************************************** */
 /*  initialize the data structure                                   */
 /*  *************************************************************** */
-static int sim_initialize(paramFile,numpe)
-char *paramFile;
-int numpe;
+static int sim_initialize(char *paramFile, int numpe)
 {
     int i,j,k;
 #ifdef DEBUG
@@ -754,7 +749,7 @@ int numpe;
 }
 
 
-static init_max_time_const()
+static init_max_time_const(void)
 {
    max_time_const = 1e+20;
 }
@@ -763,9 +758,7 @@ static init_max_time_const()
 /*  *************************************************************** */
 /*  print  error message                                            */ 
 /*  *************************************************************** */
-static int error_msg(err_msg,err_no)
-int  *err_no;
-char *err_msg;
+static int error_msg(int *err_msg, char *err_no)
 {
     printf("Sim 1 [%d]: %s\n",err_no,err_msg);
     exit(1);

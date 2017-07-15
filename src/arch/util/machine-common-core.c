@@ -73,11 +73,11 @@ static int CmiNodesDim;
 /* ###End of Broadcast related definitions ### */
 
 #if CMK_SMP_TRACE_COMMTHREAD
-extern double TraceTimerCommon();
+extern double TraceTimerCommon(void);
 #endif
 
 static void handleOneBcastMsg(int size, char *msg);
-static void processBcastQs();
+static void processBcastQs(void);
 
 /* Utility functions for forwarding broadcast messages,
  * should not be used in machine-specific implementations
@@ -346,8 +346,8 @@ static struct CmiStateStruct Cmi_state;
 int _Cmi_mype;
 int _Cmi_myrank;
 
-void CmiMemLock() {}
-void CmiMemUnlock() {}
+void CmiMemLock(void) {}
+void CmiMemUnlock(void) {}
 
 #define CmiGetState() (&Cmi_state)
 #define CmiGetStateN(n) (&Cmi_state)
@@ -1358,7 +1358,7 @@ static INLINE_KEYWORD void AdvanceCommunication(int whenidle) {
 #endif
 }
 
-extern void ConverseCommonExit();
+extern void ConverseCommonExit(void);
 
 static void CommunicationServer(int sleepTime) {
 #if CMK_SMP 

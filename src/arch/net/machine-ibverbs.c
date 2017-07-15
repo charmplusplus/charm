@@ -101,7 +101,7 @@ static int numMultiSendFree=0;
 #include "pcqueue.h"
 PCQueue **queuePool;
 void infi_CmiFreeDirect(void *ptr);
-static inline void fillBufferPools();
+static inline void fillBufferPools(void);
 #endif
 
 #define INFIBARRIERPACKET 128
@@ -364,10 +364,10 @@ static infiCmiChunkPool **infiCmiChunkPools;
 static infiCmiChunkPool infiCmiChunkPools[INFINUMPOOLS];
 #endif
 
-static void initInfiCmiChunkPools();
+static void initInfiCmiChunkPools(void);
 
 
-static inline infiPacket newPacket(){
+static inline infiPacket newPacket(void){
 	infiPacket pkt = (infiPacket )CmiAlloc(sizeof(struct infiPacketStruct));
 	pkt->size = -1;
 	pkt->header = context->header;
@@ -441,7 +441,7 @@ static int  checkQp(struct ibv_qp *qp){
 	}
 	return 1;
 }
-static void checkAllQps(){
+static void checkAllQps(void){
 	int i;
 	for(i=0;i<_Cmi_numnodes;i++){
 		if(i != _Cmi_mynode){
@@ -454,7 +454,7 @@ static void checkAllQps(){
 }
 
 #if CMK_IBVERBS_FAST_START
-static void send_partial_init();
+static void send_partial_init(void);
 #endif
 
 static void CmiMachineInit(char **argv){
@@ -933,7 +933,7 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 }
 
 
-void 	infiPostInitialRecvs(){
+void 	infiPostInitialRecvs(void){
 	//create the pool and post the receives
 	int numPosts;
 
@@ -1084,14 +1084,14 @@ void postInitialRecvs(struct infiBufferPool *recvBufferPool,int numRecvs,int siz
 
 static inline void CommunicationServer_nolock(int toBuffer); //if buffer ==1 recvd messages are buffered but not processed
 
-void CmiMachineExit()
+void CmiMachineExit(void)
 {
 #if CMK_IBVERBS_STATS	
 	printf("[%d] numReg %d numUnReg %d numCurReg %d msgCount %d pktCount %d packetSize %d total Time %.6lf s processBufferedCount %d processBufferedTime %.6lf s maxTokens %d tokensLeft %d \n",_Cmi_mynode,numReg, numUnReg, numCurReg, msgCount,pktCount,packetSize,CmiTimer(),processBufferedCount,processBufferedTime,maxTokens,context->tokensLeft);
 #endif
 }
 
-void CmiMachineCleanup(){
+void CmiMachineCleanup(void){
 	MACHSTATE(3, "CmiMachineCleanup")
 	int num_devices;
 	struct ibv_device **devList;
@@ -1101,7 +1101,7 @@ void CmiMachineCleanup(){
 	ibv_free_device_list(devList);
 	MACHSTATE(3, "CmiMachineCleanup END")
 }
-static void ServiceCharmrun_nolock();
+static void ServiceCharmrun_nolock(void);
 
 static void CmiNotifyStillIdle(CmiIdleState *s) {
 #if CMK_SMP
@@ -1257,7 +1257,7 @@ static void inline EnqueueDataPacket(OutgoingMsg ogm, OtherNode node, int rank,c
 };
 
 static inline void EnqueueRdmaPacket(OutgoingMsg ogm, OtherNode node);
-static inline void processAllBufferedMsgs();
+static inline void processAllBufferedMsgs(void);
 
 void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int broot, int copy){
 	int size; char *data;
@@ -1348,7 +1348,7 @@ static inline void processSendWC(struct ibv_wc *sendWC);
 static unsigned int _count=0;
 extern int errno;
 static int _countAsync=0;
-static inline void processAsyncEvents(){
+static inline void processAsyncEvents(void){
 	struct ibv_async_event event;
 	int ready;
 	_countAsync++;
@@ -1378,7 +1378,7 @@ static inline void processAsyncEvents(){
 	
 }
 
-static void pollCmiDirectQ();
+static void pollCmiDirectQ(void);
 
 static inline  void CommunicationServer_nolock(int toBuffer) {
 	int processed;
@@ -1599,7 +1599,7 @@ int CheckSocketsReady(int withDelayMs)
 /*** Service the charmrun socket
 *************/
 
-static void ServiceCharmrun_nolock()
+static void ServiceCharmrun_nolock(void)
 {
   int again = 1;
   MACHSTATE(2,"ServiceCharmrun_nolock begin {")
@@ -2087,7 +2087,7 @@ static inline void processRdmaAck(struct infiRdmaPacket *rdmaPacket){
 ******************************/
 
 
-static inline infiBufferedBcastPool createBcastPool(){
+static inline infiBufferedBcastPool createBcastPool(void){
 	int i;
 	infiBufferedBcastPool ret = malloc(sizeof(struct infiBufferedBcastPoolStruct));
 	ret->count = 0;
@@ -2132,7 +2132,7 @@ static void insertBufferedBcast(char *msg,int size,int broot,int asm_rank){
 	Go through the blocks of buffered bcast messages. process last block first
 	processign within a block is in sequence though
 *********/
-static inline void processBufferedBcast(){
+static inline void processBufferedBcast(void){
 	infiBufferedBcastPool start;
 
 	if(context->bufferedBcastList == NULL){
@@ -2201,7 +2201,7 @@ static inline void processBufferedBcast(){
 };
 
 
-static inline void processBufferedRdmaAcks(){
+static inline void processBufferedRdmaAcks(void){
 	struct infiRdmaPacket *start = context->bufferedRdmaAcks;
 	if(start == NULL){
 		return;
@@ -2221,7 +2221,7 @@ static inline void processBufferedRdmaAcks(){
 
 
 
-static inline void processBufferedRdmaRequests(){
+static inline void processBufferedRdmaRequests(void){
 	struct infiRdmaPacket *start = context->bufferedRdmaRequests;
 	if(start == NULL){
 		return;
@@ -2245,7 +2245,7 @@ static inline void processBufferedRdmaRequests(){
 
 
 
-static inline void processAllBufferedMsgs(){
+static inline void processAllBufferedMsgs(void){
 #if CMK_IBVERBS_STATS
 	double _startTime = CmiWallTimer();
 	processBufferedCount++;
@@ -2328,7 +2328,7 @@ static void increasePostedRecvs(int nodeNo){
 	The ith pool is of size firstBinSize*2^i
 */
 
-static void initInfiCmiChunkPools(){
+static void initInfiCmiChunkPools(void){
 	int i,j;
 	int size = firstBinSize;
 	int nodeSize;
@@ -2394,7 +2394,7 @@ infiCmiChunkMetaData *registerMultiSendMesg(char *msg,int size){
 #if THREAD_MULTI_POOL
 
 // Fills up the buffer pools for every thread in the node
-static inline void fillBufferPools(){
+static inline void fillBufferPools(void){
 	int nodeSize, poolIdx, thread;
 	infiCmiChunkMetaData *metaData;		
 	infiCmiChunkHeader *hdr;
@@ -3326,7 +3326,7 @@ static int receivedDirectMessage(infiDirectHandle *handle){
 }
 
 
-static void pollCmiDirectQ(){
+static void pollCmiDirectQ(void){
 	directPollingQNode *ptr = headDirectPollingQ, *prevPtr=NULL;
 	while(ptr != NULL){
 		if(receivedDirectMessage(ptr->handle)){

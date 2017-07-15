@@ -262,7 +262,7 @@ void TransmitImplicitDgram1(ImplicitDgram dg)
  * is 0, then the count of un-acked datagrams, and the time at which
  * the ack should be sent is reset.
  ***********************************************************************/
-int TransmitAcknowledgement()
+int TransmitAcknowledgement(void)
 {
   int skip; static int nextnode=0; OtherNode node;
   for (skip=0; skip<_Cmi_numnodes; skip++) {
@@ -294,7 +294,7 @@ int TransmitAcknowledgement()
  * Send Queue. It also sets the node->send_primer variable, which
  * indicates when a retransmission will be attempted.
  ***********************************************************************/
-int TransmitDatagram()
+int TransmitDatagram(void)
 {
   ImplicitDgram dg; OtherNode node;
   static int nextnode=0; int skip, count, slot;
@@ -695,7 +695,7 @@ void IntegrateAckDatagram(ExplicitDgram dg)
   FreeExplicitDgram(dg);  
 }
 
-void ReceiveDatagram()
+void ReceiveDatagram(void)
 {
   ExplicitDgram dg; int ok, magic;
   MACHLOCK_ASSERT(comm_flag,"ReceiveDatagram")
@@ -753,7 +753,7 @@ void ReceiveDatagram()
  * are ready, the corresponding tasks are called
  *
  ***********************************************************************/
-void CmiHandleImmediate();
+void CmiHandleImmediate(void);
 
 static void CommunicationServer(int sleepTime, int where)
 {
@@ -825,7 +825,7 @@ void CmiCommunicationInit(char **argv)
 {
 }
 
-void CmiMachineExit()
+void CmiMachineExit(void)
 {
 }
 

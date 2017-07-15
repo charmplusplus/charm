@@ -157,9 +157,9 @@ typedef struct {
 
 PxshmContext *pxshmContext = NULL; // global context
 
-void calculateNodeSizeAndRank();
-void setupSharedBuffers();
-void initAllSendQs();
+void calculateNodeSizeAndRank(void);
+void setupSharedBuffers(void);
+void initAllSendQs(void);
 
 /******************
  * 	Initialization routine
@@ -218,9 +218,9 @@ void CmiInitPxshm(char **argv)
  * shutdown shmem objects and semaphores
  *
  * *******************/
-void tearDownSharedBuffers();
+void tearDownSharedBuffers(void);
 
-void CmiExitPxshm()
+void CmiExitPxshm(void)
 {
   int i = 0;
 
@@ -368,14 +368,14 @@ void CmiSendMessagePxshm(OutgoingMsg ogm, OtherNode node, int rank,
   MEMDEBUG(CmiMemoryCheck());
 };
 
-inline void emptyAllRecvBufs();
-inline void flushAllSendQs();
+inline void emptyAllRecvBufs(void);
+inline void flushAllSendQs(void);
 
 /**********
  * Extract all the messages from the recvBuffers you can
  * Flush all sendQs
  * ***/
-inline void CommunicationServerPxshm()
+inline void CommunicationServerPxshm(void)
 {
 
 #if PXSHM_STATS
@@ -576,7 +576,7 @@ void createShmObject(char *name, int size, char **pPtr)
   close(fd);
 }
 
-void tearDownSharedBuffers()
+void tearDownSharedBuffers(void)
 {
   int i;
   for (i = 0; i < pxshmContext->nodesize; i++) {
@@ -596,7 +596,7 @@ void tearDownSharedBuffers()
 
 void initSendQ(PxshmSendQ *q, int size);
 
-void initAllSendQs()
+void initAllSendQs(void)
 {
   int i = 0;
   pxshmContext->sendQs =
@@ -672,7 +672,7 @@ inline int flushSendQ(int dstRank)
 
 inline void emptyRecvBuf(sharedBufData *recvBuf);
 
-inline void emptyAllRecvBufs()
+inline void emptyAllRecvBufs(void)
 {
   int i;
   for (i = 0; i < pxshmContext->nodesize; i++) {
@@ -716,7 +716,7 @@ inline void emptyAllRecvBufs()
   }
 };
 
-inline void flushAllSendQs()
+inline void flushAllSendQs(void)
 {
   int i = 0;
 

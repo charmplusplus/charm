@@ -183,7 +183,7 @@ static int MSG_HISTOGRAM_BINSIZE;
 static int MAX_HISTOGRAM_BUCKETS; /* only cares msg size less 2 MB */
 CpvDeclare(int *, MSG_HISTOGRAM_ARRAY);
 static void recordMsgHistogramInfo(int size);
-static void reportMsgHistogramInfo();
+static void reportMsgHistogramInfo(void);
 #endif /* end of MPI_DYNAMIC_POST_RECV defined */
 
 #endif /* end of MPI_POST_RECV defined */
@@ -218,7 +218,7 @@ static IRecvList freedIrecvList = NULL; /* used to recycle the entries */
 static IRecvList waitIrecvListHead = NULL; /* points to the guardian entry, i.e., the next of it points to the first entry */
 static IRecvList waitIrecvListTail = NULL; /* points to the last entry */
 
-static IRecvList irecvListEntryAllocate(){
+static IRecvList irecvListEntryAllocate(void){
     IRecvList ret;
     if(freedIrecvList == NULL) {
         ret = (IRecvList)malloc(sizeof(struct IRecvListEntry));        
@@ -239,7 +239,7 @@ static void irecvListEntryFree(IRecvList used){
 /* Providing functions for external usage to set up the dynamic recv buffer
  * when the user is aware that it's safe to call such function
  */
-void CmiSetupMachineRecvBuffers();
+void CmiSetupMachineRecvBuffers(void);
 
 #define CAPTURE_MSG_HISTOGRAM 0
 #if CAPTURE_MSG_HISTOGRAM && !MPI_DYNAMIC_POST_RECV
@@ -247,7 +247,7 @@ static int MSG_HISTOGRAM_BINSIZE=1000;
 static int MAX_HISTOGRAM_BUCKETS=2000; /* only cares msg size less 2 MB */
 CpvDeclare(int *, MSG_HISTOGRAM_ARRAY);
 static void recordMsgHistogramInfo(int size);
-static void reportMsgHistogramInfo();
+static void reportMsgHistogramInfo(void);
 #endif
 
 /* ###End of POST_RECV related related macros ### */
@@ -361,7 +361,7 @@ static CmiNodeLock  sendMsgBufLock = NULL;        /* for sendMsgBuf */
 int num_workpes, total_pes;
 int *petorank = NULL;
 int  nextrank;
-void mpi_end_spare();
+void mpi_end_spare(void);
 #endif
 
 /* =====Beginning of Declarations of Machine Specific Functions===== */
@@ -373,9 +373,9 @@ static int PumpMsgs(void);
 static void PumpMsgsBlocking(void);
 
 #if CMK_SMP
-static int MsgQueueEmpty();
-static int RecvQueueEmpty();
-static int SendMsgBuf();
+static int MsgQueueEmpty(void);
+static int RecvQueueEmpty(void);
+static int SendMsgBuf(void);
 static  void EnqueueMsg(void *m, int size, int node, int mode);
 #endif
 
@@ -1000,7 +1000,7 @@ static void PumpMsgsBlocking(void) {
 #if CMK_SMP
 
 /* called by communication thread in SMP */
-static int SendMsgBuf() {
+static int SendMsgBuf(void) {
     SMSG_LIST *msg_tmp;
     char *msg;
     int node, rank, size;
@@ -1135,7 +1135,7 @@ void LrtsAdvanceCommunication(int whenidle) {
 }
 /* ######End of functions related with communication progress ###### */
 
-void LrtsPostNonLocal() {
+void LrtsPostNonLocal(void) {
 #if !CMK_SMP
     if (no_outstanding_sends) {
         while (CpvAccess(MsgQueueLen)>0) {
@@ -1175,7 +1175,7 @@ void CmiNotifyIdleForMPI(void) {
 /* Network progress function is used to poll the network when for
    messages. This flushes receive buffers on some  implementations*/
 #if CMK_MACHINE_PROGRESS_DEFINED
-void CmiMachineProgressImpl() {
+void CmiMachineProgressImpl(void) {
 #if !CMK_SMP
     PumpMsgs();
 #if CMK_IMMEDIATE_MSG
@@ -1191,7 +1191,7 @@ void CmiMachineProgressImpl() {
 #endif
 
 /* ######Beginning of functions related with exiting programs###### */
-void LrtsDrainResources() {
+void LrtsDrainResources(void) {
 #if !CMK_SMP
     while (!CheckAllAsyncMsgsSent()) {
         PumpMsgs();
@@ -1224,7 +1224,7 @@ void LrtsDrainResources() {
     MACHSTATE(2, "} Machine exit barrier end");
 }
 
-void LrtsExit() {
+void LrtsExit(void) {
     int i;
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
     int doPrint = 0;
@@ -1285,7 +1285,7 @@ static void KillOnAllSigs(int sigNo) {
 
 
 /* ######Beginning of functions related with starting programs###### */
-static void registerMPITraceEvents() {
+static void registerMPITraceEvents(void) {
 #if CMI_MPI_TRACE_USEREVENTS && CMK_TRACE_ENABLED && !CMK_TRACE_IN_CHARM
     traceRegisterUserEvent("MPI_Barrier", 10);
     traceRegisterUserEvent("MPI_Send", 20);
@@ -1617,11 +1617,11 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 #endif
 }
 
-INLINE_KEYWORD void LrtsNotifyIdle() {}
+INLINE_KEYWORD void LrtsNotifyIdle(void) {}
 
-INLINE_KEYWORD void LrtsBeginIdle() {}
+INLINE_KEYWORD void LrtsBeginIdle(void) {}
 
-INLINE_KEYWORD void LrtsStillIdle() {}
+INLINE_KEYWORD void LrtsStillIdle(void) {}
 
 void LrtsPreCommonInit(int everReturn) {
 
@@ -1777,11 +1777,11 @@ void LrtsAbort(const char *message) {
 
 /* MPI calls are not threadsafe, even the timer on some machines */
 static CmiNodeLock  timerLock = 0;
-                                static int _absoluteTime = 0;
-                                                           static double starttimer = 0;
-                                                                                      static int _is_global = 0;
+static int _absoluteTime = 0;
+static double starttimer = 0; 
+static int _is_global =0;
 
-int CmiTimerIsSynchronized() {
+int CmiTimerIsSynchronized(void) {
     int  flag;
     void *v;
 
@@ -1800,15 +1800,15 @@ int CmiTimerIsSynchronized() {
     return _is_global;
 }
 
-int CmiTimerAbsolute() {
+int CmiTimerAbsolute(void) {
     return _absoluteTime;
 }
 
-double CmiStartTimer() {
+double CmiStartTimer(void) {
     return 0.0;
 }
 
-double CmiInitTime() {
+double CmiInitTime(void) {
     return starttimer;
 }
 
@@ -1898,14 +1898,14 @@ double CmiCpuTimer(void) {
 
 #endif     /* CMK_TIMER_USE_SPECIAL */
 
-void LrtsBarrier()
+void LrtsBarrier(void)
 {
     if (MPI_SUCCESS != MPI_Barrier(charmComm))
         CmiAbort("Timernit: MPI_Barrier failed!\n");
 }
 
 /* CmiBarrierZero make sure node 0 is the last one exiting the barrier */
-int CmiBarrierZero() {
+int CmiBarrierZero(void) {
     int i;
     if (CmiMyRank() == 0)
     {
@@ -1945,7 +1945,7 @@ void mpi_restart_crashed(int pe, int rank)
 }
 
 /* notify spare processors to exit */
-void mpi_end_spare()
+void mpi_end_spare(void)
 {
     int i;
     for (i=nextrank; i<total_pes; i++) {
@@ -1989,7 +1989,7 @@ int isRankDie(int rank){
   return 0;
 }
 
-void CkDieNow()
+void CkDieNow(void)
 {
 #if __FAULT__
     CmiPrintf("[%d] die now.\n", CmiMyPe());
@@ -2014,7 +2014,7 @@ void CkDieNow()
 
 #if MPI_DYNAMIC_POST_RECV
 /* Consume all messages in the request buffers */
-static void consumeAllMsgs()
+static void consumeAllMsgs(void)
 {
     MPIPostRecvList *ptr = CpvAccess(curPostRecvPtr);
     if (ptr) {
@@ -2068,7 +2068,7 @@ static void recordMsgHistogramInfo(int size)
 static int buildDynCallCnt = 0;
 #endif
 
-static void buildDynamicRecvBuffers()
+static void buildDynamicRecvBuffers(void)
 {
     int i;
 
@@ -2293,7 +2293,7 @@ void reportMsgHistogramInfo()
 }
 #endif /* end of CAPTURE_MSG_HISTOGRAM || MPI_DYNAMIC_POST_RECV */
 
-void CmiSetupMachineRecvBuffersUser()
+void CmiSetupMachineRecvBuffersUser(void)
 {
 #if MPI_DYNAMIC_POST_RECV
     buildDynamicRecvBuffers();

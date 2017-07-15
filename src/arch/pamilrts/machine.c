@@ -684,9 +684,9 @@ void LrtsPostCommonInit(int everReturn)
   CmiBarrier();
 }
 
-void LrtsPostNonLocal() {}
+void LrtsPostNonLocal(void) {}
 
-void LrtsDrainResources()
+void LrtsDrainResources(void)
 {
   while (MSGQLEN() > 0 || ORECVS() > 0) {
     LrtsAdvanceCommunication(0);
@@ -694,7 +694,7 @@ void LrtsDrainResources()
   CmiNodeBarrier();
 }
 
-void LrtsExit() 
+void LrtsExit(void)
 {
   int rank0 = 0;
   CmiBarrier();
@@ -726,11 +726,11 @@ void LrtsAbort(const char *message) {
   assert(0);
 }
 
-INLINE_KEYWORD void LrtsBeginIdle() {}
+INLINE_KEYWORD void LrtsBeginIdle(void) {}
 
-INLINE_KEYWORD void LrtsStillIdle() {}
+INLINE_KEYWORD void LrtsStillIdle(void) {}
 
-void LrtsNotifyIdle()
+void LrtsNotifyIdle(void)
 {
 #if CMK_SMP && CMK_PAMI_MULTI_CONTEXT
 #if !CMK_ENABLE_ASYNC_PROGRESS && SPECIFIC_QUEUE  
@@ -928,7 +928,7 @@ pami_result_t network_barrier_handoff(pami_context_t context, void *msg)
   return machine_network_barrier(context, 0);
 }
 
-void LrtsBarrier()
+void LrtsBarrier(void)
 {
     CmiNetworkBarrier(1);
 }

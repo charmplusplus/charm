@@ -99,7 +99,7 @@ void CmiMachineInit(char **argv);
 
 void CmiAmmassoNodeAddressesStoreHandler(int pe, struct sockaddr_in *addr, int port);
 
-void AmmassoDoIdle();
+void AmmassoDoIdle(void);
 void CmiNotifyIdle(void);
 static CmiIdleState* CmiNotifyGetState(void);
 static void CmiNotifyBeginIdle(CmiIdleState *s);
@@ -110,14 +110,14 @@ AmmassoToken *getQPSendToken(OtherNode node);
 int sendDataOnQP(char* data, int len, OtherNode node, char flags);
 void DeliverViaNetwork(OutgoingMsg msg, OtherNode otherNode, int rank, unsigned int broot, int copy);
 static void CommunicationServer(int withDelayMs, int where);
-void CmiMachineExit();
+void CmiMachineExit(void);
 
 void AsynchronousEventHandler(cc_rnic_handle_t rnic, cc_event_record_t *eventRecord, void *cb);
 void CheckRecvBufForMessage(OtherNode node);
 //void CompletionEventHandler(cc_rnic_handle_t rnic, cc_cq_handle_t cq, void *cb);
 //void CompletionEventHandlerWithAckFlag(cc_rnic_handle_t rnic, cc_cq_handle_t cq, void *cb, int breakOnAck);
 
-void CmiAmmassoOpenQueuePairs();
+void CmiAmmassoOpenQueuePairs(void);
 
 void processAmmassoControlMessage(char* msg, int len, Tailer *tail, OtherNode from);
 int ProcessMessage(char* msg, int len, Tailer *tail, OtherNode from);
@@ -140,7 +140,7 @@ void ReleaseTokens(OtherNode node, int n);
 // Function Bodies /////////////////////////////////////////////////////////////////////////////////
 
 /* Callbacks used by the DYNAMIC ALLOCATOR */
-void AllocatorCheck () {
+void AllocatorCheck (void) {
   int i, limit;
   char buf[24];
   for (i=0; i<contextBlock->numNodes; ++i) {
@@ -466,7 +466,7 @@ void CmiAmmassoNodeAddressesStoreHandler(int pe, struct sockaddr_in *addr, int p
 }
 
 
-void AmmassoDoIdle() {
+void AmmassoDoIdle(void) {
 
   int i;
   cc_wc_t wc;
@@ -992,7 +992,7 @@ int CheckSocketsReady(int withDelayMs)
  ***********************************************************************/
 
 // NOTE: Always called from interrupt
-static void ServiceCharmrun_nolock() {
+static void ServiceCharmrun_nolock(void) {
 
   int again = 1;
 
@@ -2148,7 +2148,7 @@ void CompletionEventHandlerWithAckFlag(cc_rnic_handle_t rnic, cc_cq_handle_t cq,
 */
 
 // NOTE: DMK: The code here follows from open_tcp_sockets() in machine-tcp.c.
-void CmiAmmassoOpenQueuePairs() {
+void CmiAmmassoOpenQueuePairs(void) {
 
   char buf[128];
   int i, myNode, numNodes, keepWaiting;

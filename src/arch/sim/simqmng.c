@@ -39,26 +39,22 @@ MSG *item;
     item->next = current;
 }
 
-static not_empty(front)
-void *front;
+static not_empty(void *front)
 {
     return (front) ? TRUE : FALSE;
 }
 
-static empty(front)
-void *front;
+static empty(void *front)
 {
     return (front) ? FALSE : TRUE;
 }
 
-static is_first_element(front,element)
-void *front, *element;
+static is_first_element(void *front, void *element)
 {
     return (front == element) ? TRUE : FALSE;
 }
 
-static SIM_TIME next_msg_arrival(front)
-MSG *front;
+static SIM_TIME next_msg_arrival(MSG *front)
 {
     /* valid for MSG_QUEUE */
     return front->arrival_time;
@@ -68,8 +64,7 @@ MSG *front;
 /* remove the front element                                       */
 /* ************************************************************** */
 
-static void *remove_front(front_ptr)
-MSG **front_ptr;
+static void *remove_front(MSG **front_ptr)
 {    
     void *front_element;
     
@@ -79,17 +74,14 @@ MSG **front_ptr;
     return front_element;
 }
 
-static int ge(arg1,arg2)
-MSG *arg1,*arg2;
+static int ge(MSG *arg1, MSG *arg2)
 {
     return( !less_time(arg1->arrival_time,arg2->arrival_time));
 }
 
 /* temporary FIFO implementation */
 
-static fifo_enqueue(q,msg)
-PE_MSG_QUEUE *q;
-MSG          *msg;
+static fifo_enqueue(PE_MSG_QUEUE *q, MSG *msg)
 {
     msg->next = NULL; 
     if (q->front == NULL) 
@@ -102,8 +94,7 @@ MSG          *msg;
     q->size += msg->length;
 }
 
-static MSG *fifo_dequeue(q)
-PE_MSG_QUEUE *q;
+static MSG *fifo_dequeue(PE_MSG_QUEUE *q)
 {
     MSG *msg;   
     msg = q->front;
@@ -117,8 +108,7 @@ PE_MSG_QUEUE *q;
     return msg;
 }
 
-static fifo_empty(q)
-PE_MSG_QUEUE *q;
+static fifo_empty(PE_MSG_QUEUE *q)
 {
     return ( (q->front) ? FALSE:TRUE);
 }

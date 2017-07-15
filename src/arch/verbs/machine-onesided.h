@@ -39,11 +39,11 @@ void verbsOnesidedSendAck(int peNum, CmiVerbsRdmaRecvOp_t *recvOpInfo);
 
 void verbsOnesidedReceivedAck(struct infiRdmaPacket *rdmaPacket);
 
-int LrtsGetRdmaOpInfoSize(){
+int LrtsGetRdmaOpInfoSize(void){
   return sizeof(CmiVerbsRdmaOp_t);
 }
 
-int LrtsGetRdmaGenInfoSize(){
+int LrtsGetRdmaGenInfoSize(void){
   return sizeof(CmiVerbsRdma_t);
 }
 
@@ -51,11 +51,11 @@ int LrtsGetRdmaInfoSize(int numOps){
   return sizeof(CmiVerbsRdma_t) + numOps * sizeof(CmiVerbsRdmaOp_t);
 }
 
-int LrtsGetRdmaOpRecvInfoSize(){
+int LrtsGetRdmaOpRecvInfoSize(void){
   return sizeof(CmiVerbsRdmaRecvOp_t);
 }
 
-int LrtsGetRdmaGenRecvInfoSize(){
+int LrtsGetRdmaGenRecvInfoSize(void){
   return sizeof(CmiVerbsRdmaRecv_t);
 }
 

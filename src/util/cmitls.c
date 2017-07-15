@@ -8,20 +8,20 @@
 
 extern void* __executable_start;
 
-static Addr getCodeSegAddr() {
+static Addr getCodeSegAddr(void) {
   return (Addr) &__executable_start;
 }
 
-static Ehdr* getELFHeader() {
+static Ehdr* getELFHeader(void) {
   return (Ehdr*) getCodeSegAddr();
 }
 
-static Phdr* getProgramHeader() {
+static Phdr* getProgramHeader(void) {
   Ehdr* ehdr = getELFHeader();
   return (Phdr*)((char *)ehdr + ehdr->e_phoff);
 }
 
-Phdr* getTLSPhdrEntry() {
+Phdr* getTLSPhdrEntry(void) {
   int phnum, i;
   Ehdr* elfHeader;
   Phdr* progHeader;

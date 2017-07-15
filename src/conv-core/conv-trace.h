@@ -17,10 +17,10 @@ void traceResume(CmiObjId *);
 void traceSuspend(void);
 void traceAwaken(CthThread t);
 void traceUserEvent(int);
-void beginAppWork();
-void endAppWork();
-void beginTuneOverhead();
-void endTuneOverhead();
+void beginAppWork(void);
+void endAppWork(void);
+void beginTuneOverhead(void);
+void endTuneOverhead(void);
 void traceUserBracketEvent(int, double, double);
 void traceUserBracketEventNestedID(int, double, double, int nestedID);
 void traceUserSuppliedData(int);
@@ -75,7 +75,7 @@ CpvExtern(int, traceOn);
 #define traceIsOn()  0
 #endif
 
-int  traceAvailable();
+int  traceAvailable(void);
 
 /* Comm thread tracing */
 #if CMK_SMP_TRACE_COMMTHREAD

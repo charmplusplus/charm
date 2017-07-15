@@ -109,4 +109,4 @@ int zlib_decompress(const void *src, void *dst, int srcLen, int dstLen) {
 #endif
 }
 
-void zlib_init() {}
+void zlib_init(void) {}

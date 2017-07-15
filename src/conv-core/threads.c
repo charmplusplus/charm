@@ -512,14 +512,14 @@ void CtgInstallTLS(void *cur, void *next)
 
 static tlsseg_t  _oldtlsseg[128] = {0};
 static int       tlsseg_ptr = -1;
-void CmiDisableTLS()
+void CmiDisableTLS(void)
 {
   tlsseg_ptr++;
   CmiAssert(tlsseg_ptr < 128);
   switchTLS(&_oldtlsseg[tlsseg_ptr], &_ctgTLS);
 }
 
-void CmiEnableTLS()
+void CmiEnableTLS(void)
 {
   tlsseg_t  dummy;
   switchTLS(&dummy, &_oldtlsseg[tlsseg_ptr]);
@@ -527,8 +527,8 @@ void CmiEnableTLS()
 }
 #else
 void CtgInstallTLS(void *cur, void *next) {}
-void CmiDisableTLS() {}
-void CmiEnableTLS() {}
+void CmiDisableTLS(void) {}
+void CmiEnableTLS(void) {}
 #endif
 
 static void CthBaseInit(char **argv)
@@ -563,9 +563,9 @@ static void CthBaseInit(char **argv)
 #endif
 }
 
-int CthImplemented() { return 1; } 
+int CthImplemented(void) { return 1; }
 
-CthThread CthSelf()
+CthThread CthSelf(void)
 {
   return CthCpvAccess(CthCurrent);
 }
@@ -763,7 +763,7 @@ void CthSwitchThread(CthThread t)
    1- stack might have grown too much
    2- memory corruptions might have occured
  */
-void CthCheckThreadSanity()
+void CthCheckThreadSanity(void)
 {
 #if !CMK_THREADS_USE_FCONTEXT
   /* use the address of a dummy variable on stack to see how large the stack is currently */
@@ -872,7 +872,7 @@ void CthAwaken(CthThread th)
 
 }
 
-void CthYield()
+void CthYield(void)
 {
 #if CMK_OMP
   B(CthCpvAccess(CthCurrent))->scheduled--;
@@ -970,7 +970,7 @@ typedef struct CthThreadStruct
   qt_t      *savedptr;   /* stack pointer */	
 } CthThreadStruct;
 
-int CthMigratable()
+int CthMigratable(void)
 {
   return 1;
 }
@@ -1025,8 +1025,7 @@ static void CthThreadFree(CthThread t)
   free(t);
 }
 
-void CthFree(t)
-  CthThread t;
+void CthFree(CthThread t)
 {
   CthProcInfo proc;
   if (t==NULL) return;
@@ -1038,7 +1037,7 @@ void CthFree(t)
     t->base.exiting = 1;
 }
 
-void CthDummy() { }
+void CthDummy(void) { }
 
 void CthInit(char **argv)
 {
@@ -1148,8 +1147,7 @@ static void CthResume1(qt_t *sp, CthProcInfo proc, CthThread t)
   QT_ABORT((qt_helper_t*)CthDummy,0,0,sp);
 }
 
-void CthResume(t)
-  CthThread t;
+void CthResume(CthThread t)
 {
   CthProcInfo proc = CthCpvAccess(CthProc);
   QT_BLOCK((qt_helper_t*)CthResume1, proc, t, proc->switchbuf_sp);
@@ -1296,7 +1294,7 @@ void CthThreadFree(CthThread old)
   free(old);
 }
 
-static void CthClearThreads()
+static void CthClearThreads(void)
 {
   int i,p,m;
   int n = CthCpvAccess(nExit);
@@ -1419,7 +1417,7 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
   return result;
 }
 
-int CthMigratable()
+int CthMigratable(void)
 {
   return 0;
 }
@@ -1466,8 +1464,7 @@ struct CthThreadStruct
   */
 CthCpvStatic(pthread_mutex_t, sched_mutex);
 
-static void CthThreadInit(t)
-  CthThread t;
+static void CthThreadInit(CthThread t)
 {
   CthThreadBaseInit(&t->base);
   t->inited = 0;
@@ -1492,8 +1489,7 @@ void CthInit(char **argv)
   CmiThreadIs_flag |= CMI_THREAD_IS_PTHREADS;
 }
 
-void CthFree(t)
-  CthThread t;
+void CthFree(CthThread t)
 {
   if (t==NULL) return;
   if (t==CthCpvAccess(CthCurrent)) {
@@ -1586,7 +1582,7 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
   return result;
 }
 
-int CthMigratable()
+int CthMigratable(void)
 {
   return 0;
 }
@@ -1661,8 +1657,7 @@ struct CthThreadStruct
 };
 
 
-static void CthThreadInit(t)
-  CthThread t;
+static void CthThreadInit(CthThread t)
 {
   CthThreadBaseInit(&t->base);
 }
@@ -1886,7 +1881,7 @@ CthThread CthCreateMigratable(CthVoidFn fn,void *arg,int size)
   return CthCreateInner(fn,arg,size,1);
 }
 
-int CthMigratable()
+int CthMigratable(void)
 {
   return CmiIsomallocEnabled();
 }
@@ -2050,8 +2045,7 @@ static void *CthBlockHelp(qt_t *sp, CthThread old, void *null)
 void CthResume(CthThread) __attribute__((optimize(0)));
 #endif
 
-void CthResume(t)
-  CthThread t;
+void CthResume(CthThread t)
 {
   CthThread tc = CthCpvAccess(CthCurrent);
   if (t == tc) return;
@@ -2123,7 +2117,7 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
 CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size)
 { return CthCreateInner(fn,arg,size,1);}
 
-int CthMigratable()
+int CthMigratable(void)
 {
 #if CMK_THREADS_ALIAS_STACK
   return 1;

@@ -24,7 +24,7 @@ double get_clock()
 static int compress_mode = CMODE_ZLIB;
 //static int compress_mode = CMODE_LZ4;
 static int initDone=0;
-void initCompress()
+void initCompress(void)
 {
     switch(compress_mode)
     {

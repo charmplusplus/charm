@@ -689,7 +689,7 @@ void ReceiveDatagram(void)
  * are ready, the corresponding tasks are called
  *
  ***********************************************************************/
-void CmiHandleImmediate();
+void CmiHandleImmediate(void);
 
 static void CommunicationServerNet(int sleepTime, int where)
 {

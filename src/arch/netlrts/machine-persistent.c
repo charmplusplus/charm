@@ -147,7 +147,7 @@ void PerFree(char *msg)
     CmiFree(msg);
 }
 
-void persist_machine_init() 
+void persist_machine_init(void)
 {
   persistentSendMsgHandlerIdx =
        CmiRegisterHandler((CmiHandler)sendPerMsgHandler);

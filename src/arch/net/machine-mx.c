@@ -209,7 +209,7 @@ int CheckSocketsReady(int withDelayMs)
  ***********************************************************************/
 
 /* always called from interrupt */
-static void ServiceCharmrun_nolock()
+static void ServiceCharmrun_nolock(void)
 {
   int again = 1;
   MACHSTATE(2,"ServiceCharmrun_nolock begin {")
@@ -703,7 +703,7 @@ static void sendBarrierMessage(int pe)
   } while (rc != MX_SUCCESS || result==0);
 }
 
-static void recvBarrierMessage()
+static void recvBarrierMessage(void)
 {
   mx_segment_t buffer_desc;
   char msg[4];
@@ -734,7 +734,7 @@ static void recvBarrierMessage()
 }
 
 /* happen at node level */
-int CmiBarrier()
+int CmiBarrier(void)
 {
   int len, size, i;
   int status;
@@ -781,7 +781,7 @@ int CmiBarrier()
 }
 
 /* everyone sends a message to pe 0 and go on */
-int CmiBarrierZero()
+int CmiBarrierZero(void)
 {
   int i;
 
@@ -860,14 +860,14 @@ void CmiMachineInit(char **argv)
   MACHSTATE(3,"} CmiMachineInit");
 }
 
-void CmiMXMakeConnection();
+void CmiMXMakeConnection(void);
 
 void CmiCommunicationInit(char **argv)
 {
   CmiMXMakeConnection();
 }
 
-void CmiMachineExit()
+void CmiMachineExit(void)
 {
   MACHSTATE(3, "CmiMachineExit {");
   mx_return_t  rc;
@@ -890,7 +890,7 @@ void CmiMachineExit()
 }
 
 /* make sure other gm nodes are accessible in routing table */
-void CmiMXMakeConnection()
+void CmiMXMakeConnection(void)
 {
   int i;
   int doabort = 0;

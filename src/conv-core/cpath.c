@@ -576,7 +576,7 @@ void CPathMakeArray(CPath *path, int startfn, int mapfn, ...)
 
 void CPathMergeReduction(reduction red, void *data);
 
-void CPathReduceMismatch()
+void CPathReduceMismatch(void)
 {
   CmiError("CPathReduce: all members of reduction do not agree on reduction parameters.\n");
   exit(1);
@@ -789,7 +789,7 @@ synerr:
   exit(1);
 }
 
-void CPathModuleInit()
+void CPathModuleInit(void)
 {
   CpvInitialize(int, seqno);
   CpvInitialize(int, CPathSendIdx);

@@ -16,15 +16,15 @@ typedef struct _cmi_rdma_ack{
 /*Sender Functions*/
 void LrtsSetRdmaInfo(void *dest, int destPE, int numOps);
 void LrtsSetRdmaOpInfo(void *dest, const void *ptr, int size, void *ack, int destPE);
-int LrtsGetRdmaOpInfoSize();
-int LrtsGetRdmaGenInfoSize();
+int LrtsGetRdmaOpInfoSize(void);
+int LrtsGetRdmaGenInfoSize(void);
 int LrtsGetRdmaInfoSize(int numOps);
 void LrtsSetRdmaRecvInfo(void *dest, int numOps, void *charmMsg, void *rdmaInfo, int msgSize);
 
 /*Receiver Functions*/
 void LrtsSetRdmaRecvOpInfo(void *dest, void *buffer, void *src_ref, int size, int opIndex, void *rdmaRecv);
-int LrtsGetRdmaOpRecvInfoSize();
-int LrtsGetRdmaGenRecvInfoSize();
+int LrtsGetRdmaOpRecvInfoSize(void);
+int LrtsGetRdmaGenRecvInfoSize(void);
 int LrtsGetRdmaRecvInfoSize(int numOps);
 void LrtsIssueRgets(void *recv, int pe);
 
@@ -48,12 +48,12 @@ void CmiSetRdmaOpInfo(void *dest, const void *ptr, int size, void *ack, int dest
  * while allocating the message*/
 
 /* Get the size occupied by the machine layer info specific to RDMA op*/
-int CmiGetRdmaOpInfoSize(){
+int CmiGetRdmaOpInfoSize(void){
   return LrtsGetRdmaOpInfoSize();
 }
 
 /* Get the size occupied by the macine layer info generic to RDMA ops*/
-int CmiGetRdmaGenInfoSize(){
+int CmiGetRdmaGenInfoSize(void){
   return LrtsGetRdmaGenInfoSize();
 }
 
@@ -84,12 +84,12 @@ void CmiSetRdmaRecvOpInfo(void *dest, void *buffer, void *src_ref, int size, int
 }
 
 /* Get the size occupied by the receiver specific machine layer specific to RDMA op*/
-int CmiGetRdmaOpRecvInfoSize(){
+int CmiGetRdmaOpRecvInfoSize(void){
   return LrtsGetRdmaOpRecvInfoSize();
 }
 
 /* Get the size occupied by the receiver specific machine layer info generic to RDMA ops*/
-int CmiGetRdmaGenRecvInfoSize(){
+int CmiGetRdmaGenRecvInfoSize(void){
   return LrtsGetRdmaGenRecvInfoSize();
 }
 

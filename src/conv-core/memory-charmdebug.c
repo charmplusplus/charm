@@ -856,7 +856,7 @@ void * mergeMemStat(int *size, void *data, void **remoteData, int numRemote) {
   }
 }
 
-MemStat * CreateMemStat() {
+MemStat * CreateMemStat(void) {
   Slot *cur;
   MemStat *st;
   MemStatSingle *stat;
@@ -920,7 +920,7 @@ static void resetSlotCRC(void *userPtr) {
   }
 }
 
-static void ResetAllCRC() {
+static void ResetAllCRC(void) {
   Slot *cur;
   unsigned int crc1, crc2;
 
@@ -933,7 +933,7 @@ static void ResetAllCRC() {
   SLOT_ITERATE_END
 }
 
-static void CheckAllCRC() {
+static void CheckAllCRC(void) {
   Slot *cur;
   unsigned int crc1, crc2;
 
@@ -957,7 +957,7 @@ static void CheckAllCRC() {
 
 static int CpdMemBackup = 0;
 
-static void backupMemory() {
+static void backupMemory(void) {
   Slot *cur;
   char * ptr;
   int totalMemory = SLOTSPACE;
@@ -994,7 +994,7 @@ static void backupMemory() {
   allocatedSinceSize = 0;
 }
 
-static void checkBackup() {
+static void checkBackup(void) {
 #ifndef CMK_SEPARATE_SLOT
   Slot *cur = slot_first->next;
   char *ptr = *memoryBackup + sizeof(Slot);
@@ -1078,7 +1078,7 @@ static void CpdMMAPhandler(int sig, siginfo_t *si, void *unused){
   //CmiPrintStackTrace(0);
 }
 
-static void protectMemory() {
+static void protectMemory(void) {
 #ifdef CPD_USE_MMAP
   Slot *cur;
   /*printf("protecting memory (chareid=%d)",memory_chare_id);*/
@@ -1098,7 +1098,7 @@ static void protectMemory() {
 #endif
 }
 
-static void unProtectMemory() {
+static void unProtectMemory(void) {
 #ifdef CPD_USE_MMAP
   Slot *cur;
   SLOT_ITERATE_START(cur)
@@ -1117,7 +1117,7 @@ static void unProtectMemory() {
 /** Called before the entry method: resets all current memory for the chare
  * receiving the message.
  */
-void CpdResetMemory() {
+void CpdResetMemory(void) {
   if (CpdMemBackup) backupMemory();
   if (CpdCRC32) ResetAllCRC();
   if (CpdMprotect) protectMemory();
@@ -1126,7 +1126,7 @@ void CpdResetMemory() {
 /** Called after the entry method to check if the chare that just received the
  * message has corrupted the memory of some other chare, or some system memory.
  */
-void CpdCheckMemory() {
+void CpdCheckMemory(void) {
   Slot *cur;
   if (CpdMprotect) unProtectMemory();
   if (CpdCRC32) CheckAllCRC();
@@ -1140,7 +1140,7 @@ void CpdCheckMemory() {
   SLOT_ITERATE_END
 }
 
-void CpdSystemEnter() {
+void CpdSystemEnter(void) {
 #ifdef CPD_USE_MMAP
   Slot *cur;
   if (++cpdInSystem == 1) {
@@ -1164,7 +1164,7 @@ void CpdSystemEnter() {
 #endif
 }
 
-void CpdSystemExit() {
+void CpdSystemExit(void) {
 #ifdef CPD_USE_MMAP
   Slot *cur;
   int i;
@@ -1254,7 +1254,7 @@ static int stackTraceDisabled = 0;
 static int numStackFrames; // the number of frames presetn in stackFrames - 4 (this number is trimmed at 0
 static void *stackFrames[MAX_STACK_FRAMES];
 
-static void dumpStackFrames() {
+static void dumpStackFrames(void) {
   numStackFrames=MAX_STACK_FRAMES;
   if (stackTraceDisabled==0) {
     stackTraceDisabled = 1;
@@ -1405,7 +1405,7 @@ static void status(char *msg) {
   }
 }
 
-extern int getCharmEnvelopeSize();
+extern int getCharmEnvelopeSize(void);
 
 static int disableVerbosity = 1;
 int cpdInitializeMemory;
