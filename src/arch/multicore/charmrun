@@ -13,14 +13,15 @@ do
         ++ppn)  echo please use +ppn instead of ++ppn
                 exit 1
                 ;;
+	++quiet)
+		QUIET=1
+		args=$args" "$1
+		shift
+		;;
         +*)
                 args=$args" "$1
                 shift
                 ;;
-	++quiet)
-		QUIET=1
-		args=$args" "$1
-		;;
         *)
 		break;
 		;;
