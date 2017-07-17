@@ -1,13 +1,12 @@
+. $CHARMINC/cc-mpi.sh
+
 CMK_INCDIR='/sicortex/software/gentoo/buildroot/default/usr/include'
 CMK_LIBDIR='-L/sicortex/software/gentoo/buildroot/default/lib64 -L/sicortex/software/gentoo/buildroot/default/usr/lib64'
 
-CMK_CPP_CHARM='cpp -P'
-CMK_CPP_C='mpicc -G0 -E '
-CMK_CC='mpicc -G0 -mips64 -march=5kf -mtune=5kf '
-CMK_CXX='mpicxx -G0 -mips64 -march=5kf -mtune=5kf '
-CMK_RANLIB='ranlib'
-CMK_LIBS='-lckqt -lscdma -lpmi '
-CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
+CMK_CPP_C="$CMK_CPP_C -G0 "
+CMK_CC="$CMK_CC -G0 -mips64 -march=5kf -mtune=5kf "
+CMK_CXX="$CMK_CXX -G0 -mips64 -march=5kf -mtune=5kf "
+CMK_LIBS="$CMK_LIBS -lscdma -lpmi "
 #CMK_QT="i386-gcc"
 
 CMK_NATIVE_CC='mpicc -G0 -mips64 '
@@ -21,5 +20,3 @@ CMK_CF90='mpif90'
 #CMK_F90LIBS='-L/usr/absoft/lib -L/opt/absoft/lib -lf90math -lfio -lU77 -lf77math '
 CMK_MOD_NAME_ALLCAPS=1
 CMK_MOD_EXT='mod'
-CMK_F90_USE_MODDIR=1
-CMK_F90_MODINC='-p'
