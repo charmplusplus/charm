@@ -657,6 +657,7 @@ static int arg_requested_nodes;
 static int arg_requested_numhosts;
 
 static int arg_timeout;
+static int arg_timelimit;
 static int arg_verbose;
 static const char *arg_nodelist;
 static const char *arg_nodegroup;
@@ -781,6 +782,8 @@ static void arg_init(int argc, const char **argv)
 
   pparam_int(&arg_timeout, 60, "timeout",
              "Seconds to wait per host connection");
+  pparam_int(&arg_timelimit, -1, "timelimit",
+             "Seconds to wait for program to complete");
   pparam_flag(&arg_verbose, 0, "verbose", "Print diagnostic messages");
   pparam_flag(&arg_quiet, 0, "quiet", "Omit non-error runtime messages");
   pparam_str(&arg_nodelist, 0, "nodelist", "File containing list of physical nodes");
@@ -4224,8 +4227,32 @@ int main(int argc, const char **argv, char **envp)
       req_poll_hierarchical();
   else
 #endif
-    while (1)
-      req_poll();
+  {
+    if (arg_timelimit == -1)
+    {
+      while (1)
+        req_poll();
+    }
+    else
+    {
+      time_t start = time(NULL);
+      while (1)
+      {
+        req_poll();
+        time_t end = time(NULL);
+        double elapsed = difftime(end, start);
+        if (elapsed >= arg_timelimit)
+        {
+          fprintf(stderr, "Charmrun> Error: Time limit reached\n");
+
+          kill_all_compute_nodes("Time limit reached");
+          for (const nodetab_process & p : my_process_table)
+            skt_close(p.req_client);
+          exit(1);
+        }
+      }
+    }
+  }
 }
 
 /*This little snippet creates a NETSTART
