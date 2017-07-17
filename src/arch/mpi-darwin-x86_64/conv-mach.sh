@@ -1,38 +1,14 @@
+. $CHARMINC/cc-mpiopts.sh
+
 CMK_MACOSX=1
-
-# user enviorn var: MPICXX and MPICC
-# or, use the definition in file $CHARMINC/MPIOPTS
-if test -x "$CHARMINC/MPIOPTS"
-then
-  . $CHARMINC/MPIOPTS
-else
-  MPICXX_DEF=mpicxx
-  MPICC_DEF=mpicc
-fi
-
-test -z "$MPICXX" && MPICXX=$MPICXX_DEF
-test -z "$MPICC" && MPICC=$MPICC_DEF
-test "$MPICXX" != "$MPICXX_DEF" && /bin/rm -f $CHARMINC/MPIOPTS
-if test ! -f "$CHARMINC/MPIOPTS"
-then
-  echo MPICXX_DEF=$MPICXX > $CHARMINC/MPIOPTS
-  echo MPICC_DEF=$MPICC >> $CHARMINC/MPIOPTS
-  chmod +x $CHARMINC/MPIOPTS
-fi
-
-CMK_REAL_COMPILER=`$MPICXX -show 2>/dev/null | cut -d' ' -f1 `
 
 CMK_AMD64="-dynamic -fPIC -fno-common -mmacosx-version-min=10.7 -Wno-deprecated-declarations"
 
-CMK_CPP_CHARM="/usr/bin/cpp -P"
-CMK_CPP_C="$MPICC -E -mmacosx-version-min=10.7"
+CMK_CPP_C="$CMK_CPP_C -mmacosx-version-min=10.7"
 CMK_CC="$MPICC $CMK_AMD64 "
 CMK_CXX="$MPICXX $CMK_AMD64 "
 
 CMK_XIOPTS=""
-CMK_QT="generic64-light"
-CMK_LIBS="-lckqt $CMK_SYSLIBS "
-CMK_RANLIB="ranlib"
 
 CMK_NATIVE_CC="clang $CMK_GCC64 "
 CMK_NATIVE_LD="clang -Wl,-no_pie $CMK_GCC64 "

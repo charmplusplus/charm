@@ -1,40 +1,17 @@
-
-# user enviorn var: MPICXX and MPICC
-# or, use the definition in file $CHARMINC/MPIOPTS
-if test -x "$CHARMINC/MPIOPTS"
-then
-  . $CHARMINC/MPIOPTS
-else
-  MPICXX_DEF=mpicxx
-  MPICC_DEF=mpicc
-fi
-
-test -z "$MPICXX" && MPICXX=$MPICXX_DEF
-test -z "$MPICC" && MPICC=$MPICC_DEF
-test "$MPICXX" != "$MPICXX_DEF" && /bin/rm -f $CHARMINC/MPIOPTS
-if test ! -f "$CHARMINC/MPIOPTS"
-then
-  echo MPICXX_DEF=$MPICXX > $CHARMINC/MPIOPTS
-  echo MPICC_DEF=$MPICC >> $CHARMINC/MPIOPTS
-  chmod +x $CHARMINC/MPIOPTS
-fi
+. $CHARMINC/cc-mpiopts.sh
 
 CMK_GCC64='-fPIC'
 
-CMK_REAL_COMPILER=`$MPICXX -show 2>/dev/null | cut -d' ' -f1 `
 case "$CMK_REAL_COMPILER" in
 g++) CMK_AMD64_CC="$CMK_GCC64"; CMK_AMD64_CXX="$CMK_GCC64" ;;
 pgCC)  CMK_AMD64_CC='-fPIC'; CMK_AMD64_CXX='-fPIC -DCMK_FIND_FIRST_OF_PREDICATE=1 --no_using_std ' ;;
 charmc)  echo "Error> charmc can not call AMPI's mpicxx/mpiCC wrapper! Please fix your PATH."; exit 1 ;;
 esac
 
-CMK_CPP_CHARM='cpp -P'
-CMK_CPP_C="$MPICC -E"
 CMK_CC="$MPICC $CMK_AMD64_CC "
 CMK_CXX="$MPICXX $CMK_AMD64_CXX "
 
 #CMK_SYSLIBS="-lmpich"
-CMK_LIBS="-lckqt $CMK_SYSLIBS "
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 
 CMK_NATIVE_CC="gcc $CMK_GCC64 "
@@ -65,6 +42,3 @@ else
     CMK_F90_USE_MODDIR=1
     CMK_F90_MODINC='-p'
 fi
-
-CMK_QT='generic64-light'
-CMK_RANLIB='ranlib'
