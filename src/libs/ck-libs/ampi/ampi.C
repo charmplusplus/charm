@@ -7903,6 +7903,7 @@ CDECL
 int AMPI_Comm_free(MPI_Comm *comm)
 {
   AMPIAPI("AMPI_Comm_free");
+  *comm = MPI_COMM_NULL;
   return MPI_SUCCESS;
 }
 
@@ -8188,6 +8189,7 @@ int AMPI_Comm_get_errhandler(MPI_Comm comm, MPI_Errhandler *errhandler){
 CDECL
 int AMPI_Comm_free_errhandler(MPI_Errhandler *errhandler){
   AMPIAPI("AMPI_Comm_free_errhandler");
+  *errhandler = MPI_ERRHANDLER_NULL;
   return MPI_SUCCESS;
 }
 
