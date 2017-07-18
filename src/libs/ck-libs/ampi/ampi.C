@@ -7896,11 +7896,6 @@ int AMPI_Comm_split_type(MPI_Comm src, int split_type, int key, MPI_Info info, M
     color = CkMyPe();
   }
 
-  if (color == MPI_UNDEFINED) {
-    *dest = MPI_COMM_NULL;
-    return ampiErrhandler("MPI_Comm_split_type", MPI_ERR_ARG);
-  }
-
   return AMPI_Comm_split(src, color, key, dest);
 }
 
