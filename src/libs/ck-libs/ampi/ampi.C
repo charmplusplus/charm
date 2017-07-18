@@ -3624,7 +3624,7 @@ int AMPI_Initialized(int *isInit)
 CDECL
 int AMPI_Finalized(int *isFinalized)
 {
-  AMPIAPI("AMPI_Finalized");     /* in case charm init not called */
+  AMPIAPI_INIT("AMPI_Finalized");     /* in case charm init not called */
   *isFinalized=(CtvAccess(ampiFinalized)) ? 1 : 0;
   return MPI_SUCCESS;
 }
