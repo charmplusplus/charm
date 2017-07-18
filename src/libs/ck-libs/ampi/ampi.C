@@ -2946,19 +2946,37 @@ void ampi::processGathervMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype 
   delete [] results;
 }
 
+static inline void clearStatus(MPI_Status *sts) {
+  if (sts != MPI_STATUS_IGNORE) {
+    sts->MPI_TAG    = MPI_ANY_TAG;
+    sts->MPI_SOURCE = MPI_ANY_SOURCE;
+    sts->MPI_COMM   = MPI_COMM_NULL;
+    sts->MPI_LENGTH = 0;
+    sts->MPI_ERROR  = MPI_SUCCESS;
+    sts->MPI_CANCEL = 0;
+  }
+}
+
+static inline void clearStatus(MPI_Status sts[], int idx) {
+  if (sts != MPI_STATUSES_IGNORE) {
+    clearStatus(&sts[idx]);
+  }
+}
+
+static inline bool handle_MPI_PROC_NULL(int src, MPI_Comm comm, MPI_Status* sts)
+{
+  if (src == MPI_PROC_NULL) {
+    clearStatus(sts);
+    return true;
+  }
+  return false;
+}
+
 int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm comm, MPI_Status *sts)
 {
   MPI_Comm disComm = myComm.getComm();
-  if(s==MPI_PROC_NULL) {
-    if(sts != MPI_STATUS_IGNORE) {
-      sts->MPI_SOURCE = MPI_PROC_NULL;
-      sts->MPI_TAG = MPI_ANY_TAG;
-      sts->MPI_COMM = comm;
-      sts->MPI_LENGTH = 0;
-      sts->MPI_CANCEL = 0;
-    }
-    return 0;
-  }
+  if (handle_MPI_PROC_NULL(s, disComm, sts)) return 0;
+
 #if CMK_TRACE_ENABLED && CMK_PROJECTOR
   _LOG_E_END_AMPI_PROCESSING(thisIndex)
 #endif
@@ -3033,6 +3051,8 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
 
 void ampi::probe(int t, int s, MPI_Comm comm, MPI_Status *sts)
 {
+  if (handle_MPI_PROC_NULL(s, comm, sts)) return;
+
   int tags[2];
 #if CMK_BIGSIM_CHARM
   void *curLog; // store current log in timeline
@@ -3065,6 +3085,8 @@ void ampi::probe(int t, int s, MPI_Comm comm, MPI_Status *sts)
 
 int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts)
 {
+  if (handle_MPI_PROC_NULL(s, comm, sts)) return 1;
+
   int tags[2];
   AmpiMsg *msg = 0;
   MPI_Status tmpStatus;
@@ -3481,23 +3503,6 @@ inline void checkRequests(int n, MPI_Request* reqs){
   for(int i=0;i<n;i++)
     reqlist->checkRequest(reqs[i]);
 #endif
-}
-
-static inline void clearStatus(MPI_Status *sts) {
-  if (sts != MPI_STATUS_IGNORE) {
-    sts->MPI_TAG    = MPI_ANY_TAG;
-    sts->MPI_SOURCE = MPI_ANY_SOURCE;
-    sts->MPI_COMM   = MPI_COMM_NULL;
-    sts->MPI_LENGTH = 0;
-    sts->MPI_ERROR  = MPI_SUCCESS;
-    sts->MPI_CANCEL = 0;
-  }
-}
-
-static inline void clearStatus(MPI_Status sts[], int idx) {
-  if (sts != MPI_STATUSES_IGNORE) {
-    clearStatus(&sts[idx]);
-  }
 }
 
 int testRequest(MPI_Request *reqIdx, int *flag, MPI_Status *sts){
