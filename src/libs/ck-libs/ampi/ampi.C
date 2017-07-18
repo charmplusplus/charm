@@ -8716,6 +8716,11 @@ int AMPI_Graph_create(MPI_Comm comm_old, int nnodes, const int *index, const int
                       int reorder, MPI_Comm *comm_graph) {
   AMPIAPI("AMPI_Graph_create");
 
+  if (nnodes == 0) {
+    *comm_graph = MPI_COMM_NULL;
+    return MPI_SUCCESS;
+  }
+
   /* No mapping done */
   int newrank;
   AMPI_Graph_map(comm_old, nnodes, index, edges, &newrank);
