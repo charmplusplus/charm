@@ -2016,6 +2016,16 @@ void ampi::split(int color,int key,MPI_Comm *dest, int type)
     MPI_Comm newComm=parent->getNextCart()-1;
     *dest=newComm;
   }
+  else if (type == MPI_GRAPH) {
+    ampiSplitKey splitKey(parent->getNextGraph(),color,key,myRank);
+    int rootIdx=myComm.getIndexForRank(0);
+    CkCallback cb(CkIndex_ampi::splitPhase1(0),CkArrayIndex1D(rootIdx),myComm.getProxy());
+    contribute(sizeof(splitKey),&splitKey,CkReduction::concat,cb);
+
+    thread->suspend(); //Resumed by ampiParent::graphChildRegister
+    MPI_Comm newComm=parent->getNextGraph()-1;
+    *dest=newComm;
+  }
   else if (type == MPI_INTER) {
     ampiSplitKey splitKey(parent->getNextInter(),color,key,myRank);
     int rootIdx=myComm.getIndexForRank(0);
@@ -7834,6 +7844,16 @@ int AMPI_Comm_dup(MPI_Comm comm, MPI_Comm *newcomm)
     newc.setdims(c.getdims());
     newc.setperiods(c.getperiods());
     newc.setnbors(c.getnbors());
+  }
+  else if (topol == MPI_GRAPH) {
+    ptr->split(0, rank, newcomm, MPI_GRAPH);
+
+    // duplicate graph topology info
+    ampiCommStruct &g = getAmpiParent()->getGraph(comm);
+    ampiCommStruct &newg = getAmpiParent()->getGraph(*newcomm);
+    newg.setnvertices(g.getnvertices());
+    newg.setindex(g.getindex());
+    newg.setedges(g.getedges());
   }
   else {
     if (getAmpiParent()->isInter(comm)) {
