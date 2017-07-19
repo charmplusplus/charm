@@ -509,7 +509,7 @@ inline groupStruct diffOp(groupStruct vec1, groupStruct vec2){
 
 inline int* translateRanksOp(int n,groupStruct vec1,const int* ranks1,groupStruct vec2, int *ret){
   for(int i=0;i<n;i++){
-    ret[i] = getPosOp(vec1[ranks1[i]],vec2);
+    ret[i] = (ranks1[i] == MPI_PROC_NULL) ?  MPI_PROC_NULL : getPosOp(vec1[ranks1[i]],vec2);
   }
   return ret;
 }
