@@ -9124,6 +9124,18 @@ int AMPI_Dims_create(int nnodes, int ndims, int *dims) {
         j++;
       }
     }
+
+    // Sort the factors in non-increasing order.
+    // Bubble sort because dims is always small.
+    for (int i=0; i<d-1; i++) {
+      for (int j=i+1; j<d; j++) {
+        if (dims[j] > dims[i]) {
+          int tmp = dims[i];
+          dims[i] = dims[j];
+          dims[j] = tmp;
+        }
+      }
+    }
   }
 
   return MPI_SUCCESS;
