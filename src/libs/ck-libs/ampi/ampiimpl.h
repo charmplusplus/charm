@@ -1429,6 +1429,8 @@ class ampiParent : public CBase_ampiParent {
     //isInter omitted because its comm number != its group number
   }
   inline const groupStruct group2vec(MPI_Group group) const {
+    if(group == MPI_GROUP_NULL || group == MPI_GROUP_EMPTY)
+      return groupStruct();
     if(hasComm(group))
       return comm2CommStruct((MPI_Comm)group).getIndices();
     if(isInGroups(group))
@@ -1437,6 +1439,7 @@ class ampiParent : public CBase_ampiParent {
     return *groups[0]; //meaningless return
   }
   inline MPI_Group saveGroupStruct(groupStruct vec){
+    if (vec.empty()) return MPI_GROUP_EMPTY;
     int idx = groups.size();
     groups.resize(idx+1);
     groups[idx]=new groupStruct(vec);
