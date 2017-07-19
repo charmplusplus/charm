@@ -20,7 +20,9 @@ OPTS_CPP="$OPTS_CPP"
 OPTS_LD="$OPTS_LD"
 
 CMK_CPP_CHARM="$BGQ_BIN/powerpc64-bgq-linux-cpp -P"
-CMK_CPP_C="$BGQ_BIN/powerpc64-bgq-linux-cpp -E "
+CMK_CPP_C="$BGQ_BIN/powerpc64-bgq-linux-cpp "
+
+CMK_CPP_C_FLAGS="-E"
 
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 

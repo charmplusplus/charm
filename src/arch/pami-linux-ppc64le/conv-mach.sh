@@ -8,11 +8,13 @@ CXX=xlC_r
 CC=xlc_r
 
 CMK_CPP_CHARM='cpp -P'
-CMK_CPP_C="$CC -E"
+CMK_CPP_C="$CC"
 CMK_CC="$CC "
 CMK_CXX="$CXX "
 CMK_LD="$CMK_CC"
 CMK_LDXX="$CMK_CXX "
+
+CMK_CPP_C_FLAGS="-E"
 
 CMK_C_OPTIMIZE='-O3 -g'
 CMK_CXX_OPTIMIZE='-O3 -g'

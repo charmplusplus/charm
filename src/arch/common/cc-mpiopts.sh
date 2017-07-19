@@ -21,7 +21,9 @@ fi
 CMK_REAL_COMPILER=`$MPICXX -show 2>/dev/null | cut -d' ' -f1 `
 
 CMK_CPP_CHARM='cpp -P'
-CMK_CPP_C="$MPICC -E"
+CMK_CPP_C="$MPICC"
+
+CMK_CPP_C_FLAGS="-E"
 
 CMK_LIBS="-lckqt $CMK_SYSLIBS "
 CMK_QT='generic64-light'

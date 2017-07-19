@@ -1,9 +1,11 @@
 CMK_CPP_CHARM='cpp -P'
-CMK_CPP_C='gcc -E'
+CMK_CPP_C='gcc'
 CMK_CC='gcc'
 CMK_CXX='g++'
 CMK_LD='gcc'
 CMK_LDXX='g++'
+
+CMK_CPP_C_FLAGS="-E"
 
 CMK_LD_SHARED='-shared'
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
@@ -18,11 +20,16 @@ if [ "$CMK_MACOSX" ]; then
     $cand -v 2>&1 | grep -q clang
     if [ $? -eq 1 ]; then
       cppcand=$(echo $cand | sed s,cc,++,)
-      CMK_CPP_C="$cand -E "
-      CMK_CC="$cand -fPIC "
+      CMK_CPP_C="$cand"
+      CMK_CC="$cand "
       CMK_LD="$cand "
-      CMK_CXX="$cppcand -fPIC -Wno-deprecated "
+      CMK_CXX="$cppcand "
       CMK_LDXX="$cppcand "
+
+      CMK_CC_FLAGS="-fPIC"
+      CMK_CXX_FLAGS="-fPIC -Wno-deprecated"
+      CMK_LD_FLAGS="-fPIC -Wl,-no_pie "
+      CMK_LDXX_FLAGS="-fPIC -multiply_defined suppress -Wl,-no_pie"
       found=1
       break
     fi

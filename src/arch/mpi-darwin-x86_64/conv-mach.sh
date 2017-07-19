@@ -4,9 +4,12 @@ CMK_MACOSX=1
 
 CMK_AMD64="-dynamic -fPIC -fno-common -mmacosx-version-min=10.7 -Wno-deprecated-declarations"
 
-CMK_CPP_C="$CMK_CPP_C -mmacosx-version-min=10.7"
-CMK_CC="$MPICC $CMK_AMD64 "
-CMK_CXX="$MPICXX $CMK_AMD64 "
+CMK_CC="$MPICC "
+CMK_CXX="$MPICXX "
+
+CMK_CPP_C_FLAGS="$CMK_CPP_C_FLAGS -mmacosx-version-min=10.7"
+CMK_CC_FLAGS="$CMK_CC_FLAGS $CMK_AMD64"
+CMK_CXX_FLAGS="$CMK_CXX_FLAGS $CMK_AMD64"
 
 CMK_XIOPTS=""
 

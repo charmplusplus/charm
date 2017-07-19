@@ -7,11 +7,18 @@ CMK_INC="-I/opt/cray/mpt/5.2.0/xt/gemini/sma/include/"
 CMK_LD_PATH="-L/opt/cray/mpt/5.2.0/xt/gemini/sma/lib64/"
 
 CMK_CPP_CHARM="cpp -P"
-CMK_CPP_C="cc -E $CMK_INC"
-CMK_CC="cc $CMK_INC"
-CMK_CXX="CC $CMK_INC"
-CMK_LD="$CMK_CC $CMK_LD_DEFS $CMK_LD_PATH"
-CMK_LDXX="$CMK_CXX $CMK_LD_DEFS $CMK_LD_PATH"
+CMK_CPP_C="cc"
+CMK_CC="cc"
+CMK_CXX="CC"
+CMK_LD="$CMK_CC"
+CMK_LDXX="$CMK_CXX"
+
+CMK_CPP_C_FLAGS="-E $CMK_INC"
+CMK_CC_FLAGS="$CMK_INC"
+CMK_CXX_FLAGS="$CMK_INC"
+CMK_LD_FLAGS="$CMK_CC_FLAGS $CMK_LD_DEFS $CMK_LD_PATH"
+CMK_LDXX_FLAGS="$CMK_CXX_FLAGS $CMK_LD_DEFS $CMK_LD_PATH"
+
 CMK_LIBS="-lckqt -lsma -lrca"
 CMK_QT='generic64-light'
 
@@ -21,8 +28,8 @@ CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 # compiler for compiling sequential programs
 if test -n "$PGCC"
 then
-CMK_CC="$CMK_CC -DCMK_FIND_FIRST_OF_PREDICATE=1 "
-CMK_CXX="$CMK_CXX -DCMK_FIND_FIRST_OF_PREDICATE=1 --no_using_std "
+CMK_CC_FLAGS="$CMK_CC_FLAGS -DCMK_FIND_FIRST_OF_PREDICATE=1 "
+CMK_CXX_FLAGS="$CMK_CXX_FLAGS -DCMK_FIND_FIRST_OF_PREDICATE=1 --no_using_std "
 # gcc is needed for building QT
 CMK_SEQ_CC="gcc -fPIC"
 CMK_SEQ_CXX="pgCC -fPIC --no_using_std "

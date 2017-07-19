@@ -24,12 +24,17 @@ fi
 
 GCC_OPTS="$GCC_OPTS -mminimal-toc $BGQ_INC"
 
-CMK_CXX="mpixlcxx_r -qhalt=e $BGQ_INC -qnokeyword=__int128 -qtls=local-exec -DCMK_USING_XLC=1"
-CMK_CC="mpixlc_r -qcpluscmt -qhalt=e $BGQ_INC -qnokeyword=__int128 -qtls=local-exec"
+CMK_CXX="mpixlcxx_r"
+CMK_CC="mpixlc_r"
 CMK_GCXX="mpicxx $GCC_OPTS "
 
 CMK_LD="$CMK_CC"
 CMK_LDXX="$CMK_CXX"
+
+CMK_CC_FLAGS="-qcpluscmt -qhalt=e $BGQ_INC -qnokeyword=__int128 -qtls=local-exec"
+CMK_CXX_FLAGS="-qhalt=e $BGQ_INC -qnokeyword=__int128 -qtls=local-exec -DCMK_USING_XLC=1"
+CMK_LD_FLAGS="$CMK_CC_FLAGS"
+CMK_LDXX_FLAGS="$CMK_CXX_FLAGS"
 
 CMK_CF77="mpixlf77_r "
 CMK_CF90="mpixlf90_r  -qsuffix=f=f90"

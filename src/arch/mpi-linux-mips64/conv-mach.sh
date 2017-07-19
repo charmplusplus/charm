@@ -3,9 +3,10 @@
 CMK_INCDIR='/sicortex/software/gentoo/buildroot/default/usr/include'
 CMK_LIBDIR='-L/sicortex/software/gentoo/buildroot/default/lib64 -L/sicortex/software/gentoo/buildroot/default/usr/lib64'
 
-CMK_CPP_C="$CMK_CPP_C -G0 "
-CMK_CC="$CMK_CC -G0 -mips64 -march=5kf -mtune=5kf "
-CMK_CXX="$CMK_CXX -G0 -mips64 -march=5kf -mtune=5kf "
+CMK_CPP_C_FLAGS="$CMK_CPP_C_FLAGS -G0"
+CMK_CC_FLAGS="$CMK_CC_FLAGS -G0 -mips64 -march=5kf -mtune=5kf"
+CMK_CXX_FLAGS="$CMK_CXX_FLAGS -G0 -mips64 -march=5kf -mtune=5kf"
+
 CMK_LIBS="$CMK_LIBS -lscdma -lpmi "
 #CMK_QT="i386-gcc"
 

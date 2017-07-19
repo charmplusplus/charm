@@ -5,11 +5,10 @@ CMK_LIBS='-lckqt'
 CMK_QT='generic64-light'
 CMK_XIOPTS=''
 
-CMK_CPP_C="$CMK_CPP_C -fPIC "
-CMK_CC="$CMK_CC -dynamic -fno-common "
-CMK_LD="$CMK_LD -Wl,-no_pie "
-CMK_CXX="$CMK_CXX -fPIC -dynamic -fno-common -stdlib=libc++ "
-CMK_LDXX="$CMK_LDXX -multiply_defined suppress -Wl,-no_pie -stdlib=libc++ "
+CMK_CC_FLAGS="$CMK_CC_FLAGS -fPIC -dynamic -fno-common "
+CMK_LD_FLAGS="$CMK_LD_FLAGS -Wl,-no_pie "
+CMK_CXX_FLAGS="$CMK_CXX_FLAGS -fPIC -dynamic -fno-common -stdlib=libc++ "
+CMK_LDXX_FLAGS="$CMK_LDXX_FLAGS -multiply_defined suppress -Wl,-no_pie -stdlib=libc++ "
 
 # setting for shared lib
 # need -lc++ for c++ reference, and it needs to be put at very last

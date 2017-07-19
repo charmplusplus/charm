@@ -1,12 +1,15 @@
 . $CHARMINC/cc-gcc.sh
 
-CMK_CPP_C="$CMK_CPP_C -m32"
-CMK_CC="$CMK_CC -m32"
-CMK_CXX="$CMK_CXX -m32"
+CMK_CPP_C_FLAGS="$CMK_CPP_C_FLAGS -m32"
+CMK_CC_FLAGS="$CMK_CC_FLAGS -m32"
+CMK_CXX_FLAGS="$CMK_CXX_FLAGS -m32"
 #CMK_LD="$CMK_CC -Wl,--allow-multiple-definition "
 #CMK_LDXX="$CMK_CXX -Wl,--allow-multiple-definition "
 CMK_LD="$CMK_CC "
 CMK_LDXX="$CMK_CXX "
+CMK_LD_FLAGS="$CMK_CC_FLAGS "
+CMK_LDXX_FLAGS="$CMK_CXX_FLAGS "
+
 CMK_XIOPTS=''
 CMK_QT='i386-gcc'
 

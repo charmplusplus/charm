@@ -1308,7 +1308,7 @@ do
 	DoNoErrCheck $RM $BASE.cpm.h $TMP.c
 	Do touch $BASE.cpm.h
 	Do $LN -f -s $FILE $TMP.c
-	Do $CMK_CPP_C -I$CHARMINC $CMK_SYSINC $OPTS_CC_GENCPM $OPTS_CPP $TMP.c > $TMP.i
+	Do $CMK_CPP_C $CMK_CPP_C_FLAGS -I$CHARMINC $CMK_SYSINC $OPTS_CC_GENCPM $OPTS_CPP $TMP.c > $TMP.i
 	Do $CHARMBIN/conv-cpm $TMP.i $BASE.cpm.h
 done
 
@@ -1396,7 +1396,7 @@ do
                 fi
 		;;
 	*.c|*.s|*.S)
-		Do $CMK_CC -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CC -c $FILE $DESTO
+		Do $CMK_CC $CMK_CC_FLAGS -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CC -c $FILE $DESTO
 		NU_OBJ=$BASEO
 		if [ "$Do_res" -ne 0 ]
 		then
@@ -1408,7 +1408,7 @@ do
                 then
                     Do $CMK_NATIVE_CXX -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP -c $FILE $DESTO
                 else
-                    Do $CMK_CXX -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE $DESTO
+                    Do $CMK_CXX $CMK_CXX_FLAGS -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE $DESTO
                 fi
 		NU_OBJ=$BASEO
 		if [ "$Do_res" -ne 0 ]
@@ -1491,9 +1491,9 @@ MakeSO() {
 	fi
 	if test "$MAKE_LDXX" = "1"
 	then
- 	  soCmd="$CMK_LDXX -o $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES $PRE_LIBRARIES $POST_LIBRARIES $CMK_LD_SHARED_LIBS"
+	  soCmd="$CMK_LDXX $CMK_LDXX_FLAGS -o $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES $PRE_LIBRARIES $POST_LIBRARIES $CMK_LD_SHARED_LIBS"
 	else
-	  soCmd="$CMK_LD -o $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES $PRE_LIBRARIES $POST_LIBRARIES $CMK_LD_SHARED_LIBS"
+	  soCmd="$CMK_LD $CMK_LD_FLAGS -o $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES $PRE_LIBRARIES $POST_LIBRARIES $CMK_LD_SHARED_LIBS"
 	fi
 	DoNoErrCheck $soCmd
 	Do_res=$?
@@ -1688,7 +1688,7 @@ case "$LANGUAGE" in
 	  Do $CMK_NATIVE_LD $OPTS_LD -o $OBJECT $OBJECTFILES \
 		-L$CHARMLIB $PRE_LIBRARIES $CMK_NATIVE_LIBS $POST_LIBRARIES
   	else
-	  Do $CMK_SEQ_LD $OPTS_LD -o $OBJECT $OBJECTFILES \
+	  Do $CMK_SEQ_LD $CMK_LD_FLAGS $OPTS_LD -o $OBJECT $OBJECTFILES \
 		-L$CHARMLIB $PRE_LIBRARIES $CMK_SEQ_LIBS $POST_LIBRARIES
 	fi
 	Copyobj
@@ -1699,7 +1699,7 @@ case "$LANGUAGE" in
 	  Do $CMK_NATIVE_LDXX $OPTS_LD -o $OBJECT $OBJECTFILES \
 		-L$CHARMLIB $PRE_LIBRARIES $CMK_NATIVE_LIBS $POST_LIBRARIES
 	else
-	  Do $CMK_SEQ_LDXX $OPTS_LD -o $OBJECT $OBJECTFILES \
+	  Do $CMK_SEQ_LDXX $CMK_LDXX_FLAGS $OPTS_LD -o $OBJECT $OBJECTFILES \
 		-L$CHARMLIB $PRE_LIBRARIES $CMK_SEQ_LIBS $POST_LIBRARIES
 	fi
 	Copyobj
@@ -1942,7 +1942,7 @@ for trace in $TRACEMODE; do
 done
 echo "}" >> $modInitSrc
 
-Do $CMK_CXX $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $modInitSrc -o $modInitObj
+Do $CMK_CXX $CMK_CXX_FLAGS $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $modInitSrc -o $modInitObj
 
 ###############################################################################
 #
@@ -2045,9 +2045,9 @@ else
   # if interoperate, need a lib with moduleinit
   if [ "$MPI_INTEROPERATE" != "" ]
   then
-    LANG_LIBS="-L$CHARMLIB -I$CHARMINC $CMK_SYSINC $PRE_LIBRARIES"
+    LANG_LIBS="-L$CHARMLIB $PRE_LIBRARIES"
   else
-    LANG_LIBS="-L$CHARMLIB -I$CHARMINC $CMK_SYSINC $OBJECTFILES $modInitObj $PRE_LIBRARIES"
+    LANG_LIBS="-L$CHARMLIB $OBJECTFILES $modInitObj $PRE_LIBRARIES"
   fi
 fi
 if [ "$TRACE_WITH_TAU" = 1 ]
@@ -2092,13 +2092,13 @@ then
   OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO -L$CHARMLIBSO"
   Debugf "Running ldro..."
   DoNoErrCheck $RM $OBJECT
-  [ "$MAKE_LDXX" = "1" ] && Do $CMK_LDXX $OPTS_LD $OPTS_LDXX -o $OBJECT $ALL_LIBS
-  [ "$MAKE_LD" = "1" ] && Do $CMK_LD $OPTS_LD -o $OBJECT $ALL_LIBS
+  [ "$MAKE_LDXX" = "1" ] && Do $CMK_LDXX $CMK_LDXX_FLAGS $OPTS_LD $OPTS_LDXX -o $OBJECT $ALL_LIBS
+  [ "$MAKE_LD" = "1" ] && Do $CMK_LD $CMK_LD_FLAGS $OPTS_LD -o $OBJECT $ALL_LIBS
   Copyobj
 else
 # Make a regular executable: call the appropriate linker
-  [ "$MAKE_LDXX" = "1" ] && Do $CMK_LDXX $OPTS_LD $OPTS_LDXX -o $OBJECT $ALL_LIBS
-  [ "$MAKE_LD" = "1" ] && Do $CMK_LD $OPTS_LD -o $OBJECT $ALL_LIBS
+  [ "$MAKE_LDXX" = "1" ] && Do $CMK_LDXX $CMK_LDXX_FLAGS $OPTS_LD $OPTS_LDXX -o $OBJECT $ALL_LIBS
+  [ "$MAKE_LD" = "1" ] && Do $CMK_LD $CMK_LD_FLAGS $OPTS_LD -o $OBJECT $ALL_LIBS
 fi
 
 ########################################################################

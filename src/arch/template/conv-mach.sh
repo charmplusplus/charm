@@ -1,8 +1,14 @@
 CMK_CPP_CHARM='cpp -P'
-CMK_CPP_C='gcc -E'
-CMK_CC='gcc -D_REENTRANT -I/usr/opt/rms/include '
-CMK_CXX='g++ -D_REENTRANT -I/usr/opt/rms/include '
+CMK_CPP_C='gcc'
+CMK_CC='gcc '
+CMK_CXX='g++ '
 CMK_LD="eval $CMK_CC "
+
+CMK_CPP_C_FLAGS="-E"
+CMK_CC_FLAGS="-D_REENTRANT -I/usr/opt/rms/include"
+CMK_CXX_FLAGS="-D_REENTRANT -I/usr/opt/rms/include"
+CMK_LD_FLAGS="$CMK_CC_FLAGS"
+
 CMK_RANLIB='ranlib'
 CMK_LIBS='-lckqt'
 CMK_LD_LIBRARY_PATH="-rpath $CHARMLIBSO/"

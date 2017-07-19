@@ -16,11 +16,16 @@ then
  exit 1
 fi
 
-CMK_CXX="bgxlC_r -qhalt=e -qnokeyword=__int128 -qtls=local-exec -DCMK_USING_XLC=1"
-CMK_CC="bgxlc_r -qcpluscmt -qhalt=e -qnokeyword=__int128 -qtls=local-exec"
+CMK_CXX="bgxlC_r"
+CMK_CC="bgxlc_r"
 
 CMK_LD="$CMK_CC"
 CMK_LDXX="$CMK_CXX"
+
+CMK_CXX_FLAGS="-qhalt=e -qnokeyword=__int128 -qtls=local-exec -DCMK_USING_XLC=1"
+CMK_CC_FLAGS="-qcpluscmt -qhalt=e -qnokeyword=__int128 -qtls=local-exec"
+CMK_LD_FLAGS="$CMK_CC_FLAGS"
+CMK_LDXX_FLAGS="$CMK_CXX_FLAGS"
 
 CMK_CF77="bgxlf_r "
 CMK_CF90="bgxlf90_r  -qsuffix=f=f90"
