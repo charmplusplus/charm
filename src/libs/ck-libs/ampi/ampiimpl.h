@@ -1698,7 +1698,8 @@ class ampi : public CBase_ampi {
   static void bcastraw(void* buf, int len, CkArrayID aid);
   void split(int color,int key,MPI_Comm *dest, int type);
   void commCreate(const groupStruct vec,MPI_Comm *newcomm);
-  void cartCreate(const groupStruct vec, MPI_Comm *newcomm);
+  MPI_Comm cartCreate0D(void);
+  MPI_Comm cartCreate(groupStruct vec, int ndims, const int* dims);
   void graphCreate(const groupStruct vec, MPI_Comm *newcomm);
   void intercommCreate(const groupStruct rvec, int root, MPI_Comm tcomm, MPI_Comm *ncomm);
 

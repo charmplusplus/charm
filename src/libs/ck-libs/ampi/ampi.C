@@ -2223,20 +2223,47 @@ void ampiParent::groupChildRegister(const ampiCommStruct &s) {
 }
 
 /* Virtual topology communicator creation */
-void ampi::cartCreate(const groupStruct vec,MPI_Comm* newcomm){
-  int rootIdx=vec[0];
+
+// 0-dimensional cart comm: rank 0 creates a dup of COMM_SELF with topo info.
+MPI_Comm ampi::cartCreate0D(void){
+  if (getRank() == 0) {
+    tmpVec.clear();
+    tmpVec.push_back(0);
+    commCreatePhase1(parent->getNextCart());
+    return parent->getNextCart()-1;
+  }
+  else {
+    return MPI_COMM_NULL;
+  }
+}
+
+MPI_Comm ampi::cartCreate(groupStruct vec, int ndims, const int* dims){
+  if (ndims == 0) {
+    return cartCreate0D();
+  }
+
+  // Subtract out ranks from the group that won't be in the new comm
+  int newsize = dims[0];
+  for (int i = 1; i < ndims; i++) {
+    newsize *= dims[i];
+  }
+  for (int i = vec.size(); i > newsize; i--) {
+    vec.pop_back();
+  }
+
+  int rootIdx = vec[0];
   tmpVec = vec;
   CkCallback cb(CkReductionTarget(ampi,commCreatePhase1),CkArrayIndex1D(rootIdx),myComm.getProxy());
 
   MPI_Comm nextcart = parent->getNextCart();
   contribute(sizeof(nextcart), &nextcart,CkReduction::max_int,cb);
 
-  if(getPosOp(thisIndex,vec)>=0){
+  if (getPosOp(thisIndex,vec)>=0) {
     thread->suspend(); //Resumed by ampiParent::cartChildRegister
-    MPI_Comm retcomm = parent->getNextCart()-1;
-    *newcomm = retcomm;
-  }else
-    *newcomm = MPI_COMM_NULL;
+    return parent->getNextCart()-1;
+  } else {
+    return MPI_COMM_NULL;
+  }
 }
 
 void ampiParent::cartChildRegister(const ampiCommStruct &s) {
@@ -8716,24 +8743,24 @@ int AMPI_Cart_create(MPI_Comm comm_old, int ndims, const int *dims, const int *p
 
   ampiParent *ptr = getAmpiParent();
   groupStruct vec = ptr->group2vec(ptr->comm2group(comm_old));
-  getAmpiInstance(comm_old)->cartCreate(vec, comm_cart);
-  ampiCommStruct &c = ptr->getCart(*comm_cart);
-  c.setndims(ndims);
+  *comm_cart = getAmpiInstance(comm_old)->cartCreate(vec, ndims, dims);
 
-  vector<int> dimsv;
-  vector<int> periodsv;
+  if (*comm_cart != MPI_COMM_NULL) {
+    ampiCommStruct &c = ptr->getCart(*comm_cart);
+    c.setndims(ndims);
 
-  for (int i = 0; i < ndims; i++) {
-    dimsv.push_back(dims[i]);
-    periodsv.push_back(periods[i]);
+    vector<int> dimsv(ndims), periodsv(ndims);
+    for (int i = 0; i < ndims; i++) {
+      dimsv[i] = dims[i];
+      periodsv[i] = periods[i];
+    }
+    c.setdims(dimsv);
+    c.setperiods(periodsv);
+
+    vector<int> nborsv;
+    getAmpiInstance(*comm_cart)->findNeighbors(*comm_cart, newrank, nborsv);
+    c.setnbors(nborsv);
   }
-
-  c.setdims(dimsv);
-  c.setperiods(periodsv);
-
-  vector<int> nborsv;
-  getAmpiInstance(*comm_cart)->findNeighbors(*comm_cart, newrank, nborsv);
-  c.setnbors(nborsv);
 
   return MPI_SUCCESS;
 }
@@ -9203,6 +9230,11 @@ int AMPI_Cart_sub(MPI_Comm comm, const int *remain_dims, MPI_Comm *newcomm) {
       /* color */
       color = color * dims[i] + coords[i];
     }
+  }
+
+  if (num_remain_dims == 0) {
+    *newcomm = getAmpiInstance(comm)->cartCreate0D();
+    return MPI_SUCCESS;
   }
 
   getAmpiInstance(comm)->split(color, key, newcomm, MPI_CART);
