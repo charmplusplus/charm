@@ -8686,7 +8686,15 @@ int AMPI_Cart_map(MPI_Comm comm, int ndims, const int *dims, const int *periods,
 CDECL
 int AMPI_Graph_map(MPI_Comm comm, int nnodes, const int *index, const int *edges, int *newrank) {
   AMPIAPI("AMPI_Graph_map");
-  return AMPI_Comm_rank(comm, newrank);
+
+  ampi* ptr = getAmpiInstance(comm);
+
+  if (ptr->getRank() < nnodes) {
+    *newrank = ptr->getRank();
+  } else {
+    *newrank = MPI_UNDEFINED;
+  }
+  return MPI_SUCCESS;
 }
 
 CDECL
