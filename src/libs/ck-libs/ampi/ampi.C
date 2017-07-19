@@ -8661,7 +8661,26 @@ int AMPI_Attr_delete(MPI_Comm comm, int keyval){
 CDECL
 int AMPI_Cart_map(MPI_Comm comm, int ndims, const int *dims, const int *periods, int *newrank) {
   AMPIAPI("AMPI_Cart_map");
-  return AMPI_Comm_rank(comm, newrank);
+
+  ampi* ptr = getAmpiInstance(comm);
+  int nranks;
+
+  if (ndims == 0) {
+    nranks = 1;
+  } else {
+    nranks = dims[0];
+    for (int i=1; i<ndims; i++) {
+      nranks *= dims[i];
+    }
+  }
+
+  int rank = ptr->getRank();
+  if (rank < nranks) {
+    *newrank = rank;
+  } else {
+    *newrank = MPI_UNDEFINED;
+  }
+  return MPI_SUCCESS;
 }
 
 CDECL
