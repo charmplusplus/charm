@@ -55,7 +55,7 @@
        integer, parameter :: MPI_ERR_UNSUPPORTED_OPERATION = 52
        integer, parameter :: MPI_ERR_WIN                   = 53
        integer, parameter :: MPI_ERR_LASTCODE              = 53
-       integer, parameter :: MPI_ERR_LASTUSEDCODE          = 53
+       integer, parameter :: MPI_LASTUSEDCODE          = 53
 
        integer, parameter :: MPI_ERRHANDLER_NULL  = 0
        integer, parameter :: MPI_ERRORS_RETURN    = 1

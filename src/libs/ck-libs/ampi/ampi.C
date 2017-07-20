@@ -796,7 +796,7 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
 
 class Builtin_kvs{
  public:
-  int tag_ub,host,io,wtime_is_global,appnum,universe_size;
+  int tag_ub,host,io,wtime_is_global,appnum,lastusedcode,universe_size;
   void* win_base;
   int win_disp_unit,win_create_flavor,win_model;
   MPI_Aint win_size;
@@ -807,6 +807,7 @@ class Builtin_kvs{
     io = 0;
     wtime_is_global = 0;
     appnum = 0;
+    lastusedcode = MPI_ERR_LASTCODE;
     universe_size = 0;
     win_base = NULL;
     win_size = 0;
@@ -1537,6 +1538,7 @@ bool ampiParent::kv_set_builtin(int keyval, void* attribute_val) {
     case MPI_IO:                /*immutable*/ return false;
     case MPI_WTIME_IS_GLOBAL:   /*immutable*/ return false;
     case MPI_APPNUM:            /*immutable*/ return false;
+    case MPI_LASTUSEDCODE:      /*immutable*/ return false;
     case MPI_UNIVERSE_SIZE:     (CkpvAccess(bikvs).universe_size)     = *((int*)attribute_val);      return true;
     case MPI_WIN_BASE:          (CkpvAccess(bikvs).win_base)          = attribute_val;               return true;
     case MPI_WIN_SIZE:          (CkpvAccess(bikvs).win_size)          = *((MPI_Aint*)attribute_val); return true;
@@ -1558,6 +1560,7 @@ bool ampiParent::kv_get_builtin(int keyval) {
     case MPI_IO:                kv_builtin_storage = &(CkpvAccess(bikvs).io);                 return true;
     case MPI_WTIME_IS_GLOBAL:   kv_builtin_storage = &(CkpvAccess(bikvs).wtime_is_global);    return true;
     case MPI_APPNUM:            kv_builtin_storage = &(CkpvAccess(bikvs).appnum);             return true;
+    case MPI_LASTUSEDCODE:      kv_builtin_storage = &(CkpvAccess(bikvs).lastusedcode);       return true;
     case MPI_UNIVERSE_SIZE:     kv_builtin_storage = &(CkpvAccess(bikvs).universe_size);      return true;
     case MPI_WIN_BASE:          win_base_storage   = &(CkpvAccess(bikvs).win_base);           return true;
     case MPI_WIN_SIZE:          win_size_storage   = &(CkpvAccess(bikvs).win_size);           return true;
