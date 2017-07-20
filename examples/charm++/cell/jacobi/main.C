@@ -10,8 +10,8 @@
 /* readonly */ CProxy_Jacobi jacobiProxy;
 
 
-Main::Main(CkArgMsg *msg) {
-
+Main::Main(CkArgMsg *msg)
+{
   // Print some header information for the user
   CkPrintf(" ----- 2D Jacobi for Cell -----\n");
   CkPrintf("   Matrix : [ %d x %d ]\n", NUM_ROWS * NUM_CHARES, NUM_COLS * NUM_CHARES);
@@ -40,23 +40,21 @@ Main::Main(CkArgMsg *msg) {
 
   // Create the Jacobi array
   #if CHARE_MAPPING_TO_PES__STRIPE != 0
+  CkPrintf("Using Chare striping...\n");
 
-    CkPrintf("Using Chare striping...\n");
+  register float numPEs_f = (float)(CkNumPes());
+  jArray = CProxy_Jacobi::ckNew();
 
-    register float numPEs_f = (float)(CkNumPes());
-    jArray = CProxy_Jacobi::ckNew();
-    for (int i = 0; i < (NUM_CHARES * NUM_CHARES); i++) {
-      register int pe = (int)(((float)i / (float)(NUM_CHARES * NUM_CHARES)) * numPEs_f);
-      jArray(i).insert(pe);
-    }
-    jArray.doneInserting();
+  for (int i = 0; i < (NUM_CHARES * NUM_CHARES); i++) {
+    register int pe = (int)(((float)i / (float)(NUM_CHARES * NUM_CHARES)) * numPEs_f);
+    jArray(i).insert(pe);
+  }
 
+  jArray.doneInserting();
   #else
+  CkPrintf("Using default Chare placement...\n");
 
-    CkPrintf("Using default Chare placement...\n");
-
-    jArray = CProxy_Jacobi::ckNew(NUM_CHARES * NUM_CHARES);
-
+  jArray = CProxy_Jacobi::ckNew(NUM_CHARES * NUM_CHARES);
   #endif
   jacobiProxy = jArray;
 
@@ -67,35 +65,33 @@ Main::Main(CkArgMsg *msg) {
   reportMaxError_resendCount = 0;
 }
 
-void Main::createdCheckIn() {
-
+void Main::createdCheckIn()
+{
   createdCheckIn_count++;
   if (createdCheckIn_count >= (NUM_CHARES * NUM_CHARES)) {
-
     // Start timing
     startTime = CkWallTimer();
 
     // Tell the jArray to start the first iteration
     jArray.startIteration();
     #if DISPLAY_MATRIX != 0
-      CkPrintf("Starting Iteration %d...\n", iterationCount);
+    CkPrintf("Starting Iteration %d...\n", iterationCount);
     #endif
   }
 }
 
-void Main::maxErrorReductionClient(CkReductionMsg *msg) {
-
+void Main::maxErrorReductionClient(CkReductionMsg *msg)
+{
   float maxError = *((float*)(msg->getData()));
 
   #if DISPLAY_MAX_ERROR_FREQ > 0
-    if (iterationCount == 0 || (iterationCount % DISPLAY_MAX_ERROR_FREQ) == 0) {
-      CkPrintf("Iteration %d Finished... maxError = %f...\n", iterationCount, maxError);
-      fflush(NULL);
-    }
+  if (iterationCount == 0 || (iterationCount % DISPLAY_MAX_ERROR_FREQ) == 0) {
+    CkPrintf("Iteration %d Finished... maxError = %f...\n", iterationCount, maxError);
+    fflush(NULL);
+  }
   #endif
 
   if (maxError <= MAX_ERROR) {
-
     // Stop timing
     endTime = CkWallTimer();
 
@@ -104,30 +100,27 @@ void Main::maxErrorReductionClient(CkReductionMsg *msg) {
     CkPrintf("Time: %lfs\n", endTime - startTime);
 
     CkExit();
-
   } else {
     iterationCount++;
   }
-
 }
 
 
-void Main::reportMaxError(float val, int iter) {
-
+void Main::reportMaxError(float val, int iter)
+{
   // Calculate the iteration count offset of this value and the current iteration
   //   the main chare is working on
   register int iterDelta = iter - iterationCount;
   if (iterDelta < 0) {
     CkPrintf("iterDelta = %d, iter = %d, iterationCount = %d\n",
              iterDelta, iter, iterationCount
-	    );
+             );
     CkAbort("ERROR: iterDelta < 0 in Main::reportMaxError... later...\n");
   }
 
   // Check to see if this partial max error does not go into the buffer of max error
   //   values... if so, resend to self... if it does, combine with the appropriate value
   if (iterDelta >= REPORT_MAX_ERROR_BUFFER_DEPTH) {
-
     // STATS
     reportMaxError_resendCount++;
 
@@ -137,22 +130,21 @@ void Main::reportMaxError(float val, int iter) {
 
   // Combine the value with the appropriate partial max error
   partialMaxError[iterDelta] = (partialMaxError[iterDelta] < val)
-                                 ? (val)
-                                 : (partialMaxError[iterDelta]);
+                               ? (val)
+                               : (partialMaxError[iterDelta]);
   checkInCount[iterDelta]++;
 
   // Check to see if one or more iterations have completed
   while (checkInCount[0] >= (NUM_CHARES * NUM_CHARES)) {
-
     //CkPrintf("Iteration %d Finished... maxError = %f...\n",
     //         iterationCount, partialMaxError[0]);
     #if DISPLAY_MAX_ERROR_FREQ > 0
-      if (iterationCount == 0 || (iterationCount % DISPLAY_MAX_ERROR_FREQ) == 0)
-        CkPrintf("Iteration %d Finished... maxError = %f...\n", iterationCount, partialMaxError[0]);
+    if (iterationCount == 0 || (iterationCount % DISPLAY_MAX_ERROR_FREQ) == 0) {
+      CkPrintf("Iteration %d Finished... maxError = %f...\n", iterationCount, partialMaxError[0]);
+    }
     #endif
 
     if (partialMaxError[0] <= MAX_ERROR) {
-
       // Stop timing
       endTime = CkWallTimer();
 
@@ -164,22 +156,19 @@ void Main::reportMaxError(float val, int iter) {
       CkPrintf("reportMaxError_resendCount = %d\n", reportMaxError_resendCount);
 
       CkExit();
-
     } else {
-
       iterationCount++;
 
       // Advance the elements in the paritial max error buffer
       for (int i = 1; i < REPORT_MAX_ERROR_BUFFER_DEPTH; i++) {
-        partialMaxError[i-1] = partialMaxError[i];
-        checkInCount[i-1] = checkInCount[i];
+        partialMaxError[i - 1] = partialMaxError[i];
+        checkInCount[i - 1] = checkInCount[i];
       }
+
       partialMaxError[REPORT_MAX_ERROR_BUFFER_DEPTH - 1] = 0.0f;
       checkInCount[REPORT_MAX_ERROR_BUFFER_DEPTH - 1] = 0;
     }
-
   } // end while
-
 }
 
 

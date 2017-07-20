@@ -11,68 +11,82 @@
 
 
 struct sectionBcastMsg : public CkMcastBaseMsg, public CMessage_sectionBcastMsg {
-
-   int k;
-   sectionBcastMsg(int _k) : k(_k) {} 
-   void pup(PUP::er &p){
-	  CMessage_sectionBcastMsg::pup(p);
-	  p|k;
-   }
+  int k;
+  sectionBcastMsg(int _k) : k(_k)
+  {
+  }
+  void pup(PUP::er &p)
+  {
+    CMessage_sectionBcastMsg::pup(p);
+    p | k;
+  }
 };
 
 class Main : public CBase_Main {
-   int sum;
-   public:
-   Main(CkArgMsg* msg){
-	  ckout<<"Numpes: "<<CkNumPes()<<endl;
-	  checkGroup = CProxy_Check::ckNew();
-	  mCastGrpId = CProxy_CkMulticastMgr::ckNew();
-	  checkGroup.createSection();
-	  sum = 0;
-	  mainProxy = thisProxy;
-   }
-   Main(CkMigrateMessage* msg){}
-   void done(int k){
-	  ckout<<"Sum : "<<k<<endl;
-	  CkExit();
-   }
+int sum;
+public:
+Main(CkArgMsg* msg)
+{
+  ckout << "Numpes: " << CkNumPes() << endl;
+  checkGroup = CProxy_Check::ckNew();
+  mCastGrpId = CProxy_CkMulticastMgr::ckNew();
+  checkGroup.createSection();
+  sum = 0;
+  mainProxy = thisProxy;
+}
+Main(CkMigrateMessage* msg)
+{
+}
+void done(int k)
+{
+  ckout << "Sum : " << k << endl;
+  CkExit();
+}
 };
 
 
 class Check : public CBase_Check {
-   CProxySection_Check secProxy;
-   CkSectionInfo cookie;
-   public:
-   Check() {}
-   Check(CkMigrateMessage* msg) {}
-   void createSection(){
-	  int numpes = CkNumPes(), step=1;
-	  int me = CkMyPe();
-	  if(CkMyPe() == 0){   //root
-		 CkVec<int> elems;
-		 for(int i=0; i<numpes; i+=step){
-			elems.push_back(i);
-			ckout<<i<<" : "<<endl;
-		 }
-		 //branching factor for the spanning tree
-		 int bfactor = 4;
-		 secProxy = CProxySection_Check(checkGroup.ckGetGroupID(), elems.getVec(), elems.size(), bfactor); 
-		 CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
-		 secProxy.ckSectionDelegate(mCastGrp);
-		 sectionBcastMsg *msg = new sectionBcastMsg(1);
-		 secProxy.recvMsg(msg);
-	  }
-   }
+CProxySection_Check secProxy;
+CkSectionInfo cookie;
+public:
+Check()
+{
+}
+Check(CkMigrateMessage* msg)
+{
+}
+void createSection()
+{
+  int numpes = CkNumPes(), step = 1;
+  int me = CkMyPe();
+  if (CkMyPe() == 0) {   //root
+    CkVec<int> elems;
 
-   void recvMsg(sectionBcastMsg *msg){
-	  ckout<<"sectionBcastMsg received  - "<<CkMyPe()<<endl;
-	  int me = msg->k;
-	  CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
-	  CkGetSectionInfo(cookie, msg);
-    CkCallback cb(CkReductionTarget(Main, done), mainProxy);
-	  mCastGrp->contribute(sizeof(int), &me, CkReduction::sum_int, cookie, cb);
-	  CkFreeMsg(msg);
-   }
+    for (int i = 0; i < numpes; i += step) {
+      elems.push_back(i);
+      ckout << i << " : " << endl;
+    }
+
+    //branching factor for the spanning tree
+    int bfactor = 4;
+    secProxy = CProxySection_Check(checkGroup.ckGetGroupID(), elems.getVec(), elems.size(), bfactor);
+    CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
+    secProxy.ckSectionDelegate(mCastGrp);
+    sectionBcastMsg *msg = new sectionBcastMsg(1);
+    secProxy.recvMsg(msg);
+  }
+}
+
+void recvMsg(sectionBcastMsg *msg)
+{
+  ckout << "sectionBcastMsg received  - " << CkMyPe() << endl;
+  int me = msg->k;
+  CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
+  CkGetSectionInfo(cookie, msg);
+  CkCallback cb(CkReductionTarget(Main, done), mainProxy);
+  mCastGrp->contribute(sizeof(int), &me, CkReduction::sum_int, cookie, cb);
+  CkFreeMsg(msg);
+}
 };
 
 

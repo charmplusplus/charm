@@ -12,27 +12,27 @@
 /*mainchare*/
 
 main::main(CkArgMsg* m)
-  {
-    //Process command-line arguments
-    //Start the computation
+{
+  //Process command-line arguments
+  //Start the computation
 
-    mainProxy = thishandle;
-    if(m->argc < 4)
-      {
-        CkPrintf("%s [numChares] [starting_index_one] [starting_index_two]\n", m->argv[0]);
-	CkExit();
-      }
-    units=atoi(m->argv[1]);
-    dOne=atof(m->argv[2]);
-    dTwo=atof(m->argv[3]);
-
-    arr = CProxy_RedExample::ckNew(units);
-
-    CkPrintf("simple_reduction for %d pes on %d units for %f and %f\n",
-	     CkNumPes(),units,dOne, dTwo);
-
-    arr.dowork();
+  mainProxy = thishandle;
+  if (m->argc < 4) {
+    CkPrintf("%s [numChares] [starting_index_one] [starting_index_two]\n", m->argv[0]);
+    CkExit();
   }
+
+  units = atoi(m->argv[1]);
+  dOne = atof(m->argv[2]);
+  dTwo = atof(m->argv[3]);
+
+  arr = CProxy_RedExample::ckNew(units);
+
+  CkPrintf("simple_reduction for %d pes on %d units for %f and %f\n",
+           CkNumPes(), units, dOne, dTwo);
+
+  arr.dowork();
+}
 
 
 
