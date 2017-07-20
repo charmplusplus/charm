@@ -271,7 +271,8 @@ void Jacobi::doCalculation_post() {
 
   #if USE_REDUCTION != 0
     // Get the maxError calculated by the work request and contribute it the reduction for this overall iteration
-    contribute(sizeof(float), (float*)matrixTmp, CkReduction::max_float);
+    CkCallback cb(CkIndex_Main::maxErrorReductionClient(NULL), mainProxy);
+    contribute(sizeof(float), (float*)matrixTmp, CkReduction::max_float, cb);
   #else
     mainProxy.reportMaxError(*((float*)matrixTmp), iterCount); 
   #endif

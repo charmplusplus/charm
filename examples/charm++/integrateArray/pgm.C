@@ -38,10 +38,6 @@ main::main(CkArgMsg *m)
     integrateArray[i].insert(x, dx, nSlices); 
   }
   integrateArray.doneInserting();	// done with creation
-
-  // set up reduction handler for sum up the integrals across all chares.
-  CkCallback *cb = new CkCallback(CkIndex_main::results(NULL), mainProxy);
-  integrateArray.ckSetReductionClient(cb);
 }
 
 // reduction handler, it prints out the result and exits.
@@ -64,7 +60,8 @@ integrate::integrate(double xStart,double dx, int nSlices)
   }
 
   // reduction to sum the partialIntegral across all chares
-  contribute(sizeof(double), &partialIntegral, CkReduction::sum_double);
+  CkCallback cb(CkIndex_main::results(NULL), mainProxy);
+  contribute(sizeof(double), &partialIntegral, CkReduction::sum_double, cb);
 }
 
 #include "pgm.def.h"

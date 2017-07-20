@@ -59,7 +59,6 @@ class Check : public CBase_Check {
 		 secProxy = CProxySection_Check(checkGroup.ckGetGroupID(), elems.getVec(), elems.size(), bfactor); 
 		 CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
 		 secProxy.ckSectionDelegate(mCastGrp);
-		 mCastGrp->setReductionClient(secProxy, new CkCallback(CkReductionTarget(Main,done), mainProxy));
 		 sectionBcastMsg *msg = new sectionBcastMsg(1);
 		 secProxy.recvMsg(msg);
 	  }
@@ -70,7 +69,8 @@ class Check : public CBase_Check {
 	  int me = msg->k;
 	  CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
 	  CkGetSectionInfo(cookie, msg);
-	  mCastGrp->contribute(sizeof(int), &me, CkReduction::sum_int, cookie);
+    CkCallback cb(CkReductionTarget(Main, done), mainProxy);
+	  mCastGrp->contribute(sizeof(int), &me, CkReduction::sum_int, cookie, cb);
 	  CkFreeMsg(msg);
    }
 };

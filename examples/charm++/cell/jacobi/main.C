@@ -60,12 +60,6 @@ Main::Main(CkArgMsg *msg) {
   #endif
   jacobiProxy = jArray;
 
-  #if USE_REDUCTION != 0
-    // Register a reduction callback with the array
-    CkCallback *cb = new CkCallback(CkIndex_Main::maxErrorReductionClient(NULL), mainProxy);
-    jArray.ckSetReductionClient(cb);
-  #endif
-
   // Clear the createdCheckIn count
   createdCheckIn_count = 0;
 
