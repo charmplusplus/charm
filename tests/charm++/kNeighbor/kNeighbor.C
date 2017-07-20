@@ -109,9 +109,6 @@ public:
         opts.setMap(myMap);
         array = CProxy_Block::ckNew(totalElems, opts);
 
-        CkCallback *cb = new CkCallback(CkIndex_Main::nextStep(NULL), thisProxy);
-        array.ckSetReductionClient(cb);
-
         beginIteration();
     }
 
@@ -338,7 +335,8 @@ public:
         /*for(int i=0; i<numNeighbors; i++){
         	CkPrintf("Elem[%d]: avg RTT from neighbor %d (actual elem id %d): %lf\n", thisIndex, i, neighbors[i], recvTimes[i]/totalSteps);
         }*/
-        contribute(0,0,CkReduction::max_int);
+        CkCallback cb(CkIndex_Main::nextStep(NULL), mainProxy);
+        contribute(0,0,CkReduction::max_int,cb);
     }
 
     void startInternalIteration() {
@@ -438,7 +436,8 @@ public:
             if (internalStepCnt==CALCPERSTEP) {
                 double iterCommTime = CmiWallTimer() - startTime;
 	    #if USE_ARRAY_REDUCTION
-                contribute(sizeof(double), &iterCommTime, CkReduction::max_double);
+                CkCallback cb(CkIndex_Main::nextStep(NULL), mainProxy);
+                contribute(sizeof(double), &iterCommTime, CkReduction::max_double, cb);
 	    #else
                 mainProxy.nextStep_plain(iterCommTime);
 	    #endif

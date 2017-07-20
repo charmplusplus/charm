@@ -26,8 +26,6 @@ Main::Main(CkArgMsg *m)
 	mainhandle = thishandle;
 	testProxy1D = CProxy_Test1D::ckNew(arrayDimension);
 	sectionProxy = new CProxySection_Test1D[arrayDimension];
-	CkCallback *cb = new CkCallback(CkIndex_Main::reportSum(NULL), mainProxy);
-	testProxy1D.ckSetReductionClient(cb);
 	
 	//Multicast stuff
 	CkArrayID testArrayID = testProxy1D.ckGetArrayID();
@@ -36,7 +34,6 @@ Main::Main(CkArgMsg *m)
 	{
 		//creating sectionProxy[i]:
 		sectionProxy[i] = CProxySection_Test1D::ckNew(testArrayID, 0, arrayDimension-1, i+1);
-		sectionProxy[i].setReductionClient(cb);
 		//msg for sectionProxy[i]
 		DummyMsg *msg = new DummyMsg;
 		msg->section = i;

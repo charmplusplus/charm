@@ -5,6 +5,8 @@
 extern TestController *mainChare;
 extern int bcastHandlerID;
 
+/// Readonly proxy to the test controller
+CProxy_TestController mainProxy;
 /// Readonly proxy to the QHogger group
 CProxy_QHogger hogger;
 // Define the readonly config object
@@ -82,6 +84,7 @@ TestController::TestController(CkArgMsg *m)
 
     // Initialize the mainchare pointer used by the converse redn handler
     mainChare = this;
+    mainProxy = thisProxy;
     // Set up a QHogger group to keep the scheduler Q non-empty
     hogger = CProxy_QHogger::ckNew();
 
@@ -91,10 +94,6 @@ TestController::TestController(CkArgMsg *m)
     /// Create the array section to use with CkMulticast
     arraySections.push_back( createSection(cfg.useContiguousSection) );
     arraySections.push_back( createSection(cfg.useContiguousSection) );
-
-    CkCallback *cb = new CkCallback(CkIndex_TestController::receiveReduction(0),thisProxy);
-    chareArray.ckSetReductionClient(cb);
-    arraySections[0].setReductionClient(cb);
 
     /// Start off with the first comm type and the smallest message size
     curCommType    = bcastCkMulticast;

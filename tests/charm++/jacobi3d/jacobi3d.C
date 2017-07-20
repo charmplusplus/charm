@@ -172,10 +172,6 @@ class Main : public CBase_Main {
 		//Start the computation
 		startTime = CmiWallTimer();
 
-		//Registering the callback
-		CkCallback *cb = new CkCallback(CkIndex_Main::report(NULL), mainProxy);
-		array.ckSetReductionClient(cb);
-
 		array.doStep();
     }
 
@@ -418,16 +414,17 @@ class Jacobi: public CBase_Jacobi {
 #ifdef CMK_MESSAGE_LOGGING
 		if(iterations % ckptFreq == 0){
 			AtSync();
-		} else {
-			contribute(sizeof(int), &iterations, CkReduction::max_int);
-		}
-#else
-		contribute(sizeof(int), &iterations, CkReduction::max_int);
+		} else
 #endif
+    {
+      CkCallback cb(CkIndex_Main::report(NULL), mainProxy);
+			contribute(sizeof(int), &iterations, CkReduction::max_int, cb);
+		}
 	}
 
 	void ResumeFromSync(){
-		contribute(sizeof(int), &iterations, CkReduction::max_int);
+    CkCallback cb(CkIndex_Main::report(NULL), mainProxy);
+		contribute(sizeof(int), &iterations, CkReduction::max_int, cb);
 	}
 
     // Check to see if we have received all neighbor values yet

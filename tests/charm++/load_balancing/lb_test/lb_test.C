@@ -73,12 +73,6 @@ private:
   void arg_error(char* argv0);
 };
 
-static void programBegin(void *dummy,int size,void *data)
-{
-  // Start computing
-  lbproxy.ForwardMessages();
-}
-
 main::main(CkArgMsg *m) 
 {
   char *topology;	// String name for communication topology
@@ -123,10 +117,7 @@ main::main(CkArgMsg *m)
   if (topoid.isZero())
     CkAbort("ERROR! Topology not found!  \n");
 
-	// TODO: this code looks wrong, since reduction client is set AFTER array creation,
-	// which, according to Charm++ manual, should be done BEFORE array is created
   lbproxy = CProxy_Lb_array::ckNew(element_count);
-  lbproxy.setReductionClient(programBegin, NULL);
 }
 
 void main::arg_error(char* argv0)
@@ -186,7 +177,8 @@ public:
 	
     usesAtSync = true;
 
-    contribute(sizeof(i), &i, CkReduction::sum_int);
+    CkCallback cb(CkIndex_Lb_array::ForwardMessages(), thisProxy);
+    contribute(sizeof(i), &i, CkReduction::sum_int, cb);
   }
 
   //Packing/migration utilities

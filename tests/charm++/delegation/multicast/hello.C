@@ -120,9 +120,6 @@ CmiPrintf("start %d elements\n", nElements);
 
     cnt.reductionsRemaining=REDUCE_TIME;
     cnt.reductionNo=0;
-//    mg->setReductionClient(mcp, client, cnt);
-    CkCallback *cb = new CkCallback(CkIndex_Hello::cb_client(NULL), CkArrayIndex1D(0), thisProxy);
-    mg->setReductionClient(mcp, cb);
 
     HiMsg *hiMsg = new (2, 0) HiMsg;
     hiMsg->data[0] = 22;
@@ -195,9 +192,9 @@ CmiPrintf("start %d elements\n", nElements);
     CkCallback cb(CkIndex_Hello::cb_client(NULL), CkArrayIndex1D(0), thisProxy);
     mg->contribute(sizeof(int), &data,CkReduction::sum_int, sid, cb);
     data = thisIndex+2;
-    mg->contribute(sizeof(int), &data,CkReduction::max_int, sid);
+    mg->contribute(sizeof(int), &data,CkReduction::max_int, sid, cb);
     data = thisIndex+1;
-    mg->contribute(sizeof(int), &data,CkReduction::product_int, sid);
+    mg->contribute(sizeof(int), &data,CkReduction::product_int, sid, cb);
     delete m;
     if (1)
     ckMigrate((CkMyPe()+1)%CkNumPes());
@@ -212,8 +209,6 @@ CmiPrintf("start %d elements\n", nElements);
     if (p.isUnpacking() && thisIndex == 0) {
       CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
       mg->resetSection(mcp);
-      CkCallback *cb = new CkCallback(CkIndex_Hello::cb_client(NULL), CkArrayIndex1D(0), thisProxy);
-      mg->setReductionClient(mcp, cb);
     }
 #endif
   }

@@ -4,7 +4,7 @@
 
 //----------------- externed globals -----------------
 CpvExtern(std::vector<MyChareArray*>, localElems);
-
+extern CProxy_TestController mainProxy;
 
 
 MyChareArray::MyChareArray(): msgNum(0)
@@ -36,30 +36,48 @@ void MyChareArray::crunchData(DataMsg *msg)
     switch (msg->commType)
     {
         case bcastCkMulticast:
+        {
+            CkCallback cb(CkIndex_TestController::receiveReduction(0), mainProxy);
             CkGetSectionInfo(sid, msg);
-            CProxySection_MyChareArray::contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double,sid);
+            CProxySection_MyChareArray::contribute(msg->rednSize*sizeof(double), returnData, CkReduction::sum_double, sid, cb);
             break;
+        }
 
         case bcastCharm:
-            CProxySection_MyChareArray::contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double,sid);
+        {
+            CkCallback cb(CkIndex_TestController::receiveReduction(0), mainProxy);
+            CProxySection_MyChareArray::contribute(msg->rednSize*sizeof(double), returnData, CkReduction::sum_double, sid, cb);
             break;
+        }
 
         case bcastConverse:
-            CProxySection_MyChareArray::contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double,sid);
+        {
+            CkCallback cb(CkIndex_TestController::receiveReduction(0), mainProxy);
+            CProxySection_MyChareArray::contribute(msg->rednSize*sizeof(double), returnData, CkReduction::sum_double, sid, cb);
             break;
+        }
 
         case rednCkMulticast:
+        {
+            CkCallback cb(CkIndex_TestController::receiveReduction(0), mainProxy);
             CkGetSectionInfo(sid, msg);
-            CProxySection_MyChareArray::contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double,sid);
+            CProxySection_MyChareArray::contribute(msg->rednSize*sizeof(double), returnData, CkReduction::sum_double, sid, cb);
             break;
+        }
 
         case rednCharm:
-            contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double);
+        {
+            CkCallback cb(CkIndex_TestController::receiveReduction(NULL), mainProxy);
+            contribute(msg->rednSize*sizeof(double), returnData, CkReduction::sum_double, cb);
             break;
+        }
 
         case setRednCharm:
-            contribute(msg->rednSize*sizeof(double), returnData, CkReduction::set);
+        {
+            CkCallback cb(CkIndex_TestController::receiveReduction(NULL), mainProxy);
+            contribute(msg->rednSize*sizeof(double), returnData, CkReduction::set, cb);
             break;
+        }
 
         case rednConverse:
         {

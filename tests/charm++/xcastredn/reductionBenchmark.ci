@@ -2,6 +2,7 @@ mainmodule reductionBenchmark {
 
     readonly config cfg;
     readonly CProxy_QHogger hogger;
+    readonly CProxy_TestController mainProxy;
 
     initproc void registerHandlers();
 
