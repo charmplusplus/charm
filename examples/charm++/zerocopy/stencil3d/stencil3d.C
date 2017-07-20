@@ -322,7 +322,7 @@ class Stencil: public CBase_Stencil {
       }
 
       if(iterations == MAX_ITER)
-        contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
+        contribute(CkCallback(CkReductionTarget(Main, report), mainProxy));
       else {
         if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0)
           startTime = CkWallTimer();
@@ -331,7 +331,7 @@ class Stencil: public CBase_Stencil {
           AtSync();
         }
         else {
-          contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Stencil::doStep(), thisProxy));
+          contribute(CkCallback(CkReductionTarget(Stencil, doStep), thisProxy));
         }
       }
     }

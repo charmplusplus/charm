@@ -127,11 +127,10 @@ class Main : public CBase_Main
     }
 
     // Each worker reports back to here when it completes an iteration
-    void report(CkReductionMsg *msg) {
+    void report(double error) {
       iterations++;
       if(iterations == WARM_ITER)
 	startTime = CmiWallTimer();
-      double error = *((double *)msg->getData());
 
       if((globalBarrier == 1 && iterations < MAX_ITER) || (globalBarrier == 0 && iterations <= WARM_ITER)) {
 	if(iterations > WARM_ITER) CkPrintf("Start of iteration %d\n", iterations);
@@ -323,7 +322,7 @@ class Jacobi: public CBase_Jacobi {
 
 	if(globalBarrier == 1 || (globalBarrier==0 && (iterations <= WARM_ITER || iterations >= MAX_ITER))) {
 	  contribute(sizeof(double), &max_error, CkReduction::max_double,
-	      CkCallback(CkIndex_Main::report(NULL), mainProxy));
+	      CkCallback(CkReductionTarget(Main, report), mainProxy));
 	} else {
 	  begin_iteration();
 	}

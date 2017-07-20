@@ -14,7 +14,7 @@ mainmodule stencil3d {
 
   mainchare Main {
     entry Main(CkArgMsg *m);
-    entry void report();
+    entry [reductiontarget] void report();
   };
 
   array [3D] Stencil {
@@ -39,7 +39,7 @@ mainmodule stencil3d {
     entry void receiveGhosts(int iter, int dir, int height, int width,
         nocopy double ghosts[height*width]);
 
-    entry void doStep() {
+    entry [reductiontarget] void doStep() {
       serial "begin_iteration" {
         begin_iteration();
       }

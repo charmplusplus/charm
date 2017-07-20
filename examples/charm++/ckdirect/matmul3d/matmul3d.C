@@ -243,7 +243,7 @@ void Compute::resetArrays() {
 #endif
     }
 
-  contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::resetDone(), mainProxy));
+  contribute(CkCallback(CkReductionTarget(Main, resetDone), mainProxy));
 }
 
 void Compute::sendA() {

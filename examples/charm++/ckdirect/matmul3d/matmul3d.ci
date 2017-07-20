@@ -22,7 +22,7 @@ mainmodule matmul3d {
   mainchare Main {
     entry Main(CkArgMsg *m);
     entry void done();
-    entry void resetDone();
+    entry [reductiontarget] void resetDone();
     entry void setupDone();
   };
 

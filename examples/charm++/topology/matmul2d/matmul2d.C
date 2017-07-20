@@ -188,11 +188,11 @@ void Compute::compute(){
     }
     fclose(fp);
 #endif
-    contribute(0,0,CkReduction::concat, CkCallback(CkIndex_Main::done(), mainProxy));
+    contribute(CkCallback(CkReductionTarget(Main, done), mainProxy));
     CkPrintf("[%d,%d] comps: %d iter: %d\n", thisIndex.x, thisIndex.y, -1, iteration);
   }
   else{
-    contribute(0,0,CkReduction::concat,CkCallback(CkIndex_Compute::resumeFromBarrier(), thisProxy));
+    contribute(CkCallback(CkReductionTarget(Compute, resumeFromBarrier), thisProxy));
   }
 }
 
