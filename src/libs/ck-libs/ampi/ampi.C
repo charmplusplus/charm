@@ -4383,6 +4383,8 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
 static int copyDatatype(MPI_Datatype sendtype, int sendcount, MPI_Datatype recvtype,
                         int recvcount, const void *inbuf, void *outbuf)
 {
+  if (inbuf == outbuf) return MPI_SUCCESS; // handle MPI_IN_PLACE
+
   CkDDT_DataType *sddt = getDDT()->getType(sendtype);
   int slen = sddt->getSize(sendcount);
   CkDDT_DataType *rddt = getDDT()->getType(recvtype);
@@ -4405,6 +4407,61 @@ static void handle_MPI_IN_PLACE(void* &inbuf, void* &outbuf)
   if (inbuf == MPI_IN_PLACE) inbuf = outbuf;
   if (outbuf == MPI_IN_PLACE) outbuf = inbuf;
   CkAssert(inbuf != MPI_IN_PLACE && outbuf != MPI_IN_PLACE);
+}
+
+static void handle_MPI_IN_PLACE_gather(void* &sendbuf, void* recvbuf, int &sendcount,
+                                       MPI_Datatype &sendtype, int recvdispl,
+                                       int recvcount, MPI_Datatype recvtype)
+{
+  if (sendbuf == MPI_IN_PLACE) {
+    // The MPI standard says that when MPI_IN_PLACE is passed to any of the gather
+    // variants, the contribution of the root to the gathered vector is assumed
+    // to be already in the correct place in the receive buffer.
+    sendbuf   = (char*)recvbuf + (recvdispl * getDDT()->getExtent(recvtype));
+    sendcount = recvcount;
+    sendtype  = recvtype;
+  }
+  CkAssert(recvbuf != MPI_IN_PLACE);
+}
+
+static void handle_MPI_IN_PLACE_alltoall(void* &sendbuf, void* recvbuf, int &sendcount,
+                                         MPI_Datatype &sendtype, int recvcount,
+                                         MPI_Datatype recvtype)
+{
+  if (sendbuf == MPI_IN_PLACE) {
+    sendbuf   = recvbuf;
+    sendcount = recvcount;
+    sendtype  = recvtype;
+  }
+  CkAssert(recvbuf != MPI_IN_PLACE);
+}
+
+static void handle_MPI_IN_PLACE_alltoallv(void* &sendbuf, void* recvbuf, int* &sendcounts,
+                                          MPI_Datatype &sendtype, int* &sdispls,
+                                          const int* recvcounts, MPI_Datatype recvtype,
+                                          const int* rdispls)
+{
+  if (sendbuf == MPI_IN_PLACE) {
+    sendbuf    = recvbuf;
+    sendcounts = (int*)recvcounts;
+    sendtype   = recvtype;
+    sdispls    = (int*)rdispls;
+  }
+  CkAssert(recvbuf != MPI_IN_PLACE);
+}
+
+static void handle_MPI_IN_PLACE_alltoallw(void* &sendbuf, void* recvbuf, int* &sendcounts,
+                                          MPI_Datatype* &sendtypes, int* &sdispls,
+                                          const int* recvcounts, const MPI_Datatype* recvtypes,
+                                          const int* rdispls)
+{
+  if (sendbuf == MPI_IN_PLACE) {
+    sendbuf    = recvbuf;
+    sendcounts = (int*)recvcounts;
+    sendtypes  = (MPI_Datatype*)recvtypes;
+    sdispls    = (int*)rdispls;
+  }
+  CkAssert(recvbuf != MPI_IN_PLACE);
 }
 
 #define AMPI_SYNC_REDUCE 0
@@ -6155,28 +6212,29 @@ int AMPI_Allgather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 {
   AMPIAPI("AMPI_Allgather");
 
+  ampi *ptr = getAmpiInstance(comm);
+  int rank = ptr->getRank();
+
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
+  handle_MPI_IN_PLACE_gather((void*&)sendbuf, recvbuf, sendcount, sendtype,
+                             rank*recvcount, recvcount, recvtype);
 
 #if AMPI_ERROR_CHECKING
   int ret;
-  ret = errorCheck("AMPI_Allgather", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
-  if(ret != MPI_SUCCESS)
-    return ret;
+  if (sendbuf != recvbuf) {
+    ret = errorCheck("AMPI_Allgather", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+    if(ret != MPI_SUCCESS)
+      return ret;
+  }
   ret = errorCheck("AMPI_Allgather", comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
 
-  ampi *ptr = getAmpiInstance(comm);
-
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Allgather for Inter-communicators!");
   if(ptr->getSize() == 1)
     return copyDatatype(sendtype,sendcount,recvtype,recvcount,sendbuf,recvbuf);
-
-  int rank = ptr->getRank();
-  int sendSize = ptr->getDDT()->getType(sendtype)->getSize(sendcount);
 
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback allgatherCB(CkIndex_ampi::rednResult(0), ptr->getProxy());
@@ -6196,15 +6254,21 @@ int AMPI_Iallgather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 {
   AMPIAPI("AMPI_Iallgather");
 
+  ampi *ptr = getAmpiInstance(comm);
+  int rank = ptr->getRank();
+
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
+  handle_MPI_IN_PLACE_gather((void*&)sendbuf, recvbuf, sendcount, sendtype,
+                             rank*recvcount, recvcount, recvtype);
 
 #if AMPI_ERROR_CHECKING
   int ret;
-  ret = errorCheck("AMPI_Iallgather", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
-  if(ret != MPI_SUCCESS){
-    *request = MPI_REQUEST_NULL;
-    return ret;
+  if (sendbuf != recvbuf) {
+    ret = errorCheck("AMPI_Iallgather", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+    if(ret != MPI_SUCCESS){
+      *request = MPI_REQUEST_NULL;
+      return ret;
+    }
   }
   ret = errorCheck("AMPI_Iallgather", comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
   if(ret != MPI_SUCCESS){
@@ -6213,8 +6277,6 @@ int AMPI_Iallgather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
 #endif
 
-  ampi *ptr = getAmpiInstance(comm);
-
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Iallgather for Inter-communicators!");
   if(ptr->getSize() == 1){
@@ -6222,7 +6284,6 @@ int AMPI_Iallgather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
     return copyDatatype(sendtype,sendcount,recvtype,recvcount,sendbuf,recvbuf);
   }
 
-  int rank = ptr->getRank();
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback allgatherCB(CkIndex_ampi::irednResult(0), ptr->getProxy());
   msg->setCallback(allgatherCB);
@@ -6242,27 +6303,30 @@ int AMPI_Allgatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 {
   AMPIAPI("AMPI_Allgatherv");
 
+  ampi *ptr = getAmpiInstance(comm);
+  int rank = ptr->getRank();
+
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
+  handle_MPI_IN_PLACE_gather((void*&)sendbuf, recvbuf, sendcount, sendtype,
+                             displs[rank], recvcounts[rank], recvtype);
 
 #if AMPI_ERROR_CHECKING
   int ret;
-  ret = errorCheck("AMPI_Allgatherv", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
-  if(ret != MPI_SUCCESS)
-    return ret;
+  if (sendbuf != recvbuf) {
+    ret = errorCheck("AMPI_Allgatherv", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+    if(ret != MPI_SUCCESS)
+      return ret;
+  }
   ret = errorCheck("AMPI_Allgatherv", comm, 1, recvcounts[0], 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
-
-  ampi *ptr = getAmpiInstance(comm);
 
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Allgatherv for Inter-communicators!");
   if(ptr->getSize() == 1)
     return copyDatatype(sendtype,sendcount,recvtype,recvcounts[0],sendbuf,recvbuf);
 
-  int rank = ptr->getRank();
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback allgathervCB(CkIndex_ampi::rednResult(0), ptr->getProxy());
   msg->setCallback(allgathervCB);
@@ -6281,15 +6345,21 @@ int AMPI_Iallgatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 {
   AMPIAPI("AMPI_Iallgatherv");
 
+  ampi *ptr = getAmpiInstance(comm);
+  int rank = ptr->getRank();
+
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
+  handle_MPI_IN_PLACE_gather((void*&)sendbuf, recvbuf, sendcount, sendtype,
+                             displs[rank], recvcounts[rank], recvtype);
 
 #if AMPI_ERROR_CHECKING
   int ret;
-  ret = errorCheck("AMPI_Iallgatherv", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
-  if(ret != MPI_SUCCESS){
-    *request = MPI_REQUEST_NULL;
-    return ret;
+  if (sendbuf != recvbuf) {
+    ret = errorCheck("AMPI_Iallgatherv", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+    if(ret != MPI_SUCCESS){
+      *request = MPI_REQUEST_NULL;
+      return ret;
+    }
   }
   ret = errorCheck("AMPI_Iallgatherv", comm, 1, recvcounts[0], 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
   if(ret != MPI_SUCCESS){
@@ -6297,9 +6367,6 @@ int AMPI_Iallgatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
     return ret;
   }
 #endif
-
-  ampi *ptr = getAmpiInstance(comm);
-  int rank = ptr->getRank();
 
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Iallgatherv for Inter-communicators!");
@@ -6329,22 +6396,26 @@ int AMPI_Gather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 {
   AMPIAPI("AMPI_Gather");
 
+  ampi *ptr = getAmpiInstance(comm);
+  int rank = ptr->getRank();
+
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
+  handle_MPI_IN_PLACE_gather((void*&)sendbuf, recvbuf, sendcount, sendtype,
+                             rank*recvcount, recvcount, recvtype);
 
 #if AMPI_ERROR_CHECKING
   int ret;
-  ret = errorCheck("AMPI_Gather", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
-  if(ret != MPI_SUCCESS)
-    return ret;
+  if (sendbuf != recvbuf) {
+    ret = errorCheck("AMPI_Gather", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+    if(ret != MPI_SUCCESS)
+      return ret;
+  }
   if (getAmpiInstance(comm)->getRank() == root) {
     ret = errorCheck("AMPI_Gather", comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
     if(ret != MPI_SUCCESS)
       return ret;
   }
 #endif
-
-  ampi *ptr = getAmpiInstance(comm);
 
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Gather for Inter-communicators!");
@@ -6361,8 +6432,6 @@ int AMPI_Gather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif
 
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
-  int rank = ptr->getRank();
-
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback gatherCB(CkIndex_ampi::rednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
   msg->setCallback(gatherCB);
@@ -6391,15 +6460,21 @@ int AMPI_Igather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 {
   AMPIAPI("AMPI_Igather");
 
+  ampi *ptr = getAmpiInstance(comm);
+  int rank = ptr->getRank();
+
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
+  handle_MPI_IN_PLACE_gather((void*&)sendbuf, recvbuf, sendcount, sendtype,
+                             rank*recvcount, recvcount, recvtype);
 
 #if AMPI_ERROR_CHECKING
   int ret;
-  ret = errorCheck("AMPI_Igather", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
-  if(ret != MPI_SUCCESS){
-    *request = MPI_REQUEST_NULL;
-    return ret;
+  if (sendbuf != recvbuf) {
+    ret = errorCheck("AMPI_Igather", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+    if(ret != MPI_SUCCESS){
+      *request = MPI_REQUEST_NULL;
+      return ret;
+    }
   }
   if (getAmpiInstance(comm)->getRank() == root) {
     ret = errorCheck("AMPI_Igather", comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
@@ -6409,8 +6484,6 @@ int AMPI_Igather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
     }
   }
 #endif
-
-  ampi *ptr = getAmpiInstance(comm);
 
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Igather for Inter-communicators!");
@@ -6429,8 +6502,6 @@ int AMPI_Igather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif
 
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
-  int rank = ptr->getRank();
-
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback gatherCB(CkIndex_ampi::irednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
   msg->setCallback(gatherCB);
@@ -6463,22 +6534,26 @@ int AMPI_Gatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 {
   AMPIAPI("AMPI_Gatherv");
 
+  ampi *ptr = getAmpiInstance(comm);
+  int rank = ptr->getRank();
+
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
+  handle_MPI_IN_PLACE_gather((void*&)sendbuf, recvbuf, sendcount, sendtype,
+                             displs[rank], recvcounts[rank], recvtype);
 
 #if AMPI_ERROR_CHECKING
   int ret;
-  ret = errorCheck("AMPI_Gatherv", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
-  if(ret != MPI_SUCCESS)
-    return ret;
+  if (sendbuf != recvbuf) {
+    ret = errorCheck("AMPI_Gatherv", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+    if(ret != MPI_SUCCESS)
+      return ret;
+  }
   if (getAmpiInstance(comm)->getRank() == root) {
     ret = errorCheck("AMPI_Gatherv", comm, 1, recvcounts[0], 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
     if(ret != MPI_SUCCESS)
       return ret;
   }
 #endif
-
-  ampi *ptr = getAmpiInstance(comm);
 
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Gatherv for Inter-communicators!");
@@ -6500,8 +6575,6 @@ int AMPI_Gatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif
 
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
-  int rank = ptr->getRank();
-
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback gathervCB(CkIndex_ampi::rednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
   msg->setCallback(gathervCB);
@@ -6532,15 +6605,21 @@ int AMPI_Igatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 {
   AMPIAPI("AMPI_Igatherv");
 
+  ampi *ptr = getAmpiInstance(comm);
+  int rank = ptr->getRank();
+
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
+  handle_MPI_IN_PLACE_gather((void*&)sendbuf, recvbuf, sendcount, sendtype,
+                             displs[rank], recvcounts[rank], recvtype);
 
 #if AMPI_ERROR_CHECKING
   int ret;
-  ret = errorCheck("AMPI_Igatherv", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
-  if(ret != MPI_SUCCESS){
-    *request = MPI_REQUEST_NULL;
-    return ret;
+  if (sendbuf != recvbuf) {
+    ret = errorCheck("AMPI_Igatherv", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+    if(ret != MPI_SUCCESS){
+      *request = MPI_REQUEST_NULL;
+      return ret;
+    }
   }
   if (getAmpiInstance(comm)->getRank() == root) {
     ret = errorCheck("AMPI_Igatherv", comm, 1, recvcounts[0], 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
@@ -6550,9 +6629,6 @@ int AMPI_Igatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
     }
   }
 #endif
-
-  ampi *ptr = getAmpiInstance(comm);
-  int rank = ptr->getRank();
 
   if(getAmpiParent()->isInter(comm))
     CkAbort("AMPI does not implement MPI_Igatherv for Inter-communicators!");
@@ -6624,9 +6700,11 @@ int AMPI_Scatter(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
     if(ret != MPI_SUCCESS)
       return ret;
   }
-  ret = errorCheck("AMPI_Scatter", comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
-  if(ret != MPI_SUCCESS)
-    return ret;
+  if (sendbuf != recvbuf || getAmpiInstance(comm)->getRank() != root) {
+    ret = errorCheck("AMPI_Scatter", comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
+    if(ret != MPI_SUCCESS)
+      return ret;
+  }
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
@@ -6647,19 +6725,26 @@ int AMPI_Scatter(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif
 
   int size = ptr->getSize();
+  int rank = ptr->getRank();
   int i;
 
-  if(ptr->getRank()==root) {
+  if(rank==root) {
     CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
     int itemsize = dttype->getSize(sendcount) ;
     for(i=0;i<size;i++) {
-      ptr->send(MPI_SCATTER_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*i),
-                sendcount, sendtype, i, comm);
+      if (i != rank) {
+        ptr->send(MPI_SCATTER_TAG, rank, ((char*)sendbuf)+(itemsize*i),
+                  sendcount, sendtype, i, comm);
+      }
+    }
+    if (sendbuf != recvbuf) {
+      copyDatatype(sendtype,sendcount,recvtype,recvcount,(char*)sendbuf+(itemsize*rank),recvbuf);
     }
   }
-
-  if(-1==ptr->recv(MPI_SCATTER_TAG, root, recvbuf, recvcount, recvtype, comm))
-    CkAbort("AMPI> Error in MPI_Scatter recv");
+  else {
+    if(-1==ptr->recv(MPI_SCATTER_TAG, root, recvbuf, recvcount, recvtype, comm))
+      CkAbort("AMPI> Error in MPI_Scatter recv");
+  }
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -6691,10 +6776,12 @@ int AMPI_Iscatter(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
       return ret;
     }
   }
-  ret = errorCheck("AMPI_Iscatter", comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
-  if(ret != MPI_SUCCESS){
-    *request = MPI_REQUEST_NULL;
-    return ret;
+  if (sendbuf != recvbuf || getAmpiInstance(comm)->getRank() != root) {
+    ret = errorCheck("AMPI_Iscatter", comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
+    if(ret != MPI_SUCCESS){
+      *request = MPI_REQUEST_NULL;
+      return ret;
+    }
   }
 #endif
 
@@ -6719,19 +6806,26 @@ int AMPI_Iscatter(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 #endif
 
   int size = ptr->getSize();
+  int rank = ptr->getRank();
   int i;
 
-  if(ptr->getRank()==root) {
+  if(rank==root) {
     CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
     int itemsize = dttype->getSize(sendcount) ;
     for(i=0;i<size;i++) {
-      ptr->send(MPI_SCATTER_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*i),
-                sendcount, sendtype, i, comm);
+      if (i != rank) {
+        ptr->send(MPI_SCATTER_TAG, rank, ((char*)sendbuf)+(itemsize*i),
+                  sendcount, sendtype, i, comm);
+      }
     }
+    if (sendbuf != recvbuf) {
+      copyDatatype(sendtype,sendcount,recvtype,recvcount,(char*)sendbuf+(itemsize*rank),recvbuf);
+    }
+    *request = ptr->postReq(new IReq(recvbuf,recvcount,recvtype,root,MPI_SCATTER_TAG,comm,AMPI_REQ_COMPLETED));
   }
-
-  // call irecv to post an IReq and process any pending messages
-  ptr->irecv(recvbuf,recvcount,recvtype,root,MPI_SCATTER_TAG,comm,request);
+  else {
+    ptr->irecv(recvbuf,recvcount,recvtype,root,MPI_SCATTER_TAG,comm,request);
+  }
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -6761,9 +6855,11 @@ int AMPI_Scatterv(const void *sendbuf, const int *sendcounts, const int *displs,
     if(ret != MPI_SUCCESS)
       return ret;
   }
-  ret = errorCheck("AMPI_Scatterv", comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
-  if(ret != MPI_SUCCESS)
-    return ret;
+  if (sendbuf != recvbuf || getAmpiInstance(comm)->getRank() != root) {
+    ret = errorCheck("AMPI_Scatterv", comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
+    if(ret != MPI_SUCCESS)
+      return ret;
+  }
 #endif
 
   ampi* ptr = getAmpiInstance(comm);
@@ -6784,19 +6880,26 @@ int AMPI_Scatterv(const void *sendbuf, const int *sendcounts, const int *displs,
 #endif
 
   int size = ptr->getSize();
+  int rank = ptr->getRank();
   int i;
 
-  if(ptr->getRank() == root) {
+  if(rank == root) {
     CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
     int itemsize = dttype->getSize() ;
     for(i=0;i<size;i++) {
-      ptr->send(MPI_SCATTER_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*displs[i]),
-                sendcounts[i], sendtype, i, comm);
+      if (i != rank) {
+        ptr->send(MPI_SCATTER_TAG, rank, ((char*)sendbuf)+(itemsize*displs[i]),
+                  sendcounts[i], sendtype, i, comm);
+      }
+    }
+    if (sendbuf != recvbuf) {
+      copyDatatype(sendtype,sendcounts[rank],recvtype,recvcount,(char*)sendbuf+(itemsize*displs[rank]),recvbuf);
     }
   }
-
-  if(-1==ptr->recv(MPI_SCATTER_TAG, root, recvbuf, recvcount, recvtype, comm))
-    CkAbort("AMPI> Error in MPI_Scatterv recv");
+  else {
+    if(-1==ptr->recv(MPI_SCATTER_TAG, root, recvbuf, recvcount, recvtype, comm))
+      CkAbort("AMPI> Error in MPI_Scatterv recv");
+  }
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -6828,10 +6931,12 @@ int AMPI_Iscatterv(const void *sendbuf, const int *sendcounts, const int *displs
       return ret;
     }
   }
-  ret = errorCheck("AMPI_Iscatterv", comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
-  if(ret != MPI_SUCCESS){
-    *request = MPI_REQUEST_NULL;
-    return ret;
+  if (sendbuf != recvbuf || getAmpiInstance(comm)->getRank() != root) {
+    ret = errorCheck("AMPI_Iscatterv", comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
+    if(ret != MPI_SUCCESS){
+      *request = MPI_REQUEST_NULL;
+      return ret;
+    }
   }
 #endif
 
@@ -6856,19 +6961,27 @@ int AMPI_Iscatterv(const void *sendbuf, const int *sendcounts, const int *displs
 #endif
 
   int size = ptr->getSize();
+  int rank = ptr->getRank();
   int i;
 
-  if(ptr->getRank() == root) {
+  if(rank == root) {
     CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
     int itemsize = dttype->getSize() ;
     for(i=0;i<size;i++) {
-      ptr->send(MPI_SCATTER_TAG, ptr->getRank(), ((char*)sendbuf)+(itemsize*displs[i]),
-                sendcounts[i], sendtype, i, comm);
+      if (i != rank) {
+        ptr->send(MPI_SCATTER_TAG, rank, ((char*)sendbuf)+(itemsize*displs[i]),
+                  sendcounts[i], sendtype, i, comm);
+      }
     }
+    if (sendbuf != recvbuf) {
+      copyDatatype(sendtype,sendcounts[rank],recvtype,recvcount,(char*)sendbuf+(itemsize*displs[rank]),recvbuf);
+    }
+    *request = ptr->postReq(new IReq(recvbuf,recvcount,recvtype,root,MPI_SCATTER_TAG,comm,AMPI_REQ_COMPLETED));
   }
-
-  // call irecv to post an IReq and process any pending messages
-  ptr->irecv(recvbuf,recvcount,recvtype,root,MPI_SCATTER_TAG,comm,request);
+  else {
+    // call irecv to post an IReq and process any pending messages
+    ptr->irecv(recvbuf,recvcount,recvtype,root,MPI_SCATTER_TAG,comm,request);
+  }
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -6889,13 +7002,15 @@ int AMPI_Alltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
   AMPIAPI("AMPI_Alltoall");
 
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE((void*&)sendbuf, recvbuf);
+  handle_MPI_IN_PLACE_alltoall((void*&)sendbuf, recvbuf, sendcount, sendtype, recvcount, recvtype);
 
 #if AMPI_ERROR_CHECKING
   int ret;
-  ret = errorCheck("AMPI_Alltoall", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
-  if(ret != MPI_SUCCESS)
-    return ret;
+  if (sendbuf != recvbuf) {
+    ret = errorCheck("AMPI_Alltoall", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+    if(ret != MPI_SUCCESS)
+      return ret;
+  }
   ret = errorCheck("AMPI_Alltoall", comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
@@ -7038,14 +7153,16 @@ int AMPI_Ialltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
   AMPIAPI("AMPI_Ialltoall");
 
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
+  handle_MPI_IN_PLACE_alltoall((void*&)sendbuf, recvbuf, sendcount, sendtype, recvcount, recvtype);
 
 #if AMPI_ERROR_CHECKING
   int ret;
-  ret = errorCheck("AMPI_Ialltoall", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
-  if(ret != MPI_SUCCESS){
-    *request = MPI_REQUEST_NULL;
-    return ret;
+  if (sendbuf != recvbuf) {
+    ret = errorCheck("AMPI_Ialltoall", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+    if(ret != MPI_SUCCESS){
+      *request = MPI_REQUEST_NULL;
+      return ret;
+    }
   }
   ret = errorCheck("AMPI_Ialltoall", comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
   if(ret != MPI_SUCCESS){
@@ -7095,13 +7212,16 @@ int AMPI_Alltoallv(const void *sendbuf, const int *sendcounts, const int *sdispl
   AMPIAPI("AMPI_Alltoallv");
 
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
+  handle_MPI_IN_PLACE_alltoallv((void*&)sendbuf, recvbuf, (int*&)sendcounts, sendtype,
+                                (int*&)sdispls, recvcounts, recvtype, rdispls);
 
 #if AMPI_ERROR_CHECKING
   int ret;
-  ret = errorCheck("AMPI_Alltoallv", comm, 1, 0, 0, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
-  if(ret != MPI_SUCCESS)
-    return ret;
+  if (sendbuf != recvbuf) {
+    ret = errorCheck("AMPI_Alltoallv", comm, 1, 0, 0, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+    if(ret != MPI_SUCCESS)
+      return ret;
+  }
   ret = errorCheck("AMPI_Alltoallv", comm, 1, 0, 0, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
@@ -7144,14 +7264,17 @@ int AMPI_Ialltoallv(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype s
   AMPIAPI("AMPI_Ialltoallv");
 
   handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE(sendbuf,recvbuf);
+  handle_MPI_IN_PLACE_alltoallv((void*&)sendbuf, recvbuf, (int*&)sendcounts, sendtype,
+                                (int*&)sdispls, recvcounts, recvtype, rdispls);
 
 #if AMPI_ERROR_CHECKING
   int ret;
-  ret = errorCheck("AMPI_Ialltoallv", comm, 1, 0, 0, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
-  if(ret != MPI_SUCCESS){
-    *request = MPI_REQUEST_NULL;
-    return ret;
+  if (sendbuf != recvbuf) {
+    ret = errorCheck("AMPI_Ialltoallv", comm, 1, 0, 0, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
+    if(ret != MPI_SUCCESS){
+      *request = MPI_REQUEST_NULL;
+      return ret;
+    }
   }
   ret = errorCheck("AMPI_Ialltoallv", comm, 1, 0, 0, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
   if(ret != MPI_SUCCESS){
@@ -7202,13 +7325,17 @@ int AMPI_Alltoallw(const void *sendbuf, const int *sendcounts, const int *sdispl
   AMPIAPI("AMPI_Alltoallw");
 
   handle_MPI_BOTTOM((void*&)sendbuf, sendtypes[0], recvbuf, recvtypes[0]);
-  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
+  handle_MPI_IN_PLACE_alltoallw((void*&)sendbuf, recvbuf, (int*&)sendcounts,
+                                (MPI_Datatype*&)sendtypes, (int*&)sdispls,
+                                recvcounts, recvtypes, rdispls);
 
 #if AMPI_ERROR_CHECKING
   int ret;
-  ret = errorCheck("AMPI_Alltoallw", comm, 1, 0, 0, sendtypes[0], 1, 0, 0, 0, 0, sendbuf, 1);
-  if(ret != MPI_SUCCESS)
-    return ret;
+  if (sendbuf != recvbuf) {
+    ret = errorCheck("AMPI_Alltoallw", comm, 1, 0, 0, sendtypes[0], 1, 0, 0, 0, 0, sendbuf, 1);
+    if(ret != MPI_SUCCESS)
+      return ret;
+  }
   ret = errorCheck("AMPI_Alltoallw", comm, 1, 0, 0, recvtypes[0], 1, 0, 0, 0, 0, recvbuf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
@@ -7250,14 +7377,18 @@ int AMPI_Ialltoallw(const void *sendbuf, const int *sendcounts, const int *sdisp
   AMPIAPI("AMPI_Ialltoallw");
 
   handle_MPI_BOTTOM((void*&)sendbuf, sendtypes[0], recvbuf, recvtypes[0]);
-  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
+  handle_MPI_IN_PLACE_alltoallw((void*&)sendbuf, recvbuf, (int*&)sendcounts,
+                                (MPI_Datatype*&)sendtypes, (int*&)sdispls,
+                                recvcounts, recvtypes, rdispls);
 
 #if AMPI_ERROR_CHECKING
   int ret;
-  ret = errorCheck("AMPI_Ialltoallw", comm, 1, 0, 0, sendtypes[0], 1, 0, 0, 0, 0, sendbuf, 1);
-  if(ret != MPI_SUCCESS){
-    *request = MPI_REQUEST_NULL;
-    return ret;
+  if (sendbuf != recvbuf) {
+    ret = errorCheck("AMPI_Ialltoallw", comm, 1, 0, 0, sendtypes[0], 1, 0, 0, 0, 0, sendbuf, 1);
+    if(ret != MPI_SUCCESS){
+      *request = MPI_REQUEST_NULL;
+      return ret;
+    }
   }
   ret = errorCheck("AMPI_Ialltoallw", comm, 1, 0, 0, recvtypes[0], 1, 0, 0, 0, 0, recvbuf, 1);
   if(ret != MPI_SUCCESS){
