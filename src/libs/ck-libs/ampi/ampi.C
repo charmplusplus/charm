@@ -4798,7 +4798,7 @@ int AMPI_Exscan(const void* sendbuf, void* recvbuf, int count, MPI_Datatype data
   vector<char> tmp_buf(blklen);
   vector<char> partial_scan(blklen);
 
-  memcpy(recvbuf, sendbuf, blklen);
+  if (rank > 0) memcpy(recvbuf, sendbuf, blklen);
   memcpy(&partial_scan[0], sendbuf, blklen);
   flag = 0;
   mask = 0x1;
