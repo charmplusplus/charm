@@ -246,7 +246,6 @@ void CkUpdateRdmaPtrs(envelope *env, int msgsize, char *recv_md, char *src_md){
  * Assumes that msg is unpacked
  */
 void CkPackRdmaPtrs(char *msgBuf){
-  envelope *env = UsrToEnv(env);
   PUP::toMem p((void *)msgBuf);
   PUP::fromMem up((void *)msgBuf);
   int numops;
