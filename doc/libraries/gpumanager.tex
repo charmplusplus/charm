@@ -1,27 +1,6 @@
-\newif\ifstandalone
-%\standalonetrue   % use if built stand alone
-\standalonefalse  % use if part of the manual
-
-\ifstandalone
-  \documentclass[10pt]{report}
-  \usepackage[hmargin=0.85in,vmargin=0.85in]{geometry}
-  \usepackage{alltt}
-  \usepackage{amsmath}
-  \usepackage[T1]{fontenc}
-\fi
-
 \setcounter{secnumdepth}{3}
 
-\ifstandalone
-  \begin{document}
-
-  \chapter{GPU Manager Library}
-
-  \newcommand{\charmpp}{Charm++}
-  \newcommand{\code}[1]{\texttt{\textbf{#1}}} % \textbf doesn't work here
-\else
-  \renewcommand{\code}[1]{\texttt{\textbf{#1}}} % \textbf doesn't work here
-\fi
+\renewcommand{\code}[1]{\texttt{\textbf{#1}}} % \textbf doesn't work here
 
 \newcommand{\cuda}{\code{CUDA}}
 
@@ -377,7 +356,3 @@ statements, including when buffers are allocated and freed.
 \item When using \code{++debug}, add the debugging flags \code{-g} and
 \code{-G} during compilation.
 \end{enumerate}
-
-\ifstandalone
-  \end{document}
-\fi

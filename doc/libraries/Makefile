@@ -1,6 +1,6 @@
 # Stub makefile for LaTeX PPL manual
 FILE=manual
-TEX=$(FILE).tex intro.tex liveviz.tex fftlib.tex gpumanager.tex
+TEX=$(FILE).tex intro.tex liveviz.tex fftlib.tex tram.tex gpumanager.tex
 
 DEST=libraries
 LATEX2HTML=$(L2H) -split 5
