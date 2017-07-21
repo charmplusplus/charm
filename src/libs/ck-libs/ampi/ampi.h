@@ -180,7 +180,7 @@ typedef MPI_Aint MPI_Count;
 
 #define MPI_IN_PLACE    ((void *) -1L)
 
-#define MPI_BOTTOM      0
+#define MPI_BOTTOM      ((void *) -2L)
 #define MPI_UNDEFINED   (-32766)
 
 #define MPI_IDENT       0
