@@ -16,7 +16,7 @@ Charm++ Features
 
 - Calls to parameter-marshalled entry methods with large array
   arguments can ask for asynchronous zero-copy send behavior with an
-  `rdma' tag in the parameter's declaration.
+  `nocopy' tag in the parameter's declaration.
 
 - The runtime system now integrates an OpenMP runtime library so that
   code using OpenMP parallelism will dispatch work to idle worker

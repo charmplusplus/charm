@@ -379,7 +379,7 @@ void Entry::genChareDefs(XStr& str)
     } else {//Regular, non-sync message
       str << "  if (ckIsDelegated()) {\n";
       if (param->hasRdma()) {
-        str << "  CkAbort(\"Entry methods with rdma parameters not supported when called with delegation managers\");\n";
+        str << "  CkAbort(\"Entry methods with nocopy parameters not supported when called with delegation managers\");\n";
       } else {
         str << "    int destPE=CkChareMsgPrep("<<params<<");\n";
         str << "    if (destPE!=-1) ckDelegatedTo()->ChareSend(ckDelegatedPtr(),"<<params<<",destPE);\n";
@@ -481,7 +481,7 @@ void Entry::genArrayDefs(XStr& str)
     str << addDummyStaticCastIfVoid();
     //regular broadcast and section broadcast for an entry method with rdma
     if (param->hasRdma() && !container->isForElement()) {
-      str << "  CkAbort(\"Broadcast not supported for entry methods with rdma parameters\");\n";
+      str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy parameters\");\n";
     }
     else{
       str << "  ckCheck();\n";
@@ -741,7 +741,7 @@ void Entry::genGroupDefs(XStr& str)
     str << addDummyStaticCastIfVoid();
     //regular broadcast and section broadcast for an entry method with rdma
     if (param->hasRdma() && !container->isForElement()) {
-      str << "  CkAbort(\"Broadcast not supported for entry methods with rdma parameters\");\n";
+      str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy parameters\");\n";
     }
     else{
       str << "  ckCheck();\n";
@@ -790,7 +790,7 @@ void Entry::genGroupDefs(XStr& str)
         {// Send
           str << "  if (ckIsDelegated()) {\n";
           if (param->hasRdma()) {
-            str << "    CkAbort(\"Entry methods with rdma parameters not supported when called with delegation managers\");\n";
+            str << "    CkAbort(\"Entry methods with nocopy parameters not supported when called with delegation managers\");\n";
           } else {
             str << "     Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
             str << "     ckDelegatedTo()->"<<node<<"GroupSend(ckDelegatedPtr(),"<<parampg<<");\n";
@@ -830,7 +830,7 @@ void Entry::genGroupDefs(XStr& str)
       str << ""<<makeDecl(retStr,1)<<"::"<<name<<"("<<paramComma(1,0)<<"int npes, int *pes"<<eo(0)<<") {\n";
       str << addDummyStaticCastIfVoid();
       if (param->hasRdma()) {
-        str << "  CkAbort(\"Broadcast not supported for entry methods with rdma parameters\");\n";
+        str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy parameters\");\n";
       } else {
         str << marshallMsg();
         str << "  CkSendMsg"<<node<<"BranchMulti("<<paramg<<", npes, pes"<<opts<<");\n";
@@ -839,7 +839,7 @@ void Entry::genGroupDefs(XStr& str)
       str << ""<<makeDecl(retStr,1)<<"::"<<name<<"("<<paramComma(1,0)<<"CmiGroup &grp"<<eo(0)<<") {\n";
       str << addDummyStaticCastIfVoid();
       if (param->hasRdma()) {
-        str << "  CkAbort(\"Broadcast not supported for entry methods with rdma parameters\");\n";
+        str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy parameters\");\n";
       } else {
         str << marshallMsg();
         str << "  CkSendMsg"<<node<<"BranchGroup("<<paramg<<", grp"<<opts<<");\n";
