@@ -423,28 +423,28 @@ void MPI_BAND_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *data
 void MPI_LOR_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 #define MPI_OP_IMPL(type) \
   ((type *)inoutvec)[i] = ((type *)inoutvec)[i] || ((type *)invec)[i];
-  MPI_LOGICAL_OP_SWITCH(MPI_LAND)
+  MPI_LOGICAL_OP_SWITCH(MPI_LOR)
 #undef MPI_OP_IMPL
 }
 
 void MPI_BOR_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 #define MPI_OP_IMPL(type) \
   ((type *)inoutvec)[i] = ((type *)inoutvec)[i] | ((type *)invec)[i];
-  MPI_BITWISE_OP_SWITCH(MPI_BAND)
+  MPI_BITWISE_OP_SWITCH(MPI_BOR)
 #undef MPI_OP_IMPL
 }
 
 void MPI_LXOR_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 #define MPI_OP_IMPL(type) \
   ((type *)inoutvec)[i] = (((type *)inoutvec)[i]&&(!((type *)invec)[i]))||(!(((type *)inoutvec)[i])&&((type *)invec)[i]);
-  MPI_LOGICAL_OP_SWITCH(MPI_LAND)
+  MPI_LOGICAL_OP_SWITCH(MPI_LXOR)
 #undef MPI_OP_IMPL
 }
 
 void MPI_BXOR_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 #define MPI_OP_IMPL(type) \
   ((type *)inoutvec)[i] = ((type *)inoutvec)[i] ^ ((type *)invec)[i];
-  MPI_BITWISE_OP_SWITCH(MPI_BAND)
+  MPI_BITWISE_OP_SWITCH(MPI_BXOR)
 #undef MPI_OP_IMPL
 }
 
