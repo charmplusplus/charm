@@ -1405,7 +1405,7 @@ CkDDT_Indexed_Block::pupType(PUP::er &p, CkDDT *ddt)
 int
 CkDDT_Indexed_Block::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
 {
-  *ni = count*2+1;
+  *ni = count+2;
   *na = 0;
   *nd = 1;
   *combiner = CkDDT_COMBINER_INDEXED_BLOCK;
@@ -1530,8 +1530,8 @@ CkDDT_HIndexed_Block::pupType(PUP::er &p, CkDDT *ddt)
 int
 CkDDT_HIndexed_Block::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
 {
-  *ni = count*2+1;
-  *na = 0;
+  *ni = 2;
+  *na = count;
   *nd = 1;
   *combiner = CkDDT_COMBINER_HINDEXED_BLOCK;
   return 0;
@@ -1543,7 +1543,7 @@ CkDDT_HIndexed_Block::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[
   i[0] = count;
   i[1] = BlockLength;
   for(int z=0;z<i[0];z++) {
-    i[z+2] = arrayDisplacements[z];
+    a[z] = arrayDisplacements[z];
   }
   d[0] = baseIndex;
   return 0;
