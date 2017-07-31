@@ -62,6 +62,12 @@ class fromzDisk : public zdisk {
 #endif
 #endif // AMPIMSGLOG
 
+/* AMPI sends messages inline to PE-local destination VPs if: BigSim is not being used and
+ * if tracing is not being used (see bug #1640 for more details on the latter). */
+#ifndef AMPI_LOCAL_IMPL
+#define AMPI_LOCAL_IMPL ( !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
+#endif
+
 /* AMPI uses RDMA sends if BigSim is not being used and the underlying comm
  * layer supports it (except for GNI, which has experimental RDMA support). */
 #ifndef AMPI_RDMA_IMPL

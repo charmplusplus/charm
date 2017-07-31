@@ -2787,7 +2787,7 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int size = ddt->getSize(count);
   if (ddt->isContig()) {
-#if !CMK_BIGSIM_CHARM
+#if AMPI_LOCAL_IMPL
     if (destPtr != NULL) {
       return sendLocalMsg(t, sRank, buf, size, rank, destcomm, destPtr, ssendReq, sendType);
     }
@@ -2800,7 +2800,7 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
     }
 #endif
   }
-#if !CMK_BIGSIM_CHARM
+#if AMPI_LOCAL_IMPL
   if (destPtr != NULL) {
     destPtr->generic(makeAmpiMsg(rank, t, sRank, buf, count, type, destcomm, ssendReq));
     return MPI_REQUEST_NULL;
