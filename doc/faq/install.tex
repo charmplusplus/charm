@@ -252,6 +252,21 @@ group main
 For the MPI version, you need to set up an MPI configuration for available
 machines as for normal MPI applications.
 
+You can specify the exact cores to use on each node
+using the \texttt{+pemap} option.
+When running in SMP or multicore mode, this applies to the worker threads only,
+not communication threads.
+To specify the placement of communication threads, use the \texttt{+commap}
+option.
+For example, to place 8 threads on 2 nodes (16 threads total) with
+the comm thread on core 0 and the worker threads on cores 1 - 7, you would use
+the following command:
+\begin{alltt}
+./charmrun +p14 ./pgm ++ppn 7 +commap 0 +pemap 1-7
+\end{alltt}
+
+See section \htmladdnormallink{C.2.2 SMP and Multicore Options}{http://charm.cs.illinois.edu/manuals/html/charm++/C.html\#SECTION05322000000000000000} of the \charm{} manual for more information.
+
 \subsection{How do I use {\em ssh} instead of the deprecated {\em rsh}?}
 
 You need to set up your {\tt .ssh/authorized\_keys} file
