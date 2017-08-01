@@ -353,3 +353,34 @@ building for the custom layer ({\tt gni-crayxc} for Cray XC machines,
 for example). To enable AVX-512 vector instructions, Charm++ can be
 built with {\tt -xMIC-AVX512} on Intel compilers or {\tt -mavx512f
   -mavx512er -mavx512cd -mavx512pf} for GNU compilers.
+
+\subsection{How do I use \charm{} on GPUs?}
+\charm{} users have two options when utilizing GPUs in \charm.
+
+The first is to write CUDA (or OpenCL, etc) code directly in their \charm{}
+applications. This does not take advantage of any of the special GPU-friendly
+features the \charm{} runtime provides and is similar to how programmers utilize
+GPUs in other parallel environments, e.g. MPI.
+
+The second option is to leverage \charm's GPU library, GPU Manager. This library
+provides several useful features including:
+\begin{itemize}
+\item Automated data movement
+\item Ability to invoke callbacks at various points
+\item Host side pinned memory pooling
+\item Asynchronous kernel invocation
+\item Integrated tracing in Projections
+\end{itemize}
+
+To do this, \charm{} must be built with the \texttt{cuda} option. Users must
+describe their kernels using a work request struct, which includes the buffers
+to be copied, callbacks to be invoked, and kernel to be executed. Additionally,
+users can take advantage of a pre-allocated host side pinned memory pool
+allocated by the runtime via invoking \texttt{hapi\_poolMalloc}. Finally, the
+user must compile this code using the appropriate \texttt{nvcc} compiler as per
+usual.
+
+More details on using GPUs in \charm{} can be found in the
+\htmladdnormallink{GPU Manager Library}{http://charm.cs.illinois.edu/manuals/html/libraries/6.html}
+entry in the larger Libraries Manual.
+
