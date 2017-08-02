@@ -5267,7 +5267,7 @@ char *find_abs_path(const char *target)
 void start_nodes_local(char **env)
 {
   char **envp;
-  int envc, rank0no, i;
+  int envc, rank0no;
   int extra = 0;
   
   char **dparamp;
@@ -5281,7 +5281,7 @@ void start_nodes_local(char **env)
   for (envc = 0; env[envc]; envc++)
     ;
   envp = (char **) malloc((envc + 2 + extra + 1) * sizeof(void *));
-  for (i = 0; i < envc; i++)
+  for (int i = 0; i < envc; i++)
     envp[i] = env[i];
   envp[envc] = (char *) malloc(256);
   envp[envc + 1] = (char *) malloc(256);
@@ -5290,7 +5290,7 @@ void start_nodes_local(char **env)
   sprintf(envp[envc + 2], "MALLOCMULTIHEAP=1");
 #endif
   envp[envc + 2 + extra] = 0;
-  for (i = 0; i < envc; i++)
+  for (int i = 0; i < envc; i++)
     envp[i] = env[i];
   envp[envc] = (char *) malloc(256);
   envp[envc + 1] = (char *) malloc(256);
@@ -5335,7 +5335,7 @@ void start_nodes_local(char **env)
     if (arg_verbose)
       {
 	printf("Charmrun> gdb args : ");
-	for (i = 0; i < dparamoutc; i++)
+	for (int i = 0; i < dparamoutc; i++)
 	  printf(" %s ",dparamp[i]);
 	printf("\n");
       }
