@@ -5,7 +5,7 @@ This file describes the most significant changes. For more detail, use
 What's new in Charm++ 6.8.0
 ================================================================================
 
-Over 600 bug fixes, improvements, and cleanups have been applied
+Over 900 bug fixes, improvements, and cleanups have been applied
 across the entire system. Major changes are described below:
 
 Charm++ Features
@@ -94,7 +94,7 @@ Charm++ Features
   messages at startup.
 
 - Calls to chare array element entry methods with the [inline] tag now
-  avoid copying their arguments when the called method takes its 
+  avoid copying their arguments when the called method takes its
   parameters by const&, offering a substantial reduction in overhead in
   those cases.
 
@@ -122,7 +122,7 @@ AMPI Features
 - More efficient implementations of message matching infrastructure, multiple
   completion routines, and all varieties of reductions and gathers.
 
-- Support for user-defined non-commutative reductions, MPI_IN_PLACE, cancelling
+- Support for user-defined non-commutative reductions, MPI_BOTTOM, cancelling
   receive requests, MPI_THREAD_FUNNELED, PSCW synchronization for RMA, and more.
 
 - Fixes to AMPI's extensions for load balancing and to Isomalloc on SMP builds.
@@ -130,6 +130,11 @@ AMPI Features
 - More robust derived datatype support, optimizations for truly contiguous types.
 
 - ROMIO is now built on AMPI and linked in by ampicc by default.
+
+- A version of HDF5 v1.10.1 that builds and runs on AMPI with virtualization
+  is now available at https://charm.cs.illinois.edu/gerrit/#/admin/projects/hdf5-ampi
+
+- Improved support for performance analysis and visualization with Projections.
 
 Platforms and Portability
 
