@@ -1269,7 +1269,11 @@ If you want to define your own mapping scheme, please contact us for assistance.
 \ampi{} users can take advantage of \charmpp{}'s tracing framework and
 associated performance visualization tool, Projections. Projections
 provides a number of different views of performance data that help
-users diagnose performance issues.
+users diagnose performance issues. Along with the traditional Timeline view,
+Projections also offers visualizations of load imbalance and communication-related data.
+
+In order to generate tracing logs from an application to view in Projections,
+link with \texttt{ampicc -tracemode projections}.
 
 \ampi{} defines the following extensions for tracing support:
 
@@ -1280,7 +1284,11 @@ AMPI_Trace_start_function_name        AMPI_Trace_start_function_id
 AMPI_Trace_end_function_name          AMPI_Trace_end_function_id
 \end{alltt}
 
-See the Projections manual for information on how to visualize traces.
+When using the \emph{Timeline} view in Projections, \ampi{} users can visualize
+what each VP on each processor is doing (what MPI method it is running or blocked in)
+by clicking the \emph{View} tab and then selecting \emph{Show Nested Bracketed User Events}
+from the drop down menu.
+See the Projections manual for information on performance analysis and visualization.
 
 \subsection{Compiling AMPI Programs}
 
