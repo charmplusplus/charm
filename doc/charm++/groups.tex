@@ -50,7 +50,7 @@ class Foo : public CBase\_Foo \{
 \subsection{Group Creation}
 \label{sec:groups/creation}
 
-Groups are created using {\kw ckNew} like chares and chare arrays. 
+Groups are created using \kw{ckNew} like chares and chare arrays.
 Given the declarations and definitions of group {\tt Foo}
 from above, we can create a group in the following manner:
 
@@ -58,7 +58,7 @@ from above, we can create a group in the following manner:
 CProxy_Foo fooProxy = CProxy_Foo::ckNew(\uw{parameters1});
 \end{alltt}
 
-One can also use {\kw ckNew} to get a CkGroupID as shown below
+One can also use \kw{ckNew} to get a CkGroupID as shown below:
 
 \begin{alltt}
 CkGroupID fooGroupID = CProxy_Foo::ckNew(\uw{parameters1});
