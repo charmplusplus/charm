@@ -1270,7 +1270,7 @@ __kmp_barrier(enum barrier_type bt, int gtid, int is_split, size_t reduce_size,
                  StealTask();
              }
              KF_TRACE( 5, ( "__kmp_barrier: T#%d is waiting: %d \n",
-                       __kmp_gtid, this_thr->th.th_team->t.t_num_barrier_counts) );
+                       gtid, this_thr->th.th_team->t.t_num_barrier_counts) );
            } while (1);
            
            KMP_MB();
@@ -1278,11 +1278,11 @@ __kmp_barrier(enum barrier_type bt, int gtid, int is_split, size_t reduce_size,
            TCW_4(team->t.t_num_barrier_counts, team->t.t_nproc-1);
            CmiMemoryWriteFence();
            KF_TRACE( 5, ( "__kmp_barrier: T#%d reset barrier counts: %d, %p \n",
-                       __kmp_gtid, this_thr->th.th_team->t.t_num_barrier_counts, &(this_thr->th.th_team->t.t_num_barrier_counts)));
+                       gtid, this_thr->th.th_team->t.t_num_barrier_counts, &(this_thr->th.th_team->t.t_num_barrier_counts)));
          }
          else
            KF_TRACE( 5, ( "__kmp_barrier: T#%d barrier counts: %d, %p \n",
-                       __kmp_gtid, this_thr->th.th_team->t.t_num_barrier_counts, &(this_thr->th.th_team->t.t_num_barrier_counts)));
+                       gtid, this_thr->th.th_team->t.t_num_barrier_counts, &(this_thr->th.th_team->t.t_num_barrier_counts)));
          KF_TRACE(5, ("linear_release start: %d\n", this_thr->th.th_team->t.t_num_barrier_counts));
          
          __kmp_linear_barrier_release(bt, this_thr, gtid, tid, FALSE

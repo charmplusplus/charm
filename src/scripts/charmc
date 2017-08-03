@@ -1350,7 +1350,7 @@ do
 #	if [ "$FILE_EXT" != ".o" -a "$FILE_EXT" != ".co" -a "$FILE_EXT" != ".M" -a "$FILE_EXT" != ".ci" ]
 #	then
         case "$FILE_EXT" in
-        .c|.s|.C|.cc|.cxx|.cpp|.c++|.cu|.f|.F|.f90|.F90|.fpp|.FPP|.f77|.F77)
+        .c|.s|.S|.C|.cc|.cxx|.cpp|.c++|.cu|.f|.F|.f90|.F90|.fpp|.FPP|.f77|.F77)
 		[ $VERBOSE ] && echo "Compiling $FILE"
 		DoNoErrCheck $RM $BASEO $BASE.f.o
         esac
@@ -1395,7 +1395,7 @@ do
 		  Do $CHARMBIN/charmxi $XIOPTS $FILE
                 fi
 		;;
-	*.c|*.s)
+	*.c|*.s|*.S)
 		Do $CMK_CC -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CC -c $FILE $DESTO
 		NU_OBJ=$BASEO
 		if [ "$Do_res" -ne 0 ]

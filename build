@@ -491,6 +491,28 @@ then
   exit 1
 fi
 
+#generate header for uFcontext for the target VERSION
+UFCONTEXT_HEADER_NAME=
+if test `echo "$BASEVERSION" | grep -c "darwin"` -gt 0
+then
+  UFCONTEXT_HEADER_NAME="macho_gas"
+else
+  UFCONTEXT_HEADER_NAME="elf_gas"
+fi
+
+if test `echo "$BASEVERSION" | grep -c "arm"` -gt 0
+then
+  UFCONTEXT_HEADER_NAME="arm_aapcs_${UFCONTEXT_HEADER_NAME}"
+elif test `echo "$BASEVERSION" | grep -c "mips"` -gt 0
+then
+  UFCONTEXT_HEADER_NAME="mips32_o32_${UFCONTEXT_HEADER_NAME}"
+elif test `echo "$BASEVERSION" | grep -c "bluegene\|pami\|ppc"` -gt 0
+then
+  UFCONTEXT_HEADER_NAME="ppc64_sysv_${UFCONTEXT_HEADER_NAME}"
+else
+  UFCONTEXT_HEADER_NAME="x86_64_sysv_${UFCONTEXT_HEADER_NAME}"
+fi
+
 #generate VERSION name combining all the build-time options.
 if [ -n "$BOPTS" -o -n "$COMPILER" ]
 then
@@ -556,6 +578,7 @@ rm -f $DESTINATION/tmp/Make.lb
 rm -f $DESTINATION/tmp/Make.machine
 rm -f $DESTINATION/tmp/Make.extlib
 
+echo "TARGET=${UFCONTEXT_HEADER_NAME}" > $DESTINATION/tmp/uFcontext.mk
 
 # Create the bin, lib, include, etc. links:
 WINNAME=`echo $VERSION | awk -F- '{print $2}'`

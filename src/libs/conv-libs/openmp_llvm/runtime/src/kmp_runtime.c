@@ -5525,7 +5525,7 @@ __kmp_launch_thread( kmp_info_t *this_thr )
 #ifdef KMP_TDATA_GTID
         __kmp_gtid = gtid;
 #endif
-        CharmOMPDebug("[%f][%d] start, thread: %p, __kmp_gtid: %d, gtid: %d, prev_gtid: %d\n",CmiWallTimer(), CmiMyPe(), this_thr, __kmp_gtid, gtid, CpvAccess(prevGtid));         
+        CharmOMPDebug("[%f][%d] start, thread: %p, gtid: %d, prev_gtid: %d\n",CmiWallTimer(), CmiMyPe(), this_thr,gtid, CpvAccess(prevGtid));
 #endif
         KMP_DEBUG_ASSERT( this_thr == __kmp_threads[ gtid ] );
         KMP_MB();
@@ -5634,7 +5634,7 @@ __kmp_launch_thread( kmp_info_t *this_thr )
 #ifdef KMP_TDATA_GTID
           __kmp_gtid = CpvAccess(prevGtid);
 #endif
-        KA_TRACE(20, ("[%f][%d] end, thread: %p, __kmp_gtid: %d, gtid: %d, prev_gtid: %d\n",CmiWallTimer(), CmiMyPe(), this_thr, __kmp_gtid, gtid, CpvAccess(prevGtid)));
+        KA_TRACE(20, ("[%f][%d] end, thread: %p, __kmp_gtid: %d, gtid: %d, prev_gtid: %d\n",CmiWallTimer(), CmiMyPe(), this_thr, CpvAccess(prevGtid), gtid, CpvAccess(prevGtid)));
         KMP_MB();
         CthSuspend();
 #endif
@@ -7138,7 +7138,7 @@ __kmp_internal_fork( ident_t *id, int gtid, kmp_team_t *team )
 
 #if CHARM_OMP
     KF_TRACE( 5, ( "__kmp_runtime: T#%d reset barrier counts: %d \n",
-                       __kmp_gtid, team->t.t_num_barrier_counts) );
+                       gtid, team->t.t_num_barrier_counts) );
     KMP_MB();
      for (int i = 1; i < team->t.t_nproc ; i++) {
       CharmOMPDebug("[%e] thread: %p, %p inserted\n", CmiWallTimer(), team->t.t_threads[i], team->t.t_threads[i]->th.th_info.ds.ds_thread);

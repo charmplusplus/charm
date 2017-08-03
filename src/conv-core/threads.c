@@ -116,12 +116,15 @@
 
 #if ! CMK_THREADS_BUILD_DEFAULT
 #undef CMK_THREADS_USE_JCONTEXT
+#undef CMK_THREADS_USE_FCONTEXT
 #undef CMK_THREADS_USE_CONTEXT
 #undef CMK_THREADS_ARE_WIN32_FIBERS
 #undef CMK_THREADS_USE_PTHREADS
 
 #if CMK_THREADS_BUILD_CONTEXT
 #define CMK_THREADS_USE_CONTEXT       1
+#elif CMK_THREADS_BUILD_FCONTEXT
+#define CMK_THREADS_USE_FCONTEXT      1
 #elif CMK_THREADS_BUILD_JCONTEXT
 #define CMK_THREADS_USE_JCONTEXT       1
 #elif  CMK_THREADS_BUILD_FIBERS
@@ -760,6 +763,7 @@ void CthSwitchThread(CthThread t)
  */
 void CthCheckThreadSanity()
 {
+#if !CMK_THREADS_USE_FCONTEXT
   /* use the address of a dummy variable on stack to see how large the stack is currently */
   int tmp;
   char* curr_stack;
@@ -775,6 +779,7 @@ void CthCheckThreadSanity()
       (base_stack != 0 && (curr_stack < base_stack || curr_stack > base_stack + base_thread->stacksize)))
     CmiAbort("Thread meta data is not sane! Check for memory corruption and stack overallocation. Use +stacksize to"
         "increase stack size or allocate in heap instead of stack.");
+#endif
 }
 #endif
 
@@ -1622,7 +1627,7 @@ will disable the randomization of the stack pointer
 Gengbin Zheng October, 2007
 
 */
-#elif (CMK_THREADS_USE_CONTEXT || CMK_THREADS_USE_JCONTEXT)
+#elif (CMK_THREADS_USE_CONTEXT || CMK_THREADS_USE_JCONTEXT || CMK_THREADS_USE_FCONTEXT)
 
 #include <signal.h>
 #include <errno.h>
@@ -1637,7 +1642,9 @@ Gengbin Zheng October, 2007
 #define swapJcontext swapcontext
 #define makeJcontext makecontext
 typedef void (*uJcontext_fn_t)(void);
-
+#elif CMK_THREADS_USE_FCONTEXT
+#include "uFcontext.h"
+#define uJcontext_t uFcontext_t
 #else /* CMK_THREADS_USE_JCONTEXT */
 /* Orion's setjmp-based context routines: */
 #include "uJcontext.h"
@@ -1761,6 +1768,16 @@ void CthStartThread(CmiUInt4 fn1, CmiUInt4 fn2, CmiUInt4 arg1, CmiUInt4 arg2)
   (*fn)(arg);
   CthThreadFinished(CthSelf());
 }
+#elif CMK_THREADS_USE_FCONTEXT
+void CthStartThread(transfer_t arg)
+{
+  data_t *data = (data_t *)arg.data;
+  uFcontext_t *old_ucp  = data->from;
+  old_ucp->fctx = arg.fctx;
+  uFcontext_t *cur_ucp = data->data;
+  cur_ucp->func(cur_ucp->arg);
+  CthThreadFinished(CthSelf());
+}
 #else
 void CthStartThread(qt_userf_t fn,void *arg)
 {
@@ -1793,10 +1810,10 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
 #endif
   CthAllocateStack(&result->base,&size,migratable);
   stack = result->base.stack;
-
+#if !CMK_THREADS_USE_FCONTEXT
   if (0 != getJcontext(&result->context))
     CmiAbort("CthCreateInner: getcontext failed.\n");
-
+#endif
   ss_end = stack + size;
 
   /**
@@ -1808,6 +1825,9 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
     */
 #if CMK_THREADS_USE_JCONTEXT /* Jcontext is always STACKBEGIN */
   ss_sp = stack;
+#elif CMK_THREADS_USE_FCONTEXT
+  ss_sp = (void*)((char*)stack+size);
+  ss_end = stack;
 #elif CMK_CONTEXT_STACKEND /* ss_sp should point to *end* of buffer */
   ss_sp = stack+size-MINSIGSTKSZ; /* the MINSIGSTKSZ seems like a hack */
   ss_end = stack;
@@ -1817,13 +1837,21 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   ss_sp = stack;
 #endif
 
+#if CMK_THREADS_USE_FCONTEXT
+  result->context.uc_stack.ss_sp = ss_sp;
+  result->context.uc_stack.ss_size = size;
+#else
   result->context.uc_stack.ss_sp = STP_STKALIGN(ss_sp,sizeof(char *)*8);
   result->context.uc_stack.ss_size = ptrDiffLen(result->context.uc_stack.ss_sp,ss_end);
+#endif
   result->context.uc_stack.ss_flags = 0;
   result->context.uc_link = 0;
 
   CthAliasEnable(B(result)); /* Change to new thread's stack while building context */
   errno = 0;
+#if CMK_THREADS_USE_FCONTEXT
+  makeJcontext(&result->context, (uFcontext_fn_t)CthStartThread, (void*)fn, (void *)arg);
+#else
 #if CMK_THREADS_USE_CONTEXT
   if (sizeof(void *) == 8) {
     CmiUInt4 fn1 = ((CmiUInt8)fn) >> 32;
@@ -1835,6 +1863,7 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   else
 #endif
     makeJcontext(&result->context, (uJcontext_fn_t)CthStartThread, 2, (void *)fn,(void *)arg);
+#endif
   if(errno !=0) { 
     perror("makecontext"); 
     CmiAbort("CthCreateInner: makecontext failed.\n");
@@ -1876,7 +1905,7 @@ CthThread CthPup(pup_er p, CthThread t)
   /* so far, context and context-memoryalias works for IA64, not ia32 */
   /* so far, uJcontext and context-memoryalias works for IA32, not ia64 */
   pup_bytes(p,&t->context,sizeof(t->context));
-#if !CMK_THREADS_USE_JCONTEXT && CMK_CONTEXT_FPU_POINTER
+#if !CMK_THREADS_USE_FCONTEXT && !CMK_THREADS_USE_JCONTEXT && CMK_CONTEXT_FPU_POINTER
 #if ! CMK_CONTEXT_FPU_POINTER_UCREGS
   /* context is not portable for ia32 due to pointer in uc_mcontext.fpregs,
      pup it separately */
@@ -1899,7 +1928,7 @@ CthThread CthPup(pup_er p, CthThread t)
   }
 #endif
 #endif
-#if !CMK_THREADS_USE_JCONTEXT && CMK_CONTEXT_V_REGS
+#if !CMK_THREADS_USE_FCONTEXT && !CMK_THREADS_USE_JCONTEXT && CMK_CONTEXT_V_REGS
   /* linux-ppc  64 bit */
   if (pup_isUnpacking(p)) {
     t->context.uc_mcontext.v_regs = malloc(sizeof(vrregset_t));

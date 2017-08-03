@@ -1681,7 +1681,7 @@ static inline void __kmp_suspend_template( int th_gtid, C *flag )
     old_spin = flag->set_sleeping();
 
     KF_TRACE( 5, ( "__kmp_suspend_template: T#%d set sleep bit for spin(%p)==%x, was %x\n",
-                   __kmp_gtid, flag->get(), *(flag->get()), old_spin ) );
+                   th_gtid, flag->get(), *(flag->get()), old_spin ) );
 #if CHARM_OMP
     CthSetStrategySuspendedWorkStealing(th->th.th_info.ds.ds_thread);
     KMP_TEST_THEN_DEC32((kmp_int32 *) &(th->th.th_team->t.t_num_barrier_counts));
@@ -1703,9 +1703,11 @@ static inline void __kmp_suspend_template( int th_gtid, C *flag )
 #if KMP_TDATA_GTID
     __kmp_gtid = th_gtid;
 #endif
+    CharmOMPDebug( "__kmp_suspend_template: T#%d is resumed \n",
+                       th_gtid);
 
     KF_TRACE( 5, ( "__kmp_suspend_template: T#%d is resumed \n",
-                       __kmp_gtid) );
+                       th_gtid) );
 #else
     if ( flag->done_check_val(old_spin) ) {
         old_spin = flag->unset_sleeping();
