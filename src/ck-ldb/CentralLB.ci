@@ -14,7 +14,7 @@ initnode void lbinit(void);
 group [migratable] CentralLB : BaseLB {
   entry void CentralLB(const CkLBOptions &);  
   entry void ProcessAtSync(void);
-  entry void SendStats();
+  entry [reductiontarget] void SendStats();
   entry void ReceiveStats(CkMarshalledCLBStatsMessage data);
   entry void ReceiveStatsViaTree(CkMarshalledCLBStatsMessage data);
   entry void ReceiveStatsFromRoot(CkMarshalledCLBStatsMessage data);

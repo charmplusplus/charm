@@ -337,7 +337,10 @@ void CentralLB::ReceiveCounts(int *counts, int n)
 
   DEBUGF(("[%d] ReceiveCounts: n_objs:%d n_comm:%d\n",CkMyPe(), n_objs, n_comm));
 	
-  if (concurrent) SendStats();
+  if (concurrent) {
+    CkCallback cb = CkCallback(CkReductionTarget(CentralLB, SendStats), thisProxy);
+    contribute(cb);
+  }
   else thisProxy.SendStats(); // broadcast call to let everybody start to send stats
 }
 
