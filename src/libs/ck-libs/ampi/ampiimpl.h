@@ -615,15 +615,14 @@ extern int _mpi_nworlds;
 #define AMPI_COLL_SOURCE 0
 #define AMPI_COLL_COMM   MPI_COMM_WORLD
 
-#define MPI_PERS_REQ    1
-#define MPI_I_REQ       2
-#define MPI_IATA_REQ    3
-#define MPI_SEND_REQ    4
-#define MPI_SSEND_REQ   5
-#define MPI_REDN_REQ    6
-#define MPI_GATHER_REQ  7
-#define MPI_GATHERV_REQ 8
-#define MPI_GPU_REQ     9
+#define MPI_I_REQ       1
+#define MPI_IATA_REQ    2
+#define MPI_SEND_REQ    3
+#define MPI_SSEND_REQ   4
+#define MPI_REDN_REQ    5
+#define MPI_GATHER_REQ  6
+#define MPI_GATHERV_REQ 7
+#define MPI_GPU_REQ     8
 
 enum AmpiReqSts : char {
   AMPI_REQ_PENDING   = 0,
@@ -666,9 +665,8 @@ class AmpiRequest {
   virtual ~AmpiRequest(){ }
 
   /// Activate this persistent request.
-  ///  Only meaningful for persistent requests,
-  ///  other requests just abort.
-  virtual int start(void){ return -1; }
+  ///  Only meaningful for persistent Ireq, SendReq, and SsendReq requests.
+  virtual void start(MPI_Request reqIdx){ }
 
   /// Return true if this request is finished (progress):
   virtual bool test(MPI_Status *sts=MPI_STATUS_IGNORE) =0;
@@ -680,6 +678,14 @@ class AmpiRequest {
   /// Mark this request for cancellation.
   /// Supported only for IReq requests
   virtual void cancel() =0;
+
+  /// Mark this request persistent.
+  /// Supported only for IReq, SendReq, and SsendReq requests
+  virtual void setPersistent(bool p){ }
+
+  /// Is this request persistent?
+  /// Supported only for IReq, SendReq, and SsendReq requests
+  virtual bool isPersistent(void) const { return false; }
 
   /// Receive an AmpiMsg
   virtual void receive(ampi *ptr, AmpiMsg *msg) = 0;
@@ -701,7 +707,7 @@ class AmpiRequest {
   inline bool isValid(void) const { return isvalid; }
 
   /// Returns the type of request:
-  ///  MPI_PERS_REQ, MPI_I_REQ, MPI_IATA_REQ, MPI_SEND_REQ, MPI_SSEND_REQ,
+  ///  MPI_I_REQ, MPI_IATA_REQ, MPI_SEND_REQ, MPI_SSEND_REQ,
   ///  MPI_REDN_REQ, MPI_GATHER_REQ, MPI_GATHERV_REQ, MPI_GPU_REQ
   virtual int getType(void) const =0;
 
@@ -733,38 +739,16 @@ class AmpiRequest {
   virtual void print();
 };
 
-class PersReq : public AmpiRequest {
- public:
-  int sndrcv; // 1 if send , 2 if recv, 3 if ssend
-  PersReq(void *buf_, int count_, MPI_Datatype type_, int src_, int tag_, MPI_Comm comm_, int sndrcv_){
-    buf=buf_;  count=count_;  type=type_;  src=src_;  tag=tag_;
-    comm=comm_;  sndrcv=sndrcv_;  isvalid=true;
-  }
-  PersReq(){};
-  ~PersReq(){}
-  int start();
-  bool test(MPI_Status *sts=MPI_STATUS_IGNORE);
-  int wait(MPI_Status *sts);
-  void cancel() {}
-  void receive(ampi *ptr, AmpiMsg *msg) {}
-  void receive(ampi *ptr, CkReductionMsg *msg) {}
-  inline int getType(void) const { return MPI_PERS_REQ; }
-  virtual void pup(PUP::er &p){
-    AmpiRequest::pup(p);
-    p(sndrcv);
-  }
-  virtual void print();
-};
-
 class IReq : public AmpiRequest {
  public:
   int length; // recv'ed length in bytes
   bool cancelled; // track if request is cancelled
+  bool persistent; // Is this a persistent recv request?
   IReq(void *buf_, int count_, MPI_Datatype type_, int src_, int tag_, MPI_Comm comm_,
        AmpiReqSts sts_=AMPI_REQ_PENDING)
   {
     buf=buf_;  count=count_;  type=type_;  src=src_;  tag=tag_;
-    comm=comm_;  isvalid=true; length=0; cancelled=false;
+    comm=comm_;  isvalid=true; length=0; cancelled=false; persistent=false;
     if (sts_ == AMPI_REQ_BLOCKED) blocked=true;
     else if (sts_ == AMPI_REQ_COMPLETED) statusIreq=true;
   }
@@ -778,6 +762,9 @@ class IReq : public AmpiRequest {
     }
   }
   inline int getType(void) const { return MPI_I_REQ; }
+  inline void setPersistent(bool p) { persistent = p; }
+  inline bool isPersistent(void) const { return persistent; }
+  void start(MPI_Request reqIdx);
   void receive(ampi *ptr, AmpiMsg *msg);
   void receive(ampi *ptr, CkReductionMsg *msg) {}
   void receiveRdma(ampi *ptr, char *sbuf, int slength, int ssendReq, int srcRank, MPI_Comm scomm);
@@ -788,6 +775,7 @@ class IReq : public AmpiRequest {
     AmpiRequest::pup(p);
     p|length;
     p|cancelled;
+    p|persistent;
   }
   virtual void print();
 };
@@ -874,41 +862,59 @@ class GathervReq : public AmpiRequest {
 };
 
 class SendReq : public AmpiRequest {
+  bool persistent; // is this a persistent send request?
  public:
   SendReq(MPI_Comm comm_, AmpiReqSts sts_=AMPI_REQ_PENDING) {
-    comm = comm_; isvalid=true;
+    comm = comm_; isvalid=true; persistent=false;
     if (sts_ == AMPI_REQ_BLOCKED) blocked=true;
     else if (sts_ == AMPI_REQ_COMPLETED) statusIreq=true;
+  }
+  SendReq(void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_, MPI_Comm comm_) {
+    buf=buf_;  count=count_;  type=type_;  src=dest_;  tag=tag_;
+    comm=comm_;  isvalid=true; blocked=false; statusIreq=false; persistent=false;
   }
   SendReq(){}
   ~SendReq(){ }
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE);
   int wait(MPI_Status *sts);
   void cancel() {}
+  inline void setPersistent(bool p) { persistent = p; }
+  inline bool isPersistent(void) const { return persistent; }
+  void start(MPI_Request reqIdx);
   void receive(ampi *ptr, AmpiMsg *msg) {}
   void receive(ampi *ptr, CkReductionMsg *msg) {}
   inline int getType(void) const { return MPI_SEND_REQ; }
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
+    p|persistent;
   }
   virtual void print();
 };
 
 class SsendReq : public AmpiRequest {
+  bool persistent; // is this a persistent Ssend request?
  public:
   SsendReq(MPI_Comm comm_) {
-    comm = comm_; isvalid=true;
+    comm = comm_; isvalid=true; persistent=false;
+  }
+  SsendReq(void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_, MPI_Comm comm_) {
+    buf=buf_;  count=count_;  type=type_;  src=dest_;  tag=tag_;
+    comm=comm_;  isvalid=true; blocked=false; statusIreq=false; persistent=false;
   }
   SsendReq() {}
   ~SsendReq(){ }
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE);
   int wait(MPI_Status *sts);
   void cancel() {}
+  inline void setPersistent(bool p) { persistent = p; }
+  inline bool isPersistent(void) const { return persistent; }
+  void start(MPI_Request reqIdx);
   void receive(ampi *ptr, AmpiMsg *msg) {}
   void receive(ampi *ptr, CkReductionMsg *msg) {}
   inline int getType(void) const { return MPI_SSEND_REQ; }
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
+    p|persistent;
   }
   virtual void print();
 };

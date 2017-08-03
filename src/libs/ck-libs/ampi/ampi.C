@@ -1929,9 +1929,6 @@ void ampi::pup(PUP::er &p)
   if (nonnull != 0) {
     if (p.isUnpacking()) {
       switch (nonnull) {
-        case MPI_PERS_REQ:
-          blockingReq = new PersReq;
-          break;
         case MPI_I_REQ:
           blockingReq = new IReq;
           break;
@@ -2704,7 +2701,7 @@ AmpiMsg *ampi::makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int coun
 
 static inline void freeNonPersReq(int &request) {
   AmpiRequestList* reqs = getReqs();
-  if ((*reqs)[request]->getType() != MPI_PERS_REQ) { // only free non-blocking request
+  if (!(*reqs)[request]->isPersistent()) {
     reqs->free(request);
     request = MPI_REQUEST_NULL;
   }
@@ -3399,11 +3396,6 @@ void AmpiRequest::print(){
   CkPrintf("In AmpiRequest: buf=%p, count=%d, type=%d, src=%d, tag=%d, comm=%d, isvalid=%d\n", buf, count, type, src, tag, comm, isvalid);
 }
 
-void PersReq::print(){
-  AmpiRequest::print();
-  CkPrintf("In PersReq: sndrcv=%d\n", sndrcv);
-}
-
 void IReq::print(){
   AmpiRequest::print();
   CkPrintf("In IReq: this=%p, status=%d, length=%d\n", this, statusIreq, length);
@@ -3463,9 +3455,6 @@ void AmpiRequestList::pup(PUP::er &p) {
     if(nonnull != 0){
       if(p.isUnpacking()){
         switch(nonnull){
-          case MPI_PERS_REQ:
-            block[i] = new PersReq;
-            break;
           case MPI_I_REQ:
             block[i] = new IReq;
             break;
@@ -3556,10 +3545,7 @@ int testRequest(MPI_Request *reqIdx, int *flag, MPI_Status *sts){
   AmpiRequest& req = *(*reqList)[*reqIdx];
   if(1 == (*flag = req.test())){
     req.wait(sts);
-    if(req.getType() != MPI_PERS_REQ) { // only free non-blocking request
-      reqList->free(*reqIdx);
-      *reqIdx = MPI_REQUEST_NULL;
-    }
+    freeNonPersReq(*reqIdx);
   }
   return MPI_SUCCESS;
 }
@@ -3824,8 +3810,8 @@ MPI_Request ampi::postReq(AmpiRequest* newreq)
   // not by (tag, src, comm), so they should not be inserted either.
   if (!newreq->statusIreq &&
       newreq->getType() != MPI_SEND_REQ &&
-      newreq->getType() != MPI_SSEND_REQ &&
-      !(newreq->getType() == MPI_PERS_REQ && ((PersReq*)newreq)->sndrcv != 2)) {
+      newreq->getType() != MPI_SSEND_REQ)
+  {
     int tags[2] = { newreq->tag, newreq->src };
     AmmPut(posted_ireqs, tags, (void *)(CmiIntPtr)(request+1));
   }
@@ -4882,23 +4868,17 @@ double AMPI_Wtick(void){
   return 1e-6;
 }
 
-int PersReq::start(){
-  if(sndrcv == 1 || sndrcv == 3) { // send or ssend request
-    ampi *ptr=getAmpiInstance(comm);
-    ptr->send(tag, ptr->getRank(), buf, count, type, src, comm, sndrcv==3?1:0);
-  }
-  return 0;
-}
-
 CDECL
 int AMPI_Start(MPI_Request *request)
 {
   AMPIAPI("AMPI_Start");
   checkRequest(*request);
   AmpiRequestList *reqs = getReqs();
-  if(-1==(*reqs)[*request]->start()) {
-    CkAbort("MPI_Start could be used only on persistent communication requests!");
-  }
+#if AMPI_ERROR_CHECKING
+  if (!(*reqs)[*request]->isPersistent())
+    return ampiErrhandler("AMPI_Start", MPI_ERR_REQUEST);
+#endif
+  (*reqs)[*request]->start(*request);
   return MPI_SUCCESS;
 }
 
@@ -4908,21 +4888,43 @@ int AMPI_Startall(int count, MPI_Request *requests){
   checkRequests(count,requests);
   AmpiRequestList *reqs = getReqs();
   for(int i=0;i<count;i++){
-    if(-1==(*reqs)[requests[i]]->start())
-      CkAbort("MPI_Start could be used only on persistent communication requests!");
+#if AMPI_ERROR_CHECKING
+    if (!(*reqs)[requests[i]]->isPersistent())
+      return ampiErrhandler("MPI_Startall", MPI_ERR_REQUEST);
+#endif
+    (*reqs)[requests[i]]->start(requests[i]);
   }
   return MPI_SUCCESS;
 }
 
-int PersReq::wait(MPI_Status *sts){
-  if(sndrcv == 2) {
-    if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, sts))
-      CkAbort("AMPI> Error in persistent request wait");
-#if CMK_BIGSIM_CHARM
-    _TRACE_BG_TLINE_END(&event);
-#endif
+void IReq::start(MPI_Request reqIdx){
+  CkAssert(persistent);
+  statusIreq = false;
+  ampi* ptr = getAmpiInstance(comm);
+  AmpiMsg *msg = NULL;
+  msg = ptr->getMessage(tag, src, comm, &tag);
+  if (msg) { // if msg has already arrived, do the receive right away
+    receive(ptr, msg);
   }
-  return 0;
+  else { // ... otherwise post the receive
+    int tags[2] = { tag, src };
+    AmmPut(ptr->posted_ireqs, tags, (void *)(CmiIntPtr)(reqIdx+1));
+  }
+}
+
+void SendReq::start(MPI_Request reqIdx){
+  CkAssert(persistent);
+  statusIreq = false;
+  ampi* ptr = getAmpiInstance(comm);
+  ptr->send(tag, ptr->getRank(), buf, count, type, src /*really, the destination*/, comm);
+  statusIreq = true;
+}
+
+void SsendReq::start(MPI_Request reqIdx){
+  CkAssert(persistent);
+  statusIreq = false;
+  ampi* ptr = getAmpiInstance(comm);
+  ptr->send(tag, ptr->getRank(), buf, count, type, src /*really, the destination*/, comm, reqIdx+2, I_SEND);
 }
 
 int IReq::wait(MPI_Status *sts){
@@ -5435,13 +5437,6 @@ int AMPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
   }
 }
 
-bool PersReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) {
-  if(sndrcv == 2) // recv request
-    return getAmpiInstance(comm)->iprobe(tag, src, comm, sts);
-  else            // send request
-    return true;
-}
-
 bool IReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) {
   if (sts != MPI_STATUS_IGNORE) {
     if (cancelled) {
@@ -5758,7 +5753,9 @@ int AMPI_Recv_init(void *buf, int count, MPI_Datatype type, int src, int tag,
   }
 #endif
 
-  *req = getAmpiInstance(comm)->postReq(new PersReq(buf,count,type,src,tag,comm,2));
+  IReq* ireq = new IReq(buf,count,type,src,tag,comm);
+  ireq->setPersistent(true);
+  *req = getAmpiInstance(comm)->postReq(ireq);
   return MPI_SUCCESS;
 }
 
@@ -5778,7 +5775,9 @@ int AMPI_Send_init(const void *buf, int count, MPI_Datatype type, int dest, int 
   }
 #endif
 
-  *req = getAmpiInstance(comm)->postReq(new PersReq(const_cast<void*>(buf),count,type,dest,tag,comm,1));
+  SendReq* sreq = new SendReq(const_cast<void*>(buf),count,type,dest,tag,comm);
+  sreq->setPersistent(true);
+  *req = getAmpiInstance(comm)->postReq(sreq);
   return MPI_SUCCESS;
 }
 
@@ -5798,7 +5797,9 @@ int AMPI_Ssend_init(const void *buf, int count, MPI_Datatype type, int dest, int
   }
 #endif
 
-  *req = getAmpiInstance(comm)->postReq(new PersReq(const_cast<void*>(buf),count,type,dest,tag,comm,3));
+  SsendReq* sreq = new SsendReq(const_cast<void*>(buf),count,type,dest,tag,comm);
+  sreq->setPersistent(true);
+  *req = getAmpiInstance(comm)->postReq(sreq);
   return MPI_SUCCESS;
 }
 
