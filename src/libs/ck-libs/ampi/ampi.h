@@ -270,7 +270,6 @@ typedef struct {
   struct AmpiMsg *msg;
 } MPI_Status;
 
-#define stsempty(sts)       (sts).MPI_TAG=(sts).MPI_SOURCE=(sts).MPI_COMM=(sts).MPI_LENGTH=(sts).MPI_CANCEL=0
 #define MPI_STATUS_IGNORE   (MPI_Status *)0
 #define MPI_STATUSES_IGNORE (MPI_Status *)0
 

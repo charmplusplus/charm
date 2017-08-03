@@ -2950,11 +2950,13 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
 {
   MPI_Comm disComm = myComm.getComm();
   if(s==MPI_PROC_NULL) {
-    sts->MPI_SOURCE = MPI_PROC_NULL;
-    sts->MPI_TAG = MPI_ANY_TAG;
-    sts->MPI_COMM = comm;
-    sts->MPI_LENGTH = 0;
-    sts->MPI_CANCEL = 0;
+    if(sts != MPI_STATUS_IGNORE) {
+      sts->MPI_SOURCE = MPI_PROC_NULL;
+      sts->MPI_TAG = MPI_ANY_TAG;
+      sts->MPI_COMM = comm;
+      sts->MPI_LENGTH = 0;
+      sts->MPI_CANCEL = 0;
+    }
     return 0;
   }
 #if CMK_TRACE_ENABLED && CMK_PROJECTOR
@@ -2977,9 +2979,10 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
   )
 
   ampi *dis = getAmpiInstance(disComm);
+  MPI_Status tmpStatus;
   int tags[2] = { t, s };
   AmpiMsg *msg = NULL;
-  msg = (AmpiMsg *)AmmGet(msgs, tags, (int*)sts);
+  msg = (AmpiMsg *)AmmGet(msgs, tags, (sts == MPI_STATUS_IGNORE) ? (int*)&tmpStatus : (int*)sts);
   if (msg) { // the matching message has already arrived
     if (sts != MPI_STATUS_IGNORE) {
       sts->MPI_SOURCE = msg->getSrcRank();
@@ -3039,8 +3042,9 @@ void ampi::probe(int t, int s, MPI_Comm comm, MPI_Status *sts)
   ampi *dis = getAmpiInstance(comm);
   AmpiMsg *msg = 0;
   while(1) {
+    MPI_Status tmpStatus;
     tags[0] = t; tags[1] = s;
-    msg = (AmpiMsg *) AmmProbe(dis->msgs, tags, (int*)sts);
+    msg = (AmpiMsg *) AmmProbe(dis->msgs, tags, (sts == MPI_STATUS_IGNORE) ? (int*)&tmpStatus : (int*)sts);
     if (msg) break;
     // "dis" is updated in case an ampi thread is migrated while waiting for a message
     dis = dis->blockOnRecv();
@@ -3063,8 +3067,9 @@ int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts)
 {
   int tags[2];
   AmpiMsg *msg = 0;
+  MPI_Status tmpStatus;
   tags[0] = t; tags[1] = s;
-  msg = (AmpiMsg *) AmmProbe(msgs, tags, (int*)sts);
+  msg = (AmpiMsg *) AmmProbe(msgs, tags, (sts == MPI_STATUS_IGNORE) ? (int*)&tmpStatus : (int*)sts);
   if (msg) {
     if (sts != MPI_STATUS_IGNORE) {
       sts->MPI_SOURCE = msg->getSrcRank();
@@ -3478,13 +3483,27 @@ inline void checkRequests(int n, MPI_Request* reqs){
 #endif
 }
 
-int testRequest(MPI_Request *reqIdx, int *flag, MPI_Status *sts){
-  MPI_Status tempStatus;
-  if(sts==MPI_STATUS_IGNORE) sts = &tempStatus;
+static inline void clearStatus(MPI_Status *sts) {
+  if (sts != MPI_STATUS_IGNORE) {
+    sts->MPI_TAG    = MPI_ANY_TAG;
+    sts->MPI_SOURCE = MPI_ANY_SOURCE;
+    sts->MPI_COMM   = MPI_COMM_NULL;
+    sts->MPI_LENGTH = 0;
+    sts->MPI_ERROR  = MPI_SUCCESS;
+    sts->MPI_CANCEL = 0;
+  }
+}
 
+static inline void clearStatus(MPI_Status sts[], int idx) {
+  if (sts != MPI_STATUSES_IGNORE) {
+    clearStatus(&sts[idx]);
+  }
+}
+
+int testRequest(MPI_Request *reqIdx, int *flag, MPI_Status *sts){
   if(*reqIdx==MPI_REQUEST_NULL){
     *flag = 1;
-    stsempty(*sts);
+    clearStatus(sts);
     return MPI_SUCCESS;
   }
   checkRequest(*reqIdx);
@@ -3501,12 +3520,9 @@ int testRequest(MPI_Request *reqIdx, int *flag, MPI_Status *sts){
 }
 
 int testRequestNoFree(MPI_Request *reqIdx, int *flag, MPI_Status *sts){
-  MPI_Status tempStatus;
-  if(sts==MPI_STATUS_IGNORE) sts = &tempStatus;
-
   if(*reqIdx==MPI_REQUEST_NULL){
     *flag = 1;
-    stsempty(*sts);
+    clearStatus(sts);
     return MPI_SUCCESS;
   }
   checkRequest(*reqIdx);
@@ -3867,9 +3883,6 @@ int AMPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
 {
   AMPIAPI("AMPI_Recv");
 
-  MPI_Status tempStatus;
-  if(status == MPI_STATUS_IGNORE) status = &tempStatus;
-
   handle_MPI_BOTTOM(msg, type);
 
 #if AMPI_ERROR_CHECKING
@@ -3914,9 +3927,6 @@ int AMPI_Probe(int src, int tag, MPI_Comm comm, MPI_Status *status)
     return ret;
 #endif
 
-  MPI_Status tempStatus;
-  if(status == MPI_STATUS_IGNORE) status = &tempStatus;
-
   ampi *ptr = getAmpiInstance(comm);
   ptr->probe(tag, src, comm, status);
   return MPI_SUCCESS;
@@ -3932,8 +3942,6 @@ int AMPI_Iprobe(int src,int tag,MPI_Comm comm,int *flag,MPI_Status *status)
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
-  MPI_Status tempStatus;
-  if(status == MPI_STATUS_IGNORE) status = &tempStatus;
 
   ampi *ptr = getAmpiInstance(comm);
   *flag = ptr->iprobe(tag, src, comm, status);
@@ -4631,7 +4639,6 @@ int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
   if (size == 1 && !getAmpiParent()->isInter(comm))
     return copyDatatype(datatype, count, datatype, count, sendbuf, recvbuf);
 
-  MPI_Status sts;
   int blklen = ptr->getDDT()->getType(datatype)->getSize(count);
   int rank = ptr->getRank();
   int mask = 0x1;
@@ -4645,7 +4652,7 @@ int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
     dst = rank^mask;
     if(dst < size){
       ptr->sendrecv(&partial_scan[0], count, datatype, dst, MPI_SCAN_TAG,
-                    &tmp_buf[0], count, datatype, dst, MPI_SCAN_TAG, comm, &sts);
+                    &tmp_buf[0], count, datatype, dst, MPI_SCAN_TAG, comm, MPI_STATUS_IGNORE);
       if(rank > dst){
         getAmpiParent()->applyOp(datatype, op, count, &tmp_buf[0], &partial_scan[0]);
         getAmpiParent()->applyOp(datatype, op, count, &tmp_buf[0], recvbuf);
@@ -4682,7 +4689,6 @@ int AMPI_Exscan(const void* sendbuf, void* recvbuf, int count, MPI_Datatype data
   if (size == 1 && !getAmpiParent()->isInter(comm))
     return MPI_SUCCESS;
 
-  MPI_Status sts;
   int blklen = ptr->getDDT()->getType(datatype)->getSize(count);
   int rank = ptr->getRank();
   int mask = 0x1;
@@ -4698,7 +4704,7 @@ int AMPI_Exscan(const void* sendbuf, void* recvbuf, int count, MPI_Datatype data
     dst = rank^mask;
     if(dst < size){
       ptr->sendrecv(&partial_scan[0], count, datatype, dst, MPI_EXSCAN_TAG,
-                    &tmp_buf[0], count, datatype, dst, MPI_EXSCAN_TAG, comm, &sts);
+                    &tmp_buf[0], count, datatype, dst, MPI_EXSCAN_TAG, comm, MPI_STATUS_IGNORE);
       if(rank > dst){
         getAmpiParent()->applyOp(datatype, op, count, &tmp_buf[0], &partial_scan[0]);
         if(rank != 0){
@@ -4831,7 +4837,7 @@ int IReq::wait(MPI_Status *sts){
     parent = getAmpiParent();
 
     if (cancelled) {
-      sts->MPI_CANCEL = 1;
+      if (sts != MPI_STATUS_IGNORE) sts->MPI_CANCEL = 1;
       statusIreq = true;
       parent->resumeOnRecv = false;
       return 0;
@@ -5018,11 +5024,8 @@ int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
 {
   AMPIAPI("AMPI_Wait");
 
-  MPI_Status tempStatus;
-  if(sts == MPI_STATUS_IGNORE) sts = &tempStatus;
-
   if(*request == MPI_REQUEST_NULL){
-    stsempty(*sts);
+    clearStatus(sts);
     return MPI_SUCCESS;
   }
   checkRequest(*request);
@@ -5099,7 +5102,7 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
   if(msgLogRead){
     for(int i=0;i<count;i++){
       if(request[i] == MPI_REQUEST_NULL){
-        stsempty(sts[i]);
+        clearStatus(sts, i);
         continue;
       }
       AmpiRequest *waitReq = (*reqs)[request[i]];
@@ -5115,18 +5118,15 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
   _TRACE_BG_TLINE_END(&curLog);
 #endif
 
-  MPI_Status tmpStatus;
-
   // First check for any incomplete requests
   for (int i=0; i<count; i++) {
     if (request[i] == MPI_REQUEST_NULL) {
-      if (sts != MPI_STATUSES_IGNORE)
-        stsempty(sts[i]);
+      clearStatus(sts, i);
       continue;
     }
     AmpiRequest& req = *(*reqs)[request[i]];
     if (req.test()) {
-      req.wait((sts != MPI_STATUSES_IGNORE) ? &sts[i] : &tmpStatus);
+      req.wait((sts == MPI_STATUSES_IGNORE) ? MPI_STATUS_IGNORE : &sts[i]);
       req.setBlocked(false);
 #if AMPIMSGLOG
       if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -5159,7 +5159,7 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
       if (!req.test())
         CkAbort("In AMPI_Waitall, all requests should have completed by now!");
 #endif
-      req.wait((sts != MPI_STATUSES_IGNORE) ? &sts[i] : &tmpStatus);
+      req.wait((sts == MPI_STATUSES_IGNORE) ? MPI_STATUS_IGNORE : &sts[i]);
       req.setBlocked(false);
 #if AMPIMSGLOG
       if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -5196,8 +5196,6 @@ int AMPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
   CkAssert(getAmpiParent()->numBlockedReqs == 0);
 
   AmpiRequestList* reqs = getReqs();
-  MPI_Status tmpStatus;
-  if (sts == MPI_STATUS_IGNORE) sts = &tmpStatus;
   int nullReqs = 0;
 
   // First check for an already complete request
@@ -5220,7 +5218,7 @@ int AMPI_Waitany(int count, MPI_Request *request, int *idx, MPI_Status *sts)
   }
 
   if (nullReqs == count) {
-    stsempty(*sts);
+    clearStatus(sts);
     *idx = MPI_UNDEFINED;
     CkAssert(getAmpiParent()->numBlockedReqs == 0);
     return MPI_SUCCESS;
@@ -5275,8 +5273,7 @@ int AMPI_Waitsome(int incount, MPI_Request *array_of_requests, int *outcount,
 
   for (int i=0; i<incount; i++) {
     if (array_of_requests[i] == MPI_REQUEST_NULL) {
-      if (array_of_statuses != MPI_STATUSES_IGNORE)
-        stsempty(array_of_statuses[i]);
+      clearStatus(array_of_statuses, i);
       nullReqs++;
       continue;
     }
@@ -5483,13 +5480,10 @@ int AMPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Sta
 
   checkRequests(count, request);
 
-  MPI_Status tempStatus;
-  if (sts == MPI_STATUS_IGNORE) sts = &tempStatus;
-
   if (count == 0) {
     *flag = 1;
     *index = MPI_UNDEFINED;
-    stsempty(*sts);
+    clearStatus(sts);
     return MPI_SUCCESS;
   }
 
@@ -5511,7 +5505,7 @@ int AMPI_Testany(int count, MPI_Request *request, int *index, int *flag, MPI_Sta
   *index = MPI_UNDEFINED;
   if (nullReqs == count) {
     *flag = 1;
-    stsempty(*sts);
+    clearStatus(sts);
   }
   else {
     getAmpiParent()->yield();
@@ -5532,14 +5526,12 @@ int AMPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
   }
 
   AmpiRequestList* reqs = getReqs();
-  MPI_Status tmpStatus;
   int nullReqs = 0;
   *flag = 1;
 
   for (int i=0; i<count; i++) {
     if (request[i] == MPI_REQUEST_NULL) {
-      if (sts != MPI_STATUSES_IGNORE)
-        stsempty(sts[i]);
+      clearStatus(sts, i);
       nullReqs++;
       continue;
     }
@@ -5555,7 +5547,7 @@ int AMPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
       int reqIdx = request[i];
       if (reqIdx != MPI_REQUEST_NULL) {
         AmpiRequest& req = *(*reqs)[reqIdx];
-        req.wait((sts != MPI_STATUSES_IGNORE) ? &sts[i] : &tmpStatus);
+        req.wait((sts == MPI_STATUSES_IGNORE) ? MPI_STATUS_IGNORE : &sts[i]);
         freeNonPersReq(request[i]);
       }
     }
@@ -5582,8 +5574,7 @@ int AMPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount,
 
   for (int i=0; i<incount; i++) {
     if (array_of_requests[i] == MPI_REQUEST_NULL) {
-      if (array_of_statuses != MPI_STATUSES_IGNORE)
-        stsempty(array_of_statuses[i]);
+      clearStatus(array_of_statuses, i);
       nullReqs++;
       continue;
     }
