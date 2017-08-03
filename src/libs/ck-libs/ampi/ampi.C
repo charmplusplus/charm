@@ -5128,13 +5128,13 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
   // First check for any incomplete requests
   for (int i=0; i<count; i++) {
     if (request[i] == MPI_REQUEST_NULL) {
-      if (sts != MPI_STATUS_IGNORE)
+      if (sts != MPI_STATUSES_IGNORE)
         stsempty(sts[i]);
       continue;
     }
     AmpiRequest& req = *(*reqs)[request[i]];
     if (req.test()) {
-      req.wait((sts != MPI_STATUS_IGNORE) ? &sts[i] : &tmpStatus);
+      req.wait((sts != MPI_STATUSES_IGNORE) ? &sts[i] : &tmpStatus);
       req.setBlocked(false);
 #if AMPIMSGLOG
       if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -5167,7 +5167,7 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
       if (!req.test())
         CkAbort("In AMPI_Waitall, all requests should have completed by now!");
 #endif
-      req.wait((sts != MPI_STATUS_IGNORE) ? &sts[i] : &tmpStatus);
+      req.wait((sts != MPI_STATUSES_IGNORE) ? &sts[i] : &tmpStatus);
       req.setBlocked(false);
 #if AMPIMSGLOG
       if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -5546,7 +5546,7 @@ int AMPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
 
   for (int i=0; i<count; i++) {
     if (request[i] == MPI_REQUEST_NULL) {
-      if (sts != MPI_STATUS_IGNORE)
+      if (sts != MPI_STATUSES_IGNORE)
         stsempty(sts[i]);
       nullReqs++;
       continue;
@@ -5563,7 +5563,7 @@ int AMPI_Testall(int count, MPI_Request *request, int *flag, MPI_Status *sts)
       int reqIdx = request[i];
       if (reqIdx != MPI_REQUEST_NULL) {
         AmpiRequest& req = *(*reqs)[reqIdx];
-        req.wait((sts != MPI_STATUS_IGNORE) ? &sts[i] : &tmpStatus);
+        req.wait((sts != MPI_STATUSES_IGNORE) ? &sts[i] : &tmpStatus);
         freeNonPersReq(request[i]);
       }
     }
