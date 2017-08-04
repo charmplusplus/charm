@@ -15,8 +15,12 @@ struct TramInfo {
   std::string type;
   std::string name;
   std::string itemType;
-  TramInfo(const char* t, const char* n, const char* i)
-    : type(t), name(n), itemType(i) {}
+
+  int numDimensions;
+  int bufferSize;
+
+  TramInfo(const char* t, const char* n, const char* i, int nd, int b)
+    : type(t), name(n), itemType(i), numDimensions(nd), bufferSize(b) {}
 };
 
 /* Chare or group is a templated entity */

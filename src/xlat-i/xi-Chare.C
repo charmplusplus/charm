@@ -206,7 +206,7 @@ Chare::preprocess()
     list->recursev(&Member::preprocessSDAG);
     //Add migration constructor to MemberList
     if(isMigratable()) {
-      Entry *e=new Entry(line,SMIGRATE,NULL,
+      Entry *e=new Entry(line,new Attribute(SMIGRATE),NULL,
                          (char *)type->getBaseName(),
                          new ParamList(new Parameter(line,
                                                      new PtrType(new NamedType("CkMigrateMessage")))),0,0,0);

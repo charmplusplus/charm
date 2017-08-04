@@ -10,6 +10,84 @@ using std::cerr;
 
 namespace xi {
 
+class Attribute {
+public:
+  struct Argument {
+    int       value;
+    char     *name;
+    Argument *next;
+
+    Argument(const char* name_, int value_, Argument *next_ = NULL)
+    : value(value_), next(next_) {
+      name = new char[strlen(name_) + 1];
+      strcpy(name, name_);
+    };
+
+    ~Argument() {
+      if (next) {
+        delete next;
+      }
+      delete [] name;
+    }
+  };
+
+  Attribute(int type, Argument* args = NULL, Attribute* next = NULL)
+  : type_(type), args_(args), next_(next) { };
+
+  ~Attribute() {
+    if (args_) {
+      delete args_;
+    }
+
+    if (next_) {
+      delete next_;
+    }
+  }
+
+  Attribute* getNext() { return next_; }
+  Argument*  getArgs() { return args_; }
+
+  int is(int type) { return (type_ == type); }
+
+  void setNext(Attribute *next) {
+    next_ = next;
+  }
+
+  Attribute* getAttribute(int attribute) {
+    if (this->is(attribute)) {
+      return this;
+    } else if (next_) {
+      return next_->getAttribute(attribute);
+    } else {
+      return NULL;
+    }
+  }
+
+  bool hasAttribute(int attribute) {
+    return (getAttribute(attribute) != NULL);
+  }
+
+  int getArgument(const char* arg, int def = -1) {
+    if (args_) {
+      Argument *tmp = args_;
+      while (tmp) {
+        if (strcmp(arg, tmp->name) == 0) {
+          return tmp->value;
+        } else {
+          tmp = tmp->next;
+        }
+      }
+    }
+
+    return def;
+  }
+private:
+  int        type_;
+  Argument  *args_;
+  Attribute *next_;
+};
+
+
 class Value;
 class CStateVar;
 // class SdagConstruct;
@@ -49,7 +127,7 @@ class Entry : public Member {
   int first_line_, last_line_;
 
  private:    
-  int attribs;    
+  Attribute *attribs;
   Type *retType;
   Value *stacksize;
   const char *pythonDoc;
@@ -165,7 +243,42 @@ class Entry : public Member {
     int accel_dmaList_numWriteOnly;
     int accel_dmaList_scalarNeedsWrite;
 
-    Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz=0, SdagConstruct *sc =0, const char *e=0, int fl=-1, int ll=-1);
+    Entry(int l, Attribute *a, Type *r, const char *n, ParamList *p, Value *sz=0, SdagConstruct *sc =0, const char *e=0, int fl=-1, int ll=-1);
+
+    inline int hasAttribute(int attribute) {
+      return (attribs != NULL) && (attribs->hasAttribute(attribute));
+    }
+
+    inline Attribute* getAttribute(int attribute) {
+      return attribs ? attribs->getAttribute(attribute) : NULL;
+    }
+
+    inline void addAttribute(int attribute) {
+      attribs = new Attribute(attribute, NULL, attribs);
+    }
+
+    inline void removeAttribute(int attribute) {
+      Attribute *curr = attribs;
+      Attribute *prev = NULL;
+
+      while (curr) {
+        if (curr->is(attribute)) {
+          if (prev) {
+            prev->setNext(curr->getNext());
+          } else {
+            attribs = curr->getNext();
+          }
+
+          delete curr;
+
+          break;
+        } else {
+          prev = curr;
+          curr = curr->getNext();
+        }
+      }
+    }
+
     void setChare(Chare *c);
     int paramIsMarshalled(void);
     int getStackSize(void);

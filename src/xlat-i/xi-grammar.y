@@ -50,6 +50,8 @@ void ReservedWord(int token, int fCol, int lCol);
 %locations
 
 %union {
+  Attribute *attr;
+  Attribute::Argument *attrarg;
   AstChildren<Module> *modlist;
   Module *module;
   ConstructList *conslist;
@@ -147,7 +149,7 @@ void ReservedWord(int token, int fCol, int lCol);
 %type <val>		OptStackSize
 %type <intval>		OptExtern OptSemiColon OneOrMoreSemiColon MAttribs MAttribList MAttrib
 %type <intval>		OptConditional MsgArray
-%type <intval>		EAttribs EAttribList EAttrib OptVoid
+%type <intval>		EAttrib OptVoid
 %type <cattr>		CAttribs CAttribList CAttrib
 %type <cattr>		ArrayAttribs ArrayAttribList ArrayAttrib
 %type <tparam>		TParam
@@ -188,6 +190,9 @@ void ReservedWord(int token, int fCol, int lCol);
 %type <sentry>		OptSdagCode
 %type <when>            WhenConstruct NonWhenConstruct
 %type <intval>		PythonOptions
+
+%type <attrarg>  AttributeArg AttributeArgList
+%type <attr>     EAttribs EAttribList
 
 %%
 
@@ -327,7 +332,7 @@ ConstructSemi   : USING NAMESPACE QualName
                 { $2->setExtern($1); $$ = $2; }
                 | EXTERN ENTRY EReturn QualNamedType Name OptTParams EParameters
                 {
-                  Entry *e = new Entry(lineno, 0, $3, $5, $7, 0, 0, 0, @1.first_line, @$.last_line);
+                  Entry *e = new Entry(lineno, NULL, $3, $5, $7, 0, 0, 0, @1.first_line, @$.last_line);
                   int isExtern = 1;
                   e->setExtern(isExtern);
                   e->targs = $6;
@@ -895,11 +900,11 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
 		}
 		| ENTRY '[' ACCEL ']' VOID Name EParameters AccelEParameters ParamBraceStart CCode ParamBraceEnd Name OneOrMoreSemiColon/* DMK : Accelerated Entry Method */
                 {
-                  int attribs = SACCEL;
+                  Attribute* attribs = new Attribute(SACCEL);
                   const char* name = $6;
                   ParamList* paramList = $7;
                   ParamList* accelParamList = $8;
-		  XStr* codeBody = new XStr($10);
+		              XStr* codeBody = new XStr($10);
                   const char* callbackName = $12;
 
                   $$ = new Entry(lineno, attribs, new BuiltinType("void"), name, paramList, 0, 0, 0 );
@@ -921,7 +926,7 @@ EReturn	: RestrictedType
 		;
 
 EAttribs	: /* Empty */
-		{ $$ = 0; }
+		{ $$ = NULL; }
 		| '[' EAttribList ']'
 		{ $$ = $2; }
 		| error
@@ -931,10 +936,20 @@ EAttribs	: /* Empty */
 		}
 		;
 
-EAttribList	: EAttrib
-		{ $$ = $1; }
-		| EAttrib ',' EAttribList
-		{ $$ = $1 | $3; }
+AttributeArg:
+      Name ':' NUMBER { $$ = new Attribute::Argument($1, atoi($3)); }
+    ;
+
+AttributeArgList:
+      AttributeArg                       { $$ = $1; }
+    | AttributeArg ',' AttributeArgList  { $$ = $1; $1->next = $3; }
+    ;
+
+EAttribList:
+      EAttrib                                           { $$ = new Attribute($1);           }
+    | EAttrib '(' AttributeArgList ')'                  { $$ = new Attribute($1, $3);       }
+		| EAttrib ',' EAttribList                           { $$ = new Attribute($1, NULL, $3); }
+		| EAttrib '(' AttributeArgList ')' ',' EAttribList  { $$ = new Attribute($1, $3, $6);   }
 		;
 
 EAttrib		: THREADED
@@ -1304,12 +1319,12 @@ StartIntExpr	: '('
 
 SEntry		: IDENT EParameters
 		{
-		  $$ = new Entry(lineno, 0, 0, $1, $2, 0, 0, 0, @$.first_line, @$.last_line);
+		  $$ = new Entry(lineno, NULL, 0, $1, $2, 0, 0, 0, @$.first_line, @$.last_line);
 		  firstRdma = true;
 		}
 		| IDENT SParamBracketStart CCode SParamBracketEnd EParameters 
 		{
-		  $$ = new Entry(lineno, 0, 0, $1, $5, 0, 0, $3, @$.first_line, @$.last_line);
+		  $$ = new Entry(lineno, NULL, 0, $1, $5, 0, 0, $3, @$.first_line, @$.last_line);
 		  firstRdma = true;
 		}
 		;
