@@ -88,6 +88,8 @@ void NullLB::staticAtSync(void* data)
   me->AtSync();
 }
 
+// CkMigratable::AtSync() bypasses this to avoid waiting for LBPeriod
+// when no balancer exists
 void NullLB::AtSync()
 {
   // tried to reset the database so it doesn't waste memory

@@ -1712,6 +1712,10 @@ void CkMigratable::AtSync(int waitForMigration)
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         mlogData->toResumeOrNot=1;
 #endif
+	if(CkpvAccess(hasNullLB)) {
+		ResumeFromSync();
+		return;
+	}
 	myRec->AsyncMigrate(!waitForMigration);
 	if (waitForMigration) ReadyMigrate(true);
 	ckFinishConstruction();
