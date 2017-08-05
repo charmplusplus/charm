@@ -1585,6 +1585,10 @@ void CkArray::ckDestroy() {
   }
 
   locMgr->deleteManager(CkGroupID(thisProxy), this);
+  if (!mCastMgrID.isZero()) {
+    delete _localBranch(mCastMgrID);
+    mCastMgrID.setZero();
+  }
   delete this;
 }
 
