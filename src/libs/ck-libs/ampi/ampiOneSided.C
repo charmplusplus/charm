@@ -229,7 +229,7 @@ int ampi::winPut(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank
       thisProxy[rank].winRemotePut(orgtotalsize, CkSendBuffer(orgaddr, completedSendCB), orgcnt, orgtype,
                                    targdisp, targcnt, targtype, win->index);
       ampiReq->wait(MPI_STATUS_IGNORE);
-      reqs->free(req);
+      reqs->free(parent, req);
     }
 #endif
     else {
@@ -407,7 +407,7 @@ int ampi::winAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, i
       thisProxy[rank].winRemoteAccumulate(orgtotalsize, CkSendBuffer(orgaddr, completedSendCB), orgcnt,
                                           orgtype, targdisp, targcnt, targtype,  op, win->index);
       ampiReq->wait(MPI_STATUS_IGNORE);
-      reqs->free(req);
+      reqs->free(parent, req);
     }
 #endif
     else {
@@ -468,7 +468,7 @@ int ampi::winGetAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype
       msg = thisProxy[rank].winRemoteGetAccumulate(orgtotalsize, CkSendBuffer(orgaddr, completedSendCB), orgcnt,
                                                    orgtype, targdisp, targcnt, targtype, op, win->index);
       ampiReq->wait(MPI_STATUS_IGNORE);
-      reqs->free(req);
+      reqs->free(parent, req);
     }
 #endif
     else {
