@@ -130,8 +130,9 @@ CkpvExtern(int, papiEventSet);
 CkpvExtern(LONG_LONG_PAPI*, papiValues);
 CkpvExtern(int, papiStarted);
 CkpvExtern(int, papiStopped);
-extern int papiEvents[NUMPAPIEVENTS];
-void initPAPI(); 
+CkpvExtern(int*, papiEvents);
+CkpvExtern(int, numEvents);
+void initPAPI();
 #endif
 
 #endif
