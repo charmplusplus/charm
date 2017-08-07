@@ -125,14 +125,15 @@ extern "C" void (*registerMachineUserEvents())();
 #ifdef USE_SPP_PAPI
 #define NUMPAPIEVENTS 6
 #else
-#define NUMPAPIEVENTS 4
+#define NUMPAPIEVENTS 50
 #endif
 CkpvExtern(int, papiEventSet);
 CkpvExtern(LONG_LONG_PAPI*, papiValues);
 CkpvExtern(int, papiStarted);
 CkpvExtern(int, papiStopped);
-extern int papiEvents[NUMPAPIEVENTS];
-void initPAPI(); 
+CkpvExtern(int*, papiEvents);
+CkpvExtern(int, numEvents);
+void initPAPI();
 #endif
 
 #endif

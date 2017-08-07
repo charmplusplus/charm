@@ -1059,10 +1059,11 @@ proportional to the number of processors to be displayed.
 
 This view is enabled when \charmpp{} is compiled with the {\tt papi}
 option, which enables the collection of performance counter data using
-PAPI. Currently, this collects {\tt PAPI\_L1\_TCM}, {\tt PAPI\_L1\_TCA},
-{\tt PAPI\_L2\_TCM}, and {\tt PAPI\_L2\_TCA} on all platforms except
-Cray, where it collects {\tt PAPI\_FP\_OPS}, {\tt PAPI\_TOT\_INS},
-{\tt perf::PERF\_COUNT\_HW\_CACHE\_LL:MISS}, {\tt DATA\_PREFETCHER:ALL},
+PAPI. Currently, this collects {\tt PAPI\_L1\_DCM}, {\tt PAPI\_L2\_DCM},
+{\tt PAPI\_L1\_ICM}, {\tt PAPI\_L2\_ICM}, {\tt PAPI\_L1\_TCM}, {\tt PAPI\_L2\_TCM},
+{\tt PAPI\_L3\_TCM}, {\tt PAPI\_LD\_INS} and {\tt PAPI\_SR\_INS} on all
+platforms where possible except Cray, where it collects {\tt PAPI\_FP\_OPS},
+{\tt PAPI\_TOT\_INS},{\tt perf::PERF\_COUNT\_HW\_CACHE\_LL:MISS}, {\tt DATA\_PREFETCHER:ALL},
 {\tt PAPI\_L1\_DCA} and {\tt PAPI\_TOT\_CYC}. This tool shows the
 values of the collected performance counters on different PEs, broken
 down by entry point.  An example is show in Figure \ref{performance counters}.

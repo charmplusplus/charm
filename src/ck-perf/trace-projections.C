@@ -502,12 +502,12 @@ void LogPool::writeSts(void)
   fprintf(stsfp, "VERSION %s\n", PROJECTION_VERSION);
   fprintf(stsfp, "TOTAL_PHASES %d\n", numPhases);
 #if CMK_HAS_COUNTER_PAPI
-  fprintf(stsfp, "TOTAL_PAPI_EVENTS %d\n", NUMPAPIEVENTS);
-  // for now, use i, next time use papiEvents[i].
+  fprintf(stsfp, "TOTAL_PAPI_EVENTS %d\n", CkpvAccess(numEvents));
+  // for now, use i, next time use CkpvAccess(papiEvents)[i].
   // **CW** papi event names is a hack.
   char eventName[PAPI_MAX_STR_LEN];
-  for (i=0;i<NUMPAPIEVENTS;i++) {
-    PAPI_event_code_to_name(papiEvents[i], eventName);
+  for (i=0;i<CkpvAccess(numEvents);i++) {
+    PAPI_event_code_to_name(CkpvAccess(papiEvents)[i], eventName);
     fprintf(stsfp, "PAPI_EVENT %d %s\n", i, eventName);
   }
 #endif
@@ -871,7 +871,7 @@ void LogPool::modLastEntryTimestamp(double ts)
 //void LogEntry::addPapi(LONG_LONG_PAPI *papiVals)
 //{
 //#if CMK_HAS_COUNTER_PAPI
-//   memcpy(papiValues, papiVals, sizeof(LONG_LONG_PAPI)*NUMPAPIEVENTS);
+//   memcpy(papiValues, papiVals, sizeof(LONG_LONG_PAPI)*CkpvAccess(numEvents));
 //#endif
 //}
 
@@ -911,11 +911,11 @@ void LogEntry::pup(PUP::er &p)
       p|icputime;
 #if CMK_HAS_COUNTER_PAPI
       //p|numPapiEvents;
-      for (i=0; i<NUMPAPIEVENTS; i++) {
+      for (i=0; i<CkpvAccess(numEvents); i++) {
 	// not yet!!!
 	//	p|papiIDs[i]; 
 	p|papiValues[i];
-	
+
       }
 #else
       //p|numPapiEvents;     // non papi version has value 0
@@ -930,7 +930,7 @@ void LogEntry::pup(PUP::er &p)
       p|mIdx; p|eIdx; p|itime; p|event; p|pe; p|msglen; p|icputime;
 #if CMK_HAS_COUNTER_PAPI
       //p|numPapiEvents;
-      for (i=0; i<NUMPAPIEVENTS; i++) {
+      for (i=0; i<CkpvAccess(numEvents); i++) {
 	// not yet!!!
 	//	p|papiIDs[i];
 	p|papiValues[i];
