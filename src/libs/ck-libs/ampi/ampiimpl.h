@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <numeric>
 #include <forward_list>
+#include <bitset>
 
 #include "ampi.h"
 #include "ddt.h"
@@ -927,14 +928,21 @@ extern int _mpi_nworlds;
 #define AMPI_COLL_DEST   -1
 #define AMPI_COLL_COMM   MPI_COMM_WORLD
 
-#define MPI_I_REQ       1
-#define MPI_ATA_REQ     2
-#define MPI_SEND_REQ    3
-#define MPI_SSEND_REQ   4
-#define MPI_REDN_REQ    5
-#define MPI_GATHER_REQ  6
-#define MPI_GATHERV_REQ 7
-#define MPI_GPU_REQ     8
+enum AmpiReqType : uint8_t {
+  AMPI_INVALID_REQ = 0,
+  AMPI_I_REQ       = 1,
+  AMPI_ATA_REQ     = 2,
+  AMPI_SEND_REQ    = 3,
+  AMPI_SSEND_REQ   = 4,
+  AMPI_REDN_REQ    = 5,
+  AMPI_GATHER_REQ  = 6,
+  AMPI_GATHERV_REQ = 7,
+  AMPI_GPU_REQ     = 8
+};
+
+inline void operator|(PUP::er &p, AmpiReqType &r) {
+  pup_bytes(&p, (void *)&r, sizeof(AmpiReqType));
+}
 
 enum AmpiReqSts : char {
   AMPI_REQ_PENDING   = 0,
@@ -964,14 +972,13 @@ class AmpiRequest {
   MPI_Request reqIdx;
   bool statusIreq;
   bool blocked; // this req is currently blocked on
+  bool isvalid;
 
 #if CMK_BIGSIM_CHARM
  public:
   void *event; // the event point that corresponds to this message
   int eventPe; // the PE that the event is located on
 #endif
- protected:
-  bool isvalid;
  public:
   AmpiRequest(){
     // free() requires type to be initialized
@@ -1032,9 +1039,9 @@ class AmpiRequest {
   inline bool isValid(void) const { return isvalid; }
 
   /// Returns the type of request:
-  ///  MPI_I_REQ, MPI_ATA_REQ, MPI_SEND_REQ, MPI_SSEND_REQ,
-  ///  MPI_REDN_REQ, MPI_GATHER_REQ, MPI_GATHERV_REQ, MPI_GPU_REQ
-  virtual int getType(void) const =0;
+  ///  AMPI_I_REQ, AMPI_ATA_REQ, AMPI_SEND_REQ, AMPI_SSEND_REQ,
+  ///  AMPI_REDN_REQ, AMPI_GATHER_REQ, AMPI_GATHERV_REQ, AMPI_GPU_REQ
+  virtual AmpiReqType getType(void) const =0;
 
   /// Return the actual number of bytes that were received.
   virtual int getNumReceivedBytes(CkDDT *ddt) const {
@@ -1073,11 +1080,19 @@ class IReq : public AmpiRequest {
   IReq(void *buf_, int count_, MPI_Datatype type_, int src_, int tag_, MPI_Comm comm_,
        CkDDT *ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING)
   {
-    buf=buf_;  count=count_;  type=type_;  src=src_;  tag=tag_;
-    comm=comm_;  isvalid=true; length=0; cancelled=false; persistent=false;
-    if (sts_ == AMPI_REQ_BLOCKED) blocked=true;
-    else if (sts_ == AMPI_REQ_COMPLETED) statusIreq=true;
-    ddt_->getType(type_)->incRefCount();
+    buf        = buf_;
+    count      = count_;
+    type       = type_;
+    src        = src_;
+    tag        = tag_;
+    comm       = comm_;
+    length     = 0;
+    cancelled  = false;
+    persistent = false;
+    isvalid    = true;
+    blocked    = (sts_ == AMPI_REQ_BLOCKED);
+    statusIreq = (sts_ == AMPI_REQ_COMPLETED);
+    if (type_ != MPI_DATATYPE_NULL) ddt_->getType(type_)->incRefCount();
   }
   IReq(){}
   ~IReq(){}
@@ -1088,7 +1103,7 @@ class IReq : public AmpiRequest {
       cancelled = true;
     }
   }
-  inline int getType(void) const { return MPI_I_REQ; }
+  inline AmpiReqType getType(void) const { return AMPI_I_REQ; }
   inline void setPersistent(bool p) { persistent = p; }
   inline bool isPersistent(void) const { return persistent; }
   void start(MPI_Request reqIdx);
@@ -1110,21 +1125,27 @@ class IReq : public AmpiRequest {
 class RednReq : public AmpiRequest {
  public:
   MPI_Op op;
-  RednReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_, MPI_Op op_,
-          CkDDT *ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING)
+  RednReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_,
+          MPI_Op op_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING)
   {
-    buf=buf_;  count=count_;  type=type_;  src=AMPI_COLL_SOURCE;  tag=MPI_REDN_TAG;
-    comm=comm_;  op=op_;  isvalid=true;
-    if (sts_ == AMPI_REQ_BLOCKED) blocked=true;
-    else if (sts_ == AMPI_REQ_COMPLETED) statusIreq=true;
-    ddt_->getType(type_)->incRefCount();
+    buf        = buf_;
+    count      = count_;
+    type       = type_;
+    src        = AMPI_COLL_SOURCE;
+    tag        = MPI_REDN_TAG;
+    comm       = comm_;
+    op         = op_;
+    isvalid    = true;
+    blocked    = (sts_ == AMPI_REQ_BLOCKED);
+    statusIreq = (sts_ == AMPI_REQ_COMPLETED);
+    if (type_ != MPI_DATATYPE_NULL) ddt_->getType(type_)->incRefCount();
   }
   RednReq(){};
   ~RednReq(){}
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE);
   int wait(MPI_Status *sts);
   void cancel() {}
-  inline int getType(void) const { return MPI_REDN_REQ; }
+  inline AmpiReqType getType(void) const { return AMPI_REDN_REQ; }
   void receive(ampi *ptr, AmpiMsg *msg) {}
   void receive(ampi *ptr, CkReductionMsg *msg);
   virtual void pup(PUP::er &p){
@@ -1139,18 +1160,23 @@ class GatherReq : public AmpiRequest {
   GatherReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_,
             CkDDT *ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING)
   {
-    buf=buf_;  count=count_;  type=type_;  src=AMPI_COLL_SOURCE;  tag=MPI_REDN_TAG;
-    comm=comm_;  isvalid=true;
-    if (sts_ == AMPI_REQ_BLOCKED) blocked=true;
-    else if (sts_ == AMPI_REQ_COMPLETED) statusIreq=true;
-    ddt_->getType(type_)->incRefCount();
+    buf        = buf_;
+    count      = count_;
+    type       = type_;
+    src        = AMPI_COLL_SOURCE;
+    tag        = MPI_REDN_TAG;
+    comm       = comm_;
+    isvalid    = true;
+    blocked    = (sts_ == AMPI_REQ_BLOCKED);
+    statusIreq = (sts_ == AMPI_REQ_COMPLETED);
+    if (type_ != MPI_DATATYPE_NULL) ddt_->getType(type_)->incRefCount();
   }
   GatherReq(){}
   ~GatherReq(){}
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE);
   int wait(MPI_Status *sts);
   void cancel() {}
-  inline int getType(void) const { return MPI_GATHER_REQ; }
+  inline AmpiReqType getType(void) const { return AMPI_GATHER_REQ; }
   void receive(ampi *ptr, AmpiMsg *msg) {}
   void receive(ampi *ptr, CkReductionMsg *msg);
   virtual void pup(PUP::er &p){
@@ -1163,25 +1189,28 @@ class GathervReq : public AmpiRequest {
  public:
   vector<int> recvCounts;
   vector<int> displs;
-  GathervReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_, const int *rc, const int *d,
-             CkDDT *ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING)
+  GathervReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_, const int *rc,
+             const int *d, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING)
   {
-    buf=buf_;  count=count_;  type=type_;  src=AMPI_COLL_SOURCE;  tag=MPI_REDN_TAG;
-    comm=comm_;  isvalid=true;
-    recvCounts.resize(count);
-    for(int i=0; i<count; i++) recvCounts[i]=rc[i];
-    displs.resize(count);
-    for(int i=0; i<count; i++) displs[i]=d[i];
-    if (sts_ == AMPI_REQ_BLOCKED) blocked=true;
-    else if (sts_ == AMPI_REQ_COMPLETED) statusIreq=true;
-    ddt_->getType(type_)->incRefCount();
+    buf        = buf_;
+    count      = count_;
+    type       = type_;
+    src        = AMPI_COLL_SOURCE;
+    tag        = MPI_REDN_TAG;
+    comm       = comm_;
+    isvalid    = true;
+    blocked    = (sts_ == AMPI_REQ_BLOCKED);
+    statusIreq = (sts_ == AMPI_REQ_COMPLETED);
+    recvCounts.assign(rc, rc+count);
+    displs.assign(d, d+count);
+    if (type_ != MPI_DATATYPE_NULL) ddt_->getType(type_)->incRefCount();
   }
   GathervReq(){}
   ~GathervReq(){}
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE);
   int wait(MPI_Status *sts);
   void cancel() {}
-  inline int getType(void) const { return MPI_GATHERV_REQ; }
+  inline AmpiReqType getType(void) const { return AMPI_GATHERV_REQ; }
   void receive(ampi *ptr, AmpiMsg *msg) {}
   void receive(ampi *ptr, CkReductionMsg *msg);
   virtual void pup(PUP::er &p){
@@ -1194,22 +1223,32 @@ class GathervReq : public AmpiRequest {
 class SendReq : public AmpiRequest {
   bool persistent; // is this a persistent send request?
  public:
-  // This constructor is used for RMA operations, which currently do not support derived datatypes.
-  SendReq(MPI_Comm comm_, AmpiReqSts sts_=AMPI_REQ_PENDING) {
-    comm = comm_; isvalid=true; persistent=false;
-    if (sts_ == AMPI_REQ_BLOCKED) blocked=true;
-    else if (sts_ == AMPI_REQ_COMPLETED) statusIreq=true;
+  SendReq(MPI_Datatype type_, MPI_Comm comm_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) {
+    buf        = NULL;
+    count      = 0;
+    type       = type_;
+    src        = MPI_PROC_NULL;
+    tag        = MPI_ANY_TAG;
+    comm       = comm_;
+    isvalid    = true;
+    persistent = false;
+    blocked    = (sts_ == AMPI_REQ_BLOCKED);
+    statusIreq = (sts_ == AMPI_REQ_COMPLETED);
+    if (type_ != MPI_DATATYPE_NULL) ddt_->getType(type_)->incRefCount();
   }
-  SendReq(MPI_Datatype type_, MPI_Comm comm_, CkDDT *ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) {
-    comm = comm_; isvalid=true; persistent=false; type = type_;
-    if (sts_ == AMPI_REQ_BLOCKED) blocked=true;
-    else if (sts_ == AMPI_REQ_COMPLETED) statusIreq=true;
-    ddt_->getType(type_)->incRefCount();
-  }
-  SendReq(void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_, MPI_Comm comm_, CkDDT *ddt_) {
-    buf=buf_;  count=count_;  type=type_;  src=dest_;  tag=tag_;
-    comm=comm_;  isvalid=true; blocked=false; statusIreq=false; persistent=false;
-    ddt_->getType(type_)->incRefCount();
+  SendReq(void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_,
+          MPI_Comm comm_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) {
+    buf        = buf_;
+    count      = count_;
+    type       = type_;
+    src        = dest_;
+    tag        = tag_;
+    comm       = comm_;
+    isvalid    = true;
+    persistent = false;
+    blocked    = (sts_ == AMPI_REQ_BLOCKED);
+    statusIreq = (sts_ == AMPI_REQ_COMPLETED);
+    if (type_ != MPI_DATATYPE_NULL) ddt_->getType(type_)->incRefCount();
   }
   SendReq(){}
   ~SendReq(){ }
@@ -1221,7 +1260,7 @@ class SendReq : public AmpiRequest {
   void start(MPI_Request reqIdx);
   void receive(ampi *ptr, AmpiMsg *msg) {}
   void receive(ampi *ptr, CkReductionMsg *msg) {}
-  inline int getType(void) const { return MPI_SEND_REQ; }
+  inline AmpiReqType getType(void) const { return AMPI_SEND_REQ; }
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
     p|persistent;
@@ -1232,17 +1271,49 @@ class SendReq : public AmpiRequest {
 class SsendReq : public AmpiRequest {
   bool persistent; // is this a persistent Ssend request?
  public:
-  SsendReq(MPI_Datatype type_, MPI_Comm comm_, CkDDT *ddt_) {
-    comm = comm_; isvalid=true; persistent=false; type = type_;
-    ddt_->getType(type_)->incRefCount();
+  SsendReq(MPI_Datatype type_, MPI_Comm comm_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) {
+    comm       = comm_;
+    buf        = NULL;
+    src        = MPI_PROC_NULL;
+    type       = type_;
+    count      = 0;
+    tag        = MPI_ANY_TAG;
+    isvalid    = true;
+    persistent = false;
+    blocked    = (sts_ == AMPI_REQ_BLOCKED);
+    statusIreq = (sts_ == AMPI_REQ_COMPLETED);
+    if (type_ != MPI_DATATYPE_NULL) ddt_->getType(type_)->incRefCount();
   }
-  SsendReq(void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_, MPI_Comm comm_, CkDDT *ddt_) {
-    buf=buf_;  count=count_;  type=type_;  src=dest_;  tag=tag_;
-    comm=comm_;  isvalid=true; blocked=false; statusIreq=false; persistent=false;
-    ddt_->getType(type_)->incRefCount();
+  SsendReq(void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_, MPI_Comm comm_,
+           CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) {
+    comm       = comm_;
+    buf        = buf_;
+    src        = MPI_PROC_NULL;
+    type       = type_;
+    count      = count_;
+    tag        = tag_;
+    isvalid    = true;
+    persistent = false;
+    blocked    = (sts_ == AMPI_REQ_BLOCKED);
+    statusIreq = (sts_ == AMPI_REQ_COMPLETED);
+    if (type_ != MPI_DATATYPE_NULL) ddt_->getType(type_)->incRefCount();
+  }
+  SsendReq(MPI_Comm comm_, int destRank_, void* buf_, int src_, MPI_Datatype type_,
+           int count_, int tag_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) {
+    comm       = comm_;
+    buf        = buf_;
+    src        = src_;
+    type       = type_;
+    count      = count_;
+    tag        = tag_;
+    isvalid    = true;
+    persistent = false;
+    blocked    = (sts_ == AMPI_REQ_BLOCKED);
+    statusIreq = (sts_ == AMPI_REQ_COMPLETED);
+    if (type_ != MPI_DATATYPE_NULL) ddt_->getType(type_)->incRefCount();
   }
   SsendReq() {}
-  ~SsendReq(){ }
+  ~SsendReq(){}
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE);
   int wait(MPI_Status *sts);
   void cancel() {}
@@ -1251,7 +1322,7 @@ class SsendReq : public AmpiRequest {
   void start(MPI_Request reqIdx);
   void receive(ampi *ptr, AmpiMsg *msg) {}
   void receive(ampi *ptr, CkReductionMsg *msg) {}
-  inline int getType(void) const { return MPI_SSEND_REQ; }
+  inline AmpiReqType getType(void) const { return AMPI_SSEND_REQ; }
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
     p|persistent;
@@ -1262,7 +1333,7 @@ class SsendReq : public AmpiRequest {
 class GPUReq : public AmpiRequest {
  public:
   GPUReq();
-  inline int getType(void) const { return MPI_GPU_REQ; }
+  inline AmpiReqType getType(void) const { return AMPI_GPU_REQ; }
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE);
   int wait(MPI_Status *sts);
   void cancel() {}
@@ -1284,7 +1355,7 @@ class ATAReq : public AmpiRequest {
   void receive(ampi *ptr, AmpiMsg *msg) {}
   void receive(ampi *ptr, CkReductionMsg *msg) {}
   inline int getCount(void) const { return reqs.size(); }
-  inline int getType(void) const { return MPI_ATA_REQ; }
+  inline AmpiReqType getType(void) const { return AMPI_ATA_REQ; }
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
     p|reqs;
@@ -1292,7 +1363,7 @@ class ATAReq : public AmpiRequest {
   virtual void print();
 };
 
-class AmpiRequestPoolMgr;
+class AmpiRequestPool;
 
 class AmpiRequestList {
  private:
@@ -1310,7 +1381,7 @@ class AmpiRequestList {
     return reqs[n];
 #endif
   }
-  void free(int idx, CkDDT *ddt);
+  void free(AmpiRequestPool& reqPool, int idx, CkDDT *ddt);
   inline int insert(AmpiRequest* req) {
     for (int i=startIdx; i<reqs.size(); i++) {
       if (reqs[i] == NULL) {
@@ -1340,7 +1411,7 @@ class AmpiRequestList {
     }
   }
 
-  void pup(PUP::er &p);
+  void pup(PUP::er &p, AmpiRequestPool &reqPool);
 
   void print(void) const {
     for (int i=0; i<reqs.size(); i++) {
@@ -1512,6 +1583,184 @@ class AmpiMsgPool {
     p|msgUsersize;
     p|maxMsgs;
     // Don't PUP the msgs in the free list or currMsgs, let the pool fill lazily
+  }
+};
+
+// Number of requests in the pool
+#ifndef AMPI_REQ_POOL_SIZE
+#define AMPI_REQ_POOL_SIZE 64
+#endif
+
+// pooledReqSize is the size of the largest AmpiRequest object that is pooled:
+static const size_t ireqSize = sizeof(IReq);
+static const size_t sreqSize = sizeof(SendReq);
+static const size_t ssreqSize = sizeof(SsendReq);
+static const size_t pooledReqSize = (ireqSize >= sreqSize && ireqSize >= ssreqSize) ? ireqSize :
+                                    (sreqSize >= ireqSize && sreqSize >= ssreqSize) ? sreqSize :
+                                    (ssreqSize);
+
+// Pool of IReq, SendReq, and SsendReq objects:
+// These are different sizes, but we use a single pool for them so
+// that iteration over these objects is fast, as in AMPI_Waitall.
+// We also try to always allocate new requests from the start to the end
+// of the pool, so that forward iteration over requests is fast.
+class AmpiRequestPool {
+ private:
+  std::bitset<AMPI_REQ_POOL_SIZE> validReqs; // reqs in the pool are either valid (being used by a real req) or invalid
+  int startIdx; // start next search from this index
+  std::array<char, AMPI_REQ_POOL_SIZE*pooledReqSize> reqs; // pool of memory for requests
+
+ public:
+  AmpiRequestPool() : startIdx(0) {}
+  ~AmpiRequestPool() {}
+  inline IReq* newIReq() {
+    if (validReqs.all()) {
+      return new IReq();
+    } else {
+      for (int i=startIdx; i<validReqs.size(); i++) {
+        if (!validReqs[i]) {
+          validReqs[i] = 1;
+          IReq* ireq = new (&reqs[i*pooledReqSize]) IReq();
+          startIdx = i+1;
+          return ireq;
+        }
+      }
+      CkAbort("AMPI> failed to find a free request in pool!");
+      return NULL;
+    }
+  }
+  inline IReq* newIReq(void* buf, int count, MPI_Datatype type, int src, int tag,
+                       MPI_Comm comm, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) {
+    if (validReqs.all()) {
+      return new IReq(buf, count, type, src, tag, comm, ddt, sts);
+    } else {
+      for (int i=startIdx; i<validReqs.size(); i++) {
+        if (!validReqs[i]) {
+          validReqs[i] = 1;
+          IReq* ireq = new (&reqs[i*pooledReqSize]) IReq(buf, count, type, src, tag, comm, ddt, sts);
+          startIdx = i+1;
+          return ireq;
+        }
+      }
+      CkAbort("AMPI> failed to find a free request in pool!");
+      return NULL;
+    }
+  }
+  inline SendReq* newSendReq() {
+    if (validReqs.all()) {
+      return new SendReq();
+    } else {
+      for (int i=startIdx; i<validReqs.size(); i++) {
+        if (!validReqs[i]) {
+          validReqs[i] = 1;
+          SendReq* sreq = new (&reqs[i*pooledReqSize]) SendReq();
+          startIdx = i+1;
+          return sreq;
+        }
+      }
+      CkAbort("AMPI> failed to find a free request in pool!");
+      return NULL;
+    }
+  }
+  inline SendReq* newSendReq(MPI_Datatype type, MPI_Comm comm, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) {
+    if (validReqs.all()) {
+      return new SendReq(type, comm, ddt, sts);
+    } else {
+      for (int i=startIdx; i<validReqs.size(); i++) {
+        if (!validReqs[i]) {
+          validReqs[i] = 1;
+          SendReq* sreq = new (&reqs[i*pooledReqSize]) SendReq(type, comm, ddt, sts);
+          startIdx = i+1;
+          return sreq;
+        }
+      }
+      CkAbort("AMPI> failed to find a free request in pool!");
+      return NULL;
+    }
+  }
+  inline SendReq* newSendReq(MPI_Comm comm, int destRank, void* buf, MPI_Datatype type,
+                             int count, int tag, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) {
+    if (validReqs.all()) {
+      return new SendReq(buf, count, type, destRank, tag, comm, ddt, sts);
+    } else {
+      for (int i=startIdx; i<validReqs.size(); i++) {
+        if (!validReqs[i]) {
+          validReqs[i] = 1;
+          SendReq* sreq = new (&reqs[i*pooledReqSize]) SendReq(buf, count, type, destRank, tag, comm, ddt, sts);
+          startIdx = i+1;
+          return sreq;
+        }
+      }
+      CkAbort("AMPI> failed to find a free request in pool!");
+      return NULL;
+    }
+  }
+  inline SsendReq* newSsendReq() {
+    if (validReqs.all()) {
+      return new SsendReq();
+    } else {
+      for (int i=startIdx; i<validReqs.size(); i++) {
+        if (!validReqs[i]) {
+          validReqs[i] = 1;
+          SsendReq* sreq = new (&reqs[i*pooledReqSize]) SsendReq();
+          startIdx = i+1;
+          CkPrintf("Creating SsendReq from pool 0\n");
+          return sreq;
+        }
+      }
+      CkAbort("AMPI> failed to find a free request in pool!");
+      return NULL;
+    }
+  }
+  inline SsendReq* newSsendReq(MPI_Datatype type, MPI_Comm comm, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) {
+    if (validReqs.all()) {
+      return new SsendReq(type, comm, ddt, sts);
+    } else {
+      for (int i=startIdx; i<validReqs.size(); i++) {
+        if (!validReqs[i]) {
+          validReqs[i] = 1;
+          SsendReq* sreq = new (&reqs[i*pooledReqSize]) SsendReq(type, comm, ddt, sts);
+          startIdx = i+1;
+          return sreq;
+        }
+      }
+      CkAbort("AMPI> failed to find a free request in pool!");
+      return NULL;
+    }
+  }
+  inline SsendReq* newSsendReq(MPI_Comm comm, int destRank, void* buf, int src, MPI_Datatype type,
+                               int count, int tag, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) {
+    if (validReqs.all()) {
+      return new SsendReq(comm, destRank, buf, src, type, count, tag, ddt, sts);
+    } else {
+      for (int i=startIdx; i<validReqs.size(); i++) {
+        if (!validReqs[i]) {
+          validReqs[i] = 1;
+          SsendReq* sreq = new (&reqs[i*pooledReqSize]) SsendReq(comm, destRank, buf, src, type, count, tag, ddt, sts);
+          startIdx = i+1;
+          return sreq;
+        }
+      }
+      CkAbort("AMPI> failed to find a free request in pool!");
+      return NULL;
+    }
+  }
+  inline void deleteAmpiRequest(AmpiRequest* req) {
+    if (((char*)req >= &reqs.front() && (char*)req <= &reqs.back()) &&
+        (req->getType() == AMPI_I_REQ ||
+         req->getType() == AMPI_SEND_REQ ||
+         req->getType() == AMPI_SSEND_REQ))
+    {
+      int idx = (int)((intptr_t)req - (intptr_t)&reqs[0]) / pooledReqSize;
+      validReqs[idx] = 0;
+      startIdx = std::min(idx, startIdx);
+    } else {
+      delete req;
+    }
+  }
+  void pup(PUP::er& p) {
+    // Nothing to do here, because AmpiRequestList::pup will be the
+    // one to actually PUP the AmpiRequest objects to/from the pool
   }
 };
 
@@ -1705,6 +1954,10 @@ class ampiParent : public CBase_ampiParent {
   bool ampiInitCallDone;
   bool resumeOnRecv, resumeOnColl;
   int numBlockedReqs; // number of requests currently blocked on
+  AmpiRequestList ampiReqs;
+  AmpiRequestPool reqPool;
+  CkDDT myDDTsto;
+  CkDDT *myDDT;
 
  public:
   ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int nRanks_);
@@ -1917,10 +2170,6 @@ class ampiParent : public CBase_ampiParent {
   int setWinAttr(MPI_Win win, int keyval, void *attribute_val);
   int getWinAttr(MPI_Win win, int keyval, void *attribute_val, int *flag);
   int deleteWinAttr(MPI_Win win, int keyval);
-
-  CkDDT myDDTsto;
-  CkDDT *myDDT;
-  AmpiRequestList ampiReqs;
 
   int addWinStruct(WinStruct *win);
   WinStruct *getWinStruct(MPI_Win win) const;
