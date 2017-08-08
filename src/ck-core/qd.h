@@ -1,53 +1,12 @@
 #ifndef _QD_H
 #define _QD_H
 
-class QdMsg {
-  private:
-    int phase; // 0..2
-    union {
-      struct { /* none */ } p1;
-      struct { int created; int processed; } p2;
-      struct { /* none */ } p3;
-      struct { int dirty; } p4;
-    } u;
-    CkCallback cb;
-  public:
-    int getPhase(void) { return phase; }
-    void setPhase(int p) { phase = p; }
-    CkCallback getCb(void) { CkAssert(phase==0); return cb; }
-    void setCb(CkCallback cb_) { CkAssert(phase==0); cb = cb_; }
-    int getCreated(void) { CkAssert(phase==1); return u.p2.created; }
-    void setCreated(int c) { CkAssert(phase==1); u.p2.created = c; }
-    int getProcessed(void) { CkAssert(phase==1); return u.p2.processed; }
-    void setProcessed(int p) { CkAssert(phase==1); u.p2.processed = p; }
-    int getDirty(void) { CkAssert(phase==2); return u.p4.dirty; }
-    void setDirty(int d) { CkAssert(phase==2); u.p4.dirty = d; }
-};
+#include "ckcallback.h"
+#include "envelope.h"
+#include "init.h"
 
-class QdCommMsg {
-  public:
-    bool isCreated;     //  false: create   true: process
-    int count;
-};
-
-class QdCallback {
-  public:
-	CkCallback cb;
-  public:
-    QdCallback(int e, CkChareID c) : cb(e, c) {}
-	QdCallback(CkCallback cb_) : cb(cb_) {}
-//    void send(void) { CkSendMsg(ep,CkAllocMsg(0,0,0),&cid); }
-    void send(void) {
-      // pretending pe 0 in blue gene mode, switch back after the call.
-#if CMK_CONDS_USE_SPECIAL_CODE
-      int old = CmiSwitchToPE(0);
-#endif
-      cb.send(NULL);
-#if CMK_CONDS_USE_SPECIAL_CODE
-      CmiSwitchToPE(old);
-#endif
-    }
-};
+class QdMsg;
+class QdCallback;
 
 class QdState {
   private:

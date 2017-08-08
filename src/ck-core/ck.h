@@ -4,9 +4,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
+#include "qd.h"
 #include "charm++.h"
 #include "envelope.h"
-#include "qd.h"
 #include "register.h"
 #include "stats.h"
 #include "ckfutures.h"
