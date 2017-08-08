@@ -255,8 +255,10 @@ void RefineSwapLB::work(LDStats* stats)
   double threshold = avg_load * 0.01;
   double lower_bound_load = avg_load - threshold;
   double upper_bound_load = avg_load + threshold;
-  cout <<"Average load " << avg_load << endl;
-  
+
+  if (_lb_args.debug()>1)
+    cout <<"Average load " << avg_load << endl;
+
   std::vector<int> min_pe_heap;
   std::vector<int> max_pe_heap;
 

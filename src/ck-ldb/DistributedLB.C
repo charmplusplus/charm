@@ -51,7 +51,7 @@ void DistributedLB::InitLB(const CkLBOptions &opt) {
 }
 
 void DistributedLB::Strategy(const DistBaseLB::LDStats* const stats) {
-	if (CkMyPe() == 0)
+	if (CkMyPe() == 0 && _lb_args.debug() > 1)
 		CkPrintf("[%d] In DistributedLB strategy\n", CkMyPe());
 
   // Initialize constants
