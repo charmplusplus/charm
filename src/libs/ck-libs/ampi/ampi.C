@@ -7073,7 +7073,7 @@ int AMPI_Alltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
       }
     }
   }
-  else if (itemsize <= AMPI_ALLTOALL_LONG_MSG) {
+  else if (itemsize <= AMPI_ALLTOALL_SHORT_MSG && size <= AMPI_ALLTOALL_THROTTLE) {
     vector<MPI_Request> reqs(size*2);
     for (int i=0; i<size; i++) {
       int src = (rank+i) % size;
@@ -7086,6 +7086,24 @@ int AMPI_Alltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                                sendcount, sendtype, dst, comm, 0, I_SEND);
     }
     AMPI_Waitall(reqs.size(), &reqs[0], MPI_STATUSES_IGNORE);
+  }
+  else if (itemsize <= AMPI_ALLTOALL_LONG_MSG) {
+    /* Don't post all sends and recvs at once. Instead do N sends/recvs at a time. */
+    vector<MPI_Request> reqs(AMPI_ALLTOALL_THROTTLE*2);
+    for (int j=0; j<size; j+=AMPI_ALLTOALL_THROTTLE) {
+      int blockSize = std::min(size - j, AMPI_ALLTOALL_THROTTLE);
+      for (int i=0; i<blockSize; i++) {
+        int src = (rank + j + i) % size;
+        ptr->irecv(((char*)recvbuf)+(extent*src), recvcount, recvtype,
+                   src, MPI_ATA_TAG, comm, &reqs[i]);
+      }
+      for (int i=0; i<blockSize; i++) {
+        int dst = (rank - j - i + size) % size;
+        reqs[blockSize+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*dst),
+                                      sendcount, sendtype, dst, comm, I_SEND);
+      }
+      AMPI_Waitall(blockSize*2, &reqs[0], MPI_STATUSES_IGNORE);
+    }
   }
   else {
     /* Long message. Use pairwise exchange. If comm_size is a
@@ -7276,18 +7294,38 @@ int AMPI_Alltoallv(const void *sendbuf, const int *sendcounts, const int *sdispl
   int itemsize = getDDT()->getSize(sendtype);
   int extent = getDDT()->getExtent(recvtype);
 
-  vector<MPI_Request> reqs(size*2);
-  for (int i=0; i<size; i++) {
-    int src = (rank+i) % size;
-    ptr->irecv(((char*)recvbuf)+(extent*rdispls[src]), recvcounts[src], recvtype,
-               src, MPI_ATA_TAG, comm, &reqs[i]);
+  if (size <= AMPI_ALLTOALL_THROTTLE) {
+    vector<MPI_Request> reqs(size*2);
+    for (int i=0; i<size; i++) {
+      int src = (rank+i) % size;
+      ptr->irecv(((char*)recvbuf)+(extent*rdispls[src]), recvcounts[src], recvtype,
+                 src, MPI_ATA_TAG, comm, &reqs[i]);
+    }
+    for (int i=0; i<size; i++) {
+      int dst = (rank+i) % size;
+      reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*sdispls[dst]),
+                               sendcounts[dst], sendtype, dst, comm, 0, I_SEND);
+    }
+    AMPI_Waitall(size*2, &reqs[0], MPI_STATUSES_IGNORE);
   }
-  for (int i=0; i<size; i++) {
-    int dst = (rank+i) % size;
-    reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*sdispls[dst]),
-                             sendcounts[dst], sendtype, dst, comm, 0, I_SEND);
+  else {
+    /* Don't post all sends and recvs at once. Instead do N sends/recvs at a time. */
+    vector<MPI_Request> reqs(AMPI_ALLTOALL_THROTTLE*2);
+    for (int j=0; j<size; j+=AMPI_ALLTOALL_THROTTLE) {
+      int blockSize = std::min(size - j, AMPI_ALLTOALL_THROTTLE);
+      for (int i=0; i<blockSize; i++) {
+        int src = (rank + j + i) % size;
+        ptr->irecv(((char*)recvbuf)+(extent*rdispls[src]), recvcounts[src], recvtype,
+                   src, MPI_ATA_TAG, comm, &reqs[i]);
+      }
+      for (int i=0; i<blockSize; i++) {
+        int dst = (rank - j - i + size) % size;
+        reqs[blockSize+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*sdispls[dst]),
+                                      sendcounts[dst], sendtype, dst, comm);
+      }
+      AMPI_Waitall(blockSize*2, &reqs[0], MPI_STATUSES_IGNORE);
+    }
   }
-  AMPI_Waitall(reqs.size(), &reqs[0], MPI_STATUSES_IGNORE);
 
   return MPI_SUCCESS;
 }
@@ -7387,18 +7425,38 @@ int AMPI_Alltoallw(const void *sendbuf, const int *sendcounts, const int *sdispl
     return copyDatatype(sendtypes[0],sendcounts[0],recvtypes[0],recvcounts[0],sendbuf,recvbuf);
 
   /* displs are in terms of bytes for Alltoallw (unlike Alltoallv) */
-  vector<MPI_Request> reqs(size*2);
-  for (int i=0; i<size; i++) {
-    int src = (rank+i) % size;
-    ptr->irecv(((char*)recvbuf)+rdispls[src], recvcounts[src], recvtypes[src],
-               src, MPI_ATA_TAG, comm, &reqs[i]);
+  if (size <= AMPI_ALLTOALL_THROTTLE) {
+    vector<MPI_Request> reqs(size*2);
+    for (int i=0; i<size; i++) {
+      int src = (rank+i) % size;
+      ptr->irecv(((char*)recvbuf)+rdispls[src], recvcounts[src], recvtypes[src],
+                 src, MPI_ATA_TAG, comm, &reqs[i]);
+    }
+    for (int i=0; i<size; i++) {
+      int dst = (rank+i) % size;
+      reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+sdispls[dst],
+                               sendcounts[dst], sendtypes[dst], dst, comm, 0, I_SEND);
+    }
+    AMPI_Waitall(size*2, &reqs[0], MPI_STATUSES_IGNORE);
   }
-  for (int i=0; i<size; i++) {
-    int dst = (rank+i) % size;
-    reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+sdispls[dst],
-                             sendcounts[dst], sendtypes[dst], dst, comm, 0, I_SEND);
+  else {
+    /* Don't post all sends and recvs at once. Instead do N sends/recvs at a time. */
+    vector<MPI_Request> reqs(AMPI_ALLTOALL_THROTTLE*2);
+    for (int j=0; j<size; j+=AMPI_ALLTOALL_THROTTLE) {
+      int blockSize = std::min(size - j, AMPI_ALLTOALL_THROTTLE);
+      for (int i=0; i<blockSize; i++) {
+        int src = (rank + j + i) % size;
+        ptr->irecv(((char*)recvbuf)+rdispls[src], recvcounts[src], recvtypes[src],
+                   src, MPI_ATA_TAG, comm, &reqs[i]);
+      }
+      for (int i=0; i<blockSize; i++) {
+        int dst = (rank - j - i + size) % size;
+        reqs[blockSize+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+sdispls[dst],
+                                      sendcounts[dst], sendtypes[dst], dst, comm);
+      }
+      AMPI_Waitall(blockSize*2, &reqs[0], MPI_STATUSES_IGNORE);
+    }
   }
-  AMPI_Waitall(reqs.size(), &reqs[0], MPI_STATUSES_IGNORE);
 
   return MPI_SUCCESS;
 }
