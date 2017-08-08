@@ -7,9 +7,9 @@ class QdMsg {
     int phase; // 0..2
     union {
       struct { /* none */ } p1;
-      struct { int created; int processed; } p2;
+      struct { CmiUInt8 created; CmiUInt8 processed; } p2;
       struct { /* none */ } p3;
-      struct { int dirty; } p4;
+      struct { bool dirty; } p4;
     } u;
     CkCallback cb;
   public:
@@ -17,12 +17,12 @@ class QdMsg {
     void setPhase(int p) { phase = p; }
     CkCallback getCb(void) { CkAssert(phase==0); return cb; }
     void setCb(CkCallback cb_) { CkAssert(phase==0); cb = cb_; }
-    int getCreated(void) { CkAssert(phase==1); return u.p2.created; }
-    void setCreated(int c) { CkAssert(phase==1); u.p2.created = c; }
-    int getProcessed(void) { CkAssert(phase==1); return u.p2.processed; }
-    void setProcessed(int p) { CkAssert(phase==1); u.p2.processed = p; }
-    int getDirty(void) { CkAssert(phase==2); return u.p4.dirty; }
-    void setDirty(int d) { CkAssert(phase==2); u.p4.dirty = d; }
+    CmiUInt8 getCreated(void) { CkAssert(phase==1); return u.p2.created; }
+    void setCreated(CmiUInt8 c) { CkAssert(phase==1); u.p2.created = c; }
+    CmiUInt8 getProcessed(void) { CkAssert(phase==1); return u.p2.processed; }
+    void setProcessed(CmiUInt8 p) { CkAssert(phase==1); u.p2.processed = p; }
+    bool getDirty(void) { CkAssert(phase==2); return u.p4.dirty; }
+    void setDirty(bool d) { CkAssert(phase==2); u.p4.dirty = d; }
 };
 
 class QdCommMsg {

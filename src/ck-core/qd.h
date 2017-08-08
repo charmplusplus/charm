@@ -11,10 +11,10 @@ class QdCallback;
 class QdState {
   private:
     int stage; // 0..2
-    int oProcessed;
-    int mCreated, mProcessed;
-    int cCreated, cProcessed;
-    int cDirty;
+    CmiUInt8 oProcessed;
+    CmiUInt8 mCreated, mProcessed;
+    CmiUInt8 cCreated, cProcessed;
+    bool cDirty;
     int nReported;
     PtrQ *callbacks;
     int nChildren;
@@ -24,7 +24,7 @@ class QdState {
     int oldCount;
 
     QdState():stage(0),mCreated(0),mProcessed(0),nReported(0) {
-      cCreated = 0; cProcessed = 0; cDirty = 0;
+      cCreated = 0; cProcessed = 0; cDirty = false;
       oProcessed = 0;
       oldCount = -1; // should not match the first time
       callbacks = new PtrQ();
@@ -65,23 +65,23 @@ class QdState {
         sendCount(true, n);
 #endif
     }
-    int getCreated(void) { return mCreated; }
-    int getProcessed(void) { return mProcessed; }
-    int getCCreated(void) { return cCreated; }
-    int getCProcessed(void) { return cProcessed; }
-    void subtreeCreate(int c) { cCreated += c; }
-    void subtreeProcess(int p) { cProcessed += p; }
+    CmiUInt8 getCreated(void) { return mCreated; }
+    CmiUInt8 getProcessed(void) { return mProcessed; }
+    CmiUInt8 getCCreated(void) { return cCreated; }
+    CmiUInt8 getCProcessed(void) { return cProcessed; }
+    void subtreeCreate(CmiUInt8 c) { cCreated += c; }
+    void subtreeProcess(CmiUInt8 p) { cProcessed += p; }
     int getStage(void) { return stage; }
     void setStage(int p) { stage = p; }
     void reported(void) { nReported++; }
-    int allReported(void) {return nReported==(nChildren+1);}
-    void reset(void) { nReported=0; cCreated=0; cProcessed=0; cDirty=0; }
+    bool allReported(void) {return nReported==(nChildren+1);}
+    void reset(void) { nReported=0; cCreated=0; cProcessed=0; cDirty=false; }
     void markProcessed(void) { oProcessed = mProcessed; }
-    int isDirty(void) { return ((mProcessed > oProcessed) || cDirty); }
-    void subtreeSetDirty(int d) { cDirty = cDirty || d; }
+    bool isDirty(void) { return ((mProcessed > oProcessed) || cDirty); }
+    void subtreeSetDirty(bool d) { cDirty = cDirty || d; }
     void flushStates() {
       stage = mCreated = mProcessed = nReported = 0;
-      cCreated = 0; cProcessed = 0; cDirty = 0;
+      cCreated = 0; cProcessed = 0; cDirty = false;
       oProcessed = 0;
     }
 };
