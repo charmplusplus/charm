@@ -4937,12 +4937,163 @@ int AMPI_Allreduce(const void *inbuf, void *outbuf, int count, MPI_Datatype type
   }
 #endif
 
-  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type), inbuf, count, type, ptr->getRank(), op);
-  CkCallback allreduceCB(CkIndex_ampi::rednResult(0),ptr->getProxy());
-  msg->setCallback(allreduceCB);
-  ptr->contribute(msg);
+  if (0) {
+    CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type), inbuf, count, type, ptr->getRank(), op);
+    CkCallback allreduceCB(CkIndex_ampi::rednResult(0),ptr->getProxy());
+    msg->setCallback(allreduceCB);
+    ptr->contribute(msg);
+    ptr->blockOnRedn(new RednReq(outbuf, count, type, comm, op));
+  }
+  else {
+    ampiParent* parent = getAmpiParent();
+    int size = ptr->getSize();
+    int rank = ptr->getRank();
+    int mask, dst, newdst, newrank, pof2 = 1;
+    CkDDT_DataType* ddt = getDDT()->getType(type);
+    int typeSize = ddt->getSize();
+    int extent = ddt->getExtent();
+    vector<char> tmpbuf(extent * count);
 
-  ptr->blockOnRedn(new RednReq(outbuf, count, type, comm, op));
+    if (inbuf != outbuf) { // not MPI_IN_PLACE
+      copyDatatype(type, count, type, count, inbuf, outbuf);
+    }
+
+    while (pof2 <= size) pof2 <<= 1;
+    pof2 >>= 1;
+    int rem = size - pof2;
+
+    if (rank < 2*rem) {
+      if (rank % 2 == 0) { // even
+        ptr->send(MPI_ATA_TAG, rank, outbuf, count, type, rank+1, comm);
+        newrank = -1; // this rank won't participate in recursive doubling
+      } else { // odd
+        ptr->recv(MPI_ATA_TAG, rank-1, &tmpbuf[0], count, type, comm, MPI_STATUS_IGNORE);
+        parent->applyOp(type, op, count, &tmpbuf[0], outbuf);
+        newrank = rank / 2;
+      }
+    } else { // rank >= 2*rem
+      newrank = rank - rem;
+    }
+
+    if (newrank != -1) {
+      if (count*typeSize <= AMPI_ALLREDUCE_SHORT_MSG ||
+          !parent->opIsPredefined(op) ||
+          count < pof2) { // recursive doubling
+        mask = 0x1;
+        while (mask < pof2) {
+          newdst = newrank ^ mask;
+          dst = (newdst < rem) ? newdst*2 + 1 : newdst + rem;
+          ptr->sendrecv(outbuf, count, type, dst, MPI_ATA_TAG,
+                        &tmpbuf[0], count, type, dst, MPI_ATA_TAG,
+                        comm, MPI_STATUS_IGNORE);
+          if (getAmpiParent()->opIsCommutative(op) || dst < rank) {
+            parent->applyOp(type, op, count, &tmpbuf[0], outbuf);
+          } else {
+            parent->applyOp(type, op, count, outbuf, &tmpbuf[0]);
+            copyDatatype(type, count, type, count, &tmpbuf[0], outbuf);
+          }
+          mask <<= 1;
+        }
+      }
+      else { // reduce-scatter followed by allgather
+        vector<int> cnts(pof2), disps(pof2);
+        int sendCnt, recvCnt;
+
+        for (int i=0; i<pof2-1; i++) {
+          cnts[i] = count/pof2;
+        }
+        cnts[pof2-1] = count - (count/pof2)*(pof2-1);
+
+        disps[0] = 0;
+        for (int i=1; i<pof2; i++) {
+          disps[i] = disps[i-1] + cnts[i-1];
+        }
+        int sendIdx = 0, recvIdx = 0, lastIdx = pof2;
+
+        // reduce-scatter
+        mask = 0x1;
+        while (mask < pof2) {
+          newdst = newrank ^ mask;
+          dst = (newdst < rem) ? newdst*2 + 1 : newdst + rem;
+          sendCnt = 0;
+          recvCnt = 0;
+          if (newrank < newdst) {
+            sendIdx = recvIdx + pof2/(mask*2);
+            for (int i=sendIdx; i<lastIdx; i++) {
+              sendCnt += cnts[i];
+            }
+            for (int i=recvIdx; i<sendIdx; i++) {
+              recvCnt += cnts[i];
+            }
+          }
+          else {
+            recvIdx = sendIdx + pof2/(mask*2);
+            for (int i=sendIdx; i<recvIdx; i++) {
+              sendCnt += cnts[i];
+            }
+            for (int i=recvIdx; i<lastIdx; i++) {
+               recvCnt += cnts[i];
+            }
+          }
+          ptr->sendrecv((char *)outbuf + disps[sendIdx]*extent, sendCnt, type,
+                        dst, MPI_ATA_TAG, (char *)&tmpbuf[0] + disps[recvIdx]*extent,
+                        recvCnt, type, dst, MPI_ATA_TAG, comm, MPI_STATUS_IGNORE);
+          parent->applyOp(type, op, recvCnt, ((char *)&tmpbuf[0] + disps[recvIdx]*extent),
+                          ((char *)outbuf + disps[recvIdx]*extent));
+          sendIdx = recvIdx;
+          mask <<= 1;
+          if (mask < pof2) {
+            lastIdx = recvIdx + pof2/mask;
+          }
+        }
+
+        // allgather
+        mask >>= 1;
+        while (mask > 0) {
+          newdst = newrank ^ mask;
+          dst = (newdst < rem) ? newdst*2 + 1 : newdst + rem;
+          sendCnt = 0;
+          recvCnt = 0;
+          if (newrank < newdst) {
+            if (mask != pof2/2) {
+              lastIdx = lastIdx + pof2/(mask*2);
+            }
+            recvIdx = sendIdx + pof2/(mask*2);
+            for (int i=sendIdx; i<recvIdx; i++) {
+              sendCnt += cnts[i];
+            }
+            for (int i=recvIdx; i<lastIdx; i++) {
+              recvCnt += cnts[i];
+            }
+          }
+          else {
+            recvIdx = sendIdx - pof2/(mask*2);
+            for (int i=sendIdx; i<lastIdx; i++) {
+              sendCnt += cnts[i];
+            }
+            for (int i=recvIdx; i<sendIdx; i++) {
+              recvCnt += cnts[i];
+            }
+          }
+          ptr->sendrecv((char *)outbuf + disps[sendIdx]*extent, sendCnt, type,
+                        dst, MPI_ATA_TAG, (char *)outbuf + disps[recvIdx]*extent,
+                        recvCnt, type, dst, MPI_ATA_TAG, comm,  MPI_STATUS_IGNORE);
+          if (newrank > newdst) {
+            sendIdx = recvIdx;
+          }
+          mask >>= 1;
+        }
+      }
+    }
+
+    if (rank < 2*rem) {
+      if (rank % 2) { // odd
+        ptr->send(MPI_ATA_TAG, rank, outbuf, count, type, rank-1, comm);
+      } else { // even
+        ptr->recv(MPI_ATA_TAG, rank+1, outbuf, count, type, comm, MPI_STATUS_IGNORE);
+      }
+    }
+  }
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){

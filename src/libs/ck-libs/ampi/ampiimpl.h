@@ -109,6 +109,8 @@ extern int AMPI_RDMA_THRESHOLD;
 #define AMPI_ALLTOALL_LONG_MSG   32768
 #endif
 
+#define AMPI_ALLREDUCE_SHORT_MSG  2048
+
 typedef void (*MPI_MigrateFn)(void);
 
 /*
