@@ -7294,7 +7294,23 @@ int AMPI_Alltoallv(const void *sendbuf, const int *sendcounts, const int *sdispl
   int itemsize = getDDT()->getSize(sendtype);
   int extent = getDDT()->getExtent(recvtype);
 
-  if (size <= AMPI_ALLTOALL_THROTTLE) {
+  if (recvbuf == sendbuf) {
+    for (int i=0; i<size; i++) {
+      for (int j=i; j<size; j++) {
+        if (rank == i) {
+          AMPI_Sendrecv_replace(((char *)recvbuf + (extent*rdispls[j])),
+                                recvcounts[j], recvtype, j, MPI_ATA_TAG, j,
+                                MPI_ATA_TAG, comm, MPI_STATUS_IGNORE);
+        }
+        else if (rank == j) {
+          AMPI_Sendrecv_replace(((char *)recvbuf + (extent*rdispls[i])),
+                                recvcounts[i], recvtype, i, MPI_ATA_TAG, i,
+                                MPI_ATA_TAG, comm, MPI_STATUS_IGNORE);
+        }
+      }
+    }
+  }
+  else if (size <= AMPI_ALLTOALL_THROTTLE) {
     vector<MPI_Request> reqs(size*2);
     for (int i=0; i<size; i++) {
       int src = (rank+i) % size;
@@ -7425,7 +7441,23 @@ int AMPI_Alltoallw(const void *sendbuf, const int *sendcounts, const int *sdispl
     return copyDatatype(sendtypes[0],sendcounts[0],recvtypes[0],recvcounts[0],sendbuf,recvbuf);
 
   /* displs are in terms of bytes for Alltoallw (unlike Alltoallv) */
-  if (size <= AMPI_ALLTOALL_THROTTLE) {
+  if (recvbuf == sendbuf) {
+    for (int i=0; i<size; i++) {
+      for (int j=i; j<size; j++) {
+        if (rank == i) {
+          AMPI_Sendrecv_replace(((char *)recvbuf + rdispls[j]),
+                                recvcounts[j], recvtypes[j], j, MPI_ATA_TAG, j,
+                                MPI_ATA_TAG, comm, MPI_STATUS_IGNORE);
+        }
+        else if (rank == j) {
+          AMPI_Sendrecv_replace(((char *)recvbuf + rdispls[i]),
+                                recvcounts[i], recvtypes[i], i, MPI_ATA_TAG, i,
+                                MPI_ATA_TAG, comm, MPI_STATUS_IGNORE);
+        }
+      }
+    }
+  }
+  else if (size <= AMPI_ALLTOALL_THROTTLE) {
     vector<MPI_Request> reqs(size*2);
     for (int i=0; i<size; i++) {
       int src = (rank+i) % size;
