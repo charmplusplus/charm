@@ -3695,7 +3695,7 @@ static void _init_static_smsg()
     register_memory_size += smsg_memlen*(mysize);
     GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
 
-    if (myrank == 0)  printf("Charm++> SMSG memory: %1.1fKB\n", 1.0*smsg_memlen*(mysize)/1024);
+    if (myrank == 0 && !quietMode)  printf("Charm++> SMSG memory: %1.1fKB\n", 1.0*smsg_memlen*(mysize)/1024);
     if (myrank == 0 && register_memory_size>=MAX_REG_MEM ) printf("Charm++> FATAL ERROR your program has risk of hanging \n please set CHARM_UGNI_MEMPOOL_MAX  to a larger value or use Dynamic smsg\n");
 
     base_infor.addr =  (uint64_t)smsg_mailbox_base;
