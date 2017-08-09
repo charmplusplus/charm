@@ -4035,6 +4035,23 @@ int AMPI_Sendrecv(const void *sbuf, int scount, MPI_Datatype stype, int dest,
   return MPI_SUCCESS;
 }
 
+void ampi::sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
+                            int dest, int sendtag, int source, int recvtag,
+                            MPI_Comm comm, MPI_Status *status)
+{
+  MPI_Request req;
+  irecv(buf, count, datatype, source, recvtag, comm, &req);
+
+  CkDDT_DataType* ddt = getDDT()->getType(datatype);
+  vector<char> tmpBuf(ddt->getSize(count));
+  ddt->serialize((char*)buf, &tmpBuf[0], count, 1);
+
+  // FIXME: this send may do a copy internally! If we knew now that it would, we could avoid double copying:
+  send(sendtag, source, &tmpBuf[0], count, datatype, dest, comm, 0, BLOCKING_SEND);
+
+  AMPI_Wait(&req, status);
+}
+
 CDECL
 int AMPI_Sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
                           int dest, int sendtag, int source, int recvtag,
@@ -4056,17 +4073,7 @@ int AMPI_Sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
 
   ampi* ptr = getAmpiInstance(comm);
 
-  MPI_Request req;
-  ptr->irecv(buf, count, datatype, source, recvtag, comm, &req);
-
-  CkDDT_DataType* ddt = getDDT()->getType(datatype);
-  vector<char> tmpBuf(ddt->getSize(count));
-  ddt->serialize((char*)buf, &tmpBuf[0], count, 1);
-
-  // FIXME: this send may do a copy internally! If we knew now that it would, we could avoid double copying:
-  ptr->send(sendtag, source, &tmpBuf[0], count, datatype, dest, comm, 0, BLOCKING_SEND);
-
-  AMPI_Wait(&req, status);
+  ptr->sendrecv_replace(buf, count, datatype, dest, sendtag, source, recvtag, comm, status);
 
   return MPI_SUCCESS;
 }
@@ -7061,12 +7068,12 @@ int AMPI_Alltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
     for (int i=0; i<size; i++) {
       for (int j=i; j<size; j++) {
         if (rank == i) {
-          AMPI_Sendrecv_replace(((char *)recvbuf + j*recvcount*extent),
+          ptr->sendrecv_replace(((char *)recvbuf + j*recvcount*extent),
                                 recvcount, recvtype, j, MPI_ATA_TAG, j,
                                 MPI_ATA_TAG, comm, MPI_STATUS_IGNORE);
         }
         else if (rank == j) {
-          AMPI_Sendrecv_replace(((char *)recvbuf + i*recvcount*extent),
+          ptr->sendrecv_replace(((char *)recvbuf + i*recvcount*extent),
                                 recvcount, recvtype, i, MPI_ATA_TAG, i,
                                 MPI_ATA_TAG, comm, MPI_STATUS_IGNORE);
         }
@@ -7298,12 +7305,12 @@ int AMPI_Alltoallv(const void *sendbuf, const int *sendcounts, const int *sdispl
     for (int i=0; i<size; i++) {
       for (int j=i; j<size; j++) {
         if (rank == i) {
-          AMPI_Sendrecv_replace(((char *)recvbuf + (extent*rdispls[j])),
+          ptr->sendrecv_replace(((char *)recvbuf + (extent*rdispls[j])),
                                 recvcounts[j], recvtype, j, MPI_ATA_TAG, j,
                                 MPI_ATA_TAG, comm, MPI_STATUS_IGNORE);
         }
         else if (rank == j) {
-          AMPI_Sendrecv_replace(((char *)recvbuf + (extent*rdispls[i])),
+          ptr->sendrecv_replace(((char *)recvbuf + (extent*rdispls[i])),
                                 recvcounts[i], recvtype, i, MPI_ATA_TAG, i,
                                 MPI_ATA_TAG, comm, MPI_STATUS_IGNORE);
         }
@@ -7445,12 +7452,12 @@ int AMPI_Alltoallw(const void *sendbuf, const int *sendcounts, const int *sdispl
     for (int i=0; i<size; i++) {
       for (int j=i; j<size; j++) {
         if (rank == i) {
-          AMPI_Sendrecv_replace(((char *)recvbuf + rdispls[j]),
+          ptr->sendrecv_replace(((char *)recvbuf + rdispls[j]),
                                 recvcounts[j], recvtypes[j], j, MPI_ATA_TAG, j,
                                 MPI_ATA_TAG, comm, MPI_STATUS_IGNORE);
         }
         else if (rank == j) {
-          AMPI_Sendrecv_replace(((char *)recvbuf + rdispls[i]),
+          ptr->sendrecv_replace(((char *)recvbuf + rdispls[i]),
                                 recvcounts[i], recvtypes[i], i, MPI_ATA_TAG, i,
                                 MPI_ATA_TAG, comm, MPI_STATUS_IGNORE);
         }

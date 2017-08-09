@@ -1718,6 +1718,9 @@ class ampi : public CBase_ampi {
   void sendrecv(const void *sbuf, int scount, MPI_Datatype stype, int dest, int stag,
                 void *rbuf, int rcount, MPI_Datatype rtype, int src, int rtag,
                 MPI_Comm comm, MPI_Status *sts);
+  void sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
+                        int dest, int sendtag, int source, int recvtag,
+                        MPI_Comm comm, MPI_Status *status);
   void probe(int t,int s,MPI_Comm comm,MPI_Status *sts);
   int iprobe(int t,int s,MPI_Comm comm,MPI_Status *sts);
   void barrier(void);
