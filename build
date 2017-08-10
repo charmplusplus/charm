@@ -405,6 +405,10 @@ do
 		MAKEOPTS="$MAKEOPTS -j $PMAKENUM"
 		shift;
 		;;
+    -k|--keep-going)
+		MAKEOPTS="$MAKEOPTS $1"
+		shift;
+		;;
     -*) 
 # We hit a real compiler option (like -g, or -Dfoo),
 # so just copy over all remaining options
