@@ -4039,12 +4039,12 @@ void ampi::sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
                             int dest, int sendtag, int source, int recvtag,
                             MPI_Comm comm, MPI_Status *status)
 {
-  MPI_Request req;
-  irecv(buf, count, datatype, source, recvtag, comm, &req);
-
   CkDDT_DataType* ddt = getDDT()->getType(datatype);
   vector<char> tmpBuf(ddt->getSize(count));
   ddt->serialize((char*)buf, &tmpBuf[0], count, 1);
+
+  MPI_Request req;
+  irecv(buf, count, datatype, source, recvtag, comm, &req);
 
   // FIXME: this send may do a copy internally! If we knew now that it would, we could avoid double copying:
   send(sendtag, source, &tmpBuf[0], count, datatype, dest, comm, 0, BLOCKING_SEND);
