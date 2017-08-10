@@ -11,7 +11,7 @@ versions of charm.
 #include <alloca.h>
 #endif
 
-struct helpdesc { qt_helper_t *hfn; qt_t *jb; void *old; void *new; };
+struct helpdesc { qt_helper_t *hfn; qt_t *jb; void *oldptr; void *newptr; };
 
 #ifdef __CYGWIN__
 # ifdef QT_GROW_DOWN
@@ -36,7 +36,7 @@ static void qt_args_1(qt_t *rjb, void *u, void *t,
     SHIFTSP(rjb);
     _longjmp((int*)rjb, (int)jb);
   }
-  rhelp->hfn(rhelp->jb, rhelp->old, rhelp->new);
+  rhelp->hfn(rhelp->jb, rhelp->oldptr, rhelp->newptr);
   only(u, t, userf);
   write(2,"Never get here 2.\n",18);
 }
@@ -55,29 +55,29 @@ qt_t *qt_args(qt_t *sp, void *u, void *t,
   return result;
 }
 
-void *qt_block(qt_helper_t *hfn, void *old, void *new, qt_t *sp)
+void *qt_block(qt_helper_t *hfn, void *oldptr, void *newptr, qt_t *sp)
 {
   struct helpdesc help, *rhelp; char *oldsp; int offs;
   jmp_buf jb;
   help.hfn = hfn;
   help.jb  = (qt_t*)&jb;
-  help.old = old;
-  help.new = new;
+  help.oldptr = oldptr;
+  help.newptr = newptr;
   rhelp = (struct helpdesc *)_setjmp(jb);
   if (rhelp==0) {
     SHIFTSP(sp);
     _longjmp((int*)sp, (int)&help);
   }
-  rhelp->hfn(rhelp->jb, rhelp->old, rhelp->new);
+  rhelp->hfn(rhelp->jb, rhelp->oldptr, rhelp->newptr);
 }
 
-void *qt_abort(qt_helper_t *hfn, void *old, void *new, qt_t *sp)
+void *qt_abort(qt_helper_t *hfn, void *oldptr, void *newptr, qt_t *sp)
 {
   struct helpdesc help, *rhelp;
   help.hfn = hfn;
   help.jb  = (qt_t*)&help;
-  help.old = old;
-  help.new = new;
+  help.oldptr = oldptr;
+  help.newptr = newptr;
   SHIFTSP(sp);
   _longjmp((int*)sp, (int)&help);
 }

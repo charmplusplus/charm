@@ -75,18 +75,18 @@ void display_node(tree_t *node){
   printf("child : %p\narity : %d\nparent : %p\nid : %d\nval : %f\nuniq : %d\n\n" ,
 	 node->child,node->arity,node->parent,node->id,node->val,node->uniq);
 }
-void clone_tree(tree_t *new,tree_t *old){
+void clone_tree(tree_t *newptr,tree_t *oldptr){
   int i;
-  new->child=old->child;
-  new->arity=old->arity;
-  new->parent=old->parent;
-  //new->deb_tab_child=old->deb_tab_child;
-  new->id=old->id;
-  new->val=old->val;
-  new->uniq=old->uniq;
-  new->dumb=old->dumb;
-  for(i=0;i<new->arity;i++)
-    new->child[i]->parent=new;
+  newptr->child=oldptr->child;
+  newptr->arity=oldptr->arity;
+  newptr->parent=oldptr->parent;
+  //newptr->deb_tab_child=oldptr->deb_tab_child;
+  newptr->id=oldptr->id;
+  newptr->val=oldptr->val;
+  newptr->uniq=oldptr->uniq;
+  newptr->dumb=oldptr->dumb;
+  for(i=0;i<newptr->arity;i++)
+    newptr->child[i]->parent=newptr;
 }
 
 
