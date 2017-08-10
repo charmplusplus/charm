@@ -306,10 +306,7 @@ static void sort(int *adj, int fromIndex, int toIndex);
 void countDegrees(Edge *edges, Vertex *vertRecs, int V, int E);
 
 VerticesListType * 
-InitVertices(EdgeList, V,E)
-     EdgeListType * EdgeList;
-     int V;
-     int E;
+InitVertices(EdgeListType * EdgeList, int V, int E)
 { /* returns a structure of type VerticesListType, which contains an arry of 
      vertex records, and an array of adjacency information. See typedef. */
   /* First allocate the adjacency subarray of size E, and vertex subarray size V.

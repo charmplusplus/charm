@@ -4,10 +4,7 @@
 /*  sorted with respect to the comparison function.               */
 /* ************************************************************** */
 
-static insert(front_ptr,comparison,item)
-MSG **front_ptr;
-int  (*comparison)();
-MSG *item;
+static insert(MSG **front_ptr, int (*comparison)(MSG *, MSG *), MSG *item)
 { 
     MSG *prev,*current;
 #if HELPME

@@ -1,8 +1,6 @@
 #include "converse.h"
 
-user_main(argc, argv)
-int argc;
-char *argv[];
+void user_main(int argc, char **argv)
 {
   CmiPrintf("user_main probably not currently working\n");
   /*  ConverseInit(argv); */

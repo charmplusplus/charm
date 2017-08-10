@@ -34,9 +34,7 @@ void pvmc_user_main(int argc, char **argv)
 
 #define SLAVENAME "timeslave"
 
-time_master(argc, argv)
-int argc;
-char **argv;
+void time_master(int argc, char **argv)
 {
   int mytid;                  /* my task id */
   int stid = 0;               /* slave task id */
@@ -183,9 +181,7 @@ bail:
 *       See timing.c
 */
 
-time_slave(argc, argv)
-int argc;
-char **argv;
+void time_slave(int argc, char **argv)
 {
   int mytid;   /* my task id */
   int dtid;    /* driver task */

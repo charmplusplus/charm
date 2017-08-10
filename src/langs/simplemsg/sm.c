@@ -15,14 +15,12 @@ CpvStaticDeclare(int *, SMSeqOut);
 CpvStaticDeclare(int *, SMSeqIn);
 CpvStaticDeclare(CmmTable, SMMessages);
 
-void SMHandler(m)
-SMMessage m;
+void SMHandler(SMMessage m)
 {
   CmmPut(CpvAccess(SMMessages), m->ntags, m->tags, m);
 }
 
-void SMInit(argv)
-char **argv;
+void SMInit(char **argv)
 {
   int *seqout, *seqin; int i;
 
@@ -42,11 +40,7 @@ char **argv;
   CpvAccess(SMMessages) = CmmNew();
 }
 
-void GeneralSend(pe, ntags, tags, buffer, buflen)
-int pe, ntags;
-int *tags;
-void *buffer;
-int buflen;
+void GeneralSend(int pe, int ntags, int *tags, void *buffer, int buflen)
 {
   int headsize, totsize, i; SMMessage msg;
 
@@ -63,11 +57,7 @@ int buflen;
   CmiSyncSend(pe, totsize, msg);
 }
 
-int GeneralBroadcast(rootpe, ntags, tags, buffer, buflen, rtags)
-int rootpe, ntags;
-int *tags, *rtags;
-void *buffer;
-int buflen;
+int GeneralBroadcast(int rootpe, int ntags, int *tags, void *buffer, int buflen, int *rtags)
 {
   if(CmiMyPe()==rootpe) {
     int headsize, totsize, i; SMMessage msg;
@@ -100,12 +90,7 @@ int buflen;
   }
 }
 
-int GeneralRecv(ntags, tags, buffer, buflen, rtags)
-int ntags;
-int *tags;
-void *buffer;
-int buflen;
-int *rtags;
+int GeneralRecv(int ntags, int *tags, void *buffer, int buflen, int *rtags)
 {
   SMMessage msg;
   int headsize;

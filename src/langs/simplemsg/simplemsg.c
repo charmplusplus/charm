@@ -16,8 +16,7 @@ CpvStaticDeclare(int *, CsmSeqIn);
 CpvStaticDeclare(CmmTable, CsmMessages);
 CpvStaticDeclare(CmmTable, CsmSleepers);
 
-void CsmHandler(m)
-CsmMessage m;
+void CsmHandler(CsmMessage m)
 {
   CthThread t;
   CmmPut(CpvAccess(CsmMessages), m->ntags, m->tags, m);
@@ -25,8 +24,7 @@ CsmMessage m;
   if (t) CthAwaken(t);
 }
 
-void CsmInit(argv)
-char **argv;
+void CsmInit(char **argv)
 {
   int *seqout, *seqin; int i;
 
@@ -48,11 +46,7 @@ char **argv;
   CpvAccess(CsmSleepers) = CmmNew();
 }
 
-void CsmTVSend(pe, ntags, tags, buffer, buflen)
-int pe, ntags;
-int *tags;
-void *buffer;
-int buflen;
+void CsmTVSend(int pe, int ntags, int *tags, void *buffer, int buflen)
 {
   int headsize, totsize, i; CsmMessage msg;
 
@@ -69,12 +63,7 @@ int buflen;
   CmiSyncSend(pe, totsize, msg);
 }
 
-void CsmTVRecv(ntags, tags, buffer, buflen, rtags)
-int ntags;
-int *tags;
-void *buffer;
-int buflen;
-int *rtags;
+void CsmTVRecv(int ntags, int *tags, void *buffer, int buflen, int *rtags)
 {
   CsmMessage msg; CthThread self;
   int headsize;

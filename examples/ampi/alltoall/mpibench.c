@@ -26,9 +26,7 @@ void getclockvalue(double *retval)
 }
 #endif
 
-int main(argc,argv)
-int argc;
-char *argv[];
+int main(int argc, char **argv)
 {
     int myid, root, numprocs, i, j, k, size, num_sizes, times,reps;
     double startwtime, endwtime, opertime[NUMTIMES][NUM_SIZES];
