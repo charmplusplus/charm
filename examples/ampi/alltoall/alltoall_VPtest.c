@@ -61,7 +61,7 @@ float Read_Timer (int i, int which){
   return elapsed_time;
 }
 
-main(int argc, char **argv){
+int main(int argc, char **argv){
   int my_id;		/* process id */
   int p;		/* number of processes */
   char* message;	/* storage for the message */

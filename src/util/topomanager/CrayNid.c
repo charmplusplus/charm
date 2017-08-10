@@ -211,7 +211,7 @@ void craynid_reset()
 
 void craynid_init()
 {
-  static init_done = 0;
+  static int init_done = 0;
   if (!init_done) {
     cray_lock = CmiCreateLock();
     cray_lock2 = CmiCreateLock();

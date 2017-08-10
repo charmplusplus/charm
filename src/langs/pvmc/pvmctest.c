@@ -11,7 +11,7 @@
 #define PRINTF CmiPrintf
 #define puts(x) CmiPrintf("%s%c",(x),'\n')
 
-pvmc_user_main(argc,argv)
+void pvmc_user_main(int argc, char **argv)
 {
   if (CmiMyPe()==0) {
     time_master(argc,argv);

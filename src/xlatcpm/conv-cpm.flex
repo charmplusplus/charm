@@ -53,7 +53,7 @@ ID     [_a-zA-Z][_a-zA-Z0-9]*
 #ifdef yywrap
 #undef yywrap
 #endif
-yywrap(){ return(1); }
+int yywrap(){ return(1); }
 
 void yytokget()
 {
@@ -455,7 +455,7 @@ void disclaim(FILE *f, char *src)
   fprintf(f,"\n");
 }
 
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
   if (argc != 3) usage();
   file_src = fopen_nofail(argv[1], "r");
