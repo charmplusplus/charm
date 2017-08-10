@@ -30,7 +30,7 @@ void initCompress(void)
     {
         case CMODE_ZLIB:    zlib_init();    break;
         //case CMODE_QUICKLZ: quicklz_init(); break;
-        case CMODE_LZ4:     lz4_init();     break;
+        case CMODE_LZ4: break;
     }
 
 }
@@ -94,7 +94,9 @@ void compressLz4(void *src, void *dst, int size, int *compressSize, void *bData)
     int i;
     for(i=0; i<size; i++)
         xor[i] = (src_ptr[i])^(bdata_ptr[i]);       
-    lz4_wrapper_compress(xor, dst, size, compressSize);
+
+    *compressSize = LZ4_compress_default(xor, dst, size, LZ4_compressBound(size));
+
 #if DEBUG
     double t = get_clock()-t1;
     printf("+%d external compression done compressing(%d===>%d) (reduction:%d) ration=%f time=%d us\n", compress_mode, (int)(size*sizeof(char)), *compressSize, (int)(size*sizeof(char)-*compressSize), (1-(float)*compressSize/(size*sizeof(char)))*100, (int)(t*1000000));
@@ -107,7 +109,10 @@ void decompressLz4(void *cData, void *dData, int size, int compressSize, void *b
     double t1 = get_clock();
 #endif
     char *xor=(char*)malloc(size);
-    lz4_wrapper_decompress(cData, xor, compressSize, size);
+
+    if (LZ4_decompress_safe(cData, xor, compressSize, size) < 0)
+        CmiAbort("decode fails\n");
+
     int i;
     char *dptr = (char*)dData;
     char *bptr = (char*)bData; 
