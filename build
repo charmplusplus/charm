@@ -506,7 +506,7 @@ then
     if test -z "$COMPILER" -o "$COMPILER" != "gcc"
     then
       echo "The integrated OpenMP runtime library is supported on Mac only with the normal gcc"
-      echo "You need to install this normal(non-clang) gcc via MacPorts or HomeBrew"
+      echo "You need to install this normal (non-clang) gcc via MacPorts or Homebrew"
       echo "Read the instructions on the Charm++ manual."
       exit 1
     fi
