@@ -2482,6 +2482,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
   }
   pup_bytes(p,lp,sizeof(int*));
   if(pup_isDeleting(p)) {
+    mempool_destroy(CtvAccessOther(tid,threadpool));
     *lp=NULL;
   }
 }
