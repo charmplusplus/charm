@@ -429,7 +429,7 @@ CpmDestination.  The following is the code for CpmEnqueueFIFO:
 \pagebreak
 
 \begin{alltt}
-typedef struct CpmDestinationSend
+typedef struct CpmDestinationSend_s
 \{
   void *(*sendfn)();
   int envsize;
@@ -439,7 +439,7 @@ typedef struct CpmDestinationSend
 
 CpmDestination CpmEnqueueFIFO(int pe)
 \{
-  static struct CpmDestinationSend ctrl;
+  static struct CpmDestinationSend_s ctrl;
   ctrl.envsize = sizeof(int);
   ctrl.sendfn  = CpmEnqueueFIFO1;
   ctrl.pe = pe;

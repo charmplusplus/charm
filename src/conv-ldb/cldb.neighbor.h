@@ -18,7 +18,7 @@ typedef struct requestmsg_s {
   int to_rank;
 } requestmsg;
 
-typedef struct CldNeighborData
+typedef struct CldNeighborData_s
 {
   int pe, load;
 #if ! USE_MULTICAST

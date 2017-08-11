@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <converse.h>
 
-typedef struct incmsg
+typedef struct incmsg_s
 {
   char head[CmiMsgHeaderSizeBytes];
   int n;
@@ -25,7 +25,7 @@ void deadlock_inc(incmsg m)
 
 void deadlock_cram(char *msg)
 {
-  struct incmsg m={{0},1};
+  struct incmsg_s m={{0},1};
   int count = 0;
   CmiSetHandler(&m, CpvAccess(deadlock_inc_idx));
   while (count<5000) {

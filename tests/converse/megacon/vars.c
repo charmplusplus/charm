@@ -3,7 +3,7 @@
 
 void Cpm_megacon_ack();
 
-typedef struct vars_chare
+typedef struct vars_chare_s
 {
   int countdown;
   CthThread pending;
@@ -65,7 +65,8 @@ CpmInvokable vars_check_cpv_and_csv(vars_chare c)
 
 CpmInvokable vars_control()
 {
-  struct vars_chare c; CthThread t1,t2;
+  struct vars_chare_s c;
+  CthThread t1,t2;
 
   t1 = CthCreate(vars_check_ctv_privacy, (void *)&c, 0);
   t2 = CthCreate(vars_check_ctv_privacy, (void *)&c, 0);

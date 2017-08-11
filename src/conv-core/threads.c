@@ -962,7 +962,7 @@ Gengbin Zheng March, 2006
 
 #define SWITCHBUF_SIZE 32768
 
-typedef struct CthProcInfo *CthProcInfo;
+typedef struct CthProcInfo_s *CthProcInfo;
 
 typedef struct CthThreadStruct
 {
@@ -1003,7 +1003,7 @@ CthThread CthPup(pup_er p, CthThread t)
 
 
 
-struct CthProcInfo
+struct CthProcInfo_s
 {
   qt_t      *stackbase;
   qt_t      *switchbuf_sp;
@@ -1056,7 +1056,7 @@ void CthInit(char **argv)
   CthCpvAccess(CthCurrent)=t;
   CthThreadInit(t,0,0);
 
-  p = (CthProcInfo)malloc(sizeof(struct CthProcInfo));
+  p = (CthProcInfo)malloc(sizeof(struct CthProcInfo_s));
   _MEMCHECK(p);
   CthCpvAccess(CthProc)=p;
 

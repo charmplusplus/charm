@@ -3,7 +3,7 @@
 
 void Cpm_megacon_ack();
 
-typedef struct bchare
+typedef struct bchare_s
 {
   CmiGroup grp;
   int totalsent;
@@ -11,7 +11,7 @@ typedef struct bchare
 }
 *bchare;
 
-typedef struct mesg
+typedef struct mesg_s
 {
   char head[CmiMsgHeaderSizeBytes];
   int reply_pe;
@@ -30,25 +30,25 @@ void multicast_recv(mesg m)
     exit(1);
   }
   CmiSetHandler(m, CpvAccess(multicast_reply_idx));
-  CmiSyncSendAndFree(m->reply_pe, sizeof(struct mesg), m);
+  CmiSyncSendAndFree(m->reply_pe, sizeof(struct mesg_s), m);
 }
 
 void multicast_start_cycle(bchare c)
 {
-  struct mesg m={{0},CmiMyPe(),c,0x12345678}; struct mesg *mp;
+  struct mesg_s m={{0},CmiMyPe(),c,0x12345678}; struct mesg_s *mp;
   switch (c->totalsent) {
   case 0:
     CmiSetHandler(&m, CpvAccess(multicast_recv_idx));
     m.reply_ptr = c; m.reply_pe = CmiMyPe(); m.magic = 0x12345678;
-    CmiSyncMulticast(c->grp, sizeof(struct mesg),&m);
+    CmiSyncMulticast(c->grp, sizeof(struct mesg_s),&m);
     c->totalsent++;
     break;
   case 1:
   case 2:
-    mp = (mesg)CmiAlloc(sizeof(struct mesg));
+    mp = (mesg)CmiAlloc(sizeof(struct mesg_s));
     CmiSetHandler(mp, CpvAccess(multicast_recv_idx));
     mp->reply_ptr = c; mp->reply_pe = CmiMyPe();mp->magic = 0x12345678;
-    CmiSyncMulticastAndFree(c->grp, sizeof(struct mesg), mp);
+    CmiSyncMulticastAndFree(c->grp, sizeof(struct mesg_s), mp);
     c->totalsent++;
     break;
   case 3:
@@ -84,7 +84,7 @@ CmiGroup multicast_all()
 void multicast_init(void)
 {
   bchare c;
-  c = (bchare)malloc(sizeof(struct bchare));
+  c = (bchare)malloc(sizeof(struct bchare_s));
   c->grp = multicast_all();
   c->totalsent = 0;
   c->totalreplies = 0;

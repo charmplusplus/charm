@@ -11,10 +11,10 @@
 
 void Cpm_megacon_ack();
 
-typedef struct fibobj_chare
+typedef struct fibobj_chare_s
 {
   int ppe;
-  struct fibobj_chare *ppos;
+  struct fibobj_chare_s *ppos;
   int count, total;
 }
 *fibobj_chare;
@@ -64,7 +64,7 @@ CpmInvokable fibobj_calc(int n, int ppe, fibobj_chare ppos)
 {
   if (n<2) Cpm_fibobj_result(CpmSend(ppe), n, ppos);
   else {
-    fibobj_chare c = (fibobj_chare)malloc(sizeof(struct fibobj_chare));
+    fibobj_chare c = (fibobj_chare)malloc(sizeof(struct fibobj_chare_s));
     c->ppe = ppe, c->ppos = ppos; c->count=c->total=0;
     Cpm_fibobj_calc(CpmLDB(), n-1, CmiMyPe(), c);
     Cpm_fibobj_calc(CpmLDB(), n-2, CmiMyPe(), c);
@@ -73,7 +73,7 @@ CpmInvokable fibobj_calc(int n, int ppe, fibobj_chare ppos)
 
 void fibobj_init()
 {
-  fibobj_chare c = (fibobj_chare)malloc(sizeof(struct fibobj_chare));
+  fibobj_chare c = (fibobj_chare)malloc(sizeof(struct fibobj_chare_s));
   c->ppe = -1, c->ppos = (fibobj_chare)FIB_INPUT; c->total=0; c->count=1;
   Cpm_fibobj_calc(CpmLDB(), FIB_INPUT, CmiMyPe(), c);
 }

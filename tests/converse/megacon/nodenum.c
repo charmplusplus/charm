@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <converse.h>
 
-typedef struct node_info
+typedef struct node_info_s
 {
   int pe;
   int rank;
@@ -9,10 +9,10 @@ typedef struct node_info
 }
 *node_info;
 
-typedef struct nodenum_chare
+typedef struct nodenum_chare_s
 {
   int countdown; CthThread pending;
-  struct node_info info[64];
+  struct node_info_s info[64];
 }
 *nodenum_chare;
 
@@ -57,7 +57,7 @@ CpmInvokable nodenum_collect_info(nodenum_chare c)
 
 CpmInvokable nodenum_control()
 {
-  struct nodenum_chare c;
+  struct nodenum_chare_s c;
   int i, npe; node_info curr, prev;
   npe = CmiNumPes();
 

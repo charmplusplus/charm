@@ -16,7 +16,7 @@ static void CpmLSend(int pe, int len, void *msg)
  *
  *****************************************************************************/
 
-typedef struct CpmDestinationSend
+typedef struct CpmDestinationSend_s
 { 
   void *(*sendfn)();
   int envsize;
@@ -24,7 +24,7 @@ typedef struct CpmDestinationSend
 }
 *CpmDestinationSend;
 
-typedef struct CpmDestinationSend DestinationSend;
+typedef struct CpmDestinationSend_s DestinationSend;
 
 void CpmSend1(CpmDestinationSend ctrl, int len, void *msg)
 {
@@ -47,7 +47,7 @@ CpmDestination CpmSend(int pe)
  *
  *****************************************************************************/
 
-typedef struct CpmDestinationEnq
+typedef struct CpmDestinationEnq_s
 {
   void *(*sendfn)();
   int envsize;
@@ -56,7 +56,7 @@ typedef struct CpmDestinationEnq
 }
 *CpmDestinationEnq;
 
-typedef struct CpmDestinationEnq DestinationEnq;
+typedef struct CpmDestinationEnq_s DestinationEnq;
 
 CpvStaticDeclare(DestinationEnq, ctrlEnq);
 
@@ -251,7 +251,7 @@ CpmDestination CpmMakeThread(int pe)
 
 CpvDeclare(int, CpmThreadSize2_Index);
 
-typedef struct CpmDestinationThreadSize
+typedef struct CpmDestinationThreadSize_s
 { 
   void *(*sendfn)();
   int envsize;
@@ -260,7 +260,7 @@ typedef struct CpmDestinationThreadSize
 }
 *CpmDestinationThreadSize;
 
-typedef struct CpmDestinationThreadSize DestinationThreadSize;
+typedef struct CpmDestinationThreadSize_s DestinationThreadSize;
 
 void CpmThreadSize2(void *msg)
 {

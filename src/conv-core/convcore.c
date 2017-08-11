@@ -2721,11 +2721,11 @@ void CmiReductionsInit(void) {
 
 #if CMK_MULTICAST_DEF_USE_COMMON_CODE
 
-typedef struct GroupDef
+typedef struct GroupDef_s
 {
   union {
     char core[CmiMsgHeaderSizeBytes];
-    struct GroupDef *next;
+    struct GroupDef_s *next;
   } core;
   CmiGroup group;
   int npes;
@@ -2756,7 +2756,7 @@ CmiGroup CmiEstablishGroup(int npes, int *pes)
   CmiGroup grp; GroupDef def; int len, i;
   grp.id = CpvAccess(CmiGroupCounter)++;
   grp.pe = CmiMyPe();
-  len = sizeof(struct GroupDef)+(npes*sizeof(int));
+  len = sizeof(struct GroupDef_s)+(npes*sizeof(int));
   def = (GroupDef)CmiAlloc(len);
   def->group = grp;
   def->npes = npes;
@@ -2857,7 +2857,7 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 
 #if CMK_MULTICAST_GROUP_USE_COMMON_CODE
 
-typedef struct MultiMsg
+typedef struct MultiMsg_s
 {
   char core[CmiMsgHeaderSizeBytes];
   CmiGroup group;
@@ -2873,7 +2873,7 @@ void CmiMulticastDeliver(MultiMsg msg)
 {
   int npes, *pes; int olen, nlen, pos, child1, child2;
   olen = msg->origlen;
-  nlen = olen + sizeof(struct MultiMsg);
+  nlen = olen + sizeof(struct MultiMsg_s);
   CmiLookupGroup(msg->group, &npes, &pes);
   if (pes==0) {
     CmiSyncSendAndFree(CmiMyPe(), nlen, msg);
@@ -2899,10 +2899,10 @@ void CmiMulticastDeliver(MultiMsg msg)
     msg->pos = child2;
     CmiSyncSend(pes[child2], nlen, msg);
   }
-  if(olen < sizeof(struct MultiMsg)) {
+  if(olen < sizeof(struct MultiMsg_s)) {
     memcpy(msg, msg+1, olen);
   } else {
-    memcpy(msg, (((char*)msg)+olen), sizeof(struct MultiMsg));
+    memcpy(msg, (((char*)msg)+olen), sizeof(struct MultiMsg_s));
   }
   CmiSyncSendAndFree(CmiMyPe(), olen, msg);
 }
@@ -2915,13 +2915,13 @@ void CmiMulticastHandler(MultiMsg msg)
 void CmiSyncMulticastFn(CmiGroup grp, int len, char *msg)
 {
   int newlen; MultiMsg newmsg;
-  newlen = len + sizeof(struct MultiMsg);
+  newlen = len + sizeof(struct MultiMsg_s);
   newmsg = (MultiMsg)CmiAlloc(newlen);
-  if(len < sizeof(struct MultiMsg)) {
+  if(len < sizeof(struct MultiMsg_s)) {
     memcpy(newmsg+1, msg, len);
   } else {
-    memcpy(newmsg+1, msg+sizeof(struct MultiMsg), len-sizeof(struct MultiMsg));
-    memcpy(((char *)newmsg+len), msg, sizeof(struct MultiMsg));
+    memcpy(newmsg+1, msg+sizeof(struct MultiMsg_s), len-sizeof(struct MultiMsg_s));
+    memcpy(((char *)newmsg+len), msg, sizeof(struct MultiMsg_s));
   }
   newmsg->group = grp;
   newmsg->origlen = len;

@@ -4,7 +4,7 @@ void Cpm_megacon_ack();
 
 /* an accumulator datatype, which can have one pending thread */
 
-typedef struct accum
+typedef struct accum_s
 {
   int total; int countdown;
   CthThread pending;
@@ -40,7 +40,7 @@ CpmInvokable blk_fibthr(int n, int pe, accum resp)
   int result;
   if (n<2) result = n;
   else {
-    struct accum acc;
+    struct accum_s acc;
     acc.total = 0; acc.countdown = 2; acc.pending = CthSelf();
     Cpm_blk_fibthr(CpmMakeThread(blk_randpe()), n-1, CmiMyPe(), &acc);
     Cpm_blk_fibthr(CpmMakeThread(blk_randpe()), n-2, CmiMyPe(), &acc);
@@ -54,7 +54,7 @@ CpmInvokable blk_fibthr(int n, int pe, accum resp)
 
 CpmInvokable blk_fibtop(int n)
 {
-  struct accum acc;
+  struct accum_s acc;
   acc.total = 0; acc.countdown = 1; acc.pending = CthSelf();
   Cpm_blk_fibthr(CpmMakeThread(blk_randpe()), n, CmiMyPe(), &acc);
   CthSuspend();

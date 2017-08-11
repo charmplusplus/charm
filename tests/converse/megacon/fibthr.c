@@ -6,7 +6,7 @@ void Cpm_megacon_ack();
 
 #define STACKSIZE_DEFAULT  (51200)
 
-typedef struct accum
+typedef struct accum_s
 {
   int total; int countdown;
   CthThread pending;
@@ -42,7 +42,7 @@ CpmInvokable fibthr(int n, int pe, accum resp)
   int result;
   if (n<2) result = n;
   else {
-    struct accum acc;
+    struct accum_s acc;
     acc.total = 0; acc.countdown = 2; acc.pending = CthSelf();
     Cpm_fibthr(CpmMakeThreadSize(randpe(),STACKSIZE_DEFAULT), n-1, CmiMyPe(), &acc);
     Cpm_fibthr(CpmMakeThreadSize(randpe(),STACKSIZE_DEFAULT), n-2, CmiMyPe(), &acc);
@@ -56,7 +56,7 @@ CpmInvokable fibthr(int n, int pe, accum resp)
 
 CpmInvokable fibtop(int n)
 {
-  struct accum acc;
+  struct accum_s acc;
   acc.total = 0; acc.countdown = 1; acc.pending = CthSelf();
   Cpm_fibthr(CpmMakeThreadSize(randpe(),STACKSIZE_DEFAULT), n, CmiMyPe(), &acc);
   CthSuspend();

@@ -3,7 +3,7 @@
 
 void Cpm_megacon_ack();
 
-typedef struct priotest_chare
+typedef struct priotest_chare_s
 {
   int numreceived;
   int totalexpected;
@@ -31,7 +31,7 @@ CpmInvokable priotest_bink(priotest_chare c, int n)
 CpmInvokable priotest_send()
 {
   int me = CmiMyPe();
-  priotest_chare c = (priotest_chare)CmiAlloc(sizeof(struct priotest_chare));
+  priotest_chare c = (priotest_chare)CmiAlloc(sizeof(struct priotest_chare_s));
   c->numreceived = 0;
   c->totalexpected = 8;
   Cpm_priotest_bink(CpmEnqueueIFIFO(me, 1), c, 1);

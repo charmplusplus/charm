@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <converse.h>
 
-typedef struct specmsg_chare
+typedef struct specmsg_chare_s
 {
   int next;
 }
@@ -47,7 +47,8 @@ CpmInvokable specmsg_step4(specmsg_chare c)
 
 CpmInvokable specmsg_begin()
 {
-  int i; struct specmsg_chare c;
+  struct specmsg_chare_s c;
+  int i;
   Cpm_specmsg_request(CpmSend(0), CmiMyPe(), &c);
   if (CmiMyPe()==0)
     for (i=0; i<CmiNumPes(); i++)

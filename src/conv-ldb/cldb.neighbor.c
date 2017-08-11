@@ -539,8 +539,8 @@ void CldReadNeighborData(void)
     }
   fscanf(fp, "%d", &CpvAccess(numNeighbors));
   CpvAccess(neighbors) = 
-    (struct CldNeighborData *)calloc(CpvAccess(numNeighbors), 
-				     sizeof(struct CldNeighborData));
+    (struct CldNeighborData_s *)calloc(CpvAccess(numNeighbors),
+				     sizeof(struct CldNeighborData_s));
   pes = (int *)calloc(CpvAccess(numNeighbors), sizeof(int));
   for (i=0; i<CpvAccess(numNeighbors); i++) {
     fscanf(fp, "%d", &(CpvAccess(neighbors)[i].pe));
@@ -587,7 +587,7 @@ static void CldComputeNeighborData(void)
 
   CpvAccess(numNeighbors) = npes;
   CpvAccess(neighbors) = 
-    (struct CldNeighborData *)calloc(npes, sizeof(struct CldNeighborData));
+    (struct CldNeighborData_s *)calloc(npes, sizeof(struct CldNeighborData_s));
   for (i=0; i<npes; i++) {
     CpvAccess(neighbors)[i].pe = pes[i];
     CpvAccess(neighbors)[i].load = 0;
