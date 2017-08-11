@@ -51,6 +51,9 @@ int peNumKeep;
 bool outlierUsePhases;
 double entryThreshold;
 
+bool papiUsingFile;
+char *papiFilename;
+
 typedef void (*mTFP)();                   // function pointer for
 CpvStaticDeclare(mTFP, machineTraceFuncPtr);    // machine user event
                                           // registration
@@ -197,7 +200,11 @@ static void traceCommonInit(char **argv)
         free(root);
   }
 
-  
+  if (CmiGetArgStringDesc(argv, "+papi", &papiFilename, "File with PAPI events to be followed")) {
+    papiUsingFile = true;
+  } else {
+    papiUsingFile = false;
+  }
   
 #ifdef __BIGSIM__
   if(BgNodeRank()==0) {
@@ -992,6 +999,56 @@ void initPAPI() {
   }
   CkpvInitialize(int*, papiEvents);
   CkpvInitialize(int, numEvents);
+
+  if(papiUsingFile) {
+    FILE *papiFile = fopen(papiFilename, "r");
+    if(papiFile == NULL)
+      CmiAbort("Couldn't open PAPI Event List.");
+    char *line = NULL;
+    size_t n = 0;
+    int count = 0;
+    while(getline(&line, &n, papiFile) != -1) {
+      count++;
+      line = NULL;
+      n = 0;
+    }
+    if(count > NUMPAPIEVENTS) {
+      CmiPrintf("Read %d events from file, max allowed is %d\n", count, NUMPAPIEVENTS);
+      CmiAbort("Event list has too many events.");
+    }
+    fclose(papiFile);
+    papiFile = fopen(papiFilename, "r");
+    if(papiFile == NULL)
+      CmiAbort("Couldn't open PAPI Event List.");
+    line = NULL;
+    n = 0;
+    int i = 0;
+    int temp[count];
+    while(getline(&line, &n, papiFile) != -1) {
+      while(line[strlen(line) - 1] == '\n')
+        line[strlen(line) - 1] = '\0';
+      int EventCode, ret;
+      ret = PAPI_event_name_to_code(line, &EventCode);
+      // skip this string if there were issues converting it to an event code
+      if (ret != 0) {
+        CmiPrintf("PAPI error %d when converting %s to code: %s\n", ret, line, PAPI_strerror(ret));
+      } else if(PAPI_query_event(EventCode) == PAPI_OK) { // next check that event is countable on this architecture
+        temp[i] = EventCode;
+        i++;
+      } else { // abort if event can't be counted on this platform
+        CmiPrintf("PAPI Event %s cannot be counted\n", line);
+        CmiAbort("WARNING: Event cannot be counted on this platform");
+      }
+      line = NULL;
+      n = 0;
+    }
+    fclose(papiFile);
+    CkpvAccess(numEvents) = i;
+    CkpvAccess(papiEvents) = new int[CkpvAccess(numEvents)];
+    for(i = 0; i < CkpvAccess(numEvents); i++) {
+      CkpvAccess(papiEvents)[i] = temp[i];
+    }
+  } else {
 #ifdef USE_SPP_PAPI
   CkpvAccess(numEvents) = NUMPAPIEVENTS;
   CkpvAccess(papiEvents) = new int[CkpvAccess(numEvents)];
@@ -1096,16 +1153,59 @@ void initPAPI() {
   for(i = 0; i < CkpvAccess(numEvents); i++)
     CkpvAccess(papiEvents)[i] = temp[i];
 #endif
-  papiRetValue = PAPI_add_events(CkpvAccess(papiEventSet), papiEvents, numEvents);
-  if (papiRetValue < 0) {
-    if (papiRetValue == PAPI_ECNFLCT) {
-      CmiAbort("PAPI events conflict! Please re-assign event types!\n");
+  }
+  int totalAdded = 0;
+  CkpvInitialize(LONG_LONG_PAPI*, papiValues);
+  CkpvAccess(papiValues) = (LONG_LONG_PAPI*)malloc(CkpvAccess(numEvents)*sizeof(LONG_LONG_PAPI));
+  for(int i = 0; i < CkpvAccess(numEvents); i++) {
+    memset(CkpvAccess(papiValues), 0, CkpvAccess(numEvents)*sizeof(LONG_LONG_PAPI));
+    papiRetValue = PAPI_add_event(CkpvAccess(papiEventSet), CkpvAccess(papiEvents)[i]);
+    if(papiRetValue != PAPI_OK) {
+      char nameBuf[PAPI_MAX_STR_LEN];
+      PAPI_event_code_to_name(CkpvAccess(papiEvents)[i], nameBuf);
+      CmiPrintf("Event not added: %s\n", nameBuf);
+      if(papiUsingFile)
+        break;
+      int *temp = CkpvAccess(papiEvents);
+      CkpvAccess(papiEvents) = new int[CkpvAccess(numEvents) - 1];
+      for(int j = 0, count = 0; j < CkpvAccess(numEvents); j++, count++) {
+          if(i == j) {
+            count--;
+            continue;
+          }
+          CkpvAccess(papiEvents)[count] = temp[j];
+      }
+      CkpvAccess(numEvents)--;
+      i--;
+      free(temp);
+      temp = NULL;
+    } else if(PAPI_OK != PAPI_read(CkpvAccess(papiEventSet), CkpvAccess(papiValues))) {
+      if(papiUsingFile)
+        break;
+      PAPI_remove_event(CkpvAccess(papiEventSet), CkpvAccess(papiEvents)[totalAdded]);
+      int *temp = CkpvAccess(papiEvents);
+      CkpvAccess(papiEvents) = new int[CkpvAccess(numEvents) - 1];
+      for(int j = 0, count = 0; j < CkpvAccess(numEvents); j++, count++) {
+          if(i == j) {
+            count--;
+            continue;
+          }
+          CkpvAccess(papiEvents)[count] = temp[j];
+      }
+      CkpvAccess(numEvents)--;
+      i--;
+      free(temp);
+      temp = NULL;
     } else {
-      char error_str[PAPI_MAX_STR_LEN];
-      //PAPI_perror(error_str);
-      //PAPI_perror(papiRetValue,error_str,PAPI_MAX_STR_LEN);
-      CmiAbort("PAPI failed to add designated events!\n");
+      totalAdded++;
     }
+  }
+  if (papiUsingFile && papiRetValue == PAPI_ECNFLCT) {
+    CmiAbort("PAPI failed to add event\n");
+  } else if (papiUsingFile && totalAdded != CkpvAccess(numEvents)) {
+    CmiAbort("PAPI failed to read event\n");
+  } else if (totalAdded == 0) {
+    CmiAbort("PAPI failed to add or read any events\n");
   }
   if(CkMyPe()==0)
     {
@@ -1118,8 +1218,6 @@ void initPAPI() {
 	}
       CmiPrintf("\n");
     }
-  CkpvInitialize(LONG_LONG_PAPI*, papiValues);
-  CkpvAccess(papiValues) = (LONG_LONG_PAPI*)malloc(CkpvAccess(numEvents)*sizeof(LONG_LONG_PAPI));
   memset(CkpvAccess(papiValues), 0, CkpvAccess(numEvents)*sizeof(LONG_LONG_PAPI));
 #endif
 }
