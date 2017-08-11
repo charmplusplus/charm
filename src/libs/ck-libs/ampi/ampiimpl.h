@@ -1241,8 +1241,6 @@ class ampiParent : public CBase_ampiParent {
   MPI_Comm worldNo; //My MPI_COMM_WORLD
   ampi *worldPtr; //AMPI element corresponding to MPI_COMM_WORLD
   ampiCommStruct worldStruct;
-  ampi *selfPtr; //AMPI element corresponding to MPI_COMM_SELF
-  ampiCommStruct selfStruct;
 
   CkPupPtrVec<ampiCommStruct> splitComm; //Communicators from MPI_Comm_split
   CkPupPtrVec<ampiCommStruct> groupComm; //Communicators from MPI_Comm_group
@@ -1324,13 +1322,6 @@ class ampiParent : public CBase_ampiParent {
   void setUserJustMigratedFn(MPI_MigrateFn f);
   ~ampiParent();
 
-  ampi *lookupComm(MPI_Comm comm) const {
-    if (comm==MPI_COMM_SELF) return selfPtr;
-    if (comm!=worldStruct.getComm())
-      CkAbort("ampiParent::lookupComm> Bad communicator!");
-    return worldPtr;
-  }
-
   //Children call this when they are first created, or just migrated
   TCharm *registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration);
 
@@ -1389,7 +1380,6 @@ class ampiParent : public CBase_ampiParent {
 
   inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) const {
     if (comm==MPI_COMM_WORLD) return worldStruct;
-    if (comm==MPI_COMM_SELF) return selfStruct;
     if (comm==worldNo) return worldStruct;
     if (isSplit(comm)) return getSplit(comm);
     if (isGroup(comm)) return getGroup(comm);
@@ -1402,7 +1392,6 @@ class ampiParent : public CBase_ampiParent {
 
   inline ampi *comm2ampi(MPI_Comm comm) const {
     if (comm==MPI_COMM_WORLD) return worldPtr;
-    if (comm==MPI_COMM_SELF) return selfPtr;
     if (comm==worldNo) return worldPtr;
     if (isSplit(comm)) {
       const ampiCommStruct &st=getSplit(comm);
@@ -1466,14 +1455,14 @@ class ampiParent : public CBase_ampiParent {
   }
 
   inline void checkComm(MPI_Comm comm) const {
-    if ((comm > MPI_COMM_FIRST_RESVD && comm != MPI_COMM_SELF && comm != MPI_COMM_WORLD)
+    if ((comm > MPI_COMM_FIRST_RESVD && comm != MPI_COMM_WORLD)
      || (isSplit(comm) && comm-MPI_COMM_FIRST_SPLIT >= splitComm.size())
      || (isGroup(comm) && comm-MPI_COMM_FIRST_GROUP >= groupComm.size())
      || (isCart(comm)  && comm-MPI_COMM_FIRST_CART  >=  cartComm.size())
      || (isGraph(comm) && comm-MPI_COMM_FIRST_GRAPH >= graphComm.size())
      || (isInter(comm) && comm-MPI_COMM_FIRST_INTER >= interComm.size())
      || (isIntra(comm) && comm-MPI_COMM_FIRST_INTRA >= intraComm.size()) )
-      CkAbort("Invalide MPI_Comm\n");
+      CkAbort("Invalid MPI_Comm\n");
   }
 
   /// if intra-communicator, return comm, otherwise return null group

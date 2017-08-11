@@ -1239,7 +1239,6 @@ ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_)
   STARTUP_DEBUG("ampiParent> starting up")
   thread=NULL;
   worldPtr=NULL;
-  selfPtr=NULL;
   userAboutToMigrateFn=NULL;
   userJustMigratedFn=NULL;
   myDDT=&myDDTsto;
@@ -1257,7 +1256,6 @@ ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_)
 ampiParent::ampiParent(CkMigrateMessage *msg):CBase_ampiParent(msg) {
   thread=NULL;
   worldPtr=NULL;
-  selfPtr=NULL;
   myDDT=&myDDTsto;
 
   init();
@@ -1271,7 +1269,6 @@ void ampiParent::pup(PUP::er &p) {
   p|threads;
   p|worldNo;
   p|worldStruct;
-  p|selfStruct;
   myDDT->pup(p);
   p|splitComm;
   p|groupComm;
@@ -1408,11 +1405,6 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration)
     if (worldPtr!=NULL) CkAbort("One ampiParent has two MPI_COMM_WORLDs");
     worldPtr=ptr;
     worldStruct=s;
-  }
-  else if (s.getComm()==MPI_COMM_SELF) {
-    if (selfPtr!=NULL) CkAbort("One ampiParent has two MPI_COMM_SELFs");
-    selfPtr=ptr;
-    selfStruct=s;
   }
 
   if (!forMigration)
