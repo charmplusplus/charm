@@ -198,7 +198,7 @@ public:
 
   inline void markMessageReceived(int msgType, int finalCount) {
     cntMsgReceived_[msgType]++;
-    if (finalCount != -1) {
+    if (finalCount >= 0) {
       cntFinished_[msgType]++;
       cntMsgExpected_[msgType] += finalCount;
 #ifdef CMK_TRAM_VERBOSE_OUTPUT
@@ -497,10 +497,6 @@ insertData(const dtype& dataItem, int destinationPe) {
     detectorLocalObj_->produce();
   }
   QdCreate(1);
-  if (destinationPe == myIndex_) {
-    localDeliver(dataItem);
-    return;
-  }
 
   insertData((const void *) &dataItem, destinationPe);
 }
@@ -662,7 +658,14 @@ receiveAlongRoute(MeshStreamerMessage<dtype> *msg) {
 #endif
 
   if (useStagedCompletion_) {
-    markMessageReceived(msg->msgType, msg->finalMsgCount);
+    if (msg->finalMsgCount != -2) {
+      markMessageReceived(msg->msgType, msg->finalMsgCount);
+    }
+#if !CMK_MULTICORE
+    else if (stagedCompletionStarted_) {
+      checkForCompletedStages();
+    }
+#endif
   }
 
   delete msg;
@@ -700,10 +703,15 @@ inline void MeshStreamer<dtype, RouterType>::sendLargestBuffer() {
 
       destinationIndex =
         myRouter_.nextPeAlongRoute(flushDimension, flushIndex);
+      
+      if (destinationIndex == myIndex_) {
+        destinationBuffer->finalMsgCount = -2;
+      }
+      
       sendMeshStreamerMessage(destinationBuffer, flushDimension,
-                              destinationIndex);
+        destinationIndex);
 
-      if (useStagedCompletion_) {
+      if (useStagedCompletion_ && destinationIndex != myIndex_) {
         cntMsgSent_[i][flushIndex]++;
       }
 
@@ -732,8 +740,7 @@ flushDimension(int dimension, bool sendMsgCounts) {
 
   for (int j = 0; j < messageBuffers.size(); j++) {
 
-    if (!myRouter_.isBufferInUse(dimension, j) ||
-        (messageBuffers[j] == NULL && !sendMsgCounts)) {
+    if (messageBuffers[j] == NULL && !sendMsgCounts) {
       continue;
     }
     if(messageBuffers[j] == NULL && sendMsgCounts) {
@@ -745,19 +752,26 @@ flushDimension(int dimension, bool sendMsgCounts) {
     else {
       // if not sending the full buffer, shrink the message size
       envelope *env = UsrToEnv(messageBuffers[j]);
-      env->shrinkUsersize((bufferSize_ - messageBuffers[j]->numDataItems)
-                          * sizeof(dtype));
-    }
-
-    MeshStreamerMessage<dtype> *destinationBuffer = messageBuffers[j];
-    numDataItemsBuffered_ -= destinationBuffer->numDataItems;
-    if (useStagedCompletion_) {
-      cntMsgSent_[dimension][j]++;
-      if (sendMsgCounts) {
-        destinationBuffer->finalMsgCount = cntMsgSent_[dimension][j];
+      const UInt s = (bufferSize_ - messageBuffers[j]->numDataItems) * sizeof(dtype);
+      if (env->getUsersize() > s) {
+        env->shrinkUsersize(s);
       }
     }
+    
+    MeshStreamerMessage<dtype> *destinationBuffer = messageBuffers[j];
     int destinationIndex = myRouter_.nextPeAlongRoute(dimension, j);
+    numDataItemsBuffered_ -= destinationBuffer->numDataItems;
+    if (useStagedCompletion_) {
+      if (destinationIndex == myIndex_) {
+        destinationBuffer->finalMsgCount = -2;
+      } else {
+        cntMsgSent_[dimension][j]++;
+        if (sendMsgCounts) {
+          destinationBuffer->finalMsgCount = cntMsgSent_[dimension][j];
+        }
+      }
+      CkAssert(!sendMsgCounts || destinationBuffer->finalMsgCount != -1);
+    }
     sendMeshStreamerMessage(destinationBuffer, dimension, destinationIndex);
     messageBuffers[j] = NULL;
   }
@@ -1125,6 +1139,7 @@ public:
       broadcast(&tempHandle, this->numDimensions_ - 1, copyIndirectly);
   }
 
+  template <bool deliverInline = false>
   inline void insertData(const dtype& dataItem, itype arrayIndex) {
 
     // no data items should be submitted after all local contributors call done
@@ -1150,7 +1165,7 @@ public:
       clientArrayMgr_->lastKnown((CkArrayIndex)arrayIndex);
 #endif
 
-    if (destinationPe == this->myIndex_) {
+    if (deliverInline && destinationPe == this->myIndex_) {
       ArrayDataItem<dtype, itype>
         packedDataItem(arrayIndex, this->myIndex_, dataItem);
       localDeliver(packedDataItem);

@@ -968,7 +968,7 @@ void Entry::genTramDefs(XStr &str) {
   else if (container->isArray()) {
     XStr dim; dim << ((Array*)container)->dim();
     str << "  const CkArrayIndex &myIndex = ckGetIndex();\n"
-        << "  " << aggregatorName() << "->insertData(" << param->param->name;
+        << "  " << aggregatorName() << "->insertData<" << (isInline() ? "true" : "false") << ">(" << param->param->name;
     if (dim==(const char*)"1D") {
       str << ", " << "myIndex.data()[0]);\n}\n";
     }
