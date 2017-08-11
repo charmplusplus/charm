@@ -52,15 +52,13 @@
  *
  *****************************************************************************/
  
-typedef void *(*voidfn)();
+typedef void *(*voidfn)(void *);
 
 struct Cpthread_s
 {
   int magic;
   voidfn startfn;
-  void *startarg1;
-  void *startarg2;
-  void *startarg3;
+  void *startarg;
   int detached;
   void *joinstatus;
   Cpthread_cleanup_t cleanups;
@@ -271,12 +269,12 @@ void Cpthread_top(Cpthread_t pt)
     *(void **)(data+(k->offset)) = 0;
   CtvAccess(Cpthread_errcode) = 0;
   CtvAccess(Cpthread_current) = pt;
-  result = (pt->startfn)(pt->startarg1, pt->startarg2, pt->startarg3);
+  result = pt->startfn(pt->startarg);
   Cpthread_exit(result);
 }
 
-int Cpthread_create3(Cpthread_t *thread, Cpthread_attr_t *attr,
-		     voidfn fn, void *a1, void *a2, void *a3)
+int Cpthread_create(Cpthread_t *thread, Cpthread_attr_t *attr,
+		     voidfn fn, void *arg)
 {
   Cpthread_t pt;
   if (attr->magic != ATTR_MAGIC) errcode(EINVAL);
@@ -284,9 +282,7 @@ int Cpthread_create3(Cpthread_t *thread, Cpthread_attr_t *attr,
   _MEMCHECK(pt);
   pt->magic = PT_MAGIC;
   pt->startfn = fn;
-  pt->startarg1 = a1;
-  pt->startarg2 = a2;
-  pt->startarg3 = a3;
+  pt->startarg = arg;
   pt->detached = attr->detached;
   pt->joinstatus = 0;
   pt->cleanups = 0;
@@ -296,12 +292,6 @@ int Cpthread_create3(Cpthread_t *thread, Cpthread_attr_t *attr,
   CthAwaken(pt->thread);
   *thread = pt;
   return 0;
-}
-
-int Cpthread_create(Cpthread_t *thread, Cpthread_attr_t *attr,
-		     voidfn fn, void *arg)
-{
-  return Cpthread_create3(thread, attr, fn, arg, 0, 0);
 }
 
 void Cpthread_exit(void *status)
@@ -578,7 +568,18 @@ int Cpthread_cond_broadcast(Cpthread_cond_t *cond)
  *
  *****************************************************************************/
 
-typedef void (*mainfn)(int argc, char **argv);
+typedef struct CmiMainFnArg_s
+{
+  CmiStartFn fn;
+  char **argv;
+  int argc;
+} CmiMainFnArg;
+
+static void Cpthread_main_wrapper(CmiMainFnArg *arg)
+{
+    arg->fn(arg->argc, arg->argv);
+    free(arg);
+}
 
 int Cpthread_init(void)
 {
@@ -591,14 +592,21 @@ void CpthreadModuleInit(void)
   CtvInitialize(int,        Cpthread_errcode);
 }
 
-void Cpthread_start_main(mainfn fn, int argc, char **argv)
+void Cpthread_start_main(CmiStartFn fn, int argc, char **argv)
 {
   Cpthread_t pt;
   Cpthread_attr_t attrib;
   CmiIntPtr pargc = argc;
   if (CmiMyRank()==0) {
+    CmiMainFnArg * arg = (CmiMainFnArg *)malloc(sizeof(CmiMainFnArg));
+
     Cpthread_attr_init(&attrib);
     Cpthread_attr_setdetachstate(&attrib, 1);
-    Cpthread_create3(&pt, &attrib, (voidfn)fn, (void *)pargc, argv, 0);
+
+    arg->fn = fn;
+    arg->argc = argc;
+    arg->argv = argv;
+
+    Cpthread_create(&pt, &attrib, (voidfn)Cpthread_main_wrapper, arg);
   }
 }
