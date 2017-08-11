@@ -41,12 +41,15 @@ This will create the executable {\tt bin/charmdebug}. To start, simply substitut
 You can find more detailed information in the debugger manual in 
 \href{http://charm.cs.illinois.edu/manuals/html/debugger/manual-1p.html}{here}.
 
-\subsection{Can I use TotalView?}
+\subsection{Can I use distributed debuggers like Allinea DDT and RogueWave TotalView?}
 
 Yes, on mpi- versions of Charm++. In this case, the program is a regular MPI
 application, and as such any tool available for MPI programs can be used. Notice
 that some of the internal data structures (like messages in queue) might be
 difficult to find.
+
+Depending on your debugging needs, see the other notes about
+alternatives such as CharmDebug and directly-attached gdb.
 
 \subsection{How do I use {\em gdb} with Charm++ programs?}
 
