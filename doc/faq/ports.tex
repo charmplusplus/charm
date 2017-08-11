@@ -62,7 +62,7 @@ are C++ templates, the STL, new-style C++ system headers,
 and the other features listed in the C++ question below.
 \end{itemize}
 
-\subsection{Which C language features cause porting problems?}
+\subsection{How should I approach portability of C language code?}
 
 Our suggestions for Charm++ developers are:
 
@@ -80,88 +80,57 @@ This will not compile under many compilers. %including the IBM SP C compiler.
 Use memset and memcpy for portable programs.
 \end{itemize}
 
-\subsection{Which C++ language features cause porting problems?}
+If you're writing code that is expected to compile and run on
+Microsoft Windows using the Visual C++ compiler (e.g. modification to
+NAMD that you intend to submit for integration), that compiler has
+limited support for the C99 standard, and Microsoft recommends using
+C++ instead.
 
-Our suggestions for Charm++ developers are:
+Many widely-used C compilers on HPC systems have limited support for
+the C11 standard. If you want to use features of C11 in your code,
+particularly \verb|_Atomic|, we recommend writing the code in C++
+instead, since C++11 standard support is much more ubiquitous.
 
-\begin{itemize}
+\subsection{How should I approach portability and performance of C++ language code?}
 
-\item Never declare the same loop index inside two adjacent loops.
-The C++ standard recently changed to make this legal:
-\begin{alltt}
-for (int i=...) ...
-for (int i=...) ...
-\end{alltt}
-However, many compilers choke on the above, complaining of 
-``duplicate declaration of int i''.  Instead, use:
-\begin{alltt}
-int i;
-for (i=...) ...
-for (i=...) ...
-\end{alltt}
+The Charm++ system developers are conservative about which C++
+standard version is relied upon in runtime system code and what
+features get used to ensure maximum portability across the broad range
+of HPC systems and the compilers used on them. Through version 6.8.x,
+the system code requires only limited support for C++11 features,
+specifically variadic templates and R-value references. From version
+6.9 onwards, the system will require a compiler and standard library
+with at least full C++11 support.
 
-\item Be wary of the C++ STL (Standard Template Library).
-Sometimes a compiler will appear to have perfectly good
-ANSI headers, but none of the members are declared in the ``std''
-namespace.
+A good reference for which compiler versions
+provide what level of standard support can be found at
+\url{http://en.cppreference.com/w/cpp/compiler_support}
 
-\item Be wary of C++ exception handling when mixing with C code. 
-Many compilers, including gcc on Linux, sensibly choose not 
-to allow C++ exceptions to propagate through C code.  Hence
-a C++ exception becomes std::unexpected when unwinding hits
-the first C routine.
+Developers of several Charm++ applications have reported good results
+using features in more recent C++ standards, with the caveat of
+requiring that those applications be built with a sufficiently
+up-to-date C++ compiler.
 
-\item Templates should be declared ``inline'' to avoid linking problems.
-Non-``inline'' templates have to be ``instantiated'',
-a process which works differently on different compilers.
-For example, non-inline templates work automatically under gcc;
-but when used inside a library under Sun CC 7, fail to link
-unless explicitly instantiated. So use this:
-\begin{alltt}
-template <class T>
-inline void foo() {...}
-\end{alltt}
-not this, which may (someday) cause a link error saying ``can't find
-foo\textless bar\textgreater'':
-\begin{alltt}
-template <class T>
-void foo() {...}
-\end{alltt}
+The containers specified in the C++ standard library are generally
+designed to provide a very broad API that can be used correctly over
+highly-varied use cases. This often entails tradeoffs against the
+performance attainable for narrower use cases that some applications
+may have. The most visible of these concerns are the tension between
+strict iterator invalidation semantics and cache-friendly memory
+layout. We recommend that developers whose code includes container
+access in performance-critical elements explore alternative
+implementations, such as those published by EA, Google, and Facebook,
+or potentially write custom implementations tailored to their
+application's needs.
 
-\item Templated class members should be declared right in the class. 
-This avoids the ugly syntax of outside template members, and 
-makes them implicitly ``inline'', which avoids linking problems.
-In addition, declaring in the class works around a bug where
-templated members of a templated class cannot be defined outside the 
-class under MS Visual C++ 6.0.
-
-\item Templated functions work best when the template types can 
-be deduced from the function parameters.  We've had problems with
-Sun CC failing to instantiate an explicitly-named, non-inline
-function template used for a function pointer.  
-
-So use this:
-\begin{alltt}
-template <class T>
-inline void foo(T t) {...}
-\end{alltt}
-not this, which may (someday) cause a compile error saying 
-``"can't determine template type'':
-\begin{alltt}
-template <class T>
-inline void foo(void *t) {...}
-\end{alltt}
-
-\item ``Fancy'' uses of templates can fail, often in spectacularly
-bizarre ways.  For example, partial template specialization can 
-lead to compiler crashes; and ``int'' parameters are not always 
-supported in function templates. 
-
-\end{itemize}
-
-Luckily, C++ support, especially STL support, is improving
-rapidly.  Hopefully soon several of the above features will
-become widely supported enough to use everywhere.
+In benchmarks across a range of compilers, we have found that avoiding
+use of exceptions (i.e. \verb+throw/catch+) and disabling support for
+them with compiler flags can produce higher-performance code,
+especially with aggressive optimization settings enabled. The runtime
+system does not use exceptions internally. If your goal as an
+application developer is to most efficiently use large-scale
+computational resources, we recommend alternative error-handling
+strategies.
 
 \subsection{Why do I get a link error when mixing Fortran and C/C++?}
 
