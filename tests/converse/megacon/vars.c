@@ -27,8 +27,9 @@ CpmInvokable vars_ack(vars_chare c)
     CthAwaken(c->pending);
 }
 
-void vars_check_ctv_privacy(vars_chare c)
+void vars_check_ctv_privacy(void *v)
 {
+  vars_chare c = (vars_chare)v;
   int me = (size_t)CthSelf();
   CtvAccess(ctv1) = me;
   vars_ack(c);

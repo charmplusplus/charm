@@ -16,12 +16,12 @@ schedulers.
 a first-class thread object.  No information is publicized about the
 contents of a CthThreadStruct.}
 
-\function{typedef void (CthVoidFn)();}
+\function{typedef void (CthVoidFn)(void *);}
 \index{CthVoidFn}
 \desc{This is a type defined in {\tt converse.h}.  It represents
 a function that returns nothing.}
 
-\function{typedef CthThread (CthThFn)();}
+\function{typedef CthThread (CthThFn)(void);}
 \index{CthThFn}
 \desc{This is a type defined in {\tt converse.h}.  It represents
 a function that returns a CthThread.}

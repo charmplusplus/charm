@@ -18,7 +18,7 @@ static void CpmLSend(int pe, int len, void *msg)
 
 typedef struct CpmDestinationSend_s
 { 
-  void *(*sendfn)();
+  void *(*sendfn)(struct CpmDestinationSend_s *, int, void *);
   int envsize;
   int pe;
 }
@@ -26,9 +26,10 @@ typedef struct CpmDestinationSend_s
 
 typedef struct CpmDestinationSend_s DestinationSend;
 
-void CpmSend1(CpmDestinationSend ctrl, int len, void *msg)
+void *CpmSend1(CpmDestinationSend ctrl, int len, void *msg)
 {
   CpmLSend(ctrl->pe, len, msg);
+  return (void *) 0;
 }
 
 CpvStaticDeclare(DestinationSend, ctrlSend);
@@ -36,7 +37,7 @@ CpvStaticDeclare(DestinationSend, ctrlSend);
 CpmDestination CpmSend(int pe)
 {
   CpvAccess(ctrlSend).envsize = 0;
-  CpvAccess(ctrlSend).sendfn = (CpmSender)CpmSend1;
+  CpvAccess(ctrlSend).sendfn = CpmSend1;
   CpvAccess(ctrlSend).pe = pe;
   return (CpmDestination)&CpvAccess(ctrlSend);
 }
@@ -49,7 +50,7 @@ CpmDestination CpmSend(int pe)
 
 typedef struct CpmDestinationEnq_s
 {
-  void *(*sendfn)();
+  void *(*sendfn)(struct CpmDestinationEnq_s *, int, void *);
   int envsize;
   int pe, qs, priobits;
   unsigned int *prioptr;
@@ -225,12 +226,13 @@ void CpmThread2(void *msg)
   CthSetStrategyDefault(t); CthAwaken(t);
 }
 
-void CpmThread1(CpmDestinationSend ctrl, int len, void *msg)
+void *CpmThread1(CpmDestinationSend ctrl, int len, void *msg)
 {
   int *env = (int *)CpmEnv(msg);
   env[0] = CmiGetHandler(msg);
   CmiSetHandler(msg, CpvAccess(CpmThread2_Index));
   CpmLSend(ctrl->pe, len, msg);
+  return (void *) 0;
 }
 
 CpvStaticDeclare(DestinationSend, ctrlThread);
@@ -238,7 +240,7 @@ CpvStaticDeclare(DestinationSend, ctrlThread);
 CpmDestination CpmMakeThread(int pe)
 {
   CpvAccess(ctrlThread).envsize = sizeof(int);
-  CpvAccess(ctrlThread).sendfn = (CpmSender)CpmThread1;
+  CpvAccess(ctrlThread).sendfn = CpmThread1;
   CpvAccess(ctrlThread).pe = pe;
   return (CpmDestination)&CpvAccess(ctrlThread);
 }
@@ -253,7 +255,7 @@ CpvDeclare(int, CpmThreadSize2_Index);
 
 typedef struct CpmDestinationThreadSize_s
 { 
-  void *(*sendfn)();
+  void *(*sendfn)(struct CpmDestinationThreadSize_s *, int, void *);
   int envsize;
   int pe;
   int size;
@@ -270,13 +272,14 @@ void CpmThreadSize2(void *msg)
   CthSetStrategyDefault(t); CthAwaken(t);
 }
 
-void CpmThreadSize1(CpmDestinationThreadSize ctrl, int len, void *msg)
+void *CpmThreadSize1(CpmDestinationThreadSize ctrl, int len, void *msg)
 {
   int *env = (int *)CpmEnv(msg);
   env[0] = CmiGetHandler(msg);
   env[1] = ctrl->size;
   CmiSetHandler(msg, CpvAccess(CpmThreadSize2_Index));
   CpmLSend(ctrl->pe, len, msg);
+  return (void *) 0;
 }
 
 CpvStaticDeclare(DestinationThreadSize, ctrlThreadSize);
@@ -284,7 +287,7 @@ CpvStaticDeclare(DestinationThreadSize, ctrlThreadSize);
 CpmDestination CpmMakeThreadSize(int pe, int size)
 {
   CpvAccess(ctrlThreadSize).envsize = 2*sizeof(int);
-  CpvAccess(ctrlThreadSize).sendfn = (CpmSender)CpmThreadSize1;
+  CpvAccess(ctrlThreadSize).sendfn = CpmThreadSize1;
   CpvAccess(ctrlThreadSize).pe = pe;
   CpvAccess(ctrlThreadSize).size = size;
   return (CpmDestination)&CpvAccess(ctrlThreadSize);

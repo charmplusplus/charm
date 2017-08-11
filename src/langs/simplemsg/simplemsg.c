@@ -16,8 +16,9 @@ CpvStaticDeclare(int *, CsmSeqIn);
 CpvStaticDeclare(CmmTable, CsmMessages);
 CpvStaticDeclare(CmmTable, CsmSleepers);
 
-void CsmHandler(CsmMessage m)
+void CsmHandler(void *v)
 {
+  CsmMessage m = (CsmMessage)v;
   CthThread t;
   CmmPut(CpvAccess(CsmMessages), m->ntags, m->tags, m);
   t = (CthThread)CmmGet(CpvAccess(CsmSleepers), m->ntags, m->tags, (int *)0);

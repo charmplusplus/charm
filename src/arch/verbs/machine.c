@@ -886,7 +886,7 @@ static void CommunicationInterrupt(int ignored)
   MACHSTATE(2,"--END SIGIO--")
 }
 
-extern void CmiSignal(int sig1, int sig2, int sig3, void (*handler)());
+extern void CmiSignal(int sig1, int sig2, int sig3, void (*handler)(int));
 
 static void CmiDestroyLocks(void)
 {
@@ -968,7 +968,7 @@ static int memoryusage_counter;
 static double Cmi_check_last;
 
 /* if charmrun dies, we finish */
-static void pingCharmrun(void *ignored) 
+static void pingCharmrun(int ignored)
 {
 #if MEMORYUSAGE_OUTPUT
   memoryusage_output;
@@ -995,7 +995,7 @@ static void pingCharmrun(void *ignored)
 /* periodic charm ping, for gm and netpoll */
 static void pingCharmrunPeriodic(void *ignored)
 {
-  pingCharmrun(ignored);
+  pingCharmrun(0);
   CcdCallFnAfter((CcdVoidFn)pingCharmrunPeriodic,NULL,1000);
 }
 

@@ -5,7 +5,7 @@
 
 extern VerticesListType graph;
 
-void * InitEdgeList(int E)
+EdgeListType * InitEdgeList(int E)
 {
   EdgeListType * edgesRec;
 

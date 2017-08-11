@@ -97,6 +97,11 @@ void CmiNotifyIdle(void)
   CmiNext();
 }
 
+static void CmiNotifyIdleCcd(void *ignored1, double ignored2)
+{
+    CmiNotifyIdle();
+}
+
 void CmiNodeBarrier(void)
 {
   int i;
@@ -253,11 +258,11 @@ char **CmiInitPE(void)
   CpvAccess(CmiLocalQueue) = CmiQueues[CmiMyPe()];
   CmiTimerInit(argv);
   ConverseCommonInit(argv);
-  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,CmiNotifyIdle,NULL);
+  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE, CmiNotifyIdleCcd, NULL);
   return argv;
 }
 
-void CmiCallMain(void)
+static void CmiCallMain(void *ignored)
 {
   char **argv;
   argv = CmiInitPE();

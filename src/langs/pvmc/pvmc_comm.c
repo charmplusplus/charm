@@ -23,8 +23,8 @@ typedef struct control_msg_struct {
   int type;
 } control_msg;
 
-static void pvmc_control_handler_func();
-static void pvmc_msg_handler_func();
+static void pvmc_control_handler_func(void *);
+static void pvmc_msg_handler_func(void *);
 
 void pvmc_init_comm(void)
 {
@@ -78,8 +78,9 @@ void pvmc_send_control_msg(int type, int pe)
   CmiSyncSendAndFree(pe,sizeof(control_msg),msg);
 }
 
-static void pvmc_control_handler_func(control_msg *msg)
+static void pvmc_control_handler_func(void *voidmsg)
 {
+  control_msg *msg = (control_msg *)voidmsg;
   switch (msg->type)  {
   case PVMC_CTRL_AT_BARRIER:
     CpvAccess(pvmc_at_barrier_num)++;

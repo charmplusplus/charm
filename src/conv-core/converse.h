@@ -1400,10 +1400,10 @@ typedef struct {
 
 CthThreadToken *CthGetToken(CthThread);
 
-typedef void        (*CthVoidFn)();
+typedef void        (*CthVoidFn)(void *);
 typedef void        (*CthAwkFn)(CthThreadToken *,int,
 				int prioBits,unsigned int *prioptr);
-typedef CthThread   (*CthThFn)();
+typedef CthThread   (*CthThFn)(void);
 
 void       CthSetSerialNo(CthThread t, int no);
 int        CthImplemented(void);

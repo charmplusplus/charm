@@ -901,6 +901,11 @@ int PerrorExit (char *err) {
     return -1;
 }
 
+static void CmiNotifyIdleCcd(void *ignored1, double ignored2)
+{
+    CmiNotifyIdle();
+}
+
 #include <sys/syscall.h>
 
 void ConverseRunPE(int everReturn) {
@@ -940,7 +945,7 @@ void ConverseRunPE(int everReturn) {
     traceRegisterUserEvent("PAMI_Context_post",   30007);
 #endif
 
-    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdle,NULL);
+    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE, CmiNotifyIdleCcd, NULL);
 
     //printf ("before calling CmiBarrier() \n");
 

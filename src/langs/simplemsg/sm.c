@@ -15,8 +15,9 @@ CpvStaticDeclare(int *, SMSeqOut);
 CpvStaticDeclare(int *, SMSeqIn);
 CpvStaticDeclare(CmmTable, SMMessages);
 
-void SMHandler(SMMessage m)
+void SMHandler(void *v)
 {
+  SMMessage m = (SMMessage)v;
   CmmPut(CpvAccess(SMMessages), m->ntags, m->tags, m);
 }
 

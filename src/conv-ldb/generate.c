@@ -50,7 +50,7 @@ void gengraph(int pV, int pC, int pseed, int *pes, int *npe, int tofile)
   int seed;
   EdgeListType * EdgeList;
   /* VerticesListType * vertices; */
-  extern EdgeListType * InitEdgeList();
+  extern EdgeListType * InitEdgeList(int);
   char dircmd[20], dirname[10];
 
   V = pV;
@@ -471,7 +471,7 @@ static void enqueue(Q *q, int i);
 
 static void diameter(VerticesListType *graph)
 {
-  Q * makeQueue();
+  extern Q * makeQueue(void);
   int i,j, k, v, w, start;
   int *distance;
   int *histogram;

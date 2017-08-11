@@ -1488,7 +1488,7 @@ int CmiLongSendQueue(int forNode,int longerThanBytes) {
 
 #if CMK_SIGNAL_USE_SIGACTION
 #include <signal.h>
-void CmiSignal(int sig1, int sig2, int sig3, void (*handler)())
+void CmiSignal(int sig1, int sig2, int sig3, void (*handler)(int))
 {
   struct sigaction in, out ;
   in.sa_handler = handler;
@@ -1505,7 +1505,7 @@ void CmiSignal(int sig1, int sig2, int sig3, void (*handler)())
 
 #if CMK_SIGNAL_USE_SIGACTION_WITH_RESTART
 #include <signal.h>
-void CmiSignal(int sig1, int sig2, int sig3, void (*handler)())
+void CmiSignal(int sig1, int sig2, int sig3, void (*handler)(int))
 {
   struct sigaction in, out ;
   in.sa_handler = handler;
@@ -2023,7 +2023,7 @@ CpvDeclare (int, CthResumeStealableThreadIdx);
 CpvDeclare (int, CthResumeSuspendedStealableThreadIdx);
 #endif
 
-void CthStandinCode(void)
+void CthStandinCode(void *arg)
 {
   CsdScheduler(-1);
 }

@@ -71,6 +71,11 @@ void CmiNotifyIdle(void)
 #endif
 }
 
+static void CmiNotifyIdleCcd(void *ignored1, double ignored2)
+{
+    CmiNotifyIdle();
+}
+
 /***********************************************************************
  *
  * Abort function:
@@ -246,7 +251,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int initret)
     CpvAccess(CmiLocalQueue) = CdsFifo_Create();
     CthInit(argv);
     ConverseCommonInit(argv);
-    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,CmiNotifyIdle,NULL);
+    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE, CmiNotifyIdleCcd, NULL);
     argc=CmiGetArgc(argv);
     fn(argc, CmiCopyArgs(argv));
     CpvAccess(CsdStopFlag) = 0;
