@@ -62,9 +62,12 @@ class QdState {
     int parent;
     int *children;
   public:
+    int oldCount;
+
     QdState():stage(0),mCreated(0),mProcessed(0),nReported(0) {
       cCreated = 0; cProcessed = 0; cDirty = 0;
       oProcessed = 0;
+      oldCount = -1; // should not match the first time
       callbacks = new PtrQ();
       _MEMCHECK(callbacks);
       nChildren = CmiNumSpanTreeChildren(CmiMyPe());

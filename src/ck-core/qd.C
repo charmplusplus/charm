@@ -103,7 +103,12 @@ static inline void _handlePhase1(QdState *state, QdMsg *msg)
         if(CmiMyPe()==0) {
           DEBUGP(("ALL: %p getCCreated:%d getCProcessed:%d\n", state, state->getCCreated(), state->getCProcessed()));
           if(state->getCCreated()==state->getCProcessed()) {
-            _bcastQD2(state, msg);    // almost reached, one pass to make sure
+            if(state->oldCount == state->getCProcessed()) {// counts unchanged in second round
+              _bcastQD2(state, msg);    // almost reached, one pass to make sure
+            } else {
+              state->oldCount = state->getCProcessed();
+              _bcastQD1(state, msg);    // may have reached, go over again
+            }
           } else {
             _bcastQD1(state, msg);    // not reached, go over again
           }
