@@ -590,9 +590,10 @@ void DiscardImplicitDgram(ImplicitDgram dg)
  Check the real-time clock and perform periodic tasks.
  Must be called with comm. lock held.
  */
-static double Cmi_ack_last, Cmi_check_last;
 static void CommunicationsClock(void)
 {
+  static double Cmi_ack_last, Cmi_check_last;
+
   MACHSTATE(1,"CommunicationsClock");
   Cmi_clock = GetClock();
   if (Cmi_clock > Cmi_ack_last + 0.5*Cmi_ack_delay) {

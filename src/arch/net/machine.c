@@ -1211,11 +1211,11 @@ static int memoryusage_counter;
   if(CmiMyPe()==0) printf("-- %d %f %ld --\n", CmiMyPe(), GetClock(), CmiMemoryUsage());}
 #endif
 
-static double Cmi_check_last;
-
 /* if charmrun dies, we finish */
 static void pingCharmrun(int ignored)
 {
+  static double Cmi_check_last;
+
 #if MEMORYUSAGE_OUTPUT
   memoryusage_output;
   if(memoryusage_isOutput){
