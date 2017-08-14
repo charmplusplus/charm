@@ -632,7 +632,7 @@ void prepost_buffers()
 #if USE_OFIREQUEST_CACHE
         reqs[i] = alloc_request(context.request_cache);
 #else
-        reqs[i] = CmiAlloc(sizeof(OFIRequest));
+        reqs[i] = (OFIRequest *)CmiAlloc(sizeof(OFIRequest));
 #endif
         reqs[i]->callback = recv_callback;
         reqs[i]->data.recv_buffer = CmiAlloc(context.eager_maxsize);
@@ -665,7 +665,7 @@ void send_short_callback(struct fi_cq_tagged_entry *e, OFIRequest *req)
 
     MACHSTATE(3, "OFI::send_short_callback {");
 
-    msg = req->data.short_msg;
+    msg = (char *)req->data.short_msg;
     CmiAssert(msg);
     MACHSTATE1(3, "--> msg=%p", msg);
     CmiFree(msg);
@@ -755,7 +755,7 @@ static inline int sendMsg(OFIRequest *req)
         MACHSTATE(3, "--> eager");
 
         op = OFI_OP_SHORT;
-        buf = req->data.short_msg;
+        buf = (char *)req->data.short_msg;
         len = req->size;
     } else {
         /**
@@ -794,7 +794,7 @@ CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mo
 #if USE_OFIREQUEST_CACHE
     req = alloc_request(context.request_cache);
 #else
-    req = CmiAlloc(sizeof(OFIRequest));
+    req = (OFIRequest *)CmiAlloc(sizeof(OFIRequest));
 #endif
     CmiAssert(req);
 
@@ -969,7 +969,7 @@ void process_short_recv(struct fi_cq_tagged_entry *e, OFIRequest *req)
     char    *data;
     size_t  msg_size;
 
-    data = req->data.recv_buffer;
+    data = (char *)req->data.recv_buffer;
     CmiAssert(data);
 
     msg_size = CMI_MSG_SIZE(data);
@@ -1025,7 +1025,7 @@ void process_long_recv(struct fi_cq_tagged_entry *e, OFIRequest *req)
     /**
      * Prepare buffer
      */
-    asm_buf = CmiAlloc(len);
+    asm_buf = (char *)CmiAlloc(len);
     CmiAssert(asm_buf);
 
     if (FI_MR_BASIC == context.mr_mode) {
@@ -1070,7 +1070,7 @@ void process_long_recv(struct fi_cq_tagged_entry *e, OFIRequest *req)
 #if USE_OFIREQUEST_CACHE
         rma_req = alloc_request(context.request_cache);
 #else
-        rma_req = CmiAlloc(sizeof(OFIRequest));
+        rma_req = (OFIRequest *)CmiAlloc(sizeof(OFIRequest));
 #endif
         CmiAssert(rma_req);
         rma_req->callback = rma_read_callback;
@@ -1527,7 +1527,7 @@ int fill_av_ofi(int myid,
         CmiAbort("OFI::LrtsInit::runtime_get_max_keylen error");
     }
 
-    key = malloc(max_keylen);
+    key = (char *)malloc(max_keylen);
     CmiAssert(key);
 
     ret = snprintf(key, max_keylen, OFI_KEY_FORMAT_EPNAME, myid);
@@ -1545,7 +1545,7 @@ int fill_av_ofi(int myid,
      * Once all the names are exchanged, they will be inserted into the AV.
      */
     epnameslen = FI_NAME_MAX * nnodes;
-    epnames = malloc(epnameslen);
+    epnames = (char *)malloc(epnameslen);
     CmiAssert(epnames);
     memset(epnames, 0, epnameslen);
 
@@ -1553,7 +1553,7 @@ int fill_av_ofi(int myid,
         /**
          * Non-root nodes expect a message which contains the EP names.
          */
-        epnames_contexts = malloc(sizeof(struct fi_context));
+        epnames_contexts = (struct fi_context *)malloc(sizeof(struct fi_context));
         CmiAssert(epnames_contexts);
 
         ret = fi_trecv(ep,
@@ -1603,7 +1603,7 @@ int fill_av_ofi(int myid,
         }
 
         /* Send epnames to everyone */
-        epnames_contexts = malloc(nnodes * sizeof(struct fi_context));
+        epnames_contexts = (struct fi_context *)malloc(nnodes * sizeof(struct fi_context));
         CmiAssert(epnames_contexts);
         for (i=1; i<nnodes; ++i) {
             ret = fi_tsend(ep,
@@ -1699,7 +1699,7 @@ int fill_av(int myid,
         CmiAbort("OFI::LrtsInit::runtime_get_max_keylen error");
     }
 
-    key = malloc(max_keylen);
+    key = (char *)malloc(max_keylen);
     CmiAssert(key);
 
     ret = snprintf(key, max_keylen, OFI_KEY_FORMAT_EPNAME, myid);
@@ -1717,7 +1717,7 @@ int fill_av(int myid,
      * Once all the names are exchanged, they will be inserted into the AV.
      */
     epnameslen = FI_NAME_MAX * nnodes;
-    epnames = malloc(epnameslen);
+    epnames = (char *)malloc(epnameslen);
     CmiAssert(epnames);
     memset(epnames, 0, epnameslen);
 

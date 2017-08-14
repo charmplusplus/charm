@@ -55,7 +55,7 @@ int runtime_init(int *rank, int *jobsize)
         return 4;
     }
 
-    kvsname = calloc(max_kvsnamelen, sizeof(char));
+    kvsname = (char *)calloc(max_kvsnamelen, sizeof(char));
     if (!kvsname) {
         return 5;
     }
@@ -72,7 +72,7 @@ int runtime_init(int *rank, int *jobsize)
         return 7;
     }
 
-    key = calloc(max_keylen, sizeof(char));
+    key = (char *)calloc(max_keylen, sizeof(char));
     if (!key) {
         free(kvsname);
         return 8;
@@ -85,7 +85,7 @@ int runtime_init(int *rank, int *jobsize)
         return 9;
     }
 
-    value = calloc(max_valuelen, sizeof(char));
+    value = (char *)calloc(max_valuelen, sizeof(char));
     if (!value) {
         free(key);
         free(kvsname);

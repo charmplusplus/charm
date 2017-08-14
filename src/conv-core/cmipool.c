@@ -145,7 +145,7 @@ void CmiPoolFree(void * p)
 #endif
       /* add to the begining of the list at CpvAccess(bins)[bin]*/
       *header =  CpvAccess(bins)[bin]; 
-      CpvAccess(bins)[bin] = p;
+      CpvAccess(bins)[bin] = (char *)p;
 #if CMK_WITH_STATS
       CpvAccess(binLengths)[bin]++;
 #endif

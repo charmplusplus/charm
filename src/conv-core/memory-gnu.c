@@ -389,7 +389,7 @@ _int_new_arena(size_t size)
     mmap_sz = ARENA_SIZE_MIN;
   /* conservative estimate for page size */
   mmap_sz = (mmap_sz + 8191) & ~(size_t)8191;
-  a = CALL_MMAP(mmap_sz);
+  a = (struct malloc_arena *)CALL_MMAP(mmap_sz);
   if ((char*)a == (char*)-1)
     return 0;
 
@@ -1119,7 +1119,7 @@ public_iCOMALLOc(size_t n, size_t sizes[], void* chunks[])
   if (ar_ptr != &main_arena) {
     /* Temporary m_sizes[] array is ugly but it would be surprising to
        change the original sizes[]... */
-    m_sizes = mspace_malloc(arena_to_mspace(ar_ptr), n*sizeof(size_t));
+    m_sizes = (size_t *)mspace_malloc(arena_to_mspace(ar_ptr), n*sizeof(size_t));
     if (!m_sizes) {
       (void)mutex_unlock(&ar_ptr->mutex);
       return 0;
@@ -1127,7 +1127,7 @@ public_iCOMALLOc(size_t n, size_t sizes[], void* chunks[])
     for (i=0; i<n; ++i)
       m_sizes[i] = sizes[i] + FOOTER_OVERHEAD;
     if (!chunks) {
-      chunks = mspace_malloc(arena_to_mspace(ar_ptr),
+      chunks = (void **)mspace_malloc(arena_to_mspace(ar_ptr),
 			     n*sizeof(void*)+FOOTER_OVERHEAD);
       if (!chunks) {
 	mspace_free(arena_to_mspace(ar_ptr), m_sizes);
@@ -1209,7 +1209,7 @@ public_mSTATs(void)
   if(__malloc_initialized < 0)
     ptmalloc_init ();
   for (i=0, ar_ptr = &main_arena;; ++i) {
-    struct malloc_state* msp = arena_to_mspace(ar_ptr);
+    struct malloc_state* msp = (struct malloc_state *)arena_to_mspace(ar_ptr);
 
     fprintf(stderr, "Arena %d:\n", i);
     mspace_malloc_stats(msp);

@@ -64,7 +64,7 @@ int CmiGetRdmaInfoSize(int numOps){
 
 /* Set the ack function handler and token*/
 void *CmiSetRdmaAck(RdmaAckHandlerFn fn, void *token){
-  CmiRdmaAck *ack = malloc(sizeof(CmiRdmaAck));
+  CmiRdmaAck *ack = (CmiRdmaAck *)malloc(sizeof(CmiRdmaAck));
   ack->fnPtr = fn;
   ack->token = token;
   return ack;

@@ -70,8 +70,8 @@ extern "C" {
      new_ucp->param.from = old_ucp;
      new_ucp->param.data = new_ucp;
      transfer_t t = jump_fcontext(new_ucp->fctx, &(new_ucp->param));
-     data_t *old_data = t.data;
-     uFcontext_t *prev_ucp = old_data->from;
+     data_t *old_data = (data_t *)t.data;
+     uFcontext_t *prev_ucp = (uFcontext_t *)old_data->from;
      if (prev_ucp)
        prev_ucp->fctx = t.fctx;
      return 0;

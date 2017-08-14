@@ -130,7 +130,7 @@ static void AddEdges(VerticesListType *graph, EdgeListType *EdgeList, int V, int
 	/* first add edges for a C-way spanning tree.*/
         varr=(int **)calloc(V, sizeof(int*));
         for (i=0;i<V;i++)
-            varr[i]=calloc(2, sizeof(int));
+            varr[i] = (int *)calloc(2, sizeof(int));
 	
   c1 = 1;
 	if (C>1) c1 = C-1;

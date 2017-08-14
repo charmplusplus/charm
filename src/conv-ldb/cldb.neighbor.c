@@ -53,7 +53,7 @@ loadmsg *getPool(void){
     CpvAccess(msgpool) = msg->next;
   }
   else {
-    msg = CmiAlloc(sizeof(loadmsg));
+    msg = (loadmsg *)CmiAlloc(sizeof(loadmsg));
     CmiSetHandler(msg, CpvAccess(CldLoadResponseHandlerIndex));
   }
   return msg;

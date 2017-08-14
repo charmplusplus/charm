@@ -1627,7 +1627,7 @@ static memRegion_t find_free_region(memRegion_t *used,int nUsed,int atLeast)
   for (i=0;i<nUsed;i++) {
     /*Consider a hole starting at the end of region i*/
     char *holeStart=used[i].start+used[i].len;
-    char *holeEnd=(void *)(-1);
+    char *holeEnd=(char *)(intptr_t)-1;
 
     /*Shrink the hole by all others*/ 
     for (j=0;j<nUsed && pointer_lt(holeStart,holeEnd);j++) {
@@ -1779,7 +1779,7 @@ static int try_largest_mmap_region(memRegion_t *destRegion)
     }
   }
   CmiAssert(good_range!=NULL);
-  destRegion->start=good_range; 
+  destRegion->start = (char *)good_range;
   destRegion->len=good_size;
 #if ISOMALLOC_DEBUG
   pid_t pid = getpid();
@@ -1974,7 +1974,7 @@ static void init_ranges(char **argv)
           if (CmiMyPe()==0) CmiPrintf("[%d] Invalid isomalloc region: %lx - %lx.\n", CmiMyPe(), s, e);
           CmiAbort("isomalloc> failed to find consolidated isomalloc region!");
         }
-        freeRegion.start = (void *)s;
+        freeRegion.start = (char *)s;
         freeRegion.len = (char *)e -(char *)s;
 
         if (CmiMyPe() == 0)

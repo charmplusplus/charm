@@ -1367,7 +1367,7 @@ static void InternalWriteToTerminal(int isStdErr,const char *str,int len);
 static void InternalPrintf(const char *f, va_list l)
 {
   ChMessage replymsg;
-  char *buffer = malloc(PRINTBUFSIZE);
+  char *buffer = (char *)malloc(PRINTBUFSIZE);
   CmiStdoutFlush();
   vsprintf(buffer, f, l);
   if(Cmi_syncprint) {
@@ -1386,7 +1386,7 @@ static void InternalPrintf(const char *f, va_list l)
 static void InternalError(const char *f, va_list l)
 {
   ChMessage replymsg;
-  char *buffer = malloc(PRINTBUFSIZE);
+  char *buffer = (char *)malloc(PRINTBUFSIZE);
   CmiStdoutFlush();
   vsprintf(buffer, f, l);
   if(Cmi_syncprint) {
@@ -2080,7 +2080,7 @@ static OutgoingMsg PrepareOutgoing(CmiState cs,int pe,int size,int freemode,char
   ogm->dst = pe;
   ogm->freemode = freemode;
   ogm->refcount = 0;
-  return (CmiCommHandle)ogm;	
+  return ogm;
 }
 
 #if CMK_NODE_QUEUE_AVAILABLE
@@ -2462,7 +2462,7 @@ void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int 
 
 	MACHSTATE2(3,"Broadcast SendHypercube ogm %p size %d",ogm,size);
 
-  dest_pes = malloc(sizeof(int)*(k+1));
+  dest_pes = (int *)malloc(sizeof(int)*(k+1));
   k--;
   npes = HypercubeGetBcastDestinations(CmiMyNode(), CmiNumNodes(), k, dest_pes);
   
@@ -3132,7 +3132,7 @@ if(Cmi_isOldProcess!=1)
   if (Cmi_charmrun_fd==-1) /*Don't bother with check in standalone mode*/
       Cmi_check_delay=1.0e30;
 
-  inProgress = calloc(_Cmi_mynodesize, sizeof(int));
+  inProgress = (int *)calloc(_Cmi_mynodesize, sizeof(int));
 
   CsvInitialize(CmiNodeState, NodeState);
   CmiNodeStateInit(&CsvAccess(NodeState));

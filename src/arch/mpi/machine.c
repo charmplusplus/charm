@@ -412,7 +412,7 @@ static void EnqueueMsg(void *m, int size, int node, int mode) {
     /*SMSG_LIST *msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));*/
     SMSG_LIST *msg_tmp = (SMSG_LIST *) malloc(sizeof(SMSG_LIST));
     MACHSTATE1(3,"EnqueueMsg to node %d {{ ", node);
-    msg_tmp->msg = m;
+    msg_tmp->msg = (char *)m;
     msg_tmp->size = size;
     msg_tmp->destpe = node;
     msg_tmp->next = 0;

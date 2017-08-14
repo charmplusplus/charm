@@ -194,7 +194,7 @@ static void startNextSize(EmptyMsg* msg) {
     pva(buffer_msgs) =
         (char*)malloc((sizes[pva(nextSize)].numiter) * sizeof(Message*));
     for (i = 0; i < sizes[pva(nextSize)].numiter; i++) {
-      mm = CmiAlloc(size);
+      mm = (Message *)CmiAlloc(size);
       mm->srcpe = CmiMyPe();
       mm->idx = pva(nextSize);
       CmiSetHandler(mm, pva(bounceHandler));

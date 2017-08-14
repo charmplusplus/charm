@@ -28,7 +28,7 @@ void verbsOnesidedOpDone(CmiVerbsRdmaRecvOp_t *recvOpInfo) {
 
 /* function to perform RDMA read operation */
 void verbsOnesidedPostRdmaRead(int peNum, CmiVerbsRdmaRecvOp_t *recvOpInfo) {
-  struct infiRdmaPacket *rdmaPacket = malloc(sizeof(struct infiRdmaPacket));
+  struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)malloc(sizeof(struct infiRdmaPacket));
   rdmaPacket->type = INFI_ONESIDED;
   rdmaPacket->localBuffer = recvOpInfo;
 
@@ -119,7 +119,7 @@ void verbsOnesidedReceivedAck(struct infiRdmaPacket *rdmaPacket) {
     MACHSTATE(3, "ibv_dereg_mr() failed\n");
   }
 
-  CmiRdmaAck *ack = rdmaPacket->localBuffer;
+  CmiRdmaAck *ack = (CmiRdmaAck *)rdmaPacket->localBuffer;
   ack->fnPtr(ack->token);
 
   //free callback structure, CmiRdmaAck allocated in CmiSetRdmaAck

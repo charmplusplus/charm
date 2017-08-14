@@ -45,7 +45,7 @@ void pvmc_init_comm(void)
   CpvAccess(pvmc_msg_handler)=CmiRegisterHandler(pvmc_msg_handler_func);
 
   CpvInitialize(int*,recv_seq_num);
-  CpvAccess(recv_seq_num)=MALLOC(CmiNumPes()*sizeof(int));
+  CpvAccess(recv_seq_num)=(int *)MALLOC(CmiNumPes()*sizeof(int));
 
   if (CpvAccess(recv_seq_num)==NULL) {
     PRINTF("Pe(%d) tid=%d:%s:%d pvmc_init_comm() can't allocate seq buffer\n",
@@ -56,7 +56,7 @@ void pvmc_init_comm(void)
     CpvAccess(recv_seq_num)=0;
 
   CpvInitialize(int*,send_seq_num);
-  CpvAccess(send_seq_num)=MALLOC(CmiNumPes()*sizeof(int));
+  CpvAccess(send_seq_num)=(int *)MALLOC(CmiNumPes()*sizeof(int));
 
   if (CpvAccess(send_seq_num)==NULL) {
     PRINTF("Pe(%d) tid=%d:%s:%d pvmc_init_comm() can't allocate seq buffer\n",
@@ -72,7 +72,7 @@ void pvmc_send_control_msg(int type, int pe)
 {
   control_msg *msg;
 
-  msg=CmiAlloc(sizeof(control_msg));
+  msg=(control_msg *)CmiAlloc(sizeof(control_msg));
   msg->type=type;
   CmiSetHandler(msg,CpvAccess(pvmc_control_handler));
   CmiSyncSendAndFree(pe,sizeof(control_msg),msg);

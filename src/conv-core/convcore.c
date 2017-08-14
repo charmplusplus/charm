@@ -291,7 +291,7 @@ static void CmiAddCLA(const char *arg,const char *param,const char *desc) {
 		i=CLAlistLen++;
 		if (CLAlistLen>CLAlistMax) { /*Grow the CLA list */
 			CLAlistMax=16+2*CLAlistLen;
-			temp=realloc(CLAlist,sizeof(CLA)*CLAlistMax);
+			temp = (CLA *)realloc(CLAlist,sizeof(CLA)*CLAlistMax);
                         if(temp != NULL) {
 			  CLAlist=temp;
                         } else {
@@ -1973,8 +1973,8 @@ void CmiDeliverSpecificMsg(int handler)
   while (1) {
     CsdPeriodic();
     side ^= 1;
-    if (side) msg = CmiGetNonLocal();
-    else      msg = CdsFifo_Dequeue(localqueue);
+    if (side) msg = (int *)CmiGetNonLocal();
+    else      msg = (int *)CdsFifo_Dequeue(localqueue);
     if (msg) {
       if (CmiGetHandler(msg)==handler) {
 	CpvAccess(cQdState)->mProcessed++;
@@ -2685,7 +2685,7 @@ void CmiNodeReduceStruct(void *data, CmiReducePupFn pupFn,
 void CmiHandleReductionMessage(void *msg) {
   CmiReduction *red = CmiGetReduction(CmiGetRedID(msg));
   if (red->numRemoteReceived == red->numChildren) red = CmiGetReductionCreate(CmiGetRedID(msg), red->numChildren+4);
-  red->remoteData[red->numRemoteReceived++] = msg;
+  red->remoteData[red->numRemoteReceived++] = (char *)msg;
   /*CmiPrintf("[%d] CmiReduce::remote %hd\n",CmiMyPe(),red->seqID);*/
   CmiSendReduce(red);
 /*
@@ -2709,7 +2709,7 @@ void CmiReductionsInit(void) {
   CpvInitialize(int, _reduce_info_size);
   CpvAccess(_reduce_info_size) = 4;
   CpvInitialize(CmiReduction**, _reduce_info);
-  CpvAccess(_reduce_info) = malloc(16*sizeof(CmiReduction*));
+  CpvAccess(_reduce_info) = (CmiReduction **)malloc(16*sizeof(CmiReduction*));
   for (i=0; i<16; ++i) CpvAccess(_reduce_info)[i] = NULL;
 }
 

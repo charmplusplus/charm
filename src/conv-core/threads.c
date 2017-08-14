@@ -1772,9 +1772,9 @@ void CthStartThread(CmiUInt4 fn1, CmiUInt4 fn2, CmiUInt4 arg1, CmiUInt4 arg2)
 void CthStartThread(transfer_t arg)
 {
   data_t *data = (data_t *)arg.data;
-  uFcontext_t *old_ucp  = data->from;
+  uFcontext_t *old_ucp  = (uFcontext_t *)data->from;
   old_ucp->fctx = arg.fctx;
-  uFcontext_t *cur_ucp = data->data;
+  uFcontext_t *cur_ucp = (uFcontext_t *)data->data;
   cur_ucp->func(cur_ucp->arg);
   CthThreadFinished(CthSelf());
 }
@@ -1809,7 +1809,7 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   if (size && size<MINSIGSTKSZ) size = MINSIGSTKSZ;
 #endif
   CthAllocateStack(&result->base,&size,migratable);
-  stack = result->base.stack;
+  stack = (char *)result->base.stack;
 #if !CMK_THREADS_USE_FCONTEXT
   if (0 != getJcontext(&result->context))
     CmiAbort("CthCreateInner: getcontext failed.\n");
@@ -1826,7 +1826,7 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
 #if CMK_THREADS_USE_JCONTEXT /* Jcontext is always STACKBEGIN */
   ss_sp = stack;
 #elif CMK_THREADS_USE_FCONTEXT
-  ss_sp = (void*)((char*)stack+size);
+  ss_sp = (char *)stack+size;
   ss_end = stack;
 #elif CMK_CONTEXT_STACKEND /* ss_sp should point to *end* of buffer */
   ss_sp = stack+size-MINSIGSTKSZ; /* the MINSIGSTKSZ seems like a hack */
@@ -1913,7 +1913,7 @@ CthThread CthPup(pup_er p, CthThread t)
   pup_int(p,&flag);
   if (flag) {
     if (pup_isUnpacking(p)) {
-      t->context.uc_mcontext.fpregs = malloc(sizeof(struct _libc_fpstate));
+      t->context.uc_mcontext.fpregs = (struct _libc_fpstate *)malloc(sizeof(struct _libc_fpstate));
     }
     pup_bytes(p,t->context.uc_mcontext.fpregs,sizeof(struct _libc_fpstate));
   }
@@ -1922,7 +1922,7 @@ CthThread CthPup(pup_er p, CthThread t)
   pup_int(p,&flag);
   if (flag) {
     if (pup_isUnpacking(p)) {
-      t->context.uc_mcontext.uc_regs = malloc(sizeof(mcontext_t));
+      t->context.uc_mcontext.uc_regs = (mcontext_t *)malloc(sizeof(mcontext_t));
     }
     pup_bytes(p,t->context.uc_mcontext.uc_regs,sizeof(mcontext_t));
   }
@@ -1931,7 +1931,7 @@ CthThread CthPup(pup_er p, CthThread t)
 #if !CMK_THREADS_USE_FCONTEXT && !CMK_THREADS_USE_JCONTEXT && CMK_CONTEXT_V_REGS
   /* linux-ppc  64 bit */
   if (pup_isUnpacking(p)) {
-    t->context.uc_mcontext.v_regs = malloc(sizeof(vrregset_t));
+    t->context.uc_mcontext.v_regs = (vrregset_t *)malloc(sizeof(vrregset_t));
   }
   pup_bytes(p,t->context.uc_mcontext.v_regs,sizeof(vrregset_t));
 #endif
@@ -2089,7 +2089,7 @@ static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size,int Migratable
     B(result)->stack = stack;
     B(result)->stacksize = size;
   } else
-    stack=CthAllocateStack(&result->base,&size,Migratable);
+    stack = (qt_t *)CthAllocateStack(&result->base,&size,Migratable);
   CthAliasEnable(B(result)); /* Change to new thread's stack while setting args */
   stackbase = QT_SP(stack, size);
   stackp = QT_ARGS(stackbase, arg, result, (qt_userf_t *)fn, CthOnly);

@@ -463,7 +463,7 @@ int Cpthread_mutex_unlock(Cpthread_mutex_t *mutex)
   if (mutex->onpe != CmiMyPe()) errspan();
   if (CdsFifo_Peek(mutex->users) != self) errcode(EPERM);
   CdsFifo_Pop(mutex->users);
-  sleeper = CdsFifo_Peek(mutex->users);
+  sleeper = (CthThread)CdsFifo_Peek(mutex->users);
   if (sleeper) CthAwaken(sleeper);
   return 0;
 }
@@ -530,7 +530,7 @@ int Cpthread_cond_wait(Cpthread_cond_t *cond, Cpthread_mutex_t *mutex)
 
   if (CdsFifo_Peek(mutex->users) != self) errcode(EPERM);
   CdsFifo_Pop(mutex->users);
-  sleeper = CdsFifo_Peek(mutex->users);
+  sleeper = (CthThread)CdsFifo_Peek(mutex->users);
   if (sleeper) CthAwaken(sleeper);
   CdsFifo_Enqueue(cond->users, self);
   CthSuspend();
@@ -544,7 +544,7 @@ int Cpthread_cond_signal(Cpthread_cond_t *cond)
   CthThread sleeper;
   if (cond->magic != COND_MAGIC) errcode(EINVAL);
   if (cond->onpe != CmiMyPe()) errspan();
-  sleeper = CdsFifo_Dequeue(cond->users);
+  sleeper = (CthThread)CdsFifo_Dequeue(cond->users);
   if (sleeper) CthAwaken(sleeper);
   return 0;
 }
@@ -555,7 +555,7 @@ int Cpthread_cond_broadcast(Cpthread_cond_t *cond)
   if (cond->magic != COND_MAGIC) errcode(EINVAL);
   if (cond->onpe != CmiMyPe()) errspan();
   while (1) {
-    sleeper = CdsFifo_Dequeue(cond->users);
+    sleeper = (CthThread)CdsFifo_Dequeue(cond->users);
     if (sleeper==0) break;
     CthAwaken(sleeper);
   }

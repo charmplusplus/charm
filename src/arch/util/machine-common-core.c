@@ -1170,7 +1170,7 @@ if (  MSG_STATISTIC)
     Cmi_usrsched = usched;
 
     if ( CmiGetArgStringDesc(argv,"+stdout",&stdoutbase,"base filename to redirect partition stdout to") ) {
-      stdoutpath = malloc(strlen(stdoutbase) + 30);
+      stdoutpath = (char *)malloc(strlen(stdoutbase) + 30);
       sprintf(stdoutpath, stdoutbase, CmiMyPartition(), CmiMyPartition(), CmiMyPartition());
       if ( ! strcmp(stdoutpath, stdoutbase) ) {
         sprintf(stdoutpath, "%s.%d", stdoutbase, CmiMyPartition());

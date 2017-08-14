@@ -426,7 +426,7 @@ static void cpuAffinityHandler(void *m)
   static int nodecount = 0;
   hostnameMsg *rec;
   hostnameMsg *msg = (hostnameMsg *)m;
-  hostnameMsg *tmpm;
+  void *tmpm;
   int tag, tag1, pe, myrank;
   int npes = CmiNumPes();
 

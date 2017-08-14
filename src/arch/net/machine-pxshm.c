@@ -496,7 +496,7 @@ void allocBufNameStrings(char ***bufName)
   int i, count;
 
   int totalAlloc = sizeof(char) * NAMESTRLEN * (pxshmContext->nodesize - 1);
-  char *tmp = malloc(totalAlloc);
+  char *tmp = (char *)malloc(totalAlloc);
 
   MACHSTATE2(3, "allocBufNameStrings tmp %p totalAlloc %d", tmp, totalAlloc);
 
@@ -570,7 +570,7 @@ void createShmObject(char *name, int size, char **pPtr)
 
   ftruncate(fd, size); // set the size of the shared memory object
 
-  *pPtr = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  *pPtr = (char *)mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   CmiAssert(*pPtr != NULL);
 
   close(fd);

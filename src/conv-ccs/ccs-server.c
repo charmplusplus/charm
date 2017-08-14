@@ -557,7 +557,7 @@ void print_node0(const char *format, va_list args) {
     write_stdio_duplicate(buffer);
   } else {
     /* Need to forward the string to processor 0 */
-    char* msg = CmiAlloc(CmiReservedHeaderSize+len+1);
+    char* msg = (char *)CmiAlloc(CmiReservedHeaderSize+len+1);
     memcpy(msg+CmiReservedHeaderSize, buffer, len+1);
     CmiSetHandler(msg,print_fw_handler_idx);
     CmiSyncSendAndFree(0,CmiReservedHeaderSize+len+1,msg);

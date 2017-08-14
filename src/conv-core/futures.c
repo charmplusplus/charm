@@ -98,7 +98,7 @@ void *CfutureWait(Cfuture f)
     data->waiters = self;
     CthSuspend();
   }
-  value = data->value;
+  value = (CfutureValue)data->value;
   return (void*)(value->rest);
 }
 

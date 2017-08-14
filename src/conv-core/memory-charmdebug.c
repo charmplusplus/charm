@@ -979,7 +979,7 @@ static void backupMemory(void) {
   }
   if (reportMEM) CmiPrintf("CPD: total memory in use (%d): %d\n",CmiMyPe(),totalMemory);
   BEFORE_MALLOC_CALL;
-  *memoryBackup = mm_malloc(totalMemory);
+  *memoryBackup = (char *)mm_malloc(totalMemory);
   AFTER_MALLOC_CALL;
 
   ptr = *memoryBackup;

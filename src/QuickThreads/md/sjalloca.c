@@ -5,9 +5,9 @@
 struct helpdesc { qt_helper_t *hfn; qt_t *jb; void *oldptr; void *newptr; };
 
 #ifdef QT_GROW_DOWN
-#define SHIFTSP(pos) {char *osp=alloca(0); alloca((osp-((char*)pos))+256); }
+#define SHIFTSP(pos) {char *osp = (char *)alloca(0); alloca((osp-((char*)pos))+256); }
 #else
-#define SHIFTSP(pos) {char *osp=alloca(0); alloca((((char*)pos)-osp)+256); }
+#define SHIFTSP(pos) {char *osp = (char *)alloca(0); alloca((((char*)pos)-osp)+256); }
 #endif
 
 static void qt_args_1(qt_t *rjb, void *u, void *t,

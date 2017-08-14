@@ -12,7 +12,7 @@ void Cpm_megacon_ack(CpmDestination);
 void bigmsg_handler(void *vmsg)
 {
   int i, next;
-  int *msg = vmsg;
+  int *msg = (int *)vmsg;
   if (CmiMyPe()==0) {
     for (i=CmiMsgHeaderSizeInts; i<250000; i++) {
       if (msg[i] != i) {
@@ -35,7 +35,7 @@ void bigmsg_init()
     CmiPrintf("note: bigmsg requires at least 2 processors, skipping test.\n");
     Cpm_megacon_ack(CpmSend(0));
   } else {
-    msg = CmiAlloc(250000 * sizeof(int));
+    msg = (int *)CmiAlloc(250000 * sizeof(int));
     for (i=CmiMsgHeaderSizeInts; i<250000; i++) msg[i] = i;
     CmiSetHandler(msg, CpvAccess(bigmsg_index));
     CmiSyncSendAndFree(1, 250000 * sizeof(int), msg);

@@ -223,7 +223,7 @@ mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool
 #if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
   mptr->mempoolLock = CmiCreateLock();
 #endif
-  mptr->block_head.mptr = pool;
+  mptr->block_head.mptr = (struct mempool_type *)pool;
   mptr->block_head.mem_hndl = mem_hndl;
   mptr->block_head.size = pool_size;
   mptr->block_head.used = 0;

@@ -42,7 +42,7 @@ void pvmc_init_bufs(void)
 #endif
 
   CpvInitialize(pvmc_buffer*,pvmc_bufarray);
-  CpvAccess(pvmc_bufarray)=MALLOC(sizeof(pvmc_buffer)*MAX_BUFFERS);
+  CpvAccess(pvmc_bufarray)=(pvmc_buffer *)MALLOC(sizeof(pvmc_buffer)*MAX_BUFFERS);
   if (CpvAccess(pvmc_bufarray)==NULL) {
     PRINTF("Pe(%d) tid=%d:%s:%d pvmc_init_bufs() can't alloc buffer array\n",
 	   MYPE(),pvm_mytid(),__FILE__,__LINE__);
@@ -447,8 +447,8 @@ int pvmc_unpackmsg(void *msgbuf, void *start_of_msg)
 	 MYPE(),cur_buf->num_items,cur_buf->tag);
 #endif
   if (msgbuf)
-    cur_buf->data_buf = msgbuf;
-  else cur_buf->data_buf = (void *)NULL;
+    cur_buf->data_buf = (char *)msgbuf;
+  else cur_buf->data_buf = (char *)NULL;
 
   cur_item=(pvmc_item *)MALLOC(sizeof(pvmc_item));
   cur_buf->first_item=cur_item;
@@ -494,7 +494,7 @@ int pvmc_unpackmsg(void *msgbuf, void *start_of_msg)
   while(cur_item!=cur_buf->last_item) {
     if (cur_item->size > 0) {
       cur_item->free_data=FALSE;
-      cur_item->data = (void *)((char *)start_of_msg+bytes_unpacked);
+      cur_item->data = (char *)start_of_msg+bytes_unpacked;
       bytes_unpacked+=cur_item->size;
     }
     else cur_item->data=NULL;
@@ -531,7 +531,7 @@ void *pvmc_mkitem(int nbytes, int type)
     return databuf;
   }
   buf->last_item->free_data=TRUE;
-  buf->last_item->data=databuf;
+  buf->last_item->data=(char *)databuf;
   buf->last_item->nxt=(pvmc_item *)MALLOC(sizeof(pvmc_item));
   if (buf->last_item->nxt==NULL) {
     PRINTF("Pe(%d) tid=%d:%s:%d pvmc_mkitem() can't allocate new item\n",

@@ -606,7 +606,7 @@ loop:
 	}
 	
 	context->infiPacketFreeList=NULL;
-	pktPtrs = malloc(sizeof(infiPacket)*sendPacketPoolSize);
+	pktPtrs = (infiPacket *)malloc(sizeof(infiPacket)*sendPacketPoolSize);
 
 	//Silly way of allocating the memory buffers (slow as well) but simplifies the code
 #if !THREAD_MULTI_POOL
@@ -797,7 +797,7 @@ void postInitialRecvs(struct infiBufferPool *recvBufferPool,int numRecvs,int siz
 	1. connect the qp and store it in and return it
 **/
 struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
-	struct infiOtherNodeData * ret = malloc(sizeof(struct infiOtherNodeData));
+	struct infiOtherNodeData * ret = (struct infiOtherNodeData *)malloc(sizeof(struct infiOtherNodeData));
 	int err;
 	ret->state = INFI_HEADER_DATA;
 	ret->qp = context->qp[node];
@@ -941,14 +941,14 @@ struct infiBufferPool * allocateInfiBufferPool(int numRecvs,int sizePerBuffer){
 	MACHSTATE2(3,"allocateInfiBufferPool numRecvs %d sizePerBuffer%d ",numRecvs,sizePerBuffer);
 
 	page_size = sysconf(_SC_PAGESIZE);
-	ret = malloc(sizeof(struct infiBufferPool));
+	ret = (struct infiBufferPool *)malloc(sizeof(struct infiBufferPool));
 	ret->next = NULL;
 	numBuffers=ret->numBuffers = numRecvs;
 	
-	ret->buffers = malloc(sizeof(struct infiBuffer)*numBuffers);
+	ret->buffers = (struct infiBuffer *)malloc(sizeof(struct infiBuffer)*numBuffers);
 	
 	bigSize = numBuffers*sizePerBuffer;
-	bigBuf=malloc(bigSize);
+	bigBuf = (char *)malloc(bigSize);
 	bigKey = ibv_reg_mr(context->pd,bigBuf,bigSize,IBV_ACCESS_LOCAL_WRITE);
 #if CMK_IBVERBS_STATS
 	numCurReg++;
@@ -981,8 +981,8 @@ struct infiBufferPool * allocateInfiBufferPool(int numRecvs,int sizePerBuffer){
 */
 void postInitialRecvs(struct infiBufferPool *recvBufferPool,int numRecvs,int sizePerBuffer){
 	int j,err;
-	struct ibv_recv_wr *workRequests = malloc(sizeof(struct ibv_recv_wr)*numRecvs);
-	struct ibv_sge *sgElements = malloc(sizeof(struct ibv_sge)*numRecvs);
+	struct ibv_recv_wr *workRequests = (struct ibv_recv_wr *)malloc(sizeof(struct ibv_recv_wr)*numRecvs);
+	struct ibv_sge *sgElements = (struct ibv_sge *)malloc(sizeof(struct ibv_sge)*numRecvs);
 	struct ibv_recv_wr *bad_wr;
 	
 	int startBufferIdx=0;
@@ -1129,7 +1129,7 @@ static void inline EnqueueDummyPacket(OtherNode node,int size){
 	infiPacket packet;
 	MallocInfiPacket(packet);
 	packet->size = size;
-	packet->buf = CmiAlloc(size);
+	packet->buf = (char *)CmiAlloc(size);
 	
 	packet->header.code = INFIDUMMYPACKET;
 
@@ -1703,7 +1703,7 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)(buffer->buf+sizeof(struct infiPacketHeader));
 //		if(toBuffer){
 			//TODO: make a function of this and use for both acks and requests
-			struct infiRdmaPacket *copyPacket = malloc(sizeof(struct infiRdmaPacket));
+			struct infiRdmaPacket *copyPacket = (struct infiRdmaPacket *)malloc(sizeof(struct infiRdmaPacket));
 			struct infiRdmaPacket *tmp=context->bufferedRdmaRequests;
 			*copyPacket = *rdmaPacket;
 			copyPacket->fromNodeNo = nodeNo;
@@ -1800,14 +1800,14 @@ static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket,int fro
 #endif
 #endif
 	
-	struct infiBuffer *buffer = malloc(sizeof(struct infiBuffer));
+	struct infiBuffer *buffer = (struct infiBuffer *)malloc(sizeof(struct infiBuffer));
 //	CmiAssert(buffer != NULL);
 	
 	
 	if(isBuffered){
 		rdmaPacket = _rdmaPacket;
 	}else{
-		rdmaPacket = malloc(sizeof(struct infiRdmaPacket));
+		rdmaPacket = (struct infiRdmaPacket *)malloc(sizeof(struct infiRdmaPacket));
 		*rdmaPacket = *_rdmaPacket;
 	}
 
@@ -1968,7 +1968,7 @@ static inline void processRdmaAck(struct infiRdmaPacket *rdmaPacket){
 
 static inline infiBufferedBcastPool createBcastPool(void){
 	int i;
-	infiBufferedBcastPool ret = malloc(sizeof(struct infiBufferedBcastPoolStruct));
+	infiBufferedBcastPool ret = (struct infiBufferedBcastPoolStruct *)malloc(sizeof(struct infiBufferedBcastPoolStruct));
 	ret->count = 0;
 	ret->next = ret->prev = NULL;	
 	for(i=0;i<BCASTLIST_SIZE;i++){
@@ -2195,9 +2195,9 @@ static void initInfiCmiChunkPools(void){
 
 #if THREAD_MULTI_POOL
 	nodeSize = CmiMyNodeSize() + 1;
-	infiCmiChunkPools = malloc(sizeof(infiCmiChunkPool *) * nodeSize);
+	infiCmiChunkPools = (infiCmiChunkPool **)malloc(sizeof(infiCmiChunkPool *) * nodeSize);
 	for(i = 0; i < nodeSize; i++){
-		infiCmiChunkPools[i] = malloc(sizeof(infiCmiChunkPool) * INFINUMPOOLS);
+		infiCmiChunkPools[i] = (infiCmiChunkPool *)malloc(sizeof(infiCmiChunkPool) * INFINUMPOOLS);
 	}
 	for(j = 0; j < nodeSize; j++){
 		size = firstBinSize;
@@ -2210,9 +2210,9 @@ static void initInfiCmiChunkPools(void){
 	}
 
 	// creating the n^2 system of queues
-	queuePool = malloc(sizeof(PCQueue *) * nodeSize);
+	queuePool = (PCQueue **)malloc(sizeof(PCQueue *) * nodeSize);
 	for(i = 0; i < nodeSize; i++){
-		queuePool[i] = malloc(sizeof(PCQueue) * nodeSize);
+		queuePool[i] = (PCQueue *)malloc(sizeof(PCQueue) * nodeSize);
 	}
 	for(i = 0; i < nodeSize; i++)
 		for(j = 0; j < nodeSize; j++)
@@ -2235,7 +2235,7 @@ static void initInfiCmiChunkPools(void){
 Register memory for a part of a received multisend message
 *************/
 infiCmiChunkMetaData *registerMultiSendMesg(char *msg,int size){
-	infiCmiChunkMetaData *metaData = malloc(sizeof(infiCmiChunkMetaData));
+	infiCmiChunkMetaData *metaData = (infiCmiChunkMetaData *)malloc(sizeof(infiCmiChunkMetaData));
 	char *res=msg-sizeof(infiCmiChunkHeader);
 	metaData->key = ibv_reg_mr(context->pd,res,(size+sizeof(infiCmiChunkHeader)),IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
 #if CMK_IBVERBS_STATS
@@ -2277,7 +2277,7 @@ static inline void fillBufferPools(void){
 				count = 1;
 			}
 			posix_memalign((void **)&res, ALIGN_BYTES, (allocSize+sizeof(infiCmiChunkHeader))*count);
-			hdr = res;
+			hdr = (infiCmiChunkHeader *)res;
 			key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(infiCmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
 			CmiAssert(key != NULL);
 #if CMK_IBVERBS_STATS
@@ -2286,7 +2286,7 @@ static inline void fillBufferPools(void){
 #endif
 			res += sizeof(infiCmiChunkHeader);
 			for(i=0;i<count;i++){
-				metaData = METADATAFIELD(res) = malloc(sizeof(infiCmiChunkMetaData));
+				metaData = METADATAFIELD(res) = (infiCmiChunkMetaData *)malloc(sizeof(infiCmiChunkMetaData));
 				metaData->key = key;
 				metaData->owner = hdr;
 				metaData->poolIdx = poolIdx;
@@ -2365,7 +2365,7 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 		}
 		posix_memalign((void **)&res, ALIGN_BYTES, (allocSize+sizeof(infiCmiChunkHeader))*count);
 		_MEMCHECK(res);
-		hdr = res;
+		hdr = (infiCmiChunkHeader *)res;
 		
 		key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(infiCmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
 	        if(key == NULL)
@@ -2378,7 +2378,7 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 		origres = (res += sizeof(infiCmiChunkHeader));
 
 		for(i=0;i<count;i++){
-			metaData = METADATAFIELD(res) = malloc(sizeof(infiCmiChunkMetaData));
+			metaData = METADATAFIELD(res) = (infiCmiChunkMetaData *)malloc(sizeof(infiCmiChunkMetaData));
 			_MEMCHECK(metaData);
 			metaData->key = key;
 			metaData->owner = hdr;
@@ -2408,7 +2408,7 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 	if(poolIdx < INFINUMPOOLS){
 		infiCmiChunkMetaData *metaData;				
 	
-		res = infiCmiChunkPools[CmiMyRank()][poolIdx].startBuf;
+		res = (char *)infiCmiChunkPools[CmiMyRank()][poolIdx].startBuf;
 		res += sizeof(infiCmiChunkHeader);
 
 		MACHSTATE2(2,"Reusing old pool %d buf %p",poolIdx,res);
@@ -2478,7 +2478,7 @@ static inline void *getInfiCmiChunk(int dataSize){
                 origres = (res += sizeof(infiCmiChunkHeader));
 
                 for(i=0;i<count;i++){
-                        metaData = METADATAFIELD(res) = malloc(sizeof(infiCmiChunkMetaData));
+                        metaData = METADATAFIELD(res) = (infiCmiChunkMetaData *)malloc(sizeof(infiCmiChunkMetaData));
                         metaData->key = key;
                         metaData->owner = hdr;
                         metaData->poolIdx = poolIdx;
@@ -2506,7 +2506,7 @@ static inline void *getInfiCmiChunk(int dataSize){
         if(poolIdx < INFINUMPOOLS){
                 infiCmiChunkMetaData *metaData;
 
-                res = infiCmiChunkPools[poolIdx].startBuf;
+                res = (char *)infiCmiChunkPools[poolIdx].startBuf;
                 res += sizeof(infiCmiChunkHeader);
 
                 MACHSTATE2(2,"Reusing old pool %d buf %p",poolIdx,res);
@@ -2540,7 +2540,7 @@ void * infi_CmiAlloc(int size){
           return res;
 	}
 #if THREAD_MULTI_POOL
-	res = getInfiCmiChunkThread(size-sizeof(CmiChunkHeader));
+	res = (char *)getInfiCmiChunkThread(size-sizeof(CmiChunkHeader));
 	res -= sizeof(CmiChunkHeader);
 
 	return res;
@@ -2557,7 +2557,7 @@ void * infi_CmiAlloc(int size){
 	CmiMemUnlock();
 #endif
 /*	}else{
-		res = malloc(size);
+		res = (char *)malloc(size);
 	}*/
 	
 	return res;
@@ -2643,7 +2643,7 @@ void infi_CmiFree(void *ptr){
 
 	MACHSTATE(3,"Freeing");
 
-        if (Cmi_charmrun_fd == -1) { char *res = ptr; res -= sizeof(void*); free(res); return; }
+        if (Cmi_charmrun_fd == -1) { char *res = (char *)ptr; res -= sizeof(void*); free(res); return; }
         ptr = (char *)ptr + sizeof(CmiChunkHeader);
         size = SIZEFIELD (ptr);
 /*      if(size > firstBinSize){*/
@@ -2685,7 +2685,7 @@ void infi_CmiFree(void *ptr){
 	numFree++;
 #endif
 	
-        if (Cmi_charmrun_fd == -1) { char *res = ptr; res -= sizeof(void*); free(res); return; }
+        if (Cmi_charmrun_fd == -1) { char *res = (char *)ptr; res -= sizeof(void*); free(res); return; }
 #if CMK_SMP	
 	CmiMemLock();
 #endif
@@ -2851,7 +2851,7 @@ infiDirectHandle *removeHandleFromPollingQ(){
 }*/
 
 static inline infiDirectHandleTable **createHandleTable(void){
-	infiDirectHandleTable **table = malloc(Lrts_numNodes*sizeof(infiDirectHandleTable *));
+	infiDirectHandleTable **table = (infiDirectHandleTable **)malloc(Lrts_numNodes*sizeof(infiDirectHandleTable *));
 	int i;
 	for(i=0;i<Lrts_numNodes;i++){
 		table[i] = NULL;
@@ -2887,13 +2887,13 @@ struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf,
 	
 	if(recvHandleTable == NULL){
 		recvHandleTable = createHandleTable();
-		recvHandleCount = malloc(sizeof(int)*CmiNumNodesGlobal());
+		recvHandleCount = (int *)malloc(sizeof(int)*CmiNumNodesGlobal());
 		for(i=0;i<CmiNumNodesGlobal();i++){
 			recvHandleCount[i] = -1;
 		}
 	}
 	if(recvHandleTable[senderNode] == NULL){
-		recvHandleTable[senderNode] = malloc(sizeof(infiDirectHandleTable));
+		recvHandleTable[senderNode] = (infiDirectHandleTable *)malloc(sizeof(infiDirectHandleTable));
 		recvHandleTable[senderNode]->next = NULL;		
 	}
 	
@@ -2905,7 +2905,7 @@ struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf,
 	table = recvHandleTable[senderNode];
 	for(i=0;i<tableIdx;i++){
 		if(table->next ==NULL){
-			table->next = malloc(sizeof(infiDirectHandleTable));
+			table->next = (infiDirectHandleTable *)malloc(sizeof(infiDirectHandleTable));
 			table->next->next = NULL;
 		}
 		table = table->next;
@@ -2967,7 +2967,7 @@ void CmiDirect_assocLocalBuffer(struct infiDirectUserHandle *userHandle,void *se
 		sendHandleTable = createHandleTable();
 	}
 	if(sendHandleTable[recverNode] == NULL){
-		sendHandleTable[recverNode] = malloc(sizeof(infiDirectHandleTable));
+		sendHandleTable[recverNode] = (infiDirectHandleTable *)malloc(sizeof(infiDirectHandleTable));
 		sendHandleTable[recverNode]->next = NULL;
 	}
 	
@@ -2977,7 +2977,7 @@ void CmiDirect_assocLocalBuffer(struct infiDirectUserHandle *userHandle,void *se
 	table = sendHandleTable[recverNode];
 	for(i=0;i<tableIdx;i++){
 		if(table->next ==NULL){
-			table->next = malloc(sizeof(infiDirectHandleTable));
+			table->next = (infiDirectHandleTable *)malloc(sizeof(infiDirectHandleTable));
 			table->next->next = NULL;
 		}
 		table = table->next;
@@ -3001,7 +3001,7 @@ void CmiDirect_assocLocalBuffer(struct infiDirectUserHandle *userHandle,void *se
 	table->handles[idx].userHandle = *userHandle;
 	CmiAssert(sendBufSize == table->handles[idx].userHandle.recverBufSize);
 	
-	table->handles[idx].rdmaPacket = CmiAlloc(sizeof(struct infiRdmaPacket));
+	table->handles[idx].rdmaPacket = (struct infiRdmaPacket *)CmiAlloc(sizeof(struct infiRdmaPacket));
 	table->handles[idx].rdmaPacket->type = INFI_DIRECT;
 	table->handles[idx].rdmaPacket->localBuffer = &(table->handles[idx]);
 	

@@ -1107,7 +1107,7 @@ static void InternalWriteToTerminal(int isStdErr,const char *str,int len);
 static void InternalPrintf(const char *f, va_list l)
 {
   ChMessage replymsg;
-  char *buffer = malloc(PRINTBUFSIZE);
+  char *buffer = (char *)malloc(PRINTBUFSIZE);
   CmiStdoutFlush();
   vsprintf(buffer, f, l);
   if(Cmi_syncprint) {
@@ -1126,7 +1126,7 @@ static void InternalPrintf(const char *f, va_list l)
 static void InternalError(const char *f, va_list l)
 {
   ChMessage replymsg;
-  char *buffer = malloc(PRINTBUFSIZE);
+  char *buffer = (char *)malloc(PRINTBUFSIZE);
   CmiStdoutFlush();
   vsprintf(buffer, f, l);
   if(Cmi_syncprint) {
@@ -1482,7 +1482,7 @@ static void node_addresses_obtain(char **argv)
 #if CMK_USE_IBVERBS
 	{
 		int qpListSize = (Lrts_numNodes-1)*sizeof(ChInfiAddr);
-		me.info.qpList = malloc(qpListSize);
+		me.info.qpList = (ChInfiAddr *)malloc(qpListSize);
 		copyInfiAddr(me.info.qpList);
 		MACHSTATE1(3,"me.info.qpList created and copied size %d bytes",qpListSize);
 		ctrl_sendone_nolock("initnode",(const char *)&me,sizeof(me),(const char *)me.info.qpList,qpListSize);
@@ -1589,7 +1589,7 @@ static OutgoingMsg PrepareOutgoing(int pe,int size,int freemode,char *data) {
   ogm->dst = pe;
   ogm->freemode = freemode;
   ogm->refcount = 0;
-  return (CmiCommHandle)ogm;	
+  return ogm;
 }
 
 
@@ -2038,9 +2038,9 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
 #if CMK_SMP
   // Allocate a slot for the comm thread
-  inProgress = calloc(_Cmi_mynodesize+1, sizeof(int));
+  inProgress = (int *)calloc(_Cmi_mynodesize+1, sizeof(int));
 #else
-  inProgress = calloc(_Cmi_mynodesize, sizeof(int));
+  inProgress = (int *)calloc(_Cmi_mynodesize, sizeof(int));
 #endif
 
   *numNodes = Lrts_numNodes;

@@ -124,7 +124,7 @@ int setJcontext (const uJcontext_t *u)
 			allocLen=old_sp-new_sp;
                   
 		        VERBOSE( printf("calling alloca with %lld", allocLen); printStack(); )
-			_dummyAllocaSetJcontext = alloca(allocLen);  /* defeat the compiler optimization! */
+			_dummyAllocaSetJcontext = (char *)alloca(allocLen);  /* defeat the compiler optimization! */
 #endif
 		}
 		VERBOSE( printf("After alloca"); printStack(); )

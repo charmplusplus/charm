@@ -74,7 +74,7 @@ void CcsRegisterHandlerFn(const char *name, CcsHandlerFn fn, void *ptr) {
   *(CcsHandlerRec *)CkHashtablePut(CpvAccess(ccsTab),(void *)&cp.name)=cp;
 }
 CcsHandlerRec *CcsGetHandler(const char *name) {
-  return CkHashtableGet(CpvAccess(ccsTab),(void *)&name);
+  return (CcsHandlerRec *)CkHashtableGet(CpvAccess(ccsTab),(void *)&name);
 }
 void CcsSetMergeFn(const char *name, CmiReduceMergeFn newMerge) {
   CcsHandlerRec *rec=(CcsHandlerRec *)CkHashtableGet(CpvAccess(ccsTab),(void *)&name);
@@ -251,7 +251,7 @@ void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
     /* We are conditionally delivering, the message has been sent to the child, wait for its response */
     int bytes;
     if (4==read(conditionalPipe[0], &bytes, 4)) {
-      char *buf = malloc(bytes);
+      char *buf = (char *)malloc(bytes);
       read(conditionalPipe[0], buf, bytes);
       CcsSendReply(bytes,buf);
       free(buf);
@@ -283,7 +283,7 @@ void CcsBufferMessage(char *msg) {
   CmiPrintf("Buffering CCS message\n");
   CmiAssert(CcsNumBufferedMsgs < CCS_MAX_NUM_BUFFERED_MSGS);
   if (CcsNumBufferedMsgs < 0) CmiAbort("Why is a CCS message being buffered now???");
-  if (bufferedMessages == NULL) bufferedMessages = malloc(sizeof(char*)*CCS_MAX_NUM_BUFFERED_MSGS);
+  if (bufferedMessages == NULL) bufferedMessages = (char **)malloc(sizeof(char*)*CCS_MAX_NUM_BUFFERED_MSGS);
   bufferedMessages[CcsNumBufferedMsgs] = msg;
   CcsNumBufferedMsgs ++;
 }
@@ -439,7 +439,7 @@ void CcsImpl_reply(CcsImplHeader *rep,int repLen,const void *repData)
     /*Forward data & socket # to the replyPE*/
     int len=CmiReservedHeaderSize+
            sizeof(CcsImplHeader)+repLen;
-    char *msg=CmiAlloc(len);
+    char *msg = (char *)CmiAlloc(len);
     char *r=msg+CmiReservedHeaderSize;
     *(CcsImplHeader *)r=*rep; r+=sizeof(CcsImplHeader);
     memcpy(r,repData,repLen);

@@ -44,7 +44,7 @@ void vecsend_init()
 	sizes = (int *) CmiAlloc(4*sizeof(int));
     msgs = (int **) CmiAlloc(4*sizeof(int *));
     sizes[0] = 1000; sizes[1] = 500; sizes[2] = 2000; sizes[3] = 100;
-    for(i=0;i<4;i++) msgs[i] = CmiAlloc(sizes[i]*sizeof(int));
+    for(i=0;i<4;i++) msgs[i] = (int *)CmiAlloc(sizes[i]*sizeof(int));
     for(i=0;i<4;i++) sizes[i] *= sizeof(int);
     for (i=CmiMsgHeaderSizeInts; i<1000; i++) msgs[0][i] = i;
     for (i=0; i<500; i++) msgs[1][i] = i+1000;

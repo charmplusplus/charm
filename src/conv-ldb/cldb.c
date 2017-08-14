@@ -249,7 +249,7 @@ void CldGetToken(char **msg)
   CldProcInfo proc = CpvAccess(CldProc);
   CmiNodeLock cldlock = CpvAccess(cldLock);
   CmiLock(cldlock);
-  *msg = _CldGetTokenMsg(proc);
+  *msg = (char *)_CldGetTokenMsg(proc);
   if (*msg) CpvAccess(CldLoadOffset)++;
   CmiUnlock(cldlock);
 }
@@ -265,7 +265,7 @@ void CldGetTokenFromRank(char **msg, int rank)
   CldProcInfo proc = CpvAccessOther(CldProc, rank);
   CmiNodeLock cldlock = CpvAccessOther(cldLock, rank);
   CmiLock(cldlock);
-  *msg = _CldGetTokenMsg(proc);
+  *msg = (char *)_CldGetTokenMsg(proc);
   if (*msg) CpvAccessOther(CldLoadOffset, rank)++;
   CmiUnlock(cldlock);
 }
@@ -298,7 +298,7 @@ void CldGetTokenFromRankAt(char **msg, int rank, CldToken tok)
   CldProcInfo proc = CpvAccessOther(CldProc, rank);
   CmiNodeLock cldlock = CpvAccessOther(cldLock, rank);
   CmiLock(cldlock);
-  *msg = _CldGetTokenMsgAt(proc, tok);
+  *msg = (char *)_CldGetTokenMsgAt(proc, tok);
   if (*msg) CpvAccessOther(CldLoadOffset, rank)++;
   CmiUnlock(cldlock);
 }

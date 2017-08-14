@@ -1148,7 +1148,7 @@ static void InternalWriteToTerminal(int isStdErr,const char *str,int len);
 static void InternalPrintf(const char *f, va_list l)
 {
   ChMessage replymsg;
-  char *buffer = malloc(PRINTBUFSIZE);
+  char *buffer = (char *)malloc(PRINTBUFSIZE);
   CmiStdoutFlush();
   vsprintf(buffer, f, l);
   if(Cmi_syncprint) {
@@ -1167,7 +1167,7 @@ static void InternalPrintf(const char *f, va_list l)
 static void InternalError(const char *f, va_list l)
 {
   ChMessage replymsg;
-  char *buffer = malloc(PRINTBUFSIZE);
+  char *buffer = (char *)malloc(PRINTBUFSIZE);
   CmiStdoutFlush();
   vsprintf(buffer, f, l);
   if(Cmi_syncprint) {
@@ -1604,7 +1604,7 @@ static OutgoingMsg PrepareOutgoing(int pe,int size,int freemode,char *data) {
   ogm->dst = pe;
   ogm->freemode = freemode;
   ogm->refcount = 0;
-  return (CmiCommHandle)ogm;	
+  return ogm;
 }
 
 
@@ -2205,9 +2205,9 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #if CMK_SMP
   // Allocate a slot for the comm thread. Do this even for multicore,
   // since it's possible to ask for a 'comm' thread at runtime
-  inProgress = calloc(_Cmi_mynodesize+1, sizeof(int));
+  inProgress = (int *)calloc(_Cmi_mynodesize+1, sizeof(int));
 #else
-  inProgress = calloc(_Cmi_mynodesize, sizeof(int));
+  inProgress = (int *)calloc(_Cmi_mynodesize, sizeof(int));
 #endif
 
   *numNodes = Lrts_numNodes;

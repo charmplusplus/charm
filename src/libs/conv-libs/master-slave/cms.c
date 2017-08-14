@@ -56,7 +56,7 @@ static void callWorker(void *msg)
     size = CpvAccess(clientWorker) (m, &r);
 
     msgSize = 2 * sizeof(int) + CmiMsgHeaderSizeBytes + size;
-    msg2 = CmiAlloc(msgSize);
+    msg2 = (char *)CmiAlloc(msgSize);
     m = msg2 + CmiMsgHeaderSizeBytes;
     *((int *) m) = size;
     m += sizeof(int);
@@ -148,7 +148,7 @@ void CmsFireTask(int ref, void *t, int size)
     char *m;
     char *msg;
 
-    msg = CmiAlloc(2 * sizeof(int) + CmiExtHeaderSizeBytes + size);
+    msg = (char *)CmiAlloc(2 * sizeof(int) + CmiExtHeaderSizeBytes + size);
 
     CmiSetHandler(msg, CpvAccess(workHandler));
     m = msg + CmiExtHeaderSizeBytes;

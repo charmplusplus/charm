@@ -1012,7 +1012,7 @@ allgather(void *in,void *out, int len)
     rc = PMI_Allgather(in,tmp_buf,len);
     CmiAssert(rc == PMI_SUCCESS);
 
-    out_ptr = out;
+    out_ptr = (char *)out;
 
     for(i=0;i<job_size;i++) {
 
@@ -1043,7 +1043,7 @@ allgather_2(void *in,void *out, int len)
     rc = PMI_Allgather(in2, out_ptr, extend_len);
     GNI_RC_CHECK("allgather", rc);
 
-    out_ref = out;
+    out_ref = (char *)out;
 
     for(i=0;i<mysize;i++) {
         //rank index 
@@ -3683,7 +3683,7 @@ static void _init_static_smsg(void)
 
     set_smsg_max();
     
-    smsg_attr = malloc(mysize * sizeof(gni_smsg_attr_t));
+    smsg_attr = (gni_smsg_attr_t *)malloc(mysize * sizeof(gni_smsg_attr_t));
     
     smsg_attr[0].msg_type = GNI_SMSG_TYPE_MBOX_AUTO_RETRANSMIT;
     smsg_attr[0].mbox_maxcredit = SMSG_MAX_CREDIT;
@@ -3707,7 +3707,7 @@ static void _init_static_smsg(void)
 
     base_infor.addr =  (uint64_t)smsg_mailbox_base;
     base_infor.mdh =  my_smsg_mdh_mailbox;
-    base_addr_vec = malloc(mysize * sizeof(mdh_addr_t));
+    base_addr_vec = (mdh_addr_t *)malloc(mysize * sizeof(mdh_addr_t));
 
     allgather(&base_infor, base_addr_vec,  sizeof(mdh_addr_t));
  
@@ -4244,22 +4244,22 @@ void* LrtsAlloc(int n_bytes, int header)
         n_bytes = ALIGN64(n_bytes);
         if(n_bytes < BIG_MSG)
         {
-            char *res = mempool_malloc(CpvAccess(mempool), ALIGNBUF+n_bytes-sizeof(mempool_header), 1);
+            char *res = (char *)mempool_malloc(CpvAccess(mempool), ALIGNBUF+n_bytes-sizeof(mempool_header), 1);
             if (res) ptr = res - sizeof(mempool_header) + ALIGNBUF - header;
         }else 
         {
 #if LARGEPAGE
             //printf("[%d] LrtsAlloc a big_msg: %d %d\n", myrank, n_bytes, ALIGNHUGEPAGE(n_bytes+ALIGNBUF));
             n_bytes = ALIGNHUGEPAGE(n_bytes+ALIGNBUF);
-            char *res = my_get_huge_pages(n_bytes);
+            char *res = (char *)my_get_huge_pages(n_bytes);
 #else
-            char *res = memalign(ALIGNBUF, n_bytes+ALIGNBUF);
+            char *res = (char *)memalign(ALIGNBUF, n_bytes+ALIGNBUF);
 #endif
             if (res) ptr = res + ALIGNBUF - header;
         }
 #else
         n_bytes = ALIGN64(n_bytes);           /* make sure size if 4 aligned */
-        char *res = memalign(ALIGNBUF, n_bytes+ALIGNBUF);
+        char *res = (char *)memalign(ALIGNBUF, n_bytes+ALIGNBUF);
         ptr = res + ALIGNBUF - header;
 #endif
     }
