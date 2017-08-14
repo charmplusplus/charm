@@ -62,7 +62,7 @@ void reduction_moduleinit(void);
 
 struct testinfo
 {
-  char *name;
+  const char *name;
   void (*initiator)(void);
   void (*initializer)(void);
   int  reentrant;
@@ -127,7 +127,7 @@ CpmInvokable megacon_shutdown(int n)
   }
 }
 
-int megacon_skip(char *test)
+int megacon_skip(const char *test)
 {
   int i;
   int num_skip = CpvAccess(num_tests_to_skip);

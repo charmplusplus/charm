@@ -45,7 +45,7 @@ extern void reduction_moduleinit(void);
 extern void ctxt_moduleinit(void);
 
 struct testinfo {
-  char* name;
+  const char* name;
   void (*initiator)(void);
   void (*initializer)(void);
 } tests[] = {
@@ -82,7 +82,7 @@ void commbench_shutdown(void* msg) {
   CsdExitScheduler();
 }
 
-int commbench_skip(char* test) {
+int commbench_skip(const char* test) {
   int i;
   int num_skip = CpvAccess(num_tests_to_skip);
   char** skip;

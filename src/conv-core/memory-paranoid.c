@@ -110,7 +110,7 @@ static void slotAbort(const char *why,Slot *s) {
 }
 
 /*Check these padding bytes*/
-static void checkPad(char *pad,char *errMsg,void *ptr,Slot *s) {
+static void checkPad(const char *pad, const char *errMsg, const void *ptr, Slot *s) {
 	int i;
 	for (i=0;i<PADLEN;i++)
 		if (pad[i]!=PADFN(i)) {
@@ -271,7 +271,7 @@ static int meta_getpagesize(void)
 }
 
 /*Only display startup status messages from processor 0*/
-static void status(char *msg) {
+static void status(const char *msg) {
   if (CmiMyPe()==0 && !CmiArgGivingUsage()) {
     CmiPrintf("%s",msg);
   }

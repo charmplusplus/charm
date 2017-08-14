@@ -452,7 +452,7 @@ typedef CMK_TYPEDEF_UINT8 (*CmiMemUsageFn)(void);
 /* this structure defines the order of testing for memory usage functions */
 struct CmiMemUsageStruct {
     CmiMemUsageFn  fn;
-    char *name;
+    const char *name;
 } memtest_order[] = {
     {MemusageBGQ, "BlueGene/Q"},
     {MemusageWindows, "Windows"},
@@ -473,10 +473,10 @@ CMK_TYPEDEF_UINT8 CmiMemoryUsage(void){
     return memtotal;
 }
 
-char *CmiMemoryUsageReporter(void){
+const char *CmiMemoryUsageReporter(void){
     int i;
     CMK_TYPEDEF_UINT8 memtotal = 0;
-    char *reporter = NULL;
+    const char *reporter = NULL;
     for (i=0; i<sizeof(memtest_order)/sizeof(struct CmiMemUsageStruct); i++) {
         memtotal = memtest_order[i].fn();
         reporter = memtest_order[i].name;

@@ -22,9 +22,9 @@ static struct testdata {
     {-1, -1, 0.0},
 };
 
-static char* sync_outstr = "[overhead] (%s) %le seconds per %d bytes\n";
+static const char sync_outstr[] = "[overhead] (%s) %le seconds per %d bytes\n";
 
-static void print_results(char* func) {
+static void print_results(const char* func) {
   int i = 0;
 
   while (sizes[i].size != (-1)) {

@@ -817,7 +817,7 @@ void CmiMemoryMark(void); /* ignore current allocations, for -memory leak */
 void CmiMemoryMarkBlock(void *blk); /* ignore this allocation, for -memory leak */
 void CmiMemorySweep(const char *where); /* print current allocations, for -memory leak */
 CMK_TYPEDEF_UINT8 CmiMemoryUsage();
-char *CmiMemoryUsageReporter();
+const char *CmiMemoryUsageReporter();
 CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage();
 void CmiResetMaxMemory();
 CMK_TYPEDEF_UINT8 CmiMinMemoryUsage();
@@ -1649,7 +1649,7 @@ int CldRegisterInfoFn(CldInfoFn fn);
 int CldRegisterPackFn(CldPackFn fn);
 void CldRegisterEstimator(CldEstimator fn);
 int CldEstimate(void);
-char *CldGetStrategy(void);
+const char *CldGetStrategy(void);
 
 void CldEnqueue(int pe, void *msg, int infofn);
 void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn);

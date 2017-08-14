@@ -1300,7 +1300,7 @@ static void registerMPITraceEvents(void) {
 #endif
 }
 
-static char *thread_level_tostring(int thread_level) {
+static const char *thread_level_tostring(int thread_level) {
 #if CMK_MPI_INIT_THREAD
     switch (thread_level) {
     case MPI_THREAD_SINGLE:
@@ -1312,14 +1312,14 @@ static char *thread_level_tostring(int thread_level) {
     case MPI_THREAD_MULTIPLE :
         return "MPI_THREAD_MULTIPLE";
     default: {
-        char *str = (char*)malloc(5);
+        char *str = (char *)malloc(5); // XXX: leaked
         sprintf(str,"%d", thread_level);
         return str;
     }
     }
     return  "unknown";
 #else
-    char *str = (char*)malloc(5);
+    char *str = (char *)malloc(5); // XXX: leaked
     sprintf(str,"%d", thread_level);
     return str;
 #endif

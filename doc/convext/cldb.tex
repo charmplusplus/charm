@@ -254,7 +254,7 @@ following code.
 #include <stdio.h>
 #include "converse.h"
 
-char *CldGetStrategy(void)
+const char *CldGetStrategy(void)
 \{
   return "test";
 \}
@@ -602,7 +602,7 @@ message to the token queue on the local processor.
 #define PERIOD 100
 #define MAXMSGBFRSIZE 100000
 
-char *CldGetStrategy(void)
+const char *CldGetStrategy(void)
 \{
   return "test";
 \}

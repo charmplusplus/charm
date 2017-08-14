@@ -28,7 +28,7 @@ CpvStaticDeclare(int, CldAckNoTaskHandlerIndex);
 CpvStaticDeclare(int, isStealing);
 
 
-char *CldGetStrategy(void)
+const char *CldGetStrategy(void)
 {
   return "work stealing";
 }

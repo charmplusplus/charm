@@ -59,7 +59,7 @@ typedef struct _timemsg {
 
 typedef struct _timemsg timemsg;
 
-static char* sync_outstr = "[broadcast] (%s) %le seconds per %d bytes\n";
+static const char sync_outstr[] = "[broadcast] (%s) %le seconds per %d bytes\n";
 
 static void* reduceMessage(int* size, void* data, void** remote, int count) {
   (void)size;
@@ -68,7 +68,7 @@ static void* reduceMessage(int* size, void* data, void** remote, int count) {
   return data;
 }
 
-static void print_results(char* func) {
+static void print_results(const char* func) {
   int i = 0;
 
   while (sizes[i].size != (-1)) {

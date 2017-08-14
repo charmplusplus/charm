@@ -9,7 +9,7 @@ void LoadNotifyFn(int l)
 {
 }
 
-char *CldGetStrategy(void)
+const char *CldGetStrategy(void)
 {
   return "spray";
 }

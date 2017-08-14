@@ -3,8 +3,8 @@
 
 struct pvmhostinfo {
 	int hi_tid;			/* pvmd tid */
-	char *hi_name;		/* host name */
-	char *hi_arch;		/* host arch */
+	const char *hi_name;		/* host name */
+	const char *hi_arch;		/* host arch */
 	int hi_speed;		/* cpu relative speed */
 };
 
@@ -13,7 +13,7 @@ struct pvmtaskinfo {
 	int ti_ptid;			/* parent tid */
 	int ti_host;			/* pvmd tid */
 	int ti_flag;			/* status flags */
-	char *ti_a_out;			/* a.out name */
+	const char *ti_a_out;			/* a.out name */
 	int ti_pid;				/* task (O/S dependent) process id */
 };
 

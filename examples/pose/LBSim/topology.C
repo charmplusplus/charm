@@ -363,7 +363,7 @@ public:
 static LBTopoVec lbTopoMap;
 
 extern "C"
-LBtopoFn LBTopoLookup(char *name)
+LBtopoFn LBTopoLookup(const char *name)
 {
   //printf("maplen: %d\n",lbTopoMap.length());
   for (int i=0; i<lbTopoMap.length(); i++) {

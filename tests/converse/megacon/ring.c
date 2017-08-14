@@ -11,6 +11,13 @@ void ring_fail()
   exit(1);
 }
 
+static char s_HowdyDude[] = "Howdy, Dude.";
+static char s_this[] = "this";
+static char s_is[] = "is";
+static char s_a[] = "a";
+static char s_test[] = "test";
+static char *data[4] = { s_this, s_is, s_a, s_test };
+
 CpmInvokable ring_hop(int steps, CpmStr t1, CpmDim t2, CpmStr *t3)
 {
   int thispe = CmiMyPe();
@@ -30,8 +37,7 @@ CpmInvokable ring_hop(int steps, CpmStr t1, CpmDim t2, CpmStr *t3)
 
 void ring_init(void)
 {
-  char *data[4] = { "this", "is", "a", "test" };
-  Cpm_ring_hop(CpmSend(0), 1000, "Howdy, Dude.", 4, data);
+  Cpm_ring_hop(CpmSend(0), 1000, s_HowdyDude, 4, data);
 }
 
 void ring_moduleinit()

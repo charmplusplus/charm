@@ -115,11 +115,11 @@ CDECL size_t pup_decodeSize(CMK_TYPEDEF_UINT2 a)
 }
 
 /*Insert a synchronization into the data stream */
-CDECL void pup_syncComment(const pup_er p, unsigned int sync, char *message)
+CDECL void pup_syncComment(const pup_er p, unsigned int sync, const char *message)
   { mp.syncComment(sync, message); }
-/*FDECL void FNT_NAME(FPUP_SYNCCOMMENT,fpup_syncComment)(const pup_er p, unsigned int sync, char *message)
+/*FDECL void FNT_NAME(FPUP_SYNCCOMMENT,fpup_syncComment)(const pup_er p, unsigned int sync, const char *message)
   { mp.syncComment(sync, message); }*/
-CDECL void pup_comment(const pup_er p, char *message)
+CDECL void pup_comment(const pup_er p, const char *message)
   { mp.comment(message); }
 
 #undef PUP_BASIC_DATATYPE /*from pup_c.h*/

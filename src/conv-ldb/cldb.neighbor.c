@@ -77,7 +77,7 @@ void LoadNotifyFn(int l)
   cldData->sent = 0;
 }
 
-char *CldGetStrategy(void)
+const char *CldGetStrategy(void)
 {
   return "neighbor";
 }

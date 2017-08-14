@@ -60,7 +60,7 @@ void yytokget()
   yytoktype=yylex();
 }
 
-void yychkword(char *s)
+void yychkword(const char *s)
 {
   if (strcmp(yytext, s)) {
     fprintf(stderr,"%s expected\n", s);
@@ -438,7 +438,7 @@ void usage()
   exit(1);
 }
 
-FILE *fopen_nofail(char *path, char *mode)
+FILE *fopen_nofail(const char *path, const char *mode)
 {
   FILE *res = fopen(path, mode);
   if (res==0) {

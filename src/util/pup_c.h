@@ -97,8 +97,8 @@ int pup_isRestarting(const pup_er p);
 char *pup_typeString(const pup_er p);
 
 /*Insert a synchronization into the data stream */
-void pup_syncComment(const pup_er p, unsigned int sync, char *message);
-void pup_comment(const pup_er p, char *message);
+void pup_syncComment(const pup_er p, unsigned int sync, const char *message);
+void pup_comment(const pup_er p, const char *message);
 
 /*Read the size of a pupper */
 size_t pup_size(const pup_er p);

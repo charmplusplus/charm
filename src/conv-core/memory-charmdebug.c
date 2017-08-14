@@ -245,9 +245,10 @@ void cpd_memory_single_pup(Slot* list, pup_er p) {
 /** PUP the entire information about the allocated memory to the debugger */
 CMI_EXTERNC
 void cpd_memory_pup(void *itemParam, pup_er p, CpdListItemsRequest *req) {
+  static char s_memory[] = "memory";
   CpdListBeginItem(p, 0);
   pup_comment(p, "name");
-  pup_chars(p, "memory", strlen("memory"));
+  pup_chars(p, s_memory, sizeof(s_memory)-1);
   pup_comment(p, "slots");
   pup_syncComment(p, pup_sync_begin_array, 0);
 #ifdef CMK_SEPARATE_SLOT
@@ -1406,7 +1407,7 @@ static int meta_getpagesize(void) {
 }
 
 /* Only display startup status messages from processor 0 */
-static void status(char *msg) {
+static void status(const char *msg) {
   if (CmiMyPe()==0 && !CmiArgGivingUsage()) {
     CmiPrintf("%s",msg);
   }

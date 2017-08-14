@@ -175,7 +175,7 @@ static int meta_getpagesize(void)
 }
 
 /*Only display startup status messages from processor 0*/
-static void status(char *msg) {
+static void status(const char *msg) {
   if (CmiMyPe()==0 && !CmiArgGivingUsage()) {
     CmiPrintf("%s",msg);
   }

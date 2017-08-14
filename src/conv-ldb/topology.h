@@ -92,7 +92,7 @@ typedef  void* (*LBtopoFn)();
 #ifdef __cplusplus
 extern "C" {
 #endif
-LBtopoFn LBTopoLookup(char *);
+LBtopoFn LBTopoLookup(const char *);
 int getTopoMaxNeighbors(void *topo);
 void getTopoNeighbors(void *topo, int myid, int* na, int *n);
 void printoutTopo(void);

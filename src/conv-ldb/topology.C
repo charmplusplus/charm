@@ -1326,7 +1326,7 @@ static LBTopoVec* lbTopoMap;
 static CmiNodeLock lbTopoMapInitLock;
 
 extern "C"
-LBtopoFn LBTopoLookup(char *name)
+LBtopoFn LBTopoLookup(const char *name)
 {
   // This routine is called from an LB's constructor. LBs are Groups, so their construction happens
   // inline on PE 0 but via the scheduler on other PEs, so we use a lock instead of a barrier here.

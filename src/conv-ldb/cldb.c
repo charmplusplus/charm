@@ -20,7 +20,8 @@ CpvDeclare(CmiNodeLock, cldLock);
 
 extern void LoadNotifyFn(int);
 
-char* _lbtopo = "torus_nd_5";
+static char s_lbtopo_default[] = "torus_nd_5";
+char *_lbtopo = s_lbtopo_default;
 
 /* Estimator stuff.  Of any use? */
 /*
@@ -372,7 +373,7 @@ void CldModuleGeneralInit(char **argv)
   _cldb_cs = CmiGetArgFlagDesc(argv, "+cldb_cs", "Converse> Print seed load balancing statistics.");
   
   if (CmiMyPe() == 0) {
-    char *stra = CldGetStrategy();
+    const char *stra = CldGetStrategy();
     if (strcmp(stra, "rand") != 0) {
       CmiPrintf("Charm++> %s seed load balancer.\n", stra);
     }
