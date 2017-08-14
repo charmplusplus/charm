@@ -191,7 +191,11 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
     if (tcharm_nomig) { /*Nonmigratable version, for debugging*/
       tid=CthCreate((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize);
     } else {
-      tid=CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize);
+      /* HACK: Isomalloc gets memory from the mempool, which allocates chunks of memory in sizes
+       * that are powers of two only. Isomalloc & mempool also add their own metadata to every allocation,
+       * so we try to play nice with that here (since the stacksize is often already a power of two): */
+      int isomalloc_offset=64;
+      tid=CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize-isomalloc_offset);
     }
 #if CMK_BIGSIM_CHARM
     BgAttach(tid);
