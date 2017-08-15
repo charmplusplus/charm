@@ -22,7 +22,7 @@ void verbsOnesidedOpDone(CmiVerbsRdmaRecvOp_t *recvOpInfo) {
   verbsOnesidedSendAck(recvInfo->peNum, recvOpInfo);
   recvInfo->comOps++;
   if (recvInfo->comOps == recvInfo->numOps) {
-    verbsOnesidedAllOpsDone(recvInfo->msg);
+    verbsOnesidedAllOpsDone((char *)recvInfo->msg);
   }
 }
 

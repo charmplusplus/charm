@@ -256,7 +256,7 @@ static void persistentNoDecompressHandler(void *msg)
 #if COPY_HISTORY 
     memcpy(slot->history, msg, size);
 #endif
-    CldRestoreHandler(msg);
+    CldRestoreHandler((char *)msg);
     (((CmiMsgHeaderExt*)msg)->xhdl) =  (((CmiMsgHeaderExt*)msg)->xxhdl);
     CmiHandleMessage(msg);
 }
@@ -301,7 +301,7 @@ static void persistentDecompressHandler(void *msg)
 	decompressLz4(msg + slot->compressStart+2*sizeof(int), decompressData, originalSize, compressSize, history+slot->compressStart);
     memcpy(msg+slot->compressStart, decompressData, originalSize);
     free(decompressData);
-    CldRestoreHandler(msg);
+    CldRestoreHandler(cmsg);
     (((CmiMsgHeaderExt*)msg)->xhdl) =  (((CmiMsgHeaderExt*)msg)->xxhdl);
 
 #if VERIFY
@@ -341,7 +341,7 @@ int CompressPersistentMsg(PersistentHandle h, int size, void **m)
         slot->previousMsg = msg;
         CmiReference(msg);
         (((CmiMsgHeaderExt*)msg)->xxhdl) = (((CmiMsgHeaderExt*)msg)->xhdl);
-        CldSwitchHandler(msg, persistentNoDecompressHandlerIdx);
+        CldSwitchHandler((char *)msg, persistentNoDecompressHandlerIdx);
     }else
     {
         if(slot->compressSize == 0)
@@ -361,7 +361,7 @@ int CompressPersistentMsg(PersistentHandle h, int size, void **m)
         {
             newSize = size;
             (((CmiMsgHeaderExt*)msg)->xxhdl) = (((CmiMsgHeaderExt*)msg)->xhdl);
-            CldSwitchHandler(msg, persistentNoDecompressHandlerIdx);
+            CldSwitchHandler((char *)msg, persistentNoDecompressHandlerIdx);
             if(dest != NULL)
                 CmiFree(dest);
         }else
@@ -376,7 +376,7 @@ int CompressPersistentMsg(PersistentHandle h, int size, void **m)
                 memcpy((char*)dest+slot->compressStart+sizeof(int)+compressSize, msg+slot->compressStart+slot->compressSize, leftSize);
             newSize = size-slot->compressSize+compressSize+sizeof(int);
             (((CmiMsgHeaderExt*)dest)->xxhdl) = (((CmiMsgHeaderExt*)dest)->xhdl);
-            CldSwitchHandler(dest, persistentDecompressHandlerIdx);
+            CldSwitchHandler((char *)dest, persistentDecompressHandlerIdx);
             CmiPrintf(" handler =(%d : %d : %d) (%d:%d:%d)  %d\n", (((CmiMsgHeaderExt*)dest)->hdl), (((CmiMsgHeaderExt*)dest)->xhdl), (((CmiMsgHeaderExt*)dest)->xxhdl), (((CmiMsgHeaderExt*)msg)->hdl),  (((CmiMsgHeaderExt*)msg)->xhdl), (((CmiMsgHeaderExt*)msg)->xxhdl), persistentDecompressHandlerIdx);
             *m=dest;
         }
@@ -409,7 +409,7 @@ int CompressPersistentMsg(PersistentHandle h, int size, void *msg)
         slot->previousSize = size;
         CmiReference(msg);
         (((CmiMsgHeaderExt*)msg)->xxhdl) = (((CmiMsgHeaderExt*)msg)->xhdl);
-        CldSwitchHandler(msg, persistentNoDecompressHandlerIdx);
+        CldSwitchHandler(cmsg, persistentNoDecompressHandlerIdx);
     }else if(size != slot->previousSize)    //persistent msg size changes
     {
         newSize = size;
@@ -420,7 +420,7 @@ int CompressPersistentMsg(PersistentHandle h, int size, void *msg)
         slot->previousSize = size;
         CmiReference(msg);
         (((CmiMsgHeaderExt*)msg)->xxhdl) = (((CmiMsgHeaderExt*)msg)->xhdl);
-        CldSwitchHandler(msg, persistentNoDecompressHandlerIdx);
+        CldSwitchHandler(cmsg, persistentNoDecompressHandlerIdx);
     }
     else {
         
@@ -463,7 +463,7 @@ int CompressPersistentMsg(PersistentHandle h, int size, void *msg)
         {
             newSize = size;
             (((CmiMsgHeaderExt*)msg)->xxhdl) = (((CmiMsgHeaderExt*)msg)->xhdl);
-            CldSwitchHandler(msg, persistentNoDecompressHandlerIdx);
+            CldSwitchHandler(cmsg, persistentNoDecompressHandlerIdx);
             CmiFree(slot->previousMsg);
             slot->previousMsg = msg;
             CmiReference(msg);
@@ -479,7 +479,7 @@ int CompressPersistentMsg(PersistentHandle h, int size, void *msg)
                 memcpy(msg+slot->compressStart+compressSize+2*sizeof(int), msg+slot->compressStart+slot->compressSize, leftSize);
             newSize = slot->compressStart + compressSize + 2*sizeof(int) +leftSize;
             (((CmiMsgHeaderExt*)msg)->xxhdl) = (((CmiMsgHeaderExt*)msg)->xhdl);
-            CldSwitchHandler(msg, persistentDecompressHandlerIdx);
+            CldSwitchHandler(cmsg, persistentDecompressHandlerIdx);
 #if VERIFY
             memcpy(msg+newSize, &checksum1, 1); 
             memcpy(msg+newSize+1, &checksum2, 1); 

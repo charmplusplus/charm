@@ -21,7 +21,7 @@ void CldHandler(char *msg)
 {
   int len, queueing, priobits;
   unsigned int *prioptr; CldInfoFn ifn; CldPackFn pfn;
-  CldRestoreHandler(msg);
+  CldRestoreHandler((char *)msg);
   ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
   CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
@@ -37,7 +37,7 @@ void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn)
     pfn(&msg);
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
   }
-  CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
+  CldSwitchHandler((char *)msg, CpvAccess(CldHandlerIndex));
   CmiSetInfo(msg,infofn);
 
   /*
@@ -68,7 +68,7 @@ void CldEnqueue(int pe, void *msg, int infofn)
       pfn(&msg);
       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     }
-    CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
+    CldSwitchHandler((char *)msg, CpvAccess(CldHandlerIndex));
     CmiSetInfo(msg,infofn);
     if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, msg); }
     else if (pe==CLD_BROADCAST_ALL) { CmiSyncBroadcastAllAndFree(len, msg); }
@@ -93,7 +93,7 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
       pfn(&msg);
       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     }
-    CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
+    CldSwitchHandler((char *)msg, CpvAccess(CldHandlerIndex));
     CmiSetInfo(msg,infofn);
     if (node==CLD_BROADCAST) { CmiSyncNodeBroadcastAndFree(len, msg); }
     else if (node==CLD_BROADCAST_ALL){CmiSyncNodeBroadcastAllAndFree(len,msg);}

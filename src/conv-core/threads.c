@@ -1850,7 +1850,7 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   CthAliasEnable(B(result)); /* Change to new thread's stack while building context */
   errno = 0;
 #if CMK_THREADS_USE_FCONTEXT
-  makeJcontext(&result->context, (uFcontext_fn_t)CthStartThread, (void*)fn, (void *)arg);
+  makeJcontext(&result->context, (uFcontext_fn_t)CthStartThread, fn, arg);
 #else
 #if CMK_THREADS_USE_CONTEXT
   if (sizeof(void *) == 8) {

@@ -1208,7 +1208,7 @@ int process_completion_queue()
         {
             MACHSTATE(3, "POLL: error available\n");
             CmiPrintf("POLL: error available\n");
-            ret = fi_cq_readerr(context.cq, (void *)&error, sizeof(error));
+            ret = fi_cq_readerr(context.cq, &error, sizeof(error));
             if (ret < 0)
             {
                 CmiAbort("can't retrieve error");

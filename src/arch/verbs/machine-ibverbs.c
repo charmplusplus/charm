@@ -1877,7 +1877,7 @@ static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 		context->tokensLeft++;
 #endif
 
-		verbsOnesidedOpDone(rdmaPacket->localBuffer);
+		verbsOnesidedOpDone((CmiVerbsRdmaRecvOp_t *)rdmaPacket->localBuffer);
 		free(rdmaPacket);
 
 		return;
@@ -2276,7 +2276,7 @@ static inline void fillBufferPools(void){
 			}else{
 				count = 1;
 			}
-			posix_memalign(&res, ALIGN_BYTES, (allocSize+sizeof(infiCmiChunkHeader))*count);
+			posix_memalign((void **)&res, ALIGN_BYTES, (allocSize+sizeof(infiCmiChunkHeader))*count);
 			hdr = res;
 			key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(infiCmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
 			CmiAssert(key != NULL);
@@ -2363,7 +2363,7 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 		if(poolIdx < blockThreshold){
 			count = blockAllocRatio;
 		}
-		posix_memalign(&res, ALIGN_BYTES, (allocSize+sizeof(infiCmiChunkHeader))*count);
+		posix_memalign((void **)&res, ALIGN_BYTES, (allocSize+sizeof(infiCmiChunkHeader))*count);
 		_MEMCHECK(res);
 		hdr = res;
 		
@@ -2466,7 +2466,7 @@ static inline void *getInfiCmiChunk(int dataSize){
                 if(poolIdx < blockThreshold){
                         count = blockAllocRatio;
                 }
-                posix_memalign(&res, ALIGN_BYTES, (allocSize+sizeof(infiCmiChunkHeader))*count);
+                posix_memalign((void **)&res, ALIGN_BYTES, (allocSize+sizeof(infiCmiChunkHeader))*count);
                 hdr = (infiCmiChunkHeader *)res;
 
                 key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(infiCmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
@@ -2535,7 +2535,7 @@ void * infi_CmiAlloc(int size){
 	numAlloc++;
 #endif
         if (Cmi_charmrun_fd == -1) {
-          posix_memalign(&res, ALIGN_BYTES, size + sizeof(void*));
+          posix_memalign((void **)&res, ALIGN_BYTES, size + sizeof(void*));
           res += sizeof(void*);
           return res;
 	}

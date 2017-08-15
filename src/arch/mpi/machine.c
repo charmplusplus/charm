@@ -684,7 +684,7 @@ static int PumpMsgs(void) {
           }
           //all recvs for this message have completed i.e numops number of recvs
           if(allOpsDone){
-            handleOneRecvedMsg(recvBufferTmp->msgLen, recvBufferTmp->msg);
+            handleOneRecvedMsg(recvBufferTmp->msgLen, (char *)recvBufferTmp->msg);
             //remove from the list
             CpvAccess(RdmaRecvQueueLen)--;
             temp = recvBufferTmp->next;

@@ -677,21 +677,23 @@ typedef struct {
 	void *userPtr;
 } CmiHandlerInfo;
 
+#include "queueing.h" /* for "Queue" */
+
 CpvExtern(CmiHandlerInfo*, CmiHandlerTable);
 CpvExtern(int,         CmiHandlerMax);
-CpvExtern(void*,       CsdSchedQueue);
+CpvExtern(Queue,       CsdSchedQueue);
 #if CMK_SMP && CMK_TASKQUEUE
-CpvExtern(void*,       CsdTaskQueue);
+CpvExtern(Queue,       CsdTaskQueue);
 CpvExtern(void*,       CmiSuspendedTaskQueue);
 #endif
 #if CMK_GRID_QUEUE_AVAILABLE
-CpvExtern(void *,      CsdGridQueue);
+CpvExtern(Queue,      CsdGridQueue);
 #endif
 #if CMK_OBJECT_QUEUE_AVAILABLE
-CpvExtern(void*,       CsdObjQueue);
+CpvExtern(Queue,       CsdObjQueue);
 #endif
 #if CMK_NODE_QUEUE_AVAILABLE
-CsvExtern(void*,       CsdNodeQueue);
+CsvExtern(Queue,       CsdNodeQueue);
 CsvExtern(CmiNodeLock, CsdNodeQueueLock);
 #endif
 CpvExtern(int,         CsdStopFlag);
@@ -902,8 +904,6 @@ int      CmiTimerIsSynchronized(void);
 
 char *CmiPrintDate(void);
 
-#include "queueing.h" /* for "Queue" */
-
 #if CMK_NODE_QUEUE_AVAILABLE
 
 #define CsdNodeEnqueueGeneral(x,s,i,p) do { \
@@ -1018,18 +1018,18 @@ extern void  CsdBeginIdle(void);
 
 typedef struct {
   void *localQ;
-  void *nodeQ;
-  void *schedQ;
+  Queue nodeQ;
+  Queue schedQ;
   int *localCounter;
 #if CMK_OBJECT_QUEUE_AVAILABLE
-  void *objQ;
+  Queue objQ;
 #endif
   CmiNodeLock nodeLock;
 #if CMK_GRID_QUEUE_AVAILABLE
-  void *gridQ;
+  Queue gridQ;
 #endif
 #if CMK_SMP && CMK_TASKQUEUE
-  void *taskQ;
+  Queue taskQ;
   void *suspendedTaskQ;
 #endif
 } CsdSchedulerState_t;

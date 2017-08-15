@@ -14,8 +14,8 @@ const char *CldGetStrategy(void)
 
 void CldBalanceHandler(void *msg)
 {
-  CldRestoreHandler(msg);
-  CldPutToken(msg);
+  CldRestoreHandler((char *)msg);
+  CldPutToken((char *)msg);
 }
 
 void CldHandler(char *msg)
@@ -40,7 +40,7 @@ void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn)
     pfn(&msg);
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
   }
-  CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
+  CldSwitchHandler((char *)msg, CpvAccess(CldHandlerIndex));
   CmiSetInfo(msg,infofn);
   for(i=0;i<npes;i++) {
     CmiSyncSend(pes[i], len, msg);
@@ -63,7 +63,7 @@ void CldEnqueue(int pe, void *msg, int infofn)
     if (pe == CmiMyPe()) {
       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
       CmiSetInfo(msg,infofn);
-      CldPutToken(msg);
+      CldPutToken((char *)msg);
     } 
     else {
       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
@@ -71,7 +71,7 @@ void CldEnqueue(int pe, void *msg, int infofn)
 	pfn(&msg);
 	ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
       }
-      CldSwitchHandler(msg, CpvAccess(CldBalanceHandlerIndex));
+      CldSwitchHandler((char *)msg, CpvAccess(CldBalanceHandlerIndex));
       CmiSetInfo(msg,infofn);
       CmiSyncSendAndFree(pe, len, msg);
     }
@@ -87,7 +87,7 @@ void CldEnqueue(int pe, void *msg, int infofn)
       pfn(&msg);
       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     }
-    CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
+    CldSwitchHandler((char *)msg, CpvAccess(CldHandlerIndex));
     CmiSetInfo(msg,infofn);
     if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, msg); }
     else if (pe==CLD_BROADCAST_ALL) { CmiSyncBroadcastAllAndFree(len, msg); }
@@ -116,7 +116,7 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
       pfn(&msg);
       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     }
-    CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
+    CldSwitchHandler((char *)msg, CpvAccess(CldHandlerIndex));
     CmiSetInfo(msg,infofn);
     if (node==CLD_BROADCAST) { CmiSyncNodeBroadcastAndFree(len, msg); }
     else if (node==CLD_BROADCAST_ALL){CmiSyncNodeBroadcastAllAndFree(len,msg);}

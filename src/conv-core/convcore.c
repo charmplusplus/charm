@@ -198,16 +198,16 @@ CpvDeclare(int,expIOBufferSize);
 void  *CmiGetNonLocalNodeQ();
 #endif
 
-CpvDeclare(void*, CsdSchedQueue);
+CpvDeclare(Queue, CsdSchedQueue);
 
 #if CMK_OUT_OF_CORE
 /* The Queue where the Prefetch Thread puts the messages from CsdSchedQueue  */
-CpvDeclare(void*, CsdPrefetchQueue);
+CpvDeclare(Queue, CsdPrefetchQueue);
 pthread_mutex_t prefetchLock;
 #endif
 
 #if CMK_NODE_QUEUE_AVAILABLE
-CsvDeclare(void*, CsdNodeQueue);
+CsvDeclare(Queue, CsdNodeQueue);
 CsvDeclare(CmiNodeLock, CsdNodeQueueLock);
 #endif
 CpvDeclare(int,   CsdStopFlag);
@@ -236,7 +236,7 @@ void   CmiFree_ppcq  (void  * buf);
 
 #if CMK_GRID_QUEUE_AVAILABLE
 CpvDeclare(void *, CkGridObject);
-CpvDeclare(void *, CsdGridQueue);
+CpvDeclare(Queue, CsdGridQueue);
 #endif
 
 #if CMK_CRAYXE || CMK_CRAYXC || CMK_OFI
@@ -247,7 +247,7 @@ void  LrtsFree(void*);
 CpvStaticDeclare(int, cmiMyPeIdle);
 #if CMK_SMP && CMK_TASKQUEUE
 CsvDeclare(unsigned int, idleThreadsCnt);
-CpvDeclare(void *, CsdTaskQueue);
+CpvDeclare(Queue, CsdTaskQueue);
 CpvDeclare(void *, CmiSuspendedTaskQueue);
 #endif
 int CmiIsMyNodeIdle(void);
@@ -2235,14 +2235,14 @@ void CthSchedInit()
 
 void CsdInit(char **argv)
 {
-  CpvInitialize(void *, CsdSchedQueue);
+  CpvInitialize(Queue, CsdSchedQueue);
   CpvInitialize(int,   CsdStopFlag);
   CpvInitialize(int,   CsdLocalCounter);
   int argCsdLocalMax=CSD_LOCAL_MAX_DEFAULT;
   int argmaxset = CmiGetArgIntDesc(argv,"+csdLocalMax",&argCsdLocalMax,"Set the max number of local messages to process before forcing a check for remote messages.");
   if (CmiMyRank() == 0 ) CsdLocalMax = argCsdLocalMax;
   CpvAccess(CsdLocalCounter) = argCsdLocalMax;
-  CpvAccess(CsdSchedQueue) = (void *)CqsCreate();
+  CpvAccess(CsdSchedQueue) = CqsCreate();
 #if CMK_SMP && CMK_TASKQUEUE
   CsvInitialize(unsigned int, idleThreadsCnt);
   CsvAccess(idleThreadsCnt) = 0;
@@ -2255,29 +2255,29 @@ void CsdInit(char **argv)
    #endif
 
 #if CMK_OBJECT_QUEUE_AVAILABLE
-  CpvInitialize(void *,CsdObjQueue);
+  CpvInitialize(Queue, CsdObjQueue);
   CpvAccess(CsdObjQueue) = CdsFifo_Create();
 #endif
 
 #if CMK_NODE_QUEUE_AVAILABLE
   CsvInitialize(CmiLock, CsdNodeQueueLock);
-  CsvInitialize(void *, CsdNodeQueue);
+  CsvInitialize(Queue, CsdNodeQueue);
   if (CmiMyRank() ==0) {
 	CsvAccess(CsdNodeQueueLock) = CmiCreateLock();
-	CsvAccess(CsdNodeQueue) = (void *)CqsCreate();
+	CsvAccess(CsdNodeQueue) = CqsCreate();
   }
   CmiNodeAllBarrier();
 #endif
 
 #if CMK_GRID_QUEUE_AVAILABLE
-  CsvInitialize(void *, CsdGridQueue);
-  CpvAccess(CsdGridQueue) = (void *)CqsCreate();
+  CsvInitialize(Queue, CsdGridQueue);
+  CpvAccess(CsdGridQueue) = CqsCreate();
 #endif
 
 #if CMK_SMP && CMK_TASKQUEUE
-  CpvInitialize(void *, CsdTaskQueue);
+  CpvInitialize(Queue, CsdTaskQueue);
   CpvInitialize(void *, CmiSuspendedTaskQueue);
-  CpvAccess(CsdTaskQueue) = (void *)TaskQueueCreate();
+  CpvAccess(CsdTaskQueue) = TaskQueueCreate();
 #endif
   CpvAccess(CsdStopFlag)  = 0;
 }

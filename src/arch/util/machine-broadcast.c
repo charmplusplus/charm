@@ -281,7 +281,7 @@ void CmiSyncBroadcastFn1(int size, char *msg) {
 }
 
 void CmiSyncBroadcastFn(int size, char *msg) {
-    void *newmsg = msg;
+    char *newmsg = msg;
 #if CMK_BROADCAST_SPANNING_TREE && CMK_BROADCAST_USE_CMIREFERENCE
       /* need to copy the msg in case the msg is on the stack */
       /* and we only need to copy when sending out network */
@@ -312,7 +312,7 @@ CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg) {
 
 /* Functions regarding broadcat op that sends to every one */
 void CmiSyncBroadcastAllFn(int size, char *msg) {
-    void *newmsg = msg;
+    char *newmsg = msg;
 #if CMK_BROADCAST_SPANNING_TREE && CMK_BROADCAST_USE_CMIREFERENCE
       /* need to copy the msg in case the msg is on the stack */
       /* and we only need to copy when sending out network */

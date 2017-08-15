@@ -33,7 +33,7 @@ void CkObjectMsgQ::create() {
 #if OBJQ_FIFO
     objQ = (void *)CdsFifo_Create();
 #else
-    objQ = (void *)CqsCreate(); 
+    objQ = CqsCreate();
 #endif
 }
 

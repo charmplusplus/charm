@@ -248,7 +248,7 @@ static void CmiPushNode(void *msg) {
 #if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
     PPCAtomicEnqueue(&node_recv_atomic_q, msg);
 #else
-    PCQueuePush(CsvAccess(NodeState).NodeRecv,msg);
+    PCQueuePush(CsvAccess(NodeState).NodeRecv, (char *)msg);
 #endif
     //CmiState cs=CmiGetStateN(0);
     //CmiIdleLock_addMessage(&cs->idle);
@@ -1970,7 +1970,7 @@ void CmiSendNodeSelf(char *msg) {
 #if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
     PPCAtomicEnqueue(&node_recv_atomic_q, msg);
 #else
-    PCQueuePush(CsvAccess(NodeState).NodeRecv, msg);
+    PCQueuePush(CsvAccess(NodeState).NodeRecv, (char *)msg);
 #endif
 }
 

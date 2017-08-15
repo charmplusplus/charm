@@ -360,8 +360,8 @@ void CldLoadResponseHandler(loadmsg *msg)
 
 void CldBalanceHandler(void *msg)
 {
-  CldRestoreHandler(msg);
-  CldPutToken(msg);
+  CldRestoreHandler((char *)msg);
+  CldPutToken((char *)msg);
 }
 
 void CldHandler(void *msg)
@@ -369,7 +369,7 @@ void CldHandler(void *msg)
   CldInfoFn ifn; CldPackFn pfn;
   int len, queueing, priobits; unsigned int *prioptr;
   
-  CldRestoreHandler(msg);
+  CldRestoreHandler((char *)msg);
   ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
   CsdEnqueueGeneral(msg, CQS_QUEUEING_LIFO, priobits, prioptr);
@@ -386,7 +386,7 @@ void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn)
     pfn(&msg);
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
   }
-  CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
+  CldSwitchHandler((char *)msg, CpvAccess(CldHandlerIndex));
   CmiSetInfo(msg,infofn);
 
   CmiSyncMulticastAndFree(grp, len, msg);
@@ -402,7 +402,7 @@ void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn)
     pfn(&msg);
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
   }
-  CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
+  CldSwitchHandler((char *)msg, CpvAccess(CldHandlerIndex));
   CmiSetInfo(msg,infofn);
   /*
   for(i=0;i<npes;i++) {
@@ -442,13 +442,13 @@ void CldEnqueue(int pe, void *msg, int infofn)
       CpvAccess(neighbors)[CpvAccess(Mindex)].load++;
       CpvAccess(CldRelocatedMessages)++;
       CmiSetInfo(msg,infofn);
-      CldSwitchHandler(msg, CpvAccess(CldBalanceHandlerIndex));
+      CldSwitchHandler((char *)msg, CpvAccess(CldBalanceHandlerIndex));
       CmiSyncSendAndFree(pe, len, msg);
     }
     else {
       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
       CmiSetInfo(msg,infofn);
-      CldPutToken(msg);
+      CldPutToken((char *)msg);
     }
   } 
   else if ((pe == CmiMyPe()) || (CmiNumPes() == 1)) {
@@ -463,7 +463,7 @@ void CldEnqueue(int pe, void *msg, int infofn)
       pfn(&msg);
       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     }
-    CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
+    CldSwitchHandler((char *)msg, CpvAccess(CldHandlerIndex));
     CmiSetInfo(msg,infofn);
     if (pe==CLD_BROADCAST) 
       CmiSyncBroadcastAndFree(len, msg);
@@ -494,13 +494,13 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
             ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
         }
         CmiSetInfo(msg,infofn);
-        CldSwitchHandler(msg, CpvAccess(CldBalanceHandlerIndex));
+        CldSwitchHandler((char *)msg, CpvAccess(CldBalanceHandlerIndex));
         CmiSyncNodeSendAndFree(node, len, msg);
     }
     else {
       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
       /* CmiSetInfo(msg,infofn);
-       CldPutToken(msg); */
+       CldPutToken((char *)msg); */
       CsdNodeEnqueueGeneral(msg, queueing, priobits, prioptr);
     }
   }
@@ -515,7 +515,7 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
       pfn(&msg);
       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     }
-    CldSwitchHandler(msg, CpvAccess(CldHandlerIndex));
+    CldSwitchHandler((char *)msg, CpvAccess(CldHandlerIndex));
     CmiSetInfo(msg,infofn);
     if (node==CLD_BROADCAST) { CmiSyncNodeBroadcastAndFree(len, msg); }
     else if (node==CLD_BROADCAST_ALL){CmiSyncNodeBroadcastAllAndFree(len,msg);}

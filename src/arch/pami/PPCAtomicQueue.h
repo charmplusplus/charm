@@ -112,7 +112,7 @@ int PPCAtomicEnqueue (PPCAtomicQueue          * queue,
     return CMI_PPCQ_EAGAIN; //Q is full, try later
 
   //No ordering is guaranteed if there is overflow
-  PCQueuePush(queue->_overflowQ, element);
+  PCQueuePush(queue->_overflowQ, (char *)element);
 
   return CMI_PPCQ_SUCCESS;
 }

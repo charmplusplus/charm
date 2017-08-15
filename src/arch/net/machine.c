@@ -1050,7 +1050,7 @@ static void CmiDestroyLocks(void)
 /*Network progress utility variables. Period controls the rate at
   which the network poll is called */
 
-CpvDeclare(unsigned , networkProgressCount);
+CpvDeclare(unsigned int, networkProgressCount);
 int networkProgressPeriod;
 
 CpvDeclare(void *, CmiLocalQueue);
@@ -1098,9 +1098,9 @@ void CmiPushPE(int pe,void *msg)
   }
 #endif
 #if !CMK_SMP_MULTIQ
-  PCQueuePush(cs->recv,msg);
+  PCQueuePush(cs->recv, (char *)msg);
 #else
-  PCQueuePush(cs->recv[CmiGetState()->myGrpIdx], msg);
+  PCQueuePush(cs->recv[CmiGetState()->myGrpIdx], (char *)msg);
 #endif
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
@@ -1135,7 +1135,7 @@ static void CmiPushNode(void *msg)
 #if CMK_SMP_MULTIQ && !CMK_PCQUEUE_PUSH_LOCK
   CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
 #endif
-  PCQueuePush(CsvAccess(NodeState).NodeRecv,msg);
+  PCQueuePush(CsvAccess(NodeState).NodeRecv, (char *)msg);
 #if CMK_SMP_MULTIQ && !CMK_PCQUEUE_PUSH_LOCK
   CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
 #endif
@@ -1353,7 +1353,7 @@ void CcsImpl_reply(CcsImplHeader *hdr,int repLen,const void *repData)
 {
   MACHSTATE(2,"Outgoing CCS reply");
   ctrl_sendone_locking("reply_fw",(const char *)hdr,sizeof(CcsImplHeader),
-      repData,repLen);
+      (const char *)repData,repLen);
   MACHSTATE(1,"Outgoing CCS reply away");
 }
 #endif
@@ -2627,7 +2627,7 @@ static void ConverseRunPE(int everReturn)
   /* initialize the network progress counter*/
   /* Network progress function is used to poll the network when for
      messages. This flushes receive buffers on some  implementations*/ 
-  CpvInitialize(int , networkProgressCount);
+  CpvInitialize(unsigned int, networkProgressCount);
   CpvAccess(networkProgressCount) = 0;
 
   /* better to show the status here */

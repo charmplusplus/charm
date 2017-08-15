@@ -91,7 +91,7 @@ int LRTSQueuePush(LRTSQueue queue,
   
   //No ordering is guaranteed if there is overflow
   pthread_mutex_lock(&queue->_overflowMutex);
-  PCQueuePush(queue->_overflowQ, element);
+  PCQueuePush(queue->_overflowQ, (char *)element);
   pthread_mutex_unlock(&queue->_overflowMutex);
   
   return L2A_SUCCESS;

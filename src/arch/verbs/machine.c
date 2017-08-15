@@ -1093,7 +1093,7 @@ void CcsImpl_reply(CcsImplHeader *hdr,int repLen,const void *repData)
 {
   MACHSTATE(2,"Outgoing CCS reply");
   ctrl_sendone_locking("reply_fw",(const char *)hdr,sizeof(CcsImplHeader),
-      repData,repLen);
+      (const char *)repData,repLen);
   MACHSTATE(1,"Outgoing CCS reply away");
 }
 #endif

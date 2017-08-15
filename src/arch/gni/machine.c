@@ -2249,7 +2249,7 @@ static void PumpNetworkSmsg()
                 GNI_SmsgRelease(ep_hndl_array[inst_id]);
                 CMI_GNI_UNLOCK(smsg_mailbox_lock)
                 CMI_CHECK_CHECKSUM(msg_data, msg_nbytes);
-                handleOneRecvedMsg(msg_nbytes, msg_data);
+                handleOneRecvedMsg(msg_nbytes, (char *)msg_data);
                 break;
             }
             case LMSG_PERSISTENT_INIT_TAG:
@@ -2343,7 +2343,7 @@ static void PumpNetworkSmsg()
                 GNI_SmsgRelease(ep_hndl_array[inst_id]);
                 CMI_GNI_UNLOCK(smsg_mailbox_lock)
 
-                char *msg = newRecvInfo->msg;
+                char *msg = (char *)newRecvInfo->msg;
                 int size = CmiGetMsgSize(msg);
 
                 handleOneRecvedMsg(size, msg);
@@ -2387,7 +2387,7 @@ static void PumpNetworkSmsg()
                 }else if (header_tmp->total_length > offset)
                 {
                     CmiSetMsgSeq(msg, cur_seq+1);
-                    control_msg_tmp = construct_control_msg(header_tmp->total_length, msg, cur_seq+1+1);
+                    control_msg_tmp = construct_control_msg(header_tmp->total_length, (char *)msg, cur_seq+1+1);
                     control_msg_tmp->dest_addr = header_tmp->dest_addr;
                     //send next seg
                     send_large_messages( queue, inst_id, control_msg_tmp, 0, NULL, LMSG_INIT_TAG);
@@ -3067,7 +3067,7 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
                     MACHSTATE5(8, "GO Recv done ack send from %d (%d,%d, %d) tag=%d\n", inst_id, buffered_send_msg, buffered_recv_msg, register_memory_size, msg_tag); 
 #endif
                     CMI_CHECK_CHECKSUM((void*)tmp_pd->local_addr, CmiGetMsgSize(tmp_pd->local_addr));
-                    handleOneRecvedMsg(CmiGetMsgSize(tmp_pd->local_addr), (void*)tmp_pd->local_addr);
+                    handleOneRecvedMsg(CmiGetMsgSize(tmp_pd->local_addr), (char *)tmp_pd->local_addr);
                 }else if(msg_tag == BIG_MSG_TAG){
                     void *msg = (char*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG;
                     CmiSetMsgSeq(msg, CmiGetMsgSeq(msg)+1);
@@ -3081,7 +3081,7 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
                             TRACE_COMM_CONTROL_CREATION((double)(tmp_pd->sync_flag_addr/1000000.0), (double)((tmp_pd->sync_flag_addr+1)/1000000.0), (double)((tmp_pd->sync_flag_addr+2)/1000000.0), (void*)tmp_pd->local_addr); 
 #endif
                         CMI_CHECK_CHECKSUM(msg, CmiGetMsgSize(msg));
-                        handleOneRecvedMsg(CmiGetMsgSize(msg), msg);
+                        handleOneRecvedMsg(CmiGetMsgSize(msg), (char *)msg);
                     }
                 }
             }

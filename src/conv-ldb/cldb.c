@@ -149,7 +149,7 @@ int CldLoadRank(int rank)
 {
   int len, offset;
   /* CmiLock(CpvAccessOther(cldLock, rank));  */
-  len = CqsLength(CpvAccessOther(CsdSchedQueue, rank));
+  len = CqsLength((Queue)CpvAccessOther(CsdSchedQueue, rank));
      /* CldLoadOffset is the empty token counter */
   offset = CpvAccessOther(CldLoadOffset, rank);
   /* CmiUnlock(CpvAccessOther(cldLock, rank)); */

@@ -481,7 +481,7 @@ void CmiPushNode(void *msg) {
     }
 #endif
     CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
-    CMIQueuePush(CsvAccess(NodeState).NodeRecv,msg);
+    CMIQueuePush(CsvAccess(NodeState).NodeRecv, (char *)msg);
     CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
@@ -1684,9 +1684,9 @@ void LrtsDestroyLock(LrtsNodeLock lock){
 
 #else /*other smp versions uses pthread mutex by default*/
 LrtsNodeLock LrtsCreateLock(void){
-    LrtsNodeLock l = (LrtsNodeLock)malloc(sizeof(pthread_mutex_t));
-    pthread_mutex_init(l,(pthread_mutexattr_t *)0);
-    return l;
+    void *l = malloc(sizeof(pthread_mutex_t));
+    pthread_mutex_init((pthread_mutex_t *)l,(pthread_mutexattr_t *)0);
+    return (LrtsNodeLock)l;
 }
 void LrtsLock(LrtsNodeLock lock){
     pthread_mutex_lock((pthread_mutex_t*)lock);
