@@ -102,6 +102,9 @@
 /* whether PAPI exists */
 #undef CMK_HAS_COUNTER_PAPI
 
+/* whether libperf exists */
+#undef CMK_HAS_COUNTER_PERF
+
 /* whether C++ library has <cstdatomic> */
 #undef CMK_HAS_CXX0X_CSTDATOMIC
 

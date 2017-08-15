@@ -511,6 +511,10 @@ void LogPool::writeSts(void)
     fprintf(stsfp, "PAPI_EVENT %d %s\n", i, eventName);
   }
 #endif
+
+#if CMK_HAS_COUNTER_PERF
+	fprintf(stsfp, "TOTAL_PERF_EVENTS %d\n", CkpvAccess(numEvents));
+#endif
   // Adds common elements to sts file such as num stats, num chares etc.
   traceWriteSTS(stsfp,CkpvAccess(usrEvents)->length());
   fprintf(stsfp, "TOTAL_STATS %d\n", (int) CkpvAccess(usrStats)->length());
@@ -917,8 +921,11 @@ void LogEntry::pup(PUP::er &p)
 	p|papiValues[i];
 	
       }
-#else
-      //p|numPapiEvents;     // non papi version has value 0
+#endif
+#if CMK_HAS_COUNTER_PERF
+      for(i  = 0; i < CkpvAccess(numEvents); i++) {
+        p|perfValues[i];
+      }
 #endif
       if (p.isUnpacking()) {
 	recvTime = irecvtime/1.0e6;
@@ -935,8 +942,11 @@ void LogEntry::pup(PUP::er &p)
 	//	p|papiIDs[i];
 	p|papiValues[i];
       }
-#else
-      //p|numPapiEvents;  // non papi version has value 0
+#endif
+#if CMK_HAS_COUNTER_PERF
+      for(i  = 0; i < CkpvAccess(numEvents); i++) {
+        p|perfValues[i];
+      }
 #endif
       if (p.isUnpacking()) cputime = icputime/1.0e6;
       break;
@@ -1125,6 +1135,9 @@ TraceProjections::TraceProjections(char **argv):
 
 #if CMK_HAS_COUNTER_PAPI
   initPAPI();
+#endif
+#if CMK_HAS_COUNTER_PERF
+	initlibperf();
 #endif
 }
 
@@ -1476,6 +1489,11 @@ void TraceProjections::beginExecute(CmiObjId *tid)
     CmiAbort("PAPI failed to read at begin execute!\n");
   }
 #endif
+#if CMK_HAS_COUNTER_PERF
+  for(int i = 0; i < CkpvAccess(numEvents); i++) {
+    CkpvAccess(perfValues)[i] = libperf_readcounter(CkpvAccess(pd), CkpvAccess(perfEvents)[i]);
+  }
+#endif
   if (checknested && inEntry) CmiAbort("Nested Begin Execute!\n");
   execEvent = CtvAccess(curThreadEvent);
   execEp = (-1);
@@ -1483,6 +1501,9 @@ void TraceProjections::beginExecute(CmiObjId *tid)
 		execEvent,CkMyPe(), 0, tid);
 #if CMK_HAS_COUNTER_PAPI
   _logPool->addPapi(CkpvAccess(papiValues));
+#endif
+#if CMK_HAS_COUNTER_PERF
+  _logPool->addPerf(CkpvAccess(perfValues));
 #endif
   inEntry = true;
 }
@@ -1496,6 +1517,11 @@ void TraceProjections::beginExecute(envelope *e, void *obj)
       CmiAbort("PAPI failed to read at begin execute!\n");
     }
 #endif
+#if CMK_HAS_COUNTER_PERF
+  for(int i = 0; i < CkpvAccess(numEvents); i++) {
+    CkpvAccess(perfValues)[i] = libperf_readcounter(CkpvAccess(pd), CkpvAccess(perfEvents)[i]);
+  }
+#endif
     if (checknested && inEntry) CmiAbort("Nested Begin Execute!\n");
     execEvent = CtvAccess(curThreadEvent);
     execEp = (-1);
@@ -1503,6 +1529,9 @@ void TraceProjections::beginExecute(envelope *e, void *obj)
 		  execEvent,CkMyPe(), 0, NULL, 0.0, TraceCpuTimer());
 #if CMK_HAS_COUNTER_PAPI
     _logPool->addPapi(CkpvAccess(papiValues));
+#endif
+#if CMK_HAS_COUNTER_PERF
+  _logPool->addPerf(CkpvAccess(perfValues));
 #endif
     inEntry = true;
   } else {
@@ -1547,6 +1576,11 @@ void TraceProjections::beginExecuteLocal(int event, int msgType, int ep, int src
     CmiAbort("PAPI failed to read at begin execute!\n");
   }
 #endif
+#if CMK_HAS_COUNTER_PERF
+  for(int i = 0; i < CkpvAccess(numEvents); i++) {
+    CkpvAccess(perfValues)[i] = libperf_readcounter(CkpvAccess(pd), CkpvAccess(perfEvents)[i]);
+  }
+#endif
   if (checknested && inEntry) CmiAbort("Nested Begin Execute!\n");
   execEvent=event;
   execEp=ep;
@@ -1555,6 +1589,9 @@ void TraceProjections::beginExecuteLocal(int event, int msgType, int ep, int src
 		srcPe, mlen, idx, 0.0, TraceCpuTimer());
 #if CMK_HAS_COUNTER_PAPI
   _logPool->addPapi(CkpvAccess(papiValues));
+#endif
+#if CMK_HAS_COUNTER_PERF
+  _logPool->addPerf(CkpvAccess(perfValues));
 #endif
   inEntry = true;
 }
@@ -1589,6 +1626,11 @@ void TraceProjections::endExecuteLocal(void)
     CmiAbort("PAPI failed to read at end execute!\n");
   }
 #endif
+#if CMK_HAS_COUNTER_PERF
+  for(int i = 0; i < CkpvAccess(numEvents); i++) {
+    CkpvAccess(perfValues)[i] = libperf_readcounter(CkpvAccess(pd), CkpvAccess(perfEvents)[i]);
+  }
+#endif
   if (checknested && !inEntry) CmiAbort("Nested EndExecute!\n");
   double cputime = TraceCpuTimer();
   double now = TraceTimer();
@@ -1601,6 +1643,9 @@ void TraceProjections::endExecuteLocal(void)
   }
 #if CMK_HAS_COUNTER_PAPI
   _logPool->addPapi(CkpvAccess(papiValues));
+#endif
+#if CMK_HAS_COUNTER_PERF
+  _logPool->addPerf(CkpvAccess(perfValues));
 #endif
   inEntry = false;
 }
@@ -1684,6 +1729,10 @@ void TraceProjections::beginComputation(void)
       CkpvAccess(papiStarted) = 1;
   }
 #endif
+#if CMK_HAS_COUNTER_PERF
+  for(int i = 0; i < CkpvAccess(numEvents); i++)
+    libperf_enablecounter(CkpvAccess(pd), CkpvAccess(perfEvents)[i]);
+#endif
 }
 
 void TraceProjections::endComputation(void)
@@ -1699,6 +1748,10 @@ void TraceProjections::endComputation(void)
   }
   // NOTE: We should not do a complete close of PAPI until after the
   // sts writer is done.
+#endif
+#if CMK_HAS_COUNTER_PERF
+  for(int i = 0; i < CkpvAccess(numEvents); i++)
+    libperf_disablecounter(CkpvAccess(pd), CkpvAccess(perfEvents)[i]);
 #endif
   endTime = TraceTimer();
   _logPool->add(END_COMPUTATION, 0, 0, endTime, -1, -1);

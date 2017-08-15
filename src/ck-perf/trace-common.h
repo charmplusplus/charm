@@ -135,6 +135,16 @@ extern int papiEvents[NUMPAPIEVENTS];
 void initPAPI(); 
 #endif
 
+#if CMK_HAS_COUNTER_PERF
+#include <libperf.h>
+#define NUMPERFEVENTS 1
+CkpvExtern(struct libperf_data*, pd);
+CkpvExtern(uint64_t*, perfValues);
+CkpvExtern(int*, perfEvents);
+CkpvExtern(int, numEvents);
+void initlibperf();
+#endif
+
 #endif
 
 /*@}*/

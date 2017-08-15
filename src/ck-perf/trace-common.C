@@ -1063,6 +1063,33 @@ void initPAPI() {
 }
 #endif
 
+#if CMK_HAS_COUNTER_PERF
+CkpvDeclare(struct libperf_data*, pd);
+CkpvDeclare(int, numEvents);
+CkpvDeclare(int*, perfEvents);
+CkpvDeclare(uint64_t*, perfValues);
+#endif
+
+#if CMK_HAS_COUNTER_PERF
+void initlibperf() {
+#if CMK_HAS_COUNTER_PERF
+    CkpvInitialize(struct libperf_data*, pd);
+    CkpvInitialize(int, numEvents);
+    CkpvInitialize(int*, perfEvents);
+    CkpvInitialize(uint64_t*, perfValues);
+
+    CkpvAccess(pd) = libperf_initialize(-1, -1);
+    CkpvAccess(numEvents) = 0;
+    CkpvAccess(perfEvents) = new int[1];
+    CkpvAccess(perfEvents)[0] = LIBPERF_COUNT_HW_INSTRUCTIONS;
+    CkpvAccess(numEvents)++;
+    CkpvAccess(perfValues) =
+    (uint64_t*)malloc(CkpvAccess(numEvents) * sizeof(uint64_t));
+    memset(CkpvAccess(perfValues), 0, CkpvAccess(numEvents) * sizeof(uint64_t));
+#endif
+}
+#endif
+
 extern "C"
 void traceSend(void *env, int pe, int size)
 {

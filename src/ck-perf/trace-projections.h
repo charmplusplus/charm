@@ -59,6 +59,9 @@ class LogEntry {
 #if CMK_HAS_COUNTER_PAPI
     LONG_LONG_PAPI papiValues[NUMPAPIEVENTS];
 #endif
+#if CMK_HAS_COUNTER_PERF
+    uint64_t perfValues[NUMPERFEVENTS];
+#endif
     unsigned char type; 
     char *fName;
     int flen;
@@ -185,6 +188,12 @@ class LogEntry {
     void addPapi(LONG_LONG_PAPI *papiVals){
 #if CMK_HAS_COUNTER_PAPI
    	memcpy(papiValues, papiVals, sizeof(LONG_LONG_PAPI)*NUMPAPIEVENTS);
+#endif
+    }
+
+    void addPerf(uint64_t *perfVals) {
+#if CMK_HAS_COUNTER_PERF
+        memcpy(perfValues, perfVals, sizeof(uint64_t) * CkpvAccess(numEvents));
 #endif
     }
    
@@ -358,6 +367,10 @@ class LogPool {
     // must be called after an add()
     void addPapi(LONG_LONG_PAPI *papVals) {
       pool[numEntries-1].addPapi(papVals);
+    }
+
+    void addPerf(uint64_t *perfVals) {
+      pool[numEntries - 1].addPerf(perfVals);
     }
 
 	/** add a record for a user supplied piece of data */

@@ -4324,6 +4324,29 @@ then
 fi
 fi
 
+#### check if libperf exists ####
+if test -n "$CMK_USE_PERF"
+then
+cat > $t <<EOT
+#include <stdio.h>
+#include <libperf.h>
+
+int main() {
+    return 0;
+}
+EOT
+test_link "whether libperf exists" "yes" "no" "-lperf"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_COUNTER_PERF $pass
+_ACEOF
+
+if test $pass -eq 1
+then
+	add_flag 'CMK_LIBS="$CMK_LIBS -lperf"' "libperf"
+fi
+fi
+
 #### test if Python headers are installed ####
 PYTHON_VERSION=`python -V 2>&1 | awk {'print $2'} | awk -F. {'print $1"."$2'}`
 cat > $t <<EOT
