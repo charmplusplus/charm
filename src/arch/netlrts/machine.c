@@ -891,8 +891,6 @@ void CmiCommUnlock(void) {
 }
 #endif
 
-int _Cmi_myrank=0; /* Normally zero; only 1 during SIGIO handling */
-
 static void CommunicationInterrupt(int ignored)
 {
   MACHLOCK_ASSERT(!_Cmi_myrank,"CommunicationInterrupt");

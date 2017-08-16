@@ -529,7 +529,6 @@ double GetClock(void)
  *
  ************************************************************************/
 
-static int  Cmi_truecrash;
 static int already_aborting=0;
 void LrtsAbort(const char *message)
 {
@@ -861,9 +860,6 @@ void CmiCommUnlock(void) {
   comm_flag=0;
 }
 #endif
-
-//int _Cmi_myrank=0; /* Normally zero; only 1 during SIGIO handling */
-_Cmi_myrank=0;
 
 static void CommunicationInterrupt(int ignored)
 {
