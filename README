@@ -114,7 +114,7 @@ To choose <version>, your choice is determined by two options:
 option for networks of workstations, clusters, or single-machine
 development and testing.
 
-        "gni-", "bluegeneq-", "pamilrts-", "verbs-" Charm++
+        "gni-", "pamilrts-", "verbs-" Charm++
 communicates using direct calls to the machine's communication primitives.
 Use these versions on machines that support them for best performance.
 
