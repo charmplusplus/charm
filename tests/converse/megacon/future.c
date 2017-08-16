@@ -2,7 +2,7 @@
 #include <converse.h>
 #include "future.cpm.h"
 
-void Cpm_megacon_ack();
+void Cpm_megacon_ack(CpmDestination);
 
 void future_fail()
 {

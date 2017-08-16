@@ -21,7 +21,7 @@ CpmDeclareSimple(nodenum_chare);
 #define CpmUnpack_nodenum_chare(x) (0)
 CsvDeclare(int, myhost);
 
-void Cpm_megacon_ack();
+void Cpm_megacon_ack(CpmDestination);
 
 #include "nodenum.cpm.h"
 

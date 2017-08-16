@@ -305,9 +305,10 @@ void CldEnqueue(int pe, void *msg, int infofn)
 
 void CldModuleInit()
 \{
+  char *argv[] = \{ NULL \};
   CpvInitialize(int, CldHandlerIndex);
   CpvAccess(CldHandlerIndex) = CmiRegisterHandler(CldHandler);
-  CldModuleGeneralInit();
+  CldModuleGeneralInit(argv);
 \}
 \end{alltt}
 
@@ -480,9 +481,10 @@ initialize the load balancer module.
 \begin{alltt}
 void CldModuleInit()
 \{
+  char *argv[] = \{ NULL \};
   CpvInitialize(int, CldHandlerIndex);
   CpvAccess(CldHandlerIndex) = CmiRegisterHandler(CldHandler);
-  CldModuleGeneralInit();
+  CldModuleGeneralInit(argv);
 
   /* call other init processes here */
   CldBalance();
@@ -505,7 +507,7 @@ int CldCountTokens()
 int CldLoad()
 void CldPutToken(char *msg)
 void CldGetToken(char **msg)
-void CldModuleGeneralInit()
+void CldModuleGeneralInit(char **argv)
 \end{alltt}
 
 Messages normally have a handler index associated with them, but in addition
@@ -676,6 +678,7 @@ void CldEnqueue(int pe, void *msg, int infofn)
 
 void CldModuleInit()
 {
+  char *argv[] = \{ NULL \};
   CpvInitialize(int, CldHandlerIndex);
   CpvAccess(CldHandlerIndex) = CmiRegisterHandler(CldHandler);
   CpvInitialize(int, CldBalanceHandlerIndex);
@@ -685,7 +688,7 @@ void CldModuleInit()
   CpvInitialize(int, CldMessageChunks);
   CpvAccess(CldRelocatedMessages) = CpvAccess(CldLoadBalanceMessages) = 
     CpvAccess(CldMessageChunks) = 0;
-  CldModuleGeneralInit();
+  CldModuleGeneralInit(argv);
   if (CmiNumPes() > 1)
     CldDistributeTokens();
 }

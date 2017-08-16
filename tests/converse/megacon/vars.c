@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <converse.h>
 
-void Cpm_megacon_ack();
+void Cpm_megacon_ack(CpmDestination);
 
 typedef struct vars_chare_s
 {

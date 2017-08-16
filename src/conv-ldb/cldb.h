@@ -26,6 +26,6 @@ void CldPutToken(char *);
 void CldPutTokenPrio(char *);
 void CldRestoreHandler(char *);
 void CldSwitchHandler(char *, int);
-void CldModuleGeneralInit();
+void CldModuleGeneralInit(char **);
 int  CldPresentPE(int pe);
 void seedBalancerExit(void);

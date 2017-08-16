@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <converse.h>
-void Cpm_megacon_ack();
+void Cpm_megacon_ack(CpmDestination);
 
 /* an accumulator datatype, which can have one pending thread */
 

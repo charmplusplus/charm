@@ -12,7 +12,7 @@ CpvDeclare(int, deadlock_inc_idx);
 CpvDeclare(int, deadlock_cram_idx);
 CpvDeclare(int, deadlock_count);
 
-void Cpm_megacon_ack();
+void Cpm_megacon_ack(CpmDestination);
 
 void deadlock_inc(incmsg m)
 {

@@ -405,7 +405,7 @@ void CcdCallBacksReset(void *ignored,double curWallTime);
 /**
  * Initialize the callback containers
  */
-void CcdModuleInit(void)
+void CcdModuleInit(char **ignored)
 {
    int i;
    double curTime;

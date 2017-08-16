@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <converse.h>
 #define entries    10
-void Cpm_megacon_ack();
+void Cpm_megacon_ack(CpmDestination);
 
 typedef struct
 {

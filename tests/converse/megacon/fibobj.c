@@ -9,7 +9,7 @@
 #define FIB_INPUT 17
 #define FIB_OUTPUT 1597
 
-void Cpm_megacon_ack();
+void Cpm_megacon_ack(CpmDestination);
 
 typedef struct fibobj_chare_s
 {

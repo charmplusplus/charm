@@ -3,7 +3,7 @@
 #include <sys/types.h>
 #include "ring.cpm.h"
 
-void Cpm_megacon_ack();
+void Cpm_megacon_ack(CpmDestination);
 
 void ring_fail()
 {

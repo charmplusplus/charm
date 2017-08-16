@@ -13,7 +13,7 @@ CpmDeclareSimple(specmsg_chare);
 
 #include "specmsg.cpm.h"
 
-void Cpm_megacon_ack();
+void Cpm_megacon_ack(CpmDestination);
 
 void specmsg_fail()
 {

@@ -4,7 +4,7 @@ static int reduction_debug = 0;
 
 #define DebugPrintf  if (reduction_debug) CmiPrintf
 
-void Cpm_megacon_ack();
+void Cpm_megacon_ack(CpmDestination);
 
 typedef struct _mesg {
   char head[CmiMsgHeaderSizeBytes];

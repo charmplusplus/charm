@@ -7,7 +7,7 @@ CpvDeclare(int, bigmsg_index);
 #define CmiMsgHeaderSizeInts \
     ((CmiMsgHeaderSizeBytes+sizeof(int)-1)/sizeof(int))
 
-void Cpm_megacon_ack();
+void Cpm_megacon_ack(CpmDestination);
 
 void bigmsg_handler(void *vmsg)
 {

@@ -4,7 +4,7 @@
 #include <cpthreads.h>
 #include "posixth.cpm.h"
 
-void Cpm_megacon_ack();
+void Cpm_megacon_ack(CpmDestination);
 
 CpvStaticDeclare(Cpthread_attr_t,  joinable);
 CpvStaticDeclare(Cpthread_attr_t,  detached);
