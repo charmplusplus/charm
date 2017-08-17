@@ -8,6 +8,10 @@
 #include <math.h>
 #include "converse.h"
 
+extern void CthInit(char **);
+extern void ConverseCommonInit(char **);
+extern void ConverseCommonExit(void);
+
 /***********************************************************************
  *
  * Abort function:

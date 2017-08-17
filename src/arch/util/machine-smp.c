@@ -124,6 +124,8 @@ void CmiYield(void)
 
 #define CmiGetStateN(n) (Cmi_state_vector+(n))
 
+void CommunicationServerThread(int sleepTime);
+
 /*
 static DWORD WINAPI comm_thread(LPVOID dummy)
 {  
@@ -390,6 +392,7 @@ static void *call_startfn(void *vindex)
 */
 
 extern void StartInteropScheduler(void);
+void CommunicationServerThread(int sleepTime);
 
 static void *call_startfn(void *vindex)
 {

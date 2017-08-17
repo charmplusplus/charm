@@ -316,6 +316,7 @@ static int already_in_signal_handler=0;
 
 static void CmiDestroyLocks(void);
 
+void EmergencyExit(void);
 void MachineExit(void);
 
 static void machine_exit(int status)

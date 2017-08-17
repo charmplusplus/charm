@@ -52,6 +52,14 @@ added by Ryan Mokos in July 2008.
 #include <errno.h> /* just so I can find dynamically-linked symbols */
 #include <unistd.h>
 
+#ifdef _WIN32
+# include <io.h>
+# define open _open
+# define close _close
+# define read _read
+# define write _write
+#endif
+
 #if CMK_HAS_ADDR_NO_RANDOMIZE
 #include <sys/personality.h>
 #endif

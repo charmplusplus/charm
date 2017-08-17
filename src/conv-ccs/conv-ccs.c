@@ -9,6 +9,11 @@
 #include "sockRoutines.h"
 #include "queueing.h"
 
+#ifdef _WIN32
+# include <io.h>
+# define read _read
+#endif
+
 void CpdEndConditionalDeliver_master(void);
 
 #if CMK_CCS_AVAILABLE

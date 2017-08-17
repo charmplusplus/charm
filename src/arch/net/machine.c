@@ -347,6 +347,7 @@ static int already_in_signal_handler=0;
 
 static void CmiDestroyLocks(void);
 
+void EmergencyExit(void);
 void CmiMachineExit(void);
 
 #if CMK_USE_SYSVSHM /* define teardown function before use */

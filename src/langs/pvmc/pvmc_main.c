@@ -1,4 +1,5 @@
 #include "converse.h"
+#include "pvmc.h"
 
 void user_main(int argc, char **argv)
 {

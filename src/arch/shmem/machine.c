@@ -24,6 +24,9 @@
 enum boolean {false = 0, true = 1};
 enum {list_empty = -1 };
 
+extern void CthInit(char **);
+extern void ConverseCommonInit(char **);
+extern void ConverseCommonExit(void);
 
 /*
  * Local declarations for Cmi, used by common code

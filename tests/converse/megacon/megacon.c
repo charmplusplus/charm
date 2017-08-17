@@ -218,6 +218,10 @@ CpmInvokable megacon_ack()
 
 void megacon_init(int argc, char **argv)
 {
+  void CpmModuleInit(void);
+  void CfutureModuleInit(void);
+  void CpthreadModuleInit(void);
+
   int numtests, i;
   CpmModuleInit();
   CfutureModuleInit();

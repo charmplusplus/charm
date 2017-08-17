@@ -1175,6 +1175,8 @@ void CmiNotifyIdleForMPI(void) {
 /* Network progress function is used to poll the network when for
    messages. This flushes receive buffers on some  implementations*/
 #if CMK_MACHINE_PROGRESS_DEFINED
+void CommunicationServerThread(int);
+
 void CmiMachineProgressImpl(void) {
 #if !CMK_SMP
     PumpMsgs();

@@ -12,6 +12,11 @@ Orion Sky Lawlor, olawlor@acm.org, 4/10/2001
 #include "conv-ccs.h"
 #include <errno.h>
 
+#ifdef _WIN32
+# include <io.h>
+# define write _write
+#endif
+
 CpvExtern(int, freezeModeFlag);
 CpvStaticDeclare(int, continueFlag);
 CpvStaticDeclare(int, stepFlag);

@@ -2947,6 +2947,8 @@ void CmiMulticastInit(void)
     CmiRegisterHandler((CmiHandler)CmiMulticastHandler);
 }
 
+#else
+extern void CmiMulticastInit(void);
 #endif
 
 #if CONVERSE_VERSION_SHMEM && CMK_ARENA_MALLOC
