@@ -58,11 +58,17 @@ CkDDT::pup(PUP::er &p)
         case CkDDT_HINDEXED:
           typeTable[i] = new CkDDT_HIndexed ;
           break ;
+        case CkDDT_INDEXED_BLOCK:
+          typeTable[i] = new CkDDT_Indexed_Block ;
+          break ;
+        case CkDDT_HINDEXED_BLOCK:
+          typeTable[i] = new CkDDT_HIndexed_Block ;
+          break ;
         case CkDDT_STRUCT:
           typeTable[i] = new CkDDT_Struct ;
           break ;
         default: //CkDDT_PRIMITIVE
-	  typeTable[i] = new CkDDT_DataType;
+          typeTable[i] = new CkDDT_DataType;
           break ;
       }
     } //End of for loop
@@ -707,22 +713,23 @@ CkDDT_DataType::getRefCount(void) const
 void
 CkDDT_DataType::pupType(PUP::er  &p, CkDDT* ddt)
 {
-  p(datatype);
-  p(refCount);
-  p(size);
-  p(extent);
-  p(count);
-  p(baseSize);
-  p(baseExtent);
-  p(baseIndex);
-  p(trueExtent);
-  p(trueLB);
-  p(lb);
-  p(ub);
-  p(iscontig);
-  p(isAbsolute);
-  p(numElements);
+  p|datatype;
+  p|refCount;
+  p|size;
+  p|extent;
+  p|count;
+  p|baseSize;
+  p|baseExtent;
+  p|baseIndex;
+  p|trueExtent;
+  p|trueLB;
+  p|lb;
+  p|ub;
+  p|iscontig;
+  p|isAbsolute;
+  p|numElements;
   p|name;
+  if (p.isUnpacking()) baseType = NULL;
 }
 
 int
@@ -789,20 +796,8 @@ CkDDT_Contiguous::serialize(char* userdata, char* buffer, int num, int dir) cons
 void
 CkDDT_Contiguous::pupType(PUP::er &p, CkDDT *ddt)
 {
-  p(datatype);
-  p(size);
-  p(extent);
-  p(count);
-  p(baseSize);
-  p(baseExtent);
-  p(baseIndex);
-  p(lb);
-  p(ub);
-  p(trueExtent);
-  p(trueLB);
-  p(iscontig);
-  p(numElements);
-  if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
+  CkDDT_DataType::pupType(p, ddt);
+  if (p.isUnpacking()) baseType = ddt->getType(baseIndex);
 }
 
 int
@@ -889,22 +884,10 @@ CkDDT_Vector::serialize(char* userdata, char* buffer, int num, int dir) const
 void
 CkDDT_Vector::pupType(PUP::er &p, CkDDT* ddt)
 {
-  p(datatype);
-  p(size);
-  p(extent);
-  p(count);
-  p(baseSize);
-  p(baseExtent);
-  p(blockLength);
-  p(strideLength);
-  p(baseIndex);
-  p(lb);
-  p(ub);
-  p(trueExtent);
-  p(trueLB);
-  p(iscontig);
-  p(numElements);
-  if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
+  CkDDT_DataType::pupType(p, ddt);
+  p|blockLength;
+  p|strideLength;
+  if (p.isUnpacking()) baseType = ddt->getType(baseIndex);
 }
 
 int
@@ -1100,23 +1083,10 @@ CkDDT_Indexed::~CkDDT_Indexed()
 void
 CkDDT_Indexed::pupType(PUP::er &p, CkDDT* ddt)
 {
-  p(datatype);
-  p(size);
-  p(extent);
-  p(count);
-  p(baseSize);
-  p(baseExtent);
-  p(baseIndex);
-  p(lb);
-  p(ub);
-  p(trueExtent);
-  p(trueLB);
-  p(iscontig);
-  p(numElements);
+  CkDDT_DataType::pupType(p, ddt);
   p|arrayBlockLength;
   p|arrayDisplacements;
-
-  if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
+  if (p.isUnpacking()) baseType = ddt->getType(baseIndex);
 }
 
 int
@@ -1318,23 +1288,10 @@ CkDDT_Indexed_Block::serialize(char *userdata, char *buffer, int num, int dir) c
 void
 CkDDT_Indexed_Block::pupType(PUP::er &p, CkDDT *ddt)
 {
-  p(datatype);
-  p(size);
-  p(extent);
-  p(count);
-  p(baseSize);
-  p(baseExtent);
-  p(baseIndex);
-  p(lb);
-  p(ub);
-  p(trueExtent);
-  p(trueLB);
-  p(iscontig);
-  p(numElements);
-  p(BlockLength);
+  CkDDT_DataType::pupType(p, ddt);
+  p|BlockLength;
   p|arrayDisplacements;
-
-  if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
+  if (p.isUnpacking()) baseType = ddt->getType(baseIndex);
 }
 
 int
@@ -1439,23 +1396,7 @@ CkDDT_HIndexed_Block::serialize(char *userdata, char *buffer, int num, int dir) 
 void
 CkDDT_HIndexed_Block::pupType(PUP::er &p, CkDDT *ddt)
 {
-  p(datatype);
-  p(size);
-  p(extent);
-  p(count);
-  p(baseSize);
-  p(baseExtent);
-  p(baseIndex);
-  p(lb);
-  p(ub);
-  p(trueExtent);
-  p(trueLB);
-  p(iscontig);
-  p(numElements);
-  p(BlockLength);
-  p|arrayDisplacements;
-
-  if(p.isUnpacking()) baseType = ddt->getType(baseIndex);
+  CkDDT_Indexed_Block::pupType(p, ddt);
 }
 
 int
@@ -1603,24 +1544,16 @@ CkDDT_Struct::serialize(char* userdata, char* buffer, int num, int dir) const
 void
 CkDDT_Struct::pupType(PUP::er &p, CkDDT* ddt)
 {
-  p(datatype);
-  p(size);
-  p(extent);
-  p(count);
-  p(lb);
-  p(ub);
-  p(trueExtent);
-  p(trueLB);
-  p(iscontig);
-  p(numElements);
+  CkDDT_DataType::pupType(p, ddt);
   p|arrayBlockLength;
   p|arrayDisplacements;
   p|index;
 
-  if(p.isUnpacking())
+  if (p.isUnpacking()) {
     arrayDataType.resize(count);
     for(int i=0 ; i < count; i++)
       arrayDataType[i] = ddt->getType(index[i]);
+  }
 }
 
 int
