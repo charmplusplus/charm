@@ -94,13 +94,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "converse.h"
+
 #if CMK_MEMORY_PROTECTABLE
 #if CMK_HAS_MALLOC_H
 #include <malloc.h> /*<- for memalign*/
+#else
+void *memalign(size_t align, size_t size) CMK_THROW;
 #endif
 #endif
 
-#include "converse.h"
 #include "qt.h"
 
 #include "conv-trace.h"
