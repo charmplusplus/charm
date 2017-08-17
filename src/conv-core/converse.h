@@ -59,6 +59,13 @@
 #include <string.h>
 #include <stdint.h>
 
+/* brittle accommodation of libc header internals */
+#if defined __cplusplus && defined __THROW
+# define CMK_THROW __THROW
+#else
+# define CMK_THROW
+#endif
+
 /* Paste the tokens x and y together, without any space between them.
    The ANSI C way to do this is the bizarre ## "token-pasting" 
    preprocessor operator.

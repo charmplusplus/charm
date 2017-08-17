@@ -286,13 +286,13 @@ void (* __MALLOC_HOOK_VOLATILE __malloc_initialize_hook) (void) = my_init_hook;
 void (* __malloc_initialize_hook) (void) = my_init_hook;
 #endif
 #else
-void *malloc(size_t size) { return meta_malloc(size); }
-void free(void *ptr) { meta_free(ptr); }
-void *calloc(size_t nelem, size_t size) { return meta_calloc(nelem,size); }
-void cfree(void *ptr) { meta_cfree(ptr); }
-void *realloc(void *ptr, size_t size) { return meta_realloc(ptr,size); }
-void *memalign(size_t align, size_t size) { return meta_memalign(align,size); }
-void *valloc(size_t size) { return meta_valloc(size); }
+void *malloc(size_t size) CMK_THROW { return meta_malloc(size); }
+void free(void *ptr) CMK_THROW { meta_free(ptr); }
+void *calloc(size_t nelem, size_t size) CMK_THROW { return meta_calloc(nelem,size); }
+void cfree(void *ptr) CMK_THROW { meta_cfree(ptr); }
+void *realloc(void *ptr, size_t size) CMK_THROW { return meta_realloc(ptr,size); }
+void *memalign(size_t align, size_t size) CMK_THROW { return meta_memalign(align,size); }
+void *valloc(size_t size) CMK_THROW { return meta_valloc(size); }
 #endif
 
 #endif
@@ -623,7 +623,7 @@ void CmiMemoryInit(char **argv)
   	code; \
   }
 
-void *malloc(size_t size)
+void *malloc(size_t size) CMK_THROW
 {
   void *result;
   MEM_LOCK_AROUND( result = meta_malloc(size); )
@@ -631,12 +631,12 @@ void *malloc(size_t size)
   return result;
 }
 
-void free(void *mem)
+void free(void *mem) CMK_THROW
 {
   MEM_LOCK_AROUND( meta_free(mem); )
 }
 
-void *calloc(size_t nelem, size_t size)
+void *calloc(size_t nelem, size_t size) CMK_THROW
 {
   void *result;
   MEM_LOCK_AROUND( result = meta_calloc(nelem, size); )
@@ -644,19 +644,19 @@ void *calloc(size_t nelem, size_t size)
   return result;
 }
 
-void cfree(void *mem)
+void cfree(void *mem) CMK_THROW
 {
   MEM_LOCK_AROUND( meta_cfree(mem); )
 }
 
-void *realloc(void *mem, size_t size)
+void *realloc(void *mem, size_t size) CMK_THROW
 {
   void *result;
   MEM_LOCK_AROUND( result = meta_realloc(mem, size); )
   return result;
 }
 
-void *memalign(size_t align, size_t size)
+void *memalign(size_t align, size_t size) CMK_THROW
 {
   void *result;
   MEM_LOCK_AROUND( result = meta_memalign(align, size); )
@@ -664,7 +664,7 @@ void *memalign(size_t align, size_t size)
   return result;
 }
 
-void *valloc(size_t size)
+void *valloc(size_t size) CMK_THROW
 {
   void *result;
   MEM_LOCK_AROUND( result = meta_valloc(size); )

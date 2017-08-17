@@ -191,7 +191,7 @@ void public_fREe(void* mem);
 void* public_rEALLOc(void* oldmem, size_t bytes);
 void* public_mEMALIGn(size_t alignment, size_t bytes);
 void* public_vALLOc(size_t bytes);
-int public_pMEMALIGn (void **memptr, size_t alignment, size_t size);
+int public_pMEMALIGn (void **memptr, size_t alignment, size_t size) CMK_THROW;
 void* public_cALLOc(size_t n_elements, size_t elem_size);
 void** public_iCALLOc(size_t n, size_t elem_size, void* chunks[]);
 void** public_iCOMALLOc(size_t n, size_t sizes[], void* chunks[]);
@@ -994,7 +994,7 @@ public_vALLOc(size_t bytes)
 }
 
 int
-public_pMEMALIGn (void **memptr, size_t alignment, size_t size)
+public_pMEMALIGn (void **memptr, size_t alignment, size_t size) CMK_THROW
 {
   void *mem;
 
