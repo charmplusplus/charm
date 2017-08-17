@@ -706,27 +706,21 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 	if(numNodes > 1)
 	{
 		context->srqSize = (maxRecvBuffers+2);
-		struct ibv_srq_init_attr srqAttr = {
-			.attr = {
-			.max_wr  = context->srqSize,
-			.max_sge = 1
-			}
-		};
+		struct ibv_srq_init_attr srqAttr = { 0 };
+		srqAttr.attr.max_wr  = context->srqSize;
+		srqAttr.attr.max_sge = 1;
 		context->srq = ibv_create_srq(context->pd,&srqAttr);
 		CmiAssert(context->srq != NULL);
 	
-		struct ibv_qp_init_attr initAttr = {
-			.qp_type = IBV_QPT_RC,
-			.send_cq = context->sendCq,
-			.recv_cq = context->recvCq,
-			.srq		 = context->srq,
-			.sq_sig_all = 0,
-			.qp_context = NULL,
-			.cap     = {
-				.max_send_wr  = maxTokens,
-				.max_send_sge = 2,
-			},
-		};
+		struct ibv_qp_init_attr initAttr = { 0 };
+		initAttr.qp_type = IBV_QPT_RC;
+		initAttr.send_cq = context->sendCq;
+		initAttr.recv_cq = context->recvCq;
+		initAttr.srq		 = context->srq;
+		initAttr.sq_sig_all = 0;
+		initAttr.qp_context = NULL;
+		initAttr.cap.max_send_wr  = maxTokens;
+		initAttr.cap.max_send_sge = 2;
 		struct ibv_qp_attr attr;
 
 		attr.qp_state        = IBV_QPS_INIT;
@@ -810,21 +804,17 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 	ret->recvPsn = 0;
 #endif
 	
-	struct ibv_qp_attr attr = {
-		.qp_state		= IBV_QPS_RTR,
-		.path_mtu		= mtu,
-		.dest_qp_num		= addr[1],
-		.rq_psn 		= addr[2],
-		.max_dest_rd_atomic	= 1,
-		.min_rnr_timer		= 31,
-		.ah_attr		= {
-			.is_global	= 0,
-			.dlid		= addr[0],
-			.sl		= 0,
-			.src_path_bits	= 0,
-			.port_num	= context->ibPort
-		}
-	};
+	struct ibv_qp_attr attr = { IBV_QPS_RTR };
+	attr.path_mtu		= mtu;
+	attr.dest_qp_num		= addr[1];
+	attr.rq_psn 		= addr[2];
+	attr.max_dest_rd_atomic	= 1;
+	attr.min_rnr_timer		= 31;
+	attr.ah_attr.is_global	= 0;
+	attr.ah_attr.dlid		= addr[0];
+	attr.ah_attr.sl		= 0;
+	attr.ah_attr.src_path_bits	= 0;
+	attr.ah_attr.port_num	= context->ibPort;
 	
 	MACHSTATE2(3,"initInfiOtherNodeData %d{ qp %p",node,ret->qp);
 	MACHSTATE3(3,"dlid 0x%x qp 0x%x psn 0x%x",attr.ah_attr.dlid,attr.dest_qp_num,attr.rq_psn);
@@ -1735,16 +1725,16 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 	}*/
 	{
 		struct ibv_sge list = {
-			.addr 	= (uintptr_t) buffer->buf,
-			.length = buffer->size,
-			.lkey 	= buffer->key->lkey
+			(uintptr_t) buffer->buf,
+			buffer->size,
+			buffer->key->lkey,
 		};
 	
 		struct ibv_recv_wr wr = {
-			.wr_id = (uint64_t)buffer,
-			.sg_list = &list,
-			.num_sge = 1,
-			.next = NULL
+			(uint64_t)buffer,
+			NULL,
+			&list,
+			1,
 		};
 		struct ibv_recv_wr *bad_wr;
 	
@@ -1830,23 +1820,21 @@ static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket,int fro
 	
 	{
 		struct ibv_sge list = {
-			.addr = (uintptr_t )buffer->buf,
-			.length = buffer->size,
-			.lkey 	= buffer->key->lkey
+			(uintptr_t )buffer->buf,
+			buffer->size,
+			buffer->key->lkey,
 		};
 
 		struct ibv_send_wr *bad_wr;
-		struct ibv_send_wr wr = {
-			.wr_id = (uint64_t )rdmaPacket,
-			.sg_list = &list,
-			.num_sge = 1,
-			.opcode = IBV_WR_RDMA_READ,
-			.send_flags = IBV_SEND_SIGNALED,
-			.wr.rdma = {
-				.remote_addr = (uint64_t )rdmaPacket->remoteBuf,
-				.rkey = rdmaPacket->key.rkey
-			}
-		};
+		struct ibv_send_wr wr = { 0 };
+		wr.wr_id = (uint64_t )rdmaPacket;
+		wr.sg_list = &list;
+		wr.num_sge = 1;
+		wr.opcode = IBV_WR_RDMA_READ;
+		wr.send_flags = IBV_SEND_SIGNALED;
+		wr.wr.rdma.remote_addr = (uint64_t )rdmaPacket->remoteBuf;
+		wr.wr.rdma.rkey = rdmaPacket->key.rkey;
+
 		/** post and rdma_read that is a rdma get*/
 		if(ibv_post_send(node->infiData->qp,&wr,&bad_wr)){
 			CmiAbort("ibv_post_send failed");
@@ -3087,26 +3075,23 @@ void CmiDirect_put(struct infiDirectUserHandle *userHandle){
 			
 			OtherNode node = &nodes[table->handles[idx].userHandle.recverNode];
 			struct ibv_sge list = {
-				.addr = (uintptr_t )table->handles[idx].buf,
-				.length = table->handles[idx].size,
-				.lkey 	= table->handles[idx].key->lkey
+				(uintptr_t )table->handles[idx].buf,
+				table->handles[idx].size,
+				table->handles[idx].key->lkey,
 			};
 			
 			struct ibv_mr *remoteKey = (struct ibv_mr *)table->handles[idx].userHandle.recverKey;
 
 			struct ibv_send_wr *bad_wr;
-			struct ibv_send_wr wr = {
-				.wr_id = (uint64_t)table->handles[idx].rdmaPacket,
-				.sg_list = &list,
-				.num_sge = 1,
-				.opcode = IBV_WR_RDMA_WRITE,
-				.send_flags = IBV_SEND_SIGNALED,
-				
-				.wr.rdma = {
-					.remote_addr = (uint64_t )table->handles[idx].userHandle.recverBuf,
-					.rkey = remoteKey->rkey
-				}
-			};
+			struct ibv_send_wr wr = { 0 };
+			wr.wr_id = (uint64_t)table->handles[idx].rdmaPacket;
+			wr.sg_list = &list;
+			wr.num_sge = 1;
+			wr.opcode = IBV_WR_RDMA_WRITE;
+			wr.send_flags = IBV_SEND_SIGNALED;
+			wr.wr.rdma.remote_addr = (uint64_t )table->handles[idx].userHandle.recverBuf;
+			wr.wr.rdma.rkey = remoteKey->rkey;
+
 			/** post and rdma_read that is a rdma get*/
 			if(ibv_post_send(node->infiData->qp,&wr,&bad_wr)){
 				CmiAbort("ibv_post_send failed");
@@ -3258,23 +3243,21 @@ void  LrtsStillIdle(void) {}
 	
 	{
 		struct ibv_sge list = {
-			.addr = (uintptr_t )table->handles[idx].buf,
-			.length = table->handles[idx].size,
-			.lkey 	= table->handles[idx].key->lkey
+			(uintptr_t )table->handles[idx].buf,
+			table->handles[idx].size,
+			table->handles[idx].key->lkey,
 		};
 
 		struct ibv_send_wr *bad_wr;
-		struct ibv_send_wr wr = {
-			.wr_id = (uint64_t)table->handles[idx].rdmaPacket,
-			.sg_list = &list,
-			.num_sge = 1,
-			.opcode = IBV_WR_RDMA_READ,
-			.send_flags = IBV_SEND_SIGNALED,
-			.wr.rdma = {
-				.remote_addr = (uint64_t )directRequestPacket->senderBuf,
-				.rkey = directRequestPacket->senderKey.rkey
-			}
-		};
+		struct ibv_send_wr wr = { 0 };
+		wr.wr_id = (uint64_t)table->handles[idx].rdmaPacket;
+		wr.sg_list = &list;
+		wr.num_sge = 1;
+		wr.opcode = IBV_WR_RDMA_READ;
+		wr.send_flags = IBV_SEND_SIGNALED;
+		wr.wr.rdma.remote_addr = (uint64_t )directRequestPacket->senderBuf;
+		wr.wr.rdma.rkey = directRequestPacket->senderKey.rkey;
+
 //	 post and rdma_read that is a rdma get
 		if(ibv_post_send(node->infiData->qp,&wr,&bad_wr)){
 			CmiEnforce(0);
@@ -3385,16 +3368,16 @@ static void recvBarrierMessage()
 	  }
 	  {
 	    struct ibv_sge list = {
-	      .addr 	= (uintptr_t) buffer->buf,
-	      .length = buffer->size,
-	      .lkey 	= buffer->key->lkey
+	      (uintptr_t) buffer->buf,
+	      buffer->size,
+	      buffer->key->lkey,
 	    };
 	
 	    struct ibv_recv_wr wr = {
-	      .wr_id = (uint64_t)buffer,
-	      .sg_list = &list,
-	      .num_sge = 1,
-	      .next = NULL
+	      (uint64_t)buffer,
+	      NULL,
+	      &list,
+	      1,
 	    };
 	    struct ibv_recv_wr *bad_wr;
 	

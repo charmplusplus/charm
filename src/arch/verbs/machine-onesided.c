@@ -54,23 +54,20 @@ void verbsOnesidedPostRdmaRead(int peNum, CmiVerbsRdmaRecvOp_t *recvOpInfo) {
   recvOpInfo->local_mr = mr;
 
   struct ibv_sge list = {
-    .addr = (uintptr_t)local_addr,
-    .length = size,
-    .lkey = mr->lkey
+    (uintptr_t)local_addr,
+    size,
+    mr->lkey,
   };
 
   struct ibv_send_wr *bad_wr;
-  struct ibv_send_wr wr = {
-    .wr_id = (uint64_t)rdmaPacket,
-    .sg_list = &list,
-    .num_sge = 1,
-    .opcode = IBV_WR_RDMA_READ,
-    .send_flags = IBV_SEND_SIGNALED,
-    .wr.rdma = {
-      .remote_addr = remote_addr,
-      .rkey = rkey
-    }
-  };
+  struct ibv_send_wr wr = { 0 };
+  wr.wr_id = (uint64_t)rdmaPacket;
+  wr.sg_list = &list;
+  wr.num_sge = 1;
+  wr.opcode = IBV_WR_RDMA_READ;
+  wr.send_flags = IBV_SEND_SIGNALED;
+  wr.wr.rdma.remote_addr = remote_addr;
+  wr.wr.rdma.rkey = rkey;
 
   OtherNode node = nodes_by_pe[peNum];
 #if CMK_IBVERBS_TOKENS_FLOW
