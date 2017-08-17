@@ -99,7 +99,7 @@ void LrtsSetRdmaOpInfo(void *dest, const void *ptr, int size, void *ack, int des
   rdmaOp->remote_addr = (uint64_t)ptr;
   rdmaOp->size = size;
 
-  mr = ibv_reg_mr(context->pd, ptr, size, IBV_ACCESS_REMOTE_READ |
+  mr = ibv_reg_mr(context->pd, (void *)(intptr_t)ptr, size, IBV_ACCESS_REMOTE_READ |
       IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
   if (!mr) {
     MACHSTATE(3, "ibv_reg_mr() failed\n");
