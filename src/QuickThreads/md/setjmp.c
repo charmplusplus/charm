@@ -29,7 +29,7 @@ static void qt_args_1(qt_t *rjb, void *u, void *t,
   rhelp = (struct helpdesc *)setjmp(jb);
   if (rhelp == 0) {
     SHIFTSP(rjb);
-    longjmp((int*)rjb, (int)jb);
+    longjmp(*(jmp_buf *)&rjb, (int)jb);
   }
   rhelp->hfn(rhelp->jb, rhelp->oldptr, rhelp->newptr);
   only(u, t, userf);
@@ -61,7 +61,7 @@ void *qt_block(qt_helper_t *hfn, void *oldptr, void *newptr, qt_t *sp)
   rhelp = (struct helpdesc *)setjmp(jb);
   if (rhelp==0) {
     SHIFTSP(sp);
-    longjmp((int*)sp, (int)&help);
+    longjmp(*(jmp_buf *)&sp, (int)&help);
   }
   rhelp->hfn(rhelp->jb, rhelp->oldptr, rhelp->newptr);
 }
@@ -74,5 +74,5 @@ void *qt_abort(qt_helper_t *hfn, void *oldptr, void *newptr, qt_t *sp)
   help.oldptr = oldptr;
   help.newptr = newptr;
   SHIFTSP(sp);
-  longjmp((int*)sp, (int)&help);
+  longjmp(*(jmp_buf *)&sp, (int)&help);
 }
