@@ -381,29 +381,29 @@ INLINE_KEYWORD CMIQueue CmiMyNodeQueue(void) {
 }
 #endif
 
-INLINE_KEYWORD int CmiMyPe(void) {
+int CmiMyPe(void) {
     return CmiGetState()->pe;
 }
-INLINE_KEYWORD int CmiNodeSpan(void) {
+int CmiNodeSpan(void) {
   return (CmiMyNodeSize() + 1);
 }
-INLINE_KEYWORD int CmiMyPeGlobal(void) {
+int CmiMyPeGlobal(void) {
     return CmiGetPeGlobal(CmiGetState()->pe,CmiMyPartition());
 }
-INLINE_KEYWORD int CmiMyRank(void) {
+int CmiMyRank(void) {
     return CmiGetState()->rank;
 }
-INLINE_KEYWORD int CmiNodeSize(int node) {
+int CmiNodeSize(int node) {
     return _Cmi_mynodesize;
 }
 #if !CMK_MULTICORE // these are defined in converse.h
-INLINE_KEYWORD int CmiNodeFirst(int node) {
+int CmiNodeFirst(int node) {
     return node*_Cmi_mynodesize;
 }
-INLINE_KEYWORD int CmiNodeOf(int pe) {
+int CmiNodeOf(int pe) {
     return (pe/_Cmi_mynodesize);
 }
-INLINE_KEYWORD int CmiRankOf(int pe) {
+int CmiRankOf(int pe) {
     return pe%_Cmi_mynodesize;
 }
 #endif // end of !CMK_MULTICORE
@@ -624,7 +624,7 @@ if (MSG_STATISTIC)
 
 //I am changing this function to offload task to a generic function - the one
 //that handles sending to any partition
-INLINE_KEYWORD void CmiFreeSendFn(int destPE, int size, char *msg) {
+void CmiFreeSendFn(int destPE, int size, char *msg) {
     CmiInterFreeSendFn(destPE, CmiMyPartition(), size, msg);
 }
 //and the generic implementation - I may be in danger of making the frequent
@@ -708,7 +708,7 @@ void CmiInterSyncNodeSendFn(int destNode, int partition, int size, char *msg) {
 }
 
 //again, offloading the task to a generic function
-INLINE_KEYWORD void CmiFreeNodeSendFn(int destNode, int size, char *msg) {
+void CmiFreeNodeSendFn(int destNode, int size, char *msg) {
   CmiInterFreeNodeSendFn(destNode, CmiMyPartition(), size, msg);
 }
 //and the inter-partition function
@@ -1018,7 +1018,7 @@ void CmiCreatePartitions(char **argv) {
   //mype and numpes will be set following this
 }
 
-INLINE_KEYWORD int node_lToGTranslate(int node, int partition) {
+int node_lToGTranslate(int node, int partition) {
   int rank;
   if(_partitionInfo.type == PARTITION_SINGLETON) { 
     return node;
@@ -1043,7 +1043,7 @@ INLINE_KEYWORD int node_lToGTranslate(int node, int partition) {
   }
 }
 
-INLINE_KEYWORD int pe_lToGTranslate(int pe, int partition) {
+int pe_lToGTranslate(int pe, int partition) {
   if(_partitionInfo.type == PARTITION_SINGLETON) 
     return pe;
 
