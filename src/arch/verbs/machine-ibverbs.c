@@ -2262,7 +2262,7 @@ static inline void fillBufferPools(void){
 	int count=1;
 	int i;
 	struct ibv_mr *key;
-	void *res;
+	char *res;
 
 	// initializing values
 	nodeSize = CmiMyNodeSize() + 1;
@@ -2315,7 +2315,7 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 	// poolIdx = floor(log2(dataSize/firstBinSize))+1
 	int ratio = dataSize/firstBinSize;
 	int poolIdx=0;
-	void *res;
+	char *res;
 	int i,j,nodeSize;
 	void *pointer;
 
@@ -2580,7 +2580,7 @@ void infi_CmiFreeDirect(void *ptr){
         infiCmiChunkMetaData *metaData;
         int poolIdx;
         //there is a infiniband specific header
-        freePtr = ptr - sizeof(infiCmiChunkHeader);
+        freePtr = (char *)ptr - sizeof(infiCmiChunkHeader);
         metaData = METADATAFIELD(ptr);
         poolIdx = metaData->poolIdx;
 	infiCmiChunkPool *pool = infiCmiChunkPools[CmiMyRank()] + poolIdx;
@@ -2644,13 +2644,13 @@ void infi_CmiFree(void *ptr){
 	MACHSTATE(3,"Freeing");
 
         if (Cmi_charmrun_fd == -1) { char *res = ptr; res -= sizeof(void*); free(res); return; }
-        ptr += sizeof(CmiChunkHeader);
+        ptr = (char *)ptr + sizeof(CmiChunkHeader);
         size = SIZEFIELD (ptr);
 /*      if(size > firstBinSize){*/
 	infiCmiChunkMetaData *metaData;
         int poolIdx;
         //there is a infiniband specific header
-        freePtr = ptr - sizeof(infiCmiChunkHeader);
+        freePtr = (char *)ptr - sizeof(infiCmiChunkHeader);
         metaData = METADATAFIELD(ptr);
         poolIdx = metaData->poolIdx;
 
@@ -2689,7 +2689,7 @@ void infi_CmiFree(void *ptr){
 #if CMK_SMP	
 	CmiMemLock();
 #endif
-	ptr += sizeof(CmiChunkHeader);
+	ptr = (char*)ptr + sizeof(CmiChunkHeader);
 	size = SIZEFIELD (ptr);
 /*	if(size > firstBinSize){*/
 		infiCmiChunkMetaData *metaData;

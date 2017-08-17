@@ -3197,8 +3197,8 @@ void infi_freeMultipleSend(void *msgWhole)
       /*unreg meta, free meta, move the ptr */
       /* note these weird little things are not pooled */
       /* do NOT free the message here, we are only a part of this buffer*/
-      infiCmiChunkHeader *ch=(infiCmiChunkHeader *)(msgWhole+offset);
-      char *msg=(msgWhole+offset+sizeof(infiCmiChunkHeader));
+      infiCmiChunkHeader *ch = (infiCmiChunkHeader *)((char *)msgWhole + offset);
+      char *msg = (char *)msgWhole + offset + sizeof(infiCmiChunkHeader);
       int msgSize=ch->chunkHeader.size; /* Size of user portion of message (plus padding at end) */
       infi_unregAndFreeMeta(ch->metaData);
       offset+= sizeof(infiCmiChunkHeader) + msgSize;

@@ -55,7 +55,7 @@ void allocNewTLSSeg(tlsseg_t* t, CthThread th) {
     t->memseg = (Addr)CmiIsomallocAlign(t->align, t->size, th);
     memset((void*)t->memseg, 0, t->size);
     memcpy((void*)t->memseg, (void*) (phdr->p_vaddr), (size_t)(phdr->p_filesz));
-    t->memseg = (Addr)( ((void*)(t->memseg)) + t->size );
+    t->memseg = (Addr)( ((char *)(t->memseg)) + t->size );
     /* printf("[%d] 2 ALIGN %d MEM %p SIZE %d\n", CmiMyPe(), t->align, t->memseg, t->size); */
   } else {
     t->memseg = (Addr)NULL;

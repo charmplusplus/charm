@@ -459,7 +459,7 @@ static void *CthAllocateStack(CthThreadBase *th,int *stackSize,int useMigratable
   th->stack=ret;
 
 #ifndef _WIN32
-  th->valgrindStackID = VALGRIND_STACK_REGISTER(ret, ret + *stackSize);
+  th->valgrindStackID = VALGRIND_STACK_REGISTER(ret, (char *)ret + *stackSize);
 #endif
 
   return ret;
@@ -674,7 +674,7 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
   {
     void* aux;
     pup_bytes(p, &t->tlsseg, sizeof(tlsseg_t));
-    aux = ((void*)(t->tlsseg.memseg)) - t->tlsseg.size;
+    aux = ((char*)(t->tlsseg.memseg)) - t->tlsseg.size;
     /* fixme: tls global variables handling needs isomalloc */
 #if CMK_USE_MEMPOOL_ISOMALLOC
     pup_bytes(p,&aux,sizeof(char*));
