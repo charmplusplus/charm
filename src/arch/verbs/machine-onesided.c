@@ -55,7 +55,7 @@ void verbsOnesidedPostRdmaRead(int peNum, CmiVerbsRdmaRecvOp_t *recvOpInfo) {
 
   struct ibv_sge list = {
     (uintptr_t)local_addr,
-    size,
+    (uint32_t)size,
     mr->lkey,
   };
 

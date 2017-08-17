@@ -1726,7 +1726,7 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 	{
 		struct ibv_sge list = {
 			(uintptr_t) buffer->buf,
-			buffer->size,
+			(uint32_t)buffer->size,
 			buffer->key->lkey,
 		};
 	
@@ -1821,7 +1821,7 @@ static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket,int fro
 	{
 		struct ibv_sge list = {
 			(uintptr_t )buffer->buf,
-			buffer->size,
+			(uint32_t)buffer->size,
 			buffer->key->lkey,
 		};
 
@@ -3076,7 +3076,7 @@ void CmiDirect_put(struct infiDirectUserHandle *userHandle){
 			OtherNode node = &nodes[table->handles[idx].userHandle.recverNode];
 			struct ibv_sge list = {
 				(uintptr_t )table->handles[idx].buf,
-				table->handles[idx].size,
+				(uint32_t)table->handles[idx].size,
 				table->handles[idx].key->lkey,
 			};
 			
