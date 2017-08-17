@@ -370,8 +370,8 @@ char *CcsImpl_ccs2converse(const CcsImplHeader *hdr,const void *data,int *ret_le
     CmiAbort("Why do we need to buffer messages when node 0 is Convhost?");
 #else
     CcsBufferMessage(msg);
-    return NULL;
 #endif
+    return NULL;
   }
 }
 

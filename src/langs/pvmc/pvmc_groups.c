@@ -106,5 +106,6 @@ int pvm_barrier(const char *group, int count)
    */
   CpvAccess(pvmc_last_barrier_num)++;
   
+  return 0;
 }
 

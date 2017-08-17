@@ -29,6 +29,8 @@ int pvm_exit(void)
 #endif
 
   ConverseExit();
+
+  return 0;
 }
 
 int pvm_spawn(char *task, char **argv, int flag,
@@ -163,4 +165,5 @@ int pvm_gettid(char *group, int inum)
 int pvm_catchout(FILE *ff)
 {
   PRINTF("Warning: pvm_catchout not implemented\n");
+  return 0;
 }

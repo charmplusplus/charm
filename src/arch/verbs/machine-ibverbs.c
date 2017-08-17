@@ -2425,7 +2425,7 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 	}
 
 	CmiAbort("getInfiCmiChunkThread failed");
-
+	return NULL;
 	
 };
 #else /* not MULTIPOOL case */

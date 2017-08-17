@@ -81,6 +81,7 @@ void *posixth_top(void *x)
   if (CpvAccess(fibs)==0)
     errck(Cpthread_cond_signal(&CpvAccess(donecond)));
   if (CrnRand()&1) CthYield();
+  return NULL;
 }
 
 void posixth_main(int argc, char **argv)

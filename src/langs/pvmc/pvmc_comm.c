@@ -122,6 +122,8 @@ int pvm_kill(int tid)
 	MYPE(),pvm_mytid(),tid);
 #endif
   pvmc_send_control_msg(PVMC_CTRL_KILL,TID2PE(tid));
+
+  return 0;
 }
 
 int pvm_send(int pvm_tid, int tag)
@@ -176,6 +178,8 @@ int pvm_mcast(int *tids, int ntask, int msgtag)
 #endif
   for(i=0;i<ntask;i++)
     pvm_send(tids[i],msgtag);
+
+  return 0;
 }
 
 int pvm_nrecv(int tid, int tag)

@@ -367,6 +367,7 @@ int pvmc_settidtag(int pvm_tid, int tag)
   cur_buf=&(CpvAccess(pvmc_bufarray)[CpvAccess(pvmc_sbufid)]);
   cur_buf->tag = tag;
   cur_buf->tid = pvm_tid;
+  return 0;
 }
 
 
