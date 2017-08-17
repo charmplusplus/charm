@@ -148,6 +148,7 @@ static int isProtected(Slot *s) {
   return s->magic & BLOCK_PROTECTED;
 }
 
+CMI_EXTERNC
 int Slot_ChareOwner(void *s) {
   return ((Slot*)s)->chareID;
 }
@@ -156,6 +157,7 @@ int Slot_AllocatedSize(void *s) {
   return ((Slot*)s)->userSize;
 }
 
+CMI_EXTERNC
 int Slot_StackTrace(void *s, void ***stack) {
   *stack = ((Slot*)s)->from;
   return ((Slot*)s)->stackLen;
@@ -170,6 +172,7 @@ static void printSlot(Slot *s) {
 /********* Cpd routines for pupping data to the debugger *********/
 
 /** Returns the number of total blocks of memory allocated */
+CMI_EXTERNC
 size_t cpd_memory_length(void *lenParam) {
   size_t n=0;
 #ifdef CMK_SEPARATE_SLOT
@@ -240,6 +243,7 @@ void cpd_memory_single_pup(Slot* list, pup_er p) {
 }
 
 /** PUP the entire information about the allocated memory to the debugger */
+CMI_EXTERNC
 void cpd_memory_pup(void *itemParam, pup_er p, CpdListItemsRequest *req) {
   CpdListBeginItem(p, 0);
   pup_comment(p, "name");
@@ -256,6 +260,7 @@ void cpd_memory_pup(void *itemParam, pup_er p, CpdListItemsRequest *req) {
 
 /*
 void check_memory_leaks(CpdListItemsRequest *);
+CMI_EXTERNC
 void cpd_memory_leak(void *iterParam, pup_er p, CpdListItemsRequest *req) {
   if (pup_isSizing(p)) {
     // let's perform the memory leak checking. This is the first step in the
@@ -267,10 +272,12 @@ void cpd_memory_leak(void *iterParam, pup_er p, CpdListItemsRequest *req) {
 }
 */
 
+CMI_EXTERNC
 size_t cpd_memory_getLength(void *lenParam) { return 1; }
 /** Returns the content of a block of memory (i.e the user data).
     This request must always be at the beginning of an allocated block
     (not for example an object part of an array) */
+CMI_EXTERNC
 void cpd_memory_get(void *iterParam, pup_er p, CpdListItemsRequest *req) {
   void *userData = (void*)(((unsigned int)req->lo) + (((unsigned long)req->hi)<<32));
   Slot *sl = UserToSlot(userData);
@@ -1704,6 +1711,7 @@ void setMemoryOwnedBy(void *ptr, int chareID) {
   sl->chareID = chareID;
 }
 
+CMI_EXTERNC
 void * MemoryToSlot(void *ptr) {
   Slot *sl;
   int i;

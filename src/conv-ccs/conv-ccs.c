@@ -14,10 +14,12 @@
 # define read _read
 #endif
 
+CMI_EXTERNC
 void CpdEndConditionalDeliver_master(void);
 
 #if CMK_CCS_AVAILABLE
 
+CMI_EXTERNC
 int CcsReply(CcsImplHeader *rep,int repLen,const void *repData);
 
 /*****************************************************************************
@@ -225,6 +227,7 @@ delivery.
   Deliver the given message data to the given
 CCS handler.
 */
+CMI_EXTERNC
 void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
 {
   char *cmsg;
@@ -323,7 +326,8 @@ static void bg_req_fw_handler(char *msg) {
 }
 #define req_fw_handler bg_req_fw_handler
 #endif
-extern void req_fw_handler(char *msg);
+CMI_EXTERNC
+void req_fw_handler(char *msg);
 
 void CcsReleaseMessages(void) {
 #if ! NODE_0_IS_CONVHOST || CMK_BIGSIM_CHARM
@@ -526,6 +530,7 @@ int _isCcsHandlerIdx(int hIdx) {
   return 0;
 }
 
+CMI_EXTERNC
 void CcsBuiltinsInit(char **argv);
 
 CpvDeclare(int, cmiArgDebugFlag);

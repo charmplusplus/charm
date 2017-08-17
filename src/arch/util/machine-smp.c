@@ -124,6 +124,7 @@ void CmiYield(void)
 
 #define CmiGetStateN(n) (Cmi_state_vector+(n))
 
+CMI_EXTERNC
 void CommunicationServerThread(int sleepTime);
 
 /*
@@ -391,7 +392,9 @@ static void *call_startfn(void *vindex)
 }
 */
 
-extern void StartInteropScheduler(void);
+CMI_EXTERNC
+void StartInteropScheduler(void);
+CMI_EXTERNC
 void CommunicationServerThread(int sleepTime);
 
 static void *call_startfn(void *vindex)

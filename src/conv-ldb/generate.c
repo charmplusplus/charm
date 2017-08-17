@@ -43,6 +43,7 @@ static void initGraph(VerticesListType *graph);
 static void diameter(VerticesListType *graph);
 static void AddEdges(VerticesListType *graph, EdgeListType *EdgeList, int V, int n);
 
+CMI_EXTERNC
 void gengraph(int pV, int pC, int pseed, int *pes, int *npe, int tofile)
 { int i;
   VerticesListType graph;

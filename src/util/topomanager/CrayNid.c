@@ -28,6 +28,7 @@ CmiNodeLock  cray_lock, cray_lock2;
  *  returns nodeID corresponding to the MPI rank (possibly obtained
  *  from CmiMyNode()/CmiNodeOf(pe)) passed to it
  */
+CMI_EXTERNC
 int getXTNodeID(int mpirank, int nummpiranks) {
   int nid = -1;
 
@@ -48,7 +49,13 @@ int getXTNodeID(int mpirank, int nummpiranks) {
 #error "The Cray rca library is not available. Try 'module load rca' and rebuild"
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include <rca_lib.h>
+#ifdef __cplusplus
+}
+#endif
 
 int *pid2nid = NULL;            /* rank to node ID */
 int maxX = -1;
@@ -59,12 +66,14 @@ int maxNID = -1;
 rca_mesh_coord_t  *rca_coords = NULL;
 #endif
 
+CMI_EXTERNC
 void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim);
 
 /** \function getMeshCoord
  *  wrapper function for rca_get_meshcoord
  *  0: success,   -1: failure
  */
+CMI_EXTERNC
 int getMeshCoord(int nid, int *x, int *y, int *z) {
 #if CMK_HAS_RCALIB
   if (rca_coords == NULL) {
@@ -93,6 +102,7 @@ int getMeshCoord(int nid, int *x, int *y, int *z) {
  *  finds nids for pids 1 to CmiNumPes and stores them in an array
  *  correspondingly also creates an array for nids to pids
  */
+CMI_EXTERNC
 void pidtonid(int numpes) {
   CmiLock(cray_lock);
   if (pid2nid != NULL) {
@@ -123,6 +133,7 @@ void pidtonid(int numpes) {
 }
 
 /* get size and dimension for XE machine */
+CMI_EXTERNC
 void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
 {
   int i = 0, nid, ret;
@@ -186,6 +197,7 @@ void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
   /* printf("%d %d %d %d\n", *maxnid, *xdim, *ydim, *zdim); */
 }
 
+CMI_EXTERNC
 void craynid_free()
 {
   CmiLock(cray_lock);
@@ -198,6 +210,7 @@ void craynid_free()
   CmiUnlock(cray_lock);
 }
 
+CMI_EXTERNC
 void craynid_reset()
 {
   craynid_free();
@@ -209,6 +222,7 @@ void craynid_reset()
   CmiUnlock(cray_lock);
 }
 
+CMI_EXTERNC
 void craynid_init()
 {
   static int init_done = 0;

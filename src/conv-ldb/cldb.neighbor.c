@@ -28,6 +28,7 @@ typedef struct CldProcInfo_s {
 extern char *_lbtopo;			/* topology name string */
 int _lbsteal = 0;                       /* work stealing flag */
 
+CMI_EXTERNC
 void gengraph(int, int, int, int *, int *);
 
 CpvStaticDeclare(CldProcInfo, CldData);

@@ -347,6 +347,7 @@ static int already_in_signal_handler=0;
 
 static void CmiDestroyLocks(void);
 
+CMI_EXTERNC
 void EmergencyExit(void);
 void CmiMachineExit(void);
 
@@ -1056,12 +1057,14 @@ CpvDeclare(void *, CmiLocalQueue);
 
 
 #ifndef CmiMyPe
+CMI_EXTERNC
 int CmiMyPe(void)
 { 
   return CmiGetState()->pe; 
 }
 #endif
 #ifndef CmiMyRank
+CMI_EXTERNC
 int CmiMyRank(void)
 {
   return CmiGetState()->rank;
@@ -1652,12 +1655,16 @@ static void CmiStdoutFlush(void) {
 
 
 #ifndef CmiNodeFirst
+CMI_EXTERNC
 int CmiNodeFirst(int node) { return nodes[node].nodestart; }
+CMI_EXTERNC
 int CmiNodeSize(int node)  { return nodes[node].nodesize; }
 #endif
 
 #ifndef CmiNodeOf
+CMI_EXTERNC
 int CmiNodeOf(int pe)      { return (nodes_by_pe[pe] - nodes); }
+CMI_EXTERNC
 int CmiRankOf(int pe)      { return pe - (nodes_by_pe[pe]->nodestart); }
 #endif
 

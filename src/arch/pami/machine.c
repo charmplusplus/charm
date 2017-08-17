@@ -1838,31 +1838,43 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
 
+CMI_EXTERNC
 int CmiMyPe(void);
+CMI_EXTERNC
 int CmiMyRank(void);
+CMI_EXTERNC
 int CmiNodeFirst(int node);
+CMI_EXTERNC
 int CmiNodeSize(int node);
+CMI_EXTERNC
 int CmiNodeOf(int pe);
+CMI_EXTERNC
 int CmiRankOf(int pe);
 
+CMI_EXTERNC
 int CmiMyPe(void) {
     return CmiGetState()->pe;
 }
 
+CMI_EXTERNC
 int CmiMyRank(void) {
     return CmiGetState()->rank;
 }
 
+CMI_EXTERNC
 int CmiNodeFirst(int node) {
     return node*_Cmi_mynodesize;
 }
+CMI_EXTERNC
 int CmiNodeSize(int node)  {
     return _Cmi_mynodesize;
 }
 
+CMI_EXTERNC
 int CmiNodeOf(int pe)      {
     return (pe/_Cmi_mynodesize);
 }
+CMI_EXTERNC
 int CmiRankOf(int pe)      {
     return pe%_Cmi_mynodesize;
 }

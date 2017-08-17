@@ -32,6 +32,12 @@
 #ifndef CONVERSE_H
 #define CONVERSE_H
 
+#ifdef __cplusplus
+# define CMI_EXTERNC extern "C"
+#else
+# define CMI_EXTERNC
+#endif
+
 #include "conv-config.h"
 
 #define CMIALIGN(x,n)       (size_t)((~((size_t)n-1))&((x)+(n-1)))
@@ -298,11 +304,14 @@ extern int _Cmi_numnodes;
 extern int _Cmi_sleepOnIdle;
 extern int _Cmi_forceSpinOnIdle;
 
-extern int CmiMyPe(void);
-extern int CmiMyRank(void);
+CMI_EXTERNC
+int CmiMyPe(void);
+CMI_EXTERNC
+int CmiMyRank(void);
 #define CmiNumPes()         _Cmi_numpes
 #define CmiMyNodeSize()     _Cmi_mynodesize
-extern int CmiNodeSize(int node);
+CMI_EXTERNC
+int CmiNodeSize(int node);
 #if CMK_MULTICORE
 #define CmiMyNode()         0
 #define CmiNumNodes()       1
@@ -312,9 +321,12 @@ extern int CmiNodeSize(int node);
 #else
 #define CmiMyNode()         _Cmi_mynode
 #define CmiNumNodes()       _Cmi_numnodes
-extern int CmiNodeFirst(int node);
-extern int CmiNodeOf(int pe);
-extern int CmiRankOf(int pe);
+CMI_EXTERNC
+int CmiNodeFirst(int node);
+CMI_EXTERNC
+int CmiNodeOf(int pe);
+CMI_EXTERNC
+int CmiRankOf(int pe);
 #endif
 
 #define CMK_CPV_IS_SMP sched_yield();
@@ -434,11 +446,14 @@ extern int _Cmi_numnodes;
 extern int _Cmi_sleepOnIdle;
 extern int _Cmi_forceSpinOnIdle;
 
-extern int CmiMyPe(void);
-extern int CmiMyRank(void);
+CMI_EXTERNC
+int CmiMyPe(void);
+CMI_EXTERNC
+int CmiMyRank(void);
 #define CmiNumPes()         _Cmi_numpes
 #define CmiMyNodeSize()     _Cmi_mynodesize
-extern int CmiNodeSize(int node);
+CMI_EXTERNC
+int CmiNodeSize(int node);
 #if CMK_MULTICORE
 #define CmiMyNode()         0
 #define CmiNumNodes()       1
@@ -448,9 +463,12 @@ extern int CmiNodeSize(int node);
 #else
 #define CmiMyNode()         _Cmi_mynode
 #define CmiNumNodes()       _Cmi_numnodes
-extern int CmiNodeFirst(int node);
-extern int CmiNodeOf(int pe);
-extern int CmiRankOf(int pe);
+CMI_EXTERNC
+int CmiNodeFirst(int node);
+CMI_EXTERNC
+int CmiNodeOf(int pe);
+CMI_EXTERNC
+int CmiRankOf(int pe);
 #endif
 
 #define CMK_CPV_IS_SMP Sleep(0);

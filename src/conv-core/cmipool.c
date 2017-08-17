@@ -34,8 +34,10 @@ CpvStaticDeclare(int, numOFrees);
 
 /* Once it all works inline it */
 
-extern void *malloc_nomigrate(size_t size);
-extern void free_nomigrate(void *mem);
+CMI_EXTERNC
+void *malloc_nomigrate(size_t size);
+CMI_EXTERNC
+void free_nomigrate(void *mem);
 
 void CmiPoolAllocInit(int numBins)
 {

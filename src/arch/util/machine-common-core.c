@@ -300,6 +300,7 @@ static void ConverseRunPE(int everReturn);
 /* Functions regarding machine running on every proc */
 static void AdvanceCommunication(int whenidle);
 static void CommunicationServer(int sleepTime);
+CMI_EXTERNC
 void CommunicationServerThread(int sleepTime);
 void ConverseExit(void);
 
@@ -381,28 +382,36 @@ INLINE_KEYWORD CMIQueue CmiMyNodeQueue(void) {
 }
 #endif
 
+CMI_EXTERNC
 int CmiMyPe(void) {
     return CmiGetState()->pe;
 }
+CMI_EXTERNC
 int CmiNodeSpan(void) {
   return (CmiMyNodeSize() + 1);
 }
+CMI_EXTERNC
 int CmiMyPeGlobal(void) {
     return CmiGetPeGlobal(CmiGetState()->pe,CmiMyPartition());
 }
+CMI_EXTERNC
 int CmiMyRank(void) {
     return CmiGetState()->rank;
 }
+CMI_EXTERNC
 int CmiNodeSize(int node) {
     return _Cmi_mynodesize;
 }
 #if !CMK_MULTICORE // these are defined in converse.h
+CMI_EXTERNC
 int CmiNodeFirst(int node) {
     return node*_Cmi_mynodesize;
 }
+CMI_EXTERNC
 int CmiNodeOf(int pe) {
     return (pe/_Cmi_mynodesize);
 }
+CMI_EXTERNC
 int CmiRankOf(int pe) {
     return pe%_Cmi_mynodesize;
 }
@@ -763,7 +772,8 @@ if (  MSG_STATISTIC)
 #endif
 
 #include "TopoManager.h"
-extern void createCustomPartitions(int numparts, int *partitionSize, int *nodeMap);
+CMI_EXTERNC
+void createCustomPartitions(int numparts, int *partitionSize, int *nodeMap);
 extern void setDefaultPartitionParams(void);
 
 void create_topoaware_partitions(void) {

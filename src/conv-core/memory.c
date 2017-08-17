@@ -291,6 +291,7 @@ void free(void *ptr) CMK_THROW { meta_free(ptr); }
 void *calloc(size_t nelem, size_t size) CMK_THROW { return meta_calloc(nelem,size); }
 void cfree(void *ptr) CMK_THROW { meta_cfree(ptr); }
 void *realloc(void *ptr, size_t size) CMK_THROW { return meta_realloc(ptr,size); }
+CMI_EXTERNC
 void *memalign(size_t align, size_t size) CMK_THROW { return meta_memalign(align,size); }
 void *valloc(size_t size) CMK_THROW { return meta_valloc(size); }
 #endif
@@ -310,6 +311,12 @@ void CmiMemoryInit(char ** argv)
   CmiOutOfMemoryInit();
   if (getenv("MEMORYUSAGE_NO_MALLINFO"))  skip_mallinfo = 1;
 }
+
+CMI_EXTERNC
+void *malloc_reentrant(size_t);
+CMI_EXTERNC
+void free_reentrant(void *);
+
 void *malloc_reentrant(size_t size) { return malloc(size); }
 void free_reentrant(void *mem) { free(mem); }
 
@@ -656,6 +663,7 @@ void *realloc(void *mem, size_t size) CMK_THROW
   return result;
 }
 
+CMI_EXTERNC
 void *memalign(size_t align, size_t size) CMK_THROW
 {
   void *result;
@@ -679,6 +687,11 @@ flag to see if they already hold the memory lock before
 actually trying the lock, which prevents a deadlock where
 you try to aquire one of your own locks.
 */
+
+CMI_EXTERNC
+void *malloc_reentrant(size_t);
+CMI_EXTERNC
+void free_reentrant(void *);
 
 void *malloc_reentrant(size_t size) {
   void *result;
@@ -721,6 +734,11 @@ void CmiResetMinMemory(void) {
 
 #ifndef CMK_MEMORY_HAS_NOMIGRATE
 /*Default implementations of the nomigrate routines:*/
+CMI_EXTERNC
+void *malloc_nomigrate(size_t);
+CMI_EXTERNC
+void free_nomigrate(void *);
+
 void *malloc_nomigrate(size_t size) { return malloc(size); }
 void free_nomigrate(void *mem) { free(mem); }
 #endif
@@ -780,11 +798,16 @@ void CmiOutOfMemoryInit(void) {
 #ifndef CMK_MEMORY_BUILD_CHARMDEBUG
 /* declare the cpd_memory routines */
 void CpdSetInitializeMemory(int v) { }
+CMI_EXTERNC
 size_t  cpd_memory_length(void *lenParam) { return 0; }
+CMI_EXTERNC
 void cpd_memory_pup(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
+CMI_EXTERNC
 void cpd_memory_leak(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
 void check_memory_leaks(LeakSearchInfo* i) { }
+CMI_EXTERNC
 size_t  cpd_memory_getLength(void *lenParam) { return 0; }
+CMI_EXTERNC
 void cpd_memory_get(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
 void CpdMemoryMarkClean(char *msg) { }
 /* routine used by CthMemory{Protect,Unprotect} to specify that some region of
@@ -806,9 +829,12 @@ void CpdResetMemory(void) { }
 void CpdCheckMemory(void) { }
 
 int get_memory_allocated_user_total(void) { return 0; }
+CMI_EXTERNC
 void * MemoryToSlot(void *ptr) { return NULL; }
+CMI_EXTERNC
 int Slot_ChareOwner(void *s) { return 0; }
 int Slot_AllocatedSize(void *s) { return 0; }
+CMI_EXTERNC
 int Slot_StackTrace(void *s, void ***stack) { return 0; }
 #ifdef setMemoryChareIDFromPtr
 #undef setMemoryChareIDFromPtr

@@ -101,6 +101,7 @@
 #if CMK_HAS_MALLOC_H
 #include <malloc.h> /*<- for memalign*/
 #else
+CMI_EXTERNC
 void *memalign(size_t align, size_t size) CMK_THROW;
 #endif
 #endif

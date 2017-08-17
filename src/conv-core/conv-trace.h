@@ -8,13 +8,17 @@
  * by the tracing strategies.
  */
 
+CMI_EXTERNC
 void traceInit(char **argv);
 void traceCharmInit(char **argv);	/* init trace module in ck */
 void traceMessageRecv(char *msg, int pe);
 void traceBeginIdle(void);
 void traceEndIdle(void);
+CMI_EXTERNC
 void traceResume(CmiObjId *);
+CMI_EXTERNC
 void traceSuspend(void);
+CMI_EXTERNC
 void traceAwaken(CthThread t);
 void traceUserEvent(int);
 void beginAppWork(void);
@@ -59,7 +63,9 @@ int traceRegisterFunction(const char*, int idx
 void traceBeginFuncIndexProj(int, const char* file, int);
 void traceEndFuncIndexProj(int);
 
+CMI_EXTERNC
 void traceClose(void);
+CMI_EXTERNC
 void traceCharmClose(void);          /* close trace in ck */
 void traceBegin(void);
 void traceEnd(void);

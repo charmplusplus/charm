@@ -149,6 +149,7 @@ void traceAddThreadListeners(CthThread tid, struct envelope *env);
 #endif
 
 void seedBalancerExit(void);
+CMI_EXTERNC
 void EmergencyExit(void);
 
 //int cur_restart_phase = 1;      /* checkpointing/restarting phase counter */
@@ -2054,6 +2055,7 @@ CthThread CthSuspendSchedulingThread(void)
 }
 
 /* Notice: For changes to the following function, make sure the function CthResumeNormalThreadDebug is also kept updated. */
+CMI_EXTERNC
 void CthResumeNormalThread(CthThreadToken* token)
 {
   CthThread t = token->thread;

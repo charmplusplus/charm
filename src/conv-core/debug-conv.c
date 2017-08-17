@@ -32,6 +32,7 @@ int _replaySystem = 0;
 int _conditionalDelivery = 0;
 
 #undef ConverseDeliver
+CMI_EXTERNC
 int ConverseDeliver(int pe) {
   return !_replaySystem && (!_conditionalDelivery || pe==CmiMyPe());
 }

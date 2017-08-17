@@ -111,6 +111,7 @@ int CmiSetMemAffinity(int policy, int *nids, int len) {
     } else
         return 0;
 }
+CMI_EXTERNC
 void CmiInitMemAffinity(char **argv) {
 
     int i;
@@ -238,6 +239,7 @@ void CmiInitMemAffinity(char **argv) {
     CmiNodeAllBarrier();
 }
 #else
+CMI_EXTERNC
 void CmiInitMemAffinity(char **argv) {
     char *tmpstr = NULL;
     int maffinity_flag = CmiGetArgFlagDesc(argv,"+maffinity",

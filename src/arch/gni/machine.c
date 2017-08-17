@@ -1128,7 +1128,14 @@ static uint32_t get_cookie(void)
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include <hugetlbfs.h>
+#ifdef __cplusplus
+}
+#endif
 
 // size must be _tlbpagesize aligned
 void *my_get_huge_pages(size_t size)
