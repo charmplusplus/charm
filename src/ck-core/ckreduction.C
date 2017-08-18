@@ -1788,7 +1788,7 @@ CkReduction::reducerType CkReduction::addReducer(reducerFn fn, bool streamable)
 {
   CkAssert(CmiMyRank() == 0);
   reducerType index = (reducerType)reducerTable().size();
-  reducerTable().push_back(reducerStruct(fn, streamable));
+  reducerTable().emplace_back(fn, streamable);
   return index;
 }
 
@@ -1802,119 +1802,119 @@ std::vector<CkReduction::reducerStruct> CkReduction::initReducerTable()
 {
   std::vector<CkReduction::reducerStruct> vec;
 
-  vec.push_back(CkReduction::reducerStruct(invalid_reducer_fn, true));
-  vec.push_back(CkReduction::reducerStruct(nop_fn, true));
+  vec.emplace_back(invalid_reducer_fn, true);
+  vec.emplace_back(nop_fn, true);
   //Compute the sum the numbers passed by each element.
-  vec.push_back(CkReduction::reducerStruct(sum_char_fn, true));
-  vec.push_back(CkReduction::reducerStruct(sum_short_fn, true));
-  vec.push_back(CkReduction::reducerStruct(sum_int_fn, true));
-  vec.push_back(CkReduction::reducerStruct(sum_long_fn, true));
-  vec.push_back(CkReduction::reducerStruct(sum_long_long_fn, true));
-  vec.push_back(CkReduction::reducerStruct(sum_uchar_fn, true));
-  vec.push_back(CkReduction::reducerStruct(sum_ushort_fn, true));
-  vec.push_back(CkReduction::reducerStruct(sum_uint_fn, true));
-  vec.push_back(CkReduction::reducerStruct(sum_ulong_fn, true));
-  vec.push_back(CkReduction::reducerStruct(sum_ulong_long_fn, true));
-  vec.push_back(CkReduction::reducerStruct(sum_float_fn, true));
-  vec.push_back(CkReduction::reducerStruct(sum_double_fn, true));
+  vec.emplace_back(sum_char_fn, true);
+  vec.emplace_back(sum_short_fn, true);
+  vec.emplace_back(sum_int_fn, true);
+  vec.emplace_back(sum_long_fn, true);
+  vec.emplace_back(sum_long_long_fn, true);
+  vec.emplace_back(sum_uchar_fn, true);
+  vec.emplace_back(sum_ushort_fn, true);
+  vec.emplace_back(sum_uint_fn, true);
+  vec.emplace_back(sum_ulong_fn, true);
+  vec.emplace_back(sum_ulong_long_fn, true);
+  vec.emplace_back(sum_float_fn, true);
+  vec.emplace_back(sum_double_fn, true);
 
   //Compute the product the numbers passed by each element.
-  vec.push_back(CkReduction::reducerStruct(product_char_fn, true));
-  vec.push_back(CkReduction::reducerStruct(product_short_fn, true));
-  vec.push_back(CkReduction::reducerStruct(product_int_fn, true));
-  vec.push_back(CkReduction::reducerStruct(product_long_fn, true));
-  vec.push_back(CkReduction::reducerStruct(product_long_long_fn, true));
-  vec.push_back(CkReduction::reducerStruct(product_uchar_fn, true));
-  vec.push_back(CkReduction::reducerStruct(product_ushort_fn, true));
-  vec.push_back(CkReduction::reducerStruct(product_uint_fn, true));
-  vec.push_back(CkReduction::reducerStruct(product_ulong_fn, true));
-  vec.push_back(CkReduction::reducerStruct(product_ulong_long_fn, true));
-  vec.push_back(CkReduction::reducerStruct(product_float_fn, true));
-  vec.push_back(CkReduction::reducerStruct(product_double_fn, true));
+  vec.emplace_back(product_char_fn, true);
+  vec.emplace_back(product_short_fn, true);
+  vec.emplace_back(product_int_fn, true);
+  vec.emplace_back(product_long_fn, true);
+  vec.emplace_back(product_long_long_fn, true);
+  vec.emplace_back(product_uchar_fn, true);
+  vec.emplace_back(product_ushort_fn, true);
+  vec.emplace_back(product_uint_fn, true);
+  vec.emplace_back(product_ulong_fn, true);
+  vec.emplace_back(product_ulong_long_fn, true);
+  vec.emplace_back(product_float_fn, true);
+  vec.emplace_back(product_double_fn, true);
 
   //Compute the largest number passed by any element.
-  vec.push_back(CkReduction::reducerStruct(max_char_fn, true));
-  vec.push_back(CkReduction::reducerStruct(max_short_fn, true));
-  vec.push_back(CkReduction::reducerStruct(max_int_fn, true));
-  vec.push_back(CkReduction::reducerStruct(max_long_fn, true));
-  vec.push_back(CkReduction::reducerStruct(max_long_long_fn, true));
-  vec.push_back(CkReduction::reducerStruct(max_uchar_fn, true));
-  vec.push_back(CkReduction::reducerStruct(max_ushort_fn, true));
-  vec.push_back(CkReduction::reducerStruct(max_uint_fn, true));
-  vec.push_back(CkReduction::reducerStruct(max_ulong_fn, true));
-  vec.push_back(CkReduction::reducerStruct(max_ulong_long_fn, true));
-  vec.push_back(CkReduction::reducerStruct(max_float_fn, true));
-  vec.push_back(CkReduction::reducerStruct(max_double_fn, true));
+  vec.emplace_back(max_char_fn, true);
+  vec.emplace_back(max_short_fn, true);
+  vec.emplace_back(max_int_fn, true);
+  vec.emplace_back(max_long_fn, true);
+  vec.emplace_back(max_long_long_fn, true);
+  vec.emplace_back(max_uchar_fn, true);
+  vec.emplace_back(max_ushort_fn, true);
+  vec.emplace_back(max_uint_fn, true);
+  vec.emplace_back(max_ulong_fn, true);
+  vec.emplace_back(max_ulong_long_fn, true);
+  vec.emplace_back(max_float_fn, true);
+  vec.emplace_back(max_double_fn, true);
 
   //Compute the smallest number passed by any element.
-  vec.push_back(CkReduction::reducerStruct(min_char_fn, true));
-  vec.push_back(CkReduction::reducerStruct(min_short_fn, true));
-  vec.push_back(CkReduction::reducerStruct(min_int_fn, true));
-  vec.push_back(CkReduction::reducerStruct(min_long_fn, true));
-  vec.push_back(CkReduction::reducerStruct(min_long_long_fn, true));
-  vec.push_back(CkReduction::reducerStruct(min_uchar_fn, true));
-  vec.push_back(CkReduction::reducerStruct(min_ushort_fn, true));
-  vec.push_back(CkReduction::reducerStruct(min_uint_fn, true));
-  vec.push_back(CkReduction::reducerStruct(min_ulong_fn, true));
-  vec.push_back(CkReduction::reducerStruct(min_ulong_long_fn, true));
-  vec.push_back(CkReduction::reducerStruct(min_float_fn, true));
-  vec.push_back(CkReduction::reducerStruct(min_double_fn, true));
+  vec.emplace_back(min_char_fn, true);
+  vec.emplace_back(min_short_fn, true);
+  vec.emplace_back(min_int_fn, true);
+  vec.emplace_back(min_long_fn, true);
+  vec.emplace_back(min_long_long_fn, true);
+  vec.emplace_back(min_uchar_fn, true);
+  vec.emplace_back(min_ushort_fn, true);
+  vec.emplace_back(min_uint_fn, true);
+  vec.emplace_back(min_ulong_fn, true);
+  vec.emplace_back(min_ulong_long_fn, true);
+  vec.emplace_back(min_float_fn, true);
+  vec.emplace_back(min_double_fn, true);
 
   //Compute the logical AND of the values passed by each element.
   // The resulting value will be zero if any source value is zero.
     // logical_and deprecated in favor of logical_and_int
-  vec.push_back(CkReduction::reducerStruct(logical_and_fn, true));
-  vec.push_back(CkReduction::reducerStruct(logical_and_int_fn, true));
-  vec.push_back(CkReduction::reducerStruct(logical_and_bool_fn, true));
+  vec.emplace_back(logical_and_fn, true);
+  vec.emplace_back(logical_and_int_fn, true);
+  vec.emplace_back(logical_and_bool_fn, true);
 
   //Compute the logical OR of the values passed by each element.
   // The resulting value will be 1 if any source value is nonzero.
     // logical_or deprecated in favor of logical_or_int
-  vec.push_back(CkReduction::reducerStruct(logical_or_fn, true));
-  vec.push_back(CkReduction::reducerStruct(logical_or_int_fn, true));
-  vec.push_back(CkReduction::reducerStruct(logical_or_bool_fn, true));
+  vec.emplace_back(logical_or_fn, true);
+  vec.emplace_back(logical_or_int_fn, true);
+  vec.emplace_back(logical_or_bool_fn, true);
 
   //Compute the logical XOR of the values passed by each element.
   // The resulting value will be 1 if an odd number of source values is nonzero.
-  vec.push_back(CkReduction::reducerStruct(logical_xor_int_fn, true));
-  vec.push_back(CkReduction::reducerStruct(logical_xor_bool_fn, true));
+  vec.emplace_back(logical_xor_int_fn, true);
+  vec.emplace_back(logical_xor_bool_fn, true);
 
   // Compute the logical bitvector AND of the values passed by each element.
     // bitvec_and deprecated in favor of bitvec_and_int
-  vec.push_back(CkReduction::reducerStruct(bitvec_and_fn, true));
-  vec.push_back(CkReduction::reducerStruct(bitvec_and_int_fn, true));
-  vec.push_back(CkReduction::reducerStruct(bitvec_and_bool_fn, true));
+  vec.emplace_back(bitvec_and_fn, true);
+  vec.emplace_back(bitvec_and_int_fn, true);
+  vec.emplace_back(bitvec_and_bool_fn, true);
 
   // Compute the logical bitvector OR of the values passed by each element.
     // bitvec_or deprecated in favor of bitvec_or_int
-  vec.push_back(CkReduction::reducerStruct(bitvec_or_fn, true));
-  vec.push_back(CkReduction::reducerStruct(bitvec_or_int_fn, true));
-  vec.push_back(CkReduction::reducerStruct(bitvec_or_bool_fn, true));
+  vec.emplace_back(bitvec_or_fn, true);
+  vec.emplace_back(bitvec_or_int_fn, true);
+  vec.emplace_back(bitvec_or_bool_fn, true);
 
   // Compute the logical bitvector XOR of the values passed by each element.
-  vec.push_back(CkReduction::reducerStruct(bitvec_xor_fn, true));
-  vec.push_back(CkReduction::reducerStruct(bitvec_xor_int_fn, true));
-  vec.push_back(CkReduction::reducerStruct(bitvec_xor_bool_fn, true));
+  vec.emplace_back(bitvec_xor_fn, true);
+  vec.emplace_back(bitvec_xor_int_fn, true);
+  vec.emplace_back(bitvec_xor_bool_fn, true);
 
   // Select one of the messages at random to pass on
-  vec.push_back(CkReduction::reducerStruct(random_fn, true));
+  vec.emplace_back(random_fn, true);
 
   //Concatenate the (arbitrary) data passed by each element
   // This reduction is marked as unstreamable because of the n^2
   // work required to stream it
-  vec.push_back(CkReduction::reducerStruct(concat_fn, false));
+  vec.emplace_back(concat_fn, false);
 
   //Combine the data passed by each element into an list of setElements.
   // Each element may contribute arbitrary data (with arbitrary length).
   // This reduction is marked as unstreamable because of the n^2
   // work required to stream it
-  vec.push_back(CkReduction::reducerStruct(set_fn, false));
+  vec.emplace_back(set_fn, false);
 
   // Computes a count, mean, and variance for the contributed values
-  vec.push_back(CkReduction::reducerStruct(statistics_fn, true));
+  vec.emplace_back(statistics_fn, true);
 
   // Allows multiple reductions to be done in the same message
-  vec.push_back(CkReduction::reducerStruct(CkReduction::tupleReduction_fn, false));
+  vec.emplace_back(CkReduction::tupleReduction_fn, false);
 
   return vec;
 }
