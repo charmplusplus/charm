@@ -251,7 +251,7 @@ private:
 
     // tupleReduction needs access to the reducerTable that lives in this namespace
     // so it is not a standalone function in ckreduction.C like other reduction implementations
-    static CkReductionMsg* tupleReduction(int nMsgs, CkReductionMsg** msgs);
+    static CkReductionMsg* tupleReduction_fn(int nMsgs, CkReductionMsg** msgs);
 
 	//Don't instantiate a CkReduction object-- it's just a namespace.
 	CkReduction();

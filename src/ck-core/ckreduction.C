@@ -1322,14 +1322,14 @@ The basic idea is to use the first message's data array as
 (pre-initialized!) scratch space for folding in the other messages.
  */
 
-static CkReductionMsg *invalid_reducer(int nMsg,CkReductionMsg **msg)
+static CkReductionMsg *invalid_reducer_fn(int nMsg,CkReductionMsg **msg)
 {
 	CkAbort("Called the invalid reducer type 0.  This probably\n"
 		"means you forgot to initialize your custom reducer index.\n");
 	return NULL;
 }
 
-static CkReductionMsg *nop(int nMsg,CkReductionMsg **msg)
+static CkReductionMsg *nop_fn(int nMsg,CkReductionMsg **msg)
 {
   return CkReductionMsg::buildNew(0,NULL, CkReduction::invalid, msg[0]);
 }
@@ -1356,18 +1356,18 @@ static CkReductionMsg *name(int nMsg,CkReductionMsg **msg)\
 
 //Use this macro for reductions that have the same type for all inputs
 #define SIMPLE_POLYMORPH_REDUCTION(nameBase,loop) \
-  SIMPLE_REDUCTION(nameBase##_char,char,"%c",loop) \
-  SIMPLE_REDUCTION(nameBase##_short,short,"%h",loop) \
-  SIMPLE_REDUCTION(nameBase##_int,int,"%d",loop) \
-  SIMPLE_REDUCTION(nameBase##_long,long,"%ld",loop) \
-  SIMPLE_REDUCTION(nameBase##_long_long,long long,"%lld",loop) \
-  SIMPLE_REDUCTION(nameBase##_uchar,unsigned char,"%c",loop) \
-  SIMPLE_REDUCTION(nameBase##_ushort,unsigned short,"%hu",loop) \
-  SIMPLE_REDUCTION(nameBase##_uint,unsigned int,"%u",loop) \
-  SIMPLE_REDUCTION(nameBase##_ulong,unsigned long,"%lu",loop) \
-  SIMPLE_REDUCTION(nameBase##_ulong_long,unsigned long long,"%llu",loop) \
-  SIMPLE_REDUCTION(nameBase##_float,float,"%f",loop) \
-  SIMPLE_REDUCTION(nameBase##_double,double,"%f",loop)
+  SIMPLE_REDUCTION(nameBase##_char_fn,char,"%c",loop) \
+  SIMPLE_REDUCTION(nameBase##_short_fn,short,"%h",loop) \
+  SIMPLE_REDUCTION(nameBase##_int_fn,int,"%d",loop) \
+  SIMPLE_REDUCTION(nameBase##_long_fn,long,"%ld",loop) \
+  SIMPLE_REDUCTION(nameBase##_long_long_fn,long long,"%lld",loop) \
+  SIMPLE_REDUCTION(nameBase##_uchar_fn,unsigned char,"%c",loop) \
+  SIMPLE_REDUCTION(nameBase##_ushort_fn,unsigned short,"%hu",loop) \
+  SIMPLE_REDUCTION(nameBase##_uint_fn,unsigned int,"%u",loop) \
+  SIMPLE_REDUCTION(nameBase##_ulong_fn,unsigned long,"%lu",loop) \
+  SIMPLE_REDUCTION(nameBase##_ulong_long_fn,unsigned long long,"%llu",loop) \
+  SIMPLE_REDUCTION(nameBase##_float_fn,float,"%f",loop) \
+  SIMPLE_REDUCTION(nameBase##_double_fn,double,"%f",loop)
 
 //Compute the sum the numbers passed by each element.
 SIMPLE_POLYMORPH_REDUCTION(sum,ret[i]+=value[i];)
@@ -1384,7 +1384,7 @@ SIMPLE_POLYMORPH_REDUCTION(min,if (ret[i]>value[i]) ret[i]=value[i];)
 
 //Compute the logical AND of the integers passed by each element.
 // The resulting integer will be zero if any source integer is zero; else 1.
-SIMPLE_REDUCTION(logical_and,int,"%d",
+SIMPLE_REDUCTION(logical_and_fn,int,"%d",
         if (value[i]==0)
      ret[i]=0;
   ret[i]=!!ret[i];//Make sure ret[i] is 0 or 1
@@ -1392,7 +1392,7 @@ SIMPLE_REDUCTION(logical_and,int,"%d",
 
 //Compute the logical AND of the integers passed by each element.
 // The resulting integer will be zero if any source integer is zero; else 1.
-SIMPLE_REDUCTION(logical_and_int,int,"%d",
+SIMPLE_REDUCTION(logical_and_int_fn,int,"%d",
         if (value[i]==0)
      ret[i]=0;
   ret[i]=!!ret[i];//Make sure ret[i] is 0 or 1
@@ -1400,13 +1400,13 @@ SIMPLE_REDUCTION(logical_and_int,int,"%d",
 
 //Compute the logical AND of the bools passed by each element.
 // The resulting bool will be false if any source bool is false; else true.
-SIMPLE_REDUCTION(logical_and_bool,bool,"%d",
+SIMPLE_REDUCTION(logical_and_bool_fn,bool,"%d",
   if (!value[i]) ret[i]=false;
 )
 
 //Compute the logical OR of the integers passed by each element.
 // The resulting integer will be 1 if any source integer is nonzero; else 0.
-SIMPLE_REDUCTION(logical_or,int,"%d",
+SIMPLE_REDUCTION(logical_or_fn,int,"%d",
   if (value[i]!=0)
            ret[i]=1;
   ret[i]=!!ret[i];//Make sure ret[i] is 0 or 1
@@ -1414,7 +1414,7 @@ SIMPLE_REDUCTION(logical_or,int,"%d",
 
 //Compute the logical OR of the integers passed by each element.
 // The resulting integer will be 1 if any source integer is nonzero; else 0.
-SIMPLE_REDUCTION(logical_or_int,int,"%d",
+SIMPLE_REDUCTION(logical_or_int_fn,int,"%d",
   if (value[i]!=0)
            ret[i]=1;
   ret[i]=!!ret[i];//Make sure ret[i] is 0 or 1
@@ -1422,36 +1422,36 @@ SIMPLE_REDUCTION(logical_or_int,int,"%d",
 
 //Compute the logical OR of the bools passed by each element.
 // The resulting bool will be true if any source bool is true; else false.
-SIMPLE_REDUCTION(logical_or_bool,bool,"%d",
+SIMPLE_REDUCTION(logical_or_bool_fn,bool,"%d",
   if (value[i]) ret[i]=true;
 )
 
 //Compute the logical XOR of the integers passed by each element.
 // The resulting integer will be 1 if an odd number of source integers is nonzero; else 0.
-SIMPLE_REDUCTION(logical_xor_int,int,"%d",
+SIMPLE_REDUCTION(logical_xor_int_fn,int,"%d",
   ret[i] = (!ret[i] != !value[i]);
 )
 
 //Compute the logical XOR of the bools passed by each element.
 // The resulting bool will be true if an odd number of source bools is true; else false.
-SIMPLE_REDUCTION(logical_xor_bool,bool,"%d",
+SIMPLE_REDUCTION(logical_xor_bool_fn,bool,"%d",
   ret[i] = (ret[i] != value[i]);
 )
 
-SIMPLE_REDUCTION(bitvec_and,int,"%d",ret[i]&=value[i];)
-SIMPLE_REDUCTION(bitvec_and_int,int,"%d",ret[i]&=value[i];)
-SIMPLE_REDUCTION(bitvec_and_bool,bool,"%d",ret[i]&=value[i];)
+SIMPLE_REDUCTION(bitvec_and_fn,int,"%d",ret[i]&=value[i];)
+SIMPLE_REDUCTION(bitvec_and_int_fn,int,"%d",ret[i]&=value[i];)
+SIMPLE_REDUCTION(bitvec_and_bool_fn,bool,"%d",ret[i]&=value[i];)
 
-SIMPLE_REDUCTION(bitvec_or,int,"%d",ret[i]|=value[i];)
-SIMPLE_REDUCTION(bitvec_or_int,int,"%d",ret[i]|=value[i];)
-SIMPLE_REDUCTION(bitvec_or_bool,bool,"%d",ret[i]|=value[i];)
+SIMPLE_REDUCTION(bitvec_or_fn,int,"%d",ret[i]|=value[i];)
+SIMPLE_REDUCTION(bitvec_or_int_fn,int,"%d",ret[i]|=value[i];)
+SIMPLE_REDUCTION(bitvec_or_bool_fn,bool,"%d",ret[i]|=value[i];)
 
-SIMPLE_REDUCTION(bitvec_xor,int,"%d",ret[i]^=value[i];)
-SIMPLE_REDUCTION(bitvec_xor_int,int,"%d",ret[i]^=value[i];)
-SIMPLE_REDUCTION(bitvec_xor_bool,bool,"%d",ret[i]^=value[i];)
+SIMPLE_REDUCTION(bitvec_xor_fn,int,"%d",ret[i]^=value[i];)
+SIMPLE_REDUCTION(bitvec_xor_int_fn,int,"%d",ret[i]^=value[i];)
+SIMPLE_REDUCTION(bitvec_xor_bool_fn,bool,"%d",ret[i]^=value[i];)
 
 //Select one random message to pass on
-static CkReductionMsg *random(int nMsg,CkReductionMsg **msg) {
+static CkReductionMsg *random_fn(int nMsg,CkReductionMsg **msg) {
   int idx = (int)(CrnDrand()*(nMsg-1) + 0.5);
   return CkReductionMsg::buildNew(msg[idx]->getLength(),
                                   (void *)msg[idx]->getData(),
@@ -1463,7 +1463,7 @@ static CkReductionMsg *random(int nMsg,CkReductionMsg **msg) {
 This reducer simply appends the data it recieves from each element,
 without any housekeeping data to separate them.
 */
-static CkReductionMsg *concat(int nMsg,CkReductionMsg **msg)
+static CkReductionMsg *concat_fn(int nMsg,CkReductionMsg **msg)
 {
   RED_DEB(("/ PE_%d: reduction_concat invoked on %d messages\n",CkMyPe(),nMsg));
   //Figure out how big a message we'll need
@@ -1512,7 +1512,7 @@ static CkReduction::setElement *SET_NEXT(CkReduction::setElement *cur)
 
 //Combine the data passed by each element into an list of reduction_set_elements.
 // Each element may contribute arbitrary data (with arbitrary length).
-static CkReductionMsg *set(int nMsg,CkReductionMsg **msg)
+static CkReductionMsg *set_fn(int nMsg,CkReductionMsg **msg)
 {
   RED_DEB(("/ PE_%d: reduction_set invoked on %d messages\n",CkMyPe(),nMsg));
   //Figure out how big a message we'll need
@@ -1580,7 +1580,7 @@ CkReduction::statisticsElement::statisticsElement(double initialValue)
 // Chan, Tony F.; Golub, Gene H.; LeVeque, Randall J. (1979),
 // "Updating Formulae and a Pairwise Algorithm for Computing Sample Variances." (PDF),
 // Technical Report STAN-CS-79-773, Department of Computer Science, Stanford University.
-static CkReductionMsg* statistics(int nMsgs, CkReductionMsg** msg)
+static CkReductionMsg* statistics_fn(int nMsgs, CkReductionMsg** msg)
 {
   int nElem = msg[0]->getLength() / sizeof(CkReduction::statisticsElement);
   CkReduction::statisticsElement* ret = (CkReduction::statisticsElement*)(msg[0]->getData());
@@ -1692,7 +1692,7 @@ void CkReductionMsg::toTuple(CkReduction::tupleElement** out_reductions, int* nu
 }
 
 // tuple reducer
-CkReductionMsg* CkReduction::tupleReduction(int num_messages, CkReductionMsg** messages)
+CkReductionMsg* CkReduction::tupleReduction_fn(int num_messages, CkReductionMsg** messages)
 {
   CkReduction::tupleElement** tuple_data = new CkReduction::tupleElement*[num_messages];
   int num_reductions = 0;
@@ -1802,119 +1802,119 @@ std::vector<CkReduction::reducerStruct> CkReduction::initReducerTable()
 {
   std::vector<CkReduction::reducerStruct> vec;
 
-  vec.push_back(CkReduction::reducerStruct(::invalid_reducer, true));
-  vec.push_back(CkReduction::reducerStruct(::nop, true));
+  vec.push_back(CkReduction::reducerStruct(invalid_reducer_fn, true));
+  vec.push_back(CkReduction::reducerStruct(nop_fn, true));
   //Compute the sum the numbers passed by each element.
-  vec.push_back(CkReduction::reducerStruct(::sum_char, true));
-  vec.push_back(CkReduction::reducerStruct(::sum_short, true));
-  vec.push_back(CkReduction::reducerStruct(::sum_int, true));
-  vec.push_back(CkReduction::reducerStruct(::sum_long, true));
-  vec.push_back(CkReduction::reducerStruct(::sum_long_long, true));
-  vec.push_back(CkReduction::reducerStruct(::sum_uchar, true));
-  vec.push_back(CkReduction::reducerStruct(::sum_ushort, true));
-  vec.push_back(CkReduction::reducerStruct(::sum_uint, true));
-  vec.push_back(CkReduction::reducerStruct(::sum_ulong, true));
-  vec.push_back(CkReduction::reducerStruct(::sum_ulong_long, true));
-  vec.push_back(CkReduction::reducerStruct(::sum_float, true));
-  vec.push_back(CkReduction::reducerStruct(::sum_double, true));
+  vec.push_back(CkReduction::reducerStruct(sum_char_fn, true));
+  vec.push_back(CkReduction::reducerStruct(sum_short_fn, true));
+  vec.push_back(CkReduction::reducerStruct(sum_int_fn, true));
+  vec.push_back(CkReduction::reducerStruct(sum_long_fn, true));
+  vec.push_back(CkReduction::reducerStruct(sum_long_long_fn, true));
+  vec.push_back(CkReduction::reducerStruct(sum_uchar_fn, true));
+  vec.push_back(CkReduction::reducerStruct(sum_ushort_fn, true));
+  vec.push_back(CkReduction::reducerStruct(sum_uint_fn, true));
+  vec.push_back(CkReduction::reducerStruct(sum_ulong_fn, true));
+  vec.push_back(CkReduction::reducerStruct(sum_ulong_long_fn, true));
+  vec.push_back(CkReduction::reducerStruct(sum_float_fn, true));
+  vec.push_back(CkReduction::reducerStruct(sum_double_fn, true));
 
   //Compute the product the numbers passed by each element.
-  vec.push_back(CkReduction::reducerStruct(::product_char, true));
-  vec.push_back(CkReduction::reducerStruct(::product_short, true));
-  vec.push_back(CkReduction::reducerStruct(::product_int, true));
-  vec.push_back(CkReduction::reducerStruct(::product_long, true));
-  vec.push_back(CkReduction::reducerStruct(::product_long_long, true));
-  vec.push_back(CkReduction::reducerStruct(::product_uchar, true));
-  vec.push_back(CkReduction::reducerStruct(::product_ushort, true));
-  vec.push_back(CkReduction::reducerStruct(::product_uint, true));
-  vec.push_back(CkReduction::reducerStruct(::product_ulong, true));
-  vec.push_back(CkReduction::reducerStruct(::product_ulong_long, true));
-  vec.push_back(CkReduction::reducerStruct(::product_float, true));
-  vec.push_back(CkReduction::reducerStruct(::product_double, true));
+  vec.push_back(CkReduction::reducerStruct(product_char_fn, true));
+  vec.push_back(CkReduction::reducerStruct(product_short_fn, true));
+  vec.push_back(CkReduction::reducerStruct(product_int_fn, true));
+  vec.push_back(CkReduction::reducerStruct(product_long_fn, true));
+  vec.push_back(CkReduction::reducerStruct(product_long_long_fn, true));
+  vec.push_back(CkReduction::reducerStruct(product_uchar_fn, true));
+  vec.push_back(CkReduction::reducerStruct(product_ushort_fn, true));
+  vec.push_back(CkReduction::reducerStruct(product_uint_fn, true));
+  vec.push_back(CkReduction::reducerStruct(product_ulong_fn, true));
+  vec.push_back(CkReduction::reducerStruct(product_ulong_long_fn, true));
+  vec.push_back(CkReduction::reducerStruct(product_float_fn, true));
+  vec.push_back(CkReduction::reducerStruct(product_double_fn, true));
 
   //Compute the largest number passed by any element.
-  vec.push_back(CkReduction::reducerStruct(::max_char, true));
-  vec.push_back(CkReduction::reducerStruct(::max_short, true));
-  vec.push_back(CkReduction::reducerStruct(::max_int, true));
-  vec.push_back(CkReduction::reducerStruct(::max_long, true));
-  vec.push_back(CkReduction::reducerStruct(::max_long_long, true));
-  vec.push_back(CkReduction::reducerStruct(::max_uchar, true));
-  vec.push_back(CkReduction::reducerStruct(::max_ushort, true));
-  vec.push_back(CkReduction::reducerStruct(::max_uint, true));
-  vec.push_back(CkReduction::reducerStruct(::max_ulong, true));
-  vec.push_back(CkReduction::reducerStruct(::max_ulong_long, true));
-  vec.push_back(CkReduction::reducerStruct(::max_float, true));
-  vec.push_back(CkReduction::reducerStruct(::max_double, true));
+  vec.push_back(CkReduction::reducerStruct(max_char_fn, true));
+  vec.push_back(CkReduction::reducerStruct(max_short_fn, true));
+  vec.push_back(CkReduction::reducerStruct(max_int_fn, true));
+  vec.push_back(CkReduction::reducerStruct(max_long_fn, true));
+  vec.push_back(CkReduction::reducerStruct(max_long_long_fn, true));
+  vec.push_back(CkReduction::reducerStruct(max_uchar_fn, true));
+  vec.push_back(CkReduction::reducerStruct(max_ushort_fn, true));
+  vec.push_back(CkReduction::reducerStruct(max_uint_fn, true));
+  vec.push_back(CkReduction::reducerStruct(max_ulong_fn, true));
+  vec.push_back(CkReduction::reducerStruct(max_ulong_long_fn, true));
+  vec.push_back(CkReduction::reducerStruct(max_float_fn, true));
+  vec.push_back(CkReduction::reducerStruct(max_double_fn, true));
 
   //Compute the smallest number passed by any element.
-  vec.push_back(CkReduction::reducerStruct(::min_char, true));
-  vec.push_back(CkReduction::reducerStruct(::min_short, true));
-  vec.push_back(CkReduction::reducerStruct(::min_int, true));
-  vec.push_back(CkReduction::reducerStruct(::min_long, true));
-  vec.push_back(CkReduction::reducerStruct(::min_long_long, true));
-  vec.push_back(CkReduction::reducerStruct(::min_uchar, true));
-  vec.push_back(CkReduction::reducerStruct(::min_ushort, true));
-  vec.push_back(CkReduction::reducerStruct(::min_uint, true));
-  vec.push_back(CkReduction::reducerStruct(::min_ulong, true));
-  vec.push_back(CkReduction::reducerStruct(::min_ulong_long, true));
-  vec.push_back(CkReduction::reducerStruct(::min_float, true));
-  vec.push_back(CkReduction::reducerStruct(::min_double, true));
+  vec.push_back(CkReduction::reducerStruct(min_char_fn, true));
+  vec.push_back(CkReduction::reducerStruct(min_short_fn, true));
+  vec.push_back(CkReduction::reducerStruct(min_int_fn, true));
+  vec.push_back(CkReduction::reducerStruct(min_long_fn, true));
+  vec.push_back(CkReduction::reducerStruct(min_long_long_fn, true));
+  vec.push_back(CkReduction::reducerStruct(min_uchar_fn, true));
+  vec.push_back(CkReduction::reducerStruct(min_ushort_fn, true));
+  vec.push_back(CkReduction::reducerStruct(min_uint_fn, true));
+  vec.push_back(CkReduction::reducerStruct(min_ulong_fn, true));
+  vec.push_back(CkReduction::reducerStruct(min_ulong_long_fn, true));
+  vec.push_back(CkReduction::reducerStruct(min_float_fn, true));
+  vec.push_back(CkReduction::reducerStruct(min_double_fn, true));
 
   //Compute the logical AND of the values passed by each element.
   // The resulting value will be zero if any source value is zero.
     // logical_and deprecated in favor of logical_and_int
-  vec.push_back(CkReduction::reducerStruct(::logical_and, true));
-  vec.push_back(CkReduction::reducerStruct(::logical_and_int, true));
-  vec.push_back(CkReduction::reducerStruct(::logical_and_bool, true));
+  vec.push_back(CkReduction::reducerStruct(logical_and_fn, true));
+  vec.push_back(CkReduction::reducerStruct(logical_and_int_fn, true));
+  vec.push_back(CkReduction::reducerStruct(logical_and_bool_fn, true));
 
   //Compute the logical OR of the values passed by each element.
   // The resulting value will be 1 if any source value is nonzero.
     // logical_or deprecated in favor of logical_or_int
-  vec.push_back(CkReduction::reducerStruct(::logical_or, true));
-  vec.push_back(CkReduction::reducerStruct(::logical_or_int, true));
-  vec.push_back(CkReduction::reducerStruct(::logical_or_bool, true));
+  vec.push_back(CkReduction::reducerStruct(logical_or_fn, true));
+  vec.push_back(CkReduction::reducerStruct(logical_or_int_fn, true));
+  vec.push_back(CkReduction::reducerStruct(logical_or_bool_fn, true));
 
   //Compute the logical XOR of the values passed by each element.
   // The resulting value will be 1 if an odd number of source values is nonzero.
-  vec.push_back(CkReduction::reducerStruct(::logical_xor_int, true));
-  vec.push_back(CkReduction::reducerStruct(::logical_xor_bool, true));
+  vec.push_back(CkReduction::reducerStruct(logical_xor_int_fn, true));
+  vec.push_back(CkReduction::reducerStruct(logical_xor_bool_fn, true));
 
   // Compute the logical bitvector AND of the values passed by each element.
     // bitvec_and deprecated in favor of bitvec_and_int
-  vec.push_back(CkReduction::reducerStruct(::bitvec_and, true));
-  vec.push_back(CkReduction::reducerStruct(::bitvec_and_int, true));
-  vec.push_back(CkReduction::reducerStruct(::bitvec_and_bool, true));
+  vec.push_back(CkReduction::reducerStruct(bitvec_and_fn, true));
+  vec.push_back(CkReduction::reducerStruct(bitvec_and_int_fn, true));
+  vec.push_back(CkReduction::reducerStruct(bitvec_and_bool_fn, true));
 
   // Compute the logical bitvector OR of the values passed by each element.
     // bitvec_or deprecated in favor of bitvec_or_int
-  vec.push_back(CkReduction::reducerStruct(::bitvec_or, true));
-  vec.push_back(CkReduction::reducerStruct(::bitvec_or_int, true));
-  vec.push_back(CkReduction::reducerStruct(::bitvec_or_bool, true));
+  vec.push_back(CkReduction::reducerStruct(bitvec_or_fn, true));
+  vec.push_back(CkReduction::reducerStruct(bitvec_or_int_fn, true));
+  vec.push_back(CkReduction::reducerStruct(bitvec_or_bool_fn, true));
 
   // Compute the logical bitvector XOR of the values passed by each element.
-  vec.push_back(CkReduction::reducerStruct(::bitvec_xor, true));
-  vec.push_back(CkReduction::reducerStruct(::bitvec_xor_int, true));
-  vec.push_back(CkReduction::reducerStruct(::bitvec_xor_bool, true));
+  vec.push_back(CkReduction::reducerStruct(bitvec_xor_fn, true));
+  vec.push_back(CkReduction::reducerStruct(bitvec_xor_int_fn, true));
+  vec.push_back(CkReduction::reducerStruct(bitvec_xor_bool_fn, true));
 
   // Select one of the messages at random to pass on
-  vec.push_back(CkReduction::reducerStruct(::random, true));
+  vec.push_back(CkReduction::reducerStruct(random_fn, true));
 
   //Concatenate the (arbitrary) data passed by each element
   // This reduction is marked as unstreamable because of the n^2
   // work required to stream it
-  vec.push_back(CkReduction::reducerStruct(::concat, false));
+  vec.push_back(CkReduction::reducerStruct(concat_fn, false));
 
   //Combine the data passed by each element into an list of setElements.
   // Each element may contribute arbitrary data (with arbitrary length).
   // This reduction is marked as unstreamable because of the n^2
   // work required to stream it
-  vec.push_back(CkReduction::reducerStruct(::set, false));
+  vec.push_back(CkReduction::reducerStruct(set_fn, false));
 
   // Computes a count, mean, and variance for the contributed values
-  vec.push_back(CkReduction::reducerStruct(::statistics, true));
+  vec.push_back(CkReduction::reducerStruct(statistics_fn, true));
 
   // Allows multiple reductions to be done in the same message
-  vec.push_back(CkReduction::reducerStruct(CkReduction::tupleReduction, false));
+  vec.push_back(CkReduction::reducerStruct(CkReduction::tupleReduction_fn, false));
 
   return vec;
 }
