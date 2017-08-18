@@ -351,7 +351,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     struct fi_domain_attr domain_attr = {0};
     struct fi_tx_attr     tx_attr = { 0 };
     struct fi_cq_attr     cq_attr = { 0 };
-    struct fi_av_attr     av_attr = { 0 };
+    struct fi_av_attr     av_attr = { (enum fi_av_type)0 };
     int                   fi_version;
     size_t                max_header_size;
 

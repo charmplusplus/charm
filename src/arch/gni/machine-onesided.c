@@ -81,7 +81,7 @@ gni_return_t post_rdma(uint64_t remote_addr, gni_mem_handle_t remote_mem_hndl,
   MallocPostDesc(pd);
 
   // length, local_addr, and remote_addr must be 4-byte aligned.
-  pd->type                = type;
+  pd->type                = (gni_post_type_t)type;
   pd->cq_mode             = GNI_CQMODE_GLOBAL_EVENT;
   pd->dlvr_mode           = GNI_DLVMODE_PERFORMANCE;
   pd->length              = length;
@@ -91,7 +91,7 @@ gni_return_t post_rdma(uint64_t remote_addr, gni_mem_handle_t remote_mem_hndl,
   pd->remote_mem_hndl     = remote_mem_hndl;
   pd->src_cq_hndl         = rdma_onesided_cqh;
   pd->rdma_mode           = 0;
-  pd->amo_cmd             = 0;
+  pd->amo_cmd             = (gni_fma_cmd_type_t)0;
   pd->first_operand       = post_id;
 
   MACH_DEBUG(CmiPrintf("[%d]post_rdma, local_addr: %p, remote_addr: %p, length: %d\n", 

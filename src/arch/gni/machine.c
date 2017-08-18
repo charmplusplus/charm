@@ -1912,7 +1912,7 @@ static void ProcessDeadlock(void)
     if (ptr == NULL) ptr = (CmiUInt8*)malloc(mysize * sizeof(CmiUInt8));
     mysum = smsg_send_count + smsg_recv_count;
     MACHSTATE5(9,"Before allgather Progress Deadlock (%d,%d)  (%d,%d)(%d)\n", buffered_send_msg, register_memory_size, last, sum, count); 
-    status = PMI_Allgather(&mysum,ptr,sizeof(CmiUInt8));
+    status = (gni_return_t)PMI_Allgather(&mysum,ptr,sizeof(CmiUInt8));
     GNI_RC_CHECK("PMI_Allgather", status);
     sum = 0;
     for (i=0; i<mysize; i++)  sum+= ptr[i];
@@ -2545,7 +2545,7 @@ static void getPersistentMsgRequest(void* header, uint64_t inst_id, uint8_t tag,
     pd->remote_mem_hndl = request_msg->source_mem_hndl;
     pd->src_cq_hndl     = 0;
     pd->rdma_mode       = 0;
-    pd->amo_cmd         = 0;
+    pd->amo_cmd         = (gni_fma_cmd_type_t)0;
 #if REMOTE_EVENT
     bufferRdmaMsg(bufferRdmaQueue, inst_id, pd, request_msg->ack_index); 
 #else
@@ -2624,8 +2624,8 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id, uint8_t tag, PCQu
 #endif
     }
 
-    pd->rdma_mode       = 0;
-    pd->amo_cmd         = 0;
+    pd->rdma_mode       = (gni_fma_cmd_type_t)0;
+    pd->amo_cmd         = (gni_fma_cmd_type_t)0;
 #if CMI_EXERT_RECV_RDMA_CAP
     if(status == GNI_RC_SUCCESS && RDMA_pending >= RDMA_cap ) status = GNI_RC_ERROR_RESOURCE; 
 #endif
@@ -3927,14 +3927,14 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     //void (*remote_bte_event_handler)(gni_cq_entry_t *, void *)  = &RemoteBteEventHandle;
   
     if(!CharmLibInterOperate || userDrivenMode) {
-      status = PMI_Init(&first_spawned);
+      status = (gni_return_t)PMI_Init(&first_spawned);
       GNI_RC_CHECK("PMI_Init", status);
     }
 
-    status = PMI_Get_size(&mysize);
+    status = (gni_return_t)PMI_Get_size(&mysize);
     GNI_RC_CHECK("PMI_Getsize", status);
 
-    status = PMI_Get_rank(&myrank);
+    status = (gni_return_t)PMI_Get_rank(&myrank);
     GNI_RC_CHECK("PMI_getrank", status);
 
     //physicalID = CmiPhysicalNodeID(myrank);
@@ -4436,7 +4436,7 @@ void LrtsBarrier(void)
 {
     gni_return_t status;
 
-    status = PMI_Barrier();
+    status = (gni_return_t)PMI_Barrier();
     GNI_RC_CHECK("PMI_Barrier", status);
 }
 #if CMK_ONESIDED_IMPL
