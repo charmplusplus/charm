@@ -99,7 +99,7 @@ void LrtsSetRdmaOpInfo(void *dest, const void *ptr, int size, void *ack, int des
   rdmaOp->remote_addr = (uint64_t)ptr;
   rdmaOp->size = size;
 
-  mr = ibv_reg_mr(context->pd, ptr, size, IBV_ACCESS_REMOTE_READ |
+  mr = ibv_reg_mr(context->pd, (void *)ptr, size, IBV_ACCESS_REMOTE_READ |
       IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
   if (!mr) {
     MACHSTATE(3, "ibv_reg_mr() failed\n");
@@ -109,3 +109,32 @@ void LrtsSetRdmaOpInfo(void *dest, const void *ptr, int size, void *ack, int des
 }
 
 #endif /* VERBS_MACHINE_ONESIDED_H */
+
+typedef struct _cmi_verbs_rzv_rdma_source {
+  struct ibv_mr *mr;
+  uint32_t key;
+}CmiVerbsRdmaPtr_t;
+
+// Set the machine specific information for a nocopy source pointer
+void LrtsSetRdmaSrcInfo(void *info, const void *ptr, int size){
+  struct ibv_mr *mr;
+  mr = ibv_reg_mr(context->pd, (void *)ptr, size, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ);
+  if (!mr) {
+    CmiAbort("Memory Registration at Source Failed!\n");
+  }
+  CmiVerbsRdmaPtr_t *rdmaSrc = (CmiVerbsRdmaPtr_t *)info;
+  rdmaSrc->mr = mr;
+  rdmaSrc->key = mr->rkey;
+}
+
+// Set the machine specific information for a nocopy target pointer
+void LrtsSetRdmaTgtInfo(void *info, const void *ptr, int size){
+  struct ibv_mr *mr;
+  mr = ibv_reg_mr(context->pd, (void *)ptr, size, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ);
+  if (!mr) {
+    CmiAbort("Memory Registration at Target Failed!\n");
+  }
+  CmiVerbsRdmaPtr_t *rdmaTgt = (CmiVerbsRdmaPtr_t *)info;
+  rdmaTgt->mr = mr;
+  rdmaTgt->key = mr->rkey;
+}

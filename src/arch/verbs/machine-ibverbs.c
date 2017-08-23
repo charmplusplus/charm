@@ -140,6 +140,7 @@ struct infiPacketHeader{
 #define INFI_DIRECT 2
 #if CMK_ONESIDED_IMPL
 #define INFI_ONESIDED 3
+#define INFI_ONESIDED_DIRECT 4
 #endif
 
 struct infiRdmaPacket{
@@ -1447,13 +1448,14 @@ static inline int pollSendCq(const int toBuffer){
 			case IBV_WC_RDMA_READ:
 			{
 //				processRdmaWC(&wc[i],toBuffer);
-					processRdmaWC(&wc[i],1);
+				// used for zerocopy api direct get api and zercopy entry method api
+				processRdmaWC(&wc[i],1);
 				break;
 			}
 			case IBV_WC_RDMA_WRITE:
 			{
-				/*** used for CmiDirect puts 
-				Nothing needs to be done on the sender side once send is done **/
+				// used for zerocopy api direct put api
+				processRdmaWC(&wc[i],1);
 				break;
 			}
 			default:
@@ -1881,6 +1883,17 @@ static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 		free(rdmaPacket);
 
 		return;
+	}
+#endif
+#if CMK_ONESIDED_DIRECT_IMPL
+	if (rdmaPacket->type == INFI_ONESIDED_DIRECT) {
+
+#if CMK_IBVERBS_TOKENS_FLOW
+		context->tokensLeft++;
+#endif
+		CmiInvokeNcpyAck(rdmaPacket->localBuffer);
+		return;
+
 	}
 #endif
 	struct infiBuffer *buffer = (struct infiBuffer *)rdmaPacket->localBuffer;

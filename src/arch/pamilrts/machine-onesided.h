@@ -118,3 +118,26 @@ void LrtsSetRdmaOpInfo(void *dest, const void *ptr, int size, void *ack, int des
   rdmaOp->offset = (size_t)(ptr) - (size_t)cmi_pami_memregion[0].baseVA;
   rdmaOp->size = size;
 }
+
+/* Support for Nocopy Direct API */
+
+// Machine specific information for a nocopy pointer
+typedef struct _cmi_pami_rzv_rdma_ptr {
+  pami_memregion_t    mregion;
+  int                 offset;
+} CmiPAMIRzvRdmaPtr_t;
+
+void setRdmaPtrInfo(void *info, const void *ptr) {
+  CmiPAMIRzvRdmaPtr_t *rdmaInfo = (CmiPAMIRzvRdmaPtr_t *)info;
+  memcpy(rdmaInfo->mregion, &cmi_pami_memregion[0].mregion, sizeof(pami_memregion_t));
+  rdmaInfo->offset = (size_t)(ptr) - (size_t)cmi_pami_memregion[0].baseVA;
+}
+
+// Set the machine specific information for a nocopy pointer
+void LrtsSetRdmaSrcInfo(void *info, const void *ptr, int size){
+  setRdmaPtrInfo(info, ptr);
+}
+// Set the machine specific information for a nocopy target pointer
+void LrtsSetRdmaTgtInfo(void *info, const void *ptr, int size){
+  setRdmaPtrInfo(info, ptr);
+}

@@ -1,9 +1,9 @@
 #include "pingpong.decl.h"
 
-#define BIG_ITER 1000
+#define BIG_ITER 10
 #define SMALL_ITER 100
 
-#define MAX_PAYLOAD 1 << 27
+#define MAX_PAYLOAD 1 << 12
 
 CProxy_main mainProxy;
 

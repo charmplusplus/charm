@@ -66,6 +66,7 @@ never be excluded...
 #include "ckcheckpoint.h"
 #include "ck.h"
 #include "trace.h"
+#include "ckrdma.h"
 #include "CkCheckpoint.decl.h"
 #include "ckmulticast.h"
 #include <sstream>
@@ -1195,6 +1196,9 @@ void _initCharm(int unused_argc, char **argv)
     CkpvAccess(envelopeEventID) = 0;
 	CkMessageWatcherInit(argv,CkpvAccess(_coreState));
 	
+	// Set the ack handler function used for the direct nocopy api
+	CmiSetRdmaNcpyAck(CkRdmaAckHandler);
+
 	/**
 	  The rank-0 processor of each node calls the 
 	  translator-generated "_register" routines. 

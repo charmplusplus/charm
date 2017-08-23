@@ -422,7 +422,7 @@ LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o mem-arena.o conv-counter.o memory-darwin-clang.o \
 	global-nop.o cmipool.o cpuaffinity.o cputopology.o  \
-	cmitls.o memoryaffinity.o commitid.o sdag.o conv-interoperate.o
+	cmitls.o memoryaffinity.o commitid.o sdag.o conv-interoperate.o conv-rdma.o
 
 LIBCONV_LDB = topology.o generate.o edgelist.o
 

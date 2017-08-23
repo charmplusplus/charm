@@ -34,6 +34,18 @@ static char* strsignal(int sig) {
 #include "machine.h"
 #include "pcqueue.h"
 
+/* Msg types to have different actions taken for different message types 
+ * REGULAR                     - Regular Charm++ message
+ * ONESIDED_BUFFER             - Nocopy Entry Method API buffer
+ * ONESIDED_BUFFER_DIRECT_RECV - Nocopy Direct API Recv buffer
+ * ONESIDED_BUFFER_DIRECT_SEND - Nocopy Direct API Send buffer
+ * POST_DIRECT_RECV            - Metadata message with Direct Recv buffer information
+ * POST_DIRECT_SEND            - Metadata message with Direct Send buffer information
+ * */
+
+#define CMI_MSGTYPE(msg)            ((CmiMsgHeaderBasic *)msg)->msgType
+enum mpiMsgTypes { REGULAR, ONESIDED_BUFFER, ONESIDED_BUFFER_DIRECT_RECV, ONESIDED_BUFFER_DIRECT_SEND, POST_DIRECT_RECV, POST_DIRECT_SEND};
+
 /* =======Beginning of Definitions of Performance-Specific Macros =======*/
 /* Whether to use multiple send queue in SMP mode */
 #define MULTI_SENDQUEUE    0
@@ -318,11 +330,12 @@ int rdmaTag=RDMA_BASE_TAG;
 typedef struct msg_list {
     char *msg;
     struct msg_list *next;
-    int size, destpe, mode;
+    int size, destpe, mode, type;
     MPI_Request req;
 #if CMK_ONESIDED_IMPL
-    CmiMPIRzvRdmaOpInfo_t *rdmaOpInfo;
-    //this field stores the pointer to rdma buffer specific information (ack, tag)
+    void *ref;
+    // This field can store the pointer to any structure that might have to be accessed.
+    // For rdma messages, it stores the pointer to rdma buffer specific information (ack, tag)
     //for rdma messages, tag is greater than RDMA_BASE_TAG; regular messages, it is 0
 #endif
 #if __FAULT__ 
@@ -344,15 +357,15 @@ int inside_comm = 0;
 
 typedef struct ProcState {
 #if MULTI_SENDQUEUE
-    PCQueue      sendMsgBuf;       /* per processor message sending queue */
+    PCQueue      postMsgBuf;       /* per processor message sending queue */
 #endif
     CmiNodeLock  recvLock;		    /* for cs->recv */
 } ProcState;
 static ProcState  *procState;
 
 #if CMK_SMP && !MULTI_SENDQUEUE
-PCQueue sendMsgBuf;
-static CmiNodeLock  sendMsgBufLock = NULL;        /* for sendMsgBuf */
+PCQueue postMsgBuf;
+static CmiNodeLock  postMsgBufLock = NULL;        /* for postMsgBuf */
 #endif
 /* =====End of Declarations of Machine Specific Variables===== */
 
@@ -368,7 +381,7 @@ void mpi_end_spare();
 /* Utility functions */
 
 static size_t CheckAllAsyncMsgsSent(void);
-static void ReleaseSentMessages(void);
+static void ReleasePostedMessages(void);
 static int PumpMsgs(void);
 static void PumpMsgsBlocking(void);
 
@@ -376,7 +389,7 @@ static void PumpMsgsBlocking(void);
 static int MsgQueueEmpty();
 static int RecvQueueEmpty();
 static int SendMsgBuf();
-static  void EnqueueMsg(void *m, int size, int node, int mode);
+static  void EnqueueMsg(void *m, int size, int node, int mode, int type, void *ref);
 #endif
 
 /* ### End of Machine-running Related Functions ### */
@@ -397,39 +410,41 @@ void CmiNotifyIdleForMPI(void);
 #include "machine-lrts.h"
 #include "machine-common-core.c"
 
-#if CMK_ONESIDED_IMPL
-#include "machine-onesided.c"
-#endif
-
 #if USE_MPI_CTRLMSG_SCHEME
 #include "machine-ctrlmsg.c"
 #endif
 
+SMSG_LIST *allocateSmsgList(char *msg, int destNode, int size, int mode, int type, void *ref) {
+  SMSG_LIST *msg_tmp = (SMSG_LIST *) malloc(sizeof(SMSG_LIST));
+  msg_tmp->msg = msg;
+  msg_tmp->destpe = destNode;
+  msg_tmp->size = size;
+  msg_tmp->next = 0;
+  msg_tmp->mode = mode;
+  msg_tmp->type = type;
+#if CMK_ONESIDED_IMPL
+  msg_tmp->ref = ref;
+#endif
+  return msg_tmp;
+}
+
 /* The machine specific msg-sending function */
 
 #if CMK_SMP
-static void EnqueueMsg(void *m, int size, int node, int mode) {
+static void EnqueueMsg(void *m, int size, int node, int mode, int type, void *ref) {
     /*SMSG_LIST *msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));*/
-    SMSG_LIST *msg_tmp = (SMSG_LIST *) malloc(sizeof(SMSG_LIST));
+    SMSG_LIST *msg_tmp = allocateSmsgList(m, node, size, mode, type, ref);
     MACHSTATE1(3,"EnqueueMsg to node %d {{ ", node);
-    msg_tmp->msg = m;
-    msg_tmp->size = size;
-    msg_tmp->destpe = node;
-    msg_tmp->next = 0;
-    msg_tmp->mode = mode;
-#if CMK_ONESIDED_IMPL
-    msg_tmp->rdmaOpInfo = NULL;
-#endif
 
 #if MULTI_SENDQUEUE
-    PCQueuePush(procState[CmiMyRank()].sendMsgBuf,(char *)msg_tmp);
+    PCQueuePush(procState[CmiMyRank()].postMsgBuf,(char *)msg_tmp);
 #else
-    /*CmiLock(sendMsgBufLock);*/
-    PCQueuePush(sendMsgBuf,(char *)msg_tmp);
-    /*CmiUnlock(sendMsgBufLock);*/
+    /*CmiLock(postMsgBufLock);*/
+    PCQueuePush(postMsgBuf,(char *)msg_tmp);
+    /*CmiUnlock(postMsgBufLock);*/
 #endif
 
-    MACHSTATE3(3,"}} EnqueueMsg to %d finish with queue %p len: %d", node, sendMsgBuf, PCQueueLength(sendMsgBuf));
+    MACHSTATE3(3,"}} EnqueueMsg to %d finish with queue %p len: %d", node, postMsgBuf, PCQueueLength(postMsgBuf));
 }
 #endif
 
@@ -497,7 +512,7 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
     if (mode == P2P_SYNC || mode == P2P_ASYNC)
     {
     while (CpvAccess(MsgQueueLen) > request_max) {
-        ReleaseSentMessages();
+        ReleasePostedMessages();
         PumpMsgs();
     }
     }
@@ -513,23 +528,17 @@ CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mo
     SMSG_LIST *msg_tmp;
 
     CmiAssert(destNode != CmiMyNodeGlobal());
+    // Mark the message type as REGULAR to indicate a regular charm message
+    CMI_MSGTYPE(msg) = REGULAR;
 #if CMK_SMP
     if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV) {
-      EnqueueMsg(msg, size, destNode, mode);
+      EnqueueMsg(msg, size, destNode, mode, REGULAR, NULL);
       return 0;
     }
 #endif
     /* non smp */
     /*msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));*/
-    msg_tmp = (SMSG_LIST *) malloc(sizeof(SMSG_LIST));
-    msg_tmp->msg = msg;
-    msg_tmp->destpe = destNode;
-    msg_tmp->size = size;
-    msg_tmp->next = 0;
-    msg_tmp->mode = mode;
-#if CMK_ONESIDED_IMPL
-    msg_tmp->rdmaOpInfo = NULL;
-#endif
+    msg_tmp = allocateSmsgList(msg, destNode, size, mode, REGULAR, NULL);
     return MPISendOneMsg(msg_tmp);
 }
 
@@ -575,9 +584,12 @@ int CheckAsyncMsgSent(CmiCommHandle c) {
     }
 }
 
+#if CMK_ONESIDED_IMPL
+#include "machine-onesided.c"
+#endif
 
 /* ######Beginning of functions related with communication progress ###### */
-static void ReleaseSentMessages(void) {
+static void ReleasePostedMessages(void) {
     SMSG_LIST *msg_tmp=CpvAccess(sent_msgs);
     SMSG_LIST *prev=0;
     SMSG_LIST *temp;
@@ -585,21 +597,21 @@ static void ReleaseSentMessages(void) {
     MPI_Status sts;
 
 
-    MACHSTATE1(2,"ReleaseSentMessages begin on %d {", CmiMyPe());
+    MACHSTATE1(2,"ReleasePostedMessages begin on %d {", CmiMyPe());
     while (msg_tmp!=0) {
         done =0;
 #if CMK_SMP_TRACE_COMMTHREAD || CMK_TRACE_COMMOVERHEAD
         double startT = CmiWallTimer();
 #endif
         if (MPI_Test(&(msg_tmp->req), &done, &sts) != MPI_SUCCESS)
-            CmiAbort("ReleaseSentMessages: MPI_Test failed!\n");
+            CmiAbort("ReleasePostedMessages: MPI_Test failed!\n");
 #if __FAULT__ 
         if (isRankDie(msg_tmp->dstrank)){
           done = 1;
         }
 #endif
         if (done) {
-            MACHSTATE2(3,"ReleaseSentMessages release one %d to %d", CmiMyPe(), msg_tmp->destpe);
+            MACHSTATE2(3,"ReleasePostedMessages release one %d to %d", CmiMyPe(), msg_tmp->destpe);
             CpvAccess(MsgQueueLen)--;
             /* Release the message */
             temp = msg_tmp->next;
@@ -609,12 +621,24 @@ static void ReleaseSentMessages(void) {
                 prev->next = temp;
 #if CMK_ONESIDED_IMPL
             //if rdma msg, call the callback
-            if(msg_tmp->rdmaOpInfo !=NULL) {
-                CmiMPIRzvRdmaOpInfo_t *rdmaOpInfo = (CmiMPIRzvRdmaOpInfo_t *)msg_tmp->rdmaOpInfo;
+            if(msg_tmp->type == ONESIDED_BUFFER) {
+                CmiMPIRzvRdmaOpInfo_t *rdmaOpInfo = (CmiMPIRzvRdmaOpInfo_t *)msg_tmp->ref;
                 CmiRdmaAck *ack = (CmiRdmaAck *) rdmaOpInfo->ack;
                 ack->fnPtr(ack->token);
 
                 //free callback structure, CmiRdmaAck allocated in CmiSetRdmaAck
+                free(ack);
+            } else if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_RECV || msg_tmp->type == ONESIDED_BUFFER_DIRECT_SEND) {
+                // Get the ack information
+                CmiMPIRzvRdmaAckInfo_t *ack = (CmiMPIRzvRdmaAckInfo_t *)(msg_tmp->ref);
+
+                // Call Ack function
+                ncpyAckHandlerFn(
+                                       (char *)msg_tmp->ref + sizeof(CmiMPIRzvRdmaAckInfo_t),
+                                       ack->pe,
+                                       msg_tmp->msg);
+
+                // free the ack information
                 free(ack);
             }
             else
@@ -638,7 +662,7 @@ static void ReleaseSentMessages(void) {
 #endif
     }
     CpvAccess(end_sent) = prev;
-    MACHSTATE(2,"} ReleaseSentMessages end");
+    MACHSTATE(2,"} ReleasePostedMessages end");
 }
 
 static int PumpMsgs(void) {
@@ -674,7 +698,7 @@ static int PumpMsgs(void) {
             if(recvBufferTmp->rdmaOp[i].hasCompleted == 0){
 
               if(MPI_Test(&(recvBufferTmp->rdmaOp[i].req), &opDone, MPI_STATUS_IGNORE) != MPI_SUCCESS)
-                CmiAbort("ReleaseSentMessages: MPI_Test for Rdma buffers failed!\n");
+                CmiAbort("ReleasePostedMessages: MPI_Test for Rdma buffers failed!\n");
               //recv has completed
               if(opDone)
                 recvBufferTmp->rdmaOp[i].hasCompleted = 1;
@@ -841,8 +865,43 @@ static int PumpMsgs(void) {
 				continue;
 			}
 	#endif
-        
-            handleOneRecvedMsg(nbytes, msg);
+            if(CMI_MSGTYPE(msg) == REGULAR) {
+              handleOneRecvedMsg(nbytes, msg);
+            } else if(CMI_MSGTYPE(msg) == POST_DIRECT_RECV || CMI_MSGTYPE(msg) == POST_DIRECT_SEND) {
+              CmiMPIRzvRdmaPostInfo_t *postInfo = (CmiMPIRzvRdmaPostInfo_t *)(msg + CmiMsgHeaderSizeBytes);
+
+              // Allocate a local ack
+              CmiMPIRzvRdmaAckInfo_t *ackNew = (CmiMPIRzvRdmaAckInfo_t *)malloc(sizeof(CmiMPIRzvRdmaAckInfo_t) + postInfo->ackSize);
+              ackNew->tag = postInfo->tag;
+              memcpy((char *)ackNew + sizeof(CmiMPIRzvRdmaAckInfo_t),
+                     (char *)postInfo + sizeof(CmiMPIRzvRdmaPostInfo_t),
+                     postInfo->ackSize);
+
+              int postMsgType, myPe, otherPe;
+              if(CMI_MSGTYPE(msg) == POST_DIRECT_RECV) {
+                // Direct Buffer Target, post MPI_Irecv
+                postMsgType = ONESIDED_BUFFER_DIRECT_RECV;
+                myPe = postInfo->tgtPe;
+                otherPe = postInfo->srcPe;
+              }
+              else {
+                // Direct Buffer Source, post MPI_Isend
+                postMsgType = ONESIDED_BUFFER_DIRECT_SEND;
+                myPe = postInfo->srcPe;
+                otherPe = postInfo->tgtPe;
+              }
+
+              ackNew->pe = myPe;
+              MPIPostOneBuffer(postInfo->buffer,
+                               (void *)ackNew,
+                               postInfo->size,
+                               otherPe,
+                               postInfo->tag,
+                               postMsgType);
+
+            } else {
+              CmiAbort("Invalid Type of message\n");
+            }
         }
         
 #if CAPTURE_MSG_HISTOGRAM || MPI_DYNAMIC_POST_RECV
@@ -897,12 +956,12 @@ static int PumpMsgs(void) {
 #elif CMI_DYNAMIC_EXERT_CAP
         recvCnt++;
 #if CMK_SMP
-        /* check sendMsgBuf to get the  number of messages that have not been sent
+        /* check postMsgBuf to get the  number of messages that have not been sent
              * which is only available in SMP mode
          * MsgQueueLen indicates the number of messages that have not been released
              * by MPI
              */
-        if (PCQueueLength(sendMsgBuf) > CMI_DYNAMIC_OUTGOING_THRESHOLD
+        if (PCQueueLength(postMsgBuf) > CMI_DYNAMIC_OUTGOING_THRESHOLD
                 || CpvAccess(MsgQueueLen) > CMI_DYNAMIC_OUTGOING_THRESHOLD) {
             dynamicRecvCap = CMI_DYNAMIC_RECV_CAPSIZE;
         }
@@ -1018,19 +1077,25 @@ static int SendMsgBuf() {
     MACHSTATE(2,"SendMsgBuf begin {");
 #if MULTI_SENDQUEUE
     for (i=0; i<_Cmi_mynodesize+1; i++) { /* subtle: including comm thread */
-        if (!PCQueueEmpty(procState[i].sendMsgBuf)) {
-            msg_tmp = (SMSG_LIST *)PCQueuePop(procState[i].sendMsgBuf);
+        if (!PCQueueEmpty(procState[i].postMsgBuf)) {
+            msg_tmp = (SMSG_LIST *)PCQueuePop(procState[i].postMsgBuf);
 #else
     /* single message sending queue */
-    /* CmiLock(sendMsgBufLock); */
-    msg_tmp = (SMSG_LIST *)PCQueuePop(sendMsgBuf);
-    /* CmiUnlock(sendMsgBufLock); */
+    /* CmiLock(postMsgBufLock); */
+    msg_tmp = (SMSG_LIST *)PCQueuePop(postMsgBuf);
+    /* CmiUnlock(postMsgBufLock); */
     while (NULL != msg_tmp) {
 #endif
 
 #if CMK_ONESIDED_IMPL
-            if(msg_tmp->rdmaOpInfo !=NULL)
-                MPISendOneRdmaBuffer(msg_tmp);
+            if(msg_tmp->type == ONESIDED_BUFFER) {
+                CmiMPIRzvRdmaOpInfo_t *rdmaOpInfo = (CmiMPIRzvRdmaOpInfo_t *)(msg_tmp->ref);
+                MPISendOrRecvOneBuffer(msg_tmp, rdmaOpInfo->tag);
+            }
+            else if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_RECV || msg_tmp->type == ONESIDED_BUFFER_DIRECT_SEND) {
+                CmiMPIRzvRdmaAckInfo_t *ack = (CmiMPIRzvRdmaAckInfo_t *)(msg_tmp->ref);
+                MPISendOrRecvOneBuffer(msg_tmp, ack->tag);
+            }
             else
 #endif
             {
@@ -1047,9 +1112,9 @@ static int SendMsgBuf() {
 #endif
 
 #if ! MULTI_SENDQUEUE
-            /* CmiLock(sendMsgBufLock); */
-            msg_tmp = (SMSG_LIST *)PCQueuePop(sendMsgBuf);
-            /* CmiUnlock(sendMsgBufLock); */
+            /* CmiLock(postMsgBufLock); */
+            msg_tmp = (SMSG_LIST *)PCQueuePop(postMsgBuf);
+            /* CmiUnlock(postMsgBufLock); */
 #endif
         }
 #if MULTI_SENDQUEUE
@@ -1063,9 +1128,9 @@ static int MsgQueueEmpty() {
     int i;
 #if MULTI_SENDQUEUE
     for (i=0; i<_Cmi_mynodesize; i++)
-        if (!PCQueueEmpty(procState[i].sendMsgBuf)) return 0;
+        if (!PCQueueEmpty(procState[i].postMsgBuf)) return 0;
 #else
-    return PCQueueEmpty(sendMsgBuf);
+    return PCQueueEmpty(postMsgBuf);
 #endif
     return 1;
 }
@@ -1103,7 +1168,7 @@ void LrtsAdvanceCommunication(int whenidle) {
     t2 = CmiWallTimer();
 #endif
 
-    ReleaseSentMessages();
+    ReleasePostedMessages();
 #if REPORT_COMM_METRICS
     t3 = CmiWallTimer();
 #endif
@@ -1118,7 +1183,7 @@ void LrtsAdvanceCommunication(int whenidle) {
 #endif
 
 #else /* non-SMP case */
-    ReleaseSentMessages();
+    ReleasePostedMessages();
 
 #if REPORT_COMM_METRICS
     t2 = CmiWallTimer();
@@ -1148,7 +1213,7 @@ void LrtsPostNonLocal() {
      */
 #if 0
     if (!msg) {
-        ReleaseSentMessages();
+        ReleasePostedMessages();
         if (PumpMsgs())
             return  PCQueuePop(cs->recv);
         else
@@ -1157,7 +1222,7 @@ void LrtsPostNonLocal() {
 #endif
 #else
   if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV) {
-        ReleaseSentMessages();       
+        ReleasePostedMessages();       
         /* ??? SendMsgBuf is a not a thread-safe function. If it is put
          * here and this function will be called in CmiNotifyStillIdle,
          * then a data-race problem occurs */
@@ -1168,7 +1233,7 @@ void LrtsPostNonLocal() {
 
 /* Idle-state related functions: called in non-smp mode */
 void CmiNotifyIdleForMPI(void) {
-    ReleaseSentMessages();
+    ReleasePostedMessages();
     if (!PumpMsgs() && idleblock) PumpMsgsBlocking();
 }
 
@@ -1195,18 +1260,18 @@ void LrtsDrainResources() {
 #if !CMK_SMP
     while (!CheckAllAsyncMsgsSent()) {
         PumpMsgs();
-        ReleaseSentMessages();
+        ReleasePostedMessages();
     }
 #else
     if(Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV){
         while (!MsgQueueEmpty() || !CheckAllAsyncMsgsSent()) {
-	    ReleaseSentMessages();
+	    ReleasePostedMessages();
             SendMsgBuf();
             PumpMsgs();
         }
     }else if(Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV) {
         while(!CheckAllAsyncMsgsSent()) {
-            ReleaseSentMessages();
+            ReleasePostedMessages();
         }
     }
 #endif
@@ -1616,14 +1681,14 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     procState = (ProcState *)malloc((_Cmi_mynodesize+1) * sizeof(ProcState));
     for (i=0; i<_Cmi_mynodesize+1; i++) {
 #if MULTI_SENDQUEUE
-        procState[i].sendMsgBuf = PCQueueCreate();
+        procState[i].postMsgBuf = PCQueueCreate();
 #endif
         procState[i].recvLock = CmiCreateLock();
     }
 #if CMK_SMP
 #if !MULTI_SENDQUEUE
-    sendMsgBuf = PCQueueCreate();
-    sendMsgBufLock = CmiCreateLock();
+    postMsgBuf = PCQueueCreate();
+    postMsgBufLock = CmiCreateLock();
 #endif
 
 #if CMK_ONESIDED_IMPL && CMK_SMP
@@ -2017,7 +2082,7 @@ void CkDieNow()
       /* release old messages */
     while (!CheckAllAsyncMsgsSent()) {
         PumpMsgs();
-        ReleaseSentMessages();
+        ReleasePostedMessages();
     }
     MPI_Barrier(charmComm);
  //   MPI_Barrier(charmComm);

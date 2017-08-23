@@ -51,3 +51,9 @@
 #define CMK_HAS_SIZE_IN_MSGHDR                             1
 
 #define CMK_USE_COMMON_LOCK                                1
+
+#define CMK_ONESIDED_DIRECT_IMPL                           1
+
+#define CMK_NOCOPY_SRC_BYTES                               16
+
+#define CMK_NOCOPY_TGT_BYTES                               16

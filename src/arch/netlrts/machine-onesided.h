@@ -59,5 +59,4 @@ int LrtsGetRdmaRecvInfoSize(int numOps) {
 void LrtsIssueRgets(void *recv, int pe) {
   CmiAbort("Should never reach here!");
 }
-
 #endif /* NETLRTS_MACHINE_ONESIDED_H */

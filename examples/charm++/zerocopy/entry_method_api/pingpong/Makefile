@@ -1,5 +1,5 @@
--include ../../../common.mk
-CHARMC=../../../../bin/charmc $(OPTS)
+-include ../../../../common.mk
+CHARMC=../../../../../bin/charmc $(OPTS)
 
 all:	pgm
 

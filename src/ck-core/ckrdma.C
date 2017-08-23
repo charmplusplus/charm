@@ -5,12 +5,12 @@
 #include "charm++.h"
 #include "converse.h"
 
-#if CMK_ONESIDED_IMPL
 
 #if CMK_SMP && CMK_IMMEDIATE_MSG
 /*readonly*/ extern CProxy_ckcallback_group _ckcallbackgroup;
 #endif
 
+#if CMK_ONESIDED_IMPL
 /* Sender Functions */
 
 /*
@@ -315,3 +315,103 @@ int getRdmaBufSize(envelope *env){
 }
 
 #endif
+/* End of CMK_ONESIDED_IMPL */
+
+/* Support for Direct Nocopy API */
+
+// Ack handler function which invokes the callback
+void CkRdmaAckHandler(void *cbPtr, int pe, const void *ptr) {
+  CkCallback *cb = (CkCallback *)cbPtr;
+
+#if CMK_SMP && CMK_IMMEDIATE_MSG
+  //call to callbackgroup to call the callback when calling from comm thread
+  //this adds one more trip through the scheduler
+  _ckcallbackgroup[pe].call(*cb, sizeof(void *), (char*)&ptr);
+#else
+  //Invoke the target callback
+  cb->send(sizeof(void *), (char *)&ptr);
+#endif
+}
+
+// Perform a nocopy put operation into the passed target using this source
+void CkNcpySource::rput(CkNcpyTarget target){
+  // Check that the count for both the counters matches
+  CkAssert(cnt == target.cnt);
+
+  // Check that this object is local when CkRput is called
+  CkAssert(CkNodeOf(pe) == CkMyNode());
+
+  if(CmiNodeOf(target.pe) == CkMyNode()) {
+    // memcpy the data from the source buffer into the target buffer
+    memcpy((void *)target.ptr, ptr, cnt);
+
+    //Invoke the source callback
+    cb.send(sizeof(void *), &ptr);
+
+    //Invoke the target callback
+    target.cb.send(sizeof(void *), &target.ptr);
+
+  } else {
+
+    // Issue the Rput call
+    CmiIssueRput(target.ptr,
+                 &target.layerInfo,
+                 &target.cb,
+                 sizeof(CkCallback),
+                 target.pe,
+                 ptr,
+                 &layerInfo,
+                 &cb,
+                 sizeof(CkCallback),
+                 CkMyPe(),
+                 cnt);
+  }
+}
+
+// Release the registered resources for this source object
+void CkNcpySource::releaseResource(){
+  CmiReleaseSourceResource(&layerInfo, pe);
+}
+
+// Perform a nocopy get operation into this target using the passed source
+void CkNcpyTarget::rget(CkNcpySource source){
+
+  // Check that the count for both the counters matches
+  CkAssert(source.cnt == cnt);
+
+  // Check that this object is local when CkRget is called
+  CkAssert(CkNodeOf(pe) == CkMyNode());
+
+  //Check if it is a within-process sending
+  if(CmiNodeOf(source.pe) == CkMyNode()) {
+
+    // memcpy the data from the source buffer into the target buffer
+    memcpy((void *)ptr, source.ptr, cnt);
+
+    //Invoke the receiver's callback
+    cb.send(sizeof(void *), &ptr);
+
+    //Invoke the sender's callback
+    source.cb.send(sizeof(void *), &source.ptr);
+
+  } else {
+
+    // Issue the Rget call
+    CmiIssueRget(source.ptr,
+                 &source.layerInfo,
+                 &source.cb,
+                 sizeof(CkCallback),
+                 source.pe,
+                 ptr,
+                 &layerInfo,
+                 &cb,
+                 sizeof(CkCallback),
+                 CkMyPe(),
+                 cnt);
+  }
+}
+
+// Release the registered resources for this target object
+void CkNcpyTarget::releaseResource(){
+  CmiReleaseTargetResource(&layerInfo, pe);
+}

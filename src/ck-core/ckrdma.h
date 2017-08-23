@@ -70,5 +70,92 @@ int getRdmaNumOps(envelope *env);
 //Get the sum of rdma buffer sizes using the metadata message
 int getRdmaBufSize(envelope *env);
 
+
+#endif /* End of CMK_ONESIDED_IMPL */
+
+
+/* Support for Nocopy Direct API */
+
+/* Use 0 sized headers for generic Direct API implementation */
+#ifndef CMK_NOCOPY_SRC_BYTES
+#define CMK_NOCOPY_SRC_BYTES 0
 #endif
+
+#ifndef CMK_NOCOPY_TGT_BYTES
+#define CMK_NOCOPY_TGT_BYTES 0
+#endif
+
+// Ack handler function which invokes the callbacks on the source and target PEs
+void CkRdmaAckHandler(void *cookie);
+void CkRdmaAckHandler(void *cbPtr, int pe, const void *ptr);
+
+class CkNcpyTarget;
+
+// Class to represent an RDMA source
+class CkNcpySource{
+  public:
+  // pointer to the source buffer
+  const void *ptr;
+
+  // number of bytes
+  size_t cnt;
+
+  // callback to be invoked on the sender
+  CkCallback cb;
+
+  // home pe
+  int pe;
+
+  // machine specific information about the source pointer
+  char layerInfo[CMK_NOCOPY_SRC_BYTES];
+
+  CkNcpySource() : ptr(NULL), pe(-1) {}
+
+  CkNcpySource(const void *ptr_, size_t cnt_, CkCallback cb_) : ptr(ptr_), cnt(cnt_), cb(cb_){
+    pe = CkMyPe();
+    // set the source pointer layerInfo
+    CmiSetRdmaSrcInfo(&layerInfo, ptr, cnt);
+  }
+
+  void rput(CkNcpyTarget target);
+
+  void releaseResource();
+};
+PUPbytes(CkNcpySource);
+
+// Class to represent an RDMA target
+class CkNcpyTarget{
+  public:
+  // pointer to the target buffer
+  const void *ptr;
+
+  // number of bytes
+  size_t cnt;
+
+  // callback to be invoked on the receiver
+  CkCallback cb;
+
+  // home pe
+  int pe;
+
+  // machine specific information about the target pointer
+  char layerInfo[CMK_NOCOPY_TGT_BYTES];
+
+  CkNcpyTarget() : ptr(NULL), pe(-1) {}
+
+  CkNcpyTarget(const void *ptr_, size_t cnt_, CkCallback cb_) : ptr(ptr_), cnt(cnt_), cb(cb_) {
+    pe = CkMyPe();
+
+    // set the target pointer layerInfo
+    CmiSetRdmaTgtInfo(&layerInfo, ptr, cnt);
+  }
+
+  void rget(CkNcpySource source);
+
+  void releaseResource();
+};
+PUPbytes(CkNcpyTarget);
+
+
+
 #endif

@@ -368,6 +368,10 @@ static int LOCAL_QUEUE_ENTRIES=20480;
 #define RDMA_PUT_MD_TAG         0x37
 #define RDMA_PUT_DONE_TAG       0x38
 
+#define RDMA_PUT_MD_DIRECT_TAG  0x39
+#define RDMA_PUT_DONE_DIRECT_TAG 0x40
+#define RDMA_DEREG_DIRECT_TAG    0x41
+
 #define DEBUG
 #ifdef GNI_RC_CHECK
 #undef GNI_RC_CHECK
@@ -2323,6 +2327,29 @@ static void PumpNetworkSmsg()
                 LrtsIssueRputs((void *)newRecvInfo, recvInfo->destNode);
                 break;
             }
+            case RDMA_PUT_MD_DIRECT_TAG:
+            {
+                // Direct API when PUT is used instead of a GET
+                // This tag implies the receival of a PUT metadata used for the Direct API
+                CmiGNIRzvRdmaPutOp_t *putOp = (CmiGNIRzvRdmaPutOp_t *)header;
+                CmiGNIRzvRdmaPutOp_t *newPutOp = (CmiGNIRzvRdmaPutOp_t *)malloc(sizeof(CmiGNIRzvRdmaPutOp_t));
+                memcpy(newPutOp, putOp, sizeof(CmiGNIRzvRdmaPutOp_t));
+                GNI_SmsgRelease(ep_hndl_array[inst_id]);
+                CMI_GNI_UNLOCK(smsg_mailbox_lock)
+
+                // Issue PUT
+                status = post_rdma(
+                         newPutOp->tgt_addr,
+                         newPutOp->tgt_mem_hndl,
+                         newPutOp->src_addr,
+                         newPutOp->src_mem_hndl,
+                         newPutOp->size,
+                         (uint64_t)newPutOp,
+                         CmiNodeOf(newPutOp->destPe),
+                         GNI_POST_RDMA_PUT,
+                         DIRECT_SEND_RECV_UNALIGNED);
+                 break;
+            }
             case RDMA_PUT_DONE_TAG:
             {
                 CmiGNIRzvRdmaRecv_t *recvInfo = (CmiGNIRzvRdmaRecv_t *)header;
@@ -2350,6 +2377,30 @@ static void PumpNetworkSmsg()
                 }
                 // free newRecvInfo as it is no longer used
                 free(newRecvInfo);
+                break;
+            }
+            case RDMA_PUT_DONE_DIRECT_TAG:
+            {
+                // Direct API when PUT is used instead of a GET
+                // This tag implies the completion of an indirect PUT operation used for the Direct API
+                CmiGNIRzvRdmaPutOp_t *putOp = (CmiGNIRzvRdmaPutOp_t *)header;
+                void *token = (void *)putOp->ref;
+                GNI_SmsgRelease(ep_hndl_array[inst_id]);
+                CMI_GNI_UNLOCK(smsg_mailbox_lock)
+
+                // Invoke the ack handler function
+                CmiInvokeNcpyAck(token);
+                break;
+            }
+            case RDMA_DEREG_DIRECT_TAG:
+            {
+                // Direct API
+                // This tag implies a request to free the memory handle local to this node
+                gni_mem_handle_t *memhndl = (gni_mem_handle_t *)header;
+                status = GNI_MemDeregister(nic_hndl, memhndl);
+                GNI_RC_CHECK("GNI_MemDeregister Failed!", status);
+                GNI_SmsgRelease(ep_hndl_array[inst_id]);
+                CMI_GNI_UNLOCK(smsg_mailbox_lock)
                 break;
             }
 #endif

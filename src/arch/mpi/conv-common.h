@@ -15,9 +15,9 @@
 #define CMK_HANDLE_SIGUSR                                  1
 
 #if CMK_ERROR_CHECKING
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, stratid, redID; CmiInt4 root; unsigned char cksum, magic;
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, stratid, redID; CmiInt4 root; unsigned char cksum, magic, msgType;
 #else
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, stratid, redID; CmiInt4 root; 
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, stratid, redID; CmiInt4 root; unsigned char msgType;
 #endif
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT    { CMK_MSG_HEADER_EXT_ }
@@ -52,3 +52,9 @@
 #define CMK_USE_COMMON_LOCK                                1
 
 #define CMK_ONESIDED_IMPL                                  1
+
+#define CMK_ONESIDED_DIRECT_IMPL                           1
+
+#define CMK_NOCOPY_SRC_BYTES                               0
+
+#define CMK_NOCOPY_TGT_BYTES                               0
