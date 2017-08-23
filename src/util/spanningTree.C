@@ -103,9 +103,9 @@ int ST_RecursivePartition<Iterator>::buildSpanningTree(Iterator start, Iterator 
 #endif
 
   // group nodes into phynodes
-  std::vector<ST_RecursivePartition<Iterator>::PhyNode> phynodes;
+  std::vector<typename ST_RecursivePartition<Iterator>::PhyNode> phynodes;
   initPhyNodes(start, end, phynodes);
-  std::vector<ST_RecursivePartition<Iterator>::PhyNode*> pphynodes(phynodes.size());
+  std::vector<typename ST_RecursivePartition<Iterator>::PhyNode*> pphynodes(phynodes.size());
   for (int i=0; i < phynodes.size(); i++) pphynodes[i] = &phynodes[i];
 
   // build the spanning tree of physical nodes
@@ -229,7 +229,7 @@ void ST_RecursivePartition<Iterator>::build(std::vector<PhyNode*> &phyNodes,
                                             Iterator start,
                                             unsigned int maxBranches)
 {
-  ST_RecursivePartition<Iterator>::PhyNode *rootPhyNode = phyNodes[0];
+  typename ST_RecursivePartition<Iterator>::PhyNode *rootPhyNode = phyNodes[0];
   children.reserve(rootPhyNode->size() + maxBranches); // reserve for max number of children
 
   Iterator pos = start+1;
@@ -337,7 +337,7 @@ void ST_RecursivePartition<Iterator>::bisect(std::vector<PhyNode*> &nodes,
     int maxSpreadDim = maxSpreadDimension(nodes,start,end);
     // Bisect the vertex list at the median element
     typename std::vector<PhyNode*>::iterator itr = nodes.begin();
-    std::nth_element(itr+start, itr+median, itr+end, ST_RecursivePartition::PhyNodeCompare(maxSpreadDim));
+    std::nth_element(itr+start, itr+median, itr+end, typename ST_RecursivePartition::PhyNodeCompare(maxSpreadDim));
 #if _DEBUG_SPANNING_TREE_
     CkPrintf("Bisecting, maxSpreadDim=%d\n", maxSpreadDim);
 #endif
@@ -360,8 +360,8 @@ void ST_RecursivePartition<Iterator>::trisect(std::vector<PhyNode*> &nodes,
   if (tmgr->haveTopologyInfo()) {
     int maxSpreadDim = maxSpreadDimension(nodes,start,end);
     typename std::vector<PhyNode*>::iterator itr = nodes.begin();
-    std::nth_element(itr+start,    itr+oneThird, itr+end, ST_RecursivePartition::PhyNodeCompare(maxSpreadDim));
-    std::nth_element(itr+oneThird, itr+twoThird, itr+end, ST_RecursivePartition::PhyNodeCompare(maxSpreadDim));
+    std::nth_element(itr+start,    itr+oneThird, itr+end, typename ST_RecursivePartition::PhyNodeCompare(maxSpreadDim));
+    std::nth_element(itr+oneThird, itr+twoThird, itr+end, typename ST_RecursivePartition::PhyNodeCompare(maxSpreadDim));
 #if _DEBUG_SPANNING_TREE_
     CkPrintf("Trisecting, maxSpreadDim=%d\n", maxSpreadDim);
 #endif
