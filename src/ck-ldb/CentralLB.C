@@ -76,7 +76,7 @@ void CentralLB::staticStartLB(void* data)
 void CentralLB::staticMigrated(void* data, LDObjHandle h, int waitBarrier)
 {
   CentralLB *me = (CentralLB*)(data);
-  me->Migrated(h, waitBarrier);
+  me->Migrated(waitBarrier);
 }
 
 void CentralLB::staticAtSync(void* data)
@@ -443,7 +443,7 @@ void CentralLB::SendStats()
 extern int donotCountMigration;
 #endif
 
-void CentralLB::Migrated(LDObjHandle h, int waitBarrier)
+void CentralLB::Migrated(int waitBarrier)
 {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     if(donotCountMigration){
@@ -471,8 +471,7 @@ void CentralLB::Migrated(LDObjHandle h, int waitBarrier)
 
 void CentralLB::MissMigrate(int waitForBarrier)
 {
-  LDObjHandle h;
-  Migrated(h, waitForBarrier);
+  Migrated(waitForBarrier);
 }
 
 // build a complete data from bufferred messages
