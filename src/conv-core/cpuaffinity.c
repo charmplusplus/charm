@@ -249,7 +249,7 @@ int CmiSetCPUAffinity(int mycore)
 /* CPU affinity mask buffer instead, as the present code will fail beyond 32 CPUs */
 int print_cpu_affinity(void) {
 #ifdef _WIN32
-  unsigned long pMask, sMask;
+  DWORD_PTR pMask, sMask;
   HANDLE hProcess = GetCurrentProcess();
   if(GetProcessAffinityMask(hProcess, &pMask, &sMask)){
 	perror("On Windows: GetProcessAffinityMask");

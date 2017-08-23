@@ -437,9 +437,9 @@ static CMK_TYPEDEF_UINT8 MemusageWindows(void){
 #if CMK_BLUEGENEQ
 #include <spi/include/kernel/memory.h>
 INLINE static CMK_TYPEDEF_UINT8 MemusageBGQ(void){
-  CMK_TYPEDEF_UINT8 heapUsed;
+  uint64_t heapUsed;
   Kernel_GetMemorySize(KERNEL_MEMSIZE_HEAP, &heapUsed);
-  return heapUsed;
+  return (CMK_TYPEDEF_UINT8)heapUsed;
 }
 #else
 static CMK_TYPEDEF_UINT8 MemusageBGQ(void){

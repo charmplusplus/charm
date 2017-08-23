@@ -1314,7 +1314,7 @@ double CmiInitTime(void)
 
 void CmiTimerInit(char **argv)
 {
-	struct _timeb tv;
+	struct timeb tv;
 	clock_t       ru;
 
 	CpvInitialize(double, inittime_wallclock);
@@ -1338,7 +1338,7 @@ double CmiCpuTimer(void)
 
 double CmiWallTimer(void)
 {
-	struct _timeb tv;
+	struct timeb tv;
 	double currenttime;
 
 	ftime(&tv);
