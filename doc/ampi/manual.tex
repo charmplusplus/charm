@@ -1234,6 +1234,526 @@ command line, it promptly passes it to all the individual compilers and linkers
 it invokes to compile the program. See the appendix for more details on
 building and running AMPI programs.
 
+\subsection{AMPI Example Applications}
+\label{adaptive-mpi-ampi-codes}
+
+This section contains a list of applications that have
+been written or adapted to work with AMPI.
+Most applications are available on git:\\ \texttt{git clone ssh://charm.cs.illinois.edu:9418/benchmarks/ampi-benchmarks}.
+
+Most benchmarks can be compiled with the provided top-level Makefile:
+
+\begin{alltt}
+	> git clone ssh://charm.cs.illinois.edu:9418/benchmarks/ampi-benchmarks
+	> cd ampi-benchmarks
+	> make -f Makefile.ampi
+\end{alltt}
+
+\subsubsection{Mantevo project v3.0}
+
+Set of mini-apps from the Mantevo project. Download at \url{https://mantevo.org/download/}.
+
+\paragraph{MiniFE}
+    \begin{itemize}
+    \item
+      Mantevo mini-app for unstructured implicit Finite Element
+      computations.
+    \item
+      No changes necessary to source to run on AMPI. Modify
+      file \texttt{makefile.ampi} and change variable \texttt{AMPIDIR} to point to
+      your Charm++ directory, execute \texttt{make -f makefile.ampi} to
+      build the program.
+    \item
+      Refer to the \texttt{README} file on how to run the program. For
+      example: \texttt{./charmrun +p4 ./miniFE.x nx=30 ny=30 nz=30 +vp32}
+    \end{itemize}
+
+\paragraph{MiniMD v2.0}
+    \begin{itemize}
+    \item
+      Mantevo mini-app for particle interaction in a Lennard-Jones
+      system, as in the LAMMPS MD
+      code.
+    \item
+      No changes necessary to source code. Modify file
+      \texttt{Makefile.ampi} and change variable \texttt{AMPIDIR} to point to your
+      Charm++ directory, execute \texttt{make ampi} to build the program.
+    \item
+      Refer to the \texttt{README} file on how to run the program. For
+      example: \texttt{./charmrun +p4 ./miniMD\_ampi +vp32}
+    \end{itemize}
+
+\paragraph{CoMD v1.1}
+    \begin{itemize}
+    \item
+      Mantevo mini-app for molecular dynamics
+      codes: \url{https://github.com/exmatex/CoMD}
+    \item
+      To AMPI-ize it, we had to remove calls to not thread-safe \texttt{getopt()}.
+      Support for dynamic load balancing has been added in the main
+      loop and the command line options. It will run on all platforms.
+    \item
+      Just update the Makefile to point to AMPI compilers and run with the provided
+      run scripts.
+    \end{itemize}
+
+\paragraph{MiniXYCE v1.0}
+    \begin{itemize}
+    \item
+      Mantevo mini-app for discrete analog circuit simulation, version
+      1.0, with serial, MPI, OpenMP, and MPI+OpenMP versions.
+    \item
+      No changes besides Makefile necessary to run with virtualization.
+      To build, do \texttt{cp common/generate\_info\_header miniXyce\_ref/.},
+      modify the CC path in \texttt{miniXyce\_ref/} and run \texttt{make}. Run scripts are
+      in \texttt{test/}.
+    \item
+      Example run command: \texttt{./charmrun +p3 ./miniXyce.x +vp3 --circuit
+      ../tests/cir1.net --t\_start 1e-6 --pf params.txt}
+    \end{itemize}
+
+\paragraph{HPCCG v1.0}
+    \begin{itemize}
+    \item
+      Mantevo mini-app for sparse iterative solves using the Conjugate
+      Gradient method for a problem similar to that of MiniFE.
+    \item
+      No changes necessary except to set compilers in \texttt{Makefile} to the AMPI
+      compilers.
+    \item
+      Run with a command such as: \texttt{./charmrun +p2 ./test\_HPCCG 20 30 10
+      +vp16}
+    \end{itemize}
+
+\paragraph{MiniAMR v1.0}
+    \begin{itemize}
+    \item
+      miniAMR applies a stencil calculation on a unit cube computational
+      domain, which is refined over time.
+    \item
+      No changes if using swap-globals. Explicitly extern global
+      variables if using TLS.
+    \end{itemize}
+
+\paragraph{Not yet AMPI-zed (reason):} MiniAero v1.0 (build issues),
+    MiniGhost v1.0.1 (globals), MiniSMAC2D v2.0 (globals), TeaLeaf
+    v1.0 (globals), CloverLeaf v1.1 (globals), CloverLeaf3D v1.0
+    (globals).
+
+
+\subsubsection{LLNL ASC Proxy Apps}
+
+\paragraph{LULESH v2.0}
+    \begin{itemize}
+    \item
+      LLNL Unstructured Lagrangian-Eulerian Shock Hydrodynamics proxy
+      app: \url{https://codesign.llnl.gov/lulesh.php}
+    \item
+      Charm++, MPI, MPI+OpenMP, Liszt, Loci, Chapel versions all exist
+      for comparison.
+    \item
+      Manually privatized version of LULESH 2.0, plus a version with PUP
+      routines in subdirectory \texttt{pup\_lulesh202/}.
+    \end{itemize}
+
+\paragraph{AMG 2013}
+    \begin{itemize}
+    \item
+      LLNL ASC proxy app: Algebraic Multi-Grid solver for linear systems
+      arising from unstructured
+      meshes: \url{https://codesign.llnl.gov/amg2013.php}
+    \item
+      AMG is based on HYPRE, both from LLNL. The only change necessary
+      to get AMG running on AMPI with virtualization is
+      to remove calls to HYPRE's timing interface, which is not
+      thread-safe.
+    \item
+      To build, point the CC variable in Makefile.include to your AMPI
+      CC wrapper script and \texttt{make}. Executable is \texttt{test/amg2013}.
+    \end{itemize}
+
+\paragraph{Lassen v1.0}
+    \begin{itemize}
+    \item
+      LLNL ASC mini-app for wave-tracking applications with dynamic load
+      imbalance. Reference versions are serial, MPI, Charm++, and
+      MPI/Charm++ interop: \url{https://codesign.llnl.gov/lassen.php}
+    \item
+      No changes necessary to enable AMPI virtualization. Requires some
+      C++11 support. Set \texttt{AMPIDIR} in Makefile and \texttt{make}. Run with:
+      \texttt{./charmrun +p4 ./lassen\_mpi +vp8 default 2 2 2 50 50 50}
+    \end{itemize}
+
+\paragraph{Kripke v1.1}
+    \begin{itemize}
+    \item
+      LLNL ASC proxy app for ARDRA, a full Sn deterministic particle
+      transport application: \url{https://codesign.llnl.gov/kripke.php}
+    \item
+      Charm++, MPI, MPI+OpenMP, MPI+RAJA, MPI+CUDA, MPI+OCCA versions
+      exist for comparison.
+    \item
+      Kripke requires no changes between MPI and AMPI since it has no
+      global/static variables. It uses
+      cmake so edit the cmake toolchain files in \texttt{cmake/toolchain/} to
+      point to the AMPI compilers, and build in a build directory:
+\begin{alltt}
+> mkdir build; cd build;
+> cmake .. -DCMAKE_TOOLCHAIN\_FILE=../cmake/Toolchain/linux-gcc-ampi.cmake
+-DENABLE_OPENMP=OFF
+> make
+\end{alltt}
+Run with:
+\begin{alltt}
+> ./charmrun +p8 ./src/tools/kripke +vp8 --zones 64,64,64 --procs 2,2,2 --nest ZDG
+\end{alltt}
+    \end{itemize}
+
+\paragraph{MCB v1.0.3 (2013)}
+    \begin{itemize}
+    \item
+      LLNL ASC proxy app for Monte Carlo particle transport
+      codes: \url{https://codesign.llnl.gov/mcb.php}
+    \item
+      MPI+OpenMP reference version.
+    \item
+      Run with:
+\begin{alltt}
+> OMP_NUM_THREADS=1 ./charmrun +p4 ./../src/MCBenchmark.exe --weakScaling
+ --distributedSource --nCores=1 --numParticles=20000 --multiSigma --nThreadCore=1 +vp16
+\end{alltt}
+
+  \end{itemize}
+
+\paragraph{Not yet AMPI-zed (reason)}: UMT 2013 (global variables).
+
+\subsubsection{Other Applications}
+
+\paragraph{MILC 7.0}
+    \begin{itemize}
+    \item
+      MILC is a code to
+      study quantum chromodynamics (QCD) physics. \url{http://www.nersc.gov/users/computational-systems/cori/nersc-8-procurement/trinity-nersc-8-rfp/nersc-8-trinity-benchmarks/milc/}
+    \item
+      Moved \texttt{MPI\_Init\_thread} call to \texttt{main()}, added \texttt{\_\_thread} to all
+      global/static variable declarations. Runs on AMPI with
+      virtualization when using -tlsglobals.
+    \item
+      Build: edit \texttt{ks\_imp\_ds/Makefile} to use AMPI compiler wrappers,
+      run \texttt{make su3\_rmd} in \texttt{ks\_imp\_ds/}
+    \item
+      Run with: \texttt{./su3\_rmd +vp8
+      ../benchmark\_n8/single\_node/n8\_single.in}
+    \end{itemize}
+
+\paragraph{SNAP v1.01 (C version)}
+    \begin{itemize}
+    \item
+      LANL proxy app for PARTISN, an Sn deterministic particle transport
+      application: \url{https://github.com/losalamos/SNAP}
+    \item
+      SNAP is an update to Sweep3D. It simulates the same thing as
+      Kripke, but with a different decomposition and slight algorithmic
+      differences. It uses a 1- or 2-dimensional decomposition and the
+      KBA algorithm to perform parallel sweeps over the 3-dimensional
+      problem space. It contains all of the memory, computation, and
+      network performance characteristics of a real particle transport
+      code.
+    \item
+      Original SNAP code is Fortran90-MPI-OpenMP, but this is a
+      C-MPI-OpenMP version of it provided along with the original
+      version. The Fortran90 version will require global variable
+      privatization, while the C version works out of the box on all
+      platforms.
+    \item
+      Edit the Makefile for AMPI compiler paths and run with: \texttt{./charmrun
+      +p4 ./snap +vp4 -\/-fi center\_src/fin01 -\/-fo center\_src/fout01}
+    \end{itemize}
+
+\paragraph{Sweep3D}
+    \begin{itemize}
+    \item
+      Sweep3D is a \emph{particle transport} program that analyzes the
+      flux of particles along a space. It solves a three-dimensional
+      particle transport problem.
+    \item
+      This mini-app has been deprecated, and replaced at LANL by SNAP
+      (above).
+    \item
+      Build/Run Instructions:
+      \begin{itemize}
+      \item
+        Modify the \texttt{makefile} and change variable CHARMC to point
+        to your Charm++ compiler command, execute \texttt{make mpi} to
+        build the program.
+      \item
+        Modify file \texttt{input} to set the different parameters. Refer
+        to file \texttt{README} on how to change those parameters.
+        Run with: \texttt{./charmrun ./sweep3d.mpi +p8 +vp16}
+      \end{itemize}
+    \end{itemize}
+
+\paragraph{PENNANT v0.8}
+    \begin{itemize}
+    \item
+      Unstructured mesh Rad-Hydro mini-app for a full application at
+      LANL called FLAG. \url{https://github.com/losalamos/PENNANT}
+    \item
+      Written in C++, only global/static variables that need to be
+      privatized are mype and numpe. Done manually.
+    \item
+      Legion, Regent, MPI, MPI+OpenMP, MPI+CUDA versions of PENNANT
+      exist for comparison.
+    \item
+      For PENNANT-v0.8, point CC in Makefile to AMPICC and just 'make'.
+      Run with the provided input files, such as: \texttt{./charmrun +p2
+      ./build/pennant +vp8 test/noh/noh.pnt}
+    \end{itemize}
+
+
+\subsubsection{Benchmarks}
+
+\paragraph{Jacobi-2D (Fortran)}
+    \begin{itemize}
+    \item
+      Jacobi-2D with 1D decomposition. Problem size and number of
+      iterations are defined in the source code. Manually privatized.
+    \end{itemize}
+
+\paragraph{Jacobi-3D (C)}
+    \begin{itemize}
+    \item
+      Jacobi-3D with 3D decomposition. Manually privatized. Includes multiple versions: Isomalloc, PUP, FT, LB,
+      Isend/Irecv, Iput/Iget.
+    \end{itemize}
+
+\paragraph{NAS Parallel Benchmarks (NPB 3.3)}
+    \begin{itemize}
+    \item
+      A collection of kernels used in different scientific applications.
+      They are mainly implementations of various linear algebra
+      methods. \url{http://www.nas.nasa.gov/Resources/Software/npb.html}
+    \item
+      Build/Run Instructions:
+      \begin{itemize}
+      \item
+        Modify file \texttt{config/make.def} to make
+        variable \texttt{CHAMRDIR} point to the right Charm++ directory.
+      \item
+        Use \texttt{make \textless{}benchmark\textgreater{}
+        NPROCS=\textless{}P\textgreater{}
+        CLASS=\textless{}C\textgreater{}} to build a particular
+        benchmark. The values
+        for \texttt{\textless{}benchmark\textgreater{}} are (bt, cg, dt,
+        ep, ft, is, lu, mg, sp), \texttt{\textless{}P\textgreater{}} is
+        the number of ranks and \texttt{\textless{}C\textgreater{}} is the
+        class or the problem size (to be chosen from A,B,C,D or E). Some
+        benchmarks may have restrictions on values
+        of \texttt{\textless{}P\textgreater{}} and \texttt{\textless{}C\textgreater{}}.
+        For instance, to make CG benchmark with 256 ranks and class C,
+        we will use the following command: \texttt{make cg NPROCS=256}
+      \item
+        The resulting executable file will be generated in the
+        respective directory for the benchmark. In the previous example,
+        a file \emph{cg.256.C} will appear in the \emph{CG} and \texttt{bin/} directories.
+        To run the particular benchmark, you must follow the standard
+        procedure of running AMPI programs: \texttt{./charmrun ./cg.C.256 +p64
+        +vp256 ++nodelist nodelist +isomalloc\_sync}
+      \end{itemize}
+    \end{itemize}
+
+\paragraph{NAS PB Multi-Zone Version (NPB-MZ 3.3)}
+    \begin{itemize}
+    \item
+      A multi-zone version of BT, SP and LU NPB benchmarks. The
+      multi-zone intentionally divides the space unevenly among ranks
+      and causes load imbalance. The original goal of multi-zone
+      versions was to offer an test case for hybrid MPI+OpenMP
+      programming, where the load imbalance can be dealt with by
+      increasing the number of threads in those ranks with more
+      computation. \url{http://www.nas.nasa.gov/Resources/Software/npb.html}
+    \item
+      The BT-MZ program shows the heaviest load imbalance.
+    \item
+      Build/Run Instructions:
+      \begin{itemize}
+      \item
+        Modify file \texttt{config/make.def} to make
+        variable \texttt{CHAMRDIR} point to the right Charm++ build.
+      \item
+        Use the format \texttt{make \textless{}benchmark\textgreater{}
+        NPROCS=\textless{}P\textgreater{}
+        CLASS=\textless{}C\textgreater{}} to build a particular
+        benchmark. The values
+        for \texttt{\textless{}benchmark\textgreater{}} are (bt-mz, lu-mz,
+        sp-mz), \texttt{\textless{}P\textgreater{}} is the number of ranks
+        and \texttt{\textless{}C\textgreater{}} is the class or the
+        problem size (to be chosen from A,B,C,D or E). Some benchmarks
+        may have restrictions on values
+        of \texttt{\textless{}P\textgreater{}} and \texttt{\textless{}C\textgreater{}}.
+        For instance, to make the BT-MZ benchmark with 256 ranks and class
+        C, you can use the following command: \texttt{make bt-mz NPROCS=256
+        CLASS=C}
+      \item
+        The resulting executable file will be generated in
+        the \emph{bin/} directory. In the previous example, a
+        file \emph{bt-mz.256.C} will be created in the \texttt{bin} directory.
+        To run the particular benchmark, you must follow the standard
+        procedure of running AMPI programs: \texttt{./charmrun ./bt-mz.C.256
+        +p64 +vp256 ++nodelist nodelist +isomalloc\_sync}
+      \end{itemize}
+    \end{itemize}
+
+\paragraph{HPCG v3.0}
+    \begin{itemize}
+    \item
+      High Performance Conjugate Gradient benchmark, version 3.0.
+      Companion metric to Linpack, with many vendor-optimized
+      implementations available: \url{http://hpcg-benchmark.org/}
+    \item
+      No AMPI-ization needed. To build, modify \texttt{setup/Make.AMPI} for
+      compiler paths, do \texttt{mkdir build \&\& cd build \&\& configure
+      ../setup/Make.AMPI \&\& make}. To run, do \texttt{./charmrun +p16
+      ./bin/xhpcg +vp64}
+    \end{itemize}
+
+\paragraph{Intel Parallel Research Kernels (PRK) v2.16}
+    \begin{itemize}
+    \item
+      A variety of kernels (Branch, DGEMM, Nstream, Random, Reduce,
+      Sparse, Stencil, Synch\_global, Synch\_p2p, and Transpose)
+      implemented for a variety of runtimes (SERIAL, OpenMP, MPI-1,
+      MPI-RMA, MPI-SHM, MPI+OpenMP, SHMEM, FG\_MPI, UPC, Grappa,
+      Charm++, and AMPI). \url{https://github.com/ParRes/Kernels}
+    \item
+      For AMPI tests, set \texttt{CHARMTOP} and run: \texttt{make allampi}. There are
+      run scripts included.
+    \end{itemize}
+
+\paragraph{OSU Microbenchmarks}
+	MPI collectives performance testing suite. \url{https://charm.cs.illinois.edu/gerrit/\#/admin/projects/benchmarks/osu-collectives-benchmarking}
+    \begin{itemize}
+    \item
+       Build with:
+      \texttt{./configure CC=\textasciitilde{}/charm/bin/ampicc
+      \&\& make}
+    \end{itemize}
+
+\subsubsection{Third Party Open Source Libraries}
+
+\paragraph{HYPRE-2.11.1}
+
+    \begin{itemize}
+    \item
+      High Performance Preconditioners and solvers library from LLNL. \url{https://computation.llnl.gov/project/linear_solvers/software.php}
+    \item
+      Hypre-2.11.1 builds on top of AMPI using the configure
+      command:
+      \begin{alltt}
+> ./configure --with-MPI
+      CC=~/charm/bin/ampicc
+      CXX=~/charm/bin/ampicxx
+      F77=~/charm/bin/ampif77
+      --with-MPI-include=~/charm/include
+      --with-MPI-lib-dirs=~/charm/lib
+      --with-MPI-libs=mpi --without-timing --without-print-errors
+> make -j8
+      \end{alltt}
+    \item
+      All HYPRE tests and examples pass tests with virtualization,
+      migration, etc. except for those that use Hypre's timing
+      interface, which uses a global variable internally. So just remove
+      those calls and do not define \texttt{HYPRE\_TIMING} when compiling a code
+      that uses Hypre. In the examples directory, you'll have to set the
+      compilers to your AMPI compilers explicitly too. In the test
+      directory, you'll have to edit the Makefile to 1) Remove
+      \texttt{-DHYPRE\_TIMING} from both \texttt{CDEFS} and \texttt{CXXDEFS}, 2) Remove both
+      \texttt{\$\{MPILIBS\}} and \texttt{\$\{MPIFLAGS\}} from \texttt{MPILIBFLAGS}, and 3) Remove
+      \texttt{\$\{LIBS\}} from \texttt{LIBFLAGS}. Then run \texttt{make}.
+    \item
+      To run the \texttt{new\_ij} test, run: \texttt{./charmrun +p64 ./new\_ij -n 128 128
+      128 -P 4 4 4 -intertype 6 -tol 1e-8 -CF 0 -solver 61 -agg\_nl 1
+      27pt -Pmx 6 -ns 4 -mu 1 -hmis -rlx 13 +vp64}
+    \end{itemize}
+
+\paragraph{MFEM-3.2}
+    \begin{itemize}
+    \item
+      MFEM is a scalable library for Finite Element Methods developed at
+      LLNL. \url{http://mfem.org/}
+    \item
+      MFEM-3.2 builds on top of AMPI (and METIS-4.0.3 and
+      HYPRE-2.11.1). Download {MFEM}, \href{https://computation.llnl.gov/project/linear_solvers/software.php}{HYPRE},
+      and \href{http://glaros.dtc.umn.edu/gkhome/fsroot/sw/metis/OLD}{METIS}.
+      Untar all 3 in the same top-level directory.
+    \item
+      Build HYPRE-2.11.1 as described above.
+    \item
+      Build METIS-4.0.3 by doing \texttt{cd metis-4.0.3/ \&\& make}
+    \item
+      Build MFEM-3.2 serial first by doing \texttt{make serial}
+    \item
+      Build MFEM-3.2 parallel by doing:
+
+      \begin{itemize}
+      \item
+        First, comment out \texttt{\#define HYPRE\_TIMING} in
+        \texttt{mfem/linalg/hypre.hpp}. Also, you must add a \texttt{\#define
+        hypre\_clearTiming()} at the top of \texttt{linalg/hypre.cpp}, because
+        Hypre-2.11.1 has a bug where it doesn't provide a definition of
+        this function if you don't define \texttt{HYPRE\_TIMING}.
+      \item
+        \texttt{make parallel MFEM\_USE\_MPI=YES
+        MPICXX=\textasciitilde{}/charm/bin/ampicxx
+        HYPRE\_DIR=\textasciitilde{}/hypre-2.11.1/src/hypre
+        METIS\_DIR=\textasciitilde{}/metis-4.0.3}
+      \end{itemize}
+    \item
+      To run an example, do \texttt{./charmrun +p4 ./ex15p -m
+      ../data/amr-quad.mesh +vp16}. You may want to add the runtime
+      options \texttt{-no-vis} and \texttt{-no-visit} to speed things up.
+    \item
+      All example programs and miniapps pass with virtualization, and
+      migration if added.
+    \end{itemize}
+
+\paragraph{XBraid-1.1}
+    \begin{itemize}
+    \item
+      XBraid is a scalable library for parallel time integration using
+      MultiGrid, developed at LLNL. \url{https://computation.llnl.gov/project/parallel-time-integration/software.php}
+    \item
+      XBraid-1.1 builds on top of AMPI (and its examples/drivers build
+      on top of MFEM-3.2, HYPRE-2.11.1, and METIS-4.0.3 or
+      METIS-5.1.0).
+    \item
+      To build XBraid, modify the variables CC, MPICC, and MPICXX in
+      makefile.inc to point to your AMPI compilers, then do \texttt{make}.
+    \item
+      To build XBraid's examples/ and drivers/ modify the paths to MFEM
+      and HYPRE in their Makefiles and \texttt{make}.
+    \item
+      To run an example, do \texttt{./charmrun +p2 ./ex-02 -pgrid 1 1 8 -ml 15
+      -nt 128 -nx 33 33 -mi 100 +vp8 ++local}.
+    \item
+      To run a driver, do \texttt{./charmrun +p4 ./drive-03 -pgrid 2 2 2 2 -nl
+      32 32 32 -nt 16 -ml 15 +vp16 ++local}
+    \end{itemize}
+
+
+\subsubsection{Other AMPI codes}
+  \begin{itemize}
+  \item FLASH
+  \item BRAMS (Weather prediction model)
+  \item CGPOP
+  \item Fractography3D (Crack Propagation)
+  \item JetAlloc
+  \item PlasComCM (XPACC)
+  \item PlasCom2 (XPACC)
+  \item Harm3D
+  \end{itemize}
+
+
 \appendix
 
 \section{Installing AMPI}
