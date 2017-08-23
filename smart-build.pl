@@ -9,6 +9,10 @@
 use strict;
 use warnings;
 
+# Get location of script
+use File::Basename;
+my $dirname = dirname(__FILE__);
+
 # Turn off I/O buffering
 $| = 1;
 
@@ -190,7 +194,7 @@ if($arch eq "netlrts-darwin"){
 #================ Choose SMP/PXSHM =================================
 
 # find what options are available
-my $opts = `./build charm++ $arch help 2>&1 | grep "Supported options"`;
+my $opts = `$dirname/build charm++ $arch help 2>&1 | grep "Supported options"`;
 $opts =~ m/Supported options: (.*)/;
 $opts = $1;
 
@@ -237,7 +241,7 @@ if ($counter != 1) {
 #================ Choose Compiler =================================
 
 # Lookup list of compilers
-my $cs = `./build charm++ $arch help 2>&1 | grep "Supported compilers"`;
+my $cs = `$dirname/build charm++ $arch help 2>&1 | grep "Supported compilers"`;
 # prune away beginning of the line
 $cs =~ m/Supported compilers: (.*)/;
 $cs = $1;
@@ -294,7 +298,7 @@ $explanations{"causalft"} = "Use causal message logging fault tolerance support"
 
   # Produce list of options
 
-  $opts = `./build charm++ $arch help 2>&1 | grep "Supported options"`;
+  $opts = `$dirname/build charm++ $arch help 2>&1 | grep "Supported options"`;
   # prune away beginning of line
   $opts =~ m/Supported options: (.*)/;
   $opts = $1;
@@ -485,7 +489,7 @@ EOF
 
 
 # Compose the build line
-my $build_line = "./build $target $arch $compilers $options $j $nobs ${compiler_flags}\n";
+my $build_line = "$dirname/build $target $arch $compilers $options $j $nobs ${compiler_flags}\n";
 
 
 # Save the build line in the log
@@ -504,7 +508,7 @@ print "\t$build_line\n\n";
 print "Do you want to start the build now? [Y/n]";
 my $p = promptUserYN();
 if($p eq "yes" || $p eq "default"){
-  if(-e "src/arch/$arch"){
+  if(-e "$dirname/src/arch/$arch"){
 	print "Building with: ${build_line}\n";	
 	# Execute the build line
 	system($build_line);
