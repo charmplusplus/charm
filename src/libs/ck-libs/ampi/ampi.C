@@ -1947,8 +1947,8 @@ void ampi::pup(PUP::er &p)
         case MPI_SSEND_REQ:
           blockingReq = new SsendReq;
           break;
-        case MPI_IATA_REQ:
-          blockingReq = new IATAReq;
+        case MPI_ATA_REQ:
+          blockingReq = new ATAReq;
           break;
       }
     }
@@ -3260,10 +3260,13 @@ int ampi::intercomm_iscatter(int root, const void *sendbuf, int sendcount, MPI_D
 
     CkDDT_DataType* dttype = getDDT()->getType(sendtype) ;
     int itemsize = dttype->getSize(sendcount) ;
+    // use an ATAReq to non-block the caller and get a request ptr
+    ATAReq *newreq = new ATAReq(remote_size);
     for(int i = 0; i < remote_size; i++) {
-        send(MPI_SCATTER_TAG, getRank(), ((char*)sendbuf)+(itemsize*i),
-             sendcount, sendtype, i, intercomm);
+      newreq->reqs[i] = send(MPI_SCATTER_TAG, getRank(), ((char*)sendbuf)+(itemsize*i),
+                             sendcount, sendtype, i, intercomm, 0, I_SEND);
     }
+    *request = postReq(newreq);
   }
 
   if (root!=MPI_PROC_NULL && root!=MPI_ROOT) { //remote group ranks
@@ -3306,10 +3309,13 @@ int ampi::intercomm_iscatterv(int root, const void* sendbuf, const int* sendcoun
 
     CkDDT_DataType* dttype = getDDT()->getType(sendtype);
     int itemsize = dttype->getSize();
+    // use an ATAReq to non-block the caller and get a request ptr
+    ATAReq *newreq = new ATAReq(remote_size);
     for (int i = 0; i < remote_size; i++) {
-        send(MPI_SCATTER_TAG, getRank(), ((char*)sendbuf)+(itemsize*displs[i]),
-             sendcounts[i], sendtype, i, intercomm);
+      newreq->reqs[i] = send(MPI_SCATTER_TAG, getRank(), ((char*)sendbuf)+(itemsize*displs[i]),
+                             sendcounts[i], sendtype, i, intercomm, 0, I_SEND);
     }
+    *request = postReq(newreq);
   }
 
   if (root != MPI_PROC_NULL && root != MPI_ROOT) { // remote group ranks
@@ -3416,9 +3422,9 @@ void GathervReq::print(){
   CkPrintf("In GathervReq: this=%p, status=%d\n", this, statusIreq);
 }
 
-void IATAReq::print(){ //not complete for myreqs
+void ATAReq::print(){ //not complete for reqs
   AmpiRequest::print();
-  CkPrintf("In IATAReq: elmcount=%d, idx=%d\n", elmcount, idx);
+  CkPrintf("In ATAReq: num_reqs=%d\n", reqs.size());
 }
 
 void SendReq::print(){
@@ -3473,8 +3479,8 @@ void AmpiRequestList::pup(PUP::er &p) {
           case MPI_SSEND_REQ:
             block[i] = new SsendReq;
             break;
-          case MPI_IATA_REQ:
-            block[i] = new IATAReq;
+          case MPI_ATA_REQ:
+            block[i] = new ATAReq;
             break;
         }
       }
@@ -3810,7 +3816,8 @@ MPI_Request ampi::postReq(AmpiRequest* newreq)
   // not by (tag, src, comm), so they should not be inserted either.
   if (!newreq->statusIreq &&
       newreq->getType() != MPI_SEND_REQ &&
-      newreq->getType() != MPI_SSEND_REQ)
+      newreq->getType() != MPI_SSEND_REQ &&
+      newreq->getType() != MPI_ATA_REQ)
   {
     int tags[2] = { newreq->tag, newreq->src };
     AmmPut(posted_ireqs, tags, (void *)(CmiIntPtr)(request+1));
@@ -5111,23 +5118,10 @@ int SsendReq::wait(MPI_Status *sts){
   return 0;
 }
 
-int IATAReq::wait(MPI_Status *sts){
-  int i;
-  for(i=0;i<elmcount;i++){
-    if(-1==getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
-                                                 myreqs[i].count, myreqs[i].type,
-                                                 myreqs[i].comm, sts))
-      CkAbort("AMPI> Error in ialltoall request wait");
-#if CMK_BIGSIM_CHARM
-    _TRACE_BG_TLINE_END(&myreqs[i].event);
-#endif
-  }
-#if CMK_BIGSIM_CHARM
-  TRACE_BG_AMPI_BREAK(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "IATAReq_wait", NULL, 0, 1);
-  for (i=0; i<elmcount; i++)
-    _TRACE_BG_ADD_BACKWARD_DEP(myreqs[i].event);
-  _TRACE_BG_TLINE_END(&event);
-#endif
+int ATAReq::wait(MPI_Status *sts){
+  AMPI_Waitall(reqs.size(), &reqs[0], MPI_STATUSES_IGNORE);
+  reqs.clear();
+  statusIreq = true;
   return 0;
 }
 
@@ -5485,12 +5479,27 @@ bool SsendReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) {
   return statusIreq;
 }
 
-bool IATAReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/){
-  for(int i=0;i<elmcount;i++){
-    if(!myreqs[i].test(sts))
-      return false;
+bool ATAReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/){
+  AmpiRequestList* reqList = getReqs();
+  int i = 0;
+  while (i < reqs.size()) {
+    if (reqs[i] == MPI_REQUEST_NULL) {
+      std::swap(reqs[i], reqs.back());
+      reqs.pop_back();
+      continue;
+    }
+    AmpiRequest& req = *(*reqList)[reqs[i]];
+    if (req.test()) {
+      req.wait(sts);
+      freeNonPersReq(reqs[i]);
+      std::swap(reqs[i], reqs.back());
+      reqs.pop_back();
+      continue;
+    }
+    i++;
   }
-  return true;
+  statusIreq = reqs.empty();
+  return statusIreq;
 }
 
 void IReq::receive(ampi *ptr, AmpiMsg *msg)
@@ -6821,16 +6830,18 @@ int AMPI_Iscatter(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
   if(rank==root) {
     CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
     int itemsize = dttype->getSize(sendcount) ;
+    // use an ATAReq to non-block the caller and get a request ptr
+    ATAReq *newreq = new ATAReq(size-1);
     for(i=0;i<size;i++) {
       if (i != rank) {
-        ptr->send(MPI_SCATTER_TAG, rank, ((char*)sendbuf)+(itemsize*i),
-                  sendcount, sendtype, i, comm);
+        newreq->reqs[i] = ptr->send(MPI_SCATTER_TAG, rank, ((char*)sendbuf)+(itemsize*i),
+                                    sendcount, sendtype, i, comm, 0, I_SEND);
       }
     }
     if (sendbuf != recvbuf) {
       copyDatatype(sendtype,sendcount,recvtype,recvcount,(char*)sendbuf+(itemsize*rank),recvbuf);
     }
-    *request = ptr->postReq(new IReq(recvbuf,recvcount,recvtype,root,MPI_SCATTER_TAG,comm,AMPI_REQ_COMPLETED));
+    *request = ptr->postReq(newreq);
   }
   else {
     ptr->irecv(recvbuf,recvcount,recvtype,root,MPI_SCATTER_TAG,comm,request);
@@ -6976,16 +6987,18 @@ int AMPI_Iscatterv(const void *sendbuf, const int *sendcounts, const int *displs
   if(rank == root) {
     CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
     int itemsize = dttype->getSize() ;
+    // use an ATAReq to non-block the caller and get a request ptr
+    ATAReq *newreq = new ATAReq(size-1);
     for(i=0;i<size;i++) {
       if (i != rank) {
-        ptr->send(MPI_SCATTER_TAG, rank, ((char*)sendbuf)+(itemsize*displs[i]),
-                  sendcounts[i], sendtype, i, comm);
+        newreq->reqs[i] = ptr->send(MPI_SCATTER_TAG, rank, ((char*)sendbuf)+(itemsize*displs[i]),
+                                    sendcounts[i], sendtype, i, comm, 0, I_SEND);
       }
     }
     if (sendbuf != recvbuf) {
       copyDatatype(sendtype,sendcounts[rank],recvtype,recvcount,(char*)sendbuf+(itemsize*displs[rank]),recvbuf);
     }
-    *request = ptr->postReq(new IReq(recvbuf,recvcount,recvtype,root,MPI_SCATTER_TAG,comm,AMPI_REQ_COMPLETED));
+    *request = ptr->postReq(newreq);
   }
   else {
     // call irecv to post an IReq and process any pending messages
@@ -7211,20 +7224,18 @@ int AMPI_Ialltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int itemsize = getDDT()->getSize(sendtype) * sendcount;
   int extent = getDDT()->getExtent(recvtype) * recvcount;
 
-  // use an IATAReq to non-block the caller and get a request ptr
-  AmpiRequestList* reqs = getReqs();
-  IATAReq *newreq = new IATAReq(size);
+  // use an ATAReq to non-block the caller and get a request ptr
+  ATAReq *newreq = new ATAReq(size*2);
   for (int i=0; i<size; i++) {
-    if (newreq->addReq(((char*)recvbuf)+(extent*i),recvcount,recvtype,i,MPI_ATA_TAG,comm)!=(i+1))
-      CkAbort("MPI_Ialltoall: Error adding requests into IATAReq!");
+    ptr->irecv((char*)recvbuf+(extent*i), recvcount, recvtype, i, MPI_ATA_TAG, comm, &newreq->reqs[i]);
   }
-  *request = ptr->postReq(newreq);
 
   for (int i=0; i<size; i++) {
     int dst = (rank+i) % size;
-    ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*dst), sendcount,
-              sendtype, dst, comm);
+    newreq->reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*dst), sendcount,
+                                     sendtype, dst, comm, 0, I_SEND);
   }
+  *request = ptr->postReq(newreq);
 
   AMPI_DEBUG("MPI_Ialltoall: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
   return MPI_SUCCESS;
@@ -7323,20 +7334,19 @@ int AMPI_Ialltoallv(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype s
   int itemsize = getDDT()->getSize(sendtype);
   int extent = getDDT()->getExtent(recvtype);
 
-  // use an IATAReq to non-block the caller and get a request ptr
-  AmpiRequestList* reqs = getReqs();
-  IATAReq *newreq = new IATAReq(size);
+  // use an ATAReq to non-block the caller and get a request ptr
+  ATAReq *newreq = new ATAReq(size*2);
   for (int i=0; i<size; i++) {
-    if (newreq->addReq((void*)(((char*)recvbuf)+(extent*rdispls[i])),recvcounts[i],recvtype,i,MPI_ATA_TAG,comm)!=(i+1))
-      CkAbort("MPI_Ialltoallv: Error adding requests into IATAReq!");
+    ptr->irecv((char*)recvbuf+(extent*rdispls[i]), recvcounts[i],
+               recvtype, i, MPI_ATA_TAG, comm, &newreq->reqs[i]);
   }
-  *request = ptr->postReq(newreq);
 
   for (int i=0; i<size; i++) {
     int dst = (rank+i) % size;
-    ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*sdispls[dst]), sendcounts[dst],
-              sendtype, dst, comm);
+    newreq->reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*sdispls[dst]),
+                                     sendcounts[dst], sendtype, dst, comm, 0, I_SEND);
   }
+  *request = ptr->postReq(newreq);
 
   AMPI_DEBUG("MPI_Ialltoallv: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
 
@@ -7435,19 +7445,18 @@ int AMPI_Ialltoallw(const void *sendbuf, const int *sendcounts, const int *sdisp
   }
 
   /* displs are in terms of bytes for Alltoallw (unlike Alltoallv) */
+
+  // use an ATAReq to non-block the caller and get a request ptr
+  ATAReq *newreq = new ATAReq(size*2);
   for (int i=0; i<size; i++) {
-    int dst = (rank+i) % size;
-    ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+sdispls[dst],
-              sendcounts[dst], sendtypes[dst], dst, comm);
+    ptr->irecv((char*)recvbuf+rdispls[i], recvcounts[i], recvtypes[i],
+               i, MPI_ATA_TAG, comm, &newreq->reqs[i]);
   }
 
-  // use an IATAReq to non-block the caller and get a request ptr
-  AmpiRequestList* reqs = getReqs();
-  IATAReq *newreq = new IATAReq(size);
   for (int i=0; i<size; i++) {
-    if (newreq->addReq((void*)(((char*)recvbuf)+rdispls[i]), recvcounts[i],
-                       recvtypes[i], i, MPI_ATA_TAG, comm) != (i+1))
-      CkAbort("MPI_Ialltoallw: Error adding requests into IATAReq!");
+    int dst = (rank+i) % size;
+    newreq->reqs[i] = ptr->send(MPI_ATA_TAG, rank, (char*)sendbuf+sdispls[dst],
+                                sendcounts[dst], sendtypes[dst], dst, comm, 0, I_SEND);
   }
   *request = ptr->postReq(newreq);
 
@@ -7545,20 +7554,18 @@ int AMPI_Ineighbor_alltoall(const void* sendbuf, int sendcount, MPI_Datatype sen
   int itemsize = getDDT()->getSize(sendtype) * sendcount;
   int extent = getDDT()->getExtent(recvtype) * recvcount;
 
-  // use an IATAReq to non-block the caller and get a request ptr
-  AmpiRequestList* reqs = getReqs();
-  IATAReq *newreq = new IATAReq(num_neighbors);
+  // use an ATAReq to non-block the caller and get a request ptr
+  ATAReq *newreq = new ATAReq(num_neighbors*2);
   for (int j=0; j<num_neighbors; j++) {
-    if(newreq->addReq(((char*)recvbuf)+(extent*j), recvcount, recvtype,
-                      neighbors[j], MPI_NBOR_TAG, comm)!=(j+1))
-      CkAbort("MPI_Ineighbor_alltoall: Error adding requests into IATAReq!");
+    ptr->irecv((char*)recvbuf+(extent*j), recvcount, recvtype,
+               neighbors[j], MPI_NBOR_TAG, comm, &newreq->reqs[j]);
   }
-  *request = ptr->postReq(newreq);
 
   for (int i=0; i<num_neighbors; i++) {
-    ptr->send(MPI_ATA_TAG, rank_in_comm, ((char*)sendbuf)+(i*itemsize),
-              sendcount, sendtype, neighbors[i], comm);
+    newreq->reqs[num_neighbors+i] = ptr->send(MPI_ATA_TAG, rank_in_comm, ((char*)sendbuf)+(i*itemsize),
+                                              sendcount, sendtype, neighbors[i], comm, 0, I_SEND);
   }
+  *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
 }
@@ -7655,20 +7662,18 @@ int AMPI_Ineighbor_alltoallv(const void* sendbuf, const int *sendcounts, const i
   int itemsize = getDDT()->getSize(sendtype);
   int extent = getDDT()->getExtent(recvtype);
 
-  // use an IATAReq to non-block the caller and get a request ptr
-  AmpiRequestList* reqs = getReqs();
-  IATAReq *newreq = new IATAReq(num_neighbors);
+  // use an ATAReq to non-block the caller and get a request ptr
+  ATAReq *newreq = new ATAReq(num_neighbors*2);
   for (int j=0; j<num_neighbors; j++) {
-    if(newreq->addReq(((char*)recvbuf)+(extent*rdispls[j]), recvcounts[j], recvtype,
-                      neighbors[j], MPI_NBOR_TAG, comm)!=(j+1))
-      CkAbort("MPI_Ineighbor_alltoallv: Error adding requests into IATAReq!");
+    ptr->irecv((char*)recvbuf+(extent*rdispls[j]), recvcounts[j], recvtype,
+               neighbors[j], MPI_NBOR_TAG, comm, &newreq->reqs[j]);
   }
-  *request = ptr->postReq(newreq);
 
   for (int i=0; i<num_neighbors; i++) {
-    ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+(itemsize*sdispls[i])),
-              sendcounts[i], sendtype, neighbors[i], comm);
+    newreq->reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, (char*)sendbuf+(itemsize*sdispls[i]),
+                                              sendcounts[i], sendtype, neighbors[i], comm, 0, I_SEND);
   }
+  *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
 }
@@ -7761,20 +7766,18 @@ int AMPI_Ineighbor_alltoallw(const void* sendbuf, const int *sendcounts, const M
   const vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
 
-  // use an IATAReq to non-block the caller and get a request ptr
-  AmpiRequestList* reqs = getReqs();
-  IATAReq *newreq = new IATAReq(num_neighbors);
+  // use an ATAReq to non-block the caller and get a request ptr
+  ATAReq *newreq = new ATAReq(num_neighbors*2);
   for (int j=0; j<num_neighbors; j++) {
-    if(newreq->addReq((char*)recvbuf+rdispls[j], recvcounts[j], recvtypes[j],
-                      neighbors[j], MPI_NBOR_TAG, comm)!=(j+1))
-      CkAbort("MPI_Ineighbor_alltoallw: Error adding requests into IATAReq!");
+    ptr->irecv((char*)recvbuf+rdispls[j], recvcounts[j], recvtypes[j],
+               neighbors[j], MPI_NBOR_TAG, comm, &newreq->reqs[j]);
   }
-  *request = ptr->postReq(newreq);
 
   for (int i=0; i<num_neighbors; i++) {
-    ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+sdispls[i]),
-              sendcounts[i], sendtypes[i], neighbors[i], comm);
+    newreq->reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+sdispls[i]),
+                                              sendcounts[i], sendtypes[i], neighbors[i], comm, 0, I_SEND);
   }
+  *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
 }
@@ -7867,20 +7870,19 @@ int AMPI_Ineighbor_allgather(const void* sendbuf, int sendcount, MPI_Datatype se
   const vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
 
-  // use an IATAReq to non-block the caller and get a request ptr
-  AmpiRequestList* reqs = getReqs();
-  IATAReq *newreq = new IATAReq(num_neighbors);
+  // use an ATAReq to non-block the caller and get a request ptr
+  ATAReq *newreq = new ATAReq(num_neighbors*2);
   int extent = getDDT()->getExtent(recvtype) * recvcount;
   for (int j=0; j<num_neighbors; j++) {
-    if(newreq->addReq(((char*)recvbuf)+(extent*j), recvcount, recvtype,
-                      neighbors[j], MPI_NBOR_TAG, comm)!=(j+1))
-      CkAbort("MPI_Ineighbor_allgather: Error adding requests into IATAReq!");
+    ptr->irecv((char*)recvbuf+(extent*j), recvcount, recvtype,
+               neighbors[j], MPI_NBOR_TAG, comm, &newreq->reqs[j]);
   }
-  *request = ptr->postReq(newreq);
 
   for (int i=0; i<num_neighbors; i++) {
-    ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount, sendtype, neighbors[i], comm);
+    newreq->reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount,
+                                              sendtype, neighbors[i], comm, 0, I_SEND);
   }
+  *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
 }
@@ -7971,20 +7973,19 @@ int AMPI_Ineighbor_allgatherv(const void* sendbuf, int sendcount, MPI_Datatype s
   const vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
 
-  // use an IATAReq to non-block the caller and get a request ptr
-  AmpiRequestList* reqs = getReqs();
-  IATAReq *newreq = new IATAReq(num_neighbors);
+  // use an ATAReq to non-block the caller and get a request ptr
+  ATAReq *newreq = new ATAReq(num_neighbors*2);
   int extent = getDDT()->getExtent(recvtype);
   for (int j=0; j<num_neighbors; j++) {
-    if(newreq->addReq(((char*)recvbuf)+(extent*displs[j]), recvcounts[j], recvtype,
-                      neighbors[j], MPI_NBOR_TAG, comm)!=(j+1))
-      CkAbort("MPI_Ineighbor_allgatherv: Error adding requests into IATAReq!");
+    ptr->irecv((char*)recvbuf+(extent*displs[j]), recvcounts[j], recvtype,
+               neighbors[j], MPI_NBOR_TAG, comm, &newreq->reqs[j]);
   }
-  *request = ptr->postReq(newreq);
 
   for (int i=0; i<num_neighbors; i++) {
-    ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount, sendtype, neighbors[i], comm);
+    newreq->reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount,
+                                              sendtype, neighbors[i], comm, 0, I_SEND);
   }
+  *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
 }

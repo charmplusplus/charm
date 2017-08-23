@@ -627,7 +627,7 @@ extern int _mpi_nworlds;
 #define AMPI_COLL_COMM   MPI_COMM_WORLD
 
 #define MPI_I_REQ       1
-#define MPI_IATA_REQ    2
+#define MPI_ATA_REQ     2
 #define MPI_SEND_REQ    3
 #define MPI_SSEND_REQ   4
 #define MPI_REDN_REQ    5
@@ -718,7 +718,7 @@ class AmpiRequest {
   inline bool isValid(void) const { return isvalid; }
 
   /// Returns the type of request:
-  ///  MPI_I_REQ, MPI_IATA_REQ, MPI_SEND_REQ, MPI_SSEND_REQ,
+  ///  MPI_I_REQ, MPI_ATA_REQ, MPI_SEND_REQ, MPI_SSEND_REQ,
   ///  MPI_REDN_REQ, MPI_GATHER_REQ, MPI_GATHERV_REQ, MPI_GPU_REQ
   virtual int getType(void) const =0;
 
@@ -942,32 +942,23 @@ class GPUReq : public AmpiRequest {
   void setComplete();
 };
 
-class IATAReq : public AmpiRequest {
-  vector<IReq> myreqs;
-  int elmcount;
-  int idx;
+class ATAReq : public AmpiRequest {
  public:
-  IATAReq(int c_):elmcount(c_),idx(0){ myreqs.resize(c_); isvalid=true; }
-  IATAReq(){};
-  ~IATAReq(void) { }
-  int addReq(void *buf_, int count_, MPI_Datatype type_, int src_, int tag_, MPI_Comm comm_){
-    myreqs[idx].buf=buf_;   myreqs[idx].count=count_;
-    myreqs[idx].type=type_; myreqs[idx].src=src_;
-    myreqs[idx].tag=tag_;   myreqs[idx].comm=comm_;
-    return (++idx);
-  }
+  vector<MPI_Request> reqs;
+
+  ATAReq(int c_) : reqs(c_) { isvalid=true; }
+  ATAReq(){}
+  ~ATAReq(void) { }
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE);
   int wait(MPI_Status *sts);
   void cancel() {}
   void receive(ampi *ptr, AmpiMsg *msg) {}
   void receive(ampi *ptr, CkReductionMsg *msg) {}
-  inline int getCount(void) const { return elmcount; }
-  inline int getType(void) const { return MPI_IATA_REQ; }
+  inline int getCount(void) const { return reqs.size(); }
+  inline int getType(void) const { return MPI_ATA_REQ; }
   virtual void pup(PUP::er &p){
     AmpiRequest::pup(p);
-    p(elmcount);
-    p(idx);
-    p|myreqs;
+    p|reqs;
   }
   virtual void print();
 };
