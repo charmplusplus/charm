@@ -426,8 +426,7 @@ any change to the source code and works with any language (C, C++, Fortran, etc)
 However, it does not handle static variables and has a context switching 
 overhead that grows with the number of global variables.
 Currently, this feature only works on x86 and x86\_64 
-(e.g. amd64) platforms that fully support ELF. Thus, it may not work on PPC or 
-Itanium, or on some microkernels such as Catamount. When this feature does 
+platforms that fully support ELF. Thus, it may not work on PPC or on some microkernels such as Catamount. When this feature does 
 not work for you, you can try other ways of handling global or static variables, 
 which are detailed in the following sections.
 
@@ -619,29 +618,28 @@ ampiCC -o example example.C -tlsglobals
 \end{alltt}
 Table \ref{tab:portability} shows portability of different schemes.
 
-\begin{table*}[!t]
+\begin{table*}[!tb]
 \begin{center}
-\begin{tabular}{|c||c|c|c|c|c|c|c|c|c|}
+\begin{tabular}{|c||c|c|c|c|c|c|c|}
 \hline
-Privatization
-Scheme     & X86 & IA64 & Opteron & Mac OS X & IBM SP & SUN & BG/P & Cray/XT & Windows \\
-		   \hline
-		   \hline
-		   Transformation  & Yes  & Yes   & Yes     & Yes     & Yes  & Yes  & Yes & Yes & Yes  \\
-			   \hline
-			   GOT-Globals  & Yes  & Yes  & Yes     & No       & No    & Maybe  & No  & No  & No \\
-				   \hline
-				   TLS-Globals  &  Yes & Maybe  & Yes     & No    & Maybe & Maybe & No  & Yes & Maybe  \\
-					   \hline
-					   \end{tabular}
-					   \caption{Portability of current implementations of three privatization schemes.
-						   ``Yes'' means we have implemented this technique.
-							   ``Maybe'' indicates there are no theoretical problems, but no implementation exists.
-							   ``No'' indicates the technique is impossible on this platform.}
-							   \label{tab:portability}
-							   \vspace{-1.0cm}
-							   \end{center}
-							   \end{table*}
+Privatization Scheme     & x86     & x86\_64  & Mac OS & BG/Q  & Windows & PPC   & ARM7  \\
+\hline
+\hline
+Transformation           & Yes     & Yes     & Yes     & Yes   & Yes     & Yes   & Yes   \\
+\hline
+GOT-Globals              & Yes     & Yes     & No      & No    & No      & Yes   & Yes   \\
+\hline
+TLS-Globals              & Yes     & Yes     & No      & No    & Maybe   & Maybe & Maybe \\
+\hline
+\end{tabular}
+\caption{Portability of current implementations of three privatization schemes.
+``Yes'' means we have implemented this technique.
+``Maybe'' indicates there are no theoretical problems, but no implementation exists.
+``No'' indicates the technique is impossible on this platform.}
+\label{tab:portability}
+\vspace{-1.0cm}
+\end{center}
+\end{table*}
 \subsection{Extensions for Migrations}
 
 \ampi{} provides fully automated support for migrating MPI ranks between nodes of a
