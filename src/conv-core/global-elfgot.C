@@ -170,7 +170,7 @@ public:
   
   /// Point at this set of global data (must be getSize() bytes).
   inline void install(void *datav) const {
-    char *data=(char *)datav;
+    intptr_t data = (intptr_t)datav;
     for (int i=0;i<nRec;i++)
       *(rec[i].got)=(ELFXX_TYPE_Addr)(data+rec[i].off);
   }

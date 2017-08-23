@@ -14,10 +14,10 @@ static void qt_args_1(qt_t *rjb, void *u, void *t,
 		      qt_userf_t *userf, qt_only_t *only)
 {
   jmp_buf jb; struct helpdesc *rhelp;
-  rhelp = (struct helpdesc *)setjmp(jb);
+  rhelp = (struct helpdesc *)(intptr_t)setjmp(jb);
   if (rhelp == 0) {
     SHIFTSP(rjb);
-    longjmp(*(jmp_buf *)&rjb, (int)jb);
+    longjmp(*(jmp_buf *)&rjb, (int)(intptr_t)jb);
   }
   rhelp->hfn(rhelp->jb, rhelp->oldptr, rhelp->newptr);
   only(u, t, userf);
@@ -29,7 +29,7 @@ qt_t *qt_args(qt_t *sp, void *u, void *t,
 {
   jmp_buf jb; qt_t *result;
 
-  result = (qt_t*)setjmp(jb);
+  result = (qt_t*)(intptr_t)setjmp(jb);
   if (result==0) {
     SHIFTSP(sp);
     qt_args_1((qt_t*)jb,u,t,userf,only);
@@ -46,10 +46,10 @@ void *qt_block(qt_helper_t *hfn, void *oldptr, void *newptr, qt_t *sp)
   help.jb  = (qt_t*)&jb;
   help.oldptr = oldptr;
   help.newptr = newptr;
-  rhelp = (struct helpdesc *)setjmp(jb);
+  rhelp = (struct helpdesc *)(intptr_t)setjmp(jb);
   if (rhelp==0) {
     SHIFTSP(sp);
-    longjmp(*(jmp_buf *)&sp, (int)&help);
+    longjmp(*(jmp_buf *)&sp, (int)(intptr_t)&help);
   }
   rhelp->hfn(rhelp->jb, rhelp->oldptr, rhelp->newptr);
 }
@@ -62,5 +62,5 @@ void *qt_abort(qt_helper_t *hfn, void *oldptr, void *newptr, qt_t *sp)
   help.oldptr = oldptr;
   help.newptr = newptr;
   SHIFTSP(sp);
-  longjmp(*(jmp_buf *)&sp, (int)&help);
+  longjmp(*(jmp_buf *)&sp, (int)(intptr_t)&help);
 }
