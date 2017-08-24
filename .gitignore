@@ -18,6 +18,11 @@ lib
 lib_so
 tmp
 src/util/pup_f.f90
+CMakeCache.txt
+cmake_install.cmake
+CMakeFiles
+/Makefile
+Charm++-prefix
 
 # Ignore directories created from compilation
 /netlrts-*
