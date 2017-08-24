@@ -2081,8 +2081,14 @@ void CthResumeNormalThread(CthThreadToken* token)
   CmiPrintf("In CthResumeNormalThread:   ");
   CthPrintThdMagic(t);
   */
-
+#if CMK_OMP
+  CthSetPrev(t, CthSelf());
+#endif
   CthResume(t);
+#if CMK_OMP
+  CthScheduledDecrement();
+  CthSetPrev(CthSelf(), 0);
+#endif
 }
 
 void CthResumeSchedulingThread(CthThreadToken  *token)
@@ -2104,7 +2110,14 @@ void CthResumeSchedulingThread(CthThreadToken  *token)
 	        resumeTraceCore();*/
 #endif
 #endif
+#if CMK_OMP
+  CthSetPrev(t, CthSelf());
+#endif
   CthResume(t);
+#if CMK_OMP
+  CthScheduledDecrement();
+  CthSetPrev(CthSelf(), 0);
+#endif
 }
 
 void CthEnqueueNormalThread(CthThreadToken* token, int s, 

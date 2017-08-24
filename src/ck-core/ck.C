@@ -2579,11 +2579,17 @@ extern "C" void CthResumeNormalThreadDebug(CthThreadToken* token)
             resumeTraceCore();*/
 #endif
 #endif
-  
+#if CMK_OMP
+  CthSetPrev(t, CthSelf());
+#endif
   /* For Record/Replay debugging: need to notify the upper layer that we are resuming a thread */
   if (CpdExecuteThreadResume(token)) {
     CthResume(t);
   }
+#if CMK_OMP
+  CthScheduledDecrement();
+  CthSetPrev(CthSelf(), 0);
+#endif
 }
 
 void CpdHandleLBMessage(LBMigrateMsg **msg) {

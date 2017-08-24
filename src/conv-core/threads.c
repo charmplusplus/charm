@@ -718,6 +718,8 @@ inline int CthScheduled(CthThread t) {
 /* The next scheduled thread decrements 'scheduled' of the previous thread.*/
 void CthScheduledDecrement() {
     CthThread prevCurrent = B(CthSelf())->prev;
+    if (!B(prevCurrent))
+      return;
     CthDebug("[%f][%d] scheduled before decremented: %d\n", CmiWallTimer(), CmiMyRank(), B(prevCurrent)->scheduled);
     /* CthMainThread should have empty stack(stack == NULL) and never scheduled(scheduled == 0) */
     if (B(prevCurrent)->stack && B(prevCurrent)->scheduled > 0) {
@@ -809,7 +811,7 @@ void CthSuspend(void)
   }
   if (cur->choosefn == 0) CthNoStrategy();
   next = cur->choosefn();
-#if CMK_SMP && CMK_TASKQUEUE
+#if CMK_OMP
   cur->tid.id[2] = CmiMyRank();
 #else
   /*cur->scheduled=0;*/
@@ -823,7 +825,7 @@ void CthSuspend(void)
 #if CMK_ERROR_CHECKING
   if(cur->scheduled<0)
     CmiAbort("A thread's scheduler should not be less than 0!\n");
-#endif    
+#endif
 #endif
 #if CMK_TRACE_ENABLED
 #if !CMK_TRACE_IN_CHARM
@@ -833,12 +835,16 @@ void CthSuspend(void)
 #endif
   CthDebug("[%f] next(%p) resumed\n",CmiWallTimer(), next);
 #if CMK_OMP
-  CthSetPrev(next,CthCpvAccess(CthCurrent));
+  /* If this thread is supposed to terminate after CthResume, then the next thread cannot get access to this thread to decrement 'scheduled' */
+  if (cur->exiting)
+    CthSetPrev(next, 0);
+  else
+    CthSetPrev(next, CthCpvAccess(CthCurrent));
 #endif
   CthResume(next);
 #if CMK_OMP
   CthScheduledDecrement();
-  CthSetPrev(B(CthSelf()), 0);
+  CthSetPrev(CthSelf(), 0);
 #endif
 }
 
@@ -877,6 +883,9 @@ void CthAwaken(CthThread th)
 
 void CthYield()
 {
+#if CMK_OMP
+  B(CthCpvAccess(CthCurrent))->scheduled--;
+#endif
   CthAwaken(CthCpvAccess(CthCurrent));
   CthSuspend();
 }

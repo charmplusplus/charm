@@ -1416,8 +1416,10 @@ void       CthSetStrategyDefault(CthThread);
 void       CthSetStrategyWorkStealing(CthThread);
 void       CthSetStrategySuspendedWorkStealing(CthThread);
 int        CthScheduled(CthThread t);
+void       CthScheduledDecrement();
 CthThread  CthGetCurrentThread();
 CpvExtern(int, prevGtid);
+void       CthSetPrev(CthThread t, CthThread prev);
 #endif
 void       CthYield(void);
 void       CthYieldPrio(int,int,unsigned int*);
