@@ -4,12 +4,19 @@ because it does not store signal mask, which is not a problem for netpoll
 versions of charm.
 */
 
+#include <stdlib.h>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
 #include "qt.h"
 #include <setjmp.h>
 
 #ifdef ALLOCA_H
 #include <alloca.h>
 #endif
+
+#include "conv-config.h"
 
 struct helpdesc { qt_helper_t *hfn; qt_t *jb; void *oldptr; void *newptr; };
 

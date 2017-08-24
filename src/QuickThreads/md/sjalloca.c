@@ -1,6 +1,13 @@
 
+#include <stdlib.h>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
 #include "qt.h"
 #include <setjmp.h>
+
+#include "conv-config.h"
 
 struct helpdesc { qt_helper_t *hfn; qt_t *jb; void *oldptr; void *newptr; };
 

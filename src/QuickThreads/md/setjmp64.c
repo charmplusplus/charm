@@ -1,4 +1,9 @@
 
+#include <stdlib.h>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
 #include "qt.h"
 #include <setjmp.h>
 #ifdef ALLOCA_H
