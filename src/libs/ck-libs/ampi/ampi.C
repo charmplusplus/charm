@@ -8035,6 +8035,9 @@ int AMPI_Comm_split(MPI_Comm src, int color, int key, MPI_Comm *dest)
     else if (getAmpiParent()->isCart(src)) {
       ptr->split(color, key, dest, MPI_CART);
     }
+    else if (getAmpiParent()->isGraph(src)) {
+      ptr->split(color, key, dest, MPI_GRAPH);
+    }
     else {
       ptr->split(color, key, dest, MPI_UNDEFINED);
     }
