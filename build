@@ -209,6 +209,7 @@ DESTINATION_SUFFIX=""
 TAU_MAKEFILE=""
 QUIET=""
 BUILD_OMP=0
+ONLY_CONFIGURE=
 
 [ "$1" = '--help' -o "$1" = '-h' ] && more=1 && syntax | ( less || more ) && exit 1
 [ $# -lt 2 ] && $(dirname "$0")/smart-build.pl && exit 1
@@ -387,6 +388,10 @@ do
 	        MAKEOPTS="$MAKEOPTS --quiet"
 		QUIET="--quiet"
 		shift;
+		;;
+    --only-configure)
+		ONLY_CONFIGURE="true"
+		shift
 		;;
     --enable-tracing|--enable-tracing=*)
 		CONFIG_OPTS="$CONFIG_OPTS $1"
@@ -829,6 +834,11 @@ echo "OPTSATBUILDTIME += $OPTS" > buildopts.mk
 $MAKE $MAKEOPTS basics OPTS="$OPTS $BUILD_SHARED" QUIET="$QUIET"
 MAKEEXIT=$?
 [ $MAKEEXIT -ne 0 ] && printError
+
+if test -n "$ONLY_CONFIGURE"
+then
+    exit 0
+fi
 
 Echo "Performing '$MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS" QUIET="$QUIET"' in $DESTINATION/tmp"
 $MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS $BUILD_SHARED" QUIET="$QUIET"
