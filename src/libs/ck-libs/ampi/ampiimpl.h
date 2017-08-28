@@ -135,7 +135,7 @@ void AmmFree(AmmTable t);
 void AmmFreeAll(AmmTable t);
 void AmmPut(AmmTable t, const int tags[AMM_NTAGS], void* msg);
 static bool AmmMatch(const int tags1[AMM_NTAGS], const int tags2[AMM_NTAGS]);
-void* AmmGet(AmmTable t, const int tags[AMM_NTAGS], int* rtags);
+void* AmmGet(AmmTable t, const int tags[AMM_NTAGS], int* rtags=NULL);
 void* AmmProbe(AmmTable t, const int tags[AMM_NTAGS], int* rtags);
 int AmmEntries(AmmTable t);
 AmmTable AmmPup(pup_er p, AmmTable t, AmmPupMessageFn msgpup);

@@ -1689,9 +1689,9 @@ void AmmFreeAll(AmmTable t)
 void AmmPut(AmmTable t, int* tags, void* msg)
 {
   AmmEntry e = (AmmEntry)malloc(sizeof(struct AmmEntryStruct));
-  e->next = 0;
+  e->next = NULL;
   e->msg = msg;
-  for (int i=0; i<AMM_NTAGS; i++) e->tags[i] = tags[i];
+  memcpy(e->tags, tags, sizeof(int)*AMM_NTAGS);
   *(t->lasth) = e;
   t->lasth = &(e->next);
 }
@@ -1720,22 +1720,24 @@ static bool AmmMatch(const int tags1[AMM_NTAGS], const int tags2[AMM_NTAGS])
   }
 }
 
-void* AmmGet(AmmTable t, const int tags[AMM_NTAGS], int* rtags)
+void* AmmGet(AmmTable t, const int tags[AMM_NTAGS], int* rtags/*=NULL*/)
 {
   AmmEntry* enth;
   AmmEntry ent;
   void* msg;
 
+#if CMK_BIGSIM_CHARM
   /* added by Chao Mei in case that t is already freed
    * which happens in ~ampi() when doing out-of-core emulation for AMPI programs */
   if (t==NULL) return NULL;
+#endif
 
   enth = &(t->first);
   while (true) {
     ent = (*enth);
     if (ent==NULL) return NULL;
     if (AmmMatch(tags, ent->tags)) {
-      if (rtags) for (int i=0; i<AMM_NTAGS; i++) rtags[i] = ent->tags[i];
+      if (rtags) memcpy(rtags, ent->tags, sizeof(int)*AMM_NTAGS);
       msg = ent->msg;
       // unlike probe, delete the matched entry:
       AmmEntry next = ent->next;
@@ -1754,16 +1756,19 @@ void* AmmProbe(AmmTable t, const int tags[AMM_NTAGS], int* rtags)
   AmmEntry ent;
   void* msg;
 
+  CkAssert(rtags);
+#if CMK_BIGSIM_CHARM
   /* added by Chao Mei in case that t is already freed
    * which happens in ~ampi() when doing out-of-core emulation for AMPI programs */
   if (t==NULL) return NULL;
+#endif
 
   enth = &(t->first);
   while (true) {
     ent = (*enth);
     if (ent==NULL) return NULL;
     if (AmmMatch(tags, ent->tags)) {
-      if (rtags) for (int i=0; i<AMM_NTAGS; i++) rtags[i] = ent->tags[i];
+      memcpy(rtags, ent->tags, sizeof(int)*AMM_NTAGS);
       msg = ent->msg;
       return msg;
     }
@@ -1967,11 +1972,10 @@ ampi::~ampi()
   if (CkInRestarting() || _BgOutOfCoreFlag==1) {
     // in restarting, we need to flush messages
     int tags[2] = { MPI_ANY_TAG, MPI_ANY_SOURCE };
-    MPI_Status sts;
-    AmpiMsg *msg = (AmpiMsg *) AmmGet(msgs, tags, (int*)&sts);
+    AmpiMsg *msg = (AmpiMsg *) AmmGet(msgs, tags);
     while (msg) {
       delete msg;
-      msg = (AmpiMsg *) AmmGet(msgs, tags, (int*)&sts);
+      msg = (AmpiMsg *) AmmGet(msgs, tags);
     }
   }
 
@@ -2581,7 +2585,6 @@ void ampi::inorder(AmpiMsg* msg)
 
   // check posted recvs
   int tags[2] = { msg->getTag(), msg->getSrcRank() };
-  MPI_Status sts;
 
 #if CMK_BIGSIM_CHARM
   _TRACE_BG_TLINE_END(&msg->event); // store current log
@@ -2593,7 +2596,7 @@ void ampi::inorder(AmpiMsg* msg)
   AmpiRequestList *reqL = &(parent->ampiReqs);
   //When storing the req index, it's 1-based. The reason is stated in the comments
   //in the ampi::irecv function.
-  int ireqIdx = (int)((long)AmmGet(posted_ireqs, tags, (int*)&sts));
+  int ireqIdx = (int)((intptr_t)AmmGet(posted_ireqs, tags));
   IReq *ireq = NULL;
   if(reqL->size()>0 && ireqIdx>0)
     ireq = (IReq *)(*reqL)[ireqIdx-1];
@@ -2659,14 +2662,13 @@ void ampi::inorderRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int sr
 
   // check posted recvs
   int tags[2] = { tag, srcRank };
-  MPI_Status sts;
 
   //in case ampi has not initialized and posted_ireqs are only inserted
   //at AMPI_Irecv (MPI_Irecv)
   AmpiRequestList *reqL = &(parent->ampiReqs);
   //When storing the req index, it's 1-based. The reason is stated in the comments
   //in the ampi::irecv function.
-  int ireqIdx = (int)((long)AmmGet(posted_ireqs, tags, (int*)&sts));
+  int ireqIdx = (int)((intptr_t)AmmGet(posted_ireqs, tags));
   IReq *ireq = NULL;
   if (reqL->size()>0 && ireqIdx>0)
     ireq = (IReq *)(*reqL)[ireqIdx-1];
@@ -4376,10 +4378,9 @@ void ampi::irednResult(CkReductionMsg *msg)
 {
   MSG_ORDER_DEBUG(CkPrintf("[%d] irednResult called on comm %d\n", thisIndex, myComm.getComm()));
 
-  MPI_Status sts;
   int tags[2] = { MPI_REDN_TAG, AMPI_COLL_SOURCE };
   AmpiRequestList *reqL = &(parent->ampiReqs);
-  int rednReqIdx = (int)((long)AmmGet(posted_ireqs, tags, (int*)&sts));
+  int rednReqIdx = (int)((intptr_t)AmmGet(posted_ireqs, tags));
   AmpiRequest *rednReq = NULL;
   if(reqL->size()>0 && rednReqIdx>0)
     rednReq = (AmpiRequest *)(*reqL)[rednReqIdx-1];
