@@ -1510,11 +1510,12 @@ then
        MIDDLE_LIBS="$MIDDLE_LIBS $MEM_OBJ $THREAD_OBJ"
 fi
 
+CMK_SYSLIBS="$CMK_SYSLIBS -lm"
+
 case "$PARADIGM" in
 "f90charm")
 	MAKE_LDXX="1"
 	MIDDLE_LIBS="-lck $MIDDLE_LIBS -lconv-machine $CORE_LIBS "
-        CMK_SYSLIBS="$CMK_SYSLIBS -lm"
         if [ "$NO_MAIN" = "" ]
         then
 	  MIDDLE_LIBS="-lckmain $MIDDLE_LIBS"
@@ -1533,7 +1534,6 @@ case "$PARADIGM" in
         then
 	  MIDDLE_LIBS="-lckmain $MIDDLE_LIBS"
         fi
-        CMK_SYSLIBS="$CMK_SYSLIBS -lm"
 	if [ "$TAU_TRACE_MPI" = "1" ]
 	then
 		TAU_LIBS="$TAU_MPI_LIBS $TAU_LIBS"
@@ -1544,12 +1544,10 @@ case "$PARADIGM" in
 "converse")
 	MAKE_LD="1"
 	MIDDLE_LIBS="$MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
-        CMK_SYSLIBS="$CMK_SYSLIBS -lm"
 	;;
 "converse++"|"bluegene"|"bigsim"|"bgconverse++")
 	MAKE_LDXX="1"
 	MIDDLE_LIBS="$MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
-        CMK_SYSLIBS="$CMK_SYSLIBS -lm"
 	;;
 "c"|"C"|"c++"|"C++"|"f90"|"f77")
   ;;
