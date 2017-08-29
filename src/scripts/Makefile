@@ -476,7 +476,6 @@ QUICK_THREADS: $(CVHEADERS)
 	cp -f QuickThreads/libqt.a ../lib/libckqt.a
 	-(CHARMINC=.; . ./conv-config.sh; \
 	  test -d ../lib_so && \
-	  cp -f QuickThreads/libqt.$$CMK_SHARED_SUF ../lib_so && \
 	  cp -f QuickThreads/libqt.$$CMK_SHARED_SUF ../lib_so/libckqt.$$CMK_SHARED_SUF)
 	touch QUICK_THREADS
 
