@@ -94,6 +94,7 @@ BUILD_SHARE="0"
 SWAPGLOBALS="0"
 TLSGLOBALS="0"
 ROSE_OMP_TLS_GLOBALS="no"
+PRINT_BUILDING_BLOCKS=""
 NOABORT=""
 
 TAU_MAKEFILE=Make.tau
@@ -834,6 +835,11 @@ do
 		;;
 
 	-skip-module-init)
+		SKIP_MODULEINIT="yes"
+		;;
+
+	-print-building-blocks)
+		PRINT_BUILDING_BLOCKS="yes"
 		SKIP_MODULEINIT="yes"
 		;;
 
@@ -1616,6 +1622,22 @@ CHARM_CC_FLAGS="$CMK_CC_FLAGS -I$CHARMINC $CMK_INCDIR $CMK_SYSINC $OPTS_CPP_INTE
 CHARM_CXX_FLAGS="$CMK_CXX_FLAGS -I$CHARMINC $CMK_INCDIR $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX"
 CHARM_LD_FLAGS="$CMK_LD_FLAGS $CMK_LIBDIR $OPTS_LD $ALL_LIBS"
 CHARM_LDXX_FLAGS="$CMK_LDXX_FLAGS $CMK_LIBDIR $OPTS_LD $OPTS_LDXX $ALL_LIBS"
+
+
+########################################################################
+#
+# Print command building blocks and quit, if specified
+#
+########################################################################
+
+if [ -n "$PRINT_BUILDING_BLOCKS" ]
+then
+	for i in CHARM_{CC,CXX,LD,LDXX}{,_FLAGS}
+	do
+		echo "${i}='${!i}'"
+	done
+	exit 0
+fi
 
 
 ########################################################################
