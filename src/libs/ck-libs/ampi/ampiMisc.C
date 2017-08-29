@@ -5,6 +5,13 @@
 #include <string.h>
 #include "ampiimpl.h"
 
+#if defined(_WIN32)
+#include <windows.h>
+#include <sstream>
+#else
+#include <sys/utsname.h>
+#endif
+
 // Strip leading/trailing whitespaces from MPI_Info key and value strings.
 char* create_stripped_string(const char *str) {
   int newLen;
@@ -254,6 +261,57 @@ int ampiParent::freeInfo(MPI_Info info){
   return MPI_SUCCESS;
 }
 
+void ampiParent::defineInfoEnv(int nRanks_){
+  char **p_argv;
+  std::string argv_str, maxprocs_str;
+  char hostname[255], work_dir[1024];
+#if defined(_WIN32)
+  SYSTEM_INFO sys_info_data;
+#else
+  struct utsname uname_data;
+#endif
+  MPI_Info envInfo;
+
+  p_argv = CkGetArgv();
+  createInfo(&envInfo);
+  CkAssert(envInfo == MPI_INFO_ENV);
+
+  setInfo(envInfo, "command", p_argv[0]);
+
+  for(int i=1; i<CkGetArgc(); i++) {
+    argv_str += p_argv[i];
+    argv_str += " ";
+  }
+  setInfo(envInfo, "argv", argv_str.c_str());
+
+  maxprocs_str = std::to_string(nRanks_);
+  setInfo(envInfo, "maxprocs", maxprocs_str.c_str());
+
+  //TODO: soft
+
+  gethostname(hostname, sizeof(hostname));
+  setInfo(envInfo, "host", hostname);
+
+  //extract arch(machine) info
+#if defined(_WIN32)
+  std::stringstream win_arch;
+  GetSystemInfo(&sys_info_data);
+  win_arch << sys_info_data.dwProcessorType;
+  setInfo(envInfo, "arch", win_arch.str().c_str());
+#else
+  if (uname(&uname_data) == -1) {
+    CkAbort("uname call in defineInfoEnv() failed\n");
+  }
+  else {
+    setInfo(envInfo, "arch", uname_data.machine);
+  }
+#endif
+
+  getcwd(work_dir, sizeof(work_dir));
+  setInfo(envInfo, "wdir", work_dir);
+
+  //TODO: file, thread_level
+}
 
 AMPI_API_IMPL(MPI_Info_create)
 int AMPI_Info_create(MPI_Info *info){

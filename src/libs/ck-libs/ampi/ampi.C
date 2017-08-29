@@ -1140,7 +1140,7 @@ static ampi *ampiInit(char **argv)
     opts=TCHARM_Attach_start(&threads,&_nchunks);
     opts.setSectionAutoDelegate(false);
     CkArrayCreatedMsg *m;
-    CProxy_ampiParent::ckNew(new_world, threads, opts, CkCallbackResumeThread((void*&)m));
+    CProxy_ampiParent::ckNew(new_world, threads, _nchunks, opts, CkCallbackResumeThread((void*&)m));
     parent = CProxy_ampiParent(m->aid);
     delete m;
     STARTUP_DEBUG("ampiInit> array size "<<_nchunks);
@@ -1228,7 +1228,7 @@ class ampiWorlds : public CBase_ampiWorlds {
 };
 
 //-------------------- ampiParent -------------------------
-ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_)
+ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int nRanks_)
 :threads(threads_), worldNo(worldNo_), isTmpRProxySet(false)
 {
   int barrier = 0x1234;
@@ -1244,6 +1244,9 @@ ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_)
   groups.push_back(new groupStruct);
 
   init();
+
+  //ensure MPI_INFO_ENV will always be first info object
+  defineInfoEnv(nRanks_);
 
   thread->semaPut(AMPI_BARRIER_SEMAID,&barrier);
   AsyncEvacuate(false);

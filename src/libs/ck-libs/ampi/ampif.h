@@ -185,6 +185,8 @@
        integer, parameter :: MPI_MAX_COMM_WORLDS  = 8
        integer :: MPI_COMM_UNIVERSE(1:MPI_MAX_COMM_WORLDS)
 
+       integer, parameter :: MPI_INFO_ENV = 0
+
        double precision, external :: MPI_WTIME
        double precision, external :: MPI_WTICK
 

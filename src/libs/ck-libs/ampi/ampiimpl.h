@@ -1355,7 +1355,7 @@ class ampiParent : public CBase_ampiParent {
   int numBlockedReqs; // number of requests currently blocked on
 
  public:
-  ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_);
+  ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int nRanks_);
   ampiParent(CkMigrateMessage *msg);
   void ckAboutToMigrate(void);
   void ckJustMigrated(void);
@@ -1560,6 +1560,7 @@ class ampiParent : public CBase_ampiParent {
   int getInfoNkeys(MPI_Info info, int *nkeys) const;
   int getInfoNthkey(MPI_Info info, int n, char *key) const;
   int freeInfo(MPI_Info info);
+  void defineInfoEnv(int nRanks_);
 
   void initOps(void);
   inline int createOp(MPI_User_function *fn, bool isCommutative) {
