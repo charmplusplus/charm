@@ -13,7 +13,6 @@ fi
 CMK_CPP_CHARM="$BGQ_BIN/powerpc64-bgq-linux-cpp -P"
 CMK_CPP_C="$BGQ_BIN/powerpc64-bgq-linux-cpp -E "
 CMK_CXX="$BGQ_BIN/powerpc64-bgq-linux-g++ $GCC_OPTS "
-CMK_GCXX="$BGQ_BIN/powerpc64-bgq-linux-g++ $GCC_OPTS "
 CMK_CC="$BGQ_BIN/powerpc64-bgq-linux-gcc $GCC_OPTS "
 CMK_CF77="$BGQ_BIN/powerpc64-bgq-linux-gfortran "
 CMK_CF90="$BGQ_BIN/powerpc64-bgq-linux-gfortran "

@@ -25,7 +25,6 @@ OPTS_LD="$OPTS_LD"
 CMK_CPP_CHARM="$BGQ_BIN/powerpc64-bgq-linux-cpp -P"
 CMK_CPP_C="$BGQ_BIN/powerpc64-bgq-linux-cpp -E "
 CMK_CXX="mpicxx $GCC_OPTS "
-CMK_GCXX="mpicxx $GCC_OPTS "
 CMK_CC="mpicc $GCC_OPTS "
 CMK_CF77="mpif77 "
 CMK_CF90='mpif90'

@@ -1398,10 +1398,6 @@ do
 		    touch $BASEO
 		fi
 		;;
-	bglmachine.C)
-		Do $CMK_GCXX -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE $DESTO
-		NU_OBJ=$BASEO
-		;;
 	*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu)
                 if [ -n "$NATIVE" ]
                 then
