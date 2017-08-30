@@ -106,7 +106,9 @@
 #include "conv-trace.h"
 #include <sys/types.h>
 
+#ifndef _WIN32
 #include "valgrind.h"
+#endif
 
 #ifndef CMK_STACKSIZE_DEFAULT
 #define CMK_STACKSIZE_DEFAULT 32768
@@ -169,7 +171,9 @@
   int        stacksize; /*Size of thread stack (bytes)*/
   struct CthThreadListener *listener; /* pointer to the first of the listeners */
 
+#ifndef _WIN32
   unsigned int valgrindStackID;
+#endif
 
 #if CMK_THREADS_BUILD_TLS
   tlsseg_t tlsseg;
@@ -438,7 +442,9 @@ static void *CthAllocateStack(CthThreadBase *th,int *stackSize,int useMigratable
   _MEMCHECK(ret);
   th->stack=ret;
 
+#ifndef _WIN32
   th->valgrindStackID = VALGRIND_STACK_REGISTER(ret, ret + *stackSize);
+#endif
 
   return ret;
 }
@@ -475,7 +481,9 @@ static void CthThreadBaseFree(CthThreadBase *th)
   else if (th->stack!=NULL) {
     free(th->stack);
   }
+#ifndef _WIN32
   VALGRIND_STACK_DEREGISTER(th->valgrindStackID);
+#endif
   th->stack=NULL;
 }
 
