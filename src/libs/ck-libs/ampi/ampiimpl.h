@@ -119,19 +119,34 @@ typedef void (*MPI_MigrateFn)(void);
 #define AMM_SRC   1
 #define AMM_NTAGS 2
 
-typedef struct AmmTableStruct* AmmTable;
-typedef struct AmmEntryStruct* AmmEntry;
-typedef void (*AmmPupMessageFn)(pup_er p, void **msg);
+typedef void (*AmmPupMessageFn)(PUP::er& p, void **msg);
 
-AmmTable AmmNew();
-void AmmFree(AmmTable t);
-void AmmFreeAll(AmmTable t);
-void AmmPut(AmmTable t, const int tags[AMM_NTAGS], void* msg);
-static bool AmmMatch(const int tags1[AMM_NTAGS], const int tags2[AMM_NTAGS]);
-void* AmmGet(AmmTable t, const int tags[AMM_NTAGS], int* rtags=NULL);
-void* AmmProbe(AmmTable t, const int tags[AMM_NTAGS], int* rtags);
-int AmmEntries(AmmTable t);
-AmmTable AmmPup(pup_er p, AmmTable t, AmmPupMessageFn msgpup);
+class AmmEntry {
+ public:
+  AmmEntry* next;
+  void* msg; // either an MPI_Request or an AmpiMsg
+  int tags[AMM_NTAGS]; // [tag, src]
+  AmmEntry(int tag, int src) { tags[AMM_TAG] = tag; tags[AMM_SRC] = src; }
+  AmmEntry(){}
+  ~AmmEntry(){}
+};
+
+class Amm {
+ public:
+  AmmEntry* first;
+  AmmEntry** lasth;
+
+  Amm();
+  ~Amm(){}
+  inline void freeAll(void);
+  inline void flushAmpiMsgs(void);
+  inline bool match(const int tags1[AMM_NTAGS], const int tags2[AMM_NTAGS]) const;
+  inline void put(int tag, int src, void* msg);
+  inline void* get(int tag, int src, int* rtags=NULL);
+  inline void* probe(int tag, int src, int* rtags);
+  inline int size(void);
+  void pup(PUP::er& p, AmmPupMessageFn msgpup);
+};
 
 PUPfunctionpointer(MPI_User_function*)
 
@@ -2239,12 +2254,12 @@ class ampi : public CBase_ampi {
   CthThread getThread() const { return thread->getThread(); }
  public:
   /*
-   * AmmTable is indexed by the tag and sender.
-   * Since ampi objects are per-communicator, there are separate AmmTables per communicator.
+   * Amm is indexed by the tag and sender.
+   * Since ampi objects are per-communicator, there are separate Amm's per communicator.
    * FIXME: These are directly used by API routines, which is hideous.
    */
-  AmmTable msgs;         // unexpected message queue
-  AmmTable posted_ireqs; // posted request queue
+  Amm msgs;         // unexpected message queue
+  Amm posted_ireqs; // posted request queue
   //------------------------ Added by YAN ---------------------
  private:
   CkPupPtrVec<win_obj> winObjects;
