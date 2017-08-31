@@ -10,7 +10,7 @@
 /* 1 if the machine has a function called "getpagesize()", 0 otherwise .
    used in the memory files of converse */
 #define CMK_GETPAGESIZE_AVAILABLE                          1
-#define CMK_MEMORY_PAGESIZE                                8192
+#define CMK_MEMORY_PAGESIZE                                4096
 #define CMK_MEMORY_PROTECTABLE                             0
 
 /* defines which version of memory handlers should be used.
