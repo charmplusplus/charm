@@ -1273,7 +1273,7 @@ class ampiWorlds : public CBase_ampiWorlds {
 
 //-------------------- ampiParent -------------------------
 ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_)
-:threads(threads_), worldNo(worldNo_), isTmpRProxySet(false)
+:threads(threads_), worldNo(worldNo_), isTmpRProxySet(false), entryPool(64)
 {
   int barrier = 0x1234;
   STARTUP_DEBUG("ampiParent> starting up")
@@ -1339,6 +1339,7 @@ void ampiParent::pup(PUP::er &p) {
   p|resumeOnColl;
   p|numBlockedReqs;
   p|reqPool;
+  p|entryPool;
 
 #if AMPI_PRINT_MSG_SIZES
   p|msgSizes;
@@ -1720,7 +1721,8 @@ void Amm::flushAmpiMsgs(void)
 
 void Amm::put(int tag, int src, void* msg)
 {
-  AmmEntry* e = new AmmEntry(tag, src);
+  CkAssert(pool);
+  AmmEntry* e = pool->newAmmEntry(tag, src);
   e->next = NULL;
   e->msg = msg;
   *lasth = e;
@@ -1753,6 +1755,7 @@ bool Amm::match(const int tags1[AMM_NTAGS], const int tags2[AMM_NTAGS]) const
 
 void* Amm::get(int tag, int src, int* rtags/*=NULL*/)
 {
+  CkAssert(pool);
   AmmEntry** enth;
   AmmEntry* ent;
   void* msg;
@@ -1769,7 +1772,7 @@ void* Amm::get(int tag, int src, int* rtags/*=NULL*/)
       AmmEntry* next = ent->next;
       *enth = next;
       if (!next) lasth = enth;
-      delete ent;
+      pool->deleteAmmEntry(ent);
       return msg;
     }
     enth = &ent->next;
@@ -1888,6 +1891,8 @@ void ampi::findParent(bool forMigration) {
   if (parent==NULL) CkAbort("AMPI can't find its parent!");
   thread=parent->registerAmpi(this,myComm,forMigration);
   if (thread==NULL) CkAbort("AMPI can't find its thread!");
+  msgs.pool         = &parent->entryPool;
+  posted_ireqs.pool = &parent->entryPool;
 }
 
 //The following method should be called on the first element of the

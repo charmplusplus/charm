@@ -131,10 +131,69 @@ class AmmEntry {
   ~AmmEntry(){}
 };
 
+// Pool of AmmEntry's
+class AmmEntryPool {
+ private:
+  vector<AmmEntry *> entries; // pool of free entries
+  int maxEntries; // max # of entries in the pool
+
+ public:
+  AmmEntryPool(void) { maxEntries = 0; }
+  AmmEntryPool(int _numEntries) {
+    maxEntries = _numEntries;
+    entries.reserve(maxEntries);
+    // We only reserve memory for the max # of entry ptr's here, and
+    // the pool will be filled as entries are given to the pool.
+  }
+  ~AmmEntryPool() {
+    for (int i=0; i<entries.size(); i++) {
+      delete entries[i];
+    }
+    entries.clear();
+  }
+  inline AmmEntry* newAmmEntry(int tag, int src) {
+    if (entries.empty()) {
+      return new AmmEntry(tag, src);
+    } else {
+      AmmEntry* ent = entries.back();
+      entries.pop_back();
+      ent->tags[AMM_TAG] = tag;
+      ent->tags[AMM_SRC] = src;
+      return ent;
+    }
+  }
+  inline void deleteAmmEntry(AmmEntry* ent) {
+    if (entries.size() != maxEntries) {
+      entries.push_back(ent);
+    } else {
+      delete ent;
+    }
+  }
+  void pup(PUP::er& p) {
+    p|maxEntries;
+    size_t poolSize = entries.size();
+    p|poolSize;
+    if (p.isUnpacking()) {
+      entries.resize(poolSize);
+      for (int i=0; i<poolSize; i++) {
+        entries[i] = new AmmEntry();
+      }
+    }
+    // We don't care about PUP'ing the contents of pooled objects
+    if (p.isDeleting()) {
+      for (int i=0; i<poolSize; i++) {
+        delete entries[i];
+      }
+      entries.clear();
+    }
+  }
+};
+
 class Amm {
  public:
   AmmEntry* first;
   AmmEntry** lasth;
+  AmmEntryPool* pool; // ampiParent owns the pool
 
   Amm();
   ~Amm(){}
@@ -1779,6 +1838,7 @@ class ampiParent : public CBase_ampiParent {
   bool resumeOnRecv, resumeOnColl;
   int numBlockedReqs; // number of requests currently blocked on
   AmpiRequestPoolMgr reqPool;
+  AmmEntryPool entryPool;
 
  public:
   ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_);
