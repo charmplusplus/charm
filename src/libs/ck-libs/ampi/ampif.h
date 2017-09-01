@@ -185,7 +185,10 @@
        integer, parameter :: MPI_MAX_COMM_WORLDS  = 8
        integer :: MPI_COMM_UNIVERSE(1:MPI_MAX_COMM_WORLDS)
 
-       integer, parameter :: MPI_INFO_ENV = 0
+       integer, parameter :: MPI_INFO_ENV              = 0
+       integer, parameter :: AMPI_INFO_LB_SYNC         = 1
+       integer, parameter :: AMPI_INFO_LB_ASYNC        = 2
+       integer, parameter :: AMPI_INFO_CHKPT_IN_MEMORY = 3
 
        double precision, external :: MPI_WTIME
        double precision, external :: MPI_WTICK

@@ -272,14 +272,10 @@ void MPI_Tester::testMigrate(void) {
 		printf("Missing AMPI_MY_WTH attribute on MPI_COMM_WORLD\n");
 		MPI_Abort(MPI_COMM_WORLD, MPI_ERR_UNKNOWN);
 	}
-	MPI_Info hints;
-
-	MPI_Info_create(&hints);
-	MPI_Info_set(hints, "ampi_load_balance", "sync");
 	
 	TEST_MPI(MPI_Barrier,(comm));
 	
-	AMPI_Migrate(hints);
+	AMPI_Migrate(AMPI_INFO_LB_SYNC);
 	
 	TEST_MPI(MPI_Barrier,(comm));
 

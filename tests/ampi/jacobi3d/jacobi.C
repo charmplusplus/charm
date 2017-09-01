@@ -140,11 +140,9 @@ int main(int ac, char** av)
   else
     niter = 20;
 
-  /* Set up MPI_Info hints for AMPI_Migrate() */
+  /* Set up MPI_Info hints for Message Logging FT */
   MPI_Info_create(&hints);
-#ifdef CMK_MEM_CHECKPOINT
-  MPI_Info_set(hints, "ampi_checkpoint", "in_memory");
-#elif CMK_MESSAGE_LOGGING
+#ifdef CMK_MESSAGE_LOGGING
   MPI_Info_set(hints, "ampi_checkpoint", "message_logging");
 #endif
 
@@ -239,7 +237,11 @@ int main(int ac, char** av)
     starttime = MPI_Wtime();
 #ifdef AMPI
     if(iter%CKPT_FREQ == 50) {
+#ifdef CMK_MEM_CHECKPOINT
+		AMPI_Migrate(AMPI_INFO_CHKPT_IN_MEMORY);
+#elif CMK_MESSAGE_LOGGING
 		AMPI_Migrate(hints);
+#endif
     }
 #endif
   }

@@ -205,7 +205,6 @@ int main(int ac, char** av)
   int i,j,k,m,cidx;
   int iter, niter;
   MPI_Status status;
-  MPI_Info hints;
   double error, tval, maxerr, tmpmaxerr, starttime, endtime, itertime;
   chunk *cp;
   int thisIndex, ierr, nblocks;
@@ -234,10 +233,6 @@ int main(int ac, char** av)
     niter = atoi(av[5]);
   else
     niter = 10;
-
-  /* Set up MPI_Info hints for AMPI_Migrate() */
-  MPI_Info_create(&hints);
-  MPI_Info_set(hints, "ampi_load_balance", "sync");
 
   DIMX = DIM/NX;
   DIMY = DIM/NY;
@@ -283,7 +278,7 @@ int main(int ac, char** av)
 
 #ifdef AMPI
     if(iter%20 == 10) {
-      AMPI_Migrate(hints);
+      AMPI_Migrate(AMPI_INFO_LB_SYNC);
     }
 #endif
   }

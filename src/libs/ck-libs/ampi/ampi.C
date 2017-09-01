@@ -1247,6 +1247,8 @@ ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int nRanks_)
 
   //ensure MPI_INFO_ENV will always be first info object
   defineInfoEnv(nRanks_);
+  // define Info objects for AMPI_Migrate calls
+  defineInfoMigration();
 
   thread->semaPut(AMPI_BARRIER_SEMAID,&barrier);
   AsyncEvacuate(false);

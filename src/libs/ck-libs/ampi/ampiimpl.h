@@ -1561,6 +1561,7 @@ class ampiParent : public CBase_ampiParent {
   int getInfoNthkey(MPI_Info info, int n, char *key) const;
   int freeInfo(MPI_Info info);
   void defineInfoEnv(int nRanks_);
+  void defineInfoMigration();
 
   void initOps(void);
   inline int createOp(MPI_User_function *fn, bool isCommutative) {

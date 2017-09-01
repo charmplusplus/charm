@@ -654,31 +654,23 @@ the local state. Knowing this, the runtime system can act in several ways.
 
 The MPI\_Info object taken as a parameter by \texttt{AMPI\_Migrate} gives
 users a way to influence the runtime system's decision-making and behavior.
-Users should set the \texttt{MPI\_Info} key \texttt{"ampi\_load\_balance"} to one
-of the following values: \texttt{"sync"}, \texttt{"async"}, or \texttt{"false"}.
-Synchronous load balancing assumes that the application is already at a
-synchronization point. Asynchronous load balancing does not assume this, and a
-value of \texttt{"false"} is the same as not requesting load balancing at all.
+\ampi{} provides two built-in MPI\_Info objects for this, called \texttt{AMPI\_INFO\_LB\_SYNC}
+and \texttt{AMPI\_INFO\_LB\_ASYNC}. Synchronous load balancing assumes that
+the application is already at a synchronization point. Asynchronous load balancing
+does not assume this.
 
 Calling \texttt{AMPI\_Migrate} on a rank with pending send requests (i.e. from MPI\_Isend)
 is currently not supported, therefore users should always wait on any outstanding send requests
 before calling \texttt{AMPI\_Migrate}.
 
 \begin{alltt}
-// Setup
-MPI_Info hints;
-MPI_Info_create(&hints);
-MPI_Info_set(hints, "ampi_load_balance", "sync");
-
-...
-
 // Main time-stepping loop
 for (int iter=0; iter < max_iters; iter++) \{
 
   // Time step work ...
 
   if (iter \% lb_freq == 0)
-    AMPI_Migrate(hints);
+    AMPI_Migrate(AMPI_INFO_LB_SYNC);
 \}
 \end{alltt}
 
@@ -932,8 +924,9 @@ to \texttt{int AMPI\_Migrate(MPI\_Info hints)} with an \texttt{MPI\_Info} object
 specifies how you would like to checkpoint. Checkpointing can be thought of as
 migrating \ampi{} ranks to storage. Users set the checkpointing policy
 on an \texttt{MPI\_Info} object's \texttt{"ampi\_checkpoint"} key to one of the
-following values: \texttt{"to\_file=directory\_name"}, \texttt{"in\_memory"},
-or \texttt{"false"}.
+following values: \texttt{"to\_file=directory\_name"} or \texttt{"false"}.
+To perform checkpointing in memory a built-in MPI\_Info object called
+\texttt{AMPI\_INFO\_CHKPT\_IN\_MEMORY} is provided.
 
 Checkpointing to file tells the runtime system to save checkpoints in a given
 directory. (Typically, in an iterative program, the iteration number, converted to a
@@ -954,20 +947,13 @@ Any load imbalance resulting from the restart can then be managed by the runtime
 Use of this scheme is illustrated in the code snippet below.
 
 \begin{alltt}
-// Setup
-MPI_Info hints;
-MPI_Info_create(&hints);
-MPI_Info_set(hints, "ampi_checkpoint", "in_memory");
-
-...
-
 // Main time-stepping loop
 for (int iter=0; iter < max_iters; iter++) \{
 
   // Time step work ...
 
   if (iter \% chkpt_freq == 0)
-    AMPI_Migrate(hints);
+    AMPI_Migrate(AMPI_INFO_CHKPT_IN_MEMORY);
 \}
 \end{alltt}
 

@@ -270,7 +270,10 @@ typedef int MPI_Info;
 #define MPI_MAX_COMM_WORLDS  8
 extern MPI_Comm MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS];
 
-#define MPI_INFO_ENV         (MPI_Info)(0)
+#define MPI_INFO_ENV                (MPI_Info)(0)
+#define AMPI_INFO_LB_SYNC           (MPI_Info)(1)
+#define AMPI_INFO_LB_ASYNC          (MPI_Info)(2)
+#define AMPI_INFO_CHKPT_IN_MEMORY   (MPI_Info)(3)
 
 /* the size of MPI_Status must conform to MPI_STATUS_SIZE in ampif.h */
 struct AmpiMsg;

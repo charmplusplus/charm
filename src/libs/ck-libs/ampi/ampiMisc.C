@@ -313,6 +313,25 @@ void ampiParent::defineInfoEnv(int nRanks_){
   //TODO: file, thread_level
 }
 
+void ampiParent::defineInfoMigration(){
+  MPI_Info lb_sync_info, lb_async_info, chkpt_mem_info, chkpt_msg_log_info;
+
+  // info object for AMPI_INFO_LB_SYNC
+  createInfo(&lb_sync_info);
+  CkAssert(lb_sync_info == AMPI_INFO_LB_SYNC);
+  setInfo(lb_sync_info, "ampi_load_balance", "sync");
+
+  // info object for AMPI_INFO_LB_ASYNC
+  createInfo(&lb_async_info);
+  CkAssert(lb_async_info == AMPI_INFO_LB_ASYNC);
+  setInfo(lb_async_info, "ampi_load_balance", "async");
+
+  // info object for AMPI_INFO_CHKPT_IN_MEMORY
+  createInfo(&chkpt_mem_info);
+  CkAssert(chkpt_mem_info == AMPI_INFO_CHKPT_IN_MEMORY);
+  setInfo(chkpt_mem_info, "ampi_checkpoint", "in_memory");
+}
+
 AMPI_API_IMPL(MPI_Info_create)
 int AMPI_Info_create(MPI_Info *info){
   AMPI_API("AMPI_Info_create");
