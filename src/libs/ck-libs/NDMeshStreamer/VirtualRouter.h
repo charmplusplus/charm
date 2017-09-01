@@ -177,7 +177,7 @@ public:
     if (destinationPe == CkMyPe()) {
       routeToDestination.dimension      = 0;
       routeToDestination.destinationPe  = destinationPe;
-      routeToDestination.dimensionIndex = CkMyNode();
+      routeToDestination.dimensionIndex = routeAlongDimension(destinationPe, 0);
     } else {
       // treat newly inserted items as if they were received along
       // a higher dimension (e.g. for a 3D mesh, received along 4th dimension)
