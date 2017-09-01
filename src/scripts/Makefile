@@ -752,7 +752,7 @@ $(L)/libmodule%LB.a: %LB.o
 	( [ -r libmodule$*LB.dep ] && cp -f libmodule$*LB.dep $(L)/ ) || true
 $(L)/libmoduleCommonLBs.a:
 	$(CHARMC) -o $@ $^
-	( [ -r libmoduleCommobLBs.dep ] && cp -f libmoduleCommonLBs.dep $(L)/ ) || true
+	( [ -r libmoduleCommonLBs.dep ] && cp -f libmoduleCommonLBs.dep $(L)/ ) || true
 
 ###############################################################################
 #
