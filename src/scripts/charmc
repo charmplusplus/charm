@@ -1601,6 +1601,25 @@ fi
 
 ########################################################################
 #
+# Finalize command parameters
+#
+########################################################################
+
+CHARM_CPP_C="$CMK_CPP_C"
+CHARM_CC="$CMK_CC"
+CHARM_CXX="$CMK_CXX"
+CHARM_LD="$CMK_LD"
+CHARM_LDXX="$CMK_LDXX"
+
+CHARM_CPP_C_FLAGS="$CMK_CPP_C_FLAGS -I$CHARMINC $CMK_INCDIR $CMK_SYSINC $OPTS_CC_GENCPM $OPTS_CPP"
+CHARM_CC_FLAGS="$CMK_CC_FLAGS -I$CHARMINC $CMK_INCDIR $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CC"
+CHARM_CXX_FLAGS="$CMK_CXX_FLAGS -I$CHARMINC $CMK_INCDIR $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX"
+CHARM_LD_FLAGS="$CMK_LD_FLAGS $CMK_LIBDIR $OPTS_LD $ALL_LIBS"
+CHARM_LDXX_FLAGS="$CMK_LDXX_FLAGS $CMK_LIBDIR $OPTS_LD $OPTS_LDXX $ALL_LIBS"
+
+
+########################################################################
+#
 # We've parsed and verified the command-line parameters.
 # Now we prepare routines to clean up and exit.
 # None of these routines ever returns-- they all just exit.
@@ -1670,7 +1689,7 @@ do
 	DoNoErrCheck $RM $BASE.cpm.h $TMP.c
 	Do touch $BASE.cpm.h
 	Do $LN -f -s $FILE $TMP.c
-	Do $CMK_CPP_C $CMK_CPP_C_FLAGS -I$CHARMINC $CMK_INCDIR $CMK_SYSINC $OPTS_CC_GENCPM $OPTS_CPP $TMP.c > $TMP.i
+	Do $CHARM_CPP_C $CHARM_CPP_C_FLAGS $TMP.c > $TMP.i
 	Do $CHARMBIN/conv-cpm $TMP.i $BASE.cpm.h
 done
 
@@ -1756,7 +1775,7 @@ do
                 fi
 		;;
 	*.c|*.s|*.S)
-		Do $CMK_CC $CMK_CC_FLAGS -I$CHARMINC $CMK_INCDIR $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CC -c $FILE $DESTO
+		Do $CHARM_CC $CHARM_CC_FLAGS -c $FILE $DESTO
 		if [ "$Do_res" -ne 0 ]
 		then
 		    touch $BASEO
@@ -1767,7 +1786,7 @@ do
                 then
                     Do $CMK_NATIVE_CXX $CMK_NATIVE_CXX_FLAGS -I$CHARMINC $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP -c $FILE $DESTO
                 else
-                    Do $CMK_CXX $CMK_CXX_FLAGS -I$CHARMINC $CMK_INCDIR $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE $DESTO
+                    Do $CHARM_CXX $CHARM_CXX_FLAGS -c $FILE $DESTO
                 fi
 		if [ "$Do_res" -ne 0 ]
 		then
@@ -2137,7 +2156,7 @@ then
     done
     echo "}" >> $modInitSrc
 
-    Do $CMK_CXX $CMK_CXX_FLAGS $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $modInitSrc -o $modInitObj
+    Do $CHARM_CXX $CHARM_CXX_FLAGS -c $modInitSrc -o $modInitObj
 fi
 
 ###############################################################################
@@ -2184,8 +2203,8 @@ then
   Copyobj
 else
 # Make a regular executable: call the appropriate linker
-  [ "$MAKE_LDXX" = "1" ] && Do $CMK_LDXX $CMK_LDXX_FLAGS $CMK_LIBDIR $OPTS_LD $OPTS_LDXX -o $OBJECT $ALL_LIBS
-  [ "$MAKE_LD" = "1" ] && Do $CMK_LD $CMK_LD_FLAGS $CMK_LIBDIR $OPTS_LD -o $OBJECT $ALL_LIBS
+  [ "$MAKE_LDXX" = "1" ] && Do $CHARM_LDXX $CHARM_LDXX_FLAGS -o $OBJECT
+  [ "$MAKE_LD" = "1" ] && Do $CHARM_LD $CHARM_LD_FLAGS -o $OBJECT
 fi
 
 ########################################################################
