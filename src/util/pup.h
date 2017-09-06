@@ -437,6 +437,14 @@ class toMem : public mem {
  public:
   //Write data to the given buffer
   toMem(void *Nbuf):mem(IS_PACKING,(myByte *)Nbuf) {}
+
+  inline char* get_current_pointer() const {
+    return reinterpret_cast<char*>(buf);
+  }
+
+  inline void advance(size_t const offset) {
+    buf += offset;
+  }
 };
 template <class T>
 inline void toMemBuf(T &t,void *buf, size_t len) {
