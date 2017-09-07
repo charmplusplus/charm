@@ -6,18 +6,6 @@ CMK_LIBS="$CMK_LIBS -libverbs"
 CMK_WARNINGS_ARE_ERRORS='-Werror'
 CMK_CXX_OPTIMIZE='-O3'
 
-# native compiler for compiling charmxi, etc
-CMK_NATIVE_CC="$CMK_CC $CMK_CC_FLAGS $CMK_DEFS "
-CMK_NATIVE_CXX="$CMK_CXX $CMK_CXX_FLAGS $CMK_DEFS "
-CMK_NATIVE_LD="$CMK_CC $CMK_CC_FLAGS "
-CMK_NATIVE_LDXX="$CMK_CXX $CMK_CXX_FLAGS "
-
-# native compiler for compiling charmxi, etc
-CMK_SEQ_CC="$CMK_NATIVE_CC"
-CMK_SEQ_CXX="$CMK_NATIVE_CXX"
-CMK_SEQ_LD="$CMK_NATIVE_LD"
-CMK_SEQ_LDXX="$CMK_NATIVE_LDXX"
-
 CMK_QT='generic64-light'
 
 CMK_CF90=`which f95 2>/dev/null`

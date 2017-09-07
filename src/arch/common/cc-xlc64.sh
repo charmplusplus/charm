@@ -14,16 +14,6 @@ then
   CMK_LD_SHARED="$CMK_LD_SHARED -Wl,-bbigtoc"
 fi
 
-CMK_SEQ_CC='xlc_r -q64'
-CMK_SEQ_LD='xlc_r -q64'
-CMK_SEQ_CXX='xlC_r -q64'
-CMK_SEQ_LDXX='xlC_r -q64'
-
-CMK_NATIVE_CC='xlc_r -q64'
-CMK_NATIVE_LD='xlc_r -q64'
-CMK_NATIVE_CXX='xlC_r -q64'
-CMK_NATIVE_LDXX='xlC_r -q64'
-
 CMK_CF77='xlf_r -q64 '
 CMK_CF90='xlf90_r -q64 -qsuffix=f=f90' 
 CMK_CF90_FIXED='xlf90_r -q64 ' 

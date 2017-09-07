@@ -14,18 +14,6 @@ mpicc*)
 	CMK_CXX_FLAGS="-fPIC"
 	CMK_LD_FLAGS=""
 	CMK_LDXX_FLAGS=""
-
-# native compiler for compiling charmxi, etc
-	CMK_NATIVE_CC="$CMK_CC $CMK_CC_FLAGS"
-	CMK_NATIVE_CXX="$CMK_CXX $CMK_CXX_FLAGS"
-	CMK_NATIVE_LD="$CMK_CC $CMK_CC_FLAGS"
-	CMK_NATIVE_LDXX="$CMK_CXX $CMK_CXX_FLAGS"
-
-# native compiler for compiling charmxi, etc
-	CMK_SEQ_CC="$CMK_CC $CMK_CC_FLAGS"
-	CMK_SEQ_CXX="$CMK_CXX $CMK_CXX_FLAGS"
-	CMK_SEQ_LD="$CMK_CC $CMK_CC_FLAGS"
-	CMK_SEQ_LDXX="$CMK_CXX $CMK_CXX_FLAGS"
 	;;
 esac
 CMK_LIBS="$CMK_LIBS -lmpi"

@@ -1,4 +1,3 @@
-CMK_DEFS="$CMK_DEFS "
 CMK_CC="xlc_r -qcpluscmt "
 CMK_CXX="xlC_r"
 

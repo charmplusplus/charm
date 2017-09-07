@@ -24,11 +24,6 @@ CMK_CXX="$MPICXX $CMK_AMD64 "
 CMK_LD="$CMK_CC "
 CMK_LDXX="$CMK_CXX "
 
-CMK_NATIVE_CC="$CMK_CC"
-CMK_NATIVE_LD="$CMK_LD"
-CMK_NATIVE_CXX="$CMK_CXX"
-CMK_NATIVE_LDXX="$CMK_LDXX"
-
 # fortran compiler
 # for Intel Fortran compiler 8.0 and higher which is renamed to ifort from ifc
 # does not work for ifc 7.0

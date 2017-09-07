@@ -28,10 +28,7 @@ CMK_SYSINC="-I $PAMI_INC -I $LIBCOLL_INC"
 CMK_SYSLIBS="-L $PAMI_LIB -L $LIBCOLL_LIB -lcollectives -L /usr/lib/powerpc64le-linux-gnu -lpami -libverbs -lstdc++ -lc -ldl -lrt -lpthread"
 
 CMK_NATIVE_LIBS=''
-CMK_NATIVE_CC="$CC -q64"
-CMK_NATIVE_LD="$CC -q64"
-CMK_NATIVE_CXX="$CXX -q64"
-CMK_NATIVE_LDXX="$CXX -q64"
+CMK_NATIVE_DEFS='-q64'
 
 # fortran compiler
 CMK_CF77='xlf_r -q64 -fPIC '

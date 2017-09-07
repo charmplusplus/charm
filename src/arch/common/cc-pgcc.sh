@@ -1,6 +1,5 @@
 
 # machine specific recommendation
-CMK_DEFS=""
 case `hostname` in
 *.ranger.tacc.utexas.edu) CMK_DEFS="-tp barcelona-64 " ;;
 esac

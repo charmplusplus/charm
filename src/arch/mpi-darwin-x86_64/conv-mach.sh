@@ -2,22 +2,29 @@
 
 CMK_MACOSX=1
 
-CMK_AMD64="-dynamic -fPIC -fno-common -mmacosx-version-min=10.7 -Wno-deprecated-declarations"
+CMK_DEFS="$CMK_DEFS -mmacosx-version-min=10.7"
+
+CMK_AMD64="-dynamic -fPIC -fno-common -Wno-deprecated-declarations"
 
 CMK_CC="$MPICC "
 CMK_CXX="$MPICXX "
 
-CMK_CPP_C_FLAGS="$CMK_CPP_C_FLAGS -mmacosx-version-min=10.7"
+CMK_CPP_C_FLAGS="$CMK_CPP_C_FLAGS"
 CMK_CC_FLAGS="$CMK_CC_FLAGS $CMK_AMD64"
-CMK_CXX_FLAGS="$CMK_CXX_FLAGS $CMK_AMD64"
+CMK_CXX_FLAGS="$CMK_CXX_FLAGS $CMK_AMD64 -stdlib=libc++"
 
 CMK_XIOPTS=""
 
-CMK_NATIVE_CC="clang $CMK_GCC64 "
-CMK_NATIVE_LD="clang -Wl,-no_pie $CMK_GCC64 "
-CMK_NATIVE_CXX="clang++ $CMK_GCC64 -stdlib=libc++ "
-CMK_NATIVE_LDXX="clang++ -Wl,-no_pie $CMK_GCC64 -stdlib=libc++ "
+CMK_NATIVE_CC='clang'
+CMK_NATIVE_LD='clang'
+CMK_NATIVE_CXX='clang++'
+CMK_NATIVE_LDXX='clang++'
 CMK_NATIVE_LIBS=""
+
+CMK_NATIVE_CC_FLAGS="$CMK_GCC64"
+CMK_NATIVE_LD_FLAGS="-Wl,-no_pie $CMK_GCC64"
+CMK_NATIVE_CXX_FLAGS="$CMK_GCC64 -stdlib=libc++"
+CMK_NATIVE_LDXX_FLAGS="-Wl,-no_pie $CMK_GCC64 -stdlib=libc++"
 
 CMK_CF90=`which f95 2>/dev/null`
 if test -n "$CMK_CF90"

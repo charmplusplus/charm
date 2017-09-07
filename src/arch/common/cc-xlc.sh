@@ -8,10 +8,10 @@ CMK_PIC='-qpic=small'
 CMK_LD="$CMK_CC -brtl "
 CMK_LDXX="$CMK_CXX -brtl "
 
-CMK_NATIVE_CC='xlc_r -q32 '
-CMK_NATIVE_LD='xlc_r -q32 '
-CMK_NATIVE_CXX='xlC_r -q32 -D_H_UNISTD -DYY_NEVER_INTERACTIVE=1 '
-CMK_NATIVE_LDXX='xlC_r -q32 '
+CMK_NATIVE_CC='xlc_r '
+CMK_NATIVE_LD='xlc_r '
+CMK_NATIVE_CXX='xlC_r -D_H_UNISTD -DYY_NEVER_INTERACTIVE=1 '
+CMK_NATIVE_LDXX='xlC_r '
 
 CMK_CF77='xlf_r -q32  '
 CMK_CF90='xlf90_r  -qsuffix=f=f90 -q32 '

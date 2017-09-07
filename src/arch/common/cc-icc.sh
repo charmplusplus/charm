@@ -6,10 +6,6 @@ CMK_LD="icc -shared-intel "
 CMK_LDXX="icpc -shared-intel "
 
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
-CMK_NATIVE_CC="$CMK_CC"
-CMK_NATIVE_CXX="$CMK_CXX"
-CMK_NATIVE_LD="$CMK_LD"
-CMK_NATIVE_LDXX="$CMK_LDXX"
 CPPFLAGS="$CPPFLAGS -fpic "
 LDFLAGS="$LDFLAGS -shared-intel "
 
@@ -34,11 +30,5 @@ CMK_F90LIBS="-L$F90LIBDIR -lifcore -lifport -lifcore "
 CMK_F77LIBS="$CMK_F90LIBS"
 
 CMK_F90_USE_MODDIR=""
-
-# native compiler for compiling charmxi, etc
-CMK_SEQ_CC="$CMK_NATIVE_CC"
-CMK_SEQ_CXX="$CMK_NATIVE_CXX"
-CMK_SEQ_LD="$CMK_NATIVE_LD"
-CMK_SEQ_LDXX="$CMK_NATIVE_LDXX"
 
 CMK_C_OPENMP="-fopenmp"
