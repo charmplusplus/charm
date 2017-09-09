@@ -1561,7 +1561,7 @@ class ampiParent : public CBase_ampiParent {
     }
   }
   inline bool opIsPredefined(MPI_Op op) const {
-    return (op>=MPI_INFO_NULL && op<=MPI_NO_OP);
+    return (op>=MPI_OP_NULL && op<=MPI_NO_OP);
   }
   inline bool opIsCommutative(MPI_Op op) const {
     CkAssert(op>MPI_OP_NULL && op<ops.size());
