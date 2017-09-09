@@ -133,11 +133,22 @@ class OpStruct {
  public:
   MPI_User_function* func;
   bool isCommutative;
+ private:
+  bool isValid;
+
+ public:
   OpStruct(void) {}
-  OpStruct(MPI_User_function* f) : func(f), isCommutative(true) {}
-  OpStruct(MPI_User_function* f, bool c) : func(f), isCommutative(c) {}
+  OpStruct(MPI_User_function* f) : func(f), isCommutative(true), isValid(true) {}
+  OpStruct(MPI_User_function* f, bool c) : func(f), isCommutative(c), isValid(true) {}
+  void init(MPI_User_function* f, bool c) {
+    func = f;
+    isCommutative = c;
+    isValid = true;
+  }
+  bool isFree(void) const { return !isValid; }
+  void free(void) { isValid = false; }
   void pup(PUP::er &p) {
-    p|func;  p|isCommutative;
+    p|func;  p|isCommutative;  p|isValid;
   }
 };
 
@@ -1527,9 +1538,27 @@ class ampiParent : public CBase_ampiParent {
 
   void initOps(void);
   inline int createOp(MPI_User_function *fn, bool isCommutative) {
+    // Search thru non-predefined op's for any invalidated ones:
+    for (int i=MPI_NO_OP+1; i<ops.size(); i++) {
+      if (ops[i].isFree()) {
+        ops[i].init(fn, isCommutative);
+        return i;
+      }
+    }
+    // No invalid entries, so create a new one:
     OpStruct newop = OpStruct(fn, isCommutative);
     ops.push_back(newop);
     return ops.size()-1;
+  }
+  inline void freeOp(MPI_Op op) {
+    // Don't free predefined op's:
+    if (op > MPI_NO_OP) {
+      // Invalidate op, then free all invalid op's from the back of the op's vector
+      ops[op].free();
+      while (ops.back().isFree()) {
+        ops.pop_back();
+      }
+    }
   }
   inline bool opIsPredefined(MPI_Op op) const {
     return (op>=MPI_INFO_NULL && op<=MPI_NO_OP);

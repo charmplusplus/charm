@@ -4826,6 +4826,7 @@ int AMPI_Op_create(MPI_User_function *function, int commute, MPI_Op *op){
 CDECL
 int AMPI_Op_free(MPI_Op *op){
   AMPIAPI("AMPI_Op_free");
+  getAmpiParent()->freeOp(*op);
   *op = MPI_OP_NULL;
   return MPI_SUCCESS;
 }
