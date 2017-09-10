@@ -4,7 +4,7 @@ DIRS=hi hello kNeighbor
 
 libs:
 	for d in $(DIRS); do \
-		($(MAKE) -C $$D all || exit 1) || exit 1; \
+		($(MAKE) -C $$d all || exit 1) || exit 1; \
 	done
 	for d in $(DIRS); do \
 		cp $$d/"libmodule$$d.a" ../; \
