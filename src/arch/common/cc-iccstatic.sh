@@ -10,3 +10,5 @@ CMK_LDXX="icpc $ICCOPTS"
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 
 . $CHARMINC/conv-mach-ifort.sh
+
+CMK_COMPILER='icc'

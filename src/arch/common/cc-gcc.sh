@@ -39,3 +39,5 @@ if [ "$CMK_MACOSX" ]; then
     exit 1
   fi
 fi
+
+CMK_COMPILER='gcc'

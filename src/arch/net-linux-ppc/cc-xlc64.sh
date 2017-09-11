@@ -20,3 +20,5 @@ CMK_CF90_FIXED='xlf90_r -q64 '
 
 CMK_AR='ar cq'
 CMK_NM='nm '
+
+CMK_COMPILER='xlc'

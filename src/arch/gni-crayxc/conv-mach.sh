@@ -60,18 +60,22 @@ CMK_CXX_FLAGS="$CMK_CXX_FLAGS -DCMK_FIND_FIRST_OF_PREDICATE=1 --no_using_std "
 # gcc is needed for building QT
 CMK_SEQ_CC="gcc "
 CMK_SEQ_CXX="pgCC  --no_using_std "
+CMK_COMPILER='pgcc'
 elif test -n "$CCE"
 then
 CMK_CXX_OPTIMIZE=" -hipa4"   # For improved C++ performance
 CMK_SEQ_CC="gcc "
 CMK_SEQ_CXX="g++ "
+CMK_COMPILER='craycc'
 elif test -n "$ICPC"
 then
 CMK_SEQ_CC="cc -fPIC "
 CMK_SEQ_CXX="CC -fPIC "
+CMK_COMPILER='icc'
 else   # gcc
 CMK_SEQ_CC="gcc "
 CMK_SEQ_CXX="g++ "
+CMK_COMPILER='gcc'
 fi
 CMK_SEQ_LD="$CMK_SEQ_CC "
 CMK_SEQ_LDXX="$CMK_SEQ_CXX "

@@ -34,3 +34,5 @@ CMK_MOD_EXT="mod"
 CMK_F90_USE_MODDIR=1
 CMK_F90_MODINC="-I"
 CMK_QT="generic64-light"
+
+CMK_COMPILER='gcc'

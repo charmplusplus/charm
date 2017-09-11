@@ -33,9 +33,11 @@ CMK_CXX_FLAGS="$CMK_CXX_FLAGS -DCMK_FIND_FIRST_OF_PREDICATE=1 --no_using_std "
 # gcc is needed for building QT
 CMK_SEQ_CC="gcc -fPIC"
 CMK_SEQ_CXX="pgCC -fPIC --no_using_std "
+CMK_COMPILER='pgcc'
 else
 CMK_SEQ_CC="gcc -fPIC"
 CMK_SEQ_CXX="g++ -fPIC "
+CMK_COMPILER='gcc'
 fi
 CMK_SEQ_LD="$CMK_SEQ_CC "
 CMK_SEQ_LDXX="$CMK_SEQ_CXX "

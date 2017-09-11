@@ -25,3 +25,5 @@ CMK_AR="ar $AR_OPTS cq"
 CMK_NM="nm $AR_OPTS"
 
 CMK_C_OPENMP="-qsmp=omp"
+
+CMK_COMPILER='xlc'

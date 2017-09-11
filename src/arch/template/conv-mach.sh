@@ -20,3 +20,5 @@ CMK_CF77='f77 -automatic'
 CMK_CF90='f90 -automatic'
 CMK_F90LIBS="-lUfor -lfor -lFutil"
 CMK_F77LIBS="$CMK_F90LIBS"
+
+CMK_COMPILER='gcc'

@@ -44,3 +44,5 @@ else
     CMK_F90_MODINC="-I"
   fi
 fi
+
+CMK_COMPILER='gcc'

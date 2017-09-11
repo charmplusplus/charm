@@ -41,3 +41,5 @@ CMK_CF90="mpixlf90_r  -qsuffix=f=f90"
 CMK_CF90_FIXED="mpixlf90_r "
 
 CMK_SYSLIBS="$BGQ_LIB"
+
+CMK_COMPILER='bgxlc'

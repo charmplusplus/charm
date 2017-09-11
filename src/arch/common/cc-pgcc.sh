@@ -39,3 +39,5 @@ then
 fi
 CMK_F90LIBS="-L$f90libdir  -lpgf90 -lpgf90_rpm1 -lpgf902 -lpgf90rtl -lpgftnrtl "
 CMK_F90_USE_MODDIR=""
+
+CMK_COMPILER='pgcc'

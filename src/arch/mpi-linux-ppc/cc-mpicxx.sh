@@ -46,3 +46,5 @@ CMK_F90LIBS="-L$F90LIBDIR -lifcore -lifport -lifcore "
 CMK_F77LIBS="$CMK_F90LIBS"
 
 CMK_F90_USE_MODDIR=""
+
+CMK_COMPILER='mpicc'
