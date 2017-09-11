@@ -13,5 +13,5 @@ if [ -z "$CMK_MACOSX" ]; then
     CMK_CXX_FLAGS="-Wno-deprecated-declarations"
 fi
 
-CMK_USING_CLANG="1"
+CMK_COMPILER='clang'
 CMK_WARNINGS_ARE_ERRORS="-Werror"

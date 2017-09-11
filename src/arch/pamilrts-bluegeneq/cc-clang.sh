@@ -10,4 +10,4 @@ CMK_CXX_OPTIMIZE='-O3 -ffast-math '
 OPTS_LD="$OPTS_LD "
 CMK_QT="generic64-light"
 
-CMK_USING_BGCLANG="1"
+CMK_COMPILER='bgclang'

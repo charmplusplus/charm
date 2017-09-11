@@ -7,7 +7,7 @@ all: ataTest
 
 ataTest: $(OBJS)
 	CHARMINC=../../../include . ../../../tmp/conv-config.sh ; \
-	if [ "$$CMK_USING_BGXLC" = "1" ] ; \
+	if [ "$$CMK_COMPILER" = "bgxlc" ] ; \
 	then \
 	  echo "Skipping test whose compilation will fail under BG XLC"; exit 0 ; \
 	fi ; \
@@ -18,7 +18,7 @@ ataTest.decl.h: ataTest.ci
 
 test: all
 	CHARMINC=../../../include . ../../../tmp/conv-config.sh ; \
-	if [ "$$CMK_USING_BGXLC" = "1" ] ; \
+	if [ "$$CMK_COMPILER" = "bgxlc" ] ; \
 	then \
 	  echo "Skipping test whose compilation will fail under BG XLC"; exit 0 ; \
 	fi ; \
@@ -29,7 +29,7 @@ clean:
 
 ataTest.o: ataTest.C ataTest.decl.h
 	CHARMINC=../../../include . ../../../tmp/conv-config.sh ; \
-	if [ "$$CMK_USING_BGXLC" = "1" ] ; \
+	if [ "$$CMK_COMPILER" = "bgxlc" ] ; \
 	then \
 	  echo "Skipping test whose compilation will fail under BG XLC"; exit 0 ; \
 	fi ; \
