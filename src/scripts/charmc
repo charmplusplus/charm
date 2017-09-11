@@ -83,6 +83,7 @@ PROG_EXT=""
 GENDEPENDS="no"
 COUNTTOKENS="no"
 USE_OPENMP="no"
+SKIP_MODULEINIT=""
 
 COPY_CHARMRUN=true
 USE_BUILD_OPTIONS=0
@@ -164,7 +165,7 @@ End() {
             $RM $TMP.i $TMP.$CMK_CPP_SUFFIX
         done
         $RM core $DELETE
-	if test -n "$modInitObj"
+	if [ -z "$SKIP_MODULEINIT" -a -n "$modInitObj" ]
 	then
 	    [ -n "$VERBOSE" ] && echo $RM $modInitSrc $modInitObj
 	    DoNoErrCheck $RM $modInitSrc $modInitObj > /dev/null 2>&1
@@ -830,6 +831,10 @@ do
 
 	-fopenmp|-openmp)
 		USE_OPENMP="yes"
+		;;
+
+	-skip-module-init)
+		SKIP_MODULEINIT="yes"
 		;;
 
 	-touch-on-failure)
@@ -1552,7 +1557,7 @@ then
   [ -z "$CHARMLIBSO" ] &&  Abort "Charm++ lib_so directory not found!"
   # build user executable/shared lib linking with charm .so
   OPTS_LD="$OPTS_LD $CMK_LD_LIBRARY_PATH"
-  if [ "$BUILD_SHARE" = "1" ]
+  if [ "$BUILD_SHARE" = "1" -o -n "$SKIP_MODULEINIT" ]
   then
     LANG_LIBS="-L$CHARMLIBSO $OBJECTFILES $PRE_LIBRARIES"
   else
@@ -1564,7 +1569,12 @@ else
   then
     LANG_LIBS="-L$CHARMLIB $PRE_LIBRARIES"
   else
-    LANG_LIBS="-L$CHARMLIB $OBJECTFILES $modInitObj $PRE_LIBRARIES"
+    if [ -n "$SKIP_MODULEINIT" ]
+    then
+      LANG_LIBS="-L$CHARMLIB $OBJECTFILES $PRE_LIBRARIES"
+    else
+      LANG_LIBS="-L$CHARMLIB $OBJECTFILES $modInitObj $PRE_LIBRARIES"
+    fi
   fi
 fi
 if [ "$TRACE_WITH_TAU" = 1 ]
@@ -1580,7 +1590,12 @@ if [ "$MPI_INTEROPERATE" != "" ]
 then
   # preserve this variable in its state here for use later
   CHARM_ALL_LIBS="$ALL_LIBS"
-  ALL_LIBS="$OBJECTFILES $modInitObj $ALL_LIBS"
+  if [ -n "$SKIP_MODULEINIT" ]
+  then
+    ALL_LIBS="$OBJECTFILES $ALL_LIBS"
+  else
+    ALL_LIBS="$OBJECTFILES $modInitObj $ALL_LIBS"
+  fi
 fi
 
 
@@ -2024,102 +2039,106 @@ fi
 
 
 ################# Build the module initialization function ##################
-DoNoErrCheck $RM $modInitSrc $modInitObj > /dev/null 2>&1
 
-for module in $MODULES; do
-    echo "extern void _register$module(void);" >> $modInitSrc
-done
-for trace in $TRACEMODE; do
-    if test $trace = "summary" 
-    then
-      echo "  extern void _registerTraceSummary();" >> $modInitSrc
-    elif test $trace = "projections"
-    then
-      echo "  extern void _registerTraceProjections();" >> $modInitSrc
-    elif test $trace = "simple"
-    then
-      echo "  extern void _registerTraceSimple();" >> $modInitSrc
-    elif test $trace = "Tau"
-    then
-      echo "  extern void _registerTraceTau();" >> $modInitSrc
-    elif test $trace = "utilization" 
-    then 
-      echo "  extern void _registerTraceUtilization();" >> $modInitSrc 
-    elif test $trace = "controlPoints"
-    then
-      echo "  extern void _registerTraceControlPoints();" >> $modInitSrc
-    elif test $trace = "perfReport"
-    then
-      Do $CP $CHARMBIN/fuzzytree.txt fuzzytree.txt
-      Do $CP $CHARMBIN/tree.txt tree.txt
-      echo "  extern void _registerTraceAutoPerf();" >> $modInitSrc
+if [ -z "$SKIP_MODULEINIT" ]
+then
+    DoNoErrCheck $RM $modInitSrc $modInitObj > /dev/null 2>&1
 
-    elif test $trace = "all"
-    then
-      echo "  extern void _registerTraceProjections();" >> $modInitSrc
-      echo "  extern void _registerTraceControlPoints();" >> $modInitSrc
-      echo "  extern void _registerTraceSummary();" >> $modInitSrc
-    fi
-done
-if test -n "$BALANCER"
-then
-    echo "extern void LBDefaultCreate(const char *);" >> $modInitSrc
-fi
-echo "void _registerExternalModules(char **argv) { (void)argv;" >> $modInitSrc
-for module in $MODULES; do
-    [ -n "$VERBOSE" ] && echo "Adding registration for module $module"
-    echo "  _register$module();" >> $modInitSrc
-done
-for trace in $TRACEMODE; do
-    if test $trace = "summary"
-    then
-      echo "  _registerTraceSummary();" >> $modInitSrc
-    elif test $trace = "projections"
-    then
-      echo "  _registerTraceProjections();" >> $modInitSrc
-    elif test $trace = "Tau"
-    then
-      TRACE_WITH_TAU=1
-      echo "  _registerTraceTau();" >> $modInitSrc
-    elif test $trace = "simple"
-    then
-      echo "  _registerTraceSimple();" >> $modInitSrc
-    elif test $trace = "utilization" 
-    then 
-      echo "  _registerTraceUtilization();" >>  $modInitSrc 
-    elif test $trace = "controlPoints"
-    then
-      echo "  _registerTraceControlPoints();" >> $modInitSrc
-    elif test $trace = "perfReport"
-    then
-      echo "  _registerTraceAutoPerf();" >> $modInitSrc
-    elif test $trace = "all"
-    then
-      echo "  _registerTraceProjections();" >> $modInitSrc
-      echo "  _registerTraceControlPoints();" >> $modInitSrc
-      echo "  _registerTraceSummary();" >> $modInitSrc
-    fi
-done
-if test -n "$BALANCER"
-then
-    [ -n "$VERBOSE" ] && echo "Adding load balancer for $BALANCER"
-    for deflb in $BALANCER
-    do
-      echo "  LBDefaultCreate(\"$deflb\");" >> $modInitSrc
+    for module in $MODULES; do
+        echo "extern void _register$module(void);" >> $modInitSrc
     done
+    for trace in $TRACEMODE; do
+        if test $trace = "summary"
+        then
+          echo "  extern void _registerTraceSummary();" >> $modInitSrc
+        elif test $trace = "projections"
+        then
+          echo "  extern void _registerTraceProjections();" >> $modInitSrc
+        elif test $trace = "simple"
+        then
+          echo "  extern void _registerTraceSimple();" >> $modInitSrc
+        elif test $trace = "Tau"
+        then
+          echo "  extern void _registerTraceTau();" >> $modInitSrc
+        elif test $trace = "utilization"
+        then
+          echo "  extern void _registerTraceUtilization();" >> $modInitSrc
+        elif test $trace = "controlPoints"
+        then
+          echo "  extern void _registerTraceControlPoints();" >> $modInitSrc
+        elif test $trace = "perfReport"
+        then
+          Do $CP $CHARMBIN/fuzzytree.txt fuzzytree.txt
+          Do $CP $CHARMBIN/tree.txt tree.txt
+          echo "  extern void _registerTraceAutoPerf();" >> $modInitSrc
+
+        elif test $trace = "all"
+        then
+          echo "  extern void _registerTraceProjections();" >> $modInitSrc
+          echo "  extern void _registerTraceControlPoints();" >> $modInitSrc
+          echo "  extern void _registerTraceSummary();" >> $modInitSrc
+        fi
+    done
+    if test -n "$BALANCER"
+    then
+        echo "extern void LBDefaultCreate(const char *);" >> $modInitSrc
+    fi
+    echo "void _registerExternalModules(char **argv) { (void)argv;" >> $modInitSrc
+    for module in $MODULES; do
+        [ -n "$VERBOSE" ] && echo "Adding registration for module $module"
+        echo "  _register$module();" >> $modInitSrc
+    done
+    for trace in $TRACEMODE; do
+        if test $trace = "summary"
+        then
+          echo "  _registerTraceSummary();" >> $modInitSrc
+        elif test $trace = "projections"
+        then
+          echo "  _registerTraceProjections();" >> $modInitSrc
+        elif test $trace = "Tau"
+        then
+          TRACE_WITH_TAU=1
+          echo "  _registerTraceTau();" >> $modInitSrc
+        elif test $trace = "simple"
+        then
+          echo "  _registerTraceSimple();" >> $modInitSrc
+        elif test $trace = "utilization"
+        then
+          echo "  _registerTraceUtilization();" >>  $modInitSrc
+        elif test $trace = "controlPoints"
+        then
+          echo "  _registerTraceControlPoints();" >> $modInitSrc
+        elif test $trace = "perfReport"
+        then
+          echo "  _registerTraceAutoPerf();" >> $modInitSrc
+        elif test $trace = "all"
+        then
+          echo "  _registerTraceProjections();" >> $modInitSrc
+          echo "  _registerTraceControlPoints();" >> $modInitSrc
+          echo "  _registerTraceSummary();" >> $modInitSrc
+        fi
+    done
+    if test -n "$BALANCER"
+    then
+        [ -n "$VERBOSE" ] && echo "Adding load balancer for $BALANCER"
+        for deflb in $BALANCER
+        do
+          echo "  LBDefaultCreate(\"$deflb\");" >> $modInitSrc
+        done
+    fi
+    echo "}" >> $modInitSrc
+
+    # creating projections
+    echo "void _createTraces(char **argv) { (void)argv;" >> $modInitSrc
+    for trace in $TRACEMODE; do
+        [ -n "$VERBOSE" ] && echo "Adding registration for trace $trace"
+        echo "extern void _createTrace$trace(char **argv);" >> $modInitSrc
+        echo "_createTrace$trace(argv);" >> $modInitSrc
+    done
+    echo "}" >> $modInitSrc
+
+    Do $CMK_CXX $CMK_CXX_FLAGS $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $modInitSrc -o $modInitObj
 fi
-echo "}" >> $modInitSrc
-
-# creating projections
-echo "void _createTraces(char **argv) { (void)argv;" >> $modInitSrc
-for trace in $TRACEMODE; do
-    [ -n "$VERBOSE" ] && echo "Adding registration for trace $trace"
-    echo "extern void _createTrace$trace(char **argv);" >> $modInitSrc
-    echo "_createTrace$trace(argv);" >> $modInitSrc
-done
-echo "}" >> $modInitSrc
-
-Do $CMK_CXX $CMK_CXX_FLAGS $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $modInitSrc -o $modInitObj
 
 ###############################################################################
 #
@@ -2136,8 +2155,11 @@ case "$OBJECT" in
 *.a)
 	# in case building charm so, build .so under lib_so as well # Gengbin
 	DoNoErrCheck $RM $OBJECT
-        echo "$CMK_AR $OBJECT $OBJECTFILES $modInitObj"
-	Do $CMK_AR $OBJECT $OBJECTFILES $modInitObj
+	if [ -z "$SKIP_MODULEINIT" ]
+	then
+		echo "$CMK_AR $OBJECT $OBJECTFILES $modInitObj"
+		Do $CMK_AR $OBJECT $OBJECTFILES $modInitObj
+	fi
 	Do $CMK_RANLIB $OBJECT
         echo "export CHARM_ALL_LIBS=\"$CHARM_ALL_LIBS\"" > ./charm_all_libs.sh
         echo "CHARM_ALL_LIBS=\"$CHARM_ALL_LIBS\""
@@ -2185,6 +2207,6 @@ then
   fi
 fi
 
-[ -z "$SAVE" ] && DoNoErrCheck $RM $modInitSrc $modInitObj > /dev/null 2>&1
+[ -z "$SKIP_MODULEINIT" -a -z "$SAVE" ] && DoNoErrCheck $RM $modInitSrc $modInitObj > /dev/null 2>&1
 
 Copyobj
