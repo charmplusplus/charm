@@ -999,7 +999,6 @@ extern void init_memcheckpt(char **argv);
 #endif
 extern "C" void initCharmProjections();
 extern "C" void CmiInitCPUTopology(char **argv);
-extern "C" void CmiInitCPUAffinity(char **argv);
 extern "C" void CmiCheckAffinity();
 extern "C" void CmiInitMemAffinity(char **argv);
 extern "C" void CmiInitPxshm(char **argv);

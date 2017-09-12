@@ -585,7 +585,7 @@ extern int CmiNumPesOnPhysicalNode(int node);
 extern void CmiGetPesOnPhysicalNode(int node, int **pelist, int *num);
 extern int CmiGetFirstPeOnPhysicalNode(int node);
 extern int CmiPhysicalRank(int pe);
-
+extern void CmiInitCPUAffinity(char **argv);
 extern int CmiPrintCPUAffinity();
 extern int CmiSetCPUAffinity(int core);
 extern int CmiOnCore();

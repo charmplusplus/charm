@@ -159,6 +159,10 @@ CmiStartFn mymain(int argc, char *argv[])
   CpvInitialize(int,factor);
   CpvInitialize(bool,warmUp);
 
+  // Set runtime cpuaffinity
+  CmiInitCPUAffinity(argv);
+  // Update the argc after runtime parameters are extracted out
+  argc = CmiGetArgc(argv);
   if(argc == 5){
     CpvAccess(nCycles)=atoi(argv[1]);
     CpvAccess(minMsgSize)= atoi(argv[2]);
