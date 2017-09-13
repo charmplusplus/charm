@@ -14,7 +14,9 @@ entry [\uw{attribute1}, ..., \uw{attributeN}] void \uw{EntryMethod}(\uw{paramete
 
 \charmpp{} currently offers the following attributes that one may assign to 
 an entry method:
-\kw{threaded}, \kw{sync}, \kw{exclusive}, \kw{nokeep}, \kw{notrace}, \kw{appwork}, \kw{immediate}, \kw{expedited}, \kw{inline}, \kw{local}, \kw{python}.
+\kw{threaded}, \kw{sync}, \kw{exclusive}, \kw{nokeep}, \kw{notrace},
+\kw{appwork}, \kw{immediate}, \kw{expedited}, \kw{inline}, \kw{local},
+\kw{python}, \kw{reductiontarget}, \kw{aggregate}.
 
 \begin{description}
 \index{threaded}\item[threaded] \index{entry method}entry methods 
@@ -109,29 +111,31 @@ has no effect. An example ``inlineem'' can be found in \testrefdir{megatest}.
 \index{local}\item[local] entry methods are equivalent to normal function
 calls: the entry method is always executed immediately. This feature is
 available only for Group objects and Chare Array objects. The user has to
-guarantee that the recipient chare element reside on the same PE. Otherwise,
-the application will abort on a failure. If the \kw{local} entry method uses
+guarantee that the recipient chare element resides on the same PE. Otherwise,
+the application will abort with a failure. If the \kw{local} entry method uses
 parameter marshalling, instead of marshalling input parameters into a message,
 it will pass them directly to the callee. This implies that the callee can
 modify the caller data if method parameters are passed by pointer or reference.
-Furthermore, input parameters do not require to be PUPable. Considering that
+Furthermore, input parameters are not required to be PUPable. Considering that
 these entry methods always execute immediately, they are allowed to have a
-non-void return value. Nevertheless, the return type of the method must be a
-pointer. An example can be found in \examplerefdir{hello/local}.
+non-void return value. An example can be found in \examplerefdir{hello/local}.
 
 \index{python}\item[python] entry methods are enabled to be
 called from python scripts as explained in chapter~\ref{python}. Note that the object owning the method must also be declared with the
 keyword \kw{python}. Refer to chapter~\ref{python} for more details.
 
-\index{reductiontarget}\item[reductiontarget] entry methods may be used as the
-target of reductions, despite not taking CkReductionMsg as an argument.
-See section~\ref{reductions} for more references.
+\index{reductiontarget}\item[reductiontarget] entry methods can be
+used as the target of reductions while taking arguments of the same
+type specified in the contribute call rather than a message of type
+\kw{CkReductionMsg}. See section~\ref{reductions} for more
+information.
 
 \index{aggregate}\item[aggregate] data sent to this entry method will be
 aggregated into larger messages before being sent, to reduce fine-grained
 overhead. The aggregation is handled by the Topological Routing and Aggregation
 Module (TRAM). The argument to this entry method must be a single fixed-size
-object. More details on TRAM are given in the Converse and Charm++ Libraries
-Manual (http://charm.cs.illinois.edu/manuals/html/libraries/5.html).
+object. More details on TRAM are given in the
+\href{http://charm.cs.illinois.edu/manuals/html/libraries/manual-1p.html#TRAM}
+{TRAM section} of the libraries manual.
 
 \end{description}
