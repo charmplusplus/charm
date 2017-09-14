@@ -1365,7 +1365,9 @@ void _initCharm(int unused_argc, char **argv)
         CmiInitCPUTopology(argv);
         if (CkMyRank() == 0) {
           TopoManager_reset(); // initialize TopoManager singleton
+#if !CMK_BIGSIM_CHARM
           _topoTree = ST_RecursivePartition_getTreeInfo(0);
+#endif
         }
         CmiNodeAllBarrier(); // threads wait until _topoTree has been generated
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP

@@ -180,6 +180,8 @@ CkReductionMgr::CkReductionMgr()
 { 
 #ifdef BINOMIAL_TREE
   init_BinomialTree();
+#elif CMK_BIGSIM_CHARM
+  init_BinaryTree();
 #else
   init_TopoTree();
 #endif
@@ -1047,6 +1049,8 @@ void CkReductionMgr::pup(PUP::er &p)
     maxStartRequest=0;
 #ifdef BINOMIAL_TREE
     init_BinomialTree();
+#elif CMK_BIGSIM_CHARM
+    init_BinaryTree();
 #else
     init_TopoTree();
 #endif
@@ -1992,6 +1996,8 @@ CkNodeReductionMgr::CkNodeReductionMgr()//Constructor
 {
 #ifdef BINOMIAL_TREE
   init_BinomialTree();
+#elif CMK_BIGSIM_CHARM
+  init_BinaryTree();
 #else
   init_TopoTree();
 #endif
@@ -2633,6 +2639,8 @@ void CkNodeReductionMgr::pup(PUP::er &p)
     lockEverything = CmiCreateLock();
 #ifdef BINOMIAL_TREE
     init_BinomialTree();
+#elif CMK_BIGSIM_CHARM
+    init_BinaryTree();
 #else
     init_TopoTree();
 #endif		
