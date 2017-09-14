@@ -1,17 +1,15 @@
-mainmodule vectorAdd {
+mainmodule vecadd {
   readonly int vectorSize;
   readonly CProxy_Main mainProxy;
 
   mainchare Main {
-    entry Main(CkArgMsg *m);
-    entry void finishWork(CkReductionMsg *m);
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void done();
   };
 
   array [1D] Workers {
     entry Workers();
-    entry void beginWork();
+    entry void begin();
     entry void complete();
   };
-
 };
-

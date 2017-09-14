@@ -10,9 +10,9 @@ NVCC = $(CUDATOOLKIT_HOME)/bin/nvcc
 NVCC_FLAGS = -c -std=c++11 $(USE_WR)
 NVCC_INC = -I$(CUDATOOLKIT_HOME)/include
 CHARM_INC = -I../../../../include
-LD_LIBS =
+LD_LIBS = -lcublas
 
-TARGET = hello
+TARGET = matmul
 all: $(TARGET)
 
 OBJS = $(TARGET).o $(TARGET)CUDA.o

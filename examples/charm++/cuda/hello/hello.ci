@@ -4,13 +4,13 @@ mainmodule hello {
   readonly CProxy_Hello arr;
 
   mainchare Main {
-    entry Main(CkArgMsg *m);
-    entry void done(void);
+    entry Main(CkArgMsg* m);
+    entry void done();
   };
 
   array [1D] Hello {
-    entry Hello(void);
-    entry void SayHi(void);
-    entry void SendHi(void); 
-  };        	
+    entry Hello();
+    entry void greet();
+    entry void pass();
+  };
 };

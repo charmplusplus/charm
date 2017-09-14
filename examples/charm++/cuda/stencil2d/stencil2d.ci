@@ -1,0 +1,50 @@
+mainmodule stencil2d {
+  readonly CProxy_Main mainProxy;
+  readonly int grid_x;
+  readonly int grid_y;
+  readonly int block_x;
+  readonly int block_y;
+  readonly int num_chares_x;
+  readonly int num_chares_y;
+  readonly int num_iters;
+  readonly int global_exec_mode;
+  readonly int thread_size;
+  readonly float offload_ratio;
+  readonly bool gpu_prio;
+  readonly int gpu_pes;
+
+  group CustomMap : CkArrayMap {
+    entry CustomMap();
+  };
+
+  message CallbackMsg;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void initDone();
+    entry [reductiontarget] void done(double time);
+  };
+
+  array [2D] Stencil {
+    entry Stencil(void);
+    entry void init();
+    entry void run(CallbackMsg*);
+    entry void receiveGhosts(int ref, int dir, int w, double gh[w]);
+
+    entry void iterate() {
+      serial {
+        sendGhosts();
+      }
+
+      for (remote_count = 0; remote_count < neighbors; remote_count++) {
+        when receiveGhosts[my_iter](int ref, int dir, int w, double buf[w]) serial {
+          processGhosts(dir, w, buf);
+        }
+      }
+
+      serial {
+        update();
+      }
+    };
+  };
+};

@@ -12,7 +12,7 @@ NVCC_INC = -I$(CUDATOOLKIT_HOME)/include
 CHARM_INC = -I../../../../include
 LD_LIBS =
 
-TARGET = hello
+TARGET = vecadd
 all: $(TARGET)
 
 OBJS = $(TARGET).o $(TARGET)CUDA.o
