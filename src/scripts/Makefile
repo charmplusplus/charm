@@ -928,7 +928,7 @@ veryclean:
 	rm -rf .[a-z]* .[A-Z]*
 
 
-config: configure.in
+config: configure.ac
 	autoconf && autoheader
 
 cidepends: charmxi
