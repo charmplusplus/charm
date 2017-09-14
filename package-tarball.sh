@@ -32,11 +32,21 @@ fi
 # Make sure the working copy and index are completely clean
 git diff --quiet --exit-code HEAD
 
-# Emit a static indicator of the original commit
+# Get in position to process build scripts
 pushd src/scripts
+
+# Emit a static indicator of the original commit
 SRCBASE=`pwd` ./commitid.sh
 git add -f VERSION
 rm VERSION.new
+
+# Run autotools so users don't need to
+autoreconf
+autoheader
+rm -rf autom4te.cache
+git add -f configure conv-autoconfig.h.in
+
+# Done with build scripts
 popd
 
 # Stage all of the modified files
