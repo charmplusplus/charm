@@ -7,12 +7,13 @@
 #include <string.h> // for memcpy
 
 //"Documentation" class: prevents people from using copy constructors 
-class CkNoncopyable {
-	//These aren't defined anywhere-- don't use them!
-	CkNoncopyable(const CkNoncopyable &c);
-	CkNoncopyable &operator=(const CkNoncopyable &c);
-public:
+struct CkNoncopyable {
 	CkNoncopyable(void) {}
+	CkNoncopyable(const CkNoncopyable &c) = delete;
+	CkNoncopyable& operator=(const CkNoncopyable &c) = delete;
+	CkNoncopyable(CkNoncopyable&&) = default;
+	CkNoncopyable& operator=(CkNoncopyable &&) = default;
+	~CkNoncopyable() = default;
 };
 
 //Implementation class 
@@ -32,7 +33,7 @@ template <class T> void pupCkQ(PUP::er &p,CkQ<T> &q);
 /// A single-ended FIFO queue.
 ///  See CkMsgQ if T is a Charm++ message type.
 template <class T>
-class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
+class CkQ : private CkSTLHelper<T> {
     T *block;
     int blklen;
     int first;
@@ -54,6 +55,17 @@ class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
     }
   public:
     CkQ() : block(NULL), blklen(0), first(0),len(0),mask(0) {}
+    CkQ(CkQ &&rhs)
+      : block(rhs.block)
+      , blklen(rhs.blklen)
+      , first(rhs.first)
+      , len(rhs.len)
+      , mask(rhs.mask)
+    {
+      rhs.block = NULL;
+      rhs.blklen = 0;
+      rhs.len = 0;
+    }
     CkQ(int sz) :first(0),len(0) {
       int size = 2;
       mask = 0x03;
@@ -61,6 +73,9 @@ class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
       blklen = 1<<size;
       block = new T[blklen];
     }
+    CkQ(const CkQ&) = delete;
+    void operator=(const CkQ&) = delete;
+    void operator=(CkQ&&) = delete; // Assignment of one queue to another makes no sense
     ~CkQ() { delete[] block; }
     int length(void) { return len; }
     int isEmpty(void) { return (len==0); }

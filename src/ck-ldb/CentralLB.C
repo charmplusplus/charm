@@ -1946,7 +1946,7 @@ void CkMarshalledCLBStatsMessage::free() {
     delete msgs[i];
     msgs[i] = NULL;
   }
-  msgs.free();
+  msgs.clear();
 }
 
 void CkMarshalledCLBStatsMessage::add(CkMarshalledCLBStatsMessage &m)

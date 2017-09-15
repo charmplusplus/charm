@@ -813,20 +813,9 @@ class CkPointer {
 	T *allocated; //Pointer that PUP dynamically allocated for us (recv only)
 	T *ptr; //Read-only pointer
 
-#if 0 /* Private (do-not-use) copy constructor.  This prevents allocated from being
-         deleted twice--once in the original, and again in the copy.*/
-	CkPointer(const CkPointer<T> &src); // Don't use this!
-#else /* Some compilers, like gcc3, have a hideous bug that causes them to *demand*
-         a public copy constructor when a class is used to initialize a const-reference
-	 from a temporary.  The public copy constructor should never be called, though. */
-public:
-	CkPointer(const CkPointer<T> &src) {
-		CmiAbort("PUPable_marshall's cannot be passed by value.  Pass them only by reference!");
-	}
-  	void operator=(const CkPointer<T> &src) {
-		CmiAbort("PUPable_marshall's cannot be passed by value.  Pass them only by reference!");
-	}
-#endif
+	CkPointer(const CkPointer<T> &) = delete;
+	void operator=(const CkPointer<T> &) = delete;
+	void operator=(CkPointer<T> &&) = delete;
 protected:
 	T *peek(void) {return ptr;}
 public:
@@ -835,6 +824,14 @@ public:
 	{ 
 		allocated=0; //Don't ever delete src
 		ptr=src;
+	}
+	CkPointer(CkPointer<T> &&src)
+	{
+		allocated = src.allocated;
+		ptr = src.ptr;
+
+		src.allocated = nullptr;
+		src.ptr = nullptr;
 	}
 	
 	/// Begin completely empty: used on marshalling recv side.

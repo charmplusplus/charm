@@ -40,14 +40,21 @@ class CkArray;
 //This is for passing a single Charm++ message via parameter marshalling
 class CkMarshalledMessage {
 	void *msg;
-	//Don't use these: only pass by reference
-	void operator=(const CkMarshalledMessage &);
  public:
 	CkMarshalledMessage(void): msg(NULL) {}
 	CkMarshalledMessage(CkMessage *m): msg(m) {} //Takes ownership of message
-	CkMarshalledMessage(const CkMarshalledMessage &);
-	~CkMarshalledMessage() {if (msg) CkFreeMsg(msg);}
-	CkMessage *getMessage(void) {void *ret=msg; msg=NULL; return (CkMessage *)ret;}
+
+        CkMarshalledMessage(const CkMarshalledMessage &) = delete;
+	void operator=     (const CkMarshalledMessage &) = delete;
+        CkMarshalledMessage(CkMarshalledMessage &&rhs) { msg = rhs.msg; rhs.msg = NULL; }
+        void operator=     (CkMarshalledMessage &&rhs) { msg = rhs.msg; rhs.msg = NULL; }
+	~CkMarshalledMessage() { if (msg) CkFreeMsg(msg); }
+
+	CkMessage *getMessage(void) {
+          void *ret = msg;
+          msg = nullptr;
+          return (CkMessage *)ret;
+        }
 	void pup(PUP::er &p) {CkPupMessage(p,&msg,1);}
 };
 PUPmarshall(CkMarshalledMessage)
@@ -144,6 +151,11 @@ public:
 template <class MSG>
 class CkMsgQ : public CkQ<MSG *> {
 public:
+	CkMsgQ() = default;
+	CkMsgQ(CkMsgQ&&) = default;
+	CkMsgQ(const CkMsgQ&) = delete;
+	void operator=(CkMsgQ&&) = delete;
+	void operator=(const CkMsgQ&) = delete;
 	~CkMsgQ() { //Delete the messages in the queue:
 		MSG *m;
 		while (NULL!=(m=this->deq())) delete m;
