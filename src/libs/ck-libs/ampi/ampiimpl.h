@@ -2,6 +2,7 @@
 #define _AMPIIMPL_H
 
 #include <string.h> /* for strlen */
+#include <algorithm>
 
 #include "ampi.h"
 #include "ddt.h"
