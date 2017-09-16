@@ -4,7 +4,7 @@
 CDIR=../../../../..
 LIBDIR=$(CDIR)/lib
 INCDIR=$(CDIR)/include
-CC=$(CDIR)/bin/charmc -I. -I../GKlib
+CC=$(CDIR)/bin/charmc -I. -I../GKlib $(OPTS)
 LD = $(CC)
 RANLIB = ar -ts
 
