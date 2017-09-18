@@ -2078,8 +2078,15 @@ int main() {
 EOT
 test_link "whether PAPI exists" "yes" "no" "-lpapi"
 AC_DEFINE_UNQUOTED(CMK_HAS_COUNTER_PAPI, $pass, [whether PAPI exists])
-if test $pass -eq 1
-then 
+if test "$enable_tracing" = "no"
+then
+	echo "Error: Cannot build papi version when tracing is disabled, build with --enable-tracing"
+	test_finish 1
+elif test $fail -eq 1
+then
+	echo "Error: Cannot find papi library"
+	test_finish 1
+else
 	add_flag 'CMK_LIBS="$CMK_LIBS -lpapi"' "papi"
 fi
 fi
