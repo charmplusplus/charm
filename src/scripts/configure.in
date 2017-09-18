@@ -1341,7 +1341,7 @@ BUILD_MPI=$strictpass
 
 if test $BUILD_MPI -eq 0
 then
-  echo "Error: Can not compile a MPI program"
+  echo "Error: Cannot compile an MPI program"
   test_finish 1
 fi
 
@@ -1362,7 +1362,7 @@ then
         then
                 add_flag CMK_SYSLIBS='"$CMK_SYSLIBS -lmpi"' "mpi lib"
         else
-                echo "Error: can not find mpi library"
+                echo "Error: Cannot find MPI library"
                 test_finish 1
         fi
       fi
