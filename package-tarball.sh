@@ -40,11 +40,17 @@ SRCBASE=`pwd` ./commitid.sh
 git add -f VERSION
 rm VERSION.new
 
+# Symlink hwloc in temporarily
+ln -s ../../contrib/hwloc hwloc
+
 # Run autotools so users don't need to
 autoreconf
 autoheader
 rm -rf autom4te.cache
-git add -f configure conv-autoconfig.h.in
+git add -f aclocal.m4 configure conv-autoconfig.h.in
+
+# Remove symlink
+rm hwloc
 
 # Done with build scripts
 popd

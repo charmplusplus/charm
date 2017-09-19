@@ -281,7 +281,7 @@ headers: dirs+sources
 	$(MAKE) charmxi
 	$(MAKE) headerlinks
 
-configure: configure.ac
+configure: Makefile.am configure.ac
 	autoreconf
 
 conv-autoconfig.h.in: configure.ac
@@ -311,6 +311,7 @@ dirs+sources:
 	pwd
 	find . -type l -exec rm {} \;
 	rm -rf QuickThreads
+	rm -rf hwloc
 	rm -rf libs
 	rm -rf ../bin ; mkdir ../bin
 	if case `cat .vdir` in *win32*) true;; *win64*) true;; *-win-*) true;; *) false;; esac; then \
@@ -339,6 +340,7 @@ dirs+sources:
 	./gatherflat $(SRCBASE)/langs/f90charm   .
 	./gatherflat $(SRCBASE)/xlatcpm          .
 	./gathertree $(SRCBASE)/QuickThreads     QuickThreads
+	./gathertree $(SRCBASE)/../contrib/hwloc hwloc
 	./gathertree $(SRCBASE)/libs             libs
 	./gathertree $(SRCBASE)/arch/util        .
 	./gathertree $(SRCBASE)/util             .
@@ -418,7 +420,7 @@ CVLIBS=$(L)/libconv-core.a \
 	$(L)/libconv-cplus-y.a $(L)/libconv-cplus-n.a \
 	$(L)/libconv-util.a $(L)/libconv-utilf.a \
 	$(CLBLIBS) $(TRACELIBS) $(MEMLIBS) $(THREADLIBS) \
-	$(L)/libccs-client.a $(L)/libconv-partition.a \
+	$(L)/libccs-client.a $(L)/libconv-partition.a $(L)/libhwloc_embedded.a \
 	$(L)/libconv-ldb.a
 
 LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
@@ -441,9 +443,24 @@ LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 
 LIBCONV_UTILF=pup_f.o
 
-converse: charmrun-target swapglobal-target conv-cpm tmgr
+converse: charmrun-target swapglobal-target conv-cpm tmgr hwloc-target
 
-charmrun-target: charmrun  sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h sockRoutines-seq.o $(L)/libck.a $(CVLIBS)
+$(L)/libhwloc_embedded.a: hwloc-target
+
+cpuaffinity.o: hwloc-target
+
+hwloc-target:  conv-autoconfig.h
+	( $(MAKE) -C hwloc )
+	( cp -f hwloc/src/.libs/libhwloc_embedded.a $(L) )
+	( cp -f hwloc/include/hwloc.h $(INC) )
+	( cp -LRf hwloc/include/hwloc $(INC) )
+#	-(CHARMINC=.; . ./conv-config.sh; \
+	 test -d ../lib_so && \
+	 cp -f hwloc/src/.libs/libhwloc_embedded.$$CMK_SHARED_SUF ../lib_so && \
+	 cp -f hwloc/src/.libs/libhwloc_embedded.$$CMK_SHARED_SUF ../lib_so/libhwloc_embedded.$$CMK_SHARED_SUF)
+	touch $@
+
+charmrun-target: hwloc-target charmrun  sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h sockRoutines-seq.o $(L)/libck.a $(L)/libhwloc_embedded.a $(CVLIBS)
 	if [ -f charmrun ] ; then ( cp -f charmrun ../bin ) ; fi
 
 QUICK_THREADS: $(CVHEADERS)

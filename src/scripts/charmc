@@ -1100,6 +1100,7 @@ then
     CMK_LDXX="$CMK_SEQ_LDXX" 
     CMK_AR="$CMK_SEQ_AR"
     CMK_RANLIB="$CMK_SEQ_RANLIB"
+    POST_LIBRARIES=`AddList $POST_LIBRARIES $CMK_HWLOC_LIBS`
 fi
 
 if [ -n "$NATIVE" ]
@@ -1954,7 +1955,7 @@ Debug "About to perform final link..."
 MAKE_LDXX="0"
 MAKE_LD="0"
 
-CORE_LIBS="-lconv-core -ltmgr -lconv-util -lconv-partition $TRACE_OBJ"
+CORE_LIBS="-lconv-core -ltmgr -lconv-util -lconv-partition $TRACE_OBJ $CMK_HWLOC_LIBS"
 
 # get TAU stub makefile variables
 if test "$CMK_WITH_TAU" = "true"

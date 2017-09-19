@@ -1,5 +1,23 @@
 
-AC_INIT(./Makefile)
+AC_INIT(Charm++, 2.6)
+AC_CONFIG_SRCDIR(./Makefile)
+
+# for hwloc
+enable_embedded_mode='yes'
+enable_static='yes'
+enable_libxml2='no'
+enable_visibility='no'
+AC_CONFIG_AUX_DIR(hwloc/config)
+AC_CANONICAL_TARGET
+AC_USE_SYSTEM_EXTENSIONS
+LT_INIT
+AS_CASE([$target_os],
+        [darwin*],
+        export MACOSX_DEPLOYMENT_TARGET='10.7'
+        export HWLOC_FLAGS='-mmacosx-version-min=10.7'
+        )
+
+AM_INIT_AUTOMAKE
 
 AC_CONFIG_HEADER(conv-autoconfig.h)
 
@@ -2417,6 +2435,15 @@ EOF
   fi
   /bin/rm -f conftest.f90
 fi
+
+# for hwloc
+AC_CONFIG_MACRO_DIR(hwloc/config)
+HWLOC_SET_SYMBOL_PREFIX([cmi_])
+HWLOC_SETUP_CORE([hwloc], [happy=yes], [happy=no])
+HWLOC_DO_AM_CONDITIONALS
+add_flag 'CMK_HWLOC_LIBS="-lhwloc_embedded '"$HWLOC_EMBEDDED_LIBS"' -lpthread"' "hwloc"
+add_flag 'OPTS_CC="$OPTS_CC '"$HWLOC_EMBEDDED_CFLAGS"'"' 'hwloc'
+add_flag 'OPTS_CXX="$OPTS_CXX '"$HWLOC_EMBEDDED_CFLAGS"'"' 'hwloc'
 
 AC_OUTPUT(
 libs/ck-libs/ampi/ampiCC,
