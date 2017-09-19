@@ -114,6 +114,9 @@ bool refine(ProcArray* parr, ObjGraph* ogr, std::vector<int>& max_pe_heap,
     for (int j = 0; j < min_pe_heap.size(); j++) {
       obj_considered = pe_obj[max_pe][i];
       pe_considered = min_pe_heap[j];
+
+      // Skip over objects that cannot be migrated
+      if (!ogr->vertices[obj_considered].isMigratable()) continue;
    
       if (parr->procs[pe_considered].getTotalLoad() +
           ogr->vertices[obj_considered].getVertexLoad() < (avg_load + threshold)) {
@@ -169,7 +172,9 @@ bool IsSwapPossWithPe(ProcArray* parr, ObjGraph* ogr, std::vector<int>* pe_obj,
      //     ogr->vertices[pe_cons].getVertexLoad(), diff);
 
       if (ogr->vertices[pe_cons].getVertexLoad() <
-          ogr->vertices[max_pe_obj].getVertexLoad()) {
+          ogr->vertices[max_pe_obj].getVertexLoad() &&
+          ogr->vertices[pe_cons].isMigratable() &&
+          ogr->vertices[max_pe_obj].isMigratable()) {
         if ((diff + ogr->vertices[pe_cons].getVertexLoad()) >
             ogr->vertices[max_pe_obj].getVertexLoad()) {
           //CkPrintf("\tSwapping %d with %d\n", max_pe_obj, pe_cons);
