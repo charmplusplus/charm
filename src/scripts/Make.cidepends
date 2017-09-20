@@ -24,6 +24,7 @@ GridHybridLB.decl.h GridHybridLB.def.h: GridHybridLB.ci.stamp
 GridHybridSeedLB.decl.h GridHybridSeedLB.def.h: GridHybridSeedLB.ci.stamp
 GridMetisLB.decl.h GridMetisLB.def.h: GridMetisLB.ci.stamp
 HbmLB.decl.h HbmLB.def.h: HbmLB.ci.stamp
+HierarchicalLB.decl.h HierarchicalLB.def.h: HierarchicalLB.ci.stamp
 HybridBaseLB.decl.h HybridBaseLB.def.h: HybridBaseLB.ci.stamp
 HybridLB.decl.h HybridLB.def.h: HybridLB.ci.stamp
 LBDatabase.decl.h LBDatabase.def.h: LBDatabase.ci.stamp

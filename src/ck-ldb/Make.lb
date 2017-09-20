@@ -9,6 +9,7 @@ COMMON_LDBS=\
    RefineCommLB \
    RotateLB \
    DistributedLB \
+   HierarchicalLB \
    HybridLB \
    ComboCentLB \
    RefineSwapLB \
@@ -29,6 +30,7 @@ ALL_LDBS=\
    RefineCommLB \
    RotateLB \
    DistributedLB \
+   HierarchicalLB \
    HybridLB \
    ComboCentLB \
    RefineSwapLB \
@@ -81,6 +83,9 @@ LBHEADERS += RotateLB.h RotateLB.decl.h
 
 $(L)/libmoduleDistributedLB.a: 
 LBHEADERS += DistributedLB.h DistributedLB.decl.h
+
+$(L)/libmoduleHierarchicalLB.a: 
+LBHEADERS += HierarchicalLB.h HierarchicalLB.decl.h
 
 $(L)/libmoduleHybridLB.a: 
 LBHEADERS += HybridLB.h HybridLB.decl.h
@@ -196,6 +201,7 @@ ALL_LB_OBJS=EveryLB.o \
     RefineCommLB.o \
     RotateLB.o \
     DistributedLB.o \
+    HierarchicalLB.o \
     HybridLB.o \
     ComboCentLB.o \
     RefineSwapLB.o \
@@ -246,6 +252,7 @@ EVERYLB_DEPS=EveryLB.o \
     RefineCommLB.o \
     RotateLB.o \
     DistributedLB.o \
+    HierarchicalLB.o \
     HybridLB.o \
     ComboCentLB.o \
     RefineSwapLB.o \
@@ -286,6 +293,7 @@ COMMONLBS_DEPS=CommonLBs.o \
     RefineCommLB.o \
     RotateLB.o \
     DistributedLB.o \
+    HierarchicalLB.o \
     HybridLB.o \
     ComboCentLB.o \
     RefineSwapLB.o \

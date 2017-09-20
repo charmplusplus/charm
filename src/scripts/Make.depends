@@ -249,10 +249,11 @@ CommonLBs.o: CommonLBs.C LBDatabase.h lbdb.h converse.h conv-config.h \
  DummyLB.decl.h CentralLB.decl.h BaseLB.decl.h LBDatabase.decl.h \
  CentralLBMsg.h GreedyLB.decl.h GreedyRefineLB.decl.h CommLB.decl.h \
  RandCentLB.decl.h RefineLB.decl.h RefineCommLB.decl.h RotateLB.decl.h \
- DistributedLB.decl.h DistBaseLB.decl.h HybridLB.decl.h \
- HybridBaseLB.decl.h NeighborLBMsg.h HybridLBMsg.h ComboCentLB.decl.h \
- RefineSwapLB.decl.h NeighborLB.decl.h NborBaseLB.decl.h OrbLB.decl.h \
- BlockLB.decl.h GreedyCommLB.decl.h NodeLevelLB.decl.h CommonLBs.def.h
+ DistributedLB.decl.h DistBaseLB.decl.h HierarchicalLB.decl.h \
+ HybridLB.decl.h HybridBaseLB.decl.h NeighborLBMsg.h HybridLBMsg.h \
+ ComboCentLB.decl.h RefineSwapLB.decl.h NeighborLB.decl.h \
+ NborBaseLB.decl.h OrbLB.decl.h BlockLB.decl.h GreedyCommLB.decl.h \
+ NodeLevelLB.decl.h CommonLBs.def.h
 
 DistBaseLB.o: DistBaseLB.C BaseLB.h LBDatabase.h lbdb.h converse.h \
  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
@@ -345,15 +346,16 @@ EveryLB.o: EveryLB.C LBDatabase.h lbdb.h converse.h conv-config.h \
  DummyLB.decl.h CentralLB.decl.h BaseLB.decl.h LBDatabase.decl.h \
  CentralLBMsg.h GreedyLB.decl.h GreedyRefineLB.decl.h CommLB.decl.h \
  RandCentLB.decl.h RefineLB.decl.h RefineCommLB.decl.h RotateLB.decl.h \
- DistributedLB.decl.h DistBaseLB.decl.h HybridLB.decl.h \
- HybridBaseLB.decl.h NeighborLBMsg.h HybridLBMsg.h ComboCentLB.decl.h \
- RefineSwapLB.decl.h NeighborLB.decl.h NborBaseLB.decl.h OrbLB.decl.h \
- BlockLB.decl.h GreedyCommLB.decl.h NodeLevelLB.decl.h GraphPartLB.decl.h \
- GraphBFTLB.decl.h GridCommLB.decl.h GridCommRefineLB.decl.h HbmLB.decl.h \
- RefineKLB.decl.h TempAwareCommLB.decl.h TreeMatchLB.decl.h \
- GreedyAgentLB.decl.h NeighborCommLB.decl.h PhasebyArrayLB.decl.h \
- RecBipartLB.decl.h CommAwareRefineLB.decl.h AdaptiveLB.decl.h \
- MetisLB.decl.h GridMetisLB.decl.h EveryLB.def.h
+ DistributedLB.decl.h DistBaseLB.decl.h HierarchicalLB.decl.h \
+ HybridLB.decl.h HybridBaseLB.decl.h NeighborLBMsg.h HybridLBMsg.h \
+ ComboCentLB.decl.h RefineSwapLB.decl.h NeighborLB.decl.h \
+ NborBaseLB.decl.h OrbLB.decl.h BlockLB.decl.h GreedyCommLB.decl.h \
+ NodeLevelLB.decl.h GraphPartLB.decl.h GraphBFTLB.decl.h \
+ GridCommLB.decl.h GridCommRefineLB.decl.h HbmLB.decl.h RefineKLB.decl.h \
+ TempAwareCommLB.decl.h TreeMatchLB.decl.h GreedyAgentLB.decl.h \
+ NeighborCommLB.decl.h PhasebyArrayLB.decl.h RecBipartLB.decl.h \
+ CommAwareRefineLB.decl.h AdaptiveLB.decl.h MetisLB.decl.h \
+ GridMetisLB.decl.h EveryLB.def.h
 
 GraphBFTLB.o: GraphBFTLB.C GraphBFTLB.h CentralLB.h BaseLB.h LBDatabase.h \
  lbdb.h converse.h conv-config.h conv-autoconfig.h conv-common.h \
@@ -632,6 +634,29 @@ HbmLB.o: HbmLB.C HbmLB.h CentralLB.h BaseLB.h LBDatabase.h lbdb.h \
  GreedyCommLB.h GreedyCommLB.decl.h CommLBHeap.h RefineCommLB.h \
  RefinerComm.h Refiner.h elements.h ckset.h ckheap.h RefineLB.h \
  RefineLB.decl.h RefineCommLB.decl.h HbmLB.def.h
+
+HierarchicalLB.o: HierarchicalLB.C HierarchicalLB.h HierarchicalLBTypes.h \
+ DistBaseLB.h BaseLB.h LBDatabase.h lbdb.h converse.h conv-config.h \
+ conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
+ pup_c.h lrtslock.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h \
+ conv-random.h conv-lists.h conv-trace.h persistent.h conv-rdma.h \
+ debug-conv.h charm.h pup.h middle.h middle-conv.h LBDBManager.h \
+ cklists.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h \
+ LBDatabase.decl.h charm++.h ckbitvector.h ckstream.h init.h \
+ ckhashtable.h debug-charm.h debug-conv++.h simd.h ckmessage.h pup.h \
+ CkMarshall.decl.h envelope.h charm.h middle.h cklists.h objid.h charm.h \
+ converse.h pup.h sdag.h pup_stl.h conv-config.h envelope.h debug-charm.h \
+ ckarrayindex.h objid.h cksection.h ckcallback.h conv-ccs.h \
+ sockRoutines.h ccs-server.h ckrdmawrapper.h ckrdma.h ckobjQ.h \
+ ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
+ CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h MetaBalancer.h \
+ MetaBalancer.decl.h CkLocation.decl.h ckarrayoptions.h ckmulticast.h \
+ CkMulticast.decl.h cklocrec.h ckmigratable.h CkArray.decl.h ckfutures.h \
+ CkFutures.decl.h waitqd.h waitqd.decl.h ckcheckpoint.h ckcallback.h \
+ CkCheckpointStatus.decl.h ckevacuation.h trace.h trace-bluegene.h \
+ pathHistory.h PathHistory.decl.h ckcallback-ccs.h CkCallback.decl.h \
+ NullLB.decl.h BaseLB.decl.h DistBaseLB.decl.h HierarchicalLB.decl.h \
+ ckheap.h elements.h ckset.h HierarchicalLB.def.h
 
 HybridBaseLB.o: HybridBaseLB.C HybridBaseLB.h charm++.h charm.h \
  converse.h conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
