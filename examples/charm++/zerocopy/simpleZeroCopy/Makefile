@@ -14,8 +14,8 @@ simpleZeroCopy.o : simpleZeroCopy.C cifiles
 	$(CHARMC) -c simpleZeroCopy.C
 
 test: all
-	$(call run, +p4 ./simpleZeroCopy 200 +balancer RotateLB)
-	$(call run, +p4 ./simpleZeroCopy 200 +balancer GreedyLB)
+	$(call run, +p4 ./simpleZeroCopy 32 +balancer RotateLB)
+	$(call run, +p4 ./simpleZeroCopy 32 +balancer GreedyLB)
 
 clean:
 	rm -f *.def.h *.decl.h *.o *~ *.exe cifiles charmrun simpleZeroCopy
