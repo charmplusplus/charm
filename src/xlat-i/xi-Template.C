@@ -255,7 +255,8 @@ void TParamList::genSpec(XStr& str)
 void
 TParamList::print(XStr& str)
 {
-  tparam->print(str);
+  if (tparam)
+    tparam->print(str);
   if(next) {
     str << ",";
     next->print(str);
