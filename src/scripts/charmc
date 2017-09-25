@@ -106,6 +106,7 @@ NO_MAIN_MODULE=""
 NO_MAIN=""
 CUSTOM_PARTITION=""
 PREPROCESS_CI="yes"
+INPUT_GIVEN=""
 
 ####################################################################
 #
@@ -453,6 +454,7 @@ do
 
 	"-module"|"-modules")
 		AddModules `echo $1 | sed -e 's/,/ /g'`
+                INPUT_GIVEN="1"
 		shift
 		;;
 
@@ -783,6 +785,7 @@ do
 		else
 			PRE_LIBRARIES="$PRE_LIBRARIES $arg"
 		fi
+                INPUT_GIVEN="1"
 		;;
 
 	-s)
@@ -832,6 +835,7 @@ do
 	*.*)
 		[ -n "$VERBOSE" ] && echo "Adding file $arg..."
 		FILES="$FILES $arg"
+                INPUT_GIVEN="1"
 		;;
 # Default
 	*)
@@ -1518,6 +1522,11 @@ then
 fi
 
 Debug "About to link..."
+
+if [ "$INPUT_GIVEN" != "1" ]
+then
+    Abort "Trying to link, but no object files or library archives were specified"
+fi
 
 # if interoperate dont create the library now, wait to collect all info
 if [ "$MPI_INTEROPERATE" = "" ]
