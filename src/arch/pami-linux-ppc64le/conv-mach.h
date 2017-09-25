@@ -22,11 +22,11 @@
 
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 
-#define CMK_TIMER_USE_GETRUSAGE                            0
+#define CMK_TIMER_USE_GETRUSAGE                            1
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
 #define CMK_TIMER_USE_RDTSC                                0
-#define CMK_TIMER_USE_PPC64                                1
+#define CMK_TIMER_USE_PPC64                                0
 
 #define CMK_THREADS_USE_CONTEXT                            1
 #define CMK_THREADS_USE_JCONTEXT                           0
