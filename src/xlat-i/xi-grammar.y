@@ -391,7 +391,7 @@ TParamList	: TParam
 		;
 
 TParamEList	: /* Empty */
-		{ $$ = 0; }
+		{ $$ = new TParamList(0); }
 		| TParamList
 		{ $$ = $1; }
 		;
