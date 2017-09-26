@@ -7,7 +7,7 @@ module CkArray {
   group [migratable] CkArray : CkReductionMgr {
 	entry CkArray(CkArrayOptions opts, CkMarshalledMessage ctorMsg);
 	//Insertion
-        entry [inline] void insertElement(CkMarshalledMessage, CkArrayIndex, int listenerData[CK_ARRAYLISTENER_MAXLEN]);
+        entry [notrace] void insertElement(CkMarshalledMessage, CkArrayIndex, int listenerData[CK_ARRAYLISTENER_MAXLEN]);
         entry [inline] void demandCreateElement(const CkArrayIndex &idx, int ctor, CkDeliver_t type);
         entry void remoteBeginInserting(void);
 	entry void remoteDoneInserting(void);

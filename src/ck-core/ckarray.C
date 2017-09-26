@@ -668,6 +668,11 @@ void CProxy_ArrayBase::ckInsertIdx(CkArrayMessage *m,int ctor,int proposedPe,
 {
   if (m==NULL) m=(CkArrayMessage *)CkAllocSysMsg();
   m->array_ep()=ctor;
+
+  envelope *env = UsrToEnv(m);
+  env->getsetArraySrcPe() = CkMyPe();
+  _TRACE_CREATION_DETAILED(env, ctor);
+
   CkArray *ca = ckLocalBranch();
   if (ca == NULL) {
       CkInsertIdxMsg *msg = (CkInsertIdxMsg *)CmiAlloc(sizeof(CkInsertIdxMsg));
@@ -792,7 +797,6 @@ static void CkCreateArrayAsync(void *vmsg)
 void _ckArrayInit(void)
 {
   CkpvInitialize(ArrayElement_initInfo,initInfo);
-  CkDisableTracing(CkIndex_CkArray::insertElement(0, CkArrayIndex(), 0));
   CkDisableTracing(CkIndex_CkArray::recvBroadcast(0));
     // disable because broadcast listener may deliver broadcast message
   CkDisableTracing(CkIndex_CkLocMgr::immigrate(0));
