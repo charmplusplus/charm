@@ -82,7 +82,7 @@ class fromzDisk : public zdisk {
 /* AMPI uses RDMA sends if BigSim is not being used and the underlying comm
  * layer supports it (except for GNI, which has experimental RDMA support). */
 #ifndef AMPI_RDMA_IMPL
-#define AMPI_RDMA_IMPL ( !CMK_BIGSIM_CHARM && CMK_ONESIDED_IMPL && !CMK_CONVERSE_UGNI )
+#define AMPI_RDMA_IMPL !CMK_BIGSIM_CHARM
 #endif
 
 /* contiguous messages larger than or equal to this threshold are sent via RDMA */
@@ -169,33 +169,41 @@ class AmpiOpHeader {
 };
 
 /*
- * For within-node Ssend's: used in ampi::processSsendMsg()
+ * For within-process Ssend's, we use this in place of a CkNcpySource object in the
+ * AmpiMsg's data. This allows us to handle non-contiguous DDTs directly and to avoid
+ * the cost of pinning memory when doing Ssend's on the same PE and in the same process.
  */
-class SsendInfo {
+class AmpiNcpyShmSource {
  private:
   int node;
   int idx;
   int count;
+  int length;
+  MPI_Request sreq;
   char* buf;
   CkDDT_DataType* ddt;
 
  public:
-  SsendInfo(void) {}
-  SsendInfo(int idx_, int count_, char* buf_, CkDDT_DataType* ddt_) {
+  AmpiNcpyShmSource() {}
+  AmpiNcpyShmSource(int idx_, int count_, MPI_Request sreq_, char* buf_, CkDDT_DataType* ddt_) {
     node = CkMyNode();
     idx = idx_;
     count = count_;
+    length = ddt_->getSize(count_);
+    sreq = sreq_;
     buf = buf_;
     ddt = ddt_;
   }
-  ~SsendInfo(void) {}
+  ~AmpiNcpyShmSource() {}
   inline int getNode(void) const { return node; }
   inline int getIdx(void) const { return idx; }
   inline int getCount(void) const { return count; }
+  inline int getLength(void) const { return length; }
+  inline int getSreqIdx(void) const { return sreq; }
   inline char* getBuf(void) const { CkAssert(node == CkMyNode()); return buf; }
   inline CkDDT_DataType* getDDT(void) const { CkAssert(node == CkMyNode()); return ddt; }
 };
-PUPbytes(SsendInfo); // PUP as bytes b/c buf & ddt are only meant to be accessed from within shared memory
+PUPbytes(AmpiNcpyShmSource); // PUP as bytes b/c buf & ddt are only meant to be accessed from within shared memory
 
 //------------------- added by YAN for one-sided communication -----------
 /* the index is unique within a communicator */
@@ -699,6 +707,7 @@ class AmpiRequest {
   MPI_Comm comm;
   bool statusIreq;
   bool blocked; // this req is currently blocked on
+  MPI_Request reqIdx;
 
 #if CMK_BIGSIM_CHARM
  public:
@@ -731,14 +740,24 @@ class AmpiRequest {
   /// Supported only for IReq, SendReq, and SsendReq requests
   virtual void setPersistent(bool p){ }
 
+  /// Set/get the MPI_Request for this AmpiRequest
+  virtual void setReqIdx(MPI_Request r){ reqIdx = r; }
+  virtual MPI_Request getReqIdx(void) const { return reqIdx; }
+
   /// Is this request persistent?
   /// Supported only for IReq, SendReq, and SsendReq requests
   virtual bool isPersistent(void) const { return false; }
 
+  /// Release resources for an rget/rput
+  virtual void releaseResource(void) { }
+
+  /// Set an intermediate/system buffer that a message will be serialized thru
+  virtual void setSystemBuf(void* buf_, int len=0) { }
+
   /// Receive an AmpiMsg
   /// Returns true if the msg payload is recv'ed, otherwise return false
-  /// (if the msg is a sync msg, it can't be recv'ed until the caller
-  /// acks the sender to get the real payload)
+  /// (if the msg is a sync msg, it might not be recv'ed until an rget
+  /// operation completes)
   virtual bool receive(ampi *ptr, AmpiMsg *msg) = 0;
 
   /// Receive a CkReductionMsg
@@ -777,6 +796,7 @@ class AmpiRequest {
     p(isvalid);
     p(statusIreq);
     p(blocked);
+    p(reqIdx);
 #if CMK_BIGSIM_CHARM
     //needed for bigsim out-of-core emulation
     //as the "log" is not moved from memory, this pointer is safe
@@ -794,11 +814,15 @@ class IReq : public AmpiRequest {
   int length; // recv'ed length in bytes
   bool cancelled; // track if request is cancelled
   bool persistent; // Is this a persistent recv request?
+  int systemBufLen; // length in bytes of systemBuf
+  char* systemBuf; // non-NULL for non-contiguous recv datatypes
+  CkNcpyTarget* targetInfo;
   IReq(void *buf_, int count_, MPI_Datatype type_, int src_, int tag_, MPI_Comm comm_,
        AmpiReqSts sts_=AMPI_REQ_PENDING)
   {
-    buf=buf_;  count=count_;  type=type_;  src=src_;  tag=tag_;
+    buf=buf_;  count=count_;  type=type_;  src=src_;  tag=tag_; targetInfo=NULL;
     comm=comm_;  isvalid=true; length=0; cancelled=false; persistent=false;
+    systemBuf=NULL; systemBufLen=0;
     if (sts_ == AMPI_REQ_BLOCKED) blocked=true;
     else if (sts_ == AMPI_REQ_COMPLETED) statusIreq=true;
   }
@@ -815,6 +839,16 @@ class IReq : public AmpiRequest {
   inline void setPersistent(bool p) { persistent = p; }
   inline bool isPersistent(void) const { return persistent; }
   void start(MPI_Request reqIdx);
+  inline void setSystemBuf(void* buf_, int len=0) { systemBuf = (char*)buf_; systemBufLen = len; }
+  void releaseResource(void) {
+    if (targetInfo) {
+      targetInfo->releaseResource();
+      delete targetInfo; targetInfo = NULL;
+    }
+    if (systemBuf) {
+      delete [] systemBuf; systemBuf = NULL;
+    }
+  }
   bool receive(ampi *ptr, AmpiMsg *msg);
   void receive(ampi *ptr, CkReductionMsg *msg) {}
   void receiveRdma(ampi *ptr, char *sbuf, int slength, int srcRank);
@@ -826,6 +860,16 @@ class IReq : public AmpiRequest {
     p|length;
     p|cancelled;
     p|persistent;
+    p|systemBufLen;
+    p((char *)&systemBuf, sizeof(char *));
+    bool hasTargetInfo = (targetInfo != NULL);
+    p|hasTargetInfo;
+    if (hasTargetInfo) {
+      if (p.isUnpacking()) {
+        targetInfo = new CkNcpyTarget();
+      }
+      p|*targetInfo;
+    }
   }
   virtual void print();
 };
@@ -946,32 +990,44 @@ class SendReq : public AmpiRequest {
 
 class SsendReq : public AmpiRequest {
   bool persistent; // is this a persistent Ssend request?
+  bool systemBuf; // is 'buf' an intermediate/system buffer?
  public:
   int destRank;
+  CkNcpySource* srcInfo;
   SsendReq(MPI_Comm comm_, AmpiReqSts sts_=AMPI_REQ_PENDING) {
-    comm = comm_; isvalid=true; persistent=false;
+    comm = comm_; isvalid=true; persistent=false; srcInfo = NULL; systemBuf = false;
     if (sts_ == AMPI_REQ_BLOCKED) blocked=true;
     else if (sts_ == AMPI_REQ_COMPLETED) statusIreq=true;
   }
   SsendReq(void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_, MPI_Comm comm_) {
-    buf=buf_;  count=count_;  type=type_;  src=dest_;  tag=tag_;
-    comm=comm_;  isvalid=true; blocked=false; statusIreq=false; persistent=false;
+    buf=buf_;  count=count_;  type=type_;  src=dest_;  tag=tag_; srcInfo = NULL;
+    comm=comm_;  isvalid=true; blocked=false; statusIreq=false; persistent=false; systemBuf=false;
   }
   SsendReq(MPI_Comm comm_, int destRank_, void* buf_, int src_, MPI_Datatype type_,
            int count_, int tag_, AmpiReqSts sts_=AMPI_REQ_PENDING) {
-    comm = comm_; isvalid=true; destRank = destRank_; buf = buf_;
-    src = src_; type = type_; count = count_; tag = tag_; persistent = false;
+    comm = comm_; isvalid=true; destRank = destRank_; buf = buf_; srcInfo = NULL;
+    src = src_; type = type_; count = count_; tag = tag_; persistent = false; systemBuf = false;
     if (sts_ == AMPI_REQ_BLOCKED) blocked=true;
     else if (sts_ == AMPI_REQ_COMPLETED) statusIreq=true;
   }
   SsendReq() {}
-  ~SsendReq(){ }
+  ~SsendReq(){}
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE);
   int wait(MPI_Status *sts);
   void cancel() {}
   inline void setPersistent(bool p) { persistent = p; }
   inline bool isPersistent(void) const { return persistent; }
   void start(MPI_Request reqIdx);
+  void releaseResource(void) {
+    if (srcInfo) {
+      srcInfo->releaseResource();
+      delete srcInfo; srcInfo = NULL;
+    }
+    if (systemBuf) {
+      delete [] (char*)buf; buf = NULL;
+    }
+  }
+  inline void setSystemBuf(void* buf_, int len=0) { systemBuf = true; buf = buf_; }
   bool receive(ampi *ptr, AmpiMsg *msg) { return true; }
   void receive(ampi *ptr, CkReductionMsg *msg) {}
   inline int getType(void) const { return MPI_SSEND_REQ; }
@@ -979,6 +1035,13 @@ class SsendReq : public AmpiRequest {
     AmpiRequest::pup(p);
     p|persistent;
     p|destRank;
+    p|systemBuf;
+    bool hasSrcInfo = (srcInfo != NULL);
+    p|hasSrcInfo;
+    if (hasSrcInfo) {
+      if (p.isUnpacking()) srcInfo = new CkNcpySource();
+      p|*srcInfo;
+    }
   }
   virtual void print();
 };
@@ -1139,6 +1202,12 @@ inline void pupFromBuf(const void *data,T &t) {
   PUP::fromMem p(data); p|t;
 }
 
+enum AmpiMsgType : bool {
+  NCPY_SHM_MSG = true,
+  NCPY_MSG     = false
+};
+PUPbytes(AmpiMsgType);
+
 class AmpiMsg : public CMessage_AmpiMsg {
  private:
   int seq; //Sequence number (for message ordering)
@@ -1160,6 +1229,17 @@ class AmpiMsg : public CMessage_AmpiMsg {
   inline bool isSsend(void) const { return (UsrToEnv(this)->getRef() > 0); }
   inline int getSsendReq(void) const { return UsrToEnv(this)->getRef() - 1; }
   inline void setSsendReq(int sreqIdx) { CkAssert(sreqIdx >= 0); UsrToEnv(this)->setRef(sreqIdx + 1); }
+  inline AmpiMsgType isNcpyShmMsg(void) const { CkAssert(isSsend()); return ((AmpiMsgType*)data)[0]; }
+  inline void getNcpyShmSource(AmpiNcpyShmSource& srcInfo) {
+    CkAssert(isNcpyShmMsg());
+    PUP::fromMem p(((char*)data)+sizeof(bool));
+    p | srcInfo;
+  }
+  inline void getNcpySource(CkNcpySource& srcInfo) {
+    CkAssert(!isNcpyShmMsg());
+    PUP::fromMem p(((char*)data)+sizeof(bool));
+    p | srcInfo;
+  }
   inline int getSeq(void) const { return seq; }
   inline int getSeqIdx(void) const { return srcRank; }
   inline int getSrcRank(void) const { return srcRank; }
@@ -1726,7 +1806,8 @@ class ampi : public CBase_ampi {
   void generic(AmpiMsg *);
   void genericRdma(char* buf, int size, int seq, int tag, int srcRank);
   void completedRdmaSend(CkDataMsg *msg);
-  void ssendAck(int sreqIdx);
+  void completedRdmaRecv(CkDataMsg *msg);
+  void requestRput(MPI_Request req, CkNcpyTarget targetInfo);
   void barrierResult(void);
   void ibarrierResult(void);
   void rednResult(CkReductionMsg *msg);
@@ -1755,12 +1836,17 @@ class ampi : public CBase_ampi {
   inline ampi* blockOnRedn(AmpiRequest *req);
   MPI_Request postReq(AmpiRequest* newreq);
   inline void waitOnBlockingSend(MPI_Request* req, AmpiSendType sendType);
-  inline void requestSsendMsg(AmpiMsg* msg);
   inline void completedSend(MPI_Request req);
+  inline void completedRecv(MPI_Request req);
 
   inline int getSeqNo(int destRank, MPI_Comm destcomm, int tag);
-  AmpiMsg *makeSyncMsg(int destRank,int t,int sRank,const void *buf,int count,
-                       MPI_Datatype type,MPI_Comm destcomm,int ssendReq,int seq);
+  AmpiMsg *makeSyncMsg(int t,int sRank,const void *buf,int count,
+                       MPI_Datatype type,CProxy_ampi destProxy,
+                       int destIdx,int ssendReq,int seq);
+  AmpiMsg *makeNcpyShmMsg(int t, int sRank, const void* buf, int count,
+                          MPI_Datatype type, int ssendReq, int seq);
+  AmpiMsg *makeNcpyMsg(int t, int sRank, const void* buf, int count,
+                       MPI_Datatype type, int ssendReq, int seq);
   AmpiMsg *makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
                        MPI_Datatype type,MPI_Comm destcomm);
   AmpiMsg *makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
@@ -1770,11 +1856,11 @@ class ampi : public CBase_ampi {
                    MPI_Comm destcomm, AmpiSendType sendType=BLOCKING_SEND, MPI_Request=MPI_REQUEST_NULL);
   static void sendraw(int t, int s, void* buf, int len, CkArrayID aid, int idx);
   inline MPI_Request sendSyncMsg(int t, int sRank, const void* buf, MPI_Datatype type, int count,
-                                 int rank, MPI_Comm destcomm, int seq, CProxyElement_ampi destElem,
+                                 int rank, MPI_Comm destcomm, int seq, CProxy_ampi destElem, int destIdx,
                                  AmpiSendType sendType, MPI_Request req);
-  inline MPI_Request sendLocalMsg(int t, int sRank, const void* buf, MPI_Datatype type,
-                                  int count, int destRank, MPI_Comm destcomm, int seq,
-                                  ampi* destPtr, MPI_Request* req, AmpiSendType sendType);
+  inline MPI_Request sendLocalInOrderMsg(int t, int sRank, const void* buf, MPI_Datatype type,
+                                         int count, int destRank, MPI_Comm destcomm, int seq,
+                                         ampi* destPtr, MPI_Request* req, AmpiSendType sendType);
   inline MPI_Request sendRdmaMsg(int t, int sRank, const void* buf, int size, int destIdx,
                                  int destRank, MPI_Comm destcomm, int seq, CProxy_ampi arrProxy,
                                  MPI_Request req);
@@ -1792,10 +1878,11 @@ class ampi : public CBase_ampi {
   }
   MPI_Request delesend(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
                        MPI_Comm destcomm, CProxy_ampi arrproxy, AmpiSendType sendType, MPI_Request req);
-  inline bool processSsendMsg(AmpiMsg* msg, int* msgLen, char** msgData);
-  inline bool processAmpiMsg(AmpiMsg *msg, const void* buf, MPI_Datatype type, int count);
-  inline void processRdmaMsg(const void *sbuf, int slength, int srank, void* rbuf,
-                             int rcount, MPI_Datatype rtype, MPI_Comm comm);
+  inline bool processSsendMsg(AmpiMsg* msg, const void* buf, MPI_Datatype type, int count, MPI_Request req);
+  inline bool processSsendNcpyShmMsg(AmpiMsg* msg, const void* buf, MPI_Datatype type, int count, MPI_Request req);
+  inline bool processSsendNcpyMsg(AmpiMsg* msg, const void* buf, MPI_Datatype type, int count, MPI_Request req);
+  inline bool processAmpiMsg(AmpiMsg *msg, const void* buf, MPI_Datatype type, int count, MPI_Request req);
+  inline void processRdmaMsg(const void *sbuf, int slength, void* rbuf, int rcount, MPI_Datatype rtype);
   inline void processRednMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype type, int count);
   inline void processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count,
                                            MPI_User_function* func);
