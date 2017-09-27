@@ -487,6 +487,12 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   }
   cmi_pami_numcontexts = _n;
 
+#if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
+  // No comm thread for regular smp
+  Cmi_smp_mode_setting = COMM_THREAD_NOT_EXIST;
+#endif
+  // The default setting i.e COMM_THREAD_SEND_RECV, set in machine-common-core.c is used for async-smp
+
   //fprintf(stderr,"Creating %d pami contexts\n", _n);
 
   pami_configuration_t configuration;

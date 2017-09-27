@@ -182,6 +182,7 @@ enum MACHINE_SMP_MODE {
 /* The default mode of smp charm runtime */
 static enum MACHINE_SMP_MODE Cmi_smp_mode_setting = COMM_THREAD_SEND_RECV;
 
+/* Machine layer dependent specific modes of the smp charm runtime are set in individual machine layers */
 
 #if CMK_SMP
 volatile int commThdExit = 0;
