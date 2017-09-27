@@ -119,10 +119,9 @@ class fromzDisk : public zdisk {
 #define AMPI_NODE_LOCAL_THRESHOLD_DEFAULT 16384
 #endif
 
-/* AMPI uses RDMA sends if BigSim is not being used and the underlying comm
- * layer supports it (except for GNI, which has experimental RDMA support). */
+/* AMPI uses RDMA sends if BigSim is not being used. */
 #ifndef AMPI_RDMA_IMPL
-#define AMPI_RDMA_IMPL ( !CMK_BIGSIM_CHARM && CMK_ONESIDED_IMPL && !CMK_CONVERSE_UGNI )
+#define AMPI_RDMA_IMPL !CMK_BIGSIM_CHARM
 #endif
 
 /* contiguous messages larger than or equal to this threshold are sent via RDMA */
@@ -287,28 +286,38 @@ class AmpiOpHeader {
 };
 
 /*
- * For within-node Ssend's: used in ampi::processSsendMsg()
+ * For within-process Ssend's, we use this in place of a CkNcpyBuffer object in the
+ * AmpiMsg's data. This allows us to handle non-contiguous DDTs directly and to avoid
+ * the cost of pinning memory when doing Ssend's on the same PE and in the same process.
  */
-class SsendInfo {
+class AmpiNcpyShmBuffer {
  private:
   int node;
   int idx;
   int count;
+  int length;
   char* buf;
   CkDDT_DataType* ddt;
+  MPI_Request sreq;
 
  public:
-  SsendInfo() = default;
-  SsendInfo(int idx_, int count_, char* buf_, CkDDT_DataType* ddt_) noexcept :
-    node(CkMyNode()), idx(idx_), count(count_), buf(buf_), ddt(ddt_) {}
-  ~SsendInfo() {}
+  AmpiNcpyShmBuffer() = default;
+  AmpiNcpyShmBuffer(int idx_, int count_, char* buf_, CkDDT_DataType* ddt_, MPI_Request sreq_) noexcept
+    : idx(idx_), count(count_), buf(buf_), ddt(ddt_), sreq(sreq_)
+  {
+    node = CkMyNode();
+    length = ddt_->getSize(count_);
+  }
+  ~AmpiNcpyShmBuffer() = default;
   inline int getNode() const noexcept { return node; }
   inline int getIdx() const noexcept { return idx; }
   inline int getCount() const noexcept { return count; }
+  inline int getLength() const noexcept { return length; }
+  inline int getSreqIdx() const noexcept { return sreq; }
   inline char* getBuf() const noexcept { CkAssert(node == CkMyNode()); return buf; }
   inline CkDDT_DataType* getDDT() const noexcept { CkAssert(node == CkMyNode()); return ddt; }
 };
-PUPbytes(SsendInfo) // PUP as bytes b/c buf & ddt are only meant to be accessed from within shared memory
+PUPbytes(AmpiNcpyShmBuffer) // PUP as bytes b/c buf & ddt are only meant to be accessed from within shared memory
 
 //------------------- added by YAN for one-sided communication -----------
 /* the index is unique within a communicator */
@@ -1180,6 +1189,12 @@ class AmpiRequest {
   virtual void setPersistent(bool p) noexcept {}
   virtual bool isPersistent() const noexcept { return false; }
 
+  /// Deregister memory from a get/put
+  virtual void deregisterMem() { }
+
+  /// Set an intermediate/system buffer that a message will be serialized thru
+  virtual void setSystemBuf(void* buf_, int len=0) { }
+
   /// Receive an AmpiMsg
   /// Returns true if the msg payload is recv'ed, otherwise return false
   /// (if the msg is a sync msg, it can't be recv'ed until the caller
@@ -1260,9 +1275,12 @@ class AmpiRequest {
 
 class IReq final : public AmpiRequest {
  public:
-  bool cancelled  = false; // track if request is cancelled
-  bool persistent = false; // Is this a persistent recv request?
-  int length      = 0; // recv'ed length in bytes
+  bool cancelled   = false; // track if request is cancelled
+  bool persistent  = false; // Is this a persistent recv request?
+  int length       = 0; // recv'ed length in bytes
+  CkNcpyBuffer* targetInfo = nullptr;
+  char* systemBuf  = nullptr; // non-NULL for non-contiguous recv datatypes
+  int systemBufLen = 0; // length in bytes of systemBuf
 
   IReq(void *buf_, int count_, MPI_Datatype type_, int src_, int tag_,
        MPI_Comm comm_, CkDDT *ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
@@ -1292,11 +1310,34 @@ class IReq final : public AmpiRequest {
   int getNumReceivedBytes(CkDDT *ptr) const noexcept override {
     return length;
   }
+  void setSystemBuf(void* buf_, int len=0) noexcept override {
+    systemBuf = (char*)buf_;
+    systemBufLen = len;
+  }
+  void deregisterMem() noexcept override {
+    if (targetInfo) {
+      targetInfo->deregisterMem();
+      delete targetInfo;
+    }
+    if (systemBuf) {
+      delete [] systemBuf;
+    }
+  }
   void pup(PUP::er &p) noexcept override {
     AmpiRequest::pup(p);
     p|cancelled;
     p|persistent;
     p|length;
+    p|systemBufLen;
+    p((char *)&systemBuf, sizeof(char *));
+    bool hasTargetInfo = (targetInfo != NULL);
+    p|hasTargetInfo;
+    if (hasTargetInfo) {
+      if (p.isUnpacking()) {
+        targetInfo = new CkNcpyBuffer();
+      }
+      p|*targetInfo;
+    }
   }
   void print() const noexcept override;
 };
@@ -1437,9 +1478,11 @@ class SendReq final : public AmpiRequest {
 
 class SsendReq final : public AmpiRequest {
  private:
+  bool systemBuf = false; // is 'buf' an intermediate/system buffer?
   bool persistent = false; // is this a persistent Ssend request?
  public:
   int destRank = MPI_PROC_NULL;
+  CkNcpyBuffer* srcInfo = nullptr;
 
  public:
   SsendReq(MPI_Datatype type_, MPI_Comm comm_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
@@ -1448,7 +1491,7 @@ class SsendReq final : public AmpiRequest {
     comm = comm_;
     AMPI_REQUEST_COMMON_INIT
   }
-  SsendReq(const void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_, MPI_Comm comm_,
+  SsendReq(void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_, MPI_Comm comm_,
            CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
   {
     buf      = (void*)buf_;
@@ -1459,7 +1502,7 @@ class SsendReq final : public AmpiRequest {
     destRank = dest_;
     AMPI_REQUEST_COMMON_INIT
   }
-  SsendReq(const void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_, MPI_Comm comm_,
+  SsendReq(void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_, MPI_Comm comm_,
            int src_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
   {
     buf      = (void*)buf_;
@@ -1483,10 +1526,30 @@ class SsendReq final : public AmpiRequest {
   AmpiReqType getType() const noexcept override { return AMPI_SSEND_REQ; }
   bool isUnmatched() const noexcept override { return false; }
   bool isPooledType() const noexcept override { return true; }
+  void deregisterMem() noexcept override {
+    if (srcInfo) {
+      srcInfo->deregisterMem();
+      delete srcInfo;
+    }
+    if (systemBuf) {
+      delete [] (char*)buf;
+    }
+  }
+  void setSystemBuf(void* buf_, int len=0) noexcept override {
+    systemBuf = true;
+    buf = buf_;
+  }
   void pup(PUP::er &p) noexcept override {
     AmpiRequest::pup(p);
     p|persistent;
     p|destRank;
+    p|systemBuf;
+    bool hasSrcInfo = (srcInfo != NULL);
+    p|hasSrcInfo;
+    if (hasSrcInfo) {
+      if (p.isUnpacking()) srcInfo = new CkNcpyBuffer();
+      p|*srcInfo;
+    }
   }
   void print() const noexcept override;
 };
@@ -1655,6 +1718,11 @@ inline void pupFromBuf(const void *data,T &t) noexcept {
 
 class AmpiMsgPool;
 
+enum AmpiMsgType : bool {
+  NCPY_SHM_MSG = true,
+  NCPY_MSG     = false
+};
+
 class AmpiMsg final : public CMessage_AmpiMsg {
  private:
   int ssendReq; //Index to the sender's request (MPI_REQUEST_NULL if no request)
@@ -1672,9 +1740,9 @@ class AmpiMsg final : public CMessage_AmpiMsg {
 #endif
 
  public:
-  AmpiMsg() noexcept { data = NULL; }
-  AmpiMsg(int sreq, int t, int sRank, int l) noexcept :
-    ssendReq(sreq), tag(t), srcRank(sRank), length(l), origLength(l)
+  AmpiMsg() noexcept : data(NULL) {}
+  AmpiMsg(int sreq, int t, int sRank, int l, MPI_Comm c) noexcept :
+    ssendReq(sreq), tag(t), srcRank(sRank), length(l), origLength(l), comm(c)
   { /* only called from AmpiMsg::pup() since the refnum (seq) will get pup'ed by the runtime */ }
   AmpiMsg(CMK_REFNUM_TYPE seq, int sreq, int t, int sRank, int l) noexcept :
     ssendReq(sreq), tag(t), srcRank(sRank), length(l), origLength(l)
@@ -1697,14 +1765,25 @@ class AmpiMsg final : public CMessage_AmpiMsg {
       return srcRank;
     }
   }
-  inline int getSrcRank() const noexcept { return srcRank; }
-  inline int getLength() const noexcept { return length; }
-  inline char* getData() const noexcept { return data; }
-  inline int getTag() const noexcept { return tag; }
-  inline MPI_Comm getComm() const noexcept { return comm; }
+  inline AmpiMsgType isNcpyShmMsg(void) const noexcept { CkAssert(isSsend()); return ((AmpiMsgType*)data)[0]; }
+  inline void getNcpyShmBuffer(AmpiNcpyShmBuffer& srcInfo) noexcept {
+    CkAssert(isNcpyShmMsg());
+    PUP::fromMem p(data+sizeof(AmpiMsgType));
+    p | srcInfo;
+  }
+  inline void getNcpyBuffer(CkNcpyBuffer& srcInfo) noexcept {
+    CkAssert(!isNcpyShmMsg());
+    PUP::fromMem p(data+sizeof(AmpiMsgType));
+    p | srcInfo;
+  }
+  inline int getSrcRank(void) const noexcept { return srcRank; }
+  inline int getLength(void) const noexcept { return length; }
+  inline char* getData(void) const noexcept { return data; }
+  inline int getTag(void) const noexcept { return tag; }
+  inline MPI_Comm getComm(void) const noexcept { return comm; }
   static AmpiMsg* pup(PUP::er &p, AmpiMsg *m) noexcept
   {
-    int ref, ssendReq, tag, srcRank, length, origLength;
+    int ref, ssendReq, tag, srcRank, length, origLength, dataLen;
     MPI_Comm comm;
     if(p.isPacking() || p.isSizing()) {
       ref = CkGetRefNum(m);
@@ -1714,14 +1793,31 @@ class AmpiMsg final : public CMessage_AmpiMsg {
       length = m->length;
       origLength = m->origLength;
       comm = m->comm;
+      if (m->isSsend()) {
+        // For SsendMsg's, m->data is a ncpyBuffer object and m->length
+        // is the length of the real msg payload to be recv'ed.
+        PUP::sizer pupSizer;
+        AmpiMsgType msgType;
+        pupSizer | msgType;
+        if (m->isNcpyShmMsg()) {
+          AmpiNcpyShmBuffer srcInfo;
+          pupSizer | srcInfo;
+        } else {
+          CkNcpyBuffer srcInfo;
+          pupSizer | srcInfo;
+        }
+        dataLen = pupSizer.size();
+      } else {
+        dataLen = length;
+      }
     }
-    p(ref); p(ssendReq); p(tag); p(srcRank); p(length); p(origLength); p(comm);
+    p(ref); p(ssendReq); p(tag); p(srcRank); p(length); p(origLength); p(comm); p(dataLen);
     if(p.isUnpacking()) {
       m = new (origLength, 0) AmpiMsg(ref, ssendReq, tag, srcRank, origLength);
       m->setLength(length);
       m->setComm(comm);
     }
-    p(m->data, length);
+    p(m->data, dataLen);
     if(p.isDeleting()) {
       delete m;
       m = 0;
@@ -1732,8 +1828,8 @@ class AmpiMsg final : public CMessage_AmpiMsg {
   friend AmpiMsgPool;
 };
 
-#define AMPI_MSG_POOL_SIZE   32 // Max # of AmpiMsg's allowed in the pool
-#define AMPI_POOLED_MSG_SIZE 64 // Max # of Bytes in pooled msgs' payload
+#define AMPI_MSG_POOL_SIZE    32 // Max # of AmpiMsg's allowed in the pool
+#define AMPI_POOLED_MSG_SIZE 128 // Max # of Bytes in pooled msgs' payload
 
 class AmpiMsgPool {
  private:
@@ -2402,6 +2498,7 @@ class ampiParent final : public CBase_ampiParent {
     (func)((void*)invec, inoutvec, &count, &datatype);
   }
 
+  int wait(MPI_Request* req, MPI_Status* sts) noexcept;
   void init() noexcept;
   void finalize() noexcept;
   CMI_WARN_UNUSED_RESULT ampiParent* block() noexcept;
@@ -2505,8 +2602,8 @@ class ampi final : public CBase_ampi {
   ampi() noexcept;
   ampi(CkArrayID parent_,const ampiCommStruct &s) noexcept;
   ampi(CkMigrateMessage *msg) noexcept;
-  void ckJustMigrated() noexcept;
-  void ckJustRestored() noexcept;
+  void ckJustMigrated(void) noexcept;
+  void ckJustRestored(void) noexcept;
   ~ampi() noexcept;
 
   void pup(PUP::er &p) noexcept;
@@ -2523,7 +2620,8 @@ class ampi final : public CBase_ampi {
   void generic(AmpiMsg *) noexcept;
   void genericRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank) noexcept;
   void completedRdmaSend(CkDataMsg *msg) noexcept;
-  void ssendAck(int sreqIdx) noexcept;
+  void completedRdmaRecv(CkDataMsg *msg) noexcept;
+  void requestPut(MPI_Request req, CkNcpyBuffer targetInfo) noexcept;
   void bcastResult(AmpiMsg *msg) noexcept;
   void barrierResult(void) noexcept;
   void ibarrierResult(void) noexcept;
@@ -2572,13 +2670,18 @@ class ampi final : public CBase_ampi {
                            int t, MPI_Comm comm, MPI_Status* sts) noexcept;
   MPI_Request postReq(AmpiRequest* newreq) noexcept;
   inline void waitOnBlockingSend(MPI_Request* req, AmpiSendType sendType) noexcept;
-  inline void requestSsendMsg(AmpiMsg* msg) noexcept;
   inline void completedSend(MPI_Request req) noexcept;
+  inline void completedRecv(MPI_Request req) noexcept;
 
   inline CMK_REFNUM_TYPE getSeqNo(int destRank, MPI_Comm destcomm, int tag) noexcept;
   AmpiMsg *makeBcastMsg(const void *buf,int count,MPI_Datatype type,int root,MPI_Comm destcomm) noexcept;
-  AmpiMsg *makeSyncMsg(int destRank,int t,int sRank,const void *buf,int count,
-                       MPI_Datatype type,MPI_Comm destcomm,int ssendReq,CMK_REFNUM_TYPE seq) noexcept;
+  AmpiMsg *makeSyncMsg(int t,int sRank,const void *buf,int count,
+                       MPI_Datatype type,CProxy_ampi destProxy,
+                       int destIdx,int ssendReq,CMK_REFNUM_TYPE seq) noexcept;
+  AmpiMsg *makeNcpyShmMsg(int t, int sRank, const void* buf, int count,
+                          MPI_Datatype type, int ssendReq, int seq) noexcept;
+  AmpiMsg *makeNcpyMsg(int t, int sRank, const void* buf, int count,
+                       MPI_Datatype type, int ssendReq, int seq) noexcept;
   AmpiMsg *makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
                        MPI_Datatype type,MPI_Comm destcomm) noexcept;
   AmpiMsg *makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
@@ -2588,11 +2691,11 @@ class ampi final : public CBase_ampi {
                    MPI_Comm destcomm, AmpiSendType sendType=BLOCKING_SEND, MPI_Request=MPI_REQUEST_NULL) noexcept;
   static void sendraw(int t, int s, void* buf, int len, CkArrayID aid, int idx) noexcept;
   inline MPI_Request sendSyncMsg(int t, int sRank, const void* buf, MPI_Datatype type, int count,
-                                 int rank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxyElement_ampi destElem,
-                                 AmpiSendType sendType, MPI_Request reqIdx) noexcept;
-  inline MPI_Request sendLocalMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type,
-                                  int count, int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq,
-                                  ampi* destPtr, AmpiSendType sendType, MPI_Request reqIdx) noexcept;
+                                 int rank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi destElem,
+                                 int destIdx, AmpiSendType sendType, MPI_Request reqIdx) noexcept;
+  inline MPI_Request sendLocalInOrderMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type,
+                                         int count, int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq,
+                                         ampi* destPtr, AmpiSendType sendType, MPI_Request reqIdx) noexcept;
   inline MPI_Request sendRdmaMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type, int destIdx,
                                  int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi arrProxy,
                                  MPI_Request reqIdx) noexcept;
@@ -2610,10 +2713,11 @@ class ampi final : public CBase_ampi {
   }
   inline MPI_Request delesend(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
                               MPI_Comm destcomm, CProxy_ampi arrproxy, AmpiSendType sendType, MPI_Request req) noexcept;
-  inline bool processSsendMsg(AmpiMsg* msg, int* msgLen, char** msgData) noexcept;
-  inline bool processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count) noexcept;
-  inline void processRdmaMsg(const void *sbuf, int slength, int srank, void* rbuf,
-                             int rcount, MPI_Datatype rtype, MPI_Comm comm) noexcept;
+  inline bool processSsendMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
+  inline bool processSsendNcpyShmMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
+  inline bool processSsendNcpyMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
+  inline bool processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
+  inline void processRdmaMsg(const void *sbuf, int slength, void* rbuf, int rcount, MPI_Datatype rtype) noexcept;
   inline void processRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count) noexcept;
   inline void processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count,
                                            MPI_User_function* func) noexcept;
