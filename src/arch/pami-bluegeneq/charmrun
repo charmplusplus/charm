@@ -95,6 +95,7 @@ test $QUIET -eq 0 && echo "Job enqueued under job ID $jobid"
 
 output=$jobid.output
 err=$jobid.error
+log=$jobid.cobaltlog
 
 End() {
         echo "Charmrun> $queue_kill $jobid ..."
@@ -123,6 +124,17 @@ do
               exit 0
             else
               echo "job did not exit with status 0; error in $err, output in $output"
+              # display the error, output and cobaltlog for failed jobs
+              echo "==============================================================="
+              echo "Job error: $err"
+              cat $err
+              echo "==============================================================="
+              echo "Job output: $output"
+              cat $output
+              echo "==============================================================="
+              echo "Job scheduler log: $log"
+              cat $log
+              echo "==============================================================="
               exit 1
             fi
         fi
