@@ -472,7 +472,9 @@ void _cmidirect_m2m_initialize (pami_context_t *contexts, int nc) {
   soptions.use_rdma       = PAMI_HINT_DISABLE;
 
   loptions.long_header     = PAMI_HINT_DISABLE;
+#if CMK_BLUEGENEQ
   loptions.recv_contiguous = PAMI_HINT_ENABLE;
+#endif
   loptions.recv_copy       = PAMI_HINT_ENABLE;
 
   pami_dispatch_callback_function pfn;

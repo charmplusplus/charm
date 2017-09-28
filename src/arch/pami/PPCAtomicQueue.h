@@ -43,7 +43,9 @@ typedef  void* PPCAtomicQueueElement;
 typedef struct _ppcatomicstate {
   volatile ppc_atomic_t Producer;
   volatile ppc_atomic_t UpperBound;
+#if CMK_BLUEGENEQ
   char pad[32 - 2*sizeof(ppc_atomic_t)];
+#endif
 } PPCAtomicState;
 
 typedef struct _ppcatomicq {
