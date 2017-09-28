@@ -21,6 +21,10 @@
 
  CmiNodeLock loop_info_inited_lock;
 
+#if CMK_TRACE_ENABLED
+CpvDeclare(envelope*, dummyEnv);
+#endif
+
 class FuncSingleHelper;
 
 class CurLoopInfo {
@@ -124,6 +128,7 @@ public:
 typedef struct converseNotifyMsg {
     char core[CmiMsgHeaderSizeBytes];
     int srcRank;
+    unsigned int eventID;
     void *ptr;
 } ConverseNotifyMsg;
 
@@ -159,6 +164,11 @@ public:
     FuncCkLoop(CkMigrateMessage *m);
 
     ~FuncCkLoop() {
+#if CMK_TRACE_ENABLED
+      int i;
+      for (i = 0; i < CkMyNodeSize(); i++)
+        CmiFree(CpvAccessOther(dummyEnv,i));
+#endif
       CmiDestroyLock(loop_info_inited_lock);
         delete [] helperPtr;
     }

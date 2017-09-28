@@ -230,15 +230,26 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
 #endif
         curLoop = (CurLoopInfo *)(notifyMsg->ptr);
         curLoop->set(numChunks, func, lowerRange, upperRange, paramNum, param);
+#if CMK_TRACE_ENABLED
+        envelope *env = CpvAccess(dummyEnv);
+#endif
         if (useTreeBcast) {
             int loopTimes = TREE_BCAST_BRANCH>(CmiMyNodeSize()-1)?CmiMyNodeSize()-1:TREE_BCAST_BRANCH;
             //just implicit binary tree
             int pe = CmiMyRank()+1;
+#if CMK_TRACE_ENABLED
+            _TRACE_CREATION_N(env, loopTimes);
+            notifyMsg->eventID =env->getEvent();
+#endif
             for (int i=0; i<loopTimes; i++, pe++) {
                 if (pe >= CmiMyNodeSize()) pe -= CmiMyNodeSize();
                 CmiPushPE(pe, (void *)(notifyMsg));
             }
         } else {
+#if CMK_TRACE_ENABLED
+            _TRACE_CREATION_N(env, numHelpers-1);
+            notifyMsg->eventID = env->getEvent();
+#endif
             for (int i=CmiMyRank()+1; i<numHelpers; i++) {
                 CmiPushPE(i, (void *)(notifyMsg));
             }
@@ -402,6 +413,10 @@ static int _ckloopEP;
 CpvStaticDeclare(int, NdhStealWorkHandler);
 static void RegisterCkLoopHdlrs() {
     CpvInitialize(int, NdhStealWorkHandler);
+#if CMK_TRACE_ENABLED
+    CpvInitialize(envelope*, dummyEnv);
+    CpvAccess(dummyEnv) = envelope::alloc(ForChareMsg,0,0); //Msgtype is the same as the one used for TRACE_BEGIN_EXECUTED_DETAILED
+#endif
     CpvAccess(NdhStealWorkHandler) = CmiRegisterHandler((CmiHandler)SingleHelperStealWork);
 #ifdef __BIGSIM__
     if(BgNodeRank()==0) {
@@ -521,11 +536,15 @@ void SingleHelperStealWork(ConverseNotifyMsg *msg) {
         }
     }
     CurLoopInfo *loop = (CurLoopInfo *)msg->ptr;
-
-    _TRACE_BEGIN_EXECUTE_DETAILED(0, 4, _ckloopEP,
+#if CMK_TRACE_ENABLED
+    unsigned int event = msg->eventID;
+    _TRACE_BEGIN_EXECUTE_DETAILED(event, ForChareMsg, _ckloopEP,
       CkNodeFirst(CkMyNode())+srcRank, sizeof(ConverseNotifyMsg), NULL, NULL);
+#endif
     loop->stealWork();
+#if CMK_TRACE_ENABLED
     _TRACE_END_EXECUTE();
+#endif
 }
 
 void CurLoopInfo::stealWork() {
