@@ -236,7 +236,7 @@ CpvDeclare(int, _ccd_numchecks);
 
 
 
-#define MAXTIMERHEAPENTRIES       256
+#define MAXTIMERHEAPENTRIES       1024
 
 /**
  * Structure used to manage callbacks in a heap
@@ -538,7 +538,7 @@ void CcdCallBacks(void)
   double curWallTime = CmiWallTimer();
 
   unsigned int nSkip=o->nSkip;
-#if 1
+#if 0
 /* Dynamically adjust the number of messages to skip */
   double elapsed = curWallTime - o->lastCheck;
 #define targetElapsed 5.0e-3

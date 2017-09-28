@@ -1738,13 +1738,15 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 #if CMK_NODE_QUEUE_AVAILABLE
 	/*#warning "CsdNextMessage: CMK_NODE_QUEUE_AVAILABLE" */
 	if (NULL!=(msg=CmiGetNonLocalNodeQ())) return msg;
-	if (!CqsEmpty(s->nodeQ)
-	 && CqsPrioGT(CqsGetPriority(s->schedQ),
-		       CqsGetPriority(s->nodeQ))) {
-	  if(CmiTryLock(s->nodeLock) == 0) {
-	    CqsDequeue(s->nodeQ,(void **)&msg);
-	    CmiUnlock(s->nodeLock);
-	    if (msg!=NULL) return msg;
+	if (CmiMyRank() == 0) {
+	  if (!CqsEmpty(s->nodeQ)
+	      && CqsPrioGT(CqsGetPriority(s->schedQ),
+			   CqsGetPriority(s->nodeQ))) {
+	    if(CmiTryLock(s->nodeLock) == 0) {
+	      CqsDequeue(s->nodeQ,(void **)&msg);
+	      CmiUnlock(s->nodeLock);
+	      if (msg!=NULL) return msg;
+	    }
 	  }
 	}
 #endif
