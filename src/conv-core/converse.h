@@ -340,7 +340,7 @@ extern CmiNodeLock CmiMemLock_lock;
 #define CmiMemUnlock() do{if (CmiMemLock_lock) CmiUnlock(CmiMemLock_lock);} while (0)
 
 
-#if CMK_BLUEGENEQ && CMK_ENABLE_ASYNC_PROGRESS
+#if (CMK_BLUEGENEQ || CMK_PAMI_LINUX_PPC8) && CMK_ENABLE_ASYNC_PROGRESS
 extern __thread int32_t _cmi_bgq_incommthread;
 #define CmiInCommThread()  (_cmi_bgq_incommthread)
 #else
@@ -524,7 +524,7 @@ for each processor in the node.
     } while(0)
 #define CpvInitialized(v) (0!=CMK_TAG(Cpv_,v))
 
-#if CMK_BLUEGENEQ && CMK_ENABLE_ASYNC_PROGRESS && CMK_IMMEDIATE_MSG
+#if (CMK_BLUEGENEQ || CMK_PAMI_LINUX_PPC8) && CMK_ENABLE_ASYNC_PROGRESS && CMK_IMMEDIATE_MSG
   #define CpvAccess(v) (*(CMK_TAG(Cpv_addr_,v)[CmiMyRank()]))
 #else
 #define CpvAccess(v) (*CMK_TAG(Cpv_,v))
