@@ -1183,10 +1183,8 @@ double CmiTimer(void)
 #if CMK_TIMER_USE_PPC64
 
 #include <sys/time.h>
-#include <endian.h>
-
-#define SPRN_TBRU 0x10D
-#define SPRN_TBRL 0x10C
+#include <sys/time.h>
+#include <sys/platform/ppc.h>
 
 CpvStaticDeclare(uint64_t, inittime);
 CpvStaticDeclare(double, clocktick);
@@ -1213,26 +1211,16 @@ double CmiInitTime()
 
 static inline uint64_t PPC64_TimeBase()
 {
-  unsigned temp;
-  union
-  {
-#if __BYTE_ORDER  == __LITTLE_ENDIAN
-    struct { unsigned lo, hi; } w;
-#else
-#warning "PPC64 Is BigEndian"
-    struct { unsigned hi, lo; } w;
-#endif
-    uint64_t d;
-  } result;
+  register volatile uint64_t result;
 
-  do {
-    asm volatile ("mfspr %0,%1" : "=r" (temp)        : "i" (SPRN_TBRU));
-    asm volatile ("mfspr %0,%1" : "=r" (result.w.lo) : "i" (SPRN_TBRL));
-    asm volatile ("mfspr %0,%1" : "=r" (result.w.hi) : "i" (SPRN_TBRU));
-  }
-  while (temp != result.w.hi);
+  /* For 64-bit only */
+  asm volatile (
+            "   isync    \n\t"
+            "   mftb  %0 \n\t"
+            "   isync    \n\t"
+            : "=r"(result));
 
-  return result.d;
+  return result;
 }
 
 uint64_t __micro_timer () {
@@ -1245,54 +1233,7 @@ void CmiTimerInit(char **argv)
 {
   CpvInitialize(double, clocktick);
   CpvInitialize(unsigned long, inittime);
-
-  //Initialize PPC64 timers
-
-  uint64_t sampleTime = 100ULL; //sample time in usec
-  uint64_t timeStart = 0ULL, timeStop = 0ULL;
-  uint64_t startBase = 0ULL, endBase = 0ULL;
-  uint64_t overhead = 0ULL, tbf = 0ULL, tbi = 0ULL;
-  uint64_t ticks = 0ULL;
-  int      iter = 0ULL;
-
-  do {
-    tbi = PPC64_TimeBase();
-    tbf = PPC64_TimeBase();
-    tbi = PPC64_TimeBase();
-    tbf = PPC64_TimeBase();
-
-    overhead = tbf - tbi;
-    timeStart = __micro_timer();
-
-    //wait for system time to change
-    while (__micro_timer() == timeStart)
-      timeStart = __micro_timer();
-
-    while (1) {
-      timeStop = __micro_timer();
-      if ((timeStop - timeStart) > 1) {
-        startBase = PPC64_TimeBase();
-        break;
-      }
-    }
-    timeStart = timeStop;
-
-    while (1) {
-      timeStop = __micro_timer();
-      if ((timeStop - timeStart) > sampleTime) {
-        endBase = PPC64_TimeBase();
-        break;
-      }
-    }
-
-    ticks = ((endBase - startBase) + (overhead));
-    iter++;
-    if (iter == 10ULL)
-      CmiAbort("Warning: unable to initialize high resolution timer.\n");
-
-  } while (endBase <= startBase);
-
-  CpvAccess (clocktick) = (1e-6) / ((double)ticks/(double)sampleTime);
+  CpvAccess(clocktick) =  1.0 / ((double) __ppc_get_timebase_freq());
 
   /* try to synchronize calling barrier */
 #if !(__FAULT__)
