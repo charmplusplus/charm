@@ -1489,6 +1489,9 @@ static void send_singlenodeinfo(void)
   memset(&me, 0, sizeof(me));
 
   me.nodeNo = ChMessageInt_new(Lrts_myNode);
+  me.num_pus = ChMessageInt_new(CmiHwlocTopologyLocal.num_pus);
+  me.num_cores = ChMessageInt_new(CmiHwlocTopologyLocal.num_cores);
+  me.num_sockets = ChMessageInt_new(CmiHwlocTopologyLocal.num_sockets);
 
   /* The nPE fields are set by charmrun--these values don't matter.
      Set IP in case it is mpiexec mode where charmrun does not have IP yet */

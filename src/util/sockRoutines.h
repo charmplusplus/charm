@@ -288,6 +288,9 @@ typedef struct {
 
 typedef struct {
   ChMessageInt_t nodeNo;
+  ChMessageInt_t num_pus;
+  ChMessageInt_t num_cores;
+  ChMessageInt_t num_sockets;
   ChNodeinfo info;
 } ChSingleNodeinfo;
 
