@@ -647,6 +647,7 @@ int CMI_Progress_finalize(int start, int ncontexts) {
   for (i = start; i < start+ncontexts; ++i) 
     cmi_progress_disable  (cmi_pami_contexts[i], 0 /*progress all*/);    
   PAMI_Extension_close (cmi_ext_progress);
+  return 0;
 }
 #endif
 
@@ -1664,6 +1665,7 @@ pami_result_t machineFreeList_handoff(pami_context_t context, void *cookie)
   ListMulticastVec *lvec = (ListMulticastVec *) cookie;
   machineFreeListSendFn(context, lvec->npes, lvec->pes, lvec->size, lvec->msg);
   CmiFree(cookie);
+  return PAMI_SUCCESS;
 }
 
 void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
@@ -1728,7 +1730,9 @@ void machineFreeListSendFn(pami_context_t my_context, int npes, int *pes, int si
 	copymsg = (char *)CmiAlloc(size);
 	CmiAssert(copymsg != NULL);
 	CmiMemcpy(copymsg,msg,size);	  
-	CmiSendPeer(CmiRankOf(pes[i]), size, copymsg);
+	int rank = CmiRankOf(pes[i]);
+	CMI_DEST_RANK(copymsg) = rank;
+	CmiSendPeer(rank, size, copymsg);
       }
     }
 #else
@@ -1769,6 +1773,7 @@ pami_result_t machineFreeNodeList_handoff(pami_context_t context, void *cookie)
   machineFreeNodeListSendFn(context, lvec->n_nodes, 
 			    lvec->nodes, lvec->size, lvec->msg);
   CmiFree(cookie);
+  return PAMI_SUCCESS;
 }
 
 void CmiFreeNodeListSendFn(int n_nodes, int *nodes, int size, char *msg) {
