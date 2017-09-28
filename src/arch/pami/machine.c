@@ -732,7 +732,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     soptions.use_rdma       = PAMI_HINT_DISABLE;
 
     loptions.long_header     = PAMI_HINT_DISABLE;
+#if CMK_BLUEGENEQ
     loptions.recv_contiguous = PAMI_HINT_ENABLE;
+#endif
     //loptions.recv_immediate = PAMI_HINT_ENABLE;
     loptions.recv_copy       = PAMI_HINT_ENABLE;
 
