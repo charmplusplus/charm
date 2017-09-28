@@ -617,6 +617,17 @@ extern int CmiPrintCPUAffinity(void);
 extern int CmiSetCPUAffinity(int core);
 extern int CmiOnCore(void);
 
+typedef struct
+{
+  int num_pus;
+  int num_cores;
+  int num_sockets;
+} CmiHwlocTopology;
+
+extern CmiHwlocTopology CmiHwlocTopologyLocal;
+
+extern void CmiInitHwlocTopology(void);
+
 /** Return 1 if our outgoing message queue 
    for this node is longer than this many bytes. */
 int CmiLongSendQueue(int forNode,int longerThanBytes);

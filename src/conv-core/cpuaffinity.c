@@ -32,6 +32,36 @@ CpvDeclare(int, myCPUAffToCore);
 CpvDeclare(void *, myProcStatFP);
 #endif
 
+CmiHwlocTopology CmiHwlocTopologyLocal;
+
+void CmiInitHwlocTopology(void)
+{
+    hwloc_topology_t topology;
+    int depth;
+
+    /* Allocate and initialize topology object. */
+    cmi_hwloc_topology_init(&topology);
+    /* Perform the topology detection. */
+    cmi_hwloc_topology_load(topology);
+
+    // packages == sockets
+    depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PACKAGE);
+    if (depth != HWLOC_TYPE_DEPTH_UNKNOWN)
+      CmiHwlocTopologyLocal.num_sockets = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
+
+    // cores
+    depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_CORE);
+    if (depth != HWLOC_TYPE_DEPTH_UNKNOWN)
+      CmiHwlocTopologyLocal.num_cores = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
+
+    // PUs
+    depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PU);
+    if (depth != HWLOC_TYPE_DEPTH_UNKNOWN)
+      CmiHwlocTopologyLocal.num_pus = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
+
+    cmi_hwloc_topology_destroy(topology);
+}
+
 #if CMK_HAS_SETAFFINITY || defined (_WIN32) || CMK_HAS_BINDPROCESSOR
 
 #include <stdlib.h>
@@ -87,40 +117,12 @@ static void add_exclude(int core)
 #include <sys/processor.h>
 #endif
 
-
-static void show_topology(hwloc_topology_t topology) {
-  int depth;
-  unsigned int i;
-  char string[128];
-
-  // Optionally, get some additional topology information
-  //   in case we need the topology depth later.
-  int topodepth = cmi_hwloc_topology_get_depth(topology);
-
-  // Walk the topology with an array style, from level 0 (always
-  // the system level) to the lowest level (always the proc level).
-  for (depth = 0; depth < topodepth; depth++) {
-    CmiPrintf("*** Objects at level %d\n", depth);
-    for (i = 0; i < cmi_hwloc_get_nbobjs_by_depth(topology, depth); i++) {
-      cmi_hwloc_obj_snprintf(string, sizeof(string), topology,
-                             cmi_hwloc_get_obj_by_depth(topology, depth, i),
-                             "#", 0);
-      CmiPrintf("Index %u: %s\n", i, string);
-    }
-  }
-}
-
 int set_cpu_affinity(unsigned int cpuid) {
   hwloc_topology_t topology;
   // Allocate and initialize topology object.
   cmi_hwloc_topology_init(&topology);
   // Perform the topology detection.
   cmi_hwloc_topology_load(topology);
-#if 0
-  if (CmiMyPe() == 0) {
-    show_topology(topology);
-  }
-#endif
 
   hwloc_cpuset_t cpuset = cmi_hwloc_bitmap_alloc();
   cmi_hwloc_bitmap_set(cpuset, cpuid);
@@ -158,11 +160,6 @@ int set_thread_affinity(int cpuid) {
   cmi_hwloc_topology_init(&topology);
   // Perform the topology detection.
   cmi_hwloc_topology_load(topology);
-#if 0
-  if (CmiMyPe() == 0) {
-    show_topology(topology);
-  }
-#endif
 
   hwloc_cpuset_t cpuset = cmi_hwloc_bitmap_alloc();
   cmi_hwloc_bitmap_set(cpuset, cpuid);

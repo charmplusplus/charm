@@ -299,6 +299,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   CmiStart = fn;
   CmiUsched = usched;
   CmiParseArgs(CmiArgv);
+
+  CmiInitHwlocTopology();
+
   CthInit(CmiArgv);
   CpvInitialize(void*, CmiLocalQueue);
   CmiThreads = (CthThread *)CmiAlloc(CmiNumPes()*sizeof(CthThread));

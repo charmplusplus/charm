@@ -676,6 +676,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
       quietModeRequested = quietMode = 1;
     }
 
+    CmiInitHwlocTopology();
+
     /* processor per node */
     _Cmi_mynodesize = 1;
     /* Read +ppn or ++ppn */
