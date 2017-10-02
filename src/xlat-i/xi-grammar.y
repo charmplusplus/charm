@@ -27,6 +27,7 @@ extern unsigned char in_comment;
 extern unsigned int lineno;
 extern int in_bracket,in_braces,in_int_expr;
 extern std::list<Entry *> connectEntries;
+extern char* yytext;
 AstChildren<Module> *modlist;
 
 void yyerror(const char *);
@@ -1337,4 +1338,7 @@ HashIFDefComment: HASHIFDEF Name
 
 %%
 
-void yyerror(const char *msg) { }
+void yyerror(const char *s) 
+{
+	fprintf(stderr, "[PARSE-ERROR] Unexpected/missing token at line %d. Current token being parsed: '%s'.\n", lineno, yytext);
+}
