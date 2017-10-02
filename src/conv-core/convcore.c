@@ -458,7 +458,11 @@ int CmiGetArgIntDesc(char **argv,const char *arg,int *optDest,const char *desc)
 			default:
 				continue; /*False alarm-- skip it*/
 			}
-			if (opt==NULL) continue; /*False alarm*/
+			if (opt==NULL) {
+				fprintf(stderr, "Command-line flag '%s' expects a numerical argument, "
+				                "but none was provided\n", arg);
+				CmiAbort("Bad command-line argument\n");
+                        }
 			if (sscanf(opt,"%i",optDest)<1) {
 			/*Bad command line argument-- die*/
 				fprintf(stderr,"Cannot parse %s option '%s' "
@@ -497,7 +501,11 @@ int CmiGetArgLongDesc(char **argv,const char *arg,CmiInt8 *optDest,const char *d
 			default:
 				continue; /*False alarm-- skip it*/
 			}
-			if (opt==NULL) continue; /*False alarm*/
+			if (opt==NULL) {
+				fprintf(stderr, "Command-line flag '%s' expects a numerical argument, "
+				                "but none was provided\n", arg);
+				CmiAbort("Bad command-line argument\n");
+                        }
 			if (sscanf(opt,"%lld",optDest)<1) {
 			/*Bad command line argument-- die*/
 				fprintf(stderr,"Cannot parse %s option '%s' "
