@@ -39,7 +39,8 @@ The top-level construct in a \ci file is a named container for interface
 declarations called a \kw{module}. Modules allow related declarations to be
 grouped together, and cause generated code for these declarations to be grouped
 into files named after the module. Modules cannot be nested, but each \ci file
-can have several modules. Modules are specified using the keyword \kw{module}.
+can have several modules. Modules are specified using the keyword \kw{module}. A 
+module name must be a valid C++ identifier.
 
 \begin{alltt}
 module myFirstModule \{
