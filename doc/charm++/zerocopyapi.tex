@@ -93,6 +93,54 @@ requests.
 It should also be noted that the benefit of this API can be seen for large arrays on
 only RDMA enabled networks. On networks which do not support RDMA and for within process sends
 (which uses shared memory), the API is functional but doesn't show any performance benefit as it
-behaves like a regular entry method that copies its arguments. Currently, the benefit of the API
-is mostly in terms of reducing application memory footprint as the API is largely unoptimized.
-Optimized versions of this API are expected to be released in the future.
+behaves like a regular entry method that copies its arguments.
+
+Table~\ref{tab:rdmathreshold} displays the message size thresholds for the zero copy API on popular
+systems and build architectures. These results were obtained by running \examplerefdir{zerocopy/pingpong}
+in non-SMP mode on production builds. For message sizes greater than or equal to the displayed thresholds,
+the zero copy API is found to perform better than the regular message send API. For network layers
+that are not pamilrts, gni, verbs, ofi or mpi, the generic implementation is used.
+
+\begin{table}[ht]
+\begin{tabular}{|p{4cm}|p{1.5cm}|p{4cm}|p{1.5cm}|p{1.5cm}|p{1.5cm}|}
+\hline
+Machine & Network & Build Architecture & Intra Processor & Intra Host & Inter Host
+\\\hline
+Blue Gene/Q (Vesta) & PAMI & \verb|pamilrts-bluegeneq| & 4 MB & 32 KB & 256 KB
+%\\\hline
+%Blue Gene/Q (Vesta) & PAMI & \verb|pamilrts-bluegeneq-smp| & & &
+%\\\hline
+%Blue Gene/Q (Vesta) & PAMI & \verb|pamilrts-bluegeneq-async-smp| & & &
+%\\\hline
+%Cray XK6 (Titan) & Gemini & \verb|gni-crayxe| & & &
+%\\\hline
+%Cray XE6 (Blue Waters) & Gemini & \verb|gni-crayxe-smp| & & &
+%\\\hline
+%Cray XK6 (Titan) & Gemini & \verb|mpi-crayxe| & & &
+%\\\hline
+%Cray XE6 (Blue Waters) & Gemini & \verb|mpi-crayxe-smp| & & &
+\\\hline
+Cray XC30 (Edison) & Aries & \verb|gni-crayxc| & 1 MB & 2 MB & 2 MB
+%\\\hline
+%Cray XC30 (Edison) & Aries & \verb|gni-crayxc-smp| & & &
+\\\hline
+Cray XC30 (Edison) & Aries & \verb|mpi-crayxc| & 256 KB & 8 KB & 32 KB
+%\\\hline
+%Cray XC30 (Edison) & Aries & \verb|mpi-crayxc-smp| & & &
+\\\hline
+Dell Cluster (Golub) & Infiniband &\verb|verbs-linux-x86_64| & 128 KB & 2 MB & 1 MB
+%\\\hline
+%Dell Cluster (Golub) & Infiniband &\verb|verbs-linux-x86_64-smp| & &  &
+\\\hline
+Dell Cluster (Golub) & Infiniband &\verb|mpi-linux-x86_64| & 128 KB & 32 KB & 64 KB
+%\\\hline
+%Dell Cluster (Golub) & Infiniband &\verb|mpi-linux-x86_64-smp| & & &
+\\\hline
+Intel Cluster (Bridges) & Intel Omni-Path &\verb|ofi-linux-x86_64| & 64 KB & 32 KB & 32 KB
+\\\hline
+Intel KNL Cluster (Stampede2) & Intel Omni-Path &\verb|ofi-linux-x86_64| & 1 MB & 64 KB & 64 KB
+\\\hline
+\end{tabular}
+\caption{Message Size Thresholds for which Zero Copy API performs better than Regular API}
+\label{tab:rdmathreshold}
+\end{table}
