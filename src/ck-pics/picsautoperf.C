@@ -725,10 +725,6 @@ extern "C" void traceAutoPerfExitFunction() {
   CkpvAccess(isExit) = true;
   autoPerfProxy.getPerfData(0, CkCallback::ignore );
 
-  if(CkpvAccess(fpSummary)!=NULL){
-    fflush(CkpvAccess(fpSummary));
-    fclose(CkpvAccess(fpSummary));
-  }
 }
 
 void _initTraceAutoPerfBOC()
