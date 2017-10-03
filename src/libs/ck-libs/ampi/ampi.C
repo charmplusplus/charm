@@ -4393,14 +4393,19 @@ static int copyDatatype(MPI_Datatype sendtype, int sendcount, MPI_Datatype recvt
   if (inbuf == outbuf) return MPI_SUCCESS; // handle MPI_IN_PLACE
 
   CkDDT_DataType *sddt = getDDT()->getType(sendtype);
-  int slen = sddt->getSize(sendcount);
   CkDDT_DataType *rddt = getDDT()->getType(recvtype);
 
   if (sddt->isContig() && rddt->isContig()) {
+    int slen = sddt->getSize(sendcount);
     memcpy(outbuf, inbuf, slen);
+  } else if (sddt->isContig()) {
+    rddt->serialize((char*)outbuf, (char*)inbuf, recvcount, -1);
+  } else if (rddt->isContig()) {
+    sddt->serialize((char*)inbuf, (char*)outbuf, sendcount, 1);
   } else {
     // ddts don't have "copy", so fake it by serializing into a temp buffer, then
     //  deserializing into the output.
+    int slen = sddt->getSize(sendcount);
     vector<char> serialized(slen);
     sddt->serialize((char*)inbuf, &serialized[0], sendcount, 1);
     rddt->serialize((char*)outbuf, &serialized[0], recvcount, -1);
