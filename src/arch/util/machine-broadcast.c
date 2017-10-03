@@ -2,6 +2,8 @@
  *        functions for broadcast
 **/
 
+#include "spanningTree.h"
+
 CmiCommHandle CmiSendNetworkFunc(int destPE, int size, char *msg, int mode);
 
 static void handleOneBcastMsg(int size, char *msg) {
