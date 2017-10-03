@@ -173,7 +173,7 @@ void TraceAutoPerfBOC::gatherSummary(CkReductionMsg *msg){
   }
 }
 
-CkpvDeclare(CkReduction::reducerType, PerfDataReductionType);
+CkReduction::reducerType PerfDataReductionType;
 
 CkReductionMsg *PerfDataReduction(int nMsg,CkReductionMsg **msgs){
   PerfData *ret;
@@ -385,7 +385,7 @@ void TraceAutoPerfBOC::getPerfData(int reductionPE, CkCallback cb) {
     if(treeBranchFactor < 0) {
       PerfData *data = CkpvAccess(perfDatabase)->getCurrentPerfData();
       CkCallback *cb1 = new CkCallback(CkIndex_TraceAutoPerfBOC::globalPerfAnalyze(NULL), thisProxy[reductionPE]);
-      contribute(sizeof(PerfData)*CkpvAccess(numOfPhases)*PERIOD_PERF,data, CkpvAccess(PerfDataReductionType), *cb1);
+      contribute(sizeof(PerfData)*CkpvAccess(numOfPhases)*PERIOD_PERF,data, PerfDataReductionType, *cb1);
       }
     else 
     {
@@ -724,15 +724,17 @@ extern "C" void traceAutoPerfExitFunction() {
 
   CkpvAccess(isExit) = true;
   autoPerfProxy.getPerfData(0, CkCallback::ignore );
+}
 
+void _initTraceAutoPerfNode()
+{
+  PerfDataReductionType = CkReduction::addReducer(PerfDataReduction);
 }
 
 void _initTraceAutoPerfBOC()
 {
   WARMUP_STEP = 0;
   PAUSE_STEP = 1000;
-  CkpvInitialize(CkReduction::reducerType, PerfDataReductionType);
-  CkpvAccess(PerfDataReductionType)=CkReduction::addReducer(PerfDataReduction);
   CkpvInitialize(int, hasPendingAnalysis);
   CkpvAccess(hasPendingAnalysis) = 0;
   CkpvInitialize(CkCallback, callBackAutoPerfDone);
