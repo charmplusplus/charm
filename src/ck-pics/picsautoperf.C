@@ -384,8 +384,8 @@ void TraceAutoPerfBOC::getPerfData(int reductionPE, CkCallback cb) {
   if(t->getTraceOn()) {
     if(treeBranchFactor < 0) {
       PerfData *data = CkpvAccess(perfDatabase)->getCurrentPerfData();
-      CkCallback *cb1 = new CkCallback(CkIndex_TraceAutoPerfBOC::globalPerfAnalyze(NULL), thisProxy[reductionPE]);
-      contribute(sizeof(PerfData)*CkpvAccess(numOfPhases)*PERIOD_PERF,data, PerfDataReductionType, *cb1);
+      CkCallback cb1(CkIndex_TraceAutoPerfBOC::globalPerfAnalyze(NULL), thisProxy[reductionPE]);
+      contribute(sizeof(PerfData)*CkpvAccess(numOfPhases)*PERIOD_PERF,data, PerfDataReductionType, cb1);
       }
     else 
     {
