@@ -586,6 +586,9 @@ void CurLoopInfo::stealWork() {
       }
 
         fnPtr(first, last, redBufs[nextChunkId], paramNum, param);
+#if CMK_PAMI_LINUX_PPC8
+        CmiMemoryWriteFence(); //Wait for shared data to be updated.
+#endif
         execTimes++;
         nextChunkId = getNextChunkIdx();
     }

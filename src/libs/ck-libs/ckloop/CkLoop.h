@@ -87,7 +87,10 @@ public:
     void waitLoopDone(int sync) {
         //while(!__sync_bool_compare_and_swap(&finishFlag, numChunks, 0));
         if (sync) while (finishFlag!=numChunks);
-        //finishFlag = 0;
+#if CMK_PAMI_LINUX_PPC8
+        CmiMemoryReadFence();
+#endif
+       //finishFlag = 0;
         CmiLock(loop_info_inited_lock);
         inited = 0;
         CmiUnlock(loop_info_inited_lock);
@@ -109,11 +112,18 @@ public:
 #endif
 #else
         __sync_add_and_fetch(&finishFlag, counter);
+#if CMK_PAMI_LINUX_PPC8
+        CmiMemoryWriteFence();  //optional..
+#endif
 #endif
     }
 
     int isFree() {
-        return finishFlag == numChunks;
+      int fin = finishFlag == numChunks;
+#if CMK_PAMI_LINUX_PPC8
+      CmiMemoryReadFence();
+#endif
+      return fin;
     }
 
     void **getRedBufs() {
