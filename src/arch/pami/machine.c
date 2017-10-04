@@ -678,10 +678,13 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
     /* processor per node */
     _Cmi_mynodesize = 1;
-    CmiGetArgInt(argv,"+ppn", &_Cmi_mynodesize);
+    /* Read +ppn or ++ppn */
+    if (CmiGetArgInt(argv, "+ppn", &_Cmi_mynodesize) == 0) {
+      CmiGetArgInt(argv, "++ppn", &_Cmi_mynodesize);
+    }
 #if ! CMK_SMP
     if (_Cmi_mynodesize > 1 && _Cmi_mynode == 0)
-      CmiAbort("+ppn cannot be used in non SMP version!\n");
+      CmiAbort("+ppn/++ppn cannot be used in non SMP version!\n");
 #endif
     
     PAMI_Client_create (clientname, &cmi_pami_client, NULL, 0);
