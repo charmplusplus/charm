@@ -40,8 +40,6 @@ public:
   void turnOff();
 
 private:
-  CProxy_DistributedLB thisProxy;
-
   int underloaded_pe_count;
   std::vector<int> pe_no;
   std::vector<double> loads;

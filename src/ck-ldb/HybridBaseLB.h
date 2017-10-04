@@ -341,7 +341,6 @@ public:
   };
 
 private:
-  CProxy_HybridBaseLB  thisProxy;
   int              foundNeighbors;
   CmiGroup            group1;              // level 1 multicast group
   int                 group1_created;

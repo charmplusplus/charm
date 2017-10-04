@@ -270,12 +270,10 @@ protected:
   void findSimResults(LDStats* stats, int count, 
                       LBMigrateMsg* msg, LBSimulation* simResults);
   void removeNonMigratable(LDStats* statsDataList, int count);
-	CProxy_CentralLB thisProxy;
   void loadbalance_with_thread() { use_thread = true; }
 
   bool concurrent;
 private:  
-//CProxy_CentralLB thisProxy;
   int myspeed;
   int stats_msg_count;
   CLBStatsMsg **statsMsgsList;

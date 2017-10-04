@@ -99,7 +99,6 @@ private:
   void FindNeighbors();
   WSLBStatsMsg* AssembleStats();
 
-  CProxy_WSLB   thisProxy;
   LBTopology    *topo;
   int mystep;
   int stats_msg_count;

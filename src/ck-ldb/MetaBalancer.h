@@ -148,7 +148,6 @@ public:
   void SetStrategyCost(double lb_strategy_cost);
 
 private:
-  //CProxy_MetaBalancer thisProxy;
   LBDatabase* lbdatabase;
   std::vector<double> total_load_vec;
   // Keeps track of how many local chares contributed

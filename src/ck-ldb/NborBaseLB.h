@@ -21,7 +21,6 @@ class NLBStatsMsg;
 class NborBaseLB : public CBase_NborBaseLB
 {
 private:
-  CProxy_NborBaseLB  thisProxy;
   LBTopology         *topo;
 public:
   NborBaseLB(const CkLBOptions &);
