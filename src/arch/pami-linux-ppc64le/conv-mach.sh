@@ -1,6 +1,8 @@
+PAMI_INC=${CHARMBASE}/ibm_includes/pami
+PAMI_LIB=/opt/ibm/spectrum_mpi/lib/pami_port
 
-PAMI_INC=/opt/ibmhpc/pecurrent/ppe.pami/include
-PAMI_LIB=/opt/ibmhpc/pecurrent/ppe.pami/gnu/lib64/pami64
+LIBCOLL_INC=${CHARMBASE}/ibm_includes/libcoll
+LIBCOLL_LIB=/opt/ibm/spectrum_mpi/lib
 
 CXX=xlC_r
 CC=xlc_r
@@ -19,9 +21,9 @@ CMK_RANLIB='ranlib'
 CMK_LIBS='-lckqt'
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 
-CMK_SYSINC="-I $PAMI_INC"
+CMK_SYSINC="-I $PAMI_INC -I $LIBCOLL_INC"
 #CMK_SYSLIBS="-L $PAMI_LIB -L /usr/lib/powerpc64le-linux-gnu -lpami -libverbs -lnuma -lstdc++ -lc -ldl -lrt -lpthread"
-CMK_SYSLIBS="-L $PAMI_LIB -L /usr/lib/powerpc64le-linux-gnu -lpami -libverbs -lstdc++ -lc -ldl -lrt -lpthread"
+CMK_SYSLIBS="-L $PAMI_LIB -L $LIBCOLL_LIB -lcollectives -L /usr/lib/powerpc64le-linux-gnu -lpami -libverbs -lstdc++ -lc -ldl -lrt -lpthread"
 
 CMK_NATIVE_LIBS=''
 CMK_NATIVE_CC="$CC -q64"
