@@ -160,6 +160,7 @@ static PPCAtomicMutex *node_recv_mutex;
 //The random seed to pick destination context
 __thread uint32_t r_seed = 0xdeadbeef;
 __thread int32_t _cmi_bgq_incommthread = 0;
+__thread int32_t _comm_thread_id = 0;
 #endif
 
 void ConverseRunPE(int everReturn);
@@ -298,7 +299,7 @@ volatile int outstanding_recvs;
 #define  ORECVS()        (outstanding_recvs)
 #endif //CMK_SMP
 
-#if CMK_SMP  && !CMK_ENABLE_ASYNC_PROGRESS
+#if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
 #define PAMIX_CONTEXT_LOCK_INIT(x)
 #define PAMIX_CONTEXT_LOCK(x)        if(LTPS) PAMI_Context_lock(x)
 #define PAMIX_CONTEXT_UNLOCK(x)      if(LTPS) {CmiMemoryWriteFence(); PAMI_Context_unlock(x);}
@@ -516,22 +517,32 @@ void mysleep (unsigned long cycles) {
 #endif
 
 static void * test_buf;
-volatile int pami_barrier_flag = 0;
 
-void pami_barrier_done (void *ctxt, void * clientdata, pami_result_t err)
+pami_client_t      cmi_pami_client;
+pami_context_t   * cmi_pami_contexts;
+size_t             cmi_pami_numcontexts;
+char clientname[] = "Converse";
+
+volatile int coll_barrier_flag = 0;
+void coll_barrier_done (void *ctxt, void * clientdata, pami_result_t err)
 {
   int * active = (int *) clientdata;
   (*active)--;
 }
 
-pami_client_t      cmi_pami_client;
-pami_context_t   * cmi_pami_contexts;
-size_t             cmi_pami_numcontexts;
-pami_geometry_t    world_geometry;
-pami_xfer_t        pami_barrier;
-char clientname[] = "Converse";
+//Collective definitions
+#ifdef LIBCOLL
+#include <libcoll.h>
+libcoll_context_t   cmi_libcoll_context;
+libcoll_geometry_t  world_geometry;
+libcoll_xfer_t      xfer_barrier;
+#else
+pami_geometry_t     world_geometry;
+pami_xfer_t         xfer_barrier;
+#endif
+void init_barrier ();
 
-#if 1
+
 typedef struct _cmi_pami_mregion_t {
   pami_memregion_t   mregion;
   void             * baseVA;
@@ -539,13 +550,11 @@ typedef struct _cmi_pami_mregion_t {
 
 //one for each of the 64 possible contexts
 CmiPAMIMemRegion_t  cmi_pami_memregion[64];
-#endif
 
 #include "malloc.h"
 
 void _alias_rank (int rank) {
 #if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
-
   CmiState cs = CmiGetState();
   CmiState cs_r = CmiGetStateN(rank);
 
@@ -555,6 +564,11 @@ void _alias_rank (int rank) {
 }
 
 #if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
+
+typedef struct _comm_thr_init_state {
+  volatile int flag;
+  int          id;
+} CommThreadInitState;
 
 pami_result_t init_comm_thread (pami_context_t   context,
 				void           * cookie)
@@ -567,14 +581,14 @@ pami_result_t init_comm_thread (pami_context_t   context,
   // CmiMyPe());
 
   //Notify main thread comm thread has been initialized
-  *(int*)cookie = 0;
+  CommThreadInitState *state = (CommThreadInitState *) cookie;
+  state->flag = 0;
+  _comm_thread_id = state->id;
 
-#if 1
   //set the seed to choose destination context
   uint64_t rseedl = r_seed;
   rseedl |= (uint64_t)context;
   r_seed = ((uint32_t)rseedl)^((uint32_t)(rseedl >> 32));
-#endif
 
   _cmi_bgq_incommthread = 1;
 
@@ -631,12 +645,13 @@ int CMI_Progress_init(int start, int ncontexts) {
   }
 
   pami_work_t  work;
-  volatile int x;
+  CommThreadInitState cstate;
   for (i = start; i < start+ncontexts; ++i) {
-    x = 1;
-    PAMI_Context_post(cmi_pami_contexts[i], &work, 
-		      init_comm_thread, (void*)&x);
-    while(x);
+    cstate.flag = 1;
+    cstate.id   = i;
+    PAMI_Context_post(cmi_pami_contexts[i], &work,
+		      init_comm_thread, (void*)&cstate);
+    while(cstate.flag);
   }
   
   return 0;
@@ -792,71 +807,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
     //fprintf(stderr, "%d Initializing Converse PAMI machine Layer on %d tasks\n", _Cmi_mynode, _Cmi_numnodes);
 
-    ///////////---------------------------------/////////////////////
-    //////////----------- Initialize Barrier -------////////////////
-    size_t               num_algorithm[2];
-    pami_algorithm_t    *always_works_algo = NULL;
-    pami_metadata_t     *always_works_md = NULL;
-    pami_algorithm_t    *must_query_algo = NULL;
-    pami_metadata_t     *must_query_md = NULL;
-    pami_xfer_type_t     xfer_type = PAMI_XFER_BARRIER;
-
-    /* Docs01:  Get the World Geometry */
-    result = PAMI_Geometry_world (cmi_pami_client,&world_geometry);
-    if (result != PAMI_SUCCESS)
-      {
-	fprintf (stderr, "Error. Unable to get world geometry: result = %d\n", result);
-	return;
-      }
-
-    result = PAMI_Geometry_algorithms_num(world_geometry,
-					  xfer_type,
-					  (size_t*)num_algorithm);
-
-    if (result != PAMI_SUCCESS || num_algorithm[0]==0)
-      {
-	fprintf (stderr,
-		 "Error. Unable to query algorithm, or no algorithms available result = %d\n",
-		 result);
-	return;
-      }
-
-    always_works_algo = (pami_algorithm_t*)malloc(sizeof(pami_algorithm_t)*num_algorithm[0]);
-    always_works_md  = (pami_metadata_t*)malloc(sizeof(pami_metadata_t)*num_algorithm[0]);
-    must_query_algo   = (pami_algorithm_t*)malloc(sizeof(pami_algorithm_t)*num_algorithm[1]);
-    must_query_md    = (pami_metadata_t*)malloc(sizeof(pami_metadata_t)*num_algorithm[1]);
-
-    /* Docs05:  Query the algorithm lists */
-    result = PAMI_Geometry_algorithms_query(world_geometry,
-					    xfer_type,
-					    always_works_algo,
-					    always_works_md,
-					    num_algorithm[0],
-					    must_query_algo,
-					    must_query_md,
-					    num_algorithm[1]);
-    
-    int opt_alg = 0, nalg = 0;
-    for (nalg = 0; nalg < num_algorithm[0]; ++nalg)
-      if (strstr(always_works_md[nalg].name, "GI") != NULL) {
-	opt_alg = nalg;
-	break;
-      }
-
-    if ((_Cmi_mynode == 0) && (!quietMode))
-      printf ("Choosing optimized barrier algorithm name %s\n",
-	      always_works_md[opt_alg]);
-	      
-    pami_barrier.cb_done   = pami_barrier_done;
-    pami_barrier.cookie    = (void*) & pami_barrier_flag;
-    pami_barrier.algorithm = always_works_algo[opt_alg];
-
-    /* Docs06:  Query the algorithm lists */
-    if (result != PAMI_SUCCESS)
-      {
-	fprintf (stderr, "Error. Unable to get query algorithm. result = %d\n", result);
-	return;
-      }
+    init_barrier();
 
     CmiNetworkBarrier(0);
     CmiNetworkBarrier(0);
@@ -896,10 +847,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
 #if CMK_PPC_ATOMIC_MUTEX
     //Allocate for PPC Atomic Mutex as well
-    size_t size = (_Cmi_mynodesize + 3*actualNodeSize + 1)
+    size_t size = (_Cmi_mynodesize + 6*actualNodeSize + 1)
       * sizeof(PPCAtomicState) + 2*sizeof(PPCAtomicMutex);
 #else
-    size_t size = (_Cmi_mynodesize + 3*actualNodeSize + 1)
+    size_t size = (_Cmi_mynodesize + 6*actualNodeSize + 1)
       * sizeof(PPCAtomicState);
 #endif
     void *atomic_buf;
@@ -915,8 +866,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     }
     atomic_start += _Cmi_mynodesize * sizeof(PPCAtomicState);
 
-    CmiMemAllocInit_ppcq(atomic_start,3*actualNodeSize*sizeof(PPCAtomicState));
-    atomic_start += 3*actualNodeSize*sizeof(PPCAtomicState);
+    CmiMemAllocInit_ppcq(atomic_start,6*actualNodeSize*sizeof(PPCAtomicState));
+    atomic_start += 6*actualNodeSize*sizeof(PPCAtomicState);
 
     PPCAtomicQueueInit (atomic_start,
 			sizeof(PPCAtomicState),
@@ -950,8 +901,10 @@ int PerrorExit (char *err) {
     return -1;
 }
 
+#include <sys/syscall.h>
+
 void ConverseRunPE(int everReturn) {
-    //    printf ("ConverseRunPE on rank %d\n", CmiMyPe());    
+  //printf ("ConverseRunPE on rank %d node %d tid %d\n", CmiMyPe(), CmiMyNode(), syscall(SYS_gettid));    
 
     CmiState cs;
     char** CmiMyArgv;
@@ -1064,6 +1017,11 @@ void ConverseExit(void) {
   if (CmiMyPe() == 0) {
     CmiPrintf("End of program\n");
   }
+
+#if !CMK_BLUEGENEQ
+  CmiBarrier();
+  CmiBarrier();
+#endif
 
   int rank0 = 0;
   if (CmiMyRank() == 0) {
@@ -1717,7 +1675,7 @@ void machineFreeListSendFn(pami_context_t my_context, int npes, int *pes, int si
           copymsg = (char *)CmiAlloc(size);
           CmiAssert(copymsg != NULL);
           CmiMemcpy(copymsg,msg,size);
-          CmiGeneralFreeSendN(CmiNodeOf(pes[i]), CmiRankOf(pes[i]), size, copymsg, 0);
+          machine_send(my_context, CmiNodeOf(pes[i]), CmiRankOf(pes[i]), size, copymsg, 0);
 #endif
         }
     }
@@ -1934,15 +1892,22 @@ extern int CmiBarrier() {
 static pami_result_t machine_network_barrier(pami_context_t   my_context, 
 					     int              to_lock) 
 {
-    pami_result_t result = PAMI_SUCCESS;    
     if (to_lock)
       PAMIX_CONTEXT_LOCK(my_context);    
-    result = PAMI_Collective(my_context, &pami_barrier);       
-    if (to_lock)
-      PAMIX_CONTEXT_UNLOCK(my_context);
 
+#ifdef LIBCOLL
+    libcoll_result_t result = LIBCOLL_SUCCESS;
+    result = LIBCOLL_Start (&cmi_libcoll_context, &xfer_barrier);
+    if (result != LIBCOLL_SUCCESS)
+      fprintf (stderr, "Error. Unable to issue  collective. result = %d\n", result);
+#else
+    pami_result_t result = PAMI_SUCCESS;
+    result = PAMI_Collective(my_context, &xfer_barrier);
     if (result != PAMI_SUCCESS)
       fprintf (stderr, "Error. Unable to issue  collective. result = %d\n", result);
+#endif
+    if (to_lock)
+      PAMIX_CONTEXT_UNLOCK(my_context);
 
     return result;
 }
@@ -1953,13 +1918,15 @@ pami_result_t network_barrier_handoff(pami_context_t context, void *msg)
 }
 
 static void CmiNetworkBarrier(int async) {
+    if (CmiNumNodes() == 1) return;
+
     pami_context_t my_context = cmi_pami_contexts[0];
-    pami_barrier_flag = 1;
+    coll_barrier_flag = 1;
 #if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
     if (async) {
       pami_work_t work;
       PAMI_Context_post(my_context, &work, network_barrier_handoff, NULL);
-      while (pami_barrier_flag);
+      while (coll_barrier_flag);
       //fprintf (stderr, "After Network Barrier\n");
     }
     else 
@@ -1967,7 +1934,7 @@ static void CmiNetworkBarrier(int async) {
     {
       machine_network_barrier(my_context, 1);    
       PAMIX_CONTEXT_LOCK(my_context);
-      while (pami_barrier_flag)
+      while (coll_barrier_flag)
 	PAMI_Context_advance (my_context, 100);
       PAMIX_CONTEXT_UNLOCK(my_context);
     }
@@ -2224,6 +2191,173 @@ void ack_pkt_dispatch (pami_context_t       context,
 {
   char **buf = (char **)header_addr;
   CmiFree (*buf);
+}
+
+
+#ifdef LIBCOLL
+
+static void libcoll_init_done (void *ctxt, void * clientdata, libcoll_result_t err)
+{
+  int * active = (int *) clientdata;
+  (*active)--;
+}
+
+void init_barrier_libcoll () {
+    ///////////---------------------------------/////////////////////
+    //////////----------- Initialize Barrier -------////////////////
+    /* Docs01:  Initialize LIBCOLL */
+    libcoll_attribute_t attribute[3];
+    size_t nattr = 3;
+    attribute[0].attribute_id    = LIBCOLL_PAMI_CLIENT;
+    attribute[0].attribute_value = cmi_pami_client;
+    attribute[1].attribute_id    = LIBCOLL_PAMI_CONTEXT_POINTER;
+    attribute[1].attribute_value = (void *) cmi_pami_contexts;
+    attribute[2].attribute_id    = LIBCOLL_PAMI_NUM_CONTEXTS;
+    attribute[2].attribute_value = (void *) 1UL;
+
+    libcoll_epdomain_t epdomain;
+    volatile int active = 1;
+    LIBCOLL_Init("CMI LIBCOLL",
+                 attribute, nattr,
+                 libcoll_init_done, (void *)&active,
+                 &cmi_libcoll_context,
+                 &epdomain, &world_geometry);
+    //Wait for libcoll init
+    while (active) LIBCOLL_Advance(cmi_libcoll_context);
+
+    size_t               num_algorithm[2];
+    libcoll_algorithm_t    *always_works_algo = NULL;
+    libcoll_metadata_t     *always_works_md = NULL;
+    libcoll_algorithm_t    *must_query_algo = NULL;
+    libcoll_metadata_t     *must_query_md = NULL;
+    libcoll_xfer_type_t     xfer_type = LIBCOLL_XFER_BARRIER;
+
+    libcoll_result_t result = LIBCOLL_Geometry_algorithms_num(world_geometry,
+                                                              xfer_type,
+                                                              num_algorithm);
+
+    if (result != LIBCOLL_SUCCESS || num_algorithm[0]==0)
+    {
+        fprintf (stderr,
+                 "Error. Unable to query algorithm, or no algorithms available result = %d\n",
+                 result);
+        return;
+    }
+
+    always_works_algo = (libcoll_algorithm_t*)malloc(sizeof(libcoll_algorithm_t)*num_algorithm[0]);
+    always_works_md  = (libcoll_metadata_t*)malloc(sizeof(libcoll_metadata_t)*num_algorithm[0]);
+    must_query_algo   = (libcoll_algorithm_t*)malloc(sizeof(libcoll_algorithm_t)*num_algorithm[1]);
+    must_query_md    = (libcoll_metadata_t*)malloc(sizeof(libcoll_metadata_t)*num_algorithm[1]);
+
+    /* Docs05:  Query the algorithm lists */
+    result = LIBCOLL_Geometry_algorithms_query(world_geometry,
+                                               xfer_type,
+                                               always_works_algo,
+                                               always_works_md,
+                                               num_algorithm[0],
+                                               must_query_algo,
+                                               must_query_md,
+                                               num_algorithm[1]);
+    int opt_alg = 0, nalg = 0;
+    for (nalg = 0; nalg < num_algorithm[0]; ++nalg)
+        if (strstr(always_works_md[nalg].name, "SHMEM") != NULL) {
+            opt_alg = nalg;
+            break;
+        }
+
+    if ((_Cmi_mynode == 0) && (!quietMode))
+        printf ("Choosing optimized barrier algorithm name %s\n",
+                always_works_md[opt_alg].name);
+
+    xfer_barrier.cb_done   = (libcoll_event_function) coll_barrier_done;
+    xfer_barrier.cookie    = (void*) & coll_barrier_flag;
+    xfer_barrier.algorithm = always_works_algo[opt_alg];
+    xfer_barrier.geometry  = world_geometry;
+
+    /* Docs06:  Query the algorithm lists */
+    if (result != LIBCOLL_SUCCESS)
+    {
+        fprintf (stderr, "Error. Unable to get query algorithm. result = %d\n", result);
+        return;
+    }
+}
+
+#else
+void init_barrier_pami () {
+    ///////////---------------------------------/////////////////////
+    //////////----------- Initialize Barrier -------////////////////
+    size_t               num_algorithm[2];
+    pami_algorithm_t    *always_works_algo = NULL;
+    pami_metadata_t     *always_works_md = NULL;
+    pami_algorithm_t    *must_query_algo = NULL;
+    pami_metadata_t     *must_query_md = NULL;
+    pami_xfer_type_t     xfer_type = PAMI_XFER_BARRIER;
+
+    /* Docs01:  Get the World Geometry */
+    pami_result_t result = PAMI_Geometry_world (cmi_pami_client,&world_geometry);
+    if (result != PAMI_SUCCESS)
+    {
+        fprintf (stderr, "Error. Unable to get world geometry: result = %d\n", result);
+        return;
+    }
+
+    result = PAMI_Geometry_algorithms_num(world_geometry,
+                                          xfer_type,
+                                          (size_t*)num_algorithm);
+
+    if (result != PAMI_SUCCESS || num_algorithm[0]==0)
+    {
+        fprintf (stderr,
+                 "Error. Unable to query algorithm, or no algorithms available result = %d\n",
+                 result);
+        return;
+    }
+
+    always_works_algo = (pami_algorithm_t*)malloc(sizeof(pami_algorithm_t)*num_algorithm[0]);
+    always_works_md  = (pami_metadata_t*)malloc(sizeof(pami_metadata_t)*num_algorithm[0]);
+    must_query_algo   = (pami_algorithm_t*)malloc(sizeof(pami_algorithm_t)*num_algorithm[1]);
+    must_query_md    = (pami_metadata_t*)malloc(sizeof(pami_metadata_t)*num_algorithm[1]);
+
+    /* Docs05:  Query the algorithm lists */
+    result = PAMI_Geometry_algorithms_query(world_geometry,
+                                            xfer_type,
+                                            always_works_algo,
+                                            always_works_md,
+                                            num_algorithm[0],
+                                            must_query_algo,
+                                            must_query_md,
+                                            num_algorithm[1]);
+
+    int opt_alg = 0, nalg = 0;
+    for (nalg = 0; nalg < num_algorithm[0]; ++nalg)
+        if (strstr(always_works_md[nalg].name, "GI") != NULL) {
+            opt_alg = nalg;
+            break;
+        }
+
+    if ((_Cmi_mynode == 0) && (!quietMode))
+        printf ("Choosing optimized barrier algorithm name %s\n",
+	              always_works_md[opt_alg]);
+
+    xfer_barrier.cb_done   = coll_barrier_done;
+    xfer_barrier.cookie    = (void*) & coll_barrier_flag;
+    xfer_barrier.algorithm = always_works_algo[opt_alg];
+
+    /* Docs06:  Query the algorithm lists */
+    if (result != PAMI_SUCCESS)
+    {
+        fprintf (stderr, "Error. Unable to get query algorithm. result = %d\n", result);
+        return;
+    }
+}
+#endif
+
+void init_barrier () {
+#ifndef LIBCOLL
+  init_barrier_pami();
+#else
+  init_barrier_libcoll();
+#endif
 }
 
 #if CMK_BLUEGENEQ

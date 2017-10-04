@@ -1,13 +1,29 @@
 
 #include <converse.h>
 
+//#define CMK_POWER8_NVL   1
+
+#ifdef CMK_POWER8_NVL
+#include "/usr/local/cuda/include/cuda_runtime.h"
+#include "/usr/local/cuda/include/cuda_runtime_api.h"
+#endif
+
 #define ALIGNMENT        32
+#ifdef CMK_POWER8_NVL
+#define SMSG_SIZE        4096
+#define N_SMSG_ELEM      4096
+#define MMSG_SIZE        131072
+#define N_MMSG_ELEM      1024
+#define LLMSG_SIZE       4194304
+#define N_LLMSG_ELEM     128
+#else
 #define SMSG_SIZE        4096
 #define N_SMSG_ELEM      4096
 #define MMSG_SIZE        16384
 #define N_MMSG_ELEM      2048
 #define LLMSG_SIZE       65536
 #define N_LLMSG_ELEM     1024
+#endif
 
 #if CMK_BLUEGENEQ
 #include <spi/include/kernel/location.h>
@@ -27,6 +43,10 @@ typedef struct CmiMemAllocHdr_ppcq_t {
 static int _nodeStart;
 extern int  Cmi_nodestart; /* First processor in this address space */
 
+#if CMK_ENABLE_ASYNC_PROGRESS
+extern __thread int32_t _comm_thread_id;
+#endif
+
 void *CmiAlloc_ppcq (int size) {
   CmiMemAllocHdr_ppcq *hdr = NULL;
   char *buf;
@@ -39,32 +59,55 @@ void *CmiAlloc_ppcq (int size) {
   int myrank = Kernel_ProcessorID() - _nodeStart;
 #else
   int myrank = CmiMyRank();
+#if CMK_ENABLE_ASYNC_PROGRESS
+  if (CmiInCommThread())
+    myrank = CmiMyNodeSize() + _comm_thread_id;
+#endif
 #endif
 
   if (size <= SMSG_SIZE) {
     hdr = PPCAtomicDequeue (&sPPCMemallocVec[myrank]);
-    if (hdr == NULL)
+    if (hdr == NULL) {
+#ifdef CMK_POWER8_NVL
+      cudaMallocHost ((void **) &hdr, SMSG_SIZE + sizeof(CmiMemAllocHdr_ppcq));
+#else
       hdr = (CmiMemAllocHdr_ppcq *)
         malloc_nomigrate(SMSG_SIZE + sizeof(CmiMemAllocHdr_ppcq));
+#endif
+    }
     hdr->size = SMSG_SIZE;
   }
   else if (size <= MMSG_SIZE) {
     hdr = PPCAtomicDequeue (&mPPCMemallocVec[myrank]);
-    if (hdr == NULL)
+    if (hdr == NULL) {
+#ifdef CMK_POWER8_NVL
+      cudaMallocHost ((void **) &hdr, MMSG_SIZE + sizeof(CmiMemAllocHdr_ppcq));
+#else
       hdr = (CmiMemAllocHdr_ppcq *)
         malloc_nomigrate(MMSG_SIZE + sizeof(CmiMemAllocHdr_ppcq));
+#endif
+    }
     hdr->size = MMSG_SIZE;
   }
   else if (size <= LLMSG_SIZE) {
     hdr = PPCAtomicDequeue (&llPPCMemallocVec[myrank]);
-    if (hdr == NULL)
+    if (hdr == NULL) {
+#ifdef CMK_POWER8_NVL
+      cudaMallocHost ((void **) &hdr, LLMSG_SIZE + sizeof(CmiMemAllocHdr_ppcq));
+#else
       hdr = (CmiMemAllocHdr_ppcq *)
         malloc_nomigrate(LLMSG_SIZE + sizeof(CmiMemAllocHdr_ppcq));
+#endif
+    }
     hdr->size = LLMSG_SIZE;
   }
   else {
+#ifdef CMK_POWER8_NVL
+    cudaMallocHost ((void **) &hdr, size + sizeof(CmiMemAllocHdr_ppcq));
+#else
     hdr = (CmiMemAllocHdr_ppcq *)
       malloc_nomigrate(size + sizeof(CmiMemAllocHdr_ppcq));
+#endif
     hdr->size = size;
   }
 
@@ -93,9 +136,14 @@ void CmiFree_ppcq (void *buf) {
   else if (hdr->size == LLMSG_SIZE)
     rc = PPCAtomicEnqueue (&llPPCMemallocVec[hdr->rank], hdr);
 
-  if (rc == CMI_PPCQ_EAGAIN)
+  if (rc == CMI_PPCQ_EAGAIN) {
+#ifdef CMK_POWER8_NVL
+    cudaFreeHost (hdr);
+#else
     //queues are full or large buf
     free_nomigrate(hdr);
+#endif
+  }
 
 #if CMK_TRACE_ENABLED
   traceUserBracketEvent(30002, start, CmiWallTimer());
@@ -110,7 +158,7 @@ void CmiMemAllocInit_ppcq (void   * atomic_mem,
   int node_size = 64/Kernel_ProcessCount();
   _nodeStart = node_size * Kernel_MyTcoord();
 #else
-  int node_size = CmiMyNodeSize();
+  int node_size = 2 * CmiMyNodeSize();
   _nodeStart = Cmi_nodestart;
 #endif
 
