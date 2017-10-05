@@ -2,6 +2,68 @@ This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 
 ================================================================================
+What's new in Charm++ 6.8.1
+================================================================================
+
+This is a backwards-compatible patch/bug-fix release. Roughly 100 bug
+fixes, improvements, and cleanups have been applied across the entire
+system. Notable changes are described below:
+
+General System Improvements
+
+- Enable network- and node-topology-aware trees for group and chare
+  array reductions and broadcasts
+
+- Add a message receive 'fast path' for quicker array element lookup
+
+- Feature #1434: Optimize degenerate CkLoop cases
+
+- Fix a rare race condition in Quiescence Detection that could allow
+  it to fire prematurely (bug #1658)
+  * Thanks to Nikhil Jain (LLNL) and Karthik Senthil for isolating
+    this in the Quicksilver proxy application
+
+- Fix various LB bugs
+  * Fix RefineSwapLB to properly handle non-migratable objects
+  * GreedyRefine: improvements for concurrent=false and HybridLB integration
+  * Bug #1649: NullLB shouldnt wait for LB period
+
+- Fix Projections tracing bug #1437: CkLoop work traces to the
+  previous entry on the PE rather than to the caller
+
+- Modify [aggregate] entry method (TRAM) support to only deliver
+  PE-local messages inline for [inline]-annotated methods. This avoids
+  the potential for excessively deep recursion that could overrun
+  thread stacks.
+
+- Fix various compilation warnings
+
+Platform Support
+
+- Improve experimental support for PAMI network layer on POWER8 Linux platforms
+  * Thanks to Sameer Kumar of IBM for contributing these patches
+
+- Add an experimental 'ofi' network layer to run on Intel Omni-Path
+  hardware using libfabric
+  * Note that support for '+partitions' (also used as '+replicas' by
+    NAMD) is known to be broken, currently (bug #1675)
+  * Thanks to Yohann Burette and Mikhail Shiryaev of Intel for
+    contributing this new network layer
+
+- The GNI network layer (used on Cray XC/XK/XE systems) now respects
+  the ++quiet command line argument during startup
+
+AMPI Improvements
+
+- Support for MPI_IN_PLACE in all collectives and for persistent requests
+
+- Improved Alltoall(v,w) implementations
+
+- AMPI now passes all MPICH-3.2 tests for groups, virtual topologies, and infos
+
+- Fixed Isomalloc to not leave behind mapped memory when migrating off a PE
+
+================================================================================
 What's new in Charm++ 6.8.0
 ================================================================================
 
