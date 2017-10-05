@@ -2,6 +2,9 @@
 
 #include "rand48_replacement.h"
 #include <vector>
+#include <cmath>
+
+using std::abs;
 
 #define XOFFSET 0
 #define YOFFSET 1
@@ -77,7 +80,7 @@ public:
       // Now that we've found the new means, check if they're the same as before
       bool match = true;
       for (int i = 0; i < k; ++i) {
-        if (means[i].x != oldMeans[i].x || means[i].y != oldMeans[i].y) {
+        if (abs(means[i].x - oldMeans[i].x) > 1.0e-6 || abs(means[i].y - oldMeans[i].y) > 1.0e-6) {
           match = false;
           break;
         }
