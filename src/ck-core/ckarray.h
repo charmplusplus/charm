@@ -376,6 +376,8 @@ template <class T>
 class ArrayElementT : public ArrayElement
 {
 public:
+  using array_index_t = T;
+
   ArrayElementT(void): thisIndex(*(const T *)thisIndexMax.data()) {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
         mlogData->objID.data.array.idx=thisIndexMax;

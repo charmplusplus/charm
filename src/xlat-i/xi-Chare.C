@@ -1141,6 +1141,7 @@ Array::genSubDecls(XStr& str)
   str << CIClassStart;
 
   genTypedefs(str);
+  str << "    using array_index_t = " << indexType << ";\n";
 
   genTramDecls(str);
 
