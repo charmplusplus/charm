@@ -1273,21 +1273,6 @@ void LrtsExit() {
     }
 }
 
-static int machine_exit_idx;
-static void machine_exit(char *m) {
-    EmergencyExit();
-    /*printf("--> %d: machine_exit\n",CmiMyPe());*/
-    fflush(stdout);
-    CmiNodeBarrier();
-    if (CmiMyRank() == 0) {
-        MPI_Barrier(charmComm);
-        /*printf("==> %d: passed barrier\n",CmiMyPe());*/
-        MPI_Abort(charmComm, 1);
-    } else {
-        while (1) CmiYield();
-    }
-}
-
 static void KillOnAllSigs(int sigNo) {
     static int already_in_signal_handler = 0;
     char *m;
@@ -1766,8 +1751,6 @@ void LrtsPostCommonInit(int everReturn) {
     CpvAccess(RdmaRecvQueueLen) = 0;
 #endif
 
-    machine_exit_idx = CmiRegisterHandler((CmiHandler)machine_exit);
-
 #if CMI_MPI_TRACE_USEREVENTS && CMK_TRACE_ENABLED && !CMK_TRACE_IN_CHARM
     CpvInitialize(double, projTraceStart);
     /* only PE 0 needs to care about registration (to generate sts file). */
@@ -1786,13 +1769,6 @@ void LrtsPostCommonInit(int everReturn) {
  ************************************************************************/
 
 void LrtsAbort(const char *message) {
-    char *m;
-
-    m = CmiAlloc(CmiMsgHeaderSizeBytes);
-    CmiSetHandler(m, machine_exit_idx);
-    CmiSyncBroadcastAndFree(CmiMsgHeaderSizeBytes, m);
-    machine_exit(m);
-    /* Program never reaches here */
     MPI_Abort(charmComm, 1);
 }
 
