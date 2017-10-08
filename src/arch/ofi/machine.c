@@ -843,7 +843,7 @@ CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mo
             CmiAbort("fi_mr_reg error");
         }
 
-        rma_header->nodeNo  = CmiMyNode();
+        rma_header->nodeNo  = CmiMyNodeGlobal();
         rma_header->src_msg = (uint64_t)msg;
         rma_header->len     = size;
         rma_header->key     = fi_mr_key(mr);
