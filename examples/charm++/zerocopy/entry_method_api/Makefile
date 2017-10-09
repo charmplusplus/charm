@@ -1,4 +1,4 @@
-DIRS	= direct_api entry_method_api
+DIRS	= pingpong simpleZeroCopy stencil3d
 
 all:
 	for d in $(DIRS); do \

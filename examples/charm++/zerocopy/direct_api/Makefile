@@ -1,4 +1,4 @@
-DIRS	= direct_api entry_method_api
+DIRS	= simple_rget simple_rput get_put_pingpong pingpong
 
 all:
 	for d in $(DIRS); do \

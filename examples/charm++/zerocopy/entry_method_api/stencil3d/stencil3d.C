@@ -203,9 +203,9 @@ class Stencil: public CBase_Stencil {
 
     Stencil(CkMigrateMessage* m) { }
 
-    ~Stencil() { 
-      delete [] temperature; 
-      delete [] new_temperature; 
+    ~Stencil() {
+      delete [] temperature;
+      delete [] new_temperature;
     }
 
     // Send ghost faces to the six neighbors
