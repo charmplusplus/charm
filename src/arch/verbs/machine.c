@@ -1441,19 +1441,16 @@ static void node_addresses_obtain(char **argv)
   MACHSTATE(3,"node_addresses_obtain { ");
   if (Cmi_charmrun_fd==-1) 
   {/*Standalone-- fake a single-node nodetab message*/
-  	ChSingleNodeinfo *fakeTab;
-	ChMessage_new("nodeinfo",sizeof(ChSingleNodeinfo),&nodetabmsg);
-	fakeTab=(ChSingleNodeinfo *)(nodetabmsg.data);
+	ChMessageInt_t *n32;
+	ChNodeinfo *nodeInfo;
+	ChMessage_new("nodeinfo", sizeof(ChMessageInt_t)+sizeof(ChNodeinfo), &nodetabmsg);
+	n32 = (ChMessageInt_t *)nodetabmsg.data;
+	nodeInfo = (ChNodeinfo *)(nodetabmsg.data + sizeof(ChMessageInt_t));
 
-	/*This is a stupid hack: we expect the *number* of nodes
-	followed by ChNodeinfo structs; so we use a ChSingleNodeinfo
-	(which happens to have exactly that layout!) and stuff
-	a 1 into the "node number" slot
-	*/
-	fakeTab->nodeNo=ChMessageInt_new(1); /* <- hack */
-	fakeTab->info.nPE=ChMessageInt_new(_Cmi_mynodesize);
-	fakeTab->info.dataport=ChMessageInt_new(0);
-	fakeTab->info.IP=_skt_invalid_ip;
+	n32[0] = ChMessageInt_new(1);
+	nodeInfo->nPE = ChMessageInt_new(_Cmi_mynodesize);
+	nodeInfo->dataport = ChMessageInt_new(0);
+	nodeInfo->IP = _skt_invalid_ip;
   }
   else 
   { /*Contact charmrun for machine info.*/
