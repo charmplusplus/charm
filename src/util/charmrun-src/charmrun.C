@@ -1369,24 +1369,18 @@ void parse_oldnodenames(char **oldnodelist)
 }
 #endif
 
-void nodetab_init()
+void nodetab_init_with_nodelist()
 {
   FILE *f;
   char *nodesfile;
   nodetab_host global, group, host;
   char input_line[MAX_LINE_LENGTH];
-  int rightgroup, i, remain, lineNo;
+  int rightgroup, lineNo;
   /* Store the previous host so we can make sure we aren't mixing localhost and
    * non-localhost */
   char *prevHostName = NULL;
   std::vector< std::pair<int, nodetab_host> > hosts;
   std::multimap<int, nodetab_host> binned_hosts;
-
-  /* if arg_local is set, ignore the nodelist file */
-  if (arg_local || arg_mpiexec) {
-    nodetab_init_for_local();
-    goto fin;
-  }
 
   /* Open the NODES_FILE. */
   nodesfile = nodetab_file_find();
@@ -1509,7 +1503,19 @@ void nodetab_init()
     nodetab_add(&(it->second));
   }
 
-fin:
+  free(prevHostName);
+}
+
+void nodetab_init()
+{
+  int i, remain;
+
+  /* if arg_local is set, ignore the nodelist file */
+  if (arg_local || arg_mpiexec)
+    nodetab_init_for_local();
+  else
+    nodetab_init_with_nodelist();
+
   /*Clip off excess CPUs at end*/
   for (i = 0; i < nodetab_size; i++) {
     if (nodetab_table[i]->rank == 0)
@@ -1525,8 +1531,6 @@ fin:
   if (arg_hierarchical_start)
     nodetab_init_hierarchical_start();
 #endif
-
-  free(prevHostName);
 
 #if CMK_SHRINK_EXPAND
   if (arg_shrinkexpand &&
