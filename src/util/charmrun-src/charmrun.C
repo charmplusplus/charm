@@ -1352,7 +1352,7 @@ static void nodetab_init_with_nodelist()
   /* Open the NODES_FILE. */
   char *nodesfile = nodetab_file_find();
   if (arg_verbose)
-    fprintf(stderr, "Charmrun> using %s as nodesfile\n", nodesfile);
+    printf("Charmrun> using %s as nodesfile\n", nodesfile);
 
   FILE *f;
   if (!(f = fopen(nodesfile, "r"))) {
@@ -3811,7 +3811,8 @@ int main(int argc, const char **argv, char **envp)
   /* Compute the values of all constants */
   arg_init(argc, argv);
   if (arg_verbose)
-    fprintf(stderr, "Charmrun> charmrun started...\n");
+    printf("Charmrun> charmrun started...\n");
+
   start_timer = GetClock();
 #if CMK_BPROC
   /* check scyld configuration */
@@ -3905,7 +3906,7 @@ int main(int argc, const char **argv, char **envp)
   }
 
   if (arg_verbose)
-    fprintf(stderr, "Charmrun> node programs all started\n");
+    printf("Charmrun> node programs all started\n");
 
 /* Wait for all clients to connect */
 #ifdef HSTART
@@ -3936,7 +3937,7 @@ int main(int argc, const char **argv, char **envp)
   kill_nodes();
 #endif
   if (arg_verbose)
-    fprintf(stderr, "Charmrun> node programs all connected\n");
+    printf("Charmrun> node programs all connected\n");
   /* report time */
   PRINT(("Charmrun> started all node programs in %.3f seconds.\n",
           GetClock() - start_timer));
@@ -4025,7 +4026,7 @@ static void start_nodes_daemon(void)
     char *argBuf;
     if (nodetab_nice(nodeNumber) != -100) {
       if (arg_verbose)
-        fprintf(stderr, "Charmrun> +nice %d\n", nodetab_nice(nodeNumber));
+        printf("Charmrun> +nice %d\n", nodetab_nice(nodeNumber));
       sprintf(nodeArgBuffer, "%s +nice %d", argBuffer,
               nodetab_nice(nodeNumber));
       argBuf = nodeArgBuffer;
@@ -4388,7 +4389,7 @@ static int ssh_fork(int nodeno, const char *startScript)
     exit(1);
   }
   if (arg_verbose)
-    fprintf(stderr, "Charmrun> remote shell (%s:%d) started\n",
+    printf("Charmrun> remote shell (%s:%d) started\n",
             nodetab_name(nodeno), nodeno);
   return pid;
 }
@@ -4664,7 +4665,7 @@ static void ssh_script(FILE *f, int nodeno, int rank0no, const char **argv,
     }
   } else if (arg_in_xterm) {
     if (arg_verbose)
-      fprintf(stderr, "Charmrun> node %d: xterm is %s\n", nodeno,
+      printf("Charmrun> node %d: xterm is %s\n", nodeno,
               nodetab_xterm(nodeno));
     fprintf(f, "cat > /tmp/charmrun_inx.$$ << END_OF_SCRIPT\n");
     fprintf(f, "#!/bin/sh\n");
@@ -4686,14 +4687,14 @@ static void ssh_script(FILE *f, int nodeno, int rank0no, const char **argv,
       fprintf(f, "\"%s\" ", arg_runscript);
     if (arg_no_va_rand) {
       if (arg_verbose)
-        fprintf(stderr, "Charmrun> setarch -R is used.\n");
+        printf("Charmrun> setarch -R is used.\n");
       fprintf(f, "setarch `uname -m` -R ");
     }
     fprintf(f, "\"%s\" ", arg_nodeprog_r);
     fprint_arg(f, argv);
     if (nodetab_nice(nodeno) != -100) {
       if (arg_verbose)
-        fprintf(stderr, "Charmrun> nice -n %d\n", nodetab_nice(nodeno));
+        printf("Charmrun> nice -n %d\n", nodetab_nice(nodeno));
       fprintf(f, " +nice %d ", nodetab_nice(nodeno));
     }
     fprintf(f, "\nres=$?\n");
@@ -5012,7 +5013,7 @@ static int ssh_fork_one(const char *startScript)
     exit(1);
   }
   if (arg_verbose)
-    fprintf(stderr, "Charmrun> mpiexec started\n");
+    printf("Charmrun> mpiexec started\n");
   return pid;
 }
 
