@@ -544,7 +544,8 @@ loop:
 	************/
 
 #if CMK_IBVERBS_FAST_START
-  send_partial_init();
+  if (Cmi_charmrun_fd != -1)
+    send_partial_init();
 #endif
 
 

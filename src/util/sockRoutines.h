@@ -265,23 +265,19 @@ int ChMessage_send(SOCKET fd,
 
 #if CMK_USE_IBVERBS | CMK_USE_IBUD
 typedef struct {
+  ChMessageInt_t nodeno;
   ChMessageInt_t lid, qpn, psn;
 } ChInfiAddr;
 #endif
 
-#define ChInitNodetabFields 1
+#define ChInitNodetabFields 2
+#define ChInitNodeforkFields 2
 
 typedef struct {
+  ChMessageInt_t nodeno;
   ChMessageInt_t nProcessesInPhysNode; /* Number of distinct OS processes on
                                           this physical hardware node */
   ChMessageInt_t nPE; /* Number of worker threads in this OS process */
-#if CMK_USE_IBVERBS
-  ChInfiAddr *
-      qpList; /** An array of queue pair identifiers of length CmiNumNodes()-1*/
-#endif
-#if CMK_USE_IBUD
-  ChInfiAddr qp; /** my qp */
-#endif
   ChMessageInt_t dataport; /* node's data port (UDP or GM) */
   ChMessageInt_t mach_id;  /* node's hardware address (GM-only) */
 #if CMK_USE_MX
@@ -302,8 +298,6 @@ typedef struct {
   ChMessageInt_t pe;            /*Destination processor number*/
   char handler[CCS_HANDLERLEN]; /*Handler name for message to follow*/
 } CcsMessageHeader;
-
-extern const char *skt_to_name(SOCKET skt);
 
 #ifdef __cplusplus
 }

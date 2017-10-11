@@ -368,18 +368,10 @@ static void node_addresses_store(ChMessage *msg)
   MACHSTATE(1,"node_addresses_store {");	
   Lrts_numNodes=ChMessageInt(n32[0]);
 
-#if CMK_USE_IBVERBS
-  ChInfiAddr *remoteInfiAddr = (ChInfiAddr *) (&msg->data[sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*Lrts_numNodes]);
-  if ((sizeof(ChMessageInt_t)*ChInitNodetabFields+sizeof(ChNodeinfo)*Lrts_numNodes +sizeof(ChInfiAddr)*Lrts_numNodes )
-         !=(unsigned int)msg->len)
-    {printf("Node table has inconsistent length!");machine_exit(1);}
-
-#else
-
   if ((sizeof(ChMessageInt_t)*ChInitNodetabFields+sizeof(ChNodeinfo)*Lrts_numNodes)
          !=(unsigned int)msg->len)
-    {printf("Node table has inconsistent length!");machine_exit(1);}
-#endif /*CMK_USE_IBVERBS*/
+    {CmiPrintf("Node table has inconsistent length!\n");machine_exit(1);}
+
   nodes = (OtherNode)malloc(Lrts_numNodes * sizeof(struct OtherNodeStruct));
   nodestart=0;
   for (i=0; i<Lrts_numNodes; i++) {
@@ -388,10 +380,6 @@ static void node_addresses_store(ChMessage *msg)
     MACHSTATE2(3,"node %d nodesize %d",i,nodes[i].nodesize);
     nodes[i].mach_id = ChMessageInt(d[i].mach_id);
 
-#if CMK_USE_IBUD
-    nodes[i].infiData=initinfiData(i,ChMessageInt(d[i].qp.lid),ChMessageInt(d[i].qp.qpn),ChMessageInt(d[i].qp.psn));
-#endif
-
     nodes[i].IP=d[i].IP;
     if (i==Lrts_myNode) {
       Cmi_nodestart=nodes[i].nodestart;
@@ -399,15 +387,7 @@ static void node_addresses_store(ChMessage *msg)
       Cmi_self_IP=nodes[i].IP;
     }
 
-#if CMK_USE_IBVERBS 
-    if(i != Lrts_myNode){
-	int addr[3];
-	addr[0] =ChMessageInt(remoteInfiAddr[i].lid);
-	addr[1] =ChMessageInt(remoteInfiAddr[i].qpn);
-	addr[2] =ChMessageInt(remoteInfiAddr[i].psn);
-	nodes[i].infiData = initInfiOtherNodeData(i,addr);
-    }
-#else
+#if !CMK_USE_IBVERBS
     nodes[i].dataport = ChMessageInt(d[i].dataport);
     nodes[i].addr = skt_build_addr(nodes[i].IP,nodes[i].dataport);
 #endif
@@ -435,11 +415,45 @@ static void node_addresses_store(ChMessage *msg)
     nodes_by_pe[i] = node;
   }
 #endif
+  MACHSTATE(1,"} node_addresses_store");
+}
+
+#if CMK_USE_IBVERBS || CMK_USE_IBUD
+static void store_qpdata(ChMessage *msg)
+{
+  int i;
+  const int qpDataSize = sizeof(ChInfiAddr) * Lrts_numNodes;
+
+  if (qpDataSize != msg->len)
+    {CmiPrintf("qpdata table has inconsistent length!");machine_exit(1);}
+
+#if CMK_USE_IBVERBS
+  ChInfiAddr *remoteInfiAddr = (ChInfiAddr *)msg->data;
+#elif CMK_USE_IBUD
+  ChInfiAddr *qp = (ChInfiAddr *)msg->data;
+#endif
+
+  for (i=0; i<Lrts_numNodes; i++)
+  {
+#if CMK_USE_IBVERBS
+    if (i != Lrts_myNode)
+    {
+      int addr[3];
+      addr[0] =ChMessageInt(remoteInfiAddr[i].lid);
+      addr[1] =ChMessageInt(remoteInfiAddr[i].qpn);
+      addr[2] =ChMessageInt(remoteInfiAddr[i].psn);
+      nodes[i].infiData = initInfiOtherNodeData(i,addr);
+    }
+#elif CMK_USE_IBUD
+    nodes[i].infiData=initinfiData(i,ChMessageInt(qp[i].lid),ChMessageInt(qp[i].qpn),ChMessageInt(qp[i].psn));
+#endif
+  }
+
 #if CMK_USE_IBVERBS
   infiPostInitialRecvs();
 #endif
-  MACHSTATE(1,"} node_addresses_store");
 }
+#endif
 
 /**
  * Printing Net Statistics -- milind

@@ -356,7 +356,7 @@ static void node_addresses_store(ChMessage *msg)
 
   if ((sizeof(ChMessageInt_t)*ChInitNodetabFields+sizeof(ChNodeinfo)*Lrts_numNodes)
          !=(unsigned int)msg->len)
-    {printf("Node table has inconsistent length!");machine_exit(1);}
+    {CmiPrintf("Node table has inconsistent length!\n");machine_exit(1);}
 
   nodes = (OtherNode)malloc(Lrts_numNodes * sizeof(struct OtherNodeStruct));
   nodestart=0;

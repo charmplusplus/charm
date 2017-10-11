@@ -1393,6 +1393,15 @@ static void CmiStdoutFlush(void) {
 
 #include "machine-dgram.c"
 
+static void open_charmrun_socket(void)
+{
+  dataskt=skt_datagram(&dataport, Cmi_os_buffer_size);
+  MACHSTATE2(5, "skt_connect at dataskt:%d Cmi_charmrun_port:%d", dataskt, Cmi_charmrun_port);
+  Cmi_charmrun_fd = skt_connect(Cmi_charmrun_IP, Cmi_charmrun_port, 1800);
+  MACHSTATE2(5, "Opened connection to charmrun at socket %d, dataport=%d", Cmi_charmrun_fd, dataport);
+  skt_tcp_no_nagle(Cmi_charmrun_fd);
+}
+
 
 /*****************************************************************************
  *
@@ -1432,6 +1441,31 @@ static void send_partial_init(void)
 }	
 #endif
 
+static void send_singlenodeinfo(void)
+{
+  /* Contact charmrun for machine info. */
+  ChSingleNodeinfo me;
+  memset(&me, 0, sizeof(me));
+
+  me.nodeNo = ChMessageInt_new(Lrts_myNode);
+
+#if !CMK_USE_IBVERBS
+  /* The nPE fields are set by charmrun--these values don't matter.
+     Set IP in case it is mpiexec mode where charmrun does not have IP yet */
+  me.info.nPE = ChMessageInt_new(0);
+  /* me.info.IP = _skt_invalid_ip; */
+  me.info.IP = skt_innode_my_ip();
+  me.info.dataport = ChMessageInt_new(dataport);
+#endif
+
+  /* Send our node info. to charmrun.
+     CommLock hasn't been initialized yet--
+     use non-locking version */
+  ctrl_sendone_nolock("initnode", (const char *)&me, sizeof(me), NULL, 0);
+  MACHSTATE1(5, "send initnode - dataport:%d", dataport);
+
+  MACHSTATE(3, "initnode sent");
+}
 
 /*Note: node_addresses_obtain is called before starting
   threads, so no locks are needed (or valid!)*/
@@ -1448,62 +1482,63 @@ static void node_addresses_obtain(char **argv)
 	nodeInfo = (ChNodeinfo *)(nodetabmsg.data + sizeof(ChMessageInt_t)*ChInitNodetabFields);
 
 	n32[0] = ChMessageInt_new(1);
+	n32[1] = ChMessageInt_new(Lrts_myNode);
 	nodeInfo->nPE = ChMessageInt_new(_Cmi_mynodesize);
 	nodeInfo->dataport = ChMessageInt_new(0);
 	nodeInfo->IP = _skt_invalid_ip;
   }
   else 
-  { /*Contact charmrun for machine info.*/
-	ChSingleNodeinfo me;
-	memset(&me, 0, sizeof(me));
+  {
+    send_singlenodeinfo();
 
-  	me.nodeNo=ChMessageInt_new(Lrts_myNode);
+    /* We get the other node addresses from a message sent
+       back via the charmrun control port. */
+    if (!skt_select1(Cmi_charmrun_fd, 1200*1000))
+      CmiAbort("Timeout waiting for nodetab!\n");
 
-#if CMK_USE_IBVERBS
-	{
-		int qpListSize = (Lrts_numNodes-1)*sizeof(ChInfiAddr);
-		me.info.qpList = (ChInfiAddr *)malloc(qpListSize);
-		copyInfiAddr(me.info.qpList);
-		MACHSTATE1(3,"me.info.qpList created and copied size %d bytes",qpListSize);
-		ctrl_sendone_nolock("initnode",(const char *)&me,sizeof(me),(const char *)me.info.qpList,qpListSize);
-		free(me.info.qpList);
-	}
-#else
-	/*The nPE fields are set by charmrun--
-	  these values don't matter. 
-          Set IP in case it is mpiexec mode where charmrun does not have IP yet
-        */
-	me.info.nPE=ChMessageInt_new(0);
-	/* me.info.IP=_skt_invalid_ip; */
-        me.info.IP=skt_innode_my_ip();
-#if CMK_USE_IBUD
-	me.info.qp.lid=ChMessageInt_new(context->localAddr.lid);
-	me.info.qp.qpn=ChMessageInt_new(context->localAddr.qpn);
-	me.info.qp.psn=ChMessageInt_new(context->localAddr.psn);
-	MACHSTATE3(3,"IBUD Information lid=%i qpn=%i psn=%i\n",me.info.qp.lid,me.info.qp.qpn,me.info.qp.psn);
-#endif
-  	me.info.dataport=ChMessageInt_new(dataport);
-
-  	/*Send our node info. to charmrun.
-  	CommLock hasn't been initialized yet-- 
-  	use non-locking version*/
-  	ctrl_sendone_nolock("initnode",(const char *)&me,sizeof(me),NULL,0);
-        MACHSTATE1(5,"send initnode - dataport:%d", dataport);
-#endif	//CMK_USE_IBVERBS
-
-	MACHSTATE(3,"initnode sent");
-  
-  	/*We get the other node addresses from a message sent
-  	  back via the charmrun control port.*/
-  	if (!skt_select1(Cmi_charmrun_fd,1200*1000)){
-		CmiAbort("Timeout waiting for nodetab!\n");
-	}
         MACHSTATE(2,"recv initnode {");
   	ChMessage_recv(Cmi_charmrun_fd,&nodetabmsg);
+
+    if (strcmp("nodefork", nodetabmsg.header.type) == 0)
+    {
+#ifndef _WIN32
+      int i;
+
+      assert(sizeof(ChMessageInt_t)*ChInitNodeforkFields == (size_t)nodetabmsg.len);
+      ChMessageInt_t *n32 = (ChMessageInt_t *) nodetabmsg.data;
+      const int phase2_forks = ChMessageInt(n32[0]);
+      const int start_id = ChMessageInt(n32[1]);
+
+      ChMessage_free(&nodetabmsg);
+
+      for (i = 0; i < phase2_forks; ++i)
+      {
+        const int pid = fork();
+        if (pid < 0)
+          CmiAbort("fork failed");
+        else if (pid == 0)
+        {
+          skt_close(Cmi_charmrun_fd);
+          dataport = 0;
+          Lrts_myNode = start_id + i;
+          open_charmrun_socket();
+          send_singlenodeinfo();
+          break;
+        }
+      }
+#endif
+
+      if (!skt_select1(Cmi_charmrun_fd, 1200*1000))
+        CmiAbort("Timeout waiting for nodetab!\n");
+
+      ChMessage_recv(Cmi_charmrun_fd, &nodetabmsg);
+    }
+
         MACHSTATE(2,"} recv initnode");
   }
   ChMessageInt_t *n32 = (ChMessageInt_t *) nodetabmsg.data;
   ChNodeinfo *d = (ChNodeinfo *) (n32+ChInitNodetabFields);
+  Lrts_myNode = ChMessageInt(n32[1]);
   _Cmi_myphysnode_numprocesses = ChMessageInt(d[Lrts_myNode].nProcessesInPhysNode);
 //#if CMK_USE_IBVERBS	
 //#else
@@ -1513,6 +1548,40 @@ static void node_addresses_obtain(char **argv)
   MACHSTATE(3,"} node_addresses_obtain ");
 }
 
+#if CMK_USE_IBVERBS || CMK_USE_IBUD
+static void send_qplist(void)
+{
+#if CMK_USE_IBVERBS
+	int qpListSize = (Lrts_numNodes-1) * sizeof(ChInfiAddr);
+	ChInfiAddr * qpList = (ChInfiAddr *)malloc(qpListSize);
+	copyInfiAddr(qpList);
+	MACHSTATE1(3,"qpList created and copied size %d bytes", qpListSize);
+	ctrl_sendone_nolock("qplist", (const char *)qpList, qpListSize, NULL, 0);
+	free(qpList);
+#elif CMK_USE_IBUD
+  ChInfiAddr qp;
+	qp.lid = ChMessageInt_new(context->localAddr.lid);
+	qp.qpn = ChMessageInt_new(context->localAddr.qpn);
+	qp.psn = ChMessageInt_new(context->localAddr.psn);
+	MACHSTATE3(3,"IBUD Information lid=%i qpn=%i psn=%i\n", qp.lid, qp.qpn, qp.psn);
+	ctrl_sendone_nolock("qplist", (const char *)&qp, sizeof(qp), NULL, 0);
+#endif
+}
+
+static void store_qpdata(ChMessage *msg);
+
+static void receive_qpdata(void)
+{
+  ChMessage msg;
+
+	if (!skt_select1(Cmi_charmrun_fd,1200*1000))
+		CmiAbort("Timeout waiting for qpdata!\n");
+
+  ChMessage_recv(Cmi_charmrun_fd, &msg);
+  store_qpdata(&msg);
+  ChMessage_free(&msg);
+}
+#endif
 
 /***********************************************************************
  * DeliverOutgoingMessage()
@@ -1991,22 +2060,28 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   skt_set_idle(obtain_idleFn);
   if (!skt_ip_match(Cmi_charmrun_IP,_skt_invalid_ip)) {
   	set_signals();
-  	dataskt=skt_datagram(&dataport, Cmi_os_buffer_size);
-	MACHSTATE2(5,"skt_connect at dataskt:%d Cmi_charmrun_port:%d",dataskt, Cmi_charmrun_port);
-  	Cmi_charmrun_fd = skt_connect(Cmi_charmrun_IP, Cmi_charmrun_port, 1800);
-	MACHSTATE2(5,"Opened connection to charmrun at socket %d, dataport=%d", Cmi_charmrun_fd, dataport);
-	skt_tcp_no_nagle(Cmi_charmrun_fd);
-	CmiStdoutInit();
+    open_charmrun_socket();
   } else {/*Standalone operation*/
   	CmiPrintf("Charm++: standalone mode (not using charmrun)\n");
   	dataskt=-1;
   	Cmi_charmrun_fd=-1;
   }
 
-  CmiMachineInit(*argv);
-
   node_addresses_obtain(*argv);
   MACHSTATE(5,"node_addresses_obtain done");
+
+  if (Cmi_charmrun_fd != -1)
+    CmiStdoutInit();
+
+  CmiMachineInit(*argv);
+
+#if CMK_USE_IBVERBS || CMK_USE_IBUD
+  if (Cmi_charmrun_fd != -1)
+  {
+    send_qplist();
+    receive_qpdata();
+  }
+#endif
 
   CmiCommunicationInit(*argv);
 
