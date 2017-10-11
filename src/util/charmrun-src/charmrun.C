@@ -1114,36 +1114,37 @@ static char *nodetab_file_find()
   return strdup(buffer);
 }
 
-typedef struct nodetab_host {
-  const char *name; /*Host DNS name*/
-  skt_ip_t ip;      /*IP address of host*/
-  pathfixlist pathfixes;
-  char *ext;    /*FIXME: What the heck is this?  OSL 9/8/00*/
-  int cpus;     /* # of physical CPUs*/
-  int rank;     /*Rank of this CPU*/
-  double speed; /*Relative speed of each CPU*/
-  int nice;     /* process priority */
-  int forks;    /* number of processes to fork on remote node */
-  /*These fields are set during node-startup*/
-  int dataport;  /*UDP port number*/
-  SOCKET ctrlfd; /*Connection to control port*/
-#if CMK_USE_SSH
-  const char *shell;    /*Ssh to use*/
-  const char *debugger; /*Debugger to use*/
-  const char *xterm;    /*Xterm to use*/
-  const char *login;    /*User login name to use*/
-  const char *passwd;   /*User login password*/
-  const char *setup;    /*Commands to execute on login*/
-#endif
+struct nodetab_host
+{
+  double speed = 1.0; /*Relative speed of each CPU*/
 
+  const char *name = "SET_H->NAME"; /*Host DNS name*/
+#if CMK_USE_SSH
+  const char *shell = arg_shell;    /*Ssh to use*/
+  const char *debugger = arg_debugger; /*Debugger to use*/
+  const char *xterm = arg_xterm;    /*Xterm to use*/
+  const char *login = arg_mylogin;    /*User login name to use*/
+  const char *passwd = "*";   /*User login password*/
+  const char *setup = "*";    /*Commands to execute on login*/
+#endif
+  char *ext = nullptr;        /* Command suffix */
+  pathfixlist pathfixes = nullptr;
 #if CMK_USE_IBVERBS
-  ChInfiAddr *qpData;
+  ChInfiAddr *qpData = nullptr;
 #endif
 #if CMK_USE_IBUD
-  ChInfiAddr qp;
+  ChInfiAddr qp = nullptr;
 #endif
 
-} nodetab_host;
+  skt_ip_t ip = _skt_invalid_ip;      /*IP address of host*/
+  int cpus = 1;     /* # of physical CPUs*/
+  int rank = 0;     /*Rank of this CPU*/
+  int nice = -100;     /* process priority */
+  int forks = 0;    /* number of processes to fork on remote node */
+  /*These fields are set during node-startup*/
+  int dataport = -1;  /*UDP port number*/
+  SOCKET ctrlfd = -1; /*Connection to control port*/
+};
 
 static std::vector<nodetab_host*> nodetab_table;
 static std::vector<int> nodetab_rank0_table;
@@ -1152,36 +1153,12 @@ static std::vector<int> nodetab_rank0_table;
 static int loaded_max_pe;
 #endif
 
-static void nodetab_reset(nodetab_host *h)
-{
-  h->name = "SET_H->NAME";
-  h->ip = _skt_invalid_ip;
-  h->pathfixes = 0;
-  h->ext = NULL;
-  h->speed = 1.0;
-  h->cpus = 1;
-  h->rank = 0;
-  h->nice = -100;
-  h->forks = 0;
-  h->dataport = -1;
-  h->ctrlfd = -1;
-#if CMK_USE_SSH
-  h->shell = arg_shell;
-  h->debugger = arg_debugger;
-  h->xterm = arg_xterm;
-  h->login = arg_mylogin;
-  h->passwd = "*";
-  h->setup = "*";
-#endif
-}
-
 static void nodetab_add(nodetab_host *h)
 {
   const int nodetab_size = nodetab_table.size();
   if (h->rank == 0)
     nodetab_rank0_table.push_back(nodetab_size);
-  nodetab_host* new_host = (nodetab_host *) malloc(sizeof(nodetab_host));
-  *new_host = *h;  // copy the data
+  nodetab_host* new_host = new nodetab_host{*h};
   nodetab_table.push_back(new_host);
 
   if (arg_verbose) {
@@ -1278,7 +1255,6 @@ static void nodetab_init_for_local()
   nodetab_rank0_table.reserve(tablesize);
 
   nodetab_host group;
-  nodetab_reset(&group);
   if (arg_ppn == 0)
     arg_ppn = 1;
 #if CMK_SHARED_VARS_UNAVAILABLE
@@ -1383,9 +1359,7 @@ static void nodetab_init_with_nodelist()
   }
   free(nodesfile);
 
-  nodetab_host global;
-  nodetab_reset(&global);
-  nodetab_host group = global;
+  nodetab_host global, group;
   int rightgroup = (strcmp(arg_nodegroup, "main") == 0);
 
   /* Store the previous host so we can make sure we aren't mixing localhost and
@@ -4205,7 +4179,6 @@ static void nodetab_init_for_scyld()
   nodetab_rank0_table.reserve(tablesize);
 
   nodetab_host group;
-  nodetab_reset(&group);
 
   if (arg_ppn == 0)
     arg_ppn = 1;
