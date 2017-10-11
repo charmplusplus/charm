@@ -133,9 +133,10 @@ CpvDeclare(mempool_type*, mempool);
 #define OFI_OP_SHORT 0x1ULL
 #define OFI_OP_LONG  0x2ULL
 #define OFI_OP_ACK   0x3ULL
-#define OFI_OP_NAMES 0x4ULL
+#define OFI_RDMA_OP_ACK 0x7ULL
+#define OFI_OP_NAMES 0x8ULL
 
-#define OFI_OP_MASK  0x3ULL
+#define OFI_OP_MASK  0x7ULL
 
 #define MR_ACCESS_PERMISSIONS (FI_REMOTE_READ | FI_READ | FI_RECV | FI_SEND)
 
@@ -335,6 +336,11 @@ static int fill_av_ofi(int myid, int nnodes, struct fid_ep *ep,
                        struct fid_av *av, struct fid_cq *cq);
 
 static OFIContext context;
+
+#if CMK_ONESIDED_IMPL
+#include "machine-rdma.h"
+#include "machine-onesided.h"
+#endif
 
 /* ### Beginning of Machine-startup Related Functions ### */
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
@@ -1133,6 +1139,9 @@ void recv_callback(struct fi_cq_tagged_entry *e, OFIRequest *req)
     case OFI_OP_ACK:
         process_long_send_ack(e, req);
         break;
+    case OFI_RDMA_OP_ACK:
+        process_onesided_completion_ack(e, req);
+        break;
     default:
         MACHSTATE2(3, "--> unknown operation %x len=%ld", e->tag, e->len);
         CmiAbort("!! Wrong operation !!");
@@ -1750,3 +1759,7 @@ int fill_av(int myid,
 
     return 0;
 }
+
+#if CMK_ONESIDED_IMPL
+#include "machine-onesided.c"
+#endif

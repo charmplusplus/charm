@@ -54,6 +54,8 @@ struct OFILongMsg;
  *      - rma_ack: used when an OFIRmaAck was received
  *      - long_msg: used when an RMA Read operation completed
  *      - short_msg: used when a short message was sent
+ *      - rma_ncpy_info: used when an RMA Read operation completed through the Nocopy API
+ *      - rma_ncpy_ack: used when an OFIRmaAck was received through the Nocopy API
  */
 typedef struct OFIRequest
 {
@@ -73,6 +75,10 @@ typedef struct OFIRequest
         struct OFIRmaAck    *rma_ack;
         struct OFILongMsg   *long_msg;
         void                *short_msg;
+#if CMK_ONESIDED_IMPL
+        void                *rma_ncpy_info;
+        void                *rma_ncpy_ack;
+#endif
     } data;
 } OFIRequest;
 
