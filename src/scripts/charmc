@@ -867,6 +867,14 @@ Debug "Read config script, setting defaults..."
 
 Debug "Setting vars..."
 
+if [ -n "$MPI_CRAYXC" ] || [ -n "$MPI_CRAYXE" ]
+then
+  if echo $LOADEDMODULES | grep -q craype-hugepages; then
+    echo "Using craype-hugepages with Cray MPI has known issues as documented in Bug #1708(https://charm.cs.illinois.edu/redmine/issues/1708)."
+    Abort 'Unload craype-hugepages module and compile again'
+  fi
+fi
+
 if [ "$USE_BUILD_OPTIONS" = "1" ]  
 then
 	[ -n "$VERBOSE" ] && echo "Charmc applying build time options: $BUILDOPTS"
@@ -2122,3 +2130,4 @@ fi
 [ -z "$SAVE" ] && DoNoErrCheck $RM $modInitSrc $modInitObj > /dev/null 2>&1
 
 Copyobj
+                

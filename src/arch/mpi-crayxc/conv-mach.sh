@@ -30,6 +30,7 @@
 #  # MPI build
 #  ./build charm++ mpi-crayxc smp --with-production
 
+MPI_CRAYXC=1
 CMK_BUILD_CRAY=1
 PMI_LIBS="$CRAY_PMI_POST_LINK_OPTS"
 
