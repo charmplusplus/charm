@@ -83,3 +83,9 @@
 #define CMK_CMA_MIN                                        16384
 
 #define CMK_CMA_MAX                                        4194304
+
+#define CMK_ONESIDED_DIRECT_IMPL                           1
+
+#define CMK_NOCOPY_DIRECT_BYTES                           16
+
+#define CMK_REG_REQUIRED                                   1

@@ -2,6 +2,9 @@
 #ifndef OFI_MACHINE_ONESIDED_H
 #define OFI_MACHINE_ONESIDED_H
 
+// Signature of the callback function to be called on rdma direct operation completion
+typedef void (*ofiCallbackFn)(struct fi_cq_tagged_entry *e, OFIRequest *req);
+
 // Structure for sender side machine specific information for a buffer
 typedef struct _cmi_ofi_rdma_op {
   int         len;
@@ -159,4 +162,98 @@ void LrtsSetRdmaRecvOpInfo(void *rdmaRecvOp, void *buffer, void *src_ref, int si
 
 inline void ofi_onesided_all_ops_done(char *msg);
 inline void process_onesided_completion_ack(struct fi_cq_tagged_entry *e, OFIRequest *req);
+inline void process_onesided_reg_and_put(struct fi_cq_tagged_entry *e, OFIRequest *req);
+inline void process_onesided_reg_and_get(struct fi_cq_tagged_entry *e, OFIRequest *req);
+
+/* Support for Nocopy Direct API */
+// Structure representing the machine specific information for a source or destination buffer used in the direct API
+typedef struct _cmi_ofi_rzv_rdma_pointer {
+  uint64_t       key;
+  struct fid_mr  *mr;
+}CmiOfiRdmaPtr_t;
+
+/* Compiler checks to ensure that CMK_NOCOPY_DIRECT_BYTES in conv-common.h
+ * is set to sizeof(CmiOfiRdmaPtr_t). CMK_NOCOPY_DIRECT_BYTES is used in
+ * ckrdma.h to reserve bytes for source or destination metadata info.           */
+#define DUMB_STATIC_ASSERT(test) typedef char sizeCheckAssertion[(!!(test))*2-1]
+
+/* Check the value of CMK_NOCOPY_DIRECT_BYTES if the compiler reports an
+ * error with the message "the size of an array must be greater than zero" */
+DUMB_STATIC_ASSERT(sizeof(CmiOfiRdmaPtr_t) == CMK_NOCOPY_DIRECT_BYTES);
+
+// Structure to track the progress of an RDMA read or write call
+typedef struct _cmi_ofi_rzv_rdma_completion {
+  void *ack_info;
+  int  completion_count;
+}CmiOfiRdmaComp_t;
+
+/* Machine specific metadata information required to register a buffer and perform
+ * an RDMA operation with a remote buffer. This metadata information is used to perform
+ * registration and a PUT operation when the remote buffer wants to perform a GET with an
+ * unregistered buffer. Similary, the metadata information is used to perform registration
+ * and a GET operation when the remote buffer wants to perform a PUT with an unregistered
+ * buffer.*/
+typedef struct _cmi_ofi_rdma_reverse_op {
+  const void *destAddr;
+  int destPe;
+  int destMode;
+  const void *srcAddr;
+  int srcPe;
+  int srcMode;
+
+  struct fid_mr *rem_mr;
+  uint64_t rem_key;
+  int ackSize;
+  int size;
+} CmiOfiRdmaReverseOp_t;
+
+// Set the machine specific information for a nocopy source pointer
+void LrtsSetRdmaSrcInfo(void *info, const void *ptr, int size, unsigned short int mode){
+  CmiOfiRdmaPtr_t *rdmaSrc = (CmiOfiRdmaPtr_t *)info;
+  uint64_t requested_key = 0;
+  int ret;
+
+  /* Register the source buffer */
+  if(FI_MR_SCALABLE == context.mr_mode) {
+    requested_key = __sync_fetch_and_add(&(context.mr_counter), 1);
+  }
+  ret = fi_mr_reg(context.domain,
+                  ptr,
+                  size,
+                  FI_REMOTE_READ | FI_REMOTE_WRITE | FI_READ | FI_WRITE,
+                  0ULL,
+                  requested_key,
+                  0ULL,
+                  &(rdmaSrc->mr),
+                  NULL);
+  if (ret) {
+    CmiAbort("LrtsSetRdmaSrcInfo: fi_mr_reg failed!\n");
+  }
+  rdmaSrc->key = fi_mr_key(rdmaSrc->mr);
+}
+
+// Set the machine specific information for a nocopy destination pointer
+void LrtsSetRdmaDestInfo(void *info, const void *ptr, int size, unsigned short int mode){
+  CmiOfiRdmaPtr_t *rdmaDest = (CmiOfiRdmaPtr_t *)info;
+  uint64_t requested_key = 0;
+  int ret;
+
+  /* Register the destination buffer */
+  if(FI_MR_SCALABLE == context.mr_mode) {
+    requested_key = __sync_fetch_and_add(&(context.mr_counter), 1);
+  }
+  ret = fi_mr_reg(context.domain,
+                  ptr,
+                  size,
+                  FI_REMOTE_READ | FI_REMOTE_WRITE | FI_READ | FI_WRITE,
+                  0ULL,
+                  requested_key,
+                  0ULL,
+                  &(rdmaDest->mr),
+                  NULL);
+  if (ret) {
+    CmiAbort("LrtsSetRdmaSrcInfo: fi_mr_reg failed!\n");
+  }
+  rdmaDest->key = fi_mr_key(rdmaDest->mr);
+}
 #endif /* OFI_MACHINE_ONESIDED_H */
