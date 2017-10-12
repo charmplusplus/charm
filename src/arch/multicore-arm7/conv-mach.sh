@@ -7,6 +7,7 @@ CMK_XIOPTS=""
 CMK_LIBS="-lpthread $CMK_LIBS"
 CMK_WARNINGS_ARE_ERRORS="-Werror"
 CMK_CXX_OPTIMIZE="-O3"
+CMK_NO_PARTITIONS="1"
 
 CMK_QT='generic64-light'
 CMK_CF90=`which f95 2>/dev/null`

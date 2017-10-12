@@ -23,3 +23,4 @@ CMK_POST_EXE=".exe"
 CMK_QT="none"
 
 CMK_COMPILER='msvc'
+CMK_NO_PARTITIONS="1"
