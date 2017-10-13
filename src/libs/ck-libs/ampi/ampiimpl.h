@@ -77,7 +77,7 @@ class fromzDisk : public zdisk {
 
 /* contiguous messages larger than or equal to this threshold are sent via RDMA */
 #ifndef AMPI_RDMA_THRESHOLD_DEFAULT
-#if CMK_USE_IBVERBS || CMK_CONVERSE_UGNI
+#if CMK_USE_IBVERBS || CMK_OFI || CMK_CONVERSE_UGNI
 #define AMPI_RDMA_THRESHOLD_DEFAULT 65536
 #else
 #define AMPI_RDMA_THRESHOLD_DEFAULT 32768
