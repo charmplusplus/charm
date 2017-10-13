@@ -709,12 +709,9 @@ void CmiInitCPUAffinity(char **argv)
   show_affinity_flag = CmiGetArgFlagDesc(argv,"+showcpuaffinity",
 						"print cpu affinity");
 
-  cpuAffinityHandlerIdx =
-       CmiRegisterHandler((CmiHandler)cpuAffinityHandler);
-  cpuAffinityRecvHandlerIdx =
-       CmiRegisterHandler((CmiHandler)cpuAffinityRecvHandler);
-  cpuPhyNodeAffinityRecvHandlerIdx =
-       CmiRegisterHandler((CmiHandler)cpuPhyNodeAffinityRecvHandler);
+  CmiAssignOnce(&cpuAffinityHandlerIdx, CmiRegisterHandler((CmiHandler)cpuAffinityHandler));
+  CmiAssignOnce(&cpuAffinityRecvHandlerIdx, CmiRegisterHandler((CmiHandler)cpuAffinityRecvHandler));
+  CmiAssignOnce(&cpuPhyNodeAffinityRecvHandlerIdx, CmiRegisterHandler((CmiHandler)cpuPhyNodeAffinityRecvHandler));
 
   if (CmiMyRank() ==0) {
      affLock = CmiCreateLock();

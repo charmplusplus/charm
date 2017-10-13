@@ -797,8 +797,8 @@ void _ckArrayInit(void)
     // disable because broadcast listener may deliver broadcast message
   CkDisableTracing(CkIndex_CkLocMgr::immigrate(0));
   // by default anytime migration is allowed
-  ckinsertIdxHdl = CkRegisterHandler(ckinsertIdxFunc);
-  ckArrayCreationHdl = CkRegisterHandler(CkCreateArrayAsync);
+  CmiAssignOnce(&ckinsertIdxHdl, CkRegisterHandler(ckinsertIdxFunc));
+  CmiAssignOnce(&ckArrayCreationHdl, CkRegisterHandler(CkCreateArrayAsync));
 }
 
 CkArray::CkArray(CkArrayOptions &opts,

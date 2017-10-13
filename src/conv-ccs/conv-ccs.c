@@ -533,7 +533,7 @@ void CcsInit(char **argv)
   CpvAccess(ccsTab) = CkCreateHashtable_string(sizeof(CcsHandlerRec),5);
   CpvInitialize(CcsImplHeader *, ccsReq);
   CpvAccess(ccsReq) = NULL;
-  _ccsHandlerIdx = CmiRegisterHandler((CmiHandler)req_fw_handler);
+  CmiAssignOnce(&_ccsHandlerIdx,CmiRegisterHandler((CmiHandler)req_fw_handler));
 #if CMK_BIGSIM_CHARM
   CpvInitialize(int, _bgCcsHandlerIdx);
   CpvAccess(_bgCcsHandlerIdx) = 0;
@@ -547,10 +547,10 @@ void CcsInit(char **argv)
   
   CcsBuiltinsInit(argv);
 
-  rep_fw_handler_idx = CmiRegisterHandler((CmiHandler)rep_fw_handler);
+  CmiAssignOnce(&rep_fw_handler_idx, CmiRegisterHandler((CmiHandler)rep_fw_handler));
 #if NODE_0_IS_CONVHOST
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
-  print_fw_handler_idx = CmiRegisterHandler((CmiHandler)print_fw_handler);
+  CmiAssignOnce(&print_fw_handler_idx, CmiRegisterHandler((CmiHandler)print_fw_handler));
 #endif
   {
    int ccs_serverPort=0;

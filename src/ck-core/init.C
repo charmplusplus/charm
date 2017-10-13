@@ -1041,8 +1041,8 @@ extern "C" void initQd(char **argv)
 	CpvAccessOther(_qd, 1) = new QdState(); // for i/o interrupt
 #endif
 	}
-	_qdHandlerIdx = CmiRegisterHandler((CmiHandler)_qdHandler);
-	_qdCommHandlerIdx = CmiRegisterHandler((CmiHandler)_qdCommHandler);
+	CmiAssignOnce(&_qdHandlerIdx, CmiRegisterHandler((CmiHandler)_qdHandler));
+	CmiAssignOnce(&_qdCommHandlerIdx, CmiRegisterHandler((CmiHandler)_qdCommHandler));
         if (CmiGetArgIntDesc(argv,"+qd",&_dummy_dq, "QD time in seconds")) {
           if (CmiMyPe()==0)
             CmiPrintf("Charm++> Fake QD using %d seconds.\n", _dummy_dq);
@@ -1153,16 +1153,16 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvAccess(_ckout) = new _CkOutStream();
 	CkpvAccess(_ckerr) = new _CkErrStream();
 
-	_charmHandlerIdx = CkRegisterHandler(_bufferHandler);
-	_initHandlerIdx = CkRegisterHandlerEx(_initHandler, CkpvAccess(_coreState));
-	_roRestartHandlerIdx = CkRegisterHandler(_roRestartHandler);
-	_exitHandlerIdx = CkRegisterHandler(_exitHandler);
+	CmiAssignOnce(&_charmHandlerIdx, CkRegisterHandler(_bufferHandler));
+	CmiAssignOnce(&_initHandlerIdx, CkRegisterHandlerEx(_initHandler, CkpvAccess(_coreState)));
+	CmiAssignOnce(&_roRestartHandlerIdx, CkRegisterHandler(_roRestartHandler));
+	CmiAssignOnce(&_exitHandlerIdx, CkRegisterHandler(_exitHandler));
 	//added for interoperabilitY
-	_libExitHandlerIdx = CkRegisterHandler(_libExitHandler);
-	_bocHandlerIdx = CkRegisterHandlerEx(_initHandler, CkpvAccess(_coreState));
+	CmiAssignOnce(&_libExitHandlerIdx, CkRegisterHandler(_libExitHandler));
+	CmiAssignOnce(&_bocHandlerIdx, CkRegisterHandlerEx(_initHandler, CkpvAccess(_coreState)));
 #if CMK_SHRINK_EXPAND
 	// for shrink expand cleanup
-	_ROGroupRestartHandlerIdx = CkRegisterHandler(_ROGroupRestartHandler);
+	CmiAssignOnce(&_ROGroupRestartHandlerIdx, CkRegisterHandler(_ROGroupRestartHandler));
 #endif
 
 #ifdef __BIGSIM__
@@ -1170,7 +1170,7 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
 
-	_triggerHandlerIdx = CkRegisterHandler(_triggerHandler);
+	CmiAssignOnce(&_triggerHandlerIdx, CkRegisterHandler(_triggerHandler));
 	_ckModuleInit();
 
 	CldRegisterEstimator((CldEstimator)_charmLoadEstimator);
@@ -1323,8 +1323,8 @@ void _initCharm(int unused_argc, char **argv)
 	for(int vProc=0;vProc<CkNumPes();vProc++){
 		CpvAccess(_validProcessors)[vProc]=1;
 	}
-	_ckEvacBcastIdx = CkRegisterHandler(_ckEvacBcast);
-	_ckAckEvacIdx = CkRegisterHandler(_ckAckEvac);
+	CmiAssignOnce(&_ckEvacBcastIdx, CkRegisterHandler(_ckEvacBcast));
+	CmiAssignOnce(&_ckAckEvacIdx, CkRegisterHandler(_ckAckEvac));
 #endif
 	CkpvAccess(startedEvac) = 0;
 	CpvAccess(serializer) = 0;

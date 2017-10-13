@@ -640,8 +640,8 @@ void CWebInit(void)
 #if CMK_WEB_MODE
   CcsRegisterHandler("perf_monitor", (CmiHandler)CWebHandler);
   
-  CWeb_CollectIndex=CmiRegisterHandler((CmiHandler)CWeb_Collect);
-  CWeb_ReduceIndex=CmiRegisterHandler((CmiHandler)CWeb_Reduce);
+  CmiAssignOnce(&CWeb_CollectIndex, CmiRegisterHandler((CmiHandler)CWeb_Collect));
+  CmiAssignOnce(&CWeb_ReduceIndex, CmiRegisterHandler((CmiHandler)CWeb_Reduce));
   
   initUsage();
   CWebPerformanceRegisterFunction(getUsage);

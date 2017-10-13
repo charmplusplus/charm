@@ -673,6 +673,8 @@ CpvExtern(int,         CsdStopFlag);
 CpvExtern(int,         CsdLocalCount);
 #define CSD_LOCAL_MAX_DEFAULT 0
 
+extern void CmiAssignOnce(int* variable, int value);
+
 extern int CmiRegisterHandler(CmiHandler h);
 extern int CmiRegisterHandlerEx(CmiHandlerEx h,void *userPtr);
 #if CMI_LOCAL_GLOBAL_AVAILABLE

@@ -2074,8 +2074,8 @@ static slotOP grabOP,freeOP;
 
 static void init_comm(char **argv)
 {
-  grab_remote_idx=CmiRegisterHandler((CmiHandler)grab_remote);
-  free_remote_idx=CmiRegisterHandler((CmiHandler)free_remote);	
+  CmiAssignOnce(&grab_remote_idx, CmiRegisterHandler((CmiHandler)grab_remote));
+  CmiAssignOnce(&free_remote_idx, CmiRegisterHandler((CmiHandler)free_remote));
   grabOP.local=grab_slots;
   grabOP.remote=grab_remote_idx;
   freeOP.local=free_slots;

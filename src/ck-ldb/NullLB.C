@@ -44,7 +44,7 @@ static void lbinit(void) {
 
 static void lbprocinit(void) {
 #if NULLLB_CONVERSE
-  _migDoneHandle = CkRegisterHandlerEx(migrationDone, CkpvAccess(_coreState));
+  CmiAssignOnce(&_migDoneHandle, CkRegisterHandlerEx(migrationDone, CkpvAccess(_coreState)));
 #endif
 }
 

@@ -757,6 +757,11 @@ static void CmiExtendHandlerTable(int atLeastLen) {
     CpvAccess(CmiHandlerMax) = newmax;
 }
 
+void CmiAssignOnce(int* variable, int value) {
+  if (CmiMyRank() == 0) { *variable = value; }
+  CmiBarrier();
+}
+
 void CmiNumberHandler(int n, CmiHandler h)
 {
   CmiHandlerInfo *tab;
@@ -786,12 +791,27 @@ int CmiRegisterHandler(CmiHandler h)
   CpvAccess(CmiHandlerCount) = Count+DIST_BETWEEN_HANDLERS;
   return Count;
 }
+
+void CmiRegisterHandlerAssignOnce(CmiHandler h, int *index)
+{
+  if (CmiMyRank() == 0) { *index = CmiRegisterHandler(h); }
+  else { CmiRegisterHandler(h); }
+  CmiBarrier();
+}
+
 int CmiRegisterHandlerEx(CmiHandlerEx h,void *userPtr)
 {
   int Count = CpvAccess(CmiHandlerCount);
   CmiNumberHandlerEx(Count, h, userPtr);
   CpvAccess(CmiHandlerCount) = Count+DIST_BETWEEN_HANDLERS;
   return Count;
+}
+
+void CmiRegisterHandlerExAssignOnce(CmiHandlerEx h, void *userPtr, int *index)
+{
+  if (CmiMyRank() == 0) { *index = CmiRegisterHandlerEx(h, userPtr); }
+  else { CmiRegisterHandlerEx(h, userPtr); }
+  CmiBarrier();
 }
 
 #if CMI_LOCAL_GLOBAL_AVAILABLE
