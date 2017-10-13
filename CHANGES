@@ -45,8 +45,6 @@ Platform Support
 
 - Add an experimental 'ofi' network layer to run on Intel Omni-Path
   hardware using libfabric
-  * Note that support for '+partitions' (also used as '+replicas' by
-    NAMD) is known to be broken, currently (bug #1675)
   * Thanks to Yohann Burette and Mikhail Shiryaev of Intel for
     contributing this new network layer
 
