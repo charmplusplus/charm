@@ -31,6 +31,8 @@ static inline void ofi_onesided_read_callback(struct fi_cq_tagged_entry *e, OFIR
 {
   CmiOfiRdmaRecvOp_t *rdmaRecvOpInfo = (CmiOfiRdmaRecvOp_t *)(req->data.rma_ncpy_info);
   rdmaRecvOpInfo->completion_count--;
+  struct fid* memregion;
+
   if(0 == rdmaRecvOpInfo->completion_count) {
     CmiOfiRdmaRecv_t *recvInfo = (CmiOfiRdmaRecv_t *)((char *)rdmaRecvOpInfo
                         - rdmaRecvOpInfo->opIndex * sizeof(CmiOfiRdmaRecvOp_t)
@@ -46,13 +48,18 @@ static inline void ofi_onesided_read_callback(struct fi_cq_tagged_entry *e, OFIR
              req);
 
     recvInfo->comOps++;
+
+    // Store the memregion for registration
+    memregion = rdmaRecvOpInfo->mr;
+
     if(recvInfo->comOps == recvInfo->numOps) {
       // All the RDMA operations for one entry method have completed
       ofi_onesided_all_ops_done(recvInfo->msg);
     }
+
     // Deregister the memory region
-    if(rdmaRecvOpInfo->mr)
-      fi_close((struct fid*)(rdmaRecvOpInfo->mr));
+    if(memregion)
+      fi_close(memregion);
 
   } else {
 #if USE_OFIREQUEST_CACHE
