@@ -86,8 +86,8 @@ extern int quietModeRequested;
 #define SHORT_CUTOFF   128
 #define EAGER_CUTOFF   4096
 #else
-#define SHORT_CUTOFF   1920
-#define EAGER_CUTOFF   2000000000
+#define SHORT_CUTOFF   7680
+#define EAGER_CUTOFF   16384
 #endif
 
 //typically this can be enabled when LTPS==0
