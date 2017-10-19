@@ -96,14 +96,14 @@ Charm version                OS         Communication    Default Compiler
 -------------             ---------     --------------   --------------------
 netlrts-linux-x86_64       Linux            UDP            GNU compiler
 netlrts-darwin-x86_64      MacOS X          UDP            Clang C++ compiler
+netlrts-win-x86_64         Windows          UDP            MS Visual C++
 mpi-linux-x86_64           Linux            MPI            GNU compiler
-mpi-darwin-x86_64          MacOS X          MPI            Clang C++ compiler
+multicore-darwin-x86_64    MacOS X          Shared memory  Clang C++ compiler
 pamilrts-bluegeneq         CNK              PAMI           XLC
-gni-crayxe                 Linux            GNI            GNU compiler
+gni-crayxc                 Linux            GNI            CC (whatever PrgEnv module is loaded)
+gni-crayxe                 Linux            GNI            CC (whatever PrgEnv module is loaded)
 verbs-linux-x86_64         Linux            IB Verbs       GNU compiler
 ofi-linux-x86_64           Linux            OFI            GNU compiler
-net-win64                  Windows          UDP            MS Visual C++
-net-cygwin                 Cygwin           UDP            GNU compiler
 
 
 To choose <version>, your choice is determined by two options:
@@ -127,12 +127,11 @@ Use these versions on machines that support them for best performance.
 2.)  Your operating system:
 
         "linux-x86_64"       Linux with AMD64 64-bit x86 instructions
-        "win64"              MS Windows with MS Visual C++ compiler
-        "cygwin"             MS Windows with Cygnus' Cygwin Unix layer
+        "win-x86_64"         MS Windows with MS Visual C++ compiler
         "darwin-x86_64"      Apple Mac OS X
         "bluegeneq"          IBM's Blue Gene/Q
         "cray{xe/xc}"        Cray's X-Series Supercomputer
-        "linux-ppc"          POWER/PowerPC
+        "linux-ppc64le"      POWER/PowerPC
 
 
 Your Charm++ version is made by concatenating the options, e.g.:
@@ -194,8 +193,7 @@ BUILDING THE SOURCE
 ===================
 
 If you have downloaded a binary version of Charm++, you can skip
-this step-- Charm++ should already be compiled.  For win64 systems,
-see README.win; for Cygwin version, see README.cygwin.
+this step-- Charm++ should already be compiled.
 
 Once you have decided on a version, unpack Charm++, cd into charm,
 and run
