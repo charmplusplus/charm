@@ -194,7 +194,9 @@ void * CmiDirect_manytomany_allocate_handle (void) {
     CpvInitialize(PAMICmiDirectM2mHandle*, _handle);
   if (!CpvInitialized(_completion_handler))
     CpvInitialize(int, _completion_handler);  
+#if CMK_BLUEGENEQ
   ppc_msync();
+#endif
   
   if (CpvAccess(_handle) == NULL) {
     CpvAccess(_handle) = (PAMICmiDirectM2mHandle *)malloc (MAX_CONN *sizeof(PAMICmiDirectM2mHandle));

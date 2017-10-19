@@ -176,7 +176,7 @@ CpvDeclare(void*, CmiLocalQueue);
 enum MACHINE_SMP_MODE {
     INVALID_MODE,
 #if CMK_BLUEGENEQ
-    COMM_THREAD_SEND_RECV = 1,
+    COMM_THREAD_SEND_RECV = 0,
 #else 
     COMM_THREAD_SEND_RECV = 0,
 #endif
@@ -222,7 +222,7 @@ int Cmi_commthread = 1;
 #endif
 
 /*SHOULD BE MOVED TO MACHINE-SMP.C ??*/
-static int Cmi_nodestart = -1;
+int Cmi_nodestart = -1;
 static int Cmi_nodestartGlobal = -1;
 
 /*
@@ -460,7 +460,11 @@ void CmiPushPE(int rank,void *msg) {
     }
 #endif
 
+#if CMK_MACH_SPECIALIZED_QUEUE
+    LrtsSpecializedQueuePush(rank, msg);
+#else
     CMIQueuePush(cs->recv,(char*)msg);
+#endif
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
   if (_Cmi_sleepOnIdle)
@@ -490,9 +494,14 @@ void CmiPushNode(void *msg) {
         return;
     }
 #endif
+
+#if CMK_MACH_SPECIALIZED_QUEUE
+    LrtsSpecializedNodeQueuePush(msg);
+#else
     CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
     CMIQueuePush(CsvAccess(NodeState).NodeRecv, (char *)msg);
     CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
+#endif
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
     if (_Cmi_sleepOnIdle)
@@ -728,9 +737,13 @@ static void CmiSendNodeSelf(char *msg) {
         return;
     }
 #endif
+#if CMK_MACH_SPECIALIZED_QUEUE
+    LrtsSpecializedNodeQueuePush(msg);
+#else
     CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
     CMIQueuePush(CsvAccess(NodeState).NodeRecv, msg);
     CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
+#endif
 }
 
 //I think this #if is incorrect - should be SYNC_P2P
@@ -1611,7 +1624,7 @@ if (MSG_STATISTIC)
       CmiPrintf("[Partition %d][Node %d] End of program\n",CmiMyPartition(),CmiMyNode());
 #endif
 
-#if !CMK_SMP || CMK_BLUEGENEQ
+#if !CMK_SMP || CMK_BLUEGENEQ || CMK_PAMI_LINUX_PPC8
 #if CMK_USE_PXSHM
     CmiExitPxshm();
 #endif
@@ -1695,14 +1708,23 @@ void *CmiGetNonLocal(void) {
 #endif
 
     MACHSTATE2(3, "[%p] CmiGetNonLocal begin %d{", cs, CmiMyPe());
+
+#if CMK_MACH_SPECIALIZED_QUEUE
+    msg = LrtsSpecializedQueuePop();
+#else
     CmiIdleLock_checkMessage(&cs->idle);
     /* ?????although it seems that lock is not needed, I found it crashes very often
        on mpi-smp without lock */
     msg = CMIQueuePop(cs->recv);
+#endif
 #if (!CMK_SMP || CMK_SMP_NO_COMMTHD) && !CMK_MULTICORE
     if (!msg) {
        AdvanceCommunication(0);
+#if CMK_MACH_SPECIALIZED_QUEUE
+       msg = LrtsSpecializedQueuePop();
+#else
        msg = CMIQueuePop(cs->recv);
+#endif
     }
 #else
 //    LrtsPostNonLocal();
@@ -1721,8 +1743,25 @@ void *CmiGetNonLocal(void) {
 
 #if CMK_NODE_QUEUE_AVAILABLE
 void *CmiGetNonLocalNodeQ(void) {
-    CmiState cs = CmiGetState();
     char *result = 0;
+
+#if CMK_MACH_SPECIALIZED_QUEUE && CMK_MACH_SPECIALIZED_MUTEX
+    if (!LrtsSpecializedNodeQueueEmpty()) {
+      if (LrtsSpecializedMutexTryAcquire() == 0) {
+        result = LrtsSpecializedNodeQueuePop();
+        LrtsSpecializedMutexRelease();
+      }
+    }
+#elif CMK_MACH_SPECIALIZED_QUEUE
+    if(!LrtsSpecializedNodeQueueEmpty()) {
+      if(CmiTryLock(CsvAccess(NodeState).CmiNodeRecvLock) == 0) {
+        result = LrtsSpecializedNodeQueuePop();
+        CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
+      }
+
+    }
+#else
+    CmiState cs = CmiGetState();
     CmiIdleLock_checkMessage(&cs->idle);
     if (!CMIQueueEmpty(CsvAccess(NodeState).NodeRecv)) {
         MACHSTATE1(3,"CmiGetNonLocalNodeQ begin %d {", CmiMyPe());
@@ -1731,8 +1770,9 @@ void *CmiGetNonLocalNodeQ(void) {
         CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
         MACHSTATE1(3,"} CmiGetNonLocalNodeQ end %d ", CmiMyPe());
     }
-
+#endif
     return result;
+
 }
 #endif
 /* ##### End of Functions Providing Incoming Network Messages ##### */

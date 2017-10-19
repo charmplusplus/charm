@@ -51,4 +51,3 @@
 
 #define CMK_USE_COMMON_LOCK                                1
 
-#define CMK_ONESIDED_IMPL                                  1
