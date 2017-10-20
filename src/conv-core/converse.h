@@ -2206,7 +2206,7 @@ extern int CmiIsMyNodeIdle();
 #endif
 #if CMK_SMP && CMK_TASKQUEUE
 #include "taskqueue.h" /* for tasks queue */
-
+#include "conv-taskQ.h" /* for standalone-OpenMP */
 #define CsdTaskEnqueue(x) TaskQueuePush((TaskQueue)CpvAccess(CsdTaskQueue),x)
 #define CsdTaskPop() TaskQueuePop((TaskQueue)CpvAccess(CsdTaskQueue))
 #if CMK_OMP

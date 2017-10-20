@@ -66,6 +66,7 @@
 #include "queueing.h"
 #if CMK_SMP && CMK_TASKQUEUE
 #include "taskqueue.h"
+#include "conv-taskQ.h"
 #endif
 #include "conv-ccs.h"
 #include "ccs-server.h"
@@ -2281,6 +2282,9 @@ void CsdInit(char **argv)
   CpvAccess(CsdTaskQueue) = TaskQueueCreate();
 #endif
   CpvAccess(CsdStopFlag)  = 0;
+#if CMK_SMP && CMK_TASKQUEUE
+  CmiTaskQueueInit();
+#endif
 }
 
 

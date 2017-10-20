@@ -1178,9 +1178,7 @@ void _initCharm(int unused_argc, char **argv)
 	_futuresModuleInit(); // part of futures implementation is a converse module
 	_loadbalancerInit();
         _metabalancerInit();
-#if CMK_SMP && CMK_TASKQUEUE
-	_taskqInit();
-#endif
+
 #if CMK_MEM_CHECKPOINT
         init_memcheckpt(argv);
 #endif

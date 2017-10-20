@@ -1,17 +1,11 @@
-#include "charm++.h"
-#include "envelope.h"
-#include "queueing.h"
-
+#include "conv-taskQ.h"
 #if CMK_SMP && CMK_TASKQUEUE
-#include "taskqueue.h"
-#include "cktaskQ.h"
-
 extern "C" void StealTask() {
 #if CMK_TRACE_ENABLED
   double _start = CmiWallTimer();
 #endif
-  int random_rank = CrnRand() % (CkMyNodeSize()-1);
-  if (random_rank >= CkMyRank())
+  int random_rank = CrnRand() % (CmiMyNodeSize()-1);
+  if (random_rank >= CmiMyRank())
     ++random_rank;
 #if CMK_TRACE_ENABLED
   char s[10];
@@ -28,12 +22,12 @@ extern "C" void StealTask() {
 }
 
 static void TaskStealBeginIdle(void *dummy) {
-  if (CkMyNodeSize() > 1)
+  if (CmiMyNodeSize() > 1)
     StealTask();
 }
 
-void _taskqInit() {
-  if(CkMyNodeSize() > 1) {
+extern "C" void CmiTaskQueueInit() {
+  if(CmiMyNodeSize() > 1) {
     CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
         (CcdVoidFn) TaskStealBeginIdle, NULL);
 
