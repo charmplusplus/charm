@@ -2016,7 +2016,7 @@ static int req_handle_initnodedistribution(ChMessage *msg, SOCKET fd, int client
   return REQ_OK;
 }
 
-static ChSingleNodeinfo *myNodesInfo;
+static std::vector<ChSingleNodeinfo> myNodesInfo;
 static int send_myNodeInfo_to_parent()
 {
   const int nodetab_rank0_size = nodetab_rank0_table.size();
@@ -2028,8 +2028,8 @@ static int send_myNodeInfo_to_parent()
                       &hdr);
   skt_sendN(parent_charmrun_fd, (const char *) &hdr, sizeof(hdr));
   skt_sendN(parent_charmrun_fd, (const char *) &nNodes, sizeof(nNodes));
-  skt_sendN(parent_charmrun_fd, (const char *) myNodesInfo,
-            sizeof(ChSingleNodeinfo) * nodetab_rank0_size);
+  skt_sendN(parent_charmrun_fd, (const char *) myNodesInfo.data(),
+            sizeof(ChSingleNodeinfo) * myNodesInfo.size());
 
   return REQ_OK;
 }
@@ -3175,7 +3175,6 @@ static void req_one_client_partinit(int client)
 #endif
 
 #ifdef HSTART
-static int nodeCount = 0;
 /* To keep a global node numbering */
 static void add_singlenodeinfo_to_mynodeinfo(ChMessage *msg, SOCKET ctrlfd)
 {
@@ -3183,9 +3182,9 @@ static void add_singlenodeinfo_to_mynodeinfo(ChMessage *msg, SOCKET ctrlfd)
   ChSingleNodeinfo *nodeInfo = (ChSingleNodeinfo *) msg->data;
 
   /* need to change nodeNo */
-  myNodesInfo[nodeCount].nodeNo = ChMessageInt_new(
+  ChMessageInt_t nodeNo = ChMessageInt_new(
       nodetab_rank0_table[ChMessageInt(nodeInfo->nodeNo) - mynodes_start]);
-  myNodesInfo[nodeCount++].info = nodeInfo->info;
+  myNodesInfo.push_back({nodeNo, nodeInfo->info});
 
   /* Required for CCS */
   int nt = nodetab_rank0_table[ChMessageInt(nodeInfo->nodeNo) -
@@ -3205,11 +3204,6 @@ static void req_set_client_connect(int start, int end)
   // -1 if client i not finished, otherwise the node id of client i
   for (int i = 0; i < (end - start); i++)
     finished[i] = -1;
-
-#ifdef HSTART
-  if (arg_child_charmrun && start == 0)
-    myNodesInfo = malloc(sizeof(ChSingleNodeinfo) * nodetab_rank0_table.size());
-#endif
 
   ChMessage msg;
 #if CMK_USE_IBVERBS && !CMK_IBVERBS_FAST_START
