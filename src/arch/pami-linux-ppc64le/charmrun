@@ -99,9 +99,19 @@ then
   fi
 elif [ -n "$LSB_HOSTS" ]
 then
-# Tungsten
+  hostname=`hostname`
+	case "$hostname" in
+# Summitdev
+	summitdev*)
+  test $QUIET -eq 0 && echo jsrun -n"$pes" $args
+  jsrun -n"$pes" $args
+  ;;
+# Tungsten and other machines
+  *)
   test $QUIET -eq 0 && echo cmpirun -lsf -poll -no_smp -gm_long 200000 $args
   cmpirun -lsf -poll -no_smp -gm_long 200000 $args
+  ;;
+  esac
 elif [ -n "$PBS_QUEUE" -o -n "$LSF_QUEUE" ]
 then
 # Interactive mode: create, and submit a batch job
