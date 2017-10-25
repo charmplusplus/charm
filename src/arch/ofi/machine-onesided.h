@@ -35,7 +35,7 @@ typedef struct _cmi_ofi_rdma_recv_op {
   int           completion_count;
   int           opIndex;
   const void    *buf;
-  struct        fid *mr;
+  struct        fid_mr *mr;
 } CmiOfiRdmaRecvOp_t;
 
 // Structure for receiver side machine specific information for multiple buffers

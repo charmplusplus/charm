@@ -50,7 +50,7 @@ static inline void ofi_onesided_read_callback(struct fi_cq_tagged_entry *e, OFIR
     recvInfo->comOps++;
 
     // Store the memregion for registration
-    memregion = rdmaRecvOpInfo->mr;
+    memregion = (struct fid *)rdmaRecvOpInfo->mr;
 
     if(recvInfo->comOps == recvInfo->numOps) {
       // All the RDMA operations for one entry method have completed
