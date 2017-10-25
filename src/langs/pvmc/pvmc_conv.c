@@ -84,7 +84,7 @@ int pvm_config(int *nhost, int *narch, struct pvmhostinfo **hostp)
 #ifdef PVM_DEBUG
   PRINTF("tid=%d:pvm_config(%x,%x,%x)\n",pvm_mytid(),nhost,narch,hostp);
 #endif
-      printf("tid=%d:pvm_config(%x,%x,%x)\n",pvm_mytid(),nhost,narch,hostp);
+      printf("tid=%d:pvm_config\n",pvm_mytid());
       printf("%d\n",*nhost);
       *nhost=nh=CmiNumPes();
     }
