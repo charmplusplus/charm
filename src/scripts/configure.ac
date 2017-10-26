@@ -5,6 +5,9 @@ AC_CONFIG_SRCDIR(./Makefile)
 # for hwloc
 enable_embedded_mode='yes'
 enable_static='yes'
+enable_libnuma='no'
+enable_pci='no'
+enable_libudev='no'
 enable_libxml2='no'
 enable_visibility='no'
 AC_CONFIG_AUX_DIR(hwloc/config)
