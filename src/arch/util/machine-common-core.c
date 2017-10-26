@@ -13,6 +13,9 @@
 FILE *debugLog = NULL;
 #endif
 
+// Use CMA for intra node shared memory communication
+#define CMK_USE_CMA                    1
+
 /******* broadcast related  */
 #ifndef CMK_BROADCAST_SPANNING_TREE
 #define CMK_BROADCAST_SPANNING_TREE    1
@@ -555,6 +558,9 @@ void CmiInterSyncSendFn(int destPE, int partition, int size, char *msg) {
 #endif
 #if CMK_USE_XPMEM
 #include "machine-xpmem.c"
+#endif
+#if CMK_USE_CMA
+#include "machine-cma.c"
 #endif
 
 static int refcount = 0;
@@ -1179,6 +1185,9 @@ if (  MSG_STATISTIC)
 #endif
 #if CMK_USE_XPMEM
     CmiInitXpmem(argv);
+#endif
+#if CMK_USE_CMA
+    CmiInitCma();
 #endif
 
     /* CmiTimerInit(); */
