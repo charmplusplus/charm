@@ -2,6 +2,17 @@ This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 
 ================================================================================
+What's new in Charm++ 6.8.2
+================================================================================
+
+This is a minor release containing only the following changes on top of 6.8.1:
+
+- Fix for a crash in memory deregistration on the OFI communication layer in SMP mode.
+
+- Tuned eager/rendezvous messaging thresholds for the PAMI communication layer
+  on POWER8 systems.
+
+================================================================================
 What's new in Charm++ 6.8.1
 ================================================================================
 
