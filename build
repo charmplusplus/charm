@@ -509,8 +509,11 @@ then
 elif test `echo "$BASEVERSION" | grep -c "bluegene\|pami\|ppc"` -gt 0
 then
   UFCONTEXT_HEADER_NAME="ppc64_sysv_${UFCONTEXT_HEADER_NAME}"
-else
+elif test `echo "$BASEVERSION" | grep -c "cray\|x86_64\|linux64\|amd64"` -gt 0
+then
   UFCONTEXT_HEADER_NAME="x86_64_sysv_${UFCONTEXT_HEADER_NAME}"
+else
+  UFCONTEXT_HEADER_NAME="i386_sysv_${UFCONTEXT_HEADER_NAME}"
 fi
 
 #generate VERSION name combining all the build-time options.
