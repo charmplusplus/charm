@@ -68,10 +68,10 @@ void NQueen::sequentialSolve( QueenState *m)
     int aQueenBitNegDiag[MAX_BOARDSIZE];
     int aStack[MAX_BOARDSIZE + 2]; /* we use a stack instead of recursion */
     int n = m->numrows;
-    register int* pnStack;
-    register int numrows = m->numrows; /* numrows redundant - could use stack */
-    register unsigned int lsb; /* least significant bit */
-    register unsigned int bitfield; /* bits which are set mark possible positions for a queen */
+    int* pnStack;
+    int numrows = m->numrows; /* numrows redundant - could use stack */
+    unsigned int lsb; /* least significant bit */
+    unsigned int bitfield; /* bits which are set mark possible positions for a queen */
     int board_minus = numQueens - 1; /* board size - 1 */
     int mask = (1 << numQueens) - 1; /* if board size is N, mask consists of N 1's */
     aStack[0] = -1;
