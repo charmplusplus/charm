@@ -580,9 +580,8 @@ inline groupStruct rangeInclOp(int n, int ranges[][3], groupStruct vec, int *fla
 
 inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec, int *flag){
   groupStruct retvec;
-  vector<int> ranksvec;
+  vector<int> ranks;
   int first,last,stride;
-  int *ranks,cnt;
   int i,j;
   for(i=0;i<n;i++){
     first = ranges[i][0];
@@ -590,18 +589,14 @@ inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec, int *fla
     stride = ranges[i][2];
     if(stride!=0){
       for(j=0;j<=(last-first)/stride;j++)
-        ranksvec.push_back(first+stride*j);
+        ranks.push_back(first+stride*j);
     }else{
       *flag = MPI_ERR_ARG;
       return retvec;
     }
   }
-  cnt=ranksvec.size();
-  ranks=new int[cnt];
-  for(i=0;i<cnt;i++)
-    ranks[i]=ranksvec[i];
   *flag = MPI_SUCCESS;
-  return exclOp(cnt,ranks,vec);
+  return exclOp(ranks.size(),&ranks[0],vec);
 }
 
 #include "tcharm.h"
