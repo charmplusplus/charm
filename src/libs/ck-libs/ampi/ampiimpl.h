@@ -1194,6 +1194,9 @@ class AmpiSeqQ : private CkNoncopyable {
 
 public:
   AmpiSeqQ() {}
+  AmpiSeqQ(int commSize) {
+    elements.reserve(std::min(commSize, 64));
+  }
   ~AmpiSeqQ ();
   void pup(PUP::er &p);
 

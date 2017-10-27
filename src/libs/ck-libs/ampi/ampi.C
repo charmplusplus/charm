@@ -1848,7 +1848,7 @@ ampi::ampi()
   CkAbort("Default ampi constructor should never be called");
 }
 
-ampi::ampi(CkArrayID parent_,const ampiCommStruct &s):parentProxy(parent_)
+ampi::ampi(CkArrayID parent_,const ampiCommStruct &s):parentProxy(parent_), oorder(s.getSize())
 {
   init();
 
