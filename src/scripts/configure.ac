@@ -579,20 +579,14 @@ then
 fi
 
 #### check if C++ compiler will accept C++11 features without warning ####
-# C++11 features in use:
-# early variadic templates
-# R-value and move semantics
-# auto
 cat > $t <<EOT
 // Check for Intel compiler incompatibility with the active g++/libstdc++ by
 // including an arbitrary standard library header (cf bug #1560)
 #include <map>
 
 // Check for an excessively old g++/libstdc++ that can't handle features we use
-#if !CMK_USING_XLC
 #include <memory>
 std::unique_ptr<int> i;
-#endif
 
 class CkMigrateMessage;
 
@@ -620,8 +614,8 @@ if test $strictpass -eq 1
 then
   got_cpp11="true"
 else
-# Flags for g++/clang++/icc(icpc), xlC++, pgCC, and CrayCC respectively
-for i in "-std=c++0x" "-qlanglvl=extended0x" "--c++11" "-h std=c++11"; do
+# Flags for g++/clang++/icpc/xlC++, pgCC, and CrayCC respectively
+for i in "-std=c++11" "--c++11" "-h std=c++11"; do
     test_cxx "whether C++ compiler supports C++11 with '$i'" "yes" "no" "$i"
     if test $strictpass -eq 1
     then
@@ -635,11 +629,13 @@ fi
 
 if test -z $got_cpp11
 then
-  echo "Charm++ requires some C++11 support, but doesn't know the flag to enable it"
+  echo "Charm++ requires C++11 support, but doesn't know the flag to enable it"
   echo
   echo "For Intel's compiler please see"
   echo "https://charm.cs.illinois.edu/redmine/issues/1560"
   echo "about making a suitable version of gcc/g++/libstdc++ available"
+  echo
+  echo "For Blue Gene/Q please use the Clang compiler"
   test_finish 1
 fi
 
