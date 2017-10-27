@@ -79,12 +79,7 @@ void ampiParent::recordMsgSize(const char* func, int msgSize) {
   }
 }
 
-#if CMK_USING_XLC
-#include <tr1/unordered_map>
-typedef std::tr1::unordered_map<std::string, std::map<int, int> >::iterator outer_itr_t;
-#else
 typedef std::unordered_map<std::string, std::map<int, int> >::iterator outer_itr_t;
-#endif
 typedef std::map<int, int>::iterator inner_itr_t;
 
 void ampiParent::printMsgSizes(void) {

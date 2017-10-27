@@ -1181,16 +1181,9 @@ public:
   }
 };
 
-#if CMK_USING_XLC
-#include <tr1/unordered_map>
-typedef std::tr1::unordered_map<int, AmpiOtherElement> AmpiElements;
-#else
-typedef std::unordered_map<int, AmpiOtherElement> AmpiElements;
-#endif
-
 class AmpiSeqQ : private CkNoncopyable {
   CkMsgQ<AmpiMsg> out; // all out of order messages
-  AmpiElements elements; // element info: indexed by seqIdx (comm rank)
+  std::unordered_map<int, AmpiOtherElement> elements; // element info: indexed by seqIdx (comm rank)
 
 public:
   AmpiSeqQ() {}
@@ -1603,12 +1596,7 @@ class ampiParent : public CBase_ampiParent {
 #if AMPI_PRINT_MSG_SIZES
 // Map of AMPI routine names to message sizes and number of messages:
 // ["AMPI_Routine"][ [msg_size][num_msgs] ]
-#if CMK_USING_XLC
-#include <tr1/unordered_map>
-  std::tr1::unordered_map<std::string, std::map<int, int> > msgSizes;
-#else
   std::unordered_map<std::string, std::map<int, int> > msgSizes;
-#endif
   inline bool isRankRecordingMsgSizes(void);
   inline void recordMsgSize(const char* func, int msgSize);
   void printMsgSizes(void);

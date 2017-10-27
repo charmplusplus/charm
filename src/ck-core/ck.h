@@ -88,13 +88,8 @@ inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
 CkpvExtern(CkVec<void *>, chare_objs);
 #endif
 
-#ifdef CMK_USING_XLC
-#include <tr1/unordered_map>
-typedef std::tr1::unordered_map<CmiUInt8, ArrayElement*> ArrayObjMap;
-#else
 #include <unordered_map>
 typedef std::unordered_map<CmiUInt8, ArrayElement*> ArrayObjMap;
-#endif
 CkpvExtern(ArrayObjMap, array_objs);
 
 /// A set of "Virtual ChareID"'s

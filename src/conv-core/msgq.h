@@ -79,11 +79,7 @@ class msgQ
         /// A key-val pair of a priority value and a handle to the bucket of msgs of that priority
         typedef typename std::pair<prio_t, bkt_t*> prioidx_t;
         /// A type for mapping between priority values and msg buckets
-        #if CMK_USING_XLC
-        typedef typename std::tr1::unordered_map<prio_t, bkt_t> bktmap_t;
-        #else
         typedef typename std::unordered_map<prio_t, bkt_t> bktmap_t;
-        #endif
 
         /// The size of this message queue
         size_t qSize;

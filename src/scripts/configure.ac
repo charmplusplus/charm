@@ -1095,6 +1095,11 @@ EOT
 test_cxx "whether std::unordered_map is defined" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_STD_UNORDERED_MAP, $pass, [whether std::unordered_map works])
 
+if test $pass -ne 1
+then
+	echo "Charm++ requires std::unordered_map support"
+	test_finish 1
+fi
 
 #### check if anon structs are permitted #####
 cat > $t <<EOT

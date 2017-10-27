@@ -8,13 +8,9 @@
 #include <algorithm>
 #include <limits.h>
 
-#if CMK_USING_XLC
-  #include <tr1/unordered_map>
-  typedef std::tr1::unordered_map<int,int> intMap;
-#else
-  #include <unordered_map>
-  typedef std::unordered_map<int,int> intMap;
-#endif
+#include <unordered_map>
+typedef std::unordered_map<int,int> intMap;
+
 #include <bitset>
 #define DIM_SET_SIZE 32     // bitset size
 
@@ -585,11 +581,7 @@ void getProcNeighborsTopoTree(int rootPE, int myPE, CmiSpanningTreeInfo &t, unsi
   getNeighborsTopoTree_R(pes.begin(), pes.end(), myPE, -1, false, bfactor, t);
 }
 
-#if CMK_USING_XLC
-  typedef std::tr1::unordered_map<int,CmiSpanningTreeInfo*> TreeInfoMap;
-#else
-  typedef std::unordered_map<int,CmiSpanningTreeInfo*> TreeInfoMap;
-#endif
+typedef std::unordered_map<int,CmiSpanningTreeInfo*> TreeInfoMap;
 
 static TreeInfoMap trees;
 CmiNodeLock _treeLock;
