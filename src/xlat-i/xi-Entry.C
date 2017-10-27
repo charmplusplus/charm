@@ -528,12 +528,12 @@ void Entry::genArrayDefs(XStr& str)
 
       if (!isLocal()) {
         if (isInline() && container->isForElement()) {
-	str << "  " << container->baseName() << " *obj = ckLocal();\n";
-	str << "  if (obj) {\n"
-	    << inlineCall
-	    << "  }\n";
-      }
-      str << prepareMsg;
+          str << "  " << container->baseName() << " *obj = ckLocal();\n";
+          str << "  if (obj) {\n"
+              << inlineCall
+              << "  }\n";
+        }
+        str << prepareMsg;
       } else {
         str << "  "<< container->baseName() << " *obj = ckLocal();\n";
         str << "#if CMK_ERROR_CHECKING\n";
