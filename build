@@ -54,6 +54,7 @@ syntax() {
   echo ''
   echo 'Choose an alternative fortran compiler (only one option is allowed from this section):'
   echo '  gfortran        GNU Fortran compiler'
+  echo '  flang           Flang Fortran compiler'
   echo '  xlf             IBM XL Fortran compiler'
   echo '  ifort           Intel Fortran compiler'
   echo "  pgf90           Portland Group Fortran compiler"

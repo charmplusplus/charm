@@ -290,6 +290,7 @@ my %explanations = ();
 $explanations{"ooc"} = "Out-of-core execution support in Charm++";
 $explanations{"tcp"} = "Charm++ over TCP instead of UDP for net versions. TCP is slower";
 $explanations{"gfortran"} = "Use gfortran compiler for fortran";
+$explanations{"flang"} = "Use flang compiler for fortran";
 $explanations{"ifort"} = "Use Intel's ifort fortran compiler";
 $explanations{"pgf90"} = "Use Portland Group's pgf90 fortran compiler";
 $explanations{"syncft"} = "Use fault tolerance support";

@@ -1,0 +1,15 @@
+CMK_FPP="$CMK_CPP_C -P -CC"
+
+CMK_CF90="flang"
+
+CMK_CF90_FIXED="$CMK_CF90 -ffixed-form "
+
+CMK_F90LIBS="-lflang -lflangrti -lompstub -lrt"
+
+CMK_CF77=$CMK_CF90
+CMK_F77LIBS=$CMK_F90LIBS
+
+CMK_MOD_NAME_ALLCAPS=
+CMK_MOD_EXT="mod"
+CMK_F90_USE_MODDIR=1
+CMK_F90_MODINC="-I"
