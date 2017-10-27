@@ -476,127 +476,151 @@ class mpi_comm_worlds{
 };
 
 typedef vector<int> groupStruct;
+
 // groupStructure operations
-inline void outputOp(groupStruct vec){
-  if(vec.size()>50){
+inline void outputOp(groupStruct vec) {
+  if (vec.size() > 50) {
     CkPrintf("vector too large to output!\n");
     return;
   }
-  CkPrintf("output vector: size=%d  {",vec.size());
-  for(int i=0;i<vec.size();i++)
-    CkPrintf(" %d ",vec[i]);
+  CkPrintf("output vector: size=%d {",vec.size());
+  for (int i=0; i<vec.size(); i++) {
+    CkPrintf(" %d ", vec[i]);
+  }
   CkPrintf("}\n");
 }
 
-inline int getPosOp(int idx, groupStruct vec){
-  for (int r=0;r<vec.size();r++)
-    if (vec[r]==idx) return r;
+inline int getPosOp(int idx, groupStruct vec) {
+  for (int r=0; r<vec.size(); r++) {
+    if (vec[r] == idx) {
+      return r;
+    }
+  }
   return MPI_UNDEFINED;
 }
 
-inline groupStruct unionOp(groupStruct vec1, groupStruct vec2){
+inline groupStruct unionOp(groupStruct vec1, groupStruct vec2) {
   groupStruct newvec(vec1);
-  for(int i=0;i<vec2.size();i++){
-    if(getPosOp(vec2[i],vec1)==MPI_UNDEFINED)
+  for (int i=0; i<vec2.size(); i++) {
+    if (getPosOp(vec2[i], vec1) == MPI_UNDEFINED) {
       newvec.push_back(vec2[i]);
+    }
   }
   return newvec;
 }
 
-inline groupStruct intersectOp(groupStruct vec1, groupStruct vec2){
+inline groupStruct intersectOp(groupStruct vec1, groupStruct vec2) {
   groupStruct newvec;
-  for(int i=0;i<vec1.size();i++){
-    if(getPosOp(vec1[i],vec2)!=MPI_UNDEFINED)
+  for (int i=0; i<vec1.size(); i++) {
+    if (getPosOp(vec1[i], vec2) != MPI_UNDEFINED) {
       newvec.push_back(vec1[i]);
+    }
   }
   return newvec;
 }
 
 inline groupStruct diffOp(groupStruct vec1, groupStruct vec2){
   groupStruct newvec;
-  for(int i=0;i<vec1.size();i++){
-    if(getPosOp(vec1[i],vec2)==MPI_UNDEFINED)
+  for (int i=0; i<vec1.size(); i++) {
+    if (getPosOp(vec1[i], vec2) == MPI_UNDEFINED) {
       newvec.push_back(vec1[i]);
+    }
   }
   return newvec;
 }
 
-inline int* translateRanksOp(int n,groupStruct vec1,const int* ranks1,groupStruct vec2, int *ret){
-  for(int i=0;i<n;i++){
-    ret[i] = (ranks1[i] == MPI_PROC_NULL) ?  MPI_PROC_NULL : getPosOp(vec1[ranks1[i]],vec2);
+inline int* translateRanksOp(int n, groupStruct vec1, const int* ranks1, groupStruct vec2, int *ret) {
+  for (int i=0; i<n; i++) {
+    ret[i] = (ranks1[i] == MPI_PROC_NULL) ? MPI_PROC_NULL : getPosOp(vec1[ranks1[i]], vec2);
   }
   return ret;
 }
 
-inline int compareVecOp(groupStruct vec1,groupStruct vec2){
-  int i,pos,ret = MPI_IDENT;
-  if(vec1.size() != vec2.size()) return MPI_UNEQUAL;
-  for(i=0;i<vec1.size();i++){
-    pos = getPosOp(vec1[i],vec2);
-    if(pos == MPI_UNDEFINED) return MPI_UNEQUAL;
-    if(pos != i)   ret = MPI_SIMILAR;
+inline int compareVecOp(groupStruct vec1, groupStruct vec2) {
+  int pos, ret = MPI_IDENT;
+  if (vec1.size() != vec2.size()) {
+    return MPI_UNEQUAL;
+  }
+  for (int i=0; i<vec1.size(); i++) {
+    pos = getPosOp(vec1[i], vec2);
+    if (pos == MPI_UNDEFINED) {
+      return MPI_UNEQUAL;
+    }
+    else if (pos != i) {
+      ret = MPI_SIMILAR;
+    }
   }
   return ret;
 }
 
-inline groupStruct inclOp(int n,const int* ranks,groupStruct vec){
-  groupStruct retvec;
-  for(int i=0;i<n;i++){
-    retvec.push_back(vec[ranks[i]]);
+inline groupStruct inclOp(int n, const int* ranks, groupStruct vec) {
+  groupStruct retvec(n);
+  for (int i=0; i<n; i++) {
+    retvec[i] = vec[ranks[i]];
   }
   return retvec;
 }
 
-inline groupStruct exclOp(int n,const int* ranks,groupStruct vec){
+inline groupStruct exclOp(int n, const int* ranks, groupStruct vec) {
   groupStruct retvec;
-  int add=1;
-  for(int j=0;j<vec.size();j++){
-    for(int i=0;i<n;i++)
-      if(j==ranks[i]){ add=0; break; }
-    if(add==1)  retvec.push_back(vec[j]);
-    else add=1;
+  bool add = true;
+  for (int j=0; j<vec.size(); j++) {
+    for (int i=0; i<n; i++) {
+      if (j == ranks[i]) {
+        add = false;
+        break;
+      }
+    }
+    if (add) {
+      retvec.push_back(vec[j]);
+    }
+    else {
+      add = true;
+    }
   }
   return retvec;
 }
 
-inline groupStruct rangeInclOp(int n, int ranges[][3], groupStruct vec, int *flag){
+inline groupStruct rangeInclOp(int n, int ranges[][3], groupStruct vec, int *flag) {
   groupStruct retvec;
-  int first,last,stride;
-  for(int i=0;i<n;i++){
-    first = ranges[i][0];
-    last = ranges[i][1];
+  int first, last, stride;
+  for (int i=0; i<n; i++) {
+    first  = ranges[i][0];
+    last   = ranges[i][1];
     stride = ranges[i][2];
-    if(stride!=0){
-      for(int j=0;j<=(last-first)/stride;j++)
+    if (stride != 0) {
+      for (int j=0; j<=(last-first)/stride; j++) {
         retvec.push_back(vec[first+stride*j]);
-    }else{
+      }
+    }
+    else {
       *flag = MPI_ERR_ARG;
-      return retvec;
+      return groupStruct();
     }
   }
   *flag = MPI_SUCCESS;
   return retvec;
 }
 
-inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec, int *flag){
-  groupStruct retvec;
+inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec, int *flag) {
   vector<int> ranks;
-  int first,last,stride;
-  int i,j;
-  for(i=0;i<n;i++){
-    first = ranges[i][0];
-    last = ranges[i][1];
+  int first, last, stride;
+  for (int i=0; i<n; i++) {
+    first  = ranges[i][0];
+    last   = ranges[i][1];
     stride = ranges[i][2];
-    if(stride!=0){
-      for(j=0;j<=(last-first)/stride;j++)
+    if (stride != 0) {
+      for (int j=0; j<=(last-first)/stride; j++) {
         ranks.push_back(first+stride*j);
-    }else{
+      }
+    }
+    else {
       *flag = MPI_ERR_ARG;
-      return retvec;
+      return groupStruct();
     }
   }
   *flag = MPI_SUCCESS;
-  return exclOp(ranks.size(),&ranks[0],vec);
+  return exclOp(ranks.size(), &ranks[0], vec);
 }
 
 #include "tcharm.h"
