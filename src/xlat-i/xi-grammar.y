@@ -972,15 +972,7 @@ EAttrib		: THREADED
                 { $$ = SREDUCE; }
                 | AGGREGATE
 		{
-#ifdef CMK_USING_XLC
-        WARNING("a known bug in xl compilers (PMR 18366,122,000) currently breaks "
-                "aggregate entry methods.\n"
-                "Until a fix is released, this tag will be ignored on those compilers.",
-                @1.first_column, @1.last_column, @1.first_line);
-        $$ = 0;
-#else
         $$ = SAGGREGATE;
-#endif
     }
 		| error
 		{

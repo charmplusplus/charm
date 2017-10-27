@@ -20,11 +20,7 @@
 
 #include <map>
 #include <vector>
-#if CMK_USING_XLC
-#include <tr1/unordered_map>
-#else
 #include <unordered_map>
-#endif
 
 #define DEBUGF(x)  // CkPrintf x;
 

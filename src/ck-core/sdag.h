@@ -401,11 +401,7 @@ namespace SDAG {
     }
   };
 
-#if CMK_USING_XLC
-  typedef std::auto_ptr<Dependency> dep_ptr;
-#else
   typedef std::unique_ptr<Dependency> dep_ptr;
-#endif
 
   void registerPUPables();
 }

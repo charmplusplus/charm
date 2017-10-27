@@ -26,11 +26,7 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 #include <deque>
 #include <list>
 #include <map>
-#if !CMK_USING_XLC
 #include <unordered_map>
-#else
-#include <tr1/unordered_map>
-#endif
 #include <string>
 #include <complex>
 #include <utility> /*for std::pair*/
@@ -46,10 +42,8 @@ namespace PUP {
   inline void operator|(er &p,typename std::pair<const A,B> &v);
   template <class T>
   inline void operator|(er &p,std::complex<T> &v);
-#if !CMK_USING_XLC
   template <class T>
   inline void operator|(er &p, std::unique_ptr<T, std::default_delete<T>> &ptr);
-#endif
   template <class charType>
   inline void operator|(er &p,typename std::basic_string<charType> &v);
   inline void operator|(er &p,std::string &v);
@@ -98,7 +92,6 @@ namespace PUP {
     p|re; p|im;
     v=std::complex<T>(re,im);
   }
-#if !CMK_USING_XLC
   template <class T>
   inline void operator|(er &p, std::unique_ptr<T, std::default_delete<T>> &ptr)
   {
@@ -112,7 +105,6 @@ namespace PUP {
       p|(*ptr);
     }
   }
-#endif
   template <class charType> 
   inline void operator|(er &p,typename std::basic_string<charType> &v)
   {
@@ -231,19 +223,10 @@ namespace PUP {
 
   template <class V,class T,class Cmp> 
   inline void operator|(er &p,typename std::map<V,T,Cmp> &m)
-  //{ PUP_stl_map<std::map<V,T,Cmp>,std::pair<const V,T> >(p,m); }    // 'const' confuses old version of a SUN CC compiler
-  { PUP_stl_map<std::map<V,T,Cmp>,std::pair<V,T> >(p,m); }
-#if !CMK_USING_XLC
+  { PUP_stl_map<std::map<V,T,Cmp>,std::pair<const V,T> >(p,m); }
   template <class V,class T,class Cmp>
   inline void operator|(er &p,typename std::unordered_map<V,T,Cmp> &m)
-  //{ PUP_stl_map<std::unordered_map<V,T,Cmp>,std::pair<const V,T> >(p,m); }    // 'const' confuses old version of a SUN CC compiler
-  { PUP_stl_map<std::unordered_map<V,T,Cmp>,std::pair<V,T> >(p,m); }
-#else
-  template <class V,class T,class Cmp>
-  inline void operator|(er &p,typename std::tr1::unordered_map<V,T,Cmp> &m)
-  //{ PUP_stl_map<std::unordered_map<V,T,Cmp>,std::pair<const V,T> >(p,m); }    // 'const' confuses old version of a SUN CC compiler
-  { PUP_stl_map<std::tr1::unordered_map<V,T,Cmp>,std::pair<V,T> >(p,m); }
-#endif
+  { PUP_stl_map<std::unordered_map<V,T,Cmp>,std::pair<const V,T> >(p,m); }
   template <class V,class T,class Cmp> 
   inline void operator|(er &p,typename std::multimap<V,T,Cmp> &m)
   { PUP_stl_map<std::multimap<V,T,Cmp>,std::pair<const V,T> >(p,m); }
