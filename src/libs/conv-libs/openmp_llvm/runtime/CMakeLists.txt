@@ -17,7 +17,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 
 # Standalone build or part of LLVM?
 set(LIBOMP_STANDALONE_BUILD FALSE)
-if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}" OR
+if(OPENMP_STANDALONE_BUILD OR
+   "${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}" OR
    "${CMAKE_SOURCE_DIR}/runtime" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
   project(libomp C CXX)
   set(LIBOMP_STANDALONE_BUILD TRUE)
@@ -38,7 +39,7 @@ if(${LIBOMP_STANDALONE_BUILD})
   # If adding a new architecture, take a look at cmake/LibompGetArchitecture.cmake
   libomp_get_architecture(LIBOMP_DETECTED_ARCH)
   set(LIBOMP_ARCH ${LIBOMP_DETECTED_ARCH} CACHE STRING
-    "The architecture to build for (x86_64/i386/arm/ppc64/ppc64le/aarch64/mic).")
+    "The architecture to build for (x86_64/i386/arm/ppc64/ppc64le/aarch64/mic/mips/mips64).")
   # Allow user to choose a suffix for the installation directory.
   set(LIBOMP_LIBDIR_SUFFIX "" CACHE STRING
     "suffix of lib installation directory e.g., 64 => lib64")
@@ -65,6 +66,8 @@ else() # Part of LLVM build
     set(LIBOMP_ARCH x86_64)
   elseif(LIBOMP_NATIVE_ARCH STREQUAL "x86_64")
     set(LIBOMP_ARCH x86_64)
+  elseif(LIBOMP_NATIVE_ARCH MATCHES "powerpc64le")
+    set(LIBOMP_ARCH ppc64le)
   elseif(LIBOMP_NATIVE_ARCH MATCHES "powerpc")
     set(LIBOMP_ARCH ppc64)
   elseif(LIBOMP_NATIVE_ARCH MATCHES "aarch64")
@@ -81,20 +84,20 @@ else() # Part of LLVM build
   set(LIBOMP_ENABLE_ASSERTIONS ${LLVM_ENABLE_ASSERTIONS})
   set(LIBOMP_ENABLE_WERROR ${LLVM_ENABLE_WERROR})
 endif()
-libomp_check_variable(LIBOMP_ARCH 32e x86_64 32 i386 arm ppc64 ppc64le aarch64 mic)
+libomp_check_variable(LIBOMP_ARCH 32e x86_64 32 i386 arm ppc64 ppc64le aarch64 mic mips mips64)
 
 set(LIBOMP_LIB_TYPE normal CACHE STRING
   "Performance,Profiling,Stubs library (normal/profile/stubs)")
 libomp_check_variable(LIBOMP_LIB_TYPE normal profile stubs)
-set(LIBOMP_OMP_VERSION 45 CACHE STRING
-  "The OpenMP version (45/40/30)")
-if(LIBOMP_OMP_VERSION EQUAL 41)
-  libomp_warning_say("LIBOMP_OMP_VERSION=41 is deprecated and will be removed in a later version. Please use 45.")
-  set(LIBOMP_OMP_VERSION 45)
-endif()
-libomp_check_variable(LIBOMP_OMP_VERSION 45 40 30)
+set(LIBOMP_OMP_VERSION 50 CACHE STRING
+  "The OpenMP version (50/45/40/30)")
+libomp_check_variable(LIBOMP_OMP_VERSION 50 45 40 30)
 # Set the OpenMP Year and Month assiociated with version
-if(${LIBOMP_OMP_VERSION} GREATER 40 OR ${LIBOMP_OMP_VERSION} EQUAL 40)
+if(${LIBOMP_OMP_VERSION} GREATER 50 OR ${LIBOMP_OMP_VERSION} EQUAL 50)
+  set(LIBOMP_OMP_YEAR_MONTH 201611)
+elseif(${LIBOMP_OMP_VERSION} GREATER 45 OR ${LIBOMP_OMP_VERSION} EQUAL 45)
+  set(LIBOMP_OMP_YEAR_MONTH 201511)
+elseif(${LIBOMP_OMP_VERSION} GREATER 40 OR ${LIBOMP_OMP_VERSION} EQUAL 40)
   set(LIBOMP_OMP_YEAR_MONTH 201307)
 elseif(${LIBOMP_OMP_VERSION} GREATER 30 OR ${LIBOMP_OMP_VERSION} EQUAL 30)
   set(LIBOMP_OMP_YEAR_MONTH 201107)
@@ -153,7 +156,7 @@ set(LIBOMP_USE_HWLOC FALSE CACHE BOOL
 set(LIBOMP_HWLOC_INSTALL_DIR /usr/local CACHE PATH
   "Install path for hwloc library")
 
-# Get the build number from kmp_version.c
+# Get the build number from kmp_version.cpp
 libomp_get_build_number("${CMAKE_CURRENT_SOURCE_DIR}" LIBOMP_VERSION_BUILD)
 math(EXPR LIBOMP_VERSION_BUILD_YEAR "${LIBOMP_VERSION_BUILD}/10000")
 math(EXPR LIBOMP_VERSION_BUILD_MONTH_DAY "${LIBOMP_VERSION_BUILD}%10000")
@@ -170,6 +173,8 @@ set(PPC64BE FALSE)
 set(PPC64LE FALSE)
 set(PPC64 FALSE)
 set(MIC FALSE)
+set(MIPS64 FALSE)
+set(MIPS FALSE)
 if("${LIBOMP_ARCH}" STREQUAL "i386" OR "${LIBOMP_ARCH}" STREQUAL "32")    # IA-32 architecture
   set(IA32 TRUE)
 elseif("${LIBOMP_ARCH}" STREQUAL "x86_64" OR "${LIBOMP_ARCH}" STREQUAL "32e") # Intel(R) 64 architecture
@@ -186,6 +191,10 @@ elseif("${LIBOMP_ARCH}" STREQUAL "aarch64") # AARCH64 architecture
   set(AARCH64 TRUE)
 elseif("${LIBOMP_ARCH}" STREQUAL "mic") # Intel(R) Many Integrated Core Architecture
   set(MIC TRUE)
+elseif("${LIBOMP_ARCH}" STREQUAL "mips") # MIPS architecture
+    set(MIPS TRUE)
+elseif("${LIBOMP_ARCH}" STREQUAL "mips64") # MIPS64 architecture
+    set(MIPS64 TRUE)
 endif()
 
 # Set some flags based on build_type
@@ -205,7 +214,7 @@ elseif("${libomp_build_type_lowercase}" STREQUAL "minsizerel")
 endif()
 
 # Include itt notify interface?
-set(LIBOMP_USE_ITT_NOTIFY FALSE CACHE BOOL
+set(LIBOMP_USE_ITT_NOTIFY TRUE CACHE BOOL
   "Enable ITT notify?")
 
 # normal, profile, stubs library.
@@ -270,12 +279,13 @@ set(LIBOMP_USE_DEBUGGER FALSE CACHE BOOL
 set(LIBOMP_USE_STDCPPLIB FALSE CACHE BOOL
   "Should we link to C++ library?")
 
-# TSX (x86) based locks have __asm code which can be troublesome for some compilers.
+# Intel(R) Transactional Synchronization Extensions (Intel(R) TSX) based locks have
+# __asm code which can be troublesome for some compilers.  This feature is also x86 specific.
 # TODO: Make this a real feature check
 set(LIBOMP_USE_ADAPTIVE_LOCKS "${LIBOMP_HAVE_ADAPTIVE_LOCKS}" CACHE BOOL
-  "Should TSX-based lock be compiled (adaptive lock in kmp_lock.cpp).  These are x86 specific.")
+  "Should Intel(R) TSX lock be compiled (adaptive lock in kmp_lock.cpp).  These are x86 specific.")
 if(LIBOMP_USE_ADAPTIVE_LOCKS AND (NOT LIBOMP_HAVE_ADAPTIVE_LOCKS))
-  libomp_error_say("Adaptive locks (TSX) functionality requested but not available")
+  libomp_error_say("Adaptive locks (Intel(R) TSX) functionality is only supported on x86 Architecture")
 endif()
 
 # - stats-gathering enables OpenMP stats where things like the number of
@@ -298,17 +308,37 @@ if(WIN32 AND NOT LIBOMP_ENABLE_SHARED)
   libomp_error_say("Static libraries requested but not available on Windows")
 endif()
 
+if(LIBOMP_USE_ITT_NOTIFY AND NOT LIBOMP_ENABLE_SHARED)
+  message(STATUS "ITT Notify not supported for static libraries - forcing ITT Notify off")
+  set(LIBOMP_USE_ITT_NOTIFY FALSE)
+endif()
+
+if(LIBOMP_USE_VERSION_SYMBOLS AND (NOT LIBOMP_ENABLE_SHARED) )
+  message(STATUS "Version symbols not supported for static libraries - forcing Version symbols functionality off")
+  set (LIBOMP_USE_VERSION_SYMBOLS FALSE)
+endif()
+
 # OMPT-support
 set(LIBOMP_OMPT_DEBUG FALSE CACHE BOOL
   "Trace OMPT initialization?")
 set(LIBOMP_OMPT_SUPPORT FALSE CACHE BOOL
   "OMPT-support?")
-set(LIBOMP_OMPT_BLAME FALSE CACHE BOOL
+set(LIBOMP_OMPT_BLAME TRUE CACHE BOOL
   "OMPT-blame?")
-set(LIBOMP_OMPT_TRACE FALSE CACHE BOOL
+set(LIBOMP_OMPT_TRACE TRUE CACHE BOOL
   "OMPT-trace?")
 if(LIBOMP_OMPT_SUPPORT AND (NOT LIBOMP_HAVE_OMPT_SUPPORT))
-  libomp_error_say("OpenMP Tools Interface requested but not available")
+  libomp_error_say("OpenMP Tools Interface requested but not available in this implementation")
+endif()
+if(LIBOMP_OMPT_SUPPORT AND (${LIBOMP_OMP_VERSION} LESS 50))
+  libomp_error_say("OpenMP Tools Interface only available with OpenMP 5.0, LIBOMP_OMP_VERSION is ${LIBOMP_OMP_VERSION}")
+endif()
+
+# TSAN-support
+set(LIBOMP_TSAN_SUPPORT FALSE CACHE BOOL
+  "TSAN-support?")
+if(LIBOMP_TSAN_SUPPORT AND (NOT LIBOMP_HAVE_TSAN_SUPPORT))
+  libomp_error_say("TSAN functionality requested but not available")
 endif()
 
 # Error check hwloc support after config-ix has run
@@ -337,6 +367,10 @@ else()
 endif()
 
 set(LIBOMP_LIB_FILE ${LIBOMP_LIB_NAME}${LIBOMP_LIBRARY_SUFFIX})
+
+# Optional backwards compatibility aliases.
+set(LIBOMP_INSTALL_ALIASES TRUE CACHE BOOL
+  "Install libgomp and libiomp5 library aliases for backwards compatibility")
 
 # Print configuration after all variables are set.
 if(${LIBOMP_STANDALONE_BUILD})
@@ -367,6 +401,7 @@ if(${LIBOMP_STANDALONE_BUILD})
   endif()
   libomp_say("Use Adaptive locks   -- ${LIBOMP_USE_ADAPTIVE_LOCKS}")
   libomp_say("Use quad precision   -- ${LIBOMP_USE_QUAD_PRECISION}")
+  libomp_say("Use TSAN-support     -- ${LIBOMP_TSAN_SUPPORT}")
   libomp_say("Use Hwloc library    -- ${LIBOMP_USE_HWLOC}")
 endif()
 
