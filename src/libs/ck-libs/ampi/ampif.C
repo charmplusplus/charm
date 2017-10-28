@@ -1160,11 +1160,11 @@ void mpi_ineighbor_allgatherv(void* sendbuf, int *sendcount, int *sendtype,
 }
 
 void mpi_op_create(void* function, int* commute, int* op, int* ierr){
-  *ierr = MPI_Op_create((MPI_User_function *)function, *commute, op);
+  *ierr = AMPI_Op_create((MPI_User_function *)function, *commute, op);
 }
 
 void mpi_op_free(int* op, int* ierr){
-  *ierr = MPI_Op_free(op);
+  *ierr = AMPI_Op_free(op);
 }
 
 void mpi_op_commutative(int* op, int* commute, int* ierr){

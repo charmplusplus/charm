@@ -979,7 +979,7 @@ int AMPI_Get_accumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype,
                         int rank, MPI_Aint targdisp, int targcnt,
                         MPI_Datatype targtype, MPI_Op op, MPI_Win win);
 #define MPI_Rput AMPI_Rput
-int MPI_Rput(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int targrank,
+int AMPI_Rput(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int targrank,
              MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win,
              MPI_Request *request);
 #define MPI_Rget AMPI_Rget
