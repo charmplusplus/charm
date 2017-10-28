@@ -7,7 +7,7 @@
 #include "charm-api.h" /* for CLINKAGE */
 
 /* NON-standard define: this lets people #ifdef on
-   AMPI, e.g. for our bizarre AMPI_Main. */
+   AMPI, e.g. to portably use AMPI extensions to the MPI standard. */
 #define AMPI
 
 /* Allow applications to terminate cleanly with exit() */
