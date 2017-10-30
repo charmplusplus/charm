@@ -257,8 +257,11 @@ migrate array elements to better balance the load between processors.
 % PUP
 For an array element to be migratable, it must implement a \uw{pup}
 method.  The standard PUP contract (see section \ref{sec:pupcontract})
-and constraints wrt to serializing data apply.
-
+and constraints wrt to serializing data apply. The one exception for chare
+, group and node group types is that since the runtime system will be the
+one to invoke their PUP routines, the runtime will automatically call PUP
+on the generated CBase\_ superclasses so users do not need to call PUP on
+generated superclasses.
 
 A simple example for an array follows:
 
@@ -280,6 +283,7 @@ public:
 //In the .C file:
 void A2::pup(PUP::er \&p)
 \{
+    // The runtime will automatically call CBase\_A2::pup()
     p|nt;
     p|chr;
     p(flt,7);
