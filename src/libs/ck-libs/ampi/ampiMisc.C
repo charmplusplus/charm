@@ -255,63 +255,63 @@ int ampiParent::freeInfo(MPI_Info info){
 }
 
 
-CDECL
+AMPI_API_IMPL(MPI_Info_create)
 int AMPI_Info_create(MPI_Info *info){
   AMPIAPI("AMPI_Info_create");
   int ret = getAmpiParent()->createInfo(info);
   return ampiErrhandler("AMPI_Info_create", ret);
 }
 
-CDECL
+AMPI_API_IMPL(MPI_Info_set)
 int AMPI_Info_set(MPI_Info info, const char *key, const char *value){
   AMPIAPI("AMPI_Info_set");
   int ret = getAmpiParent()->setInfo(info, key, value);
   return ampiErrhandler("AMPI_Info_set", ret);
 }
 
-CDECL
+AMPI_API_IMPL(MPI_Info_delete)
 int AMPI_Info_delete(MPI_Info info, const char *key){
   AMPIAPI("AMPI_Info_delete");
   int ret = getAmpiParent()->deleteInfo(info, key);
   return ampiErrhandler("AMPI_Info_delete", ret);
 }
 
-CDECL
+AMPI_API_IMPL(MPI_Info_get)
 int AMPI_Info_get(MPI_Info info, const char *key, int valuelen, char *value, int *flag){
   AMPIAPI("AMPI_Info_get");
   getAmpiParent()->getInfo(info, key, valuelen, value, flag);
   return MPI_SUCCESS; // It is not an error if the requested key does not exist
 }
 
-CDECL
+AMPI_API_IMPL(MPI_Info_get_valuelen)
 int AMPI_Info_get_valuelen(MPI_Info info, const char *key, int *valuelen, int *flag){
   AMPIAPI("AMPI_Info_get_valuelen");
   getAmpiParent()->getInfoValuelen(info, key, valuelen, flag);
   return MPI_SUCCESS; // It is not an error if the requested key does not exist
 }
 
-CDECL
+AMPI_API_IMPL(MPI_Info_get_nkeys)
 int AMPI_Info_get_nkeys(MPI_Info info, int *nkeys){
   AMPIAPI("AMPI_Info_get_nkeys");
   int ret = getAmpiParent()->getInfoNkeys(info, nkeys);
   return ampiErrhandler("AMPI_Info_get_nkeys", ret);
 }
 
-CDECL
+AMPI_API_IMPL(MPI_Info_get_nthkey)
 int AMPI_Info_get_nthkey(MPI_Info info, int n, char *key){
   AMPIAPI("AMPI_Info_get_nthkey");
   int ret = getAmpiParent()->getInfoNthkey(info, n, key);
   return ampiErrhandler("AMPI_Info_get_nthkey", ret);
 }
 
-CDECL
+AMPI_API_IMPL(MPI_Info_dup)
 int AMPI_Info_dup(MPI_Info info, MPI_Info *newinfo){
   AMPIAPI("AMPI_Info_dup");
   int ret = getAmpiParent()->dupInfo(info, newinfo);
   return ampiErrhandler("AMPI_Info_dup", ret);
 }
 
-CDECL
+AMPI_API_IMPL(MPI_Info_free)
 int AMPI_Info_free(MPI_Info *info){
   AMPIAPI("AMPI_Info_free");
   int ret = getAmpiParent()->freeInfo(*info);

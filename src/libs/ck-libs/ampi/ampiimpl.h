@@ -11,6 +11,18 @@
 
 using std::vector;
 
+#define STRINGIFY(a) #a
+#define AMPI_API_IMPL(name) \
+  _Pragma(STRINGIFY(weak A##name)) \
+  _Pragma(STRINGIFY(weak AP##name = A##name)) \
+  CLINKAGE
+
+// MSVC does not support _Pragma, disable it.
+#if defined(_WIN32)
+  #define _Pragma(string)
+#endif
+
+
 //Uncomment for debug print statements
 #define AMPI_DEBUG(...) //CkPrintf(__VA_ARGS__)
 
