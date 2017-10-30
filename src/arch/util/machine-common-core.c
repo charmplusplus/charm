@@ -13,9 +13,6 @@
 FILE *debugLog = NULL;
 #endif
 
-// Use CMA for intra node shared memory communication
-#define CMK_USE_CMA                    1
-
 /******* broadcast related  */
 #ifndef CMK_BROADCAST_SPANNING_TREE
 #define CMK_BROADCAST_SPANNING_TREE    1

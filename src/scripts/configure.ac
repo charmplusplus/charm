@@ -1937,6 +1937,22 @@ EOT
 test_cxx "whether has mprotect" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_MPROTECT, $pass, [whether has mprotect])
 
+#### check if support for SHM through CMA exists ####
+cat > $t <<EOT
+#define _GNU_SOURCE
+#include <sys/uio.h>
+#include <errno.h>
+int main() {
+  pid_t pid;
+  struct iovec *local, *remote;
+  int nread = process_vm_readv(pid, local, 1, remote, 1, 0);
+  nread = process_vm_writev(pid, local, 1, remote, 1, 0);
+  return errno;
+}
+EOT
+test_link "whether has support for shm transport using Cross Memory Attach" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_CMA, $pass, [whether supports cma])
+
 #### check if glibc backtrace exists ####
 cat > $t <<EOT
 #include "cmibacktrace.c"
