@@ -104,10 +104,6 @@ struct _SYSTEM_INFO sysinfo;
   return a;
 }
 
-CpvStaticDeclare(int, cpuTopoHandlerIdx);
-CpvStaticDeclare(int, cpuTopoRecvHandlerIdx);
-CpvStaticDeclare(int, topoDoneHandlerIdx);
-
 struct _procInfo {
   skt_ip_t ip;
   int pe;
@@ -130,9 +126,6 @@ typedef struct _nodeTopoMsg {
 typedef struct _topoDoneMsg { // used for empty reduction to indicate all PEs have topo info
   char core[CmiMsgHeaderSizeBytes];
 } topoDoneMsg;
-
-static nodeTopoMsg *topomsg = NULL;
-static CmmTable hostTable;
 
 // nodeIDs[pe] is the node number of processor pe
 class CpuTopology {
@@ -225,10 +218,24 @@ int CpuTopology::numNodes = 0;
 CkVec<int> *CpuTopology::bynodes = NULL;
 int CpuTopology::supported = 0;
 
+namespace CpuTopoDetails {
+
+static nodeTopoMsg *topomsg = NULL;
+static CmmTable hostTable;
+
+CpvStaticDeclare(int, cpuTopoHandlerIdx);
+CpvStaticDeclare(int, cpuTopoRecvHandlerIdx);
+CpvStaticDeclare(int, topoDoneHandlerIdx);
+
 static CpuTopology cpuTopo;
 static CmiNodeLock topoLock = 0; /* Not spelled 'NULL' to quiet warnings when CmiNodeLock is just 'int' */
 static int done = 0;
 static int topoDone = 0;
+static int _noip = 0;
+
+}
+
+using namespace CpuTopoDetails;
 
 /* called on PE 0 */
 static void cpuTopoHandler(void *m)
@@ -413,7 +420,6 @@ extern "C"  int LrtsNodeFirst(int node)
 }
 
 
-static int _noip = 0;
 extern "C" void LrtsInitCpuTopo(char **argv)
 {
   static skt_ip_t myip;
