@@ -68,7 +68,6 @@ static void meta_init(char **argv)
    isomalloc_thread = 1;         /* isomalloc is allowed in this pthread */
 #endif
    if (CmiMyRank()==0) meta_inited = 1;
-   CmiNodeAllBarrier();
 #if CMK_SMP
     if (_sync_iso == 0 && _sync_iso_warned == 0) {
         _sync_iso_warned = 1;

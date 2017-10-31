@@ -306,6 +306,7 @@ void CmiMemoryInit(argv)
 #if CMK_MEMORY_BUILD_OS_WRAPPED || CMK_MEMORY_BUILD_GNU_HOOKS
   CmiArgGroup("Converse","Memory module");
   if(CmiMyRank() == 0) meta_init(argv);
+  CmiNodeAllBarrier();
 #endif
   CmiOutOfMemoryInit();
   if (getenv("MEMORYUSAGE_NO_MALLINFO"))  skip_mallinfo = 1;
