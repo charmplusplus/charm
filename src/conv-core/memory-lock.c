@@ -21,7 +21,7 @@
 
 static void meta_init(char **argv)
 {
-/*   CmiMemoryIs_flag|=CMI_MEMORY_IS_OSLOCK;   */
+/*   if (CmiMyRank()==0) CmiMemoryIs_flag|=CMI_MEMORY_IS_OSLOCK;   */
 }
 
 void *meta_malloc(size_t size)

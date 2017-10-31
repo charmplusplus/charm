@@ -1412,52 +1412,58 @@ int cpdInitializeMemory;
 void CpdSetInitializeMemory(int v) { cpdInitializeMemory = v; }
 
 static void meta_init(char **argv) {
-  char buf[100];
-  status("Converse -memory mode: charmdebug\n");
-  sprintf(buf, "slot size %d\n", (int)sizeof(Slot));
-  status(buf);
-  CmiMemoryIs_flag|=CMI_MEMORY_IS_CHARMDEBUG;
-  cpdInitializeMemory = 0;
-  charmEnvelopeSize = getCharmEnvelopeSize();
-  CpdDebugGetAllocationTree = (void* (*)(int*))CreateAllocationTree;
-  CpdDebug_pupAllocationPoint = pupAllocationPoint;
-  CpdDebug_deleteAllocationPoint = deleteAllocationPoint;
-  CpdDebug_MergeAllocationTree = MergeAllocationTree;
-  CpdDebugGetMemStat = (void* (*)(void))CreateMemStat;
-  CpdDebug_pupMemStat = pupMemStat;
-  CpdDebug_deleteMemStat = deleteMemStat;
-  CpdDebug_mergeMemStat = mergeMemStat;
-  memory_allocated_user_total = 0;
-  nextChareID = 1;
+  if (CmiMyRank()==0) {
+    char buf[100];
+    status("Converse -memory mode: charmdebug\n");
+    sprintf(buf, "slot size %d\n", (int)sizeof(Slot));
+    status(buf);
+    CmiMemoryIs_flag|=CMI_MEMORY_IS_CHARMDEBUG;
+    cpdInitializeMemory = 0;
+    charmEnvelopeSize = getCharmEnvelopeSize();
+    CpdDebugGetAllocationTree = (void* (*)(int*))CreateAllocationTree;
+    CpdDebug_pupAllocationPoint = pupAllocationPoint;
+    CpdDebug_deleteAllocationPoint = deleteAllocationPoint;
+    CpdDebug_MergeAllocationTree = MergeAllocationTree;
+    CpdDebugGetMemStat = (void* (*)(void))CreateMemStat;
+    CpdDebug_pupMemStat = pupMemStat;
+    CpdDebug_deleteMemStat = deleteMemStat;
+    CpdDebug_mergeMemStat = mergeMemStat;
+    memory_allocated_user_total = 0;
+    nextChareID = 1;
 #ifndef CMK_SEPARATE_SLOT
-  slot_first->userSize = 0;
-  slot_first->stackLen = 0;
+    slot_first->userSize = 0;
+    slot_first->stackLen = 0;
 #endif
+  }
   if (CmiGetArgFlagDesc(argv,"+memory_report", "Print all cross-object violations")) {
-    reportMEM = 1;
+    if (CmiMyRank()==0) reportMEM = 1;
   }
   if (CmiGetArgFlagDesc(argv,"+memory_backup", "Backup all memory at every entry method")) {
-    CpdMemBackup = 1;
-    saveAllocationHistory = 1;
+    if (CmiMyRank()==0) {
+      CpdMemBackup = 1;
+      saveAllocationHistory = 1;
+    }
   }
   if (CmiGetArgFlagDesc(argv,"+memory_crc", "Use CRC32 to detect memory changes")) {
-    CpdCRC32 = 1;
+    if (CmiMyRank()==0) CpdCRC32 = 1;
   }
 #ifdef CPD_USE_MMAP
   if (CmiGetArgFlagDesc(argv,"+memory_mprotect", "Use mprotect to protect memory of other chares")) {
-    struct sigaction sa;
-    CpdMprotect = 1;
-    sa.sa_flags = SA_SIGINFO | SA_NODEFER | SA_RESTART;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_sigaction = CpdMMAPhandler;
-    if (sigaction(SIGSEGV, &sa, NULL) == -1) CmiPrintf("failed to install signal handler\n");
+    if (CmiMyRank()==0) {
+      struct sigaction sa;
+      CpdMprotect = 1;
+      sa.sa_flags = SA_SIGINFO | SA_NODEFER | SA_RESTART;
+      sigemptyset(&sa.sa_mask);
+      sa.sa_sigaction = CpdMMAPhandler;
+      if (sigaction(SIGSEGV, &sa, NULL) == -1) CmiPrintf("failed to install signal handler\n");
+    }
   }
 #endif
   if (CmiGetArgFlagDesc(argv,"+memory_verbose", "Print all memory-related operations")) {
-    disableVerbosity = 0;
+    if (CmiMyRank()==0) disableVerbosity = 0;
   }
   if (CmiGetArgFlagDesc(argv,"+memory_nostack", "Do not collect stack traces for memory allocations")) {
-    stackTraceDisabled = 1;
+    if (CmiMyRank()==0) stackTraceDisabled = 1;
   }
 }
 

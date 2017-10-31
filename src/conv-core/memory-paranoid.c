@@ -278,25 +278,37 @@ static void status(char *msg) {
 }
 static void meta_init(char **argv)
 {
-  CmiMemoryIs_flag|=CMI_MEMORY_IS_PARANOID;
+  if (CmiMyRank()==0) CmiMemoryIs_flag|=CMI_MEMORY_IS_PARANOID;
   CmiArgGroup("Converse","memory-paranoid");
   status("Converse -memory mode: paranoid");
   /*Parse uninitialized-memory-fill options:*/
-  if (CmiGetArgIntDesc(argv,"+memory_fill",&memory_fill, "Overwrite new and deleted memory")) { 
+  int memory_fill_value;
+  if (CmiGetArgIntDesc(argv,"+memory_fill",&memory_fill_value, "Overwrite new and deleted memory")) {
+    if (CmiMyRank()==0) {
+      memory_fill = memory_fill_value;
+    }
     status(" fill");
   }
-  if (CmiGetArgFlagDesc(argv,"+memory_fillphase", "Invert memory overwrite pattern")) { 
+  if (CmiGetArgFlagDesc(argv,"+memory_fillphase", "Invert memory overwrite pattern")) {
+    if (CmiMyRank()==0) {
+      memory_fillphase=1;
+    }
     status(" phaseflip");
-    memory_fillphase=1;
   }
   /*Parse heap-check options*/
-  if (CmiGetArgIntDesc(argv,"+memory_checkfreq",&memory_checkfreq, "Check heap this many mallocs")) {
+  int memory_checkfreq_value;
+  if (CmiGetArgIntDesc(argv,"+memory_checkfreq",&memory_checkfreq_value, "Check heap this many mallocs")) {
+    if (CmiMyRank()==0) {
+      memory_checkfreq = memory_checkfreq_value;
+    }
     status(" checkfreq");
   }
   if (CmiGetArgFlagDesc(argv,"+memory_verbose", "Give a printout at each heap check")) {
+    if (CmiMyRank()==0) {
+      memory_verbose=1;
+    }
     status(" verbose");
-    memory_verbose=1;
-  }  
+  }
   status("\n");
 }
 

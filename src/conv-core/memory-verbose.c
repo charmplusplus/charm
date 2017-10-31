@@ -16,9 +16,9 @@ static int inMemVerbose=0;
 
 static void meta_init(char **argv)
 {
-  memInit=1;
-  if (memInit) CmiPrintf("CMI_MEMORY(%d)> Called meta_init\n",
-			 CmiMyPe());
+  if (CmiMyRank()==0) memInit=1;
+  CmiNodeAllBarrier();
+  if (memInit) CmiPrintf("CMI_MEMORY(%d)> Called meta_init\n", CmiMyPe());
 }
 
 static void *meta_malloc(size_t size)

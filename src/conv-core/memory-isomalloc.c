@@ -61,7 +61,7 @@ extern int _sync_iso_warned;
 
 static void meta_init(char **argv)
 {
-   CmiMemoryIs_flag|=CMI_MEMORY_IS_ISOMALLOC;
+   if (CmiMyRank()==0) CmiMemoryIs_flag|=CMI_MEMORY_IS_ISOMALLOC;
    CpvInitialize(CmiIsomallocBlockList *,isomalloc_blocklist);
    CpvInitialize(CmiIsomallocBlockList *,pushed_blocklist);
 #if CMK_HAS_TLS_VARIABLES
@@ -69,7 +69,7 @@ static void meta_init(char **argv)
 #endif
    if (CmiMyRank()==0) meta_inited = 1;
 #if CMK_SMP
-    if (_sync_iso == 0 && _sync_iso_warned == 0) {
+    if (CmiMyPe()==0 && _sync_iso == 0 && _sync_iso_warned == 0) {
         _sync_iso_warned = 1;
         printf("Warning> Using Isomalloc in SMP mode, you may need to run with '+isomalloc_sync'.\n");
     }

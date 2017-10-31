@@ -305,7 +305,7 @@ void CmiMemoryInit(argv)
   if(CmiMyRank() == 0)   CmiMemoryIs_flag |= CMI_MEMORY_IS_OS;
 #if CMK_MEMORY_BUILD_OS_WRAPPED || CMK_MEMORY_BUILD_GNU_HOOKS
   CmiArgGroup("Converse","Memory module");
-  if(CmiMyRank() == 0) meta_init(argv);
+  meta_init(argv);
   CmiNodeAllBarrier();
 #endif
   CmiOutOfMemoryInit();
@@ -519,7 +519,7 @@ void CmiResetMinMemory() {}
 
 #include "memory-gnu.c"
 static void meta_init(char **argv) {
-  CmiMemoryIs_flag |= CMI_MEMORY_IS_GNU;
+  if (CmiMyRank()==0) CmiMemoryIs_flag |= CMI_MEMORY_IS_GNU;
 }
 
 #endif /* CMK_MEMORY_BUILD_GNU */
