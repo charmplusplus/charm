@@ -55,6 +55,8 @@ class bar {
 #define __CK_PUP_H
 
 #include <stdio.h> /*<- for "FILE *" */
+#include <type_traits>
+#include <utility>
 
 #ifndef __cplusplus
 #error "Use pup_c.h for C programs-- pup.h is for C++ programs"
@@ -75,6 +77,30 @@ extern "C" void CmiAbort(const char *msg);
 typedef struct {int is_only_a_name;} CkMigrateMessage;
 
 namespace PUP {
+  class er; // Forward declare for all sorts of things
+
+  // A utility to let classes avoid default construction when they're
+  // about to be unpacked, by defining a constructor that takes a
+  // value of type PUP::reconstruct
+  struct reconstruct {};
+  namespace detail {
+    template <typename T, bool b = std::is_constructible<reconstruct, T>::value>
+    struct TemporaryObjectHolder { };
+    template <typename T>
+    struct TemporaryObjectHolder<T, true>
+    {
+      T t{reconstruct()};
+    };
+    template <typename T>
+    struct TemporaryObjectHolder<T, false>
+    {
+      T t{};
+    };
+    template <typename T>
+    void operator|(er &p, TemporaryObjectHolder<T> &t) {
+      p | t.t;
+    }
+  }
 
 #if CMK_LONG_LONG_DEFINED
 #define CMK_PUP_LONG_LONG long long

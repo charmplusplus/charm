@@ -50,8 +50,8 @@ namespace PUP {
   template <class container>
   inline size_t PUP_stl_container_size(er &p,container &c);
   template <class container, class dtype>
-  inline void PUP_stl_container_items(er &p,container &c);
-  template <> inline void PUP_stl_container_items<std::vector<bool>,bool>(er &p, std::vector<bool> &c);
+  inline void PUP_stl_container_items(er &p, container &c, size_t nElem);
+  template <> inline void PUP_stl_container_items<std::vector<bool>,bool>(er &p, std::vector<bool> &c, size_t nElem);
   template <class container,class dtype>
   inline void PUP_stl_container(er &p,container &c);
   template <class container,class dtype>
@@ -141,6 +141,18 @@ namespace PUP {
 
   /**************** Containers *****************/
 
+  template <class container>
+  void reserve_if_applicable(container &c, size_t nElem)
+  {
+    c.clear();
+    c.reserve(nElem);
+  }
+  template <class dtype>
+  void reserve_if_applicable(std::list<dtype> &c, size_t nElem)
+  {
+    c.clear();
+  }
+
   //Impl. util: pup the length of a container
   template <class container>
   inline size_t PUP_stl_container_size(er &p,container &c) {
@@ -151,20 +163,37 @@ namespace PUP {
 
   //Impl. util: pup each current item of a container (no allocation)
   template <class container, class dtype>
-  inline void PUP_stl_container_items(er &p,container &c) {
-    for (typename container::iterator it=c.begin();
-	 it!=c.end();
-	 ++it) {
-      p.syncComment(sync_item);
-      // Cast away the constness (needed for std::set)
-      p|*(dtype *)&(*it);
+  inline void PUP_stl_container_items(er &p, container &c, size_t nElem)
+  {
+    if (p.isUnpacking())
+    {
+      reserve_if_applicable(c, nElem);
+      for (size_t i = 0; i < nElem; ++i)
+      {
+        p.syncComment(sync_item);
+        detail::TemporaryObjectHolder<dtype> n;
+        p|n;
+        c.emplace_back(std::move(n.t));
+      }
+    }
+    else
+    {
+      for (typename container::iterator it=c.begin(); it!=c.end(); ++it)
+      {
+        p.syncComment(sync_item);
+        // Cast away the constness (needed for std::set)
+        p|*(dtype *)&(*it);
+      }
     }
   }
 
   // Specialized to work with vector<bool>
   template<>
-  inline void PUP_stl_container_items<std::vector<bool>, bool>(er &p, std::vector<bool> &c)
+  inline void PUP_stl_container_items<std::vector<bool>, bool>(er &p, std::vector<bool> &c, size_t nElem)
   {
+    if (p.isUnpacking())
+      c.resize(nElem);
+
     std::deque<bool> q(c.begin(), c.end());
     
     for (std::deque<bool>::iterator it = q.begin(); it != q.end(); it++)
@@ -178,10 +207,7 @@ namespace PUP {
   inline void PUP_stl_container(er &p,container &c) {
     p.syncComment(sync_begin_array);
     size_t nElem=PUP_stl_container_size(p,c);
-    if (p.isUnpacking()) {
-      c.resize(nElem);
-    }
-    PUP_stl_container_items<container, dtype>(p,c);
+    PUP_stl_container_items<container, dtype>(p, c, nElem);
     p.syncComment(sync_end_array);
   }
 
@@ -194,12 +220,20 @@ namespace PUP {
     if (p.isUnpacking()) 
       { //Unpacking: Extract each element and insert:
 	for (size_t i=0;i<nElem;i++) {
-	  dtype n;
-	  p|n;
-	  c.insert(n);
+          detail::TemporaryObjectHolder<dtype> n;
+          p|n;
+          c.emplace(std::move(n.t));
 	} 
       }
-    else PUP_stl_container_items<container, dtype>(p,c);
+    else
+    {
+      for (typename container::iterator it=c.begin(); it!=c.end(); ++it)
+      {
+        p.syncComment(sync_item);
+        // Cast away the constness (needed for std::set)
+        p|*(dtype *)&(*it);
+      }
+    }
     p.syncComment(sync_end_list);
   }
 
