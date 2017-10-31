@@ -10,7 +10,7 @@ qt: md/setjmp_d.h qt.c md/setjmp.c
 	$(CHARMC) -c -o qtmds.o md/setjmp.c
 	CHARMINC=..; . ../conv-config.sh;	\
 	$(CHARMC) -shared -o libqt.$$CMK_SHARED_SUF qt.o qtmds.o
-	$(CHARMC) -o libqt.a qt.o qtmds.o 
+	$(CHARMC) -o libckqt.a qt.o qtmds.o 
 
 stp:
 	$(CHARMC) -c stp.c
@@ -19,4 +19,4 @@ stp:
 testpgm:
 	$(CHARMC) -c meas.c
 	$(CHARMC) -c -o qtmdb.o md/setjmp_b.c
-	$(CHARMC) -o run meas.o qtmdb.o libstp.a libqt.a
+	$(CHARMC) -o run meas.o qtmdb.o libstp.a libckqt.a

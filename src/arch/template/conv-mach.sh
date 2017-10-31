@@ -12,7 +12,7 @@ CMK_LD_FLAGS="$CMK_CC_FLAGS"
 CMK_RANLIB='ranlib'
 CMK_LIBS='-lckqt'
 CMK_LD_LIBRARY_PATH="-rpath $CHARMLIBSO/"
-CMK_QT='gcc'
+CMK_QT='generic64-light'
 CMK_XIOPTS='-ansi'
 
 # fortran compilers

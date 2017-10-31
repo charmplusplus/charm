@@ -8,7 +8,6 @@ CMK_CC_FLAGS="$CMK_CC_FLAGS -G0 -mips64 -march=5kf -mtune=5kf"
 CMK_CXX_FLAGS="$CMK_CXX_FLAGS -G0 -mips64 -march=5kf -mtune=5kf"
 
 CMK_LIBS="$CMK_LIBS -lscdma -lpmi "
-#CMK_QT="i386-gcc"
 
 CMK_NATIVE_CC='mpicc'
 CMK_NATIVE_CXX='mpicxx'

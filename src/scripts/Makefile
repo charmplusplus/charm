@@ -473,10 +473,10 @@ QUICK_THREADS: $(CVHEADERS)
 	-( $(MAKE) -C QuickThreads clean )
 	( cd QuickThreads;./configure )
 	( $(MAKE) -C QuickThreads qt  OPTS='$(OPTS) -Wno-error' ) || ( echo "Did you try to build netlrts-linux on a 64-bit system? Try netlrts-linux-x86_64" && false )
-	cp -f QuickThreads/libqt.a ../lib/libckqt.a
+	cp -f QuickThreads/libckqt.a ../lib/
 	-(CHARMINC=.; . ./conv-config.sh; \
 	  test -d ../lib_so && \
-	  cp -f QuickThreads/libqt.$$CMK_SHARED_SUF ../lib_so/libckqt.$$CMK_SHARED_SUF)
+	  cp -f QuickThreads/libckqt.$$CMK_SHARED_SUF ../lib_so/ ) || true
 	touch QUICK_THREADS
 
 CONVLIBS: converse

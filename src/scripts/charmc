@@ -1871,6 +1871,7 @@ MakeSO() {
 	dir=`cd $dir; pwd`
 	OBJECT=$dir/$fname
 	fi
+	[ "$CMK_MACOSX" = "1" ] && OPTS_LD="$OPTS_LD -Wl,-install_name,$CHARMLIBSO/$fname"
 	if test "$MAKE_LDXX" = "1"
 	then
 	  soCmd="$CMK_LDXX $CMK_LDXX_FLAGS $CMK_LIBDIR -o $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES $PRE_LIBRARIES $POST_LIBRARIES $CMK_LD_SHARED_LIBS"

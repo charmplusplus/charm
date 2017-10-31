@@ -7,9 +7,9 @@ qt: md/setjmp_d.h qt.c md/setjmp.c
 	ln -s md/setjmp_d.h qtmd.h
 	$(CC) -c -o qt.o qt.c
 	$(CC) -c -o qtmds.o md/setjmp.c
-	$(CC) -o libqt.a qt.o qtmds.o
+	$(CC) -o libckqt.a qt.o qtmds.o
 	CHARMINC=..; . ../conv-config.sh;	\
-	$(CC) -shared -o libqt.$$CMK_SHARED_SUF qt.o qtmds.o
+	$(CC) -shared -o libckqt.$$CMK_SHARED_SUF qt.o qtmds.o
 
 stp:
 	$(CC) -c stp.c
@@ -18,4 +18,4 @@ stp:
 testpgm:
 	$(CC) -c meas.c
 	$(CC) -c -o qtmdb.o md/setjmp_b.c
-	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a
+	$(CC) -o run meas.o qtmdb.o libstp.a libckqt.a
