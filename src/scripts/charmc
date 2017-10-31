@@ -1212,6 +1212,7 @@ fi
 ##############################################################################
 Debug "Checking language..."
 
+[ -z "$PARADIGM" -a -n "$LANGUAGE" ] && PARADIGM="$LANGUAGE"
 [ -z "$PARADIGM" ] && PARADIGM="charm++"
 
 case "$LANGUAGE" in
