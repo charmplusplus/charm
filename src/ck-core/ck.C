@@ -1172,7 +1172,11 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
     _SET_USED(env, 0);
     ck->process();
     int opts = 0;
-    iter->second->ckInvokeEntry(env->getEpIdx(), EnvToUsr(env), !(opts & CK_MSG_KEEP));
+    CkArrayMessage* msg = (CkArrayMessage*)EnvToUsr(env);
+    if (msg->array_hops()>1) {
+      CProxy_ArrayBase(env->getArrayMgr()).ckLocMgr()->multiHop(msg);
+    }
+    iter->second->ckInvokeEntry(env->getEpIdx(), msg, !(opts & CK_MSG_KEEP));
   } else {
     // Otherwise fallback to delivery through the array manager
     CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getArrayMgr());
