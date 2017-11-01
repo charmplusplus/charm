@@ -464,7 +464,7 @@ class CkDDT {
   public:
 
   CkDDT(void*) {} // emulates migration constructor
-  CkDDT(void) : typeTable(CkDDT_MAX_PRIMITIVE_TYPE+1, NULL), types(CkDDT_MAX_PRIMITIVE_TYPE+1, CkDDT_TYPE_NULL)
+  CkDDT(void) : typeTable(CkDDT_MAX_PRIMITIVE_TYPE+1, nullptr), types(CkDDT_MAX_PRIMITIVE_TYPE+1, CkDDT_TYPE_NULL)
   {
     typeTable[0] = new CkDDT_DataType(CkDDT_DOUBLE);
     types[0] = CkDDT_DOUBLE;
