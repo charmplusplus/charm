@@ -864,17 +864,8 @@ void CthAwaken(CthThread th)
     traceAwaken(th);
 #endif
 #endif
-#if CMK_OMP
-  if (B(th)->scheduled > 0) {
-    CmiAbort("this thread is already scheduled\n");
-  }
-#endif
 
-#if CMK_OMP
-  CmiMemoryAtomicIncrement(B(th)->scheduled, memory_order_release);
-#else
   B(th)->scheduled++;
-#endif
   B(th)->awakenfn(B(th)->token, CQS_QUEUEING_FIFO, 0, 0);
   /*B(th)->scheduled = 1; */
   /*changed due to out-of-core emulation in BigSim */
