@@ -1212,6 +1212,7 @@ fi
 ##############################################################################
 Debug "Checking language..."
 
+[ -z "$LANGUAGE" -a -n "$SEQUENTIAL" ] && LANGUAGE=c
 [ -z "$PARADIGM" -a -n "$LANGUAGE" ] && PARADIGM="$LANGUAGE"
 [ -z "$PARADIGM" ] && PARADIGM="charm++"
 
@@ -1220,8 +1221,6 @@ case "$LANGUAGE" in
 	[ -z "$SEQUENTIAL" -a -z "$NATIVE" ] && Abort "Language $LANGUAGE is for sequential programs"
 	;;
 esac
-
-[ -z "$LANGUAGE" -a -n "$SEQUENTIAL" ] && LANGUAGE=c
 
 # update charm to bgcharm
 [ "$PARADIGM" = "charm++" -a -n "$CMK_BIGSIM" ] && PARADIGM="bgcharm++"
