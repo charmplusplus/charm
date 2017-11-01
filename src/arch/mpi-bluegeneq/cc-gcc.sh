@@ -18,14 +18,12 @@ else
   exit 1
 fi
 
-OPTS_CPP="$OPTS_CPP"
 GCC_OPTS="-Wno-deprecated -mminimal-toc $BGQ_INC"
-OPTS_LD="$OPTS_LD"
 
 CMK_CPP_CHARM="$BGQ_BIN/powerpc64-bgq-linux-cpp -P"
-CMK_CPP_C="$BGQ_BIN/powerpc64-bgq-linux-cpp -E "
-CMK_CXX="mpicxx $GCC_OPTS "
-CMK_CC="mpicc $GCC_OPTS "
+CMK_CPP_C="$BGQ_BIN/powerpc64-bgq-linux-cpp"
+CMK_CXX='mpicxx'
+CMK_CC='mpicc'
 CMK_CF77="mpif77 "
 CMK_CF90='mpif90'
 CMK_RANLIB="$BGQ_BIN/powerpc64-bgq-linux-ranlib "
@@ -35,9 +33,9 @@ CMK_LIBS='-lckqt'
 CMK_LD="$CMK_CC"
 CMK_LDXX="$CMK_CXX"
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
-CMK_NATIVE_CC='gcc '
-CMK_NATIVE_LD='gcc '
-CMK_NATIVE_CXX='g++ -Wno-deprecated '
+CMK_NATIVE_CC='gcc'
+CMK_NATIVE_LD='gcc'
+CMK_NATIVE_CXX='g++'
 CMK_NATIVE_LDXX='g++'
 CMK_F90LIBS='-lgfortran '
 CMK_MOD_NAME_ALLCAPS=1
@@ -45,5 +43,17 @@ CMK_MOD_EXT="mod"
 CMK_F90_USE_MODDIR=1
 CMK_F90_MODINC="-I"
 CMK_QT="generic64-light"
+
+CMK_CPP_C_FLAGS='-E'
+
+CMK_CC_FLAGS="$GCC_OPTS"
+CMK_CXX_FLAGS="$GCC_OPTS"
+CMK_LD_FLAGS=''
+CMK_LDXX_FLAGS=''
+
+CMK_NATIVE_CC_FLAGS='-Wno-deprecated'
+CMK_NATIVE_CXX_FLAGS='-Wno-deprecated'
+CMK_NATIVE_LD_FLAGS=''
+CMK_NATIVE_LDXX_FLAGS=''
 
 CMK_COMPILER='gcc'
