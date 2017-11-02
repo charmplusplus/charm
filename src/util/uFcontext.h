@@ -55,7 +55,7 @@ extern "C" {
   }
 
   int setJcontext (uFcontext_t *__ucp) {
-    swapJcontext(NULL, __ucp);
+    return swapJcontext(NULL, __ucp);
   }
 
   void makeJcontext (uFcontext_t *__ucp, uFcontext_fn_t __func, void (*fn)(void *), void *arg) {
