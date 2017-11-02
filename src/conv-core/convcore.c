@@ -759,7 +759,7 @@ static void CmiExtendHandlerTable(int atLeastLen) {
 
 void CmiAssignOnce(int* variable, int value) {
   if (CmiMyRank() == 0) { *variable = value; }
-  CmiBarrier();
+  CmiNodeAllBarrier();
 }
 
 void CmiNumberHandler(int n, CmiHandler h)
