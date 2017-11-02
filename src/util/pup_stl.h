@@ -21,17 +21,23 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 /*It's kind of annoying that we have to drag all these headers in
   just so the std:: parameter declarations will compile.
  */
+#include <algorithm>
+#include <array>
 #include <set>
 #include <vector>
 #include <deque>
 #include <list>
 #include <map>
+#include <memory>
+#include <tuple>
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
 #include <complex>
 #include <utility> /*for std::pair*/
-#include <memory>
 #include "pup.h"
+
+#include <cstddef>
 
 namespace PUP {
   /*************** Simple classes ***************/
@@ -91,19 +97,6 @@ namespace PUP {
     T re=v.real(), im=v.imag();
     p|re; p|im;
     v=std::complex<T>(re,im);
-  }
-  template <class T>
-  inline void operator|(er &p, std::unique_ptr<T, std::default_delete<T>> &ptr)
-  {
-    bool nonNull = static_cast<bool>(ptr);
-    p|nonNull;
-
-    if (nonNull) {
-      if (p.isUnpacking())
-        ptr.reset(new T);
-
-      p|(*ptr);
-    }
   }
   template <class charType> 
   inline void operator|(er &p,typename std::basic_string<charType> &v)
@@ -257,10 +250,7 @@ namespace PUP {
 
   template <class V,class T,class Cmp> 
   inline void operator|(er &p,typename std::map<V,T,Cmp> &m)
-  { PUP_stl_map<std::map<V,T,Cmp>,std::pair<const V,T> >(p,m); }
-  template <class V,class T,class Cmp>
-  inline void operator|(er &p,typename std::unordered_map<V,T,Cmp> &m)
-  { PUP_stl_map<std::unordered_map<V,T,Cmp>,std::pair<const V,T> >(p,m); }
+  { PUP_stl_map<std::map<V,T,Cmp>,std::pair<V,T> >(p,m); }
   template <class V,class T,class Cmp> 
   inline void operator|(er &p,typename std::multimap<V,T,Cmp> &m)
   { PUP_stl_map<std::multimap<V,T,Cmp>,std::pair<const V,T> >(p,m); }
@@ -274,6 +264,159 @@ namespace PUP {
   inline void operator|(er &p,std::vector<bool> &v) {
     PUP_stl_container<std::vector<bool>, bool>(p, v);
   }
-}
+} // end of namespace PUP
+
+// Distributed under the MIT License.
+// The following allows for pupping STL structures with pointers to abstract
+// base classes. Requires is used in place of enable_if_t to enforce
+// requirements on template parameters for the following PUP methods.
+template <bool B>
+struct requires_impl {
+  using template_error_type_failed_to_meet_requirements_on_template_parameters
+      = std::nullptr_t;
+};
+
+template <>
+struct requires_impl<false> {};
+
+template <bool B>
+using Requires = typename requires_impl<
+    B>::template_error_type_failed_to_meet_requirements_on_template_parameters;
+
+namespace PUP {
+  template <typename T, std::size_t N,
+            Requires<!std::is_arithmetic<T>::value> = nullptr>
+  inline void pup(PUP::er& p, std::array<T, N>& a) {
+    std::for_each(a.begin(), a.end(), [&p](T& t) { p | t; });
+  }
+
+  template <typename T, std::size_t N,
+            Requires<std::is_arithmetic<T>::value> = nullptr>
+  inline void pup(PUP::er& p, std::array<T, N>& a) {
+    PUParray(p, a.data(), N);
+  }
+
+  template <typename T, std::size_t N>
+  inline void operator|(er& p, std::array<T, N>& a) {
+    pup(p, a);
+  }
+
+  /// \warning This does not work with custom hash functions that have state
+  template <typename K, typename V, typename H>
+  inline void pup(PUP::er& p, std::unordered_map<K, V, H>& m) {
+    size_t number_elem = PUP_stl_container_size(p, m);
+
+    if (p.isUnpacking()) {
+      for (size_t i = 0; i < number_elem; ++i) {
+        std::pair<K, V> kv;
+        p | kv;
+        m.emplace(std::move(kv));
+      }
+    } else {
+      for (auto& kv : m) {
+        p | kv;
+      }
+    }
+  }
+
+  /// \warning This does not work with custom hash functions that have state
+  template <typename K, typename V, typename H>
+  inline void operator|(er& p, std::unordered_map<K, V, H>& m) {
+    pup(p, m);
+  }
+
+  template <typename T>
+  inline void pup(PUP::er& p, std::unordered_set<T>& s) {
+    size_t number_elem = PUP_stl_container_size(p, s);
+
+    if (p.isUnpacking()) {
+      for (size_t i = 0; i < number_elem; ++i) {
+        T element;
+        p | element;
+        s.emplace(std::move(element));
+      }
+    } else {
+      // This intentionally is not a reference because at least with stdlibc++
+      // the reference code does not compile because it turns the dereferenced
+      // iterator into a value
+      for (T e : s) {
+        p | e;
+      }
+    }
+  }
+
+  template <class T>
+  inline void operator|(er& p, std::unordered_set<T>& s) {
+    pup(p, s);
+  }
+
+  template <size_t N = 0, typename... Args,
+            Requires<0 == sizeof...(Args)> = nullptr>
+  void pup_tuple_impl(PUP::er& /* p */, std::tuple<Args...>& /* t */) {
+  }
+
+  template <size_t N = 0, typename... Args,
+            Requires<(0 < sizeof...(Args) && 0 == N)> = nullptr>
+  void pup_tuple_impl(PUP::er& p, std::tuple<Args...>& t) {
+    p | std::get<N>(t);
+  }
+
+  template <size_t N, typename... Args,
+            Requires<(sizeof...(Args) > 0 && N > 0)> = nullptr>
+  void pup_tuple_impl(PUP::er& p, std::tuple<Args...>& t) {
+    p | std::get<N>(t);
+    pup_tuple_impl<N - 1>(p, t);
+  }
+
+  template <typename... Args>
+  inline void pup(PUP::er& p, std::tuple<Args...>& t) {
+    if (p.isUnpacking()) {
+      t = std::tuple<Args...>{};
+    }
+    pup_tuple_impl<sizeof...(Args) - 1>(p, t);
+  }
+
+  template <typename... Args>
+  inline void operator|(PUP::er& p, std::tuple<Args...>& t) {
+    pup(p, t);
+  }
+
+  template <typename T,
+            Requires<!std::is_base_of<PUP::able, T>::value> = nullptr>
+  inline void pup(PUP::er& p, std::unique_ptr<T>& t) {
+    bool is_nullptr = nullptr == t;
+    p | is_nullptr;
+    if (!is_nullptr) {
+      T* t1;
+      if (p.isUnpacking()) {
+        t1 = new T;
+      } else {
+        t1 = t.get();
+      }
+      p | *t1;
+      if (p.isUnpacking()) {
+        t.reset(t1);
+      }
+    }
+  }
+
+  template <typename T, Requires<std::is_base_of<PUP::able, T>::value> = nullptr>
+  inline void pup(PUP::er& p, std::unique_ptr<T>& t) {
+    T* t1 = nullptr;
+    if (p.isUnpacking()) {
+      p | t1;
+      t = std::unique_ptr<T>(t1);
+    } else {
+      t1 = t.get();
+      p | t1;
+    }
+  }
+
+  template <typename T>
+  inline void operator|(PUP::er& p, std::unique_ptr<T>& t) {
+    pup(p, t);
+  }
+
+} // end of namespace PUP
 
 #endif
