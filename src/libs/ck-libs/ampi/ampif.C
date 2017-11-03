@@ -8,9 +8,13 @@ FDECL {
 #define mpi_isend FTN_NAME( MPI_ISEND , mpi_isend )
 #define mpi_bsend FTN_NAME( MPI_BSEND , mpi_bsend )
 #define mpi_rsend FTN_NAME( MPI_RSEND , mpi_rsend )
+#define mpi_ibsend FTN_NAME( MPI_IBSEND , mpi_ibsend )
+#define mpi_irsend FTN_NAME( MPI_IRSEND , mpi_irsend )
 #define mpi_ssend FTN_NAME( MPI_SSEND , mpi_ssend )
 #define mpi_issend FTN_NAME( MPI_ISSEND , mpi_issend )
 #define mpi_irecv FTN_NAME( MPI_IRECV , mpi_irecv )
+#define mpi_buffer_attach FTN_NAME( MPI_BUFFER_ATTACH , mpi_buffer_attach )
+#define mpi_buffer_detach FTN_NAME( MPI_BUFFER_DETACH , mpi_buffer_detach )
 #define mpi_wait FTN_NAME( MPI_WAIT , mpi_wait )
 #define mpi_test FTN_NAME( MPI_TEST , mpi_test )
 #define mpi_waitany FTN_NAME( MPI_WAITANY , mpi_waitany )
@@ -27,6 +31,8 @@ FDECL {
 #define mpi_iprobe FTN_NAME( MPI_IPROBE , mpi_iprobe )
 #define mpi_probe FTN_NAME( MPI_PROBE , mpi_probe )
 #define mpi_send_init FTN_NAME( MPI_SEND_INIT , mpi_send_init )
+#define mpi_rsend_init FTN_NAME( MPI_RSEND_INIT , mpi_rsend_init )
+#define mpi_bsend_init FTN_NAME( MPI_BSEND_INIT , mpi_bsend_init )
 #define mpi_recv_init FTN_NAME( MPI_RECV_INIT , mpi_recv_init )
 #define mpi_start FTN_NAME( MPI_START , mpi_start )
 #define mpi_startall FTN_NAME( MPI_STARTALL , mpi_startall )
@@ -418,6 +424,16 @@ void mpi_bsend(void *msg, int *count, int *type, int *dest,
   *ierr = AMPI_Bsend(msg, *count, *type, *dest, *tag, *comm);
 }
 
+void mpi_buffer_attach(void *buffer, int *size, int *ierr)
+{
+  *ierr = AMPI_Buffer_attach(buffer, *size);
+}
+
+void mpi_buffer_detach(void *buffer, int *size, int *ierr)
+{
+  *ierr = AMPI_Buffer_detach(buffer, size);
+}
+
 void mpi_rsend(void *msg, int *count, int *type, int *dest,
                int *tag, int *comm, int *ierr)
 {
@@ -625,6 +641,18 @@ void mpi_send_init(void *buf, int *count, int *type, int *destpe,
                    int *tag, int *comm, int *req, int *ierr)
 {
   *ierr = AMPI_Send_init(buf,*count,*type,*destpe,*tag,*comm,(MPI_Request*)req);
+}
+
+void mpi_rsend_init(void *buf, int *count, int *type, int *destpe,
+                   int *tag, int *comm, int *req, int *ierr)
+{
+  *ierr = AMPI_Rsend_init(buf,*count,*type,*destpe,*tag,*comm,(MPI_Request*)req);
+}
+
+void mpi_bsend_init(void *buf, int *count, int *type, int *destpe,
+                   int *tag, int *comm, int *req, int *ierr)
+{
+  *ierr = AMPI_Bsend_init(buf,*count,*type,*destpe,*tag,*comm,(MPI_Request*)req);
 }
 
 void mpi_type_contiguous(int *count, int *oldtype, int *newtype, int *ierr)
@@ -849,6 +877,18 @@ void mpi_isend(void *buf, int *count, int *datatype, int *dest,
                int *tag, int *comm, int *request, int *ierr)
 {
   *ierr = AMPI_Isend(buf, *count, *datatype, *dest, *tag, *comm, (MPI_Request *)request);
+}
+
+void mpi_ibsend(void *buf, int *count, int *datatype, int *dest,
+                int *tag, int *comm, int *request, int *ierr)
+{
+  *ierr = AMPI_Ibsend(buf, *count, *datatype, *dest, *tag, *comm, (MPI_Request *)request);
+}
+
+void mpi_irsend(void *buf, int *count, int *datatype, int *dest,
+                int *tag, int *comm, int *request, int *ierr)
+{
+  *ierr = AMPI_Irsend(buf, *count, *datatype, *dest, *tag, *comm, (MPI_Request *)request);
 }
 
 void mpi_irecv(void *buf, int *count, int *datatype, int *src,

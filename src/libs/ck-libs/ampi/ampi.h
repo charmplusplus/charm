@@ -367,22 +367,36 @@ AMPI_API_DEF(MPI_Recv, void *msg, int count, MPI_Datatype type, int src, int tag
 #define MPI_Get_count AMPI_Get_count
 #define PMPI_Get_count APMPI_Get_count
 AMPI_API_DEF(MPI_Get_count, const MPI_Status *sts, MPI_Datatype dtype, int *count);
-#define AMPI_Bsend AMPI_Send
-#define AMPI_Rsend AMPI_Send
 #define MPI_Bsend AMPI_Bsend
-#define MPI_Rsend AMPI_Rsend /* FIXME: MPI_Rsend can be posted only after recv */
-#define MPI_Buffer_attach(buf,len) /*LIE: empty*/ /*Silly: default send is buffering in Charm++*/
-#define MPI_Buffer_detach(buf,len) /*LIE: empty*/
+#define PMPI_Bsend APMPI_Bsend
+AMPI_API_DEF(MPI_Bsend, const void *buf, int count, MPI_Datatype datatype,
+             int dest, int tag,MPI_Comm comm)
+#define MPI_Rsend AMPI_Rsend
+#define PMPI_Rsend APMPI_Rsend
+AMPI_API_DEF(MPI_Rsend, const void *buf, int count, MPI_Datatype datatype,
+             int dest, int tag,MPI_Comm comm)
+#define MPI_Buffer_attach AMPI_Buffer_attach
+#define PMPI_Buffer_attach APMPI_Buffer_attach
+AMPI_API_DEF(MPI_Buffer_attach, void *buffer, int size)
+#define MPI_Buffer_detach AMPI_Buffer_detach
+#define PMPI_Buffer_detach APMPI_Buffer_detach
+AMPI_API_DEF(MPI_Buffer_detach, void *buffer, int *size)
 #define MPI_Isend AMPI_Isend
 #define PMPI_Isend APMPI_Isend
 AMPI_API_DEF(MPI_Isend, const void *buf, int count, MPI_Datatype datatype, int dest,
                int tag, MPI_Comm comm, MPI_Request *request);
-#define MPI_Ibsend AMPI_Isend
+#define MPI_Ibsend AMPI_Ibsend
+#define PMPI_Ibsend APMPI_Ibsend
+AMPI_API_DEF(MPI_Ibsend, const void *buf, int count, MPI_Datatype datatype, int dest,
+               int tag, MPI_Comm comm, MPI_Request *request);
 #define MPI_Issend AMPI_Issend
 #define PMPI_Issend APMPI_Issend
 AMPI_API_DEF(MPI_Issend, const void *buf, int count, MPI_Datatype datatype, int dest,
-                int tag, MPI_Comm comm, MPI_Request *request);
-#define MPI_Irsend AMPI_Isend /* FIXME: see MPI_Rsend */
+             int tag, MPI_Comm comm, MPI_Request *request);
+#define MPI_Irsend AMPI_Irsend
+#define PMPI_Irsend APMPI_Irsend
+AMPI_API_DEF(MPI_Irsend, const void *buf, int count, MPI_Datatype datatype, int dest,
+             int tag, MPI_Comm comm, MPI_Request *request);
 #define MPI_Irecv AMPI_Irecv
 #define PMPI_Irecv APMPI_Irecv
 AMPI_API_DEF(MPI_Irecv, void *buf, int count, MPI_Datatype datatype, int src,
@@ -442,8 +456,14 @@ AMPI_API_DEF(MPI_Send_init, const void *buf, int count, MPI_Datatype type, int d
 #define PMPI_Ssend_init APMPI_Ssend_init
 AMPI_API_DEF(MPI_Ssend_init, const void *buf, int count, MPI_Datatype type, int dest, int tag,
                     MPI_Comm comm, MPI_Request *req);
-#define MPI_Bsend_init AMPI_Send_init
-#define MPI_Rsend_init AMPI_Send_init /* FIXME: see MPI_Rsend */
+#define MPI_Rsend_init AMPI_Rsend_init
+#define PMPI_Rsend_init APMPI_Rsend_init
+AMPI_API_DEF(MPI_Rsend_init, const void *buf, int count, MPI_Datatype type, int dest, int tag,
+                  MPI_Comm comm, MPI_Request *req);
+#define MPI_Bsend_init AMPI_Bsend_init
+#define PMPI_Bsend_init APMPI_Bsend_init
+AMPI_API_DEF(MPI_Bsend_init, const void *buf, int count, MPI_Datatype type, int dest, int tag,
+                  MPI_Comm comm, MPI_Request *req);
 #define MPI_Recv_init AMPI_Recv_init
 #define PMPI_Recv_init APMPI_Recv_init
 AMPI_API_DEF(MPI_Recv_init, void *buf, int count, MPI_Datatype type, int src, int tag,
@@ -736,7 +756,7 @@ AMPI_API_DEF(MPI_Reduce_scatter, const void* sendbuf, void* recvbuf, const int *
                         MPI_Datatype datatype, MPI_Op op, MPI_Comm comm);
 #define MPI_Scan AMPI_Scan
 #define PMPI_Scan APMPI_Scan
-AMPI_API_DEF(MPI_Scan, void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
+AMPI_API_DEF(MPI_Scan, const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
               MPI_Op op, MPI_Comm comm );
 #define MPI_Exscan AMPI_Exscan
 #define PMPI_Exscan APMPI_Exscan

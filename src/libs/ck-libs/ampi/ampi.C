@@ -3831,6 +3831,38 @@ int AMPI_Send(const void *msg, int count, MPI_Datatype type, int dest, int tag, 
   return MPI_SUCCESS;
 }
 
+AMPI_API_IMPL(MPI_Bsend)
+int AMPI_Bsend(const void *buf, int count, MPI_Datatype datatype, int dest, int tag, MPI_Comm comm)
+{
+  AMPIAPI("AMPI_Bsend");
+  return AMPI_Send(buf, count, datatype, dest, tag, comm);
+}
+
+AMPI_API_IMPL(MPI_Buffer_attach)
+int AMPI_Buffer_attach(void *buffer, int size)
+{
+  AMPIAPI("MPI_Buffer_attach");
+  /* No-op implementation */
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(MPI_Buffer_detach)
+int AMPI_Buffer_detach(void *buffer, int *size)
+{
+  AMPIAPI("AMPI_Buffer_detach");
+  /* No-op implementation */
+  *size = 0;
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(MPI_Rsend)
+int AMPI_Rsend(const void *buf, int count, MPI_Datatype datatype, int dest, int tag, MPI_Comm comm)
+{
+  /* FIXME: MPI_Rsend can be posted only after recv */
+  AMPIAPI("AMPI_Rsend");
+  return AMPI_Send(buf, count, datatype, dest, tag, comm);
+}
+
 AMPI_API_IMPL(MPI_Ssend)
 int AMPI_Ssend(const void *msg, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm)
 {
@@ -4713,12 +4745,12 @@ int AMPI_Reduce_scatter(const void* sendbuf, void* recvbuf, const int *recvcount
 }
 
 AMPI_API_IMPL(MPI_Scan)
-int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
+int AMPI_Scan(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
               MPI_Op op, MPI_Comm comm ){
   AMPIAPI("AMPI_Scan");
 
-  handle_MPI_BOTTOM(sendbuf, datatype, recvbuf, datatype);
-  handle_MPI_IN_PLACE(sendbuf,recvbuf);
+  handle_MPI_BOTTOM((void*&)sendbuf, datatype, recvbuf, datatype);
+  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
 
 #if AMPI_ERROR_CHECKING
   if(op == MPI_OP_NULL)
@@ -5791,6 +5823,22 @@ int AMPI_Send_init(const void *buf, int count, MPI_Datatype type, int dest, int 
   return MPI_SUCCESS;
 }
 
+AMPI_API_IMPL(MPI_Rsend_init)
+int AMPI_Rsend_init(const void *buf, int count, MPI_Datatype type, int dest, int tag,
+                   MPI_Comm comm, MPI_Request *req)
+{
+  AMPIAPI("AMPI_Rsend_init");
+  return AMPI_Send_init(buf, count, type, dest, tag, comm, req);
+}
+
+AMPI_API_IMPL(MPI_Bsend_init)
+int AMPI_Bsend_init(const void *buf, int count, MPI_Datatype type, int dest, int tag,
+                   MPI_Comm comm, MPI_Request *req)
+{
+  AMPIAPI("AMPI_Bsend_init");
+  return AMPI_Send_init(buf, count, type, dest, tag, comm, req);
+}
+
 AMPI_API_IMPL(MPI_Ssend_init)
 int AMPI_Ssend_init(const void *buf, int count, MPI_Datatype type, int dest, int tag,
                     MPI_Comm comm, MPI_Request *req)
@@ -6072,6 +6120,22 @@ int AMPI_Isend(const void *buf, int count, MPI_Datatype type, int dest,
 #endif
 
   return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(MPI_Ibsend)
+int AMPI_Ibsend(const void *buf, int count, MPI_Datatype type, int dest,
+               int tag, MPI_Comm comm, MPI_Request *request)
+{
+  AMPIAPI("AMPI_Ibsend");
+  return AMPI_Isend(buf, count, type, dest, tag, comm, request);
+}
+
+AMPI_API_IMPL(MPI_Irsend)
+int AMPI_Irsend(const void *buf, int count, MPI_Datatype type, int dest,
+               int tag, MPI_Comm comm, MPI_Request *request)
+{
+  AMPIAPI("AMPI_Irsend");
+  return AMPI_Isend(buf, count, type, dest, tag, comm, request);
 }
 
 void ampi::irecv(void *buf, int count, MPI_Datatype type, int src,
