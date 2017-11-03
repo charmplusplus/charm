@@ -138,8 +138,8 @@ typedef long long int MPI_Offset;
 #define MPI_MAX_ERROR_STRING           256
 #define MPI_MAX_LIBRARY_VERSION_STRING 256
 
-#define MPI_VERSION    2
-#define MPI_SUBVERSION 2
+#define MPI_VERSION    3
+#define MPI_SUBVERSION 1
 
 #define MPI_THREAD_SINGLE     1
 #define MPI_THREAD_FUNNELED   2
