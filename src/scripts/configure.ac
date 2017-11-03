@@ -2,26 +2,6 @@
 AC_INIT(Charm++, 2.6)
 AC_CONFIG_SRCDIR(./Makefile)
 
-# for hwloc
-enable_embedded_mode='yes'
-enable_static='yes'
-enable_libnuma='no'
-enable_pci='no'
-enable_libudev='no'
-enable_libxml2='no'
-enable_visibility='no'
-AC_CONFIG_AUX_DIR(hwloc/config)
-AC_CANONICAL_TARGET
-AC_USE_SYSTEM_EXTENSIONS
-LT_INIT
-AS_CASE([$target_os],
-        [darwin*],
-        export MACOSX_DEPLOYMENT_TARGET='10.7'
-        export HWLOC_FLAGS='-mmacosx-version-min=10.7'
-        )
-
-AM_INIT_AUTOMAKE
-
 AC_CONFIG_HEADER(conv-autoconfig.h)
 
 AC_CONFIG_COMMANDS([config-cleanup],
@@ -2436,6 +2416,28 @@ EOF
 fi
 
 # for hwloc
+enable_embedded_mode='yes'
+enable_static='yes'
+enable_libnuma='no'
+enable_pci='no'
+enable_libudev='no'
+enable_libxml2='no'
+enable_visibility='no'
+
+echo "Configuring hwloc:"
+AC_CONFIG_AUX_DIR(hwloc/config)
+AC_CANONICAL_TARGET
+AC_USE_SYSTEM_EXTENSIONS
+LT_INIT
+
+AS_CASE([$target_os],
+        [darwin*],
+        export MACOSX_DEPLOYMENT_TARGET='10.7'
+        export HWLOC_FLAGS='-mmacosx-version-min=10.7'
+        )
+
+AM_INIT_AUTOMAKE
+
 AC_CONFIG_MACRO_DIR(hwloc/config)
 HWLOC_SET_SYMBOL_PREFIX([cmi_])
 HWLOC_SETUP_CORE([hwloc], [happy=yes], [happy=no])
