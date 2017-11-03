@@ -907,23 +907,30 @@ CkReductionMsg *CkReductionMgr::reduceMessages(CkMsgQ<CkReductionMsg> &msgs)
       // for "nop" reducer type, only need to accept one message
       if (nMsgs == 0 || m->reducer != CkReduction::nop) {
         msgArr[nMsgs++]=m;
-        r=m->reducer;
-        if (!m->callback.isInvalid()){
+        if (!m->callback.isInvalid()) {
 #if CMK_ERROR_CHECKING
-          if(nMsgs > 1 && !(msgs_callback == m->callback))
+          if(nMsgs > 1 && !(msgs_callback == m->callback)) {
+            CkPrintf("Mismatched callback details: reducers %d, %d; callback types %d, %d;\n",
+                     r, m->reducer,
+                     msgs_callback.type, m->callback.type);
             CkAbort("mis-matched client callbacks in reduction messages\n");
+          }
 #endif
           msgs_callback=m->callback;
         }
+        r=m->reducer;
         if (m->userFlag!=(CMK_REFNUM_TYPE)-1)
           msgs_userFlag=m->userFlag;
 	isMigratableContributor=m->isMigratableContributor();
-      }
-      else {
+      } else {
 #if CMK_ERROR_CHECKING
-        if(!(msgs_callback == m->callback))
+        if(!(msgs_callback == m->callback)) {
+          CkPrintf("Mismatched callback details: reducers %d, %d; callback types %d, %d;\n",
+                     r, m->reducer,
+                     msgs_callback.type, m->callback.type);
           CkAbort("mis-matched client callbacks in reduction messages\n");
-#endif  
+        }
+#endif
         delete m;
       }
     }
@@ -957,8 +964,6 @@ CkReductionMsg *CkReductionMgr::reduceMessages(CkMsgQ<CkReductionMsg> &msgs)
     }
     ret->reducer=r;
   }
-
-
 
 #if USE_CRITICAL_PATH_HEADER_ARRAY
 #if CRITICAL_PATH_DEBUG > 3
