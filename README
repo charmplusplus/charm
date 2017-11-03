@@ -99,7 +99,7 @@ netlrts-darwin-x86_64      MacOS X          UDP            Clang C++ compiler
 netlrts-win-x86_64         Windows          UDP            MS Visual C++
 mpi-linux-x86_64           Linux            MPI            GNU compiler
 multicore-darwin-x86_64    MacOS X          Shared memory  Clang C++ compiler
-pamilrts-bluegeneq         CNK              PAMI           XLC
+pamilrts-bluegeneq         CNK              PAMI           BGClang C++ compiler
 gni-crayxc                 Linux            GNI            CC (whatever PrgEnv module is loaded)
 gni-crayxe                 Linux            GNI            CC (whatever PrgEnv module is loaded)
 verbs-linux-x86_64         Linux            IB Verbs       GNU compiler

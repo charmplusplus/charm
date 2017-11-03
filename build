@@ -670,7 +670,12 @@ then
       echo '. $CHARMINC/'"cc-$i.sh" >> $ConvSh
 elif test `echo "$BASEVERSION" | grep -c "bluegeneq"` -gt 0
 then
-      i="xlc"
+      i="clang"
+      bgclang++11 --version
+      if [ $? -ne 0 ]; then
+         echo "ERROR: bgclang C/C++ compiler missing. Please load bgclang compilers, i.e. 'soft add +mpiwrapper-bgclang'."
+         exit 1
+      fi
       echo '#include "'cc-$i.h'"' >> $ConvHeader
       echo '. $CHARMINC/'"cc-$i.sh" >> $ConvSh
 fi
