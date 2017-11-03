@@ -726,8 +726,15 @@ void CkReductionMgr::finishReduction(void)
 	
  
   DEBR((AA "Reducing data... %d %d\n" AB,nContrib,(lcount+adj(redNo).lcount)));
-  CkReductionMsg *result=reduceMessages();
+#if CMK_BIGSIM_CHARM
+  _TRACE_BG_END_EXECUTE(1);
+  void* _bgParentLog = NULL;
+  _TRACE_BG_BEGIN_EXECUTE_NOMSG("GroupReduce", &_bgParentLog, 0);
+#endif
+  CkReductionMsg *result=reduceMessages(msgs);
+  result->fromPE = CkMyPe();
   result->redNo=redNo;
+  DEBR((AA "Reduced gcount=%d; sourceFlag=%d\n" AB,result->gcount,result->sourceFlag));
 
   if (partialReduction) {
     msgs.enq(result);
@@ -869,13 +876,8 @@ countAdjustment &CkReductionMgr::adj(int number)
 }
 
 //Combine (& free) the current message vector msgs.
-CkReductionMsg *CkReductionMgr::reduceMessages(void)
+CkReductionMsg *CkReductionMgr::reduceMessages(CkMsgQ<CkReductionMsg> &msgs)
 {
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_END_EXECUTE(1);
-  void* _bgParentLog = NULL;
-  _TRACE_BG_BEGIN_EXECUTE_NOMSG("GroupReduce", &_bgParentLog, 0);
-#endif
   CkReductionMsg *ret=NULL;
 
   //Look through the vector for a valid reducer, swapping out placeholder messages
@@ -886,13 +888,14 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
   CkCallback msgs_callback;
   int i;
   int nMsgs=0;
-  CkReductionMsg **msgArr=new CkReductionMsg*[msgs.length()];
   CkReductionMsg *m;
+  CkReductionMsg **msgArr=new CkReductionMsg*[msgs.length()];
   bool isMigratableContributor;
 
   // Copy message queue into msgArr, skipping placeholders:
   while (NULL!=(m=msgs.deq()))
   {
+    DEBR((AA "***** gcount=%d; sourceFlag=%d ismigratable %d \n" AB,m->gcount,m->nSources(),m->isMigratableContributor()));
     msgs_gcount+=m->gcount;
     if (m->sourceFlag!=0)
     { //This is a real message from an element, not just a placeholder
@@ -958,22 +961,20 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
 
 
 #if USE_CRITICAL_PATH_HEADER_ARRAY
-
 #if CRITICAL_PATH_DEBUG > 3
-  CkPrintf("combining critical path information from messages in CkReductionMgr::reduceMessages\n");
+  CkPrintf("[%d] combining critical path information from messages in reduceMessages(). numMsgs=%d\n", CkMyPe(), nMsgs);
 #endif
-
   MergeablePathHistory path(CkpvAccess(currentlyExecutingPath));
   path.updateMax(UsrToEnv(ret));
-  // Combine the critical paths from all the reduction messages
+  // Combine the critical paths from all the reduction messages into the header for the new result
   for (i=0;i<nMsgs;i++){
     if (msgArr[i]!=ret){
       //      CkPrintf("[%d] other path = %lf\n", CkMyPe(), UsrToEnv(msgArr[i])->pathHistory.getTime() );
       path.updateMax(UsrToEnv(msgArr[i]));
+    } else {
+      //	    CkPrintf("[%d] other path is ret = %lf\n", CkMyPe(), UsrToEnv(msgArr[i])->pathHistory.getTime() );
     }
   }
-  
-
 #if CRITICAL_PATH_DEBUG > 3
   CkPrintf("[%d] result path = %lf\n", CkMyPe(), path.getTime() );
 #endif
@@ -988,14 +989,11 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
   delete [] msgArr;
 
   //Set the message counts
-  ret->redNo=redNo;
   ret->gcount=msgs_gcount;
   ret->userFlag=msgs_userFlag;
   ret->callback=msgs_callback;
   ret->sourceFlag=msgs_nSources;
-	ret->setMigratableContributor(isMigratableContributor);
-  ret->fromPE = CkMyPe();
-  DEBR((AA "Reduced gcount=%d; sourceFlag=%d\n" AB,ret->gcount,ret->sourceFlag));
+  ret->setMigratableContributor(isMigratableContributor);
 
   return ret;
 }
@@ -2292,7 +2290,17 @@ void CkNodeReductionMgr::finishReduction(void)
   DEBR((AA "Reducing node data...\n" AB));
 
   /**reduce all messages received at this node **/
-  CkReductionMsg *result=reduceMessages();
+#if CMK_BIGSIM_CHARM
+  _TRACE_BG_END_EXECUTE(1);
+  void* _bgParentLog = NULL;
+  _TRACE_BG_BEGIN_EXECUTE_NOMSG("NodeReduce", &_bgParentLog, 0);
+#endif
+  CkReductionMsg *result=CkReductionMgr::reduceMessages(msgs);
+  result->redNo=redNo;
+  DEBR((AA "Node Reduced gcount=%d; sourceFlag=%d\n" AB,result->gcount,result->sourceFlag));
+#if CMK_BIGSIM_CHARM
+  _TRACE_BG_TLINE_END(&result->log);
+#endif
 
   if (partialReduction) {
     msgs.enq(result);
@@ -2487,133 +2495,6 @@ int CkNodeReductionMgr::treeKids(void)//Number of children in tree
   return nKids;*/
 	return numKids;
 #endif
-}
-
-//Combine (& free) the current message vector msgs.
-CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
-{
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_END_EXECUTE(1);
-  void* _bgParentLog = NULL;
-  _TRACE_BG_BEGIN_EXECUTE_NOMSG("NodeReduce", &_bgParentLog, 0);
-#endif
-  CkReductionMsg *ret=NULL;
-
-  //Look through the vector for a valid reducer, swapping out placeholder messages
-  CkReduction::reducerType r=CkReduction::invalid;
-  int msgs_gcount=0;//Reduced gcount
-  int msgs_nSources=0;//Reduced nSources
-  CMK_REFNUM_TYPE msgs_userFlag=(CMK_REFNUM_TYPE)-1;
-  CkCallback msgs_callback;
-  int i;
-  int nMsgs=0;
-  CkReductionMsg *m;
-  CkReductionMsg **msgArr=new CkReductionMsg*[msgs.length()];
-  bool isMigratableContributor;
-	
-
-  while(NULL!=(m=msgs.deq()))
-  {
-    DEBR((AA "***** gcount=%d; sourceFlag=%d ismigratable %d \n" AB,m->gcount,m->nSources(),m->isMigratableContributor()));	  
-    msgs_gcount+=m->gcount;
-    if (m->sourceFlag!=0)
-    { //This is a real message from an element, not just a placeholder
-      msgs_nSources+=m->nSources();
-#if CMK_BIGSIM_CHARM
-      _TRACE_BG_ADD_BACKWARD_DEP(m->log);
-#endif
-
-      if (nMsgs == 0 || m->reducer != CkReduction::nop) {
-        msgArr[nMsgs++]=m;
-        r=m->reducer;
-        if (!m->callback.isInvalid()){
-#if CMK_ERROR_CHECKING
-          if(nMsgs > 1 && !(msgs_callback == m->callback))
-            CkAbort("mis-matched client callbacks in reduction messages\n");
-#endif  
-          msgs_callback=m->callback;
-	}
-        if (m->userFlag!=(CMK_REFNUM_TYPE)-1)
-          msgs_userFlag=m->userFlag;
-	isMigratableContributor= m->isMigratableContributor();
-      }
-      else {
-#if CMK_ERROR_CHECKING
-        if(!(msgs_callback == m->callback))
-          CkAbort("mis-matched client callbacks in reduction messages\n");
-#endif  
-        delete m;
-      }
-    }
-    else
-    { //This is just a placeholder message-- replace it
-      delete m;
-    }
-  }
-
-  if (nMsgs==0||r==CkReduction::invalid)
-  //No valid reducer in the whole vector
-    ret=CkReductionMsg::buildNew(0,NULL);
-  else
-  {//Use the reducer to reduce the messages
-    if(nMsgs == 1 &&
-      msgArr[0]->reducer != CkReduction::set &&
-      msgArr[0]->reducer != CkReduction::tuple) {
-      ret = msgArr[0];
-    }else{
-      if (msgArr[0]->reducer == CkReduction::nop) {
-        // nMsgs > 1 indicates that reduction type is not nop
-        // this means any data with reducer type nop was submitted
-        // only so that counts would agree, and can be removed
-        delete msgArr[0];
-        msgArr[0] = msgArr[nMsgs - 1];
-        nMsgs--;
-      }
-      CkReduction::reducerFn f=CkReduction::reducerTable()[r].fn;
-      ret=(*f)(nMsgs,msgArr);
-    }
-    ret->reducer=r;
-  }
-
-	
-#if USE_CRITICAL_PATH_HEADER_ARRAY
-#if CRITICAL_PATH_DEBUG > 3
-	CkPrintf("[%d] combining critical path information from messages in CkNodeReductionMgr::reduceMessages(). numMsgs=%d\n", CkMyPe(), nMsgs);
-#endif
-	MergeablePathHistory path(CkpvAccess(currentlyExecutingPath));
-	path.updateMax(UsrToEnv(ret));
-	// Combine the critical paths from all the reduction messages into the header for the new result
-	for (i=0;i<nMsgs;i++){
-	  if (msgArr[i]!=ret){
-	    //	    CkPrintf("[%d] other path = %lf\n", CkMyPe(), UsrToEnv(msgArr[i])->pathHistory.getTime() );
-	    path.updateMax(UsrToEnv(msgArr[i]));
-	  } else {
-	    //	    CkPrintf("[%d] other path is ret = %lf\n", CkMyPe(), UsrToEnv(msgArr[i])->pathHistory.getTime() );
-	  }
-	}
-#if CRITICAL_PATH_DEBUG > 3
-	CkPrintf("[%d] result path = %lf\n", CkMyPe(), path.getTime() );
-#endif
-
-#endif
-
-
-	//Go back through the vector, deleting old messages
-  for (i=0;i<nMsgs;i++) if (msgArr[i]!=ret) delete msgArr[i];
-  delete [] msgArr;
-  //Set the message counts
-  ret->redNo=redNo;
-  ret->gcount=msgs_gcount;
-  ret->userFlag=msgs_userFlag;
-  ret->callback=msgs_callback;
-  ret->sourceFlag=msgs_nSources;
-  ret->setMigratableContributor(isMigratableContributor);
-  DEBR((AA "Node Reduced gcount=%d; sourceFlag=%d\n" AB,ret->gcount,ret->sourceFlag));
-#if CMK_BIGSIM_CHARM
-  _TRACE_BG_TLINE_END(&ret->log);
-#endif
-
-  return ret;
 }
 
 void CkNodeReductionMgr::pup(PUP::er &p)

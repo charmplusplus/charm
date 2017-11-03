@@ -470,9 +470,6 @@ private:
 	int firstKid(void);//My first child PE
 	int treeKids(void);//Number of children in tree
 
-	//Combine (& free) the current message vector.
-	CkReductionMsg *reduceMessages(void);
-
 	//Map reduction number to a time
 	bool isPast(int num) const {return (bool)(num<redNo);}
 	bool isPresent(int num) const {return (bool)(num==redNo);}
@@ -623,6 +620,9 @@ public:
 
 #endif
 
+        //Combine (& free) the current message vector.
+	static CkReductionMsg *reduceMessages(CkMsgQ<CkReductionMsg> &msgs);
+
 private:
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -689,9 +689,6 @@ private:
 	void init_BinaryTree();
 	enum {TREE_WID=2};
 	int treeRoot(void);//Root PE
-
-	//Combine (& free) the current message vector.
-	CkReductionMsg *reduceMessages(void);
 
 	//Map reduction number to a time
 	bool isPast(int num) const {return (bool)(num<redNo);}
