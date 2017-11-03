@@ -1294,6 +1294,13 @@ then
 	POST_LIBRARIES="$POST_LIBRARIES -lconv-utilf $CMK_F90LIBS"
 fi
 
+# GEN-CPM options
+if [ "$CMK_COMPILER" = "bgclang" ]
+then
+  OPTS_CC_GENCPM="-x c "  # -x c is only applied for the preprocessing of the GEN-CPM files on BG/Q
+fi
+
+OPTS_CC_GENCPM="$OPTS_CC $OPTS_CC_GENCPM"
 
 ############ Determine the language and libraries ##########
 
@@ -1696,12 +1703,6 @@ Success() {
 
 Debug "Preprocessing GEN-CPM files"
 
-if [ "$CMK_COMPILER" = "bgclang" ]
-then
-  OPTS_CC_GENCPM="-x c "  # -x c is only applied for the preprocessing of the GEN-CPM files on BG/Q
-fi
-
-OPTS_CC_GENCPM="$OPTS_CC $OPTS_CC_GENCPM"
 for FILE in `echo $GENCPM`
 do
 # This used to be "$FILE:r", which strips the extention
