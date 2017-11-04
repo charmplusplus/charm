@@ -22,7 +22,8 @@ $(BINARY): $(patsubst %.C,%.o,$(wildcard *.C))
 	$(CHARMC) $(CHARMCFLAGS) $<
 
 test: $(BINARY)
-	$(call run, ./$(BINARY) $(TESTFLAGS))
+	$(call run, ./typed_reduction +p1 )
+	$(call run, ./typed_reduction +p4 )
 
 clean:
 	rm -f *.o *.decl.h *.def.h charmrun $(BINARY)
