@@ -3,6 +3,7 @@
 
 #include <string.h> /* for strlen */
 #include <algorithm>
+#include <numeric>
 
 #include "ampi.h"
 #include "ddt.h"
@@ -358,8 +359,9 @@ class ampiCommStruct {
 
   // Lazily fill world communicator indices
   void makeWorldIndices(void) const {
-    vector<int> *ind=const_cast<vector<int> *>(&indices);
-    for (int i=0;i<size;i++) ind->push_back(i);
+    vector<int> &ind = const_cast<vector<int> &>(indices);
+    ind.resize(size);
+    std::iota(ind.begin(), ind.end(), 0);
   }
  public:
   ampiCommStruct(int ignored=0) {size=-1;isWorld=false;isInter=false;commNameLen=0;}
