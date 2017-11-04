@@ -98,13 +98,13 @@ public:
   CkSectionInfo cookie;
   int offset;
   int n;
-  char *data;
+  std::vector<char> data;
   int seqno;
   int count;
   int totalsize;
 
   mCastPacket(CkSectionInfo &_cookie, int _offset, int _n, char *_d, int _s, int _c, int _t):
-		cookie(_cookie), offset(_offset), n(_n), data(_d), seqno(_s), count(_c), totalsize(_t) {}
+              cookie(_cookie), offset(_offset), n(_n), data(_d, _d+_n), seqno(_s), count(_c), totalsize(_t) {}
 };
 
 typedef CkQ<mCastPacket *> multicastGrpPacketBuf;
@@ -775,8 +775,7 @@ void CkMulticastMgr::childrenReady(mCastEntry *entry)
     {
         mCastPacket *packet = entry->packetBuf.deq();
         packet->cookie.get_val() = entry;
-        mCastGrp[CkMyPe()].recvPacket(packet->cookie, packet->offset, packet->n, packet->data, packet->seqno, packet->count, packet->totalsize, 1);
-        delete [] packet->data;
+        mCastGrp[CkMyPe()].recvPacket(packet->cookie, packet->offset, packet->n, packet->data.data(), packet->seqno, packet->count, packet->totalsize, 1);
         delete packet;
     }
 #endif
@@ -1016,9 +1015,7 @@ void CkMulticastMgr::recvPacket(CkSectionInfo &_cookie, int offset, int n, char 
 
 
   if (!fromBuffer && (entry->notReady() || !entry->packetBuf.isEmpty())) {
-    char *newdata = new char[n];
-    memcpy(newdata, data, n);
-    entry->packetBuf.enq(new mCastPacket(_cookie, offset, n, newdata, seqno, count, totalsize));
+    entry->packetBuf.enq(new mCastPacket(_cookie, offset, n, data, seqno, count, totalsize));
 //CmiPrintf("[%d] Buffered recvPacket: seqno: %d %d frombuf:%d empty:%d entry:%p\n", CkMyPe(), seqno, count, fromBuffer, entry->packetBuf.isEmpty(),entry);
     return;
   }

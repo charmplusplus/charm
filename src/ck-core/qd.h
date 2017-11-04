@@ -60,7 +60,7 @@ class QdState {
     PtrQ *callbacks;
     int nChildren;
     int parent;
-    int *children;
+    std::vector<int> children;
   public:
     int oldCount;
 
@@ -73,9 +73,9 @@ class QdState {
       nChildren = CmiNumSpanTreeChildren(CmiMyPe());
       parent = CmiSpanTreeParent(CmiMyPe());
       if (nChildren != 0) {
-	children = new int[nChildren];
-	_MEMCHECK(children);
-	CmiSpanTreeChildren(CmiMyPe(), children);
+	children.resize(nChildren);
+	_MEMCHECK(children.data());
+	CmiSpanTreeChildren(CmiMyPe(), children.data());
       }
       /* CmiPrintf("[%d] n:%d parent:%d - %d %d %d %d %d %d.\n", CmiMyPe(), nChildren, parent, nChildren?children[0]:-1, nChildren?children[1]:-1, nChildren?children[2]:-1, nChildren?children[3]:-1, nChildren?children[4]:-1, nChildren?children[5]:-1); */
     }

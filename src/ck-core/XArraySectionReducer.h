@@ -20,18 +20,16 @@ class XArraySectionReducer
     public:
         ///
         XArraySectionReducer(int _numSubSections, CkCallback *_finalCB)
-            : numSubSections(_numSubSections), finalCB(_finalCB), numReceived(0)
+            : numSubSections(_numSubSections), finalCB(_finalCB), numReceived(0),
+              msgList(numSubSections, 0)
         {
             CkAssert(numSubSections > 0);
-            msgList = new CkReductionMsg*[numSubSections];
-            memset( msgList, 0, numSubSections*sizeof(CkReductionMsg*) );
         }
 
         ///
         ~XArraySectionReducer()
         {
             delete finalCB;
-            delete [] msgList;
         }
 
         /// Each subsection reduction message needs to be passed in here
@@ -49,14 +47,14 @@ class XArraySectionReducer
             // Get a handle on the reduction function for this message
             CkReduction::reducerFn f = CkReduction::reducerTable()[ msgList[0]->reducer ].fn;
             // Perform an extra reduction step on all the subsection reduction msgs
-            CkReductionMsg *finalMsg = (*f)(numSubSections, msgList);
+            CkReductionMsg *finalMsg = (*f)(numSubSections, msgList.data());
             // Send the final reduced msg to the client
             finalCB->send(finalMsg);
             // Delete the subsection redn msgs, accounting for any msg reuse
             for (int i=0; i < numSubSections; i++)
                 if (msgList[i] != finalMsg) delete msgList[i];
             // Reset the msg list and counters in preparation for the next redn
-            memset( msgList, 0, numSubSections*sizeof(CkReductionMsg*) );
+            memset( msgList.data(), 0, numSubSections*sizeof(CkReductionMsg*) );
             numReceived = 0;
         }
 
@@ -67,7 +65,7 @@ class XArraySectionReducer
         // Counter to track when all subsection redns are complete
         int numReceived;
         // List of subsection redn msgs
-        CkReductionMsg **msgList;
+        std::vector<CkReductionMsg *> msgList;
 };
 
 

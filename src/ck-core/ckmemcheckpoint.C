@@ -259,32 +259,31 @@ public:
 // checkpoint holder class - for in-disk checkpointing
 class CkDiskCheckPTInfo: public CkCheckPTInfo 
 {
-  char *fname;
+  std::string fname;
   int bud1, bud2;
   int len; 			// checkpoint size
 public:
   CkDiskCheckPTInfo(CkArrayID a, CkGroupID loc, CkArrayIndex idx, int pno, int myidx): CkCheckPTInfo(a, loc, idx, pno)
   {
 #if CMK_USE_MKSTEMP
-    fname = new char[64];
 #if CMK_CONVERSE_MPI
-    sprintf(fname, "/tmp/ckpt%d-%d-%d-XXXXXX",CmiMyPartition(), CkMyPe(), myidx);
+    fname = "/tmp/ckpt" + std::to_string(CmiMyPartition()) + "-" + std::to_string(CkMyPe()) + "-" + std::to_string(myidx) + "-XXXXXX";
 #else
-    sprintf(fname, "/tmp/ckpt%d-%d-XXXXXX", CkMyPe(), myidx);
+    fname = "/tmp/ckpt" + std::to_string(CkMyPe()) + "-" + std::to_string(myidx) + "-XXXXXX";
 #endif
-    if(mkstemp(fname) < 0)
+    if(mkstemp(&fname[0]) < 0)
     {
       CmiAbort("mkstemp fail in checkpoint");
     }
 #else
-    fname=tmpnam(NULL);
+    fname = tmpnam(NULL);
 #endif
     bud1 = bud2 = -1;
     len = 0;
   }
   ~CkDiskCheckPTInfo() 
   {
-    remove(fname);
+    remove(fname.c_str());
   }
   inline void updateBuffer(CkArrayCheckPTMessage *data) 
   {
@@ -293,7 +292,7 @@ public:
     envelope *env = UsrToEnv(data);
     CkUnpackMessage(&env);
     data = (CkArrayCheckPTMessage *)EnvToUsr(env);
-    FILE *f = fopen(fname,"wb");
+    FILE *f = fopen(fname.c_str(),"wb");
     PUP::toDisk p(f);
     CkPupMessage(p, (void **)&data);
     // delay sync to the end because otherwise the messages are blocked
@@ -308,7 +307,7 @@ public:
   inline CkArrayCheckPTMessage * getCopy()	// get a copy of checkpoint
   {
     CkArrayCheckPTMessage *data;
-    FILE *f = fopen(fname,"rb");
+    FILE *f = fopen(fname.c_str(),"rb");
     PUP::fromDisk p(f);
     CkPupMessage(p, (void **)&data);
     fclose(f);
@@ -844,24 +843,22 @@ void CkMemCheckPT::resetLB(int diepe)
 {
 #if CMK_LBDB_ON
   int i;
-  char *bitmap = new char[CkNumPes()];
+  std::vector<char> bitmap(CkNumPes());
   // set processor available bitmap
-  get_avail_vector(bitmap);
+  get_avail_vector(bitmap.data());
 
   for (i=0; i<failedPes.length(); i++)
     bitmap[failedPes[i]] = 0; 
   bitmap[diepe] = 0;
 
 #if CK_NO_PROC_POOL
-  set_avail_vector(bitmap);
+  set_avail_vector(bitmap.data());
 #endif
 
   // if I am the crashed pe, rebuild my failedPEs array
   if (CkMyNode() == diepe)
     for (i=0; i<CkNumPes(); i++) 
       if (bitmap[i]==0) failed(i);
-
-  delete [] bitmap;
 #endif
 }
 

@@ -2196,31 +2196,30 @@ CkMessageWatcher::~CkMessageWatcher() { if (next!=NULL) delete next;}
 
 #if CMK_REPLAYSYSTEM
 static FILE *openReplayFile(const char *prefix, const char *suffix, const char *permissions) {
-
-    char *fName = new char[CkpvAccess(traceRootBaseLength)+strlen(prefix)+strlen(suffix)+7];
-    strncpy(fName, CkpvAccess(traceRoot), CkpvAccess(traceRootBaseLength));
-    sprintf(fName+CkpvAccess(traceRootBaseLength), "%s%06d%s",prefix,CkMyPe(),suffix);
-    FILE *f=fopen(fName,permissions);
-    REPLAYDEBUG("openReplayfile "<<fName);
-    if (f==NULL) {
-        CkPrintf("[%d] Could not open replay file '%s' with permissions '%w'\n",
-            CkMyPe(),fName,permissions);
-        CkAbort("openReplayFile> Could not open replay file");
-    }
-    return f;
+  std::string fName = CkpvAccess(traceRoot);
+  fName += prefix;
+  fName += std::to_string(CkMyPe());
+  fName += suffix;
+  FILE *f = fopen(fName.c_str(), permissions);
+  REPLAYDEBUG("openReplayfile " << fName.c_str());
+  if (f==NULL) {
+    CkPrintf("[%d] Could not open replay file '%s' with permissions '%w'\n",
+             CkMyPe(), fName.c_str(), permissions);
+    CkAbort("openReplayFile> Could not open replay file");
+  }
+  return f;
 }
 
 class CkMessageRecorder : public CkMessageWatcher {
-  char *buffer;
   unsigned int curpos;
   bool firstOpen;
+  std::vector<char> buffer;
 public:
-  CkMessageRecorder(FILE *f_): curpos(0), firstOpen(true) { f=f_; buffer=new char[_recplay_logsize]; }
+  CkMessageRecorder(FILE *f_): curpos(0), firstOpen(true), buffer(_recplay_logsize) { f=f_; }
   ~CkMessageRecorder() {
     flushLog(0);
     fprintf(f,"-1 -1 -1 ");
     fclose(f);
-    delete[] buffer;
 #if 0
     FILE *stsfp = fopen("sts", "w");
     void traceWriteSTS(FILE *stsfp,int nUserEvents);
@@ -2233,7 +2232,7 @@ public:
 private:
   void flushLog(int verbose=1) {
     if (verbose) CkPrintf("[%d] flushing log\n", CkMyPe());
-    fprintf(f, "%s", buffer);
+    fprintf(f, "%s", buffer.data());
     curpos=0;
   }
   virtual bool process(envelope **envptr,CkCoreState *ck) {

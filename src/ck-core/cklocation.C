@@ -639,21 +639,17 @@ bool myCompare(hilbert_pair p1, hilbert_pair p2)
 class HilbertArrayMap: public DefaultArrayMap
 {
   std::vector<int> allpairs;
-  int *procList;
+  std::vector<int> procList;
 public:
   HilbertArrayMap(void) {
-    procList = new int[CkNumPes()]; 
-    getHilbertList(procList);
+    procList.resize(CkNumPes());
+    getHilbertList(procList.data());
     DEBC((AA "Creating HilbertArrayMap\n" AB));
   }
 
   HilbertArrayMap(CkMigrateMessage *m) : DefaultArrayMap(m){}
 
-  ~HilbertArrayMap()
-  {
-    if(procList)
-      delete []procList;
-  }
+  ~HilbertArrayMap() {}
 
   int registerArray(const CkArrayIndex& i, CkArrayID aid)
   {
@@ -1082,7 +1078,7 @@ public:
 class ConfigurableRRMapLoader {
 public:
   
-  int *locations;
+  std::vector<int> locations;
   int objs_per_block;
   int PE_per_block;
 
@@ -1097,7 +1093,6 @@ public:
   
   ConfigurableRRMapLoader(){
     state = not_loaded;
-    locations = NULL;
     objs_per_block = 0;
     PE_per_block = 0;
   }
@@ -1129,7 +1124,7 @@ public:
 	CkAssert(instream.good());
 	CkAssert(objs_per_block > 0);
 	CkAssert(PE_per_block > 0);
-	locations = new int[objs_per_block];
+	locations.resize(objs_per_block);
 	for(int i=0;i<objs_per_block;i++){
 	  locations[i] = 0;
 	  CkAssert(instream.good());
@@ -1218,25 +1213,19 @@ CkpvStaticDeclare(double*, rem);
 class arrInfo {
  private:
    CkArrayIndex _nelems;
-   int *_map;
+   std::vector<int> _map;
  public:
-   arrInfo(void):_map(NULL){}
-   arrInfo(const CkArrayIndex& n, int *speeds)
+   arrInfo() {}
+   arrInfo(const CkArrayIndex& n, int *speeds) : _nelems(n), _map(_nelems.getCombinedCount())
    {
-     _nelems = n;
-     _map = new int[_nelems.getCombinedCount()];
      distrib(speeds);
    }
-   ~arrInfo() { delete[] _map; }
+   ~arrInfo() {}
    int getMap(const CkArrayIndex &i);
    void distrib(int *speeds);
    void pup(PUP::er& p){
      p|_nelems;
-     int totalElements = _nelems.getCombinedCount();
-     if(p.isUnpacking()){
-       _map = new int[totalElements];
-     }
-     p(_map,totalElements);
+     p|_map;
    }
 };
 
@@ -1259,10 +1248,10 @@ arrInfo::distrib(int *speeds)
   int i,j,k;
   for(i=0;i<npes;i++)
     total += (double) speeds[i];
-  double *nspeeds = new double[npes];
+  std::vector<double> nspeeds(npes);
   for(i=0;i<npes;i++)
     nspeeds[i] = (double) speeds[i] / total;
-  int *cp = new int[npes];
+  std::vector<int> cp(npes);
   for(i=0;i<npes;i++)
     cp[i] = (int) (nspeeds[i]*_nelemsCount);
   int nr = 0;
@@ -1274,13 +1263,12 @@ arrInfo::distrib(int *speeds)
     CkpvAccess(rem) = new double[npes];
     for(i=0;i<npes;i++)
       CkpvAccess(rem)[i] = (double)_nelemsCount*nspeeds[i] - cp[i];
-    int *pes = new int[npes];
+    std::vector<int> pes(npes);
     for(i=0;i<npes;i++)
       pes[i] = i;
-    qsort(pes, npes, sizeof(int), cmp);
+    qsort(pes.data(), npes, sizeof(int), cmp);
     for(i=0;i<nr;i++)
       cp[pes[i]]++;
-    delete[] pes;
     delete[] CkpvAccess(rem);
   }
   k = 0;
@@ -1289,8 +1277,6 @@ arrInfo::distrib(int *speeds)
     for(j=0;j<cp[i];j++)
       _map[k++] = i;
   }
-  delete[] cp;
-  delete[] nspeeds;
 }
 
 int

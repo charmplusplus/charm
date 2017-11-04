@@ -57,7 +57,7 @@ public:
 
 class CkCheckPTEntry{
   CkArrayCheckPTMessage **data;
-  char * fname;
+  std::string fname;
 public:
   int bud1, bud2;
   int where;
@@ -70,18 +70,17 @@ public:
     if(where == CkCheckPoint_inDISK)
     {
 #if CMK_USE_MKSTEMP
-      fname = new char[64];
 #if CMK_CONVERSE_MPI
-      sprintf(fname, "/tmp/ckpt%d-%d-%d-XXXXXX",CmiMyPartition(), CkMyPe(), idx);
+      fname = "/tmp/ckpt" + std::to_string(CmiMyPartition()) + "-" + std::to_string(CkMyPe()) + "-" + std::to_string(idx) + "-XXXXXX";
 #else
-      sprintf(fname, "/tmp/ckpt%d-%d-XXXXXX", CkMyPe(), idx);
+      fname = "/tmp/ckpt" + std::to_string(CkMyPe()) + "-" + std::to_string(idx) + "-XXXXXX";
 #endif
-      if(mkstemp(fname)<0)
+      if(mkstemp(&fname[0])<0)
 	{
 	  CmiAbort("mkstemp fail in checkpoint");
 	}
 #else
-      fname=tmpnam(NULL);
+      fname = tmpnam(NULL);
 #endif
     }
   }
@@ -93,7 +92,7 @@ public:
       envelope *env = UsrToEnv(msg);
       CkUnpackMessage(&env);
       data[pointer] = (CkArrayCheckPTMessage *)EnvToUsr(env);
-      FILE *f = fopen(fname,"wb");
+      FILE *f = fopen(fname.c_str(),"wb");
       PUP::toDisk p(f);
       CkPupMessage(p, (void **)&msg);
       // delay sync to the end because otherwise the messages are blocked
@@ -118,7 +117,7 @@ public:
     if(where == CkCheckPoint_inDISK)
     {
       CkArrayCheckPTMessage *msg;
-      FILE *f = fopen(fname,"rb");
+      FILE *f = fopen(fname.c_str(),"rb");
       PUP::fromDisk p(f);
       CkPupMessage(p, (void **)&msg);
       fclose(f);
