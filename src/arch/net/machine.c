@@ -1364,7 +1364,7 @@ static void InternalWriteToTerminal(int isStdErr,const char *str,int len);
 static void InternalPrintf(const char *f, va_list l)
 {
   ChMessage replymsg;
-  char *buffer = CmiTmpAlloc(PRINTBUFSIZE);
+  char *buffer = malloc(PRINTBUFSIZE);
   CmiStdoutFlush();
   vsprintf(buffer, f, l);
   if(Cmi_syncprint) {
@@ -1377,13 +1377,13 @@ static void InternalPrintf(const char *f, va_list l)
   	  ctrl_sendone_locking("print", buffer,strlen(buffer)+1,NULL,0);
   }
   InternalWriteToTerminal(0,buffer,strlen(buffer));
-  CmiTmpFree(buffer);
+  free(buffer);
 }
 
 static void InternalError(const char *f, va_list l)
 {
   ChMessage replymsg;
-  char *buffer = CmiTmpAlloc(PRINTBUFSIZE);
+  char *buffer = malloc(PRINTBUFSIZE);
   CmiStdoutFlush();
   vsprintf(buffer, f, l);
   if(Cmi_syncprint) {
@@ -1396,7 +1396,7 @@ static void InternalError(const char *f, va_list l)
   	  ctrl_sendone_locking("printerr", buffer,strlen(buffer)+1,NULL,0);
   }
   InternalWriteToTerminal(1,buffer,strlen(buffer));
-  CmiTmpFree(buffer);
+  free(buffer);
 }
 
 static int InternalScanf(char *fmt, va_list l)
@@ -2455,7 +2455,7 @@ void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int 
 
 	MACHSTATE2(3,"Broadcast SendHypercube ogm %p size %d",ogm,size);
 
-  dest_pes = CmiTmpAlloc(sizeof(int)*(k+1));
+  dest_pes = malloc(sizeof(int)*(k+1));
   k--;
   npes = HypercubeGetBcastDestinations(CmiMyNode(), CmiNumNodes(), k, dest_pes);
   
@@ -2467,7 +2467,7 @@ void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int 
     DeliverViaNetworkOrPxshm(ogm, nodes + p, noderank, CmiMyNode(), 1);
   }
   if (!root && ogm) GarbageCollectMsg(ogm);
-  CmiTmpFree(dest_pes);
+  free(dest_pes);
 }
 #endif
 
