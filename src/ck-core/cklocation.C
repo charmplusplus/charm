@@ -2450,7 +2450,7 @@ void CkLocMgr::requestLocation(const CkArrayIndex &idx, const int peToTell,
   } else {
     // We don't know the ID so buffer the location request
     DEBN(("%d Buffering ID/location req for %s\n", CkMyPe(), idx2str(idx)));
-    bufferedLocationRequests[idx].push_back(make_pair(peToTell, suppressIfHere));
+    bufferedLocationRequests[idx].emplace_back(peToTell, suppressIfHere);
 
     switch (ifNonExistent) {
     case CkArray_IfNotThere_createhome:
