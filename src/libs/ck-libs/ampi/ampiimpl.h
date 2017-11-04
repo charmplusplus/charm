@@ -1561,8 +1561,7 @@ class ampiParent : public CBase_ampiParent {
       }
     }
     // No invalid entries, so create a new one:
-    OpStruct newop = OpStruct(fn, isCommutative);
-    ops.push_back(newop);
+    ops.emplace_back(fn, isCommutative);
     return ops.size()-1;
   }
   inline void freeOp(MPI_Op op) {
