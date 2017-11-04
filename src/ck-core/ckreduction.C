@@ -889,7 +889,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(CkMsgQ<CkReductionMsg> &msgs)
   int i;
   int nMsgs=0;
   CkReductionMsg *m;
-  CkReductionMsg **msgArr=new CkReductionMsg*[msgs.length()];
+  std::vector<CkReductionMsg *> msgArr(msgs.length());
   bool isMigratableContributor;
 
   // Copy message queue into msgArr, skipping placeholders:
@@ -960,7 +960,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(CkMsgQ<CkReductionMsg> &msgs)
         nMsgs--;
       }
       CkReduction::reducerFn f=CkReduction::reducerTable()[r].fn;
-      ret=(*f)(nMsgs,msgArr);
+      ret=(*f)(nMsgs,msgArr.data());
     }
     ret->reducer=r;
   }
@@ -991,7 +991,6 @@ CkReductionMsg *CkReductionMgr::reduceMessages(CkMsgQ<CkReductionMsg> &msgs)
 
 	//Go back through the vector, deleting old messages
   for (i=0;i<nMsgs;i++) if (msgArr[i]!=ret) delete msgArr[i];
-  delete [] msgArr;
 
   //Set the message counts
   ret->gcount=msgs_gcount;
@@ -1697,7 +1696,7 @@ void CkReductionMsg::toTuple(CkReduction::tupleElement** out_reductions, int* nu
 // tuple reducer
 CkReductionMsg* CkReduction::tupleReduction_fn(int num_messages, CkReductionMsg** messages)
 {
-  CkReduction::tupleElement** tuple_data = new CkReduction::tupleElement*[num_messages];
+  std::vector<CkReduction::tupleElement*> tuple_data(num_messages);
   int num_reductions = 0;
   for (int message_idx = 0; message_idx < num_messages; ++message_idx)
   {
@@ -1714,16 +1713,17 @@ CkReductionMsg* CkReduction::tupleReduction_fn(int num_messages, CkReductionMsg*
   DEB_TUPLE(("tupleReduction {\n  num_messages=%d,\n  num_reductions=%d,\n  length=%d\n",
            num_messages, num_reductions, messages[0]->getLength()));
 
-  CkReduction::tupleElement* return_data = new CkReduction::tupleElement[num_reductions];
+  std::vector<CkReduction::tupleElement> return_data(num_reductions);
   // using a raw buffer to avoid CkReductionMsg constructor/destructor, we want to manage
   //  the inner memory of these temps ourselves to avoid unneeded copies
-  char* simulated_messages_buffer = new char[sizeof(CkReductionMsg) * num_reductions * num_messages];
-  CkReductionMsg** simulated_messages = new CkReductionMsg*[num_messages];
+  std::vector<char> simulated_messages_buffer(sizeof(CkReductionMsg) * num_reductions * num_messages);
+  std::vector<CkReductionMsg*> simulated_messages(num_messages);
 
   // imagine the given data in a 2D layout where the messages are rows and reductions are columns
   // here we grab each column and run that reduction
 
   std::vector<CkReductionMsg *> msgs_to_delete;
+  msgs_to_delete.reserve(num_reductions);
   for (int reduction_idx = 0; reduction_idx < num_reductions; ++reduction_idx)
   {
     DEB_TUPLE(("  reduction_idx=%d {\n", reduction_idx));
@@ -1754,7 +1754,7 @@ CkReductionMsg* CkReduction::tupleReduction_fn(int num_messages, CkReductionMsg*
 
     // run the reduction and copy the result back to our data structure
     const auto& reducerFp = CkReduction::reducerTable()[reducerType].fn;
-    CkReductionMsg* result = reducerFp(num_messages, simulated_messages);
+    CkReductionMsg* result = reducerFp(num_messages, simulated_messages.data());
     DEB_TUPLE(("    result_len=%d\n  },\n", result->getLength()));
     return_data[reduction_idx] = CkReduction::tupleElement(result->getLength(), result->getData(), reducerType);
     // reducers are allowed to reuse the zeroth message's memory, so it is not safe to delete this
@@ -1764,19 +1764,12 @@ CkReductionMsg* CkReduction::tupleReduction_fn(int num_messages, CkReductionMsg*
     }
   }
 
-  CkReductionMsg* retval = CkReductionMsg::buildFromTuple(return_data, num_reductions);
+  CkReductionMsg* retval = CkReductionMsg::buildFromTuple(return_data.data(), num_reductions);
   DEB_TUPLE(("} tupleReduction msg_size=%d\n", retval->getSize()));
 
-  for (int message_idx = 0; message_idx < num_messages; ++message_idx)
-    delete[] tuple_data[message_idx];
-  delete[] tuple_data;
-  delete[] return_data;
-  delete[] simulated_messages_buffer;
-  // note that although this is a 2d array, we don't need to delete the inner objects,
-  //  their memory is tracked in simulated_messages_buffer
-  delete[] simulated_messages;
-  for (int i = 0; i < msgs_to_delete.size(); ++i)
-    delete msgs_to_delete[i];
+  for (auto data : tuple_data) delete[] data;
+  for (auto msg : msgs_to_delete) delete msg;
+
   return retval;
 }
 
@@ -2610,14 +2603,14 @@ void CkNodeReductionMgr::evacuate(){
 			Tell newParent (1st child) about its new children,
 			the current node and its children except the newParent
 		*/
-		int *newParentData = new int[numKids+2];
+		std::vector<int> newParentData(numKids+2);
+		newParentData[0] = CkMyNode();
 		for(int i=1;i<numKids;i++){
 			newParentData[i] = kids[i];
 		}
-		newParentData[0] = CkMyNode();
 		newParentData[numKids] = parent;
 		newParentData[numKids+1] = getTotalGCount()+additionalGCount;
-		thisProxy[newParent].modifyTree(NEWPARENT,numKids+2,newParentData);
+		thisProxy[newParent].modifyTree(NEWPARENT,numKids+2,newParentData.data());
 	}
 	readyDeletion = false;
 	blocked = true;
