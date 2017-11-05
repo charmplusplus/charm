@@ -1249,103 +1249,61 @@ class ATAReq : public AmpiRequest {
   virtual void print();
 };
 
-/// Special CkVec<AmpiRequest*> for AMPI. Most code copied from cklist.h
-class AmpiRequestList : private CkSTLHelper<AmpiRequest *> {
-  AmpiRequest** block; //Elements of vector
-  int blklen; //Allocated size of block
-  int len; //Number of used elements in block
-  void makeBlock(int blklen_,int len_) {
-    block=new AmpiRequest* [blklen_];
-    blklen=blklen_; len=len_;
-  }
-  void freeBlock(void) {
-    len=0; blklen=0;
-    delete[] block; block=NULL;
-  }
-  void copyFrom(const AmpiRequestList &src) {
-    makeBlock(src.blklen, src.len);
-    elementCopy(block,src.block,blklen);
-  }
+class AmpiRequestPoolMgr;
+
+class AmpiRequestList {
+ private:
+  vector<AmpiRequest*> reqs; // indexed by MPI_Request
+  int startIdx; // start next search from this index
  public:
-  AmpiRequestList() {block=NULL;blklen=len=0;}
-  ~AmpiRequestList() { freeBlock(); }
-  AmpiRequestList(const AmpiRequestList &src) {copyFrom(src);}
-  AmpiRequestList(int size) { makeBlock(size,size); }
-  AmpiRequestList &operator=(const AmpiRequestList &src) {
-    freeBlock();
-    copyFrom(src);
-    return *this;
-  }
+  AmpiRequestList() : startIdx(0) {}
+  AmpiRequestList(int size) : reqs(size), startIdx(0) {}
+  ~AmpiRequestList() {}
 
-  AmpiRequest* operator[](size_t n) { return block[n]; }
-
-  int size(void) const {return len;}
-  void setSize(int blklen_) {
-    AmpiRequest **oldBlock=block;
-    makeBlock(blklen_,len);
-    elementCopy(block,oldBlock,len);
-    delete[] oldBlock; //WARNING: leaks if element copy throws exception
+  inline AmpiRequest* operator[](int n) {
+#if CMK_ERROR_CHECKING
+    return reqs.at(n);
+#else
+    return reqs[n];
+#endif
   }
-  //Grow to contain at least this position:
-  void growAtLeast(int pos) {
-    if (pos>=blklen) setSize(pos*2+16);
-  }
-  void insertAt(int pos, AmpiRequest* elt) {
-    if (pos>=len) {
-      growAtLeast(pos);
-      len=pos+1;
-    }
-    block[pos] = elt;
-  }
-  void free(int pos) {
-    if (pos<0 || pos>=len) return;
-    block[pos]->free();
-    delete block[pos];
-    block[pos]=NULL;
-  }
-  void push_back(AmpiRequest* elt) {insertAt(len,elt);}
-  int insert(AmpiRequest* elt){
-    for(int i=0;i<len;i++){
-      if(block[i]==NULL){
-        block[i] = elt;
-        elt->setReqIdx(i);
+  void free(int idx);
+  inline int insert(AmpiRequest* req) {
+    for (int i=startIdx; i<reqs.size(); i++) {
+      if (reqs[i] == NULL) {
+        req->setReqIdx(i);
+        reqs[i] = req;
+        startIdx = i+1;
         return i;
       }
     }
-    push_back(elt);
-    elt->setReqIdx(len-1);
-    return len-1;
+    reqs.push_back(req);
+    int idx = reqs.size()-1;
+    req->setReqIdx(idx);
+    startIdx = idx+1;
+    return idx;
   }
 
   inline void checkRequest(MPI_Request idx) const {
-    if(!(idx==-1 || (idx < this->len && (block[idx])->isValid())))
+    if (!(idx==-1 || (idx < reqs.size() && (reqs[idx])->isValid())))
       CkAbort("Invalid MPI_Request\n");
   }
 
-  //find an AmpiRequest by its pointer value
-  //return -1 if not found!
-  int findRequestIndex(AmpiRequest *req) const {
-    for(int i=0; i<len; i++){
-      if(block[i]==req) return i;
-    }
-    return -1;
-  }
-
-  inline void unblockReqs(MPI_Request *request, int numReqs) {
+  inline void unblockReqs(MPI_Request *requests, int numReqs) {
     for (int i=0; i<numReqs; i++) {
-      if (request[i] != MPI_REQUEST_NULL) {
-        block[request[i]]->setBlocked(false);
+      if (requests[i] != MPI_REQUEST_NULL) {
+        reqs[requests[i]]->setBlocked(false);
       }
     }
   }
 
   void pup(PUP::er &p);
 
-  void print(){
-    for(int i=0; i<len; i++){
-      if(block[i]==NULL) continue;
-      CkPrintf("AmpiRequestList Element %d [%p]: \n", i+1, block[i]);
-      block[i]->print();
+  void print(void) const {
+    for (int i=0; i<reqs.size(); i++) {
+      if (reqs[i] == NULL) continue;
+      CkPrintf("AmpiRequestList Element %d [%p]: \n", i+1, reqs[i]);
+      reqs[i]->print();
     }
   }
 };

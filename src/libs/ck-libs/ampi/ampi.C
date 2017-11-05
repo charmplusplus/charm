@@ -1220,7 +1220,7 @@ class ampiWorlds : public CBase_ampiWorlds {
 
 //-------------------- ampiParent -------------------------
 ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int nRanks_)
-:threads(threads_), worldNo(worldNo_), isTmpRProxySet(false)
+:threads(threads_), worldNo(worldNo_), isTmpRProxySet(false), ampiReqs(64)
 {
   int barrier = 0x1234;
   STARTUP_DEBUG("ampiParent> starting up")
@@ -2540,6 +2540,13 @@ void ampi::generic(AmpiMsg* msg)
 
 inline static AmpiRequestList *getReqs(void);
 
+void AmpiRequestList::free(int idx) {
+  if (idx < 0) return;
+  delete reqs[idx];
+  reqs[idx] = NULL;
+  startIdx = std::min(idx, startIdx);
+}
+
 void ampi::inorder(AmpiMsg* msg)
 {
   MSG_ORDER_DEBUG(
@@ -3399,19 +3406,23 @@ void AmpiRequestList::pup(PUP::er &p) {
     return;
   }
 
-  p(blklen); //Allocated size of block
-  p(len); //Number of used elements in block
-  if(p.isUnpacking()){
-    makeBlock(blklen,len);
+  p|startIdx;
+  int size;
+  if(!p.isUnpacking()){
+    size = reqs.size();
   }
-  int count=0;
-  for(int i=0;i<len;i++){
+  p|size;
+  if(p.isUnpacking()){
+    reqs.resize(size);
+  }
+  // Must preserve indices in 'block' so that MPI_Request's remain the same, so keep NULL entries:
+  for(int i=0;i<size;i++){
     char nonnull;
     if(!p.isUnpacking()){
-      if(block[i] == NULL){
+      if(reqs[i] == NULL){
         nonnull = 0;
       }else{
-        nonnull = block[i]->getType();
+        nonnull = reqs[i]->getType();
       }
     }
     p(nonnull);
@@ -3419,36 +3430,35 @@ void AmpiRequestList::pup(PUP::er &p) {
       if(p.isUnpacking()){
         switch(nonnull){
           case MPI_I_REQ:
-            block[i] = new IReq;
+            reqs[i] = new IReq;
             break;
           case MPI_REDN_REQ:
-            block[i] = new RednReq;
+            reqs[i] = new RednReq;
             break;
           case MPI_GATHER_REQ:
-            block[i] = new GatherReq;
+            reqs[i] = new GatherReq;
             break;
           case MPI_GATHERV_REQ:
-            block[i] = new GathervReq;
+            reqs[i] = new GathervReq;
             break;
           case MPI_SEND_REQ:
-            block[i] = new SendReq;
+            reqs[i] = new SendReq;
             break;
           case MPI_SSEND_REQ:
-            block[i] = new SsendReq;
+            reqs[i] = new SsendReq;
             break;
           case MPI_ATA_REQ:
-            block[i] = new ATAReq;
+            reqs[i] = new ATAReq;
             break;
         }
       }
-      block[i]->pup(p);
-      count++;
+      reqs[i]->pup(p);
     }else{
-      block[i] = 0;
+      reqs[i] = NULL;
     }
   }
   if(p.isDeleting()){
-    freeBlock();
+    reqs.clear();
   }
 }
 
