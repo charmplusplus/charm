@@ -3,11 +3,9 @@ include ../uFcontext.mk
 CDIR=../../
 CHARMC=../../bin/charmc
 
-.SUFFIXES : .S .o
+all:
+	if [ $(shell echo ${TARGET}| grep -c 'windows') -gt 0 ]; then	make -f Makefile_windows;\
+	else make -f Makefile_default;	fi
 
-all: jump_${TARGET}.o make_${TARGET}.o ontop_${TARGET}.o #libuFcontext_asm.a
-
-.S.o:
-	$(CHARMC) -c $<
 clean:
-	rm *.o *.a
+	rm *.o

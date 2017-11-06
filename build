@@ -497,6 +497,9 @@ UFCONTEXT_HEADER_NAME=
 if test `echo "$BASEVERSION" | grep -c "darwin"` -gt 0
 then
   UFCONTEXT_HEADER_NAME="macho_gas"
+elif test `echo "$BASEVERSION" | grep -c "win"` -gt 0
+then
+  UFCONTEXT_HEADER_NAME="windows"
 else
   UFCONTEXT_HEADER_NAME="elf_gas"
 fi
