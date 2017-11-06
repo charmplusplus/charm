@@ -452,6 +452,7 @@ cpuaffinity.o: hwloc-target
 
 hwloc-target:  conv-autoconfig.h
 	( $(MAKE) -C hwloc )
+	-( test -e hwloc/src/.libs/libhwloc_embedded.lib && cp -f hwloc/src/.libs/libhwloc_embedded.lib hwloc/src/.libs/libhwloc_embedded.a )
 	( cp -f hwloc/src/.libs/libhwloc_embedded.a $(L) )
 	( cp -f hwloc/include/hwloc.h $(INC) )
 	( cp -LRf hwloc/include/hwloc $(INC) )

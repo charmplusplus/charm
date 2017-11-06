@@ -7,6 +7,15 @@ AC_CONFIG_HEADER(conv-autoconfig.h)
 AC_CONFIG_COMMANDS([config-cleanup],
                    [sed -i -e 's:^#define\s\+PACKAGE://&:' conv-autoconfig.h])
 
+get_full_command_name()
+{
+    if test "$(basename "$*")" != "$*"; then
+        echo "$(cd "$(dirname "$*")" && pwd)/$(basename "$*")"
+    else
+        echo "$*"
+    fi
+}
+
 #clean up conv-mach-opt.sh
 sed -e '/Option added by configure/d' ../include/conv-mach-opt.sh  | sed -e '/^$/d' > conv-mach-opt.sh.clean
 cp -f conv-mach-opt.sh.clean   ../include/conv-mach-opt.sh
@@ -2416,6 +2425,13 @@ EOF
 fi
 
 # for hwloc
+eval "`./charmc -print-building-blocks $OPTS`"
+export CC="$(get_full_command_name "$CMK_SEQ_CC")"
+export CXX="$(get_full_command_name "$CMK_SEQ_CXX")"
+export CC_FOR_BUILD="$(get_full_command_name "$CMK_NATIVE_CC")"
+AC_SUBST(CC_FOR_BUILD)
+export HWLOC_FLAGS="$CHARM_CC_FLAGS"
+export AR="$(get_full_command_name "${CMK_SEQ_AR%% *}")"
 enable_embedded_mode='yes'
 enable_static='yes'
 enable_libnuma='no'
@@ -2423,18 +2439,15 @@ enable_pci='no'
 enable_libudev='no'
 enable_libxml2='no'
 enable_visibility='no'
+. hwloc/VERSION
+export libhwloc_so_version
+AC_SUBST(libhwloc_so_version)
 
 echo "Configuring hwloc:"
 AC_CONFIG_AUX_DIR(hwloc/config)
 AC_CANONICAL_TARGET
 AC_USE_SYSTEM_EXTENSIONS
 LT_INIT
-
-AS_CASE([$target_os],
-        [darwin*],
-        export MACOSX_DEPLOYMENT_TARGET='10.7'
-        export HWLOC_FLAGS='-mmacosx-version-min=10.7'
-        )
 
 AM_INIT_AUTOMAKE
 
