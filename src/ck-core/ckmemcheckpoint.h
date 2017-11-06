@@ -16,7 +16,7 @@ public:
 	CkArrayIndex index;
 	double *packData;
 	int bud1, bud2;
-	int len;
+	size_t len;
 	bool cp_flag;          // true: from checkpoint, false: from recover
 };
 
@@ -27,7 +27,7 @@ public:
 	int reportPe;		// chkpt starter
 	int failedpe;
 	int cur_restart_phase;
-	int len;
+	size_t len;
 	int pointer;
 	char *packData;
 };
@@ -48,7 +48,7 @@ public:
    virtual void updateBuffer(CkArrayCheckPTMessage *data) = 0;
    virtual CkArrayCheckPTMessage * getCopy() = 0;
    virtual void updateBuddy(int b1, int b2) = 0;
-   virtual int getSize() = 0;
+   virtual size_t getSize() = 0;
 };
 
 /// memory or disk checkpointing
@@ -56,16 +56,14 @@ public:
 #define CkCheckPoint_inDISK  2
 
 class CkCheckPTEntry{
-  CkArrayCheckPTMessage **data;
+  std::vector<CkArrayCheckPTMessage *> data;
   std::string fname;
 public:
   int bud1, bud2;
   int where;
   void init(int _where, int idx)
   {
-    data = new CkArrayCheckPTMessage*[2];
-    data[0] = NULL;
-    data[1] = NULL;
+    data.resize(2, NULL);
     where = _where;
     if(where == CkCheckPoint_inDISK)
     {

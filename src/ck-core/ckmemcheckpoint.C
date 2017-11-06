@@ -191,13 +191,13 @@ void ArrayElement::inmem_checkpoint(CkArrayCheckPTReqMessage *m) {
 //printf("[%d] checkpointing %s\n", CkMyPe(), index);
   CkLocMgr *locMgr = thisArray->getLocMgr();
   CmiAssert(myRec!=NULL);
-  int size;
+  size_t size;
   {
         PUP::sizer p;
         locMgr->pupElementsFor (p, myRec, CkElementCreation_migrate);
         size = p.size();
   }
-  int packSize = size/sizeof(double) +1;
+  size_t packSize = size/sizeof(double) +1;
   CkArrayCheckPTMessage *msg =
                  new (packSize, 0) CkArrayCheckPTMessage;
   msg->len = size;
@@ -250,7 +250,7 @@ public:
      pNo = b1;  if (pNo == CkMyPe()) pNo = b2;
      CmiAssert(pNo != CkMyPe());
   }
-  inline int getSize() { 
+  inline size_t getSize() {
      CmiAssert(ckBuffer);
      return ckBuffer->len; 
   }
@@ -261,7 +261,7 @@ class CkDiskCheckPTInfo: public CkCheckPTInfo
 {
   std::string fname;
   int bud1, bud2;
-  int len; 			// checkpoint size
+  size_t len; 			// checkpoint size
 public:
   CkDiskCheckPTInfo(CkArrayID a, CkGroupID loc, CkArrayIndex idx, int pno, int myidx): CkCheckPTInfo(a, loc, idx, pno)
   {
@@ -320,7 +320,7 @@ public:
      pNo = b1;  if (pNo == CkMyPe()) pNo = b2;
      CmiAssert(pNo != CkMyPe());
   }
-  inline int getSize() { 
+  inline size_t getSize() {
      return len; 
   }
 };
@@ -437,14 +437,15 @@ void CkMemCheckPT::inmem_restore(CkArrayCheckPTMessage *m)
     }
   }
 #endif
+  delete m;
 }
 
 // return 1 if pe is a crashed processor
 bool CkMemCheckPT::isFailed(int pe)
 {
   for (int i=0; i<failedPes.length(); i++)
-    if (failedPes[i] == pe) return 1;
-  return 0;
+    if (failedPes[i] == pe) return true;
+  return false;
 }
 
 // add pe into history list of all failed processors
@@ -574,14 +575,14 @@ void CkMemCheckPT::pupAllElements(PUP::er &p){
 
 void CkMemCheckPT::startArrayCheckpoint(){
 #if CMK_CHKP_ALL
-	int size;
+	size_t size;
 	{
 		PUP::sizer psizer;
 		pupAllElements(psizer);
 		size = psizer.size();
 	}
-	int packSize = size/sizeof(double)+1;
- // CkPrintf("[%d]checkpoint size :%d\n",CkMyPe(),packSize);
+	size_t packSize = size/sizeof(double)+1;
+	// CkPrintf("[%d] checkpoint size: %ld\n", CkMyPe(), (CmiUInt8)packSize);
 	CkArrayCheckPTMessage * msg = new (packSize,0) CkArrayCheckPTMessage;
 	msg->len = size;
 	msg->cp_flag = true;
@@ -665,15 +666,15 @@ static inline void _handleProcData(PUP::er &p)
 void CkMemCheckPT::sendProcData()
 {
   // find out size of buffer
-  int size;
+  size_t size;
   {
     PUP::sizer p;
     _handleProcData(p);
     size = p.size();
   }
-  int packSize = size;
+  size_t packSize = size;
   CkProcCheckPTMessage *msg = new (packSize, 0) CkProcCheckPTMessage;
-  DEBUGF("[%d] CkMemCheckPT::sendProcData - size: %d to %d\n", CkMyPe(), size, ChkptOnPe(CkMyPe()));
+  DEBUGF("[%d] CkMemCheckPT::sendProcData - size: %ld to %d\n", CkMyPe(), (CmiUInt8)size, ChkptOnPe(CkMyPe()));
   {
     PUP::toMem p(msg->packData);
     _handleProcData(p);
