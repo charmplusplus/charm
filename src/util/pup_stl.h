@@ -62,7 +62,6 @@ namespace PUP {
   inline void PUP_stl_container(er &p,container &c);
   template <class container,class dtype>
   inline void PUP_stl_map(er &p,container &c);
-  template <> inline void operator|(er &p,std::vector<bool> &v);
   template <class T>
   inline void operator|(er &p,typename std::vector<T> &v);
   template <class T>
@@ -73,6 +72,7 @@ namespace PUP {
   inline void operator|(er &p,typename std::multimap<V,T,Cmp> &m);
   template <class T>
   inline void operator|(er &p,typename std::set<T> &m);
+  template <> inline void operator|(er &p,std::vector<bool> &v);
 
   template <class A,class B>
   inline void operator|(er &p,typename std::pair<A,B> &v)
@@ -225,13 +225,6 @@ namespace PUP {
     }
   }
 
-  // Specialized to work with vector<bool>, which doesn't
-  // have data() or shrink_to_fit() members
-  template <>
-  inline void operator|(er &p,std::vector<bool> &v) {
-    PUP_stl_container<std::vector<bool>, bool>(p, v);
-  }
-
   template <class T> 
   inline void operator|(er &p,typename std::list<T> &v)
   { PUP_stl_container<std::list<T>,T>(p,v); }
@@ -258,6 +251,12 @@ namespace PUP {
   inline void operator|(er &p,typename std::set<T> &m)
   { PUP_stl_map<std::set<T>,T >(p,m); }
 
+  // Specialized to work with vector<bool>, which doesn't
+  // have data() or shrink_to_fit() members
+  template <>
+  inline void operator|(er &p,std::vector<bool> &v) {
+    PUP_stl_container<std::vector<bool>, bool>(p, v);
+  }
 }
 
 #endif
