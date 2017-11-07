@@ -4451,6 +4451,8 @@ int ssh_fork(int nodeno, const char *startScript)
   }
 
   sshargv.push_back(nodetab_name(nodeno));
+  if (arg_ssh_display)
+    sshargv.push_back("-X");
   sshargv.push_back("-l");
   sshargv.push_back(nodetab_login(nodeno));
   sshargv.push_back("-o");
