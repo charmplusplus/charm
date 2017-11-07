@@ -507,7 +507,7 @@ void CkMemCheckPT::recoverEntry(CkArrayCheckPTMessage *msg)
 
 // loop through my checkpoint table and ask checkpointed array elements
 // to send me checkpoint data.
-void CkMemCheckPT::doItNow(int starter, CkCallback &cb)
+void CkMemCheckPT::doItNow(int starter, CkCallback &&cb)
 {
   checkpointed = true;
   cpCallback = cb;
@@ -1210,7 +1210,7 @@ void CkMemCheckPT::finishUp()
 }
 
 // called only on 0
-void CkMemCheckPT::quiescence(CkCallback &cb)
+void CkMemCheckPT::quiescence(CkCallback &&cb)
 {
   static int pe_count = 0;
   pe_count ++;

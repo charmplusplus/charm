@@ -35,10 +35,10 @@ public:
 	ckcallback_group() { /*empty*/ }
 	ckcallback_group(CkMigrateMessage *m) { /*empty*/ }
 	void registerCcsCallback(const char *name,const CkCallback &cb);
-	void call(CkCallback &c,CkMarshalledMessage &msg) {
+	void call(CkCallback &&c, CkMarshalledMessage &&msg) {
 		c.send(msg.getMessage());
 	}
-	void call(CkCallback &c, int length, const char *data) {
+	void call(CkCallback &&c, int length, const char *data) {
 		c.send(CkDataMsg::buildNew(length,data));
 	}
 };

@@ -146,7 +146,7 @@ public:
 
   Domain(CkMigrateMessage* m) { }
 
-  void findClusters(int k, Point means[], CkCallback &cb) {
+  void findClusters(int k, Point means[], CkCallback cb) {
     std::vector<double> result(SIZEPERPOINT*k, 0); // For each candidate mean, create entry for x, y, and count
 
     for (int i = 0; i < numPoints; ++i) {

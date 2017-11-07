@@ -304,7 +304,7 @@ class CkCacheManager : public CBase_CkCacheManager<CkCacheKey> {
       finished their computation */
 
   /** Collect the statistics for the latest iteration */
-  void collectStatistics(CkCallback& cb);
+  void collectStatistics(CkCallback cb);
   std::map<CkCacheKey,CkCacheEntry<CkCacheKey>*> *getCache();
 
 };
@@ -626,7 +626,7 @@ inline void CkCacheManager<CkCacheKey>::recvData(CkCacheKey key, void *data, CkC
   }
   
   template<class CkCacheKey>
-  void CkCacheManager<CkCacheKey>::collectStatistics(CkCallback &cb) {
+  void CkCacheManager<CkCacheKey>::collectStatistics(CkCallback cb) {
 #if COSMO_STATS > 0
     CkCacheStatistics cs(dataArrived, dataTotalArrived,
         dataMisses, dataLocal, dataError, totalDataRequested,

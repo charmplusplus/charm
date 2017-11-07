@@ -470,7 +470,7 @@ private:
 
 public:
 //Array Creation:
-  CkArray(CkArrayOptions &c,CkMarshalledMessage &initMsg);
+  CkArray(CkArrayOptions &&c, CkMarshalledMessage &&initMsg);
   CkArray(CkMigrateMessage *m);
   ~CkArray();
   CkGroupID &getGroupID(void) {return thisgroup;}
@@ -556,7 +556,7 @@ public:
 
   /// Create manually:
   bool insertElement(CkArrayMessage *, const CkArrayIndex &idx, int listenerData[CK_ARRAYLISTENER_MAXLEN]);
-  void insertElement(CkMarshalledMessage &, const CkArrayIndex &idx, int listenerData[CK_ARRAYLISTENER_MAXLEN]);
+  void insertElement(CkMarshalledMessage &&, const CkArrayIndex &idx, int listenerData[CK_ARRAYLISTENER_MAXLEN]);
 
 /// Demand-creation:
   /// Demand-create an element at this index on this processor

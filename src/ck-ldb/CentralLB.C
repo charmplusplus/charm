@@ -557,14 +557,14 @@ void CentralLB::depositData(CLBStatsMsg *m)
   delete m;
 }
 
-void CentralLB::ReceiveStatsFromRoot(CkMarshalledCLBStatsMessage &msg) {
+void CentralLB::ReceiveStatsFromRoot(CkMarshalledCLBStatsMessage &&msg) {
 #if CMK_LBDB_ON
   if (CkMyPe() == cur_ld_balancer) return;
-  else ReceiveStats(msg);
+  else ReceiveStats(std::move(msg));
 #endif
 }
 
-void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
+void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
 {
 #if CMK_LBDB_ON
   if (concurrent && (CkMyPe() == cur_ld_balancer)) {
@@ -655,11 +655,11 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 }
 
 /** added by Abhinav for receiving msgs via spanning tree */
-void CentralLB::ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &msg)
+void CentralLB::ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &&msg)
 {
 #if CMK_LBDB_ON
 	CmiAssert(CkMyPe() != 0);
-	bufMsg.add(msg);         // buffer messages
+	bufMsg.add(std::move(msg));         // buffer messages
 	count_msgs++;
 	//CkPrintf("here %d\n", CkMyPe());
 	if (count_msgs == st.numChildren+1) {
@@ -1949,7 +1949,7 @@ void CkMarshalledCLBStatsMessage::free() {
   msgs.clear();
 }
 
-void CkMarshalledCLBStatsMessage::add(CkMarshalledCLBStatsMessage &m)
+void CkMarshalledCLBStatsMessage::add(CkMarshalledCLBStatsMessage &&m)
 {
   int count = m.getCount();
   for (int i=0; i<count; i++) add(m.getMessage(i));

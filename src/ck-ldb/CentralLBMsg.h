@@ -18,7 +18,7 @@ public:
   CkMarshalledCLBStatsMessage(CkMarshalledCLBStatsMessage &&rhs) : msgs(std::move(rhs.msgs)) {}
   ~CkMarshalledCLBStatsMessage() { free(); }
   void add(CLBStatsMsg *m) { if (m!=NULL) msgs.push_back(m); } 
-  void add(CkMarshalledCLBStatsMessage &msg);     // add multiple messages
+  void add(CkMarshalledCLBStatsMessage &&msg);     // add multiple messages
   CLBStatsMsg *getMessage(int c=0) {CLBStatsMsg *ret=msgs[c]; msgs[c]=NULL; return ret;}
   int  getCount() { return msgs.size(); }
   void pup(PUP::er &p);

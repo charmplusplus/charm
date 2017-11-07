@@ -142,7 +142,7 @@ public:
   virtual ~CkMemCheckPT();
   void pup(PUP::er& p);
   inline int BuddyPE(int pe);
-  void doItNow(int sp, CkCallback &);
+  void doItNow(int sp, CkCallback &&);
   void restart(int diePe);
   void removeArrayElements();
   void createEntry(CkArrayID aid, CkGroupID loc, CkArrayIndex index, int buddy);
@@ -155,7 +155,7 @@ public:
   void recoverBuddies();
   void recoverEntry(CkArrayCheckPTMessage *msg);
   void recoverArrayElements();
-  void quiescence(CkCallback &);
+  void quiescence(CkCallback &&);
   void resetReductionMgr();
   void finishUp();
   void gotReply();

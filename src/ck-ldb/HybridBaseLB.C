@@ -225,7 +225,7 @@ CLBStatsMsg* HybridBaseLB::AssembleStats()
 #endif
 }
 
-void HybridBaseLB::ReceiveStats(CkMarshalledCLBStatsMessage &data, int fromlevel)
+void HybridBaseLB::ReceiveStats(CkMarshalledCLBStatsMessage &&data, int fromlevel)
 {
 #if CMK_LBDB_ON
   FindNeighbors();
@@ -733,7 +733,7 @@ void HybridBaseLB::CreateMigrationOutObjs(int atlevel, LDStats* stats,
 }
 
 // objects arrives with only objdata
-void HybridBaseLB::ObjsMigrated(CkVec<LDObjData>& datas, int m,
+void HybridBaseLB::ObjsMigrated(CkVec<LDObjData>&& datas, int m,
     LDCommData *cdata, int n, int atlevel)
 {
   int i;

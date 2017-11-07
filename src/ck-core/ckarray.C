@@ -801,8 +801,8 @@ void _ckArrayInit(void)
   CmiAssignOnce(&ckArrayCreationHdl, CkRegisterHandler(CkCreateArrayAsync));
 }
 
-CkArray::CkArray(CkArrayOptions &opts,
-		 CkMarshalledMessage &initMsg)
+CkArray::CkArray(CkArrayOptions &&opts,
+		 CkMarshalledMessage &&initMsg)
   : locMgr(CProxy_CkLocMgr::ckLocalBranch(opts.getLocationManager())),
     locMgrID(opts.getLocationManager()),
     sectionAutoDelegate(opts.isSectionAutoDelegated()),
@@ -991,7 +991,7 @@ ArrayElement *CkArray::allocate(int elChareType, CkMessage *msg, bool fromMigrat
 	return elem;
 }
 
-void CkArray::insertElement(CkMarshalledMessage &m, const CkArrayIndex &idx, int listenerData[CK_ARRAYLISTENER_MAXLEN])
+void CkArray::insertElement(CkMarshalledMessage &&m, const CkArrayIndex &idx, int listenerData[CK_ARRAYLISTENER_MAXLEN])
 {
   insertElement((CkArrayMessage*)m.getMessage(), idx, listenerData);
 }
