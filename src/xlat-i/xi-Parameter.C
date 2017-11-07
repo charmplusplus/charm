@@ -404,8 +404,8 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool needsClosure) {
 	  if (isArray() && !next->isArray()) {
               if (!needsClosure) {
                 Type* dtLen = next->param->type->deref();
-                str << "  " << dtLen << " " << next->param->name << "; "
-                    << next->param->name << " = "
+                str << "  PUP::detail::TemporaryObjectHolder<" << dtLen << "> " << next->param->name << "; "
+                    << next->param->name << ".t = "
                     << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
                     << param->type->deref() << ");\n";
                 Type *dt = param->type->deref();
@@ -421,8 +421,8 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str, bool needsClosure) {
 	  } else if (!isArray() && next->isArray()) {
               if (!needsClosure) {
                 Type* dt = param->type->deref();
-                str << "  " << dt << " " << param->name << "; "
-                    << param->name << " = "
+                str << "  PUP::detail::TemporaryObjectHolder<" << dt << "> " << param->name << "; "
+                    << param->name << ".t = "
                     << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
                     << next->param->type->deref() << ");\n";
                 dt = next->param->type->deref();
@@ -554,7 +554,8 @@ void Parameter::beginUnmarshall(XStr &str)
 	else if (isConditional())
                 str<<"  "<<dt<<" *"<<name<<"=impl_msg_typed->"<<name<<";\n";
 	else if(!isRdma())
-	        str<<"  "<<dt<<" "<<name<<"; implP|"<<name<<";\n";
+          str << "  PUP::detail::TemporaryObjectHolder<" << dt << "> " << name << ";\n"
+              << "  " << "implP|" << name << ";\n";
 }
 
 void Parameter::beginUnmarshallSDAGCallRdma(XStr &str, bool genRdma) {
@@ -720,7 +721,7 @@ void Parameter::unmarshallRegArrayData(XStr &str)
 		unmarshallArrayData(str);
 }
 
-void ParamList::unmarshall(XStr &str, int isFirst)  //Pass-by-value
+void ParamList::unmarshall(XStr &str, bool isInline, bool isFirst)  //Pass-by-value
 {
 	if (isFirst && isMessage()) str<<"("<<param->type<<")impl_msg";
 	else if (!isVoid()) {
@@ -731,13 +732,15 @@ void ParamList::unmarshall(XStr &str, int isFirst)  //Pass-by-value
 	    str<<"\n#else\n";
 	    str<<param->getName();
 	    str<<"\n#endif\n";
+	  } else if (param->isArray() || isInline) {
+	    str << param->getName();
+	  } else {
+	    str << param->getName() << ".t";
 	  }
-	  else{
-	    str<<param->getName();
-	  }
+
 	  if (next) {
 	    str<<", ";
-	    next->unmarshall(str, 0);
+	    next->unmarshall(str, isInline, false);
 	  }
 	}
 }

@@ -504,7 +504,7 @@ void Entry::genArrayDefs(XStr& str)
       if (!retType->isVoid())
         inlineCall << retType << " retValue = ";
       inlineCall << "obj->" << name << "(";
-      param->unmarshall(inlineCall);
+      param->unmarshall(inlineCall, true);
       inlineCall << ");\n";
       inlineCall <<
         "#if CMK_CHARMDEBUG\n"
@@ -748,7 +748,7 @@ void Entry::genGroupDefs(XStr& str)
       if (!isLocal()) str <<marshallMsg();
 
       if (isLocal()) {
-        XStr unmarshallStr; param->unmarshall(unmarshallStr);
+        XStr unmarshallStr; param->unmarshall(unmarshallStr, true);
         str << "  "<<container->baseName()<<" *obj = ckLocalBranch();\n";
         str << "  CkAssert(obj);\n";
         if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForBocMsg,("<<epIdx()<<"),CkMyPe(),0,NULL, NULL);\n";
