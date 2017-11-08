@@ -16,16 +16,14 @@ distributed checkpoints.
 \charm is a production-quality parallel programming system used by
 multiple applications in science and engineering on supercomputers as
 well as smaller clusters around the world.  Currently the parallel
-platforms supported by \charm are the BlueGene/L, BlueGene/P,
-BlueGene/Q, Cray XT, XE and XK series (including XK6 and XE6),
-% XT3/4, Cray X1, Cray T3E,
-a single workstation or a network of workstations (including x86
-(running Linux, Windows, MacOS)), etc.  The communication protocols
-and infrastructures supported by
-\charm are UDP, TCP, Myrinet, Infiniband, MPI, uGNI, and PAMI. 
+platforms supported by \charm are the IBM BlueGene/Q and OpenPOWER systems,
+Cray XE, XK, and XC systems, Omni-Path and Infiniband clusters, single workstations and
+networks of workstations (including x86 (running Linux, Windows, MacOS)), etc.
+The communication protocols and infrastructures supported by
+\charm are UDP, MPI, OFI, Infiniband, uGNI, and PAMI.
 \charm programs can run without changing the source
-on all these platforms. If built on MPI, \charm programs can 
-also interoperate with pure MPI programs (\S\ref{sec:interop}).
+on all these platforms. \charm programs can
+also interoperate with MPI programs (\S\ref{sec:interop}).
   Please see the \charm/\converse{}
 Installation and Usage
 \htmladdnormallink{Manual}{http://charm.cs.illinois.edu/manuals/html/install/manual.html}
