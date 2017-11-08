@@ -4,7 +4,10 @@ The \index{PUP} PUP (Pack/Unpack) framework is a generic way to describe the
 data in an object and to use that description for serialization.
 The \charmpp\ system can use this description to pack the object
 into a message and unpack the message into a new object on another
-processor.
+processor, to pack and unpack migratable objects
+for load balancing or checkpoint/restart-based fault tolerance.
+The PUP framework also includes support special for STL containers
+to ease development in C++.
 
 Like many \CC\ concepts, the PUP framework is easier to use than 
 describe: 
@@ -99,7 +102,7 @@ This utility method is defined for user-defined types T as:
 \subsection{PUP STL Container Objects}
 \label{sec:pupstl}
 If the variable is from the C++ Standard Template Library, you can include 
-operator\verb.|.'s for STL vector, map, list, pair, and string, templated
+operator\verb.|.'s for STL containers such as vector, map, set, list, pair, and string, templated
 on anything, by including the header ``pup\_stl.h''.
 
 See \examplerefdir{PUP/STLPUP}
@@ -341,7 +344,7 @@ entry void process(Buffer &buf);
 For efficiency, arrays are always copied as blocks of bytes and passed
 via pointers.  This means classes that need their pup routines to be
 called, such as those with dynamically allocated data or virtual
-methods cannot be passed as arrays--use CkVec or STL vectors to pass
+methods cannot be passed as arrays--use STL vectors to pass
 lists of complicated user-defined classes.  For historical reasons,
 pointer-accessible structures cannot appear alone in the parameter
 list (because they are confused with messages).
