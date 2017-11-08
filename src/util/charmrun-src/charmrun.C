@@ -1349,18 +1349,6 @@ static void parse_oldnodenames(char **oldnodelist)
 static void nodetab_init_with_nodelist()
 {
 
-  /* Open the NODES_FILE. */
-  char *nodesfile = nodetab_file_find();
-  if (arg_verbose)
-    printf("Charmrun> using %s as nodesfile\n", nodesfile);
-
-  FILE *f;
-  if (!(f = fopen(nodesfile, "r"))) {
-    fprintf(stderr, "ERROR> Cannot read %s: %s\n", nodesfile, strerror(errno));
-    exit(1);
-  }
-  free(nodesfile);
-
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   if (arg_read_pes == 0) {
     arg_read_pes = arg_requested_pes;
@@ -1378,13 +1366,25 @@ static void nodetab_init_with_nodelist()
   nodetab_max = arg_requested_pes;
 #endif
 
+  if (arg_ppn == 0)
+    arg_ppn = 1;
+
+  /* Open the NODES_FILE. */
+  char *nodesfile = nodetab_file_find();
+  if (arg_verbose)
+    printf("Charmrun> using %s as nodesfile\n", nodesfile);
+
+  FILE *f;
+  if (!(f = fopen(nodesfile, "r"))) {
+    fprintf(stderr, "ERROR> Cannot read %s: %s\n", nodesfile, strerror(errno));
+    exit(1);
+  }
+  free(nodesfile);
+
   nodetab_host global;
   nodetab_reset(&global);
   nodetab_host group = global;
   int rightgroup = (strcmp(arg_nodegroup, "main") == 0);
-
-  if (arg_ppn == 0)
-    arg_ppn = 1;
 
   /* Store the previous host so we can make sure we aren't mixing localhost and
    * non-localhost */
