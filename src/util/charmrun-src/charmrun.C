@@ -1214,13 +1214,36 @@ static const char *nodetab_args(const char *args, nodetab_host *h)
 {
   if (arg_ppn > 0)
     h->cpus = arg_ppn;
-  while (*args != 0) {
+
+  while (*args != 0)
+  {
     const char *b1 = skipblanks(args), *e1 = skipstuff(b1);
     const char *b2 = skipblanks(e1), *e2 = skipstuff(b2);
+
     while (*b1 == '+')
       b1++; /*Skip over "++" on parameters*/
+
+    if (subeqs(b1, e1, "speed"))
+      h->speed = atof(b2);
+    else if (subeqs(b1, e1, "cpus"))
+    {
+      if (arg_ppn == 0)
+        h->cpus = atol(b2); /* ignore if there is ++ppn */
+    }
+    else if (subeqs(b1, e1, "pathfix"))
+    {
+      const char *b3 = skipblanks(e2), *e3 = skipstuff(b3);
+      args = skipblanks(e3);
+      h->pathfixes =
+          pathfix_append(substr(b2, e2), substr(b3, e3), h->pathfixes);
+      e2 = e3; /* for the skipblanks at the end */
+    }
+    else if (subeqs(b1, e1, "ext"))
+      h->ext = substr(b2, e2);
+    else if (subeqs(b1, e1, "nice"))
+      h->nice = atoi(b2);
 #if CMK_USE_SSH
-    if (subeqs(b1, e1, "login"))
+    else if (subeqs(b1, e1, "login"))
       h->login = substr(b2, e2);
     else if (subeqs(b1, e1, "passwd"))
       h->passwd = substr(b2, e2);
@@ -1232,27 +1255,13 @@ static const char *nodetab_args(const char *args, nodetab_host *h)
       h->debugger = substr(b2, e2);
     else if (subeqs(b1, e1, "xterm"))
       h->xterm = substr(b2, e2);
-    else
 #endif
-        if (subeqs(b1, e1, "speed"))
-      h->speed = atof(b2);
-    else if (subeqs(b1, e1, "cpus")) {
-      if (arg_ppn == 0)
-        h->cpus = atol(b2); /* ignore if there is ++ppn */
-    } else if (subeqs(b1, e1, "pathfix")) {
-      const char *b3 = skipblanks(e2), *e3 = skipstuff(b3);
-      args = skipblanks(e3);
-      h->pathfixes =
-          pathfix_append(substr(b2, e2), substr(b3, e3), h->pathfixes);
-      e2 = e3; /* for the skipblanks at the end */
-    } else if (subeqs(b1, e1, "ext"))
-      h->ext = substr(b2, e2);
-    else if (subeqs(b1, e1, "nice"))
-      h->nice = atoi(b2);
     else
       return args;
+
     args = skipblanks(e2);
   }
+
   return args;
 }
 
