@@ -112,7 +112,7 @@ extern ELFXX_TYPE_Dyn _DYNAMIC[];      //The Dynamic section table pointer
 	identified as global variables
 	**/
 
-CkVec<char *>  _blacklist;
+std::vector<char *>  _blacklist;
 static bool loaded = false;
 
 static void readBlacklist()
@@ -151,7 +151,7 @@ class CtgGlobalList
     CtgRec() {got=NULL;}
     CtgRec(ELFXX_TYPE_Addr *got_,int off_) :got(got_), off(off_) {}
   };
-  CkVec<CtgRec> rec;
+  std::vector<CtgRec> rec;
   int nRec;
 public:
   /**
@@ -343,7 +343,7 @@ CtgGlobalList::CtgGlobalList() {
         }
 #endif
 
-	rec.push_back(CtgRec(gGot,datalen));
+	rec.emplace_back(gGot, datalen);
 	datalen+=gSize;
     }
 

@@ -1,7 +1,8 @@
 #include <map>
+#include <vector>
+#include <algorithm>
 #include "converse.h"
 #include "sockRoutines.h"
-#include "cklists.h"
 
 #define DEBUGP(x)  /** CmiPrintf x; */
 
@@ -133,7 +134,7 @@ public:
   static int *nodeIDs;
   static int numPes;
   static int numNodes;
-  static CkVec<int> *bynodes;
+  static std::vector<int> *bynodes;
   static int supported;
 
   ~CpuTopology() {
@@ -152,11 +153,10 @@ public:
     return numNodes;
 #else
     if (numNodes > 0) return numNodes;     // already calculated
-    CkVec<int> unodes;
+    std::vector<int> unodes(numPes);
     int i;
-    for (i=0; i<numPes; i++)  unodes.push_back(nodeIDs[i]);
-    //unodes.bubbleSort(0, numPes-1);
-    unodes.quickSort();
+    for (i=0; i<numPes; i++) unodes[i] = nodeIDs[i];
+    std::sort(unodes.begin(), unodes.end());
     int last = -1;
     std::map<int, int> nodemap;  // nodeIDs can be out of range of [0,numNodes]
     for (i=0; i<numPes; i++)  { 
@@ -182,7 +182,7 @@ public:
   void sort() {
     int i;
     numUniqNodes();
-    bynodes = new CkVec<int>[numNodes];
+    bynodes = new std::vector<int>[numNodes];
     if (supported) {
       for (i=0; i<numPes; i++){
         CmiAssert(nodeIDs[i] >=0 && nodeIDs[i] <= numNodes); // Sanity check for bug that occurs on mpi-crayxt
@@ -215,7 +215,7 @@ public:
 int *CpuTopology::nodeIDs = NULL;
 int CpuTopology::numPes = 0;
 int CpuTopology::numNodes = 0;
-CkVec<int> *CpuTopology::bynodes = NULL;
+std::vector<int> *CpuTopology::bynodes = NULL;
 int CpuTopology::supported = 0;
 
 namespace CpuTopoDetails {
@@ -392,13 +392,13 @@ extern "C" int LrtsNodeSize(int node)
 extern "C" void LrtsPeOnNode(int node, int **pelist, int *num)
 {
   *num = cpuTopo.bynodes[node].size();
-  if (pelist!=NULL && *num>0) *pelist = cpuTopo.bynodes[node].getVec();
+  if (pelist!=NULL && *num>0) *pelist = cpuTopo.bynodes[node].data();
 }
 
 extern "C" int LrtsRankOf(int pe)
 {
   if (!cpuTopo.supported) return CmiRankOf(pe);
-  const CkVec<int> &v = cpuTopo.bynodes[cpuTopo.nodeIDs[pe]];
+  const std::vector<int> &v = cpuTopo.bynodes[cpuTopo.nodeIDs[pe]];
   int rank = 0;  
   int npes = v.size();
   while (rank < npes && v[rank] < pe) rank++;       // already sorted
