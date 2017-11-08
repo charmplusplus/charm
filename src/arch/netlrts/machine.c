@@ -1468,9 +1468,9 @@ static void node_addresses_obtain(char **argv)
   {/*Standalone-- fake a single-node nodetab message*/
 	ChMessageInt_t *n32;
 	ChNodeinfo *nodeInfo;
-	ChMessage_new("nodeinfo", sizeof(ChMessageInt_t)+sizeof(ChNodeinfo), &nodetabmsg);
+	ChMessage_new("nodeinfo", sizeof(ChMessageInt_t)*ChInitNodetabFields+sizeof(ChNodeinfo), &nodetabmsg);
 	n32 = (ChMessageInt_t *)nodetabmsg.data;
-	nodeInfo = (ChNodeinfo *)(nodetabmsg.data + sizeof(ChMessageInt_t));
+	nodeInfo = (ChNodeinfo *)(nodetabmsg.data + sizeof(ChMessageInt_t)*ChInitNodetabFields);
 
 	n32[0] = ChMessageInt_new(1);
 	nodeInfo->nPE = ChMessageInt_new(_Cmi_mynodesize);
@@ -1511,7 +1511,7 @@ static void node_addresses_obtain(char **argv)
         MACHSTATE(2,"} recv initnode");
   }
   ChMessageInt_t *n32 = (ChMessageInt_t *) nodetabmsg.data;
-  ChNodeinfo *d = (ChNodeinfo *) (n32+1);
+  ChNodeinfo *d = (ChNodeinfo *) (n32+ChInitNodetabFields);
   _Cmi_myphysnode_numprocesses = ChMessageInt(d[Lrts_myNode].nProcessesInPhysNode);
 //#if CMK_USE_IBVERBS	
 //#else

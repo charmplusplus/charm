@@ -1960,7 +1960,7 @@ static void req_send_initnodetab_internal(SOCKET fd, int count, int msgSize)
 static int req_send_initnodetab(SOCKET fd)
 {
   const int nodetab_rank0_size = nodetab_rank0_table.size();
-  int msgSize = sizeof(ChMessageInt_t) +
+  int msgSize = sizeof(ChMessageInt_t) * ChInitNodetabFields +
                 sizeof(ChNodeinfo) * nodetab_rank0_size;
   req_send_initnodetab_internal(fd, nodetab_rank0_size, msgSize);
 
@@ -3320,7 +3320,7 @@ static void exchange_qpdata_clients()
 static void send_clients_nodeinfo_qpdata()
 {
   const int nodetab_rank0_size = nodetab_rank0_table.size();
-  int msgSize = sizeof(ChMessageInt_t) +
+  int msgSize = sizeof(ChMessageInt_t) * ChInitNodetabFields +
                 sizeof(ChNodeinfo) * nodetab_rank0_size +
                 sizeof(ChInfiAddr) * nodetab_rank0_size;
   for (int node = 0; node < nodetab_rank0_size; node++) {

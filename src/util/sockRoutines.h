@@ -269,6 +269,8 @@ typedef struct {
 } ChInfiAddr;
 #endif
 
+#define ChInitNodetabFields 1
+
 typedef struct {
   ChMessageInt_t nProcessesInPhysNode; /* Number of distinct OS processes on
                                           this physical hardware node */

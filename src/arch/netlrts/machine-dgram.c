@@ -348,13 +348,13 @@ extern void CmiAmmassoNodeAddressesStoreHandler(int pe, struct sockaddr_in *addr
 static void node_addresses_store(ChMessage *msg)
 {
   ChMessageInt_t *n32=(ChMessageInt_t *)msg->data;
-  ChNodeinfo *d=(ChNodeinfo *)(n32+1);
+  ChNodeinfo *d=(ChNodeinfo *)(n32+ChInitNodetabFields);
   int nodestart;
   int i,j,n;
   MACHSTATE(1,"node_addresses_store {");	
   Lrts_numNodes=ChMessageInt(n32[0]);
 
-  if ((sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*Lrts_numNodes)
+  if ((sizeof(ChMessageInt_t)*ChInitNodetabFields+sizeof(ChNodeinfo)*Lrts_numNodes)
          !=(unsigned int)msg->len)
     {printf("Node table has inconsistent length!");machine_exit(1);}
 
