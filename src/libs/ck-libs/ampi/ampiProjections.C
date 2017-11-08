@@ -24,11 +24,11 @@ typedef struct {
 
 typedef struct {
   int index;
-  CkVec<int> funcList;
+  std::vector<int> funcList;
 } vprocData;
 
-CkVec<funcData *> _funcTable; /*stores the name and index for the different functions (might add somethings later on)*/
-CkVec<vprocData *> vprocTable; /*stores the activation stack (only those functions that are being traced) for each virtual processor*/
+std::vector<funcData *> _funcTable; /*stores the name and index for the different functions (might add somethings later on)*/
+std::vector<vprocData *> vprocTable; /*stores the activation stack (only those functions that are being traced) for each virtual processor*/
 
 extern "C" void initAmpiProjections(void){
   //ampi_beginProcessing(current_rank,current_src,current_count);
@@ -105,7 +105,8 @@ extern "C" void ampi_beginFunc(int funcNo,MPI_Comm comm){
     procElem = new vprocData;
     procElem->index = myindex;
     procElem->funcList.push_back(funcNo);
-    vprocTable.insert(myindex,procElem);
+    vprocTable.resize(myindex+1);
+    vprocTable[myindex] = procElem;
   }else{
     vprocTable[myindex]->funcList.push_back(funcNo);
   }
@@ -119,11 +120,9 @@ extern "C" void ampi_beginFunc(int funcNo,MPI_Comm comm){
 extern "C" void ampi_endFunc(int funcNo,MPI_Comm comm){
   ampi *ptr = getAmpiInstance(comm);
   int myindex = ptr->thisIndex;
-  if(vprocTable.size() <= myindex){
-  }else{
-    int size = vprocTable[myindex]->funcList.size();
-    if(size > 0){
-      vprocTable[myindex]->funcList.remove(size-1);
+  if(vprocTable.size() > myindex){
+    if(!vprocTable[myindex]->funcList.empty()){
+      vprocTable[myindex]->funcList.pop_back();
     }
     int iData[2];
     iData[0] = myindex;
