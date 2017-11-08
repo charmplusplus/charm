@@ -214,7 +214,7 @@ void Worker::reduce_set() {
     for (int idx = 0; idx < setData.size(); ++idx)
         setData[idx] = idx;
 
-    contribute(setData.size() * sizeof(int), &setData[0], CkReduction::set,
+    contribute(setData.size() * sizeof(int), setData.data(), CkReduction::set,
                CkCallback(CkIndex_Driver::set_done(NULL), driverProxy));
 }
 
@@ -235,7 +235,7 @@ void Worker::reduce_tuple() {
         CkReduction::tupleElement(sizeof(int), &val, CkReduction::max_int),
         CkReduction::tupleElement(sizeof(int), &val, CkReduction::sum_int),
         CkReduction::tupleElement(sizeof(CkReduction::statisticsElement), &stats, CkReduction::statistics),
-        CkReduction::tupleElement(setData.size() * sizeof(int), &setData[0], CkReduction::set)};
+        CkReduction::tupleElement(setData.size() * sizeof(int), setData.data(), CkReduction::set)};
 
     CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tuple_reduction, tuple_size);
 

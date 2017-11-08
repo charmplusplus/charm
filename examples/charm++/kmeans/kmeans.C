@@ -157,7 +157,7 @@ public:
       result[closest + SIZEOFFSET]++;
     }
 
-    contribute(SIZEPERPOINT*k*sizeof(double), &result[0], CkReduction::sum_double, cb);
+    contribute(SIZEPERPOINT*k*sizeof(double), result.data(), CkReduction::sum_double, cb);
   }
 };
 
