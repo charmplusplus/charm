@@ -76,7 +76,7 @@ class redistributor2D: public CBase_redistributor2D {
 
   bool resizeGranulesHasBeenCalled;
 
-  CkVec<redistributor2DMsg *> bufferedMsgs;
+  std::vector<redistributor2DMsg *> bufferedMsgs;
 
  private:
 
@@ -366,12 +366,12 @@ class redistributor2D: public CBase_redistributor2D {
   redistributor2D(){
     incoming_count = 0;
     fakeMemoryUsage = NULL;
-    CkAssert(bufferedMsgs.size() == 0);
+    CkAssert(bufferedMsgs.empty());
   }
 
 
   redistributor2D(CkMigrateMessage*){
-    CkAssert(bufferedMsgs.size() == 0);
+    CkAssert(bufferedMsgs.empty());
   }
 
 
@@ -514,7 +514,7 @@ class redistributor2D: public CBase_redistributor2D {
       //     CkPrintf("Delivering buffered receiveTransposeData(msg=%p) i=%d\n", msg, i);
       receiveTransposeData(msg); // this will delete the message
     }
-    bufferedMsgs.removeAll();
+    bufferedMsgs.clear();
 
     int newPe = (thisIndex.y * new_active_chare_cols + thisIndex.x) % CkNumPes();
     if(newPe == CkMyPe()){
