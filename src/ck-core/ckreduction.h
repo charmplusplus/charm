@@ -362,6 +362,10 @@ private:
 	CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1); \
   void contribute(int dataSize,const void *data,CkReduction::reducerType type, \
 	const CkCallback &cb,CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1); \
+  template <typename T> \
+  void contribute(const std::vector<T> &data,CkReduction::reducerType type,            \
+	const CkCallback &cb,CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1) \
+  { contribute(sizeof(T)*data.size(), data.data(), type, cb, userFlag); }  \
   void contribute(CkReductionMsg *msg); \
   void contribute(const CkCallback &cb,CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1);\
   void contribute(CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1);

@@ -26,6 +26,10 @@ main::main(CkArgMsg* m)
     dOne=atof(m->argv[2]);
     dTwo=atof(m->argv[3]);
 
+    double indexSum = (units-1)*units/2;
+    expected[0] = dOne*units + indexSum;
+    expected[1] = dTwo*units + indexSum;
+
     arr = CProxy_RedExample::ckNew(units);
 
     CkPrintf("simple_reduction for %d pes on %d units for %f and %f\n",

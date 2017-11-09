@@ -261,13 +261,22 @@ all elements, from each element call:
     contribute(2*sizeof(double),forces,CkReduction::sum_double);
 \end{alltt}
 
-This will result in a {\tt double} array of 2 elements, the first of which
-contains the sum of all \uw{forces}[0] values, with the second element 
-holding the sum of all \uw{forces}[1] values of the chare array elements.
-
 Note that since C++ arrays (like \uw{forces}[2]) are already pointers, we 
 don't use \&\uw{forces}.
 
+A slightly simpler interface is available for \verb+std::vector<T>+,
+since the class determines the size and count of the underlying type:
+
+\begin{alltt}
+    CkCallback cb(...);
+    vector<double> forces(2);
+    get_my_forces(forces);
+    contribute(forces, CkReduction::sum_double, cb);
+\end{alltt}
+
+Either of these will result in a {\tt double} array of 2 elements, the first of which
+contains the sum of all \uw{forces}[0] values, with the second element
+holding the sum of all \uw{forces}[1] values of the chare array elements.
 
 Typically the client entry method of a reduction takes a single argument of
 type CkReductionMsg (see Section~\ref{reductionClients}). However, by giving an entry method the
