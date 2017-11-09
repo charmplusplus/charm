@@ -4,9 +4,23 @@
 CkpvDeclare(size_t *, _offsets);
 
 extern "C"
-void *CkAllocSysMsg(void)
+void *CkAllocSysMsg(const CkEntryOptions *opts)
 {
-  return CkpvAccess(_msgPool)->get();
+  if(opts == NULL)
+    return CkpvAccess(_msgPool)->get();
+
+  envelope *env = _allocEnv(ForChareMsg, 0, opts->getPriorityBits());
+  setMemoryTypeMessage(env);
+  env->setMsgIdx(0);
+
+  env->setIsVarSysMsg(1);
+  // Set the message's queueing type
+  env->setQueueing((unsigned char)opts->getQueueing());
+
+  // Copy the priority bytes into the env from the opts
+  if (opts->getPriorityPtr() != NULL)
+    CmiMemcpy(env->getPrioPtr(), opts->getPriorityPtr(), env->getPrioBytes());
+  return EnvToUsr(env);
 }
 
 extern "C"

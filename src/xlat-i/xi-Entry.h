@@ -123,7 +123,6 @@ class Entry : public Member {
   XStr syncPostCall(void);
   XStr marshallMsg(void);
   XStr callThread(const XStr& procName, int prependEntryName = 0);
-  XStr addDummyStaticCastIfVoid(void);
 
   // SDAG support
   std::list<CStateVar*> estateVars;

@@ -257,14 +257,6 @@ void Entry::collectSdagCode(SdagCollection* sc) {
   }
 }
 
-/* Method to add static_cast<void> to impl_e_opts to avoid unused variable warning
- * Called by entry methods that have CkEntryOptions *impl_e_opts as a parameter*/
-XStr Entry::addDummyStaticCastIfVoid(void) {
-  XStr ret;
-  if (param->isVoid()) ret << "  static_cast<void>(impl_e_opts);\n";
-  return ret;
-}
-
 XStr Entry::marshallMsg(void) {
   XStr ret;
   XStr epName = epStr();
@@ -369,7 +361,6 @@ void Entry::genChareDefs(XStr& str) {
     retStr << retType;
     str << makeDecl(retStr, 1) << "::" << name << "(" << paramType(0, 1) << ")\n";
     str << "{\n  ckCheck();\n";
-    str << addDummyStaticCastIfVoid();
     str << marshallMsg();
     if (isSync()) {
       str << syncPreCall() << "CkRemoteCall(" << params << ");\n";
@@ -413,7 +404,6 @@ void Entry::genChareStaticConstructorDefs(XStr& str) {
   str << makeDecl("CkChareID", 1) << "::ckNew(" << paramComma(0) << "int impl_onPE"
       << eo(0) << ")\n";
   str << "{\n";
-  str << addDummyStaticCastIfVoid();
   str << marshallMsg();
   str << "  CkChareID impl_ret;\n";
   str << "  CkCreateChare(" << chareIdx() << ", " << epIdx()
@@ -424,7 +414,6 @@ void Entry::genChareStaticConstructorDefs(XStr& str) {
   str << makeDecl("void", 1) << "::ckNew(" << paramComma(0)
       << "CkChareID* pcid, int impl_onPE" << eo(0) << ")\n";
   str << "{\n";
-  str << addDummyStaticCastIfVoid();
   str << marshallMsg();
   str << "  CkCreateChare(" << chareIdx() << ", " << epIdx()
       << ", impl_msg, pcid, impl_onPE);\n";
@@ -434,7 +423,6 @@ void Entry::genChareStaticConstructorDefs(XStr& str) {
     str << makeDecl(" ", 1) << "::" << container->proxyName(0) << "(" << paramComma(0)
         << "int impl_onPE" << eo(0) << ")\n";
     str << "{\n";
-    str << addDummyStaticCastIfVoid();
     str << marshallMsg();
     str << "  CkChareID impl_ret;\n";
     str << "  CkCreateChare(" << chareIdx() << ", " << epIdx()
@@ -490,7 +478,6 @@ void Entry::genArrayDefs(XStr& str) {
       str << makeDecl(retStr, 1) << "::" << name << "(" << paramType(0, 1)
           << ") \n";  // no const
     str << "{\n";
-    str << addDummyStaticCastIfVoid();
     // regular broadcast and section broadcast for an entry method with rdma
     if (param->hasRdma() && !container->isForElement()) {
       str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy "
@@ -640,7 +627,7 @@ void Entry::genArrayStaticConstructorDefs(XStr& str) {
     str << makeDecl("void", 1) << "::insert(" << paramComma(0, 0) << "int onPE" << eo(0)
         << ")\n"
            "{ \n "
-        << addDummyStaticCastIfVoid() << marshallMsg()
+        << marshallMsg()
         << "   UsrToEnv(impl_msg)->setMsgtype(ArrayEltInitMsg);\n"
            "   ckInsert((CkArrayMessage *)impl_msg,"
         << epIdx() << ",onPE);\n}\n";
@@ -649,7 +636,7 @@ void Entry::genArrayStaticConstructorDefs(XStr& str) {
     syncPrototype << makeDecl("CkArrayID", 1) << "::ckNew";
     asyncPrototype << makeDecl("void", 1) << "::ckNew";
 
-    head << "{\n" << addDummyStaticCastIfVoid() << marshallMsg();
+    head << "{\n" << marshallMsg();
 
     syncTail << "  UsrToEnv(impl_msg)->setMsgtype(ArrayEltInitMsg);\n"
              << "  CkArrayID gId = ckCreateArray((CkArrayMessage *)impl_msg, " << epIdx()
@@ -775,7 +762,6 @@ void Entry::genGroupDefs(XStr& str) {
       msgTypeStr << paramType(0, 1);
     str << makeDecl(retStr, 1) << "::" << name << "(" << msgTypeStr << ")\n";
     str << "{\n";
-    str << addDummyStaticCastIfVoid();
     // regular broadcast and section broadcast for an entry method with rdma
     if (param->hasRdma() && !container->isForElement()) {
       str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy "
@@ -874,7 +860,6 @@ void Entry::genGroupDefs(XStr& str) {
         !container->isNodeGroup()) {
       str << "" << makeDecl(retStr, 1) << "::" << name << "(" << paramComma(1, 0)
           << "int npes, int *pes" << eo(0) << ") {\n";
-      str << addDummyStaticCastIfVoid();
       if (param->hasRdma()) {
         str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy "
                "parameters\");\n";
@@ -886,7 +871,6 @@ void Entry::genGroupDefs(XStr& str) {
       str << "}\n";
       str << "" << makeDecl(retStr, 1) << "::" << name << "(" << paramComma(1, 0)
           << "CmiGroup &grp" << eo(0) << ") {\n";
-      str << addDummyStaticCastIfVoid();
       if (param->hasRdma()) {
         str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy "
                "parameters\");\n";
@@ -1105,7 +1089,6 @@ void Entry::genGroupStaticConstructorDefs(XStr& str) {
   char* node = (char*)(container->isNodeGroup() ? "Node" : "");
   str << makeDecl("CkGroupID", 1) << "::ckNew(" << paramType(0, 1) << ")\n";
   str << "{\n";
-  str << addDummyStaticCastIfVoid();
   str << marshallMsg();
   str << "  UsrToEnv(impl_msg)->setMsgtype(" << node << "BocInitMsg);\n";
   if (param->isMarshalled() || param->isVoid()) {
@@ -1124,7 +1107,6 @@ void Entry::genGroupStaticConstructorDefs(XStr& str) {
     str << makeDecl(" ", 1) << "::" << container->proxyName(0) << "(" << paramType(0, 1)
         << ")\n";
     str << "{\n";
-    str << addDummyStaticCastIfVoid();
     str << marshallMsg();
     str << "  UsrToEnv(impl_msg)->setMsgtype(" << node << "BocInitMsg);\n";
     if (param->isMarshalled()) {
@@ -2534,11 +2516,18 @@ void Entry::genDefs(XStr& str) {
     postCall << "  CmiUnlock(impl_obj->__nodelock);\n";
   }
 
-  if(param->isVoid() && !isNoKeep())
-      postCall <<"  CkFreeSysMsg(impl_msg);\n";
+  if (param->isVoid() && !isNoKeep()) {
+    /* Reuse the message using CkFreeSysMsg by putting it in the msgpool if it is a fixed
+     * sized message. The message is a fixed sized message if it has no priority bytes. A
+     * message with priority bytes will not be reused and will be deallocated similar to
+     * other marshalled messages.
+     */
+    postCall << "  if(UsrToEnv(impl_msg)->isVarSysMsg() == 0)\n";
+    postCall << "    CkFreeSysMsg(impl_msg);\n";
+  }
 
-  if (!isConstructor() && fortranMode) { // Fortran90
-      str << "/* FORTRAN SECTION */\n";
+  if (!isConstructor() && fortranMode) {  // Fortran90
+    str << "/* FORTRAN SECTION */\n";
 
     XStr dim;
     dim << ((Array*)container)->dim();

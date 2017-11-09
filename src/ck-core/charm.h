@@ -74,8 +74,10 @@ extern int  CkGetArgc(void);
  * Message Allocation Calls
  *
  *****************************************************************************/
-
-extern void* CkAllocSysMsg(void);
+#ifdef __cplusplus
+class CkEntryOptions;
+extern void* CkAllocSysMsg(const CkEntryOptions *opts = NULL);
+#endif
 extern void  CkFreeSysMsg(void *msg);
 extern void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits);
 extern void* CkAllocBuffer(void *msg, int bufsize);

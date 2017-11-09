@@ -182,6 +182,7 @@ namespace ck {
       UChar isPacked:1; ///< If true, message must be unpacked before use
       UChar isUsed:1;   ///< Marker bit to prevent message re-send.
       UChar isRdma:1;   ///< True if msg has Rdma parameters
+      UChar isVarSysMsg:1; ///< True if msg is a variable sized sys message that doesn't use a pool
     };
 
   }
@@ -291,6 +292,8 @@ public:
     UChar  isRdma(void) const { return attribs.isRdma; }
     void   setPacked(const UChar p) { attribs.isPacked = p; }
     void   setRdma(const UChar b) { attribs.isRdma = b; }
+    UChar  isVarSysMsg(void) const { return attribs.isVarSysMsg; }
+    void   setIsVarSysMsg(const UChar d) { attribs.isVarSysMsg = d; }
     UShort getPriobits(void) const { return priobits; }
     void   setPriobits(const UShort p) { priobits = p; }
     UShort getPrioWords(void) const { return CkPriobitsToInts(priobits); }
@@ -324,6 +327,7 @@ public:
       _SET_USED(env, 0);
       env->setRef(0);
       env->setEpIdx(0);
+      env->setIsVarSysMsg(0);
 
 #if USE_CRITICAL_PATH_HEADER_ARRAY
       env->pathHistory.reset();

@@ -189,7 +189,7 @@ int ParamList::hasConditional() { return orEach(&Parameter::isConditional); }
 /** marshalling: pack fields into flat byte buffer **/
 void ParamList::marshall(XStr& str, XStr& entry) {
   if (isVoid())
-    str << "  void *impl_msg = CkAllocSysMsg();\n";
+    str << "  void *impl_msg = CkAllocSysMsg(impl_e_opts);\n";
   else if (isMarshalled()) {
     str << "  //Marshall: ";
     print(str, 0);
