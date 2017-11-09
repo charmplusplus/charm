@@ -4187,10 +4187,10 @@ static void start_nodes_scyld(void)
   char *envp[2] = { (char *) malloc(256), NULL };
   for (int i = 0, nodetab_rank0_size = nodetab_rank0_table.size(); i < nodetab_rank0_size; i++) {
     int pe = nodetab_rank0_table[i];
-    int nodeno = atoi(nodetab_name(pe));
+    const int bproc_nodeno = atoi(nodetab_name(pe));
 
     if (arg_verbose)
-      printf("Charmrun> start node program on slave node: %d.\n", nodeno);
+      printf("Charmrun> start node program on slave node: %d.\n", bproc_nodeno);
     sprintf(envp[0], "NETSTART=%s", create_netstart(i));
 
     int pid = fork();
@@ -4205,13 +4205,13 @@ static void start_nodes_scyld(void)
           dup2(fd, 2);
         }
       }
-      if (nodeno == -1) {
+      if (bproc_nodeno == -1) {
         int status = execve(pparam_argv[1], pparam_argv + 1, envp);
         dup2(fd1, 1);
         fprintf(stderr, "execve failed to start process \"%s\" with status: %d\n",
                pparam_argv[1], status);
       } else {
-        int status = bproc_execmove(nodeno, pparam_argv[1], pparam_argv + 1, envp);
+        int status = bproc_execmove(bproc_nodeno, pparam_argv[1], pparam_argv + 1, envp);
         dup2(fd1, 1);
         fprintf(stderr, "bproc_execmove failed to start remote process \"%s\" with "
                "status: %d\n",
