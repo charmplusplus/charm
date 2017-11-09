@@ -1946,18 +1946,23 @@ static int req_handle_initnode(ChMessage *msg, SOCKET fd)
  * node-programs
  * to talk to one another.
  */
-static int req_send_initnodetab(SOCKET fd)
+static void req_send_initnodetab_internal(SOCKET fd, int count, int msgSize)
 {
-  const int nodetab_rank0_size = nodetab_rank0_table.size();
   ChMessageHeader hdr;
-  ChMessageInt_t nNodes = ChMessageInt_new(nodetab_rank0_size);
-  ChMessageHeader_new(
-      "initnodetab",
-      sizeof(ChMessageInt_t) + sizeof(ChNodeinfo) * nodetab_rank0_size, &hdr);
+  ChMessageInt_t nNodes = ChMessageInt_new(count);
+  ChMessageHeader_new("initnodetab", msgSize, &hdr);
   skt_sendN(fd, (const char *) &hdr, sizeof(hdr));
   skt_sendN(fd, (const char *) &nNodes, sizeof(nNodes));
   skt_sendN(fd, (const char *) nodeinfo_arr,
-            sizeof(ChNodeinfo) * nodetab_rank0_size);
+            sizeof(ChNodeinfo) * count);
+}
+
+static int req_send_initnodetab(SOCKET fd)
+{
+  const int nodetab_rank0_size = nodetab_rank0_table.size();
+  int msgSize = sizeof(ChMessageInt_t) +
+                sizeof(ChNodeinfo) * nodetab_rank0_size;
+  req_send_initnodetab_internal(fd, nodetab_rank0_size, msgSize);
 
   return REQ_OK;
 }
@@ -3311,15 +3316,9 @@ static void send_clients_nodeinfo_qpdata()
     int nt = nodetab_rank0_table[node]; /*Nodetable index for this node*/
     //		printf("Charmrun> Node %d proc %d sending initnodetab
     //\n",node,nt);
-    ChMessageHeader hdr;
-    ChMessageInt_t nNodes = ChMessageInt_new(nodetab_rank0_size);
-    ChMessageHeader_new("initnodetab", msgSize, &hdr);
-    skt_sendN(nodetab_table[nt]->ctrlfd, (const char *) &hdr, sizeof(hdr));
-    skt_sendN(nodetab_table[nt]->ctrlfd, (const char *) &nNodes,
-              sizeof(nNodes));
-    skt_sendN(nodetab_table[nt]->ctrlfd, (const char *) nodeinfo_arr,
-              sizeof(ChNodeinfo) * nodetab_rank0_size);
-    skt_sendN(nodetab_table[nt]->ctrlfd,
+    const SOCKET fd = nodetab_table[nt]->ctrlfd;
+    req_send_initnodetab_internal(fd, nodetab_rank0_size, msgSize);
+    skt_sendN(fd,
               (const char *) &nodetab_table[nt]->qpData[0],
               sizeof(ChInfiAddr) * nodetab_rank0_size);
   }
