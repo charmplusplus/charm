@@ -3196,8 +3196,6 @@ static void add_singlenodeinfo_to_mynodeinfo(ChMessage *msg, SOCKET ctrlfd)
 }
 #endif
 
-#ifndef HSTART
-/* Original Function, need to check if modifications required*/
 static void req_set_client_connect(int start, int end)
 {
   int curclient, curclientend, curclientstart;
@@ -3207,6 +3205,11 @@ static void req_set_client_connect(int start, int end)
   // -1 if client i not finished, otherwise the node id of client i
   for (int i = 0; i < (end - start); i++)
     finished[i] = -1;
+
+#ifdef HSTART
+  if (arg_child_charmrun && start == 0)
+    myNodesInfo = malloc(sizeof(ChSingleNodeinfo) * nodetab_rank0_table.size());
+#endif
 
   ChMessage msg;
 #if CMK_USE_IBVERBS && !CMK_IBVERBS_FAST_START
@@ -3235,7 +3238,21 @@ static void req_set_client_connect(int start, int end)
       if (req_clients[client] > 0) {
         if (skt_select1(req_clients[client], 1) != 0) {
           ChMessage_recv(req_clients[client], &msg);
-          req_handle_initnode(&msg, req_clients[client]);
+#ifdef HSTART
+          if (arg_hierarchical_start)
+          {
+            if (!arg_child_charmrun) {
+              if (charmrun_phase == 1)
+                receive_nodeset_from_child(&msg, req_clients[client]);
+              else
+                set_sockets_list(&msg, req_clients[client]);
+              // here we need to decide based upon the phase
+            } else /* hier-start with 2nd leval*/
+              add_singlenodeinfo_to_mynodeinfo(&msg, req_clients[client]);
+          }
+          else
+#endif
+            req_handle_initnode(&msg, req_clients[client]);
           finished[client - start] = 
             ChMessageInt(((ChSingleNodeinfo *)msg.data)->nodeNo);
         }
@@ -3258,83 +3275,6 @@ static void req_set_client_connect(int start, int end)
 
   free(finished);
 }
-#else
-/*int charmrun_phase =0; meaningful for main charmun to decide what to receive*/
-static void req_set_client_connect(int start, int end)
-{
-  int curclient, curclientend, curclientstart;
-  curclient = curclientend = curclientstart = start;
-
-  int *finished = malloc((end - start) * sizeof(int));
-  // -1 if client i not finished, otherwise the node id of client i
-  for (int i = 0; i < (end - start); i++)
-    finished[i] = -1;
-
-  if (arg_child_charmrun && start == 0)
-    myNodesInfo = malloc(sizeof(ChSingleNodeinfo) * nodetab_rank0_table.size());
-
-  ChMessage msg;
-#if CMK_USE_IBVERBS && !CMK_IBVERBS_FAST_START
-  for (int i = start; i < end; i++) {
-    errorcheck_one_client_connect(curclientend++);
-  }
-  if (req_nClients > 1) {
-    /*  a barrier to make sure infiniband device gets initialized */
-    for (int i = start; i < end; i++)
-      ChMessage_recv(req_clients[i], &msg);
-    for (int i = start; i < end; i++)
-      req_reply(req_clients[i], "barrier", "", 1);
-  }
-#endif
-
-  int done = 0;
-  while (!done) {
-/* check server socket for messages */
-#if !CMK_USE_IBVERBS || CMK_IBVERBS_FAST_START
-    while (curclientstart == curclientend || skt_select1(server_fd, 1) != 0) {
-      errorcheck_one_client_connect(curclientend++);
-    }
-#endif
-    /* check appropriate clients for messages */
-    for (int client = curclientstart; client < curclientend; client++)
-      if (req_clients[client] > 0) {
-        if (skt_select1(req_clients[client], 1) != 0) {
-          ChMessage_recv(req_clients[client], &msg);
-          if (!arg_hierarchical_start)
-            req_handle_initnode(&msg, req_clients[client]);
-          else {
-            if (!arg_child_charmrun) {
-              if (charmrun_phase == 1)
-                receive_nodeset_from_child(&msg, req_clients[client]);
-              else
-                set_sockets_list(&msg, req_clients[client]);
-              // here we need to decide based upon the phase
-            } else /* hier-start with 2nd leval*/
-              add_singlenodeinfo_to_mynodeinfo(&msg, req_clients[client]);
-          }
-          finished[client - start] = 
-              ChMessageInt(((ChSingleNodeinfo *)msg.data)->nodeNo);
-        }
-      }
-
-    /* test if done */
-    done = 1;
-    for (int i = curclientstart - start; i < (end - start); i++)
-      if (finished[i] == -1) {
-        curclientstart = start + i;
-        done = 0;
-        break;
-      }
-  }
-  ChMessage_free(&msg);
-
-  // correct mapping in skt_client_table so that socket points to node using the socket
-  for (int i = start; i < (end - start); i++)
-    skt_client_table[req_clients[i]] = finished[i];
-
-  free(finished);
-}
-#endif
 
 /* allow one client to connect */
 static void req_one_client_connect(int client)
