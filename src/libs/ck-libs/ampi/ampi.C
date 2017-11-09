@@ -51,10 +51,10 @@ inline int ampiErrhandler(const char* func, int errcode) {
     char errstr[MPI_MAX_ERROR_STRING];
     AMPI_Error_string(errcode, errstr, &errstrlen);
     vector<char> str(funclen + fillerlen + errstrlen);
-    strcpy(&str[0], func);
-    strcat(&str[0], filler);
-    strcat(&str[0], errstr);
-    CkAbort(&str[0]);
+    strcpy(str.data(), func);
+    strcat(str.data(), filler);
+    strcat(str.data(), errstr);
+    CkAbort(str.data());
   }
   return errcode;
 }
@@ -2927,8 +2927,8 @@ void ampi::processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Data
     // Invoke the MPI_User_function on the deserialized contributions in 'rank' order
     vector<char> deserializedBuf(ddt->getExtent() * count);
     for (int i=1; i<commSize; i++) {
-      ddt->serialize((char*)contributionData[i], &deserializedBuf[0], count, -1);
-      (*func)(&deserializedBuf[0], buf, &count, &type);
+      ddt->serialize((char*)contributionData[i], deserializedBuf.data(), count, -1);
+      (*func)(deserializedBuf.data(), buf, &count, &type);
     }
   }
   delete [] results;
@@ -4059,13 +4059,13 @@ void ampi::sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
 {
   CkDDT_DataType* ddt = getDDT()->getType(datatype);
   vector<char> tmpBuf(ddt->getSize(count));
-  ddt->serialize((char*)buf, &tmpBuf[0], count, 1);
+  ddt->serialize((char*)buf, tmpBuf.data(), count, 1);
 
   MPI_Request req;
   irecv(buf, count, datatype, source, recvtag, comm, &req);
 
   // FIXME: this send may do a copy internally! If we knew now that it would, we could avoid double copying:
-  send(sendtag, source, &tmpBuf[0], count, datatype, dest, comm, 0, BLOCKING_SEND);
+  send(sendtag, source, tmpBuf.data(), count, datatype, dest, comm, 0, BLOCKING_SEND);
 
   AMPI_Wait(&req, status);
 }
@@ -4393,8 +4393,8 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
     tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set);
     if (!ddt->isContig()) {
       vector<char> sbuf(szdata);
-      ddt->serialize((char*)inbuf, &sbuf[0], count, 1);
-      tupleRedn[1] = CkReduction::tupleElement(szdata, &sbuf[0], CkReduction::set);
+      ddt->serialize((char*)inbuf, sbuf.data(), count, 1);
+      tupleRedn[1] = CkReduction::tupleElement(szdata, sbuf.data(), CkReduction::set);
     }
     else {
       tupleRedn[1] = CkReduction::tupleElement(szdata, (void*)inbuf, CkReduction::set);
@@ -4425,8 +4425,8 @@ static int copyDatatype(MPI_Datatype sendtype, int sendcount, MPI_Datatype recvt
     //  deserializing into the output.
     int slen = sddt->getSize(sendcount);
     vector<char> serialized(slen);
-    sddt->serialize((char*)inbuf, &serialized[0], sendcount, 1);
-    rddt->serialize((char*)outbuf, &serialized[0], recvcount, -1);
+    sddt->serialize((char*)inbuf, serialized.data(), sendcount, 1);
+    rddt->serialize((char*)outbuf, serialized.data(), recvcount, -1);
   }
 
   return MPI_SUCCESS;
@@ -4760,8 +4760,8 @@ int AMPI_Reduce_scatter(const void* sendbuf, void* recvbuf, const int *recvcount
     count+= recvcounts[i];
   }
   vector<char> tmpbuf(ptr->getDDT()->getType(datatype)->getSize(count));
-  AMPI_Reduce(sendbuf, &tmpbuf[0], count, datatype, op, AMPI_COLL_SOURCE, comm);
-  AMPI_Scatterv(&tmpbuf[0], recvcounts, &displs[0], datatype,
+  AMPI_Reduce(sendbuf, tmpbuf.data(), count, datatype, op, AMPI_COLL_SOURCE, comm);
+  AMPI_Scatterv(tmpbuf.data(), recvcounts, displs.data(), datatype,
       recvbuf, recvcounts[ptr->getRank()], datatype, AMPI_COLL_SOURCE, comm);
   return MPI_SUCCESS;
 }
@@ -4796,18 +4796,18 @@ int AMPI_Scan(const void* sendbuf, void* recvbuf, int count, MPI_Datatype dataty
   vector<char> partial_scan(blklen);
 
   memcpy(recvbuf, sendbuf, blklen);
-  memcpy(&partial_scan[0], sendbuf, blklen);
+  memcpy(partial_scan.data(), sendbuf, blklen);
   while(mask < size){
     dst = rank^mask;
     if(dst < size){
-      ptr->sendrecv(&partial_scan[0], count, datatype, dst, MPI_SCAN_TAG,
-                    &tmp_buf[0], count, datatype, dst, MPI_SCAN_TAG, comm, MPI_STATUS_IGNORE);
+      ptr->sendrecv(partial_scan.data(), count, datatype, dst, MPI_SCAN_TAG,
+                    tmp_buf.data(), count, datatype, dst, MPI_SCAN_TAG, comm, MPI_STATUS_IGNORE);
       if(rank > dst){
-        getAmpiParent()->applyOp(datatype, op, count, &tmp_buf[0], &partial_scan[0]);
-        getAmpiParent()->applyOp(datatype, op, count, &tmp_buf[0], recvbuf);
+        getAmpiParent()->applyOp(datatype, op, count, tmp_buf.data(), partial_scan.data());
+        getAmpiParent()->applyOp(datatype, op, count, tmp_buf.data(), recvbuf);
       }else {
-        getAmpiParent()->applyOp(datatype, op, count, &partial_scan[0], &tmp_buf[0]);
-        memcpy(&partial_scan[0],&tmp_buf[0],blklen);
+        getAmpiParent()->applyOp(datatype, op, count, partial_scan.data(), tmp_buf.data());
+        memcpy(partial_scan.data(), tmp_buf.data(), blklen);
       }
     }
     mask <<= 1;
@@ -4846,29 +4846,29 @@ int AMPI_Exscan(const void* sendbuf, void* recvbuf, int count, MPI_Datatype data
   vector<char> partial_scan(blklen);
 
   if (rank > 0) memcpy(recvbuf, sendbuf, blklen);
-  memcpy(&partial_scan[0], sendbuf, blklen);
+  memcpy(partial_scan.data(), sendbuf, blklen);
   flag = 0;
   mask = 0x1;
   while(mask < size){
     dst = rank^mask;
     if(dst < size){
-      ptr->sendrecv(&partial_scan[0], count, datatype, dst, MPI_EXSCAN_TAG,
-                    &tmp_buf[0], count, datatype, dst, MPI_EXSCAN_TAG, comm, MPI_STATUS_IGNORE);
+      ptr->sendrecv(partial_scan.data(), count, datatype, dst, MPI_EXSCAN_TAG,
+                    tmp_buf.data(), count, datatype, dst, MPI_EXSCAN_TAG, comm, MPI_STATUS_IGNORE);
       if(rank > dst){
-        getAmpiParent()->applyOp(datatype, op, count, &tmp_buf[0], &partial_scan[0]);
+        getAmpiParent()->applyOp(datatype, op, count, tmp_buf.data(), partial_scan.data());
         if(rank != 0){
           if(flag == 0){
-            memcpy(recvbuf,&tmp_buf[0],blklen);
+            memcpy(recvbuf, tmp_buf.data(), blklen);
             flag = 1;
           }
           else{
-            getAmpiParent()->applyOp(datatype, op, count, &tmp_buf[0], recvbuf);
+            getAmpiParent()->applyOp(datatype, op, count, tmp_buf.data(), recvbuf);
           }
         }
       }
       else{
-        getAmpiParent()->applyOp(datatype, op, count, &partial_scan[0], &tmp_buf[0]);
-        memcpy(&partial_scan[0],&tmp_buf[0],blklen);
+        getAmpiParent()->applyOp(datatype, op, count, partial_scan.data(), tmp_buf.data());
+        memcpy(partial_scan.data(), tmp_buf.data(), blklen);
       }
       mask <<= 1;
     }
@@ -5166,7 +5166,7 @@ int SsendReq::wait(MPI_Status *sts){
 }
 
 int ATAReq::wait(MPI_Status *sts){
-  AMPI_Waitall(reqs.size(), &reqs[0], MPI_STATUSES_IGNORE);
+  AMPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
   reqs.clear();
   statusIreq = true;
   return 0;
@@ -5605,7 +5605,7 @@ void GatherReq::receive(ampi *ptr, CkReductionMsg *msg)
 
 void GathervReq::receive(ampi *ptr, CkReductionMsg *msg)
 {
-  ptr->processGathervMsg(msg, buf, type, &recvCounts[0], &displs[0]);
+  ptr->processGathervMsg(msg, buf, type, recvCounts.data(), displs.data());
   statusIreq = true;
   comm = ptr->getComm();
 #if CMK_BIGSIM_CHARM
@@ -5927,7 +5927,7 @@ int AMPI_Type_indexed(int count, const int* arrBlength, const int* arrDisp,
   vector<MPI_Aint> arrDispAint(count);
   for(int i=0; i<count; i++)
     arrDispAint[i] = (MPI_Aint)(arrDisp[i]);
-  getDDT()->newIndexed(count, arrBlength, &arrDispAint[0], oldtype, newtype);
+  getDDT()->newIndexed(count, arrBlength, arrDispAint.data(), oldtype, newtype);
   return MPI_SUCCESS;
 }
 
@@ -6296,8 +6296,8 @@ static CkReductionMsg *makeGatherMsg(const void *inbuf, int count, MPI_Datatype 
     tupleRedn[1] = CkReduction::tupleElement(szdata, (void*)inbuf, CkReduction::set);
   } else {
     vector<char> sbuf(szdata);
-    ddt->serialize((char*)inbuf, &sbuf[0], count, 1);
-    tupleRedn[1] = CkReduction::tupleElement(szdata, &sbuf[0], CkReduction::set);
+    ddt->serialize((char*)inbuf, sbuf.data(), count, 1);
+    tupleRedn[1] = CkReduction::tupleElement(szdata, sbuf.data(), CkReduction::set);
   }
 
   return CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
@@ -7165,7 +7165,7 @@ int AMPI_Alltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
       reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*dst),
                                sendcount, sendtype, dst, comm, 0, I_SEND);
     }
-    AMPI_Waitall(reqs.size(), &reqs[0], MPI_STATUSES_IGNORE);
+    AMPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
   }
   else if (itemsize <= AMPI_ALLTOALL_LONG_MSG) {
     /* Don't post all sends and recvs at once. Instead do N sends/recvs at a time. */
@@ -7182,7 +7182,7 @@ int AMPI_Alltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
         reqs[blockSize+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*dst),
                                       sendcount, sendtype, dst, comm, I_SEND);
       }
-      AMPI_Waitall(blockSize*2, &reqs[0], MPI_STATUSES_IGNORE);
+      AMPI_Waitall(blockSize*2, reqs.data(), MPI_STATUSES_IGNORE);
     }
   }
   else {
@@ -7338,7 +7338,7 @@ int AMPI_Alltoallv(const void *sendbuf, const int *sendcounts, const int *sdispl
       reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*sdispls[dst]),
                                sendcounts[dst], sendtype, dst, comm, 0, I_SEND);
     }
-    AMPI_Waitall(size*2, &reqs[0], MPI_STATUSES_IGNORE);
+    AMPI_Waitall(size*2, reqs.data(), MPI_STATUSES_IGNORE);
   }
   else {
     /* Don't post all sends and recvs at once. Instead do N sends/recvs at a time. */
@@ -7355,7 +7355,7 @@ int AMPI_Alltoallv(const void *sendbuf, const int *sendcounts, const int *sdispl
         reqs[blockSize+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*sdispls[dst]),
                                       sendcounts[dst], sendtype, dst, comm);
       }
-      AMPI_Waitall(blockSize*2, &reqs[0], MPI_STATUSES_IGNORE);
+      AMPI_Waitall(blockSize*2, reqs.data(), MPI_STATUSES_IGNORE);
     }
   }
 
@@ -7485,7 +7485,7 @@ int AMPI_Alltoallw(const void *sendbuf, const int *sendcounts, const int *sdispl
       reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+sdispls[dst],
                                sendcounts[dst], sendtypes[dst], dst, comm, 0, I_SEND);
     }
-    AMPI_Waitall(size*2, &reqs[0], MPI_STATUSES_IGNORE);
+    AMPI_Waitall(size*2, reqs.data(), MPI_STATUSES_IGNORE);
   }
   else {
     /* Don't post all sends and recvs at once. Instead do N sends/recvs at a time. */
@@ -7502,7 +7502,7 @@ int AMPI_Alltoallw(const void *sendbuf, const int *sendcounts, const int *sdispl
         reqs[blockSize+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+sdispls[dst],
                                       sendcounts[dst], sendtypes[dst], dst, comm);
       }
-      AMPI_Waitall(blockSize*2, &reqs[0], MPI_STATUSES_IGNORE);
+      AMPI_Waitall(blockSize*2, reqs.data(), MPI_STATUSES_IGNORE);
     }
   }
 
@@ -7614,7 +7614,7 @@ int AMPI_Neighbor_alltoall(const void* sendbuf, int sendcount, MPI_Datatype send
                                       sendcount, sendtype, neighbors[i], comm, 0, I_SEND);
   }
 
-  AMPI_Waitall(reqs.size(), &reqs[0], MPI_STATUSES_IGNORE);
+  AMPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
 
   return MPI_SUCCESS;
 }
@@ -7721,7 +7721,7 @@ int AMPI_Neighbor_alltoallv(const void* sendbuf, const int *sendcounts, const in
                                       sendcounts[i], sendtype, neighbors[i], comm, 0, I_SEND);
   }
 
-  AMPI_Waitall(reqs.size(), &reqs[0], MPI_STATUSES_IGNORE);
+  AMPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
 
   return MPI_SUCCESS;
 }
@@ -7827,7 +7827,7 @@ int AMPI_Neighbor_alltoallw(const void* sendbuf, const int *sendcounts, const MP
                                       sendcounts[i], sendtypes[i], neighbors[i], comm, 0, I_SEND);
   }
 
-  AMPI_Waitall(reqs.size(), &reqs[0], MPI_STATUSES_IGNORE);
+  AMPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
 
   return MPI_SUCCESS;
 }
@@ -7932,7 +7932,7 @@ int AMPI_Neighbor_allgather(const void* sendbuf, int sendcount, MPI_Datatype sen
                                       sendtype, neighbors[i], comm, 0, I_SEND);
   }
 
-  AMPI_Waitall(reqs.size(), &reqs[0], MPI_STATUSES_IGNORE);
+  AMPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
 
   return MPI_SUCCESS;
 }
@@ -8035,7 +8035,7 @@ int AMPI_Neighbor_allgatherv(const void* sendbuf, int sendcount, MPI_Datatype se
                                       sendtype, neighbors[i], comm, 0, I_SEND);
   }
 
-  AMPI_Waitall(reqs.size(), &reqs[0], MPI_STATUSES_IGNORE);
+  AMPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
 
   return MPI_SUCCESS;
 }
@@ -8276,11 +8276,11 @@ int AMPI_Intercomm_create(MPI_Comm localComm, int localLeader, MPI_Comm peerComm
     vector<int> localVec;
     localVec = localPtr->getIndices();
     // local leader exchanges groupStruct with remote leader
-    peerPtr->send(tag, peerPtr->getRank(), &localVec[0], localVec.size(), MPI_INT, remoteLeader, peerComm);
+    peerPtr->send(tag, peerPtr->getRank(), localVec.data(), localVec.size(), MPI_INT, remoteLeader, peerComm);
     peerPtr->probe(tag, remoteLeader, peerComm, &sts);
     AMPI_Get_count(&sts, MPI_INT, &remoteSize);
     remoteVec.resize(remoteSize);
-    if (-1==peerPtr->recv(tag, remoteLeader, &remoteVec[0], remoteSize, MPI_INT, peerComm))
+    if (-1==peerPtr->recv(tag, remoteLeader, remoteVec.data(), remoteSize, MPI_INT, peerComm))
       CkAbort("AMPI> Error in MPI_Intercomm_create");
 
     if (remoteSize==0) {
@@ -9513,7 +9513,7 @@ int AMPI_Cart_sub(MPI_Comm comm, const int *remain_dims, MPI_Comm *newcomm) {
   int num_remain_dims = 0;
 
   vector<int> coords(ndims);
-  AMPI_Cart_coords(comm, rank, ndims, &coords[0]);
+  AMPI_Cart_coords(comm, rank, ndims, coords.data());
 
   for (i = 0; i < ndims; i++) {
     if (remain_dims[i]) {

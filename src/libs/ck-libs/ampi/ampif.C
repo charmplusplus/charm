@@ -1797,10 +1797,10 @@ void ampif_info_get(int* info, const char *key, int* valuelen, char *value, int 
 
   vector<char> tmpValue(*valuelen);
 
-  *ierr = AMPI_Info_get(*info, tmpKey, *valuelen, &tmpValue[0], flag);
+  *ierr = AMPI_Info_get(*info, tmpKey, *valuelen, tmpValue.data(), flag);
 
   if (*ierr == MPI_SUCCESS)
-    ampif_str_c2f(value, &tmpValue[0], *valuelen);
+    ampif_str_c2f(value, tmpValue.data(), *valuelen);
 }
 
 void ampif_info_get_valuelen(int* info, const char *key, int *valuelen, int *flag,

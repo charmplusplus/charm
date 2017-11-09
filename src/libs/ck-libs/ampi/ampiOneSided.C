@@ -242,8 +242,8 @@ int ampi::winPut(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank
   }
   else {
     vector<char> sorgaddr(orgtotalsize);
-    ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, 1);
-    thisProxy[rank].winRemotePut(orgtotalsize, &sorgaddr[0], orgcnt, orgtype, targdisp,
+    ddt->serialize((char*)orgaddr, sorgaddr.data(), orgcnt, 1);
+    thisProxy[rank].winRemotePut(orgtotalsize, sorgaddr.data(), orgcnt, orgtype, targdisp,
                                  targcnt, targtype, win->index);
   }
 
@@ -422,8 +422,8 @@ int ampi::winAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, i
   }
   else {
     vector<char> sorgaddr(orgtotalsize);
-    ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, 1);
-    thisProxy[rank].winRemoteAccumulate(orgtotalsize, &sorgaddr[0], orgcnt, orgtype,
+    ddt->serialize((char*)orgaddr, sorgaddr.data(), orgcnt, 1);
+    thisProxy[rank].winRemoteAccumulate(orgtotalsize, sorgaddr.data(), orgcnt, orgtype,
                                         targdisp, targcnt, targtype,  op, win->index);
   }
 
@@ -441,8 +441,8 @@ void ampi::winRemoteAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt,
   }
   else {
     vector<char> getdata(orgtotalsize);
-    ddt->serialize(&getdata[0], sorgaddr, targcnt, (-1));
-    winobj->accumulate(&getdata[0], targcnt, targdisp, targtype, op, parent);
+    ddt->serialize(getdata.data(), sorgaddr, targcnt, (-1));
+    winobj->accumulate(getdata.data(), targcnt, targdisp, targtype, op, parent);
   }
 }
 
@@ -485,8 +485,8 @@ int ampi::winGetAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype
   }
   else {
     vector<char> sorgaddr(orgtotalsize);
-    orgddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, 1);
-    msg = thisProxy[rank].winRemoteGetAccumulate(orgtotalsize, &sorgaddr[0], orgcnt, orgtype, targdisp,
+    orgddt->serialize((char*)orgaddr, sorgaddr.data(), orgcnt, 1);
+    msg = thisProxy[rank].winRemoteGetAccumulate(orgtotalsize, sorgaddr.data(), orgcnt, orgtype, targdisp,
                                                  targcnt, targtype, op, win->index);
   }
 
@@ -516,8 +516,8 @@ void ampi::winLocalGetAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt, M
   }
   else {
     vector<char> getdata(orgtotalsize);
-    tddt->serialize(&getdata[0], sorgaddr, targcnt, (-1));
-    winobj->accumulate(&getdata[0], targcnt, targdisp, targtype, op, parent);
+    tddt->serialize(getdata.data(), sorgaddr, targcnt, (-1));
+    winobj->accumulate(getdata.data(), targcnt, targdisp, targtype, op, parent);
   }
 }
 
@@ -542,8 +542,8 @@ AmpiMsg* ampi::winRemoteGetAccumulate(int orgtotalsize, char* sorgaddr, int orgc
   }
   else {
     vector<char> getdata(orgtotalsize);
-    tddt->serialize(&getdata[0], sorgaddr, targcnt, (-1));
-    winobj->accumulate(&getdata[0], targcnt, targdisp, targtype, op, parent);
+    tddt->serialize(getdata.data(), sorgaddr, targcnt, (-1));
+    winobj->accumulate(getdata.data(), targcnt, targdisp, targtype, op, parent);
   }
 
   return msg;
@@ -1041,7 +1041,7 @@ int AMPI_Win_post(MPI_Group group, int assertion, MPI_Win win){
   for (int i=0; i<parentGroupSize; i++) {
     parentGroupRanks[i] = i;
   }
-  AMPI_Group_translate_ranks(parentGroup, parentGroupSize, &parentGroupRanks[0], group, &subsetGroupRanks[0]);
+  AMPI_Group_translate_ranks(parentGroup, parentGroupSize, parentGroupRanks.data(), group, subsetGroupRanks.data());
 
   ampi *ptr = getAmpiInstance(winStruct->comm);
   int actualRanks = 0;
@@ -1082,7 +1082,7 @@ int AMPI_Win_wait(MPI_Win win){
     }
   }
 
-  AMPI_Waitall(requestList.size(), &requestList[0], MPI_STATUSES_IGNORE);
+  AMPI_Waitall(requestList.size(), requestList.data(), MPI_STATUSES_IGNORE);
   winStruct->clearEpochExposure();
 
   return MPI_SUCCESS;
@@ -1110,7 +1110,7 @@ int AMPI_Win_start(MPI_Group group, int assertion, MPI_Win win){
     parentGroupRanks[i] = i;
   }
 
-  AMPI_Group_translate_ranks(parentGroup, parentGroupSize, &parentGroupRanks[0], group, &subsetGroupRanks[0]);
+  AMPI_Group_translate_ranks(parentGroup, parentGroupSize, parentGroupRanks.data(), group, subsetGroupRanks.data());
 
   ampi *ptr = getAmpiInstance(winStruct->comm);
   int actualRanks = 0;
@@ -1167,12 +1167,12 @@ int AMPI_Win_test(MPI_Win win, int *flag){
   // If nonblocking recvs have been posted already, there is no reason to post duplicates
   if (!winStruct->AreRecvsPosted()) {
     for (int i=0; i<reqList.size(); i++) {
-      ptr->irecv(NULL, 0, MPI_INT, exposureRankList[i], MPI_EPOCH_END_TAG, winStruct->comm, &reqList[0]);
+      ptr->irecv(NULL, 0, MPI_INT, exposureRankList[i], MPI_EPOCH_END_TAG, winStruct->comm, reqList.data());
     }
     winStruct->setAreRecvsPosted(true);
   }
 
-  AMPI_Testall(reqList.size(), &reqList[0], flag, MPI_STATUSES_IGNORE);
+  AMPI_Testall(reqList.size(), reqList.data(), flag, MPI_STATUSES_IGNORE);
   if (*flag) {
     winStruct->clearEpochExposure();
   }
