@@ -1946,7 +1946,7 @@ static int req_handle_initnode(ChMessage *msg, SOCKET fd)
  * node-programs
  * to talk to one another.
  */
-static int req_handle_initnodetab(ChMessage *msg, SOCKET fd)
+static int req_send_initnodetab(SOCKET fd)
 {
   const int nodetab_rank0_size = nodetab_rank0_table.size();
   ChMessageHeader hdr;
@@ -1964,7 +1964,7 @@ static int req_handle_initnodetab(ChMessage *msg, SOCKET fd)
 
 #ifdef HSTART
 /* Used for fault tolerance with hierarchical start */
-static int req_handle_initnodetab1(ChMessage *msg, SOCKET fd)
+static int req_send_initnodetab1(SOCKET fd)
 {
   const int nodetab_rank0_size = nodetab_rank0_table.size();
   ChMessageHeader hdr;
@@ -2391,7 +2391,7 @@ static int req_handle_crashack(ChMessage *msg, SOCKET fd)
       /* only after everybody else update its nodetab, can this
          restarted process continue */
       PRINT(("Charmrun> continue node: %d\n", _last_crash));
-      req_handle_initnodetab1(NULL, req_clients[_crash_socket_charmrun_index]);
+      req_send_initnodetab1(req_clients[_crash_socket_charmrun_index]);
       _last_crash = 0;
       count = 0;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -2407,7 +2407,7 @@ static int req_handle_crashack(ChMessage *msg, SOCKET fd)
     // only after everybody else update its nodetab, can this restarted process
     // continue
     PRINT(("Charmrun> continue node: %d\n", _last_crash));
-    req_handle_initnodetab(NULL, req_clients[_crash_socket_index]);
+    req_send_initnodetab(req_clients[_crash_socket_index]);
     _last_crash = 0;
     count = 0;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -2464,7 +2464,7 @@ static int req_handle_crash(ChMessage *msg, SOCKET fd)
 
   /* Already processed, so send*/
   for (int client = 0; client < req_nClients; client++) {
-    req_handle_initnodetab(NULL, req_clients[client]);
+    req_send_initnodetab(req_clients[client]);
   }
 
   /*Anounce crash to all child charmruns*/
@@ -3380,7 +3380,7 @@ static void req_client_connect(void)
   else
 #endif
     for (int client = 0; client < req_nClients; client++) {
-      req_handle_initnodetab(NULL, req_clients[client]);
+      req_send_initnodetab(req_clients[client]);
     }
 
 #endif
@@ -3441,7 +3441,7 @@ static void req_charmrun_connect(void)
 
   /* Already processed, so send*/
   for (int client = 0; client < req_nClients; client++) {
-    req_handle_initnodetab(NULL, req_clients[client]);
+    req_send_initnodetab(req_clients[client]);
   }
 // if(!arg_child_charmrun) getthetime(t4);
 #endif
@@ -3527,7 +3527,7 @@ static void req_client_start_and_connect(void)
   else
 #endif
     for (int client = 0; client < req_nClients; client++) {
-      req_handle_initnodetab(NULL, req_clients[client]);
+      req_send_initnodetab(req_clients[client]);
     }
 
 #endif
@@ -5338,7 +5338,7 @@ static void reconnect_crashed_client(int socket_index, int crashed_node)
     nodeinfo_add(in, req_clients[socket_index]);
     for (int i = 0; i < req_nClients; i++) {
       if (i != socket_index) {
-        req_handle_initnodetab(NULL, req_clients[i]);
+        req_send_initnodetab(req_clients[i]);
       }
     }
 
@@ -5353,8 +5353,8 @@ static void reconnect_crashed_client(int socket_index, int crashed_node)
     /*holds the restarted process until I got ack back from
       everyone in req_handle_crashack
       now the restarted one can only continue until
-      req_handle_crashack calls req_handle_initnodetab(socket_index)
-      req_handle_initnodetab(NULL,req_clients[socket_index]); */
+      req_handle_crashack calls req_send_initnodetab(socket_index)
+      req_send_initnodetab(req_clients[socket_index]); */
     ChMessage_free(&msg);
   }
 }
