@@ -3333,6 +3333,9 @@ static struct timeval tim;
 #define getthetime1(x)                                                         \
   gettimeofday(&tim, NULL);                                                    \
   x = tim.tv_sec;
+
+static void req_all_clients_connected(void);
+
 /*Wait for all the clients to connect to our server port*/
 static void req_client_connect(void)
 {
@@ -3360,10 +3363,16 @@ static void req_client_connect(void)
 
 #endif
 
+  req_all_clients_connected();
+}
+
+static void req_all_clients_connected(void)
+{
   if (portOk == 0)
     exit(1);
   if (arg_verbose)
     printf("Charmrun> All clients connected.\n");
+
 #if CMK_USE_IBVERBS
   exchange_qpdata_clients();
   send_clients_nodeinfo_qpdata();
@@ -3506,33 +3515,8 @@ static void req_client_start_and_connect(void)
     read_initnode_one_client(client);
   }
 #endif
-  if (portOk == 0)
-    exit(1);
-  if (arg_verbose)
-    printf("Charmrun> All clients connected.\n");
 
-#if CMK_USE_IBVERBS
-  exchange_qpdata_clients();
-  send_clients_nodeinfo_qpdata();
-#else
-#ifdef HSTART
-  if (arg_hierarchical_start) {
-    /* first we need to send data to parent charmrun and then send the nodeinfo
-     * to the clients*/
-    send_myNodeInfo_to_parent();
-    /*then receive from root */
-    forward_nodetab_to_children();
-  }
-
-  else
-#endif
-    for (int client = 0; client < req_nClients; client++) {
-      req_send_initnodetab(req_clients[client]);
-    }
-
-#endif
-  if (arg_verbose)
-    printf("Charmrun> IP tables sent.\n");
+  req_all_clients_connected();
   free(ssh_pids); /* done with ssh_pids */
 }
 
