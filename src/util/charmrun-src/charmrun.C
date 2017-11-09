@@ -3691,13 +3691,15 @@ static void start_next_level_charmruns(void);
 static void nodetab_init_for_scyld(void);
 static void start_nodes_scyld(void);
 #endif
-static void start_nodes_local(char **envp);
+static void start_nodes_local(void);
 static void kill_nodes(void);
 static void open_gdb_info(void);
 static void read_global_segments_size(void);
 
 static void fast_idleFn(void) { sleep(0); }
 static void finish_nodes(void);
+
+static char **main_envp;
 
 int main(int argc, const char **argv, char **envp)
 {
@@ -3706,6 +3708,7 @@ int main(int argc, const char **argv, char **envp)
   skt_set_idle(fast_idleFn);
 /* CrnSrand((int) time(0)); */
 
+  main_envp = envp;
   /* Compute the values of all constants */
   arg_init(argc, argv);
   if (arg_verbose)
@@ -3759,7 +3762,7 @@ int main(int argc, const char **argv, char **envp)
           req_client_start_and_connect();
       }
     } else
-      start_nodes_local(envp);
+      start_nodes_local();
   }
 
   /* Normal startup*/
@@ -3783,7 +3786,7 @@ int main(int argc, const char **argv, char **envp)
       } else
         req_client_start_and_connect();
     } else
-      start_nodes_local(envp);
+      start_nodes_local();
   }
 #endif
 
@@ -3980,7 +3983,7 @@ static void envCat(char *dest, LPTSTR oldEnv)
 
 /* simple version of charmrun that avoids the sshd or charmd,   */
 /* it spawn the node program just on local machine using exec. */
-static void start_nodes_local(char **env)
+static void start_nodes_local(void)
 {
   char cmdLine[10000];     /*Program command line, including executable name*/
                            /*Command line too long.*/
@@ -5038,8 +5041,10 @@ static char *find_abs_path(const char *target)
 
 /* simple version of charmrun that avoids the sshd or charmd,   */
 /* it spawn the node program just on local machine using exec. */
-static void start_nodes_local(char **env)
+static void start_nodes_local(void)
 {
+  char ** env = main_envp;
+
   /* copy environ and expanded to hold NETSTART and CmiNumNodes */
   int envc;
   for (envc = 0; env[envc]; envc++)
