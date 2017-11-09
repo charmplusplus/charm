@@ -3276,15 +3276,6 @@ static void req_set_client_connect(int start, int end)
   free(finished);
 }
 
-/* allow one client to connect */
-static void req_one_client_connect(int client)
-{
-  if (errorcheck_one_client_connect(
-          client)) { /*This client has just connected-- fetch his name and IP*/
-    read_initnode_one_client(client);
-  }
-}
-
 #if CMK_USE_IBVERBS
 /* Each node has sent the qpn data for all the qpns it has created
    This data needs to be sent to all the other nodes
