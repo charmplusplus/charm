@@ -88,7 +88,7 @@ void CpdBeforeEp(int ep, void *obj, void *msg) {
       CpdResetMemory();
       CpdSystemExit();
     }
-    CkVec<DebugPersistentCheck> &preExecutes = CkpvAccess(_debugEntryTable)[ep].preProcess;
+    std::vector<DebugPersistentCheck> &preExecutes = CkpvAccess(_debugEntryTable)[ep].preProcess;
     for (int i=0; i<preExecutes.size(); ++i) {
       preExecutes[i].object->cpdCheck(preExecutes[i].msg);
     }
@@ -101,7 +101,7 @@ void CpdAfterEp(int ep) {
 #if CMK_CHARMDEBUG
   if (CpvAccess(cmiArgDebugFlag)) {
     DebugRecursiveEntry entry = _debugData.peek();
-    CkVec<DebugPersistentCheck> &postExecutes = CkpvAccess(_debugEntryTable)[ep].postProcess;
+    std::vector<DebugPersistentCheck> &postExecutes = CkpvAccess(_debugEntryTable)[ep].postProcess;
     for (int i=0; i<postExecutes.size(); ++i) {
       postExecutes[i].object->cpdCheck(postExecutes[i].msg);
     }

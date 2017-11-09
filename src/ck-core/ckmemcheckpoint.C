@@ -370,9 +370,8 @@ void CkMemCheckPT::initEntry()
 
 CkMemCheckPT::~CkMemCheckPT()
 {
-  int len = ckTable.length();
-  for (int i=0; i<len; i++) {
-    delete ckTable[i];
+  for (CkCheckPTInfo* it : ckTable) {
+    delete it;
   }
 }
 
@@ -422,10 +421,10 @@ void CkMemCheckPT::inmem_restore(CkArrayCheckPTMessage *m)
   ArrayElement *elt = arrmgr->lookup(m->index);
   CmiAssert(elt);
   CkLocRec *rec = elt->myRec;
-  CkVec<CkMigratable *> list;
+  std::vector<CkMigratable *> list;
   mgr->migratableList(rec, list);
-  CmiAssert(list.length() > 0);
-  for (int l=0; l<list.length(); l++) {
+  CmiAssert(!list.empty());
+  for (int l=0; l<list.size(); l++) {
     elt = (ArrayElement *)list[l];
     elt->budPEs[0] = m->bud1;
     elt->budPEs[1] = m->bud2;
@@ -443,7 +442,7 @@ void CkMemCheckPT::inmem_restore(CkArrayCheckPTMessage *m)
 // return 1 if pe is a crashed processor
 bool CkMemCheckPT::isFailed(int pe)
 {
-  for (int i=0; i<failedPes.length(); i++)
+  for (int i=0; i<failedPes.size(); i++)
     if (failedPes[i] == pe) return true;
   return false;
 }
@@ -457,7 +456,7 @@ void CkMemCheckPT::failed(int pe)
 
 int CkMemCheckPT::totalFailed()
 {
-  return failedPes.length();
+  return failedPes.size();
 }
 
 // create an checkpoint entry for array element of aid with index.
@@ -518,7 +517,7 @@ void CkMemCheckPT::doItNow(int starter, CkCallback &&cb)
     CkPrintf("[%d] Start checkpointing  starter: %d... \n", CkMyPe(), cpStarter);
   }
 #if !CMK_CHKP_ALL
-  int len = ckTable.length();
+  int len = ckTable.size();
   for (int i=0; i<len; i++) {
     CkCheckPTInfo *entry = ckTable[i];
       // always let the bigger number processor send request
@@ -705,7 +704,7 @@ void CkMemCheckPT::recvProcData(CkProcCheckPTMessage *msg)
 // ArrayElement call this function to give us the checkpointed data
 void CkMemCheckPT::recvData(CkArrayCheckPTMessage *msg)
 {
-  int len = ckTable.length();
+  int len = ckTable.size();
   int idx;
   for (idx=0; idx<len; idx++) {
     CkCheckPTInfo *entry = ckTable[idx];
@@ -718,7 +717,7 @@ void CkMemCheckPT::recvData(CkArrayCheckPTMessage *msg)
       // all my array elements have returned their inmem data
       // inform starter processor that I am done.
     recvCount ++;
-    if (recvCount == ckTable.length()) {
+    if (recvCount == ckTable.size()) {
       if (where == CkCheckPoint_inMEM) {
         contribute(CkCallback(CkReductionTarget(CkMemCheckPT, cpFinish), thisProxy[cpStarter]));
       }
@@ -766,7 +765,7 @@ void CkMemCheckPT::report()
   inCheckpointing = false;
 #if !CMK_CHKP_ALL
   int objsize = 0;
-  int len = ckTable.length();
+  int len = ckTable.size();
   for (int i=0; i<len; i++) {
     CkCheckPTInfo *entry = ckTable[i];
     CmiAssert(entry);
@@ -848,7 +847,7 @@ void CkMemCheckPT::resetLB(int diepe)
   // set processor available bitmap
   get_avail_vector(bitmap.data());
 
-  for (i=0; i<failedPes.length(); i++)
+  for (i=0; i<failedPes.size(); i++)
     bitmap[failedPes[i]] = 0; 
   bitmap[diepe] = 0;
 
@@ -884,7 +883,7 @@ void CkMemCheckPT::restart(int diePe)
 #endif
   thisFailedPe = diePe;
 
-  if (CkMyPe() == diePe) CmiAssert(ckTable.length() == 0);
+  if (CkMyPe() == diePe) CmiAssert(ckTable.empty());
 
   inRestarting = true;
                                                                                 
@@ -906,7 +905,7 @@ void CkMemCheckPT::restart(int diePe)
 void CkMemCheckPT::removeArrayElements()
 {
 #if CMK_MEM_CHECKPOINT
-  int len = ckTable.length();
+  int len = ckTable.size();
   double curTime = CmiWallTimer();
   if (CkMyPe() == thisFailedPe) 
     CkPrintf("[%d] CkMemCheckPT ----- %s len:%d in %f seconds.\n",CkMyPe(),stage,len,curTime-startTime);
@@ -957,7 +956,7 @@ void CkMemCheckPT::resetReductionMgr()
 void CkMemCheckPT::recoverBuddies()
 {
   int idx;
-  int len = ckTable.length();
+  int len = ckTable.size();
   // ready to flush reduction manager
   // cannot be CkMemCheckPT::restart because destroy will modify states
   double curTime = CmiWallTimer();
@@ -1046,7 +1045,7 @@ void CkMemCheckPT::updateLocations(int n, CkGroupID *g, CkArrayIndex *idx, CmiUI
 void CkMemCheckPT::recoverArrayElements()
 {
   double curTime = CmiWallTimer();
-  int len = ckTable.length();
+  int len = ckTable.size();
   //CkPrintf("[%d] CkMemCheckPT ----- %s len: %d in %f seconds \n",CkMyPe(), stage, len, curTime-startTime);
   stage = (char *)"recoverArrayElements";
   if (CkMyPe() == thisFailedPe)
@@ -1057,9 +1056,8 @@ void CkMemCheckPT::recoverArrayElements()
   int count = 0;
 
 #if STREAMING_INFORMHOME && CK_NO_PROC_POOL
-  CkVec<CkGroupID> * gmap = new CkVec<CkGroupID>[CkNumPes()];
-  CkVec<CkArrayIndex> * imap = new CkVec<CkArrayIndex>[CkNumPes()];
-  CkVec<CkArrayIndex> * idmap = new CkVec<CmiUInt8>[CkNumPes()];
+  std::vector<CkGroupID> * gmap = new std::vector<CkGroupID>[CkNumPes()];
+  std::vector<CkArrayIndex> * imap = new std::vector<CkArrayIndex>[CkNumPes()];
 #endif
 
 #if !CMK_CHKP_ALL
@@ -1109,7 +1107,7 @@ void CkMemCheckPT::recoverArrayElements()
 #if STREAMING_INFORMHOME && CK_NO_PROC_POOL
   for (int i=0; i<CkNumPes(); i++) {
     if (gmap[i].size() && i!=CkMyPe()&& i==thisFailedPe) {
-      thisProxy[i].updateLocations(gmap[i].size(), gmap[i].getVec(), imap[i].getVec(), CkMyPe());
+      thisProxy[i].updateLocations(gmap[i].size(), gmap[i].data(), imap[i].data(), CkMyPe());
 	flag++;	
 	  }
   }
@@ -1138,7 +1136,7 @@ void CkMemCheckPT::gotReply(){
     contribute(CkCallback(CkReductionTarget(CkMemCheckPT, finishUp), thisProxy));
 }
 
-void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,CkVec<CkGroupID> * gmap, CkVec<CkArrayIndex> * imap){
+void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,std::vector<CkGroupID> * gmap, std::vector<CkArrayIndex> * imap){
 #if CMK_CHKP_ALL
 	PUP::fromMem p(msg->packData);
 	int numElements = 0;

@@ -1541,7 +1541,7 @@ void CkArray::recvBroadcast(CkMessage *m)
         void *root;
         _TRACE_BG_TLINE_END(&root);
 	BgSetEntryName("start-broadcast", &root);
-        CkVec<void *> logs;    // store all logs for each delivery
+        std::vector<void *> logs;    // store all logs for each delivery
 	extern void stopVTimer();
 	extern void startVTimer();
 #endif
@@ -1563,7 +1563,7 @@ void CkArray::recvBroadcast(CkMessage *m)
 #if CMK_BIGSIM_CHARM
 	//BgEntrySplit("end-broadcast");
 	stopVTimer();
-	BgSplitEntry("end-broadcast", logs.getVec(), logs.size());
+	BgSplitEntry("end-broadcast", logs.data(), logs.size());
 	startVTimer();
 #endif
 

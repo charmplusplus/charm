@@ -166,7 +166,7 @@ public:
   void pupAllElements(PUP::er &p);
   void startArrayCheckpoint();
   void recvArrayCheckpoint(CkArrayCheckPTMessage *m);
-  void recoverAll(CkArrayCheckPTMessage * msg, CkVec<CkGroupID> * gmap=NULL, CkVec<CkArrayIndex> * imap=NULL);
+  void recoverAll(CkArrayCheckPTMessage * msg, std::vector<CkGroupID> * gmap=NULL, std::vector<CkArrayIndex> * imap=NULL);
 public:
   static CkCallback  cpCallback;
 
@@ -177,7 +177,7 @@ public:
   static char*  stage;
 
 private:
-  CkVec<CkCheckPTInfo *> ckTable;
+  std::vector<CkCheckPTInfo *> ckTable;
   CkCheckPTEntry chkpTable[2];
 
   int recvCount, peCount;
@@ -185,7 +185,7 @@ private:
   int recvChkpCount;//expect to receive both the processor checkpoint and array checkpoint from buddy PE
   /// the processor who initiate the checkpointing
   int cpStarter;
-  CkVec<int> failedPes;
+  std::vector<int> failedPes;
   int thisFailedPe;
 
     /// to use memory or disk checkpointing

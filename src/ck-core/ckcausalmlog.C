@@ -141,7 +141,7 @@ CpvDeclare(char **, _storeDetsPtrs);
 /***** VARIABLES FOR PARALLEL RECOVERY *****/
 CpvDeclare(int, _numEmigrantRecObjs);
 CpvDeclare(int, _numImmigrantRecObjs);
-CpvDeclare(CkVec<CkLocation *> *, _immigrantRecObjs);
+CpvDeclare(std::vector<CkLocation *> *, _immigrantRecObjs);
 /***** *****/
 
 #if COLLECT_STATS_MSGS
@@ -233,8 +233,8 @@ int _receiveMigrationNoticeAckHandlerIdx;
 int _checkpointBarrierHandlerIdx;
 int _checkpointBarrierAckHandlerIdx;
 
-CkVec<MigrationRecord> migratedNoticeList;
-CkVec<RetainedMigratedObject *> retainedObjectList;
+std::vector<MigrationRecord> migratedNoticeList;
+std::vector<RetainedMigratedObject *> retainedObjectList;
 int donotCountMigration=0;
 int countLBMigratedAway=0;
 int countLBToMigrate=0;
@@ -356,14 +356,14 @@ void _messageLoggingInit(){
 	_phaseBufferedDets = 0;
 	_maxBufferedDets = INITIAL_BUFFERED_DETERMINANTS;
 	CpvInitialize(char *, _localDets);
-	CpvInitialize((CkHashtableT<CkHashtableAdaptorT<CkObjID>, CkVec<Determinant> *> *),_remoteDets);
+	CpvInitialize((CkHashtableT<CkHashtableAdaptorT<CkObjID>, std::vector<Determinant> *> *),_remoteDets);
 	CpvInitialize(char *, _incarnation);
 	CpvInitialize(RemoveDeterminantsHeader *, _removeDetsHeader);
 	CpvInitialize(StoreDeterminantsHeader *, _storeDetsHeader);
 	CpvInitialize(int *, _storeDetsSizes);
 	CpvInitialize(char **, _storeDetsPtrs);
 	CpvAccess(_localDets) = (char *) CmiAlloc(_maxBufferedDets * sizeof(Determinant));
-	CpvAccess(_remoteDets) = new CkHashtableT<CkHashtableAdaptorT<CkObjID>, CkVec<Determinant> *>(100, 0.4);
+	CpvAccess(_remoteDets) = new CkHashtableT<CkHashtableAdaptorT<CkObjID>, std::vector<Determinant> *>(100, 0.4);
 	CpvAccess(_incarnation) = (char *) CmiAlloc(CmiNumPes() * sizeof(int));
 	for(int i=0; i<CmiNumPes(); i++){
 		CpvAccess(_incarnation)[i] = 0;
@@ -379,8 +379,8 @@ void _messageLoggingInit(){
     CpvInitialize(int, _numImmigrantRecObjs);
     CpvAccess(_numImmigrantRecObjs) = 0;
 
-    CpvInitialize(CkVec<CkLocation *> *, _immigrantRecObjs);
-    CpvAccess(_immigrantRecObjs) = new CkVec<CkLocation *>;
+    CpvInitialize(std::vector<CkLocation *> *, _immigrantRecObjs);
+    CpvAccess(_immigrantRecObjs) = new std::vector<CkLocation *>;
 
 	//Cpv variables for checkpoint
 	CpvInitialize(StoredCheckpoint *,_storedCheckpointData);
@@ -1034,7 +1034,7 @@ void _storeDeterminantsHandler(char *buffer){
 	StoreDeterminantsHeader *header;
 	Determinant *detPtr, det;
 	int i, n, index, phase, destPE;
-	CkVec<Determinant> *vec;
+	std::vector<Determinant> *vec;
 
 	// getting the header from the message and pointing to the first determinant
 	header = (StoreDeterminantsHeader *)buffer;
@@ -1057,7 +1057,7 @@ void _storeDeterminantsHandler(char *buffer){
 		// getting the determinant array
 		vec = CpvAccess(_remoteDets)->get(det.receiver);
 		if(vec == NULL){
-			vec = new CkVec<Determinant>();
+			vec = new std::vector<Determinant>();
 			CpvAccess(_remoteDets)->put(det.receiver) = vec;
 		}
 #if COLLECT_STATS_DETS
@@ -1351,7 +1351,7 @@ void _pingHandler(CkPingMsg *msg){
 		Pack all the data on a processor and send it to the buddy periodically
 		Also used to throw away message logs
 *****************************************************************************/
-CkVec<TProcessedLog> processedTicketLog;
+std::vector<TProcessedLog> processedTicketLog;
 void buildProcessedTicketLog(void *data,ChareMlogData *mlogData);
 void clearUpMigratedRetainedLists(int PE);
 
@@ -1438,7 +1438,7 @@ void startMlogCheckpoint(void *_dummy, double curWallTime){
 	/*
 		Store the highest Ticket number processed for each chare on this processor
 	*/
-	processedTicketLog.removeAll();
+	processedTicketLog.clear();
 	forAllCharesDo(buildProcessedTicketLog,(void *)&processedTicketLog);
 
 #if DEBUG_CHECKPOINT
@@ -1467,7 +1467,7 @@ void startMlogCheckpoint(void *_dummy, double curWallTime){
 void buildProcessedTicketLog(void *data, ChareMlogData *mlogData){
 	DEBUG(char objString[100]);
 
-	CkVec<TProcessedLog> *log = (CkVec<TProcessedLog> *)data;
+	std::vector<TProcessedLog> *log = (std::vector<TProcessedLog> *)data;
 	TProcessedLog logEntry;
 	logEntry.recver = mlogData->objID;
 	logEntry.tProcessed = mlogData->tProcessed;
@@ -1605,7 +1605,7 @@ void _storeCheckpointHandler(char *msg){
 			CmiAssert("migratedNoticeList entry for processor other than buddy");
 		}
 		if(migratedNoticeList[j].ackFrom == 1 && migratedNoticeList[j].ackTo == 1){
-			migratedNoticeList.remove(j);
+			migratedNoticeList.erase(migratedNoticeList.begin() + j);
 			count++;
 		}
 		
@@ -1642,7 +1642,7 @@ void sendRemoveLogRequests(){
 	request->PE = CkMyPe();
 	request->numberObjects = processedTicketLog.size();
 	char *listProcessedLogs = &requestMsg[sizeof(RemoveLogRequest)];
-	memcpy(listProcessedLogs,(char *)processedTicketLog.getVec(),processedTicketLog.size()*sizeof(TProcessedLog));
+	memcpy(listProcessedLogs,(char *)processedTicketLog.data(),processedTicketLog.size()*sizeof(TProcessedLog));
 	char *listDeterminants = &listProcessedLogs[processedTicketLog.size()*sizeof(TProcessedLog)];
 	int *numDeterminants = (int *)listDeterminants;
 	numDeterminants[0] = 0; 
@@ -1813,7 +1813,7 @@ void clearUpMigratedRetainedLists(int PE){
 			migratedNoticeList[j].ackTo = 1;
 		}
 		if(migratedNoticeList[j].ackFrom == 1 && migratedNoticeList[j].ackTo == 1){
-			migratedNoticeList.remove(j);
+			migratedNoticeList.erase(migratedNoticeList.begin() + j);
 			count++;
 		}
 	}
@@ -1823,7 +1823,7 @@ void clearUpMigratedRetainedLists(int PE){
 		if(retainedObjectList[j]->migRecord.toPE == PE){
 			RetainedMigratedObject *obj = retainedObjectList[j];
 			DEBUG(printf("[%d] Clearing retainedObjectList %d to PE %d obj %p msg %p\n",CmiMyPe(),j,PE,obj,obj->msg));
-			retainedObjectList.remove(j);
+			retainedObjectList.erase(retainedObjectList.begin() + j);
 			if(obj->msg != NULL){
 				CmiMemoryCheck();
 				CmiFree(obj->msg);
@@ -2012,7 +2012,7 @@ void _recvRestartCheckpointHandler(char *_restartData){
 
 
 	// Send out the request to resend logged messages to all other processors
-	CkVec<TProcessedLog> objectVec;
+	std::vector<TProcessedLog> objectVec;
 	forAllCharesDo(createObjIDList, (void *)&objectVec);
 	int numberObjects = objectVec.size();
 	
@@ -2185,7 +2185,7 @@ void sendCheckpointData(int mode){
 	char *buf = &msg[sizeof(RestartProcessorData)];
 
 	if(dataMsg->numMigratedAwayElements != 0){
-		memcpy(buf,migratedNoticeList.getVec(),migratedNoticeList.size()*sizeof(MigrationRecord));
+		memcpy(buf,migratedNoticeList.data(),migratedNoticeList.size()*sizeof(MigrationRecord));
 		buf = &buf[migratedNoticeList.size()*sizeof(MigrationRecord)];
 	}
 
@@ -2210,9 +2210,9 @@ void sendCheckpointData(int mode){
 
 // this list is used to create a vector of the object ids of all
 //the chares on this processor currently and the highest TN processed by them 
-//the first argument is actually a CkVec<TProcessedLog> *
+//the first argument is actually a std::vector<TProcessedLog> *
 void createObjIDList(void *data,ChareMlogData *mlogData){
-	CkVec<TProcessedLog> *list = (CkVec<TProcessedLog> *)data;
+	std::vector<TProcessedLog> *list = (std::vector<TProcessedLog> *)data;
 	TProcessedLog entry;
 	entry.recver = mlogData->objID;
 	entry.tProcessed = mlogData->tProcessed;
@@ -2277,7 +2277,7 @@ void _recvCheckpointHandler(char *_restartData){
 	_numRestartResponses = 0;
 	
 	// Send out the request to resend logged determinants to all other processors
-	CkVec<TProcessedLog> objectVec;
+	std::vector<TProcessedLog> objectVec;
 	forAllCharesDo(createObjIDList, (void *)&objectVec);
 	int numberObjects = objectVec.size();
 	
@@ -2309,7 +2309,7 @@ void _updateHomeAckHandler(RestartRequest *updateHomeAck){
 	}
 
 	// Send out the request to resend logged messages to all other processors
-	CkVec<TProcessedLog> objectVec;
+	std::vector<TProcessedLog> objectVec;
 	forAllCharesDo(createObjIDList, (void *)&objectVec);
 	int numberObjects = objectVec.size();
 	
@@ -2350,7 +2350,7 @@ void _updateHomeAckHandler(RestartRequest *updateHomeAck){
  */
 void initializeRestart(void *data, ChareMlogData *mlogData){
 	mlogData->resendReplyRecvd = 0;
-	mlogData->receivedTNs = new CkVec<MCount>;
+	mlogData->receivedTNs = new std::vector<MCount>;
 	mlogData->restartFlag = true;
 };
 
@@ -2551,7 +2551,7 @@ void resendMessageForChare(void *data, ChareMlogData *mlogData){
  */
 void _sendDetsHandler(char *msg){
 	ResendData d;
-	CkVec<Determinant> *detVec;
+	std::vector<Determinant> *detVec;
 	ResendRequest *resendReq = (ResendRequest *)msg;
 
 	// CkPrintf("[%d] Sending determinants\n",CkMyPe());
@@ -2564,12 +2564,12 @@ void _sendDetsHandler(char *msg){
 	d.numberObjects = resendReq->numberObjects;
 	d.PE = resendReq->PE;
 	d.listObjects = (TProcessedLog *)listObjects;
-	d.ticketVecs = new CkVec<MCount>[d.numberObjects];
-	detVec = new CkVec<Determinant>[d.numberObjects];
+	d.ticketVecs = new std::vector<MCount>[d.numberObjects];
+	detVec = new std::vector<Determinant>[d.numberObjects];
 
 	// adding the remote determinants to the resendReplyMsg
 	// traversing all the remote determinants
-	CkVec<Determinant> *vec;
+	std::vector<Determinant> *vec;
 	for(int i=0; i<d.numberObjects; i++){
 		vec = CpvAccess(_remoteDets)->get(d.listObjects[i].recver);
 		if(vec != NULL){
@@ -2622,7 +2622,7 @@ void _sendDetsHandler(char *msg){
 		int vecsize = d.ticketVecs[i].size();
 		memcpy(ticketList,&vecsize,sizeof(int));
 		ticketList = &ticketList[sizeof(int)];
-		memcpy(ticketList,d.ticketVecs[i].getVec(),sizeof(MCount)*vecsize);
+		memcpy(ticketList,d.ticketVecs[i].data(),sizeof(MCount)*vecsize);
 		ticketList = &ticketList[sizeof(MCount)*vecsize];
 	}
 
@@ -2685,9 +2685,9 @@ void _resendMessagesHandler(char *msg){
 	lastRestart = CmiWallTimer();
 }
 
-MCount maxVec(CkVec<MCount> *TNvec);
-void sortVec(CkVec<MCount> *TNvec);
-int searchVec(CkVec<MCount> *TNVec,MCount searchTN);
+MCount maxVec(std::vector<MCount> *TNvec);
+void sortVec(std::vector<MCount> *TNvec);
+int searchVec(std::vector<MCount> *TNVec,MCount searchTN);
 
 /**
  * @brief Processes the messages in the delayed remote message queue
@@ -2783,7 +2783,7 @@ void _sendDetsReplyHandler(char *msg){
 		_numRestartResponses = 0;
 
 	// continuing with restart process; send out the request to resend logged messages to all other processors
-	CkVec<TProcessedLog> objectVec;
+	std::vector<TProcessedLog> objectVec;
 	forAllCharesDo(createObjIDList, (void *)&objectVec);
 	int numberObjects = objectVec.size();
 	
@@ -2961,7 +2961,7 @@ void processReceivedTN(Chare *obj, int listSize, MCount *listTNs){
 }
 
 /** @brief Returns the maximum ticket from a vector */
-MCount maxVec(CkVec<MCount> *TNvec){
+MCount maxVec(std::vector<MCount> *TNvec){
 	MCount max = 0;
 	for(int i=0; i<TNvec->size(); i++){
 		if((*TNvec)[i] > max)
@@ -2970,38 +2970,12 @@ MCount maxVec(CkVec<MCount> *TNvec){
 	return max;
 }
 
-void sortVec(CkVec<MCount> *TNvec){
-	//sort it ->its bloddy bubble sort
-	//TODO: use quicksort
-	for(int i=0;i<TNvec->size();i++){
-		for(int j=i+1;j<TNvec->size();j++){
-			if((*TNvec)[j] < (*TNvec)[i]){
-				MCount temp;
-				temp = (*TNvec)[i];
-				(*TNvec)[i] = (*TNvec)[j];
-				(*TNvec)[j] = temp;
-			}
-		}
-	}
-	//make it unique .. since its sorted all equal units will be consecutive
-	MCount *tempArray = new MCount[TNvec->size()];
-	int	uniqueCount=-1;
-	for(int i=0;i<TNvec->size();i++){
-		tempArray[i] = 0;
-		if(uniqueCount == -1 || tempArray[uniqueCount] != (*TNvec)[i]){
-			uniqueCount++;
-			tempArray[uniqueCount] = (*TNvec)[i];
-		}
-	}
-	uniqueCount++;
-	TNvec->removeAll();
-	for(int i=0;i<uniqueCount;i++){
-		TNvec->push_back(tempArray[i]);
-	}
-	delete [] tempArray;
+void sortVec(std::vector<MCount> *TNvec){
+	std::sort(TNvec->begin(), TNvec->end());
+	std::erase(std::unique(TNvec->begin(), TNvec->end()), TNvec->end());
 }	
 
-int searchVec(CkVec<MCount> *TNVec,MCount searchTN){
+int searchVec(std::vector<MCount> *TNVec,MCount searchTN){
 	if(TNVec->size() == 0){
 		return -1; //not found in an empty vec
 	}
@@ -3068,7 +3042,7 @@ public:
 		CkArrayIndexMax idx = loc.getIndex();
 		CkLocRec *rec = loc.getLocalRecord();
 		CkLocMgr *locMgr = loc.getManager();
-		CkVec<CkMigratable *> eltList;
+		std::vector<CkMigratable *> eltList;
 			
 		CkPrintf("[%d] Distributing objects to Processor %d: ",CkMyPe(),*targetPE);
 		idx.print();
@@ -3145,7 +3119,7 @@ void _sendBackLocationHandler(char *receivedMsg){
 	idx.print();
 
 	// decrementing number of emigrant objects at reduction manager
-	CkVec<CkMigratable *> eltList;
+	std::vector<CkMigratable *> eltList;
 	CkLocRec *rec = mgr->elementRec(idx);
 	mgr->migratableList((CkLocRec *)rec,eltList);
 	CkReductionMgr *reductionMgr = (CkReductionMgr*)CkpvAccess(_groupTable)->find(eltList[0]->mlogData->objID.data.array.id).getObj();
@@ -3188,7 +3162,7 @@ void _distributedLocationHandler(char *receivedMsg){
 	CpvAccess(_immigrantRecObjs)->push_back(new CkLocation(mgr,rec));
 	CpvAccess(_numImmigrantRecObjs)++;
 	
-	CkVec<CkMigratable *> eltList;
+	std::vector<CkMigratable *> eltList;
 	mgr->migratableList((CkLocRec *)rec,eltList);
 	for(int i=0;i<eltList.size();i++){
 		if(eltList[i]->mlogData->toResumeOrNot && eltList[i]->mlogData->resumeCount < globalResumeCount){
@@ -3280,7 +3254,7 @@ public:
 		data = _data;
 	};
 	void addLocation(CkLocation &loc){
-		CkVec<CkMigratable *> list;
+		std::vector<CkMigratable *> list;
 		CkLocRec *local = loc.getLocalRecord();
 		locMgr->migratableList (local,list);
 		for(int i=0;i<list.size();i++){
@@ -3355,7 +3329,7 @@ void sendBackImmigrantRecObjs(){
 	CkLocRec *rec;
 	PUP::sizer psizer;
 	int targetPE;
-	CkVec<CkMigratable *> eltList;
+	std::vector<CkMigratable *> eltList;
 	CkReductionMgr *reductionMgr;
  
 	// looping through all elements in immigrant recovery objects vector
@@ -3407,7 +3381,7 @@ void sendBackImmigrantRecObjs(){
 	}
 
 	// cleaning up all data structures
-	CpvAccess(_immigrantRecObjs)->removeAll();
+	CpvAccess(_immigrantRecObjs)->clear();
 	CpvAccess(_numImmigrantRecObjs) = 0;
 
 }
@@ -3619,7 +3593,7 @@ void garbageCollectMlogForChare(void *data, ChareMlogData *mlogData){
  */
 void garbageCollectMlog(){
 	CkHashtableIterator *iterator;
-	CkVec<Determinant> *detArray;
+	std::vector<Determinant> *detArray;
 
 	DEBUG(CkPrintf("[%d] Garbage collecting message log and data structures\n", CkMyPe()));
 
@@ -3631,8 +3605,8 @@ void garbageCollectMlog(){
 	// cleaning up remote determinants, since they belong to a previous checkpoint period
 	iterator = CpvAccess(_remoteDets)->iterator();
 	while(iterator->hasNext()){
-		detArray = *(CkVec<Determinant> **)iterator->next();
-		detArray->removeAll();
+		detArray = *(std::vector<Determinant> **)iterator->next();
+		detArray->clear();
 	}
 	
 	// deleting the iterator
@@ -4002,7 +3976,7 @@ void ChareMlogData::pup(PUP::er &p){
 		if(lengthReceivedTNs == -1){
 			receivedTNs = NULL;
 		}else{
-			receivedTNs = new CkVec<MCount>;
+			receivedTNs = new std::vector<MCount>;
 			for(int i=0;i<lengthReceivedTNs;i++){
 				MCount tempTicket;
 				p | tempTicket;

@@ -355,9 +355,9 @@ void CkPupMainChareData(PUP::er &p, CkArgMsg *args)
 
 #ifndef CMK_CHARE_USE_PTR
 
-CkpvExtern(CkVec<void *>, chare_objs);
-CkpvExtern(CkVec<int>, chare_types);
-CkpvExtern(CkVec<VidBlock *>, vidblocks);
+CkpvExtern(std::vector<void *>, chare_objs);
+CkpvExtern(std::vector<int>, chare_types);
+CkpvExtern(std::vector<VidBlock *>, vidblocks);
 
 // handle plain non-migratable chare
 void CkPupChareData(PUP::er &p)

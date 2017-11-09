@@ -85,7 +85,7 @@ inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
 #endif
 
 #ifndef CMK_CHARE_USE_PTR
-CkpvExtern(CkVec<void *>, chare_objs);
+CkpvExtern(std::vector<void *>, chare_objs);
 #endif
 
 #include <unordered_map>

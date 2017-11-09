@@ -34,14 +34,14 @@
 // maximum number of fragments into which a message can be broken
 #define MAXFRAGS 100
 
-typedef CkQ<multicastGrpMsg *>   multicastGrpMsgBuf;
-typedef CkVec<CkArrayIndex>   arrayIndexList;
-typedef CkVec<int>   groupPeList;
-typedef CkVec<CkSectionInfo>     sectionIdList;
-typedef CkVec<CkReductionMsg *>  reductionMsgs;
-typedef CkQ<int>                 PieceSize;
-typedef CkVec<LDObjid>          ObjKeyList;
-typedef unsigned char            byte;
+typedef CkQ<multicastGrpMsg *> multicastGrpMsgBuf;
+typedef std::vector<CkArrayIndex> arrayIndexList;
+typedef std::vector<int> groupPeList;
+typedef std::vector<CkSectionInfo> sectionIdList;
+typedef std::vector<CkReductionMsg *> reductionMsgs;
+typedef CkQ<int> PieceSize;
+typedef std::vector<LDObjid> ObjKeyList;
+typedef unsigned char byte;
 
 /** Information about the status of reductions proceeding along a given section
  *
@@ -183,11 +183,11 @@ class mCastEntry
         /// Is this a group section
         inline int isGrpSec() {  return grpSec; }
         inline int getNumLocalElems(){
-            return (isGrpSec()? localGrpElem : localElem.length());
+            return (isGrpSec()? localGrpElem : localElem.size());
         }
 	inline void setLocalGrpElem() { localGrpElem = 1; }
         inline int getNumAllElems(){
-            return (isGrpSec()? allGrpElem.length() : allElem.length());
+            return (isGrpSec()? allGrpElem.size() : allElem.size());
         }
         /// Increment the reduction number across the whole linked list of cookies
         inline void incReduceNo() {
@@ -281,13 +281,13 @@ mCastEntry::mCastEntry (mCastEntry *old):
   int i;
   aid = old->aid;
   parentGrp = old->parentGrp;
-  for (i=0; i<old->allElem.length(); i++)
+  for (i=0; i<old->allElem.size(); i++)
     allElem.push_back(old->allElem[i]);
-  for (i=0; i<old->allGrpElem.length(); i++)
+  for (i=0; i<old->allGrpElem.size(); i++)
     allGrpElem.push_back(old->allGrpElem[i]);
 #if CMK_LBDB_ON
-  CmiAssert(old->allElem.length() == old->allObjKeys.length());
-  for (i=0; i<old->allObjKeys.length(); i++)
+  CmiAssert(old->allElem.size() == old->allObjKeys.size());
+  for (i=0; i<old->allObjKeys.size(); i++)
     allObjKeys.push_back(old->allObjKeys[i]);
 #endif
   pe = old->pe;
@@ -503,7 +503,7 @@ void CkMulticastMgr::recvCookieInfo(CkSectionInfo s, int red)
 void CkMulticastMgr::initCookie(CkSectionInfo s)
 {
   mCastEntry *entry = (mCastEntry *)s.get_val();
-  const int n = entry->allElem.length();
+  const int n = entry->allElem.size();
   DEBUGF(("init: %d elems %p at %f\n", n, s.get_val(), CkWallTimer()));
   // might want to consider using unordered_map, but some spanning tree
   // algorithms could rely on initial list of PEs being ordered
@@ -543,7 +543,7 @@ void CkMulticastMgr::initCookie(CkSectionInfo s)
 void CkMulticastMgr::initGrpCookie(CkSectionInfo s)
 {
    mCastEntry *entry = (mCastEntry *)s.get_val();
-   int n = entry->allGrpElem.length();
+   int n = entry->allGrpElem.size();
    DEBUGF(("init: %d elems %p\n", n, s.get_val()));
    // Create and initialize a setup message
    multicastSetupMsg *msg = new (0, n, 0) multicastSetupMsg;
@@ -575,7 +575,7 @@ void CkMulticastMgr::teardown(CkSectionInfo cookie)
     releaseBufferedReduceMsgs(sect);
     // Propagate the teardown to each of your children
     CProxy_CkMulticastMgr mp(thisgroup);
-    for (i=0; i<sect->children.length(); i++)
+    for (i=0; i<sect->children.size(); i++)
         mp[sect->children[i].get_pe()].teardown(sect->children[i]);
 }
 
@@ -594,7 +594,7 @@ void CkMulticastMgr::retire(CkSectionInfo cookie, CkSectionInfo newroot)
     releaseBufferedReduceMsgs(sect);
     // Propagate the teardown to each of your children
     CProxy_CkMulticastMgr mp(thisgroup);
-    for (i=0; i<sect->children.length(); i++)
+    for (i=0; i<sect->children.size(); i++)
         mp[sect->children[i].get_pe()].teardown(sect->children[i]);
 }
 
@@ -609,7 +609,7 @@ void CkMulticastMgr::freeup(CkSectionInfo cookie)
   while (sect) 
   {
       // Free their children
-      for (int i=0; i<sect->children.length(); i++)
+      for (int i=0; i<sect->children.size(); i++)
           mp[ sect->children[i].get_pe() ].freeup(sect->children[i]);
       // Free the cookie itself
       DEBUGF(("[%d] Free up on %p\n", CkMyPe(), sect));
@@ -667,7 +667,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
           mySubTreePEs.push_back(pe);
         } else {
           for (int j=msg->peElems[i2+1]; j < msg->peElems[i2+3]; j++)
-            entry->localElem.insertAtEnd(msg->arrIdx[j]);
+            entry->localElem.push_back(msg->arrIdx[j]);
         }
       }
     }
@@ -757,7 +757,7 @@ void CkMulticastMgr::childrenReady(mCastEntry *entry)
     entry->setReady();
     CProxy_CkMulticastMgr  mCastGrp(thisgroup);
 
-    DEBUGF(("[%d] childrenReady entry %p groupsection?: %d,  Arrayelems: %d, GroupElems: %d, redNo: %d\n", CkMyPe(), entry, entry->isGrpSec(), entry->allElem.length(), entry->allGrpElem.length(), entry->red.redNo));
+    DEBUGF(("[%d] childrenReady entry %p groupsection?: %d,  Arrayelems: %d, GroupElems: %d, redNo: %d\n", CkMyPe(), entry, entry->isGrpSec(), entry->allElem.size(), entry->allGrpElem.size(), entry->red.redNo));
 
     if (entry->hasParent()) 
         mCastGrp[entry->parentGrp.get_pe()].recvCookie(entry->parentGrp, CkSectionInfo(entry->getAid(), entry));
@@ -790,7 +790,7 @@ void CkMulticastMgr::recvCookie(CkSectionInfo sid, CkSectionInfo child)
 {
   mCastEntry *entry = (mCastEntry *)sid.get_val();
   entry->children.push_back(child);
-  if (entry->children.length() == entry->numChild) {
+  if (entry->children.size() == entry->numChild) {
     childrenReady(entry);
   }
 }
@@ -918,7 +918,7 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
       // fixme: running obj?
       envelope *env = UsrToEnv(msg);
       const LDOMHandle &om = CProxy_ArrayBase(s.get_aid()).ckLocMgr()->getOMHandle();
-      LBDatabaseObj()->MulticastSend(om,entry->allObjKeys.getVec(),entry->allObjKeys.size(),env->getTotalsize());
+      LBDatabaseObj()->MulticastSend(om,entry->allObjKeys.data(),entry->allObjKeys.size(),env->getTotalsize());
     }
 #endif
 
@@ -1017,7 +1017,7 @@ void CkMulticastMgr::recvPacket(CkSectionInfo &&_cookie, int offset, int n, char
   // send to spanning tree children
   // can not optimize using list send because the difference in cookie
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
-  for (i=0; i<entry->children.length(); i++) {
+  for (i=0; i<entry->children.size(); i++) {
     mCastGrp[entry->children[i].get_pe()].recvPacket(entry->children[i], offset, n, data, seqno, count, totalsize, 0);
   }
 
@@ -1055,7 +1055,7 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
   // send to spanning tree children
   // can not optimize using list send because the difference in cookie
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
-  for (i=0; i<entry->children.length(); i++) {
+  for (i=0; i<entry->children.size(); i++) {
     multicastGrpMsg *newmsg = (multicastGrpMsg *)CkCopyMsg((void **)&msg);
 #if CMK_MESSAGE_LOGGING
 	envelope *env = UsrToEnv(newmsg);
@@ -1102,7 +1102,7 @@ void CkMulticastMgr::sendToLocal(multicastGrpMsg *msg)
   }
 
   // else if array section
-  nLocal = entry->localElem.length();
+  nLocal = entry->localElem.size();
   DEBUGF(("[%d] send to local %d elems, ArraySection\n", CkMyPe(), nLocal));
   for (i=0; i<nLocal-1; i++) {
     CProxyElement_ArrayBase ap(aid, entry->localElem[i]);
@@ -1330,7 +1330,7 @@ CkReductionMsg* CkMulticastMgr::combineFrags (CkSectionInfo& id,
     CkReductionMsg* msg = redInfo.msgs[0][0];
 
     // free up the msg slot
-    redInfo.msgs[0].length() = 0;
+    redInfo.msgs[0].clear();
 
     return msg;
   }
@@ -1365,7 +1365,7 @@ CkReductionMsg* CkMulticastMgr::combineFrags (CkSectionInfo& id,
 
     // free fragments
     delete redInfo.msgs[i][0];
-    redInfo.msgs[i].length() = 0;    
+    redInfo.msgs[i].clear();
   }
 
   return msg;
@@ -1394,13 +1394,13 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
     // Check if migration occurred in any of the subtrees, and pick one valid callback
     CkCallback msg_cb;
     int rebuilt = 0;
-    for (i=0; i<rmsgs.length(); i++) {
+    for (i=0; i<rmsgs.size(); i++) {
         if (rmsgs[i]->rebuilt) rebuilt = 1;
         if (!rmsgs[i]->callback.isInvalid()) msg_cb = rmsgs[i]->callback;
     }
 
     // Perform the actual reduction
-    CkReductionMsg *newmsg = (*f)(rmsgs.length(), rmsgs.getVec());
+    CkReductionMsg *newmsg = (*f)(rmsgs.size(), rmsgs.data());
 #if CMK_MESSAGE_LOGGING
 	envelope *env = UsrToEnv(newmsg);
 	env->flags = env->flags | CK_REDUCTION_MSG_MLOG;
@@ -1415,9 +1415,9 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
     redInfo.npProcessed ++;
 
     // Delete all the fragments which are no longer needed
-    for (i=0; i<rmsgs.length(); i++)
+    for (i=0; i<rmsgs.size(); i++)
         if (rmsgs[i]!=newmsg) delete rmsgs[i];
-    rmsgs.length() = 0;
+    rmsgs.clear();
 
     // If I am not the tree root
     if (entry->hasParent()) {
@@ -1534,7 +1534,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     reductionInfo &redInfo = entry->red;
 
 
-    DEBUGF(("[%d] RecvRedMsg, entry: %p, lcount: %d, cccount: %d, #localelems: %d, #children: %d \n", CkMyPe(), entry, redInfo.lcount[msg->fragNo], redInfo.ccount[msg->fragNo], entry->getNumLocalElems(), entry->children.length()));
+    DEBUGF(("[%d] RecvRedMsg, entry: %p, lcount: %d, cccount: %d, #localelems: %d, #children: %d \n", CkMyPe(), entry, redInfo.lcount[msg->fragNo], redInfo.ccount[msg->fragNo], entry->getNumLocalElems(), entry->children.size()));
 
     //-------------------------------------------------------------------------
     /// If you've received a msg from a previous redn, something has gone horribly wrong somewhere!
@@ -1571,7 +1571,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     //-------------------------------------------------------------------------
     /// Flag if this fragment can be reduced (if all local elements and children have contributed this fragment)
     int currentTreeUp = 0;
-    if (redInfo.lcount [index] == entry->getNumLocalElems() && redInfo.ccount [index] == entry->children.length())
+    if (redInfo.lcount [index] == entry->getNumLocalElems() && redInfo.ccount [index] == entry->children.size())
         currentTreeUp = 1;
 
     /// Flag (only at the redn root) if all array elements contributed all their fragments
@@ -1621,11 +1621,11 @@ void CkMulticastMgr::releaseFutureReduceMsgs(mCastEntryPtr entry)
 {
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
 
-  for (int i=0; i<entry->red.futureMsgs.length(); i++) {
+  for (int i=0; i<entry->red.futureMsgs.size(); i++) {
     DEBUGF(("releaseFutureReduceMsgs: %p\n", entry->red.futureMsgs[i]));
     mCastGrp[CkMyPe()].recvRedMsg(entry->red.futureMsgs[i]);
   }
-  entry->red.futureMsgs.length() = 0;
+  entry->red.futureMsgs.clear();
 }
 
 
@@ -1637,25 +1637,25 @@ void CkMulticastMgr::releaseBufferedReduceMsgs(mCastEntryPtr entry)
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
 
   for (int j=0; j<MAXFRAGS; j++) {
-    for (i=0; i<entry->red.msgs[j].length(); i++) {
+    for (i=0; i<entry->red.msgs[j].size(); i++) {
       CkReductionMsg *msg = entry->red.msgs[j][i];
       DEBUGF(("releaseBufferedReduceMsgs:%p red:%d in entry:%p\n", msg, msg->redNo, entry));
       msg->sid = entry->rootSid;
       msg->sourceFlag = 0;
       mCastGrp[entry->rootSid.get_pe()].recvRedMsg(msg);
     }
-    entry->red.msgs[j].length() = 0;
+    entry->red.msgs[j].clear();
   }
 
 
-  for (i=0; i<entry->red.futureMsgs.length(); i++) {
+  for (i=0; i<entry->red.futureMsgs.size(); i++) {
     CkReductionMsg *msg = entry->red.futureMsgs[i];
     DEBUGF(("releaseBufferedFutureReduceMsgs: %p red:%d in entry: %p\n", msg,msg->redNo, entry));
     msg->sid = entry->rootSid;
     msg->sourceFlag = 0;
     mCastGrp[entry->rootSid.get_pe()].recvRedMsg(msg);
   }
-  entry->red.futureMsgs.length() = 0;
+  entry->red.futureMsgs.clear();
 }
 
 
@@ -1667,7 +1667,7 @@ void CkMulticastMgr::updateRedNo(mCastEntryPtr entry, int red)
     entry->red.redNo = red;
 
   CProxy_CkMulticastMgr mp(thisgroup);
-  for (int i=0; i<entry->children.length(); i++) {
+  for (int i=0; i<entry->children.size(); i++) {
     mp[entry->children[i].get_pe()].updateRedNo((mCastEntry *)entry->children[i].get_val(), red);
   }
 

@@ -4,6 +4,10 @@
 */
 #ifndef _REGISTER_H
 #define _REGISTER_H
+
+#include "charm.h"
+#include "cklists.h"
+
 /** \addtogroup CkRegister */
 /*@{*/
 
@@ -258,7 +262,7 @@ public:
 	Subtle: we *don't* want to call vec's constructor,
 	because the order in which constructors for global
 	variables get called is undefined.
-	Hence we rely on the implicit zero-initialization 
+	Hence we rely on the implicit zero-initialization
 	that all globals get.
 	*/
 	CkRegisteredInfo() :vec(CkSkipInitialization()) {}
@@ -278,9 +282,7 @@ public:
 		return vec.size()-1;
 	}
 	
-	/// Return the number of registered entities in this table.
-	/// (This is a reference so the CpdLists can stay up to date).
-	size_t &size(void) {return vec.length();}
+	size_t size(void) {return vec.size();}
 	
 	/// Return the registered data at this index.
 	T *operator[](size_t idx) {

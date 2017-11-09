@@ -18,9 +18,9 @@ clients, including the rest of Charm++, are actually C++.
 
 #ifndef CMK_CHARE_USE_PTR
 #include <map>
-CkpvDeclare(CkVec<void *>, chare_objs);
-CkpvDeclare(CkVec<int>, chare_types);
-CkpvDeclare(CkVec<VidBlock *>, vidblocks);
+CkpvDeclare(std::vector<void *>, chare_objs);
+CkpvDeclare(std::vector<int>, chare_types);
+CkpvDeclare(std::vector<VidBlock *>, vidblocks);
 
 typedef std::map<int, CkChareID>  Vidblockmap;
 CkpvDeclare(Vidblockmap, vmap);      // remote VidBlock to notify upon deletion
@@ -46,9 +46,9 @@ void _initChareTables()
 {
 #ifndef CMK_CHARE_USE_PTR
           /* chare and vidblock table */
-  CkpvInitialize(CkVec<void *>, chare_objs);
-  CkpvInitialize(CkVec<int>, chare_types);
-  CkpvInitialize(CkVec<VidBlock *>, vidblocks);
+  CkpvInitialize(std::vector<void *>, chare_objs);
+  CkpvInitialize(std::vector<int>, chare_types);
+  CkpvInitialize(std::vector<VidBlock *>, vidblocks);
   CkpvInitialize(Vidblockmap, vmap);
   CkpvInitialize(int, currentChareIdx);
   CkpvAccess(currentChareIdx) = -1;

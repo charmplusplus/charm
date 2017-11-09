@@ -287,12 +287,12 @@ void _registerDone(void)
   __registerDone = 1;
 #if CMK_CHARMDEBUG
   if (CkMyRank() == 0) {
-    CpdListRegister(new CpdSimpleListAccessor("charm/entries",_entryTable.size(),pupEntry));
-    CpdListRegister(new CpdSimpleListAccessor("charm/messages",_msgTable.size(),pupMsg));
-    CpdListRegister(new CpdSimpleListAccessor("charm/chares",_chareTable.size(),pupChare));
-    CpdListRegister(new CpdSimpleListAccessor("charm/mains",_mainTable.size(),pupMain));
-    CpdListRegister(new CpdSimpleListAccessor("charm/readonly",_readonlyTable.size(),pupReadonly));
-    CpdListRegister(new CpdSimpleListAccessor("charm/readonlyMsg",_readonlyMsgs.size(),pupReadonlyMsg));
+    CpdListRegister(new CpdSimpleListAccessor<EntryInfo>("charm/entries",&_entryTable,pupEntry));
+    CpdListRegister(new CpdSimpleListAccessor<MsgInfo>("charm/messages",&_msgTable,pupMsg));
+    CpdListRegister(new CpdSimpleListAccessor<ChareInfo>("charm/chares",&_chareTable,pupChare));
+    CpdListRegister(new CpdSimpleListAccessor<MainInfo>("charm/mains",&_mainTable,pupMain));
+    CpdListRegister(new CpdSimpleListAccessor<ReadonlyInfo>("charm/readonly",&_readonlyTable,pupReadonly));
+    CpdListRegister(new CpdSimpleListAccessor<ReadonlyMsgInfo>("charm/readonlyMsg",&_readonlyMsgs,pupReadonlyMsg));
     CpdCharmInit();
   }
 #endif

@@ -505,7 +505,7 @@ private:
 	bool interrupt; /* flag for use in non-smp: false means interrupt can occur, true means not (also acts as a lock) */
 
 	/*vector storing the children of this node*/
-	CkVec<int> kids;
+	std::vector<int> kids;
 	
 //State:
 	void startReduction(int number,int srcPE);
@@ -544,7 +544,7 @@ private:
 	bool blocked;
 	int newParent;
 	int additionalGCount,newAdditionalGCount; //gcount that gets passed to u from the node u replace
-	CkVec<int> newKids;
+	std::vector<int> newKids;
 	CkMsgQ<CkReductionMsg> bufferedMsgs;
 	CkMsgQ<CkReductionMsg> bufferedRemoteMsgs;
 	enum {OLDPARENT,OLDCHILDREN,NEWPARENT,LEAFPARENT};
@@ -745,8 +745,8 @@ private:
 	int parent;
 	int numKids;
 	/*vector storing the children of this node*/
-	CkVec<int> newKids;
-	CkVec<int> kids;
+	std::vector<int> newKids;
+	std::vector<int> kids;
 	void init_BinomialTree();
 
 	void init_TopoTree();
@@ -762,11 +762,9 @@ private:
 
 	//This vector of adjustments is indexed by redNo,
 	// starting from the current redNo.
-	CkVec<countAdjustment> adjVec;
+	std::vector<countAdjustment> adjVec;
 	//Return the countAdjustment struct for the given redNo:
 	countAdjustment &adj(int number);
-	//Shift the list of countAdjustments down
-	void shiftAdjVec(void);
 
 protected:
 	bool hasParent(void);

@@ -886,14 +886,20 @@ static void _initHandler(void *msg, CkCoreState *ck)
         CkpvAccess(_numInitsRecd)++;
 	// _processBocInitMsg already handles QD
         //CpvAccess(_qd)->process();
-        CkpvAccess(_bocInitVec)->insert(env->getGroupNum().idx, env);
+        if (CkpvAccess(_bocInitVec)->size() < env->getGroupNum().idx + 1) {
+          CkpvAccess(_bocInitVec)->resize(env->getGroupNum().idx + 1);
+        }
+        (*CkpvAccess(_bocInitVec))[env->getGroupNum().idx] = env;
       } else _bufferHandler(msg);
       break;
     case NodeBocInitMsg:
       if (env->getGroupEpoch()==0) {
         CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
         CksvAccess(_numInitNodeMsgs)++;
-        CksvAccess(_nodeBocInitVec)->insert(env->getGroupNum().idx, env);
+        if (CksvAccess(_nodeBocInitVec)->size() < env->getGroupNum().idx + 1) {
+          CksvAccess(_nodeBocInitVec)->resize(env->getGroupNum().idx + 1);
+        }
+        (*CksvAccess(_nodeBocInitVec))[env->getGroupNum().idx] = env;
         CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
         CpvAccess(_qd)->process();
       } else _bufferHandler(msg);

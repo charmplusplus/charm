@@ -244,7 +244,7 @@ void CkElementEvacuate::addLocation(CkLocation &loc){
 			This is in all probability a location containing an ampi, ampiParent and their
 			associated TCharm thread.
 		*/
-		CkVec<CkMigratable *>list;
+		std::vector<CkMigratable *>list;
 		locMgr->migratableList(rec,list);
 		DEBUGC(printf("[%d] ArrayElement not ready to Evacuate number of migratable %d \n",CkMyPe(),list.size()));
 		for(int i=0;i<list.size();i++){

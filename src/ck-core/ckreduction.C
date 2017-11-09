@@ -256,7 +256,7 @@ void CkReductionMgr::flushStates()
   while (!futureRemoteMsgs.isEmpty()) delete futureRemoteMsgs.deq();
   while (!finalMsgs.isEmpty()) delete finalMsgs.deq();
 
-  adjVec.length()=0;
+  adjVec.clear();
 
 }
 
@@ -790,10 +790,7 @@ void CkReductionMgr::finishReduction(void)
   //Shift the count adjustment vector down one slot (to match new redNo)
   int i;
   completedRedNo++;
-  for (i=1;i<(int)(adjVec.length());i++){
-    adjVec[i-1]=adjVec[i];
-  }
-  adjVec.length()--;
+  adjVec.erase(adjVec.begin());
 
   inProgress=false;
   startRequested=false;
@@ -873,8 +870,7 @@ countAdjustment &CkReductionMgr::adj(int number)
   number--;
   if (number<0) CkAbort("Requested adjustment to prior reduction!\n");
   //Pad the adjustment vector with zeros until it's at least number long
-  while ((int)(adjVec.length())<=number)
-    adjVec.push_back(countAdjustment());
+  if (adjVec.size() <= number) { adjVec.resize(number + 1); }
   return adjVec[number];
 }
 
@@ -2734,7 +2730,7 @@ void CkNodeReductionMgr::evacuate(){
 	*/
 		newParent = kids[0];
 		for(int i=numKids-1;i>=0;i--){
-			newKids.remove(i);
+			newKids.erase(newKids.begin() + i);
 		}
 		/*
 			Ask everybody for the highest reduction number they have seen and
@@ -2815,7 +2811,7 @@ void CkNodeReductionMgr::modifyTree(int code,int size,int *data){
 		case LEAFPARENT:
 			for(int i=0;i<numKids;i++){
 				if(newKids[i] == data[0]){
-					newKids.remove(i);
+					newKids.erase(newKids.begin() + i);
 					break;
 				}
 			}
@@ -2949,18 +2945,18 @@ void CkNodeReductionMgr::DeleteChild(int deletedChild){
 	DEBREVAC(("[%d]%d> Deleting child %d \n",CkMyNode(),thisgroup.idx,deletedChild));
 	for(int i=0;i<numKids;i++){
 		if(kids[i] == deletedChild){
-			kids.remove(i);
+			kids.erase(kids.begin() + i);
 			break;
 		}
 	}
-	numKids = kids.length();
+	numKids = kids.size();
 	finishReduction();
 }
 
 void CkNodeReductionMgr::DeleteNewChild(int deletedChild){
-	for(int i=0;i<(int)(newKids.length());i++){
+	for(int i=0;i<(int)(newKids.size());i++){
 		if(newKids[i] == deletedChild){
-			newKids.remove(i);
+			newKids.erase(newKids.begin() + i);
 			break;
 		}
 	}

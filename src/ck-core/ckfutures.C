@@ -71,15 +71,14 @@ class CkSema {
 
 class CkSemaPool {
   private:
-    CkVec<CkSema*> pool;
+    std::vector<CkSema*> pool;
     CkQ<int> freelist;
   public:
     int getNew(void) {
-      CkSema *sem = new CkSema();
       int idx;
       if(freelist.isEmpty()) {
-        idx = pool.length();
-        pool.insertAtEnd(sem);
+        idx = pool.size();
+        pool.push_back(new CkSema());
       } else {
         idx = freelist.deq();
         pool[idx] = new CkSema();

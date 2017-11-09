@@ -45,7 +45,7 @@ typedef struct {
 /**
  * @brief Typedef for the hashtable type that maps object IDs to determinants.
  */
-typedef CkHashtableT<CkHashtableAdaptorT<CkObjID>, CkVec<Determinant> *> CkDeterminantHashtableT;
+typedef CkHashtableT<CkHashtableAdaptorT<CkObjID>, std::vector<Determinant> *> CkDeterminantHashtableT;
 
 /**
  * @brief Struct for the header of the removeDeterminants handler
@@ -187,7 +187,7 @@ public:
 	MCount tProcessed;
 	
 	//TODO: pup receivedTNs
-	CkVec<MCount> *receivedTNs; //used to store TNs received by senders during a restart
+	std::vector<MCount> *receivedTNs; //used to store TNs received by senders during a restart
 	MCount *ticketHoles;
 	int numberHoles;
 	int currentHoles;
@@ -419,7 +419,7 @@ typedef struct{
 	int PE;
 	int numberObjects;
 	TProcessedLog *listObjects;
-	CkVec<MCount> *ticketVecs;
+	std::vector<MCount> *ticketVecs;
 } ResendData;
 
 typedef struct {
@@ -635,8 +635,8 @@ extern int _checkpointBarrierHandlerIdx;
 extern int _checkpointBarrierAckHandlerIdx;
 
 //extern CkHashtableT<CkHashtableAdaptorT<CkObjID>,void *> migratedObjectList;
-extern CkVec<MigrationRecord> migratedNoticeList;
-extern CkVec<RetainedMigratedObject *> retainedObjectList;
+extern std::vector<MigrationRecord> migratedNoticeList;
+extern std::vector<RetainedMigratedObject *> retainedObjectList;
 
 int getCheckPointPE();
 int getReverseCheckPointPE();

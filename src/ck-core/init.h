@@ -4,10 +4,11 @@
 #include "charm.h" // For CkNumPes
 #include <new>   // for in-place new operator
 #include "ckhashtable.h"
+#include <vector>
 
 typedef CkQ<void *> PtrQ;
 class envelope;
-typedef CkVec<CkZeroPtr<envelope> > PtrVec;
+typedef std::vector<CkZeroPtr<envelope> > PtrVec;
 
 class IrrGroup;
 class TableEntry {
@@ -96,7 +97,7 @@ class GroupIdxArray {
 };
 
 typedef GroupIdxArray<TableEntry> GroupTable;
-typedef CkVec<CkGroupID> GroupIDTable;
+typedef std::vector<CkGroupID> GroupIDTable;
 
 typedef void (*CkInitCallFn)(void);
 class InitCallTable 

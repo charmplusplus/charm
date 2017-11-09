@@ -884,7 +884,7 @@ public:
 class ReadFileMap : public DefaultArrayMap
 {
 private:
-  CkVec<int> mapping;
+  std::vector<int> mapping;
 
 public:
   ReadFileMap(void) {
@@ -2242,8 +2242,8 @@ void CkLocMgr::pup(PUP::er &p){
  */
 #if __FAULT__
         int count=0;
-        CkVec<int> pe_list;
-        CkVec<CmiUInt8> idx_list;
+        std::vector<int> pe_list;
+        std::vector<CmiUInt8> idx_list;
         for (auto itr = id2pe.begin(); itr != id2pe.end(); ++itr)
             if (homePe(itr->first) == CmiMyPe() && itr->second != CmiMyPe())
             {
@@ -2253,10 +2253,8 @@ void CkLocMgr::pup(PUP::er &p){
             }
 
         p | count;
-      for(int i=0;i<pe_list.length();i++){
-        p|idx_list[i];
-        p|pe_list[i];
-      }
+        p | pe_list;
+        p | idx_list;
 #endif
 
 	}
@@ -2927,7 +2925,7 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec *rec,
         CkElementCreation_t type, bool create, int dummy)
 {
     p.comment("-------- Array Location --------");
-    CkVec<CkMigratable *> dummyElts;
+    std::vector<CkMigratable *> dummyElts;
 
     for (auto itr = managers.begin(); itr != managers.end(); ++itr) {
         int elCType;
@@ -3019,10 +3017,10 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec *rec,
 #if CMK_MEM_CHECKPOINT
 	if(rebuild){
 	  ArrayElement *elt;
-	  CkVec<CkMigratable *> list;
+	  std::vector<CkMigratable *> list;
 	  migratableList(rec, list);
-	  CmiAssert(list.length() > 0);
-	  for (int l=0; l<list.length(); l++) {
+	  CmiAssert(!list.empty());
+	  for (int l=0; l<list.size(); l++) {
 		//    reset, may not needed now
 		// for now.
 		for (int i=0; i<CK_ARRAYLISTENER_MAXLEN; i++) {
@@ -3056,7 +3054,7 @@ void CkLocMgr::callMethod(CkLocRec *rec,CkMigratable_voidfn_arg_t fn,     void *
 }
 
 /// return a list of migratables in this local record
-void CkLocMgr::migratableList(CkLocRec *rec, CkVec<CkMigratable *> &list)
+void CkLocMgr::migratableList(CkLocRec *rec, std::vector<CkMigratable *> &list)
 {
         for (auto itr = managers.begin(); itr != managers.end(); ++itr) {
                 CkMigratable *elt = itr->second->getEltFromArrMgr(rec->getID());

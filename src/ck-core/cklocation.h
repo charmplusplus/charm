@@ -410,7 +410,7 @@ typedef std::unordered_map<CmiUInt8, CkLocRec*> LocRecHash;
 	void dummyAtSync(void);
 
 	/// return a list of migratables in this local record
-	void migratableList(CkLocRec *rec, CkVec<CkMigratable *> &list);
+	void migratableList(CkLocRec *rec, std::vector<CkMigratable *> &list);
 
 	void flushAllRecs(void);
 	void flushLocalRecs(void);
