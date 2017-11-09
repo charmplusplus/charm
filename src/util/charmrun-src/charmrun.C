@@ -3098,10 +3098,21 @@ static SOCKET dataskt;
 static int charmrun_phase = 0;
 #endif
 
-static int client_connect_problem(SOCKET skt, int code, const char *msg)
+static int client_connect_problem(SOCKET skt, const char *msg)
 { /*Called when something goes wrong during a client connect*/
   const char *name = skt_to_name(skt);
   fprintf(stderr, "Charmrun> error attaching to node '%s':\n%s\n", name, msg);
+  exit(1);
+  return -1;
+}
+
+static int client_connect_problem_skt(SOCKET skt, int code, const char *msg)
+{ /* Passed to skt_set_abort */
+  auto iter_proc = skt_client_table.find(skt);
+  if (iter_proc != skt_client_table.end())
+    return client_connect_problem(skt, msg);
+
+  fprintf(stderr, "Charmrun> unknown error %d with socket:\n%s\n", code, msg);
   exit(1);
   return -1;
 }
@@ -3130,7 +3141,7 @@ static int errorcheck_one_client_connect(int client)
     printf("Charmrun> Waiting for %d-th client to connect.\n", client);
   /* FIXME: why are we passing the client as an error code here? */
   if (0 == skt_select1(server_fd, arg_timeout * 1000))
-    client_connect_problem(dummy_skt, client,
+    client_connect_problem(dummy_skt,
                            "Timeout waiting for node-program to connect");
 
   req_clients[client] = skt_accept(server_fd, &clientIP, &clientPort);
@@ -3140,7 +3151,7 @@ static int errorcheck_one_client_connect(int client)
    *        'client_connect_problem', which calls exit(1), so we'd exit
    *        in skt_accept. */
   if (req_clients[client] == SOCKET_ERROR)
-    client_connect_problem(dummy_skt, client, "Failure in node accept");
+    client_connect_problem(dummy_skt, "Failure in node accept");
 
   skt_tcp_no_nagle(req_clients[client]);
 
@@ -3154,7 +3165,7 @@ inline static
     read_initnode_one_client(int client)
 {
   if (!skt_select1(req_clients[client], arg_timeout * 1000))
-    client_connect_problem(req_clients[client], client,
+    client_connect_problem(req_clients[client],
                            "Timeout on IP request");
   ChMessage msg;
   ChMessage_recv(req_clients[client], &msg);
@@ -3167,7 +3178,7 @@ static void req_one_client_partinit(int client)
 {
   if (errorcheck_one_client_connect(client)) {
     if (!skt_select1(req_clients[client], arg_timeout * 1000))
-      client_connect_problem(req_clients[client], client,
+      client_connect_problem(req_clients[client],
                              "Timeout on partial init request");
 
     ChMessage partStartMsg;
@@ -3347,7 +3358,7 @@ static void req_client_connect(void)
   for (int client = 0; client < req_nClients; client++)
     req_clients[client] = -1;
 
-  skt_set_abort(client_connect_problem);
+  skt_set_abort(client_connect_problem_skt);
 
 #if CMK_IBVERBS_FAST_START
   for (int client = 0; client < req_nClients; client++) {
@@ -3409,7 +3420,7 @@ static void req_charmrun_connect(void)
   for (int client = 0; client < req_nClients; client++)
     req_clients[client] = -1;
 
-  skt_set_abort(client_connect_problem);
+  skt_set_abort(client_connect_problem_skt);
 
 #if CMK_IBVERBS_FAST_START
   for (int client = 0; client < req_nClients; client++) {
@@ -3443,7 +3454,7 @@ static void req_charmrun_connect(void)
   /* Now receive the nodetab from child charmruns*/
   charmrun_phase = 1;
 
-  skt_set_abort(client_connect_problem);
+  skt_set_abort(client_connect_problem_skt);
 
   req_set_client_connect(0, req_nClients);
 
@@ -3479,7 +3490,7 @@ static void req_client_start_and_connect(void)
   req_nClients = nodetab_rank0_table.size();
   req_clients = (SOCKET *) malloc(req_nClients * sizeof(SOCKET));
 
-  skt_set_abort(client_connect_problem);
+  skt_set_abort(client_connect_problem_skt);
 
   int clientstart, clientend = 0;
   while (clientend < req_nClients) { /* initiate a batch */
@@ -5279,7 +5290,7 @@ static void reconnect_crashed_client(int socket_index, int crashed_node)
 {
   if (0 == skt_select1(server_fd, arg_timeout * 1000)) {
     client_connect_problem(
-        socket_index, socket_index,
+        socket_index,
         "Timeout waiting for restarted node-program to connect");
   }
 
@@ -5290,12 +5301,12 @@ static void reconnect_crashed_client(int socket_index, int crashed_node)
   skt_client_table[req_clients[socket_index]] = crashed_node;
 
   if (req_clients[socket_index] == SOCKET_ERROR) {
-    client_connect_problem(socket_index, socket_index,
+    client_connect_problem(socket_index,
                            "Failure in restarted node accept");
   } else {
     ChMessage msg;
     if (!skt_select1(req_clients[socket_index], arg_timeout * 1000)) {
-      client_connect_problem(socket_index, socket_index,
+      client_connect_problem(socket_index,
                              "Timeout on IP request for restarted processor");
     }
 
