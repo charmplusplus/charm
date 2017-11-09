@@ -21,7 +21,7 @@ class XArraySectionReducer
         ///
         XArraySectionReducer(int _numSubSections, CkCallback *_finalCB)
             : numSubSections(_numSubSections), finalCB(_finalCB), numReceived(0),
-              msgList(numSubSections, 0)
+              msgList(numSubSections, nullptr)
         {
             CkAssert(numSubSections > 0);
         }
