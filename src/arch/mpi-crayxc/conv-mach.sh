@@ -67,8 +67,8 @@ CMK_SEQ_CXX="g++ -fPIC "
 CMK_COMPILER='craycc'
 elif test -n "$ICPC"
 then
-CMK_SEQ_CC="cc -fPIC "
-CMK_SEQ_CXX="CC -fPIC "
+CMK_SEQ_CC="icc -fPIC "
+CMK_SEQ_CXX="icpc -fPIC "
 CMK_COMPILER='icc'
 else   # gcc
 CMK_SEQ_CC="gcc -fPIC"
