@@ -604,16 +604,16 @@ endef
 uFcontext_asm:
 	$(MAKE) -C boost-context
 
-$(eval $(call libthreads,default,            uFcontext_asm,-DCMK_THREADS_BUILD_DEFAULT=1 boost-context/*.o))
-$(eval $(call libthreads,default-tls,        uFcontext_asm,-DCMK_THREADS_BUILD_DEFAULT -DCMK_THREADS_BUILD_TLS=1 -touch-on-failure boost-context/*.o))
+$(eval $(call libthreads,default,            uFcontext_asm,-DCMK_THREADS_BUILD_DEFAULT=1 $(wildcard boost-context/*.o)))
+$(eval $(call libthreads,default-tls,        uFcontext_asm,-DCMK_THREADS_BUILD_DEFAULT -DCMK_THREADS_BUILD_TLS=1 -touch-on-failure $(wildcard boost-context/*.o)))
 $(eval $(call libthreads,qt,                              ,-DCMK_THREADS_BUILD_QT=1))
 $(eval $(call libthreads,qt-tls,                          ,-DCMK_THREADS_BUILD_QT=1 -DCMK_THREADS_BUILD_TLS=1 -touch-on-failure))
 $(eval $(call libthreads,context,                         ,-DCMK_THREADS_BUILD_CONTEXT=1 -touch-on-failure))
 $(eval $(call libthreads,context-tls,                     ,-DCMK_THREADS_BUILD_CONTEXT=1 -DCMK_THREADS_BUILD_TLS=1 -touch-on-failure))
 $(eval $(call libthreads,uJcontext,            uJcontext.c,-DCMK_THREADS_BUILD_JCONTEXT=1 -U_FORTIFY_SOURCE -touch-on-failure))
 $(eval $(call libthreads,uJcontext-tls,        uJcontext.c,-DCMK_THREADS_BUILD_JCONTEXT=1 -DCMK_THREADS_BUILD_TLS=1 -U_FORTIFY_SOURCE -touch-on-failure))
-$(eval $(call libthreads,uFcontext,          uFcontext_asm,-DCMK_THREADS_BUILD_FCONTEXT=1 -U_FORTIFY_SOURCE -touch-on-failure boost-context/*.o ))
-$(eval $(call libthreads,uFcontext-tls,      uFcontext_asm,-DCMK_THREADS_BUILD_FCONTEXT=1 -DCMK_THREADS_BUILD_TLS=1 -U_FORTIFY_SOURCE -touch-on-failure boost-context/*.o))
+$(eval $(call libthreads,uFcontext,          uFcontext_asm,-DCMK_THREADS_BUILD_FCONTEXT=1 -U_FORTIFY_SOURCE -touch-on-failure $(wildcard boost-context/*.o) ))
+$(eval $(call libthreads,uFcontext-tls,      uFcontext_asm,-DCMK_THREADS_BUILD_FCONTEXT=1 -DCMK_THREADS_BUILD_TLS=1 -U_FORTIFY_SOURCE -touch-on-failure $(wildcard boost-context/*.o)))
 $(eval $(call libthreads,pthreads,                        ,-DCMK_THREADS_BUILD_PTHREADS=1 -touch-on-failure))
 $(eval $(call libthreads,fibers,                          ,-DCMK_THREADS_BUILD_FIBERS=1 -touch-on-failure))
 $(eval $(call libthreads,stackcopy,                       ,-DCMK_THREADS_BUILD_STACKCOPY=1 -touch-on-failure))
