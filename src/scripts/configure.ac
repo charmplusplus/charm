@@ -2461,7 +2461,7 @@ AC_CONFIG_MACRO_DIR(hwloc/config)
 HWLOC_SET_SYMBOL_PREFIX([cmi_])
 HWLOC_SETUP_CORE([hwloc], [happy=yes], [happy=no])
 HWLOC_DO_AM_CONDITIONALS
-add_flag 'CMK_HWLOC_LIBS="-lhwloc_embedded '"$HWLOC_EMBEDDED_LIBS"' -lpthread"' "hwloc"
+add_flag 'CMK_HWLOC_LIBS="-lhwloc_embedded '"$HWLOC_EMBEDDED_LIBS"'"' "hwloc"
 add_flag 'OPTS_CC="$OPTS_CC '"$HWLOC_EMBEDDED_CFLAGS"'"' 'hwloc'
 add_flag 'OPTS_CXX="$OPTS_CXX '"$HWLOC_EMBEDDED_CFLAGS"'"' 'hwloc'
 
