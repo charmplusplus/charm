@@ -469,8 +469,8 @@ fi
 
 #Check if building verbs on Omni-Path 
 if [ "x_$ARCH" = "x_verbs" ] && type /usr/sbin/opafabricinfo >/dev/null 2>&1; then
-  echo "WARNING: Verbs on Omni-Path architectures is not well supported, please use an OFI build instead.";
-  exit 1;
+  echo "WARNING: Detected Omni-Path diagnostic tools.";
+  echo "Verbs on Omni-Path architectures is not well supported: please use an OFI build instead.";
 fi 
 
 if test -n "$WITH_PRODUCTION" -a $BUILD_EMULATOR -eq 1 -a -z "$ENABLE_TRACING"
