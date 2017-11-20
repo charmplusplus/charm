@@ -17,7 +17,7 @@ class TraceCore;
 class TraceLogger;
 class TraceEntry;
 
-CpvCExtern(int, _traceCoreOn);
+CpvExtern(int, _traceCoreOn);
 /*** structure of events ***/
 
 struct TraceCoreEvent {

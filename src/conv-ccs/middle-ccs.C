@@ -48,7 +48,7 @@ extern "C" void req_fw_handler(char *msg)
 extern "C" size_t write(int fd, const void *buf, size_t count);
 #endif
 
-extern "C" int rep_fw_handler_idx;
+extern int rep_fw_handler_idx;
 /**
  * Decide if the reply is ready to be forwarded to the waiting client,
  * or if combination is required (for broadcast/multicast CCS requests.
@@ -115,10 +115,10 @@ void ccs_getinfo(char *msg)
 typedef int pid_t;
 #endif
 
-extern "C" {
-
 CpvDeclare(void *, debugQueue);
 CpvDeclare(int, freezeModeFlag);
+
+extern "C" {
 
 /*
  Start the freeze-- call will not return until unfrozen

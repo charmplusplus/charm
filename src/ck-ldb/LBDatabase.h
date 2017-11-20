@@ -108,7 +108,7 @@ CkpvExtern(bool, hasNullLB);
 CkpvExtern(bool, lbdatabaseInited);
 
 // LB options, mostly controled by user parameter
-extern "C" char * _lbtopo;
+extern char * _lbtopo;
 
 typedef void (*LBCreateFn)();
 typedef BaseLB * (*LBAllocFn)();

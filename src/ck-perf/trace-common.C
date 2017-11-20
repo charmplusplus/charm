@@ -16,7 +16,7 @@
 #include "allEvents.h"          //projector
 #include "register.h" // for _entryTable
 
-CpvCExtern(int, _traceCoreOn);   // projector
+CpvExtern(int, _traceCoreOn);   // projector
 
 #if ! CMK_TRACE_ENABLED
 static int warned = 0;

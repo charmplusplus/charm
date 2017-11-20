@@ -159,7 +159,7 @@ CkpvStaticDeclare(PtrVec*, _bocInitVec);
 //for interoperability
 extern void _libExitHandler(envelope *env);
 extern int _libExitHandlerIdx;
-CpvCExtern(int,interopExitFlag);
+CpvExtern(int,interopExitFlag);
 
 #if CMK_SHRINK_EXPAND
 //for shrink expand cleanup
@@ -169,7 +169,7 @@ const char* _shrinkexpand_basedir;
 /*
 	FAULT_EVAC
 */
-CpvCExtern(char *, _validProcessors);
+CpvExtern(char *, _validProcessors);
 CkpvDeclare(char ,startedEvac);
 
 int    _exitHandlerIdx;
@@ -229,8 +229,8 @@ void processRaiseEvacFile(char *raiseEvacFile);
 
 extern bool useNodeBlkMapping;
 
-extern "C" int quietMode;
-extern "C" int quietModeRequested;
+extern int quietMode;
+extern int quietModeRequested;
 
 // Modules are required to register command line opts they will parse. These
 // options are stored in the _optSet, and then when parsing command line opts
@@ -1027,7 +1027,7 @@ void InitCallTable::enumerateInitCalls()
   for (i=0; i<initProcCalls.length(); i++) initProcCalls[i]();
 }
 
-CpvCExtern(int, cpdSuspendStartup);
+CpvExtern(int, cpdSuspendStartup);
 extern "C" void CpdFreeze(void);
 
 extern int _dummy_dq;

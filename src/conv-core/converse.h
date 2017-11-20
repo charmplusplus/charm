@@ -2180,7 +2180,7 @@ EXTERN void CmiResetNotifyCommThdMsg(CmiNotifyCommThdMsg *msg, CmiCommThdFnPtr f
 EXTERN void CmiNotifyCommThd(CmiNotifyCommThdMsg *msg);
 #endif
 
-CpvCExtern(int, _urgentSend);
+CpvExtern(int, _urgentSend);
 #if CMK_USE_OOB
 #define CmiEnableUrgentSend(yn)   CpvAccess(_urgentSend)=(yn)
 #else

@@ -2565,7 +2565,7 @@ static bool CpdExecuteThreadResume(CthThreadToken *token) {
   return true;
 }
 
-CpvCExtern(int, CthResumeNormalThreadIdx);
+CpvExtern(int, CthResumeNormalThreadIdx);
 extern "C" void CthResumeNormalThreadDebug(CthThreadToken* token)
 {
   CthThread t = token->thread;

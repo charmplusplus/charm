@@ -17,6 +17,8 @@
 
 static std::atomic<int> interopCommThdExit{0};
 
+CpvExtern(int,interopExitFlag);
+
 extern "C"
 {
   int _cleanUp = 0;
@@ -28,7 +30,6 @@ extern "C"
 #endif
 
   extern int CharmLibInterOperate;
-  CpvExtern(int,interopExitFlag);
 
   void StartInteropScheduler() {
     DEBUG(printf("[%d]Starting scheduler [%d]/[%d]\n",CmiMyPe(),CmiMyRank(),CmiMyNodeSize()););
