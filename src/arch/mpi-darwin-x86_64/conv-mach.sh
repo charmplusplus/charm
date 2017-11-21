@@ -2,7 +2,7 @@
 
 CMK_MACOSX=1
 
-CMK_DEFS="$CMK_DEFS -mmacosx-version-min=10.7"
+CMK_DEFS="$CMK_DEFS -mmacosx-version-min=10.7 -D_DARWIN_C_SOURCE"
 
 CMK_AMD64="-dynamic -fPIC -fno-common -Wno-deprecated-declarations"
 

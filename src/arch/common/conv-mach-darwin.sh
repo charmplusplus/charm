@@ -20,7 +20,7 @@ CMK_LD_SHARED=" -dynamic -dynamiclib -undefined dynamic_lookup "
 CMK_LD_SHARED_LIBS='-lc++'
 CMK_LD_SHARED_ABSOLUTE_PATH=true
 
-CMK_DEFS=' -mmacosx-version-min=10.7 '
+CMK_DEFS='-mmacosx-version-min=10.7 -D_DARWIN_C_SOURCE'
 
 # Assumes GNU fortran compiler:
 CMK_CF77="g95 -mmacosx-version-min=10.7"
