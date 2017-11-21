@@ -37,7 +37,7 @@ Yes.  Keep src, bin, lib, lib\_so, include, tmp.  You will not need tests, examp
 \subsection{If the interactive script fails, how do I compile Charm++?}
 
 %<p>First, on a typical Linux machine, unpack the tarball, cd into "charm",
-%and type <tt>./build AMPI net-linux -g</tt>.
+%and type <tt>./build AMPI netlrts-linux -g</tt>.
 
 %<p>Next, if your machine is similar to one of the machines below, 
 %use the listed "build" command:
@@ -49,8 +49,8 @@ Yes.  Keep src, bin, lib, lib\_so, include, tmp.  You will not need tests, examp
 %	<td>Myrinet Linux Cluster. <br>
 %		640 2GHz G5 processors as 2-way nodes.</td>
 %	<td>
-%		Debug: ./build AMPI net-ppc-darwin -g<br>
-%		Production: ./build AMPI net-ppc-darwin gm -O3<br>
+%		Debug: ./build AMPI netlrts-ppc-darwin -g<br>
+%		Production: ./build AMPI netlrts-ppc-darwin gm -O3<br>
 %		To run a job, use "rjc" to find nodes, then "charmrun".
 %	</td>
 %</tr>
@@ -83,8 +83,8 @@ Yes.  Keep src, bin, lib, lib\_so, include, tmp.  You will not need tests, examp
 %		2,560 3.2 GHz Intel Xeon processors as 2-way nodes with Myrinet, 3 GB RAM per node.
 %	</td>
 %	<td>
-%		Use: ./build AMPI net-linux gm -O , or<br>
-%		     ./build AMPI net-linux gm icc ifort -O (Intel compilers) , or<br>
+%		Use: ./build AMPI netlrts-linux gm -O , or<br>
+%		     ./build AMPI netlrts-linux gm icc ifort -O (Intel compilers) , or<br>
 %		     ./build AMPI mpi-linux cmpi -O (Champion MPI)<br>
 %	</td>
 %</tr>
@@ -94,7 +94,7 @@ Yes.  Keep src, bin, lib, lib\_so, include, tmp.  You will not need tests, examp
 %		1,744 1.3/1.5 GHz Intel Itanium-2 processors as 2-way nodes with Myrinet, 4 GB RAM per node.
 %	</td>
 %	<td>
-%		Use: ./build AMPI net-linux-ia64 gm -O , or<br>
+%		Use: ./build AMPI netlrts-linux-ia64 gm -O , or<br>
 %		     ./build AMPI mpi-linux-ia64 gm -nobs -O (MPICH over GM)<br>
 %	</td>
 %</tr>
@@ -113,7 +113,7 @@ Yes.  Keep src, bin, lib, lib\_so, include, tmp.  You will not need tests, examp
 %		968 1 GHz 32-bit Intel Pentium III processors as 2-way nodes with Myrinet.
 %	</td>
 %	<td>
-%		Debug: ./build AMPI net-linux gm icc -O<br>
+%		Debug: ./build AMPI netlrts-linux gm icc -O<br>
 %		Production: ./build AMPI mpi-linux vmi icc -O<br>
 %		To run an interactive job with net version, use "charmrun". To run with mpi version, use vmirun. Checkout NCSA's webpage for how to write a job script.<br>
 %	</td>
@@ -124,7 +124,7 @@ Yes.  Keep src, bin, lib, lib\_so, include, tmp.  You will not need tests, examp
 %		256 800 MHz 64-bit Intel Itanium processors as 2-way nodes with Myrinet.
 %	</td>
 %	<td>
-%		Use: ./build AMPI net-linux-ia64 gm ecc -O , or<br>
+%		Use: ./build AMPI netlrts-linux-ia64 gm ecc -O , or<br>
 %		     ./build AMPI mpi-linux-ia64 vmi ecc -O<br>
 %		To run an interactive job with net version, use "charmrun". To run with mpi version, use vmirun.<br>
 %	</td>
@@ -142,8 +142,8 @@ Yes.  Keep src, bin, lib, lib\_so, include, tmp.  You will not need tests, examp
 %		140 1.7 GHz 32-bit Athlon MP 2000 processors as 2-way nodes.
 %	</td>
 %	<td>
-%		Debug: ./build AMPI net-linux -g<br>
-%		Production: ./build AMPI net-linux -O<br>
+%		Debug: ./build AMPI netlrts-linux -g<br>
+%		Production: ./build AMPI netlrts-linux -O<br>
 %		To run interactive use "frun", "fsub" for batch submission.<br> 
 %	</td>
 %</tr>
@@ -159,7 +159,7 @@ Yes.  Keep src, bin, lib, lib\_so, include, tmp.  You will not need tests, examp
 %option like "icc", "pgcc", "xlc", "xlc64", or many others--
 %see the README file or charm/src/arch/common for a complete list.
 %For platform specific options, one can run build command with "help" option, for example: <br>
-%./build charm++ net-linux help
+%./build charm++ netlrts-linux help
 
 %<li>Under Linux, if you or your communication layer uses pthreads,
 %and you use Charm threads (such as AMPI), and your Glibc is less than
@@ -167,9 +167,9 @@ Yes.  Keep src, bin, lib, lib\_so, include, tmp.  You will not need tests, examp
 %This version links in a special version of pthreads that works with
 %our user-level threads.
 
-%<li>On the net- version, if you're having trouble with rsh/ssh or just
+%<li>On the netlrts- version, if you're having trouble with rsh/ssh or just
 %want to spawn processes on your own machine, add the "local" option, 
-%like <tt>./build AMPI net-linux local -g</tt>
+%like <tt>./build AMPI netlrts-linux local -g</tt>
 
 %<li>Run "./build --help" to display detailed help page for supported build options
 

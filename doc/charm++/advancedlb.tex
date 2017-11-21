@@ -308,7 +308,7 @@ The database data structure named \kw{LDStats} is defined in {\em CentralLB.h}:
 \end{verbatim}
 
 \begin{enumerate}
-\item {\em LBRealType} is the data type for load balancer measured time. It is "double" by default. User can specify the type to float at \charmpp{} compile time if want. For example, ./build charm++ net-linux-x86\_64 {-}{-}with-lbtime-type=float;
+\item {\em LBRealType} is the data type for load balancer measured time. It is "double" by default. User can specify the type to float at \charmpp{} compile time if want. For example, ./build charm++ netlrts-linux-x86\_64 {-}{-}with-lbtime-type=float;
 \item {\em procs} array defines processor attributes and usage data for each
 processor;
 \item {\em objData} array records per object information, {\em LDObjData} is defined in {\em lbdb.h};

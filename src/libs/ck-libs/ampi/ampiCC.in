@@ -30,9 +30,6 @@ then
 elif `echo $arch | grep '^bluegene' > /dev/null 2>&1`
 then
   charmarch="mpi"
-elif `echo $arch | grep 'net-' > /dev/null 2>&1`
-then     
-  charmarch="net"
 else      
   charmarch="other"
 fi

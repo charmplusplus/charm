@@ -1,5 +1,5 @@
 /*Exactly like the system() call, but signal-safe, so 
-  it will work from the (non-netpoll) net- version
+  it will work from the (non-netpoll) netlrts- version
   instead of just returning EINTR on the first SIGIO.
   
   This code is #included by both ckdll.C and the configure script

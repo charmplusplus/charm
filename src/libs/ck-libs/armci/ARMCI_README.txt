@@ -3,7 +3,7 @@ http://charm.cs.uiuc.edu/autobuild/bin/charm_src.tar.gz
 
 Build charm target ARMCI (instead of charm or AMPI)
 > cd charm
-> ./build ARMCI net-linux -O3
+> ./build ARMCI netlrts-linux -O3
 Compiling the code with:
 > charm/bin/charmc -c lu.c $(OPTS)
 Linking the program with:

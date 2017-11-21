@@ -1,13 +1,13 @@
 \subsection{Compiling BigSimulator}
 
 To compile the simulator which is called BigSimulator (or BigNetSim), we need
-the regular Charm++ build (net-linux-x86\_64 in our example).  It needs to be
+the regular Charm++ build (netlrts-linux-x86\_64 in our example).  It needs to be
 complemented with a few more libraries from BigSim and with the Pose
 discrete-event simulator. These pieces can be built, respectively, with:
 
 \begin{verbatim}
-./build bgampi net-linux-x86_64 -O2
-./build pose net-linux-x86_64 -O2
+./build bgampi netlrts-linux-x86_64 -O2
+./build pose netlrts-linux-x86_64 -O2
 \end{verbatim}
 
 Access to the discrete-event simulation is realized via a Charm++ package

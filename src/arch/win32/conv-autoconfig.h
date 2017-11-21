@@ -1,7 +1,7 @@
 /* conv-autoconfig.h.  Generated automatically by configure.  */
 /* conv-autoconfig.h.in.  Generated automatically from configure.in by autoheader.  */
 
-#define CMK_MACHINE_NAME "net-win32"
+#define CMK_MACHINE_NAME "netlrts-win32"
 
 #define CMK_LONG_LONG_DEFINED 0
 #define CMK___int64_DEFINED 1

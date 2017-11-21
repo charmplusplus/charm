@@ -33,7 +33,7 @@ syntax() {
   echo ''
   fi
   echo '<versions>: ' 
-  ( cd $src ; ls -1 | egrep -v '(^shmem$)|(^mpi$)|(^sim$)|(^net(lrts)?$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win64$)|(^(gemini_)?gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^template$)|(^cuda$)' | pr -3 -t )
+  ( cd $src ; ls -1 | egrep -v '(^shmem$)|(^mpi$)|(^sim$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win64$)|(^(gemini_)?gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^template$)|(^cuda$)' | pr -3 -t )
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'icc iccstatic xlc xlc64 gcc clang pgcc cc mpicxx'
@@ -63,7 +63,7 @@ syntax() {
   echo '  smp             support for SMP, multithreaded charm on each node'
   echo '  omp             support for the integrated LLVM OpenMP runtime'
   echo '  ibverbs         use Infiniband Verbs for communication (only for netlrts-linux-x86_64; prefer verbs-*)'
-  echo '  tcp             use TCP sockets for communication (only for net version)'
+  echo '  tcp             use TCP sockets for communication (only for netlrts)'
   echo '  pthreads        compile with pthreads Converse threads'
   echo ''
   echo 'Advanced options:'
@@ -466,6 +466,11 @@ if [ $BUILD_CUDA -eq 1 ]; then
 fi
 
 [ "x$VERSION" = "x" ] && syntax && exit 1
+
+if [ "x_$ARCH" = "x_net" ]; then
+  echo "Error: net-* has been removed, please use netlrts or verbs.";
+  exit 1;
+fi
 
 #Check if building verbs on Omni-Path 
 if [ "x_$ARCH" = "x_verbs" ] && type /usr/sbin/opafabricinfo >/dev/null 2>&1; then

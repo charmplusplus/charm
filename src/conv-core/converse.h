@@ -290,7 +290,7 @@ typedef int CmiNodeLock;
 
 #endif
 
-#if CMK_SHARED_VARS_POSIX_THREADS_SMP /*Used by the net-*-smp versions*/
+#if CMK_SHARED_VARS_POSIX_THREADS_SMP /*Used by the netlrts-*-smp versions*/
 
 #include <pthread.h>
 #include <sched.h>
@@ -1982,7 +1982,7 @@ typedef enum
 #define CmiMemoryAtomicIncrementSimple(someInt)  __asm__ __volatile__("lock incl (%0)" :: "r" (&(someInt)))
 #define CmiMemoryAtomicDecrementSimple(someInt)  __asm__ __volatile__("lock decl (%0)" :: "r" (&(someInt)))
 #else /* 1 */
-/* this might be slightly faster, but does not compile with -O3 on net-darwin-x86_64 */
+/* this might be slightly faster, but does not compile with -O3 on netlrts-darwin-x86_64 */
 #define CmiMemoryAtomicIncrement(someInt)  __asm__ __volatile__("lock incl %0" :: "m" (someInt))
 #define CmiMemoryAtomicDecrement(someInt)  __asm__ __volatile__("lock decl %0" :: "m" (someInt))
 #endif /* 1 */

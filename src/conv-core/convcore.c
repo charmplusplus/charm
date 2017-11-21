@@ -264,7 +264,7 @@ static int printUsage=0; /* if set, print command-line usage information */
 static const char *CLAformatString="%20s %10s %s\n";
 
 /** This little list of CLA's holds the argument descriptions until it's
-   safe to print them--it's needed because the net- versions don't have 
+   safe to print them--it's needed because the netlrts- versions don't have 
    printf until they're pretty well started.
  */
 typedef struct {
@@ -3716,14 +3716,14 @@ void ConverseCommonInit(char **argv)
   CmiReductionsInit();
   CIdleTimeoutInit(argv);
   
-#if CMK_SHARED_VARS_POSIX_THREADS_SMP /*Used by the net-*-smp and multicore versions*/
+#if CMK_SHARED_VARS_POSIX_THREADS_SMP /*Used by the netlrts-*-smp and multicore versions*/
   if(CmiGetArgFlagDesc(argv, "+CmiSpinOnIdle", "Force the runtime system to spin on message reception when idle, rather than sleeping")) {
     if(CmiMyRank() == 0) _Cmi_forceSpinOnIdle = 1;
   }
   if(CmiGetArgFlagDesc(argv, "+CmiSleepOnIdle", "Force the runtime system to sleep when idle, rather than spinning on message reception")) {
     if(CmiMyRank() == 0) _Cmi_sleepOnIdle = 1;
   }
-  if(CmiGetArgFlagDesc(argv,"+CmiNoProcForComThread","Is there an extra processor for the communication thread on each node(only for net-smp-*) ?")){
+  if(CmiGetArgFlagDesc(argv,"+CmiNoProcForComThread","Is there an extra processor for the communication thread on each node(only for netlrts-smp-*) ?")){
     if (CmiMyPe() == 0) {
       CmiPrintf("Charm++> Note: The option +CmiNoProcForComThread has been superseded by +CmiSleepOnIdle\n");
     }

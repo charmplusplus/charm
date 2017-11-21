@@ -391,10 +391,10 @@ static void rep_fw_handler(char *msg)
 
 #if NODE_0_IS_CONVHOST
 /************** NODE_0_IS_CONVHOST ***********
-Non net- versions of charm++ are run without a 
+Non netlrts- versions of charm++ are run without a 
 (real) conv-host program.  This is fine, except 
 CCS clients connect via conv-host; so for CCS
-on non-net- versions of charm++, node 0 carries
+on non-netlrts- versions of charm++, node 0 carries
 out the CCS forwarding normally done in conv-host.
 
 CCS works by listening to a TCP connection on a 

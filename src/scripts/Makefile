@@ -472,7 +472,7 @@ charmrun-target: hwloc-target charmrun  sockRoutines.c sockRoutines.h ccs-server
 QUICK_THREADS: $(CVHEADERS)
 	-( $(MAKE) -C QuickThreads clean )
 	( cd QuickThreads;./configure )
-	( $(MAKE) -C QuickThreads qt  OPTS='$(OPTS) -Wno-error' ) || ( echo "Did you try to build net-linux on a 64-bit system? Try net-linux-x86_64" && false )
+	( $(MAKE) -C QuickThreads qt  OPTS='$(OPTS) -Wno-error' ) || ( echo "Did you try to build netlrts-linux on a 64-bit system? Try netlrts-linux-x86_64" && false )
 	cp -f QuickThreads/libqt.a ../lib/libckqt.a
 	-(CHARMINC=.; . ./conv-config.sh; \
 	  test -d ../lib_so && \

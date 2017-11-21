@@ -4,7 +4,7 @@ Orion Sky Lawlor, olawlor@uiuc.edu, 2003/8/21
 
 This is needed to accurately, uniformly compare
 vertically, across all our API's:
-  - Converse's net-linux
+  - Converse's netlrts-linux
   - Charm++ messaging
   - AMPI messaging
 

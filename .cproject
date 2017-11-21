@@ -22,14 +22,14 @@
 <folderInfo id="cdt.managedbuild.config.gnu.exe.debug.590241402." name="/" resourcePath="">
 <toolChain id="cdt.managedbuild.toolchain.gnu.exe.debug.1701969183" name="Linux GCC" superClass="cdt.managedbuild.toolchain.gnu.exe.debug">
 <targetPlatform id="cdt.managedbuild.target.gnu.platform.exe.debug.807248394" name="Debug Platform" superClass="cdt.managedbuild.target.gnu.platform.exe.debug"/>
-<builder autoBuildTarget="charm++" buildPath="${workspace_loc:/charm/net-linux-amd64/tmp}" enableAutoBuild="true" id="cdt.managedbuild.target.gnu.builder.exe.debug.1025102572" incrementalBuildTarget="charm++" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" parallelBuildOn="true" parallelizationNumber="8" superClass="cdt.managedbuild.target.gnu.builder.exe.debug"/>
+<builder autoBuildTarget="charm++" buildPath="${workspace_loc:/charm/netlrts-linux-amd64/tmp}" enableAutoBuild="true" id="cdt.managedbuild.target.gnu.builder.exe.debug.1025102572" incrementalBuildTarget="charm++" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" parallelBuildOn="true" parallelizationNumber="8" superClass="cdt.managedbuild.target.gnu.builder.exe.debug"/>
 <tool id="cdt.managedbuild.tool.gnu.archiver.base.926487193" name="GCC Archiver" superClass="cdt.managedbuild.tool.gnu.archiver.base"/>
 <tool id="cdt.managedbuild.tool.gnu.cpp.compiler.exe.debug.976682201" name="GCC C++ Compiler" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.exe.debug">
 <option id="gnu.cpp.compiler.exe.debug.option.optimization.level.344431787" name="Optimization Level" superClass="gnu.cpp.compiler.exe.debug.option.optimization.level" value="gnu.cpp.compiler.optimization.level.none" valueType="enumerated"/>
 <option id="gnu.cpp.compiler.exe.debug.option.debugging.level.1707866992" name="Debug Level" superClass="gnu.cpp.compiler.exe.debug.option.debugging.level" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
 <option id="gnu.cpp.compiler.option.include.paths.1853938627" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/charm/net-linux-amd64/tmp}&quot;"/>
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/charm/net-linux-amd64/tmp/libs/ck-libs/pythonCCS}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/charm/netlrts-linux-amd64/tmp}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/charm/netlrts-linux-amd64/tmp/libs/ck-libs/pythonCCS}&quot;"/>
 </option>
 <option id="gnu.cpp.compiler.option.preprocessor.def.1120432124" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" valueType="definedSymbols">
 <listOptionValue builtIn="false" value="CMK_SEPARATE_PATH=1"/>
@@ -43,7 +43,7 @@
 <option defaultValue="gnu.c.optimization.level.none" id="gnu.c.compiler.exe.debug.option.optimization.level.1414076724" name="Optimization Level" superClass="gnu.c.compiler.exe.debug.option.optimization.level" valueType="enumerated"/>
 <option id="gnu.c.compiler.exe.debug.option.debugging.level.917143894" name="Debug Level" superClass="gnu.c.compiler.exe.debug.option.debugging.level" value="gnu.c.debugging.level.max" valueType="enumerated"/>
 <option id="gnu.c.compiler.option.include.paths.783568532" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
-<listOptionValue builtIn="false" value="&quot;${workspace_loc:/charm/net-linux-amd64/tmp}&quot;"/>
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/charm/netlrts-linux-amd64/tmp}&quot;"/>
 </option>
 <option id="gnu.c.compiler.option.preprocessor.def.symbols.2106822378" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" valueType="definedSymbols">
 <listOptionValue builtIn="false" value="CMK_SEPARATE_PATH=1"/>
@@ -67,7 +67,7 @@
 </toolChain>
 </folderInfo>
 <sourceEntries>
-<entry excluding="bin/|include/|lib/|lib_so/|tmp/|net-**|mpi-**" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name=""/>
+<entry excluding="bin/|include/|lib/|lib_so/|tmp/|netlrts-**|mpi-**" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name=""/>
 </sourceEntries>
 </configuration>
 </storageModule>

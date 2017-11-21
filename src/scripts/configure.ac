@@ -547,16 +547,6 @@ AC_MSG_RESULT("$CMK_NATIVE_CXX")
 AC_MSG_CHECKING("Sequential C++ compiler as")
 AC_MSG_RESULT("$CMK_SEQ_CXX")
 
-if test "$base_version" = "net-linux" 
-then
-  test_link "whether linker accept --allow-multiple-definition" "ok" "no" "-Wl,--allow-multiple-definition"
-  if test $pass -eq 1
-  then
-        remove_flag CMK_LDXX
-	add_flag CMK_LDXX='"$CMK_LDXX -Wl,--allow-multiple-definition"' "net-linux linker"
-  fi
-fi
-
 if echo "$CMK_CC" | grep -E "gcc|clang|icc" > /dev/null 2> /dev/null
 then
   test_link "whether compiler accept -fno-stack-protector" "ok" "no" "-fno-stack-protector"

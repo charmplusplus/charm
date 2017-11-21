@@ -186,7 +186,7 @@ void CmiMemUnlock(void);
 
 #endif
 
-#if CMK_SHARED_VARS_POSIX_THREADS_SMP /*Used by the net-*-smp versions*/
+#if CMK_SHARED_VARS_POSIX_THREADS_SMP
 
 int _Cmi_numpes;
 int _Cmi_mynodesize;
@@ -295,7 +295,7 @@ int CmiBarrierZero(void);
 /** PRINTF FUNCTIONS
 
  * Default code is provided in convcore.c but for particular architectures they
- * can be reimplemented. At present only net- versions reimplement them.
+ * can be reimplemented. At present only netlrts- versions reimplement them.
 
  */
 

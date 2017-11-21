@@ -16,7 +16,7 @@ needs to provide {\em target} and {\em platform} selections:
 
 For example, to compile on a 64-bit Linux machine, one would type:
 \begin{verbatim}
-./build charm++ net-linux-x86_64 -O2
+./build charm++ netlrts-linux-x86_64 -O2
 \end{verbatim}
 
 \noindent which builds essential \charmpp{} kernel using UDP sockets as the
@@ -26,7 +26,7 @@ on MPI using:
 ./build charm++ mpi-linux-x86_64 -O2
 \end{verbatim}
 
-For other platforms, net-linux-x86\_64 should be replaced by whatever platform is being used. 
+For other platforms, netlrts-linux-x86\_64 should be replaced by whatever platform is being used. 
 See the charm/README file for a complete list of supported platforms.
 
 \subsubsection{Building Only the BigSim Emulator}
@@ -35,7 +35,7 @@ The BigSim Emulator is implemented on top of Converse in Charm++.  To compile
 the BigSim Emulator, one can compile Emulator libraries directly on top of
 normal \charmpp{} using ``bgampi'' as the compilation target, like
 \begin{verbatim}
-./build bgampi net-linux-x86_64 -O2
+./build bgampi netlrts-linux-x86_64 -O2
 \end{verbatim}
 
 With Emulator libraries, one can write BigSim applications using its
@@ -47,16 +47,16 @@ In order to build Charm++ or AMPI on top of BigSim Emulator (which itself is
 implemented on top of Converse), a special build option ``bigemulator'' needs
 to be specified:
 \begin{verbatim}
-./build bgampi net-linux-x86_64 bigemulator -O2
+./build bgampi netlrts-linux-x86_64 bigemulator -O2
 \end{verbatim}
 
 The ``bgampi'' option is the compilation {\em target} that tells ``build'' to
 compile BigSim Emulator libraries in addition to \charmpp{} kernel libraries.
-The ``bigemulator'' option is a build {\em option} to platform ``net-linux'',
+The ``bigemulator'' option is a build {\em option} to platform ``netlrts-linux'',
 which tells ``build'' to build Charm++ on top of the BigSim Emulator. 
 
 The above ``build" command creates a directory named
-``net-linux-x86\_64-bigemulator" under charm, which contains all the header
+``netlrts-linux-x86\_64-bigemulator" under charm, which contains all the header
 files and libraries needed for compiling a user application.
 With this version of Charm++, one can run normal Charm++ and AMPI application
 on top of the emulator (in a virtualized environment).

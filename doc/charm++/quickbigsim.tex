@@ -12,10 +12,10 @@ For more information, please refer to BigSim and Projections manuals.
 
 \item build charm (and AMPI) with bigemulator and bigsim (replace ``linux" with ``darwin" for mac):\\
         cd charm\\
-        ./build charm++ net-linux-x86\_64 bigemulator bigsim\\
-        ./build AMPI net-linux-x86\_64 bigemulator bigsim\\
+        ./build charm++ netlrts-linux-x86\_64 bigemulator bigsim\\
+        ./build AMPI netlrts-linux-x86\_64 bigemulator bigsim\\
 
-\item compile your code using charm or AMPI compilers located in ``net-linux-x86\_64-bigemulator-bigsim/bin", for example:\\
+\item compile your code using charm or AMPI compilers located in ``netlrts-linux-x86\_64-bigemulator-bigsim/bin", for example:\\
         cd tests/ampi/jacobi3d; make\\
 
 \item run your application emulating the target machine, for example:\\
@@ -27,7 +27,7 @@ For more information, please refer to BigSim and Projections manuals.
 
 \item build BigFastSim:\\
         cd BigFastSim/Release\\
-        vim makefile  \#change CHARMPATH=\$(HOME)/charm/net-linux-x86\_64-bigemulator-bigsim/\\
+        vim makefile  \#change CHARMPATH=\$(HOME)/charm/netlrts-linux-x86\_64-bigemulator-bigsim/\\
         make\\
 
 \item copy simulator to trace files' directory:\\

@@ -50,8 +50,8 @@
 
 /* Defines if there is a "charmrun" program running on the system, which
    interacts with possible connecting clients (0), or if there is no such
-   program, and processor 0 does the job (1). Currently only net- versions have
-   this set to 0, all the others have it to 1. */
+   program, and processor 0 does the job (1). Currently only netlrts- versions
+   have this set to 0, all the others have it to 1. */
 #define NODE_0_IS_CONVHOST                                 1
 
 /* Enables the persistent communication protocol if set to 1. */
