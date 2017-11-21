@@ -297,7 +297,8 @@ VERSION: VERSION.new
 	SRCBASE=$(SRCBASE) ./commitid.sh
 
 commitid.c: VERSION
-	echo "const char * const CmiCommitID = \"`cat VERSION`\";" > $@
+	echo "extern const char * const CmiCommitID;" > $@
+	echo "const char * const CmiCommitID = \"`cat VERSION`\";" >> $@
 commitid.o: CC=$(CHARMC)
 
 headerlinks: dirs+sources Makefile $(ALLHEADERS)
