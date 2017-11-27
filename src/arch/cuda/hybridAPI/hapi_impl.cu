@@ -114,11 +114,6 @@ public:
 
   CkVec<BufferPool> mempool_free_bufs_;
   CkVec<size_t> mempool_boundaries_;
-
-#ifdef HAPI_DUMMY_MEMPOOL
-  CkVec<int> mempool_max_;
-  CkVec<int> mempool_size_;
-#endif
 #endif // HAPI_MEMPOOL
 
   // The runtime system keeps track of all allocated buffers on the GPU.
@@ -232,14 +227,6 @@ void GPUManager::init() {
 #endif
 
 #ifdef HAPI_MEMPOOL
-#ifdef HAPI_DUMMY_MEMPOOL
-  int n_slots = HAPI_MEMPOOL_NUM_SLOTS;
-  mempool_max_.reserve(n_slots);
-  mempool_max_.length() = n_slots;
-  mempool_size_.reserve(n_slots);
-  mempool_size_.length() = n_slots;
-#endif
-
   mempool_boundaries_.reserve(HAPI_MEMPOOL_NUM_SLOTS);
   mempool_boundaries_.length() = HAPI_MEMPOOL_NUM_SLOTS;
 
@@ -247,10 +234,6 @@ void GPUManager::init() {
   for(int i = 0; i < HAPI_MEMPOOL_NUM_SLOTS; i++){
     mempool_boundaries_[i] = buf_size;
     buf_size = buf_size << 1;
-#ifdef HAPI_DUMMY_MEMPOOL
-    mempool_size_[i] =  0;
-    mempool_max_[i]  = -1;
-#endif
   }
 #endif // HAPI_MEMPOOL
 
@@ -693,7 +676,6 @@ void initHybridAPI() {
   CsvAccess(gpu_manager).init();
 
 #ifdef HAPI_MEMPOOL
-#ifndef HAPI_DUMMY_MEMPOOL
   // create pool of page-locked memory
   int sizes[HAPI_MEMPOOL_NUM_SLOTS];
         /*256*/ sizes[0]  =  4;
@@ -722,7 +704,6 @@ void initHybridAPI() {
   printf("[HAPI (%d)] done creating buffer pool\n", CmiMyPe());
 #endif
 
-#endif // HAPI_DUMMY_MEMPOOL
 #endif // HAPI_MEMPOOL
 }
 
@@ -740,23 +721,8 @@ void exitHybridAPI() {
   CsvAccess(gpu_manager).destroyStreams();
 
 #ifdef HAPI_MEMPOOL
-#ifndef HAPI_DUMMY_MEMPOOL
   // release memory pool
   releasePool(CsvAccess(gpu_manager).mempool_free_bufs_);
-#else
-  for (int i = 0; i < CsvAccess(gpu_manager).mempool_boundaries_.length(); i++) {
-#ifdef HAPI_MEMPOOL_DEBUG
-    printf("[HAPI (%d)] mempool slot %d, size: %d, max: %d\n",
-           CmiMyPe(), i, CsvAccess(gpu_manager).mempool_boundaries_[i],
-           CsvAccess(gpu_manager).mempool_max_[i]);
-#endif
-  }
-
-  if (CsvAccess(gpu_manager).mempool_boundaries_.length() !=
-      CsvAccess(gpu_manager).mempool_max_.length()) {
-    CmiAbort("[HAPI] mempool_boundaries_ and mempool_max_ sizes do not match!");
-  }
-#endif // HAPI_DUMMY_MEMPOOL
 #endif // HAPI_MEMPOOL
 
 #ifdef HAPI_TRACE
@@ -945,10 +911,6 @@ static int findPool(int size){
   else if (size > CsvAccess(gpu_manager).mempool_boundaries_[boundary_array_len-1]) {
     // create new slot
     CsvAccess(gpu_manager).mempool_boundaries_.push_back(size);
-#ifdef HAPI_DUMMY_MEMPOOL
-    CsvAccess(gpu_manager).mempool_max_.push_back(-1);
-    CsvAccess(gpu_manager).mempool_size_.push_back(0);
-#endif
 
     BufferPool newpool;
     hapiCheck(cudaMallocHost((void**)&newpool.head, size + sizeof(Header)));
@@ -1030,26 +992,7 @@ void* hapiPoolMalloc(int size) {
 #endif
 
   int pool = findPool(size);
-  void* buf;
-#ifdef HAPI_DUMMY_MEMPOOL
-  hapiCheck(cudaMallocHost((void**)&buf, size+sizeof(Header)));
-  if (pool < 0 || pool >= CsvAccess(gpu_manager).mempool_size_.length()) {
-    printf("[HAPI (%d)] need to create up to pool %d; malloc size: %d\n",
-           CmiMyPe(), pool, size);
-    CmiAbort("[HAPI] exiting after need to create bigger pool");
-  }
-  CsvAccess(gpu_manager).mempool_size_[pool]++;
-  if (CsvAccess(gpu_manager).mempool_size_[pool] >
-      CsvAccess(gpu_manager).mempool_max_[pool]) {
-    CsvAccess(gpu_manager).mempool_max_[pool] = CsvAccess(gpu_manager).mempool_size_[pool];
-  }
-  Header* hdr = (Header*)buf;
-  hdr->slot = pool;
-  hdr = hdr+1;
-  buf = (void*)hdr;
-#else
-  buf = getBufferFromPool(pool, size);
-#endif
+  void* buf = getBufferFromPool(pool, size);
 
 #ifdef HAPI_MEMPOOL_DEBUG
   printf("[HAPI (%d)] hapiPoolMalloc size %d pool %d left %d\n",
@@ -1072,24 +1015,11 @@ void hapiPoolFree(void* ptr) {
   int size = hd->size;
 #endif
 
-  /* FIXME: We should get rid of code under HAPI_DUMMY_MEMPOOL because
-   *  a) we don't use this flag
-   *  b) code under this flag does nothing useful.
-   */
 #if CMK_SMP || CMK_MULTICORE
   CmiLock(CsvAccess(gpu_manager).buffer_lock_);
 #endif
 
-#ifdef HAPI_DUMMY_MEMPOOL
-  if (pool < 0 || pool >= CsvAccess(gpu_manager).mempool_size_.length()) {
-    printf("[HAPI (%d)] free pool %d\n", CmiMyPe(), pool);
-    CmiAbort("[HAPI] exiting after freeing out of bounds pool");
-  }
-  CsvAccess(gpu_manager).mempool_size_[pool]--;
-  hapiCheck(cudaFreeHost((void*)hd));
-#else
   returnBufferToPool(pool, hd);
-#endif
 
 #if CMK_SMP || CMK_MULTICORE
   CmiUnlock(CsvAccess(gpu_manager).buffer_lock_);
