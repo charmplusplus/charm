@@ -757,7 +757,10 @@ void CkReductionMgr::finishReduction(void)
     } else if (totalElements<result->nSources()) {
       DEBR((AA "Got %d of %d contributions\n" AB,result->nSources(),totalElements));
 #if !defined(_FAULT_CAUSAL_)
+      CkPrintf("Got %d of %d contributions\n", result->nSources(), totalElements);
+# if 0
       CkAbort("ERROR! Too many contributions at root!\n");
+# endif
 #endif
     }
     DEBR((AA "Passing result to client function\n" AB));

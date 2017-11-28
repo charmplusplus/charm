@@ -2845,7 +2845,9 @@ void CkLocMgr::checkInBounds(const CkArrayIndex &idx)
     for (int i = 0; i < idx.dimension; ++i) {
       unsigned int thisDim = shorts ? idx.indexShorts[i] : idx.index[i];
       unsigned int thatDim = shorts ? bounds.indexShorts[i] : bounds.index[i];
+# if 0
       CkAssert(thisDim < thatDim);
+# endif
     }
   }
 #endif
