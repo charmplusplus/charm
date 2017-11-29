@@ -575,6 +575,7 @@ cat > $t <<EOT
 
 // Check for an excessively old g++/libstdc++ that can't handle features we use
 #include <memory>
+#include <vector>
 std::unique_ptr<int> i;
 
 class CkMigrateMessage;
@@ -586,8 +587,9 @@ struct base {
 
 template <class Parent>
 struct CBaseT1 : Parent {
+  std::vector<int> v; // check for C++11's shrink_to_fit()
 
-  CBaseT1(void) :Parent()  { }
+  CBaseT1(void) :Parent()  { v.shrink_to_fit(); }
   CBaseT1(CkMigrateMessage *m) :Parent(m) { }
   CBaseT1(CBaseT1&& rhs) :Parent() { }
 
