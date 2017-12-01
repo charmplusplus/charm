@@ -2139,9 +2139,6 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper, bool uses
         param->beginUnmarshallSDAGCall(str, usesImplBuf);
       else
         param->beginUnmarshall(str);
-
-      if (param->isVoid() && !isNoKeep())
-        str<<"  CkFreeSysMsg(impl_msg);\n";
     }
   }
 
@@ -2363,6 +2360,9 @@ void Entry::genDefs(XStr& str)
 
     postCall << "  CmiUnlock(impl_obj->__nodelock);\n";
   }
+
+  if(param->isVoid() && !isNoKeep())
+      postCall <<"  CkFreeSysMsg(impl_msg);\n";
 
   if (!isConstructor() && fortranMode) { // Fortran90
       str << "/* FORTRAN SECTION */\n";
