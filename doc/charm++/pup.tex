@@ -174,6 +174,17 @@ For arrays of builtin types like ``int" and ``double", or arrays of a type
 with the ``PUPbytes'' declaration, \kw{PUParray} uses an even faster block 
 transfer, with one virtual function call per array.
 
+For types of objects whose default constructors do more than necessary
+when an object will be unpacked from PUP, it is possible to tell the
+runtime system to call a more minimalistic alternative. This can apply
+to types used as both member variables of chares and as marshalled
+arguments to entry methods. A non-chare class can define a constructor
+that takes an argument of type \verb+PUP::reconstruct+ for this
+purpose. The runtime system code will call a \verb+PUP::reconstruct+
+constructor in preference to a default constructor when it's
+available. Where necessary, constructors
+taking \verb+PUP::reconstruct+ should call the constructors of members
+variables with \verb+PUP::reconstruct+ if applicable to that member.
 
 \subsection{PUP modes}
 

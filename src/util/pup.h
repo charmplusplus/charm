@@ -79,9 +79,11 @@ typedef struct {int is_only_a_name;} CkMigrateMessage;
 namespace PUP {
   class er; // Forward declare for all sorts of things
 
-  // A utility to let classes avoid default construction when they're
-  // about to be unpacked, by defining a constructor that takes a
-  // value of type PUP::reconstruct
+  /**
+   * A utility to let classes avoid default construction when they're
+   * about to be unpacked, by defining a constructor that takes a
+   * value of type PUP::reconstruct
+   */
   struct reconstruct {};
   namespace detail {
     template <typename T, bool b = std::is_constructible<reconstruct, T>::value>
