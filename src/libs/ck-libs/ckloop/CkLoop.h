@@ -4,7 +4,7 @@
 
 #include "charm++.h"
 #include "CkLoopAPI.h"
-
+#include <atomic>
 #define USE_TREE_BROADCAST_THRESHOLD 8
 #define TREE_BCAST_BRANCH (4)
 #define CACHE_LINE_SIZE 64
@@ -31,7 +31,7 @@ class CurLoopInfo {
     friend class FuncSingleHelper;
 
 private:
-    int curChunkIdx; // Should become std::atomic<int>
+    std::atomic<int> curChunkIdx;
     int numChunks;
     HelperFn fnPtr;
     int lowerIndex;
@@ -42,11 +42,11 @@ private:
     void **redBufs;
     char *bufSpace;
 
-    volatile int finishFlag;
+    std::atomic<int> finishFlag;
 
     //a tag to indicate whether the task for this new loop has been inited
     //this tag is needed to prevent other helpers to run the old task
-    int inited;
+    std::atomic<int> inited;
 
 public:
     CurLoopInfo(int maxChunks):numChunks(0),fnPtr(NULL), lowerIndex(-1), upperIndex(0),
@@ -86,43 +86,23 @@ public:
 
     void waitLoopDone(int sync) {
         //while(!__sync_bool_compare_and_swap(&finishFlag, numChunks, 0));
-        if (sync) while (finishFlag!=numChunks);
-#if CMK_PAMI_LINUX_PPC8
-        CmiMemoryReadFence();
-#endif
+        if (sync) while (finishFlag.load(std::memory_order_relaxed)!=numChunks);
+        std::atomic_thread_fence(std::memory_order_acquire);
        //finishFlag = 0;
         CmiLock(loop_info_inited_lock);
         inited = 0;
         CmiUnlock(loop_info_inited_lock);
     }
     int getNextChunkIdx() {
-        int next_chunk_id;
-        CmiMemoryAtomicFetchAndInc(curChunkIdx, next_chunk_id);
-        return next_chunk_id+1;
+        return curChunkIdx.fetch_add(1, std::memory_order_relaxed) + 1;
     }
     void reportFinished(int counter) {
         if (counter==0) return;
-#if defined(_WIN32)
-#if CMK_SMP
-        CmiLock(cmiMemoryLock);
-        finishFlag=finishFlag+counter;
-        CmiUnlock(cmiMemoryLock);
-#else
-        finishFlag=finishFlag+counter;
-#endif
-#else
-        __sync_add_and_fetch(&finishFlag, counter);
-#if CMK_PAMI_LINUX_PPC8
-        CmiMemoryWriteFence();  //optional..
-#endif
-#endif
+        finishFlag.fetch_add(counter, std::memory_order_release);
     }
 
     int isFree() {
-      int fin = finishFlag == numChunks;
-#if CMK_PAMI_LINUX_PPC8
-      CmiMemoryReadFence();
-#endif
+      int fin = finishFlag.load(std::memory_order_acquire) == numChunks;
       return fin;
     }
 
