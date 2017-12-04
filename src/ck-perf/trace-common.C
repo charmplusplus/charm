@@ -60,12 +60,16 @@ int _packMsg, _packChare, _packEP;
 int _unpackMsg, _unpackChare, _unpackEP;
 int _sdagMsg, _sdagChare, _sdagEP;
 
+CtvDeclare(int, curThreadEvent);
+
 #if CMK_BIGSIM_CHARM
 extern "C" double TraceTimerCommon(){return TRACE_TIMER();}
 #else
 extern "C" double TraceTimerCommon(){return TRACE_TIMER() - CkpvAccess(traceInitTime);}
 #endif
-
+#if CMK_TRACE_ENABLED
+extern "C" void CthSetEventInfo(CthThread t, int event, int srcPE);
+#endif
 /// decide parameters from command line
 static void traceCommonInit(char **argv)
 {
@@ -98,6 +102,9 @@ static void traceCommonInit(char **argv)
   CkpvInitialize(char*, traceRoot);
   CkpvInitialize(char*, partitionRoot);
   CkpvInitialize(int, traceRootBaseLength);
+
+  CtvInitialize(int,curThreadEvent);
+  CtvAccess(curThreadEvent)=0;
 
   char subdir[20];
   if(CmiNumPartitions() > 1) {
@@ -526,9 +533,9 @@ void traceEndIdle()
 // themselves are implemented as threads and we don't want them to be traced
 // In BigSim, so far, only AMPI threads are traced.
 extern "C"
-void traceResume(CmiObjId *tid)
+void traceResume(int eventID, int srcPE, CmiObjId *tid)
 {
-    _TRACE_ONLY(CkpvAccess(_traces)->beginExecute(tid));
+    _TRACE_BEGIN_EXECUTE_DETAILED(eventID, ForChareMsg, _threadEP, srcPE, 0, NULL, tid);
     if(CpvAccess(_traceCoreOn))
 	    resumeTraceCore();
 }
@@ -543,6 +550,9 @@ extern "C"
 void traceAwaken(CthThread t)
 {
   CkpvAccess(_traces)->creation(0, _threadEP);
+#if CMK_TRACE_ENABLED
+  CthSetEventInfo(t, CtvAccess(curThreadEvent), CkMyPe());
+#endif
 }
 
 extern "C"

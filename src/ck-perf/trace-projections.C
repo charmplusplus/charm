@@ -41,7 +41,7 @@ CkReduction::reducerType minMaxReductionType;
 #endif // PROJ_ANALYSIS
 
 CkpvStaticDeclare(TraceProjections*, _trace);
-CtvStaticDeclare(int,curThreadEvent);
+CtvExtern(int,curThreadEvent);
 
 CkpvDeclare(CmiInt8, CtrLogBufSize);
 
@@ -1063,10 +1063,8 @@ TraceProjections::TraceProjections(char **argv):
   //  CkPrintf("Trace projections dummy constructor called on %d\n",CkMyPe());
   if (CkpvAccess(traceOnPe) == 0) return;
 
-  CtvInitialize(int,curThreadEvent);
   CkpvInitialize(CmiInt8, CtrLogBufSize);
   CkpvAccess(CtrLogBufSize) = DefaultLogBufSize;
-  CtvAccess(curThreadEvent)=0;
   if (CmiGetArgLongDesc(argv,"+logsize",&CkpvAccess(CtrLogBufSize), 
 		       "Log entries to buffer per I/O")) {
     if (CkMyPe() == 0) {

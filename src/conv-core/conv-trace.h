@@ -15,7 +15,7 @@ void traceMessageRecv(char *msg, int pe);
 void traceBeginIdle(void);
 void traceEndIdle(void);
 CMI_EXTERNC
-void traceResume(CmiObjId *);
+void traceResume(int,int,CmiObjId *);
 CMI_EXTERNC
 void traceSuspend(void);
 CMI_EXTERNC

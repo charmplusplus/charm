@@ -31,7 +31,7 @@ void traceMessageRecv(char *msg, int pe) {}
 void traceBeginIdle(void) {}
 void traceEndIdle(void) {}
 CMI_EXTERNC
-void traceResume(CmiObjId *t) {}
+void traceResume(int event, int srcPE, CmiObjId *t) {}
 CMI_EXTERNC
 void traceSuspend(void) {}
 CMI_EXTERNC

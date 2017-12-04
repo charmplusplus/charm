@@ -191,6 +191,10 @@ void *memalign(size_t align, size_t size) CMK_THROW;
   tlsseg_t tlsseg;
 #endif
 
+#if CMK_TRACE_ENABLED
+  int eventID;
+  int srcPE;
+#endif
   int magic; /* magic number for checking corruption */
 
 } CthThreadBase;
@@ -703,7 +707,12 @@ CthThread CthGetNext(CthThread t) { return B(t)->next; }
 #if CMK_OMP
 void CthSetPrev(CthThread t, CthThread v) { B(t)->prev = v;}
 #endif
-
+#if CMK_TRACE_ENABLED
+void CthSetEventInfo(CthThread t, int event, int srcPE ) {
+  B(t)->eventID = event;
+  B(t)->srcPE = srcPE;
+}
+#endif
 static void CthNoStrategy(void)
 {
   CmiAbort("Called CthAwaken or CthSuspend before calling CthSetStrategy.\n");
@@ -2186,12 +2195,12 @@ char * CthPointer(CthThread t, size_t pos)
 }
 #endif
 
-
+#if CMK_TRACE_ENABLED
 void CthTraceResume(CthThread t)
 {
-  traceResume(&t->base.tid);
+  traceResume(B(t)->eventID, B(t)->srcPE,&t->base.tid);
 }
-
+#endif
 /* Functions that help debugging of out-of-core emulation in BigSim */
 void CthPrintThdMagic(CthThread t){
   CmiPrintf("CthThread[%p]'s magic: %x\n", t, t->base.magic);

@@ -1453,7 +1453,9 @@ void       CthYieldPrio(int,int,unsigned int*);
 
 void       CthSetNext(CthThread t, CthThread next);
 CthThread  CthGetNext(CthThread t);
-
+#if CMK_TRACE_ENABLED
+void CthSetEventInfo(CthThread t, int event, int srcPE);
+#endif
 void       CthSwitchThread(CthThread t);
 
 size_t     CthStackOffset(CthThread t, char *p);
