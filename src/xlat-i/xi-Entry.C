@@ -738,157 +738,158 @@ void Entry::genGroupDecl(XStr& str) {
 }
 
 void Entry::genGroupDefs(XStr& str) {
+  if(isConstructor()) {
+    genGroupStaticConstructorDefs(str);
+    return;
+  }
+
   // Selects between NodeGroup and Group
   char* node = (char*)(container->isNodeGroup() ? "Node" : "");
 
-  if (isConstructor()) {
-    genGroupStaticConstructorDefs(str);
+  int forElement = container->isForElement();
+  XStr params;
+  params << epIdx() << ", impl_msg";
+  XStr paramg;
+  paramg << epIdx() << ", impl_msg, ckGetGroupID()";
+  XStr parampg;
+  parampg << epIdx() << ", impl_msg, ckGetGroupPe(), ckGetGroupID()";
+  // append options parameter
+  XStr opts;
+  opts << ",0";
+  if (isImmediate()) opts << "+CK_MSG_IMMEDIATE";
+  if (isInline()) opts << "+CK_MSG_INLINE";
+  if (isSkipscheduler()) opts << "+CK_MSG_EXPEDITED";
+
+  if ((isSync() || isLocal()) && !container->isForElement())
+    return;  // No sync broadcast
+
+  XStr retStr;
+  retStr << retType;
+  XStr msgTypeStr;
+  if (isLocal())
+    msgTypeStr << paramType(0, 1, 0);
+  else
+    msgTypeStr << paramType(0, 1);
+  str << makeDecl(retStr, 1) << "::" << name << "(" << msgTypeStr << ")\n";
+  str << "{\n";
+  // regular broadcast and section broadcast for an entry method with rdma
+  if (param->hasRdma() && !container->isForElement()) {
+    str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy "
+           "parameters\");\n";
   } else {
-    int forElement = container->isForElement();
-    XStr params;
-    params << epIdx() << ", impl_msg";
-    XStr paramg;
-    paramg << epIdx() << ", impl_msg, ckGetGroupID()";
-    XStr parampg;
-    parampg << epIdx() << ", impl_msg, ckGetGroupPe(), ckGetGroupID()";
-    // append options parameter
-    XStr opts;
-    opts << ",0";
-    if (isImmediate()) opts << "+CK_MSG_IMMEDIATE";
-    if (isInline()) opts << "+CK_MSG_INLINE";
-    if (isSkipscheduler()) opts << "+CK_MSG_EXPEDITED";
+    str << "  ckCheck();\n";
+    if (!isLocal()) str << marshallMsg();
 
-    if ((isSync() || isLocal()) && !container->isForElement())
-      return;  // No sync broadcast
+    if (isLocal()) {
+      XStr unmarshallStr;
+      param->unmarshall(unmarshallStr, true);
+      str << "  " << container->baseName() << " *obj = ckLocalBranch();\n";
+      str << "  CkAssert(obj);\n";
+      if (!isNoTrace())
+        str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForBocMsg,(" << epIdx()
+            << "),CkMyPe(),0,NULL, NULL);\n";
+      if (isAppWork()) str << " _TRACE_BEGIN_APPWORK();\n";
+      str << "#if CMK_LBDB_ON\n"
+             "  // if there is a running obj being measured, stop it temporarily\n"
+             "  LDObjHandle objHandle;\n"
+             "  int objstopped = 0;\n"
+             "  LBDatabase *the_lbdb = (LBDatabase *)CkLocalBranch(_lbdb);\n"
+             "  if (the_lbdb->RunningObject(&objHandle)) {\n"
+             "    objstopped = 1;\n"
+             "    the_lbdb->ObjectStop(objHandle);\n"
+             "  }\n"
+             "#endif\n";
+      str << "#if CMK_CHARMDEBUG\n"
+             "  CpdBeforeEp("
+          << epIdx()
+          << ", obj, NULL);\n"
+             "#endif\n  ";
+      if (!retType->isVoid()) str << retType << " retValue = ";
+      str << "obj->" << name << "(" << unmarshallStr << ");\n";
+      str << "#if CMK_CHARMDEBUG\n"
+             "  CpdAfterEp("
+          << epIdx()
+          << ");\n"
+             "#endif\n";
+      str << "#if CMK_LBDB_ON\n"
+             "  if (objstopped) the_lbdb->ObjectStart(objHandle);\n"
+             "#endif\n";
+      if (isAppWork()) str << " _TRACE_END_APPWORK();\n";
+      if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
+      if (!retType->isVoid()) str << "  return retValue;\n";
+    } else if (isSync()) {
+      str << syncPreCall() << "CkRemote" << node << "BranchCall(" << paramg
+          << ", ckGetGroupPe());\n";
+      str << syncPostCall();
+    } else {             // Non-sync, non-local entry method
+      if (forElement) {  // Send
+        str << "  if (ckIsDelegated()) {\n";
+        if (param->hasRdma()) {
+          str << "    CkAbort(\"Entry methods with nocopy parameters not supported "
+                 "when called with delegation managers\");\n";
+        } else {
+          str << "     Ck" << node << "GroupMsgPrep(" << paramg << ");\n";
+          str << "     ckDelegatedTo()->" << node << "GroupSend(ckDelegatedPtr(),"
+              << parampg << ");\n";
+        }
+        str << "  } else {\n";
+        if (param->hasRdma()) {
+          opts << "+CK_MSG_RDMA";
+        }
+        str << "    CkSendMsg" << node << "Branch"
+            << "(" << parampg << opts << ");\n";
+        str << "  }\n";
+      } else if (container->isForSection()) {  // Multicast
+        str << "  if (ckIsDelegated()) {\n";
+        str << "     ckDelegatedTo()->" << node << "GroupSectionSend(ckDelegatedPtr(),"
+            << params << ", ckGetNumSections(), ckGetSectionIDs());\n";
+        str << "  } else {\n";
+        str << "    void *impl_msg_tmp;\n";
+        str << "    for (int i=0; i<ckGetNumSections(); ++i) {\n";
+        str << "       impl_msg_tmp= (i<ckGetNumSections()-1) ? CkCopyMsg((void **) "
+               "&impl_msg):impl_msg;\n";
+        str << "       CkSendMsg" << node << "BranchMulti(" << epIdx()
+            << ", impl_msg_tmp, ckGetGroupIDn(i), ckGetNumElements(i), ckGetElements(i)"
+            << opts << ");\n";
+        str << "    }\n";
+        str << "  }\n";
+      } else {  // Broadcast
+        str << "  if (ckIsDelegated()) {\n";
+        str << "     Ck" << node << "GroupMsgPrep(" << paramg << ");\n";
+        str << "     ckDelegatedTo()->" << node << "GroupBroadcast(ckDelegatedPtr(),"
+            << paramg << ");\n";
+        str << "  } else CkBroadcastMsg" << node << "Branch(" << paramg << opts
+            << ");\n";
+      }
+    }
+  }
+  str << "}\n";
 
-    XStr retStr;
-    retStr << retType;
-    XStr msgTypeStr;
-    if (isLocal())
-      msgTypeStr << paramType(0, 1, 0);
-    else
-      msgTypeStr << paramType(0, 1);
-    str << makeDecl(retStr, 1) << "::" << name << "(" << msgTypeStr << ")\n";
-    str << "{\n";
-    // regular broadcast and section broadcast for an entry method with rdma
-    if (param->hasRdma() && !container->isForElement()) {
+  // entry method on multiple PEs declaration
+  if (!forElement && !container->isForSection() && !isSync() && !isLocal() &&
+      !container->isNodeGroup()) {
+    str << "" << makeDecl(retStr, 1) << "::" << name << "(" << paramComma(0, 0)
+        << "int npes, int *pes" << eo(0) << ") {\n";
+    if (param->hasRdma()) {
       str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy "
              "parameters\");\n";
     } else {
-      str << "  ckCheck();\n";
-      if (!isLocal()) str << marshallMsg();
-
-      if (isLocal()) {
-        XStr unmarshallStr;
-        param->unmarshall(unmarshallStr, true);
-        str << "  " << container->baseName() << " *obj = ckLocalBranch();\n";
-        str << "  CkAssert(obj);\n";
-        if (!isNoTrace())
-          str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForBocMsg,(" << epIdx()
-              << "),CkMyPe(),0,NULL, NULL);\n";
-        if (isAppWork()) str << " _TRACE_BEGIN_APPWORK();\n";
-        str << "#if CMK_LBDB_ON\n"
-               "  // if there is a running obj being measured, stop it temporarily\n"
-               "  LDObjHandle objHandle;\n"
-               "  int objstopped = 0;\n"
-               "  LBDatabase *the_lbdb = (LBDatabase *)CkLocalBranch(_lbdb);\n"
-               "  if (the_lbdb->RunningObject(&objHandle)) {\n"
-               "    objstopped = 1;\n"
-               "    the_lbdb->ObjectStop(objHandle);\n"
-               "  }\n"
-               "#endif\n";
-        str << "#if CMK_CHARMDEBUG\n"
-               "  CpdBeforeEp("
-            << epIdx()
-            << ", obj, NULL);\n"
-               "#endif\n  ";
-        if (!retType->isVoid()) str << retType << " retValue = ";
-        str << "obj->" << name << "(" << unmarshallStr << ");\n";
-        str << "#if CMK_CHARMDEBUG\n"
-               "  CpdAfterEp("
-            << epIdx()
-            << ");\n"
-               "#endif\n";
-        str << "#if CMK_LBDB_ON\n"
-               "  if (objstopped) the_lbdb->ObjectStart(objHandle);\n"
-               "#endif\n";
-        if (isAppWork()) str << " _TRACE_END_APPWORK();\n";
-        if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
-        if (!retType->isVoid()) str << "  return retValue;\n";
-      } else if (isSync()) {
-        str << syncPreCall() << "CkRemote" << node << "BranchCall(" << paramg
-            << ", ckGetGroupPe());\n";
-        str << syncPostCall();
-      } else {             // Non-sync, non-local entry method
-        if (forElement) {  // Send
-          str << "  if (ckIsDelegated()) {\n";
-          if (param->hasRdma()) {
-            str << "    CkAbort(\"Entry methods with nocopy parameters not supported "
-                   "when called with delegation managers\");\n";
-          } else {
-            str << "     Ck" << node << "GroupMsgPrep(" << paramg << ");\n";
-            str << "     ckDelegatedTo()->" << node << "GroupSend(ckDelegatedPtr(),"
-                << parampg << ");\n";
-          }
-          str << "  } else {\n";
-          if (param->hasRdma()) {
-            opts << "+CK_MSG_RDMA";
-          }
-          str << "    CkSendMsg" << node << "Branch"
-              << "(" << parampg << opts << ");\n";
-          str << "  }\n";
-        } else if (container->isForSection()) {  // Multicast
-          str << "  if (ckIsDelegated()) {\n";
-          str << "     ckDelegatedTo()->" << node << "GroupSectionSend(ckDelegatedPtr(),"
-              << params << ", ckGetNumSections(), ckGetSectionIDs());\n";
-          str << "  } else {\n";
-          str << "    void *impl_msg_tmp;\n";
-          str << "    for (int i=0; i<ckGetNumSections(); ++i) {\n";
-          str << "       impl_msg_tmp= (i<ckGetNumSections()-1) ? CkCopyMsg((void **) "
-                 "&impl_msg):impl_msg;\n";
-          str << "       CkSendMsg" << node << "BranchMulti(" << epIdx()
-              << ", impl_msg_tmp, ckGetGroupIDn(i), ckGetNumElements(i), ckGetElements(i)"
-              << opts << ");\n";
-          str << "    }\n";
-          str << "  }\n";
-        } else {  // Broadcast
-          str << "  if (ckIsDelegated()) {\n";
-          str << "     Ck" << node << "GroupMsgPrep(" << paramg << ");\n";
-          str << "     ckDelegatedTo()->" << node << "GroupBroadcast(ckDelegatedPtr(),"
-              << paramg << ");\n";
-          str << "  } else CkBroadcastMsg" << node << "Branch(" << paramg << opts
-              << ");\n";
-        }
-      }
+      str << marshallMsg();
+      str << "  CkSendMsg" << node << "BranchMulti(" << paramg << ", npes, pes" << opts
+          << ");\n";
     }
     str << "}\n";
-
-    // entry method on multiple PEs declaration
-    if (!forElement && !container->isForSection() && !isSync() && !isLocal() &&
-        !container->isNodeGroup()) {
-      str << "" << makeDecl(retStr, 1) << "::" << name << "(" << paramComma(0, 0)
-          << "int npes, int *pes" << eo(0) << ") {\n";
-      if (param->hasRdma()) {
-        str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy "
-               "parameters\");\n";
-      } else {
-        str << marshallMsg();
-        str << "  CkSendMsg" << node << "BranchMulti(" << paramg << ", npes, pes" << opts
-            << ");\n";
-      }
-      str << "}\n";
-      str << "" << makeDecl(retStr, 1) << "::" << name << "(" << paramComma(0, 0)
-          << "CmiGroup &grp" << eo(0) << ") {\n";
-      if (param->hasRdma()) {
-        str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy "
-               "parameters\");\n";
-      } else {
-        str << marshallMsg();
-        str << "  CkSendMsg" << node << "BranchGroup(" << paramg << ", grp" << opts
-            << ");\n";
-      }
-      str << "}\n";
+    str << "" << makeDecl(retStr, 1) << "::" << name << "(" << paramComma(0, 0)
+        << "CmiGroup &grp" << eo(0) << ") {\n";
+    if (param->hasRdma()) {
+      str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy "
+             "parameters\");\n";
+    } else {
+      str << marshallMsg();
+      str << "  CkSendMsg" << node << "BranchGroup(" << paramg << ", grp" << opts
+          << ");\n";
     }
+    str << "}\n";
   }
 }
 
