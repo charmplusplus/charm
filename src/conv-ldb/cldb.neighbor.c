@@ -25,7 +25,7 @@ typedef struct CldProcInfo_s {
   int    idleprocEvt;		/* user event for processing idle req */
 } *CldProcInfo;
 
-extern char *_lbtopo;			/* topology name string */
+CMI_EXTERNC_VARIABLE char *_lbtopo;			/* topology name string */
 int _lbsteal = 0;                       /* work stealing flag */
 
 CMI_EXTERNC

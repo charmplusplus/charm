@@ -164,6 +164,7 @@ void CcsCallerId(skt_ip_t *pip, unsigned int *pport)
   *pport = ChMessageInt(CpvAccess(ccsReq)->attr.port);
 }
 
+CMI_EXTERNC_VARIABLE int rep_fw_handler_idx;
 int rep_fw_handler_idx;
 
 CcsDelayedReply CcsDelayReply(void)

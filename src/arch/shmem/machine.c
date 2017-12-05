@@ -563,8 +563,8 @@ ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   ConverseRunPE(initret);
 }
 
-extern int quietModeRequested;
-extern int quietMode;
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+CMI_EXTERNC_VARIABLE int quietMode;
 
 void ConverseExit(void)
 {

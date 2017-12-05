@@ -34,8 +34,10 @@
 
 #ifdef __cplusplus
 # define CMI_EXTERNC extern "C"
+# define CMI_EXTERNC_VARIABLE extern "C"
 #else
 # define CMI_EXTERNC
+# define CMI_EXTERNC_VARIABLE extern
 #endif
 
 #include "conv-config.h"

@@ -50,8 +50,8 @@ char *ALIGN_32(char *p) {
   return((char *)((((unsigned long)p)+0x1f) & (~0x1FUL)));
 }
 
-extern int quietMode;
-extern int quietModeRequested;
+CMI_EXTERNC_VARIABLE int quietMode;
+CMI_EXTERNC_VARIABLE int quietModeRequested;
 
 /*To reduce the buffer used in broadcast and distribute the load from
   broadcasting node, define CMK_BROADCAST_SPANNING_TREE enforce the use of

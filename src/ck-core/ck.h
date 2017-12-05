@@ -19,7 +19,7 @@
 #endif
 
 // Flag that tells the system if we are replaying using Record/Replay
-extern int _replaySystem;
+CMI_EXTERNC_VARIABLE int _replaySystem;
 
 #if CMK_CHARMDEBUG
 extern "C" int ConverseDeliver(int pe);

@@ -19,7 +19,7 @@
 #define PRIOR_WEIGHT 0.1
 
 CpvDeclare(CldProcInfo, CldData);
-extern char *_lbtopo;			/* topology name string */
+CMI_EXTERNC_VARIABLE char *_lbtopo;			/* topology name string */
 int _lbsteal = 0;                       /* work stealing flag */
 
 CpvDeclare(MsgHeap, CldManagerLoadQueue);

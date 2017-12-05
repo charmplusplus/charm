@@ -216,7 +216,7 @@ int printf(const char *fmt, ...) {
 #include "machine.h"
 static int        Cmi_charmrun_pid;
 
-extern int quietMode;
+CMI_EXTERNC_VARIABLE int quietMode;
 
 /******************* Producer-Consumer Queues ************************/
 #include "pcqueue.h"
@@ -358,7 +358,7 @@ static void KillEveryoneCode(int n)
   machine_exit(1);
 }
 
-CpvExtern(int, freezeModeFlag);
+CpvCExtern(int, freezeModeFlag);
 
 static int Cmi_truecrash;
 

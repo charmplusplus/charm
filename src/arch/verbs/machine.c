@@ -348,7 +348,7 @@ static void KillEveryoneCode(int n)
   machine_exit(1);
 }
 
-CpvExtern(int, freezeModeFlag);
+CpvCExtern(int, freezeModeFlag);
 
 static int Cmi_truecrash;
 
@@ -1184,7 +1184,7 @@ static int InternalScanf(char *fmt, va_list l)
 /*New stdarg.h declarations*/
 void CmiPrintf(const char *fmt, ...)
 {
-  extern int quietMode;
+  CMI_EXTERNC_VARIABLE int quietMode;
   if (quietMode) return;
   CpdSystemEnter();
   {

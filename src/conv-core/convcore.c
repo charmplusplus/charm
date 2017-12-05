@@ -76,7 +76,7 @@
 #include "machineEvents.h"     /* projector */
 #endif
 
-extern const char * const CmiCommitID;
+CMI_EXTERNC_VARIABLE const char * const CmiCommitID;
 
 #if CMK_BIGSIM_CHARM
 extern void initQd(char **argv);
@@ -157,6 +157,7 @@ CpvDeclare(int,_curRestartPhase);
 static int CsdLocalMax = CSD_LOCAL_MAX_DEFAULT;
 
 int CharmLibInterOperate = 0;
+CpvCExtern(int,interopExitFlag);
 CpvDeclare(int,interopExitFlag);
 
 CpvStaticDeclare(int, CmiMainHandlerIDP); /* Main handler for _CmiMultipleSend that is run on every node */
@@ -3585,7 +3586,9 @@ static void checkTSanOptions(void)
 int ccsRunning;
 #endif
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
 int quietModeRequested;  // user has requested quiet mode
+CMI_EXTERNC_VARIABLE int quietMode;
 int quietMode; // quiet mode active (CmiPrintf's are disabled)
 CmiSpanningTreeInfo* _topoTree = NULL;
 

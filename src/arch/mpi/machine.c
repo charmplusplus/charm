@@ -1325,7 +1325,7 @@ static const char *thread_level_tostring(int thread_level) {
 #endif
 }
 
-extern int quietMode;
+CMI_EXTERNC_VARIABLE int quietMode;
 
 /**
  *  Obtain the number of nodes, my node id, and consuming machine layer

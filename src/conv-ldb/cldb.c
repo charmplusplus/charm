@@ -21,6 +21,7 @@ CpvDeclare(CmiNodeLock, cldLock);
 extern void LoadNotifyFn(int);
 
 static char s_lbtopo_default[] = "torus_nd_5";
+CMI_EXTERNC_VARIABLE char *_lbtopo;
 char *_lbtopo = s_lbtopo_default;
 
 /* Estimator stuff.  Of any use? */

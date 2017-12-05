@@ -427,7 +427,7 @@ pamix_progress_register_fn  cmi_progress_register;
 pamix_progress_enable_fn    cmi_progress_enable;
 pamix_progress_disable_fn   cmi_progress_disable;
 
-extern int quietMode;
+CMI_EXTERNC_VARIABLE int quietMode;
 
 int CMI_Progress_init(int start, int ncontexts) {
   if ((CmiMyPe() == 0) && (!quietMode))

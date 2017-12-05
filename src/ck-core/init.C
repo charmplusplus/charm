@@ -159,7 +159,7 @@ CkpvStaticDeclare(PtrVec*, _bocInitVec);
 //for interoperability
 extern void _libExitHandler(envelope *env);
 extern int _libExitHandlerIdx;
-CpvExtern(int,interopExitFlag);
+CpvCExtern(int,interopExitFlag);
 
 #if CMK_SHRINK_EXPAND
 //for shrink expand cleanup
@@ -229,8 +229,8 @@ void processRaiseEvacFile(char *raiseEvacFile);
 
 extern bool useNodeBlkMapping;
 
-extern int quietMode;
-extern int quietModeRequested;
+CMI_EXTERNC_VARIABLE int quietMode;
+CMI_EXTERNC_VARIABLE int quietModeRequested;
 
 // Modules are required to register command line opts they will parse. These
 // options are stored in the _optSet, and then when parsing command line opts

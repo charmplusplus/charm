@@ -17,7 +17,7 @@
 
 static std::atomic<int> interopCommThdExit{0};
 
-CpvExtern(int,interopExitFlag);
+CpvCExtern(int,interopExitFlag);
 
 extern "C"
 {

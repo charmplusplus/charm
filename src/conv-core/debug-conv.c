@@ -17,10 +17,10 @@ Orion Sky Lawlor, olawlor@acm.org, 4/10/2001
 # define write _write
 #endif
 
-CpvExtern(int, freezeModeFlag);
+CpvCExtern(int, freezeModeFlag);
 CpvStaticDeclare(int, continueFlag);
 CpvStaticDeclare(int, stepFlag);
-CpvExtern(void *, debugQueue);
+CpvCExtern(void *, debugQueue);
 CpvDeclare(void*, conditionalQueue);
 int conditionalPipe[2] = {0, 0};
 int _debugHandlerIdx;
@@ -28,6 +28,7 @@ int _debugHandlerIdx;
 char ** memoryBackup;
 
 /** Specify if we are replaying the processor from message logs, thus disable delivering of messages */
+CMI_EXTERNC_VARIABLE int _replaySystem;
 int _replaySystem = 0;
 int _conditionalDelivery = 0;
 

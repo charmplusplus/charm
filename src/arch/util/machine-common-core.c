@@ -156,6 +156,7 @@ int               _Cmi_mynodesize;/* Number of processors in my address space */
 int               _Cmi_mynode;    /* Which address space am I */
 int               _Cmi_numnodes;  /* Total number of address spaces */
 int               _Cmi_numpes;    /* Total number of processors */
+CMI_EXTERNC_VARIABLE int userDrivenMode;
 int               userDrivenMode; /* Set by CharmInit for interop in user driven mode */
 extern int CharmLibInterOperate;
 
@@ -1072,8 +1073,8 @@ INLINE_KEYWORD int pe_gToLTranslate(int pe) {
 }
 //end of functions related to partition
 
-extern int quietMode;
-extern int quietModeRequested;
+CMI_EXTERNC_VARIABLE int quietMode;
+CMI_EXTERNC_VARIABLE int quietModeRequested;
 
 /* ##### Beginning of Functions Related with Machine Startup ##### */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret) {

@@ -392,7 +392,7 @@ static void KillEveryoneCode(int n)
   machine_exit(1);
 }
 
-CpvExtern(int, freezeModeFlag);
+CpvCExtern(int, freezeModeFlag);
 
 static void KillOnAllSigs(int sigNo)
 {
@@ -1440,8 +1440,8 @@ static int InternalScanf(char *fmt, va_list l)
   return i;
 }
 
-extern int quietModeRequested;
-extern int quietMode;
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+CMI_EXTERNC_VARIABLE int quietMode;
 
 #if CMK_CMIPRINTF_IS_A_BUILTIN
 

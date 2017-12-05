@@ -3905,7 +3905,7 @@ void LrtsPreCommonInit(int everReturn){
 #endif
 }
 
-extern int quietMode;
+CMI_EXTERNC_VARIABLE int quietMode;
 
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
