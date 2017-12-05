@@ -582,7 +582,7 @@ rm -f $DESTINATION/tmp/Makefile
 rm -f $DESTINATION/tmp/Make.depends
 rm -f $DESTINATION/tmp/Make.cidepends
 rm -f $DESTINATION/tmp/Make.lb
-rm -f $DESTINATION/tmp/Make.machine
+rm -f $DESTINATION/tmp/Makefile.machine
 rm -f $DESTINATION/tmp/Make.extlib
 
 echo "TARGET=${UFCONTEXT_HEADER_NAME}" > $DESTINATION/tmp/uFcontext.mk
