@@ -422,7 +422,7 @@ THREADLIBS=$(L)/libthreads-default.a $(L)/libthreads-default-tls.a  \
 	  $(L)/libthreads-uJcontext-memoryalias.a
 
 CVLIBS=$(L)/libconv-core.a \
-	$(L)/libconv-cplus-y.a $(L)/libconv-cplus-n.a \
+	$(L)/libconv-machine.a \
 	$(L)/libconv-util.a $(L)/libconv-utilf.a \
 	$(CLBLIBS) $(TRACELIBS) $(MEMLIBS) $(THREADLIBS) \
 	$(L)/libccs-client.a $(L)/libconv-partition.a $(L)/libhwloc_embedded.a \
@@ -486,18 +486,14 @@ CONVLIBS: converse
 $(L)/libconv-core.a: $(LIBCONV_CORE)
 	$(CHARMC) $(TAU_LIBS) -o $@ $(LIBCONV_CORE) 
 
-$(L)/libconv-cplus-y.a: $(L)/libconv-cplus-n.a
-
 $(L)/libconv-partition.a: custom_partitioner.o set_partition_params.o
 	$(CHARMC) -o $@ $^
 
 include Makefile.machine
 
-$(L)/libconv-cplus-n.a: machine.c $(CVHEADERS)
+$(L)/libconv-machine.a: machine.c $(CVHEADERS)
 	@-test -f $(INC)/mpi.h && mv -f $(INC)/mpi.h $(INC)/mpi.BAK || true
-	$(CHARMC) -I. -o machine.o  -DFOR_CPLUS=1 machine.c
-	$(CHARMC) -o $(L)/libconv-cplus-y.a machine.o
-	$(CHARMC) -I. -o $(L)/libconv-cplus-n.a -DFOR_CPLUS=0 machine.c
+	$(CHARMC) -I. -o $@ $<
 	@-test -f $(INC)/mpi.BAK && mv -f $(INC)/mpi.BAK $(INC)/mpi.h || true
 
 $(L)/libconv-util.a: $(LIBCONV_UTIL)
