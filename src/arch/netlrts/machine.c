@@ -948,22 +948,40 @@ static int sendone_abort_fn(SOCKET skt,int code,const char *msg) {
 	return -1;
 }
 
+#include <sys/uio.h>
+
 static void ctrl_sendone_nolock(const char *type,
 				const char *data1,int dataLen1,
 				const char *data2,int dataLen2)
 {
-  const void *bufs[3]; int lens[3]; int nBuffers=0;
+  int nBuffers=0;
+  struct iovec iovs[3];
   ChMessageHeader hdr;
   skt_abortFn oldAbort=skt_set_abort(sendone_abort_fn);
+
   MACHSTATE1(2,"ctrl_sendone_nolock { type=%s", type);
   if (Cmi_charmrun_fd==-1) 
   	charmrun_abort("ctrl_sendone called in standalone!\n");
   Cmi_charmrun_fd_sendflag=1;
+
   ChMessageHeader_new(type,dataLen1+dataLen2,&hdr);
-  bufs[nBuffers]=&hdr; lens[nBuffers]=sizeof(hdr); nBuffers++;
-  if (dataLen1>0) {bufs[nBuffers]=data1; lens[nBuffers]=dataLen1; nBuffers++;}
-  if (dataLen2>0) {bufs[nBuffers]=data2; lens[nBuffers]=dataLen2; nBuffers++;}
-  skt_sendV(Cmi_charmrun_fd,nBuffers,bufs,lens);
+  iovs[0].iov_base = &hdr;
+  iovs[0].iov_len = sizeof(hdr);
+  nBuffers++;
+
+  if (dataLen1>0) {
+    iovs[nBuffers].iov_base = data1;
+    iovs[nBuffers].iov_len  = dataLen1;
+    nBuffers++;
+  }
+  if (dataLen2>0) {
+    iovs[nBuffers].iov_base = data2;
+    iovs[nBuffers].iov_len  = dataLen2;
+    nBuffers++;
+  }
+
+  writev(Cmi_charmrun_fd, iovs, nBuffers);
+
   Cmi_charmrun_fd_sendflag=0;
   skt_set_abort(oldAbort);
   MACHSTATE(2,"} ctrl_sendone_nolock");
