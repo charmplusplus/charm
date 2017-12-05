@@ -496,7 +496,6 @@ include Makefile.machine
 $(L)/libconv-cplus-n.a: machine.c $(CVHEADERS)
 	@-test -f $(INC)/mpi.h && mv -f $(INC)/mpi.h $(INC)/mpi.BAK || true
 	$(CHARMC) -I. -o machine.o  -DFOR_CPLUS=1 machine.c
-	@-test -f ./bglmachine.C && $(CHARMC) -o machine.o  -DFOR_CPLUS=1 bglmachine.C || true
 	$(CHARMC) -o $(L)/libconv-cplus-y.a machine.o
 	$(CHARMC) -I. -o $(L)/libconv-cplus-n.a -DFOR_CPLUS=0 machine.c
 	@-test -f $(INC)/mpi.BAK && mv -f $(INC)/mpi.BAK $(INC)/mpi.h || true
