@@ -199,6 +199,9 @@ include Make.lb
 # Build changes for external libraries
 include Make.extlib
 
+# GPU manager support
+include Make.gpu
+
 ###############################################################################
 #
 # The basics (bin, lib, include, headers, charmc, conv-mach.sh)

@@ -582,6 +582,7 @@ rm -f $DESTINATION/tmp/Makefile
 rm -f $DESTINATION/tmp/Make.depends
 rm -f $DESTINATION/tmp/Make.cidepends
 rm -f $DESTINATION/tmp/Make.lb
+rm -f $DESTINATION/tmp/Make.gpu
 rm -f $DESTINATION/tmp/Makefile.machine
 rm -f $DESTINATION/tmp/Make.extlib
 
@@ -635,6 +636,7 @@ touch $DESTINATION/tmp/Make.lb
 fi
 $DESTINATION/tmp/system_ln "$srcbase/scripts/Makefile" $DESTINATION/tmp/Makefile
 $DESTINATION/tmp/system_ln "$srcbase/scripts/Make.tau" $DESTINATION/tmp/Make.tau
+$DESTINATION/tmp/system_ln "$srcbase/scripts/Make.gpu" $DESTINATION/tmp/Make.gpu
 touch $DESTINATION/tmp/Makefile.machine
 touch $DESTINATION/tmp/Make.extlib
 
