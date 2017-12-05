@@ -197,8 +197,8 @@ typedef struct _cmi_rdma_direct_ack {
 } CmiRdmaDirectAck;
 
 /* Support for Nocopy Direct API */
-void LrtsSetRdmaSrcInfo(void *info, const void *ptr, int size);
-void LrtsSetRdmaDestInfo(void *info, const void *ptr, int size);
+void LrtsSetRdmaSrcInfo(void *info, const void *ptr, int size, unsigned short int mode);
+void LrtsSetRdmaDestInfo(void *info, const void *ptr, int size, unsigned short int mode);
 void LrtsSetRdmaNcpyAck(RdmaAckHandlerFn fn);
 void LrtsIssueRget(
   const void* srcAddr,
@@ -206,11 +206,13 @@ void LrtsIssueRget(
   void *srcAck,
   int srcAckSize,
   int srcPe,
+  unsigned short int *srcMode,
   const void* destAddr,
   void *destInfo,
   void *destAck,
   int destAckSize,
   int destPe,
+  unsigned short int *destMode,
   int size);
 void LrtsIssueRput(
   const void* destAddr,
@@ -218,23 +220,25 @@ void LrtsIssueRput(
   void *destAck,
   int destAckSize,
   int destPe,
+  unsigned short int *destMode,
   const void* srcAddr,
   void *srcInfo,
   void *srcAck,
   int srcAckSize,
   int srcPe,
+  unsigned short int *srcMode,
   int size);
-void LrtsReleaseSourceResource(void *info, int pe);
-void LrtsReleaseDestinationResource(void *info, int pe);
+void LrtsReleaseSourceResource(const void *ptr, void *info, int pe, unsigned short int mode);
+void LrtsReleaseDestinationResource(const void *ptr, void *info, int pe, unsigned short int mode);
 
 /* Set the machine specific information for a nocopy source pointer */
-void CmiSetRdmaSrcInfo(void *info, const void *ptr, int size){
-  LrtsSetRdmaSrcInfo(info, ptr, size);
+void CmiSetRdmaSrcInfo(void *info, const void *ptr, int size, unsigned short int mode){
+  LrtsSetRdmaSrcInfo(info, ptr, size, mode);
 }
 
 /* Set the machine specific information for a nocopy destination pointer */
-void CmiSetRdmaDestInfo(void *info, const void *ptr, int size){
-  LrtsSetRdmaDestInfo(info, ptr, size);
+void CmiSetRdmaDestInfo(void *info, const void *ptr, int size, unsigned short int mode){
+  LrtsSetRdmaDestInfo(info, ptr, size, mode);
 }
 
 void *CmiGetNcpyAck(const void *srcAddr, void *srcAck, int srcPe, const void *destAddr, void *destAck, int destPe, int ackSize) {
@@ -282,11 +286,13 @@ void CmiIssueRget(
   void *srcAck,
   int srcAckSize,
   int srcPe,
+  unsigned short int *srcMode,
   const void* destAddr,
   void *destInfo,
   void *destAck,
   int destAckSize,
   int destPe,
+  unsigned short int *destMode,
   int size) {
 
 #if CMK_USE_CMA
@@ -304,15 +310,17 @@ void CmiIssueRget(
 #endif
   // Use network RDMA for a PE on a remote host
   LrtsIssueRget(srcAddr,
-                srcInfo,
+                srcInfo + CmiGetRdmaCommonInfoSize(),
                 srcAck,
                 srcAckSize,
                 srcPe,
+                srcMode,
                 destAddr,
-                destInfo,
+                destInfo + CmiGetRdmaCommonInfoSize(),
                 destAck,
                 destAckSize,
                 destPe,
+                destMode,
                 size);
 }
 
@@ -323,11 +331,13 @@ void CmiIssueRput(
   void *destAck,
   int destAckSize,
   int destPe,
+  unsigned short int *destMode,
   const void* srcAddr,
   void *srcInfo,
   void *srcAck,
   int srcAckSize,
   int srcPe,
+  unsigned short int *srcMode,
   int size) {
 
 #if CMK_USE_CMA
@@ -346,26 +356,28 @@ void CmiIssueRput(
 #endif
   // Use network RDMA for a PE on a remote host
   LrtsIssueRput(destAddr,
-                destInfo,
+                destInfo + CmiGetRdmaCommonInfoSize(),
                 destAck,
                 destAckSize,
                 destPe,
+                destMode,
                 srcAddr,
-                srcInfo,
+                srcInfo + CmiGetRdmaCommonInfoSize(),
                 srcAck,
                 srcAckSize,
                 srcPe,
+                srcMode,
                 size);
 }
 
 /* Resource cleanup for source pointer */
-void CmiReleaseSourceResource(void *info, int pe){
-  LrtsReleaseSourceResource(info, pe);
+void CmiReleaseSourceResource(const void *ptr, void *info, int pe, unsigned short int mode){
+  LrtsReleaseSourceResource(ptr, info, pe, mode);
 }
 
 /* Resource cleanup for destination pointer */
-void CmiReleaseDestinationResource(void *info, int pe){
-  LrtsReleaseDestinationResource(info, pe);
+void CmiReleaseDestinationResource(const void *ptr, void *info, int pe, unsigned short int mode){
+  LrtsReleaseDestinationResource(ptr, info, pe, mode);
 }
 
 #endif /*End of CMK_ONESIDED_DIRECT_IMPL */

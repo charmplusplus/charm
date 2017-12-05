@@ -1,4 +1,4 @@
-DIRS	= unreg prereg reg
+DIRS	= simple_rget simple_rput get_put_pingpong pingpong
 
 all:
 	for d in $(DIRS); do \

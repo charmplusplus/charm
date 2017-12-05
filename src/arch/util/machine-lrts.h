@@ -32,6 +32,8 @@ CMK_NORETURN void LrtsAbort(const char *message);
 void LrtsPostNonLocal(void);
 
 void* LrtsAlloc(int, int);
+void* LrtsRdmaAlloc(int, int);
+
 void  LrtsFree(void*);
 void  LrtsNotifyIdle(void);
 

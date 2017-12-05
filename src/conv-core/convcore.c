@@ -251,6 +251,7 @@ CpvDeclare(Queue, CsdGridQueue);
 
 #if CMK_CRAYXE || CMK_CRAYXC || CMK_OFI
 void* LrtsAlloc(int, int);
+void* LrtsRdmaAlloc(int, int);
 void  LrtsFree(void*);
 #endif
 
@@ -3063,6 +3064,20 @@ void *CmiAlloc(int size)
   return (void *)res;
 }
 
+void *CmiRdmaAlloc(int size) {
+  char *res;
+  res =(char *) malloc_nomigrate(size+sizeof(CmiChunkHeader));
+
+  _MEMCHECK(res);
+  res+=sizeof(CmiChunkHeader);
+  CmiAssert((intptr_t)res % ALIGN_BYTES == 0);
+
+  SIZEFIELD(res)=size;
+  REFFIELD(res)=1;
+  return (void *)res;
+}
+
+
 /** Follow the header links out to the most enclosing block */
 static void *CmiAllocFindEnclosing(void *blk) {
   int refCount = REFFIELD(blk);
@@ -3137,6 +3152,29 @@ void CmiFree(void *blk)
 #else
     free_nomigrate(BLKSTART(parentBlk));
 #endif
+  }
+}
+
+void CmiRdmaFree(void *blk)
+{
+  void *parentBlk=CmiAllocFindEnclosing(blk);
+  int refCount=REFFIELD(parentBlk);
+#if CMK_ERROR_CHECKING
+  if(refCount==0) /* Logic error: reference count shouldn't already have been zero */
+    CmiAbort("CmiRdmaFree reference count was zero-- is this a duplicate free?");
+#endif
+  refCount--;
+  REFFIELD(parentBlk) = refCount;
+  if(refCount==0) { /* This was the last reference to the block-- free it */
+#ifdef MEMMONITOR
+    int size=SIZEFIELD(parentBlk);
+    if (size > 1000000000) /* Absurdly large size field-- warning */
+      CmiPrintf("MEMSTAT Uh-oh -- SIZEFIELD=%d\n",size);
+    CpvAccess(MemoryUsage) -= (size + sizeof(CmiChunkHeader));
+    CpvAccess(BlocksAllocated)--;
+#endif
+
+    free_nomigrate(BLKSTART(parentBlk));
   }
 }
 

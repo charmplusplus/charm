@@ -57,11 +57,13 @@ static void getRequestHandler(getRequestMsg *reqMsg){
                destAck,
                reqMsg->ackSize,
                reqMsg->destPe,
+               NULL,
                reqMsg->srcAddr,
                NULL,
                srcAck,
                reqMsg->ackSize,
                reqMsg->srcPe,
+               NULL,
                reqMsg->size);
 }
 
@@ -92,11 +94,13 @@ void CmiIssueRget(
   void *srcAck,
   int srcAckSize,
   int srcPe,
+  unsigned short int *srcMode,
   const void* destAddr,
   void *destInfo,
   void *destAck,
   int destAckSize,
   int destPe,
+  unsigned short int *destMode,
   int size) {
 
 #if CMK_USE_CMA
@@ -141,11 +145,13 @@ void CmiIssueRput(
   void *destAck,
   int destAckSize,
   int destPe,
+  unsigned short int *destMode,
   const void* srcAddr,
   void *srcInfo,
   void *srcAck,
   int srcAckSize,
   int srcPe,
+  unsigned short int *srcMode,
   int size) {
 
 #if CMK_USE_CMA
@@ -183,13 +189,9 @@ void CmiIssueRput(
   CmiSyncSendAndFree(destPe, sizeof(rdmaPayloadMsg) + size + destAckSize, recvMsg);
 }
 
-void CmiSetRdmaSrcInfo(void *info, const void *ptr, int size) {
-  CmiSetRdmaCommonInfo(info, ptr, size);
-}
-void CmiSetRdmaDestInfo(void *info, const void *ptr, int size) {
-  CmiSetRdmaCommonInfo(info, ptr, size);
-}
+void CmiSetRdmaSrcInfo(void *info, const void *ptr, int size, unsigned short int mode) {}
+void CmiSetRdmaDestInfo(void *info, const void *ptr, int size, unsigned short int mode) {}
 
-void CmiReleaseSourceResource(void *info, int pe) {}
-void CmiReleaseDestinationResource(void *info, int pe) {}
+void CmiReleaseSourceResource(const void *ptr, void *info, int pe, unsigned short int mode) {}
+void CmiReleaseDestinationResource(const void *ptr, void *info, int pe, unsigned short int mode) {}
 #endif

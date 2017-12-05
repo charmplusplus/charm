@@ -1,5 +1,5 @@
--include ../../../../common.mk
-CHARMC=../../../../../bin/charmc $(OPTS)
+-include ../../../../../common.mk
+CHARMC=../../../../../../bin/charmc $(OPTS)
 
 all: pingpong
 
@@ -16,8 +16,8 @@ pingpong.o: pingpong.C cifiles
 	$(CHARMC) -c pingpong.C
 
 test: all
-	$(call run, +p1 ./pingpong 32768 262144 100 10)
-	$(call run, +p2 ./pingpong 32768 262144 100 10)
+	$(call run, +p1 ./pingpong 1024 8192 2 1)
+	$(call run, +p2 ./pingpong 1024 8192 2 1)
 
 test-bench: all
 	$(call run, +p1 ./pingpong)

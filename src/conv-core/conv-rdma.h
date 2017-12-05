@@ -23,8 +23,8 @@ void CmiIssueRgets(void *recv, int pe);
 void CmiSetRdmaCommonInfo(void *info, const void *ptr, int size);
 int CmiGetRdmaCommonInfoSize(void);
 
-void CmiSetRdmaSrcInfo(void *info, const void *ptr, int size);
-void CmiSetRdmaDestInfo(void *info, const void *ptr, int size);
+void CmiSetRdmaSrcInfo(void *info, const void *ptr, int size, unsigned short int mode);
+void CmiSetRdmaDestInfo(void *info, const void *ptr, int size, unsigned short int mode);
 void CmiSetRdmaNcpyAck(RdmaSingleAckCallerFn fn);
 
 /* CmiIssueRget initiates an RDMA read operation, transferring 'size' bytes of data from the address space of 'srcPe' to local address, 'destAddr'.
@@ -38,11 +38,13 @@ void CmiIssueRget(
   void *srcAck,
   int srcAckSize,
   int srcPe,
+  unsigned short int *srcMode,
   const void* destAddr,
   void *destInfo,
   void *destAck,
   int destAckSize,
   int destPe,
+  unsigned short int *destMode,
   int size);
 
 /* CmiIssueRput initiates an RDMA write operation, transferring 'size' bytes of data from the local address, 'srcAddr' to the address space of 'destPe'.
@@ -57,15 +59,17 @@ void CmiIssueRput(
   void *destAck,
   int destAckSize,
   int destPe,
+  unsigned short int *destMode,
   const void* srcAddr,
   void *srcInfo,
   void *srcAck,
   int srcAckSize,
   int srcPe,
+  unsigned short int *srcMode,
   int size);
 
-void CmiReleaseSourceResource(void *info, int pe);
-void CmiReleaseDestinationResource(void *info, int pe);
+void CmiReleaseSourceResource(const void *ptr, void *info, int pe, unsigned short int mode);
+void CmiReleaseDestinationResource(const void *ptr, void *info, int pe, unsigned short int mode);
 
 #if CMK_USE_CMA
 void CmiIssueRgetUsingCMA(
@@ -87,8 +91,21 @@ void CmiIssueRputUsingCMA(
   int size);
 #endif
 
+// Allocation from pool
+void *CmiRdmaAlloc(int size);
+
 #if !CMK_ONESIDED_DIRECT_IMPL
 // Function declaration used for the generic implementation of the Nocopy Direct API
 void CmiOnesidedDirectInit(void);
 #endif
+
+// Macros required to keep the Nocopy Direct API functional on non-LRTS layers
+#if !CMK_USE_LRTS
+#define CMK_BUFFER_REG                 0
+#define CMK_BUFFER_UNREG               1
+#define CMK_BUFFER_PREREG              2
+
+#define CMK_COMMON_NOCOPY_DIRECT_BYTES 0
+#endif
+
 #endif

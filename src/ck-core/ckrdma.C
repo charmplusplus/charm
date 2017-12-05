@@ -335,13 +335,17 @@ void CkRdmaAckHandler(void *cbPtr, int pe, const void *ptr) {
 
 // Perform a nocopy put operation into the passed destination using this source
 void CkNcpySource::rput(CkNcpyDestination &destination){
+  if(mode == CK_BUFFER_NOREG || destination.mode == CK_BUFFER_NOREG) {
+    CkAbort("Cannot perform RDMA operations in CK_BUFFER_NOREG mode\n");
+  }
+
   // Check that the count for both the counters matches
   CkAssert(cnt <= destination.cnt);
 
   // Check that this object is local when CkRput is called
   CkAssert(CkNodeOf(pe) == CkMyNode());
 
-  if(CmiNodeOf(destination.pe) == CkMyNode()) {
+  if(CkNodeOf(destination.pe) == CkMyNode()) {
     // memcpy the data from the source buffer into the destination buffer
     memcpy((void *)destination.ptr, ptr, cnt);
 
@@ -355,26 +359,33 @@ void CkNcpySource::rput(CkNcpyDestination &destination){
 
     // Issue the Rput call
     CmiIssueRput(destination.ptr,
-                 &destination.layerInfo,
+                 destination.layerInfo,
                  &destination.cb,
                  sizeof(CkCallback),
                  destination.pe,
+                 &destination.mode,
                  ptr,
-                 &layerInfo,
+                 layerInfo,
                  &cb,
                  sizeof(CkCallback),
                  CkMyPe(),
+                 &mode,
                  cnt);
   }
 }
 
 // Release the registered resources for this source object
 void CkNcpySource::releaseResource(){
-  CmiReleaseSourceResource(&layerInfo, pe);
+#if CMK_REG_REQUIRED
+  CmiReleaseSourceResource(ptr, layerInfo + CmiGetRdmaCommonInfoSize(), pe, mode);
+#endif
 }
 
 // Perform a nocopy get operation into this destination using the passed source
 void CkNcpyDestination::rget(CkNcpySource &source){
+  if(mode == CK_BUFFER_NOREG || source.mode == CK_BUFFER_NOREG) {
+    CkAbort("Cannot perform RDMA operations in CK_BUFFER_NOREG mode\n");
+  }
 
   // Check that the count for both the counters matches
   CkAssert(source.cnt <= cnt);
@@ -398,20 +409,24 @@ void CkNcpyDestination::rget(CkNcpySource &source){
 
     // Issue the Rget call
     CmiIssueRget(source.ptr,
-                 &source.layerInfo,
+                 source.layerInfo,
                  &source.cb,
                  sizeof(CkCallback),
                  source.pe,
+                 &source.mode,
                  ptr,
-                 &layerInfo,
+                 layerInfo,
                  &cb,
                  sizeof(CkCallback),
                  CkMyPe(),
+                 &mode,
                  cnt);
   }
 }
 
 // Release the registered resources for this destination object
 void CkNcpyDestination::releaseResource(){
-  CmiReleaseDestinationResource(&layerInfo, pe);
+#if CMK_REG_REQUIRED
+  CmiReleaseDestinationResource(ptr, layerInfo + CmiGetRdmaCommonInfoSize(), pe, mode);
+#endif
 }
