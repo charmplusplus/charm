@@ -289,7 +289,6 @@ FDECL {
 #define ampi_iget_wait FTN_NAME ( AMPI_IGET_WAIT  , ampi_iget_wait )
 #define ampi_iget_data FTN_NAME ( AMPI_IGET_DATA  , ampi_iget_data )
 #define ampi_iget_free FTN_NAME ( AMPI_IGET_FREE  , ampi_iget_free )
-#define ampi_alltoall_iget FTN_NAME( AMPI_ALLTOALL_IGET , ampi_alltoall_iget )
 #define ampi_alltoall_medium FTN_NAME( AMPI_ALLTOALL_MEDIUM , ampi_alltoall_medium )
 #define ampi_alltoall_long FTN_NAME( AMPI_ALLTOALL_LONG , ampi_alltoall_long )
 #define ampi_yield FTN_NAME ( AMPI_YIELD , ampi_yield )
@@ -1871,13 +1870,6 @@ void ampi_iget_free(int *request, int *status, int *win, int *ierr) {
 
 void ampi_iget_data(void *data, int *status, int *ierr) {
   *ierr = AMPI_Iget_data(data, *((MPI_Status*)status));
-}
-
-void ampi_alltoall_iget(void *data, int *sendcount, int *sendtype,
-                        void *recvbuf, int *recvcount, int *recvtype,
-                        int *comm, int *ierr) {
-  *ierr = AMPI_Alltoall_iget(data, *sendcount, *sendtype, recvbuf,
-                             *recvcount, *recvtype, *comm);
 }
 
 void ampi_alltoall_medium(void *data, int *sendcount, int *sendtype,

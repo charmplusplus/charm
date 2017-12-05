@@ -3210,20 +3210,6 @@ void ampi::bcastraw(void* buf, int len, CkArrayID aid)
   pa.generic(msg);
 }
 
-AmpiMsg* ampi::Alltoall_RemoteIget(MPI_Aint disp, int cnt, MPI_Datatype type, int tag)
-{
-  CkAssert(tag==MPI_ATA_TAG && AlltoallGetFlag);
-  int unit;
-  CkDDT_DataType *ddt = getDDT()->getType(type);
-  unit = ddt->getSize(1);
-  int totalsize = unit*cnt;
-
-  AmpiMsg *msg = new (totalsize, 0) AmpiMsg(-1, MPI_ATA_TAG, thisIndex,totalsize);
-  char* addr = (char*)Alltoallbuff+disp*unit;
-  ddt->serialize(msg->getData(), addr, cnt, (-1));
-  return msg;
-}
-
 int ampi::intercomm_scatter(int root, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                             void *recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm intercomm)
 {
@@ -7140,70 +7126,6 @@ int AMPI_Alltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                     comm, MPI_STATUS_IGNORE);
     } // end of large message
   }
-
-  return MPI_SUCCESS;
-}
-
-CDECL
-int AMPI_Alltoall_iget(void *sendbuf, int sendcount, MPI_Datatype sendtype,
-                       void *recvbuf, int recvcount, MPI_Datatype recvtype,
-                       MPI_Comm comm)
-{
-  AMPIAPI("AMPI_Alltoall_iget");
-
-  handle_MPI_BOTTOM(sendbuf, sendtype, recvbuf, recvtype);
-
-#if AMPI_ERROR_CHECKING
-  int ret;
-  ret = errorCheck("AMPI_Alltoall_iget", comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
-  if(ret != MPI_SUCCESS)
-    return ret;
-  ret = errorCheck("AMPI_Alltoall_iget", comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
-  if(ret != MPI_SUCCESS)
-    return ret;
-#endif
-
-  ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize();
-
-  if(getAmpiParent()->isInter(comm))
-    CkAbort("AMPI does not implement MPI_Alltoall_iget for Inter-communicators!");
-  if(size == 1)
-    return copyDatatype(sendtype,sendcount,recvtype,recvcount,sendbuf,recvbuf);
-  if(sendbuf == MPI_IN_PLACE || recvbuf == MPI_IN_PLACE)
-    CkAbort("AMPI does not implement MPI_IN_PLACE for MPI_Alltoall_iget!");
-
-  CProxy_ampi pa(ptr->ckGetArrayID());
-  CkDDT_DataType *dttype;
-  int itemsize;
-  int recvdisp;
-  int myrank;
-  int i;
-  // Set flags for others to get
-  ptr->setA2AIgetFlag((void*)sendbuf);
-  MPI_Comm_rank(comm,&myrank);
-  recvdisp = myrank*recvcount;
-
-  ptr->barrier();
-  // post receives
-  vector<MPI_Request> reqs(size);
-  for(i=0;i<size;i++) {
-    reqs[i] = pa[i].Alltoall_RemoteIget(recvdisp, recvcount, recvtype, MPI_ATA_TAG);
-  }
-
-  dttype = ptr->getDDT()->getType(recvtype) ;
-  itemsize = dttype->getSize(recvcount) ;
-  AmpiMsg *msg;
-  for(i=0;i<size;i++) {
-    msg = (AmpiMsg*)CkWaitReleaseFuture(reqs[i]);
-    memcpy((char*)recvbuf+(itemsize*i), msg->getData(),itemsize);
-    delete msg;
-  }
-
-  ptr->barrier();
-
-  // Reset flags
-  ptr->resetA2AIgetFlag();
 
   return MPI_SUCCESS;
 }

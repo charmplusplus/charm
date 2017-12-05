@@ -1781,7 +1781,7 @@ class ampi : public CBase_ampi {
    */
   AmmTable msgs;         // unexpected message queue
   AmmTable posted_ireqs; // posted request queue
-  //------------------------ Added by YAN ---------------------
+
  private:
   CkPupPtrVec<win_obj> winObjects;
  public:
@@ -1835,7 +1835,6 @@ class ampi : public CBase_ampi {
   win_obj* getWinObjInstance(WinStruct *win) const;
   int getNewSemaId();
 
-  AmpiMsg* Alltoall_RemoteIget(MPI_Aint disp, int targcnt, MPI_Datatype targtype, int tag);
   int intercomm_scatter(int root, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                         void *recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm intercomm);
   int intercomm_iscatter(int root, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
@@ -1847,14 +1846,6 @@ class ampi : public CBase_ampi {
   int intercomm_iscatterv(int root, const void* sendbuf, const int* sendcounts, const int* displs,
                           MPI_Datatype sendtype, void* recvbuf, int recvcount,
                           MPI_Datatype recvtype, MPI_Comm intercomm, MPI_Request* request);
-
- private:
-  bool AlltoallGetFlag;
-  void *Alltoallbuff;
- public:
-  void setA2AIgetFlag(void* ptr) {AlltoallGetFlag=true;Alltoallbuff=ptr;}
-  void resetA2AIgetFlag() {AlltoallGetFlag=false;Alltoallbuff=NULL;}
-  //------------------------ End of code by YAN ---------------------
 };
 
 ampiParent *getAmpiParent(void);
@@ -1940,7 +1931,7 @@ static const char *funclist[] = {"AMPI_Abort", "AMPI_Add_error_class", "AMPI_Add
 "AMPI_Register_about_to_migrate", "AMPI_Register_just_migrated",
 "AMPI_Iget", "AMPI_Iget_wait", "AMPI_Iget_free", "AMPI_Iget_data",
 "AMPI_Type_is_contiguous", "AMPI_Evacuate", "AMPI_Yield", "AMPI_Suspend",
-"AMPI_Resume", "AMPI_Print", "AMPI_Alltoall_iget", "AMPI_Alltoall_medium",
+"AMPI_Resume", "AMPI_Print", "AMPI_Alltoall_medium",
 "AMPI_Alltoall_long", /*CUDA:*/ "AMPI_GPU_Iinvoke", "AMPI_GPU_Invoke", "AMPI_System"};
 
 // not traced: AMPI_Trace_begin, AMPI_Trace_end
