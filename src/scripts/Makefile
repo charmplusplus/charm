@@ -594,32 +594,36 @@ LIBTHREADSDEPS = $(CVHEADERS) QUICK_THREADS
 libthreads-%.c: threads.c
 	cp $< $@
 
-# $1 is the name of the module, $2 is any additional dependency beyond threads.c and $(LIBTHREADSDEPS), $3 is extra arguments to charmc
+# $1 is the name of the module, $2 is any additional dependency beyond threads.c and $(LIBTHREADSDEPS), $3 is extra arguments to charmc, $4 is an option to include 'boost-context'
 define libthreads
 $(L)/libthreads-$1.a: libthreads-$1.c $(LIBTHREADSDEPS) $2
-	$(CHARMC) -IQuickThreads -I. -o $$@ $3 $$<
+	if [ `ls boost-context/*.o 2>/dev/null | wc -l` -gt 0 -a  $4 -eq 1 ]; then \
+		$(CHARMC) -IQuickThreads -I. -o $$@ $3 boost-context/*.o $$<; \
+	else \
+		$(CHARMC) -IQuickThreads -I. -o $$@ $3 $$<; \
+	fi;
 endef
 
 uFcontext_asm:
 	$(MAKE) -C boost-context
 
-$(eval $(call libthreads,default,            uFcontext_asm,-DCMK_THREADS_BUILD_DEFAULT=1 $(wildcard boost-context/*.o)))
-$(eval $(call libthreads,default-tls,        uFcontext_asm,-DCMK_THREADS_BUILD_DEFAULT -DCMK_THREADS_BUILD_TLS=1 -touch-on-failure $(wildcard boost-context/*.o)))
-$(eval $(call libthreads,qt,                              ,-DCMK_THREADS_BUILD_QT=1))
-$(eval $(call libthreads,qt-tls,                          ,-DCMK_THREADS_BUILD_QT=1 -DCMK_THREADS_BUILD_TLS=1 -touch-on-failure))
-$(eval $(call libthreads,context,                         ,-DCMK_THREADS_BUILD_CONTEXT=1 -touch-on-failure))
-$(eval $(call libthreads,context-tls,                     ,-DCMK_THREADS_BUILD_CONTEXT=1 -DCMK_THREADS_BUILD_TLS=1 -touch-on-failure))
-$(eval $(call libthreads,uJcontext,            uJcontext.c,-DCMK_THREADS_BUILD_JCONTEXT=1 -U_FORTIFY_SOURCE -touch-on-failure))
-$(eval $(call libthreads,uJcontext-tls,        uJcontext.c,-DCMK_THREADS_BUILD_JCONTEXT=1 -DCMK_THREADS_BUILD_TLS=1 -U_FORTIFY_SOURCE -touch-on-failure))
-$(eval $(call libthreads,uFcontext,          uFcontext_asm,-DCMK_THREADS_BUILD_FCONTEXT=1 -U_FORTIFY_SOURCE -touch-on-failure $(wildcard boost-context/*.o) ))
-$(eval $(call libthreads,uFcontext-tls,      uFcontext_asm,-DCMK_THREADS_BUILD_FCONTEXT=1 -DCMK_THREADS_BUILD_TLS=1 -U_FORTIFY_SOURCE -touch-on-failure $(wildcard boost-context/*.o)))
-$(eval $(call libthreads,pthreads,                        ,-DCMK_THREADS_BUILD_PTHREADS=1 -touch-on-failure))
-$(eval $(call libthreads,fibers,                          ,-DCMK_THREADS_BUILD_FIBERS=1 -touch-on-failure))
-$(eval $(call libthreads,stackcopy,                       ,-DCMK_THREADS_BUILD_STACKCOPY=1 -touch-on-failure))
-$(eval $(call libthreads,memoryalias,                     ,-DCMK_THREADS_BUILD_DEFAULT=1 -DCMK_THREADS_ALIAS_STACK=1 -touch-on-failure))
-$(eval $(call libthreads,qt-memoryalias,                  ,-DCMK_THREADS_BUILD_QT=1 -DCMK_THREADS_ALIAS_STACK=1 -touch-on-failure))
-$(eval $(call libthreads,context-memoryalias,             ,-DCMK_THREADS_BUILD_CONTEXT=1 -DCMK_THREADS_ALIAS_STACK=1 -touch-on-failure))
-$(eval $(call libthreads,uJcontext-memoryalias,uJcontext.c,-DCMK_THREADS_BUILD_JCONTEXT=1 -DCMK_THREADS_ALIAS_STACK=1 -U_FORTIFY_SOURCE -touch-on-failure))
+$(eval $(call libthreads,default,            uFcontext_asm,-DCMK_THREADS_BUILD_DEFAULT=1, 1 ))
+$(eval $(call libthreads,default-tls,        uFcontext_asm,-DCMK_THREADS_BUILD_DEFAULT -DCMK_THREADS_BUILD_TLS=1 -touch-on-failure, 1 ))
+$(eval $(call libthreads,qt,                              ,-DCMK_THREADS_BUILD_QT=1, 0))
+$(eval $(call libthreads,qt-tls,                          ,-DCMK_THREADS_BUILD_QT=1 -DCMK_THREADS_BUILD_TLS=1 -touch-on-failure, 0))
+$(eval $(call libthreads,context,                         ,-DCMK_THREADS_BUILD_CONTEXT=1 -touch-on-failure, 0))
+$(eval $(call libthreads,context-tls,                     ,-DCMK_THREADS_BUILD_CONTEXT=1 -DCMK_THREADS_BUILD_TLS=1 -touch-on-failure, 0))
+$(eval $(call libthreads,uJcontext,            uJcontext.c,-DCMK_THREADS_BUILD_JCONTEXT=1 -U_FORTIFY_SOURCE -touch-on-failure,0))
+$(eval $(call libthreads,uJcontext-tls,        uJcontext.c,-DCMK_THREADS_BUILD_JCONTEXT=1 -DCMK_THREADS_BUILD_TLS=1 -U_FORTIFY_SOURCE -touch-on-failure,0))
+$(eval $(call libthreads,uFcontext,          uFcontext_asm,-DCMK_THREADS_BUILD_FCONTEXT=1 -U_FORTIFY_SOURCE -touch-on-failure, 1))
+$(eval $(call libthreads,uFcontext-tls,      uFcontext_asm,-DCMK_THREADS_BUILD_FCONTEXT=1 -DCMK_THREADS_BUILD_TLS=1 -U_FORTIFY_SOURCE -touch-on-failure, 1))
+$(eval $(call libthreads,pthreads,                        ,-DCMK_THREADS_BUILD_PTHREADS=1 -touch-on-failure,0))
+$(eval $(call libthreads,fibers,                          ,-DCMK_THREADS_BUILD_FIBERS=1 -touch-on-failure,0))
+$(eval $(call libthreads,stackcopy,                       ,-DCMK_THREADS_BUILD_STACKCOPY=1 -touch-on-failure,0))
+$(eval $(call libthreads,memoryalias,                     ,-DCMK_THREADS_BUILD_DEFAULT=1 -DCMK_THREADS_ALIAS_STACK=1 -touch-on-failure,0))
+$(eval $(call libthreads,qt-memoryalias,                  ,-DCMK_THREADS_BUILD_QT=1 -DCMK_THREADS_ALIAS_STACK=1 -touch-on-failure,0))
+$(eval $(call libthreads,context-memoryalias,             ,-DCMK_THREADS_BUILD_CONTEXT=1 -DCMK_THREADS_ALIAS_STACK=1 -touch-on-failure,0))
+$(eval $(call libthreads,uJcontext-memoryalias,uJcontext.c,-DCMK_THREADS_BUILD_JCONTEXT=1 -DCMK_THREADS_ALIAS_STACK=1 -U_FORTIFY_SOURCE -touch-on-failure,0))
 
 ## Global swapping (-swapglobal)
 swapglobal-target: $(L)/libglobal-swap.a

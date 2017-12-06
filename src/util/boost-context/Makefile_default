@@ -5,7 +5,7 @@ CHARMC=../../bin/charmc
 
 .SUFFIXES : .S .o
 
-all: jump_${TARGET}.o make_${TARGET}.o ontop_${TARGET}.o #libuFcontext_asm.a
+all: jump_${TARGET}.o make_${TARGET}.o ontop_${TARGET}.o
 
 .S.o:
 	$(CHARMC) -c $<
