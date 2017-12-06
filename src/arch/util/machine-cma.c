@@ -2,7 +2,7 @@
 #include <sys/uio.h>
 
 // Method checks if process has permissions to use CMA
-void CmiInitCma(void) {
+int CmiInitCma(void) {
   char buffer   = '0';
   int cma_works = 0;
   int fd;
@@ -26,13 +26,10 @@ void CmiInitCma(void) {
     cma_works = 1;
   }
 
-  if(cma_works) {
-    if(CmiMyPe() == 0) {
-      CmiPrintf("Charm++> cma enabled for within node transfers using the zerocopy API\n");
-    }
-  } else {
-    CmiAbort("Can't use CMA for SHM! Permissions Denied\n");
-  }
+  if(cma_works && _Cmi_mynode == 0)
+      CmiPrintf("Charm++> CMA enabled for within node transfers using the zerocopy API\n");
+
+  return cma_works;
 }
 
 /* Used to read from a list of remote buffers and write into a

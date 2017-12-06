@@ -567,6 +567,7 @@ void CmiInterSyncSendFn(int destPE, int partition, int size, char *msg) {
 #include "machine-xpmem.c"
 #endif
 #if CMK_USE_CMA
+int cma_works;
 #include "machine-cma.c"
 #endif
 
@@ -1195,7 +1196,13 @@ if (  MSG_STATISTIC)
     CmiInitXpmem(argv);
 #endif
 #if CMK_USE_CMA
-    CmiInitCma();
+    cma_works = CmiInitCma();
+    /* To use CMA, check that the global variable cma_works flag is set to 1.
+     * If it is 0, it indicates that CMA calls are supported but operations do
+     * not have the right permissions for usage. If cma_works is 0, CMA cannot be
+     * used by the RTS. CMA_HAS_CMA being disabled indicates that CMA calls are not
+     * even supported by the OS.
+     */
 #endif
 
     /* CmiTimerInit(); */
