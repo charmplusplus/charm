@@ -77,7 +77,7 @@ never be excluded...
 #endif
 
 #if CMK_CUDA
-#include "cuda-hybrid-api.h"
+#include "hapi_src.h"
 #endif
 
 void CkRestartMain(const char* dirname, CkArgMsg* args);

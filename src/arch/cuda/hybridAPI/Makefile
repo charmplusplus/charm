@@ -17,8 +17,8 @@ libcudahybridapi.a: hybridapi.o wrqueue.o
 	-rm -f $@
 	ar q $@ hybridapi.o wrqueue.o 
 
-hybridapi.o: cuda-hybrid-api.cu cuda-hybrid-api.h
-	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) -o hybridapi.o cuda-hybrid-api.cu
+hybridapi.o: hapi_src.cu hapi_src.h
+	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) -o hybridapi.o hapi_src.cu
 
 wrqueue.o: wrqueue.cu wrqueue.h wr.h 
 	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) -o wrqueue.o wrqueue.cu

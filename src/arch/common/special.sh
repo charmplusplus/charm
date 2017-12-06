@@ -13,7 +13,7 @@ then
   ./gathertree $SRCBASE/arch/cuda .
 
 # make links
-  test ! -f "../include/cuda-hybrid-api.h" && ./system_ln "../tmp/hybridAPI/cuda-hybrid-api.h" ../include && test ! -f "../include/wr.h" && ./system_ln "../tmp/hybridAPI/wr.h" ../include && test ! -f "../include/wrqueue.h" && ./system_ln "../tmp/hybridAPI/wrqueue.h" ../include
+  test ! -f "../include/hapi_src.h" && ./system_ln "../tmp/hybridAPI/hapi_src.h" ../include && test ! -f "../include/hapi.h" && ./system_ln "../tmp/hybridAPI/hapi.h" ../include && test ! -f "../include/wrqueue.h" && ./system_ln "../tmp/hybridAPI/wrqueue.h" ../include
 
 #make library
   export CHARMINC=../include
