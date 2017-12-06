@@ -350,6 +350,11 @@ namespace PUP {
     pup(p, s);
   }
 
+  template <typename T, Requires<std::is_enum<T>::value> = nullptr>
+  inline void operator|(PUP::er& p, T& s) {
+    pup_bytes(&p, static_cast<void*>(&s), sizeof(T));
+  }
+
   template <size_t N = 0, typename... Args,
             Requires<0 == sizeof...(Args)> = nullptr>
   void pup_tuple_impl(PUP::er& /* p */, std::tuple<Args...>& /* t */) {

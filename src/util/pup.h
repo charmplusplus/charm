@@ -928,15 +928,35 @@ template<class T> inline void PUParray(PUP::er &p,T *t,size_t n) { \
 }
 
 #else /* !CK_DEFAULT_BITWISE_PUP */
-/// Normal case: Call pup routines by default
+
+// Defines is_pupable to allow enums to be pupped in pup_stl.h
+namespace details {
+
+template <typename... Ts>
+struct make_void {
+  typedef void type;
+};
+template <typename... Ts>
+using void_t = typename make_void<Ts...>::type;
+
+template <typename T, typename U = void>
+struct is_pupable : std::false_type {};
+
+template <typename T>
+struct is_pupable<
+    T, void_t<decltype(std::declval<T>().pup(std::declval<PUP::er &>()))>>
+    : std::true_type {};
+
+}
+
 /**
-  Default operator|: call pup routine.
+  Default operator|: call pup routine (as long as T has a pup function).
 */
-template<class T>
-inline void operator|(PUP::er &p,T &t) { 
-	p.syncComment(PUP::sync_begin_object);
-	t.pup(p);
-	p.syncComment(PUP::sync_end_object); 
+template <class T, typename std::enable_if<details::is_pupable<T>::value, int>::type = 0>
+inline void operator|(PUP::er &p, T &t) {
+  p.syncComment(PUP::sync_begin_object);
+  t.pup(p);
+  p.syncComment(PUP::sync_end_object);
 }
 
 /**
