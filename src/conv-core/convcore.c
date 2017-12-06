@@ -178,6 +178,10 @@ void (*notify_crash_fn)(int) = NULL;
 
 CpvDeclare(char *, _validProcessors);
 
+#if CMK_CUDA
+CpvExtern(int, n_hapi_events);
+#endif
+
 /*****************************************************************************
  *
  * Unix Stub Functions
@@ -1904,11 +1908,6 @@ void CsdScheduleForever(void)
     int progressCount = CMK_CELL_PROGRESS_FREQ;
   #endif
 
-  #if CMK_CUDA
-    #define CMK_CUDA_PROGRESS_FREQ 50
-    int cudaProgressCount = CMK_CUDA_PROGRESS_FREQ;
-  #endif
-
   int isIdle=0;
   SCHEDULE_TOP
   while (1) {
@@ -1919,6 +1918,12 @@ void CsdScheduleForever(void)
         break;
       }
     }
+    #if CMK_CUDA
+    // check if any GPU work needs to be processed
+    if (CpvAccess(n_hapi_events) > 0) {
+      hapiPoll();
+    }
+    #endif
     msg = CsdNextMessage(&state);
     if (msg!=NULL) { /*A message is available-- process it*/
       if (isIdle) {isIdle=0;CsdEndIdle();}
@@ -1932,15 +1937,6 @@ void CsdScheduleForever(void)
 	}
         progressCount--;
       #endif
-
-      #if CMK_CUDA
-	if (cudaProgressCount == 0) {
-	  gpuProgressFn(); 
-	  cudaProgressCount = CMK_CUDA_PROGRESS_FREQ; 
-	}
-	cudaProgressCount--; 
-      #endif
-
     } else { /*No message available-- go (or remain) idle*/
       SCHEDULE_IDLE
 
@@ -1949,12 +1945,6 @@ void CsdScheduleForever(void)
         machine_OffloadAPIProgress();
         progressCount = CMK_CELL_PROGRESS_FREQ;
       #endif
-
-      #if CMK_CUDA
-	gpuProgressFn(); 
-	cudaProgressCount = CMK_CUDA_PROGRESS_FREQ;
-      #endif
-
     }
     CsdPeriodic();
   }
@@ -3926,7 +3916,7 @@ void ConverseCommonExit(void)
 #endif
 
 #if CMK_CUDA
-  // Ensure all PEs have exited gpuProgressFn before destructing
+  // ensure all PEs have finished GPU work before destructing
   if(CmiMyRank() < CmiMyNodeSize()) {
     CmiNodeBarrier();
   }

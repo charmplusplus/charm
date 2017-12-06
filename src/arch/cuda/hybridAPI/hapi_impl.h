@@ -1,49 +1,29 @@
-/*
- * cuda-hybrid-api.h
- *
- * by Lukasz Wesolowski
- * 04.01.2008
- *
- * an interface for execution on the GPU
- *
- * description:
- * -user enqueues one or more work requests to the work
- * request queue (wrQueue) to be executed on the GPU
- * - a converse function (gpuProgressFn) executes periodically to
- * offload work requests to the GPU one at a time
- *
- */
-
-#ifndef __CUDA_HYBRID_API_H__
-#define __CUDA_HYBRID_API_H__
-
+#ifndef __HAPI_SRC_H_
+#define __HAPI_SRC_H_
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* initHybridAPI
-   initializes the work request queue
-*/
-void initHybridAPI(void);
+// Initialize & exit hybrid API.
+void initHybridAPI();
+void exitHybridAPI();
 
-/* gpuProgressFn
-   called periodically to check if the current kernel has completed,
-   and invoke subsequent kernel */
-void gpuProgressFn(void);
+// Initializes event queues used for polling.
+void initEventQueues();
 
-/* exitHybridAPI
-   cleans up and deletes memory allocated for the queue
-*/
-void exitHybridAPI(void);
+// Registers callback handler functions.
+void registerCallbacks();
 
+// Polls for GPU work completion. Does not do anything if HAPI_CUDA_CALLBACK is defined.
+void hapiPoll();
 
-#ifdef GPU_MEMPOOL
+#ifdef HAPI_MEMPOOL
 // data and metadata reside in same chunk of memory
 typedef struct _header {
   struct _header *next;
   int slot;
-#ifdef GPU_MEMPOOL_DEBUG
+#ifdef HAPI_MEMPOOL_DEBUG
   int size;
 #endif
 } Header;
@@ -51,15 +31,14 @@ typedef struct _header {
 typedef struct _bufferPool {
   Header *head;
   size_t size;
-#ifdef GPU_MEMPOOL_DEBUG
+#ifdef HAPI_MEMPOOL_DEBUG
   int num;
 #endif
 } BufferPool;
-
-#endif // GPU_MEMPOOL
+#endif // HAPI_MEMPOOL
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // __CUDA_HYBRID_API_H__
+#endif // __HAPI_SRC_H_

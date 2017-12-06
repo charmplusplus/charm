@@ -1514,6 +1514,13 @@ void _initCharm(int unused_argc, char **argv)
     if (CmiMyRank() == 0) {
       initHybridAPI();
     }
+    initEventQueues();
+
+    // ensure HAPI is initialized before registering callback functions
+    if (CmiMyRank() < CmiMyNodeSize()) {
+      CmiNodeBarrier();
+    }
+    registerCallbacks();
 #endif
 
     if(CmiMyPe() == 0) {

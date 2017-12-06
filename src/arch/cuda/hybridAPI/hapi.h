@@ -1,262 +1,254 @@
-/*
- * wr.h
- *
- * by Lukasz Wesolowski
- * 06.02.2008
- *
- * header containing declarations needed by the user of the API
- *
- */
+#ifndef __HAPI_H_
+#define __HAPI_H_
+#include <cuda_runtime.h>
+#include <string.h>
+#include <stdlib.h>
+#include <vector>
 
-#ifndef __WR_H__
-#define __WR_H__
-
-/* struct pinnedMemReq
- *
- * a structure for submitting page-locked memory allocation requests;
- * passed as input into pinnedMallocHost
- *
- */
-typedef struct pinnedMemReq {
-  void*** hostPtrs;
-  size_t* sizes;
-  int nBuffers;
-  void* callbackFn;
-} pinnedMemReq;
-
-
-/**
- Do a CudaFreeHost on this host pinned memory,
- but only when no kernels are runnable.
-*/
-void delayedFree(void* ptr);
-
-
-/* hybrid API wrappers to call appropriate malloc/free functions
- *
- * Their behavior is controlled by the following user defined
- * variables:
- *
- * CUDA_MEMPOOL - toggle use of mempool functions
- *   when enabled, makes calls to the appropriate hapi_*
- *   functions which draw memory from a preallocated pool
- *   if disabled (and cuda functions are enabled) we use the blocking
- *   cuda memory allocators (cuda*Host) directly
- *
- * CUDA_USE_CUDA_MALLOCHOST - toggle use of the cuda memory allocators,
- *   if not defined then these functions fallback to regular
- *   malloc and free
- */
-#ifdef CUDA_USE_CUDAMALLOCHOST /* <- user define */
+/******************** DEPRECATED ********************/
+// HAPI wrappers whose behavior is controlled by user defined variables,
+// which are CUDA_USE_CUDAMALLOCHOST and CUDA_MEMPOOL.
+#ifdef CUDA_USE_CUDAMALLOCHOST
 #  ifdef CUDA_MEMPOOL
-#    define hapi_hostMalloc hapi_poolMalloc
-#    define hapi_hostFree   hapi_poolFree
+#    define hapiHostMalloc hapiPoolMalloc
+#    define hapiHostFree   hapiPoolFree
 #  else
-#    define hapi_hostMalloc hapi_cudaMallocHost
-#    define hapi_hostFree   delayedFree
+#    define hapiHostMalloc cudaMallocHost
+#    define hapiHostFree   cudaFreeHost
 #  endif // CUDA_MEMPOOL
 #else
-#  define hapi_hostMalloc malloc
-#  define hapi_hostFree   free
-#endif // CUDA_USE_CUDAMALLOCHOST
+#  define hapiHostMalloc malloc
+#  define hapiHostFree   free
+#endif // CUDA_USE_MALLOCHOST
 
-/* pinnedMallocHost
- *
- * schedules a pinned memory allocation so that it does not impede
- * concurrent asynchronous execution
- *
- */
-void pinnedMallocHost(pinnedMemReq* reqs);
-
-// Provide funtion to work with macro
-void* hapi_cudaMallocHost(size_t size);
-
-/* struct bufferInfo
- *
- * purpose:
- * structure to indicate which actions the runtime system should
- * perform in relation to the buffer
- *
- * usage:
- *
- * the user associates an array of dataInfo structures with each
- * submitted work request; device memory will be allocated if there is
- * no buffer in use for that index
- *
- */
-typedef struct dataInfo {
+/******************** DEPRECATED ********************/
+// Contains information about a device buffer, which is used by
+// the runtime to perform appropriate operations. Each bufferInfo should
+// be associated with a workRequest.
+typedef struct bufferInfo {
   // ID of buffer in the runtime system's buffer table
-  int bufferID;
+  int id;
 
   // flags to indicate if the buffer should be transferred
-  int transferToDevice;
-  int transferFromDevice;
+  bool transfer_to_device;
+  bool transfer_to_host;
 
   // flag to indicate if the device buffer memory should be freed
-  // after  execution of work request
-  int freeBuffer;
+  // after execution of work request
+  bool need_free;
 
   // pointer to host data buffer
-  void* hostBuffer;
+  void* host_buffer;
 
   // size of buffer in bytes
   size_t size;
 
-  dataInfo(int _bufferID = -1): bufferID(_bufferID) {}
+  bufferInfo(int _id = -1) : id(_id), transfer_to_device(false),
+    transfer_to_host(false) {}
 
-} dataInfo;
+  bufferInfo(void* _host_buffer, size_t _size, bool _transfer_to_device,
+      bool _transfer_to_host, bool _need_free, int _id = -1) :
+    host_buffer(_host_buffer), size(_size), transfer_to_device(_transfer_to_device),
+    transfer_to_host(_transfer_to_host), need_free(_need_free), id(_id) {}
 
+} bufferInfo;
 
-
-/* struct workRequest
- *
- * purpose:
- * structure for organizing work units for execution on the GPU
- *
- * usage model:
- * 1. declare a pointer to a workRequest
- * 2. allocate dynamic memory for the work request
- * 3. define the data members for the work request
- * 4. enqueue the work request
- */
-
-
+/******************** DEPRECATED ********************/
+// Data structure that ties a kernel, associated buffers, and other variables
+// required by the runtime. The user gets a workRequest from the runtime,
+// fills it in, and enqueues it. The memory associated with it is managed
+// by the runtime.
 typedef struct workRequest {
-  // The following parameters need to be set by the user
-
   // parameters for kernel execution
-  dim3 dimGrid;
-  dim3 dimBlock;
-  int smemSize;
+  dim3 grid_dim;
+  dim3 block_dim;
+  int shared_mem;
 
-  // array of dataInfo structs containing buffer information for the
-  // execution of the work request
-  dataInfo* bufferInfo;
+  // contains information about buffers associated with the kernel
+  std::vector<bufferInfo> buffers;
 
-  // number of buffers used by the work request
-  int nBuffers;
+  // Charm++ callback functions to be executed after certain stages of
+  // GPU execution
+  void* host_to_device_cb; // after host to device data transfer
+  void* kernel_cb; // after kernel execution
+  void* device_to_host_cb; // after device to host data transfer
 
-  // a Charm++ callback function (cast to a void *) to be called after
-  // the kernel finishes executing on the GPU
-  void* callbackFn;
+#ifdef HAPI_TRACE
+  // short identifier used for tracing and logging
+  const char *trace_name;
+#endif
 
-  // Short identifier used for tracing and logging
-  const char *traceName;
+  // Pointer to host-side function that actually invokes the kernel.
+  // The user implements this function, using the given CUDA stream and
+  // device buffers (which are indexed by bufferInfo->id).
+  // Could be set to NULL if no kernel needs to be executed.
+  void (*runKernel)(struct workRequest* wr, cudaStream_t kernel_stream,
+                    void** device_buffers);
 
-  /**
-    Host-side function to run this kernel (0 if no kernel to run)
-      kernelStream is the cuda stream to run the kernel in.
-      deviceBuffers is an array of device pointers, indexed by bufferInfo -> bufferID.
-  */
-  void (*runKernel)(struct workRequest *wr, cudaStream_t kernelStream, void **deviceBuffers);
-
-  // The following flag is used for control by the system
+  // flag used for control by the system
   int state;
 
-  // user data, may be used to pass scalar values to kernel calls
-  void* userData;
+  // may be used to pass data to kernel calls
+  void* user_data;
 
-#ifdef GPU_INSTRUMENT_WRS
-  double phaseStartTime;
-  int chareIndex;
-  char compType;
-  char compPhase;
+  // CUDA stream index provided by the user or assigned by GPUManager
+  cudaStream_t stream;
+
+#ifdef HAPI_INSTRUMENT_WRS
+  double phase_start_time;
+  int chare_index;
+  char comp_type;
+  char comp_phase;
 #endif
 
-  workRequest()
-  	:dimGrid(0), dimBlock(0), smemSize(0),
-  	 bufferInfo(0), nBuffers(0), callbackFn(0),
-  	 traceName(""), runKernel(0), state(0),
-  	 userData(0)
+  workRequest() :
+    grid_dim(0), block_dim(0), shared_mem(0), host_to_device_cb(NULL),
+    kernel_cb(NULL), device_to_host_cb(NULL), runKernel(NULL), state(0),
+    user_data(NULL), stream(NULL)
   {
-#ifdef GPU_INSTRUMENT_WRS
-    chareIndex = -1;
+#ifdef HAPI_TRACE
+    trace_name = "";
 #endif
+#ifdef HAPI_INSTRUMENT_WRS
+    chare_index = -1;
+#endif
+  }
+
+  ~workRequest() {
+    free(user_data);
+  }
+
+  void setExecParams(dim3 _grid_dim, dim3 _block_dim, int _shared_mem = 0) {
+    grid_dim = _grid_dim;
+    block_dim = _block_dim;
+    shared_mem = _shared_mem;
+  }
+
+  void addBuffer(void *host_buffer, size_t size, bool transfer_to_device,
+                 bool transfer_to_host, bool need_free, int id = -1) {
+    buffers.emplace_back(host_buffer, size, transfer_to_device, transfer_to_host,
+                         need_free, id);
+  }
+
+  int getBufferID(int i) {
+    return buffers[i].id;
+  }
+
+  int getBufferCount() {
+    return buffers.size();
+  }
+
+  void setHostToDeviceCallback(void* cb) {
+    host_to_device_cb = cb;
+  }
+
+  void setKernelCallback(void* cb) {
+    kernel_cb = cb;
+  }
+
+  void setDeviceToHostCallback(void* cb) {
+    device_to_host_cb = cb;
+  }
+
+  void setCallback(void* cb) {
+    device_to_host_cb = cb;
+  }
+
+#ifdef HAPI_TRACE
+  void setTraceName(const char* _trace_name) {
+    trace_name = _trace_name;
+  }
+#endif
+
+  void setRunKernel(void (*_runKernel)(struct workRequest*, cudaStream_t, void**)) {
+    runKernel = _runKernel;
+  }
+
+  void setStream(cudaStream_t _stream) {
+    stream = _stream;
+  }
+
+  cudaStream_t getStream() {
+    return stream;
+  }
+
+  void setUserData(void* ptr, size_t size) {
+    // free memory if something else was contained previously
+    if (user_data != NULL) {
+      free(user_data);
+    }
+
+    user_data = malloc(size);
+
+    // make a separate copy to prevent tampering with the original data
+    memcpy(user_data, ptr, size);
+  }
+
+  void* getUserData() {
+    return user_data;
   }
 
 } workRequest;
 
+/******************** DEPRECATED ********************/
+// Create a workRequest object for the user. The runtime manages the associated
+// memory, so the user only needs to set it up properly.
+workRequest* hapiCreateWorkRequest();
 
-/* struct workRequestQueue
- *
- * purpose: container for GPU work requests
- *
- * usage model:
- * 1. declare a workRequestQueue
- * 2. call init to allocate memory for the queue and initialize
- *    bookkeeping variables
- * 3. enqueue each work request which needs to be
- *    executed on the GPU
- * 4. the runtime system will be invoked periodically to
- *    handle the details of executing the work request on the GPU
- *
- * implementation notes:
- * the queue is implemented using a circular array; if the array fills
- * up, requests are transferred to a queue having additional
- * QUEUE_EXPANSION_SIZE slots, and the memory for the old queue is freed
- */
-typedef struct {
-  // array of requests
-  workRequest* requests;
+/******************** DEPRECATED ********************/
+// Add a work request into the "queue". Currently all specified data transfers
+// and kernel execution are directly put into a CUDA stream.
+void hapiEnqueue(workRequest* wr);
 
-  // array index for the logically first item in the queue
-  int head;
+// The runtime queries the compute capability of the device, and creates as
+// many streams as the maximum number of concurrent kernels.
+int hapiCreateStreams();
 
-  // array index for the last item in the queue
-  int tail;
+// Get a CUDA stream that was created by the runtime. Current scheme is to
+// hand out streams in a round-robin fashion.
+cudaStream_t hapiGetStream();
 
-  // number of work requests in the queue
-  int size;
+// Add a Charm++ callback function to be invoked after the previous operation
+// in the stream completes. This call should be placed after data transfers or
+// a kernel invocation.
+void hapiAddCallback(cudaStream_t, void*, void* = NULL);
 
-  // size of the array of work request
-  int capacity;
+// Thin wrappers for memory related CUDA API calls.
+cudaError_t hapiMalloc(void**, size_t);
+cudaError_t hapiFree(void*);
+cudaError_t hapiMallocHost(void**, size_t);
+cudaError_t hapiFreeHost(void*);
+cudaError_t hapiMemcpyAsync(void*, const void*, size_t, cudaMemcpyKind, cudaStream_t);
 
-} workRequestQueue;
+// Provides support for detecting errors with CUDA API calls.
+#ifndef HAPI_CHECK_OFF
+#define hapiCheck(code) hapiErrorDie(code, #code, __FILE__, __LINE__)
+#else
+#define hapiCheck(code) code
+#endif
+void hapiErrorDie(cudaError_t, const char*, const char*, int);
 
-/* enqueue
- *
- * add a work request to the queue to be later executed on the GPU
- *
- */
-void enqueue(workRequestQueue* q, workRequest* wr);
-void enqueue(workRequest* wr);
-void setWRCallback(workRequest* wr, void* cb);
+#ifdef HAPI_MEMPOOL
+// Allocate memory from a pool of page-locked memory.
+void* hapiPoolMalloc(int);
 
-#ifdef GPU_MEMPOOL
-/**
- Return host pinned memory, just like delayedFree,
- but with the option of recycling to future poolMallocs.
-*/
-void hapi_poolFree(void*);
-
-/**
- Allocate host pinned memory from the pool.
-*/
-void *hapi_poolMalloc(int size);
-#endif // GPU_MEMPOOL
-/* external declarations needed by the user */
-
-void** getdevBuffers();
-cudaStream_t getKernelStream();
-
-#ifdef GPU_INSTRUMENT_WRS
-struct RequestTimeInfo {
-  double transferTime;
-  double kernelTime;
-  double cleanupTime;
-  int n;
-
-  RequestTimeInfo(){
-    transferTime = 0.0;
-    kernelTime = 0.0;
-    cleanupTime = 0.0;
-    n = 0;
-  }
-};
-
-void hapi_initInstrument(int nchares, char ntypes);
-RequestTimeInfo *hapi_queryInstrument(int chare, char type, char phase);
+// Return page-locked memory to the pool.
+void hapiPoolFree(void*);
 #endif
 
-#endif // __WR_H__
+#ifdef HAPI_INSTRUMENT_WRS
+struct RequestTimeInfo {
+  double transfer_time;
+  double kernel_time;
+  double cleanup_time;
+  int n;
 
+  RequestTimeInfo() : transfer_time(0.0), kernel_time(0.0), cleanup_time(0.0),
+    n(0) {}
+};
+
+void hapiInitInstrument(int n_chares, char n_types);
+RequestTimeInfo* hapiQueryInstrument(int chare, char type, char phase);
+#endif
+
+#endif // __HAPI_H_
