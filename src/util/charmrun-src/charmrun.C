@@ -632,7 +632,7 @@ static int pparam_parsecmd(char optchr, const char **argv)
 }
 
 #ifdef HSTART
-static char **dupargv(char **argv)
+static char **dupargv(const char **argv)
 {
   if (argv == NULL)
     return NULL;
@@ -649,7 +649,7 @@ static char **dupargv(char **argv)
   /* the strings */
   for (argc = 0; argv[argc] != NULL; argc++) {
     int len = strlen(argv[argc]);
-    copy[argc] = malloc(sizeof(char) * (len + 1));
+    copy[argc] = (char *)malloc(sizeof(char) * (len + 1));
     strcpy(copy[argc], argv[argc]);
   }
   copy[argc] = NULL;
@@ -849,7 +849,7 @@ static void arg_init(int argc, const char **argv)
   pparam_flag(&arg_no_va_rand, 0, "no-va-randomization",
               "Disables randomization of the virtual address  space");
 #ifdef HSTART
-  arg_argv = dupargv(argv);
+  arg_argv = (const char **)dupargv(argv);
 #endif
 
 #if CMK_SHRINK_EXPAND
@@ -910,8 +910,7 @@ static void arg_init(int argc, const char **argv)
     arg_argv++;
     arg_argc--;
 
-    arg_argv[arg_argc] = malloc(sizeof(char) * strlen("++child-charmrun"));
-    strcpy(arg_argv[arg_argc++], "++child-charmrun");
+    arg_argv[arg_argc++] = "++child-charmrun";
     arg_argv[arg_argc] = NULL;
   }
 #else
@@ -1287,7 +1286,6 @@ static void nodetab_init_for_local()
 static int branchfactor;
 static int nodes_per_child;
 static std::vector<int> nodetab_unique_table;
-static char *nodetab_name(int i);
 static void nodetab_init_hierarchical_start(void)
 {
   const int nodetab_rank0_size = nodetab_rank0_table.size();
@@ -1295,7 +1293,7 @@ static void nodetab_init_hierarchical_start(void)
   int node_start = 0;
   while (node_start < nodetab_rank0_size) {
     nodetab_unique_table.push_back(node_start);
-    char *node_name = nodetab_name(node_start);
+    const char *node_name = nodetab_name(node_start);
     do {
       node_start++;
     } while (node_start < nodetab_rank0_size &&
@@ -1875,6 +1873,7 @@ static FILE *gdb_stream = NULL;
 #define REQ_FAILED -1
 
 #ifdef HSTART
+static int req_reply(SOCKET fd, const char *type, const char *data, int dataLen);
 static int req_reply_child(SOCKET fd, const char *type, const char *data, int dataLen)
 {
 
@@ -1882,7 +1881,7 @@ static int req_reply_child(SOCKET fd, const char *type, const char *data, int da
   if (status != REQ_OK)
     return status;
   SOCKET clientFd;
-  skt_recvN(fd, (const char *) &clientFd, sizeof(SOCKET));
+  skt_recvN(fd, (char *) &clientFd, sizeof(SOCKET));
   skt_sendN(fd, (const char *) &clientFd, sizeof(fd));
   return status;
 }
@@ -2765,7 +2764,7 @@ static void req_forward_client()
   } else if (strcmp(cmd, "barrier0") == 0) {
     fd = nodetab_table[0]->ctrlfd;
   } else
-    skt_recvN(parent_charmrun_fd, (const char *) &fd, sizeof(SOCKET));
+    skt_recvN(parent_charmrun_fd, (char *) &fd, sizeof(SOCKET));
 
   int status = req_reply(fd, cmd, msg.data, ChMessageInt(msg.header.len));
 
@@ -3003,7 +3002,7 @@ static void req_poll_hierarchical()
   if (status < 0) {
     fflush(stdout);
     fflush(stderr);
-    socket_error_in_poll(1359, "Node program terminated unexpectedly!\n");
+    socket_error_in_poll(req_clients[0], 1359, "Node program terminated unexpectedly!\n");
   }
   for (int i = 0; i < req_nClients; i++)
     if (FD_ISSET(req_clients[i], &rfds)) {
@@ -3093,7 +3092,7 @@ static void req_poll_hierarchical()
 static skt_ip_t parent_charmrun_IP;
 static int parent_charmrun_port;
 static int parent_charmrun_pid;
-static int dataport;
+static unsigned int dataport;
 static SOCKET dataskt;
 static int charmrun_phase = 0;
 #endif
@@ -4743,10 +4742,9 @@ static void open_gdb_info()
 static void start_next_level_charmruns()
 {
 
-  char *nodeprog_name = strrchr(arg_nodeprog_a, '/');
-  nodeprog_name[0] = 0;
+  const char *nodeprog_name = strrchr(arg_nodeprog_a, '/');
   static char buf[1024];
-  sprintf(buf, "%s%s%s", arg_nodeprog_a, DIRSEP, "charmrun");
+  sprintf(buf, "%.*s%s%s", (int)(nodeprog_name-arg_nodeprog_a), arg_nodeprog_a, DIRSEP, "charmrun");
   arg_nodeprog_a = strdup(buf);
 
   int nextIndex = 0;
