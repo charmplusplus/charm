@@ -17,6 +17,14 @@
 #include <sys/bproc.h>
 #endif
 
+#ifndef CMK_NOT_USE_CONVERSE
+#  include "converse.h" /* use real CmiTmpAlloc/Free */
+#elif CMK_NOT_USE_CONVERSE /* fake CmiTmpAlloc/Free via malloc */
+#  define CMI_TMP_SKIP
+#  define CmiTmpAlloc(size) malloc(size)
+#  define CmiTmpFree(ptr) free(ptr)
+#endif
+
 #if !CMK_HAS_SOCKLEN
 typedef int socklen_t;
 #endif
@@ -551,7 +559,7 @@ int skt_sendV(SOCKET fd,int nBuffers,const void **bufs,int *lens)
 	int b,len=0;
 	for (b=0;b<nBuffers;b++) len+=lens[b];
 	if (len<=skt_sendV_max) { /*Short message: Copy and do one big send*/
-		char *buf=(char *)malloc(skt_sendV_max);
+		char *buf=(char *)CmiTmpAlloc(skt_sendV_max);
 		char *dest=buf;
 		int ret;
 		for (b=0;b<nBuffers;b++) {
@@ -559,7 +567,7 @@ int skt_sendV(SOCKET fd,int nBuffers,const void **bufs,int *lens)
 			dest+=lens[b];
 		}
 		ret=skt_sendN(fd,buf,len);
-		free(buf);
+		CmiTmpFree(buf);
 		return ret;
 	}
 	else { /*Big message: Just send one-by-one as usual*/

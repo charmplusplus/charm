@@ -814,6 +814,14 @@ int      CmiGetReference(void *blk);
 int      CmiSize(void *blk);
 void     CmiFree(void *blk);
 
+#ifndef CMI_TMP_SKIP
+void *CmiTmpAlloc(int size);
+void CmiTmpFree(void *);
+#endif
+
+/* Pool features */
+
+
 /* Various special features of certain -memory modes: */
 extern void * memory_stack_top; /* contains the top of the stack, for -memory charmdebug */
 void CmiMemoryCheck(void); /* heap check, for -memory paranoid */

@@ -3112,6 +3112,72 @@ void CmiFree(void *blk)
   }
 }
 
+
+/***************************************************************************
+ *
+ * Temporary-memory Allocation routines 
+ *
+ *  This buffer augments the storage available on the regular machine stack
+ * for fairly large temporary buffers, which allows us to use smaller machine
+ * stacks.
+ *
+ ***************************************************************************/
+
+#define CMI_TMP_BUF_MAX 128*1024 /* Allow this much temporary storage. */
+
+typedef struct {
+  char *buf; /* Start of temporary buffer */
+  int cur; /* First unused location in temporary buffer */
+  int max; /* Length of temporary buffer */
+} CmiTmpBuf_t;
+CpvDeclare(CmiTmpBuf_t,CmiTmpBuf); /* One temporary buffer per PE */
+
+static void CmiTmpSetup(CmiTmpBuf_t *b) {
+  b->buf=malloc(CMI_TMP_BUF_MAX);
+  b->cur=0;
+  b->max=CMI_TMP_BUF_MAX;
+}
+
+void *CmiTmpAlloc(int size) {
+  if (!CpvInitialized(CmiTmpBuf)) {
+    return malloc(size);
+  }
+  else { /* regular case */
+    CmiTmpBuf_t *b=&CpvAccess(CmiTmpBuf);
+    void *t;
+    if (b->cur+size>b->max) {
+      if (b->max==0) /* We're just uninitialized */
+        CmiTmpSetup(b);
+      else /* We're really out of space! */
+        CmiAbort("CmiTmpAlloc: asked for too much temporary buffer space");
+    }
+    t=b->buf+b->cur;
+    b->cur+=size;
+    return t;
+  }
+}
+void CmiTmpFree(void *t) {
+  if (!CpvInitialized(CmiTmpBuf)) {
+    free(t);
+  }
+  else { /* regular case */
+    CmiTmpBuf_t *b=&CpvAccess(CmiTmpBuf);
+    /* t should point into our temporary buffer: figure out where */
+    int cur=((const char *)t)-b->buf;
+#if CMK_ERROR_CHECKING
+    if (cur<0 || cur>b->max)
+      CmiAbort("CmiTmpFree: called with an invalid pointer");
+#endif
+    b->cur=cur;
+  }
+}
+
+void CmiTmpInit(char **argv) {
+  CpvInitialize(CmiTmpBuf_t,CmiTmpBuf);
+  /* Set up this processor's temporary buffer */
+  CmiTmpSetup(&CpvAccess(CmiTmpBuf));
+}
+
 /******************************************************************************
 
   Cross-platform directory creation
@@ -3226,15 +3292,15 @@ static void _CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *ms
   int vec; /* Entry we're currently filling out in above array */
 	
 #if CMK_USE_IBVERBS
-  msgHdr = (infiCmiChunkHeader *)malloc(len * sizeof(infiCmiChunkHeader));
+  msgHdr = (infiCmiChunkHeader *)CmiTmpAlloc(len * sizeof(infiCmiChunkHeader));
 #else
-  msgHdr = (CmiChunkHeader *)malloc(len * sizeof(CmiChunkHeader));
+  msgHdr = (CmiChunkHeader *)CmiTmpAlloc(len * sizeof(CmiChunkHeader));
 #endif
 	
   /* Allocate memory for the outgoing vector*/
   vecLen=1+3*len; /* Header and 3 parts per message */
-  vecSizes = (int *)malloc(vecLen * sizeof(int));
-  vecPtrs = (char **)malloc(vecLen * sizeof(char *));
+  vecSizes = (int *)CmiTmpAlloc(vecLen * sizeof(int));
+  vecPtrs = (char **)CmiTmpAlloc(vecLen * sizeof(char *));
   vec=0;
   
   /* Build the header */
@@ -3281,9 +3347,9 @@ static void _CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *ms
   
   CmiSyncVectorSend(destPE, vecLen, vecSizes, vecPtrs);
   
-  free(vecPtrs);
-  free(vecSizes);
-  free(msgHdr);
+  CmiTmpFree(vecPtrs); /* CmiTmp: Be sure to throw away in opposite order of allocation */
+  CmiTmpFree(vecSizes);
+  CmiTmpFree(msgHdr);
 }
 
 void CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *msgComps[])
@@ -3640,6 +3706,7 @@ void ConverseCommonInit(char **argv)
 #if CONVERSE_POOL
   CmiPoolAllocInit(30);  
 #endif
+  CmiTmpInit(argv);
   CmiTimerInit(argv);
   CstatsInit(argv);
   CmiInitCPUAffinityUtil();

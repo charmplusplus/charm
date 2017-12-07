@@ -1148,7 +1148,7 @@ static void InternalWriteToTerminal(int isStdErr,const char *str,int len);
 static void InternalPrintf(const char *f, va_list l)
 {
   ChMessage replymsg;
-  char *buffer = (char *)malloc(PRINTBUFSIZE);
+  char *buffer = (char *)CmiTmpAlloc(PRINTBUFSIZE);
   CmiStdoutFlush();
   vsprintf(buffer, f, l);
   if(Cmi_syncprint) {
@@ -1161,13 +1161,13 @@ static void InternalPrintf(const char *f, va_list l)
   	  ctrl_sendone_locking("print", buffer,strlen(buffer)+1,NULL,0);
   }
   InternalWriteToTerminal(0,buffer,strlen(buffer));
-  free(buffer);
+  CmiTmpFree(buffer);
 }
 
 static void InternalError(const char *f, va_list l)
 {
   ChMessage replymsg;
-  char *buffer = (char *)malloc(PRINTBUFSIZE);
+  char *buffer = (char *)CmiTmpAlloc(PRINTBUFSIZE);
   CmiStdoutFlush();
   vsprintf(buffer, f, l);
   if(Cmi_syncprint) {
@@ -1180,7 +1180,7 @@ static void InternalError(const char *f, va_list l)
   	  ctrl_sendone_locking("printerr", buffer,strlen(buffer)+1,NULL,0);
   }
   InternalWriteToTerminal(1,buffer,strlen(buffer));
-  free(buffer);
+  CmiTmpFree(buffer);
 }
 
 static int InternalScanf(char *fmt, va_list l)
