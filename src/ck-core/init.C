@@ -1027,7 +1027,7 @@ void InitCallTable::enumerateInitCalls()
   for (i=0; i<initProcCalls.length(); i++) initProcCalls[i]();
 }
 
-CpvExtern(int, cpdSuspendStartup);
+CpvCExtern(int, cpdSuspendStartup);
 extern "C" void CpdFreeze(void);
 
 extern int _dummy_dq;

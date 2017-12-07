@@ -536,6 +536,7 @@ void CcsBuiltinsInit(char **argv);
 
 CpvDeclare(int, cmiArgDebugFlag);
 CpvDeclare(char *, displayArgument);
+CpvCExtern(int, cpdSuspendStartup);
 CpvDeclare(int, cpdSuspendStartup);
 
 void CcsInit(char **argv)
