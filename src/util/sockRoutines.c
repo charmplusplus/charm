@@ -551,14 +551,6 @@ int skt_sendV(SOCKET fd,int nBuffers,const void **bufs,int *lens)
 	int b,len=0;
 	for (b=0;b<nBuffers;b++) len+=lens[b];
 	if (len<=skt_sendV_max) { /*Short message: Copy and do one big send*/
-		if (nBuffers == 1) {
-			// Avoid unnecessary dynamic allocation in the
-			// simplest case. This is necessary to avoid
-			// calling malloc() in the periodic
-			// pingCharmrun() signal handler.
-			return skt_sendN(fd, bufs[0], lens[0]);
-                }
-
 		char *buf=(char *)malloc(skt_sendV_max);
 		char *dest=buf;
 		int ret;
