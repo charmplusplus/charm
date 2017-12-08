@@ -1519,7 +1519,7 @@ static void node_addresses_obtain(char **argv)
   {/*Standalone-- fake a single-node nodetab message*/
 	ChMessageInt_t *n32;
 	ChNodeinfo *nodeInfo;
-	ChMessage_new("nodeinfo", sizeof(ChMessageInt_t)*ChInitNodetabFields+sizeof(ChNodeinfo), &nodetabmsg);
+	ChMessage_new("initnodetab", sizeof(ChMessageInt_t)*ChInitNodetabFields+sizeof(ChNodeinfo), &nodetabmsg);
 	n32 = (ChMessageInt_t *)nodetabmsg.data;
 	nodeInfo = (ChNodeinfo *)(nodetabmsg.data + sizeof(ChMessageInt_t)*ChInitNodetabFields);
 
@@ -1578,15 +1578,22 @@ static void node_addresses_obtain(char **argv)
 
         MACHSTATE(2,"} recv initnode");
   }
-  ChMessageInt_t *n32 = (ChMessageInt_t *) nodetabmsg.data;
-  ChNodeinfo *d = (ChNodeinfo *) (n32+ChInitNodetabFields);
-  Lrts_myNode = ChMessageInt(n32[1]);
-  _Cmi_myphysnode_numprocesses = ChMessageInt(d[Lrts_myNode].nProcessesInPhysNode);
-//#if CMK_USE_IBVERBS	
-//#else
-  node_addresses_store(&nodetabmsg);
-  ChMessage_free(&nodetabmsg);
-//#endif	
+
+  if (strcmp("initnodetab", nodetabmsg.header.type) == 0)
+  {
+    ChMessageInt_t *n32 = (ChMessageInt_t *) nodetabmsg.data;
+    ChNodeinfo *d = (ChNodeinfo *) (n32+ChInitNodetabFields);
+    Lrts_myNode = ChMessageInt(n32[1]);
+    _Cmi_myphysnode_numprocesses = ChMessageInt(d[Lrts_myNode].nProcessesInPhysNode);
+
+    node_addresses_store(&nodetabmsg);
+    ChMessage_free(&nodetabmsg);
+  }
+  else if (strcmp("die", nodetabmsg.header.type) == 0)
+  {
+    _Exit(1);
+  }
+
   MACHSTATE(3,"} node_addresses_obtain ");
 }
 

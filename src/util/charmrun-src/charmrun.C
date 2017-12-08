@@ -653,6 +653,9 @@ static const char **arg_argv;
 static int arg_argc;
 
 static int arg_requested_pes;
+static int arg_requested_nodes;
+static int arg_requested_numhosts;
+
 static int arg_timeout;
 static int arg_verbose;
 static const char *arg_nodelist;
@@ -722,6 +725,44 @@ static int arg_singlemaster;
 static int arg_skipmaster;
 #endif
 
+struct TopologyRequest
+{
+  int host, socket, core, pu;
+
+  enum class Unit
+  {
+    Host,
+    Socket,
+    Core,
+    PU,
+    None,
+  };
+
+  int active() const
+  {
+    return (host > 0) + (socket > 0) + (core > 0) + (pu > 0);
+  }
+
+  Unit unit() const
+  {
+    if (host > 0)
+      return Unit::Host;
+    else if (socket > 0)
+      return Unit::Socket;
+    else if (core > 0)
+      return Unit::Core;
+    else if (pu > 0)
+      return Unit::PU;
+    else
+      return Unit::None;
+  }
+};
+
+TopologyRequest proc_per;
+#if CMK_SMP
+TopologyRequest onewth_per;
+#endif
+
 static void arg_init(int argc, const char **argv)
 {
   static char buf[1024];
@@ -731,7 +772,12 @@ static void arg_init(int argc, const char **argv)
   local_def = 1; /*++local is the default*/
 #endif
 
-  pparam_int(&arg_requested_pes, 0, "p", "Number of processes to create");
+  pparam_int(&arg_requested_pes, 0, "p", "Number of PEs to create");
+  pparam_int(&arg_requested_numhosts, 0, "numHosts", "Number of hosts to use from nodelist file");
+
+  pparam_int(&arg_requested_nodes, 0, "n", "Number of processes to create");
+  pparam_int(&arg_requested_nodes, 0, "np", "Number of processes to create");
+
   pparam_int(&arg_timeout, 60, "timeout",
              "Seconds to wait per host connection");
   pparam_flag(&arg_verbose, 0, "verbose", "Print diagnostic messages");
@@ -822,6 +868,29 @@ static void arg_init(int argc, const char **argv)
 #endif
   pparam_flag(&arg_no_va_rand, 0, "no-va-randomization",
               "Disables randomization of the virtual address  space");
+
+  // Process Binding Parameters
+  pparam_int(&proc_per.host, 0,
+             "processPerHost", "assign N processes per host");
+  pparam_int(&proc_per.socket, 0,
+             "processPerSocket", "assign N processes per socket");
+  pparam_int(&proc_per.core, 0,
+             "processPerCore", "assign N processes per core");
+  pparam_int(&proc_per.pu, 0,
+             "processPerPU", "assign N processes per PU");
+
+#if CMK_SMP
+  // Worker Thread Binding Parameters
+  pparam_flag(&onewth_per.host, 0,
+             "oneWthPerHost", "assign N worker threads per host");
+  pparam_flag(&onewth_per.socket, 0,
+             "oneWthPerSocket", "assign N worker threads per socket");
+  pparam_flag(&onewth_per.core, 0,
+             "oneWthPerCore", "assign N worker threads per core");
+  pparam_flag(&onewth_per.pu, 0,
+             "oneWthPerPU", "assign N worker threads per PU");
+#endif
+
 #ifdef HSTART
   arg_argv = (const char **)dupargv(argv);
 #endif
@@ -1016,21 +1085,97 @@ static void arg_init(int argc, const char **argv)
   }
 #endif
 
-  /*If number of pes per node does not divide number of pes*/
-  if(arg_requested_pes && arg_ppn){
-    if(arg_requested_pes % arg_ppn != 0){
-      if(arg_ppn > arg_requested_pes){
-	arg_ppn=arg_requested_pes;
-	fprintf(stderr, "Charmrun> warning: forced ++ppn = +p = %d\n",arg_ppn);
+  const int proc_active = proc_per.active();
+#if CMK_SMP
+  const int onewth_active = onewth_per.active();
+  if (proc_active || onewth_active)
+#else
+  if (proc_active)
+#endif
+  {
+    if (arg_requested_pes != 0)
+    {
+      fprintf(stderr, "Charmrun> Error: +p and ++(process|oneWth)Per* cannot be used together.\n");
+      exit(1);
+    }
+
+    if (proc_active && arg_requested_nodes > 0)
+    {
+      fprintf(stderr, "Charmrun> Error: +n/++np and ++processPer* cannot be used together.\n");
+      exit(1);
+    }
+
+    if (proc_active && arg_mpiexec)
+    {
+      fprintf(stderr, "Charmrun> Error: ++mpiexec and ++processPer* cannot be used together.\n");
+      exit(1);
+    }
+
+    if (proc_active > 1)
+    {
+      fprintf(stderr, "Charmrun> Error: Only one ++processPer(Host|Socket|Core|PU) is allowed.\n");
+      exit(1);
+    }
+
+#if CMK_SMP
+    if (onewth_active + (arg_ppn > 0) > 1)
+    {
+      fprintf(stderr, "Charmrun> Error: Only one ++oneWthPer(Host|Socket|Core|PU) or ++ppn is allowed.\n");
+      exit(1);
+    }
+
+    using Unit = typename TopologyRequest::Unit;
+
+    const Unit proc_unit = proc_per.unit();
+    const Unit onewth_unit = onewth_per.unit();
+
+    if ((onewth_unit == Unit::Host && (proc_unit == Unit::Socket || proc_unit == Unit::Core || proc_unit == Unit::PU)) ||
+        (onewth_unit == Unit::Socket && (proc_unit == Unit::Core || proc_unit == Unit::PU)) ||
+        (onewth_unit == Unit::Core && proc_unit == Unit::PU))
+    {
+      fprintf(stderr, "Charmrun> Error: Cannot request processes on a smaller unit than that requested for worker threads.\n");
+      exit(1);
+    }
+
+    if ((onewth_unit == Unit::Host && proc_unit == Unit::Host && proc_per.host > 1) ||
+        (onewth_unit == Unit::Socket && proc_unit == Unit::Socket && proc_per.socket > 1) ||
+        (onewth_unit == Unit::Core && proc_unit == Unit::Core && proc_per.core > 1) ||
+        (onewth_unit == Unit::PU && proc_unit == Unit::PU && proc_per.pu > 1))
+    {
+      fprintf(stderr, "Charmrun> Error: Cannot request more processes than worker threads per unit.\n");
+      exit(1);
+    }
+#endif
+  }
+  else
+  {
+#if CMK_SMP
+    if (arg_requested_pes > 0 && arg_requested_nodes > 0 && arg_ppn > 0 && arg_ppn * arg_requested_nodes != arg_requested_pes)
+    {
+      fprintf(stderr, "Charmrun> Error: ++np times ++ppn does not equal +p.\n");
+      exit(1);
+    }
+
+    if (arg_requested_pes > 0 && arg_ppn > 0 && arg_requested_pes % arg_ppn != 0)
+    {
+      if (arg_ppn > arg_requested_pes)
+      {
+        arg_ppn = arg_requested_pes;
+        fprintf(stderr, "Charmrun> Warning: forced ++ppn = +p = %d\n", arg_ppn);
       }
       else
-	{
-	  fprintf(
-		  stderr,
-		  "Charmrun> Error: ++ppn (number of PEs per node) does not divide +p (number of PEs) \n");
-	  exit(1);
-	}
+      {
+        fprintf(stderr, "Charmrun> Error: ++ppn (number of PEs per node) does not divide +p (number of PEs).\n");
+        exit(1);
+      }
     }
+#else
+    if (arg_requested_pes > 0 && arg_requested_nodes > 0 && arg_requested_pes != arg_requested_nodes)
+    {
+      fprintf(stderr, "Charmrun> Error: +p and ++np do not agree.\n");
+      exit(1);
+    }
+#endif
   }
 }
 
@@ -1158,6 +1303,10 @@ struct nodetab_process
 #endif
 
   ChNodeinfo info;
+
+  int num_pus;
+  int num_cores;
+  int num_sockets;
 
   int forkstart = 0;
 
@@ -1408,6 +1557,9 @@ static void nodeinfo_add(const ChSingleNodeinfo *in, nodetab_process & p)
     fprintf(stderr, "Charmrun> Warning: Process #%d received ChSingleNodeInfo #%d\n", p.nodeno, node);
 
   p.info = in->info;
+  p.num_pus = ChMessageInt(in->num_pus);
+  p.num_cores = ChMessageInt(in->num_cores);
+  p.num_sockets = ChMessageInt(in->num_sockets);
 }
 
 static void nodeinfo_populate(nodetab_process & p)
@@ -1730,6 +1882,28 @@ static int req_reply(SOCKET fd, const char *type, const char *data, int dataLen)
   skt_sendN(fd, (const char *) &msg, sizeof(msg));
   skt_sendN(fd, data, dataLen);
   return REQ_OK;
+}
+
+static void kill_all_compute_nodes(const char *msg, size_t msgSize)
+{
+  ChMessageHeader hdr;
+  ChMessageHeader_new("die", msgSize, &hdr);
+  for (const nodetab_process & p : my_process_table)
+  {
+      skt_sendN(p.req_client, (const char *) &hdr, sizeof(hdr));
+      skt_sendN(p.req_client, msg, msgSize);
+  }
+}
+
+static void kill_all_compute_nodes(const char *msg)
+{
+  return kill_all_compute_nodes(msg, strlen(msg)+1);
+}
+
+template <size_t msgSize>
+static inline void kill_all_compute_nodes(const char msg[msgSize])
+{
+  return kill_all_compute_nodes(msg, msgSize);
 }
 
 /* Request handlers:
@@ -3269,25 +3443,91 @@ static void req_client_connect_table(std::vector<nodetab_process> & process_tabl
 #endif
 }
 
+static int get_old_style_process_count()
+{
+  const int p = arg_requested_pes;
+  const int np = arg_requested_nodes;
+  const int ppn = arg_ppn;
+
+  const bool p_active = (p > 0);
+  const bool np_active = (np > 0);
+  const bool ppn_active = (ppn > 0);
+
+  if (np_active)
+    return np;
+  else if (p_active)
+    return ppn_active ? (p + ppn - 1) / ppn : p;
+  else
+    return 1;
+}
+
+static int calculated_processes_per_host;
+
 static void req_construct_phase2_processes(std::vector<nodetab_process> & phase2_processes)
 {
-  const int phase1_process_count = my_process_table.size();
+  const int active_host_count = my_process_table.size(); // phase1_process_count
 
-  const int ppn = arg_ppn > 0 ? arg_ppn : 1;
-  const int total_processes = arg_requested_pes > 1 ? (arg_requested_pes + ppn - 1) / ppn : 1;
+  int total_processes;
 
-  const int num_new_processes = total_processes - phase1_process_count;
-  const int new_processes_per_host = (num_new_processes + phase1_process_count - 1) / phase1_process_count;
+  if (proc_per.active())
+  {
+    const nodetab_process & p0 = my_process_table[0];
+
+    for (nodetab_process & p : my_process_table)
+    {
+      if (p.num_pus != p0.num_pus ||
+          p.num_cores != p0.num_cores ||
+          p.num_sockets != p0.num_sockets)
+      {
+        fprintf(stderr, "Charmrun> Error: Detected system topology is heterogeneous, please use old-style launch options.\n");
+        exit(1);
+      }
+    }
+
+    using Unit = typename TopologyRequest::Unit;
+
+    int num_processes;
+    const Unit proc_unit = proc_per.unit();
+    switch (proc_unit)
+    {
+      case Unit::Host:
+        num_processes = proc_per.host;
+        break;
+      case Unit::Socket:
+        num_processes = proc_per.socket * p0.num_sockets;
+        break;
+      case Unit::Core:
+        num_processes = proc_per.core * p0.num_cores;
+        break;
+      case Unit::PU:
+        num_processes = proc_per.pu * p0.num_pus;
+        break;
+      default:
+        num_processes = 1;
+        break;
+    }
+
+    calculated_processes_per_host = num_processes;
+    total_processes = arg_requested_nodes <= 0 ? num_processes * active_host_count : arg_requested_nodes;
+  }
+  else
+  {
+    total_processes = get_old_style_process_count();
+    calculated_processes_per_host = (total_processes + active_host_count - 1) / active_host_count;
+  }
+
+  const int num_new_processes = total_processes - active_host_count;
+  const int new_processes_per_host = (num_new_processes + active_host_count - 1) / active_host_count;
 
   for (nodetab_process & p : my_process_table)
   {
-    p.forkstart = phase1_process_count + p.nodeno * new_processes_per_host;
+    p.forkstart = active_host_count + p.nodeno * new_processes_per_host;
     p.host->processes = 1;
   }
 
   for (int i = 0; i < num_new_processes; ++i)
   {
-    nodetab_process & src = my_process_table[i % phase1_process_count];
+    nodetab_process & src = my_process_table[i % active_host_count];
     phase2_processes.push_back(src);
 
     nodetab_process & p = phase2_processes.back();
@@ -3379,7 +3619,55 @@ static void req_all_clients_connected()
   if (arg_verbose)
     printf("Charmrun> All clients connected.\n");
 
-  const int ppn = arg_ppn > 0 ? arg_ppn : 1;
+  // determine ppn
+  int ppn = 1;
+#if CMK_SMP
+  if (onewth_per.active())
+  {
+    using Unit = typename TopologyRequest::Unit;
+
+    const nodetab_process & p0 = my_process_table[0];
+
+    int threads_per_host;
+    switch (onewth_per.unit())
+    {
+      case Unit::Socket:
+        threads_per_host = p0.num_sockets;
+        break;
+      case Unit::Core:
+        threads_per_host = p0.num_cores;
+        break;
+      case Unit::PU:
+        threads_per_host = p0.num_pus;
+        break;
+
+      // case Unit::Host:
+      default:
+        threads_per_host = 2; // instead of 1 to allow for a comm thread
+        break;
+    }
+
+    // account for comm thread
+    threads_per_host -= calculated_processes_per_host;
+
+    if (threads_per_host < calculated_processes_per_host || threads_per_host % calculated_processes_per_host != 0)
+    {
+      fprintf(stderr, "Charmrun> Error: Invalid request for %d PEs among %d processes per host.\n",
+                      threads_per_host, calculated_processes_per_host);
+      kill_all_compute_nodes("Invalid provisioning request");
+      exit(1);
+    }
+
+    ppn = threads_per_host / calculated_processes_per_host;
+  }
+  else
+  {
+    if (arg_ppn > 1)
+      ppn = arg_ppn;
+    else if (arg_requested_pes > 0 && arg_requested_nodes > 0)
+      ppn = arg_requested_pes / arg_requested_nodes;
+  }
+#endif
 
   // sort them so that node number locality implies physical locality
   std::stable_sort(my_process_table.begin(), my_process_table.end());
@@ -3746,6 +4034,17 @@ int main(int argc, const char **argv, char **envp)
   nodetab_init();
 #endif
 
+  if (arg_requested_numhosts > 0)
+  {
+    if (arg_requested_numhosts > host_table.size())
+    {
+      fprintf(stderr, "Charmrun> Error: ++numHosts exceeds available host pool.\n");
+      exit(1);
+    }
+    else
+      host_table.resize(arg_requested_numhosts);
+  }
+
   if (arg_verbose)
   {
     char ips[200];
@@ -3777,8 +4076,9 @@ int main(int argc, const char **argv, char **envp)
 #endif
 
   const int my_host_count = my_host_table.size();
-  const int requested_process_count = arg_ppn > 1 ? (arg_requested_pes + arg_ppn - 1) / arg_ppn : arg_requested_pes;
-  const int my_initial_process_count = requested_process_count > 0 ? std::min(my_host_count, requested_process_count) : my_host_count;
+  const int my_initial_process_count = proc_per.active()
+                                       ? (arg_requested_nodes > 0 ? std::min(my_host_count, arg_requested_nodes) : my_host_count)
+                                       : std::min(my_host_count, get_old_style_process_count());
   my_process_table.resize(my_initial_process_count);
   for (int i = 0; i < my_initial_process_count; ++i)
   {
@@ -4391,6 +4691,45 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
 
   fprintf(f, "CmiMyForks='%d'; export CmiMyForks\n", 0);
 
+  // cpu affinity hints
+  using Unit = typename TopologyRequest::Unit;
+  switch (proc_per.unit())
+  {
+    case Unit::Host:
+      fprintf(f, "CmiProcessPerHost='%d'; export CmiProcessPerHost\n", proc_per.host);
+      break;
+    case Unit::Socket:
+      fprintf(f, "CmiProcessPerSocket='%d'; export CmiProcessPerSocket\n", proc_per.socket);
+      break;
+    case Unit::Core:
+      fprintf(f, "CmiProcessPerCore='%d'; export CmiProcessPerCore\n", proc_per.core);
+      break;
+    case Unit::PU:
+      fprintf(f, "CmiProcessPerPU='%d'; export CmiProcessPerPU\n", proc_per.pu);
+      break;
+    default:
+      break;
+  }
+#if CMK_SMP
+  switch (onewth_per.unit())
+  {
+    case Unit::Host:
+      fprintf(f, "CmiOneWthPerHost='%d'; export CmiOneWthPerHost\n", 1);
+      break;
+    case Unit::Socket:
+      fprintf(f, "CmiOneWthPerSocket='%d'; export CmiOneWthPerSocket\n", 1);
+      break;
+    case Unit::Core:
+      fprintf(f, "CmiOneWthPerCore='%d'; export CmiOneWthPerCore\n", 1);
+      break;
+    case Unit::PU:
+      fprintf(f, "CmiOneWthPerPU='%d'; export CmiOneWthPerPU\n", 1);
+      break;
+    default:
+      break;
+  }
+#endif
+
   if (arg_mpiexec) {
     fprintf(f, "CmiNumNodes=$OMPI_COMM_WORLD_SIZE\n");
     fprintf(f, "test -z \"$CmiNumNodes\" && CmiNumNodes=$MPIRUN_NPROCS\n");
@@ -4800,8 +5139,7 @@ static int ssh_fork_one(nodetab_process & p, const char *startScript)
     e = skipstuff(s);
   }
 
-  const int ppn = arg_ppn > 0 ? arg_ppn : 1;
-  const int processes = arg_requested_pes > 1 ? (arg_requested_pes + ppn - 1) / ppn : 1;
+  const int processes = get_old_style_process_count();
 
   char npes[24];
   if ( ! arg_mpiexec_no_n ) {
@@ -4959,21 +5297,77 @@ static void start_nodes_local(std::vector<nodetab_process> & process_table)
   int envc;
   for (envc = 0; env[envc]; envc++)
     ;
+  int extra = 0;
 #if CMK_AIX && CMK_SMP
-  const int extra = 1;
-#else
-  const int extra = 0;
+  ++extra;
 #endif
+  const int proc_active = proc_per.active();
+  extra += proc_active;
+#if CMK_SMP
+  const int onewth_active = onewth_per.active();
+  extra += onewth_active;
+#endif
+
   char **envp = (char **) malloc((envc + 2 + extra + 1) * sizeof(void *));
   for (int i = 0; i < envc; i++)
     envp[i] = env[i];
   envp[envc] = (char *) malloc(256);
   envp[envc + 1] = (char *) malloc(256);
+  int n = 2;
 #if CMK_AIX && CMK_SMP
-  envp[envc + 2] = (char *) malloc(256);
-  sprintf(envp[envc + 2], "MALLOCMULTIHEAP=1");
+  envp[envc + n] = (char *) malloc(256);
+  sprintf(envp[envc + n], "MALLOCMULTIHEAP=1");
+  ++n;
 #endif
-  envp[envc + 2 + extra] = 0;
+  // cpu affinity hints
+  using Unit = typename TopologyRequest::Unit;
+  if (proc_active)
+  {
+    envp[envc + n] = (char *) malloc(256);
+    switch (proc_per.unit())
+    {
+      case Unit::Host:
+        sprintf(envp[envc + n], "CmiProcessPerHost='%d'; export CmiProcessPerHost\n", proc_per.host);
+        break;
+      case Unit::Socket:
+        sprintf(envp[envc + n], "CmiProcessPerSocket='%d'; export CmiProcessPerSocket\n", proc_per.socket);
+        break;
+      case Unit::Core:
+        sprintf(envp[envc + n], "CmiProcessPerCore='%d'; export CmiProcessPerCore\n", proc_per.core);
+        break;
+      case Unit::PU:
+        sprintf(envp[envc + n], "CmiProcessPerPU='%d'; export CmiProcessPerPU\n", proc_per.pu);
+        break;
+      default:
+        break;
+    }
+    ++n;
+  }
+#if CMK_SMP
+  if (onewth_active)
+  {
+    envp[envc + n] = (char *) malloc(256);
+    switch (onewth_per.unit())
+    {
+      case Unit::Host:
+        sprintf(envp[envc + n], "CmiOneWthPerHost='%d'; export CmiOneWthPerHost\n", 1);
+        break;
+      case Unit::Socket:
+        sprintf(envp[envc + n], "CmiOneWthPerSocket='%d'; export CmiOneWthPerSocket\n", 1);
+        break;
+      case Unit::Core:
+        sprintf(envp[envc + n], "CmiOneWthPerCore='%d'; export CmiOneWthPerCore\n", 1);
+        break;
+      case Unit::PU:
+        sprintf(envp[envc + n], "CmiOneWthPerPU='%d'; export CmiOneWthPerPU\n", 1);
+        break;
+      default:
+        break;
+    }
+    ++n;
+  }
+#endif
+  envp[envc + n] = 0;
 
   int dparamoutc=0;
   int dparamoutmax=7;
@@ -5061,11 +5455,8 @@ static void start_nodes_local(std::vector<nodetab_process> & process_table)
       for(;dparamoutc>=0;dparamoutc--) free(dparamp[dparamoutc]);
       free(dparamp);
     }
-  free(envp[envc]);
-  free(envp[envc + 1]);
-#if CMK_AIX && CMK_SMP
-  free(envp[envc + 2]);
-#endif
+  for (int i = envc, i_end = envc + n; i < i_end; ++i)
+    free(envp[i]);
   free(envp);
 }
 
