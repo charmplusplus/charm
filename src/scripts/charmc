@@ -1505,6 +1505,11 @@ then
 fi
 # done getting TAU variables
 
+if [ "$BUILD_SHARE" = "0" ]
+then
+       MIDDLE_LIBS="$MIDDLE_LIBS $MEM_OBJ $THREAD_OBJ"
+fi
+
 CMK_SYSLIBS="$CMK_SYSLIBS -lm"
 
 case "$PARADIGM" in
