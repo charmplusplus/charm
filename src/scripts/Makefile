@@ -491,7 +491,10 @@ $(L)/libconv-partition.a: custom_partitioner.o set_partition_params.o
 
 include Makefile.machine
 
-$(L)/libconv-machine.a: machine.c $(CVHEADERS)
+$(L)/libconv-machine.a: machine.o
+	$(CHARMC) -o $@ $<
+
+machine.o: machine.c $(CVHEADERS)
 	@-test -f $(INC)/mpi.h && mv -f $(INC)/mpi.h $(INC)/mpi.BAK || true
 	$(CHARMC) -I. -o $@ $<
 	@-test -f $(INC)/mpi.BAK && mv -f $(INC)/mpi.BAK $(INC)/mpi.h || true
@@ -694,7 +697,7 @@ $(L)/libtrace-perfReport.a: $(LIBTRACE_AP)
 LIBTRACE_SUMM=trace-summary.o
 $(L)/libtrace-summary.a: $(LIBTRACE_SUMM)
 	$(CHARMC) -o $@ $(LIBTRACE_SUMM)
- 
+
 LIBTRACE_UTIL=trace-utilization.o
 $(L)/libtrace-utilization.a: $(LIBTRACE_UTIL)
 	$(CHARMC) -o $@ $(LIBTRACE_UTIL)
@@ -1032,3 +1035,12 @@ ifeq ($(strip $(OPTS)),)
 $(warning Variable OPTS is defined to an empty string. Are you sure this is what you want?)
 endif
 
+
+-include machine.d
+machine.o: machine.d
+machine.d: machine.c conv-autoconfig.h
+	@set -e; \
+	rm -f $@; \
+	$(CHARMC) $(OPTS) -MM -I. -I$(INC) $< >$@.$$$$; \
+	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.$$$$ > $@; \
+	rm -f $@.$$$$

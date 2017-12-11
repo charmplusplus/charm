@@ -1,2 +1,0 @@
-$(L)/libconv-machine.a: machine.c machine-ctrlmsg.c machine-common-core.c machine-broadcast.c machine-lrts.h machine-commthd-util.c machine-onesided.h machine-onesided.c
-
