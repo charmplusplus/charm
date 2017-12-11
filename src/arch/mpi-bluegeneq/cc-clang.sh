@@ -1,5 +1,5 @@
 CMK_CPP_CHARM="$BGQ_BIN/powerpc64-bgq-linux-cpp -P"
-CMK_CPP_C='mpic++11'
+CMK_CPP_C='mpic++'
 CMK_CXX='mpic++11'
 CMK_CC='mpicc'
 CMK_LD="$CMK_CC"
