@@ -3066,7 +3066,12 @@ void *CmiAlloc(int size)
 
 void *CmiRdmaAlloc(int size) {
   char *res;
+
+#if CMK_CONVERSE_UGNI
+  res = (char *)LrtsRdmaAlloc(size, sizeof(CmiChunkHeader));
+#else
   res =(char *) malloc_nomigrate(size+sizeof(CmiChunkHeader));
+#endif
 
   _MEMCHECK(res);
   res+=sizeof(CmiChunkHeader);
@@ -3174,7 +3179,11 @@ void CmiRdmaFree(void *blk)
     CpvAccess(BlocksAllocated)--;
 #endif
 
+#if CMK_CONVERSE_UGNI
+    LrtsRdmaFree(BLKSTART(parentBlk));
+#else
     free_nomigrate(BLKSTART(parentBlk));
+#endif
   }
 }
 

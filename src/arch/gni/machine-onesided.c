@@ -74,7 +74,7 @@ void  rdma_sendMsgForPutCompletion (CmiGNIRzvRdmaRecv_t* recvInfo, int destNode)
 
 gni_return_t post_rdma(uint64_t remote_addr, gni_mem_handle_t remote_mem_hndl,
     uint64_t local_addr, gni_mem_handle_t local_mem_hndl,
-    int length, uint64_t post_id, int destNode, int type)
+    int length, uint64_t post_id, int destNode, int type, unsigned short int mode)
 {
   gni_return_t            status;
   gni_post_descriptor_t *pd;
@@ -92,9 +92,20 @@ gni_return_t post_rdma(uint64_t remote_addr, gni_mem_handle_t remote_mem_hndl,
   pd->src_cq_hndl         = rdma_onesided_cqh;
   pd->rdma_mode           = 0;
   pd->amo_cmd             = (gni_fma_cmd_type_t)0;
-  pd->first_operand       = post_id;
 
-  MACH_DEBUG(CmiPrintf("[%d]post_rdma, local_addr: %p, remote_addr: %p, length: %d\n", 
+  switch(mode) {
+    case INDIRECT_SEND                :  // Using entry method api
+    case DIRECT_SEND_RECV             :  // Using direct api GET or PUT
+    case DIRECT_SEND_RECV_UNALIGNED   :  // Using direct api GET,
+                                         // which resulted into a PUT because of alignment
+                                         pd->first_operand = mode;
+                                         break;
+    default                           :  CmiAbort("Invalid case\n");
+                                         break;
+  }
+
+  pd->second_operand     = post_id;
+  MACH_DEBUG(CmiPrintf("[%d]post_rdma, local_addr: %p, remote_addr: %p, length: %d\n",
         CmiMyPe(), (void *)local_addr, (void *)remote_addr, length));
   //local_addr, remote_addr and length must be 4-byte aligned if called with GET
   if(type == GNI_POST_RDMA_GET)
@@ -127,7 +138,7 @@ void LrtsIssueRputs(void *recv, int node)
     uint64_t opAddress = (uint64_t)(recvOp);
 
     status = post_rdma(remote_addr, remote_mem_hndl, buffer, local_mem_hndl,
-        length, opAddress, node, GNI_POST_RDMA_PUT);
+        length, opAddress, node, GNI_POST_RDMA_PUT, INDIRECT_SEND);
   }
 }
 
@@ -153,11 +164,11 @@ void LrtsIssueRgets(void *recv, int pe)
       gni_mem_handle_t local_mem_hndl;
 
       status = GNI_MemRegister(nic_hndl, buffer, length, NULL,  GNI_MEM_READWRITE, -1, &local_mem_hndl);
-      GNI_RC_CHECK("Error! Exceeded Allowed Pinned Memory Limit! GNI_MemRegister on Receiver Buffer (target) Failed before GET", status);
+      GNI_RC_CHECK("Error! Exceeded Allowed Pinned Memory Limit! GNI_MemRegister on Receiver Buffer (destination) Failed before GET", status);
 
       recvOp->local_mem_hndl = local_mem_hndl;
       status = post_rdma(remote_addr, remote_mem_hndl, buffer, local_mem_hndl,
-          length, opAddress, CmiNodeOf(pe), GNI_POST_RDMA_GET);
+          length, opAddress, CmiNodeOf(pe), GNI_POST_RDMA_GET, INDIRECT_SEND);
     }
   }
   //use RPUT because of 4-byte alignment not being conformed
@@ -174,7 +185,7 @@ void LrtsIssueRgets(void *recv, int pe)
       /* Register the local buffer with the NIC */
       gni_mem_handle_t local_mem_hndl;
       status = GNI_MemRegister(nic_hndl, buffer, length, NULL,  GNI_MEM_READWRITE, -1, &local_mem_hndl);
-      GNI_RC_CHECK("Error! Exceeded Allowed Pinned Memory Limit! GNI_MemRegister on Receiver Buffer (target) Failed before PUT", status);
+      GNI_RC_CHECK("Error! Exceeded Allowed Pinned Memory Limit! GNI_MemRegister on Receiver Buffer (destination) Failed before PUT", status);
 
       //Switch local and remote handles and buffers as recvInfo will be sent to the sender for PUT
       recvOp->local_mem_hndl = recvOp->remote_mem_hndl;
@@ -219,49 +230,81 @@ void PumpOneSidedRDMATransactions(gni_cq_handle_t rdma_cq, CmiNodeLock rdma_cq_l
       GNI_RC_CHECK("GNI_GetCompleted", status);
 
       if(tmp_pd->type == GNI_POST_RDMA_GET){
-        CmiGNIRzvRdmaRecvOp_t * recvOpInfo = (CmiGNIRzvRdmaRecvOp_t *)tmp_pd->first_operand;
-        CmiGNIRzvRdmaRecv_t * recvInfo = (CmiGNIRzvRdmaRecv_t *)((char *)recvOpInfo
-            - recvOpInfo->opIndex * sizeof(CmiGNIRzvRdmaRecvOp_t)
-            - sizeof(CmiGNIRzvRdmaRecv_t));
 
-        // Deregister registered receiver memory used for GET
-        status = GNI_MemDeregister(nic_hndl, &(recvOpInfo->local_mem_hndl));
-        GNI_RC_CHECK("GNI_MemDeregister on Receiver for GET operation", status);
+        if(tmp_pd->first_operand == INDIRECT_SEND) {
+          // Invoke the method handler if used for indirect api
+          CmiGNIRzvRdmaRecvOp_t * recvOpInfo = (CmiGNIRzvRdmaRecvOp_t *)tmp_pd->second_operand;
+          CmiGNIRzvRdmaRecv_t * recvInfo = (CmiGNIRzvRdmaRecv_t *)((char *)recvOpInfo
+              - recvOpInfo->opIndex * sizeof(CmiGNIRzvRdmaRecvOp_t)
+              - sizeof(CmiGNIRzvRdmaRecv_t));
 
-        rdma_sendAck(recvOpInfo, recvInfo->srcPE);
-        recvInfo->comOps++;
-        if(recvInfo->comOps == recvInfo->numOps)
-        {
-          char * msg = (char *)recvInfo->msg;
-          int msg_size = CmiGetMsgSize(msg);
-          handleOneRecvedMsg(msg_size, msg);
-          MACH_DEBUG(CmiPrintf("[%d]PumpOneSidedTransaction: Final Ack sent to %d\n", CmiMyPe(), CMI_DEST_RANK(msg)));
+          // Deregister registered receiver memory used for GET
+          status = GNI_MemDeregister(nic_hndl, &(recvOpInfo->local_mem_hndl));
+          GNI_RC_CHECK("GNI_MemDeregister on Receiver for GET operation", status);
 
+          rdma_sendAck(recvOpInfo, recvInfo->srcPE);
+          recvInfo->comOps++;
+          if(recvInfo->comOps == recvInfo->numOps)
+          {
+            char * msg = (char *)recvInfo->msg;
+            int msg_size = CmiGetMsgSize(msg);
+            handleOneRecvedMsg(msg_size, msg);
+            MACH_DEBUG(CmiPrintf("[%d]PumpOneSidedTransaction: Final Ack sent to %d\n", CmiMyPe(), CMI_DEST_RANK(msg)));
+
+          }
+        } else if (tmp_pd->first_operand == DIRECT_SEND_RECV) {
+          // Call the ack handler function if used for direct api
+          CmiInvokeNcpyAck((void *)tmp_pd->second_operand);
+        } else {
+          CmiAbort("Invalid case!\n");
         }
         free(tmp_pd);
       }
       else if(tmp_pd->type == GNI_POST_RDMA_PUT){
-        CmiGNIRzvRdmaRecvOp_t * recvOpInfo = (CmiGNIRzvRdmaRecvOp_t *)tmp_pd->first_operand;
-        CmiGNIRzvRdmaRecv_t * recvInfo = (CmiGNIRzvRdmaRecv_t *)((char *)recvOpInfo
-            - recvOpInfo->opIndex * sizeof(CmiGNIRzvRdmaRecvOp_t)
-            - sizeof(CmiGNIRzvRdmaRecv_t));
-        recvInfo->comOps++;
-        // Deregister registered sender memory used for PUT
-        status = GNI_MemDeregister(nic_hndl, &(recvOpInfo->local_mem_hndl));
-        GNI_RC_CHECK("GNI_MemDeregister on Sender for PUT operation", status);
 
-        if(recvInfo->comOps == recvInfo->numOps)
-        {
-          // send message to the receiver to signal PUT completion so that
-          // the receiver can call the message handler
-          rdma_sendMsgForPutCompletion(recvInfo, recvInfo->destNode);
+        if(tmp_pd->first_operand == INDIRECT_SEND) {
+          // Invoke the method handler if used for indirect api
+          CmiGNIRzvRdmaRecvOp_t * recvOpInfo = (CmiGNIRzvRdmaRecvOp_t *)tmp_pd->second_operand;
+          CmiGNIRzvRdmaRecv_t * recvInfo = (CmiGNIRzvRdmaRecv_t *)((char *)recvOpInfo
+              - recvOpInfo->opIndex * sizeof(CmiGNIRzvRdmaRecvOp_t)
+              - sizeof(CmiGNIRzvRdmaRecv_t));
+          recvInfo->comOps++;
+          // Deregister registered sender memory used for PUT
+          status = GNI_MemDeregister(nic_hndl, &(recvOpInfo->local_mem_hndl));
+          GNI_RC_CHECK("GNI_MemDeregister on Sender for PUT operation", status);
+
+          if(recvInfo->comOps == recvInfo->numOps)
+          {
+            // send message to the receiver to signal PUT completion so that
+            // the receiver can call the message handler
+            rdma_sendMsgForPutCompletion(recvInfo, recvInfo->destNode);
+          }
+          //call ack on the sender
+          CmiRdmaAck* ack = (CmiRdmaAck *)(recvOpInfo->src_info);
+          ack->fnPtr(ack->token);
+          //free callback structure, CmiRdmaAck allocated in CmiSetRdmaAck
+          free(ack);
+        } else if (tmp_pd->first_operand == DIRECT_SEND_RECV) {
+
+          // Call the ack handler function if used for direct api
+          CmiInvokeNcpyAck((void *)tmp_pd->second_operand);
+
+        } else if (tmp_pd->first_operand == DIRECT_SEND_RECV_UNALIGNED) {
+
+          // Send the metadata back to the original PE which invoked PUT
+          // The original PE then calls the ack handler function
+          CmiGNIRzvRdmaPutOp_t *putOp = (CmiGNIRzvRdmaPutOp_t *)tmp_pd->second_operand;
+
+          // send the ref data to the destination
+          gni_return_t status = send_smsg_message(&smsg_queue, CmiNodeOf(putOp->destPe), putOp, sizeof(CmiGNIRzvRdmaPutOp_t), RDMA_PUT_DONE_DIRECT_TAG, 0, NULL, NONCHARM_SMSG, 1);
+#if !CMK_SMSGS_FREE_AFTER_EVENT
+          if(status == GNI_RC_SUCCESS) {
+            free(putOp);
+          }
+#endif
+        }  else {
+          CmiAbort("Invalid case!\n");
         }
-        //call ack on the sender
-        CmiRdmaAck* ack = (CmiRdmaAck *)(recvOpInfo->src_info);
-        ack->fnPtr(ack->token);
-        //free callback structure, CmiRdmaAck allocated in CmiSetRdmaAck
-        free(ack);
-
         free(tmp_pd);
       }
       else{
@@ -273,4 +316,195 @@ void PumpOneSidedRDMATransactions(gni_cq_handle_t rdma_cq, CmiNodeLock rdma_cq_l
       CmiAbort("Received message on onesided rdma queue that wasn't a POSTRdma");
     }
   }
+}
+
+/* Support for Nocopy Direct API */
+
+// Perform an RDMA Get call into the local destination address from the remote source address
+void LrtsIssueRget(
+  const void* srcAddr,
+  void *srcInfo,
+  void *srcAck,
+  int srcAckSize,
+  int srcPe,
+  unsigned short int *srcMode,
+  const void* destAddr,
+  void *destInfo,
+  void *destAck,
+  int destAckSize,
+  int destPe,
+  unsigned short int *destMode,
+  int size) {
+
+  // Remote buffer is registered, perform GET
+  CmiAssert(srcAckSize == destAckSize);
+
+  // Register local buffer if it is not registered
+  if(*destMode == CMK_BUFFER_UNREG) {
+    ((CmiGNIRzvRdmaPtr_t *)destInfo)->mem_hndl = registerDirectMemory(destAddr, size, GNI_MEM_READWRITE);
+    *destMode = CMK_BUFFER_REG;
+  }
+
+  if(*srcMode == CMK_BUFFER_UNREG) {
+    // Remote buffer is unregistered, send a message to register it and perform PUT
+
+    int mdMsgSize = sizeof(CmiGNIRzvRdmaReverseOp_t) + destAckSize + srcAckSize;
+    CmiGNIRzvRdmaReverseOp_t *regAndPutMsg = (CmiGNIRzvRdmaReverseOp_t *)malloc(mdMsgSize);
+
+    regAndPutMsg->destAddr      = destAddr;
+    regAndPutMsg->destPe        = destPe;
+    regAndPutMsg->rem_mem_hndl  = ((CmiGNIRzvRdmaPtr_t *)destInfo)->mem_hndl;
+    regAndPutMsg->destMode      = *destMode;
+
+    regAndPutMsg->srcAddr       = srcAddr;
+    regAndPutMsg->srcPe         = srcPe;
+    regAndPutMsg->srcMode       = *srcMode;
+
+    regAndPutMsg->ackSize       = destAckSize;
+    regAndPutMsg->size          = size;
+
+    memcpy((char*)regAndPutMsg + sizeof(CmiGNIRzvRdmaReverseOp_t), destAck, destAckSize);
+    memcpy((char*)regAndPutMsg + sizeof(CmiGNIRzvRdmaReverseOp_t) + srcAckSize, srcAck, srcAckSize);
+
+    // send all the data to the source to register and perform a put
+    gni_return_t status = send_smsg_message(&smsg_queue, CmiNodeOf(srcPe), regAndPutMsg, mdMsgSize, RDMA_REG_AND_PUT_MD_DIRECT_TAG, 0, NULL, NONCHARM_SMSG, 1);
+    GNI_RC_CHECK("Sending REG & PUT metadata msg failed!", status);
+#if !CMK_SMSGS_FREE_AFTER_EVENT
+    if(status == GNI_RC_SUCCESS) {
+      free(regAndPutMsg);
+    }
+#endif
+
+  } else {
+    void *ref = CmiGetNcpyAck(srcAddr, srcAck, srcPe, destAddr, destAck, destPe, srcAckSize);
+
+    uint64_t src_addr = (uint64_t)srcAddr;
+    uint64_t dest_addr = (uint64_t)destAddr;
+    uint64_t ref_addr = (uint64_t)ref;
+
+    CmiGNIRzvRdmaPtr_t *src_info = (CmiGNIRzvRdmaPtr_t *)srcInfo;
+    CmiGNIRzvRdmaPtr_t *dest_info = (CmiGNIRzvRdmaPtr_t *)destInfo;
+
+    //check alignment
+    if(((src_addr % 4)==0) && ((dest_addr % 4)==0) && ((size % 4)==0)) {
+      // 4-byte aligned, perform GET
+      gni_return_t status = post_rdma(src_addr, src_info->mem_hndl, dest_addr, dest_info->mem_hndl,
+          size, ref_addr, CmiNodeOf(srcPe), GNI_POST_RDMA_GET, DIRECT_SEND_RECV);
+    }
+    else {
+      // not 4-byte aligned, send md for performing PUT from other node
+
+      // Allocate machine specific metadata
+      CmiGNIRzvRdmaPutOp_t *putOp = (CmiGNIRzvRdmaPutOp_t *)malloc(sizeof(CmiGNIRzvRdmaPutOp_t));
+      putOp->dest_mem_hndl = dest_info->mem_hndl;
+      putOp->dest_addr = dest_addr;
+      putOp->src_mem_hndl = src_info->mem_hndl;
+      putOp->src_addr = src_addr;
+      putOp->destPe = CmiMyPe();
+      putOp->size = size;
+      putOp->ref = ref_addr;
+
+      // send all the data to the source to perform a put
+      gni_return_t status = send_smsg_message(&smsg_queue, CmiNodeOf(srcPe), putOp, sizeof(CmiGNIRzvRdmaPutOp_t), RDMA_PUT_MD_DIRECT_TAG, 0, NULL, NONCHARM_SMSG, 1);
+      GNI_RC_CHECK("Sending PUT metadata msg failed!", status);
+#if !CMK_SMSGS_FREE_AFTER_EVENT
+      if(status == GNI_RC_SUCCESS) {
+        free(putOp);
+      }
+#endif
+    }
+  }
+}
+
+// Perform an RDMA Put call into the remote destination address from the local source address
+void LrtsIssueRput(
+  const void* destAddr,
+  void *destInfo,
+  void *destAck,
+  int destAckSize,
+  int destPe,
+  unsigned short int *destMode,
+  const void* srcAddr,
+  void *srcInfo,
+  void *srcAck,
+  int srcAckSize,
+  int srcPe,
+  unsigned short int *srcMode,
+  int size) {
+
+  // Register local buffer if it is not registered
+  if(*srcMode == CMK_BUFFER_UNREG) {
+    ((CmiGNIRzvRdmaPtr_t *)srcInfo)->mem_hndl = registerDirectMemory(srcAddr, size, GNI_MEM_READ_ONLY);
+    *srcMode = CMK_BUFFER_REG;
+  }
+
+  if(*destMode == CMK_BUFFER_UNREG) {
+    // Remote buffer is unregistered, send a message to register it and perform GET
+
+    int mdMsgSize = sizeof(CmiGNIRzvRdmaReverseOp_t) + destAckSize + srcAckSize;
+    CmiGNIRzvRdmaReverseOp_t *regAndGetMsg = (CmiGNIRzvRdmaReverseOp_t *)malloc(mdMsgSize);
+
+    regAndGetMsg->srcAddr       = srcAddr;
+    regAndGetMsg->srcPe         = srcPe;
+    regAndGetMsg->rem_mem_hndl  = ((CmiGNIRzvRdmaPtr_t *)srcInfo)->mem_hndl;
+    regAndGetMsg->srcMode       = *srcMode;
+
+    regAndGetMsg->destAddr      = destAddr;
+    regAndGetMsg->destPe        = destPe;
+    regAndGetMsg->destMode      = *destMode;
+
+    regAndGetMsg->ackSize       = srcAckSize;
+    regAndGetMsg->size          = size;
+
+    memcpy((char*)regAndGetMsg + sizeof(CmiGNIRzvRdmaReverseOp_t), destAck, destAckSize);
+    memcpy((char*)regAndGetMsg + sizeof(CmiGNIRzvRdmaReverseOp_t) + srcAckSize, srcAck, srcAckSize);
+
+    // send all the data to the source to register and perform a put
+    gni_return_t status = send_smsg_message(&smsg_queue, CmiNodeOf(destPe), regAndGetMsg, mdMsgSize, RDMA_REG_AND_GET_MD_DIRECT_TAG, 0, NULL, NONCHARM_SMSG, 1);
+    GNI_RC_CHECK("Sending REG & GET metadata msg failed!", status);
+#if !CMK_SMSGS_FREE_AFTER_EVENT
+    if(status == GNI_RC_SUCCESS) {
+      free(regAndGetMsg);
+    }
+#endif
+
+  } else {
+    // Remote buffer is registered, perform PUT
+    CmiAssert(srcAckSize == destAckSize);
+    void *ref = CmiGetNcpyAck(srcAddr, srcAck, srcPe, destAddr, destAck, destPe, srcAckSize);
+
+    uint64_t dest_addr = (uint64_t)destAddr;
+    uint64_t src_addr = (uint64_t)srcAddr;
+    uint64_t ref_addr = (uint64_t)ref;
+
+    CmiGNIRzvRdmaPtr_t *dest_info = (CmiGNIRzvRdmaPtr_t *)destInfo;
+    CmiGNIRzvRdmaPtr_t *src_info = (CmiGNIRzvRdmaPtr_t *)srcInfo;
+
+    // perform PUT
+    gni_return_t status = post_rdma(dest_addr, dest_info->mem_hndl, src_addr, src_info->mem_hndl,
+        size, ref_addr, CmiNodeOf(destPe), GNI_POST_RDMA_PUT, DIRECT_SEND_RECV);
+  }
+}
+
+// Method invoked to deregister destination memory handle
+void LrtsReleaseDestinationResource(const void *ptr, void *info, int pe, unsigned short int mode){
+  if(mode == CMK_BUFFER_REG || (mode == CMK_BUFFER_PREREG && SIZEFIELD(ptr) >= BIG_MSG)) {
+    CmiGNIRzvRdmaPtr_t *destInfo = (CmiGNIRzvRdmaPtr_t *)info;
+    DeregisterMemhandle(destInfo->mem_hndl, pe);
+  }
+}
+
+// Method invoked to deregister source memory handle
+void LrtsReleaseSourceResource(const void *ptr, void *info, int pe, unsigned short int mode){
+  if(mode == CMK_BUFFER_REG || (mode == CMK_BUFFER_PREREG && SIZEFIELD(ptr) >= BIG_MSG)) {
+    CmiGNIRzvRdmaPtr_t *srcInfo = (CmiGNIRzvRdmaPtr_t *)info;
+    DeregisterMemhandle(srcInfo->mem_hndl, pe);
+  }
+}
+
+// Deregister local and remote memory handles
+void DeregisterMemhandle(gni_mem_handle_t mem_hndl, int pe) {
+  gni_return_t status = GNI_RC_SUCCESS;
+  status = GNI_MemDeregister(nic_hndl, &mem_hndl);
+  GNI_RC_CHECK("GNI_MemDeregister failed!", status);
 }

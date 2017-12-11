@@ -368,6 +368,13 @@ static int LOCAL_QUEUE_ENTRIES=20480;
 #define RDMA_PUT_MD_TAG         0x37
 #define RDMA_PUT_DONE_TAG       0x38
 
+#define RDMA_PUT_MD_DIRECT_TAG  0x39
+#define RDMA_PUT_DONE_DIRECT_TAG 0x40
+#define RDMA_DEREG_DIRECT_TAG    0x41
+
+#define RDMA_REG_AND_PUT_MD_DIRECT_TAG  0x42
+#define RDMA_REG_AND_GET_MD_DIRECT_TAG  0x43
+
 #define DEBUG
 #ifdef GNI_RC_CHECK
 #undef GNI_RC_CHECK
@@ -1174,9 +1181,9 @@ void my_free_huge_pages(void *ptr, int size)
 
 #include "machine-lrts.h"
 
-#include "machine-rdma.h"
-
 #include "machine-common-core.c"
+
+#include "machine-rdma.h"
 
 
 static int SendBufferMsg(SMSG_QUEUE *queue, SMSG_QUEUE *urgent_queue);
@@ -2330,6 +2337,29 @@ static void PumpNetworkSmsg()
                 LrtsIssueRputs((void *)newRecvInfo, recvInfo->destNode);
                 break;
             }
+            case RDMA_PUT_MD_DIRECT_TAG:
+            {
+                // Direct API when PUT is used instead of a GET
+                // This tag implies the receival of a PUT metadata used for the Direct API
+                CmiGNIRzvRdmaPutOp_t *putOp = (CmiGNIRzvRdmaPutOp_t *)header;
+                CmiGNIRzvRdmaPutOp_t *newPutOp = (CmiGNIRzvRdmaPutOp_t *)malloc(sizeof(CmiGNIRzvRdmaPutOp_t));
+                memcpy(newPutOp, putOp, sizeof(CmiGNIRzvRdmaPutOp_t));
+                GNI_SmsgRelease(ep_hndl_array[inst_id]);
+                CMI_GNI_UNLOCK(smsg_mailbox_lock)
+
+                // Issue PUT
+                status = post_rdma(
+                         newPutOp->dest_addr,
+                         newPutOp->dest_mem_hndl,
+                         newPutOp->src_addr,
+                         newPutOp->src_mem_hndl,
+                         newPutOp->size,
+                         (uint64_t)newPutOp,
+                         CmiNodeOf(newPutOp->destPe),
+                         GNI_POST_RDMA_PUT,
+                         DIRECT_SEND_RECV_UNALIGNED);
+                 break;
+            }
             case RDMA_PUT_DONE_TAG:
             {
                 CmiGNIRzvRdmaRecv_t *recvInfo = (CmiGNIRzvRdmaRecv_t *)header;
@@ -2357,6 +2387,86 @@ static void PumpNetworkSmsg()
                 }
                 // free newRecvInfo as it is no longer used
                 free(newRecvInfo);
+                break;
+            }
+            case RDMA_PUT_DONE_DIRECT_TAG:
+            {
+                // Direct API when PUT is used instead of a GET
+                // This tag implies the completion of an indirect PUT operation used for the Direct API
+                CmiGNIRzvRdmaPutOp_t *putOp = (CmiGNIRzvRdmaPutOp_t *)header;
+                void *token = (void *)putOp->ref;
+                GNI_SmsgRelease(ep_hndl_array[inst_id]);
+                CMI_GNI_UNLOCK(smsg_mailbox_lock)
+
+                // Invoke the ack handler function
+                CmiInvokeNcpyAck(token);
+                break;
+            }
+            case RDMA_DEREG_DIRECT_TAG:
+            {
+                // Direct API
+                // This tag implies a request to free the memory handle local to this node
+                gni_mem_handle_t *memhndl = (gni_mem_handle_t *)header;
+                status = GNI_MemDeregister(nic_hndl, memhndl);
+                GNI_RC_CHECK("GNI_MemDeregister Failed!", status);
+                GNI_SmsgRelease(ep_hndl_array[inst_id]);
+                CMI_GNI_UNLOCK(smsg_mailbox_lock)
+                break;
+            }
+            case RDMA_REG_AND_PUT_MD_DIRECT_TAG:
+            {
+                CmiGNIRzvRdmaReverseOp_t *revOp = (CmiGNIRzvRdmaReverseOp_t *)header;
+                // Register source buffer
+                gni_mem_handle_t src_mem_hndl = registerDirectMemory(revOp->srcAddr, revOp->size, GNI_MEM_READ_ONLY);
+
+                // Perform PUT
+                void *ref = CmiGetNcpyAck(revOp->srcAddr,
+                                          (char *)revOp + sizeof(CmiGNIRzvRdmaReverseOp_t),
+                                          revOp->srcPe,
+                                          revOp->destAddr,
+                                          (char *)revOp + sizeof(CmiGNIRzvRdmaReverseOp_t) + revOp->ackSize,
+                                          revOp->destPe,
+                                          revOp->ackSize);
+                post_rdma((uint64_t)revOp->destAddr,
+                          revOp->rem_mem_hndl,
+                          (uint64_t)revOp->srcAddr,
+                          src_mem_hndl,
+                          revOp->size,
+                          (uint64_t)ref,
+                          CmiNodeOf(revOp->destPe),
+                          GNI_POST_RDMA_PUT,
+                          DIRECT_SEND_RECV);
+
+                GNI_SmsgRelease(ep_hndl_array[inst_id]);
+                CMI_GNI_UNLOCK(smsg_mailbox_lock)
+                break;
+            }
+            case RDMA_REG_AND_GET_MD_DIRECT_TAG:
+            {
+                CmiGNIRzvRdmaReverseOp_t *revOp = (CmiGNIRzvRdmaReverseOp_t *)header;
+                // Register destination buffer
+                gni_mem_handle_t dest_mem_hndl = registerDirectMemory(revOp->destAddr, revOp->size, GNI_MEM_READWRITE);
+
+                // Perform PUT
+                void *ref = CmiGetNcpyAck(revOp->srcAddr,
+                                          (char *)revOp + sizeof(CmiGNIRzvRdmaReverseOp_t),
+                                          revOp->srcPe,
+                                          revOp->destAddr,
+                                          (char *)revOp + sizeof(CmiGNIRzvRdmaReverseOp_t) + revOp->ackSize,
+                                          revOp->destPe,
+                                          revOp->ackSize);
+                post_rdma((uint64_t)revOp->srcAddr,
+                          revOp->rem_mem_hndl,
+                          (uint64_t)revOp->destAddr,
+                          dest_mem_hndl,
+                          revOp->size,
+                          (uint64_t)ref,
+                          CmiNodeOf(revOp->srcPe),
+                          GNI_POST_RDMA_GET,
+                          DIRECT_SEND_RECV);
+
+                GNI_SmsgRelease(ep_hndl_array[inst_id]);
+                CMI_GNI_UNLOCK(smsg_mailbox_lock)
                 break;
             }
 #endif
@@ -3239,7 +3349,7 @@ INLINE_KEYWORD gni_return_t _sendOneBufferedSmsg(SMSG_QUEUE *queue, MSG_LIST *pt
 {
     CONTROL_MSG         *control_msg_tmp;
     gni_return_t        status = GNI_RC_ERROR_RESOURCE;
-    int                 numRdmaOps, recvInfoSize;
+    int                 numRdmaOps, recvInfoSize, msgSize;
 
     MACHSTATE5(8, "noempty-smsg  %d (%d,%d,%d) tag=%d \n", ptr->destNode, buffered_send_msg, buffered_recv_msg, register_memory_size, ptr->tag); 
     if (useDynamicSMSG && smsg_connected_flag[ptr->destNode] != 2) {   
@@ -3326,6 +3436,26 @@ INLINE_KEYWORD gni_return_t _sendOneBufferedSmsg(SMSG_QUEUE *queue, MSG_LIST *pt
         numRdmaOps = ((CmiGNIRzvRdmaRecv_t *)(ptr->msg))->numOps;
         recvInfoSize = LrtsGetRdmaRecvInfoSize(numRdmaOps);
         status = send_smsg_message(queue, ptr->destNode, ptr->msg, recvInfoSize, ptr->tag, 1, ptr, NONCHARM_SMSG, 1);
+#if !CMK_SMSGS_FREE_AFTER_EVENT
+        if(status == GNI_RC_SUCCESS) {
+          free(ptr->msg);
+        }
+#endif
+        break;
+
+     case RDMA_PUT_MD_DIRECT_TAG:
+        status = send_smsg_message(queue, ptr->destNode, ptr->msg, sizeof(CmiGNIRzvRdmaPutOp_t), ptr->tag, 1, ptr, NONCHARM_SMSG, 1);
+#if !CMK_SMSGS_FREE_AFTER_EVENT
+        if(status == GNI_RC_SUCCESS) {
+          free(ptr->msg);
+        }
+#endif
+        break;
+
+     case RDMA_REG_AND_GET_MD_DIRECT_TAG:
+     case RDMA_REG_AND_PUT_MD_DIRECT_TAG:
+        msgSize = sizeof(CmiGNIRzvRdmaReverseOp_t) + 2*(((CmiGNIRzvRdmaReverseOp_t *)(ptr->msg))->ackSize);
+        status = send_smsg_message(queue, ptr->destNode, ptr->msg, msgSize, ptr->tag, 1, ptr, NONCHARM_SMSG, 1);
 #if !CMK_SMSGS_FREE_AFTER_EVENT
         if(status == GNI_RC_SUCCESS) {
           free(ptr->msg);
@@ -4225,6 +4355,64 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     IndexPool_init(&persistPool, POOL_INIT_SIZE, 1u<<(31-SHIFT));
 #endif
 #endif
+}
+
+void* LrtsRdmaAlloc(int n_bytes, int header)
+{
+    void *ptr = NULL;
+    int alignbuf = ALIGNBUF;
+    CmiAssert(header+sizeof(mempool_header) <= ALIGNBUF);
+#if     USE_LRTS_MEMPOOL
+    n_bytes = ALIGN64(n_bytes);
+    int val = ALIGNBUF+n_bytes-sizeof(mempool_header);
+    if(n_bytes < BIG_MSG)
+    {
+        char *res = (char *)mempool_malloc(CpvAccess(mempool), ALIGNBUF+n_bytes-sizeof(mempool_header), 1);
+        if (res) ptr = res - sizeof(mempool_header) + ALIGNBUF - header;
+    }else
+    {
+#if LARGEPAGE
+        n_bytes = ALIGNHUGEPAGE(n_bytes+ALIGNBUF);
+        char *res = (char *)my_get_huge_pages(n_bytes);
+#else
+        char *res = (char *)memalign(ALIGNBUF, n_bytes+ALIGNBUF);
+#endif
+        if (res) ptr = res + ALIGNBUF - header;
+    }
+#else
+    n_bytes = ALIGN64(n_bytes);           /* make sure size if 4 aligned */
+    char *res = (char *)memalign(ALIGNBUF, n_bytes+ALIGNBUF);
+    ptr = res + ALIGNBUF - header;
+#endif
+    return ptr;
+}
+
+void  LrtsRdmaFree(void *msg)
+{
+    int headersize = sizeof(CmiChunkHeader);
+    char *aligned_addr = (char *)msg + headersize - ALIGNBUF;
+    CmiUInt4 size = SIZEFIELD((char*)msg+headersize);
+    size = ALIGN64(size);
+    if(size>=BIG_MSG)
+    {
+#if LARGEPAGE
+        int s = ALIGNHUGEPAGE(size+ALIGNBUF);
+        my_free_huge_pages(aligned_addr, s);
+#else
+        free((char*)msg + headersize - ALIGNBUF);
+#endif
+    }
+    else {
+#if    USE_LRTS_MEMPOOL
+#if CMK_SMP
+        mempool_free_thread(aligned_addr + sizeof(mempool_header));
+#else
+        mempool_free(CpvAccess(mempool), aligned_addr + sizeof(mempool_header));
+#endif
+#else
+        free(aligned_addr);
+#endif
+    }
 }
 
 void* LrtsAlloc(int n_bytes, int header)
