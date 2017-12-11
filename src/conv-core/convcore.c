@@ -3123,7 +3123,7 @@ void CmiFree(void *blk)
  *
  ***************************************************************************/
 
-#define CMI_TMP_BUF_MAX 128*1024 /* Allow this much temporary storage. */
+#define CMI_TMP_BUF_MAX 16*1024 /* Allow this much temporary storage. */
 
 typedef struct {
   char *buf; /* Start of temporary buffer */
@@ -3149,7 +3149,7 @@ void *CmiTmpAlloc(int size) {
       if (b->max==0) /* We're just uninitialized */
         CmiTmpSetup(b);
       else /* We're really out of space! */
-        CmiAbort("CmiTmpAlloc: asked for too much temporary buffer space");
+        return malloc(size);
     }
     t=b->buf+b->cur;
     b->cur+=size;
@@ -3164,10 +3164,8 @@ void CmiTmpFree(void *t) {
     CmiTmpBuf_t *b=&CpvAccess(CmiTmpBuf);
     /* t should point into our temporary buffer: figure out where */
     int cur=((const char *)t)-b->buf;
-#if CMK_ERROR_CHECKING
     if (cur<0 || cur>b->max)
-      CmiAbort("CmiTmpFree: called with an invalid pointer");
-#endif
+      free(t);
     b->cur=cur;
   }
 }
