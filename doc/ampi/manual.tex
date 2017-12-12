@@ -17,17 +17,19 @@ derived data types support, has been developed by Neelam Saboo.
 \section{Introduction}
 
 This manual describes Adaptive MPI~(\ampi{}), which is an implementation of the
-MPI-2.2 standard\footnote{Currently, the MPI-3.1 standard is under active development,
-though we already support non-blocking and neighborhood collectives.} on top of \charmpp{}.
-\charmpp{} is a \CC{}-based parallel programming library being developed by Prof.
-Laxmikant (Sanjay) Kale and his students since 1992 at the University of
-Illinois at Urbana-Champaign.
+MPI standard\footnote{Currently, AMPI supports the MPI-2.2 standard, and the MPI-3.1 standard is under active development,
+though we already support non-blocking and neighborhood collectives among other MPI-3.1 features.} on top of \charmpp{}.
+\ampi{} acts as a regular MPI implementation (akin to MPICH, OpenMPI, MVAPICH, etc.)
+with several built-in extensions that allow MPI developers to take advantage of \charmpp{}'s
+dynamic runtime system, which provides support for process virtualization,
+overlap of communication and computation, load balancing, and fault tolerance
+with zero to minimal changes to existing MPI codes.
 
-We first describe the philosophy behind Adaptive MPI. Then we give a brief
+In this manual, we first describe the philosophy behind Adaptive MPI, then give a brief
 introduction to \charmpp{} and rationale for \ampi{}. We then describe
 \ampi{} in detail. Finally we summarize the changes required for existing MPI
 codes to run with \ampi{}. Appendices contain the details of installing
-\ampi{}, building and running \ampi{} programs.
+\ampi{}, and building and running \ampi{} programs.
 
 \subsection{Overview}
 
@@ -66,24 +68,17 @@ $n*2^n$ virtual processors on any number of physical ones using \ampi{}.
 \ampi{}'s execution model consists of multiple user-level threads per Processing Element (PE).
 The \charmpp{} scheduler coordinates
 execution of these user-level threads (also called Virtual Processors or VPs) and controls
-execution as shown in Figure \ref{fig_ratio}. These VPs can also migrate between
+execution. These VPs can also migrate between
 PEs for the purpose of load balancing or other reasons. The number of VPs
 per PE specifies the virtualization ratio (degree of over-decomposition).
-For example, in Figure \ref{fig_ratio} virtualization ratio is four (there are
-four VPs per each PE). Figure \ref{fig_prac} show how the problem domain
-is over-decomposed in \ampi{}'s VPs as opposed to other MPI implementations.
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=1.8in]{figs/ratio.png}
-\caption{VPs are managed by \charmpp{} scheduler}
-\label{fig_ratio}
-\end{figure}
+For example, in Figure \ref{fig_virt} the virtualization ratio is $3.5$ (there are
+four VPs on PE 0 and three VPs on PE 1). Figure \ref{fig_prac} show how the problem domain
+can be over-decomposed in \ampi{}'s VPs as opposed to other MPI implementations.
 
 \begin{figure}[h]
 \centering
 \includegraphics[width=4.6in]{figs/prac.png}
-\caption{Problem domain is over-decomposed to more VPs}
+\caption{The problem domain is over-decomposed to more VPs than PEs}
 \label{fig_prac}
 \end{figure}
 
@@ -158,39 +153,6 @@ a suite of plug-in load balancing strategies, infrastructure for defining and
 migrating computational load, and is interoperable with other programming
 paradigms.
 
-\subsection{Terminology}
-
-\begin{description}
-
-\item[Module] A module refers to either a complete program or a library with an
-orchestrator subroutine\footnote{Like many software engineering terms, this
-term is overused, and unfortunately clashes with Fortran90 module that denotes
-a program unit. We specifically refer to the later as ``Fortran 90 module'' to
-avoid confusion.} . An orchestrator subroutine specifies the main control flow
-of the module by calling various subroutines from the associated library and
-does not usually have much state associated with it.
-
-\item[Thread] A thread is a lightweight process that owns a stack and machine
-registers including a program counter, but shares code and data with other
-threads within the same address space. If the underlying operating system
-recognizes a thread, it is known as a kernel thread, otherwise it is known as a
-user-thread. A context-switch between threads refers to suspending one thread's
-execution and transferring control to another thread. Kernel threads typically
-have higher context switching costs than user-threads because of operating
-system overheads. The policy implemented by the underlying system for
-transferring control between threads is known as its thread scheduling policy.
-Scheduling policy for kernel threads is determined by the operating system, and
-is often more inflexible than user-threads. Scheduling policy is said to be
-non-preemptive if a context-switch occurs only when the currently running
-thread willingly asks to be suspended, otherwise it is said to be preemptive.
-\ampi{} threads are non-preemptive user-level threads.
-
-\item[Object] An object is just a blob of memory on which certain computations
-can be performed. The memory is referred to as an object's state, and the set
-of computations that can be performed on the object is called the interface of
-the object.
-
-\end{description}
 
 \section{\charmpp{}}
 
@@ -213,11 +175,10 @@ arrive.  They also tend to be modular, because of their object-based nature.
 Most importantly, \charmpp{} programs can be \emph{dynamically load balanced},
 because the messages are directed at objects and not at processors; thus
 allowing the runtime system to migrate the objects from heavily loaded
-processors to lightly loaded processors. It is this feature of \charmpp{} that
-we utilize for \ampi{}.
+processors to lightly loaded processors.
 
 Since many CSE applications are originally written using MPI, one would have to
-do a complete rewrite if they were to be converted to \charmpp{} to take
+rewrite existing code if they were to be converted to \charmpp{} to take
 advantage of dynamic load balancing and other \charmpp{} features. This is
 indeed impractical. However, \converse{} -- the runtime system of \charmpp{} --
 supports interoperability between different parallel programming paradigms
@@ -237,7 +198,7 @@ overall load while simultaneously minimizing communication overhead.
 
 \subsection{AMPI Compliance to MPI Standards}
 
-Currently \ampi{} supports the MPI-2.2 standard, with preliminary support for some MPI-3.1
+Currently \ampi{} supports the MPI-2.2 standard, with preliminary support for most MPI-3.1
 features and a collection of extensions explained in detail in this manual. One-sided
 communication calls in MPI-2 and MPI-3 are implemented, but they do not yet
 take advantage of RMA features. Non-blocking collectives have been defined in
@@ -245,24 +206,7 @@ take advantage of RMA features. Non-blocking collectives have been defined in
 ROMIO\footnote{http://www-unix.mcs.anl.gov/romio/} has been integrated into
 \ampi{} to support parallel I/O features.
 
-The following MPI basic datatypes are supported in \ampi{}. (Some are not
-available in the Fortran binding. Refer to the MPI Standard for details.)
-\begin{alltt}
-MPI_DATATYPE_NULL  MPI_BYTE            MPI_UNSIGNED_LONG MPI_LONG_DOUBLE_INT
-MPI_DOUBLE         MPI_PACKED          MPI_LONG_DOUBLE   MPI_2FLOAT
-MPI_INT            MPI_SHORT           MPI_FLOAT_INT     MPI_2DOUBLE
-MPI_FLOAT          MPI_LONG            MPI_DOUBLE_INT    MPI_LB
-MPI_COMPLEX        MPI_UNSIGNED_CHAR   MPI_LONG_INT      MPI_UB
-MPI_LOGICAL        MPI_UNSIGNED_SHORT  MPI_2INT
-MPI_CHAR           MPI_UNSIGNED        MPI_SHORT_INT
-\end{alltt}
-
-The following MPI reduction operations are supported in \ampi{}.
-
-\begin{alltt}
-MPI_MAX   MPI_MIN   MPI_SUM   MPI_PROD  MPI_MAXLOC  MPI_MINLOC  MPI_REPLACE
-MPI_LAND  MPI_LOR   MPI_LXOR  MPI_BAND  MPI_BOR     MPI_BXOR    MPI_NO_OP
-\end{alltt}
+\subsection{AMPI Extensions to MPI Standards}
 
 The following are AMPI extensions to the MPI standard, which will be explained in
 detail in this manual. All AMPI extensions to the MPI standard are prefixed with
