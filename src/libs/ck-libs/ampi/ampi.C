@@ -4449,6 +4449,23 @@ static void handle_MPI_IN_PLACE_gather(void* &sendbuf, void* recvbuf, int &sendc
   CkAssert(recvbuf != MPI_IN_PLACE);
 }
 
+static void handle_MPI_IN_PLACE_gatherv(void* &sendbuf, void* recvbuf, int &sendcount,
+                                        MPI_Datatype &sendtype, const int recvdispls[],
+                                        const int recvcounts[], int rank,
+                                        MPI_Datatype recvtype)
+{
+  if (sendbuf == MPI_IN_PLACE) {
+    // The MPI standard says that when MPI_IN_PLACE is passed to any of the gather
+    // variants, the contribution of the root to the gathered vector is assumed
+    // to be already in the correct place in the receive buffer.
+    CkAssert(recvbuf != NULL && recvdispls != NULL && recvcounts != NULL);
+    sendbuf   = (char*)recvbuf + (recvdispls[rank] * getDDT()->getExtent(recvtype));
+    sendcount = recvcounts[rank];
+    sendtype  = recvtype;
+  }
+  CkAssert(recvbuf != MPI_IN_PLACE);
+}
+
 static void handle_MPI_IN_PLACE_alltoall(void* &sendbuf, void* recvbuf, int &sendcount,
                                          MPI_Datatype &sendtype, int recvcount,
                                          MPI_Datatype recvtype)
@@ -6383,8 +6400,8 @@ int AMPI_Allgatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int rank = ptr->getRank();
 
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE_gather((void*&)sendbuf, recvbuf, sendcount, sendtype,
-                             displs[rank], recvcounts[rank], recvtype);
+  handle_MPI_IN_PLACE_gatherv((void*&)sendbuf, recvbuf, sendcount, sendtype,
+                              displs, recvcounts, rank, recvtype);
 
 #if AMPI_ERROR_CHECKING
   int ret;
@@ -6425,8 +6442,8 @@ int AMPI_Iallgatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int rank = ptr->getRank();
 
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE_gather((void*&)sendbuf, recvbuf, sendcount, sendtype,
-                             displs[rank], recvcounts[rank], recvtype);
+  handle_MPI_IN_PLACE_gatherv((void*&)sendbuf, recvbuf, sendcount, sendtype,
+                              displs, recvcounts, rank, recvtype);
 
 #if AMPI_ERROR_CHECKING
   int ret;
@@ -6614,8 +6631,8 @@ int AMPI_Gatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int rank = ptr->getRank();
 
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE_gather((void*&)sendbuf, recvbuf, sendcount, sendtype,
-                             displs[rank], recvcounts[rank], recvtype);
+  handle_MPI_IN_PLACE_gatherv((void*&)sendbuf, recvbuf, sendcount, sendtype,
+                              displs, recvcounts, rank, recvtype);
 
 #if AMPI_ERROR_CHECKING
   int ret;
@@ -6685,8 +6702,8 @@ int AMPI_Igatherv(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int rank = ptr->getRank();
 
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
-  handle_MPI_IN_PLACE_gather((void*&)sendbuf, recvbuf, sendcount, sendtype,
-                             displs[rank], recvcounts[rank], recvtype);
+  handle_MPI_IN_PLACE_gatherv((void*&)sendbuf, recvbuf, sendcount, sendtype,
+                              displs, recvcounts, rank, recvtype);
 
 #if AMPI_ERROR_CHECKING
   int ret;
