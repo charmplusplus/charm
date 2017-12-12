@@ -1293,19 +1293,26 @@ linux and ethernet environment:
 > build AMPI netlrts-linux-x86_64 -g
 \end{alltt}
 
-And the following is an example of how to build a production version of AMPI in a
-linux and ethernet environment, with MPI-level error checking in AMPI turned off:
+And the following is an example of how to build a production version of AMPI on a
+Cray XC system, with MPI-level error checking in AMPI turned off:
 
 \begin{alltt}
-> build AMPI netlrts-linux-x86_64 --with-production --disable-ampi-error-checking
+> build AMPI gni-crayxc --with-production --disable-ampi-error-checking
+\end{alltt}
+
+\ampi{} can also be built with support for shared memory on any communication layer
+by adding "smp" as an option after the build target. For example, on an Infiniband Linux cluster:
+\begin{alltt}
+> build AMPI verbs-linux-x86_64 smp --with-production
 \end{alltt}
 
 \ampi{} ranks are implemented as user-level threads with a stack size default of 1MB.
 If the default is not correct for your program, you can specify a different default
-stack size (in bytes) at build time:
+stack size (in bytes) at build time. The following build command illustrates this
+for an Intel Omni-Path system:
 
 \begin{alltt}
-> build AMPI netlrts-linux-x86_64 --with-production -DTCHARM_STACKSIZE_DEFAULT=16777216
+> build AMPI ofi-linux-x86_64 --with-production -DTCHARM_STACKSIZE_DEFAULT=16777216
 \end{alltt}
 
 The same can be done for AMPI's RDMA messaging threshold using \texttt{AMPI\_RDMA\_THRESHOLD\_DEFAULT} and,
