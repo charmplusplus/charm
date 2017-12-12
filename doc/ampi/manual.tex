@@ -1422,4 +1422,11 @@ migrated, as in the following example:
 > charmrun +p16 ./pgm +vp128 +tcharm_stacksize 32K +balancer RefineLB
 \end{alltt}
 
+Note that for AMPI programs compiled with gfortran, users may need to set the following
+environment variable to see program output to stdout:
+\begin{alltt}
+> export GFORTRAN_UNBUFFERED_ALL=1
+\end{alltt}
+
+
 \end{document}
