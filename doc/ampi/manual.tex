@@ -17,10 +17,9 @@ derived data types support, has been developed by Neelam Saboo.
 \section{Introduction}
 
 This manual describes Adaptive MPI~(\ampi{}), which is an implementation of the
-MPI-2.2 standard\footnote{Currently, MPI-2.2's PMPI profiling interface is missing
-from \ampi{} and the MPI-3.1 standard is under active development, though we already
-support non-blocking and neighborhood collectives.} on top of \charmpp{}. \charmpp{} is a
-\CC{}-based parallel programming library being developed by Prof.
+MPI-2.2 standard\footnote{Currently, the MPI-3.1 standard is under active development,
+though we already support non-blocking and neighborhood collectives.} on top of \charmpp{}.
+\charmpp{} is a \CC{}-based parallel programming library being developed by Prof.
 Laxmikant (Sanjay) Kale and his students since 1992 at the University of
 Illinois at Urbana-Champaign.
 
@@ -1287,6 +1286,9 @@ what each VP on each processor is doing (what MPI method it is running or blocke
 by clicking the \emph{View} tab and then selecting \emph{Show Nested Bracketed User Events}
 from the drop down menu.
 See the Projections manual for information on performance analysis and visualization.
+
+AMPI users can also use any tracing libraries or tools that rely on MPI's PMPI profiling interface,
+though such tools may not be aware of AMPI process virtualization.
 
 \subsection{Compiling AMPI Programs}
 

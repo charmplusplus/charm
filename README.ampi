@@ -76,7 +76,7 @@ AMPI has some known flaws and incompatibilities with other MPI implementations:
     * Datatypes are not reused, freed, or reference counted.
     * Not all collectives are supported on intercommunicators.
     * MPI_Comm_free does not actually free any of the runtime's memory.
-    * The PMPI profiling interface and generalized requests are not yet implemented in AMPI.
+    * Support for generalized requests is not yet implemented in AMPI.
 
 AMPI also has extensions to the MPI standard to enable use of the high-level
 features provided by the Charm++ adaptive runtime system. All extensions are
