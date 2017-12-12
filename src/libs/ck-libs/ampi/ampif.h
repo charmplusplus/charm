@@ -168,8 +168,10 @@
        integer, parameter :: MPI_COMM        = 3
        integer, parameter :: MPI_ERROR       = 5
 
-       integer, dimension(MPI_STATUS_SIZE), parameter :: MPI_STATUS_IGNORE   = (/-9,-9,-9,-9,-9,-9,-9,-9/)
-       integer, dimension(MPI_STATUS_SIZE), parameter :: MPI_STATUSES_IGNORE = (/-9,-9,-9,-9,-9,-9,-9,-9/)
+       integer, dimension(MPI_STATUS_SIZE), parameter ::                &
+     & MPI_STATUS_IGNORE = (/-9,-9,-9,-9,-9,-9,-9,-9/)
+       integer, dimension(MPI_STATUS_SIZE), parameter ::                &
+     & MPI_STATUSES_IGNORE = (/-9,-9,-9,-9,-9,-9,-9,-9/)
 
        integer, parameter :: MPI_COMM_SELF        = 1000000
        integer, parameter :: MPI_COMM_FIRST_SPLIT = 1000000
