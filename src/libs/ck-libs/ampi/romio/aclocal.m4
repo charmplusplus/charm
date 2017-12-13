@@ -404,7 +404,7 @@ define(PAC_TEST_MPI,[
   rm -f mpitest.c
   cat > mpitest.c <<EOF
 #include "mpi.h"
-     main(int argc, char **argv)
+     int main(int argc, char **argv)
      {
          MPI_Init(&argc,&argv);
          MPI_Finalize(); 
