@@ -1952,14 +1952,14 @@ static const char *funclist[] = {"AMPI_Abort", "AMPI_Add_error_class", "AMPI_Add
 
 //Use this to mark the start of AMPI interface routines that can only be called on AMPI threads:
 #if CMK_ERROR_CHECKING
-#define AMPIAPI(routineName) \
+#define AMPI_API(routineName) \
   if (!isAmpiThread()) { CkAbort("AMPI> cannot call MPI routines from non-AMPI threads!"); } \
   TCHARM_API_TRACE(routineName, "ampi");
 #else
-#define AMPIAPI(routineName) TCHARM_API_TRACE(routineName, "ampi")
+#define AMPI_API(routineName) TCHARM_API_TRACE(routineName, "ampi")
 #endif
 
 //Use this for MPI_Init and routines than can be called before AMPI threads have been initialized:
-#define AMPIAPI_INIT(routineName) TCHARM_API_TRACE(routineName, "ampi")
+#define AMPI_API_INIT(routineName) TCHARM_API_TRACE(routineName, "ampi")
 
 #endif // _AMPIIMPL_H

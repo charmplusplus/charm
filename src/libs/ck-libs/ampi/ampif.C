@@ -2013,7 +2013,7 @@ void ampi_get_command_argument(int *c, char *str, int *len, int *ierr) {
 }
 
 void ampi_init_universe(int *unicomm, int *ierr) {
-  AMPIAPI("AMPI_Init_universe");
+  AMPI_API("AMPI_Init_universe");
   for(int i=0; i<_mpi_nworlds; i++) {
     unicomm[i] = MPI_COMM_UNIVERSE[i];
   }
