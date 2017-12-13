@@ -16,18 +16,22 @@ static inline void serializeContig(char* userdata, char* buffer, size_t size, in
     memcpy(buffer, userdata, size);
   } else if (dir==-1) {
     memcpy(userdata, buffer, size);
-  } else {
-    CmiAbort("CkDDT: Invalid dir given to serialize a contiguous type!\n");
   }
+#if CMK_ERROR_CHECKING
+  else {
+    CmiAbort("CkDDT: Invalid dir given to serialize a contiguous type!");
+  }
+#endif
 }
 
 CkDDT_DataType*
 CkDDT::getType(int nIndex) const
 {
-  if( (nIndex >= 0) && (nIndex < CkDDT_MAXTYPE))
-    return typeTable[nIndex] ;
-  else
-    return 0 ;
+#if CMK_ERROR_CHECKING
+  if (nIndex < 0 || nIndex >= CkDDT_MAXTYPE)
+    CmiAbort("CkDDT: Invalid type index passed to getType!");
+#endif
+  return typeTable[nIndex];
 }
 
 void
@@ -160,6 +164,11 @@ CkDDT::createDup(int nIndexOld, int *nIndexNew)
   CkDDT_DataType *dttype = getType(nIndexOld);
   CkDDT_DataType *type;
 
+#if CMK_ERROR_CHECKING
+  if (typeTable.size()+1 >= CkDDT_MAXTYPE)
+    CmiAbort("CkDDT: type table exceeded its maximum size!");
+#endif
+
   switch(dttype->getType()) {
     case CkDDT_CONTIGUOUS:
       type = new CkDDT_Contiguous(static_cast<CkDDT_Contiguous&> (*dttype));
@@ -226,6 +235,11 @@ CkDDT::createResized(CkDDT_Type oldtype, CkDDT_Aint lb, CkDDT_Aint extent, CkDDT
   CkDDT_DataType *dttype = getType(oldtype);
   CkDDT_DataType *type;
 
+#if CMK_ERROR_CHECKING
+  if (typeTable.size()+1 >= CkDDT_MAXTYPE)
+    CmiAbort("CkDDT: type table exceeded its maximum size!");
+#endif
+
   switch(dttype->getType()) {
     case CkDDT_CONTIGUOUS:
       type = new CkDDT_Contiguous(static_cast<CkDDT_Contiguous&> (*dttype));
@@ -271,6 +285,11 @@ CkDDT::createResized(CkDDT_Type oldtype, CkDDT_Aint lb, CkDDT_Aint extent, CkDDT
 void
 CkDDT::newContiguous(int count, CkDDT_Type oldType, CkDDT_Type *newType)
 {
+#if CMK_ERROR_CHECKING
+  if (typeTable.size()+1 >= CkDDT_MAXTYPE)
+    CmiAbort("CkDDT: type table exceeded its maximum size!");
+#endif
+
   CkDDT_DataType *type = new CkDDT_Contiguous(count, oldType, typeTable[oldType]);
   typeTable.push_back(type);
   types.push_back(CkDDT_CONTIGUOUS);
@@ -280,6 +299,11 @@ void
 CkDDT::newVector(int count, int blocklength, int stride,
                  CkDDT_Type oldType, CkDDT_Type* newType)
 {
+#if CMK_ERROR_CHECKING
+  if (typeTable.size()+1 >= CkDDT_MAXTYPE)
+    CmiAbort("CkDDT: type table exceeded its maximum size!");
+#endif
+
   CkDDT_DataType* type = new CkDDT_Vector(count, blocklength, stride, oldType, typeTable[oldType]);
   typeTable.push_back(type);
   types.push_back(CkDDT_VECTOR);
@@ -289,6 +313,11 @@ void
 CkDDT::newHVector(int count, int blocklength, int stride,
                   CkDDT_Type oldtype, CkDDT_Type* newType)
 {
+#if CMK_ERROR_CHECKING
+  if (typeTable.size()+1 >= CkDDT_MAXTYPE)
+    CmiAbort("CkDDT: type table exceeded its maximum size!");
+#endif
+
   CkDDT_DataType* type =
     new CkDDT_HVector(count, blocklength, stride, oldtype, typeTable[oldtype]);
   typeTable.push_back(type);
@@ -299,6 +328,11 @@ void
 CkDDT::newIndexed(int count, const int* arrbLength, CkDDT_Aint* arrDisp,
                   CkDDT_Type oldtype, CkDDT_Type* newType)
 {
+#if CMK_ERROR_CHECKING
+  if (typeTable.size()+1 >= CkDDT_MAXTYPE)
+    CmiAbort("CkDDT: type table exceeded its maximum size!");
+#endif
+
   CkDDT_DataType* type =
     new CkDDT_Indexed(count, arrbLength, arrDisp, oldtype, typeTable[oldtype]);
   typeTable.push_back(type);
@@ -309,6 +343,11 @@ void
 CkDDT::newHIndexed(int count, const int* arrbLength, const CkDDT_Aint* arrDisp,
                    CkDDT_Type oldtype, CkDDT_Type* newType)
 {
+#if CMK_ERROR_CHECKING
+  if (typeTable.size()+1 >= CkDDT_MAXTYPE)
+    CmiAbort("CkDDT: type table exceeded its maximum size!");
+#endif
+
   CkDDT_DataType* type =
     new CkDDT_HIndexed(count, arrbLength, arrDisp, oldtype, typeTable[oldtype]);
   typeTable.push_back(type);
@@ -319,6 +358,11 @@ void
 CkDDT::newIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
                   CkDDT_Type *newtype)
 {
+#if CMK_ERROR_CHECKING
+  if (typeTable.size()+1 >= CkDDT_MAXTYPE)
+    CmiAbort("CkDDT: type table exceeded its maximum size!");
+#endif
+
   CkDDT_DataType *type = new CkDDT_Indexed_Block(count, Blocklength, arrDisp, oldtype, typeTable[oldtype]);
   typeTable.push_back(type);
   types.push_back(CkDDT_INDEXED_BLOCK);
@@ -328,6 +372,11 @@ void
 CkDDT::newHIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
                   CkDDT_Type *newtype)
 {
+#if CMK_ERROR_CHECKING
+  if (typeTable.size()+1 >= CkDDT_MAXTYPE)
+    CmiAbort("CkDDT: type table exceeded its maximum size!");
+#endif
+
   CkDDT_DataType *type = new CkDDT_HIndexed_Block(count, Blocklength, arrDisp, oldtype, typeTable[oldtype]);
   typeTable.push_back(type);
   types.push_back(CkDDT_HINDEXED_BLOCK);
@@ -337,12 +386,17 @@ void
 CkDDT::newStruct(int count, const int* arrbLength, const CkDDT_Aint* arrDisp,
                  const CkDDT_Type *oldtype, CkDDT_Type* newType)
 {
-  vector<CkDDT_DataType *> olddatatypes = vector<CkDDT_DataType*>(count);
+#if CMK_ERROR_CHECKING
+  if (typeTable.size()+1 >= CkDDT_MAXTYPE)
+    CmiAbort("CkDDT: type table exceeded its maximum size!");
+#endif
+
+  vector<CkDDT_DataType *> olddatatypes(count);
   for(int i=0;i<count;i++){
-    olddatatypes[i] = typeTable[oldtype[i]];
+    olddatatypes[i] = getType(oldtype[i]);
   }
   CkDDT_DataType* type =
-    new CkDDT_Struct(count, arrbLength, arrDisp, oldtype, &olddatatypes[0]);
+    new CkDDT_Struct(count, arrbLength, arrDisp, oldtype, olddatatypes.data());
   typeTable.push_back(type);
   types.push_back(CkDDT_STRUCT);
 }
