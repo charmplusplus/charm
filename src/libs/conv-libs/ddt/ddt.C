@@ -169,6 +169,8 @@ CkDDT::createDup(int nIndexOld, int *nIndexNew)
     CmiAbort("CkDDT: type table exceeded its maximum size!");
 #endif
 
+  *nIndexNew = typeTable.size();
+
   switch(dttype->getType()) {
     case CkDDT_CONTIGUOUS:
       type = new CkDDT_Contiguous(static_cast<CkDDT_Contiguous&> (*dttype));
@@ -230,7 +232,7 @@ CkDDT::getName(int nIndex, char *name, int *len) const
 }
 
 void
-CkDDT::createResized(CkDDT_Type oldtype, CkDDT_Aint lb, CkDDT_Aint extent, CkDDT_Type *newtype)
+CkDDT::createResized(CkDDT_Type oldtype, CkDDT_Aint lb, CkDDT_Aint extent, CkDDT_Type *newType)
 {
   CkDDT_DataType *dttype = getType(oldtype);
   CkDDT_DataType *type;
@@ -278,6 +280,8 @@ CkDDT::createResized(CkDDT_Type oldtype, CkDDT_Aint lb, CkDDT_Aint extent, CkDDT
       break;
   }
 
+  *newType = typeTable.size();
+
   typeTable.push_back(type);
   types.push_back(types[oldtype]);
 }
@@ -289,6 +293,8 @@ CkDDT::newContiguous(int count, CkDDT_Type oldType, CkDDT_Type *newType)
   if (typeTable.size()+1 >= CkDDT_MAXTYPE)
     CmiAbort("CkDDT: type table exceeded its maximum size!");
 #endif
+
+  *newType = typeTable.size();
 
   CkDDT_DataType *type = new CkDDT_Contiguous(count, oldType, typeTable[oldType]);
   typeTable.push_back(type);
@@ -304,6 +310,8 @@ CkDDT::newVector(int count, int blocklength, int stride,
     CmiAbort("CkDDT: type table exceeded its maximum size!");
 #endif
 
+  *newType = typeTable.size();
+
   CkDDT_DataType* type = new CkDDT_Vector(count, blocklength, stride, oldType, typeTable[oldType]);
   typeTable.push_back(type);
   types.push_back(CkDDT_VECTOR);
@@ -317,6 +325,8 @@ CkDDT::newHVector(int count, int blocklength, int stride,
   if (typeTable.size()+1 >= CkDDT_MAXTYPE)
     CmiAbort("CkDDT: type table exceeded its maximum size!");
 #endif
+
+  *newType = typeTable.size();
 
   CkDDT_DataType* type =
     new CkDDT_HVector(count, blocklength, stride, oldtype, typeTable[oldtype]);
@@ -333,6 +343,8 @@ CkDDT::newIndexed(int count, const int* arrbLength, CkDDT_Aint* arrDisp,
     CmiAbort("CkDDT: type table exceeded its maximum size!");
 #endif
 
+  *newType = typeTable.size();
+
   CkDDT_DataType* type =
     new CkDDT_Indexed(count, arrbLength, arrDisp, oldtype, typeTable[oldtype]);
   typeTable.push_back(type);
@@ -348,6 +360,8 @@ CkDDT::newHIndexed(int count, const int* arrbLength, const CkDDT_Aint* arrDisp,
     CmiAbort("CkDDT: type table exceeded its maximum size!");
 #endif
 
+  *newType = typeTable.size();
+
   CkDDT_DataType* type =
     new CkDDT_HIndexed(count, arrbLength, arrDisp, oldtype, typeTable[oldtype]);
   typeTable.push_back(type);
@@ -356,12 +370,14 @@ CkDDT::newHIndexed(int count, const int* arrbLength, const CkDDT_Aint* arrDisp,
 
 void
 CkDDT::newIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
-                  CkDDT_Type *newtype)
+                  CkDDT_Type *newType)
 {
 #if CMK_ERROR_CHECKING
   if (typeTable.size()+1 >= CkDDT_MAXTYPE)
     CmiAbort("CkDDT: type table exceeded its maximum size!");
 #endif
+
+  *newType = typeTable.size();
 
   CkDDT_DataType *type = new CkDDT_Indexed_Block(count, Blocklength, arrDisp, oldtype, typeTable[oldtype]);
   typeTable.push_back(type);
@@ -370,12 +386,14 @@ CkDDT::newIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, Ck
 
 void
 CkDDT::newHIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
-                  CkDDT_Type *newtype)
+                  CkDDT_Type *newType)
 {
 #if CMK_ERROR_CHECKING
   if (typeTable.size()+1 >= CkDDT_MAXTYPE)
     CmiAbort("CkDDT: type table exceeded its maximum size!");
 #endif
+
+  *newType = typeTable.size();
 
   CkDDT_DataType *type = new CkDDT_HIndexed_Block(count, Blocklength, arrDisp, oldtype, typeTable[oldtype]);
   typeTable.push_back(type);
@@ -390,6 +408,8 @@ CkDDT::newStruct(int count, const int* arrbLength, const CkDDT_Aint* arrDisp,
   if (typeTable.size()+1 >= CkDDT_MAXTYPE)
     CmiAbort("CkDDT: type table exceeded its maximum size!");
 #endif
+
+  *newType = typeTable.size();
 
   vector<CkDDT_DataType *> olddatatypes(count);
   for(int i=0;i<count;i++){
