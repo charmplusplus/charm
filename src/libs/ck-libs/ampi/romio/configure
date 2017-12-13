@@ -170,7 +170,7 @@ MAKE=${MAKE:-"make"}
 F77GETARG="call getarg(i,str)"
 F77IARGC="iargc()"
 FTESTDEFINE=""
-FORTRAN_MPI_OFFSET=""
+FORTRAN_MPI_OFFSET="integer(kind=MPI_OFFSET_KIND)"
 MPIOF_H_INCLUDED=0
 MPI_OFFSET_KIND1="!"
 MPI_OFFSET_KIND2="!"
@@ -1072,8 +1072,8 @@ SEDDEFS="${SEDDEFS}\${SEDdA}AIX\${SEDdB}AIX\${SEDdC}1\${SEDdD}
 
 # assume long long exists.
     longlongsize=${longlongsize:-8} 
-    MPI_OFFSET_KIND1="      INTEGER MPI_OFFSET_KIND"
-    MPI_OFFSET_KIND2="      PARAMETER (MPI_OFFSET_KIND=8)"
+    MPI_OFFSET_KIND1="!"
+    MPI_OFFSET_KIND2="!"
 fi    
 #
 if test -n "$arch_paragon"; then
@@ -1538,8 +1538,8 @@ SEDDEFS="${SEDDEFS}\${SEDdA}SX4\${SEDdB}SX4\${SEDdC}1\${SEDdD}
         FILE_SYSTEM="sfs nfs"
         echo "configuring for file systems sfs and nfs"
     fi
-    MPI_OFFSET_KIND1="      INTEGER MPI_OFFSET_KIND"
-    MPI_OFFSET_KIND2="      PARAMETER (MPI_OFFSET_KIND=8)"
+    MPI_OFFSET_KIND1="!"
+    MPI_OFFSET_KIND2="!"
 fi
 #
 if test -n "$arch_hpux" || test -n "$arch_sppux" ; then
@@ -1653,8 +1653,8 @@ rm -f conftest*
             echo "no flock64; configuring for file systems ufs and nfs"
         fi
     fi
-    MPI_OFFSET_KIND1="      INTEGER MPI_OFFSET_KIND"
-    MPI_OFFSET_KIND2="      PARAMETER (MPI_OFFSET_KIND=8)"
+    MPI_OFFSET_KIND1="!"
+    MPI_OFFSET_KIND2="!"
     if test "$CC" != "gcc" ; then
         ROMIO_TCFLAGS="-Ae"
     fi
@@ -1706,8 +1706,8 @@ SEDDEFS="${SEDDEFS}\${SEDdA}DEC\${SEDdB}DEC\${SEDdC}1\${SEDdD}
 "
 }
 
-    MPI_OFFSET_KIND1="      INTEGER MPI_OFFSET_KIND"
-    MPI_OFFSET_KIND2="      PARAMETER (MPI_OFFSET_KIND=8)"
+    MPI_OFFSET_KIND1="!"
+    MPI_OFFSET_KIND2="!"
     ROMIO_LIBLIST="-laio"
 fi    
 #
@@ -1799,8 +1799,8 @@ SEDDEFS="${SEDDEFS}\${SEDdA}NO_MPI_SGI_type_is_contig\${SEDdB}NO_MPI_SGI_type_is
         FILE_SYSTEM="ufs nfs"
         echo "configuring for file systems ufs and nfs"
     fi
-    MPI_OFFSET_KIND1="      INTEGER MPI_OFFSET_KIND"
-    MPI_OFFSET_KIND2="      PARAMETER (MPI_OFFSET_KIND=8)"
+    MPI_OFFSET_KIND1="!"
+    MPI_OFFSET_KIND2="!"
 fi
 #
 if test -n "$arch_sgi" ; then
@@ -2234,8 +2234,8 @@ SEDDEFS="${SEDDEFS}\${SEDdA}IRIX\${SEDdB}IRIX\${SEDdC}1\${SEDdD}
 "
 }
 
-   MPI_OFFSET_KIND1="      INTEGER MPI_OFFSET_KIND"
-   MPI_OFFSET_KIND2="      PARAMETER (MPI_OFFSET_KIND=8)"
+   MPI_OFFSET_KIND1="!"
+   MPI_OFFSET_KIND2="!"
 fi
 
 for func in memalign
@@ -2809,9 +2809,7 @@ SEDDEFS="${SEDDEFS}\${SEDdA}MPI_OFFSET_IS_INT\${SEDdB}MPI_OFFSET_IS_INT\${SEDdC}
        MPI_OFFSET_KIND1="!"
        MPI_OFFSET_KIND2="!"
     else 
-       echo "defining MPI_Offset as long in C and integer in Fortran" 
-       DEFINE_MPI_OFFSET="typedef long MPI_Offset;"
-       FORTRAN_MPI_OFFSET="integer"
+       DEFINE_MPI_OFFSET=""
        LL="\%ld"
        MPI_OFFSET_KIND1="!"
        MPI_OFFSET_KIND2="!"
@@ -3040,9 +3038,7 @@ else
 echo "$ac_t""no!!" 1>&1
 fi
        echo "the compiler doesn't print long longs correctly!"
-       echo "defining MPI_Offset as long in C and integer in Fortran" 
-       DEFINE_MPI_OFFSET="typedef long MPI_Offset;"
-       FORTRAN_MPI_OFFSET="integer"
+       DEFINE_MPI_OFFSET=""
        LL="\%ld"
        MPI_OFFSET_KIND1="!"
        MPI_OFFSET_KIND2="!"
@@ -3050,9 +3046,7 @@ fi
 fi
 
       else
-         echo "defining MPI_Offset as long in C and integer in Fortran" 
-         DEFINE_MPI_OFFSET="typedef long MPI_Offset;"
-         FORTRAN_MPI_OFFSET="integer"
+         DEFINE_MPI_OFFSET=""
          LL="\%ld"
          MPI_OFFSET_KIND1="!"
          MPI_OFFSET_KIND2="!"
@@ -3089,9 +3083,7 @@ SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_LONG_LONG_64\${SEDdB}HAVE_LONG_LONG_64\${SEDdC}
          LL="\%lld"
       else 
          echo "assuming long long is not available; use '-longlongsize' to indicate otherwise"
-         echo "defining MPI_Offset as long in C and integer in Fortran" 
-         DEFINE_MPI_OFFSET="typedef long MPI_Offset;"
-         FORTRAN_MPI_OFFSET="integer"
+         DEFINE_MPI_OFFSET=""
          LL="\%ld"
          MPI_OFFSET_KIND1="!"
          MPI_OFFSET_KIND2="!"
@@ -3186,8 +3178,8 @@ SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_MPI_LONG_LONG_INT\${SEDdB}HAVE_MPI_LONG_LONG_IN
 fi
 #
 if test -n "$OFFSET_KIND" -a "A$MPI_OFFSET_KIND1" = "A!" ; then 
-  MPI_OFFSET_KIND1="        INTEGER MPI_OFFSET_KIND"
-  MPI_OFFSET_KIND2="        PARAMETER (MPI_OFFSET_KIND=$OFFSET_KIND)"
+  MPI_OFFSET_KIND1="!"
+  MPI_OFFSET_KIND2="!"
 else
  if test "$FORTRAN_MPI_OFFSET" = "integer*8" && test "A$MPI_OFFSET_KIND2" = "A!" && test $NOF77 = 0 ; then
    if test -z "$ac_echo_n" ; then
@@ -3243,8 +3235,8 @@ echo "$ac_t""$KINDVAL"
 else
 echo "$ac_t""$KINDVAL" 1>&1
 fi
-   MPI_OFFSET_KIND1="      INTEGER MPI_OFFSET_KIND"
-   MPI_OFFSET_KIND2="      PARAMETER (MPI_OFFSET_KIND=$KINDVAL)"
+   MPI_OFFSET_KIND1="!"
+   MPI_OFFSET_KIND2="!"
 else
     if test -z "$ac_echo_test" -a 1 = 1 ; then
 echo "$ac_t""unavailable"
@@ -3309,8 +3301,8 @@ echo "$ac_t""$KINDVAL"
 else
 echo "$ac_t""$KINDVAL" 1>&1
 fi
-   MPI_OFFSET_KIND1="      INTEGER MPI_OFFSET_KIND"
-   MPI_OFFSET_KIND2="      PARAMETER (MPI_OFFSET_KIND=$KINDVAL)"
+   MPI_OFFSET_KIND1="!"
+   MPI_OFFSET_KIND2="!"
 else
     if test -z "$ac_echo_test" -a 1 = 1 ; then
 echo "$ac_t""unavailable"
