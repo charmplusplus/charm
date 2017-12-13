@@ -3639,13 +3639,13 @@ echo $ac_n "checking if MPI_OFFSET_KIND is defined in mpif.h""... $ac_c" 1>&1
 fi
   rm -f mpitest.f
   cat > mpitest.f <<EOF
-      program main
+      subroutine mpi_main
       implicit none
       include 'mpif.h'
       integer i
       i = MPI_OFFSET_KIND
       stop
-      end
+      end subroutine mpi_main
 EOF
   rm -f conftest
   $F77 $FFLAGS -I$MPI_INCLUDE_DIR -o conftest mpitest.f $MPI_LIB > /dev/null 2>&1
@@ -4450,13 +4450,13 @@ echo $ac_n "checking if mpiof.h is included in mpif.h""... $ac_c" 1>&1
 fi
   rm -f mpitest.f
   cat > mpitest.f <<EOF
-      program main
+      subroutine mpi_main
       implicit none
       include 'mpif.h'
       integer i
       i = MPI_MODE_RDWR
       stop
-      end
+      end subroutine mpi_main
 EOF
   rm -f conftest
   $F77 $FFLAGS -I$MPI_INCLUDE_DIR -o conftest mpitest.f $MPI_LIB > /dev/null 2>&1
