@@ -61,7 +61,7 @@ $n*2^n$ virtual processors on any number of physical ones using \ampi{}.
 \begin{figure}[h]
 \centering
 \includegraphics[width=4.6in]{figs/virtualization.png}
-\caption{MPI processes are implemented as user-level threads in \ampi{}}
+\caption{MPI ranks are implemented as user-level threads in \ampi{} rather than Operating System processes.}
 \label{fig_virt}
 \end{figure}
 
@@ -78,7 +78,7 @@ can be over-decomposed in \ampi{}'s VPs as opposed to other MPI implementations.
 \begin{figure}[h]
 \centering
 \includegraphics[width=4.6in]{figs/prac.png}
-\caption{The problem domain is over-decomposed to more VPs than PEs}
+\caption{The problem domain is over-decomposed to more VPs than PEs.}
 \label{fig_prac}
 \end{figure}
 
@@ -98,16 +98,9 @@ over-decomposition, a smaller subdomain is accessed by a VP repeatedly
 in different function calls before getting blocked by communication and
 switching to another VP. That smaller subdomain may fit into cache if
 over-decomposition is enough. This concept is illustrated in Figure
-\ref{fig_cache} where each \ampi{} subdomain (such as 12) is smaller than
-corresponding MPI subdomain (such as 3) and may fit into cache memory. Thus,
+\ref{fig_virt} where each \ampi{} rank's subdomain is smaller than the
+corresponding MPI subdomain and so may fit into cache memory. Thus,
 there is a potential performance improvement without changing the source code.
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=4.6in]{figs/cache.png}
-\caption{Smaller subdomains may fit into cache and result in better performance}
-\label{fig_cache}
-\end{figure}
 
 One important concern is that of load imbalance. New generation parallel
 applications are dynamically varying, meaning that processors' load is
@@ -122,7 +115,7 @@ runtime system is uniquely positioned to deal with load imbalance. Figure
 \ref{fig_migrate} shows the runtime system migrating a VP after detecting
 load imbalance. This domain may correspond to a weather forecast model
 where there is a storm cell in the top-left quadrant, which requires more
-computation to simulate. \ampi{} will then migrate VP 13 to balance the
+computation to simulate. \ampi{} will then migrate VP 1 to balance the
 division of work across processors and improve performance. Note that
 incorporating this sort of load balancing inside the application code may
 take a lot of effort and complicate the code.
@@ -130,7 +123,7 @@ take a lot of effort and complicate the code.
 \begin{figure}[h]
 \centering
 \includegraphics[width=4.6in]{figs/migrate.png}
-\caption{\ampi{} migrates VPs across processors for load balancing}
+\caption{\ampi{} can migrate VPs across processes for load balancing.}
 \label{fig_migrate}
 \end{figure}
 
