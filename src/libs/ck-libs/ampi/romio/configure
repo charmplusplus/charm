@@ -2305,7 +2305,7 @@ fi
   rm -f mpitest.c
   cat > mpitest.c <<EOF
 #include "mpi.h"
-     main(int argc, char **argv)
+     int main(int argc, char **argv)
      {
      	 MPI_Status status;
          MPI_Datatype type;
@@ -3124,7 +3124,7 @@ fi
   rm -f mpitest.c
   cat > mpitest.c <<EOF
 #include "mpi.h"
-     main(int argc, char **argv)
+     int main(int argc, char **argv)
      {
          long long i;   
          MPI_Init(&argc,&argv);
@@ -3345,7 +3345,7 @@ fi
   rm -f mpitest.c
   cat > mpitest.c <<EOF
 #include "mpi.h"
-     main(int argc, char **argv)
+     int main(int argc, char **argv)
      {
          MPI_Info info;
          MPI_Init(&argc,&argv);
@@ -3443,7 +3443,7 @@ fi
   rm -f mpitest.c
   cat > mpitest.c <<EOF
 #include "mpi.h"
-     main(int argc, char **argv)
+     int main(int argc, char **argv)
      {
 	int i;
 	i = MPI_INFO_NULL;
@@ -3497,7 +3497,7 @@ fi
   rm -f mpitest.c
   cat > mpitest.c <<EOF
 #include "mpi.h"
-     main(int argc, char **argv)
+     int main(int argc, char **argv)
      {
          MPI_Datatype type;
          int i;
@@ -3565,7 +3565,7 @@ fi
   rm -f mpitest.c
   cat > mpitest.c <<EOF
 #include "mpi.h"
-     main(int argc, char **argv)
+     int main(int argc, char **argv)
      {
          int i;
 
@@ -3691,7 +3691,7 @@ fi
   rm -f mpitest.c
   cat > mpitest.c <<EOF
 #include "mpi.h"
-     main(int argc, char **argv)
+     int main(int argc, char **argv)
      {
          int i=MPI_DISTRIBUTE_CYCLIC;
          MPI_Datatype t;
@@ -4647,7 +4647,7 @@ fi
   rm -f mpitest.c
   cat > mpitest.c <<EOF
 #include "mpi.h"
-     main(int argc, char **argv)
+     int main(int argc, char **argv)
      {
          MPI_Init(&argc,&argv);
          MPI_Finalize(); 
@@ -4700,7 +4700,7 @@ echo $ac_n "checking if MPI_Fint is defined in the MPI implementation""... $ac_c
 fi
   cat > mpitest1.c <<EOF
 #include "mpi.h"
-     main(int argc, char** argv)
+     int main(int argc, char** argv)
      {
          MPI_Fint i;
          i = 0;
