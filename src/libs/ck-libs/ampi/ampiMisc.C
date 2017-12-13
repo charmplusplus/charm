@@ -56,7 +56,7 @@ int InfoStruct::set(const char* k, const char* v){
   int found=0;
   for(int i=0;i<sz;i++){
     if(!strcmp(nodes[i]->key, key)){
-      free((char*)(nodes[i]->val));
+      delete [] nodes[i]->val;
       nodes[i]->val = create_stripped_string(v);
       found=1;
       break;
