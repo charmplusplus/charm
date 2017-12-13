@@ -206,6 +206,7 @@
 
        integer, parameter :: MPI_ADDRESS_KIND = 8
        integer, parameter :: MPI_COUNT_KIND = MPI_ADDRESS_KIND
+       integer, parameter :: MPI_OFFSET_KIND = 8
 
        integer, parameter :: MPI_BSEND_OVERHEAD = 1
 

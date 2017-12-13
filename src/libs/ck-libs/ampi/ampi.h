@@ -48,6 +48,8 @@ typedef int MPI_Datatype;
 typedef intptr_t MPI_Aint;
 typedef int MPI_Fint;
 typedef MPI_Aint MPI_Count;
+typedef long long int MPI_Offset;
+#define HAVE_MPI_OFFSET 1 /* ROMIO requires us to set this */
 
 /********************** MPI-1.1 prototypes and defines ***************************/
 /* MPI-1 Errors */
