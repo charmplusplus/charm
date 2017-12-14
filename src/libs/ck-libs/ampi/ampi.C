@@ -3628,8 +3628,8 @@ int AMPI_Initialized(int *isInit)
     AMPI_API_INIT("AMPI_Initialized");     /* in case charm init not called */
     *isInit=CtvAccess(ampiInitDone);
   }
-  else /* !nodeinit_has_been_called */ {
-    *isInit=nodeinit_has_been_called;
+  else {
+    *isInit=0;
   }
   return MPI_SUCCESS;
 }
@@ -8447,7 +8447,7 @@ int AMPI_Pack_size(int incount,MPI_Datatype datatype,MPI_Comm comm,int *sz)
 
 AMPI_API_IMPL(MPI_Get_version)
 int AMPI_Get_version(int *version, int *subversion){
-  AMPI_API("AMPI_Get_version");
+  AMPI_API_INIT("AMPI_Get_version");
   *version = MPI_VERSION;
   *subversion = MPI_SUBVERSION;
   return MPI_SUCCESS;
@@ -8455,7 +8455,7 @@ int AMPI_Get_version(int *version, int *subversion){
 
 AMPI_API_IMPL(MPI_Get_library_version)
 int AMPI_Get_library_version(char *version, int *resultlen){
-  AMPI_API("AMPI_Get_library_version");
+  AMPI_API_INIT("AMPI_Get_library_version");
   const char *ampiNameStr = "Adaptive MPI ";
   strncpy(version, ampiNameStr, MPI_MAX_LIBRARY_VERSION_STRING);
   strncat(version, CmiCommitID, MPI_MAX_LIBRARY_VERSION_STRING - strlen(version));
@@ -8465,7 +8465,7 @@ int AMPI_Get_library_version(char *version, int *resultlen){
 
 AMPI_API_IMPL(MPI_Get_processor_name)
 int AMPI_Get_processor_name(char *name, int *resultlen){
-  AMPI_API("AMPI_Get_processor_name");
+  AMPI_API_INIT("AMPI_Get_processor_name");
   ampiParent *ptr = getAmpiParent();
   sprintf(name,"AMPI_RANK[%d]_WTH[%d]",ptr->thisIndex,ptr->getMyPe());
   *resultlen = strlen(name);
