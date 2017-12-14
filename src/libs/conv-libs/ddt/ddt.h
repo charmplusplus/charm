@@ -8,7 +8,7 @@
 using std::vector;
 using std::string;
 
-#define CkDDT_MAXTYPE           100
+#define CkDDT_MAXTYPE           1024
 
 #define CkDDT_TYPE_NULL          -1
 #define CkDDT_DOUBLE              0
