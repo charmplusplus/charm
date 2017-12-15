@@ -20,6 +20,9 @@ int CmiGetRdmaRecvInfoSize(int numOps);
 void CmiIssueRgets(void *recv, int pe);
 
 /* Support for Direct API */
+void CmiSetRdmaCommonInfo(void *info, const void *ptr, int size);
+int CmiGetRdmaCommonInfoSize(void);
+
 void CmiSetRdmaSrcInfo(void *info, const void *ptr, int size);
 void CmiSetRdmaDestInfo(void *info, const void *ptr, int size);
 void CmiSetRdmaNcpyAck(RdmaSingleAckCallerFn fn);
@@ -63,6 +66,26 @@ void CmiIssueRput(
 
 void CmiReleaseSourceResource(void *info, int pe);
 void CmiReleaseDestinationResource(void *info, int pe);
+
+#if CMK_USE_CMA
+void CmiIssueRgetUsingCMA(
+  const void* srcAddr,
+  void *srcInfo,
+  int srcPe,
+  const void* destAddr,
+  void *destInfo,
+  int destPe,
+  int size);
+
+void CmiIssueRputUsingCMA(
+  const void* destAddr,
+  void *destInfo,
+  int destPe,
+  const void* srcAddr,
+  void *srcInfo,
+  int srcPe,
+  int size);
+#endif
 
 #if !CMK_ONESIDED_DIRECT_IMPL
 // Function declaration used for the generic implementation of the Nocopy Direct API

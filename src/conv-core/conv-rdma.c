@@ -2,6 +2,21 @@
  * Specific implementations are in arch/layer/machine-onesided.{h,c}
  */
 #include "converse.h"
+
+#if CMK_USE_CMA
+extern int cma_works;
+#endif
+
+// Methods required to keep the Nocopy Direct API functional on non-LRTS layers
+#if !CMK_USE_LRTS
+void CmiSetRdmaCommonInfo(void *info, const void *ptr, int size) {
+}
+
+int CmiGetRdmaCommonInfoSize() {
+  return 0;
+}
+#endif
+
 #if !CMK_ONESIDED_DIRECT_IMPL
 /* Support for generic implementation */
 
@@ -84,6 +99,21 @@ void CmiIssueRget(
   int destPe,
   int size) {
 
+#if CMK_USE_CMA
+  // check if remote PE is on the same physical node
+  if(cma_works && CmiPeOnSamePhysicalNode(srcPe, destPe)) {
+
+    CmiIssueRgetUsingCMA(srcAddr, srcInfo, srcPe,
+                         destAddr, destInfo, destPe,
+                         size);
+
+    // directy invoke the acks
+    ncpyAckHandlerFn(srcAck, srcPe, srcAddr);
+    ncpyAckHandlerFn(destAck, destPe, destAddr);
+    return;
+  }
+#endif
+
   // Send a getRequestMsg to other PE requesting it to send the array
   getRequestMsg *getReqMsg = (getRequestMsg *)CmiAlloc(sizeof(getRequestMsg) + srcAckSize + destAckSize);
   getReqMsg->srcPe = srcPe;
@@ -118,6 +148,21 @@ void CmiIssueRput(
   int srcPe,
   int size) {
 
+#if CMK_USE_CMA
+  // check if remote PE is on the same physical node
+  if(cma_works && CmiPeOnSamePhysicalNode(srcPe, destPe)) {
+
+    CmiIssueRputUsingCMA(destAddr, destInfo, destPe,
+                         srcAddr, srcInfo, srcPe,
+                         size);
+
+    // directy invoke the acks
+    ncpyAckHandlerFn(srcAck, srcPe, srcAddr);
+    ncpyAckHandlerFn(destAck, destPe, destAddr);
+    return;
+  }
+#endif
+
   // Send a rdmaPayloadMsg to the other PE sending the array
   rdmaPayloadMsg *recvMsg = (rdmaPayloadMsg *)CmiAlloc(sizeof(rdmaPayloadMsg) + size + destAckSize);
 
@@ -138,9 +183,12 @@ void CmiIssueRput(
   CmiSyncSendAndFree(destPe, sizeof(rdmaPayloadMsg) + size + destAckSize, recvMsg);
 }
 
-// Dummy method declarations for API consistency
-void CmiSetRdmaSrcInfo(void *info, const void *ptr, int size) {}
-void CmiSetRdmaDestInfo(void *info, const void *ptr, int size) {}
+void CmiSetRdmaSrcInfo(void *info, const void *ptr, int size) {
+  CmiSetRdmaCommonInfo(info, ptr, size);
+}
+void CmiSetRdmaDestInfo(void *info, const void *ptr, int size) {
+  CmiSetRdmaCommonInfo(info, ptr, size);
+}
 
 void CmiReleaseSourceResource(void *info, int pe) {}
 void CmiReleaseDestinationResource(void *info, int pe) {}

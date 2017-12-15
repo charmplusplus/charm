@@ -275,8 +275,8 @@ int getDestHandler;
 #endif
 #endif
 
-#if CMK_ONESIDED_IMPL
 #include "machine-rdma.h"
+#if CMK_ONESIDED_IMPL
 #include "machine-onesided.h"
 #endif
 
