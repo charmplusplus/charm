@@ -25,17 +25,6 @@
 */ 
 #include "conv-common.h"
 
-/*
- Include the lrts common header for all lrts layers
- (charm/src/arch/util/lrts-common.h)
-
- This header declares properties common for all lrts
- based machine layer implementations
- */
-#if CMK_USE_LRTS
-#include "lrts-common.h"
-#endif
-
 /* 
  Include the system/platform header.
   (e.g., charm/src/arch/netlrts-linux/conv-mach.h )
@@ -53,6 +42,17 @@
  It's typically empty or very short.
 */
 #include "conv-mach-opt.h"
+
+/*
+ Include the lrts common header for all lrts layers
+ (charm/src/arch/util/lrts-common.h)
+
+ This header declares properties common for all lrts
+ based machine layer implementations
+ */
+#if CMK_USE_LRTS
+#include "lrts-common.h"
+#endif
 
 
 
