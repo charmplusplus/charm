@@ -307,6 +307,9 @@ do
 		LINK="$LINK $base.o"
 		DOCOMPILE="yes"
 		;;
+        -fno-lifetime-dse)
+		exit 1
+		;;
 # Default
 	*)
 #		printUsage  "Error: Unrecognized argument $arg"
