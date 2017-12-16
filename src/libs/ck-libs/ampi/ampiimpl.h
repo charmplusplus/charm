@@ -11,15 +11,17 @@
 
 using std::vector;
 
-#define STRINGIFY(a) #a
-#define AMPI_API_IMPL(name) \
-  _Pragma(STRINGIFY(weak A##name)) \
-  _Pragma(STRINGIFY(weak AP##name = A##name)) \
-  CLINKAGE
-
-// MSVC does not support _Pragma, disable it.
-#if defined(_WIN32)
-  #define _Pragma(string)
+#if defined(__linux__)
+  // On Linux, use weak symbols for PMPI support
+  #define STRINGIFY(a) #a
+  #define AMPI_API_IMPL(name) \
+    _Pragma(STRINGIFY(weak A##name)) \
+    _Pragma(STRINGIFY(weak AP##name = A##name)) \
+    CLINKAGE
+#else
+  // Windows/Darwin do not support weak symbols, do not use them
+  // No support for PMPI
+  #define AMPI_API_IMPL(name) CLINKAGE
 #endif
 
 
