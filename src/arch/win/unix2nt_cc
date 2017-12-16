@@ -164,6 +164,7 @@ SAVE=""
 
 DOCOMPILE="no"
 DOLINK="no"
+DODEPS="no"
 OUTPUT=""
 CL_OPTS=$CL_DEF
 LINK_OPTS=$LINK_DEF
@@ -221,6 +222,9 @@ do
 	-I*)
 		path=`echo $arg | awk -F@ '{print substr($1,3)}'`
 		CL="$CL /I`cygpath -w $path`"
+		;;
+        -MM)
+		DODEPS="yes"
 		;;
 	-L)
 		LIBDIR="`cygpath -w $1`"
@@ -294,6 +298,7 @@ do
 #C source file
 	*.c)
 		base=`stripExtention $arg`
+		source="$arg"
 		CL="$CL /Tc`cygpath -w $arg`"
 		OBJ_OUTPUT="/Fo$base.o"
 		LINK="$LINK $base.o"
@@ -302,6 +307,7 @@ do
 #C++ source file
 	*.C|*.cxx|*.cpp)
 		base=`stripExtention $arg`
+		source="$arg"
 		CL="$CL /Tp`cygpath -w $arg`"
 #		OUTPUT="/Fo$base.o"
 		LINK="$LINK $base.o"
@@ -317,6 +323,19 @@ do
 		;;
 	esac
 done
+
+if [ $DODEPS = yes ]
+then
+	OPTS="$CL_OPTS $CL /showIncludes"
+	echo "$base.o: $source \\"
+	"$CL_CMD" $OPTS | sed -e '/^Note: including file:/!d' \
+		-e 's/^Note: including file:\s*\(.*\)$/\1/' \
+		-e 's/\\/\//g' \
+		-e 's/ /\\ /g' \
+		-e 's/^\(.*\)$/\t\1 \\/' \
+	| tr -d '\r'
+	exit 0
+fi
 
 #if [ "x$CL" != "x" ]
 if [ $DOCOMPILE = yes ]
