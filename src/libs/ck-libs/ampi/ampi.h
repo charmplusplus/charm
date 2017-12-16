@@ -10,15 +10,11 @@
    AMPI, e.g. to portably use AMPI extensions to the MPI standard. */
 #define AMPI
 
-/* Macros to define the AMPI'fied name of an MPI function, plus the AMPI'fied
+/* Macro to define the AMPI'fied name of an MPI function, plus the AMPI'fied
   PMPI name */
-#define AMPI_API_DEF(name, ...) \
-  int A##name(__VA_ARGS__);        \
-  int AP##name(__VA_ARGS__);
-
-#define AMPI_API_DEF_DOUBLE(name, ...) \
-  double A##name(__VA_ARGS__);        \
-  double AP##name(__VA_ARGS__);
+#define AMPI_API_DEF(return_type, function_name, ...) \
+  return_type A##function_name(__VA_ARGS__);        \
+  return_type AP##function_name(__VA_ARGS__);
 
 /* Allow applications to terminate cleanly with exit() */
 CLINKAGE void AMPI_Exit(int exitCode);
@@ -356,744 +352,744 @@ typedef void (*MPI_MigrateFn)(void);
 
 #define MPI_Send AMPI_Send
 #define PMPI_Send APMPI_Send
-AMPI_API_DEF(MPI_Send, const void *msg, int count, MPI_Datatype type, int dest,
+AMPI_API_DEF(int, MPI_Send, const void *msg, int count, MPI_Datatype type, int dest,
               int tag, MPI_Comm comm);
 #define MPI_Ssend AMPI_Ssend
 #define PMPI_Ssend APMPI_Ssend
-AMPI_API_DEF(MPI_Ssend, const void *msg, int count, MPI_Datatype type, int dest,
+AMPI_API_DEF(int, MPI_Ssend, const void *msg, int count, MPI_Datatype type, int dest,
                int tag, MPI_Comm comm);
 #define MPI_Recv AMPI_Recv
 #define PMPI_Recv APMPI_Recv
-AMPI_API_DEF(MPI_Recv, void *msg, int count, MPI_Datatype type, int src, int tag,
+AMPI_API_DEF(int, MPI_Recv, void *msg, int count, MPI_Datatype type, int src, int tag,
               MPI_Comm comm, MPI_Status *status);
 #define MPI_Get_count AMPI_Get_count
 #define PMPI_Get_count APMPI_Get_count
-AMPI_API_DEF(MPI_Get_count, const MPI_Status *sts, MPI_Datatype dtype, int *count);
+AMPI_API_DEF(int, MPI_Get_count, const MPI_Status *sts, MPI_Datatype dtype, int *count);
 #define MPI_Bsend AMPI_Bsend
 #define PMPI_Bsend APMPI_Bsend
-AMPI_API_DEF(MPI_Bsend, const void *buf, int count, MPI_Datatype datatype,
+AMPI_API_DEF(int, MPI_Bsend, const void *buf, int count, MPI_Datatype datatype,
              int dest, int tag,MPI_Comm comm)
 #define MPI_Rsend AMPI_Rsend
 #define PMPI_Rsend APMPI_Rsend
-AMPI_API_DEF(MPI_Rsend, const void *buf, int count, MPI_Datatype datatype,
+AMPI_API_DEF(int, MPI_Rsend, const void *buf, int count, MPI_Datatype datatype,
              int dest, int tag,MPI_Comm comm)
 #define MPI_Buffer_attach AMPI_Buffer_attach
 #define PMPI_Buffer_attach APMPI_Buffer_attach
-AMPI_API_DEF(MPI_Buffer_attach, void *buffer, int size)
+AMPI_API_DEF(int, MPI_Buffer_attach, void *buffer, int size)
 #define MPI_Buffer_detach AMPI_Buffer_detach
 #define PMPI_Buffer_detach APMPI_Buffer_detach
-AMPI_API_DEF(MPI_Buffer_detach, void *buffer, int *size)
+AMPI_API_DEF(int, MPI_Buffer_detach, void *buffer, int *size)
 #define MPI_Isend AMPI_Isend
 #define PMPI_Isend APMPI_Isend
-AMPI_API_DEF(MPI_Isend, const void *buf, int count, MPI_Datatype datatype, int dest,
+AMPI_API_DEF(int, MPI_Isend, const void *buf, int count, MPI_Datatype datatype, int dest,
                int tag, MPI_Comm comm, MPI_Request *request);
 #define MPI_Ibsend AMPI_Ibsend
 #define PMPI_Ibsend APMPI_Ibsend
-AMPI_API_DEF(MPI_Ibsend, const void *buf, int count, MPI_Datatype datatype, int dest,
+AMPI_API_DEF(int, MPI_Ibsend, const void *buf, int count, MPI_Datatype datatype, int dest,
                int tag, MPI_Comm comm, MPI_Request *request);
 #define MPI_Issend AMPI_Issend
 #define PMPI_Issend APMPI_Issend
-AMPI_API_DEF(MPI_Issend, const void *buf, int count, MPI_Datatype datatype, int dest,
+AMPI_API_DEF(int, MPI_Issend, const void *buf, int count, MPI_Datatype datatype, int dest,
              int tag, MPI_Comm comm, MPI_Request *request);
 #define MPI_Irsend AMPI_Irsend
 #define PMPI_Irsend APMPI_Irsend
-AMPI_API_DEF(MPI_Irsend, const void *buf, int count, MPI_Datatype datatype, int dest,
+AMPI_API_DEF(int, MPI_Irsend, const void *buf, int count, MPI_Datatype datatype, int dest,
              int tag, MPI_Comm comm, MPI_Request *request);
 #define MPI_Irecv AMPI_Irecv
 #define PMPI_Irecv APMPI_Irecv
-AMPI_API_DEF(MPI_Irecv, void *buf, int count, MPI_Datatype datatype, int src,
+AMPI_API_DEF(int, MPI_Irecv, void *buf, int count, MPI_Datatype datatype, int src,
                int tag, MPI_Comm comm, MPI_Request *request);
 #define MPI_Wait AMPI_Wait
 #define PMPI_Wait APMPI_Wait
-AMPI_API_DEF(MPI_Wait, MPI_Request *request, MPI_Status *sts);
+AMPI_API_DEF(int, MPI_Wait, MPI_Request *request, MPI_Status *sts);
 #define MPI_Test AMPI_Test
 #define PMPI_Test APMPI_Test
-AMPI_API_DEF(MPI_Test, MPI_Request *request, int *flag, MPI_Status *sts);
+AMPI_API_DEF(int, MPI_Test, MPI_Request *request, int *flag, MPI_Status *sts);
 #define MPI_Waitany AMPI_Waitany
 #define PMPI_Waitany APMPI_Waitany
-AMPI_API_DEF(MPI_Waitany, int count, MPI_Request *request, int *index, MPI_Status *sts);
+AMPI_API_DEF(int, MPI_Waitany, int count, MPI_Request *request, int *index, MPI_Status *sts);
 #define MPI_Testany AMPI_Testany
 #define PMPI_Testany APMPI_Testany
-AMPI_API_DEF(MPI_Testany, int count, MPI_Request *request, int *index, int *flag, MPI_Status *status);
+AMPI_API_DEF(int, MPI_Testany, int count, MPI_Request *request, int *index, int *flag, MPI_Status *status);
 #define MPI_Waitall AMPI_Waitall
 #define PMPI_Waitall APMPI_Waitall
-AMPI_API_DEF(MPI_Waitall, int count, MPI_Request *request, MPI_Status *sts);
+AMPI_API_DEF(int, MPI_Waitall, int count, MPI_Request *request, MPI_Status *sts);
 #define MPI_Testall AMPI_Testall
 #define PMPI_Testall APMPI_Testall
-AMPI_API_DEF(MPI_Testall, int count, MPI_Request *request, int *flag, MPI_Status *sts);
+AMPI_API_DEF(int, MPI_Testall, int count, MPI_Request *request, int *flag, MPI_Status *sts);
 #define MPI_Waitsome AMPI_Waitsome
 #define PMPI_Waitsome APMPI_Waitsome
-AMPI_API_DEF(MPI_Waitsome, int incount, MPI_Request *array_of_requests, int *outcount,
+AMPI_API_DEF(int, MPI_Waitsome, int incount, MPI_Request *array_of_requests, int *outcount,
                   int *array_of_indices, MPI_Status *array_of_statuses);
 #define MPI_Testsome AMPI_Testsome
 #define PMPI_Testsome APMPI_Testsome
-AMPI_API_DEF(MPI_Testsome, int incount, MPI_Request *array_of_requests, int *outcount,
+AMPI_API_DEF(int, MPI_Testsome, int incount, MPI_Request *array_of_requests, int *outcount,
                   int *array_of_indices, MPI_Status *array_of_statuses);
 #define MPI_Request_get_status AMPI_Request_get_status
 #define PMPI_Request_get_status APMPI_Request_get_status
-AMPI_API_DEF(MPI_Request_get_status, MPI_Request request, int *flag, MPI_Status *sts);
+AMPI_API_DEF(int, MPI_Request_get_status, MPI_Request request, int *flag, MPI_Status *sts);
 #define MPI_Request_free AMPI_Request_free
 #define PMPI_Request_free APMPI_Request_free
-AMPI_API_DEF(MPI_Request_free, MPI_Request *request);
+AMPI_API_DEF(int, MPI_Request_free, MPI_Request *request);
 #define MPI_Cancel AMPI_Cancel
 #define PMPI_Cancel APMPI_Cancel
-AMPI_API_DEF(MPI_Cancel, MPI_Request *request);
+AMPI_API_DEF(int, MPI_Cancel, MPI_Request *request);
 #define MPI_Test_cancelled AMPI_Test_cancelled
 #define PMPI_Test_cancelled APMPI_Test_cancelled
-AMPI_API_DEF(MPI_Test_cancelled, const MPI_Status *status, int *flag); /* FIXME: always returns success */
+AMPI_API_DEF(int, MPI_Test_cancelled, const MPI_Status *status, int *flag); /* FIXME: always returns success */
 #define MPI_Status_set_cancelled AMPI_Status_set_cancelled
 #define PMPI_Status_set_cancelled APMPI_Status_set_cancelled
-AMPI_API_DEF(MPI_Status_set_cancelled, MPI_Status *status, int flag);
+AMPI_API_DEF(int, MPI_Status_set_cancelled, MPI_Status *status, int flag);
 #define MPI_Iprobe AMPI_Iprobe
 #define PMPI_Iprobe APMPI_Iprobe
-AMPI_API_DEF(MPI_Iprobe, int src, int tag, MPI_Comm comm, int *flag, MPI_Status *sts);
+AMPI_API_DEF(int, MPI_Iprobe, int src, int tag, MPI_Comm comm, int *flag, MPI_Status *sts);
 #define MPI_Probe AMPI_Probe
 #define PMPI_Probe APMPI_Probe
-AMPI_API_DEF(MPI_Probe, int source, int tag, MPI_Comm comm, MPI_Status *sts);
+AMPI_API_DEF(int, MPI_Probe, int source, int tag, MPI_Comm comm, MPI_Status *sts);
 #define MPI_Send_init AMPI_Send_init
 #define PMPI_Send_init APMPI_Send_init
-AMPI_API_DEF(MPI_Send_init, const void *buf, int count, MPI_Datatype type, int dest, int tag,
+AMPI_API_DEF(int, MPI_Send_init, const void *buf, int count, MPI_Datatype type, int dest, int tag,
                   MPI_Comm comm, MPI_Request *req);
 #define MPI_Ssend_init AMPI_Ssend_init
 #define PMPI_Ssend_init APMPI_Ssend_init
-AMPI_API_DEF(MPI_Ssend_init, const void *buf, int count, MPI_Datatype type, int dest, int tag,
+AMPI_API_DEF(int, MPI_Ssend_init, const void *buf, int count, MPI_Datatype type, int dest, int tag,
                     MPI_Comm comm, MPI_Request *req);
 #define MPI_Rsend_init AMPI_Rsend_init
 #define PMPI_Rsend_init APMPI_Rsend_init
-AMPI_API_DEF(MPI_Rsend_init, const void *buf, int count, MPI_Datatype type, int dest, int tag,
+AMPI_API_DEF(int, MPI_Rsend_init, const void *buf, int count, MPI_Datatype type, int dest, int tag,
                   MPI_Comm comm, MPI_Request *req);
 #define MPI_Bsend_init AMPI_Bsend_init
 #define PMPI_Bsend_init APMPI_Bsend_init
-AMPI_API_DEF(MPI_Bsend_init, const void *buf, int count, MPI_Datatype type, int dest, int tag,
+AMPI_API_DEF(int, MPI_Bsend_init, const void *buf, int count, MPI_Datatype type, int dest, int tag,
                   MPI_Comm comm, MPI_Request *req);
 #define MPI_Recv_init AMPI_Recv_init
 #define PMPI_Recv_init APMPI_Recv_init
-AMPI_API_DEF(MPI_Recv_init, void *buf, int count, MPI_Datatype type, int src, int tag,
+AMPI_API_DEF(int, MPI_Recv_init, void *buf, int count, MPI_Datatype type, int src, int tag,
                    MPI_Comm comm, MPI_Request *req);
 #define MPI_Start AMPI_Start
 #define PMPI_Start APMPI_Start
-AMPI_API_DEF(MPI_Start, MPI_Request *reqnum);
+AMPI_API_DEF(int, MPI_Start, MPI_Request *reqnum);
 #define MPI_Startall AMPI_Startall
 #define PMPI_Startall APMPI_Startall
-AMPI_API_DEF(MPI_Startall, int count, MPI_Request *array_of_requests);
+AMPI_API_DEF(int, MPI_Startall, int count, MPI_Request *array_of_requests);
 #define MPI_Sendrecv AMPI_Sendrecv
 #define PMPI_Sendrecv APMPI_Sendrecv
-AMPI_API_DEF(MPI_Sendrecv, const void *sbuf, int scount, MPI_Datatype stype, int dest,
+AMPI_API_DEF(int, MPI_Sendrecv, const void *sbuf, int scount, MPI_Datatype stype, int dest,
                   int stag, void *rbuf, int rcount, MPI_Datatype rtype,
                   int src, int rtag, MPI_Comm comm, MPI_Status *sts);
 #define MPI_Sendrecv_replace AMPI_Sendrecv_replace
 #define PMPI_Sendrecv_replace APMPI_Sendrecv_replace
-AMPI_API_DEF(MPI_Sendrecv_replace, void* buf, int count, MPI_Datatype datatype,
+AMPI_API_DEF(int, MPI_Sendrecv_replace, void* buf, int count, MPI_Datatype datatype,
                           int dest, int sendtag, int source, int recvtag,
                           MPI_Comm comm, MPI_Status *status);
 #define MPI_Type_contiguous AMPI_Type_contiguous
 #define PMPI_Type_contiguous APMPI_Type_contiguous
-AMPI_API_DEF(MPI_Type_contiguous, int count, MPI_Datatype oldtype,
+AMPI_API_DEF(int, MPI_Type_contiguous, int count, MPI_Datatype oldtype,
                          MPI_Datatype *newtype);
 #define MPI_Type_vector AMPI_Type_vector
 #define PMPI_Type_vector APMPI_Type_vector
-AMPI_API_DEF(MPI_Type_vector, int count, int blocklength, int stride,
+AMPI_API_DEF(int, MPI_Type_vector, int count, int blocklength, int stride,
                      MPI_Datatype oldtype, MPI_Datatype *newtype);
 #define MPI_Type_create_hvector AMPI_Type_create_hvector
 #define PMPI_Type_create_hvector APMPI_Type_create_hvector
-AMPI_API_DEF(MPI_Type_create_hvector, int count, int blocklength, MPI_Aint stride,
+AMPI_API_DEF(int, MPI_Type_create_hvector, int count, int blocklength, MPI_Aint stride,
                              MPI_Datatype oldtype, MPI_Datatype *newtype);
 #define MPI_Type_hvector AMPI_Type_hvector
 #define PMPI_Type_hvector APMPI_Type_hvector
-AMPI_API_DEF(MPI_Type_hvector, int count, int blocklength, MPI_Aint stride,
+AMPI_API_DEF(int, MPI_Type_hvector, int count, int blocklength, MPI_Aint stride,
                       MPI_Datatype oldtype, MPI_Datatype *newtype);
 #define MPI_Type_indexed AMPI_Type_indexed
 #define PMPI_Type_indexed APMPI_Type_indexed
-AMPI_API_DEF(MPI_Type_indexed, int count, const int* arrBlength, const int* arrDisp,
+AMPI_API_DEF(int, MPI_Type_indexed, int count, const int* arrBlength, const int* arrDisp,
                       MPI_Datatype oldtype, MPI_Datatype *newtype);
 #define MPI_Type_create_hindexed AMPI_Type_create_hindexed
 #define PMPI_Type_create_hindexed APMPI_Type_create_hindexed
-AMPI_API_DEF(MPI_Type_create_hindexed, int count, const int* arrBlength, const MPI_Aint* arrDisp,
+AMPI_API_DEF(int, MPI_Type_create_hindexed, int count, const int* arrBlength, const MPI_Aint* arrDisp,
                               MPI_Datatype oldtype, MPI_Datatype *newtype);
 #define MPI_Type_create_indexed_block AMPI_Type_create_indexed_block
 #define PMPI_Type_create_indexed_block APMPI_Type_create_indexed_block
-AMPI_API_DEF(MPI_Type_create_indexed_block, int count, int Blength, const MPI_Aint *arrDisp,
+AMPI_API_DEF(int, MPI_Type_create_indexed_block, int count, int Blength, const MPI_Aint *arrDisp,
                                    MPI_Datatype oldtype, MPI_Datatype *newtype);
 #define MPI_Type_create_hindexed_block AMPI_Type_create_hindexed_block
 #define PMPI_Type_create_hindexed_block APMPI_Type_create_hindexed_block
-AMPI_API_DEF(MPI_Type_create_hindexed_block, int count, int Blength, const MPI_Aint *arrDisp,
+AMPI_API_DEF(int, MPI_Type_create_hindexed_block, int count, int Blength, const MPI_Aint *arrDisp,
                                     MPI_Datatype oldtype, MPI_Datatype *newtype);
 #define MPI_Type_hindexed AMPI_Type_hindexed
 #define PMPI_Type_hindexed APMPI_Type_hindexed
-AMPI_API_DEF(MPI_Type_hindexed, int count, int* arrBlength, MPI_Aint* arrDisp,
+AMPI_API_DEF(int, MPI_Type_hindexed, int count, int* arrBlength, MPI_Aint* arrDisp,
                        MPI_Datatype oldtype, MPI_Datatype *newtype);
 #define MPI_Type_create_struct AMPI_Type_create_struct
 #define PMPI_Type_create_struct APMPI_Type_create_struct
-AMPI_API_DEF(MPI_Type_create_struct, int count, const int* arrBLength, const MPI_Aint* arrDisp,
+AMPI_API_DEF(int, MPI_Type_create_struct, int count, const int* arrBLength, const MPI_Aint* arrDisp,
                             const MPI_Datatype *oldType, MPI_Datatype *newType);
 #define MPI_Type_struct AMPI_Type_struct
 #define PMPI_Type_struct APMPI_Type_struct
-AMPI_API_DEF(MPI_Type_struct, int count, int* arrBLength, MPI_Aint* arrDisp,
+AMPI_API_DEF(int, MPI_Type_struct, int count, int* arrBLength, MPI_Aint* arrDisp,
                      MPI_Datatype *oldType, MPI_Datatype *newType);
 #define MPI_Type_get_envelope AMPI_Type_get_envelope
 #define PMPI_Type_get_envelope APMPI_Type_get_envelope
-AMPI_API_DEF(MPI_Type_get_envelope, MPI_Datatype datatype, int *num_integers, int *num_addresses,
+AMPI_API_DEF(int, MPI_Type_get_envelope, MPI_Datatype datatype, int *num_integers, int *num_addresses,
                            int *num_datatypes, int *combiner);
 #define MPI_Type_get_contents AMPI_Type_get_contents
 #define PMPI_Type_get_contents APMPI_Type_get_contents
-AMPI_API_DEF(MPI_Type_get_contents, MPI_Datatype datatype, int max_integers, int max_addresses,
+AMPI_API_DEF(int, MPI_Type_get_contents, MPI_Datatype datatype, int max_integers, int max_addresses,
                            int max_datatypes, int array_of_integers[], MPI_Aint array_of_addresses[],
                            MPI_Datatype array_of_datatypes[]);
 #define MPI_Type_commit AMPI_Type_commit
 #define PMPI_Type_commit APMPI_Type_commit
-AMPI_API_DEF(MPI_Type_commit, MPI_Datatype *datatype);
+AMPI_API_DEF(int, MPI_Type_commit, MPI_Datatype *datatype);
 #define MPI_Type_free AMPI_Type_free
 #define PMPI_Type_free APMPI_Type_free
-AMPI_API_DEF(MPI_Type_free, MPI_Datatype *datatype);
+AMPI_API_DEF(int, MPI_Type_free, MPI_Datatype *datatype);
 #define MPI_Type_get_extent AMPI_Type_get_extent
 #define PMPI_Type_get_extent APMPI_Type_get_extent
-AMPI_API_DEF(MPI_Type_get_extent, MPI_Datatype datatype, MPI_Aint *lb, MPI_Aint *extent);
+AMPI_API_DEF(int, MPI_Type_get_extent, MPI_Datatype datatype, MPI_Aint *lb, MPI_Aint *extent);
 #define MPI_Type_extent AMPI_Type_extent
 #define PMPI_Type_extent APMPI_Type_extent
-AMPI_API_DEF(MPI_Type_extent, MPI_Datatype datatype, MPI_Aint *extent);
+AMPI_API_DEF(int, MPI_Type_extent, MPI_Datatype datatype, MPI_Aint *extent);
 #define MPI_Type_get_true_extent AMPI_Type_get_true_extent
 #define PMPI_Type_get_true_extent APMPI_Type_get_true_extent
-AMPI_API_DEF(MPI_Type_get_true_extent, MPI_Datatype datatype, MPI_Aint *true_lb, MPI_Aint *true_extent);
+AMPI_API_DEF(int, MPI_Type_get_true_extent, MPI_Datatype datatype, MPI_Aint *true_lb, MPI_Aint *true_extent);
 #define MPI_Type_size AMPI_Type_size
 #define PMPI_Type_size APMPI_Type_size
-AMPI_API_DEF(MPI_Type_size, MPI_Datatype datatype, int *size);
+AMPI_API_DEF(int, MPI_Type_size, MPI_Datatype datatype, int *size);
 #define MPI_Type_lb AMPI_Type_lb
 #define PMPI_Type_lb APMPI_Type_lb
-AMPI_API_DEF(MPI_Type_lb, MPI_Datatype datatype, MPI_Aint* displacement);
+AMPI_API_DEF(int, MPI_Type_lb, MPI_Datatype datatype, MPI_Aint* displacement);
 #define MPI_Type_ub AMPI_Type_ub
 #define PMPI_Type_ub APMPI_Type_ub
-AMPI_API_DEF(MPI_Type_ub, MPI_Datatype datatype, MPI_Aint* displacement);
+AMPI_API_DEF(int, MPI_Type_ub, MPI_Datatype datatype, MPI_Aint* displacement);
 #define MPI_Type_set_name AMPI_Type_set_name
 #define PMPI_Type_set_name APMPI_Type_set_name
-AMPI_API_DEF(MPI_Type_set_name, MPI_Datatype datatype, const char *name);
+AMPI_API_DEF(int, MPI_Type_set_name, MPI_Datatype datatype, const char *name);
 #define MPI_Type_get_name AMPI_Type_get_name
 #define PMPI_Type_get_name APMPI_Type_get_name
-AMPI_API_DEF(MPI_Type_get_name, MPI_Datatype datatype, char *name, int *resultlen);
+AMPI_API_DEF(int, MPI_Type_get_name, MPI_Datatype datatype, char *name, int *resultlen);
 #define MPI_Type_dup AMPI_Type_dup
 #define PMPI_Type_dup APMPI_Type_dup
-AMPI_API_DEF(MPI_Type_dup, MPI_Datatype oldtype, MPI_Datatype *newtype);
+AMPI_API_DEF(int, MPI_Type_dup, MPI_Datatype oldtype, MPI_Datatype *newtype);
 #define MPI_Type_create_resized AMPI_Type_create_resized
 #define PMPI_Type_create_resized APMPI_Type_create_resized
-AMPI_API_DEF(MPI_Type_create_resized, MPI_Datatype oldtype, MPI_Aint lb, MPI_Aint extent, MPI_Datatype *newtype);
+AMPI_API_DEF(int, MPI_Type_create_resized, MPI_Datatype oldtype, MPI_Aint lb, MPI_Aint extent, MPI_Datatype *newtype);
 #define MPI_Type_set_attr AMPI_Type_set_attr
 #define PMPI_Type_set_attr APMPI_Type_set_attr
-AMPI_API_DEF(MPI_Type_set_attr, MPI_Datatype datatype, int type_keyval, void *attribute_val);
+AMPI_API_DEF(int, MPI_Type_set_attr, MPI_Datatype datatype, int type_keyval, void *attribute_val);
 #define MPI_Type_get_attr AMPI_Type_get_attr
 #define PMPI_Type_get_attr APMPI_Type_get_attr
-AMPI_API_DEF(MPI_Type_get_attr, MPI_Datatype datatype, int type_keyval, void *attribute_val, int *flag);
+AMPI_API_DEF(int, MPI_Type_get_attr, MPI_Datatype datatype, int type_keyval, void *attribute_val, int *flag);
 #define MPI_Type_delete_attr AMPI_Type_delete_attr
 #define PMPI_Type_delete_attr APMPI_Type_delete_attr
-AMPI_API_DEF(MPI_Type_delete_attr, MPI_Datatype datatype, int type_keyval);
+AMPI_API_DEF(int, MPI_Type_delete_attr, MPI_Datatype datatype, int type_keyval);
 #define MPI_Type_create_keyval AMPI_Type_create_keyval
 #define PMPI_Type_create_keyval APMPI_Type_create_keyval
-AMPI_API_DEF(MPI_Type_create_keyval, MPI_Type_copy_attr_function *type_copy_attr_fn,
+AMPI_API_DEF(int, MPI_Type_create_keyval, MPI_Type_copy_attr_function *type_copy_attr_fn,
                             MPI_Type_delete_attr_function *type_delete_attr_fn,
                             int *type_keyval, void *extra_state);
 #define MPI_Type_free_keyval AMPI_Type_free_keyval
 #define PMPI_Type_free_keyval APMPI_Type_free_keyval
-AMPI_API_DEF(MPI_Type_free_keyval, int *type_keyval);
+AMPI_API_DEF(int, MPI_Type_free_keyval, int *type_keyval);
 #define MPI_Get_address AMPI_Get_address
 #define PMPI_Get_address APMPI_Get_address
-AMPI_API_DEF(MPI_Get_address, const void* location, MPI_Aint *address);
+AMPI_API_DEF(int, MPI_Get_address, const void* location, MPI_Aint *address);
 #define MPI_Address AMPI_Address
 #define PMPI_Address APMPI_Address
-AMPI_API_DEF(MPI_Address, void* location, MPI_Aint *address);
+AMPI_API_DEF(int, MPI_Address, void* location, MPI_Aint *address);
 #define MPI_Status_set_elements AMPI_Status_set_elements
 #define PMPI_Status_set_elements APMPI_Status_set_elements
-AMPI_API_DEF(MPI_Status_set_elements, MPI_Status *status, MPI_Datatype datatype, int count);
+AMPI_API_DEF(int, MPI_Status_set_elements, MPI_Status *status, MPI_Datatype datatype, int count);
 #define MPI_Get_elements AMPI_Get_elements
 #define PMPI_Get_elements APMPI_Get_elements
-AMPI_API_DEF(MPI_Get_elements, const MPI_Status *status, MPI_Datatype datatype, int *count);
+AMPI_API_DEF(int, MPI_Get_elements, const MPI_Status *status, MPI_Datatype datatype, int *count);
 #define MPI_Get_elements_x AMPI_Get_elements_x
 #define PMPI_Get_elements_x APMPI_Get_elements_x
-AMPI_API_DEF(MPI_Get_elements_x, const MPI_Status *status, MPI_Datatype datatype, MPI_Count *count);
+AMPI_API_DEF(int, MPI_Get_elements_x, const MPI_Status *status, MPI_Datatype datatype, MPI_Count *count);
 #define MPI_Pack AMPI_Pack
 #define PMPI_Pack APMPI_Pack
-AMPI_API_DEF(MPI_Pack, const void *inbuf, int incount, MPI_Datatype dtype, void *outbuf,
+AMPI_API_DEF(int, MPI_Pack, const void *inbuf, int incount, MPI_Datatype dtype, void *outbuf,
               int outsize, int *position, MPI_Comm comm);
 #define MPI_Unpack AMPI_Unpack
 #define PMPI_Unpack APMPI_Unpack
-AMPI_API_DEF(MPI_Unpack, const void *inbuf, int insize, int *position, void *outbuf,
+AMPI_API_DEF(int, MPI_Unpack, const void *inbuf, int insize, int *position, void *outbuf,
                 int outcount, MPI_Datatype dtype, MPI_Comm comm);
 #define MPI_Pack_size AMPI_Pack_size
 #define PMPI_Pack_size APMPI_Pack_size
-AMPI_API_DEF(MPI_Pack_size, int incount,MPI_Datatype datatype,MPI_Comm comm,int *sz);
+AMPI_API_DEF(int, MPI_Pack_size, int incount,MPI_Datatype datatype,MPI_Comm comm,int *sz);
 #define MPI_Aint_add(addr, disp) ((MPI_Aint)((char*)(addr) + (disp)))
 #define MPI_Aint_diff(addr1, addr2) ((MPI_Aint)((char*)(addr1) - (char*)(addr2)))
 
 /***collective***/
 #define MPI_Barrier AMPI_Barrier
 #define PMPI_Barrier APMPI_Barrier
-AMPI_API_DEF(MPI_Barrier, MPI_Comm comm);
+AMPI_API_DEF(int, MPI_Barrier, MPI_Comm comm);
 #define MPI_Ibarrier AMPI_Ibarrier
 #define PMPI_Ibarrier APMPI_Ibarrier
-AMPI_API_DEF(MPI_Ibarrier, MPI_Comm comm, MPI_Request *request);
+AMPI_API_DEF(int, MPI_Ibarrier, MPI_Comm comm, MPI_Request *request);
 #define MPI_Bcast AMPI_Bcast
 #define PMPI_Bcast APMPI_Bcast
-AMPI_API_DEF(MPI_Bcast, void *buf, int count, MPI_Datatype type, int root, MPI_Comm comm);
+AMPI_API_DEF(int, MPI_Bcast, void *buf, int count, MPI_Datatype type, int root, MPI_Comm comm);
 #define MPI_Ibcast AMPI_Ibcast
 #define PMPI_Ibcast APMPI_Ibcast
-AMPI_API_DEF(MPI_Ibcast, void *buf, int count, MPI_Datatype type, int root, MPI_Comm comm,
+AMPI_API_DEF(int, MPI_Ibcast, void *buf, int count, MPI_Datatype type, int root, MPI_Comm comm,
                 MPI_Request *request);
 #define MPI_Gather AMPI_Gather
 #define PMPI_Gather APMPI_Gather
-AMPI_API_DEF(MPI_Gather, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
+AMPI_API_DEF(int, MPI_Gather, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                 void *recvbuf, int recvcount, MPI_Datatype recvtype,
                 int root, MPI_Comm comm);
 #define MPI_Igather AMPI_Igather
 #define PMPI_Igather APMPI_Igather
-AMPI_API_DEF(MPI_Igather, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
+AMPI_API_DEF(int, MPI_Igather, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
                  int root, MPI_Comm comm, MPI_Request *request);
 #define MPI_Gatherv AMPI_Gatherv
 #define PMPI_Gatherv APMPI_Gatherv
-AMPI_API_DEF(MPI_Gatherv, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
+AMPI_API_DEF(int, MPI_Gatherv, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  void *recvbuf, const int *recvcounts, const int *displs,
                  MPI_Datatype recvtype, int root, MPI_Comm comm);
 #define MPI_Igatherv AMPI_Igatherv
 #define PMPI_Igatherv APMPI_Igatherv
-AMPI_API_DEF(MPI_Igatherv, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
+AMPI_API_DEF(int, MPI_Igatherv, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                   void *recvbuf, const int *recvcounts, const int *displs,
                   MPI_Datatype recvtype, int root, MPI_Comm comm,
                   MPI_Request *request);
 #define MPI_Scatter AMPI_Scatter
 #define PMPI_Scatter APMPI_Scatter
-AMPI_API_DEF(MPI_Scatter, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
+AMPI_API_DEF(int, MPI_Scatter, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                  void *recvbuf, int recvcount, MPI_Datatype recvtype,
                  int root, MPI_Comm comm);
 #define MPI_Iscatter AMPI_Iscatter
 #define PMPI_Iscatter APMPI_Iscatter
-AMPI_API_DEF(MPI_Iscatter, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
+AMPI_API_DEF(int, MPI_Iscatter, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                   void *recvbuf, int recvcount, MPI_Datatype recvtype,
                   int root, MPI_Comm comm, MPI_Request *request);
 #define MPI_Scatterv AMPI_Scatterv
 #define PMPI_Scatterv APMPI_Scatterv
-AMPI_API_DEF(MPI_Scatterv, const void *sendbuf, const int *sendcounts, const int *displs, MPI_Datatype sendtype,
+AMPI_API_DEF(int, MPI_Scatterv, const void *sendbuf, const int *sendcounts, const int *displs, MPI_Datatype sendtype,
                   void *recvbuf, int recvcount, MPI_Datatype recvtype,
                   int root, MPI_Comm comm);
 #define MPI_Iscatterv AMPI_Iscatterv
 #define PMPI_Iscatterv APMPI_Iscatterv
-AMPI_API_DEF(MPI_Iscatterv, const void *sendbuf, const int *sendcounts, const int *displs, MPI_Datatype sendtype,
+AMPI_API_DEF(int, MPI_Iscatterv, const void *sendbuf, const int *sendcounts, const int *displs, MPI_Datatype sendtype,
                    void *recvbuf, int recvcount, MPI_Datatype recvtype,
                    int root, MPI_Comm comm, MPI_Request *request);
 #define MPI_Allgather AMPI_Allgather
 #define PMPI_Allgather APMPI_Allgather
-AMPI_API_DEF(MPI_Allgather, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
+AMPI_API_DEF(int, MPI_Allgather, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                    void *recvbuf, int recvcount, MPI_Datatype recvtype,
                    MPI_Comm comm);
 #define MPI_Iallgather AMPI_Iallgather
 #define PMPI_Iallgather APMPI_Iallgather
-AMPI_API_DEF(MPI_Iallgather, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
+AMPI_API_DEF(int, MPI_Iallgather, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                     void *recvbuf, int recvcount, MPI_Datatype recvtype,
                     MPI_Comm comm, MPI_Request* request);
 #define MPI_Allgatherv AMPI_Allgatherv
 #define PMPI_Allgatherv APMPI_Allgatherv
-AMPI_API_DEF(MPI_Allgatherv, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
+AMPI_API_DEF(int, MPI_Allgatherv, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                     void *recvbuf, const int *recvcounts, const int *displs,
                     MPI_Datatype recvtype, MPI_Comm comm);
 #define MPI_Iallgatherv AMPI_Iallgatherv
 #define PMPI_Iallgatherv APMPI_Iallgatherv
-AMPI_API_DEF(MPI_Iallgatherv, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
+AMPI_API_DEF(int, MPI_Iallgatherv, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                      void *recvbuf, const int *recvcounts, const int *displs,
                      MPI_Datatype recvtype, MPI_Comm comm, MPI_Request *request);
 #define MPI_Alltoall AMPI_Alltoall
 #define PMPI_Alltoall APMPI_Alltoall
-AMPI_API_DEF(MPI_Alltoall, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
+AMPI_API_DEF(int, MPI_Alltoall, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                   void *recvbuf, int recvcount, MPI_Datatype recvtype,
                   MPI_Comm comm);
 #define MPI_Ialltoall AMPI_Ialltoall
 #define PMPI_Ialltoall APMPI_Ialltoall
-AMPI_API_DEF(MPI_Ialltoall, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
+AMPI_API_DEF(int, MPI_Ialltoall, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                    void *recvbuf, int recvcount, MPI_Datatype recvtype,
                    MPI_Comm comm, MPI_Request *request);
 #define MPI_Alltoallv AMPI_Alltoallv
 #define PMPI_Alltoallv APMPI_Alltoallv
-AMPI_API_DEF(MPI_Alltoallv, const void *sendbuf, const int *sendcounts, const int *sdispls,
+AMPI_API_DEF(int, MPI_Alltoallv, const void *sendbuf, const int *sendcounts, const int *sdispls,
                    MPI_Datatype sendtype, void *recvbuf, const int *recvcounts,
                    const int *rdispls, MPI_Datatype recvtype, MPI_Comm comm);
 #define MPI_Ialltoallv AMPI_Ialltoallv
 #define PMPI_Ialltoallv APMPI_Ialltoallv
-AMPI_API_DEF(MPI_Ialltoallv, void *sendbuf, int *sendcounts, int *sdispls,
+AMPI_API_DEF(int, MPI_Ialltoallv, void *sendbuf, int *sendcounts, int *sdispls,
                     MPI_Datatype sendtype, void *recvbuf, int *recvcounts,
                     int *rdispls, MPI_Datatype recvtype, MPI_Comm comm,
                     MPI_Request *request);
 #define MPI_Alltoallw AMPI_Alltoallw
 #define PMPI_Alltoallw APMPI_Alltoallw
-AMPI_API_DEF(MPI_Alltoallw, const void *sendbuf, const int *sendcounts, const int *sdispls,
+AMPI_API_DEF(int, MPI_Alltoallw, const void *sendbuf, const int *sendcounts, const int *sdispls,
                    const MPI_Datatype *sendtypes, void *recvbuf, const int *recvcounts,
                    const int *rdispls, const MPI_Datatype *recvtypes, MPI_Comm comm);
 #define MPI_Ialltoallw AMPI_Ialltoallw
 #define PMPI_Ialltoallw APMPI_Ialltoallw
-AMPI_API_DEF(MPI_Ialltoallw, const void *sendbuf, const int *sendcounts, const int *sdispls,
+AMPI_API_DEF(int, MPI_Ialltoallw, const void *sendbuf, const int *sendcounts, const int *sdispls,
                     const MPI_Datatype *sendtypes, void *recvbuf, const int *recvcounts,
                     const int *rdispls, const MPI_Datatype *recvtypes, MPI_Comm comm,
                     MPI_Request *request);
 #define MPI_Reduce AMPI_Reduce
 #define PMPI_Reduce APMPI_Reduce
-AMPI_API_DEF(MPI_Reduce, const void *inbuf, void *outbuf, int count, MPI_Datatype type,
+AMPI_API_DEF(int, MPI_Reduce, const void *inbuf, void *outbuf, int count, MPI_Datatype type,
                 MPI_Op op, int root, MPI_Comm comm);
 #define MPI_Ireduce AMPI_Ireduce
 #define PMPI_Ireduce APMPI_Ireduce
-AMPI_API_DEF(MPI_Ireduce, const void *sendbuf, void *recvbuf, int count, MPI_Datatype type,
+AMPI_API_DEF(int, MPI_Ireduce, const void *sendbuf, void *recvbuf, int count, MPI_Datatype type,
                  MPI_Op op, int root, MPI_Comm comm, MPI_Request *request);
 #define MPI_Allreduce AMPI_Allreduce
 #define PMPI_Allreduce APMPI_Allreduce
-AMPI_API_DEF(MPI_Allreduce, const void *inbuf, void *outbuf, int count, MPI_Datatype type,
+AMPI_API_DEF(int, MPI_Allreduce, const void *inbuf, void *outbuf, int count, MPI_Datatype type,
                    MPI_Op op, MPI_Comm comm);
 #define MPI_Iallreduce AMPI_Iallreduce
 #define PMPI_Iallreduce APMPI_Iallreduce
-AMPI_API_DEF(MPI_Iallreduce, const void *inbuf, void *outbuf, int count, MPI_Datatype type,
+AMPI_API_DEF(int, MPI_Iallreduce, const void *inbuf, void *outbuf, int count, MPI_Datatype type,
                     MPI_Op op, MPI_Comm comm, MPI_Request *request);
 #define MPI_Reduce_local AMPI_Reduce_local
 #define PMPI_Reduce_local APMPI_Reduce_local
-AMPI_API_DEF(MPI_Reduce_local, const void *inbuf, void *outbuf, int count,
+AMPI_API_DEF(int, MPI_Reduce_local, const void *inbuf, void *outbuf, int count,
                       MPI_Datatype datatype, MPI_Op op);
 #define MPI_Reduce_scatter_block AMPI_Reduce_scatter_block
 #define PMPI_Reduce_scatter_block APMPI_Reduce_scatter_block
-AMPI_API_DEF(MPI_Reduce_scatter_block, const void* sendbuf, void* recvbuf, int count,
+AMPI_API_DEF(int, MPI_Reduce_scatter_block, const void* sendbuf, void* recvbuf, int count,
                               MPI_Datatype datatype, MPI_Op op, MPI_Comm comm);
 #define MPI_Reduce_scatter AMPI_Reduce_scatter
 #define PMPI_Reduce_scatter APMPI_Reduce_scatter
-AMPI_API_DEF(MPI_Reduce_scatter, const void* sendbuf, void* recvbuf, const int *recvcounts,
+AMPI_API_DEF(int, MPI_Reduce_scatter, const void* sendbuf, void* recvbuf, const int *recvcounts,
                         MPI_Datatype datatype, MPI_Op op, MPI_Comm comm);
 #define MPI_Scan AMPI_Scan
 #define PMPI_Scan APMPI_Scan
-AMPI_API_DEF(MPI_Scan, const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
+AMPI_API_DEF(int, MPI_Scan, const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
               MPI_Op op, MPI_Comm comm );
 #define MPI_Exscan AMPI_Exscan
 #define PMPI_Exscan APMPI_Exscan
-AMPI_API_DEF(MPI_Exscan, const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
+AMPI_API_DEF(int, MPI_Exscan, const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
                 MPI_Op op, MPI_Comm comm);
 #define MPI_Neighbor_alltoall AMPI_Neighbor_alltoall
 #define PMPI_Neighbor_alltoall APMPI_Neighbor_alltoall
-AMPI_API_DEF(MPI_Neighbor_alltoall, const void* sendbuf, int sendcount, MPI_Datatype sendtype,
+AMPI_API_DEF(int, MPI_Neighbor_alltoall, const void* sendbuf, int sendcount, MPI_Datatype sendtype,
                            void* recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm comm);
 #define MPI_Ineighbor_alltoall AMPI_Ineighbor_alltoall
 #define PMPI_Ineighbor_alltoall APMPI_Ineighbor_alltoall
-AMPI_API_DEF(MPI_Ineighbor_alltoall, const void* sendbuf, int sendcount, MPI_Datatype sendtype,
+AMPI_API_DEF(int, MPI_Ineighbor_alltoall, const void* sendbuf, int sendcount, MPI_Datatype sendtype,
                             void* recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm comm,
                             MPI_Request* request);
 #define MPI_Neighbor_alltoallv AMPI_Neighbor_alltoallv
 #define PMPI_Neighbor_alltoallv APMPI_Neighbor_alltoallv
-AMPI_API_DEF(MPI_Neighbor_alltoallv, const void* sendbuf, const int* sendcounts, const int* sdispls,
+AMPI_API_DEF(int, MPI_Neighbor_alltoallv, const void* sendbuf, const int* sendcounts, const int* sdispls,
                             MPI_Datatype sendtype, void* recvbuf, const int* recvcounts, const int* rdispls,
                             MPI_Datatype recvtype, MPI_Comm comm);
 #define MPI_Ineighbor_alltoallv AMPI_Ineighbor_alltoallv
 #define PMPI_Ineighbor_alltoallv APMPI_Ineighbor_alltoallv
-AMPI_API_DEF(MPI_Ineighbor_alltoallv, const void* sendbuf, const int* sendcounts, const int* sdispls,
+AMPI_API_DEF(int, MPI_Ineighbor_alltoallv, const void* sendbuf, const int* sendcounts, const int* sdispls,
                              MPI_Datatype sendtype, void* recvbuf, const int* recvcounts, const int* rdispls,
                              MPI_Datatype recvtype, MPI_Comm comm, MPI_Request* request);
 #define MPI_Neighbor_alltoallw AMPI_Neighbor_alltoallw
 #define PMPI_Neighbor_alltoallw APMPI_Neighbor_alltoallw
-AMPI_API_DEF(MPI_Neighbor_alltoallw, const void* sendbuf, const int* sendcounts, const MPI_Aint* sdipls,
+AMPI_API_DEF(int, MPI_Neighbor_alltoallw, const void* sendbuf, const int* sendcounts, const MPI_Aint* sdipls,
                             const MPI_Datatype* sendtypes, void* recvbuf, const int* recvcounts, const MPI_Aint* rdispls,
                             const MPI_Datatype* recvtypes, MPI_Comm comm);
 #define MPI_Ineighbor_alltoallw AMPI_Ineighbor_alltoallw
 #define PMPI_Ineighbor_alltoallw APMPI_Ineighbor_alltoallw
-AMPI_API_DEF(MPI_Ineighbor_alltoallw, const void* sendbuf, const int* sendcounts, const MPI_Aint* sdispls,
+AMPI_API_DEF(int, MPI_Ineighbor_alltoallw, const void* sendbuf, const int* sendcounts, const MPI_Aint* sdispls,
                              const MPI_Datatype* sendtypes, void* recvbuf, const int* recvcounts, const MPI_Aint* rdispls,
                              const MPI_Datatype* recvtypes, MPI_Comm comm, MPI_Request* request);
 #define MPI_Neighbor_allgather AMPI_Neighbor_allgather
 #define PMPI_Neighbor_allgather APMPI_Neighbor_allgather
-AMPI_API_DEF(MPI_Neighbor_allgather, const void* sendbuf, int sendcount, MPI_Datatype sendtype,
+AMPI_API_DEF(int, MPI_Neighbor_allgather, const void* sendbuf, int sendcount, MPI_Datatype sendtype,
                             void* recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm comm);
 #define MPI_Ineighbor_allgather AMPI_Ineighbor_allgather
 #define PMPI_Ineighbor_allgather APMPI_Ineighbor_allgather
-AMPI_API_DEF(MPI_Ineighbor_allgather, const void* sendbuf, int sendcount, MPI_Datatype sendtype,
+AMPI_API_DEF(int, MPI_Ineighbor_allgather, const void* sendbuf, int sendcount, MPI_Datatype sendtype,
                              void* recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm comm,
                              MPI_Request *request);
 #define MPI_Neighbor_allgatherv AMPI_Neighbor_allgatherv
 #define PMPI_Neighbor_allgatherv APMPI_Neighbor_allgatherv
-AMPI_API_DEF(MPI_Neighbor_allgatherv, const void* sendbuf, int sendcount, MPI_Datatype sendtype,
+AMPI_API_DEF(int, MPI_Neighbor_allgatherv, const void* sendbuf, int sendcount, MPI_Datatype sendtype,
                              void* recvbuf, const int* recvcounts, const int* displs, MPI_Datatype recvtype,
                              MPI_Comm comm);
 #define MPI_Ineighbor_allgatherv AMPI_Ineighbor_allgatherv
 #define PMPI_Ineighbor_allgatherv APMPI_Ineighbor_allgatherv
-AMPI_API_DEF(MPI_Ineighbor_allgatherv, const void* sendbuf, int sendcount, MPI_Datatype sendtype,
+AMPI_API_DEF(int, MPI_Ineighbor_allgatherv, const void* sendbuf, int sendcount, MPI_Datatype sendtype,
                               void* recvbuf, const int* recvcounts, const int* displs, MPI_Datatype recvtype,
                               MPI_Comm comm, MPI_Request *request);
 #define MPI_Op_create AMPI_Op_create
 #define PMPI_Op_create APMPI_Op_create
-AMPI_API_DEF(MPI_Op_create, MPI_User_function *function, int commute, MPI_Op *op);
+AMPI_API_DEF(int, MPI_Op_create, MPI_User_function *function, int commute, MPI_Op *op);
 #define MPI_Op_free AMPI_Op_free
 #define PMPI_Op_free APMPI_Op_free
-AMPI_API_DEF(MPI_Op_free, MPI_Op *op);
+AMPI_API_DEF(int, MPI_Op_free, MPI_Op *op);
 #define MPI_Op_commutative AMPI_Op_commutative
 #define PMPI_Op_commutative APMPI_Op_commutative
-AMPI_API_DEF(MPI_Op_commutative, MPI_Op op, int* commute);
+AMPI_API_DEF(int, MPI_Op_commutative, MPI_Op op, int* commute);
 
 /***groups,contexts and communicators***/
 #define MPI_Group_size AMPI_Group_size
 #define PMPI_Group_size APMPI_Group_size
-AMPI_API_DEF(MPI_Group_size, MPI_Group group, int *size);
+AMPI_API_DEF(int, MPI_Group_size, MPI_Group group, int *size);
 #define MPI_Group_rank AMPI_Group_rank
 #define PMPI_Group_rank APMPI_Group_rank
-AMPI_API_DEF(MPI_Group_rank, MPI_Group group, int *rank);
+AMPI_API_DEF(int, MPI_Group_rank, MPI_Group group, int *rank);
 #define MPI_Group_translate_ranks AMPI_Group_translate_ranks
 #define PMPI_Group_translate_ranks APMPI_Group_translate_ranks
-AMPI_API_DEF(MPI_Group_translate_ranks, MPI_Group group1, int n, const int *ranks1, MPI_Group group2, int *ranks2);
+AMPI_API_DEF(int, MPI_Group_translate_ranks, MPI_Group group1, int n, const int *ranks1, MPI_Group group2, int *ranks2);
 #define MPI_Group_compare AMPI_Group_compare
 #define PMPI_Group_compare APMPI_Group_compare
-AMPI_API_DEF(MPI_Group_compare, MPI_Group group1,MPI_Group group2, int *result);
+AMPI_API_DEF(int, MPI_Group_compare, MPI_Group group1,MPI_Group group2, int *result);
 #define MPI_Comm_group AMPI_Comm_group
 #define PMPI_Comm_group APMPI_Comm_group
-AMPI_API_DEF(MPI_Comm_group, MPI_Comm comm, MPI_Group *group);
+AMPI_API_DEF(int, MPI_Comm_group, MPI_Comm comm, MPI_Group *group);
 #define MPI_Group_union AMPI_Group_union
 #define PMPI_Group_union APMPI_Group_union
-AMPI_API_DEF(MPI_Group_union, MPI_Group group1, MPI_Group group2, MPI_Group *newgroup);
+AMPI_API_DEF(int, MPI_Group_union, MPI_Group group1, MPI_Group group2, MPI_Group *newgroup);
 #define MPI_Group_intersection AMPI_Group_intersection
 #define PMPI_Group_intersection APMPI_Group_intersection
-AMPI_API_DEF(MPI_Group_intersection, MPI_Group group1, MPI_Group group2, MPI_Group *newgroup);
+AMPI_API_DEF(int, MPI_Group_intersection, MPI_Group group1, MPI_Group group2, MPI_Group *newgroup);
 #define MPI_Group_difference AMPI_Group_difference
 #define PMPI_Group_difference APMPI_Group_difference
-AMPI_API_DEF(MPI_Group_difference, MPI_Group group1, MPI_Group group2, MPI_Group *newgroup);
+AMPI_API_DEF(int, MPI_Group_difference, MPI_Group group1, MPI_Group group2, MPI_Group *newgroup);
 #define MPI_Group_incl AMPI_Group_incl
 #define PMPI_Group_incl APMPI_Group_incl
-AMPI_API_DEF(MPI_Group_incl, MPI_Group group, int n, const int *ranks, MPI_Group *newgroup);
+AMPI_API_DEF(int, MPI_Group_incl, MPI_Group group, int n, const int *ranks, MPI_Group *newgroup);
 #define MPI_Group_excl AMPI_Group_excl
 #define PMPI_Group_excl APMPI_Group_excl
-AMPI_API_DEF(MPI_Group_excl, MPI_Group group, int n, const int *ranks, MPI_Group *newgroup);
+AMPI_API_DEF(int, MPI_Group_excl, MPI_Group group, int n, const int *ranks, MPI_Group *newgroup);
 #define MPI_Group_range_incl AMPI_Group_range_incl
 #define PMPI_Group_range_incl APMPI_Group_range_incl
-AMPI_API_DEF(MPI_Group_range_incl, MPI_Group group, int n, int ranges[][3], MPI_Group *newgroup);
+AMPI_API_DEF(int, MPI_Group_range_incl, MPI_Group group, int n, int ranges[][3], MPI_Group *newgroup);
 #define MPI_Group_range_excl AMPI_Group_range_excl
 #define PMPI_Group_range_excl APMPI_Group_range_excl
-AMPI_API_DEF(MPI_Group_range_excl, MPI_Group group, int n, int ranges[][3], MPI_Group *newgroup);
+AMPI_API_DEF(int, MPI_Group_range_excl, MPI_Group group, int n, int ranges[][3], MPI_Group *newgroup);
 #define MPI_Group_free AMPI_Group_free
 #define PMPI_Group_free APMPI_Group_free
-AMPI_API_DEF(MPI_Group_free, MPI_Group *group);
+AMPI_API_DEF(int, MPI_Group_free, MPI_Group *group);
 
 #define MPI_Intercomm_create AMPI_Intercomm_create
 #define PMPI_Intercomm_create APMPI_Intercomm_create
-AMPI_API_DEF(MPI_Intercomm_create, MPI_Comm local_comm, int local_leader, MPI_Comm peer_comm,
+AMPI_API_DEF(int, MPI_Intercomm_create, MPI_Comm local_comm, int local_leader, MPI_Comm peer_comm,
                           int remote_leader, int tag, MPI_Comm *newintercomm);
 #define MPI_Intercomm_merge AMPI_Intercomm_merge
 #define PMPI_Intercomm_merge APMPI_Intercomm_merge
-AMPI_API_DEF(MPI_Intercomm_merge, MPI_Comm intercomm, int high, MPI_Comm *newintracomm);
+AMPI_API_DEF(int, MPI_Intercomm_merge, MPI_Comm intercomm, int high, MPI_Comm *newintracomm);
 
 #define MPI_Comm_create AMPI_Comm_create
 #define PMPI_Comm_create APMPI_Comm_create
-AMPI_API_DEF(MPI_Comm_create, MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm);
+AMPI_API_DEF(int, MPI_Comm_create, MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm);
 #define MPI_Comm_size AMPI_Comm_size
 #define PMPI_Comm_size APMPI_Comm_size
-AMPI_API_DEF(MPI_Comm_size, MPI_Comm comm, int *size);
+AMPI_API_DEF(int, MPI_Comm_size, MPI_Comm comm, int *size);
 #define MPI_Comm_rank AMPI_Comm_rank
 #define PMPI_Comm_rank APMPI_Comm_rank
-AMPI_API_DEF(MPI_Comm_rank, MPI_Comm comm, int *rank);
+AMPI_API_DEF(int, MPI_Comm_rank, MPI_Comm comm, int *rank);
 #define MPI_Comm_compare AMPI_Comm_compare
 #define PMPI_Comm_compare APMPI_Comm_compare
-AMPI_API_DEF(MPI_Comm_compare, MPI_Comm comm1,MPI_Comm comm2, int *result);
+AMPI_API_DEF(int, MPI_Comm_compare, MPI_Comm comm1,MPI_Comm comm2, int *result);
 #define MPI_Comm_split AMPI_Comm_split
 #define PMPI_Comm_split APMPI_Comm_split
-AMPI_API_DEF(MPI_Comm_split, MPI_Comm src, int color, int key, MPI_Comm *dest);
+AMPI_API_DEF(int, MPI_Comm_split, MPI_Comm src, int color, int key, MPI_Comm *dest);
 #define MPI_Comm_split_type AMPI_Comm_split_type
 #define PMPI_Comm_split_type APMPI_Comm_split_type
-AMPI_API_DEF(MPI_Comm_split_type, MPI_Comm src, int split_type, int key, MPI_Info info, MPI_Comm *dest);
+AMPI_API_DEF(int, MPI_Comm_split_type, MPI_Comm src, int split_type, int key, MPI_Info info, MPI_Comm *dest);
 #define MPI_Comm_dup AMPI_Comm_dup
 #define PMPI_Comm_dup APMPI_Comm_dup
-AMPI_API_DEF(MPI_Comm_dup, MPI_Comm src, MPI_Comm *dest);
+AMPI_API_DEF(int, MPI_Comm_dup, MPI_Comm src, MPI_Comm *dest);
 #define MPI_Comm_dup_with_info AMPI_Comm_dup_with_info
 #define PMPI_Comm_dup_with_info APMPI_Comm_dup_with_info
-AMPI_API_DEF(MPI_Comm_dup_with_info, MPI_Comm src, MPI_Info info, MPI_Comm *dest);
+AMPI_API_DEF(int, MPI_Comm_dup_with_info, MPI_Comm src, MPI_Info info, MPI_Comm *dest);
 #define MPI_Comm_free AMPI_Comm_free
 #define PMPI_Comm_free APMPI_Comm_free
-AMPI_API_DEF(MPI_Comm_free, MPI_Comm *comm);
+AMPI_API_DEF(int, MPI_Comm_free, MPI_Comm *comm);
 #define MPI_Comm_test_inter AMPI_Comm_test_inter
 #define PMPI_Comm_test_inter APMPI_Comm_test_inter
-AMPI_API_DEF(MPI_Comm_test_inter, MPI_Comm comm, int *flag);
+AMPI_API_DEF(int, MPI_Comm_test_inter, MPI_Comm comm, int *flag);
 #define MPI_Comm_remote_size AMPI_Comm_remote_size
 #define PMPI_Comm_remote_size APMPI_Comm_remote_size
-AMPI_API_DEF(MPI_Comm_remote_size, MPI_Comm comm, int *size);
+AMPI_API_DEF(int, MPI_Comm_remote_size, MPI_Comm comm, int *size);
 #define MPI_Comm_remote_group AMPI_Comm_remote_group
 #define PMPI_Comm_remote_group APMPI_Comm_remote_group
-AMPI_API_DEF(MPI_Comm_remote_group, MPI_Comm comm, MPI_Group *group);
+AMPI_API_DEF(int, MPI_Comm_remote_group, MPI_Comm comm, MPI_Group *group);
 #define MPI_Comm_set_name AMPI_Comm_set_name
 #define PMPI_Comm_set_name APMPI_Comm_set_name
-AMPI_API_DEF(MPI_Comm_set_name, MPI_Comm comm, const char *name);
+AMPI_API_DEF(int, MPI_Comm_set_name, MPI_Comm comm, const char *name);
 #define MPI_Comm_get_name AMPI_Comm_get_name
 #define PMPI_Comm_get_name APMPI_Comm_get_name
-AMPI_API_DEF(MPI_Comm_get_name, MPI_Comm comm, char *comm_name, int *resultlen);
+AMPI_API_DEF(int, MPI_Comm_get_name, MPI_Comm comm, char *comm_name, int *resultlen);
 #define MPI_Comm_set_info AMPI_Comm_set_info
 #define PMPI_Comm_set_info APMPI_Comm_set_info
-AMPI_API_DEF(MPI_Comm_set_info, MPI_Comm comm, MPI_Info info);
+AMPI_API_DEF(int, MPI_Comm_set_info, MPI_Comm comm, MPI_Info info);
 #define MPI_Comm_get_info AMPI_Comm_get_info
 #define PMPI_Comm_get_info APMPI_Comm_get_info
-AMPI_API_DEF(MPI_Comm_get_info, MPI_Comm comm, MPI_Info *info);
+AMPI_API_DEF(int, MPI_Comm_get_info, MPI_Comm comm, MPI_Info *info);
 #define MPI_Comm_call_errhandler AMPI_Comm_call_errhandler
 #define PMPI_Comm_call_errhandler APMPI_Comm_call_errhandler
-AMPI_API_DEF(MPI_Comm_call_errhandler, MPI_Comm comm, int errorcode);
+AMPI_API_DEF(int, MPI_Comm_call_errhandler, MPI_Comm comm, int errorcode);
 #define MPI_Comm_create_errhandler AMPI_Comm_create_errhandler
 #define PMPI_Comm_create_errhandler APMPI_Comm_create_errhandler
-AMPI_API_DEF(MPI_Comm_create_errhandler, MPI_Comm_errhandler_fn *function, MPI_Errhandler *errhandler);
+AMPI_API_DEF(int, MPI_Comm_create_errhandler, MPI_Comm_errhandler_fn *function, MPI_Errhandler *errhandler);
 #define MPI_Comm_set_errhandler AMPI_Comm_set_errhandler
 #define PMPI_Comm_set_errhandler APMPI_Comm_set_errhandler
-AMPI_API_DEF(MPI_Comm_set_errhandler, MPI_Comm comm, MPI_Errhandler errhandler);
+AMPI_API_DEF(int, MPI_Comm_set_errhandler, MPI_Comm comm, MPI_Errhandler errhandler);
 #define MPI_Comm_get_errhandler AMPI_Comm_get_errhandler
 #define PMPI_Comm_get_errhandler APMPI_Comm_get_errhandler
-AMPI_API_DEF(MPI_Comm_get_errhandler, MPI_Comm comm, MPI_Errhandler *errhandler);
+AMPI_API_DEF(int, MPI_Comm_get_errhandler, MPI_Comm comm, MPI_Errhandler *errhandler);
 #define MPI_Comm_free_errhandler AMPI_Comm_free_errhandler
 #define PMPI_Comm_free_errhandler APMPI_Comm_free_errhandler
-AMPI_API_DEF(MPI_Comm_free_errhandler, MPI_Errhandler *errhandler);
+AMPI_API_DEF(int, MPI_Comm_free_errhandler, MPI_Errhandler *errhandler);
 #define MPI_Comm_create_keyval AMPI_Comm_create_keyval
 #define PMPI_Comm_create_keyval APMPI_Comm_create_keyval
-AMPI_API_DEF(MPI_Comm_create_keyval, MPI_Comm_copy_attr_function *copy_fn, MPI_Comm_delete_attr_function *delete_fn,
+AMPI_API_DEF(int, MPI_Comm_create_keyval, MPI_Comm_copy_attr_function *copy_fn, MPI_Comm_delete_attr_function *delete_fn,
                             int *keyval, void* extra_state);
 #define MPI_Comm_free_keyval AMPI_Comm_free_keyval
 #define PMPI_Comm_free_keyval APMPI_Comm_free_keyval
-AMPI_API_DEF(MPI_Comm_free_keyval, int *keyval);
+AMPI_API_DEF(int, MPI_Comm_free_keyval, int *keyval);
 #define MPI_Comm_set_attr AMPI_Comm_set_attr
 #define PMPI_Comm_set_attr APMPI_Comm_set_attr
-AMPI_API_DEF(MPI_Comm_set_attr, MPI_Comm comm, int keyval, void* attribute_val);
+AMPI_API_DEF(int, MPI_Comm_set_attr, MPI_Comm comm, int keyval, void* attribute_val);
 #define MPI_Comm_get_attr AMPI_Comm_get_attr
 #define PMPI_Comm_get_attr APMPI_Comm_get_attr
-AMPI_API_DEF(MPI_Comm_get_attr, MPI_Comm comm, int keyval, void *attribute_val, int *flag);
+AMPI_API_DEF(int, MPI_Comm_get_attr, MPI_Comm comm, int keyval, void *attribute_val, int *flag);
 #define MPI_Comm_delete_attr AMPI_Comm_delete_attr
 #define PMPI_Comm_delete_attr APMPI_Comm_delete_attr
-AMPI_API_DEF(MPI_Comm_delete_attr, MPI_Comm comm, int keyval);
+AMPI_API_DEF(int, MPI_Comm_delete_attr, MPI_Comm comm, int keyval);
 
 #define MPI_Keyval_create AMPI_Keyval_create
 #define PMPI_Keyval_create APMPI_Keyval_create
-AMPI_API_DEF(MPI_Keyval_create, MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn,
+AMPI_API_DEF(int, MPI_Keyval_create, MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn,
                        int *keyval, void* extra_state);
 #define MPI_Keyval_free AMPI_Keyval_free
 #define PMPI_Keyval_free APMPI_Keyval_free
-AMPI_API_DEF(MPI_Keyval_free, int *keyval);
+AMPI_API_DEF(int, MPI_Keyval_free, int *keyval);
 #define MPI_Attr_put AMPI_Attr_put
 #define PMPI_Attr_put APMPI_Attr_put
-AMPI_API_DEF(MPI_Attr_put, MPI_Comm comm, int keyval, void* attribute_val);
+AMPI_API_DEF(int, MPI_Attr_put, MPI_Comm comm, int keyval, void* attribute_val);
 #define MPI_Attr_get AMPI_Attr_get
 #define PMPI_Attr_get APMPI_Attr_get
-AMPI_API_DEF(MPI_Attr_get, MPI_Comm comm, int keyval, void *attribute_val, int *flag);
+AMPI_API_DEF(int, MPI_Attr_get, MPI_Comm comm, int keyval, void *attribute_val, int *flag);
 #define MPI_Attr_delete AMPI_Attr_delete
 #define PMPI_Attr_delete APMPI_Attr_delete
-AMPI_API_DEF(MPI_Attr_delete, MPI_Comm comm, int keyval);
+AMPI_API_DEF(int, MPI_Attr_delete, MPI_Comm comm, int keyval);
 
 /***topologies***/
 #define MPI_Cart_create AMPI_Cart_create
 #define PMPI_Cart_create APMPI_Cart_create
-AMPI_API_DEF(MPI_Cart_create, MPI_Comm comm_old, int ndims, const int *dims,
+AMPI_API_DEF(int, MPI_Cart_create, MPI_Comm comm_old, int ndims, const int *dims,
                      const int *periods, int reorder, MPI_Comm *comm_cart);
 #define MPI_Graph_create AMPI_Graph_create
 #define PMPI_Graph_create APMPI_Graph_create
-AMPI_API_DEF(MPI_Graph_create, MPI_Comm comm_old, int nnodes, const int *index,
+AMPI_API_DEF(int, MPI_Graph_create, MPI_Comm comm_old, int nnodes, const int *index,
                       const int *edges, int reorder, MPI_Comm *comm_graph);
 #define MPI_Topo_test AMPI_Topo_test
 #define PMPI_Topo_test APMPI_Topo_test
-AMPI_API_DEF(MPI_Topo_test, MPI_Comm comm, int *status);
+AMPI_API_DEF(int, MPI_Topo_test, MPI_Comm comm, int *status);
 #define MPI_Cart_map AMPI_Cart_map
 #define PMPI_Cart_map APMPI_Cart_map
-AMPI_API_DEF(MPI_Cart_map, MPI_Comm comm, int ndims, const int *dims, const int *periods,
+AMPI_API_DEF(int, MPI_Cart_map, MPI_Comm comm, int ndims, const int *dims, const int *periods,
                   int *newrank);
 #define MPI_Graph_map AMPI_Graph_map
 #define PMPI_Graph_map APMPI_Graph_map
-AMPI_API_DEF(MPI_Graph_map, MPI_Comm comm, int nnodes, const int *index, const int *edges,
+AMPI_API_DEF(int, MPI_Graph_map, MPI_Comm comm, int nnodes, const int *index, const int *edges,
                    int *newrank);
 #define MPI_Cartdim_get AMPI_Cartdim_get
 #define PMPI_Cartdim_get APMPI_Cartdim_get
-AMPI_API_DEF(MPI_Cartdim_get, MPI_Comm comm, int *ndims);
+AMPI_API_DEF(int, MPI_Cartdim_get, MPI_Comm comm, int *ndims);
 #define MPI_Cart_get AMPI_Cart_get
 #define PMPI_Cart_get APMPI_Cart_get
-AMPI_API_DEF(MPI_Cart_get, MPI_Comm comm, int maxdims, int *dims, int *periods, int *coords);
+AMPI_API_DEF(int, MPI_Cart_get, MPI_Comm comm, int maxdims, int *dims, int *periods, int *coords);
 #define MPI_Cart_rank AMPI_Cart_rank
 #define PMPI_Cart_rank APMPI_Cart_rank
-AMPI_API_DEF(MPI_Cart_rank, MPI_Comm comm, const int *coords, int *rank);
+AMPI_API_DEF(int, MPI_Cart_rank, MPI_Comm comm, const int *coords, int *rank);
 #define MPI_Cart_coords AMPI_Cart_coords
 #define PMPI_Cart_coords APMPI_Cart_coords
-AMPI_API_DEF(MPI_Cart_coords, MPI_Comm comm, int rank, int maxdims, int *coords);
+AMPI_API_DEF(int, MPI_Cart_coords, MPI_Comm comm, int rank, int maxdims, int *coords);
 #define MPI_Cart_shift AMPI_Cart_shift
 #define PMPI_Cart_shift APMPI_Cart_shift
-AMPI_API_DEF(MPI_Cart_shift, MPI_Comm comm, int direction, int disp, int *rank_source, int *rank_dest);
+AMPI_API_DEF(int, MPI_Cart_shift, MPI_Comm comm, int direction, int disp, int *rank_source, int *rank_dest);
 #define MPI_Graphdims_get AMPI_Graphdims_get
 #define PMPI_Graphdims_get APMPI_Graphdims_get
-AMPI_API_DEF(MPI_Graphdims_get, MPI_Comm comm, int *nnodes, int *nedges);
+AMPI_API_DEF(int, MPI_Graphdims_get, MPI_Comm comm, int *nnodes, int *nedges);
 #define MPI_Graph_get AMPI_Graph_get
 #define PMPI_Graph_get APMPI_Graph_get
-AMPI_API_DEF(MPI_Graph_get, MPI_Comm comm, int maxindex, int maxedges, int *index, int *edges);
+AMPI_API_DEF(int, MPI_Graph_get, MPI_Comm comm, int maxindex, int maxedges, int *index, int *edges);
 #define MPI_Graph_neighbors_count AMPI_Graph_neighbors_count
 #define PMPI_Graph_neighbors_count APMPI_Graph_neighbors_count
-AMPI_API_DEF(MPI_Graph_neighbors_count, MPI_Comm comm, int rank, int *nneighbors);
+AMPI_API_DEF(int, MPI_Graph_neighbors_count, MPI_Comm comm, int rank, int *nneighbors);
 #define MPI_Graph_neighbors AMPI_Graph_neighbors
 #define PMPI_Graph_neighbors APMPI_Graph_neighbors
-AMPI_API_DEF(MPI_Graph_neighbors, MPI_Comm comm, int rank, int maxneighbors, int *neighbors);
+AMPI_API_DEF(int, MPI_Graph_neighbors, MPI_Comm comm, int rank, int maxneighbors, int *neighbors);
 #define MPI_Dims_create AMPI_Dims_create
 #define PMPI_Dims_create APMPI_Dims_create
-AMPI_API_DEF(MPI_Dims_create, int nnodes, int ndims, int *dims);
+AMPI_API_DEF(int, MPI_Dims_create, int nnodes, int ndims, int *dims);
 #define MPI_Cart_sub AMPI_Cart_sub
 #define PMPI_Cart_sub APMPI_Cart_sub
-AMPI_API_DEF(MPI_Cart_sub, MPI_Comm comm, const int *remain_dims, MPI_Comm *newcomm);
+AMPI_API_DEF(int, MPI_Cart_sub, MPI_Comm comm, const int *remain_dims, MPI_Comm *newcomm);
 
 /***environment management***/
 #define MPI_Get_version AMPI_Get_version
 #define PMPI_Get_version APMPI_Get_version
-AMPI_API_DEF(MPI_Get_version, int *version, int *subversion);
+AMPI_API_DEF(int, MPI_Get_version, int *version, int *subversion);
 #define MPI_Get_library_version AMPI_Get_library_version
 #define PMPI_Get_library_version APMPI_Get_library_version
-AMPI_API_DEF(MPI_Get_library_version, char *version, int *resultlen);
+AMPI_API_DEF(int, MPI_Get_library_version, char *version, int *resultlen);
 #define MPI_Get_processor_name AMPI_Get_processor_name
 #define PMPI_Get_processor_name APMPI_Get_processor_name
-AMPI_API_DEF(MPI_Get_processor_name, char *name, int *resultlen);
+AMPI_API_DEF(int, MPI_Get_processor_name, char *name, int *resultlen);
 #define MPI_Errhandler_create AMPI_Errhandler_create
 #define PMPI_Errhandler_create APMPI_Errhandler_create
-AMPI_API_DEF(MPI_Errhandler_create, MPI_Handler_function *function, MPI_Errhandler *errhandler);
+AMPI_API_DEF(int, MPI_Errhandler_create, MPI_Handler_function *function, MPI_Errhandler *errhandler);
 #define MPI_Errhandler_set AMPI_Errhandler_set
 #define PMPI_Errhandler_set APMPI_Errhandler_set
-AMPI_API_DEF(MPI_Errhandler_set, MPI_Comm comm, MPI_Errhandler errhandler);
+AMPI_API_DEF(int, MPI_Errhandler_set, MPI_Comm comm, MPI_Errhandler errhandler);
 #define MPI_Errhandler_get AMPI_Errhandler_get
 #define PMPI_Errhandler_get APMPI_Errhandler_get
-AMPI_API_DEF(MPI_Errhandler_get, MPI_Comm comm, MPI_Errhandler *errhandler);
+AMPI_API_DEF(int, MPI_Errhandler_get, MPI_Comm comm, MPI_Errhandler *errhandler);
 #define MPI_Errhandler_free AMPI_Errhandler_free
 #define PMPI_Errhandler_free APMPI_Errhandler_free
-AMPI_API_DEF(MPI_Errhandler_free, MPI_Errhandler *errhandler);
+AMPI_API_DEF(int, MPI_Errhandler_free, MPI_Errhandler *errhandler);
 #define MPI_Add_error_code AMPI_Add_error_code
 #define PMPI_Add_error_code APMPI_Add_error_code
-AMPI_API_DEF(MPI_Add_error_code, int errorclass, int *errorcode);
+AMPI_API_DEF(int, MPI_Add_error_code, int errorclass, int *errorcode);
 #define MPI_Add_error_class AMPI_Add_error_class
 #define PMPI_Add_error_class APMPI_Add_error_class
-AMPI_API_DEF(MPI_Add_error_class, int *errorclass);
+AMPI_API_DEF(int, MPI_Add_error_class, int *errorclass);
 #define MPI_Add_error_string AMPI_Add_error_string
 #define PMPI_Add_error_string APMPI_Add_error_string
-AMPI_API_DEF(MPI_Add_error_string, int errorcode, const char *errorstring);
+AMPI_API_DEF(int, MPI_Add_error_string, int errorcode, const char *errorstring);
 #define MPI_Error_class AMPI_Error_class
 #define PMPI_Error_class APMPI_Error_class
-AMPI_API_DEF(MPI_Error_class, int errorcode, int *errorclass);
+AMPI_API_DEF(int, MPI_Error_class, int errorcode, int *errorclass);
 #define MPI_Error_string AMPI_Error_string
 #define PMPI_Error_string APMPI_Error_string
-AMPI_API_DEF(MPI_Error_string, int errorcode, char *string, int *resultlen);
+AMPI_API_DEF(int, MPI_Error_string, int errorcode, char *string, int *resultlen);
 #define MPI_Wtime AMPI_Wtime
 #define PMPI_Wtime APMPI_Wtime
-AMPI_API_DEF_DOUBLE(MPI_Wtime, void);
+AMPI_API_DEF(double, MPI_Wtime, void);
 #define MPI_Wtick AMPI_Wtick
 #define PMPI_Wtick APMPI_Wtick
-AMPI_API_DEF_DOUBLE(MPI_Wtick, void);
+AMPI_API_DEF(double, MPI_Wtick, void);
 #define MPI_Is_thread_main AMPI_Is_thread_main
 #define PMPI_Is_thread_main APMPI_Is_thread_main
-AMPI_API_DEF(MPI_Is_thread_main, int *flag);
+AMPI_API_DEF(int, MPI_Is_thread_main, int *flag);
 #define MPI_Query_thread AMPI_Query_thread
 #define PMPI_Query_thread APMPI_Query_thread
-AMPI_API_DEF(MPI_Query_thread, int *provided);
+AMPI_API_DEF(int, MPI_Query_thread, int *provided);
 #define MPI_Init_thread AMPI_Init_thread
 #define PMPI_Init_thread APMPI_Init_thread
-AMPI_API_DEF(MPI_Init_thread, int *argc, char*** argv, int required, int *provided);
+AMPI_API_DEF(int, MPI_Init_thread, int *argc, char*** argv, int required, int *provided);
 #define MPI_Init AMPI_Init
 #define PMPI_Init APMPI_Init
-AMPI_API_DEF(MPI_Init, int *argc, char*** argv);
+AMPI_API_DEF(int, MPI_Init, int *argc, char*** argv);
 #define MPI_Initialized AMPI_Initialized
 #define PMPI_Initialized APMPI_Initialized
-AMPI_API_DEF(MPI_Initialized, int *isInit);
+AMPI_API_DEF(int, MPI_Initialized, int *isInit);
 #define MPI_Finalize AMPI_Finalize
 #define PMPI_Finalize APMPI_Finalize
-AMPI_API_DEF(MPI_Finalize, void);
+AMPI_API_DEF(int, MPI_Finalize, void);
 #define MPI_Finalized AMPI_Finalized
 #define PMPI_Finalized APMPI_Finalized
-AMPI_API_DEF(MPI_Finalized, int *);
+AMPI_API_DEF(int, MPI_Finalized, int *);
 #define MPI_Abort AMPI_Abort
 #define PMPI_Abort APMPI_Abort
-AMPI_API_DEF(MPI_Abort, MPI_Comm comm, int errorcode);
+AMPI_API_DEF(int, MPI_Abort, MPI_Comm comm, int errorcode);
 
 /*** Profiling ***/
 #define MPI_Pcontrol AMPI_Pcontrol
 #define PMPI_Pcontrol APMPI_Pcontrol
-AMPI_API_DEF(MPI_Pcontrol, const int level, ...);
+AMPI_API_DEF(int, MPI_Pcontrol, const int level, ...);
 
 /*********************One sided communication routines *****************/
 /*  MPI_Win : an index into a list in ampiParent (just like MPI_Group) */
@@ -1140,161 +1136,161 @@ int MPI_WIN_DUP_FN         ( MPI_Win, int, void *, void *, void *, int * );
 
 #define MPI_Win_create AMPI_Win_create
 #define PMPI_Win_create APMPI_Win_create
-AMPI_API_DEF(MPI_Win_create, void *base, MPI_Aint size, int disp_unit,
+AMPI_API_DEF(int, MPI_Win_create, void *base, MPI_Aint size, int disp_unit,
                     MPI_Info info, MPI_Comm comm, MPI_Win *newwin);
 #define MPI_Win_free AMPI_Win_free
 #define PMPI_Win_free APMPI_Win_free
-AMPI_API_DEF(MPI_Win_free, MPI_Win *win);
+AMPI_API_DEF(int, MPI_Win_free, MPI_Win *win);
 #define MPI_Win_create_errhandler AMPI_Win_create_errhandler
 #define PMPI_Win_create_errhandler APMPI_Win_create_errhandler
-AMPI_API_DEF(MPI_Win_create_errhandler, MPI_Win_errhandler_function *win_errhandler_fn,
+AMPI_API_DEF(int, MPI_Win_create_errhandler, MPI_Win_errhandler_function *win_errhandler_fn,
                                MPI_Errhandler *errhandler);
 #define MPI_Win_get_errhandler AMPI_Win_get_errhandler
 #define PMPI_Win_get_errhandler APMPI_Win_get_errhandler
-AMPI_API_DEF(MPI_Win_get_errhandler, MPI_Win win, MPI_Errhandler *errhandler);
+AMPI_API_DEF(int, MPI_Win_get_errhandler, MPI_Win win, MPI_Errhandler *errhandler);
 #define MPI_Win_set_errhandler AMPI_Win_set_errhandler
 #define PMPI_Win_set_errhandler APMPI_Win_set_errhandler
-AMPI_API_DEF(MPI_Win_set_errhandler, MPI_Win win, MPI_Errhandler errhandler);
+AMPI_API_DEF(int, MPI_Win_set_errhandler, MPI_Win win, MPI_Errhandler errhandler);
 #define MPI_Win_create_keyval AMPI_Win_create_keyval
 #define PMPI_Win_create_keyval APMPI_Win_create_keyval
-AMPI_API_DEF(MPI_Win_create_keyval, MPI_Win_copy_attr_function *copy_fn,
+AMPI_API_DEF(int, MPI_Win_create_keyval, MPI_Win_copy_attr_function *copy_fn,
                            MPI_Win_delete_attr_function *delete_fn,
                            int *keyval, void *extra_state);
 #define MPI_Win_free_keyval AMPI_Win_free_keyval
 #define PMPI_Win_free_keyval APMPI_Win_free_keyval
-AMPI_API_DEF(MPI_Win_free_keyval, int *keyval);
+AMPI_API_DEF(int, MPI_Win_free_keyval, int *keyval);
 #define MPI_Win_delete_attr AMPI_Win_delete_attr
 #define PMPI_Win_delete_attr APMPI_Win_delete_attr
-AMPI_API_DEF(MPI_Win_delete_attr, MPI_Win win, int key);
+AMPI_API_DEF(int, MPI_Win_delete_attr, MPI_Win win, int key);
 #define MPI_Win_get_attr AMPI_Win_get_attr
 #define PMPI_Win_get_attr APMPI_Win_get_attr
-AMPI_API_DEF(MPI_Win_get_attr, MPI_Win win, int win_keyval, void *attribute_val, int *flag);
+AMPI_API_DEF(int, MPI_Win_get_attr, MPI_Win win, int win_keyval, void *attribute_val, int *flag);
 #define MPI_Win_set_attr AMPI_Win_set_attr
 #define PMPI_Win_set_attr APMPI_Win_set_attr
-AMPI_API_DEF(MPI_Win_set_attr, MPI_Win win, int win_keyval, void *attribute_val);
+AMPI_API_DEF(int, MPI_Win_set_attr, MPI_Win win, int win_keyval, void *attribute_val);
 #define MPI_Win_get_group AMPI_Win_get_group
 #define PMPI_Win_get_group APMPI_Win_get_group
-AMPI_API_DEF(MPI_Win_get_group, MPI_Win win, MPI_Group *group);
+AMPI_API_DEF(int, MPI_Win_get_group, MPI_Win win, MPI_Group *group);
 #define MPI_Win_set_name AMPI_Win_set_name
 #define PMPI_Win_set_name APMPI_Win_set_name
-AMPI_API_DEF(MPI_Win_set_name, MPI_Win win, const char *name);
+AMPI_API_DEF(int, MPI_Win_set_name, MPI_Win win, const char *name);
 #define MPI_Win_get_name AMPI_Win_get_name
 #define PMPI_Win_get_name APMPI_Win_get_name
-AMPI_API_DEF(MPI_Win_get_name, MPI_Win win, char *name, int *length);
+AMPI_API_DEF(int, MPI_Win_get_name, MPI_Win win, char *name, int *length);
 #define MPI_Win_set_info AMPI_Win_set_info
 #define PMPI_Win_set_info APMPI_Win_set_info
-AMPI_API_DEF(MPI_Win_set_info, MPI_Win win, MPI_Info info);
+AMPI_API_DEF(int, MPI_Win_set_info, MPI_Win win, MPI_Info info);
 #define MPI_Win_get_info AMPI_Win_get_info
 #define PMPI_Win_get_info APMPI_Win_get_info
-AMPI_API_DEF(MPI_Win_get_info, MPI_Win win, MPI_Info *info);
+AMPI_API_DEF(int, MPI_Win_get_info, MPI_Win win, MPI_Info *info);
 #define MPI_Win_fence AMPI_Win_fence
 #define PMPI_Win_fence APMPI_Win_fence
-AMPI_API_DEF(MPI_Win_fence, int assertion, MPI_Win win);
+AMPI_API_DEF(int, MPI_Win_fence, int assertion, MPI_Win win);
 #define MPI_Win_lock AMPI_Win_lock
 #define PMPI_Win_lock APMPI_Win_lock
-AMPI_API_DEF(MPI_Win_lock, int lock_type, int rank, int assert, MPI_Win win);
+AMPI_API_DEF(int, MPI_Win_lock, int lock_type, int rank, int assert, MPI_Win win);
 #define MPI_Win_unlock AMPI_Win_unlock
 #define PMPI_Win_unlock APMPI_Win_unlock
-AMPI_API_DEF(MPI_Win_unlock, int rank, MPI_Win win);
+AMPI_API_DEF(int, MPI_Win_unlock, int rank, MPI_Win win);
 #define MPI_Win_post AMPI_Win_post
 #define PMPI_Win_post APMPI_Win_post
-AMPI_API_DEF(MPI_Win_post, MPI_Group group, int assertion, MPI_Win win);
+AMPI_API_DEF(int, MPI_Win_post, MPI_Group group, int assertion, MPI_Win win);
 #define MPI_Win_wait AMPI_Win_wait
 #define PMPI_Win_wait APMPI_Win_wait
-AMPI_API_DEF(MPI_Win_wait, MPI_Win win);
+AMPI_API_DEF(int, MPI_Win_wait, MPI_Win win);
 #define MPI_Win_start AMPI_Win_start
 #define PMPI_Win_start APMPI_Win_start
-AMPI_API_DEF(MPI_Win_start, MPI_Group group, int assertion, MPI_Win win);
+AMPI_API_DEF(int, MPI_Win_start, MPI_Group group, int assertion, MPI_Win win);
 #define MPI_Win_complete AMPI_Win_complete
 #define PMPI_Win_complete APMPI_Win_complete
-AMPI_API_DEF(MPI_Win_complete, MPI_Win win);
+AMPI_API_DEF(int, MPI_Win_complete, MPI_Win win);
 #define MPI_Win_test AMPI_Win_test
 #define PMPI_Win_test APMPI_Win_test
-AMPI_API_DEF(MPI_Win_test, MPI_Win win, int *flag);
+AMPI_API_DEF(int, MPI_Win_test, MPI_Win win, int *flag);
 #define MPI_Alloc_mem AMPI_Alloc_mem
 #define PMPI_Alloc_mem APMPI_Alloc_mem
-AMPI_API_DEF(MPI_Alloc_mem, MPI_Aint size, MPI_Info info, void *baseptr);
+AMPI_API_DEF(int, MPI_Alloc_mem, MPI_Aint size, MPI_Info info, void *baseptr);
 #define MPI_Free_mem AMPI_Free_mem
 #define PMPI_Free_mem APMPI_Free_mem
-AMPI_API_DEF(MPI_Free_mem, void *base);
+AMPI_API_DEF(int, MPI_Free_mem, void *base);
 #define MPI_Put AMPI_Put
 #define PMPI_Put APMPI_Put
-AMPI_API_DEF(MPI_Put, const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+AMPI_API_DEF(int, MPI_Put, const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
              MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win);
 #define MPI_Get AMPI_Get
 #define PMPI_Get APMPI_Get
-AMPI_API_DEF(MPI_Get, void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+AMPI_API_DEF(int, MPI_Get, void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
              MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win);
 #define MPI_Accumulate AMPI_Accumulate
 #define PMPI_Accumulate APMPI_Accumulate
-AMPI_API_DEF(MPI_Accumulate, const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+AMPI_API_DEF(int, MPI_Accumulate, const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
                     MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                     MPI_Op op, MPI_Win win);
 #define MPI_Get_accumulate AMPI_Get_accumulate
 #define PMPI_Get_accumulate APMPI_Get_accumulate
-AMPI_API_DEF(MPI_Get_accumulate, const void *orgaddr, int orgcnt, MPI_Datatype orgtype,
+AMPI_API_DEF(int, MPI_Get_accumulate, const void *orgaddr, int orgcnt, MPI_Datatype orgtype,
                         void *resaddr, int rescnt, MPI_Datatype restype,
                         int rank, MPI_Aint targdisp, int targcnt,
                         MPI_Datatype targtype, MPI_Op op, MPI_Win win);
 #define MPI_Rput AMPI_Rput
 #define PMPI_Rput APMPI_Rput
-AMPI_API_DEF(MPI_Rput, const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int targrank,
+AMPI_API_DEF(int, MPI_Rput, const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int targrank,
              MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win,
              MPI_Request *request);
 #define MPI_Rget AMPI_Rget
 #define PMPI_Rget APMPI_Rget
-AMPI_API_DEF(MPI_Rget, void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+AMPI_API_DEF(int, MPI_Rget, void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
               MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win,
               MPI_Request *request);
 #define MPI_Raccumulate AMPI_Raccumulate
 #define PMPI_Raccumulate APMPI_Raccumulate
-AMPI_API_DEF(MPI_Raccumulate, const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+AMPI_API_DEF(int, MPI_Raccumulate, const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
                      MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                      MPI_Op op, MPI_Win win, MPI_Request *request);
 #define MPI_Rget_accumulate AMPI_Rget_accumulate
 #define PMPI_Rget_accumulate APMPI_Rget_accumulate
-AMPI_API_DEF(MPI_Rget_accumulate, const void *orgaddr, int orgcnt, MPI_Datatype orgtype,
+AMPI_API_DEF(int, MPI_Rget_accumulate, const void *orgaddr, int orgcnt, MPI_Datatype orgtype,
                          void *resaddr, int rescnt, MPI_Datatype restype,
                          int rank, MPI_Aint targdisp, int targcnt,
                          MPI_Datatype targtype, MPI_Op op, MPI_Win win,
                          MPI_Request *request);
 #define MPI_Fetch_and_op AMPI_Fetch_and_op
 #define PMPI_Fetch_and_op APMPI_Fetch_and_op
-AMPI_API_DEF(MPI_Fetch_and_op, const void *orgaddr, void *resaddr, MPI_Datatype type,
+AMPI_API_DEF(int, MPI_Fetch_and_op, const void *orgaddr, void *resaddr, MPI_Datatype type,
                       int rank, MPI_Aint targdisp, MPI_Op op, MPI_Win win);
 #define MPI_Compare_and_swap AMPI_Compare_and_swap
 #define PMPI_Compare_and_swap APMPI_Compare_and_swap
-AMPI_API_DEF(MPI_Compare_and_swap, const void *orgaddr, const void *compaddr, void *resaddr,
+AMPI_API_DEF(int, MPI_Compare_and_swap, const void *orgaddr, const void *compaddr, void *resaddr,
                           MPI_Datatype type, int rank, MPI_Aint targdisp,
                           MPI_Win win);
 
 #define MPI_Info_create AMPI_Info_create
 #define PMPI_Info_create APMPI_Info_create
-AMPI_API_DEF(MPI_Info_create, MPI_Info *info);
+AMPI_API_DEF(int, MPI_Info_create, MPI_Info *info);
 #define MPI_Info_set AMPI_Info_set
 #define PMPI_Info_set APMPI_Info_set
-AMPI_API_DEF(MPI_Info_set, MPI_Info info, const char *key, const char *value);
+AMPI_API_DEF(int, MPI_Info_set, MPI_Info info, const char *key, const char *value);
 #define MPI_Info_delete AMPI_Info_delete
 #define PMPI_Info_delete APMPI_Info_delete
-AMPI_API_DEF(MPI_Info_delete, MPI_Info info, const char *key);
+AMPI_API_DEF(int, MPI_Info_delete, MPI_Info info, const char *key);
 #define MPI_Info_get AMPI_Info_get
 #define PMPI_Info_get APMPI_Info_get
-AMPI_API_DEF(MPI_Info_get, MPI_Info info, const char *key, int valuelen, char *value, int *flag);
+AMPI_API_DEF(int, MPI_Info_get, MPI_Info info, const char *key, int valuelen, char *value, int *flag);
 #define MPI_Info_get_valuelen AMPI_Info_get_valuelen
 #define PMPI_Info_get_valuelen APMPI_Info_get_valuelen
-AMPI_API_DEF(MPI_Info_get_valuelen, MPI_Info info, const char *key, int *valuelen, int *flag);
+AMPI_API_DEF(int, MPI_Info_get_valuelen, MPI_Info info, const char *key, int *valuelen, int *flag);
 #define MPI_Info_get_nkeys AMPI_Info_get_nkeys
 #define PMPI_Info_get_nkeys APMPI_Info_get_nkeys
-AMPI_API_DEF(MPI_Info_get_nkeys, MPI_Info info, int *nkeys);
+AMPI_API_DEF(int, MPI_Info_get_nkeys, MPI_Info info, int *nkeys);
 #define MPI_Info_get_nthkey AMPI_Info_get_nthkey
 #define PMPI_Info_get_nthkey APMPI_Info_get_nthkey
-AMPI_API_DEF(MPI_Info_get_nthkey, MPI_Info info, int n, char *key);
+AMPI_API_DEF(int, MPI_Info_get_nthkey, MPI_Info info, int n, char *key);
 #define MPI_Info_dup AMPI_Info_dup
 #define PMPI_Info_dup APMPI_Info_dup
-AMPI_API_DEF(MPI_Info_dup, MPI_Info info, MPI_Info *newinfo);
+AMPI_API_DEF(int, MPI_Info_dup, MPI_Info info, MPI_Info *newinfo);
 #define MPI_Info_free AMPI_Info_free
 #define PMPI_Info_free APMPI_Info_free
-AMPI_API_DEF(MPI_Info_free, MPI_Info *info);
+AMPI_API_DEF(int, MPI_Info_free, MPI_Info *info);
 
 #define MPI_Comm_c2f(comm) (MPI_Fint)(comm)
 #define MPI_Comm_f2c(comm) (MPI_Comm)(comm)
