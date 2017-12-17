@@ -318,9 +318,9 @@ dirs+sources:
 	rm -rf hwloc
 	rm -rf libs
 	rm -rf ../bin ; mkdir ../bin
-	if case `cat .vdir` in *win32*) true;; *win64*) true;; *-win-*) true;; *) false;; esac; then \
-		cp -f $(SRCBASE)/arch/`cat .vdir | awk -F- '{print $$2}'`/unix2nt* ../bin; \
-		cp -f $(SRCBASE)/arch/win32/createlink.exe ../bin; \
+	if case `cat .vdir` in *win64*) true;; *-win-*) true;; *) false;; esac; then \
+		cp -f $(SRCBASE)/arch/win/unix2nt* ../bin; \
+		cp -f $(SRCBASE)/arch/win/createlink.exe ../bin; \
 	fi
 	rm -rf ../lib ; mkdir ../lib
 	rm -rf ../lib_so ; mkdir ../lib_so; touch ../lib_so/.charmso

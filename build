@@ -595,23 +595,23 @@ echo "TARGET=${UFCONTEXT_HEADER_NAME}" > $DESTINATION/tmp/uFcontext.mk
 
 # Create the bin, lib, include, etc. links:
 WINNAME=`echo $VERSION | awk -F- '{print $2}'`
-if [ "x_$WINNAME" = "x_win32" -o "x_$WINNAME" = "x_win64" -o "x_$WINNAME" = "x_win" ]
+if [ "x_$WINNAME" = "x_win64" -o "x_$WINNAME" = "x_win" ]
 then
-#Win32/64 version needs special compilers and *copied* (not linked)
+#Win64 version needs special compilers and *copied* (not linked)
 # source files.
-	cp $src/win32/system_ln $DESTINATION/tmp
-	cp $src/win32/unistd.h $DESTINATION/tmp
+	cp $src/win/system_ln $DESTINATION/tmp
+	cp $src/win/unistd.h $DESTINATION/tmp
 	echo "Compiling createlink.cpp ..."
-	(cd $src/win32; ../$WINNAME/unix2nt_cc  -c createlink.cpp -o createlink.o -D_WIN32_WINNT=0x0500; ../$WINNAME/unix2nt_cc createlink.o)
+	(cd $src/win; ./unix2nt_cc -c createlink.cpp -o createlink.o -D_WIN32_WINNT=0x0500; ./unix2nt_cc createlink.o)
 
-	if test ! -x $src/win32/createlink.exe
+	if test ! -x $src/win/createlink.exe
 	then
 		echo "VC++ is not properly installed!"
 		exit 1
 	fi
 	chmod +x $DESTINATION/tmp/system_ln
-	cp $src/win32/gathertree.local   $DESTINATION/tmp
-	cp $src/win32/gatherflat.local   $DESTINATION/tmp
+	cp $src/win/gathertree.local   $DESTINATION/tmp
+	cp $src/win/gatherflat.local   $DESTINATION/tmp
 else
 	cat > $DESTINATION/tmp/system_ln <<EOF
 #!/bin/sh
