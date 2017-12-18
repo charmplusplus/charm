@@ -33,4 +33,6 @@ for i in "${DIST_SUBDIRS[@]}"; do
     touch "$i/Makefile.am"
 done
 
+rm -f "configure" "Makefile.in" "include/Makefile.in" "src/Makefile.in"
+
 popd > /dev/null
