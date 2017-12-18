@@ -2446,8 +2446,11 @@ AC_SUBST(CC_FOR_BUILD)
 export HWLOC_FLAGS="$CHARM_CC_FLAGS"
 export CFLAGS="$CMK_SEQ_CC_FLAGS"
 export AR="$(get_full_command_name "${CMK_SEQ_AR%% *}")"
+export am_libhwloc_embedded_la_rpath='-rpath $(libdir)'
+AC_SUBST(am_libhwloc_embedded_la_rpath)
 enable_embedded_mode='yes'
 enable_static='yes'
+enable_shared='yes'
 enable_libnuma='no'
 enable_pci='no'
 enable_libudev='no'
