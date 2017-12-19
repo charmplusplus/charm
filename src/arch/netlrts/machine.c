@@ -1467,47 +1467,17 @@ static void node_addresses_obtain(char **argv)
   if (Cmi_charmrun_fd==-1) 
   {/*Standalone-- fake a single-node nodetab message*/
 
-  	int npes=1;
   	ChSingleNodeinfo *fakeTab;
 	ChMessage_new("nodeinfo",sizeof(ChSingleNodeinfo),&nodetabmsg);
 	fakeTab=(ChSingleNodeinfo *)(nodetabmsg.data);
-  	int plusPSet =CmiGetArgIntDesc(argv,"+p",&npes,"Set the number of processes to create");
-#if CMK_SHARED_VARS_UNAVAILABLE
-	if (npes!=1) {
-		fprintf(stderr,
-			"To use multiple processors, you must run this program as:\n"
-			" > charmrun +p%d %s <args>\n"
-			"or build the %s-smp version of Charm++.\n",
-			npes,argv[0],CMK_MACHINE_NAME);
-		exit(1);
-	}
-#else
-	if(plusPSet)
-	  {
-	    if(_Cmi_mynodesize >1 && _Cmi_mynodesize != npes)
-	      {
-		// if you want to use redundant arguments they need to be consistent
-		CmiError("Error, p!=ppn, must not have inconsistent values .\n"
-			"standalone invocation should use only one of [+p, +ppn, ++ppn]\n", npes, _Cmi_mynodesize);
-		exit(1);
-	      }
-	    else
-	      { // +ppn wasn't set, make it the same as +p
-		_Cmi_mynodesize =npes;
-	      }
-	  }
-	else
-	  { // +p wasn't set, make it the same as +ppn
-	    npes = _Cmi_mynodesize;
-	  }
-#endif
+
 	/*This is a stupid hack: we expect the *number* of nodes
 	followed by ChNodeinfo structs; so we use a ChSingleNodeinfo
 	(which happens to have exactly that layout!) and stuff
 	a 1 into the "node number" slot
 	*/
 	fakeTab->nodeNo=ChMessageInt_new(1); /* <- hack */
-	fakeTab->info.nPE=ChMessageInt_new(npes);
+	fakeTab->info.nPE=ChMessageInt_new(_Cmi_mynodesize);
 	fakeTab->info.dataport=ChMessageInt_new(0);
 	fakeTab->info.IP=_skt_invalid_ip;
   }

@@ -1097,9 +1097,36 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     _Cmi_mynodesize = 1;
     if (!CmiGetArgInt(argv,"+ppn", &_Cmi_mynodesize))
         CmiGetArgInt(argv,"++ppn", &_Cmi_mynodesize);
+
+    int npes = 1;
+    int plusPSet = CmiGetArgInt(argv,"+p",&npes);
 #if ! CMK_SMP
+    if (plusPSet && npes != 1)
+    {
+      fprintf(stderr,
+        "To use multiple processors, you must run this program as:\n"
+        " > charmrun +p%d %s <args>\n"
+        "or build the %s-smp version of Charm++.\n",
+        npes,argv[0],CMK_MACHINE_NAME);
+      exit(1);
+    }
     if (_Cmi_mynodesize > 1 && _Cmi_mynode == 0)
         CmiAbort("+ppn cannot be used in non SMP version!\n");
+#else
+    if (plusPSet)
+    {
+      if (_Cmi_mynodesize > 1 && _Cmi_mynodesize != npes)
+      {
+        // if you want to use redundant arguments they need to be consistent
+        CmiError("Error: p != ppn, must not have inconsistent values. (%d != %d)\n"
+          "Standalone invocation should use only one of [+p, +ppn, ++ppn].\n", npes, _Cmi_mynodesize);
+        exit(1);
+      }
+      else
+      { // +ppn wasn't set, make it the same as +p
+        _Cmi_mynodesize = npes;
+      }
+    }
 #endif
 
     /* Network progress function is used to poll the network when for
