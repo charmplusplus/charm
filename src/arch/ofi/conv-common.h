@@ -23,7 +23,7 @@
  * - startid, redID
  * - rank is needed by broadcast
  */
-#define CMK_MSG_HEADER_UNIQUE    CmiUInt4 size; CmiUInt2 rank,hdl,xhdl,info,stratid,redID; CmiInt4 root;
+#define CMK_MSG_HEADER_UNIQUE    CmiUInt4 size; CmiUInt2 rank,hdl,xhdl,info,type,redID; CmiInt4 root;
 
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT            { CMK_MSG_HEADER_UNIQUE }
@@ -79,3 +79,7 @@
 #define CMK_USE_COMMON_LOCK                                1
 
 #define CMK_ONESIDED_IMPL                                  1
+
+#define CMK_CMA_MIN                                        16384
+
+#define CMK_CMA_MAX                                        4194304

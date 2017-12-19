@@ -21,7 +21,7 @@
    Stratid is the stratgy id and root is used in the broadcast.
 */
 #define CMK_MSG_HEADER_BASIC   CMK_MSG_HEADER_EXT
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,hdl,stratid,xhdl,info,redID,rank; CmiInt4 root, size;
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,hdl,type,xhdl,info,redID,rank; CmiInt4 root, size;
 #define CMK_MSG_HEADER_EXT       { CMK_MSG_HEADER_EXT_ }
 #define CMK_MSG_HEADER_BIGSIM_  { CMK_MSG_HEADER_EXT_ CMK_BIGSIM_FIELDS }
 
@@ -51,3 +51,7 @@
 #define CMK_USE_COMMON_LOCK                                1
 
 #define CMK_ONESIDED_IMPL                                  CMK_MULTICORE
+
+#define CMK_CMA_MIN                                        32768
+
+#define CMK_CMA_MAX                                        INT_MAX

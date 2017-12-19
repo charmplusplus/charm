@@ -13,6 +13,10 @@
 FILE *debugLog = NULL;
 #endif
 
+// Macro for message type
+#define CMI_MSG_TYPE(msg)            ((CmiMsgHeaderBasic *)msg)->type
+#define CMI_SET_MSG_TYPE(msg, type)  CMI_MSG_TYPE(msg) = (type);
+
 /******* broadcast related  */
 #ifndef CMK_BROADCAST_SPANNING_TREE
 #define CMK_BROADCAST_SPANNING_TREE    1
@@ -421,11 +425,19 @@ static int CmiState_hasMessage(void) {
   return CmiIdleLock_hasMessage(cs);
 }
 
+// Function declaration
+CmiCommHandle CmiInterSendNetworkFunc(int destPE, int partition, int size, char *msg, int mode);
+
 /* ===== End of Processor/Node State-related Stuff =====*/
 
 #include "machine-broadcast.c"
 #include "immediate.c"
 #include "machine-commthd-util.c"
+#if CMK_USE_CMA
+// cma_min_thresold and cma_max_threshold specify the range of sizes between which CMA will be used for SHM messaging
+int cma_works, cma_min_threshold, cma_max_threshold;
+#include "machine-cma.c"
+#endif
 
 /* ===== Beginning of Common Function Definitions ===== */
 static void PerrorExit(const char *msg) {
@@ -499,6 +511,16 @@ static INLINE_KEYWORD void handleOneRecvedMsg(int size, char *msg) {
     TRACE_COMM_CREATION(TraceTimerCommon(), msg);
 #endif
 
+#if CMK_USE_CMA
+    // If CMA message, perform CMA read to get the payload message
+    if(cma_works && CMI_MSG_TYPE(msg) == CMK_CMA_MD_MSG) {
+      handleOneCmaMdMsg(&size, &msg);  // size & msg are modififed
+    } else if(cma_works && CMI_MSG_TYPE(msg) == CMK_CMA_ACK_MSG) {
+      handleOneCmaAckMsg(size, msg);
+      return;
+    }
+#endif
+
     int isBcastMsg = 0;
 #if CMK_BROADCAST_SPANNING_TREE || CMK_BROADCAST_HYPERCUBE
     isBcastMsg = (CMI_BROADCAST_ROOT(msg)!=0);
@@ -566,10 +588,6 @@ void CmiInterSyncSendFn(int destPE, int partition, int size, char *msg) {
 #if CMK_USE_XPMEM
 #include "machine-xpmem.c"
 #endif
-#if CMK_USE_CMA
-int cma_works;
-#include "machine-cma.c"
-#endif
 
 static int refcount = 0;
 
@@ -577,11 +595,11 @@ static int refcount = 0;
 CpvExtern(int, _urgentSend);
 #endif
 
-//declaration so that it can be used
-CmiCommHandle CmiInterSendNetworkFunc(int destPE, int partition, int size, char *msg, int mode);
 //I am changing this function to offload task to a generic function - the one
 //that handles sending to any partition
 INLINE_KEYWORD CmiCommHandle CmiSendNetworkFunc(int destPE, int size, char *msg, int mode) {
+  // Set the message as a regular message (defined in lrts-common.h)
+  CMI_SET_MSG_TYPE(msg, CMK_REG_MSG);
   return CmiInterSendNetworkFunc(destPE, CmiMyPartition(), size, msg, mode);
 }
 //the generic function that replaces the older one
@@ -590,6 +608,15 @@ CmiCommHandle CmiInterSendNetworkFunc(int destPE, int partition, int size, char 
         int rank;
         int destLocalNode = CmiNodeOf(destPE); 
         int destNode = CmiGetNodeGlobal(destLocalNode,partition); 
+
+#if CMK_USE_CMA
+        if(cma_works && partition == CmiMyPartition() && CmiPeOnSamePhysicalNode(CmiMyPe(), destPE)) {
+          if(CMI_MSG_TYPE(msg) == CMK_REG_MSG && cma_min_threshold <= size && size <= cma_max_threshold) {
+            CmiSendMessageCma(&msg, &size); // size & msg are modififed
+          }
+        }
+#endif
+
 #if CMK_USE_PXSHM      
         if ((partition == CmiMyPartition()) && CmiValidPxshm(destLocalNode, size)) {
           CmiSendMessagePxshm(msg, size, destLocalNode, &refcount);
@@ -639,6 +666,9 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
 //case slower - two extra comparisons may happen
 void CmiInterFreeSendFn(int destPE, int partition, int size, char *msg) {
     CMI_SET_BROADCAST_ROOT(msg, 0);
+
+    // Set the message as a regular message (defined in lrts-common.h)
+    CMI_SET_MSG_TYPE(msg, CMK_REG_MSG);
     CQdCreate(CpvAccess(cQdState), 1);
     if (CmiMyPe()==destPE && partition == CmiMyPartition()) {
         CmiSendSelf(msg);
@@ -724,6 +754,8 @@ void CmiInterFreeNodeSendFn(int destNode, int partition, int size, char *msg) {
     CMI_DEST_RANK(msg) = DGRAM_NODEMESSAGE;
     CQdCreate(CpvAccess(cQdState), 1);
     CMI_SET_BROADCAST_ROOT(msg, 0);
+    // Set the message as a regular message (defined in lrts-common.h)
+    CMI_SET_MSG_TYPE(msg, CMK_REG_MSG);
     if (destNode == CmiMyNode() && CmiMyPartition() == partition) {
         CmiSendNodeSelf(msg);
     } else {
@@ -1083,6 +1115,8 @@ CMI_EXTERNC_VARIABLE int quietModeRequested;
 #else
 #define SET_ENV_VAR(key, value) setenv(key, value, 0)
 #endif
+// For INT_MAX
+#include <limits.h>
 
 /* ##### Beginning of Functions Related with Machine Startup ##### */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret) {
@@ -1293,13 +1327,40 @@ if (  MSG_STATISTIC)
     CmiInitXpmem(argv);
 #endif
 #if CMK_USE_CMA
-    cma_works = CmiInitCma();
-    /* To use CMA, check that the global variable cma_works flag is set to 1.
-     * If it is 0, it indicates that CMA calls are supported but operations do
-     * not have the right permissions for usage. If cma_works is 0, CMA cannot be
-     * used by the RTS. CMA_HAS_CMA being disabled indicates that CMA calls are not
-     * even supported by the OS.
-     */
+    cma_works = 1;
+    if (CmiGetArgFlagDesc(argv,"+cma_enable_all","Ignore default thresholds & Enable use of CMA for all intranode SHM transport")) {
+      cma_min_threshold = 0U;
+      cma_max_threshold = INT_MAX;
+    } else {
+      // CMA Message size lower bound
+      if(!CmiGetArgIntDesc(argv,"+cma_min_threshold", &cma_min_threshold,"CMA Message size (Bytes) lower bound")) {
+        // Default cma_min_threshold
+        cma_min_threshold = CMK_CMA_MIN;
+      }
+      // CMA Message size upper bound
+      if(!CmiGetArgIntDesc(argv,"+cma_max_threshold", &cma_max_threshold,"CMA Message size (Bytes) upper bound")) {
+        // Default cma_max_threshold
+        cma_max_threshold = CMK_CMA_MAX;
+      }
+      // Disable CMA
+      if (CmiGetArgFlagDesc(argv,"+cma_disable","Disable use of CMA for SHM transport")) {
+        cma_works = 0;
+      }
+    }
+
+    //TODO: Remove this to enable CMA following network threshold determination
+    cma_works = 0;
+
+    if(cma_works) {
+      // Initialize CMA if it is not disabled
+      cma_works = CmiInitCma(cma_min_threshold, cma_max_threshold);
+      /* To use CMA, check that the global variable cma_works flag is set to 1.
+       * If it is 0, it indicates that CMA calls are supported but operations do
+       * not have the right permissions for usage. If cma_works is 0, CMA cannot be
+       * used by the RTS. CMA_HAS_CMA being disabled indicates that CMA calls are not
+       * even supported by the OS.
+       */
+    }
 #endif
 
     /* CmiTimerInit(); */

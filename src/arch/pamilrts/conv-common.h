@@ -11,9 +11,9 @@
 
 //#define  DELTA_COMPRESS                                     1
 #if DELTA_COMPRESS
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, stratid; unsigned char cksum, magic; int root, size; CmiUInt2 redID, padding; CmiUInt4 compressStart; CmiUInt2 compress_flag,xxhdl; CmiUInt8 persistRecvHandler;
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, type; unsigned char cksum, magic; int root, size; CmiUInt2 redID, padding; CmiUInt4 compressStart; CmiUInt2 compress_flag,xxhdl; CmiUInt8 persistRecvHandler;
 #else
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, stratid; unsigned char cksum, magic; int root, size; CmiUInt2 redID, padding; 
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, type; unsigned char cksum, magic; int root, size; CmiUInt2 redID, padding; 
 #endif
 
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT

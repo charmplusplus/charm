@@ -99,22 +99,6 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
     int i, oldRank;
     char *newmsg;
 
-#if CMK_ERROR_CHECKING
-    CmiUInt2 strategy = 0;
-    if (startNode == CmiMyNode()) { // I'm the root
-      if (_topoTree != NULL) strategy = 1;
-      CmiSetStrategy(msg, strategy);
-    } else {
-      strategy = CmiGetStrategy(msg);
-      if ((strategy == 0) && (_topoTree != NULL)) {
-        CmiAbort("ERROR: root not switched to topotree but intermediate node has topo info");
-      }
-      if ((strategy == 1) && (_topoTree == NULL)) {
-        CmiAbort("ERROR: root switched to topotree but intermediate node has no topo info yet");
-      }
-    }
-#endif
-
     oldRank = CMI_DEST_RANK(msg);
     /* doing this is to avoid the multiple assignment in the following for loop */
     CMI_DEST_RANK(msg) = rankToAssign;

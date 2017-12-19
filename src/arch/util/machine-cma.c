@@ -4,7 +4,7 @@
 #include <sys/uio.h>
 
 // Method checks if process has permissions to use CMA
-int CmiInitCma(void) {
+int CmiInitCma(int cma_min_threshold, int cma_max_threshold) {
   char buffer   = '0';
   int cma_works = 0;
   int fd;
@@ -28,8 +28,12 @@ int CmiInitCma(void) {
     cma_works = 1;
   }
 
-  if(cma_works && _Cmi_mynode == 0)
-      CmiPrintf("Charm++> CMA enabled for within node transfers using the zerocopy API\n");
+  if(cma_works && _Cmi_mynode == 0) {
+      if(cma_min_threshold > cma_max_threshold) {
+        CmiAbort("CMA size thresholds incorrect! Values should satisfy cma_min_threshold <= cma_min_threshold condition");
+      }
+      CmiPrintf("Charm++> CMA enabled for within node transfers of messages(sized between %d & %d bytes)\n", cma_min_threshold, cma_max_threshold);
+  }
 
   return cma_works;
 }
@@ -70,3 +74,91 @@ int writeShmCma(
   return 0;
 }
 
+// Metadata of a buffer that is to be sent to another intra-host process over CMA
+typedef struct _cma_src_buffer_info {
+  int srcPE;
+  pid_t srcPid;
+  void *srcAddr;
+  int size;
+}CmaSrcBufferInfo_t;
+
+// Method invoked on receiving a CMK_CMA_MD_MSG
+// This method uses the buffer metadata to perform a CMA read. It also modifies *sizePtr & *msgPtr to
+// point to the buffer message
+void handleOneCmaMdMsg(int *sizePtr, char **msgPtr) {
+  struct iovec local, remote;
+  char *destAddr;
+
+  // Get buffer metadata
+  CmaSrcBufferInfo_t *bufInfo = (CmaSrcBufferInfo_t *)(*msgPtr + CmiMsgHeaderSizeBytes);
+
+  // Allocate a buffer to hold the buffer
+  destAddr = CmiAlloc(bufInfo->size);
+
+  local.iov_base = (void *)destAddr;
+  local.iov_len  = bufInfo->size;
+
+  remote.iov_base = bufInfo->srcAddr;
+  remote.iov_len  = bufInfo->size;
+
+  // Perform CMA read into destAddr
+  readShmCma(bufInfo->srcPid,
+             &local,
+             &remote,
+             1,
+             bufInfo->size);
+
+  // Send the buffer md msg back as an ack msg to signal CMA read completion in order to free buffers
+  // on the source process
+  CMI_SET_MSG_TYPE(*msgPtr, CMK_CMA_ACK_MSG);
+
+  CmiInterSendNetworkFunc(bufInfo->srcPE,
+                          CmiMyPartition(),
+                          CmiMsgHeaderSizeBytes + sizeof(CmaSrcBufferInfo_t),
+                          *msgPtr,
+                          P2P_SYNC);
+
+  // Reassign *msgPtr to the buffer
+  *msgPtr = destAddr;
+  // Reassign *sizePtr to the size of the buffer
+  *sizePtr = local.iov_len;
+}
+
+
+// Method invoked on receiving CMK_CMA_ACK_MSG
+// This method frees the buffer and the received buffer ack msg
+void handleOneCmaAckMsg(int size, void *msg) {
+
+  // Get buffer metadata
+  CmaSrcBufferInfo_t *bufInfo = (CmaSrcBufferInfo_t *)(msg + CmiMsgHeaderSizeBytes);
+
+  // Free the large buffer sent
+  CmiFree(bufInfo->srcAddr);
+
+  // Free this ack message
+  CmiFree(msg);
+}
+
+// Method invoked to send the buffer via CMA
+// This method creates a buffer metadata msg from a buffer and modifies the *msgPtr and *sizePtr to point to
+// the buffer metadata msg.
+void CmiSendMessageCma(char **msgPtr, int *sizePtr) {
+
+  // Send buffer metadata instead of original msg
+  // Buffer metadata msg consists of pid, addr, size for the other process to perform a read through CMA
+  char *cmaBufMdMsg = CmiAlloc(CmiMsgHeaderSizeBytes + sizeof(CmaSrcBufferInfo_t));
+  CmaSrcBufferInfo_t *bufInfo = (CmaSrcBufferInfo_t *)(cmaBufMdMsg + CmiMsgHeaderSizeBytes);
+  bufInfo->srcPE  = CmiMyPe();
+  bufInfo->srcPid = getpid();
+  bufInfo->srcAddr = *msgPtr;
+  bufInfo->size    = *sizePtr;
+
+  // Tag this message as a CMA buffer md message
+  CMI_SET_MSG_TYPE(cmaBufMdMsg, CMK_CMA_MD_MSG);
+
+  // Reassign *sizePtr to store the size of the buffer md msg
+  *sizePtr = CmiMsgHeaderSizeBytes + sizeof(CmaSrcBufferInfo_t);
+
+  // Reassign *msgPtr to point to the buffer metadata msg
+  *msgPtr = (char *)cmaBufMdMsg;
+}
