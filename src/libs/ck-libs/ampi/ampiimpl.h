@@ -11,22 +11,45 @@
 
 using std::vector;
 
-#if defined(__linux__)
-  // On Linux, use weak symbols for PMPI support
-  #define STRINGIFY(a) #a
-  #define AMPI_API_IMPL(name) \
-    _Pragma(STRINGIFY(weak A##name)) \
-    _Pragma(STRINGIFY(weak AP##name = A##name)) \
-    CLINKAGE
-#else
-  // Windows/Darwin do not support weak symbols, do not use them
-  // No support for PMPI
-  #define AMPI_API_IMPL(name) CLINKAGE
-#endif
-
-
 //Uncomment for debug print statements
 #define AMPI_DEBUG(...) //CkPrintf(__VA_ARGS__)
+
+/*
+ * All MPI_* routines must be defined using the AMPI_API_IMPL macro.
+ * All calls inside AMPI to MPI_* routines must use MPI_* as the name.
+ * There are two reasons for this:
+ *
+ * 1. AMPI supports the PMPI interface only on Linux.
+ *
+ * 2. When AMPI is built on top of MPI, we rename the user's MPI_* calls as AMPI_*.
+ */
+#define STRINGIFY(a) #a
+
+#if defined(__linux__)
+  #if CMK_CONVERSE_MPI
+    #define AMPI_API_IMPL(ret, name, ...) \
+      _Pragma(STRINGIFY(weak A##name)) \
+      _Pragma(STRINGIFY(weak AP##name = A##name)) \
+      CLINKAGE \
+      ret A##name(__VA_ARGS__)
+  #else
+    #define AMPI_API_IMPL(ret, name, ...) \
+      _Pragma(STRINGIFY(weak name)) \
+      _Pragma(STRINGIFY(weak P##name = name)) \
+      CLINKAGE \
+      ret name(__VA_ARGS__)
+  #endif
+#else // not Linux (no PMPI support):
+  #if CMK_CONVERSE_MPI
+    #define AMPI_API_IMPL(ret, name, ...) \
+      CLINKAGE \
+      ret A##name(__VA_ARGS__)
+  #else
+    #define AMPI_API_IMPL(ret, name, ...) \
+      CLINKAGE \
+      ret name(__VA_ARGS__)
+  #endif
+#endif
 
 #if AMPIMSGLOG
 #include "ckliststring.h"
