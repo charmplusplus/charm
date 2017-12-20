@@ -1324,6 +1324,13 @@ public:
 
 static LBTopoVec* lbTopoMap;
 static CmiNodeLock lbTopoMapInitLock;
+static bool lbTopoInitialized = false;
+
+void LBTopoInit() {
+  CmiAssert(!lbTopoInitialized);
+  lbTopoMapInitLock = CmiCreateLock();
+  lbTopoInitialized = true;
+}
 
 extern "C"
 LBtopoFn LBTopoLookup(const char *name)

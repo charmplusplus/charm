@@ -993,6 +993,9 @@ extern void _metabalancerInit();
 #if CMK_SMP && CMK_TASKQUEUE
 extern void _taskqInit();
 #endif
+#if CMK_SMP
+extern void LBTopoInit();
+#endif
 extern void _initChareTables();
 #if CMK_MEM_CHECKPOINT
 extern void init_memcheckpt(char **argv);
@@ -1179,6 +1182,11 @@ void _initCharm(int unused_argc, char **argv)
 	_loadbalancerInit();
         _metabalancerInit();
 
+#if CMK_SMP
+	if (CmiMyRank() == 0) {
+		LBTopoInit();
+	}
+#endif
 #if CMK_MEM_CHECKPOINT
         init_memcheckpt(argv);
 #endif
