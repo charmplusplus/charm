@@ -28,7 +28,7 @@ CkDDT_DataType*
 CkDDT::getType(int nIndex) const
 {
 #if CMK_ERROR_CHECKING
-  if (nIndex < 0 || nIndex >= CkDDT_MAXTYPE)
+  if (nIndex < 0 || nIndex > typeTable.size())
     CkAbort("CkDDT: Invalid type index passed to getType!");
 #endif
   return typeTable[nIndex];
@@ -40,7 +40,7 @@ CkDDT::pup(PUP::er &p)
   p|types;
   if (p.isUnpacking())
   {
-    typeTable.resize(types.size(), NULL);
+    typeTable.resize(types.size(), nullptr);
     for(int i=0 ; i < types.size(); i++)
     {
       switch(types[i])
@@ -88,27 +88,63 @@ CkDDT::pup(PUP::er &p)
 }
 
 void
-CkDDT::freeType(int* index)
+CkDDT::freeType(int index)
 {
-  // FIXME: Use reference counting
-/*  delete typeTable[*index];
-  typeTable[*index] = 0 ;
-  types[*index] = CkDDT_TYPE_NULL ;
-  *index = -1 ;
-*/
+  CkAssert(types.size() == typeTable.size());
+  if (index > CkDDT_MAX_PRIMITIVE_TYPE) {
+    // Decrement the ref count and free the type if there are no references to it.
+    if (typeTable[index]->decRefCount() == 0) {
+      // Remove a reference from this type's base type(s).
+      if (typeTable[index]->getType() == CkDDT_STRUCT) {
+        int count = typeTable[index]->getCount();
+        vector<int> baseIndices = (static_cast<CkDDT_Struct&> (*typeTable[index])).getBaseIndices();
+        for (int i=0; i < count; i++)
+          freeType(baseIndices[i]);
+      } else {
+        freeType(typeTable[index]->getBaseIndex());
+      }
+
+      // Free non-primitive type
+      delete typeTable[index];
+      typeTable[index] = nullptr;
+      types[index] = CkDDT_TYPE_NULL;
+      // Free all NULL types from back of typeTable
+      while (typeTable.back() == nullptr) {
+        typeTable.pop_back();
+        CkAssert(types.back() == CkDDT_TYPE_NULL);
+        types.pop_back();
+      }
+    }
+  }
 }
 
 CkDDT::~CkDDT()
 {
   for(int i=0; i < typeTable.size(); i++)
   {
-    if(typeTable[i] != NULL)
+    if(typeTable[i] != nullptr)
     {
        delete typeTable[i];
     }
   }
 }
 
+int
+CkDDT::insertType(CkDDT_DataType* ptr, int type)
+{
+  // Search thru non-primitive types for a free one first:
+  CkAssert(types.size() == typeTable.size());
+  for (int i=CkDDT_MAX_PRIMITIVE_TYPE+1; i<types.size(); i++) {
+    if (types[i] == CkDDT_TYPE_NULL) {
+      types[i] = type;
+      typeTable[i] = ptr;
+      return i;
+    }
+  }
+  types.push_back(type);
+  typeTable.push_back(ptr);
+  return types.size()-1;
+}
 
 bool
 CkDDT::isContig(int nIndex) const
@@ -164,13 +200,6 @@ CkDDT::createDup(int nIndexOld, int *nIndexNew)
   CkDDT_DataType *dttype = getType(nIndexOld);
   CkDDT_DataType *type;
 
-#if CMK_ERROR_CHECKING
-  if (typeTable.size()+1 >= CkDDT_MAXTYPE)
-    CkAbort("CkDDT: type table exceeded its maximum size!");
-#endif
-
-  *nIndexNew = typeTable.size();
-
   switch(dttype->getType()) {
     case CkDDT_CONTIGUOUS:
       type = new CkDDT_Contiguous(static_cast<CkDDT_Contiguous&> (*dttype));
@@ -201,8 +230,7 @@ CkDDT::createDup(int nIndexOld, int *nIndexNew)
       break;
   }
 
-  typeTable.push_back(type);
-  types.push_back(types[nIndexOld]);
+  *nIndexNew = insertType(type, types[nIndexOld]);
 }
 
 int CkDDT::getEnvelope(int nIndex, int *ni, int *na, int *nd, int *combiner) const
@@ -211,10 +239,19 @@ int CkDDT::getEnvelope(int nIndex, int *ni, int *na, int *nd, int *combiner) con
   return dttype->getEnvelope(ni, na, nd, combiner);
 }
 
-int CkDDT::getContents(int nIndex, int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const
+int CkDDT::getContents(int nIndex, int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[])
 {
   CkDDT_DataType* dttype = getType(nIndex);
-  return dttype->getContents(ni, na, nd, i, a, d);
+  int ret = dttype->getContents(ni, na, nd, i, a, d);
+  if (dttype->getType() == CkDDT_STRUCT) {
+    int count = dttype->getCount();
+    vector<CkDDT_DataType*> baseTypes = (static_cast<CkDDT_Struct&> (*dttype)).getBaseTypes();
+    for (int i=0; i < count; i++)
+      baseTypes[i]->incRefCount();
+  } else {
+    dttype->getBaseType()->incRefCount();
+  }
+  return ret;
 }
 
 void
@@ -236,11 +273,6 @@ CkDDT::createResized(CkDDT_Type oldtype, CkDDT_Aint lb, CkDDT_Aint extent, CkDDT
 {
   CkDDT_DataType *dttype = getType(oldtype);
   CkDDT_DataType *type;
-
-#if CMK_ERROR_CHECKING
-  if (typeTable.size()+1 >= CkDDT_MAXTYPE)
-    CkAbort("CkDDT: type table exceeded its maximum size!");
-#endif
 
   switch(dttype->getType()) {
     case CkDDT_CONTIGUOUS:
@@ -280,145 +312,79 @@ CkDDT::createResized(CkDDT_Type oldtype, CkDDT_Aint lb, CkDDT_Aint extent, CkDDT
       break;
   }
 
-  *newType = typeTable.size();
-
-  typeTable.push_back(type);
-  types.push_back(types[oldtype]);
+  *newType = insertType(type, types[oldtype]);
 }
 
 void
 CkDDT::newContiguous(int count, CkDDT_Type oldType, CkDDT_Type *newType)
 {
-#if CMK_ERROR_CHECKING
-  if (typeTable.size()+1 >= CkDDT_MAXTYPE)
-    CkAbort("CkDDT: type table exceeded its maximum size!");
-#endif
-
-  *newType = typeTable.size();
-
   CkDDT_DataType *type = new CkDDT_Contiguous(count, oldType, typeTable[oldType]);
-  typeTable.push_back(type);
-  types.push_back(CkDDT_CONTIGUOUS);
+  *newType = insertType(type, CkDDT_CONTIGUOUS);
 }
 
 void
 CkDDT::newVector(int count, int blocklength, int stride,
                  CkDDT_Type oldType, CkDDT_Type* newType)
 {
-#if CMK_ERROR_CHECKING
-  if (typeTable.size()+1 >= CkDDT_MAXTYPE)
-    CkAbort("CkDDT: type table exceeded its maximum size!");
-#endif
-
-  *newType = typeTable.size();
-
   CkDDT_DataType* type = new CkDDT_Vector(count, blocklength, stride, oldType, typeTable[oldType]);
-  typeTable.push_back(type);
-  types.push_back(CkDDT_VECTOR);
+  *newType = insertType(type, CkDDT_VECTOR);
 }
 
 void
 CkDDT::newHVector(int count, int blocklength, int stride,
                   CkDDT_Type oldtype, CkDDT_Type* newType)
 {
-#if CMK_ERROR_CHECKING
-  if (typeTable.size()+1 >= CkDDT_MAXTYPE)
-    CkAbort("CkDDT: type table exceeded its maximum size!");
-#endif
-
-  *newType = typeTable.size();
-
   CkDDT_DataType* type =
     new CkDDT_HVector(count, blocklength, stride, oldtype, typeTable[oldtype]);
-  typeTable.push_back(type);
-  types.push_back(CkDDT_HVECTOR);
+  *newType = insertType(type, CkDDT_HVECTOR);
 }
 
 void
 CkDDT::newIndexed(int count, const int* arrbLength, CkDDT_Aint* arrDisp,
                   CkDDT_Type oldtype, CkDDT_Type* newType)
 {
-#if CMK_ERROR_CHECKING
-  if (typeTable.size()+1 >= CkDDT_MAXTYPE)
-    CkAbort("CkDDT: type table exceeded its maximum size!");
-#endif
-
-  *newType = typeTable.size();
-
   CkDDT_DataType* type =
     new CkDDT_Indexed(count, arrbLength, arrDisp, oldtype, typeTable[oldtype]);
-  typeTable.push_back(type);
-  types.push_back(CkDDT_INDEXED);
+  *newType = insertType(type, CkDDT_INDEXED);
 }
 
 void
 CkDDT::newHIndexed(int count, const int* arrbLength, const CkDDT_Aint* arrDisp,
                    CkDDT_Type oldtype, CkDDT_Type* newType)
 {
-#if CMK_ERROR_CHECKING
-  if (typeTable.size()+1 >= CkDDT_MAXTYPE)
-    CkAbort("CkDDT: type table exceeded its maximum size!");
-#endif
-
-  *newType = typeTable.size();
-
   CkDDT_DataType* type =
     new CkDDT_HIndexed(count, arrbLength, arrDisp, oldtype, typeTable[oldtype]);
-  typeTable.push_back(type);
-  types.push_back(CkDDT_HINDEXED);
+  *newType = insertType(type, CkDDT_HINDEXED);
 }
 
 void
 CkDDT::newIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
                   CkDDT_Type *newType)
 {
-#if CMK_ERROR_CHECKING
-  if (typeTable.size()+1 >= CkDDT_MAXTYPE)
-    CkAbort("CkDDT: type table exceeded its maximum size!");
-#endif
-
-  *newType = typeTable.size();
-
   CkDDT_DataType *type = new CkDDT_Indexed_Block(count, Blocklength, arrDisp, oldtype, typeTable[oldtype]);
-  typeTable.push_back(type);
-  types.push_back(CkDDT_INDEXED_BLOCK);
+  *newType = insertType(type, CkDDT_INDEXED_BLOCK);
 }
 
 void
 CkDDT::newHIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
                   CkDDT_Type *newType)
 {
-#if CMK_ERROR_CHECKING
-  if (typeTable.size()+1 >= CkDDT_MAXTYPE)
-    CkAbort("CkDDT: type table exceeded its maximum size!");
-#endif
-
-  *newType = typeTable.size();
-
   CkDDT_DataType *type = new CkDDT_HIndexed_Block(count, Blocklength, arrDisp, oldtype, typeTable[oldtype]);
-  typeTable.push_back(type);
-  types.push_back(CkDDT_HINDEXED_BLOCK);
+  *newType = insertType(type, CkDDT_HINDEXED_BLOCK);
 }
 
 void
 CkDDT::newStruct(int count, const int* arrbLength, const CkDDT_Aint* arrDisp,
                  const CkDDT_Type *oldtype, CkDDT_Type* newType)
 {
-#if CMK_ERROR_CHECKING
-  if (typeTable.size()+1 >= CkDDT_MAXTYPE)
-    CkAbort("CkDDT: type table exceeded its maximum size!");
-#endif
-
-  *newType = typeTable.size();
-
   vector<CkDDT_DataType *> olddatatypes(count);
   for(int i=0;i<count;i++){
     olddatatypes[i] = getType(oldtype[i]);
   }
+
   CkDDT_DataType* type =
     new CkDDT_Struct(count, arrbLength, arrDisp, oldtype, olddatatypes.data());
-  typeTable.push_back(type);
-  types.push_back(CkDDT_STRUCT);
+  *newType = insertType(type, CkDDT_STRUCT);
 }
 
 typedef struct { float val; int idx; } FloatInt;
@@ -587,7 +553,10 @@ CkDDT_DataType::CkDDT_DataType(int datatype, int size, CkDDT_Aint extent, int co
     datatype(datatype), refCount(1), size(size), extent(extent), count(count), lb(lb), ub(ub), trueExtent(trueExtent),
     trueLB(trueLB), iscontig(iscontig), baseSize(baseSize), baseExtent(baseExtent), baseType(baseType),
     numElements(numElements), baseIndex(baseIndex), isAbsolute(false)
-{}
+{
+  if (baseType)
+    baseType->incRefCount();
+}
 
 CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType &obj)  :
   datatype(obj.datatype)
@@ -608,6 +577,8 @@ CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType &obj)  :
   ,isAbsolute(obj.isAbsolute)
   ,name(obj.name)
 {
+  if (baseType)
+    baseType->incRefCount();
 }
 
 // TODO: this constructor can be combined with the previous one in C++11.
@@ -626,6 +597,9 @@ CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType &obj, CkDDT_Aint _lb, CkDDT_
   count       = obj.count;
   isAbsolute  = obj.isAbsolute;
   name        = obj.name;
+
+  if (baseType)
+    baseType->incRefCount();
 
   setSize(_lb, _extent);
 }
@@ -773,15 +747,21 @@ CkDDT_DataType::getType(void) const
 }
 
 void
-CkDDT_DataType::inrRefCount(void)
+CkDDT_DataType::incRefCount()
 {
-  refCount++ ;
+  CkAssert(refCount > 0);
+  if (datatype > CkDDT_MAX_PRIMITIVE_TYPE)
+    refCount++;
 }
 
+// Callers of this function should always check its return value and free the type only if it returns 0.
 int
-CkDDT_DataType::getRefCount(void) const
+CkDDT_DataType::decRefCount(void)
 {
-  return refCount ;
+  CkAssert(refCount > 0);
+  if (datatype > CkDDT_MAX_PRIMITIVE_TYPE)
+    return --refCount;
+  return -1;
 }
 
 void
@@ -831,6 +811,8 @@ CkDDT_Contiguous::CkDDT_Contiguous(int nCount, int bindex, CkDDT_DataType* oldTy
   baseIndex = bindex;
   baseSize = baseType->getSize();
   baseExtent = baseType->getExtent();
+  refCount = 1;
+  baseType->incRefCount();
   size = count * baseSize;
   extent = count * baseExtent;
   numElements = count * baseType->getNumElements();
@@ -902,6 +884,8 @@ CkDDT_Vector::CkDDT_Vector(int nCount, int blength, int stride, int bindex, CkDD
   baseType =  oldType;
   baseSize = baseType->getSize() ;
   baseExtent = baseType->getExtent() ;
+  refCount = 1;
+  baseType->incRefCount();
   numElements = count * baseType->getNumElements();
   size = count *  blockLength * baseSize ;
 
@@ -995,6 +979,8 @@ CkDDT_HVector::CkDDT_HVector(int nCount, int blength, int stride,  int bindex,
   baseType = oldType ;
   baseSize = baseType->getSize() ;
   baseExtent = baseType->getExtent() ;
+  refCount = 1;
+  baseType->incRefCount();
   numElements = count * baseType->getNumElements();
   size = count *  blockLength * baseSize ;
 
@@ -1507,6 +1493,7 @@ CkDDT_Struct::CkDDT_Struct(int nCount, const int* arrBlock,
       arrayBlockLength[i] = arrBlock[i];
       arrayDisplacements[i] = arrDisp[i];
       arrayDataType[i] =  arrBase[i];
+      arrayDataType[i]->incRefCount();
       numElements += arrayBlockLength[i] * arrayDataType[i]->getNumElements();
       index[i] = bindex[i];
       size += arrBlock[i]*arrayDataType[i]->getSize();
@@ -1650,5 +1637,17 @@ CkDDT_Struct::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d
     d[z] = index[z];
   }
   return 0;
+}
+
+const vector<int> &
+CkDDT_Struct::getBaseIndices() const
+{
+  return index;
+}
+
+const vector<CkDDT_DataType*> &
+CkDDT_Struct::getBaseTypes() const
+{
+  return arrayDataType;
 }
 

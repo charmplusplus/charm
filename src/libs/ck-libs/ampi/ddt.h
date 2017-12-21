@@ -8,8 +8,6 @@
 using std::vector;
 using std::string;
 
-#define CkDDT_MAXTYPE           1024
-
 #define CkDDT_TYPE_NULL          -1
 #define CkDDT_DOUBLE              0
 #define CkDDT_INT                 1
@@ -118,8 +116,8 @@ class CkDDT ;
   getSize -  returns the size of the datatype. 
   getExtent - returns the extent of the datatype.
 
-  inrRefCount - increament the reference count.
-  getRefCount - returns the RefCount
+  incRefCount - increment the reference count.
+  decRefCount - decrement the reference count.
 
   serialize - This is the function which actually copies the contents from
     user's space to buffer if dir=1 or reverse if dir=-1
@@ -179,8 +177,8 @@ class CkDDT_DataType {
     virtual int getCount(void) const;
     virtual int getType(void) const;
     virtual int getNumElements(void) const;
-    virtual void inrRefCount(void) ;
-    virtual int getRefCount(void) const;
+    virtual void incRefCount() ;
+    virtual int decRefCount();
     virtual void pupType(PUP::er &p, CkDDT* ddt) ;
 
     virtual int getEnvelope(int *num_integers, int *num_addresses, int *num_datatypes, int *combiner) const;
@@ -435,6 +433,8 @@ class CkDDT_Struct : public CkDDT_DataType {
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+    virtual const vector<int>& getBaseIndices() const;
+    virtual const vector<CkDDT_DataType*>& getBaseTypes() const;
 };
 
 /*
@@ -565,7 +565,8 @@ class CkDDT {
                        CkDDT_Type *newtype);
   void newStruct(int count, const int* arrbLength, const CkDDT_Aint* arrDisp , const CkDDT_Type *oldtype,
                 CkDDT_Type* newtype);
-  void  freeType(int* index);
+  int insertType(CkDDT_DataType* ptr, int type);
+  void freeType(int index);
   void  pup(PUP::er &p);
   CkDDT_DataType*  getType(int nIndex) const;
 
@@ -579,7 +580,7 @@ class CkDDT {
   void createDup(int nIndexOld, int *nIndexNew);
   int getEnvelope(int nIndex, int *num_integers, int *num_addresses, int *num_datatypes, int *combiner) const;
   int getContents(int nIndex, int max_integers, int max_addresses, int max_datatypes,
-                 int array_of_integers[], CkDDT_Aint array_of_addresses[], int array_of_datatypes[]) const;
+                 int array_of_integers[], CkDDT_Aint array_of_addresses[], int array_of_datatypes[]);
   void setName(int nIndex, const char *name);
   void getName(int nIndex, char *name, int *len) const;
   void createResized(CkDDT_Type oldtype, CkDDT_Aint lb, CkDDT_Aint extent, CkDDT_Type *newtype);
