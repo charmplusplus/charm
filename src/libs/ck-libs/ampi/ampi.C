@@ -4072,7 +4072,7 @@ int AMPI_Sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
 {
   AMPI_API("AMPI_Sendrecv_replace");
 
-  handle_MPI_BOTTOM(buf, datatype, buf, datatype);
+  handle_MPI_BOTTOM(buf, datatype);
 
 #if AMPI_ERROR_CHECKING
   int ret;
