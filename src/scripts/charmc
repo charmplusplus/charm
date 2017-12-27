@@ -1637,9 +1637,9 @@ CHARM_LDXX_FLAGS="$CMK_LDXX_FLAGS $CMK_LIBDIR $OPTS_LD $OPTS_LDXX $ALL_LIBS"
 
 if [ -n "$PRINT_BUILDING_BLOCKS" ]
 then
-	for i in CHARM_{CC,CXX,LD,LDXX}{,_FLAGS}
+	for i in CHARM_CC CHARM_CXX CHARM_LD CHARM_LDXX CHARM_CC_FLAGS CHARM_CXX_FLAGS CHARM_LD_FLAGS CHARM_LDXX_FLAGS
 	do
-		echo "${i}='${!i}'"
+		eval "echo $i=\\'\${$i}\\'"
 	done
 	exit 0
 fi
