@@ -460,10 +460,9 @@ hwloc-target:  conv-autoconfig.h
 	( cp -f hwloc/src/.libs/libhwloc_embedded.a $(L) )
 	( cp -f hwloc/include/hwloc.h $(INC) )
 	( cp -LRf hwloc/include/hwloc $(INC) )
-#	-(CHARMINC=.; . ./conv-config.sh; \
+	(CHARMINC=.; . ./conv-config.sh; \
 	 test -d ../lib_so && \
-	 cp -f hwloc/src/.libs/libhwloc_embedded.$$CMK_SHARED_SUF ../lib_so && \
-	 cp -f hwloc/src/.libs/libhwloc_embedded.$$CMK_SHARED_SUF ../lib_so/libhwloc_embedded.$$CMK_SHARED_SUF)
+	 cp -f hwloc/src/.libs/libhwloc_embedded.*$$CMK_SHARED_SUF ../lib_so/ ) || true
 	touch $@
 
 charmrun-target: hwloc-target charmrun  sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h sockRoutines-seq.o $(L)/libck.a $(L)/libhwloc_embedded.a $(CVLIBS)
