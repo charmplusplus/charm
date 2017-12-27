@@ -1,6 +1,6 @@
 CHARMC=../../../bin/charmc $(OPTS)
 
-SIMPLE_DIRS= master-slave packlib ddt
+SIMPLE_DIRS= master-slave packlib
 DIRS= $(SIMPLE_DIRS)
 
 all: $(SIMPLE_DIRS)
