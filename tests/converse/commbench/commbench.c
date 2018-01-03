@@ -139,6 +139,13 @@ void commbench_init(int argc, char** argv) {
   CpvInitialize(int, num_tests_to_skip);
   CpvInitialize(char**, tests_to_skip);
   CpvInitialize(int, next_test_index);
+
+  // Set runtime cpuaffinity
+  CmiInitCPUAffinity(argv);
+
+  // Initialize CPU topology
+  CmiInitCPUTopology(argv);
+
   for (numtests = 0; tests[numtests].name; numtests++)
     ;
   CpvAccess(test_bank_size) = numtests;

@@ -175,6 +175,12 @@ CmiStartFn mymain(int argc, char** argv)
 
     CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE, ApplIdleStart, NULL);
     CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE, ApplIdleEnd, NULL);
+
+    // Set runtime cpuaffinity
+    CmiInitCPUAffinity(argv);
+
+    // Initialize CPU topology
+    CmiInitCPUTopology(argv);
     
     if(argc > 1)
         CpvAccess(twoway) = atoi(argv[1]);

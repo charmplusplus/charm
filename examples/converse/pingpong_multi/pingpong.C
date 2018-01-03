@@ -153,11 +153,17 @@ CmiHandler node1HandlerFunc(Message *msg)
 
 
 //Converse main. Initialize variables and register handlers
-CmiStartFn mymain()
+CmiStartFn mymain(int argc, char *argv[])
 {
     CpvInitialize(int,msgSize);
     CpvInitialize(int,cycleNum);
     
+    // Set runtime cpuaffinity
+    CmiInitCPUAffinity(argv);
+
+    // Initialize CPU topology
+    CmiInitCPUTopology(argv);
+
     CpvAccess(msgSize)= 4 + CmiMsgHeaderSizeBytes;
     
     CpvInitialize(int,exitHandler);

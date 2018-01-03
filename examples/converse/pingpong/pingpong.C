@@ -161,6 +161,10 @@ CmiStartFn mymain(int argc, char *argv[])
 
   // Set runtime cpuaffinity
   CmiInitCPUAffinity(argv);
+
+  // Initialize CPU topology
+  CmiInitCPUTopology(argv);
+
   // Update the argc after runtime parameters are extracted out
   argc = CmiGetArgc(argv);
   if(argc == 5){

@@ -201,6 +201,12 @@ CmiStartFn mymain(int argc, char **argv)
     CpvInitialize(int,twoway);
     CpvAccess(twoway) = 0;
 
+    // Set runtime cpuaffinity
+    CmiInitCPUAffinity(argv);
+
+    // Initialize CPU topology
+    CmiInitCPUTopology(argv);
+
     if(argc > 1)
         CpvAccess(twoway) = atoi(argv[1]);
     

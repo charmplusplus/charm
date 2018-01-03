@@ -629,6 +629,7 @@ extern int CmiPhysicalRank(int pe);
 extern void CmiInitCPUAffinity(char **argv);
 extern int CmiPrintCPUAffinity(void);
 extern int CmiSetCPUAffinity(int core);
+extern void CmiInitCPUTopology(char **argv);
 extern int CmiOnCore(void);
 
 typedef struct

@@ -238,6 +238,13 @@ void megacon_init(int argc, char **argv)
   CpvInitialize(int, next_test_number);
   CpvInitialize(int, acks_expected);
   CpvInitialize(int, acks_received);
+
+  // Set runtime cpuaffinity
+  CmiInitCPUAffinity(argv);
+
+  // Initialize CPU topology
+  CmiInitCPUTopology(argv);
+
   for (numtests=0; tests[numtests].name; numtests++);
   CpvAccess(test_bank_size) = numtests;
   CpvAccess(next_test_index) = 0;
