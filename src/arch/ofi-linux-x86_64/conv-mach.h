@@ -45,7 +45,8 @@
    Only one of the following can be 1. If none of them is selected, qthreads
    will be used as default. This default can be overwritten at compile time
    using -DCMK_THREADS_BUILD_"type"=1 */
-#define CMK_THREADS_USE_CONTEXT                            1
+#define CMK_THREADS_USE_CONTEXT                            0
+#define CMK_THREADS_USE_FCONTEXT                           1
 #define CMK_THREADS_USE_JCONTEXT                           0
 #define CMK_THREADS_USE_PTHREADS                           0
 
