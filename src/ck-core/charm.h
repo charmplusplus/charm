@@ -50,6 +50,7 @@ extern "C" {
 #define CkError                 CmiError
 #define CkAbort                 CmiAbort
 #define CkAssert                CmiAssert
+#define CkSetPeHelpsOtherThreads CmiSetPeHelpsOtherThreads
 
 extern void  CkExit(void);
 #if CMK_SHRINK_EXPAND

@@ -22,7 +22,7 @@ extern "C" void StealTask() {
 }
 
 static void TaskStealBeginIdle(void *dummy) {
-  if (CmiMyNodeSize() > 1)
+  if (CmiMyNodeSize() > 1 && CpvAccess(isHelperOn))
     StealTask();
 }
 

@@ -233,6 +233,8 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
 #if CMK_TRACE_ENABLED
         envelope *env = CpvAccess(dummyEnv);
 #endif
+
+        CmiMemoryReadFence();
         if (useTreeBcast) {
             int loopTimes = TREE_BCAST_BRANCH>(CmiMyNodeSize()-1)?CmiMyNodeSize()-1:TREE_BCAST_BRANCH;
             //just implicit binary tree
@@ -243,7 +245,8 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
 #endif
             for (int i=0; i<loopTimes; i++, pe++) {
                 if (pe >= CmiMyNodeSize()) pe -= CmiMyNodeSize();
-                CmiPushPE(pe, (void *)(notifyMsg));
+                if (CpvAccessOther(isHelperOn, pe))
+                    CmiPushPE(pe, (void *)(notifyMsg));
             }
         } else {
 #if CMK_TRACE_ENABLED
@@ -251,10 +254,12 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
             notifyMsg->eventID = env->getEvent();
 #endif
             for (int i=CmiMyRank()+1; i<numHelpers; i++) {
-                CmiPushPE(i, (void *)(notifyMsg));
+                if (CpvAccessOther(isHelperOn, i))
+                    CmiPushPE(i, (void *)(notifyMsg));
             }
             for (int i=0; i<CmiMyRank(); i++) {
-                CmiPushPE(i, (void *)(notifyMsg));
+                if (CpvAccessOther(isHelperOn, i))
+                    CmiPushPE(i, (void *)(notifyMsg));
             }
         }
 #else
@@ -265,12 +270,14 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
 #endif
         curLoop->set(numChunks, func, lowerRange, upperRange, paramNum, param);
         CpvAccess(_qd)->create(numHelpers-1);
+        CmiMemoryReadFence();
         if (useTreeBcast) {
             int loopTimes = TREE_BCAST_BRANCH>(CmiMyNodeSize()-1)?CmiMyNodeSize()-1:TREE_BCAST_BRANCH;
             //just implicit binary tree
             int pe = CmiMyRank()+1;
             for (int i=0; i<loopTimes; i++, pe++) {
                 if (pe >= CmiMyNodeSize()) pe -= CmiMyNodeSize();
+                if (!CpvAccessOther(isHelperOn,pe)) continue;
                 CharmNotifyMsg *one = thisHelper->getNotifyMsg();
                 one->ptr = (void *)curLoop;
                 envelope *env = UsrToEnv(one);
@@ -279,6 +286,7 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
             }
         } else {
             for (int i=CmiMyRank()+1; i<numHelpers; i++) {
+                if (!CpvAccessOther(isHelperOn, i)) continue;
                 CharmNotifyMsg *one = thisHelper->getNotifyMsg();
                 one->ptr = (void *)curLoop;
                 envelope *env = UsrToEnv(one);
@@ -287,6 +295,7 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
                 CmiPushPE(i, (void *)(env));
             }
             for (int i=0; i<CmiMyRank(); i++) {
+                if (!CpvAccessOther(isHelperOn, i)) continue;
                 CharmNotifyMsg *one = thisHelper->getNotifyMsg();
                 one->ptr = (void *)curLoop;
                 envelope *env = UsrToEnv(one);
@@ -504,6 +513,7 @@ void FuncSingleHelper::stealWork(CharmNotifyMsg *msg) {
         for (int i=0; i<TREE_BCAST_BRANCH; i++, relPE++) {
             if (relPE >= CmiMyNodeSize()) break;
             int pe = (relPE + msg->srcRank)%CmiMyNodeSize();
+            if (!CpvAccessOther(isHelperOn, pe)) continue;
             //CmiPrintf("Rank[%d]: send msg to dst %d (relPE: %d) from src %d\n", CmiMyRank(), pe, relPE, msg->srcRank);
             CharmNotifyMsg *newone = getNotifyMsg();
             newone->ptr = (void *)loop;
@@ -531,6 +541,7 @@ void SingleHelperStealWork(ConverseNotifyMsg *msg) {
         for (int i=0; i<TREE_BCAST_BRANCH; i++, relPE++) {
             if (relPE >= CmiMyNodeSize()) break;
             int pe = (relPE + msg->srcRank)%CmiMyNodeSize();
+            if (!CpvAccessOther(isHelperOn, pe)) continue;
             //CmiPrintf("Rank[%d]: send msg to dst %d (relPE: %d) from src %d\n", CmiMyRank(), pe, relPE, msg->srcRank);
             CmiPushPE(pe, (void *)msg);
         }

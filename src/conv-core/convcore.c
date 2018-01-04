@@ -252,6 +252,9 @@ CsvDeclare(unsigned int, idleThreadsCnt);
 CpvDeclare(Queue, CsdTaskQueue);
 CpvDeclare(void *, CmiSuspendedTaskQueue);
 #endif
+
+CpvDeclare(int, isHelperOn);
+
 int CmiIsMyNodeIdle(void);
 
 /*****************************************************************************
@@ -2282,6 +2285,9 @@ void CsdInit(char **argv)
   CpvAccess(CsdTaskQueue) = TaskQueueCreate();
 #endif
   CpvAccess(CsdStopFlag)  = 0;
+  CpvInitialize(int, isHelperOn);
+  CpvAccess(isHelperOn) = 1; // Turn on this bit by default for threads to be used for CkLoop and OpenMP integration
+  CmiMemoryWriteFence();
 #if CMK_SMP && CMK_TASKQUEUE
   CmiTaskQueueInit();
 #endif
@@ -4011,6 +4017,11 @@ int CmiIsMyNodeIdle(void){
         if(CpvAccessOther(cmiMyPeIdle, i)) return 1;
     }
     return 0;
+}
+
+void CmiSetPeHelpsOtherThreads(int input) {
+  CpvAccess(isHelperOn) = input;
+  CmiMemoryWriteFence();
 }
 
 /*@}*/

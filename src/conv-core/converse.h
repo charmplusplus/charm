@@ -2217,6 +2217,12 @@ extern int CmiGetCurKnownOmpThreads();
 #endif
 #endif
 #endif
+CpvExtern(int, isHelperOn);
+#if defined(__cplusplus)
+extern "C" void CmiSetPeHelpsOtherThreads(int);
+#else
+extern void CmiSetPeHelpsOtherThreads(int);
+#endif
 #endif /* CONVERSE_H */
 
 
