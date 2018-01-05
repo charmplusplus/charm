@@ -5,7 +5,7 @@ mainmodule wave2d {
 
   mainchare Main {
     entry Main(CkArgMsg *m);
-    entry void iterationCompleted();
+    entry [reductiontarget] void iterationCompleted(int iteration);
   };
 
   array [2D] Wave {
