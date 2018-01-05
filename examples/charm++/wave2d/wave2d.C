@@ -9,9 +9,9 @@
 /*readonly*/ CProxy_Wave arrayProxy;
 
 #define TotalDataWidth  800
-#define TotalDataHeight 700
-#define chareArrayWidth  4
-#define chareArrayHeight  3
+#define TotalDataHeight 800
+#define chareArrayWidth  16
+#define chareArrayHeight  16
 #define total_iterations 5000
 #define numInitialPertubations 5
 
@@ -22,12 +22,7 @@ enum { left=0, right, up, down };
 class Main : public CBase_Main
 {
 public:
-  int iteration;
-  int count;
-
   Main(CkArgMsg* m) {
-    iteration = 0;
-    count = 0;
     mainProxy = thisProxy; // store the main proxy
     
     CkPrintf("Running wave2d on %d processors\n", CkNumPes());
@@ -46,18 +41,22 @@ public:
   }
 
   // Each worker calls this method
-  void iterationCompleted() {
-    count++;
-    if(count == chareArrayWidth*chareArrayHeight){
+  void iterationCompleted(int iteration)
+  {
       if (iteration == total_iterations) {
 	CkPrintf("Program Done!\n");
 	CkExit();
       } else { 
 	// Start the next iteration
-	count = 0;
-	iteration++;
 	if(iteration % 20 == 0) CkPrintf("Completed %d iterations\n", iteration);    
-	arrayProxy.begin_iteration();
+      if (iteration != 0 && iteration % 200 == 0)
+      {
+        CkCallback cb(CkIndex_Wave::begin_iteration(), arrayProxy);
+        CkStartMemCheckpoint(cb);
+      }
+      else
+      {
+        arrayProxy.begin_iteration();
       }
     }
   }
@@ -77,26 +76,49 @@ public:
 
   double *buffers[4];
 
-  // Constructor, initialize values
-  Wave() {
+  double *left_edge;
+  double *right_edge;
 
-    mywidth=TotalDataWidth / chareArrayWidth;
-    myheight= TotalDataHeight / chareArrayHeight;
+  unsigned char *intensity;
 
-    pressure_new  = new double[mywidth*myheight];
-    pressure = new double[mywidth*myheight];
-    pressure_old  = new double[mywidth*myheight];
+  int iteration;
+
+  Wave()
+  {
+    iteration = 0;
+
+    CommonInit();
+
+    InitialConditions();
+  }
+
+  Wave(CkMigrateMessage* m) : CBase_Wave(m)
+  {
+    CommonInit();
+  }
+
+  void CommonInit()
+  {
+    mywidth = TotalDataWidth / chareArrayWidth;
+    myheight = TotalDataHeight / chareArrayHeight;
+    size_t size = mywidth * myheight;
+
+    pressure_new  = new double[size];
+    pressure = new double[size];
+    pressure_old  = new double[size];
 
     buffers[left] = new double[myheight];
     buffers[right]= new double[myheight];
     buffers[up]   = new double[mywidth];
     buffers[down] = new double[mywidth];
 
+    left_edge = new double[myheight];
+    right_edge = new double[myheight];
+
+    intensity = new unsigned char[3 * mywidth * myheight];
+
     messages_due = 4;
-
-    InitialConditions();
   }
-
 
   // Setup some Initial pressure pertubations for timesteps t-1 and t
   void InitialConditions(){
@@ -126,17 +148,40 @@ public:
     }
   }
 
-  Wave(CkMigrateMessage* m) { }
+  void pup(PUP::er &p)
+  {
+    CBase_Wave::pup(p);
 
-  ~Wave() { }
+    p|iteration;
+
+    size_t size = mywidth * myheight;
+
+    p(pressure,size);
+    p(pressure_old,size);
+  }
+
+  ~Wave()
+  {
+    delete [] pressure_new;
+    delete [] pressure;
+    delete [] pressure_old;
+
+    delete [] buffers[left];
+    delete [] buffers[right];
+    delete [] buffers[up];
+    delete [] buffers[down];
+
+    delete [] right_edge;
+    delete [] left_edge;
+
+    delete [] intensity;
+  }
 
   void begin_iteration(void) {
 
     double *top_edge = &pressure[0];
     double *bottom_edge = &pressure[(myheight-1)*mywidth];
 
-    double *left_edge = new double[myheight];
-    double *right_edge = new double[myheight];
     for(int i=0;i<myheight;++i){
       left_edge[i] = pressure[i*mywidth];
       right_edge[i] = pressure[i*mywidth + mywidth-1];
@@ -150,9 +195,6 @@ public:
     thisProxy(thisIndex.x, mod(thisIndex.y-1, chareArrayHeight)).recvGhosts(down, mywidth, top_edge);
     // Send my bottom edge
     thisProxy(thisIndex.x, mod(thisIndex.y+1, chareArrayHeight)).recvGhosts(up, mywidth, bottom_edge);
-
-    delete [] right_edge;
-    delete [] left_edge;
   }
   
   void recvGhosts(int whichSide, int size, double ghost_values[]) {
@@ -194,7 +236,8 @@ public:
       pressure_new = tmp;
 
       messages_due = 4;
-      mainProxy.iterationCompleted();
+      contribute(sizeof(int), &iteration, CkReduction::min_int, CkCallback(CkReductionTarget(Main,iterationCompleted), mainProxy));
+      ++iteration;
     }
   }
 
@@ -210,7 +253,6 @@ public:
     
     // set the output pixel values for my rectangle
     // Each RGB component is a char which can have 256 possible values.
-    unsigned char *intensity= new unsigned char[3*w*h];
     for(int i=0;i<myheight;++i){
       for(int j=0;j<mywidth;++j){
 
@@ -245,7 +287,6 @@ public:
     }
 
     liveVizDeposit(m, sx,sy, w,h, intensity, this);
-    delete[] intensity;
 
   }
   
