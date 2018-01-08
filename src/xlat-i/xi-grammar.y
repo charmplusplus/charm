@@ -489,14 +489,18 @@ BaseDataType	: SimpleType
 		{ $$ = new ConstType($1); }
 		;
 
-RestrictedType : BaseDataType '&'
+RestrictedType : BaseDataType '&' '&'
+		{ $$ = new RValueReferenceType($1); }
+		| BaseDataType '&'
 		{ $$ = new ReferenceType($1); }
 		| BaseDataType
 		{ $$ = $1; }
 		;
 
-Type		: BaseType '&'
-                { $$ = new ReferenceType($1); }
+Type		: BaseType '&' '&'
+		{ $$ = new RValueReferenceType($1); }
+		| BaseType '&'
+		{ $$ = new ReferenceType($1); }
 		| BaseType
 		{ $$ = $1; }
 		;

@@ -119,6 +119,19 @@ class PtrType : public Type {
   }
 };
 
+class RValueReferenceType : public Type {
+ private:
+  Type* referant;
+
+ public:
+  RValueReferenceType(Type* t) : referant(t) {}
+  int isReference(void) const { return 1; }
+  void print(XStr& str) { str << referant << " &&"; }
+  virtual Type* deref(void) { return referant; }
+  const char* getBaseName(void) const { return referant->getBaseName(); }
+  const char* getScope(void) const { return NULL; }
+};
+
 class ReferenceType : public Type {
  private:
   Type* referant;
