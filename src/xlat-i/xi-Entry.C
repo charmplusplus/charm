@@ -1106,10 +1106,6 @@ void Entry::genGroupStaticConstructorDefs(XStr& str) {
   str << "{\n";
   str << marshallMsg();
   str << "  UsrToEnv(impl_msg)->setMsgtype(" << node << "BocInitMsg);\n";
-  if (param->isMarshalled() || param->isVoid()) {
-    str << "  if (impl_e_opts)\n";
-    str << "    UsrToEnv(impl_msg)->setGroupDep(impl_e_opts->getGroupDepID());\n";
-  }
   str << "  CkGroupID gId = CkCreate" << node << "Group(" << chareIdx() << ", " << epIdx()
       << ", impl_msg);\n";
 
@@ -1124,10 +1120,6 @@ void Entry::genGroupStaticConstructorDefs(XStr& str) {
     str << "{\n";
     str << marshallMsg();
     str << "  UsrToEnv(impl_msg)->setMsgtype(" << node << "BocInitMsg);\n";
-    if (param->isMarshalled()) {
-      str << "  if (impl_e_opts)\n";
-      str << "    UsrToEnv(impl_msg)->setGroupDep(impl_e_opts->getGroupDepID());\n";
-    }
     str << "  ckSetGroupID(CkCreate" << node << "Group(" << chareIdx() << ", " << epIdx()
         << ", impl_msg));\n";
     str << "}\n";

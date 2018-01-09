@@ -924,8 +924,25 @@ static inline void *_allocNewChare(envelope *env, int &idx)
   return tmp;
 }
 
+// Method returns true if one or more group dependencies are unsatisfied
+inline bool isGroupDepUnsatisfied(const CkCoreState *ck, const envelope *env) {
+  int groupDepNum = env->getGroupDepNum();
+  if(groupDepNum != 0) {
+    CkGroupID *groupDepPtr = (CkGroupID *)(env->getGroupDepPtr());
+    for(int i=0;i<groupDepNum;i++) {
+      CkGroupID depID = groupDepPtr[i];
+      if (!depID.isZero() && !_lookupGroupAndBufferIfNotThere(ck, env, depID)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 static void _processNewChareMsg(CkCoreState *ck,envelope *env)
 {
+  if(isGroupDepUnsatisfied(ck, env))
+    return;
   int idx;
   void *obj = _allocNewChare(env, idx);
 #ifndef CMK_CHARE_USE_PTR
@@ -942,6 +959,8 @@ void CkCreateLocalChare(int epIdx, envelope *env)
 
 static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
 {
+  if(isGroupDepUnsatisfied(ck, env))
+    return;
   int idx;
   void *obj = _allocNewChare(env, idx);
   CkChareID *pCid = (CkChareID *)
@@ -977,6 +996,8 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
 
 static inline void _processForPlainChareMsg(CkCoreState *ck,envelope *env)
 {
+  if(isGroupDepUnsatisfied(ck, env))
+    return;
   int epIdx = env->getEpIdx();
   int mainIdx = _chareTable[_entryTable[epIdx]->chareIdx]->mainChareType();
   void *obj;
@@ -1051,13 +1072,13 @@ static inline void _processDeleteVidMsg(CkCoreState *ck,envelope *env)
  The message passed in must have its handlers correctly set so that it can be
  scheduled again.
 */
-static inline IrrGroup *_lookupGroupAndBufferIfNotThere(CkCoreState *ck,envelope *env,const CkGroupID &groupID)
+static inline IrrGroup *_lookupGroupAndBufferIfNotThere(const CkCoreState *ck, const envelope *env, const CkGroupID &groupID)
 {
 
 	CmiImmediateLock(CkpvAccess(_groupTableImmLock));
 	IrrGroup *obj = ck->localBranch(groupID);
 	if (obj==NULL) { /* groupmember not yet created: stash message */
-		ck->getGroupTable()->find(groupID).enqMsg(env);
+		ck->getGroupTable()->find(groupID).enqMsg((envelope *)env);
 	}
 	CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
 	return obj;
@@ -1089,11 +1110,8 @@ static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,Irr
 
 static inline void _processForBocMsg(CkCoreState *ck,envelope *env)
 {
-  CkGroupID depID = env->getGroupDep();
-  if (!depID.isZero() && !_lookupGroupAndBufferIfNotThere(ck, env, depID)) {
-      return;
-  }
-
+  if(isGroupDepUnsatisfied(ck, env))
+    return;
   CkGroupID groupID =  env->getGroupNum();
   IrrGroup *obj = _lookupGroupAndBufferIfNotThere(ck,env,env->getGroupNum());
   if(obj) {
@@ -1118,6 +1136,8 @@ static inline void _deliverForNodeBocMsg(CkCoreState *ck,int epIdx, envelope *en
 
 static inline void _processForNodeBocMsg(CkCoreState *ck,envelope *env)
 {
+  if(isGroupDepUnsatisfied(ck, env))
+    return;
   CkGroupID groupID = env->getGroupNum();
   void *obj;
 
@@ -1144,20 +1164,18 @@ static inline void _processForNodeBocMsg(CkCoreState *ck,envelope *env)
 
 void _processBocInitMsg(CkCoreState *ck,envelope *env)
 {
+  if(isGroupDepUnsatisfied(ck, env))
+    return;
   CkGroupID groupID = env->getGroupNum();
   int epIdx = env->getEpIdx();
-  if (!env->getGroupDep().isZero()) {      // dependence
-    CkGroupID dep = env->getGroupDep();
-    IrrGroup *obj = _lookupGroupAndBufferIfNotThere(ck,env,dep);
-    if (obj == NULL) return;
-  }
-
   ck->process();
   CkCreateLocalGroup(groupID, epIdx, env);
 }
 
 void _processNodeBocInitMsg(CkCoreState *ck,envelope *env)
 {
+  if(isGroupDepUnsatisfied(ck, env))
+    return;
   CkGroupID groupID = env->getGroupNum();
   int epIdx = env->getEpIdx();
   CkCreateLocalNodeGroup(groupID, epIdx, env);

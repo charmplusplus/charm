@@ -622,6 +622,12 @@ static CkArrayID CkCreateArray(CkArrayMessage *m, int ctor, CkArrayOptions opts)
   {
     e_opts.setGroupDepID(mCastMgr);
   }
+
+  // Add user defined group dependencies
+  envelope *env = UsrToEnv(m);
+  for(int i=0; i<env->getGroupDepNum(); i++) {
+    e_opts.addGroupDepID(env->getGroupDep(i));
+  }
   CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,&e_opts);
   return (CkArrayID)ag;
 }

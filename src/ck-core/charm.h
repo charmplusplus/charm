@@ -77,9 +77,9 @@ extern int  CkGetArgc(void);
 #ifdef __cplusplus
 class CkEntryOptions;
 extern void* CkAllocSysMsg(const CkEntryOptions *opts = NULL);
+extern void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits, int groupDepNum=0);
 #endif
 extern void  CkFreeSysMsg(void *msg);
-extern void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits);
 extern void* CkAllocBuffer(void *msg, int bufsize);
 extern void  CkFreeMsg(void *msg);
 extern void* CkCopyMsg(void **pMsg);

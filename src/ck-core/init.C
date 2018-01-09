@@ -1444,7 +1444,7 @@ void _initCharm(int unused_argc, char **argv)
 		if (CkMyPe()==0) _allStats = new Stats*[CkNumPes()];
 #endif
 		if (!inCommThread) {
-                  CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0);
+                  CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0, 0);
                   msg->argc = CmiGetArgc(argv);
                   msg->argv = argv;
                   faultFunc(_restartDir, msg);
@@ -1494,7 +1494,7 @@ void _initCharm(int unused_argc, char **argv)
 			_mainTable[i]->setObj(obj);
 			CkpvAccess(_currentChare) = obj;
 			CkpvAccess(_currentChareType) = _mainTable[i]->chareIdx;
-			CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0);
+			CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0, 0);
 			msg->argc = CmiGetArgc(argv);
 			msg->argv = argv;
       quietMode = 0;  // allow printing any mainchare user messages

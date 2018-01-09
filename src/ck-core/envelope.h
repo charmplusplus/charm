@@ -154,7 +154,6 @@ namespace ck {
       struct s_group {         // NodeBocInitMsg, BocInitMsg, ForNodeBocMsg, ForBocMsg
         CkGroupID g;           ///< GroupID
         CkNodeGroupID rednMgr; ///< Reduction manager for this group (constructor only!)
-        CkGroupID dep;         ///< create after dep is created (constructor only!)
         int epoch;             ///< "epoch" this group was created during (0--mainchare, 1--later)
         UShort arrayEp;        ///< Used only for array broadcasts
       } group;
@@ -221,10 +220,11 @@ namespace ck {
   char   core[CmiReservedHeaderSize];                                          \
   ck::impl::u_type type; /* Depends on message type (attribs.mtype) */         \
   UInt   pe;           /* source processor */                                  \
-  UInt   totalsize;    /* Byte count from envelope start to end of priobits */ \
+  UInt   totalsize;    /* Byte count from envelope start to end of group dependencies */ \
   CMK_ENVELOPE_OPTIONAL_FIELDS                                                 \
   CMK_REFNUM_TYPE ref; /* Used by futures and SDAG */                          \
   UShort priobits;     /* Number of bits of priority data after user data */   \
+  UShort groupDepNum;  /* Number of group dependencies */                      \
   UShort epIdx;        /* Entry point to call */                               \
   ck::impl::s_attribs attribs;
 
@@ -267,7 +267,7 @@ public:
     UInt   getTotalsize(void) const { return totalsize; }
     void   setTotalsize(const UInt s) { totalsize = s; }
     UInt   getUsersize(void) const { 
-      return totalsize - getPrioBytes() - sizeof(envelope); 
+      return totalsize - getGroupDepSize() - getPrioBytes() - sizeof(envelope); 
     }
     void   setUsersize(const UInt s) {
       if (s == getUsersize()) {
@@ -275,7 +275,7 @@ public:
       }
       CkAssert(s < getUsersize());
       UInt newPrioOffset = sizeof(envelope) + CkMsgAlignLength(s);
-      UInt newTotalsize = newPrioOffset + getPrioBytes();
+      UInt newTotalsize = newPrioOffset + getPrioBytes() + getGroupDepSize();
       void *newPrioPtr = (void *) ((char *) this + newPrioOffset); 
       // use memmove instead of memcpy in case memory areas overlap
       memmove(newPrioPtr, getPrioPtr(), getPrioBytes()); 
@@ -299,9 +299,12 @@ public:
     UShort getPrioWords(void) const { return CkPriobitsToInts(priobits); }
     UShort getPrioBytes(void) const { return getPrioWords()*sizeof(int); }
     void*  getPrioPtr(void) const { 
-      return (void *)((char *)this + totalsize - getPrioBytes());
+      return (void *)((char *)this + totalsize - getGroupDepSize() - getPrioBytes());
     }
-    static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0)
+    void* getGroupDepPtr(void) const {
+      return (void *)((char *)this + totalsize - getGroupDepSize());
+    }
+    static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0, const UShort groupDepNum=0)
     {
       CkAssert(type>=NewChareMsg && type<=ForArrayEltMsg);
 #if CMK_USE_STL_MSGQ
@@ -310,8 +313,12 @@ public:
 #endif
 
       UInt tsize = sizeof(envelope)+ 
-            CkMsgAlignLength(size)+
-	    sizeof(int)*CkPriobitsToInts(prio);
+                   CkMsgAlignLength(size)+
+                   sizeof(int)*CkPriobitsToInts(prio) +
+                   sizeof(CkGroupID)*groupDepNum;
+
+      //CkPrintf("[%d] inside envelope alloc groupDepNum:%d\n", CkMyPe(), groupDepNum);
+
       envelope *env = (envelope *)CmiAlloc(tsize);
 #if CMK_REPLAYSYSTEM
       //for record-replay
@@ -323,7 +330,7 @@ public:
       env->priobits = prio;
       env->setPacked(0);
       env->setRdma(0);
-      env->type.group.dep.setZero();
+      env->setGroupDepNum(groupDepNum);
       _SET_USED(env, 0);
       env->setRef(0);
       env->setEpIdx(0);
@@ -350,7 +357,7 @@ public:
 #if CMK_REPLAYSYSTEM
       setEvent(++CkpvAccess(envelopeEventID));
 #endif
-      type.group.dep.setZero();
+      memset(getGroupDepPtr(), 0, getGroupDepSize());
     }
     UShort getEpIdx(void) const { return epIdx; }
     void   setEpIdx(const UShort idx) { epIdx = idx; }
@@ -425,12 +432,13 @@ public:
     CkNodeGroupID getRednMgr(){       CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
           || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
  return type.group.rednMgr; }
-    CkGroupID getGroupDep(){       CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
-          || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
- return type.group.dep; }
-    void setGroupDep(const CkGroupID &r){       CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
-          || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
-      type.group.dep = r; }
+    UShort getGroupDepSize() const { return groupDepNum*sizeof(CkGroupID); }
+    UShort getGroupDepNum() const { return groupDepNum; }
+    void setGroupDepNum(const UShort &r) { groupDepNum = r; }
+    CkGroupID getGroupDep(int index=0) { return *((CkGroupID *)getGroupDepPtr() + index); }
+    void setGroupDep(const CkGroupID &r, int index=0) {
+      *(((CkGroupID *)getGroupDepPtr())+ index) = r;
+    }
 
 // Array-specific fields
     CkGroupID getArrayMgr(void) const { 
@@ -485,12 +493,12 @@ inline void *EnvToUsr(const envelope *const env) {
   return (void *)((intptr_t)env + sizeof(envelope));
 }
 
-inline envelope *_allocEnv(const int msgtype, const int size=0, const int prio=0) {
-  return envelope::alloc(msgtype,size,prio);
+inline envelope *_allocEnv(const int msgtype, const int size=0, const int prio=0, const int groupDepNum=0) {
+  return envelope::alloc(msgtype,size,prio,groupDepNum);
 }
 
-inline void *_allocMsg(const int msgtype, const int size, const int prio=0) {
-  return EnvToUsr(envelope::alloc(msgtype,size,prio));
+inline void *_allocMsg(const int msgtype, const int size, const int prio=0, const int groupDepNum=0) {
+  return EnvToUsr(envelope::alloc(msgtype,size,prio,groupDepNum));
 }
 
 inline void _resetEnv(envelope *env) {
@@ -514,7 +522,7 @@ class MsgPool: public SafePool<void *> {
 private:
     static void *_alloc(void) {
       /* CkAllocSysMsg() called in .def.h is not thread of sigio safe */
-      envelope *env = _allocEnv(ForChareMsg,0,0);
+      envelope *env = _allocEnv(ForChareMsg,0,0,0);
       env->setQueueing(_defaultQueueing);
       env->setMsgIdx(0);
       return EnvToUsr(env);

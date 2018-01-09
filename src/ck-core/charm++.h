@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <memory.h>
+#include <vector>
 
 #include "charm.h"
 #include "middle.h"
@@ -71,10 +72,11 @@ class CkEntryOptions : public CkNoncopyable {
 	typedef unsigned int prio_t; //Datatype used to represent priorities
 	prio_t *prioPtr; //Points to message priority values
 	prio_t prioStore; //For short priorities, stores the priority value
-	CkGroupID  depGroupID;  // group dependence
+	std::vector<CkGroupID> depGroupIDs;  // group dependencies
 public:
 	CkEntryOptions(void): queueingtype(CK_QUEUEING_FIFO), prioBits(0), 
-                              prioPtr(NULL), prioStore(0) { depGroupID.setZero(); }
+                              prioPtr(NULL), prioStore(0) {
+	}
 
 	~CkEntryOptions() {
 		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO &&
@@ -129,13 +131,22 @@ public:
 	}
 	
 	inline CkEntryOptions& setQueueing(int queueingtype_) { queueingtype=queueingtype_; return *this; }
-	inline CkEntryOptions& setGroupDepID(const CkGroupID &gid) { depGroupID = gid; return *this; }
+	inline CkEntryOptions& setGroupDepID(const CkGroupID &gid) {
+		depGroupIDs.clear();
+		depGroupIDs.push_back(gid);
+		return *this;
+	}
+	inline CkEntryOptions& addGroupDepID(const CkGroupID &gid) { depGroupIDs.push_back(gid); return *this; }
 
 	///These are used by CkAllocateMarshallMsg, below:
 	inline int getQueueing(void) const {return queueingtype;}
 	inline int getPriorityBits(void) const {return prioBits;}
 	inline const prio_t *getPriorityPtr(void) const {return prioPtr;}
-	inline const CkGroupID getGroupDepID() const { return depGroupID; }
+	inline const CkGroupID getGroupDepID() const { return depGroupIDs[0]; }
+	inline const CkGroupID getGroupDepID(int index) const { return depGroupIDs[index]; }
+	inline const int getGroupDepSize() const { return sizeof(CkGroupID)*(depGroupIDs.size()); }
+	inline const int getGroupDepNum() const { return depGroupIDs.size(); }
+	inline const CkGroupID *getGroupDepPtr() const { return &(depGroupIDs[0]); }
 };
 
 #include "CkMarshall.decl.h"
@@ -1081,10 +1092,10 @@ typedef CProxySection_Group CProxySection_IrrGroup;
 
 class CkQdMsg {
   public:
-    void *operator new(size_t s) { return CkAllocMsg(0,(int)s,0); }
+    void *operator new(size_t s) { return CkAllocMsg(0,(int)s,0,0); }
     void operator delete(void* ptr) { CkFreeMsg(ptr); }
-    static void *alloc(int, size_t s, int*, int) {
-      return CkAllocMsg(0,(int)s,0);
+    static void *alloc(int, size_t s, int*, int, int) {
+      return CkAllocMsg(0,(int)s,0,0);
     }
     static void *pack(CkQdMsg *m) { return (void*) m; }
     static CkQdMsg *unpack(void *buf) { return (CkQdMsg*) buf; }

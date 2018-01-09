@@ -309,7 +309,7 @@ public:
 
 //Implementation-only fields (don't access these directly!)
 	//Msg runtime support
-	static void *alloc(int msgnum, size_t size, int *reqSize, int priobits);
+	static void *alloc(int msgnum, size_t size, int *reqSize, int priobits, int groupDepNum=0);
 	static void *pack(CkReductionMsg *);
 	static CkReductionMsg *unpack(void *in);
 

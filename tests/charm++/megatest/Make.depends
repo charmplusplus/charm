@@ -204,3 +204,9 @@ completion_test.o: \
 	megatest.h \
 	completion_test.def.h
 	$(CHARMC) -o completion_test.o completion_test.C
+groupdependence.o: \
+	groupdependence.C \
+	groupdependence.decl.h \
+	megatest.h \
+	groupdependence.def.h
+	$(CHARMC) -o groupdependence.o groupdependence.C

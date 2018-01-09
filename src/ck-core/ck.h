@@ -206,10 +206,10 @@ public:
 		 qd(CpvAccess(_qd)) { watcher=NULL; }
 	~CkCoreState() { delete watcher;}
 
-	inline GroupTable *getGroupTable() {
+	inline GroupTable *getGroupTable() const {
  		return groupTable;
 	}
-	inline IrrGroup *localBranch(CkGroupID gID) {
+	inline IrrGroup *localBranch(CkGroupID gID) const {
 		return groupTable->find(gID).getObj();
 	}
 
@@ -245,5 +245,5 @@ extern void CkCreateLocalNodeGroup(CkGroupID groupID, int eIdx, envelope *env);
 extern void _createGroup(CkGroupID groupID, envelope *env);
 extern void _createNodeGroup(CkGroupID groupID, envelope *env);
 extern int _getGroupIdx(int,int,int);
-
+static inline IrrGroup *_lookupGroupAndBufferIfNotThere(const CkCoreState *ck, const envelope *env,const CkGroupID &groupID);
 #endif
