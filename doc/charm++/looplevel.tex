@@ -25,7 +25,7 @@ shared-memory multithreading runtime will waste computational power because
 those dedicated cores are not utilized at all during most of the application's
 execution time. This case indicates the necessity of a unified
 runtime supporting both types of parallelism.
-
+\section{CkLoop library}
 The \emph{CkLoop} library is an add-on to the \charmpp{} runtime to achieve such
 a unified runtime.  The library implements a simple OpenMP-like shared-memory
 multithreading runtime that reuses \charmpp{} PEs to perform tasks spawned by
@@ -201,90 +201,59 @@ for (int j = 0; j < CmiCurKnownOmpThreads(); j++)
   CkPrintf("partial sum of thread %d: %d \n", j, partialResult[j]);
 \end{verbatim}
 
-\subsection{Limitation of the current implementation}
-\subsubsection{The lack of barrier within OpenMP region}
-In OpenMP standards, within a OpenMP region, each worksharing constructs has implicit barriers 
-between each other so that the result of the earlier worksharing construct can be used for 
-later constructs. However our current implementation doesn't support this barrier between 
-worksharing constructs in the same OpenMP region. The following is an example to execute 
-two `omp for' loops within a single OpenMP region.
-\begin{verbatim}
-int result = 0;
-#pragma omp parallel 
-{
-  #pragma omp for reduction(+: result)
-  for (int i=0; i < 128 ; i++) { 
-    result+= i;
-  }/* Implicit barrier should exist here for threads within this team.
-      But the current implementation of the integrated OpenMP doesn't provide barrier here.
-      The OpenMP threads within this team continue to move forward without being blocked here 
-      as if it works with 'nowait' clause on 'omp for' .
-
-  #pragma omp for reduction(+: result)
-  for (int j=0; j < 128; j++) {
-    result += j;
-  }
-  /* Because there was not a barrier before this 'omp for' construct,
-     the value in `result` may not be consistent with what is expected. */
-} /* We provide an implicit barrier at the end of each OpenMP parallel region. */
-\end{verbatim}
-
-So if you want to use multiple worksharing constructs, you should use them with separate 
-'parallel' pragmas. The example above can be rewritten as the following. 
-\begin{verbatim}
-int result = 0;
-#pragma omp parallel for reduction(+: result)
-for (int i = 0; i < 128; i ++) {
-  result +=i;
-}
-
-#pragma omp parallel for reduction(+: result)
-for (int j = 0; j < 128; j++) {
-  result +=j;
-}
-\end{verbatim}
-The implicit barrier between worksharing constructs will be supported in the next release of Charm++.
-
-\subsubsection{The list of supported pragmas}
+\subsection{The list of supported pragmas}
 This library is forked from LLVM OpenMP Library supporting OpenMP 4.0. Among many number of 
 directives specified in OpenMP 4.0,  limited set of directives are supported. 
-The following is the list of supported pragmas which has been confirmed to work on this library. 
+The following list of supported pragmas is verified from the openmp conformance test suite which forked from LLVM OpenMP library and ported to Charm++ program running multiple OpenMP instances on chares. The test suite can be found in \emph{tests/converse/openmp\_test}.
 \begin{verbatim}
+/* omp_<directive>_<clauses> */
 omp_atomic
-omp_master
+omp_barrier
 omp_critical
-omp_master_3
-omp_get_wtick
-omp_for_private
-omp_in_parallel
-omp_parallel_if
-omp_for_reduction
-omp_for_lastprivate
+omp_flush
+
+/* the following directives means they work within omp parallel region */
 omp_for_firstprivate
-omp_for_schedule_static
+omp_for_lastprivate
+omp_for_nowait
+omp_for_private
+omp_for_reduction
 omp_for_schedule_dynamic
-omp_get_num_threads
-omp_parallel_for_if
-omp_parallel_shared
-omp_section_private
-omp_parallel_default
-omp_parallel_private
-omp_parallel_reduction
-omp_parallel_for_private
-omp_parallel_firstprivate
-omp_sections_reduction
-omp_section_lastprivate
+omp_for_schedule_guided
+omp_for_schedule_static
 omp_section_firstprivate
+omp_section_lastprivate
+omp_section_private
+omp_sections_nowait
+omp_sections_reduction
+
+omp_get_num_threads
+omp_get_wtick
+omp_get_wtime
+omp_in_parallel
+omp_master
+omp_master_3
+omp_parallel_default
+omp_parallel_firstprivate
+
+/* the following directives means the combination of 'omp parallel and omp for/section' works */
 omp_parallel_for_firstprivate
+omp_parallel_for_if
 omp_parallel_for_lastprivate
+omp_parallel_for_private
 omp_parallel_for_reduction
 omp_parallel_sections_firstprivate
 omp_parallel_sections_lastprivate
 omp_parallel_sections_private
 omp_parallel_sections_reduction
-omp_for_schedule_guided
-omp_flush
-omp_get_wtime
+
+omp_parallel_if
+omp_parallel_private
+omp_parallel_reduction
+omp_parallel_shared
+omp_single
+omp_single_nowait
+omp_single_private
 \end{verbatim}
 The other directives in OpenMP standard will be supported in the next version.
 
@@ -293,3 +262,21 @@ and the integrated OpenMP with this example. You can see that the total executio
 this example with enough big size of problem is faster with OpenMP than CkLoop thanks to 
 load balancing through work-stealing between threads within a node while the execution 
 time of each chare can be slower on OpenMP because idle PEs helping busy PEs.
+\section{API to control which PEs participating in CkLoop/OpenMP work}
+User may want certain PE not to be involved in other PE's loop-level parallelization for some cases because it may add latency to works in the PE by helping other PEs. User can enable or disable each PE to participate in the loop-level parallelization through the following API.
+
+void \textbf{CkSetPeHelpsOtherThreads} (int value)
+
+
+value can be 0 or 1, 0 means this API disable the current PE to help other PEs. value 1 or others can enable the current PE for loop-level parallelization.
+By default, all the PEs are enabled for the loop-level parallelization by CkLoop and OpenMP.
+User should explicitly enable the PE again by calling this API with value 1 after they disable it during certain procedure so that the PE can help others after that. The following example shows how this API can be used.
+
+\begin{verbatim}
+CkSetPeHelpsOtherThreads(0);
+
+/* codes which can run without the current PE
+interuppted by loop-level work from other PEs */
+
+CkSetPeHelpsOtherThreads(1);
+\end{verbatim}
