@@ -79,6 +79,7 @@ void TraceUtilization::endExecute(void)
   if (execEp == TRACEON_EP) {
     // if trace just got turned on, then one expects to see this
     // END_PROCESSING event without seeing a preceeding BEGIN_PROCESSING
+    execEp = INVALIDEP;
     return;
   }
 
