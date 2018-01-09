@@ -699,7 +699,7 @@ void ParamList::unmarshall(XStr& str, bool isInline, bool isFirst)  // Pass-by-v
     } else if (param->isArray() || isInline) {
       str << param->getName();
     } else {
-      str << "std::move(" << param->getName() << ").t";
+      str << "std::move(" << param->getName() << ".t)";
     }
 
     if (next) {
