@@ -4624,9 +4624,6 @@ void ssh_script(FILE *f, int nodeno, int rank0no, const char **argv,
   else
     fprintf(f, "CmiNumNodes='%d'; export CmiNumNodes\n", nodetab_rank0_size);
 
-#ifdef CMK_G95
-  fprintf(f, "G95_UNBUFFERED_ALL=TRUE; export G95_UNBUFFERED_ALL\n");
-#endif
 #ifdef CMK_GFORTRAN
   fprintf(f, "GFORTRAN_UNBUFFERED_ALL=YES; export GFORTRAN_UNBUFFERED_ALL\n");
 #endif

@@ -22,6 +22,6 @@ CMK_LD_SHARED_ABSOLUTE_PATH=true
 
 CMK_DEFS='-mmacosx-version-min=10.7 -D_DARWIN_C_SOURCE'
 
-# Assumes GNU fortran compiler:
-CMK_CF77="g95 -mmacosx-version-min=10.7"
-CMK_CF90="g95 -mmacosx-version-min=10.7"
+# Assumes gfortran compiler:
+CMK_CF77="gfortran -mmacosx-version-min=10.7"
+CMK_CF90="gfortran -mmacosx-version-min=10.7"
