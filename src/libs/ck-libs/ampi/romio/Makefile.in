@@ -27,13 +27,10 @@ all: mpio
 # is related to the use of file time stamps in make, but is in fact
 # a bug in the logic of several make implementations, including gnumake
 mpio:
-	$(MAKE) clean
 	$(MAKE) mpiolib
-	$(MAKE) clean
 	@if test "$(NOPROFILE)" = 0 ; then\
             $(MAKE) profile; \
         fi;\
-	$(MAKE) clean
 	$(RANLIB) $(LIBNAME)
 	@if test "$(FROM_MPICH)" = 0 -a "$(FROM_MPICH2)" = 0 ; then \
            echo " "; \

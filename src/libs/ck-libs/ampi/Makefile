@@ -15,12 +15,21 @@ AMPI_LIBDIR=$(CDIR)/lib
 DEST=$(AMPI_LIBDIR)/$(AMPI_LIB).a
 DESTF=$(AMPI_LIBDIR)/$(AMPI_LIB)f.a
 COMPATLIB=$(AMPI_LIBDIR)/libampi-compat.a
-ROMIOLIB=$(AMPI_LIBDIR)/libampiromio.a
+ROMIOLIB=$(AMPI_LIBDIR)/libampiromio
+ROMIOLIBSHARED=
+
+AMPI_STATIC_ONLY=$(shell CHARMINC=$(CDIR)/tmp ; . $(CDIR)/tmp/conv-config.sh ; echo $$CMK_NO_BUILD_SHARED)
+
+SHARED_SUF=$(shell CHARMINC=$(CDIR)/tmp ; . $(CDIR)/tmp/conv-config.sh ; echo $$CMK_SHARED_SUF)
+
+ifeq ($(AMPI_STATIC_ONLY), false)
+	ROMIOLIBSHARED=$(CDIR)/lib_so/libampiromio.$(SHARED_SUF)
+endif
 
 USE_ROMIO=$(shell CHARMINC=$(CDIR)/tmp ; . $(CDIR)/tmp/conv-config.sh ; echo $$CMK_AMPI_WITH_ROMIO)
 
 ifeq ($(USE_ROMIO),true)
-	ROMIO=$(ROMIOLIB)
+	ROMIO=$(ROMIOLIB).a
 endif
 
 .SUFFIXES:
@@ -51,6 +60,10 @@ $(ROMIO): | AMPI AMPIF
 	fi
 	cp romio/include/mpio.h romio/include/mpiof.h $(CDIR)/include
 	$(MAKE) -C romio
+	if [ -n "$(ROMIOLIBSHARED)" ]; then \
+		echo "Building dynamic ROMIO library: $(ROMIOLIBSHARED)"; \
+		find romio/ -name \*.o -exec $(CHARMC) -o $(ROMIOLIBSHARED) {} + ; \
+	fi
 	@echo "ROMIO built successfully"
 
 AMPI: $(DEST) 
