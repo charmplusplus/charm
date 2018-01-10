@@ -77,10 +77,36 @@ syntax() {
   echo "  --no-build-shared  don't build Charm++'s shared libraries (default)"
   echo "  --build-shared     build Charm++ dynamic libraries (.so) "
   echo ''
+
+
   echo 'Enable/disable features:'
-  $srcbaseabs/scripts/configure --help | grep enable-
-  $srcbaseabs/scripts/configure --help | grep with-
-  echo "  --with-production       build Charm++ with all optimizations for maximum performance, and disabling all above features"
+  configure_ac="$srcbaseabs/scripts/configure.ac"
+  parameter_regex='\([-A-Za-z0-9_=/ ]*\)'
+  description_regex='\([-A-Za-z0-9_=/ ()\\]*\)'
+
+  # Isolate the sections of configure.ac on which we want to operate. This command uses sed's p command which gives a result similar to grep.
+  # This is because grep cannot operate on multiple lines. GNU grep can do this using "-z", but it is not portable to BSD grep as found on macOS.
+  help_string_source="$(sed -n "/AS_HELP_STRING(\[${parameter_regex}\],/,/ *\[${description_regex}\])/p" "$configure_ac")"
+
+  # This regex matches the AS_HELP_STRING entries in configure.ac.
+  # It looks messy at the end due to matching square brackets (which must be escaped), commas, and an unrelated token on the same line (a BSD sed concession).
+  help_item_regex=" *\[AS_HELP_STRING(\[${parameter_regex}\],\n *\[${description_regex}\]) *\]*[, []*[a-z=_]*\]*[, ]*"
+  # "\1" is the parameter and "\2" is the description; use printf to left-justify the parameter.
+  help_output_print='printf "  %-30s \2\\\\n" "\1"'
+  # The remaining sed syntax allows us to perform a substitution over two successive lines instead of only one.
+  help_items="$(echo "$help_string_source" | sed -n "1h; 1!H; \${ g; s:${help_item_regex}:${help_output_print}:g p; }")"
+  # With the AS_HELP_STRING entries replaced with printf commands, evaluate the result.
+  eval "$help_items"
+  printf "  %-30s %s\n" "--with-production" "build Charm++ with all optimizations for maximum performance, and disabling all above features"
+
+  # Test that the above regular expressions are sufficient to capture all help strings.
+  num_help_strings="$(grep -c AS_HELP_STRING "$configure_ac")"
+  num_help_items="$(echo "$help_items" | wc -l)"
+  if [ $num_help_strings != $num_help_items ]; then
+    echo '<Warning>: Not all parameters were able to be displayed. Please notify the Charm++ developers at charm@cs.illinois.edu.'
+  fi
+
+
   echo ''
   echo 'Miscellaneous options:'
   echo '  --incdir=DIR        specify additional include path for compiler'
