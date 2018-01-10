@@ -222,7 +222,19 @@ void TestInstance::doTest(int curstep, int curTestMode) {
     double timerec = CkWallTimer();
     
     if(curTestMode == 0){
+#if USE_LAMBDA
+    CkLoop_Parallelize( numChunks, 0, loopTimes-1,
+      [=](int start, int end, void* result) {
+        int tmp=0;
+        for (int i=start; i<=end; i++) {
+          tmp+=(int)(sqrt(1+cos(i*1.57)));
+        }
+        *(int *)result = tmp;
+      }, &result, CKLOOP_INT_SUM
+    );
+#else
 	    CkLoop_Parallelize(doCalc, 0, NULL, numChunks, 0, loopTimes-1, 1, &result, CKLOOP_INT_SUM);
+#endif
     }else if(curTestMode == 1){
         result = openMPWork(0, loopTimes-1);
     }

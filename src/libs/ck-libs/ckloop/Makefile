@@ -7,7 +7,7 @@ LIB = $(CDIR)/lib/libmodule$(MODULE).a
 LIBOBJ = CkLoop.o
 
 CIFILES = CkLoop.ci
-HEADERS = CkLoopAPI.h $(MODULE).decl.h $(MODULE).def.h
+HEADERS = CkLoopAPI.h CkLambda.h $(MODULE).decl.h $(MODULE).def.h
 
 all: $(LIB)  headers
 

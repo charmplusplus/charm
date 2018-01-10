@@ -68,6 +68,20 @@ and the ``result'' is the buffer for reduction result on a single simple-type va
 The ``CallerFn'' is defined as ``typedef void (*CallerFn)(int paramNum, void *param);''
 \end{itemize}
 
+Lambda syntax for \emph{CkLoop} is also supported. The interface for using lambda syntax is as follows:
+\begin{itemize}
+\item void \textbf{CkLoop\_Parallelize}( \\
+int numChunks, int lowerRange, int upperRange, \\
+    \lbrack=\rbrack(int first, int last, void *result) \{ \\
+    for ( int i=first; i\textless=last; ++i ) \{ \\
+      ... \\
+    \} \\
+  \}, int sync, void *redResult, REDUCTION\_TYPE type, \lbrack=\rbrack() \{ \\
+    ... optional caller function body ... \\
+  \} \\
+);
+\end{itemize}
+
 Examples using this library can be found in \examplerefdir{ckloop} and the
 widely used molecular dynamics simulation application
 NAMD\footnote{http://www.ks.uiuc.edu/Research/namd}.
