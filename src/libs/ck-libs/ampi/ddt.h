@@ -3,7 +3,7 @@
 
 #include <string>
 #include <vector>
-#include "pup.h"
+#include "charm++.h"
 
 using std::vector;
 using std::string;
@@ -84,7 +84,7 @@ typedef intptr_t CkDDT_Aint;
  * Leading whitespaces are significant, trailing whitespaces are not. */
 inline void CkDDT_SetName(char *dst, const char *src, int *len)
 {
-  CmiAssert(strlen(src) < CkDDT_MAX_NAME_LEN-1);
+  CkAssert(strlen(src) < CkDDT_MAX_NAME_LEN-1);
   int end = strlen(src)-1;
   while ((end>0) && (src[end]==' '))
     end--;

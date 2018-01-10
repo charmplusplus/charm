@@ -6,7 +6,7 @@
 using std::numeric_limits;
 
 //Uncomment for debug print statements
-#define DDTDEBUG(...) //CmiPrintf(__VA_ARGS__)
+#define DDTDEBUG(...) //CkPrintf(__VA_ARGS__)
 
 
 /* Serialize a contiguous chunk of memory */
@@ -19,7 +19,7 @@ static inline void serializeContig(char* userdata, char* buffer, size_t size, in
   }
 #if CMK_ERROR_CHECKING
   else {
-    CmiAbort("CkDDT: Invalid dir given to serialize a contiguous type!");
+    CkAbort("CkDDT: Invalid dir given to serialize a contiguous type!");
   }
 #endif
 }
@@ -29,7 +29,7 @@ CkDDT::getType(int nIndex) const
 {
 #if CMK_ERROR_CHECKING
   if (nIndex < 0 || nIndex >= CkDDT_MAXTYPE)
-    CmiAbort("CkDDT: Invalid type index passed to getType!");
+    CkAbort("CkDDT: Invalid type index passed to getType!");
 #endif
   return typeTable[nIndex];
 }
@@ -166,7 +166,7 @@ CkDDT::createDup(int nIndexOld, int *nIndexNew)
 
 #if CMK_ERROR_CHECKING
   if (typeTable.size()+1 >= CkDDT_MAXTYPE)
-    CmiAbort("CkDDT: type table exceeded its maximum size!");
+    CkAbort("CkDDT: type table exceeded its maximum size!");
 #endif
 
   *nIndexNew = typeTable.size();
@@ -239,7 +239,7 @@ CkDDT::createResized(CkDDT_Type oldtype, CkDDT_Aint lb, CkDDT_Aint extent, CkDDT
 
 #if CMK_ERROR_CHECKING
   if (typeTable.size()+1 >= CkDDT_MAXTYPE)
-    CmiAbort("CkDDT: type table exceeded its maximum size!");
+    CkAbort("CkDDT: type table exceeded its maximum size!");
 #endif
 
   switch(dttype->getType()) {
@@ -291,7 +291,7 @@ CkDDT::newContiguous(int count, CkDDT_Type oldType, CkDDT_Type *newType)
 {
 #if CMK_ERROR_CHECKING
   if (typeTable.size()+1 >= CkDDT_MAXTYPE)
-    CmiAbort("CkDDT: type table exceeded its maximum size!");
+    CkAbort("CkDDT: type table exceeded its maximum size!");
 #endif
 
   *newType = typeTable.size();
@@ -307,7 +307,7 @@ CkDDT::newVector(int count, int blocklength, int stride,
 {
 #if CMK_ERROR_CHECKING
   if (typeTable.size()+1 >= CkDDT_MAXTYPE)
-    CmiAbort("CkDDT: type table exceeded its maximum size!");
+    CkAbort("CkDDT: type table exceeded its maximum size!");
 #endif
 
   *newType = typeTable.size();
@@ -323,7 +323,7 @@ CkDDT::newHVector(int count, int blocklength, int stride,
 {
 #if CMK_ERROR_CHECKING
   if (typeTable.size()+1 >= CkDDT_MAXTYPE)
-    CmiAbort("CkDDT: type table exceeded its maximum size!");
+    CkAbort("CkDDT: type table exceeded its maximum size!");
 #endif
 
   *newType = typeTable.size();
@@ -340,7 +340,7 @@ CkDDT::newIndexed(int count, const int* arrbLength, CkDDT_Aint* arrDisp,
 {
 #if CMK_ERROR_CHECKING
   if (typeTable.size()+1 >= CkDDT_MAXTYPE)
-    CmiAbort("CkDDT: type table exceeded its maximum size!");
+    CkAbort("CkDDT: type table exceeded its maximum size!");
 #endif
 
   *newType = typeTable.size();
@@ -357,7 +357,7 @@ CkDDT::newHIndexed(int count, const int* arrbLength, const CkDDT_Aint* arrDisp,
 {
 #if CMK_ERROR_CHECKING
   if (typeTable.size()+1 >= CkDDT_MAXTYPE)
-    CmiAbort("CkDDT: type table exceeded its maximum size!");
+    CkAbort("CkDDT: type table exceeded its maximum size!");
 #endif
 
   *newType = typeTable.size();
@@ -374,7 +374,7 @@ CkDDT::newIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, Ck
 {
 #if CMK_ERROR_CHECKING
   if (typeTable.size()+1 >= CkDDT_MAXTYPE)
-    CmiAbort("CkDDT: type table exceeded its maximum size!");
+    CkAbort("CkDDT: type table exceeded its maximum size!");
 #endif
 
   *newType = typeTable.size();
@@ -390,7 +390,7 @@ CkDDT::newHIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, C
 {
 #if CMK_ERROR_CHECKING
   if (typeTable.size()+1 >= CkDDT_MAXTYPE)
-    CmiAbort("CkDDT: type table exceeded its maximum size!");
+    CkAbort("CkDDT: type table exceeded its maximum size!");
 #endif
 
   *newType = typeTable.size();
@@ -406,7 +406,7 @@ CkDDT::newStruct(int count, const int* arrbLength, const CkDDT_Aint* arrDisp,
 {
 #if CMK_ERROR_CHECKING
   if (typeTable.size()+1 >= CkDDT_MAXTYPE)
-    CmiAbort("CkDDT: type table exceeded its maximum size!");
+    CkAbort("CkDDT: type table exceeded its maximum size!");
 #endif
 
   *newType = typeTable.size();
@@ -819,7 +819,7 @@ CkDDT_DataType::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
 int
 CkDDT_DataType::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const
 {
-  CmiPrintf("CkDDT_DataType::getContents: Shouldn't call getContents on primitive datatypes!\n");
+  CkPrintf("CkDDT_DataType::getContents: Shouldn't call getContents on primitive datatypes!\n");
   return -1;
 }
 
