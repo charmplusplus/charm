@@ -9,16 +9,14 @@ class IntExprConstruct;
 
 class ForallConstruct : public BlockConstruct {
  public:
-  ForallConstruct(SdagConstruct *tag,
-                  IntExprConstruct *begin,
-                  IntExprConstruct *end,
-                  IntExprConstruct *step,
-                  SdagConstruct *body);
-  void propagateState(std::list<EncapState*>, std::list<CStateVar*>&, std::list<CStateVar*>&, int);
-  void generateCode(XStr&, XStr&, Entry *);
+  ForallConstruct(SdagConstruct* tag, IntExprConstruct* begin, IntExprConstruct* end,
+                  IntExprConstruct* step, SdagConstruct* body);
+  void propagateState(std::list<EncapState*>, std::list<CStateVar*>&,
+                      std::list<CStateVar*>&, int);
+  void generateCode(XStr&, XStr&, Entry*);
   void numberNodes();
 };
 
-}   // namespace xi
+}  // namespace xi
 
 #endif  // ifndef _FORALL_H

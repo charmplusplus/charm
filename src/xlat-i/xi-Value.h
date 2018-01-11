@@ -10,25 +10,27 @@ class XStr;
 class Value : public Printable {
  private:
   int factor;
-  const char *val;
+  const char* val;
+
  public:
-  Value(const char *s);
+  Value(const char* s);
   void print(XStr& str);
   int getIntVal(void);
 };
 
 class ValueList : public Printable {
  private:
-  Value *val;
-  ValueList *next;
+  Value* val;
+  ValueList* next;
+
  public:
-  ValueList(Value* v, ValueList* n=0);
+  ValueList(Value* v, ValueList* n = 0);
   void print(XStr& str);
   void printValue(XStr& str);
   void printValueProduct(XStr& str);
   void printZeros(XStr& str);
 };
 
-}
+}  // namespace xi
 
 #endif  // ifndef _VALUE_H

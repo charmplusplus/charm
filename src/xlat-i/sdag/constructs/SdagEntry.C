@@ -1,21 +1,19 @@
-#include "SdagEntry.h"
 #include "CStateVar.h"
+#include "SdagEntry.h"
+#include "xi-Chare.h"
 #include "xi-Entry.h"
 #include "xi-Parameter.h"
-#include "xi-Chare.h"
 #include <list>
 
 namespace xi {
 
-SdagEntryConstruct::SdagEntryConstruct(SdagConstruct *body)
-: SdagConstruct(SSDAGENTRY, body)
-{ }
+SdagEntryConstruct::SdagEntryConstruct(SdagConstruct* body)
+    : SdagConstruct(SSDAGENTRY, body) {}
 
-SdagEntryConstruct::SdagEntryConstruct(SListConstruct *body)
-: SdagConstruct(SSDAGENTRY, body)
-{ }
+SdagEntryConstruct::SdagEntryConstruct(SListConstruct* body)
+    : SdagConstruct(SSDAGENTRY, body) {}
 
-void SdagEntryConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry) {
+void SdagEntryConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   buildTypes(encapState);
   buildTypes(encapStateChild);
 
@@ -33,7 +31,8 @@ void SdagEntryConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry) {
   signature << "(";
   if (stateVars) {
     int count = 0;
-    for (std::list<CStateVar*>::iterator iter = stateVars->begin(); iter != stateVars->end(); ++iter) {
+    for (std::list<CStateVar*>::iterator iter = stateVars->begin();
+         iter != stateVars->end(); ++iter) {
       CStateVar& var = **iter;
       if (var.isVoid != 1) {
         if (count != 0) signature << ", ";
@@ -48,14 +47,15 @@ void SdagEntryConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry) {
   }
   signature << ")";
 
-  if (!entry->param->isVoid())
-    decls << "  void " <<  signature << ";\n";
+  if (!entry->param->isVoid()) decls << "  void " << signature << ";\n";
 
   // generate wrapper for local calls to the function
   if (entry->paramIsMarshalled() && !entry->param->isVoid())
-    generateLocalWrapper(decls, defs, entry->param->isVoid(), signature, entry, stateVars, con1->text);
+    generateLocalWrapper(decls, defs, entry->param->isVoid(), signature, entry, stateVars,
+                         con1->text);
 
-  generateClosureSignature(decls, defs, entry, false, "void", con1->text, false, encapState);
+  generateClosureSignature(decls, defs, entry, false, "void", con1->text, false,
+                           encapState);
 
 #if CMK_BIGSIM_CHARM
   generateEndSeq(defs);
@@ -87,11 +87,11 @@ void SdagEntryConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry) {
   decls << "private:\n";
   generateClosureSignature(decls, defs, entry, false, "void", con1->text, true,
 #if CMK_BIGSIM_CHARM
-                       encapStateChild
+                           encapStateChild
 #else
-                       encapState
+                           encapState
 #endif
-                       );
+                           );
 
   if (!entry->paramIsMarshalled() && !entry->param->isVoid()) {
     // decrease reference count by one for the message
@@ -113,4 +113,4 @@ void SdagEntryConstruct::labelNodes() {
   SdagConstruct::labelNodes();
 }
 
-}   // namespace xi
+}  // namespace xi

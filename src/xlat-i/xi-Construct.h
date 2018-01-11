@@ -3,7 +3,7 @@
 
 #include "xi-AstNode.h"
 
-namespace xi { 
+namespace xi {
 
 class Module;
 
@@ -13,17 +13,17 @@ class Construct : public virtual AstNode {
 
  public:
   // FIXME?: isn't this circular since Module < Construct?
-  Module *containerModule;
+  Module* containerModule;
   explicit Construct();
   void setExtern(int& e);
-  void setModule(Module *m);
+  void setModule(Module* m);
   virtual bool isTramTarget() { return false; }
 };
 
 // FIXME?: shouldn't the "public virtual" be here instead of in the Construct baseclass?
 class ConstructList : public AstChildren<Construct>, public Construct {
  public:
-  ConstructList(int l, Construct *c, ConstructList *n=0);
+  ConstructList(int l, Construct* c, ConstructList* n = 0);
   using AstChildren<Construct>::isTramTarget;
 };
 
@@ -50,6 +50,6 @@ class AccelBlock : public Construct {
   int genAccels_spe_c_funcBodies(XStr& str);
 };
 
-} // namespace xi
+}  // namespace xi
 
-#endif // ifndef _CONSTRUCT_H
+#endif  // ifndef _CONSTRUCT_H

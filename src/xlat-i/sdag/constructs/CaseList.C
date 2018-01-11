@@ -4,18 +4,16 @@
 
 namespace xi {
 
-CaseListConstruct::CaseListConstruct(WhenConstruct *single_construct)
-: SdagConstruct(SCASELIST, single_construct)
-{
+CaseListConstruct::CaseListConstruct(WhenConstruct* single_construct)
+    : SdagConstruct(SCASELIST, single_construct) {
   label_str = "caselist";
 }
 
-CaseListConstruct::CaseListConstruct(WhenConstruct *single_construct, CaseListConstruct *tail)
-: SdagConstruct(SCASELIST, single_construct, tail)
-{
+CaseListConstruct::CaseListConstruct(WhenConstruct* single_construct,
+                                     CaseListConstruct* tail)
+    : SdagConstruct(SCASELIST, single_construct, tail) {
   label_str = "caselist";
 }
-
 
 void CaseListConstruct::numberNodes() {
   nodeNum = numCaseLists++;
@@ -24,10 +22,9 @@ void CaseListConstruct::numberNodes() {
 
 void CaseListConstruct::propagateState(std::list<EncapState*> encap,
                                        std::list<CStateVar*>& plist,
-                                       std::list<CStateVar*>& wlist,
-                                       int uniqueVarNum) {
-  CStateVar *sv;
-  std::list<CStateVar*> *whensEntryMethodStateVars = NULL;
+                                       std::list<CStateVar*>& wlist, int uniqueVarNum) {
+  CStateVar* sv;
+  std::list<CStateVar*>* whensEntryMethodStateVars = NULL;
 
   encapState = encap;
 
@@ -43,14 +40,13 @@ void CaseListConstruct::propagateState(std::list<EncapState*> encap,
     sv->isSpeculator = true;
     stateVarsChildren->push_back(sv);
 
-    for (std::list<SdagConstruct *>::iterator iter = constructs->begin();
-         iter != constructs->end();
-         ++iter) {
+    for (std::list<SdagConstruct*>::iterator iter = constructs->begin();
+         iter != constructs->end(); ++iter) {
       dynamic_cast<WhenConstruct*>(*iter)->speculativeState = sv;
     }
     std::list<CStateVar*> lst;
     lst.push_back(sv);
-    EncapState *state = new EncapState(NULL, lst);
+    EncapState* state = new EncapState(NULL, lst);
     state->name = new XStr(txt);
     state->type = new XStr("SDAG::CSpeculator");
     encap.push_back(state);
@@ -63,11 +59,12 @@ void CaseListConstruct::propagateState(std::list<EncapState*> encap,
 
 void CaseListConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
-  defs << "  SDAG::CSpeculator* " << counter << " = new SDAG::CSpeculator(__dep->getAndIncrementSpeculationIndex());\n";
+  defs << "  SDAG::CSpeculator* " << counter
+       << " = new SDAG::CSpeculator(__dep->getAndIncrementSpeculationIndex());\n";
 
   defs << "  SDAG::Continuation* c = 0;\n";
-  for (std::list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
-       ++it) {
+  for (std::list<SdagConstruct*>::iterator it = constructs->begin();
+       it != constructs->end(); ++it) {
     defs << "  c = ";
     generateCall(defs, encapStateChild, encapStateChild, (*it)->label);
     defs << "  if (!c) return;\n";
@@ -75,10 +72,11 @@ void CaseListConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   }
   endMethod(defs);
 
-  sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-  strcat(nameStr,"_end");
+  sprintf(nameStr, "%s%s", CParsedFile::className->charstar(), label->charstar());
+  strcat(nameStr, "_end");
 
-  generateClosureSignature(decls, defs, entry, false, "void", label, true, encapStateChild);
+  generateClosureSignature(decls, defs, entry, false, "void", label, true,
+                           encapStateChild);
 
   defs << "  " << counter << "->deref();\n";
   defs << "  ";
@@ -88,4 +86,4 @@ void CaseListConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   generateChildrenCode(decls, defs, entry);
 }
 
-}   // namespace xi
+}  // namespace xi

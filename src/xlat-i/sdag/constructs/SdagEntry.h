@@ -1,20 +1,20 @@
 #ifndef _SDAGENTRY_H
 #define _SDAGENTRY_H
 
-#include "xi-SdagConstruct.h"
 #include "SList.h"
+#include "xi-SdagConstruct.h"
 
 namespace xi {
 
 class SdagEntryConstruct : public SdagConstruct {
  public:
-  SdagEntryConstruct(SdagConstruct *);
-  SdagEntryConstruct(SListConstruct *);
-  void generateCode(XStr&, XStr&, Entry *);
+  SdagEntryConstruct(SdagConstruct*);
+  SdagEntryConstruct(SListConstruct*);
+  void generateCode(XStr&, XStr&, Entry*);
   void numberNodes();
   void labelNodes();
 };
 
-}   // namespace xi
+}  // namespace xi
 
 #endif  // ifndef _SDAGENTRY_H

@@ -2,8 +2,6 @@
 
 namespace xi {
 
-IntExprConstruct::IntExprConstruct(const char *ccode)
-: SdagConstruct(SINT_EXPR, ccode)
-{ }
+IntExprConstruct::IntExprConstruct(const char* ccode) : SdagConstruct(SINT_EXPR, ccode) {}
 
-}   // namespace xi
+}  // namespace xi
