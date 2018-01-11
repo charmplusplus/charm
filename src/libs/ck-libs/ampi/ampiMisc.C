@@ -8,8 +8,12 @@
 #if defined(_WIN32)
 #include <windows.h>
 #include <sstream>
+#include <direct.h>
+#include <stdlib.h>
+#define getcwd _getcwd
 #else
 #include <sys/utsname.h>
+#include <unistd.h>
 #endif
 
 // Strip leading/trailing whitespaces from MPI_Info key and value strings.
