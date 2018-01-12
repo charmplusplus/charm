@@ -4061,13 +4061,20 @@ void ampi::sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
   vector<char> tmpBuf(ddt->getSize(count));
   ddt->serialize((char*)buf, tmpBuf.data(), count, 1);
 
-  MPI_Request req;
-  irecv(buf, count, datatype, source, recvtag, comm, &req);
+  MPI_Request reqs[2];
+  irecv(buf, count, datatype, source, recvtag, comm, &reqs[0]);
 
   // FIXME: this send may do a copy internally! If we knew now that it would, we could avoid double copying:
-  send(sendtag, source, tmpBuf.data(), count, datatype, dest, comm, 0, BLOCKING_SEND);
+  reqs[1] = send(sendtag, getRank(), tmpBuf.data(), count, datatype, dest, comm, 0, I_SEND);
 
-  AMPI_Wait(&req, status);
+  if (status == MPI_STATUS_IGNORE) {
+    AMPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
+  }
+  else {
+    MPI_Status statuses[2];
+    AMPI_Waitall(2, reqs, statuses);
+    *status = statuses[0];
+  }
 }
 
 AMPI_API_IMPL(MPI_Sendrecv_replace)
