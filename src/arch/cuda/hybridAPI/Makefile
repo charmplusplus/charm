@@ -1,7 +1,7 @@
 CHARMDIR=../..
 CUDA_PATH=$(shell CHARMINC=../.; . $$CHARMINC/conv-mach-opt.sh; echo $$CUDA_DIR;  )
 NVCC = $(CUDA_PATH)/bin/nvcc
-NVCC_FLAGS = -c -use_fast_math -DGPU_MEMPOOL #-DGPU_PROFILE -DGPU_TRACE #-DGPU_MEMPOOL_DEBUG -DGPU_WRQ_VERBOSE #-device-debug -deviceemu
+NVCC_FLAGS = -c -std=c++11 -use_fast_math -DGPU_MEMPOOL #-DGPU_PROFILE -DGPU_TRACE #-DGPU_MEMPOOL_DEBUG -DGPU_WRQ_VERBOSE #-device-debug -deviceemu
 NVCC_INC = -I$(CUDA_PATH)/include -I..
 
 all: libs
