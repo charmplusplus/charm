@@ -2244,7 +2244,7 @@ then
   if [ -x $CHARMBIN/$targ ]
   then
 	DoNoErrCheck $RM $targ
-	Do $CP $CHARMBIN/$targ $targ
+	DoNoErrCheck $CP $CHARMBIN/$targ $targ
   fi
 fi
 
