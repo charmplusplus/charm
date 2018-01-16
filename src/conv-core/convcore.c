@@ -3174,9 +3174,11 @@ void CmiTmpFree(void *t) {
     CmiTmpBuf_t *b=&CpvAccess(CmiTmpBuf);
     /* t should point into our temporary buffer: figure out where */
     int cur=((const char *)t)-b->buf;
-    if (cur<0 || cur>b->max)
+    if (cur<0 || cur>b->max) {
       free(t);
-    b->cur=cur;
+    } else {
+      b->cur=cur;
+    }
   }
 }
 
