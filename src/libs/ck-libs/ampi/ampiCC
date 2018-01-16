@@ -15,28 +15,7 @@ do
   shift
 done
 
-# replaced by configure
-arch=@base_version@
-
-CharmArch()
-{
-if test x$arch = x
-then
-  echo "Unknown Charm architecture!"
-  exit 1
-elif `echo $arch | grep 'mpi-' > /dev/null 2>&1`
-then
-  charmarch="mpi" 
-elif `echo $arch | grep '^bluegene' > /dev/null 2>&1`
-then
-  charmarch="mpi"
-else      
-  charmarch="other"
-fi
-}            
-
-charmarch=""
-CharmArch
+charmarch=$(cat $CHARMBIN/../tmp/.gdir)
 
 AMPICC_EXTRA_OPTIONS=""
 
