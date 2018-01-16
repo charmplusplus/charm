@@ -6,10 +6,16 @@
 // This taskqueue implementation refers to the work-stealing queue of Cilk (THE protocol).
 // New tasks are pushed into the tail of this queue and the tasks are popped at the tail of this queue by the same thread. Thieves(other threads trying to steal) steal a task at the head of this queue.
 // So, synchronization is needed only when there is only one task in the queue because thieves and victim can try to obtain the same task.
-
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+typedef LONG taskq_idx;
+#else
+typedef int taskq_idx;
+#endif
 typedef struct TaskQueueStruct {
-  int head; // This pointer indicates the first task in the queue
-  int tail; // The tail indicates the array element next to the last available task in the queue. So, if head == tail, the queue is empty
+  taskq_idx head; // This pointer indicates the first task in the queue
+  taskq_idx tail; // The tail indicates the array element next to the last available task in the queue. So, if head == tail, the queue is empty
   void *data[TaskQueueSize];
 } *TaskQueue;
 
@@ -28,10 +34,11 @@ inline static void TaskQueuePush(TaskQueue Q, void *data) {
 
 inline static void* TaskQueuePop(TaskQueue Q) { // Pop happens in the same worker thread which pushed the task before.
   TaskQueueDebug("[%d] TaskQueuePop head %d tail %d\n", CmiMyPe(), Q->head, Q->tail);
-  int t = Q->tail - 1;
+  taskq_idx h, t;
+  t = Q->tail -1;
   Q->tail = t;
   CmiMemoryWriteFence();
-  int h = Q->head;
+  h = Q->head;
   if (t > h) { // This means there are more than two tasks in the queue, so it is safe to pop a task from the queue.
     TaskQueueDebug("[%d] returning valid data\n", CmiMyPe());
     return Q->data[t % TaskQueueSize];
@@ -43,20 +50,28 @@ inline static void* TaskQueuePop(TaskQueue Q) { // Pop happens in the same worke
   }
   // From now on, we should handle the situation where there is only one task so thieves and victim can try to obtain this task simultaneously.
   Q->tail = h + 1;
+#ifdef _WIN32
+  if (h != InterlockedCompareExchange(&(Q->head), h+1,h))
+#else
   if (!__sync_bool_compare_and_swap(&(Q->head), h, h+1)) // Check whether the last task has already stolen.
+#endif
     return NULL;
   return Q->data[t % TaskQueueSize];
 }
 
 inline static void* TaskQueueSteal(TaskQueue Q) {
-  int h, t;
+  taskq_idx h, t;
   void *task;
   while (1) {
     h = Q->head;
     t = Q->tail;
     if (h >= t) // The queue is empty or the last element has been stolen by other thieves or popped by the victim.
       return NULL;
-    if(!__sync_bool_compare_and_swap(&(Q->head), h, h+1)) // Check whether the task this thief is trying to steal is still in the queue and not stolen by the other thieves.
+#ifdef _WIN32
+    if (h != InterlockedCompareExchange(&(Q->head), h+1, h))
+#else
+    if (!__sync_bool_compare_and_swap(&(Q->head), h, h+1)) // Check whether the task this thief is trying to steal is still in the queue and not stolen by the other thieves.
+#endif
       continue;
     return Q->data[h % TaskQueueSize];
   }
