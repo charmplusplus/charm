@@ -8,6 +8,10 @@
 #include "qd.h"
 #endif
 
+#if CMK_NODE_QUEUE_AVAILABLE
+extern "C" void CmiPushNode(void *msg);
+#endif
+
 #define CKLOOP_USECHARM 1
 #define CKLOOP_PTHREAD 2
 #define CKLOOP_NOOP 3
@@ -77,7 +81,7 @@ static void *ndhThreadWork(void *id) {
         pthread_cond_wait(&thdCondition, &thdLock);
         pthread_mutex_unlock(&thdLock);
         /* kids ID range: [1 ~ numHelpers-1] */
-        if (mainHelper->needTreeBcast()) {
+        if (mainHelper->getSchedPolicy() == CKLOOP_TREE) {
             //notify my children
             int myKid = myId*TREE_BCAST_BRANCH+1;
             for (int i=0; i<TREE_BCAST_BRANCH; i++, myKid++) {
@@ -159,8 +163,11 @@ void FuncCkLoop::init(int mode_, int numThreads_) {
       //CkPrintf("FuncCkLoop created on node %d\n", CkMyNode());
       numHelpers = CkMyNodeSize();
       helperPtr = new FuncSingleHelper *[numHelpers];
-      useTreeBcast = (numHelpers >= USE_TREE_BROADCAST_THRESHOLD);
-
+#if CMK_NODE_QUEUE_AVAILABLE
+      schedPolicy = (numHelpers >= USE_TREE_BROADCAST_THRESHOLD ? CKLOOP_NODE_QUEUE : CKLOOP_LIST);
+#else
+      schedPolicy =  (numHelpers >= USE_TREE_BROADCAST_THRESHOLD ? CKLOOP_TREE : CKLOOP_LIST);
+#endif
       int pestart = CkNodeFirst(CkMyNode());
 
       for (int i=0; i<numHelpers; i++) {
@@ -171,7 +178,7 @@ void FuncCkLoop::init(int mode_, int numThreads_) {
       helperPtr = NULL;
 
       numHelpers = numThreads_;
-      useTreeBcast = (numHelpers >= USE_TREE_BROADCAST_THRESHOLD);
+      schedPolicy =  (numHelpers >= USE_TREE_BROADCAST_THRESHOLD ? CKLOOP_TREE : CKLOOP_LIST);
       pthdLoop = new CurLoopInfo(FuncCkLoop::MAX_CHUNKS);
       mainHelper = this;
       createPThreads();
@@ -233,22 +240,36 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
 #if CMK_TRACE_ENABLED
         envelope *env = CpvAccess(dummyEnv);
 #endif
-
         CmiMemoryReadFence();
-        if (useTreeBcast) {
+        if (schedPolicy == CKLOOP_NODE_QUEUE) {
+#if CMK_NODE_QUEUE_AVAILABLE
+            notifyMsg->queueID = NODE_Q;
+#if CMK_TRACE_ENABLED
+            int loopTimes = CkMyNodeSize();
+            _TRACE_CREATION_N(env, loopTimes);
+            notifyMsg->eventID = env->getEvent();
+#endif
+            notifyMsg->srcRank = CmiMyRank();
+            CmiPushNode((void *)(notifyMsg));
+#else
+            CkAbort("SchedPolicy, CKLOOP_NODE_QUEUE is not available on this environment\n");
+#endif
+        }
+        else if (schedPolicy == CKLOOP_TREE) {
             int loopTimes = TREE_BCAST_BRANCH>(CmiMyNodeSize()-1)?CmiMyNodeSize()-1:TREE_BCAST_BRANCH;
             //just implicit binary tree
             int pe = CmiMyRank()+1;
+            notifyMsg->queueID = NODE_Q;
 #if CMK_TRACE_ENABLED
             _TRACE_CREATION_N(env, loopTimes);
             notifyMsg->eventID =env->getEvent();
 #endif
             for (int i=0; i<loopTimes; i++, pe++) {
                 if (pe >= CmiMyNodeSize()) pe -= CmiMyNodeSize();
-                if (CpvAccessOther(isHelperOn, pe))
-                    CmiPushPE(pe, (void *)(notifyMsg));
+                CmiPushPE(pe, (void *)(notifyMsg));
             }
-        } else {
+        } else { /* schedPolicy == CKLOOP_LIST */
+            notifyMsg->queueID = PE_Q;
 #if CMK_TRACE_ENABLED
             _TRACE_CREATION_N(env, numHelpers-1);
             notifyMsg->eventID = env->getEvent();
@@ -262,7 +283,7 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
                     CmiPushPE(i, (void *)(notifyMsg));
             }
         }
-#else
+#else /* We don't support scheduling policy on node queue in this case */
 #if ALLOW_MULTIPLE_UNSYNC
         curLoop = thisHelper->getNewTask();
 #else
@@ -271,13 +292,12 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
         curLoop->set(numChunks, func, lowerRange, upperRange, paramNum, param);
         CpvAccess(_qd)->create(numHelpers-1);
         CmiMemoryReadFence();
-        if (useTreeBcast) {
+        if (schedPolicy == CKLOOP_TREE) {
             int loopTimes = TREE_BCAST_BRANCH>(CmiMyNodeSize()-1)?CmiMyNodeSize()-1:TREE_BCAST_BRANCH;
             //just implicit binary tree
             int pe = CmiMyRank()+1;
             for (int i=0; i<loopTimes; i++, pe++) {
                 if (pe >= CmiMyNodeSize()) pe -= CmiMyNodeSize();
-                if (!CpvAccessOther(isHelperOn,pe)) continue;
                 CharmNotifyMsg *one = thisHelper->getNotifyMsg();
                 one->ptr = (void *)curLoop;
                 envelope *env = UsrToEnv(one);
@@ -312,7 +332,7 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
         curLoop = pthdLoop;
         curLoop->set(numChunks, func, lowerRange, upperRange, paramNum, param);
         int numNotices = numThreads;
-        if (useTreeBcast) {
+        if (schedPolicy == CKLOOP_TREE) {
             numNotices = TREE_BCAST_BRANCH>=numThreads?numThreads:TREE_BCAST_BRANCH;
         }
         for (int i=0; i<numNotices; i++) {
@@ -446,7 +466,7 @@ FuncSingleHelper::FuncSingleHelper() {
     thisCkLoop = globalCkLoop;
     totalHelpers = globalCkLoop->numHelpers;
     funcckproxy = globalCkLoop->thisProxy;
-    useTreeBcast = globalCkLoop->useTreeBcast;
+    schedPolicy = globalCkLoop->schedPolicy;
 
     createNotifyMsg();
 
@@ -465,7 +485,7 @@ void FuncSingleHelper::createNotifyMsg() {
     notifyMsg = (ConverseNotifyMsg *)malloc(sizeof(ConverseNotifyMsg)*notifyMsgBufSize);
     for (int i=0; i<notifyMsgBufSize; i++) {
         ConverseNotifyMsg *tmp = notifyMsg+i;
-        if (useTreeBcast) {
+        if (schedPolicy == CKLOOP_NODE_QUEUE || schedPolicy == CKLOOP_TREE) {
             tmp->srcRank = CmiMyRank();
         } else {
             tmp->srcRank = -1;
@@ -479,7 +499,7 @@ void FuncSingleHelper::createNotifyMsg() {
     for (int i=0; i<notifyMsgBufSize; i++) {
         CharmNotifyMsg *tmp = new(sizeof(int)*8)CharmNotifyMsg; //allow msg priority bits
         notifyMsg[i] = tmp;
-        if (useTreeBcast) {
+        if (schedPolicy == CKLOOP_NODE_QUEUE || schedPolicy == CKLOOP_TREE) {
             tmp->srcRank = CmiMyRank();
         } else {
             tmp->srcRank = -1;
@@ -528,25 +548,46 @@ void FuncSingleHelper::stealWork(CharmNotifyMsg *msg) {
 
 void SingleHelperStealWork(ConverseNotifyMsg *msg) {
     int srcRank = msg->srcRank;
+    CurLoopInfo *loop = (CurLoopInfo *)msg->ptr;
 
-    if (srcRank >= 0) {
-        //means using tree-broadcast to send the notification msg
+    if (srcRank >= 0 && !loop->isFree()) {
+        if (msg->queueID == NODE_Q && globalCkLoop->getSchedPolicy() == CKLOOP_NODE_QUEUE ) {
+            msg->queueID = PE_Q;
+            int myRank = CmiMyRank();
+            if ( srcRank == myRank ) return;  // already done
+            /* We don't push a message to PE where its helper bit is disabled. */
+            for (int i=srcRank+1; i<CmiMyNodeSize(); i++) {
+                if ( i == myRank ) continue;
+                if (!CpvAccessOther(isHelperOn, i)) continue;
+                CmiPushPE(i, (void *)(msg));
+            }
+            for (int i=0; i<srcRank; i++) {
+                if ( i == myRank ) continue;
+                if (!CpvAccessOther(isHelperOn, i)) continue;
+                CmiPushPE(i, (void *)(msg));
+            }
+        }
+        else if (globalCkLoop->getSchedPolicy() == CKLOOP_TREE) {
+          int relPE = CmiMyRank()-msg->srcRank;
+          if (relPE<0) relPE += CmiMyNodeSize();
 
-        //int numHelpers = CmiMyNodeSize(); //the value of "numHelpers" should be obtained somewhere else
-        int relPE = CmiMyRank()-msg->srcRank;
-        if (relPE<0) relPE += CmiMyNodeSize();
-
-        //CmiPrintf("Rank[%d]: got msg from src %d with relPE %d\n", CmiMyRank(), msg->srcRank, relPE);
-        relPE=relPE*TREE_BCAST_BRANCH+1;
-        for (int i=0; i<TREE_BCAST_BRANCH; i++, relPE++) {
-            if (relPE >= CmiMyNodeSize()) break;
-            int pe = (relPE + msg->srcRank)%CmiMyNodeSize();
-            if (!CpvAccessOther(isHelperOn, pe)) continue;
-            //CmiPrintf("Rank[%d]: send msg to dst %d (relPE: %d) from src %d\n", CmiMyRank(), pe, relPE, msg->srcRank);
-            CmiPushPE(pe, (void *)msg);
+          //means using tree-broadcast to send the notification msg
+          //CmiPrintf("Rank[%d]: got msg from src %d with relPE %d\n", CmiMyRank(), msg->srcRank, relPE);
+          relPE=relPE*TREE_BCAST_BRANCH+1;
+          for (int i=0; i<TREE_BCAST_BRANCH; i++, relPE++) {
+              if (relPE >= CmiMyNodeSize()) break;
+              int pe = (relPE + msg->srcRank)%CmiMyNodeSize();
+              //CmiPrintf("Rank[%d]: send msg to dst %d (relPE: %d) from src %d\n", CmiMyRank(), pe, relPE, msg->srcRank);
+              /* This message is passed to children in the tree even when their helper bit is off. */
+              CmiPushPE(pe, (void *)msg);
+          }
         }
     }
-    CurLoopInfo *loop = (CurLoopInfo *)msg->ptr;
+    /* If this PE's helper bit is off, we should not steal work.
+     * This handles NODE_QUEUE / TREE cases and cases when helper bit is off
+     * after the master in NODE_QUEUE or parent in TREE pushes this message to this PE's queue
+     * */
+    if (!CpvAccess(isHelperOn)) return;
 #if CMK_TRACE_ENABLED
     unsigned int event = msg->eventID;
     _TRACE_BEGIN_EXECUTE_DETAILED(event, ForChareMsg, _ckloopEP,
@@ -640,6 +681,11 @@ void CkLoop_Parallelize(HelperFn func,
     if ( numChunks > upperRange - lowerRange + 1 ) numChunks = upperRange - lowerRange + 1;
     globalCkLoop->parallelizeFunc(func, paramNum, param, numChunks, lowerRange,
         upperRange, sync, redResult, type, cfunc, cparamNum, cparam);
+}
+
+void CkLoop_SetSchedPolicy(CkLoop_sched schedPolicy) {
+  globalCkLoop->setSchedPolicy(schedPolicy);
+  std::atomic_thread_fence(std::memory_order_release);
 }
 
 void CkLoop_DestroyHelpers() {

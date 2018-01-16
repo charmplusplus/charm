@@ -115,10 +115,14 @@ public:
 
 /* FuncCkLoop is a nodegroup object */
 
+typedef enum CkLoop_queueID { NODE_Q=0, PE_Q} CkLoop_queueID;
+
 typedef struct converseNotifyMsg {
     char core[CmiMsgHeaderSizeBytes];
     int srcRank;
     unsigned int eventID;
+    CkLoop_queueID queueID; /* indiciate which queue this message come from
+                    (e.g Node/PE Queue) */
     void *ptr;
 } ConverseNotifyMsg;
 
@@ -146,7 +150,7 @@ private:
 
     int numHelpers; //in pthread mode, the counter includes itself
     FuncSingleHelper **helperPtr; /* ptrs to the FuncSingleHelpers it manages */
-    int useTreeBcast;
+    CkLoop_sched schedPolicy;
 
 public:
     FuncCkLoop(int mode_, int numThreads_);
@@ -176,10 +180,16 @@ public:
     int getNumHelpers() {
         return numHelpers;
     }
-    int needTreeBcast() {
-        return useTreeBcast;
+    CkLoop_sched getSchedPolicy() {
+        return schedPolicy;
     }
-
+    void setSchedPolicy(CkLoop_sched schedPolicy) {
+#if !CMK_NODE_QUEUE_AVAILABLE && CMK_ERROR_CHECKING
+      if (schedPolicy == CKLOOP_NODE_QUEUE)
+        CkAbort("SchedPolicy, CKLOOP_NODE_QUEUE is not available on this environment\n");
+#endif
+      this->schedPolicy = schedPolicy;
+    }
     void parallelizeFunc(HelperFn func, /* the function that finishes a partial work on another thread */
                          int paramNum, void * param, /* the input parameters for the above func */
                          int numChunks, /* number of chunks to be partitioned */
@@ -207,7 +217,7 @@ private:
 
     FuncCkLoop *thisCkLoop;
     CProxy_FuncCkLoop funcckproxy;
-    int useTreeBcast;
+    CkLoop_sched schedPolicy;
 
 #if USE_CONVERSE_NOTIFICATION
     //this msg is shared across all SingleHelpers

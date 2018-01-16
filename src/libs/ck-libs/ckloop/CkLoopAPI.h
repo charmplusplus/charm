@@ -16,6 +16,8 @@ typedef enum REDUCTION_TYPE {
     CKLOOP_DOUBLE_MAX
 } REDUCTION_TYPE;
 
+typedef enum CkLoop_sched { CKLOOP_NODE_QUEUE=0, CKLOOP_TREE, CKLOOP_LIST} CkLoop_sched;
+
 class CProxy_FuncCkLoop;
 /*
  * "numThreads" argument is intended to be used in non-SMP mode to specify
@@ -37,6 +39,8 @@ extern void CkLoop_Parallelize(
     CallerFn cfunc=NULL, /* caller PE will call this function before ckloop is done and before starting to work on its chunks */
     int cparamNum=0, void *cparam=NULL /* the input parameters to the above function */
 );
+
+extern void CkLoop_SetSchedPolicy(CkLoop_sched schedPolicy);
 
 extern void CkLoop_DestroyHelpers();
 #endif

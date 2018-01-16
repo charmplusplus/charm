@@ -45,6 +45,14 @@ application.  The argument ``numThreads'' is only used in non-SMP mode,
 specifying the number of threads to be created for the single-node shared-memory
 parallelism. It will be ignored in SMP mode.
 
+\item void \textbf{CkLoop\_SetSchedPolicy}(CkLoop\_sched schedPolicy=CKLOOP\_NODE\_QUEUE)
+: This function sets the scheduling policy of CkLoop work, three options
+available: CKLOOP\_NODE\_QUEUE, CKLOOP\_TREE and CKLOOP\_LIST. The default policy, CKLOOP\_NODE\_QUEUE
+on supported environments is to use node\_queue message so that master or another idle PE
+delievers the CkLoop work to all other PEs.
+CKLOOP\_TREE policy is set by default for builds not supporting a node queue. This policy delivers
+CkLoop messages on the implicit tree. CKLOOP\_LIST uses list to deliver the messages.
+
 \item void \textbf{CkLoop\_Exit}(CProxy\_FuncCkLoop ckLoop): This function is
 intended to be used in non-SMP mode, as it frees the resources
 (e.g. terminating the spawned threads) used by the CkLoop library. It should
