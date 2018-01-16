@@ -16,8 +16,9 @@ CMK_C_OPTIMIZE='-O3 -ffast-math '
 CMK_CXX_OPTIMIZE='-O3 -ffast-math '
 CMK_QT="generic64-light"
 
-CMK_CF77=""
-CMK_CF90=""
-CMK_CF90_FIXED=""
+# Use XLF since Flang is not supported on BGQ
+CMK_CF77="mpixlf77_r"
+CMK_CF90="mpixlf90_r -qsuffix=f=f90"
+CMK_CF90_FIXED="mpixlf90_r"
 
 CMK_COMPILER='bgclang'
