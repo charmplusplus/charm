@@ -6,7 +6,7 @@ all: hello
 ampi: hello
 
 hello: hello.c
-	$(CHARMC) -o hello hello.c -language ampi $(OPTS)
+	$(CHARMC) -o hello hello.c $(OPTS)
 
 test: hello
 	rm -rf log
