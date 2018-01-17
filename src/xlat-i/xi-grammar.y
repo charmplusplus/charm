@@ -294,6 +294,12 @@ QualName	: IDENT
 		  sprintf(tmp,"%s::%s", $1, $4);
 		  $$ = tmp;
 		}
+		| QualName ':'':' ARRAY
+		{
+		  char *tmp = new char[strlen($1)+5+3];
+		  sprintf(tmp,"%s::array", $1);
+		  $$ = tmp;
+		}
 		;
 Module		: MODULE Name ConstructEList
 		{ 
