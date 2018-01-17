@@ -14,7 +14,7 @@ test.o: test.C
 # clean up .o, .mod, .exe and EMACS backup files
 #
 clean:
-	rm -f *.o *.mod pgm *~ conv-host charmrun test.o charmrun.exe pgm.exe pgm.pdb pgm.ilk
+	rm -f *.o *.mod pgm *~ conv-host charmrun test.o charmrun.exe pgm.exe pgm.pdb pgm.ilk ampirun
 
 test: pgm
 	$(call run, ./pgm +p1 +vp1 )

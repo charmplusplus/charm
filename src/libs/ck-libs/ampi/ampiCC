@@ -42,4 +42,7 @@ then
     rmdir $dirName
 fi
 
+# Copy ampirun, but do not overwrite it if it already exists.
+cp -n $CHARMBIN/ampirun .
+
 exit $status

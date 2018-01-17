@@ -25,4 +25,4 @@ test:
 	$(call run, +p2 ./simple +vp 16)
 
 clean:
-	rm -f charmrun simple *.o
+	rm -f charmrun simple *.o ampirun

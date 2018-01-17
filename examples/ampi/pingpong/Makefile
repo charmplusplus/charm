@@ -19,5 +19,5 @@ test: all
 	$(call run, +p2 ./pgm 100000 16 +vp2)
 
 clean:
-	rm -rf charmrun conv-host moduleinit* *.o pingpong pgm pgm-mpi pgm-pipe pgm-pipe-mpi *~ *.sts core
+	rm -rf charmrun conv-host moduleinit* *.o pingpong pgm pgm-mpi pgm-pipe pgm-pipe-mpi *~ *.sts core ampirun
 

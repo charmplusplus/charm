@@ -98,6 +98,7 @@ headers: $(HEADERS)
 	cp ampiCC $(CDIR)/bin/ampicxx
 	cp ampif77 $(CDIR)/bin/ampif77
 	cp ampif90 $(CDIR)/bin/ampif90
+	cp ampirun $(CDIR)/bin/ampirun
 	touch headers
 
 compat_ampius.o: compat_ampius.C

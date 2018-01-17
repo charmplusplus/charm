@@ -21,5 +21,5 @@ test: all
 	$(call run, +p2 ./IgetTest 100000 16 +vp2)
 
 clean:
-	rm -rf charmrun conv-host moduleinit* *.o GetPutTest IgetTest GetPutTest-mpi *~ *.sts core
+	rm -rf charmrun conv-host moduleinit* *.o GetPutTest IgetTest GetPutTest-mpi *~ *.sts core ampirun
 

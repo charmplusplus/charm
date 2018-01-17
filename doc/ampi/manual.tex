@@ -1026,7 +1026,7 @@ Fluids on 32 physical processors, one would specify those with multiple
 \verb|+vp| options on the command line as:
 
 \begin{alltt}
-> charmrun gen1.x +p 32 +vp 128 +vp 64
+> ./charmrun gen1.x +p 32 +vp 128 +vp 64
 \end{alltt}
 
 This will ensure that multiple modules representing different complete
@@ -1804,7 +1804,7 @@ support this capability. You can also set the environment variables \texttt{AMPI
 before running a job to override the default specified at build time.
 
 \section{Building and Running AMPI Programs}
-\subsection{Building}
+\subsection{Building AMPI Programs}
 \ampi{} provides a compiler called \emph{ampicc} in your charm/bin/ directory.
 You can use this compiler to build your AMPI program the same way as other
 compilers like cc. All the command line flags that you would use
@@ -1826,18 +1826,22 @@ or a suite of strategies in with \emph{-module \textless LB\textgreater}. For ex
 \end{alltt}
 
 
-\subsection{Running}
+\subsection{Running AMPI programs}
+
+AMPI offers two options to execute an AMPI program, \texttt{charmrun} and \texttt{ampirun}.
+
+\subsubsection{Running with charmrun}
 The \charmpp{} distribution contains a script called \texttt{charmrun} that
 makes the job of running \ampi{} programs portable and easier across all
 parallel machines supported by \charmpp{}. \texttt{charmrun} is copied to a
-directory where an \ampi{} program is built using \emph{ampicc}. It takes a command
+directory where an \ampi{} program is built using \texttt{ampicc}. It takes a command
 line parameter specifying number of processors, and the name of the program
 followed by \ampi{} options (such as number of ranks to create, and the stack size
 of every user-level thread) and the program arguments. A typical invocation of an \ampi{}
 program \texttt{pgm} with \texttt{charmrun} is:
 
 \begin{alltt}
-> charmrun +p16 ./pgm +vp64
+> ./charmrun +p16 ./pgm +vp64
 \end{alltt}
 
 Here, the \ampi{} program \texttt{pgm} is run on 16 physical processors with
@@ -1845,14 +1849,41 @@ Here, the \ampi{} program \texttt{pgm} is run on 16 physical processors with
 
 To run with load balancing, specify a load balancing strategy. If Address Space
 Layout Randomization is enabled on your target system, you may need to add the
-flag \emph{+isomalloc\_sync} when running with migration. You can also specify
-the size of user-level thread's stack using the \emph{+tcharm\_stacksize}
+flag \texttt{+isomalloc\_sync} when running with migration. You can also specify
+the size of user-level thread's stack using the \texttt{+tcharm\_stacksize}
 option, which can be used to decrease the size of the stack that must be
 migrated, as in the following example:
 
 \begin{alltt}
-> charmrun +p16 ./pgm +vp128 +tcharm_stacksize 32K +balancer RefineLB
+> ./charmrun +p16 ./pgm +vp128 +tcharm_stacksize 32K +balancer RefineLB
 \end{alltt}
+
+
+\subsubsection{Running with ampirun}
+
+For compliance with the MPI standard and simpler execution, \ampi{} ships with the 
+\texttt{ampirun} script that is similar to \texttt{mpirun} provided by other MPI 
+runtimes. As with \texttt{charmrun}, \texttt{ampirun} is copied automatically to 
+the program directory when compiling an application with \texttt{ampicc}.
+
+The basic usage of ampirun is as follows:
+\begin{alltt}
+> ./ampirun -np 16 --host h1,h2,h3,h4 ./pgm
+\end{alltt}
+This command will create 16 (non-virtualized) ranks and distribute them on the hosts h1--h4.
+
+When using the \texttt{-vr} option, AMPI will create the number of ranks specified by the \texttt{-np} parameter as virtual ranks, and will create only one process per host:
+\begin{alltt}
+> ./ampirun -np 16 --host h1,h2,h3,h4 -vr ./pgm
+\end{alltt}
+
+Other options (such as the load balancing strategy), can be specified in the same way as for charmrun:
+\begin{alltt}
+> ./ampirun -np 16 ./pgm +balancer RefineLB
+\end{alltt}
+
+
+\subsubsection{Other options}
 
 Note that for AMPI programs compiled with gfortran, users may need to set the following
 environment variable to see program output to stdout:

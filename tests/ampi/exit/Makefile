@@ -12,4 +12,4 @@ test: clean test_exit
 	@rm -f tmp.out
 
 clean:
-	rm -f *.o test_exit charmrun
+	rm -f *.o test_exit charmrun ampirun

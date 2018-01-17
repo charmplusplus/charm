@@ -1,0 +1,122 @@
+#!/bin/bash
+
+set -o nounset -o posix -o pipefail
+
+progname=$(basename $0)
+
+verbose=0
+num_ranks=1
+num_hosts=0
+
+virtual_ranks=0
+
+cmd=""
+hosts=""
+
+usage() {
+  echo
+  echo "Usage: $progname [options] <program>"
+  echo
+  echo "Options:"
+  echo "    -h|--help                 Show this help"
+  echo "    -v|--verbose              Verbose output"
+  echo "    -n|-np|--np|-p <#ranks>   Number of ranks"
+  echo "    --host <host1,host2,...>  Comma-separated list of hosts"
+  echo "    -vr|--vr                  Use virtual ranks"
+  echo
+  echo "Other options will be passed unmodified to charmrun."
+}
+
+
+handle_hosts() {
+  if [[ -z $hosts ]]; then
+    num_hosts=1
+    return
+  fi
+
+  echo "group main" > ampirun-nodelist
+
+  IFS=","
+  for n in $hosts; do
+    num_hosts=$((num_hosts+1))
+    echo "  host $n" >> ampirun-nodelist
+  done
+}
+
+
+processArgs() {
+  while [[ ! $# == 0 ]]
+  do
+    arg="$1"
+    shift
+
+    case "$arg" in
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      -v|--verbose)
+        verbose=1
+        ;;
+
+      -n|-np|--np|-p)
+        num_ranks=$1
+        shift
+        ;;
+
+      --host)
+        hosts=$1
+        shift
+        ;;
+
+      -vr|--vr)
+        virtual_ranks=1
+        ;;
+
+      *)
+        cmd+="$arg "
+        ;;
+    esac
+  done
+}
+
+eval processArgs "$@"
+
+if [[ -z $cmd ]]; then
+  echo "$progname error: missing command to execute"
+  usage
+  exit 2
+fi
+
+handle_hosts
+
+full_cmd="./charmrun "
+
+if [[ $verbose == 0 ]]; then
+  full_cmd+="++quiet "
+fi
+
+if [[ -z $hosts ]]; then
+  full_cmd+="++local "
+else
+  full_cmd+="++nodelist ampirun-nodelist "
+fi
+
+full_cmd+="$cmd"
+
+if [[ $virtual_ranks == 0 ]]; then
+  full_cmd+="+p$num_ranks "
+else
+  full_cmd+="+vp$num_ranks +p$num_hosts "
+fi
+
+if [[ $verbose == 1 ]]; then
+  echo "Executing '$full_cmd'"
+fi
+
+eval $full_cmd
+status=$?
+
+rm -f ampirun-nodelist
+
+exit $status

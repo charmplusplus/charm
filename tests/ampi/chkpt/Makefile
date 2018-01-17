@@ -26,5 +26,5 @@ bgtest: clean ampi
 	$(call run, +p2 ./hello +vp8 +restart log +x2 +y1 +z1)
 
 clean:
-	rm -f *.o *.mod moduleinit.C hello *~ conv-host charmrun
+	rm -f *.o *.mod moduleinit.C hello *~ conv-host charmrun ampirun
 	rm -rf log

@@ -38,4 +38,4 @@ alltoall_VPtest_f: alltoall_VPtest.f
 	$(CHARMF) -o alltoall_VPtest_f alltoall_VPtest.o -swapglobals $(OPTS) $(LIBS)
 
 clean:
-	rm -rf *~ *.o alltoall mpibench charmrun conv-host allgather
+	rm -rf *~ *.o alltoall mpibench charmrun conv-host allgather ampirun
