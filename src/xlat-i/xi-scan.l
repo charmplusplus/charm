@@ -147,6 +147,7 @@ struct rwentry rwtable[] = {
 {  "memcritical", MEMCRITICAL },
 {  "reductiontarget", REDUCTIONTARGET },
 {  "case",       CASE },
+{  "typename", TYPENAME },
 {  "",		0 }
 };
 

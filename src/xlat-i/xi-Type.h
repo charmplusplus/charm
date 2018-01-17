@@ -158,6 +158,18 @@ class ConstType : public Type {
   const char* getScope(void) const { return NULL; }
 };
 
+class TypenameType : public Type {
+ private:
+  Type* referant;
+
+ public:
+  TypenameType(Type* t) : referant(t) {}
+  void print(XStr& str) { str << "typename " << referant; }
+  virtual Type* deref(void) { return referant; }
+  const char* getBaseName(void) const { return referant->getBaseName(); }
+  const char* getScope(void) const { return NULL; }
+};
+
 class FuncType : public Type {
  private:
   Type* rtype;

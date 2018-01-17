@@ -138,6 +138,7 @@ void ReservedWord(int token, int fCol, int lCol);
 %token MEMCRITICAL
 %token REDUCTIONTARGET
 %token CASE
+%token TYPENAME
 
 %type <modlist>		ModuleEList File
 %type <module>		Module
@@ -451,6 +452,8 @@ QualNamedType	: QualName OptTParams {
 
 SimpleType	: BuiltinType
 		{ $$ = $1; }
+		| TYPENAME QualNamedType
+		{ $$ = new TypenameType($2); }
 		| QualNamedType
 		{ $$ = $1; }
 		;
@@ -719,6 +722,8 @@ OptNameInit	: /* Empty */
 		;
 
 TVar		: CLASS Name OptTypeInit
+		{ $$ = new TType(new NamedType($2), $3); }
+		| TYPENAME IDENT OptTypeInit
 		{ $$ = new TType(new NamedType($2), $3); }
 		| FuncType OptNameInit
 		{ $$ = new TFunc($1, $2); }

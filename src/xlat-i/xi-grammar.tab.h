@@ -116,7 +116,8 @@ extern int yydebug;
     ACCELBLOCK = 326,
     MEMCRITICAL = 327,
     REDUCTIONTARGET = 328,
-    CASE = 329
+    CASE = 329,
+    TYPENAME = 330
   };
 #endif
 /* Tokens.  */
@@ -192,6 +193,7 @@ extern int yydebug;
 #define MEMCRITICAL 327
 #define REDUCTIONTARGET 328
 #define CASE 329
+#define TYPENAME 330
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
@@ -242,7 +244,7 @@ union YYSTYPE
   XStr* xstrptr;
   AccelBlock* accelBlock;
 
-#line 246 "y.tab.h" /* yacc.c:1915  */
+#line 248 "y.tab.h" /* yacc.c:1915  */
 };
 
 typedef union YYSTYPE YYSTYPE;
