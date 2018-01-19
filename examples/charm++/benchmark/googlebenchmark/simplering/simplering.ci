@@ -1,0 +1,20 @@
+mainmodule simplering {
+
+  readonly CProxy_Main mainProxy;
+
+  readonly int RingSize;
+  readonly int Rounds;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry [threaded] void run_main();
+  };
+
+  message token_t;
+
+  array [1D] Node {
+    entry Node(void);
+    entry [expedited] void take(token_t *);
+  };
+};
+
