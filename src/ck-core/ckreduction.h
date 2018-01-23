@@ -182,7 +182,10 @@ public:
         statistics,
 
         // Combine multiple data/reducer pairs into one reduction
-        tuple
+        tuple,
+
+        // Perform reduction using external reducer defined in Python (for CharmPy)
+        external_py
 	} reducerType;
 
 	//This structure is used with the set reducer above,
@@ -257,6 +260,67 @@ private:
 	CkReduction();
 };
 PUPbytes(CkReduction::reducerType)
+
+//CkReductionTypesExt struct to expose the reducerTypes for external
+//modules like CharmPy
+        /*  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+                 The order of reducerTypes here should match the order in "class ReducerTypes" in
+                 charmlib_ctypes.py and "struct CkReductionTypesExt" in charmlib_cffi_build.py
+
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  */
+struct CkReductionTypesExt {
+    // No-op reducer
+    int nop = CkReduction::nop;
+    // Sum reducers
+    int sum_char = CkReduction::sum_char;
+    int sum_short = CkReduction::sum_short;
+    int sum_int = CkReduction::sum_int;
+    int sum_long = CkReduction::sum_long;
+    int sum_uchar = CkReduction::sum_uchar;
+    int sum_ushort = CkReduction::sum_ushort;
+    int sum_uint = CkReduction::sum_uint;
+    int sum_ulong = CkReduction::sum_ulong;
+    int sum_float = CkReduction::sum_float;
+    int sum_double = CkReduction::sum_double;
+    // Product reducers
+    int product_char = CkReduction::product_char;
+    int product_short = CkReduction::product_short;
+    int product_int = CkReduction::product_int;
+    int product_long = CkReduction::product_long;
+    int product_uchar = CkReduction::product_uchar;
+    int product_ushort = CkReduction::product_ushort;
+    int product_uint = CkReduction::product_uint;
+    int product_ulong = CkReduction::product_ulong;
+    int product_float = CkReduction::product_float;
+    int product_double = CkReduction::product_double;
+    // Max reducers
+    int max_char = CkReduction::max_char;
+    int max_short = CkReduction::max_short;
+    int max_int = CkReduction::max_int;
+    int max_long = CkReduction::max_long;
+    int max_uchar = CkReduction::max_uchar;
+    int max_ushort = CkReduction::max_ushort;
+    int max_uint = CkReduction::max_uint;
+    int max_ulong = CkReduction::max_ulong;
+    int max_float = CkReduction::max_float;
+    int max_double = CkReduction::max_double;
+    // Min reducers
+    int min_char = CkReduction::min_char;
+    int min_short = CkReduction::min_short;
+    int min_int = CkReduction::min_int;
+    int min_long = CkReduction::min_long;
+    int min_uchar = CkReduction::min_uchar;
+    int min_ushort = CkReduction::min_ushort;
+    int min_uint = CkReduction::min_uint;
+    int min_ulong = CkReduction::min_ulong;
+    int min_float = CkReduction::min_float;
+    int min_double = CkReduction::min_double;
+    // External custom reducer in Python
+    int external_py = CkReduction::external_py;
+};
 
 //A CkReductionMsg is sent up the reduction tree-- it
 // carries a contribution, or several reduced contributions.

@@ -423,6 +423,96 @@ typedef ArrayElementT<CkIndex5D> ArrayElement5D;
 typedef ArrayElementT<CkIndex6D> ArrayElement6D;
 typedef ArrayElementT<CkIndexMax> ArrayElementMax;
 
+extern void (*ArrayMsgRecvExtCallback)(int, int, int *, int, int, char *, int);
+extern int (*ArrayElemLeaveExt)(int, int, int *, char**, int);
+extern void (*ArrayElemJoinExt)(int, int, int *, int, char*, int);
+extern void (*ArrayResumeFromSyncExtCallback)(int, int, int *);
+
+class ArrayElemExt: public ArrayElement {
+private:
+  int ctorEpIdx;
+
+public:
+  ArrayElemExt();
+  ArrayElemExt(CkMigrateMessage *m) {}
+
+  static void __ArrayElemExt(void *impl_msg, void *impl_obj_void) {
+    CkFreeSysMsg(impl_msg);
+    new (impl_obj_void) ArrayElemExt();
+  }
+
+  static void __entryMethod(void *impl_msg, void *impl_obj_void) {
+    //fprintf(stderr, "ArrayElemExt:: Entry method invoked\n");
+    ArrayElemExt *e = static_cast<ArrayElemExt *>(impl_obj_void);
+    CkMarshallMsg *impl_msg_typed = (CkMarshallMsg *)impl_msg;
+    char *impl_buf = impl_msg_typed->msgBuf;
+    PUP::fromMem implP(impl_buf);
+    int msgSize; implP|msgSize;
+    int ep; implP|ep;
+    int dcopy_start; implP|dcopy_start;
+    ArrayMsgRecvExtCallback(((CkGroupID)e->thisArrayID).idx,
+                            int(e->thisIndexMax.getDimension()),
+                            e->thisIndexMax.data(), ep, msgSize, impl_buf+(3*sizeof(int)),
+                            dcopy_start);
+  }
+
+  static void __AtSyncEntryMethod(void *impl_msg, void *impl_obj_void) {
+    ArrayElemExt *e = static_cast<ArrayElemExt *>(impl_obj_void);
+    //printf("ArrayElementExt:: calling AtSync elem->usesAtSync=%d\n", e->usesAtSync);
+    e->AtSync();
+  }
+
+  static void __migrateEntryMethod(void *impl_msg, void *impl_obj_void) {
+    ArrayElemExt *e = static_cast<ArrayElemExt *>(impl_obj_void);
+    CkMarshallMsg *impl_msg_typed = (CkMarshallMsg *)impl_msg;
+    char *impl_buf = impl_msg_typed->msgBuf;
+    PUP::fromMem implP(impl_buf);
+    int msgSize, ep, toPe;
+    implP|msgSize;
+    implP|ep;
+    implP|toPe;
+    //fprintf(stderr, "---- Migrating object to PE %d ----\n", toPe);
+    e->migrateMe(toPe);
+  }
+
+  static void __CkMigrateMessage(void *impl_msg, void *impl_obj_void) {
+    //printf("ArrayElemExt:: Migration constructor invoked\n");
+    call_migration_constructor<ArrayElemExt> c = impl_obj_void;
+    c((CkMigrateMessage*)impl_msg);
+  }
+
+  // NOTE this assumes that calls to pup are due to array element migration
+  // not sure if it's always going to be the case
+  void pup(PUP::er &p) {
+    // because this is not generated code, looks like I need to make explicit call
+    // to parent pup method, otherwise fields in parent class like usesAtSync will
+    // not be pupped!
+    ArrayElement::pup(p);
+    int nDims = thisIndexMax.getDimension();
+    int aid = ((CkGroupID)thisArrayID).idx;
+    int data_size;
+    if (!p.isUnpacking()) { // packing or sizing
+      char *msg;
+      data_size = ArrayElemLeaveExt(aid, nDims, thisIndexMax.data(), &msg, p.isSizing());
+      p | data_size;
+      p | ctorEpIdx;
+      p(msg, data_size);
+    } else {
+      p | data_size;
+      p | ctorEpIdx;
+      PUP::fromMem *p_mem = (PUP::fromMem *)&p;
+      ArrayElemJoinExt(aid, nDims, thisIndexMax.data(), ctorEpIdx, p_mem->get_current_pointer(), data_size);
+      p_mem->advance(data_size);
+    }
+  }
+
+  void ResumeFromSync() {
+    ArrayResumeFromSyncExtCallback(((CkGroupID)thisArrayID).idx,
+                            int(thisIndexMax.getDimension()),
+                            thisIndexMax.data());
+  }
+};
+
 /*@}*/
 
 

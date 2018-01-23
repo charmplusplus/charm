@@ -215,6 +215,60 @@ CkCallback::CkCallback(ArrayElement *p, int ep,bool doInline) {
         d.array.refnum = 0;
 }
 
+#if CMK_CHARMPY
+
+// currently this is only used with Charmpy, so we are only enabling it for that case
+// to guarantee best performance for non-charmpy applications
+
+// function pointer to interact with Charmpy to generate callback msg
+extern void (*CPickleDataExtCallback)(void*, int, int, char**, int*);
+
+static void CkCallbackSendExt(const CkCallback &cb, void *msg)
+{
+  CkAssert(msg != NULL);
+  char *extResultMsgData[2] = {NULL, NULL};
+  int extResultMsgDataSizes[2] = {0, 0};
+  CkReductionMsg* redMsg = (CkReductionMsg*) msg;
+  if (redMsg->getReducer() == CkReduction::external_py) {
+    // this was produced by a python reducer, so it's already in a suitable format
+    extResultMsgData[0] = (char*) redMsg->getData();
+    extResultMsgDataSizes[0] = redMsg->getSize();
+  } else {
+    // reduced data was produced by charm++, transform to a charmpy msg
+    CPickleDataExtCallback(redMsg->getData(), redMsg->getLength(), redMsg->getReducer(),
+                           extResultMsgData, extResultMsgDataSizes);
+  }
+
+  switch (cb.type) {
+    case CkCallback::sendChare: // Send message to a chare
+      CkChareExtSend_multi(cb.d.chare.id.onPE, cb.d.chare.id.objPtr, cb.d.chare.ep,
+                           2, extResultMsgData, extResultMsgDataSizes);
+      break;
+    case CkCallback::sendGroup: // Send message to a group element
+      CkGroupExtSend_multi(cb.d.group.id.idx, cb.d.group.onPE, cb.d.group.ep,
+                           2, extResultMsgData, extResultMsgDataSizes);
+      break;
+    case CkCallback::sendArray: // Send message to an array element
+      CkArrayExtSend_multi(cb.d.array.id.idx, cb.d.array.idx.asChild().data(), cb.d.array.idx.dimension,
+                           cb.d.array.ep, 2, extResultMsgData, extResultMsgDataSizes);
+      break;
+    case CkCallback::bcastGroup:
+      // onPE is set to -1 since its a bcast
+      CkGroupExtSend_multi(cb.d.group.id.idx, -1, cb.d.group.ep, 2, extResultMsgData, extResultMsgDataSizes);
+      break;
+    case CkCallback::bcastArray:
+      // numDimensions is set to 0 since its bcast
+      CkArrayExtSend_multi(cb.d.array.id.idx, cb.d.array.idx.asChild().data(), 0,
+                           cb.d.array.ep, 2, extResultMsgData, extResultMsgDataSizes);
+      break;
+    default:
+      CkAbort("Unsupported callback for ext reduction, or corrupted callback");
+      break;
+  }
+
+  CkFreeMsg(msg); // free no longer used msg object
+}
+#endif
 
 void CkCallback::send(int length,const void *data) const
 {
@@ -227,6 +281,13 @@ void CkCallback::send(int length,const void *data) const
 */
 void CkCallback::send(void *msg) const
 {
+#if CMK_CHARMPY
+  if (isCkExtReductionCb) { // callback target is external
+    CkCallbackSendExt(*this, msg);
+    return;
+  }
+#endif
+
 	switch(type) {
 	  //	CkPrintf("type:%d\n",type);
 	case ignore: //Just ignore the callback

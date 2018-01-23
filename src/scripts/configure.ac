@@ -246,6 +246,21 @@ else
   AC_DEFINE_UNQUOTED(CMK_SHRINK_EXPAND, 0, [disable shrinkexpand])
 fi
 
+AC_ARG_ENABLE([charmpy],
+            [AS_HELP_STRING([--enable-charmpy],
+              [enable CharmPy support])],
+            [enable_charmpy=$enableval],
+            [enable_charmpy=no])
+
+if test "$enable_charmpy" = "yes"
+then
+  Echo "CharmPy support is enabled"
+  AC_DEFINE_UNQUOTED(CMK_CHARMPY, 1, [enable charmpy])
+else
+  Echo "CharmPy support is disabled"
+  AC_DEFINE_UNQUOTED(CMK_CHARMPY, 0, [disable charmpy])
+fi
+
 AC_ARG_WITH([numa],
             [AS_HELP_STRING([--with-numa],
               [support memory affinity with NUMA])],

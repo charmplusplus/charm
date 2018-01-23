@@ -2195,6 +2195,325 @@ void CthEnqueueBigSimThread(CthThreadToken* token, int s,
                                    int pb,unsigned int *prio);
 #endif
 
+//------------------- External client support (e.g. CharmPy) ----------------
+
+static std::vector< std::vector<char> > ext_args;
+static std::vector<char*> ext_argv;
+
+// This is just a wrapper for ConverseInit that copies command-line args into a private
+// buffer.
+// To be called from external clients like charmpy. This wrapper avoids issues with
+// ctypes and cffi.
+extern "C" void StartCharmExt(int argc, char **argv) {
+#if !defined(_WIN32) && !NODE_0_IS_CONVHOST
+  // only do this in net layers if using charmrun, so that output of process 0
+  // doesn't get duplicated
+  char *ns = getenv("NETSTART");
+  if (ns != 0) {
+    int fd;
+    if (-1 != (fd = open("/dev/null", O_RDWR))) {
+      dup2(fd, 0);
+      dup2(fd, 1);
+      dup2(fd, 2);
+    }
+  }
+#endif
+  ext_args.resize(argc);
+  ext_argv.resize(argc + 1, NULL);
+  for (int i=0; i < argc; i++) {
+    ext_args[i].resize(strlen(argv[i]) + 1);
+    strcpy(ext_args[i].data(), argv[i]);
+    ext_argv[i] = ext_args[i].data();
+  }
+  ConverseInit(argc, ext_argv.data(), _initCharm, 0, 0);
+}
+
+void (*CkRegisterMainModuleCallback)() = NULL;
+extern "C" void registerCkRegisterMainModuleCallback(void (*cb)()) {
+  CkRegisterMainModuleCallback = cb;
+}
+
+void (*MainchareCtorExtCallback)(int, void*, int, int, char **) = NULL;
+extern "C" void registerMainchareCtorExtCallback(void (*cb)(int, void*, int, int, char **)) {
+  MainchareCtorExtCallback = cb;
+}
+
+void (*ReadOnlyRecvExtCallback)(int, char*) = NULL;
+extern "C" void registerReadOnlyRecvExtCallback(void (*cb)(int, char*)) {
+  ReadOnlyRecvExtCallback = cb;
+}
+
+void* ReadOnlyExt::ro_data = NULL;
+size_t ReadOnlyExt::data_size = 0;
+
+void (*ChareMsgRecvExtCallback)(int, void*, int, int, char *, int) = NULL;
+extern "C" void registerChareMsgRecvExtCallback(void (*cb)(int, void*, int, int, char *, int)) {
+  ChareMsgRecvExtCallback = cb;
+}
+
+void (*GroupMsgRecvExtCallback)(int, int, int, char *, int) = NULL;
+extern "C" void registerGroupMsgRecvExtCallback(void (*cb)(int, int, int, char *, int)) {
+  GroupMsgRecvExtCallback = cb;
+}
+
+void (*ArrayMsgRecvExtCallback)(int, int, int *, int, int, char *, int) = NULL;
+extern "C" void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char *, int)) {
+  ArrayMsgRecvExtCallback = cb;
+}
+
+int (*ArrayElemLeaveExt)(int, int, int *, char**, int) = NULL;
+extern "C" void registerArrayElemLeaveExtCallback(int (*cb)(int, int, int *, char**, int)) {
+  ArrayElemLeaveExt = cb;
+}
+
+void (*ArrayElemJoinExt)(int, int, int *, int, char*, int) = NULL;
+extern "C" void registerArrayElemJoinExtCallback(void (*cb)(int, int, int *, int, char*, int)) {
+  ArrayElemJoinExt = cb;
+}
+
+void (*ArrayResumeFromSyncExtCallback)(int, int, int *) = NULL;
+extern "C" void registerArrayResumeFromSyncExtCallback(void (*cb)(int, int, int *)) {
+  ArrayResumeFromSyncExtCallback = cb;
+}
+
+void (*CPickleDataExtCallback)(void*, int, int, char**, int*) = NULL;
+extern "C" void registerCPickleDataExtCallback(void (*cb)(void*, int, int, char**, int*)) {
+  CPickleDataExtCallback = cb;
+}
+
+int (*PyReductionExt)(char**, int*, int, char**) = NULL;
+extern "C" void registerPyReductionExtCallback(int (*cb)(char**, int*, int, char**)) {
+    PyReductionExt = cb;
+}
+
+extern "C" int CkMyPeHook() { return CkMyPe(); }
+extern "C" int CkNumPesHook() { return CkNumPes(); }
+
+void ReadOnlyExt::setData(void *msg, size_t msgSize) {
+  ro_data = malloc(msgSize);
+  memcpy(ro_data, msg, msgSize);
+  data_size = msgSize;
+}
+
+void ReadOnlyExt::_roPup(void *pup_er) {
+  PUP::er &p=*(PUP::er *)pup_er;
+  if (!p.isUnpacking()) {
+    //printf("[%d] Sizing/packing data, ro_data=%p, data_size=%d\n", CkMyPe(), ro_data, int(data_size));
+    p | data_size;
+    p((char*)ro_data, data_size);
+  } else {
+    CkAssert(CkMyPe() != 0);
+    CkAssert(ro_data == NULL);
+    PUP::fromMem &p_mem = *(PUP::fromMem *)pup_er;
+    p_mem | data_size;
+    //printf("[%d] Unpacking ro, size of data to unpack is %d\n", CkMyPe(), int(data_size));
+    ReadOnlyRecvExtCallback(int(data_size), p_mem.get_current_pointer());
+    p_mem.advance(data_size);
+  }
+}
+
+CkpvExtern(int, _currentChareType);
+
+MainchareExt::MainchareExt(CkArgMsg *m) {
+  int cIdx = CkpvAccess(_currentChareType);
+  //printf("Constructor of MainchareExt, chareId=(%d,%p), chareIdx=%d\n", thishandle.onPE, thishandle.objPtr, cIdx);
+  int ctorEpIdx =  _mainTable[_chareTable[cIdx]->mainChareType()]->entryIdx;
+  MainchareCtorExtCallback(thishandle.onPE, thishandle.objPtr, ctorEpIdx, m->argc, m->argv);
+}
+
+GroupExt::GroupExt() {
+  //printf("Constructor of GroupExt, gid=%d\n", thisgroup.idx);
+  //int chareIdx = CkpvAccess(_groupTable)->find(thisgroup).getcIdx();
+  int chareIdx = ckGetChareType();
+  int ctorEpIdx = _chareTable[chareIdx]->getDefaultCtor();
+  GroupMsgRecvExtCallback(thisgroup.idx, ctorEpIdx, 0, NULL, -1);
+}
+
+// TODO options
+extern "C"
+int CkCreateGroupExt(int cIdx, int eIdx, char *msg, int msgSize) {
+  //static_cast<void>(impl_e_opts);
+  void *impl_msg = CkAllocSysMsg();
+  UsrToEnv(impl_msg)->setMsgtype(BocInitMsg);
+  //if (impl_e_opts)
+  //  UsrToEnv(impl_msg)->setGroupDep(impl_e_opts->getGroupDepID());
+  CkGroupID gId = CkCreateGroup(cIdx, eIdx, impl_msg);
+  return gId.idx;
+}
+
+// TODO options
+extern "C"
+int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, char *msg, int msgSize) {
+  //static_cast<void>(impl_e_opts);
+  void *impl_msg = CkAllocSysMsg();
+  CkArrayOptions opts(ndims, dims);
+  UsrToEnv(impl_msg)->setMsgtype(ArrayEltInitMsg);
+  //CkArrayID gId = ckCreateArray((CkArrayMessage *)impl_msg, eIdx, opts);
+  CkGroupID gId = CProxyElement_ArrayElement::ckCreateArray((CkArrayMessage *)impl_msg, eIdx, opts);
+  return gId.idx;
+}
+
+// TODO options
+extern "C"
+void CkInsertArrayExt(int aid, int ndims, int *index, int epIdx, int onPE, char *msg, int msgSize) {
+  void *impl_msg = CkAllocSysMsg();
+  UsrToEnv(impl_msg)->setMsgtype(ArrayEltInitMsg);
+  CkArrayIndex newIdx(ndims, index);
+  CkGroupID gId;
+  gId.idx = aid;
+  CProxy_ArrayBase(gId).ckInsertIdx((CkArrayMessage *)impl_msg, epIdx, onPE, newIdx);
+}
+
+extern "C"
+void CkArrayDoneInsertingExt(int aid) {
+  CkGroupID gId;
+  gId.idx = aid;
+  CProxy_ArrayBase(gId).doneInserting();
+}
+
+extern "C"
+void CkChareExtSend(int onPE, void *objPtr, int epIdx, char *msg, int msgSize) {
+  //ckCheck();    // checks that gid is not zero
+  int marshall_msg_size = (sizeof(char)*msgSize + 3*sizeof(int));
+  CkMarshallMsg *impl_msg = CkAllocateMarshallMsg(marshall_msg_size, NULL);
+  PUP::toMem implP((void *)impl_msg->msgBuf);
+  implP|msgSize;
+  implP|epIdx;
+  int d=0; implP|d;
+  implP(msg, msgSize);
+  CkChareID chareID;
+  chareID.onPE = onPE;
+  chareID.objPtr = objPtr;
+  /*if (ckIsDelegated()) {
+     CkGroupMsgPrep(CkIndex_Hello::idx_SayHi_marshall2(), impl_msg, ckGetGroupID());
+     ckDelegatedTo()->GroupBroadcast(ckDelegatedPtr(),CkIndex_Hello::idx_SayHi_marshall2(), impl_msg, ckGetGroupID());
+  } else CkBroadcastMsgBranch(/*CkIndex_Hello::idx_SayHi_marshall2()epIdx, impl_msg, gId, 0);*/
+
+  CkSendMsg(epIdx, impl_msg, &chareID);
+}
+
+extern "C"
+void CkChareExtSend_multi(int onPE, void *objPtr, int epIdx, int num_bufs, char **bufs, int *buf_sizes) {
+  CkAssert(num_bufs >= 1);
+  //ckCheck();    // checks that gid is not zero
+  int totalSize = 0;
+  for (int i=0; i < num_bufs; i++) totalSize += buf_sizes[i];
+  int marshall_msg_size = (sizeof(char)*totalSize + 3*sizeof(int));
+  CkMarshallMsg *impl_msg = CkAllocateMarshallMsg(marshall_msg_size, NULL);
+  PUP::toMem implP((void *)impl_msg->msgBuf);
+  implP | totalSize;
+  implP | epIdx;
+  implP | buf_sizes[0];
+  for (int i=0; i < num_bufs; i++) implP(bufs[i], buf_sizes[i]);
+  CkChareID chareID;
+  chareID.onPE = onPE;
+  chareID.objPtr = objPtr;
+  /*if (ckIsDelegated()) {
+     CkGroupMsgPrep(CkIndex_Hello::idx_SayHi_marshall2(), impl_msg, ckGetGroupID());
+     ckDelegatedTo()->GroupBroadcast(ckDelegatedPtr(),CkIndex_Hello::idx_SayHi_marshall2(), impl_msg, ckGetGroupID());
+  } else CkBroadcastMsgBranch(/*CkIndex_Hello::idx_SayHi_marshall2()epIdx, impl_msg, gId, 0);*/
+
+  CkSendMsg(epIdx, impl_msg, &chareID);
+}
+
+extern "C"
+void CkGroupExtSend(int gid, int pe, int epIdx, char *msg, int msgSize) {
+  //ckCheck();    // checks that gid is not zero
+  int marshall_msg_size = (sizeof(char)*msgSize + 3*sizeof(int));
+  CkMarshallMsg *impl_msg = CkAllocateMarshallMsg(marshall_msg_size, NULL);
+  PUP::toMem implP((void *)impl_msg->msgBuf);
+  implP|msgSize;
+  implP|epIdx;
+  int d=0; implP|d;
+  implP(msg, msgSize);
+  CkGroupID gId;
+  gId.idx = gid;
+  /*if (ckIsDelegated()) {
+     CkGroupMsgPrep(CkIndex_Hello::idx_SayHi_marshall2(), impl_msg, ckGetGroupID());
+     ckDelegatedTo()->GroupBroadcast(ckDelegatedPtr(),CkIndex_Hello::idx_SayHi_marshall2(), impl_msg, ckGetGroupID());
+  } else CkBroadcastMsgBranch(/*CkIndex_Hello::idx_SayHi_marshall2()epIdx, impl_msg, gId, 0);*/
+
+  if (pe == -1)
+    CkBroadcastMsgBranch(epIdx, impl_msg, gId, 0);
+  else
+    CkSendMsgBranch(epIdx, impl_msg, pe, gId, 0);
+}
+
+extern "C"
+void CkGroupExtSend_multi(int gid, int pe, int epIdx, int num_bufs, char **bufs, int *buf_sizes) {
+  CkAssert(num_bufs >= 1);
+  //ckCheck();    // checks that gid is not zero
+  int totalSize = 0;
+  for (int i=0; i < num_bufs; i++) totalSize += buf_sizes[i];
+  int marshall_msg_size = (sizeof(char)*totalSize + 3*sizeof(int));
+  CkMarshallMsg *impl_msg = CkAllocateMarshallMsg(marshall_msg_size, NULL);
+  PUP::toMem implP((void *)impl_msg->msgBuf);
+  implP | totalSize;
+  implP | epIdx;
+  implP | buf_sizes[0];
+  for (int i=0; i < num_bufs; i++) implP(bufs[i], buf_sizes[i]);
+  CkGroupID gId;
+  gId.idx = gid;
+  /*if (ckIsDelegated()) {
+     CkGroupMsgPrep(CkIndex_Hello::idx_SayHi_marshall2(), impl_msg, ckGetGroupID());
+     ckDelegatedTo()->GroupBroadcast(ckDelegatedPtr(),CkIndex_Hello::idx_SayHi_marshall2(), impl_msg, ckGetGroupID());
+  } else CkBroadcastMsgBranch(/*CkIndex_Hello::idx_SayHi_marshall2()epIdx, impl_msg, gId, 0);*/
+
+  if (pe == -1)
+    CkBroadcastMsgBranch(epIdx, impl_msg, gId, 0);
+  else
+    CkSendMsgBranch(epIdx, impl_msg, pe, gId, 0);
+}
+
+extern "C"
+void CkArrayExtSend(int aid, int *idx, int ndims, int epIdx, char *msg, int msgSize) {
+  int marshall_msg_size = (sizeof(char)*msgSize + 3*sizeof(int));
+  CkMarshallMsg *impl_msg = CkAllocateMarshallMsg(marshall_msg_size, NULL);
+  PUP::toMem implP((void *)impl_msg->msgBuf);
+  implP|msgSize;
+  implP|epIdx;
+  int d=0; implP|d;
+  implP(msg, msgSize);
+  UsrToEnv(impl_msg)->setMsgtype(ForArrayEltMsg);
+  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;
+  impl_amsg->array_setIfNotThere(CkArray_IfNotThere_buffer);
+  CkGroupID gId;
+  gId.idx = aid;
+  if (ndims > 0) {
+    CkArrayIndex arrIndex(ndims, idx);
+    // TODO is there a better function for this?
+    CProxyElement_ArrayBase::ckSendWrapper(gId, arrIndex, impl_amsg, epIdx, 0);
+  } else { // broadcast
+    CkBroadcastMsgArray(epIdx, impl_amsg, gId, 0);
+  }
+}
+
+extern "C"
+void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs, char **bufs, int *buf_sizes) {
+  CkAssert(num_bufs >= 1);
+  int totalSize = 0;
+  for (int i=0; i < num_bufs; i++) totalSize += buf_sizes[i];
+  int marshall_msg_size = (sizeof(char)*totalSize + 3*sizeof(int));
+  CkMarshallMsg *impl_msg = CkAllocateMarshallMsg(marshall_msg_size, NULL);
+  PUP::toMem implP((void *)impl_msg->msgBuf);
+  implP | totalSize;
+  implP | epIdx;
+  implP | buf_sizes[0];
+  for (int i=0; i < num_bufs; i++) implP(bufs[i], buf_sizes[i]);
+  UsrToEnv(impl_msg)->setMsgtype(ForArrayEltMsg);
+  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;
+  impl_amsg->array_setIfNotThere(CkArray_IfNotThere_buffer);
+  CkGroupID gId;
+  gId.idx = aid;
+  if (ndims > 0) {
+    CkArrayIndex arrIndex(ndims, idx);
+    // TODO is there a better function for this?
+    CProxyElement_ArrayBase::ckSendWrapper(gId, arrIndex, impl_amsg, epIdx, 0);
+  } else { // broadcast
+    CkBroadcastMsgArray(epIdx, impl_amsg, gId, 0);
+  }
+}
+
 //------------------- Message Watcher (record/replay) ----------------
 
 #include "crc32.h"

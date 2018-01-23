@@ -12,6 +12,7 @@ fill out global tables, they are normally called exactly
 once per node at Charm startup time.
 */
 #include "ck.h"
+#include "ckarray.h"
 #include "debug-charm.h"
 
 CkRegisteredInfo<EntryInfo> _entryTable;
@@ -82,6 +83,48 @@ void CkRegisterGroupIrr(int chareIndex,int isIrr){
   _chareTable[chareIndex]->isIrr = (isIrr!=0);
 }
 
+// TODO give a unique name to entry methods when calling CkRegisterEp
+extern "C"
+void CkRegisterGroupExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx) {
+  int __idx = CkRegisterChare(s, sizeof(GroupExt), TypeGroup);
+  CkRegisterBase(__idx, CkIndex_IrrGroup::__idx);
+  CkRegisterGroupIrr(__idx, true); // isIrreducible?
+
+  int epIdxCtor = CkRegisterEp(s, GroupExt::__GroupExt, 0, __idx, 0);
+  // TODO do I need to register twice like in ci def files?
+  CkRegisterDefaultCtor(__idx, epIdxCtor);
+
+  for (int i=0; i < numEntryMethods; i++)
+    int epidx = CkRegisterEp(s, GroupExt::__entryMethod,
+                             CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
+
+  *chareIdx = __idx;
+  *startEpIdx = epIdxCtor;
+}
+
+// TODO give a unique name to entry methods when calling CkRegisterEp
+extern "C"
+void CkRegisterArrayExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx) {
+  int __idx = CkRegisterChare(s, sizeof(ArrayElemExt), TypeArray);
+  CkRegisterBase(__idx, CkIndex_ArrayElement::__idx);
+
+  int epIdxCtor = CkRegisterEp(s, ArrayElemExt::__ArrayElemExt, 0, __idx, 0);
+  // TODO do I need to register twice like in ci def files?
+  CkRegisterDefaultCtor(__idx, epIdxCtor);
+
+  int epidx = CkRegisterEp(s, ArrayElemExt::__CkMigrateMessage, 0, __idx, 0);
+  CkRegisterMigCtor(__idx, epidx);
+
+  epidx = CkRegisterEp(s, ArrayElemExt::__AtSyncEntryMethod, 0, __idx, 0);
+  //epidx = CkRegisterEp(s, ArrayElemExt::__migrateEntryMethod, 0, __idx, 0);
+  for (int i=0; i < numEntryMethods; i++)
+    epidx = CkRegisterEp(s, ArrayElemExt::__entryMethod, CkMarshallMsg::__idx,
+                         __idx, 0+CK_EP_NOKEEP);
+
+  *chareIdx = __idx;
+  *startEpIdx = epIdxCtor;
+}
+
 extern "C"
 void CkRegisterDefaultCtor(int chareIdx, int ctorEpIdx)
 {
@@ -99,6 +142,25 @@ int CkRegisterMainChare(int chareIdx, int entryIdx)
   int mIdx =  _mainTable.add(new MainInfo(chareIdx, entryIdx));
   _chareTable[chareIdx]->setMainChareType(mIdx);
   return mIdx;
+}
+
+// TODO give a unique name to entry methods when calling CkRegisterEp
+extern "C"
+void CkRegisterMainChareExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx) {
+  int __idx = CkRegisterChare(s, sizeof(MainchareExt), TypeMainChare);
+  CkRegisterBase(__idx, CkIndex_Chare::__idx);
+
+  int epIdxCtor = CkRegisterEp(s, MainchareExt::__Ctor_CkArgMsg, CMessage_CkArgMsg::__idx, __idx, 0);
+  CkRegisterMessagePupFn(epIdxCtor, (CkMessagePupFn)CkArgMsg::ckDebugPup);
+  // TODO do I need to register twice like in ci def files?
+  CkRegisterMainChare(__idx, epIdxCtor);
+
+  for (int i=0; i < numEntryMethods; i++)
+    int epidx = CkRegisterEp(s, MainchareExt::__entryMethod, CkMarshallMsg::__idx,
+                             __idx, 0+CK_EP_NOKEEP);
+
+  *chareIdx = __idx;
+  *startEpIdx = epIdxCtor;
 }
 
 extern "C"
@@ -121,6 +183,12 @@ void CkRegisterReadonly(const char *name,const char *type,
 	size_t size, void *ptr,CkPupReadonlyFnPtr pup_fn)
 {
   _readonlyTable.add(new ReadonlyInfo(name,type,size,ptr,pup_fn));
+}
+
+extern "C"
+void CkRegisterReadonlyExt(const char *name, const char *type, size_t msgSize, char *msg) {
+  if (msgSize > 0) ReadOnlyExt::setData(msg, msgSize);
+  CkRegisterReadonly(name, type, msgSize, ReadOnlyExt::ro_data, ReadOnlyExt::_roPup);
 }
 
 extern "C"

@@ -84,6 +84,9 @@ waits for the migrant contributions to straggle in.
 #endif
 
 extern bool _inrestart;
+//define a global instance of CkReductionTypesExt for external access
+CkReductionTypesExt charm_reducers;
+extern int (*PyReductionExt)(char**, int*, int, char**);
 
 Group::Group():thisIndex(CkMyPe())
 {
@@ -1774,6 +1777,30 @@ CkReductionMsg* CkReduction::tupleReduction_fn(int num_messages, CkReductionMsg*
 }
 
 
+/////////////// external Python reducer ////////////////
+static CkReductionMsg *external_py(int nMsgs, CkReductionMsg **msg)
+{
+    //CkPrintf("Reached external_py reducer, %d\n", nMsgs);
+    char* msg_data[nMsgs];
+    int msg_sizes[nMsgs];
+
+    for (int i = 0; i < nMsgs; i++)
+    {
+        msg_data[i] = (char*)(msg[i]->getData());
+        msg_sizes[i] = msg[i]->getSize();
+        //CkPrintf("[msg %d] size: %d data: %s\n", i, msg_sizes[i], msg_data[i]);
+    }
+
+    // send msg_data to CharmPy to perform reduction with Python reducer
+    // expected : pickle([reducer.__name__, result])
+    char* reduction_result;
+    int reduction_result_size = PyReductionExt(msg_data, msg_sizes, nMsgs, &reduction_result);
+    //CkPrintf("[charm side] Recvd reduction result: %s, size: %d\n", reduction_result, reduction_result_size);
+
+    return CkReductionMsg::buildNew(reduction_result_size, reduction_result);
+}
+
+
 
 /////////////////// Reduction Function Table /////////////////////
 CkReduction::CkReduction() {} //Dummy private constructor
@@ -1912,6 +1939,9 @@ std::vector<CkReduction::reducerStruct> CkReduction::initReducerTable()
   // Allows multiple reductions to be done in the same message
   vec.emplace_back(CkReduction::tupleReduction_fn, false);
 
+  // Perform reduction using an external reducer defined in Python
+  vec.emplace_back(CkReduction::reducerStruct(::external_py, false));
+
   return vec;
 }
 
@@ -1923,11 +1953,138 @@ std::vector<CkReduction::reducerStruct>& CkReduction::reducerTable()
   return table;
 }
 
+// Enum to detect type of contributors in a reduction
+typedef enum {
+    array=0,
+    group,
+    nodegroup
+} extContributorType;
 
+// Structure to store contribute parameters from external clients (e.g. CharmPy)
+struct CkExtContributeInfo
+{
+    int cbEpIdx;
+    void* data;
+    int numelems;
+    int dataSize;
+    CkReduction::reducerType redtype;
+    int id;                                 // arrayId or groupId
+    int *idx;                               // this is contributor index (PE for groups)
+    int ndims;                              // ensured to be 1 for groups
+    extContributorType contributorType;     // type of contributors
+};
 
+template <typename T>
+T* getExtContributor(CkExtContributeInfo* contribute_params);
 
+template <>
+ArrayElement* getExtContributor<ArrayElement>(CkExtContributeInfo* contribute_params)
+{
+    CkGroupID gId;
+    gId.idx = contribute_params->id;
+    CkArrayIndex arrIndex(contribute_params->ndims, contribute_params->idx);
+    CProxyElement_ArrayBase meProxy = CProxyElement_ArrayBase(gId, arrIndex);
+    return meProxy.ckLocal();
+}
 
+template <>
+Group* getExtContributor<Group>(CkExtContributeInfo* contribute_params)
+{
+    CkGroupID gId;
+    gId.idx = contribute_params->id;
+    return (Group*)CkLocalBranch(gId);
+}
 
+// Functions to perform reduction over contributors from external clients (e.g. CharmPy)
+
+// Generic function to extract CkExtContributeInfo and perform reduction
+template <class T>
+void CkExtContribute(CkExtContributeInfo* contribute_params, CkCallback& cb)
+{
+    T* me = getExtContributor<T>(contribute_params);
+
+    if (contribute_params->redtype == CkReduction::nop) {
+        contribute_params->dataSize = 0;
+        contribute_params->data = NULL;
+    }
+
+    me->contribute(contribute_params->dataSize, contribute_params->data, contribute_params->redtype, cb);
+}
+
+extern "C"
+void CkExtContributeTo(CkExtContributeInfo* contribute_params, CkCallback& cb)
+{
+#if CMK_CHARMPY
+    cb.isCkExtReductionCb = true;
+
+    switch (contribute_params->contributorType) {
+        case extContributorType::array :
+            CkExtContribute<ArrayElement>(contribute_params, cb);
+            break;
+        case extContributorType::group :
+            CkExtContribute<Group>(contribute_params, cb);
+            break;
+        default : CkAbort("Invalid external contributor type!\n");
+    }
+#else
+    CkAbort("Charmpy support must be enabled to use CkExtContributeTo");
+#endif
+}
+
+// When a reduction contributes to a singleton chare
+extern "C"
+void CkExtContributeToChare(CkExtContributeInfo* contribute_params, int onPE, void* objPtr)
+{
+    CkChareID targetChareID;
+    targetChareID.onPE = onPE;
+    targetChareID.objPtr = objPtr;
+
+    CkCallback cb(contribute_params->cbEpIdx, targetChareID);
+    CkExtContributeTo(contribute_params, cb);
+}
+
+// When a reduction contributes to an array element or broadcasts result to an array
+extern "C"
+void CkExtContributeToArray(CkExtContributeInfo* contribute_params, int aid, int* idx, int ndims)
+{
+    CkCallback cb;
+    CkGroupID gId;
+    gId.idx = aid;
+
+    CkArrayID arrayId(gId);
+
+    if (ndims > 0) {
+        // callback to a particular array element
+        CkArrayIndex arrIndex(ndims, idx);
+        cb = CkCallback(contribute_params->cbEpIdx, arrIndex, arrayId);
+    }
+    else {
+        // callback broadcasts to all elements of array
+        cb = CkCallback(contribute_params->cbEpIdx, arrayId);
+    }
+
+    CkExtContributeTo(contribute_params, cb);
+}
+
+// When a reduction contributes to a group chare element or broadcasts result to group
+extern "C"
+void CkExtContributeToGroup(CkExtContributeInfo* contribute_params, int gid, int pe)
+{
+    CkCallback cb;
+    CkGroupID groupId;
+    groupId.idx = gid;
+
+    if (pe == -1) {
+        // callback broadcasts to all PEs
+        cb = CkCallback(contribute_params->cbEpIdx, groupId);
+    }
+    else {
+        // callback to specific PE
+        cb = CkCallback(contribute_params->cbEpIdx, pe, groupId);
+    }
+
+    CkExtContributeTo(contribute_params, cb);
+}
 
 
 /********** Code added by Sayantan *********************/

@@ -500,6 +500,16 @@ void ArrayElement::recvBroadcast(CkMessage *m){
 #endif
 }
 
+ArrayElemExt::ArrayElemExt() {
+  // TODO make this configurable?
+  usesAtSync = true;
+
+  int chareIdx = ckGetChareType();
+  ctorEpIdx = _chareTable[chareIdx]->getDefaultCtor();
+  //printf("Constructor of ArrayElemExt, aid=%d, chareIdx=%d, ctorEpIdx=%d\n", ((CkGroupID)thisArrayID).idx, chareIdx, ctorEpIdx);
+  ArrayMsgRecvExtCallback(((CkGroupID)thisArrayID).idx, int(thisIndexMax.getDimension()), thisIndexMax.data(), ctorEpIdx, 0, NULL, -1);
+}
+
 /*********************** Spring Cleaning *****************
 Periodically (every minute or so) remove expired broadcasts
 from the queue.

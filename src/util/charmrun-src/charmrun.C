@@ -5514,7 +5514,12 @@ static void start_nodes_local(std::vector<nodetab_process> & process_table)
     }
     if (pid == 0) {
       int fd, fd2 = dup(2);
+#if CMK_CHARMPY
+      // don't disable initial output on rank 0 process (need to be able to see python syntax errors, etc)
+      if ((p.nodeno != 0) && (-1 != (fd = open("/dev/null", O_RDWR)))) {
+#else
       if (-1 != (fd = open("/dev/null", O_RDWR))) {
+#endif
         dup2(fd, 0);
         dup2(fd, 1);
         dup2(fd, 2);
