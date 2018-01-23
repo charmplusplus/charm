@@ -7,7 +7,6 @@
 #include "xi-util.h"
 
 #include "xi-AstNode.h"
-#include "xi-BlockConstruct.h"
 #include "xi-Construct.h"
 #include "xi-Entry.h"
 #include "xi-Member.h"

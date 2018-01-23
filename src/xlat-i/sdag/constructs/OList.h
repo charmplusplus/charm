@@ -1,6 +1,7 @@
 #ifndef _OLIST_H
 #define _OLIST_H
 
+#include "CStateVar.h"
 #include "SList.h"
 #include "xi-SdagConstruct.h"
 
