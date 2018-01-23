@@ -1117,17 +1117,19 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     if (_Cmi_mynodesize > 1 && _Cmi_mynode == 0)
         CmiAbort("+ppn cannot be used in non SMP version!\n");
 #else
+    int auto_provision = CmiGetArgFlagDesc(argv, "+auto-provision", "fully utilize available resources");
+    auto_provision |= CmiGetArgFlagDesc(argv, "+autoProvision", "fully utilize available resources");
     int onewth_per_socket = CmiGetArgFlagDesc(argv, "+oneWthPerSocket", "assign N worker threads per socket");
     int onewth_per_core = CmiGetArgFlagDesc(argv, "+oneWthPerCore", "assign N worker threads per core");
     int onewth_per_pu = CmiGetArgFlagDesc(argv, "+oneWthPerPU", "assign N worker threads per PU");
     int onewth_active = (onewth_per_socket > 0) + (onewth_per_core > 0) + (onewth_per_pu > 0);
-    if (onewth_active > 1 || (onewth_active && (plusPSet || ppnSet)))
+    if (onewth_active > 1 || onewth_active + (plusPSet || ppnSet) + auto_provision > 1)
     {
-      CmiError("Error: Only one of +oneWthPer(Socket|Core|PU) or +p/++ppn is allowed.\n");
+      CmiError("Error: Only one of +auto-provision, +oneWthPer(Socket|Core|PU), or +p/++ppn is allowed.\n");
       exit(1);
     }
 
-    if (onewth_active)
+    if (onewth_active || auto_provision)
     {
       setenv("CmiProcessPerHost", "1", 0);
 
@@ -1142,7 +1144,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
         ppn = CmiHwlocTopologyLocal.num_cores;
         setenv("CmiOneWthPerCore", "1", 0);
       }
-      else // if (onewth_per_pu)
+      else // if (onewth_per_pu || auto_provision)
       {
         ppn = CmiHwlocTopologyLocal.num_pus;
         setenv("CmiOneWthPerPU", "1", 0);
@@ -1174,6 +1176,20 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
         _Cmi_mynodesize = npes;
       }
     }
+# if CMK_NET_VERSION || CMK_IBVERBS || CMK_MULTICORE
+#  if CMK_MULTICORE
+    else if (!ppnSet)
+#  else
+    else if (!ppnSet && Cmi_charmrun_fd == -1)
+#  endif
+    {
+      if (!quietMode)
+      {
+        printf("Charm++> No provisioning arguments specified. Running with a single PE.\n"
+               "         Use +auto-provision to fully subscribe resources or +p1 to silence this message.\n");
+      }
+    }
+# endif
 #endif
 
     /* Network progress function is used to poll the network when for

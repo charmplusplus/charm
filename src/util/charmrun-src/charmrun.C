@@ -762,6 +762,7 @@ TopologyRequest proc_per;
 #if CMK_SMP
 TopologyRequest onewth_per;
 #endif
+int auto_provision;
 
 static void arg_init(int argc, const char **argv)
 {
@@ -890,6 +891,9 @@ static void arg_init(int argc, const char **argv)
   pparam_flag(&onewth_per.pu, 0,
              "oneWthPerPU", "assign N worker threads per PU");
 #endif
+
+  pparam_flag(&auto_provision, 0, "auto-provision", "fully utilize available resources");
+  pparam_flag(&auto_provision, 0, "autoProvision", "fully utilize available resources");
 
 #ifdef HSTART
   arg_argv = (const char **)dupargv(argv);
@@ -1088,20 +1092,21 @@ static void arg_init(int argc, const char **argv)
   const int proc_active = proc_per.active();
 #if CMK_SMP
   const int onewth_active = onewth_per.active();
-  if (proc_active || onewth_active)
+  if (proc_active || onewth_active || auto_provision)
 #else
-  if (proc_active)
+  const int onewth_active = 0;
+  if (proc_active || auto_provision)
 #endif
   {
     if (arg_requested_pes != 0)
     {
-      fprintf(stderr, "Charmrun> Error: +p and ++(process|oneWth)Per* cannot be used together.\n");
+      fprintf(stderr, "Charmrun> Error: +p cannot be used with ++(process|oneWth)Per* or ++auto-provision.\n");
       exit(1);
     }
 
     if (proc_active && arg_requested_nodes > 0)
     {
-      fprintf(stderr, "Charmrun> Error: +n/++np and ++processPer* cannot be used together.\n");
+      fprintf(stderr, "Charmrun> Error: +n/++np cannot be used with ++processPer* or ++auto-provision.\n");
       exit(1);
     }
 
@@ -1111,16 +1116,16 @@ static void arg_init(int argc, const char **argv)
       exit(1);
     }
 
-    if (proc_active > 1)
+    if (proc_active + (auto_provision > 0) > 1)
     {
-      fprintf(stderr, "Charmrun> Error: Only one ++processPer(Host|Socket|Core|PU) is allowed.\n");
+      fprintf(stderr, "Charmrun> Error: Only one of ++processPer(Host|Socket|Core|PU) or ++auto-provision is allowed.\n");
       exit(1);
     }
 
 #if CMK_SMP
-    if (onewth_active + (arg_ppn > 0) > 1)
+    if (onewth_active + (arg_ppn > 0) + (auto_provision > 0) > 1)
     {
-      fprintf(stderr, "Charmrun> Error: Only one ++oneWthPer(Host|Socket|Core|PU) or ++ppn is allowed.\n");
+      fprintf(stderr, "Charmrun> Error: Only one of ++oneWthPer(Host|Socket|Core|PU), ++ppn, or ++auto-provision is allowed.\n");
       exit(1);
     }
 
@@ -1176,6 +1181,21 @@ static void arg_init(int argc, const char **argv)
       exit(1);
     }
 #endif
+  }
+
+  if (auto_provision)
+  {
+#if CMK_SMP
+    proc_per.socket = 1;
+    onewth_per.pu = 1;
+#else
+    proc_per.core = 1;
+#endif
+  }
+  else if (arg_requested_pes <= 0 && arg_requested_nodes <= 0 && arg_ppn <= 0 && !proc_active && !onewth_active)
+  {
+    PRINT(("Charmrun> No provisioning arguments specified. Running with a single PE.\n"
+           "          Use ++auto-provision to fully subscribe resources or +p1 to silence this message.\n"));
   }
 }
 

@@ -215,6 +215,7 @@ int printf(const char *fmt, ...) {
 /* define machine debug */
 #include "machine.h"
 static int        Cmi_charmrun_pid;
+static int        Cmi_charmrun_fd = -1;
 
 CMI_EXTERNC_VARIABLE int quietMode;
 
@@ -620,7 +621,6 @@ void CmiEnableNonblockingIO(int fd) { }
 static skt_ip_t   Cmi_self_IP;
 static skt_ip_t   Cmi_charmrun_IP; /*Address of charmrun machine*/
 static int        Cmi_charmrun_port;
-static int        Cmi_charmrun_fd=-1;
 /* Magic number to be used for sanity check in messege header */
 static int 				Cmi_net_magic;
 
