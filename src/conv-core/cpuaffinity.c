@@ -46,18 +46,15 @@ void CmiInitHwlocTopology(void)
 
     // packages == sockets
     depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PACKAGE);
-    if (depth != HWLOC_TYPE_DEPTH_UNKNOWN)
-      CmiHwlocTopologyLocal.num_sockets = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
+    CmiHwlocTopologyLocal.num_sockets = depth != HWLOC_TYPE_DEPTH_UNKNOWN ? cmi_hwloc_get_nbobjs_by_depth(topology, depth) : 1;
 
     // cores
     depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_CORE);
-    if (depth != HWLOC_TYPE_DEPTH_UNKNOWN)
-      CmiHwlocTopologyLocal.num_cores = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
+    CmiHwlocTopologyLocal.num_cores = depth != HWLOC_TYPE_DEPTH_UNKNOWN ? cmi_hwloc_get_nbobjs_by_depth(topology, depth) : 1;
 
     // PUs
     depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PU);
-    if (depth != HWLOC_TYPE_DEPTH_UNKNOWN)
-      CmiHwlocTopologyLocal.num_pus = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
+    CmiHwlocTopologyLocal.num_pus = depth != HWLOC_TYPE_DEPTH_UNKNOWN ? cmi_hwloc_get_nbobjs_by_depth(topology, depth) : 1;
 
     cmi_hwloc_topology_destroy(topology);
 }
