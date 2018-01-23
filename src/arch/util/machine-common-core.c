@@ -1097,8 +1097,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
     /* processor per node */
     _Cmi_mynodesize = 1;
-    if (!CmiGetArgInt(argv,"+ppn", &_Cmi_mynodesize))
-        CmiGetArgInt(argv,"++ppn", &_Cmi_mynodesize);
+
+    int ppnSet = 0;
+    if (!(ppnSet = CmiGetArgInt(argv,"+ppn", &_Cmi_mynodesize)))
+        ppnSet = CmiGetArgInt(argv,"++ppn", &_Cmi_mynodesize);
 
     int npes = 1;
     int plusPSet = CmiGetArgInt(argv,"+p",&npes);
@@ -1115,9 +1117,52 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     if (_Cmi_mynodesize > 1 && _Cmi_mynode == 0)
         CmiAbort("+ppn cannot be used in non SMP version!\n");
 #else
-    if (plusPSet)
+    int onewth_per_socket = CmiGetArgFlagDesc(argv, "+oneWthPerSocket", "assign N worker threads per socket");
+    int onewth_per_core = CmiGetArgFlagDesc(argv, "+oneWthPerCore", "assign N worker threads per core");
+    int onewth_per_pu = CmiGetArgFlagDesc(argv, "+oneWthPerPU", "assign N worker threads per PU");
+    int onewth_active = (onewth_per_socket > 0) + (onewth_per_core > 0) + (onewth_per_pu > 0);
+    if (onewth_active > 1 || (onewth_active && (plusPSet || ppnSet)))
     {
-      if (_Cmi_mynodesize > 1 && _Cmi_mynodesize != npes)
+      CmiError("Error: Only one of +oneWthPer(Socket|Core|PU) or +p/++ppn is allowed.\n");
+      exit(1);
+    }
+
+    if (onewth_active)
+    {
+      setenv("CmiProcessPerHost", "1", 0);
+
+      int ppn;
+      if (onewth_per_socket)
+      {
+        ppn = CmiHwlocTopologyLocal.num_sockets;
+        setenv("CmiOneWthPerSocket", "1", 0);
+      }
+      else if (onewth_per_core)
+      {
+        ppn = CmiHwlocTopologyLocal.num_cores;
+        setenv("CmiOneWthPerCore", "1", 0);
+      }
+      else // if (onewth_per_pu)
+      {
+        ppn = CmiHwlocTopologyLocal.num_pus;
+        setenv("CmiOneWthPerPU", "1", 0);
+      }
+# if !CMK_MULTICORE
+      // account for comm thread
+      --ppn;
+# endif
+
+      if (ppn <= 0)
+      {
+        CmiError("Error: Invalid request for %d PEs\n", ppn);
+        exit(1);
+      }
+
+      _Cmi_mynodesize = ppn;
+    }
+    else if (plusPSet)
+    {
+      if (ppnSet && _Cmi_mynodesize != npes)
       {
         // if you want to use redundant arguments they need to be consistent
         CmiError("Error: p != ppn, must not have inconsistent values. (%d != %d)\n"
