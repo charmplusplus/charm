@@ -38,7 +38,20 @@ will run that shell script before running the executable.
 A \charmpp{} program accepts the following command line options:
 \begin{description}
 
-\item[{\tt +pN}] Run the program with N processors. The default is 1.
+\item[{\tt +auto-provision}] Automatically determine the number of worker
+threads to launch in order to fully subscribe the machine running the program.
+
+\item[{\tt +autoProvision}] Same as above.
+
+\item[{\tt +oneWthPerSocket}] Launch one worker thread per CPU socket.
+
+\item[{\tt +oneWthPerCore}] Launch one worker thread per CPU core.
+
+\item[{\tt +oneWthPerPU}] Launch one worker thread per CPU processing unit,
+i.e. hardware thread.
+
+\item[{\tt +pN}] Explicitly request exactly N worker threads.
+The default is 1.
 
 \item[{\tt +ss}] Print summary statistics about chare creation.  This option
 prints the total number of chare creation requests, and the total number of
@@ -68,7 +81,48 @@ entry point of the main chare.
 \label{network command line options}
 
 The following {\tt ++} command line options are available in
-the network version:
+the network version.
+
+First, commands related to subscription of computing resources:
+
+\begin{description}
+
+\item[{\tt ++auto-provision}] Automatically determine the number of processes
+and threads to launch in order to fully subscribe the available resources.
+
+\item[{\tt ++autoProvision}] Same as above.
+
+\item[{\tt ++processPerHost N}] Launch N processes per compute host.
+
+\item[{\tt ++processPerSocket N}] Launch N processes per CPU socket.
+
+\item[{\tt ++processPerCore N}] Launch N processes per CPU core.
+
+\item[{\tt ++processPerPU N}] Launch N processes per CPU processing unit, i.e.
+hardware thread.
+
+\end{description}
+
+The above options should allow sufficient control over process provisioning
+for most users. If you need more control, the following advanced options are
+available:
+
+\begin{description}
+
+\item[{\tt ++n N}] Run the program with N processes. Functionally identical to
+{\tt +p} in non-SMP mode (see below). The default is 1.
+
+\item[{\tt ++p N}] Total number of processing elements to create. In SMP mode,
+this refers to worker threads (where ${\tt n} * {\tt ppn} = {\tt p}$),
+otherwise it refers to processes (${\tt n} = {\tt p}$). The default is 1.
+Use of {\tt ++p} is discouraged in favor of {\tt ++processPer*} (and
+{\tt ++oneWthPer*} in SMP mode) where desirable, or {\tt ++n} (and
+{\tt ++ppn}) otherwise.
+
+\end{description}
+
+The remaining options cover details of process launch and connectivity:
+
 \begin{description}
 
 \item[{\tt ++local}] Run charm program only on local machines. No
@@ -140,6 +194,8 @@ time. For backwards compatibility, this option is also available as {\tt ++maxrs
 
 \item[{\tt ++nodelist}] File containing list of nodes.
 
+\item[{\tt ++numHosts}] Number of nodes from the nodelist to use. If the value requested is larger than the number of nodes found, Charmrun will error out.
+
 \item[{\tt ++help}]             Print help messages
 
 \item[{\tt ++runscript}]        Script to run node-program with. The specified run script is invoked with the node program and parameter. For example:
@@ -179,8 +235,6 @@ In this case, the {\tt set\_env\_script} is invoked on each node before launchin
 \item[{\tt ++quiet}]            Suppress runtime output during startup and shutdown
 
 \item[{\tt ++timeout}]          Seconds to wait per host connection
-
-\item[{\tt ++p}]                Number of processes to create
 
 \end{description}
 
@@ -234,7 +288,24 @@ communication threads:
 
 \begin{description}
 
-\item[{\tt ++ppn}] Number of PEs (or worker threads) per logical node (OS process).
+\item[{\tt ++oneWthPerHost}] Launch one worker thread per compute host.
+
+\item[{\tt ++oneWthPerSocket}] Launch one worker thread per CPU socket.
+
+\item[{\tt ++oneWthPerCore}] Launch one worker thread per CPU core.
+
+\item[{\tt ++oneWthPerPU}] Launch one worker thread per CPU processing unit,
+i.e. hardware thread.
+
+\end{description}
+
+The above options (and {\tt ++auto-provision}) should allow sufficient control
+over thread provisioning for most users. If you need more precise control over
+thread count and placement, the following options are available:
+
+\begin{description}
+
+\item[{\tt ++ppn N}] Number of PEs (or worker threads) per logical node (OS process).
   This option should be specified even when using platform specific launchers
   (e.g., aprun, ibrun).
 
