@@ -138,7 +138,7 @@ and on migrating computations from heavily loaded to lightly loaded processors.
 For this approach to be effective, we need the computation to be split into
 pieces many more in number than available processors. This allows us to
 flexibly map and re-map these computational pieces to available processors.
-This approach is usually called ``multi-domain decomposition''.
+This approach is usually called "multi-domain decomposition".
 
 \charmpp{}, which we use as a runtime system layer for the work described here,
 simplifies our approach. It embeds an elaborate performance tracing mechanism,
@@ -151,11 +151,11 @@ paradigms.
 
 \charmpp{} is an object-oriented parallel programming library for \CC{}.  It
 differs from traditional message passing programming libraries (such as MPI) in
-that \charmpp{} is ``message-driven''. Message-driven parallel programs do not
+that \charmpp{} is "message-driven". Message-driven parallel programs do not
 block the processor waiting for a message to be received.  Instead, each
 message carries with itself a computation that the processor performs on
 arrival of that message. The underlying runtime system of \charmpp{} is called
-\converse{}, which implements a ``scheduler'' that chooses which message to
+\converse{}, which implements a "scheduler" that chooses which message to
 schedule next (message-scheduling in \charmpp{} involves locating the object
 for which the message is intended, and executing the computation specified in
 the incoming message on that object). A parallel object in \charmpp{} is a
@@ -181,7 +181,7 @@ such as parallel objects and threads. Using this feature, we developed
 \section{AMPI}
 
 \ampi{} utilizes the dynamic load balancing and other capabilities of \charmpp{} by
-associating a ``user-level'' thread with each \charmpp{} migratable object.
+associating a "user-level" thread with each \charmpp{} migratable object.
 User's code runs inside this thread, so that it can issue blocking receive
 calls similar to MPI, and still present the underlying scheduler an opportunity
 to schedule other computations on the same processor. The runtime system keeps
@@ -267,7 +267,7 @@ may need to be renamed. The changes should be made as follows:
 
 \subsubsection{Fortran}
 
-You must declare the main program as a subroutine called ``MPI\_MAIN''. 
+You must declare the main program as a subroutine called "MPI\_MAIN". 
 Do not declare the main subroutine as a \textit{program} because 
 it will never be called by the AMPI runtime.
 
@@ -314,37 +314,16 @@ whose values differ across different MPI ranks.
 \end{figure}
 
 The basic transformation needed to port the MPI program to \ampi{} is
-privatization of global variables.\footnote{Typical Fortran MPI programs
-contain three types of global variables.
-
-\begin{enumerate}
-
-\item Global variables that are ``read-only''. These are either
-\emph{parameters} that are set at compile-time. Or other variables that are
-read as input or set at the beginning of the program and do not change during
-execution. It is not necessary to privatize such variables.
-
-\item Global variables that are used as temporary buffers. These are variables
-that are used temporarily to store values to be accessible across subroutines.
-These variables have a characteristic that there is no blocking call such as
-\texttt{MPI\_recv} between the time the variable is set and the time it is ever
-used. It is not necessary to privatize such variables either. 
-
-\item True global variables. These are used across subroutines that contain
-blocking receives and therefore the possibility of a context switch between the
-definition and use of the variable. These variables need to be privatized.
-
-\end{enumerate}
-}
+privatization of global variables.
 With the MPI process model, each MPI node can keep a copy of its own
-``permanent variables'' -- variables that are accessible from more than one
-subroutines without passing them as arguments.  Module variables, ``saved''
+"permanent variables" -- variables that are accessible from more than one
+subroutines without passing them as arguments.  Module variables, "saved"
 subroutine local variables, and common blocks in Fortran90 belong to this
 category. If such a program is executed without privatization on \ampi{}, all
 the \ampi{} threads that reside on one processor will access the same copy of
 such variables, which is clearly not the desired semantics.  To ensure correct
 execution of the original source program, it is necessary to make such
-variables ``private'' to individual threads. We provide two choices: automatic 
+variables "private" to individual threads. We provide two choices: automatic 
 global swapping and manual code modification.
 
 \subsubsection{Automatic Globals Swapping}
@@ -357,7 +336,7 @@ switch GOT contents at thread context-switch by the runtime system.
 
 
 The only thing that the user needs to do is to set flag {\tt -swapglobals}
-at compile and link time (e.g. ``ampicc -o prog prog.c -swapglobals"). It does not need 
+at compile and link time (e.g. "ampicc -o prog prog.c -swapglobals"). It does not need 
 any change to the source code and works with any language (C, C++, Fortran, etc).
 However, it does not handle static variables and has a context switching 
 overhead that grows with the number of global variables.
@@ -569,9 +548,9 @@ TLS-Globals              & Yes     & Yes     & No      & No    & Maybe   & Maybe
 \hline
 \end{tabular}
 \caption{Portability of current implementations of three privatization schemes.
-``Yes'' means we have implemented this technique.
-``Maybe'' indicates there are no theoretical problems, but no implementation exists.
-``No'' indicates the technique is impossible on this platform.}
+"Yes" means we have implemented this technique.
+"Maybe" indicates there are no theoretical problems, but no implementation exists.
+"No" indicates the technique is impossible on this platform.}
 \label{tab:portability}
 \vspace{-1.0cm}
 \end{center}
@@ -707,18 +686,18 @@ explains how a subroutine should be written for performing explicit pack/unpack.
 
 There are three steps for transporting the rank's data to another processor.
 First, the system calls a subroutine to get the size of the buffer required to
-pack the rank's data. This is called the ``sizing'' step. In the next step,
+pack the rank's data. This is called the "sizing" step. In the next step,
 which is called immediately afterward on the source processor, the system
 allocates the required buffer and calls the subroutine to pack the rank's data
-into that buffer. This is called the ``packing'' step. This packed data is then
+into that buffer. This is called the "packing" step. This packed data is then
 sent as a message to the destination processor, where first a rank is created
 (along with the thread) and a subroutine is called to unpack the rank's data
-from the buffer. This is called the ``unpacking'' step.
+from the buffer. This is called the "unpacking" step.
 
 Though the above description mentions three subroutines called by the \ampi{}
 runtime system, it is possible to actually write a single subroutine that will
 perform all the three tasks. This is achieved using something we call a
-``pupper''. A pupper is an external subroutine that is passed to the rank's
+"pupper". A pupper is an external subroutine that is passed to the rank's
 pack-unpack-sizing subroutine, and this subroutine, when called in different
 phases performs different tasks. An example will make this clear:
 
@@ -1054,8 +1033,8 @@ to send and receive with communicator argument as \texttt{MPI\_COMM\_WORLD}.
 But this would be completely useless if these individual applications cannot
 communicate with each other, which is essential for building efficient coupled
 codes.  For this purpose, we have extended the \ampi{} functionality to allow
-multiple ``\texttt{COMM\_WORLD}s''; one for each application. These \emph{world
-communicators} form a ``communicator universe'': an array of communicators
+multiple "\texttt{COMM\_WORLD}s"; one for each application. These \emph{world
+communicators} form a "communicator universe" an array of communicators
 aptly called \emph{MPI\_COMM\_UNIVERSE}. This array of communicators is 
 indexed [1 . . . \texttt{MPI\_MAX\_COMM}]. In the current implementation,
 \texttt{MPI\_MAX\_COMM} is 8, that is, maximum of 8 applications can co-exist
@@ -1108,8 +1087,8 @@ example is instruction-level accurate architecture simulations, in which case
 the user may wish to repeat the execution of a node in a parallel run in the
 sequential simulator. AMPI provides support for such needs by logging the change
 in the MPI environment on a certain processors. To activate the feature, build
-AMPI module with variable ``AMPIMSGLOG'' defined, like the following command in
-charm directory. (Linking with zlib ``-lz'' might be required with this, for
+AMPI module with variable "AMPIMSGLOG" defined, like the following command in
+charm directory. (Linking with zlib "-lz" might be required with this, for
 generating compressed log file.)
 
 \begin{alltt}
