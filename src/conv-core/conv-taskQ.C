@@ -1,5 +1,5 @@
-#if CMK_SMP && CMK_TASKQUEUE
 #include "conv-taskQ.h"
+#if CMK_SMP && CMK_TASKQUEUE
 extern "C" void StealTask() {
 #if CMK_TRACE_ENABLED
   double _start = CmiWallTimer();
