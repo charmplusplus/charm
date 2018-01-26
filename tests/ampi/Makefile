@@ -1,5 +1,11 @@
-DIRS=megampi stacksize migration intercomm_coll datatype
-#DIRS=megampi stacksize chkpt
+DIRS = \
+  megampi \
+  stacksize \
+  migration \
+  intercomm_coll \
+  datatype \
+  privatization \
+#  chkpt \
 
 all:
 	for d in $(DIRS); do \
