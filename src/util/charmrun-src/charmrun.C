@@ -5136,12 +5136,13 @@ static void start_nodes_local(void)
       printf("Charmrun> start %d node program on localhost.\n", pe);
     sprintf(envp[envc], "NETSTART=%s", create_netstart(rank0no));
     sprintf(envp[envc + 1], "CmiNumNodes=%d", nodetab_rank0_size);
-
     int pid = fork();
-    if (pid < 0)
+    if (pid < 0) {
+      fprintf(stderr, "fork failed: %s\n", strerror(errno));
       exit(1);
+    }
     if (pid == 0) {
-      int fd, fd1 = dup(1);
+      int fd, fd2 = dup(2);
       if (-1 != (fd = open("/dev/null", O_RDWR))) {
         dup2(fd, 0);
         dup2(fd, 1);
@@ -5149,10 +5150,9 @@ static void start_nodes_local(void)
       }
       int status = execve(dparamp[0],
 		      const_cast<char *const *>(dparamp), envp);
-
-      dup2(fd1, 1);
-      fprintf(stderr, "execve failed to start process \"%s\" with status: %d\n",
-             dparamp[0], status);
+      dup2(fd2, 2);
+      fprintf(stderr, "execve failed to start process \"%s\": %s\n",
+             dparamp[0], strerror(errno));
       kill(getppid(), 9);
       exit(1);
     }
