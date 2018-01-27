@@ -106,11 +106,13 @@ extern void registerMainchareCtorExtCallback(void (*cb)(int, void*, int, int, ch
 extern void registerReadOnlyRecvExtCallback(void (*cb)(int, char*));
 extern void registerChareMsgRecvExtCallback(void (*cb)(int, void*, int, int, char*, int));
 extern void registerGroupMsgRecvExtCallback(void (*cb)(int, int, int, char *, int));
-extern void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char *, int));
+extern void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char *, int, void *));
+extern void registerArrayMcastRecvExtCallback(void (*cb)(int, int, int, char *, int, void *));
 extern void registerArrayElemLeaveExtCallback(int (*cb)(int, int, int *, char**, int));
 extern void registerArrayElemJoinExtCallback(void (*cb)(int, int, int *, int, char*, int));
 extern void registerArrayResumeFromSyncExtCallback(void (*cb)(int, int, int *));
 extern void registerArrayMapProcNumExtCallback(int (*cb)(int, int, const int *));
+extern void registerSectionElementsExtCallback(void (*cb)(int, int, int, int*, void*));
 extern void StartCharmExt(int argc, char **argv); // start Converse/Charm, argv are the command-line arguments
 extern int CkMyPeHook();   // function equivalent of CkMyPe macro
 extern int CkNumPesHook(); // function equivalent of CkNumPes macro
@@ -269,6 +271,7 @@ extern int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, char *msg,
 extern void CkInsertArrayExt(int aid, int ndims, int *index, int epIdx, int onPE, char *msg, int msgSize);
 extern void CkArrayDoneInsertingExt(int aid);
 extern void CkMigrateExt(int aid, int ndims, int *index, int toPe);
+extern void *CreateSectionExt(int aid, int *elems, int nelems, int ndims, int bfactor);
 
 
 /******************************************************************************
@@ -375,6 +378,8 @@ extern void CkGroupExtSend_multi(int gid, int pe, int epIdx, int num_bufs, char 
 extern void CkArrayExtSend(int aid, int *idx, int ndims, int epIdx, char *msg, int msgSize);
 /// Send msg to array copying data into CkMessage from multiple input buffers
 extern void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs, char **bufs, int *buf_sizes);
+extern void CkArrayExtMcastSend(int aid, int section_ep, int real_ep, char *msg, int msgSize, int cookie_pe, void *cookie_entry);
+extern void CkArrayExtMcastSend_multi(int aid, int section_ep, int real_ep, int num_bufs, char **bufs, int *buf_sizes, int cookie_pe, void *cookie_entry);
 
 /*@}*/
 

@@ -136,6 +136,7 @@ void CkRegisterArrayExt(const char *s, int numEntryMethods, int *chareIdx, int *
 
   epidx = CkRegisterEp(s, ArrayElemExt::__AtSyncEntryMethod, 0, __idx, 0);
   //epidx = CkRegisterEp(s, ArrayElemExt::__migrateEntryMethod, 0, __idx, 0);
+  epidx = CkRegisterEp(s, ArrayElemExt::__sectionEntryMethod, 0, __idx, 0);
   for (int i=0; i < numEntryMethods; i++)
     epidx = CkRegisterEp(s, ArrayElemExt::__entryMethod, CkMarshallMsg::__idx,
                          __idx, 0+CK_EP_NOKEEP);

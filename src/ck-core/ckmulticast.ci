@@ -9,7 +9,11 @@ module CkMulticast {
 //  message CkMcastReductionMsg {
 //    char data[];
 //  };
-  
+
+  message McastExtMsg {
+    char data[];
+  };
+
   group [migratable] CkMulticastMgr {
     entry CkMulticastMgr(int _dfactor = 2, unsigned int _split_size = 32768, unsigned int _split_threshold = 32768);
     // set up

@@ -624,6 +624,8 @@ void CkMulticastMgr::freeup(CkSectionInfo cookie)
 
 typedef std::vector<int>::iterator TreeIterator;
 
+extern void (*SectionElementsExtCallback)(int, int, int, int*, void*);
+
 void CkMulticastMgr::setup(multicastSetupMsg *msg)
 {
     mCastEntry *entry;
@@ -673,6 +675,25 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
         }
       }
     }
+
+#if CMK_CHARMPY
+    int nelems = int(entry->localElem.size());
+    if (nelems > 0) {
+      int ndims = entry->localElem[0].getDimension();
+      std::vector<int> indexes_flat;
+      indexes_flat.reserve(ndims * nelems);
+      for (int i=0; i < nelems; i++) {
+        CkArrayIndex &index = entry->localElem[i];
+        if (ndims > 3) {
+          for (int j=0; j < ndims; j++) indexes_flat.push_back(int(index.shortData()[j]));
+        } else {
+          for (int j=0; j < ndims; j++) indexes_flat.push_back(index.data()[j]);
+        }
+      }
+      // notify Charmpy of local section elements
+      SectionElementsExtCallback(((CkGroupID)aid).idx, nelems, ndims, indexes_flat.data(), entry);
+    }
+#endif
 
     // The number of multicast children can be limited by the spanning tree factor 
     int num = mySubTreePEs.size() - 1, numchild = 0;
@@ -1070,6 +1091,8 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
   sendToLocal(msg);
 }
 
+extern void (*ArrayMcastRecvExtCallback)(int, int, int, char *, int, void *);
+
 void CkMulticastMgr::sendToLocal(multicastGrpMsg *msg)
 {
   int i;
@@ -1106,6 +1129,18 @@ void CkMulticastMgr::sendToLocal(multicastGrpMsg *msg)
   // else if array section
   nLocal = entry->localElem.size();
   DEBUGF(("[%d] send to local %d elems, ArraySection\n", CkMyPe(), nLocal));
+#if CMK_CHARMPY
+  // TODO need to check that it is indeed a McastExtMsg
+  if (nLocal) {
+    McastExtMsg *ext_msg = (McastExtMsg*)msg;
+    ArrayMcastRecvExtCallback(aid.idx, ext_msg->real_ep, ext_msg->msgSize, ext_msg->data,
+                              ext_msg->dcopy_start, &ext_msg->_cookie.info);
+  } else {
+    CkAssert(entry->rootSid.get_pe() == CkMyPe());
+  }
+  delete msg;
+
+#else
   for (i=0; i<nLocal-1; i++) {
     CProxyElement_ArrayBase ap(aid, entry->localElem[i]);
     if (_entryTable[msg->ep]->noKeep) {
@@ -1132,6 +1167,7 @@ void CkMulticastMgr::sendToLocal(multicastGrpMsg *msg)
     CkAssert (entry->rootSid.get_pe() == CkMyPe());
     delete msg;
   }
+#endif
 }
 
 

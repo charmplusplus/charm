@@ -2268,9 +2268,14 @@ extern "C" void registerGroupMsgRecvExtCallback(void (*cb)(int, int, int, char *
   GroupMsgRecvExtCallback = cb;
 }
 
-void (*ArrayMsgRecvExtCallback)(int, int, int *, int, int, char *, int) = NULL;
-extern "C" void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char *, int)) {
+void (*ArrayMsgRecvExtCallback)(int, int, int *, int, int, char *, int, void *) = NULL;
+extern "C" void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char *, int, void *)) {
   ArrayMsgRecvExtCallback = cb;
+}
+
+void (*ArrayMcastRecvExtCallback)(int, int, int, char *, int, void *) = NULL;
+extern "C" void registerArrayMcastRecvExtCallback(void (*cb)(int, int, int, char *, int, void *)) {
+  ArrayMcastRecvExtCallback = cb;
 }
 
 int (*ArrayElemLeaveExt)(int, int, int *, char**, int) = NULL;
@@ -2295,7 +2300,12 @@ extern "C" void registerCPickleDataExtCallback(void (*cb)(void*, int, int, char*
 
 int (*PyReductionExt)(char**, int*, int, char**) = NULL;
 extern "C" void registerPyReductionExtCallback(int (*cb)(char**, int*, int, char**)) {
-    PyReductionExt = cb;
+  PyReductionExt = cb;
+}
+
+void (*SectionElementsExtCallback)(int, int, int, int*, void*) = NULL;
+extern "C" void registerSectionElementsExtCallback(void (*cb)(int, int, int, int*, void*)) {
+  SectionElementsExtCallback = cb;
 }
 
 int (*ArrayMapProcNumExtCallback)(int, int, const int *) = NULL;
@@ -2414,6 +2424,26 @@ void CkArrayDoneInsertingExt(int aid) {
   CkGroupID gId;
   gId.idx = aid;
   CProxy_ArrayBase(gId).doneInserting();
+}
+
+extern "C"
+void *CreateSectionExt(int aid, int *elems, int nelems, int ndims, int bfactor)
+{
+  std::vector<CkArrayIndex> arrayElems;
+  arrayElems.reserve(nelems);
+  for (int i=0; i < nelems; i++, elems += ndims) {
+    arrayElems.emplace_back(ndims, elems);
+    //arrayElems[i].print();
+  }
+
+  CkGroupID gId;
+  gId.idx = aid;
+  CkArray *ckarr = CProxy_CkArray(gId).ckLocalBranch();
+  CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(ckarr->getmCastMgr()).ckLocalBranch();
+  CProxySection_ArrayBase secProxy(gId, arrayElems.data(), nelems, bfactor);
+  mCastGrp->initDelegateMgr(&secProxy);
+  //fprintf(stderr, "entry pointer value %p\n", secProxy.ckGetSectionInfo().get_val());
+  return secProxy.ckGetSectionInfo().get_val();
 }
 
 extern "C"
@@ -2541,6 +2571,47 @@ void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs,
   } else { // broadcast
     CkBroadcastMsgArray(epIdx, impl_amsg, gId, 0);
   }
+}
+
+extern "C"
+void CkArrayExtMcastSend(int aid, int section_ep, int real_ep, char *msg, int msgSize, int cookie_pe, void *cookie_entry)
+{
+  /*fprintf(stderr, "CkArrayExtMcastSend: aid=%d ep=%d msgSize=%d cookie_pe=%d cookie_entry=%p\n",
+                  aid, section_ep, msgSize, cookie_pe, (void*)cookie_entry);*/
+  CkSectionID sid;
+  sid._cookie.get_pe() = cookie_pe;
+  //sid._cookie.get_redNo() = ??; // don't think it's needed for a multicast
+  sid._cookie.get_val() = cookie_entry;
+  sid._cookie.get_aid().idx = aid;
+
+  McastExtMsg *mcastMsg = new (msgSize,0) McastExtMsg(msgSize, 0, real_ep);  // 0?
+  memcpy(mcastMsg->data, msg, msgSize);
+  CkArray *ckarr = CProxy_CkArray(sid._cookie.get_aid()).ckLocalBranch();
+  CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(ckarr->getmCastMgr()).ckLocalBranch();
+  mCastGrp->ArraySectionSend(NULL, section_ep, mcastMsg, 1, &sid, 0);
+}
+
+extern "C"
+void CkArrayExtMcastSend_multi(int aid, int section_ep, int real_ep, int num_bufs, char **bufs, int *buf_sizes, int cookie_pe, void *cookie_entry)
+{
+  CkAssert(num_bufs >= 1);
+  int totalSize = 0;
+  for (int i=0; i < num_bufs; i++) totalSize += buf_sizes[i];
+
+  CkSectionID sid;
+  sid._cookie.get_pe() = cookie_pe;
+  //sid._cookie.get_redNo() = ??; // don't think it's needed for a multicast
+  sid._cookie.get_val() = cookie_entry;
+  sid._cookie.get_aid().idx = aid;
+
+  McastExtMsg *mcastMsg = new (totalSize,0) McastExtMsg(totalSize, buf_sizes[0], real_ep);  // 0?
+  for (int i=0, offset=0; i < num_bufs; i++) {
+    memcpy(mcastMsg->data + offset, bufs[i], buf_sizes[i]);
+    offset += buf_sizes[i];
+  }
+  CkArray *ckarr = CProxy_CkArray(sid._cookie.get_aid()).ckLocalBranch();
+  CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(ckarr->getmCastMgr()).ckLocalBranch();
+  mCastGrp->ArraySectionSend(NULL, section_ep, mcastMsg, 1, &sid, 0);
 }
 
 //------------------- Message Watcher (record/replay) ----------------

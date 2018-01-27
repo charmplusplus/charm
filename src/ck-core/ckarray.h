@@ -423,7 +423,7 @@ typedef ArrayElementT<CkIndex5D> ArrayElement5D;
 typedef ArrayElementT<CkIndex6D> ArrayElement6D;
 typedef ArrayElementT<CkIndexMax> ArrayElementMax;
 
-extern void (*ArrayMsgRecvExtCallback)(int, int, int *, int, int, char *, int);
+extern void (*ArrayMsgRecvExtCallback)(int, int, int *, int, int, char *, int, void *);
 extern int (*ArrayElemLeaveExt)(int, int, int *, char**, int);
 extern void (*ArrayElemJoinExt)(int, int, int *, int, char*, int);
 extern void (*ArrayResumeFromSyncExtCallback)(int, int, int *);
@@ -453,8 +453,10 @@ public:
     ArrayMsgRecvExtCallback(((CkGroupID)e->thisArrayID).idx,
                             int(e->thisIndexMax.getDimension()),
                             e->thisIndexMax.data(), ep, msgSize, impl_buf+(3*sizeof(int)),
-                            dcopy_start);
+                            dcopy_start, NULL);
   }
+
+  static void __sectionEntryMethod(void *impl_msg, void *impl_obj_void);
 
   static void __AtSyncEntryMethod(void *impl_msg, void *impl_obj_void) {
     ArrayElemExt *e = static_cast<ArrayElemExt *>(impl_obj_void);

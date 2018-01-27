@@ -507,7 +507,17 @@ ArrayElemExt::ArrayElemExt() {
   int chareIdx = ckGetChareType();
   ctorEpIdx = _chareTable[chareIdx]->getDefaultCtor();
   //printf("Constructor of ArrayElemExt, aid=%d, chareIdx=%d, ctorEpIdx=%d\n", ((CkGroupID)thisArrayID).idx, chareIdx, ctorEpIdx);
-  ArrayMsgRecvExtCallback(((CkGroupID)thisArrayID).idx, int(thisIndexMax.getDimension()), thisIndexMax.data(), ctorEpIdx, 0, NULL, -1);
+  ArrayMsgRecvExtCallback(((CkGroupID)thisArrayID).idx, int(thisIndexMax.getDimension()), thisIndexMax.data(), ctorEpIdx, 0, NULL, -1, NULL);
+}
+
+void ArrayElemExt::__sectionEntryMethod(void *impl_msg, void *impl_obj_void) {
+  //fprintf(stderr, "ArrayElemExt:: Section entry method invoked\n");
+  ArrayElemExt *e = static_cast<ArrayElemExt *>(impl_obj_void);
+  McastExtMsg *msg = (McastExtMsg*)impl_msg;
+  ArrayMsgRecvExtCallback(((CkGroupID)e->thisArrayID).idx,
+                          int(e->thisIndexMax.getDimension()),
+                          e->thisIndexMax.data(), msg->real_ep, msg->msgSize, msg->data,
+                          msg->dcopy_start, &msg->_cookie.info);
 }
 
 /*********************** Spring Cleaning *****************

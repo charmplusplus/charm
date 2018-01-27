@@ -17,6 +17,18 @@ PUPbytes(mCastEntryPtr)
 
 #include "CkMulticast.decl.h"
 
+struct McastExtMsg : public CkMcastBaseMsg, public CMessage_McastExtMsg {
+  int msgSize;
+  int real_ep;
+  int dcopy_start;
+  char *data;
+
+  McastExtMsg(int msgSize_, int dcopy_start_, int ep)
+    : msgSize(msgSize_), dcopy_start(dcopy_start_), real_ep(ep) {}
+
+  //void pup(PUP::er &p) {
+};
+
 typedef void (*redClientFn)(CkSectionInfo sid, void *param,int dataSize,void *data);
 
 /// Retrieve section info from a multicast msg. Part of API

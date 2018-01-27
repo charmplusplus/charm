@@ -1969,6 +1969,7 @@ struct CkExtContributeInfo
     int id;                                 // arrayId or groupId
     int *idx;                               // this is contributor index (PE for groups)
     int ndims;                              // ensured to be 1 for groups
+    CkSectionInfo::CkSectionInfoStruct *scookie; // section cookie for section reductions
     extContributorType contributorType;     // type of contributors
 };
 
@@ -1996,7 +1997,7 @@ Group* getExtContributor<Group>(CkExtContributeInfo* contribute_params)
 // Functions to perform reduction over contributors from external clients (e.g. CharmPy)
 
 // Generic function to extract CkExtContributeInfo and perform reduction
-template <class T>
+template <class T, bool section>
 void CkExtContribute(CkExtContributeInfo* contribute_params, CkCallback& cb)
 {
     T* me = getExtContributor<T>(contribute_params);
@@ -2009,20 +2010,60 @@ void CkExtContribute(CkExtContributeInfo* contribute_params, CkCallback& cb)
     me->contribute(contribute_params->dataSize, contribute_params->data, contribute_params->redtype, cb);
 }
 
+template <>
+void CkExtContribute<Group,true>(CkExtContributeInfo* contribute_params, CkCallback& cb)
+{
+    CkAbort("Contributing from group section not supported yet");
+}
+
+template <>
+void CkExtContribute<ArrayElement,true>(CkExtContributeInfo* contribute_params, CkCallback& cb)
+{
+    CkGroupID gId;
+    gId.idx = contribute_params->id;
+    CkArray *ckarr = CProxy_CkArray(gId).ckLocalBranch();
+    CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(ckarr->getmCastMgr()).ckLocalBranch();
+
+    if (contribute_params->redtype == CkReduction::nop) {
+        contribute_params->dataSize = 0;
+        contribute_params->data = NULL;
+    }
+    CkSectionInfo s_info;
+    s_info.get_aid().idx = contribute_params->id;
+    s_info.get_pe() = contribute_params->scookie->pe;
+    s_info.get_redNo() = contribute_params->scookie->redNo;
+    s_info.get_val() = contribute_params->scookie->val;
+    mCastGrp->contribute(contribute_params->dataSize, contribute_params->data,
+                         contribute_params->redtype, s_info, cb, -1, -1);
+}
+
 extern "C"
 void CkExtContributeTo(CkExtContributeInfo* contribute_params, CkCallback& cb)
 {
 #if CMK_CHARMPY
     cb.isCkExtReductionCb = true;
 
-    switch (contribute_params->contributorType) {
-        case extContributorType::array :
-            CkExtContribute<ArrayElement>(contribute_params, cb);
-            break;
-        case extContributorType::group :
-            CkExtContribute<Group>(contribute_params, cb);
-            break;
-        default : CkAbort("Invalid external contributor type!\n");
+    if (contribute_params->scookie != NULL) {
+      switch (contribute_params->contributorType) {
+          case extContributorType::array :
+              CkExtContribute<ArrayElement,true>(contribute_params, cb);
+              break;
+          case extContributorType::group :
+              CkExtContribute<Group,true>(contribute_params, cb);
+              break;
+          default : CkAbort("Invalid external contributor type!\n");
+      }
+
+    } else {
+      switch (contribute_params->contributorType) {
+          case extContributorType::array :
+              CkExtContribute<ArrayElement,false>(contribute_params, cb);
+              break;
+          case extContributorType::group :
+              CkExtContribute<Group,false>(contribute_params, cb);
+              break;
+          default : CkAbort("Invalid external contributor type!\n");
+      }
     }
 #else
     CkAbort("Charmpy support must be enabled to use CkExtContributeTo");
