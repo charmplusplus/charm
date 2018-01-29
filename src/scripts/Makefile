@@ -222,7 +222,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h ckliststring.h \
 	cksequence.h ckstatistics.h ckvector3d.h conv-lists.h ckcomplex.h \
 	sockRoutines.h sockRoutines.c cmimemcpy.h simd.h SSE-Double.h SSE-Float.h \
-	crc32.h ckBIconfig.h rand48_replacement.h 
+	crc32.h ckBIconfig.h rand48_replacement.h ckregex.h
 
 CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h ckIgetControl.h cktiming.h debug-charm.h\
@@ -648,7 +648,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   NullLB.o LBSimulation.o modifyScheduler.o \
 	   charmProjections.o cktiming.o ckbitvector.o \
            pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \
-					 trace-controlPoints.o mpi-interoperate.o
+					 trace-controlPoints.o mpi-interoperate.o ckregex.o
 
 charm-core: converse $(L)/libck.a $(L)/libckf.a $(L)/libckmain.a
 charm-target: loadbalancers default_libs $(L)/libmpi-mainmodule.a tmgr
@@ -716,7 +716,7 @@ libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
   trace.h trace-bluegene.h trace-simple.h \
   register.h trace-common.h trace-simpleBOC.h TraceSimple.decl.h \
-  TraceSimple.def.h
+  TraceSimple.def.h ckregex.h
 	$(CHARMC) -c -I. $(TAU_INCLUDE) $(TAU_DEFS) trace-Tau.C -o libtrace-Tau.o
 
 tau_selective.o: $(TAUROOT)/utils/tau_selective.cpp 
