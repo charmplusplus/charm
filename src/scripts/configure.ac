@@ -852,6 +852,9 @@ EOT
 test_cxx "whether __int64 works" "yes" "no" ""
 AC_DEFINE_UNQUOTED([CMK___int64_DEFINED], $pass, [whether __int64 works])
 
+
+CMK_HAS_INT16=0
+
 #### Check __int128 ####
 cat > $t <<EOT
 #include <stdlib.h>
@@ -865,6 +868,7 @@ test_cxx "whether __int128 (128-bit integer) works" "yes" "no" ""
 AC_DEFINE_UNQUOTED([CMK___int128_DEFINED], $pass, [whether __int128 works])
 if test $pass -eq 1
 then
+  CMK_HAS_INT16=1
   add_flag CMK_HAS_INT16=1
 fi
 
@@ -883,8 +887,14 @@ test_cxx "whether __int128_t (128-bit integer) works" "yes" "no" ""
 AC_DEFINE_UNQUOTED([CMK___int128_t_DEFINED], $pass, [whether __int128_t works])
 if test $pass -eq 1
 then
+  CMK_HAS_INT16=1
   add_flag CMK_HAS_INT16=1
 fi
+
+#### Summarize *int128* ####
+
+AC_DEFINE_UNQUOTED([CMK_HAS_INT16], $CMK_HAS_INT16, [whether any 128-bit integer works])
+
 
 ### Check if we have C++11 <atomic> ###
 cat > $t <<EOT

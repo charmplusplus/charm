@@ -643,13 +643,9 @@ typedef CMK_TYPEDEF_UINT8     CmiUInt8;
 #if CMK___int128_t_DEFINED
 typedef __int128_t            CmiInt16;
 typedef __uint128_t           CmiUInt16;
-#define CMK_HAS_INT16         1
 #elif CMK___int128_DEFINED
 typedef __int128              CmiInt16;
 typedef __uint128     CmiUInt16;
-#define CMK_HAS_INT16         1
-#else
-#define CMK_HAS_INT16         0
 #endif
 
 #if defined(CMK_CUSTOM_FP_FORMAT)
