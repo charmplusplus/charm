@@ -528,6 +528,15 @@ then
   exit 1
 fi
 
+if [ ! -f "$srcbaseabs/scripts/configure" ]
+then
+  if ! command -v autoreconf >/dev/null 2>&1 || ! command -v aclocal >/dev/null 2>&1
+  then
+    echo "Error> autoconf and automake are not installed."
+    exit 1
+  fi
+fi
+
 #generate header for uFcontext for the target VERSION
 UFCONTEXT_HEADER_NAME=
 if test `echo "$BASEVERSION" | grep -c "darwin"` -gt 0
