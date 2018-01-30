@@ -335,11 +335,13 @@ ELF maintains a Global Offset Table (GOT) for globals so it is possible to
 switch GOT contents at thread context-switch by the runtime system.
 
 
-The only thing that the user needs to do is to set flag {\tt -swapglobals}
-at compile and link time (e.g. "ampicc -o prog prog.c -swapglobals"). It does not need 
-any change to the source code and works with any language (C, C++, Fortran, etc).
-However, it does not handle static variables and has a context switching 
-overhead that grows with the number of global variables.
+The only thing that the user needs to do is pass the flag {\tt -swapglobals}
+at both compile and link time (e.g. "ampicc -o prog prog.c -swapglobals"). This method does not require
+any changes to the source code and works with any language (C, C++, Fortran, etc).
+However, it does not handle static variables, has a context switching
+overhead that grows with the number of global variables, and is incompatible with SMP builds
+of AMPI, where multiple virtual ranks can execute simulataneously on different scheduler threads
+within an OS process.
 Currently, this feature only works on x86 and x86\_64 
 platforms that fully support ELF. Thus, it may not work on PPC or on some microkernels such as Catamount. When this feature does 
 not work for you, you can try other ways of handling global or static variables, 
@@ -518,6 +520,7 @@ It handles both global and static variables and has no context-switching
 overhead. Context-switching is just changing the TLS segment register
 to point to the thread's local copy. However, although it is popular, it
 is not supported by all compilers. Currently, \charmpp{} supports it for x86/x86\_64 platforms.
+Currently, only static linking is supported for objects that contain thread-local global variables.
 To use TLS-Globals, one has to add \emph{thread\_local} or \emph{\_\_thread} attributes
 to all mutable global variable declarations. For the example above, the following changes to
 the code handle the global variables:
@@ -526,7 +529,7 @@ thread_local int myrank;
 thread_local double xyz[100];
 \end{alltt}
 
-The runtime system also should know that TLS-Globals is used at compile time:
+The runtime system also should know that TLS-Globals is used at both compile and link time:
 
 \begin{alltt}
 ampiCC -o example example.C -tlsglobals
