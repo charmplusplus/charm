@@ -114,6 +114,7 @@ extern ELFXX_TYPE_Dyn _DYNAMIC[];      //The Dynamic section table pointer
 
 std::vector<char *>  _blacklist;
 static bool loaded = false;
+CMI_EXTERNC_VARIABLE int quietModeRequested;
 
 static void readBlacklist()
 {
@@ -121,7 +122,9 @@ static void readBlacklist()
   const char *fname = "blacklist";
   FILE *bl = fopen(fname, "r");
   if (bl == NULL){
-		if (CmiMyPe() == 0) printf("WARNING: Running swapglobals without blacklist, globals from libraries might be getting un-necessarily swapped\n");
+		if (!quietModeRequested && CmiMyPe() == 0) {
+			CmiPrintf("WARNING: Running swapglobals without blacklist, globals from libraries might be unnecessarily swapped.\n");
+		}
 		loaded = true;
 		return;
   }
@@ -432,8 +435,9 @@ void CtgInit(void) {
 		readBlacklist();
 		CtgGlobalList *l=new CtgGlobalList;
 		CtgGlobalStruct *g=new CtgGlobalStruct;
-		if (CmiMyNode()==0) {
-			CmiPrintf("Charm++> -swapglobals enabled\n");
+		if (!quietModeRequested && CmiMyPe() == 0) {
+			CmiPrintf("Charm++> -swapglobals enabled for automatic privatization of global variables.\n"
+				"WARNING> -swapglobals does not handle static variables.\n");
 		}
 		
 		g->allocate(l->getSize(), NULL);

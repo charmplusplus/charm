@@ -1366,8 +1366,13 @@ then
 	swapo="$CHARMLIB/libglobal-swap.a"
 	if [ ! -r "$swapo" -o ! -s "$swapo" ]
 	then
-		echo "Global-swapping library $swapo missing--"
-		echo "  Is -swapglobals supported on this machine?"
+		if [ "$CMK_SMP" == "1" ]
+		then
+			echo "Error: -swapglobals is not supported on SMP builds of Charm++/AMPI"
+		else
+			echo "Error: global-swapping library $swapo missing--"
+			echo "  Is -swapglobals supported on this machine?"
+		fi
 		exit 1
 	else
 		MIDDLE_LIBS="-lglobal-swap $MIDDLE_LIBS"
