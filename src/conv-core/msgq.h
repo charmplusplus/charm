@@ -6,11 +6,7 @@
 #include <ostream>
 #include <functional>
 
-#if CMK_USING_XLC
-#include <tr1/unordered_map>
-#else
 #include <unordered_map>
-#endif
 
 namespace conv {
 
