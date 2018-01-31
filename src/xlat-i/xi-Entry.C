@@ -728,10 +728,10 @@ void Entry::genGroupDecl(XStr& str) {
     if (!container->isForElement() && !container->isForSection() && !isSync() &&
         !isLocal() && !container->isNodeGroup()) {
       str << "    " << generateTemplateSpec(tspec) << "\n";
-      str << "    " << retType << " " << name << "(" << paramComma(1, 0)
+      str << "    " << retType << " " << name << "(" << paramComma(0, 0)
           << "int npes, int *pes" << eo(1) << ");\n";
       str << "    " << generateTemplateSpec(tspec) << "\n";
-      str << "    " << retType << " " << name << "(" << paramComma(1, 0)
+      str << "    " << retType << " " << name << "(" << paramComma(0, 0)
           << "CmiGroup &grp" << eo(1) << ");\n";
     }
   }
@@ -866,7 +866,7 @@ void Entry::genGroupDefs(XStr& str) {
     // entry method on multiple PEs declaration
     if (!forElement && !container->isForSection() && !isSync() && !isLocal() &&
         !container->isNodeGroup()) {
-      str << "" << makeDecl(retStr, 1) << "::" << name << "(" << paramComma(1, 0)
+      str << "" << makeDecl(retStr, 1) << "::" << name << "(" << paramComma(0, 0)
           << "int npes, int *pes" << eo(0) << ") {\n";
       if (param->hasRdma()) {
         str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy "
@@ -877,7 +877,7 @@ void Entry::genGroupDefs(XStr& str) {
             << ");\n";
       }
       str << "}\n";
-      str << "" << makeDecl(retStr, 1) << "::" << name << "(" << paramComma(1, 0)
+      str << "" << makeDecl(retStr, 1) << "::" << name << "(" << paramComma(0, 0)
           << "CmiGroup &grp" << eo(0) << ") {\n";
       if (param->hasRdma()) {
         str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy "
