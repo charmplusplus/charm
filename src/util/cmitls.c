@@ -7,6 +7,7 @@
 #if CMK_HAS_ELF_H && CMK_HAS_TLS_VARIABLES
 
 extern void* __executable_start;
+CMI_EXTERNC_VARIABLE int quietModeRequested;
 
 static Addr getCodeSegAddr(void) {
   return (Addr) &__executable_start;
@@ -47,6 +48,14 @@ Phdr* getTLSPhdrEntry(void) {
 
 void allocNewTLSSeg(tlsseg_t* t, CthThread th) {
   Phdr* phdr;
+
+  if (!quietModeRequested && CmiMyPe() == 0) {
+    static int firstTime = 1;
+    if (firstTime) {
+      CmiPrintf("Charm++> -tlsglobals enabled for privatization of thread-local variables.\n");
+      firstTime = 0;
+    }
+  }
 
   phdr = getTLSPhdrEntry();
   if (phdr != NULL) {
