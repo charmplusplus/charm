@@ -1,4 +1,6 @@
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include <sys/uio.h>
 
 // Method checks if process has permissions to use CMA
