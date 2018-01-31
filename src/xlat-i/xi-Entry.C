@@ -442,15 +442,19 @@ void Entry::genArrayDecl(XStr& str) {
     if ((isSync() || isLocal()) && !container->isForElement())
       return;  // No sync broadcast
     str << "    " << generateTemplateSpec(tspec) << "\n";
-    if (isIget())
+    if (isIget()) {
       str << "    "
           << "CkFutureID"
           << " " << name << "(" << paramType(1, 1) << ") ;\n";  // no const
-    else if (isLocal())
+    } else if (isLocal()) {
       str << "    " << retType << " " << name << "(" << paramType(1, 1, 0) << ") ;\n";
-    else
+    } else if (isTramTarget() && container->isForElement()) {
+      str << "    " << retType << " " << name << "(" << paramType(0, 1) << ") = delete;\n";
+      str << "    " << retType << " " << name << "(" << paramType(1, 0) << ") ;\n";
+    } else {
       str << "    " << retType << " " << name << "(" << paramType(1, 1)
           << ") ;\n";  // no const
+    }
   }
 }
 
@@ -712,10 +716,14 @@ void Entry::genGroupDecl(XStr& str) {
     if ((isSync() || isLocal()) && !container->isForElement())
       return;  // No sync broadcast
     str << "    " << generateTemplateSpec(tspec) << "\n";
-    if (isLocal())
+    if (isLocal()) {
       str << "    " << retType << " " << name << "(" << paramType(1, 1, 0) << ");\n";
-    else
+    } else if (isTramTarget() && container->isForElement()) {
+      str << "    " << retType << " " << name << "(" << paramType(0, 1) << ") = delete;\n";
+      str << "    " << retType << " " << name << "(" << paramType(1, 0) << ");\n";
+    } else {
       str << "    " << retType << " " << name << "(" << paramType(1, 1) << ");\n";
+    }
     // entry method on multiple PEs declaration
     if (!container->isForElement() && !container->isForSection() && !isSync() &&
         !isLocal() && !container->isNodeGroup()) {
@@ -966,9 +974,9 @@ void Entry::genTramDefs(XStr& str) {
   XStr msgTypeStr;
 
   if (isLocal())
-    msgTypeStr << paramType(0, 1, 0);
+    msgTypeStr << paramType(0, 0, 0);
   else
-    msgTypeStr << paramType(0, 1);
+    msgTypeStr << paramType(0, 0);
   str << makeDecl(retStr, 1) << "::" << name << "(" << msgTypeStr << ") {\n"
       << "  if (" << aggregatorName() << " == NULL) {\n";
 
