@@ -883,13 +883,13 @@ static void arg_init(int argc, const char **argv)
 #if CMK_SMP
   // Worker Thread Binding Parameters
   pparam_flag(&onewth_per.host, 0,
-             "oneWthPerHost", "assign N worker threads per host");
+             "oneWthPerHost", "assign one worker thread per host");
   pparam_flag(&onewth_per.socket, 0,
-             "oneWthPerSocket", "assign N worker threads per socket");
+             "oneWthPerSocket", "assign one worker thread per socket");
   pparam_flag(&onewth_per.core, 0,
-             "oneWthPerCore", "assign N worker threads per core");
+             "oneWthPerCore", "assign one worker thread per core");
   pparam_flag(&onewth_per.pu, 0,
-             "oneWthPerPU", "assign N worker threads per PU");
+             "oneWthPerPU", "assign one worker thread per PU");
 #endif
 
   pparam_flag(&auto_provision, 0, "auto-provision", "fully utilize available resources");

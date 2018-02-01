@@ -1119,9 +1119,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #else
     int auto_provision = CmiGetArgFlagDesc(argv, "+auto-provision", "fully utilize available resources");
     auto_provision |= CmiGetArgFlagDesc(argv, "+autoProvision", "fully utilize available resources");
-    int onewth_per_socket = CmiGetArgFlagDesc(argv, "+oneWthPerSocket", "assign N worker threads per socket");
-    int onewth_per_core = CmiGetArgFlagDesc(argv, "+oneWthPerCore", "assign N worker threads per core");
-    int onewth_per_pu = CmiGetArgFlagDesc(argv, "+oneWthPerPU", "assign N worker threads per PU");
+    int onewth_per_socket = CmiGetArgFlagDesc(argv, "+oneWthPerSocket", "assign one worker thread per socket");
+    int onewth_per_core = CmiGetArgFlagDesc(argv, "+oneWthPerCore", "assign one worker thread per core");
+    int onewth_per_pu = CmiGetArgFlagDesc(argv, "+oneWthPerPU", "assign one worker thread per PU");
     int onewth_active = (onewth_per_socket > 0) + (onewth_per_core > 0) + (onewth_per_pu > 0);
     if (onewth_active > 1 || onewth_active + (plusPSet || ppnSet) + auto_provision > 1)
     {
