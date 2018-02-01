@@ -47,7 +47,8 @@ public:
   void start() {
     starttime = CkWallTimer();
     CkCallback endCb(CkIndex_TestDriver::startVerificationPhase(), thisProxy);
-    updater_group.generateUpdates(endCb);
+    updater_group.generateUpdates();
+    CkStartQD(endCb);
   }
 
   void startVerificationPhase() {
@@ -63,7 +64,8 @@ public:
     // At the end of the second update phase, check the global table
     //  for errors in Updater::checkErrors()
     CkCallback endCb(CkIndex_Updater::checkErrors(), updater_group);
-    updater_group.generateUpdates(endCb);
+    updater_group.generateUpdates();
+    CkStartQD(endCb);
   }
 
   void reportErrors(CmiInt8 globalNumErrors) {
@@ -103,7 +105,7 @@ public:
     HPCC_Table[localOffset] ^= key;
   }
 
-  void generateUpdates(const CkCallback& endCallback) {
+  void generateUpdates() {
     CmiUInt8 key = HPCC_starts(4 * globalStartmyProc);
 
     // Generate this chare's share of global updates
@@ -113,9 +115,6 @@ public:
       // Submit generated key to chare owning that portion of the table
       thisProxy[destinationIndex].insertData(key);
     }
-
-    // Indicate to the communication library that this chare is done sending
-    contribute(endCallback);
   }
 
   void checkErrors() {
