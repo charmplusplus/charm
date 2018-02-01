@@ -1160,13 +1160,14 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #else
     int auto_provision = CmiGetArgFlagDesc(argv, "+auto-provision", "fully utilize available resources");
     auto_provision |= CmiGetArgFlagDesc(argv, "+autoProvision", "fully utilize available resources");
+    int onewth_per_host = CmiGetArgFlagDesc(argv, "+oneWthPerHost", "assign one worker thread per host");
     int onewth_per_socket = CmiGetArgFlagDesc(argv, "+oneWthPerSocket", "assign one worker thread per socket");
     int onewth_per_core = CmiGetArgFlagDesc(argv, "+oneWthPerCore", "assign one worker thread per core");
     int onewth_per_pu = CmiGetArgFlagDesc(argv, "+oneWthPerPU", "assign one worker thread per PU");
-    int onewth_active = (onewth_per_socket > 0) + (onewth_per_core > 0) + (onewth_per_pu > 0);
+    int onewth_active = (onewth_per_host > 0) + (onewth_per_socket > 0) + (onewth_per_core > 0) + (onewth_per_pu > 0);
     if (onewth_active > 1 || onewth_active + (plusPSet || ppnSet) + auto_provision > 1)
     {
-      CmiError("Error: Only one of +auto-provision, +oneWthPer(Socket|Core|PU), or +p/++ppn is allowed.\n");
+      CmiError("Error: Only one of +auto-provision, +oneWthPer(Host|Socket|Core|PU), or +p/++ppn is allowed.\n");
       exit(1);
     }
 
@@ -1175,7 +1176,12 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
       SET_ENV_VAR("CmiProcessPerHost", "1");
 
       int ppn;
-      if (onewth_per_socket)
+      if (onewth_per_host)
+      {
+        ppn = 2; // instead of 1 to allow for a comm thread
+        setenv("CmiOneWthPerHost", "1", 0);
+      }
+      else if (onewth_per_socket)
       {
         ppn = CmiHwlocTopologyLocal.num_sockets;
         SET_ENV_VAR("CmiOneWthPerSocket", "1");

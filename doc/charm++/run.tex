@@ -43,6 +43,10 @@ threads to launch in order to fully subscribe the machine running the program.
 
 \item[{\tt +autoProvision}] Same as above.
 
+\item[{\tt +oneWthPerHost}] Launch one worker thread per compute host. By
+the definition of standalone mode, this always results in exactly one worker
+thread.
+
 \item[{\tt +oneWthPerSocket}] Launch one worker thread per CPU socket.
 
 \item[{\tt +oneWthPerCore}] Launch one worker thread per CPU core.
