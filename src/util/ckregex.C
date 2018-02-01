@@ -1,5 +1,6 @@
 #include "ckregex.h"
 #include <regex>
+#include <cstring>
 
 extern "C" char ** findFirstCaptures(const char * pattern, const char * input_str) {
   std::regex re(pattern);
