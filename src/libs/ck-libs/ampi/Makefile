@@ -135,6 +135,8 @@ ampi.decl.h ampi.def.h: ampi.ci
 ampiProjections.o: ampiProjections.C ampiEvents.h ampiProjections.h $(HEADDEP)
 	$(CHARMC) -c ampiProjections.C
 
+ddt.o: ddt.C ddt.h $(HEADDEP)
+
 clean: 
 	-rm -fr *.o *~ *.decl.h *.def.h gmon.out $(DEST) $(DESTF) $(COMPATLIB) conv-host charmrun headers *.mod
 	- cd romio && $(MAKE) clean
