@@ -263,7 +263,7 @@ CpvDeclare(void *, CmiSuspendedTaskQueue);
 
 CpvDeclare(int, isHelperOn);
 
-int    CmiMyLocalRank = -1;        /* local rank only for scalable startup */
+int    CmiMyLocalRank;        /* local rank only for scalable startup */
 
 /*****************************************************************************
  *
