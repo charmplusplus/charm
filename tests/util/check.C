@@ -12,6 +12,43 @@ void check_size_approx(size_t s) {
   }
 }
 
+void test_CmiMemoryUsage() {
+  // 1 G
+  const CMK_TYPEDEF_UINT8 g = 1024 * 1024 * 1024;
+  // 100 mbs
+  const int m100 = 100 * 1024 * 1024;
+
+  CMK_TYPEDEF_UINT8 mem_total = 0;
+  CmiUInt8 mem_before = CmiMemoryUsage();
+
+  void *buf1 = malloc(m100);
+  if (buf1) {
+    mem_total += m100;
+  }
+
+  void * buf2 = NULL;
+  if (sizeof(void *) == 8) {
+    // test malloc_info support for 64 bit, allocate 6 Gs
+    buf2 = malloc(6*g);
+    if (buf2) {
+      mem_total += 6*g;
+    } else {
+      CmiPrintf("malloc of 6G failed\n");
+    }
+  }
+
+  CmiUInt8 mem_after = CmiMemoryUsage();
+  if (buf1) {free(buf1);}
+  if (buf2) {free(buf2);}
+
+  CmiPrintf("CmiMemoryUsage() reported %fMB (before) vs %fMB (after)\n", mem_before/1E6, mem_after/1E6);
+  if (mem_after - mem_before < mem_total) {
+    CmiPrintf("Error: CmiMemoryUsage() does not work %lld %lld!\n", mem_before, mem_after);
+    CmiAbort("CmiMemoryUsage failed");
+  }
+}
+
+
 // Test cases for the approximate compression provided by
 // pup_{en,de}codeSize, as tested above by check_sizes_approx()
 size_t check_size_values[] =
@@ -100,22 +137,7 @@ void check_test(int argc, char** argv) {
     exit(1);
   }
 
-#if ! CMK_SMP
-  const int s = 8*1024*1024;
-  void *buf1 = CmiAlloc(s);
-  memset(buf1, 1, s);
-  CmiUInt8 mem_before = CmiMemoryUsage();
-  void *buf2 = CmiAlloc(s);
-  memset(buf2, 2, s);
-  CmiUInt8 mem_after = CmiMemoryUsage();
-  CmiFree(buf2);
-  CmiFree(buf1);
-  CmiPrintf("CmiMemoryUsage() reported %fMB (before) vs %fMB (after)!\n", mem_before/1E6, mem_after/1E6);
-  if (mem_after - mem_before < s) {
-    CmiPrintf("Error: CmiMemoryUsage() does not work %lld %lld!\n", mem_before, mem_after);
-    //CmiAbort("CmiMemoryUsage failed");
-  }
-#endif
+  test_CmiMemoryUsage();
 
   CmiPrintf("Info: converse header: %d envelope: %d\n", CmiReservedHeaderSize, sizeof(envelope));
   if (sizeof(envelope) % 8 != 0) {

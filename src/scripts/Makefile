@@ -440,7 +440,7 @@ LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 	ckimage.o ckdll.o ckhashtable.o sockRoutines.o			\
 	conv-lists.o persist-comm.o mempool.o graph.o \
 	crc32.o  lz4.o partitioning_strategies.o hilbert.o \
-	spanningTree.o
+	spanningTree.o ckregex.o
 
 LIBCONV_UTILF=pup_f.o
 
@@ -648,7 +648,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   NullLB.o LBSimulation.o modifyScheduler.o \
 	   charmProjections.o cktiming.o ckbitvector.o \
            pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \
-					 trace-controlPoints.o mpi-interoperate.o ckregex.o
+					 trace-controlPoints.o mpi-interoperate.o
 
 charm-core: converse $(L)/libck.a $(L)/libckf.a $(L)/libckmain.a
 charm-target: loadbalancers default_libs $(L)/libmpi-mainmodule.a tmgr
