@@ -1538,6 +1538,16 @@ EOT
 test_link "whether has mallinfo" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_MALLINFO, $pass, [whether has mallinfo])
 
+#### test for mallocinfo ###
+cat > $t <<EOT
+#include <malloc.h>
+int main() {
+  malloc_info(0, NULL);
+}
+EOT
+test_link "whether has mallocinfo" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_MALLOCINFO, $pass, [whether has mallocinfo])
+
 #### test for popen ###
 cat > $t <<EOT
 #include <stdio.h>

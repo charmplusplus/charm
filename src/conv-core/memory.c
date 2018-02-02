@@ -463,6 +463,45 @@ static CMK_TYPEDEF_UINT8 MemusageBGQ(void){
 }
 #endif
 
+static CMK_TYPEDEF_UINT8 MemusageMallocinfo(void) {
+#if CMK_HAS_MALLOCINFO && CMK_HAS_REGEX
+  #include "ckregex.h"
+  char * buf = NULL;
+  size_t size;
+  // instead of writing to file, we write the string into the buffer
+  FILE * file = open_memstream(&buf, &size);
+  if (file == NULL) {
+    // open_memstream failed. No resource allocated, return
+    return 0;
+  }
+  int status = malloc_info(0, file);
+
+  // flush this buffer
+  fclose(file);
+  // if malloc_info failed, go to the next function
+  if (status == -1) {
+    free(buf);
+    return 0;
+  }
+
+  // parse the mmaped memory, might not exist at all
+  char ** mmapMemory = findFirstCaptures("[\\S\\s]*mmap.*\"([0-9]+)\"", buf);
+  CMK_TYPEDEF_UINT8 parsedMmapMemory = mmapMemory[0] == NULL ? 0 : strtoll(mmapMemory[0], NULL, 0);
+
+  char ** otherMemory = findFirstCaptures("[\\S\\s]*total.*\"([0-9]+)\"", buf);
+  free(buf);
+  // parse the total memory (total doesn't include mmap), must exist otherwise fail
+  if (otherMemory[0] == NULL) {
+    return 0;
+  }
+  CMK_TYPEDEF_UINT8 parsedOtherMemory = strtoll(otherMemory[0], NULL, 0);
+
+  return parsedMmapMemory + parsedOtherMemory;
+#else
+  return 0;
+#endif
+}
+
 typedef CMK_TYPEDEF_UINT8 (*CmiMemUsageFn)(void);
 
 /* this structure defines the order of testing for memory usage functions */
@@ -473,6 +512,7 @@ struct CmiMemUsageStruct {
     {MemusageBGQ, "BlueGene/Q"},
     {MemusageWindows, "Windows"},
     {MemusageMstats, "Mstats"},
+    {MemusageMallocinfo, "Mallocinfo"},
     {MemusageMallinfo, "Mallinfo"},
     {MemusageProcSelfStat, "/proc/self/stat"},
     {MemusageSbrk, "sbrk"},
