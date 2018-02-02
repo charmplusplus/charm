@@ -2367,6 +2367,19 @@ void CkInsertArrayExt(int aid, int ndims, int *index, int epIdx, int onPE, char 
 }
 
 extern "C"
+void CkMigrateExt(int aid, int ndims, int *index, int toPe) {
+  //printf("[charm] CkMigrateMeExt called with aid: %d, ndims: %d, index: %d, toPe: %d\n",
+        //aid, ndims, *index, toPe);
+  CkGroupID gId;
+  gId.idx = aid;
+  CkArrayIndex arrayIndex(ndims, index);
+  CProxyElement_ArrayBase arrayProxy = CProxyElement_ArrayBase(gId, arrayIndex);
+  ArrayElement* arrayElement = arrayProxy.ckLocal();
+  CkAssert(arrayElement != NULL);
+  arrayElement->migrateMe(toPe);
+}
+
+extern "C"
 void CkArrayDoneInsertingExt(int aid) {
   CkGroupID gId;
   gId.idx = aid;

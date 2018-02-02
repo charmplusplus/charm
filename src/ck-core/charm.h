@@ -257,6 +257,7 @@ extern int CkCreateGroupExt(int cIdx, int eIdx, char *msg, int msgSize);
 extern int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, char *msg, int msgSize);
 extern void CkInsertArrayExt(int aid, int ndims, int *index, int epIdx, int onPE, char *msg, int msgSize);
 extern void CkArrayDoneInsertingExt(int aid);
+extern void CkMigrateExt(int aid, int ndims, int *index, int toPe);
 
 
 /******************************************************************************
