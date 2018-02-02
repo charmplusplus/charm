@@ -32,4 +32,4 @@
 
 GNI_CRAYXC=1
 
-. common-craype.sh
+. $CHARMINC/conv-mach-craype.sh

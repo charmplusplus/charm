@@ -32,4 +32,4 @@
 
 CMK_BUILD_CRAY=1
 
-. common-craype.sh
+. $CHARMINC/conv-mach-craype.sh
