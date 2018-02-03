@@ -1077,6 +1077,13 @@ INLINE_KEYWORD int pe_gToLTranslate(int pe) {
 CMI_EXTERNC_VARIABLE int quietMode;
 CMI_EXTERNC_VARIABLE int quietModeRequested;
 
+#if defined(_WIN32)
+#include <windows.h> /* for SetEnvironmentVariable() and routines for CMK_SHARED_VARS_NT_THREADS */
+#define SET_ENV_VAR(key, value) SetEnvironmentVariable(key, value)
+#else
+#define SET_ENV_VAR(key, value) setenv(key, value, 0)
+#endif
+
 /* ##### Beginning of Functions Related with Machine Startup ##### */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret) {
     int _ii;
@@ -1131,23 +1138,23 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
     if (onewth_active || auto_provision)
     {
-      setenv("CmiProcessPerHost", "1", 0);
+      SET_ENV_VAR("CmiProcessPerHost", "1");
 
       int ppn;
       if (onewth_per_socket)
       {
         ppn = CmiHwlocTopologyLocal.num_sockets;
-        setenv("CmiOneWthPerSocket", "1", 0);
+        SET_ENV_VAR("CmiOneWthPerSocket", "1");
       }
       else if (onewth_per_core)
       {
         ppn = CmiHwlocTopologyLocal.num_cores;
-        setenv("CmiOneWthPerCore", "1", 0);
+        SET_ENV_VAR("CmiOneWthPerCore", "1");
       }
       else // if (onewth_per_pu || auto_provision)
       {
         ppn = CmiHwlocTopologyLocal.num_pus;
-        setenv("CmiOneWthPerPU", "1", 0);
+        SET_ENV_VAR("CmiOneWthPerPU", "1");
       }
 # if !CMK_MULTICORE
       // account for comm thread
@@ -1758,7 +1765,6 @@ void LrtsDestroyLock(LrtsNodeLock lock){ /* empty */ }
 
 #else /*smp version*/
 #if CMK_SHARED_VARS_NT_THREADS /*Used only by win versions*/
-#include <windows.h>
 
 LrtsNodeLock LrtsCreateLock(void){
     HANDLE hMutex = CreateMutex(NULL, FALSE, NULL);
