@@ -39,6 +39,12 @@ added by Ryan Mokos in July 2008.
 
 #define ISOMALLOC_DEBUG 0
 
+#if ISOMALLOC_DEBUG
+#define DEBUG_PRINT(...) CmiPrintf(__VA_ARGS__)
+#else
+#define DEBUG_PRINT(...)
+#endif
+
 /* b-tree definitions */
 #define TREE_NODE_SIZE 128 /* a power of 2 is probably best  */
 #define TREE_NODE_MID  63  /* must be cieling(TREE_NODE_SIZE / 2) - 1  */
@@ -1274,8 +1280,8 @@ static void *disabled_map(int nBytes)
   if (!disabled_map_warned) {
     disabled_map_warned=1;
     if (CmiMyPe()==0)
-      CmiError("charm isomalloc.c> Warning: since mmap() doesn't work,"
-          " you won't be able to migrate threads\n");
+      CmiError("Charm++> Warning: since mmap() doesn't work,"
+          " you won't be able to migrate threads.\n");
   }
   return malloc(nBytes);
 }
@@ -1289,7 +1295,7 @@ static void disable_isomalloc(const char *why)
   isomallocStart=NULL;
   isomallocEnd=NULL;
   if (CmiMyPe() == 0)
-    CmiPrintf("[%d] isomalloc.c> Disabling isomalloc because %s\n",CmiMyPe(),why);
+    CmiPrintf("Charm++> Disabling isomalloc because %s.\n", why);
 }
 
 #if ! CMK_HAS_MMAP
@@ -1380,24 +1386,16 @@ map_slots(CmiInt8 slot, CmiInt8 nslots)
 
   if (pa==NULL)
   { /*Map just failed completely*/
-#if ISOMALLOC_DEBUG
-    perror("mmap failed");
-    CmiPrintf("[%d] tried to mmap %p, but encountered error\n",CmiMyPe(),addr);
-#endif
+    DEBUG_PRINT("[%d] tried to mmap %p, but encountered error\n",CmiMyPe(),addr);
     return NULL;
   }
   if (pa != addr)
   { /*Map worked, but gave us back the wrong place*/
-#if ISOMALLOC_DEBUG
-    CmiPrintf("[%d] tried to mmap %p, but got %p back\n",CmiMyPe(),addr,pa);
-#endif
+    DEBUG_PRINT("[%d] tried to mmap %p, but got %p back\n",CmiMyPe(),addr,pa);
     call_munmap(addr,slotsize*nslots);
     return NULL;
   }
-#if ISOMALLOC_DEBUG
-  CmiPrintf("[%d] mmap'd slots %ld-%ld to address %p\n",CmiMyPe(),
-      slot,slot+nslots-1,addr);
-#endif
+  DEBUG_PRINT("[%d] mmap'd slots %ld-%ld to address %p\n",CmiMyPe(),slot,slot+nslots-1,addr);
   return (CmiIsomallocBlock *)pa;
 }
 
@@ -1409,16 +1407,13 @@ unmap_slots(CmiInt8 slot, CmiInt8 nslots)
 {
   void *addr=slot2addr(slot);
   call_munmap(addr, slotsize*nslots);
-#if ISOMALLOC_DEBUG
-  CmiPrintf("[%d] munmap'd slots %ld-%ld from address %p\n",CmiMyPe(),
-      slot,slot+nslots-1,addr);
-#endif
+  DEBUG_PRINT("[%d] munmap'd slots %ld-%ld from address %p\n",CmiMyPe(),slot,slot+nslots-1,addr);
 }
 
 static void map_failed(CmiInt8 s,CmiInt8 n)
 {
   void *addr=slot2addr(s);
-  CmiError("charm isomalloc.c> map failed to allocate %d bytes at %p, errno:%d.\n",
+  CmiError("Charm++> Isomalloc map failed to allocate %d bytes at %p, errno: %d.\n",
       slotsize*n, addr, errno);
   CmiAbort("Exiting\n");
 }
@@ -1511,9 +1506,7 @@ static int bad_location(char *loc) {
   void *addr;
   addr=call_mmap_fixed(loc,slotsize);
   if (addr==NULL || addr!=loc) {
-#if ISOMALLOC_DEBUG
-    CmiPrintf("[%d] Skipping unmappable space at %p\n",CmiMyPe(),loc);
-#endif
+    DEBUG_PRINT("[%d] Skipping unmappable space at %p\n",CmiMyPe(),loc);
     return 1; /*No good*/
   }
   call_munmap(addr,slotsize);
@@ -1540,9 +1533,7 @@ static int partially_good(char *start,memRange_t len,int n) {
 static int good_range(char *start,memRange_t len,int n) {
   int i;
   memRange_t quant=divide_range(len,n);
-#if ISOMALLOC_DEBUG
-  CmiPrintf("good_range: %lld, %d\n", quant, n);
-#endif
+  DEBUG_PRINT("good_range: %lld, %d\n", quant, n);
   CmiAssert (quant > 0);
 
   for (i=0;i<n;i++)
@@ -1581,17 +1572,13 @@ static void check_range(char *start,char *end,memRegion_t *max)
   }
 #endif
   if (len<=max->len) return; /*It's too short already!*/
-#if ISOMALLOC_DEBUG
-  CmiPrintf("[%d] Checking at %p - %p\n",CmiMyPe(),start,end);
-#endif
+  DEBUG_PRINT("[%d] Checking at %p - %p\n",CmiMyPe(),start,end);
 
   /* Check the middle of the range */
   if (!good_range(start,len,256)) {
     /* Try to split into subranges: */
     int i,n=2;
-#if ISOMALLOC_DEBUG
-    CmiPrintf("[%d] Trying to split bad address space at %p - %p...\n",CmiMyPe(),start,end);
-#endif
+    DEBUG_PRINT("[%d] Trying to split bad address space at %p - %p...\n",CmiMyPe(),start,end);
     len=divide_range(len,n);
     for (i=0;i<n;i++) {
       char *cur=start+i*len;
@@ -1602,9 +1589,7 @@ static void check_range(char *start,char *end,memRegion_t *max)
   }
   else /* range is good */
   { 
-#if ISOMALLOC_DEBUG
-    CmiPrintf("[%d] Address space at %p - %p is largest\n",CmiMyPe(),start,end);
-#endif
+    DEBUG_PRINT("[%d] Address space at %p - %p is largest\n",CmiMyPe(),start,end);
 
     /*If we got here, we're the new largest usable range*/
     max->len=len;
@@ -1708,11 +1693,9 @@ static int find_largest_free_region(memRegion_t *destRegion) {
 #if CMK_MACOSX
     if (regions[i].start+regions[i].len*2>regions[i].start) regions[i].len *= 2;
 #endif
-#if ISOMALLOC_DEBUG
-    CmiPrintf("[%d] Memory map: %p - %p (len: %lu => %lu) %s \n",CmiMyPe(),
-        regions[i].start,regions[i].start+regions[i].len,
-        old.len, regions[i].len, regions[i].type);
-#endif
+    DEBUG_PRINT("[%d] Memory map: %p - %p (len: %lu => %lu) %s \n",CmiMyPe(),
+                regions[i].start,regions[i].start+regions[i].len,
+                old.len, regions[i].len, regions[i].type);
   }
 
   /*Find a large, unused region in this map: */
@@ -1754,9 +1737,6 @@ static int try_largest_mmap_region(memRegion_t *destRegion)
     range = bad_alloc;
 #endif
     if (range == bad_alloc) {  /* mmap failed */
-#if ISOMALLOC_DEBUG
-      /* CmiPrintf("[%d] test failed at size: %llu error: %d\n", CmiMyPe(), size, errno);  */
-#endif
 #if CMK_HAS_USLEEP
       if (retry++ < 5) { usleep(rand()%10000); continue; }
       else retry = 0;
@@ -1765,9 +1745,7 @@ static int try_largest_mmap_region(memRegion_t *destRegion)
       if (size<=0) return 0; /* mmap doesn't work */
     }
     else { /* this allocation size is available */
-#if ISOMALLOC_DEBUG
-      CmiPrintf("[%d] available: %p, %lld\n", CmiMyPe(), range, size);
-#endif
+      DEBUG_PRINT("[%d] available: %p, %lld\n", CmiMyPe(), range, size);
       call_munmap(range,size); /* needed/wanted? */
       if (size > good_size) {
         good_range = range;
@@ -1788,7 +1766,7 @@ static int try_largest_mmap_region(memRegion_t *destRegion)
     sprintf(s, "cat /proc/%d/maps", pid);
     system(s);
   }
-  CmiPrintf("[%d] try_largest_mmap_region: %p, %lld\n", CmiMyPe(), good_range, good_size);
+  DEBUG_PRINT("[%d] try_largest_mmap_region: %p, %lld\n", CmiMyPe(), good_range, good_size);
 #endif
   return 1;
 }
@@ -1820,7 +1798,7 @@ static void init_ranges(char **argv)
 
 #if ISOMALLOC_DEBUG
     if (CmiMyPe() == 0)
-      CmiPrintf("[%d] Using slotsize of %d\n", CmiMyPe(), slotsize);
+      DEBUG_PRINT("[%d] Using slotsize of %d\n", CmiMyPe(), slotsize);
 #endif
     freeRegion.len=0u;
 
@@ -1849,11 +1827,8 @@ static void init_ranges(char **argv)
     }
     else /* freeRegion.len>0, so can isomalloc */
     {
-#if ISOMALLOC_DEBUG
-      CmiPrintf("[%d] Isomalloc memory region: %p - %p (%d megs)\n",CmiMyPe(),
-          freeRegion.start,freeRegion.start+freeRegion.len,
-          freeRegion.len/meg);
-#endif
+      DEBUG_PRINT("[%d] Isomalloc memory region: %p - %p (%d megs)\n",CmiMyPe(),
+                  freeRegion.start,freeRegion.start+freeRegion.len,freeRegion.len/meg);
     }
   }             /* end if myrank == 0 */
 
@@ -1890,7 +1865,7 @@ static void init_ranges(char **argv)
                 freeRegion.start = (void *)ss;
                 freeRegion.len = (char *)ee -(char *)ss;
             }
-            CmiPrintf("[%d] consolidated Isomalloc memory region at restart: %p - %p (%d megs)\n",CmiMyPe(),freeRegion.start,freeRegion.start+freeRegion.len,freeRegion.len/meg);
+            CmiPrintf("Charm++> Consolidated Isomalloc memory region at restart: %p - %p (%d MB).\n",freeRegion.start,freeRegion.start+freeRegion.len,freeRegion.len/meg);
             goto AFTER_SYNC;
         }
 #endif
@@ -1905,7 +1880,8 @@ static void init_ranges(char **argv)
         int fd, i;
         char fname[128];
 
-        if (CmiMyNode()==0) CmiPrintf("Charm++> synchronizing isomalloc memory region...\n");
+        if (CmiMyNode() == 0)
+          CmiPrintf("Charm++> Synchronizing isomalloc memory region...\n");
 
         sprintf(fname,".isomalloc.%d", CmiMyNode());
 
@@ -1954,8 +1930,8 @@ static void init_ranges(char **argv)
           read(fd, &ss, sizeof(CmiUInt8));
           read(fd, &ee, sizeof(CmiUInt8));
 #if ISOMALLOC_DEBUG
-          if (CmiMyPe() == 0) CmiPrintf("[%d] load node %d isomalloc region: %lx %lx. \n",
-              CmiMyPe(), i, ss, ee);
+          if (CmiMyPe() == 0)
+            DEBUG_PRINT("[%d] load node %d isomalloc region: %lx %lx.\n", CmiMyPe(), i, ss, ee);
 #endif
           close(fd);
           if (ss>s) s = ss;
@@ -1972,13 +1948,13 @@ static void init_ranges(char **argv)
         /* update */
         if (s > e)  {
           if (CmiMyPe()==0) CmiPrintf("[%d] Invalid isomalloc region: %lx - %lx.\n", CmiMyPe(), s, e);
-          CmiAbort("isomalloc> failed to find consolidated isomalloc region!");
+          CmiAbort("Isomalloc> failed to find consolidated isomalloc region!");
         }
         freeRegion.start = (char *)s;
         freeRegion.len = (char *)e -(char *)s;
 
         if (CmiMyPe() == 0)
-          CmiPrintf("[%d] consolidated Isomalloc memory region: %p - %p (%d megs)\n",CmiMyPe(),
+          CmiPrintf("Charm++> Consolidated Isomalloc memory region: %p - %p (%d MB).\n",
               freeRegion.start,freeRegion.start+freeRegion.len,
               freeRegion.len/meg);
 #if __FAULT__
@@ -2015,10 +1991,8 @@ static void init_ranges(char **argv)
     isomallocEnd=freeRegion.start+freeRegion.len;
     numslots=(freeRegion.len/slotsize)/CmiNumPes();
 
-#if ISOMALLOC_DEBUG
-    CmiPrintf("[%d] Can isomalloc up to %lu megs per pe\n",CmiMyPe(),
-        ((memRange_t)numslots)*slotsize/meg);
-#endif
+    DEBUG_PRINT("[%d] Can isomalloc up to %lu MB per PE\n",CmiMyPe(),
+                ((memRange_t)numslots)*slotsize/meg);
   }
 
   /*SMP Mode: wait here for rank 0 to initialize numslots before calculating myss*/
@@ -2134,17 +2108,13 @@ void *CmiIsomalloc(size_t size, CthThread tid)
   if (isomallocStart==NULL) return disabled_map(size);
   if(tid != NULL) {
     if(CtvAccessOther(tid,threadpool) == NULL) {
-#if ISOMALLOC_DEBUG
-      printf("Init Mempool in %d for %d\n",CthSelf(), tid);
-#endif
+      DEBUG_PRINT("Init Mempool in %d for %d\n",CthSelf(), tid);
       CtvAccessOther(tid,threadpool) = mempool_init(2*(size+sizeof(CmiIsomallocBlock)+sizeof(mempool_header))+sizeof(mempool_type), isomallocfn, isofreefn,0);
     }
     blk = (CmiIsomallocBlock*)mempool_malloc(CtvAccessOther(tid,threadpool),size+sizeof(CmiIsomallocBlock),1);
   } else {
     if(CtvAccess(threadpool) == NULL) {
-#if ISOMALLOC_DEBUG
-      printf("Init Mempool in %d\n",CthSelf());
-#endif
+      DEBUG_PRINT("Init Mempool in %d\n",CthSelf());
       CtvAccess(threadpool) = mempool_init(2*(size+sizeof(CmiIsomallocBlock)+sizeof(mempool_header))+sizeof(mempool_type), isomallocfn, isofreefn,0);
     }
     blk = (CmiIsomallocBlock*)mempool_malloc(CtvAccess(threadpool),size+sizeof(CmiIsomallocBlock),1);
@@ -2401,9 +2371,8 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
   pup_int(p,&dopup);
   if(!dopup)  return;
 
-#if ISOMALLOC_DEBUG
-  printf("[%d] My rank is %lld Pupping for %lld with isUnpack %d isDelete %d \n",CmiMyPe(),CthSelf(),tid,pup_isUnpacking(p),pup_isDeleting(p));
-#endif
+  DEBUG_PRINT("[%d] My rank is %lld Pupping for %lld with isUnpack %d isDelete %d \n",
+              CmiMyPe(),CthSelf(),tid,pup_isUnpacking(p),pup_isDeleting(p));
   flags[0] = 0; flags[1] = 1;
   if(!pup_isUnpacking(p)) {
     mptr = CtvAccessOther(tid,threadpool);
@@ -2412,9 +2381,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
       numBlocks++;
       current = MEMPOOL_GetBlockNext(current)?(block_header *)((char*)mptr+MEMPOOL_GetBlockNext(current)):NULL;
     }
-#if ISOMALLOC_DEBUG
-    printf("Number of blocks packed %d\n",numBlocks);
-#endif
+    DEBUG_PRINT("Number of blocks packed %d\n",numBlocks);
     pup_int(p,&numBlocks);
     current = MEMPOOL_GetBlockHead(mptr);
     while(current != NULL) {
@@ -2456,9 +2423,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
 
   if(pup_isUnpacking(p)) {
     pup_int(p,&numBlocks);
-#if ISOMALLOC_DEBUG
-    printf("Number of blocks to be unpacked %d\n",numBlocks);
-#endif
+    DEBUG_PRINT("Number of blocks to be unpacked %d\n",numBlocks);
     for(i = 0; i < numBlocks; i++) { 
       pup_bytes(p,&size,sizeof(size));
       pup_bytes(p,&slot,sizeof(slot));
