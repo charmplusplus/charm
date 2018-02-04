@@ -2346,7 +2346,9 @@ extern "C"
 int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, char *msg, int msgSize) {
   //static_cast<void>(impl_e_opts);
   void *impl_msg = CkAllocSysMsg();
-  CkArrayOptions opts(ndims, dims);
+  CkArrayOptions opts;
+  if (ndims != -1)
+    opts = CkArrayOptions(ndims, dims);
   UsrToEnv(impl_msg)->setMsgtype(ArrayEltInitMsg);
   //CkArrayID gId = ckCreateArray((CkArrayMessage *)impl_msg, eIdx, opts);
   CkGroupID gId = CProxyElement_ArrayElement::ckCreateArray((CkArrayMessage *)impl_msg, eIdx, opts);
