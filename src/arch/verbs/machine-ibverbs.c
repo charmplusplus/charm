@@ -394,6 +394,7 @@ static inline infiPacket newPacket(void){
 
 
 
+CMI_EXTERNC
 void infi_unregAndFreeMeta(void *md)
 {
   if(md!=NULL && (((infiCmiChunkMetaData *)md)->poolIdx == INFIMULTIPOOL))
@@ -2597,6 +2598,7 @@ static inline void *getInfiCmiChunk(int dataSize){
 #endif
 
 
+CMI_EXTERNC
 void * infi_CmiAlloc(int size){
 	char *res;
 #if CMK_IBVERBS_STATS
@@ -2699,6 +2701,7 @@ void infi_CmiFreeDirect(void *ptr){
 }
 
 
+CMI_EXTERNC
 void infi_CmiFree(void *ptr){
 
 	int i,j;
@@ -2746,6 +2749,7 @@ void infi_CmiFree(void *ptr){
 }
 
 #else
+CMI_EXTERNC
 void infi_CmiFree(void *ptr){
 	int size;
 	void *freePtr = ptr;

@@ -16,12 +16,12 @@
 #include "conv-autoconfig.h"
 
 /* 
- Include the machine.c configuration header 
+ Include the machine.C configuration header
   (e.g., charm/src/arch/net/conv-common.h )
 
  This header declares communication properties
  (like message header formats) and the various 
- machine arcana handled by machine.c.
+ machine arcana handled by machine.C.
 */ 
 #include "conv-common.h"
 

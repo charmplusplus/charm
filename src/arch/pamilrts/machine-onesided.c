@@ -1,5 +1,5 @@
 /*
-  included in machine.c
+  included in machine.C
   Nitin Bhat 06/03/2016
 */
 #define CMI_PAMI_ONESIDED_ACK_DISPATCH            12

@@ -326,6 +326,7 @@ void *valloc(size_t size) CMK_THROW { return meta_valloc(size); }
 
 static int skip_mallinfo = 0;
 
+CMI_EXTERNC
 void CmiMemoryInit(char ** argv)
 {
   if(CmiMyRank() == 0)   CmiMemoryIs_flag |= CMI_MEMORY_IS_OS;
@@ -634,6 +635,7 @@ The locking code is common to all implementations except OS-builtin.
 */
 static int CmiMemoryInited = 0;
 
+CMI_EXTERNC
 void CmiMemoryInit(char **argv)
 {
   CmiArgGroup("Converse","Memory module");
@@ -837,11 +839,13 @@ CMI_EXTERNC
 void cpd_memory_pup(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
 CMI_EXTERNC
 void cpd_memory_leak(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
+CMI_EXTERNC
 void check_memory_leaks(LeakSearchInfo* i) { }
 CMI_EXTERNC
 size_t  cpd_memory_getLength(void *lenParam) { return 0; }
 CMI_EXTERNC
 void cpd_memory_get(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
+CMI_EXTERNC
 void CpdMemoryMarkClean(char *msg) { }
 /* routine used by CthMemory{Protect,Unprotect} to specify that some region of
    memory has been protected */

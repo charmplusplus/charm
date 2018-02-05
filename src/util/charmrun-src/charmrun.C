@@ -973,7 +973,7 @@ static void arg_init(int argc, const char **argv)
     arg_scalable_start = 0;
     arg_quiet = 0;
     arg_verbose = 1;
-    /*Pass ++debug along to program (used by machine.c)*/
+    /*Pass ++debug along to program (used by machine.C)*/
     arg_argv[arg_argc++] = "++debug";
   }
   /* pass ++quiet to program */
@@ -3926,7 +3926,7 @@ static void req_start_server(void)
 }
 
 #ifdef HSTART
-/* Function copied from machine.c file */
+/* Function copied from machine.C file */
 static void parse_netstart(void)
 {
   char *ns = getenv("NETSTART");

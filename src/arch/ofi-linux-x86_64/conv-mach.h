@@ -11,7 +11,7 @@
 #define CMK_GETPAGESIZE_AVAILABLE                          1
 
 /* defines which version of memory handlers should be used.
-   used in conv-core/machine.c */
+   used in conv-core/machine.C */
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 
@@ -51,7 +51,7 @@
 #define CMK_THREADS_USE_PTHREADS                           0
 
 /* Specifies what kind of timer to use, and the correspondent headers will be
-   included in convcore.c. If none is selected, then the machine.c file needs to
+   included in convcore.c. If none is selected, then the machine.C file needs to
    implement the timer primitives. */
 #define CMK_TIMER_USE_RTC                                  0
 #define CMK_TIMER_USE_RDTSC                                0
@@ -62,7 +62,7 @@
 
 /* Specifies what the processor will do when it is idle, either sleep (1) or go
    into busy waiting mode (0). In convcore.c there are a few files included if
-   sleeping mode, but the real distinct implementation is in the machine.c
+   sleeping mode, but the real distinct implementation is in the machine.C
    file. */
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
 
@@ -87,7 +87,7 @@ extended header must contain also another field called "pn" (phase number).
 
 /*
  * Specifies which version of PMI to use.
- * See src/arch/ofi/machine.c
+ * See src/arch/ofi/machine.C
  */
 #define CMK_OFI_USE_PMI                                     1
 #define CMK_OFI_USE_PMI2                                    0

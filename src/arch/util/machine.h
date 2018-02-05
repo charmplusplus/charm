@@ -14,7 +14,7 @@
 
  These files describe the common characteristics of all implementations, and provide converse, and every language built on top of it the same functional interface in all machines, however different they are.
 
- In addition to these common files, there are files called "machine.c" which are the real implementation for the different architectures. Every file is in a different directory, and get selected for compilation at compile time through the "build" script. With this implementation, only one single machine layer can be compiled into the runtime system. Changing architecture needs a different compilation.
+ In addition to these common files, there are files called "machine.C" which are the real implementation for the different architectures. Every file is in a different directory, and get selected for compilation at compile time through the "build" script. With this implementation, only one single machine layer can be compiled into the runtime system. Changing architecture needs a different compilation.
 */
 
 /** @file

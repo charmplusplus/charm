@@ -4,7 +4,7 @@
 */
 
 /*
-  included in machine.c
+  included in machine.C
   Gengbin Zheng, 9/6/2011
 */
 

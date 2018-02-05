@@ -13,9 +13,12 @@
 #endif
 
 
-extern void CthInit(char **);
-extern void ConverseCommonInit(char **);
-extern void ConverseCommonExit(void);
+CMI_EXTERNC
+void CthInit(char **);
+CMI_EXTERNC
+void ConverseCommonInit(char **);
+CMI_EXTERNC
+void ConverseCommonExit(void);
 
 static void **McQueue;
 

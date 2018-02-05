@@ -9,7 +9,7 @@
 #endif
 
 #if CMK_NODE_QUEUE_AVAILABLE
-extern "C" void CmiPushNode(void *msg);
+void CmiPushNode(void *msg);
 #endif
 
 #define CKLOOP_USECHARM 1

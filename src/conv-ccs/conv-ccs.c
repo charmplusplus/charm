@@ -427,7 +427,7 @@ Since there is no conv-host, node 0 does all the CCS
 communication-- this means all requests come to node 0
 and are forwarded out; all replies are forwarded back to node 0.
 
-Note: on Net- versions, CcsImpl_reply is implemented in machine.c
+Note: on Net- versions, CcsImpl_reply is implemented in machine.C
 */
 void CcsImpl_reply(CcsImplHeader *rep,int repLen,const void *repData)
 {

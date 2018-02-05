@@ -756,7 +756,8 @@ static IndexPool  persistPool;
 #define CHARM_MAGIC_NUMBER               126
 
 #if CMK_ERROR_CHECKING
-extern unsigned char computeCheckSum(unsigned char *data, int len);
+CMI_EXTERNC
+unsigned char computeCheckSum(unsigned char *data, int len);
 static int checksum_flag = 0;
 #define CMI_SET_CHECKSUM(msg, len)      \
         if (checksum_flag)  {   \

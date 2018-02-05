@@ -32,6 +32,7 @@ static void *currentImmediateMsg=NULL; /* immediate message currently being exec
 
 SMP:  This routine does its own locking.
 */
+CMI_EXTERNC
 void CmiPushImmediateMsg(void *msg)
 {
   MACHSTATE(4,"pushing immediate message {");

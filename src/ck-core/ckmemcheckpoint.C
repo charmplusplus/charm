@@ -1467,7 +1467,7 @@ static void getChkpSeqHandler(char * m)
    char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int)*2);
    *(int *)(msg+CmiMsgHeaderSizeBytes) = CpvAccess(_crashedNode);
     *(int *)(msg+CmiMsgHeaderSizeBytes+sizeof(int)) =CpvAccess(chkpNum);
-   // cur_restart_phase = RESTART_PHASE_MAX;             // big enough to get it processed, moved to machine.c
+   // cur_restart_phase = RESTART_PHASE_MAX;             // big enough to get it processed, moved to machine.C
    CmiSetHandler(msg, askProcDataHandlerIdx);
    int pe = ChkptOnPe(CpvAccess(_crashedNode));
    CmiSyncSendAndFree(pe, CmiMsgHeaderSizeBytes+sizeof(int)*2, (char *)msg);
@@ -1509,7 +1509,7 @@ void CkMemRestart(const char *dummy, CkArgMsg *args)
   }else{  
    /*char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
    *(int *)(msg+CmiMsgHeaderSizeBytes) = CpvAccess(_crashedNode);
-   // cur_restart_phase = RESTART_PHASE_MAX;             // big enough to get it processed, moved to machine.c
+   // cur_restart_phase = RESTART_PHASE_MAX;             // big enough to get it processed, moved to machine.C
    CmiSetHandler(msg, askProcDataHandlerIdx);
    int pe = ChkptOnPe(CpvAccess(_crashedNode));
    CmiSyncSendAndFree(pe, CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);*/

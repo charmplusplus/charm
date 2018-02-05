@@ -15,7 +15,7 @@ the same meaning as the two conv-mach files. In this case, the normal
 "conv-mach-smp.h" file. Thus, this second file need to take care of the
 definitions already made by the former one.
 
-The decision whether to implement a fully new machine.c, or base to an already
+The decision whether to implement a fully new machine.C, or base to an already
 existing one, should be made primarly on who will start the job in the target
 machine. For example the program directly (charmrun in netlrts- versions),
 mpirun in mpi- versions, qsub, psub of any other scheduler. In particular, if it
@@ -44,11 +44,11 @@ included into the code by conv-config.h which is itself included into converse.h
 	this file is similar to conv-common.h as structure, but it allows to
 specify subarchitectures (like 'gm' in "./build charm++ netlrts-linux gm"). In
 this way, a single conv-common.h will contain the common definitions for all the
-architectures, a single machine.c will contain the common code, and the flags in
+architectures, a single machine.C will contain the common code, and the flags in
 this file can select the code to be compiled.
 
 
-* machine.c
+* machine.C
 
 	this file contains the implementation of the architecture in its
 totality, meaning that subarchitectures (specified with "conv-mach-option.h"
@@ -71,7 +71,7 @@ When charm builds, the tmp directory is created and all source files are linked
 inside it. Regarding the arch files, only two directories are linked: the base
 directory and the architecture directory. With an example, if compiling
 "netlrts-linux", the base directory will be "netlrts" and the architecture
-directory "netlrts-linux". This implies that the machine.c file present in the
+directory "netlrts-linux". This implies that the machine.C file present in the
 "netlrts" directory will be linked (together will all the conv-mach* files and
 conv-common.h), but those present in "netlrts-linux" will eventually overwrite
 them.

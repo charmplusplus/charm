@@ -5,7 +5,7 @@
 
   Routine names in Converse include a short prefix starting with "C".
   These generally tell you what category the routine is in:
-  - Cmi, Converse Machine Interface, the machine layer. (machine.c)
+  - Cmi, Converse Machine Interface, the machine layer. (machine.C)
      Also used for various generic low-level features.
   - Cth, Converse threads, user-level nonpreemptive threads. (threads.c) 
   - Ccd, Converse condition detection, similar to signal handling. (conv-conds.c)
@@ -1009,7 +1009,7 @@ char *CmiPrintDate(void);
 #define CsdEnqueue(x)         (CqsEnqueueFifo((Queue)CpvAccess(CsdSchedQueue),(x)))
 #define CsdEmpty()            (CqsEmpty((Queue)CpvAccess(CsdSchedQueue)))
 #define CsdLength()           (CqsLength((Queue)CpvAccess(CsdSchedQueue)))
-#if CMK_CMIPRINTF_IS_A_BUILTIN /* these are implemented in machine.c */
+#if CMK_CMIPRINTF_IS_A_BUILTIN /* these are implemented in machine.C */
 void  CmiPrintf(const char *, ...);
 void  CmiError(const char *, ...);
 int   CmiScanf(const char *, ...);

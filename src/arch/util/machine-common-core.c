@@ -237,7 +237,7 @@ CpvDeclare(unsigned , networkProgressCount);
 int networkProgressPeriod;
 
 #if CMK_CCS_AVAILABLE
-extern int ccsRunning;
+CMI_EXTERNC_VARIABLE int ccsRunning;
 #endif
 
 /* ===== Beginning of Common Function Declarations ===== */
@@ -309,6 +309,7 @@ void ConverseExit(void);
 /* Functions providing incoming network messages */
 void *CmiGetNonLocal(void);
 #if CMK_NODE_QUEUE_AVAILABLE
+CMI_EXTERNC
 void *CmiGetNonLocalNodeQ(void);
 #endif
 /* Utiltiy functions */
@@ -822,7 +823,8 @@ if (  MSG_STATISTIC)
 #include "TopoManager.h"
 CMI_EXTERNC
 void createCustomPartitions(int numparts, int *partitionSize, int *nodeMap);
-extern void setDefaultPartitionParams(void);
+CMI_EXTERNC
+void setDefaultPartitionParams(void);
 
 void create_topoaware_partitions(void) {
   int i, j, numparts_bak;
@@ -1430,8 +1432,10 @@ if (  MSG_STATISTIC)
     ConverseRunPE(initret);
 }
 
-extern void ConverseCommonInit(char **argv);
-extern void CthInit(char **argv);
+CMI_EXTERNC
+void ConverseCommonInit(char **argv);
+CMI_EXTERNC
+void CthInit(char **argv);
 static void ConverseRunPE(int everReturn) {
     CmiState cs;
     char** CmiMyArgv;
@@ -1572,7 +1576,8 @@ static INLINE_KEYWORD void AdvanceCommunication(int whenidle) {
 #endif
 }
 
-extern void ConverseCommonExit(void);
+CMI_EXTERNC
+void ConverseCommonExit(void);
 
 static void CommunicationServer(int sleepTime) {
 #if CMK_SMP 

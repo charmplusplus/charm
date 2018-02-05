@@ -24,9 +24,12 @@
 enum boolean {false = 0, true = 1};
 enum {list_empty = -1 };
 
-extern void CthInit(char **);
-extern void ConverseCommonInit(char **);
-extern void ConverseCommonExit(void);
+CMI_EXTERNC
+void CthInit(char **);
+CMI_EXTERNC
+void ConverseCommonInit(char **);
+CMI_EXTERNC
+void ConverseCommonExit(void);
 
 /*
  * Local declarations for Cmi, used by common code
@@ -69,7 +72,7 @@ typedef struct McMsgHdrS
 
 
 /*
- * Mc functions, used in machine.c only.
+ * Mc functions, used in machine.C only.
  */
 static void McInit(void);
 static void McInitList(void);
@@ -635,7 +638,7 @@ void clear_lock(long *lock, int pe)
 
 /**********************************************************************
  * Mc Functions:
- * Mc functions are used internally in machine.c only
+ * Mc functions are used internally in machine.C only
  */
 
 static void McInit(void)
@@ -681,8 +684,8 @@ static void McInitList(void)
 #else
   if (_Cmi_numpes > MAX_PES)
   {
-    CmiPrintf("Not enough processors allocated in machine.c.\n");
-    CmiPrintf("Change MAX_PES in machine.c to at least %d and recompile Converse\n",
+    CmiPrintf("Not enough processors allocated in machine.C.\n");
+    CmiPrintf("Change MAX_PES in machine.C to at least %d and recompile Converse\n",
     _Cmi_numpes);
   }
 #endif

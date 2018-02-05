@@ -1,6 +1,6 @@
 /******************************************************************************
 
-A caching memory allocator-- #included whole by memory.c
+A caching memory allocator-- #included whole by memory.C
 
 Orion Sky Lawlor, olawlor@acm.org, 6/22/2001
 

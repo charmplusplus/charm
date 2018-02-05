@@ -107,7 +107,8 @@ CmiSwitchToPEFnPtr CmiSwitchToPE;
 
 CpvExtern(int, _traceCoreOn);   /* projector */
 extern void CcdModuleInit(char **);
-extern void CmiMemoryInit(char **);
+CMI_EXTERNC
+void CmiMemoryInit(char **);
 extern void CldModuleInit(char **);
 
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
@@ -205,6 +206,7 @@ CpvDeclare(int,expIOBufferSize);
 #endif
 
 #if CMK_NODE_QUEUE_AVAILABLE
+CMI_EXTERNC
 void  *CmiGetNonLocalNodeQ();
 #endif
 
@@ -228,9 +230,12 @@ CpvDeclare(int,   _urgentSend);
 CmiNodeLock _smp_mutex;               /* for smp */
 
 #if CMK_USE_IBVERBS | CMK_USE_IBUD
+CMI_EXTERNC
 void *infi_CmiAlloc(int size);
+CMI_EXTERNC
 void infi_CmiFree(void *ptr);
 void infi_freeMultipleSend(void *ptr);
+CMI_EXTERNC
 void infi_unregAndFreeMeta(void *ch);
 #endif
 
@@ -264,6 +269,8 @@ CpvDeclare(void *, CmiSuspendedTaskQueue);
 #endif
 
 CpvDeclare(int, isHelperOn);
+
+CMI_EXTERNC_VARIABLE int CmiMyLocalRank;
 
 int    CmiMyLocalRank;        /* local rank only for scalable startup */
 
@@ -875,7 +882,7 @@ static void CmiHandlerInit(void)
  * CmiTimer
  *
  * Here are two possible implementations of CmiTimer.  Some machines don't
- * select either, and define the timer in machine.c instead.
+ * select either, and define the timer in machine.C instead.
  *
  *****************************************************************************/
 
@@ -1503,6 +1510,7 @@ int CmiLongSendQueue(int forNode,int longerThanBytes) {
 
 #if CMK_SIGNAL_USE_SIGACTION
 #include <signal.h>
+CMI_EXTERNC
 void CmiSignal(int sig1, int sig2, int sig3, void (*handler)(int))
 {
   struct sigaction in, out ;
@@ -1520,6 +1528,7 @@ void CmiSignal(int sig1, int sig2, int sig3, void (*handler)(int))
 
 #if CMK_SIGNAL_USE_SIGACTION_WITH_RESTART
 #include <signal.h>
+CMI_EXTERNC
 void CmiSignal(int sig1, int sig2, int sig3, void (*handler)(int))
 {
   struct sigaction in, out ;
@@ -3735,6 +3744,7 @@ static void checkTSanOptions(void)
 #endif
 
 #if CMK_CCS_AVAILABLE
+CMI_EXTERNC_VARIABLE int ccsRunning;
 int ccsRunning;
 #endif
 
@@ -3746,8 +3756,8 @@ CmiSpanningTreeInfo* _topoTree = NULL;
 
 /**
   Main Converse initialization routine.  This routine is 
-  called by the machine file (machine.c) to set up Converse.
-  It's "Common" because it's shared by all the machine.c files. 
+  called by the machine file (machine.C) to set up Converse.
+  It's "Common" because it's shared by all the machine.C files.
   
   The main task of this routine is to set up all the Cpv's
   (message queues, handler tables, etc.) used during main execution.
@@ -3769,6 +3779,7 @@ CmiSpanningTreeInfo* _topoTree = NULL;
   won't work properly until they're initialized.  For example,
   nobody can register handlers before calling CmiHandlerInit.
 */
+CMI_EXTERNC
 void ConverseCommonInit(char **argv)
 {
   CpvInitialize(int, _urgentSend);
@@ -3871,6 +3882,7 @@ void ConverseCommonInit(char **argv)
 #endif
 }
 
+CMI_EXTERNC
 void ConverseCommonExit(void)
 {
   CcsImpl_kill();
@@ -4041,6 +4053,7 @@ char *CmiCopyMsg(char *msg, int len)
   return copy;
 }
 
+CMI_EXTERNC
 unsigned char computeCheckSum(unsigned char *data, int len)
 {
   int i;

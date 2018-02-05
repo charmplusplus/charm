@@ -640,7 +640,7 @@ int    Cmi_myoldpe = 0;
 static int Cmi_charmrun_assigned_pe;
 #endif
 
-extern int    CmiMyLocalRank;
+CMI_EXTERNC_VARIABLE int    CmiMyLocalRank;
 
 #if ! defined(_WIN32)
 /* parse forks only used in non-smp mode */
@@ -929,7 +929,8 @@ static void CommunicationInterrupt(int ignored)
   MACHSTATE(2,"--END SIGIO--")
 }
 
-extern void CmiSignal(int sig1, int sig2, int sig3, void (*handler)(int));
+CMI_EXTERNC
+void CmiSignal(int sig1, int sig2, int sig3, void (*handler)(int));
 
 static void CmiDestroyLocks(void)
 {

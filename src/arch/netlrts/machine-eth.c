@@ -8,7 +8,7 @@
  * - DeliverViaNetwork()
  * - CommunicationServer()
 
-  moved from machine.c by 
+  moved from machine.C by
   Gengbin Zheng, gzheng@uiuc.edu  4/22/2001
 */
 

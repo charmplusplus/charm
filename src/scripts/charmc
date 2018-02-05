@@ -1767,7 +1767,7 @@ do
 	# instead generate object.o directly.
  	# remove and generate foo.o may be dangerous in parallel make 
 	# for example in the case of compiling several objs from one 
-	# same c file such as memory.c.
+	# same c file such as memory.C.
 	if [ $numFiles = 1 -a -n "$OBJECT" ]
 	then
 		OBJ_EXT=`getExtention $OBJECT`

@@ -218,7 +218,7 @@ int CmiSetCPUAffinity(int mycore)
 #endif
 }
 
-extern int CmiMyLocalRank;
+CMI_EXTERNC_VARIABLE int CmiMyLocalRank;
 
 void CmiMapHosts(int mylocalrank, int proc_per_host)
 {

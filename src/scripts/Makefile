@@ -486,7 +486,7 @@ $(L)/libconv-partition.a: custom_partitioner.o set_partition_params.o
 $(L)/libconv-machine.a: machine.o
 	$(CHARMC) -o $@ $<
 
-machine.o: machine.c $(CVHEADERS)
+machine.o: machine.C $(CVHEADERS)
 	@-test -f $(INC)/mpi.h && mv -f $(INC)/mpi.h $(INC)/mpi.BAK || true
 	$(CHARMC) -I. -o $@ $<
 	@-test -f $(INC)/mpi.BAK && mv -f $(INC)/mpi.BAK $(INC)/mpi.h || true
@@ -547,12 +547,12 @@ $(L)/libldb-bluegene.a: cldb.bluegene.c $(CVHEADERS)
 ## Memory allocation libraries (-memory)
 MEM_DEPS=memory-gnu.c memory-gnu-internal.c converse.h conv-mach.h $(CVHEADERS)
 
-libmemory-%.c: memory.c
+libmemory-%.C: memory.C
 	cp $< $@
 
-# $1 is the name of the module, $2 is any additional dependency beyond memory.c and $(MEM_DEPS), $3 is extra arguments to charmc
+# $1 is the name of the module, $2 is any additional dependency beyond memory.C and $(MEM_DEPS), $3 is extra arguments to charmc
 define libmem
-$(L)/libmemory-$1.a: libmemory-$1.c $(MEM_DEPS) $2
+$(L)/libmemory-$1.a: libmemory-$1.C $(MEM_DEPS) $2
 	$(CHARMC) -I. -o $$@ $3 $$<
 endef
 
@@ -1030,7 +1030,7 @@ endif
 
 -include machine.d
 machine.o: machine.d
-machine.d: machine.c conv-autoconfig.h $(CKHEADERS)
+machine.d: machine.C conv-autoconfig.h $(CKHEADERS)
 	@set -e; \
 	rm -f $@; \
 	$(CHARMC) $(OPTS) -M -I. -I$(INC) $< >$@.$$$$; \

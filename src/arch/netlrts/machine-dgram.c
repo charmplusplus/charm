@@ -6,7 +6,7 @@
  * hdl:          handler<br>
  * xhdl:         extended handler<br>
 
-  moved from machine.c by 
+  moved from machine.C by
   Orion Sky Lawlor, olawlor@acm.org, 7/25/2001
 */
 
@@ -47,7 +47,8 @@ typedef struct {
 /* the window size needs to be Cmi_window_size + sizeof(unsigned int) bytes) */
 typedef struct { DgramHeader head; char window[1024]; } DgramAck;
 
-extern unsigned char computeCheckSum(unsigned char *data, int len);
+CMI_EXTERNC
+unsigned char computeCheckSum(unsigned char *data, int len);
 
 #define DgramHeaderMake(ptr, dstrank_, srcpe_, magic_, seqno_, root_) { \
    DgramHeader *header = (DgramHeader *)(ptr);	\

@@ -95,7 +95,8 @@ CMI_EXTERNC_VARIABLE int quietModeRequested;
 
 #if CMK_ERROR_CHECKING
 static int checksum_flag = 0;
-extern unsigned char computeCheckSum(unsigned char *data, int len);
+CMI_EXTERNC
+unsigned char computeCheckSum(unsigned char *data, int len);
 
 #define CMI_SET_CHECKSUM(msg, len)      \
         if (checksum_flag)  {   \
@@ -317,9 +318,12 @@ static char     **Cmi_argvcopy;
 static CmiStartFn Cmi_startfn;   /* The start function */
 static int        Cmi_usrsched;  /* Continue after start function finishes? */
 
-extern void ConverseCommonInit(char **argv);
-extern void ConverseCommonExit(void);
-extern void CthInit(char **argv);
+CMI_EXTERNC
+void ConverseCommonInit(char **argv);
+CMI_EXTERNC
+void ConverseCommonExit(void);
+CMI_EXTERNC
+void CthInit(char **argv);
 
 static void SendMsgsUntil(int);
 
@@ -1074,6 +1078,7 @@ void CmiAbort(const char * message) {
 }
 
 #if CMK_NODE_QUEUE_AVAILABLE
+CMI_EXTERNC
 char *CmiGetNonLocalNodeQ(void) {
     char *result = 0;
 

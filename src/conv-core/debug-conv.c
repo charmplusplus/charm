@@ -59,6 +59,7 @@ u_long ntohl(u_long netlong) {
 
 #include "pup_c.h"
 
+CMI_EXTERNC
 void check_memory_leaks(LeakSearchInfo *info);
 
 CpvDeclare(int, CpdSearchLeaks_Index);
@@ -313,6 +314,7 @@ void CpdFreezeModeScheduler(void)
 #endif
 }
 
+CMI_EXTERNC
 void CpdMemoryMarkClean(char *msg);
 
 void CpdInit(void)

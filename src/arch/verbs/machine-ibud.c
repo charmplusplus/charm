@@ -216,6 +216,7 @@ infiCmiChunkPool infiCmiChunkPools[INFINUMPOOLS];
 	pkt = p;\
 }
 
+CMI_EXTERNC
 void infi_unregAndFreeMeta(void *md) {
 	if(md!=NULL && (((infiCmiChunkMetaData *)md)->poolIdx == INFIMULTIPOOL)) {
 		ibv_dereg_mr(((infiCmiChunkMetaData*)md)->key);
@@ -309,6 +310,7 @@ static inline void *getInfiCmiChunk(int dataSize){
         CmiAssert(0);
 }
 
+CMI_EXTERNC
 void * infi_CmiAlloc(int size){
 	void *res;
 
@@ -326,6 +328,7 @@ void * infi_CmiAlloc(int size){
 }
 
 
+CMI_EXTERNC
 void infi_CmiFree(void *ptr){
 	int size;
 	void *freePtr = ptr;

@@ -1,5 +1,5 @@
 /*
-   included in machine.c
+   included in machine.C
    Justin Miron
  */
 

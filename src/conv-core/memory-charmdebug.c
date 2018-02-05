@@ -260,6 +260,7 @@ void cpd_memory_pup(void *itemParam, pup_er p, CpdListItemsRequest *req) {
 }
 
 /*
+CMI_EXTERNC
 void check_memory_leaks(CpdListItemsRequest *);
 CMI_EXTERNC
 void cpd_memory_leak(void *iterParam, pup_er p, CpdListItemsRequest *req) {
@@ -322,6 +323,7 @@ int charmEnvelopeSize = 0;
 /** Perform a scan of all the memory to find all the memory that is reacheable
  * from either the stack or the global variables. */
 // FIXME: this function assumes that all memory is allocated in slot_unknown!
+CMI_EXTERNC
 void check_memory_leaks(LeakSearchInfo *info) {
   //FILE* fd=fopen("check_memory_leaks", "w");
   // Step 1)
@@ -512,6 +514,7 @@ void check_memory_leaks(LeakSearchInfo *info) {
   memory_charmdebug_internal = 0;
 }
 
+CMI_EXTERNC
 void CpdMemoryMarkClean(char *msg) {
   Slot *sl;
   /* The first byte of the data packet indicates if we want o mark or unmark */

@@ -1,5 +1,5 @@
 /*
-  included in machine.c
+  included in machine.C
     Yanhua 01/27/2013
 */
 
