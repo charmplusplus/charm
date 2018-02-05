@@ -44,6 +44,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h> /*For memset, memcpy*/
+#include <inttypes.h>
 #ifndef WIN32
 #  include <unistd.h> /*For getpagesize*/
 #endif
@@ -376,7 +377,7 @@ INLINE static CMK_TYPEDEF_UINT8 MemusageProcSelfStat(void){
     f = fopen("/proc/self/stat", "r");
     if(!f) { failed_once = 1; return 0; }
     for(i=0; i<22; i++) ret = fscanf(f, "%*s");
-    ret = fscanf(f, "%llu", &vsz);
+    ret = fscanf(f, "%" PRIu64, &vsz);
     fclose(f);
     if(!vsz) failed_once=1;
     return vsz;
@@ -416,7 +417,7 @@ INLINE static CMK_TYPEDEF_UINT8 MemusagePS(void){
     sprintf(pscmd, "/bin/ps -o vsz= -p %d", getpid());
     p = popen(pscmd, "r");
     if(p){
-	ret = fscanf(p, "%lld", &vsz);
+	ret = fscanf(p, "%" PRIu64, &vsz);
 	pclose(p);
     }
     return (vsz * (CMK_TYPEDEF_UINT8)1024);

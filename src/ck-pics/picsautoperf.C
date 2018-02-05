@@ -1,5 +1,6 @@
 #include  <stdlib.h>
 #include <stdio.h>
+#include <inttypes.h>
 #include "charm++.h"
 #include "pathHistory.h"
 #include "TopoManager.h"
@@ -441,7 +442,7 @@ void TraceAutoPerfBOC::globalPerfAnalyze(CkReductionMsg *msg )
   }
 
   TRACE_START(PICS_CODE);
-  fprintf(CkpvAccess(fpSummary), "NEWITER %d %d %d %llu %d\n", analyzeStep, CkMyPe(), CkpvAccess(numOfPhases)*PERIOD_PERF, (CMK_TYPEDEF_UINT8)(CkWallTimer()*1000000), currentAppStep); 
+  fprintf(CkpvAccess(fpSummary), "NEWITER %d %d %d %" PRIu64 " %d\n", analyzeStep, CkMyPe(), CkpvAccess(numOfPhases)*PERIOD_PERF, (CMK_TYPEDEF_UINT8)(CkWallTimer()*1000000), currentAppStep); 
   for(int j=0; j<CkpvAccess(numOfPhases)*PERIOD_PERF; j++)
   {
     formatPerfData(data, j/CkpvAccess(numOfPhases), j%CkpvAccess(numOfPhases));
