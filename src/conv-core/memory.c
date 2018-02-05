@@ -195,6 +195,10 @@ int memory_chare_id=0;
 /* Just use the OS's built-in malloc.  All we provide is CmiMemoryInit.
 */
 
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
 
 #if CMK_MEMORY_BUILD_OS_WRAPPED || CMK_MEMORY_BUILD_GNU_HOOKS
 
@@ -296,6 +300,10 @@ void *memalign(size_t align, size_t size) CMK_THROW { return meta_memalign(align
 void *valloc(size_t size) CMK_THROW { return meta_valloc(size); }
 #endif
 
+#endif
+
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
 #endif
 
 static int skip_mallinfo = 0;

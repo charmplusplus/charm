@@ -438,6 +438,11 @@ static void* memalign_hook_ini (size_t alignment, size_t sz,
 # define memalign_hook_ini memalign_starter
 #endif
 
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+
 void weak_variable (*__malloc_initialize_hook) (void) = NULL;
 void weak_variable (*__free_hook) (void * __ptr, const void *)
      = free_hook_ini;
@@ -448,6 +453,10 @@ void * weak_variable (*__realloc_hook)
 void * weak_variable (*__memalign_hook)
   (size_t __alignment, size_t __size, const void *) = memalign_hook_ini;
 /*void weak_variable (*__after_morecore_hook) (void) = NULL;*/
+
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 /* The initial hooks just call the initialization routine, then do the
    normal work. */
