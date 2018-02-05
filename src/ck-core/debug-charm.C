@@ -1006,7 +1006,7 @@ void CpdStartGdb(void)
      if (pid == 0)
      {
          //CmiPrintf("In child process to start script %s\n", gdbScript);
- if (-1 == execvp(gdbScript, NULL))
+ if (-1 == execlp(gdbScript, gdbScript, NULL))
             CmiPrintf ("Error> Could not Execute Debugger Script: %s\n",strerror
 (errno));
 
