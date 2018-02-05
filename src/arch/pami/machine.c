@@ -235,7 +235,7 @@ void CmiPushPE(int pe,void *msg) {
 
 #if CMK_NODE_QUEUE_AVAILABLE
 /*Add a message to this processor's receive queue */
-static void CmiPushNode(void *msg) {
+void CmiPushNode(void *msg) {
     MACHSTATE(3,"Pushing message into NodeRecv queue");
 #if CMK_IMMEDIATE_MSG
     if (CmiIsImmediate(msg)) {

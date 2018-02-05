@@ -1,8 +1,8 @@
-PAMI_INC=${CHARMBASE}/ibm_includes/pami
-PAMI_LIB=/opt/ibm/spectrum_mpi/lib/pami_port
+PAMI_INC=${MPI_ROOT}/pami_devel/include
+PAMI_LIB=${MPI_ROOT}/lib/pami_port
 
-LIBCOLL_INC=${CHARMBASE}/ibm_includes/libcoll
-LIBCOLL_LIB=/opt/ibm/spectrum_mpi/lib
+LIBCOLL_INC=${MPI_ROOT}/pami_devel/include
+LIBCOLL_LIB=${MPI_ROOT}/lib/pami_port
 
 CXX=xlC_r
 CC=xlc_r
