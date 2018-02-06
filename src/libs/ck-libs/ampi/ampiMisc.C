@@ -17,7 +17,7 @@
 #endif
 
 // Strip leading/trailing whitespaces from MPI_Info key and value strings.
-char* create_stripped_string(const char *str) {
+std::string create_stripped_string(const char *str) {
   int newLen;
   int len = strlen(str);
 
@@ -36,24 +36,17 @@ char* create_stripped_string(const char *str) {
     newLen = end - start+1;
   }
 
-  char *newStr = new char[newLen+1];
-
-  if(newLen>0)
-    memcpy(newStr, &str[start], newLen);
-  newStr[newLen] = '\0';
-  return newStr;
+  if(newLen==0){
+    return std::string();
+  }else{
+    std::string newStr(&str[start], newLen);
+    return newStr;
+  }
 }
 
 KeyvalPair::KeyvalPair(const char* k, const char* v){
   key = create_stripped_string(k);
   val = create_stripped_string(v);
-  klen = strlen(key);
-  vlen = strlen(val);
-}
-
-KeyvalPair::~KeyvalPair(void){
-  delete [] key;
-  delete [] val;
 }
 
 void InfoStruct::pup(PUP::er& p){
@@ -62,83 +55,66 @@ void InfoStruct::pup(PUP::er& p){
 }
 
 int InfoStruct::set(const char* k, const char* v){
-  const char *key = create_stripped_string(k);
-  int sz=nodes.size();
-  int found=0;
-  for(int i=0;i<sz;i++){
-    if(!strcmp(nodes[i]->key, key)){
-      delete [] nodes[i]->val;
+  std::string key = create_stripped_string(k);
+  for(int i=0;i<nodes.size();i++){
+    if(nodes[i]->key == key){
+      nodes[i]->val.clear();
       nodes[i]->val = create_stripped_string(v);
-      found=1;
-      break;
+      return MPI_SUCCESS;
     }
   }
-  if(!found){
-    KeyvalPair* newkvp = new KeyvalPair(k,v);
-    nodes.push_back(newkvp);
-  }
-  delete [] key;
+
+  KeyvalPair* newkvp = new KeyvalPair(k,v);
+  nodes.push_back(newkvp);
   return MPI_SUCCESS;
 }
 
 int InfoStruct::dup(InfoStruct& src){
-  int sz=src.nodes.size();
-  for(int i=0;i<sz;i++){
-    KeyvalPair* newkvp = new KeyvalPair(src.nodes[i]->key,src.nodes[i]->val);
+  for(int i=0;i<nodes.size();i++){
+    KeyvalPair* newkvp = new KeyvalPair(src.nodes[i]->key.c_str(), src.nodes[i]->val.c_str());
     nodes.push_back(newkvp);
   }
   return MPI_SUCCESS;
 }
 
 int InfoStruct::deletek(const char* k){
-  const char *key = create_stripped_string(k);
-  int sz=nodes.size();
-  int found=MPI_ERR_INFO_KEY;
-  for(int i=0;i<sz;i++){
-    if(!strcmp(nodes[i]->key, key)){
+  std::string key = create_stripped_string(k);
+  for(int i=0;i<nodes.size();i++){
+    if(nodes[i]->key == key){
       delete nodes[i];
       nodes.remove(i);
-      found=MPI_SUCCESS;
-      break;
+      return MPI_SUCCESS;
     }
   }
-  delete [] key;
-  return found;
+  return MPI_ERR_INFO_KEY;
 }
 
 int InfoStruct::get(const char* k, int vl, char*& v, int *flag) const{
-  const char *key = create_stripped_string(k);
-  int sz=nodes.size();
-  int found=MPI_ERR_INFO_KEY;
-  *flag=0;
-  for(int i=0;i<sz;i++){
-    if(!strcmp(nodes[i]->key, key)){
-      strncpy(v, nodes[i]->val, vl);
-      if(vl<strlen(nodes[i]->val)) v[vl]='\0';
-      found=MPI_SUCCESS;
+  std::string key = create_stripped_string(k);
+  for(int i=0;i<nodes.size();i++){
+    if(nodes[i]->key == key){
+      strncpy(v, nodes[i]->val.c_str(), vl);
+      if(vl<strlen(nodes[i]->val.c_str()))
+        v[vl]='\0';
       *flag=1;
-      break;
+      return MPI_SUCCESS;
     }
   }
-  delete [] key;
-  return found;
+  *flag=0;
+  return MPI_ERR_INFO_KEY;
 }
 
 int InfoStruct::get_valuelen(const char* k, int* vl, int *flag) const{
-  const char *key = create_stripped_string(k);
-  int sz=nodes.size();
-  int found=MPI_ERR_INFO_KEY;
-  *flag=0;
-  for(int i=0;i<sz;i++){
-    if(!strcmp(nodes[i]->key, key)){
-      *vl=strlen(nodes[i]->val);
-      found=MPI_SUCCESS;
+  std::string key = create_stripped_string(k);
+  for(int i=0;i<nodes.size();i++){
+    if(nodes[i]->key == key){
+      *vl=strlen(nodes[i]->val.c_str());
       *flag=1;
-      break;
+      return MPI_SUCCESS;
     }
   }
-  delete [] key;
-  return found;
+  *flag=0;
+  return MPI_ERR_INFO_KEY;
 }
 
 int InfoStruct::get_nkeys(int *n) const{
@@ -151,13 +127,12 @@ int InfoStruct::get_nthkey(int n, char* k) const{
   if(n<0 || n>=nodes.size())
     return MPI_ERR_INFO_KEY;
 #endif
-  strcpy(k,nodes[n]->key);
+  strcpy(k,nodes[n]->key.c_str());
   return MPI_SUCCESS;
 }
 
 void InfoStruct::myfree(void){
-  int sz=nodes.size();
-  for(int i=0;i<sz;i++){
+  for(int i=0;i<nodes.size();i++){
     delete nodes[i];
   }
   nodes.resize(0);

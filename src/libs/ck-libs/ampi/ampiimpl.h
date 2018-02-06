@@ -296,26 +296,15 @@ class win_obj {
 
 class KeyvalPair{
  protected:
-  int klen, vlen;
-  const char* key;
-  const char* val;
+  std::string key;
+  std::string val;
  public:
   KeyvalPair(void){ }
   KeyvalPair(const char* k, const char* v);
-  ~KeyvalPair(void);
+  ~KeyvalPair(void){ }
   void pup(PUP::er& p){
-    p|klen;
-    p|vlen;
-    if(p.isUnpacking()){
-      if(klen>0)
-        key = new char[klen+1];
-      if(vlen>0)
-        val = new char[vlen+1];
-    }
-    if(klen>0)
-      p((char*)key, klen+1);
-    if(vlen>0)
-      p((char*)val, vlen+1);
+    p|key;
+    p|val;
   }
   friend class InfoStruct;
 };
