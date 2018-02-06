@@ -8,8 +8,6 @@ Licensing details should be addresssed, since this is copyrighted.
 
 #include "ampiimpl.h"
 #include "tcharm.h"
-#include "ampiEvents.h" /*** for trace generation for projector *****/
-#include "ampiProjections.h"
 
 
 /* This is the default implementation of alltoall. The algorithm is:

@@ -7,10 +7,7 @@
 
 #include "ampiimpl.h"
 #include "tcharm.h"
-#if CMK_TRACE_ENABLED && CMK_PROJECTOR
-#include "ampiEvents.h" /*** for trace generation for projector *****/
-#include "ampiProjections.h"
-#endif
+
 
 #if CMK_BIGSIM_CHARM
 #include "bigsim_logs.h"
@@ -966,11 +963,6 @@ static void ampiProcInit(void){
 
   CkpvInitialize(Builtin_kvs, bikvs); // built-in key-values
   CkpvAccess(bikvs) = Builtin_kvs();
-
-#if CMK_TRACE_ENABLED && CMK_PROJECTOR
-  REGISTER_AMPI
-#endif
-  initAmpiProjections();
 
 #if AMPIMSGLOG
   char **argv=CkGetArgv();
@@ -2444,9 +2436,6 @@ ampi* ampi::blockOnRedn(AmpiRequest *req){
 
   blockingReq = req;
 
-#if CMK_TRACE_ENABLED && CMK_PROJECTOR
-  _LOG_E_END_AMPI_PROCESSING(thisIndex)
-#endif
 #if CMK_BIGSIM_CHARM
   void *curLog; // store current log in timeline
   _TRACE_BG_TLINE_END(&curLog);
@@ -2459,9 +2448,6 @@ ampi* ampi::blockOnRedn(AmpiRequest *req){
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   CpvAccess(_currentObj) = dis;
-#endif
-#if CMK_TRACE_ENABLED && CMK_PROJECTOR
-  _LOG_E_BEGIN_AMPI_PROCESSING(thisIndex, dis->blockingReq->src, dis->blockingReq->count)
 #endif
 #if CMK_BIGSIM_CHARM
 #if CMK_TRACE_IN_CHARM
@@ -3014,9 +3000,6 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
   MPI_Comm disComm = myComm.getComm();
   if (handle_MPI_PROC_NULL(s, disComm, sts)) return 0;
 
-#if CMK_TRACE_ENABLED && CMK_PROJECTOR
-  _LOG_E_END_AMPI_PROCESSING(thisIndex)
-#endif
 #if CMK_BIGSIM_CHARM
    void *curLog; // store current log in timeline
   _TRACE_BG_TLINE_END(&curLog);
@@ -3073,9 +3056,6 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   CpvAccess(_currentObj) = dis;
   MSG_ORDER_DEBUG( printf("[%d] AMPI thread rescheduled  to Index %d buf %p src %d\n",CkMyPe(),dis->thisIndex,buf,s); )
-#endif
-#if CMK_TRACE_ENABLED && CMK_PROJECTOR
-  _LOG_E_BEGIN_AMPI_PROCESSING(thisIndex,s,count)
 #endif
 #if CMK_BIGSIM_CHARM && CMK_TRACE_IN_CHARM
   //Due to the reason mentioned the in the else-statement above, we need to

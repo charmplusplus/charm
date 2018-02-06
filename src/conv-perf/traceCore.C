@@ -12,7 +12,6 @@
 #include "converseEvents.h"	//TODO: remove this hack for REGISTER_CONVESE
 #include "charmEvents.h"	//TODO: remove this hack for REGISTER_CHARM
 #include "machineEvents.h"	// for machine events
-//#include "ampiEvents.h" 	/* for ampi events */
 
 CpvExtern(double, _traceCoreInitTime);
 CpvExtern(char*, _traceCoreRoot);

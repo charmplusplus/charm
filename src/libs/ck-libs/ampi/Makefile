@@ -1,13 +1,13 @@
 CDIR=$(shell cd ../../../.. && pwd)
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-HEADERS=ampi.h ampif.h mpio.h mpiof.h ampiimpl.h ampiProjections.h
-HEADDEP=$(HEADERS) ampiimpl.h ddt.h ampi.decl.h ampiEvents.h \
+HEADERS=ampi.h ampif.h mpio.h mpiof.h ampiimpl.h
+HEADDEP=$(HEADERS) ampiimpl.h ddt.h ampi.decl.h \
 		../tcharm/tcharm.h ../tcharm/tcharm_impl.h
 COMPAT=compat_ampius.o compat_ampifus.o compat_ampi.o \
        compat_ampim.o compat_ampifm.o compat_ampicm.o \
 	   compat_ampicpp.o
-OBJS=ampi.o ampif.o ampiProjections.o ampiOneSided.o \
+OBJS=ampi.o ampif.o ampiOneSided.o \
      ampiMisc.o ddt.o mpich-alltoall.o  
 
 AMPI_LIB=libmoduleampi
@@ -131,9 +131,6 @@ mpich-alltoall.o: mpich-alltoall.C $(HEADDEP)
 
 ampi.decl.h ampi.def.h: ampi.ci
 	$(CHARMC) ampi.ci
-
-ampiProjections.o: ampiProjections.C ampiEvents.h ampiProjections.h $(HEADDEP)
-	$(CHARMC) -c ampiProjections.C
 
 ddt.o: ddt.C ddt.h $(HEADDEP)
 

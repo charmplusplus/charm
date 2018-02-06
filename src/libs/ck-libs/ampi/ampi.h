@@ -1383,7 +1383,6 @@ extern long ampiCurrentStackUsage(void);
 #define AMPI_Trace_begin_function_name(name) traceBeginFuncProj(name, __FILE__, __LINE__);
 #define AMPI_Trace_end_function_name(name) traceEndFuncProj(name);
 
-#include "ampiProjections.h"
 #ifdef __cplusplus
 }
 #endif
