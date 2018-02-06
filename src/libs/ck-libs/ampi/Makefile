@@ -50,6 +50,8 @@ $(ROMIO): | AMPI AMPIF
 		-cc=$(CDIR)/bin/ampicc \
 		-fc=$(CDIR)/bin/ampif77 \
 		-f90=$(CDIR)/bin/ampif90 \
+		-cflags="$(OPTS)" \
+		-fflags="$(OPTS)" \
 		-noprofile \
 		-mpiolib=$@
 
