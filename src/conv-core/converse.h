@@ -48,6 +48,12 @@
 # define CMI_FORCE_INLINE inline
 #endif
 
+#if defined(__GNUC__) && !defined(__clang__)
+#define CMI_NOOPTIMIZE __attribute__((optimize(0)))
+#else
+#define CMI_NOOPTIMIZE
+#endif
+
 #include "conv-config.h"
 
 #define CMIALIGN(x,n)       (size_t)((~((size_t)n-1))&((x)+(n-1)))

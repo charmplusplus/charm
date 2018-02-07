@@ -1733,7 +1733,7 @@ void CthFree(CthThread t)
 }
 
 #if CMK_THREADS_BUILD_TLS
-void CthResume(CthThread) __attribute__((optimize(0)));
+void CthResume(CthThread) CMI_NOOPTIMIZE;
 #endif
 
 void CthResume(CthThread t)
@@ -2056,7 +2056,7 @@ static void *CthBlockHelp(qt_t *sp, CthThread old, void *null)
 }
 
 #if CMK_THREADS_BUILD_TLS
-void CthResume(CthThread) __attribute__((optimize(0)));
+void CthResume(CthThread) CMI_NOOPTIMIZE;
 #endif
 
 void CthResume(CthThread t)

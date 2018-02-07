@@ -73,8 +73,8 @@ void allocNewTLSSeg(tlsseg_t* t, CthThread th) {
   }
 }
 
-void switchTLS(tlsseg_t* , tlsseg_t* ) __attribute__((optimize(0)));
-void currentTLS(tlsseg_t*) __attribute__((optimize(0)));
+void switchTLS(tlsseg_t* , tlsseg_t* ) CMI_NOOPTIMIZE;
+void currentTLS(tlsseg_t*) CMI_NOOPTIMIZE;
 
 /* void allocNewTLSSegEmpty(tlsseg_t* t) {
  *   void* aux = CmiIsomallocAlign(t->align, t->size);
