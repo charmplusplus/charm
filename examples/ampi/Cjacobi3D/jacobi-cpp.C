@@ -6,7 +6,7 @@
 #endif
 
 #if CMK_BIGSIM_CHARM
-extern void BgPrintf(char *);
+extern "C" void BgPrintf(const char *);
 #define BGPRINTF(x)  if (thisIndex == 0) BgPrintf(x);
 #else
 #define BGPRINTF(x)
