@@ -1437,17 +1437,17 @@ BAL_OBJ="-lldb-$BALANCE -lconv-ldb"
 
 # Check for valid choice of MEMORY
 
-# Isomalloc does not work on BGQ:
-if [ "$CMK_BLUEGENEQ" = "1" ] && [ "$MEMORY" = "isomalloc" -o "$MEMORY" = "os-isomalloc" ]
+# Isomalloc does not work on BGQ or Windows:
+if [ "$CMK_BLUEGENEQ" = "1" -o "$CMK_COMPILER" = "msvc" ] && [ "$MEMORY" = "isomalloc" -o "$MEMORY" = "os-isomalloc" ]
 then
-  Abort "Isomalloc is not supported on BlueGene/Q."
+  Abort "Isomalloc is not supported on BlueGene/Q or Windows."
 fi
 
-# Isomalloc does not work on Clang in non-SMP mode, so use os-isomalloc instead:
-if [ "$MEMORY" = "isomalloc" -a "$CMK_COMPILER" = "clang" -a "$CMK_SMP" != "1" ]
+# Isomalloc does not work on Clang in non-SMP mode or on Darwin at all, so use os-isomalloc instead:
+if [ "$MEMORY" = "isomalloc" -a "$CMK_COMPILER" = "clang" -a "$CMK_SMP" != "1" ] || [ "$MEMORY" = "isomalloc" -a "$CMK_MACOSX" = 1 ]
 then
   MEMORY="os-isomalloc"
-  echo "Warning: changing '-memory isomalloc' to '-memory os-isomalloc' on Clang non-SMP build target."
+  echo "Warning: changing '-memory isomalloc' to '-memory os-isomalloc' on Clang non-SMP or Darwin build targets."
 fi
 
 MEM_OBJ="-lmemory-${MEMORY}"
