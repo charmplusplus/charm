@@ -220,7 +220,7 @@ int CmiSetCPUAffinity(int mycore)
 
 extern int CmiMyLocalRank;
 
-int CmiMapHosts(int mylocalrank, int proc_per_host)
+void CmiMapHosts(int mylocalrank, int proc_per_host)
 {
   hwloc_topology_t topology;
   hwloc_cpuset_t cpuset;
@@ -340,7 +340,7 @@ static void CmiMapHostsBySocket(int mylocalrank, int proc_per_host)
   cmi_hwloc_topology_destroy(topology);
 }
 
-int CmiMapHostsByCore(int mylocalrank, int proc_per_host)
+void CmiMapHostsByCore(int mylocalrank, int proc_per_host)
 {
   hwloc_topology_t topology;
   hwloc_cpuset_t cpuset;
@@ -375,7 +375,7 @@ int CmiMapHostsByCore(int mylocalrank, int proc_per_host)
   cmi_hwloc_topology_destroy(topology);
 }
 
-int CmiMapSockets(int mylocalrank, int proc_per_socket)
+void CmiMapSockets(int mylocalrank, int proc_per_socket)
 {
   hwloc_topology_t topology;
   hwloc_cpuset_t cpuset;
@@ -429,7 +429,7 @@ int CmiMapSockets(int mylocalrank, int proc_per_socket)
 }
 
 
-int CmiMapCores(int mylocalrank, int proc_per_core)
+void CmiMapCores(int mylocalrank, int proc_per_core)
 {
   hwloc_topology_t topology;
   hwloc_cpuset_t cpuset;
@@ -480,7 +480,7 @@ int CmiMapCores(int mylocalrank, int proc_per_core)
   }
 }
 
-int CmiMapPUs(int mylocalrank, int proc_per_pu)
+void CmiMapPUs(int mylocalrank, int proc_per_pu)
 {
   hwloc_topology_t topology;
   hwloc_cpuset_t cpuset;
