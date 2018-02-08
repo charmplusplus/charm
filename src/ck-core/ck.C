@@ -2298,6 +2298,11 @@ extern "C" void registerPyReductionExtCallback(int (*cb)(char**, int*, int, char
     PyReductionExt = cb;
 }
 
+int (*ArrayMapProcNumExtCallback)(int, int, const int *) = NULL;
+extern "C" void registerArrayMapProcNumExtCallback(int (*cb)(int, int, const int *)) {
+  ArrayMapProcNumExtCallback = cb;
+}
+
 extern "C" int CkMyPeHook() { return CkMyPe(); }
 extern "C" int CkNumPesHook() { return CkNumPes(); }
 
@@ -2341,6 +2346,13 @@ GroupExt::GroupExt() {
   GroupMsgRecvExtCallback(thisgroup.idx, ctorEpIdx, 0, NULL, -1);
 }
 
+ArrayMapExt::ArrayMapExt() {
+  //printf("Constructor of ArrayMapExt, gid=%d\n", thisgroup.idx);
+  int chareIdx = ckGetChareType();
+  int ctorEpIdx = _chareTable[chareIdx]->getDefaultCtor();
+  GroupMsgRecvExtCallback(thisgroup.idx, ctorEpIdx, 0, NULL, -1);
+}
+
 // TODO options
 extern "C"
 int CkCreateGroupExt(int cIdx, int eIdx, char *msg, int msgSize) {
@@ -2355,12 +2367,18 @@ int CkCreateGroupExt(int cIdx, int eIdx, char *msg, int msgSize) {
 
 // TODO options
 extern "C"
-int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, char *msg, int msgSize) {
+int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, char *msg, int msgSize, int map_gid) {
   //static_cast<void>(impl_e_opts);
   void *impl_msg = CkAllocSysMsg();
   CkArrayOptions opts;
-  if (ndims != -1)
+  if (ndims != -1) {
     opts = CkArrayOptions(ndims, dims);
+    if (map_gid >= 0) {
+      CkGroupID map_gId;
+      map_gId.idx = map_gid;
+      opts.setMap(CProxy_Group(map_gId));
+    }
+  }
   UsrToEnv(impl_msg)->setMsgtype(ArrayEltInitMsg);
   //CkArrayID gId = ckCreateArray((CkArrayMessage *)impl_msg, eIdx, opts);
   CkGroupID gId = CProxyElement_ArrayElement::ckCreateArray((CkArrayMessage *)impl_msg, eIdx, opts);

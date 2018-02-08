@@ -128,6 +128,37 @@ public:
   CkArrayOptions storeOpts;
   std::unordered_map<int, bool> dynamicIns;
 };
+
+extern int (*ArrayMapProcNumExtCallback)(int, int, const int *);
+
+class ArrayMapExt: public CkArrayMap {
+public:
+  ArrayMapExt();
+
+  static void __ArrayMapExt(void *impl_msg, void *impl_obj_void) {
+    CkFreeSysMsg(impl_msg);
+    new (impl_obj_void) ArrayMapExt();
+  }
+
+  static void __entryMethod(void *impl_msg, void *impl_obj_void) {
+    //fprintf(stderr, "ArrayMapExt:: entry method invoked\n");
+    ArrayMapExt *obj = static_cast<ArrayMapExt *>(impl_obj_void);
+    CkMarshallMsg *impl_msg_typed = (CkMarshallMsg *)impl_msg;
+    char *impl_buf = impl_msg_typed->msgBuf;
+    PUP::fromMem implP(impl_buf);
+    int msgSize; implP|msgSize;
+    int ep; implP|ep;
+    int dcopy_start; implP|dcopy_start;
+    GroupMsgRecvExtCallback(obj->thisgroup.idx, ep, msgSize, impl_buf+(3*sizeof(int)),
+                            dcopy_start);
+  }
+
+  int procNum(int arrayHdl, const CkArrayIndex &element) {
+    return ArrayMapProcNumExtCallback(thisgroup.idx, element.getDimension(), element.data());
+    //fprintf(stderr, "[%d] ArrayMapExt - procNum is %d\n", CkMyPe(), pe);
+  }
+};
+
 /*@}*/
 
 /**

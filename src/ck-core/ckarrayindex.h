@@ -105,7 +105,7 @@ class CkArrayIndex: public CkArrayIndexBase
         const int *data(void) const {return index; }
 
         /// Return the dimension size
-        short getDimension(void)             { return dimension; }
+        short getDimension(void) const            { return dimension; }
         /// Return a pointer to the short index data
         short *shortData(void)             { return indexShorts; }
         /// Return a const pointer to the short index data
