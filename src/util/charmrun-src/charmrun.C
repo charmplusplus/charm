@@ -3650,7 +3650,8 @@ static void req_all_clients_connected()
     const nodetab_process & p0 = my_process_table[0];
 
     int threads_per_host;
-    switch (onewth_per.unit())
+    const Unit onewth_unit = onewth_per.unit();
+    switch (onewth_unit)
     {
       case Unit::Socket:
         threads_per_host = p0.num_sockets;
@@ -3664,12 +3665,14 @@ static void req_all_clients_connected()
 
       // case Unit::Host:
       default:
-        threads_per_host = 2; // instead of 1 to allow for a comm thread
+        threads_per_host = 1;
         break;
     }
 
-    // account for comm thread
-    threads_per_host -= calculated_processes_per_host;
+    // account for comm thread, except when `++processPerX 1 ++oneWthPerX` is requested
+    // assumes that proc_per.xyz == 1, which is enforced in this situation during arg checking
+    if (onewth_unit != proc_per.unit() && threads_per_host + calculated_processes_per_host > p0.num_pus)
+      threads_per_host -= calculated_processes_per_host;
 
     if (threads_per_host < calculated_processes_per_host || threads_per_host % calculated_processes_per_host != 0)
     {
