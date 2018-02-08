@@ -106,19 +106,19 @@ static void copyin(double *d, double t[DIMX+2][DIMY+2][DIMZ+2],
 
 int main(int ac, char** av)
 {
-  int i,j,k,m,cidx;
+  int i, j, k, m;
   int iter, niter, cp_idx;
-  MPI_Status status;
-  double error, tval, maxerr, tmpmaxerr, starttime, endtime, itertime;
+  double maxerr, error, tval, starttime, itertime;
   chunk *cp;
-  int thisIndex, ierr, nblocks;
+  int rank, size;
+  MPI_Request req[12];
 
   MPI_Init(&ac, &av);
-  MPI_Comm_rank(MPI_COMM_WORLD, &thisIndex);
-  MPI_Comm_size(MPI_COMM_WORLD, &nblocks);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
 
   if (ac < 4) {
-    if (thisIndex == 0)
+    if (rank == 0)
       printf("Usage: jacobi X Y Z [nIter].\n");
     MPI_Finalize();
     return 1;
@@ -126,9 +126,9 @@ int main(int ac, char** av)
   NX = atoi(av[1]);
   NY = atoi(av[2]);
   NZ = atoi(av[3]);
-  if (NX*NY*NZ != nblocks) {
-    if (thisIndex == 0) 
-      printf("%d x %d x %d != %d\n", NX,NY,NZ, nblocks);
+  if (NX*NY*NZ != size) {
+    if (rank == 0)
+      printf("%d x %d x %d != %d\n", NX,NY,NZ, size);
     MPI_Finalize();
     return 2;
   }
@@ -148,7 +148,7 @@ int main(int ac, char** av)
   AMPI_Register_pup((MPI_PupFn)chunk_pup, (void*)&cp, &cp_idx);
 #endif
 
-  index3d(thisIndex, cp->xidx, cp->yidx, cp->zidx);
+  index3d(rank, cp->xidx, cp->yidx, cp->zidx);
   cp->xp = index1d((cp->xidx+1)%NX,cp->yidx,cp->zidx);
   cp->xm = index1d((cp->xidx+NX-1)%NX,cp->yidx,cp->zidx);
   cp->yp = index1d(cp->xidx,(cp->yidx+1)%NY,cp->zidx);
@@ -163,7 +163,6 @@ int main(int ac, char** av)
   MPI_Barrier(MPI_COMM_WORLD);
   starttime = MPI_Wtime();
 
-  maxerr = 0.0;
   for(iter=1; iter<=niter; iter++) {
     BGPRINTF("interation starts at %f\n");
     maxerr = 0.0;
@@ -174,24 +173,21 @@ int main(int ac, char** av)
     copyout(cp->sbzm, cp->t, 1, DIMX, 1, DIMY, 1, 1);
     copyout(cp->sbzp, cp->t, 1, DIMX, 1, DIMY, DIMZ, DIMZ);
 
-    MPI_Request rreq[6];
-    MPI_Status rsts[6];
+    MPI_Irecv(cp->rbxp, DIMY*DIMZ, MPI_DOUBLE, cp->xp, 0, MPI_COMM_WORLD, &req[0]);
+    MPI_Irecv(cp->rbxm, DIMY*DIMZ, MPI_DOUBLE, cp->xm, 1, MPI_COMM_WORLD, &req[1]);
+    MPI_Irecv(cp->rbyp, DIMX*DIMZ, MPI_DOUBLE, cp->yp, 2, MPI_COMM_WORLD, &req[2]);
+    MPI_Irecv(cp->rbym, DIMX*DIMZ, MPI_DOUBLE, cp->ym, 3, MPI_COMM_WORLD, &req[3]);
+    MPI_Irecv(cp->rbzm, DIMX*DIMY, MPI_DOUBLE, cp->zm, 5, MPI_COMM_WORLD, &req[4]);
+    MPI_Irecv(cp->rbzp, DIMX*DIMY, MPI_DOUBLE, cp->zp, 4, MPI_COMM_WORLD, &req[5]);
 
-    MPI_Irecv(cp->rbxp, DIMY*DIMZ, MPI_DOUBLE, cp->xp, 0, MPI_COMM_WORLD, &rreq[0]);
-    MPI_Irecv(cp->rbxm, DIMY*DIMZ, MPI_DOUBLE, cp->xm, 1, MPI_COMM_WORLD, &rreq[1]);
-    MPI_Irecv(cp->rbyp, DIMX*DIMZ, MPI_DOUBLE, cp->yp, 2, MPI_COMM_WORLD, &rreq[2]);
-    MPI_Irecv(cp->rbym, DIMX*DIMZ, MPI_DOUBLE, cp->ym, 3, MPI_COMM_WORLD, &rreq[3]);
-    MPI_Irecv(cp->rbzm, DIMX*DIMY, MPI_DOUBLE, cp->zm, 5, MPI_COMM_WORLD, &rreq[4]);
-    MPI_Irecv(cp->rbzp, DIMX*DIMY, MPI_DOUBLE, cp->zp, 4, MPI_COMM_WORLD, &rreq[5]);
+    MPI_Isend(cp->sbxm, DIMY*DIMZ, MPI_DOUBLE, cp->xm, 0, MPI_COMM_WORLD, &req[6]);
+    MPI_Isend(cp->sbxp, DIMY*DIMZ, MPI_DOUBLE, cp->xp, 1, MPI_COMM_WORLD, &req[7]);
+    MPI_Isend(cp->sbym, DIMX*DIMZ, MPI_DOUBLE, cp->ym, 2, MPI_COMM_WORLD, &req[8]);
+    MPI_Isend(cp->sbyp, DIMX*DIMZ, MPI_DOUBLE, cp->yp, 3, MPI_COMM_WORLD, &req[9]);
+    MPI_Isend(cp->sbzm, DIMX*DIMY, MPI_DOUBLE, cp->zm, 4, MPI_COMM_WORLD, &req[10]);
+    MPI_Isend(cp->sbzp, DIMX*DIMY, MPI_DOUBLE, cp->zp, 5, MPI_COMM_WORLD, &req[11]);
 
-    MPI_Send(cp->sbxm, DIMY*DIMZ, MPI_DOUBLE, cp->xm, 0, MPI_COMM_WORLD);
-    MPI_Send(cp->sbxp, DIMY*DIMZ, MPI_DOUBLE, cp->xp, 1, MPI_COMM_WORLD);
-    MPI_Send(cp->sbym, DIMX*DIMZ, MPI_DOUBLE, cp->ym, 2, MPI_COMM_WORLD);
-    MPI_Send(cp->sbyp, DIMX*DIMZ, MPI_DOUBLE, cp->yp, 3, MPI_COMM_WORLD);
-    MPI_Send(cp->sbzm, DIMX*DIMY, MPI_DOUBLE, cp->zm, 4, MPI_COMM_WORLD);
-    MPI_Send(cp->sbzp, DIMX*DIMY, MPI_DOUBLE, cp->zp, 5, MPI_COMM_WORLD);
-
-    MPI_Waitall(6, rreq, rsts);
+    MPI_Waitall(12, req, MPI_STATUSES_IGNORE);
 
     copyin(cp->sbxm, cp->t, 0, 0, 1, DIMY, 1, DIMZ);
     copyin(cp->sbxp, cp->t, DIMX+1, DIMX+1, 1, DIMY, 1, DIMZ);
@@ -199,7 +195,8 @@ int main(int ac, char** av)
     copyin(cp->sbyp, cp->t, 1, DIMX, DIMY+1, DIMY+1, 1, DIMZ);
     copyin(cp->sbzm, cp->t, 1, DIMX, 1, DIMY, 0, 0);
     copyin(cp->sbzp, cp->t, 1, DIMX, 1, DIMY, DIMZ+1, DIMZ+1);
-    if(iter > 25 &&  iter < 85 && thisIndex == 35)
+
+    if(iter > 25 && iter < 85 && rank == 35)
       m = 9;
     else
       m = 1;
@@ -207,24 +204,20 @@ int main(int ac, char** av)
       for(i=1; i<=DIMZ; i++)
         for(j=1; j<=DIMY; j++)
           for(k=1; k<=DIMX; k++) {
-            tval = (cp->t[k][j][i] + cp->t[k][j][i+1] +
-                 cp->t[k][j][i-1] + cp->t[k][j+1][i]+ 
-                 cp->t[k][j-1][i] + cp->t[k+1][j][i] + cp->t[k-1][j][i])/7.0;
+            tval = (cp->t[k][j][i]   + cp->t[k][j][i+1] +
+                    cp->t[k][j][i-1] + cp->t[k][j+1][i] +
+                    cp->t[k][j-1][i] + cp->t[k+1][j][i] +
+                    cp->t[k-1][j][i]) / 7.0;
             error = abs(tval-cp->t[k][j][i]);
             cp->t[k][j][i] = tval;
             if (error > maxerr) maxerr = error;
           }
-    MPI_Allreduce(&maxerr, &tmpmaxerr, 1, MPI_DOUBLE, MPI_MAX, 
-                   MPI_COMM_WORLD);
-    maxerr = tmpmaxerr;
-    endtime = MPI_Wtime();
-    itertime = endtime - starttime;
-    double  it;
-    MPI_Allreduce(&itertime, &it, 1, MPI_DOUBLE, MPI_SUM,
-                   MPI_COMM_WORLD);
-    itertime = it/nblocks;
-    if (thisIndex == 0)
-      printf("iter %d time: %lf maxerr: %lf\n", iter, itertime, maxerr);
+    MPI_Allreduce(MPI_IN_PLACE, &maxerr, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+
+    itertime = MPI_Wtime() - starttime;
+    MPI_Allreduce(MPI_IN_PLACE, &itertime, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    if (rank == 0)
+      printf("iter %d time: %lf maxerr: %lf\n", iter, itertime / size, maxerr);
     starttime = MPI_Wtime();
 #ifdef AMPI
     if(iter%10 == 5) {
