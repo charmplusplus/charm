@@ -26,6 +26,7 @@ Date: 04/19/2005
 #define _DIJKSTRA_LIKE_ 0
 #define _INIT_FROM_FILE  
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
 
 CreateLBFunc_Def(TopoLB,"TopoLB: Balance objects based on the network topology")
 
@@ -33,8 +34,8 @@ CreateLBFunc_Def(TopoLB,"TopoLB: Balance objects based on the network topology")
 TopoLB::TopoLB(const CkLBOptions &opt) : CBase_TopoLB (opt)
 {
   lbname = "TopoLB";
-  if (CkMyPe () == 0) {
-    CkPrintf ("[%d] TopoLB created\n",CkMyPe());
+  if (CkMyPe () == 0 && !quietModeRequested) {
+    CkPrintf("CharmLB> TopoLB created.\n");
   }
 }
 

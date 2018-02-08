@@ -15,12 +15,14 @@
 #include "ckgraph.h"
 #include <scotch.h>
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 CreateLBFunc_Def(ScotchLB, "Load balancing using the Scotch graph partitioning library")
 
 ScotchLB::ScotchLB(const CkLBOptions &opt) : CBase_ScotchLB(opt) {
   lbname = "ScotchLB";
-  if(CkMyPe() == 0)
-    CkPrintf("ScotchLB created\n");
+  if(CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> ScotchLB created.\n");
 }
 
 bool ScotchLB::QueryBalanceNow(int _step) {

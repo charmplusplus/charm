@@ -28,6 +28,8 @@
 
 using std::vector;
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 /**
  *  Class to contain additional data about the vertices in object graph
  */
@@ -154,8 +156,8 @@ void BQueue::push(Vertex *vert)
 
 RecBipartLB::RecBipartLB(const CkLBOptions &opt) : CBase_RecBipartLB(opt) {
   lbname = "RecBipartLB";
-  if(CkMyPe() == 0)
-    CkPrintf("RecBipartLB created\n");
+  if(CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> RecBipartLB created.\n");
 }
 
 bool RecBipartLB::QueryBalanceNow(int _step) {

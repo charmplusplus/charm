@@ -20,6 +20,8 @@
 #define VACATE_AFTER 30
 #define UNVACATE_AFTER 15
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 CreateLBFunc_Def(WSLB, "Workstation load balancer")
 
 void WSLB::staticMigrated(void* data, LDObjHandle h, int waitBarrier)
@@ -41,8 +43,8 @@ WSLB::WSLB(const CkLBOptions &opt) : CBase_WSLB(opt)
 #if CMK_LBDB_ON
   thisProxy = CProxy_WSLB(thisgroup);
   lbname = "WSLB";
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] WSLB created\n",CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> WSLB created.\n");
 
   mystep = 0;
   theLbdb->

@@ -12,6 +12,8 @@
 
 #define  DEBUGF(x)     // CmiPrintf x;
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 CreateLBFunc_Def(HybridBaseLB, "HybridBase load balancer")
 
 class DummyMsg: public CMessage_DummyMsg 
@@ -59,8 +61,8 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): CBase_HybridBaseLB(opt)
 
   }
   //tree = new FourLevelTree;
-  if (CkMyPe() == 0)
-    CkPrintf("%s: %s is created.\n", lbname, tree->name());
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> %s: %s is created.\n", lbname, tree->name());
 
   // decide which load balancer to call
 //  greedy = (CentralLB *)AllocateGreedyLB();

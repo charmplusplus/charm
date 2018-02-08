@@ -3,6 +3,7 @@
 #include "BlockLB.h"
 #include <math.h>
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
 
 CreateLBFunc_Def (BlockLB, "Allocate objects in blocks to the remaining valid PE")
 
@@ -13,8 +14,8 @@ BlockLB::BlockLB (const CkLBOptions &opt) : CBase_BlockLB (opt)
 {
   lbname = "BlockLB";
 
-  if (CkMyPe () == 0) {
-    CkPrintf ("[%d] BlockLB created\n", CkMyPe ());
+  if (CkMyPe () == 0 && !quietModeRequested) {
+    CkPrintf("CharmLB> BlockLB created.\n");
   }
 }
 

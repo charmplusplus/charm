@@ -29,6 +29,8 @@
 #include <algorithm>
 #include <math.h>
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 // a solution is feasible if num migrations <= user-specified limit
 // LOAD_MIG_BAL is used to control tradeoff between maxload and migrations
 // when selecting solutions from the feasible set
@@ -182,8 +184,8 @@ CreateLBFunc_Def(GreedyRefineLB, "Greedy refinement-based algorithm")
 GreedyRefineLB::GreedyRefineLB(const CkLBOptions &opt): CBase_GreedyRefineLB(opt), migrationTolerance(1.0)
 {
   lbname = "GreedyRefineLB";
-  if ((CkMyPe() == 0) && (_lb_args.debug() > 0))
-    CkPrintf("[%d] GreedyRefineLB created\n", CkMyPe());
+  if ((CkMyPe() == 0) && !quietModeRequested)
+    CkPrintf("CharmLB> GreedyRefineLB created.\n");
   if (_lb_args.percentMovesAllowed() < 100) {
     migrationTolerance = float(_lb_args.percentMovesAllowed())/100.0;
   }

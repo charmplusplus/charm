@@ -11,6 +11,8 @@
 #include "GridMetisLB.h"
 #include "manager.h"
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 CreateLBFunc_Def (GridMetisLB, "Grid load balancer that uses Metis to optimize communication graph")
 
 
@@ -25,8 +27,8 @@ GridMetisLB::GridMetisLB (const CkLBOptions &opt) : CBase_GridMetisLB (opt)
 
   lbname = (char *) "GridMetisLB";
 
-  if (CkMyPe() == 0) {
-    CkPrintf ("[%d] GridMetisLB created.\n", CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested) {
+    CkPrintf ("CharmLB> GridMetisLB created.\n");
   }
 
   if ((value = getenv ("CK_LDB_GRIDMETISLB_MODE"))) {

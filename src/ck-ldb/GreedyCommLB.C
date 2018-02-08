@@ -19,6 +19,8 @@ Status:
 #include "GreedyCommLB.h"
 #include "manager.h"
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 CreateLBFunc_Def(GreedyCommLB, "Greedy algorithm which takes communication graph into account")
 
 void GreedyCommLB::init()
@@ -32,8 +34,8 @@ void GreedyCommLB::init()
 GreedyCommLB::GreedyCommLB(const CkLBOptions &opt): CBase_GreedyCommLB(opt)
 {
     init();
-    if (CkMyPe() == 0)
-	CkPrintf("[%d] GreedyCommLB created\n",CkMyPe());
+    if (CkMyPe() == 0 && !quietModeRequested)
+	CkPrintf("CharmLB> GreedyCommLB created.\n");
 }
 
 GreedyCommLB::GreedyCommLB(CkMigrateMessage *m):CBase_GreedyCommLB(m) {

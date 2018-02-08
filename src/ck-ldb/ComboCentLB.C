@@ -13,14 +13,16 @@ Status:
 
 extern LBAllocFn getLBAllocFn(const char *lbname);
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 CreateLBFunc_Def(ComboCentLB, "Allow multiple strategies to work serially")
 
 ComboCentLB::ComboCentLB(const CkLBOptions &opt): CBase_ComboCentLB(opt)
 {
   lbname = "ComboCentLB";
   const char *lbs = theLbdb->loadbalancer(opt.getSeqNo());
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] ComboCentLB created with %s\n",CkMyPe(), lbs);
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> ComboCentLB created with %s\n", lbs);
   
   char *lbcopy = strdup(lbs);
   char *p = strchr(lbcopy, ':');

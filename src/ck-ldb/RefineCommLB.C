@@ -7,13 +7,15 @@
 #include "ckheap.h"
 #include "RefineCommLB.h"
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 CreateLBFunc_Def(RefineCommLB, "Average load among processors by moving objects away from overloaded processor, communication aware")
 
 RefineCommLB::RefineCommLB(const CkLBOptions &opt): CBase_RefineCommLB(opt)
 {
   lbname = (char *)"RefineCommLB";
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] RefineCommLB created\n",CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> RefineCommLB created.\n");
 }
 
 bool RefineCommLB::QueryBalanceNow(int _step)

@@ -7,13 +7,15 @@
 #include "ckheap.h"
 #include "NeighborLB.h"
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 CreateLBFunc_Def(NeighborLB, "The neighborhood load balancer")
 
 NeighborLB::NeighborLB(const CkLBOptions &opt):CBase_NeighborLB(opt)
 {
   lbname = "NeighborLB";
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] NeighborLB created\n",CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> NeighborLB created.\n");
 }
 
 LBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int n_nbrs)

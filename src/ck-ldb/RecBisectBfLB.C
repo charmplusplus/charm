@@ -37,15 +37,15 @@ extern "C" {
   void destroySet(BV_Set* s);
 }
 
-
+CMI_EXTERNC_VARIABLE int quietModeRequested;
 
 CreateLBFunc_Def(RecBisectBfLB, "Recursive partitioning with Breadth first enumeration")
 
 RecBisectBfLB::RecBisectBfLB(const CkLBOptions &opt): CBase_RecBisectBfLB(opt)
 {
   lbname = (char*)"RecBisectBfLB";
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] RecBisectBfLB created\n",CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> RecBisectBfLB created.\n");
 }
 
 bool RecBisectBfLB::QueryBalanceNow(int _step)

@@ -23,12 +23,14 @@
 #define UPPER_FACTOR 0.67
 #define MAX_WEIGHT 5.0
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 CreateLBFunc_Def(CommLB, "another variation of CommLB")
 
 CommLB::CommLB(const CkLBOptions &opt): CBase_CommLB(opt)
 {
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] CommLB created\n",CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> CommLB created.\n");
   lbname = "CommLB";
 }
 

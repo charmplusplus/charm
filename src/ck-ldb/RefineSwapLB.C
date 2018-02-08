@@ -20,14 +20,16 @@
 using std::cout;
 using std::endl;
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 CreateLBFunc_Def(RefineSwapLB,
     "always assign the heaviest obj onto lightest loaded processor.")
 
 RefineSwapLB::RefineSwapLB(const CkLBOptions &opt): CBase_RefineSwapLB(opt)
 {
   lbname = "RefineSwapLB";
-  if (CkMyPe()==0)
-    CkPrintf("[%d] RefineSwapLB created\n",CkMyPe());
+  if (CkMyPe()==0 && !quietModeRequested)
+    CkPrintf("CharmLB> RefineSwapLB created.\n");
 }
 
 bool RefineSwapLB::QueryBalanceNow(int _step)

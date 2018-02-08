@@ -14,12 +14,14 @@
 #include "GraphPartLB.h"
 #include "ckgraph.h"
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 CreateLBFunc_Def(GraphPartLB, "Algorithm which uses graph partitioning for communication aware load balancing")
 
 GraphPartLB::GraphPartLB(const CkLBOptions &opt) : CBase_GraphPartLB(opt) {
   lbname = "GraphPartLB";
-  if(CkMyPe() == 0)
-    CkPrintf("GraphPartLB created\n");
+  if(CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> GraphPartLB created.\n");
 }
 
 bool GraphPartLB::QueryBalanceNow(int _step) {

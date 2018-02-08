@@ -14,6 +14,8 @@
 
 #define LOAD_OFFSET 0.05
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 CreateLBFunc_Def(GreedyAgentLB,"always assign the heaviest obj onto lightest loaded processor taking into account the topology")
 
 /*static void lbinit(void) {
@@ -28,8 +30,8 @@ CreateLBFunc_Def(GreedyAgentLB,"always assign the heaviest obj onto lightest loa
 GreedyAgentLB::GreedyAgentLB(const CkLBOptions &opt): CBase_GreedyAgentLB(opt)
 {
   lbname = "GreedyAgentLB";
-  if (CkMyPe()==0)
-    CkPrintf("[%d] GreedyAgentLB created\n",CkMyPe());
+  if (CkMyPe()==0 && !quietModeRequested)
+    CkPrintf("CharmLB> GreedyAgentLB created.\n");
 }
 
 bool GreedyAgentLB::QueryBalanceNow(int _step)

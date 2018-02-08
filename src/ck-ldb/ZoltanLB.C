@@ -54,13 +54,15 @@ static void get_hypergraph_edge_wgts(void *data, int numGID, int numLID, int num
                                      int edge_weight_dim, ZOLTAN_ID_PTR edgeGID, ZOLTAN_ID_PTR edgeLID,
                                      float *edge_wgts, int *ierr);
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 CreateLBFunc_Def(ZoltanLB, "Use Zoltan(tm) to partition object graph")
 
 ZoltanLB::ZoltanLB(const CkLBOptions &opt): CBase_ZoltanLB(opt)
 {
   lbname = "ZoltanLB";
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] ZoltanLB created\n",CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> ZoltanLB created.\n");
 }
 
 void ZoltanLB::work(LDStats* stats)

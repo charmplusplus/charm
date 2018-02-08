@@ -7,6 +7,8 @@
 
 #include "elements.h"
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 CreateLBFunc_Def(DistributedLB, "The distributed load balancer")
 
 using std::vector;
@@ -16,8 +18,8 @@ DistributedLB::DistributedLB(CkMigrateMessage *m) : CBase_DistributedLB(m) {
 
 DistributedLB::DistributedLB(const CkLBOptions &opt) : CBase_DistributedLB(opt) {
   lbname = "DistributedLB";
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] DistributedLB created\n",CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> DistributedLB created.\n");
   InitLB(opt);
 }
 

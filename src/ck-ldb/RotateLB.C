@@ -12,6 +12,7 @@
 #include "RotateLB.decl.h"
 #include "RotateLB.h"
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
 
 CreateLBFunc_Def (RotateLB, "Rotate each object to the next higher PE")
 
@@ -22,8 +23,8 @@ RotateLB::RotateLB (const CkLBOptions &opt) : CBase_RotateLB (opt)
 {
   lbname = "RotateLB";
 
-  if (CkMyPe () == 0) {
-    CkPrintf ("[%d] RotateLB created\n", CkMyPe ());
+  if (CkMyPe () == 0 && !quietModeRequested) {
+    CkPrintf ("CharmLB> RotateLB created.\n");
   }
 }
 

@@ -11,6 +11,8 @@
 #include "GridHybridSeedLB.h"
 #include "manager.h"
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 CreateLBFunc_Def (GridHybridSeedLB, "Grid load balancer that uses hybrid seed technique to optimize communication graph")
 
 
@@ -25,8 +27,8 @@ GridHybridSeedLB::GridHybridSeedLB (const CkLBOptions &opt) : CBase_GridHybridSe
 
   lbname = (char *) "GridHybridSeedLB";
 
-  if (CkMyPe() == 0) {
-    CkPrintf ("[%d] GridHybridSeedLB created.\n", CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested) {
+    CkPrintf ("CharmLB> GridHybridSeedLB created.\n");
   }
 
   if (value = getenv ("CK_LDB_GRIDHYBRIDSEEDLB_MODE")) {

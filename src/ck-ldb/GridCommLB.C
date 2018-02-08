@@ -43,6 +43,8 @@
 #include "GridCommLB.h"
 #include "manager.h"
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 CreateLBFunc_Def (GridCommLB, "Grid communication load balancer (evenly distribute objects across each cluster)")
 
 
@@ -57,8 +59,8 @@ GridCommLB::GridCommLB (const CkLBOptions &opt) : CBase_GridCommLB (opt)
 
   lbname = (char *) "GridCommLB";
 
-  if (CkMyPe() == 0) {
-    CkPrintf ("[%d] GridCommLB created.\n", CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested) {
+    CkPrintf ("CharmLB> GridCommLB created.\n");
   }
 
   if ((value = getenv ("CK_LDB_GRIDCOMMLB_MODE"))) {

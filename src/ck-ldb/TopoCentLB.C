@@ -19,6 +19,8 @@
 //#define RAND_COMM
 #define make_mapping 0
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 CreateLBFunc_Def(TopoCentLB,"Balance objects based on the network topology")
 
 
@@ -34,8 +36,8 @@ CreateLBFunc_Def(TopoCentLB,"Balance objects based on the network topology")
 TopoCentLB::TopoCentLB(const CkLBOptions &opt) : CBase_TopoCentLB (opt)
 {
   lbname = "TopoCentLB";
-  if (CkMyPe () == 0) {
-    CkPrintf ("[%d] TopoCentLB created\n",CkMyPe());
+  if (CkMyPe () == 0 && !quietModeRequested) {
+    CkPrintf("CharmLB> TopoCentLB created.\n");
   }
 }
 

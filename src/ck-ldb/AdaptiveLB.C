@@ -12,14 +12,16 @@
 
 extern LBAllocFn getLBAllocFn(const char *lbname);
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 CreateLBFunc_Def(AdaptiveLB, "Allow multiple strategies to work serially")
 
 AdaptiveLB::AdaptiveLB(const CkLBOptions &opt): CBase_AdaptiveLB(opt)
 {
   lbname = "AdaptiveLB";
   const char *lbs = theLbdb->loadbalancer(opt.getSeqNo());
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] AdaptiveLB created with %s\n",CkMyPe(), lbs);
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> AdaptiveLB created with %s.\n", lbs);
 
   char *lbcopy = strdup(lbs);
   const char *greedyLBString = "GreedyLB";

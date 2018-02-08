@@ -21,14 +21,16 @@ Date: 04/27/2005
 #define _make_new_grouping_ 0
 #define _USE_MAX_HOPBYTES_ 1
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 CreateLBFunc_Def(RefineTopoLB,"TopoLB: Balance objects based on the network topology")
 
 
 RefineTopoLB::RefineTopoLB(const CkLBOptions &opt) : CBase_RefineTopoLB (opt)
 {
   lbname = "RefineTopoLB";
-  if (CkMyPe () == 0) {
-    CkPrintf ("[%d] RefineTopoLB created\n",CkMyPe());
+  if (CkMyPe () == 0 && !quietModeRequested) {
+    CkPrintf ("CharmLB> RefineTopoLB created.\n");
   }
 }
 

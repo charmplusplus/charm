@@ -22,13 +22,15 @@
 
 using namespace std;
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 CreateLBFunc_Def(GreedyLB, "always assign the heaviest obj onto lightest loaded processor.")
 
 GreedyLB::GreedyLB(const CkLBOptions &opt): CBase_GreedyLB(opt)
 {
   lbname = "GreedyLB";
-  if (CkMyPe()==0)
-    CkPrintf("[%d] GreedyLB created\n",CkMyPe());
+  if (CkMyPe()==0 && !quietModeRequested)
+    CkPrintf("CharmLB> GreedyLB created.\n");
 }
 
 bool GreedyLB::QueryBalanceNow(int _step)

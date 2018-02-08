@@ -12,14 +12,15 @@
 #include "ckgraph.h"
 #include <metis.h>
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
 
 CreateLBFunc_Def(MetisLB, "Use Metis(tm) to partition object graph")
 
 MetisLB::MetisLB(const CkLBOptions &opt): CBase_MetisLB(opt)
 {
   lbname = "MetisLB";
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] MetisLB created\n",CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> MetisLB created.\n");
 }
 
 void MetisLB::work(LDStats* stats)

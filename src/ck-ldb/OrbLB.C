@@ -15,6 +15,8 @@
 
 //#define DEBUG
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 CreateLBFunc_Def(OrbLB, "partition objects based on coordinates")
 
 CkpvExtern(int, _lb_obj_index);
@@ -33,8 +35,8 @@ OrbLB::OrbLB(const CkLBOptions &opt, bool userdata): CBase_OrbLB(opt)
 {
   use_udata = userdata;
   init();
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] OrbLB created\n",CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> OrbLB created.\n");
 }
 
 OrbLB::OrbLB(const CkLBOptions &opt): CBase_OrbLB(opt)

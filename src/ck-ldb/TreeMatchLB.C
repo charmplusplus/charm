@@ -10,7 +10,7 @@
 #include "ckgraph.h"
 #include <algorithm>
 
-
+CMI_EXTERNC_VARIABLE int quietModeRequested;
 
 CreateLBFunc_Def(TreeMatchLB, "TreeMatch load balancer, like a normal one but with empty strategy")
 
@@ -19,8 +19,8 @@ CreateLBFunc_Def(TreeMatchLB, "TreeMatch load balancer, like a normal one but wi
 TreeMatchLB::TreeMatchLB(const CkLBOptions &opt): CBase_TreeMatchLB(opt)
 {
   lbname = (char*)"TreeMatchLB";
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] TreeMatchLB created\n",CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> TreeMatchLB created.\n");
 }
 
 bool TreeMatchLB::QueryBalanceNow(int _step)

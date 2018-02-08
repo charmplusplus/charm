@@ -11,13 +11,15 @@ Status:
 
 #include "RandCentLB.h"
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 CreateLBFunc_Def(RandCentLB, "Assign objects to processors randomly")
 
 RandCentLB::RandCentLB(const CkLBOptions &opt): CBase_RandCentLB(opt)
 {
   lbname = "RandCentLB";
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] RandCentLB created\n",CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> RandCentLB created.\n");
 }
 
 bool RandCentLB::QueryBalanceNow(int _step)

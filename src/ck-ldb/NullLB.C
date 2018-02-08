@@ -12,6 +12,8 @@ load balancer around.
 
 #define NULLLB_CONVERSE                     1
 
+CMI_EXTERNC_VARIABLE int quietModeRequested;
+
 void CreateNullLB(void) {
   // special seqno -1
   // not putting into LBDatabase's loadbalancer list
@@ -56,7 +58,7 @@ static void staticStartLB(void* data)
 
 void NullLB::init()
 {
-  // if (CkMyPe() == 0) CkPrintf("[%d] NullLB created\n",CkMyPe());
+  // if (CkMyPe() == 0 && !quietModeRequested) CkPrintf("CharmLB> NullLB created.\n");
   thisProxy = CProxy_NullLB(thisgroup);
   CkpvAccess(hasNullLB) = 1;
   receiver = theLbdb->
