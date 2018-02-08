@@ -110,6 +110,7 @@ extern void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int
 extern void registerArrayElemLeaveExtCallback(int (*cb)(int, int, int *, char**, int));
 extern void registerArrayElemJoinExtCallback(void (*cb)(int, int, int *, int, char*, int));
 extern void registerArrayResumeFromSyncExtCallback(void (*cb)(int, int, int *));
+extern void registerArrayMapProcNumExtCallback(int (*cb)(int, int, const int *));
 extern void StartCharmExt(int argc, char **argv); // start Converse/Charm, argv are the command-line arguments
 extern int CkMyPeHook();   // function equivalent of CkMyPe macro
 extern int CkNumPesHook(); // function equivalent of CkNumPes macro
@@ -187,6 +188,7 @@ extern void CkRegisterMigCtor(int chareIndex, int ctorEpIndex);
 /** Indicate whether this group is an IrrGroup. */
 extern void CkRegisterGroupIrr(int chareIndex,int isIrr);
 extern void CkRegisterGroupExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
+extern void CkRegisterArrayMapExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
 extern void CkRegisterArrayExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
 /** Register the chare baseIdx as a base class of the chare derivedIdx. */
 extern void CkRegisterBase(int derivedIdx, int baseIdx);
@@ -265,7 +267,7 @@ extern void CkCreateLocalGroup(CkGroupID groupID, int constructorIdx, envelope *
 extern void CkCreateLocalNodeGroup(CkGroupID groupID, int constructorIdx, envelope *env);
 
 extern int CkCreateGroupExt(int cIdx, int eIdx, int num_bufs, char **bufs, int *buf_sizes);
-extern int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, int num_bufs, char **bufs, int *buf_sizes);
+extern int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, int num_bufs, char **bufs, int *buf_sizes, int map_gid);
 extern void CkInsertArrayExt(int aid, int ndims, int *index, int epIdx, int onPE, int num_bufs, char **bufs, int *buf_sizes);
 extern void CkArrayDoneInsertingExt(int aid);
 extern void CkMigrateExt(int aid, int ndims, int *index, int toPe);

@@ -2298,6 +2298,11 @@ extern "C" void registerPyReductionExtCallback(int (*cb)(char**, int*, int, char
     PyReductionExt = cb;
 }
 
+int (*ArrayMapProcNumExtCallback)(int, int, const int *) = NULL;
+extern "C" void registerArrayMapProcNumExtCallback(int (*cb)(int, int, const int *)) {
+  ArrayMapProcNumExtCallback = cb;
+}
+
 extern "C" int CkMyPeHook() { return CkMyPe(); }
 extern "C" int CkNumPesHook() { return CkNumPes(); }
 
@@ -2348,6 +2353,19 @@ GroupExt::GroupExt(void *impl_msg) {
                           dcopy_start);
 }
 
+ArrayMapExt::ArrayMapExt(void *impl_msg) {
+  //printf("Constructor of ArrayMapExt, gid=%d\n", thisgroup.idx);
+  int chareIdx = ckGetChareType();
+  int ctorEpIdx = _chareTable[chareIdx]->getDefaultCtor();
+  CkMarshallMsg *impl_msg_typed = (CkMarshallMsg *)impl_msg;
+  char *impl_buf = impl_msg_typed->msgBuf;
+  PUP::fromMem implP(impl_buf);
+  int msgSize; implP|msgSize;
+  int dcopy_start; implP|dcopy_start;
+  GroupMsgRecvExtCallback(thisgroup.idx, ctorEpIdx, msgSize, impl_buf+(2*sizeof(int)),
+                          dcopy_start);
+}
+
 // TODO options
 extern "C"
 int CkCreateGroupExt(int cIdx, int eIdx, int num_bufs, char **bufs, int *buf_sizes) {
@@ -2370,7 +2388,7 @@ int CkCreateGroupExt(int cIdx, int eIdx, int num_bufs, char **bufs, int *buf_siz
 
 // TODO options
 extern "C"
-int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, int num_bufs, char **bufs, int *buf_sizes) {
+int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, int num_bufs, char **bufs, int *buf_sizes, int map_gid) {
   //static_cast<void>(impl_e_opts);
   CkAssert(num_bufs >= 1);
   int totalSize = 0;
@@ -2384,6 +2402,11 @@ int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, int num_bufs, cha
   CkArrayOptions opts;
   if (ndims != -1)
     opts = CkArrayOptions(ndims, dims);
+  if (map_gid >= 0) {
+    CkGroupID map_gId;
+    map_gId.idx = map_gid;
+    opts.setMap(CProxy_Group(map_gId));
+  }
   UsrToEnv(impl_msg)->setMsgtype(ArrayEltInitMsg);
   //CkArrayID gId = ckCreateArray((CkArrayMessage *)impl_msg, eIdx, opts);
   CkGroupID gId = CProxyElement_ArrayElement::ckCreateArray((CkArrayMessage *)impl_msg, eIdx, opts);

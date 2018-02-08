@@ -106,6 +106,24 @@ void CkRegisterGroupExt(const char *s, int numEntryMethods, int *chareIdx, int *
   *startEpIdx = epIdxCtor;
 }
 
+extern "C"
+void CkRegisterArrayMapExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx) {
+  int __idx = CkRegisterChare(s, sizeof(ArrayMapExt), TypeGroup);
+  //CkRegisterChareInCharm(__idx);
+  CkRegisterBase(__idx, CkIndex_IrrGroup::__idx);
+  CkRegisterGroupIrr(__idx, true); // isIrreducible?
+
+  int epIdxCtor = CkRegisterEp(s, ArrayMapExt::__ArrayMapExt, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
+  CkRegisterDefaultCtor(__idx, epIdxCtor);
+
+  for (int i=0; i < numEntryMethods; i++)
+    int epidx = CkRegisterEp(s, ArrayMapExt::__entryMethod,
+                             CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
+
+  *chareIdx = __idx;
+  *startEpIdx = epIdxCtor;
+}
+
 // TODO give a unique name to entry methods when calling CkRegisterEp
 extern "C"
 void CkRegisterArrayExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx) {
