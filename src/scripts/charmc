@@ -84,6 +84,7 @@ GENDEPENDS="no"
 COUNTTOKENS="no"
 USE_OPENMP="no"
 SKIP_MODULEINIT=""
+RPATH_ORIGIN=""
 
 COPY_CHARMRUN=true
 USE_BUILD_OPTIONS=0
@@ -626,6 +627,10 @@ do
 		OPTS_LD="$OPTS_LD -rpath $1"
 		shift
 		;;
+
+	"-rpath-origin")
+		RPATH_ORIGIN="yes"
+		;;
 	
 	"-fortran"|"-flib"|"-flibs")
 		USE_F90_LIBRARIES="1" 
@@ -942,6 +947,8 @@ if [ -n "$CHARMDEBUG" -a -z "$SEQUENTIAL" -a -z "$NATIVE" ]; then
    	fi
     	OPTS_CPP="$OPTS_CPP -O0 -g"
 fi
+
+[ -n "$RPATH_ORIGIN" -a "$CMK_MACOSX" != "1" -a "$CMK_COMPILER" != "msvc" ] && OPTS_LD="$OPTS_LD -Wl,-rpath,\\\$ORIGIN"
 
 PROCESSED_MODULES=""
 
