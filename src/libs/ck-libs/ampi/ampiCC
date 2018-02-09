@@ -1,6 +1,9 @@
 #!/bin/sh
 CHARMBIN=`dirname $0`
 
+STANDALONE=""
+
+processArgs() {
 while [ ! $# -eq 0 ]
 do
   arg="$1"
@@ -9,11 +12,17 @@ do
      echo "charmc"
      exit 0
      ;;
-  *) break
+  -standalone)
+     STANDALONE="true"
+     ;;
+  *)
      ;;
   esac
   shift
 done
+}
+
+eval processArgs "$@"
 
 charmarch=$(cat $CHARMBIN/../tmp/.gdir)
 
@@ -27,7 +36,7 @@ then
     AMPICC_EXTRA_OPTIONS="-I./$dirName"
 fi
 
-[ -f $CHARMBIN/../lib/libampiromio.a ] && ROMIO=-lampiromio
+[ -f $CHARMBIN/../lib/libampiromio.a -a -z "$STANDALONE" ] && ROMIO=-lampiromio
 
 $CHARMBIN/charmc -language ampi -default-to-aout $AMPICC_EXTRA_OPTIONS $@ $ROMIO
 status=$?

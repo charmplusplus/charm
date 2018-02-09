@@ -21,6 +21,7 @@ SED="sed"
 MACHTYPE=""
 SEQUENTIAL=""
 NATIVE=""
+STANDALONE=""
 LANGUAGE=""
 PARADIGM=""
 BALANCE="rand"
@@ -425,6 +426,11 @@ do
 
 	"-host")
 		NATIVE=true
+		;;
+
+	"-standalone")
+		STANDALONE="true"
+		SKIP_MODULEINIT="yes"
 		;;
 
 	"-language")
@@ -864,6 +870,9 @@ trap 'End 1' 2
 
 # Process original command-line arguments
 eval processArgs "$@"
+
+USER_POST_LIBRARIES="$POST_LIBRARIES"
+USER_PRE_LIBRARIES="$PRE_LIBRARIES"
 
 # Construct list of object files
 numFiles=`echo $FILES | wc -w`
@@ -1555,52 +1564,37 @@ then
 	MIDDLE_LIBS="$MIDDLE_LIBS $MEM_OBJ $THREAD_OBJ"
 fi
 
-CMK_SYSLIBS="-lmoduleNDMeshStreamer -lmodulecompletion $CMK_SYSLIBS"
-
 if [ "$CHARM_SHARED" = "1" ]
 then
   [ -z "$CHARMLIBSO" ] &&  Abort "Charm++ lib_so directory not found!"
   # build user executable/shared lib linking with charm .so
   OPTS_LD="$OPTS_LD $CMK_LD_LIBRARY_PATH"
-  if [ "$BUILD_SHARE" = "1" -o -n "$SKIP_MODULEINIT" ]
-  then
-    LANG_LIBS="-L$CHARMLIBSO $OBJECTFILES $PRE_LIBRARIES"
-  else
-    LANG_LIBS="-L$CHARMLIBSO $OBJECTFILES $modInitObj $PRE_LIBRARIES"
-  fi
+  LANG_LIBS="-L$CHARMLIBSO"
 else
-  # if interoperate, need a lib with moduleinit
-  if [ "$MPI_INTEROPERATE" != "" ]
-  then
-    LANG_LIBS="-L$CHARMLIB $PRE_LIBRARIES"
-  else
-    if [ -n "$SKIP_MODULEINIT" ]
-    then
-      LANG_LIBS="-L$CHARMLIB $OBJECTFILES $PRE_LIBRARIES"
-    else
-      LANG_LIBS="-L$CHARMLIB $OBJECTFILES $modInitObj $PRE_LIBRARIES"
-    fi
-  fi
+  LANG_LIBS="-L$CHARMLIB"
 fi
+
+if [ -z "$STANDALONE" ]
+then
+  ALL_LIBS="$LANG_LIBS $PRE_LIBRARIES $MIDDLE_LIBS $BAL_OBJ $CMK_LIBS $POST_LIBRARIES -lmoduleNDMeshStreamer -lmodulecompletion $CMK_SYSLIBS"
+else
+  ALL_LIBS="$USER_PRE_LIBRARIES $USER_POST_LIBRARIES $CMK_SYSLIBS"
+fi
+
 if [ "$TRACE_WITH_TAU" = 1 ]
 then
 	echo "Linking with the TAU libraries: $TAU_LIBS"
-	ALL_LIBS="$LANG_LIBS $MIDDLE_LIBS $BAL_OBJ $CMK_LIBS $POST_LIBRARIES $CMK_SYSLIBS $TAU_LIBS"
-else
-	ALL_LIBS="$LANG_LIBS $MIDDLE_LIBS $BAL_OBJ $CMK_LIBS $POST_LIBRARIES $CMK_SYSLIBS"
+	ALL_LIBS="$ALL_LIBS $TAU_LIBS"
 fi
 Debugf "All libraries are: $ALL_LIBS"
 
-if [ "$MPI_INTEROPERATE" != "" ]
+# preserve this variable in its state here for use later
+CHARM_ALL_LIBS="$ALL_LIBS"
+if [ "$BUILD_SHARE" = "1" -o -n "$SKIP_MODULEINIT" ]
 then
-  # preserve this variable in its state here for use later
-  CHARM_ALL_LIBS="$ALL_LIBS"
-  if [ -n "$SKIP_MODULEINIT" ]
-  then
-    ALL_LIBS="$OBJECTFILES $ALL_LIBS"
-  else
-    ALL_LIBS="$OBJECTFILES $modInitObj $ALL_LIBS"
-  fi
+  ALL_LIBS="$OBJECTFILES $ALL_LIBS"
+else
+  ALL_LIBS="$OBJECTFILES $modInitObj $ALL_LIBS"
 fi
 
 
@@ -1865,13 +1859,20 @@ MakeSO() {
 	dir=`cd $dir; pwd`
 	OBJECT=$dir/$fname
 	fi
-	[ "$CMK_MACOSX" = "1" ] && OPTS_LD="$OPTS_LD -Wl,-install_name,$CHARMLIBSO/$fname"
 	if test "$MAKE_LDXX" = "1"
 	then
-	  soCmd="$CMK_LDXX $CMK_LDXX_FLAGS $CMK_LIBDIR -o $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES $PRE_LIBRARIES $POST_LIBRARIES $CMK_LD_SHARED_LIBS"
+	  soTool="$CMK_LDXX $CMK_LDXX_FLAGS"
 	else
-	  soCmd="$CMK_LD $CMK_LD_FLAGS $CMK_LIBDIR -o $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES $PRE_LIBRARIES $POST_LIBRARIES $CMK_LD_SHARED_LIBS"
+	  soTool="$CMK_LD $CMK_LD_FLAGS"
 	fi
+	if [ -n "$STANDALONE" ]
+	then
+	  soLibs="$USER_PRE_LIBRARIES $USER_POST_LIBRARIES"
+	else
+	  soLibs="$PRE_LIBRARIES $POST_LIBRARIES"
+	  [ "$CMK_MACOSX" = "1" ] && OPTS_LD="$OPTS_LD -Wl,-install_name,$CHARMLIBSO/$fname"
+	fi
+	soCmd="$soTool $CMK_LIBDIR -o $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES $soLibs $CMK_LD_SHARED_LIBS"
 	DoNoErrCheck $soCmd
 	Do_res=$?
 	if [ $Do_res -ne 0 ]

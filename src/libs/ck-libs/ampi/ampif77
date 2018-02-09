@@ -1,6 +1,25 @@
 #!/bin/sh
 CHARMBIN=`dirname $0`
 
-[ -f $CHARMBIN/../lib/libampiromio.a ] && ROMIO=-lampiromio
+STANDALONE=""
+
+processArgs() {
+while [ ! $# -eq 0 ]
+do
+  arg="$1"
+  case "$arg" in
+  -standalone)
+     STANDALONE="true"
+     ;;
+  *)
+     ;;
+  esac
+  shift
+done
+}
+
+eval processArgs "$@"
+
+[ -f $CHARMBIN/../lib/libampiromio.a -a -z "$STANDALONE" ] && ROMIO=-lampiromio
 
 $CHARMBIN/charmc -language ampif -default-to-aout $@ $ROMIO
