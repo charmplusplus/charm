@@ -1058,12 +1058,7 @@ fi
 
 if [ "$BUILD_SHARE" = "1" ]
 then
-	if [ x"$CMK_NO_BUILD_SHARED" = "xtrue" -o -z "$CHARMLIBSO" ]
-	then
-		BUILD_SHARE="0"
-	else
-		USE_PIC="1"
-	fi
+	USE_PIC="1"
 fi
 
 OPTS_PIC="$CMK_PIC"
@@ -1926,11 +1921,11 @@ case "$OBJECT" in
 	;;
 *.so|*.so.*|*.sl|*.dylib)
 # Make shared library
-	# if no build share is set, exit normally.
-	if [ "$BUILD_SHARE" = 0 ]
+	# If building shared is not supported and this object is not standalone, exit.
+	if [ "$BUILD_SHARE" = 0 -a -z "$STANDALONE" ]
 	then
 		Warning "Warning: building shared library is not supported, recompile charm++ with '--build-shared'."
-		End 0
+		End 1
 	elif [ "$CHARM_SHARED" = "0" ]
 	then
 	  	MakeSO
