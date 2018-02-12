@@ -355,14 +355,14 @@ INLINE static CMK_TYPEDEF_UINT8 MemusageMstats(void) { return 0; }
 #endif
 
 static int MemusageInited = 0;
-static CMK_TYPEDEF_UINT8 MemusageInitSbrkval = 0;
+static uintptr_t MemusageInitSbrkval = 0;
 INLINE static CMK_TYPEDEF_UINT8 MemusageSbrk(void){
-	CMK_TYPEDEF_UINT8 newval;
+	uintptr_t newval;
 	if(MemusageInited==0){
-		MemusageInitSbrkval = (CMK_TYPEDEF_UINT8)sbrk(0);
+		MemusageInitSbrkval = (uintptr_t)sbrk(0);
 		MemusageInited = 1;
 	}
-	newval = (CMK_TYPEDEF_UINT8)sbrk(0);
+	newval = (uintptr_t)sbrk(0);
 	return (newval - MemusageInitSbrkval);
 }
 

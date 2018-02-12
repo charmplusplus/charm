@@ -6,6 +6,7 @@
 
 #include <errno.h>
 #include <string.h>
+#include <inttypes.h>
 #include <sys/stat.h>		// for chmod
 
 #include "ckhashtable.h"
@@ -521,7 +522,7 @@ class CpdList_message : public CpdListAccessor {
   virtual const char * getPath(void) const {return "converse/message";}
   virtual size_t getLength(void) const {return 1;}
   virtual void pup(PUP::er &p, CpdListItemsRequest &req) {
-    envelope *env = (envelope*)(((unsigned int)req.lo) + (((unsigned long)req.hi)<<32)+sizeof(CmiChunkHeader));
+    envelope *env = (envelope*)(((uint64_t)req.lo) + (((uint64_t)req.hi)<<32)+sizeof(CmiChunkHeader));
     beginItem(p, 0);
     const char *type="Converse";
     p.comment("name");

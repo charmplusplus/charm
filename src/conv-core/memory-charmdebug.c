@@ -280,7 +280,7 @@ size_t cpd_memory_getLength(void *lenParam) { return 1; }
     (not for example an object part of an array) */
 CMI_EXTERNC
 void cpd_memory_get(void *iterParam, pup_er p, CpdListItemsRequest *req) {
-  void *userData = (void*)(((unsigned int)req->lo) + (((unsigned long)req->hi)<<32));
+  void *userData = (void*)(uintptr_t)(((uint64_t)req->lo) + (((uint64_t)req->hi)<<32));
   Slot *sl = UserToSlot(userData);
   CpdListBeginItem(p, 0);
   pup_comment(p, "size");
@@ -1068,7 +1068,7 @@ static void CpdMMAPhandler(int sig, siginfo_t *si, void *unused){
     CpdFreeze();
   }
   lastAddressSegv = si->si_addr;
-  pageToUnprotect = (void*)((CmiUInt8)si->si_addr & ~(meta_getpagesize()-1));
+  pageToUnprotect = (void*)(uintptr_t)((CmiUInt8)(uintptr_t)si->si_addr & ~(meta_getpagesize()-1));
   mprotect(pageToUnprotect, 4, PROT_READ|PROT_WRITE);
   if (unProtectedPagesSize >= unProtectedPagesMaxSize) {
     void **newUnProtectedPages;
@@ -1718,7 +1718,7 @@ void * MemoryToSlot(void *ptr) {
   int i;
 #if defined(CPD_USE_MMAP) && defined(CMK_SEPARATE_SLOT)
   for (i=0; i<1000; ++i) {
-    sl = UserToSlot((void*)(((CmiUInt8)ptr)-i*meta_getpagesize() & ~(meta_getpagesize()-1)));
+    sl = UserToSlot((void*)(intptr_t)(((CmiUInt8)(intptr_t)ptr)-i*meta_getpagesize() & ~(meta_getpagesize()-1)));
     if (sl != NULL) return sl;
   }
 #endif

@@ -1863,10 +1863,10 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
 #else
 #if CMK_THREADS_USE_CONTEXT
   if (sizeof(void *) == 8) {
-    CmiUInt4 fn1 = ((CmiUInt8)fn) >> 32;
-    CmiUInt4 fn2 = (CmiUInt8)fn & 0xFFFFFFFF;
-    CmiUInt4 arg1 = ((CmiUInt8)arg) >> 32;
-    CmiUInt4 arg2 = (CmiUInt8)arg & 0xFFFFFFFF;
+    CmiUInt4 fn1 = ((CmiUInt8)(uintptr_t)fn) >> 32;
+    CmiUInt4 fn2 = (CmiUInt8)(uintptr_t)fn & 0xFFFFFFFF;
+    CmiUInt4 arg1 = ((CmiUInt8)(uintptr_t)arg) >> 32;
+    CmiUInt4 arg2 = (CmiUInt8)(uintptr_t)arg & 0xFFFFFFFF;
     makeJcontext(&result->context, (uJcontext_fn_t)CthStartThread, 4, fn1, fn2, arg1, arg2);
   }
   else

@@ -10,6 +10,7 @@
 #include <sstream>
 #include <algorithm>
 #include <math.h>
+#include <inttypes.h>
 
 using namespace std;
 
@@ -407,16 +408,16 @@ void recursive_bisect(
     if ( PARTITION_TOPOLOGY_VERBOSE && CmiMyNodeGlobal() == 0 ) {
       int crds[5];
       tmgr.coords(*node_begin, crds);
-      printf("partitioning node %5d at %5d %5d %5d %5d %5d nodes %5ld\n",
+      printf("partitioning node %5d at %5d %5d %5d %5d %5d nodes %5" PRId64 "\n",
                *node_begin,
                crds[0], crds[1], crds[2], crds[3], crds[4],
-               node_end - node_begin);
+               (int64_t)(node_end - node_begin));
     }
     return;
   }
 
   if ( PARTITION_TOPOLOGY_VERBOSE && CmiMyNodeGlobal() == 0 )
-    printf("recursive_bisect %d %d %ld\n", part_begin, part_end, node_end-node_begin);
+    printf("recursive_bisect %d %d %" PRId64 "\n", part_begin, part_end, (int64_t)(node_end-node_begin));
 
   int nnodes = node_end - node_begin;
   int nsplit = (nnodes+1) / 2;

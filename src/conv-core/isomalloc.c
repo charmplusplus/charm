@@ -1874,9 +1874,9 @@ static void init_ranges(char **argv)
         CmiAbort("Charm++ Error> +isomalloc_sync requires CmiBarrier() implemented.\n");
       else {
 	/* cppcheck-suppress uninitStructMember */
-        CmiUInt8 s = (CmiUInt8)freeRegion.start;
+        uintptr_t s = (uintptr_t)freeRegion.start;
 	/* cppcheck-suppress uninitStructMember */
-        CmiUInt8 e = (CmiUInt8)(freeRegion.start+freeRegion.len);
+        uintptr_t e = (uintptr_t)freeRegion.start+freeRegion.len;
         int fd, i;
         char fname[128];
 
@@ -1950,8 +1950,8 @@ static void init_ranges(char **argv)
           if (CmiMyPe()==0) CmiPrintf("[%d] Invalid isomalloc region: %lx - %lx.\n", CmiMyPe(), s, e);
           CmiAbort("Isomalloc> failed to find consolidated isomalloc region!");
         }
-        freeRegion.start = (char *)s;
-        freeRegion.len = (char *)e -(char *)s;
+        freeRegion.start = (char *)(uintptr_t)s;
+        freeRegion.len = (char *)(uintptr_t)e -(char *)(uintptr_t)s;
 
         if (CmiMyPe() == 0)
           CmiPrintf("Charm++> Consolidated Isomalloc memory region: %p - %p (%d MB).\n",
@@ -2119,7 +2119,7 @@ void *CmiIsomalloc(size_t size, CthThread tid)
     }
     blk = (CmiIsomallocBlock*)mempool_malloc(CtvAccess(threadpool),size+sizeof(CmiIsomallocBlock),1);
   }
-  blk->slot=(CmiInt8)blk;
+  blk->slot=(CmiInt8)(uintptr_t)blk;
   blk->length=size;
   return block2pointer(blk);
 }
@@ -2249,7 +2249,7 @@ void CmiIsomallocFree(void *blockPtr)
   else if (blockPtr!=NULL)
   {
 #if CMK_USE_MEMPOOL_ISOMALLOC
-    mempool_free_thread((void*)pointer2block(blockPtr)->slot);
+    mempool_free_thread((void*)(uintptr_t)pointer2block(blockPtr)->slot);
 #else
     CmiIsomallocBlock *blk=pointer2block(blockPtr);
     CmiInt8 s=blk->slot; 
