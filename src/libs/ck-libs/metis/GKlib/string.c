@@ -13,6 +13,9 @@ of standard functions (but with enhanced functionality).
 */
 /************************************************************************/
 
+#ifdef __arm__
+#define _GNU_SOURCE
+#endif
 #include <GKlib.h>
 
 
