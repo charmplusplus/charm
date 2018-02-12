@@ -1,5 +1,9 @@
+# Decimal representation of Charm++ release line and API revision
+# Increment the last 2 digits when making an API change
+# Increase the first three after branching for a release
 
-AC_INIT(Charm++, 2.6)
+AC_INIT(Charm++, 60900, [charm@cs.illinois.edu], charm, [http://charm.cs.illinois.edu/])
+
 AC_CONFIG_SRCDIR(./Makefile)
 
 AC_CONFIG_HEADER(conv-autoconfig.h)
@@ -25,12 +29,8 @@ CHARMINC="."
 CHARMBIN="../bin"
 test -r ./conv-config.sh && . ./conv-config.sh
 
-# Decimal representation of Charm++ release line and API revision
-# Increment the last 2 digits when making an API change
-# Increase the first three after branching for a release
-VERSION=60900
-echo $VERSION > ../include/VERSION
-AC_DEFINE_UNQUOTED([CHARM_VERSION], $VERSION, [Charm++ Release/API version number])
+echo AC_PACKAGE_VERSION > ../include/VERSION
+AC_DEFINE_UNQUOTED([CHARM_VERSION], AC_PACKAGE_VERSION, [Charm++ Release/API version number])
 
 charmout="charmconfig.out"
 /bin/rm -rf $charmout
