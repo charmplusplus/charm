@@ -8,7 +8,7 @@
 *.def.h
 *.ci.stamp
 
-# Ignore build artifacts created in the top-level directory
+# Ignore build artifacts
 config_opts.sh
 smart-build.log
 VERSION
@@ -23,6 +23,7 @@ cmake_install.cmake
 CMakeFiles
 /Makefile
 Charm++-prefix
+src/arch/win/createlink.exe
 
 # Ignore directories created from compilation
 /netlrts-*
