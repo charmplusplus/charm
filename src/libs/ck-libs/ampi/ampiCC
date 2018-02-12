@@ -29,12 +29,8 @@ fi
 
 [ -f $CHARMBIN/../lib/libampiromio.a ] && ROMIO=-lampiromio
 
-export NO_WIN_HPC_HEADERS_FOR_AMPI=1
-
 $CHARMBIN/charmc -language ampi -default-to-aout $AMPICC_EXTRA_OPTIONS $@ $ROMIO
 status=$?
-
-unset NO_WIN_HPC_HEADERS_FOR_AMPI
 
 if test "$charmarch" = "mpi"
 then

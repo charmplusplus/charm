@@ -14,18 +14,16 @@ CMK_CXX="$CHARMBIN/unix2nt_cc"
 CMK_LD="$CMK_CC"
 CMK_LDXX="$CMK_CXX"
 
-CMK_CC_FLAGS="-D_CRT_SECURE_NO_DEPRECATE -I `cygpath -u "$HPC_SDK\Inc"` -I `cygpath -u "$HPC_SDK\Include"`"
+# These include paths for MS MPI (added through the $INCLUDE variable) have a
+# lower priority than paths added via -I, thus allowing us to use AMPI's mpi.h
+# when compiling AMPI applications.
+export INCLUDE="$INCLUDE;`cygpath -wl "$HPC_SDK\Inc"`;`cygpath -wl "$HPC_SDK\Include"`"
+
+CMK_CC_FLAGS="-D_CRT_SECURE_NO_DEPRECATE"
 CMK_CPP_C_FLAGS="$CMK_CC_FLAGS -E"
-CMK_CXX_FLAGS="-D_CRT_SECURE_NO_DEPRECATE  -I `cygpath -u "$HPC_SDK\Inc"` -I `cygpath -u "$HPC_SDK\Include"`"
+CMK_CXX_FLAGS="-D_CRT_SECURE_NO_DEPRECATE"
 CMK_LD_FLAGS="$CMK_CC_FLAGS -L `cygpath -u "$HPC_SDK\Lib\amd64"` -lmsmpi"
 CMK_LDXX_FLAGS="$CMK_CXX_FLAGS -L `cygpath -u "$HPC_SDK\Lib\amd64"` -lmsmpi"
-
-if test "$NO_WIN_HPC_HEADERS_FOR_AMPI" = "1" ; then
-	CMK_CC="$CHARMBIN/unix2nt_cc"
-	CMK_CXX="$CHARMBIN/unix2nt_cc"
-	CMK_CC_FLAGS="-D_CRT_SECURE_NO_DEPRECATE"
-	CMK_CXX_FLAGS="-D_CRT_SECURE_NO_DEPRECATE"
-fi
 
 CMK_CF77="f77"
 CMK_CF90="f90"
