@@ -912,7 +912,7 @@ void CmiCheckAffinity(void)
       // TODO suggest command line arguments?
       if (!aff_is_set) {
         CmiAbort("Multiple PEs assigned to same core. Set affinity "
-        "options to correct or lower the number of threads.\n");
+        "options to correct or lower the number of threads, or pass +setcpuaffinity to ignore.\n");
       } else {
         CmiPrintf("WARNING: Multiple PEs assigned to same core, recommend "
         "adjusting processor affinity or passing +CmiSleepOnIdle to reduce "
