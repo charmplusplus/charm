@@ -13,6 +13,11 @@ use warnings;
 use File::Basename;
 my $dirname = dirname(__FILE__);
 
+# Create temporary file for compiler tests
+use File::Temp qw(tempfile);
+my $tempfile = new File::Temp(UNLINK => 1, SUFFIX => '.c');
+print $tempfile "\n";
+
 # Turn off I/O buffering
 $| = 1;
 
@@ -103,46 +108,161 @@ if($arch_os eq "darwin") {
     }
 }
 
+
+# check for BG/Q
+
+if($skip_choosing eq "false"){
+  my $BGQ_FLOOR = $ENV{'BGQ_FLOOR'};
+  if (not defined $BGQ_FLOOR) {
+    $BGQ_FLOOR = "/bgsys/drivers/ppcfloor";
+  }
+
+  my $bgq_found = system("which \"$BGQ_FLOOR/gnu-linux/bin/powerpc64-bgq-linux-cpp\" 2>/dev/null") / 256;
+
+  if ($bgq_found == 0) {
+    print "\nI found that you have a Blue Gene/Q toolchain available in your path.\nDo you want to build Charm++ targeting BG/Q? [Y/n]: ";
+    my $p = promptUserYN();
+    if($p eq "yes" || $p eq "default") {
+      $arch = "pamilrts-bluegeneq";
+      $skip_choosing = "true";
+    }
+  }
+}
+
+
+# check for GNI
+
+if($skip_choosing eq "false"){
+  my $craycc_found = index(`which CC 2>/dev/null`, "/opt/cray/") != -1;
+
+  my $PE_PRODUCT_LIST = $ENV{'PE_PRODUCT_LIST'};
+  if (not defined $PE_PRODUCT_LIST) {
+    $PE_PRODUCT_LIST = "";
+  }
+
+  my $CRAY_UGNI_found = index(":$PE_PRODUCT_LIST:", ":CRAY_UGNI:") != -1;
+
+  my $gni_found = $craycc_found || $CRAY_UGNI_found;
+
+  if ($gni_found) {
+    my $CRAYPE_INTERLAGOS_found = index(":$PE_PRODUCT_LIST:", ":CRAYPE_INTERLAGOS:") != -1;
+    if ($CRAYPE_INTERLAGOS_found) {
+      print "\nI found that you have a Cray environment with Interlagos processors.\nDo you want to build Charm++ targeting Cray XE? [Y/n]: ";
+      my $p = promptUserYN();
+      if($p eq "yes" || $p eq "default") {
+                    $arch = "gni-crayxe";
+                    $skip_choosing = "true";
+      }
+    } else {
+      print "\nI found that you have a Cray environment.\nDo you want to build Charm++ targeting Cray XC? [Y/n]: ";
+      my $p = promptUserYN();
+      if($p eq "yes" || $p eq "default") {
+                    $arch = "gni-crayxc";
+                    $skip_choosing = "true";
+      }
+    }
+  }
+}
+
+
+# check for OFI
+
+if($skip_choosing eq "false"){
+  my $ofi_found = index(`cc $tempfile -Wl,-lfabric 2>&1`, "-lfabric") == -1;
+
+  if ($ofi_found) {
+    print "\nI found that you have libfabric available in your toolchain.\nDo you want to build Charm++ targeting OFI? [Y/n]: ";
+    my $p = promptUserYN();
+    if($p eq "yes" || $p eq "default") {
+      $converse_network_type = "ofi";
+      $skip_choosing = "true";
+    }
+  }
+}
+
+
+# check for PAMI
+
+if($skip_choosing eq "false"){
+  my $MPI_ROOT = $ENV{'MPI_ROOT'};
+  if (not defined $MPI_ROOT) {
+    $MPI_ROOT = "";
+  }
+
+  my $pami_found = index(`cc $tempfile -Wl,-L,"$MPI_ROOT/lib/pami_port" -Wl,-L,/usr/lib/powerpc64le-linux-gnu -Wl,-lpami 2>&1`, "-lpami") == -1;
+
+  if ($pami_found) {
+    print "\nI found that you have libpami available in your toolchain.\nDo you want to build Charm++ targeting PAMI? [Y/n]: ";
+    my $p = promptUserYN();
+    if($p eq "yes" || $p eq "default") {
+      $converse_network_type = "pamilrts";
+      $skip_choosing = "true";
+    }
+  }
+}
+
+
+# check for Verbs
+
+if($skip_choosing eq "false"){
+  my $verbs_found = index(`cc $tempfile -Wl,-libverbs 2>&1`, "-libverbs") == -1;
+
+  if ($verbs_found) {
+    print "\nI found that you have libibverbs available in your toolchain.\nDo you want to build Charm++ targeting Infiniband Verbs? [Y/n]: ";
+    my $p = promptUserYN();
+    if($p eq "yes" || $p eq "default") {
+      $converse_network_type = "verbs";
+      $skip_choosing = "true";
+    }
+  }
+}
+
+
 # check for MPI
 
-my $mpi_found = "false";
-my $m = system("which mpicc mpiCC > /dev/null 2>/dev/null") / 256;
-my $mpioption;
-if($m == 0){
-    $mpi_found = "true";
-    $mpioption = "";
-}
-$m = system("which mpicc mpicxx > /dev/null 2>/dev/null") / 256;
-if($m == 0){
-    $mpi_found = "true";
-    $mpioption = "mpicxx";
+if($skip_choosing eq "false"){
+  my $mpi_found = "false";
+  my $m = system("which mpicc mpiCC > /dev/null 2>/dev/null") / 256;
+  my $mpioption;
+  if($m == 0){
+      $mpi_found = "true";
+      $mpioption = "";
+  }
+  $m = system("which mpicc mpicxx > /dev/null 2>/dev/null") / 256;
+  if($m == 0){
+      $mpi_found = "true";
+      $mpioption = "mpicxx";
+  }
+
+  # Give option of just using the mpi version if mpicc and mpiCC are found
+  if($mpi_found eq "true"){
+    print "\nI found that you have an mpicc available in your path.\nDo you want to build Charm++ on this MPI? [y/N]: ";
+    my $p = promptUserYN();
+    if($p eq "yes"){
+    $converse_network_type = "mpi";
+    $skip_choosing = "true";
+    $options = "$options $mpioption";
+    }
+  }
 }
 
-# Give option of just using the mpi version if mpicc and mpiCC are found
-if($skip_choosing eq "false" && $mpi_found eq "true"){
-  print "\nI found that you have an mpicc available in your path.\nDo you want to build Charm++ on this MPI? [y/N]: ";
-  my $p = promptUserYN();
-  if($p eq "yes"){
-	$converse_network_type = "mpi";
-	$skip_choosing = "true";
-	$options = "$options $mpioption";
-  }	
-}
 
 if($skip_choosing eq "false") { 
   
   print "\nDo you have a special network interconnect? [y/N]: ";
   my $p = promptUserYN();
   if($p eq "yes"){
+
 	print << "EOF";
 	
 Choose an interconnect from below: [1-10]
 	 1) MPI
-	 2) Infiniband (ibverbs)
+	 2) Infiniband (verbs)
 	 3) Cray XE, XK
 	 4) Cray XC
 	 5) Blue Gene/Q
 	 6) Intel Omni-Path (ofi)
+	 7) PAMI
 
 EOF
 	
@@ -166,6 +286,9 @@ EOF
 	  } elsif($line eq "6"){
 		$converse_network_type = "ofi";
 		last;
+	  } elsif($line eq "7"){
+		$converse_network_type = "pamilrts";
+		last;
 	  } else {
 		print "Invalid option, please try again :P\n"
 	  }
@@ -180,7 +303,7 @@ if($arch eq ""){
 	  if($amd64) {
 		$arch = $arch . "-x86_64";
 	  } elsif($ppc){
-	  	$arch = $arch . "-ppc";
+		$arch = $arch . "-ppc64le";
 	  } elsif($arm7){
 	  	$arch = $arch . "-arm7";
 	  }
