@@ -1044,8 +1044,31 @@ class CProxy_NodeGroup : public CProxy{
 
 };
 
+class CProxyElement_NodeGroup : public CProxy_NodeGroup {
+  private:
+    int _onNode;
+  public:
+    CProxyElement_NodeGroup() {}
+    CProxyElement_NodeGroup(CkGroupID g, int onNode)
+      : CProxy_NodeGroup(g), _onNode(onNode) {}
+    CProxyElement_NodeGroup(CkGroupID g, int onNode, CK_DELCTOR_PARAM)
+      : CProxy_NodeGroup(g, CK_DELCTOR_ARGS), _onNode(onNode) {}
+    CProxyElement_NodeGroup(const IrrGroup *g)
+      : CProxy_NodeGroup(g), _onNode(CkMyNode()) {}
+
+    bool operator ==(const CProxyElement_NodeGroup& other) {
+      return ckGetGroupID() == other.ckGetGroupID() &&
+             ckGetGroupPe() == other.ckGetGroupPe();
+    }
+
+    int ckGetGroupPe(void) const { return _onNode; }
+    void pup(PUP::er &p) {
+      CProxy_NodeGroup::pup(p);
+      p(_onNode);
+    }
+};
+
 typedef CProxy_Group CProxy_IrrGroup;
-typedef CProxyElement_Group CProxyElement_NodeGroup;
 typedef CProxyElement_Group CProxyElement_IrrGroup;
 typedef CProxySection_Group CProxySection_NodeGroup;
 typedef CProxySection_Group CProxySection_IrrGroup;

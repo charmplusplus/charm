@@ -147,6 +147,19 @@ CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,bool doInline) {
         d.group.hasRefnum= false;
         d.group.refnum = 0;
 }
+
+CkCallback::CkCallback(int ep, const CProxyElement_NodeGroup &grpElt, bool doInline) {
+#if CMK_ERROR_CHECKING
+  memset(this, 0, sizeof(CkCallback));
+#endif
+  type = doInline ? isendNodeGroup : sendNodeGroup;
+  d.group.ep = ep;
+  d.group.id = grpElt.ckGetGroupID();
+  d.group.onPE = grpElt.ckGetGroupPe();
+  d.group.hasRefnum = false;
+  d.group.refnum = 0;
+}
+
 CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool doInline) {
 #if CMK_ERROR_CHECKING
       memset(this, 0, sizeof(CkCallback));

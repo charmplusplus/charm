@@ -23,6 +23,7 @@ typedef void (*Ck1CallbackFn)(void *message);
 class CProxyElement_ArrayBase; /*forward declaration*/
 class CProxySection_ArrayBase;/*forward declaration*/
 class CProxyElement_Group; /*forward declaration*/
+class CProxyElement_NodeGroup; /*forward declaration*/
 class CProxy_NodeGroup;
 class Chare;
 class Group;
@@ -249,7 +250,10 @@ public:
 
     // Send to specified group element
 	CkCallback(int ep,const CProxyElement_Group &grpElt,bool doInline=false);
-	
+
+    // Send to specified nodegroup element
+	CkCallback(int ep,const CProxyElement_NodeGroup &grpElt,bool doInline=false);
+
     // Bcast to array
 	CkCallback(int ep,const CkArrayID &id) {
 #if CMK_REPLAYSYSTEM
