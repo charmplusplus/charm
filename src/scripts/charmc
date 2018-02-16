@@ -1493,7 +1493,7 @@ modInitObj="$modInitName.o"
 MAKE_LDXX="0"
 MAKE_LD="0"
 
-CORE_LIBS="-lconv-core -ltmgr -lconv-partition $TRACE_OBJ $CMK_HWLOC_LIBS"
+CORE_LIBS="-lconv-core -ltmgr -lconv-util -lconv-partition $TRACE_OBJ $CMK_HWLOC_LIBS"
 
 # get TAU stub makefile variables
 if test "$CMK_WITH_TAU" = "true"
@@ -1512,7 +1512,7 @@ fi
 
 if [ "$BUILD_SHARE" = "0" ]
 then
-       MIDDLE_LIBS="$MIDDLE_LIBS $MEM_OBJ $THREAD_OBJ -lconv-util"
+       MIDDLE_LIBS="$MIDDLE_LIBS $MEM_OBJ $THREAD_OBJ"
 fi
 
 CMK_SYSLIBS="$CMK_SYSLIBS -lm"
@@ -1563,7 +1563,7 @@ esac
 
 if [ "$BUILD_SHARE" = "0" ]
 then
-	MIDDLE_LIBS="$MIDDLE_LIBS $MEM_OBJ $THREAD_OBJ -lconv-util"
+	MIDDLE_LIBS="$MIDDLE_LIBS $MEM_OBJ $THREAD_OBJ"
 fi
 
 CMK_SYSLIBS="-lmoduleNDMeshStreamer -lmodulecompletion $CMK_SYSLIBS"
