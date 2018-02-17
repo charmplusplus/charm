@@ -1691,9 +1691,9 @@ void Amm<T>::flushMsgs()
 }
 
 template<typename T>
-void Amm<T>::put(int tag, int src, T msg)
+void Amm<T>::put(T msg)
 {
-  AmmEntry<T>* e = new AmmEntry<T>(tag, src, msg);
+  AmmEntry<T>* e = new AmmEntry<T>(msg);
   *lasth = e;
   lasth = &e->next;
 }
@@ -1790,7 +1790,6 @@ void Amm<T>::pup(PUP::er& p, AmmPupMessageFn msgpup)
     p|sz;
     AmmEntry<T> *doomed, *e = first;
     while (e) {
-      pup_ints(&p, e->tags, AMM_NTAGS);
       msgpup(p, (void**)&e->msg);
       doomed = e;
       e = e->next;
@@ -1802,10 +1801,8 @@ void Amm<T>::pup(PUP::er& p, AmmPupMessageFn msgpup)
     p|sz;
     for (int i=0; i<sz; i++) {
       T msg;
-      int tags[AMM_NTAGS];
-      pup_ints(&p, tags, AMM_NTAGS);
       msgpup(p, (void**)&msg);
-      put(tags[0], tags[1], msg);
+      put(msg);
     }
   }
 }
@@ -1941,7 +1938,6 @@ void ampi::pup(PUP::er &p)
         case AMPI_ATA_REQ:
           blockingReq = new ATAReq;
           break;
-        case AMPI_GPU_REQ:
         case AMPI_INVALID_REQ:
           CkAbort("AMPI> error trying to PUP an invalid request!");
           break;
@@ -2520,7 +2516,7 @@ void ampi::ssend_ack(int sreq_idx){
     sreq_idx -= 2;              // start from 2
     AmpiRequestList *reqs = &(parent->ampiReqs);
     SsendReq *sreq = (SsendReq *)(*reqs)[sreq_idx];
-    sreq->statusIreq = true;
+    sreq->complete = true;
     handleBlockedReq(sreq);
     resumeThreadIfReady();
   }
@@ -2586,7 +2582,7 @@ void ampi::inorder(AmpiMsg* msg)
     handleBlockedReq(ireq);
     ireq->receive(this, msg);
   } else {
-    unexpectedMsgs.put(tag, srcRank, msg);
+    unexpectedMsgs.put(msg);
   }
 }
 
@@ -2645,7 +2641,7 @@ void ampi::inorderRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int sr
     ireq->receiveRdma(this, buf, size, ssendReq, srcRank, comm);
   } else {
     AmpiMsg* msg = rdma2AmpiMsg(buf, size, seq, tag, srcRank, ssendReq);
-    unexpectedMsgs.put(tag, srcRank, msg);
+    unexpectedMsgs.put(msg);
   }
 }
 
@@ -2662,7 +2658,7 @@ void ampi::completedRdmaSend(CkDataMsg *msg)
 
   AmpiRequestList& reqList = parent->ampiReqs;
   SendReq& sreq = (SendReq&)(*reqList[reqIdx]);
-  sreq.statusIreq = true;
+  sreq.complete = true;
 
   handleBlockedReq(&sreq);
   resumeThreadIfReady();
@@ -2876,7 +2872,7 @@ void ampi::processAmpiMsg(AmpiMsg *msg, const void* buf, MPI_Datatype type, int 
 }
 
 // RDMA version of ampi::processAmpiMsg
-void ampi::processRdmaMsg(const void *sbuf, int slength, int ssendReq, int srank, void* rbuf,
+void ampi::processRdmaMsg(const void *sbuf, int slength, int ssendReq, int srank, const void* rbuf,
                           int rcount, MPI_Datatype rtype, MPI_Comm comm)
 {
   if (ssendReq > 0) { // send an ack to sender
@@ -3396,43 +3392,44 @@ AmpiMsg *AmpiSeqQ::getOutOfOrder(int seqIdx)
   return 0;
 }
 
-void AmpiRequest::print(){
-  CkPrintf("In AmpiRequest: buf=%p, count=%d, type=%d, src=%d, tag=%d, comm=%d, isvalid=%d\n", buf, count, type, src, tag, comm, isvalid);
+void AmpiRequest::print() const {
+  CkPrintf("In AmpiRequest: buf=%p, count=%d, type=%d, src=%d, tag=%d, comm=%d, reqIdx=%d, complete=%d, blocked=%d\n",
+           buf, count, type, src, tag, comm, reqIdx, (int)complete, (int)blocked);
 }
 
-void IReq::print(){
+void IReq::print() const {
   AmpiRequest::print();
-  CkPrintf("In IReq: this=%p, status=%d, length=%d\n", this, statusIreq, length);
+  CkPrintf("In IReq: this=%p, length=%d, cancelled=%d, persistent=%d\n", this, length, (int)cancelled, (int)persistent);
 }
 
-void RednReq::print(){
+void RednReq::print() const {
   AmpiRequest::print();
-  CkPrintf("In RednReq: this=%p, status=%d\n", this, statusIreq);
+  CkPrintf("In RednReq: this=%p, op=%d\n", this, op);
 }
 
-void GatherReq::print(){
+void GatherReq::print() const {
   AmpiRequest::print();
-  CkPrintf("In GatherReq: this=%p, status=%d\n", this, statusIreq);
+  CkPrintf("In GatherReq: this=%p\n", this);
 }
 
-void GathervReq::print(){
+void GathervReq::print() const {
   AmpiRequest::print();
-  CkPrintf("In GathervReq: this=%p, status=%d\n", this, statusIreq);
+  CkPrintf("In GathervReq: this=%p\n", this);
 }
 
-void ATAReq::print(){ //not complete for reqs
+void ATAReq::print() const { //not complete for reqs
   AmpiRequest::print();
   CkPrintf("In ATAReq: num_reqs=%d\n", reqs.size());
 }
 
-void SendReq::print(){
+void SendReq::print() const {
   AmpiRequest::print();
-  CkPrintf("In SendReq: this=%p, status=%d\n", this, statusIreq);
+  CkPrintf("In SendReq: this=%p, persistent=%d\n", this, (int)persistent);
 }
 
-void SsendReq::print(){
+void SsendReq::print() const {
   AmpiRequest::print();
-  CkPrintf("In SsendReq: this=%p, status=%d\n", this, statusIreq);
+  CkPrintf("In SsendReq: this=%p, persistent=%d\n", this, (int)persistent);
 }
 
 void AmpiRequestList::pup(PUP::er &p, AmpiRequestPool& reqPool) {
@@ -3484,7 +3481,6 @@ void AmpiRequestList::pup(PUP::er &p, AmpiRequestPool& reqPool) {
           case AMPI_ATA_REQ:
             reqs[i] = new ATAReq;
             break;
-          case AMPI_GPU_REQ:
           case AMPI_INVALID_REQ:
             CkAbort("AMPI> error trying to PUP an invalid request!");
             break;
@@ -3816,16 +3812,13 @@ AMPI_API_IMPL(int, MPI_Finalize, void)
 
 MPI_Request ampi::postReq(AmpiRequest* newreq)
 {
+  // All valid requests must be inserted into the AmpiRequestList
   MPI_Request request = getReqs()->insert(newreq);
   // Completed requests should not be inserted into the postedReqs queue.
   // All types of send requests are matched by their request number,
   // not by (tag, src, comm), so they should not be inserted either.
-  if (!newreq->statusIreq &&
-      newreq->getType() != AMPI_SEND_REQ &&
-      newreq->getType() != AMPI_SSEND_REQ &&
-      newreq->getType() != AMPI_ATA_REQ)
-  {
-    postedReqs.put(newreq->tag, newreq->src, newreq);
+  if (newreq->isUnmatched()) {
+    postedReqs.put(newreq);
   }
   return request;
 }
@@ -5007,28 +5000,28 @@ AMPI_API_IMPL(int, MPI_Startall, int count, MPI_Request *requests)
 
 void IReq::start(MPI_Request reqIdx){
   CkAssert(persistent);
-  statusIreq = false;
+  complete = false;
   ampi* ptr = getAmpiInstance(comm);
   AmpiMsg* msg = ptr->unexpectedMsgs.get(tag, src);
   if (msg) { // if msg has already arrived, do the receive right away
     receive(ptr, msg);
   }
   else { // ... otherwise post the receive
-    ptr->postedReqs.put(tag, src, this);
+    ptr->postedReqs.put(this);
   }
 }
 
 void SendReq::start(MPI_Request reqIdx){
   CkAssert(persistent);
-  statusIreq = false;
+  complete = false;
   ampi* ptr = getAmpiInstance(comm);
   ptr->send(tag, ptr->getRank(), buf, count, type, src /*really, the destination*/, comm);
-  statusIreq = true;
+  complete = true;
 }
 
 void SsendReq::start(MPI_Request reqIdx){
   CkAssert(persistent);
-  statusIreq = false;
+  complete = false;
   ampi* ptr = getAmpiInstance(comm);
   ptr->send(tag, ptr->getRank(), buf, count, type, src /*really, the destination*/, comm, reqIdx+2, I_SEND);
 }
@@ -5037,7 +5030,7 @@ int IReq::wait(MPI_Status *sts){
   // ampi::generic() writes directly to the buffer, so the only thing we do here is wait
   ampiParent *parent = getAmpiParent();
 
-  while (!statusIreq) {
+  while (!complete) {
     // parent is updated in case an ampi thread is migrated while waiting for a message
     parent->resumeOnRecv = true;
     parent->numBlockedReqs = 1;
@@ -5048,7 +5041,7 @@ int IReq::wait(MPI_Status *sts){
 
     if (cancelled) {
       if (sts != MPI_STATUS_IGNORE) sts->MPI_CANCEL = 1;
-      statusIreq = true;
+      complete = true;
       parent->resumeOnRecv = false;
       return 0;
     }
@@ -5081,7 +5074,7 @@ int RednReq::wait(MPI_Status *sts){
   // ampi::irednResult() writes directly to the buffer, so the only thing we do here is wait
   ampiParent *parent = getAmpiParent();
 
-  while (!statusIreq) {
+  while (!complete) {
     parent->resumeOnColl = true;
     parent->numBlockedReqs = 1;
     setBlocked(true);
@@ -5114,7 +5107,7 @@ int GatherReq::wait(MPI_Status *sts){
   // ampi::irednResult() writes directly to the buffer, so the only thing we do here is wait
   ampiParent *parent = getAmpiParent();
 
-  while (!statusIreq) {
+  while (!complete) {
     parent->resumeOnColl = true;
     parent->numBlockedReqs = 1;
     setBlocked(true);
@@ -5147,7 +5140,7 @@ int GathervReq::wait(MPI_Status *sts){
   // ampi::irednResult writes directly to the buffer, so the only thing we do here is wait
   ampiParent *parent = getAmpiParent();
 
-  while (!statusIreq) {
+  while (!complete) {
     parent->resumeOnColl = true;
     parent->numBlockedReqs = 1;
     setBlocked(true);
@@ -5178,7 +5171,7 @@ int GathervReq::wait(MPI_Status *sts){
 
 int SendReq::wait(MPI_Status *sts){
   ampiParent *parent = getAmpiParent();
-  while (!statusIreq) {
+  while (!complete) {
     parent->resumeOnRecv = true;
     parent->numBlockedReqs = 1;
     setBlocked(true);
@@ -5198,7 +5191,7 @@ int SendReq::wait(MPI_Status *sts){
 
 int SsendReq::wait(MPI_Status *sts){
   ampiParent *parent = getAmpiParent();
-  while (!statusIreq) {
+  while (!complete) {
     // "dis" is updated in case an ampi thread is migrated while waiting for a message
     parent = parent->blockOnRecv();
   }
@@ -5212,7 +5205,7 @@ int SsendReq::wait(MPI_Status *sts){
 int ATAReq::wait(MPI_Status *sts){
   MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
   reqs.clear();
-  statusIreq = true;
+  complete = true;
   return 0;
 }
 
@@ -5530,9 +5523,9 @@ bool IReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) {
   if (sts != MPI_STATUS_IGNORE) {
     if (cancelled) {
       sts->MPI_CANCEL = 1;
-      statusIreq = true;
+      complete = true;
     }
-    else if (statusIreq) {
+    else if (complete) {
       sts->MPI_SOURCE = src;
       sts->MPI_TAG    = tag;
       sts->MPI_COMM   = comm;
@@ -5541,29 +5534,29 @@ bool IReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) {
     }
   }
   else if (cancelled) {
-    statusIreq = true;
+    complete = true;
   }
-  return statusIreq;
+  return complete;
 }
 
 bool RednReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) {
-  return statusIreq;
+  return complete;
 }
 
 bool GatherReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) {
-  return statusIreq;
+  return complete;
 }
 
 bool GathervReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) {
-  return statusIreq;
+  return complete;
 }
 
 bool SendReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) {
-  return statusIreq;
+  return complete;
 }
 
 bool SsendReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) {
-  return statusIreq;
+  return complete;
 }
 
 bool ATAReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/){
@@ -5585,14 +5578,14 @@ bool ATAReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/){
     }
     i++;
   }
-  statusIreq = reqs.empty();
-  return statusIreq;
+  complete = reqs.empty();
+  return complete;
 }
 
 void IReq::receive(ampi *ptr, AmpiMsg *msg)
 {
   ptr->processAmpiMsg(msg, buf, type, count);
-  statusIreq = true;
+  complete = true;
   length = msg->getLength();
   this->tag = msg->getTag(); // Although not required, we also extract tag from msg
   src = msg->getSrcRank();   // Although not required, we also extract src from msg
@@ -5608,7 +5601,7 @@ void IReq::receive(ampi *ptr, AmpiMsg *msg)
 void IReq::receiveRdma(ampi *ptr, char *sbuf, int slength, int ssendReq, int srcRank, MPI_Comm scomm)
 {
   ptr->processRdmaMsg(sbuf, slength, ssendReq, srcRank, buf, count, type, scomm);
-  statusIreq = true;
+  complete = true;
   length = slength;
   comm = scomm;
   // ampi::genericRdma is parameter marshalled, so there is no msg to delete
@@ -5620,9 +5613,9 @@ void RednReq::receive(ampi *ptr, CkReductionMsg *msg)
     ptr->processRednMsg(msg, buf, type, count);
   } else {
     MPI_User_function* func = ptr->op2User_function(op);
-    ptr->processNoncommutativeRednMsg(msg, buf, type, count, func);
+    ptr->processNoncommutativeRednMsg(msg, const_cast<void*>(buf), type, count, func);
   }
-  statusIreq = true;
+  complete = true;
   comm = ptr->getComm();
 #if CMK_BIGSIM_CHARM
   event = msg->event;
@@ -5634,7 +5627,7 @@ void RednReq::receive(ampi *ptr, CkReductionMsg *msg)
 void GatherReq::receive(ampi *ptr, CkReductionMsg *msg)
 {
   ptr->processGatherMsg(msg, buf, type, count);
-  statusIreq = true;
+  complete = true;
   comm = ptr->getComm();
 #if CMK_BIGSIM_CHARM
   event = msg->event;
@@ -5646,7 +5639,7 @@ void GatherReq::receive(ampi *ptr, CkReductionMsg *msg)
 void GathervReq::receive(ampi *ptr, CkReductionMsg *msg)
 {
   ptr->processGathervMsg(msg, buf, type, recvCounts.data(), displs.data());
-  statusIreq = true;
+  complete = true;
   comm = ptr->getComm();
 #if CMK_BIGSIM_CHARM
   event = msg->event;
@@ -5873,7 +5866,7 @@ AMPI_API_IMPL(int, MPI_Send_init, const void *buf, int count, MPI_Datatype type,
   }
 #endif
 
-  SendReq* sreq = getAmpiParent()->reqPool.newSendReq(comm,dest,const_cast<void*>(buf),type,count,tag,getDDT());
+  SendReq* sreq = getAmpiParent()->reqPool.newSendReq(buf, count, type, dest, tag, comm, getDDT());
   sreq->setPersistent(true);
   *req = getAmpiInstance(comm)->postReq(sreq);
   return MPI_SUCCESS;
@@ -5909,7 +5902,7 @@ AMPI_API_IMPL(int, MPI_Ssend_init, const void *buf, int count, MPI_Datatype type
 #endif
 
   ampi* ptr = getAmpiInstance(comm);
-  SsendReq* sreq = getAmpiParent()->reqPool.newSsendReq(comm,dest,const_cast<void*>(buf),ptr->getRank(),type,count,tag,getDDT());
+  SsendReq* sreq = getAmpiParent()->reqPool.newSsendReq(buf, count, type, dest, tag, comm, ptr->getRank(), getDDT());
   sreq->setPersistent(true);
   *req = ptr->postReq(sreq);
   return MPI_SUCCESS;
@@ -6202,7 +6195,7 @@ void ampi::irecv(void *buf, int count, MPI_Datatype type, int src,
     newreq->receive(this, msg);
   }
   else { // ... otherwise post the receive
-    postedReqs.put(tag, src, newreq);
+    postedReqs.put(newreq);
   }
 
 #if AMPIMSGLOG
@@ -10175,79 +10168,6 @@ int AMPI_Set_end_event(void)
   return MPI_SUCCESS;
 }
 #endif // CMK_BIGSIM_CHARM
-
-#if CMK_CUDA
-GPUReq::GPUReq()
-{
-  comm = MPI_COMM_SELF;
-  isvalid = true;
-  MPI_Comm_rank(comm, &src);
-  buf = getAmpiInstance(comm);
-}
-
-bool GPUReq::test(void)
-{
-  return statusIreq;
-}
-
-int GPUReq::wait(MPI_Status *sts)
-{
-  (void)sts;
-  while (!statusIreq) {
-    getAmpiParent()->block();
-  }
-  return 0;
-}
-
-void GPUReq::receive(ampi *ptr, AmpiMsg *msg)
-{
-  CkAbort("GPUReq::receive should never be called");
-}
-
-void GPUReq::setComplete()
-{
-  statusIreq = true;
-}
-
-class workRequestQueue;
-extern workRequestQueue *wrQueue;
-void enqueue(workRequestQueue *q, workRequest *wr);
-extern "C++" void setWRCallback(workRequest *wr, void *cb);
-
-void AMPI_GPU_complete(void *request, void* dummy)
-{
-  GPUReq *req = static_cast<GPUReq *>(request);
-  req->setComplete();
-  ampi *ptr = static_cast<ampi *>(req->buf);
-  ptr->unblock();
-}
-
-CDECL
-int AMPI_GPU_Iinvoke(workRequest *to_call, MPI_Request *request)
-{
-  AMPI_API("AMPI_GPU_Iinvoke");
-
-  *request = ptr->postReq(new GPUReq());
-
-  // A callback that completes the corresponding request
-  CkCallback *cb = new CkCallback(&AMPI_GPU_complete, newreq);
-  setWRCallback(to_call, cb);
-
-  enqueue(wrQueue, to_call);
-}
-
-CDECL
-int AMPI_GPU_Invoke(workRequest *to_call)
-{
-  AMPI_API("AMPI_GPU_Invoke");
-
-  MPI_Request req;
-  AMPI_GPU_Iinvoke(to_call, &req);
-  MPI_Wait(&req, MPI_STATUS_IGNORE);
-
-  return MPI_SUCCESS;
-}
-#endif // CMK_CUDA
 
 #include "ampi.def.h"
 
