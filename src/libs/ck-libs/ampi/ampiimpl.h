@@ -126,13 +126,15 @@ typedef void (*MPI_MigrateFn)(void);
 #define AMM_SRC   1
 #define AMM_NTAGS 2
 
+class AmpiRequestList;
+
 typedef void (*AmmPupMessageFn)(PUP::er& p, void **msg);
 
 class AmmEntry {
  public:
   int tags[AMM_NTAGS]; // [tag, src]
   AmmEntry* next;
-  void* msg; // either an MPI_Request or an AmpiMsg
+  void* msg; // either an AmpiRequest* or an AmpiMsg*
   AmmEntry(int tag, int src, void* m) { tags[AMM_TAG] = tag; tags[AMM_SRC] = src; next = NULL; msg = m; }
   AmmEntry(){}
   ~AmmEntry(){}
@@ -937,6 +939,7 @@ class AmpiRequest {
   int tag; // the order must match MPI_Status
   int src;
   MPI_Comm comm;
+  MPI_Request reqIdx;
   bool statusIreq;
   bool blocked; // this req is currently blocked on
 
@@ -990,6 +993,9 @@ class AmpiRequest {
   virtual void setBlocked(bool b) { blocked = b; }
   virtual bool isBlocked(void) const { return blocked; }
 
+  inline void setReqIdx(MPI_Request r) { reqIdx = r; }
+  inline MPI_Request getReqIdx(void) const { return reqIdx; }
+
   /// Frees up the request: invalidate it
   virtual void free(void){ isvalid=false; }
   inline bool isValid(void) const { return isvalid; }
@@ -1012,9 +1018,10 @@ class AmpiRequest {
     p(src);
     p(tag);
     p(comm);
-    p(isvalid);
+    p(reqIdx);
     p(statusIreq);
     p(blocked);
+    p(isvalid);
 #if CMK_BIGSIM_CHARM
     //needed for bigsim out-of-core emulation
     //as the "log" is not moved from memory, this pointer is safe
@@ -1299,10 +1306,12 @@ class AmpiRequestList : private CkSTLHelper<AmpiRequest *> {
     for(int i=0;i<len;i++){
       if(block[i]==NULL){
         block[i] = elt;
+        elt->setReqIdx(i);
         return i;
       }
     }
     push_back(elt);
+    elt->setReqIdx(len-1);
     return len-1;
   }
 
@@ -2076,12 +2085,11 @@ class ampi : public CBase_ampi {
 
  public:
   /*
-   * Amm is indexed by the tag and sender.
+   * AMPI Message Matching (Amm) queues are indexed by the tag and sender.
    * Since ampi objects are per-communicator, there are separate Amm's per communicator.
-   * FIXME: These are directly used by API routines, which is hideous.
    */
-  Amm msgs;         // unexpected message queue
-  Amm posted_ireqs; // posted request queue
+  Amm unexpectedMsgs;
+  Amm postedReqs;
 
  private:
   CkPupPtrVec<win_obj> winObjects;

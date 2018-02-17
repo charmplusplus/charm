@@ -1400,8 +1400,18 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration)
     worldStruct=s;
   }
 
-  if (!forMigration)
-  { //Register the new communicator:
+  if (forMigration) { //Restore AmpiRequest*'s in postedReqs:
+    AmmEntry* e = ptr->postedReqs.first;
+    while (e) {
+      MPI_Request reqIdx = (MPI_Request)(intptr_t)e->msg;
+      CkAssert(reqIdx != MPI_REQUEST_NULL);
+      AmpiRequest* req = ampiReqs[reqIdx];
+      CkAssert(req);
+      e->msg = (void*)req;
+      e = e->next;
+    }
+  }
+  else { //Register the new communicator:
     MPI_Comm comm = s.getComm();
     STARTUP_DEBUG("ampiParent> registering new communicator "<<comm)
     if (comm>=MPI_COMM_WORLD) {
@@ -1850,13 +1860,28 @@ void ampi::setInitDoneFlag(){
   parent->getTCharmThread()->start();
 }
 
-static void cmm_pup_ampi_message(PUP::er& p,void **msg) {
+static void AmmPupUnexpectedMsgs(PUP::er& p,void **msg) {
   CkPupMessage(p,msg,1);
   if (p.isDeleting()) delete (AmpiMsg *)*msg;
 }
 
-static void cmm_pup_posted_ireq(PUP::er& p,void **msg) {
-  pup_int(&p, (int *)msg);
+static void AmmPupPostedReqs(PUP::er& p,void **msg) {
+  // AmpiRequests objects are PUPed by AmpiRequestList, so here we pack
+  // the reqIdx of posted requests and in ampiParent::registerAmpi we
+  // lookup the AmpiRequest*'s using the indices. That is necessary because
+  // the ampiParent object is unpacked after the ampi objects.
+  if (p.isPacking()) {
+    MPI_Request reqIdx = ((AmpiRequest*)*msg)->getReqIdx();
+    *msg = (void*)(intptr_t)reqIdx;
+    CkAssert(reqIdx != MPI_REQUEST_NULL);
+  }
+  pup_pointer(&p, msg);
+#if CMK_ERROR_CHECKING
+  if (p.isUnpacking()) {
+    MPI_Request reqIdx = (MPI_Request)(intptr_t)*msg;
+    CkAssert(reqIdx != MPI_REQUEST_NULL);
+  }
+#endif
 }
 
 void ampi::pup(PUP::er &p)
@@ -1911,9 +1936,8 @@ void ampi::pup(PUP::er &p)
     delete blockingReq; blockingReq = NULL;
   }
 
-  msgs.pup(p, cmm_pup_ampi_message);
-
-  posted_ireqs.pup(p, cmm_pup_posted_ireq);
+  unexpectedMsgs.pup(p, AmmPupUnexpectedMsgs);
+  postedReqs.pup(p, AmmPupPostedReqs);
 
   p|oorder;
 }
@@ -1922,9 +1946,9 @@ ampi::~ampi()
 {
   if (CkInRestarting() || _BgOutOfCoreFlag==1) {
     // in restarting, we need to flush messages
-    msgs.flushAmpiMsgs();
+    unexpectedMsgs.flushAmpiMsgs();
+    postedReqs.freeAll();
   }
-  posted_ireqs.freeAll();
 
   delete blockingReq; blockingReq = NULL;
 }
@@ -2536,23 +2560,15 @@ void ampi::inorder(AmpiMsg* msg)
   //Check posted recvs:
   int tag = msg->getTag();
   int srcRank = msg->getSrcRank();
-
-  //in case ampi has not initialized and posted_ireqs are only inserted
-  //at AMPI_Irecv (MPI_Irecv)
   AmpiRequestList *reqL = &(parent->ampiReqs);
-  //When storing the req index, it's 1-based. The reason is stated in the comments
-  //in the ampi::irecv function.
-  int ireqIdx = (int)((intptr_t)posted_ireqs.get(tag, srcRank));
-  IReq *ireq = NULL;
-  if(reqL->size()>0 && ireqIdx>0)
-    ireq = (IReq *)(*reqL)[ireqIdx-1];
+  IReq* ireq = (IReq*)postedReqs.get(tag, srcRank);
   if (ireq) { // receive posted
     if (ireq->isBlocked() && parent->numBlockedReqs != 0) {
       parent->numBlockedReqs--;
     }
     ireq->receive(this, msg);
   } else {
-    msgs.put(tag, srcRank, msg);
+    unexpectedMsgs.put(tag, srcRank, msg);
   }
 }
 
@@ -2607,15 +2623,7 @@ void ampi::inorderRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int sr
   )
 
   //Check posted recvs:
-  //in case ampi has not initialized and posted_ireqs are only inserted
-  //at AMPI_Irecv (MPI_Irecv)
-  AmpiRequestList *reqL = &(parent->ampiReqs);
-  //When storing the req index, it's 1-based. The reason is stated in the comments
-  //in the ampi::irecv function.
-  int ireqIdx = (int)((intptr_t)posted_ireqs.get(tag, srcRank));
-  IReq *ireq = NULL;
-  if (reqL->size()>0 && ireqIdx>0)
-    ireq = (IReq *)(*reqL)[ireqIdx-1];
+  IReq* ireq = (IReq*)postedReqs.get(tag, srcRank);
   if (ireq) { // receive posted
     if (ireq->isBlocked() && parent->numBlockedReqs != 0) {
       parent->numBlockedReqs--;
@@ -2623,7 +2631,7 @@ void ampi::inorderRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int sr
     ireq->receiveRdma(this, buf, size, ssendReq, srcRank, comm);
   } else {
     AmpiMsg* msg = rdma2AmpiMsg(buf, size, seq, tag, srcRank, ssendReq);
-    msgs.put(tag, srcRank, msg);
+    unexpectedMsgs.put(tag, srcRank, msg);
   }
 }
 
@@ -3016,7 +3024,7 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
   ampi *dis = getAmpiInstance(disComm);
   MPI_Status tmpStatus;
   AmpiMsg *msg = NULL;
-  msg = (AmpiMsg *) msgs.get(t, s, (sts == MPI_STATUS_IGNORE) ? (int*)&tmpStatus : (int*)sts);
+  msg = (AmpiMsg *)unexpectedMsgs.get(t, s, (sts == MPI_STATUS_IGNORE) ? (int*)&tmpStatus : (int*)sts);
   if (msg) { // the matching message has already arrived
     if (sts != MPI_STATUS_IGNORE) {
       sts->MPI_SOURCE = msg->getSrcRank();
@@ -3075,7 +3083,7 @@ void ampi::probe(int t, int s, MPI_Comm comm, MPI_Status *sts)
   AmpiMsg *msg = 0;
   while(1) {
     MPI_Status tmpStatus;
-    msg = (AmpiMsg *) msgs.probe(t, s, (sts == MPI_STATUS_IGNORE) ? (int*)&tmpStatus : (int*)sts);
+    msg = (AmpiMsg *)unexpectedMsgs.probe(t, s, (sts == MPI_STATUS_IGNORE) ? (int*)&tmpStatus : (int*)sts);
     if (msg) break;
     // "dis" is updated in case an ampi thread is migrated while waiting for a message
     dis = dis->blockOnRecv();
@@ -3100,7 +3108,7 @@ int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts)
 
   AmpiMsg *msg = 0;
   MPI_Status tmpStatus;
-  msg = (AmpiMsg *) msgs.probe(t, s, (sts == MPI_STATUS_IGNORE) ? (int*)&tmpStatus : (int*)sts);
+  msg = (AmpiMsg *)unexpectedMsgs.probe(t, s, (sts == MPI_STATUS_IGNORE) ? (int*)&tmpStatus : (int*)sts);
   if (msg) {
     if (sts != MPI_STATUS_IGNORE) {
       sts->MPI_SOURCE = msg->getSrcRank();
@@ -3779,7 +3787,7 @@ int AMPI_Finalize(void)
 MPI_Request ampi::postReq(AmpiRequest* newreq)
 {
   MPI_Request request = getReqs()->insert(newreq);
-  // Completed requests should not be inserted into the posted_ireqs queue.
+  // Completed requests should not be inserted into the postedReqs queue.
   // All types of send requests are matched by their request number,
   // not by (tag, src, comm), so they should not be inserted either.
   if (!newreq->statusIreq &&
@@ -3787,7 +3795,7 @@ MPI_Request ampi::postReq(AmpiRequest* newreq)
       newreq->getType() != MPI_SSEND_REQ &&
       newreq->getType() != MPI_ATA_REQ)
   {
-    posted_ireqs.put(newreq->tag, newreq->src, (void *)(intptr_t)(request+1));
+    postedReqs.put(newreq->tag, newreq->src, newreq);
   }
   return request;
 }
@@ -4309,11 +4317,7 @@ void ampi::irednResult(CkReductionMsg *msg)
 {
   MSG_ORDER_DEBUG(CkPrintf("[%d] irednResult called on comm %d\n", thisIndex, myComm.getComm()));
 
-  AmpiRequestList *reqL = &(parent->ampiReqs);
-  int rednReqIdx = (int)((intptr_t) posted_ireqs.get(MPI_REDN_TAG, AMPI_COLL_SOURCE));
-  AmpiRequest *rednReq = NULL;
-  if(reqL->size()>0 && rednReqIdx>0)
-    rednReq = (AmpiRequest *)(*reqL)[rednReqIdx-1];
+  RednReq* rednReq = (RednReq*)postedReqs.get(MPI_REDN_TAG, AMPI_COLL_SOURCE);
   if (rednReq == NULL)
     CkAbort("AMPI> recv'ed a non-blocking reduction unexpectedly!\n");
 
@@ -4950,12 +4954,12 @@ void IReq::start(MPI_Request reqIdx){
   statusIreq = false;
   ampi* ptr = getAmpiInstance(comm);
   AmpiMsg *msg = NULL;
-  msg = (AmpiMsg *) ptr->msgs.get(tag, src);
+  msg = (AmpiMsg *)ptr->unexpectedMsgs.get(tag, src);
   if (msg) { // if msg has already arrived, do the receive right away
     receive(ptr, msg);
   }
   else { // ... otherwise post the receive
-    ptr->posted_ireqs.put(tag, src, (void *)(intptr_t)(reqIdx+1));
+    ptr->postedReqs.put(tag, src, this);
   }
 }
 
@@ -6170,23 +6174,13 @@ void ampi::irecv(void *buf, int count, MPI_Datatype type, int src,
 #endif
 
   AmpiMsg *msg = NULL;
-  msg = (AmpiMsg *) msgs.get(tag, src);
+  msg = (AmpiMsg *)unexpectedMsgs.get(tag, src);
   // if msg has already arrived, do the receive right away
   if (msg) {
     newreq->receive(this, msg);
   }
-  // ... otherwise post the receive
-  else {
-    //just insert the index of the newreq in the ampiParent::ampiReqs
-    //to posted_ireqs. Such change is due to the need for Out-of-core Emulation
-    //in BigSim. Before this change, posted_ireqs and ampiReqs both hold pointers to
-    //AmpiRequest instances. After going through the Pupping routines, both will have
-    //pointers to different AmpiRequest instances and no longer refer to the same AmpiRequest
-    //instance. Therefore, to keep both always accessing the same AmpiRequest instance,
-    //posted_ireqs stores the index (an integer) to ampiReqs.
-    //The index is 1-based rather 0-based because when pulling entries from posted_ireqs,
-    //if not found, a "0" (i.e. NULL) is returned, this confuses the indexing of ampiReqs.
-    posted_ireqs.put(tag, src, (void *)(intptr_t)((*request)+1));
+  else { // ... otherwise post the receive
+    postedReqs.put(tag, src, newreq);
   }
 
 #if AMPIMSGLOG
