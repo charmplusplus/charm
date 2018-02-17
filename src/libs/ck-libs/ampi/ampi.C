@@ -3345,24 +3345,23 @@ void AmpiSeqQ::putOutOfOrder(int seqIdx, AmpiMsg *msg)
 {
   AmpiOtherElement &el=elements[seqIdx];
 #if CMK_ERROR_CHECKING
-  if (msg->getSeq() < el.seqIncoming)
+  if (msg->getSeq() < el.getSeqIncoming())
     CkAbort("AMPI Logic error: received late out-of-order message!\n");
 #endif
   out.enq(msg);
-  el.nOut++; // We have another message in the out-of-order queue
+  el.incNumOutOfOrder(); // We have another message in the out-of-order queue
 }
 
 AmpiMsg *AmpiSeqQ::getOutOfOrder(int seqIdx)
 {
   AmpiOtherElement &el=elements[seqIdx];
-  if (el.nOut==0) return 0; // No more out-of-order left.
+  if (el.getNumOutOfOrder()==0) return 0; // No more out-of-order left.
   // Walk through our out-of-order queue, searching for our next message:
   for (int i=0;i<out.length();i++) {
     AmpiMsg *msg=out.deq();
-    if (msg->getSeqIdx()==seqIdx && msg->getSeq()==el.seqIncoming) {
-      el.seqIncoming++;
-      if (el.seqIncoming == 0) el.seqIncoming++;
-      el.nOut--; // We have one less message out-of-order
+    if (msg->getSeqIdx()==seqIdx && msg->getSeq()==el.getSeqIncoming()) {
+      el.incSeqIncoming();
+      el.decNumOutOfOrder(); // We have one less message out-of-order
       return msg;
     }
     else

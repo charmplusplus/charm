@@ -1442,22 +1442,30 @@ class AmpiMsg : public CMessage_AmpiMsg {
  the out-of-order message list.
 */
 class AmpiOtherElement {
-public:
+private:
   /// Next incoming and outgoing message sequence number
   CMK_REFNUM_TYPE seqIncoming, seqOutgoing;
 
-  /// Number of elements in out-of-order queue. (normally 0)
-  int nOut;
+  /// Number of messages in out-of-order queue (normally 0)
+  int numOutOfOrder;
 
+public:
   /// seqIncoming starts from 1, b/c 0 means unsequenced
   /// seqOutgoing starts from 0, b/c this will be incremented for the first real seq #
-  AmpiOtherElement(void) : seqIncoming(1), seqOutgoing(0), nOut(0) {}
+  AmpiOtherElement(void) : seqIncoming(1), seqOutgoing(0), numOutOfOrder(0) {}
 
-  void pup(PUP::er &p) {
-    p|seqIncoming; p|seqOutgoing;
-    p|nOut;
-  }
+  /// Handle wrap around of unsigned type CMK_REFNUM_TYPE
+  inline void incSeqIncoming() { seqIncoming++; if (seqIncoming==0) seqIncoming=1; }
+  inline CMK_REFNUM_TYPE getSeqIncoming() const { return seqIncoming; }
+
+  inline void incSeqOutgoing() { seqOutgoing++; if (seqOutgoing==0) seqOutgoing=1; }
+  inline CMK_REFNUM_TYPE getSeqOutgoing() const { return seqOutgoing; }
+
+  inline void incNumOutOfOrder() { numOutOfOrder++; }
+  inline void decNumOutOfOrder() { numOutOfOrder--; }
+  inline int getNumOutOfOrder() const { return numOutOfOrder; }
 };
+PUPbytes(AmpiOtherElement)
 
 class AmpiSeqQ : private CkNoncopyable {
   CkMsgQ<AmpiMsg> out; // all out of order messages
@@ -1478,11 +1486,10 @@ public:
   ///   If >1, this message can be immediately processed,
   ///     and you should call "getOutOfOrder" repeatedly.
   inline int put(int seqIdx, AmpiMsg *msg) {
-    AmpiOtherElement &el=elements[seqIdx];
-    if (msg->getSeq()==el.seqIncoming) { // In order:
-      el.seqIncoming++;
-      if (el.seqIncoming == 0) el.seqIncoming++;
-      return 1+el.nOut;
+    AmpiOtherElement &el = elements[seqIdx];
+    if (msg->getSeq() == el.getSeqIncoming()) { // In order:
+      el.incSeqIncoming();
+      return 1+el.getNumOutOfOrder();
     }
     else { // Out of order: stash message
       putOutOfOrder(seqIdx, msg);
@@ -1495,10 +1502,9 @@ public:
   /// so the caller should do that separately
   inline int isInOrder(int srcRank, CMK_REFNUM_TYPE seq) {
     AmpiOtherElement &el = elements[srcRank];
-    if (seq == el.seqIncoming) { // In order:
-      el.seqIncoming++;
-      if (el.seqIncoming == 0) el.seqIncoming++;
-      return 1+el.nOut;
+    if (seq == el.getSeqIncoming()) { // In order:
+      el.incSeqIncoming();
+      return 1+el.getNumOutOfOrder();
     }
     else { // Out of order: caller should stash message
       return 0;
@@ -1514,18 +1520,14 @@ public:
 
   /// Increment the outgoing sequence number.
   inline void incCollSeqOutgoing(void) {
-    CMK_REFNUM_TYPE& seqOutgoing = elements[COLL_SEQ_IDX].seqOutgoing;
-    seqOutgoing++;
-    if (seqOutgoing == 0) seqOutgoing++;
+    elements[COLL_SEQ_IDX].incSeqOutgoing();
   }
 
   /// Return the next outgoing sequence number, and increment it.
-  /// Handle wrap around of unsigned type CMK_REFNUM_TYPE.
   inline CMK_REFNUM_TYPE nextOutgoing(int destRank) {
-    CMK_REFNUM_TYPE& seqOutgoing = elements[destRank].seqOutgoing;
-    seqOutgoing++;
-    if (seqOutgoing == 0) seqOutgoing++;
-    return seqOutgoing;
+    AmpiOtherElement &el = elements[destRank];
+    el.incSeqOutgoing();
+    return el.getSeqOutgoing();
   }
 };
 PUPmarshall(AmpiSeqQ)
