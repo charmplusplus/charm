@@ -1401,13 +1401,14 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration)
   }
 
   if (forMigration) { //Restore AmpiRequest*'s in postedReqs:
-    AmmEntry* e = ptr->postedReqs.first;
+    AmmEntry<AmpiRequest *> *e = ptr->postedReqs.first;
     while (e) {
+      // AmmPupPostedReqs() packed these as MPI_Requests
       MPI_Request reqIdx = (MPI_Request)(intptr_t)e->msg;
       CkAssert(reqIdx != MPI_REQUEST_NULL);
       AmpiRequest* req = ampiReqs[reqIdx];
       CkAssert(req);
-      e->msg = (void*)req;
+      e->msg = req;
       e = e->next;
     }
   }
@@ -1649,43 +1650,45 @@ int ampiParent::deleteWinAttr(MPI_Win win, int keyval){
 }
 
 /*
- * AMPI Message Matching (Amm) Interface
- *   messages are matched based on 2 ints: [tag, src]
+ * AMPI Message Matching (Amm) queues:
+ *   AmpiMsg*'s and AmpiRequest*'s are matched based on 2 ints: [tag, src].
  */
-Amm::Amm() {
-  first = NULL;
-  lasth = &first;
-}
+template class Amm<AmpiMsg *>;
+template class Amm<AmpiRequest *>;
 
-/* free all table entries but not the space pointed by "msg" */
-void Amm::freeAll()
+/* free all table entries but not the space pointed to by 'msg' */
+template<typename T>
+void Amm<T>::freeAll()
 {
-  AmmEntry* cur = first;
+  AmmEntry<T>* cur = first;
   while (cur) {
-    AmmEntry* toDel = cur;
+    AmmEntry<T>* toDel = cur;
     cur = cur->next;
     delete toDel;
   }
 }
 
-/* free all msgs as AmpiMsgs */
-void Amm::flushAmpiMsgs()
+/* free all msgs */
+template<typename T>
+void Amm<T>::flushMsgs()
 {
-  void *msg = get(MPI_ANY_TAG, MPI_ANY_SOURCE);
+  T msg = get(MPI_ANY_TAG, MPI_ANY_SOURCE);
   while (msg) {
-    delete (AmpiMsg*)msg;
+    delete msg;
     msg = get(MPI_ANY_TAG, MPI_ANY_SOURCE);
   }
 }
 
-void Amm::put(int tag, int src, void* msg)
+template<typename T>
+void Amm<T>::put(int tag, int src, T msg)
 {
-  AmmEntry* e = new AmmEntry(tag, src, msg);
+  AmmEntry<T>* e = new AmmEntry<T>(tag, src, msg);
   *lasth = e;
   lasth = &e->next;
 }
 
-bool Amm::match(const int tags1[AMM_NTAGS], const int tags2[AMM_NTAGS]) const
+template<typename T>
+bool Amm<T>::match(const int tags1[AMM_NTAGS], const int tags2[AMM_NTAGS]) const
 {
   if (tags1[AMM_TAG]==tags2[AMM_TAG] && tags1[AMM_SRC]==tags2[AMM_SRC]) {
     // tag and src match
@@ -1709,11 +1712,11 @@ bool Amm::match(const int tags1[AMM_NTAGS], const int tags2[AMM_NTAGS]) const
   }
 }
 
-void* Amm::get(int tag, int src, int* rtags/*=NULL*/)
+template<typename T>
+T Amm<T>::get(int tag, int src, int* rtags)
 {
-  AmmEntry** enth;
-  AmmEntry* ent;
-  void* msg;
+  AmmEntry<T> *ent, **enth;
+  T msg;
   int tags[AMM_NTAGS] = { tag, src };
 
   enth = &first;
@@ -1724,7 +1727,7 @@ void* Amm::get(int tag, int src, int* rtags/*=NULL*/)
       if (rtags) memcpy(rtags, ent->tags, sizeof(int)*AMM_NTAGS);
       msg = ent->msg;
       // unlike probe, delete the matched entry:
-      AmmEntry* next = ent->next;
+      AmmEntry<T>* next = ent->next;
       *enth = next;
       if (!next) lasth = enth;
       delete ent;
@@ -1734,13 +1737,12 @@ void* Amm::get(int tag, int src, int* rtags/*=NULL*/)
   }
 }
 
-void* Amm::probe(int tag, int src, int* rtags)
+template<typename T>
+T Amm<T>::probe(int tag, int src, int* rtags)
 {
-  AmmEntry** enth;
-  AmmEntry* ent;
-  void* msg;
+  AmmEntry<T> *ent, **enth;
+  T msg;
   int tags[AMM_NTAGS] = { tag, src };
-
   CkAssert(rtags);
 
   enth = &first;
@@ -1756,10 +1758,11 @@ void* Amm::probe(int tag, int src, int* rtags)
   }
 }
 
-int Amm::size(void) const
+template<typename T>
+int Amm<T>::size(void) const
 {
   int n = 0;
-  AmmEntry* e = first;
+  AmmEntry<T> *e = first;
   while (e) {
     e = e->next;
     n++;
@@ -1767,32 +1770,30 @@ int Amm::size(void) const
   return n;
 }
 
-void Amm::pup(PUP::er& p, AmmPupMessageFn msgpup)
+template<typename T>
+void Amm<T>::pup(PUP::er& p, AmmPupMessageFn msgpup)
 {
   int sz;
-
   if (!p.isUnpacking()) {
-    AmmEntry* doomed;
-    AmmEntry* e = first;
     sz = size();
     p|sz;
+    AmmEntry<T> *doomed, *e = first;
     while (e) {
       pup_ints(&p, e->tags, AMM_NTAGS);
-      msgpup(p, &e->msg);
+      msgpup(p, (void**)&e->msg);
       doomed = e;
       e = e->next;
       if (p.isDeleting()) {
         delete doomed;
       }
     }
-  }
-  else { //unpacking
+  } else { // unpacking
     p|sz;
     for (int i=0; i<sz; i++) {
-      void* msg;
+      T msg;
       int tags[AMM_NTAGS];
       pup_ints(&p, tags, AMM_NTAGS);
-      msgpup(p, &msg);
+      msgpup(p, (void**)&msg);
       put(tags[0], tags[1], msg);
     }
   }
@@ -1946,7 +1947,7 @@ ampi::~ampi()
 {
   if (CkInRestarting() || _BgOutOfCoreFlag==1) {
     // in restarting, we need to flush messages
-    unexpectedMsgs.flushAmpiMsgs();
+    unexpectedMsgs.flushMsgs();
     postedReqs.freeAll();
   }
 
@@ -2560,7 +2561,6 @@ void ampi::inorder(AmpiMsg* msg)
   //Check posted recvs:
   int tag = msg->getTag();
   int srcRank = msg->getSrcRank();
-  AmpiRequestList *reqL = &(parent->ampiReqs);
   IReq* ireq = (IReq*)postedReqs.get(tag, srcRank);
   if (ireq) { // receive posted
     if (ireq->isBlocked() && parent->numBlockedReqs != 0) {
@@ -3023,8 +3023,7 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
 
   ampi *dis = getAmpiInstance(disComm);
   MPI_Status tmpStatus;
-  AmpiMsg *msg = NULL;
-  msg = (AmpiMsg *)unexpectedMsgs.get(t, s, (sts == MPI_STATUS_IGNORE) ? (int*)&tmpStatus : (int*)sts);
+  AmpiMsg* msg = unexpectedMsgs.get(t, s, (sts == MPI_STATUS_IGNORE) ? (int*)&tmpStatus : (int*)sts);
   if (msg) { // the matching message has already arrived
     if (sts != MPI_STATUS_IGNORE) {
       sts->MPI_SOURCE = msg->getSrcRank();
@@ -3080,10 +3079,10 @@ void ampi::probe(int t, int s, MPI_Comm comm, MPI_Status *sts)
 #endif
 
   ampi *dis = getAmpiInstance(comm);
-  AmpiMsg *msg = 0;
+  AmpiMsg *msg = NULL;
   while(1) {
     MPI_Status tmpStatus;
-    msg = (AmpiMsg *)unexpectedMsgs.probe(t, s, (sts == MPI_STATUS_IGNORE) ? (int*)&tmpStatus : (int*)sts);
+    msg = unexpectedMsgs.probe(t, s, (sts == MPI_STATUS_IGNORE) ? (int*)&tmpStatus : (int*)sts);
     if (msg) break;
     // "dis" is updated in case an ampi thread is migrated while waiting for a message
     dis = dis->blockOnRecv();
@@ -3106,9 +3105,8 @@ int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts)
 {
   if (handle_MPI_PROC_NULL(s, comm, sts)) return 1;
 
-  AmpiMsg *msg = 0;
   MPI_Status tmpStatus;
-  msg = (AmpiMsg *)unexpectedMsgs.probe(t, s, (sts == MPI_STATUS_IGNORE) ? (int*)&tmpStatus : (int*)sts);
+  AmpiMsg* msg = unexpectedMsgs.probe(t, s, (sts == MPI_STATUS_IGNORE) ? (int*)&tmpStatus : (int*)sts);
   if (msg) {
     if (sts != MPI_STATUS_IGNORE) {
       sts->MPI_SOURCE = msg->getSrcRank();
@@ -4953,8 +4951,7 @@ void IReq::start(MPI_Request reqIdx){
   CkAssert(persistent);
   statusIreq = false;
   ampi* ptr = getAmpiInstance(comm);
-  AmpiMsg *msg = NULL;
-  msg = (AmpiMsg *)ptr->unexpectedMsgs.get(tag, src);
+  AmpiMsg* msg = ptr->unexpectedMsgs.get(tag, src);
   if (msg) { // if msg has already arrived, do the receive right away
     receive(ptr, msg);
   }
@@ -6173,8 +6170,7 @@ void ampi::irecv(void *buf, int count, MPI_Datatype type, int src,
   }
 #endif
 
-  AmpiMsg *msg = NULL;
-  msg = (AmpiMsg *)unexpectedMsgs.get(tag, src);
+  AmpiMsg* msg = unexpectedMsgs.get(tag, src);
   // if msg has already arrived, do the receive right away
   if (msg) {
     newreq->receive(this, msg);

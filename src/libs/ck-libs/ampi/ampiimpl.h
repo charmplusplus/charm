@@ -130,29 +130,31 @@ class AmpiRequestList;
 
 typedef void (*AmmPupMessageFn)(PUP::er& p, void **msg);
 
+template <class T>
 class AmmEntry {
  public:
   int tags[AMM_NTAGS]; // [tag, src]
-  AmmEntry* next;
-  void* msg; // either an AmpiRequest* or an AmpiMsg*
-  AmmEntry(int tag, int src, void* m) { tags[AMM_TAG] = tag; tags[AMM_SRC] = src; next = NULL; msg = m; }
+  AmmEntry<T>* next;
+  T msg; // T is either an AmpiRequest* or an AmpiMsg*
+  AmmEntry(int tag, int src, T m) { tags[AMM_TAG] = tag; tags[AMM_SRC] = src; next = NULL; msg = m; }
   AmmEntry(){}
   ~AmmEntry(){}
 };
 
+template <class T>
 class Amm {
  public:
-  AmmEntry* first;
-  AmmEntry** lasth;
+  AmmEntry<T>* first;
+  AmmEntry<T>** lasth;
 
-  Amm();
+  Amm() : first(NULL), lasth(&first) {}
   ~Amm(){}
-  inline void freeAll();
-  inline void flushAmpiMsgs();
+  void freeAll();
+  void flushMsgs();
   inline bool match(const int tags1[AMM_NTAGS], const int tags2[AMM_NTAGS]) const;
-  inline void put(int tag, int src, void* msg);
-  inline void* get(int tag, int src, int* rtags=NULL);
-  inline void* probe(int tag, int src, int* rtags);
+  inline void put(int tag, int src, T msg);
+  inline T get(int tag, int src, int* rtags=NULL);
+  inline T probe(int tag, int src, int* rtags);
   inline int size(void) const;
   void pup(PUP::er& p, AmmPupMessageFn msgpup);
 };
@@ -2088,8 +2090,8 @@ class ampi : public CBase_ampi {
    * AMPI Message Matching (Amm) queues are indexed by the tag and sender.
    * Since ampi objects are per-communicator, there are separate Amm's per communicator.
    */
-  Amm unexpectedMsgs;
-  Amm postedReqs;
+  Amm<AmpiMsg *> unexpectedMsgs;
+  Amm<AmpiRequest *> postedReqs;
 
  private:
   CkPupPtrVec<win_obj> winObjects;
