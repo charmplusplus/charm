@@ -1992,7 +1992,7 @@ void ampi_trace_end(int *ierr) {
 }
 
 #if CMK_BIGSIM_CHARM
-int ampi_set_start_event(int *comm, int *ierr) {
+void ampi_set_start_event(int *comm, int *ierr) {
   *ierr = AMPI_Set_start_event(*comm);
 }
 
