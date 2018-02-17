@@ -2503,12 +2503,8 @@ void ampi::ssend_ack(int sreq_idx){
     AmpiRequestList *reqs = &(parent->ampiReqs);
     SsendReq *sreq = (SsendReq *)(*reqs)[sreq_idx];
     sreq->statusIreq = true;
-    if (sreq->isBlocked() && parent->numBlockedReqs != 0) {
-      parent->numBlockedReqs--;
-    }
-    if (parent->resumeOnRecv && parent->numBlockedReqs == 0) {
-      thread->resume();
-    }
+    handleBlockedReq(sreq);
+    resumeThreadIfReady();
   }
 }
 
@@ -2539,9 +2535,7 @@ void ampi::generic(AmpiMsg* msg)
   }
   // msg may be free'ed from calling inorder()
 
-  if(parent->resumeOnRecv && parent->numBlockedReqs==0){
-    thread->resume();
-  }
+  resumeThreadIfReady();
 }
 
 inline static AmpiRequestList *getReqs(void);
@@ -2563,9 +2557,7 @@ void ampi::inorder(AmpiMsg* msg)
   int srcRank = msg->getSrcRank();
   IReq* ireq = (IReq*)postedReqs.get(tag, srcRank);
   if (ireq) { // receive posted
-    if (ireq->isBlocked() && parent->numBlockedReqs != 0) {
-      parent->numBlockedReqs--;
-    }
+    handleBlockedReq(ireq);
     ireq->receive(this, msg);
   } else {
     unexpectedMsgs.put(tag, srcRank, msg);
@@ -2608,9 +2600,7 @@ void ampi::genericRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int sr
     inorderRdma(buf, size, seq, tag, srcRank, destcomm, ssendReq);
   }
 
-  if (parent->resumeOnRecv && parent->numBlockedReqs == 0) {
-    thread->resume();
-  }
+  resumeThreadIfReady();
 }
 
 // RDMA version of ampi::inorder
@@ -2625,9 +2615,7 @@ void ampi::inorderRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int sr
   //Check posted recvs:
   IReq* ireq = (IReq*)postedReqs.get(tag, srcRank);
   if (ireq) { // receive posted
-    if (ireq->isBlocked() && parent->numBlockedReqs != 0) {
-      parent->numBlockedReqs--;
-    }
+    handleBlockedReq(ireq);
     ireq->receiveRdma(this, buf, size, ssendReq, srcRank, comm);
   } else {
     AmpiMsg* msg = rdma2AmpiMsg(buf, size, seq, tag, srcRank, ssendReq);
@@ -2650,12 +2638,8 @@ void ampi::completedRdmaSend(CkDataMsg *msg)
   SendReq& sreq = (SendReq&)(*reqList[reqIdx]);
   sreq.statusIreq = true;
 
-  if (sreq.isBlocked() && parent->numBlockedReqs != 0) {
-    parent->numBlockedReqs--;
-  }
-  if (parent->resumeOnRecv && parent->numBlockedReqs == 0) {
-    thread->resume();
-  }
+  handleBlockedReq(&sreq);
+  resumeThreadIfReady();
   // CkDataMsg is allocated & freed by the runtime, so do not delete msg
 }
 
@@ -4331,9 +4315,7 @@ void ampi::irednResult(CkReductionMsg *msg)
   }
 #endif
 
-  if (rednReq->isBlocked() && parent->numBlockedReqs != 0) {
-    parent->numBlockedReqs--;
-  }
+  handleBlockedReq(rednReq);
   rednReq->receive(this, msg);
 
 #if AMPIMSGLOG

@@ -1996,6 +1996,17 @@ class ampi : public CBase_ampi {
   CProxy_ampi createNewChildAmpiSync();
   void insertNewChildAmpiElements(MPI_Comm newComm, CProxy_ampi newAmpi);
 
+  inline void handleBlockedReq(AmpiRequest* req) {
+    if (req->isBlocked() && parent->numBlockedReqs != 0) {
+      parent->numBlockedReqs--;
+    }
+  }
+  inline void resumeThreadIfReady() {
+    if (parent->resumeOnRecv && parent->numBlockedReqs == 0) {
+      thread->resume();
+    }
+  }
+
  public: // to be used by MPI_* functions
 
   inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) const {
