@@ -1010,19 +1010,6 @@ EOT
 test_cxx "whether C++ signed char and char differ" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_SIGNEDCHAR_DIFF_CHAR, $pass, [whether C++ signed char and char differ])
 
-### check if varsize array on stack ####
-cat > $t <<EOT
-#include <stdio.h>
-void foo()
-{
-  int size=10;
-  char arr[size];
-}
-
-EOT
-test_cxx "whether C++ allows declaration of varsize array" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_DECLARE_VARSIZE_ARRAY, $pass, [whether C++ allows declaration of variable sized array])
-
 #### check if typeinfo exists and works #####
 cat > $t <<EOT
 #include <typeinfo>
@@ -1081,59 +1068,6 @@ AC_DEFINE_UNQUOTED(CMK_HAS_STD_INSERTER, $pass, [whether std::inserter works])
 
 
 ####### Check support for features added by the new C11 and CPP11 standards ########
-
-#### check if std::unordered_map is defined #####
-cat > $t <<EOT
-#include <unordered_map>
-
-int foo()
-{
-  std::unordered_map<int,int> myhashtbl;
-  myhashtbl[[0]] = 42;
-  myhashtbl[[1234]] = 0;
-  return myhashtbl[[1234]];
-}
-EOT
-test_cxx "whether std::unordered_map is defined" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_STD_UNORDERED_MAP, $pass, [whether std::unordered_map works])
-
-if test $pass -ne 1
-then
-	echo "Charm++ requires std::unordered_map support"
-	test_finish 1
-fi
-
-#### check if anon structs are permitted #####
-cat > $t <<EOT
-#include <iostream>
-using std::cout;
-
-struct idx
-{
-    const static int dims = 3;
-    union
-    {
-        int data[[dims]];
-        struct { int x, y, z; };
-    };
-
-    idx(const int i=0, const int j=0, const int k=0): x(i), y(j), z(k) {}
-};
-
-int main()
-{
-    cout<<"Hello World!\n";
-    idx myidx(1, 2, 3);
-    cout<< "idx = ("
-        << myidx.data[[0]] << ","
-        << myidx.data[[1]] << ","
-        << myidx.z << ")\n";
-    return (myidx.data[[0]] == 1 && myidx.y == 2 && myidx.data[[2]] == 3);
-}
-EOT
-test_cxx "whether anon structs are permitted" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_ANON_STRUCTS, $pass, [whether anon structs are permitted])
-
 
 #### test if we can have multiple delete like this ####
 cat > $t <<EOT
