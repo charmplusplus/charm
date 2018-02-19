@@ -5520,6 +5520,8 @@ processor to connect it to a new one**/
   static int next_replacement_host = 0;
   p.host->crashed = true;
   const int host_count = host_table.size();
+#if 0
+  // Disabled since ft does not distinguish host faults from process faults
   int hosts_checked = 0;
   while (host_table[next_replacement_host]->crashed)
   {
@@ -5531,6 +5533,7 @@ processor to connect it to a new one**/
       exit(1);
     }
   }
+#endif
   p.host = host_table[next_replacement_host];
   ++next_replacement_host;
   next_replacement_host %= host_count;
