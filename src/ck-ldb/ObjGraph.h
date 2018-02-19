@@ -70,7 +70,7 @@ public:
 private:
   enum { hash_max = 256 };
 
-  int calc_hashval(LDOMid, LDObjid);
+  int calc_hashval(LDOMid, CmiUInt8);
   Node* find_node(const LDObjKey &);
 
   Edge* edgelist;

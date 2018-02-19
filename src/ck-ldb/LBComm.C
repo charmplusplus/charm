@@ -92,8 +92,8 @@ bool LBCommData::equal(const LBCommData &d2) const
     if (src_proc != d2.src_proc)
       return false;
   } else {
-    if (!LDOMidEqual(srcObj.omID(), d2.srcObj.omID())
-	|| !LDObjIDEqual(srcObj.objID(),d2.srcObj.objID()) )
+    if (srcObj.omID() != d2.srcObj.omID()
+	|| srcObj.objID() != d2.srcObj.objID() )
       return false;
   }
   return (bool)(destObj == d2.destObj);
@@ -109,9 +109,8 @@ int LBCommData::compute_key()
     pcount = sprintf(kptr,"%d",src_proc);
     kptr += pcount;
   } else {
-    pcount = sprintf(kptr,"%d%d%d%d%d",srcObj.omID().id.idx,
-		     srcObj.id.id[0],srcObj.id.id[1],
-		     srcObj.id.id[2],srcObj.id.id[3]);
+    pcount = sprintf(kptr,"%d%" PRIu64 "",srcObj.omID().id.idx,
+		     srcObj.id);
     kptr += pcount;
   }
 
@@ -122,9 +121,8 @@ int LBCommData::compute_key()
        break;
   case LD_OBJ_MSG: {
        LDObjKey &destKey = destObj.get_destObj();
-       pcount += sprintf(kptr,"%d%d%d%d%dXXXXXXXX",destKey.omID().id.idx,
-		    destKey.objID().id[0],destKey.objID().id[1],
-		    destKey.objID().id[2],destKey.objID().id[3]);
+       pcount += sprintf(kptr,"%d%" PRIu64 "XXXXXXXX",destKey.omID().id.idx,
+		    destKey.objID());
        pcount -= 8;  /* The 'X's insure that the next few bytes are fixed */
        break;
        }
@@ -132,9 +130,8 @@ int LBCommData::compute_key()
        int len;
        LDObjKey *destKeys = destObj.get_destObjs(len);
        CmiAssert(len>0);
-       pcount += sprintf(kptr,"%d%d%d%d%dXXXXXXXX",destKeys[0].omID().id.idx,
-		    destKeys[0].objID().id[0],destKeys[0].objID().id[1],
-		    destKeys[0].objID().id[2],destKeys[0].objID().id[3]);
+       pcount += sprintf(kptr,"%d%" PRIu64 "XXXXXXXX",destKeys[0].omID().id.idx,
+		    destKeys[0].objID());
        pcount -= 8;  /* The 'X's insure that the next few bytes are fixed */
        break;
        }

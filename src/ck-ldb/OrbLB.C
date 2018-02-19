@@ -357,17 +357,25 @@ void OrbLB::work(LDStats* stats)
       y = idx->data()[1];
       z = idx->data()[2];
     } else {
-      x = odata.objID().id[0];
-      y = odata.objID().id[1];
-      z = odata.objID().id[2];
+      CkGroupID locMgrGid;
+      locMgrGid.idx = odata.omHandle().id.id.idx;
+      CkLocMgr *localLocMgr = (CkLocMgr *) CkLocalBranch(locMgrGid);
+      CkArrayIndex arr_idx = localLocMgr->lookupIdx(odata.objID());
+      x = arr_idx.data()[0];
+      y = arr_idx.data()[1];
+      z = arr_idx.data()[2];
     }
     computeLoad[objIdx].v[XDIR] = x;
     computeLoad[objIdx].v[YDIR] = y;
     computeLoad[objIdx].v[ZDIR] = z;
 #else
-    computeLoad[objIdx].v[XDIR] = odata.objID().id[0];
-    computeLoad[objIdx].v[YDIR] = odata.objID().id[1];
-    computeLoad[objIdx].v[ZDIR] = odata.objID().id[2];
+    CkGroupID locMgrGid;
+    locMgrGid.idx = odata.omHandle().id.id.idx;
+    CkLocMgr *localLocMgr = (CkLocMgr *) CkLocalBranch(locMgrGid);
+    CkArrayIndex arr_idx = localLocMgr->lookupIdx(odata.objID());
+    computeLoad[objIdx].v[XDIR] = arr_idx.data()[0];
+    computeLoad[objIdx].v[YDIR] = arr_idx.data()[1];
+    computeLoad[objIdx].v[ZDIR] = arr_idx.data()[2];
 #endif
 #if CMK_LB_CPUTIMER
     computeLoad[objIdx].load = _lb_args.useCpuTime()?odata.cpuTime:odata.wallTime;

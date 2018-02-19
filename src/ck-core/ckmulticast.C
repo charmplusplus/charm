@@ -42,7 +42,7 @@ typedef std::vector<int> groupPeList;
 typedef std::vector<CkSectionInfo> sectionIdList;
 typedef std::vector<CkReductionMsg *> reductionMsgs;
 typedef CkQ<int> PieceSize;
-typedef std::vector<LDObjid> ObjKeyList;
+typedef std::vector<CmiUInt8> ObjKeyList;
 typedef unsigned char byte;
 
 /** Information about the status of reductions proceeding along a given section
@@ -302,8 +302,6 @@ mCastEntry::mCastEntry (mCastEntry *old):
   asm_fill = 0;
 }
 
-extern LDObjid idx2LDObjid(const CkArrayIndex &idx);    // cklocation.C
-
 
 
 void CkMulticastMgr::setSection(CkSectionInfo &_id, CkArrayID aid, CkArrayIndex *al, int n)
@@ -319,8 +317,9 @@ void CkMulticastMgr::setSection(CkSectionInfo &_id, CkArrayID aid, CkArrayIndex 
     for (int i=0; i<n; i++) {
         entry->allElem.push_back(al[i]);
 #if CMK_LBDB_ON
-        const LDObjid key = idx2LDObjid(al[i]);
-        entry->allObjKeys.push_back(key);
+    CmiUInt8 _key;
+    if(CProxy_ArrayBase(aid).ckLocMgr()->lookupID(al[i], _key))
+      entry->allObjKeys.push_back(_key);
 #endif
     }
     entry->bfactor = factor;
@@ -354,8 +353,9 @@ void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
   for (int i=0; i<proxy.ckGetNumElements(); i++) {
     entry->allElem.push_back(al[i]);
 #if CMK_LBDB_ON
-    const LDObjid key = idx2LDObjid(al[i]);
-    entry->allObjKeys.push_back(key);
+    CmiUInt8 _key;
+    if(CProxy_ArrayBase(aid).ckLocMgr()->lookupID(al[i], _key))
+      entry->allObjKeys.push_back(_key);
 #endif
   }
   if(proxy.ckGetBfactor() == USE_DEFAULT_BRANCH_FACTOR)
@@ -407,8 +407,9 @@ void CkMulticastMgr::prepareCookie(mCastEntry *entry, CkSectionID &sid, const Ck
   for (int i=0; i<count; i++) {
     entry->allElem.push_back(al[i]);
 #if CMK_LBDB_ON
-    const LDObjid key = idx2LDObjid(al[i]);
-    entry->allObjKeys.push_back(key);
+    CmiUInt8 _key;
+    if(CProxy_ArrayBase(aid).ckLocMgr()->lookupID(al[i], _key))
+      entry->allObjKeys.push_back(_key);
 #endif
   }
   if(sid.bfactor == USE_DEFAULT_BRANCH_FACTOR)

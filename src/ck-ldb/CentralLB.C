@@ -960,8 +960,8 @@ static bool isMigratable(LDObjData **objData, int *len, int count, const LDCommD
   for (int pe=0 ; pe<count; pe++)
   {
     for (int i=0; i<len[pe]; i++)
-      if (LDObjIDEqual(objData[pe][i].objID(), commData.sender.objID()) ||
-          LDObjIDEqual(objData[pe][i].objID(), commData.receiver.get_destObj().objID())) 
+      if (objData[pe][i].objID() == commData.sender.objID() ||
+          objData[pe][i].objID() == commData.receiver.get_destObj().objID())
       return false;
   }
 #endif

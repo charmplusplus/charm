@@ -304,6 +304,8 @@ else
   test_finish 1
 fi
 
+AC_DEFINE_UNQUOTED(CMK_LBID_64BIT, 1, [enable 64 bit LB ID])
+
 AC_ARG_WITH([qlogic],
             [AS_HELP_STRING([--with-qlogic],
               [QLogic based Infiniband])],[with_qlogic=yes],

@@ -342,6 +342,21 @@ typedef std::unordered_map<CmiUInt8, CkLocRec*> LocRecHash;
           }
         }
 
+        // Lookup CkArrayIndex for a CmiUInt8, used by BlockLB and OrbLB
+        inline CkArrayIndex lookupIdx(const CmiUInt8 &id) const {
+         if (compressor) {
+           return compressor->decompress(id);
+          } else {
+           CkLocMgr::IdxIdMap::const_iterator itr;
+            for ( itr = idx2id.begin(); itr != idx2id.end(); itr++ ) {
+              if(itr->second == id)
+                break;
+            }
+            CkAssert(itr != idx2id.end());
+            return itr->first;
+          }
+        }
+
 	//Look up array element in hash table.  Index out-of-bounds if not found.
 	CkLocRec *elementRec(const CkArrayIndex &idx);
 	//Look up array element in hash table.  Return NULL if not there.

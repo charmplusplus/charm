@@ -215,7 +215,7 @@ public:
 
   void ResetAdaptive();
 
-  inline LDObjHandle RegisterObj(LDOMHandle h, LDObjid id,
+  inline LDObjHandle RegisterObj(LDOMHandle h, CmiUInt8 id,
 			  void *userptr,int migratable) {
     return LDRegisterObj(h,id,userptr,migratable);
   };
@@ -264,10 +264,10 @@ public:
   inline const LDObjHandle &GetObjHandle(int idx) { return LDGetObjHandle(myLDHandle, idx);}
   inline void ObjectStart(const LDObjHandle &_h) { LDObjectStart(_h); };
   inline void ObjectStop(const LDObjHandle &_h) { LDObjectStop(_h); };
-  inline void Send(const LDOMHandle &_om, const LDObjid _id, unsigned int _b, int _p, int force = 0) {
+  inline void Send(const LDOMHandle &_om, const CmiUInt8 _id, unsigned int _b, int _p, int force = 0) {
     LDSend(_om, _id, _b, _p, force);
   };
-  inline void MulticastSend(const LDOMHandle &_om, LDObjid *_ids, int _n, unsigned int _b, int _nMsgs=1) {
+  inline void MulticastSend(const LDOMHandle &_om, CmiUInt8 *_ids, int _n, unsigned int _b, int _nMsgs=1) {
     LDMulticastSend(_om, _ids, _n, _b, _nMsgs);
   };
 

@@ -72,7 +72,7 @@ public:
   LDOMHandle AddOM(LDOMid _userID, void* _userData, LDCallbacks _callbacks);
   void RemoveOM(LDOMHandle om);
 
-  LDObjHandle AddObj(LDOMHandle _h, LDObjid _id, void *_userData,
+  LDObjHandle AddObj(LDOMHandle _h, CmiUInt8 _id, void *_userData,
 		     bool _migratable);
   void UnregisterObj(LDObjHandle _h);
 
@@ -118,8 +118,8 @@ public:
     else CmiPrintf("Predictor not supported in this load balancer");
   }
 
-  void Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes, int destObjProc);
-  void MulticastSend(const LDOMHandle &destOM, LDObjid *destids, int ndests, unsigned int bytes, int nMsgs);
+  void Send(const LDOMHandle &destOM, const CmiUInt8 &destid, unsigned int bytes, int destObjProc);
+  void MulticastSend(const LDOMHandle &destOM, CmiUInt8 *destids, int ndests, unsigned int bytes, int nMsgs);
   int ObjDataCount();
   void GetObjData(LDObjData *data);
   inline int CommDataCount() { 

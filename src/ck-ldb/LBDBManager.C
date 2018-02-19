@@ -106,7 +106,7 @@ void LBDB::RemoveOM(LDOMHandle om)
 #define LBOBJ_OOC_IDX 0x1
 #endif
 
-LDObjHandle LBDB::AddObj(LDOMHandle _omh, LDObjid _id,
+LDObjHandle LBDB::AddObj(LDOMHandle _omh, CmiUInt8 _id,
 			 void *_userData, bool _migratable)
 {
   LDObjHandle newhandle;
@@ -114,7 +114,7 @@ LDObjHandle LBDB::AddObj(LDOMHandle _omh, LDObjid _id,
   newhandle.omhandle = _omh;
 //  newhandle.user_ptr = _userData;
   newhandle.id = _id;
-  
+
 #if CMK_BIGSIM_CHARM
   if(_BgOutOfCoreFlag==2){ //taking object into memory
     //first find the first (LBOBJ_OOC_IDX) in objs and insert the object at that position
@@ -227,7 +227,7 @@ void LBDB::DoneRegisteringObjects(LDOMHandle _h)
 }
 
 
-void LBDB::Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes, int destObjProc)
+void LBDB::Send(const LDOMHandle &destOM, const CmiUInt8 &destid, unsigned int bytes, int destObjProc)
 {
   LBCommData* item_ptr;
 
@@ -236,7 +236,7 @@ void LBDB::Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int by
 
     // Don't record self-messages from an object to an object
     if ( LDOMidEqual(runObj.omhandle.id,destOM.id)
-	 && LDObjIDEqual(runObj.id,destid) )
+	 && runObj.id == destid )
       return;
 
     // In the future, we'll have to eliminate processor to same 
@@ -251,10 +251,9 @@ void LBDB::Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int by
   item_ptr->addMessage(bytes);
 }
 
-void LBDB::MulticastSend(const LDOMHandle &destOM, LDObjid *destids, int ndests, unsigned int bytes, int nMsgs)
+void LBDB::MulticastSend(const LDOMHandle &destOM, CmiUInt8 *destids, int ndests, unsigned int bytes, int nMsgs)
 {
   LBCommData* item_ptr;
-
   //CmiAssert(obj_running);
   if (obj_running) {
     const LDObjHandle &runObj = RunningObj();
@@ -262,7 +261,7 @@ void LBDB::MulticastSend(const LDOMHandle &destOM, LDObjid *destids, int ndests,
     LBCommData item(runObj,destOM.id,destids, ndests);
     item_ptr = commTable->HashInsertUnique(item);
     item_ptr->addMessage(bytes, nMsgs);
-  } 
+  }
 }
 
 void LBDB::ClearLoads(void)

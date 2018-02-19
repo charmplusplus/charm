@@ -76,58 +76,17 @@ bool useNodeBlkMapping;
 int _messageBufferingThreshold;
 
 #if CMK_LBDB_ON
-/*LBDB object handles are fixed-sized, and not necc.
-the same size as ArrayIndices.
-*/
-LDObjid idx2LDObjid(const CkArrayIndex &idx)
-{
-  LDObjid r;
-  int i;
-  const int *data=idx.data();
-  if (OBJ_ID_SZ>=idx.nInts) {
-    for (i=0;i<idx.nInts;i++)
-      r.id[i]=data[i];
-    for (i=idx.nInts;i<OBJ_ID_SZ;i++)
-      r.id[i]=0;
-  } else {
-    //Must hash array index into LBObjid
-    int j;
-    for (j=0;j<OBJ_ID_SZ;j++)
-    	r.id[j]=data[j];
-    for (i=0;i<idx.nInts;i++)
-      for (j=0;j<OBJ_ID_SZ;j++)
-        r.id[j]+=circleShift(data[i],22+11*i*(j+1))+
-          circleShift(data[i],21-9*i*(j+1));
-  }
-
-#if CMK_GLOBAL_LOCATION_UPDATE
-  r.dimension = idx.dimension;
-  r.nInts = idx.nInts; 
-  r.isArrayElement = 1; 
-#endif
-
-  return r;
-}
 
 #if CMK_GLOBAL_LOCATION_UPDATE
 void UpdateLocation(MigrateInfo& migData) {
 
-  if (migData.obj.id.isArrayElement == 0) {
+  CkGroupID locMgrGid = ck::ObjID(migData.obj.id).getCollectionID();
+  if (locMgrGid.idx == 0) {
     return;
   }
 
-  CkArrayIndex idx; 
-  idx.dimension = migData.obj.id.dimension; 
-  idx.nInts = migData.obj.id.nInts; 
-
-  for (int i = 0; i < idx.nInts; i++) {
-    idx.data()[i] = migData.obj.id.id[i];    
-  }
-
-  CkGroupID locMgrGid;
-  locMgrGid.idx = migData.obj.id.locMgrGid;
   CkLocMgr *localLocMgr = (CkLocMgr *) CkLocalBranch(locMgrGid);
-  localLocMgr->updateLocation(idx, migData.to_pe); 
+  localLocMgr->updateLocation(migData.obj.id, migData.to_pe);
 }
 #endif
 
@@ -1898,12 +1857,13 @@ CkLocRec::CkLocRec(CkLocMgr *mgr,bool fromMigration,
 	the_lbdb=mgr->getLBDB();
 	if(_lb_args.metaLbOn())
 	  the_metalb=mgr->getMetaBalancer();
-	LDObjid ldid = idx2LDObjid(idx);
 #if CMK_GLOBAL_LOCATION_UPDATE
-        ldid.locMgrGid = mgr->getGroupID().idx;
+	CmiUInt8 locMgrGid = mgr->getGroupID().idx;
+	id_ = ck::ObjID(id_).getElementID();
+	id_ |= locMgrGid << ck::ObjID().ELEMENT_BITS;
 #endif        
 	ldHandle=the_lbdb->RegisterObj(mgr->getOMHandle(),
-		ldid,(void *)this,1);
+		id_, (void *)this,1);
 	if (fromMigration) {
 		DEBL((AA "Element %s migrated in\n" AB,idx2str(idx)));
 		if (!ignoreArrival)  {
@@ -2392,7 +2352,7 @@ bool CkLocMgr::addElement(CkArrayID mgr,const CkArrayIndex &idx,
                 if (homePe(idx) != CkMyPe()) {
                   DEBC((AA "Global location broadcast for new element idx %s "
                         "assigned to %d \n" AB, idx2str(idx), CkMyPe()));
-                  thisProxy.updateLocation(idx, CkMyPe());  
+                  thisProxy.updateLocation(id, CkMyPe());
                 }
 #endif
                 
@@ -2635,16 +2595,13 @@ int CkLocMgr::deliverMsg(CkArrayMessage *msg, CkArrayID mgr, CmiUInt8 id, const 
 #if CMK_LBDB_ON
   if ((idx || compressor) && type==CkDeliver_queue && !(opts & CK_MSG_LB_NOTRACE) && the_lbdb->CollectingCommStats())
   {
-    LDObjid ldid;
-    if (idx)
-      ldid = idx2LDObjid(*idx);
-    else if (compressor)
-      ldid = idx2LDObjid(compressor->decompress(id));
 #if CMK_GLOBAL_LOCATION_UPDATE
-    ldid.locMgrGid = thisgroup.idx;
+    CmiUInt8 locMgrGid = thisgroup.idx;
+    id = ck::ObjID(id).getElementID();
+    id |= locMgrGid << ck::ObjID().ELEMENT_BITS;
 #endif
     the_lbdb->Send(myLBHandle
-                   , ldid
+                   , id
                    , UsrToEnv(msg)->getTotalsize()
                    , lastKnown(id)
                    , 1);
@@ -3174,7 +3131,7 @@ void CkLocMgr::emigrate(CkLocRec *rec,int toPe)
 #if !CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
         DEBM((AA "Global location update. idx %s " 
               "assigned to %d \n" AB,idx2str(idx),toPe));
-        thisProxy.updateLocation(idx, toPe);                        
+        thisProxy.updateLocation(id, toPe);
 #endif
 
 	CK_MAGICNUMBER_CHECK
