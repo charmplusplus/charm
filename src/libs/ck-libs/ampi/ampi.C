@@ -8358,7 +8358,7 @@ int AMPI_Intercomm_merge(MPI_Comm intercomm, int high, MPI_Comm *newintracomm){
 AMPI_API_IMPL(MPI_Abort)
 int AMPI_Abort(MPI_Comm comm, int errorcode)
 {
-  AMPI_API("AMPI_Abort");
+  AMPI_API_INIT("AMPI_Abort");
   CkAbort("AMPI: Application called MPI_Abort()!\n");
   return errorcode;
 }
