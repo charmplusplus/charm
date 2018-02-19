@@ -216,6 +216,7 @@ int CtgGlobalList::isUserSymbol(const char *name) {
        || (strncmp("ckout", name, 5) == 0) || (strncmp("stdout", name, 6) == 0)
        || (strncmp("ckerr", name, 5) == 0)
        || (strncmp("environ", name, 7) == 0)
+       || (strncmp("pthread", name, 7) == 0)
        || (strncmp("stderr", name, 6) == 0) || (strncmp("stdin", name, 5) == 0)) {
 #ifdef CMK_GFORTRAN
         if (match(name, "__.*_MOD_.*")) return 1;
