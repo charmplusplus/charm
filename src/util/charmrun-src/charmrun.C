@@ -1352,8 +1352,6 @@ static std::vector<nodetab_host *> my_host_table;
 static std::vector<nodetab_process> my_process_table;
 static std::vector<nodetab_process *> pe_to_process_map;
 
-static std::unordered_map<SOCKET, nodetab_process *> skt_client_table;
-
 static const char *nodetab_args(const char *args, nodetab_host *h)
 {
   while (*args != 0)
@@ -2390,7 +2388,6 @@ static int req_handle_realloc(ChMessage *msg, SOCKET fd)
   for (const nodetab_process & p : my_process_table)
     ChMessage_send(p.req_client, &ackmsg);
 
-  skt_client_table.clear();
   skt_close(server_fd);
   skt_close(CcsServer_fd());
   execv(ret[0], (char **)ret);
@@ -2785,6 +2782,27 @@ static int ignore_socket_errors(SOCKET skt, int c, const char *m)
   return -1;
 }
 
+static nodetab_process & get_process_for_socket(std::vector<nodetab_process> & process_table, SOCKET req_client)
+{
+  nodetab_process * ptr = nullptr;
+  for (nodetab_process & p : process_table)
+  {
+    if (p.req_client == req_client)
+    {
+      ptr = &p;
+      break;
+    }
+  }
+  if (ptr == nullptr)
+  {
+    fprintf(stderr, "Charmrun> get_process_for_socket: unknown socket\n");
+    exit(1);
+  }
+
+  nodetab_process & p = *ptr;
+  return p;
+}
+
 /*A socket went bad somewhere!  Immediately disconnect,
 which kills everybody.
 */
@@ -2793,18 +2811,14 @@ static int socket_error_in_poll(SOCKET skt, int code, const char *msg)
   /*commenting it for fault tolerance*/
   /*ifdef it*/
   skt_set_abort(ignore_socket_errors);
-  auto iter_proc = skt_client_table.find(skt);
-  if (iter_proc != skt_client_table.end())
+
   {
-    const nodetab_process * p = (*iter_proc).second;
+    const nodetab_process & p = get_process_for_socket(my_process_table, skt);
     fprintf(stderr, "Charmrun> error on request socket to node %d '%s'--\n"
                     "%s\n",
-            p->nodeno, p->host->name, msg);
+            p.nodeno, p.host->name, msg);
   }
-  else
-  {
-    fprintf(stderr, "Charmrun> unknown error on request socket--\n%s\n", msg);
-  }
+
 #ifndef __FAULT__
   for (const nodetab_process & p : my_process_table)
     skt_close(p.req_client);
@@ -3115,13 +3129,8 @@ static int client_connect_problem(const nodetab_process & p, const char *msg)
 
 static int client_connect_problem_skt(SOCKET skt, int code, const char *msg)
 { /* Passed to skt_set_abort */
-  auto iter_proc = skt_client_table.find(skt);
-  if (iter_proc != skt_client_table.end())
-    return client_connect_problem(*(*iter_proc).second, msg);
-
-  fprintf(stderr, "Charmrun> unknown error %d with socket:\n%s\n", code, msg);
-  exit(1);
-  return -1;
+  const nodetab_process & p = get_process_for_socket(my_process_table, skt);
+  return client_connect_problem(p, msg);
 }
 
 /** return 1 if connection is opened succesfully with client**/
@@ -3183,12 +3192,6 @@ static nodetab_process & get_process_for_nodeno(std::vector<nodetab_process> & p
   return p;
 }
 
-static void assign_socket_to_process(nodetab_process & p, SOCKET req_client)
-{
-  p.req_client = req_client;
-  skt_client_table[req_client] = &p;
-}
-
 #if CMK_C_INLINE
 inline static
 #endif
@@ -3219,7 +3222,8 @@ static void req_one_client_partinit_skt(std::vector<nodetab_process> & process_t
   int nodeNo = ChMessageInt(*(ChMessageInt_t *) partStartMsg.data);
   ChMessage_free(&partStartMsg);
 
-  assign_socket_to_process(get_process_for_nodeno(process_table, nodeNo), req_client);
+  nodetab_process & p = get_process_for_nodeno(process_table, nodeNo);
+  p.req_client = req_client;
 }
 
 static void req_one_client_partinit(std::vector<nodetab_process> & process_table, int index)
@@ -3304,7 +3308,7 @@ static void req_set_client_connect(std::vector<nodetab_process> & process_table,
 
         int nodeNo = ChMessageInt(((ChSingleNodeinfo *)msg.data)->nodeNo);
         nodetab_process & p = get_process_for_nodeno(process_table, nodeNo);
-        assign_socket_to_process(p, req_client);
+        p.req_client = req_client;
 
 #ifdef HSTART
         if (arg_hierarchical_start)
@@ -5613,7 +5617,7 @@ static void reconnect_crashed_client(nodetab_process & crashed)
     this node, skip the restarted one */
     ChSingleNodeinfo *in = (ChSingleNodeinfo *) msg.data;
 
-    assign_socket_to_process(crashed, req_client);
+    crashed.req_client = req_client;
 
     nodeinfo_add(in, crashed);
 
