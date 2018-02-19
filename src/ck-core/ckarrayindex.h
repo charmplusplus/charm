@@ -106,11 +106,21 @@ class CkArrayIndex: public CkArrayIndexBase
             if      (dimension == 1) return data()[0];
             else if (dimension == 2) return data()[0] * data()[1];
             else if (dimension == 3) return data()[0] * data()[1] * data()[2];
+            else if (dimension == 4) return shortData()[0] * shortData()[1] * shortData()[2] *
+                                            shortData()[3];
+            else if (dimension == 5) return shortData()[0] * shortData()[1] * shortData()[2] *
+                                            shortData()[3] * shortData()[4];
+            else if (dimension == 6) return shortData()[0] * shortData()[1] * shortData()[2] *
+                                            shortData()[3] * shortData()[4] * shortData()[5];
             else return 0;
         }
 
         /// Used for debug prints elsewhere
-        void print() const { CmiPrintf("%d: %d %d %d\n", nInts, index[0], index[1], index[2]); }
+        void print() const {
+            if (dimension < 4) CmiPrintf("%d: %d %d %d\n", dimension, index[0], index[1], index[2]);
+            else CmiPrintf("%d: %d %d %d %d %d %d\n", dimension, indexShorts[0], indexShorts[1], indexShorts[2],
+                                                      indexShorts[3], indexShorts[4], indexShorts[5]);
+        }
 
         /// Equality comparison
         bool operator==(const CkArrayIndex& idx) const
