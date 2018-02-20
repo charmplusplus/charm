@@ -25,9 +25,9 @@ CreateLBFunc_Def(
 #define HIER_LB_BIN_SIZE 10
 
 #if DEBUG_HIER_LB_ON
-  #define DEBUG_HIER_LB(arg...) CkPrintf(##arg)
+  #define DEBUG_HIER_LB(...) CkPrintf(__VA_ARGS__)
 #else
-  #define DEBUG_HIER_LB(arg...)
+  #define DEBUG_HIER_LB(...)
 #endif
 
 HierarchicalLB::HierarchicalLB(CkMigrateMessage *m)
@@ -136,7 +136,7 @@ HierarchicalLB::Strategy(const DistBaseLB::LDStats* const stats) {
     CkMyPe(), my_load, my_stats->n_objs
   );
 
-  if (not tree_is_setup) {
+  if (!tree_is_setup) {
     setup_tree();
     tree_is_setup = true;
   }
@@ -149,7 +149,7 @@ HierarchicalLB::Strategy(const DistBaseLB::LDStats* const stats) {
 void
 HierarchicalLB::setup_tree() {
   CkAssert(
-    tree_is_setup == false and
+    tree_is_setup == false &&
     "Tree must not already be set up when is this called"
   );
 
@@ -205,7 +205,7 @@ HierarchicalLB::calc_load_over() {
     rank, my_load, avg_load, threshold
   );
 
-  while (my_load > threshold and cur_item != obj_sample.end()) {
+  while (my_load > threshold && cur_item != obj_sample.end()) {
     if (cur_item->second.size() != 0) {
       auto const obj = cur_item->second.back();
 
@@ -272,7 +272,7 @@ HierarchicalLB::lb_tree_msg(
           given_iter = given_objs.find(bin.first);
 
           CkAssert(
-            given_iter != given_objs.end() and
+            given_iter != given_objs.end() &&
             "An insertion just took place so this must not fail"
           );
         }
@@ -292,7 +292,7 @@ HierarchicalLB::lb_tree_msg(
   auto child_iter = children.find(child);
 
   CkAssert(
-    child_iter != children.end() and "Entry must exist in children map"
+    child_iter != children.end() && "Entry must exist in children map"
   );
 
   child_iter->second->node_size = child_size;
@@ -303,7 +303,7 @@ HierarchicalLB::lb_tree_msg(
 
   child_msgs++;
 
-  if (child_size > 0 and child_load != 0.0) {
+  if (child_size > 0 && child_load != 0.0) {
     auto live_iter = live_children.find(child);
     if (live_iter == live_children.end()) {
       live_children.emplace(
@@ -315,7 +315,7 @@ HierarchicalLB::lb_tree_msg(
   }
 
   CkAssert(
-    child_msgs <= children.size() and
+    child_msgs <= children.size() &&
     "Number of children must be greater or less than"
   );
 
@@ -412,7 +412,7 @@ HierarchicalLB::send_down_tree() {
       weight, avg_load, threshold
     );
 
-    if (c == nullptr or weight == 0) {
+    if (c == nullptr || weight == 0) {
       break;
     } else {
       if (cIter->second.size() != 0) {
@@ -470,7 +470,7 @@ HierarchicalLB::clear_obj_map(cont_hier_objid_t& objs) {
   for (auto&& r : to_remove) {
     auto giter = objs.find(r);
     CkAssert(
-      giter != objs.end() and "Must exist"
+      giter != objs.end() && "Must exist"
     );
     objs.erase(giter);
   }
@@ -494,7 +494,7 @@ HierarchicalLB::distribute_amoung_children() {
       weight, avg_load, threshold
     );
 
-    if (c == nullptr or c->cur_load > threshold or weight == 0) {
+    if (c == nullptr || c->cur_load > threshold || weight == 0) {
       break;
     } else {
       if (cIter->second.size() != 0) {
@@ -569,7 +569,7 @@ HierarchicalLB::transfer_objects(
   auto trans_iter = transfers.find(to_pe);
 
   CkAssert(
-    trans_iter == transfers.end() and
+    trans_iter == transfers.end() &&
     "There must not be an entry"
   );
 
