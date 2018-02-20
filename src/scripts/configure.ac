@@ -780,6 +780,26 @@ EOT
 test_cxx "whether compiler supports std::alignment_of" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_ALIGNMENT_OF, $strictpass, [whether compiler supports std::alignment_of])
 
+### Check if compiler implements regex ###
+cat > $t <<EOT
+#include <regex>
+void foo()
+{
+#if __cplusplus >= 201103L &&                             \
+    (!defined(__GLIBCXX__) || (__cplusplus >= 201402L) || \
+        (defined(_GLIBCXX_REGEX_DFS_QUANTIFIERS_LIMIT) || \
+         defined(_GLIBCXX_REGEX_STATE_LIMIT)           || \
+             (defined(_GLIBCXX_RELEASE)                && \
+             _GLIBCXX_RELEASE > 4)))
+// compiler has regex support, continue
+#else
+// force compilation to fail
+static_assert(false, "compiler has no regex implementation");
+#endif
+}
+EOT
+test_cxx "whether compiler implements regex" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_REGEX, $pass, [whether compiler implements regex])
 
 #### test if has values.h ####
 cat > $t <<EOT
