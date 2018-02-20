@@ -531,9 +531,9 @@ int main() {
 	return 0;
 }
 EOT
-#echo "set C++ linker as: $CMK_LDXX $OPTS_LDXX"
+#echo "set C++ linker as: $CMK_LDXX $OPTS_LD"
 AC_MSG_CHECKING("C++ linker as")
-AC_MSG_RESULT("$CMK_LDXX $OPTS_LDXX")
+AC_MSG_RESULT("$CMK_LDXX $OPTS_LD")
 test_link "whether linker works" "ok" "no" ""
 if test $fail -eq 1
 then

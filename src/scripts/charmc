@@ -50,7 +50,6 @@ OPTS_CC_GENCPM=""
 OPTS_CXX="" 
 OPTS_F90=""
 OPTS_LD=""  
-OPTS_LDXX=""
 OPTS_PIC=""
 USE_PIC="0"
 
@@ -612,18 +611,13 @@ do
 		shift
 		;;
 
-	"-ld-option")
+	"-ld-option"|"-ld++-option")
 		OPTS_LD="$OPTS_LD $1"
 		shift
 		;;
 
-	"-ld++-option")
-		OPTS_LDXX="$OPTS_LDXX $1"
-		shift
-		;;
-
 	"-rpath")
-		OPTS_LDXX="$OPTS_LDXX -rpath $1"
+		OPTS_LD="$OPTS_LD -rpath $1"
 		shift
 		;;
 	
@@ -980,7 +974,6 @@ then
     OPTS_CXX="$OPTS_CXX $CMK_C_OPENMP"
     OPTS_F90="$OPTS_F90 $CMK_F_OPENMP"
     OPTS_LD="$OPTS_LD $CMK_LD_OPENMP"
-    OPTS_LDXX="$OPTS_LDXX $CMK_LD_OPENMP"
 else
     [ -n "$VERBOSE" ] && echo OpenMP support not enabled
 fi
@@ -991,7 +984,6 @@ then
     OPTS_CXX="$OPTS_CXX -mno-tls-direct-seg-refs"
     OPTS_F90="$OPTS_F90 -mno-tls-direct-seg-refs"
     OPTS_LD="$OPTS_LD -static -Wl,--allow-multiple-definition"
-    OPTS_LDXX="$OPTS_LDXX -static -Wl,--allow-multiple-definition"
 fi
 
 # Look up and add the dependencies for module $1
@@ -1196,7 +1188,6 @@ then
     OPTS_CXX="$CMK_CXX_OPTIMIZE $OPTS_CXX"
     OPTS_F90="$CMK_F90_OPTIMIZE $OPTS_F90"
     OPTS_LD="$CMK_C_OPTIMIZE $OPTS_LD"
-    OPTS_LDXX="$CMK_CXX_OPTIMIZE $OPTS_LDXX"
 fi
 
 # Pick up per-architecture production mode settings
@@ -1206,7 +1197,6 @@ then
     OPTS_CXX="$CMK_PRODUCTION $CMK_CXX_PRODUCTION $OPTS_CXX"
     OPTS_F90="$CMK_PRODUCTION $CMK_F90_PRODUCTION $OPTS_F90"
     OPTS_LD="$CMK_PRODUCTION $CMK_C_PRODUCTION $OPTS_LD"
-    OPTS_LDXX="$CMK_PRODUCTION $CMK_CXX_PRODUCTION $OPTS_LDXX"
 fi
 
 if [ -n "$XI_INTERNAL" ]
@@ -1242,7 +1232,6 @@ OPTS_CC="$OPTS $TAU_DEFS $TAU_INCLUDE $OPTS_CC"
 OPTS_CXX="$OPTS $TAU_DEFS $TAU_INCLUDE $OPTS_CXX"
 OPTS_F90="$OPTS $OPTS_F90"
 OPTS_LD="$OPTS $OPTS_LD"
-# OPTS_LDXX gets OPTS from OPTS_LD
 
 if [ -n "$F90_MAIN" ] 
 then
@@ -1631,7 +1620,7 @@ CHARM_CPP_C_FLAGS="$CMK_CPP_C_FLAGS -I$CHARMINC $CMK_INCDIR $CMK_SYSINC $OPTS_CC
 CHARM_CC_FLAGS="$CMK_CC_FLAGS -I$CHARMINC $CMK_INCDIR $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CC"
 CHARM_CXX_FLAGS="$CMK_CXX_FLAGS -I$CHARMINC $CMK_INCDIR $CMK_SYSINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX"
 CHARM_LD_FLAGS="$CMK_LD_FLAGS $CMK_LIBDIR $OPTS_LD $ALL_LIBS"
-CHARM_LDXX_FLAGS="$CMK_LDXX_FLAGS $CMK_LIBDIR $OPTS_LD $OPTS_LDXX $ALL_LIBS"
+CHARM_LDXX_FLAGS="$CMK_LDXX_FLAGS $CMK_LIBDIR $OPTS_LD $ALL_LIBS"
 
 
 ########################################################################
@@ -2225,7 +2214,7 @@ then
   OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO -L$CHARMLIBSO"
   Debugf "Running ldro..."
   DoNoErrCheck $RM $OBJECT
-  [ "$MAKE_LDXX" = "1" ] && Do $CMK_LDXX $CMK_LDXX_FLAGS $CMK_LIBDIR $OPTS_LD $OPTS_LDXX -o $OBJECT $ALL_LIBS
+  [ "$MAKE_LDXX" = "1" ] && Do $CMK_LDXX $CMK_LDXX_FLAGS $CMK_LIBDIR $OPTS_LD -o $OBJECT $ALL_LIBS
   [ "$MAKE_LD" = "1" ] && Do $CMK_LD $CMK_LD_FLAGS $CMK_LIBDIR $OPTS_LD -o $OBJECT $ALL_LIBS
   Copyobj
 else

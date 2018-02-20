@@ -691,7 +691,6 @@ echo > $ConvUsr
 if test -n "$LIBDIR" 
 then
   echo 'USER_OPTS_LD="$USER_OPTS_LD '$LIBDIR'"' >> $ConvUsr
-  echo 'USER_OPTS_LDXX="$USER_OPTS_LDXX '$LIBDIR'"' >> $ConvUsr
 fi
 if test -n "$INCDIR" 
 then
