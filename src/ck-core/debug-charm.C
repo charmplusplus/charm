@@ -6,6 +6,13 @@
 
 #include <errno.h>
 #include <string.h>
+
+#ifndef __STDC_FORMAT_MACROS
+# define __STDC_FORMAT_MACROS
+#endif
+#ifndef __STDC_LIMIT_MACROS
+# define __STDC_LIMIT_MACROS
+#endif
 #include <inttypes.h>
 #include <sys/stat.h>		// for chmod
 
