@@ -12,6 +12,16 @@ CkArrayOptions::CkArrayOptions(void)  // Default: empty array
   init();
 }
 
+CkArrayOptions::CkArrayOptions(int ndims, int dims[]) // With initial elements (nD)
+    : start(CkArrayIndex(ndims, 0)),
+      end(CkArrayIndex(ndims, dims)),
+      step(CkArrayIndex(ndims, 1)),
+      numInitial(end),
+      bounds(end),
+      map(_defaultArrayMapID) {
+  init();
+}
+
 CkArrayOptions::CkArrayOptions(int ni1)  // With initial elements (1D)
     : start(CkArrayIndex1D(0)),
       end(CkArrayIndex1D(ni1)),

@@ -86,6 +86,17 @@ class CkArrayIndex: public CkArrayIndexBase
         /// Default
         CkArrayIndex() { nInts=0; dimension=0; for (int i=0; i<CK_ARRAYINDEX_MAXLEN; i++) index[i] = 0; }
 
+        /// Create array index of 'ndims' dimensions with given size for each dimension
+        CkArrayIndex(int ndims, int dims[]) {
+          init_nd(ndims, dims);
+        }
+
+        /// Create array index of 'ndims' dimensions with same size 'val' for each dimension
+        CkArrayIndex(int ndims, int val) {
+          std::vector<int> dims(ndims, val);
+          init_nd(ndims, dims.data());
+        }
+
 	explicit CkArrayIndex(int idx) {init(1,1,idx);};
 
         /// Return a pointer to the actual index data
@@ -205,6 +216,18 @@ class CkArrayIndex: public CkArrayIndexBase
             indexShorts[5] = z;
             for (int i=6; i < 2 * CK_ARRAYINDEX_MAXLEN; i++)
                 indexShorts[i] = 0;
+        }
+
+        inline void init_nd(int ndims, int dims[]) {
+          switch (ndims) {
+            case 1: init(1,1,dims[0]); break;
+            case 2: init(2,2,dims[0],dims[1]); break;
+            case 3: init(3,3,dims[0],dims[1],dims[2]); break;
+            case 4: init(2,4,dims[0],dims[1],dims[2],dims[3]); break;
+            case 5: init(3,5,dims[0],dims[1],dims[2],dims[3],dims[4]); break;
+            case 6: init(3,6,dims[0],dims[1],dims[2],dims[3],dims[4],dims[5]); break;
+            default: CkAbort("CKArrayIndex() unsupported number of dimensions\n");
+          }
         }
 
 
