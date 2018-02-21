@@ -122,8 +122,7 @@ inline int checkTag(const char* func, int tag) {
 }
 
 inline int checkRank(const char* func, int rank, MPI_Comm comm) {
-  int size;
-  AMPI_Comm_size(comm, &size);
+  int size = (comm == MPI_COMM_NULL) ? 0 : getAmpiInstance(comm)->getSize();
   if (((rank >= 0) && (rank < size)) ||
       (rank == MPI_ANY_SOURCE)       ||
       (rank == MPI_PROC_NULL)        ||
