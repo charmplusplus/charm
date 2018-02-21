@@ -155,7 +155,6 @@ class CtgGlobalList
     CtgRec(ELFXX_TYPE_Addr *got_,int off_) :got(got_), off(off_) {}
   };
   std::vector<CtgRec> rec;
-  int nRec;
 public:
   /**
    Analyze the current set of global variables, determine 
@@ -174,6 +173,7 @@ public:
   /// Point at this set of global data (must be getSize() bytes).
   inline void install(void *datav) const {
     intptr_t data = (intptr_t)datav;
+    int nRec = rec.size();
     for (int i=0;i<nRec;i++)
       *(rec[i].got)=(ELFXX_TYPE_Addr)(data+rec[i].off);
   }
@@ -238,13 +238,16 @@ int CtgGlobalList::isUserSymbol(const char *name) {
 
 void CtgGlobalList::read(void *datav) const {
     char *data=(char *)datav;
-    for (int i=0;i<nRec;i++) {
-      size_t size;
-      if (i<nRec-1) 
-        size=rec[i+1].off-rec[i].off;
-      else /* i==nRec-1, last one: */ 
-        size=datalen-rec[i].off;
+    int nRec = rec.size();
+    size_t size;
+    for (int i=0;i<nRec-1;i++) { // First nRec-1 elements:
+      size = rec[i+1].off-rec[i].off;
       memcpy(data+rec[i].off, (void *)*rec[i].got, size);
+    }
+    // Last element:
+    if (nRec > 0) {
+      size = datalen-rec[nRec-1].off;
+      memcpy(data+rec[nRec-1].off, (void *)*rec[nRec-1].got, size);
     }
 }
 
@@ -255,7 +258,6 @@ void CtgGlobalList::read(void *datav) const {
  */
 CtgGlobalList::CtgGlobalList() {
     datalen=0;
-    nRec=0;
     
     int count;
     size_t relt_size = 0;
@@ -351,11 +353,9 @@ CtgGlobalList::CtgGlobalList() {
 	datalen+=gSize;
     }
 
-    nRec=rec.size();
-
 #if DEBUG_GOT_MANAGER   
     printf("relt has %d entries, %d of which are user globals\n\n", 
-	   relt_size, nRec);
+	   relt_size, rec.size());
     printf("Globals take %d bytes (padding bytes: %d)\n", datalen, padding);
 #endif
 }
