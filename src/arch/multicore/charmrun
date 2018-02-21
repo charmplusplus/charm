@@ -18,6 +18,10 @@ do
 		args=$args" "$1
 		shift
 		;;
+	++local)
+		# consume and ignore, local-mode is all that multicore supports
+		shift
+		;;
         +*)
                 args=$args" "$1
                 shift
