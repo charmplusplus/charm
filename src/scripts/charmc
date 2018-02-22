@@ -1361,12 +1361,40 @@ then
 	OBJECTFILES="$CHARMLIB/lib$AMPIMAIN.o $OBJECTFILES"
 fi
 
+if [ "$TLSGLOBALS" = "1" ]
+then
+    if ! `$CMK_CC --version | grep -q gcc`
+    then
+      echo "Warning: -tlsglobals may not work with compilers other than GCC."
+    fi
+    if ! `$CMK_LD -Wl,--version,-v 2>&1 | grep -q elf`
+    then
+      echo "Warning: -tlsglobals may not work with a linker that does not report ELF support."
+    fi
+fi
+
 if [ "$SWAPGLOBALS" = "1" ]
 then
+	LD_VERSION_TEXT=`$CMK_LD -Wl,--version,-v 2>/dev/null`
+	if ! `printf "$LD_VERSION_TEXT" | grep -q 'GNU ld'`
+	then
+		echo "Warning: -swapglobals may not work with linkers other than GNU ld."
+	else
+		LD_VERSION=`printf "$LD_VERSION_TEXT" | grep -Eo 'GNU ld \(?[^)]*\)? ?[-0-9._]+' | awk '{print $NF}'`
+		LD_VERSION_MAJOR=`printf $LD_VERSION | cut -d. -f1`
+		LD_VERSION_MINOR=`printf $LD_VERSION | cut -d. -f2`
+		if [ $LD_VERSION_MAJOR -eq 2 -a $LD_VERSION_MINOR -gt 23 ]
+		then
+			echo "Warning: -swapglobals may not work with GNU ld >= 2.24."
+			echo "For some versions, an experimental patch is available:"
+			echo 'https://charm.cs.illinois.edu/gerrit/gitweb?p=libbfd-patches.git;a=tree;f=swapglobals'
+		fi
+	fi
+
 	swapo="$CHARMLIB/libglobal-swap.a"
 	if [ ! -r "$swapo" -o ! -s "$swapo" ]
 	then
-		if [ "$CMK_SMP" == "1" ]
+		if [ "$CMK_SMP" = "1" ]
 		then
 			echo "Error: -swapglobals is not supported on SMP builds of Charm++/AMPI"
 		else
