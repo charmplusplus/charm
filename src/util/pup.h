@@ -427,6 +427,14 @@ class mem : public er { //Memory-buffer packers and unpackers
  public:
   //Return the current number of buffer bytes used
   size_t size(void) const {return buf-origBuf;}
+
+  inline char* get_current_pointer() const {
+    return reinterpret_cast<char*>(buf);
+  }
+
+  inline void advance(size_t const offset) {
+    buf += offset;
+  }
 };
 
 //For packing into a preallocated, presized memory buffer
@@ -437,14 +445,6 @@ class toMem : public mem {
  public:
   //Write data to the given buffer
   toMem(void *Nbuf):mem(IS_PACKING,(myByte *)Nbuf) {}
-
-  inline char* get_current_pointer() const {
-    return reinterpret_cast<char*>(buf);
-  }
-
-  inline void advance(size_t const offset) {
-    buf += offset;
-  }
 };
 template <class T>
 inline void toMemBuf(T &t,void *buf, size_t len) {
