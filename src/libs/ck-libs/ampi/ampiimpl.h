@@ -1447,7 +1447,7 @@ private:
   CMK_REFNUM_TYPE seqIncoming, seqOutgoing;
 
   /// Number of messages in out-of-order queue (normally 0)
-  int numOutOfOrder;
+  uint16_t numOutOfOrder;
 
 public:
   /// seqIncoming starts from 1, b/c 0 means unsequenced
@@ -1463,7 +1463,7 @@ public:
 
   inline void incNumOutOfOrder() { numOutOfOrder++; }
   inline void decNumOutOfOrder() { numOutOfOrder--; }
-  inline int getNumOutOfOrder() const { return numOutOfOrder; }
+  inline uint16_t getNumOutOfOrder() const { return numOutOfOrder; }
 };
 PUPbytes(AmpiOtherElement)
 
