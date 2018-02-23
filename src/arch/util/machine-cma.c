@@ -93,7 +93,7 @@ void handleOneCmaMdMsg(int *sizePtr, char **msgPtr) {
   CmaSrcBufferInfo_t *bufInfo = (CmaSrcBufferInfo_t *)(*msgPtr + CmiMsgHeaderSizeBytes);
 
   // Allocate a buffer to hold the buffer
-  destAddr = CmiAlloc(bufInfo->size);
+  destAddr = (char *)CmiAlloc(bufInfo->size);
 
   local.iov_base = (void *)destAddr;
   local.iov_len  = bufInfo->size;
@@ -130,7 +130,7 @@ void handleOneCmaMdMsg(int *sizePtr, char **msgPtr) {
 void handleOneCmaAckMsg(int size, void *msg) {
 
   // Get buffer metadata
-  CmaSrcBufferInfo_t *bufInfo = (CmaSrcBufferInfo_t *)(msg + CmiMsgHeaderSizeBytes);
+  CmaSrcBufferInfo_t *bufInfo = (CmaSrcBufferInfo_t *)((char *)msg + CmiMsgHeaderSizeBytes);
 
   // Free the large buffer sent
   CmiFree(bufInfo->srcAddr);
@@ -146,7 +146,7 @@ void CmiSendMessageCma(char **msgPtr, int *sizePtr) {
 
   // Send buffer metadata instead of original msg
   // Buffer metadata msg consists of pid, addr, size for the other process to perform a read through CMA
-  char *cmaBufMdMsg = CmiAlloc(CmiMsgHeaderSizeBytes + sizeof(CmaSrcBufferInfo_t));
+  char *cmaBufMdMsg = (char *)CmiAlloc(CmiMsgHeaderSizeBytes + sizeof(CmaSrcBufferInfo_t));
   CmaSrcBufferInfo_t *bufInfo = (CmaSrcBufferInfo_t *)(cmaBufMdMsg + CmiMsgHeaderSizeBytes);
   bufInfo->srcPE  = CmiMyPe();
   bufInfo->srcPid = getpid();
