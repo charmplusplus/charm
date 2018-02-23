@@ -34,9 +34,13 @@
 
 #ifdef __cplusplus
 # define CMI_EXTERNC extern "C"
-# define CMI_EXTERNC_VARIABLE extern "C"
 #else
 # define CMI_EXTERNC
+#endif
+
+#if defined __cplusplus && defined _MSC_VER
+# define CMI_EXTERNC_VARIABLE extern "C"
+#else
 # define CMI_EXTERNC_VARIABLE extern
 #endif
 
