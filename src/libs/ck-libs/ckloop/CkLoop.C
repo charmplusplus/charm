@@ -221,6 +221,15 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
 
     //for using nodequeue
     TRACE_START(CKLOOP_TOTAL_WORK_EVENTID);
+
+    /* Setting numChunks to 0 guarantees that func (and cfunc, if it exists)
+     * will be executed on the calling PE.
+     *
+     * Setting numChunks to 1 guarantees that func will be executed on the
+     * calling PE if cfunc does not exist. Otherwise (not in this block,
+     * see below) it attempts to offload func while executing cfunc on the
+     * calling PE, in an attempt to overlap their executions.
+     */
     if (mode == CKLOOP_NOOP || numChunks + !!cfunc < 2) {
       func(lowerRange, upperRange, redResult, paramNum, param);
       if (cfunc != NULL) {
@@ -653,9 +662,9 @@ CProxy_FuncCkLoop CkLoop_Init(int numThreads) {
 #if CMK_SMP
     mode = CKLOOP_USECHARM;
 #if USE_CONVERSE_NOTIFICATION
-    CkPrintf("CkLoopLib is used in SMP with a simple dynamic scheduling (converse-level notification) but not using node-level queue\n");
+    CkPrintf("CkLoopLib is used in SMP with simple dynamic scheduling (converse-level notification)\n");
 #else
-    CkPrintf("CkLoopLib is used in SMP with a simple dynamic scheduling (charm-level notifiation) but not using node-level queue\n");
+    CkPrintf("CkLoopLib is used in SMP with simple dynamic scheduling (charm-level notification)\n");
 #endif
 #elif defined(WIN32)
     mode = CKLOOP_NOOP;

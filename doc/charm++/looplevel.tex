@@ -76,18 +76,21 @@ and the ``result'' is the buffer for reduction result on a single simple-type va
 The ``CallerFn'' is defined as ``typedef void (*CallerFn)(int paramNum, void *param);''
 \end{itemize}
 
-Lambda syntax for \emph{CkLoop} is also supported. The interface for using lambda syntax is as follows:
+Lambda syntax for \emph{CkLoop} is also supported. The interface for
+using lambda syntax is as follows:
 \begin{itemize}
-\item void \textbf{CkLoop\_Parallelize}( \\
-int numChunks, int lowerRange, int upperRange, \\
-    \lbrack=\rbrack(int first, int last, void *result) \{ \\
-    for ( int i=first; i\textless=last; ++i ) \{ \\
-      ... \\
-    \} \\
-  \}, int sync, void *redResult, REDUCTION\_TYPE type, \lbrack=\rbrack() \{ \\
-    ... optional caller function body ... \\
-  \} \\
+\item \begin{verbatim}
+void CkLoop_Parallelize(
+int numChunks, int lowerRange, int upperRange,
+    [=](int first, int last, void *result) {
+    for (int i = first; i <= last; ++i ) {
+      // work to parallelize goes here
+    }
+  }, void *redResult=NULL, REDUCTION_TYPE type=CKLOOP_NONE,
+  std::function<void()> cfunc=NULL
+  }
 );
+\end{verbatim}
 \end{itemize}
 
 Examples using this library can be found in \examplerefdir{ckloop} and the
