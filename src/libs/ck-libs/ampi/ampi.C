@@ -1675,7 +1675,7 @@ void Amm<T>::freeAll()
   while (cur) {
     AmmEntry<T>* toDel = cur;
     cur = cur->next;
-    delete toDel;
+    deleteEntry(toDel);
   }
 }
 
@@ -1693,7 +1693,15 @@ void Amm<T>::flushMsgs()
 template<typename T>
 void Amm<T>::put(T msg)
 {
-  AmmEntry<T>* e = new AmmEntry<T>(msg);
+  AmmEntry<T>* e = newEntry(msg);
+  *lasth = e;
+  lasth = &e->next;
+}
+
+template<typename T>
+void Amm<T>::put(int tag, int src, T msg)
+{
+  AmmEntry<T>* e = newEntry(tag, src, msg);
   *lasth = e;
   lasth = &e->next;
 }
@@ -1741,7 +1749,7 @@ T Amm<T>::get(int tag, int src, int* rtags)
       AmmEntry<T>* next = ent->next;
       *enth = next;
       if (!next) lasth = enth;
-      delete ent;
+      deleteEntry(ent);
       return msg;
     }
     enth = &ent->next;
@@ -1790,19 +1798,22 @@ void Amm<T>::pup(PUP::er& p, AmmPupMessageFn msgpup)
     p|sz;
     AmmEntry<T> *doomed, *e = first;
     while (e) {
+      pup_ints(&p, e->tags, AMM_NTAGS);
       msgpup(p, (void**)&e->msg);
       doomed = e;
       e = e->next;
       if (p.isDeleting()) {
-        delete doomed;
+        deleteEntry(doomed);
       }
     }
   } else { // unpacking
     p|sz;
     for (int i=0; i<sz; i++) {
       T msg;
+      int tags[AMM_NTAGS];
+      pup_ints(&p, tags, AMM_NTAGS);
       msgpup(p, (void**)&msg);
-      put(msg);
+      put(tags[0], tags[1], msg);
     }
   }
 }
@@ -1883,9 +1894,9 @@ static void AmmPupPostedReqs(PUP::er& p,void **msg) {
   // lookup the AmpiRequest*'s using the indices. That is necessary because
   // the ampiParent object is unpacked after the ampi objects.
   if (p.isPacking()) {
-    MPI_Request reqIdx = ((AmpiRequest*)*msg)->getReqIdx();
-    *msg = (void*)(intptr_t)reqIdx;
+    int reqIdx = ((AmpiRequest*)*msg)->getReqIdx();
     CkAssert(reqIdx != MPI_REQUEST_NULL);
+    *msg = (void*)(intptr_t)reqIdx;
   }
   pup_pointer(&p, msg);
 #if CMK_ERROR_CHECKING

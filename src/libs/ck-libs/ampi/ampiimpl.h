@@ -151,6 +151,11 @@ typedef void (*MPI_MigrateFn)(void);
 #define AMM_SRC   1
 #define AMM_NTAGS 2
 
+// Number of AmmEntry<T>'s in AmmEntryPool
+#ifndef AMPI_AMM_POOL_SIZE
+#define AMPI_AMM_POOL_SIZE 32
+#endif
+
 class AmpiRequestList;
 
 typedef void (*AmmPupMessageFn)(PUP::er& p, void **msg);
@@ -162,6 +167,7 @@ class AmmEntry {
   AmmEntry<T>* next;
   T msg; // T is either an AmpiRequest* or an AmpiMsg*
   AmmEntry(T m) { tags[AMM_TAG] = m->getTag(); tags[AMM_SRC] = m->getSrcRank(); next = NULL; msg = m; }
+  AmmEntry(int tag, int src, T m) { tags[AMM_TAG] = tag; tags[AMM_SRC] = src; next = NULL; msg = m; }
   AmmEntry(){}
   ~AmmEntry(){}
 };
@@ -172,12 +178,60 @@ class Amm {
   AmmEntry<T>* first;
   AmmEntry<T>** lasth;
 
-  Amm() : first(NULL), lasth(&first) {}
+ private:
+  int startIdx;
+  std::bitset<AMPI_AMM_POOL_SIZE> validEntries;
+  std::array<AmmEntry<T>, AMPI_AMM_POOL_SIZE> entryPool;
+
+ public:
+  Amm() : first(NULL), lasth(&first), startIdx(0) { validEntries.reset();  }
   ~Amm(){}
+  inline AmmEntry<T>* newEntry(int tag, int src, T msg) {
+    if (validEntries.all()) {
+      return new AmmEntry<T>(tag, src, msg);
+    } else {
+      for (int i=startIdx; i<validEntries.size(); i++) {
+        if (!validEntries[i]) {
+          validEntries[i] = 1;
+          AmmEntry<T>* ent = new (&entryPool[i]) AmmEntry<T>(tag, src, msg);
+          startIdx = i+1;
+          return ent;
+        }
+      }
+      CkAbort("AMPI> failed to find a free entry in pool!");
+      return NULL;
+    }
+  }
+  inline AmmEntry<T>* newEntry(T msg) {
+    if (validEntries.all()) {
+      return new AmmEntry<T>(msg);
+    } else {
+      for (int i=startIdx; i<validEntries.size(); i++) {
+        if (!validEntries[i]) {
+          validEntries[i] = 1;
+          AmmEntry<T>* ent = new (&entryPool[i]) AmmEntry<T>(msg);
+          startIdx = i+1;
+          return ent;
+        }
+      }
+      CkAbort("AMPI> failed to find a free entry in pool!");
+      return NULL;
+    }
+  }
+  inline void deleteEntry(AmmEntry<T> *ent) {
+    if (ent >= &entryPool.front() && ent <= &entryPool.back()) {
+      int idx = (int)((intptr_t)ent - (intptr_t)&entryPool.front()) / sizeof(AmmEntry<T>);
+      validEntries[idx] = 0;
+      startIdx = std::min(idx, startIdx);
+    } else {
+      delete ent;
+    }
+  }
   void freeAll();
   void flushMsgs();
   inline bool match(const int tags1[AMM_NTAGS], const int tags2[AMM_NTAGS]) const;
   inline void put(T msg);
+  inline void put(int tag, int src, T msg);
   inline T get(int tag, int src, int* rtags=NULL);
   inline T probe(int tag, int src, int* rtags);
   inline int size(void) const;
