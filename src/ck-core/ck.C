@@ -156,7 +156,7 @@ int Chare::ckGetChareType() const {
 }
 char *Chare::ckDebugChareName(void) {
   char buf[100];
-  sprintf(buf,"Chare on pe %d at %p",CkMyPe(),this);
+  sprintf(buf,"Chare on pe %d at %p",CkMyPe(),(void*)this);
   return strdup(buf);
 }
 int Chare::ckDebugChareID(char *str, int limit) {

@@ -22,7 +22,7 @@ int CCS_AUTH_makeSecretKey(const char *str,CcsSec_secretKey *key)
     tmp[1]=str[2*i+1];
     if (tmp[1]==0 || tmp[1]==' ' || tmp[1]=='\n') tmp[1]='0'; /*zero-pad*/
     tmp[2]=0;
-    if (1!=sscanf(tmp,"%x",&cur)) break;
+    if (1!=sscanf(tmp,"%d",&cur)) break;
     key->data[i]=(unsigned char)cur;
   }
   if (i==0) return 0;

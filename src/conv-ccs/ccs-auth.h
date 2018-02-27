@@ -40,7 +40,7 @@ void CCS_RAND_new(CCS_RAND_state *s);
 unsigned int CCS_RAND_next(CCS_RAND_state *s);
 
 #ifdef __cplusplus
-};
+}
 #endif
 
 #endif /* def(thisHeader) */
