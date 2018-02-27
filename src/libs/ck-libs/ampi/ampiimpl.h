@@ -429,7 +429,9 @@ class CProxyElement_ampi;
 
 //Virtual class describing a virtual topology: Cart, Graph, DistGraph
 class ampiTopology {
+ private:
   vector<int> v; // dummy variable for const& returns from virtual functions
+
  public:
   virtual ~ampiTopology() {};
   virtual void pup(PUP::er &p) =0;
@@ -598,6 +600,7 @@ class ampiDistGraphTopology : public ampiTopology {
 
 //Describes an AMPI communicator
 class ampiCommStruct {
+ private:
   MPI_Comm comm; //Communicator
   CkArrayID ampiID; //ID of corresponding ampi array
   int size; //Number of processes in communicator
@@ -621,6 +624,7 @@ class ampiCommStruct {
     ind.resize(size);
     std::iota(ind.begin(), ind.end(), 0);
   }
+
  public:
   ampiCommStruct(int ignored=0) {size=-1;isWorld=false;isInter=false;ampiTopo=NULL;topoType=MPI_UNDEFINED;}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,int size_)
@@ -1905,10 +1909,19 @@ An ampiParent holds all the communicators and the TCharm thread
 for its children, which are bound to it.
 */
 class ampiParent : public CBase_ampiParent {
-  CProxy_TCharm threads;
+ private:
   TCharm *thread;
-  void prepareCtv(void);
+  CProxy_TCharm threads;
 
+ public: // Communication state:
+  int numBlockedReqs; // number of requests currently blocked on
+  bool resumeOnRecv, resumeOnColl;
+  AmpiRequestList ampiReqs;
+  AmpiRequestPool reqPool;
+  CkDDT *myDDT;
+  CkDDT myDDTsto;
+
+ private:
   MPI_Comm worldNo; //My MPI_COMM_WORLD
   ampi *worldPtr; //AMPI element corresponding to MPI_COMM_WORLD
   ampiCommStruct worldStruct;
@@ -1925,6 +1938,31 @@ class ampiParent : public CBase_ampiParent {
   CkPupPtrVec<WinStruct> winStructList; //List of windows for one-sided communication
   CkPupPtrVec<InfoStruct> infos; // list of all MPI_Infos
   vector<OpStruct> ops; // list of all MPI_Ops
+
+  /* MPI_*_get_attr C binding returns a *pointer* to an integer,
+   *  so there needs to be some storage somewhere to point to.
+   * All builtin keyvals are ints, except for MPI_WIN_BASE, which
+   *  is a pointer, and MPI_WIN_SIZE, which is an MPI_Aint. */
+  int* kv_builtin_storage;
+  MPI_Aint* win_size_storage;
+  void** win_base_storage;
+  CkPupPtrVec<KeyvalNode> kvlist;
+
+  // Intercommunicator creation:
+  bool isTmpRProxySet;
+  CProxy_ampi tmpRProxy;
+
+  MPI_MigrateFn userAboutToMigrateFn, userJustMigratedFn;
+
+ public:
+  bool ampiInitCallDone;
+
+ private:
+  bool kv_set_builtin(int keyval, void* attribute_val);
+  bool kv_get_builtin(int keyval);
+
+ public:
+  void prepareCtv(void);
 
   inline bool isSplit(MPI_Comm comm) const {
     return (comm>=MPI_COMM_FIRST_SPLIT && comm<MPI_COMM_FIRST_GROUP);
@@ -1954,31 +1992,6 @@ class ampiParent : public CBase_ampiParent {
   void distGraphChildRegister(const ampiCommStruct &s);
   void interChildRegister(const ampiCommStruct &s);
   void intraChildRegister(const ampiCommStruct &s);
-
-  /* MPI_*_get_attr C binding returns a *pointer* to an integer,
-   *  so there needs to be some storage somewhere to point to.
-   * All builtin keyvals are ints, except for MPI_WIN_BASE, which
-   *  is a pointer, and MPI_WIN_SIZE, which is an MPI_Aint. */
-  int* kv_builtin_storage;
-  MPI_Aint* win_size_storage;
-  void** win_base_storage;
-  bool kv_set_builtin(int keyval, void* attribute_val);
-  bool kv_get_builtin(int keyval);
-  CkPupPtrVec<KeyvalNode> kvlist;
-
-  bool isTmpRProxySet;
-  CProxy_ampi tmpRProxy;
-
-  MPI_MigrateFn userAboutToMigrateFn, userJustMigratedFn;
-
- public:
-  bool ampiInitCallDone;
-  bool resumeOnRecv, resumeOnColl;
-  int numBlockedReqs; // number of requests currently blocked on
-  AmpiRequestList ampiReqs;
-  AmpiRequestPool reqPool;
-  CkDDT myDDTsto;
-  CkDDT *myDDT;
 
  public:
   ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int nRanks_);
@@ -2196,7 +2209,6 @@ class ampiParent : public CBase_ampiParent {
   WinStruct *getWinStruct(MPI_Win win) const;
   void removeWinStruct(WinStruct *win);
 
- public:
   int createInfo(MPI_Info *newinfo);
   int dupInfo(MPI_Info info, MPI_Info *newinfo);
   int setInfo(MPI_Info info, const char *key, const char *value);
@@ -2254,7 +2266,11 @@ class ampiParent : public CBase_ampiParent {
     (func)((void*)invec, inoutvec, &count, &datatype);
   }
 
- public:
+  void init();
+  void finalize();
+  void block();
+  void yield();
+
 #if AMPI_PRINT_MSG_SIZES
 // Map of AMPI routine names to message sizes and number of messages:
 // ["AMPI_Routine"][ [msg_size][num_msgs] ]
@@ -2277,10 +2293,6 @@ class ampiParent : public CBase_ampiParent {
   PUP::fromDisk *fromPUPer;
 #endif
 #endif
-  void init();
-  void finalize();
-  void block(void);
-  void yield(void);
 };
 
 /*
@@ -2288,32 +2300,45 @@ An ampi manages the communication of one thread over
 one MPI communicator.
 */
 class ampi : public CBase_ampi {
+ private:
   friend class IReq; // for checking resumeOnRecv
   friend class SendReq;
   friend class SsendReq;
   friend class RednReq;
   friend class GatherReq;
   friend class GathervReq;
-  CProxy_ampiParent parentProxy;
-  void findParent(bool forMigration);
-  ampiParent *parent;
-  TCharm *thread;
-  AmpiRequest *blockingReq;
 
-  ampiCommStruct myComm;
+  ampiParent *parent;
+  CProxy_ampiParent parentProxy;
+  TCharm *thread;
+
+  AmpiRequest *blockingReq;
   int myRank;
+  AmpiSeqQ oorder;
+
+ public:
+  /*
+   * AMPI Message Matching (Amm) queues are indexed by the tag and sender.
+   * Since ampi objects are per-communicator, there are separate Amm's per communicator.
+   */
+  Amm<AmpiRequest *> postedReqs;
+  Amm<AmpiMsg *> unexpectedMsgs;
+
+ private:
+  ampiCommStruct myComm;
   groupStruct tmpVec; // stores temp group info
   CProxy_ampi remoteProxy; // valid only for intercommunicator
+  CkPupPtrVec<win_obj> winObjects;
 
-  AmpiSeqQ oorder;
+ private:
   void inorder(AmpiMsg *msg);
   void inorderRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank,
                    MPI_Comm comm, int ssendReq);
 
   void init(void);
+  void findParent(bool forMigration);
 
  public: // entry methods
-
   ampi();
   ampi(CkArrayID parent_,const ampiCommStruct &s);
   ampi(CkMigrateMessage *msg);
@@ -2359,7 +2384,6 @@ class ampi : public CBase_ampi {
   }
 
  public: // to be used by MPI_* functions
-
   inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) const {
     return parent->comm2CommStruct(comm);
   }
@@ -2450,16 +2474,6 @@ class ampi : public CBase_ampi {
   CkDDT *getDDT(void) const {return parent->myDDT;}
   CthThread getThread() const { return thread->getThread(); }
 
- public:
-  /*
-   * AMPI Message Matching (Amm) queues are indexed by the tag and sender.
-   * Since ampi objects are per-communicator, there are separate Amm's per communicator.
-   */
-  Amm<AmpiMsg *> unexpectedMsgs;
-  Amm<AmpiRequest *> postedReqs;
-
- private:
-  CkPupPtrVec<win_obj> winObjects;
  public:
   MPI_Win createWinInstance(void *base, MPI_Aint size, int disp_unit, MPI_Info info);
   int deleteWinInstance(MPI_Win win);
