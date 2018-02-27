@@ -1145,19 +1145,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
     int npes = 1;
     int plusPSet = CmiGetArgInt(argv,"+p",&npes);
-#if ! CMK_SMP
-    if (plusPSet && npes != 1)
-    {
-      fprintf(stderr,
-        "To use multiple processors, you must run this program as:\n"
-        " > charmrun +p%d %s <args>\n"
-        "or build the %s-smp version of Charm++.\n",
-        npes,argv[0],CMK_MACHINE_NAME);
-      exit(1);
-    }
-    if (_Cmi_mynodesize > 1 && _Cmi_mynode == 0)
-        CmiAbort("+ppn cannot be used in non SMP version!\n");
-#else
+
     int auto_provision = CmiGetArgFlagDesc(argv, "+auto-provision", "fully utilize available resources");
     auto_provision |= CmiGetArgFlagDesc(argv, "+autoProvision", "fully utilize available resources");
     int onewth_per_host = CmiGetArgFlagDesc(argv, "+oneWthPerHost", "assign one worker thread per host");
@@ -1171,6 +1159,23 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
       exit(1);
     }
 
+#if ! CMK_SMP
+    if (plusPSet && npes != 1)
+    {
+      fprintf(stderr,
+        "To use multiple processors, you must run this program as:\n"
+        " > charmrun +p%d %s <args>\n"
+        "or build the %s-smp version of Charm++.\n",
+        npes,argv[0],CMK_MACHINE_NAME);
+      exit(1);
+    }
+
+    if ((_Cmi_mynodesize > 1 && _Cmi_mynode == 0) || onewth_per_socket || onewth_per_core || onewth_per_pu)
+    {
+      CmiError("Error: +oneWthPer(Socket|Core|PU) and +ppn can only be used in SMP mode.\n");
+      exit(1);
+    }
+#else
     if (onewth_active || auto_provision)
     {
       SET_ENV_VAR("CmiProcessPerHost", "1");

@@ -760,9 +760,7 @@ struct TopologyRequest
 };
 
 TopologyRequest proc_per;
-#if CMK_SMP
 TopologyRequest onewth_per;
-#endif
 int auto_provision;
 
 static void arg_init(int argc, const char **argv)
@@ -867,9 +865,7 @@ static void arg_init(int argc, const char **argv)
 #endif
   pparam_str(&arg_runscript, 0, "runscript", "Script to run node-program with");
   pparam_flag(&arg_help, 0, "help", "Print help messages");
-#if CMK_SMP
   pparam_int(&arg_ppn, 0, "ppn", "Number of PEs per Charm++ node (=OS process)");
-#endif
   pparam_flag(&arg_no_va_rand, 0, "no-va-randomization",
               "Disables randomization of the virtual address  space");
 
@@ -883,7 +879,6 @@ static void arg_init(int argc, const char **argv)
   pparam_int(&proc_per.pu, 0,
              "processPerPU", "assign N processes per PU");
 
-#if CMK_SMP
   // Worker Thread Binding Parameters
   pparam_flag(&onewth_per.host, 0,
              "oneWthPerHost", "assign one worker thread per host");
@@ -893,7 +888,6 @@ static void arg_init(int argc, const char **argv)
              "oneWthPerCore", "assign one worker thread per core");
   pparam_flag(&onewth_per.pu, 0,
              "oneWthPerPU", "assign one worker thread per PU");
-#endif
 
   pparam_flag(&auto_provision, 0, "auto-provision", "fully utilize available resources");
   pparam_flag(&auto_provision, 0, "autoProvision", "fully utilize available resources");
@@ -1093,13 +1087,8 @@ static void arg_init(int argc, const char **argv)
 #endif
 
   const int proc_active = proc_per.active();
-#if CMK_SMP
   const int onewth_active = onewth_per.active();
   if (proc_active || onewth_active || auto_provision)
-#else
-  const int onewth_active = 0;
-  if (proc_active || auto_provision)
-#endif
   {
     if (arg_requested_pes != 0)
     {
@@ -1185,6 +1174,14 @@ static void arg_init(int argc, const char **argv)
     }
 #endif
   }
+
+#if !CMK_SMP
+  if (arg_ppn > 1 || onewth_active)
+  {
+    fprintf(stderr, "Charmrun> Error: ++oneWthPer(Host|Socket|Core|PU) and ++ppn are only available in SMP mode.\n");
+    exit(1);
+  }
+#endif
 
   if (auto_provision)
   {
