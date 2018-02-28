@@ -136,25 +136,23 @@ class CkDDT ;
 class CkDDT_DataType {
 
   protected:
+    bool iscontig;
+    bool isAbsolute;
+    int size;
+    int count;
     int datatype;
     int refCount;
-
-  protected:
-    int size;
+    int baseSize;
+    int baseIndex;
+    int numElements;
     CkDDT_Aint extent;
-    int count;
+    CkDDT_Aint ub;
     CkDDT_Aint lb;
     CkDDT_Aint trueExtent;
     CkDDT_Aint trueLB;
-    CkDDT_Aint ub;
-    bool iscontig;
-    int baseSize;
     CkDDT_Aint baseExtent;
     CkDDT_DataType *baseType;
-    int baseIndex;
-    int numElements;
     string name;
-    bool isAbsolute;
 
   public:
     CkDDT_DataType& operator=(const CkDDT_DataType& obj);
