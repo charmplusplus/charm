@@ -122,7 +122,6 @@
        integer, parameter :: MPI_GROUP_NULL     = -1
        integer, parameter :: MPI_GROUP_EMPTY    = 0
        integer, parameter :: MPI_COMM_NULL      = -1
-       integer, parameter :: MPI_TYPE_NULL      = -1
        integer, parameter :: MPI_KEYVAL_INVALID = -1
        integer, parameter :: MPI_INFO_NULL      = -1
 
