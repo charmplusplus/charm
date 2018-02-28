@@ -232,7 +232,7 @@ namespace PUP {
 
   template <class T>
   inline void operator|(er &p, typename std::vector<T> &v) {
-    if (std::is_arithmetic<T>::value) {
+    if (PUP::as_bytes<T>::value) {
       size_t nElem = PUP_stl_container_size(p, v);
       if (p.isUnpacking()) {
         v.resize(nElem);
@@ -285,13 +285,13 @@ using Requires = typename requires_impl<
 
 namespace PUP {
   template <typename T, std::size_t N,
-            Requires<!std::is_arithmetic<T>::value> = nullptr>
+            Requires<!PUP::as_bytes<T>::value> = nullptr>
   inline void pup(PUP::er& p, std::array<T, N>& a) {
     std::for_each(a.begin(), a.end(), [&p](T& t) { p | t; });
   }
 
   template <typename T, std::size_t N,
-            Requires<std::is_arithmetic<T>::value> = nullptr>
+            Requires<PUP::as_bytes<T>::value> = nullptr>
   inline void pup(PUP::er& p, std::array<T, N>& a) {
     PUParray(p, a.data(), N);
   }
