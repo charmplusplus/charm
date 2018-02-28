@@ -170,9 +170,11 @@ The \kw{PUP::er} overhead is very small---one virtual function call
 for each item or array to be packed/unpacked.  The actual packing/unpacking is
 normally a simple memory-to-memory binary copy. 
 
-For arrays of builtin types like ``int" and ``double", or arrays of a type 
-with the ``PUPbytes'' declaration, \kw{PUParray} uses an even faster block 
-transfer, with one virtual function call per array.
+For arrays and vectors of builtin arithmetic types like ``int" and ``double", or
+of types declared as ``PUPbytes'', \kw{PUParray} uses an even faster block
+transfer, with one virtual function call per array or vector.
+
+Thus, if an object does not contain pointers, you should prefer declaring it as PUPbytes.
 
 For types of objects whose default constructors do more than necessary
 when an object will be unpacked from PUP, it is possible to tell the
