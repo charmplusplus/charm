@@ -168,8 +168,6 @@ CmiHandler node1HandlerFunc(char *msg)
 
 CmiStartFn mymain(int argc, char **argv)
 {
-    if(CmiMyRank() == CmiMyNodeSize()) return 0;
-
     CpvInitialize(int,msgSize);
     CpvInitialize(int,cycleNum);
     
@@ -201,12 +199,6 @@ CmiStartFn mymain(int argc, char **argv)
     CpvInitialize(int,twoway);
     CpvAccess(twoway) = 0;
 
-    // Set runtime cpuaffinity
-    CmiInitCPUAffinity(argv);
-
-    // Initialize CPU topology
-    CmiInitCPUTopology(argv);
-
     if(argc > 1)
         CpvAccess(twoway) = atoi(argv[1]);
     
@@ -217,7 +209,15 @@ CmiStartFn mymain(int argc, char **argv)
     
     CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE, ApplIdleStart, NULL);
     CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE, ApplIdleEnd, NULL);
-    
+
+    // Set runtime cpuaffinity
+    CmiInitCPUAffinity(argv);
+
+    // Initialize CPU topology
+    CmiInitCPUTopology(argv);
+
+    if(CmiMyRank() == CmiMyNodeSize()) return 0;
+
     if(CmiMyPe() == 0) {
         if(!CpvAccess(twoway))
             CmiPrintf("Starting Multiping with oneway traffic, kFactor = %d\n", 

@@ -144,8 +144,6 @@ CmiHandler node1HandlerFunc(char *msg)
 
 CmiStartFn mymain(int argc, char** argv)
 {
-    if(CmiMyRank() == CmiMyNodeSize()) return 0;
-
     CpvInitialize(int,msgSize);
     CpvInitialize(int,cycleNum);
     CpvInitialize(int,sizeNum);
@@ -181,6 +179,8 @@ CmiStartFn mymain(int argc, char** argv)
 
     // Initialize CPU topology
     CmiInitCPUTopology(argv);
+
+    if(CmiMyRank() == CmiMyNodeSize()) return 0;
     
     if(argc > 1)
         CpvAccess(twoway) = atoi(argv[1]);
