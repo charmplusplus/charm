@@ -223,15 +223,15 @@ int ampi::winPut(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank
     else if (orgtotalsize >= AMPI_RDMA_THRESHOLD ||
             (orgtotalsize >= AMPI_SMP_RDMA_THRESHOLD && destLikelyWithinProcess(thisProxy, rank)))
     {
-      AmpiRequestList* reqs = &(getAmpiParent()->ampiReqs);
+      AmpiRequestList& reqs = getReqs();
       SendReq* ampiReq = parent->reqPool.newSendReq(orgtype, myComm.getComm(), getDDT());
-      MPI_Request req = reqs->insert(ampiReq);
+      MPI_Request req = reqs.insert(ampiReq);
       CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
       completedSendCB.setRefnum(req);
       thisProxy[rank].winRemotePut(orgtotalsize, CkSendBuffer(orgaddr, completedSendCB), orgcnt, orgtype,
                                    targdisp, targcnt, targtype, win->index);
       ampiReq->wait(MPI_STATUS_IGNORE);
-      reqs->free(parent->reqPool, req, getDDT());
+      reqs.free(parent->reqPool, req, getDDT());
     }
 #endif
     else {
@@ -403,15 +403,15 @@ int ampi::winAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, i
     else if (orgtotalsize >= AMPI_RDMA_THRESHOLD ||
             (orgtotalsize >= AMPI_SMP_RDMA_THRESHOLD && destLikelyWithinProcess(thisProxy, rank)))
     {
-      AmpiRequestList* reqs = &(getAmpiParent()->ampiReqs);
+      AmpiRequestList& reqs = getReqs();
       SendReq* ampiReq = parent->reqPool.newSendReq(orgtype, myComm.getComm(), getDDT());
-      MPI_Request req = reqs->insert(ampiReq);
+      MPI_Request req = reqs.insert(ampiReq);
       CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
       completedSendCB.setRefnum(req);
       thisProxy[rank].winRemoteAccumulate(orgtotalsize, CkSendBuffer(orgaddr, completedSendCB), orgcnt,
                                           orgtype, targdisp, targcnt, targtype,  op, win->index);
       ampiReq->wait(MPI_STATUS_IGNORE);
-      reqs->free(parent->reqPool, req, getDDT());
+      reqs.free(parent->reqPool, req, getDDT());
     }
 #endif
     else {
@@ -466,15 +466,15 @@ int ampi::winGetAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype
     else if (orgtotalsize >= AMPI_RDMA_THRESHOLD ||
             (orgtotalsize >= AMPI_SMP_RDMA_THRESHOLD && destLikelyWithinProcess(thisProxy, rank)))
     {
-      AmpiRequestList* reqs = &(getAmpiParent()->ampiReqs);
+      AmpiRequestList& reqs = getReqs();
       SendReq* ampiReq = parent->reqPool.newSendReq(orgtype, myComm.getComm(), getDDT());
-      MPI_Request req = reqs->insert(ampiReq);
+      MPI_Request req = reqs.insert(ampiReq);
       CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
       completedSendCB.setRefnum(req);
       msg = thisProxy[rank].winRemoteGetAccumulate(orgtotalsize, CkSendBuffer(orgaddr, completedSendCB), orgcnt,
                                                    orgtype, targdisp, targcnt, targtype, op, win->index);
       ampiReq->wait(MPI_STATUS_IGNORE);
-      reqs->free(parent->reqPool, req, getDDT());
+      reqs.free(parent->reqPool, req, getDDT());
     }
 #endif
     else {

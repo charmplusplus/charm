@@ -1396,9 +1396,11 @@ class AmpiRequestList {
  private:
   vector<AmpiRequest*> reqs; // indexed by MPI_Request
   int startIdx; // start next search from this index
+  AmpiRequestPool* reqPool;
  public:
   AmpiRequestList() : startIdx(0) {}
-  AmpiRequestList(int size) : reqs(size), startIdx(0) {}
+  AmpiRequestList(int size, AmpiRequestPool* reqPoolPtr)
+    : reqs(size), startIdx(0), reqPool(reqPoolPtr) {}
   ~AmpiRequestList() {}
 
   inline AmpiRequest* operator[](int n) {
@@ -1409,6 +1411,7 @@ class AmpiRequestList {
 #endif
   }
   void free(AmpiRequestPool& reqPool, int idx, CkDDT *ddt);
+  void freeNonPersReq(int &idx);
   inline int insert(AmpiRequest* req) {
     for (int i=startIdx; i<reqs.size(); i++) {
       if (reqs[i] == NULL) {
@@ -1438,7 +1441,7 @@ class AmpiRequestList {
     }
   }
 
-  void pup(PUP::er &p, AmpiRequestPool &reqPool);
+  void pup(PUP::er &p, AmpiRequestPool* reqPool);
 
   void print(void) const {
     for (int i=0; i<reqs.size(); i++) {
@@ -2153,7 +2156,7 @@ class ampiParent : public CBase_ampiParent {
     groupStruct vec = group2vec(group);
     return getPosOp(thisIndex,vec);
   }
-
+  inline AmpiRequestList &getReqs() { return ampiReqs; }
   inline int getMyPe(void) const {
     return CkMyPe();
   }
@@ -2471,6 +2474,7 @@ class ampi : public CBase_ampi {
   inline MPI_User_function* op2User_function(MPI_Op op) const { return parent->op2User_function(op); }
   void topoDup(int topoType, int rank, MPI_Comm comm, MPI_Comm *newcomm);
 
+  inline AmpiRequestList& getReqs() { return parent->ampiReqs; }
   CkDDT *getDDT(void) const {return parent->myDDT;}
   CthThread getThread() const { return thread->getThread(); }
 

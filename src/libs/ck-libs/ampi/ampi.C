@@ -1225,7 +1225,7 @@ class ampiWorlds : public CBase_ampiWorlds {
 
 //-------------------- ampiParent -------------------------
 ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int nRanks_)
-:threads(threads_), worldNo(worldNo_), isTmpRProxySet(false), ampiReqs(64)
+:threads(threads_), worldNo(worldNo_), isTmpRProxySet(false), ampiReqs(64, &reqPool)
 {
   int barrier = 0x1234;
   STARTUP_DEBUG("ampiParent> starting up")
@@ -1286,7 +1286,7 @@ void ampiParent::pup(PUP::er &p) {
   p|ops;
 
   p|reqPool;
-  ampiReqs.pup(p, reqPool);
+  ampiReqs.pup(p, &reqPool);
 
   p|kvlist;
   p|isTmpRProxySet;
@@ -2525,8 +2525,8 @@ void ampi::ssend_ack(int sreq_idx){
     thread->resume();           // MPI_Ssend
   else {
     sreq_idx -= 2;              // start from 2
-    AmpiRequestList *reqs = &(parent->ampiReqs);
-    SsendReq *sreq = (SsendReq *)(*reqs)[sreq_idx];
+    AmpiRequestList& reqs = getReqs();
+    SsendReq *sreq = (SsendReq *)reqs[sreq_idx];
     sreq->complete = true;
     handleBlockedReq(sreq);
     resumeThreadIfReady();
@@ -2563,7 +2563,15 @@ void ampi::generic(AmpiMsg* msg)
   resumeThreadIfReady();
 }
 
-inline static AmpiRequestList *getReqs(void);
+inline static AmpiRequestList &getReqs(void);
+
+void AmpiRequestList::freeNonPersReq(int &idx) {
+  ampiParent* pptr = getAmpiParent();
+  if (!reqs[idx]->isPersistent()) {
+    free(pptr->reqPool, idx, pptr->getDDT());
+    idx = MPI_REQUEST_NULL;
+  }
+}
 
 void AmpiRequestList::free(AmpiRequestPool &reqPool, int idx, CkDDT *ddt) {
   if (idx < 0) return;
@@ -2667,7 +2675,7 @@ void ampi::completedRdmaSend(CkDataMsg *msg)
              CkMyPe(), parent->thisIndex, reqIdx);
   )
 
-  AmpiRequestList& reqList = parent->ampiReqs;
+  AmpiRequestList& reqList = getReqs();
   SendReq& sreq = (SendReq&)(*reqList[reqIdx]);
   sreq.complete = true;
 
@@ -2718,15 +2726,6 @@ AmpiMsg *ampi::makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int coun
   return msg;
 }
 
-static inline void freeNonPersReq(int &request) {
-  ampiParent* ptr = getAmpiParent();
-  AmpiRequestList* reqs = &(ptr->ampiReqs);
-  if (!(*reqs)[request]->isPersistent()) {
-    reqs->free(ptr->reqPool, request, ptr->getDDT());
-    request = MPI_REQUEST_NULL;
-  }
-}
-
 MPI_Request ampi::send(int t, int sRank, const void* buf, int count, MPI_Datatype type,
                        int rank, MPI_Comm destcomm, int ssendReq/*=0*/, AmpiSendType sendType/*=BLOCKING_SEND*/)
 {
@@ -2743,10 +2742,10 @@ MPI_Request ampi::send(int t, int sRank, const void* buf, int count, MPI_Datatyp
   const ampiCommStruct &dest=comm2CommStruct(destcomm);
   MPI_Request req = delesend(t,sRank,buf,count,type,rank,destcomm,dest.getProxy(),ssendReq,sendType);
   if (sendType == BLOCKING_SEND && req != MPI_REQUEST_NULL) {
-    AmpiRequestList* reqList = getReqs();
-    SendReq *sreq = (SendReq*)(*reqList)[req];
+    AmpiRequestList& reqList = getReqs();
+    SendReq *sreq = (SendReq*)reqList[req];
     sreq->wait(MPI_STATUS_IGNORE);
-    reqList->free(parent->reqPool, req, getDDT());
+    reqList.free(parent->reqPool, req, parent->getDDT());
     req = MPI_REQUEST_NULL;
   }
 
@@ -3076,16 +3075,17 @@ int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm c
     CkAssert(parent->numBlockedReqs == 0);
     parent->numBlockedReqs = 1;
     dis = dis->blockOnRecv(); // "dis" is updated in case an ampi thread is migrated while waiting for a message
+    parent = dis->parent;
+    AmpiRequestList& reqs = parent->getReqs();
     if (sts != MPI_STATUS_IGNORE) {
-      AmpiRequestList* reqs = getReqs();
-      AmpiRequest& req = *(*reqs)[request];
+      AmpiRequest& req = *reqs[request];
       sts->MPI_SOURCE = req.src;
       sts->MPI_TAG    = req.tag;
       sts->MPI_COMM   = req.comm;
       sts->MPI_LENGTH = req.getNumReceivedBytes(getDDT());
       sts->MPI_CANCEL = 0;
     }
-    freeNonPersReq(request);
+    reqs.freeNonPersReq(request);
   }
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -3443,7 +3443,11 @@ void SsendReq::print() const {
   CkPrintf("In SsendReq: this=%p, persistent=%d\n", this, (int)persistent);
 }
 
-void AmpiRequestList::pup(PUP::er &p, AmpiRequestPool& reqPool) {
+void AmpiRequestList::pup(PUP::er &p, AmpiRequestPool* pool) {
+  if (p.isUnpacking()) {
+    CkAssert(pool);
+    reqPool = pool;
+  }
   if(!CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)){
     return;
   }
@@ -3472,7 +3476,7 @@ void AmpiRequestList::pup(PUP::er &p, AmpiRequestPool& reqPool) {
       if(p.isUnpacking()){
         switch(reqType){
           case AMPI_I_REQ:
-            reqs[i] = reqPool.newIReq();
+            reqs[i] = reqPool->newIReq();
             break;
           case AMPI_REDN_REQ:
             reqs[i] = new RednReq;
@@ -3484,10 +3488,10 @@ void AmpiRequestList::pup(PUP::er &p, AmpiRequestPool& reqPool) {
             reqs[i] = new GathervReq;
             break;
           case AMPI_SEND_REQ:
-            reqs[i] = reqPool.newSendReq();
+            reqs[i] = reqPool->newSendReq();
             break;
           case AMPI_SSEND_REQ:
-            reqs[i] = reqPool.newSsendReq();
+            reqs[i] = reqPool->newSsendReq();
             break;
           case AMPI_ATA_REQ:
             reqs[i] = new ATAReq;
@@ -3528,8 +3532,8 @@ bool isAmpiThread(void) {
   return (CtvAccess(ampiPtr)) ? true : false;
 }
 
-inline static AmpiRequestList *getReqs(void) {
-  return &(getAmpiParent()->ampiReqs);
+inline static AmpiRequestList &getReqs(void) {
+  return getAmpiParent()->ampiReqs;
 }
 
 inline void checkComm(MPI_Comm comm){
@@ -3540,15 +3544,15 @@ inline void checkComm(MPI_Comm comm){
 
 inline void checkRequest(MPI_Request req){
 #if AMPI_ERROR_CHECKING
-  getReqs()->checkRequest(req);
+  getReqs().checkRequest(req);
 #endif
 }
 
 inline void checkRequests(int n, MPI_Request* reqs){
 #if AMPI_ERROR_CHECKING
-  AmpiRequestList* reqlist = getReqs();
+  AmpiRequestList& reqlist = getReqs();
   for(int i=0;i<n;i++)
-    reqlist->checkRequest(reqs[i]);
+    reqlist.checkRequest(reqs[i]);
 #endif
 }
 
@@ -3559,11 +3563,12 @@ int testRequest(MPI_Request *reqIdx, int *flag, MPI_Status *sts){
     return MPI_SUCCESS;
   }
   checkRequest(*reqIdx);
-  AmpiRequestList* reqList = getReqs();
-  AmpiRequest& req = *(*reqList)[*reqIdx];
+  ampiParent* pptr = getAmpiParent();
+  AmpiRequestList& reqList = pptr->getReqs();
+  AmpiRequest& req = *reqList[*reqIdx];
   if(1 == (*flag = req.test())){
     req.wait(sts);
-    freeNonPersReq(*reqIdx);
+    reqList.freeNonPersReq(*reqIdx);
   }
   return MPI_SUCCESS;
 }
@@ -3575,8 +3580,8 @@ int testRequestNoFree(MPI_Request *reqIdx, int *flag, MPI_Status *sts){
     return MPI_SUCCESS;
   }
   checkRequest(*reqIdx);
-  AmpiRequestList* reqList = getReqs();
-  AmpiRequest& req = *(*reqList)[*reqIdx];
+  AmpiRequestList& reqList = getReqs();
+  AmpiRequest& req = *reqList[*reqIdx];
   *flag = req.test();
   if(*flag)
     req.wait(sts);
@@ -3824,7 +3829,7 @@ AMPI_API_IMPL(int, MPI_Finalize, void)
 MPI_Request ampi::postReq(AmpiRequest* newreq)
 {
   // All valid requests must be inserted into the AmpiRequestList
-  MPI_Request request = getReqs()->insert(newreq);
+  MPI_Request request = getReqs().insert(newreq);
   // Completed requests should not be inserted into the postedReqs queue.
   // All types of send requests are matched by their request number,
   // not by (tag, src, comm), so they should not be inserted either.
@@ -4985,12 +4990,12 @@ AMPI_API_IMPL(int, MPI_Start, MPI_Request *request)
 {
   AMPI_API("AMPI_Start");
   checkRequest(*request);
-  AmpiRequestList *reqs = getReqs();
+  AmpiRequestList& reqs = getReqs();
 #if AMPI_ERROR_CHECKING
-  if (!(*reqs)[*request]->isPersistent())
+  if (!reqs[*request]->isPersistent())
     return ampiErrhandler("AMPI_Start", MPI_ERR_REQUEST);
 #endif
-  (*reqs)[*request]->start(*request);
+  reqs[*request]->start(*request);
   return MPI_SUCCESS;
 }
 
@@ -4998,13 +5003,13 @@ AMPI_API_IMPL(int, MPI_Startall, int count, MPI_Request *requests)
 {
   AMPI_API("AMPI_Startall");
   checkRequests(count,requests);
-  AmpiRequestList *reqs = getReqs();
+  AmpiRequestList& reqs = getReqs();
   for(int i=0;i<count;i++){
 #if AMPI_ERROR_CHECKING
-    if (!(*reqs)[requests[i]]->isPersistent())
+    if (!reqs[requests[i]]->isPersistent())
       return ampiErrhandler("MPI_Startall", MPI_ERR_REQUEST);
 #endif
-    (*reqs)[requests[i]]->start(requests[i]);
+    reqs[requests[i]]->start(requests[i]);
   }
   return MPI_SUCCESS;
 }
@@ -5229,13 +5234,13 @@ AMPI_API_IMPL(int, MPI_Wait, MPI_Request *request, MPI_Status *sts)
     return MPI_SUCCESS;
   }
   checkRequest(*request);
-  AmpiRequestList* reqs = getReqs();
+  ampiParent* pptr = getAmpiParent();
+  AmpiRequestList& reqs = pptr->getReqs();
 
 #if AMPIMSGLOG
-  ampiParent* pptr = getAmpiParent();
   if(msgLogRead){
     (*(pptr->fromPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->fromPUPer), (char *)((*reqs)[*request]->buf), (pptr->pupBytes));
+    PUParray(*(pptr->fromPUPer), (char *)(reqs[*request]->buf), (pptr->pupBytes));
     PUParray(*(pptr->fromPUPer), (char *)sts, sizeof(MPI_Status));
     return MPI_SUCCESS;
   }
@@ -5246,14 +5251,14 @@ AMPI_API_IMPL(int, MPI_Wait, MPI_Request *request, MPI_Status *sts)
   _TRACE_BG_TLINE_END(&curLog);
 #endif
 
-  AMPI_DEBUG("AMPI_Wait request=%d (*reqs)[*request]=%p (*reqs)[*request]->tag=%d\n",
-             *request, (*reqs)[*request], (int)((*reqs)[*request]->tag));
+  AMPI_DEBUG("AMPI_Wait request=%d reqs[*request]=%p reqs[*request]->tag=%d\n",
+             *request, reqs[*request], (int)(reqs[*request]->tag));
   AMPI_DEBUG("MPI_Wait: request=%d, reqs.size=%d, &reqs=%d\n",
-             *request, reqs->size(), reqs);
-  CkAssert(getAmpiParent()->numBlockedReqs == 0);
+             *request, reqs.size(), reqs);
+  CkAssert(pptr->numBlockedReqs == 0);
   int waitResult = -1;
   do{
-    AmpiRequest& waitReq = *(*reqs)[*request];
+    AmpiRequest& waitReq = *reqs[*request];
     waitResult = waitReq.wait(sts);
 #if CMK_BIGSIM_CHARM
     if(_BgInOutOfCoreMode){
@@ -5262,24 +5267,24 @@ AMPI_API_IMPL(int, MPI_Wait, MPI_Request *request, MPI_Status *sts)
 #endif
   }while(waitResult==-1);
 
-  CkAssert(getAmpiParent()->numBlockedReqs == 0);
-  AMPI_DEBUG("AMPI_Wait after calling wait, request=%d (*reqs)[*request]=%p (*reqs)[*request]->tag=%d\n",
-             *request, (*reqs)[*request], (int)((*reqs)[*request]->tag));
+  CkAssert(pptr->numBlockedReqs == 0);
+  AMPI_DEBUG("AMPI_Wait after calling wait, request=%d reqs[*request]=%p reqs[*request]->tag=%d\n",
+             *request, reqs[*request], (int)(reqs[*request]->tag));
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (pptr->pupBytes) = getDDT()->getSize((*reqs)[*request]->type) * ((*reqs)[*request]->count);
+    (pptr->pupBytes) = getDDT()->getSize(reqs[*request]->type) * (reqs[*request]->count);
     (*(pptr->toPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->toPUPer), (char *)((*reqs)[*request]->buf), (pptr->pupBytes));
+    PUParray(*(pptr->toPUPer), (char *)(reqs[*request]->buf), (pptr->pupBytes));
     PUParray(*(pptr->toPUPer), (char *)sts, sizeof(MPI_Status));
   }
 #endif
 
 #if CMK_BIGSIM_CHARM
-  TRACE_BG_AMPI_WAIT(reqs); // setup forward and backward dependence
+  TRACE_BG_AMPI_WAIT(&reqs); // setup forward and backward dependence
 #endif
 
-  freeNonPersReq(*request);
+  reqs.freeNonPersReq(*request);
 
   AMPI_DEBUG("End of AMPI_Wait\n");
 
@@ -5293,8 +5298,8 @@ AMPI_API_IMPL(int, MPI_Waitall, int count, MPI_Request request[], MPI_Status sts
   checkRequests(count, request);
   if (count == 0) return MPI_SUCCESS;
 
-  AmpiRequestList* reqs = getReqs();
   ampiParent* pptr = getAmpiParent();
+  AmpiRequestList& reqs = pptr->getReqs();
   CkAssert(pptr->numBlockedReqs == 0);
 
 #if AMPIMSGLOG
@@ -5304,7 +5309,7 @@ AMPI_API_IMPL(int, MPI_Waitall, int count, MPI_Request request[], MPI_Status sts
         clearStatus(sts, i);
         continue;
       }
-      AmpiRequest *waitReq = (*reqs)[request[i]];
+      AmpiRequest *waitReq = reqs[request[i]];
       (*(pptr->fromPUPer))|(pptr->pupBytes);
       PUParray(*(pptr->fromPUPer), (char *)(waitReq->buf), pptr->pupBytes);
       PUParray(*(pptr->fromPUPer), (char *)(&sts[i]), sizeof(MPI_Status));
@@ -5323,7 +5328,7 @@ AMPI_API_IMPL(int, MPI_Waitall, int count, MPI_Request request[], MPI_Status sts
       clearStatus(sts, i);
       continue;
     }
-    AmpiRequest& req = *(*reqs)[request[i]];
+    AmpiRequest& req = *reqs[request[i]];
     if (req.test()) {
       req.wait((sts == MPI_STATUSES_IGNORE) ? MPI_STATUS_IGNORE : &sts[i]);
       req.setBlocked(false);
@@ -5335,7 +5340,7 @@ AMPI_API_IMPL(int, MPI_Waitall, int count, MPI_Request request[], MPI_Status sts
         PUParray(*(pptr->toPUPer), (char *)(&sts[i]), sizeof(MPI_Status));
       }
 #endif
-      freeNonPersReq(request[i]);
+      reqs.freeNonPersReq(request[i]);
     }
     else {
       req.setBlocked(true);
@@ -5346,14 +5351,14 @@ AMPI_API_IMPL(int, MPI_Waitall, int count, MPI_Request request[], MPI_Status sts
   // If any requests are incomplete, block until all have been completed
   if (pptr->numBlockedReqs > 0) {
     getAmpiParent()->blockOnRecv();
-    reqs = getReqs(); //update pointer in case of migration while suspended
     pptr = getAmpiParent();
+    reqs = pptr->getReqs(); //update pointer in case of migration while suspended
 
     for (int i=0; i<count; i++) {
       if (request[i] == MPI_REQUEST_NULL) {
         continue;
       }
-      AmpiRequest& req = *(*reqs)[request[i]];
+      AmpiRequest& req = *reqs[request[i]];
 #if CMK_ERROR_CHECKING
       if (!req.test())
         CkAbort("In AMPI_Waitall, all requests should have completed by now!");
@@ -5368,14 +5373,14 @@ AMPI_API_IMPL(int, MPI_Waitall, int count, MPI_Request request[], MPI_Status sts
         PUParray(*(pptr->toPUPer), (char *)(&sts[i]), sizeof(MPI_Status));
       }
 #endif
-      freeNonPersReq(request[i]);
+      reqs.freeNonPersReq(request[i]);
     }
   }
 
   CkAssert(getAmpiParent()->numBlockedReqs == 0);
 
 #if CMK_BIGSIM_CHARM
-  TRACE_BG_AMPI_WAITALL(reqs); // setup forward and backward dependence
+  TRACE_BG_AMPI_WAITALL(&reqs); // setup forward and backward dependence
 #endif
 
   return MPI_SUCCESS;
@@ -5391,9 +5396,9 @@ AMPI_API_IMPL(int, MPI_Waitany, int count, MPI_Request *request, int *idx, MPI_S
     return MPI_SUCCESS;
   }
 
-  CkAssert(getAmpiParent()->numBlockedReqs == 0);
-
-  AmpiRequestList* reqs = getReqs();
+  ampiParent* pptr = getAmpiParent();
+  CkAssert(pptr->numBlockedReqs == 0);
+  AmpiRequestList& reqs = pptr->getReqs();
   int nullReqs = 0;
 
   // First check for an already complete request
@@ -5402,13 +5407,13 @@ AMPI_API_IMPL(int, MPI_Waitany, int count, MPI_Request *request, int *idx, MPI_S
       nullReqs++;
       continue;
     }
-    AmpiRequest& req = *(*reqs)[request[i]];
+    AmpiRequest& req = *reqs[request[i]];
     if (req.test()) {
       req.wait(sts);
-      reqs->unblockReqs(&request[0], i);
-      freeNonPersReq(request[i]);
+      reqs.unblockReqs(&request[0], i);
+      reqs.freeNonPersReq(request[i]);
       *idx = i;
-      CkAssert(getAmpiParent()->numBlockedReqs == 0);
+      CkAssert(pptr->numBlockedReqs == 0);
       return MPI_SUCCESS;
     }
 
@@ -5418,26 +5423,26 @@ AMPI_API_IMPL(int, MPI_Waitany, int count, MPI_Request *request, int *idx, MPI_S
   if (nullReqs == count) {
     clearStatus(sts);
     *idx = MPI_UNDEFINED;
-    CkAssert(getAmpiParent()->numBlockedReqs == 0);
+    CkAssert(pptr->numBlockedReqs == 0);
     return MPI_SUCCESS;
   }
 
   // block until one of the requests is completed
-  getAmpiParent()->numBlockedReqs = 1;
-  getAmpiParent()->blockOnRecv();
-  reqs = getReqs(); // update pointer in case of migration while suspended
+  pptr->numBlockedReqs = 1;
+  pptr = pptr->blockOnRecv();
+  reqs = pptr->getReqs(); // update pointer in case of migration while suspended
 
   for (int i=0; i<count; i++) {
     if (request[i] == MPI_REQUEST_NULL) {
       continue;
     }
-    AmpiRequest& req = *(*reqs)[request[i]];
+    AmpiRequest& req = *reqs[request[i]];
     if (req.test()) {
       req.wait(sts);
-      reqs->unblockReqs(&request[i], count-i);
-      freeNonPersReq(request[i]);
+      reqs.unblockReqs(&request[i], count-i);
+      reqs.freeNonPersReq(request[i]);
       *idx = i;
-      CkAssert(getAmpiParent()->numBlockedReqs == 0);
+      CkAssert(pptr->numBlockedReqs == 0);
       return MPI_SUCCESS;
     }
 
@@ -5447,7 +5452,6 @@ AMPI_API_IMPL(int, MPI_Waitany, int count, MPI_Request *request, int *idx, MPI_S
   CkAbort("In AMPI_Waitany, a request should have completed by now!");
 #endif
   return MPI_SUCCESS;
-
 }
 
 AMPI_API_IMPL(int, MPI_Waitsome, int incount, MPI_Request *array_of_requests, int *outcount,
@@ -5461,9 +5465,9 @@ AMPI_API_IMPL(int, MPI_Waitsome, int incount, MPI_Request *array_of_requests, in
     return MPI_SUCCESS;
   }
 
-  CkAssert(getAmpiParent()->numBlockedReqs == 0);
-
-  AmpiRequestList* reqs = getReqs();
+  ampiParent* pptr = getAmpiParent();
+  CkAssert(pptr->numBlockedReqs == 0);
+  AmpiRequestList& reqs = pptr->getReqs();
   MPI_Status sts;
   int nullReqs = 0;
   *outcount = 0;
@@ -5474,14 +5478,14 @@ AMPI_API_IMPL(int, MPI_Waitsome, int incount, MPI_Request *array_of_requests, in
       nullReqs++;
       continue;
     }
-    AmpiRequest& req = *(*reqs)[array_of_requests[i]];
+    AmpiRequest& req = *reqs[array_of_requests[i]];
     if (req.test()) {
       req.wait(&sts);
       array_of_indices[(*outcount)] = i;
       (*outcount)++;
       if (array_of_statuses != MPI_STATUSES_IGNORE)
         array_of_statuses[(*outcount)] = sts;
-      freeNonPersReq(array_of_requests[i]);
+      reqs.freeNonPersReq(array_of_requests[i]);
     }
     else {
       req.setBlocked(true);
@@ -5489,34 +5493,34 @@ AMPI_API_IMPL(int, MPI_Waitsome, int incount, MPI_Request *array_of_requests, in
   }
 
   if (*outcount > 0) {
-    reqs->unblockReqs(&array_of_requests[0], incount);
-    CkAssert(getAmpiParent()->numBlockedReqs == 0);
+    reqs.unblockReqs(&array_of_requests[0], incount);
+    CkAssert(pptr->numBlockedReqs == 0);
     return MPI_SUCCESS;
   }
   else if (nullReqs == incount) {
     *outcount = MPI_UNDEFINED;
-    CkAssert(getAmpiParent()->numBlockedReqs == 0);
+    CkAssert(pptr->numBlockedReqs == 0);
     return MPI_SUCCESS;
   }
   else { // block until one of the requests is completed
-    getAmpiParent()->numBlockedReqs = 1;
-    getAmpiParent()->blockOnRecv();
-    reqs = getReqs(); // update pointer in case of migration while suspended
+    pptr->numBlockedReqs = 1;
+    pptr = pptr->blockOnRecv();
+    reqs = pptr->getReqs(); // update pointer in case of migration while suspended
 
     for (int i=0; i<incount; i++) {
       if (array_of_requests[i] == MPI_REQUEST_NULL) {
         continue;
       }
-      AmpiRequest& req = *(*reqs)[array_of_requests[i]];
+      AmpiRequest& req = *reqs[array_of_requests[i]];
       if (req.test()) {
         req.wait(&sts);
         array_of_indices[(*outcount)] = i;
         (*outcount)++;
         if (array_of_statuses != MPI_STATUSES_IGNORE)
           array_of_statuses[(*outcount)] = sts;
-        reqs->unblockReqs(&array_of_requests[i], incount-i);
-        freeNonPersReq(array_of_requests[i]);
-        CkAssert(getAmpiParent()->numBlockedReqs == 0);
+        reqs.unblockReqs(&array_of_requests[i], incount-i);
+        reqs.freeNonPersReq(array_of_requests[i]);
+        CkAssert(pptr->numBlockedReqs == 0);
         return MPI_SUCCESS;
       }
       else {
@@ -5571,7 +5575,7 @@ bool SsendReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) {
 }
 
 bool ATAReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/){
-  AmpiRequestList* reqList = getReqs();
+  AmpiRequestList& reqList = getReqs();
   int i = 0;
   while (i < reqs.size()) {
     if (reqs[i] == MPI_REQUEST_NULL) {
@@ -5579,10 +5583,10 @@ bool ATAReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/){
       reqs.pop_back();
       continue;
     }
-    AmpiRequest& req = *(*reqList)[reqs[i]];
+    AmpiRequest& req = *reqList[reqs[i]];
     if (req.test()) {
       req.wait(sts);
-      freeNonPersReq(reqs[i]);
+      reqList.freeNonPersReq(reqs[i]);
       std::swap(reqs[i], reqs.back());
       reqs.pop_back();
       continue;
@@ -5727,7 +5731,8 @@ AMPI_API_IMPL(int, MPI_Testall, int count, MPI_Request *request, int *flag, MPI_
     return MPI_SUCCESS;
   }
 
-  AmpiRequestList* reqs = getReqs();
+  ampiParent* pptr = getAmpiParent();
+  AmpiRequestList& reqs = pptr->getReqs();
   int nullReqs = 0;
   *flag = 1;
 
@@ -5737,9 +5742,9 @@ AMPI_API_IMPL(int, MPI_Testall, int count, MPI_Request *request, int *flag, MPI_
       nullReqs++;
       continue;
     }
-    if (!(*reqs)[request[i]]->test()) {
+    if (!reqs[request[i]]->test()) {
       *flag = 0;
-      getAmpiParent()->yield();
+      pptr->yield();
       return MPI_SUCCESS;
     }
   }
@@ -5748,9 +5753,9 @@ AMPI_API_IMPL(int, MPI_Testall, int count, MPI_Request *request, int *flag, MPI_
     for (int i=0; i<count; i++) {
       int reqIdx = request[i];
       if (reqIdx != MPI_REQUEST_NULL) {
-        AmpiRequest& req = *(*reqs)[reqIdx];
+        AmpiRequest& req = *reqs[reqIdx];
         req.wait((sts == MPI_STATUSES_IGNORE) ? MPI_STATUS_IGNORE : &sts[i]);
-        freeNonPersReq(request[i]);
+        reqs.freeNonPersReq(request[i]);
       }
     }
   }
@@ -5803,8 +5808,9 @@ AMPI_API_IMPL(int, MPI_Request_free, MPI_Request *request)
   AMPI_API("AMPI_Request_free");
   if(*request==MPI_REQUEST_NULL) return MPI_SUCCESS;
   checkRequest(*request);
-  AmpiRequestList* reqs = getReqs();
-  reqs->free(getAmpiParent()->reqPool, *request, getDDT());
+  ampiParent* pptr = getAmpiParent();
+  AmpiRequestList& reqs = pptr->getReqs();
+  reqs.free(pptr->reqPool, *request, pptr->getDDT());
   *request = MPI_REQUEST_NULL;
   return MPI_SUCCESS;
 }
@@ -5814,8 +5820,8 @@ AMPI_API_IMPL(int, MPI_Cancel, MPI_Request *request)
   AMPI_API("AMPI_Cancel");
   if(*request == MPI_REQUEST_NULL) return MPI_SUCCESS;
   checkRequest(*request);
-  AmpiRequestList* reqs = getReqs();
-  AmpiRequest& req = *(*reqs)[*request];
+  AmpiRequestList& reqs = getReqs();
+  AmpiRequest& req = *reqs[*request];
   if(req.getType() == AMPI_I_REQ) {
     req.cancel();
     return MPI_SUCCESS;
@@ -6188,9 +6194,9 @@ void ampi::irecv(void *buf, int count, MPI_Datatype type, int src,
     src = myComm.getIndexForRemoteRank(src);
   }
 
-  AmpiRequestList* reqs = getReqs();
+  AmpiRequestList& reqs = getReqs();
   IReq *newreq = parent->reqPool.newIReq(buf, count, type, src, tag, comm, getDDT());
-  *request = reqs->insert(newreq);
+  *request = reqs.insert(newreq);
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();
