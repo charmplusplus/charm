@@ -506,7 +506,13 @@ void Entry::genArrayDefs(XStr& str) {
                     "#endif\n";
       inlineCall << "    ";
       if (!retType->isVoid()) inlineCall << retType << " retValue = ";
-      inlineCall << "obj->" << name << "(";
+      inlineCall << "obj->" << (tspec ? "template " : "") << name;
+      if (tspec) {
+        inlineCall << "< ";
+        tspec->genShort(inlineCall);
+        inlineCall << " >";
+      }
+      inlineCall << "(";
       param->unmarshall(inlineCall, true);
       inlineCall << ");\n";
       inlineCall << "#if CMK_CHARMDEBUG\n"
