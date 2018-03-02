@@ -72,4 +72,6 @@
 #undef CMK_IBVERBS_FAST_START
 #define CMK_IBVERBS_FAST_START                             0
 
+#define CMK_PPC64                                          1
+
 #endif

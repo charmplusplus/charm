@@ -323,29 +323,85 @@ void CmiDestroyLock(CmiNodeLock lk)
 
 void CmiYield(void) { sched_yield(); }
 
-int barrier = 0;
-pthread_cond_t barrier_cond = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t barrier_mutex = PTHREAD_MUTEX_INITIALIZER;
+#if CMK_PPC64
+  #define CACHE_LINE_SIZE 128
+#else
+  #define CACHE_LINE_SIZE 64
+#endif //CMK_PPC64
+
+// compute how many of each element will fit in the given cache line:
+// we're assuming that integers will always evenly divide either of the two cache line sizes
+// and that the pthread_cond_t and pthread_mutex_t (48 and 40 bytes respectively on Linux) types
+// will never evenly divide the sizes (hence the "+1" to round up, we want the last element
+// to be in its own line entirely).
+#define INT_PER_CACHE_LINE    (CACHE_LINE_SIZE / sizeof(int))
+#define COND_PER_CACHE_LINE   (CACHE_LINE_SIZE / sizeof(pthread_cond_t) + 1)
+#define MUT_PER_CACHE_LINE    (CACHE_LINE_SIZE / sizeof(pthread_mutex_t) + 1)
+
+// by creating arrays with one more element than the number of elements that will (partially) fit
+// inside a cache line, we are guaranteeing that the first and last elements will exist on entirely
+// two separate lines
+int barrierCounter[INT_PER_CACHE_LINE + 1] = {0};
+pthread_cond_t barrier_cond[COND_PER_CACHE_LINE + 1];
+pthread_mutex_t barrier_mutex[MUT_PER_CACHE_LINE + 1];
+
+// initialization of the barrier_cond and barrier_mutex arrays can't happen at file scope, and since multiple
+// threads will be calling CmiNodeBarrierCount() we need to synchronize the initialization step
+pthread_mutex_t init_mutex = PTHREAD_MUTEX_INITIALIZER;
+int initFlag = 1;
 
 void CmiNodeBarrierCount(int nThreads)
 {
-  static unsigned int volatile level = 0;
-  unsigned int cur;
-  pthread_mutex_lock(&barrier_mutex);
-  cur = level;
-  /* CmiPrintf("[%d] CmiNodeBarrierCount: %d of %d level:%d\n", CmiMyPe(), barrier, nThreads, level); */
-  barrier++;
-  if(barrier != nThreads) {
-      /* occasionally it wakes up without having reach the count */
-    while (cur == level)
-      pthread_cond_wait(&barrier_cond, &barrier_mutex);
+  static unsigned int volatile level[INT_PER_CACHE_LINE + 1] = {0};
+  unsigned int cur[INT_PER_CACHE_LINE + 1];
+
+  /* The outer-most if-statement is to prevent needless locking overhead on future barrier calls
+     once the initialization has already completed.
+
+     At first every thread will potentially read initFlag as 1, after which the first thread to obtain
+     the lock will perform the initialization, update initFlag, and then release the lock. Every thread
+     that obtains the lock afterwards will see the new initFlag value in the second if-statement and
+     skip the initialization.
+
+     Once every thread gets past trying to obtain the lock to perform the init step, the
+     initFlag value will be safe for simultaneous reads (it will no longer will be written to), and thus
+     no locking will be needed. */
+  if (initFlag) {
+    pthread_mutex_lock(&init_mutex);
+    if (initFlag) {
+      // call the init routines for the first and last elements of each array
+      pthread_cond_init(&barrier_cond[0], NULL);
+      pthread_cond_init(&barrier_cond[COND_PER_CACHE_LINE], NULL);
+
+      pthread_mutex_init(&barrier_mutex[0], NULL);
+      pthread_mutex_init(&barrier_mutex[MUT_PER_CACHE_LINE], NULL);
+
+      initFlag = 0;
+    }
+    pthread_mutex_unlock(&init_mutex);
   }
-  else{
-    barrier = 0;
-    level++;  /* !level;  */
-    pthread_cond_broadcast(&barrier_cond);
+  int which_line = nThreads - CmiMyNodeSize(); // 0 = worker threads only, 1 = all threads
+
+  // compute index of elements we're using for this type of barrier (either first elem or last)
+  int int_idx = INT_PER_CACHE_LINE * which_line;
+  int cond_idx = COND_PER_CACHE_LINE * which_line;
+  int mut_idx = MUT_PER_CACHE_LINE * which_line;
+
+  pthread_mutex_lock(&barrier_mutex[mut_idx]);
+  cur[int_idx] = level[int_idx];
+  barrierCounter[int_idx]++;
+  // CmiPrintf("[%d] CmiNodeBarrierCount: %d of %d level:%d\n", CmiMyPe(), barrierCounter[int_idx], nThreads, level[int_idx]);
+  if (barrierCounter[int_idx] != nThreads) {
+    /* occasionally it wakes up without having reach the count */
+    while (cur[int_idx] == level[int_idx])
+      pthread_cond_wait(&barrier_cond[cond_idx], &barrier_mutex[mut_idx]);
   }
-  pthread_mutex_unlock(&barrier_mutex);
+  else {
+    barrierCounter[int_idx] = 0;
+    level[int_idx]++;  /* !level;  */
+    pthread_cond_broadcast(&barrier_cond[cond_idx]);
+  }
+  pthread_mutex_unlock(&barrier_mutex[mut_idx]);
 }
 
 static CmiNodeLock comm_mutex;
@@ -522,7 +578,8 @@ static void CmiDestroyLocks(void)
   comm_mutex = 0;
   CmiDestroyLock(CmiMemLock_lock);
   CmiMemLock_lock = 0;
-  pthread_mutex_destroy(&barrier_mutex);
+  pthread_mutex_destroy(&barrier_mutex[0]);
+  pthread_mutex_destroy(&barrier_mutex[MUT_PER_CACHE_LINE]);
 #ifdef CMK_NO_ASM_AVAILABLE
   pthread_mutex_destroy(cmiMemoryLock);
 #endif
