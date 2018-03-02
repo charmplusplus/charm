@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include "charm++.h"
+#include "ampi.h"
 
 using std::vector;
 using std::string;
@@ -74,21 +75,18 @@ using std::string;
 #define CkDDT_COMBINER_INDEXED_BLOCK  8
 #define CkDDT_COMBINER_HINDEXED_BLOCK 9
 
-#define CkDDT_MAX_NAME_LEN         255
-
 typedef intptr_t CkDDT_Aint;
 
 /* Helper function to set names (used by AMPI too).
- * Leading whitespaces are significant, trailing whitespaces are not. */
-inline void CkDDT_SetName(char *dst, const char *src, int *len)
+ * Leading whitespaces are significant, trailing spaces are not. */
+inline void CkDDT_SetName(string &dst, const char *src)
 {
-  CkAssert(strlen(src) < CkDDT_MAX_NAME_LEN-1);
   int end = strlen(src)-1;
   while ((end>0) && (src[end]==' '))
     end--;
-  *len = (end==0) ? 0 : end+1;
-  memcpy(dst, src, *len);
-  dst[*len] = '\0';
+  int len = (end==0) ? 0 : end+1;
+  if (len > MPI_MAX_OBJECT_NAME) len = MPI_MAX_OBJECT_NAME;
+  dst.assign(src, len);
 }
 
 typedef int CkDDT_Type ;

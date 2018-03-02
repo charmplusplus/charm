@@ -17,7 +17,6 @@ extern int AMPI_RDMA_THRESHOLD;
 extern int AMPI_SMP_RDMA_THRESHOLD;
 
 win_obj::win_obj() {
-  winNameLen = 0;
   baseAddr = NULL;
   comm = MPI_COMM_NULL;
   initflag = false;
@@ -30,12 +29,13 @@ win_obj::win_obj(const char *name, void *base, MPI_Aint size, int disp_unit,
 }
 
 void win_obj::setName(const char *src) {
-  CkDDT_SetName(winName, src, &winNameLen);
+  CkDDT_SetName(winName, src);
 }
 
 void win_obj::getName(char *name, int *len) {
-  *len = winNameLen;
-  memcpy(name, winName, *len+1);
+  int length = *len = winName.size();
+  memcpy(name, winName.data(), length);
+  name[length] = '\0';
 }
 
 win_obj::~win_obj() {
@@ -51,8 +51,7 @@ void win_obj::pup(PUP::er &p) {
   p|comm;
   p|initflag;
 
-  p|winNameLen;
-  p(winName,MPI_MAX_OBJECT_NAME);
+  p|winName;
 
   int size = 0;
   if(baseAddr) size = winSize;

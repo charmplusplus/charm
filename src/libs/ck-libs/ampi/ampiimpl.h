@@ -279,8 +279,7 @@ class ampiParent;
 
 class win_obj {
  public:
-  char winName[MPI_MAX_OBJECT_NAME];
-  int winNameLen;
+  std::string winName;
   bool initflag;
 
   void *baseAddr;
@@ -559,8 +558,7 @@ class ampiCommStruct {
   vector<void *> keyvals;
 
   // For communicator names
-  char commName[MPI_MAX_OBJECT_NAME];
-  int commNameLen;
+  std::string commName;
 
   // Lazily fill world communicator indices
   void makeWorldIndices(void) const {
@@ -569,19 +567,19 @@ class ampiCommStruct {
     std::iota(ind.begin(), ind.end(), 0);
   }
  public:
-  ampiCommStruct(int ignored=0) {size=-1;isWorld=false;isInter=false;commNameLen=0;ampiTopo=NULL;topoType=MPI_UNDEFINED;}
+  ampiCommStruct(int ignored=0) {size=-1;isWorld=false;isInter=false;ampiTopo=NULL;topoType=MPI_UNDEFINED;}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,int size_)
-    :comm(comm_), ampiID(id_),size(size_), isWorld(true), isInter(false), commNameLen(0), ampiTopo(NULL), topoType(MPI_UNDEFINED) {}
+    :comm(comm_), ampiID(id_),size(size_), isWorld(true), isInter(false), ampiTopo(NULL), topoType(MPI_UNDEFINED) {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
                  int size_,const vector<int> &indices_)
                 :comm(comm_), ampiID(id_),size(size_),isWorld(false),
-                 isInter(false), indices(indices_), commNameLen(0),
+                 isInter(false), indices(indices_),
                  ampiTopo(NULL), topoType(MPI_UNDEFINED) {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
                  int size_,const vector<int> &indices_,
                  const vector<int> &remoteIndices_)
                 :comm(comm_),ampiID(id_),size(size_),isWorld(false),isInter(true),
-                 indices(indices_),remoteIndices(remoteIndices_),commNameLen(0),
+                 indices(indices_),remoteIndices(remoteIndices_),
                  ampiTopo(NULL), topoType(MPI_UNDEFINED) {}
 
   ~ampiCommStruct() {
@@ -614,8 +612,7 @@ class ampiCommStruct {
     indices        = obj.indices;
     remoteIndices  = obj.remoteIndices;
     keyvals        = obj.keyvals;
-    memcpy(commName, obj.commName, obj.commNameLen+1);
-    commNameLen    = obj.commNameLen;
+    commName       = obj.commName;
   }
 
   ampiCommStruct &operator=(const ampiCommStruct &obj) {
@@ -645,8 +642,7 @@ class ampiCommStruct {
     indices        = obj.indices;
     remoteIndices  = obj.remoteIndices;
     keyvals        = obj.keyvals;
-    memcpy(commName, obj.commName, obj.commNameLen+1);
-    commNameLen    = obj.commNameLen;
+    commName       = obj.commName;
     return *this;
   }
 
@@ -670,12 +666,13 @@ class ampiCommStruct {
   vector<void *> &getKeyvals(void) {return keyvals;}
 
   void setName(const char *src) {
-    CkDDT_SetName(commName, src, &commNameLen);
+    CkDDT_SetName(commName, src);
   }
 
   void getName(char *name, int *len) const {
-    *len = commNameLen;
-    memcpy(name, commName, *len+1);
+    int length = *len = commName.size();
+    memcpy(name, commName.data(), length);
+    name[length] = '\0';
   }
 
   //Get the proxy for the entire array
@@ -716,8 +713,7 @@ class ampiCommStruct {
     p|isInter;
     p|indices;
     p|remoteIndices;
-    p|commNameLen;
-    p(commName,MPI_MAX_OBJECT_NAME);
+    p|commName;
     p|topoType;
     if (topoType != MPI_UNDEFINED) {
       if (p.isUnpacking()) {

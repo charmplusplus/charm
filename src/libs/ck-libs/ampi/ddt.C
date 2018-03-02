@@ -645,15 +645,15 @@ CkDDT_DataType::serialize(char* userdata, char* buffer, int num, int dir) const
 void
 CkDDT_DataType::setName(const char *src)
 {
-  int nameLen = name.size();
-  CkDDT_SetName(&name[0], src, &nameLen);
+  CkDDT_SetName(name, src);
 }
 
 void
 CkDDT_DataType::getName(char *dest, int *len) const
 {
-  *len = name.size();
-  memcpy(dest, name.c_str(), *len+1);
+  int length = *len = name.size();
+  memcpy(dest, &name[0], length);
+  dest[length] = '\0';
 }
 
 bool
