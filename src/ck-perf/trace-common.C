@@ -964,19 +964,28 @@ void initPAPI() {
 #if CMK_HAS_COUNTER_PAPI
   // We initialize and create the event sets for use with PAPI here.
   int papiRetValue;
+  // Only one process per node needs to initialize the PAPI library
   if(CkMyRank()==0){
-      papiRetValue = PAPI_is_initialized();
-      if(papiRetValue != PAPI_NOT_INITED)
-          return;
+    // CmiPrintf("Node %d Rank %d initializing PAPI\n", CkMyNode(), CkMyRank());
     papiRetValue = PAPI_library_init(PAPI_VER_CURRENT);
-    if (papiRetValue != PAPI_VER_CURRENT) {
-      CmiAbort("PAPI Library initialization failure!\n");
+    if (papiRetValue != PAPI_VER_CURRENT && papiRetValue > 0) {
+      CmiAbort("PAPI Library version mismatch!\n");
+    }
+    if (papiRetValue < 0) {
+      CmiPrintf("PE %d papiRetValue = %d\n", CkMyPe(), papiRetValue);
+      CmiAbort("PAPI Library initialization failed!\n");
+    }
+    papiRetValue = PAPI_is_initialized();
+    if(papiRetValue != PAPI_LOW_LEVEL_INITED) {
+      CmiPrintf("PE %d papiRetValue = %d\n", CkMyPe(), papiRetValue);
+      CmiAbort("PAPI Low level has not called init!\n");
     }
 #if CMK_SMP
     if(PAPI_thread_init(pthread_self) != PAPI_OK){
       CmiAbort("PAPI could not be initialized in SMP mode!\n");
     }
 #endif
+    // CmiPrintf("Node %d PE %d initialized PAPI library!\n", CkMyNode(), CkMyPe());
   }
   CkpvInitialize(int, papiStarted);
   CkpvAccess(papiStarted) = 0;
@@ -984,17 +993,16 @@ void initPAPI() {
   CkpvAccess(papiStopped) = 0;
 
 #if CMK_SMP
-  //PAPI_thread_init has to finish before calling PAPI_create_eventset
-  #if CMK_SMP_TRACE_COMMTHREAD
-      CmiNodeAllBarrier();
-  #else
-      CmiNodeBarrier();
-  #endif
+  // PAPI_library_init and PAPI_thread_init have to finish before calling PAPI_create_eventset
+  // Only worker threads enter this function so CmiNodeAllBarrier() is not ever needed
+  CmiNodeBarrier();
 #endif
   // PAPI 3 mandates the initialization of the set to PAPI_NULL
-  CkpvInitialize(int, papiEventSet); 
-  CkpvAccess(papiEventSet) = PAPI_NULL; 
-  if (PAPI_create_eventset(&CkpvAccess(papiEventSet)) != PAPI_OK) {
+  CkpvInitialize(int, papiEventSet);
+  CkpvAccess(papiEventSet) = PAPI_NULL;
+  int ret = PAPI_create_eventset(&CkpvAccess(papiEventSet));
+  if (ret != PAPI_OK) {
+    CmiPrintf("Node %d PE %d PAPI error: %d\n", CkMyNode(), CkMyPe(), ret);
     CmiAbort("PAPI failed to create event set!\n");
   }
   CkpvInitialize(int*, papiEvents);
