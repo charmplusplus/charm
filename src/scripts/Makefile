@@ -446,9 +446,7 @@ LIBCONV_UTILF=pup_f.o
 
 converse: charmrun-target swapglobal-target conv-cpm tmgr hwloc-target
 
-$(L)/libhwloc_embedded.a: hwloc-target
-
-cpuaffinity.o: hwloc-target
+cpuaffinity.o $(L)/libhwloc_embedded.a $(INC)/hwloc.h $(INC)/hwloc/autogen/config.h $(INC)/hwloc/rename.h $(INC)/hwloc/bitmap.h $(INC)/hwloc/helper.h $(INC)/hwloc/inlines.h $(INC)/hwloc/diff.h $(INC)/hwloc/deprecated.h: hwloc-target
 
 hwloc-target:  conv-autoconfig.h
 	( $(MAKE) -C hwloc )
