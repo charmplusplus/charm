@@ -1184,7 +1184,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
       if (onewth_per_host)
       {
         ppn = 2; // instead of 1 to allow for a comm thread
-        setenv("CmiOneWthPerHost", "1", 0);
+        SET_ENV_VAR("CmiOneWthPerHost", "1");
       }
       else if (onewth_per_socket)
       {
