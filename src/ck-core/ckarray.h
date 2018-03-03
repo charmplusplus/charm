@@ -436,7 +436,8 @@ typedef ArrayElementT<CkIndexMax> ArrayElementMax;
 
 void CkSendAsyncCreateArray(int ctor, CkCallback cb, CkArrayOptions opts, void *ctorMsg);
 
-struct CkArrayCreatedMsg : public CMessage_CkArrayCreatedMsg {
+class CkArrayCreatedMsg : public CMessage_CkArrayCreatedMsg {
+public:
   CkArrayID aid;
   CkArrayCreatedMsg(CkArrayID _aid) : aid(_aid) { }
 };

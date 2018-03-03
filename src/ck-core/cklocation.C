@@ -1586,8 +1586,8 @@ CkMigratable::~CkMigratable() {
 #endif
 	myRec->destroy(); /* Attempt to delete myRec if it's no longer in use */
 	//To detect use-after-delete
-	thisIndexMax.nInts=-12345;
-	thisIndexMax.dimension=-12345;
+	thisIndexMax.nInts=0;
+	thisIndexMax.dimension=0;
 }
 
 void CkMigratable::CkAbort(const char *why) const {

@@ -1921,7 +1921,7 @@ std::vector<CkReduction::reducerStruct>& CkReduction::reducerTable()
 {
   static std::vector<CkReduction::reducerStruct> table = initReducerTable();
   return table;
-};
+}
 
 
 

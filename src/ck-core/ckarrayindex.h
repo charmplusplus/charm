@@ -264,7 +264,8 @@ typedef CkArrayIndex CkArrayIndexMax;
 
 class CkArray;
 
-class CkArrayID {
+struct CkArrayID {
+private:
 	CkGroupID _gid;
 public:
 	CkArrayID() : _gid() { }
