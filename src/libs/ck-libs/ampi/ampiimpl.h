@@ -1178,7 +1178,7 @@ class AmpiRequest {
 
   /// Block until this request is finished,
   ///  returning a valid MPI error code.
-  virtual int wait(MPI_Status *sts) noexcept =0;
+  virtual int wait(ampiParent* parent, MPI_Status *sts) noexcept =0;
 
   /// Mark this request for cancellation.
   /// Supported only for IReq requests
@@ -1296,7 +1296,7 @@ class IReq final : public AmpiRequest {
   IReq() =default;
   ~IReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  int wait(ampiParent* parent, MPI_Status *sts) noexcept override;
   void cancel() noexcept override { if (!complete) cancelled = true; }
   AmpiReqType getType() const noexcept override { return AMPI_I_REQ; }
   bool isUnmatched() const noexcept override { return !complete; }
@@ -1361,7 +1361,7 @@ class RednReq final : public AmpiRequest {
   RednReq() =default;
   ~RednReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  int wait(ampiParent* parent, MPI_Status *sts) noexcept override;
   void cancel() noexcept override {}
   AmpiReqType getType() const noexcept override { return AMPI_REDN_REQ; }
   bool isUnmatched() const noexcept override { return !complete; }
@@ -1390,7 +1390,7 @@ class GatherReq final : public AmpiRequest {
   GatherReq() =default;
   ~GatherReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  int wait(ampiParent* parent, MPI_Status *sts) noexcept override;
   void cancel() noexcept override {}
   AmpiReqType getType() const noexcept override { return AMPI_GATHER_REQ; }
   bool isUnmatched() const noexcept override { return !complete; }
@@ -1423,7 +1423,7 @@ class GathervReq final : public AmpiRequest {
   GathervReq() =default;
   ~GathervReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  int wait(ampiParent* parent, MPI_Status *sts) noexcept override;
   AmpiReqType getType() const noexcept override { return AMPI_GATHERV_REQ; }
   bool isUnmatched() const noexcept override { return !complete; }
   bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override { return true; }
@@ -1460,7 +1460,7 @@ class SendReq final : public AmpiRequest {
   SendReq() noexcept {}
   ~SendReq() noexcept {}
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  int wait(ampiParent* parent, MPI_Status *sts) noexcept override;
   void setPersistent(bool p) noexcept override { persistent = p; }
   bool isPersistent() const noexcept override { return persistent; }
   void start(MPI_Request reqIdx) noexcept override;
@@ -1517,7 +1517,7 @@ class SsendReq final : public AmpiRequest {
   SsendReq() =default;
   ~SsendReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  int wait(ampiParent* parent, MPI_Status *sts) noexcept override;
   void setPersistent(bool p) noexcept override { persistent = p; }
   bool isPersistent() const noexcept override { return persistent; }
   void start(MPI_Request reqIdx) noexcept override;
@@ -1578,7 +1578,7 @@ class ATAReq final : public AmpiRequest {
   ATAReq() =default;
   ~ATAReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  int wait(ampiParent* parent, MPI_Status *sts) noexcept override;
   bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override { return true; }
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
   int getCount() const noexcept { return reqs.size(); }
@@ -1610,7 +1610,7 @@ class GReq final : public AmpiRequest {
   GReq() =default;
   ~GReq() noexcept { (*freeFn)(extraState); }
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  int wait(MPI_Status *sts) noexcept override;
+  int wait(ampiParent* parent, MPI_Status *sts) noexcept override;
   bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override { return true; }
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
   void cancel() noexcept override { (*cancelFn)(extraState, complete); }
@@ -1648,8 +1648,8 @@ class AmpiRequestList {
     return reqs[n];
 #endif
   }
-  void free(AmpiRequestPool& reqPool, int idx, CkDDT *ddt) noexcept;
-  void freeNonPersReq(int &idx) noexcept;
+  void free(int idx, CkDDT *ddt) noexcept;
+  void freeNonPersReq(ampiParent* pptr, int &idx) noexcept;
   inline int insert(AmpiRequest* req) noexcept {
     for (int i=startIdx; i<reqs.size(); i++) {
       if (reqs[i] == NULL) {
@@ -2666,6 +2666,7 @@ class ampi final : public CBase_ampi {
     return static_blockOnColl(this);
   }
   inline void setBlockingReq(AmpiRequest *req) noexcept;
+  inline AmpiRequestPool& getReqPool() const { return parent->reqPool; }
   inline ampi* blockOnIReq(void* buf, int count, MPI_Datatype type, int s,
                            int t, MPI_Comm comm, MPI_Status* sts) noexcept;
   MPI_Request postReq(AmpiRequest* newreq) noexcept;
