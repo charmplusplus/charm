@@ -19,6 +19,7 @@ hello.o: hello.C hello.decl.h
 
 test: all
 	CHARMINC=../../../include . ../../../tmp/conv-mach.sh ; \
+	CHARMINC=../../../include . ../../../tmp/conv-mach-opt.sh ; \
 	if [ "$$CMK_NO_PARTITIONS" = "1" ] ; \
 	then \
 	  echo "Skipping test since build does not support partitions"; exit 0 ; \
