@@ -257,7 +257,7 @@ public:
     UChar  getMsgtype(void) const { return attribs.mtype; }
     void   setMsgtype(const UChar m) { attribs.mtype = m; }
 #if CMK_ERROR_CHECKING
-    UChar  isUsed(void) { return attribs.isUsed; }
+    UChar  isUsed(void) const { return attribs.isUsed; }
     void   setUsed(const UChar u) { attribs.isUsed=u; }
 #else /* CMK_ERROR_CHECKING */
     inline void setUsed(const UChar u) {}
@@ -380,7 +380,7 @@ public:
     }
     
  // Chare-specific fields
-    UInt isForAnyPE(void) { 
+    UInt isForAnyPE(void) const {
       CkAssert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg); 
       return type.chare.forAnyPe; 
     }
@@ -404,7 +404,7 @@ public:
     void   setObjPtr(void *p) { 
       CkAssert(getMsgtype()==ForChareMsg); type.chare.ptr = p; 
     }
-    UInt getByPe(void) { 
+    UInt getByPe(void) const {
       CkAssert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg); 
       return type.chare.bype; 
     }
@@ -425,7 +425,7 @@ public:
       type.group.g = g;
     }
     void setGroupEpoch(int epoch) { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); type.group.epoch=epoch; }
-    int getGroupEpoch(void) { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); return type.group.epoch; }
+    int getGroupEpoch(void) const { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); return type.group.epoch; }
     void setRednMgr(CkNodeGroupID r){ CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
           || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
  type.group.rednMgr = r; }
@@ -459,7 +459,7 @@ public:
     UInt &getsetArraySrcPe(void) {return pe;}
 #endif
     UChar &getsetArrayHops(void) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return type.array.hopCount;}
-    int getArrayIfNotThere(void) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return type.array.ifNotThere;}
+    int getArrayIfNotThere(void) const { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return type.array.ifNotThere;}
     void setArrayIfNotThere(int nt) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); type.array.ifNotThere=nt;}
 
     void setRecipientID(ck::ObjID objid)
@@ -468,7 +468,7 @@ public:
       type.array.id = objid.getID();
     }
 
-    CmiUInt8 getRecipientID()
+    CmiUInt8 getRecipientID() const
     {
       CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg);
       return type.array.id;
