@@ -309,8 +309,9 @@ class tester : public CBase_tester {
     // check preset values
     for(int i=0;i<20;i++) {
       CkAssert(msg->a[i]==i);
-      if(i<10)
-        CkAssert(msg->b[i]==i*1.3);
+      if(i<10) {
+        CkAssert(std::fabs(msg->b[i] - 1.3*i) < 1.0e-6);
+      }
     }
     complete_test(1);
   }
