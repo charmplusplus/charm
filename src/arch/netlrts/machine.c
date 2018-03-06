@@ -1339,7 +1339,7 @@ static void CmiStdoutInit(void) {
 #  define read(x,y,z) 0
 # endif
 # ifndef write
-#  define write(x,y,z) 
+#  define write(x,y,z) z
 # endif
 #endif
 }
