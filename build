@@ -196,9 +196,10 @@ CheckDir() {
 }
 
 TestIfCompiler() {
+  compilerName=`echo $1 | sed -E 's/-[0-9\.]+$//'`
   for dir in $OPT_DIRS
   do
-    [ -f $dir/cc-$1.sh ] && return 1
+    [ -f $dir/cc-$compilerName.sh ] && return 1
   done  
   return 0
 }
@@ -711,7 +712,8 @@ then
 fi
 if test -n "$COMPILER"
 then
-      i="$COMPILER"
+      i=`echo $COMPILER | sed -E 's/-[0-9\.]+$//'`
+      echo "CMK_COMPILER_SUFFIX=${COMPILER#$i}" >> $ConvSh
       echo '#include "'cc-$i.h'"' >> $ConvHeader
       echo '. $CHARMINC/'"cc-$i.sh" >> $ConvSh
 elif test `echo "$BASEVERSION" | grep -c "bluegeneq"` -gt 0
