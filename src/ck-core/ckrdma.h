@@ -78,8 +78,19 @@ int getRdmaBufSize(envelope *env);
 
 /* Use 0 sized headers for generic Direct API implementation */
 #ifndef CMK_NOCOPY_DIRECT_BYTES
+
+#if defined(_WIN32)
+#define CMK_NOCOPY_DIRECT_BYTES 1
+/* It is required to declare CMK_NOCOPY_DIRECT_BYTES to 1 instead of 0
+ * as this avoids the C2229 error (illegal zero-sized array)
+ * for char layerInfo[CMK_NOCOPY_DIRECT_BYTES] which is seen for
+ * a 0 sized array on VC++
+ */
+#else
 #define CMK_NOCOPY_DIRECT_BYTES 0
-#endif
+#endif // end of if defined(_WIN32)
+
+#endif // end of ifndef CMK_NOCOPY_DIRECT_BYTES
 
 // Ack handler function which invokes the callbacks on the source and destination PEs
 void CkRdmaAckHandler(void *cookie);
