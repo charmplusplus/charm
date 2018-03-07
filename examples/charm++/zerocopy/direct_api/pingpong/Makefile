@@ -16,8 +16,8 @@ pingpong.o: pingpong.C cifiles
 	$(CHARMC) -c pingpong.C
 
 test: all
-	$(call run, +p1 ./pingpong ++timeout 200)
-	$(call run, +p2 ./pingpong ++timeout 200)
+	$(call run, +p1 ./pingpong)
+	$(call run, +p2 ./pingpong)
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o pingpong charmrun cifiles
