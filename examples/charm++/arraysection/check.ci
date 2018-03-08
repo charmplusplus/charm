@@ -11,7 +11,7 @@ mainmodule check {
 
 	mainchare Main {
 		entry Main(CkArgMsg* msg);
-		entry [reductiontarget] void done(int k);
+		entry [reductiontarget] void done(int q, int output[q]);
 	};
 
 	array[1D] Check {
