@@ -16,6 +16,10 @@ pingpong.o: pingpong.C cifiles
 	$(CHARMC) -c pingpong.C
 
 test: all
+	$(call run, +p1 ./pingpong 32768 262144 100 10)
+	$(call run, +p2 ./pingpong 32768 262144 100 10)
+
+test-bench: all
 	$(call run, +p1 ./pingpong)
 	$(call run, +p2 ./pingpong)
 

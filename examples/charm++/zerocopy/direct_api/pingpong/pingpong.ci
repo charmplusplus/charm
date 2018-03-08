@@ -2,6 +2,10 @@ mainmodule pingpong {
 
   readonly CProxy_main mainProxy;
   readonly bool warmUp;
+  readonly int minSize;
+  readonly int maxSize;
+  readonly int smallIter;
+  readonly int bigIter;
 
   mainchare main {
     entry main(CkArgMsg *m);

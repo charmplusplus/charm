@@ -1,12 +1,8 @@
 #include "pingpong.decl.h"
 
-#define BIG_ITER 1000
-#define SMALL_ITER 100
-
-#define MAX_PAYLOAD 1 << 23
-
 CProxy_main mainProxy;
 bool warmUp;
+int minSize, maxSize, smallIter, bigIter;
 
 class main : public CBase_main
 {
@@ -19,8 +15,22 @@ class main : public CBase_main
     if(CkNumPes()>2) {
       CkAbort("Run this program on 1 or 2 processors only.\n");
     }
+    if(m->argc == 5) {
+      minSize = atoi(m->argv[1])/2; // Start with a smaller size to run a warm up phase
+      maxSize = atoi(m->argv[2]);
+      smallIter = atoi(m->argv[3]);
+      bigIter = atoi(m->argv[4]);
+    } else if(m->argc == 1) {
+      // use defaults for benchmarking
+      minSize = 512; // Start with a smaller size to run a warm up phase before starting message size at 1024 bytes
+      maxSize = 1 << 25;
+      smallIter = 1000;
+      bigIter = 100;
+    } else {
+      CkAbort("Usage: ./pingpong <min size> <max size> <small message iter> <big message iter>\n");
+    }
     delete m;
-    size = 512;
+    size = minSize;
     mainProxy = thisProxy;
     warmUp = true;
     CkPrintf("Size (bytes) \t\tIterations\t\tRegular API (one-way us)\tDirect Get Get (one-way us)\tDirect Put Put (one-way us)\n");
@@ -29,10 +39,10 @@ class main : public CBase_main
   };
 
   void maindone(void){
-    if(size < MAX_PAYLOAD) {
+    if(size <= maxSize) {
       arr1[0].start(size);
       size = size << 1;
-    } else if(size == MAX_PAYLOAD) {
+    } else {
       arr1[0].freeBuffer();
     }
   }
@@ -53,8 +63,8 @@ class Ping1 : public CBase_Ping1
   public:
   Ping1()
   {
-    nocopyMsg = new char[MAX_PAYLOAD];
-    otherMsg = new char[MAX_PAYLOAD];
+    nocopyMsg = new char[maxSize];
+    otherMsg = new char[maxSize];
     niter = 0;
     otherIndex = (thisIndex + 1) % 2;
   }
@@ -66,9 +76,9 @@ class Ping1 : public CBase_Ping1
     counter = 0;
     this->size = size;
     if(size >= 1 << 20)
-      iterations = SMALL_ITER;
+      iterations = bigIter;
     else
-      iterations = BIG_ITER;
+      iterations = smallIter;
 
     start_time = CkWallTimer();
     // send CkNcpySource to 1
