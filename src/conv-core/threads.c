@@ -1190,6 +1190,7 @@ CthThread CthCreateMigratable(CthVoidFn fn,void *arg,int size)
   Written by Sameer Paranjpye around October 2000
   */
 #elif  CMK_THREADS_ARE_WIN32_FIBERS
+#if defined _WIN32
 #include <windows.h>
 #include <winbase.h>
 
@@ -1447,6 +1448,12 @@ CthThread CthCreateMigratable(CthVoidFn fn,void *arg,int size)
   /*Fibers are never migratable, unless we can figure out how to set their stacks*/
   return CthCreate(fn,arg,size);
 }
+#else /* defined _WIN32 */
+struct CthThreadStruct
+{
+  CthThreadBase base;
+};
+#endif /* defined _WIN32 */
 
 /***************************************************
   Use Posix Threads to simulate cooperative user-level
