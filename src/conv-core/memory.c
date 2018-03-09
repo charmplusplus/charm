@@ -365,11 +365,18 @@ static int MemusageInited = 0;
 static uintptr_t MemusageInitSbrkval = 0;
 INLINE static CMK_TYPEDEF_UINT8 MemusageSbrk(void){
 	uintptr_t newval;
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
 	if(MemusageInited==0){
 		MemusageInitSbrkval = (uintptr_t)sbrk(0);
 		MemusageInited = 1;
 	}
 	newval = (uintptr_t)sbrk(0);
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 	return (newval - MemusageInitSbrkval);
 }
 

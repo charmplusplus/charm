@@ -1648,12 +1648,29 @@ Gengbin Zheng October, 2007
 /* system builtin context routines: */
 #include <ucontext.h>
 
-#define uJcontext_t ucontext_t
-#define setJcontext setcontext
-#define getJcontext getcontext
-#define swapJcontext swapcontext
-#define makeJcontext makecontext
+typedef ucontext_t uJcontext_t;
 typedef void (*uJcontext_fn_t)(void);
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+/* function 'getJcontext' can never be inlined because it uses setjmp */
+#define getJcontext(ucp) getcontext(ucp)
+static CMI_FORCE_INLINE int setJcontext(const uJcontext_t *ucp)
+{
+  return setcontext(ucp);
+}
+static CMI_FORCE_INLINE int swapJcontext(uJcontext_t *oucp, const uJcontext_t *ucp)
+{
+  return swapcontext(oucp, ucp);
+}
+static CMI_FORCE_INLINE void makeJcontext(uJcontext_t *ucp, uJcontext_fn_t func, int argc, void *a1, void *a2)
+{
+  makecontext(ucp, func, argc, a1, a2);
+}
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 #elif CMK_THREADS_USE_FCONTEXT
 #include "uFcontext.h"
 #define uJcontext_t uFcontext_t
@@ -1689,8 +1706,15 @@ void CthInit(char **argv)
   t = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(t);
   CthCpvAccess(CthCurrent)=t;
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
   if (0 != getJcontext(&t->context))
     CmiAbort("CthInit: getcontext failed.\n");
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
   CthThreadInit(t);
   CpvInitialize(CthThread, doomedThreadPool);
   CpvAccess(doomedThreadPool) = (CthThread)NULL;
@@ -1822,8 +1846,15 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   CthAllocateStack(&result->base,&size,migratable);
   stack = (char *)result->base.stack;
 #if !CMK_THREADS_USE_FCONTEXT
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
   if (0 != getJcontext(&result->context))
     CmiAbort("CthCreateInner: getcontext failed.\n");
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 #endif
   ss_end = stack + size;
 
@@ -1869,7 +1900,14 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
     CmiUInt4 fn2 = (CmiUInt8)(uintptr_t)fn & 0xFFFFFFFF;
     CmiUInt4 arg1 = ((CmiUInt8)(uintptr_t)arg) >> 32;
     CmiUInt4 arg2 = (CmiUInt8)(uintptr_t)arg & 0xFFFFFFFF;
-    makeJcontext(&result->context, (uJcontext_fn_t)CthStartThread, 4, fn1, fn2, arg1, arg2);
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+    makecontext(&result->context, (uJcontext_fn_t)CthStartThread, 4, fn1, fn2, arg1, arg2);
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
   }
   else
 #endif
