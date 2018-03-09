@@ -5405,16 +5405,16 @@ static void start_nodes_local(std::vector<nodetab_process> & process_table)
     switch (proc_per.unit())
     {
       case Unit::Host:
-        sprintf(envp[envc + n], "CmiProcessPerHost='%d'; export CmiProcessPerHost\n", proc_per.host);
+        sprintf(envp[envc + n], "CmiProcessPerHost=%d", proc_per.host);
         break;
       case Unit::Socket:
-        sprintf(envp[envc + n], "CmiProcessPerSocket='%d'; export CmiProcessPerSocket\n", proc_per.socket);
+        sprintf(envp[envc + n], "CmiProcessPerSocket=%d", proc_per.socket);
         break;
       case Unit::Core:
-        sprintf(envp[envc + n], "CmiProcessPerCore='%d'; export CmiProcessPerCore\n", proc_per.core);
+        sprintf(envp[envc + n], "CmiProcessPerCore=%d", proc_per.core);
         break;
       case Unit::PU:
-        sprintf(envp[envc + n], "CmiProcessPerPU='%d'; export CmiProcessPerPU\n", proc_per.pu);
+        sprintf(envp[envc + n], "CmiProcessPerPU=%d", proc_per.pu);
         break;
       default:
         break;
@@ -5428,16 +5428,16 @@ static void start_nodes_local(std::vector<nodetab_process> & process_table)
     switch (onewth_per.unit())
     {
       case Unit::Host:
-        sprintf(envp[envc + n], "CmiOneWthPerHost='%d'; export CmiOneWthPerHost\n", 1);
+        sprintf(envp[envc + n], "CmiOneWthPerHost=%d", 1);
         break;
       case Unit::Socket:
-        sprintf(envp[envc + n], "CmiOneWthPerSocket='%d'; export CmiOneWthPerSocket\n", 1);
+        sprintf(envp[envc + n], "CmiOneWthPerSocket=%d", 1);
         break;
       case Unit::Core:
-        sprintf(envp[envc + n], "CmiOneWthPerCore='%d'; export CmiOneWthPerCore\n", 1);
+        sprintf(envp[envc + n], "CmiOneWthPerCore=%d", 1);
         break;
       case Unit::PU:
-        sprintf(envp[envc + n], "CmiOneWthPerPU='%d'; export CmiOneWthPerPU\n", 1);
+        sprintf(envp[envc + n], "CmiOneWthPerPU=%d", 1);
         break;
       default:
         break;
