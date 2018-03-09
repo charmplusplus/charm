@@ -676,7 +676,7 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 
   pup_int(p, &t->magic);
 
-#if CMK_THREADS_BUILD_TLS
+#if CMK_THREADS_BUILD_TLS && CMK_HAS_ELF_H && CMK_HAS_TLS_VARIABLES
   {
     void* aux;
     pup_bytes(p, &t->tlsseg, sizeof(tlsseg_t));
