@@ -1781,8 +1781,8 @@ CkReductionMsg* CkReduction::tupleReduction_fn(int num_messages, CkReductionMsg*
 static CkReductionMsg *external_py(int nMsgs, CkReductionMsg **msg)
 {
     //CkPrintf("Reached external_py reducer, %d\n", nMsgs);
-    char* msg_data[nMsgs];
-    int msg_sizes[nMsgs];
+    std::vector<char*> msg_data(nMsgs);
+    std::vector<int> msg_sizes(nMsgs);
 
     for (int i = 0; i < nMsgs; i++)
     {
@@ -1794,7 +1794,7 @@ static CkReductionMsg *external_py(int nMsgs, CkReductionMsg **msg)
     // send msg_data to CharmPy to perform reduction with Python reducer
     // expected : pickle([reducer.__name__, result])
     char* reduction_result;
-    int reduction_result_size = PyReductionExt(msg_data, msg_sizes, nMsgs, &reduction_result);
+    int reduction_result_size = PyReductionExt(msg_data.data(), msg_sizes.data(), nMsgs, &reduction_result);
     //CkPrintf("[charm side] Recvd reduction result: %s, size: %d\n", reduction_result, reduction_result_size);
 
     return CkReductionMsg::buildNew(reduction_result_size, reduction_result);
