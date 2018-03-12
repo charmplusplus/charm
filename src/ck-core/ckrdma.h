@@ -113,8 +113,15 @@ class CkNcpySource{
   // home pe
   int pe;
 
+  #ifdef __GNUC__
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wpedantic"
+  #endif
   // machine specific information about the source pointer
   char layerInfo[CMK_NOCOPY_DIRECT_BYTES];
+  #ifdef __GNUC__
+  #pragma GCC diagnostic pop
+  #endif
 
   CkNcpySource() : ptr(NULL), pe(-1) {}
 
@@ -128,7 +135,7 @@ class CkNcpySource{
 
   void releaseResource();
 };
-PUPbytes(CkNcpySource);
+PUPbytes(CkNcpySource)
 
 // Class to represent an RDMA destination
 class CkNcpyDestination{
@@ -145,8 +152,15 @@ class CkNcpyDestination{
   // home pe
   int pe;
 
+  #ifdef __GNUC__
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wpedantic"
+  #endif
   // machine specific information about the destination pointer
   char layerInfo[CMK_NOCOPY_DIRECT_BYTES];
+  #ifdef __GNUC__
+  #pragma GCC diagnostic pop
+  #endif
 
   CkNcpyDestination() : ptr(NULL), pe(-1) {}
 
@@ -161,7 +175,7 @@ class CkNcpyDestination{
 
   void releaseResource();
 };
-PUPbytes(CkNcpyDestination);
+PUPbytes(CkNcpyDestination)
 
 
 

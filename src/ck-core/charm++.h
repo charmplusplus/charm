@@ -142,10 +142,10 @@ public:
 	inline int getQueueing(void) const {return queueingtype;}
 	inline int getPriorityBits(void) const {return prioBits;}
 	inline const prio_t *getPriorityPtr(void) const {return prioPtr;}
-	inline const CkGroupID getGroupDepID() const { return depGroupIDs[0]; }
-	inline const CkGroupID getGroupDepID(int index) const { return depGroupIDs[index]; }
-	inline const int getGroupDepSize() const { return sizeof(CkGroupID)*(depGroupIDs.size()); }
-	inline const int getGroupDepNum() const { return depGroupIDs.size(); }
+	inline CkGroupID getGroupDepID() const { return depGroupIDs[0]; }
+	inline CkGroupID getGroupDepID(int index) const { return depGroupIDs[index]; }
+	inline int getGroupDepSize() const { return sizeof(CkGroupID)*(depGroupIDs.size()); }
+	inline int getGroupDepNum() const { return depGroupIDs.size(); }
 	inline const CkGroupID *getGroupDepPtr() const { return &(depGroupIDs[0]); }
 };
 

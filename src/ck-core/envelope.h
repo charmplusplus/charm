@@ -236,14 +236,28 @@ private:
       CMK_ENVELOPE_FT_FIELDS
     };
 
+    #ifdef __GNUC__
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-private-field"
+    #endif
     CMK_ENVELOPE_FIELDS
+    #ifdef __GNUC__
+    #pragma GCC diagnostic pop
+    #endif
 
 public:
 
     CMK_ENVELOPE_FT_FIELDS
 
+    #ifdef __GNUC__
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wpedantic"
+    #endif
     // padding to ensure ALIGN_BYTES alignment
     UChar align[CkMsgAlignOffset(sizeof(envelopeSizeHelper))];
+    #ifdef __GNUC__
+    #pragma GCC diagnostic pop
+    #endif
 
     void pup(PUP::er &p);
 #if CMK_REPLAYSYSTEM || CMK_TRACE_ENABLED
