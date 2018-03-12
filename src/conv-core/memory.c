@@ -491,14 +491,24 @@ static CMK_TYPEDEF_UINT8 MemusageMallocinfo(void) {
     return 0;
   }
 
-  // parse the mmaped memory, might not exist at all
-  char ** mmapMemory = findFirstCaptures("[\\S\\s]*mmap.*\"([0-9]+)\"", buf);
-  CMK_TYPEDEF_UINT8 parsedMmapMemory = mmapMemory[0] == NULL ? 0 : strtoll(mmapMemory[0], NULL, 0);
+  // remove all new line in buffer
+  char * cur = buf;
+  while(*cur != '\0')
+  {
+      if (*cur == '\n') {
+        *cur = ' ';
+      }
+      cur += 1;
+  }
 
-  char ** otherMemory = findFirstCaptures("[\\S\\s]*total.*\"([0-9]+)\"", buf);
+  // parse the mmaped memory, might not exist at all
+  char ** mmapMemory = findFirstCaptures("<\\/heap>.+mmap\" count=\"\\d*\" size=\"([0-9]+)\"", buf);
+  CMK_TYPEDEF_UINT8 parsedMmapMemory = mmapMemory == NULL ? 0 : mmapMemory[0] == NULL ? 0 : strtoll(mmapMemory[0], NULL, 0);
+
+  char ** otherMemory = findFirstCaptures("<\\/heap>.+total\" size=\"([0-9]+)\"", buf);
   free(buf);
   // parse the total memory (total doesn't include mmap), must exist otherwise fail
-  if (otherMemory[0] == NULL) {
+  if (otherMemory == NULL || otherMemory[0] == NULL) {
     return 0;
   }
   CMK_TYPEDEF_UINT8 parsedOtherMemory = strtoll(otherMemory[0], NULL, 0);
