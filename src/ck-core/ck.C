@@ -2386,10 +2386,6 @@ void CkChareExtSend(int onPE, void *objPtr, int epIdx, char *msg, int msgSize) {
   CkChareID chareID;
   chareID.onPE = onPE;
   chareID.objPtr = objPtr;
-  /*if (ckIsDelegated()) {
-     CkGroupMsgPrep(CkIndex_Hello::idx_SayHi_marshall2(), impl_msg, ckGetGroupID());
-     ckDelegatedTo()->GroupBroadcast(ckDelegatedPtr(),CkIndex_Hello::idx_SayHi_marshall2(), impl_msg, ckGetGroupID());
-  } else CkBroadcastMsgBranch(/*CkIndex_Hello::idx_SayHi_marshall2()epIdx, impl_msg, gId, 0);*/
 
   CkSendMsg(epIdx, impl_msg, &chareID);
 }
@@ -2410,10 +2406,6 @@ void CkChareExtSend_multi(int onPE, void *objPtr, int epIdx, int num_bufs, char 
   CkChareID chareID;
   chareID.onPE = onPE;
   chareID.objPtr = objPtr;
-  /*if (ckIsDelegated()) {
-     CkGroupMsgPrep(CkIndex_Hello::idx_SayHi_marshall2(), impl_msg, ckGetGroupID());
-     ckDelegatedTo()->GroupBroadcast(ckDelegatedPtr(),CkIndex_Hello::idx_SayHi_marshall2(), impl_msg, ckGetGroupID());
-  } else CkBroadcastMsgBranch(/*CkIndex_Hello::idx_SayHi_marshall2()epIdx, impl_msg, gId, 0);*/
 
   CkSendMsg(epIdx, impl_msg, &chareID);
 }
@@ -2430,10 +2422,6 @@ void CkGroupExtSend(int gid, int pe, int epIdx, char *msg, int msgSize) {
   implP(msg, msgSize);
   CkGroupID gId;
   gId.idx = gid;
-  /*if (ckIsDelegated()) {
-     CkGroupMsgPrep(CkIndex_Hello::idx_SayHi_marshall2(), impl_msg, ckGetGroupID());
-     ckDelegatedTo()->GroupBroadcast(ckDelegatedPtr(),CkIndex_Hello::idx_SayHi_marshall2(), impl_msg, ckGetGroupID());
-  } else CkBroadcastMsgBranch(/*CkIndex_Hello::idx_SayHi_marshall2()epIdx, impl_msg, gId, 0);*/
 
   if (pe == -1)
     CkBroadcastMsgBranch(epIdx, impl_msg, gId, 0);
@@ -2456,10 +2444,6 @@ void CkGroupExtSend_multi(int gid, int pe, int epIdx, int num_bufs, char **bufs,
   for (int i=0; i < num_bufs; i++) implP(bufs[i], buf_sizes[i]);
   CkGroupID gId;
   gId.idx = gid;
-  /*if (ckIsDelegated()) {
-     CkGroupMsgPrep(CkIndex_Hello::idx_SayHi_marshall2(), impl_msg, ckGetGroupID());
-     ckDelegatedTo()->GroupBroadcast(ckDelegatedPtr(),CkIndex_Hello::idx_SayHi_marshall2(), impl_msg, ckGetGroupID());
-  } else CkBroadcastMsgBranch(/*CkIndex_Hello::idx_SayHi_marshall2()epIdx, impl_msg, gId, 0);*/
 
   if (pe == -1)
     CkBroadcastMsgBranch(epIdx, impl_msg, gId, 0);
