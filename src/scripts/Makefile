@@ -1033,6 +1033,6 @@ machine.o: machine.d
 machine.d: machine.c conv-autoconfig.h
 	@set -e; \
 	rm -f $@; \
-	$(CHARMC) $(OPTS) -MM -I. -I$(INC) $< >$@.$$$$; \
+	$(CHARMC) $(OPTS) -M -I. -I$(INC) $< >$@.$$$$; \
 	sed -e 's,\($*\)\.o[ :]*,\1.o $@ : ,g' -e 's,[Cc]:/,/cygdrive/c/,' < $@.$$$$ > $@; \
 	rm -f $@.$$$$
