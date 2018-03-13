@@ -526,12 +526,12 @@ template class ST_RecursivePartition<int*>;
 template class ST_RecursivePartition<std::vector<int>::iterator>;
 
 // ------------------------------------------------------------------
-typedef std::vector<int>::iterator TreeIterator;
 
-void getNeighborsTopoTree_R(TreeIterator start, TreeIterator end, int myElem, int prevLvlParent,
+template <typename Iterator>
+void getNeighborsTopoTree_R(Iterator start, Iterator end, int myElem, int prevLvlParent,
                             bool nodeTree, unsigned int bfactor, CmiSpanningTreeInfo &t)
 {
-  ST_RecursivePartition<TreeIterator> tb(nodeTree, prevLvlParent != -1);
+  ST_RecursivePartition<Iterator> tb(nodeTree, prevLvlParent != -1);
   int numSubtrees = tb.buildSpanningTree(start, end, std::min(bfactor, (unsigned int)std::distance(start,end)-1));
   if (myElem == *start) {
     // I am the root of this subtree so we're done (collect my children and return)
@@ -542,43 +542,69 @@ void getNeighborsTopoTree_R(TreeIterator start, TreeIterator end, int myElem, in
     return;
   }
   // find in which subtree myElem is in and recursively continue on only that subtree
+  bool elemFound = false;
   for (int i=0; i < numSubtrees; i++) {
-    TreeIterator subtreeStart = tb.begin(i), subtreeEnd = tb.end(i);
-    TreeIterator f = std::find(subtreeStart, subtreeEnd, myElem);
+    Iterator subtreeStart = tb.begin(i), subtreeEnd = tb.end(i);
+    Iterator f = std::find(subtreeStart, subtreeEnd, myElem);
     if (f != subtreeEnd) {
       getNeighborsTopoTree_R(subtreeStart, subtreeEnd, myElem, *start, nodeTree, bfactor, t);
+      elemFound = true;
       break;
     }
   }
+  if (!elemFound) CkAbort("Can't build tree. The element is not in the list of tree nodes");
 }
 
-/**
- * Obtain parent and children of 'myNode' in tree rooted at 'rootNode', using
- * ST_RecursivePartition algorithm. Spanning tree assumed to cover all nodes.
- */
-void getNodeNeighborsTopoTree(int rootNode, int myNode, CmiSpanningTreeInfo &t, unsigned int bfactor)
+void getNodeTopoTreeEdges(int node, int rootNode, int *nodes, int numnodes, unsigned int bfactor,
+                          int *parent, int *child_count, int **children)
 {
-  std::vector<int> nodes;
-  nodes.reserve(CkNumNodes());
-  nodes.push_back(rootNode);
-  for (int i=0; i < CkNumNodes(); i++) {
-    if (i == rootNode) continue;
-    nodes.push_back(i);
+  CkAssert((node >= 0 && node < CkNumNodes()) && (rootNode >= 0 && rootNode < CkNumNodes()) && (bfactor > 0));
+
+  std::vector<int> node_v;
+  if (nodes == NULL) {
+    numnodes = CkNumNodes();
+    node_v.resize(numnodes);
+    node_v[0] = rootNode;
+    for (int i=0, j=1; i < numnodes; i++) {
+      if (i != rootNode) node_v[j++] = i;
+    }
+    nodes = node_v.data();
+  } else {
+    CkAssert(numnodes > 0);
+    if (rootNode != nodes[0]) CkAbort("getNodeTopoTreeEdges: root must be in first position of nodes");
   }
-  getNeighborsTopoTree_R(nodes.begin(), nodes.end(), myNode, -1, true, bfactor, t);
+
+  CmiSpanningTreeInfo t;
+  getNeighborsTopoTree_R(nodes, nodes + numnodes, node, -1, true, bfactor, t);
+  *parent      = t.parent;
+  *child_count = t.child_count;
+  *children    = t.children;
 }
 
-/// same as above but for processors
-void getProcNeighborsTopoTree(int rootPE, int myPE, CmiSpanningTreeInfo &t, unsigned int bfactor)
+void getPETopoTreeEdges(int pe, int rootPE, int *pes, int numpes, unsigned int bfactor,
+                        int *parent, int *child_count, int **children)
 {
-  std::vector<int> pes;
-  pes.reserve(CkNumPes());
-  pes.push_back(rootPE);
-  for (int i=0; i < CkNumPes(); i++) {
-    if (i == rootPE) continue;
-    pes.push_back(i);
+  CkAssert((pe >= 0 && pe < CkNumPes()) && (rootPE >= 0 && rootPE < CkNumPes()) && (bfactor > 0));
+
+  std::vector<int> pe_v;
+  if (pes == NULL) {
+    numpes = CkNumPes();
+    pe_v.resize(numpes);
+    pe_v[0] = rootPE;
+    for (int i=0, j=1; i < numpes; i++) {
+      if (i != rootPE) pe_v[j++] = i;
+    }
+    pes = pe_v.data();
+  } else {
+    CkAssert(numpes > 0);
+    if (rootPE != pes[0]) CkAbort("getPETopoTreeEdges: root must be in first position of pes");
   }
-  getNeighborsTopoTree_R(pes.begin(), pes.end(), myPE, -1, false, bfactor, t);
+
+  CmiSpanningTreeInfo t;
+  getNeighborsTopoTree_R(pes, pes + numpes, pe, -1, true, bfactor, t);
+  *parent      = t.parent;
+  *child_count = t.child_count;
+  *children    = t.children;
 }
 
 typedef std::unordered_map<int,CmiSpanningTreeInfo*> TreeInfoMap;
@@ -603,7 +629,7 @@ CmiSpanningTreeInfo *ST_RecursivePartition_getTreeInfo(int root) {
     CmiSpanningTreeInfo *t = new CmiSpanningTreeInfo;
     t->children = NULL;
     trees[root] = t;
-    getNodeNeighborsTopoTree(root, CkMyNode(), *t, 4);
+    getNodeTopoTreeEdges(CkMyNode(), root, NULL, -1, 4, &t->parent, &t->child_count, &t->children);
     CmiUnlock(_treeLock);
     return t;
   }

@@ -8,7 +8,25 @@
 extern "C" {
 #endif
 
-/// C API to ST_RecursivePartition_getTreeInfo
+/**
+ * Calculate and return parent and children of 'node' in topo tree rooted at 'rootNode'.
+ * The tree spans the specified 'nodes', or *all* nodes if nodes == NULL
+ * If nodes are given, rootNode must appear first in the array
+ * NOTE: caller is responsible for freeing array of children (if child_count > 0)
+ */
+void getNodeTopoTreeEdges(int node, int rootNode, int *nodes, int numnodes, unsigned int bfactor,
+                          int *parent, int *child_count, int **children);
+
+/**
+ * Calculate and return parent and children of 'pe' in topo tree rooted at 'rootPE'.
+ * The tree spans the specified 'pes', or *all* pes if pes == NULL
+ * If pes are given, rootPE must appear first in the array
+ * NOTE: caller is responsible for freeing array of children (if child_count > 0)
+ */
+void getPETopoTreeEdges(int pe, int rootPE, int *pes, int numpes, unsigned int bfactor,
+                        int *parent, int *child_count, int **children);
+
+/// C API to ST_RecursivePartition_getTreeInfo (see below)
 void get_topo_tree_nbs(int root, int *parent, int *child_count, int **children);
 
 #if defined(__cplusplus)
@@ -60,7 +78,8 @@ class TopoManager;
 /**
  * obtain TreeInfo (parent and children) of CkMyNode() for tree rooted at
  * specified node using ST_RecursivePartition. Tree is assumed to cover all nodes.
- * This function allocates and caches the TreeInfo structure.
+ * This function allocates and caches the TreeInfo structure, so any subsequent
+ * calls don't recalculate the tree.
  */
 CmiSpanningTreeInfo *ST_RecursivePartition_getTreeInfo(int root);
 
