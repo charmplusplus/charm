@@ -40,7 +40,7 @@ CpvDeclare(CmiMPIRzvRdmaRecvList_t *, recvRdmaBuffers);
 CpvDeclare(CmiMPIRzvRdmaRecvList_t *, endRdmaBuffer);
 CpvDeclare(int, RdmaRecvQueueLen);
 
-void MPIPostRdmaBuffer(const void *buffer, void *ack, int size, int pe, int tag);
+void MPIPostOneBuffer(const void *buffer, void *ref, int size, int pe, int tag, int type);
 
 int getNewMPITag(void){
 
@@ -129,6 +129,34 @@ void LrtsSetRdmaOpInfo(void *dest, const void *ptr, int size, void *ack, int des
   //Generate a new tag to be used for the RDMA buffer
   rdmaOp->tag = getNewMPITag();
 
-  //Post the RDMA buffer with the generated tag using MPI_Isend
-  MPIPostRdmaBuffer(ptr, ack, size, destPE, rdmaOp->tag);
+  CmiMPIRzvRdmaOpInfo_t *rdmaOpInfo = (CmiMPIRzvRdmaOpInfo_t *) malloc(sizeof(CmiMPIRzvRdmaOpInfo_t));
+  rdmaOpInfo->ack = ack;
+  rdmaOpInfo->tag = rdmaOp->tag;
+
+  // Post the RDMA buffer with the generated tag using MPI_Isend. Post MPI_Isend directly for non-smp or through the comm thread for smp mode
+  MPIPostOneBuffer(ptr, (void *)rdmaOpInfo, size, destPE, rdmaOp->tag, ONESIDED_BUFFER);
+}
+
+// Structure used for the Nocopy Direct API to request an MPI rank to post a buffer
+typedef struct _cmi_mpi_rzv_rdma_post_info {
+  void *buffer;
+  int size;
+  int tag;
+  int ackSize;
+  int srcPe;
+  int destPe;
+}CmiMPIRzvRdmaPostInfo_t;
+
+// Structure used for the Nocopy Direct API for acknowledgement handling
+typedef struct _cmi_mpi_rzv_rdma_ack_info {
+  int pe;
+  int tag;
+}CmiMPIRzvRdmaAckInfo_t;
+
+// Set the machine specific information for a nocopy source pointer
+void LrtsSetRdmaSrcInfo(void *info, const void *ptr, int size, unsigned short int mode){
+}
+
+// Set the machine specific information for a nocopy destination pointer
+void LrtsSetRdmaDestInfo(void *info, const void *ptr, int size, unsigned short int mode){
 }
