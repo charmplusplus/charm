@@ -452,12 +452,33 @@ void CkMulticastMgr::initDelegateMgr(CProxy *cproxy, int opts)
 
   CProxySection_ArrayBase *proxy = (CProxySection_ArrayBase *)cproxy;
   int numSubSections = proxy->ckGetNumSubSections();
+  CkCallback *sectionCB;
+  // If its a cross-array section,
+  if (numSubSections > 1)
+  {
+      /** @warning: Each instantiation is a mem leak! :o
+       * The class is trivially small, but there's one instantiation for each
+       * section delegated to CkMulticast. The objects need to live as long as
+       * their section exists and is used. The idea of 'destroying' an array
+       * section is still academic, and hence no effort has been made to charge
+       * some 'owner' entity with the task of deleting this object.
+       *
+       * Reimplementing delegated x-array reductions will make this consideration moot
+       */
+      // Configure the final cross-section reducer
+      ck::impl::XArraySectionReducer *red =
+          new ck::impl::XArraySectionReducer(numSubSections, nullptr);
+      // Configure the subsection callback to deposit with the final reducer
+      sectionCB = new CkCallback(ck::impl::processSectionContribution, red);
+  }
   for (int i=0; i<numSubSections; i++)
   {
       CkArrayID aid = proxy->ckGetArrayIDn(i);
       mCastEntry *entry = new mCastEntry(aid);
       CkSectionID *sid = &( proxy->ckGetSectionID(i) );
       const CkArrayIndex *al = proxy->ckGetArrayElements(i);
+      if (numSubSections > 1)
+          entry->red.storedCallback = sectionCB;
       prepareCookie(entry, *sid, al, proxy->ckGetNumElements(i), aid);
       initCookie(sid->_cookie);
   }
@@ -1161,20 +1182,20 @@ void CkMulticastMgr::setReductionClient(CProxySection_ArrayBase &proxy, CkCallba
   // If its a cross-array section,
   if (numSubSections > 1)
   {
-      /** @warning: Each instantiation is a mem leak! :o
-       * The class is trivially small, but there's one instantiation for each
-       * section delegated to CkMulticast. The objects need to live as long as
-       * their section exists and is used. The idea of 'destroying' an array
-       * section is still academic, and hence no effort has been made to charge
-       * some 'owner' entity with the task of deleting this object.
-       *
-       * Reimplementing delegated x-array reductions will make this consideration moot
-       */
-      // Configure the final cross-section reducer
-      ck::impl::XArraySectionReducer *red =
-          new ck::impl::XArraySectionReducer(numSubSections, cb);
-      // Configure the subsection callback to deposit with the final reducer
-      sectionCB = new CkCallback(ck::impl::processSectionContribution, red);
+    /** @warning: setReductionClient in cross section reduction should be phased out
+     * Redmine Issue: https://charm.cs.illinois.edu/redmine/issues/1249
+     * Since finalCB is already set in initDelegateMgr it needs to be deleted here
+     * There will still be a memory leak for the instantiation of XGroupSectionReducer object
+     * Since this function will eventually be phased out, it is only a quick fix
+     */
+    // Configure the final cross-section reducer
+    CkSectionInfo &sInfo = proxy.ckGetSectionID(0)._cookie;
+    mCastEntry *entry = (mCastEntry *)sInfo.get_val();
+    delete entry->red.storedCallback;
+    ck::impl::XGroupSectionReducer *red =
+      new ck::impl::XGroupSectionReducer(numSubSections, cb);
+    // Configure the subsection callback to deposit with the final reducer
+    sectionCB = new CkCallback(ck::impl::processSectionContribution, red);
   }
   // else, just direct the reduction to the actual client cb
   else
@@ -1198,16 +1219,16 @@ void CkMulticastMgr::setReductionClient(CProxySection_Group &proxy, CkCallback *
   // If its a cross-array section,
   if (numSubSections > 1)
   {
-    /** @warning: Each instantiation is a mem leak! :o
-     * The class is trivially small, but there's one instantiation for each
-     * section delegated to CkMulticast. The objects need to live as long as
-     * their section exists and is used. The idea of 'destroying' an array
-     * section is still academic, and hence no effort has been made to charge
-     * some 'owner' entity with the task of deleting this object.
-     *
-     * Reimplementing delegated x-array reductions will make this consideration moot
+    /** @warning: setReductionClient in cross section reduction should be phased out
+     * Redmine Issue: https://charm.cs.illinois.edu/redmine/issues/1249
+     * Since finalCB is already set in initDelegateMgr it needs to be deleted here
+     * There will still be a memory leak for the instantiation of XGroupSectionReducer object
+     * Since this function will eventually be phased out, it is only a quick fix
      */
     // Configure the final cross-section reducer
+    CkSectionInfo &sInfo = proxy.ckGetSectionID(0)._cookie;
+    mCastEntry *entry = (mCastEntry *)sInfo.get_val();
+    delete entry->red.storedCallback;
     ck::impl::XGroupSectionReducer *red =
       new ck::impl::XGroupSectionReducer(numSubSections, cb);
     // Configure the subsection callback to deposit with the final reducer
@@ -1443,10 +1464,10 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
             // Set the reference number based on the user flag at the contribute call
             CkSetRefNum(newmsg, userFlag);
             // Trigger the appropriate reduction client
-            if ( !msg_cb.isInvalid() )
-                msg_cb.send(newmsg);
-            else if (redInfo.storedCallback != NULL)
+            if (redInfo.storedCallback != NULL)
                 redInfo.storedCallback->send(newmsg);
+            else if ( !msg_cb.isInvalid() )
+                msg_cb.send(newmsg);
             else if (redInfo.storedClient != NULL) {
                 redInfo.storedClient(id, redInfo.storedClientParam, dataSize, newmsg->data);
                 delete newmsg;

@@ -18,9 +18,6 @@ class Main : public CBase_Main
 public:
   Main(CkArgMsg* m): numArrays(2), numElements(5), sectionSize(numElements), maxIter(3), numIter(0)
   {
-    CkAbort("This test does not currently work and is not expected to work" \
-            " until support for cross array reductions is added to the multicast manager.");
-
     // Save a proxy to main for use as a reduction target
     mainProxy = thisProxy;
 

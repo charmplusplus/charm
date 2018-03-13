@@ -48,7 +48,7 @@ again:
 
 test: all
 	@echo "########################################################################################"
-	$(call run, $(EXECFLAGS) $(TARGET) $(ARGS))
+	$(call run, $(EXECFLAGS) ./$(TARGET) $(ARGS))
 
 ####### Pattern rules
 # Rule to generate dependency information for C++ source files

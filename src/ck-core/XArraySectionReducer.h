@@ -20,8 +20,7 @@ class XArraySectionReducer
     public:
         ///
         XArraySectionReducer(int _numSubSections, CkCallback *_finalCB)
-            : numSubSections(_numSubSections), finalCB(_finalCB), numReceived(0),
-              msgList(numSubSections, nullptr)
+            : numSubSections(_numSubSections), finalCB(_finalCB)
         {
             CkAssert(numSubSections > 0);
         }
@@ -35,37 +34,43 @@ class XArraySectionReducer
         /// Each subsection reduction message needs to be passed in here
         void acceptSectionContribution(CkReductionMsg *msg)
         {
-            msgList[numReceived++] = msg;
-            if (numReceived >= numSubSections)
-                finalReducer();
+            msgMap[msg->redNo].push_back(msg);
+            numReceivedMap[msg->redNo]++;
+            if (numReceivedMap[msg->redNo] >= numSubSections)
+              finalReducer(msg->redNo);
         }
 
     private:
-        /// Triggered after all subsections have completed their reductions
-        void finalReducer()
+        /// Triggered after all subsections have completed their reductions for a particular redNo
+        void finalReducer(int redNo)
         {
             // Get a handle on the reduction function for this message
-            CkReduction::reducerFn f = CkReduction::reducerTable()[ msgList[0]->reducer ].fn;
+            CkReduction::reducerFn f = CkReduction::reducerTable()[ msgMap[redNo][0]->reducer ].fn;
             // Perform an extra reduction step on all the subsection reduction msgs
-            CkReductionMsg *finalMsg = (*f)(numSubSections, msgList.data());
+            CkReductionMsg *finalMsg = (*f)(numSubSections, msgMap[redNo].data());
             // Send the final reduced msg to the client
-            finalCB->send(finalMsg);
+            if (finalCB == nullptr)
+                msgMap[redNo][0]->callback.send(finalMsg);
+            else
+                finalCB->send(finalMsg);
             // Delete the subsection redn msgs, accounting for any msg reuse
             for (int i=0; i < numSubSections; i++)
-                if (msgList[i] != finalMsg) delete msgList[i];
-            // Reset the msg list and counters in preparation for the next redn
-            memset( msgList.data(), 0, numSubSections*sizeof(CkReductionMsg*) );
-            numReceived = 0;
+                if (msgMap[redNo][i] != finalMsg) delete msgMap[redNo][i];
+            // Reset the msg list and counters for the corresponding redNo
+            memset( msgMap[redNo].data(), 0, numSubSections*sizeof(CkReductionMsg*) );
+            numReceivedMap[redNo] = 0;
         }
 
         // The number of subsection redn msgs to expect
         const int numSubSections;
         // The final client callback after all redn are done
         const CkCallback *finalCB;
-        // Counter to track when all subsection redns are complete
-        int numReceived;
-        // List of subsection redn msgs
-        std::vector<CkReductionMsg *> msgList;
+        // A map of counters indexed using redNo to track when all the subsection redns are complete
+        // Since a single instance of this class is used to stitch the reductions across arrays,
+        // multiple callbacks to a particular cross section array are tagged using their redNo
+        std::map<int, int> numReceivedMap;
+        // A map storing a list of subsection redn msgs indexed using redNo
+        std::map<int, std::vector<CkReductionMsg *> > msgMap;
 };
 
 

@@ -239,9 +239,6 @@ array sections with the following restrictions.
 
 \item The elements within each array must be enumerated explicitly.
 
-\item No existing modules currently support delegation of cross
-  section proxies. Therefore reductions are not currently supported.
-
 \end{itemize}
 
 Note: cross section logic also works for groups with analogous characteristics.
@@ -285,9 +282,11 @@ The resulting cross section proxy, as in the example \uw{arrayLowProxy},
 can then be used for multicasts in the same way as a normal array
 section.
 
-Note: For simplicity the example has all arrays and sections of uniform
+Note: For simplicity the above example has all arrays and sections of uniform
 size.  The size of each array and the number of elements in each array
 within a section can all be set independently.
+For a more concrete example on how to use cross array section reduction,
+please refer to: \examplerefdir{hello/xarraySection}.
 
 
 
