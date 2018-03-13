@@ -15,10 +15,10 @@ CpvExtern(CQdState, cQdState);
 
 void CQdInit(void);
 void CQdCpvInit(void);
-void CQdCreate(CQdState, int);
-void CQdProcess(CQdState, int);
-int  CQdGetCreated(CQdState);
-int  CQdGetProcessed(CQdState);
+void CQdCreate(CQdState, CmiInt8);
+void CQdProcess(CQdState, CmiInt8);
+CmiInt8 CQdGetCreated(CQdState);
+CmiInt8 CQdGetProcessed(CQdState);
 void CQdRegisterCallback(CQdVoidFn, void *);
 void CmiStartQD(CQdVoidFn, void *);
 

@@ -31,35 +31,35 @@ int  CQdMsgGetPhase(CQdMsg msg)
 void CQdMsgSetPhase(CQdMsg msg, int p) 
 { msg->phase = p; }
 
-int  CQdMsgGetCreated(CQdMsg msg) 
+CmiInt8 CQdMsgGetCreated(CQdMsg msg)
 { CmiAssert(msg->phase==1); return msg->u.p1.created; }
 
-void CQdMsgSetCreated(CQdMsg msg, int c) 
+void CQdMsgSetCreated(CQdMsg msg, CmiInt8 c)
 { CmiAssert(msg->phase==1); msg->u.p1.created = c; }
 
-int  CQdMsgGetProcessed(CQdMsg msg) 
+CmiInt8 CQdMsgGetProcessed(CQdMsg msg)
 { CmiAssert(msg->phase==1); return msg->u.p1.processed; }
 
-void CQdMsgSetProcessed(CQdMsg msg, int p) 
+void CQdMsgSetProcessed(CQdMsg msg, CmiInt8 p)
 { CmiAssert(msg->phase==1); msg->u.p1.processed = p; }
 
-int  CQdMsgGetDirty(CQdMsg msg) 
+char CQdMsgGetDirty(CQdMsg msg) 
 { CmiAssert(msg->phase==2); return msg->u.p2.dirty; }
 
-void CQdMsgSetDirty(CQdMsg msg, int d) 
+void CQdMsgSetDirty(CQdMsg msg, char d) 
 { CmiAssert(msg->phase==2); msg->u.p2.dirty = d; }
 
 
-int CQdGetCreated(CQdState state)
+CmiInt8 CQdGetCreated(CQdState state)
 { return state->mCreated; }
 
-void CQdCreate(CQdState state, int n)
+void CQdCreate(CQdState state, CmiInt8 n)
 { state->mCreated += n; }
 
-int CQdGetProcessed(CQdState state)
+CmiInt8 CQdGetProcessed(CQdState state)
 { return state->mProcessed; }
 
-void CQdProcess(CQdState state, int n)
+void CQdProcess(CQdState state, CmiInt8 n)
 { state->mProcessed += n; }
 
 void CQdPropagate(CQdState state, CQdMsg msg) 
@@ -75,16 +75,16 @@ void CQdPropagate(CQdState state, CQdMsg msg)
 int  CQdGetParent(CQdState state) 
 { return state->parent; }
     
-int  CQdGetCCreated(CQdState state) 
+CmiInt8 CQdGetCCreated(CQdState state)
 { return state->cCreated; }
 
-int  CQdGetCProcessed(CQdState state) 
+CmiInt8 CQdGetCProcessed(CQdState state)
 { return state->cProcessed; }
 
-void CQdSubtreeCreate(CQdState state, int c) 
+void CQdSubtreeCreate(CQdState state, CmiInt8 c)
 { state->cCreated += c; }
 
-void CQdSubtreeProcess(CQdState state, int p) 
+void CQdSubtreeProcess(CQdState state, CmiInt8 p)
 { state->cProcessed += p; }
 
 int  CQdGetStage(CQdState state) 
@@ -108,10 +108,10 @@ void CQdReset(CQdState state)
 void CQdMarkProcessed(CQdState state) 
 { state->oProcessed = state->mProcessed; }
 
-int  CQdIsDirty(CQdState state) 
+char CQdIsDirty(CQdState state) 
 { return ((state->mProcessed > state->oProcessed) || state->cDirty); }
 
-void CQdSubtreeSetDirty(CQdState state, int d) 
+void CQdSubtreeSetDirty(CQdState state, char d) 
 { state->cDirty = state->cDirty || d; }
 
 CQdState CQdStateCreate(void)
