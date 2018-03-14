@@ -12,6 +12,8 @@ messages (e.g., from reductions) you CANNOT use converse
 quiescence detection!
 */
 
+#if CMI_QD
+
 #include "converse.h"
 #include "quiescence.h"
 #include <stdio.h>
@@ -304,5 +306,5 @@ void CmiStartQD(CQdVoidFn fn, void *arg)
   CmiSyncSendAndFree(0, sizeof(struct ConvQdMsg), (char *)msg);
 }
 
-
+#endif
 

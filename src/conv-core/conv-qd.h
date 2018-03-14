@@ -1,3 +1,5 @@
+#if CMI_QD
+
 #ifndef _CONV_QD_H
 #define _CONV_QD_H
 
@@ -25,4 +27,6 @@ void CmiStartQD(CQdVoidFn, void *);
 #ifdef __cplusplus
 }
 #endif
+#endif
+
 #endif

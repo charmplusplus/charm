@@ -203,7 +203,9 @@ void CmiSyncSendPersistent(int destPE, int size, char *msg, PersistentHandle h)
   CMI_SET_BROADCAST_ROOT(dupmsg, 0);
 
   if (cs->pe==destPE) {
+#if CMI_QD
     CQdCreate(CpvAccess(cQdState), 1);
+#endif
     CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),dupmsg);
   }
   else

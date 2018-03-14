@@ -1,3 +1,9 @@
+#ifndef CMI_QD
+#define CMI_QD CMK_BIGSIM_CHARM || CMK_REPLAYSYSTEM
+#endif
+
+#if CMI_QD
+
 #ifndef _QUIESCENCE_H_
 #define _QUIESCENCE_H_
 
@@ -60,5 +66,7 @@ void CQdSubtreeSetDirty(CQdState, char);
 
 CQdState CQdStateCreate(void);
 void CQdHandler(CQdMsg);
+
+#endif
 
 #endif

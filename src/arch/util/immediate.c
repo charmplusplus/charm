@@ -56,7 +56,9 @@ void CmiDelayImmediate(void)
 {
   MACHLOCK_ASSERT(_immRunning,"CmiDelayImmediate");
 
+#if CMI_QD
   CQdCreate(CpvAccess(cQdState),1);
+#endif
   MACHSTATE(5,"Actually delaying an immediate message");
   CMIQueuePush(CsvAccess(NodeState).delayedImmQ, (char *)currentImmediateMsg);
 }
@@ -82,7 +84,9 @@ void CmiHandleImmediateMessage(void *msg) {
   CmiAssert(h && h->hdlr);
 
   MACHLOCK_ASSERT(_immRunning,"CmiHandleImmediateMessage");
+#if CMI_QD
   CQdProcess(CpvAccess(cQdState),1);
+#endif
   (h->hdlr)(msg,h->userPtr);
 }
 

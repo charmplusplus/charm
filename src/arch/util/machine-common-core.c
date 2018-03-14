@@ -678,7 +678,9 @@ void CmiInterFreeSendFn(int destPE, int partition, int size, char *msg) {
 
     // Set the message as a regular message (defined in lrts-common.h)
     CMI_SET_MSG_TYPE(msg, CMK_REG_MSG);
+#if CMI_QD
     CQdCreate(CpvAccess(cQdState), 1);
+#endif
     if (CmiMyPe()==destPE && partition == CmiMyPartition()) {
         CmiSendSelf(msg);
 #if CMK_PERSISTENT_COMM
@@ -765,7 +767,9 @@ void CmiFreeNodeSendFn(int destNode, int size, char *msg) {
 //and the inter-partition function
 void CmiInterFreeNodeSendFn(int destNode, int partition, int size, char *msg) {
     CMI_DEST_RANK(msg) = DGRAM_NODEMESSAGE;
+#if CMI_QD
     CQdCreate(CpvAccess(cQdState), 1);
+#endif
     CMI_SET_BROADCAST_ROOT(msg, 0);
     // Set the message as a regular message (defined in lrts-common.h)
     CMI_SET_MSG_TYPE(msg, CMK_REG_MSG);

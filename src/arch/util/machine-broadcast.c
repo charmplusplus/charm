@@ -233,7 +233,9 @@ static void SendHyperCubeNode(int size, char *msg) {
 void CmiSyncBroadcastFn1(int size, char *msg) {
     int i, mype;
 
+#if CMI_QD
     CQdCreate(CpvAccess(cQdState), CmiNumPes()-1);
+#endif
     /*record the rank to avoid re-sending the msg in  spanning tree or hypercube*/
     CMI_DEST_RANK(msg) = CmiMyRank();
 
@@ -333,7 +335,9 @@ CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg) {
 void CmiSyncNodeBroadcastFn(int size, char *msg) {
     int mynode = CmiMyNode();
     int i;
+#if CMI_QD
     CQdCreate(CpvAccess(cQdState), CmiNumNodes()-1);
+#endif
 #if CMK_BROADCAST_SPANNING_TREE
     CMI_SET_BROADCAST_ROOT(msg, -CmiMyNode()-1);
     SendSpanningChildrenNode(size, msg);

@@ -111,7 +111,9 @@ CmiPrintf("\n\n\nBroadcast begin EXIT\n");
     CmiSetHandler(sendmsg, cva(simState).beginExitHandler);
     CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
 
+#if CMI_QD
     CmiStartQD(BroadcastShutdown, NULL);
+#endif
 
 #if 0
     // trapped here, so close the log

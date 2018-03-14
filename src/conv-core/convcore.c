@@ -87,7 +87,7 @@
 
 CMI_EXTERNC_VARIABLE const char * const CmiCommitID;
 
-#if CMK_BIGSIM_CHARM
+#if CMI_QD
 extern void initQd(char **argv);
 #endif
 
@@ -1751,7 +1751,9 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
               msg=CdsFifo_Dequeue(s->localQ);
               if (msg!=NULL)
 		{
+#if CMI_QD
 		  CpvAccess(cQdState)->mProcessed++;
+#endif
 		  return msg;	    
 		}
               CqsDequeue(s->schedQ,(void **)&msg);
@@ -1761,7 +1763,9 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	*(s->localCounter)=CsdLocalMax;
 	if ( NULL!=(msg=CmiGetNonLocal()) || 
 	     NULL!=(msg=CdsFifo_Dequeue(s->localQ)) ) {
+#if CMI_QD
             CpvAccess(cQdState)->mProcessed++;
+#endif
             return msg;
         }
 #if CMK_GRID_QUEUE_AVAILABLE
@@ -1992,7 +1996,9 @@ void CmiDeliverSpecificMsg(int handler)
     else      msg = (int *)CdsFifo_Dequeue(localqueue);
     if (msg) {
       if (CmiGetHandler(msg)==handler) {
+#if CMI_QD
 	CpvAccess(cQdState)->mProcessed++;
+#endif
 	CmiHandleMessage(msg);
 	return;
       } else {
@@ -3626,7 +3632,9 @@ static void CmiProcessPriority(char **argv)
 void CommunicationServerInit(void)
 {
 #if CMK_IMMEDIATE_MSG
+#if CMI_QD
   CQdCpvInit();
+#endif
   CpvInitialize(int,CmiImmediateMsgHandlerIdx); 
 #endif
 }
@@ -3783,7 +3791,9 @@ void ConverseCommonInit(char **argv)
   CmiGroupInit();
   CmiMulticastInit();
   CmiInitMultipleSend();
+#if CMI_QD
   CQdInit();
+#endif
 
   CrnInit();
   CmiInitImmediateMsg();

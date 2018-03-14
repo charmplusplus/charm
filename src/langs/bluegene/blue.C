@@ -1967,7 +1967,7 @@ static void beginExitHandlerFunc(void *msg)
   delayCheckFlag = 0;
 //CmiPrintf("\n\n\nbeginExitHandlerFunc called on %d\n", CmiMyPe());
   programExit = 1;
-#if LIMITED_SEND
+#if LIMITED_SEND && CMI_QD
   CQdCreate(CpvAccess(cQdState), BgNodeSize());
 #endif
 

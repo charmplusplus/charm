@@ -92,7 +92,9 @@ void CmiSyncSendPersistent(int destPE, int size, char *msg, PersistentHandle h)
 
   /*  CmiPrintf("Setting root to %d\n", 0); */
   if (CmiMyPe()==destPE) {
+#if CMI_QD
     CQdCreate(CpvAccess(cQdState), 1);
+#endif
     CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),dupmsg);
   }
   else

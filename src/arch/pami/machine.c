@@ -1369,7 +1369,9 @@ void CmiSyncSendFn(int destPE, int size, char *msg) {
 }
 
 void CmiFreeSendFn(int destPE, int size, char *msg) {    
+#if CMI_QD
     CQdCreate(CpvAccess(cQdState), 1);
+#endif
     //if(CmiMyRank()==CmiMyNodeSize()) printf("CmiFreeSendFn on comm thd on node %d\n", CmiMyNode());
 
     CMI_SET_BROADCAST_ROOT(msg,0);
@@ -1446,7 +1448,9 @@ void CmiFreeBroadcastFn(int size, char *msg) {
 
     CmiState cs = CmiGetState();
 #if CMK_BROADCAST_SPANNING_TREE    
+#if CMI_QD
     CQdCreate(CpvAccess(cQdState), CmiNumPes()-1);
+#endif
     //if(CmiMyRank()==CmiMyNodeSize()) printf("CmiFreeBroadcastFn on comm thd on node %d\n", CmiMyNode());
 
     //printf ("%d: Starting Spanning Tree Broadcast of size %d bytes\n", CmiMyPe(), size);
@@ -1487,7 +1491,9 @@ void CmiFreeBroadcastAllFn(int size, char *msg) {
 
     CmiSyncSendFn(cs->pe,size,msg);
     
+#if CMI_QD
     CQdCreate(CpvAccess(cQdState), CmiNumPes()-1);
+#endif
 
     CMI_SET_BROADCAST_ROOT(msg, CmiMyNode()+1);
     CMI_DEST_RANK(msg) = CmiMyRank();
@@ -1991,7 +1997,9 @@ void CmiFreeNodeSendFn(int node, int size, char *msg) {
     CMI_SET_CHECKSUM(msg, size);
     //if(CmiMyRank()==CmiMyNodeSize()) printf("CmiFreeNodeSendFn on comm thd on node %d\n", CmiMyNode());
     
+#if CMI_QD
     CQdCreate(CpvAccessOther(cQdState, CmiMyRank()), 1);
+#endif
 
     if (node == _Cmi_mynode) {
         CmiSendNodeSelf(msg);
@@ -2040,7 +2048,9 @@ void CmiFreeNodeBroadcastFn(int s, char *m) {
 #if CMK_BROADCAST_SPANNING_TREE
     //if(CmiMyRank()==CmiMyNodeSize()) printf("CmiFreeNodeBcastFn on comm thd on node %d\n", CmiMyNode());
     
+#if CMI_QD
     CQdCreate(CpvAccess(cQdState), CmiNumNodes()-1);
+#endif
 
     int mynode = CmiMyNode();
     CMI_SET_BROADCAST_ROOT(m, -mynode-1);
@@ -2081,7 +2091,9 @@ void CmiFreeNodeBroadcastAllFn(int s, char *m) {
 
     //if(CmiMyRank()==CmiMyNodeSize()) printf("CmiFreeNodeBcastAllFn on comm thd on node %d\n", CmiMyNode());
     
+#if CMI_QD
     CQdCreate(CpvAccess(cQdState), 1);
+#endif
     CmiSendNodeSelf(dupmsg);
 
     CmiFreeNodeBroadcastFn(s, m);
