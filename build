@@ -550,9 +550,12 @@ else
   UFCONTEXT_HEADER_NAME="elf_gas"
 fi
 
-if test `echo "$BASEVERSION" | grep -c "arm"` -gt 0
+if test `echo "$BASEVERSION" | grep -c "arm7"` -gt 0
 then
   UFCONTEXT_HEADER_NAME="arm_aapcs_${UFCONTEXT_HEADER_NAME}"
+elif test `echo "$BASEVERSION" | grep -c "arm8"` -gt 0
+then
+  UFCONTEXT_HEADER_NAME="arm64_aapcs_${UFCONTEXT_HEADER_NAME}"
 elif test `echo "$BASEVERSION" | grep -c "mips"` -gt 0
 then
   UFCONTEXT_HEADER_NAME="mips32_o32_${UFCONTEXT_HEADER_NAME}"

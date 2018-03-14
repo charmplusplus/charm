@@ -47,8 +47,8 @@
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
 
-#define CMK_64BIT   0 
-#define CMK_32BIT   1
+#define CMK_64BIT   1 
+#define CMK_32BIT   0
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   0
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     1
 
