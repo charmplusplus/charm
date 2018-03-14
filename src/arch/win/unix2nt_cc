@@ -225,7 +225,7 @@ do
 		path=`echo $arg | awk -F@ '{print substr($1,3)}'`
 		CL="$CL /I`cygpath -w $path`"
 		;;
-        -MM)
+	-MM|-M)
 		DODEPS="yes"
 		;;
 	-L)
