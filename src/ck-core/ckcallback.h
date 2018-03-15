@@ -91,10 +91,10 @@ private:
 		bool hasRefnum;
 	} array;
 	struct s_section {
-		CkSectionInfo::CkSectionInfoStruct sinfo;
                 CkArrayIndex *_elems;
-                int _nElems;
                 int *pelist;
+		CkSectionInfo::CkSectionInfoStruct sinfo;
+                int _nElems;
                 int npes;
 		int ep;
 		CMK_REFNUM_TYPE refnum; // Reference number to set on the message

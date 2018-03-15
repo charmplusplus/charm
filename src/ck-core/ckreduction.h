@@ -377,47 +377,45 @@ public:
 	static void *pack(CkReductionMsg *);
 	static CkReductionMsg *unpack(void *in);
 
-#if CMK_BIGSIM_CHARM
-	/* AMPI reductions use bare CkReductionMsg's instead of AmpiMsg's */
-	void *event; // the event point that corresponds to this message
-	int eventPe; // the PE that the event is located on
-#endif
+private:
+	int nSources(void) {return sourceFlag<0?-sourceFlag:sourceFlag;}
+
+	//Default constructor is private so you must use "buildNew", above
+	CkReductionMsg();
 
 private:
 	int dataSize;//Length of array below, in bytes
-	void *data;//Reduction data
-	CMK_REFNUM_TYPE userFlag; //Some sort of identifying flag, for client use
-	CkCallback callback; //What to do when done
-	bool migratableContributor; // are the contributors migratable
-
 	int sourceFlag;/*Flag:
 		0 indicates this is a placeholder message (meaning: nothing to report)
 		-1 indicates this is a single (non-reduced) contribution.
   		>0 indicates this is a reduced contribution.
   	*/
-  	int nSources(void) {return sourceFlag<0?-sourceFlag:sourceFlag;}
 #if (defined(_FAULT_MLOG_) && _MLOG_REDUCE_P2P_ )
     int sourceProcessorCount;
 #endif
     int fromPE;
-private:
-#if CMK_BIGSIM_CHARM
-        void *log;
-#endif
-	CkReduction::reducerType reducer;
-	//contributorInfo *ci;//Source contributor, or NULL if none
 	int redNo;//The serial number of this reduction
 	int gcount;//Contribution to the global contributor count
+	CkReduction::reducerType reducer;
+	CMK_REFNUM_TYPE userFlag; //Some sort of identifying flag, for client use
+	bool migratableContributor; // are the contributors migratable
         // for section multicast/reduction library
-        CkSectionInfo sid;   // section cookie for multicast
-        char rebuilt;          // indicate if the multicast tree needs rebuilt
-        int nFrags;
-        int fragNo;      // fragment of a reduction msg (when pipelined)
+        int8_t rebuilt;          // indicate if the multicast tree needs rebuilt
+        int8_t nFrags;
+        int8_t fragNo;      // fragment of a reduction msg (when pipelined)
                          // value = 0 to nFrags-1
+        CkSectionInfo sid;   // section cookie for multicast
+	CkCallback callback; //What to do when done
+#if CMK_BIGSIM_CHARM
+public:
+	/* AMPI reductions use bare CkReductionMsg's instead of AmpiMsg's */
+	void *event; // the event point that corresponds to this message
+	int eventPe; // the PE that the event is located on
+private:
+        void *log;
+#endif
+	void *data;//Reduction data
 	double dataStorage;//Start of data array (so it's double-aligned)
-
-	//Default constructor is private so you must use "buildNew", above
-    CkReductionMsg();
 };
 
 

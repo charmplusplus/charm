@@ -32,6 +32,8 @@
 #endif
 
 // maximum number of fragments into which a message can be broken
+// NOTE: CkReductionMsg::{nFrags,fragNo} and reductionInfo::npProcessed are int8_t,
+//       which has a maximum value of 127.
 #define MAXFRAGS 100
 
 typedef CkQ<multicastGrpMsg *> multicastGrpMsgBuf;
@@ -57,7 +59,7 @@ class reductionInfo {
         /// The total number of array elements that have contributed so far to a given fragment
         int gcount [MAXFRAGS];
         /// The number of fragments processed so far
-        int npProcessed;
+        int8_t npProcessed;
         /// User callback
         CkCallback *storedCallback;
         /// User reduction client function
@@ -76,7 +78,7 @@ class reductionInfo {
                          storedClientParam(NULL),
                          redNo(0),
                          npProcessed(0) {
-            for (int i=0; i<MAXFRAGS; i++)
+            for (int8_t i=0; i<MAXFRAGS; i++)
                 lcount [i] = ccount [i] = gcount [i] = 0;
         }
 };
@@ -1264,7 +1266,7 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
   if (id.get_val() == NULL || id.get_redNo() == -1) 
     CmiAbort("contribute: SectionID is not initialized\n");
 
-  int nFrags;
+  int8_t nFrags;
   if (-1 == fragSize) {		// no frag
     nFrags = 1;
     fragSize = dataSize;
@@ -1285,7 +1287,7 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
 
   // break the message into k-piece fragments
   int fSize = fragSize;
-  for (int i=0; i<nFrags; i++) {
+  for (int8_t i=0; i<nFrags; i++) {
     if ((0 != i) && ((nFrags-1) == i) && (0 != dataSize%fragSize)) {
       fSize = dataSize%fragSize;
     }
@@ -1321,9 +1323,9 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
 CkReductionMsg* CkMulticastMgr::combineFrags (CkSectionInfo& id, 
                                               mCastEntry* entry,
                                               reductionInfo& redInfo) {
-  int i;
+  int8_t i;
   int dataSize = 0;
-  int nFrags   = redInfo.msgs[0][0]->nFrags;
+  int8_t nFrags   = redInfo.msgs[0][0]->nFrags;
 
   // to avoid memcpy and allocation cost for non-pipelined reductions
   if (1 == nFrags) {
@@ -1393,7 +1395,7 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
 
     // Check if migration occurred in any of the subtrees, and pick one valid callback
     CkCallback msg_cb;
-    int rebuilt = 0;
+    int8_t rebuilt = 0;
     for (i=0; i<rmsgs.size(); i++) {
         if (rmsgs[i]->rebuilt) rebuilt = 1;
         if (!rmsgs[i]->callback.isInvalid()) msg_cb = rmsgs[i]->callback;
@@ -1485,7 +1487,7 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
  */
 void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
 {
-    int i;
+    int8_t i;
     /// Grab the section info embedded in the redn msg
     CkSectionInfo id = msg->sid;
     /// ... and get at the ptr which shows me which cookie to use
@@ -1578,7 +1580,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     int mixTreeUp = 0;
     if (!entry->hasParent()) {
         mixTreeUp = 1;
-        for (int i=0; i<msg->nFrags; i++)
+        for (int8_t i=0; i<msg->nFrags; i++)
             if (entry->getNumAllElems() != redInfo.gcount [i])
                 mixTreeUp = 0;
     }
@@ -1587,7 +1589,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     /// If this fragment can be reduced, or if I am the root and have received all fragments from all elements
     if (currentTreeUp || mixTreeUp)
     {
-        const int nFrags = msg->nFrags;
+        const int8_t nFrags = msg->nFrags;
         /// Reduce this fragment
         reduceFragment (index, id, entry, redInfo, currentTreeUp);
 

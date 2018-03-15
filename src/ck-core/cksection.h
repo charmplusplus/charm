@@ -36,15 +36,14 @@ public:
    */
   class CkSectionInfoStruct {
   public:
+    /// Pointer to mCastEntry (used by CkMulticast)
+    void *val;
     /// Array/group ID of the array/group that has been sectioned
     CkGroupID aid;
     /// The pe on which this object has been created
     int pe;
-
     /// Counter tracking the last reduction that has traversed this section (used by CkMulticast)
     int redNo;
-    /// Pointer to mCastEntry (used by CkMulticast)
-    void *val;
   };
 
   CkSectionInfoStruct info;
