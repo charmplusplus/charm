@@ -1,3 +1,5 @@
+#if CMK_FAULT_EVAC
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,14 +7,7 @@
 #include "ck.h"
 #include "ckevacuation.h"
 
-//#define DEBUGC(x) x
-#define DEBUGC(x) 
-
-/***********************************************************************************************/
-/*
-	FAULT_EVAC
-*/
-
+#define DEBUGC(x) //x 
 
 
 int _ckEvacBcastIdx;
@@ -344,3 +339,6 @@ void processRaiseEvacFile(char *raiseEvacFile){
 	}
 	fclose(fp);	
 }
+
+#endif
+

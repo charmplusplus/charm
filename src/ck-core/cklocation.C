@@ -316,9 +316,11 @@ public:
     if (i.dimension == 1) {
       //Map 1D integer indices in simple round-robin fashion
       int ans = (i.data()[0])%CkNumPes();
+#if CMK_FAULT_EVAC
       while(!CmiNodeAlive(ans) || (ans == CkMyPe() && CkpvAccess(startedEvac))){
         ans = (ans+1)%CkNumPes();
       }
+#endif
       return ans;
     }
     else {
@@ -327,9 +329,11 @@ public:
         //Map other indices based on their hash code, mod a big prime.
         unsigned int hash=(i.hash()+739)%1280107;
         int ans = (hash % CkNumPes());
+#if CMK_FAULT_EVAC
         while(!CmiNodeAlive(ans)){
           ans = (ans+1)%CkNumPes();
         }
+#endif
         return ans;
       } else {
         if(!productsInit) { indexInit(); }
@@ -1515,10 +1519,9 @@ void CkMigratable::commonInit(void) {
   }
 #endif
 
-	/*
-	FAULT_EVAC
-	*/
+#if CMK_FAULT_EVAC
 	AsyncEvacuate(true);
+#endif
 }
 
 CkMigratable::CkMigratable(void) {
@@ -1545,11 +1548,11 @@ void CkMigratable::pup(PUP::er &p) {
 	if (p.isUnpacking()) myRec->ReadyMigrate(readyMigrate);
 #endif
 	if(p.isUnpacking()) barrierRegistered=false;
-	/*
-		FAULT_EVAC
-	*/
+
+#if CMK_FAULT_EVAC
 	p | asyncEvacuate;
 	if(p.isUnpacking()){myRec->AsyncEvacuate(asyncEvacuate);}
+#endif
 	
 	ckFinishConstruction();
 }
@@ -1889,7 +1892,9 @@ CkLocRec::CkLocRec(CkLocMgr *mgr,bool fromMigration,
 	asyncMigrate = false;
 	readyMigrate = true;
         enable_measure = true;
+#if CMK_FAULT_EVAC
 	bounced  = false;
+#endif
 	the_lbdb=mgr->getLBDB();
 	if(_lb_args.metaLbOn())
 	  the_metalb=mgr->getMetaBalancer();
@@ -1908,10 +1913,10 @@ CkLocRec::CkLocRec(CkLocMgr *mgr,bool fromMigration,
 		}
 	}
 #endif
-	/*
-		FAULT_EVAC
-	*/
+
+#if CMK_FAULT_EVAC
 	asyncEvacuate = true;
+#endif
 }
 CkLocRec::~CkLocRec()
 {
@@ -2651,9 +2656,11 @@ int CkLocMgr::deliverMsg(CkArrayMessage *msg, CkArrayID mgr, CmiUInt8 id, const 
     int destPE = whichPE(id);
     if (destPE != -1)
     {
+#if CMK_FAULT_EVAC
       if((!CmiNodeAlive(destPE) && destPE != allowMessagesOnly)){
         CkAbort("Cannot send to a chare on a dead node");
       }
+#endif
       msg->array_hops()++;
       CkArrayManagerDeliver(destPE,msg,opts);
       return true;
@@ -3067,14 +3074,17 @@ void CkLocMgr::emigrate(CkLocRec *rec,int toPe)
 {
 	CK_MAGICNUMBER_CHECK
 	if (toPe==CkMyPe()) return; //You're already there!
+
+#if CMK_FAULT_EVAC
 	/*
-		FAULT_EVAC
 		if the toProcessor is already marked as invalid, dont emigrate
 		Shouldn't happen but might
 	*/
 	if(!CmiNodeAlive(toPe)){
 		return;
 	}
+#endif
+
 	CkArrayIndex idx=rec->getIndex();
         CmiUInt8 id = rec->getID();
 
@@ -3111,7 +3121,13 @@ void CkLocMgr::emigrate(CkLocRec *rec,int toPe)
 #else
 		false,
 #endif
-		bufSize, managers.size(), rec->isBounced());
+		bufSize, managers.size(),
+#if CMK_FAULT_EVAC
+    rec->isBounced()
+#else
+    false
+#endif
+    );
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
     msg->gid = ckGetGroupID();
@@ -3209,8 +3225,9 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 		
 		CkAbort("Array element's pup routine has a direction mismatch.\n");
 	}
+
+#if CMK_FAULT_EVAC
 	/*
-		FAULT_EVAC
 			if this element came in as a result of being bounced off some other process,
 			then it needs to be resumed. It is assumed that it was bounced because load 
 			balancing caused it to move into a processor which later crashed
@@ -3218,16 +3235,18 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 	if(msg->bounced){
 		callMethod(rec,&CkMigratable::ResumeFromSync);
 	}
-	
+#endif
+
 	//Let all the elements know we've arrived
 	callMethod(rec,&CkMigratable::ckJustMigrated);
-	/*FAULT_EVAC
+
+#if CMK_FAULT_EVAC
+	/*
 		If this processor has started evacuating array elements on it 
 		dont let new immigrants in. If they arrive send them to what
 		would be their correct homePE.
 		Leave a record here mentioning the processor where it got sent
 	*/
-	
 	if(CkpvAccess(startedEvac)){
 		int newhomePE = getNextPE(idx);
 		DEBM((AA "Migrated into failed processor index size %s resent to %d \n" AB,idx2str(idx),newhomePE));	
@@ -3238,6 +3257,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 		rec->Bounced(true);
 		emigrate(rec,targetPE);
 	}
+#endif
 
 	delete msg;
 }
@@ -3335,9 +3355,11 @@ int CkLocMgr::lastKnown(const CkArrayIndex &idx) {
 	int pe = whichPE(idx);
 	if (pe==-1) return homePe(idx);
 	else{
+#if CMK_FAULT_EVAC
 		if(!CmiNodeAlive(pe)){
 			CkAbort("Last known PE is no longer alive");
 		}
+#endif
 		return pe;
 	}	
 }
@@ -3347,9 +3369,11 @@ int CkLocMgr::lastKnown(CmiUInt8 id) {
   int pe = whichPE(id);
   if (pe==-1) return homePe(id);
   else{
+#if CMK_FAULT_EVAC
     if(!CmiNodeAlive(pe)){
       CkAbort("Last known PE is no longer alive");
     }
+#endif
     return pe;
   }	
 }

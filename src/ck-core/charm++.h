@@ -355,12 +355,13 @@ class IrrGroup : public Chare {
     virtual bool isReductionMgr(void){ return false; }
     static bool isIrreducible(){ return true;}
     virtual void flushStates() {}
-		/*
-			FAULT_EVAC
-		*/
+
+    virtual void CkAddThreadListeners(CthThread tid, void *msg);
+
+#if CMK_FAULT_EVAC
 		virtual void evacuate(){};
 		virtual void doneEvacuate(){};
-    virtual void CkAddThreadListeners(CthThread tid, void *msg);
+#endif
 };
 
 extern void (*GroupMsgRecvExtCallback)(int, int, int, char *, int);        // callback to forward received msg to external Group chare

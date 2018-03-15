@@ -636,12 +636,11 @@ void CkReductionMgr::startReduction(int number,int srcPE)
   inProgress=true;
  
 
-	/*
-		FAULT_EVAC
-	*/
+#if CMK_FAULT_EVAC
   if(!CmiNodeAlive(CkMyPe())){
 	return;
   }
+#endif
 
   // TODO: This is currently gotten from the command-line...but it could
   // probably just be determined at runtime. I don't know if the CL option is
@@ -1076,14 +1075,18 @@ void CkReductionMgr::init_BinaryTree(){
     if (numKids < 0) numKids = 0;
     for (int i = 0; i < numKids; i++) {
       kids.push_back(CkNodeFirst(firstKid+i));
+#if CMK_FAULT_EVAC
       newKids.push_back(CkNodeFirst(firstKid+i));
+#endif
     }
 
     // Add PEs on my node, which are also my children
     numKids += CkNodeSize(CkMyNode())-1;
     for (int i = 1; i < CkNodeSize(CkMyNode()); i++) {
       kids.push_back(CkMyPe()+i);
+#if CMK_FAULT_EVAC
       newKids.push_back(CkMyPe()+i);
+#endif
     }
   }
 }
@@ -1102,14 +1105,18 @@ void CkReductionMgr::init_TopoTree() {
     for (int i=0; i < numKids; i++) {
       int child = CkNodeFirst(t.children[i]);
       kids.push_back(child);
+#if CMK_FAULT_EVAC
       newKids.push_back(child);
+#endif
     }
 
     // Add PEs on my node, which are also my children
     numKids += CkNodeSize(CkMyNode())-1;
     for (int i = 1; i < CkNodeSize(CkMyNode()); i++) {
       kids.push_back(CkMyPe()+i);
+#if CMK_FAULT_EVAC
       newKids.push_back(CkMyPe()+i);
+#endif
     }
   }
 }
@@ -2164,13 +2171,12 @@ CkNodeReductionMgr::CkNodeReductionMgr()//Constructor
   creating=false;
   interrupt = false;
   DEBR((AA "In NodereductionMgr constructor at %d \n" AB,this));
-	/*
-		FAULT_EVAC
-	*/
+#if CMK_FAULT_EVAC
 	blocked = false;
 	maxModificationRedNo = INT_MAX;
 	killed=false;
 	additionalGCount = newAdditionalGCount = 0;
+#endif
 }
 
 CkNodeReductionMgr::~CkNodeReductionMgr()
@@ -2265,14 +2271,13 @@ void CkNodeReductionMgr::contributeWithCounter(contributorInfo *ci,CkReductionMs
 
 void CkNodeReductionMgr::doRecvMsg(CkReductionMsg *m){
 	DEBR(("[%d,%d] doRecvMsg called for  %d at %.6f[[[[[\n",CkMyNode(),CkMyPe(),m->redNo,CkWallTimer()));
-	/*
-		FAULT_EVAC
-	*/
+#if CMK_FAULT_EVAC
 	if(blocked){
 		DEBR(("[%d] This node is blocked, so remote message is being buffered as no %d\n",CkMyNode(),bufferedRemoteMsgs.length()));
 		bufferedRemoteMsgs.enq(m);
 		return;
 	}
+#endif
 	
 	if (isPresent(m->redNo)) { //Is a regular, in-order reduction message
 	    //DEBR((AA "Recv'd remote contribution %d for #%d at %d\n" AB,nRemote,m->redNo,this));
@@ -2339,14 +2344,13 @@ void CkNodeReductionMgr::startReduction(int number,int srcNode)
 }
 
 void CkNodeReductionMgr::doAddContribution(CkReductionMsg *m){
-	/*
-		FAULT_EVAC
-	*/
+#if CMK_FAULT_EVAC
 	if(blocked){
 		DEBR(("[%d] This node is blocked, so local message is being buffered as no %d\n",CkMyNode(),bufferedMsgs.length()));
 		bufferedMsgs.enq(m);
 		return;
 	}
+#endif
 	
 	if (isFuture(m->redNo)) {//An early contribution-- add to future Q
 		DEBR((AA "Contributor gives early node contribution-- for #%d\n" AB,m->redNo));
@@ -2373,15 +2377,14 @@ void CkNodeReductionMgr::addContribution(CkReductionMsg *m)
 
 void CkNodeReductionMgr::LateMigrantMsg(CkReductionMsg *m){
         CmiLock(lockEverything);   
-	/*
-		FAULT_EVAC
-	*/
+#if CMK_FAULT_EVAC
 	if(blocked){
 		DEBR(("[%d] This node is blocked, so local message is being buffered as no %d\n",CkMyNode(),bufferedMsgs.length()));
 		bufferedMsgs.enq(m);
                 CmiUnlock(lockEverything);   
 		return;
 	}
+#endif
 	
 	if (isFuture(m->redNo)) {//An early contribution-- add to future Q
 		DEBR((AA "Latemigrant gives early node contribution-- for #%d\n" AB,m->redNo));
@@ -2460,25 +2463,34 @@ void CkNodeReductionMgr::finishReduction(void)
 
   if (hasParent())
   {//Pass data up tree to parent
-	if(CmiNodeAlive(CkMyNode()) || killed == false){
+#if CMK_FAULT_EVAC
+	if(CmiNodeAlive(CkMyNode()) || killed == false)
+#endif
+  {
     	DEBR((AA "Passing reduced data up to parent node %d. \n" AB,treeParent()));
     	DEBR(("[%d,%d] Passing data up to parentNode %d at %.6f for redNo %d with ncontrib %d\n",CkMyNode(),CkMyPe(),treeParent(),CkWallTimer(),redNo,nContrib));
-		/*
-			FAULT_EVAC
-		*/
+
+#if CMK_FAULT_EVAC
 			result->gcount += additionalGCount;//if u have replaced some node add its gcount to ur count
+#endif
 	    thisProxy[treeParent()].RecvMsg(result);
 	}
 
   }
   else
   {
-		if(result->isMigratableContributor() && result->gcount+additionalGCount != result->sourceFlag){
+		if(result->isMigratableContributor()
+#if CMK_FAULT_EVAC
+       && result->gcount+additionalGCount != result->sourceFlag
+#endif
+    ){
 		  DEBR(("[%d,%d] NodeGroup %d> Node Reduction %d not done yet gcounts %d sources %d migratable %d \n",CkMyNode(),CkMyPe(),thisgroup.idx,redNo,result->gcount,result->sourceFlag,result->isMigratableContributor()));
 			msgs.enq(result);
 			return;
 		}
+#if CMK_FAULT_EVAC
 		result->gcount += additionalGCount;
+#endif
 	  /** if the reduction is finished and I am the root of the reduction tree
 	  then call the reductionhandler and other stuff ***/
 		
@@ -2503,7 +2515,9 @@ void CkNodeReductionMgr::finishReduction(void)
   // DEBR((AA "Reduction %d finished in group!\n" AB,redNo));
   //CkPrintf("[%d,%d]Reduction %d finished with %d\n",CkMyNode(),CkMyPe(),redNo,nContrib);
   redNo++;
+#if CMK_FAULT_EVAC
 	updateTree();
+#endif
   int i;
   inProgress=false;
   startRequested=false;
@@ -2565,7 +2579,9 @@ void CkNodeReductionMgr::init_BinaryTree(){
 
 	for(int i=0;i<numKids;i++){
 		kids.push_back(firstkid+i);
+#if CMK_FAULT_EVAC
 		newKids.push_back(firstkid+i);
+#endif
 	}
 }
 
@@ -2576,7 +2592,9 @@ void CkNodeReductionMgr::init_TopoTree() {
   numKids = t.child_count;
   for (int i=0; i < numKids; i++) {
     kids.push_back(t.children[i]);
+#if CMK_FAULT_EVAC
     newKids.push_back(t.children[i]);
+#endif
   }
 }
 
@@ -2663,8 +2681,12 @@ void CkNodeReductionMgr::pup(PUP::er &p)
   p|futureRemoteMsgs;
   p|futureLateMigrantMsgs;
   p|parent;
+
+#if CMK_FAULT_EVAC
   p|additionalGCount;
   p|newAdditionalGCount;
+#endif
+
   if(p.isUnpacking()) {
     gcount=CkNumNodes();
     thisProxy = thisgroup;
@@ -2677,8 +2699,11 @@ void CkNodeReductionMgr::pup(PUP::er &p)
     init_TopoTree();
 #endif		
   }
+
+#if CMK_FAULT_EVAC
   p | blocked;
   p | maxModificationRedNo;
+#endif
 
 #if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
   bool isnull = (storedCallback == NULL);
@@ -2693,8 +2718,8 @@ void CkNodeReductionMgr::pup(PUP::er &p)
 
 }
 
+#if CMK_FAULT_EVAC
 /*
-	FAULT_EVAC
 	Evacuate - is called when this processor realizes it might crash. In that case, it tries to change 
 	the reduction tree. It also needs to decide a reduction number after which it shall use the new 
 	reduction tree. 
@@ -2985,5 +3010,6 @@ int CkNodeReductionMgr::findMaxRedNo(){
 	}
 	return max;
 }
+#endif //CMK_FAULT_EVAC
 
 #include "CkReduction.def.h"

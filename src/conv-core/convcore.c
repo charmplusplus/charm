@@ -1631,7 +1631,7 @@ void CmiHandleMessage(void *msg)
 #endif
 
 /*
-	FAULT_EVAC
+	CMK_FAULT_EVAC
 */
 /*	if((!CpvAccess(_validProcessors)[CmiMyPe()]) && handler != _exitHandlerIdx){
 		return;

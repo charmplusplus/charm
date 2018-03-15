@@ -2080,12 +2080,13 @@ void CthSetThreadID(CthThread th, int a, int b, int c);
 
 void CthTraceResume(CthThread t);
 
-/*FAULT_EVAC */
+#if CMK_FAULT_EVAC
 #if CMK_BIGSIM_CHARM
 #define CmiNodeAlive(x) (1)
 #else
 CpvExtern(char *,_validProcessors);
 #define CmiNodeAlive(x)  (CpvAccess(_validProcessors)[x])
+#endif
 #endif
 
 int CmiEndianness(void);

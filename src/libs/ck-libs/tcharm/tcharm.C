@@ -206,8 +206,9 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   CtvAccessOther(tid,_curTCharm)=this;
   asyncMigrate = false;
   isStopped=true;
-	/* FAULT_EVAC*/
+#if CMK_FAULT_EVAC
 	AsyncEvacuate(true);
+#endif
   exitWhenDone=initMsg->opts.exitWhenDone;
   isSelfDone = false;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
@@ -229,8 +230,11 @@ TCharm::TCharm(CkMigrateMessage *msg)
   tid=NULL;
   threadGlobals=NULL;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
-	AsyncEvacuate(true);
   heapBlocks=0;
+
+#if CMK_FAULT_EVAC
+	AsyncEvacuate(true);
+#endif
 }
 
 void checkPupMismatch(PUP::er &p,int expected,const char *where)
@@ -430,11 +434,7 @@ void TCharm::ckJustRestored(void) {
 	ArrayElement::ckJustRestored();
 }
 
-/*
-	FAULT_EVAC
-
-	If a Tcharm object is about to migrate it should be suspended first
-*/
+// If a Tcharm object is about to migrate it should be suspended first
 void TCharm::ckAboutToMigrate(void){
 	ArrayElement::ckAboutToMigrate();
 	isStopped = true;
@@ -537,21 +537,15 @@ void TCharm::migrate(void)
 #endif
 }
 
-
-
+#if CMK_FAULT_EVAC
 void TCharm::evacuate(){
-	/*
-		FAULT_EVAC
-	*/
 	//CkClearAllArrayElementsCPP();
 	if(CkpvAccess(startedEvac)){
 		CcdCallFnAfter((CcdVoidFn)CkEmmigrateElement, (void *)myRec, 1);
 		suspend();
-		return;
 	}
-	return;
-
 }
+#endif
 
 //calls atsync with async mode
 void TCharm::async_migrate(void)
@@ -917,11 +911,13 @@ CDECL void TCHARM_Migrate_to(int destPE)
 	TCharm::get()->migrateTo(destPE);
 }
 
+#if CMK_FAULT_EVAC
 CDECL void TCHARM_Evacuate()
 {
 	TCHARMAPI("TCHARM_Migrate_to");
 	TCharm::get()->evacuate();
 }
+#endif
 
 FORTRAN_AS_C(TCHARM_MIGRATE_TO,TCHARM_Migrate_to,tcharm_migrate_to,
 	(int *destPE),(*destPE))

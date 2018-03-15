@@ -1895,9 +1895,11 @@ void ampi_load_set_value(double *value, int *ierr) {
   *ierr = AMPI_Load_set_value(*value);
 }
 
+#if CMK_FAULT_EVAC
 void ampi_evacuate(int *ierr) {
   *ierr = AMPI_Evacuate();
 }
+#endif
 
 void ampi_migrate_to_pe(int *dest, int *ierr) {
   *ierr = AMPI_Migrate_to_pe(*dest);

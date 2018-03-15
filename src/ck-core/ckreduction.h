@@ -539,7 +539,7 @@ private:
 	bool isPresent(int num) const {return (bool)(num==redNo);}
 	bool isFuture(int num) const {return (bool)(num>redNo);}
 
-	/*FAULT_EVAC*/
+#if CMK_FAULT_EVAC
 	bool oldleaf;
 	bool blocked;
 	int newParent;
@@ -553,11 +553,12 @@ private:
 	int tempModificationRedNo;
 	bool readyDeletion;
 	bool killed;
+#endif
 	
 //Checkpointing utilities
  public:
 	virtual void pup(PUP::er &p);
-	/*FAULT_EVAC*/
+#if CMK_FAULT_EVAC
 	virtual void evacuate();
 	virtual void doneEvacuate();
 	void DeleteChild(int deletedChild);
@@ -569,6 +570,7 @@ private:
 	int findMaxRedNo();
 	void updateTree();
 	void clearBlockedMsgs();
+#endif
 };
 
 

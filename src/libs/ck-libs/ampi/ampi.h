@@ -1359,7 +1359,9 @@ int AMPI_Iget_wait(MPI_Request *request, MPI_Status *status, MPI_Win win);
 int AMPI_Iget_free(MPI_Request *request, MPI_Status *status, MPI_Win win);
 int AMPI_Iget_data(void *data, MPI_Status status);
 int AMPI_Type_is_contiguous(MPI_Datatype datatype, int *flag);
+#if CMK_FAULT_EVAC
 int AMPI_Evacuate(void);
+#endif
 int AMPI_Yield(void);
 int AMPI_Suspend(void);
 int AMPI_Resume(int dest, MPI_Comm comm);

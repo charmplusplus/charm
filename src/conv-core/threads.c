@@ -149,7 +149,7 @@ void *memalign(size_t align, size_t size) CMK_THROW;
 
   /**************************** Shared Base Thread Class ***********************/
   /*
-     FAULT_EVAC
+     CMK_FAULT_EVAC
      Moved the cmicore converse header from CthThreadBase to CthThreadToken.
      The CthThreadToken gets enqueued in the converse queue instead of the
      CthThread. This allows the thread to be moved out of a processor even

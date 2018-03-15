@@ -1443,12 +1443,14 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
   }
 #endif
 
+#if CMK_FAULT_EVAC
   if(pe == CkMyPe() ){
     if(!CmiNodeAlive(CkMyPe())){
 	printf("[%d] Invalid processor sending itself a message \n",CkMyPe());
 //	return;
     }
   }
+#endif
   if (pe == CkMyPe() && !CmiImmIsRunning()) {
 #if CMK_OBJECT_QUEUE_AVAILABLE
     Chare *obj = CkFindObjectPtr(env);
@@ -1724,9 +1726,11 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
 {
   if (pCid->onPE==CkMyPe())
   {
+#if CMK_FAULT_EVAC
     if(!CmiNodeAlive(CkMyPe())){
 	return;
     }
+#endif
 #if CMK_CHARMDEBUG
     //Just in case we need to breakpoint or use the envelope in some way
     _prepareMsg(entryIndex,msg,pCid);
@@ -1852,9 +1856,11 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int o
 {
   if (destPE==CkMyPe())
   {
+#if CMK_FAULT_EVAC
     if(!CmiNodeAlive(CkMyPe())){
 	return;
     }
+#endif
     IrrGroup *obj=(IrrGroup *)_localBranch(gID);
     if (obj!=NULL)
     { //Just directly call the group:

@@ -2238,7 +2238,7 @@ static const char *funclist[] = {"AMPI_Abort", "AMPI_Add_error_class", "AMPI_Add
 "AMPI_Register_pup", "AMPI_Get_pup_data", "AMPI_Register_main",
 "AMPI_Register_about_to_migrate", "AMPI_Register_just_migrated",
 "AMPI_Iget", "AMPI_Iget_wait", "AMPI_Iget_free", "AMPI_Iget_data",
-"AMPI_Type_is_contiguous", "AMPI_Evacuate", "AMPI_Yield", "AMPI_Suspend",
+"AMPI_Type_is_contiguous", "AMPI_Yield", "AMPI_Suspend",
 "AMPI_Resume", "AMPI_Print", "AMPI_Alltoall_medium",
 "AMPI_Alltoall_long", /*CUDA:*/ "AMPI_GPU_Iinvoke", "AMPI_GPU_Invoke", "AMPI_System"};
 

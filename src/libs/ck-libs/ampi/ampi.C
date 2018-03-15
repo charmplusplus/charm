@@ -1242,7 +1242,10 @@ ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int nRanks_)
   defineInfoMigration();
 
   thread->semaPut(AMPI_BARRIER_SEMAID,&barrier);
+
+#if CMK_FAULT_EVAC
   AsyncEvacuate(false);
+#endif
 }
 
 ampiParent::ampiParent(CkMigrateMessage *msg):CBase_ampiParent(msg) {
@@ -1252,7 +1255,9 @@ ampiParent::ampiParent(CkMigrateMessage *msg):CBase_ampiParent(msg) {
 
   init();
 
+#if CMK_FAULT_EVAC
   AsyncEvacuate(false);
+#endif
 }
 
 PUPfunctionpointer(MPI_MigrateFn)
@@ -1804,7 +1809,10 @@ void ampi::init(void) {
   parent=NULL;
   thread=NULL;
   blockingReq=NULL;
+
+#if CMK_FAULT_EVAC
   AsyncEvacuate(false);
+#endif
 }
 
 ampi::ampi()
@@ -9944,6 +9952,7 @@ int AMPI_Migrate(MPI_Info hints)
   return MPI_SUCCESS;
 }
 
+#if CMK_FAULT_EVAC
 CDECL
 int AMPI_Evacuate(void)
 {
@@ -9951,6 +9960,7 @@ int AMPI_Evacuate(void)
   TCHARM_Evacuate();
   return MPI_SUCCESS;
 }
+#endif
 
 CDECL
 int AMPI_Migrate_to_pe(int dest)

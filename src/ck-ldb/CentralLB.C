@@ -205,7 +205,10 @@ void CentralLB::AtSync()
     MigrationDone(0);
     return;
   }
-  if(CmiNodeAlive(CkMyPe())){
+#if CMK_FAULT_EVAC
+  if(CmiNodeAlive(CkMyPe()))
+#endif
+  {
     thisProxy [CkMyPe()].ProcessAtSync();
   }
 #endif
@@ -216,7 +219,9 @@ void CentralLB::ProcessAtSync()
 #if CMK_LBDB_ON
   if (reduction_started) return;              // reducton in progress
 
+#if CMK_FAULT_EVAC
   CmiAssert(CmiNodeAlive(CkMyPe()));
+#endif
   if (CkMyPe() == cur_ld_balancer) {
     start_lb_time = CkWallTimer();
   }
@@ -596,10 +601,12 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
  *  }*/
 #endif
 	
+#if CMK_FAULT_EVAC
     if(!CmiNodeAlive(pe)){
 	DEBUGF(("[%d] ReceiveStats called from invalidProcessor %d\n",CkMyPe(),pe));
 	continue;
     }
+#endif
 	
     if (m->avail_vector!=NULL) {
       LBDatabaseObj()->set_avail_vector(m->avail_vector,  m->next_lb);
@@ -640,7 +647,12 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
     }
   }    // end of for
 
+#if CMK_FAULT_EVAC
   const int clients = CkNumValidPes();
+#else
+  const int clients = CkNumPes();
+#endif
+
   DEBUGF(("THIS POINT count = %d, clients = %d\n",stats_msg_count,clients));
  
   if (stats_msg_count == clients) {
@@ -1144,11 +1156,12 @@ void CentralLB::ProcessReceiveMigration()
 
   for (i=0; i<CkNumPes(); i++) theLbdb->lastLBInfo.expectedLoad[i] = m->expectedLoad[i];
   CmiAssert(migrates_expected <= 0 || migrates_completed == migrates_expected);
-/*FAULT_EVAC*/
+#if CMK_FAULT_EVAC
   if(!CmiNodeAlive(CkMyPe())){
 	delete m;
 	return;
   }
+#endif
   migrates_expected = 0;
   future_migrates_expected = 0;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -1336,8 +1349,11 @@ void CentralLB::MigrationDoneImpl (int balancing)
     contribute(CkCallback(CkReductionTarget(CentralLB, ResumeClients),
                 thisProxy));
   }
-  else{	
-    if(CmiNodeAlive(CkMyPe())){
+  else{
+#if CMK_FAULT_EVAC
+    if(CmiNodeAlive(CkMyPe()))
+#endif
+    {
 	thisProxy [CkMyPe()].ResumeClients(balancing);
     }	
   }	

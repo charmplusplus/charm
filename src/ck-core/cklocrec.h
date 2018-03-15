@@ -78,7 +78,7 @@ private:
 #else
   void AsyncMigrate(bool use){};
 #endif
-/**FAULT_EVAC*/
+#if CMK_FAULT_EVAC
 private:
 	bool asyncEvacuate; //can the element be evacuated anytime, false for tcharm
 	bool bounced; //did this element try to immigrate into a processor which was evacuating
@@ -90,6 +90,7 @@ public:
 	void AsyncEvacuate(bool set){asyncEvacuate = set;}
 	bool isBounced(){return bounced;}
 	void Bounced(bool set){bounced = set;}
+#endif
 };
 
 #endif // CK_LOC_REC_H

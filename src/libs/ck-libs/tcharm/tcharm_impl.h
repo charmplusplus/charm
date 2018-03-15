@@ -187,7 +187,9 @@ class TCharm: public CBase_TCharm
 	//Block, migrate to destPE, and resume
 	void migrateTo(int destPE);
 
+#if CMK_FAULT_EVAC
 	void evacuate();
+#endif
 
 	//Thread finished running
 	void done(void);

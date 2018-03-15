@@ -54,7 +54,7 @@ Orion Sky Lawlor, olawlor@acm.org
 #include "ck.h"
 #include "pathHistory.h"
 
-CpvDeclare(int ,serializer);
+CpvDeclare(int ,serializer); // if !CMK_FAULT_EVAC, serializer is always 0
 
 bool _isAnytimeMigration;
 bool _isStaticInsertion;

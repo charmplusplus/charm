@@ -170,11 +170,11 @@ CpvCExtern(int,interopExitFlag);
 int _ROGroupRestartHandlerIdx;
 const char* _shrinkexpand_basedir;
 #endif
-/*
-	FAULT_EVAC
-*/
+
+#if CMK_FAULT_EVAC
 CpvExtern(char *, _validProcessors);
 CkpvDeclare(char ,startedEvac);
+#endif
 
 int    _exitHandlerIdx;
 
@@ -221,15 +221,11 @@ bool _ringexit = 0;		    // for charm exit
 int _ringtoken = 8;
 extern int _messageBufferingThreshold;
 
-
-/*
-	FAULT_EVAC
-
-	flag which marks whether or not to trigger the processor shutdowns
-*/
-static bool _raiseEvac=0;
+#if CMK_FAULT_EVAC
+static bool _raiseEvac=0; // whether or not to trigger the processor shutdowns
 static char *_raiseEvacFile;
 void processRaiseEvacFile(char *raiseEvacFile);
+#endif
 
 extern bool useNodeBlkMapping;
 
@@ -327,14 +323,12 @@ static inline void _parseCommandLineOpts(char **argv)
       CkPrintf("Charm++> Program shutdown in token ring (%d).\n", _ringtoken);
     if (_ringtoken > CkNumPes())  _ringtoken = CkNumPes();
   }
-	/*
-		FAULT_EVAC
-
-		if the argument +raiseevac is present then cause faults
-	*/
+#if CMK_FAULT_EVAC
+  // if the argument +raiseevac is present then cause faults
 	if(CmiGetArgStringDesc(argv,"+raiseevac", &_raiseEvacFile,"Generates processor evacuation on random processors")){
 		_raiseEvac = 1;
 	}
+#endif
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	if(!CmiGetArgIntDesc(argv,"+teamSize",&teamSize,"Set the team size for message logging")){
         teamSize = 1;
@@ -599,8 +593,10 @@ static void _exitHandler(envelope *env)
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
       CkNumberHandler(_charmHandlerIdx,_discardHandler);
       CkNumberHandler(_bocHandlerIdx, _discardHandler);
-      /*FAULT_EVAC*/
-      if(CmiNodeAlive(CkMyPe())){
+#if CMK_FAULT_EVAC
+      if(CmiNodeAlive(CkMyPe()))
+#endif
+      {
 #if CMK_WITH_STATS
          _sendStats();
 #endif
@@ -648,7 +644,6 @@ static void _exitHandler(envelope *env)
 	currentStats++;
       }
       DEBUGF(("StatMsg on %d with %d\n", CkMyPe(), n));
-			/*FAULT_EVAC*/
       _printStats();
       // broadcast to all others that they can now exit
       envelope* env = _allocEnv(StatDoneMsg);
@@ -949,7 +944,6 @@ CkQ<CkExitFn> _CkExitFnVec;
 extern "C"
 void CkExit(void)
 {
-	/*FAULT_EVAC*/
   DEBUGF(("[%d] CkExit called \n",CkMyPe()));
     // always send to PE 0
   envelope *env = _allocEnv(StartExitMsg);
@@ -1109,13 +1103,13 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(char**, Ck_argv); CkpvAccess(Ck_argv)=argv;
 	CkpvInitialize(MsgPool*, _msgPool);
 	CkpvInitialize(CkCoreState *, _coreState);
-	/*
-		Added for evacuation-sayantan
-	*/
+
+#if CMK_FAULT_EVAC
 #ifndef __BIGSIM__
 	CpvInitialize(char *,_validProcessors);
 #endif
 	CkpvInitialize(char ,startedEvac);
+#endif
 	CpvInitialize(int,serializer);
 
 	_initChareTables();            // for checkpointable plain chares
@@ -1364,10 +1358,8 @@ void _initCharm(int unused_argc, char **argv)
     _messageLoggingInit();
 #endif
 
+#if CMK_FAULT_EVAC
 #ifndef __BIGSIM__
-	/*
-		FAULT_EVAC
-	*/
 	CpvAccess(_validProcessors) = new char[CkNumPes()];
 	for(int vProc=0;vProc<CkNumPes();vProc++){
 		CpvAccess(_validProcessors)[vProc]=1;
@@ -1375,15 +1367,18 @@ void _initCharm(int unused_argc, char **argv)
 	CmiAssignOnce(&_ckEvacBcastIdx, CkRegisterHandler(_ckEvacBcast));
 	CmiAssignOnce(&_ckAckEvacIdx, CkRegisterHandler(_ckAckEvac));
 #endif
-	CkpvAccess(startedEvac) = 0;
-	CpvAccess(serializer) = 0;
 
+	CkpvAccess(startedEvac) = 0;
 	evacuate = 0;
 	CcdCallOnCondition(CcdSIGUSR1,(CcdVoidFn)CkDecideEvacPe,0);
+#endif
+	CpvAccess(serializer) = 0;
+
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
     CcdCallOnCondition(CcdSIGUSR2,(CcdVoidFn)CkMlogRestart,0);
 #endif
 
+#if CMK_FAULT_EVAC
 	if(_raiseEvac){
 		processRaiseEvacFile(_raiseEvacFile);
 		/*
@@ -1395,7 +1390,8 @@ void _initCharm(int unused_argc, char **argv)
 			CcdCallFnAfter((CcdVoidFn)CkDecideEvacPe, 0, 10000);
 		}*/
 	}	
-    
+#endif
+
     if (CkMyRank() == 0) {
       TopoManager_init();
     }

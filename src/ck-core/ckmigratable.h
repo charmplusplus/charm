@@ -119,10 +119,12 @@ private:
   bool isInCore; //If true, the object is present in memory
 #endif
 
-  // FAULT_EVAC
+#if CMK_FAULT_EVAC
+private:
   void AsyncEvacuate(bool set){myRec->AsyncEvacuate(set);asyncEvacuate = set;};
 public:
   bool isAsyncEvacuate(){return asyncEvacuate;};
+#endif
 };
 
 #endif // CKMIGRATABLE_H
