@@ -4297,8 +4297,8 @@ environment variable entry*/
 static char *create_oldnodenames()
 {
   static char dest1[1024 * 1000];
-  for (int i = 0; i < nodetab_size; i++)
-    sprintf(dest1, "%s %s", dest1, (*nodetab_table[i]).name);
+  for (nodetab_process * p : pe_to_process_map)
+    sprintf(dest1, "%s %s", dest1, p->host->name);
   printf("Charmrun> Created oldnames %s \n", dest1);
   return dest1;
 }
