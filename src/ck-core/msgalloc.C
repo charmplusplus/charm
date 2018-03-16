@@ -9,7 +9,7 @@ void *CkAllocSysMsg(const CkEntryOptions *opts)
   if(opts == NULL)
     return CkpvAccess(_msgPool)->get();
 
-  envelope *env = _allocEnv(ForChareMsg, 0, opts->getPriorityBits(), opts->getGroupDepNum());
+  envelope *env = _allocEnv(ForChareMsg, 0, opts->getPriorityBits(), GroupDepNum{(int)opts->getGroupDepNum()});
   setMemoryTypeMessage(env);
   env->setMsgIdx(0);
 
@@ -35,7 +35,7 @@ void CkFreeSysMsg(void *m)
 }
 
 extern "C"
-void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits, int groupDepNum)
+void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits, GroupDepNum groupDepNum)
 {
   envelope* env = _allocEnv(ForChareMsg, msgBytes, prioBits, groupDepNum);
   setMemoryTypeMessage(env);
@@ -53,7 +53,7 @@ void* CkAllocBuffer(void *msg, int bufsize)
   envelope *env = UsrToEnv(msg);
   envelope *packbuf = _allocEnv(env->getMsgtype(), bufsize,
                       env->getPriobits(),
-                      env->getGroupDepNum());
+                      GroupDepNum{(int)env->getGroupDepNum()});
   
   int size = packbuf->getTotalsize();
   CmiMemcpy(packbuf, env, sizeof(envelope));
@@ -120,7 +120,7 @@ void* CkPriorityPtr(void *msg)
 CkMarshallMsg *CkAllocateMarshallMsgNoninline(int size,const CkEntryOptions *opts)
 {
 	//Allocate the message
-	CkMarshallMsg *m=new (size,opts->getPriorityBits(),opts->getGroupDepNum())CkMarshallMsg;
+	CkMarshallMsg *m=new (size,opts->getPriorityBits(),GroupDepNum{(int)opts->getGroupDepNum()}) CkMarshallMsg;
 	//Copy the user's priority data into the message
 	envelope *env=UsrToEnv(m);
 	setMemoryTypeMessage(env);

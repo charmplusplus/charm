@@ -318,7 +318,7 @@ public:
     void* getGroupDepPtr(void) const {
       return (void *)((char *)this + totalsize - getGroupDepSize());
     }
-    static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0, const UShort groupDepNum=0)
+    static envelope *alloc(const UChar type, const UInt size=0, const UShort prio=0, const GroupDepNum groupDepNumRequest=GroupDepNum{})
     {
       CkAssert(type>=NewChareMsg && type<=ForArrayEltMsg);
 #if CMK_USE_STL_MSGQ
@@ -329,9 +329,9 @@ public:
       UInt tsize = sizeof(envelope)+ 
                    CkMsgAlignLength(size)+
                    sizeof(int)*CkPriobitsToInts(prio) +
-                   sizeof(CkGroupID)*groupDepNum;
+                   sizeof(CkGroupID)*(int)groupDepNumRequest;
 
-      //CkPrintf("[%d] inside envelope alloc groupDepNum:%d\n", CkMyPe(), groupDepNum);
+      //CkPrintf("[%d] inside envelope alloc groupDepNum:%d\n", CkMyPe(), (int)groupDepNumRequest);
 
       envelope *env = (envelope *)CmiAlloc(tsize);
 #if CMK_REPLAYSYSTEM
@@ -344,7 +344,7 @@ public:
       env->priobits = prio;
       env->setPacked(0);
       env->setRdma(0);
-      env->setGroupDepNum(groupDepNum);
+      env->setGroupDepNum((int)groupDepNumRequest);
       _SET_USED(env, 0);
       env->setRef(0);
       env->setEpIdx(0);
@@ -507,11 +507,11 @@ inline void *EnvToUsr(const envelope *const env) {
   return (void *)((intptr_t)env + sizeof(envelope));
 }
 
-inline envelope *_allocEnv(const int msgtype, const int size=0, const int prio=0, const int groupDepNum=0) {
+inline envelope *_allocEnv(const int msgtype, const int size=0, const int prio=0, const GroupDepNum groupDepNum=GroupDepNum{}) {
   return envelope::alloc(msgtype,size,prio,groupDepNum);
 }
 
-inline void *_allocMsg(const int msgtype, const int size, const int prio=0, const int groupDepNum=0) {
+inline void *_allocMsg(const int msgtype, const int size, const int prio=0, const GroupDepNum groupDepNum=GroupDepNum{}) {
   return EnvToUsr(envelope::alloc(msgtype,size,prio,groupDepNum));
 }
 
@@ -536,7 +536,7 @@ class MsgPool: public SafePool<void *> {
 private:
     static void *_alloc(void) {
       /* CkAllocSysMsg() called in .def.h is not thread of sigio safe */
-      envelope *env = _allocEnv(ForChareMsg,0,0,0);
+      envelope *env = _allocEnv(ForChareMsg,0,0,GroupDepNum{});
       env->setQueueing(_defaultQueueing);
       env->setMsgIdx(0);
       return EnvToUsr(env);

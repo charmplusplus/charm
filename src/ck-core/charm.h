@@ -77,7 +77,16 @@ extern int  CkGetArgc(void);
 #ifdef __cplusplus
 class CkEntryOptions;
 extern void* CkAllocSysMsg(const CkEntryOptions *opts = NULL);
-extern void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits, int groupDepNum=0);
+#ifndef GROUPDEPNUM_DECLARED
+# define GROUPDEPNUM_DECLARED
+struct GroupDepNum
+{
+  int groupDepNum;
+  explicit GroupDepNum(int g = 0) : groupDepNum{g} { }
+  operator int() const { return groupDepNum; }
+};
+#endif
+extern void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits, GroupDepNum groupDepNum=GroupDepNum{});
 #endif
 extern void  CkFreeSysMsg(void *msg);
 extern void* CkAllocBuffer(void *msg, int bufsize);

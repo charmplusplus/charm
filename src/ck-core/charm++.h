@@ -1158,10 +1158,10 @@ public:
 
 class CkQdMsg {
   public:
-    void *operator new(size_t s) { return CkAllocMsg(0,(int)s,0,0); }
+    void *operator new(size_t s) { return CkAllocMsg(0,(int)s,0,GroupDepNum{}); }
     void operator delete(void* ptr) { CkFreeMsg(ptr); }
     static void *alloc(int, size_t s, int*, int, int) {
-      return CkAllocMsg(0,(int)s,0,0);
+      return CkAllocMsg(0,(int)s,0,GroupDepNum{});
     }
     static void *pack(CkQdMsg *m) { return (void*) m; }
     static CkQdMsg *unpack(void *buf) { return (CkQdMsg*) buf; }

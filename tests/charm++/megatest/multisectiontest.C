@@ -138,14 +138,14 @@ multisectiontest_main::multisectiontest_main()
     mmsg->IDs[i]=gidArr[i];
   mmsg->numIDs=numgroups;
   //create message for sending IDs to sections
-  amsg= new (numarrays, 0, 1) multisectionAID_msg;
+  amsg= new (numarrays, 0, GroupDepNum{1}) multisectionAID_msg;
   for(int i=0;i<numarrays;++i)
     amsg->IDs[i]=aidArr[i];
   amsg->numIDs=numarrays;
   UsrToEnv(amsg)->setMsgtype(ForBocMsg);
   UsrToEnv(amsg)->setGroupDep(aidArr[numarrays-1]);
 
-  amsg2= new (numarrays, 0, 1) multisectionAID_msg;
+  amsg2= new (numarrays, 0, GroupDepNum{1}) multisectionAID_msg;
   for(int i=0;i<numarrays;++i)
     amsg2->IDs[i]=aidArr[i];
   amsg2->numIDs=numarrays;

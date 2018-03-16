@@ -53,7 +53,7 @@ void CkPupMessage(PUP::er &p,void **atMsg,int pack_mode) {
 	p(envSize);
 	int userSize=size-envSize-sizeof(int)*CkPriobitsToInts(prioBits)-groupDepNum*sizeof(CkGroupID);
 	if (p.isUnpacking())
-		env=_allocEnv(type,userSize,prioBits,groupDepNum);
+		env=_allocEnv(type,userSize,prioBits,GroupDepNum{groupDepNum});
 	if (pack_mode == 1) {
 	  /*Pup entire header and message as raw bytes.*/
 	  p((char *)env,size);

@@ -1275,7 +1275,7 @@ CkReductionMsg *CkReductionMsg::buildNew(int NdataSize,const void *srcData,
 
 // Charm kernel message runtime support:
 void *
-CkReductionMsg::alloc(int msgnum,size_t size,int *sz,int priobits,int groupDepNum)
+CkReductionMsg::alloc(int msgnum,size_t size,int *sz,int priobits,GroupDepNum groupDepNum)
 {
   int totalsize=ARM_DATASTART+(*sz);
   DEBR(("CkReductionMsg::Allocating %d store; %d bytes total\n",*sz,totalsize));

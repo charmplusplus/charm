@@ -231,7 +231,7 @@ class tester : public CBase_tester {
         CkGroupID groupBID = CProxy_groupB::ckNew(&optsB);
 
         // Fixed sized message
-        fixedMessage *msg = new (0, 2) fixedMessage(groupAID, groupBID);
+        fixedMessage *msg = new (0, GroupDepNum{2}) fixedMessage(groupAID, groupBID);
 
         // Set groupAID & groupBID as a group dependency in the fixed sized message
         UsrToEnv(msg)->setGroupDep(groupAID);
@@ -254,7 +254,7 @@ class tester : public CBase_tester {
         CkGroupID groupBID = CProxy_groupB::ckNew(&optsB);
 
         // Variable sized message
-        varMessage *msg = new (20, 10, 0, 2) varMessage(groupAID, groupBID);
+        varMessage *msg = new (20, 10, 0, GroupDepNum{2}) varMessage(groupAID, groupBID);
 
         // Set groupAIB & groupBID as a group dependency in the variable sized message
         UsrToEnv(msg)->setGroupDep(groupAID);

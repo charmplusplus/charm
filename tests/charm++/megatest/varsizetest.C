@@ -13,7 +13,7 @@ void varsizetest_init(void)
 
 void varsizetest_moduleinit(void) {}
 
-void *varsizetest_Msg::alloc(int mnum, size_t size, int *sizes, int pbits, int groupDepNum)
+void *varsizetest_Msg::alloc(int mnum, size_t size, int *sizes, int pbits, GroupDepNum groupDepNum)
 {
   // CkPrintf("Msg::alloc called with size=%d, sizes[0]=%d, sizes[1]=%d\n",
   //         size, sizes[0], sizes[1]);
