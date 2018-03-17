@@ -2,14 +2,13 @@
 Pup routines for STL classes.
 
 After including this header, you can parameter-marshall
-an variable consisting of STL vectors, lists, maps,
-strings, or pairs.
+a variable consisting of STL containers such as vectors,
+lists, maps, strings, or pairs.
 
 This includes variables of type "std::list<int>", or even
 "std::map<double, std::vector<std::string> >".
 
-NOT included are the rarer types like valarray or slice, 
-vector<bool>, set or multiset, or deque.
+NOT included are the rarer types like valarray or slice.
 
 Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 */
@@ -26,6 +25,7 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 #include <set>
 #include <vector>
 #include <deque>
+#include <forward_list>
 #include <list>
 #include <map>
 #include <memory>
@@ -65,13 +65,19 @@ namespace PUP {
   template <class T>
   inline void operator|(er &p,typename std::vector<T> &v);
   template <class T>
+  inline void operator|(er &p,typename std::deque<T> &d);
+  template <class T>
   inline void operator|(er &p,typename std::list<T> &v);
+  template <class T>
+  inline void operator|(er &p,typename std::forward_list<T> &fl);
   template <class V,class T,class Cmp>
   inline void operator|(er &p,typename std::map<V,T,Cmp> &m);
   template <class V,class T,class Cmp>
   inline void operator|(er &p,typename std::multimap<V,T,Cmp> &m);
   template <class T>
   inline void operator|(er &p,typename std::set<T> &m);
+  template <class T,class Cmp>
+  inline void operator|(er &p,typename std::multiset<T,Cmp> &m);
   template <> inline void operator|(er &p,std::vector<bool> &v);
 
   template <class A,class B>
@@ -141,7 +147,17 @@ namespace PUP {
     c.reserve(nElem);
   }
   template <class dtype>
+  void reserve_if_applicable(std::deque<dtype> &c, size_t nElem)
+  {
+    c.clear();
+  }
+  template <class dtype>
   void reserve_if_applicable(std::list<dtype> &c, size_t nElem)
+  {
+    c.clear();
+  }
+  template <class dtype>
+  void reserve_if_applicable(std::forward_list<dtype> &c, size_t nElem)
   {
     c.clear();
   }
@@ -244,9 +260,15 @@ namespace PUP {
     }
   }
 
+  template <class T>
+  inline void operator|(er &p,typename std::deque<T> &d)
+  { PUP_stl_container<std::deque<T>,T>(p,d); }
   template <class T> 
   inline void operator|(er &p,typename std::list<T> &v)
   { PUP_stl_container<std::list<T>,T>(p,v); }
+  template <class T>
+  inline void operator|(er &p,typename std::forward_list<T> &fl)
+  { PUP_stl_container<std::forward_list<T>,T>(p,fl); }
 
   template <class V,class T,class Cmp> 
   inline void operator|(er &p,typename std::map<V,T,Cmp> &m)
@@ -257,6 +279,9 @@ namespace PUP {
   template <class T>
   inline void operator|(er &p,typename std::set<T> &m)
   { PUP_stl_map<std::set<T>,T >(p,m); }
+  template <class T,class Cmp>
+  inline void operator|(er &p,typename std::multiset<T,Cmp> &m)
+  { PUP_stl_map<std::multiset<T,Cmp>,T >(p,m); }
 
   // Specialized to work with vector<bool>, which doesn't
   // have data() or shrink_to_fit() members
