@@ -140,7 +140,7 @@ namespace Ck { namespace IO {
 
         void sessionComplete(FileToken token) {
           CProxy_CkArray(files[token].session.ckGetArrayID()).ckDestroy();
-          files[token].complete.send(CkReductionMsg::buildNew(0, NULL));
+          files[token].complete.send(CkReductionMsg::buildNew(0, NULL, CkReduction::nop));
           files[token].complete = CkCallback(CkCallback::invalid);
         }
 

@@ -58,7 +58,7 @@ module CkIO_impl {
               CmiInt8 ret = CmiPwrite(info->fd, commitData, commitBytes, commitOffset);
               if (ret != commitBytes)
                 fatalError("Commit write failed", info->name);
-              complete.send(CkReductionMsg::buildNew(0, NULL));
+              complete.send(CkReductionMsg::buildNew(0, NULL, CkReduction::nop));
             }
           };
           entry void sessionReady(CkReductionMsg *);
