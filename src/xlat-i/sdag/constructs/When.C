@@ -220,7 +220,7 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   generateBeginTime(defs);
 #endif
 
-  if (entryLen > 1) defs << "  std::set<SDAG::Buffer*> ignore;\n";
+  if (entryLen > 1) defs << "  std::unordered_set<SDAG::Buffer*> ignore;\n";
 
   XStr haveAllBuffersCond;
   XStr removeMessagesIfFound, deleteMessagesIfFound;
