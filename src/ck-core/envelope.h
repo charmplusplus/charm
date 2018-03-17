@@ -218,8 +218,8 @@ namespace ck {
 #define CMK_ENVELOPE_FIELDS                                                    \
   /* Converse message envelope, Must be first field in this class */           \
   char   core[CmiReservedHeaderSize];                                          \
-  ck::impl::u_type type; /* Depends on message type (attribs.mtype) */         \
   UInt   pe;           /* source processor */                                  \
+  ck::impl::u_type type; /* Depends on message type (attribs.mtype) */         \
   UInt   totalsize;    /* Byte count from envelope start to end of group dependencies */ \
   CMK_ENVELOPE_OPTIONAL_FIELDS                                                 \
   CMK_REFNUM_TYPE ref; /* Used by futures and SDAG */                          \
