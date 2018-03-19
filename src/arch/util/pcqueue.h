@@ -78,7 +78,7 @@ typedef struct CircQueueStruct
 #if CMK_SMP
   char _pad2[CMI_CACHE_LINE_SIZE - sizeof(int)]; // align to cache line
 #endif
-  char *data[PCQueueSize];
+  std::atomic<char *> data[PCQueueSize];
 }
 *CircQueue;
 
@@ -193,13 +193,13 @@ static char *PCQueueTop(PCQueue Q)
 {
   CircQueue circ; int pull; char *data;
 
-    if (std::atomic_load_explicit(&Q->len, std::memory_order_acquire) == 0) return 0;
+    if (std::atomic_load_explicit(&Q->len, std::memory_order_relaxed) == 0) return 0;
 #if CMK_PCQUEUE_LOCK
     CmiLock(Q->lock);
 #endif
     circ = Q->head;
     pull = circ->pull;
-    data = circ->data[pull];
+    data = std::atomic_load_explicit(&(circ->data[pull]), std::memory_order_acquire);
 
 #if CMK_PCQUEUE_LOCK
       CmiUnlock(Q->lock);
@@ -212,13 +212,13 @@ static char *PCQueuePop(PCQueue Q)
 {
   CircQueue circ; int pull; char *data;
 
-    if (std::atomic_load_explicit(&Q->len, std::memory_order_acquire) == 0) return 0;
+    if (std::atomic_load_explicit(&Q->len, std::memory_order_relaxed) == 0) return 0;
 #if CMK_PCQUEUE_LOCK
     CmiLock(Q->lock);
 #endif
     circ = Q->head;
     pull = circ->pull;
-    data = circ->data[pull];
+    data = std::atomic_load_explicit(&(circ->data[pull]), std::memory_order_acquire);
 
 
 #if XT3_ONLY_PCQUEUE_WORKAROUND
@@ -301,8 +301,8 @@ static void PCQueuePush(PCQueue Q, char *data)
     Q->tail = circ;
   }
   
-  circ1->data[push] = data;
-  PCQueue_CmiMemoryAtomicIncrement(Q->len);
+  std::atomic_store_explicit(&circ1->data[push], data, std::memory_order_release);
+  std::atomic_fetch_add_explicit(&(Q->len), 1, std::memory_order_relaxed);
 
 #if CMK_PCQUEUE_LOCK || CMK_PCQUEUE_PUSH_LOCK
   CmiUnlock(Q->lock);
