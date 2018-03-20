@@ -5355,7 +5355,7 @@ static char *find_abs_path(const char *target)
     strcat(abspath,"/");
     strcat(abspath,target);
     if(probefile(abspath)){
-      delete path;
+      free(path);
       return abspath;
     }
     subpath=strtok(NULL,":");
