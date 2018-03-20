@@ -2976,35 +2976,12 @@ void sortVec(std::vector<MCount> *TNvec){
 }	
 
 int searchVec(std::vector<MCount> *TNVec,MCount searchTN){
-	if(TNVec->size() == 0){
-		return -1; //not found in an empty vec
-	}
-	//binary search to find 
-	int left=0;
-	int right = TNVec->size();
-	int mid = (left +right)/2;
-	while(searchTN != (*TNVec)[mid] && left < right){
-		if((*TNVec)[mid] > searchTN){
-			right = mid-1;
-		}else{
-			left = mid+1;
-		}
-		mid = (left + right)/2;
-	}
-	if(left < right){
-		//mid is the element to be returned
-		return mid;
-	}else{
-		if(mid < TNVec->size() && mid >=0){
-			if((*TNVec)[mid] == searchTN){
-				return mid;
-			}else{
-				return -1;
-			}
-		}else{
-			return -1;
-		}
-	}
+	// Find first element greater than or equal to searchTN
+	auto it = std::lower_bound(TNvec->begin(), TNvec->end(), searchTN);
+	if (it == TNvec.end() || *it != searchTN)
+		return -1;
+	else
+		return it - TNvec->begin();
 };
 
 
