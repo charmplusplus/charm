@@ -10,7 +10,7 @@
 
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
 
-#define CMI_MPI_TRACE_USEREVENTS                           0
+#define CMI_MACH_TRACE_USEREVENTS                          0
 
 #define  CMK_DIRECT                                             0
 

@@ -81,8 +81,8 @@ static int RECV_CAP=2;
 /* ###Beginning of machine-layer-tracing related macros ### */
 #if CMK_TRACE_ENABLED && CMK_SMP_TRACE_COMMTHREAD
 #define CMI_MPI_TRACE_MOREDETAILED 0
-#undef CMI_MPI_TRACE_USEREVENTS
-#define CMI_MPI_TRACE_USEREVENTS 1
+#undef CMI_MACH_TRACE_USEREVENTS
+#define CMI_MACH_TRACE_USEREVENTS 1
 #else
 #undef CMK_SMP_TRACE_COMMTHREAD
 #define CMK_SMP_TRACE_COMMTHREAD 0
@@ -90,14 +90,14 @@ static int RECV_CAP=2;
 
 #define CMK_TRACE_COMMOVERHEAD 0
 #if CMK_TRACE_ENABLED && CMK_TRACE_COMMOVERHEAD
-#undef CMI_MPI_TRACE_USEREVENTS
-#define CMI_MPI_TRACE_USEREVENTS 1
+#undef CMI_MACH_TRACE_USEREVENTS
+#define CMI_MACH_TRACE_USEREVENTS 1
 #else
 #undef CMK_TRACE_COMMOVERHEAD
 #define CMK_TRACE_COMMOVERHEAD 0
 #endif
 
-#if CMI_MPI_TRACE_USEREVENTS && CMK_TRACE_ENABLED && !CMK_TRACE_IN_CHARM
+#if CMI_MACH_TRACE_USEREVENTS && CMK_TRACE_ENABLED && !CMK_TRACE_IN_CHARM
 CpvStaticDeclare(double, projTraceStart);
 #define  START_EVENT()  CpvAccess(projTraceStart) = CmiWallTimer();
 #define  END_EVENT(x)   traceUserBracketEvent(x, CpvAccess(projTraceStart), CmiWallTimer());
@@ -1364,7 +1364,7 @@ static void KillOnAllSigs(int sigNo) {
 
 /* ######Beginning of functions related with starting programs###### */
 static void registerMPITraceEvents(void) {
-#if CMI_MPI_TRACE_USEREVENTS && CMK_TRACE_ENABLED && !CMK_TRACE_IN_CHARM
+#if CMI_MACH_TRACE_USEREVENTS && CMK_TRACE_ENABLED && !CMK_TRACE_IN_CHARM
     traceRegisterUserEvent("MPI_Barrier", 10);
     traceRegisterUserEvent("MPI_Send", 20);
     traceRegisterUserEvent("MPI_Recv", 30);
@@ -1829,7 +1829,7 @@ void LrtsPostCommonInit(int everReturn) {
     CpvAccess(RdmaRecvQueueLen) = 0;
 #endif
 
-#if CMI_MPI_TRACE_USEREVENTS && CMK_TRACE_ENABLED && !CMK_TRACE_IN_CHARM
+#if CMI_MACH_TRACE_USEREVENTS && CMK_TRACE_ENABLED && !CMK_TRACE_IN_CHARM
     CpvInitialize(double, projTraceStart);
     /* only PE 0 needs to care about registration (to generate sts file). */
     if (CmiMyPe() == 0) {
