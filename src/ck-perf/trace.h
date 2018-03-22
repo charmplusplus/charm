@@ -86,6 +86,13 @@ protected:
      virtual void userBracketEvent(int eventID, double bt, double et, int nestedID=0) {
        (void)eventID; (void)bt; (void)et; (void) nestedID;
      }
+     // begin/end user event pair
+     virtual void beginUserBracketEvent(int eventID, int nestedID=0) {
+       (void)eventID; (void) nestedID;
+     }
+     virtual void endUserBracketEvent(int eventID, int nestedID=0) {
+       (void)eventID; (void) nestedID;
+     }
 
     //Register user stat trace module returns int identifier
     virtual int traceRegisterUserStat(const char* evt, int e) {
@@ -255,6 +262,8 @@ public:
 
     inline void userEvent(int e) { ALLDO(userEvent(e));}
     inline void userBracketEvent(int e,double bt, double et, int nestedID=0) {ALLDO(userBracketEvent(e,bt,et,nestedID));}
+    inline void beginUserBracketEvent(int e, int nestedID=0) {ALLDO(beginUserBracketEvent(e, nestedID));}
+    inline void endUserBracketEvent(int e, int nestedID=0) {ALLDO(endUserBracketEvent(e, nestedID));}
     
     inline void beginAppWork() { ALLDO(beginAppWork());}
     inline void endAppWork() { ALLDO(endAppWork());}
@@ -389,6 +398,8 @@ extern "C" {
 
 #define _TRACE_USER_EVENT(x) _TRACE_ONLY(CkpvAccess(_traces)->userEvent(x))
 #define _TRACE_USER_EVENT_BRACKET(x,bt,et) _TRACE_ONLY(CkpvAccess(_traces)->userBracketEvent(x,bt,et))
+#define _TRACE_BEGIN_USER_EVENT_BRACKET(x) _TRACE_ONLY(CkpvAccess(_traces)->beginUserBracketEvent(x))
+#define _TRACE_END_USER_EVENT_BRACKET(x) _TRACE_ONLY(CkpvAccess(_traces)->endUserBracketEvent(x))
 #define _TRACE_BEGIN_APPWORK() _TRACE_ONLY(CkpvAccess(_traces)->beginAppWork())
 #define _TRACE_END_APPWORK() _TRACE_ONLY(CkpvAccess(_traces)->endAppWork())
 #define _TRACE_NEW_CHARE()  _TRACE_ONLY(CkpvAccess(_traces)->countNewChare())

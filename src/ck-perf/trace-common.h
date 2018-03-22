@@ -72,6 +72,8 @@
 /* Custom User Stats*/
 #define USER_STAT           32
 
+#define BEGIN_USER_EVENT_PAIR  98
+#define END_USER_EVENT_PAIR    99
 #define  USER_EVENT_PAIR    100
 
 CkpvExtern(CmiInt8, CtrLogBufSize);

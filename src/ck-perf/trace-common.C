@@ -641,6 +641,42 @@ void traceUserBracketEventNestedID(int e, double beginT, double endT, int nested
 #endif
 }
 
+extern "C"
+void traceBeginUserBracketEvent(int e)
+{
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->beginUserBracketEvent(e);
+#endif
+}
+
+extern "C"
+void traceBeginUserBracketEventNestedID(int e, int nestedID)
+{
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->beginUserBracketEvent(e, nestedID);
+#endif
+}
+
+extern "C"
+void traceEndUserBracketEvent(int e)
+{
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->endUserBracketEvent(e);
+#endif
+}
+
+extern "C"
+void traceEndUserBracketEventNestedID(int e, int nestedID)
+{
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->endUserBracketEvent(e, nestedID);
+#endif
+}
+
 //common version of User Stat Functions
 extern "C"
 int traceRegisterUserStat(const char*x, int e)

@@ -367,7 +367,8 @@ class LogPool {
 	/** add a record for a user supplied piece of data */
 	void addUserSuppliedNote(char *note);
 
-    void addUserBracketEventNestedID(double time, UShort mIdx, int event, int nestedID);
+        void addUserBracketEventNestedID(unsigned char type, double time,
+                                         UShort mIdx, int event, int nestedID);
 
 
 	void add(unsigned char type,double time,unsigned short funcID,int lineNum,char *fileName);
@@ -491,6 +492,8 @@ public:
     TraceProjections(char **argv);
     void userEvent(int e);
     void userBracketEvent(int e, double bt, double et, int nestedID /*=0*/);
+    void beginUserBracketEvent(int e, int nestedID /*=0*/);
+    void endUserBracketEvent(int e, int nestedID /*=0*/);
     void userSuppliedBracketedNote(char*, int, double, double);
 
     void userSuppliedData(int e);
