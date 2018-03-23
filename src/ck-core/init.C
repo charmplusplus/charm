@@ -282,7 +282,11 @@ static inline void _parseCommandLineOpts(char **argv)
 #if CMK_SHRINK_EXPAND
   if (!CmiGetArgStringDesc(argv, "+shrinkexpand_basedir", (char **)&_shrinkexpand_basedir,
                            "Checkpoint directory used for shrink-expand (defaults to /dev/shm)"))
+# if defined __APPLE__
+      _shrinkexpand_basedir = "/tmp";
+# else
       _shrinkexpand_basedir = "/dev/shm";
+# endif
 #endif
 
   if(CmiGetArgString(argv,"+restart",&_restartDir))

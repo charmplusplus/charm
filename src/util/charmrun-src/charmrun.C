@@ -2326,7 +2326,11 @@ static int req_handle_realloc(ChMessage *msg, SOCKET fd)
     }
   }
 
+#if defined __APPLE__
+  const char *dir = "/tmp";
+#else
   const char *dir = "/dev/shm";
+#endif
   for (int i = 0; i < saved_argc; ++i) {
     if (strcmp(saved_argv[i], "+shrinkexpand_basedir") == 0) {
       dir = saved_argv[i+1];
