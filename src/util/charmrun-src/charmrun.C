@@ -2293,7 +2293,7 @@ static int req_handle_scanf(ChMessage *msg, SOCKET fd)
 #if CMK_SHRINK_EXPAND
 static int req_handle_realloc(ChMessage *msg, SOCKET fd)
 {
-  printf("Charmrun> Realloc request received %s \n", msg->data);
+  printf("Charmrun> Realloc request received\n");
 
   /* Exec to clear and restart everything, just preserve contents of
    * netstart*/
@@ -2340,7 +2340,7 @@ static int req_handle_realloc(ChMessage *msg, SOCKET fd)
 
   const char **ret = (const char **) malloc(sizeof(char *) * (saved_argc + additional_args));
 
-  int newP = *(int *) (msg->data);
+  int newP = ChMessageInt(*(ChMessageInt_t *)msg->data);
   int oldP = arg_requested_pes;
   printf("Charmrun> newp =  %d oldP = %d \n \n \n", newP, oldP);
 

@@ -1967,7 +1967,8 @@ void ConverseCleanup(void)
       // TODO: figure out why this is important
       usleep(500);
       // this causes charmrun to go away
-      ctrl_sendone_locking("realloc",&numProcessAfterRestart, sizeof(int),NULL,0);
+      ChMessageInt_t numProcessAfterRestart_msg = ChMessageInt_new(numProcessAfterRestart);
+      ctrl_sendone_locking("realloc",(char *)&numProcessAfterRestart_msg, sizeof(int),NULL,0);
     } else {
       ctrl_sendone_locking("ending",NULL,0,NULL,0);
     }
