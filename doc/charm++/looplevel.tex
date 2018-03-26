@@ -147,7 +147,14 @@ echo '!<arch>' > $(CHARM_DIR)/lib/libomp.a //Dummy library. This will make you a
 On Mac, the Apple-provided clang installed in default doesn't have OpenMP feature. We're working on the support of 
 this library on Mac with OpenMP enabled clang which can be downloaded and installed through `Homebrew or MacPorts`.
 Currently, this integrated library is built and compiled on Mac with the normal GCC which can be downloaded and 
-installed via Homebrew and MacPorts. You should set environmental variables so that Charm++ build script use the
+installed via Homebrew and MacPorts. If installed globally, GCC will be accessible by appending the major version
+number and adding it to the invocation of the Charm++ build script. For example:\\
+\begin{verbatim}
+$CHARM_DIR/build charm++ multicore-linux64 omp gcc-7
+$CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp gcc-7
+\end{verbatim}
+
+If this does not work, you should set environment variables so that the Charm++ build script uses the
 normal gcc installed from Homebrew or MacPorts. The following is an example using Homebrew on Mac OS X 10.12.5.
 
 \begin{verbatim}
