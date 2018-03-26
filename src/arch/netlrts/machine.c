@@ -636,6 +636,7 @@ static int    Cmi_mynewpe = 0;
 static int    Cmi_oldpe = 0;
 static int    Cmi_newnumnodes = 0;
 int    Cmi_myoldpe = 0;
+static int Cmi_charmrun_assigned_pe;
 #endif
 
 extern int    CmiMyLocalRank;
@@ -659,6 +660,9 @@ static void parse_forks(void) {
 			/* reset mynode,pe & exit loop */
 			CmiMyLocalRank = i;
 			Lrts_myNode+=i;
+#if CMK_SHRINK_EXPAND
+			Cmi_charmrun_assigned_pe += i;
+#endif
 #if ! CMK_SMP
                         _Cmi_mype+=i;
 #endif
@@ -700,6 +704,7 @@ static void parse_netstart(void)
                 exit(1);
         }
 #if CMK_SHRINK_EXPAND
+    Cmi_charmrun_assigned_pe = Lrts_myNode;
     if (Cmi_isOldProcess) {
       Cmi_myoldpe = Lrts_myNode;
     }
@@ -1490,7 +1495,11 @@ static void send_singlenodeinfo(void)
   ChSingleNodeinfo me;
   memset(&me, 0, sizeof(me));
 
+#if CMK_SHRINK_EXPAND
+  me.nodeNo = ChMessageInt_new(Cmi_charmrun_assigned_pe);
+#else
   me.nodeNo = ChMessageInt_new(Lrts_myNode);
+#endif
   me.num_pus = ChMessageInt_new(CmiHwlocTopologyLocal.num_pus);
   me.num_cores = ChMessageInt_new(CmiHwlocTopologyLocal.num_cores);
   me.num_sockets = ChMessageInt_new(CmiHwlocTopologyLocal.num_sockets);
@@ -1565,6 +1574,9 @@ static void node_addresses_obtain(char **argv)
           skt_close(Cmi_charmrun_fd);
           dataport = 0;
           Lrts_myNode = start_id + i;
+#if CMK_SHRINK_EXPAND
+          Cmi_charmrun_assigned_pe = start_id + i;
+#endif
           open_charmrun_socket();
           send_singlenodeinfo();
           break;
