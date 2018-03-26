@@ -325,10 +325,6 @@ static char *getenv_display_no_tamper()
 static unsigned int server_port;
 static char server_addr[1024]; /* IP address or hostname of charmrun*/
 static SOCKET server_fd;
-#if CMK_SHRINK_EXPAND
-static char *create_netstart(int node);
-static char *create_oldnodenames();
-#endif
 /*****************************************************************************
  *                                                                           *
  * PPARAM - obtaining "program parameters" from the user.                    *
@@ -1432,27 +1428,6 @@ static void nodetab_init_hierarchical_start(void)
 }
 #endif
 
-#if CMK_SHRINK_EXPAND
-static int isPresent(const char *names, char **listofnames)
-{
-  for (int k = 0; k < arg_old_pes; k++) {
-    if (strcmp(names, listofnames[k]) == 0)
-      return 1;
-  }
-  return 0;
-}
-static void parse_oldnodenames(char **oldnodelist)
-{
-  char *ns = getenv("OLDNODENAMES");
-  char buffer[1024 * 1000];
-  for (int i = 0; i < arg_old_pes; i++) {
-    oldnodelist[i] = (char *) malloc(100 * sizeof(char));
-    int nread = sscanf(ns, "%s %[^\n]", oldnodelist[i], buffer);
-    ns = buffer;
-  }
-}
-#endif
-
 static void nodetab_init_with_nodelist()
 {
 
@@ -2398,9 +2373,6 @@ static int req_handle_realloc(ChMessage *msg, SOCKET fd)
     ret[restart_idx + 1] = dir;
     ret[saved_argc + index++] = NULL;
   }
-
-  setenv("NETSTART", create_netstart(1), 1);
-  setenv("OLDNODENAMES", create_oldnodenames(), 1);
 
   ChMessage ackmsg;
   ChMessage_new("realloc_ack", 0, &ackmsg);
@@ -4295,18 +4267,6 @@ static char *create_netstart(int node)
   return dest;
 }
 
-#if CMK_SHRINK_EXPAND
-/*This little snippet creates a OLDNODENAMES
-environment variable entry*/
-static char *create_oldnodenames()
-{
-  static char dest1[1024 * 1000];
-  for (nodetab_process * p : pe_to_process_map)
-    sprintf(dest1, "%s %s", dest1, p->host->name);
-  printf("Charmrun> Created oldnames %s \n", dest1);
-  return dest1;
-}
-#endif
 /* The remainder of charmrun is only concerned with starting all
 the node-programs, also known as charmrun clients.  We have to
 start nodetab_rank0_table.size() processes on the remote machines.
