@@ -236,12 +236,12 @@ private:
       CMK_ENVELOPE_FT_FIELDS
     };
 
-    #ifdef __GNUC__
+    #ifdef __clang__
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-private-field"
     #endif
     CMK_ENVELOPE_FIELDS
-    #ifdef __GNUC__
+    #ifdef __clang__
     #pragma GCC diagnostic pop
     #endif
 
