@@ -344,32 +344,32 @@ public:
 		CkReduction::reducerType reducer=CkReduction::invalid,
                 CkReductionMsg *buf = NULL);
 
-	inline int getLength(void) const {return dataSize;}
-	inline int getSize(void) const {return dataSize;}
-	inline void *getData(void) {return data;}
-	inline const void *getData(void) const {return data;}
+	inline int getLength() const {return dataSize;}
+	inline int getSize() const {return dataSize;}
+	inline void *getData() {return data;}
+	inline const void *getData() const {return data;}
 
-	inline int getGcount(void){return gcount;}
-	inline CkReduction::reducerType getReducer(void){return reducer;}
-	inline int getRedNo(void){return redNo;}
+	inline int getGcount() const {return gcount;}
+	inline CkReduction::reducerType getReducer() const {return reducer;}
+	inline int getRedNo() const {return redNo;}
 
-	inline CMK_REFNUM_TYPE getUserFlag(void) const {return userFlag;}
+	inline CMK_REFNUM_TYPE getUserFlag() const {return userFlag;}
 	inline void setUserFlag(CMK_REFNUM_TYPE f) { userFlag=f;}
 
 	inline void setCallback(const CkCallback &cb) { callback=cb; }
 
 	//Return true if this message came straight from a contribute call--
 	// if it didn't come from a previous reduction function.
-	inline bool isFromUser(void) const {return sourceFlag==-1;}
+	inline bool isFromUser() const {return sourceFlag==-1;}
 
-	inline bool isMigratableContributor(void) const {return migratableContributor;}
+	inline bool isMigratableContributor() const {return migratableContributor;}
 	inline void setMigratableContributor(bool _mig){ migratableContributor = _mig;}
 
     // Tuple reduction
     static CkReductionMsg* buildFromTuple(CkReduction::tupleElement* reductions, int num_reductions);
     void toTuple(CkReduction::tupleElement** out_reductions, int* num_reductions);
 
-	~CkReductionMsg();
+	~CkReductionMsg() {}
 
 //Implementation-only fields (don't access these directly!)
 	//Msg runtime support
@@ -378,10 +378,10 @@ public:
 	static CkReductionMsg *unpack(void *in);
 
 private:
-	int nSources(void) {return sourceFlag<0?-sourceFlag:sourceFlag;}
+	inline int nSources() const {return std::abs(sourceFlag);}
 
 	//Default constructor is private so you must use "buildNew", above
-	CkReductionMsg();
+	CkReductionMsg() {}
 
 private:
 	int dataSize;//Length of array below, in bytes
