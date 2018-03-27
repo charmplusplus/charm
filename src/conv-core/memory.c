@@ -207,6 +207,10 @@ int memory_chare_id=0;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
+#ifdef __INTEL_COMPILER
+#pragma warning push
+#pragma warning disable 1478
+#endif
 
 #if CMK_MEMORY_BUILD_OS_WRAPPED || CMK_MEMORY_BUILD_GNU_HOOKS
 
@@ -312,6 +316,9 @@ void *valloc(size_t size) CMK_THROW { return meta_valloc(size); }
 
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
+#endif
+#ifdef __INTEL_COMPILER
+#pragma warning pop
 #endif
 
 static int skip_mallinfo = 0;
