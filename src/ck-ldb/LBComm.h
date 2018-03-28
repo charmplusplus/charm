@@ -130,7 +130,7 @@ private:
 #ifdef __BIGSIM__
   enum { initial_sz = 1 };
 #else
-  enum { initial_sz = 10000 };
+  enum { initial_sz = 500 };
 #endif
   enum TableState : uint8_t { nil, InUse } ;
   LBCommData* set;
