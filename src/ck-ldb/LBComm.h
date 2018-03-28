@@ -132,7 +132,7 @@ private:
 #else
   enum { initial_sz = 10000 };
 #endif
-  enum TableState { nil, InUse } ;
+  enum TableState : uint8_t { nil, InUse } ;
   LBCommData* set;
   TableState* state;
   int cur_sz;

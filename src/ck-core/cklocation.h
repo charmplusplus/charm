@@ -52,14 +52,14 @@ class CkArray;
 class ArrayElement;
 //What to do if an entry method is invoked on
 // an array element that does not (yet) exist:
-typedef enum {
+typedef enum : uint8_t {
 	CkArray_IfNotThere_buffer=0, //Wait for it to be created
 	CkArray_IfNotThere_createhere=1, //Make it on sending Pe
 	CkArray_IfNotThere_createhome=2 //Make it on (a) home Pe
 } CkArray_IfNotThere;
 
 /// How to do a message delivery:
-typedef enum {
+typedef enum : uint8_t {
 	CkDeliver_queue=0, //Deliver via the scheduler's queue
 	CkDeliver_inline=1  //Deliver via a regular call
 } CkDeliver_t;
@@ -226,7 +226,7 @@ public:
 	virtual void addLocation(CkLocation &loc) =0;
 };
 
-enum CkElementCreation_t {
+enum CkElementCreation_t : uint8_t {
   CkElementCreation_migrate=2, // Create object for normal migration arrival
   CkElementCreation_resume=3,  // Create object after checkpoint
   CkElementCreation_restore=4  // Create object after checkpoint, skip listeners

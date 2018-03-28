@@ -33,7 +33,7 @@ class ArrayElement;
 
 class CkCallback {
 public:
-	enum callbackType {
+	enum callbackType : uint8_t {
 	invalid=0, //Invalid callback
 	ignore, //Do nothing
 	ckExit, //Call ckExit

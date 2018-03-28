@@ -1952,7 +1952,7 @@ std::vector<CkReduction::reducerStruct>& CkReduction::reducerTable()
 }
 
 // Enum to detect type of contributors in a reduction
-typedef enum {
+typedef enum : uint8_t {
     array=0,
     group,
     nodegroup

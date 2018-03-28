@@ -1089,7 +1089,7 @@ public:
   int PE_per_block;
 
   /// labels for states used when parsing the ConfigurableRRMap from ARGV
-  enum ConfigurableRRMapLoadStatus{
+  enum ConfigurableRRMapLoadStatus : uint8_t {
     not_loaded,
     loaded_found,
     loaded_not_found

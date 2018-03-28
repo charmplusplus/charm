@@ -94,7 +94,7 @@ CkpvExtern(ArrayObjMap, array_objs);
 
 /// A set of "Virtual ChareID"'s
 class VidBlock {
-    enum VidState {FILLED, UNFILLED};
+    enum VidState : uint8_t {FILLED, UNFILLED};
     VidState state;
     PtrQ *msgQ;
     CkChareID actualID;

@@ -10,7 +10,7 @@ private:
   bool asyncEvacuate;
   int atsync_iteration;
 
-  enum state {
+  enum state : uint8_t {
     OFF,
     ON,
     PAUSE,
