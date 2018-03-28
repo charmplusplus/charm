@@ -5,6 +5,7 @@
 #include <queue>
 #include <ostream>
 #include <functional>
+#include <limits>
 
 #include <unordered_map>
 
@@ -49,6 +50,7 @@ class msgQ
 
         /// Number of messages in the queue
         inline size_t size() const { return qSize; }
+        inline size_t max_size() const { return std::numeric_limits<size_t>::max(); }
 
         /// Is the queue empty?
         inline bool empty() const { return (0 == qSize); }

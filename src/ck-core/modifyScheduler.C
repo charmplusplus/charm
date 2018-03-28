@@ -20,6 +20,7 @@ int CqsFindRemoveSpecificDeq(_deq q, void *&msgPtr, const int *entryMethod, cons
 
 /** Search Queue for messages associated with a specified entry method */ 
 void CqsIncreasePriorityForEntryMethod(Queue q, const int entrymethod){
+#if !CMK_USE_STL_MSGQ
     void *removedMsgPtr;
     int numRemoved;
     
@@ -43,11 +44,13 @@ void CqsIncreasePriorityForEntryMethod(Queue q, const int entrymethod){
 	traceUserSuppliedNote(traceStr);
 #endif
     }
+#endif //!CMK_USE_STL_MSGQ
 }
  
 #ifdef ADAPT_SCHED_MEM
 /** Search Queue for messages associated with memory-critical entry methods */ 
 void CqsIncreasePriorityForMemCriticalEntries(Queue q){
+#if !CMK_USE_STL_MSGQ
     void *removedMsgPtr;
     int numRemoved;
 
@@ -68,6 +71,7 @@ void CqsIncreasePriorityForMemCriticalEntries(Queue q){
 	traceUserSuppliedNote(traceStr);
 #endif
     }
+#endif //!CMK_USE_STL_MSGQ
 }
 #endif
 
