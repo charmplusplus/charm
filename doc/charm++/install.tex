@@ -98,6 +98,13 @@ Cray XC40 & \verb|./build charm++ gni-crayxc --with-production -j8|
 As mentioned earlier, one can also build \charmpp{} using the precompiled binary
 in a manner similar to what is used for installing any common software.
 
+When a Charm++ build folder has already been generated, it is possible to
+perform incremental rebuilds by invoking \verb|make| from the \verb|tmp| folder
+inside it. For example, with a {\em netlrts-linux-x86\_64} build, the path
+would be \verb|netlrts-linux-x86_64/tmp|. On Linux and macOS, the tmp symlink
+in the top-level charm directory also points to the tmp directory of the most
+recent build.
+
 Alternatively, CMake can be used for configuring and building Charm++. You can
 use \verb|cmake-gui| or \verb|ccmake| for an overview of available options.
 Note that some are only effective when passed with \verb|-D| from the
