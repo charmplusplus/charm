@@ -32,6 +32,7 @@ typedef void msg_t;
  * maintained. enq() operations simply find the bucket corresponding to a prio
  * value and place the msg into it.
  */
+#if !CMK_NO_MSG_PRIOS
 template <typename P = int>
 class msgQ
 {
@@ -191,8 +192,6 @@ const msg_t* msgQ<P>::deq()
 
 #endif // CMK_RANDOMIZED_MSGQ
 
-
-
 template <typename P>
 void msgQ<P>::enumerate(msg_t **first, msg_t **last) const
 {
@@ -214,6 +213,36 @@ void msgQ<P>::enumerate(msg_t **first, msg_t **last) const
       *ptr = (msg_t*) randQ[i];
 #endif
 }
+
+#else //CMK_NO_MSG_PRIOS
+template <typename P = int>
+class msgQ
+{
+    public:
+        typedef P prio_t;
+        msgQ() {}
+        inline size_t size() const { return bkt.size(); }
+        inline size_t max_size() const { return bkt.max_size(); }
+        inline bool empty() const { return bkt.empty(); }
+        void enumerate(msg_t **first, msg_t **last) const {}
+        friend std::ostream& operator<< (std::ostream &out, const msgQ &q) { return out; }
+
+        inline void enq(const msg_t *msg, const prio_t &prio = prio_t(), const bool isFifo = true) {
+          bkt.push_back(msg);
+        }
+
+        inline const msg_t* deq() {
+          if (bkt.empty())
+            return NULL;
+          const msg_t *msg = bkt.front();
+          bkt.pop_front();
+          return msg;
+        }
+
+    private:
+        std::deque<const msg_t*> bkt;
+};
+#endif //CMK_NO_MSG_PRIOS
 
 } // end namespace conv
 

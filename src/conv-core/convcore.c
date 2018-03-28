@@ -1784,6 +1784,7 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 #if CMK_NODE_QUEUE_AVAILABLE
 	/*#warning "CsdNextMessage: CMK_NODE_QUEUE_AVAILABLE" */
 	if (NULL!=(msg=CmiGetNonLocalNodeQ())) return msg;
+#if !CMK_NO_MSG_PRIOS
 	if (!CqsEmpty(s->nodeQ)
 	 && CqsPrioGT(CqsGetPriority(s->schedQ),
 		       CqsGetPriority(s->nodeQ))) {
@@ -1793,6 +1794,7 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	    if (msg!=NULL) return msg;
 	  }
 	}
+#endif
 #endif
 #if CMK_OBJECT_QUEUE_AVAILABLE
 	/*#warning "CsdNextMessage: CMK_OBJECT_QUEUE_AVAILABLE"   */
@@ -2265,6 +2267,8 @@ void CsdInit(char **argv)
    #endif
    #if CMK_RANDOMIZED_MSGQ
    if (CmiMyPe() == 0) CmiPrintf("Charm++> Using randomized msgQ. Priorities will not be respected!\n");
+   #elif CMK_NO_MSG_PRIOS
+   if (CmiMyPe() == 0) CmiPrintf("Charm++> Message priorities have been turned off and will not be respected.\n");
    #endif
 
 #if CMK_OBJECT_QUEUE_AVAILABLE
