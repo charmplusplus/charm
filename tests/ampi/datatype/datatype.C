@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <vector>
+#include <numeric>
 #include <mpi.h>
 
 #define VEC_NELM 128
@@ -6,23 +8,18 @@
 
 //  Test type reference counting for SendReq
 void typefree_isend_test(int rank, int size) {
-    int errs = 0;
-    int source, dest, i;
-    MPI_Comm comm;
-    MPI_Status status;
+    int i, errs = 0;
+    int source = 0, dest = size - 1;
+    MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Request req;
     MPI_Datatype strideType;
     MPI_Datatype tmpType[1024];
-    int *buf = 0;
-    comm = MPI_COMM_WORLD;
+    std::vector<int> buf;
 
     if (size < 2) {
         fprintf(stderr, "This test requires at least two processes.");
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
-
-    source = 0;
-    dest = size - 1;
 
     /*
      * The idea here is to create a simple but non-contig datatype,
@@ -35,10 +32,10 @@ void typefree_isend_test(int rank, int size) {
     MPI_Type_commit(&strideType);
 
     if (rank == source) {
-        buf = (int *) malloc(VEC_NELM * VEC_STRIDE * sizeof(int));
-        for (i = 0; i < VEC_NELM * VEC_STRIDE; i++)
-            buf[i] = i;
-        MPI_Isend(buf, 1, strideType, dest, 0, comm, &req);
+        buf.resize(VEC_NELM * VEC_STRIDE);
+        std::iota(buf.begin(), buf.end(), 0);
+
+        MPI_Isend(buf.data(), 1, strideType, dest, 0, comm, &req);
         MPI_Type_free(&strideType);
 
         /*
@@ -52,21 +49,22 @@ void typefree_isend_test(int rank, int size) {
         }
 
         /* Synchronize with the receiver */
-        MPI_Sendrecv(NULL, 0, MPI_INT, dest, 1, NULL, 0, MPI_INT, dest, 1, comm, &status);
+        MPI_Sendrecv(NULL, 0, MPI_INT, dest, 1, NULL, 0, MPI_INT, dest, 1, comm, MPI_STATUS_IGNORE);
 
-        MPI_Wait(&req, &status);
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
         for (i = 0; i < 1024; i++) {
             MPI_Type_free(&tmpType[i]);
         }
-        free(buf);
     }
     else if (rank == dest) {
-        buf = (int *) malloc(VEC_NELM * sizeof(int));
+        buf.resize(VEC_NELM);
         for (i = 0; i < VEC_NELM; i++)
             buf[i] = -i;
+
         /* Synchronize with the sender */
-        MPI_Sendrecv(NULL, 0, MPI_INT, source, 1, NULL, 0, MPI_INT, source, 1, comm, &status);
-        MPI_Recv(buf, VEC_NELM, MPI_INT, source, 0, comm, &status);
+        MPI_Sendrecv(NULL, 0, MPI_INT, source, 1, NULL, 0, MPI_INT, source, 1, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(buf.data(), VEC_NELM, MPI_INT, source, 0, comm, MPI_STATUS_IGNORE);
+
         for (i = 0; i < VEC_NELM; i++) {
             if (buf[i] != i * VEC_STRIDE) {
                 errs++;
@@ -75,7 +73,6 @@ void typefree_isend_test(int rank, int size) {
                 }
             }
         }
-        free(buf);
     }
 
     /* Clean up the strideType */
@@ -86,23 +83,18 @@ void typefree_isend_test(int rank, int size) {
 
 //  Test type reference counting for SsendReq
 void typefree_issend_test(int rank, int size) {
-    int errs = 0;
-    int source, dest, i;
-    MPI_Comm comm;
-    MPI_Status status;
+    int i, errs = 0;
+    int source = 0, dest = size - 1;
+    MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Request req;
     MPI_Datatype strideType;
     MPI_Datatype tmpType[1024];
-    int *buf = 0;
-    comm = MPI_COMM_WORLD;
+    std::vector<int> buf;
 
     if (size < 2) {
         fprintf(stderr, "This test requires at least two processes.");
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
-
-    source = 0;
-    dest = size - 1;
 
     /*
      * The idea here is to create a simple but non-contig datatype,
@@ -115,10 +107,10 @@ void typefree_issend_test(int rank, int size) {
     MPI_Type_commit(&strideType);
 
     if (rank == source) {
-        buf = (int *) malloc(VEC_NELM * VEC_STRIDE * sizeof(int));
-        for (i = 0; i < VEC_NELM * VEC_STRIDE; i++)
-            buf[i] = i;
-        MPI_Issend(buf, 1, strideType, dest, 0, comm, &req);
+        buf.resize(VEC_NELM * VEC_STRIDE);
+        std::iota(buf.begin(), buf.end(), 0);
+
+        MPI_Issend(buf.data(), 1, strideType, dest, 0, comm, &req);
         MPI_Type_free(&strideType);
 
         /*
@@ -132,21 +124,22 @@ void typefree_issend_test(int rank, int size) {
         }
 
         /* Synchronize with the receiver */
-        MPI_Sendrecv(NULL, 0, MPI_INT, dest, 1, NULL, 0, MPI_INT, dest, 1, comm, &status);
+        MPI_Sendrecv(NULL, 0, MPI_INT, dest, 1, NULL, 0, MPI_INT, dest, 1, comm, MPI_STATUS_IGNORE);
 
-        MPI_Wait(&req, &status);
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
         for (i = 0; i < 1024; i++) {
             MPI_Type_free(&tmpType[i]);
         }
-        free(buf);
     }
     else if (rank == dest) {
-        buf = (int *) malloc(VEC_NELM * sizeof(int));
+        buf.resize(VEC_NELM);
         for (i = 0; i < VEC_NELM; i++)
             buf[i] = -i;
+
         /* Synchronize with the sender */
-        MPI_Sendrecv(NULL, 0, MPI_INT, source, 1, NULL, 0, MPI_INT, source, 1, comm, &status);
-        MPI_Recv(buf, VEC_NELM, MPI_INT, source, 0, comm, &status);
+        MPI_Sendrecv(NULL, 0, MPI_INT, source, 1, NULL, 0, MPI_INT, source, 1, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(buf.data(), VEC_NELM, MPI_INT, source, 0, comm, MPI_STATUS_IGNORE);
+
         for (i = 0; i < VEC_NELM; i++) {
             if (buf[i] != i * VEC_STRIDE) {
                 errs++;
@@ -155,7 +148,6 @@ void typefree_issend_test(int rank, int size) {
                 }
             }
         }
-        free(buf);
     }
 
     /* Clean up the strideType */
@@ -177,14 +169,12 @@ void vector_add(int *invec, int *inoutvec, int *len, MPI_Datatype *dtype) {
 // Test type reference counting for RednReq
 void typefree_ireduce_test(MPI_Comm comm) {
     int errs = 0;
+    int root = 0;
     int rank, size, i;
-    MPI_Status status;
     MPI_Request req;
     MPI_Datatype strideType;
     MPI_Datatype tmpType[1024];
     MPI_Op op;
-    int *sendbuf = 0;
-    int *recvbuf = 0;
 
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
@@ -194,20 +184,15 @@ void typefree_ireduce_test(MPI_Comm comm) {
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
-    int root = 0;
-
     MPI_Type_vector(VEC_NELM, 1, size, MPI_INT, &strideType);
     MPI_Type_commit(&strideType);
     MPI_Op_create((MPI_User_function *)vector_add, 1, &op);
 
-    sendbuf = (int *) malloc(VEC_NELM * size * size * sizeof(int));
-    recvbuf = (int *) malloc(VEC_NELM * size * size * sizeof(int));
-    for (i = 0; i < VEC_NELM * size * size; i++) {
-        recvbuf[i] = 0;
-        sendbuf[i] = rank+1;
-    }
+    std::vector<int> sendbuf(VEC_NELM * size * size, rank+1);
+    std::vector<int> recvbuf(VEC_NELM * size * size, 1);
+
     if (rank == root) {
-        MPI_Ireduce(sendbuf, recvbuf, 1, strideType, op, root, comm, &req);
+        MPI_Ireduce(sendbuf.data(), recvbuf.data(), 1, strideType, op, root, comm, &req);
         MPI_Type_free(&strideType);
         for (i = 0; i < 1024; i++) {
             MPI_Type_vector(VEC_NELM, 1, 1, MPI_INT, &tmpType[i]);
@@ -216,9 +201,9 @@ void typefree_ireduce_test(MPI_Comm comm) {
 
         // Sync with non-root processes (comm limits these to 1 process)
         for (int r = root + 1; r < size; r++) {
-          MPI_Sendrecv(NULL, 0, MPI_INT, r, 1, NULL, 0, MPI_INT, r, 1, comm, &status);
+          MPI_Sendrecv(NULL, 0, MPI_INT, r, 1, NULL, 0, MPI_INT, r, 1, comm, MPI_STATUS_IGNORE);
         }
-        MPI_Wait(&req, &status);
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
 
         int expected = (size * (size+1)) / 2;
         // Check results
@@ -236,54 +221,44 @@ void typefree_ireduce_test(MPI_Comm comm) {
         }
     } else {
         // Sync with root
-        MPI_Sendrecv(NULL, 0, MPI_INT, root, 1, NULL, 0, MPI_INT, root, 1, comm, &status);
-        MPI_Ireduce(sendbuf, recvbuf, 1, strideType, op, root, comm, &req);
-        MPI_Wait(&req, &status);
+        MPI_Sendrecv(NULL, 0, MPI_INT, root, 1, NULL, 0, MPI_INT, root, 1, comm, MPI_STATUS_IGNORE);
+        MPI_Ireduce(sendbuf.data(), recvbuf.data(), 1, strideType, op, root, comm, &req);
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
         MPI_Type_free(&strideType);
     }
-    free(sendbuf);
-    free(recvbuf);
 }
 
 //  Test type reference counting for GatherReq
 void typefree_igather_test(int rank, int size) {
-    int errs = 0;
-    int i;
-    MPI_Comm comm;
-    MPI_Status status;
+    int i, errs = 0;
+    int root = 0;
+    MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Request req;
     MPI_Datatype contigType;
     MPI_Datatype tmpType[1024];
     MPI_Op op;
-    int *sendbuf = 0;
-    int *recvbuf = 0;
-
-    comm = MPI_COMM_WORLD;
+    std::vector<int> sendbuf(VEC_NELM * size);
+    std::iota(sendbuf.begin(), sendbuf.end(), 0);
 
     if (size < 2) {
         fprintf(stderr, "This test requires at least two processes.");
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
-    int root = 0;
-
     MPI_Type_contiguous(VEC_NELM, MPI_INT, &contigType);
     MPI_Type_commit(&contigType);
 
-    sendbuf = (int *) malloc(VEC_NELM * size * sizeof(int));
-    for (i = 0; i < VEC_NELM * size; i++)
-        sendbuf[i] = i;
     if (rank == root) {
         /*
          * MPI_gather places a newly received vector after the extent of the previous vector in recvbuf.
          * If contigType is incorrectly freed and its memory is reused, allocating this extra memory ensures
          * that the program does not segfault.
          */
-        recvbuf = (int *) malloc(VEC_NELM * size * size * sizeof(int));
+        std::vector<int> recvbuf(VEC_NELM * size * size);
         for (i = 0; i < VEC_NELM * size * size; i++)
             recvbuf[i] = -i;
 
-        MPI_Igather(sendbuf+rank, 1, contigType, recvbuf, 1, contigType, root, comm, &req);
+        MPI_Igather(&sendbuf[rank], 1, contigType, recvbuf.data(), 1, contigType, root, comm, &req);
         MPI_Type_free(&contigType);
 
         for (i = 0; i < 1024; i++) {
@@ -293,9 +268,9 @@ void typefree_igather_test(int rank, int size) {
 
         // Sync with non-root processes
         for (int r = root + 1; r < size; r++) {
-            MPI_Sendrecv(NULL, 0, MPI_INT, r, 1, NULL, 0, MPI_INT, r, 1, comm, &status);
+            MPI_Sendrecv(NULL, 0, MPI_INT, r, 1, NULL, 0, MPI_INT, r, 1, comm, MPI_STATUS_IGNORE);
         }
-        MPI_Wait(&req, &status);
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
 
         // Check result
         for (i = 0; i < VEC_NELM * size; i++) {
@@ -310,62 +285,48 @@ void typefree_igather_test(int rank, int size) {
         for (i = 0; i < 1024; i++) {
             MPI_Type_free(&tmpType[i]);
         }
-        free(recvbuf);
     } else {
         // Sync with root
-        MPI_Sendrecv(NULL, 0, MPI_INT, root, 1, NULL, 0, MPI_INT, root, 1, comm, &status);
+        MPI_Sendrecv(NULL, 0, MPI_INT, root, 1, NULL, 0, MPI_INT, root, 1, comm, MPI_STATUS_IGNORE);
 
-        MPI_Igather(sendbuf+(VEC_NELM*rank), VEC_NELM, MPI_INT, NULL, 0, 0, root, comm, &req);
-        MPI_Wait(&req, &status);
+        MPI_Igather(&sendbuf[VEC_NELM*rank], VEC_NELM, MPI_INT, NULL, 0, 0, root, comm, &req);
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
 
         MPI_Type_free(&contigType);
     }
-
-    free(sendbuf);
 }
 
 //  Test type reference counting for GathervReq
 void typefree_igatherv_test(int rank, int size) {
     int errs = 0;
+    int root = 0;
     int i, j;
-    MPI_Comm comm;
-    MPI_Status status;
+    MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Request req;
     MPI_Datatype strideType, resizedType;
     MPI_Datatype tmpType[1024];
-    int *sendbuf = 0;
-    int *recvbuf = 0;
-    int recvcounts[size], displs[size];
+    std::vector<int> sendbuf(VEC_NELM * size);
+    std::vector<int> recvcounts(size, 1), displs(size);
 
-    comm = MPI_COMM_WORLD;
+    std::iota(sendbuf.begin(), sendbuf.end(), 0);
+    std::iota(displs.begin(), displs.end(), 0);
 
     if (size < 2) {
         fprintf(stderr, "This test requires at least two processes.");
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
-    int root = 0;
-
     MPI_Type_vector(VEC_NELM, 1, size, MPI_INT, &strideType);
     MPI_Type_commit(&strideType);
     // This enables the root to receive vectors in column-major order.
     MPI_Type_create_resized(strideType, 0, 4, &resizedType);
 
-    for (i = 0; i < size; i++) {
-        recvcounts[i] = 1;
-        displs[i] = i;
-    }
-
-    sendbuf = (int *) malloc(VEC_NELM * size * sizeof(int));
-    for (i = 0; i < VEC_NELM * size; i++)
-        sendbuf[i] = i;
-
     if (rank == root) {
-        recvbuf = (int *) malloc(VEC_NELM * size * sizeof(int));
+        std::vector<int> recvbuf(VEC_NELM * size);
         for (i = 0; i < VEC_NELM * size; i++)
           recvbuf[i] = -i;
 
-        MPI_Igatherv(sendbuf, VEC_NELM, MPI_INT, recvbuf, recvcounts, displs, resizedType, root, comm, &req);
+        MPI_Igatherv(sendbuf.data(), VEC_NELM, MPI_INT, recvbuf.data(), recvcounts.data(), displs.data(), resizedType, root, comm, &req);
         MPI_Type_free(&strideType);
         MPI_Type_free(&resizedType);
 
@@ -376,9 +337,9 @@ void typefree_igatherv_test(int rank, int size) {
 
         // Sync with non-root processes
         for (int r = root + 1; r < size; r++) {
-            MPI_Sendrecv(NULL, 0, MPI_INT, r, 1, NULL, 0, MPI_INT, r, 1, comm, &status);
+            MPI_Sendrecv(NULL, 0, MPI_INT, r, 1, NULL, 0, MPI_INT, r, 1, comm, MPI_STATUS_IGNORE);
         }
-        MPI_Wait(&req, &status);
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
 
         // We expect to have received a "transposed" sendbuf.
         for (i = 0; i < size; i++) {
@@ -395,26 +356,22 @@ void typefree_igatherv_test(int rank, int size) {
         for (i = 0; i < 1024; i++) {
             MPI_Type_free(&tmpType[i]);
         }
-        free(recvbuf);
     } else {
         // Sync with root
-        MPI_Sendrecv(NULL, 0, MPI_INT, root, 1, NULL, 0, MPI_INT, root, 1, comm, &status);
+        MPI_Sendrecv(NULL, 0, MPI_INT, root, 1, NULL, 0, MPI_INT, root, 1, comm, MPI_STATUS_IGNORE);
 
-        MPI_Igatherv(sendbuf+(rank*VEC_NELM), VEC_NELM, MPI_INT, NULL, recvcounts, displs, strideType, root, comm, &req);
-        MPI_Wait(&req, &status);
+        MPI_Igatherv(&sendbuf[rank*VEC_NELM], VEC_NELM, MPI_INT, NULL, recvcounts.data(), displs.data(), strideType, root, comm, &req);
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
 
         MPI_Type_free(&strideType);
         MPI_Type_free(&resizedType);
     }
-
-    free(sendbuf);
 }
 
 //  Test type reference counting for ATAReq
 void typefree_ialltoallv_test(MPI_Comm comm) {
     int errs = 0;
     int i, rank, size;
-    MPI_Status status;
     MPI_Request req;
     MPI_Datatype strideType, resizedType;
     MPI_Datatype tmpType[1024];
@@ -430,26 +387,22 @@ void typefree_ialltoallv_test(MPI_Comm comm) {
     MPI_Type_commit(&strideType);
     MPI_Type_create_resized(strideType, 0, 4, &resizedType);
 
-    int *sendbuf = 0;
-    int *recvbuf = 0;
-    int sendcounts[size], recvcounts[size], sdispls[size], rdispls[size];
+    std::vector<int> sendbuf(VEC_NELM * size), recvbuf(VEC_NELM * size);
+    std::vector<int> sendcounts(size, 1), recvcounts(size, 1);
+    std::vector<int> sdispls(size), rdispls(size);
     for (i = 0; i < size; i++) {
-        sendcounts[i] = 1;
         sdispls[i] = (rank + i) % size;
-        recvcounts[i] = 1;
         rdispls[i] = (rank + i) % size;
     }
 
-    sendbuf = (int *) malloc(VEC_NELM * size * sizeof(int));
-    recvbuf = (int *) malloc(VEC_NELM * size * sizeof(int));
+    std::iota(sendbuf.begin(), sendbuf.end(), 0);
     for (i = 0; i < VEC_NELM * size; i++) {
-        sendbuf[i] = i;
         recvbuf[i] = -i;
     }
 
     if (rank == 0) {
-        MPI_Ialltoallv(sendbuf, sendcounts, sdispls, resizedType,
-                       recvbuf, recvcounts, rdispls, resizedType,
+        MPI_Ialltoallv(sendbuf.data(), sendcounts.data(), sdispls.data(), resizedType,
+                       recvbuf.data(), recvcounts.data(), rdispls.data(), resizedType,
                        comm, &req);
         MPI_Type_free(&strideType);
         MPI_Type_free(&resizedType);
@@ -463,8 +416,8 @@ void typefree_ialltoallv_test(MPI_Comm comm) {
             MPI_Type_free(&tmpType[i]);
         }
 
-        MPI_Sendrecv(NULL, 0, MPI_INT, 1, 1, NULL, 0, MPI_INT, 1, 1, comm, &status);
-        MPI_Wait(&req, &status);
+        MPI_Sendrecv(NULL, 0, MPI_INT, 1, 1, NULL, 0, MPI_INT, 1, 1, comm, MPI_STATUS_IGNORE);
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
 
         // Check results
         for (i = 0; i < VEC_NELM * size; i++) {
@@ -476,11 +429,11 @@ void typefree_ialltoallv_test(MPI_Comm comm) {
             }
         }
     } else if (rank == 1) {
-        MPI_Sendrecv(NULL, 0, MPI_INT, 0, 1, NULL, 0, MPI_INT, 0, 1, comm, &status);
-        MPI_Ialltoallv(sendbuf, sendcounts, sdispls, resizedType,
-                       recvbuf, recvcounts, rdispls, resizedType,
+        MPI_Sendrecv(NULL, 0, MPI_INT, 0, 1, NULL, 0, MPI_INT, 0, 1, comm, MPI_STATUS_IGNORE);
+        MPI_Ialltoallv(sendbuf.data(), sendcounts.data(), sdispls.data(), resizedType,
+                       recvbuf.data(), recvcounts.data(), rdispls.data(), resizedType,
                        comm, &req);
-        MPI_Wait(&req, &status);
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
         MPI_Type_free(&strideType);
         MPI_Type_free(&resizedType);
 
@@ -497,15 +450,12 @@ void typefree_ialltoallv_test(MPI_Comm comm) {
         MPI_Type_free(&strideType);
         MPI_Type_free(&resizedType);
     }
-    free(sendbuf);
-    free(recvbuf);
 }
 
 //  Test type reference counting for ATAReq
 void typefree_ialltoall_test(MPI_Comm comm) {
     int errs = 0;
     int i, rank, size;
-    MPI_Status status;
     MPI_Request req;
     MPI_Datatype contigType;
     MPI_Datatype tmpType[1024];
@@ -520,26 +470,22 @@ void typefree_ialltoall_test(MPI_Comm comm) {
     MPI_Type_contiguous(VEC_NELM, MPI_INT, &contigType);
     MPI_Type_commit(&contigType);
 
-    int *sendbuf = 0;
-    int *recvbuf = 0;
-    int sendcounts[size], recvcounts[size], sdispls[size], rdispls[size];
+    std::vector<int> sendbuf(VEC_NELM * size), recvbuf(VEC_NELM * size);
+    std::vector<int> sendcounts(size, 1), recvcounts(size, 1);
+    std::vector<int> sdispls(size), rdispls(size);
     for (i = 0; i < size; i++) {
-        sendcounts[i] = 1;
         sdispls[i] = (rank + i) % size;
-        recvcounts[i] = 1;
         rdispls[i] = (rank + i) % size;
     }
 
-    sendbuf = (int *) malloc(VEC_NELM * size * sizeof(int));
-    recvbuf = (int *) malloc(VEC_NELM * size * sizeof(int));
+    std::iota(sendbuf.begin(), sendbuf.end(), 0);
     for (i = 0; i < VEC_NELM * size; i++) {
-        sendbuf[i] = i;
         recvbuf[i] = -i;
     }
 
     if (rank == 0) {
-        MPI_Ialltoallv(sendbuf, sendcounts, sdispls, contigType,
-                       recvbuf, recvcounts, rdispls, contigType,
+        MPI_Ialltoallv(sendbuf.data(), sendcounts.data(), sdispls.data(), contigType,
+                       recvbuf.data(), recvcounts.data(), rdispls.data(), contigType,
                        comm, &req);
         MPI_Type_free(&contigType);
 
@@ -552,8 +498,8 @@ void typefree_ialltoall_test(MPI_Comm comm) {
             MPI_Type_free(&tmpType[i]);
         }
 
-        MPI_Sendrecv(NULL, 0, MPI_INT, 1, 1, NULL, 0, MPI_INT, 1, 1, comm, &status);
-        MPI_Wait(&req, &status);
+        MPI_Sendrecv(NULL, 0, MPI_INT, 1, 1, NULL, 0, MPI_INT, 1, 1, comm, MPI_STATUS_IGNORE);
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
 
         // Check results
         for (i = 0; i < VEC_NELM * size; i++) {
@@ -565,11 +511,11 @@ void typefree_ialltoall_test(MPI_Comm comm) {
             }
         }
     } else if (rank == 1) {
-        MPI_Sendrecv(NULL, 0, MPI_INT, 0, 1, NULL, 0, MPI_INT, 0, 1, comm, &status);
-        MPI_Ialltoallv(sendbuf, sendcounts, sdispls, contigType,
-                       recvbuf, recvcounts, rdispls, contigType,
+        MPI_Sendrecv(NULL, 0, MPI_INT, 0, 1, NULL, 0, MPI_INT, 0, 1, comm, MPI_STATUS_IGNORE);
+        MPI_Ialltoallv(sendbuf.data(), sendcounts.data(), sdispls.data(), contigType,
+                       recvbuf.data(), recvcounts.data(), rdispls.data(), contigType,
                        comm, &req);
-        MPI_Wait(&req, &status);
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
         MPI_Type_free(&contigType);
 
         // Check results
@@ -584,51 +530,39 @@ void typefree_ialltoall_test(MPI_Comm comm) {
     } else {
         MPI_Type_free(&contigType);
     }
-    free(sendbuf);
-    free(recvbuf);
 }
 
 //  Test type reference counting for ATAReq
 void typefree_iscatterv_test(int rank, int size) {
     int errs = 0;
+    int root = 0;
     int i;
-    MPI_Comm comm;
-    MPI_Status status;
+    MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Request req;
     MPI_Datatype strideType, resizedType;
     MPI_Datatype tmpType[1024];
-    int *sendbuf = 0;
-    int *recvbuf = 0;
-    int sendcounts[size], displs[size];
-
-    comm = MPI_COMM_WORLD;
+    std::vector<int> recvbuf(VEC_NELM * size);
+    std::vector<int> sendcounts(size, 1), displs(size);
 
     if (size < 2) {
         fprintf(stderr, "This test requires at least two processes.");
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
-    int root = 0;
-
     MPI_Type_vector(VEC_NELM, 1, size, MPI_INT, &strideType);
     MPI_Type_commit(&strideType);
     // This enables the root to send vectors from sendbuf in column-major order.
     MPI_Type_create_resized(strideType, 0, 4, &resizedType);
 
-    for (i = 0; i < size; i++) {
-        sendcounts[i] = 1;
-        displs[i] = i;
-    }
-
-    recvbuf = (int *) malloc(VEC_NELM * sizeof(int));
+    std::iota(displs.begin(), displs.end(), 0);
     for (i = 0; i < VEC_NELM; i++)
         recvbuf[i] = -i;
 
     if (rank == root) {
-        sendbuf = (int *) malloc(VEC_NELM * size * sizeof(int));
-        for (i = 0; i < VEC_NELM * size; i++)
-            sendbuf[i] = i;
-        MPI_Iscatterv(sendbuf, sendcounts, displs, resizedType, recvbuf, VEC_NELM, MPI_INT, root, comm, &req);
+        std::vector<int> sendbuf(VEC_NELM * size);
+        std::iota(sendbuf.begin(), sendbuf.end(), 0);
+
+        MPI_Iscatterv(sendbuf.data(), sendcounts.data(), displs.data(), resizedType, recvbuf.data(), VEC_NELM, MPI_INT, root, comm, &req);
         MPI_Type_free(&strideType);
         MPI_Type_free(&resizedType);
 
@@ -639,66 +573,60 @@ void typefree_iscatterv_test(int rank, int size) {
 
         // Sync with non-root processes
         for (int r = root + 1; r < size; r++) {
-            MPI_Sendrecv(NULL, 0, MPI_INT, r, 1, NULL, 0, MPI_INT, r, 1, comm, &status);
+            MPI_Sendrecv(NULL, 0, MPI_INT, r, 1, NULL, 0, MPI_INT, r, 1, comm, MPI_STATUS_IGNORE);
         }
-        MPI_Wait(&req, &status);
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
 
         for (i = 0; i < 1024; i++) {
             MPI_Type_free(&tmpType[i]);
         }
-        free(sendbuf);
     } else {
         // Sync with root
-        MPI_Sendrecv(NULL, 0, MPI_INT, root, 1, NULL, 0, MPI_INT, root, 1, comm, &status);
+        MPI_Sendrecv(NULL, 0, MPI_INT, root, 1, NULL, 0, MPI_INT, root, 1, comm, MPI_STATUS_IGNORE);
 
-        MPI_Iscatterv(NULL, NULL, NULL, 0, recvbuf, VEC_NELM, MPI_INT, root, comm, &req);
-        MPI_Wait(&req, &status);
+        MPI_Iscatterv(NULL, NULL, NULL, 0, recvbuf.data(), VEC_NELM, MPI_INT, root, comm, &req);
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
 
         MPI_Type_free(&strideType);
         MPI_Type_free(&resizedType);
     }
 
     // Check results
-    if (rank != root)
-      for (i = 0; i < VEC_NELM; i++) {
-          if (recvbuf[i] != i*size+rank) {
-              errs++;
-              if (errs < 10) {
-                  printf("recvbuf[%d] = %d, expected %d\n", i, recvbuf[i], i*size+rank);
-              }
-          }
-      }
-
-    free(recvbuf);
+    if (rank != root) {
+        for (i = 0; i < VEC_NELM; i++) {
+            if (recvbuf[i] != i*size+rank) {
+                errs++;
+                if (errs < 10) {
+                    printf("recvbuf[%d] = %d, expected %d\n", i, recvbuf[i], i*size+rank);
+                }
+            }
+        }
+    }
 }
 
 void typefree_persistent_req_test(int rank, int size) {
-    int errs = 0;
-    int source, dest, i;
-    MPI_Comm comm;
-    MPI_Status status;
+    int i, errs = 0;
+    int source = 0;
+    int dest = size - 1;
+    MPI_Comm comm = MPI_COMM_WORLD;
     MPI_Request req;
     MPI_Datatype strideType;
     MPI_Datatype tmpType[1024];
-    int *buf = 0;
-    comm = MPI_COMM_WORLD;
-
-    source = 0;
-    dest = size - 1;
+    std::vector<int> buf;
 
     if (rank == dest) {
         MPI_Type_vector(VEC_NELM, 1, VEC_STRIDE, MPI_INT, &strideType);
         MPI_Type_commit(&strideType);
 
-        buf = (int *) malloc(VEC_NELM * VEC_STRIDE * sizeof(int));
+        buf.resize(VEC_NELM * VEC_STRIDE);
         for (i = 0; i < VEC_NELM * VEC_STRIDE; i++) {
             buf[i] = -i;
         }
 
-        MPI_Recv_init(buf, 1, strideType, source, 0, comm, &req);
+        MPI_Recv_init(buf.data(), 1, strideType, source, 0, comm, &req);
 
         MPI_Start(&req);
-        MPI_Wait(&req, &status);
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
 
         MPI_Type_free(&strideType);
 
@@ -708,10 +636,10 @@ void typefree_persistent_req_test(int rank, int size) {
         }
 
         /* Synchronize with the sender */
-        MPI_Sendrecv(NULL, 0, MPI_INT, source, 1, NULL, 0, MPI_INT, source, 1, comm, &status);
+        MPI_Sendrecv(NULL, 0, MPI_INT, source, 1, NULL, 0, MPI_INT, source, 1, comm, MPI_STATUS_IGNORE);
 
         MPI_Start(&req);
-        MPI_Wait(&req, &status);
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
 
         MPI_Request_free(&req);
 
@@ -729,24 +657,18 @@ void typefree_persistent_req_test(int rank, int size) {
             }
         }
     } else if (rank == source) {
-        buf = (int *) malloc(VEC_NELM * sizeof(int));
-        for (i = 0; i < VEC_NELM; i++) {
-            buf[i] = 0;
-        }
-        MPI_Isend(buf, VEC_NELM, MPI_INT, dest, 0, comm, &req);
-        MPI_Wait(&req, &status);
+        buf.resize(VEC_NELM, 0);
+
+        MPI_Isend(buf.data(), VEC_NELM, MPI_INT, dest, 0, comm, &req);
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
 
         /* Synchronize with the receiver */
-        MPI_Sendrecv(NULL, 0, MPI_INT, dest, 1, NULL, 0, MPI_INT, dest, 1, comm, &status);
+        MPI_Sendrecv(NULL, 0, MPI_INT, dest, 1, NULL, 0, MPI_INT, dest, 1, comm, MPI_STATUS_IGNORE);
 
-        for (i = 0; i < VEC_NELM; i++) {
-            buf[i] = i;
-        }
-        MPI_Isend(buf, VEC_NELM, MPI_INT, dest, 0, comm, &req);
-        MPI_Wait(&req, &status);
+        std::iota(buf.begin(), buf.end(), 0);
+        MPI_Isend(buf.data(), VEC_NELM, MPI_INT, dest, 0, comm, &req);
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
     }
-
-    free(buf);
 }
 
 int main(int argc, char **argv) {
