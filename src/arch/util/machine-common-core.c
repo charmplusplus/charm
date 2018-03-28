@@ -241,7 +241,7 @@ extern int ccsRunning;
 #endif
 
 /* ===== Beginning of Common Function Declarations ===== */
-void CmiAbort(const char *message);
+CMK_NORETURN void CmiAbort(const char *message);
 static void PerrorExit(const char *msg);
 
 /* This function handles the msg received as which queue to push into */

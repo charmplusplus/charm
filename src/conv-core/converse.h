@@ -88,6 +88,18 @@
 # define CMK_THROW
 #endif
 
+# if defined __cplusplus
+#  define CMK_NORETURN [[noreturn]]
+# else
+#  if defined _Noreturn
+#   define CMK_NORETURN _Noreturn
+#  elif defined _MSC_VER && 1200 <= _MSC_VER
+#   define CMK_NORETURN __declspec (noreturn)
+#  else
+#   define CMK_NORETURN __attribute__ ((__noreturn__))
+#  endif
+# endif
+
 /* Paste the tokens x and y together, without any space between them.
    The ANSI C way to do this is the bizarre ## "token-pasting" 
    preprocessor operator.

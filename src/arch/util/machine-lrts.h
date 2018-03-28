@@ -1,6 +1,8 @@
 #ifndef  _MACHINE_LRTS_H_
 #define  _MACHINE_LRTS_H_
 
+#include "converse.h"
+
 void LrtsPrepareEnvelope(char *msg, int size);
 
 /* The machine-specific send function */
@@ -25,7 +27,7 @@ void LrtsPostCommonInit(int everReturn);
 void LrtsAdvanceCommunication(int whileidle);
 void LrtsDrainResources(void); /* used when exit */
 void LrtsExit(void);
-void LrtsAbort(const char *message);
+CMK_NORETURN void LrtsAbort(const char *message);
 /* ### End of Machine-running Related Functions ### */
 void LrtsPostNonLocal(void);
 
