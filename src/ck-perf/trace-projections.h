@@ -394,17 +394,21 @@ class LogPool {
 	class that represents a key in a CkHashtable with a string as a key
 */
 class StrKey {
-	std::string str;
-	int len;
+	char *str;
+	unsigned int len;
 	unsigned int key;
 	public:
 	StrKey(const char *name){
-		str = std::string(name);
-		len = str.size();
+		len = strlen(name);
+		str = (char *)malloc((len+1)*sizeof(char));
+		strcpy(str, name);
 		key = 0;
-		for(int i=0;i<len;i++){
+		for(unsigned int i=0;i<len;i++){
 			key += str[i];
 		}
+	}
+	~StrKey(){
+		free(str);
 	}
 	static CkHashCode staticHash(const void *k,size_t){
 		return ((StrKey *)k)->key;
@@ -416,7 +420,7 @@ class StrKey {
 		if(p->len != q->len){
 			return 0;
 		}
-		for(int i=0;i<p->len;i++){
+		for(unsigned int i=0;i<p->len;i++){
 			if(p->str[i] != q->str[i]){
 				return 0;
 			}
@@ -430,15 +434,15 @@ class StrKey {
 		if(len != t.len){
 			return 0;
 		}
-		for(int i=0;i<len;i++){
+		for(unsigned int i=0;i<len;i++){
 			if(str[i] != t.str[i]){
 				return 0;
 			}	
 		}
 		return 1;
 	}
-	inline const char *getStr(){
-		return str.c_str();
+	inline const char *getStr() const {
+		return str;
 	}
 };
 
