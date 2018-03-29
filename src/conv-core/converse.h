@@ -1727,7 +1727,7 @@ void ConverseExit(void);
 #if CMK_SHRINK_EXPAND
 void ConverseCleanup(void);
 #endif
-void CmiAbort(const char *);
+CMK_NORETURN void CmiAbort(const char *);
 void CmiOutOfMemory(int nBytes);
 
 #if CMK_MEMCHECK_OFF
