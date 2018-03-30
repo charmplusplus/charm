@@ -1034,5 +1034,5 @@ machine.d: machine.c conv-autoconfig.h $(CKHEADERS)
 	@set -e; \
 	rm -f $@; \
 	$(CHARMC) $(OPTS) -M -I. -I$(INC) $< >$@.$$$$; \
-	sed -e 's,\($*\)\.o[ :]*,\1.o $@ : ,g' -e 's,[Cc]:/,/cygdrive/c/,' < $@.$$$$ > $@; \
+	sed -e 's,\($*\)\.o[ :]*,\1.o $@ : ,g' -e "s,[Cc]:/,`cygpath -u 'C:/'`," < $@.$$$$ > $@; \
 	rm -f $@.$$$$
