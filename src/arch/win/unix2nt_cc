@@ -51,13 +51,13 @@ fi
 CL_CMD="CL.EXE"
 # Define NOMINMAX to avoid definition of unexpected min(a,b) and max(a,b)
 # macros,per http://support.microsoft.com/kb/143208
-CL_COMMON=' /nologo /W1 /EHsc /D_WINDOWS /DNOMINMAX'
-# CL_COMMON="$CL_COMMON /I`cygpath -d \"$SDK_DIR/Include\"`"
-# CL_COMMON="$CL_COMMON /I`cygpath -d \"$VCC_DIR/Include\"`"
-CL_O=$CL_COMMON" /DNDEBUG /MT /Ox"
-CL_DEF=$CL_COMMON" /MT"
-CL_G=$CL_COMMON" /Z7 /MTd /Od"
-CL_DLL="/LD"
+CL_COMMON=' -nologo -W1 -EHsc -D_WINDOWS -DNOMINMAX'
+# CL_COMMON="$CL_COMMON -I`cygpath -d \"$SDK_DIR/Include\"`"
+# CL_COMMON="$CL_COMMON -I`cygpath -d \"$VCC_DIR/Include\"`"
+CL_O=$CL_COMMON" -DNDEBUG -MT -Ox"
+CL_DEF=$CL_COMMON" -MT"
+CL_G=$CL_COMMON" -Z7 -MTd -Od"
+CL_DLL="-LD"
 
 #LINK command-line options for -O and -g mode
 #only for the environment that has set corresponding environmental variables
@@ -73,20 +73,20 @@ LINK_CMD="$VCC_DIR/BIN/amd64/LINK.EXE"
 else
 LINK_CMD="$VCC_DIR/BIN/LINK.EXE"
 fi
-LINK_COMMON='/nologo /subsystem:console '
+LINK_COMMON='-nologo -subsystem:console '
 #if test -d "`cygpath -u \"$SDK_DIR/Lib/x64\"`"
 #then
-#LINK_COMMON="$LINK_COMMON /LIBPATH:`cygpath -d \"$SDK_DIR/Lib/x64\"`"
+#LINK_COMMON="$LINK_COMMON -LIBPATH:`cygpath -d \"$SDK_DIR/Lib/x64\"`"
 #else
-#LINK_COMMON="$LINK_COMMON /LIBPATH:`cygpath -d \"$VCC_DIR/Lib/amd64\"`"
+#LINK_COMMON="$LINK_COMMON -LIBPATH:`cygpath -d \"$VCC_DIR/Lib/amd64\"`"
 #fi
 LINK_O=$LINK_COMMON
 LINK_DEF=$LINK_COMMON
-LINK_G="$LINK_COMMON /DEBUG"
+LINK_G="$LINK_COMMON -DEBUG"
 #LINK_POST='ws2_32.lib kernel32.lib user32.lib gdi32.lib winspool.lib 
 #  comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib 
-#  odbc32.lib odbccp32.lib /SUBSYSTEM:CONSOLE /INCREMENTAL:NO /MACHINE:IX86 '
-LINK_POST='ws2_32.lib kernel32.lib user32.lib psapi.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib /MACHINE:X64 /ERRORREPORT:PROMPT '
+#  odbc32.lib odbccp32.lib -SUBSYSTEM:CONSOLE -INCREMENTAL:NO -MACHINE:IX86 '
+LINK_POST='ws2_32.lib kernel32.lib user32.lib psapi.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib -MACHINE:X64 -ERRORREPORT:PROMPT '
 
 if [ "x$LIB" = "x" ]
 then
@@ -189,7 +189,7 @@ do
 		VERBOSE="yes"
 		;;
 	-E)
-		CL="$CL /E"
+		CL="$CL -E"
 		;;
 	-O|-O1|-O2|-O3)
 		CL_OPTS=$CL_O
@@ -200,30 +200,30 @@ do
 		LINK_OPTS=$LINK_G
 		;;
 	-c) 
-		CL="$CL /c";;
+		CL="$CL -c";;
 	-D)
-		CL="$CL /D$1"
+		CL="$CL -D$1"
 		shift
 		;;
 	-U)
-		CL="$CL /U$1"
+		CL="$CL -U$1"
 		shift
 		;;
 	-D*)
 		def=`echo $arg | awk -F@ '{print substr($1,3)}'`
-		CL="$CL /D$def"
+		CL="$CL -D$def"
 		;;
 	-U*)
 		def=`echo $arg | awk -F@ '{print substr($1,3)}'`
-		CL="$CL /U$def"
+		CL="$CL -U$def"
 		;;
 	-I)
-		CL="$CL /I`cygpath -w $1`"
+		CL="$CL -I`cygpath -w $1`"
 		shift
 		;;
 	-I*)
 		path=`echo $arg | awk -F@ '{print substr($1,3)}'`
-		CL="$CL /I`cygpath -w $path`"
+		CL="$CL -I`cygpath -w $path`"
 		;;
 	-MM|-M)
 		DODEPS="yes"
@@ -231,14 +231,14 @@ do
 	-L)
 		LIBDIR="`cygpath -w $1`"
 		LIBDIRS="$LIBDIRS `cygpath -u $LIBDIR`"
-		LINK=$LINK"	/LIBPATH:$LIBDIR"
+		LINK=$LINK"	-LIBPATH:$LIBDIR"
 		shift
 		;;
 	-L*)
 		LIBDIR=`echo $arg | awk -F@ '{print substr($1,3)}'`
 		LIBDIR="`cygpath -w $LIBDIR`"
 		LIBDIRS="$LIBDIRS `cygpath -u $LIBDIR`"
-		LINK=$LINK"	/LIBPATH:$LIBDIR"
+		LINK=$LINK"	-LIBPATH:$LIBDIR"
 		;;
 	-l*)
 		if [ "$arg" != "-lm" ]
@@ -269,20 +269,20 @@ do
 		if [ "x`getExtention $out`" = "x.o" ]
 		then
 #It's a .o output filename-- tell CL
-			OUTPUT="/Fo`cygpath -w $out`"
+			OUTPUT="-Fo`cygpath -w $out`"
 		elif [ "x`getExtention $out`" = "x.obj" ]
 		then
-			OUTPUT="/Fo`cygpath -w $out`"
+			OUTPUT="-Fo`cygpath -w $out`"
 		elif [ "x`getExtention $out`" = "x.so" ]
 		then
-			OUTPUT="/Fo`cygpath -w $out`"
+			OUTPUT="-Fo`cygpath -w $out`"
 		elif [ "x`getExtention $out`" = "x.exe" ]
 		then
-			LINK="$LINK /out:$out"
+			LINK="$LINK -out:$out"
 			DOLINK="yes"
 		else
 #It's an exe filename-- tell LINK
-			LINK="$LINK /out:$out.exe"
+			LINK="$LINK -out:$out.exe"
 			DOLINK="yes"
 		fi
 		;;
@@ -301,8 +301,8 @@ do
 	*.c)
 		base=`stripExtention $arg`
 		source="$arg"
-		CL="$CL /Tc`cygpath -w $arg`"
-		OBJ_OUTPUT="/Fo$base.o"
+		CL="$CL -Tc`cygpath -w $arg`"
+		OBJ_OUTPUT="-Fo$base.o"
 		LINK="$LINK $base.o"
 		DOCOMPILE="yes"
 		;;
@@ -310,8 +310,8 @@ do
 	*.C|*.cxx|*.cpp)
 		base=`stripExtention $arg`
 		source="$arg"
-		CL="$CL /Tp`cygpath -w $arg`"
-#		OUTPUT="/Fo$base.o"
+		CL="$CL -Tp`cygpath -w $arg`"
+#		OUTPUT="-Fo$base.o"
 		LINK="$LINK $base.o"
 		DOCOMPILE="yes"
 		;;
@@ -328,7 +328,7 @@ done
 
 if [ $DODEPS = yes ]
 then
-	OPTS="$CL_OPTS $CL /showIncludes"
+	OPTS="$CL_OPTS $CL -showIncludes"
 	echo "$base.o: $source \\"
 	"$CL_CMD" $OPTS | sed -e '/^Note: including file:/!d' \
 		-e 's/^Note: including file:\s*\(.*\)$/\1/' \

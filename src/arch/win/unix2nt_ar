@@ -20,7 +20,7 @@ fi
 #only valid for the platform that has exported corresponding variables
 #LIB_CMD="$VCC_DIR/BIN/LIB.EXE"
 LIB_CMD="lib.exe"
-LIB_OPTS='/nologo'
+LIB_OPTS='-nologo'
 
 if [ "x$LIB" = "x" ]
 then
@@ -72,7 +72,7 @@ Abort() {
 
 out=$(cygpath -w $1)
 shift
-args="/out:$out $@"
+args="-out:$out $@"
 
 "$LIB_CMD" $LIB_OPTS $args
 
