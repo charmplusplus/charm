@@ -1,6 +1,6 @@
 CMK_CC="$CHARMBIN/unix2nt_cc "
 CMK_CPP_C="$CMK_CC"
-CMK_CPP_CHARM="/usr/bin/cpp -P"
+CMK_CPP_CHARM="cpp -P"
 CMK_CXX="$CHARMBIN/unix2nt_cc "
 CMK_LD="$CMK_CC"
 CMK_LDXX="$CMK_CXX"
