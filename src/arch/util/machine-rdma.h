@@ -16,6 +16,8 @@ typedef struct _cmi_rdma_ack{
 typedef struct _cmi_common_rdma_info {
 #if CMK_USE_CMA
   pid_t pid;
+#elif defined _MSC_VER
+  char empty;
 #endif
 } CmiCommonRdmaInfo_t;
 
@@ -176,7 +178,7 @@ int CmiGetRdmaRecvInfoSize(int numOps){
 
 /* Issue RDMA get calls on the pe using the message containing the metadata information*/
 void CmiIssueRgets(void *recv, int pe){
-  return LrtsIssueRgets(recv, pe);
+  LrtsIssueRgets(recv, pe);
 }
 
 #endif
