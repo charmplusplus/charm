@@ -67,6 +67,9 @@ CL_DLL="-LD"
 if [ "`which link`" != "/usr/bin/link" ]
 then
 LINK_CMD="link.exe"
+elif test -d "`cygpath -u \"$VCC_DIR/bin/HostX64/x64\"`"
+then
+LINK_CMD="$VCC_DIR/bin/HostX64/x64/link.exe"
 elif test -d "`cygpath -u \"$VCC_DIR/BIN/amd64\"`"
 then
 LINK_CMD="$VCC_DIR/BIN/amd64/LINK.EXE"
