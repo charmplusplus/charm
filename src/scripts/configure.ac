@@ -1776,7 +1776,7 @@ fi
 
 ### test gethostname ####
 cat > $tc <<EOT
-#ifdef WIN32
+#ifdef _WIN32
 #include <Winsock2.h>
 #else
 #include <stdlib.h>
@@ -1791,7 +1791,7 @@ int main()
   return 0;
 }
 EOT
-test_linkc "whether gethostname call exists" "yes" "no" ""
+test_cc "whether gethostname call exists" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_GETHOSTNAME, $pass, [whether gethostname() exists])
 
 #### check if getProcAddress works ####
@@ -2039,7 +2039,7 @@ int main() {
   return 0;
 }
 EOT
-test_link "whether ntohl is available" "yes" "no" ""
+test_cc "whether ntohl is available" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_NTOHL, $pass, [whether ntohl is available])
 
 ### test for libjpeg ####
