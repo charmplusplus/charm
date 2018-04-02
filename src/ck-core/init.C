@@ -883,8 +883,7 @@ static void _initHandler(void *msg, CkCoreState *ck)
     case BocInitMsg:
       if (env->getGroupEpoch()==0) {
         CkpvAccess(_numInitsRecd)++;
-	// _processBocInitMsg already handles QD
-        //CpvAccess(_qd)->process();
+        // _qd->process() or ck->process() to update QD counters is called inside _processBocInitMsg
         if (CkpvAccess(_bocInitVec)->size() < env->getGroupNum().idx + 1) {
           CkpvAccess(_bocInitVec)->resize(env->getGroupNum().idx + 1);
         }
@@ -900,7 +899,7 @@ static void _initHandler(void *msg, CkCoreState *ck)
         }
         (*CksvAccess(_nodeBocInitVec))[env->getGroupNum().idx] = env;
         CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
-        CpvAccess(_qd)->process();
+        // _qd->process() or ck->process() to update QD counters is called inside _processNodeBocInitMsg
       } else _bufferHandler(msg);
       break;
     case ROMsgMsg:

@@ -943,12 +943,16 @@ static void _processNewChareMsg(CkCoreState *ck,envelope *env)
 {
   if(isGroupDepUnsatisfied(ck, env))
     return;
+  if(ck)
+    ck->process(); // ck->process() updates mProcessed count used in QD
   int idx;
   void *obj = _allocNewChare(env, idx);
 #ifndef CMK_CHARE_USE_PTR
   CkpvAccess(currentChareIdx) = idx;
 #endif
   _invokeEntry(env->getEpIdx(),env,obj);
+  if(ck)
+    _STATS_RECORD_PROCESS_CHARE_1();
 }
 
 void CkCreateLocalChare(int epIdx, envelope *env)
@@ -961,6 +965,7 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
 {
   if(isGroupDepUnsatisfied(ck, env))
     return;
+  ck->process(); // ck->process() updates mProcessed count used in QD
   int idx;
   void *obj = _allocNewChare(env, idx);
   CkChareID *pCid = (CkChareID *)
@@ -990,6 +995,7 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
   CkpvAccess(currentChareIdx) = idx;
 #endif
   _invokeEntry(env->getEpIdx(),env,obj);
+  _STATS_RECORD_PROCESS_CHARE_1();
 }
 
 /************** Receive: Chares *************/
@@ -998,6 +1004,7 @@ static inline void _processForPlainChareMsg(CkCoreState *ck,envelope *env)
 {
   if(isGroupDepUnsatisfied(ck, env))
     return;
+  ck->process(); // ck->process() updates mProcessed count used in QD
   int epIdx = env->getEpIdx();
   int mainIdx = _chareTable[_entryTable[epIdx]->chareIdx]->mainChareType();
   void *obj;
@@ -1016,6 +1023,7 @@ static inline void _processForPlainChareMsg(CkCoreState *ck,envelope *env)
 #endif
   }
   _invokeEntry(epIdx,env,obj);
+  _STATS_RECORD_PROCESS_MSG_1();
 }
 
 static inline void _processForChareMsg(CkCoreState *ck,envelope *env)
@@ -1027,6 +1035,7 @@ static inline void _processForChareMsg(CkCoreState *ck,envelope *env)
 
 static inline void _processFillVidMsg(CkCoreState *ck,envelope *env)
 {
+  ck->process(); // ck->process() updates mProcessed count used in QD
 #ifndef CMK_CHARE_USE_PTR
   VidBlock *vptr = CkpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()];
 #else
@@ -1041,6 +1050,7 @@ static inline void _processFillVidMsg(CkCoreState *ck,envelope *env)
 
 static inline void _processForVidMsg(CkCoreState *ck,envelope *env)
 {
+  ck->process(); // ck->process() updates mProcessed count used in QD
 #ifndef CMK_CHARE_USE_PTR
   VidBlock *vptr = CkpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()];
 #else
@@ -1053,6 +1063,7 @@ static inline void _processForVidMsg(CkCoreState *ck,envelope *env)
 
 static inline void _processDeleteVidMsg(CkCoreState *ck,envelope *env)
 {
+  ck->process(); // ck->process() updates mProcessed count used in QD
 #ifndef CMK_CHARE_USE_PTR
   VidBlock *vptr = CkpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()];
   delete vptr;
@@ -1115,7 +1126,7 @@ static inline void _processForBocMsg(CkCoreState *ck,envelope *env)
   CkGroupID groupID =  env->getGroupNum();
   IrrGroup *obj = _lookupGroupAndBufferIfNotThere(ck,env,env->getGroupNum());
   if(obj) {
-    ck->process();
+    ck->process(); // ck->process() updates mProcessed count used in QD
     _deliverForBocMsg(ck,env->getEpIdx(),env,obj);
   }
 }
@@ -1155,7 +1166,7 @@ static inline void _processForNodeBocMsg(CkCoreState *ck,envelope *env)
     return;
   }
   CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
-  ck->process();
+  ck->process(); // ck->process() updates mProcessed count used in QD
   env->setMsgtype(ForChareMsg);
   env->setObjPtr(obj);
   _processForChareMsg(ck,env);
@@ -1168,7 +1179,7 @@ void _processBocInitMsg(CkCoreState *ck,envelope *env)
     return;
   CkGroupID groupID = env->getGroupNum();
   int epIdx = env->getEpIdx();
-  ck->process();
+  ck->process(); // ck->process() updates mProcessed count used in QD
   CkCreateLocalGroup(groupID, epIdx, env);
 }
 
@@ -1176,6 +1187,7 @@ void _processNodeBocInitMsg(CkCoreState *ck,envelope *env)
 {
   if(isGroupDepUnsatisfied(ck, env))
     return;
+  ck->process(); // ck->process() updates mProcessed count used in QD
   CkGroupID groupID = env->getGroupNum();
   int epIdx = env->getEpIdx();
   CkCreateLocalNodeGroup(groupID, epIdx, env);
@@ -1188,7 +1200,7 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
   if (iter != object_map.end()) {
     // First see if we already have a direct pointer to the object
     _SET_USED(env, 0);
-    ck->process();
+    ck->process(); // ck->process() updates mProcessed count used in QD
     int opts = 0;
     CkArrayMessage* msg = (CkArrayMessage*)EnvToUsr(env);
     if (msg->array_hops()>1) {
@@ -1200,7 +1212,7 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
     CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getArrayMgr());
     if (mgr) {
       _SET_USED(env, 0);
-      ck->process();
+      ck->process(); // ck->process() updates mProcessed count used in QD
       mgr->deliver((CkArrayMessage *)EnvToUsr(env), CkDeliver_inline);
     }
   }
@@ -1275,7 +1287,7 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
       break;
     case NodeBocInitMsg :
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: NodeBocInitMsg\n", CkMyPe());)
-      ck->process(); if(env->isPacked()) CkUnpackMessage(&env);
+      if(env->isPacked()) CkUnpackMessage(&env);
       _processNodeBocInitMsg(ck,env);
       break;
     case ForBocMsg :
@@ -1303,35 +1315,29 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
 // Chare support
     case NewChareMsg :
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: NewChareMsg\n", CkMyPe());)
-      ck->process(); if(env->isPacked()) CkUnpackMessage(&env);
+      if(env->isPacked()) CkUnpackMessage(&env);
       _processNewChareMsg(ck,env);
-      _STATS_RECORD_PROCESS_CHARE_1();
       break;
     case NewVChareMsg :
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: NewVChareMsg\n", CkMyPe());)
-      ck->process(); if(env->isPacked()) CkUnpackMessage(&env);
+      if(env->isPacked()) CkUnpackMessage(&env);
       _processNewVChareMsg(ck,env);
-      _STATS_RECORD_PROCESS_CHARE_1();
       break;
     case ForChareMsg :
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: ForChareMsg\n", CkMyPe());)
-      ck->process(); if(env->isPacked()) CkUnpackMessage(&env);
+      if(env->isPacked()) CkUnpackMessage(&env);
       _processForPlainChareMsg(ck,env);
-      _STATS_RECORD_PROCESS_MSG_1();
       break;
     case ForVidMsg   :
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: ForVidMsg\n", CkMyPe());)
-      ck->process();
       _processForVidMsg(ck,env);
       break;
     case FillVidMsg  :
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: FillVidMsg\n", CkMyPe());)
-      ck->process();
       _processFillVidMsg(ck,env);
       break;
     case DeleteVidMsg  :
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: DeleteVidMsg\n", CkMyPe());)
-      ck->process();
       _processDeleteVidMsg(ck,env);
       break;
 
