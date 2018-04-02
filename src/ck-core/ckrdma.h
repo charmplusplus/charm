@@ -131,7 +131,7 @@ class CkNcpySource{
     CmiSetRdmaSrcInfo(&layerInfo, ptr, cnt);
   }
 
-  void rput(CkNcpyDestination destination);
+  void rput(CkNcpyDestination &destination);
 
   void releaseResource();
 };
@@ -171,7 +171,7 @@ class CkNcpyDestination{
     CmiSetRdmaDestInfo(&layerInfo, ptr, cnt);
   }
 
-  void rget(CkNcpySource source);
+  void rget(CkNcpySource &source);
 
   void releaseResource();
 };

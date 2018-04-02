@@ -334,7 +334,7 @@ void CkRdmaAckHandler(void *cbPtr, int pe, const void *ptr) {
 }
 
 // Perform a nocopy put operation into the passed destination using this source
-void CkNcpySource::rput(CkNcpyDestination destination){
+void CkNcpySource::rput(CkNcpyDestination &destination){
   // Check that the count for both the counters matches
   CkAssert(cnt <= destination.cnt);
 
@@ -374,7 +374,7 @@ void CkNcpySource::releaseResource(){
 }
 
 // Perform a nocopy get operation into this destination using the passed source
-void CkNcpyDestination::rget(CkNcpySource source){
+void CkNcpyDestination::rget(CkNcpySource &source){
 
   // Check that the count for both the counters matches
   CkAssert(source.cnt <= cnt);
