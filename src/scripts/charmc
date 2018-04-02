@@ -161,10 +161,10 @@ End() {
         for FILE in `echo $FILES`
         do
             #BASE=`stripExtention $FILE`
-            TMP=`basename $FILE`".TMP"
-            $RM $TMP.P.C $TMP.cpp $TMP.space $TMP.xlat $TMP.o
-            $RM $TMP.c $TMP.c.0.h $TMP.c.1.h $TMP.c.2.h
-            $RM $TMP.i $TMP.$CMK_CPP_SUFFIX
+            MYTMP=`basename $FILE`".TMP"
+            $RM $MYTMP.P.C $MYTMP.cpp $MYTMP.space $MYTMP.xlat $MYTMP.o
+            $RM $MYTMP.c $MYTMP.c.0.h $MYTMP.c.1.h $MYTMP.c.2.h
+            $RM $MYTMP.i $MYTMP.$CMK_CPP_SUFFIX
         done
         $RM core $DELETE
 	if [ -z "$SKIP_MODULEINIT" -a -n "$modInitObj" ]
@@ -1728,13 +1728,13 @@ for FILE in `echo $GENCPM`
 do
 # This used to be "$FILE:r", which strips the extention
 	BASE=`stripExtention $FILE`
-	TMP=`basename $FILE`".TMP"
-	DELETE="$DELETE $TMP.c $TMP.i"
-	DoNoErrCheck $RM $BASE.cpm.h $TMP.c
+	MYTMP=`basename $FILE`".TMP"
+	DELETE="$DELETE $MYTMP.c $MYTMP.i"
+	DoNoErrCheck $RM $BASE.cpm.h $MYTMP.c
 	Do touch $BASE.cpm.h
-	Do $LN -f -s $FILE $TMP.c
-	Do $CHARM_CPP_C $CHARM_CPP_C_FLAGS $TMP.c > $TMP.i
-	Do $CHARMBIN/conv-cpm $TMP.i $BASE.cpm.h
+	Do $LN -f -s $FILE $MYTMP.c
+	Do $CHARM_CPP_C $CHARM_CPP_C_FLAGS $MYTMP.c > $MYTMP.i
+	Do $CHARMBIN/conv-cpm $MYTMP.i $BASE.cpm.h
 done
 
 ##############################################################################
@@ -1750,7 +1750,7 @@ Debug "About to compile..."
 for FILE in $FILES
 do
 	BASE=`stripExtention \`basename $FILE\``
-	TMP=`basename $FILE`".TMP"
+	MYTMP=`basename $FILE`".TMP"
 	FILE_EXT=`getExtention $FILE`
 	BASEO="$BASE.o"
 	DESTO="-o $BASEO"

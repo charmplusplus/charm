@@ -735,7 +735,7 @@ then
     # pxshm+smp note: When combining the 'smp' and 'pxshm' directives, it is
     #                 important that they be included in $ConvHeader in that
     #                 exact order. See bug #717.
-    TMP=""
+    MYTMP=""
     HAS_PXSHM=0
     HAS_SMP=0
     for i in $BOPTS; do
@@ -745,21 +745,21 @@ then
         HAS_PXSHM=1
       elif [ "$i" = "omp" ]; then
         BUILD_OMP=1
-        TMP="$TMP $i"
+        MYTMP="$MYTMP $i"
       else
-        TMP="$TMP $i"
+        MYTMP="$MYTMP $i"
       fi
     done
     if [ $HAS_PXSHM -eq 1 ]; then
-      TMP="pxshm $TMP"
+      MYTMP="pxshm $MYTMP"
     fi
     if [ $HAS_SMP -eq 1 ]; then
-      TMP="smp $TMP"
+      MYTMP="smp $MYTMP"
     elif [ $BUILD_OMP -eq 1 ]; then
       BUILD_OMP=2 #this means omp keyword inserted without smp keyword"
     fi
 
-    BOPTS=$TMP
+    BOPTS=$MYTMP
     for i in $BOPTS
     do
       echo '#include "'conv-mach-$i.h'"' >> $ConvHeader
