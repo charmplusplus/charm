@@ -646,7 +646,15 @@ then
 	cp $src/win/system_ln $DESTINATION/tmp
 	cp $src/win/unistd.h $DESTINATION/tmp
 	echo "Compiling createlink.cpp ..."
-	(cd $src/win; ./unix2nt_cc -c createlink.cpp -o createlink.o -D_WIN32_WINNT=0x0500; ./unix2nt_cc createlink.o)
+	case "$COMPILER" in
+		gcc*|clang*)
+			createlinkcc="$COMPILER"
+			;;
+		*)
+			createlinkcc="./unix2nt_cc"
+			;;
+	esac
+	(cd $src/win; $createlinkcc -c createlink.cpp -o createlink.o -D_WIN32_WINNT=0x0500; $createlinkcc createlink.o -o createlink.exe)
 
 	if test ! -x $src/win/createlink.exe
 	then

@@ -1,6 +1,6 @@
 /*
 unix2nt_cc  -c createlink.cpp -o createlink.o -D_WIN32_WINNT=0x0500
-unix2nt_cc createlink.o
+unix2nt_cc createlink.o -o createlink.exe
 */
 
 #include <windows.h>
