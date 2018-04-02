@@ -54,6 +54,9 @@
 #include <inttypes.h>
 #ifndef WIN32
 #  include <unistd.h> /*For getpagesize*/
+#else
+#  include <process.h>
+#  define getpid _getpid
 #endif
 #include "converse.h"
 

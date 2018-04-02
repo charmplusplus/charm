@@ -1194,69 +1194,6 @@ CthThread CthCreateMigratable(CthVoidFn fn,void *arg,int size)
 #include <windows.h>
 #include <winbase.h>
 
-#ifndef _WIN32_WINNT
-#define _WIN32_WINNT  0x0400
-#endif
-
-#if(_WIN32_WINNT >= 0x0400)
-typedef VOID (WINAPI *PFIBER_START_ROUTINE)(
-    LPVOID lpFiberParameter
-    );
-typedef PFIBER_START_ROUTINE LPFIBER_START_ROUTINE;
-#endif
-
-#if(_WIN32_WINNT >= 0x0400)
-WINBASEAPI
-LPVOID
-WINAPI
-CreateFiber(
-    DWORD dwStackSize,
-    LPFIBER_START_ROUTINE lpStartAddress,
-    LPVOID lpParameter
-    );
-
-WINBASEAPI
-LPVOID 
-WINAPI 
-CreateFiberEx(
-    SIZE_T dwStackCommitSize,
-    SIZE_T dwStackReserveSize,
-    DWORD dwFlags,
-    LPFIBER_START_ROUTINE lpStartAddress,
-    LPVOID lpParameter
-    );
-
-
-WINBASEAPI
-VOID
-WINAPI
-DeleteFiber(
-    LPVOID lpFiber
-    );
-
-WINBASEAPI
-LPVOID
-WINAPI
-ConvertThreadToFiber(
-    LPVOID lpParameter
-    );
-
-WINBASEAPI
-VOID
-WINAPI
-SwitchToFiber(
-    LPVOID lpFiber
-    );
-
-WINBASEAPI
-BOOL
-WINAPI
-SwitchToThread(
-    VOID
-    );
-#endif /* _WIN32_WINNT >= 0x0400 */
-
-
 struct CthThreadStruct
 {
   CthThreadBase base;

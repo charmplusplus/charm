@@ -7,6 +7,14 @@
 #include "ccs-server.h"
 #include "conv-ccs.h"
 
+#ifdef _WIN32
+# include <sys/types.h>
+# include <io.h>
+# include <process.h>
+# define write _write
+# define getpid _getpid
+#endif
+
 #if CMK_CCS_AVAILABLE
 extern "C" void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData);
 
@@ -43,10 +51,6 @@ extern "C" void req_fw_handler(char *msg)
   CcsHandleRequest(hdr, msg+offset);
   CmiFree(msg);
 }
-
-#ifdef _MSC_VER
-extern "C" size_t write(int fd, const void *buf, size_t count);
-#endif
 
 CMI_EXTERNC_VARIABLE int rep_fw_handler_idx;
 /**

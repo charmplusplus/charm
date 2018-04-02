@@ -4379,7 +4379,7 @@ static void start_nodes_local(std::vector<nodetab_process> & process_table)
                            */
   strcpy(cmdLine, pparam_argv[1]);
   const char **param = pparam_argv + 2;
-  while ((*param) != '\0') {
+  while (*param) {
     strcat(cmdLine, " ");
     strcat(cmdLine, *param);
     param++;

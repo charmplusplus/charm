@@ -15,7 +15,7 @@
 /* Given a user chunk m, extract the enclosing chunk header fields: */
 
 //Align data sizes to 8 bytes
-#define ALIGN8_LONG(x)       (long)((~7)&((x)+7))
+#define ALIGN8_LONG(x)       (intptr_t)((~7)&((x)+7))
 
 //Assuming Size of CmiChunkHeader is a multiple of 8 bytes!!
 

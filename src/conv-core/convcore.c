@@ -3281,7 +3281,7 @@ void CmiMkdir(const char *dirName) {
 #include <sys/types.h>
 
 void CmiMkdir(const char *dirName) {
-#ifndef __MINGW_H
+#ifndef _WIN32
 	mkdir(dirName,0777);
 #else
 	mkdir(dirName);

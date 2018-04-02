@@ -39,7 +39,11 @@ int ConverseDeliver(int pe) {
 }
 
 #if ! CMK_HAS_NTOHL
+#ifndef _WIN32
 uint32_t ntohl(uint32_t netlong) {
+#else
+u_long ntohl(u_long netlong) {
+#endif
   union { uint32_t i; unsigned char c[4]; } uaw;
   uaw.i = netlong;
   netlong = uaw.c[0]<<24 + uaw.c[1]<<16 + uaw.c[2]<<8 + uaw.c[3];
