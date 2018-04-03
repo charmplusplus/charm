@@ -1030,7 +1030,7 @@ endif
 
 -include machine.d
 machine.o: machine.d
-machine.d: machine.c conv-autoconfig.h
+machine.d: machine.c conv-autoconfig.h $(CKHEADERS)
 	@set -e; \
 	rm -f $@; \
 	$(CHARMC) $(OPTS) -M -I. -I$(INC) $< >$@.$$$$; \
