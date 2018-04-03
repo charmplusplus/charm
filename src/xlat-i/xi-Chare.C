@@ -65,6 +65,28 @@ void Chare::genRegisterMethodDef(XStr& str) {
   else
     str << " TypeInvalid";
   str << ");\n";
+
+  if (isArray()) {
+    str << "  CkRegisterArrayDimensions(__idx, ";
+    XStr dim = ((Array*)this)->dim();
+    if (dim == (const char*)"1D")
+      str << "1";
+    else if (dim == (const char*)"2D")
+      str << "2";
+    else if (dim == (const char*)"3D")
+      str << "3";
+    else if (dim == (const char*)"4D")
+      str << "4";
+    else if (dim == (const char*)"5D")
+      str << "5";
+    else if (dim == (const char*)"6D")
+      str << "6";
+    else
+      str << "-1";
+
+    str << ");\n";
+  }
+
   if (internalMode) str << "  CkRegisterChareInCharm(__idx);\n";
   // register all bases
   genIndexNames(str, "  CkRegisterBase(__idx, ", NULL, "::__idx);\n", "");

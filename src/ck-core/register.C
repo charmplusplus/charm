@@ -74,6 +74,11 @@ int CkRegisterChare(const char *name, size_t dataSz, ChareType chareType)
 }
 
 extern "C"
+void CkRegisterArrayDimensions(int chareIndex, int ndims) {
+  _chareTable[chareIndex]->ndims = ndims;
+}
+
+extern "C"
 void CkRegisterChareInCharm(int chareIndex){
   _chareTable[chareIndex]->inCharm = true;
 }

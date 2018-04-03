@@ -909,8 +909,25 @@ void LogEntry::pup(PUP::er &p)
         icputime = (CMK_TYPEDEF_UINT8)(1.0e6*cputime);
       }
       p|mIdx; p|eIdx; p|itime; p|event; p|pe; 
-      p|msglen; p|irecvtime; 
-      p|id.id[0]; p|id.id[1]; p|id.id[2]; p|id.id[3];
+      p|msglen; p|irecvtime;
+      { // This brace is so that ndims can be declared inside a switch
+        const int ndims = _chareTable[_entryTable[eIdx]->chareIdx]->ndims;
+        // Should only be true if the chare is part of an array, otherwise ndims should be -1
+        if (ndims >= 1) {
+          if (ndims >= 4) {
+            short int* idShorts = (short int*)&(id.id);
+            for (int i = 0; i < ndims; i++)
+              p | idShorts[i];
+          }
+          else {
+            for (int i = 0; i < ndims; i++)
+              p | id.id[i];
+          }
+        }
+        else {
+          p|id.id[0]; p|id.id[1]; p|id.id[2]; p|id.id[3];
+        }
+      }
       p|icputime;
 #if CMK_HAS_COUNTER_PAPI
       //p|numPapiEvents;

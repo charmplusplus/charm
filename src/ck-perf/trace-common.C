@@ -251,7 +251,7 @@ void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "TOTAL_EVENTS %d\n", (int)nUserEvents);
   size_t i;
   for(i=0;i<_chareTable.size();i++)
-    fprintf(stsfp, "CHARE %d %s\n", (int)i, _chareTable[i]->name);
+    fprintf(stsfp, "CHARE %d %s %d\n", (int)i, _chareTable[i]->name, _chareTable[i]->ndims);
   for(i=0;i<_entryTable.size();i++)
     fprintf(stsfp, "ENTRY CHARE %d %s %d %d\n", (int)i, _entryTable[i]->name,
                  (int)_entryTable[i]->chareIdx, (int)_entryTable[i]->msgIdx);

@@ -168,6 +168,9 @@ class ChareInfo {
     ChareType  chareType;
     int mainChareIdx;
 
+    /// Number of dimensions for chare arrays (-1 if not an array, 0 is invalid)
+    int ndims;
+
     /// For groups -- true if the group is Irreducible
     bool isIrr;
 
@@ -180,6 +183,7 @@ class ChareInfo {
       chareType = t;
       inCharm = false;
       mainChareIdx = -1;
+      ndims = -1;
     }
     void setDefaultCtor(int idx) { defCtor = idx; }
     int getDefaultCtor(void) { return defCtor; }
