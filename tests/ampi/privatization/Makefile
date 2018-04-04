@@ -10,7 +10,7 @@ VARIANTS := \
   roseomptlsglobals \
 
 
-# for determining `all`, `test`, `bgtest` rules
+# for determining `all`, `test` rules
 CANDIDATES := \
   swapglobals \
   tlsglobals \
@@ -39,15 +39,9 @@ test: $(foreach i,$(TARGETS),test-$i)
 ifeq (,$(TARGETS))
 	@echo $(EMPTY_MESSAGE)
 endif
-bgtest: $(foreach i,$(TARGETS),bgtest-$i)
-ifeq (,$(TARGETS))
-	@echo $(EMPTY_MESSAGE)
-endif
 
 everything: $(foreach i,$(VARIANTS),$i)
 test-everything: $(foreach i,$(VARIANTS),test-$i)
-bgtest-everything: $(foreach i,$(VARIANTS),bgtest-$i)
-
 
 # Define the features that each privatization method supports.
 FEATURES_control := staticvars sharedlib dynamiclib
@@ -87,12 +81,6 @@ test-$1: $1
 	$$(call run, ./$1 +p2 +vp2 )
 	$$(call run, ./$1 +p2 +vp4 )
 
-bgtest-$1: $1
-	$$(call run, ./$1 +p1 +vp2 +x1 +y1 +z1 )
-	$$(call run, ./$1 +p1 +vp4 +x1 +y1 +z1 )
-	$$(call run, ./$1 +p2 +vp2 +x2 +y1 +z1 )
-	$$(call run, ./$1 +p2 +vp4 +x2 +y1 +z1 )
-
 endef
 
 $(foreach i,$(VARIANTS),$(eval $(call VARIANT_RULES,$i)))
@@ -102,4 +90,4 @@ clean:
 	rm -f *.o *.a *.so $(foreach i,$(VARIANTS),$i) charmrun ampirun
 
 .SUFFIXES:
-.PHONY: all test bgtest everything test-everything bgtest-everything $(foreach i,$(VARIANTS),test-$i bgtest-$i)
+.PHONY: all test everything test-everything $(foreach i,$(VARIANTS),test-$i)

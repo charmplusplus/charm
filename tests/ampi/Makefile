@@ -19,7 +19,7 @@ test:
 
 bgtest:
 	for d in $(DIRS); do \
-		if [ "$$d" = "intercomm_coll" ]; then continue; fi; \
+		if [ "$$d" = "intercomm_coll" || "$$d" = "privatization" ]; then continue; fi; \
 		($(MAKE) -C $$d bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
 	done
 
