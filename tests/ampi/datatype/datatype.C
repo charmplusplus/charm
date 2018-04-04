@@ -697,14 +697,9 @@ int main(int argc, char **argv) {
     MPI_Comm comm;
     MPI_Comm_split(MPI_COMM_WORLD, color, global_rank, &comm);
 
-    /*
-     * TODO: This test yields multiple errors when compiled with AMPI, but runs as
-     * expected when compiled with MPICH. This is likely the result of a bug in
-     * the AMPI alltoallv/ialltoallv implementation.
-     */
-//    if (global_rank == 0) printf("Testing datatype free ialltoallv\n");
-//    if (global_rank == 0 || global_rank == 1)
-//        typefree_ialltoallv_test(comm);
+    if (global_rank == 0) printf("Testing datatype free ialltoallv\n");
+    if (global_rank == 0 || global_rank == 1)
+        typefree_ialltoallv_test(comm);
 
     if (global_rank == 0) printf("Testing datatype free ialltoall\n");
     if (global_rank == 0 || global_rank == 1)
@@ -719,13 +714,8 @@ int main(int argc, char **argv) {
 //        typefree_ireduce_test(comm);
     MPI_Comm_free(&comm);
 
-    /*
-     * TODO: This test causes a segfault when compiled with AMPI, but runs as
-     * expected when compiled with MPICH. This is likely the result of a bug in
-     * the AMPI scatterv/iscatterv implementation.
-     */
-//    if (global_rank == 0) printf("Testing datatype free iscatterv\n");
-//    typefree_iscatterv_test(global_rank, size);
+    if (global_rank == 0) printf("Testing datatype free iscatterv\n");
+    typefree_iscatterv_test(global_rank, size);
 
     MPI_Finalize();
 

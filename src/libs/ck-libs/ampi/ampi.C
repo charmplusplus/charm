@@ -2807,11 +2807,13 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
 {
   if (rank==MPI_PROC_NULL) return MPI_REQUEST_NULL;
   const ampiCommStruct &dest=comm2CommStruct(destcomm);
-  int destIdx = dest.getIndexForRank(rank);
+  int destIdx;
   if(isInter()){
     sRank = thisIndex;
     destIdx = dest.getIndexForRemoteRank(rank);
     arrProxy = remoteProxy;
+  } else {
+    destIdx = dest.getIndexForRank(rank);
   }
 
   MSG_ORDER_DEBUG(
@@ -6789,15 +6791,15 @@ AMPI_API_IMPL(int, MPI_Scatter, const void *sendbuf, int sendcount, MPI_Datatype
 
   if(rank==root) {
     CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
-    int itemsize = dttype->getSize(sendcount) ;
+    int itemextent = dttype->getExtent() * sendcount;
     for(i=0;i<size;i++) {
       if (i != rank) {
-        ptr->send(MPI_SCATTER_TAG, rank, ((char*)sendbuf)+(itemsize*i),
+        ptr->send(MPI_SCATTER_TAG, rank, ((char*)sendbuf)+(itemextent*i),
                   sendcount, sendtype, i, comm);
       }
     }
     if (sendbuf != recvbuf) {
-      copyDatatype(sendtype,sendcount,recvtype,recvcount,(char*)sendbuf+(itemsize*rank),recvbuf);
+      copyDatatype(sendtype,sendcount,recvtype,recvcount,(char*)sendbuf+(itemextent*rank),recvbuf);
     }
   }
   else {
@@ -6869,17 +6871,19 @@ AMPI_API_IMPL(int, MPI_Iscatter, const void *sendbuf, int sendcount, MPI_Datatyp
 
   if(rank==root) {
     CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
-    int itemsize = dttype->getSize(sendcount) ;
+    int itemextent = dttype->getExtent() * sendcount;
     // use an ATAReq to non-block the caller and get a request ptr
-    ATAReq *newreq = new ATAReq(size-1);
+    ATAReq *newreq = new ATAReq(size);
     for(i=0;i<size;i++) {
       if (i != rank) {
-        newreq->reqs[i] = ptr->send(MPI_SCATTER_TAG, rank, ((char*)sendbuf)+(itemsize*i),
+        newreq->reqs[i] = ptr->send(MPI_SCATTER_TAG, rank, (char*)sendbuf+(itemextent*i),
                                     sendcount, sendtype, i, comm, 0, I_SEND);
       }
     }
+    newreq->reqs[rank] = MPI_REQUEST_NULL;
+
     if (sendbuf != recvbuf) {
-      copyDatatype(sendtype,sendcount,recvtype,recvcount,(char*)sendbuf+(itemsize*rank),recvbuf);
+      copyDatatype(sendtype,sendcount,recvtype,recvcount,(char*)sendbuf+(itemextent*rank),recvbuf);
     }
     *request = ptr->postReq(newreq);
   }
@@ -6944,15 +6948,15 @@ AMPI_API_IMPL(int, MPI_Scatterv, const void *sendbuf, const int *sendcounts, con
 
   if(rank == root) {
     CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
-    int itemsize = dttype->getSize() ;
+    int itemextent = dttype->getExtent();
     for(i=0;i<size;i++) {
       if (i != rank) {
-        ptr->send(MPI_SCATTER_TAG, rank, ((char*)sendbuf)+(itemsize*displs[i]),
+        ptr->send(MPI_SCATTER_TAG, rank, ((char*)sendbuf)+(itemextent*displs[i]),
                   sendcounts[i], sendtype, i, comm);
       }
     }
     if (sendbuf != recvbuf) {
-      copyDatatype(sendtype,sendcounts[rank],recvtype,recvcount,(char*)sendbuf+(itemsize*displs[rank]),recvbuf);
+      copyDatatype(sendtype,sendcounts[rank],recvtype,recvcount,(char*)sendbuf+(itemextent*displs[rank]),recvbuf);
     }
   }
   else {
@@ -7025,17 +7029,19 @@ AMPI_API_IMPL(int, MPI_Iscatterv, const void *sendbuf, const int *sendcounts, co
 
   if(rank == root) {
     CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
-    int itemsize = dttype->getSize() ;
+    int itemextent = dttype->getExtent();
     // use an ATAReq to non-block the caller and get a request ptr
-    ATAReq *newreq = new ATAReq(size-1);
+    ATAReq *newreq = new ATAReq(size);
     for(i=0;i<size;i++) {
       if (i != rank) {
-        newreq->reqs[i] = ptr->send(MPI_SCATTER_TAG, rank, ((char*)sendbuf)+(itemsize*displs[i]),
+        newreq->reqs[i] = ptr->send(MPI_SCATTER_TAG, rank, ((char*)sendbuf)+(itemextent*displs[i]),
                                     sendcounts[i], sendtype, i, comm, 0, I_SEND);
       }
     }
+    newreq->reqs[rank] = MPI_REQUEST_NULL;
+
     if (sendbuf != recvbuf) {
-      copyDatatype(sendtype,sendcounts[rank],recvtype,recvcount,(char*)sendbuf+(itemsize*displs[rank]),recvbuf);
+      copyDatatype(sendtype,sendcounts[rank],recvtype,recvcount,(char*)sendbuf+(itemextent*displs[rank]),recvbuf);
     }
     *request = ptr->postReq(newreq);
   }
@@ -7084,12 +7090,13 @@ AMPI_API_IMPL(int, MPI_Alltoall, const void *sendbuf, int sendcount, MPI_Datatyp
     return copyDatatype(sendtype,sendcount,recvtype,recvcount,sendbuf,recvbuf);
 
   int itemsize = getDDT()->getSize(sendtype) * sendcount;
+  int itemextent = getDDT()->getExtent(sendtype) * sendcount;
   int extent = getDDT()->getExtent(recvtype) * recvcount;
   int size = ptr->getSize();
   int rank = ptr->getRank();
 
 #if CMK_BIGSIM_CHARM
-  TRACE_BG_AMPI_LOG(MPI_ALLTOALL, itemsize);
+  TRACE_BG_AMPI_LOG(MPI_ALLTOALL, itemextent);
 #endif
 
   /* For MPI_IN_PLACE (sendbuf==recvbuf), prevent using the algorithm for
@@ -7099,12 +7106,12 @@ AMPI_API_IMPL(int, MPI_Alltoall, const void *sendbuf, int sendcount, MPI_Datatyp
     for (int i=0; i<size; i++) {
       for (int j=i; j<size; j++) {
         if (rank == i) {
-          ptr->sendrecv_replace(((char *)recvbuf + j*recvcount*extent),
+          ptr->sendrecv_replace(((char *)recvbuf + j*extent),
                                 recvcount, recvtype, j, MPI_ATA_TAG, j,
                                 MPI_ATA_TAG, comm, MPI_STATUS_IGNORE);
         }
         else if (rank == j) {
-          ptr->sendrecv_replace(((char *)recvbuf + i*recvcount*extent),
+          ptr->sendrecv_replace(((char *)recvbuf + i*extent),
                                 recvcount, recvtype, i, MPI_ATA_TAG, i,
                                 MPI_ATA_TAG, comm, MPI_STATUS_IGNORE);
         }
@@ -7120,7 +7127,7 @@ AMPI_API_IMPL(int, MPI_Alltoall, const void *sendbuf, int sendcount, MPI_Datatyp
     }
     for (int i=0; i<size; i++) {
       int dst = (rank+i) % size;
-      reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*dst),
+      reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemextent*dst),
                                sendcount, sendtype, dst, comm, 0, I_SEND);
     }
     MPI_Waitall(reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
@@ -7137,7 +7144,7 @@ AMPI_API_IMPL(int, MPI_Alltoall, const void *sendbuf, int sendcount, MPI_Datatyp
       }
       for (int i=0; i<blockSize; i++) {
         int dst = (rank - j - i + size) % size;
-        reqs[blockSize+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*dst),
+        reqs[blockSize+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemextent*dst),
                                       sendcount, sendtype, dst, comm, I_SEND);
       }
       MPI_Waitall(blockSize*2, reqs.data(), MPI_STATUSES_IGNORE);
@@ -7166,7 +7173,7 @@ AMPI_API_IMPL(int, MPI_Alltoall, const void *sendbuf, int sendcount, MPI_Datatyp
         dst = (rank + i) % size;
       }
 
-      ptr->sendrecv(((char *)sendbuf + dst*itemsize), sendcount, sendtype, dst, MPI_ATA_TAG,
+      ptr->sendrecv(((char *)sendbuf + dst*itemextent), sendcount, sendtype, dst, MPI_ATA_TAG,
                     ((char *)recvbuf + src*extent), recvcount, recvtype, src, MPI_ATA_TAG,
                     comm, MPI_STATUS_IGNORE);
     } // end of large message
@@ -7263,7 +7270,7 @@ AMPI_API_IMPL(int, MPI_Alltoallv, const void *sendbuf, const int *sendcounts, co
     return copyDatatype(sendtype,sendcounts[0],recvtype,recvcounts[0],sendbuf,recvbuf);
 
   int rank = ptr->getRank();
-  int itemsize = getDDT()->getSize(sendtype);
+  int itemextent = getDDT()->getExtent(sendtype);
   int extent = getDDT()->getExtent(recvtype);
 
   if (recvbuf == sendbuf) {
@@ -7291,7 +7298,7 @@ AMPI_API_IMPL(int, MPI_Alltoallv, const void *sendbuf, const int *sendcounts, co
     }
     for (int i=0; i<size; i++) {
       int dst = (rank+i) % size;
-      reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*sdispls[dst]),
+      reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemextent*sdispls[dst]),
                                sendcounts[dst], sendtype, dst, comm, 0, I_SEND);
     }
     MPI_Waitall(size*2, reqs.data(), MPI_STATUSES_IGNORE);
@@ -7308,7 +7315,7 @@ AMPI_API_IMPL(int, MPI_Alltoallv, const void *sendbuf, const int *sendcounts, co
       }
       for (int i=0; i<blockSize; i++) {
         int dst = (rank - j - i + size) % size;
-        reqs[blockSize+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*sdispls[dst]),
+        reqs[blockSize+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemextent*sdispls[dst]),
                                       sendcounts[dst], sendtype, dst, comm);
       }
       MPI_Waitall(blockSize*2, reqs.data(), MPI_STATUSES_IGNORE);
@@ -7356,7 +7363,7 @@ AMPI_API_IMPL(int, MPI_Ialltoallv, void *sendbuf, int *sendcounts, int *sdispls,
   }
 
   int rank = ptr->getRank();
-  int itemsize = getDDT()->getSize(sendtype);
+  int itemextent = getDDT()->getExtent(sendtype);
   int extent = getDDT()->getExtent(recvtype);
 
   // use an ATAReq to non-block the caller and get a request ptr
@@ -7368,7 +7375,7 @@ AMPI_API_IMPL(int, MPI_Ialltoallv, void *sendbuf, int *sendcounts, int *sdispls,
 
   for (int i=0; i<size; i++) {
     int dst = (rank+i) % size;
-    newreq->reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*sdispls[dst]),
+    newreq->reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemextent*sdispls[dst]),
                                      sendcounts[dst], sendtype, dst, comm, 0, I_SEND);
   }
   *request = ptr->postReq(newreq);
@@ -7384,7 +7391,11 @@ AMPI_API_IMPL(int, MPI_Alltoallw, const void *sendbuf, const int *sendcounts, co
 {
   AMPI_API("AMPI_Alltoallw");
 
-  handle_MPI_BOTTOM((void*&)sendbuf, sendtypes[0], recvbuf, recvtypes[0]);
+  if (sendbuf == MPI_IN_PLACE) {
+    handle_MPI_BOTTOM(recvbuf, recvtypes[0]);
+  } else {
+    handle_MPI_BOTTOM((void*&)sendbuf, sendtypes[0], recvbuf, recvtypes[0]);
+  }
   handle_MPI_IN_PLACE_alltoallw((void*&)sendbuf, recvbuf, (int*&)sendcounts,
                                 (MPI_Datatype*&)sendtypes, (int*&)sdispls,
                                 recvcounts, recvtypes, rdispls);
@@ -7470,7 +7481,11 @@ AMPI_API_IMPL(int, MPI_Ialltoallw, const void *sendbuf, const int *sendcounts, c
 {
   AMPI_API("AMPI_Ialltoallw");
 
-  handle_MPI_BOTTOM((void*&)sendbuf, sendtypes[0], recvbuf, recvtypes[0]);
+  if (sendbuf == MPI_IN_PLACE) {
+    handle_MPI_BOTTOM(recvbuf, recvtypes[0]);
+  } else {
+    handle_MPI_BOTTOM((void*&)sendbuf, sendtypes[0], recvbuf, recvtypes[0]);
+  }
   handle_MPI_IN_PLACE_alltoallw((void*&)sendbuf, recvbuf, (int*&)sendcounts,
                                 (MPI_Datatype*&)sendtypes, (int*&)sdispls,
                                 recvcounts, recvtypes, rdispls);
