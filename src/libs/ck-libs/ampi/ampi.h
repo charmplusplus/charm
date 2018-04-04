@@ -574,12 +574,20 @@ typedef void (*MPI_MigrateFn)(void);
 #define PMPI_Reduce_local APMPI_Reduce_local
 #define  MPI_Reduce_scatter_block  AMPI_Reduce_scatter_block
 #define PMPI_Reduce_scatter_block APMPI_Reduce_scatter_block
+#define  MPI_Ireduce_scatter_block  AMPI_Ireduce_scatter_block
+#define PMPI_Ireduce_scatter_block APMPI_Ireduce_scatter_block
 #define  MPI_Reduce_scatter  AMPI_Reduce_scatter
 #define PMPI_Reduce_scatter APMPI_Reduce_scatter
+#define  MPI_Ireduce_scatter  AMPI_Ireduce_scatter
+#define PMPI_Ireduce_scatter APMPI_Ireduce_scatter
 #define  MPI_Scan  AMPI_Scan
 #define PMPI_Scan APMPI_Scan
+#define  MPI_Iscan  AMPI_Iscan
+#define PMPI_Iscan APMPI_Iscan
 #define  MPI_Exscan  AMPI_Exscan
 #define PMPI_Exscan APMPI_Exscan
+#define  MPI_Iexscan  AMPI_Iexscan
+#define PMPI_Iexscan APMPI_Iexscan
 
 /***neighborhood collectives***/
 #define  MPI_Neighbor_alltoall  AMPI_Neighbor_alltoall
@@ -1089,12 +1097,20 @@ AMPI_API_DEF(int, MPI_Reduce_local, const void *inbuf, void *outbuf, int count,
                       MPI_Datatype datatype, MPI_Op op)
 AMPI_API_DEF(int, MPI_Reduce_scatter_block, const void* sendbuf, void* recvbuf, int count,
                               MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
+AMPI_API_DEF(int, MPI_Ireduce_scatter_block, const void* sendbuf, void* recvbuf, int count,
+                              MPI_Datatype datatype, MPI_Op op, MPI_Comm comm, MPI_Request *request)
 AMPI_API_DEF(int, MPI_Reduce_scatter, const void* sendbuf, void* recvbuf, const int *recvcounts,
                         MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
+AMPI_API_DEF(int, MPI_Ireduce_scatter, const void* sendbuf, void* recvbuf, const int *recvcounts,
+                        MPI_Datatype datatype, MPI_Op op, MPI_Comm comm, MPI_Request *request)
 AMPI_API_DEF(int, MPI_Scan, const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
               MPI_Op op, MPI_Comm comm )
+AMPI_API_DEF(int, MPI_Iscan, const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
+              MPI_Op op, MPI_Comm comm, MPI_Request *request)
 AMPI_API_DEF(int, MPI_Exscan, const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
                 MPI_Op op, MPI_Comm comm)
+AMPI_API_DEF(int, MPI_Iexscan, const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
+                MPI_Op op, MPI_Comm comm, MPI_Request *request)
 
 /***neighborhood collectives***/
 AMPI_API_DEF(int, MPI_Neighbor_alltoall, const void* sendbuf, int sendcount, MPI_Datatype sendtype,
@@ -1480,12 +1496,6 @@ int MPI_Unpack_external(const char datarep[], const void *inbuf, MPI_Aint insize
 */
 
 /* A.2.3 Collective Communication C Bindings */
-/*
-int MPI_Iexscan(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm, MPI_Request *request);
-int MPI_Ireduce_scatter(const void* sendbuf, void* recvbuf, const int recvcounts[], MPI_Datatype datatype, MPI_Op op, MPI_Comm comm, MPI_Request *request);
-int MPI_Ireduce_scatter_block(const void* sendbuf, void* recvbuf, int recvcount, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm, MPI_Request *request);
-int MPI_Iscan(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm, MPI_Request *request);
-*/
 
 /* A.2.4 Groups, Contexts, Communicators, and Caching C Bindings */
 /*

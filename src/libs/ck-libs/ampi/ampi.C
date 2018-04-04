@@ -4690,6 +4690,17 @@ AMPI_API_IMPL(int, MPI_Reduce_scatter_block, const void* sendbuf, void* recvbuf,
   return MPI_SUCCESS;
 }
 
+AMPI_API_IMPL(int, MPI_Ireduce_scatter_block, const void* sendbuf, void* recvbuf, int count,
+                                              MPI_Datatype datatype, MPI_Op op, MPI_Comm comm,
+                                              MPI_Request* request)
+{
+  AMPI_API("AMPI_Ireduce_scatter_block");
+  // FIXME: implement non-blocking reduce_scatter_block
+  int ret = MPI_Reduce_scatter_block(sendbuf, recvbuf, count, datatype, op, comm);
+  *request = MPI_REQUEST_NULL;
+  return ret;
+}
+
 AMPI_API_IMPL(int, MPI_Reduce_scatter, const void* sendbuf, void* recvbuf, const int *recvcounts,
                                        MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
 {
@@ -4728,6 +4739,16 @@ AMPI_API_IMPL(int, MPI_Reduce_scatter, const void* sendbuf, void* recvbuf, const
   MPI_Scatterv(tmpbuf.data(), recvcounts, displs.data(), datatype,
                           recvbuf, recvcounts[ptr->getRank()], datatype, AMPI_COLL_SOURCE, comm);
   return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_Ireduce_scatter, const void* sendbuf, void* recvbuf, const int *recvcounts,
+                                        MPI_Datatype datatype, MPI_Op op, MPI_Comm comm, MPI_Request* request)
+{
+  AMPI_API("AMPI_Ireduce_scatter");
+  // FIXME: implement non-blocking reduce_scatter
+  int ret = MPI_Reduce_scatter(sendbuf, recvbuf, recvcounts, datatype, op, comm);
+  *request = MPI_REQUEST_NULL;
+  return ret;
 }
 
 AMPI_API_IMPL(int, MPI_Scan, const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
@@ -4778,6 +4799,16 @@ AMPI_API_IMPL(int, MPI_Scan, const void* sendbuf, void* recvbuf, int count, MPI_
   }
 
   return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_Iscan, const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
+                              MPI_Op op, MPI_Comm comm, MPI_Request* request)
+{
+  AMPI_API("AMPI_Iscan");
+  // FIXME: implement non-blocking scan
+  int ret = MPI_Scan(sendbuf, recvbuf, count, datatype, op, comm);
+  *request = MPI_REQUEST_NULL;
+  return ret;
 }
 
 AMPI_API_IMPL(int, MPI_Exscan, const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
@@ -4839,6 +4870,16 @@ AMPI_API_IMPL(int, MPI_Exscan, const void* sendbuf, void* recvbuf, int count, MP
   }
 
   return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_Iexscan, const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
+                                MPI_Op op, MPI_Comm comm, MPI_Request* request)
+{
+  AMPI_API("AMPI_Iexscan");
+  // FIXME: implement non-blocking exscan
+  int ret = MPI_Exscan(sendbuf, recvbuf, count, datatype, op, comm);
+  *request = MPI_REQUEST_NULL;
+  return ret;
 }
 
 AMPI_API_IMPL(int, MPI_Op_create, MPI_User_function *function, int commute, MPI_Op *op)

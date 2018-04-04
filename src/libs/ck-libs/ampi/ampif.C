@@ -105,9 +105,13 @@ FDECL {
 #define mpi_iallreduce FTN_NAME( MPI_IALLREDUCE , mpi_iallreduce )
 #define mpi_reduce_local FTN_NAME( MPI_REDUCE_LOCAL , mpi_reduce_local )
 #define mpi_reduce_scatter_block FTN_NAME( MPI_REDUCE_SCATTER_BLOCK , mpi_reduce_scatter_block )
+#define mpi_ireduce_scatter_block FTN_NAME( MPI_IREDUCE_SCATTER_BLOCK , mpi_ireduce_scatter_block )
 #define mpi_reduce_scatter FTN_NAME( MPI_REDUCE_SCATTER , mpi_reduce_scatter )
+#define mpi_ireduce_scatter FTN_NAME( MPI_IREDUCE_SCATTER , mpi_ireduce_scatter )
 #define mpi_scan FTN_NAME( MPI_SCAN , mpi_scan )
+#define mpi_iscan FTN_NAME( MPI_ISCAN , mpi_iscan )
 #define mpi_exscan FTN_NAME( MPI_EXSCAN , mpi_exscan )
+#define mpi_iexscan FTN_NAME( MPI_IEXSCAN , mpi_iexscan )
 #define mpi_neighbor_alltoall FTN_NAME( MPI_NEIGHBOR_ALLTOALL , mpi_neighbor_alltoall )
 #define mpi_ineighbor_alltoall FTN_NAME( MPI_INEIGHBOR_ALLTOALL , mpi_ineighbor_alltoall )
 #define mpi_neighbor_alltoallv FTN_NAME( MPI_NEIGHBOR_ALLTOALLV , mpi_neighbor_alltoallv )
@@ -1095,6 +1099,13 @@ void mpi_reduce_scatter_block(void* sendbuf, void* recvbuf, int *count,
   *ierr = MPI_Reduce_scatter_block(sendbuf, recvbuf, *count, *type, *op, *comm);
 }
 
+void mpi_ireduce_scatter_block(void* sendbuf, void* recvbuf, int *count,
+                               int *type, int *op, int *comm, int* request, int *ierr)
+{
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
+  *ierr = MPI_Ireduce_scatter_block(sendbuf, recvbuf, *count, *type, *op, *comm, request);
+}
+
 void mpi_reduce_scatter(void *sendbuf, void *recvbuf, int *recvcounts,
                         int* datatype, int* op, int* comm, int* ierr)
 {
@@ -1103,16 +1114,36 @@ void mpi_reduce_scatter(void *sendbuf, void *recvbuf, int *recvcounts,
                              *datatype, *op, *comm);
 }
 
+void mpi_ireduce_scatter(void *sendbuf, void *recvbuf, int *recvcounts,
+                         int* datatype, int* op, int* comm, int* request, int* ierr)
+{
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
+  *ierr = MPI_Ireduce_scatter(sendbuf, recvbuf, recvcounts,
+                              *datatype, *op, *comm, request);
+}
+
 void mpi_scan(void* sendbuf, void* recvbuf, int* count, int* datatype, int* op, int* comm, int* ierr)
 {
   handle_MPI_IN_PLACE_f(sendbuf,recvbuf);
   *ierr = MPI_Scan(sendbuf,recvbuf,*count,*datatype,*op,*comm );
 }
 
+void mpi_iscan(void* sendbuf, void* recvbuf, int* count, int* datatype, int* op, int* comm, int* request, int* ierr)
+{
+  handle_MPI_IN_PLACE_f(sendbuf,recvbuf);
+  *ierr = MPI_Iscan(sendbuf,recvbuf,*count,*datatype,*op,*comm,request);
+}
+
 void mpi_exscan(void* sendbuf, void* recvbuf, int* count, int* datatype, int* op, int* comm, int* ierr)
 {
   handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
   *ierr = MPI_Exscan(sendbuf,recvbuf,*count,*datatype,*op,*comm);
+}
+
+void mpi_iexscan(void* sendbuf, void* recvbuf, int* count, int* datatype, int* op, int* comm, int* request, int* ierr)
+{
+  handle_MPI_IN_PLACE_f(sendbuf, recvbuf);
+  *ierr = MPI_Iexscan(sendbuf,recvbuf,*count,*datatype,*op,*comm,request);
 }
 
 void mpi_neighbor_alltoall(void* sendbuf, int *sendcount, int *sendtype,
