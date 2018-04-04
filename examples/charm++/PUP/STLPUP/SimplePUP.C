@@ -10,17 +10,30 @@
 /////////////////////////////////////
 
 #include "SimplePUP.h"
+#include "SimplePUP.def.h"
+
+template <typename U> void execute_example(std::vector<U> &dataToCompare)
+{
+  //normal object construction
+  HeapObject<U> exampleObject(20, false);
+  exampleObject.data = dataToCompare;
+
+  //normal chare array construction
+  CProxy_SimpleArray<U> simpleProxy= CProxy_SimpleArray<U>::ckNew(30);
+
+  //pass object to remote method invocation on the chare array
+  simpleProxy[29].acceptData(exampleObject, dataToCompare);
+}
 
 main::main(CkArgMsg *m)
 {
- //normal object construction
-  HeapObject exampleObject(20,false);
+    std::vector<float> dataToCompare1{ 10.23, 20.92, 30.71 };
+    execute_example<float>(dataToCompare1);
 
-  //normal chare array construction
-  CProxy_SimpleArray simpleProxy= CProxy_SimpleArray::ckNew(30);
+    std::vector<int> dataToCompare2{ 10, 20, 30 };
+    execute_example<int>(dataToCompare2);
 
-  //pass object to remote method invocation on the chare array
-  simpleProxy[29].acceptData(exampleObject);
+    std::vector<bool> dataToCompare3{ false, false, true};
+    execute_example<bool>(dataToCompare3);
 }
 
-#include "SimplePUP.def.h"

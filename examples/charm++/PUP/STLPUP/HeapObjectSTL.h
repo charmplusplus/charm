@@ -1,11 +1,12 @@
 #include <vector>
 #include <pup_stl.h>
-class HeapObject
+template <typename U> class HeapObject
 {
 
  public:
 
   int publicInt;
+  std::vector<U> data;
 
  HeapObject(int param1, bool param2):publicInt(param1), privateBool(param2) {}
 
@@ -17,7 +18,7 @@ class HeapObject
    p|privateBool;
    p|data;
  }
- inline HeapObject &operator=(const HeapObject &indata) {
+ inline HeapObject &operator=(const HeapObject<U> &indata) {
     publicInt=indata.publicInt;
     privateBool=indata.privateBool;
     data=indata.data;
@@ -37,5 +38,4 @@ class HeapObject
 
   // PUP is orthogonal to public vs private member choices
   bool privateBool;
-  std::vector<float> data;
 };
