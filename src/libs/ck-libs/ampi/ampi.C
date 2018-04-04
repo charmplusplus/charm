@@ -860,6 +860,7 @@ CtvDeclare(bool, ampiFinalized);
 CkpvDeclare(Builtin_kvs, bikvs);
 CkpvDeclare(int, ampiThreadLevel);
 CkpvDeclare(AmpiMsgPool, msgPool);
+CkpvDeclare(CkNcpyBufferPool, ncpyBufferPool);
 
 CDECL
 long ampiCurrentStackUsage(void){
@@ -1016,6 +1017,9 @@ static void ampiProcInit() noexcept {
 
   CkpvInitialize(Builtin_kvs, bikvs); // built-in key-values
   CkpvAccess(bikvs) = Builtin_kvs();
+
+  CkpvInitialize(CkNcpyBufferPool, ncpyBufferPool);  // pool of CkNcpySource objects
+  CkpvAccess(ncpyBufferPool) = CkNcpyBufferPool(32);
 
   CkpvInitialize(AmpiMsgPool, msgPool); // pool of small AmpiMsg's, big enough for rendezvous messages
   CkpvAccess(msgPool) = AmpiMsgPool(AMPI_MSG_POOL_SIZE, AMPI_POOLED_MSG_SIZE);
@@ -2914,7 +2918,7 @@ AmpiMsg* ampi::makeNcpyMsg(int t, int sRank, const void* buf, int count,
   CkCallback sendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true /*inline*/);
   sendCB.setRefnum(ssendReq);
   SsendReq& req = *((SsendReq*)(getReqs()[ssendReq]));
-  req.srcInfo = new CkNcpyBuffer(buf, len, sendCB);
+  req.srcInfo = CkpvAccess(ncpyBufferPool).newCkNcpyBuffer(buf, len, sendCB);
 
   if (ddt->isContig()) {
     req.srcInfo = new CkNcpyBuffer(buf, len, sendCB);
@@ -2925,7 +2929,7 @@ AmpiMsg* ampi::makeNcpyMsg(int t, int sRank, const void* buf, int count,
     //       now we just copy into a contiguous system buffer and then send that.
     char* sbuf = new char[len];
     ddt->serialize((char*)buf, sbuf, count, len, PACK);
-    req.srcInfo = new CkNcpyBuffer(sbuf, len, sendCB);
+    req.srcInfo = CkpvAccess(ncpyBufferPool).newCkNcpyBuffer(sbuf, len, sendCB);
     req.setSystemBuf(sbuf); // completedSend will need to free this
     // NOTE: We could set 'req.complete = true' here, but then we'd
     //       have to make sure req.systemBuf gets freed by someone else
@@ -3233,13 +3237,13 @@ void ampi::requestPut(MPI_Request reqIdx, CkNcpyBuffer targetInfo) noexcept {
   sendCB.setRefnum(reqIdx);
 
   if (sddt->isContig()) {
-    req.srcInfo = new CkNcpyBuffer(req.buf, req.count, sendCB);
+    req.srcInfo = CkpvAccess(ncpyBufferPool).newCkNcpyBuffer(req.buf, req.count, sendCB);
   }
   else {
     int len = sddt->getSize(req.count);
     char* sbuf = new char[len];
     sddt->serialize((char*)req.buf, sbuf, req.count, len, PACK);
-    req.srcInfo = new CkNcpyBuffer(sbuf, len, sendCB);
+    req.srcInfo = CkpvAccess(ncpyBufferPool).newCkNcpyBuffer(sbuf, len, sendCB);
     req.setSystemBuf(sbuf); // completedSend will need to free this
     // NOTE: We could set 'req.statusIreq = true' here, but then we'd
     // have to make sure systemBuf gets freed by someone in case the
@@ -3323,7 +3327,7 @@ bool ampi::processSsendNcpyShmMsg(AmpiMsg* msg, void* buf, MPI_Datatype type,
     IReq& ireq = *((IReq*)(parent->ampiReqs[req]));
 
     if (rddt->isContig()) {
-      ireq.targetInfo = new CkNcpyBuffer(buf, len, recvCB);
+      ireq.targetInfo = CkpvAccess(ncpyBufferPool).newCkNcpyBuffer(buf, len, recvCB);
     }
     else {
       // Allocate a contiguous intermediate buffer for the put(),
@@ -3331,7 +3335,7 @@ bool ampi::processSsendNcpyShmMsg(AmpiMsg* msg, void* buf, MPI_Datatype type,
       int slen = srcInfo.getLength();
       char* sbuf = new char[slen];
       ireq.setSystemBuf(sbuf, slen); // completedRecv will need to free this
-      ireq.targetInfo = new CkNcpyBuffer(sbuf, slen, recvCB);
+      ireq.targetInfo = CkpvAccess(ncpyBufferPool).newCkNcpyBuffer(sbuf, slen, recvCB);
     }
     thisProxy[srcInfo.getIdx()].requestPut(srcInfo.getSreqIdx(), *ireq.targetInfo);
     return false;
@@ -3353,12 +3357,12 @@ bool ampi::processSsendNcpyMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int c
   ireq.length = len;
 
   if (ddt->isContig()) {
-    ireq.targetInfo = new CkNcpyBuffer(buf, len, recvCB);
+    ireq.targetInfo = CkpvAccess(ncpyBufferPool).newCkNcpyBuffer(buf, len, recvCB);
   }
   else {
     char* sbuf = new char[len];
     ireq.setSystemBuf(sbuf);
-    ireq.targetInfo = new CkNcpyBuffer(sbuf, len, recvCB);
+    ireq.targetInfo = CkpvAccess(ncpyBufferPool).newCkNcpyBuffer(sbuf, len, recvCB);
   }
   ireq.targetInfo->get(srcInfo);
   return ireq.complete; // did the get() complete inline (i.e. src is in same process as target)?
@@ -4326,6 +4330,7 @@ void AMPI_Exit(int exitCode)
   // If we are not actually running AMPI code (e.g., by compiling a serial
   // application with ampicc), exit cleanly when the application calls exit().
   AMPI_API_INIT("AMPI_Exit");
+  CkpvAccess(ncpyBufferPool).clear();
   CkpvAccess(msgPool).clear();
 
   if (!atexit_called)

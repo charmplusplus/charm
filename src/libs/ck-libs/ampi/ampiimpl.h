@@ -1099,6 +1099,66 @@ inline vector<int> rangeExclOp(int n, int ranges[][3], const vector<int>& vec,
 
 extern int _mpi_nworlds;
 
+class CkNcpyBufferPool {
+ private:
+  std::forward_list<CkNcpyBuffer *> srcInfos; // list of free CkNcpyBuffer's
+  int curr;
+  int max;
+
+ public:
+  CkNcpyBufferPool() noexcept : curr(0), max(0) {}
+  CkNcpyBufferPool(int _max) noexcept : curr(0), max(_max) {}
+  ~CkNcpyBufferPool() noexcept {
+    clear();
+  }
+  inline void clear() noexcept {
+    while (!srcInfos.empty()) {
+      delete srcInfos.front();
+      srcInfos.pop_front();
+    }
+    curr = 0;
+  }
+  inline CkNcpyBuffer* newCkNcpyBuffer() noexcept {
+    if (srcInfos.empty()) {
+      return new CkNcpyBuffer();
+    } else {
+      CkNcpyBuffer* srcInfo = srcInfos.front();
+      CkAssert(srcInfo != NULL);
+      srcInfos.pop_front();
+      curr--;
+      return srcInfo;
+    }
+  }
+  inline CkNcpyBuffer* newCkNcpyBuffer(const void* buf, size_t size, CkCallback& cb) noexcept {
+    if (srcInfos.empty()) {
+      return new CkNcpyBuffer(buf, size, cb);
+    } else {
+      CkNcpyBuffer* srcInfo = srcInfos.front();
+      CkAssert(srcInfo != NULL);
+      srcInfos.pop_front();
+      curr--;
+      srcInfo->init(buf, size, cb);
+      srcInfo->registerMem();
+      return srcInfo;
+    }
+  }
+  inline void deleteCkNcpyBuffer(CkNcpyBuffer* srcInfo) noexcept {
+    if (curr != max) {
+      CkAssert(srcInfo != NULL);
+      srcInfos.push_front(srcInfo);
+      curr++;
+    } else {
+      delete srcInfo;
+    }
+  }
+  void pup(PUP::er& p) noexcept {
+    p|max;
+    // Don't PUP the CkNcpyBuffer's in the free list, let the pool fill lazily
+  }
+};
+
+CkpvExtern(CkNcpyBufferPool, ncpyBufferPool);
+
 //MPI_ANY_TAG is defined in ampi.h to MPI_TAG_UB_VALUE+1
 #define MPI_ATA_SEQ_TAG     MPI_TAG_UB_VALUE+2
 #define MPI_BCAST_TAG       MPI_TAG_UB_VALUE+3
@@ -1329,7 +1389,7 @@ class IReq final : public AmpiRequest {
   void deregisterMem() noexcept override {
     if (targetInfo) {
       targetInfo->deregisterMem();
-      delete targetInfo;
+      CkpvAccess(ncpyBufferPool).deleteCkNcpyBuffer(targetInfo);
     }
     if (systemBuf) {
       delete [] systemBuf;
@@ -1345,9 +1405,7 @@ class IReq final : public AmpiRequest {
     bool hasTargetInfo = (targetInfo != NULL);
     p|hasTargetInfo;
     if (hasTargetInfo) {
-      if (p.isUnpacking()) {
-        targetInfo = new CkNcpyBuffer();
-      }
+      if (p.isUnpacking()) targetInfo = CkpvAccess(ncpyBufferPool).newCkNcpyBuffer();
       p|*targetInfo;
     }
   }
@@ -1541,7 +1599,7 @@ class SsendReq final : public AmpiRequest {
   void deregisterMem() noexcept override {
     if (srcInfo) {
       srcInfo->deregisterMem();
-      delete srcInfo;
+      CkpvAccess(ncpyBufferPool).deleteCkNcpyBuffer(srcInfo);
     }
     if (systemBuf) {
       delete [] (char*)buf;
@@ -1559,7 +1617,7 @@ class SsendReq final : public AmpiRequest {
     bool hasSrcInfo = (srcInfo != NULL);
     p|hasSrcInfo;
     if (hasSrcInfo) {
-      if (p.isUnpacking()) srcInfo = new CkNcpyBuffer();
+      if (p.isUnpacking()) srcInfo = CkpvAccess(ncpyBufferPool).newCkNcpyBuffer();
       p|*srcInfo;
     }
   }
