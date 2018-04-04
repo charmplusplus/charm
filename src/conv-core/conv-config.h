@@ -122,6 +122,10 @@
 #define CMK_BIGSIM_CHARM          0
 #endif
 
+#ifndef CMI_QD
+#define CMI_QD (CMK_BIGSIM_CHARM || CMK_REPLAYSYSTEM)
+#endif
+
 /**
     CmiReference broadcast/multicast optimization does not work for SMP
     due to race condition on memory reference counter, needs lock to protect

@@ -1,6 +1,4 @@
-#ifndef CMI_QD
-#define CMI_QD CMK_BIGSIM_CHARM || CMK_REPLAYSYSTEM
-#endif
+#include "conv-config.h"
 
 #if CMI_QD
 

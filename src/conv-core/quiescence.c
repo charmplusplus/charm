@@ -12,6 +12,8 @@ messages (e.g., from reductions) you CANNOT use converse
 quiescence detection!
 */
 
+#include "conv-config.h"
+
 #if CMI_QD
 
 #include "converse.h"

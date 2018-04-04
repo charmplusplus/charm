@@ -1,3 +1,5 @@
+#include "conv-config.h"
+
 #if CMI_QD
 
 #ifndef _CONV_QD_H

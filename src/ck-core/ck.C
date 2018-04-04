@@ -2781,7 +2781,9 @@ public:
 	  f=f_;
 	  getNext();
 	  REPLAYDEBUG("Constructing ckMessageReplay: "<< nextPE <<" "<< nextSize <<" "<<nextEvent);
+#if CMI_QD
 	  if (CkMyPe()==0) CmiStartQD(CkMessageReplayQuiescence, this);
+#endif
 	}
 	~CkMessageReplay() {fclose(f);}
 
