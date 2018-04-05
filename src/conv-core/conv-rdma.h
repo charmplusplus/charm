@@ -104,6 +104,7 @@ void CmiOnesidedDirectInit(void);
 #define CMK_BUFFER_REG                 0
 #define CMK_BUFFER_UNREG               1
 #define CMK_BUFFER_PREREG              2
+#define CMK_BUFFER_NOREG               3
 
 #define CMK_COMMON_NOCOPY_DIRECT_BYTES 0
 #endif
