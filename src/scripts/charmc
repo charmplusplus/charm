@@ -1363,6 +1363,11 @@ fi
 
 if [ "$TLSGLOBALS" = "1" ]
 then
+    if [ `cat $CHARMBIN/../tmp/.gdir` = "uth" ]
+    then
+      echo "Error: -tlsglobals is not supported with the uth machine layer."
+      exit 1
+    fi
     if ! `$CMK_CC --version | grep -q gcc`
     then
       echo "Warning: -tlsglobals may not work with compilers other than GCC."
