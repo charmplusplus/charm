@@ -39,11 +39,11 @@ void verbsOnesidedSendAck(int peNum, CmiVerbsRdmaRecvOp_t *recvOpInfo);
 
 void verbsOnesidedReceivedAck(struct infiRdmaPacket *rdmaPacket);
 
-int LrtsGetRdmaOpInfoSize(void){
+int LrtsGetRdmaOpInfoSize(){
   return sizeof(CmiVerbsRdmaOp_t);
 }
 
-int LrtsGetRdmaGenInfoSize(void){
+int LrtsGetRdmaGenInfoSize(){
   return sizeof(CmiVerbsRdma_t);
 }
 
@@ -51,11 +51,11 @@ int LrtsGetRdmaInfoSize(int numOps){
   return sizeof(CmiVerbsRdma_t) + numOps * sizeof(CmiVerbsRdmaOp_t);
 }
 
-int LrtsGetRdmaOpRecvInfoSize(void){
+int LrtsGetRdmaOpRecvInfoSize(){
   return sizeof(CmiVerbsRdmaRecvOp_t);
 }
 
-int LrtsGetRdmaGenRecvInfoSize(void){
+int LrtsGetRdmaGenRecvInfoSize(){
   return sizeof(CmiVerbsRdmaRecv_t);
 }
 
@@ -99,7 +99,7 @@ void LrtsSetRdmaOpInfo(void *dest, const void *ptr, int size, void *ack, int des
   rdmaOp->remote_addr = (uint64_t)ptr;
   rdmaOp->size = size;
 
-  mr = ibv_reg_mr(context->pd, (void *)(intptr_t)ptr, size, IBV_ACCESS_REMOTE_READ |
+  mr = ibv_reg_mr(context->pd, (void *)ptr, size, IBV_ACCESS_REMOTE_READ |
       IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
   if (!mr) {
     MACHSTATE(3, "ibv_reg_mr() failed\n");
@@ -109,3 +109,83 @@ void LrtsSetRdmaOpInfo(void *dest, const void *ptr, int size, void *ack, int des
 }
 
 #endif /* VERBS_MACHINE_ONESIDED_H */
+
+typedef struct _cmi_verbs_rzv_rdma_pointer {
+  struct ibv_mr *mr;
+  uint32_t key;
+}CmiVerbsRdmaPtr_t;
+
+/* Compiler checks to ensure that CMK_NOCOPY_DIRECT_BYTES in conv-common.h
+ * is set to sizeof(CmiVerbsRdmaPtr_t). CMK_NOCOPY_DIRECT_BYTES is used in
+ * ckrdma.h to reserve bytes for source or destination metadata info.           */
+#define DUMB_STATIC_ASSERT(test) typedef char sizeCheckAssertion[(!!(test))*2-1]
+
+/* Machine specific metadata information required to register a buffer and perform
+ * an RDMA operation with a remote buffer. This metadata information is used to perform
+ * registration and a PUT operation when the remote buffer wants to perform a GET with an
+ * unregistered buffer. Similary, the metadata information is used to perform registration
+ * and a GET operation when the remote buffer wants to perform a PUT with an unregistered
+ * buffer.*/
+typedef struct _cmi_verbs_rdma_reverse_op {
+  const void *destAddr;
+  int destPe;
+  int destMode;
+  const void *srcAddr;
+  int srcPe;
+  int srcMode;
+
+  struct ibv_mr *rem_mr;
+  uint32_t rem_key;
+  int ackSize;
+  int size;
+} CmiVerbsRdmaReverseOp_t;
+
+/* Check the value of CMK_NOCOPY_DIRECT_BYTES if the compiler reports an
+ * error with the message "the size of an array must be greater than zero" */
+DUMB_STATIC_ASSERT(sizeof(CmiVerbsRdmaPtr_t) == CMK_NOCOPY_DIRECT_BYTES);
+
+// Set the machine specific information for a nocopy source pointer
+void LrtsSetRdmaSrcInfo(void *info, const void *ptr, int size, unsigned short int mode){
+  struct ibv_mr *mr;
+  if(mode == CMK_BUFFER_PREREG) {
+    mr = METADATAFIELD(ptr)->key;
+  } else {
+    mr = ibv_reg_mr(context->pd, (void *)ptr, size, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ);
+  }
+  if (!mr) {
+    CmiAbort("Memory Registration at Source Failed!\n");
+  }
+  CmiVerbsRdmaPtr_t *rdmaSrc = (CmiVerbsRdmaPtr_t *)info;
+  rdmaSrc->mr = mr;
+  rdmaSrc->key = mr->rkey;
+}
+
+// Set the machine specific information for a nocopy destination pointer
+void LrtsSetRdmaDestInfo(void *info, const void *ptr, int size, unsigned short int mode){
+  struct ibv_mr *mr;
+  if(mode == CMK_BUFFER_PREREG) {
+    mr = METADATAFIELD(ptr)->key;
+  } else {
+    mr = ibv_reg_mr(context->pd, (void *)ptr, size, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ);
+  }
+  if (!mr) {
+    CmiAbort("Memory Registration at Destination Failed!\n");
+  }
+  CmiVerbsRdmaPtr_t *rdmaDest = (CmiVerbsRdmaPtr_t *)info;
+  rdmaDest->mr = mr;
+  rdmaDest->key = mr->rkey;
+}
+
+// Function Declarations
+void postRdma(
+  uint64_t local_addr,
+  uint32_t local_rkey,
+  uint64_t remote_addr,
+  uint32_t remote_rkey,
+  int size,
+  int peNum,
+  uint64_t rdmaPacket,
+  int opcode);
+
+struct ibv_mr* registerDirectMemory(const void *addr, int size);
+

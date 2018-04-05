@@ -125,6 +125,9 @@ Data Structures
 #define INFIPACKETCODE_INCTOKENSACK 32
 #define INFIDUMMYPACKET 64
 
+#define INFIRDMA_DIRECT_REG_AND_PUT 17
+#define INFIRDMA_DIRECT_REG_AND_GET 18
+
 struct infiPacketHeader{
 	char code;
 	int nodeNo;
@@ -140,6 +143,7 @@ struct infiPacketHeader{
 #define INFI_DIRECT 2
 #if CMK_ONESIDED_IMPL
 #define INFI_ONESIDED 3
+#define INFI_ONESIDED_DIRECT 4
 #endif
 
 struct infiRdmaPacket{
@@ -1438,13 +1442,14 @@ static inline int pollSendCq(const int toBuffer){
 			case IBV_WC_RDMA_READ:
 			{
 //				processRdmaWC(&wc[i],toBuffer);
-					processRdmaWC(&wc[i],1);
+				// used for zerocopy api direct get api and zercopy entry method api
+				processRdmaWC(&wc[i],1);
 				break;
 			}
 			case IBV_WC_RDMA_WRITE:
 			{
-				/*** used for CmiDirect puts 
-				Nothing needs to be done on the sender side once send is done **/
+				// used for zerocopy api direct put api
+				processRdmaWC(&wc[i],1);
 				break;
 			}
 			default:
@@ -1673,24 +1678,26 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 	MACHSTATE2(3,"packet from node %d len %d",nodeNo,len);	
 #endif
 	
-	if(header->code & INFIPACKETCODE_DATA){
+	if(header->code == INFIPACKETCODE_DATA){
 			
 			processMessage(nodeNo,len,(buffer->buf+sizeof(struct infiPacketHeader)),toBuffer);
 	}
-	if(header->code & INFIDUMMYPACKET){
+#if MACHINE_DEBUG
+	if(header->code == INFIDUMMYPACKET){
 		MACHSTATE(3,"Dummy packet");
 	}
-	if(header->code & INFIBARRIERPACKET){
+#endif
+	if(header->code == INFIBARRIERPACKET){
                 MACHSTATE(3,"Barrier packet");
                 CmiAbort("Should not receive Barrier packet in normal polling loop.  Your Barrier is broken");
         }
 
 #if CMK_IBVERBS_INCTOKENS	
-	if(header->code & INFIPACKETCODE_INCTOKENS){
+	if(header->code == INFIPACKETCODE_INCTOKENS){
 		increasePostedRecvs(nodeNo);
 	}
 #endif	
-	if(rdma && header->code & INFIRDMA_START){
+	if(rdma && header->code == INFIRDMA_START){
 		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)(buffer->buf+sizeof(struct infiPacketHeader));
 //		if(toBuffer){
 			//TODO: make a function of this and use for both acks and requests
@@ -1709,7 +1716,7 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 			processRdmaRequest(rdmaPacket,nodeNo,0);
 		}*/
 	}
-	if(rdma && header->code & INFIRDMA_ACK){
+	if(rdma && header->code == INFIRDMA_ACK){
 		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)(buffer->buf+sizeof(struct infiPacketHeader)) ;
 #if CMK_ONESIDED_IMPL
 		if (rdmaPacket->type == INFI_ONESIDED)
@@ -1720,6 +1727,59 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 			processRdmaAck(rdmaPacket);
 		}
 	}
+	if(header->code == INFIRDMA_DIRECT_REG_AND_PUT){
+		// Register the source buffer and perform PUT
+		CmiVerbsRdmaReverseOp_t *regAndPutMsg = (CmiVerbsRdmaReverseOp_t *)(buffer->buf+sizeof(struct infiPacketHeader));
+		struct ibv_mr *mr = registerDirectMemory(regAndPutMsg->srcAddr, regAndPutMsg->size);
+
+		void *ref = CmiGetNcpyAck(regAndPutMsg->srcAddr,
+		                          (char *)regAndPutMsg + sizeof(CmiVerbsRdmaReverseOp_t)+ regAndPutMsg->ackSize, //srcAck
+		                          regAndPutMsg->srcPe,
+		                          regAndPutMsg->destAddr,
+		                          (char *)regAndPutMsg + sizeof(CmiVerbsRdmaReverseOp_t), //destAck
+		                          regAndPutMsg->destPe,
+		                          regAndPutMsg->ackSize);
+		
+		struct infiRdmaPacket *rdmaPacket = malloc(sizeof(struct infiRdmaPacket));
+		rdmaPacket->type = INFI_ONESIDED_DIRECT;
+		rdmaPacket->localBuffer = ref;
+		
+		postRdma((uint64_t)regAndPutMsg->srcAddr,
+		        mr->lkey,
+		        (uint64_t)regAndPutMsg->destAddr,
+		        regAndPutMsg->rem_key,
+		        regAndPutMsg->size,
+		        regAndPutMsg->destPe,
+		        (uint64_t)rdmaPacket,
+		        IBV_WR_RDMA_WRITE);
+	}
+	if(header->code == INFIRDMA_DIRECT_REG_AND_GET){
+		// Register the destination buffer and perform GET
+		CmiVerbsRdmaReverseOp_t *regAndGetMsg = (CmiVerbsRdmaReverseOp_t *)(buffer->buf+sizeof(struct infiPacketHeader));
+		struct ibv_mr *mr = registerDirectMemory(regAndGetMsg->destAddr, regAndGetMsg->size);
+
+		void *ref = CmiGetNcpyAck(regAndGetMsg->srcAddr,
+		                          (char *)regAndGetMsg + sizeof(CmiVerbsRdmaReverseOp_t)+ regAndGetMsg->ackSize, //srcAck
+		                          regAndGetMsg->srcPe,
+		                          regAndGetMsg->destAddr,
+		                          (char *)regAndGetMsg + sizeof(CmiVerbsRdmaReverseOp_t), //destAck
+		                          regAndGetMsg->destPe,
+		                          regAndGetMsg->ackSize);
+		
+		struct infiRdmaPacket *rdmaPacket = malloc(sizeof(struct infiRdmaPacket));
+		rdmaPacket->type = INFI_ONESIDED_DIRECT;
+		rdmaPacket->localBuffer = ref;
+		
+		postRdma((uint64_t)regAndGetMsg->destAddr,
+		        mr->lkey,
+		        (uint64_t)regAndGetMsg->srcAddr,
+		        regAndGetMsg->rem_key,
+		        regAndGetMsg->size,
+		        regAndGetMsg->srcPe,
+		        (uint64_t)rdmaPacket,
+		        IBV_WR_RDMA_READ);
+	}
+
 /*	if(header->code & INFIDIRECT_REQUEST){
 		struct infiDirectRequestPacket *directRequestPacket = (struct infiDirectRequestPacket *)(buffer->buf+sizeof(struct infiPacketHeader));
 		processDirectRequest(directRequestPacket);
@@ -1870,6 +1930,17 @@ static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 		free(rdmaPacket);
 
 		return;
+	}
+#endif
+#if CMK_ONESIDED_DIRECT_IMPL
+	if (rdmaPacket->type == INFI_ONESIDED_DIRECT) {
+
+#if CMK_IBVERBS_TOKENS_FLOW
+		context->tokensLeft++;
+#endif
+		CmiInvokeNcpyAck(rdmaPacket->localBuffer);
+		return;
+
 	}
 #endif
 	struct infiBuffer *buffer = (struct infiBuffer *)rdmaPacket->localBuffer;

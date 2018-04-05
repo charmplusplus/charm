@@ -3069,6 +3069,8 @@ void *CmiRdmaAlloc(int size) {
 
 #if CMK_CONVERSE_UGNI
   res = (char *)LrtsRdmaAlloc(size, sizeof(CmiChunkHeader));
+#elif CMK_USE_IBVERBS || CMK_USE_IBUD
+  res = (char *) infi_CmiAlloc(size+sizeof(CmiChunkHeader));
 #else
   res =(char *) malloc_nomigrate(size+sizeof(CmiChunkHeader));
 #endif
@@ -3181,6 +3183,8 @@ void CmiRdmaFree(void *blk)
 
 #if CMK_CONVERSE_UGNI
     LrtsRdmaFree(BLKSTART(parentBlk));
+#elif CMK_USE_IBVERBS || CMK_USE_IBUD
+    infi_CmiFree(BLKSTART(parentBlk));
 #else
     free_nomigrate(BLKSTART(parentBlk));
 #endif
