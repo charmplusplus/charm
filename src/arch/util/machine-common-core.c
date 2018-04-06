@@ -1200,7 +1200,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
       int ppn;
       if (onewth_per_host)
       {
-        ppn = 2; // instead of 1 to allow for a comm thread
+        ppn = 1;
         SET_ENV_VAR("CmiOneWthPerHost", "1");
       }
       else if (onewth_per_socket)
@@ -1219,8 +1219,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
         SET_ENV_VAR("CmiOneWthPerPU", "1");
       }
 # if !CMK_MULTICORE
-      // account for comm thread
-      --ppn;
+      // account for comm thread, if necessary to avoid oversubscribing PUs
+      if (ppn + 1 > CmiHwlocTopologyLocal.num_pus)
+        --ppn;
 # endif
 
       if (ppn <= 0)
