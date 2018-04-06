@@ -3674,6 +3674,9 @@ static void req_all_clients_connected()
     if (onewth_unit != proc_per.unit() && threads_per_host + calculated_processes_per_host > p0.num_pus)
       threads_per_host -= calculated_processes_per_host;
 
+    if (threads_per_host == 0)
+      threads_per_host = 1;
+
     if (threads_per_host < calculated_processes_per_host || threads_per_host % calculated_processes_per_host != 0)
     {
       fprintf(stderr, "Charmrun> Error: Invalid request for %d PEs among %d processes per host.\n",

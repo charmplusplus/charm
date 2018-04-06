@@ -1222,6 +1222,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
       // account for comm thread, if necessary to avoid oversubscribing PUs
       if (ppn + 1 > CmiHwlocTopologyLocal.num_pus)
         --ppn;
+
+      if (ppn == 0)
+        ppn = 1;
 # endif
 
       if (ppn <= 0)
