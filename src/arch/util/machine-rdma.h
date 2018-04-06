@@ -310,13 +310,13 @@ void CmiIssueRget(
 #endif
   // Use network RDMA for a PE on a remote host
   LrtsIssueRget(srcAddr,
-                srcInfo + CmiGetRdmaCommonInfoSize(),
+                (char*)srcInfo + CmiGetRdmaCommonInfoSize(),
                 srcAck,
                 srcAckSize,
                 srcPe,
                 srcMode,
                 destAddr,
-                destInfo + CmiGetRdmaCommonInfoSize(),
+                (char*)destInfo + CmiGetRdmaCommonInfoSize(),
                 destAck,
                 destAckSize,
                 destPe,
@@ -356,13 +356,13 @@ void CmiIssueRput(
 #endif
   // Use network RDMA for a PE on a remote host
   LrtsIssueRput(destAddr,
-                destInfo + CmiGetRdmaCommonInfoSize(),
+                (char*)destInfo + CmiGetRdmaCommonInfoSize(),
                 destAck,
                 destAckSize,
                 destPe,
                 destMode,
                 srcAddr,
-                srcInfo + CmiGetRdmaCommonInfoSize(),
+                (char*)srcInfo + CmiGetRdmaCommonInfoSize(),
                 srcAck,
                 srcAckSize,
                 srcPe,
