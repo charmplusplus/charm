@@ -1269,7 +1269,7 @@ void CmiInitCPUAffinityUtil(void){
     CpvInitialize(void *, myProcStatFP);
     CmiLock(_smp_mutex);
 #if CMK_SMP
-    sprintf(fname, "/proc/%d/task/%d/stat", getpid(), syscall(SYS_gettid));
+    sprintf(fname, "/proc/%d/task/%ld/stat", getpid(), syscall(SYS_gettid));
 #else
     sprintf(fname, "/proc/%d/stat", getpid());
 #endif

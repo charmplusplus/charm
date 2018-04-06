@@ -456,6 +456,7 @@ void CmiAbort(const char *message)
   CmiError(message);
   /* *(char*)NULL = 0; */
   exit(1);
+  CMI_NORETURN_FUNCTION_END
 }
 
 /**********************************************************************

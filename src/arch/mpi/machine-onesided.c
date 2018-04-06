@@ -31,7 +31,7 @@ void LrtsIssueRgets(void *recv, int pe){
 
 // Post MPI_Isend or MPI_Irecv to send/recv the RDMA buffer
 // Used by both non-SMP and SMP modes
-CmiCommHandle MPISendOrRecvOneBuffer(SMSG_LIST *smsg, int tag){
+void MPISendOrRecvOneBuffer(SMSG_LIST *smsg, int tag){
   int node = smsg->destpe;
   int size = smsg->size;
 

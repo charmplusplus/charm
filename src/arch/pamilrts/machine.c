@@ -807,6 +807,7 @@ void LrtsExit(void)
 
 void LrtsAbort(const char *message) {
   assert(0);
+  CMI_NORETURN_FUNCTION_END
 }
 
 INLINE_KEYWORD void LrtsBeginIdle(void) {}

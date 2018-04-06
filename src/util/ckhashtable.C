@@ -365,10 +365,10 @@ static unsigned int primeLargerThan(unsigned int x)
 }
 
 /*************** C Interface routines ****************/
-#define CDECL extern "C"
+#define EXTERN_C_DECL extern "C"
 
 /*Create hashtable with a single integer as the key*/
-CDECL CkHashtable_c CkCreateHashtable_int(int objBytes,int initSize)
+EXTERN_C_DECL CkHashtable_c CkCreateHashtable_int(int objBytes,int initSize)
 {
   int objStart=2*sizeof(int);
   CkHashtableLayout layout(sizeof(int),sizeof(int),
@@ -377,7 +377,7 @@ CDECL CkHashtable_c CkCreateHashtable_int(int objBytes,int initSize)
 					CkHashFunction_int,CkHashCompare_int);
 }
 /*Create hashtable with a C string pointer as the key*/
-CDECL CkHashtable_c CkCreateHashtable_string(int objBytes,int initSize)
+EXTERN_C_DECL CkHashtable_c CkCreateHashtable_string(int objBytes,int initSize)
 {
   int objStart=2*sizeof(char *);
   CkHashtableLayout layout(sizeof(char *),sizeof(char *),
@@ -386,7 +386,7 @@ CDECL CkHashtable_c CkCreateHashtable_string(int objBytes,int initSize)
 					CkHashFunction_string,CkHashCompare_string);
 }
 /*Create hashtable with a C pointer as the key*/
-CDECL CkHashtable_c CkCreateHashtable_pointer(int objBytes,int initSize)
+EXTERN_C_DECL CkHashtable_c CkCreateHashtable_pointer(int objBytes,int initSize)
 {
   int objStart=2*sizeof(char *);
   CkHashtableLayout layout(sizeof(char *),sizeof(char *),
@@ -394,29 +394,29 @@ CDECL CkHashtable_c CkCreateHashtable_pointer(int objBytes,int initSize)
   return (CkHashtable_c)new CkHashtable(layout,initSize,0.5,
 					CkHashFunction_pointer,CkHashCompare_pointer);
 }
-CDECL void CkDeleteHashtable(CkHashtable_c h)
+EXTERN_C_DECL void CkDeleteHashtable(CkHashtable_c h)
 {
 	delete (CkHashtable *)h;
 }
 /*Return object storage for this (possibly new) key*/
-CDECL void *CkHashtablePut(CkHashtable_c h,const void *atKey)
+EXTERN_C_DECL void *CkHashtablePut(CkHashtable_c h,const void *atKey)
 {
 	return ((CkHashtable *)h)->put(atKey);
 }
 /*Return object storage for this (old) key-- */
 /*  returns NULL if key not found.*/
-CDECL void *CkHashtableGet(CkHashtable_c h,const void *fromKey)
+EXTERN_C_DECL void *CkHashtableGet(CkHashtable_c h,const void *fromKey)
 {
 	return ((CkHashtable *)h)->get(fromKey);
 }
 /* Remove this key, rehashing as needed
    Returns the number of keys removed (always 0 or 1) */
-CDECL int CkHashtableRemove(CkHashtable_c h,const void *doomedKey)
+EXTERN_C_DECL int CkHashtableRemove(CkHashtable_c h,const void *doomedKey)
 {
 	return ((CkHashtable *)h)->remove(doomedKey);
 }
 /*Number of elements stored in the hashtable */
-CDECL int CkHashtableSize(CkHashtable_c h)
+EXTERN_C_DECL int CkHashtableSize(CkHashtable_c h)
 {
     return ((CkHashtable *)h)->numObjects();
 }
@@ -424,24 +424,24 @@ CDECL int CkHashtableSize(CkHashtable_c h)
 /*Return the iterator for the given hashtable. It is reset to the beginning.
  ** WARNING!!! ** This is a newly allocated memory that must be freed by the
  user with CkHashtableDestroyIterator */
-CDECL CkHashtableIterator_c CkHashtableGetIterator(CkHashtable_c h) {
+EXTERN_C_DECL CkHashtableIterator_c CkHashtableGetIterator(CkHashtable_c h) {
     CkHashtableIterator *it = ((CkHashtable *)h)->iterator();
     it->seekStart();
     return it;
 }
 /* Destroy the iterator allocated with CkHashtableGetIterator */
-CDECL void CkHashtableDestroyIterator(CkHashtableIterator_c it) {
+EXTERN_C_DECL void CkHashtableDestroyIterator(CkHashtableIterator_c it) {
     delete ((CkHashtableIterator *)it);
 }
 /* Return the next element in the hash table given the iterator (NULL if not found) */
-CDECL void *CkHashtableIteratorNext(CkHashtableIterator_c it, void **keyRet) {
+EXTERN_C_DECL void *CkHashtableIteratorNext(CkHashtableIterator_c it, void **keyRet) {
     return ((CkHashtableIterator *)it)->next(keyRet);
 }
 /* Seek the iterator into the hashtable by 'n' slot (*not* objects) */
-CDECL void CkHashtableIteratorSeek(CkHashtableIterator_c it, int n) {
+EXTERN_C_DECL void CkHashtableIteratorSeek(CkHashtableIterator_c it, int n) {
     ((CkHashtableIterator *)it)->seek(n);
 }
 /* Seek the iterator into the hashtable by 'n' slot (*not* objects) */
-CDECL void CkHashtableIteratorSeekStart(CkHashtableIterator_c it) {
+EXTERN_C_DECL void CkHashtableIteratorSeekStart(CkHashtableIterator_c it) {
     ((CkHashtableIterator *)it)->seekStart();
 }

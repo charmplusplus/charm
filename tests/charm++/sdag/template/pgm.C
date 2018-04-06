@@ -6,7 +6,7 @@
 #include <iostream>
 
 class main : public CBase_main {
-  main_SDAG_CODE;
+  main_SDAG_CODE
   CProxy_tchare<int> cint;
   CProxy_tchare<double> cdouble;
 public:
@@ -18,7 +18,7 @@ public:
 
 template <typename T>
 class tchare : public CBase_tchare<T> {
-  tchare_SDAG_CODE;
+  tchare_SDAG_CODE
   T val;
   tchare(T arg) : val(arg) { }
 };

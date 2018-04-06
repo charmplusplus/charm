@@ -150,7 +150,7 @@ static DWORD WINAPI call_startfn(LPVOID vindex)
 
 static DWORD WINAPI call_startfn(LPVOID vindex)
 {
-  int index = (int)vindex;
+  int index = (int)(intptr_t)vindex;
  
   CmiState state = Cmi_state_vector + index;
   if(Cmi_state_key == 0xFFFFFFFF) PerrorExit("TlsAlloc");
@@ -230,7 +230,7 @@ static void CmiStartThreads(char **argv)
 #endif
   tocreate = _Cmi_mynodesize;
   for (i=1; i<=tocreate; i++) {
-    if((thr = CreateThread(NULL, 0, call_startfn, (LPVOID)i, 0, &threadID)) 
+    if((thr = CreateThread(NULL, 0, call_startfn, (LPVOID)(intptr_t)i, 0, &threadID)) 
        == NULL) PerrorExit("CreateThread");
     CloseHandle(thr);
   }

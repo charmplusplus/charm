@@ -550,6 +550,7 @@ void LrtsAbort(const char *message)
     charmrun_abort(message);
     machine_exit(1);
   }
+  CMI_NORETURN_FUNCTION_END
 }
 
 

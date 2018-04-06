@@ -1070,6 +1070,7 @@ void CmiAbort(const char * message) {
     //}    
     //CmiBarrier();
     assert (0);
+    CMI_NORETURN_FUNCTION_END
 }
 
 #if CMK_NODE_QUEUE_AVAILABLE

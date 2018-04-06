@@ -171,7 +171,7 @@ main::main(CkArgMsg *msg)
   fiveProxy.dowork(); 
   sixProxy.dowork(); 
   sevenProxy.dowork(); 
-};
+}
 
 void main::createReport(CkReductionMsg *msg)
 {
@@ -191,7 +191,7 @@ void main::createReport(CkReductionMsg *msg)
   default: CkAbort("impossible user flag"); break;
   }
   */
-};
+}
 
 void main::doneReport(CkReductionMsg *msg)
 {
@@ -205,31 +205,31 @@ void main::doneReport(CkReductionMsg *msg)
       CkPrintf("All Done %d\n",doneCount);  
       CkExit();
     }
-};
+}
 
 int OneMap::procNum(int hdl, const CkArrayIndex &idx)
 {
   CkArrayIndex1D idx1d = *(CkArrayIndex1D *) &idx;
   return(IntArrOne[idx1d.index[0]]%CkNumPes());
-};
+}
 
 int TwoMap::procNum(int hdl, const CkArrayIndex &idx)
 {
   CkArrayIndex1D idx1d = *(CkArrayIndex1D *) &idx;
   return(IntArrTwo[idx1d.index[0]]%CkNumPes());
-};
+}
 
 int ThreeMap::procNum(int hdl, const CkArrayIndex &idx)
 {
   CkArrayIndex1D idx1d = *(CkArrayIndex1D *) &idx;
   return(IntArrThree[idx1d.index[0]]%CkNumPes());
-};
+}
 
 int FourMap::procNum(int hdl, const CkArrayIndex &idx)
 {
   CkArrayIndex1D idx1d = *(CkArrayIndex1D *) &idx;
   return(IntArrFour[idx1d.index[0]]%CkNumPes());
-};
+}
 
 int FiveMap::procNum(int hdl, const CkArrayIndex &idx)
 {
@@ -237,8 +237,7 @@ int FiveMap::procNum(int hdl, const CkArrayIndex &idx)
   int retval=IntArrFive[idx1d.index[0]]%CkNumPes();
   //  CkPrintf("procnum five %d %d\n",idx1d.index,retval);
   return(retval);
-};
-
+}
 
 int SixMap::procNum(int hdl, const CkArrayIndex &idx)
 {
@@ -246,21 +245,17 @@ int SixMap::procNum(int hdl, const CkArrayIndex &idx)
   int retval=(idx2d.index[0]+idx2d.index[1])%CkNumPes();
   //  CkPrintf("procnum Six %d %d %d\n",idx2d.index[0],idx2d.index[1],retval);
   return(retval);
-};
-
-
+}
 
 void WasteTime(double howmuch)
 {
   double start = CmiWallTimer();
   while (CmiWallTimer() - start < howmuch) ;
   
-};
-
+}
 
 bool CheckAllReadOnly()
 {
-
   CkAssert(intOne==1);
   CkAssert(dOne==1.0);
   CkAssert(dTwo==2.0);
@@ -274,8 +269,6 @@ bool CheckAllReadOnly()
       CkAssert(IntArrFive[i]==i);
     }
   return(true);
-};
-
-
+}
 
 #include "startupTest.def.h"

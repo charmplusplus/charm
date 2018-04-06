@@ -317,5 +317,5 @@ class tester : public CBase_tester {
   }
 };
 
-MEGATEST_REGISTER_TEST(groupdependence,"nbhat4",0);
+MEGATEST_REGISTER_TEST(groupdependence,"nbhat4",0)
 #include "groupdependence.def.h"

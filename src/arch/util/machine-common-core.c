@@ -1693,6 +1693,7 @@ void CmiAbortHelper(const char *source, const char *message, const char *suggest
 
 void CmiAbort(const char *message) {
   CmiAbortHelper("Called CmiAbort", message, NULL, 1, 0);
+  CMI_NORETURN_FUNCTION_END
 }
 
 /* ##### Beginning of Functions Providing Incoming Network Messages ##### */

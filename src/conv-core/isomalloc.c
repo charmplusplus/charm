@@ -1858,8 +1858,12 @@ static void init_ranges(char **argv)
             if (fd == -1) {
                 CmiAbort("isomalloc_sync failed during restart, make sure you have a shared file system.");
             }
-            read(fd, &ss, sizeof(CmiUInt8));
-            read(fd, &ee, sizeof(CmiUInt8));
+            if (read(fd, &ss, sizeof(CmiUInt8)) != sizeof(CmiUInt8)) {
+              CmiAbort("Isomalloc> call to read() failed during restart!");
+            }
+            if (read(fd, &ee, sizeof(CmiUInt8)) != sizeof(CmiUInt8)) {
+              CmiAbort("Isomalloc> call to read() failed during restart!");
+            }
             close(fd);
             if (ss < s || ee > e)
                 CmiAbort("isomalloc_sync failed during restart, virtual memory regions do not overlap.");
@@ -1981,8 +1985,12 @@ static void init_ranges(char **argv)
                     CmiUInt8 e = (CmiUInt8)(freeRegion.start+freeRegion.len);
                     sprintf(fname,".isomalloc");
                     while ((fd = open(fname, O_WRONLY|O_TRUNC|O_CREAT, 0644)) == -1);
-                    write(fd, &s, sizeof(CmiUInt8));
-                    write(fd, &e, sizeof(CmiUInt8));
+                    if (write(fd, &s, sizeof(CmiUInt8)) != sizeof(CmiUInt8)) {
+                      CmiAbort("Isomalloc> call to write() failed while synchronizing memory regions!");
+                    }
+                    if (write(fd, &e, sizeof(CmiUInt8)) != sizeof(CmiUInt8)) {
+                      CmiAbort("Isomalloc> call to write() failed while synchronizing memory regions!");
+                    }
                     close(fd);
                 }
 #endif

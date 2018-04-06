@@ -86,6 +86,7 @@ void CmiAbort(const char *message)
 {
   CmiError(message);
   exit(1);
+  CMI_NORETURN_FUNCTION_END
 }
 
 void ConverseExit(void)

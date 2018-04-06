@@ -856,8 +856,8 @@ CDECL
 long ampiCurrentStackUsage(void){
   int localVariable;
 
-  unsigned long p1 =  (unsigned long)((void*)&localVariable);
-  unsigned long p2 =  (unsigned long)(CtvAccess(stackBottom));
+  unsigned long p1 =  (unsigned long)(uintptr_t)((void*)&localVariable);
+  unsigned long p2 =  (unsigned long)(uintptr_t)(CtvAccess(stackBottom));
 
   if(p1 > p2)
     return p1 - p2;

@@ -1463,6 +1463,7 @@ void LrtsAbort(const char *message)
     MACHSTATE1(2, "OFI::LrtsAbort '%s' {", message);
     exit(1);
     MACHSTATE(2, "} OFI::LrtsAbort");
+    CMI_NORETURN_FUNCTION_END
 }
 
 void  LrtsNotifyIdle()

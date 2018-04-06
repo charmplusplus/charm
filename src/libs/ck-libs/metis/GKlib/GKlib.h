@@ -28,6 +28,7 @@
 #define CMK_THREADLOCAL __thread
 #endif
 
+#define _XOPEN_SOURCE
 #include "gk_arch.h" /*!< This should be here, prior to the includes */
 
 

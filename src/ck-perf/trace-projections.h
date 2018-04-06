@@ -267,7 +267,7 @@ class LogPool {
     char *dfname;
     char *pgmname;
     bool binary;
-    bool nSubdirs;
+    int nSubdirs;
 #if CMK_PROJECTIONS_USE_ZLIB
     gzFile deltazfp;
     gzFile zfp;

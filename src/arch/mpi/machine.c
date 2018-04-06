@@ -25,6 +25,7 @@
 static char* strsignal(int sig) {
   static char outbuf[32];
   sprintf(outbuf, "%d", sig);
+  return outbuf;
 }
 #else
 #include <unistd.h> /*For getpid()*/
@@ -1847,6 +1848,7 @@ void LrtsPostCommonInit(int everReturn) {
 
 void LrtsAbort(const char *message) {
     MPI_Abort(charmComm, 1);
+    CMI_NORETURN_FUNCTION_END
 }
 
 /**************************  TIMER FUNCTIONS **************************/

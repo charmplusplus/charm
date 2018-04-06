@@ -428,7 +428,7 @@ ArrayElement::~ArrayElement()
   DEBC((AA "Removing %llu from PE level hashtable\n" AB, ckGetID().getID()));
   CkpvAccess(array_objs).erase(ckGetID().getID());
   //To detect use-after-delete: 
-  thisArray=(CkArray *)0xDEADa7a1;
+  thisArray=(CkArray *)(intptr_t)0xDEADa7a1;
 }
 
 void ArrayElement::pup(PUP::er &p)

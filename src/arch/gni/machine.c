@@ -4543,6 +4543,7 @@ void LrtsDrainResources(void)
 
 void LrtsAbort(const char *message) {
     PMI_Abort(-1, message);
+    CMI_NORETURN_FUNCTION_END
 }
 
 /**************************  TIMER FUNCTIONS **************************/

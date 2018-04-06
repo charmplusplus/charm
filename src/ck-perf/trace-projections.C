@@ -1084,8 +1084,8 @@ TraceProjections::TraceProjections(char **argv):
     CmiGetArgFlagDesc(argv,"+binary-trace",
 		      "Write log files in binary format");
 
-  CmiInt8 nSubdirs = 0;
-  CmiGetArgLongDesc(argv,"+trace-subdirs", &nSubdirs, "Number of subdirectories into which traces will be written");
+  int nSubdirs = 0;
+  CmiGetArgIntDesc(argv,"+trace-subdirs", &nSubdirs, "Number of subdirectories into which traces will be written");
 
 
 #if CMK_PROJECTIONS_USE_ZLIB

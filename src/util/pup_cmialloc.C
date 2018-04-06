@@ -65,7 +65,7 @@ void PUP_toCmiAllocMem::pupCmiAllocBuf(void **msg, size_t msg_size) {
 
 void PUP_fromCmiAllocMem::pupCmiAllocBuf(void **msg) {
     //First align buf
-    buf = (PUP::myByte *)ALIGN8_LONG((long)buf);
+    buf = (PUP::myByte *)(intptr_t)ALIGN8_LONG((long)buf);
 
     //Now get the chunk header
     CmiChunkHeader chnk_hdr;    

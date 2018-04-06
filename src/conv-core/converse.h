@@ -88,6 +88,20 @@
 # define CMK_THROW
 #endif
 
+#ifndef __has_builtin
+# define __has_builtin(x) 0  // Compatibility with non-clang compilers.
+#endif
+#if defined __GNUC__ || __has_builtin(__builtin_unreachable)
+// Technically GCC 4.5 is the minimum for this feature, but we require C++11.
+# define CMI_UNREACHABLE_SECTION(...) __builtin_unreachable()
+#elif _MSC_VER
+# define CMI_UNREACHABLE_SECTION(...) __assume(0)
+#else
+# define CMI_UNREACHABLE_SECTION(...) __VA_ARGS__
+#endif
+
+#define CMI_NORETURN_FUNCTION_END CMI_UNREACHABLE_SECTION(while(1));
+
 # if defined __cplusplus
 #  define CMK_NORETURN [[noreturn]]
 # else
