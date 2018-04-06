@@ -7,13 +7,11 @@ QUIET=0
 while [ $# -gt 0 ]
 do
         case $1 in
-	+p|+ppn)     args=$args" "$1" "$2
-                shift;
+	+p|+ppn|++ppn)
+		args=$args" "$1" "$2
+		shift;
 		shift
 		;;
-        ++ppn)  echo please use +ppn instead of ++ppn
-                exit 1
-                ;;
 	++quiet)
 		QUIET=1
 		args=$args" "$1
