@@ -1,5 +1,6 @@
 #! /bin/sh
 
+cmd=""
 args=""
 QUIET=0
 
@@ -22,17 +23,18 @@ do
 		# consume and ignore, local-mode is all that multicore supports
 		shift
 		;;
-        +*)
-                args=$args" "$1
-                shift
-                ;;
-        *)
-		break;
+	+*)
+		args=$args" "$1
+		shift
+		;;
+	*)
+		cmd=$cmd" "$1
+		shift
 		;;
 	esac
 done
 
-test $QUIET -eq 0 && echo Running command: $* $args
+test $QUIET -eq 0 && echo Running command: $cmd $args
 test $QUIET -eq 0 && echo
 
-exec $* $args
+exec $cmd $args
