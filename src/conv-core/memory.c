@@ -1,11 +1,11 @@
 
 
-/**  
+/**
  @defgroup MemoryModule Memory Allocation and Monitoring
 
  This module provides the functions malloc, free, calloc, cfree,
  realloc, valloc, memalign, and other functions for determining
- the current and past memory usage. 
+ the current and past memory usage.
 
  There are several possible implementations provided here-- the user
  can link in whichever is best using the -malloc option with charmc.
@@ -16,17 +16,17 @@
 
  The CMK_MEMORY_BUILD_* symbols come in from the compiler command line.
 
- To determine how much memory your Charm++ program is using on a 
- processor, call CmiMemoryUsage(). This function will return the 
- number of bytes allocated, usually representing the heap size. 
+ To determine how much memory your Charm++ program is using on a
+ processor, call CmiMemoryUsage(). This function will return the
+ number of bytes allocated, usually representing the heap size.
  It is possible that this measurement will not exactly represent
- the heap size, but rather will reflect the total amount of 
+ the heap size, but rather will reflect the total amount of
  memory used by the program.
 
 */
 
 
-/** 
+/**
     @addtogroup MemoryModule
     @{
 */
@@ -394,7 +394,7 @@ INLINE static CMK_TYPEDEF_UINT8 MemusageProcSelfStat(void){
     CMK_TYPEDEF_UINT8 vsz = 0; /* should remain 0 on failure */
 
     if(failed_once) return 0; /* no point in retrying */
-    
+
     f = fopen("/proc/self/stat", "r");
     if(!f) { failed_once = 1; return 0; }
     for(i=0; i<22; i++) ret = fscanf(f, "%*s");
@@ -430,7 +430,7 @@ INLINE static CMK_TYPEDEF_UINT8 MemusageMallinfo(void){
 INLINE static CMK_TYPEDEF_UINT8 MemusagePS(void){
 #if ! CMK_HAS_POPEN
     return 0;
-#else	
+#else
     char pscmd[100];
     CMK_TYPEDEF_UINT8 vsz=0;
     FILE *p;
@@ -442,7 +442,7 @@ INLINE static CMK_TYPEDEF_UINT8 MemusagePS(void){
 	pclose(p);
     }
     return (vsz * (CMK_TYPEDEF_UINT8)1024);
-#endif	
+#endif
 }
 
 #if defined(_WIN32)
@@ -453,7 +453,7 @@ INLINE static CMK_TYPEDEF_UINT8 MemusageWindows(void){
     PROCESS_MEMORY_COUNTERS pmc;
     if ( GetProcessMemoryInfo( GetCurrentProcess(), &pmc, sizeof(pmc)) )
     {
-      /* return pmc.WorkingSetSize; */ 
+      /* return pmc.WorkingSetSize; */
       return pmc.PagefileUsage;    /* total vm size, possibly not in memory */
     }
     return 0;
@@ -477,6 +477,12 @@ static CMK_TYPEDEF_UINT8 MemusageBGQ(void){
 }
 #endif
 
+INLINE static CMK_TYPEDEF_UINT8 MemusageDebug(void) {
+    malloc_info(0, stdout);
+    malloc_stats();
+    return 0;
+}
+
 typedef CMK_TYPEDEF_UINT8 (*CmiMemUsageFn)(void);
 
 /* this structure defines the order of testing for memory usage functions */
@@ -484,6 +490,7 @@ struct CmiMemUsageStruct {
     CmiMemUsageFn  fn;
     const char *name;
 } memtest_order[] = {
+    {MemusageDebug, "debug"},
     {MemusageBGQ, "BlueGene/Q"},
     {MemusageWindows, "Windows"},
     {MemusageMstats, "Mstats"},
@@ -544,7 +551,7 @@ void CmiResetMinMemory(void) {}
 *Not* using the system malloc-- first pick the implementation:
 */
 
-#if CMK_MEMORY_BUILD_GNU 
+#if CMK_MEMORY_BUILD_GNU
 #define meta_malloc   mm_malloc
 #define meta_free     mm_free
 #define meta_calloc   mm_calloc

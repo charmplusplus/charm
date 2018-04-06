@@ -51,14 +51,15 @@ public:
   }
 
   Hello(CkMigrateMessage *m) {}
-  
+
   void SayHi(int hiNo)
   {
+    printf("Memusage: %lu\n", CmiMemoryUsage());
     CkPrintf("Hi[%d] from element %d\n",hiNo,thisIndex);
     if (thisIndex < nElements-1)
       //Pass the hello on:
       thisProxy[thisIndex+1].SayHi(hiNo+1);
-    else 
+    else
       //We've been around once-- we're done.
       mainProxy.done();
   }
