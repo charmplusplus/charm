@@ -26,7 +26,11 @@ do
 		shift
 		;;
 	*)
-		cmd=$cmd" "$1
+		if [ -z "$cmd" ]; then
+			cmd=$1
+		else
+			args=$args" "$1
+		fi
 		shift
 		;;
 	esac
