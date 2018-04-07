@@ -58,6 +58,8 @@
 
 #define CMK_LBDB_ON                                        1
 
+#define CMK_PPC64                                          1
+
 /*
 #undef CMK_IMMEDIATE_MSG
 #define CMK_IMMEDIATE_MSG                                  0

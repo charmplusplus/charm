@@ -147,6 +147,13 @@
 #include "conv-mach-pxshm.h"
 #endif
 
+/* Cache line size */
+#if CMK_PPC64
+# define CMI_CACHE_LINE_SIZE 128
+#else
+# define CMI_CACHE_LINE_SIZE 64
+#endif
+
 /* Without stdint.h, CMK_TYPEDEF_(U)INT{2,4,8} must be defined in the
    corresponding conv-mach.h */
 #if CMK_HAS_STDINT_H && !defined(CMK_TYPEDEF_INT2)

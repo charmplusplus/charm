@@ -7,7 +7,7 @@
 #include <atomic>
 #define USE_TREE_BROADCAST_THRESHOLD 8
 #define TREE_BCAST_BRANCH (4)
-#define CACHE_LINE_SIZE 64
+
 /* 1. Using converse-level msg, then the msg is always of highest priority.
  * And the notification msg comes from the singlehelper where the loop parallelization
  * is initiated.
@@ -52,8 +52,8 @@ public:
     CurLoopInfo(int maxChunks):numChunks(0),fnPtr(NULL), lowerIndex(-1), upperIndex(0),
             paramNum(0), param(NULL), curChunkIdx(-1), finishFlag(0), redBufs(NULL), bufSpace(NULL), inited(0) {
         redBufs = new void *[maxChunks];
-        bufSpace = new char[maxChunks * CACHE_LINE_SIZE];
-        for (int i=0; i<maxChunks; i++) redBufs[i] = (void *)(bufSpace+i*CACHE_LINE_SIZE);
+        bufSpace = new char[maxChunks * CMI_CACHE_LINE_SIZE];
+        for (int i=0; i<maxChunks; i++) redBufs[i] = (void *)(bufSpace+i*CMI_CACHE_LINE_SIZE);
     }
 
     ~CurLoopInfo() {

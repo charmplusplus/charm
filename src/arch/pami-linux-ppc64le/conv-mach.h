@@ -49,6 +49,8 @@
 
 #define CMK_LBDB_ON                                        1
 
+#define CMK_PPC64                                          1
+
 #define LIBCOLL                                            1
 
 #endif

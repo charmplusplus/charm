@@ -18,6 +18,7 @@
 #ifndef __PCQUEUE__
 #define __PCQUEUE__
 
+#include "conv-config.h"
 
 /*****************************************************************************
  * #define CMK_PCQUEUE_LOCK
@@ -56,14 +57,6 @@
 
 #define PCQueueSize 0x100
 
-/** This data type is at least one cache line of padding, used to avoid
- *  cache line thrashing on SMP systems.  On x86, this is just for performance;
- *  on other CPUs, this can affect your choice of fence operations.
- **/
-typedef struct CmiMemorySMPSeparation_t {
-        unsigned char padding[128];
-} CmiMemorySMPSeparation_t;
-
 /**
  * The simple version of pcqueue has dropped the function of being
  * expanded if the queue is full. On one hand, each operation becomes simpler
@@ -77,11 +70,11 @@ typedef struct CircQueueStruct
   struct CircQueueStruct * CMK_SMP_volatile next;
   int push;
 #if CMK_SMP
-  CmiMemorySMPSeparation_t pad1;
+  char _pad1[CMI_CACHE_LINE_SIZE - (sizeof(struct CircQueueStruct *) + sizeof(int))]; // align to cache line
 #endif
   int pull;
 #if CMK_SMP
-  CmiMemorySMPSeparation_t pad2;
+  char _pad2[CMI_CACHE_LINE_SIZE - sizeof(int)]; // align to cache line
 #endif
   char *data[PCQueueSize];
 }
@@ -91,11 +84,11 @@ typedef struct PCQueueStruct
 {
   CircQueue head;
 #if CMK_SMP
-  CmiMemorySMPSeparation_t pad1;
+  char _pad1[CMI_CACHE_LINE_SIZE - sizeof(CircQueue)]; // align to cache line
 #endif
   CircQueue CMK_SMP_volatile tail;
 #if CMK_SMP
-  CmiMemorySMPSeparation_t pad2;
+  char _pad2[CMI_CACHE_LINE_SIZE - sizeof(CircQueue)]; // align to cache line
 #endif
   int  len;
 #if CMK_PCQUEUE_LOCK || CMK_PCQUEUE_PUSH_LOCK
@@ -325,18 +318,18 @@ typedef struct PCQueueStruct
 {
   char **head; /*pointing to the first element*/
 #if CMK_SMP
-  CmiMemorySMPSeparation_t pad1;
+  char _pad1[CMI_CACHE_LINE_SIZE - sizeof(char**)]; // align to cache line
 #endif
 
   //char** CMK_SMP_volatile tail; /*pointing to the last element*/
   char** tail; /*pointing to the last element*/
 #if CMK_SMP
-  CmiMemorySMPSeparation_t pad2;
+  char _pad2[CMI_CACHE_LINE_SIZE - sizeof(char**)]; // align to cache line
 #endif
 
   int  len;
 #if CMK_SMP
-  CmiMemorySMPSeparation_t pad3;
+  char _pad3[CMI_CACHE_LINE_SIZE - sizeof(int)]; // align to cache line
 #endif
 
   const char **data;
