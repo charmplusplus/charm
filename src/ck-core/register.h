@@ -56,17 +56,7 @@ class EntryInfo {
     int msgIdx;
     /// Our chare's index into the _chareTable
     int chareIdx;
-    /// Charm++ Tracing enabled for this ep (can change dynamically)
-    bool traceEnabled; 
-    /// Method doesn't keep (and delete) message passed in to it.
-    bool noKeep; 
-    /// true if this EP is charm internal functions
-    bool inCharm;
-    bool appWork; 
-#ifdef ADAPT_SCHED_MEM
-   /// true if this EP is used to be rescheduled when adjusting memory usage
-   bool isMemCritical;
-#endif
+
     /** 
       A "marshall unpack" function:
         1.) Pups method parameters out of the buffer passed in to it.
@@ -76,7 +66,7 @@ class EntryInfo {
       a whole set of combined messages.
     */
     CkMarshallUnpackFn marshallUnpack;
-    
+
 #if CMK_CHARMDEBUG
     /** 
       A "message pup" function pups the message accepted by 
@@ -89,6 +79,18 @@ class EntryInfo {
       marshalled messages.
     */
     CkMessagePupFn messagePup;
+#endif
+
+    /// Charm++ Tracing enabled for this ep (can change dynamically)
+    bool traceEnabled;
+    /// Method doesn't keep (and delete) message passed in to it.
+    bool noKeep;
+    /// true if this EP is charm internal functions
+    bool inCharm;
+    bool appWork;
+#ifdef ADAPT_SCHED_MEM
+   /// true if this EP is used to be rescheduled when adjusting memory usage
+   bool isMemCritical;
 #endif
 
     EntryInfo(const char *n, CkCallFnPtr c, int m, int ci) : 
@@ -162,16 +164,15 @@ class ChareInfo {
     /// chareIdx of each base class.
     int bases[16];
     
-    /// For groups -- 1 if the group is Irreducible 
-    bool isIrr;
-    
     /// chare type
     ChareType  chareType;
+    int mainChareIdx;
+
+    /// For groups -- true if the group is Irreducible
+    bool isIrr;
 
     /// true if this EP is charm internal functions
     bool inCharm;
-
-    int mainChareIdx;      
 
     ChareInfo(const char *n, size_t s, ChareType t) : name(n), size(s) {
       defCtor=migCtor=-1;
@@ -199,10 +200,10 @@ class ChareInfo {
 class MainInfo {
   public:
     const char *name;
+    void* obj; // real type is Chare*
     int chareIdx;
     int entryIdx;
     int entryMigCtor;
-    void* obj; // real type is Chare*
     MainInfo(int c, int e) : name("main"), chareIdx(c), entryIdx(e) {}
     inline void* getObj(void) { return obj; }
     inline void setObj(void *_obj) { obj=_obj; }

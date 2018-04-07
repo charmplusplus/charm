@@ -699,12 +699,12 @@ class CkDelegateMgr : public IrrGroup {
 */
 class CProxy {
   private:
-    CkGroupID delegatedGroupId;      
-    bool isNodeGroup;
     mutable CkDelegateMgr *delegatedMgr; // can be either a group or a nodegroup
     CkDelegateData *delegatedPtr; // private data for use by delegatedMgr.
+    CkGroupID delegatedGroupId;
+    bool isNodeGroup;
   protected: //Never allocate CProxy's-- only subclass them.
- CProxy() :  isNodeGroup(false), delegatedMgr(0), delegatedPtr(0)
+ CProxy() :  delegatedMgr(0), delegatedPtr(0), isNodeGroup(false)
       {delegatedGroupId.setZero(); }
 
 #define CK_DELCTOR_PARAM CkDelegateMgr *dTo,CkDelegateData *dPtr
