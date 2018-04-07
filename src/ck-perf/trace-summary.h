@@ -250,12 +250,12 @@ class TraceSummary : public Trace {
     int execEvent;
     int execEp;
     int execPe;
+    int msgNum; /* used to handle multiple endComputation calls?? */
 
     /* per-log metadata maintained to derive cross-event information */
     double binStart; /* time of last filled bin? */
     double start, packstart, unpackstart, idleStart;
     double binTime, binIdle;
-    int msgNum; /* used to handle multiple endComputation calls?? */
     int inIdle;
     int inExec;
     int depth;

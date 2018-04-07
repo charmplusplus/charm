@@ -207,9 +207,8 @@ double averageUtilizationInBuffer(compressedBuffer b);
 class TraceUtilization : public Trace {
  public:
   int execEp; // the currently executing EP
-  double start; // the start time for the currently executing EP
-
   unsigned int epInfoSize;
+  double start; // the start time for the currently executing EP
 
   double *cpuTime;     // NUM_BINS*epInfoSize
   int lastBinUsed;

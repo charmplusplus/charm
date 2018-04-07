@@ -45,13 +45,13 @@ class LogEntry {
     unsigned short mIdx;
     unsigned short eIdx;
     int msglen;
+    int nestedID; // Nested thread ID, e.g. virtual AMPI rank number
     CmiObjId   id;
     int numpes;
     int *pes;
-    int userSuppliedData;
-    char *userSuppliedNote;
     unsigned long memUsage;
     double stat;	//Used for storing User Stats
+    char *userSuppliedNote;
 
     // this is taken out so as to provide a placeholder value for non-PAPI
     // versions (whose value is *always* zero).
@@ -59,10 +59,10 @@ class LogEntry {
 #if CMK_HAS_COUNTER_PAPI
     LONG_LONG_PAPI papiValues[NUMPAPIEVENTS];
 #endif
-    unsigned char type; 
     char *fName;
     int flen;
-    int nestedID; // Nested thread ID, e.g. virtual AMPI rank number
+    int userSuppliedData;
+    unsigned char type;
 
   public:
     
@@ -253,9 +253,18 @@ class LogPool {
   private:
     bool writeData;
     bool writeSummaryFiles;
+    bool binary;
+    bool hasFlushed;
+    bool headerWritten;
+    bool fileCreated;
+#if CMK_PROJECTIONS_USE_ZLIB
+    bool compressed;
+#endif
     unsigned int poolSize;
     unsigned int numEntries;
     unsigned int lastCreationEvent;
+    int numPhases;
+    int nSubdirs;
     LogEntry *pool;
     FILE *fp;
     FILE *deltafp;
@@ -266,12 +275,9 @@ class LogPool {
     char *fname;
     char *dfname;
     char *pgmname;
-    bool binary;
-    int nSubdirs;
 #if CMK_PROJECTIONS_USE_ZLIB
     gzFile deltazfp;
     gzFile zfp;
-    bool compressed;
 #endif
     // **CW** prevTime stores the timestamp of the last event
     // written out to log. This allows the implementation of
@@ -282,14 +288,8 @@ class LogPool {
     double globalStartTime; // used at the end on Pe 0 only
     double globalEndTime; // used at the end on Pe 0 only
 
-    int numPhases;
-    bool hasFlushed;
     //cppcheck-suppress unsafeClassCanLeak
     bool *keepPhase;  // one decision per phase
-
-    bool headerWritten;
-    bool fileCreated;
-    void writeHeader();
 
     // for statistics 
     double beginComputationTime;
@@ -314,6 +314,7 @@ class LogPool {
     long long statisTotalMemAlloc;
     long long statisTotalMemFree;
 
+    void writeHeader();
 
   public:
     LogPool(char *pgm);
@@ -475,14 +476,17 @@ class TraceProjections : public Trace {
     int execPe;
     bool inEntry;
     bool computationStarted;
-
+    bool traceNestedEvents;
+public:
+    bool converseExit; // used for exits that bypass CkExit.
+private:
     int funcCount;
+    int currentPhaseID;
+
     CkHashtableT<StrKey,int> funcHashtable;
 
-    bool traceNestedEvents;
     CkQ<NestedEvent> nestedEvents;
     
-    int currentPhaseID;
     LogEntry* lastPhaseEvent;
 
     //as user now can specify the idx, it's possible that user may specify an existing idx
@@ -490,7 +494,6 @@ class TraceProjections : public Trace {
     CkVec<int> idxVec;
     int idxRegistered(int idx);    
 public:
-    bool converseExit; // used for exits that bypass CkExit.
     double endTime;
 
     TraceProjections(char **argv);

@@ -38,11 +38,11 @@ class MemEntry {
 class TraceMemory : public Trace {
  private:
   bool firstTime;
+  bool recordStack;
+  bool traceDisabled;
   int logBufSize;
   int usedBuffer;
-  bool recordStack;
   char *logBuffer;
-  bool traceDisabled;
 
   void checkFlush(int add);
   void flush();
