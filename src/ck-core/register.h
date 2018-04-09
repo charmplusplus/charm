@@ -184,7 +184,11 @@ class ChareInfo {
     int getDefaultCtor(void) { return defCtor; }
     void setMigCtor(int idx) { migCtor = idx; }
     int getMigCtor(void) { return migCtor; }
-    void addBase(int idx) { bases[numbases++] = idx; }
+    void addBase(int idx) {
+      CkAssert(numbases+1 <= 16); // 'bases' is declared as an array of size 16 above,
+                                  // but we could potentially make it a a std::vector
+      bases[numbases++] = idx;
+    }
     void setInCharm() { inCharm = true; }
     bool isInCharm() { return inCharm; }
     void setMainChareType(int idx) { mainChareIdx = idx; }
