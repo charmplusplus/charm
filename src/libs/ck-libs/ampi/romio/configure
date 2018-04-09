@@ -3223,7 +3223,7 @@ if test -z "$F90" ; then
 fi
 KINDVAL=""
 if $F90 -o kind kind.f >/dev/null 2>&1 ; then
-    ./kind >/dev/null 2>&1
+    ./kind ++quiet >/dev/null 2>&1
     if test -s k.out ; then 
         KINDVAL=`cat k.out`
     fi
@@ -3289,7 +3289,7 @@ if test -z "$F90" ; then
 fi
 KINDVAL=""
 if $F90 -o kind kind.f >/dev/null 2>&1 ; then
-    ./kind >/dev/null 2>&1
+    ./kind ++quiet >/dev/null 2>&1
     if test -s k.out ; then 
         KINDVAL=`cat k.out`
     fi
