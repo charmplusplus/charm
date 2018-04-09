@@ -1914,12 +1914,19 @@ static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 #endif	
 
 	struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *) rdmaWC->wr_id;
+
+	// CmiDirect Put
+	if (rdmaWC->opcode == IBV_WC_RDMA_WRITE && rdmaPacket->type == INFI_DIRECT) {
+		// Nothing needs to be done on the sender side once a CmiDirect Put is complete
+		return;
+	}
 /*	if(rdmaPacket->type == INFI_DIRECT){
 		processDirectWC(rdmaPacket);
 		return;
 	}*/
 //	CmiAssert(rdmaPacket->type == INFI_MESG);
 #if CMK_ONESIDED_IMPL
+	// Zerocopy Entry Method API
 	if (rdmaPacket->type == INFI_ONESIDED) {
 
 #if CMK_IBVERBS_TOKENS_FLOW
@@ -1933,6 +1940,7 @@ static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 	}
 #endif
 #if CMK_ONESIDED_DIRECT_IMPL
+	// Zerocopy Direct API
 	if (rdmaPacket->type == INFI_ONESIDED_DIRECT) {
 
 #if CMK_IBVERBS_TOKENS_FLOW
