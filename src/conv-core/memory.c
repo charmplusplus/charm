@@ -425,7 +425,8 @@ INLINE static CMK_TYPEDEF_UINT8 MemusageMallinfo(void){
 #if !CMK_CRAYXE && !CMK_CRAYXC
     if(memtotal2 > memtotal) memtotal = memtotal2;
 #endif
-    return memtotal;
+    // mall info doesn't support over 32 bit memory. If overflowed, fall through
+    return memtotal > 4294967290 ? 0 : memtotal;
     }
 }
 #endif
@@ -446,6 +447,90 @@ INLINE static CMK_TYPEDEF_UINT8 MemusagePS(void){
     }
     return (vsz * (CMK_TYPEDEF_UINT8)1024);
 #endif	
+}
+
+#if CMK_HAS_MALLOCINFO
+#define END_SUMMARY_SECTION 1
+
+struct mem_mallocinfo {
+    CMK_TYPEDEF_UINT8 total;
+    CMK_TYPEDEF_UINT8 max;
+    CMK_TYPEDEF_UINT8 mmap;
+};
+
+typedef struct mem_mallocinfo mem_mallocinfo;
+
+static int process_line(char * line, mem_mallocinfo * s) {
+    if (strstr(line, "</heap>") != NULL) {
+        // should terminate.
+        return END_SUMMARY_SECTION;
+    }
+
+    char * type = strstr(line, "type=\"");
+    if (type == NULL) {
+        return 0;
+    } else {
+        // skip the type chars to the actual type
+        type += 6;
+    }
+
+    CMK_TYPEDEF_UINT8 * target_type;
+    if (!strncmp(type, "mmap", 4)) {
+        target_type = &s->mmap;
+    } else if (!strncmp(type, "total", 5)) {
+        target_type = &s->total;
+    } else if (!strncmp(type, "max", 3)) {
+        target_type = &s->max;
+    } else {
+        return 0;
+    }
+
+    char * size;
+    if ((size = strstr(type, "size=\"")) == NULL) {
+        return 0;
+    } else {
+        // skip the size to the actual numbers
+        size += 6;
+    }
+    *target_type = atol(size);
+}
+
+static void parse_mallocinfo(char * buf, mem_mallocinfo * info) {
+    char * line;
+    // reverse parse the malloc_info XML to only extract the summary
+    while ((line = strrchr(buf, '\n')) != NULL) {
+        if (process_line(line, info) == END_SUMMARY_SECTION) {
+            break;
+        }
+        *line = '\0';
+    }
+}
+
+#endif
+
+INLINE static CMK_TYPEDEF_UINT8 MemusageMallocinfo(void) {
+#if CMK_HAS_MALLOCINFO && !CMK_CONVERSE_UGNI
+    char * buf = NULL;
+    size_t size;
+    FILE * file;
+    if ((file = open_memstream(&buf, &size)) == NULL) {
+        return 0;
+    }
+    if (malloc_info(0, file) == -1) {
+        fclose(file);
+        free(buf);
+        return 0;
+    }
+    fclose(file);
+
+    mem_mallocinfo memory_info;
+    memset(&memory_info, 0, sizeof(memory_info));
+    parse_mallocinfo(buf, &memory_info);
+    free(buf);
+    return memory_info.mmap + memory_info.max;
+#else
+    return 0;
+#endif
 }
 
 #if defined(_WIN32)
@@ -491,6 +576,7 @@ struct CmiMemUsageStruct {
     {MemusageWindows, "Windows"},
     {MemusageMstats, "Mstats"},
     {MemusageMallinfo, "Mallinfo"},
+    {MemusageMallocinfo, "Mallocinfo"},
     {MemusageProcSelfStat, "/proc/self/stat"},
     {MemusageSbrk, "sbrk"},
     {MemusagePS, "ps"},

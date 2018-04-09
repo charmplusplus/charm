@@ -871,6 +871,16 @@ EOT
 test_cxx "whether has regex.h " "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_REGEX_H, $pass, [whether has regex.h])
 
+#### test for mallocinfo ###
+cat > $t <<EOT
+#include <malloc.h>
+int main() {
+  malloc_info(0, NULL);
+}
+EOT
+test_link "whether has mallocinfo" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_MALLOCINFO, $pass, [whether has mallocinfo])
+
 #### Check long long ####
 cat > $t <<EOT
 #include <stdlib.h>
