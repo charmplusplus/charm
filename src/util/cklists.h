@@ -176,9 +176,9 @@ template <class T> void pupCkVec(PUP::er &p,CkVec<T> &vec);
 
 /// A typesafe, automatically growing array.
 /// Classes used must have a default constructor and working copy constructor.
-/// This class is modelled after, but *not* identical to, the
-/// (still nonportable) std::vector.
+/// This class is modelled after, but *not* identical to, std::vector.
 ///   The elements of the array are pup'd using plain old "p|elt;".
+///   The main use case for CkVec is global variables (see CkSkipInitialization above).
 template <class T>
 class CkVec : private CkSTLHelper<T> {
     typedef CkVec<T> this_type;
