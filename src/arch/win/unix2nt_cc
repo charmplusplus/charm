@@ -44,9 +44,7 @@ CL_CMD="CL.EXE"
 CL_COMMON=' -nologo -W1 -EHsc -D_WINDOWS -DNOMINMAX'
 # CL_COMMON="$CL_COMMON -I`cygpath -d \"$SDK_DIR/Include\"`"
 # CL_COMMON="$CL_COMMON -I`cygpath -d \"$VCC_DIR/Include\"`"
-CL_O=$CL_COMMON" -DNDEBUG -MT -Ox"
-CL_DEF=$CL_COMMON" -MT"
-CL_G=$CL_COMMON" -Z7 -MTd -Od"
+CL_MT='-MT'
 CL_DLL="-LD"
 
 #LINK command-line options for -O and -g mode
@@ -73,9 +71,6 @@ LINK_COMMON='-nologo -subsystem:console '
 #else
 #LINK_COMMON="$LINK_COMMON -LIBPATH:`cygpath -d \"$VCC_DIR/Lib/amd64\"`"
 #fi
-LINK_O=$LINK_COMMON
-LINK_DEF=$LINK_COMMON
-LINK_G="$LINK_COMMON -DEBUG"
 #LINK_POST='ws2_32.lib kernel32.lib user32.lib gdi32.lib winspool.lib 
 #  comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib 
 #  odbc32.lib odbccp32.lib -SUBSYSTEM:CONSOLE -INCREMENTAL:NO -MACHINE:IX86 '
@@ -161,8 +156,8 @@ DOCOMPILE="no"
 DOLINK="no"
 DODEPS="no"
 OUTPUT=""
-CL_OPTS=$CL_DEF
-LINK_OPTS=$LINK_DEF
+CL_OPTS="$CL_COMMON"
+LINK_OPTS="$LINK_COMMON"
 LIBDIR=""
 LIBDIRS=""
 
@@ -184,13 +179,25 @@ do
 	-E)
 		CL="$CL -E"
 		;;
-	-O|-O1|-O2|-O3)
-		CL_OPTS=$CL_O
-		LINK_OPTS=$LINK_O
+	-O0)
+		CL_OPTS="$CL_OPTS -Od"
+		;;
+	-Og)
+		CL_OPTS="$CL_OPTS -DNDEBUG -Od"
+		;;
+	-O|-O1|-Os)
+		CL_OPTS="$CL_OPTS -DNDEBUG -O1"
+		;;
+	-O2)
+		CL_OPTS="$CL_OPTS -DNDEBUG -O2"
+		;;
+	-O3|-Ofast)
+		CL_OPTS="$CL_OPTS -DNDEBUG -Ox"
 		;;
 	-g)
-		CL_OPTS=$CL_G
-		LINK_OPTS=$LINK_G
+		CL_OPTS="$CL_OPTS -Z7"
+		LINK_OPTS="$LINK_OPTS -DEBUG"
+		CL_MT='-MTd'
 		;;
 	-c) 
 		CL="$CL -c";;
@@ -318,6 +325,8 @@ do
 		;;
 	esac
 done
+
+CL_OPTS="$CL_OPTS $CL_MT"
 
 if [ $DODEPS = yes ]
 then
