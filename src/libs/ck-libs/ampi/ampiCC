@@ -48,6 +48,6 @@ then
 fi
 
 # Copy ampirun, but do not overwrite it if it already exists.
-cp -n $CHARMBIN/ampirun .
+[ $status -eq 0 ] && cp -n $CHARMBIN/ampirun .
 
 exit $status
