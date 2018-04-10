@@ -55,6 +55,18 @@ void NamedType::genMsgProxyName(XStr& str) {
   if (tparams) str << "<" << tparams << " >";
 }
 
+void NamedEllipsisType::print(XStr& str) {
+  if (scope) str << scope;
+  str << nameWithEllipsis;
+  if (tparams) str << "<" << tparams << " >";
+}
+
+void NamedEllipsisType::printWithoutEllipsis(XStr& str) {
+  if (scope) str << scope;
+  str << name;
+  if (tparams) str << "<" << tparams << " >";
+}
+
 void PtrType::print(XStr& str) {
   type->print(str);
   for (int i = 0; i < numstars; i++) str << "*";

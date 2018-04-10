@@ -5,6 +5,7 @@ CHARMC=../../../bin/charmc $(OPTS)
 TARGETS = \
   Typename \
   std_array \
+  ParameterPack \
 
 all: $(TARGETS)
 

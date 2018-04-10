@@ -119,6 +119,18 @@ class TVar : public Printable {
   virtual void genShort(XStr& str) = 0;
 };
 
+/* a formal type argument with parameter pack */
+class TTypeEllipsis : public TVar {
+  NamedEllipsisType* type;
+  Type* init;
+
+ public:
+  TTypeEllipsis(NamedEllipsisType* t, Type* i = 0);
+  void print(XStr& str);
+  void genLong(XStr& str, bool printDefault = true);
+  void genShort(XStr& str);
+};
+
 /* a formal type argument */
 class TType : public TVar {
   Type* type;

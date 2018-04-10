@@ -73,7 +73,7 @@ class BuiltinType : public Type {
 };
 
 class NamedType : public Type {
- private:
+ protected:
   const char* name;
   const char* scope;
   TParamList* tparams;
@@ -91,6 +91,20 @@ class NamedType : public Type {
   virtual void genProxyName(XStr& str, forWhom forElement);
   virtual void genIndexName(XStr& str);
   virtual void genMsgProxyName(XStr& str);
+};
+
+class NamedEllipsisType : public NamedType {
+ protected:
+   XStr nameWithEllipsis;
+ public:
+  NamedEllipsisType(const char* n)
+      : NamedType (n) {
+    nameWithEllipsis << n;
+    nameWithEllipsis << "...";
+  }
+  void print(XStr& str);
+  void printWithoutEllipsis(XStr& str);
+  virtual const char* getBaseName(void) const { return nameWithEllipsis.get_string_const(); }
 };
 
 class PtrType : public Type {
@@ -117,6 +131,18 @@ class PtrType : public Type {
       type->genMsgProxyName(str);
     }
   }
+};
+
+class EllipsisType : public Type {
+ private:
+  Type* referant;
+
+ public:
+  EllipsisType(Type* t) : referant(t) {}
+  void print(XStr& str) { str << referant << "..."; }
+  virtual Type* deref(void) { return referant; }
+  const char* getBaseName(void) const { return referant->getBaseName(); }
+  const char* getScope(void) const { return NULL; }
 };
 
 class RValueReferenceType : public Type {

@@ -498,7 +498,13 @@ BaseDataType	: SimpleType
 		{ $$ = new ConstType($1); }
 		;
 
-RestrictedType : BaseDataType '&' '&'
+RestrictedType : BaseDataType '&' '&' '.' '.' '.'
+		{ $$ = new EllipsisType(new RValueReferenceType($1)); }
+		| BaseDataType '&' '.' '.' '.'
+		{ $$ = new EllipsisType(new ReferenceType($1)); }
+		| BaseDataType '.' '.' '.'
+		{ $$ = new EllipsisType($1); }
+		| BaseDataType '&' '&'
 		{ $$ = new RValueReferenceType($1); }
 		| BaseDataType '&'
 		{ $$ = new ReferenceType($1); }
@@ -506,7 +512,13 @@ RestrictedType : BaseDataType '&' '&'
 		{ $$ = $1; }
 		;
 
-Type		: BaseType '&' '&'
+Type		: BaseType '&' '&' '.' '.' '.'
+		{ $$ = new EllipsisType(new RValueReferenceType($1)); }
+		| BaseType '&' '.' '.' '.'
+		{ $$ = new EllipsisType(new ReferenceType($1)); }
+		| BaseType '.' '.' '.'
+		{ $$ = new EllipsisType($1); }
+		| BaseType '&' '&'
 		{ $$ = new RValueReferenceType($1); }
 		| BaseType '&'
 		{ $$ = new ReferenceType($1); }
@@ -721,7 +733,11 @@ OptNameInit	: /* Empty */
 		}
 		;
 
-TVar		: CLASS Name OptTypeInit
+TVar		: CLASS '.' '.' '.' Name OptTypeInit
+		{ $$ = new TTypeEllipsis(new NamedEllipsisType($5), $6); }
+		| TYPENAME '.' '.' '.' IDENT OptTypeInit
+		{ $$ = new TTypeEllipsis(new NamedEllipsisType($5), $6); }
+		| CLASS Name OptTypeInit
 		{ $$ = new TType(new NamedType($2), $3); }
 		| TYPENAME IDENT OptTypeInit
 		{ $$ = new TType(new NamedType($2), $3); }
