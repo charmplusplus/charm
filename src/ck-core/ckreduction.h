@@ -86,17 +86,16 @@ class contributorInfo {
 public:
 	int redNo;//Current reduction number
 	contributorInfo() {redNo=0;}
-	//Migration utilities:
-	void pup(PUP::er &p);
 };
+PUPbytes(contributorInfo)
 
 class countAdjustment {
 public:
   int gcount;//Adjustment to global count (applied at reduction end)
   int lcount;//Adjustment to local count (applied continually)
   countAdjustment(int ignored=0) {(void)ignored; gcount=0; lcount=0;}
-  void pup(PUP::er& p){ p|gcount; p|lcount; }
 };
+PUPbytes(countAdjustment)
 
 /** @todo: Fwd decl for a temporary class. Remove after
  * delegated cross-array reductions are implemented more optimally

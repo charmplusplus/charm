@@ -242,7 +242,7 @@ void Group::CkAddThreadListeners(CthThread th, void *msg) {
 void Group::pup(PUP::er &p)
 {
   CkReductionMgr::pup(p);
-  reductionInfo.pup(p);
+  p|reductionInfo;
 }
 
 /**** Delegation Manager Group */

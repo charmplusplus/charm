@@ -730,9 +730,7 @@ void CProxy_ArrayBase::pup(PUP::er &p)
 void CProxyElement_ArrayBase::pup(PUP::er &p)
 {
   CProxy_ArrayBase::pup(p);
-  p|_idx.nInts;
-  p|_idx.dimension;
-  p(_idx.data(),_idx.nInts);
+  p|_idx;
 }
 
 void CProxySection_ArrayBase::pup(PUP::er &p)

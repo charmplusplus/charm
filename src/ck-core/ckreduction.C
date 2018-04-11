@@ -274,16 +274,6 @@ void CkReductionMgr::ckSetReductionClient(CkCallback *cb)
   storedCallback=*cb;
 }
 
-///////////////////////////// Contributor ////////////////////////
-//Contributors keep a copy of this structure:
-
-/*Contributor migration support:
-*/
-void contributorInfo::pup(PUP::er &p)
-{
-  p(redNo);
-}
-
 ////////////////////// Contributor list maintainance: /////////////////
 //These just set and clear the "creating" flag to prevent
 // reductions from finishing early because not all elements

@@ -52,14 +52,6 @@ struct CkArrayIndexBase
         /// Obtain usable object from base object. @warning: Dangerous pointer cast to child class!!!
         inline CkArrayIndex& asChild() const { return *(CkArrayIndex*)this; }
 
-        /// Permit serialization
-        void pup(PUP::er &p)
-        {
-            p|nInts;
-            p|dimension;
-            for (int i=0;i<nInts;i++) p|index[i];
-        }
-
         bool operator==(CkArrayIndexBase &other) {
           if(nInts != other.nInts) return false;
           if(dimension != other.dimension) return false;
@@ -70,6 +62,7 @@ struct CkArrayIndexBase
         }
 
 };
+PUPbytes(CkArrayIndexBase)
 
 
 
@@ -289,21 +282,17 @@ PUPmarshall(CkArrayID)
 
 typedef int CkIndex1D;
 typedef struct {int x,y;} CkIndex2D;
-inline void operator|(PUP::er &p,CkIndex2D &i) {p(i.x); p(i.y);}
+PUPbytes(CkIndex2D)
 typedef struct {int x,y,z;} CkIndex3D;
-inline void operator|(PUP::er &p,CkIndex3D &i) {p(i.x); p(i.y); p(i.z);}
+PUPbytes(CkIndex3D)
 typedef struct {short int w,x,y,z;} CkIndex4D;
-inline void operator|(PUP::er &p,CkIndex4D &i) {p(i.w); p(i.x); p(i.y); p(i.z);}
+PUPbytes(CkIndex4D)
 typedef struct {short int v,w,x,y,z;} CkIndex5D;
-inline void operator|(PUP::er &p,CkIndex5D &i) {p(i.v); p(i.w); p(i.x); p(i.y); p(i.z);}
+PUPbytes(CkIndex5D)
 typedef struct {short int x1,y1,z1,x2,y2,z2;} CkIndex6D;
-inline void operator|(PUP::er &p,CkIndex6D &i) {p(i.x1); p(i.y1); p(i.z1); p(i.x2); p(i.y2); p(i.z2);}
+PUPbytes(CkIndex6D)
 typedef struct {int data[CK_ARRAYINDEX_MAXLEN];} CkIndexMax;
-inline void operator|(PUP::er &p,CkIndexMax &i) {
-  for (int j=0;j<CK_ARRAYINDEX_MAXLEN;j++) {
-    p|i.data[j];
-  }
-}
+PUPbytes(CkIndexMax)
 
 /// Simple ArrayIndex classes: the key is just integer indices.
 class CkArrayIndex1D : public CkArrayIndex {
