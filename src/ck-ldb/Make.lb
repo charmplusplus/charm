@@ -17,6 +17,7 @@ COMMON_LDBS=\
    BlockLB \
    GreedyCommLB \
    NodeLevelLB \
+   DiffusionLB \
    manager.o
 
 ALL_LDBS=\
@@ -37,6 +38,7 @@ ALL_LDBS=\
    BlockLB \
    GreedyCommLB \
    NodeLevelLB \
+   DiffusionLB \
    GraphPartLB \
    GraphBFTLB \
    GridCommLB \
@@ -105,6 +107,9 @@ LBHEADERS += GreedyCommLB.h GreedyCommLB.decl.h
 
 $(L)/libmoduleNodeLevelLB.a: 
 LBHEADERS += NodeLevelLB.h NodeLevelLB.decl.h
+
+$(L)/libmoduleDiffusionLB.a: 
+LBHEADERS += DiffusionLB.h DiffusionLB.decl.h
 
 $(L)/libmoduleGraphPartLB.a: 
 LBHEADERS += GraphPartLB.h GraphPartLB.decl.h
@@ -204,6 +209,7 @@ ALL_LB_OBJS=EveryLB.o \
     BlockLB.o \
     GreedyCommLB.o \
     NodeLevelLB.o \
+    DiffusionLB.o \
     GraphPartLB.o \
     GraphBFTLB.o \
     GridCommLB.o \
@@ -254,6 +260,7 @@ EVERYLB_DEPS=EveryLB.o \
     BlockLB.o \
     GreedyCommLB.o \
     NodeLevelLB.o \
+    DiffusionLB.o \
     GraphPartLB.o \
     GraphBFTLB.o \
     GridCommLB.o \
@@ -294,6 +301,7 @@ COMMONLBS_DEPS=CommonLBs.o \
     BlockLB.o \
     GreedyCommLB.o \
     NodeLevelLB.o \
+    DiffusionLB.o \
     manager.o \
 
 $(L)/libmoduleEveryLB.a: $(EVERYLB_DEPS)

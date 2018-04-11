@@ -8,12 +8,15 @@ ComboCentLB.decl.h ComboCentLB.def.h: ComboCentLB.ci.stamp
 CommAwareRefineLB.decl.h CommAwareRefineLB.def.h: CommAwareRefineLB.ci.stamp
 CommLB.decl.h CommLB.def.h: CommLB.ci.stamp
 CommonLBs.decl.h CommonLBs.def.h: CommonLBs.ci.stamp
+DiffusionLB.decl.h DiffusionLB.def.h: DiffusionLB.ci.stamp
 DistBaseLB.decl.h DistBaseLB.def.h: DistBaseLB.ci.stamp
 DistributedLB.decl.h DistributedLB.def.h: DistributedLB.ci.stamp
 DummyLB.decl.h DummyLB.def.h: DummyLB.ci.stamp
 EveryLB.decl.h EveryLB.def.h: EveryLB.ci.stamp
 GraphBFTLB.decl.h GraphBFTLB.def.h: GraphBFTLB.ci.stamp
+GraphKLLB.decl.h GraphKLLB.def.h: GraphKLLB.ci.stamp
 GraphPartLB.decl.h GraphPartLB.def.h: GraphPartLB.ci.stamp
+GraphRefinementDist.decl.h GraphRefinementDist.def.h: GraphRefinementDist.ci.stamp
 GreedyAgentLB.decl.h GreedyAgentLB.def.h: GreedyAgentLB.ci.stamp
 GreedyCommLB.decl.h GreedyCommLB.def.h: GreedyCommLB.ci.stamp
 GreedyLB.decl.h GreedyLB.def.h: GreedyLB.ci.stamp
