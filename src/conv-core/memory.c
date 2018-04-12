@@ -52,7 +52,7 @@
 # define __STDC_LIMIT_MACROS
 #endif
 #include <inttypes.h>
-#ifndef WIN32
+#ifndef _WIN32
 #  include <unistd.h> /*For getpagesize*/
 #else
 #  include <process.h>

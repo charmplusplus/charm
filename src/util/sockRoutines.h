@@ -136,7 +136,7 @@ static void sleep(int secs) { Sleep(1000 * secs); }
 #define SOCKET_ERROR (-1)
 #endif /*def SOCKET*/
 
-#endif /*WIN32*/
+#endif /*_WIN32*/
 
 #ifdef __cplusplus
 extern "C" {

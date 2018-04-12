@@ -1,6 +1,6 @@
 #include "charm++.h"
 #include "ckIgetControl.h"
-#ifndef WIN32
+#ifndef _WIN32
 #include <sys/time.h>
 #include <sys/resource.h>
 #endif

@@ -666,7 +666,7 @@ CProxy_FuncCkLoop CkLoop_Init(int numThreads) {
 #else
     CkPrintf("CkLoopLib is used in SMP with simple dynamic scheduling (charm-level notification)\n");
 #endif
-#elif defined(WIN32)
+#elif defined(_WIN32)
     mode = CKLOOP_NOOP;
 #else
     mode = CKLOOP_PTHREAD;

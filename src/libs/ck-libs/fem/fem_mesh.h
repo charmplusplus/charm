@@ -19,7 +19,7 @@ Orion Sky Lawlor, olawlor@acm.org, 1/3/2003
 #  include "idxl_layout.h" /*for IDXL_Layout */
 #endif
 
-#if defined(WIN32) && defined(max)
+#if defined(_WIN32) && defined(max)
 #undef max
 #endif
 

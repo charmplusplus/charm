@@ -14,7 +14,7 @@
 #define MAGICFMLIBTYPE_H
 
 // Windows platform
-#ifdef WIN32
+#ifdef _WIN32
 
 // For the DLL library.
 #ifdef MAGICFMDLL_EXPORTS

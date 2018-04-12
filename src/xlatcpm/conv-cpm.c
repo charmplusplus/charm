@@ -10,7 +10,7 @@
 #define YY_FLEX_MINOR_VERSION 5
 
 #include <stdio.h>
-#ifdef WIN32
+#ifdef _WIN32
 #include <stdlib.h>
 #endif
 
