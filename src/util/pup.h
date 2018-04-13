@@ -748,6 +748,11 @@ public:\
     virtual const PUP::able::PUP_ID &get_PUP_ID(void) const; \
     static void register_PUP_ID(const char* name);
 
+#define PUPable_decl_base_template(baseClassName, className)                   \
+  PUPable_decl_inside_base_template(SINGLE_ARG(baseClassName),                 \
+                                    SINGLE_ARG(className))                     \
+  PUPable_operator_inside(SINGLE_ARG(className))
+
 #define PUPable_decl_inside_template(className)	\
 private: \
     static PUP::able* call_PUP_constructor(void) { \
@@ -758,6 +763,22 @@ public: \
         return my_PUP_ID; }					\
     static void register_PUP_ID(const char* name) { \
         my_PUP_ID=register_constructor(name,call_PUP_constructor);}
+
+#define PUPable_decl_inside_base_template(baseClassName, className)            \
+private:                                                                       \
+    static PUP::able *call_PUP_constructor(void) {                             \
+        return new className((CkMigrateMessage *)0);                           \
+    }                                                                          \
+    static PUP::able::PUP_ID my_PUP_ID;                                        \
+                                                                               \
+public:                                                                        \
+    virtual const PUP::able::PUP_ID &get_PUP_ID(void) const {                  \
+        return my_PUP_ID;                                                      \
+    }                                                                          \
+    static void register_PUP_ID(const char *name) {                            \
+        my_PUP_ID =                                                            \
+           baseClassName::register_constructor(name, call_PUP_constructor);    \
+    }
 
 //PUPable_decl for classes inside a namespace: in header at file scope
 #define PUPable_decl_outside(className) \
