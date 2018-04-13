@@ -139,6 +139,7 @@ class Entry : public Member {
   const char* intExpr;
   ParamList* param;
   int isWhenEntry;
+  bool containsWhenConstruct;
 
   void addEStateVar(CStateVar* sv) {
     estateVars.push_back(sv);

@@ -455,6 +455,7 @@ A full example of the \texttt{case} statement can be found
 
 \section{Usage Notes}
 
+\subsection{SDAG Code Declaration}
 If you've added \sdag\ code to your class, you must link in the code
 by adding ``{\it className}\_SDAG\_CODE'' inside the class declaration
 in the .h file. This macro defines the entry points and support code
@@ -479,6 +480,18 @@ public:
 \};
 \end{alltt}
 \end{center}
+
+\subsection{Direct Calls to SDAG Entry Methods}
+An SDAG entry method that contains one or more when clause(s) cannot be directly called
+and will result in a runtime error with an error message. It has to be only called through a proxy.
+This is a runtime requirement that is enforced in order to prevent accidental calls to SDAG entry methods
+that are asynchronous in nature. Additionally, since they are called using a proxy, it enhances
+understandability and clarity as to not be confused for a regular function call that returns immediately.
+
+For example, in the first example discussed, it is invalid to call the SDAG
+entry method {\tt startStep} directly as {\tt startStep();} because it contains when clauses.
+It has to be only called using the proxy i.e. {\tt computeObj.startStep();}
+, where {\tt computeObj} is the proxy to {\tt ComputeObject}.
 
 \zap{
 \section{Relationship to Threads}

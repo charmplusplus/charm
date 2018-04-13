@@ -590,7 +590,7 @@ init(int numContributors, CkCallback startCb, CkCallback endCb,
   detectorLocalObj_ = detector_.ckLocalBranch();
   initLocalClients();
 
-  detectorLocalObj_->start_detection(numContributors, startCb, flushCb,
+  detector_[CkMyPe()].start_detection(numContributors, startCb, flushCb,
                                      finish , 0);
 
   hasSentRecently_ = false;

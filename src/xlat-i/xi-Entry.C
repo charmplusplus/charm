@@ -100,6 +100,8 @@ void Entry::check() {
   if (isSdag()) {
     list<CEntry*> whenEntryList;
     sdagCon->generateEntryList(whenEntryList, NULL);
+    // containsWhenConstruct is used to prepend sdag entry method names with "_sdag_fnc_" when it contains one or more when clauses
+    containsWhenConstruct = !whenEntryList.empty();
 
     for (list<CEntry*>::iterator en = whenEntryList.begin(); en != whenEntryList.end();
          ++en) {
@@ -157,6 +159,7 @@ Entry::Entry(int l, int a, Type* r, const char* n, ParamList* p, Value* sz,
   container = NULL;
   entryCount = -1;
   isWhenEntry = 0;
+  containsWhenConstruct = false;
   if (param && param->isMarshalled() && !isThreaded()) attribs |= SNOKEEP;
 
   if (isPython()) pythonDoc = python_doc;
@@ -2362,7 +2365,7 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
     } else if (isConstructor()) {  // Constructor: call "new (obj) foo(parameters)"
       str << "  new (impl_obj_void) " << container->baseName();
     } else {  // Regular entry method: call "obj->bar(parameters)"
-      str << "  impl_obj->" << (tspec ? "template " : "") << name;
+      str << "  impl_obj->" << (tspec ? "template " : "") << (containsWhenConstruct ? "_sdag_fnc_" : "" ) << name;
       if (tspec) {
         str << "< ";
         tspec->genShort(str);

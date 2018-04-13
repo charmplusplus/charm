@@ -52,7 +52,7 @@ extern const char* cur_file;
 extern void RemoveSdagComments(char*);
 
 void generateLocalWrapper(XStr& decls, XStr& defs, int isVoid, XStr& signature,
-                          Entry* entry, std::list<CStateVar*>* params, XStr* next);
+                          Entry* entry, std::list<CStateVar*>* params, XStr* next, bool isDummy=false);
 
 }  // namespace xi
 

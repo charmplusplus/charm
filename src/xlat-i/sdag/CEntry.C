@@ -13,7 +13,7 @@ void CEntry::generateDeps(XStr& op) {
 }
 
 void generateLocalWrapper(XStr& decls, XStr& defs, int isVoid, XStr& signature,
-                          Entry* entry, std::list<CStateVar*>* params, XStr* next) {
+                          Entry* entry, std::list<CStateVar*>* params, XStr* next, bool isDummy) {
   int numRdmaParams = 0;
   for (std::list<CStateVar*>::iterator it = params->begin(); it != params->end(); ++it) {
     CStateVar& var = **it;
@@ -23,35 +23,41 @@ void generateLocalWrapper(XStr& decls, XStr& defs, int isVoid, XStr& signature,
   templateGuardBegin(false, defs);
   defs << entry->getContainer()->tspec() << "void " << entry->getContainer()->baseName()
        << "::" << signature << "{\n";
-  defs << "  " << *entry->genClosureTypeNameProxyTemp << "*"
-       << " genClosure = new " << *entry->genClosureTypeNameProxyTemp << "()"
-       << ";\n";
-  if (params) {
-    int i = 0;
-    for (std::list<CStateVar*>::iterator it = params->begin(); it != params->end();
-         ++it, ++i) {
-      CStateVar& var = **it;
-      if (var.name) {
-        if (var.isRdma) {
-          defs << "#if CMK_ONESIDED_IMPL\n";
-          if (var.isFirstRdma)
-            defs << "  genClosure->getP" << i++ << "() = " << numRdmaParams << ";\n";
-          defs << "  genClosure->getP" << i << "() = "
-               << "rdmawrapper_" << var.name << ";\n";
-          defs << "#else\n";
-          defs << "  genClosure->getP" << i << "() = "
-               << "(" << var.type << "*)"
-               << "rdmawrapper_" << var.name << ".ptr"
-               << ";\n";
-          defs << "#endif\n";
-        } else
-          defs << "  genClosure->getP" << i << "() = " << var.name << ";\n";
+
+  if(isDummy) {
+    // isDummy being true indicates that the function is a dummy function generated solely
+    // for throwing an error if the sdag function is called directly, without a proxy
+    defs << "  " << "CkAbort(\"Direct SDAG call is not allowed for SDAG entry methods having when constructs. Call such SDAG methods using a proxy\"); \n";
+  } else {
+    defs << "  " << *entry->genClosureTypeNameProxyTemp << "*"
+         << " genClosure = new " << *entry->genClosureTypeNameProxyTemp << "()"
+         << ";\n";
+    if (params) {
+      int i = 0;
+      for (std::list<CStateVar*>::iterator it = params->begin(); it != params->end();
+           ++it, ++i) {
+        CStateVar& var = **it;
+        if (var.name) {
+          if (var.isRdma) {
+            defs << "#if CMK_ONESIDED_IMPL\n";
+            if (var.isFirstRdma)
+              defs << "  genClosure->getP" << i++ << "() = " << numRdmaParams << ";\n";
+            defs << "  genClosure->getP" << i << "() = "
+                 << "rdmawrapper_" << var.name << ";\n";
+            defs << "#else\n";
+            defs << "  genClosure->getP" << i << "() = "
+                 << "(" << var.type << "*)"
+                 << "rdmawrapper_" << var.name << ".ptr"
+                 << ";\n";
+            defs << "#endif\n";
+          } else
+            defs << "  genClosure->getP" << i << "() = " << var.name << ";\n";
+        }
       }
     }
+    defs << "  " << ( entry->containsWhenConstruct ? "_sdag_fnc_" : "") << *next << "(genClosure);\n";
+    defs << "  genClosure->deref();\n";
   }
-
-  defs << "  " << *next << "(genClosure);\n";
-  defs << "  genClosure->deref();\n";
   defs << "}\n\n";
   templateGuardEnd(defs);
 }

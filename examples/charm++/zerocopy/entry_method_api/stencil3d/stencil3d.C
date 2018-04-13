@@ -149,7 +149,7 @@ class Stencil: public CBase_Stencil {
       // Advance to next step on completion of sending ghosts to the 6 neighbors
       if(counter == 6){
         counter = 0;
-        nextStep();
+        thisProxy[thisIndex].nextStep();
       }
     }
 

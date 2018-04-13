@@ -375,7 +375,7 @@ class Stencil: public CBase_Stencil {
     }
 
     void ResumeFromSync() {
-      doStep();
+      thisProxy[thisIndex].doStep();
     }
 };
 

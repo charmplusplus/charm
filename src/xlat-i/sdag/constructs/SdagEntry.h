@@ -11,6 +11,7 @@ class SdagEntryConstruct : public SdagConstruct {
   SdagEntryConstruct(SdagConstruct*);
   SdagEntryConstruct(SListConstruct*);
   void generateCode(XStr&, XStr&, Entry*);
+  void generateCode(XStr& ,XStr& ,XStr &, bool isDummy=false);
   void numberNodes();
   void labelNodes();
 };
