@@ -147,3 +147,29 @@ module E \{
   extern entry void libArray doSomething(int&, CkCallback redCB);
 \};
 \end{alltt}
+
+To enable generic programming using \charmpp entities, we define a number of type trait
+utilities. These can be used to determine at compile-time if a type is a certain kind
+of \charmpp type:
+\begin{alltt}
+#include "charm++_type_traits.h"
+
+// Is T a chare array proxy?
+using result = charmxx::is_array_proxy<T>;
+
+// Is T a group proxy?
+using result = charmxx::is_group_proxy<T>;
+
+// Is T a node group proxy?
+using result = charmxx::is_node_group_proxy<T>;
+
+// Is T a chare proxy?
+using result = charmxx::is_chare_proxy<T>;
+
+// Is T a bound array?
+using result = charmxx::is_bound_array<T>;
+
+// Does T have a PUP routine defined for it?
+using result = charmxx::is_pupable<T>;
+\end{alltt}
+

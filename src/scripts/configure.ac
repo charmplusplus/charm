@@ -1101,6 +1101,16 @@ EOT
 test_cxx "whether std::inserter is defined" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_STD_INSERTER, $pass, [whether std::inserter works])
 
+#### check if C++17's std::void_t is defined #####
+cat > $t <<EOT
+#include <type_traits>
+
+template<typename T, typename = std::void_t<>>
+struct has_pup_member : std::false_type {};
+
+EOT
+test_cxx "whether std::void_t is defined" "ok" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_STD_VOID_T, $pass, [whether std::void_t works])
 
 ####### Check support for features added by the new C11 and CPP11 standards ########
 

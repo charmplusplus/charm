@@ -231,7 +231,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckarrayindex.h ckarrayoptions.h ckarray.h cklocation.h ckmulticast.h ckreduction.h \
 	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h ckrdmawrapper.h ckrdma.h\
           ckmessagelogging.h ckcausalmlog.h ckobjid.h\
-	  ckobjQ.h readonly.h \
+	  ckobjQ.h readonly.h charm++_type_traits.h \
           $(UTILHEADERS) \
 	  waitqd.h LBDatabase.h MetaBalancer.h lbdb.h lbdb++.h LBProfit.h $(LBHEADERS) \
           LBDBManager.h	LBComm.h LBOM.h LBObj.h LBMachineUtil.h LBAgent.h \
