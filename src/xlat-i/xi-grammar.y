@@ -333,14 +333,14 @@ ConstructSemi   : USING NAMESPACE QualName
                 { $2->setExtern($1); $$ = $2; }
                 | OptExtern Message
                 { $2->setExtern($1); $$ = $2; }
-                | EXTERN ENTRY EReturn QualNamedType Name OptTParams EParameters
+                | EXTERN ENTRY EAttribs EReturn QualNamedType Name OptTParams EParameters
                 {
-                  Entry *e = new Entry(lineno, 0, $3, $5, $7, 0, 0, 0, @1.first_line, @$.last_line);
+                  Entry *e = new Entry(lineno, $3, $4, $6, $8, 0, 0, 0, @1.first_line, @$.last_line);
                   int isExtern = 1;
                   e->setExtern(isExtern);
-                  e->targs = $6;
+                  e->targs = $7;
                   e->label = new XStr;
-                  $4->print(*e->label);
+                  $5->print(*e->label);
                   $$ = e;
                   firstRdma = true;
                 }
