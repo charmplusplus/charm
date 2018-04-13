@@ -4,6 +4,9 @@
 # have to pass bank using -A or set PROJECT environment variable
 
 args=""
+
+# Arguments that need to be passed to the charm application, not mpirun (e.g. ++quiet)
+charm_args=""
 pes=1
 machinefile=""
 pernode=32
@@ -46,7 +49,10 @@ do
 		;;
 	++quiet)
 		QUIET=1
-		args=$args" "$1
+		charm_args=$charm_args" "$1
+		;;
+	++local)
+		charm_args=$charm_args" "$1
 		;;
   --pernode)
     pernode=$2
@@ -58,6 +64,8 @@ do
 	esac
 	shift
 done
+
+args=$args" "$charm_args
 
 
 test $QUIET -eq 0 && printf "\nRunning on $pes processors: $args\n"

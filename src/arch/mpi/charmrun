@@ -1,10 +1,13 @@
 #!/bin/sh
 #
 # Conv-host for MPI:
-#  Translates +pN-style conv-host options into 
+#  Translates +pN-style conv-host options into
 # mpirun -npN options.
 
 args=""
+
+# Arguments that need to be passed to the charm application, not mpirun (e.g. ++quiet)
+charm_args=""
 pes=1
 ppn=1
 machinefile=""
@@ -44,14 +47,19 @@ do
 		;;
 	++quiet)
 		QUIET=1
-		args=$args" "$1
+		charm_args=$charm_args" "$1
 		;;
-	*) 
+	++local)
+		charm_args=$charm_args" "$1
+		;;
+	*)
 		args=$args" "$1
 		;;
 	esac
 	shift
 done
+
+args=$args" "$charm_args
 
 rem=`expr $pes % $ppn`
 quot=`expr $pes / $ppn`
@@ -61,7 +69,7 @@ then
   exit 1
 else
   pes=$quot
-fi 
+fi
 
 test $QUIET -eq 0 && printf "\nRunning on $pes processors: $args\n"
 
@@ -315,5 +323,3 @@ else
     fi
   fi
 fi
-
-
