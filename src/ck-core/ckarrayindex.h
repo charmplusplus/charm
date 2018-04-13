@@ -52,6 +52,12 @@ struct CkArrayIndexBase
         /// Obtain usable object from base object. @warning: Dangerous pointer cast to child class!!!
         inline CkArrayIndex& asChild() const { return *(CkArrayIndex*)this; }
 
+        /// Permit serialization via calling pup(), but also declare this type as PUPbytes below
+        inline void pup(PUP::er &p)
+        {
+            p((char *)this, sizeof(CkArrayIndexBase));
+        }
+
         bool operator==(CkArrayIndexBase &other) {
           if(nInts != other.nInts) return false;
           if(dimension != other.dimension) return false;

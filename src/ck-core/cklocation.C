@@ -2224,7 +2224,7 @@ void CkLocMgr::pup(PUP::er &p){
         for(int i=0;i<count;i++){
             CkArrayIndex idx;
             int pe = 0;
-            idx.pup(p);
+            p | idx;
             p | pe;
   //          CmiPrintf("[%d] idx %s is a home element exisiting on pe %d\n",CmiMyPe(),idx2str(idx),pe);
             inform(idx, lookupID(idx), pe);

@@ -86,6 +86,9 @@ class contributorInfo {
 public:
 	int redNo;//Current reduction number
 	contributorInfo() {redNo=0;}
+	inline void pup(PUP::er& p) { // allow calling pup(), but also define as PUPbytes
+		p((char *)this, sizeof(contributorInfo));
+	}
 };
 PUPbytes(contributorInfo)
 
@@ -94,6 +97,9 @@ public:
   int gcount;//Adjustment to global count (applied at reduction end)
   int lcount;//Adjustment to local count (applied continually)
   countAdjustment(int ignored=0) {(void)ignored; gcount=0; lcount=0;}
+  inline void pup(PUP::er& p) { // allow calling pup(), but also define as PUPbytes
+    p((char *)this, sizeof(countAdjustment));
+  }
 };
 PUPbytes(countAdjustment)
 
