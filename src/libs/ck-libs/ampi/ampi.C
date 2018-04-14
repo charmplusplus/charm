@@ -3746,6 +3746,13 @@ AMPI_API_IMPL(int, MPI_Comm_compare, MPI_Comm comm1, MPI_Comm comm2, int *result
   return MPI_SUCCESS;
 }
 
+static bool atexit_called = false;
+
+void ampiMarkAtexit()
+{
+  atexit_called = true;
+}
+
 CDECL
 void AMPI_Exit(int exitCode)
 {
@@ -3758,7 +3765,9 @@ void AMPI_Exit(int exitCode)
     sprintf(err, "Application terminated with exit code %d.\n", exitCode);
     CkAbort(err);
   }
-  TCHARM_Done();
+
+  if (!atexit_called)
+    TCHARM_Done();
 }
 
 FDECL

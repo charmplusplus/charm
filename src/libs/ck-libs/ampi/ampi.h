@@ -27,6 +27,12 @@
 CLINKAGE void AMPI_Exit(int exitCode);
 #define exit(status) AMPI_Exit(status)
 
+
+/* Notify AMPI when atexit() is used in order to prevent running MPI_Finalize()
+   in a function registered with atexit. Only applies when including mpi.h. */
+extern void ampiMarkAtexit(void);
+#define atexit(...) do {atexit(__VA_ARGS__); atexit((void (*)())ampiMarkAtexit);} while(0)
+
 /*
 Silently rename the user's main routine.
 This is needed so we can call the routine as a new thread,
