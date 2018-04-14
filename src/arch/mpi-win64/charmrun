@@ -50,7 +50,7 @@ do
 	    charm_args=$charm_args" "$1
 	    ;;
 	++local)
-		charm_args=$charm_args" "$1
+		# Ignored (unsupported by MPI layer)
 		;;
 	*) 
 	    args=$args" "$1
