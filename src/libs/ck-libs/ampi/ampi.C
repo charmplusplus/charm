@@ -4918,6 +4918,8 @@ AMPI_API_IMPL(int, MPI_Op_free, MPI_Op *op)
 AMPI_API_IMPL(int, MPI_Op_commutative, MPI_Op op, int *commute)
 {
   AMPI_API("AMPI_Op_commutative");
+  if (op == MPI_OP_NULL)
+    return ampiErrhandler("AMPI_Op_commutative", MPI_ERR_OP);
   *commute = (int)getAmpiParent()->opIsCommutative(op);
   return MPI_SUCCESS;
 }
