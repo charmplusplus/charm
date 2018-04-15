@@ -40,8 +40,8 @@ sub promptUserYN {
 
 # The beginning of the good stuff:
 print "\n============================================================\n";
-print "\nBegin interactive charm configuration ...\n";
-print "If you are a poweruser expecting a list of options, please use ./build --help\n";
+print "\nInteractive Charm++/AMPI configuration ...\n";
+print "If you are a power user expecting a list of options, please use ./build --help\n";
 print "\n============================================================\n\n\n";
 
 
@@ -96,9 +96,9 @@ my $skip_choosing = "false";
 
 print "Are you building to run just on the local machine, and not across multiple nodes? [";
 if($arch_os eq "darwin") {
-    print "Y/n]\n";
+    print "Y/n]: ";
 } else {
-    print "y/N]\n";
+    print "y/N]: ";
 }
 {
     my $p = promptUserYN();
@@ -379,7 +379,7 @@ my @c_list = split(" ", $cs);
 my $numc = @c_list;
 
 if ($numc > 0) {
-    print "\nDo you want to specify a compiler? [y/N]";
+    print "\nDo you want to specify a compiler? [y/N]: ";
     my $p = promptUserYN();
     if($p eq "yes" ){
         print "Choose a compiler: [1-$numc] \n";
@@ -410,15 +410,26 @@ if ($numc > 0) {
 
 #Create a hash table containing descriptions of various options
 my %explanations = ();
-$explanations{"ooc"} = "Out-of-core execution support in Charm++";
+$explanations{"ooc"} = "Enable Out-of-core execution support in Charm++";
 $explanations{"tcp"} = "Charm++ over TCP instead of UDP for net versions. TCP is slower";
-$explanations{"gfortran"} = "Use gfortran compiler for fortran";
-$explanations{"flang"} = "Use flang compiler for fortran";
-$explanations{"ifort"} = "Use Intel's ifort fortran compiler";
-$explanations{"pgf90"} = "Use Portland Group's pgf90 fortran compiler";
+$explanations{"gfortran"} = "Use the gfortran compiler for Fortran";
+$explanations{"flang"} = "Use the flang compiler for Fortran";
+$explanations{"ifort"} = "Use Intel's ifort Fortran compiler";
+$explanations{"pgf90"} = "Use Portland Group's pgf90 Fortran compiler";
 $explanations{"syncft"} = "Use fault tolerance support";
 $explanations{"mlogft"} = "Use message logging fault tolerance support";
 $explanations{"causalft"} = "Use causal message logging fault tolerance support";
+$explanations{"omp"} = "Build Charm++ with integrated OpenMP support";
+$explanations{"papi"} = "Enable PAPI performance counters";
+$explanations{"pedantic"} = "Enable pedantic compiler warnings";
+$explanations{"bigemulator"} = "Build additional BigSim libraries";
+$explanations{"bigsim"} = "Compile Charm++ as running on the BigSim emulator";
+$explanations{"nolb"} = "Build without load balancing support";
+$explanations{"perftools"} = "Build with support for the Cray perftools";
+$explanations{"persistent"} = "Build the persistent communication interface";
+$explanations{"slurmpmi"} = "Use Slurm PMI for task launching";
+$explanations{"slurmpmi2"} = "Use Slurm PMI2 for task launching";
+$explanations{"tsan"} = "Compile Charm++ with support for Thread Sanitizer";
 
 
 
@@ -446,7 +457,7 @@ $explanations{"causalft"} = "Use causal message logging fault tolerance support"
   @option_list_pruned = sort @option_list_pruned;
   if (@option_list_pruned > 0) {
 
-      print "\nDo you want to specify any Charm++ build options, such as fortran compilers? [y/N]";
+      print "\nDo you want to specify any Charm++ build options, such as Fortran compilers? [y/N]: ";
       my $special_options = promptUserYN();
 
       if($special_options eq "yes"){
@@ -462,7 +473,7 @@ $explanations{"causalft"} = "Use causal message logging fault tolerance support"
               for(my $j=0;$j<20-length($o);$j++){
                   print " ";
               }
-              print ": $exp";
+              print "$exp";
               print "\n";
               $i++;
           }
@@ -633,7 +644,7 @@ print "\t$build_line\n\n";
 
 
 # Execute the build line if the appropriate architecture directory exists
-print "Do you want to start the build now? [Y/n]";
+print "Do you want to start the build now? [Y/n]: ";
 my $p = promptUserYN();
 if($p eq "yes" || $p eq "default"){
   if(-e "$dirname/src/arch/$arch"){
