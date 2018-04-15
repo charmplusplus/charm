@@ -443,12 +443,9 @@ do
 		shift;
 		;;
     -*) 
-# We hit a real compiler option (like -g, or -Dfoo),
-# so just copy over all remaining options
-          while [ ! $# -eq 0 ]
-          do
-            OPTS="$OPTS $1"; shift
-          done
+        # Compiler option (like -g or -Dfoo), copy it over
+        OPTS="$OPTS $1"
+        shift
 	  ;;
     "help")
 	printOption
