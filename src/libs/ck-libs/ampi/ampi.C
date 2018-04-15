@@ -3748,6 +3748,7 @@ AMPI_API_IMPL(int, MPI_Comm_compare, MPI_Comm comm1, MPI_Comm comm2, int *result
 
 static bool atexit_called = false;
 
+CLINKAGE
 void ampiMarkAtexit()
 {
   atexit_called = true;

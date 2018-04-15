@@ -30,7 +30,7 @@ CLINKAGE void AMPI_Exit(int exitCode);
 
 /* Notify AMPI when atexit() is used in order to prevent running MPI_Finalize()
    in a function registered with atexit. Only applies when including mpi.h. */
-extern void ampiMarkAtexit(void);
+CLINKAGE void ampiMarkAtexit(void);
 #define atexit(...) do {atexit(__VA_ARGS__); atexit((void (*)())ampiMarkAtexit);} while(0)
 
 /*
