@@ -12,6 +12,7 @@ pes=1
 ppn=1
 machinefile=""
 QUIET=0
+LOCAL=0
 
 while [ $# -gt 0 ]
 do
@@ -50,7 +51,8 @@ do
 		charm_args=$charm_args" "$1
 		;;
 	++local)
-		# Ignored (unsupported by MPI layer)
+		LOCAL=1
+		# Don't pass this option to the application, as ++local is not supported by the MPI layer
 		;;
 	*)
 		args=$args" "$1
@@ -73,8 +75,11 @@ fi
 
 test $QUIET -eq 0 && printf "\nRunning on $pes processors: $args\n"
 
-
-if [ -n "$PBS_NODEFILE" ]
+if [ $LOCAL -eq 1 ]
+then
+  test $QUIET -eq 0 && echo $args +p $pes
+  $args +p $pes
+elif [ -n "$PBS_NODEFILE" ]
 then
 # we are in a job shell
   aprun=`which aprun 2>/dev/null`
