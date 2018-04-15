@@ -42,7 +42,7 @@ program.
 
 * Installation
 
-Build the QuickThreads library (see above) and then copy `libqt.a' to
+Build the QuickThreads library (see above) and then copy `libckqt.a' to
 the installation library directory (e.g., /usr/local/lib) and `qt.h'
 and `qtmd.h' to the installation include directory (e.g.,
 /usr/local/include).

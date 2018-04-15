@@ -927,7 +927,7 @@ install:
 
 clean:
 	rm -f conv-autoconfig.h config.cache
-	rm -f QuickThreads/libqt.a
+	rm -f QuickThreads/libckqt.a
 	rm -f charmxi conv-cpm
 	rm -f TAGS basics cmk_extras core
 	rm -f core *.a

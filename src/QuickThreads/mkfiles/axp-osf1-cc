@@ -8,8 +8,8 @@ qt: md/axp.h qt.c  md/axp.s
 	ln -s md/axp.h qtmd.h
 	$(CC) -c -o qt.o qt.c
 	as -o qtmds.o md/axp.s
-	ar q libqt.a qt.o qtmds.o
-	$(CC) -shared -o libqt.so qt.o qtmds.o
+	ar q libckqt.a qt.o qtmds.o
+	$(CC) -shared -o libckqt.so qt.o qtmds.o
 
 stp:
 	$(CC) -c stp.c
@@ -18,4 +18,4 @@ stp:
 testpgm:
 	$(CC) -c meas.c
 	as -o qtmdb.o md/axp_b.s
-	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a
+	$(CC) -o run meas.o qtmdb.o libstp.a libckqt.a
