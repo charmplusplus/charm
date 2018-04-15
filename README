@@ -17,7 +17,7 @@ GETTING THE LATEST SOURCE
 You can use anonymous Git access to obtain the latest Charm++ source
 code, as follows:
 
-    git clone http://charm.cs.illinois.edu/gerrit/charm
+     > git clone http://charm.cs.illinois.edu/gerrit/charm
 
 
 BUILD CONFIGURATION
@@ -35,12 +35,12 @@ ADVANCED BUILD OPTIONS:
 First, you need to decide which version of charm++ to use. The "build"
 script takes several command line options to compile Charm++. The command line syntax is:
 
-build <target> <version> [options ...]
-                         [--basedir=dir] [--libdir=dir] [--incdir=dir]
-                         [charmc-options ...]
+     > build <target> <version> [options ...]
+                                [--basedir=dir] [--libdir=dir] [--incdir=dir]
+                                [charmc-options ...]
 
 For detailed help messages, pass -h or --help to the build script, i.e.
-./build --help
+     > ./build --help
 
 REQUIRED:
 ---------
@@ -68,7 +68,7 @@ the build script will compile Charm++ under this directory.
 
 For example, on an ordinary Linux PC:
 
-   ./build charm++ netlrts-linux-x86_64
+     > ./build charm++ netlrts-linux-x86_64
 
 will build charm++ in the directory: netlrts-linux-x86_64/. The communication
 defaults to UDP packets and the compiler to gcc.
@@ -76,7 +76,7 @@ defaults to UDP packets and the compiler to gcc.
 For a more complex example, consider a shared-memory build with the
 Intel C++ compiler, where you want the communication to happen over TCP sockets:
 
-   ./build charm++ netlrts-linux-x86_64 smp icc tcp
+     > ./build charm++ netlrts-linux-x86_64 smp icc tcp
 
 will build charm++ in the directory: netlrts-linux-x86_64-smp-tcp-icc/.
 
@@ -226,10 +226,10 @@ disabled. These include runtime error checking, tracing, interactive
 debugging, deterministic record-replay, and more. They can be
 controlled by passing flags of the form --enable-featurename or
 --disable-featurename to the build command:
-    > ./build charm++ netlrts-linux-x86_64 --disable-tracing
+     > ./build charm++ netlrts-linux-x86_64 --disable-tracing
 
 The list of optional features available is shown in the output of
-    > ./build --help
+     > ./build --help
 
 Production optimizations: Pass the configure option --with-production
 to ./build to turn on optimizations in Charm++/Converse. This disables
@@ -326,7 +326,7 @@ In order to compile Charm++ into dynamic libraries, one needs to specify the
 "-build-shared" option to the Charm compiler script "charmc"
 at link time. For example, to compile Charm++ under netlrts-linux/tmp, run
 
-make charm++ OPTS='-O -build-shared'
+     > make charm++ OPTS='-O -build-shared'
 
 Charm++'s dynamic libraries are compiled into the lib_so/ directory.
 Typically, they are generated with a ".so" suffix.
@@ -339,7 +339,7 @@ One can compile a Charm++ application linking against Charm++ dynamic
 libraries by linking with charmc's "-charm-shared" option.
 For example:
 
-charmc -o pgm pgm.o -charm-shared
+     > charmc -o pgm pgm.o -charm-shared
 
 You can then run the program as usual.
 Note, linking against Charm++ dynamic libraries produces much smaller size
