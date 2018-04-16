@@ -89,9 +89,10 @@ array [4D]  ArrayD \{ entry ArrayD(); entry void e(\uw{parameters});\}
 array [5D]  ArrayE \{ entry ArrayE(); entry void e(\uw{parameters});\}
 array [6D]  ArrayF \{ entry ArrayF(); entry void e(\uw{parameters});\}
 array [Foo] ArrayG \{ entry ArrayG(); entry void e(\uw{parameters});\}
+array [Bar<3>] ArrayH \{ entry ArrayH(); entry void e(\uw{parameters});\}
 \end{alltt}
 %
-The last declaration expects an array index of type \kw{CkArrayIndex}\uw{Foo},
+The declaration of ArrayG expects an array index of type \kw{CkArrayIndex}\uw{Foo},
 which must be defined before including the \texttt{.decl.h} file (see
 section~\ref{user-defined array index type} on user-defined array indices for
 more information).
@@ -105,6 +106,7 @@ class ArrayD : public CBase\_ArrayD \{ public: ArrayD()\{\} ...\};
 class ArrayE : public CBase\_ArrayE \{ public: ArrayE()\{\} ...\};
 class ArrayF : public CBase\_ArrayF \{ public: ArrayF()\{\} ...\};
 class ArrayG : public CBase\_ArrayG \{ public: ArrayG()\{\} ...\};
+class ArrayH : public CBase\_ArrayH \{ public: ArrayH()\{\} ...\};
 \end{alltt}
 %
 The fields in \kw{thisIndex} are different depending on the dimensionality of
@@ -123,6 +125,7 @@ the chare array:
   \kw{thisIndex.y1}, \kw{thisIndex.z1}, \kw{thisIndex.x2}, \kw{thisIndex.y2},
   \kw{thisIndex.z2}
 \item Foo array: \kw{thisIndex}
+\item Bar<3> array: \kw{thisIndex}
 \end{itemize}
 
 \section{Creating an Array}

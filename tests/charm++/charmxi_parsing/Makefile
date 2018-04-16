@@ -6,6 +6,7 @@ TARGETS = \
   Typename \
   std_array \
   ParameterPack \
+  ArrayIndexTemplate \
 
 all: $(TARGETS)
 

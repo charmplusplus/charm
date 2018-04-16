@@ -36,6 +36,7 @@ void NamedType::genProxyName(XStr& str, forWhom forElement) {
 }
 
 void NamedType::print(XStr& str) {
+  if (useTypename) str << "typename ";
   if (scope) str << scope;
   str << name;
   if (tparams) str << "<" << tparams << " >";

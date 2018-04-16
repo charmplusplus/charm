@@ -448,12 +448,16 @@ QualNamedType	: QualName OptTParams {
                     splitScopedName($1, &scope, &basename);
                     $$ = new NamedType(basename, $2, scope);
                 }
+		| TYPENAME QualName OptTParams
+		{
+			const char* basename, *scope;
+			splitScopedName($2, &scope, &basename);
+			$$ = new NamedType(basename, $3, scope, true);
+		}
                 ;
 
 SimpleType	: BuiltinType
 		{ $$ = $1; }
-		| TYPENAME QualNamedType
-		{ $$ = new TypenameType($2); }
 		| QualNamedType
 		{ $$ = $1; }
 		;
@@ -678,8 +682,8 @@ ArrayIndexType	: '[' NUMBER Name ']'
 			sprintf(buf,"%sD",$2);
 			$$ = new NamedType(buf); 
 		}
-		| '[' Name ']'
-		{ $$ = new NamedType($2); }
+		| '[' QualNamedType ']'
+		{ $$ = $2; }
 		;
 
 Array		: ARRAY ArrayAttribs ArrayIndexType NamedType OptBaseList MemberEList

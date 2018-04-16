@@ -77,10 +77,11 @@ class NamedType : public Type {
   const char* name;
   const char* scope;
   TParamList* tparams;
+  bool useTypename;
 
  public:
-  NamedType(const char* n, TParamList* t = 0, const char* scope_ = NULL)
-      : name(n), scope(scope_), tparams(t) {}
+  NamedType(const char* n, TParamList* t = 0, const char* scope_ = NULL, bool useTypename_ = false)
+      : name(n), scope(scope_), tparams(t), useTypename(useTypename_) {}
   int isTemplated(void) const { return (tparams != 0); }
   int isCkArgMsg(void) const { return 0 == strcmp(name, "CkArgMsg"); }
   int isCkMigMsg(void) const { return 0 == strcmp(name, "CkMigrateMessage"); }
@@ -181,18 +182,6 @@ class ConstType : public Type {
   virtual bool isConst(void) const { return true; }
   virtual Type* deref(void) { return constType; }
   const char* getBaseName(void) const { return constType->getBaseName(); }
-  const char* getScope(void) const { return NULL; }
-};
-
-class TypenameType : public Type {
- private:
-  Type* referant;
-
- public:
-  TypenameType(Type* t) : referant(t) {}
-  void print(XStr& str) { str << "typename " << referant; }
-  virtual Type* deref(void) { return referant; }
-  const char* getBaseName(void) const { return referant->getBaseName(); }
   const char* getScope(void) const { return NULL; }
 };
 
