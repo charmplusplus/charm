@@ -253,6 +253,7 @@ CpvDeclare(Queue, CsdGridQueue);
 void* LrtsAlloc(int, int);
 void* LrtsRdmaAlloc(int, int);
 void  LrtsFree(void*);
+void  LrtsRdmaFree(void*);
 #endif
 
 CpvStaticDeclare(int, cmiMyPeIdle);

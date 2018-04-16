@@ -35,6 +35,7 @@ void* LrtsAlloc(int, int);
 void* LrtsRdmaAlloc(int, int);
 
 void  LrtsFree(void*);
+void  LrtsRdmaFree(void*);
 void  LrtsNotifyIdle(void);
 
 void  LrtsBeginIdle(void);
