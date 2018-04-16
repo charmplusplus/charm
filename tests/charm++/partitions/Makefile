@@ -23,6 +23,9 @@ test: all
 	if [ "$$CMK_NO_PARTITIONS" = "1" ] ; \
 	then \
 	  echo "Skipping test since build does not support partitions"; exit 0 ; \
+	elif [ "$$CMK_BLUEGENEQ" = "1" ] ; \
+	then \
+	  echo "Skipping partitions test on BGQ"; exit 0 ; \
 	fi ; \
 	$(call run, ./hello +p4 10 2 +partitions 2)
 
