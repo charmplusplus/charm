@@ -96,7 +96,7 @@ void ADIO_Init(int *argc, char ***argv, int *error_code)
 
 /* initialize the linked list containing flattened datatypes */
     CtvAccess(ADIOI_Flatlist) = (ADIOI_Flatlist_node *) ADIOI_Malloc(sizeof(ADIOI_Flatlist_node));
-    CtvAccess(ADIOI_Flatlist)->type = (MPI_Datatype) NULL;
+    CtvAccess(ADIOI_Flatlist)->type = MPI_DATATYPE_NULL;
     CtvAccess(ADIOI_Flatlist)->next = NULL;
     CtvAccess(ADIOI_Flatlist)->blocklens = NULL;
     CtvAccess(ADIOI_Flatlist)->indices = NULL;
