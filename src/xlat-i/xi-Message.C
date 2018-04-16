@@ -17,6 +17,7 @@ static const char* CIMsgClassAnsi =
     "    void operator delete(void*p, void*){dealloc(p);}\n"
     "    void operator delete(void*p){dealloc(p);}\n"
     "    void operator delete(void*p, int*, const int){dealloc(p);}\n"
+    "    void operator delete(void*p, int*, const int, const GroupDepNum){dealloc(p);}\n"
     "    void operator delete(void*p, int*){dealloc(p);}\n"
     "#endif\n"
     "    void operator delete(void*p, size_t){dealloc(p);}\n"
@@ -61,6 +62,9 @@ void Message::genAllocDecl(XStr& str) {
   str << "    void operator delete(void *p, ";
   for (i = 0; i < num; i++) str << "int, ";
   str << "const int){dealloc(p);}\n";
+  str << "    void operator delete(void *p, ";
+  for (i = 0; i < num; i++) str << "int, ";
+  str << "const int, const GroupDepNum){dealloc(p);}\n";
   str << "#endif\n";
 }
 
