@@ -350,10 +350,12 @@ CkMemCheckPT::CkMemCheckPT(int w)
   where = w;
 
 #if CMK_CONVERSE_MPI
-  void pingBuddy();
-  void pingCheckHandler();
-  CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
-  CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+  if(CkNumPes() > 1) {
+    void pingBuddy();
+    void pingCheckHandler();
+    CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
+    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+  }
 #endif
 #if CMK_CHKP_ALL
   initEntry();
@@ -391,10 +393,12 @@ void CkMemCheckPT::pup(PUP::er& p)
   	expectCount = -1;
         inCheckpointing = false;
 #if CMK_CONVERSE_MPI
+  if(CkNumPes() > 1) {
     void pingBuddy();
     void pingCheckHandler();
     CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
     CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+  }
 #endif
   }
 }
