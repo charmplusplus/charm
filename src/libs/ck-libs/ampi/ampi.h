@@ -184,6 +184,7 @@ typedef long long int MPI_Offset;
 #define MPI_FLOAT_COMPLEX       39
 #define MPI_LONG_DOUBLE_COMPLEX 40
 #define MPI_AINT                41
+#define MPI_COUNT               MPI_AINT
 
 #define MPI_MAX_PRIMITIVE_TYPE  41
 

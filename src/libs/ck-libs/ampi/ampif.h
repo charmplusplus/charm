@@ -99,6 +99,8 @@
        integer, parameter :: MPI_DOUBLE_COMPLEX    = 27
        integer, parameter :: MPI_COMPLEX16         = 27
        integer, parameter :: MPI_COMPLEX32         = 40
+       integer, parameter :: MPI_AINT              = 41
+       integer, parameter :: MPI_COUNT             = MPI_AINT
 
        integer, parameter :: MPI_COMBINER_NAMED          = 1
        integer, parameter :: MPI_COMBINER_CONTIGUOUS     = 2
