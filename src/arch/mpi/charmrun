@@ -293,12 +293,8 @@ End() {
                 	sleep 20
 		fi
         done
-elif [ -n "`which srun 2>/dev/null`" ]
+elif [ -n "`which mpirun 2>/dev/null`" ]
 then
-# failover to srun before mpirun (for Edison autobuild support)
-  test $QUIET -eq 0 && echo  srun -n $pes -c `expr $ppn + 1` $args
-  srun -n $pes -c `expr $ppn + 1` $args
-else
   mpirun_cmd=`which mpirun 2>/dev/null`
   if test -n "$mpirun_cmd"
   then
@@ -327,4 +323,13 @@ else
       exit 1
     fi
   fi
+elif [ -n "`which srun 2>/dev/null`" ]
+then
+  #mpirun is checked before srun to support the Bridges supercomputer at PSC
+  #as srun has a known issue and fails to successfully launch the parallel job
+  test $QUIET -eq 0 && echo  srun -n $pes -c `expr $ppn + 1` $args
+  srun -n $pes -c `expr $ppn + 1` $args
+else
+  echo "No job launcher found! (tried aprun, mpirun and srun)\n"
+  exit 1
 fi
