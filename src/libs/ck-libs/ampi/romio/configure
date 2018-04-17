@@ -2313,7 +2313,8 @@ fi
 
          MPI_Init(&argc,&argv);
 //         MPIR_Status_set_bytes(status,type,err);
-         MPI_Finalize(); 
+         MPI_Finalize();
+         return 0;
      }
 EOF
   rm -f conftest
@@ -4650,7 +4651,8 @@ fi
      int main(int argc, char **argv)
      {
          MPI_Init(&argc,&argv);
-         MPI_Finalize(); 
+         MPI_Finalize();
+         return 0;
      }
 EOF
   rm -f conftest

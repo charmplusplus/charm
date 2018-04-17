@@ -37,7 +37,7 @@ Return Value:
 MPI_Fint MPI_File_c2f(MPI_File fh)
 {
 #ifndef INT_LT_POINTER
-    return (MPI_Fint) fh;
+    return (MPI_Fint)(intptr_t)fh;
 #else
     int i;
 

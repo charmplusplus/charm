@@ -182,7 +182,15 @@ char *gk_strerror(int errnum)
 #ifndef SUNOS
   static __thread char buf[1024];
 
+  /* There are two version of strerror_r with different declarations */
+  #ifdef __GNUC__
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
+  #endif
   strerror_r(errnum, buf, 1024);
+  #ifdef __GNUC__
+  #pragma GCC diagnostic pop
+  #endif
 
   buf[1023] = '\0';
   return buf;

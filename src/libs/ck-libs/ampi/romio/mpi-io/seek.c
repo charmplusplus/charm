@@ -82,7 +82,7 @@ int MPI_File_seek(MPI_File fh, MPI_Offset offset, int whence)
 	break;
     case MPI_SEEK_CUR:
 	/* find offset corr. to current location of file pointer */
-	ADIOI_Get_position(fh, &curr_offset);
+	ADIOI_Get_position(fh, (ADIO_Offset*)&curr_offset);
 	offset += curr_offset;
 	if (offset < 0) {
 #ifdef PRINT_ERR_MSG
@@ -97,7 +97,7 @@ int MPI_File_seek(MPI_File fh, MPI_Offset offset, int whence)
 	break;
     case MPI_SEEK_END:
 	/* find offset corr. to end of file */
-	ADIOI_Get_eof_offset(fh, &eof_offset);
+	ADIOI_Get_eof_offset(fh, (ADIO_Offset*)&eof_offset);
 	offset += eof_offset;
 	if (offset < 0) {
 #ifdef PRINT_ERR_MSG

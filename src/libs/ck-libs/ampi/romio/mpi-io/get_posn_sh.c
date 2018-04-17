@@ -74,6 +74,6 @@ int MPI_File_get_position_shared(MPI_File fh, MPI_Offset *offset)
 #endif
     }
 
-    ADIO_Get_shared_fp(fh, 0, offset, &error_code);
+    ADIO_Get_shared_fp(fh, 0, (ADIO_Offset*)offset, &error_code);
     return error_code;
 }

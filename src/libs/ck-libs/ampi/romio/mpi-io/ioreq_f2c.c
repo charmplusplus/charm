@@ -39,7 +39,7 @@ MPIO_Request MPIO_Request_f2c(MPI_Fint request)
 {
 
 #ifndef INT_LT_POINTER
-    return (MPIO_Request) request;
+    return (MPIO_Request)(intptr_t)request;
 #else
     if (!request) return MPIO_REQUEST_NULL;
     if ((request < 0) || (request > CtvAccess(ADIOI_Reqtable_ptr))) {

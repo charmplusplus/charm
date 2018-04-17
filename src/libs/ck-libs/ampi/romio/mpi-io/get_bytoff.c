@@ -76,6 +76,6 @@ int MPI_File_get_byte_offset(MPI_File fh, MPI_Offset offset, MPI_Offset *disp)
 #endif
     }
 
-    ADIOI_Get_byte_offset(fh, offset, disp);
+    ADIOI_Get_byte_offset(fh, offset, (ADIO_Offset*)disp);
     return MPI_SUCCESS;
 }

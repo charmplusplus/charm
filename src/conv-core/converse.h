@@ -568,7 +568,7 @@ for each processor in the node.
 #if CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD
 #define CpvDeclare(t,v) __thread t* CMK_TAG(Cpv_,v) = NULL;   \
                         int CMK_TAG(Cpv_inited_,v) = 0;  \
-                        t ** CMK_TAG(Cpv_addr_,v);
+                        t ** CMK_TAG(Cpv_addr_,v)
 #define CpvExtern(t,v)  extern __thread t* CMK_TAG(Cpv_,v);  \
                         extern int CMK_TAG(Cpv_inited_,v);  \
                         extern t ** CMK_TAG(Cpv_addr_,v)

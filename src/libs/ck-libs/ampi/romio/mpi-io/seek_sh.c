@@ -117,7 +117,7 @@ int MPI_File_seek_shared(MPI_File fh, MPI_Offset offset, int whence)
 	    break;
 	case MPI_SEEK_CUR:
 	    /* get current location of shared file pointer */
-	    ADIO_Get_shared_fp(fh, 0, &curr_offset, &error_code);
+	    ADIO_Get_shared_fp(fh, 0, (ADIO_Offset*)&curr_offset, &error_code);
 	    if (error_code != MPI_SUCCESS) {
 		FPRINTF(stderr, "MPI_File_seek_shared: Error! Could not access shared file pointer.\n");
 		MPI_Abort(MPI_COMM_WORLD, 1);
@@ -136,7 +136,7 @@ int MPI_File_seek_shared(MPI_File fh, MPI_Offset offset, int whence)
 	    break;
 	case MPI_SEEK_END:
 	    /* find offset corr. to end of file */
-	    ADIOI_Get_eof_offset(fh, &eof_offset);
+	    ADIOI_Get_eof_offset(fh, (ADIO_Offset*)&eof_offset);
 	    offset += eof_offset;
 	    if (offset < 0) {
 #ifdef PRINT_ERR_MSG

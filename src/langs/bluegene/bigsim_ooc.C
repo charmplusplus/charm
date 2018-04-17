@@ -534,7 +534,9 @@ void prefetchFinishedSignalHandler(int signo, siginfo_t *info, void *context){
 double bgGetSysTotalMemSize(){
     FILE *memf = fopen(MEMINFOFILE, "r");
     int totalM = 0;
-    fscanf(memf, "MemTotal: %dkB\n", &totalM);
+    if (fscanf(memf, "MemTotal: %dkB\n", &totalM) != 1) {
+      CmiAbort("BigSim failed reading total mem size from file");
+    }
     fclose(memf);
     return totalM/1024.0;
 }
@@ -542,8 +544,12 @@ double bgGetSysTotalMemSize(){
 double bgGetSysFreeMemSize(){
     FILE *memf = fopen(MEMINFOFILE, "r");
     int freeM = 0;
-    fscanf(memf, "MemTotal: %dkB\n", &freeM);
-    fscanf(memf, "MemFree: %dkB\n", &freeM);
+    if (fscanf(memf, "MemTotal: %dkB\n", &freeM) != 1) {
+      CmiAbort("BigSim failed reading total mem size from file");
+    }
+    if (fscanf(memf, "MemFree: %dkB\n", &freeM) != 1) {
+      CmiAbort("BigSim failed reading free mem size from file");
+    }
     fclose(memf);
     return freeM/1024.0;
 }
@@ -556,7 +562,9 @@ double bgGetProcessMemUsage(){
     long progsize, memused;
     double retval;
 
-    fscanf(memf, "%ld %ld", &progsize, &memused);
+    if (fscanf(memf, "%ld %ld", &progsize, &memused) != 2) {
+      CmiAbort("BigSim failed reading prog size and mem used from file");
+    }
     retval = (double)memused/1024.0*bgMemPageSize/1024.0;
     
     fclose(memf);

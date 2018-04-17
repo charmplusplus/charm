@@ -38,7 +38,7 @@ Return Value:
 MPI_Fint MPIO_Request_c2f(MPIO_Request request)
 {
 #ifndef INT_LT_POINTER
-    return (MPI_Fint) request;
+    return (MPI_Fint)(intptr_t)request;
 #else
     int i;
 

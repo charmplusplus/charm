@@ -64,7 +64,7 @@ int MPI_File_get_position(MPI_File fh, MPI_Offset *offset)
 #endif
     }
 
-    ADIOI_Get_position(fh, offset);
+    ADIOI_Get_position(fh, (ADIO_Offset*)offset);
 
     return MPI_SUCCESS;
 }
