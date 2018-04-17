@@ -2,7 +2,6 @@
   included in machine.c
   Nitin Bhat 06/03/2016
 */
-#include "machine-rdma.h"
 #define CMI_PAMI_ONESIDED_ACK_DISPATCH            12
 
 void _initOnesided( pami_context_t *contexts, int nc){

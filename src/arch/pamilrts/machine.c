@@ -438,6 +438,7 @@ CmiPAMIMemRegion_t  cmi_pami_memregion[64];
 #if CMK_ONESIDED_IMPL
 #include "machine-onesided.h"
 #endif
+#include "machine-rdma.h"
 
 #include "malloc.h"
 //void *l2atomicbuf;
