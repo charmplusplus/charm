@@ -509,8 +509,6 @@ static void CthThreadBaseFree(CthThreadBase *th)
   th->stack=NULL;
 }
 
-CpvDeclare(int, _numSwitches); /*Context switch count*/
-
 #if CMK_THREADS_BUILD_TLS
 static tlsseg_t _ctgTLS;
 
@@ -545,8 +543,6 @@ void CmiEnableTLS(void) {}
 static void CthBaseInit(char **argv)
 {
   char *str;
-  CpvInitialize(int, _numSwitches);
-  CpvAccess(_numSwitches) = 0;
 
   CthCpvInitialize(int,  _defaultStackSize);
   CthCpvAccess(_defaultStackSize)=CMK_STACKSIZE_DEFAULT;
@@ -758,7 +754,6 @@ static void CthBaseResume(CthThread t)
   for(l=B(t)->listener;l!=NULL;l=l->next){
     if (l->resume) l->resume(l);
   }
-  CpvAccess(_numSwitches)++;
   CthFixData(t); /*Thread-local storage may have changed in other thread.*/
   CthCpvAccess(CthCurrent) = t;
   CthCpvAccess(CthData) = B(t)->data;
