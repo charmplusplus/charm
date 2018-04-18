@@ -811,7 +811,7 @@ class Builtin_kvs{
 };
 
 // ------------ startup support -----------
-int _ampi_fallback_setup_count;
+int _ampi_fallback_setup_count = -1;
 CDECL void AMPI_Setup(void);
 FDECL void FTN_NAME(AMPI_SETUP,ampi_setup)(void);
 
@@ -1022,7 +1022,7 @@ class MPI_threadstart_t {
     // If charm++ is built with shared libraries, it does not support
     // a custom AMPI_Setup method and always uses AMPI_Fallback_Main.
     // Works around bug #1508.
-    if (_ampi_fallback_setup_count != 2 && CkMyPe() == 0) {
+    if (_ampi_fallback_setup_count != -1 && _ampi_fallback_setup_count != 2 && CkMyPe() == 0) {
       CkAbort("AMPI> The application provided a custom AMPI_Setup() method, "
       "but AMPI is built with shared library support. This is an unsupported "
       "configuration. Please recompile charm++/AMPI without `-build-shared` or "
