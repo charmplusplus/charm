@@ -433,12 +433,11 @@ private:
   int ctorEpIdx;
 
 public:
-  ArrayElemExt();
+  ArrayElemExt(void *impl_msg);
   ArrayElemExt(CkMigrateMessage *m) {}
 
   static void __ArrayElemExt(void *impl_msg, void *impl_obj_void) {
-    CkFreeSysMsg(impl_msg);
-    new (impl_obj_void) ArrayElemExt();
+    new (impl_obj_void) ArrayElemExt(impl_msg);
   }
 
   static void __entryMethod(void *impl_msg, void *impl_obj_void) {

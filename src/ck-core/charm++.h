@@ -1134,11 +1134,10 @@ typedef CProxySection_Group CProxySection_IrrGroup;
 /// Relays messages to appropiate external chare. See README.charmpy
 class GroupExt: public Group {
 public:
-  GroupExt();
+  GroupExt(void *impl_msg);
 
   static void __GroupExt(void *impl_msg, void *impl_obj_void) {
-    CkFreeSysMsg(impl_msg);
-    new (impl_obj_void) GroupExt();
+    new (impl_obj_void) GroupExt(impl_msg);
   }
 
   static void __entryMethod(void *impl_msg, void *impl_obj_void) {

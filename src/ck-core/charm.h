@@ -262,9 +262,9 @@ extern CkGroupID CkCreateNodeGroup(int chareIdx, int constructorIdx, void *msg);
 extern void CkCreateLocalGroup(CkGroupID groupID, int constructorIdx, envelope *env);
 extern void CkCreateLocalNodeGroup(CkGroupID groupID, int constructorIdx, envelope *env);
 
-extern int CkCreateGroupExt(int cIdx, int eIdx, char *msg, int msgSize);
-extern int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, char *msg, int msgSize);
-extern void CkInsertArrayExt(int aid, int ndims, int *index, int epIdx, int onPE, char *msg, int msgSize);
+extern int CkCreateGroupExt(int cIdx, int eIdx, int num_bufs, char **bufs, int *buf_sizes);
+extern int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, int num_bufs, char **bufs, int *buf_sizes);
+extern void CkInsertArrayExt(int aid, int ndims, int *index, int epIdx, int onPE, int num_bufs, char **bufs, int *buf_sizes);
 extern void CkArrayDoneInsertingExt(int aid);
 extern void CkMigrateExt(int aid, int ndims, int *index, int toPe);
 

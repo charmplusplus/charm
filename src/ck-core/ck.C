@@ -2333,19 +2333,33 @@ MainchareExt::MainchareExt(CkArgMsg *m) {
   MainchareCtorExtCallback(thishandle.onPE, thishandle.objPtr, ctorEpIdx, m->argc, m->argv);
 }
 
-GroupExt::GroupExt() {
+GroupExt::GroupExt(void *impl_msg) {
   //printf("Constructor of GroupExt, gid=%d\n", thisgroup.idx);
   //int chareIdx = CkpvAccess(_groupTable)->find(thisgroup).getcIdx();
   int chareIdx = ckGetChareType();
   int ctorEpIdx = _chareTable[chareIdx]->getDefaultCtor();
-  GroupMsgRecvExtCallback(thisgroup.idx, ctorEpIdx, 0, NULL, -1);
+  CkMarshallMsg *impl_msg_typed = (CkMarshallMsg *)impl_msg;
+  char *impl_buf = impl_msg_typed->msgBuf;
+  PUP::fromMem implP(impl_buf);
+  int msgSize; implP|msgSize;
+  int dcopy_start; implP|dcopy_start;
+  GroupMsgRecvExtCallback(thisgroup.idx, ctorEpIdx, msgSize, impl_buf+(2*sizeof(int)),
+                          dcopy_start);
 }
 
 // TODO options
 extern "C"
-int CkCreateGroupExt(int cIdx, int eIdx, char *msg, int msgSize) {
+int CkCreateGroupExt(int cIdx, int eIdx, int num_bufs, char **bufs, int *buf_sizes) {
   //static_cast<void>(impl_e_opts);
-  void *impl_msg = CkAllocSysMsg();
+  CkAssert(num_bufs >= 1);
+  int totalSize = 0;
+  for (int i=0; i < num_bufs; i++) totalSize += buf_sizes[i];
+  int marshall_msg_size = (sizeof(char)*totalSize + sizeof(int)*2);
+  CkMarshallMsg *impl_msg = CkAllocateMarshallMsg(marshall_msg_size, NULL);
+  PUP::toMem implP((void *)impl_msg->msgBuf);
+  implP|totalSize;
+  implP|buf_sizes[0];
+  for (int i=0; i < num_bufs; i++) implP(bufs[i], buf_sizes[i]);
   UsrToEnv(impl_msg)->setMsgtype(BocInitMsg);
   //if (impl_e_opts)
   //  UsrToEnv(impl_msg)->setGroupDep(impl_e_opts->getGroupDepID());
@@ -2355,9 +2369,17 @@ int CkCreateGroupExt(int cIdx, int eIdx, char *msg, int msgSize) {
 
 // TODO options
 extern "C"
-int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, char *msg, int msgSize) {
+int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, int num_bufs, char **bufs, int *buf_sizes) {
   //static_cast<void>(impl_e_opts);
-  void *impl_msg = CkAllocSysMsg();
+  CkAssert(num_bufs >= 1);
+  int totalSize = 0;
+  for (int i=0; i < num_bufs; i++) totalSize += buf_sizes[i];
+  int marshall_msg_size = (sizeof(char)*totalSize + sizeof(int)*2);
+  CkMarshallMsg *impl_msg = CkAllocateMarshallMsg(marshall_msg_size, NULL);
+  PUP::toMem implP((void *)impl_msg->msgBuf);
+  implP|totalSize;
+  implP|buf_sizes[0];
+  for (int i=0; i < num_bufs; i++) implP(bufs[i], buf_sizes[i]);
   CkArrayOptions opts;
   if (ndims != -1)
     opts = CkArrayOptions(ndims, dims);
@@ -2369,8 +2391,17 @@ int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, char *msg, int ms
 
 // TODO options
 extern "C"
-void CkInsertArrayExt(int aid, int ndims, int *index, int epIdx, int onPE, char *msg, int msgSize) {
-  void *impl_msg = CkAllocSysMsg();
+void CkInsertArrayExt(int aid, int ndims, int *index, int epIdx, int onPE, int num_bufs, char **bufs, int *buf_sizes) {
+  CkAssert(num_bufs >= 1);
+  int totalSize = 0;
+  for (int i=0; i < num_bufs; i++) totalSize += buf_sizes[i];
+  int marshall_msg_size = (sizeof(char)*totalSize + sizeof(int)*2);
+  CkMarshallMsg *impl_msg = CkAllocateMarshallMsg(marshall_msg_size, NULL);
+  PUP::toMem implP((void *)impl_msg->msgBuf);
+  implP|totalSize;
+  implP|buf_sizes[0];
+  for (int i=0; i < num_bufs; i++) implP(bufs[i], buf_sizes[i]);
+
   UsrToEnv(impl_msg)->setMsgtype(ArrayEltInitMsg);
   CkArrayIndex newIdx(ndims, index);
   CkGroupID gId;

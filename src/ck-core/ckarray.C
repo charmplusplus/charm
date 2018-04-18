@@ -500,14 +500,20 @@ void ArrayElement::recvBroadcast(CkMessage *m){
 #endif
 }
 
-ArrayElemExt::ArrayElemExt() {
+ArrayElemExt::ArrayElemExt(void *impl_msg) {
   // TODO make this configurable?
   usesAtSync = true;
 
   int chareIdx = ckGetChareType();
   ctorEpIdx = _chareTable[chareIdx]->getDefaultCtor();
   //printf("Constructor of ArrayElemExt, aid=%d, chareIdx=%d, ctorEpIdx=%d\n", ((CkGroupID)thisArrayID).idx, chareIdx, ctorEpIdx);
-  ArrayMsgRecvExtCallback(((CkGroupID)thisArrayID).idx, int(thisIndexMax.getDimension()), thisIndexMax.data(), ctorEpIdx, 0, NULL, -1);
+  CkMarshallMsg *impl_msg_typed = (CkMarshallMsg *)impl_msg;
+  char *impl_buf = impl_msg_typed->msgBuf;
+  PUP::fromMem implP(impl_buf);
+  int msgSize; implP|msgSize;
+  int dcopy_start; implP|dcopy_start;
+
+  ArrayMsgRecvExtCallback(((CkGroupID)thisArrayID).idx, int(thisIndexMax.getDimension()), thisIndexMax.data(), ctorEpIdx, msgSize, impl_buf+(2*sizeof(int)), dcopy_start);
 }
 
 /*********************** Spring Cleaning *****************

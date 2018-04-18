@@ -90,7 +90,7 @@ void CkRegisterGroupExt(const char *s, int numEntryMethods, int *chareIdx, int *
   CkRegisterBase(__idx, CkIndex_IrrGroup::__idx);
   CkRegisterGroupIrr(__idx, true); // isIrreducible?
 
-  int epIdxCtor = CkRegisterEp(s, GroupExt::__GroupExt, 0, __idx, 0);
+  int epIdxCtor = CkRegisterEp(s, GroupExt::__GroupExt, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
   // TODO do I need to register twice like in ci def files?
   CkRegisterDefaultCtor(__idx, epIdxCtor);
 
@@ -108,7 +108,7 @@ void CkRegisterArrayExt(const char *s, int numEntryMethods, int *chareIdx, int *
   int __idx = CkRegisterChare(s, sizeof(ArrayElemExt), TypeArray);
   CkRegisterBase(__idx, CkIndex_ArrayElement::__idx);
 
-  int epIdxCtor = CkRegisterEp(s, ArrayElemExt::__ArrayElemExt, 0, __idx, 0);
+  int epIdxCtor = CkRegisterEp(s, ArrayElemExt::__ArrayElemExt, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
   // TODO do I need to register twice like in ci def files?
   CkRegisterDefaultCtor(__idx, epIdxCtor);
 
