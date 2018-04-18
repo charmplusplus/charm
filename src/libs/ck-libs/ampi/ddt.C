@@ -821,7 +821,7 @@ CkDDT_Contiguous::CkDDT_Contiguous(int nCount, int bindex, CkDDT_DataType* oldTy
   trueExtent = extent;
   trueLB = lb;
 
-  if (extent != size) {
+  if (extent != size || count == 0) {
     iscontig = false;
   }
   else {
@@ -904,7 +904,7 @@ CkDDT_Vector::CkDDT_Vector(int nCount, int blength, int stride, int bindex, CkDD
 
   trueExtent = extent;
   trueLB = lb;
-  if (extent != size) {
+  if (extent != size || count == 0) {
     iscontig = false;
   }
   else {
@@ -999,7 +999,7 @@ CkDDT_HVector::CkDDT_HVector(int nCount, int blength, int stride,  int bindex,
 
   trueExtent = extent;
   trueLB = lb;
-  if (extent != size) {
+  if (extent != size || count == 0) {
     iscontig = false;
   }
   else {
@@ -1083,14 +1083,18 @@ CkDDT_Indexed::CkDDT_Indexed(int nCount, const int* arrBlock, const CkDDT_Aint* 
     }
 
     extent = positiveExtent + (-1)*negativeExtent;
-    lb = baseType->getLB() + *std::min_element(&arrayDisplacements[0],&arrayDisplacements[0] + nCount)*baseExtent;
+    if (count == 0) {
+      lb = baseType->getLB();
+    } else {
+      lb = baseType->getLB() + *std::min_element(&arrayDisplacements[0],&arrayDisplacements[0] + nCount)*baseExtent;
+    }
     ub = lb + extent;
 
     trueExtent = extent;
     trueLB = lb;
 
     /* set iscontig */
-    if (extent != size) {
+    if (extent != size || count == 0) {
         iscontig = false;
     }
     else if (count == 1) {
@@ -1183,14 +1187,18 @@ CkDDT_HIndexed::CkDDT_HIndexed(int nCount, const int* arrBlock, const CkDDT_Aint
       ub = std::max(arrBlock[i]*baseExtent + baseType->getLB() + arrayDisplacements[i], ub);
   }
 
-  lb = baseType->getLB() + *std::min_element(&arrDisp[0],&arrDisp[0]+nCount);
+  if (count == 0) {
+    lb = baseType->getLB();
+  } else {
+    lb = baseType->getLB() + *std::min_element(&arrDisp[0],&arrDisp[0]+nCount);
+  }
   extent = ub - lb;
 
   trueExtent = extent;
   trueLB = lb;
 
   /* set iscontig */
-  if (extent != size) {
+  if (extent != size || count == 0) {
     iscontig = false;
   }
   else if (count == 1) {
@@ -1286,14 +1294,18 @@ CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, const CkDDT_Ain
   }
 
   extent = positiveExtent + (-1)*negativeExtent;
-  lb = baseType->getLB() + *std::min_element(&arrayDisplacements[0], &arrayDisplacements[0] + count)*baseExtent;
+  if (count == 0) {
+    lb = baseType->getLB();
+  } else {
+    lb = baseType->getLB() + *std::min_element(&arrayDisplacements[0], &arrayDisplacements[0] + count)*baseExtent;
+  }
   ub = lb + extent;
 
   trueExtent = extent;
   trueLB = lb;
 
   /* set iscontig */
-  if (extent != size) {
+  if (extent != size || count == 0) {
     iscontig = false;
   }
   else if (count == 1) {
@@ -1394,14 +1406,18 @@ CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, const CkDDT_A
   }
 
   extent = positiveExtent + (-1)*negativeExtent;
-  lb = baseType->getLB() + *std::min_element(&arrayDisplacements[0], &arrayDisplacements[0] + count);
+  if (count == 0) {
+    lb = baseType->getLB();
+  } else {
+    lb = baseType->getLB() + *std::min_element(&arrayDisplacements[0], &arrayDisplacements[0] + count);
+  }
   ub = lb + extent;
 
   trueExtent = extent;
   trueLB = lb;
 
   /* set iscontig */
-  if (extent != size) {
+  if (extent != size || count == 0) {
     iscontig = false;
   }
   else if (count == 1) {
@@ -1530,7 +1546,7 @@ CkDDT_Struct::CkDDT_Struct(int nCount, const int* arrBlock,
   trueLB = lb;
 
   /* set iscontig */
-  if (extent != size) {
+  if (extent != size || count == 0) {
     iscontig = false;
   }
   else if (count == 1) {
