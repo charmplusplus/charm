@@ -510,14 +510,14 @@ static void CthThreadBaseFree(CthThreadBase *th)
 }
 
 #if CMK_THREADS_BUILD_TLS
-static tlsseg_t _ctgTLS;
+CthCpvStatic(tlsseg_t, _ctgTLS);
 
 // Generic TLS interface for callers that don't know which thread
 // they are switching to (main thread or CthThread).
 void CtgInstallTLS(void *cur, void *next)
 {
   tlsseg_t *newtls = (tlsseg_t *)next;
-  if (newtls == NULL)   newtls = &_ctgTLS;
+  if (newtls == NULL)   newtls = &CthCpvAccess(_ctgTLS);
   switchTLS((tlsseg_t *)cur, newtls);
 }
 
@@ -525,7 +525,7 @@ void CtgInstallTLS(void *cur, void *next)
 // to the main thread or a CthThread (this avoids branching).
 void CtgInstallMainThreadTLS(void *cur)
 {
-  switchTLS((tlsseg_t *)cur, &_ctgTLS);
+  switchTLS((tlsseg_t *)cur, &CthCpvAccess(_ctgTLS));
 }
 
 void CtgInstallCthTLS(void *cur, void *next)
@@ -540,7 +540,7 @@ void CmiDisableTLS(void)
 {
   tlsseg_ptr++;
   CmiAssert(tlsseg_ptr < 128);
-  switchTLS(&_oldtlsseg[tlsseg_ptr], &_ctgTLS);
+  switchTLS(&_oldtlsseg[tlsseg_ptr], &CthCpvAccess(_ctgTLS));
 }
 
 void CmiEnableTLS(void)
@@ -582,8 +582,9 @@ static void CthBaseInit(char **argv)
   CpvAccess(Cth_serialNo) = 1;
 
 #if CMK_THREADS_BUILD_TLS
+  CthCpvInitialize(tlsseg_t, _ctgTLS);
   CmiThreadIs_flag |= CMI_THREAD_IS_TLS;
-  currentTLS(&_ctgTLS);
+  currentTLS(&CthCpvAccess(_ctgTLS));
 #endif
 }
 
