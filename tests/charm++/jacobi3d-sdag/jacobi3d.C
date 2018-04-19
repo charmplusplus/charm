@@ -431,12 +431,12 @@ class Jacobi: public CBase_Jacobi {
             contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
 #endif
 		} else {
-			doStep();
+			thisProxy(thisIndex.x, thisIndex.y, thisIndex.z).doStep();
 		}
 	}
 
 	void ResumeFromSync(){
-		doStep();
+		thisProxy(thisIndex.x, thisIndex.y, thisIndex.z).doStep();
 	}
 
 
