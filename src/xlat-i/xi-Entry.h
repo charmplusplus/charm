@@ -116,7 +116,7 @@ class Entry : public Member {
   XStr aggregatorType();
   XStr aggregatorGlobalType(XStr& scope);
   XStr aggregatorName();
-  XStr paramType(int withDefaultVals, int withEO = 0, int useConst = 1);
+  XStr paramType(int withDefaultVals, int withEO = 0, int useConst = 1, int rValue = 0);
   XStr paramComma(int withDefaultVals, int withEO = 0);
   XStr eo(int withDefaultVals, int priorComma = 1);
   XStr syncPreCall(void);

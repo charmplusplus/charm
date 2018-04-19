@@ -87,12 +87,13 @@ Parameter::Parameter(int Nline, Type* Ntype, const char* Nname, const char* Narr
 ParamList::ParamList(ParamList* pl)
     : manyPointers(false), param(pl->param), next(pl->next) {}
 
-void ParamList::print(XStr& str, int withDefaultValues, int useConst) {
-  param->print(str, withDefaultValues, useConst);
+int ParamList::print(XStr& str, int withDefaultValues, int useConst, int fwdNum) {
+  fwdNum = param->print(str, withDefaultValues, useConst, fwdNum);
   if (next) {
     str << ", ";
-    next->print(str, withDefaultValues, useConst);
+    fwdNum = next->print(str, withDefaultValues, useConst, fwdNum);
   }
+  return fwdNum;
 }
 
 void ParamList::printTypes(XStr& str, int withDefaultValues, int useConst) {
@@ -105,7 +106,7 @@ void ParamList::printTypes(XStr& str, int withDefaultValues, int useConst) {
   }
 }
 
-void Parameter::print(XStr& str, int withDefaultValues, int useConst) {
+int Parameter::print(XStr& str, int withDefaultValues, int useConst, int fwdNum) {
   if (isRdma()) {
     str << "CkRdmaWrapper rdmawrapper_" << name;
   } else if (arrLen != NULL) {  // Passing arrays by const pointer-reference
@@ -116,8 +117,12 @@ void Parameter::print(XStr& str, int withDefaultValues, int useConst) {
     if (conditional) {
       str << type << " *" << name;
     } else if (byReference) {  // Pass named types by const C++ reference
-      if (useConst || byConst) str << "const ";
-      str << type << " &";
+      if (fwdNum) {
+        str << "Fwd" << fwdNum++ << " &&";
+      } else {
+        if (useConst || byConst) str << "const ";
+        str << type << " &";
+      }
       if (name != NULL) str << name;
     } else {  // Pass everything else by value
               // @TODO uncommenting this requires that PUP work on const types
@@ -132,6 +137,7 @@ void Parameter::print(XStr& str, int withDefaultValues, int useConst) {
       }
     }
   }
+  return fwdNum;
 }
 
 void ParamList::printAddress(XStr& str) {
@@ -706,6 +712,24 @@ void ParamList::unmarshall(XStr& str, bool isInline, bool isFirst)  // Pass-by-v
       str << ", ";
       next->unmarshall(str, isInline, false);
     }
+  }
+}
+
+// Do forwarding for rvalue references, used for inline and local entry methods
+void ParamList::unmarshallForward(XStr& str,
+                                  bool isInline,
+                                  bool isFirst)
+{
+  if (!isInline)
+    unmarshall(str, isInline, isFirst);
+  if (isReference()) {
+    str << "std::forward<" << param->type << ">(" << param->getName() << ")";
+    if (next) {
+      str << ", ";
+      next->unmarshallForward(str, isInline, false);
+    }
+  } else {
+    unmarshall(str, isInline, isFirst);
   }
 }
 

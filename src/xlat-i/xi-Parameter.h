@@ -67,7 +67,7 @@ class Parameter {
   void setConditional(int c);
   void setRdma(bool r);
   void setFirstRdma(bool fr);
-  void print(XStr& str, int withDefaultValues = 0, int useConst = 1);
+  int print(XStr& str, int withDefaultValues = 0, int useConst = 1, int fwdNum = 0);
   void printAddress(XStr& str);
   void printValue(XStr& str);
   int isMessage(void) const;
@@ -118,7 +118,7 @@ class ParamList {
   ParamList* next;
   ParamList(ParamList* pl);
   ParamList(Parameter* Nparam, ParamList* Nnext = NULL);
-  void print(XStr& str, int withDefaultValues = 0, int useConst = 1);
+  int print(XStr& str, int withDefaultValues = 0, int useConst = 1, int fwdNum = 0);
   void printTypes(XStr& str, int withDefaultValues = 0, int useConst = 1);
   void printAddress(XStr& str);
   void printValue(XStr& str);
@@ -153,6 +153,7 @@ class ParamList {
   void beginUnmarshallSDAGCall(XStr& str, bool usesImplBuf);
   void beginRednWrapperUnmarshall(XStr& str, bool isSDAGGen);
   void unmarshall(XStr& str, bool isInline = false, bool isFirst = true);
+  void unmarshallForward(XStr& str, bool isInline = false, bool isFirst = true);
   void unmarshallSDAGCall(XStr& str, int isFirst = 1);
   void unmarshallAddress(XStr& str, int isFirst = 1);
   void pupAllValues(XStr& str);

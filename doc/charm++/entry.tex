@@ -101,10 +101,18 @@ if the message recipient happens to be on the same PE. The call to the function
 will happen inline, and control will return to the calling function after the
 inline method completes. Because of this, these entry methods need to be
 re-entrant as they could be called multiple times recursively. Parameters to the
-inline method will be passed by const reference to avoid any copying, packing,
+inline method will be passed by reference to avoid any copying, packing,
 or unpacking of the parameters. This makes inline calls effective when large
 amounts of data are being passed, and copying or packing the data would be an
-expensive operation. If the recipient resides on a different PE, a regular
+expensive operation.
+Perfect forwarding has been implemented to allow for seamless passing of both
+lvalue and rvalue references. Note that calls with rvalue references must take
+place in the same translation unit as the .decl.h file to allow for the
+appropriate template instantiations. Alternatively, the method can be made
+templated and referenced from multiple translation units via CK_TEMPLATES_ONLY.
+An explicit instantiation of all lvalue references is provided for
+compatibility with existing code.
+If the recipient resides on a different PE, a regular
 message is sent with the message arguments packed up using PUP, and \kw{inline}
 has no effect. An example ``inlineem'' can be found in \testrefdir{megatest}.
 
@@ -116,6 +124,8 @@ the application will abort with a failure. If the \kw{local} entry method uses
 parameter marshalling, instead of marshalling input parameters into a message,
 it will pass them directly to the callee. This implies that the callee can
 modify the caller data if method parameters are passed by pointer or reference.
+The above description of perfect forwarding for inline entry methods also
+applies to local entry methods.
 Furthermore, input parameters are not required to be PUPable. Considering that
 these entry methods always execute immediately, they are allowed to have a
 non-void return value. An example can be found in \examplerefdir{hello/local}.

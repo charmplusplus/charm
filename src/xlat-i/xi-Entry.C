@@ -225,9 +225,9 @@ void Entry::preprocessSDAG() {
 
 // "parameterType *msg" or "void".
 // Suitable for use as the only parameter
-XStr Entry::paramType(int withDefaultVals, int withEO, int useConst) {
+XStr Entry::paramType(int withDefaultVals, int withEO, int useConst, int rValue) {
   XStr str;
-  param->print(str, withDefaultVals, useConst);
+  param->print(str, withDefaultVals, useConst, rValue);
   if (withEO) str << eo(withDefaultVals, !param->isVoid());
   return str;
 }
@@ -444,17 +444,45 @@ void Entry::genArrayDecl(XStr& str) {
   } else {
     if ((isSync() || isLocal()) && !container->isForElement())
       return;  // No sync broadcast
-    str << "    " << generateTemplateSpec(tspec) << "\n";
     if (isIget()) {
+      str << "    " << generateTemplateSpec(tspec) << "\n";
       str << "    "
           << "CkFutureID"
           << " " << name << "(" << paramType(1, 1) << ") ;\n";  // no const
+    } else if ((isLocal() || isInline()) && container->isForElement()) {
+      XStr fwdStr;
+      int fwdNum = 1;
+      ParamList *pl = param;
+      while (pl) {
+        Parameter *p = pl->param;
+        if (!p->isRdma() && p->arrLen == NULL && !p->conditional && p->byReference) {
+          if (fwdNum > 1)
+            fwdStr << ", ";
+          fwdStr << "typename Fwd" << fwdNum++ << " = " << p->type;
+        }
+        pl = pl->next;
+      }
+      if (tspec || fwdNum > 1) {
+        str << "    template < ";
+        if (tspec) {
+          tspec->genLong(str);
+          if (fwdNum > 1)
+            str << ", ";
+        }
+        if (fwdNum > 1)
+          str << fwdStr;
+        str << " >\n";
+      }
+      str << "    " << retType << " " << name << "(" << paramType(1, 1, 0, 1) << ") ;\n";
     } else if (isLocal()) {
+      str << "    " << generateTemplateSpec(tspec) << "\n";
       str << "    " << retType << " " << name << "(" << paramType(1, 1, 0) << ") ;\n";
     } else if (isTramTarget() && container->isForElement()) {
+      str << "    " << generateTemplateSpec(tspec) << "\n";
       str << "    " << retType << " " << name << "(" << paramType(0, 1) << ") = delete;\n";
       str << "    " << retType << " " << name << "(" << paramType(1, 0) << ") ;\n";
     } else {
+      str << "    " << generateTemplateSpec(tspec) << "\n";
       str << "    " << retType << " " << name << "(" << paramType(1, 1)
           << ") ;\n";  // no const
     }
@@ -479,7 +507,23 @@ void Entry::genArrayDefs(XStr& str) {
     if (isIget())
       str << makeDecl("CkFutureID ", 1) << "::" << name << "(" << paramType(0, 1)
           << ") \n";  // no const
-    else if (isLocal())
+    else if ((isLocal() || isInline()) && container->isForElement()) {
+      XStr fwdStr;
+      int fwdNum = 1;
+      ParamList *pl = param;
+      while (pl) {
+        Parameter *p = pl->param;
+        if (!p->isRdma() && p->arrLen == NULL && !p->conditional && p->byReference) {
+          if (fwdNum > 1)
+            fwdStr << ", ";
+          fwdStr << "typename Fwd" << fwdNum++;
+        }
+        pl = pl->next;
+      }
+      if (fwdNum > 1)
+        str << "template < " << fwdStr << " >\n";
+      str << makeDecl(retStr, 1) << "::" << name << "(" << paramType(0, 1, 0, 1) << ") \n";
+    } else if (isLocal())
       str << makeDecl(retStr, 1) << "::" << name << "(" << paramType(0, 1, 0) << ") \n";
     else
       str << makeDecl(retStr, 1) << "::" << name << "(" << paramType(0, 1)
@@ -516,7 +560,7 @@ void Entry::genArrayDefs(XStr& str) {
         inlineCall << " >";
       }
       inlineCall << "(";
-      param->unmarshall(inlineCall, true);
+      param->unmarshallForward(inlineCall, true);
       inlineCall << ");\n";
       inlineCall << "#if CMK_CHARMDEBUG\n"
                     "    CpdAfterEp("
@@ -582,6 +626,27 @@ void Entry::genArrayDefs(XStr& str) {
       }
     }
     str << "}\n";
+
+    if (!tspec && !container->isTemplated() && !isIget() && (isLocal() || isInline()) && container->isForElement()) {
+      XStr fwdStr;
+      int fwdNum = 1;
+      ParamList *pl = param;
+      while (pl) {
+        Parameter *p = pl->param;
+        if (!p->isRdma() && p->arrLen == NULL && !p->conditional && p->byReference) {
+          if (fwdNum > 1)
+            fwdStr << ", ";
+          ++fwdNum;
+          if (p->byConst) fwdStr << "const ";
+          fwdStr << p->type << " &";
+        }
+        pl = pl->next;
+      }
+      if (fwdNum > 1) {
+        str << "// explicit instantiation for compatibility\n";
+        str << "template " << makeDecl(retStr, 1) << "::" << name << "<" << fwdStr << ">(" << paramType(1, 1, 0) << ");\n";
+      }
+    }
   }
 }
 
