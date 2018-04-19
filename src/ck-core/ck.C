@@ -2331,6 +2331,7 @@ MainchareExt::MainchareExt(CkArgMsg *m) {
   //printf("Constructor of MainchareExt, chareId=(%d,%p), chareIdx=%d\n", thishandle.onPE, thishandle.objPtr, cIdx);
   int ctorEpIdx =  _mainTable[_chareTable[cIdx]->mainChareType()]->entryIdx;
   MainchareCtorExtCallback(thishandle.onPE, thishandle.objPtr, ctorEpIdx, m->argc, m->argv);
+  delete m;
 }
 
 GroupExt::GroupExt(void *impl_msg) {

@@ -434,7 +434,7 @@ private:
 
 public:
   ArrayElemExt(void *impl_msg);
-  ArrayElemExt(CkMigrateMessage *m) {}
+  ArrayElemExt(CkMigrateMessage *m) { delete m; }
 
   static void __ArrayElemExt(void *impl_msg, void *impl_obj_void) {
     new (impl_obj_void) ArrayElemExt(impl_msg);
@@ -459,6 +459,7 @@ public:
     ArrayElemExt *e = static_cast<ArrayElemExt *>(impl_obj_void);
     //printf("ArrayElementExt:: calling AtSync elem->usesAtSync=%d\n", e->usesAtSync);
     e->AtSync();
+    if (UsrToEnv(impl_msg)->isVarSysMsg() == 0) CkFreeSysMsg(impl_msg);
   }
 
   static void __migrateEntryMethod(void *impl_msg, void *impl_obj_void) {
