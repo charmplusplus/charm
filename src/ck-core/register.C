@@ -91,7 +91,6 @@ void CkRegisterGroupExt(const char *s, int numEntryMethods, int *chareIdx, int *
   CkRegisterGroupIrr(__idx, true); // isIrreducible?
 
   int epIdxCtor = CkRegisterEp(s, GroupExt::__GroupExt, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
-  // TODO do I need to register twice like in ci def files?
   CkRegisterDefaultCtor(__idx, epIdxCtor);
 
   for (int i=0; i < numEntryMethods; i++)
@@ -109,14 +108,12 @@ void CkRegisterArrayExt(const char *s, int numEntryMethods, int *chareIdx, int *
   CkRegisterBase(__idx, CkIndex_ArrayElement::__idx);
 
   int epIdxCtor = CkRegisterEp(s, ArrayElemExt::__ArrayElemExt, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
-  // TODO do I need to register twice like in ci def files?
   CkRegisterDefaultCtor(__idx, epIdxCtor);
 
   int epidx = CkRegisterEp(s, ArrayElemExt::__CkMigrateMessage, 0, __idx, 0);
   CkRegisterMigCtor(__idx, epidx);
 
   epidx = CkRegisterEp(s, ArrayElemExt::__AtSyncEntryMethod, 0, __idx, 0);
-  //epidx = CkRegisterEp(s, ArrayElemExt::__migrateEntryMethod, 0, __idx, 0);
   for (int i=0; i < numEntryMethods; i++)
     epidx = CkRegisterEp(s, ArrayElemExt::__entryMethod, CkMarshallMsg::__idx,
                          __idx, 0+CK_EP_NOKEEP);
@@ -152,7 +149,6 @@ void CkRegisterMainChareExt(const char *s, int numEntryMethods, int *chareIdx, i
 
   int epIdxCtor = CkRegisterEp(s, MainchareExt::__Ctor_CkArgMsg, CMessage_CkArgMsg::__idx, __idx, 0);
   CkRegisterMessagePupFn(epIdxCtor, (CkMessagePupFn)CkArgMsg::ckDebugPup);
-  // TODO do I need to register twice like in ci def files?
   CkRegisterMainChare(__idx, epIdxCtor);
 
   for (int i=0; i < numEntryMethods; i++)

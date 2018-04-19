@@ -462,19 +462,6 @@ public:
     if (UsrToEnv(impl_msg)->isVarSysMsg() == 0) CkFreeSysMsg(impl_msg);
   }
 
-  static void __migrateEntryMethod(void *impl_msg, void *impl_obj_void) {
-    ArrayElemExt *e = static_cast<ArrayElemExt *>(impl_obj_void);
-    CkMarshallMsg *impl_msg_typed = (CkMarshallMsg *)impl_msg;
-    char *impl_buf = impl_msg_typed->msgBuf;
-    PUP::fromMem implP(impl_buf);
-    int msgSize, ep, toPe;
-    implP|msgSize;
-    implP|ep;
-    implP|toPe;
-    //fprintf(stderr, "---- Migrating object to PE %d ----\n", toPe);
-    e->migrateMe(toPe);
-  }
-
   static void __CkMigrateMessage(void *impl_msg, void *impl_obj_void) {
     //printf("ArrayElemExt:: Migration constructor invoked\n");
     call_migration_constructor<ArrayElemExt> c = impl_obj_void;
