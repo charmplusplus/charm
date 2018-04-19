@@ -132,7 +132,9 @@ void BgRead_nodeinfo(int node, int &startpe, int &endpe)
       CmiPrintf("BgReplayNode> metadata file for node %d does not exist!\n", node);
       CmiAbort("BgRead_nodeinfo");
     }
-    fscanf(fp, "%d %d\n", &startpe, &endpe);
+    if (fscanf(fp, "%d %d\n", &startpe, &endpe) != 2) {
+      CmiAbort("BigSim failed to read node info from file");
+    }
     fclose(fp);
 }
 

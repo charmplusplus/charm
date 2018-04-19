@@ -311,7 +311,7 @@ void BgTimeLog::write(FILE *fp)
 { 
   int i;
 //  fprintf(fp,"%p ep:%d name:%s (srcnode:%d msgID:%d) startTime:%f endTime:%f recvime:%f effRecvTime:%e seqno:%d startevent:%d\n", this, ep, name, msgId.node(), msgId.msgID(), startTime, endTime, recvTime, effRecvTime, seqno, isStartEvent());
-  if (fprintf(fp,"%p name:%s (srcpe:%d msgID:%d) ep:%d ", this, name, msgId.pe(), msgId.msgID(), ep) < 0) {
+  if (fprintf(fp,"%p name:%s (srcpe:%d msgID:%d) ep:%d ", (void*)this, name, msgId.pe(), msgId.msgID(), ep) < 0) {
     CmiAbort("BigSim failed writing BgTimeLog");
   }
   if (ep == BgLogGetThreadEP() && ep!=-1) {
@@ -384,7 +384,7 @@ void BgTimeLog::write(FILE *fp)
     CmiAbort("BigSim failed writing BgTimeLog");
   }
   for (i=0; i<backwardDeps.length(); i++) {
-    if (fprintf(fp,"[%p %d] ",backwardDeps[i], backwardDeps[i]->seqno) < 0) {
+    if (fprintf(fp,"[%p %d] ", (void*)backwardDeps[i], backwardDeps[i]->seqno) < 0) {
       CmiAbort("BigSim failed writing BgTimeLog");
     }
   }
@@ -395,7 +395,7 @@ void BgTimeLog::write(FILE *fp)
     CmiAbort("BigSim failed writing BgTimeLog");
   }
   for (i=0; i<forwardDeps.length(); i++) {
-    if (fprintf(fp,"[%p %d] ",forwardDeps[i], forwardDeps[i]->seqno) < 0) {
+    if (fprintf(fp,"[%p %d] ", (void*)forwardDeps[i], forwardDeps[i]->seqno) < 0) {
       CmiAbort("BigSim failed writing BgTimeLog");
     }
   }
