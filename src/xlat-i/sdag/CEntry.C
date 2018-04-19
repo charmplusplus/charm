@@ -27,6 +27,8 @@ void generateLocalWrapper(XStr& decls, XStr& defs, int isVoid, XStr& signature,
   if(isDummy) {
     // isDummy being true indicates that the function is a dummy function generated solely
     // for throwing an error if the sdag function is called directly, without a proxy
+    defs << "  " << "CkPrintf(\"Error> Direct call to SDAG entry method \\\'%s::%s\\\'!\\n\", \""
+         << entry->getContainer()->baseName() << "\", \"" << signature << "\"); \n";
     defs << "  " << "CkAbort(\"Direct SDAG call is not allowed for SDAG entry methods having when constructs. Call such SDAG methods using a proxy\"); \n";
   } else {
     defs << "  " << *entry->genClosureTypeNameProxyTemp << "*"
