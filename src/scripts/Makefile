@@ -444,6 +444,8 @@ LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 
 LIBCONV_UTILF=pup_f.o
 
+include Makefile.machine
+
 converse: charmrun-target swapglobal-target conv-cpm tmgr hwloc-target
 
 cpuaffinity.o $(L)/libhwloc_embedded.a $(INC)/hwloc.h $(INC)/hwloc/autogen/config.h $(INC)/hwloc/rename.h $(INC)/hwloc/bitmap.h $(INC)/hwloc/helper.h $(INC)/hwloc/inlines.h $(INC)/hwloc/diff.h $(INC)/hwloc/deprecated.h: hwloc-target
@@ -480,8 +482,6 @@ $(L)/libconv-core.a: $(LIBCONV_CORE)
 
 $(L)/libconv-partition.a: custom_partitioner.o set_partition_params.o
 	$(CHARMC) -o $@ $^
-
-include Makefile.machine
 
 $(L)/libconv-machine.a: machine.o
 	$(CHARMC) -o $@ $<
