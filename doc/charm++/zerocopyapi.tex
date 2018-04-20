@@ -1,17 +1,273 @@
-\section{Zero Copy Message Send API}
+\section{Zero Copy Messaging API}
 
 \label{nocopyapi}
-Apart from using messages, \charmpp{} also provides a zero copy message send
-API to avoid copies for entry method invocations which use parameter marshalling
-instead of messages. This makes use of onesided communication by using the
+Apart from using messages, \charmpp{} also provides APIs to avoid sender
+and receiver side copies. On RDMA enabled networks like GNI, Verbs, PAMI and
+OFI, these internally make use of one-sided communication by using the
 underlying Remote Direct Memory Access (RDMA) enabled network.
 For large arrays (few 100 KBs or more), the cost of copying during marshalling
-the message can be quite high. Using this API can help not only save
-the expensive copy operation but also reduce the application's memory footprint
-by avoiding data duplication. Saving these costs for large arrays proves
-to be a significant optimization in achieving faster message send times.
-On the other hand, using the zero copy message send API for small arrays can lead
-to a drop in performance due to the overhead associated with onesided communication.
+the message can be quite high. Using these APIs can help not only save the
+expensive copy operation but also reduce the application's memory footprint by
+avoiding data duplication. Saving these costs for large arrays proves to be a
+significant optimization in achieving faster message send and receive times in
+addition to overall improvement in performance because of lower memory consumption.
+On the other hand, using these APIs for small arrays can lead to a drop in
+performance due to the overhead associated with one-sided communication. The overhead
+is mainly due to additional small messages required for sending the metadata message
+and the acknowledgment message on completion.
+
+For within process data-transfers, this API uses regular memcpy to achieve zerocopy
+semantics. Similarly, on CMA-enabled machines, in a few cases, this API takes
+advantage of CMA to perform inter-process intra-physical host data transfers. This
+API is also functional on non-RDMA enabled networks like regular ethernet, except that
+it does not avoid copies and behaves like a regular Charm++ entry method invocation.
+
+There are two APIs that provide Zero copy semantics in \charmpp{}:
+\begin{itemize}
+\item Zero Copy Direct API
+\item Zero Copy Entry Method Send API
+\end{itemize}
+
+\subsection{Zero Copy Direct API}
+The Zero copy Direct API allows users to explicitly invoke a standard set of
+methods on predefined buffer information objects to avoid copies. Unlike the
+Entry Method API which calls the zero copy operation for every zero copy entry
+method invocation, the direct API provides a more flexible interface by allowing
+the user to exploit the persistent nature of iterative applications to perform
+zero copy operations using the same buffer information objects across iteration
+boundaries. It is also more beneficial than the Zero copy entry method API because
+unlike the entry method API, which avoids just the sender side copy, the Zero copy
+Direct API avoids both sender and receiver side copies.
+
+\vspace{0.1in}
+\noindent
+To send an array using the zero copy Direct API, define a \kw{CkNcpyBuffer}
+object on the sender chare specifying the pointer, size, a CkCallback
+object and an optional mode parameter.
+
+\begin{alltt}
+CkCallback srcCb(CkIndex_Ping1::sourceDone, thisProxy[thisIndex]);
+// CkNcpyBuffer object representing the source buffer
+CkNcpyBuffer source(arr1, arr1Size * sizeof(int), srcCb, CK_BUFFER_UNREG);
+\end{alltt}
+
+When used inside a \kw{CkNcpyBuffer} object that represents the source buffer
+information, the callback is specified to notify about the safety of
+reusing the buffer and indicates that the \kw{get} or \kw{put}
+call has been completed. In those cases where the application can determine
+safety of reusing the buffer through other synchronization mechanisms, the
+callback is not entirely useful and in such cases, \texttt{CkCallback::ignore}
+can be passed as the callback parameter. The optional mode operator is used to
+determine the network registration mode for the buffer. It is only relevant
+on networks requiring explicit memory registration for performing RDMA operations.
+These networks include GNI, OFI and Verbs. When the mode is not specified by
+the user, the default mode is considered to be
+CK\textunderscore BUFFER\textunderscore UNREG.
+
+Similarly, to receive an array using the Zero copy Direct API, define another
+\kw{CkNcpyBuffer} object on the receiver chare object specifying the
+pointer, the size, a CkCallback object and an optional mode parameter.
+When used inside a \kw{CkNcpyBuffer} object that represents the destination
+buffer, the callback is specified to notify the completion of data transfer
+into the \kw{CkNcpyBuffer} buffer.
+In those cases where the application can determine data transfer completion
+through other synchronization mechanisms, the callback is not entirely useful
+and in such cases, \texttt{CkCallback::ignore} can be passed as the callback
+parameter.
+
+\begin{alltt}
+CkCallback destCb(CkIndex_Ping1::destinationDone, thisProxy[thisIndex]);
+// CkNcpyBuffer object representing the destination buffer
+CkNcpyBuffer dest(arr2, arr2Size * sizeof(int), destCb, CK_BUFFER_UNREG);
+\end{alltt}
+
+Once the source \kw{CkNcpyBuffer} and destination \kw{CkNcpyBuffer} objects have
+been defined on the sender and receiver chares, to perform a \kw{get} operation, send
+the source \kw{CkNcpyBuffer} object to the receiver chare. This can be done using a
+regular entry method invocation as shown in the following code snippet,
+where the sender, arrProxy[0] sends its source object to the receiver chare, arrProxy[1].
+
+\begin{alltt}
+// On Index 0 of arrProxy chare array
+arrProxy[1].recvNcpySrcObj(source);
+\end{alltt}
+
+After receiving the sender's source \kw{CkNcpyBuffer} object, the receiver can perform a \kw{get}
+operation on its destination \kw{CkNcpyBuffer} object by passing the source object as
+an argument to the runtime defined \kw{get} method as shown in the following code snippet.
+
+\begin{alltt}
+// On Index 1 of arrProxy chare array
+// Call get on the local destination object passing the source object
+dest.get(source);
+\end{alltt}
+
+This call performs a \kw{get} operation, reading the remote source buffer into the local
+destination buffer.
+
+Similarly, a receiver's destination \kw{CkNcpyBuffer} object can be sent to the sender for
+the sender to perform a \kw{put} on its source object by passing the source \kw{CkNcpyBuffer}
+object as an argument to the runtime defined \kw{put} method as shown in in the code
+snippet.
+
+\begin{alltt}
+// On Index 1 of arrProxy chare array
+arrProxy[0].recvNcpyDestObj(dest);
+\end{alltt}
+
+\begin{alltt}
+// On Index 0 of arrProxy chare array
+// Call put on the local source object passing the destination object
+source.put(dest);
+\end{alltt}
+
+After the completion of either a \kw{get} or a \kw{put}, the callbacks specified
+in both the objects are invoked. Within the
+\kw{CkNcpyBuffer} source callback, \texttt{sourceDone()}, the buffer can be safely modified or freed
+as shown in the following code snippet.
+
+\begin{alltt}
+// Invoked by the runtime on source (Index 0)
+void sourceDone() \{
+    // update the buffer to the next pointer
+    updateBuffer();
+\}
+\end{alltt}
+
+Similarly, inside the \kw{CkNcpyBuffer} destination callback, \texttt{destinationDone()}, the user
+is guaranteed that the data transfer is complete into the destination buffer and the user
+can begin operating on the newly available data as shown in the following code snippet.
+
+
+\begin{alltt}
+// Invoked by the runtime on destination (Index 1)
+void destinationDone() \{
+    // received data, begin computing
+    computeValues();
+\}
+\end{alltt}
+
+Both the source and destination buffers are of the same type i.e. \kw{CkNcpyBuffer}.
+What distinguishes a source buffer from a destination buffer is the way the \kw{get} or
+\kw{put} call is made. A valid \kw{get} call using two \kw{CkNcpyBuffer} objects \texttt{obj1} and
+\texttt{obj2} is performed as \texttt{obj1.get(obj2)}, where \texttt{obj1} is the local destination
+buffer object and \texttt{obj2} is the remote source buffer object that was passed to this PE.
+Similarly, a valid \kw{put} call using two \kw{CkNcpyBuffer} objects \texttt{obj1} and
+\texttt{obj2} is performed as \texttt{obj1.put(obj2)}, where \texttt{obj1} is the local source buffer
+object and \texttt{obj2} is the remote destination buffer object that was passed to this PE.
+
+Since callbacks in \charmpp{} allow to store a reference number, these
+callbacks passed into \kw{CkNcpyBuffer} can be set with a
+reference number using the method \texttt{cb.setRefNum(num)}. Upon callback
+invocation, these reference numbers can be used to identify the buffers that
+were passed into the \kw{CkNcpyBuffer} objects. This is
+specifically useful where there is an indexed collection of buffers, where the
+reference number can be used to index the collection.
+
+Note that the \kw{CkNcpyBuffer} objects can be
+either statically declared or be dynamically allocated.
+Additionally, the objects are also reusable across iteration boundaries i.e.
+after sending the \kw{CkNcpyBuffer} object, the remote PE can use
+the same object to perform \kw{get} or \kw{put}. However, it is
+important to note that in order to access them, it is required
+to store them in a local variable or as a data member of the class. This pattern
+of using the same objects across iterations is demonstrated in
+\examplerefdir{zerocopy/direct\textunderscore api/reg/pingpong}.
+
+This API is demonstrated in \examplerefdir{zerocopy/direct\textunderscore api}
+
+\subsubsection{Memory Registration and Modes of Operation}
+
+There are four modes of operation for the Zero Copy Direct API. These modes
+act as control switches on networks that require memory registration like GNI,
+OFI and Verbs, in order to perform RDMA operations . They dictate the functioning of the API
+providing flexible options based on user requirement. On other networks, where
+network memory management is not necessary (Netlrts) or is internally handled by the lower
+layer networking API (PAMI, MPI), these switches are still supported to maintain API
+consistency by all behaving in the similar default mode of operation.
+
+\paragraph{\texttt{CK\textunderscore BUFFER\textunderscore UNREG}:}
+\texttt{CK\textunderscore BUFFER\textunderscore UNREG} is the default mode that
+is used when no mode is passed. When this mode is passed, the buffer
+is initially unregistered and it is registered only for network transfers where
+registration is absolutely required. For example, if the target buffer is on the same
+PE or same logical node (or process), since the \kw{get} internally performs a memcpy,
+registration is avoided for non-network transfers. On the other hand, if the target buffer
+resides on a remote PE on a different logical node, the \kw{get} is implemented through
+an RDMA call requiring registration. In such a case, there is a small message sent by
+the RTS to register and perform the RDMA operation. Upon registration, the runtime
+modifies the state of \kw{CkNcpyBuffer} object to
+\texttt{CK\textunderscore BUFFER\textunderscore REG} from
+\texttt{CK\textunderscore BUFFER\textunderscore UNREG}. This mode is demonstrated in
+\examplerefdir{zerocopy/direct\textunderscore api/unreg}
+
+\paragraph{\texttt{CK\textunderscore BUFFER\textunderscore REG}:}
+\texttt{CK\textunderscore BUFFER\textunderscore REG} doesn't distinguish between
+non-network and network data transfers. When this mode is passed, the buffer
+is registered immediately and this can be used for both non-network sends (memcpy)
+and network sends without requiring an extra message being sent by the runtime system
+for the latter case. This mode is demonstrated in
+\examplerefdir{zerocopy/direct\textunderscore api/reg}
+
+\paragraph{\texttt{CK\textunderscore BUFFER\textunderscore PREREG}:}
+This mode is only beneficial by implementations that use pre-registered memory pools.
+In \charmpp{}, GNI and Verbs machine layers use pre-registered memory pools for avoiding
+registration costs. On other machine layers, this mode is supported, but it behaves similar
+to \texttt{CK\textunderscore BUFFER\textunderscore REG}. A custom allocator, \texttt{CkRdmaAlloc}
+can be used to allocate a buffer from a pool of pre-registered memory to avoid the expensive malloc
+and memory registration costs. For a buffer allocated through \texttt{CkRdmaAlloc}, the mode
+\texttt{CK\textunderscore BUFFER\textunderscore PREREG} should be passed to indicate the use of a
+mempooled buffer to the RTS. A buffer allocated with \texttt{CkRdmaAlloc} can be deallocated by
+calling a custom deallocator, \texttt{CkRdmaFree}. Although the allocator \texttt{CkRdmaAlloc} and
+deallocator, \texttt{CkRdmaFree} are beneficial on GNI and Verbs, the allocators are functional on other
+networks and allocate regular memory similar to a \texttt{malloc} call. This mode is demonstrated in
+\examplerefdir{zerocopy/direct\textunderscore api/prereg}
+
+\paragraph{\texttt{CK\textunderscore BUFFER\textunderscore NOREG}:}
+This mode is used for just storing pointer information without any actual networking
+or registration information. It cannot be used for performing any zerocopy operations.
+This mode was added as it was useful for implementing a runtime system feature.
+
+\subsubsection{Memory De-registration}
+Similar to memory registration, there is a method available to de-register
+memory after the completion of the operations. This allows for other buffers to use the
+registered memory as machines/networks are limited by the maximum amount of registered or
+pinned memory. Registered memory can be de-registered by calling the \texttt{deregisterMem()}
+method on the \kw{CkNcpyBuffer} object.
+
+\subsubsection{Other Methods}
+In addition to \texttt{deregisterMem()}, there are other methods in a \kw{CkNcpyBuffer} object
+that offer other utilities. The
+\texttt{init(const void *ptr, size\textunderscore t cnt, CkCallback \&cb,
+unsigned short int mode=CK\textunderscore BUFFER\textunderscore UNREG)}
+method can be used to re-initialize the \kw{CkNcpyBuffer} object to new values similar to the ones that
+were passed in the constructor. For example, after using a \kw{CkNcpyBuffer} object called \texttt{srcInfo},
+the user can re-initialize the same object with other values. This is shown in the following code snippet.
+
+\begin{alltt}
+// initialize src with new values
+src.init(ptr, 200, newCb, CK_BUFFER_REG);
+\end{alltt}
+
+Additionally, the user can use another method \texttt{registerMem} in order to register a buffer that has
+been de-registered. Note that it is not required to call \texttt{registerMem} after a new initialization
+using \texttt{init} as \texttt{registerMem} is internally called on every new initialization. The usage of
+\texttt{registerMem} is illustrated in the following code snippet. Additionally, also note that following
+de-registration, if intended to register again, it is required to call \texttt{registerMem} even in the
+\texttt{CK\textunderscore BUFFER\textunderscore PREREG} mode when the buffer is allocated from a preregistered
+mempool. This is required to set the registration memory handles and will not incur any registration costs.
+
+\begin{alltt}
+// register previously de-registered buffer
+src.registerMem();
+\end{alltt}
+
+\subsection{Zero Copy Entry Method Send API}
+The Zero copy Entry Method Send API only allows the user to only avoid the sender
+side copy without avoiding the receiver side copy. It offloads the user from the
+responsibility of making additional calls to support zero copy semantics.
+It extends the capability of the existing entry methods with slight modifications
+in order to send large buffers without a copy.
 
 \vspace{0.1in}
 \noindent
@@ -40,8 +296,8 @@ arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb));
 
 The callback will be invoked on completion of the RDMA operation associated with the
 corresponding array. Inside the callback, it is safe to overwrite the buffer sent
-via the zero copy API and this buffer can be accessed by dereferencing the CkDataMsg
-received in the callback.
+via the zero copy entry method send API and this buffer can be accessed by dereferencing
+the CkDataMsg received in the callback.
 
 \begin{alltt}
 //called when RDMA operation is completed
@@ -79,7 +335,8 @@ CkCallback cb2(CkIndex_Foo::zerocopySent2(NULL), thisProxy[thisIndex]);
 arrayProxy[0].foo(500000, CkSendBuffer(arrPtr1, cb1), 1024000, CkSendBuffer(arrPtr2, cb2));
 \end{alltt}
 
-This API is demonstrated in \examplerefdir{zerocopy} and \testrefdir{pingpong}
+This API is demonstrated in \examplerefdir{zerocopy/entry\textunderscore method\textunderscore api}
+and \testrefdir{pingpong}
 
 \vspace{0.1in}
 \noindent
@@ -95,9 +352,10 @@ only RDMA enabled networks. On networks which do not support RDMA and for within
 (which uses shared memory), the API is functional but doesn't show any performance benefit as it
 behaves like a regular entry method that copies its arguments.
 
-Table~\ref{tab:rdmathreshold} displays the message size thresholds for the zero copy API on popular
-systems and build architectures. These results were obtained by running \examplerefdir{zerocopy/pingpong}
-in non-SMP mode on production builds. For message sizes greater than or equal to the displayed thresholds,
+Table~\ref{tab:rdmathreshold} displays the message size thresholds for the zero copy entry method
+send API on popular systems and build architectures. These results were obtained by running
+\examplerefdir{zerocopy/entry\textunderscore method\textunderscore api/pingpong} in non-SMP mode
+on production builds. For message sizes greater than or equal to the displayed thresholds,
 the zero copy API is found to perform better than the regular message send API. For network layers
 that are not pamilrts, gni, verbs, ofi or mpi, the generic implementation is used.
 
@@ -141,6 +399,6 @@ Intel Cluster (Bridges) & Intel Omni-Path &\verb|ofi-linux-x86_64| & 64 KB & 32 
 Intel KNL Cluster (Stampede2) & Intel Omni-Path &\verb|ofi-linux-x86_64| & 1 MB & 64 KB & 64 KB
 \\\hline
 \end{tabular}
-\caption{Message Size Thresholds for which Zero Copy API performs better than Regular API}
+\caption{Message Size Thresholds for which Zero Copy Entry API performs better than Regular API}
 \label{tab:rdmathreshold}
 \end{table}
