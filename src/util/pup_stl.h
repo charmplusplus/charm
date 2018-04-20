@@ -289,7 +289,6 @@ namespace PUP {
   inline void operator|(er &p,std::vector<bool> &v) {
     PUP_stl_container<std::vector<bool>, bool>(p, v);
   }
-} // end of namespace PUP
 
 // Distributed under the MIT License.
 // The following allows for pupping STL structures with pointers to abstract
@@ -308,7 +307,6 @@ template <bool B>
 using Requires = typename requires_impl<
     B>::template_error_type_failed_to_meet_requirements_on_template_parameters;
 
-namespace PUP {
   template <typename T, std::size_t N,
             Requires<!PUP::as_bytes<T>::value> = nullptr>
   inline void pup(PUP::er& p, std::array<T, N>& a) {
