@@ -398,9 +398,6 @@ using Requires = typename requires_impl<
 
   template <typename... Args>
   inline void pup(PUP::er& p, std::tuple<Args...>& t) {
-    if (p.isUnpacking()) {
-      t = std::tuple<Args...>{};
-    }
     pup_tuple_impl<sizeof...(Args) - 1>(p, t);
   }
 
