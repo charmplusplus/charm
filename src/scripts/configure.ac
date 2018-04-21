@@ -416,8 +416,8 @@ test_link() {
         then
           test_result 1 "$1" "$2" "$3"
         else
-          echo $CMK_LDXX $CMK_LDXX_FLAGS -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 >> $charmout
-          $CMK_LDXX $CMK_LDXX_FLAGS -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 >> out 2>&1
+          echo $CMK_LDXX $CMK_LDXX_FLAGS -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 $5 >> $charmout
+          $CMK_LDXX $CMK_LDXX_FLAGS -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 $5 >> out 2>&1
           ret=$?
 	  test ! -x testlink && ret=1
           test_result $ret "$1" "$2" "$3"
@@ -657,6 +657,41 @@ if test $strictpass -eq 1
 then
     add_flag "$(echo OPTS_CXX=\"\$OPTS_CXX -fno-lifetime-dse\")" "Disable 'Lifetime DSE' optimization to work around bug #1045 in GCC >6.x"
     OPTS_CXX="$OPTS_CXX -fno-lifetime-dse"
+fi
+
+# Determine compiler/linker flags to build libcharm.so for charmpy
+if test "$enable_charmpy" = "yes"
+then
+
+  cat > $t <<EOT
+int main() { return 0; }
+EOT
+
+  test_cxx "whether C++ compiler accepts --no-as-needed" "yes" "no" "--no-as-needed"
+  if test $strictpass -eq 1
+  then
+      add_flag "$(echo CXX_NO_AS_NEEDED=\"--no-as-needed\")" "--no-as-needed flag necessary for compilers that default to linking with --as-needed"
+  fi
+
+  got_opt_whole_archive=""
+  # Flags for g++/clang++/icpc, Apple-LLVM respectively
+  for i in "-Wl,--whole-archive -Wl,--no-whole-archive" "-Wl,-all_load"; do
+      test_link "whether linker supports '$i'" "yes" "no" "" "$i"
+      if test $strictpass -eq 1
+      then
+        got_opt_whole_archive="true"
+        IFS=' ' read LDXX_WHOLE_ARCHIVE_PRE LDXX_WHOLE_ARCHIVE_POST <<< $i
+        add_flag "$(echo LDXX_WHOLE_ARCHIVE_PRE=\"$LDXX_WHOLE_ARCHIVE_PRE\")" "Flags to link whole archives into libcharm.so"
+        add_flag "$(echo LDXX_WHOLE_ARCHIVE_POST=\"$LDXX_WHOLE_ARCHIVE_POST\")" "Flags to link whole archives into libcharm.so"
+        break
+      fi
+  done
+
+  if test -z $got_opt_whole_archive
+  then
+    echo "Don't know how to build libcharm.so for Charmpy"
+    test_finish 1
+  fi
 fi
 
 # Figure out if the user has asked to enable the latest language standards

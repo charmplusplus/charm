@@ -74,6 +74,15 @@ ARMCI: charm++ LIBS
 
 f90charm: charm++ $(L)/libf90charm.a
 
+libcharm: charm++
+	cd $(L) ; $(CHARMC) -standalone -whole-archive -c++stl -shared -o libcharm.so $(LIBCHARM_LIBS)
+
+charmpy: libcharm
+
+LIBCHARM_LIBS= libck.a libconv-core.a libconv-util.a libmemory-default.a libconv-machine.a \
+               libthreads-default.a libconv-partition.a libtmgr.a libhwloc_embedded.a \
+               libldb-rand.a libconv-ldb.a libmoduleGreedyRefineLB.a
+
 DEFAULT_LIBS= completion NDMeshStreamer dummy pythonCCS io ckloop
 
 default_libs: $(DEFAULT_LIBS)

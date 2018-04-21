@@ -85,6 +85,8 @@ COUNTTOKENS="no"
 USE_OPENMP="no"
 SKIP_MODULEINIT=""
 RPATH_ORIGIN=""
+LINK_WHOLE_ARCHIVE=""
+LINK_CXX_STL=""
 
 COPY_CHARMRUN=true
 USE_BUILD_OPTIONS=0
@@ -801,6 +803,14 @@ do
 			PRE_LIBRARIES="$PRE_LIBRARIES $arg"
 		fi
                 INPUT_GIVEN="1"
+		;;
+
+	"-whole-archive")
+		LINK_WHOLE_ARCHIVE=true
+		;;
+
+	"-c++stl")
+		LINK_CXX_STL=true
 		;;
 
 	-s)
@@ -1618,9 +1628,21 @@ fi
 
 if [ -z "$STANDALONE" ]
 then
-  ALL_LIBS="$LANG_LIBS $PRE_LIBRARIES $MIDDLE_LIBS $BAL_OBJ $CMK_LIBS $POST_LIBRARIES -lmoduleNDMeshStreamer -lmodulecompletion $CMK_SYSLIBS"
+  ALL_LIBS="$LANG_LIBS $PRE_LIBRARIES $MIDDLE_LIBS $BAL_OBJ $CMK_LIBS $POST_LIBRARIES -lmoduleNDMeshStreamer -lmodulecompletion"
 else
-  ALL_LIBS="$USER_PRE_LIBRARIES $USER_POST_LIBRARIES $CMK_SYSLIBS"
+  ALL_LIBS="$USER_PRE_LIBRARIES $USER_POST_LIBRARIES"
+fi
+
+if [ -n "$LINK_WHOLE_ARCHIVE" ]
+then
+  ALL_LIBS="$CXX_NO_AS_NEEDED $LDXX_WHOLE_ARCHIVE_PRE $ALL_LIBS $LDXX_WHOLE_ARCHIVE_POST $CMK_SYSLIBS"
+else
+  ALL_LIBS="$ALL_LIBS $CMK_SYSLIBS"
+fi
+
+if [ -n "$LINK_CXX_STL" ]
+then
+  ALL_LIBS="$ALL_LIBS -lstdc++"
 fi
 
 if [ "$TRACE_WITH_TAU" = 1 ]
@@ -1913,6 +1935,14 @@ MakeSO() {
 	else
 	  soLibs="$PRE_LIBRARIES $POST_LIBRARIES"
 	  [ "$CMK_MACOSX" = "1" ] && OPTS_LD="$OPTS_LD -Wl,-install_name,$CHARMLIBSO/$fname"
+	fi
+	if [ -n "$LINK_WHOLE_ARCHIVE" ]
+	then
+	  soLibs="$CXX_NO_AS_NEEDED $LDXX_WHOLE_ARCHIVE_PRE $soLibs $LDXX_WHOLE_ARCHIVE_POST"
+	fi
+	if [ -n "$LINK_CXX_STL" ]
+	then
+	  soLibs="$soLibs -lstdc++"
 	fi
 	soCmd="$soTool $CMK_LIBDIR -o $OBJECT $OPTS_LD $OPTS_LDRO $OBJECTFILES $soLibs $CMK_LD_SHARED_LIBS"
 	DoNoErrCheck $soCmd

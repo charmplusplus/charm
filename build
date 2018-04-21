@@ -17,7 +17,7 @@ syntax() {
   echo ''
   echo 'Usage: build <target> <version> <options> [charmc-options ...]'
   echo ''
-  echo '<targets>: converse charm++ LIBS AMPI bigemulator msa'
+  echo '<targets>: converse charm++ LIBS AMPI charmpy bigemulator msa'
   echo '<targets>: doc ps-doc pdf-doc html-doc'
   if test $more = 1
   then
@@ -25,6 +25,7 @@ syntax() {
   echo '  charm++         compile Charm++ core only'
   echo '  AMPI            compile Adaptive MPI on top of Charm++'
   echo '  LIBS            compile additional parallel libraries with Charm++ core'
+  echo '  charmpy         compile shared library version of Charm++ for Charmpy'
   echo '  bigemulator     build additional BigSim libraries'
   echo '  msa             build Multiphase Shared Arrays(MSA) library'
   echo '  Tau             build the TAU tracing library for generating TAU performance data' 
@@ -773,6 +774,31 @@ then
       fi
       echo '. $CHARMINC/'"conv-mach-$i.sh" >> $ConvSh
     done
+fi
+
+# build for Charmpy
+if [ "$PROGRAM" = "charmpy" ]; then
+    if [ -n "$BOPTS" ] && [ "$HAS_SMP" -eq 1 ]; then
+        echo "Error: SMP mode is currently not supported with charmpy. Choose a non-smp version."
+        exit 1
+    fi
+
+    if [ `echo "$BASEVERSION" | grep -c "multicore"` -gt 0 ]; then
+        echo "Error: multicore is currently not supported with charmpy. Choose a non-smp version."
+        exit 1
+    fi
+
+    if test `echo "$CONFIG_OPTS" | grep -c "\--enable-charmpy"` -eq 0
+    then
+        CONFIG_OPTS="$CONFIG_OPTS --enable-charmpy"
+    fi
+
+    if test `echo "$BASEVERSION" | grep -c "win"` -gt 0
+    then
+        BUILD_SHARED=""
+    else
+        BUILD_SHARED="-build-shared"
+    fi
 fi
 
 if test  "$BUILD_SHARED"  = "-build-shared"
