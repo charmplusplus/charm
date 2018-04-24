@@ -631,15 +631,22 @@ void TCharm::done(void) {
 	DBG("TCharm thread "<<thisIndex<<" done")
 	if (exitWhenDone) {
 		//Contribute to a synchronizing reduction
-		contribute(CkCallback(CkReductionTarget(TCharm, atExit), thisProxy[0]));
+		CkCallback cb(CkIndex_TCharm::atExit(NULL), CkArrayIndex1D(0), thisProxy);
+		contribute(cb);
 	}
 	isSelfDone = true;
 	stop();
 }
 //Called when all threads are done running
-void TCharm::atExit(void) {
+void TCharm::atExit(CkReductionMsg* msg) {
 	DBGX("TCharm::atExit1> exiting");
 	//thisProxy.unsetFlags();
+
+	// NOTE: We use an explicit message rather than a [reductiontarget] entry method
+	//       here so that we can delete the msg explicitly *before* calling CkExit(),
+	//       otherwise the underlying message is leaked (and valgrind reports it).
+	delete msg;
+
 	CkExit();
 	//CkPrintf("After CkExit()!!!!!!!\n");
 }
