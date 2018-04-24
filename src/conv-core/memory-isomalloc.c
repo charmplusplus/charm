@@ -64,6 +64,8 @@ static void meta_init(char **argv)
    if (CmiMyRank()==0) CmiMemoryIs_flag|=CMI_MEMORY_IS_ISOMALLOC;
    CpvInitialize(CmiIsomallocBlockList *,isomalloc_blocklist);
    CpvInitialize(CmiIsomallocBlockList *,pushed_blocklist);
+   CpvAccess(isomalloc_blocklist) = NULL;
+   CpvAccess(pushed_blocklist) = NULL;
 #if CMK_HAS_TLS_VARIABLES
    isomalloc_thread = 1;         /* isomalloc is allowed in this pthread */
 #endif
