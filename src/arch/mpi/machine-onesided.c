@@ -71,7 +71,7 @@ void MPIPostOneBuffer(const void *buffer, void *ref, int size, int pe, int tag, 
   int destLocalNode = CmiNodeOf(pe);
   int destRank = CmiGetNodeGlobal(destLocalNode, CmiMyPartition());
 
-  SMSG_LIST *msg_tmp = allocateSmsgList((void *)buffer, destRank, size, 0, type, ref);
+  SMSG_LIST *msg_tmp = allocateSmsgList((char *)buffer, destRank, size, 0, type, ref);
 
 #if CMK_SMP
 #if MULTI_SENDQUEUE

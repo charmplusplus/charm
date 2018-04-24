@@ -435,7 +435,7 @@ SMSG_LIST *allocateSmsgList(char *msg, int destNode, int size, int mode, int typ
 #if CMK_SMP
 static void EnqueueMsg(void *m, int size, int node, int mode, int type, void *ref) {
     /*SMSG_LIST *msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));*/
-    SMSG_LIST *msg_tmp = allocateSmsgList(m, node, size, mode, type, ref);
+    SMSG_LIST *msg_tmp = allocateSmsgList((char *)m, node, size, mode, type, ref);
     MACHSTATE1(3,"EnqueueMsg to node %d {{ ", node);
     msg_tmp->msg = (char *)m;
     msg_tmp->size = size;
