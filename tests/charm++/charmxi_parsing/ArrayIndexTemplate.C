@@ -34,7 +34,7 @@ protected:
 class Main : public CBase_Main
 {
   template <typename CProxy_MyArray, size_t N>
-  void TestArray(const typename CProxy_MyArray::array_index_t::custom_t (&&initializers)[N])
+  void TestArray(const typename CProxy_MyArray::array_index_t::custom_t (&initializers)[N])
   {
     CProxy_MyArray arr = CProxy_MyArray::ckNew();
     for (const auto & index : initializers)
@@ -50,8 +50,10 @@ public:
   {
     mainProxy = thisProxy;
 
-    TestArray<CProxy_MyArray1>({ {{0}}, {{1}} });
-    TestArray<CProxy_MyArray2>({ {{0, 0}}, {{0, 1}}, {{1, 1}}, {{1, 0}} });
+    const MyIndex<1> Index1[] = { {{0}}, {{1}} };
+    TestArray<CProxy_MyArray1>(Index1);
+    const MyIndex<2> Index2[] = { {{0, 0}}, {{0, 1}}, {{1, 1}}, {{1, 0}} };
+    TestArray<CProxy_MyArray2>(Index2);
 
     CkCallback qd(CkIndex_Main::quiescence(), mainProxy);
     CkStartQD(qd);
