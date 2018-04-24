@@ -69,13 +69,35 @@ CtvExtern(TCharm *,_curTCharm);
 
 class TCharm: public CBase_TCharm
 {
- public:
+ private:
+	friend class TCharmAPIRoutine; //So he can get to heapBlocks:
 
-//User's heap-allocated/global data:
+	CthThread tid; //Our migratable thread
+	CmiIsomallocBlockList *heapBlocks; //Migratable heap data
+	CtgGlobals threadGlobals; //Global data
+
+	//isSelfDone is added for out-of-core emulation in BigSim
+	//when thread is brought back into core, ResumeFromSync is called
+	//so if the thread has finished its stuff, it should not start again
+	bool isStopped, exitWhenDone, isSelfDone, asyncMigrate;
+
+	//Informational data about the current thread:
+	class ThreadInfo {
+	public:
+		CProxy_TCharm tProxy; //Our proxy
+		int thisElement; //Index of current element
+		int numElements; //Number of array elements
+	};
+	ThreadInfo threadInfo;
+
+	TCharmInitMsg *initMsg; //Thread initialization data
+	double timeOffset; //Value to add to CkWallTimer to get my clock
+
+ public:
+	//User's heap-allocated/global data:
 	class UserData {
-//		void *data; //user data pointer
-                CthThread t;
-                size_t    pos;
+		CthThread t;
+		size_t    pos;
 		char mode;
 		TCHARM_Pup_fn cfn;
 		TCHARM_Pup_global_fn gfn;
@@ -87,86 +109,43 @@ class TCharm: public CBase_TCharm
 			{gfn=gfn_; t=t_; pos=CthStackOffset(t, (char *)p); mode='g';}
 		inline void *getData(void) const {return pos==0?NULL:CthPointer(t, pos);}
 		void pup(PUP::er &p);
-                void update(CthThread t_) { t=t_; }
+		void update(CthThread t_) { t=t_; }
 		friend inline void operator|(PUP::er &p,UserData &d) {d.pup(p);}
 	};
 	//New interface for user data:
 	CkVec<UserData> sud;
-	
-//Tiny semaphore-like pointer producer/consumer
+
+	//Tiny semaphore-like pointer producer/consumer
 	class TCharmSemaphore {
 	public:
 		int id; //User-defined identifier
 		void *data; //User-defined data
 		CthThread thread; //Waiting thread, or 0 if none
-		
+
 		TCharmSemaphore() { id=-1; data=NULL; thread=NULL; }
 		TCharmSemaphore(int id_) { id=id_; data=NULL; thread=NULL; }
 	};
 	/// Short, unordered list of waiting semaphores.
 	CkVec<TCharmSemaphore> sema;
-	TCharmSemaphore *findSema(int id);
-	TCharmSemaphore *getSema(int id);
-	void freeSema(TCharmSemaphore *);
-	
-	/// Store data at the semaphore "id".
-	///  The put can come before or after the get.
-	void semaPut(int id,void *data);
 
-	/// Retreive data from the semaphore "id", returning NULL if not there.
-	void *semaPeek(int id);
-	
-	/// Retreive data from the semaphore "id".
-	///  Blocks if the data is not immediately available.
-	void *semaGets(int id);
-	
-	/// Retreive data from the semaphore "id".
-	///  Blocks if the data is not immediately available.
-	///  Consumes the data, so another put will be required for the next get.
-	void *semaGet(int id);
-
-//One-time initialization
-	static void nodeInit(void);
-	static void procInit(void);
  private:
-	//Informational data about the current thread:
-	class ThreadInfo {
-	public:
-		CProxy_TCharm tProxy; //Our proxy
-		int thisElement; //Index of current element
-		int numElements; //Number of array elements
-	};
-
-	TCharmInitMsg *initMsg; //Thread initialization data
-	CthThread tid; //Our migratable thread
-	friend class TCharmAPIRoutine; //So he can get to heapBlocks:
-	CmiIsomallocBlockList *heapBlocks; //Migratable heap data
-	CtgGlobals threadGlobals; //Global data
-	void pupThread(PUP::er &p);
-
-	//isSelfDone is added for out-of-core emulation in BigSim
-	//when thread is brought back into core, ResumeFromSync is called
-	//so if the thread has finished its stuff, it should not start again
-	bool isStopped, exitWhenDone, isSelfDone, asyncMigrate;
-	ThreadInfo threadInfo;
-	double timeOffset; //Value to add to CkWallTimer to get my clock
-
 	//Old interface for user data:
 	enum {maxUserData=16};
 	int nUd;
 	UserData ud[maxUserData];
 
+	void pupThread(PUP::er &p);
 	void ResumeFromSync(void);
 
  public:
 	TCharm(TCharmInitMsg *initMsg);
 	TCharm(CkMigrateMessage *);
 	~TCharm();
-	
+
 	virtual void ckJustMigrated(void);
 	virtual void ckJustRestored(void);
 	virtual void ckAboutToMigrate(void);
-	
+
 	void migrateDelayed(int destPE);
 	void atBarrier(void);
 	void atExit(void);
@@ -175,15 +154,39 @@ class TCharm: public CBase_TCharm
 	//Pup routine packs the user data and migrates the thread
 	virtual void pup(PUP::er &p);
 
+	TCharmSemaphore *findSema(int id);
+	TCharmSemaphore *getSema(int id);
+	void freeSema(TCharmSemaphore *);
+
+	/// Store data at the semaphore "id".
+	///  The put can come before or after the get.
+	void semaPut(int id,void *data);
+
+	/// Retreive data from the semaphore "id", returning NULL if not there.
+	void *semaPeek(int id);
+
+	/// Retreive data from the semaphore "id".
+	///  Blocks if the data is not immediately available.
+	void *semaGets(int id);
+
+	/// Retreive data from the semaphore "id".
+	///  Blocks if the data is not immediately available.
+	///  Consumes the data, so another put will be required for the next get.
+	void *semaGet(int id);
+
+	//One-time initialization
+	static void nodeInit(void);
+	static void procInit(void);
+
 	//Start running the thread for the first time
 	void run(void);
 
 	inline double getTimeOffset(void) const { return timeOffset; }
 
-//Client-callable routines:
+	//Client-callable routines:
 	//Sleep till entire array is here
 	void barrier(void);
-	
+
 	//Block, migrate to destPE, and resume
 	void migrateTo(int destPE);
 
@@ -197,7 +200,7 @@ class TCharm: public CBase_TCharm
 	//Register user data to be packed with the thread
 	int add(const UserData &d);
 	void *lookupUserData(int ud);
-	
+
 	inline static TCharm *get(void) {
 		TCharm *c=getNULL();
 #if CMK_ERROR_CHECKING
