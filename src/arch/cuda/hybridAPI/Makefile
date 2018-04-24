@@ -2,7 +2,7 @@ CHARMDIR=../..
 -include $(CHARMDIR)/include/conv-mach-opt.mak
 CUDA_PATH=$(CUDA_DIR)
 NVCC=$(CUDA_PATH)/bin/nvcc
-NVCC_FLAGS=-c -use_fast_math -std=c++11# -device-debug -deviceemu
+NVCC_FLAGS=-c -use_fast_math -std=c++11 -DHAPI_MEMPOOL # -device-debug -deviceemu
 NVCC_INC=-I$(CUDA_PATH)/include -I..
 
 all: libs

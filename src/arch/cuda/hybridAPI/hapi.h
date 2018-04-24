@@ -1,25 +1,25 @@
 #ifndef __HAPI_H_
 #define __HAPI_H_
 #include <cuda_runtime.h>
-#include <string.h>
-#include <stdlib.h>
+#include <cstring>
+#include <cstdlib>
 #include <vector>
 
 /******************** DEPRECATED ********************/
 // HAPI wrappers whose behavior is controlled by user defined variables,
-// which are CUDA_USE_CUDAMALLOCHOST and CUDA_MEMPOOL.
-#ifdef CUDA_USE_CUDAMALLOCHOST
-#  ifdef CUDA_MEMPOOL
+// which are HAPI_USE_CUDAMALLOCHOST and HAPI_MEMPOOL.
+#ifdef HAPI_USE_CUDAMALLOCHOST
+#  ifdef HAPI_MEMPOOL
 #    define hapiHostMalloc hapiPoolMalloc
 #    define hapiHostFree   hapiPoolFree
 #  else
 #    define hapiHostMalloc cudaMallocHost
 #    define hapiHostFree   cudaFreeHost
-#  endif // CUDA_MEMPOOL
+#  endif // HAPI_MEMPOOL
 #else
 #  define hapiHostMalloc malloc
 #  define hapiHostFree   free
-#endif // CUDA_USE_MALLOCHOST
+#endif // HAPI_USE_MALLOCHOST
 
 /******************** DEPRECATED ********************/
 // Contains information about a device buffer, which is used by
@@ -91,6 +91,9 @@ typedef struct workRequest {
   // may be used to pass data to kernel calls
   void* user_data;
 
+  // flag determining whether user data is freed on destruction
+  bool free_user_data;
+
   // CUDA stream index provided by the user or assigned by GPUManager
   cudaStream_t stream;
 
@@ -104,7 +107,7 @@ typedef struct workRequest {
   workRequest() :
     grid_dim(0), block_dim(0), shared_mem(0), host_to_device_cb(NULL),
     kernel_cb(NULL), device_to_host_cb(NULL), runKernel(NULL), state(0),
-    user_data(NULL), stream(NULL)
+    user_data(NULL), free_user_data(false), stream(NULL)
   {
 #ifdef HAPI_TRACE
     trace_name = "";
@@ -115,7 +118,8 @@ typedef struct workRequest {
   }
 
   ~workRequest() {
-    free(user_data);
+    if (free_user_data)
+      std::free(user_data);
   }
 
   void setExecParams(dim3 _grid_dim, dim3 _block_dim, int _shared_mem = 0) {
@@ -172,16 +176,16 @@ typedef struct workRequest {
     return stream;
   }
 
-  void setUserData(void* ptr, size_t size) {
-    // free memory if something else was contained previously
-    if (user_data != NULL) {
-      free(user_data);
-    }
-
-    user_data = malloc(size);
-
+  void copyUserData(void* ptr, size_t size) {
     // make a separate copy to prevent tampering with the original data
-    memcpy(user_data, ptr, size);
+    free_user_data = true;
+    user_data = std::malloc(size);
+    std::memcpy(user_data, ptr, size);
+  }
+
+  void setUserData(void* ptr, bool _free_user_data = false) {
+    free_user_data = _free_user_data;
+    user_data = ptr;
   }
 
   void* getUserData() {

@@ -49,7 +49,7 @@ void cudaVecAdd(int vectorSize, float* h_A, float* h_B, float* h_C, float* d_A,
   wr->setCallback(cb);
   wr->setTraceName("vecadd");
   wr->setRunKernel(run_VECADD_KERNEL);
-  wr->setUserData(&vectorSize, sizeof(int));
+  wr->copyUserData(&vectorSize, sizeof(int));
 
   hapiEnqueue(wr);
 #else

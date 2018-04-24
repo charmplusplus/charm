@@ -58,6 +58,10 @@ typedef struct hapiEvent {
   void* cb_msg;
 } hapiEvent;
 
+// Generate a globally unique pointer to use as a flag
+static char free_buff_flag_sentinel;
+#define FREE_BUFF_FLAG ((void*)&free_buff_flag_sentinel)
+
 CpvDeclare(std::queue<hapiEvent>, hapi_event_queue);
 #endif
 CpvDeclare(int, n_hapi_events);
@@ -247,7 +251,7 @@ void GPUManager::init() {
 // Returns the number of created streams.
 int GPUManager::createStreams() {
   if (streams_)
-    return 0;
+    return n_streams_;
 
 #if CMK_SMP || CMK_MULTICORE
   if (device_prop_.major == 3) {
@@ -395,8 +399,8 @@ void GPUManager::hostToDeviceTransfer(workRequest* wr) {
     host_buffers_[index] = bi.host_buffer;
 
     if (bi.transfer_to_device && size > 0) {
-      hapiCheck(cudaMemcpyAsync(device_buffers_[index], host_buffers_[index], size,
-                                cudaMemcpyHostToDevice, wr->stream));
+      hapiCheck(cudaMemcpy(device_buffers_[index], host_buffers_[index], size,
+                                cudaMemcpyHostToDevice));
 
 #ifdef HAPI_DEBUG
       printf("[HAPI] transferring buffer %d from host to device, time: %.2f, "
@@ -414,8 +418,8 @@ void GPUManager::deviceToHostTransfer(workRequest* wr) {
     int size = bi.size;
 
     if (bi.transfer_to_host && size > 0) {
-      hapiCheck(cudaMemcpyAsync(host_buffers_[index], device_buffers_[index], size,
-                                cudaMemcpyDeviceToHost, wr->stream));
+      hapiCheck(cudaMemcpy(host_buffers_[index], device_buffers_[index], size,
+                                cudaMemcpyDeviceToHost));
 
 #ifdef HAPI_DEBUG
       printf("[HAPI] transferring buffer %d from device to host, time %.2f, "
@@ -441,6 +445,22 @@ void GPUManager::freeBuffers(workRequest* wr) {
 #endif
     }
   }
+}
+
+inline void lockAndFreeBuffersDeleteWr(workRequest* wr) {
+#if CMK_SMP || CMK_MULTICORE
+  CmiLock(CsvAccess(gpu_manager).progress_lock_);
+#endif
+
+  // free device buffers
+  CsvAccess(gpu_manager).freeBuffers(wr);
+
+#if CMK_SMP || CMK_MULTICORE
+  CmiUnlock(CsvAccess(gpu_manager).progress_lock_);
+#endif
+
+  // free workRequest
+  delete wr;
 }
 
 // Run the user's kernel for the given work request.
@@ -483,24 +503,12 @@ static void* deviceToHostCallback(void* arg) {
 #endif
   workRequest* wr = *((workRequest**)((char*)arg + CmiMsgHeaderSizeBytes + sizeof(int)));
 
-#if CMK_SMP || CMK_MULTICORE
-  CmiLock(CsvAccess(gpu_manager).progress_lock_);
-#endif
-
-  // free device buffers
-  CsvAccess(gpu_manager).freeBuffers(wr);
-
-#if CMK_SMP || CMK_MULTICORE
-  CmiUnlock(CsvAccess(gpu_manager).progress_lock_);
-#endif
-
   // invoke user callback
   if (wr->device_to_host_cb) {
     CUDACallbackManager(wr->device_to_host_cb);
   }
 
-  // free workRequest
-  delete wr;
+  lockAndFreeBuffersDeleteWr(wr);
 
   // notify process to QD
   QdProcess(1);
@@ -645,12 +653,15 @@ void hapiEnqueue(workRequest* wr) {
 
   // add device-to-host transfer callback
 #ifdef HAPI_CUDA_CALLBACK
-  // always invoekd to free memory
+  // always invoked to free memory
   addCallback(wr, AfterDeviceToHost);
 #else
   if (wr->device_to_host_cb) {
     recordEvent(wr->stream, wr->device_to_host_cb, NULL);
   }
+
+  // free device buffers
+  recordEvent(wr->stream, FREE_BUFF_FLAG, wr);
 #endif
 
 #if CMK_SMP || CMK_MULTICORE
@@ -1075,13 +1086,20 @@ void hapiClearInstrument() {
 }
 #endif // HAPI_INSTRUMENT_WRS
 
-void hapiPoll() {
+void hapiPollEvents() {
 #ifndef HAPI_CUDA_CALLBACK
   std::queue<hapiEvent>& queue = CpvAccess(hapi_event_queue);
   while (!queue.empty()) {
     hapiEvent hev = queue.front();
     if (cudaEventQuery(hev.event) == cudaSuccess) {
-      ((CkCallback*)hev.cb)->send(hev.cb_msg);
+      // Check that this event isn't a special case i.e. just doing a callback
+      if (hev.cb != FREE_BUFF_FLAG) {
+        ((CkCallback*)hev.cb)->send(hev.cb_msg);
+      }
+      // Hack cb field to serve as a flag and cb_msg as a pointer to the workRequest
+      else { // free buffers
+        lockAndFreeBuffersDeleteWr(static_cast<workRequest*>(hev.cb_msg));
+      }
       cudaEventDestroy(hev.event);
       queue.pop();
       CpvAccess(n_hapi_events)--;

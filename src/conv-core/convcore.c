@@ -1921,7 +1921,7 @@ void CsdScheduleForever(void)
     #if CMK_CUDA
     // check if any GPU work needs to be processed
     if (CpvAccess(n_hapi_events) > 0) {
-      hapiPoll();
+      hapiPollEvents();
     }
     #endif
     msg = CsdNextMessage(&state);

@@ -153,7 +153,7 @@ void cudaMatMul(int matrixSize, float* h_A, float* h_B, float* h_C, float* d_A,
     wr->setTraceName("matmul");
     wr->setRunKernel(run_MATMUL_KERNEL);
   }
-  wr->setUserData(&matrixSize, sizeof(int));
+  wr->copyUserData(&matrixSize, sizeof(int));
 
   hapiEnqueue(wr);
 #else

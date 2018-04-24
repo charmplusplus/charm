@@ -16,7 +16,7 @@ void initEventQueues();
 void registerCallbacks();
 
 // Polls for GPU work completion. Does not do anything if HAPI_CUDA_CALLBACK is defined.
-void hapiPoll();
+void hapiPollEvents();
 
 #ifdef HAPI_MEMPOOL
 // data and metadata reside in same chunk of memory
