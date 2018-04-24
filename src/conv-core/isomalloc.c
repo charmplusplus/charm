@@ -1282,8 +1282,8 @@ static void *disabled_map(int nBytes)
   if (!disabled_map_warned) {
     disabled_map_warned=1;
     if (CmiMyPe()==0)
-      CmiError("Charm++> Warning: since mmap() doesn't work,"
-          " you won't be able to migrate threads.\n");
+      CmiError("Charm++> Warning: Isomalloc is uninitialized."
+          " You won't be able to migrate threads.\n");
   }
   return malloc(nBytes);
 }
