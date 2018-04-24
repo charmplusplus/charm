@@ -1542,6 +1542,8 @@ CtgGlobals CtgCurrentGlobals(void);
 
 /** for TLS globals */
 void CtgInstallTLS(void *cur, void *next);
+void CtgInstallMainThreadTLS(void *cur);
+void CtgInstallCthTLS(void *cur, void *next);
 void CmiEnableTLS(void);
 void CmiDisableTLS(void);
 

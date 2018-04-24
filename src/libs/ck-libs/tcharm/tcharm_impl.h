@@ -240,18 +240,25 @@ class TCharm: public CBase_TCharm
 
 	//Entering thread context: turn stuff on
 	static void activateThread(void) {
+		// NOTE: if changing the body of this function, you also need to
+		//       modify TCharmAPIRoutine's destructor, which has the body
+		//       of this routine inlined into it to avoid extra branching.
 		TCharm *tc=CtvAccess(_curTCharm);
 		if (tc!=NULL) {
 			if (tc->heapBlocks)
 				CmiIsomallocBlockListActivate(tc->heapBlocks);
+#if CMI_SWAPGLOBALS
 			if (tc->threadGlobals)
 				CtgInstall(tc->threadGlobals);
+#endif
 		}
 	}
 	//Leaving this thread's context: turn stuff back off
 	static void deactivateThread(void) {
 		CmiIsomallocBlockListActivate(NULL);
-		CtgInstall(NULL);		
+#if CMI_SWAPGLOBALS
+		CtgInstall(NULL);
+#endif
 	}
 
 	/// System() call emulation:
@@ -287,10 +294,8 @@ int tcharm_routineNametoID(char const *routineName)
 // - Traces library code entry/exit with appropriate build flags
 class TCharmAPIRoutine {
 private:
-	bool actLikeMainThread; // Whether memory allocation and globals should switch away from the application thread
-	bool skipIsomalloc; // Whether to enable/disable Isomalloc for Heap memory
-	bool skipSwapglobals; // Whether to swap sets of global variables
-	CtgGlobals oldGlobals; // this is actually a pointer
+	bool doIsomalloc; // Whether to enable/disable Isomalloc for Heap memory
+	bool doSwapglobals; // Whether to swap sets of global variables
 	tlsseg_t oldtlsseg; // for TLS globals
 #if CMK_TRACE_ENABLED
 	double start; // starting time of trace event
@@ -303,9 +308,11 @@ private:
 
 public:
 	// Entering Charm++ from user code
-	TCharmAPIRoutine(const char *routineName, const char *libraryName, bool actLikeMainThread_ = true)
-	  : actLikeMainThread(actLikeMainThread_), skipIsomalloc(false), skipSwapglobals(false)
-	{
+#if CMK_TRACE_ENABLED
+	TCharmAPIRoutine(const char *routineName, const char *libraryName) {
+#else
+	TCharmAPIRoutine() {
+#endif
 #if CMK_BIGSIM_CHARM
 		// Start a new event, so we can distinguish between client
 		// execution and library execution
@@ -318,19 +325,17 @@ public:
 		start = CmiWallTimer();
 		tcharm_routineID = tcharm_routineNametoID(routineName);
 #endif
-		if (actLikeMainThread) {
-			if(CmiIsomallocBlockListCurrent() == NULL){
-				skipIsomalloc = true;
-			}
-			if(CtgCurrentGlobals() == NULL){
-				skipSwapglobals = true;
-			}
-			if (CmiThreadIs(CMI_THREAD_IS_TLS)) {
-				CtgInstallTLS(&oldtlsseg, NULL); //switch to main thread
-			}
-			//Disable migratable memory allocation while in Charm++:
-			TCharm::deactivateThread();
+
+		doIsomalloc = static_cast<bool>(CmiIsomallocBlockListCurrent());
+#if CMI_SWAPGLOBALS
+		doSwapglobals = static_cast<bool>(CtgCurrentGlobals());
+#endif
+		if (CmiThreadIs(CMI_THREAD_IS_TLS)) {
+			CtgInstallMainThreadTLS(&oldtlsseg); //switch to main thread
 		}
+		//Disable migratable memory allocation while in Charm++:
+		TCharm::deactivateThread();
+
 #if CMK_TRACE_ENABLED
 		TCHARM_Api_trace(routineName,libraryName);
 #endif
@@ -341,35 +346,25 @@ public:
 #if CMK_TRACE_ENABLED
 		double stop = CmiWallTimer();
 #endif
-		if (actLikeMainThread) {
-			CmiIsomallocBlockList *oldHeapBlock;
-			TCharm *tc=CtvAccess(_curTCharm);
-			if(tc != NULL){
-				if(skipIsomalloc){
-					oldHeapBlock = tc->heapBlocks;
-					tc->heapBlocks = NULL;
-				}
-				if(skipSwapglobals){
-					oldGlobals = tc->threadGlobals;
-					tc->threadGlobals = NULL;
-				}
-			}
 
+		TCharm *tc=CtvAccess(_curTCharm);
+		if(tc != NULL){
 			//Reenable migratable memory allocation
-			TCharm::activateThread();
-			if(tc != NULL){
-				if(skipIsomalloc){
-					tc->heapBlocks = oldHeapBlock;
-				}
-				if(skipSwapglobals){
-					tc->threadGlobals = oldGlobals;
-				}
+			// NOTE: body of TCharm::activateThread() is inlined here:
+			if(doIsomalloc){
+				CmiIsomallocBlockListActivate(tc->heapBlocks);
 			}
-			if (CmiThreadIs(CMI_THREAD_IS_TLS)) {
-				tlsseg_t cur;
-				CtgInstallTLS(&cur, &oldtlsseg);
+#if CMI_SWAPGLOBALS
+			if(doSwapglobals){
+				CtgInstall(tc->threadGlobals);
 			}
+#endif
 		}
+		if (CmiThreadIs(CMI_THREAD_IS_TLS)) {
+			tlsseg_t cur;
+			CtgInstallCthTLS(&cur, &oldtlsseg); // switch back to user's CthThread
+		}
+
 #if CMK_BIGSIM_CHARM
 		void *log;
 		_TRACE_BG_TLINE_END(&log);

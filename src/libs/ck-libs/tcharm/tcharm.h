@@ -103,12 +103,17 @@ class TCharmClient1D : public ArrayElement1D {
 Library API Calls.  The pattern:
   TCHARM_API_TRACE("myRoutineName","myLibName");
 MUST be put at the start of every user-callable library 
-routine, to turn off isomalloc'd heaps before jumping
-into regular Charm.  The string routineName is
+routine, to turn off isomalloc'd heaps and switch global variables
+before jumping into regular Charm.  The string routineName is
 used for debugging printouts, with "+tcharm_trace myLibName".
 */
+#if CMK_TRACE_ENABLED
 #define TCHARM_API_TRACE(routineName,libraryName) \
   TCharmAPIRoutine apiRoutineSentry(routineName, libraryName)
+#else
+#define TCHARM_API_TRACE(routineName,libraryName) \
+  TCharmAPIRoutine apiRoutineSentry
+#endif
 
 
 #else /* FEM_ALONE */

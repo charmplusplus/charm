@@ -512,11 +512,26 @@ static void CthThreadBaseFree(CthThreadBase *th)
 #if CMK_THREADS_BUILD_TLS
 static tlsseg_t _ctgTLS;
 
+// Generic TLS interface for callers that don't know which thread
+// they are switching to (main thread or CthThread).
 void CtgInstallTLS(void *cur, void *next)
 {
   tlsseg_t *newtls = (tlsseg_t *)next;
   if (newtls == NULL)   newtls = &_ctgTLS;
   switchTLS((tlsseg_t *)cur, newtls);
+}
+
+// TLS interface for callers who know if they are context switching
+// to the main thread or a CthThread (this avoids branching).
+void CtgInstallMainThreadTLS(void *cur)
+{
+  switchTLS((tlsseg_t *)cur, &_ctgTLS);
+}
+
+void CtgInstallCthTLS(void *cur, void *next)
+{
+  CmiAssert(next != NULL);
+  switchTLS((tlsseg_t *)cur, (tlsseg_t *)next);
 }
 
 static tlsseg_t  _oldtlsseg[128] = {0};
@@ -536,6 +551,8 @@ void CmiEnableTLS(void)
 }
 #else
 void CtgInstallTLS(void *cur, void *next) {}
+void CtgInstallMainThreadTLS(void *cur) {}
+void CtgInstallCthTLS(void *cur, void *next) {}
 void CmiDisableTLS(void) {}
 void CmiEnableTLS(void) {}
 #endif

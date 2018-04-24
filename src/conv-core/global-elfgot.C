@@ -39,6 +39,9 @@ A more readable summary is at:
  *  to this.
  */
 
+/* -swapglobals only works on ELF systems and in non-SMP mode */
+#if CMI_SWAPGLOBALS
+
 #include "converse.h"
 #include "cklists.h"
 #include <string.h>
@@ -54,7 +57,6 @@ A more readable summary is at:
 #include "converse.h"
 #include "pup.h"
 
-#if CMK_HAS_ELF_H
 #include <elf.h>
 
 #define DEBUG_GOT_MANAGER 0
@@ -72,10 +74,6 @@ A more readable summary is at:
 #define ALIGN_GOT(x)       (long)((~15)&((x)+15))
 #else
 #define ALIGN_GOT(x)       ALIGN8(x)
-#endif
-
-#if !CMK_SHARED_VARS_UNAVAILABLE
-#  error "Global-elfgot won't work properly under smp version: -swapglobals disabled"
 #endif
 
 CpvDeclare(int, CmiPICMethod);
@@ -494,7 +492,7 @@ CtgGlobals CtgCurrentGlobals(void){
 	return CpvAccess(_curCtg);
 }
 
-#else
+#else // CMI_SWAPGLOBALS
 
 #include "global-nop.c"
 

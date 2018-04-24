@@ -1232,7 +1232,7 @@ int AMPI_Iget_data(void *data, MPI_Status status) {
  */
 AMPI_API_IMPL(int, MPI_Alloc_mem, MPI_Aint size, MPI_Info info, void *baseptr)
 {
-  TCharmAPIRoutine apiRoutineSentry("AMPI_Alloc_mem", "ampi", false);
+  //NOTE: do not use AMPI_API() here, so that the memory allocated is migratable!
   *(void **)baseptr = malloc(size);
   return MPI_SUCCESS;
 }
@@ -1243,7 +1243,7 @@ AMPI_API_IMPL(int, MPI_Alloc_mem, MPI_Aint size, MPI_Info info, void *baseptr)
  */
 AMPI_API_IMPL(int, MPI_Free_mem, void *baseptr)
 {
-  TCharmAPIRoutine apiRoutineSentry("AMPI_Free_mem", "ampi", false);
+  //NOTE: do not use AMPI_API() here, since the memory being freed is migratable!
   free(baseptr);
   return MPI_SUCCESS;
 }
