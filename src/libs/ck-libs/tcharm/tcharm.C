@@ -202,7 +202,9 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
     BgUnsetStartOutOfCore();
 #endif
   }
+#if CMI_SWAPGLOBALS
   threadGlobals=CtgCreate(tid);
+#endif
   CtvAccessOther(tid,_curTCharm)=this;
   asyncMigrate = false;
   isStopped=true;
@@ -228,7 +230,9 @@ TCharm::TCharm(CkMigrateMessage *msg)
 {
   initMsg=NULL;
   tid=NULL;
+#if CMI_SWAPGLOBALS
   threadGlobals=NULL;
+#endif
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
   heapBlocks=0;
 
@@ -354,7 +358,9 @@ void TCharm::pupThread(PUP::er &pc) {
       BgAttach(tid);
 #endif
     }
+#if CMI_SWAPGLOBALS
     threadGlobals=CtgPup(p,threadGlobals);
+#endif
     checkPupMismatch(pc,5139,"after TCHARM thread");
 }
 
@@ -401,7 +407,9 @@ TCharm::~TCharm()
   if (heapBlocks) CmiIsomallocBlockListDelete(heapBlocks);
 #endif
   CthFree(tid);
+#if CMI_SWAPGLOBALS
   CtgFree(threadGlobals);
+#endif
 #if CMK_USE_MEMPOOL_ISOMALLOC 
   if(mptr != NULL) mempool_destroy(mptr);
 #endif

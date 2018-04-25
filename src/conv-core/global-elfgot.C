@@ -39,10 +39,12 @@ A more readable summary is at:
  *  to this.
  */
 
-/* -swapglobals only works on ELF systems and in non-SMP mode */
+#include "converse.h"
+
+/* conv-config.h, included in converse.h, defines CMI_SWAPGLOBALS.
+ * -swapglobals only works on ELF systems and in non-SMP mode. */
 #if CMI_SWAPGLOBALS
 
-#include "converse.h"
 #include "cklists.h"
 #include <string.h>
 #include <stdio.h>

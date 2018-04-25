@@ -74,7 +74,9 @@ class TCharm: public CBase_TCharm
 
 	CthThread tid; //Our migratable thread
 	CmiIsomallocBlockList *heapBlocks; //Migratable heap data
+#if CMI_SWAPGLOBALS
 	CtgGlobals threadGlobals; //Global data
+#endif
 
 	//isSelfDone is added for out-of-core emulation in BigSim
 	//when thread is brought back into core, ResumeFromSync is called
@@ -329,9 +331,9 @@ public:
 		tcharm_routineID = tcharm_routineNametoID(routineName);
 #endif
 
-		doIsomalloc = static_cast<bool>(CmiIsomallocBlockListCurrent());
+		doIsomalloc = (CmiIsomallocBlockListCurrent() != NULL);
 #if CMI_SWAPGLOBALS
-		doSwapglobals = static_cast<bool>(CtgCurrentGlobals());
+		doSwapglobals = (CtgCurrentGlobals() != NULL);
 #endif
 		if (CmiThreadIs(CMI_THREAD_IS_TLS)) {
 			CtgInstallMainThreadTLS(&oldtlsseg); //switch to main thread
