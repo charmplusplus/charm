@@ -29,7 +29,7 @@ bool RandCentLB::QueryBalanceNow(int _step)
 
 inline int chooseProc(int count)
 {
-  return (int)(CrnDrand()*(count-1) + 0.5);
+  return (int)(CrnDrand()*count);
 }
 
 void RandCentLB::work(LDStats* stats)
