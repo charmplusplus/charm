@@ -16,6 +16,7 @@ pipe: pingpong-pipeline.c
 	$(MPICC) pingpong-pipeline.c -o pgm-pipe-mpi
 
 test: all
+	$(call run, +p1 ./pgm 1000000 16 +vp2)
 	$(call run, +p2 ./pgm 100000 16 +vp2)
 
 clean:
