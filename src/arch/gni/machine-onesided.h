@@ -142,10 +142,15 @@ typedef struct _cmi_gni_rzv_rdma_pointer {
  * error with the message "the size of an array must be greater than zero" */
 DUMB_STATIC_ASSERT(sizeof(CmiGNIRzvRdmaPtr_t) == CMK_NOCOPY_DIRECT_BYTES);
 
-/* Machine specific metadata information required for a PUT operation
- * This structure is used for an unaligned GET, which uses PUT underneath
+/* Machine specific metadata that stores all information required for a GET/PUT operation
+ * This has three use-cases:
+ *  - Unaligned GET, which uses PUT underneath
+ *  - REG/PREREG mode GET in SMP mode, which requires worker thread to send this structure
+ *    to comm thread and comm thread then performs the GET operation
+ *  - REG/PREREG mode PUT in SMP mode, which requires worker thread to send this structure
+ *  - to comm thread and comm thread then performs the PUT operation
  */
-typedef struct _cmi_gni_rzv_rdma_put_op {
+typedef struct _cmi_gni_rzv_rdma_direct_info {
   gni_mem_handle_t dest_mem_hndl;
   uint64_t dest_addr;
   gni_mem_handle_t src_mem_hndl;
@@ -153,7 +158,7 @@ typedef struct _cmi_gni_rzv_rdma_put_op {
   int destPe;
   int size;
   uint64_t ref;
-} CmiGNIRzvRdmaPutOp_t;
+} CmiGNIRzvRdmaDirectInfo_t;
 
 /* Machine specific metadata information required to register a buffer and perform
  * an RDMA operation with a remote buffer. This metadata information is used to perform
@@ -256,4 +261,13 @@ gni_return_t post_rdma(
 
 // Method deregisters local and remote memory handles
 void DeregisterMemhandle(gni_mem_handle_t mem_hndl, int pe);
+
+#if CMK_SMP
+// Method used by the comm thread to perform GET
+void _performOneRgetForWorkerThread(MSG_LIST *ptr);
+
+// Method used by the comm thread to perform PUT
+void _performOneRputForWorkerThread(MSG_LIST *ptr);
+#endif
+
 #endif /* end if for MACHINE_ONESIDED_H_ */

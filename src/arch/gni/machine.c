@@ -374,6 +374,11 @@ static int LOCAL_QUEUE_ENTRIES=20480;
 #define RDMA_REG_AND_PUT_MD_DIRECT_TAG  0x42
 #define RDMA_REG_AND_GET_MD_DIRECT_TAG  0x43
 
+#if CMK_SMP
+#define RDMA_COMM_PERFORM_GET_TAG     0x44
+#define RDMA_COMM_PERFORM_PUT_TAG     0x45
+#endif
+
 #define DEBUG
 #ifdef GNI_RC_CHECK
 #undef GNI_RC_CHECK
@@ -2340,9 +2345,9 @@ static void PumpNetworkSmsg()
             {
                 // Direct API when PUT is used instead of a GET
                 // This tag implies the receival of a PUT metadata used for the Direct API
-                CmiGNIRzvRdmaPutOp_t *putOp = (CmiGNIRzvRdmaPutOp_t *)header;
-                CmiGNIRzvRdmaPutOp_t *newPutOp = (CmiGNIRzvRdmaPutOp_t *)malloc(sizeof(CmiGNIRzvRdmaPutOp_t));
-                memcpy(newPutOp, putOp, sizeof(CmiGNIRzvRdmaPutOp_t));
+                CmiGNIRzvRdmaDirectInfo_t *putOp = (CmiGNIRzvRdmaDirectInfo_t *)header;
+                CmiGNIRzvRdmaDirectInfo_t *newPutOp = (CmiGNIRzvRdmaDirectInfo_t *)malloc(sizeof(CmiGNIRzvRdmaDirectInfo_t));
+                memcpy(newPutOp, putOp, sizeof(CmiGNIRzvRdmaDirectInfo_t));
                 GNI_SmsgRelease(ep_hndl_array[inst_id]);
                 CMI_GNI_UNLOCK(smsg_mailbox_lock)
 
@@ -2392,7 +2397,7 @@ static void PumpNetworkSmsg()
             {
                 // Direct API when PUT is used instead of a GET
                 // This tag implies the completion of an indirect PUT operation used for the Direct API
-                CmiGNIRzvRdmaPutOp_t *putOp = (CmiGNIRzvRdmaPutOp_t *)header;
+                CmiGNIRzvRdmaDirectInfo_t *putOp = (CmiGNIRzvRdmaDirectInfo_t *)header;
                 void *token = (void *)putOp->ref;
                 GNI_SmsgRelease(ep_hndl_array[inst_id]);
                 CMI_GNI_UNLOCK(smsg_mailbox_lock)
@@ -3443,7 +3448,7 @@ INLINE_KEYWORD gni_return_t _sendOneBufferedSmsg(SMSG_QUEUE *queue, MSG_LIST *pt
         break;
 
      case RDMA_PUT_MD_DIRECT_TAG:
-        status = send_smsg_message(queue, ptr->destNode, ptr->msg, sizeof(CmiGNIRzvRdmaPutOp_t), ptr->tag, 1, ptr, NONCHARM_SMSG, 1);
+        status = send_smsg_message(queue, ptr->destNode, ptr->msg, sizeof(CmiGNIRzvRdmaDirectInfo_t), ptr->tag, 1, ptr, NONCHARM_SMSG, 1);
 #if !CMK_SMSGS_FREE_AFTER_EVENT
         if(status == GNI_RC_SUCCESS) {
           free(ptr->msg);
@@ -3500,6 +3505,20 @@ static int SendBufferMsg(SMSG_QUEUE *queue, SMSG_QUEUE *prio_queue)
                 PCQueuePush(queue->sendMsgBuf, (char*)ptr);
                 continue;
             }
+#if CMK_SMP
+            if (ptr->tag == RDMA_COMM_PERFORM_GET_TAG) {
+                // Comm thread performing GET on behalf of worker thread for Direct API
+                _performOneRgetForWorkerThread(ptr);
+                FreeMsgList(ptr);
+                continue;
+            }
+            else if (ptr->tag == RDMA_COMM_PERFORM_PUT_TAG) {
+                // Comm thread performing PUT on behalf of worker thread for Direct API
+                _performOneRputForWorkerThread(ptr);
+                FreeMsgList(ptr);
+                continue;
+            }
+#endif
             status = _sendOneBufferedSmsg(queue, ptr);
 #if CMI_SENDBUFFERSMSG_CAP
             sent_length++;
@@ -3575,7 +3594,20 @@ static int SendBufferMsg(SMSG_QUEUE *queue, SMSG_QUEUE *prio_queue)
             ptr = (MSG_LIST*)PCQueuePop(current_queue);
             CMI_PCQUEUEPOP_UNLOCK(current_queue)
             if (ptr == 0) break;
-
+#if CMK_SMP
+            if (ptr->tag == RDMA_COMM_PERFORM_GET_TAG) {
+                // Comm thread performing GET on behalf of worker thread for Direct API
+                _performOneRgetForWorkerThread(ptr);
+                FreeMsgList(ptr);
+                continue;
+            }
+            else if (ptr->tag == RDMA_COMM_PERFORM_PUT_TAG) {
+                // Comm thread performing PUT on behalf of worker thread for Direct API
+                _performOneRputForWorkerThread(ptr);
+                FreeMsgList(ptr);
+                continue;
+            }
+#endif
             status = _sendOneBufferedSmsg(queue, ptr);
 #if CMI_SENDBUFFERSMSG_CAP
             sent_length++;

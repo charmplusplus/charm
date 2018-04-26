@@ -293,10 +293,10 @@ void PumpOneSidedRDMATransactions(gni_cq_handle_t rdma_cq, CmiNodeLock rdma_cq_l
 
           // Send the metadata back to the original PE which invoked PUT
           // The original PE then calls the ack handler function
-          CmiGNIRzvRdmaPutOp_t *putOp = (CmiGNIRzvRdmaPutOp_t *)tmp_pd->second_operand;
+          CmiGNIRzvRdmaDirectInfo_t *putOpInfo = (CmiGNIRzvRdmaDirectInfo_t *)tmp_pd->second_operand;
 
           // send the ref data to the destination
-          gni_return_t status = send_smsg_message(&smsg_queue, CmiNodeOf(putOp->destPe), putOp, sizeof(CmiGNIRzvRdmaPutOp_t), RDMA_PUT_DONE_DIRECT_TAG, 0, NULL, NONCHARM_SMSG, 1);
+          gni_return_t status = send_smsg_message(&smsg_queue, CmiNodeOf(putOpInfo->destPe), putOpInfo, sizeof(CmiGNIRzvRdmaDirectInfo_t), RDMA_PUT_DONE_DIRECT_TAG, 0, NULL, NONCHARM_SMSG, 1);
 #if !CMK_SMSGS_FREE_AFTER_EVENT
           if(status == GNI_RC_SUCCESS) {
             free(putOp);
@@ -367,13 +367,19 @@ void LrtsIssueRget(
     memcpy((char*)regAndPutMsg + sizeof(CmiGNIRzvRdmaReverseOp_t) + srcAckSize, srcAck, srcAckSize);
 
     // send all the data to the source to register and perform a put
+#if CMK_SMP
+    // send the small message to the other node through the comm thread
+    buffer_small_msgs(&smsg_queue, regAndPutMsg, mdMsgSize, CmiNodeOf(srcPe), RDMA_REG_AND_PUT_MD_DIRECT_TAG);
+#else // non-smp mode
+    // send the small message directly
     gni_return_t status = send_smsg_message(&smsg_queue, CmiNodeOf(srcPe), regAndPutMsg, mdMsgSize, RDMA_REG_AND_PUT_MD_DIRECT_TAG, 0, NULL, NONCHARM_SMSG, 1);
     GNI_RC_CHECK("Sending REG & PUT metadata msg failed!", status);
 #if !CMK_SMSGS_FREE_AFTER_EVENT
     if(status == GNI_RC_SUCCESS) {
       free(regAndPutMsg);
     }
-#endif
+#endif // end of !CMK_SMSGS_FREE_AFTER_EVENT
+#endif // end of CMK_SMP
 
   } else {
     void *ref = CmiGetNcpyAck(srcAddr, srcAck, srcPe, destAddr, destAck, destPe, srcAckSize);
@@ -385,33 +391,53 @@ void LrtsIssueRget(
     CmiGNIRzvRdmaPtr_t *src_info = (CmiGNIRzvRdmaPtr_t *)srcInfo;
     CmiGNIRzvRdmaPtr_t *dest_info = (CmiGNIRzvRdmaPtr_t *)destInfo;
 
-    //check alignment
+    //check alignment as Rget in GNI requires 4 byte alignment for src_addr, dest_adder and size
     if(((src_addr % 4)==0) && ((dest_addr % 4)==0) && ((size % 4)==0)) {
       // 4-byte aligned, perform GET
+#if CMK_SMP
+      // send a message to the comm thread, making it do the GET
+      CmiGNIRzvRdmaDirectInfo_t *getOpInfo = (CmiGNIRzvRdmaDirectInfo_t *)malloc(sizeof(CmiGNIRzvRdmaDirectInfo_t));
+      getOpInfo->dest_mem_hndl = dest_info->mem_hndl;
+      getOpInfo->dest_addr = dest_addr;
+      getOpInfo->src_mem_hndl = src_info->mem_hndl;
+      getOpInfo->src_addr = src_addr;
+      getOpInfo->destPe = CmiMyPe();
+      getOpInfo->size = size;
+      getOpInfo->ref = ref_addr;
+
+      buffer_small_msgs(&smsg_queue, getOpInfo, sizeof(CmiGNIRzvRdmaDirectInfo_t), CmiNodeOf(srcPe), RDMA_COMM_PERFORM_GET_TAG);
+#else // non-smp mode
+      // perform GET directly
       gni_return_t status = post_rdma(src_addr, src_info->mem_hndl, dest_addr, dest_info->mem_hndl,
           size, ref_addr, CmiNodeOf(srcPe), GNI_POST_RDMA_GET, DIRECT_SEND_RECV);
-    }
-    else {
-      // not 4-byte aligned, send md for performing PUT from other node
+#endif // end of !CMK_SMP
 
+    } else {
+      // not 4-byte aligned, send md for performing PUT from other node
       // Allocate machine specific metadata
-      CmiGNIRzvRdmaPutOp_t *putOp = (CmiGNIRzvRdmaPutOp_t *)malloc(sizeof(CmiGNIRzvRdmaPutOp_t));
-      putOp->dest_mem_hndl = dest_info->mem_hndl;
-      putOp->dest_addr = dest_addr;
-      putOp->src_mem_hndl = src_info->mem_hndl;
-      putOp->src_addr = src_addr;
-      putOp->destPe = CmiMyPe();
-      putOp->size = size;
-      putOp->ref = ref_addr;
+      CmiGNIRzvRdmaDirectInfo_t *putOpInfo = (CmiGNIRzvRdmaDirectInfo_t *)malloc(sizeof(CmiGNIRzvRdmaDirectInfo_t));
+      putOpInfo->dest_mem_hndl = dest_info->mem_hndl;
+      putOpInfo->dest_addr = dest_addr;
+      putOpInfo->src_mem_hndl = src_info->mem_hndl;
+      putOpInfo->src_addr = src_addr;
+      putOpInfo->destPe = CmiMyPe();
+      putOpInfo->size = size;
+      putOpInfo->ref = ref_addr;
 
       // send all the data to the source to perform a put
-      gni_return_t status = send_smsg_message(&smsg_queue, CmiNodeOf(srcPe), putOp, sizeof(CmiGNIRzvRdmaPutOp_t), RDMA_PUT_MD_DIRECT_TAG, 0, NULL, NONCHARM_SMSG, 1);
+#if CMK_SMP
+      // send the small message to the other node through the comm thread
+      buffer_small_msgs(&smsg_queue, putOpInfo, sizeof(CmiGNIRzvRdmaDirectInfo_t), CmiNodeOf(srcPe), RDMA_PUT_MD_DIRECT_TAG);
+#else // nonsmp mode
+      // send the small message directly
+      gni_return_t status = send_smsg_message(&smsg_queue, CmiNodeOf(srcPe), putOpInfo, sizeof(CmiGNIRzvRdmaDirectInfo_t), RDMA_PUT_MD_DIRECT_TAG, 0, NULL, NONCHARM_SMSG, 1);
       GNI_RC_CHECK("Sending PUT metadata msg failed!", status);
 #if !CMK_SMSGS_FREE_AFTER_EVENT
       if(status == GNI_RC_SUCCESS) {
-        free(putOp);
+        free(putOpInfo);
       }
-#endif
+#endif // end of !CMK_SMSGS_FREE_AFTER_EVENT
+#endif // end of CMK_SMP
     }
   }
 }
@@ -459,16 +485,23 @@ void LrtsIssueRput(
     memcpy((char*)regAndGetMsg + sizeof(CmiGNIRzvRdmaReverseOp_t), destAck, destAckSize);
     memcpy((char*)regAndGetMsg + sizeof(CmiGNIRzvRdmaReverseOp_t) + srcAckSize, srcAck, srcAckSize);
 
-    // send all the data to the source to register and perform a put
+    // send all the data to the source to register and perform a get
+#if CMK_SMP
+    // send the small message to the other node through the comm thread
+    buffer_small_msgs(&smsg_queue, regAndGetMsg, mdMsgSize, CmiNodeOf(destPe), RDMA_REG_AND_GET_MD_DIRECT_TAG);
+#else // non-smp mode
+    // send the small message directly
     gni_return_t status = send_smsg_message(&smsg_queue, CmiNodeOf(destPe), regAndGetMsg, mdMsgSize, RDMA_REG_AND_GET_MD_DIRECT_TAG, 0, NULL, NONCHARM_SMSG, 1);
     GNI_RC_CHECK("Sending REG & GET metadata msg failed!", status);
 #if !CMK_SMSGS_FREE_AFTER_EVENT
     if(status == GNI_RC_SUCCESS) {
       free(regAndGetMsg);
     }
-#endif
+#endif // end of !CMK_SMSGS_FREE_AFTER_EVENT
+#endif // end of CMK_SMP
 
   } else {
+
     // Remote buffer is registered, perform PUT
     CmiAssert(srcAckSize == destAckSize);
     void *ref = CmiGetNcpyAck(srcAddr, srcAck, srcPe, destAddr, destAck, destPe, srcAckSize);
@@ -480,9 +513,23 @@ void LrtsIssueRput(
     CmiGNIRzvRdmaPtr_t *dest_info = (CmiGNIRzvRdmaPtr_t *)destInfo;
     CmiGNIRzvRdmaPtr_t *src_info = (CmiGNIRzvRdmaPtr_t *)srcInfo;
 
-    // perform PUT
+#if CMK_SMP
+    // send a message to the comm thread, making it do the PUT
+    CmiGNIRzvRdmaDirectInfo_t *putOpInfo = (CmiGNIRzvRdmaDirectInfo_t *)malloc(sizeof(CmiGNIRzvRdmaDirectInfo_t));
+    putOpInfo->dest_mem_hndl = dest_info->mem_hndl;
+    putOpInfo->dest_addr = dest_addr;
+    putOpInfo->src_mem_hndl = src_info->mem_hndl;
+    putOpInfo->src_addr = src_addr;
+    putOpInfo->destPe = CmiMyPe();
+    putOpInfo->size = size;
+    putOpInfo->ref = ref_addr;
+
+    buffer_small_msgs(&smsg_queue, putOpInfo, sizeof(CmiGNIRzvRdmaDirectInfo_t), CmiNodeOf(destPe), RDMA_COMM_PERFORM_PUT_TAG);
+#else // nonsmp mode
+    // perform PUT directly
     gni_return_t status = post_rdma(dest_addr, dest_info->mem_hndl, src_addr, src_info->mem_hndl,
         size, ref_addr, CmiNodeOf(destPe), GNI_POST_RDMA_PUT, DIRECT_SEND_RECV);
+#endif // end of !CMK_SMP
   }
 }
 
@@ -508,3 +555,35 @@ void DeregisterMemhandle(gni_mem_handle_t mem_hndl, int pe) {
   status = GNI_MemDeregister(nic_hndl, &mem_hndl);
   GNI_RC_CHECK("GNI_MemDeregister failed!", status);
 }
+
+#if CMK_SMP
+// Method used by the comm thread to perform GET - called from SendBufferMsg
+void _performOneRgetForWorkerThread(MSG_LIST *ptr) {
+  CmiGNIRzvRdmaDirectInfo_t *getOpInfo = (CmiGNIRzvRdmaDirectInfo_t *)(ptr->msg);
+  post_rdma(getOpInfo->src_addr,
+            getOpInfo->src_mem_hndl,
+            getOpInfo->dest_addr,
+            getOpInfo->dest_mem_hndl,
+            getOpInfo->size,
+            getOpInfo->ref,
+            ptr->destNode,
+            GNI_POST_RDMA_GET,
+            DIRECT_SEND_RECV);
+  free(getOpInfo);
+}
+
+// Method used by the comm thread to perform PUT - called from SendBufferMsg
+void _performOneRputForWorkerThread(MSG_LIST *ptr) {
+  CmiGNIRzvRdmaDirectInfo_t *putOpInfo = (CmiGNIRzvRdmaDirectInfo_t *)(ptr->msg);
+  post_rdma(putOpInfo->dest_addr,
+            putOpInfo->dest_mem_hndl,
+            putOpInfo->src_addr,
+            putOpInfo->src_mem_hndl,
+            putOpInfo->size,
+            putOpInfo->ref,
+            ptr->destNode,
+            GNI_POST_RDMA_PUT,
+            DIRECT_SEND_RECV);
+  free(putOpInfo);
+}
+#endif
