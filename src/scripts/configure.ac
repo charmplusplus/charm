@@ -2011,6 +2011,10 @@ int main() {
 EOT
 test_cxx "whether has elf.h " "yes" "no" ""
 AC_DEFINE_UNQUOTED([CMK_HAS_ELF_H], $pass, [whether has elf.h])
+if test $pass -eq 1
+then
+	add_flag "CMK_HAS_ELF_H='1'" "elf.h"
+fi
 
 #### test if has Multiprocessing.h for apple ####
 cat > $t <<EOT

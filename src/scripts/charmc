@@ -1380,15 +1380,21 @@ fi
 
 if [ "$SWAPGLOBALS" = "1" ]
 then
+	if [ "$CMK_HAS_ELF_H" != "1" ]
+	then
+		echo "Error: -swapglobals requires elf.h"
+		exit 1
+	fi
+
 	LD_VERSION_TEXT=`$CMK_LD -Wl,--version,-v 2>/dev/null`
 	if ! `printf "$LD_VERSION_TEXT" | grep -q 'GNU ld'`
 	then
 		echo "Warning: -swapglobals may not work with linkers other than GNU ld."
 	else
-		LD_VERSION=`printf "$LD_VERSION_TEXT" | grep -Eo 'GNU ld \(?[^)]*\)? ?[-0-9._]+' | awk '{print $NF}'`
+		LD_VERSION=`printf "$LD_VERSION_TEXT" | grep -Eo 'GNU ld (\([^)]*\) )?(version )?[-0-9._a-zA-Z]+' | awk '{print $NF}'`
 		LD_VERSION_MAJOR=`printf $LD_VERSION | cut -d. -f1`
 		LD_VERSION_MINOR=`printf $LD_VERSION | cut -d. -f2`
-		if [ $LD_VERSION_MAJOR -eq 2 -a $LD_VERSION_MINOR -gt 23 ]
+		if [ "$LD_VERSION_MAJOR" -eq 2 -a "$LD_VERSION_MINOR" -gt 23 ]
 		then
 			echo "Warning: -swapglobals may not work with GNU ld >= 2.24."
 			echo "For some versions, an experimental patch is available:"
@@ -1396,19 +1402,20 @@ then
 		fi
 	fi
 
-	swapo="$CHARMLIB/libglobal-swap.a"
-	if [ ! -r "$swapo" -o ! -s "$swapo" ]
+	if [ "$CMK_SMP" = "1" ]
 	then
-		if [ "$CMK_SMP" = "1" ]
-		then
-			echo "Error: -swapglobals is not supported on SMP builds of Charm++/AMPI"
-		else
-			echo "Error: global-swapping library $swapo missing--"
-			echo "  Is -swapglobals supported on this machine?"
-		fi
+		echo "Error: -swapglobals is not supported on SMP builds of Charm++/AMPI"
 		exit 1
 	else
-		MIDDLE_LIBS="-lglobal-swap $MIDDLE_LIBS"
+		swapo="$CHARMLIB/libglobal-swap.a"
+		if [ ! -r "$swapo" -o ! -s "$swapo" ]
+		then
+			echo "Error: global-swapping library $swapo missing--"
+			echo "  Is -swapglobals supported on this machine?"
+			exit 1
+		else
+			MIDDLE_LIBS="-lglobal-swap $MIDDLE_LIBS"
+		fi
 	fi
 fi
 if [ "$SWAPGLOBALS" = "2" ]
