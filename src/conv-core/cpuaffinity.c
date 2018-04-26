@@ -1088,7 +1088,7 @@ void CmiInitCPUAffinity(char **argv)
     CmiNodeAllBarrier();
     if (commap != NULL) {
       int mycore = search_pemap(commap, CmiMyPeGlobal()-CmiNumPesGlobal());
-      CmiPrintf("Charm++> set comm %d on node %d to core #%d\n", CmiMyPe()-CmiNumPes(), CmiMyNode(), mycore);
+      if (CmiPhysicalNodeID(CmiMyPe()) == 0) CmiPrintf("Charm++> set comm %d on node %d to core #%d\n", CmiMyPe()-CmiNumPes(), CmiMyNode(), mycore);
       if (-1 == CmiSetCPUAffinity(mycore))
         CmiAbort("set_cpu_affinity abort!");
       CmiNodeAllBarrier();
