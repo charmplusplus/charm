@@ -99,19 +99,24 @@ then
   fi
 elif [ -n "$LSB_HOSTS" ]
 then
-  hostname=`hostname`
-	case "$hostname" in
-# Summitdev
-	summitdev*)
-  test $QUIET -eq 0 && echo jsrun -n"$pes" $args
-  jsrun -n"$pes" $args
-  ;;
-# Tungsten and other machines
-  *)
-  test $QUIET -eq 0 && echo cmpirun -lsf -poll -no_smp -gm_long 200000 $args
-  cmpirun -lsf -poll -no_smp -gm_long 200000 $args
-  ;;
-  esac
+  # Summit/Summitdev
+  jsrun=`which jsrun 2>/dev/null`
+  if test -n "$jsrun"
+  then
+    #cores per resource set = ppn + 1 core for system processes
+    cores=`expr $ppn + 1`
+    test $QUIET -eq 0 && echo jsrun -r$pes -c$cores $args
+    $jsrun -r$pes -c$cores  $args
+  else
+    hostname=`hostname`
+    case "$hostname" in
+    #Tungsten and other machines
+    *)
+    test $QUIET -eq 0 && echo cmpirun -lsf -poll -no_smp -gm_long 200000 $args
+    cmpirun -lsf -poll -no_smp -gm_long 200000 $args
+    ;;
+    esac
+  fi
 elif [ -n "$PBS_QUEUE" -o -n "$LSF_QUEUE" ]
 then
 # Interactive mode: create, and submit a batch job
