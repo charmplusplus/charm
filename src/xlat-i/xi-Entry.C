@@ -644,7 +644,7 @@ void Entry::genArrayDefs(XStr& str) {
       }
       if (fwdNum > 1) {
         str << "// explicit instantiation for compatibility\n";
-        str << "template " << makeDecl(retStr, 1) << "::" << name << "<" << fwdStr << ">(" << paramType(1, 1, 0) << ");\n";
+        str << "template " << makeDecl(retStr, 1) << "::" << name << "<" << fwdStr << ">(" << paramType(0, 1, 0) << ");\n";
       }
     }
   }
