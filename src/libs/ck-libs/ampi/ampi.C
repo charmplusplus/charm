@@ -3013,6 +3013,7 @@ static inline bool handle_MPI_PROC_NULL(int src, MPI_Comm comm, MPI_Status* sts)
 {
   if (src == MPI_PROC_NULL) {
     clearStatus(sts);
+    if (sts != MPI_STATUS_IGNORE) sts->MPI_SOURCE = MPI_PROC_NULL;
     return true;
   }
   return false;
