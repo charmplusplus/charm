@@ -1,4 +1,4 @@
-DIRS=creduce Cjacobi3D
+DIRS=pingpong creduce Cjacobi3D
 
 all:
 	for d in $(DIRS); do \

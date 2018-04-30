@@ -1,7 +1,8 @@
 -include ../../common.mk
 OPTS=-O3 
+MPIOPTS=-O3
 CHARMC=../../../bin/ampicxx $(OPTS)
-MPICC=mpicc $(OPTS)
+MPICC=mpicc $(MPIOPTS) # Should use 'cc' instead of 'mpicc' on Cray systems
 
 #all : pingpong-2way.c
 #	$(CHARMC) pingpong-2way.c -o pgm
@@ -9,7 +10,7 @@ MPICC=mpicc $(OPTS)
 
 all : pingpong-1way.c
 	$(CHARMC) pingpong-1way.c -o pgm
-	$(MPICC) pingpong-1way.c -o pgm-mpi
+#	$(MPICC) pingpong-1way.c -o pgm-mpi
 
 pipe: pingpong-pipeline.c
 	$(CHARMC) pingpong-pipeline.c -o pgm-pipe
