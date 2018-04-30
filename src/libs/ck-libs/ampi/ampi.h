@@ -186,8 +186,6 @@ typedef long long int MPI_Offset;
 #define MPI_AINT                41
 #define MPI_COUNT               MPI_AINT
 
-#define MPI_MAX_PRIMITIVE_TYPE  41
-
 #define MPI_ANY_TAG        MPI_TAG_UB_VALUE+1
 #define MPI_REQUEST_NULL   (-1)
 #define MPI_GROUP_NULL     (-1)

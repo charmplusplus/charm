@@ -8336,7 +8336,7 @@ AMPI_API_IMPL(int, MPI_Status_set_elements, MPI_Status *sts, MPI_Datatype dtype,
 AMPI_API_IMPL(int, MPI_Get_elements, const MPI_Status *sts, MPI_Datatype dtype, int *count)
 {
   AMPI_API("AMPI_Get_elements");
-  if (dtype <= MPI_MAX_PRIMITIVE_TYPE) { // Is it a basic datatype?
+  if (dtype <= CkDDT_MAX_PRIMITIVE_TYPE) { // Is it a basic datatype?
     CkDDT_DataType* dttype = getDDT()->getType(dtype);
     int itemsize = dttype->getSize();
     *count = itemsize==0 ? 0 : sts->MPI_LENGTH/itemsize;
@@ -8350,7 +8350,7 @@ AMPI_API_IMPL(int, MPI_Get_elements, const MPI_Status *sts, MPI_Datatype dtype, 
 AMPI_API_IMPL(int, MPI_Get_elements_x, const MPI_Status *sts, MPI_Datatype dtype, MPI_Count *count)
 {
   AMPI_API("AMPI_Get_elements_x");
-  if (dtype <= MPI_MAX_PRIMITIVE_TYPE) { // Is it a basic datatype?
+  if (dtype <= CkDDT_MAX_PRIMITIVE_TYPE) { // Is it a basic datatype?
     CkDDT_DataType* dttype = getDDT()->getType(dtype);
     int itemsize = dttype->getSize();
     *count = itemsize==0 ? 0 : sts->MPI_LENGTH/itemsize;
