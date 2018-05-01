@@ -299,7 +299,7 @@ void PumpOneSidedRDMATransactions(gni_cq_handle_t rdma_cq, CmiNodeLock rdma_cq_l
           gni_return_t status = send_smsg_message(&smsg_queue, CmiNodeOf(putOpInfo->destPe), putOpInfo, sizeof(CmiGNIRzvRdmaDirectInfo_t), RDMA_PUT_DONE_DIRECT_TAG, 0, NULL, NONCHARM_SMSG, 1);
 #if !CMK_SMSGS_FREE_AFTER_EVENT
           if(status == GNI_RC_SUCCESS) {
-            free(putOp);
+            free(putOpInfo);
           }
 #endif
         }  else {
