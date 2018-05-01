@@ -20,6 +20,10 @@ test: all
 	$(call run, +p1 ./pgm 1000000 16 +vp2)
 	$(call run, +p2 ./pgm 100000 16 +vp2)
 
+bgtest: all
+	$(call run, +p1 ./pgm 10 16 +vp2 +x1 +y1 +z1 )
+	$(call run, +p2 ./pgm 10 16 +vp2 +x2 +y1 +z1 )
+
 clean:
 	rm -rf charmrun conv-host moduleinit* *.o pingpong pgm pgm-mpi pgm-pipe pgm-pipe-mpi *~ *.sts core ampirun
 
