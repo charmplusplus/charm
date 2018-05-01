@@ -25,9 +25,6 @@ is completely direct-- the ck.C routines just access, e.g.,
 */
 class EntryInfo {
   public:
-    /// Human-readable name of entry method, including parameters.
-    const char *name;
-    
     /**
       A "call function" is how Charm++ actually invokes an 
       entry method on an object.  Call functions take two parameters:
@@ -93,13 +90,18 @@ class EntryInfo {
    bool isMemCritical;
 #endif
 
+    /// Human-readable name of entry method, including parameters.
+    const char *name;
+
     EntryInfo(const char *n, CkCallFnPtr c, int m, int ci) : 
-      name(n), call(c), msgIdx(m), chareIdx(ci), 
+      call(c), msgIdx(m), chareIdx(ci),
       marshallUnpack(0)
 #if CMK_CHARMDEBUG
-        , messagePup(0)
+      ,messagePup(0)
 #endif
-    { traceEnabled=true; noKeep=false; inCharm=false; appWork=false;}
+      ,traceEnabled(true), noKeep(false), inCharm(false), appWork(false)
+      ,name(n)
+    { }
 };
 
 /**
@@ -108,8 +110,6 @@ It is always stored in _msgTable.
 */
 class MsgInfo {
   public:
-    /// Human-readable name of message, like "CkMarshallMsg".
-    const char *name;
     /**
       A message pack function converts the (possibly complex)
       message into a flat array of bytes.  This method is called
@@ -141,8 +141,11 @@ class MsgInfo {
      */
     size_t size;
 
+    /// Human-readable name of message, like "CkMarshallMsg".
+    const char *name;
+
     MsgInfo(const char *n,CkPackFnPtr p,CkUnpackFnPtr u,CkDeallocFnPtr d,int s):
-      name(n), pack(p), unpack(u), dealloc(d), size(s)
+      pack(p), unpack(u), dealloc(d), size(s), name(n)
     {}
 };
 
@@ -203,8 +206,8 @@ class ChareInfo {
 /// Describes a mainchare's constructor.  These are all executed at startup.
 class MainInfo {
   public:
-    const char *name;
     void* obj; // real type is Chare*
+    const char *name;
     int chareIdx;
     int entryIdx;
     int entryMigCtor;
@@ -216,14 +219,14 @@ class MainInfo {
 /// Describes a readonly global variable.
 class ReadonlyInfo {
   public:
-    /// Human-readable string name of variable (e.g., "nElements") and type (e.g., "int").
-    const char *name,*type;
     /// Size in bytes of basic value.
     size_t size;
     /// Address of basic value.
     void *ptr;
     /// Pup routine for value, or NULL if no pup available.
     CkPupReadonlyFnPtr pup;
+    /// Human-readable string name of variable (e.g., "nElements") and type (e.g., "int").
+    const char *name,*type;
     
     /// Pup this global variable.
     void pupData(PUP::er &p) {
@@ -234,7 +237,7 @@ class ReadonlyInfo {
     }
     ReadonlyInfo(const char *n,const char *t,
 	 size_t s, void *p,CkPupReadonlyFnPtr pf)
-	: name(n), type(t), size(s), ptr(p), pup(pf) {}
+	: size(s), ptr(p), pup(pf), name(n), type(t) {}
 };
 
 /**
