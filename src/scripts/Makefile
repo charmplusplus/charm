@@ -1034,5 +1034,5 @@ machine.d: machine.c conv-autoconfig.h $(CKHEADERS)
 	@set -e; \
 	rm -f $@; \
 	$(CHARMC) $(OPTS) -M -I. -I$(INC) $< >$@.$$$$; \
-	sed -e 's,\($*\)\.o[ :]*,\1.o $@ : ,g' -e "s,[Cc]:/,`command -v cygpath >/dev/null 2>&1 && cygpath -u 'C:/' || echo '/c/'`," < $@.$$$$ > $@; \
+	sed -e 's,\($*\)\.o[ :]*,\1.o $@ : ,g' -e "s,[Cc]:/,`command -v cygpath >/dev/null 2>&1 && cygpath -u 'C:/' || echo '/c'`/," < $@.$$$$ > $@; \
 	rm -f $@.$$$$
