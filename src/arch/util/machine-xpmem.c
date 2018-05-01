@@ -107,9 +107,9 @@ typedef struct {
 
 #if XPMEM_FENCE
 	volatile int flagSender;
-        CmiMemorySMPSeparation_t pad1;
+        char pad1[CMI_CACHE_LINE_SIZE - sizeof(volatile int)]; // align to cache line
 	volatile int flagReceiver;
-        CmiMemorySMPSeparation_t pad2;
+        char pad2[CMI_CACHE_LINE_SIZE - sizeof(volatile int)]; // align to cache line
 	volatile int turn;
 #endif	
 
