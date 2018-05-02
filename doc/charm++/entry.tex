@@ -46,16 +46,14 @@ NodeGroup object is executing on node N, and another one is scheduled to run on
 the same node, the second exclusive method will wait to execute until the first
 one finishes. An example can be found in \testrefdir{pingpong}.
 
-\index{nokeep}\item[nokeep] entry methods only take a message as the argument,
-and the memory buffer for this message will be managed by the \charmpp{}
-runtime rather than the user calls. This means that user has to guarantee that
-the message should not be buffered for a later usage or be freed in the user 
-codes. Otherwise, a runtime error will be caused. 
-Such entry methods entail runtime 
-optimizations such as reusing the message memory. An example can be found in
-\examplerefdir{histogram\_group}.
-%these user entry methods will not be kept by the calls. Charm++ runtime
-%may be able to adopt optimization for reusing the message memory.
+\index{nokeep}\item[nokeep] entry methods take only a message as their lone argument,
+and the memory buffer for this message is managed by the \charmpp{} runtime system
+rather than by the user. This means that the user has to guarantee that
+the message will not be buffered for later usage or be freed in the user
+code. Additionally, users are not allowed to modify the contents of a nokeep
+message, since for a broadcast the same message can be reused for all entry method
+invocations on each PE. If a user frees the message or modifies its contents,
+a runtime error may result. An example can be found in \examplerefdir{histogram\_group}.
 
 \index{notrace}\item[notrace] entry methods will not be traced during execution. As a result, they will not be considered and displayed in Projections for
 performance analysis.
