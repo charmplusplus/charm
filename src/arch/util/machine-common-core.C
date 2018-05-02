@@ -197,9 +197,10 @@ static enum MACHINE_SMP_MODE Cmi_smp_mode_setting = COMM_THREAD_SEND_RECV;
 void CmiSuspendedTaskEnqueue(int targetRank, void *data);
 void* CmiSuspendedTaskPop();
 #endif
+
 #if CMK_SMP
-volatile int commThdExit = 0;
-CmiNodeLock  commThdExitLock = 0;
+#include <atomic>
+std::atomic<int> commThdExit {0};
 
 /**
  *  The macro defines whether to have a comm thd to offload some
@@ -220,7 +221,7 @@ int Cmi_commthread = 0;
 int Cmi_commthread = 1;
 #endif
 
-#endif
+#endif //CMK_SMP
 
 /*SHOULD BE MOVED TO MACHINE-SMP.C ??*/
 int Cmi_nodestart = -1;
@@ -1474,9 +1475,6 @@ if (  MSG_STATISTIC)
 
     CsvInitialize(CmiNodeState, NodeState);
     CmiNodeStateInit(&CsvAccess(NodeState));
-#if CMK_SMP
-    commThdExitLock = CmiCreateLock();
-#endif
 
 #if CMK_OFFLOAD_BCAST_PROCESS
     /* the actual queues should be created on comm thread considering NUMA in SMP */
@@ -1646,7 +1644,7 @@ static void CommunicationServer(int sleepTime) {
 #if CMK_SMP 
     AdvanceCommunication(1);
 
-    if (commThdExit == CmiMyNodeSize()) {
+    if (std::atomic_load_explicit(&commThdExit, std::memory_order_acquire) == CmiMyNodeSize()) {
         MACHSTATE(2, "CommunicationServer exiting {");
         LrtsDrainResources();
         MACHSTATE(2, "} CommunicationServer EXIT");
@@ -1710,10 +1708,7 @@ if (MSG_STATISTIC)
     LrtsExit();
 #else
     /* In SMP, the communication thread will exit */
-    /* atomic increment */
-    CmiLock(commThdExitLock);
-    commThdExit++;
-    CmiUnlock(commThdExitLock);
+    std::atomic_fetch_add_explicit(&commThdExit, 1, std::memory_order_release); /* atomic increment */
     CmiNodeAllBarrier();
 #if CMK_SMP_NO_COMMTHD
 #if CMK_USE_XPMEM
