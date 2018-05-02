@@ -130,14 +130,7 @@
 #define CMI_SWAPGLOBALS (CMK_HAS_ELF_H && !CMK_SMP)
 #endif
 
-/**
-    CmiReference broadcast/multicast optimization does not work for SMP
-    due to race condition on memory reference counter, needs lock to protect
- */
-#if CMK_SMP && CMK_BROADCAST_USE_CMIREFERENCE
-#undef CMK_BROADCAST_USE_CMIREFERENCE
-#define CMK_BROADCAST_USE_CMIREFERENCE                      0
-#endif
+#define CMK_BROADCAST_USE_CMIREFERENCE                      1
 
 #if !defined(CMK_CRAYXE)
 #define CMK_CRAYXE                0

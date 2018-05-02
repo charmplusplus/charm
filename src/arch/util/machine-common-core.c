@@ -569,10 +569,20 @@ static void SendToPeers(int size, char *msg) {
     int exceptRank = CMI_DEST_RANK(msg);
     int i;
     for (i=0; i<exceptRank; i++) {
+#if CMK_BROADCAST_USE_CMIREFERENCE
+        CmiReference(msg);
+        CmiPushPE(i, msg);
+#else
         CmiPushPE(i, CopyMsg(msg, size));
+#endif
     }
     for (i=exceptRank+1; i<CmiMyNodeSize(); i++) {
+#if CMK_BROADCAST_USE_CMIREFERENCE
+        CmiReference(msg);
+        CmiPushPE(i, msg);
+#else
         CmiPushPE(i, CopyMsg(msg, size));
+#endif
     }
 }
 
@@ -593,13 +603,23 @@ static void CmiSendSelf(char *msg) {
 /* Functions regarding P2P send op */
 #if USE_COMMON_SYNC_P2P
 void CmiSyncSendFn(int destPE, int size, char *msg) {
+#if CMK_BROADCAST_USE_CMIREFERENCE
+    CmiReference(msg);
+    CmiFreeSendFn(destPE, size, msg);
+#else
     char *dupmsg = CopyMsg(msg, size);
     CmiFreeSendFn(destPE, size, dupmsg);
+#endif
 }
 //inter-partition send
 void CmiInterSyncSendFn(int destPE, int partition, int size, char *msg) {
+#if CMK_BROADCAST_USE_CMIREFERENCE
+    CmiReference(msg);
+    CmiInterFreeSendFn(destPE, partition, size, msg);
+#else
     char *dupmsg = CopyMsg(msg, size);
     CmiInterFreeSendFn(destPE, partition, size, dupmsg);
+#endif
 }
 
 #if CMK_USE_PXSHM

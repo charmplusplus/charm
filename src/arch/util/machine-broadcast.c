@@ -68,7 +68,7 @@ static INLINE_KEYWORD void processProcBcastMsg(int size, char *msg) {
       void *newmsg;
       newmsg = CopyMsg(msg, size);
       CmiFree(msg);
-      msg = newmsg;
+      msg = (char *)newmsg;
     }
 #endif
     CmiPushPE(0, msg);
@@ -320,7 +320,7 @@ void CmiFreeBroadcastAllFn(int size, char *msg) {
     if (CmiNumNodes()>1 && CmiGetReference(msg)>1) {
       void *newmsg = CopyMsg(msg, size);
       CmiFree(msg);
-      msg = newmsg;
+      msg = (char *)newmsg;
     }
 #endif
     CmiSendSelf(msg);
