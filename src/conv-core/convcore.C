@@ -3084,7 +3084,7 @@ void *CmiAlloc(int size)
   CmiAssert((intptr_t)res % ALIGN_BYTES == 0);
 
   SIZEFIELD(res)=size;
-  REFFIELD(res)=1;
+  REFFIELDSET(res, 1);
   return (void *)res;
 }
 
@@ -3106,7 +3106,7 @@ void *CmiRdmaAlloc(int size) {
   CmiAssert((intptr_t)res % ALIGN_BYTES == 0);
 
   SIZEFIELD(res)=size;
-  REFFIELD(res)=1;
+  REFFIELDSET(res, 1);
   return (void *)res;
 }
 
@@ -3130,7 +3130,7 @@ int CmiGetReference(void *blk)
     This call must be matched by an equivalent CmiFree. */
 void CmiReference(void *blk)
 {
-  REFFIELD(CmiAllocFindEnclosing(blk))++;
+  REFFIELDINC(CmiAllocFindEnclosing(blk));
 }
 
 /** Return the size of the user portion of this block. */
@@ -3143,14 +3143,12 @@ int CmiSize(void *blk)
 void CmiFree(void *blk)
 {
   void *parentBlk=CmiAllocFindEnclosing(blk);
-  int refCount=REFFIELD(parentBlk);
+  int refCount=REFFIELDDEC(parentBlk);
 #if CMK_ERROR_CHECKING
   if(refCount==0) /* Logic error: reference count shouldn't already have been zero */
     CmiAbort("CmiFree reference count was zero-- is this a duplicate free?");
 #endif
-  refCount--;
-  REFFIELD(parentBlk) = refCount;
-  if(refCount==0) { /* This was the last reference to the block-- free it */
+  if(refCount==1) { /* This was the last reference to the block-- free it */
 #ifdef MEMMONITOR
     int size=SIZEFIELD(parentBlk);
     if (size > 1000000000) /* Absurdly large size field-- warning */
@@ -3191,14 +3189,12 @@ void CmiFree(void *blk)
 void CmiRdmaFree(void *blk)
 {
   void *parentBlk=CmiAllocFindEnclosing(blk);
-  int refCount=REFFIELD(parentBlk);
+  int refCount=REFFIELDDEC(parentBlk);
 #if CMK_ERROR_CHECKING
   if(refCount==0) /* Logic error: reference count shouldn't already have been zero */
     CmiAbort("CmiRdmaFree reference count was zero-- is this a duplicate free?");
 #endif
-  refCount--;
-  REFFIELD(parentBlk) = refCount;
-  if(refCount==0) { /* This was the last reference to the block-- free it */
+  if(refCount==1) { /* This was the last reference to the block-- free it */
 #ifdef MEMMONITOR
     int size=SIZEFIELD(parentBlk);
     if (size > 1000000000) /* Absurdly large size field-- warning */
@@ -3426,11 +3422,11 @@ static void _CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *ms
   for (m=0;m<len;m++) {
 #if CMK_USE_IBVERBS
     msgHdr[m].chunkHeader.size=roundUpSize(sizes[m]); /* Size of message and padding */
-    msgHdr[m].chunkHeader.ref=0; /* Reference count will be filled out on receive side */
+    msgHdr[m].chunkHeader.setRef(0); /* Reference count will be filled out on receive side */
     msgHdr[m].metaData=NULL;
 #else
     msgHdr[m].size=roundUpSize(sizes[m]); /* Size of message and padding */
-    msgHdr[m].ref=0; /* Reference count will be filled out on receive side */
+    msgHdr[m].setRef(0); /* Reference count will be filled out on receive side */
 #endif		
     
     /* First send the message's CmiChunkHeader (for use on receive side) */
@@ -3503,13 +3499,13 @@ static void CmiMultiMsgHandler(char *msgWhole)
     infiCmiChunkHeader *ch=(infiCmiChunkHeader *)(msgWhole+offset);
     char *msg=(msgWhole+offset+sizeof(infiCmiChunkHeader));
     int msgSize=ch->chunkHeader.size; /* Size of user portion of message (plus padding at end) */
-    ch->chunkHeader.ref=msgWhole-msg; 
+    ch->chunkHeader.setRef(msgWhole-msg);
     ch->metaData =  registerMultiSendMesg(msg,msgSize);
 #else
     CmiChunkHeader *ch=(CmiChunkHeader *)(msgWhole+offset);
     char *msg=(msgWhole+offset+sizeof(CmiChunkHeader));
     int msgSize=ch->size; /* Size of user portion of message (plus padding at end) */
-    ch->ref=msgWhole-msg; 
+    ch->setRef(msgWhole-msg);
 #endif		
     /* Link new message to owner via a negative ref pointer */
     CmiReference(msg); /* Follows link & increases reference count of *msgWhole* */

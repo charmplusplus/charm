@@ -294,7 +294,7 @@ void *PerAlloc(int size)
   res = mempool_malloc(CpvAccess(persistent_mempool), ALIGNBUF+size-sizeof(mempool_header), 1);
   if (res) ptr = (char*)res - sizeof(mempool_header) + ALIGNBUF;
   SIZEFIELD(ptr)=size;
-  REFFIELD(ptr)= PERSIST_SEQ;
+  REFFIELDSET(ptr, PERSIST_SEQ);
   return ptr;
 #else
   char *ptr = CmiAlloc(size);

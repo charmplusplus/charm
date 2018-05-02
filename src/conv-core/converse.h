@@ -85,6 +85,10 @@
 #include <string.h>
 #include <stdint.h>
 
+#if defined __cplusplus
+#include <atomic>
+#endif
+
 /* brittle accommodation of libc header internals */
 #if defined __cplusplus && defined __THROW
 # define CMK_THROW __THROW
@@ -808,12 +812,19 @@ CpvExtern(int, _curRestartPhase);      /* number of restarts */
 #define MESSAGE_PHASE_CHECK(msg)
 #endif
 
+#if defined __cplusplus
+
 /** This header goes before each chunk of memory allocated with CmiAlloc. 
     See the comment in convcore.C for details on the fields.
 */
-typedef struct {
+struct CmiChunkHeader {
   int size;
+private:
+#if CMK_SMP
+  std::atomic_int ref;
+#else
   int ref;
+#endif
 #if ALIGN_BYTES > 8
   char align[ALIGN_BYTES
              - sizeof(int)*2
@@ -822,7 +833,34 @@ typedef struct {
 #endif
             ];
 #endif
-} CmiChunkHeader;
+public:
+  CmiChunkHeader() = default;
+  CmiChunkHeader(const CmiChunkHeader & x)
+    : size{x.size}, ref{x.getRef()} { }
+#if CMK_SMP
+  int getRef() const
+  {
+    return std::atomic_load_explicit(&ref, std::memory_order_acquire);
+  }
+  void setRef(int r)
+  {
+    return std::atomic_store_explicit(&ref, r, std::memory_order_release);
+  }
+  int incRef()
+  {
+    return std::atomic_fetch_add_explicit(&ref, 1, std::memory_order_release);
+  }
+  int decRef()
+  {
+    return std::atomic_fetch_sub_explicit(&ref, 1, std::memory_order_release);
+  }
+#else
+  int getRef() const { return ref; }
+  void setRef(int r) { ref = r; }
+  int incRef() { return ref++; }
+  int decRef() { return ref--; }
+#endif
+};
 
 #if CMK_USE_IBVERBS | CMK_USE_IBUD
 struct infiCmiChunkMetaDataStruct;
@@ -845,7 +883,12 @@ struct infiCmiChunkMetaDataStruct *registerMultiSendMesg(char *msg,int msgSize);
 /* Given a user chunk m, extract the enclosing chunk header fields: */
 #define BLKSTART(m) ((CmiChunkHeader *) (((intptr_t)m) - sizeof(CmiChunkHeader)))
 #define SIZEFIELD(m) ((BLKSTART(m))->size)
-#define REFFIELD(m) ((BLKSTART(m))->ref)
+#define REFFIELD(m) ((BLKSTART(m))->getRef())
+#define REFFIELDSET(m, r) ((BLKSTART(m))->setRef(r))
+#define REFFIELDINC(m) ((BLKSTART(m))->incRef())
+#define REFFIELDDEC(m) ((BLKSTART(m))->decRef())
+
+#endif
 
 CMI_EXTERNC void* malloc_nomigrate(size_t size);
 CMI_EXTERNC void free_nomigrate(void* ptr);
