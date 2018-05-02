@@ -139,9 +139,23 @@ class CkNcpySource{
 
   CkNcpySource() : ptr(NULL), pe(-1), mode(CK_BUFFER_UNREG) {}
 
-  CkNcpySource(const void *ptr_, size_t cnt_, CkCallback cb_, unsigned short int mode_=CK_BUFFER_UNREG) : ptr(ptr_), cnt(cnt_), cb(cb_), mode(mode_) {
-    pe = CkMyPe();
+  CkNcpySource(const void *ptr_, size_t cnt_, CkCallback cb_, unsigned short int mode_=CK_BUFFER_UNREG)
+  {
+    init(ptr_, cnt_, cb_, mode_);
+    registerMem();
+  }
 
+  void init(const void *ptr_, size_t cnt_, CkCallback cb_, unsigned short int mode_=CK_BUFFER_UNREG)
+  {
+    ptr  = ptr_;
+    cnt  = cnt_;
+    cb   = cb_;
+    pe   = CkMyPe();
+    mode = mode_;
+  }
+
+  void registerMem()
+  {
     // Set machine layer information when mode is not CK_BUFFER_NOREG
     if(mode != CK_BUFFER_NOREG) {
 
@@ -197,9 +211,23 @@ class CkNcpyDestination{
 
   CkNcpyDestination() : ptr(NULL), pe(-1), mode(CK_BUFFER_UNREG) {}
 
-  CkNcpyDestination(const void *ptr_, size_t cnt_, CkCallback cb_, unsigned short int mode_=CK_BUFFER_UNREG) : ptr(ptr_), cnt(cnt_), cb(cb_), mode(mode_) {
-    pe = CkMyPe();
+  CkNcpyDestination(const void *ptr_, size_t cnt_, CkCallback cb_, unsigned short int mode_=CK_BUFFER_UNREG)
+  {
+    init(ptr_, cnt_, cb_, mode_);
+    registerMem();
+  }
 
+  void init(const void *ptr_, size_t cnt_, CkCallback cb_, unsigned short int mode_=CK_BUFFER_UNREG)
+  {
+    ptr  = ptr_;
+    cnt  = cnt_;
+    cb   = cb_;
+    pe   = CkMyPe();
+    mode = mode_;
+  }
+
+  void registerMem()
+  {
     // Set machine layer information when mode is not CK_BUFFER_NOREG
     if(mode != CK_BUFFER_NOREG) {
 
