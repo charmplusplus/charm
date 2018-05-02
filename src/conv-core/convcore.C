@@ -1878,6 +1878,9 @@ int CsdScheduler(int maxmsgs)
       if (*CsdStopFlag_ptr != cycle) break;
 
 /*No message available-- go (or remain) idle*/
+#if CSD_NO_IDLE_TRACING
+#define SCHEDULE_IDLE /* do nothing */
+#else
 #define SCHEDULE_IDLE \
       if (!isIdle) {isIdle=1;CsdBeginIdle();}\
       else CsdStillIdle();\
@@ -1885,6 +1888,7 @@ int CsdScheduler(int maxmsgs)
 	CsdEndIdle();\
 	break;\
       }
+#endif
 
 /*
 	EVAC
@@ -1905,6 +1909,7 @@ void CsdScheduleForever(void)
   int isIdle=0;
   SCHEDULE_TOP
   while (1) {
+#if !CMK_NO_INTEROP
     /* The interoperation will cost this little overhead in scheduling */
     if(CharmLibInterOperate) {
       if(CpvAccess(interopExitFlag)) {
@@ -1912,6 +1917,7 @@ void CsdScheduleForever(void)
         break;
       }
     }
+#endif
     #if CMK_CUDA
     // check if any GPU work needs to be processed
     if (CpvAccess(n_hapi_events) > 0) {
@@ -1920,7 +1926,9 @@ void CsdScheduleForever(void)
     #endif
     msg = CsdNextMessage(&state);
     if (msg!=NULL) { /*A message is available-- process it*/
+#if !CSD_NO_IDLE_TRACING
       if (isIdle) {isIdle=0;CsdEndIdle();}
+#endif
       SCHEDULE_MESSAGE
 
       #if CMK_CELL
@@ -1940,7 +1948,9 @@ void CsdScheduleForever(void)
         progressCount = CMK_CELL_PROGRESS_FREQ;
       #endif
     }
+#if !CSD_NO_PERIODIC
     CsdPeriodic();
+#endif
   }
 }
 int CsdScheduleCount(int maxmsgs)
@@ -1950,14 +1960,18 @@ int CsdScheduleCount(int maxmsgs)
   while (1) {
     msg = CsdNextMessage(&state);
     if (msg!=NULL) { /*A message is available-- process it*/
+#if !CSD_NO_IDLE_TRACING
       if (isIdle) {isIdle=0;CsdEndIdle();}
+#endif
       maxmsgs--; 
       SCHEDULE_MESSAGE
       if (maxmsgs==0) break;
     } else { /*No message available-- go (or remain) idle*/
       SCHEDULE_IDLE
     }
+#if !CSD_NO_PERIODIC
     CsdPeriodic();
+#endif
   }
   return maxmsgs;
 }
@@ -1967,7 +1981,9 @@ void CsdSchedulePoll(void)
   SCHEDULE_TOP
   while (1)
   {
+#if !CSD_NO_PERIODIC
 	CsdPeriodic();
+#endif
         /*CmiMachineProgressImpl(); ??? */
 	if (NULL!=(msg = CsdNextMessage(&state)))
 	{
@@ -1999,7 +2015,9 @@ void CmiDeliverSpecificMsg(int handler)
  
   side = 0;
   while (1) {
+#if !CSD_NO_PERIODIC
     CsdPeriodic();
+#endif
     side ^= 1;
     if (side) msg = (int *)CmiGetNonLocal();
     else      msg = (int *)CdsFifo_Dequeue(localqueue);
