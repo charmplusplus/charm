@@ -85,7 +85,7 @@ void handlePutDest(void *msg) {
   msgRmaStat = (void*)CmiAlloc(sizeRmaStat);
   ((CmiRMAMsg*)msgRmaStat)->stat = context->stat;
   CmiSetHandler(msgRmaStat,putSrcHandler);
-  CmiSyncSendAndFree(context->sourceId,sizeRmaStat,msgRmaStat);
+  CmiSyncSendAndFree(context->sourceId,sizeRmaStat,(char*)msgRmaStat);
 
   CmiFree(msg);
   return;
@@ -109,7 +109,7 @@ void *CmiPut(unsigned int sourceId, unsigned int targetId, void *Saddr, void *Ta
   void *stat = context->stat;
 
   CmiSetHandler(msgRma,putDestHandler);
-  CmiSyncSendAndFree(targetId,sizeRma,msgRma);
+  CmiSyncSendAndFree(targetId,sizeRma,(char*)msgRma);
 
   return stat;
 }
@@ -133,7 +133,7 @@ void CmiPutCb(unsigned int sourceId, unsigned int targetId, void *Saddr, void *T
   memcpy(putdata,Saddr,size);
 
   CmiSetHandler(msgRma,putDestHandler);
-  CmiSyncSendAndFree(targetId,sizeRma,msgRma);
+  CmiSyncSendAndFree(targetId,sizeRma,(char*)msgRma);
   return;
 }
 
@@ -165,7 +165,7 @@ void handleGetDest(void *msg) {
   void* putdata = (void*)(((char*)(msgRma))+sizeof(RMAPutMsg));
   memcpy(putdata,context->Taddr,context->size);
   CmiSetHandler(msgRma,getSrcHandler);
-  CmiSyncSendAndFree(context->sourceId,sizeRma,msgRma);
+  CmiSyncSendAndFree(context->sourceId,sizeRma,(char*)msgRma);
   CmiFree(msg);
   return;
 }
