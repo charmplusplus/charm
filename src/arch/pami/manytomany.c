@@ -267,8 +267,8 @@ void   CmiDirect_manytomany_initialize_recvbase(void                 * h,
   //if (myIdx == (unsigned)-1)
   //(handle->m2m_ntotalrcvranks)++;
 
-  handle->m2m_rcvlens   = malloc (sizeof(int) * handle->m2m_ntotalrcvranks);
-  handle->m2m_rdispls   = malloc (sizeof(int) * handle->m2m_ntotalrcvranks);
+  handle->m2m_rcvlens   = (unsigned int*) malloc (sizeof(int) * handle->m2m_ntotalrcvranks);
+  handle->m2m_rdispls   = (unsigned int*) malloc (sizeof(int) * handle->m2m_ntotalrcvranks);
 
   assert (handle->m2m_rcvlens != NULL);
 
