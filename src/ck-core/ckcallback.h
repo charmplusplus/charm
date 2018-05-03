@@ -54,6 +54,32 @@ public:
 	bcastSection,//Broadcast to a section(d.section)
 	replyCCS // Reply to a CCS message (d.ccsReply)
 	};
+#if CMK_ERROR_CHECKING
+  static const char* typeName(callbackType type) {
+    switch(type) {
+      case invalid: return "CkCallback::invalid";
+      case ignore: return "CkCallback::ignore";
+      case ckExit: return "CkCallback::ckExit";
+      case resumeThread: return "CkCallback::resumeThread";
+      case callCFn: return "CkCallback::callCFn";
+      case call1Fn: return "CkCallback::call1Fn";
+      case sendChare: return "CkCallback::sendChare";
+      case sendGroup: return "CkCallback::sendGroup";
+      case sendNodeGroup: return "CkCallback::sendNodeGroup";
+      case sendArray: return "CkCallback::sendArray";
+      case isendChare: return "CkCallback::isendChare";
+      case isendGroup: return "CkCallback::isendGroup";
+      case isendNodeGroup: return "CkCallback::isendNodeGroup";
+      case isendArray: return "CkCallback::isendArray";
+      case bcastGroup: return "CkCallback::bcastGroup";
+      case bcastNodeGroup: return "CkCallback::bcastNodeGroup";
+      case bcastArray: return "CkCallback::bcastArray";
+      case bcastSection: return "CkCallback::bcastSection";
+      case replyCCS: return "CkCallback::replyCCS";
+      default : return "unknown CkCallback type";
+    }
+  }
+#endif
 private:
 	union callbackData {
 	struct s_thread { //resumeThread

@@ -899,9 +899,9 @@ CkReductionMsg *CkReductionMgr::reduceMessages(CkMsgQ<CkReductionMsg> &msgs)
         if (!m->callback.isInvalid()) {
 #if CMK_ERROR_CHECKING
           if(nMsgs > 1 && !(msgs_callback == m->callback)) {
-            CkPrintf("Mismatched callback details: reducers %d, %d; callback types %d, %d;\n",
-                     r, m->reducer,
-                     msgs_callback.type, m->callback.type);
+            CkPrintf("Mismatched callback details: reducers (%s, %s); callback types (%s, %s)\n",
+                     CkReduction::reducerTable()[r].name, CkReduction::reducerTable()[m->reducer].name,
+                     CkCallback::typeName(msgs_callback.type), CkCallback::typeName(m->callback.type));
             CkAbort("mis-matched client callbacks in reduction messages\n");
           }
 #endif
@@ -914,9 +914,9 @@ CkReductionMsg *CkReductionMgr::reduceMessages(CkMsgQ<CkReductionMsg> &msgs)
       } else {
 #if CMK_ERROR_CHECKING
         if(!(msgs_callback == m->callback)) {
-          CkPrintf("Mismatched callback details: reducers %d, %d; callback types %d, %d;\n",
-                     r, m->reducer,
-                     msgs_callback.type, m->callback.type);
+          CkPrintf("Mismatched callback details: reducers (%s, %s); callback types (%s, %s)\n",
+                     CkReduction::reducerTable()[r].name, CkReduction::reducerTable()[m->reducer].name,
+                     CkCallback::typeName(msgs_callback.type), CkCallback::typeName(m->callback.type));
           CkAbort("mis-matched client callbacks in reduction messages\n");
         }
 #endif
@@ -1813,122 +1813,122 @@ std::vector<CkReduction::reducerStruct> CkReduction::initReducerTable()
 {
   std::vector<CkReduction::reducerStruct> vec;
 
-  vec.emplace_back(invalid_reducer_fn, true);
-  vec.emplace_back(nop_fn, true);
+  vec.emplace_back(invalid_reducer_fn, true, "CkReduction::invalid");
+  vec.emplace_back(nop_fn, true, "CkReduction::nop");
   //Compute the sum the numbers passed by each element.
-  vec.emplace_back(sum_char_fn, true);
-  vec.emplace_back(sum_short_fn, true);
-  vec.emplace_back(sum_int_fn, true);
-  vec.emplace_back(sum_long_fn, true);
-  vec.emplace_back(sum_long_long_fn, true);
-  vec.emplace_back(sum_uchar_fn, true);
-  vec.emplace_back(sum_ushort_fn, true);
-  vec.emplace_back(sum_uint_fn, true);
-  vec.emplace_back(sum_ulong_fn, true);
-  vec.emplace_back(sum_ulong_long_fn, true);
-  vec.emplace_back(sum_float_fn, true);
-  vec.emplace_back(sum_double_fn, true);
+  vec.emplace_back(sum_char_fn, true, "CkReduction::sum_char");
+  vec.emplace_back(sum_short_fn, true, "CkReduction::sum_short");
+  vec.emplace_back(sum_int_fn, true, "CkReduction::sum_int");
+  vec.emplace_back(sum_long_fn, true, "CkReduction::sum_long");
+  vec.emplace_back(sum_long_long_fn, true, "CkReduction::sum_long_long");
+  vec.emplace_back(sum_uchar_fn, true, "CkReduction::sum_uchar");
+  vec.emplace_back(sum_ushort_fn, true, "CkReduction::sum_ushort");
+  vec.emplace_back(sum_uint_fn, true, "CkReduction::sum_uint");
+  vec.emplace_back(sum_ulong_fn, true, "CkReduction::sum_ulong");
+  vec.emplace_back(sum_ulong_long_fn, true, "CkReduction::sum_ulong_long");
+  vec.emplace_back(sum_float_fn, true, "CkReduction::sum_float");
+  vec.emplace_back(sum_double_fn, true, "CkReduction::sum_double");
 
   //Compute the product the numbers passed by each element.
-  vec.emplace_back(product_char_fn, true);
-  vec.emplace_back(product_short_fn, true);
-  vec.emplace_back(product_int_fn, true);
-  vec.emplace_back(product_long_fn, true);
-  vec.emplace_back(product_long_long_fn, true);
-  vec.emplace_back(product_uchar_fn, true);
-  vec.emplace_back(product_ushort_fn, true);
-  vec.emplace_back(product_uint_fn, true);
-  vec.emplace_back(product_ulong_fn, true);
-  vec.emplace_back(product_ulong_long_fn, true);
-  vec.emplace_back(product_float_fn, true);
-  vec.emplace_back(product_double_fn, true);
+  vec.emplace_back(product_char_fn, true, "CkReduction::product_char");
+  vec.emplace_back(product_short_fn, true, "CkReduction::product_short");
+  vec.emplace_back(product_int_fn, true, "CkReduction::product_int");
+  vec.emplace_back(product_long_fn, true, "CkReduction::product_long");
+  vec.emplace_back(product_long_long_fn, true, "CkReduction::product_long_long");
+  vec.emplace_back(product_uchar_fn, true, "CkReduction::product_uchar");
+  vec.emplace_back(product_ushort_fn, true, "CkReduction::product_ushort");
+  vec.emplace_back(product_uint_fn, true, "CkReduction::product_uint");
+  vec.emplace_back(product_ulong_fn, true, "CkReduction::product_ulong");
+  vec.emplace_back(product_ulong_long_fn, true, "CkReduction::product_ulong_long");
+  vec.emplace_back(product_float_fn, true, "CkReduction::product_float");
+  vec.emplace_back(product_double_fn, true, "CkReduction::product_double");
 
   //Compute the largest number passed by any element.
-  vec.emplace_back(max_char_fn, true);
-  vec.emplace_back(max_short_fn, true);
-  vec.emplace_back(max_int_fn, true);
-  vec.emplace_back(max_long_fn, true);
-  vec.emplace_back(max_long_long_fn, true);
-  vec.emplace_back(max_uchar_fn, true);
-  vec.emplace_back(max_ushort_fn, true);
-  vec.emplace_back(max_uint_fn, true);
-  vec.emplace_back(max_ulong_fn, true);
-  vec.emplace_back(max_ulong_long_fn, true);
-  vec.emplace_back(max_float_fn, true);
-  vec.emplace_back(max_double_fn, true);
+  vec.emplace_back(max_char_fn, true, "CkReduction::max_char");
+  vec.emplace_back(max_short_fn, true, "CkReduction::max_short");
+  vec.emplace_back(max_int_fn, true, "CkReduction::max_int");
+  vec.emplace_back(max_long_fn, true, "CkReduction::max_long");
+  vec.emplace_back(max_long_long_fn, true, "CkReduction::max_long_long");
+  vec.emplace_back(max_uchar_fn, true, "CkReduction::max_uchar");
+  vec.emplace_back(max_ushort_fn, true, "CkReduction::max_ushort");
+  vec.emplace_back(max_uint_fn, true, "CkReduction::max_uint");
+  vec.emplace_back(max_ulong_fn, true, "CkReduction::max_ulong");
+  vec.emplace_back(max_ulong_long_fn, true, "CkReduction::max_ulong_long");
+  vec.emplace_back(max_float_fn, true, "CkReduction::max_float");
+  vec.emplace_back(max_double_fn, true, "CkReduction::max_double");
 
   //Compute the smallest number passed by any element.
-  vec.emplace_back(min_char_fn, true);
-  vec.emplace_back(min_short_fn, true);
-  vec.emplace_back(min_int_fn, true);
-  vec.emplace_back(min_long_fn, true);
-  vec.emplace_back(min_long_long_fn, true);
-  vec.emplace_back(min_uchar_fn, true);
-  vec.emplace_back(min_ushort_fn, true);
-  vec.emplace_back(min_uint_fn, true);
-  vec.emplace_back(min_ulong_fn, true);
-  vec.emplace_back(min_ulong_long_fn, true);
-  vec.emplace_back(min_float_fn, true);
-  vec.emplace_back(min_double_fn, true);
+  vec.emplace_back(min_char_fn, true, "CkReduction::min_char");
+  vec.emplace_back(min_short_fn, true, "CkReduction::min_short");
+  vec.emplace_back(min_int_fn, true, "CkReduction::min_int");
+  vec.emplace_back(min_long_fn, true, "CkReduction::min_long");
+  vec.emplace_back(min_long_long_fn, true, "CkReduction::min_long_long");
+  vec.emplace_back(min_uchar_fn, true, "CkReduction::min_uchar");
+  vec.emplace_back(min_ushort_fn, true, "CkReduction::min_ushort");
+  vec.emplace_back(min_uint_fn, true, "CkReduction::min_uint");
+  vec.emplace_back(min_ulong_fn, true, "CkReduction::min_ulong");
+  vec.emplace_back(min_ulong_long_fn, true, "CkReduction::min_ulong_long");
+  vec.emplace_back(min_float_fn, true, "CkReduction::min_float");
+  vec.emplace_back(min_double_fn, true, "CkReduction::min_double");
 
   //Compute the logical AND of the values passed by each element.
   // The resulting value will be zero if any source value is zero.
     // logical_and deprecated in favor of logical_and_int
-  vec.emplace_back(logical_and_fn, true);
-  vec.emplace_back(logical_and_int_fn, true);
-  vec.emplace_back(logical_and_bool_fn, true);
+  vec.emplace_back(logical_and_fn, true, "CkReduction::logical_and");
+  vec.emplace_back(logical_and_int_fn, true, "CkReduction::logical_and_int");
+  vec.emplace_back(logical_and_bool_fn, true, "CkReduction::logical_and_bool");
 
   //Compute the logical OR of the values passed by each element.
   // The resulting value will be 1 if any source value is nonzero.
     // logical_or deprecated in favor of logical_or_int
-  vec.emplace_back(logical_or_fn, true);
-  vec.emplace_back(logical_or_int_fn, true);
-  vec.emplace_back(logical_or_bool_fn, true);
+  vec.emplace_back(logical_or_fn, true, "CkReduction::logical_or");
+  vec.emplace_back(logical_or_int_fn, true, "CkReduction::logical_or_int");
+  vec.emplace_back(logical_or_bool_fn, true, "CkReduction::logical_or_bool");
 
   //Compute the logical XOR of the values passed by each element.
   // The resulting value will be 1 if an odd number of source values is nonzero.
-  vec.emplace_back(logical_xor_int_fn, true);
-  vec.emplace_back(logical_xor_bool_fn, true);
+  vec.emplace_back(logical_xor_int_fn, true, "CkReduction::logical_xor_int");
+  vec.emplace_back(logical_xor_bool_fn, true, "CkReduction::logical_xor_bool");
 
   // Compute the logical bitvector AND of the values passed by each element.
     // bitvec_and deprecated in favor of bitvec_and_int
-  vec.emplace_back(bitvec_and_fn, true);
-  vec.emplace_back(bitvec_and_int_fn, true);
-  vec.emplace_back(bitvec_and_bool_fn, true);
+  vec.emplace_back(bitvec_and_fn, true, "CkReduction::bitvec_and");
+  vec.emplace_back(bitvec_and_int_fn, true, "CkReduction::bitvec_and_int");
+  vec.emplace_back(bitvec_and_bool_fn, true, "CkReduction::bitvec_and_bool");
 
   // Compute the logical bitvector OR of the values passed by each element.
     // bitvec_or deprecated in favor of bitvec_or_int
-  vec.emplace_back(bitvec_or_fn, true);
-  vec.emplace_back(bitvec_or_int_fn, true);
-  vec.emplace_back(bitvec_or_bool_fn, true);
+  vec.emplace_back(bitvec_or_fn, true, "CkReduction::bitvec_or");
+  vec.emplace_back(bitvec_or_int_fn, true, "CkReduction::bitvec_or_int");
+  vec.emplace_back(bitvec_or_bool_fn, true, "CkReduction::bitvec_or_bool");
 
   // Compute the logical bitvector XOR of the values passed by each element.
-  vec.emplace_back(bitvec_xor_fn, true);
-  vec.emplace_back(bitvec_xor_int_fn, true);
-  vec.emplace_back(bitvec_xor_bool_fn, true);
+  vec.emplace_back(bitvec_xor_fn, true, "CkReduction::bitvec_xor");
+  vec.emplace_back(bitvec_xor_int_fn, true, "CkReduction::bitvec_xor_int");
+  vec.emplace_back(bitvec_xor_bool_fn, true, "CkReduction::bitvec_xor_bool");
 
   // Select one of the messages at random to pass on
-  vec.emplace_back(random_fn, true);
+  vec.emplace_back(random_fn, true, "CkReduction::random");
 
   //Concatenate the (arbitrary) data passed by each element
   // This reduction is marked as unstreamable because of the n^2
   // work required to stream it
-  vec.emplace_back(concat_fn, false);
+  vec.emplace_back(concat_fn, false, "CkReduction::concat");
 
   //Combine the data passed by each element into an list of setElements.
   // Each element may contribute arbitrary data (with arbitrary length).
   // This reduction is marked as unstreamable because of the n^2
   // work required to stream it
-  vec.emplace_back(set_fn, false);
+  vec.emplace_back(set_fn, false, "CkReduction::set");
 
   // Computes a count, mean, and variance for the contributed values
-  vec.emplace_back(statistics_fn, true);
+  vec.emplace_back(statistics_fn, true, "CkReduction::statistics");
 
   // Allows multiple reductions to be done in the same message
-  vec.emplace_back(CkReduction::tupleReduction_fn, false);
+  vec.emplace_back(CkReduction::tupleReduction_fn, false, "CkReduction::tuple");
 
   // Perform reduction using an external reducer defined in Python
-  vec.emplace_back(CkReduction::reducerStruct(::external_py, false));
+  vec.emplace_back(CkReduction::reducerStruct(::external_py, false, "CkReduction::custom_python"));
 
   return vec;
 }

@@ -98,7 +98,7 @@ CkReductionMsg *sumTwoShorts(int nMsg,CkReductionMsg **msgs)
 \end{alltt}
 
 The reduction function must be registered with \charmpp{} 
-using \kw{CkReduction::addReducer(reducerFn fn, bool streamable)} from
+using \kw{CkReduction::addReducer(reducerFn fn=NULL, bool streamable=false, const char* name=NULL)} from
 an \kw{initnode} routine (see section~\ref{initnode} for details
 on the \kw{initnode} mechanism). It takes a required parameter,
 \kw{reducerFn fn}, a function pointer to the reduction function, and
@@ -173,11 +173,12 @@ For reducer functions that do not operate on fixed sized messages,
 such as set and concat, streaming would result in quadratic memory
 allocation and so is not desirable. Users can specify that a custom
 reducer is streamable when calling \kw{CkReduction::addReducer} by
-specifying an optional boolean parameter (default is false):
+specifying an optional boolean parameter (default is false). They can also provide
+a name string for their reducer to aid in debugging (default is NULL).
 
 \begin{alltt}
 static void initNodeFn(void) {
-    sumTwoShorts = CkReduction::addReducer(sumTwoShorts, /* streamable = */ true);
+    sumTwoShorts = CkReduction::addReducer(sumTwoShorts, /* streamable = */ true, /* name = */ "sumTwoShorts");
 }
 \end{alltt}
 
