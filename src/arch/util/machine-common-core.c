@@ -476,7 +476,7 @@ void CmiPushPE(int rank,void *msg) {
 
 #if CMK_OMP
 void CmiSuspendedTaskEnqueue(int targetRank, void *msg) {
-  CMIQueuePush(CpvAccessOther(CmiSuspendedTaskQueue, targetRank), msg);
+  CMIQueuePush((PCQueue)CpvAccessOther(CmiSuspendedTaskQueue, targetRank), (char *)msg);
 }
 
 void* CmiSuspendedTaskPop() {

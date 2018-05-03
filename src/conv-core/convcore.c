@@ -1791,7 +1791,7 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	if (msg != NULL) {
 	  return (msg);
 	}
-	msg = TaskQueuePop(s->taskQ);
+	msg = TaskQueuePop((TaskQueue)s->taskQ);
 	if (msg != NULL) {
 	  return (msg);
 	}
@@ -2311,7 +2311,7 @@ void CsdInit(char **argv)
 #if CMK_SMP && CMK_TASKQUEUE
   CpvInitialize(Queue, CsdTaskQueue);
   CpvInitialize(void *, CmiSuspendedTaskQueue);
-  CpvAccess(CsdTaskQueue) = TaskQueueCreate();
+  CpvAccess(CsdTaskQueue) = (Queue)TaskQueueCreate();
 #endif
   CpvAccess(CsdStopFlag)  = 0;
   CpvInitialize(int, isHelperOn);
