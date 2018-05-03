@@ -557,6 +557,7 @@ int CMI_Progress_finalize(int start, int ncontexts) {
     cmi_progress_disable  (cmi_pami_contexts[i], 0 /*progress all*/);  
   }
   PAMI_Extension_close (cmi_ext_progress);
+  return 0;
 }
 #endif
 
@@ -873,7 +874,7 @@ pami_result_t machine_send_handoff (pami_context_t context, void *msg) {
   int size = hdr->size;
 
   //As this is executed on the comm thread no locking is necessary
-  machine_send(context, node, rank, size, msg, 0);
+  machine_send(context, node, rank, size, (char*)msg, 0);
   return PAMI_SUCCESS;
 }
 #endif

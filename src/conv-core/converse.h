@@ -847,7 +847,8 @@ struct infiCmiChunkMetaDataStruct *registerMultiSendMesg(char *msg,int msgSize);
 #define SIZEFIELD(m) ((BLKSTART(m))->size)
 #define REFFIELD(m) ((BLKSTART(m))->ref)
 
-extern void* malloc_nomigrate(size_t size);
+CMI_EXTERNC void* malloc_nomigrate(size_t size);
+CMI_EXTERNC void free_nomigrate(void* ptr);
 
 /**
    Allocate `size` bytes of memory usable as a message buffer.

@@ -442,6 +442,11 @@ static void *call_startfn(void *vindex)
   return 0;
 }
 
+#if CMK_BLUEGENEQ && !CMK_USE_LRTS
+/* pami/machine.C defines its own version of this: */
+CMI_EXTERNC void PerrorExit(const char*);
+#endif
+
 static void CmiStartThreads(char **argv)
 {
   pthread_t pid;
@@ -604,6 +609,8 @@ static void CmiIdleLock_init(CmiIdleLock *l) {
   pthread_mutex_init(&l->mutex,NULL);
   pthread_cond_init(&l->cond,NULL);
 }
+
+#include <sys/time.h>
 
 static void getTimespec(int msFromNow,struct timespec *dest) {
   struct timeval cur;

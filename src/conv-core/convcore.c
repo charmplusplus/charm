@@ -245,8 +245,8 @@ void   CmiFree_bgq  (void  * buf);
 #endif
 
 #if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
-void * CmiAlloc_ppcq (int     size);
-void   CmiFree_ppcq  (void  * buf);
+CMI_EXTERNC void * CmiAlloc_ppcq (int     size);
+CMI_EXTERNC void   CmiFree_ppcq  (void  * buf);
 #endif
 
 #if CMK_GRID_QUEUE_AVAILABLE

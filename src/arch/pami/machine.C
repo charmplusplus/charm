@@ -166,7 +166,7 @@ __thread int32_t _comm_thread_id = 0;
 
 void ConverseRunPE(int everReturn);
 static void CommunicationServer(int sleepTime);
-static void CommunicationServerThread(int sleepTime);
+CMI_EXTERNC void CommunicationServerThread(int sleepTime);
 
 static void CmiNetworkBarrier(int async);
 static void CmiSendPeer (int rank, int size, char *msg);
@@ -903,11 +903,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     ConverseRunPE(initret);
 }
 
-
-int PerrorExit (char *err) {
+CMI_EXTERNC
+void PerrorExit (const char *err) {
   fprintf (stderr, "err\n\n");
     exit (-1);
-    return -1;
 }
 
 static void CmiNotifyIdleCcd(void *ignored1, double ignored2)
@@ -1190,6 +1189,8 @@ void  CmiGeneralFreeSend(int destPE, int size, char* msg) {
 
 
 pami_result_t machine_send_handoff (pami_context_t context, void *msg);
+
+CMI_EXTERNC
 void  machine_send       (pami_context_t      context, 
 			  int                 node, 
 			  int                 rank, 
@@ -1231,7 +1232,7 @@ pami_result_t machine_send_handoff (pami_context_t context, void *msg) {
   int size = hdr->size;
   
   //As this is executed on the comm thread no locking is necessary
-  machine_send(context, node, rank, size, msg, 0);
+  machine_send(context, node, rank, size, (char*)msg, 0);
   return PAMI_SUCCESS;
 }
 #endif

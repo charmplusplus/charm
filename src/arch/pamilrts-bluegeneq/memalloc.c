@@ -28,6 +28,7 @@ static int _nodeStart;
 L2MemStruct *sL2MemallocVec;
 L2MemStruct *bL2MemallocVec;
 
+CMI_EXTERNC
 void *CmiAlloc_bgq (int size) {
   CmiMemAllocHdr_bgq *hdr = NULL;
   char *buf;
@@ -35,7 +36,7 @@ void *CmiAlloc_bgq (int size) {
   int myrank = Kernel_ProcessorID() - _nodeStart;
 
   if (size <= SMSG_SIZE) {
-    hdr = LRTSQueuePop(&(sL2MemallocVec[myrank].memQ));
+    hdr = (CmiMemAllocHdr_bgq *)LRTSQueuePop(&(sL2MemallocVec[myrank].memQ));
     if (hdr == NULL) {
     if(sL2MemallocVec[myrank].allocated_msg > MAX_SMSG_ELEM) {
         hdr = (CmiMemAllocHdr_bgq *)memalign(ALIGNMENT, size + sizeof(CmiMemAllocHdr_bgq));      
@@ -49,7 +50,7 @@ void *CmiAlloc_bgq (int size) {
     }
   }
   else if (size <= LMSG_SIZE) {
-    hdr = LRTSQueuePop(&(bL2MemallocVec[myrank].memQ));
+    hdr = (CmiMemAllocHdr_bgq *)LRTSQueuePop(&(bL2MemallocVec[myrank].memQ));
     if (hdr == NULL) {      
       if(bL2MemallocVec[myrank].allocated_msg > MAX_LMSG_ELEM) {
         hdr = (CmiMemAllocHdr_bgq *)memalign(ALIGNMENT, size + sizeof(CmiMemAllocHdr_bgq));      
@@ -74,6 +75,7 @@ void *CmiAlloc_bgq (int size) {
   return buf;
 }
 
+CMI_EXTERNC
 void CmiFree_bgq (void *buf) {
   CmiMemAllocHdr_bgq *hdr = (CmiMemAllocHdr_bgq *)((char*)buf - sizeof(CmiMemAllocHdr_bgq));  
   int rc = L2A_EAGAIN;

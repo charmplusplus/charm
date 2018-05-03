@@ -47,6 +47,7 @@ extern int  Cmi_nodestart; /* First processor in this address space */
 extern __thread int32_t _comm_thread_id;
 #endif
 
+CMI_EXTERNC
 void *CmiAlloc_ppcq (int size) {
   CmiMemAllocHdr_ppcq *hdr = NULL;
   char *buf;
@@ -66,7 +67,7 @@ void *CmiAlloc_ppcq (int size) {
 #endif
 
   if (size <= SMSG_SIZE) {
-    hdr = PPCAtomicDequeue (&sPPCMemallocVec[myrank]);
+    hdr = (CmiMemAllocHdr_ppcq *)PPCAtomicDequeue (&sPPCMemallocVec[myrank]);
     if (hdr == NULL) {
 #ifdef CMK_POWER8_NVL
       cudaMallocHost ((void **) &hdr, SMSG_SIZE + sizeof(CmiMemAllocHdr_ppcq));
@@ -78,7 +79,7 @@ void *CmiAlloc_ppcq (int size) {
     hdr->size = SMSG_SIZE;
   }
   else if (size <= MMSG_SIZE) {
-    hdr = PPCAtomicDequeue (&mPPCMemallocVec[myrank]);
+    hdr = (CmiMemAllocHdr_ppcq *)PPCAtomicDequeue (&mPPCMemallocVec[myrank]);
     if (hdr == NULL) {
 #ifdef CMK_POWER8_NVL
       cudaMallocHost ((void **) &hdr, MMSG_SIZE + sizeof(CmiMemAllocHdr_ppcq));
@@ -90,7 +91,7 @@ void *CmiAlloc_ppcq (int size) {
     hdr->size = MMSG_SIZE;
   }
   else if (size <= LLMSG_SIZE) {
-    hdr = PPCAtomicDequeue (&llPPCMemallocVec[myrank]);
+    hdr = (CmiMemAllocHdr_ppcq *)PPCAtomicDequeue (&llPPCMemallocVec[myrank]);
     if (hdr == NULL) {
 #ifdef CMK_POWER8_NVL
       cudaMallocHost ((void **) &hdr, LLMSG_SIZE + sizeof(CmiMemAllocHdr_ppcq));
@@ -121,6 +122,7 @@ void *CmiAlloc_ppcq (int size) {
   return buf;
 }
 
+CMI_EXTERNC
 void CmiFree_ppcq (void *buf) {
   CmiMemAllocHdr_ppcq *hdr = (CmiMemAllocHdr_ppcq *)((char*)buf - sizeof(CmiMemAllocHdr_ppcq));
   int rc = CMI_PPCQ_EAGAIN;

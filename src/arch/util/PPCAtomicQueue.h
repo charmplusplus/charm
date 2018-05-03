@@ -86,7 +86,7 @@ void PPCAtomicQueueInit      (void            * atomic_mem,
   PPC_AtomicStore(&queue->_state->Producer, 0);
   PPC_AtomicStore(&queue->_state->UpperBound, qsize);
 
-  rc = posix_memalign ((void **)&queue->_array,
+  rc = (pami_result_t) posix_memalign ((void **)&queue->_array,
       128, /* Typical L1 line size for POWER */
       sizeof(PPCAtomicQueueElement) * qsize);
 
