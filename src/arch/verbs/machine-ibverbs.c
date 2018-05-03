@@ -1741,7 +1741,7 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		                          regAndPutMsg->destPe,
 		                          regAndPutMsg->ackSize);
 		
-		struct infiRdmaPacket *rdmaPacket = malloc(sizeof(struct infiRdmaPacket));
+		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)malloc(sizeof(struct infiRdmaPacket));
 		rdmaPacket->type = INFI_ONESIDED_DIRECT;
 		rdmaPacket->localBuffer = ref;
 		
@@ -1767,7 +1767,7 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		                          regAndGetMsg->destPe,
 		                          regAndGetMsg->ackSize);
 		
-		struct infiRdmaPacket *rdmaPacket = malloc(sizeof(struct infiRdmaPacket));
+		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)malloc(sizeof(struct infiRdmaPacket));
 		rdmaPacket->type = INFI_ONESIDED_DIRECT;
 		rdmaPacket->localBuffer = ref;
 		

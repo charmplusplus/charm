@@ -22,7 +22,7 @@ void verbsOnesidedOpDone(CmiVerbsRdmaRecvOp_t *recvOpInfo) {
   verbsOnesidedSendAck(recvInfo->peNum, recvOpInfo);
   recvInfo->comOps++;
   if (recvInfo->comOps == recvInfo->numOps) {
-    verbsOnesidedAllOpsDone(recvInfo->msg);
+    verbsOnesidedAllOpsDone((char *)recvInfo->msg);
   }
 }
 
@@ -51,7 +51,7 @@ void postRdma(
   wr.wr_id = rdmaPacket;
   wr.sg_list = &list;
   wr.num_sge = 1;
-  wr.opcode = opcode;
+  wr.opcode = (ibv_wr_opcode)opcode;
   wr.send_flags = IBV_SEND_SIGNALED;
   wr.wr.rdma.remote_addr = remote_addr;
   wr.wr.rdma.rkey = remote_rkey;
@@ -76,7 +76,7 @@ void postRdma(
 
 /* function to perform RDMA read operation */
 void verbsOnesidedPostRdmaRead(int peNum, CmiVerbsRdmaRecvOp_t *recvOpInfo) {
-  struct infiRdmaPacket *rdmaPacket = malloc(sizeof(struct infiRdmaPacket));
+  struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)malloc(sizeof(struct infiRdmaPacket));
   rdmaPacket->type = INFI_ONESIDED;
   rdmaPacket->localBuffer = recvOpInfo;
 
@@ -135,7 +135,7 @@ void verbsOnesidedReceivedAck(struct infiRdmaPacket *rdmaPacket) {
     MACHSTATE(3, "ibv_dereg_mr() failed\n");
   }
 
-  CmiRdmaAck *ack = rdmaPacket->localBuffer;
+  CmiRdmaAck *ack = (CmiRdmaAck *)rdmaPacket->localBuffer;
   ack->fnPtr(ack->token);
 
   //free callback structure, CmiRdmaAck allocated in CmiSetRdmaAck
@@ -200,7 +200,7 @@ void LrtsIssueRget(
     MallocInfiPacket(packet);
 
     packet->size = mdMsgSize;
-    packet->buf  = (void *)regAndPutMsg;
+    packet->buf  = (char *)regAndPutMsg;
     packet->header.code = INFIRDMA_DIRECT_REG_AND_PUT;
     packet->ogm  = NULL;
 
@@ -211,7 +211,7 @@ void LrtsIssueRget(
   } else {
     void *ref = CmiGetNcpyAck(srcAddr, srcAck, srcPe, destAddr, destAck, destPe, srcAckSize);
 
-    struct infiRdmaPacket *rdmaPacket = malloc(sizeof(struct infiRdmaPacket));
+    struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)malloc(sizeof(struct infiRdmaPacket));
     rdmaPacket->type = INFI_ONESIDED_DIRECT;
     rdmaPacket->localBuffer = ref;
 
@@ -279,7 +279,7 @@ void LrtsIssueRput(
     MallocInfiPacket(packet);
 
     packet->size = mdMsgSize;
-    packet->buf  = (void *)regAndGetMsg;
+    packet->buf  = (char *)regAndGetMsg;
     packet->header.code = INFIRDMA_DIRECT_REG_AND_GET;
     packet->ogm  = NULL;
 
@@ -290,7 +290,7 @@ void LrtsIssueRput(
   } else {
     void *ref = CmiGetNcpyAck(srcAddr, srcAck, srcPe, destAddr, destAck, destPe, srcAckSize);
 
-    struct infiRdmaPacket *rdmaPacket = malloc(sizeof(struct infiRdmaPacket));
+    struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)malloc(sizeof(struct infiRdmaPacket));
     rdmaPacket->type = INFI_ONESIDED_DIRECT;
     rdmaPacket->localBuffer = ref;
 
