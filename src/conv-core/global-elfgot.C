@@ -249,7 +249,7 @@ void CtgGlobalList::read(void *datav) const {
     // Last element:
     if (nRec > 0) {
       size = datalen-rec[nRec-1].off;
-      memcpy(data+rec[nRec-1].off, (void *)*rec[nRec-1].got, size);
+      memcpy(data+rec[nRec-1].off, (void *)(uintptr_t)*rec[nRec-1].got, size);
     }
 }
 
@@ -333,18 +333,18 @@ CtgGlobalList::CtgGlobalList() {
 	size_t size = symt[symindx].st_size;
 	size_t gSize = ALIGN_GOT(size);
 	padding += gSize - size;
-	ELFXX_TYPE_Addr *gGot=(ELFXX_TYPE_Addr *)relt[count].r_offset;
+	ELFXX_TYPE_Addr *gGot=(ELFXX_TYPE_Addr *)(uintptr_t)relt[count].r_offset;
 
 #if DEBUG_GOT_MANAGER
 	printf("   -> %s is a user global, of size %d, at %p\n",
 	       sym_name, size, (void *)*gGot);
 #endif
-	if ((void *)*gGot != (void *)symt[symindx].st_value)
+	if ((void *)(uintptr_t)*gGot != (void *)(uintptr_t)symt[symindx].st_value)
 	    CmiAbort("CtgGlobalList: symbol table and GOT address mismatch!\n");
 
 #if UNPROTECT_GOT && CMK_HAS_MPROTECT
 	static void *last = NULL;
-        void *pg = (void*)(((size_t)gGot) & ~(pagesize-1));
+        void *pg = (void*)(uintptr_t)(((size_t)gGot) & ~(pagesize-1));
         if (pg != last) {
             mprotect(pg, pagesize, PROT_READ | PROT_WRITE);
             last = pg;
