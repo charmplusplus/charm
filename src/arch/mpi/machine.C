@@ -1554,7 +1554,8 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
                 restart_argv[i] = largv[i];
                 i++;
       }
-      restart_argv[i] = "+restartaftercrash";
+      static char s_restartaftercrash[] = "+restartaftercrash";
+      restart_argv[i] = s_restartaftercrash;
       phase_str = (char*)malloc(10);
       sprintf(phase_str,"%d", CpvAccess(_curRestartPhase));
       restart_argv[i+1]=phase_str;

@@ -158,8 +158,8 @@ static int heartBeatCheckHandlerIdx;
 static int partnerFailureHandlerIdx;
 static double lastPingTime = -1;
 
-extern "C" void mpi_restart_crashed(int pe, int rank);
-extern "C" int  find_spare_mpirank(int pe, int partition);
+void mpi_restart_crashed(int pe, int rank);
+int  find_spare_mpirank(int pe, int partition);
 
 void heartBeatPartner();
 void heartBeatHandler(void *msg);
