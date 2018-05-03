@@ -138,7 +138,7 @@ void ack_rdma_pkt_dispatch (
     pami_recv_t         * recv)
 {
   CmiAssert(sizeof(void *) == header_size);
-  CmiRdmaAck *ack = *((void **) header_addr);
+  CmiRdmaAck *ack = *((CmiRdmaAck **) header_addr);
   ack->fnPtr(ack->token);
   //free callback structure, CmiRdmaAck allocated in CmiSetRdmaAck
   free(ack);

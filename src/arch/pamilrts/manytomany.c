@@ -243,8 +243,8 @@ void   CmiDirect_manytomany_initialize_recvbase(void                 * h,
   //if (myIdx == (unsigned)-1) 
   //(handle->m2m_ntotalrcvranks)++;
     
-  handle->m2m_rcvlens   = malloc (sizeof(int) * handle->m2m_ntotalrcvranks);
-  handle->m2m_rdispls   = malloc (sizeof(int) * handle->m2m_ntotalrcvranks);
+  handle->m2m_rcvlens   = (unsigned int *) malloc (sizeof(int) * handle->m2m_ntotalrcvranks);
+  handle->m2m_rdispls   = (unsigned int *) malloc (sizeof(int) * handle->m2m_ntotalrcvranks);
   
   assert (handle->m2m_rcvlens != NULL);
   
@@ -465,7 +465,7 @@ pami_result_t   _cmidirect_m2m_send_post_handler (pami_context_t     context,
   int i = 0;
   int pidx = 0;
   char *buffer = NULL;
-  int bytes = NULL;
+  int bytes = 0;
 
   pami_event_function cb_done = m2m_send_done;
   void *clientdata = handle;

@@ -348,7 +348,7 @@ static void short_pkt_dispatch (pami_context_t       context,
   char *smsg = (char *)pipe_addr;
   char *msg  = (char *)buffer;
 
-  CMI_CHECK_CHECKSUM(smsg, pipe_size);  
+  CMI_CHECK_CHECKSUM(smsg, (int)pipe_size);  
   if (CMI_MAGIC(smsg) != CHARM_MAGIC_NUMBER) {
     /* received a non-charm msg */
     CmiAbort("Charm++ Warning: Non Charm++ Message Received. If your application has a large number of messages, this may be because of overflow in the low-level FIFOs. Please set the environment variable MUSPI_INJFIFOSIZE if the application has large number of small messages (<=4K bytes), and/or PAMI_RGETINJFIFOSIZE if the application has a large number of large messages. The default value of these variable is 65536 which is sufficient for 1000 messages in flight; please try a larger value. Please note that the memory used for these FIFOs eats up the memory = 10*FIFO_SIZE per core. Please contact Charm++ developers for further information. \n");     
@@ -578,7 +578,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   cmi_pami_contexts = (pami_context_t *) malloc (sizeof(pami_context_t) * _n);
   pami_result_t rc = PAMI_Context_createv (cmi_pami_client, NULL, 0, cmi_pami_contexts, _n);
   if (rc != PAMI_SUCCESS) {
-    fprintf(stderr, "PAMI_Context_createv failed for %d contexts\n", _n);
+    fprintf(stderr, "PAMI_Context_createv failed for %zu contexts\n", _n);
     assert(0);
   }
   cmi_pami_numcontexts = _n;
@@ -1211,6 +1211,7 @@ pami_result_t machineFreeList_handoff(pami_context_t context, void *cookie)
   ListMulticastVec *lvec = (ListMulticastVec *) cookie;
   machineFreeListSendFn(context, lvec->npes, lvec->pes, lvec->size, lvec->msg);
   CmiFree(cookie);
+  return PAMI_SUCCESS;
 }
 
 void LrtsFreeListSendFn(int npes, int *pes, int size, char *msg) {
