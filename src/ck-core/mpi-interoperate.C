@@ -13,7 +13,7 @@ int    _libExitHandlerIdx;
 extern "C" int _cleanUp;
 
 #if CMK_CONVERSE_MPI
-extern  "C" { extern MPI_Comm charmComm ;}
+extern MPI_Comm charmComm;
 #else
 typedef int MPI_Comm;
 #endif
