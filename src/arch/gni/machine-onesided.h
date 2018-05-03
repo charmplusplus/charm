@@ -129,7 +129,7 @@ enum CMK_RDMA_TYPE {
 
 // Machine specific information for a nocopy pointer
 typedef struct _cmi_gni_rzv_rdma_pointer {
-  // memory handle for the destination buffer
+  // memory handle for the buffer
   gni_mem_handle_t mem_hndl;
 } CmiGNIRzvRdmaPtr_t;
 
@@ -179,73 +179,40 @@ typedef struct _cmi_gni_rzv_rdma_reverse_op {
   int size;
 } CmiGNIRzvRdmaReverseOp_t;
 
-gni_mem_handle_t registerDirectMemory(const void *ptr, int size, unsigned short int mode) {
-  CmiAssert(mode == GNI_MEM_READWRITE || mode == GNI_MEM_READ_ONLY);
-  gni_mem_handle_t mem_hndl;
-  gni_return_t status = GNI_RC_SUCCESS;
-  status = GNI_MemRegister(nic_hndl, (uint64_t)ptr, (uint64_t)size, NULL, mode, -1, &mem_hndl);
-  GNI_RC_CHECK("Error! Memory registration failed inside LrtsRegisterMemory!", status);
-  return mem_hndl;
-}
+// Set the machine specific information for a nocopy pointer
+void LrtsSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode);
 
-// Set the machine specific information for a nocopy source pointer
-void LrtsSetRdmaSrcInfo(void *info, const void *ptr, int size, unsigned short int mode){
+// Perform an RDMA Get call into the local destination address from the remote source address
+void LrtsIssueRget(
+  const void* srcAddr,
+  void *srcInfo,
+  void *srcAck,
+  int srcAckSize,
+  int srcPe,
+  unsigned short int *srcMode,
+  const void* destAddr,
+  void *destInfo,
+  void *destAck,
+  int destAckSize,
+  int destPe,
+  unsigned short int *destMode,
+  int size);
 
-  gni_mem_handle_t mem_hndl;
-  gni_return_t status = GNI_RC_SUCCESS;
-
-  if(mode == CMK_BUFFER_PREREG && SIZEFIELD(ptr) < BIG_MSG) {
-    // Allocation for CMK_BUFFER_PREREG happens through CmiAlloc, which is allocated out of a mempool
-    if(IsMemHndlZero(GetMemHndl(ptr))) {
-      // register it and get the info
-      status = registerMemory(GetMempoolBlockPtr(ptr), GetMempoolsize(ptr), &(GetMemHndl(ptr)), NULL);
-      if(status == GNI_RC_SUCCESS) {
-        // registration successful, get memory handle
-        mem_hndl = GetMemHndl(ptr);
-      } else {
-        GNI_RC_CHECK("Error! Source memory registration failed!", status);
-      }
-    }
-    else {
-      // get the handle
-      mem_hndl = GetMemHndl(ptr);
-    }
-  } else {
-    status = GNI_MemRegister(nic_hndl, (uint64_t)ptr, (uint64_t)size, NULL, GNI_MEM_READWRITE, -1, &mem_hndl);
-    GNI_RC_CHECK("Error! Source memory registration failed!", status);
-  }
-  CmiGNIRzvRdmaPtr_t *rdmaSrc = (CmiGNIRzvRdmaPtr_t *)info;
-  rdmaSrc->mem_hndl = mem_hndl;
-}
-
-// Set the machine specific information for a nocopy destination pointer
-void LrtsSetRdmaDestInfo(void *info, const void *ptr, int size, unsigned short int mode){
-  gni_mem_handle_t mem_hndl;
-  gni_return_t status = GNI_RC_SUCCESS;
-
-  if(mode == CMK_BUFFER_PREREG && SIZEFIELD(ptr) < BIG_MSG) {
-    // Allocation for CMK_BUFFER_PREREG happens through CmiAlloc, which is allocated out of a mempool
-    if(IsMemHndlZero(GetMemHndl(ptr))) {
-      // register it and get the info
-      status = registerMemory(GetMempoolBlockPtr(ptr), GetMempoolsize(ptr), &(GetMemHndl(ptr)), NULL);
-      if(status == GNI_RC_SUCCESS) {
-        // registration successful, get memory handle
-        mem_hndl = GetMemHndl(ptr);
-      } else {
-        GNI_RC_CHECK("Error! Destination memory registration failed!", status);
-      }
-    }
-    else {
-      // get the handle
-      mem_hndl = GetMemHndl(ptr);
-    }
-  } else {
-    status = GNI_MemRegister(nic_hndl, (uint64_t)ptr, (uint64_t)size, NULL, GNI_MEM_READWRITE, -1, &mem_hndl);
-    GNI_RC_CHECK("Error! Destination memory registration failed!", status);
-  }
-  CmiGNIRzvRdmaPtr_t *rdmaDest = (CmiGNIRzvRdmaPtr_t *)info;
-  rdmaDest->mem_hndl = mem_hndl;
-}
+// Perform an RDMA Put call into the remote destination address from the local source address
+void LrtsIssueRput(
+  const void* destAddr,
+  void *destInfo,
+  void *destAck,
+  int destAckSize,
+  int destPe,
+  unsigned short int *destMode,
+  const void* srcAddr,
+  void *srcInfo,
+  void *srcAck,
+  int srcAckSize,
+  int srcPe,
+  unsigned short int *srcMode,
+  int size);
 
 // Method performs RDMA operations
 gni_return_t post_rdma(
@@ -259,8 +226,14 @@ gni_return_t post_rdma(
   int type,
   unsigned short int mode);
 
-// Method deregisters local and remote memory handles
-void DeregisterMemhandle(gni_mem_handle_t mem_hndl, int pe);
+// Register memory and return mem_hndl
+gni_mem_handle_t registerDirectMem(const void *ptr, int size, unsigned short int mode);
+
+// Deregister local memory handle
+void deregisterDirectMem(gni_mem_handle_t mem_hndl, int pe);
+
+// Method invoked to deregister memory handle
+void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode);
 
 #if CMK_SMP
 // Method used by the comm thread to perform GET

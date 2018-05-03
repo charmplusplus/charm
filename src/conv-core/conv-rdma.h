@@ -23,8 +23,7 @@ void CmiIssueRgets(void *recv, int pe);
 void CmiSetRdmaCommonInfo(void *info, const void *ptr, int size);
 int CmiGetRdmaCommonInfoSize(void);
 
-void CmiSetRdmaSrcInfo(void *info, const void *ptr, int size, unsigned short int mode);
-void CmiSetRdmaDestInfo(void *info, const void *ptr, int size, unsigned short int mode);
+void CmiSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode);
 void CmiSetRdmaNcpyAck(RdmaSingleAckCallerFn fn);
 
 /* CmiIssueRget initiates an RDMA read operation, transferring 'size' bytes of data from the address space of 'srcPe' to local address, 'destAddr'.
@@ -68,8 +67,7 @@ void CmiIssueRput(
   unsigned short int *srcMode,
   int size);
 
-void CmiReleaseSourceResource(const void *ptr, void *info, int pe, unsigned short int mode);
-void CmiReleaseDestinationResource(const void *ptr, void *info, int pe, unsigned short int mode);
+void CmiDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode);
 
 #if CMK_USE_CMA
 void CmiIssueRgetUsingCMA(

@@ -1,4 +1,4 @@
-DIRS	= simple_rget simple_rput get_put_pingpong pingpong
+DIRS	= simple_get simple_put get_put_pingpong pingpong
 
 all:
 	for d in $(DIRS); do \

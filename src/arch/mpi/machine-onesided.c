@@ -229,10 +229,6 @@ void LrtsIssueRput(
   MPIPostOneBuffer(srcAddr, (void *)srcAckNew, size, destPe, tag, ONESIDED_BUFFER_DIRECT_SEND);
 }
 
-// Method invoked to deregister destination memory handle
-void LrtsReleaseDestinationResource(const void *ptr, void *info, int pe, unsigned short int mode){
-}
-
-// Method invoked to deregister source memory handle
-void LrtsReleaseSourceResource(const void *ptr, void *info, int pe, unsigned short int mode){
+// Method invoked to deregister source memory (Empty method to maintain API consistency)
+void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode){
 }

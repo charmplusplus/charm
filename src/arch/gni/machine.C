@@ -2434,7 +2434,7 @@ static void PumpNetworkSmsg()
             {
                 CmiGNIRzvRdmaReverseOp_t *revOp = (CmiGNIRzvRdmaReverseOp_t *)header;
                 // Register source buffer
-                gni_mem_handle_t src_mem_hndl = registerDirectMemory(revOp->srcAddr, revOp->size, GNI_MEM_READ_ONLY);
+                gni_mem_handle_t src_mem_hndl = registerDirectMem(revOp->srcAddr, revOp->size, GNI_MEM_READ_ONLY);
 
                 // Perform PUT
                 void *ref = CmiGetNcpyAck(revOp->srcAddr,
@@ -2462,7 +2462,7 @@ static void PumpNetworkSmsg()
             {
                 CmiGNIRzvRdmaReverseOp_t *revOp = (CmiGNIRzvRdmaReverseOp_t *)header;
                 // Register destination buffer
-                gni_mem_handle_t dest_mem_hndl = registerDirectMemory(revOp->destAddr, revOp->size, GNI_MEM_READWRITE);
+                gni_mem_handle_t dest_mem_hndl = registerDirectMem(revOp->destAddr, revOp->size, GNI_MEM_READWRITE);
 
                 // Perform PUT
                 void *ref = CmiGetNcpyAck(revOp->srcAddr,

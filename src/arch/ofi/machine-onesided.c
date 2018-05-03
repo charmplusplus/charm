@@ -177,6 +177,32 @@ void LrtsIssueRgets(void *recv, int pe) {
 
 /* Support for Nocopy Direct API */
 // Method called on the completion of a direct onesided operation
+
+// Set the machine specific information for a nocopy pointer
+void LrtsSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode){
+  CmiOfiRdmaPtr_t *rdmaDest = (CmiOfiRdmaPtr_t *)info;
+  uint64_t requested_key = 0;
+  int ret;
+
+  /* Register the destination buffer */
+  if(FI_MR_SCALABLE == context.mr_mode) {
+    requested_key = __sync_fetch_and_add(&(context.mr_counter), 1);
+  }
+  ret = fi_mr_reg(context.domain,
+                  ptr,
+                  size,
+                  FI_REMOTE_READ | FI_REMOTE_WRITE | FI_READ | FI_WRITE,
+                  0ULL,
+                  requested_key,
+                  0ULL,
+                  &(rdmaDest->mr),
+                  NULL);
+  if (ret) {
+    CmiAbort("LrtsSetRdmaBufferInfo: fi_mr_reg failed!\n");
+  }
+  rdmaDest->key = fi_mr_key(rdmaDest->mr);
+}
+
 static inline void ofi_onesided_direct_operation_callback(struct fi_cq_tagged_entry *e, OFIRequest *req)
 {
   CmiOfiRdmaComp_t *rdmaComp = (CmiOfiRdmaComp_t *)(req->data.rma_ncpy_info);
@@ -442,23 +468,8 @@ void LrtsIssueRput(
   }
 }
 
-// Method invoked to deregister destination memory handle
-void LrtsReleaseDestinationResource(const void *ptr, void *info, int pe, unsigned short int mode){
-  if(mode == CMK_BUFFER_REG) {
-    CmiOfiRdmaPtr_t *rdmaDest = (CmiOfiRdmaPtr_t *)info;
-    int ret;
-
-    // Deregister the buffer
-    if(rdmaDest->mr) {
-      ret = fi_close((struct fid *)rdmaDest->mr);
-      if(ret)
-        CmiAbort("LrtsReleaseDestinationResource: fi_close(mr) failed!\n");
-    }
-  }
-}
-
-// Method invoked to deregister source memory handle
-void LrtsReleaseSourceResource(const void *ptr, void *info, int pe, unsigned short int mode){
+// Method invoked to deregister memory handle
+void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode){
   if(mode == CMK_BUFFER_REG) {
     CmiOfiRdmaPtr_t *rdmaSrc = (CmiOfiRdmaPtr_t *)info;
     int ret;
@@ -467,7 +478,7 @@ void LrtsReleaseSourceResource(const void *ptr, void *info, int pe, unsigned sho
     if(rdmaSrc->mr) {
       ret = fi_close((struct fid *)rdmaSrc->mr);
       if(ret)
-        CmiAbort("LrtsReleaseSourceResource: fi_close(mr) failed!\n");
+        CmiAbort("LrtsDeregisterMem: fi_close(mr) failed!\n");
     }
   }
 }

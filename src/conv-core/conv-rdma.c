@@ -189,9 +189,7 @@ void CmiIssueRput(
   CmiSyncSendAndFree(destPe, sizeof(rdmaPayloadMsg) + size + destAckSize, recvMsg);
 }
 
-void CmiSetRdmaSrcInfo(void *info, const void *ptr, int size, unsigned short int mode) {}
-void CmiSetRdmaDestInfo(void *info, const void *ptr, int size, unsigned short int mode) {}
+void CmiSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode) {}
 
-void CmiReleaseSourceResource(const void *ptr, void *info, int pe, unsigned short int mode) {}
-void CmiReleaseDestinationResource(const void *ptr, void *info, int pe, unsigned short int mode) {}
+void CmiDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode) {}
 #endif

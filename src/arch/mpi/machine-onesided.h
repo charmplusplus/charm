@@ -153,10 +153,6 @@ typedef struct _cmi_mpi_rzv_rdma_ack_info {
   int tag;
 }CmiMPIRzvRdmaAckInfo_t;
 
-// Set the machine specific information for a nocopy source pointer
-void LrtsSetRdmaSrcInfo(void *info, const void *ptr, int size, unsigned short int mode){
-}
-
-// Set the machine specific information for a nocopy destination pointer
-void LrtsSetRdmaDestInfo(void *info, const void *ptr, int size, unsigned short int mode){
+// Set the machine specific information for a nocopy pointer (Empty method to maintain API consistency)
+void LrtsSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode){
 }

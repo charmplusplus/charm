@@ -1,4 +1,4 @@
-#include "simple_rput.decl.h"
+#include "simple_put.decl.h"
 #include <assert.h>
 
 CProxy_main mainProxy;
@@ -14,7 +14,7 @@ public:
       CkAbort("Run this program on 1 or 2 processors only.\n");
     }
     if(m->argc !=2 ) {
-      CkAbort("Usage: ./simple_rput <array size>\n");
+      CkAbort("Usage: ./simple_put <array size>\n");
     }
     int size = atoi(m->argv[1]);
     mainProxy = thisProxy;
@@ -61,8 +61,8 @@ class Ping1 : public CBase_Ping1
   int size;
   int otherIndex, cbCounter, valCounter;
   CkCallback cb;
-  CkNcpyDestination myDest1, myDest2, myDest3;
-  CkNcpySource mySrc1, mySrc2, mySrc3;
+  CkNcpyBuffer myDest1, myDest2, myDest3;
+  CkNcpyBuffer mySrc1, mySrc2, mySrc3;
 
 public:
   Ping1(int size)
@@ -94,39 +94,39 @@ public:
   void start()
   {
     CkAssert(thisIndex == 1);
-    myDest1 = CkNcpyDestination(iArr1, size*sizeof(int), cb, CK_BUFFER_PREREG);
-    myDest2 = CkNcpyDestination(dArr1, size*sizeof(double), cb, CK_BUFFER_PREREG);
-    myDest3 = CkNcpyDestination(cArr1, size*sizeof(char), cb, CK_BUFFER_PREREG);
+    myDest1 = CkNcpyBuffer(iArr1, size*sizeof(int), cb, CK_BUFFER_PREREG);
+    myDest2 = CkNcpyBuffer(dArr1, size*sizeof(double), cb, CK_BUFFER_PREREG);
+    myDest3 = CkNcpyBuffer(cArr1, size*sizeof(char), cb, CK_BUFFER_PREREG);
 
-    // Send my destinations to Index 0; Index 0 performs Rputs into these destinations
+    // Send my destinations to Index 0; Index 0 performs Puts into these destinations
     thisProxy[otherIndex].recvNcpyInfo(myDest1, myDest2, myDest3);
   }
 
-  // Executed on Index 0 (which calls rput)
+  // Executed on Index 0 (which calls put)
   void putSenderDone(CkDataMsg *m){
     CkAssert(thisIndex == 0);
     cbCounter++;
     if(cbCounter == 3) {
       // Release Resources for my sources
-      mySrc1.releaseResource();
-      mySrc2.releaseResource();
-      mySrc3.releaseResource();
-      CkPrintf("[%d][%d][%d] Rput Source Done\n", thisIndex, CkMyPe(), CkMyNode());
+      mySrc1.deregisterMem();
+      mySrc2.deregisterMem();
+      mySrc3.deregisterMem();
+      CkPrintf("[%d][%d][%d] Put Source Done\n", thisIndex, CkMyPe(), CkMyNode());
       sendValidationData();
     }
     delete m;
   }
 
-  // Executed on Index 1 (which receives data from rput)
+  // Executed on Index 1 (which receives data from put)
   void putReceiverDone(CkDataMsg *m){
     CkAssert(thisIndex == 1);
     cbCounter++;
     if(cbCounter == 3) {
       // Release Resources for my destinations
-      myDest1.releaseResource();
-      myDest2.releaseResource();
-      myDest3.releaseResource();
-      CkPrintf("[%d][%d][%d] Rput Destination Done\n", thisIndex, CkMyPe(), CkMyNode());
+      myDest1.deregisterMem();
+      myDest2.deregisterMem();
+      myDest3.deregisterMem();
+      CkPrintf("[%d][%d][%d] Put Destination Done\n", thisIndex, CkMyPe(), CkMyNode());
       thisProxy[otherIndex].sendValidationData();
     }
     delete m;
@@ -146,18 +146,18 @@ public:
   }
 
   // Executed on Index 0
-  void recvNcpyInfo(CkNcpyDestination dest1, CkNcpyDestination dest2, CkNcpyDestination dest3)
+  void recvNcpyInfo(CkNcpyBuffer dest1, CkNcpyBuffer dest2, CkNcpyBuffer dest3)
   {
     CkAssert(thisIndex == 0);
-    // Create nocopy sources for me to Rput into
-    mySrc1 = CkNcpySource(iArr1, size*sizeof(int), cb, CK_BUFFER_PREREG);
-    mySrc2 = CkNcpySource(dArr1, size*sizeof(double), cb, CK_BUFFER_PREREG);
-    mySrc3 = CkNcpySource(cArr1, size*sizeof(char), cb, CK_BUFFER_PREREG);
+    // Create nocopy sources for me to Put into
+    mySrc1 = CkNcpyBuffer(iArr1, size*sizeof(int), cb, CK_BUFFER_PREREG);
+    mySrc2 = CkNcpyBuffer(dArr1, size*sizeof(double), cb, CK_BUFFER_PREREG);
+    mySrc3 = CkNcpyBuffer(cArr1, size*sizeof(char), cb, CK_BUFFER_PREREG);
 
-    // Perform Rputs from my sources into Index 1's destinations
-    mySrc1.rput(dest1);
-    mySrc2.rput(dest2);
-    mySrc3.rput(dest3);
+    // Perform Puts from my sources into Index 1's destinations
+    mySrc1.put(dest1);
+    mySrc2.put(dest2);
+    mySrc3.put(dest3);
   }
 
   // Executed on Index 1
@@ -167,7 +167,7 @@ public:
     compareArray(iArr1, iArr2, size);
     compareArray(dArr1, dArr2, size);
     compareArray(cArr1, cArr2, size);
-    CkPrintf("[%d][%d][%d] Rput Validated! \n", thisIndex, CkMyPe(), CkMyNode());
+    CkPrintf("[%d][%d][%d] Put Validated! \n", thisIndex, CkMyPe(), CkMyNode());
     CmiRdmaFree(iArr1);
     CmiRdmaFree(dArr1);
     CmiRdmaFree(cArr1);
@@ -176,4 +176,4 @@ public:
 
 };
 
-#include "simple_rput.def.h"
+#include "simple_put.def.h"

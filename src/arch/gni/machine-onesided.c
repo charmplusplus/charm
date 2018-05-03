@@ -320,6 +320,36 @@ void PumpOneSidedRDMATransactions(gni_cq_handle_t rdma_cq, CmiNodeLock rdma_cq_l
 
 /* Support for Nocopy Direct API */
 
+// Set the machine specific information for a nocopy pointer
+void LrtsSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode){
+
+  gni_mem_handle_t mem_hndl;
+  gni_return_t status = GNI_RC_SUCCESS;
+
+  if(mode == CMK_BUFFER_PREREG && SIZEFIELD(ptr) < BIG_MSG) {
+    // Allocation for CMK_BUFFER_PREREG happens through CmiAlloc, which is allocated out of a mempool
+    if(IsMemHndlZero(GetMemHndl(ptr))) {
+      // register it and get the info
+      status = registerMemory(GetMempoolBlockPtr(ptr), GetMempoolsize(ptr), &(GetMemHndl(ptr)), NULL);
+      if(status == GNI_RC_SUCCESS) {
+        // registration successful, get memory handle
+        mem_hndl = GetMemHndl(ptr);
+      } else {
+        GNI_RC_CHECK("Error! Memory registration failed!", status);
+      }
+    }
+    else {
+      // get the handle
+      mem_hndl = GetMemHndl(ptr);
+    }
+  } else {
+    status = GNI_MemRegister(nic_hndl, (uint64_t)ptr, (uint64_t)size, NULL, GNI_MEM_READWRITE, -1, &mem_hndl);
+    GNI_RC_CHECK("Error! Memory registration failed!", status);
+  }
+  CmiGNIRzvRdmaPtr_t *rdmaSrc = (CmiGNIRzvRdmaPtr_t *)info;
+  rdmaSrc->mem_hndl = mem_hndl;
+}
+
 // Perform an RDMA Get call into the local destination address from the remote source address
 void LrtsIssueRget(
   const void* srcAddr,
@@ -341,7 +371,7 @@ void LrtsIssueRget(
 
   // Register local buffer if it is not registered
   if(*destMode == CMK_BUFFER_UNREG) {
-    ((CmiGNIRzvRdmaPtr_t *)destInfo)->mem_hndl = registerDirectMemory(destAddr, size, GNI_MEM_READWRITE);
+    ((CmiGNIRzvRdmaPtr_t *)destInfo)->mem_hndl = registerDirectMem(destAddr, size, GNI_MEM_READWRITE);
     *destMode = CMK_BUFFER_REG;
   }
 
@@ -460,7 +490,7 @@ void LrtsIssueRput(
 
   // Register local buffer if it is not registered
   if(*srcMode == CMK_BUFFER_UNREG) {
-    ((CmiGNIRzvRdmaPtr_t *)srcInfo)->mem_hndl = registerDirectMemory(srcAddr, size, GNI_MEM_READ_ONLY);
+    ((CmiGNIRzvRdmaPtr_t *)srcInfo)->mem_hndl = registerDirectMem(srcAddr, size, GNI_MEM_READ_ONLY);
     *srcMode = CMK_BUFFER_REG;
   }
 
@@ -533,27 +563,29 @@ void LrtsIssueRput(
   }
 }
 
-// Method invoked to deregister destination memory handle
-void LrtsReleaseDestinationResource(const void *ptr, void *info, int pe, unsigned short int mode){
-  if(mode == CMK_BUFFER_REG || (mode == CMK_BUFFER_PREREG && SIZEFIELD(ptr) >= BIG_MSG)) {
-    CmiGNIRzvRdmaPtr_t *destInfo = (CmiGNIRzvRdmaPtr_t *)info;
-    DeregisterMemhandle(destInfo->mem_hndl, pe);
-  }
+// Register memory and return mem_hndl
+gni_mem_handle_t registerDirectMem(const void *ptr, int size, unsigned short int mode) {
+  CmiAssert(mode == GNI_MEM_READWRITE || mode == GNI_MEM_READ_ONLY);
+  gni_mem_handle_t mem_hndl;
+  gni_return_t status = GNI_RC_SUCCESS;
+  status = GNI_MemRegister(nic_hndl, (uint64_t)ptr, (uint64_t)size, NULL, mode, -1, &mem_hndl);
+  GNI_RC_CHECK("Error! Memory registration failed inside LrtsRegisterMemory!", status);
+  return mem_hndl;
 }
 
-// Method invoked to deregister source memory handle
-void LrtsReleaseSourceResource(const void *ptr, void *info, int pe, unsigned short int mode){
-  if(mode == CMK_BUFFER_REG || (mode == CMK_BUFFER_PREREG && SIZEFIELD(ptr) >= BIG_MSG)) {
-    CmiGNIRzvRdmaPtr_t *srcInfo = (CmiGNIRzvRdmaPtr_t *)info;
-    DeregisterMemhandle(srcInfo->mem_hndl, pe);
-  }
-}
-
-// Deregister local and remote memory handles
-void DeregisterMemhandle(gni_mem_handle_t mem_hndl, int pe) {
+// Deregister memory mem_hndl
+void deregisterDirectMem(gni_mem_handle_t mem_hndl, int pe) {
   gni_return_t status = GNI_RC_SUCCESS;
   status = GNI_MemDeregister(nic_hndl, &mem_hndl);
   GNI_RC_CHECK("GNI_MemDeregister failed!", status);
+}
+
+// Method invoked to deregister memory handle
+void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode){
+  if(mode == CMK_BUFFER_REG || (mode == CMK_BUFFER_PREREG && SIZEFIELD(ptr) >= BIG_MSG)) {
+    CmiGNIRzvRdmaPtr_t *destInfo = (CmiGNIRzvRdmaPtr_t *)info;
+    deregisterDirectMem(destInfo->mem_hndl, pe);
+  }
 }
 
 #if CMK_SMP

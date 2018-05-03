@@ -197,8 +197,7 @@ typedef struct _cmi_rdma_direct_ack {
 } CmiRdmaDirectAck;
 
 /* Support for Nocopy Direct API */
-void LrtsSetRdmaSrcInfo(void *info, const void *ptr, int size, unsigned short int mode);
-void LrtsSetRdmaDestInfo(void *info, const void *ptr, int size, unsigned short int mode);
+void LrtsSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode);
 void LrtsSetRdmaNcpyAck(RdmaAckHandlerFn fn);
 void LrtsIssueRget(
   const void* srcAddr,
@@ -228,17 +227,11 @@ void LrtsIssueRput(
   int srcPe,
   unsigned short int *srcMode,
   int size);
-void LrtsReleaseSourceResource(const void *ptr, void *info, int pe, unsigned short int mode);
-void LrtsReleaseDestinationResource(const void *ptr, void *info, int pe, unsigned short int mode);
+void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode);
 
-/* Set the machine specific information for a nocopy source pointer */
-void CmiSetRdmaSrcInfo(void *info, const void *ptr, int size, unsigned short int mode){
-  LrtsSetRdmaSrcInfo(info, ptr, size, mode);
-}
-
-/* Set the machine specific information for a nocopy destination pointer */
-void CmiSetRdmaDestInfo(void *info, const void *ptr, int size, unsigned short int mode){
-  LrtsSetRdmaDestInfo(info, ptr, size, mode);
+/* Set the machine specific information for a nocopy pointer */
+void CmiSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode){
+  LrtsSetRdmaBufferInfo(info, ptr, size, mode);
 }
 
 void *CmiGetNcpyAck(const void *srcAddr, void *srcAck, int srcPe, const void *destAddr, void *destAck, int destPe, int ackSize) {
@@ -370,14 +363,9 @@ void CmiIssueRput(
                 size);
 }
 
-/* Resource cleanup for source pointer */
-void CmiReleaseSourceResource(const void *ptr, void *info, int pe, unsigned short int mode){
-  LrtsReleaseSourceResource(ptr, info, pe, mode);
-}
-
-/* Resource cleanup for destination pointer */
-void CmiReleaseDestinationResource(const void *ptr, void *info, int pe, unsigned short int mode){
-  LrtsReleaseDestinationResource(ptr, info, pe, mode);
+/* De-register registered memory for pointer */
+void CmiDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode){
+  LrtsDeregisterMem(ptr, info, pe, mode);
 }
 
 #endif /*End of CMK_ONESIDED_DIRECT_IMPL */

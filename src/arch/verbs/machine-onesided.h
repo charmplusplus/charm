@@ -144,39 +144,10 @@ typedef struct _cmi_verbs_rdma_reverse_op {
  * error with the message "the size of an array must be greater than zero" */
 DUMB_STATIC_ASSERT(sizeof(CmiVerbsRdmaPtr_t) == CMK_NOCOPY_DIRECT_BYTES);
 
-// Set the machine specific information for a nocopy source pointer
-void LrtsSetRdmaSrcInfo(void *info, const void *ptr, int size, unsigned short int mode){
-  struct ibv_mr *mr;
-  if(mode == CMK_BUFFER_PREREG) {
-    mr = METADATAFIELD(ptr)->key;
-  } else {
-    mr = ibv_reg_mr(context->pd, (void *)ptr, size, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ);
-  }
-  if (!mr) {
-    CmiAbort("Memory Registration at Source Failed!\n");
-  }
-  CmiVerbsRdmaPtr_t *rdmaSrc = (CmiVerbsRdmaPtr_t *)info;
-  rdmaSrc->mr = mr;
-  rdmaSrc->key = mr->rkey;
-}
-
-// Set the machine specific information for a nocopy destination pointer
-void LrtsSetRdmaDestInfo(void *info, const void *ptr, int size, unsigned short int mode){
-  struct ibv_mr *mr;
-  if(mode == CMK_BUFFER_PREREG) {
-    mr = METADATAFIELD(ptr)->key;
-  } else {
-    mr = ibv_reg_mr(context->pd, (void *)ptr, size, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ);
-  }
-  if (!mr) {
-    CmiAbort("Memory Registration at Destination Failed!\n");
-  }
-  CmiVerbsRdmaPtr_t *rdmaDest = (CmiVerbsRdmaPtr_t *)info;
-  rdmaDest->mr = mr;
-  rdmaDest->key = mr->rkey;
-}
-
 // Function Declarations
+// Set the machine specific information for a nocopy pointer
+void LrtsSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode);
+
 void postRdma(
   uint64_t local_addr,
   uint32_t local_rkey,
@@ -186,6 +157,38 @@ void postRdma(
   int peNum,
   uint64_t rdmaPacket,
   int opcode);
+
+// Perform an RDMA Get call into the local destination address from the remote source address
+void LrtsIssueRget(
+  const void* srcAddr,
+  void *srcInfo,
+  void *srcAck,
+  int srcAckSize,
+  int srcPe,
+  unsigned short int *srcMode,
+  const void* destAddr,
+  void *destInfo,
+  void *destAck,
+  int destAckSize,
+  int destPe,
+  unsigned short int *destMode,
+  int size);
+
+// Perform an RDMA Put call into the remote destination address from the local source address
+void LrtsIssueRput(
+  const void* destAddr,
+  void *destInfo,
+  void *destAck,
+  int destAckSize,
+  int destPe,
+  unsigned short int *destMode,
+  const void* srcAddr,
+  void *srcInfo,
+  void *srcAck,
+  int srcAckSize,
+  int srcPe,
+  unsigned short int *srcMode,
+  int size);
 
 struct ibv_mr* registerDirectMemory(const void *addr, int size);
 

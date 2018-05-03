@@ -207,53 +207,42 @@ typedef struct _cmi_ofi_rdma_reverse_op {
   int size;
 } CmiOfiRdmaReverseOp_t;
 
-// Set the machine specific information for a nocopy source pointer
-void LrtsSetRdmaSrcInfo(void *info, const void *ptr, int size, unsigned short int mode){
-  CmiOfiRdmaPtr_t *rdmaSrc = (CmiOfiRdmaPtr_t *)info;
-  uint64_t requested_key = 0;
-  int ret;
+// Set the machine specific information for a nocopy pointer
+void LrtsSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode);
 
-  /* Register the source buffer */
-  if(FI_MR_SCALABLE == context.mr_mode) {
-    requested_key = __sync_fetch_and_add(&(context.mr_counter), 1);
-  }
-  ret = fi_mr_reg(context.domain,
-                  ptr,
-                  size,
-                  FI_REMOTE_READ | FI_REMOTE_WRITE | FI_READ | FI_WRITE,
-                  0ULL,
-                  requested_key,
-                  0ULL,
-                  &(rdmaSrc->mr),
-                  NULL);
-  if (ret) {
-    CmiAbort("LrtsSetRdmaSrcInfo: fi_mr_reg failed!\n");
-  }
-  rdmaSrc->key = fi_mr_key(rdmaSrc->mr);
-}
+// Perform an RDMA Get call into the local destination address from the remote source address
+void LrtsIssueRget(
+  const void* srcAddr,
+  void *srcInfo,
+  void *srcAck,
+  int srcAckSize,
+  int srcPe,
+  unsigned short int *srcMode,
+  const void* destAddr,
+  void *destInfo,
+  void *destAck,
+  int destAckSize,
+  int destPe,
+  unsigned short int *destMode,
+  int size);
 
-// Set the machine specific information for a nocopy destination pointer
-void LrtsSetRdmaDestInfo(void *info, const void *ptr, int size, unsigned short int mode){
-  CmiOfiRdmaPtr_t *rdmaDest = (CmiOfiRdmaPtr_t *)info;
-  uint64_t requested_key = 0;
-  int ret;
+// Perform an RDMA Put call into the remote destination address from the local source address
+void LrtsIssueRput(
+  const void* destAddr,
+  void *destInfo,
+  void *destAck,
+  int destAckSize,
+  int destPe,
+  unsigned short int *destMode,
+  const void* srcAddr,
+  void *srcInfo,
+  void *srcAck,
+  int srcAckSize,
+  int srcPe,
+  unsigned short int *srcMode,
+  int size);
 
-  /* Register the destination buffer */
-  if(FI_MR_SCALABLE == context.mr_mode) {
-    requested_key = __sync_fetch_and_add(&(context.mr_counter), 1);
-  }
-  ret = fi_mr_reg(context.domain,
-                  ptr,
-                  size,
-                  FI_REMOTE_READ | FI_REMOTE_WRITE | FI_READ | FI_WRITE,
-                  0ULL,
-                  requested_key,
-                  0ULL,
-                  &(rdmaDest->mr),
-                  NULL);
-  if (ret) {
-    CmiAbort("LrtsSetRdmaSrcInfo: fi_mr_reg failed!\n");
-  }
-  rdmaDest->key = fi_mr_key(rdmaDest->mr);
-}
+// Method invoked to deregister memory handle
+void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode);
+
 #endif /* OFI_MACHINE_ONESIDED_H */

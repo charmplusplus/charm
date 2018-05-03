@@ -60,9 +60,9 @@ class Ping1 : public CBase_Ping1
   int size;
   int otherIndex, recvCbCounter, sendCbCounter;
   CkCallback sendCb, recvCb;
-  CkNcpyDestination myDest1, myDest2, myDest3;
-  CkNcpySource mySrc1, mySrc2, mySrc3;
-  CkNcpyDestination otherDest1, otherDest2, otherDest3;
+  CkNcpyBuffer myDest1, myDest2, myDest3;
+  CkNcpyBuffer mySrc1, mySrc2, mySrc3;
+  CkNcpyBuffer otherDest1, otherDest2, otherDest3;
 
 public:
   Ping1(int size)
@@ -87,17 +87,17 @@ public:
   void start()
   {
     CkAssert(thisIndex == 0);
-    mySrc1 = CkNcpySource(iArr1, size*sizeof(int), sendCb);
-    mySrc2 = CkNcpySource(dArr1, size*sizeof(double), sendCb);
-    mySrc3 = CkNcpySource(cArr1, size*sizeof(char), sendCb);
+    mySrc1 = CkNcpyBuffer(iArr1, size*sizeof(int), sendCb);
+    mySrc2 = CkNcpyBuffer(dArr1, size*sizeof(double), sendCb);
+    mySrc3 = CkNcpyBuffer(cArr1, size*sizeof(char), sendCb);
 
     iArr2 = new int[size];
     dArr2 = new double[size];
     cArr2 = new char[size];
 
-    myDest1 = CkNcpyDestination(iArr2, size*sizeof(int), recvCb);
-    myDest2 = CkNcpyDestination(dArr2, size*sizeof(double), recvCb);
-    myDest3 = CkNcpyDestination(cArr2, size*sizeof(char), recvCb);
+    myDest1 = CkNcpyBuffer(iArr2, size*sizeof(int), recvCb);
+    myDest2 = CkNcpyBuffer(dArr2, size*sizeof(double), recvCb);
+    myDest3 = CkNcpyBuffer(cArr2, size*sizeof(char), recvCb);
 
     thisProxy[otherIndex].recvNcpyInfo(mySrc1, mySrc2, mySrc3, myDest1, myDest2, myDest3);
   }
@@ -106,9 +106,9 @@ public:
     sendCbCounter++;
     if(sendCbCounter == 3) {
       // Release Resources for my sources
-      mySrc1.releaseResource();
-      mySrc2.releaseResource();
-      mySrc3.releaseResource();
+      mySrc1.deregisterMem();
+      mySrc2.deregisterMem();
+      mySrc3.deregisterMem();
 
       if(thisIndex == 1){
         delete [] iArr1;
@@ -125,25 +125,25 @@ public:
     if(recvCbCounter == 3) {
 
       // Release Resources for my destinations
-      myDest1.releaseResource();
-      myDest2.releaseResource();
-      myDest3.releaseResource();
+      myDest1.deregisterMem();
+      myDest2.deregisterMem();
+      myDest3.deregisterMem();
 
       if(thisIndex == 1){
-        CkPrintf("[%d][%d][%d] Rget call completed\n", thisIndex, CkMyPe(), CkMyNode());
+        CkPrintf("[%d][%d][%d] Get call completed\n", thisIndex, CkMyPe(), CkMyNode());
 
-        // Create a nocopy sources for me to Rput from into destinations received
-        mySrc1 = CkNcpySource(iArr1, sizeof(int)*size, sendCb);
-        mySrc2 = CkNcpySource(dArr1, sizeof(double)*size, sendCb);
-        mySrc3 = CkNcpySource(cArr1, sizeof(char)*size, sendCb);
+        // Create a nocopy sources for me to Put from into destinations received
+        mySrc1 = CkNcpyBuffer(iArr1, sizeof(int)*size, sendCb);
+        mySrc2 = CkNcpyBuffer(dArr1, sizeof(double)*size, sendCb);
+        mySrc3 = CkNcpyBuffer(cArr1, sizeof(char)*size, sendCb);
 
-        // Index 1 Rputting to 0
-        mySrc1.rput(otherDest1);
-        mySrc2.rput(otherDest2);
-        mySrc3.rput(otherDest3);
+        // Index 1 Putting to 0
+        mySrc1.put(otherDest1);
+        mySrc2.put(otherDest2);
+        mySrc3.put(otherDest3);
 
       } else {
-        CkPrintf("[%d][%d][%d] Rput call completed\n", thisIndex, CkMyPe(), CkMyNode());
+        CkPrintf("[%d][%d][%d] Put call completed\n", thisIndex, CkMyPe(), CkMyNode());
 
         compareArray(iArr1, iArr2, size);
         compareArray(dArr1, dArr2, size);
@@ -157,22 +157,22 @@ public:
   }
 
   // Executed on Index 1
-  void recvNcpyInfo(CkNcpySource src1, CkNcpySource src2, CkNcpySource src3, CkNcpyDestination dest1, CkNcpyDestination dest2, CkNcpyDestination dest3)
+  void recvNcpyInfo(CkNcpyBuffer src1, CkNcpyBuffer src2, CkNcpyBuffer src3, CkNcpyBuffer dest1, CkNcpyBuffer dest2, CkNcpyBuffer dest3)
   {
     CkAssert(thisIndex == 1);
     otherDest1 = dest1;
     otherDest2 = dest2;
     otherDest3 = dest3;
 
-    // Create nocopy destinations for me to Rget from sources received
-    myDest1 = CkNcpyDestination(iArr1, size*sizeof(int), recvCb);
-    myDest2 = CkNcpyDestination(dArr1, size*sizeof(double), recvCb);
-    myDest3 = CkNcpyDestination(cArr1, size*sizeof(char), recvCb);
+    // Create nocopy destinations for me to Get from sources received
+    myDest1 = CkNcpyBuffer(iArr1, size*sizeof(int), recvCb);
+    myDest2 = CkNcpyBuffer(dArr1, size*sizeof(double), recvCb);
+    myDest3 = CkNcpyBuffer(cArr1, size*sizeof(char), recvCb);
 
-    // Index 1 Rgetting from 0
-    myDest1.rget(src1);
-    myDest2.rget(src2);
-    myDest3.rget(src3);
+    // Index 1 Getting from 0
+    myDest1.get(src1);
+    myDest2.get(src2);
+    myDest3.get(src3);
   }
 };
 

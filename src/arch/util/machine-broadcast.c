@@ -57,6 +57,7 @@ static INLINE_KEYWORD void processProcBcastMsg(int size, char *msg) {
     CmiAssert(CMI_DEST_RANK(msg)==0);
     /*CmiPushPE(CMI_DEST_RANK(msg), msg);*/
 
+    //CmiPrintf("[%d][%d] Received the bcast message \n", CmiMyPe(), CmiMyNode());
 #if CMK_BROADCAST_SPANNING_TREE
     SendSpanningChildrenProc(size, msg);
 #elif CMK_BROADCAST_HYPERCUBE
@@ -128,6 +129,7 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
       if (startNode == 0) {
         child_count = _topoTree->child_count;
         children    = _topoTree->children;
+        //CmiPrintf("[%d][%d] SendSpanningChildren child count%d \n", CmiMyPe(), CmiMyNode(), child_count);
       } else {
         get_topo_tree_nbs(startNode, &parent, &child_count, &children);
       }
@@ -138,6 +140,7 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
         CmiSendNetworkFunc(CmiNodeFirst(nd), size, msg, BCAST_SYNC);
 #else
         newmsg = CopyMsg(msg, size);
+        //CmiPrintf("[%d][%d] SendSpanningChildren: sending copymsg to %d \n", CmiMyPe(), CmiMyNode(), CmiNodeFirst(nd));
         CmiSendNetworkFunc(CmiNodeFirst(nd), size, newmsg, BCAST_SYNC);
 #endif
       }

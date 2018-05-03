@@ -144,10 +144,26 @@ void verbsOnesidedReceivedAck(struct infiRdmaPacket *rdmaPacket) {
 
 /* Support for Nocopy Direct API */
 
+// Set the machine specific information for a nocopy pointer
+void LrtsSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode){
+  struct ibv_mr *mr;
+  if(mode == CMK_BUFFER_PREREG) {
+    mr = METADATAFIELD(ptr)->key;
+  } else {
+    mr = ibv_reg_mr(context->pd, (void *)ptr, size, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ);
+  }
+  if (!mr) {
+    CmiAbort("Memory Registration Failed in LrtsSetRdmaBufferInfo!\n");
+  }
+  CmiVerbsRdmaPtr_t *rdmaSrc = (CmiVerbsRdmaPtr_t *)info;
+  rdmaSrc->mr = mr;
+  rdmaSrc->key = mr->rkey;
+}
+
 struct ibv_mr* registerDirectMemory(const void *addr, int size) {
   struct ibv_mr *mr = ibv_reg_mr(context->pd, (void *)addr, size, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ);
   if (!mr) {
-    CmiAbort("Memory Registration at Destination Failed inside registerDirectMemory!\n");
+    CmiAbort("Memory Registration inside registerDirectMemory!\n");
   }
   return mr;
 }
@@ -308,22 +324,12 @@ void LrtsIssueRput(
   }
 }
 
-// Method invoked to deregister destination memory handle
-void LrtsReleaseDestinationResource(const void *ptr, void *info, int pe, unsigned short int mode){
+// Method invoked to deregister a memory handle
+void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode){
   if(mode == CMK_BUFFER_REG) {
     CmiVerbsRdmaPtr_t *rdmadest = (CmiVerbsRdmaPtr_t *)info;
     if (ibv_dereg_mr(rdmadest->mr)) {
-      CmiAbort("ibv_dereg_mr() failed at LrtsReleaseDestinationResource\n");
-    }
-  }
-}
-
-// Method invoked to deregister source memory handle
-void LrtsReleaseSourceResource(const void *ptr, void *info, int pe, unsigned short int mode){
-  if(mode == CMK_BUFFER_REG) {
-    CmiVerbsRdmaPtr_t *rdmaSrc = (CmiVerbsRdmaPtr_t *)info;
-    if (ibv_dereg_mr(rdmaSrc->mr)) {
-      CmiAbort("ibv_dereg_mr() failed at LrtsReleaseSourceResource\n");
+      CmiAbort("ibv_dereg_mr() failed at LrtsDeregisterMem\n");
     }
   }
 }

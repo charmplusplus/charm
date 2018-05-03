@@ -1,4 +1,4 @@
-#include "simple_rget.decl.h"
+#include "simple_get.decl.h"
 #include <assert.h>
 
 CProxy_main mainProxy;
@@ -14,7 +14,7 @@ public:
       CkAbort("Run this program on 1 or 2 processors only.\n");
     }
     if(m->argc !=2 ) {
-      CkAbort("Usage: ./simple_rget <array size>\n");
+      CkAbort("Usage: ./simple_get <array size>\n");
     }
     int size = atoi(m->argv[1]);
     mainProxy = thisProxy;
@@ -61,8 +61,8 @@ class Ping1 : public CBase_Ping1
   int size;
   int otherIndex, cbCounter, valCounter;
   CkCallback cb;
-  CkNcpyDestination myDest1, myDest2, myDest3;
-  CkNcpySource mySrc1, mySrc2, mySrc3;
+  CkNcpyBuffer myDest1, myDest2, myDest3;
+  CkNcpyBuffer mySrc1, mySrc2, mySrc3;
 
 public:
   Ping1(int size)
@@ -94,11 +94,11 @@ public:
   void start()
   {
     CkAssert(thisIndex == 0);
-    mySrc1 = CkNcpySource(iArr1, size*sizeof(int), cb, CK_BUFFER_PREREG);
-    mySrc2 = CkNcpySource(dArr1, size*sizeof(double), cb, CK_BUFFER_PREREG);
-    mySrc3 = CkNcpySource(cArr1, size*sizeof(char), cb, CK_BUFFER_PREREG);
+    mySrc1 = CkNcpyBuffer(iArr1, size*sizeof(int), cb, CK_BUFFER_PREREG);
+    mySrc2 = CkNcpyBuffer(dArr1, size*sizeof(double), cb, CK_BUFFER_PREREG);
+    mySrc3 = CkNcpyBuffer(cArr1, size*sizeof(char), cb, CK_BUFFER_PREREG);
 
-    // Send my sources to Index 1; Index 1 performs Rgets from these sources
+    // Send my sources to Index 1; Index 1 performs Gets from these sources
     thisProxy[otherIndex].recvNcpyInfo(mySrc1, mySrc2, mySrc3);
   }
 
@@ -108,25 +108,25 @@ public:
     cbCounter++;
     if(cbCounter == 3) {
       // Release Resources for my sources
-      mySrc1.releaseResource();
-      mySrc2.releaseResource();
-      mySrc3.releaseResource();
-      CkPrintf("[%d][%d][%d] Rget Source Done\n", thisIndex, CkMyPe(), CkMyNode());
+      mySrc1.deregisterMem();
+      mySrc2.deregisterMem();
+      mySrc3.deregisterMem();
+      CkPrintf("[%d][%d][%d] Get Source Done\n", thisIndex, CkMyPe(), CkMyNode());
       sendValidationData();
     }
     delete m;
   }
 
-  // Executed on Index 1 (which receives data from rget)
+  // Executed on Index 1 (which receives data from get)
   void getReceiverDone(CkDataMsg *m){
     CkAssert(thisIndex == 1);
     cbCounter++;
     if(cbCounter == 3) {
       // Release Resources for my destinations
-      myDest1.releaseResource();
-      myDest2.releaseResource();
-      myDest3.releaseResource();
-      CkPrintf("[%d][%d][%d] Rget Destination Done\n", thisIndex, CkMyPe(), CkMyNode());
+      myDest1.deregisterMem();
+      myDest2.deregisterMem();
+      myDest3.deregisterMem();
+      CkPrintf("[%d][%d][%d] Get Destination Done\n", thisIndex, CkMyPe(), CkMyNode());
       thisProxy[otherIndex].sendValidationData();
     }
     delete m;
@@ -146,18 +146,18 @@ public:
   }
 
   // Executed on Index 1
-  void recvNcpyInfo(CkNcpySource src1, CkNcpySource src2, CkNcpySource src3)
+  void recvNcpyInfo(CkNcpyBuffer src1, CkNcpyBuffer src2, CkNcpyBuffer src3)
   {
     CkAssert(thisIndex == 1);
-    // Create nocopy destination for me to Rget into
-    myDest1 = CkNcpyDestination(iArr1, size*sizeof(int), cb, CK_BUFFER_PREREG);
-    myDest2 = CkNcpyDestination(dArr1, size*sizeof(double), cb, CK_BUFFER_PREREG);
-    myDest3 = CkNcpyDestination(cArr1, size*sizeof(char), cb, CK_BUFFER_PREREG);
+    // Create nocopy destination for me to Get into
+    myDest1 = CkNcpyBuffer(iArr1, size*sizeof(int), cb, CK_BUFFER_PREREG);
+    myDest2 = CkNcpyBuffer(dArr1, size*sizeof(double), cb, CK_BUFFER_PREREG);
+    myDest3 = CkNcpyBuffer(cArr1, size*sizeof(char), cb, CK_BUFFER_PREREG);
 
-    // Perform Rget from Index 0's sources into my destinations
-    myDest1.rget(src1);
-    myDest2.rget(src2);
-    myDest3.rget(src3);
+    // Perform Get from Index 0's sources into my destinations
+    myDest1.get(src1);
+    myDest2.get(src2);
+    myDest3.get(src3);
   }
 
   // Executed on Index 1
@@ -167,7 +167,7 @@ public:
     compareArray(iArr1, iArr2, size);
     compareArray(dArr1, dArr2, size);
     compareArray(cArr1, cArr2, size);
-    CkPrintf("[%d][%d][%d] Rget Validated! \n", thisIndex, CkMyPe(), CkMyNode());
+    CkPrintf("[%d][%d][%d] Get Validated! \n", thisIndex, CkMyPe(), CkMyNode());
     CmiRdmaFree(iArr1);
     CmiRdmaFree(dArr1);
     CmiRdmaFree(cArr1);
@@ -176,4 +176,4 @@ public:
 
 };
 
-#include "simple_rget.def.h"
+#include "simple_get.def.h"

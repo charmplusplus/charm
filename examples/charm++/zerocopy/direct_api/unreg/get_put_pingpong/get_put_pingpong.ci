@@ -12,7 +12,7 @@ mainmodule simple_direct {
     entry void start();
     entry void senderCallback(CkDataMsg *m);
     entry void receiverCallback(CkDataMsg *m);
-    entry void recvNcpyInfo(CkNcpySource src1, CkNcpySource src2, CkNcpySource src3, CkNcpyDestination dest1, CkNcpyDestination dest2, CkNcpyDestination dest3);
+    entry void recvNcpyInfo(CkNcpyBuffer src1, CkNcpyBuffer src2, CkNcpyBuffer src3, CkNcpyBuffer dest1, CkNcpyBuffer dest2, CkNcpyBuffer dest3);
   };
 
 };

@@ -334,7 +334,7 @@ void CkRdmaAckHandler(void *cbPtr, int pe, const void *ptr) {
 }
 
 // Perform a nocopy put operation into the passed destination using this source
-void CkNcpySource::rput(CkNcpyDestination &destination){
+void CkNcpyBuffer::put(CkNcpyBuffer &destination){
   if(mode == CK_BUFFER_NOREG || destination.mode == CK_BUFFER_NOREG) {
     CkAbort("Cannot perform RDMA operations in CK_BUFFER_NOREG mode\n");
   }
@@ -342,7 +342,7 @@ void CkNcpySource::rput(CkNcpyDestination &destination){
   // Check that the count for both the counters matches
   CkAssert(cnt <= destination.cnt);
 
-  // Check that this object is local when CkRput is called
+  // Check that this object is local when put is called
   CkAssert(CkNodeOf(pe) == CkMyNode());
 
   if(CkNodeOf(destination.pe) == CkMyNode()) {
@@ -374,15 +374,8 @@ void CkNcpySource::rput(CkNcpyDestination &destination){
   }
 }
 
-// Release the registered resources for this source object
-void CkNcpySource::releaseResource(){
-#if CMK_REG_REQUIRED
-  CmiReleaseSourceResource(ptr, layerInfo + CmiGetRdmaCommonInfoSize(), pe, mode);
-#endif
-}
-
 // Perform a nocopy get operation into this destination using the passed source
-void CkNcpyDestination::rget(CkNcpySource &source){
+void CkNcpyBuffer::get(CkNcpyBuffer &source){
   if(mode == CK_BUFFER_NOREG || source.mode == CK_BUFFER_NOREG) {
     CkAbort("Cannot perform RDMA operations in CK_BUFFER_NOREG mode\n");
   }
@@ -390,7 +383,7 @@ void CkNcpyDestination::rget(CkNcpySource &source){
   // Check that the count for both the counters matches
   CkAssert(source.cnt <= cnt);
 
-  // Check that this object is local when CkRget is called
+  // Check that this object is local when get is called
   CkAssert(CkNodeOf(pe) == CkMyNode());
 
   //Check if it is a within-process sending
@@ -422,11 +415,4 @@ void CkNcpyDestination::rget(CkNcpySource &source){
                  &mode,
                  cnt);
   }
-}
-
-// Release the registered resources for this destination object
-void CkNcpyDestination::releaseResource(){
-#if CMK_REG_REQUIRED
-  CmiReleaseDestinationResource(ptr, layerInfo + CmiGetRdmaCommonInfoSize(), pe, mode);
-#endif
 }

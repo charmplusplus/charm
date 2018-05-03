@@ -23,7 +23,7 @@ mainmodule pingpong {
     entry void setupGetGetPingpong(int size);
     entry void beginGetGetPingpong();
     entry void callbackGetGetPingpong(CkDataMsg *m);
-    entry void recvNcpySrcInfo(CkNcpySource src);
+    entry void recvNcpySrcInfo(CkNcpyBuffer src);
     entry void endGetGetPingpong();
     entry void doneGetGetPingpong();
 
@@ -32,7 +32,7 @@ mainmodule pingpong {
     entry void beginPutPutPingpong();
     entry void callbackPutPutPingpong(CkDataMsg *m);
     entry void askNcpyDestInfo();
-    entry void recvNcpyDestInfo(CkNcpyDestination dest);
+    entry void recvNcpyDestInfo(CkNcpyBuffer dest);
     entry void endPutPutPingpong();
     entry void donePutPutPingpong();
 

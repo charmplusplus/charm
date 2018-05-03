@@ -107,18 +107,20 @@ int getRdmaBufSize(envelope *env);
 void CkRdmaAckHandler(void *cookie);
 void CkRdmaAckHandler(void *cbPtr, int pe, const void *ptr);
 
-class CkNcpyDestination;
+// Class to represent an RDMA buffer
+class CkNcpyBuffer{
+  private:
+  // bool to indicate registration for current values of ptr and cnt on pe
+  bool isRegistered;
 
-// Class to represent an RDMA source
-class CkNcpySource{
   public:
-  // pointer to the source buffer
+  // pointer to the buffer
   const void *ptr;
 
   // number of bytes
   size_t cnt;
 
-  // callback to be invoked on the sender
+  // callback to be invoked on the sender/receiver
   CkCallback cb;
 
   // home pe
@@ -128,7 +130,7 @@ class CkNcpySource{
   #pragma GCC diagnostic push
   #pragma GCC diagnostic ignored "-Wpedantic"
   #endif
-  // machine specific information about the source pointer
+  // machine specific information about the buffer
   char layerInfo[CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES];
   #ifdef __GNUC__
   #pragma GCC diagnostic pop
@@ -137,121 +139,83 @@ class CkNcpySource{
   // mode
   unsigned short int mode;
 
-  CkNcpySource() : ptr(NULL), pe(-1), mode(CK_BUFFER_UNREG) {}
+  CkNcpyBuffer() : ptr(NULL), pe(-1), mode(CK_BUFFER_UNREG) {}
 
-  CkNcpySource(const void *ptr_, size_t cnt_, CkCallback cb_, unsigned short int mode_=CK_BUFFER_UNREG)
+  CkNcpyBuffer(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int mode_=CK_BUFFER_UNREG)
   {
     init(ptr_, cnt_, cb_, mode_);
-    registerMem();
   }
 
-  void init(const void *ptr_, size_t cnt_, CkCallback cb_, unsigned short int mode_=CK_BUFFER_UNREG)
+  void init(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int mode_=CK_BUFFER_UNREG)
   {
     ptr  = ptr_;
     cnt  = cnt_;
     cb   = cb_;
     pe   = CkMyPe();
     mode = mode_;
-  }
+    isRegistered = false;
 
-  void registerMem()
-  {
-    // Set machine layer information when mode is not CK_BUFFER_NOREG
-    if(mode != CK_BUFFER_NOREG) {
-
-      CmiSetRdmaCommonInfo(&layerInfo[0], ptr, cnt);
-
-      /* set the source pointer layerInfo for REG, PREREG modes only for those layers
-       * where memory registration of the buffer is required e.g. GNI, Verbs, OFI
-       */
-#if CMK_REG_REQUIRED
-      if(mode == CK_BUFFER_REG || mode == CK_BUFFER_PREREG)
-#endif
-      {
-        CmiSetRdmaSrcInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, mode);
-      }
-    }
-  }
-
-  void setMode(unsigned short int mode_) { mode = mode_; }
-
-  void rput(CkNcpyDestination &destination);
-
-  void releaseResource();
-};
-PUPbytes(CkNcpySource)
-
-// Class to represent an RDMA destination
-class CkNcpyDestination{
-  public:
-  // pointer to the destination buffer
-  const void *ptr;
-
-  // number of bytes
-  size_t cnt;
-
-  // callback to be invoked on the receiver
-  CkCallback cb;
-
-  // home pe
-  int pe;
-
-  #ifdef __GNUC__
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wpedantic"
-  #endif
-  // machine specific information about the destination pointer
-  char layerInfo[CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES];
-  #ifdef __GNUC__
-  #pragma GCC diagnostic pop
-  #endif
-
-  // mode
-  unsigned short int mode;
-
-  CkNcpyDestination() : ptr(NULL), pe(-1), mode(CK_BUFFER_UNREG) {}
-
-  CkNcpyDestination(const void *ptr_, size_t cnt_, CkCallback cb_, unsigned short int mode_=CK_BUFFER_UNREG)
-  {
-    init(ptr_, cnt_, cb_, mode_);
+    // Register memory everytime new values are initialized
     registerMem();
   }
 
-  void init(const void *ptr_, size_t cnt_, CkCallback cb_, unsigned short int mode_=CK_BUFFER_UNREG)
-  {
-    ptr  = ptr_;
-    cnt  = cnt_;
-    cb   = cb_;
-    pe   = CkMyPe();
-    mode = mode_;
-  }
-
+  // Register(Pin) the memory for the buffer
   void registerMem()
   {
+    // Check that this object is local when registerMem is called
+    CkAssert(CkNodeOf(pe) == CkMyNode());
+
+    if(isRegistered == true)
+      return;
+
     // Set machine layer information when mode is not CK_BUFFER_NOREG
     if(mode != CK_BUFFER_NOREG) {
 
       CmiSetRdmaCommonInfo(&layerInfo[0], ptr, cnt);
 
-      /* set the destination pointer layerInfo for REG, PREREG modes only for those layers
-       * where memory registration of the buffer is required e.g. GNI, Verbs, OFI
-       */
+      /* Set the pointer layerInfo unconditionally for layers that don't require pinning (MPI, PAMI)
+       * or if mode is REG, PREREG on layers that require pinning (GNI, Verbs, OFI) */
 #if CMK_REG_REQUIRED
       if(mode == CK_BUFFER_REG || mode == CK_BUFFER_PREREG)
 #endif
       {
-        // set the destination pointer layerInfo
-        CmiSetRdmaDestInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, mode);
+        CmiSetRdmaBufferInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, mode);
       }
+      isRegistered = true;
     }
   }
 
   void setMode(unsigned short int mode_) { mode = mode_; }
 
-  void rget(CkNcpySource &source);
+  void put(CkNcpyBuffer &destination);
 
-  void releaseResource();
+  void get(CkNcpyBuffer &source);
+
+  // Deregister(Unpin) the memory that is registered for the buffer
+  void deregisterMem() {
+    // Check that this object is local when deregisterMem is called
+    CkAssert(CkNodeOf(pe) == CkMyNode());
+
+    if(isRegistered == false)
+      return;
+
+#if CMK_REG_REQUIRED
+    CmiDeregisterMem(ptr, layerInfo + CmiGetRdmaCommonInfoSize(), pe, mode);
+#endif
+
+    isRegistered = false;
+  }
+
+  void pup(PUP::er &p) {
+    p((char *)&ptr, sizeof(ptr));
+    p|cnt;
+    p|cb;
+    p|pe;
+    p|mode;
+    p|isRegistered;
+    PUParray(p, layerInfo, CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES);
+  }
+
 };
-PUPbytes(CkNcpyDestination)
 
 #endif
