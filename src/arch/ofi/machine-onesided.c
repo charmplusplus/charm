@@ -78,7 +78,7 @@ static inline void ofi_onesided_read_callback(struct fi_cq_tagged_entry *e, OFIR
 
     if(recvInfo->comOps == recvInfo->numOps) {
       // All the RDMA operations for one entry method have completed
-      ofi_onesided_all_ops_done(recvInfo->msg);
+      ofi_onesided_all_ops_done((char*)recvInfo->msg);
     }
 
     // Deregister the memory region
@@ -96,7 +96,7 @@ static inline void ofi_onesided_read_callback(struct fi_cq_tagged_entry *e, OFIR
 
 void ofi_post_nocopy_operation(
   char *lbuf,
-  char *rbuf,
+  const char *rbuf,
   int  remoteNodeNo,
   uint64_t rkey,
   int size,
@@ -116,7 +116,7 @@ void ofi_post_nocopy_operation(
 #if USE_OFIREQUEST_CACHE
     rma_req = alloc_request(context.request_cache);
 #else
-    rma_req = CmiAlloc(sizeof(OFIRequest));
+    rma_req = (OFIRequest*)CmiAlloc(sizeof(OFIRequest));
 #endif
 
     CmiAssert(rma_req);
@@ -160,7 +160,7 @@ void LrtsIssueRgets(void *recv, int pe) {
   int i;
   for(i = 0; i < recvInfo->numOps; i++) {
     CmiOfiRdmaRecvOp_t *rdmaRecvOpInfo = &(recvInfo->rdmaOp[i]);
-    char *rbuf        = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (void *)rdmaRecvOpInfo->src_buf;
+    const char *rbuf        = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (const char*)rdmaRecvOpInfo->src_buf;
     ofi_post_nocopy_operation(
         (char *)rdmaRecvOpInfo->buf,
         rbuf,
@@ -205,7 +205,7 @@ void process_onesided_reg_and_put(struct fi_cq_tagged_entry *e, OFIRequest *req)
                            regAndPutMsg->destPe,
                            regAndPutMsg->ackSize);
 
-  char *rbuf  = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (void *)(regAndPutMsg->destAddr);
+  const char *rbuf  = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (const char*)regAndPutMsg->destAddr;
 
   // Allocate a completion object for tracking write completion and ack handling
   CmiOfiRdmaComp_t* rdmaComp = (CmiOfiRdmaComp_t *)malloc(sizeof(CmiOfiRdmaComp_t));
@@ -213,7 +213,7 @@ void process_onesided_reg_and_put(struct fi_cq_tagged_entry *e, OFIRequest *req)
   rdmaComp->completion_count = 0;
 
   ofi_post_nocopy_operation(
-      (void *)regAndPutMsg->srcAddr,
+      (char*)regAndPutMsg->srcAddr,
       rbuf,
       CmiNodeOf(regAndPutMsg->destPe),
       regAndPutMsg->rem_key,
@@ -236,7 +236,7 @@ void process_onesided_reg_and_get(struct fi_cq_tagged_entry *e, OFIRequest *req)
                            regAndGetMsg->destPe,
                            regAndGetMsg->ackSize);
 
-  char *rbuf  = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (void *)(regAndGetMsg->srcAddr);
+  const char *rbuf  = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (const char*)regAndGetMsg->srcAddr;
 
   // Allocate a completion object for tracking write completion and ack handling
   CmiOfiRdmaComp_t* rdmaComp = (CmiOfiRdmaComp_t *)malloc(sizeof(CmiOfiRdmaComp_t));
@@ -244,7 +244,7 @@ void process_onesided_reg_and_get(struct fi_cq_tagged_entry *e, OFIRequest *req)
   rdmaComp->completion_count = 0;
 
   ofi_post_nocopy_operation(
-      (void *)regAndGetMsg->destAddr,
+      (char*)regAndGetMsg->destAddr,
       rbuf,
       CmiNodeOf(regAndGetMsg->srcPe),
       regAndGetMsg->rem_key,
@@ -305,7 +305,7 @@ void LrtsIssueRget(
 #if USE_OFIREQUEST_CACHE
     req = alloc_request(context.request_cache);
 #else
-    req = CmiAlloc(sizeof(OFIRequest));
+    req = (OFIRequest*)CmiAlloc(sizeof(OFIRequest));
 #endif
     CmiAssert(req);
 
@@ -328,7 +328,7 @@ void LrtsIssueRget(
     CmiOfiRdmaPtr_t *dest_info = (CmiOfiRdmaPtr_t *)destInfo;
     CmiOfiRdmaPtr_t *src_info = (CmiOfiRdmaPtr_t *)srcInfo;
 
-    char *rbuf        = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (void *)srcAddr;
+    const char *rbuf        = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (const char*)srcAddr;
 
     // Allocate a completion object for tracking read completion and ack handling
     CmiOfiRdmaComp_t* rdmaComp = (CmiOfiRdmaComp_t *)malloc(sizeof(CmiOfiRdmaComp_t));
@@ -336,7 +336,7 @@ void LrtsIssueRget(
     rdmaComp->completion_count = 0;
 
     ofi_post_nocopy_operation(
-        (void *)destAddr,
+        (char*)destAddr,
         rbuf,
         CmiNodeOf(srcPe),
         src_info->key,
@@ -397,7 +397,7 @@ void LrtsIssueRput(
 #if USE_OFIREQUEST_CACHE
     req = alloc_request(context.request_cache);
 #else
-    req = CmiAlloc(sizeof(OFIRequest));
+    req = (OFIRequest*)CmiAlloc(sizeof(OFIRequest));
 #endif
     CmiAssert(req);
 
@@ -421,7 +421,7 @@ void LrtsIssueRput(
     CmiOfiRdmaPtr_t *src_info = (CmiOfiRdmaPtr_t *)srcInfo;
     CmiOfiRdmaPtr_t *dest_info = (CmiOfiRdmaPtr_t *)destInfo;
 
-    char *rbuf         = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (void *)destAddr;
+    const char *rbuf         = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (const char*)destAddr;
 
     // Allocate a completion object for tracking write completion and ack handling
     CmiOfiRdmaComp_t* rdmaComp = (CmiOfiRdmaComp_t *)malloc(sizeof(CmiOfiRdmaComp_t));
@@ -429,7 +429,7 @@ void LrtsIssueRput(
     rdmaComp->completion_count = 0;
 
     ofi_post_nocopy_operation(
-        (void *)srcAddr,
+        (char*)srcAddr,
         rbuf,
         CmiNodeOf(destPe),
         dest_info->key,

@@ -444,7 +444,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     OFI_INFO("use inject: %d\n", context.use_inject);
 
     context.rma_maxsize = prov->ep_attr->max_msg_size;
-    context.mr_mode = prov->domain_attr->mr_mode;
+    context.mr_mode = static_cast<fi_mr_mode>(prov->domain_attr->mr_mode);
     context.mr_counter = 0;
 
     OFI_INFO("maximum rma size: %ld\n", context.rma_maxsize);

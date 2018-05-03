@@ -100,7 +100,7 @@ typedef struct request_cache_t
 
 static inline request_cache_t* create_request_cache()
 {
-    request_cache_t* cache = malloc(sizeof(*cache));
+    request_cache_t* cache = (request_cache_t*)malloc(sizeof(*cache));
     if (cache)
     {
         cache->next = 0;
