@@ -1859,6 +1859,7 @@ static char *CopyMsg(char *msg, int len) {
 
 /************Barrier Related Functions****************/
 /* must be called on all ranks including comm thread in SMP */
+#ifndef CmiBarrier
 int CmiBarrier(void) {
 #if CMK_SMP
     /* make sure all ranks reach here, otherwise comm threads may reach barrier ignoring other ranks  */
@@ -1878,6 +1879,7 @@ int CmiBarrier(void) {
 #endif
     return 0;
 }
+#endif
 
 /**********Lock Related Functions**********/
 #if CMK_USE_COMMON_LOCK

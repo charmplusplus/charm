@@ -296,6 +296,8 @@ int _ccsHandlerIdx = 0;/*Converse handler index of routine req_fw_handler*/
 #if CMK_BIGSIM_CHARM
 CpvDeclare(int, _bgCcsHandlerIdx);
 CpvDeclare(int, _bgCcsAck);
+extern int BgNodeSize(void);
+extern void addBgNodeInbuffer(char *, int);
 /* This routine is needed when the application is built on top of the bigemulator
  * layer of Charm. In this case, the real CCS handler must be called within a
  * worker thread. The function of this function is to receive the CCS message in
