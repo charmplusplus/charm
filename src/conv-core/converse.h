@@ -1904,6 +1904,7 @@ extern "C"
 void CmiMachineProgressImpl();
 
 #if CMK_USE_PXSHM
+CMI_EXTERNC void CommunicationServerPxshm(void);
 #define CmiNetworkProgress() {CpvAccess(networkProgressCount) ++; \
       if(CpvAccess(networkProgressCount) >=  networkProgressPeriod) { \
           CmiMachineProgressImpl(); \
