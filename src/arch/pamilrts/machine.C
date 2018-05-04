@@ -136,7 +136,7 @@ void LrtsSpecializedQueuePush(int pe, void  *msg) {
 }
 
 char *LrtsSpecializedQueuePop() {
- return PPCAtomicDequeue(&procState[CmiMyRank()].atomic_queue);
+ return (char *)PPCAtomicDequeue(&procState[CmiMyRank()].atomic_queue);
 }
 
 #if CMK_NODE_QUEUE_AVAILABLE
@@ -231,6 +231,9 @@ volatile int outstanding_recvs;
 #define  DECR_ORECVS()   (outstanding_recvs --)
 #define  ORECVS()        (outstanding_recvs)
 #endif
+
+// Function declaration for ppc_msync
+CMI_EXTERNC void ppc_msync();
 
 #if CMK_SMP  && !CMK_ENABLE_ASYNC_PROGRESS
 #define PAMIX_CONTEXT_LOCK_INIT(x)
@@ -1030,7 +1033,7 @@ static pami_result_t machine_network_barrier(pami_context_t   my_context,
 #endif
   if (to_lock)
     PAMIX_CONTEXT_UNLOCK(my_context);
-  return result;
+  return (pami_result_t)result;
 }
 
 pami_result_t network_barrier_handoff(pami_context_t context, void *msg)

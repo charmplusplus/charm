@@ -497,7 +497,7 @@ void CmiPushNode(void *msg) {
 #endif
 
 #if CMK_MACH_SPECIALIZED_QUEUE
-    LrtsSpecializedNodeQueuePush(msg);
+    LrtsSpecializedNodeQueuePush((char *)msg);
 #else
     CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
     CMIQueuePush(CsvAccess(NodeState).NodeRecv, (char *)msg);

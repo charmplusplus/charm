@@ -1,5 +1,8 @@
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
+
 #include <pthread.h>
 #include <sched.h>
 
@@ -173,6 +176,9 @@ static void CmiSendPeer (int rank, int size, char *msg);
 
 //So far we dont define any comm threads
 int Cmi_commthread = 0;
+
+CMI_EXTERNC
+void PerrorExit (const char *err);
 
 #include "machine-smp.c"
 CsvDeclare(CmiNodeState, NodeState);
@@ -1944,7 +1950,7 @@ static pami_result_t machine_network_barrier(pami_context_t   my_context,
     if (to_lock)
       PAMIX_CONTEXT_UNLOCK(my_context);
 
-    return result;
+    return (pami_result_t)result;
 }
 
 pami_result_t network_barrier_handoff(pami_context_t context, void *msg)
