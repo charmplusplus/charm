@@ -13,7 +13,7 @@ CmiCommHandle LrtsAsyncListSendFn(int npes, int *pes, int len, char *msg);
 void LrtsFreeListSendFn(int npes, int *pes, int len, char *msg);
 
 #if CMK_PERSISTENT_COMM
-void LrtsSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m);
+CMI_EXTERNC void LrtsSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m);
 #endif
 
 /* ### Beginning of Machine-startup Related Functions ### */

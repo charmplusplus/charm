@@ -2988,13 +2988,13 @@ static void PumpRemoteTransactions(gni_cq_handle_t rx_cqh)
         case 1:  {    // PERSISTENT
             CmiLock(persistPool.lock);
             CmiAssert(GetIndexType(persistPool, index) == NONCHARM_SMSG);
-            PersistentReceivesTable *slot = GetIndexAddress(persistPool, index);
+            PersistentReceivesTable *slot = (PersistentReceivesTable *)GetIndexAddress(persistPool, index);
             CmiUnlock(persistPool.lock);
             msg = slot->destBuf[slot->addrIndex].destAddress;
             size = CmiGetMsgSize(msg);
             CmiReference(msg);
             CMI_CHECK_CHECKSUM(msg, size);
-            handleOneRecvedMsg(size, msg); 
+            handleOneRecvedMsg(size, (char*)msg); 
             break;
             }
 #endif

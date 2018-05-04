@@ -72,14 +72,14 @@ CpvExtern(PersistentHandle *, phs);
 CpvExtern(int, phsSize);
 CpvExtern(int, curphs);
 
-PersistentHandle getPersistentHandle(PersistentHandle h, int toindex);
-void *PerAlloc(int size);
-void PerFree(char *msg);
-int PumpPersistent(void);
-void swapSendSlotBuffers(PersistentSendsTable *slot);
-void swapRecvSlotBuffers(PersistentReceivesTable *slot);
-void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes);
-void clearRecvSlot(PersistentReceivesTable *slot);
+CMI_EXTERNC PersistentHandle getPersistentHandle(PersistentHandle h, int toindex);
+CMI_EXTERNC void *PerAlloc(int size);
+CMI_EXTERNC void PerFree(char *msg);
+CMI_EXTERNC int PumpPersistent(void);
+CMI_EXTERNC void swapSendSlotBuffers(PersistentSendsTable *slot);
+CMI_EXTERNC void swapRecvSlotBuffers(PersistentReceivesTable *slot);
+CMI_EXTERNC void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes);
+CMI_EXTERNC void clearRecvSlot(PersistentReceivesTable *slot);
 
 /*@}*/
 

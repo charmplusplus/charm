@@ -70,8 +70,8 @@ CpvDeclare(int, curphs);
      Utilities
 ******************************************************************************/
 
-extern void initRecvSlot(PersistentReceivesTable *slot);
-extern void initSendSlot(PersistentSendsTable *slot);
+CMI_EXTERNC void initRecvSlot(PersistentReceivesTable *slot);
+CMI_EXTERNC void initSendSlot(PersistentSendsTable *slot);
 
 void swapSendSlotBuffers(PersistentSendsTable *slot)
 {
