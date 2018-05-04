@@ -4389,6 +4389,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #endif
 }
 
+CMI_EXTERNC
 void* LrtsRdmaAlloc(int n_bytes, int header)
 {
     void *ptr = NULL;
@@ -4419,6 +4420,7 @@ void* LrtsRdmaAlloc(int n_bytes, int header)
     return ptr;
 }
 
+CMI_EXTERNC
 void  LrtsRdmaFree(void *msg)
 {
     int headersize = sizeof(CmiChunkHeader);
@@ -4447,6 +4449,7 @@ void  LrtsRdmaFree(void *msg)
     }
 }
 
+CMI_EXTERNC
 void* LrtsAlloc(int n_bytes, int header)
 {
     void *ptr = NULL;
@@ -4486,6 +4489,7 @@ void* LrtsAlloc(int n_bytes, int header)
     return ptr;
 }
 
+CMI_EXTERNC
 void  LrtsFree(void *msg)
 {
     int headersize = sizeof(CmiChunkHeader);

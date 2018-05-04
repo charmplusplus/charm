@@ -255,10 +255,10 @@ CpvDeclare(Queue, CsdGridQueue);
 #endif
 
 #if CMK_CRAYXE || CMK_CRAYXC || CMK_OFI
-void* LrtsAlloc(int, int);
-void* LrtsRdmaAlloc(int, int);
-void  LrtsFree(void*);
-void  LrtsRdmaFree(void*);
+CMI_EXTERNC void* LrtsAlloc(int, int);
+CMI_EXTERNC void* LrtsRdmaAlloc(int, int);
+CMI_EXTERNC void  LrtsFree(void*);
+CMI_EXTERNC void  LrtsRdmaFree(void*);
 #endif
 
 CpvStaticDeclare(int, cmiMyPeIdle);

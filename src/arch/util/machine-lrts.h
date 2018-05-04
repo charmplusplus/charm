@@ -31,11 +31,11 @@ CMK_NORETURN void LrtsAbort(const char *message);
 /* ### End of Machine-running Related Functions ### */
 void LrtsPostNonLocal(void);
 
-void* LrtsAlloc(int, int);
-void* LrtsRdmaAlloc(int, int);
+CMI_EXTERNC void* LrtsAlloc(int, int);
+CMI_EXTERNC void* LrtsRdmaAlloc(int, int);
 
-void  LrtsFree(void*);
-void  LrtsRdmaFree(void*);
+CMI_EXTERNC void  LrtsFree(void*);
+CMI_EXTERNC void  LrtsRdmaFree(void*);
 void  LrtsNotifyIdle(void);
 
 void  LrtsBeginIdle(void);
