@@ -284,10 +284,12 @@ struct CkReductionTypesExt {
     int sum_short = CkReduction::sum_short;
     int sum_int = CkReduction::sum_int;
     int sum_long = CkReduction::sum_long;
+    int sum_long_long = CkReduction::sum_long_long;
     int sum_uchar = CkReduction::sum_uchar;
     int sum_ushort = CkReduction::sum_ushort;
     int sum_uint = CkReduction::sum_uint;
     int sum_ulong = CkReduction::sum_ulong;
+    int sum_ulong_long = CkReduction::sum_ulong_long;
     int sum_float = CkReduction::sum_float;
     int sum_double = CkReduction::sum_double;
     // Product reducers
@@ -295,10 +297,12 @@ struct CkReductionTypesExt {
     int product_short = CkReduction::product_short;
     int product_int = CkReduction::product_int;
     int product_long = CkReduction::product_long;
+    int product_long_long = CkReduction::product_long_long;
     int product_uchar = CkReduction::product_uchar;
     int product_ushort = CkReduction::product_ushort;
     int product_uint = CkReduction::product_uint;
     int product_ulong = CkReduction::product_ulong;
+    int product_ulong_long = CkReduction::product_ulong_long;
     int product_float = CkReduction::product_float;
     int product_double = CkReduction::product_double;
     // Max reducers
@@ -306,10 +310,12 @@ struct CkReductionTypesExt {
     int max_short = CkReduction::max_short;
     int max_int = CkReduction::max_int;
     int max_long = CkReduction::max_long;
+    int max_long_long = CkReduction::max_long_long;
     int max_uchar = CkReduction::max_uchar;
     int max_ushort = CkReduction::max_ushort;
     int max_uint = CkReduction::max_uint;
     int max_ulong = CkReduction::max_ulong;
+    int max_ulong_long = CkReduction::max_ulong_long;
     int max_float = CkReduction::max_float;
     int max_double = CkReduction::max_double;
     // Min reducers
@@ -317,10 +323,12 @@ struct CkReductionTypesExt {
     int min_short = CkReduction::min_short;
     int min_int = CkReduction::min_int;
     int min_long = CkReduction::min_long;
+    int min_long_long = CkReduction::min_long_long;
     int min_uchar = CkReduction::min_uchar;
     int min_ushort = CkReduction::min_ushort;
     int min_uint = CkReduction::min_uint;
     int min_ulong = CkReduction::min_ulong;
+    int min_ulong_long = CkReduction::min_ulong_long;
     int min_float = CkReduction::min_float;
     int min_double = CkReduction::min_double;
     // External custom reducer in Python
