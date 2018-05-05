@@ -19,6 +19,16 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 
 #include "cmitls.h"
 
+#if 0
+     /*Many debugging statements:*/
+#    define DBG(x) ckout<<"["<<thisIndex<<","<<CkMyPe()<<"] TCHARM> "<<x<<endl;
+#    define DBGX(x) ckout<<"PE("<<CkMyPe()<<") TCHARM> "<<x<<endl;
+#else
+     /*No debugging statements*/
+#    define DBG(x) /*empty*/
+#    define DBGX(x) /*empty*/
+#endif
+
 class TCharmTraceLibList;
 
 /// Used to ship around system calls.
@@ -63,6 +73,8 @@ class TCharmInitMsg : public CMessage_TCharmInitMsg {
 	TCharmInitMsg(int threadFn_,const TCHARM_Thread_options &opts_)
 		:threadFn(threadFn_), opts(opts_) {}
 };
+
+extern bool tcharm_nothreads;
 
 //Thread-local variables:
 CtvExtern(TCharm *,_curTCharm);
@@ -109,7 +121,7 @@ class TCharm: public CBase_TCharm
 			{cfn=cfn_; t=t_; pos=CthStackOffset(t, (char *)p); mode='c';}
 		UserData(TCHARM_Pup_global_fn gfn_,CthThread t_,void *p)
 			{gfn=gfn_; t=t_; pos=CthStackOffset(t, (char *)p); mode='g';}
-		inline void *getData(void) const {return pos==0?NULL:CthPointer(t, pos);}
+		inline void *getData() const {return pos==0?NULL:CthPointer(t, pos);}
 		void pup(PUP::er &p);
 		void update(CthThread t_) { t=t_; }
 		friend inline void operator|(PUP::er &p,UserData &d) {d.pup(p);}
@@ -137,20 +149,20 @@ class TCharm: public CBase_TCharm
 	UserData ud[maxUserData];
 
 	void pupThread(PUP::er &p);
-	void ResumeFromSync(void);
+	void ResumeFromSync();
 
  public:
 	TCharm(TCharmInitMsg *initMsg);
 	TCharm(CkMigrateMessage *);
 	~TCharm();
 
-	virtual void ckJustMigrated(void);
-	virtual void ckJustRestored(void);
-	virtual void ckAboutToMigrate(void);
+	virtual void ckJustMigrated();
+	virtual void ckJustRestored();
+	virtual void ckAboutToMigrate();
 
 	void migrateDelayed(int destPE);
-	void atBarrier(void);
-	void atExit(CkReductionMsg *msg);
+	void atBarrier();
+	void atExit(CkReductionMsg *msg) noexcept;
 	void clear();
 
 	//Pup routine packs the user data and migrates the thread
@@ -177,74 +189,104 @@ class TCharm: public CBase_TCharm
 	void *semaGet(int id);
 
 	//One-time initialization
-	static void nodeInit(void);
-	static void procInit(void);
+	static void nodeInit();
+	static void procInit();
 
 	//Start running the thread for the first time
-	void run(void);
+	void run() noexcept;
 
-	inline double getTimeOffset(void) const { return timeOffset; }
+	inline double getTimeOffset() const noexcept { return timeOffset; }
 
 	//Client-callable routines:
 	//Sleep till entire array is here
-	void barrier(void);
+	void barrier() noexcept;
 
 	//Block, migrate to destPE, and resume
-	void migrateTo(int destPE);
+	void migrateTo(int destPE) noexcept;
 
 #if CMK_FAULT_EVAC
-	void evacuate();
+	void evacuate() noexcept;
 #endif
 
 	//Thread finished running
-	void done(int exitcode);
+	void done(int exitcode) noexcept;
 
 	//Register user data to be packed with the thread
-	int add(const UserData &d);
-	void *lookupUserData(int ud);
+	int add(const UserData &d) noexcept;
+	void *lookupUserData(int ud) noexcept;
 
-	inline static TCharm *get(void) {
+	inline static TCharm *get() noexcept {
 		TCharm *c=getNULL();
 #if CMK_ERROR_CHECKING
 		if (!c) ::CkAbort("TCharm has not been initialized!\n");
 #endif
 		return c;
 	}
-	inline static TCharm *getNULL(void) {return CtvAccess(_curTCharm);}
-	inline CthThread getThread(void) {return tid;}
-	inline const CProxy_TCharm &getProxy(void) const {return threadInfo.tProxy;}
-	inline int getElement(void) const {return threadInfo.thisElement;}
-	inline int getNumElements(void) const {return threadInfo.numElements;}
+	inline static TCharm *getNULL() noexcept {return CtvAccess(_curTCharm);}
+	inline CthThread getThread() noexcept {return tid;}
+	inline const CProxy_TCharm &getProxy() const noexcept {return threadInfo.tProxy;}
+	inline int getElement() const noexcept {return threadInfo.thisElement;}
+	inline int getNumElements() const noexcept {return threadInfo.numElements;}
 
 	//Start/stop load balancer measurements
-	inline void stopTiming(void) {ckStopTiming();}
-	inline void startTiming(void) {ckStartTiming();}
+	inline void stopTiming() noexcept {ckStopTiming();}
+	inline void startTiming() noexcept {ckStartTiming();}
 
 	//Block our thread, run the scheduler, and come back
-	void schedule(void);
+	void schedule() noexcept {
+		DBG("thread schedule");
+		start(); // Calls CthAwaken
+		stop(); // Calls CthSuspend
+	}
+
 
 	//As above, but start/stop the thread itself, too.
-	void stop(void); //Blocks; will not return until "start" called.
-	void start(void);
+	void stop() noexcept { //Blocks; will not return until "start" called.
+		#if CMK_ERROR_CHECKING
+		if (tid != CthSelf())
+			CkAbort("Called TCharm::stop from outside TCharm thread!\n");
+		if (tcharm_nothreads)
+			CkAbort("Cannot make blocking calls using +tcharm_nothreads!\n");
+		#endif
+		stopTiming();
+		isStopped=true;
+		DBG("thread suspended");
+
+		CthSuspend();
+		/* SUBTLE: We have to do the get() because "this" may have changed
+		 * during a migration-suspend.  If you access *any* members
+		 * from this point onward, you'll cause heap corruption if
+		 * we're resuming from migration!  (OSL 2003/9/23) */
+		TCharm *dis=TCharm::get();
+		dis->isStopped=false;
+		dis->startTiming();
+	}
+
+	void start() noexcept {
+		isStopped=false; // do not migrate while running
+		DBG("thread resuming soon");
+		CthAwaken(tid);
+	}
+
 	//Aliases:
-	inline void suspend(void) {stop();}
-	inline void resume(void) {
-		//printf("in thcarm::resume, isStopped=%d\n", isStopped); 
-		if (isStopped){ 
-		    start(); 
+	inline void suspend() noexcept {stop();}
+	inline void resume() noexcept {
+		//printf("in thcarm::resume, isStopped=%d\n", isStopped);
+		if (isStopped){
+		    start();
 		}
-		else {
-		    //printf("[%d] TCharm resume called on already running thread pe %d \n",thisIndex,CkMyPe());
-		}
+		/*else {
+		    printf("[%d] TCharm resume called on already running thread pe %d \n",thisIndex,CkMyPe());
+		}*/
 	}
 
 	//Go to sync, block, possibly migrate, and then resume
-	void migrate(void);
-	void async_migrate(void);
-	void allow_migrate(void);
+	void migrate() noexcept;
+	void async_migrate() noexcept;
+	void allow_migrate();
 
 	//Entering thread context: turn stuff on
-	static void activateThread(void) {
+	static void activateThread(void) noexcept {
 		// NOTE: if changing the body of this function, you also need to
 		//       modify TCharmAPIRoutine's destructor, which has the body
 		//       of this routine inlined into it to avoid extra branching.
@@ -259,7 +301,7 @@ class TCharm: public CBase_TCharm
 		}
 	}
 	//Leaving this thread's context: turn stuff back off
-	static void deactivateThread(void) {
+	static void deactivateThread() noexcept {
 		CmiIsomallocBlockListActivate(NULL);
 #if CMI_SWAPGLOBALS
 		CtgInstall(NULL);
@@ -273,14 +315,14 @@ class TCharm: public CBase_TCharm
 	inline CthThread getTid() { return tid; }
 };
 
-void TCHARM_Api_trace(const char *routineName, const char *libraryName);
+void TCHARM_Api_trace(const char *routineName, const char *libraryName) noexcept;
 
 #if CMK_TRACE_ENABLED
 typedef std::unordered_map<std::string, int> funcmap;
 CsvExtern(funcmap*, tcharm_funcmap);
 
 static
-int tcharm_routineNametoID(char const *routineName)
+int tcharm_routineNametoID(char const *routineName) noexcept
 {
   funcmap::iterator it;
   it = CsvAccess(tcharm_funcmap)->find(routineName);
@@ -314,9 +356,9 @@ private:
 public:
 	// Entering Charm++ from user code
 #if CMK_TRACE_ENABLED
-	TCharmAPIRoutine(const char *routineName, const char *libraryName) {
+	TCharmAPIRoutine(const char *routineName, const char *libraryName) noexcept {
 #else
-	TCharmAPIRoutine() {
+	TCharmAPIRoutine() noexcept {
 #endif
 #if CMK_BIGSIM_CHARM
 		// Start a new event, so we can distinguish between client
@@ -347,7 +389,7 @@ public:
 	}
 
 	// Returning to user code from Charm++
-	~TCharmAPIRoutine() {
+	~TCharmAPIRoutine() noexcept {
 #if CMK_TRACE_ENABLED
 		double stop = CmiWallTimer();
 #endif

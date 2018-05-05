@@ -5,7 +5,7 @@
 using std::numeric_limits;
 
 void
-CkDDT::pup(PUP::er &p)
+CkDDT::pup(PUP::er &p) noexcept
 {
   p|types;
   if (p.isUnpacking()) {
@@ -53,7 +53,7 @@ CkDDT::pup(PUP::er &p)
 }
 
 void
-CkDDT::freeType(int index)
+CkDDT::freeType(int index) noexcept
 {
   CkAssert(types.size() == typeTable.size());
   if (index > CkDDT_MAX_PRIMITIVE_TYPE) {
@@ -85,7 +85,7 @@ CkDDT::freeType(int index)
   }
 }
 
-CkDDT::~CkDDT()
+CkDDT::~CkDDT() noexcept
 {
   for (int i=0; i<typeTable.size(); i++) {
     if (typeTable[i] != nullptr) {
@@ -95,7 +95,7 @@ CkDDT::~CkDDT()
 }
 
 int
-CkDDT::insertType(CkDDT_DataType* ptr, int type)
+CkDDT::insertType(CkDDT_DataType* ptr, int type) noexcept
 {
   // Search thru non-primitive types for a free one first:
   CkAssert(types.size() == typeTable.size());
@@ -112,7 +112,7 @@ CkDDT::insertType(CkDDT_DataType* ptr, int type)
 }
 
 void
-CkDDT::createDup(int nIndexOld, int *nIndexNew)
+CkDDT::createDup(int nIndexOld, int *nIndexNew) noexcept
 {
   CkDDT_DataType *dttype = getType(nIndexOld);
   CkDDT_DataType *type;
@@ -151,14 +151,14 @@ CkDDT::createDup(int nIndexOld, int *nIndexNew)
 }
 
 int
-CkDDT::getEnvelope(int nIndex, int *ni, int *na, int *nd, int *combiner) const
+CkDDT::getEnvelope(int nIndex, int *ni, int *na, int *nd, int *combiner) const noexcept
 {
   CkDDT_DataType* dttype = getType(nIndex);
   return dttype->getEnvelope(ni, na, nd, combiner);
 }
 
 int
-CkDDT::getContents(int nIndex, int ni, int na, int nd, int i[], MPI_Aint a[], int d[])
+CkDDT::getContents(int nIndex, int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) noexcept
 {
   CkDDT_DataType* dttype = getType(nIndex);
   int ret = dttype->getContents(ni, na, nd, i, a, d);
@@ -176,7 +176,7 @@ CkDDT::getContents(int nIndex, int ni, int na, int nd, int i[], MPI_Aint a[], in
 }
 
 void
-CkDDT::createResized(MPI_Datatype oldtype, MPI_Aint lb, MPI_Aint extent, MPI_Datatype *newType)
+CkDDT::createResized(MPI_Datatype oldtype, MPI_Aint lb, MPI_Aint extent, MPI_Datatype *newType) noexcept
 {
   CkDDT_DataType *dttype = getType(oldtype);
   CkDDT_DataType *type;
@@ -223,7 +223,7 @@ CkDDT::createResized(MPI_Datatype oldtype, MPI_Aint lb, MPI_Aint extent, MPI_Dat
 }
 
 void
-CkDDT::newContiguous(int count, MPI_Datatype oldType, MPI_Datatype *newType)
+CkDDT::newContiguous(int count, MPI_Datatype oldType, MPI_Datatype *newType) noexcept
 {
   CkDDT_DataType *type = new CkDDT_Contiguous(count, oldType, typeTable[oldType]);
   *newType = insertType(type, CkDDT_CONTIGUOUS);
@@ -231,7 +231,7 @@ CkDDT::newContiguous(int count, MPI_Datatype oldType, MPI_Datatype *newType)
 
 void
 CkDDT::newVector(int count, int blocklength, int stride,
-                 MPI_Datatype oldType, MPI_Datatype* newType)
+                 MPI_Datatype oldType, MPI_Datatype* newType) noexcept
 {
   CkDDT_DataType* type = new CkDDT_Vector(count, blocklength, stride, oldType, typeTable[oldType]);
   *newType = insertType(type, CkDDT_VECTOR);
@@ -239,7 +239,7 @@ CkDDT::newVector(int count, int blocklength, int stride,
 
 void
 CkDDT::newHVector(int count, int blocklength, int stride,
-                  MPI_Datatype oldtype, MPI_Datatype* newType)
+                  MPI_Datatype oldtype, MPI_Datatype* newType) noexcept
 {
   CkDDT_DataType* type = new CkDDT_HVector(count, blocklength, stride, oldtype, typeTable[oldtype]);
   *newType = insertType(type, CkDDT_HVECTOR);
@@ -247,7 +247,7 @@ CkDDT::newHVector(int count, int blocklength, int stride,
 
 void
 CkDDT::newIndexedBlock(int count, int Blocklength, const int *arrDisp, MPI_Datatype oldtypeIdx,
-                       MPI_Datatype *newType)
+                       MPI_Datatype *newType) noexcept
 {
   // Convert arrDisp from an array of int's to an array of MPI_Aint's. This is needed because
   // MPI_Type_create_indexed_block takes ints and MPI_Type_create_hindexed_block takes MPI_Aint's
@@ -264,7 +264,7 @@ CkDDT::newIndexedBlock(int count, int Blocklength, const int *arrDisp, MPI_Datat
 
 void
 CkDDT::newHIndexedBlock(int count, int Blocklength, const MPI_Aint *arrDisp, MPI_Datatype oldtype,
-                        MPI_Datatype *newType)
+                        MPI_Datatype *newType) noexcept
 {
   CkDDT_DataType *type = new CkDDT_HIndexed_Block(count, Blocklength, arrDisp,
                                                   oldtype, typeTable[oldtype]);
@@ -273,7 +273,7 @@ CkDDT::newHIndexedBlock(int count, int Blocklength, const MPI_Aint *arrDisp, MPI
 
 void
 CkDDT::newIndexed(int count, const int* arrbLength, MPI_Aint* arrDisp,
-                  MPI_Datatype oldtypeIdx, MPI_Datatype* newType)
+                  MPI_Datatype oldtypeIdx, MPI_Datatype* newType) noexcept
 {
   CkDDT_DataType* oldtype = typeTable[oldtypeIdx];
   vector<MPI_Aint> dispBytesArr(count);
@@ -287,7 +287,7 @@ CkDDT::newIndexed(int count, const int* arrbLength, MPI_Aint* arrDisp,
 
 void
 CkDDT::newHIndexed(int count, const int* arrbLength, const MPI_Aint* arrDisp,
-                   MPI_Datatype oldtype, MPI_Datatype* newType)
+                   MPI_Datatype oldtype, MPI_Datatype* newType) noexcept
 {
   CkDDT_DataType* type = new CkDDT_HIndexed(count, arrbLength, arrDisp, oldtype, typeTable[oldtype]);
   *newType = insertType(type, CkDDT_HINDEXED);
@@ -295,7 +295,7 @@ CkDDT::newHIndexed(int count, const int* arrbLength, const MPI_Aint* arrDisp,
 
 void
 CkDDT::newStruct(int count, const int* arrbLength, const MPI_Aint* arrDisp,
-                 const MPI_Datatype *oldtype, MPI_Datatype* newType)
+                 const MPI_Datatype *oldtype, MPI_Datatype* newType) noexcept
 {
   vector<CkDDT_DataType *> olddatatypes(count);
   for(int i=0;i<count;i++){
@@ -305,7 +305,7 @@ CkDDT::newStruct(int count, const int* arrbLength, const MPI_Aint* arrDisp,
   *newType = insertType(type, CkDDT_STRUCT);
 }
 
-CkDDT_DataType::CkDDT_DataType(int type) : datatype(type)
+CkDDT_DataType::CkDDT_DataType(int type) noexcept : datatype(type)
 {
   count = 1;
   switch (datatype) {
@@ -485,7 +485,7 @@ CkDDT_DataType::CkDDT_DataType(int type) : datatype(type)
 CkDDT_DataType::CkDDT_DataType(int datatype, int size, MPI_Aint extent, int count, MPI_Aint lb,
                                MPI_Aint ub, bool iscontig, int baseSize, MPI_Aint baseExtent,
                                CkDDT_DataType* baseType, int numElements, int baseIndex,
-                               MPI_Aint trueExtent, MPI_Aint trueLB) :
+                               MPI_Aint trueExtent, MPI_Aint trueLB) noexcept :
     datatype(datatype), refCount(1), size(size), extent(extent), count(count), lb(lb), ub(ub),
     trueExtent(trueExtent), trueLB(trueLB), iscontig(iscontig), baseSize(baseSize),
     baseExtent(baseExtent), baseType(baseType), numElements(numElements), baseIndex(baseIndex),
@@ -496,7 +496,7 @@ CkDDT_DataType::CkDDT_DataType(int datatype, int size, MPI_Aint extent, int coun
   }
 }
 
-CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType &obj, MPI_Aint _lb/*=0*/, MPI_Aint _extent/*=0*/) :
+CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType &obj, MPI_Aint _lb/*=0*/, MPI_Aint _extent/*=0*/) noexcept :
   datatype(obj.datatype)
   ,refCount(1)
   ,size(obj.size)
@@ -525,7 +525,7 @@ CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType &obj, MPI_Aint _lb/*=0*/, MP
 }
 
 void
-CkDDT_DataType::setSize(MPI_Aint _lb, MPI_Aint _extent)
+CkDDT_DataType::setSize(MPI_Aint _lb, MPI_Aint _extent) noexcept
 {
   extent = _extent;
   lb     = _lb;
@@ -545,7 +545,7 @@ CkDDT_DataType::setSize(MPI_Aint _lb, MPI_Aint _extent)
 }
 
 int
-CkDDT_DataType::getNumBasicElements(int bytes) const
+CkDDT_DataType::getNumBasicElements(int bytes) const noexcept
 {
   int extent = getSize();
   if (extent == 0) {
@@ -557,7 +557,7 @@ CkDDT_DataType::getNumBasicElements(int bytes) const
 }
 
 void
-CkDDT_DataType::pupType(PUP::er  &p, CkDDT* ddt)
+CkDDT_DataType::pupType(PUP::er  &p, CkDDT* ddt) noexcept
 {
   p|datatype;
   p|refCount;
@@ -582,7 +582,7 @@ CkDDT_DataType::pupType(PUP::er  &p, CkDDT* ddt)
 }
 
 int
-CkDDT_DataType::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
+CkDDT_DataType::getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept
 {
   *ni = 0;
   *na = 0;
@@ -592,12 +592,12 @@ CkDDT_DataType::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
 }
 
 int
-CkDDT_DataType::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const
+CkDDT_DataType::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept
 {
   return MPI_ERR_TYPE;
 }
 
-CkDDT_Contiguous::CkDDT_Contiguous(int nCount, int bindex, CkDDT_DataType* oldType)
+CkDDT_Contiguous::CkDDT_Contiguous(int nCount, int bindex, CkDDT_DataType* oldType) noexcept
 {
   datatype = CkDDT_CONTIGUOUS;
   count = nCount;
@@ -634,7 +634,7 @@ CkDDT_Contiguous::CkDDT_Contiguous(int nCount, int bindex, CkDDT_DataType* oldTy
 }
 
 size_t
-CkDDT_Contiguous::serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const
+CkDDT_Contiguous::serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept
 {
   DDTDEBUG("CkDDT_Contiguous::serialize, %s %d objects of type %d (iscontig=%d)\n",
            (dir==PACK)?"packing":"unpacking", num, baseType->getType(), (int)iscontig);
@@ -659,7 +659,7 @@ CkDDT_Contiguous::serialize(char* userdata, char* buffer, int num, int msgLength
 }
 
 void
-CkDDT_Contiguous::pupType(PUP::er &p, CkDDT *ddt)
+CkDDT_Contiguous::pupType(PUP::er &p, CkDDT *ddt) noexcept
 {
   CkDDT_DataType::pupType(p, ddt);
   if (p.isUnpacking()) {
@@ -668,7 +668,7 @@ CkDDT_Contiguous::pupType(PUP::er &p, CkDDT *ddt)
 }
 
 int
-CkDDT_Contiguous::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
+CkDDT_Contiguous::getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept
 {
   *ni = 1;
   *na = 0;
@@ -678,7 +678,7 @@ CkDDT_Contiguous::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
 }
 
 int
-CkDDT_Contiguous::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const
+CkDDT_Contiguous::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept
 {
   i[0] = count;
   d[0] = baseIndex;
@@ -686,12 +686,12 @@ CkDDT_Contiguous::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int
 }
 
 int
-CkDDT_Contiguous::getNumBasicElements(int bytes) const
+CkDDT_Contiguous::getNumBasicElements(int bytes) const noexcept
 {
   return getBaseType()->getNumBasicElements(bytes);
 }
 
-CkDDT_Vector::CkDDT_Vector(int nCount, int blength, int stride, int bindex, CkDDT_DataType* oldType)
+CkDDT_Vector::CkDDT_Vector(int nCount, int blength, int stride, int bindex, CkDDT_DataType* oldType) noexcept
 {
   datatype = CkDDT_VECTOR;
   count = nCount;
@@ -763,7 +763,7 @@ CkDDT_Vector::CkDDT_Vector(int nCount, int blength, int stride, int bindex, CkDD
 }
 
 size_t
-CkDDT_Vector::serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const
+CkDDT_Vector::serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept
 {
   DDTDEBUG("CkDDT_Vector::serialize, %s %d objects of type %d (iscontig=%d)\n",
            (dir==PACK)?"packing":"unpacking", num, baseType->getType(), (int)iscontig);
@@ -793,7 +793,7 @@ CkDDT_Vector::serialize(char* userdata, char* buffer, int num, int msgLength, Ck
 }
 
 void
-CkDDT_Vector::pupType(PUP::er &p, CkDDT* ddt)
+CkDDT_Vector::pupType(PUP::er &p, CkDDT* ddt) noexcept
 {
   CkDDT_DataType::pupType(p, ddt);
   p|blockLength;
@@ -804,7 +804,7 @@ CkDDT_Vector::pupType(PUP::er &p, CkDDT* ddt)
 }
 
 int
-CkDDT_Vector::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
+CkDDT_Vector::getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept
 {
   *ni = 3;
   *na = 0;
@@ -814,7 +814,7 @@ CkDDT_Vector::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
 }
 
 int
-CkDDT_Vector::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const
+CkDDT_Vector::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept
 {
   i[0] = count;
   i[1] = blockLength;
@@ -824,13 +824,13 @@ CkDDT_Vector::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]
 }
 
 int
-CkDDT_Vector::getNumBasicElements(int bytes) const
+CkDDT_Vector::getNumBasicElements(int bytes) const noexcept
 {
   return getBaseType()->getNumBasicElements(bytes);
 }
 
 CkDDT_HVector::CkDDT_HVector(int nCount, int blength, int stride,  int bindex,
-                         CkDDT_DataType* oldType)
+                         CkDDT_DataType* oldType) noexcept
 {
   datatype = CkDDT_HVECTOR;
   count = nCount;
@@ -874,7 +874,7 @@ CkDDT_HVector::CkDDT_HVector(int nCount, int blength, int stride,  int bindex,
 }
 
 size_t
-CkDDT_HVector::serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const
+CkDDT_HVector::serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept
 {
   DDTDEBUG("CkDDT_HVector::serialize, %s %d objects of type %d (iscontig=%d)\n",
            (dir==PACK)?"packing":"unpacking", num, baseType->getType(), (int)iscontig);
@@ -904,13 +904,13 @@ CkDDT_HVector::serialize(char* userdata, char* buffer, int num, int msgLength, C
 }
 
 void
-CkDDT_HVector::pupType(PUP::er &p, CkDDT* ddt)
+CkDDT_HVector::pupType(PUP::er &p, CkDDT* ddt) noexcept
 {
   CkDDT_Vector::pupType(p, ddt);
 }
 
 int
-CkDDT_HVector::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
+CkDDT_HVector::getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept
 {
   *ni = 2;
   *na = 1;
@@ -920,7 +920,7 @@ CkDDT_HVector::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
 }
 
 int
-CkDDT_HVector::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const
+CkDDT_HVector::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept
 {
   i[0] = count;
   i[1] = blockLength;
@@ -930,13 +930,13 @@ CkDDT_HVector::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[
 }
 
 int
-CkDDT_HVector::getNumBasicElements(int bytes) const
+CkDDT_HVector::getNumBasicElements(int bytes) const noexcept
 {
   return getBaseType()->getNumBasicElements(bytes);
 }
 
 CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, const MPI_Aint *arrBytesDisp,
-                                         const int *ArrDisp, int index, CkDDT_DataType *type)
+                                         const int *ArrDisp, int index, CkDDT_DataType *type) noexcept
   : CkDDT_HIndexed_Block(count, Blength, arrBytesDisp, index, type)
 {
   for (int i=0; i<count; i++) {
@@ -946,7 +946,7 @@ CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, const MPI_Aint 
 }
 
 size_t
-CkDDT_Indexed_Block::serialize(char *userdata, char *buffer, int num, int msgLength, CkDDT_Dir dir) const
+CkDDT_Indexed_Block::serialize(char *userdata, char *buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept
 {
   DDTDEBUG("CkDDT_Indexed_Block::serialize, %s %d objects of type %d (iscontig=%d)\n",
            (dir==PACK)?"packing":"unpacking", num, baseType->getType(), (int)iscontig);
@@ -979,13 +979,13 @@ CkDDT_Indexed_Block::serialize(char *userdata, char *buffer, int num, int msgLen
 }
 
 void
-CkDDT_Indexed_Block::pupType(PUP::er &p, CkDDT *ddt)
+CkDDT_Indexed_Block::pupType(PUP::er &p, CkDDT *ddt) noexcept
 {
   CkDDT_HIndexed_Block::pupType(p, ddt);
 }
 
 int
-CkDDT_Indexed_Block::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
+CkDDT_Indexed_Block::getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept
 {
   *ni = count+2;
   *na = 0;
@@ -995,7 +995,7 @@ CkDDT_Indexed_Block::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
 }
 
 int
-CkDDT_Indexed_Block::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const
+CkDDT_Indexed_Block::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept
 {
   i[0] = count;
   i[1] = blockLength;
@@ -1007,13 +1007,13 @@ CkDDT_Indexed_Block::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], 
 }
 
 int
-CkDDT_Indexed_Block::getNumBasicElements(int bytes) const
+CkDDT_Indexed_Block::getNumBasicElements(int bytes) const noexcept
 {
   return getBaseType()->getNumBasicElements(bytes);
 }
 
 CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, const MPI_Aint *ArrDisp,
-                                           int index, CkDDT_DataType *type)
+                                           int index, CkDDT_DataType *type) noexcept
   : CkDDT_DataType(CkDDT_INDEXED_BLOCK, 0, 0, count, 0, 0, 0, type->getSize(),
                    type->getExtent(), type, count * type->getNumElements(), index, 0, 0),
     blockLength(Blength),
@@ -1066,7 +1066,7 @@ CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, const MPI_Ain
 }
 
 size_t
-CkDDT_HIndexed_Block::serialize(char *userdata, char *buffer, int num, int msgLength, CkDDT_Dir dir) const
+CkDDT_HIndexed_Block::serialize(char *userdata, char *buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept
 {
   DDTDEBUG("CkDDT_HIndexed_Block::serialize, %s %d objects of type %d (iscontig=%d)\n",
            (dir==PACK)?"packing":"unpacking", num, baseType->getType(), (int)iscontig);
@@ -1099,7 +1099,7 @@ CkDDT_HIndexed_Block::serialize(char *userdata, char *buffer, int num, int msgLe
 }
 
 void
-CkDDT_HIndexed_Block::pupType(PUP::er &p, CkDDT *ddt)
+CkDDT_HIndexed_Block::pupType(PUP::er &p, CkDDT *ddt) noexcept
 {
   CkDDT_DataType::pupType(p, ddt);
   p|blockLength;
@@ -1110,7 +1110,7 @@ CkDDT_HIndexed_Block::pupType(PUP::er &p, CkDDT *ddt)
 }
 
 int
-CkDDT_HIndexed_Block::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
+CkDDT_HIndexed_Block::getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept
 {
   *ni = 2;
   *na = count;
@@ -1120,7 +1120,7 @@ CkDDT_HIndexed_Block::getEnvelope(int *ni, int *na, int *nd, int *combiner) cons
 }
 
 int
-CkDDT_HIndexed_Block::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const
+CkDDT_HIndexed_Block::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept
 {
   i[0] = count;
   i[1] = blockLength;
@@ -1132,13 +1132,13 @@ CkDDT_HIndexed_Block::getContents(int ni, int na, int nd, int i[], MPI_Aint a[],
 }
 
 int
-CkDDT_HIndexed_Block::getNumBasicElements(int bytes) const
+CkDDT_HIndexed_Block::getNumBasicElements(int bytes) const noexcept
 {
   return getBaseType()->getNumBasicElements(bytes);
 }
 
 CkDDT_Indexed::CkDDT_Indexed(int nCount, const int* arrBlock, const MPI_Aint* arrBytesDisp,
-                             const MPI_Aint* arrDisp, int bindex, CkDDT_DataType* base)
+                             const MPI_Aint* arrDisp, int bindex, CkDDT_DataType* base) noexcept
   : CkDDT_HIndexed(nCount, arrBlock, arrBytesDisp, bindex, base)
 {
   for (int i=0; i<count; i++) {
@@ -1148,7 +1148,7 @@ CkDDT_Indexed::CkDDT_Indexed(int nCount, const int* arrBlock, const MPI_Aint* ar
 }
 
 size_t
-CkDDT_Indexed::serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const
+CkDDT_Indexed::serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept
 {
   DDTDEBUG("CkDDT_Indexed::serialize, %s %d objects of type %d (iscontig=%d)\n",
            (dir==PACK)?"packing":"unpacking", num, baseType->getType(), (int)iscontig);
@@ -1182,7 +1182,7 @@ CkDDT_Indexed::serialize(char* userdata, char* buffer, int num, int msgLength, C
 }
 
 void
-CkDDT_Indexed::pupType(PUP::er &p, CkDDT* ddt)
+CkDDT_Indexed::pupType(PUP::er &p, CkDDT* ddt) noexcept
 {
   CkDDT_DataType::pupType(p, ddt);
   p|arrayBlockLength;
@@ -1193,7 +1193,7 @@ CkDDT_Indexed::pupType(PUP::er &p, CkDDT* ddt)
 }
 
 int
-CkDDT_Indexed::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
+CkDDT_Indexed::getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept
 {
   *ni = count*2+1;
   *na = 0;
@@ -1203,7 +1203,7 @@ CkDDT_Indexed::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
 }
 
 int
-CkDDT_Indexed::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const
+CkDDT_Indexed::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept
 {
   i[0] = count;
   for(int z=0; z<i[0]; z++) {
@@ -1215,13 +1215,13 @@ CkDDT_Indexed::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[
 }
 
 int
-CkDDT_Indexed::getNumBasicElements(int bytes) const
+CkDDT_Indexed::getNumBasicElements(int bytes) const noexcept
 {
   return getBaseType()->getNumBasicElements(bytes);
 }
 
 CkDDT_HIndexed::CkDDT_HIndexed(int nCount, const int* arrBlock, const MPI_Aint* arrDisp, int bindex,
-                               CkDDT_DataType* base)
+                               CkDDT_DataType* base) noexcept
   : CkDDT_DataType(CkDDT_HINDEXED, 0, 0, nCount, 0, 0, 0, base->getSize(), base->getExtent(),
                    base, 0, bindex, 0, 0),
     arrayBlockLength(nCount),
@@ -1280,7 +1280,7 @@ CkDDT_HIndexed::CkDDT_HIndexed(int nCount, const int* arrBlock, const MPI_Aint* 
 }
 
 size_t
-CkDDT_HIndexed::serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const
+CkDDT_HIndexed::serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept
 {
   DDTDEBUG("CkDDT_HIndexed::serialize, %s %d objects of type %d (iscontig=%d)\n",
            (dir==PACK)?"packing":"unpacking", num, baseType->getType(), (int)iscontig);
@@ -1314,7 +1314,7 @@ CkDDT_HIndexed::serialize(char* userdata, char* buffer, int num, int msgLength, 
 }
 
 void
-CkDDT_HIndexed::pupType(PUP::er &p, CkDDT* ddt)
+CkDDT_HIndexed::pupType(PUP::er &p, CkDDT* ddt) noexcept
 {
   CkDDT_DataType::pupType(p, ddt);
   p|arrayBlockLength;
@@ -1325,7 +1325,7 @@ CkDDT_HIndexed::pupType(PUP::er &p, CkDDT* ddt)
 }
 
 int
-CkDDT_HIndexed::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
+CkDDT_HIndexed::getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept
 {
   *ni = count+1;
   *na = count;
@@ -1335,7 +1335,7 @@ CkDDT_HIndexed::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
 }
 
 int
-CkDDT_HIndexed::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const
+CkDDT_HIndexed::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept
 {
   i[0] = count;
   for (int z=0; z<i[0]; z++) {
@@ -1347,13 +1347,13 @@ CkDDT_HIndexed::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d
 }
 
 int
-CkDDT_HIndexed::getNumBasicElements(int bytes) const
+CkDDT_HIndexed::getNumBasicElements(int bytes) const noexcept
 {
   return getBaseType()->getNumBasicElements(bytes);
 }
 
 CkDDT_Struct::CkDDT_Struct(int nCount, const int* arrBlock, const MPI_Aint* arrDisp,
-                           const int *bindex, CkDDT_DataType** arrBase)
+                           const int *bindex, CkDDT_DataType** arrBase) noexcept
   : CkDDT_DataType(CkDDT_STRUCT, 0, 0, nCount, 0, 0, 0, 0, 0, NULL, 0, 0, 0, 0),
     arrayBlockLength(nCount),
     arrayDisplacements(nCount),
@@ -1459,7 +1459,7 @@ CkDDT_Struct::CkDDT_Struct(int nCount, const int* arrBlock, const MPI_Aint* arrD
 }
 
 size_t
-CkDDT_Struct::serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const
+CkDDT_Struct::serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept
 {
   size_t bytesCopied = 0;
 
@@ -1507,7 +1507,7 @@ CkDDT_Struct::serialize(char* userdata, char* buffer, int num, int msgLength, Ck
 }
 
 void
-CkDDT_Struct::pupType(PUP::er &p, CkDDT* ddt)
+CkDDT_Struct::pupType(PUP::er &p, CkDDT* ddt) noexcept
 {
   CkDDT_DataType::pupType(p, ddt);
   p|arrayBlockLength;
@@ -1522,7 +1522,7 @@ CkDDT_Struct::pupType(PUP::er &p, CkDDT* ddt)
 }
 
 int
-CkDDT_Struct::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
+CkDDT_Struct::getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept
 {
   *ni = count+1;
   *na = count;
@@ -1532,7 +1532,7 @@ CkDDT_Struct::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
 }
 
 int
-CkDDT_Struct::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const
+CkDDT_Struct::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept
 {
   i[0] = count;
   for (int z=0; z<i[0]; z++) {
@@ -1544,7 +1544,7 @@ CkDDT_Struct::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]
 }
 
 int
-CkDDT_Struct::getNumBasicElements(int bytes) const
+CkDDT_Struct::getNumBasicElements(int bytes) const noexcept
 {
   int size = getSize();
   if (size == 0) {

@@ -166,10 +166,10 @@ class AmmEntry {
   int tags[AMM_NTAGS]; // [tag, src]
   AmmEntry<T>* next;
   T msg; // T is either an AmpiRequest* or an AmpiMsg*
-  AmmEntry(T m) { tags[AMM_TAG] = m->getTag(); tags[AMM_SRC] = m->getSrcRank(); next = NULL; msg = m; }
-  AmmEntry(int tag, int src, T m) { tags[AMM_TAG] = tag; tags[AMM_SRC] = src; next = NULL; msg = m; }
-  AmmEntry(){}
-  ~AmmEntry(){}
+  AmmEntry(T m) noexcept { tags[AMM_TAG] = m->getTag(); tags[AMM_SRC] = m->getSrcRank(); next = NULL; msg = m; }
+  AmmEntry(int tag, int src, T m) noexcept { tags[AMM_TAG] = tag; tags[AMM_SRC] = src; next = NULL; msg = m; }
+  AmmEntry() = default;
+  ~AmmEntry() = default;
 };
 
 template <class T>
@@ -184,9 +184,9 @@ class Amm {
   std::array<AmmEntry<T>, AMPI_AMM_POOL_SIZE> entryPool;
 
  public:
-  Amm() : first(NULL), lasth(&first), startIdx(0) { validEntries.reset();  }
-  ~Amm(){}
-  inline AmmEntry<T>* newEntry(int tag, int src, T msg) {
+  Amm() noexcept : first(NULL), lasth(&first), startIdx(0) { validEntries.reset();  }
+  ~Amm() = default;
+  inline AmmEntry<T>* newEntry(int tag, int src, T msg) noexcept {
     if (validEntries.all()) {
       return new AmmEntry<T>(tag, src, msg);
     } else {
@@ -202,7 +202,7 @@ class Amm {
       return NULL;
     }
   }
-  inline AmmEntry<T>* newEntry(T msg) {
+  inline AmmEntry<T>* newEntry(T msg) noexcept {
     if (validEntries.all()) {
       return new AmmEntry<T>(msg);
     } else {
@@ -218,7 +218,7 @@ class Amm {
       return NULL;
     }
   }
-  inline void deleteEntry(AmmEntry<T> *ent) {
+  inline void deleteEntry(AmmEntry<T> *ent) noexcept {
     if (ent >= &entryPool.front() && ent <= &entryPool.back()) {
       int idx = (int)((intptr_t)ent - (intptr_t)&entryPool.front()) / sizeof(AmmEntry<T>);
       validEntries[idx] = 0;
@@ -227,15 +227,15 @@ class Amm {
       delete ent;
     }
   }
-  void freeAll();
-  void flushMsgs();
-  inline bool match(const int tags1[AMM_NTAGS], const int tags2[AMM_NTAGS]) const;
-  inline void put(T msg);
-  inline void put(int tag, int src, T msg);
-  inline T get(int tag, int src, int* rtags=NULL);
-  inline T probe(int tag, int src, int* rtags);
-  inline int size(void) const;
-  void pup(PUP::er& p, AmmPupMessageFn msgpup);
+  void freeAll() noexcept;
+  void flushMsgs() noexcept;
+  inline bool match(const int tags1[AMM_NTAGS], const int tags2[AMM_NTAGS]) const noexcept;
+  inline void put(T msg) noexcept;
+  inline void put(int tag, int src, T msg) noexcept;
+  inline T get(int tag, int src, int* rtags=NULL) noexcept;
+  inline T probe(int tag, int src, int* rtags) noexcept;
+  inline int size() const noexcept;
+  void pup(PUP::er& p, AmmPupMessageFn msgpup) noexcept;
 };
 
 PUPfunctionpointer(MPI_User_function*)
@@ -253,16 +253,16 @@ class OpStruct {
   bool isValid;
 
  public:
-  OpStruct(void) {}
-  OpStruct(MPI_User_function* f) : func(f), isCommutative(true), isValid(true) {}
-  OpStruct(MPI_User_function* f, bool c) : func(f), isCommutative(c), isValid(true) {}
-  void init(MPI_User_function* f, bool c) {
+  OpStruct() = default;
+  OpStruct(MPI_User_function* f) noexcept : func(f), isCommutative(true), isValid(true) {}
+  OpStruct(MPI_User_function* f, bool c) noexcept : func(f), isCommutative(c), isValid(true) {}
+  void init(MPI_User_function* f, bool c) noexcept {
     func = f;
     isCommutative = c;
     isValid = true;
   }
-  bool isFree(void) const { return !isValid; }
-  void free(void) { isValid = false; }
+  bool isFree() const noexcept { return !isValid; }
+  void free() noexcept { isValid = false; }
   void pup(PUP::er &p) {
     p|func;  p|isCommutative;  p|isValid;
   }
@@ -274,7 +274,7 @@ class AmpiOpHeader {
   MPI_Datatype dtype;
   int len;
   int szdata;
-  AmpiOpHeader(MPI_User_function* f,MPI_Datatype d,int l,int szd):
+  AmpiOpHeader(MPI_User_function* f,MPI_Datatype d,int l,int szd) noexcept :
     func(f),dtype(d),len(l),szdata(szd) { }
 };
 
@@ -293,39 +293,39 @@ private:
   vector<MPI_Request> requestList;
 
 public:
-  WinStruct(void) : comm(MPI_COMM_NULL), index(-1), areRecvsPosted(false), inEpoch(false) {
+  WinStruct() noexcept : comm(MPI_COMM_NULL), index(-1), areRecvsPosted(false), inEpoch(false) {
     exposureRankList.clear(); accessRankList.clear(); requestList.clear();
   }
-  WinStruct(MPI_Comm comm_, int index_) : comm(comm_), index(index_), areRecvsPosted(false), inEpoch(false) {
+  WinStruct(MPI_Comm comm_, int index_) noexcept : comm(comm_), index(index_), areRecvsPosted(false), inEpoch(false) {
     exposureRankList.clear(); accessRankList.clear(); requestList.clear();
   }
-  void pup(PUP::er &p) {
+  void pup(PUP::er &p) noexcept {
     p|comm; p|index; p|areRecvsPosted; p|inEpoch; p|exposureRankList; p|accessRankList; p|requestList;
   }
-  void clearEpochAccess() {
+  void clearEpochAccess() noexcept {
     accessRankList.clear(); inEpoch = false;
   }
-  void clearEpochExposure() {
+  void clearEpochExposure() noexcept {
     exposureRankList.clear(); areRecvsPosted = false; requestList.clear(); inEpoch=false;
   }
-  vector<int>& getExposureRankList() {return exposureRankList;}
-  vector<int>& getAccessRankList() {return accessRankList;}
-  void setExposureRankList(vector<int> &tmpExposureRankList) {exposureRankList = tmpExposureRankList;}
-  void setAccessRankList(vector<int> &tmpAccessRankList) {accessRankList = tmpAccessRankList;}
-  vector<int>& getRequestList() {return requestList;}
-  bool AreRecvsPosted() const {return areRecvsPosted;}
-  void setAreRecvsPosted(bool setR) {areRecvsPosted = setR;}
-  bool isInEpoch() const {return inEpoch;}
-  void setInEpoch(bool arg) {inEpoch = arg;}
+  vector<int>& getExposureRankList() noexcept {return exposureRankList;}
+  vector<int>& getAccessRankList() noexcept {return accessRankList;}
+  void setExposureRankList(vector<int> &tmpExposureRankList) noexcept {exposureRankList = tmpExposureRankList;}
+  void setAccessRankList(vector<int> &tmpAccessRankList) noexcept {accessRankList = tmpAccessRankList;}
+  vector<int>& getRequestList() noexcept {return requestList;}
+  bool AreRecvsPosted() const noexcept {return areRecvsPosted;}
+  void setAreRecvsPosted(bool setR) noexcept {areRecvsPosted = setR;}
+  bool isInEpoch() const noexcept {return inEpoch;}
+  void setInEpoch(bool arg) noexcept {inEpoch = arg;}
 };
 
 class lockQueueEntry {
  public:
   int requestRank;
   int lock_type;
-  lockQueueEntry (int _requestRank, int _lock_type)
+  lockQueueEntry (int _requestRank, int _lock_type) noexcept
     : requestRank(_requestRank), lock_type(_lock_type) {}
-  lockQueueEntry () {}
+  lockQueueEntry() = default;
 };
 
 typedef CkQ<lockQueueEntry *> LockQueue;
@@ -348,49 +348,49 @@ class win_obj {
 
   vector<int> keyvals; // list of keyval attributes
 
-  void setName(const char *src);
-  void getName(char *src,int *len);
+  void setName(const char *src) noexcept;
+  void getName(char *src,int *len) noexcept;
 
  public:
-  void pup(PUP::er &p);
+  void pup(PUP::er &p) noexcept;
 
-  win_obj();
-  win_obj(const char *name, void *base, MPI_Aint size, int disp_unit, MPI_Comm comm);
-  ~win_obj();
+  win_obj() noexcept;
+  win_obj(const char *name, void *base, MPI_Aint size, int disp_unit, MPI_Comm comm) noexcept;
+  ~win_obj() noexcept;
 
   int create(const char *name, void *base, MPI_Aint size, int disp_unit,
-             MPI_Comm comm);
-  int free();
+             MPI_Comm comm) noexcept;
+  int free() noexcept;
 
   vector<int>& getKeyvals() { return keyvals; }
 
   int put(void *orgaddr, int orgcnt, int orgunit,
-          MPI_Aint targdisp, int targcnt, int targunit);
+          MPI_Aint targdisp, int targcnt, int targunit) noexcept;
 
   int get(void *orgaddr, int orgcnt, int orgunit,
-          MPI_Aint targdisp, int targcnt, int targunit);
+          MPI_Aint targdisp, int targcnt, int targunit) noexcept;
   int accumulate(void *orgaddr, int count, MPI_Aint targdisp, MPI_Datatype targtype,
-                 MPI_Op op, ampiParent* pptr);
+                 MPI_Op op, ampiParent* pptr) noexcept;
 
   int iget(int orgcnt, MPI_Datatype orgtype,
-          MPI_Aint targdisp, int targcnt, MPI_Datatype targtype);
-  int igetWait(MPI_Request *req, MPI_Status *status);
-  int igetFree(MPI_Request *req, MPI_Status *status);
+          MPI_Aint targdisp, int targcnt, MPI_Datatype targtype) noexcept;
+  int igetWait(MPI_Request *req, MPI_Status *status) noexcept;
+  int igetFree(MPI_Request *req, MPI_Status *status) noexcept;
 
-  int fence();
+  int fence() noexcept;
 
-  int lock(int requestRank, int lock_type);
-  int unlock(int requestRank);
+  int lock(int requestRank, int lock_type) noexcept;
+  int unlock(int requestRank) noexcept;
 
-  int wait();
-  int post();
-  int start();
-  int complete();
+  int wait() noexcept;
+  int post() noexcept;
+  int start() noexcept;
+  int complete() noexcept;
 
-  void lockTopQueue();
-  void enqueue(int requestRank, int lock_type);
-  void dequeue();
-  bool emptyQueue();
+  void lockTopQueue() noexcept;
+  void enqueue(int requestRank, int lock_type) noexcept;
+  void dequeue() noexcept;
+  bool emptyQueue() noexcept;
 };
 //-----------------------End of code by YAN ----------------------
 
@@ -399,10 +399,10 @@ class KeyvalPair{
   std::string key;
   std::string val;
  public:
-  KeyvalPair(void){ }
-  KeyvalPair(const char* k, const char* v);
-  ~KeyvalPair(void){ }
-  void pup(PUP::er& p){
+  KeyvalPair() = default;
+  KeyvalPair(const char* k, const char* v) noexcept;
+  ~KeyvalPair() = default;
+  void pup(PUP::er& p) noexcept {
     p|key;
     p|val;
   }
@@ -413,18 +413,18 @@ class InfoStruct{
   CkPupPtrVec<KeyvalPair> nodes;
   bool valid;
  public:
-  InfoStruct(void):valid(true) { }
-  void setvalid(bool valid_){ valid = valid_; }
-  bool getvalid(void) const { return valid; }
-  int set(const char* k, const char* v);
-  int dup(InfoStruct& src);
-  int get(const char* k, int vl, char*& v, int *flag) const;
-  int deletek(const char* k);
-  int get_valuelen(const char* k, int* vl, int *flag) const;
-  int get_nkeys(int *nkeys) const;
-  int get_nthkey(int n,char* k) const;
-  void myfree(void);
-  void pup(PUP::er& p);
+  InfoStruct() noexcept : valid(true) { }
+  void setvalid(bool valid_) noexcept { valid = valid_; }
+  bool getvalid() const noexcept { return valid; }
+  int set(const char* k, const char* v) noexcept;
+  int dup(InfoStruct& src) noexcept;
+  int get(const char* k, int vl, char*& v, int *flag) const noexcept;
+  int deletek(const char* k) noexcept;
+  int get_valuelen(const char* k, int* vl, int *flag) const noexcept;
+  int get_nkeys(int *nkeys) const noexcept;
+  int get_nthkey(int n,char* k) const noexcept;
+  void myfree() noexcept;
+  void pup(PUP::er& p) noexcept;
 };
 
 class CProxy_ampi;
@@ -436,43 +436,43 @@ class ampiTopology {
   vector<int> v; // dummy variable for const& returns from virtual functions
 
  public:
-  virtual ~ampiTopology() {};
-  virtual void pup(PUP::er &p) =0;
-  virtual int getType() const =0;
-  virtual void dup(ampiTopology* topo) =0;
-  virtual const vector<int> &getnbors() const =0;
-  virtual void setnbors(const vector<int> &nbors_) =0;
+  virtual ~ampiTopology() noexcept {};
+  virtual void pup(PUP::er &p) noexcept =0;
+  virtual int getType() const noexcept =0;
+  virtual void dup(ampiTopology* topo) noexcept =0;
+  virtual const vector<int> &getnbors() const noexcept =0;
+  virtual void setnbors(const vector<int> &nbors_) noexcept =0;
 
-  virtual const vector<int> &getdims() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
-  virtual const vector<int> &getperiods() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
-  virtual int getndims() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return -1;}
-  virtual void setdims(const vector<int> &dims_) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
-  virtual void setperiods(const vector<int> &periods_) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
-  virtual void setndims(int ndims_) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual const vector<int> &getdims() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual const vector<int> &getperiods() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual int getndims() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return -1;}
+  virtual void setdims(const vector<int> &dims_) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setperiods(const vector<int> &periods_) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setndims(int ndims_) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
 
-  virtual int getnvertices() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return -1;}
-  virtual const vector<int> &getindex() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
-  virtual const vector<int> &getedges() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
-  virtual void setnvertices(int nvertices_) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
-  virtual void setindex(const vector<int> &index_) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
-  virtual void setedges(const vector<int> &edges_) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual int getnvertices() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return -1;}
+  virtual const vector<int> &getindex() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual const vector<int> &getedges() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual void setnvertices(int nvertices_) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setindex(const vector<int> &index_) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setedges(const vector<int> &edges_) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
 
-  virtual int getInDegree() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return -1;}
-  virtual const vector<int> &getSources() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
-  virtual const vector<int> &getSourceWeights() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
-  virtual int getOutDegree() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return -1;}
-  virtual const vector<int> &getDestinations() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
-  virtual const vector<int> &getDestWeights() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
-  virtual bool areSourcesWeighted() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return false;}
-  virtual bool areDestsWeighted() const {CkAbort("AMPI: instance of invalid Virtual Topology class."); return false;}
-  virtual void setAreSourcesWeighted(bool val) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
-  virtual void setAreDestsWeighted(bool val) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
-  virtual void setInDegree(int degree) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
-  virtual void setSources(const vector<int> &sources) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
-  virtual void setSourceWeights(const vector<int> &sourceWeights) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
-  virtual void setOutDegree(int degree) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
-  virtual void setDestinations(const vector<int> &destinations) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
-  virtual void setDestWeights(const vector<int> &destWeights) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual int getInDegree() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return -1;}
+  virtual const vector<int> &getSources() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual const vector<int> &getSourceWeights() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual int getOutDegree() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return -1;}
+  virtual const vector<int> &getDestinations() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual const vector<int> &getDestWeights() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
+  virtual bool areSourcesWeighted() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return false;}
+  virtual bool areDestsWeighted() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return false;}
+  virtual void setAreSourcesWeighted(bool val) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setAreDestsWeighted(bool val) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setInDegree(int degree) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setSources(const vector<int> &sources) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setSourceWeights(const vector<int> &sourceWeights) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setOutDegree(int degree) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setDestinations(const vector<int> &destinations) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
+  virtual void setDestWeights(const vector<int> &destWeights) noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
 };
 
 class ampiCartTopology final : public ampiTopology {
@@ -481,17 +481,17 @@ class ampiCartTopology final : public ampiTopology {
   vector<int> dims, periods, nbors;
 
  public:
-  ampiCartTopology() : ndims(-1) {}
+  ampiCartTopology() noexcept : ndims(-1) {}
 
-  void pup(PUP::er &p) {
+  void pup(PUP::er &p) noexcept {
     p|ndims;
     p|dims;
     p|periods;
     p|nbors;
   }
 
-  inline int getType() const {return MPI_CART;}
-  inline void dup(ampiTopology* topo) {
+  inline int getType() const noexcept {return MPI_CART;}
+  inline void dup(ampiTopology* topo) noexcept {
     CkAssert(topo->getType() == MPI_CART);
     setndims(topo->getndims());
     setdims(topo->getdims());
@@ -499,15 +499,15 @@ class ampiCartTopology final : public ampiTopology {
     setnbors(topo->getnbors());
   }
 
-  inline const vector<int> &getdims() const {return dims;}
-  inline const vector<int> &getperiods() const {return periods;}
-  inline int getndims() const {return ndims;}
-  inline const vector<int> &getnbors() const {return nbors;}
+  inline const vector<int> &getdims() const noexcept {return dims;}
+  inline const vector<int> &getperiods() const noexcept {return periods;}
+  inline int getndims() const noexcept {return ndims;}
+  inline const vector<int> &getnbors() const noexcept {return nbors;}
 
-  inline void setdims(const vector<int> &d) {dims = d; dims.shrink_to_fit();}
-  inline void setperiods(const vector<int> &p) {periods = p; periods.shrink_to_fit();}
-  inline void setndims(int nd) {ndims = nd;}
-  inline void setnbors(const vector<int> &n) {nbors = n; nbors.shrink_to_fit();}
+  inline void setdims(const vector<int> &d) noexcept {dims = d; dims.shrink_to_fit();}
+  inline void setperiods(const vector<int> &p) noexcept {periods = p; periods.shrink_to_fit();}
+  inline void setndims(int nd) noexcept {ndims = nd;}
+  inline void setnbors(const vector<int> &n) noexcept {nbors = n; nbors.shrink_to_fit();}
 };
 
 class ampiGraphTopology final : public ampiTopology {
@@ -516,17 +516,17 @@ class ampiGraphTopology final : public ampiTopology {
   vector<int> index, edges, nbors;
 
  public:
-  ampiGraphTopology() : nvertices(-1) {}
+  ampiGraphTopology() noexcept : nvertices(-1) {}
 
-  void pup(PUP::er &p) {
+  void pup(PUP::er &p) noexcept {
     p|nvertices;
     p|index;
     p|edges;
     p|nbors;
   }
 
-  inline int getType() const {return MPI_GRAPH;}
-  inline void dup(ampiTopology* topo) {
+  inline int getType() const noexcept {return MPI_GRAPH;}
+  inline void dup(ampiTopology* topo) noexcept {
     CkAssert(topo->getType() == MPI_GRAPH);
     setnvertices(topo->getnvertices());
     setindex(topo->getindex());
@@ -534,15 +534,15 @@ class ampiGraphTopology final : public ampiTopology {
     setnbors(topo->getnbors());
   }
 
-  inline int getnvertices() const {return nvertices;}
-  inline const vector<int> &getindex() const {return index;}
-  inline const vector<int> &getedges() const {return edges;}
-  inline const vector<int> &getnbors() const {return nbors;}
+  inline int getnvertices() const noexcept {return nvertices;}
+  inline const vector<int> &getindex() const noexcept {return index;}
+  inline const vector<int> &getedges() const noexcept {return edges;}
+  inline const vector<int> &getnbors() const noexcept {return nbors;}
 
-  inline void setnvertices(int nv) {nvertices = nv;}
-  inline void setindex(const vector<int> &i) {index = i; index.shrink_to_fit();}
-  inline void setedges(const vector<int> &e) {edges = e; edges.shrink_to_fit();}
-  inline void setnbors(const vector<int> &n) {nbors = n; nbors.shrink_to_fit();}
+  inline void setnvertices(int nv) noexcept {nvertices = nv;}
+  inline void setindex(const vector<int> &i) noexcept {index = i; index.shrink_to_fit();}
+  inline void setedges(const vector<int> &e) noexcept {edges = e; edges.shrink_to_fit();}
+  inline void setnbors(const vector<int> &n) noexcept {nbors = n; nbors.shrink_to_fit();}
 };
 
 class ampiDistGraphTopology final : public ampiTopology {
@@ -552,9 +552,9 @@ class ampiDistGraphTopology final : public ampiTopology {
   vector<int> sources, sourceWeights, destinations, destWeights, nbors;
 
  public:
-  ampiDistGraphTopology() : inDegree(-1), outDegree(-1), sourcesWeighted(false), destsWeighted(false) {}
+  ampiDistGraphTopology() noexcept : inDegree(-1), outDegree(-1), sourcesWeighted(false), destsWeighted(false) {}
 
-  void pup(PUP::er &p) {
+  void pup(PUP::er &p) noexcept {
     p|inDegree;
     p|outDegree;
     p|sourcesWeighted;
@@ -566,8 +566,8 @@ class ampiDistGraphTopology final : public ampiTopology {
     p|nbors;
   }
 
-  inline int getType() const {return MPI_DIST_GRAPH;}
-  inline void dup(ampiTopology* topo) {
+  inline int getType() const noexcept {return MPI_DIST_GRAPH;}
+  inline void dup(ampiTopology* topo) noexcept {
     CkAssert(topo->getType() == MPI_DIST_GRAPH);
     setAreSourcesWeighted(topo->areSourcesWeighted());
     setAreDestsWeighted(topo->areDestsWeighted());
@@ -580,25 +580,25 @@ class ampiDistGraphTopology final : public ampiTopology {
     setnbors(topo->getnbors());
   }
 
-  inline int getInDegree() const {return inDegree;}
-  inline const vector<int> &getSources() const {return sources;}
-  inline const vector<int> &getSourceWeights() const {return sourceWeights;}
-  inline int getOutDegree() const {return outDegree;}
-  inline const vector<int> &getDestinations() const {return destinations;}
-  inline const vector<int> &getDestWeights() const {return destWeights;}
-  inline bool areSourcesWeighted() const {return sourcesWeighted;}
-  inline bool areDestsWeighted() const {return destsWeighted;}
-  inline const vector<int> &getnbors() const {return nbors;}
+  inline int getInDegree() const noexcept {return inDegree;}
+  inline const vector<int> &getSources() const noexcept {return sources;}
+  inline const vector<int> &getSourceWeights() const noexcept {return sourceWeights;}
+  inline int getOutDegree() const noexcept {return outDegree;}
+  inline const vector<int> &getDestinations() const noexcept {return destinations;}
+  inline const vector<int> &getDestWeights() const noexcept {return destWeights;}
+  inline bool areSourcesWeighted() const noexcept {return sourcesWeighted;}
+  inline bool areDestsWeighted() const noexcept {return destsWeighted;}
+  inline const vector<int> &getnbors() const noexcept {return nbors;}
 
-  inline void setAreSourcesWeighted(bool v) {sourcesWeighted = v ? 1 : 0;}
-  inline void setAreDestsWeighted(bool v) {destsWeighted = v ? 1 : 0;}
-  inline void setInDegree(int d) {inDegree = d;}
-  inline void setSources(const vector<int> &s) {sources = s; sources.shrink_to_fit();}
-  inline void setSourceWeights(const vector<int> &sw) {sourceWeights = sw; sourceWeights.shrink_to_fit();}
-  inline void setOutDegree(int d) {outDegree = d;}
-  inline void setDestinations(const vector<int> &d) {destinations = d; destinations.shrink_to_fit();}
-  inline void setDestWeights(const vector<int> &dw) {destWeights = dw; destWeights.shrink_to_fit();}
-  inline void setnbors(const vector<int> &nbors_) {nbors = nbors_; nbors.shrink_to_fit();}
+  inline void setAreSourcesWeighted(bool v) noexcept {sourcesWeighted = v ? 1 : 0;}
+  inline void setAreDestsWeighted(bool v) noexcept {destsWeighted = v ? 1 : 0;}
+  inline void setInDegree(int d) noexcept {inDegree = d;}
+  inline void setSources(const vector<int> &s) noexcept {sources = s; sources.shrink_to_fit();}
+  inline void setSourceWeights(const vector<int> &sw) noexcept {sourceWeights = sw; sourceWeights.shrink_to_fit();}
+  inline void setOutDegree(int d) noexcept {outDegree = d;}
+  inline void setDestinations(const vector<int> &d) noexcept {destinations = d; destinations.shrink_to_fit();}
+  inline void setDestWeights(const vector<int> &dw) noexcept {destWeights = dw; destWeights.shrink_to_fit();}
+  inline void setnbors(const vector<int> &nbors_) noexcept {nbors = nbors_; nbors.shrink_to_fit();}
 };
 
 /* KeyValue class for attribute caching */
@@ -656,35 +656,35 @@ class ampiCommStruct {
   std::string commName;
 
   // Lazily fill world communicator indices
-  void makeWorldIndices(void) const {
+  void makeWorldIndices() const noexcept {
     vector<int> &ind = const_cast<vector<int> &>(indices);
     ind.resize(size);
     std::iota(ind.begin(), ind.end(), 0);
   }
 
  public:
-  ampiCommStruct(int ignored=0) : size(-1), commType(INTRA), ampiTopo(NULL), topoType(MPI_UNDEFINED) {}
-  ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,int size_)
+  ampiCommStruct(int ignored=0) noexcept : size(-1), commType(INTRA), ampiTopo(NULL), topoType(MPI_UNDEFINED) {}
+  ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,int size_) noexcept
     :comm(comm_), ampiID(id_),size(size_), commType(WORLD), ampiTopo(NULL), topoType(MPI_UNDEFINED) {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
-                 int size_,const vector<int> &indices_)
+                 int size_,const vector<int> &indices_) noexcept
                 :comm(comm_), ampiID(id_), size(size_),
                  commType(INTRA), indices(indices_),
                  ampiTopo(NULL), topoType(MPI_UNDEFINED) {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
                  int size_,const vector<int> &indices_,
-                 const vector<int> &remoteIndices_)
+                 const vector<int> &remoteIndices_) noexcept
                 :comm(comm_),ampiID(id_),size(size_),commType(INTER),
                  indices(indices_),remoteIndices(remoteIndices_),
                  ampiTopo(NULL), topoType(MPI_UNDEFINED) {}
 
-  ~ampiCommStruct() {
+  ~ampiCommStruct() noexcept {
     if (ampiTopo != NULL)
       delete ampiTopo;
   }
 
   // Overloaded copy constructor. Used when creating virtual topologies.
-  ampiCommStruct(const ampiCommStruct &obj, int topoNumber=MPI_UNDEFINED) {
+  ampiCommStruct(const ampiCommStruct &obj, int topoNumber=MPI_UNDEFINED) noexcept {
     switch (topoNumber) {
       case MPI_CART:
         ampiTopo = new ampiCartTopology();
@@ -710,7 +710,7 @@ class ampiCommStruct {
     commName       = obj.commName;
   }
 
-  ampiCommStruct &operator=(const ampiCommStruct &obj) {
+  ampiCommStruct &operator=(const ampiCommStruct &obj) noexcept {
     if (this == &obj) {
       return *this;
     }
@@ -740,47 +740,47 @@ class ampiCommStruct {
     return *this;
   }
 
-  const ampiTopology* getTopologyforNeighbors() const {
+  const ampiTopology* getTopologyforNeighbors() const noexcept {
     return ampiTopo;
   }
 
-  ampiTopology* getTopology() {
+  ampiTopology* getTopology() noexcept {
     return ampiTopo;
   }
 
-  inline bool isinter(void) const {return commType==INTER;}
-  void setArrayID(const CkArrayID &nID) {ampiID=nID;}
+  inline bool isinter() const noexcept {return commType==INTER;}
+  void setArrayID(const CkArrayID &nID) noexcept {ampiID=nID;}
 
-  MPI_Comm getComm(void) const {return comm;}
-  inline const vector<int> &getIndices(void) const {
+  MPI_Comm getComm() const noexcept {return comm;}
+  inline const vector<int> &getIndices() const noexcept {
     if (commType==WORLD && indices.size()!=size) makeWorldIndices();
     return indices;
   }
-  const vector<int> &getRemoteIndices() const {return remoteIndices;}
-  vector<int> &getKeyvals() {return keyvals;}
+  const vector<int> &getRemoteIndices() const noexcept {return remoteIndices;}
+  vector<int> &getKeyvals() noexcept {return keyvals;}
 
-  void setName(const char *src) {
+  void setName(const char *src) noexcept {
     CkDDT_SetName(commName, src);
   }
 
-  void getName(char *name, int *len) const {
+  void getName(char *name, int *len) const noexcept {
     int length = *len = commName.size();
     memcpy(name, commName.data(), length);
     name[length] = '\0';
   }
 
   //Get the proxy for the entire array
-  CProxy_ampi getProxy(void) const;
+  CProxy_ampi getProxy() const noexcept;
 
   //Get the array index for rank r in this communicator
-  int getIndexForRank(int r) const {
+  int getIndexForRank(int r) const noexcept {
 #if CMK_ERROR_CHECKING
     if (r>=size) CkAbort("AMPI> You passed in an out-of-bounds process rank!");
 #endif
     if (commType == WORLD) return r;
     else return indices[r];
   }
-  int getIndexForRemoteRank(int r) const {
+  int getIndexForRemoteRank(int r) const noexcept {
 #if CMK_ERROR_CHECKING
     if (r>=remoteIndices.size()) CkAbort("AMPI> You passed in an out-of-bounds process rank!");
 #endif
@@ -788,7 +788,7 @@ class ampiCommStruct {
     else return remoteIndices[r];
   }
   //Get the rank for this array index (Warning: linear time)
-  int getRankForIndex(int i) const {
+  int getRankForIndex(int i) const noexcept {
     if (commType==WORLD) return i;
     else {
       for (int r=0;r<indices.size();r++)
@@ -797,9 +797,9 @@ class ampiCommStruct {
     }
   }
 
-  int getSize(void) const {return size;}
+  int getSize() const noexcept {return size;}
 
-  void pup(PUP::er &p) {
+  void pup(PUP::er &p) noexcept {
     p|comm;
     p|ampiID;
     p|size;
@@ -840,8 +840,8 @@ PUPmarshall(ampiCommStruct)
 class mpi_comm_worlds{
   ampiCommStruct comms[MPI_MAX_COMM_WORLDS];
  public:
-  ampiCommStruct &operator[](int i) {return comms[i];}
-  void pup(PUP::er &p) {
+  ampiCommStruct &operator[](int i) noexcept {return comms[i];}
+  void pup(PUP::er &p) noexcept {
     for (int i=0;i<MPI_MAX_COMM_WORLDS;i++)
       comms[i].pup(p);
   }
@@ -850,7 +850,7 @@ class mpi_comm_worlds{
 typedef vector<int> groupStruct;
 
 // groupStructure operations
-inline void outputOp(groupStruct vec) {
+inline void outputOp(groupStruct vec) noexcept {
   if (vec.size() > 50) {
     CkPrintf("vector too large to output!\n");
     return;
@@ -862,7 +862,7 @@ inline void outputOp(groupStruct vec) {
   CkPrintf("}\n");
 }
 
-inline int getPosOp(int idx, groupStruct vec) {
+inline int getPosOp(int idx, groupStruct vec) noexcept {
   for (int r=0; r<vec.size(); r++) {
     if (vec[r] == idx) {
       return r;
@@ -871,7 +871,7 @@ inline int getPosOp(int idx, groupStruct vec) {
   return MPI_UNDEFINED;
 }
 
-inline groupStruct unionOp(groupStruct vec1, groupStruct vec2) {
+inline groupStruct unionOp(groupStruct vec1, groupStruct vec2) noexcept {
   groupStruct newvec(vec1);
   for (int i=0; i<vec2.size(); i++) {
     if (getPosOp(vec2[i], vec1) == MPI_UNDEFINED) {
@@ -881,7 +881,7 @@ inline groupStruct unionOp(groupStruct vec1, groupStruct vec2) {
   return newvec;
 }
 
-inline groupStruct intersectOp(groupStruct vec1, groupStruct vec2) {
+inline groupStruct intersectOp(groupStruct vec1, groupStruct vec2) noexcept {
   groupStruct newvec;
   for (int i=0; i<vec1.size(); i++) {
     if (getPosOp(vec1[i], vec2) != MPI_UNDEFINED) {
@@ -891,7 +891,7 @@ inline groupStruct intersectOp(groupStruct vec1, groupStruct vec2) {
   return newvec;
 }
 
-inline groupStruct diffOp(groupStruct vec1, groupStruct vec2){
+inline groupStruct diffOp(groupStruct vec1, groupStruct vec2) noexcept {
   groupStruct newvec;
   for (int i=0; i<vec1.size(); i++) {
     if (getPosOp(vec1[i], vec2) == MPI_UNDEFINED) {
@@ -901,14 +901,14 @@ inline groupStruct diffOp(groupStruct vec1, groupStruct vec2){
   return newvec;
 }
 
-inline int* translateRanksOp(int n, groupStruct vec1, const int* ranks1, groupStruct vec2, int *ret) {
+inline int* translateRanksOp(int n, groupStruct vec1, const int* ranks1, groupStruct vec2, int *ret) noexcept {
   for (int i=0; i<n; i++) {
     ret[i] = (ranks1[i] == MPI_PROC_NULL) ? MPI_PROC_NULL : getPosOp(vec1[ranks1[i]], vec2);
   }
   return ret;
 }
 
-inline int compareVecOp(groupStruct vec1, groupStruct vec2) {
+inline int compareVecOp(groupStruct vec1, groupStruct vec2) noexcept {
   int pos, ret = MPI_IDENT;
   if (vec1.size() != vec2.size()) {
     return MPI_UNEQUAL;
@@ -925,7 +925,7 @@ inline int compareVecOp(groupStruct vec1, groupStruct vec2) {
   return ret;
 }
 
-inline groupStruct inclOp(int n, const int* ranks, groupStruct vec) {
+inline groupStruct inclOp(int n, const int* ranks, groupStruct vec) noexcept {
   groupStruct retvec(n);
   for (int i=0; i<n; i++) {
     retvec[i] = vec[ranks[i]];
@@ -933,7 +933,7 @@ inline groupStruct inclOp(int n, const int* ranks, groupStruct vec) {
   return retvec;
 }
 
-inline groupStruct exclOp(int n, const int* ranks, groupStruct vec) {
+inline groupStruct exclOp(int n, const int* ranks, groupStruct vec) noexcept {
   groupStruct retvec;
   bool add = true;
   for (int j=0; j<vec.size(); j++) {
@@ -953,7 +953,7 @@ inline groupStruct exclOp(int n, const int* ranks, groupStruct vec) {
   return retvec;
 }
 
-inline groupStruct rangeInclOp(int n, int ranges[][3], groupStruct vec, int *flag) {
+inline groupStruct rangeInclOp(int n, int ranges[][3], groupStruct vec, int *flag) noexcept {
   groupStruct retvec;
   int first, last, stride;
   for (int i=0; i<n; i++) {
@@ -974,7 +974,7 @@ inline groupStruct rangeInclOp(int n, int ranges[][3], groupStruct vec, int *fla
   return retvec;
 }
 
-inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec, int *flag) {
+inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec, int *flag) noexcept {
   vector<int> ranks;
   int first, last, stride;
   for (int i=0; i<n; i++) {
@@ -1073,78 +1073,78 @@ class AmpiRequest {
 #endif
 
  public:
-  AmpiRequest() {}
+  AmpiRequest() noexcept {}
   /// Close this request (used by free and cancel)
-  virtual ~AmpiRequest() {}
+  virtual ~AmpiRequest() noexcept {}
 
   /// Activate this persistent request.
   ///  Only meaningful for persistent Ireq, SendReq, and SsendReq requests.
-  virtual void start(MPI_Request reqIdx) {}
+  virtual void start(MPI_Request reqIdx) noexcept {}
 
   /// Used by AmmEntry's constructor
-  virtual int getTag() const { return tag; }
-  virtual int getSrcRank() const { return src; }
+  virtual int getTag() const noexcept { return tag; }
+  virtual int getSrcRank() const noexcept { return src; }
 
   /// Return true if this request is finished (progress):
-  virtual bool test(MPI_Status *sts=MPI_STATUS_IGNORE) =0;
+  virtual bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept =0;
 
   /// Block until this request is finished,
   ///  returning a valid MPI error code.
-  virtual int wait(MPI_Status *sts) =0;
+  virtual int wait(MPI_Status *sts) noexcept =0;
 
   /// Mark this request for cancellation.
   /// Supported only for IReq requests
-  virtual void cancel() {}
+  virtual void cancel() noexcept {}
 
   /// Mark this request persistent.
   /// Supported only for IReq, SendReq, and SsendReq requests
-  virtual void setPersistent(bool p) {}
-  virtual bool isPersistent() const { return false; }
+  virtual void setPersistent(bool p) noexcept {}
+  virtual bool isPersistent() const noexcept { return false; }
 
   /// Receive an AmpiMsg
-  virtual void receive(ampi *ptr, AmpiMsg *msg) =0;
+  virtual void receive(ampi *ptr, AmpiMsg *msg) noexcept =0;
 
   /// Receive a CkReductionMsg
-  virtual void receive(ampi *ptr, CkReductionMsg *msg) =0;
+  virtual void receive(ampi *ptr, CkReductionMsg *msg) noexcept =0;
 
   /// Receive an Rdma message
   virtual void receiveRdma(ampi *ptr, char *sbuf, int slength, int ssendReq,
-                           int srcRank, MPI_Comm scomm) { }
+                           int srcRank, MPI_Comm scomm) noexcept { }
 
   /// Set the request's index into AmpiRequestList
-  void setReqIdx(MPI_Request idx) { reqIdx = idx; }
-  MPI_Request getReqIdx() const { return reqIdx; }
+  void setReqIdx(MPI_Request idx) noexcept { reqIdx = idx; }
+  MPI_Request getReqIdx() const noexcept { return reqIdx; }
 
   /// Free the request's datatype
-  void free(CkDDT* ddt) {
+  void free(CkDDT* ddt) noexcept {
     if (type != MPI_DATATYPE_NULL) ddt->freeType(type);
   }
 
   /// Set whether the request is currently blocked on
-  void setBlocked(bool b) { blocked = b; }
-  bool isBlocked() const { return blocked; }
+  void setBlocked(bool b) noexcept { blocked = b; }
+  bool isBlocked() const noexcept { return blocked; }
 
   /// Returns the type of request:
   ///  AMPI_I_REQ, AMPI_ATA_REQ, AMPI_SEND_REQ, AMPI_SSEND_REQ,
   ///  AMPI_REDN_REQ, AMPI_GATHER_REQ, AMPI_GATHERV_REQ, AMPI_G_REQ
-  virtual AmpiReqType getType() const =0;
+  virtual AmpiReqType getType() const noexcept =0;
 
   /// Returns whether this request will need to be matched.
   /// It is used to determine whether this request should be inserted into postedReqs.
   /// AMPI_SEND_REQ, AMPI_SSEND_REQ, and AMPI_ATA_REQ should not be posted.
-  virtual bool isUnmatched() const =0;
+  virtual bool isUnmatched() const noexcept =0;
 
   /// Returns whether this type is pooled or not:
   /// Only AMPI_I_REQ, AMPI_SEND_REQ, and AMPI_SSEND_REQs are pooled.
-  virtual bool isPooledType() const { return false; }
+  virtual bool isPooledType() const noexcept { return false; }
 
   /// Return the actual number of bytes that were received.
-  virtual int getNumReceivedBytes(CkDDT *ddt) const {
+  virtual int getNumReceivedBytes(CkDDT *ddt) const noexcept {
     // by default, return number of bytes requested
     return count * ddt->getSize(type);
   }
 
-  virtual void pup(PUP::er &p) {
+  virtual void pup(PUP::er &p) noexcept {
     p((char *)&buf, sizeof(void *)); //supposed to work only with Isomalloc
     p(count);
     p(type);
@@ -1163,7 +1163,7 @@ class AmpiRequest {
 #endif
   }
 
-  virtual void print() const =0;
+  virtual void print() const noexcept =0;
 };
 
 // This is used in the constructors of the AmpiRequest types below,
@@ -1184,7 +1184,7 @@ class IReq final : public AmpiRequest {
   int length      = 0; // recv'ed length in bytes
 
   IReq(const void *buf_, int count_, MPI_Datatype type_, int src_, int tag_,
-       MPI_Comm comm_, CkDDT *ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING)
+       MPI_Comm comm_, CkDDT *ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
   {
     buf   = buf_;
     count = count_;
@@ -1194,30 +1194,30 @@ class IReq final : public AmpiRequest {
     comm  = comm_;
     AMPI_REQUEST_COMMON_INIT
   }
-  IReq() {}
-  ~IReq() {}
-  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) override;
-  int wait(MPI_Status *sts) override ;
-  void cancel() override { if (!complete) cancelled = true; }
-  AmpiReqType getType() const override { return AMPI_I_REQ; }
-  bool isUnmatched() const override { return !complete; }
-  bool isPooledType() const override { return true; }
-  void setPersistent(bool p) override { persistent = p; }
-  bool isPersistent() const override { return persistent; }
-  void start(MPI_Request reqIdx) override;
-  void receive(ampi *ptr, AmpiMsg *msg) override;
-  void receive(ampi *ptr, CkReductionMsg *msg) override {}
-  void receiveRdma(ampi *ptr, char *sbuf, int slength, int ssendReq, int srcRank, MPI_Comm scomm) override;
-  int getNumReceivedBytes(CkDDT *ptr) const override {
+  IReq() noexcept {}
+  ~IReq() noexcept {}
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
+  int wait(MPI_Status *sts) noexcept override;
+  void cancel() noexcept override { if (!complete) cancelled = true; }
+  AmpiReqType getType() const noexcept override { return AMPI_I_REQ; }
+  bool isUnmatched() const noexcept override { return !complete; }
+  bool isPooledType() const noexcept override { return true; }
+  void setPersistent(bool p) noexcept override { persistent = p; }
+  bool isPersistent() const noexcept override { return persistent; }
+  void start(MPI_Request reqIdx) noexcept override;
+  void receive(ampi *ptr, AmpiMsg *msg) noexcept override;
+  void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
+  void receiveRdma(ampi *ptr, char *sbuf, int slength, int ssendReq, int srcRank, MPI_Comm scomm) noexcept override;
+  int getNumReceivedBytes(CkDDT *ptr) const noexcept override {
     return length;
   }
-  void pup(PUP::er &p) override {
+  void pup(PUP::er &p) noexcept override {
     AmpiRequest::pup(p);
     p|cancelled;
     p|persistent;
     p|length;
   }
-  void print() const override;
+  void print() const noexcept override;
 };
 
 class RednReq final : public AmpiRequest {
@@ -1225,7 +1225,7 @@ class RednReq final : public AmpiRequest {
   MPI_Op op = MPI_OP_NULL;
 
   RednReq(const void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_,
-          MPI_Op op_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING)
+          MPI_Op op_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
   {
     buf   = buf_;
     count = count_;
@@ -1236,26 +1236,26 @@ class RednReq final : public AmpiRequest {
     op    = op_;
     AMPI_REQUEST_COMMON_INIT
   }
-  RednReq() {}
-  ~RednReq() {}
-  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) override;
-  int wait(MPI_Status *sts) override;
-  void cancel() override {}
-  AmpiReqType getType() const override { return AMPI_REDN_REQ; }
-  bool isUnmatched() const override { return !complete; }
-  void receive(ampi *ptr, AmpiMsg *msg) override {}
-  void receive(ampi *ptr, CkReductionMsg *msg) override;
-  void pup(PUP::er &p) override {
+  RednReq() noexcept {}
+  ~RednReq() noexcept {}
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
+  int wait(MPI_Status *sts) noexcept override;
+  void cancel() noexcept override {}
+  AmpiReqType getType() const noexcept override { return AMPI_REDN_REQ; }
+  bool isUnmatched() const noexcept override { return !complete; }
+  void receive(ampi *ptr, AmpiMsg *msg) noexcept override {}
+  void receive(ampi *ptr, CkReductionMsg *msg) noexcept override;
+  void pup(PUP::er &p) noexcept override {
     AmpiRequest::pup(p);
     p|op;
   }
-  void print() const override;
+  void print() const noexcept override;
 };
 
 class GatherReq final : public AmpiRequest {
  public:
   GatherReq(const void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_,
-            CkDDT *ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING)
+            CkDDT *ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
   {
     buf   = buf_;
     count = count_;
@@ -1265,19 +1265,19 @@ class GatherReq final : public AmpiRequest {
     comm  = comm_;
     AMPI_REQUEST_COMMON_INIT
   }
-  GatherReq() {}
-  ~GatherReq() {}
-  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) override;
-  int wait(MPI_Status *sts) override;
-  void cancel() override {}
-  AmpiReqType getType() const override { return AMPI_GATHER_REQ; }
-  bool isUnmatched() const override { return !complete; }
-  void receive(ampi *ptr, AmpiMsg *msg) override {}
-  void receive(ampi *ptr, CkReductionMsg *msg) override;
-  void pup(PUP::er &p) override {
+  GatherReq() noexcept {}
+  ~GatherReq() noexcept {}
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
+  int wait(MPI_Status *sts) noexcept override;
+  void cancel() noexcept override {}
+  AmpiReqType getType() const noexcept override { return AMPI_GATHER_REQ; }
+  bool isUnmatched() const noexcept override { return !complete; }
+  void receive(ampi *ptr, AmpiMsg *msg) noexcept override {}
+  void receive(ampi *ptr, CkReductionMsg *msg) noexcept override;
+  void pup(PUP::er &p) noexcept override {
     AmpiRequest::pup(p);
   }
-  void print() const override;
+  void print() const noexcept override;
 };
 
 class GathervReq final : public AmpiRequest {
@@ -1286,7 +1286,7 @@ class GathervReq final : public AmpiRequest {
   vector<int> displs;
 
   GathervReq(const void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_, const int *rc,
-             const int *d, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING)
+             const int *d, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
   {
     buf   = buf_;
     count = count_;
@@ -1298,34 +1298,34 @@ class GathervReq final : public AmpiRequest {
     displs.assign(d, d+count);
     AMPI_REQUEST_COMMON_INIT
   }
-  GathervReq() {}
-  ~GathervReq() {}
-  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) override;
-  int wait(MPI_Status *sts) override;
-  AmpiReqType getType() const override { return AMPI_GATHERV_REQ; }
-  bool isUnmatched() const override { return !complete; }
-  void receive(ampi *ptr, AmpiMsg *msg) override {}
-  void receive(ampi *ptr, CkReductionMsg *msg) override;
-  void pup(PUP::er &p) override {
+  GathervReq() noexcept {}
+  ~GathervReq() noexcept {}
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
+  int wait(MPI_Status *sts) noexcept override;
+  AmpiReqType getType() const noexcept override { return AMPI_GATHERV_REQ; }
+  bool isUnmatched() const noexcept override { return !complete; }
+  void receive(ampi *ptr, AmpiMsg *msg) noexcept override {}
+  void receive(ampi *ptr, CkReductionMsg *msg) noexcept override;
+  void pup(PUP::er &p) noexcept override {
     AmpiRequest::pup(p);
     p|recvCounts;
     p|displs;
   }
-  void print() const override;
+  void print() const noexcept override;
 };
 
 class SendReq final : public AmpiRequest {
   bool persistent = false; // is this a persistent send request?
 
  public:
-  SendReq(MPI_Datatype type_, MPI_Comm comm_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING)
+  SendReq(MPI_Datatype type_, MPI_Comm comm_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
   {
     type = type_;
     comm = comm_;
     AMPI_REQUEST_COMMON_INIT
   }
   SendReq(const void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_,
-          MPI_Comm comm_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING)
+          MPI_Comm comm_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
   {
     buf   = buf_;
     count = count_;
@@ -1335,23 +1335,23 @@ class SendReq final : public AmpiRequest {
     comm  = comm_;
     AMPI_REQUEST_COMMON_INIT
   }
-  SendReq() {}
-  ~SendReq() {}
-  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) override;
-  int wait(MPI_Status *sts) override;
-  void setPersistent(bool p) override { persistent = p; }
-  bool isPersistent() const override { return persistent; }
-  void start(MPI_Request reqIdx) override;
-  void receive(ampi *ptr, AmpiMsg *msg) override {}
-  void receive(ampi *ptr, CkReductionMsg *msg) override {}
-  AmpiReqType getType() const override { return AMPI_SEND_REQ; }
-  bool isUnmatched() const override { return false; }
-  bool isPooledType() const override { return true; }
-  void pup(PUP::er &p) override {
+  SendReq() noexcept {}
+  ~SendReq() noexcept {}
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
+  int wait(MPI_Status *sts) noexcept override;
+  void setPersistent(bool p) noexcept override { persistent = p; }
+  bool isPersistent() const noexcept override { return persistent; }
+  void start(MPI_Request reqIdx) noexcept override;
+  void receive(ampi *ptr, AmpiMsg *msg) noexcept override {}
+  void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
+  AmpiReqType getType() const noexcept override { return AMPI_SEND_REQ; }
+  bool isUnmatched() const noexcept override { return false; }
+  bool isPooledType() const noexcept override { return true; }
+  void pup(PUP::er &p) noexcept override {
     AmpiRequest::pup(p);
     p|persistent;
   }
-  void print() const override;
+  void print() const noexcept override;
 };
 
 class SsendReq final : public AmpiRequest {
@@ -1359,14 +1359,14 @@ class SsendReq final : public AmpiRequest {
   bool persistent = false; // is this a persistent Ssend request?
 
  public:
-  SsendReq(MPI_Datatype type_, MPI_Comm comm_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING)
+  SsendReq(MPI_Datatype type_, MPI_Comm comm_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
   {
     type = type_;
     comm = comm_;
     AMPI_REQUEST_COMMON_INIT
   }
   SsendReq(const void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_, MPI_Comm comm_,
-           CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING)
+           CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
   {
     buf   = buf_;
     count = count_;
@@ -1377,7 +1377,7 @@ class SsendReq final : public AmpiRequest {
     AMPI_REQUEST_COMMON_INIT
   }
   SsendReq(const void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_, MPI_Comm comm_,
-           int src_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING)
+           int src_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
   {
     buf   = buf_;
     count = count_;
@@ -1387,44 +1387,44 @@ class SsendReq final : public AmpiRequest {
     comm  = comm_;
     AMPI_REQUEST_COMMON_INIT
   }
-  SsendReq() {}
-  ~SsendReq() {}
-  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) override;
-  int wait(MPI_Status *sts) override;
-  void setPersistent(bool p) override { persistent = p; }
-  bool isPersistent() const override { return persistent; }
-  void start(MPI_Request reqIdx) override;
-  void receive(ampi *ptr, AmpiMsg *msg) override {}
-  void receive(ampi *ptr, CkReductionMsg *msg) override {}
-  AmpiReqType getType() const override { return AMPI_SSEND_REQ; }
-  bool isUnmatched() const override { return false; }
-  bool isPooledType() const override { return true; }
-  void pup(PUP::er &p) override {
+  SsendReq() noexcept {}
+  ~SsendReq() noexcept {}
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
+  int wait(MPI_Status *sts) noexcept override;
+  void setPersistent(bool p) noexcept override { persistent = p; }
+  bool isPersistent() const noexcept override { return persistent; }
+  void start(MPI_Request reqIdx) noexcept override;
+  void receive(ampi *ptr, AmpiMsg *msg) noexcept override {}
+  void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
+  AmpiReqType getType() const noexcept override { return AMPI_SSEND_REQ; }
+  bool isUnmatched() const noexcept override { return false; }
+  bool isPooledType() const noexcept override { return true; }
+  void pup(PUP::er &p) noexcept override {
     AmpiRequest::pup(p);
     p|persistent;
   }
-  void print() const override;
+  void print() const noexcept override;
 };
 
 class ATAReq final : public AmpiRequest {
  public:
   vector<MPI_Request> reqs;
 
-  ATAReq(int numReqs_) : reqs(numReqs_) {}
-  ATAReq() {}
-  ~ATAReq() {}
-  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) override;
-  int wait(MPI_Status *sts) override;
-  void receive(ampi *ptr, AmpiMsg *msg) override {}
-  void receive(ampi *ptr, CkReductionMsg *msg) override {}
-  int getCount() const { return reqs.size(); }
-  AmpiReqType getType() const override { return AMPI_ATA_REQ; }
-  bool isUnmatched() const override { return false; }
-  void pup(PUP::er &p) override {
+  ATAReq(int numReqs_) noexcept : reqs(numReqs_) {}
+  ATAReq() noexcept {}
+  ~ATAReq() noexcept {}
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
+  int wait(MPI_Status *sts) noexcept override;
+  void receive(ampi *ptr, AmpiMsg *msg) noexcept override {}
+  void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
+  int getCount() const noexcept { return reqs.size(); }
+  AmpiReqType getType() const noexcept override { return AMPI_ATA_REQ; }
+  bool isUnmatched() const noexcept override { return false; }
+  void pup(PUP::er &p) noexcept override {
     AmpiRequest::pup(p);
     p|reqs;
   }
-  void print() const override;
+  void print() const noexcept override;
 };
 
 class GReq final : public AmpiRequest {
@@ -1437,22 +1437,22 @@ class GReq final : public AmpiRequest {
   void* extraState;
 
  public:
-  GReq(MPI_Grequest_query_function* q, MPI_Grequest_free_function* f, MPI_Grequest_cancel_function* c, void* es)
+  GReq(MPI_Grequest_query_function* q, MPI_Grequest_free_function* f, MPI_Grequest_cancel_function* c, void* es) noexcept
     : queryFn(q), freeFn(f), cancelFn(c), pollFn(nullptr), waitFn(nullptr), extraState(es) {}
-  GReq(MPI_Grequest_query_function *q, MPI_Grequest_free_function* f, MPI_Grequest_cancel_function* c, MPIX_Grequest_poll_function* p, void* es)
+  GReq(MPI_Grequest_query_function *q, MPI_Grequest_free_function* f, MPI_Grequest_cancel_function* c, MPIX_Grequest_poll_function* p, void* es) noexcept
     : queryFn(q), freeFn(f), cancelFn(c), pollFn(p), waitFn(nullptr), extraState(es) {}
-  GReq(MPI_Grequest_query_function *q, MPI_Grequest_free_function* f, MPI_Grequest_cancel_function* c, MPIX_Grequest_poll_function* p, MPIX_Grequest_wait_function* w, void* es)
+  GReq(MPI_Grequest_query_function *q, MPI_Grequest_free_function* f, MPI_Grequest_cancel_function* c, MPIX_Grequest_poll_function* p, MPIX_Grequest_wait_function* w, void* es) noexcept
     : queryFn(q), freeFn(f), cancelFn(c), pollFn(p), waitFn(w), extraState(es) {}
-  GReq() {}
-  ~GReq() { (*freeFn)(extraState); }
-  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) override;
-  int wait(MPI_Status *sts) override;
-  void receive(ampi *ptr, AmpiMsg *msg) override {}
-  void receive(ampi *ptr, CkReductionMsg *msg) override {}
-  void cancel() override { (*cancelFn)(extraState, complete); }
-  AmpiReqType getType() const override { return AMPI_G_REQ; }
-  bool isUnmatched() const override { return false; }
-  void pup(PUP::er &p) override {
+  GReq() noexcept {}
+  ~GReq() noexcept { (*freeFn)(extraState); }
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
+  int wait(MPI_Status *sts) noexcept override;
+  void receive(ampi *ptr, AmpiMsg *msg) noexcept override {}
+  void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
+  void cancel() noexcept override { (*cancelFn)(extraState, complete); }
+  AmpiReqType getType() const noexcept override { return AMPI_G_REQ; }
+  bool isUnmatched() const noexcept override { return false; }
+  void pup(PUP::er &p) noexcept override {
     AmpiRequest::pup(p);
     p((char *)queryFn, sizeof(void *));
     p((char *)freeFn, sizeof(void *));
@@ -1461,7 +1461,7 @@ class GReq final : public AmpiRequest {
     p((char *)waitFn, sizeof(void *));
     p((char *)extraState, sizeof(void *));
   }
-  void print() const override;
+  void print() const noexcept override;
 };
 
 class AmpiRequestPool;
@@ -1472,21 +1472,21 @@ class AmpiRequestList {
   int startIdx; // start next search from this index
   AmpiRequestPool* reqPool;
  public:
-  AmpiRequestList() : startIdx(0) {}
-  AmpiRequestList(int size, AmpiRequestPool* reqPoolPtr)
+  AmpiRequestList() noexcept : startIdx(0) {}
+  AmpiRequestList(int size, AmpiRequestPool* reqPoolPtr) noexcept
     : reqs(size), startIdx(0), reqPool(reqPoolPtr) {}
-  ~AmpiRequestList() {}
+  ~AmpiRequestList() noexcept {}
 
-  inline AmpiRequest* operator[](int n) {
+  inline AmpiRequest* operator[](int n) noexcept {
 #if CMK_ERROR_CHECKING
     return reqs.at(n);
 #else
     return reqs[n];
 #endif
   }
-  void free(AmpiRequestPool& reqPool, int idx, CkDDT *ddt);
-  void freeNonPersReq(int &idx);
-  inline int insert(AmpiRequest* req) {
+  void free(AmpiRequestPool& reqPool, int idx, CkDDT *ddt) noexcept;
+  void freeNonPersReq(int &idx) noexcept;
+  inline int insert(AmpiRequest* req) noexcept {
     for (int i=startIdx; i<reqs.size(); i++) {
       if (reqs[i] == NULL) {
         req->setReqIdx(i);
@@ -1502,12 +1502,12 @@ class AmpiRequestList {
     return idx;
   }
 
-  inline void checkRequest(MPI_Request idx) const {
+  inline void checkRequest(MPI_Request idx) const noexcept {
     if (idx != MPI_REQUEST_NULL && (idx < 0 || idx >= reqs.size()))
       CkAbort("Invalid MPI_Request\n");
   }
 
-  inline void unblockReqs(MPI_Request *requests, int numReqs) {
+  inline void unblockReqs(MPI_Request *requests, int numReqs) noexcept {
     for (int i=0; i<numReqs; i++) {
       if (requests[i] != MPI_REQUEST_NULL) {
         reqs[requests[i]]->setBlocked(false);
@@ -1515,9 +1515,9 @@ class AmpiRequestList {
     }
   }
 
-  void pup(PUP::er &p, AmpiRequestPool* reqPool);
+  void pup(PUP::er &p, AmpiRequestPool* reqPool) noexcept;
 
-  void print(void) const {
+  void print() const noexcept {
     for (int i=0; i<reqs.size(); i++) {
       if (reqs[i] == NULL) continue;
       CkPrintf("AmpiRequestList Element %d [%p]: \n", i+1, reqs[i]);
@@ -1530,23 +1530,23 @@ class AmpiRequestList {
 class memBuf {
   CkVec<char> buf;
  public:
-  memBuf() { }
-  memBuf(int size) :buf(size) {}
-  void setSize(int s) {buf.resize(s);}
-  int getSize(void) const {return buf.size();}
-  const void *getData(void) const {return (const void *)&buf[0];}
-  void *getData(void) {return (void *)&buf[0];}
+  memBuf() =default;
+  memBuf(int size) noexcept : buf(size) {}
+  void setSize(int s) noexcept {buf.resize(s);}
+  int getSize() const noexcept {return buf.size();}
+  const void *getData() const noexcept {return (const void *)&buf[0];}
+  void *getData() noexcept {return (void *)&buf[0];}
 };
 
 template <class T>
-inline void pupIntoBuf(memBuf &b,T &t) {
+inline void pupIntoBuf(memBuf &b,T &t) noexcept {
   PUP::sizer ps;ps|t;
   b.setSize(ps.size());
   PUP::toMem pm(b.getData()); pm|t;
 }
 
 template <class T>
-inline void pupFromBuf(const void *data,T &t) {
+inline void pupFromBuf(const void *data,T &t) noexcept {
   PUP::fromMem p(data); p|t;
 }
 
@@ -1568,22 +1568,22 @@ class AmpiMsg final : public CMessage_AmpiMsg {
 #endif
 
  public:
-  AmpiMsg(void) { data = NULL; }
-  AmpiMsg(int sreq, int t, int sRank, int l) :
+  AmpiMsg() noexcept { data = NULL; }
+  AmpiMsg(int sreq, int t, int sRank, int l) noexcept :
     ssendReq(sreq), tag(t), srcRank(sRank), length(l)
   { /* only called from AmpiMsg::pup() since the refnum (seq) will get pup'ed by the runtime */ }
-  AmpiMsg(CMK_REFNUM_TYPE seq, int sreq, int t, int sRank, int l) :
+  AmpiMsg(CMK_REFNUM_TYPE seq, int sreq, int t, int sRank, int l) noexcept :
     ssendReq(sreq), tag(t), srcRank(sRank), length(l)
   { CkSetRefNum(this, seq); }
-  inline void setSsendReq(int s) { CkAssert(s >= 0); ssendReq = s; }
-  inline void setSeq(CMK_REFNUM_TYPE s) { CkAssert(s >= 0); UsrToEnv(this)->setRef(s); }
-  inline void setSrcRank(int sr) { srcRank = sr; }
-  inline void setLength(int l) { length = l; }
-  inline void setTag(int t) { tag = t; }
-  inline void setComm(MPI_Comm c) { comm = c; }
-  inline CMK_REFNUM_TYPE getSeq(void) const { return UsrToEnv(this)->getRef(); }
-  inline int getSsendReq(void) const { return ssendReq; }
-  inline int getSeqIdx(void) const {
+  inline void setSsendReq(int s) noexcept { CkAssert(s >= 0); ssendReq = s; }
+  inline void setSeq(CMK_REFNUM_TYPE s) noexcept { CkAssert(s >= 0); UsrToEnv(this)->setRef(s); }
+  inline void setSrcRank(int sr) noexcept { srcRank = sr; }
+  inline void setLength(int l) noexcept { length = l; }
+  inline void setTag(int t) noexcept { tag = t; }
+  inline void setComm(MPI_Comm c) noexcept { comm = c; }
+  inline CMK_REFNUM_TYPE getSeq() const noexcept { return UsrToEnv(this)->getRef(); }
+  inline int getSsendReq() const noexcept { return ssendReq; }
+  inline int getSeqIdx() const noexcept {
     // seqIdx is srcRank, unless this message was part of a collective
     if (tag >= MPI_BCAST_TAG && tag <= MPI_ATA_TAG) {
       return COLL_SEQ_IDX;
@@ -1592,12 +1592,12 @@ class AmpiMsg final : public CMessage_AmpiMsg {
       return srcRank;
     }
   }
-  inline int getSrcRank(void) const { return srcRank; }
-  inline int getLength(void) const { return length; }
-  inline char* getData(void) const { return data; }
-  inline int getTag(void) const { return tag; }
-  inline MPI_Comm getComm(void) const { return comm; }
-  static AmpiMsg* pup(PUP::er &p, AmpiMsg *m)
+  inline int getSrcRank() const noexcept { return srcRank; }
+  inline int getLength() const noexcept { return length; }
+  inline char* getData() const noexcept { return data; }
+  inline int getTag() const noexcept { return tag; }
+  inline MPI_Comm getComm() const noexcept { return comm; }
+  static AmpiMsg* pup(PUP::er &p, AmpiMsg *m) noexcept
   {
     int ssendReq, length, tag, srcRank, comm;
     if(p.isPacking() || p.isSizing()) {
@@ -1632,8 +1632,8 @@ class AmpiMsgPool {
   int currMsgs; // current # of msgs in the pool
 
  public:
-  AmpiMsgPool() : msgLength(0), msgUsersize(0), maxMsgs(0), currMsgs(0) {}
-  AmpiMsgPool(int _numMsgs, int _msgLength) {
+  AmpiMsgPool() noexcept : msgLength(0), msgUsersize(0), maxMsgs(0), currMsgs(0) {}
+  AmpiMsgPool(int _numMsgs, int _msgLength) noexcept {
     msgLength = _msgLength;
     maxMsgs = _numMsgs;
     if (maxMsgs > 0 && msgLength > 0) {
@@ -1653,15 +1653,15 @@ class AmpiMsgPool {
       msgUsersize = 0;
     }
   }
-  ~AmpiMsgPool() {}
-  inline void clear() {
+  ~AmpiMsgPool() =default;
+  inline void clear() noexcept {
     while (!msgs.empty()) {
       delete msgs.front();
       msgs.pop_front();
     }
     currMsgs = 0;
   }
-  inline AmpiMsg* newAmpiMsg(CMK_REFNUM_TYPE seq, int ssendReq, int tag, int srcRank, int len) {
+  inline AmpiMsg* newAmpiMsg(CMK_REFNUM_TYPE seq, int ssendReq, int tag, int srcRank, int len) noexcept {
     if (len > msgLength || msgs.empty()) {
       return new (len, 0) AmpiMsg(seq, ssendReq, tag, srcRank, len);
     } else {
@@ -1677,7 +1677,7 @@ class AmpiMsgPool {
       return msg;
     }
   }
-  inline void deleteAmpiMsg(AmpiMsg* msg) {
+  inline void deleteAmpiMsg(AmpiMsg* msg) noexcept {
     if (currMsgs != maxMsgs && UsrToEnv(msg)->getUsersize() == msgUsersize) {
       CkAssert(msg != NULL);
       msgs.push_front(msg);
@@ -1726,9 +1726,9 @@ class AmpiRequestPool {
   alignas(pooledReqAlign) std::array<char, AMPI_REQ_POOL_SIZE*pooledReqSize> reqs; // pool of memory for requests
 
  public:
-  AmpiRequestPool() : startIdx(0) {}
-  ~AmpiRequestPool() {}
-  inline IReq* newIReq() {
+  AmpiRequestPool() noexcept : startIdx(0) {}
+  ~AmpiRequestPool() =default;
+  inline IReq* newIReq() noexcept {
     if (validReqs.all()) {
       return new IReq();
     } else {
@@ -1745,7 +1745,7 @@ class AmpiRequestPool {
     }
   }
   inline IReq* newIReq(const void* buf, int count, MPI_Datatype type, int src, int tag,
-                       MPI_Comm comm, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) {
+                       MPI_Comm comm, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) noexcept {
     if (validReqs.all()) {
       return new IReq(buf, count, type, src, tag, comm, ddt, sts);
     } else {
@@ -1761,7 +1761,7 @@ class AmpiRequestPool {
       return NULL;
     }
   }
-  inline SendReq* newSendReq() {
+  inline SendReq* newSendReq() noexcept {
     if (validReqs.all()) {
       return new SendReq();
     } else {
@@ -1777,7 +1777,7 @@ class AmpiRequestPool {
       return NULL;
     }
   }
-  inline SendReq* newSendReq(MPI_Datatype type, MPI_Comm comm, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) {
+  inline SendReq* newSendReq(MPI_Datatype type, MPI_Comm comm, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) noexcept {
     if (validReqs.all()) {
       return new SendReq(type, comm, ddt, sts);
     } else {
@@ -1794,7 +1794,7 @@ class AmpiRequestPool {
     }
   }
   inline SendReq* newSendReq(const void* buf, int count, MPI_Datatype type, int destRank, int tag,
-                             MPI_Comm comm, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) {
+                             MPI_Comm comm, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) noexcept {
     if (validReqs.all()) {
       return new SendReq(buf, count, type, destRank, tag, comm, ddt, sts);
     } else {
@@ -1810,7 +1810,7 @@ class AmpiRequestPool {
       return NULL;
     }
   }
-  inline SsendReq* newSsendReq() {
+  inline SsendReq* newSsendReq() noexcept {
     if (validReqs.all()) {
       return new SsendReq();
     } else {
@@ -1827,7 +1827,7 @@ class AmpiRequestPool {
       return NULL;
     }
   }
-  inline SsendReq* newSsendReq(MPI_Datatype type, MPI_Comm comm, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) {
+  inline SsendReq* newSsendReq(MPI_Datatype type, MPI_Comm comm, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) noexcept {
     if (validReqs.all()) {
       return new SsendReq(type, comm, ddt, sts);
     } else {
@@ -1844,7 +1844,7 @@ class AmpiRequestPool {
     }
   }
   inline SsendReq* newSsendReq(const void* buf, int count, MPI_Datatype type, int dest, int tag,
-                               MPI_Comm comm, int src, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) {
+                               MPI_Comm comm, int src, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) noexcept {
     if (validReqs.all()) {
       return new SsendReq(buf, count, type, dest, tag, comm, src, ddt, sts);
     } else {
@@ -1860,7 +1860,7 @@ class AmpiRequestPool {
       return NULL;
     }
   }
-  inline void deleteAmpiRequest(AmpiRequest* req) {
+  inline void deleteAmpiRequest(AmpiRequest* req) noexcept {
     if (req->isPooledType() &&
         ((char*)req >= &reqs.front() && (char*)req <= &reqs.back()))
     {
@@ -1871,7 +1871,7 @@ class AmpiRequestPool {
       delete req;
     }
   }
-  void pup(PUP::er& p) {
+  void pup(PUP::er& p) noexcept {
     // Nothing to do here, because AmpiRequestList::pup will be the
     // one to actually PUP the AmpiRequest objects to/from the pool
   }
@@ -1894,18 +1894,18 @@ private:
 public:
   /// seqIncoming starts from 1, b/c 0 means unsequenced
   /// seqOutgoing starts from 0, b/c this will be incremented for the first real seq #
-  AmpiOtherElement(void) : seqIncoming(1), seqOutgoing(0), numOutOfOrder(0) {}
+  AmpiOtherElement() noexcept : seqIncoming(1), seqOutgoing(0), numOutOfOrder(0) {}
 
   /// Handle wrap around of unsigned type CMK_REFNUM_TYPE
-  inline void incSeqIncoming() { seqIncoming++; if (seqIncoming==0) seqIncoming=1; }
-  inline CMK_REFNUM_TYPE getSeqIncoming() const { return seqIncoming; }
+  inline void incSeqIncoming() noexcept { seqIncoming++; if (seqIncoming==0) seqIncoming=1; }
+  inline CMK_REFNUM_TYPE getSeqIncoming() const noexcept { return seqIncoming; }
 
-  inline void incSeqOutgoing() { seqOutgoing++; if (seqOutgoing==0) seqOutgoing=1; }
-  inline CMK_REFNUM_TYPE getSeqOutgoing() const { return seqOutgoing; }
+  inline void incSeqOutgoing() noexcept { seqOutgoing++; if (seqOutgoing==0) seqOutgoing=1; }
+  inline CMK_REFNUM_TYPE getSeqOutgoing() const noexcept { return seqOutgoing; }
 
-  inline void incNumOutOfOrder() { numOutOfOrder++; }
-  inline void decNumOutOfOrder() { numOutOfOrder--; }
-  inline uint16_t getNumOutOfOrder() const { return numOutOfOrder; }
+  inline void incNumOutOfOrder() noexcept { numOutOfOrder++; }
+  inline void decNumOutOfOrder() noexcept { numOutOfOrder--; }
+  inline uint16_t getNumOutOfOrder() const noexcept { return numOutOfOrder; }
 };
 PUPbytes(AmpiOtherElement)
 
@@ -1914,12 +1914,12 @@ class AmpiSeqQ : private CkNoncopyable {
   std::unordered_map<int, AmpiOtherElement> elements; // element info: indexed by seqIdx (comm rank)
 
 public:
-  AmpiSeqQ() {}
-  AmpiSeqQ(int commSize) {
+  AmpiSeqQ() =default;
+  AmpiSeqQ(int commSize) noexcept {
     elements.reserve(std::min(commSize, 64));
   }
-  ~AmpiSeqQ () {}
-  void pup(PUP::er &p);
+  ~AmpiSeqQ() =default;
+  void pup(PUP::er &p) noexcept;
 
   /// Insert this message in the table.  Returns the number
   /// of messages now available for the element.
@@ -1927,7 +1927,7 @@ public:
   ///   If 1, this message can be immediately processed.
   ///   If >1, this message can be immediately processed,
   ///     and you should call "getOutOfOrder" repeatedly.
-  inline int put(int seqIdx, AmpiMsg *msg) {
+  inline int put(int seqIdx, AmpiMsg *msg) noexcept {
     AmpiOtherElement &el = elements[seqIdx];
     if (msg->getSeq() == el.getSeqIncoming()) { // In order:
       el.incSeqIncoming();
@@ -1942,7 +1942,7 @@ public:
   /// Is this message in order (return >0) or not (return 0)?
   /// Same as put() except we don't call putOutOfOrder() here,
   /// so the caller should do that separately
-  inline int isInOrder(int srcRank, CMK_REFNUM_TYPE seq) {
+  inline int isInOrder(int srcRank, CMK_REFNUM_TYPE seq) noexcept {
     AmpiOtherElement &el = elements[srcRank];
     if (seq == el.getSeqIncoming()) { // In order:
       el.incSeqIncoming();
@@ -1955,18 +1955,18 @@ public:
 
   /// Get an out-of-order message from the table.
   /// (in-order messages never go into the table)
-  AmpiMsg *getOutOfOrder(int seqIdx);
+  AmpiMsg *getOutOfOrder(int seqIdx) noexcept;
 
   /// Stash an out-of-order message
-  void putOutOfOrder(int seqIdx, AmpiMsg *msg);
+  void putOutOfOrder(int seqIdx, AmpiMsg *msg) noexcept;
 
   /// Increment the outgoing sequence number.
-  inline void incCollSeqOutgoing(void) {
+  inline void incCollSeqOutgoing() noexcept {
     elements[COLL_SEQ_IDX].incSeqOutgoing();
   }
 
   /// Return the next outgoing sequence number, and increment it.
-  inline CMK_REFNUM_TYPE nextOutgoing(int destRank) {
+  inline CMK_REFNUM_TYPE nextOutgoing(int destRank) noexcept {
     AmpiOtherElement &el = elements[destRank];
     el.incSeqOutgoing();
     return el.getSeqOutgoing();
@@ -1975,8 +1975,8 @@ public:
 PUPmarshall(AmpiSeqQ)
 
 
-inline CProxy_ampi ampiCommStruct::getProxy(void) const {return ampiID;}
-const ampiCommStruct &universeComm2CommStruct(MPI_Comm universeNo);
+inline CProxy_ampi ampiCommStruct::getProxy() const noexcept {return ampiID;}
+const ampiCommStruct &universeComm2CommStruct(MPI_Comm universeNo) noexcept;
 
 /*
 An ampiParent holds all the communicators and the TCharm thread
@@ -2034,13 +2034,13 @@ class ampiParent final : public CBase_ampiParent {
   bool ampiInitCallDone;
 
  private:
-  bool kv_set_builtin(int keyval, void* attribute_val);
-  bool kv_get_builtin(int keyval);
+  bool kv_set_builtin(int keyval, void* attribute_val) noexcept;
+  bool kv_get_builtin(int keyval) noexcept;
 
  public:
-  void prepareCtv(void);
+  void prepareCtv() noexcept;
 
-  MPI_Message putMatchedMsg(AmpiMsg* msg) {
+  MPI_Message putMatchedMsg(AmpiMsg* msg) noexcept {
     // Search thru matchedMsgs for any NULL ones first:
     for (int i=0; i<matchedMsgs.size(); i++) {
       if (matchedMsgs[i] == NULL) {
@@ -2052,7 +2052,7 @@ class ampiParent final : public CBase_ampiParent {
     matchedMsgs.push_back(msg);
     return matchedMsgs.size() - 1;
   }
-  AmpiMsg* getMatchedMsg(MPI_Message message) {
+  AmpiMsg* getMatchedMsg(MPI_Message message) noexcept {
     if (message == MPI_MESSAGE_NO_PROC || message == MPI_MESSAGE_NULL) {
       return NULL;
     }
@@ -2066,128 +2066,128 @@ class ampiParent final : public CBase_ampiParent {
     return msg;
   }
 
-  inline void attachBuffer(void *buffer, int size) {
+  inline void attachBuffer(void *buffer, int size) noexcept {
     bsendBuffer = buffer;
     bsendBufferSize = size;
   }
-  inline void detachBuffer(void *buffer, int *size) {
+  inline void detachBuffer(void *buffer, int *size) noexcept {
     *(void **)buffer = bsendBuffer;
     *size = bsendBufferSize;
   }
-  inline bool isSplit(MPI_Comm comm) const {
+  inline bool isSplit(MPI_Comm comm) const noexcept {
     return (comm>=MPI_COMM_FIRST_SPLIT && comm<MPI_COMM_FIRST_GROUP);
   }
-  const ampiCommStruct &getSplit(MPI_Comm comm) const {
+  const ampiCommStruct &getSplit(MPI_Comm comm) const noexcept {
     int idx=comm-MPI_COMM_FIRST_SPLIT;
     if (idx>=splitComm.size()) CkAbort("Bad split communicator used");
     return *splitComm[idx];
   }
-  void splitChildRegister(const ampiCommStruct &s);
+  void splitChildRegister(const ampiCommStruct &s) noexcept;
 
-  inline bool isGroup(MPI_Comm comm) const {
+  inline bool isGroup(MPI_Comm comm) const noexcept {
     return (comm>=MPI_COMM_FIRST_GROUP && comm<MPI_COMM_FIRST_CART);
   }
-  const ampiCommStruct &getGroup(MPI_Comm comm) const {
+  const ampiCommStruct &getGroup(MPI_Comm comm) const noexcept {
     int idx=comm-MPI_COMM_FIRST_GROUP;
     if (idx>=groupComm.size()) CkAbort("Bad group communicator used");
     return *groupComm[idx];
   }
-  void groupChildRegister(const ampiCommStruct &s);
-  inline bool isInGroups(MPI_Group group) const {
+  void groupChildRegister(const ampiCommStruct &s) noexcept;
+  inline bool isInGroups(MPI_Group group) const noexcept {
     return (group>=0 && group<groups.size());
   }
 
-  void cartChildRegister(const ampiCommStruct &s);
-  void graphChildRegister(const ampiCommStruct &s);
-  void distGraphChildRegister(const ampiCommStruct &s);
-  void interChildRegister(const ampiCommStruct &s);
-  void intraChildRegister(const ampiCommStruct &s);
+  void cartChildRegister(const ampiCommStruct &s) noexcept;
+  void graphChildRegister(const ampiCommStruct &s) noexcept;
+  void distGraphChildRegister(const ampiCommStruct &s) noexcept;
+  void interChildRegister(const ampiCommStruct &s) noexcept;
+  void intraChildRegister(const ampiCommStruct &s) noexcept;
 
  public:
-  ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int nRanks_);
-  ampiParent(CkMigrateMessage *msg);
-  void ckAboutToMigrate(void);
-  void ckJustMigrated(void);
-  void ckJustRestored(void);
-  void setUserAboutToMigrateFn(MPI_MigrateFn f);
-  void setUserJustMigratedFn(MPI_MigrateFn f);
-  ~ampiParent();
+  ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int nRanks_) noexcept;
+  ampiParent(CkMigrateMessage *msg) noexcept;
+  void ckAboutToMigrate() noexcept;
+  void ckJustMigrated() noexcept;
+  void ckJustRestored() noexcept;
+  void setUserAboutToMigrateFn(MPI_MigrateFn f) noexcept;
+  void setUserJustMigratedFn(MPI_MigrateFn f) noexcept;
+  ~ampiParent() noexcept;
 
   //Children call this when they are first created, or just migrated
-  TCharm *registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration);
+  TCharm *registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration) noexcept;
 
   // exchange proxy info between two ampi proxies
-  void ExchangeProxy(CProxy_ampi rproxy){
+  void ExchangeProxy(CProxy_ampi rproxy) noexcept {
     if(!isTmpRProxySet){ tmpRProxy=rproxy; isTmpRProxySet=true; }
     else{ tmpRProxy.setRemoteProxy(rproxy); rproxy.setRemoteProxy(tmpRProxy); isTmpRProxySet=false; }
   }
 
   //Grab the next available split/group communicator
-  MPI_Comm getNextSplit(void) const {return MPI_COMM_FIRST_SPLIT+splitComm.size();}
-  MPI_Comm getNextGroup(void) const {return MPI_COMM_FIRST_GROUP+groupComm.size();}
-  MPI_Comm getNextCart(void) const {return MPI_COMM_FIRST_CART+cartComm.size();}
-  MPI_Comm getNextGraph(void) const {return MPI_COMM_FIRST_GRAPH+graphComm.size();}
-  MPI_Comm getNextDistGraph(void) const {return MPI_COMM_FIRST_DIST_GRAPH+distGraphComm.size();}
-  MPI_Comm getNextInter(void) const {return MPI_COMM_FIRST_INTER+interComm.size();}
-  MPI_Comm getNextIntra(void) const {return MPI_COMM_FIRST_INTRA+intraComm.size();}
+  MPI_Comm getNextSplit() const noexcept {return MPI_COMM_FIRST_SPLIT+splitComm.size();}
+  MPI_Comm getNextGroup() const noexcept {return MPI_COMM_FIRST_GROUP+groupComm.size();}
+  MPI_Comm getNextCart() const noexcept {return MPI_COMM_FIRST_CART+cartComm.size();}
+  MPI_Comm getNextGraph() const noexcept {return MPI_COMM_FIRST_GRAPH+graphComm.size();}
+  MPI_Comm getNextDistGraph() const noexcept {return MPI_COMM_FIRST_DIST_GRAPH+distGraphComm.size();}
+  MPI_Comm getNextInter() const noexcept {return MPI_COMM_FIRST_INTER+interComm.size();}
+  MPI_Comm getNextIntra() const noexcept {return MPI_COMM_FIRST_INTRA+intraComm.size();}
 
-  inline bool isCart(MPI_Comm comm) const {
+  inline bool isCart(MPI_Comm comm) const noexcept {
     return (comm>=MPI_COMM_FIRST_CART && comm<MPI_COMM_FIRST_GRAPH);
   }
-  ampiCommStruct &getCart(MPI_Comm comm) const {
+  ampiCommStruct &getCart(MPI_Comm comm) const noexcept {
     int idx=comm-MPI_COMM_FIRST_CART;
     if (idx>=cartComm.size()) CkAbort("AMPI> Bad cartesian communicator used!\n");
     return *cartComm[idx];
   }
-  inline bool isGraph(MPI_Comm comm) const {
+  inline bool isGraph(MPI_Comm comm) const noexcept {
     return (comm>=MPI_COMM_FIRST_GRAPH && comm<MPI_COMM_FIRST_DIST_GRAPH);
   }
-  ampiCommStruct &getGraph(MPI_Comm comm) const {
+  ampiCommStruct &getGraph(MPI_Comm comm) const noexcept {
     int idx=comm-MPI_COMM_FIRST_GRAPH;
     if (idx>=graphComm.size()) CkAbort("AMPI> Bad graph communicator used!\n");
     return *graphComm[idx];
   }
-  inline bool isDistGraph(MPI_Comm comm) const {
+  inline bool isDistGraph(MPI_Comm comm) const noexcept {
     return (comm >= MPI_COMM_FIRST_DIST_GRAPH && comm < MPI_COMM_FIRST_INTER);
   }
-  ampiCommStruct &getDistGraph(MPI_Comm comm) const {
+  ampiCommStruct &getDistGraph(MPI_Comm comm) const noexcept {
     int idx = comm-MPI_COMM_FIRST_DIST_GRAPH;
     if (idx>=distGraphComm.size()) CkAbort("Bad distributed graph communicator used");
     return *distGraphComm[idx];
   }
-  inline bool isInter(MPI_Comm comm) const {
+  inline bool isInter(MPI_Comm comm) const noexcept {
     return (comm>=MPI_COMM_FIRST_INTER && comm<MPI_COMM_FIRST_INTRA);
   }
-  const ampiCommStruct &getInter(MPI_Comm comm) const {
+  const ampiCommStruct &getInter(MPI_Comm comm) const noexcept {
     int idx=comm-MPI_COMM_FIRST_INTER;
     if (idx>=interComm.size()) CkAbort("AMPI> Bad inter-communicator used!\n");
     return *interComm[idx];
   }
-  inline bool isIntra(MPI_Comm comm) const {
+  inline bool isIntra(MPI_Comm comm) const noexcept {
     return (comm>=MPI_COMM_FIRST_INTRA && comm<MPI_COMM_FIRST_RESVD);
   }
-  const ampiCommStruct &getIntra(MPI_Comm comm) const {
+  const ampiCommStruct &getIntra(MPI_Comm comm) const noexcept {
     int idx=comm-MPI_COMM_FIRST_INTRA;
     if (idx>=intraComm.size()) CkAbort("Bad intra-communicator used");
     return *intraComm[idx];
   }
 
-  void pup(PUP::er &p);
+  void pup(PUP::er &p) noexcept;
 
-  void startCheckpoint(const char* dname);
-  void Checkpoint(int len, const char* dname);
-  void ResumeThread(void);
-  TCharm* getTCharmThread() const {return thread;}
-  inline ampiParent* blockOnRecv(void);
-  inline CkDDT* getDDT() { return &myDDT; }
+  void startCheckpoint(const char* dname) noexcept;
+  void Checkpoint(int len, const char* dname) noexcept;
+  void ResumeThread() noexcept;
+  TCharm* getTCharmThread() const noexcept {return thread;}
+  inline ampiParent* blockOnRecv() noexcept;
+  inline CkDDT* getDDT() noexcept { return &myDDT; }
 
 #if CMK_LBDB_ON
-  void setMigratable(bool mig) {
+  void setMigratable(bool mig) noexcept {
     thread->setMigratable(mig);
   }
 #endif
 
-  inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) const {
+  inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) const noexcept {
     if (comm==MPI_COMM_WORLD) return worldStruct;
     if (comm==worldNo) return worldStruct;
     if (isSplit(comm)) return getSplit(comm);
@@ -2200,12 +2200,12 @@ class ampiParent final : public CBase_ampiParent {
     return universeComm2CommStruct(comm);
   }
 
-  inline vector<int>& getKeyvals(MPI_Comm comm) {
+  inline vector<int>& getKeyvals(MPI_Comm comm) noexcept {
     ampiCommStruct &cs = *(ampiCommStruct *)&comm2CommStruct(comm);
     return cs.getKeyvals();
   }
 
-  inline ampi *comm2ampi(MPI_Comm comm) const {
+  inline ampi *comm2ampi(MPI_Comm comm) const noexcept {
     if (comm==MPI_COMM_WORLD) return worldPtr;
     if (comm==worldNo) return worldPtr;
     if (isSplit(comm)) {
@@ -2241,13 +2241,13 @@ class ampiParent final : public CBase_ampiParent {
     return NULL;
   }
 
-  inline bool hasComm(const MPI_Group group) const {
+  inline bool hasComm(const MPI_Group group) const noexcept {
     MPI_Comm comm = (MPI_Comm)group;
     return ( comm==MPI_COMM_WORLD || comm==worldNo || isSplit(comm) || isGroup(comm) ||
              isCart(comm) || isGraph(comm) || isDistGraph(comm) || isIntra(comm) );
     //isInter omitted because its comm number != its group number
   }
-  inline const groupStruct group2vec(MPI_Group group) const {
+  inline const groupStruct group2vec(MPI_Group group) const noexcept {
     if(group == MPI_GROUP_NULL || group == MPI_GROUP_EMPTY)
       return groupStruct();
     if(hasComm(group))
@@ -2257,26 +2257,26 @@ class ampiParent final : public CBase_ampiParent {
     CkAbort("ampiParent::group2vec: Invalid group id!");
     return *groups[0]; //meaningless return
   }
-  inline MPI_Group saveGroupStruct(groupStruct vec){
+  inline MPI_Group saveGroupStruct(groupStruct vec) noexcept {
     if (vec.empty()) return MPI_GROUP_EMPTY;
     int idx = groups.size();
     groups.resize(idx+1);
     groups[idx]=new groupStruct(vec);
     return (MPI_Group)idx;
   }
-  inline int getRank(const MPI_Group group) const {
+  inline int getRank(const MPI_Group group) const noexcept {
     groupStruct vec = group2vec(group);
     return getPosOp(thisIndex,vec);
   }
-  inline AmpiRequestList &getReqs() { return ampiReqs; }
-  inline int getMyPe(void) const {
+  inline AmpiRequestList &getReqs() noexcept { return ampiReqs; }
+  inline int getMyPe() const noexcept {
     return CkMyPe();
   }
-  inline bool hasWorld(void) const {
+  inline bool hasWorld() const noexcept {
     return worldPtr!=NULL;
   }
 
-  inline void checkComm(MPI_Comm comm) const {
+  inline void checkComm(MPI_Comm comm) const noexcept {
     if ((comm != MPI_COMM_SELF && comm != MPI_COMM_WORLD)
      || (isSplit(comm) && comm-MPI_COMM_FIRST_SPLIT >= splitComm.size())
      || (isGroup(comm) && comm-MPI_COMM_FIRST_GROUP >= groupComm.size())
@@ -2289,53 +2289,53 @@ class ampiParent final : public CBase_ampiParent {
   }
 
   /// if intra-communicator, return comm, otherwise return null group
-  inline MPI_Group comm2group(const MPI_Comm comm) const {
+  inline MPI_Group comm2group(const MPI_Comm comm) const noexcept {
     if(isInter(comm)) return MPI_GROUP_NULL;   // we don't support inter-communicator in such functions
     ampiCommStruct s = comm2CommStruct(comm);
     if(comm!=MPI_COMM_WORLD && comm!=s.getComm()) CkAbort("Error in ampiParent::comm2group()");
     return (MPI_Group)(s.getComm());
   }
 
-  inline int getRemoteSize(const MPI_Comm comm) const {
+  inline int getRemoteSize(const MPI_Comm comm) const noexcept {
     if(isInter(comm)) return getInter(comm).getRemoteIndices().size();
     else return -1;
   }
-  inline MPI_Group getRemoteGroup(const MPI_Comm comm) {
+  inline MPI_Group getRemoteGroup(const MPI_Comm comm) noexcept {
     if(isInter(comm)) return saveGroupStruct(getInter(comm).getRemoteIndices());
     else return MPI_GROUP_NULL;
   }
 
   int createKeyval(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn,
-                  int *keyval, void* extra_state);
-  bool getBuiltinKeyval(int keyval, void *attribute_val);
-  int setUserKeyval(MPI_Comm comm, int keyval, void *attribute_val);
-  bool getUserKeyval(MPI_Comm comm, vector<int>& keyvals, int keyval, void *attribute_val, int *flag);
-  int dupUserKeyvals(MPI_Comm old_comm, MPI_Comm new_comm);
-  int freeUserKeyval(int context, vector<int>& keyvals, int *keyval);
-  int freeUserKeyvals(int context, vector<int>& keyvals);
+                  int *keyval, void* extra_state) noexcept;
+  bool getBuiltinKeyval(int keyval, void *attribute_val) noexcept;
+  int setUserKeyval(MPI_Comm comm, int keyval, void *attribute_val) noexcept;
+  bool getUserKeyval(MPI_Comm comm, vector<int>& keyvals, int keyval, void *attribute_val, int *flag) noexcept;
+  int dupUserKeyvals(MPI_Comm old_comm, MPI_Comm new_comm) noexcept;
+  int freeUserKeyval(int context, vector<int>& keyvals, int *keyval) noexcept;
+  int freeUserKeyvals(int context, vector<int>& keyvals) noexcept;
 
-  int setAttr(MPI_Comm comm, vector<int>& keyvals, int keyval, void *attribute_val);
-  int getAttr(MPI_Comm comm, vector<int>& keyvals, int keyval, void *attribute_val, int *flag);
-  int deleteAttr(MPI_Comm comm, vector<int>& keyvals, int keyval);
+  int setAttr(MPI_Comm comm, vector<int>& keyvals, int keyval, void *attribute_val) noexcept;
+  int getAttr(MPI_Comm comm, vector<int>& keyvals, int keyval, void *attribute_val, int *flag) noexcept;
+  int deleteAttr(MPI_Comm comm, vector<int>& keyvals, int keyval) noexcept;
 
-  int addWinStruct(WinStruct *win);
-  WinStruct *getWinStruct(MPI_Win win) const;
-  void removeWinStruct(WinStruct *win);
+  int addWinStruct(WinStruct *win) noexcept;
+  WinStruct *getWinStruct(MPI_Win win) const noexcept;
+  void removeWinStruct(WinStruct *win) noexcept;
 
-  int createInfo(MPI_Info *newinfo);
-  int dupInfo(MPI_Info info, MPI_Info *newinfo);
-  int setInfo(MPI_Info info, const char *key, const char *value);
-  int deleteInfo(MPI_Info info, const char *key);
-  int getInfo(MPI_Info info, const char *key, int valuelen, char *value, int *flag) const;
-  int getInfoValuelen(MPI_Info info, const char *key, int *valuelen, int *flag) const;
-  int getInfoNkeys(MPI_Info info, int *nkeys) const;
-  int getInfoNthkey(MPI_Info info, int n, char *key) const;
-  int freeInfo(MPI_Info info);
-  void defineInfoEnv(int nRanks_);
-  void defineInfoMigration();
+  int createInfo(MPI_Info *newinfo) noexcept;
+  int dupInfo(MPI_Info info, MPI_Info *newinfo) noexcept;
+  int setInfo(MPI_Info info, const char *key, const char *value) noexcept;
+  int deleteInfo(MPI_Info info, const char *key) noexcept;
+  int getInfo(MPI_Info info, const char *key, int valuelen, char *value, int *flag) const noexcept;
+  int getInfoValuelen(MPI_Info info, const char *key, int *valuelen, int *flag) const noexcept;
+  int getInfoNkeys(MPI_Info info, int *nkeys) const noexcept;
+  int getInfoNthkey(MPI_Info info, int n, char *key) const noexcept;
+  int freeInfo(MPI_Info info) noexcept;
+  void defineInfoEnv(int nRanks_) noexcept;
+  void defineInfoMigration() noexcept;
 
-  void initOps(void);
-  inline int createOp(MPI_User_function *fn, bool isCommutative) {
+  void initOps(void) noexcept;
+  inline int createOp(MPI_User_function *fn, bool isCommutative) noexcept {
     // Search thru non-predefined op's for any invalidated ones:
     for (int i=MPI_NO_OP+1; i<ops.size(); i++) {
       if (ops[i].isFree()) {
@@ -2347,7 +2347,7 @@ class ampiParent final : public CBase_ampiParent {
     ops.emplace_back(fn, isCommutative);
     return ops.size()-1;
   }
-  inline void freeOp(MPI_Op op) {
+  inline void freeOp(MPI_Op op) noexcept {
     // Don't free predefined op's:
     if (op > MPI_NO_OP) {
       // Invalidate op, then free all invalid op's from the back of the op's vector
@@ -2357,40 +2357,40 @@ class ampiParent final : public CBase_ampiParent {
       }
     }
   }
-  inline bool opIsPredefined(MPI_Op op) const {
+  inline bool opIsPredefined(MPI_Op op) const noexcept {
     return (op>=MPI_OP_NULL && op<=MPI_NO_OP);
   }
-  inline bool opIsCommutative(MPI_Op op) const {
+  inline bool opIsCommutative(MPI_Op op) const noexcept {
     CkAssert(op>MPI_OP_NULL && op<ops.size());
     return ops[op].isCommutative;
   }
-  inline MPI_User_function* op2User_function(MPI_Op op) const {
+  inline MPI_User_function* op2User_function(MPI_Op op) const noexcept {
     CkAssert(op>MPI_OP_NULL && op<ops.size());
     return ops[op].func;
   }
-  inline AmpiOpHeader op2AmpiOpHeader(MPI_Op op, MPI_Datatype type, int count) const {
+  inline AmpiOpHeader op2AmpiOpHeader(MPI_Op op, MPI_Datatype type, int count) const noexcept {
     CkAssert(op>MPI_OP_NULL && op<ops.size());
     int size = myDDT.getType(type)->getSize(count);
     return AmpiOpHeader(ops[op].func, type, count, size);
   }
-  inline void applyOp(MPI_Datatype datatype, MPI_Op op, int count, const void* invec, void* inoutvec) const {
+  inline void applyOp(MPI_Datatype datatype, MPI_Op op, int count, const void* invec, void* inoutvec) const noexcept {
     // inoutvec[i] = invec[i] op inoutvec[i]
     MPI_User_function *func = op2User_function(op);
     (func)((void*)invec, inoutvec, &count, &datatype);
   }
 
-  void init();
-  void finalize();
-  void block();
-  void yield();
+  void init() noexcept;
+  void finalize() noexcept;
+  void block() noexcept;
+  void yield() noexcept;
 
 #if AMPI_PRINT_MSG_SIZES
 // Map of AMPI routine names to message sizes and number of messages:
 // ["AMPI_Routine"][ [msg_size][num_msgs] ]
   std::unordered_map<std::string, std::map<int, int> > msgSizes;
-  inline bool isRankRecordingMsgSizes(void);
-  inline void recordMsgSize(const char* func, int msgSize);
-  void printMsgSizes(void);
+  inline bool isRankRecordingMsgSizes() noexcept;
+  inline void recordMsgSize(const char* func, int msgSize) noexcept;
+  void printMsgSizes() noexcept;
 #endif
 
 #if AMPIMSGLOG
@@ -2417,7 +2417,7 @@ public:
   MPIX_Grequest_poll_function *poll_fn;
   MPIX_Grequest_wait_function *wait_fn;
 
-  void pup(PUP::er &p) {
+  void pup(PUP::er &p) noexcept {
     p((char *)query_fn, sizeof(void *));
     p((char *)free_fn, sizeof(void *));
     p((char *)cancel_fn, sizeof(void *));
@@ -2465,230 +2465,230 @@ class ampi final : public CBase_ampi {
   CkPupPtrVec<win_obj> winObjects;
 
  private:
-  void inorder(AmpiMsg *msg);
+  void inorder(AmpiMsg *msg) noexcept;
   void inorderRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank,
-                   MPI_Comm comm, int ssendReq);
+                   MPI_Comm comm, int ssendReq) noexcept;
 
-  void init(void);
-  void findParent(bool forMigration);
+  void init() noexcept;
+  void findParent(bool forMigration) noexcept;
 
  public: // entry methods
-  ampi();
-  ampi(CkArrayID parent_,const ampiCommStruct &s);
-  ampi(CkMigrateMessage *msg);
-  void ckJustMigrated(void);
-  void ckJustRestored(void);
-  ~ampi();
+  ampi() noexcept;
+  ampi(CkArrayID parent_,const ampiCommStruct &s) noexcept;
+  ampi(CkMigrateMessage *msg) noexcept;
+  void ckJustMigrated() noexcept;
+  void ckJustRestored() noexcept;
+  ~ampi() noexcept;
 
-  void pup(PUP::er &p);
+  void pup(PUP::er &p) noexcept;
 
-  void allInitDone();
-  void setInitDoneFlag();
+  void allInitDone() noexcept;
+  void setInitDoneFlag() noexcept;
 
-  void unblock(void);
-  void generic(AmpiMsg *);
+  void unblock() noexcept;
+  void generic(AmpiMsg *) noexcept;
   void genericRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank,
-                   MPI_Comm destcomm, int ssendReq);
-  void completedRdmaSend(CkDataMsg *msg);
-  void ssend_ack(int sreq);
-  void barrierResult(void);
-  void ibarrierResult(void);
-  void rednResult(CkReductionMsg *msg);
-  void irednResult(CkReductionMsg *msg);
+                   MPI_Comm destcomm, int ssendReq) noexcept;
+  void completedRdmaSend(CkDataMsg *msg) noexcept;
+  void ssend_ack(int sreq) noexcept;
+  void barrierResult() noexcept;
+  void ibarrierResult() noexcept;
+  void rednResult(CkReductionMsg *msg) noexcept;
+  void irednResult(CkReductionMsg *msg) noexcept;
 
-  void splitPhase1(CkReductionMsg *msg);
-  void splitPhaseInter(CkReductionMsg *msg);
-  void commCreatePhase1(MPI_Comm nextGroupComm);
-  void intercommCreatePhase1(MPI_Comm nextInterComm);
-  void intercommMergePhase1(MPI_Comm nextIntraComm);
+  void splitPhase1(CkReductionMsg *msg) noexcept;
+  void splitPhaseInter(CkReductionMsg *msg) noexcept;
+  void commCreatePhase1(MPI_Comm nextGroupComm) noexcept;
+  void intercommCreatePhase1(MPI_Comm nextInterComm) noexcept;
+  void intercommMergePhase1(MPI_Comm nextIntraComm) noexcept;
 
  private: // Used by the above entry methods that create new MPI_Comm objects
-  CProxy_ampi createNewChildAmpiSync();
-  void insertNewChildAmpiElements(MPI_Comm newComm, CProxy_ampi newAmpi);
+  CProxy_ampi createNewChildAmpiSync() noexcept;
+  void insertNewChildAmpiElements(MPI_Comm newComm, CProxy_ampi newAmpi) noexcept;
 
-  inline void handleBlockedReq(AmpiRequest* req) {
+  inline void handleBlockedReq(AmpiRequest* req) noexcept {
     if (req->isBlocked() && parent->numBlockedReqs != 0) {
       parent->numBlockedReqs--;
     }
   }
-  inline void resumeThreadIfReady() {
+  inline void resumeThreadIfReady() noexcept {
     if (parent->resumeOnRecv && parent->numBlockedReqs == 0) {
       thread->resume();
     }
   }
 
  public: // to be used by MPI_* functions
-  inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) const {
+  inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) const noexcept {
     return parent->comm2CommStruct(comm);
   }
 
-  inline ampi* blockOnRecv(void);
-  inline ampi* blockOnColl(void);
-  inline ampi* blockOnRedn(AmpiRequest *req);
-  MPI_Request postReq(AmpiRequest* newreq);
+  inline ampi* blockOnRecv() noexcept;
+  inline ampi* blockOnColl() noexcept;
+  inline ampi* blockOnRedn(AmpiRequest *req) noexcept;
+  MPI_Request postReq(AmpiRequest* newreq) noexcept;
 
-  inline CMK_REFNUM_TYPE getSeqNo(int destRank, MPI_Comm destcomm, int tag);
-  AmpiMsg *makeBcastMsg(const void *buf,int count,MPI_Datatype type,MPI_Comm destcomm);
+  inline CMK_REFNUM_TYPE getSeqNo(int destRank, MPI_Comm destcomm, int tag) noexcept;
+  AmpiMsg *makeBcastMsg(const void *buf,int count,MPI_Datatype type,MPI_Comm destcomm) noexcept;
   AmpiMsg *makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
-                       MPI_Datatype type,MPI_Comm destcomm, int ssendReq=0);
+                       MPI_Datatype type,MPI_Comm destcomm, int ssendReq=0) noexcept;
 
   MPI_Request send(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
-                   MPI_Comm destcomm, int ssendReq=0, AmpiSendType sendType=BLOCKING_SEND);
-  static void sendraw(int t, int s, void* buf, int len, CkArrayID aid, int idx);
+                   MPI_Comm destcomm, int ssendReq=0, AmpiSendType sendType=BLOCKING_SEND) noexcept;
+  static void sendraw(int t, int s, void* buf, int len, CkArrayID aid, int idx) noexcept;
   inline MPI_Request sendLocalMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type, int destRank,
-                                  MPI_Comm destcomm, ampi* destPtr, int ssendReq, AmpiSendType sendType);
+                                  MPI_Comm destcomm, ampi* destPtr, int ssendReq, AmpiSendType sendType) noexcept;
   inline MPI_Request sendRdmaMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type, int destIdx,
-                                 int destRank, MPI_Comm destcomm, CProxy_ampi arrProxy, int ssendReq);
-  inline bool destLikelyWithinProcess(CProxy_ampi arrProxy, int destIdx) const {
+                                 int destRank, MPI_Comm destcomm, CProxy_ampi arrProxy, int ssendReq) noexcept;
+  inline bool destLikelyWithinProcess(CProxy_ampi arrProxy, int destIdx) const noexcept {
     CkArray* localBranch = arrProxy.ckLocalBranch();
     int destPe = localBranch->lastKnown(CkArrayIndex1D(destIdx));
     return (CkNodeOf(destPe) == CkMyNode());
   }
   MPI_Request delesend(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
-                       MPI_Comm destcomm, CProxy_ampi arrproxy, int ssend, AmpiSendType sendType);
-  inline void processAmpiMsg(AmpiMsg *msg, const void* buf, MPI_Datatype type, int count);
+                       MPI_Comm destcomm, CProxy_ampi arrproxy, int ssend, AmpiSendType sendType) noexcept;
+  inline void processAmpiMsg(AmpiMsg *msg, const void* buf, MPI_Datatype type, int count) noexcept;
   inline void processRdmaMsg(const void *sbuf, int slength, int ssendReq, int srank, const void* rbuf,
-                             int rcount, MPI_Datatype rtype, MPI_Comm comm);
-  inline void processRednMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype type, int count);
+                             int rcount, MPI_Datatype rtype, MPI_Comm comm) noexcept;
+  inline void processRednMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype type, int count) noexcept;
   inline void processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count,
-                                           MPI_User_function* func);
-  inline void processGatherMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype type, int recvCount);
+                                           MPI_User_function* func) noexcept;
+  inline void processGatherMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype type, int recvCount) noexcept;
   inline void processGathervMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype type,
-                               int* recvCounts, int* displs);
-  inline AmpiMsg * getMessage(int t, int s, MPI_Comm comm, int *sts) const;
-  int recv(int t,int s,void* buf,int count,MPI_Datatype type,MPI_Comm comm,MPI_Status *sts=NULL);
+                               int* recvCounts, int* displs) noexcept;
+  inline AmpiMsg * getMessage(int t, int s, MPI_Comm comm, int *sts) const noexcept;
+  int recv(int t,int s,void* buf,int count,MPI_Datatype type,MPI_Comm comm,MPI_Status *sts=NULL) noexcept;
   void irecv(void *buf, int count, MPI_Datatype type, int src,
-             int tag, MPI_Comm comm, MPI_Request *request);
+             int tag, MPI_Comm comm, MPI_Request *request) noexcept;
   void mrecv(int tag, int src, void* buf, int count, MPI_Datatype datatype, MPI_Comm comm,
-             MPI_Status* status, MPI_Message* message);
+             MPI_Status* status, MPI_Message* message) noexcept;
   void imrecv(void* buf, int count, MPI_Datatype datatype, int src, int tag, MPI_Comm comm,
-              MPI_Request* request, MPI_Message* message);
+              MPI_Request* request, MPI_Message* message) noexcept;
   void sendrecv(const void *sbuf, int scount, MPI_Datatype stype, int dest, int stag,
                 void *rbuf, int rcount, MPI_Datatype rtype, int src, int rtag,
-                MPI_Comm comm, MPI_Status *sts);
+                MPI_Comm comm, MPI_Status *sts) noexcept;
   void sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
                         int dest, int sendtag, int source, int recvtag,
-                        MPI_Comm comm, MPI_Status *status);
-  void probe(int t,int s,MPI_Comm comm,MPI_Status *sts);
-  void mprobe(int t, int s, MPI_Comm comm, MPI_Status *sts, MPI_Message *message);
-  int iprobe(int t,int s,MPI_Comm comm,MPI_Status *sts);
-  int improbe(int t, int s, MPI_Comm comm, MPI_Status *sts, MPI_Message *message);
-  void barrier(void);
-  void ibarrier(MPI_Request *request);
-  void bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm comm);
-  int intercomm_bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm intercomm);
-  void ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm comm, MPI_Request* request);
-  int intercomm_ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm intercomm, MPI_Request *request);
-  static void bcastraw(void* buf, int len, CkArrayID aid);
-  void split(int color,int key,MPI_Comm *dest, int type);
-  void commCreate(const groupStruct vec,MPI_Comm *newcomm);
-  MPI_Comm cartCreate0D(void);
-  MPI_Comm cartCreate(groupStruct vec, int ndims, const int* dims);
-  void graphCreate(const groupStruct vec, MPI_Comm *newcomm);
-  void distGraphCreate(const groupStruct vec, MPI_Comm *newcomm);
-  void intercommCreate(const groupStruct rvec, int root, MPI_Comm tcomm, MPI_Comm *ncomm);
+                        MPI_Comm comm, MPI_Status *status) noexcept;
+  void probe(int t,int s,MPI_Comm comm,MPI_Status *sts) noexcept;
+  void mprobe(int t, int s, MPI_Comm comm, MPI_Status *sts, MPI_Message *message) noexcept;
+  int iprobe(int t,int s,MPI_Comm comm,MPI_Status *sts) noexcept;
+  int improbe(int t, int s, MPI_Comm comm, MPI_Status *sts, MPI_Message *message) noexcept;
+  void barrier() noexcept;
+  void ibarrier(MPI_Request *request) noexcept;
+  void bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm comm) noexcept;
+  int intercomm_bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm intercomm) noexcept;
+  void ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm comm, MPI_Request* request) noexcept;
+  int intercomm_ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm intercomm, MPI_Request *request) noexcept;
+  static void bcastraw(void* buf, int len, CkArrayID aid) noexcept;
+  void split(int color,int key,MPI_Comm *dest, int type) noexcept;
+  void commCreate(const groupStruct vec,MPI_Comm *newcomm) noexcept;
+  MPI_Comm cartCreate0D() noexcept;
+  MPI_Comm cartCreate(groupStruct vec, int ndims, const int* dims) noexcept;
+  void graphCreate(const groupStruct vec, MPI_Comm *newcomm) noexcept;
+  void distGraphCreate(const groupStruct vec, MPI_Comm *newcomm) noexcept;
+  void intercommCreate(const groupStruct rvec, int root, MPI_Comm tcomm, MPI_Comm *ncomm) noexcept;
 
-  inline bool isInter(void) const { return myComm.isinter(); }
-  void intercommMerge(int first, MPI_Comm *ncomm);
+  inline bool isInter() const noexcept { return myComm.isinter(); }
+  void intercommMerge(int first, MPI_Comm *ncomm) noexcept;
 
-  inline int getWorldRank(void) const {return parent->thisIndex;}
+  inline int getWorldRank() const noexcept {return parent->thisIndex;}
   /// Return our rank in this communicator
-  inline int getRank(void) const {return myRank;}
-  inline int getSize(void) const {return myComm.getSize();}
-  inline MPI_Comm getComm(void) const {return myComm.getComm();}
-  inline void setCommName(const char *name){myComm.setName(name);}
-  inline void getCommName(char *name, int *len) const {myComm.getName(name,len);}
-  inline vector<int> getIndices(void) const { return myComm.getIndices(); }
-  inline vector<int> getRemoteIndices(void) const { return myComm.getRemoteIndices(); }
-  inline const CProxy_ampi &getProxy(void) const {return thisProxy;}
-  inline const CProxy_ampi &getRemoteProxy(void) const {return remoteProxy;}
-  inline void setRemoteProxy(CProxy_ampi rproxy) { remoteProxy = rproxy; thread->resume(); }
-  inline int getIndexForRank(int r) const {return myComm.getIndexForRank(r);}
-  inline int getIndexForRemoteRank(int r) const {return myComm.getIndexForRemoteRank(r);}
-  void findNeighbors(MPI_Comm comm, int rank, vector<int>& neighbors) const;
-  inline const vector<int>& getNeighbors() const { return myComm.getTopologyforNeighbors()->getnbors(); }
-  inline bool opIsCommutative(MPI_Op op) const { return parent->opIsCommutative(op); }
-  inline MPI_User_function* op2User_function(MPI_Op op) const { return parent->op2User_function(op); }
-  void topoDup(int topoType, int rank, MPI_Comm comm, MPI_Comm *newcomm);
+  inline int getRank() const noexcept {return myRank;}
+  inline int getSize() const noexcept {return myComm.getSize();}
+  inline MPI_Comm getComm() const noexcept {return myComm.getComm();}
+  inline void setCommName(const char *name) noexcept {myComm.setName(name);}
+  inline void getCommName(char *name, int *len) const noexcept {myComm.getName(name,len);}
+  inline vector<int> getIndices() const noexcept { return myComm.getIndices(); }
+  inline vector<int> getRemoteIndices() const noexcept { return myComm.getRemoteIndices(); }
+  inline const CProxy_ampi &getProxy() const noexcept {return thisProxy;}
+  inline const CProxy_ampi &getRemoteProxy() const noexcept {return remoteProxy;}
+  inline void setRemoteProxy(CProxy_ampi rproxy) noexcept { remoteProxy = rproxy; thread->resume(); }
+  inline int getIndexForRank(int r) const noexcept {return myComm.getIndexForRank(r);}
+  inline int getIndexForRemoteRank(int r) const noexcept {return myComm.getIndexForRemoteRank(r);}
+  void findNeighbors(MPI_Comm comm, int rank, vector<int>& neighbors) const noexcept;
+  inline const vector<int>& getNeighbors() const noexcept { return myComm.getTopologyforNeighbors()->getnbors(); }
+  inline bool opIsCommutative(MPI_Op op) const noexcept { return parent->opIsCommutative(op); }
+  inline MPI_User_function* op2User_function(MPI_Op op) const noexcept { return parent->op2User_function(op); }
+  void topoDup(int topoType, int rank, MPI_Comm comm, MPI_Comm *newcomm) noexcept;
 
-  inline AmpiRequestList& getReqs() { return parent->ampiReqs; }
-  CkDDT *getDDT() {return &parent->myDDT;}
-  CthThread getThread() const { return thread->getThread(); }
+  inline AmpiRequestList& getReqs() noexcept { return parent->ampiReqs; }
+  CkDDT *getDDT() noexcept {return &parent->myDDT;}
+  CthThread getThread() const noexcept { return thread->getThread(); }
 
  public:
-  MPI_Win createWinInstance(void *base, MPI_Aint size, int disp_unit, MPI_Info info);
-  int deleteWinInstance(MPI_Win win);
-  int winGetGroup(WinStruct *win, MPI_Group *group) const;
+  MPI_Win createWinInstance(void *base, MPI_Aint size, int disp_unit, MPI_Info info) noexcept;
+  int deleteWinInstance(MPI_Win win) noexcept;
+  int winGetGroup(WinStruct *win, MPI_Group *group) const noexcept;
   int winPut(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
-             MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct *win);
+             MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct *win) noexcept;
   int winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
-             MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct *win);
+             MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct *win) noexcept;
   int winIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
               MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct *win,
-              MPI_Request *req);
-  int winIgetWait(MPI_Request *request, MPI_Status *status);
-  int winIgetFree(MPI_Request *request, MPI_Status *status);
+              MPI_Request *req) noexcept;
+  int winIgetWait(MPI_Request *request, MPI_Status *status) noexcept;
+  int winIgetFree(MPI_Request *request, MPI_Status *status) noexcept;
   void winRemotePut(int orgtotalsize, char* orgaddr, int orgcnt, MPI_Datatype orgtype,
-                    MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex);
+                    MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex) noexcept;
   char* winLocalGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
-                    MPI_Datatype targtype, int winIndex);
+                    MPI_Datatype targtype, int winIndex) noexcept;
   AmpiMsg* winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
-                    int targcnt, MPI_Datatype targtype, int winIndex);
+                    int targcnt, MPI_Datatype targtype, int winIndex) noexcept;
   AmpiMsg* winRemoteIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
-                         int targcnt, MPI_Datatype targtype, int winIndex);
-  int winLock(int lock_type, int rank, WinStruct *win);
-  int winUnlock(int rank, WinStruct *win);
-  void winRemoteLock(int lock_type, int winIndex, int requestRank);
-  void winRemoteUnlock(int winIndex, int requestRank);
+                         int targcnt, MPI_Datatype targtype, int winIndex) noexcept;
+  int winLock(int lock_type, int rank, WinStruct *win) noexcept;
+  int winUnlock(int rank, WinStruct *win) noexcept;
+  void winRemoteLock(int lock_type, int winIndex, int requestRank) noexcept;
+  void winRemoteUnlock(int winIndex, int requestRank) noexcept;
   int winAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
                     MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
-                    MPI_Op op, WinStruct *win);
+                    MPI_Op op, WinStruct *win) noexcept;
   void winRemoteAccumulate(int orgtotalsize, char* orgaddr, int orgcnt, MPI_Datatype orgtype,
                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
-                           MPI_Op op, int winIndex);
+                           MPI_Op op, int winIndex) noexcept;
   int winGetAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, void *resaddr,
                        int rescnt, MPI_Datatype restype, int rank, MPI_Aint targdisp,
-                       int targcnt, MPI_Datatype targtype, MPI_Op op, WinStruct *win);
+                       int targcnt, MPI_Datatype targtype, MPI_Op op, WinStruct *win) noexcept;
   void winLocalGetAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt, MPI_Datatype orgtype,
                              MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Op op,
-                             char *resaddr, int winIndex);
+                             char *resaddr, int winIndex) noexcept;
   AmpiMsg* winRemoteGetAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt, MPI_Datatype orgtype,
                                   MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Op op,
-                                  int winIndex);
+                                  int winIndex) noexcept;
   int winCompareAndSwap(const void *orgaddr, const void *compaddr, void *resaddr, MPI_Datatype type,
-                        int rank, MPI_Aint targdisp, WinStruct *win);
+                        int rank, MPI_Aint targdisp, WinStruct *win) noexcept;
   char* winLocalCompareAndSwap(int size, char* sorgaddr, char* compaddr, MPI_Datatype type,
-                               MPI_Aint targdisp, int winIndex);
+                               MPI_Aint targdisp, int winIndex) noexcept;
   AmpiMsg* winRemoteCompareAndSwap(int size, char *sorgaddr, char *compaddr, MPI_Datatype type,
-                                   MPI_Aint targdisp, int winIndex);
-  void winSetName(WinStruct *win, const char *name);
-  void winGetName(WinStruct *win, char *name, int *length) const;
-  win_obj* getWinObjInstance(WinStruct *win) const;
-  int getNewSemaId();
+                                   MPI_Aint targdisp, int winIndex) noexcept;
+  void winSetName(WinStruct *win, const char *name) noexcept;
+  void winGetName(WinStruct *win, char *name, int *length) const noexcept;
+  win_obj* getWinObjInstance(WinStruct *win) const noexcept;
+  int getNewSemaId() noexcept;
 
   int intercomm_scatter(int root, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
-                        void *recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm intercomm);
+                        void *recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm intercomm) noexcept;
   int intercomm_iscatter(int root, const void *sendbuf, int sendcount, MPI_Datatype sendtype,
                          void *recvbuf, int recvcount, MPI_Datatype recvtype,
-                         MPI_Comm intercomm, MPI_Request *request);
+                         MPI_Comm intercomm, MPI_Request *request) noexcept;
   int intercomm_scatterv(int root, const void* sendbuf, const int* sendcounts, const int* displs,
                          MPI_Datatype sendtype, void* recvbuf, int recvcount,
-                         MPI_Datatype recvtype, MPI_Comm intercomm);
+                         MPI_Datatype recvtype, MPI_Comm intercomm) noexcept;
   int intercomm_iscatterv(int root, const void* sendbuf, const int* sendcounts, const int* displs,
                           MPI_Datatype sendtype, void* recvbuf, int recvcount,
-                          MPI_Datatype recvtype, MPI_Comm intercomm, MPI_Request* request);
+                          MPI_Datatype recvtype, MPI_Comm intercomm, MPI_Request* request) noexcept;
 };
 
-ampiParent *getAmpiParent(void);
-bool isAmpiThread(void);
-ampi *getAmpiInstance(MPI_Comm comm);
-void checkComm(MPI_Comm comm);
-void checkRequest(MPI_Request req);
-void handle_MPI_BOTTOM(void* &buf, MPI_Datatype type);
-void handle_MPI_BOTTOM(void* &buf1, MPI_Datatype type1, void* &buf2, MPI_Datatype type2);
+ampiParent *getAmpiParent() noexcept;
+bool isAmpiThread() noexcept;
+ampi *getAmpiInstance(MPI_Comm comm) noexcept;
+void checkComm(MPI_Comm comm) noexcept;
+void checkRequest(MPI_Request req) noexcept;
+void handle_MPI_BOTTOM(void* &buf, MPI_Datatype type) noexcept;
+void handle_MPI_BOTTOM(void* &buf1, MPI_Datatype type1, void* &buf2, MPI_Datatype type2) noexcept;
 
 #if AMPI_ERROR_CHECKING
-int ampiErrhandler(const char* func, int errcode);
+int ampiErrhandler(const char* func, int errcode) noexcept;
 #else
 #define ampiErrhandler(func, errcode) (errcode)
 #endif

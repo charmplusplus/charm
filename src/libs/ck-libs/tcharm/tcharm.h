@@ -66,9 +66,11 @@ class TCharmClient1D : public ArrayElement1D {
      etc.  
    */
   TCharm *thread; 
-  inline void findThread(void) {
-    thread=threadProxy[thisIndex].ckLocal();  
+  inline void findThread(void) noexcept {
+    thread=threadProxy[thisIndex].ckLocal();
+#if CMK_ERROR_CHECKING
     if (thread==NULL) CkAbort("Can't locate TCharm thread!");
+#endif
   }
   
   //Clients need to override this function to set their

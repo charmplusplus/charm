@@ -52,7 +52,7 @@ enum CkDDT_Dir : bool {
 };
 
 /* Serialize a contiguous chunk of memory */
-inline void serializeContig(char* userdata, char* buffer, size_t size, CkDDT_Dir dir)
+inline void serializeContig(char* userdata, char* buffer, size_t size, CkDDT_Dir dir) noexcept
 {
   if (dir == PACK) {
     memcpy(buffer, userdata, size);
@@ -64,7 +64,7 @@ inline void serializeContig(char* userdata, char* buffer, size_t size, CkDDT_Dir
 
 /* Helper function to set names (used by AMPI too).
  * Leading whitespaces are significant, trailing spaces are not. */
-inline void CkDDT_SetName(string &dst, const char *src)
+inline void CkDDT_SetName(string &dst, const char *src) noexcept
 {
   int end = strlen(src)-1;
   while ((end>0) && (src[end]==' ')) {
@@ -134,20 +134,20 @@ class CkDDT_DataType
  public:
   CkDDT_DataType() = default;
   virtual ~CkDDT_DataType() = default;
-  CkDDT_DataType(int type);
+  CkDDT_DataType(int type) noexcept;
   CkDDT_DataType(int datatype, int size, MPI_Aint extent, int count, MPI_Aint lb, MPI_Aint ub,
                  bool iscontig, int baseSize, MPI_Aint baseExtent, CkDDT_DataType* baseType,
-                 int numElements, int baseIndex, MPI_Aint trueExtent, MPI_Aint trueLB);
-  CkDDT_DataType(const CkDDT_DataType &obj, MPI_Aint _lb=0, MPI_Aint _extent=0);
-  CkDDT_DataType& operator=(const CkDDT_DataType& obj);
+                 int numElements, int baseIndex, MPI_Aint trueExtent, MPI_Aint trueLB) noexcept;
+  CkDDT_DataType(const CkDDT_DataType &obj, MPI_Aint _lb=0, MPI_Aint _extent=0) noexcept;
+  CkDDT_DataType& operator=(const CkDDT_DataType& obj) noexcept;
 
-  virtual void pupType(PUP::er &p, CkDDT* ddt);
-  virtual int getEnvelope(int *num_integers, int *num_addresses, int *num_datatypes, int *combiner) const;
+  virtual void pupType(PUP::er &p, CkDDT* ddt) noexcept;
+  virtual int getEnvelope(int *num_integers, int *num_addresses, int *num_datatypes, int *combiner) const noexcept;
   virtual int getContents(int max_integers, int max_addresses, int max_datatypes,
                           int array_of_integers[], MPI_Aint array_of_addresses[],
-                          int array_of_datatypes[]) const;
+                          int array_of_datatypes[]) const noexcept;
 
-  virtual size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const
+  virtual size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept
   {
     DDTDEBUG("CkDDT_Datatype::serialize %s %d objects of type %d (%d bytes)\n",
              (dir==PACK)?"packing":"unpacking", num, datatype, bufSize);
@@ -167,30 +167,30 @@ class CkDDT_DataType
       return msgLength - bufSize;
     }
   }
-  virtual int getNumBasicElements(int bytes) const;
+  virtual int getNumBasicElements(int bytes) const noexcept;
 
-  void setSize(MPI_Aint lb, MPI_Aint extent);
-  bool isContig() const { return iscontig; }
-  int getSize(int count=1) const { return count * size; }
-  MPI_Aint getExtent() const { return extent; }
-  int getBaseSize() const { return baseSize; }
-  MPI_Aint getLB() const { return lb; }
-  MPI_Aint getUB() const { return ub; }
-  MPI_Aint getTrueExtent() const { return trueExtent; }
-  MPI_Aint getTrueLB() const { return trueLB; }
-  int getBaseIndex() const { return baseIndex; }
-  CkDDT_DataType* getBaseType() const { return baseType; }
-  MPI_Aint getBaseExtent() const { return baseExtent; }
-  int getCount() const { return count; }
-  int getType() const { return datatype; }
-  int getNumElements() const { return numElements; }
-  void incRefCount() {
+  void setSize(MPI_Aint lb, MPI_Aint extent) noexcept;
+  bool isContig() const noexcept { return iscontig; }
+  int getSize(int count=1) const noexcept { return count * size; }
+  MPI_Aint getExtent() const noexcept { return extent; }
+  int getBaseSize() const noexcept { return baseSize; }
+  MPI_Aint getLB() const noexcept { return lb; }
+  MPI_Aint getUB() const noexcept { return ub; }
+  MPI_Aint getTrueExtent() const noexcept { return trueExtent; }
+  MPI_Aint getTrueLB() const noexcept { return trueLB; }
+  int getBaseIndex() const noexcept { return baseIndex; }
+  CkDDT_DataType* getBaseType() const noexcept { return baseType; }
+  MPI_Aint getBaseExtent() const noexcept { return baseExtent; }
+  int getCount() const noexcept { return count; }
+  int getType() const noexcept { return datatype; }
+  int getNumElements() const noexcept { return numElements; }
+  void incRefCount() noexcept {
     CkAssert(refCount > 0);
     if (datatype > CkDDT_MAX_PRIMITIVE_TYPE) {
       refCount++;
     }
   }
-  int decRefCount() {
+  int decRefCount() noexcept {
     // Callers of this function should always check its return
     // value and free the type only if it returns 0.
     CkAssert(refCount > 0);
@@ -199,14 +199,14 @@ class CkDDT_DataType
     }
     return -1;
   }
-  vector<int>& getKeyvals() { return keyvals; }
-  void setName(const char *src) { CkDDT_SetName(name, src); }
-  void getName(char *dest, int *len) const {
+  vector<int>& getKeyvals() noexcept { return keyvals; }
+  void setName(const char *src) noexcept { CkDDT_SetName(name, src); }
+  void getName(char *dest, int *len) const noexcept {
     int length = *len = name.size();
     memcpy(dest, &name[0], length);
     dest[length] = '\0';
   }
-  void setAbsolute(bool arg) { isAbsolute = arg; }
+  void setAbsolute(bool arg) noexcept { isAbsolute = arg; }
 };
 
 /*
@@ -218,15 +218,15 @@ class CkDDT_Contiguous final : public CkDDT_DataType
  public:
   CkDDT_Contiguous() = default;
   ~CkDDT_Contiguous() override = default;
-  CkDDT_Contiguous& operator=(const CkDDT_Contiguous& obj);
-  CkDDT_Contiguous(int count, int index, CkDDT_DataType* oldType);
-  CkDDT_Contiguous(const CkDDT_Contiguous& obj, MPI_Aint _lb, MPI_Aint _extent);
+  CkDDT_Contiguous& operator=(const CkDDT_Contiguous& obj) noexcept;
+  CkDDT_Contiguous(int count, int index, CkDDT_DataType* oldType) noexcept;
+  CkDDT_Contiguous(const CkDDT_Contiguous& obj, MPI_Aint _lb, MPI_Aint _extent) noexcept;
 
-  size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const override;
-  void pupType(PUP::er &p, CkDDT* ddt) override;
-  int getEnvelope(int *ni, int *na, int *nd, int *combiner) const override;
-  int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const override;
-  int getNumBasicElements(int bytes) const override;
+  size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept override;
+  void pupType(PUP::er &p, CkDDT* ddt) noexcept override;
+  int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
+  int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
+  int getNumBasicElements(int bytes) const noexcept override;
 };
 
 /*
@@ -244,15 +244,15 @@ class CkDDT_Vector : public CkDDT_DataType
  public:
   CkDDT_Vector() = default;
   ~CkDDT_Vector() override = default;
-  CkDDT_Vector& operator=(const CkDDT_Vector& obj);
-  CkDDT_Vector(int count, int blklen, int stride, int index, CkDDT_DataType* type);
-  CkDDT_Vector(const CkDDT_Vector &obj, MPI_Aint _lb, MPI_Aint _extent);
+  CkDDT_Vector& operator=(const CkDDT_Vector& obj) noexcept;
+  CkDDT_Vector(int count, int blklen, int stride, int index, CkDDT_DataType* type) noexcept;
+  CkDDT_Vector(const CkDDT_Vector &obj, MPI_Aint _lb, MPI_Aint _extent) noexcept;
 
-  size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const override;
-  void pupType(PUP::er &p, CkDDT* ddt) override;
-  int getEnvelope(int *ni, int *na, int *nd, int *combiner) const override;
-  int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const override;
-  int getNumBasicElements(int bytes) const override;
+  size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept override;
+  void pupType(PUP::er &p, CkDDT* ddt) noexcept override;
+  int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
+  int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
+  int getNumBasicElements(int bytes) const noexcept override;
 };
 
 /*
@@ -268,15 +268,15 @@ class CkDDT_HVector final : public CkDDT_Vector
  public:
   CkDDT_HVector() = default;
   ~CkDDT_HVector() override = default;
-  CkDDT_HVector& operator=(const CkDDT_HVector& obj);
-  CkDDT_HVector(int nCount, int blength, int strideLen, int index, CkDDT_DataType* type);
-  CkDDT_HVector(const CkDDT_HVector &obj, MPI_Aint _lb, MPI_Aint _extent);
+  CkDDT_HVector& operator=(const CkDDT_HVector& obj) noexcept;
+  CkDDT_HVector(int nCount, int blength, int strideLen, int index, CkDDT_DataType* type) noexcept;
+  CkDDT_HVector(const CkDDT_HVector &obj, MPI_Aint _lb, MPI_Aint _extent) noexcept;
 
-  size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const override;
-  void pupType(PUP::er &p, CkDDT* ddt) override;
-  int getEnvelope(int *ni, int *na, int *nd, int *combiner) const override;
-  int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const override;
-  int getNumBasicElements(int bytes) const override;
+  size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept override;
+  void pupType(PUP::er &p, CkDDT* ddt) noexcept override;
+  int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
+  int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
+  int getNumBasicElements(int bytes) const noexcept override;
 };
 
 /*
@@ -301,16 +301,16 @@ class CkDDT_HIndexed_Block : public CkDDT_DataType
  public:
   CkDDT_HIndexed_Block() = default;
   ~CkDDT_HIndexed_Block() override = default;
-  CkDDT_HIndexed_Block& operator=(const CkDDT_HIndexed_Block &obj);
+  CkDDT_HIndexed_Block& operator=(const CkDDT_HIndexed_Block &obj) noexcept;
   CkDDT_HIndexed_Block(int count, int Blength, const MPI_Aint *arrBytesDisp, int index,
-                       CkDDT_DataType *type);
-  CkDDT_HIndexed_Block(const CkDDT_HIndexed_Block &obj, MPI_Aint _lb, MPI_Aint _extent);
+                       CkDDT_DataType *type) noexcept;
+  CkDDT_HIndexed_Block(const CkDDT_HIndexed_Block &obj, MPI_Aint _lb, MPI_Aint _extent) noexcept;
 
-  size_t serialize(char *userdata, char *buffer, int num, int msgLength, CkDDT_Dir dir) const override;
-  void pupType(PUP::er &p, CkDDT *ddt) override;
-  int getEnvelope(int *ni, int *na, int *nd, int *combiner) const override;
-  int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const override;
-  int getNumBasicElements(int bytes) const override;
+  size_t serialize(char *userdata, char *buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept override;
+  void pupType(PUP::er &p, CkDDT *ddt) noexcept override;
+  int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
+  int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
+  int getNumBasicElements(int bytes) const noexcept override;
 };
 
 /*
@@ -327,16 +327,16 @@ class CkDDT_Indexed_Block final : public CkDDT_HIndexed_Block
  public:
   CkDDT_Indexed_Block() = default;
   ~CkDDT_Indexed_Block() override = default;
-  CkDDT_Indexed_Block& operator=(const CkDDT_Indexed_Block &obj);
+  CkDDT_Indexed_Block& operator=(const CkDDT_Indexed_Block &obj) noexcept;
   CkDDT_Indexed_Block(int count, int Blength, const MPI_Aint *arrBytesDisp, const int *ArrDisp,
-                      int index, CkDDT_DataType *type);
-  CkDDT_Indexed_Block(const CkDDT_Indexed_Block &obj, MPI_Aint _lb, MPI_Aint _extent);
+                      int index, CkDDT_DataType *type) noexcept;
+  CkDDT_Indexed_Block(const CkDDT_Indexed_Block &obj, MPI_Aint _lb, MPI_Aint _extent) noexcept;
 
-  size_t serialize(char *userdata, char *buffer, int num, int msgLength, CkDDT_Dir dir) const override;
-  void pupType(PUP::er &p, CkDDT *ddt) override;
-  int getEnvelope(int *ni, int *na, int *nd, int *combiner) const override;
-  int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const override;
-  int getNumBasicElements(int bytes) const override;
+  size_t serialize(char *userdata, char *buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept override;
+  void pupType(PUP::er &p, CkDDT *ddt) noexcept override;
+  int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
+  int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
+  int getNumBasicElements(int bytes) const noexcept override;
 };
 
 /*
@@ -357,16 +357,16 @@ class CkDDT_HIndexed : public CkDDT_DataType
  public:
   CkDDT_HIndexed() = default;
   ~CkDDT_HIndexed() override = default;
-  CkDDT_HIndexed& operator=(const CkDDT_HIndexed& obj);
+  CkDDT_HIndexed& operator=(const CkDDT_HIndexed& obj) noexcept;
   CkDDT_HIndexed(int count, const int* arrBlock, const MPI_Aint* arrBytesDisp, int index,
-                 CkDDT_DataType* type);
-  CkDDT_HIndexed(const CkDDT_HIndexed &obj, MPI_Aint _lb, MPI_Aint _extent);
+                 CkDDT_DataType* type) noexcept;
+  CkDDT_HIndexed(const CkDDT_HIndexed &obj, MPI_Aint _lb, MPI_Aint _extent) noexcept;
 
-  size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const override;
-  void pupType(PUP::er &p, CkDDT* ddt) override;
-  int getEnvelope(int *ni, int *na, int *nd, int *combiner) const override;
-  int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const override;
-  int getNumBasicElements(int bytes) const override;
+  size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept override;
+  void pupType(PUP::er &p, CkDDT* ddt) noexcept override;
+  int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
+  int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
+  int getNumBasicElements(int bytes) const noexcept override;
 };
 
 /*
@@ -381,16 +381,16 @@ class CkDDT_Indexed final : public CkDDT_HIndexed
  public:
   CkDDT_Indexed() = default;
   ~CkDDT_Indexed() override = default;
-  CkDDT_Indexed& operator=(const CkDDT_Indexed& obj);
+  CkDDT_Indexed& operator=(const CkDDT_Indexed& obj) noexcept;
   CkDDT_Indexed(int count, const int* arrBlock, const MPI_Aint* arrBytesDisp,
-                const MPI_Aint* arrDisp, int index, CkDDT_DataType* type);
-  CkDDT_Indexed(const CkDDT_Indexed &obj, MPI_Aint _lb, MPI_Aint _extent);
+                const MPI_Aint* arrDisp, int index, CkDDT_DataType* type) noexcept;
+  CkDDT_Indexed(const CkDDT_Indexed &obj, MPI_Aint _lb, MPI_Aint _extent) noexcept;
 
-  size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const override;
-  void pupType(PUP::er &p, CkDDT* ddt) override;
-  int getEnvelope(int *ni, int *na, int *nd, int *combiner) const override;
-  int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const override;
-  int getNumBasicElements(int bytes) const override;
+  size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept override;
+  void pupType(PUP::er &p, CkDDT* ddt) noexcept override;
+  int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
+  int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
+  int getNumBasicElements(int bytes) const noexcept override;
 };
 
 /*
@@ -414,21 +414,21 @@ class CkDDT_Struct final : public CkDDT_DataType
  public:
   CkDDT_Struct() = default;
   ~CkDDT_Struct() override = default;
-  CkDDT_Struct& operator=(const CkDDT_Struct& obj);
+  CkDDT_Struct& operator=(const CkDDT_Struct& obj) noexcept;
   CkDDT_Struct(int count, const int* arrBlock, const MPI_Aint* arrDisp, const int *index,
-               CkDDT_DataType **type);
-  CkDDT_Struct(const CkDDT_Struct &obj, MPI_Aint _lb, MPI_Aint _extent);
+               CkDDT_DataType **type) noexcept;
+  CkDDT_Struct(const CkDDT_Struct &obj, MPI_Aint _lb, MPI_Aint _extent) noexcept;
 
-  vector<int>& getBaseIndices() { return index; }
-  const vector<int>& getBaseIndices() const { return index; }
-  vector<CkDDT_DataType *>& getBaseTypes() { return arrayDataType; }
-  const vector<CkDDT_DataType *>& getBaseTypes() const { return arrayDataType; }
+  vector<int>& getBaseIndices() noexcept { return index; }
+  const vector<int>& getBaseIndices() const noexcept { return index; }
+  vector<CkDDT_DataType *>& getBaseTypes() noexcept { return arrayDataType; }
+  const vector<CkDDT_DataType *>& getBaseTypes() const noexcept { return arrayDataType; }
 
-  size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const override;
-  void pupType(PUP::er &p, CkDDT* ddt) override;
-  int getEnvelope(int *ni, int *na, int *nd, int *combiner) const override;
-  int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const override;
-  int getNumBasicElements(int bytes) const override;
+  size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept override;
+  void pupType(PUP::er &p, CkDDT* ddt) noexcept override;
+  int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
+  int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
+  int getNumBasicElements(int bytes) const noexcept override;
 };
 
 /*
@@ -444,13 +444,13 @@ class CkDDT
   vector<CkDDT_DataType *> typeTable;
   vector<int> types;
 
-  void addBasic(int type) {
+  void addBasic(int type) noexcept {
     CkAssert(types.size() > type && types[type] == MPI_DATATYPE_NULL);
     typeTable[type]               = new CkDDT_DataType(type);
     types[type]                   = type;
   }
 
-  void addStruct(const char* name, int type, int val, int idx, int offset) {
+  void addStruct(const char* name, int type, int val, int idx, int offset) noexcept {
     CkAssert(types.size() > type && types[type] == MPI_DATATYPE_NULL);
     const int bLengths[2]           = {1, 1};
     MPI_Datatype bTypes[2]          = {val, idx};
@@ -463,7 +463,7 @@ class CkDDT
 
  public:
 
-  CkDDT() : typeTable(CkDDT_MAX_PRIMITIVE_TYPE+1, nullptr), types(CkDDT_MAX_PRIMITIVE_TYPE+1, MPI_DATATYPE_NULL)
+  CkDDT() noexcept : typeTable(CkDDT_MAX_PRIMITIVE_TYPE+1, nullptr), types(CkDDT_MAX_PRIMITIVE_TYPE+1, MPI_DATATYPE_NULL)
   {
     addBasic(MPI_DOUBLE);
     addBasic(MPI_INT);
@@ -545,35 +545,35 @@ class CkDDT
 
   CkDDT& operator=(const CkDDT &obj) = default;
   CkDDT(const CkDDT &obj) = default;
-  ~CkDDT();
+  ~CkDDT() noexcept;
 
-  void newContiguous(int count, MPI_Datatype  oldType, MPI_Datatype* newType);
+  void newContiguous(int count, MPI_Datatype  oldType, MPI_Datatype* newType) noexcept;
   void newVector(int count, int blocklength, int stride, MPI_Datatype oldtype,
-                 MPI_Datatype* newtype);
+                 MPI_Datatype* newtype) noexcept;
   void newHVector(int count, int blocklength, int stride, MPI_Datatype oldtype,
-                  MPI_Datatype* newtype);
+                  MPI_Datatype* newtype) noexcept;
   void newIndexedBlock(int count, int Blocklength, const int *arrDisp, MPI_Datatype oldtype,
-                       MPI_Datatype *newtype);
+                       MPI_Datatype *newtype) noexcept;
   void newHIndexedBlock(int count, int Blocklength, const MPI_Aint *arrDisp, MPI_Datatype oldtype,
-                        MPI_Datatype *newtype);
+                        MPI_Datatype *newtype) noexcept;
   void newIndexed(int count, const int* arrbLength, MPI_Aint* arrDisp, MPI_Datatype oldtype,
-                  MPI_Datatype* newtype);
+                  MPI_Datatype* newtype) noexcept;
   void newHIndexed(int count, const int* arrbLength, const MPI_Aint* arrDisp, MPI_Datatype oldtype,
-                   MPI_Datatype* newtype);
+                   MPI_Datatype* newtype) noexcept;
   void newStruct(int count, const int* arrbLength, const MPI_Aint* arrDisp,
-                 const MPI_Datatype *oldtype, MPI_Datatype* newtype);
+                 const MPI_Datatype *oldtype, MPI_Datatype* newtype) noexcept;
 
-  int insertType(CkDDT_DataType* ptr, int type);
-  void freeType(int index);
-  void pup(PUP::er &p);
-  void createDup(int nIndexOld, int *nIndexNew);
-  void createResized(MPI_Datatype oldtype, MPI_Aint lb, MPI_Aint extent, MPI_Datatype *newtype);
+  int insertType(CkDDT_DataType* ptr, int type) noexcept;
+  void freeType(int index) noexcept;
+  void pup(PUP::er &p) noexcept;
+  void createDup(int nIndexOld, int *nIndexNew) noexcept;
+  void createResized(MPI_Datatype oldtype, MPI_Aint lb, MPI_Aint extent, MPI_Datatype *newtype) noexcept;
   int getEnvelope(int nIndex, int *num_integers, int *num_addresses, int *num_datatypes,
-                  int *combiner) const;
+                  int *combiner) const noexcept;
   int getContents(int nIndex, int max_integers, int max_addresses, int max_datatypes,
-                  int array_of_integers[], MPI_Aint array_of_addresses[], int array_of_datatypes[]);
+                  int array_of_integers[], MPI_Aint array_of_addresses[], int array_of_datatypes[]) noexcept;
 
-  CkDDT_DataType* getType(int nIndex) const {
+  CkDDT_DataType* getType(int nIndex) const noexcept {
     #if CMK_ERROR_CHECKING
     if (nIndex < 0 || nIndex > typeTable.size())
       CkAbort("AMPI> invalid datatype index passed to getType!");
@@ -581,15 +581,15 @@ class CkDDT
     return typeTable[nIndex];
   }
 
-  bool isContig(int nIndex) const { return getType(nIndex)->isContig(); }
-  int getSize(int nIndex, int count=1) const { return count * getType(nIndex)->getSize(); }
-  MPI_Aint getExtent(int nIndex) const { return getType(nIndex)->getExtent(); }
-  MPI_Aint getLB(int nIndex) const { return getType(nIndex)->getLB(); }
-  MPI_Aint getUB(int nIndex) const { return getType(nIndex)->getUB(); }
-  MPI_Aint getTrueExtent(int nIndex) const { return getType(nIndex)->getTrueExtent(); }
-  MPI_Aint getTrueLB(int nIndex) const { return getType(nIndex)->getTrueLB(); }
-  void setName(int nIndex, const char *name) { getType(nIndex)->setName(name); }
-  void getName(int nIndex, char *name, int *len) const { getType(nIndex)->getName(name, len); }
+  bool isContig(int nIndex) const noexcept { return getType(nIndex)->isContig(); }
+  int getSize(int nIndex, int count=1) const noexcept { return count * getType(nIndex)->getSize(); }
+  MPI_Aint getExtent(int nIndex) const noexcept { return getType(nIndex)->getExtent(); }
+  MPI_Aint getLB(int nIndex) const noexcept { return getType(nIndex)->getLB(); }
+  MPI_Aint getUB(int nIndex) const noexcept { return getType(nIndex)->getUB(); }
+  MPI_Aint getTrueExtent(int nIndex) const noexcept { return getType(nIndex)->getTrueExtent(); }
+  MPI_Aint getTrueLB(int nIndex) const noexcept { return getType(nIndex)->getTrueLB(); }
+  void setName(int nIndex, const char *name) noexcept { getType(nIndex)->setName(name); }
+  void getName(int nIndex, char *name, int *len) const noexcept { getType(nIndex)->getName(name, len); }
 };
 
 #endif
