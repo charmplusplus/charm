@@ -95,7 +95,7 @@
 #ifndef __has_builtin
 # define __has_builtin(x) 0  // Compatibility with non-clang compilers.
 #endif
-#if defined __GNUC__ || __has_builtin(__builtin_unreachable)
+#if (defined __GNUC__ || __has_builtin(__builtin_unreachable)) && !defined _CRAYC
 // Technically GCC 4.5 is the minimum for this feature, but we require C++11.
 # define CMI_UNREACHABLE_SECTION(...) __builtin_unreachable()
 #elif _MSC_VER
