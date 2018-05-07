@@ -16,7 +16,7 @@ int _immediateReady = 0;
 
 int _immRunning=0; /* if set, somebody's inside an immediate message */
 
-/* _immediateLock and _immediateFlag declared in convcore.c 
+/* _immediateLock and _immediateFlag declared in convcore.C
    for machine layers with CMK_IMMEDIATE_MSG=0   */ 
 
 #if CMK_IMMEDIATE_MSG

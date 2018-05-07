@@ -21,7 +21,7 @@
 #define CMI_IO_BUFFER_EXPLICIT                             0
 #define CMI_IO_FLUSH_USER                                  0
 
-/* specifies if there is a node queue. it is used in convcore.c and it is
+/* specifies if there is a node queue. it is used in convcore.C and it is
    tipically set to 1 in smp versions */
 
 /* the following definitions set the type of shared variables to be used. only
@@ -56,7 +56,7 @@
 #define CMK_USE_SPINLOCK                                   1
 
 /* Specifies what kind of timer to use, and the correspondent headers will be
-   included in convcore.c. If none is selected, then the machine.C file needs to
+   included in convcore.C. If none is selected, then the machine.C file needs to
    implement the timer primitives. */
 #define CMK_TIMER_USE_RTC                                  0
 #define CMK_TIMER_USE_RDTSC                                0
@@ -68,7 +68,7 @@
 
 
 /* Specifies what the processor will do when it is idle, either sleep (1) or go
-   into busy waiting mode (0). In convcore.c there are a few files included if
+   into busy waiting mode (0). In convcore.C there are a few files included if
    sleeping mode, but the real distinct implementation is in the machine.C
    file. */
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1

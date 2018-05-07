@@ -131,7 +131,7 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
 /** GROUPS DEFINITION
 
  * For groups of processors (establishing and managing) some more functions are
- * needed, they also con be found in common code (convcore.c) or here.
+ * needed, they also con be found in common code (convcore.C) or here.
  */
 
 #if ! CMK_MULTICAST_DEF_USE_COMMON_CODE
@@ -145,10 +145,10 @@ void     CmiLookupGroup(CmiGroup grp, int *npes, int **pes);
 
  * In order to deliver the messages to objects (either converse register
  * handlers, or charm objects), a scheduler is needed. The one implemented in
- * convcore.c can be used, or a new one can be implemented here. At present, all
+ * convcore.C can be used, or a new one can be implemented here. At present, all
  * machines use the default one, exept sim-linux.
 
- * If the one in convcore.c is used, still one function is needed.
+ * If the one in convcore.C is used, still one function is needed.
  */
 
 #if CMK_CMIDELIVERS_USE_COMMON_CODE /* use the default one */
@@ -294,7 +294,7 @@ int CmiBarrierZero(void);
 
 /** PRINTF FUNCTIONS
 
- * Default code is provided in convcore.c but for particular architectures they
+ * Default code is provided in convcore.C but for particular architectures they
  * can be reimplemented. At present only netlrts- versions reimplement them.
 
  */
@@ -311,7 +311,7 @@ int  CmiScanf(const char *, ...);
 /** SPANNING TREE
 
  * During some working operations (such as quiescence detection), spanning trees
- * are used. Default code in convcore.c can be used, or a new definition can be
+ * are used. Default code in convcore.C can be used, or a new definition can be
  * implemented here.
  */
 

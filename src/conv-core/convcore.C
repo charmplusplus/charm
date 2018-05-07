@@ -106,10 +106,10 @@ CmiSwitchToPEFnPtr CmiSwitchToPE;
 #endif
 
 CpvExtern(int, _traceCoreOn);   /* projector */
-extern void CcdModuleInit(char **);
+CMI_EXTERNC void CcdModuleInit(char **);
 CMI_EXTERNC
 void CmiMemoryInit(char **);
-extern void CldModuleInit(char **);
+CMI_EXTERNC void CldModuleInit(char **);
 
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
 #include <sys/types.h>
@@ -158,7 +158,7 @@ struct envelope;
 void traceAddThreadListeners(CthThread tid, struct envelope *env);
 #endif
 
-void seedBalancerExit(void);
+CMI_EXTERNC void seedBalancerExit(void);
 CMI_EXTERNC
 void EmergencyExit(void);
 
@@ -3240,7 +3240,7 @@ typedef struct {
 CpvDeclare(CmiTmpBuf_t,CmiTmpBuf); /* One temporary buffer per PE */
 
 static void CmiTmpSetup(CmiTmpBuf_t *b) {
-  b->buf=malloc(CMI_TMP_BUF_MAX);
+  b->buf=(char *)malloc(CMI_TMP_BUF_MAX);
   b->cur=0;
   b->max=CMI_TMP_BUF_MAX;
 }
@@ -3633,14 +3633,14 @@ static void CIdleTimeoutInit(char **argv)
  *
  *****************************************************************************/
 
-extern void CrnInit(void);
-extern void CmiIsomallocInit(char **argv);
+CMI_EXTERNC void CrnInit(void);
+CMI_EXTERNC void CmiIsomallocInit(char **argv);
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
 void CmiIOInit(char **argv);
 #endif
 
 /* defined in cpuaffinity.c */
-extern void CmiInitCPUAffinityUtil(void);
+CMI_EXTERNC void CmiInitCPUAffinityUtil(void);
 
 static void CmiProcessPriority(char **argv)
 {
