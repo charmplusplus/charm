@@ -89,14 +89,14 @@ int cpdInSystem=1; /*Start inside the system (until we start executing user code
 #if CMK_MEMORY_BUILD_OS
 #if CMK_MEMORY_BUILD_OS_WRAPPED
 
-void initialize_memory_wrapper(void);
-void * initialize_memory_wrapper_calloc(size_t nelem, size_t size);
-void * initialize_memory_wrapper_malloc(size_t size);
-void * initialize_memory_wrapper_realloc(void *ptr, size_t size);
-void * initialize_memory_wrapper_memalign(size_t align, size_t size);
-void * initialize_memory_wrapper_valloc(size_t size);
-void initialize_memory_wrapper_free(void *ptr);
-void initialize_memory_wrapper_cfree(void *ptr);
+CMI_EXTERNC void initialize_memory_wrapper(void);
+CMI_EXTERNC void * initialize_memory_wrapper_calloc(size_t nelem, size_t size);
+CMI_EXTERNC void * initialize_memory_wrapper_malloc(size_t size);
+CMI_EXTERNC void * initialize_memory_wrapper_realloc(void *ptr, size_t size);
+CMI_EXTERNC void * initialize_memory_wrapper_memalign(size_t align, size_t size);
+CMI_EXTERNC void * initialize_memory_wrapper_valloc(size_t size);
+CMI_EXTERNC void initialize_memory_wrapper_free(void *ptr);
+CMI_EXTERNC void initialize_memory_wrapper_cfree(void *ptr);
 
 void * (*mm_malloc)(size_t) = initialize_memory_wrapper_malloc;
 void * (*mm_calloc)(size_t,size_t) = initialize_memory_wrapper_calloc;
