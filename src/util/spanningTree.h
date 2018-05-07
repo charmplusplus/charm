@@ -31,7 +31,11 @@ void get_topo_tree_nbs(int root, int *parent, int *child_count, int **children);
 
 #if defined(__cplusplus)
 }
+#endif
 
+// Fragile: machine-broadcast.c depends on this header, but we don't want
+// Converse to see charm++.h. Symptoms will include bigsim breakage.
+#if defined __cplusplus && !defined CONVERSE_MACHINE_BROADCAST_C_
 #include "charm++.h"
 #include <vector>
 

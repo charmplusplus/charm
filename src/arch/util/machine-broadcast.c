@@ -2,6 +2,7 @@
  *        functions for broadcast
 **/
 
+#define CONVERSE_MACHINE_BROADCAST_C_
 #include "spanningTree.h"
 
 CmiCommHandle CmiSendNetworkFunc(int destPE, int size, char *msg, int mode);
