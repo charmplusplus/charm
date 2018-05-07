@@ -12,7 +12,7 @@
   - Ccs, Converse client/server, socket access to parallel job. (conv-ccs.c; ccs-*)
   - Cpd, Converse parallel debugger. (debug-*)
   - Crn, Converse random number generation. (random.c)
-  - Csd, Converse scheduler daemon.  (convcore.c)
+  - Csd, Converse scheduler daemon.  (convcore.C)
   - Cqs, Converse prioritized queueing system. (queueing.c)
   - CQd, Converse quiesence detection. (quiescense.c)
      Not the same as Charm++ QD. (qd.C)
@@ -778,7 +778,7 @@ CpvExtern(int, _curRestartPhase);      /* number of restarts */
 #endif
 
 /** This header goes before each chunk of memory allocated with CmiAlloc. 
-    See the comment in convcore.c for details on the fields.
+    See the comment in convcore.C for details on the fields.
 */
 typedef struct {
   int size;
@@ -1424,7 +1424,7 @@ void   CmiHandleMessage(void *msg);
 typedef struct CthThreadStruct *CthThread;
 typedef struct {
   /*Start with a message header so threads can be enqueued 
-    as messages (e.g., by CthEnqueueNormalThread in convcore.c)
+    as messages (e.g., by CthEnqueueNormalThread in convcore.C)
   */
   char cmicore[CmiReservedHeaderSize];
   CthThread thread;

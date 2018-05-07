@@ -48,7 +48,7 @@
 #define CMK_THREADS_USE_PTHREADS                           0
 
 /* Specifies what kind of timer to use, and the correspondent headers will be
-   included in convcore.c. If none is selected, then the machine.C file needs to
+   included in convcore.C. If none is selected, then the machine.C file needs to
    implement the timer primitives. */
 #define CMK_TIMER_USE_RTC                                  0
 #define CMK_TIMER_USE_RDTSC                                0
@@ -80,7 +80,7 @@
 #define CMK_TYPEDEF_FLOAT8 something_like_double
 
 /* Specifies what the processor will do when it is idle, either sleep (1) or go
-   into busy waiting mode (0). In convcore.c there are a few files included if
+   into busy waiting mode (0). In convcore.C there are a few files included if
    sleeping mode, but the real distinct implementation is in the machine.C
    file. */
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     1

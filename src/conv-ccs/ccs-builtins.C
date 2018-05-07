@@ -590,7 +590,7 @@ static void usageStop(CWebModeStats *stats,double curWallTime)
 
 /* Call this when the program is started
  -> Whenever traceModuleInit would be called
- -> -> see conv-core/convcore.c
+ -> -> see conv-core/convcore.C
 */
 static void initUsage()
 {

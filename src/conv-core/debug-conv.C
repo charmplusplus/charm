@@ -1,7 +1,7 @@
 /*
 Converse-level debugger support
 
-Collected from convcore.c, conv-ccs.c, register.c by
+Collected from convcore.C, conv-ccs.c, register.c by
 Orion Sky Lawlor, olawlor@acm.org, 4/10/2001
  */
 #include <stdio.h> /*for sscanf*/
@@ -249,6 +249,7 @@ void handleDebugMessage(void *msg) {
 /* Special scheduler-type loop only executed while in
 freeze mode-- only executes CCS requests.
 */
+CMI_EXTERNC
 void CcsServerCheck(void);
 extern int _isCcsHandlerIdx(int idx);
 int (*CpdIsDebugMessage)(void *);

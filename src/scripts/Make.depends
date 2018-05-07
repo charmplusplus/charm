@@ -2360,7 +2360,7 @@ conv-taskQ.o: conv-taskQ.C conv-taskQ.h converse.h conv-config.h \
  conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
  persistent.h conv-rdma.h debug-conv.h taskqueue.h
 
-convcore.o: convcore.c converse.h conv-config.h conv-autoconfig.h \
+convcore.o: convcore.C converse.h conv-config.h conv-autoconfig.h \
  conv-common.h lrts-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
  pup_c.h lrtslock.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h \
  conv-random.h conv-lists.h conv-trace.h persistent.h conv-rdma.h \
@@ -2476,7 +2476,7 @@ debug-conv++.o: debug-conv++.C converse.h conv-config.h conv-autoconfig.h \
  conv-random.h conv-lists.h conv-trace.h persistent.h conv-rdma.h \
  debug-conv.h debug-conv++.h pup.h cklists.h
 
-debug-conv.o: debug-conv.c converse.h conv-config.h conv-autoconfig.h \
+debug-conv.o: debug-conv.C converse.h conv-config.h conv-autoconfig.h \
  conv-common.h lrts-common.h conv-mach.h conv-mach-opt.h cmiqueue.h \
  pup_c.h lrtslock.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h \
  conv-random.h conv-lists.h conv-trace.h persistent.h conv-rdma.h \
