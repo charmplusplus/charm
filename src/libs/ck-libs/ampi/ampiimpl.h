@@ -2616,6 +2616,7 @@ class ampiParent final : public CBase_ampiParent {
   }
 
   int wait(MPI_Request* req, MPI_Status* sts) noexcept;
+  int waitall(int count, MPI_Request request[], MPI_Status sts[]=MPI_STATUSES_IGNORE) noexcept;
   void init() noexcept;
   void finalize() noexcept;
   void block() noexcept;
