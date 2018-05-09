@@ -290,26 +290,29 @@ the renamed version is called by the AMPI runtime by each thread.
 For the before-mentioned benefits to be effective, one needs to map multiple
 user-level threads onto each processor. Traditional MPI programs assume that the
 entire processor is allocated to themselves, and that only one thread of
-control exists within the process's address space. So, they may use global and
+control exists within the process's address space. So, they may safely use global and
 static variables in the program. However, global and static variables are
 problematic for multi-threaded environments such as \ampi{} or OpenMP.
 This is because there is a single instance of those variables so they will be 
-shared among different threads in the single address space and a wrong result may be produced by the program.
+shared among different threads in the single address space, so if programmers are not careful
+a wrong result may be produced by the program.
 Figure \ref{fig_global} shows an example of a multi-threaded application with 
 two threads in a single process. $var$ is a global or static variable in this 
 example. Thread 1 assigns a value to it, then it gets blocked for communication 
 and another thread can continue. Thereby, thread 2 is scheduled next and 
-accesses $var$ which is wrong. Semantics of this program needs separate 
+accesses $var$ which is wrong. The semantics of this program needs separate
 instances of $var$ for each of the threads. That is where the need arises
 to make some transformations to the original MPI program in order to run
 correctly with \ampi{}. Note, this is the only change necessary to run an MPI 
-program with \ampi{}, that the program be thread-safe and have no global variables
-whose values differ across different MPI ranks.
+program with \ampi{}, that the program be thread-safe and have no global or static
+variables whose values differ across different MPI ranks. Also note that global variables
+that are constant or are only written to once to the same value across all ranks
+during initialization are already thread-safe.
 
 \begin{figure}[h]
 \centering
 \includegraphics[width=4.6in]{figs/global.png}
-\caption{Global or static variables are an issue for \ampi{}}
+\caption{Mutable global or static variables are an issue for \ampi{}}
 \label{fig_global}
 \end{figure}
 
@@ -320,20 +323,47 @@ With the MPI process model, each MPI node can keep a copy of its own
 subroutines without passing them as arguments.  Module variables, "saved"
 subroutine local variables, and common blocks in Fortran90 belong to this
 category. If such a program is executed without privatization on \ampi{}, all
-the \ampi{} threads that reside on one processor will access the same copy of
+the \ampi{} threads that reside in the same process will access the same copy of
 such variables, which is clearly not the desired semantics.  To ensure correct
 execution of the original source program, it is necessary to make such
-variables "private" to individual threads. We provide two choices: automatic 
-global swapping and manual code modification.
+variables "private" to individual threads. We provide three choices with varying
+degrees of developer effort required and varying degrees of portability:
+manual encapsulation of global state, a thread-local storage based automated mechanism, and
+global offset table based automated mechanism.
 
-\subsubsection{Automatic Globals Swapping}
+\subsubsection{Automatic Thread-Local Storage Swapping}
+Thread Local Store (TLS) was originally employed in kernel threads to
+localize variables and provide thread safety. It can be used by annotating
+global/static variable declarations in \CC{} with \emph{thread\_local}
+and in C with \emph{\_\_thread}. Thus, those variables will have one instance
+per extant thread. This keyword is not an official extension of the C language,
+though compiler writers are encouraged to implement this feature. Currently,
+the ELF object file format supports Thread Local Storage.
+
+It handles both global and static variables and has no context-switching
+overhead. AMPI provides runtime support for privatizing thread-local variables to user-level threads
+by changing the TLS segment register when context switching between user-level threads.
+Currently, \charmpp{} supports it for x86/x86\_64 platforms when using GNU compilers.
+
+For the example above, the following changes to the code handle the global variables:
+\begin{alltt}
+thread_local int myrank;
+thread_local double xyz[100];
+\end{alltt}
+
+The runtime system also should know that TLS-Globals is used at both compile and link time:
+
+\begin{alltt}
+ampicxx -o example example.C -tlsglobals
+\end{alltt}
+
+\subsubsection{Automatic Global Offset Table Swapping}
 Thanks to the ELF Object Format, we have successfully automated the procedure 
 of switching the set of user global variables when switching thread contexts.
 Executable and Linkable Format (ELF) is a common standard file format 
 for Object Files in Unix-like operating systems.
 ELF maintains a Global Offset Table (GOT) for globals so it is possible to
 switch GOT contents at thread context-switch by the runtime system.
-
 
 The only thing that the user needs to do is pass the flag {\tt -swapglobals}
 at both compile and link time (e.g. "ampicc -o prog prog.c -swapglobals"). This method does not require
@@ -342,16 +372,15 @@ However, it does not handle static variables, has a context switching
 overhead that grows with the number of global variables, and is incompatible with SMP builds
 of AMPI, where multiple virtual ranks can execute simulataneously on different scheduler threads
 within an OS process.
-Currently, this feature only works on x86 and x86\_64 
-platforms that fully support ELF. Thus, it may not work on PPC or on some microkernels such as Catamount. When this feature does 
-not work for you, you can try other ways of handling global or static variables, 
-which are detailed in the following sections.
+Currently, this feature only works on x86 and x86\_64 platforms that fully support ELF,
+and it requires ld version 2.23 or older, or else a patched version of ld 2.24+ that we provide
+here: https://charm.cs.illinois.edu/gerrit/gitweb?p=libbfd-patches.git;a=tree;f=swapglobals
 
 \subsubsection{Manual Change}
 We have employed a strategy of argument passing to do this privatization
 transformation. That is, the global variables are bunched together in a
-single user-defined type, which is allocated by each thread dynamically. Then a
-pointer to this type is passed from subroutine to subroutine as an argument.
+single user-defined type, which is allocated by each thread dynamically or on the stack.
+Then a pointer to this type is passed from subroutine to subroutine as an argument.
 Since the subroutine arguments are passed on the stack, which is not shared
 across all threads, each subroutine when executing within a thread operates on
 a private copy of the global variables. 
@@ -505,35 +534,9 @@ called \emph{Photran}\footnote{http://www.eclipse.org/photran}
 for refactoring Fortran codes that can do this transformation. It is Eclipse-based
 and works by constructing Abstract Syntax Trees (ASTs) of the program. We
 also have a tool built on top of the \emph{ROSE compiler}\footnote{http://rosecompiler.org/}
-that works for C/\CC{} and Fortran programs that is available upon request.
+that works for C/\CC{} and Fortran programs that is available upon request. It emits
+patches for all files containing global variables which can then be applied to the source code.
 
-\subsubsection{TLS-Globals}
-Thread Local Store (TLS) was originally employed in kernel threads to
-localize variables and provide thread safety. It can be used by annotating
-global/static variable declarations in \CC{} with \emph{\_\_thread\_local}
-and in C with \emph{\_\_thread}. Thus, those variables will have one instance
-per extant thread. This keyword is not an official extension of the C language,
-though compiler writers are encouraged to implement this feature. Currently,
-the ELF object file format supports Thread Local Storage.
-
-It handles both global and static variables and has no context-switching
-overhead. Context-switching is just changing the TLS segment register
-to point to the thread's local copy. However, although it is popular, it
-is not supported by all compilers. Currently, \charmpp{} supports it for x86/x86\_64 platforms.
-Currently, only static linking is supported for objects that contain thread-local global variables.
-To use TLS-Globals, one has to add \emph{thread\_local} or \emph{\_\_thread} attributes
-to all mutable global variable declarations. For the example above, the following changes to
-the code handle the global variables:
-\begin{alltt}
-thread_local int myrank;
-thread_local double xyz[100];
-\end{alltt}
-
-The runtime system also should know that TLS-Globals is used at both compile and link time:
-
-\begin{alltt}
-ampiCC -o example example.C -tlsglobals
-\end{alltt}
 Table \ref{tab:portability} shows portability of different schemes.
 
 \begin{table*}[!tb]
