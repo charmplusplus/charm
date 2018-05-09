@@ -2715,7 +2715,7 @@ AmpiMsg *ampi::makeBcastMsg(const void *buf,int count,MPI_Datatype type,MPI_Comm
   CMK_REFNUM_TYPE seq = getSeqNo(AMPI_COLL_DEST, destcomm, MPI_BCAST_TAG);
   // Do not use the msg pool for bcasts:
   AmpiMsg *msg = new (len, 0) AmpiMsg(seq, 0, MPI_BCAST_TAG, AMPI_COLL_DEST, len);
-  ddt->serialize((char*)buf, msg->getData(), count, 1);
+  ddt->serialize((char*)buf, msg->getData(), count, PACK);
   return msg;
 }
 
@@ -2726,7 +2726,7 @@ AmpiMsg *ampi::makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int coun
   int len = ddt->getSize(count);
   CMK_REFNUM_TYPE seq = getSeqNo(destRank, destcomm, t);
   AmpiMsg *msg = CkpvAccess(msgPool).newAmpiMsg(seq, ssendReq, t, sRank, len);
-  ddt->serialize((char*)buf, msg->getData(), count, 1);
+  ddt->serialize((char*)buf, msg->getData(), count, PACK);
   return msg;
 }
 
@@ -2882,7 +2882,7 @@ void ampi::processAmpiMsg(AmpiMsg *msg, const void* buf, MPI_Datatype type, int 
     count = msg->getLength()/(ddt->getSize(1));
   }
 
-  ddt->serialize((char*)buf, msg->getData(), count, (-1));
+  ddt->serialize((char*)buf, msg->getData(), count, UNPACK);
 }
 
 // RDMA version of ampi::processAmpiMsg
@@ -2901,7 +2901,7 @@ void ampi::processRdmaMsg(const void *sbuf, int slength, int ssendReq, int srank
     rcount = slength / (ddt->getSize(1));
   }
 
-  ddt->serialize((char*)rbuf, (char*)sbuf, rcount, (-1));
+  ddt->serialize((char*)rbuf, (char*)sbuf, rcount, UNPACK);
 }
 
 void ampi::processRednMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype type, int count)
@@ -2909,7 +2909,7 @@ void ampi::processRednMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype typ
   // The first sizeof(AmpiOpHeader) bytes in the redn msg data are reserved
   // for an AmpiOpHeader if our custom AmpiReducer type was used.
   int szhdr = (msg->getReducer() == AmpiReducer) ? sizeof(AmpiOpHeader) : 0;
-  getDDT()->getType(type)->serialize((char*)buf, (char*)msg->getData()+szhdr, count, (-1));
+  getDDT()->getType(type)->serialize((char*)buf, (char*)msg->getData()+szhdr, count, UNPACK);
 }
 
 void ampi::processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count, MPI_User_function* func)
@@ -2947,12 +2947,12 @@ void ampi::processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Data
   }
   else {
     // Deserialize rank 0's contribution into buf first
-    ddt->serialize((char*)contributionData[0], (char*)buf, count, -1);
+    ddt->serialize((char*)contributionData[0], (char*)buf, count, UNPACK);
 
     // Invoke the MPI_User_function on the deserialized contributions in 'rank' order
     vector<char> deserializedBuf(ddt->getExtent() * count);
     for (int i=1; i<commSize; i++) {
-      ddt->serialize((char*)contributionData[i], deserializedBuf.data(), count, -1);
+      ddt->serialize((char*)contributionData[i], deserializedBuf.data(), count, UNPACK);
       (*func)(deserializedBuf.data(), buf, &count, &type);
     }
   }
@@ -2976,7 +2976,7 @@ void ampi::processGatherMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype t
     CkAssert(currentSrc && currentData);
     int srcRank = *((int*)currentSrc->data);
     CkAssert(currentData->dataSize == contributionSize);
-    ddt->serialize(&(((char*)buf)[srcRank*contributionExtent]), currentData->data, recvCount, (-1));
+    ddt->serialize(&(((char*)buf)[srcRank*contributionExtent]), currentData->data, recvCount, UNPACK);
     currentSrc  = currentSrc->next();
     currentData = currentData->next();
   }
@@ -3001,7 +3001,7 @@ void ampi::processGathervMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype 
     CkAssert(currentSrc && currentData);
     int srcRank = *((int*)currentSrc->data);
     CkAssert(currentData->dataSize == contributionSize*recvCounts[srcRank]);
-    ddt->serialize(&((char*)buf)[displs[srcRank]*contributionExtent], currentData->data, recvCounts[srcRank], (-1));
+    ddt->serialize(&((char*)buf)[displs[srcRank]*contributionExtent], currentData->data, recvCounts[srcRank], UNPACK);
     currentSrc  = currentSrc->next();
     currentData = currentData->next();
   }
@@ -4320,7 +4320,7 @@ void ampi::sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
 {
   CkDDT_DataType* ddt = getDDT()->getType(datatype);
   vector<char> tmpBuf(ddt->getSize(count));
-  ddt->serialize((char*)buf, tmpBuf.data(), count, 1);
+  ddt->serialize((char*)buf, tmpBuf.data(), count, PACK);
 
   MPI_Request reqs[2];
   irecv(buf, count, datatype, source, recvtag, comm, &reqs[0]);
@@ -4627,7 +4627,7 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
     // MPI predefined op matches a Charm++ builtin reducer type
     AMPI_DEBUG("[%d] In makeRednMsg, using Charm++ built-in reducer type for a predefined op\n", parent->thisIndex);
     msg = CkReductionMsg::buildNew(szdata, NULL, reducer);
-    ddt->serialize((char*)inbuf, (char*)msg->getData(), count, 1);
+    ddt->serialize((char*)inbuf, (char*)msg->getData(), count, PACK);
   }
   else if (parent->opIsCommutative(op) && ddt->isContig()) {
     // Either an MPI predefined reducer operation with no Charm++ builtin reducer type equivalent, or
@@ -4637,7 +4637,7 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
     int szhdr = sizeof(AmpiOpHeader);
     msg = CkReductionMsg::buildNew(szdata+szhdr, NULL, AmpiReducer);
     memcpy(msg->getData(), &newhdr, szhdr);
-    ddt->serialize((char*)inbuf, (char*)msg->getData()+szhdr, count, 1);
+    ddt->serialize((char*)inbuf, (char*)msg->getData()+szhdr, count, PACK);
   }
   else {
     // Non-commutative user-defined reducer operation, or
@@ -4648,7 +4648,7 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
     tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set);
     if (!ddt->isContig()) {
       vector<char> sbuf(szdata);
-      ddt->serialize((char*)inbuf, sbuf.data(), count, 1);
+      ddt->serialize((char*)inbuf, sbuf.data(), count, PACK);
       tupleRedn[1] = CkReduction::tupleElement(szdata, sbuf.data(), CkReduction::set);
     }
     else {
@@ -4672,16 +4672,16 @@ static int copyDatatype(MPI_Datatype sendtype, int sendcount, MPI_Datatype recvt
     int slen = sddt->getSize(sendcount);
     memcpy(outbuf, inbuf, slen);
   } else if (sddt->isContig()) {
-    rddt->serialize((char*)outbuf, (char*)inbuf, recvcount, -1);
+    rddt->serialize((char*)outbuf, (char*)inbuf, recvcount, UNPACK);
   } else if (rddt->isContig()) {
-    sddt->serialize((char*)inbuf, (char*)outbuf, sendcount, 1);
+    sddt->serialize((char*)inbuf, (char*)outbuf, sendcount, PACK);
   } else {
     // ddts don't have "copy", so fake it by serializing into a temp buffer, then
     //  deserializing into the output.
     int slen = sddt->getSize(sendcount);
     vector<char> serialized(slen);
-    sddt->serialize((char*)inbuf, serialized.data(), sendcount, 1);
-    rddt->serialize((char*)outbuf, serialized.data(), recvcount, -1);
+    sddt->serialize((char*)inbuf, serialized.data(), sendcount, PACK);
+    rddt->serialize((char*)outbuf, serialized.data(), recvcount, UNPACK);
   }
 
   return MPI_SUCCESS;
@@ -6607,7 +6607,7 @@ static CkReductionMsg *makeGatherMsg(const void *inbuf, int count, MPI_Datatype 
     tupleRedn[1] = CkReduction::tupleElement(szdata, (void*)inbuf, CkReduction::set);
   } else {
     vector<char> sbuf(szdata);
-    ddt->serialize((char*)inbuf, sbuf.data(), count, 1);
+    ddt->serialize((char*)inbuf, sbuf.data(), count, PACK);
     tupleRedn[1] = CkReduction::tupleElement(szdata, sbuf.data(), CkReduction::set);
   }
 
@@ -8735,7 +8735,7 @@ AMPI_API_IMPL(int, MPI_Pack, const void *inbuf, int incount, MPI_Datatype dtype,
   AMPI_API("AMPI_Pack");
   CkDDT_DataType* dttype = getDDT()->getType(dtype) ;
   int itemsize = dttype->getSize();
-  dttype->serialize((char*)inbuf, ((char*)outbuf)+(*position), incount, 1);
+  dttype->serialize((char*)inbuf, ((char*)outbuf)+(*position), incount, PACK);
   *position += (itemsize*incount);
   return MPI_SUCCESS;
 }
@@ -8746,7 +8746,7 @@ AMPI_API_IMPL(int, MPI_Unpack, const void *inbuf, int insize, int *position, voi
   AMPI_API("AMPI_Unpack");
   CkDDT_DataType* dttype = getDDT()->getType(dtype) ;
   int itemsize = dttype->getSize();
-  dttype->serialize((char*)outbuf, ((char*)inbuf+(*position)), outcount, -1);
+  dttype->serialize((char*)outbuf, ((char*)inbuf+(*position)), outcount, UNPACK);
   *position += (itemsize*outcount);
   return MPI_SUCCESS;
 }

@@ -616,10 +616,10 @@ CkDDT_Contiguous::CkDDT_Contiguous(int nCount, int bindex, CkDDT_DataType* oldTy
 }
 
 size_t
-CkDDT_Contiguous::serialize(char* userdata, char* buffer, int num, int dir) const
+CkDDT_Contiguous::serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const
 {
   DDTDEBUG("CkDDT_Contiguous::serialize, %s %d objects of type %d (iscontig=%d)\n",
-           (dir==1)?"packing":"unpacking", num, baseType->getType(), iscontig);
+           (dir==PACK)?"packing":"unpacking", num, baseType->getType(), (int)iscontig);
   size_t bytesCopied = 0  ;
   if (iscontig) {
     bytesCopied = (size_t)num * (size_t)count * (size_t)baseSize ;
@@ -727,10 +727,10 @@ CkDDT_Vector::CkDDT_Vector(int nCount, int blength, int stride, int bindex, CkDD
 }
 
 size_t
-CkDDT_Vector::serialize(char* userdata, char* buffer, int num, int dir) const
+CkDDT_Vector::serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const
 {
   DDTDEBUG("CkDDT_Vector::serialize, %s %d objects of type %d (iscontig=%d)\n",
-           (dir==1)?"packing":"unpacking", num, baseType->getType(), iscontig);
+           (dir==PACK)?"packing":"unpacking", num, baseType->getType(), (int)iscontig);
   size_t bytesCopied = 0 ;
   if (iscontig) {
     bytesCopied = (size_t)num * (size_t)count * (size_t)blockLength * (size_t)baseSize ;
@@ -822,10 +822,10 @@ CkDDT_HVector::CkDDT_HVector(int nCount, int blength, int stride,  int bindex,
 }
 
 size_t
-CkDDT_HVector::serialize(char* userdata, char* buffer, int num, int dir) const
+CkDDT_HVector::serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const
 {
   DDTDEBUG("CkDDT_HVector::serialize, %s %d objects of type %d (iscontig=%d)\n",
-           (dir==1)?"packing":"unpacking", num, baseType->getType(), iscontig);
+           (dir==PACK)?"packing":"unpacking", num, baseType->getType(), (int)iscontig);
   size_t bytesCopied = 0 ;
   if (iscontig) {
     bytesCopied = (size_t)num * (size_t)count * (size_t)blockLength * (size_t)baseSize ;
@@ -945,10 +945,10 @@ CkDDT_Indexed::CkDDT_Indexed(int nCount, const int* arrBlock, const MPI_Aint* ar
 }
 
 size_t
-CkDDT_Indexed::serialize(char* userdata, char* buffer, int num, int dir) const
+CkDDT_Indexed::serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const
 {
   DDTDEBUG("CkDDT_Indexed::serialize, %s %d objects of type %d (iscontig=%d)\n",
-           (dir==1)?"packing":"unpacking", num, baseType->getType(), iscontig);
+           (dir==PACK)?"packing":"unpacking", num, baseType->getType(), (int)iscontig);
   size_t bytesCopied = 0 ;
 
   if (iscontig) {
@@ -1070,10 +1070,10 @@ CkDDT_HIndexed::CkDDT_HIndexed(int nCount, const int* arrBlock, const MPI_Aint* 
 }
 
 size_t
-CkDDT_HIndexed::serialize(char* userdata, char* buffer, int num, int dir) const
+CkDDT_HIndexed::serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const
 {
   DDTDEBUG("CkDDT_HIndexed::serialize, %s %d objects of type %d (iscontig=%d)\n",
-           (dir==1)?"packing":"unpacking", num, baseType->getType(), iscontig);
+           (dir==PACK)?"packing":"unpacking", num, baseType->getType(), (int)iscontig);
   size_t bytesCopied = 0 ;
 
   if (iscontig) {
@@ -1183,10 +1183,10 @@ CkDDT_Indexed_Block::~CkDDT_Indexed_Block()
 {}
 
 size_t
-CkDDT_Indexed_Block::serialize(char *userdata, char *buffer, int num, int dir) const
+CkDDT_Indexed_Block::serialize(char *userdata, char *buffer, int num, CkDDT_Dir dir) const
 {
   DDTDEBUG("CkDDT_Indexed_Block::serialize, %s %d objects of type %d (iscontig=%d)\n",
-           (dir==1)?"packing":"unpacking", num, baseType->getType(), iscontig);
+           (dir==PACK)?"packing":"unpacking", num, baseType->getType(), (int)iscontig);
   size_t bytesCopied = 0;
 
   if (iscontig) {
@@ -1295,10 +1295,10 @@ CkDDT_HIndexed_Block::~CkDDT_HIndexed_Block()
 {}
 
 size_t
-CkDDT_HIndexed_Block::serialize(char *userdata, char *buffer, int num, int dir) const
+CkDDT_HIndexed_Block::serialize(char *userdata, char *buffer, int num, CkDDT_Dir dir) const
 {
   DDTDEBUG("CkDDT_HIndexed_Block::serialize, %s %d objects of type %d (iscontig=%d)\n",
-           (dir==1)?"packing":"unpacking", num, baseType->getType(), iscontig);
+           (dir==PACK)?"packing":"unpacking", num, baseType->getType(), (int)iscontig);
   size_t bytesCopied = 0;
 
   if (iscontig) {
@@ -1438,13 +1438,13 @@ CkDDT_Struct::CkDDT_Struct(int nCount, const int* arrBlock,
 }
 
 size_t
-CkDDT_Struct::serialize(char* userdata, char* buffer, int num, int dir) const
+CkDDT_Struct::serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const
 {
   size_t bytesCopied = 0;
 
   if (iscontig) {
     DDTDEBUG("CkDDT_Struct::serialize, %s %d objects (iscontig=%d)\n",
-             (dir==1)?"packing":"unpacking", num, iscontig);
+             (dir==PACK)?"packing":"unpacking", num, (int)iscontig);
     /* arrayBlockLength is either of size 1 or contains all 1s */
     for (int i=0; i<count; i++)
       bytesCopied += (size_t)num * (size_t)arrayBlockLength[0] * (size_t)arrayDataType[i]->getSize();
@@ -1461,7 +1461,7 @@ CkDDT_Struct::serialize(char* userdata, char* buffer, int num, int dir) const
         int saveExtent = arrayDataType[i]->getExtent();
         for (int j=0; j<arrayBlockLength[i]; j++) {
           DDTDEBUG("CkDDT_Struct::serialize %s block of type %d (size %d) from offset %d to offset %d\n",
-                   (dir==1)?"packing":"unpacking", arrayDataType[i]->getType(),
+                   (dir==PACK)?"packing":"unpacking", arrayDataType[i]->getType(),
                    saveSize, userdata + (j*saveExtent) + arrayDisplacements[i]-sbuf, buffer-dbuf);
           bytesCopied += arrayDataType[i]->serialize(
                          arrayDisplacements[i] + j*saveExtent + (isAbsolute ? absoluteAddr : userdata),

@@ -34,11 +34,15 @@ using std::string;
 #define CkDDT_COMBINER_INDEXED_BLOCK  8
 #define CkDDT_COMBINER_HINDEXED_BLOCK 9
 
+enum CkDDT_Dir : bool {
+  PACK   = true,
+  UNPACK = false
+};
+
 /* Serialize a contiguous chunk of memory */
-inline void serializeContig(char* userdata, char* buffer, size_t size, int dir)
+inline void serializeContig(char* userdata, char* buffer, size_t size, CkDDT_Dir dir)
 {
-  CkAssert(dir == -1 || dir == 1);
-  if (dir == 1) {
+  if (dir == PACK) {
     memcpy(buffer, userdata, size);
   } else {
     memcpy(userdata, buffer, size);
@@ -85,7 +89,7 @@ class CkDDT;
   decRefCount - decrement the reference count.
 
   serialize - This is the function which actually copies the contents from
-    user's space to buffer if dir=1 or reverse if dir=-1
+    user's space to buffer if dir=PACK or reverse if dir=UNPACK
     according to the datatype.
 
   setName - set the name of datatype
@@ -133,10 +137,10 @@ class CkDDT_DataType {
     virtual int getEnvelope(int *num_integers, int *num_addresses, int *num_datatypes, int *combiner) const;
     virtual int getContents(int max_integers, int max_addresses, int max_datatypes,
                            int array_of_integers[], MPI_Aint array_of_addresses[], int array_of_datatypes[]) const;
-    virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const {
+    virtual size_t serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const {
       size_t bufSize = num * size;
       DDTDEBUG("CkDDT_Datatype::serialize %s %d objects of type %d (%d bytes)\n",
-               (dir==1)?"packing":"unpacking", num, datatype, (int)bufSize);
+               (dir==PACK)?"packing":"unpacking", num, datatype, (int)bufSize);
       CkAssert(datatype <= CkDDT_MAX_PRIMITIVE_TYPE);
       CkAssert(iscontig);
       serializeContig(userdata, buffer, bufSize, dir);
@@ -193,7 +197,7 @@ class CkDDT_Contiguous : public CkDDT_DataType {
  public:
   CkDDT_Contiguous() { };
   CkDDT_Contiguous(int count, int index, CkDDT_DataType* oldType);
-  virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
+  virtual size_t serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const;
   virtual void pupType(PUP::er &p, CkDDT* ddt) ;
   virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
   virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
@@ -224,7 +228,7 @@ class CkDDT_Vector : public CkDDT_DataType {
     CkDDT_Vector(const CkDDT_Vector &obj, MPI_Aint _lb, MPI_Aint _extent);
     CkDDT_Vector() { } ;
     ~CkDDT_Vector() { } ;
-    virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
+    virtual size_t serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const;
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
@@ -253,7 +257,7 @@ class CkDDT_HVector : public CkDDT_Vector {
                 CkDDT_DataType* type);
     CkDDT_HVector(const CkDDT_HVector &obj, MPI_Aint _lb, MPI_Aint _extent);
     ~CkDDT_HVector() { } ;
-    virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
+    virtual size_t serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const;
     virtual void pupType(PUP::er &p, CkDDT* ddt);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
@@ -285,7 +289,7 @@ class CkDDT_Indexed : public CkDDT_DataType {
                 CkDDT_DataType* type);
     CkDDT_Indexed() { } ;
     ~CkDDT_Indexed() ;
-    virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
+    virtual size_t serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const;
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
@@ -313,7 +317,7 @@ class CkDDT_HIndexed : public CkDDT_Indexed {
     CkDDT_HIndexed(int count, const int* arrBlock, const MPI_Aint* arrDisp, int index,
                  CkDDT_DataType* type);
     CkDDT_HIndexed(const CkDDT_HIndexed &obj, MPI_Aint _lb, MPI_Aint _extent);
-    virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
+    virtual size_t serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const;
     virtual void pupType(PUP::er &p, CkDDT* ddt);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
@@ -351,7 +355,7 @@ class CkDDT_Indexed_Block : public CkDDT_DataType
     CkDDT_Indexed_Block() { };
     CkDDT_Indexed_Block(const CkDDT_Indexed_Block &obj, MPI_Aint _lb, MPI_Aint _extent);
     ~CkDDT_Indexed_Block() ;
-    virtual size_t serialize(char *userdata, char *buffer, int num, int dir) const;
+    virtual size_t serialize(char *userdata, char *buffer, int num, CkDDT_Dir dir) const;
     virtual void pupType(PUP::er &p, CkDDT *ddt);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
@@ -383,7 +387,7 @@ class CkDDT_HIndexed_Block : public CkDDT_Indexed_Block
     CkDDT_HIndexed_Block() { };
     CkDDT_HIndexed_Block(const CkDDT_HIndexed_Block &obj, MPI_Aint _lb, MPI_Aint _extent);
     ~CkDDT_HIndexed_Block() ;
-    virtual size_t serialize(char *userdata, char *buffer, int num, int dir) const;
+    virtual size_t serialize(char *userdata, char *buffer, int num, CkDDT_Dir dir) const;
     virtual void pupType(PUP::er &p, CkDDT *ddt);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
@@ -418,7 +422,7 @@ class CkDDT_Struct : public CkDDT_DataType {
     CkDDT_Struct(int count, const int* arrBlock, const MPI_Aint* arrDisp, const int *index,
                CkDDT_DataType **type);
     CkDDT_Struct(const CkDDT_Struct &obj, MPI_Aint _lb, MPI_Aint _extent);
-    virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
+    virtual size_t serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const;
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
