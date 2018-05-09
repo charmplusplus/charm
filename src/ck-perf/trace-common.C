@@ -961,7 +961,7 @@ CkpvDeclare(int, papiStopped);
 #ifdef USE_SPP_PAPI
 int papiEvents[NUMPAPIEVENTS];
 #else
-int papiEvents[NUMPAPIEVENTS] = { PAPI_L1_TCM, PAPI_L1_TCA, PAPI_L2_TCM, PAPI_L2_TCA};
+int papiEvents[NUMPAPIEVENTS];
 #endif
 #endif // CMK_HAS_COUNTER_PAPI
 
@@ -1044,7 +1044,25 @@ void initPAPI() {
 #else
   // just uses { PAPI_L2_DCM, PAPI_FP_OPS } the 2 initialized PAPI_EVENTS
 #endif
-  papiRetValue = PAPI_add_events(CkpvAccess(papiEventSet), papiEvents, NUMPAPIEVENTS);
+  //papiRetValue = PAPI_add_events(CkpvAccess(papiEventSet), papiEvents, NUMPAPIEVENTS);
+  if (PAPI_query_event(PAPI_L1_TCM) == PAPI_OK && PAPI_query_event(PAPI_L1_TCA) == PAPI_OK) {
+    PAPI_add_event(CkpvAccess(papiEventSet), PAPI_L1_TCM);
+    PAPI_add_event(CkpvAccess(papiEventSet), PAPI_L1_TCA);
+    papiEvents[0] = PAPI_L1_TCM;
+    papiEvents[1] = PAPI_L1_TCA;
+  } else if (PAPI_query_event(PAPI_L2_TCM) == PAPI_OK && PAPI_query_event(PAPI_L2_TCA) == PAPI_OK) {
+    PAPI_add_event(CkpvAccess(papiEventSet), PAPI_L2_TCM);
+    PAPI_add_event(CkpvAccess(papiEventSet), PAPI_L2_TCA);
+    papiEvents[0] = PAPI_L2_TCM;
+    papiEvents[1] = PAPI_L2_TCA;
+  } else if (PAPI_query_event(PAPI_L3_TCM) == PAPI_OK && PAPI_query_event(PAPI_L3_TCA) == PAPI_OK) {
+    PAPI_add_event(CkpvAccess(papiEventSet), PAPI_L3_TCM);
+    PAPI_add_event(CkpvAccess(papiEventSet), PAPI_L3_TCA);
+    papiEvents[0] = PAPI_L3_TCM;
+    papiEvents[1] = PAPI_L3_TCA;
+  } else {
+    CmiPrintf("PAPI: no cache miss/access events supported on any level!\n");
+  }
   if (papiRetValue < 0) {
     if (papiRetValue == PAPI_ECNFLCT) {
       CmiAbort("PAPI events conflict! Please re-assign event types!\n");
@@ -1057,9 +1075,9 @@ void initPAPI() {
   }
   if(CkMyPe()==0)
     {
-      CmiPrintf("Registered %d PAPI counters:",NUMPAPIEVENTS);
+      CmiPrintf("Registered %d PAPI counters: ",PAPI_num_events(CkpvAccess(papiEventSet)));
       char nameBuf[PAPI_MAX_STR_LEN];
-      for(int i=0;i<NUMPAPIEVENTS;i++)
+      for(int i=0;i<2;i++)
 	{
 	  PAPI_event_code_to_name(papiEvents[i], nameBuf);
 	  CmiPrintf("%s ",nameBuf);
