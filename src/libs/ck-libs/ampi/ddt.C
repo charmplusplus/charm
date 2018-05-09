@@ -319,127 +319,173 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
   switch(datatype) {
     case MPI_DOUBLE:
       size = sizeof(double);
+      name = "MPI_DOUBLE";
       break;
     case MPI_INT:
       size = sizeof(signed int);
+      name = "MPI_INT";
       break;
     case MPI_FLOAT:
       size = sizeof(float);
+      name = "MPI_FLOAT";
       break;
     case MPI_CHAR:
       size = sizeof(char);
+      name = "MPI_CHAR";
       break;
     case MPI_BYTE:
       size = 1 ;
+      name = "MPI_BYTE";
       break;
     case MPI_PACKED:
       size = 1 ;
+      name = "MPI_PACKED";
       break;
     case MPI_COMPLEX:
+      size =  2 * sizeof(float) ;
+      name = "MPI_COMPLEX";
+      break;
     case MPI_FLOAT_COMPLEX:
       size =  2 * sizeof(float) ;
+      name = "MPI_FLOAT_COMPLEX";
       break;
     case MPI_DOUBLE_COMPLEX:
       size =  2 * sizeof(double) ;
+      name = "MPI_DOUBLE_COMPLEX";
       break;
     case MPI_LONG_DOUBLE_COMPLEX:
       size =  2 * sizeof(long double) ;
+      name = "MPI_LONG_DOUBLE_COMPLEX";
       break;
     case MPI_C_BOOL:
       /* Should be C99 _Bool instead of C++ bool, but MSVC doesn't support that */
       size = sizeof(bool) ;
+      name = "MPI_C_BOOL";
       break;
     case MPI_LOGICAL:
       size =  sizeof(int) ;
+      name = "MPI_LOGICAL";
       break;
     case MPI_SHORT:
       size = sizeof(signed short int);
+      name = "MPI_SHORT";
       break ;
     case MPI_LONG:
       size = sizeof(signed long);
+      name = "MPI_LONG";
       break ;
     case MPI_UNSIGNED_CHAR:
       size = sizeof(unsigned char);
+      name = "MPI_UNSIGNED_CHAR";
       break;
     case MPI_UNSIGNED_SHORT:
       size = sizeof(unsigned short);
+      name = "MPI_UNSIGNED_SHORT";
       break;
     case MPI_UNSIGNED:
       size = sizeof(unsigned);
+      name = "MPI_UNSIGNED";
       break ;
     case MPI_UNSIGNED_LONG:
       size = sizeof(unsigned long);
+      name = "MPI_UNSIGNED_LONG";
       break ;
     case MPI_LONG_DOUBLE:
       size = sizeof(long double);
+      name = "MPI_LONG_DOUBLE";
       break ;
     case MPI_FLOAT_INT:
       size = sizeof(FloatInt);
+      name = "MPI_FLOAT_INT";
       break;
     case MPI_DOUBLE_INT:
       size = sizeof(DoubleInt);
+      name = "MPI_DOUBLE_INT";
       break;
     case MPI_LONG_INT:
       size = sizeof(LongInt);
+      name = "MPI_LONG_INT";
       break;
     case MPI_2INT:
       size = sizeof(IntInt);
+      name = "MPI_2INT";
       break;
     case MPI_SHORT_INT:
       size = sizeof(ShortInt);
+      name = "MPI_SHORT_INT";
       break;
     case MPI_LONG_DOUBLE_INT:
       size = sizeof(LongdoubleInt);
+      name = "MPI_LONG_DOUBLE_INT";
       break;
     case MPI_2FLOAT:
       size = sizeof(FloatFloat);
+      name = "MPI_2FLOAT";
       break;
     case MPI_2DOUBLE:
       size = sizeof(DoubleDouble);
+      name = "MPI_2DOUBLE";
       break;
     case MPI_SIGNED_CHAR:
       size = sizeof(signed char);
+      name = "MPI_SIGNED_CHAR";
       break;
     case MPI_UNSIGNED_LONG_LONG:
       size = sizeof(unsigned long long);
+      name = "MPI_UNSIGNED_LONG_LONG";
       break;
     case MPI_WCHAR:
       size = sizeof(wchar_t);
+      name = "MPI_WCHAR";
       break;
     case MPI_INT8_T:
       size = sizeof(int8_t);
+      name = "MPI_INT8_T";
       break;
     case MPI_INT16_T:
       size = sizeof(int16_t);
+      name = "MPI_INT16_T";
       break;
     case MPI_INT32_T:
       size = sizeof(int32_t);
+      name = "MPI_INT32_T";
       break;
     case MPI_INT64_T:
       size = sizeof(int64_t);
+      name = "MPI_INT64_T";
       break;
     case MPI_UINT8_T:
       size = sizeof(uint8_t);
+      name = "MPI_UINT8_T";
       break;
     case MPI_UINT16_T:
       size = sizeof(uint16_t);
+      name = "MPI_UINT16_T";
       break;
     case MPI_UINT32_T:
       size = sizeof(uint32_t);
+      name = "MPI_UINT32_T";
       break;
     case MPI_UINT64_T:
       size = sizeof(uint64_t);
+      name = "MPI_UINT64_T";
       break;
     case MPI_AINT:
       size = sizeof(MPI_Aint);
+      name = "MPI_AINT";
       break;
     case MPI_LB:
+      size = 0;
+      name = "MPI_LB";
+      break;
     case MPI_UB:
       size = 0;
+      name = "MPI_UB";
       break;
 #if CMK_LONG_LONG_DEFINED
     case MPI_LONG_LONG_INT:
       size = sizeof(signed long long);
+      name = "MPI_LONG_LONG_INT";
       break;
 #endif
     default:
