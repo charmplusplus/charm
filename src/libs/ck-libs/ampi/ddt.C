@@ -4,35 +4,6 @@
 
 using std::numeric_limits;
 
-//Uncomment for debug print statements
-#define DDTDEBUG(...) //CkPrintf(__VA_ARGS__)
-
-
-/* Serialize a contiguous chunk of memory */
-static inline void serializeContig(char* userdata, char* buffer, size_t size, int dir)
-{
-  if (dir==1) {
-    memcpy(buffer, userdata, size);
-  } else if (dir==-1) {
-    memcpy(userdata, buffer, size);
-  }
-#if CMK_ERROR_CHECKING
-  else {
-    CkAbort("CkDDT: Invalid dir given to serialize a contiguous type!");
-  }
-#endif
-}
-
-CkDDT_DataType*
-CkDDT::getType(int nIndex) const
-{
-#if CMK_ERROR_CHECKING
-  if (nIndex < 0 || nIndex > typeTable.size())
-    CkAbort("CkDDT: Invalid type index passed to getType!");
-#endif
-  return typeTable[nIndex];
-}
-
 void
 CkDDT::pup(PUP::er &p)
 {
@@ -145,54 +116,6 @@ CkDDT::insertType(CkDDT_DataType* ptr, int type)
   return types.size()-1;
 }
 
-bool
-CkDDT::isContig(int nIndex) const
-{
-  return getType(nIndex)->isContig();
-}
-
-int
-CkDDT::getSize(int nIndex, int count) const
-{
-  CkDDT_DataType* dttype = getType(nIndex);
-  return count*dttype->getSize();
-}
-
-MPI_Aint
-CkDDT::getExtent(int nIndex) const
-{
-  CkDDT_DataType* dttype = getType(nIndex);
-  return dttype->getExtent();
-}
-
-MPI_Aint
-CkDDT::getLB(int nIndex) const
-{
-  CkDDT_DataType* dttype = getType(nIndex);
-  return dttype->getLB();
-}
-
-MPI_Aint
-CkDDT::getUB(int nIndex) const
-{
-  CkDDT_DataType* dttype = getType(nIndex);
-  return dttype->getUB();
-}
-
-MPI_Aint
-CkDDT::getTrueExtent(int nIndex) const
-{
-  CkDDT_DataType *dttype = getType(nIndex);
-  return dttype->getTrueExtent();
-}
-
-MPI_Aint
-CkDDT::getTrueLB(int nIndex) const
-{
-  CkDDT_DataType *dttype = getType(nIndex);
-  return dttype->getTrueLB();
-}
-
 void
 CkDDT::createDup(int nIndexOld, int *nIndexNew)
 {
@@ -232,13 +155,15 @@ CkDDT::createDup(int nIndexOld, int *nIndexNew)
   *nIndexNew = insertType(type, types[nIndexOld]);
 }
 
-int CkDDT::getEnvelope(int nIndex, int *ni, int *na, int *nd, int *combiner) const
+int
+CkDDT::getEnvelope(int nIndex, int *ni, int *na, int *nd, int *combiner) const
 {
   CkDDT_DataType* dttype = getType(nIndex);
   return dttype->getEnvelope(ni, na, nd, combiner);
 }
 
-int CkDDT::getContents(int nIndex, int ni, int na, int nd, int i[], MPI_Aint a[], int d[])
+int
+CkDDT::getContents(int nIndex, int ni, int na, int nd, int i[], MPI_Aint a[], int d[])
 {
   CkDDT_DataType* dttype = getType(nIndex);
   int ret = dttype->getContents(ni, na, nd, i, a, d);
@@ -251,20 +176,6 @@ int CkDDT::getContents(int nIndex, int ni, int na, int nd, int i[], MPI_Aint a[]
     dttype->getBaseType()->incRefCount();
   }
   return ret;
-}
-
-void
-CkDDT::setName(int nIndex, const char *name)
-{
-  CkDDT_DataType* dttype = getType(nIndex);
-  dttype->setName(name);
-}
-
-void
-CkDDT::getName(int nIndex, char *name, int *len) const
-{
-  CkDDT_DataType* dttype = getType(nIndex);
-  dttype->getName(name, len);
 }
 
 void
@@ -628,146 +539,6 @@ CkDDT_DataType::setSize(MPI_Aint _lb, MPI_Aint _extent)
       iscontig = true;
     }
   }
-}
-
-size_t
-CkDDT_DataType::serialize(char* userdata, char* buffer, int num, int dir) const
-{
-  size_t bufSize = (size_t)num * (size_t)size;
-  DDTDEBUG("CkDDT_Datatype::serialize %s %d objects of type %d (%d bytes)\n",
-           (dir==1)?"packing":"unpacking", num, datatype, bufSize);
-  if (iscontig) {
-    serializeContig(userdata, buffer, bufSize, dir);
-  }
-  else {
-    for (int i=0; i<num; i++) {
-      serializeContig(userdata + i*extent, buffer + i*size, size, dir);
-    }
-  }
-  return bufSize;
-}
-
-//Set name for a datatype, stripped of trailing whitespace
-void
-CkDDT_DataType::setName(const char *src)
-{
-  CkDDT_SetName(name, src);
-}
-
-void
-CkDDT_DataType::getName(char *dest, int *len) const
-{
-  int length = *len = name.size();
-  memcpy(dest, &name[0], length);
-  dest[length] = '\0';
-}
-
-bool
-CkDDT_DataType::isContig() const
-{
-  return iscontig;
-}
-
-void
-CkDDT_DataType::setAbsolute(bool arg)
-{
-  isAbsolute = arg;
-}
-
-int
-CkDDT_DataType::getSize(int num) const
-{
-  return num*size;
-}
-
-MPI_Aint
-CkDDT_DataType::getExtent() const
-{
-  return extent;
-}
-
-int
-CkDDT_DataType::getCount() const
-{
-  return count;
-}
-
-MPI_Aint
-CkDDT_DataType::getTrueExtent() const
-{
-  return trueExtent;
-}
-
-MPI_Aint
-CkDDT_DataType::getTrueLB() const
-{
-  return trueLB;
-}
-
-int
-CkDDT_DataType::getBaseSize() const
-{
-  return baseSize;
-}
-
-MPI_Aint
-CkDDT_DataType::getBaseExtent() const
-{
-  return baseExtent;
-}
-
-CkDDT_DataType*
-CkDDT_DataType::getBaseType() const
-{
-  return baseType;
-}
-
-int
-CkDDT_DataType::getNumElements() const
-{
-  return numElements;
-}
-
-MPI_Aint
-CkDDT_DataType::getLB() const
-{
-  return lb;
-}
-
-MPI_Aint
-CkDDT_DataType::getUB() const
-{
-  return ub;
-}
-
-int
-CkDDT_DataType::getBaseIndex() const
-{
-  return baseIndex;
-}
-
-int
-CkDDT_DataType::getType() const
-{
-  return datatype;
-}
-
-void
-CkDDT_DataType::incRefCount()
-{
-  CkAssert(refCount > 0);
-  if (datatype > CkDDT_MAX_PRIMITIVE_TYPE)
-    refCount++;
-}
-
-// Callers of this function should always check its return value and free the type only if it returns 0.
-int
-CkDDT_DataType::decRefCount(void)
-{
-  CkAssert(refCount > 0);
-  if (datatype > CkDDT_MAX_PRIMITIVE_TYPE)
-    return --refCount;
-  return -1;
 }
 
 void

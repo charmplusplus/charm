@@ -6,6 +6,9 @@
 #include "charm++.h"
 #include "ampi.h"
 
+//Uncomment for debug print statements
+#define DDTDEBUG(...) //CkPrintf(__VA_ARGS__)
+
 using std::vector;
 using std::string;
 
@@ -30,6 +33,17 @@ using std::string;
 #define CkDDT_COMBINER_STRUCT         7
 #define CkDDT_COMBINER_INDEXED_BLOCK  8
 #define CkDDT_COMBINER_HINDEXED_BLOCK 9
+
+/* Serialize a contiguous chunk of memory */
+inline void serializeContig(char* userdata, char* buffer, size_t size, int dir)
+{
+  CkAssert(dir == -1 || dir == 1);
+  if (dir == 1) {
+    memcpy(buffer, userdata, size);
+  } else {
+    memcpy(userdata, buffer, size);
+  }
+}
 
 /* Helper function to set names (used by AMPI too).
  * Leading whitespaces are significant, trailing spaces are not. */
@@ -105,8 +119,8 @@ class CkDDT_DataType {
 
   public:
     CkDDT_DataType& operator=(const CkDDT_DataType& obj);
-    CkDDT_DataType() { }
-    virtual ~CkDDT_DataType() { }
+    CkDDT_DataType() = default;
+    virtual ~CkDDT_DataType() = default;
     CkDDT_DataType(int type);
     CkDDT_DataType(int datatype, int size, MPI_Aint extent, int count, MPI_Aint lb, MPI_Aint ub,
             bool iscontig, int baseSize, MPI_Aint baseExtent, CkDDT_DataType* baseType,
@@ -114,34 +128,55 @@ class CkDDT_DataType {
     CkDDT_DataType(const CkDDT_DataType &obj, MPI_Aint _lb, MPI_Aint _extent);
     CkDDT_DataType(const CkDDT_DataType& obj);
 
-    virtual bool isContig(void) const;
-    virtual int getSize(int count=1) const;
-    virtual MPI_Aint getExtent(void) const;
-    virtual int getBaseSize(void) const;
-    virtual MPI_Aint getLB(void) const;
-    virtual MPI_Aint getUB(void) const;
-    virtual MPI_Aint getTrueExtent(void) const;
-    virtual MPI_Aint getTrueLB(void) const;
-    virtual int getBaseIndex(void) const;
-    virtual CkDDT_DataType* getBaseType(void) const;
-    virtual MPI_Aint getBaseExtent(void) const;
-    virtual int getCount(void) const;
-    virtual int getType(void) const;
-    virtual int getNumElements(void) const;
-    virtual void incRefCount() ;
-    virtual int decRefCount();
-    virtual void pupType(PUP::er &p, CkDDT* ddt) ;
-
+    void setSize(MPI_Aint lb, MPI_Aint extent);
+    virtual void pupType(PUP::er &p, CkDDT* ddt);
     virtual int getEnvelope(int *num_integers, int *num_addresses, int *num_datatypes, int *combiner) const;
     virtual int getContents(int max_integers, int max_addresses, int max_datatypes,
                            int array_of_integers[], MPI_Aint array_of_addresses[], int array_of_datatypes[]) const;
-    virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
+    virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const {
+      size_t bufSize = num * size;
+      DDTDEBUG("CkDDT_Datatype::serialize %s %d objects of type %d (%d bytes)\n",
+               (dir==1)?"packing":"unpacking", num, datatype, (int)bufSize);
+      CkAssert(datatype <= CkDDT_MAX_PRIMITIVE_TYPE);
+      CkAssert(iscontig);
+      serializeContig(userdata, buffer, bufSize, dir);
+      return bufSize;
+    }
 
-    void setName(const char *src);
-    void getName(char *dest, int *len) const;
-    void setAbsolute(bool arg);
-
-    void setSize(MPI_Aint lb, MPI_Aint extent);
+    virtual bool isContig() const { return iscontig; }
+    virtual int getSize(int count=1) const { return count * size; }
+    virtual MPI_Aint getExtent() const { return extent; }
+    virtual int getBaseSize() const { return baseSize; }
+    virtual MPI_Aint getLB() const { return lb; }
+    virtual MPI_Aint getUB() const { return ub; }
+    virtual MPI_Aint getTrueExtent() const { return trueExtent; }
+    virtual MPI_Aint getTrueLB() const { return trueLB; }
+    virtual int getBaseIndex() const { return baseIndex; }
+    virtual CkDDT_DataType* getBaseType() const { return baseType; }
+    virtual MPI_Aint getBaseExtent() const { return baseExtent; }
+    virtual int getCount() const { return count; }
+    virtual int getType() const { return datatype; }
+    virtual int getNumElements() const { return numElements; }
+    virtual void incRefCount() {
+      CkAssert(refCount > 0);
+      if (datatype > CkDDT_MAX_PRIMITIVE_TYPE)
+        refCount++;
+    }
+    virtual int decRefCount() {
+      // Callers of this function should always check its return
+      // value and free the type only if it returns 0.
+      CkAssert(refCount > 0);
+      if (datatype > CkDDT_MAX_PRIMITIVE_TYPE)
+        return --refCount;
+      return -1;
+    }
+    inline void setName(const char *src) { CkDDT_SetName(name, src); }
+    inline void getName(char *dest, int *len) const {
+      int length = *len = name.size();
+      memcpy(dest, &name[0], length);
+      dest[length] = '\0';
+    }
+    inline void setAbsolute(bool arg) { isAbsolute = arg; }
 };
 
 /*
@@ -521,24 +556,32 @@ class CkDDT {
                 MPI_Datatype* newtype);
   int insertType(CkDDT_DataType* ptr, int type);
   void freeType(int index);
-  void  pup(PUP::er &p);
-  CkDDT_DataType*  getType(int nIndex) const;
-
-  bool isContig(int nIndex) const;
-  int getSize(int nIndex, int count=1) const;
-  MPI_Aint getExtent(int nIndex) const;
-  MPI_Aint getLB(int nIndex) const;
-  MPI_Aint getUB(int nIndex) const;
-  MPI_Aint getTrueExtent(int nIndex) const;
-  MPI_Aint getTrueLB(int nIndex) const;
+  void pup(PUP::er &p);
   void createDup(int nIndexOld, int *nIndexNew);
-  int getEnvelope(int nIndex, int *num_integers, int *num_addresses, int *num_datatypes, int *combiner) const;
-  int getContents(int nIndex, int max_integers, int max_addresses, int max_datatypes,
-                 int array_of_integers[], MPI_Aint array_of_addresses[], int array_of_datatypes[]);
-  void setName(int nIndex, const char *name);
-  void getName(int nIndex, char *name, int *len) const;
   void createResized(MPI_Datatype oldtype, MPI_Aint lb, MPI_Aint extent, MPI_Datatype *newtype);
-  ~CkDDT() ;
+  int getEnvelope(int nIndex, int *num_integers, int *num_addresses, int *num_datatypes,
+                  int *combiner) const;
+  int getContents(int nIndex, int max_integers, int max_addresses, int max_datatypes, int array_of_integers[],
+                  MPI_Aint array_of_addresses[], int array_of_datatypes[]);
+  ~CkDDT();
+
+  inline CkDDT_DataType* getType(int nIndex) const {
+    #if CMK_ERROR_CHECKING
+    if (nIndex < 0 || nIndex > typeTable.size())
+      CkAbort("AMPI> invalid datatype index passed to getType!");
+    #endif
+    return typeTable[nIndex];
+  }
+
+  inline bool isContig(int nIndex) const { return getType(nIndex)->isContig(); }
+  inline int getSize(int nIndex, int count=1) const { return count * getType(nIndex)->getSize(); }
+  inline MPI_Aint getExtent(int nIndex) const { return getType(nIndex)->getExtent(); }
+  inline MPI_Aint getLB(int nIndex) const { return getType(nIndex)->getLB(); }
+  inline MPI_Aint getUB(int nIndex) const { return getType(nIndex)->getUB(); }
+  inline MPI_Aint getTrueExtent(int nIndex) const { return getType(nIndex)->getTrueExtent(); }
+  inline MPI_Aint getTrueLB(int nIndex) const { return getType(nIndex)->getTrueLB(); }
+  inline void setName(int nIndex, const char *name) { getType(nIndex)->setName(name); }
+  inline void getName(int nIndex, char *name, int *len) const { getType(nIndex)->getName(name, len); }
 };
 
 #endif
