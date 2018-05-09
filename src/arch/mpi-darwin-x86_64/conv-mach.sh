@@ -11,7 +11,19 @@ CMK_CXX="$MPICXX "
 
 CMK_CPP_C_FLAGS="$CMK_CPP_C_FLAGS"
 CMK_CC_FLAGS="$CMK_CC_FLAGS $CMK_AMD64"
-CMK_CXX_FLAGS="$CMK_CXX_FLAGS $CMK_AMD64 -stdlib=libc++"
+
+CMK_CLANG_CXX_FLAGS="-stdlib=libc++"
+CMK_REAL_COMPILER=`$MPICXX -show 2>/dev/null | cut -d' ' -f1 `
+case "$CMK_REAL_COMPILER" in
+  g++)
+    CMK_CXX_FLAGS="$CMK_CXX_FLAGS $CMK_AMD64"
+    CMK_COMPILER='gcc'
+    ;;
+  clang)
+    CMK_CXX_FLAGS="$CMK_CXX_FLAGS $CMK_AMD64 $CMK_CLANG_CXX_FLAGS"
+    CMK_COMPILER='clang'
+    ;;
+esac
 
 CMK_XIOPTS=""
 
@@ -49,4 +61,3 @@ CMK_SHARED_SUF="dylib"
 CMK_LD_SHARED=" -dynamic -dynamiclib -undefined dynamic_lookup "
 CMK_LD_SHARED_LIBS="-lc++"
 CMK_LD_SHARED_ABSOLUTE_PATH=true
-CMK_COMPILER='clang'
