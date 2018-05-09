@@ -215,6 +215,6 @@ extern "C" void CkResetInLdb();
 
 extern "C" int CkHasCheckpoints();
 
-extern "C" void CkDieNow();
+void CkDieNow();
 
 #endif
