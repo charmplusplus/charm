@@ -34,7 +34,7 @@
 #include "PPCAtomicMutex.h"
 #endif
 
-// These macros are used in machine-common-core.c  (LRTS layer)
+// These macros are used in machine-common-core.C  (LRTS layer)
 #define CMK_MACH_SPECIALIZED_QUEUE        (CMK_SMP && CMK_PPC_ATOMIC_QUEUE)
 #define CMK_MACH_SPECIALIZED_MUTEX        (CMK_SMP && CMK_PPC_ATOMIC_MUTEX)
 
@@ -171,7 +171,7 @@ static void CmiNetworkBarrier(int async);
 #include "memalloc.c"
 #endif
 #include "machine-lrts.h"
-#include "machine-common-core.c"
+#include "machine-common-core.C"
 
 #if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
 CpvDeclare(int, uselock);
@@ -591,7 +591,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   // No comm thread for regular smp
   Cmi_smp_mode_setting = COMM_THREAD_NOT_EXIST;
 #endif
-  // The default setting i.e COMM_THREAD_SEND_RECV, set in machine-common-core.c is used for async-smp
+  // The default setting i.e COMM_THREAD_SEND_RECV, set in machine-common-core.C is used for async-smp
 
   //fprintf(stderr,"Creating %d pami contexts\n", _n);
 

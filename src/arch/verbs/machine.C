@@ -220,15 +220,15 @@ int printf(const char *fmt, ...) {
 
 #include "machine-smp.h"
 
-// This is used by machine-pxshm.c, which is included by machine-common-core.c
+// This is used by machine-pxshm.c, which is included by machine-common-core.C
 // (itself included below.)
 static int Cmi_charmrun_pid;
 
-// Used by machine-common-core.c
+// Used by machine-common-core.C
 static int Cmi_charmrun_fd = -1;
 
 #include "machine-lrts.h"
-#include "machine-common-core.c"
+#include "machine-common-core.C"
 
 #if CMK_USE_KQUEUE
 #include <sys/event.h>

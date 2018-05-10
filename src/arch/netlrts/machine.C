@@ -225,7 +225,7 @@ CMI_EXTERNC_VARIABLE int quietMode;
 #include "machine-smp.h"
 
 #include "machine-lrts.h"
-#include "machine-common-core.c"
+#include "machine-common-core.C"
 
 #if CMK_USE_KQUEUE
 #include <sys/event.h>

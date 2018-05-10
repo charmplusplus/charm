@@ -74,7 +74,7 @@
 /* =====End of Declarations of Machine Specific Variables===== */
 
 #include "machine-lrts.h"
-#include "machine-common-core.c"
+#include "machine-common-core.C"
 
 /* Libfabric headers */
 #include <rdma/fabric.h>

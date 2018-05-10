@@ -1194,7 +1194,7 @@ void my_free_huge_pages(void *ptr, int size)
 
 #include "machine-lrts.h"
 
-#include "machine-common-core.c"
+#include "machine-common-core.C"
 
 #include "machine-rdma.h"
 

@@ -426,7 +426,7 @@ void CmiNotifyIdleForMPI(void);
  */
 #define CMK_HAS_SIZE_IN_MSGHDR 0
 #include "machine-lrts.h"
-#include "machine-common-core.c"
+#include "machine-common-core.C"
 
 #if USE_MPI_CTRLMSG_SCHEME
 #include "machine-ctrlmsg.c"
