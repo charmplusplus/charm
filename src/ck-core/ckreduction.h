@@ -242,9 +242,9 @@ public:
 #if CMK_ERROR_CHECKING
     const char *name; // aids in debugging conflicts between multiple overlapping reductions
 #endif
-    reducerStruct(reducerFn f=NULL, bool s=false, const char *n=NULL) : fn(f), streamable(s),
+    reducerStruct(reducerFn f=NULL, bool s=false, const char *n=NULL) : fn(f), streamable(s)
 #if CMK_ERROR_CHECKING
-                  name(n)
+                  ,name(n)
 #endif
     {}
   };
