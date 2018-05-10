@@ -31,6 +31,12 @@ to be set for its execution on compute nodes
 .charmrunrc under home directory. charmrun
 will run that shell script before running the executable.
 
+Charmrun normally limits the number of status messages it prints to a minimal
+level to avoid flooding the terminal with unimportant information. However, if
+you encounter trouble launching a job, try using the {\tt ++verbose} option to
+help diagnose the issue. (See the {\tt ++quiet} option to suppress output
+entirely.)
+
 \section[Command Line Options]{Command Line Options}
 \label{command line options}
 \index{command line options}
