@@ -51,7 +51,7 @@ CMI_EXTERNC
 void *CmiAlloc_ppcq (int size) {
   CmiMemAllocHdr_ppcq *hdr = NULL;
   char *buf;
-#if CMK_TRACE_ENABLED
+#if CMK_TRACE_PAMI_ENABLED
   double start = CmiWallTimer();
 #endif
 
@@ -115,7 +115,7 @@ void *CmiAlloc_ppcq (int size) {
   hdr->rank = myrank;
   buf = (char*)hdr + sizeof(CmiMemAllocHdr_ppcq);
 
-#if CMK_TRACE_ENABLED
+#if CMK_TRACE_PAMI_ENABLED
   traceUserBracketEvent(30001, start, CmiWallTimer());
 #endif
 
@@ -127,7 +127,7 @@ void CmiFree_ppcq (void *buf) {
   CmiMemAllocHdr_ppcq *hdr = (CmiMemAllocHdr_ppcq *)((char*)buf - sizeof(CmiMemAllocHdr_ppcq));
   int rc = CMI_PPCQ_EAGAIN;
 
-#if CMK_TRACE_ENABLED
+#if CMK_TRACE_PAMI_ENABLED
   double start = CmiWallTimer();
 #endif
 
@@ -147,7 +147,7 @@ void CmiFree_ppcq (void *buf) {
 #endif
   }
 
-#if CMK_TRACE_ENABLED
+#if CMK_TRACE_PAMI_ENABLED
   traceUserBracketEvent(30002, start, CmiWallTimer());
 #endif
 }

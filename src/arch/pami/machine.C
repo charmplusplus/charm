@@ -948,7 +948,7 @@ void ConverseRunPE(int everReturn) {
     //printf ("Before Converse Common Init\n");
     ConverseCommonInit(CmiMyArgv);
 
-#if CMK_TRACE_ENABLED
+#if CMK_TRACE_PAMI_ENABLED
     //Register memory allocator events
     traceRegisterUserEvent("CmiAlloc_ppcq", 30001);
     traceRegisterUserEvent("CmiFree_ppcq",  30002);
@@ -1159,12 +1159,12 @@ static void CmiSendSelf(char *msg) {
 #if CMK_SMP
 static void CmiSendPeer (int rank, int size, char *msg) {
   //fprintf(stderr, "%d Send messages to peer\n", CmiMyPe());
-#if CMK_TRACE_ENABLED
+#if CMK_TRACE_PAMI_ENABLED
   double start = CmiWallTimer();
 #endif
   CmiPushPE (rank, msg);
 
-#if CMK_TRACE_ENABLED
+#if CMK_TRACE_PAMI_ENABLED
   traceUserBracketEvent(30004, start, CmiWallTimer());
 #endif
 }
@@ -1252,7 +1252,7 @@ void  machine_send       (pami_context_t      context,
 {
     CMI_DEST_RANK(msg) = rank;
 
-#if CMK_TRACE_ENABLED
+#if CMK_TRACE_PAMI_ENABLED
     double start = CmiWallTimer();
 #endif
 
@@ -1367,7 +1367,7 @@ void  machine_send       (pami_context_t      context,
 	PAMIX_CONTEXT_UNLOCK(context);
     }
 
-#if CMK_TRACE_ENABLED
+#if CMK_TRACE_PAMI_ENABLED
     traceUserBracketEvent(30003, start, CmiWallTimer());
 #endif
 }
@@ -1529,7 +1529,7 @@ void CmiFreeBroadcastAllFn(int size, char *msg) {
 void AdvanceCommunications(void) {
     pami_context_t my_context = MY_CONTEXT();
 
-#if CMK_TRACE_ENABLED
+#if CMK_TRACE_PAMI_ENABLED
     double start = CmiWallTimer(), end;
 #endif
 
@@ -1545,7 +1545,7 @@ void AdvanceCommunications(void) {
     PAMI_Context_advance(my_context, 1);
 #endif
 
-#if CMK_TRACE_ENABLED
+#if CMK_TRACE_PAMI_ENABLED
     end = CmiWallTimer();
     //only log 1us or larger events
     if (end - start > 1e-6)

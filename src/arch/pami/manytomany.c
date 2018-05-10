@@ -427,7 +427,7 @@ pami_result_t   _cmidirect_m2m_send_post_handler (pami_context_t     context,
   PAMI_M2mWork_t  *work = (PAMI_M2mWork_t *) cd;
   PAMICmiDirectM2mHandle *handle = (PAMICmiDirectM2mHandle *)work->handle;
 
-#if CMK_TRACE_ENABLED
+#if CMK_TRACE_PAMI_ENABLED
   double starttime = CmiWallTimer();
 #endif
 
@@ -455,7 +455,7 @@ pami_result_t   _cmidirect_m2m_send_post_handler (pami_context_t     context,
       PAMI_Send (context, &parameters);
   }
 
-#if CMK_TRACE_ENABLED
+#if CMK_TRACE_PAMI_ENABLED
   traceUserBracketEvent(30006, starttime, CmiWallTimer());
 #endif
 
@@ -522,7 +522,7 @@ void   CmiDirect_manytomany_start ( void       * h,
   }
   else {
     int i;
-#if CMK_TRACE_ENABLED
+#if CMK_TRACE_PAMI_ENABLED
     double starttime = CmiWallTimer();
 #endif
     for (i = 0; i < handle->n_work; ++i)
@@ -534,7 +534,7 @@ void   CmiDirect_manytomany_start ( void       * h,
 			   _cmidirect_m2m_send_post_handler,
 			   &handle->swork[i]);
 
-#if CMK_TRACE_ENABLED
+#if CMK_TRACE_PAMI_ENABLED
     traceUserBracketEvent(30007, starttime, CmiWallTimer());
 #endif
 
