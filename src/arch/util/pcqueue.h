@@ -35,26 +35,29 @@
 
 #endif
 
-#include <atomic>
-
-/* If we are using locks in PCQueue, we disable any other fence operation,
- * otherwise we use the ones provided by converse.h */
-#if CMK_PCQUEUE_LOCK
-#define PCQueue_CmiMemoryReadFence()
-#define PCQueue_CmiMemoryWriteFence()
-#define PCQueue_CmiMemoryAtomicIncrement(someInt)  someInt=someInt+1
-#define PCQueue_CmiMemoryAtomicDecrement(someInt)  someInt=someInt-1
-#else
-#define PCQueue_CmiMemoryReadFence                 CmiMemoryReadFence
-#define PCQueue_CmiMemoryWriteFence                CmiMemoryWriteFence
-#define PCQueue_CmiMemoryAtomicIncrement(someInt)  std::atomic_fetch_add_explicit(&(someInt), 1, std::memory_order_release)
-#define PCQueue_CmiMemoryAtomicDecrement(someInt)  std::atomic_fetch_sub_explicit(&(someInt), 1, std::memory_order_release)
-#endif
-
 #if CMK_SMP
+#include <atomic>
 #define CMK_SMP_volatile volatile
 #else
 #define CMK_SMP_volatile
+#endif
+
+/* If we are using locks in PCQueue, we disable any other fence operation,
+ * otherwise we use the ones provided by converse.h and std::atomic */
+#if !CMK_SMP || CMK_PCQUEUE_LOCK
+#define PCQueue_CmiMemoryReadFence()
+#define PCQueue_CmiMemoryWriteFence()
+#define PCQueue_CmiMemoryAtomicIncrement(k, mem) k=k+1
+#define PCQueue_CmiMemoryAtomicDecrement(k, mem) k=k-1
+#define PCQueue_CmiMemoryAtomicLoad(k, mem)      k
+#define PCQueue_CmiMemoryAtomicStore(k, v, mem)  k=v
+#else
+#define PCQueue_CmiMemoryReadFence               CmiMemoryReadFence
+#define PCQueue_CmiMemoryWriteFence              CmiMemoryWriteFence
+#define PCQueue_CmiMemoryAtomicIncrement(k, mem) std::atomic_fetch_add_explicit(&k, 1, mem)
+#define PCQueue_CmiMemoryAtomicDecrement(k, mem) std::atomic_fetch_sub_explicit(&k, 1, mem)
+#define PCQueue_CmiMemoryAtomicLoad(k, mem)      std::atomic_load_explicit(&k, mem)
+#define PCQueue_CmiMemoryAtomicStore(k, v, mem)  std::atomic_store_explicit(&k, v, mem);
 #endif
 
 #define PCQueueSize 0x100
@@ -77,8 +80,10 @@ typedef struct CircQueueStruct
   int pull;
 #if CMK_SMP
   char _pad2[CMI_CACHE_LINE_SIZE - sizeof(int)]; // align to cache line
-#endif
   std::atomic<char *> data[PCQueueSize];
+#else
+  char *data[PCQueueSize];
+#endif
 }
 *CircQueue;
 
@@ -91,72 +96,22 @@ typedef struct PCQueueStruct
   CircQueue CMK_SMP_volatile tail;
 #if CMK_SMP
   char _pad2[CMI_CACHE_LINE_SIZE - sizeof(CircQueue)]; // align to cache line
-#endif
   std::atomic<int> len;
+#else
+  int len;
+#endif
 #if CMK_PCQUEUE_LOCK || CMK_PCQUEUE_PUSH_LOCK
   CmiNodeLock  lock;
 #endif
 }
 *PCQueue;
 
-/* static CircQueue Cmi_freelist_circqueuestruct = 0;
-   static int freeCount = 0; */
-
-#define FreeCircQueueStruct(dg) {\
-  CircQueue d;\
-  CmiMemLock();\
-  d=(dg);\
-  d->next = Cmi_freelist_circqueuestruct;\
-  Cmi_freelist_circqueuestruct = d;\
-  freeCount++;\
-  CmiMemUnlock();\
-}
-
-#if !XT3_PCQUEUE_HACK
-#define MallocCircQueueStruct(dg) {\
-  CircQueue d;\
-  CmiMemLock();\
-  d = Cmi_freelist_circqueuestruct;\
-  if (d==(CircQueue)0){\
-    d = ((CircQueue)calloc(1, sizeof(struct CircQueueStruct))); \
-  }\
-  else{\
-    freeCount--;\
-    Cmi_freelist_circqueuestruct = d->next;\
-    }\
-  dg = d;\
-  CmiMemUnlock();\
-}
-#else
-#define MallocCircQueueStruct(dg) {\
-  CircQueue d;\
-  CmiMemLock();\
-  d = Cmi_freelist_circqueuestruct;\
-  if (d==(CircQueue)0){\
-    d = ((CircQueue)malloc(sizeof(struct CircQueueStruct))); \
-    d = ((CircQueue)memset(d, 0, sizeof(struct CircQueueStruct))); \
-  }\
-  else{\
-    freeCount--;\
-    Cmi_freelist_circqueuestruct = d->next;\
-    }\
-  dg = d;\
-  CmiMemUnlock();\
-}
-#endif
-
 static PCQueue PCQueueCreate(void)
 {
   CircQueue circ;
   PCQueue Q;
 
-  /* MallocCircQueueStruct(circ); */
-#if !XT3_PCQUEUE_HACK
   circ = (CircQueue)calloc(1, sizeof(struct CircQueueStruct));
-#else
-  circ = (CircQueue)malloc(sizeof(struct CircQueueStruct));
-  circ = (CircQueue)memset(circ, 0, sizeof(struct CircQueueStruct));
-#endif
   Q = (PCQueue)malloc(sizeof(struct PCQueueStruct));
   _MEMCHECK(Q);
   Q->head = circ;
@@ -181,25 +136,25 @@ static void PCQueueDestroy(PCQueue Q)
 
 static int PCQueueEmpty(PCQueue Q)
 {
-  return (Q->len == 0);
+  return (PCQueue_CmiMemoryAtomicLoad(Q->len, std::memory_order_acquire) == 0);
 }
 
 static int PCQueueLength(PCQueue Q)
 {
-  return Q->len;
+  return PCQueue_CmiMemoryAtomicLoad(Q->len, std::memory_order_acquire);
 }
 
 static char *PCQueueTop(PCQueue Q)
 {
   CircQueue circ; int pull; char *data;
 
-    if (std::atomic_load_explicit(&Q->len, std::memory_order_relaxed) == 0) return 0;
+    if (PCQueue_CmiMemoryAtomicLoad(Q->len, std::memory_order_relaxed) == 0) return 0;
 #if CMK_PCQUEUE_LOCK
     CmiLock(Q->lock);
 #endif
     circ = Q->head;
     pull = circ->pull;
-    data = std::atomic_load_explicit(&(circ->data[pull]), std::memory_order_acquire);
+    data = PCQueue_CmiMemoryAtomicLoad(circ->data[pull], std::memory_order_acquire);
 
 #if CMK_PCQUEUE_LOCK
       CmiUnlock(Q->lock);
@@ -212,20 +167,16 @@ static char *PCQueuePop(PCQueue Q)
 {
   CircQueue circ; int pull; char *data;
 
-    if (std::atomic_load_explicit(&Q->len, std::memory_order_relaxed) == 0) return 0;
+    if (PCQueue_CmiMemoryAtomicLoad(Q->len, std::memory_order_relaxed) == 0) return 0;
 #if CMK_PCQUEUE_LOCK
     CmiLock(Q->lock);
 #endif
     circ = Q->head;
     pull = circ->pull;
-    data = std::atomic_load_explicit(&(circ->data[pull]), std::memory_order_acquire);
+    data = PCQueue_CmiMemoryAtomicLoad(circ->data[pull], std::memory_order_acquire);
 
 
-#if XT3_ONLY_PCQUEUE_WORKAROUND
-    if (data && (Q->len > 0)) {
-#else
     if (data) {
-#endif
       circ->pull = (pull + 1);
       circ->data[pull] = 0;
       if (pull == PCQueueSize - 1) { /* just pulled the data from the last slot
@@ -235,13 +186,12 @@ static char *PCQueuePop(PCQueue Q)
         Q->head = circ-> next; /* next buffer must exist, because "Push"  */
         CmiAssert(Q->head != NULL);
 
-	/* FreeCircQueueStruct(circ); */
         free(circ);
 
 	/* links in the next buffer *before* filling */
                                /* in the last slot. See below. */
       }
-      PCQueue_CmiMemoryAtomicDecrement(Q->len);
+      PCQueue_CmiMemoryAtomicDecrement(Q->len, std::memory_order_release);
 #if CMK_PCQUEUE_LOCK
       CmiUnlock(Q->lock);
 #endif
@@ -285,13 +235,7 @@ static void PCQueuePush(PCQueue Q, char *data)
     /* this way, the next buffer is linked in before data is filled in
        in the last slot of this buffer */
 
-#if !XT3_PCQUEUE_HACK
     circ = (CircQueue)calloc(1, sizeof(struct CircQueueStruct));
-#else
-    circ = (CircQueue)malloc(sizeof(struct CircQueueStruct));
-    circ = (CircQueue)memset(circ, 0, sizeof(struct CircQueueStruct));
-#endif
-    /* MallocCircQueueStruct(circ); */
 
 #ifdef PCQUEUE_MULTIQUEUE
     PCQueue_CmiMemoryWriteFence();
@@ -300,9 +244,9 @@ static void PCQueuePush(PCQueue Q, char *data)
     Q->tail->next = circ;
     Q->tail = circ;
   }
-  
-  std::atomic_store_explicit(&circ1->data[push], data, std::memory_order_release);
-  std::atomic_fetch_add_explicit(&(Q->len), 1, std::memory_order_relaxed);
+
+  PCQueue_CmiMemoryAtomicStore(circ1->data[push], data, std::memory_order_release);
+  PCQueue_CmiMemoryAtomicIncrement(Q->len, std::memory_order_relaxed);
 
 #if CMK_PCQUEUE_LOCK || CMK_PCQUEUE_PUSH_LOCK
   CmiUnlock(Q->lock);
@@ -325,9 +269,10 @@ typedef struct PCQueueStruct
   char** tail; /*pointing to the last element*/
 #if CMK_SMP
   char _pad2[CMI_CACHE_LINE_SIZE - sizeof(char**)]; // align to cache line
-#endif
-
+  std::atomic<int> len;
+#else
   int  len;
+#endif
 #if CMK_SMP
   char _pad3[CMI_CACHE_LINE_SIZE - sizeof(int)]; // align to cache line
 #endif
@@ -370,13 +315,12 @@ static void PCQueueDestroy(PCQueue Q)
 
 static int PCQueueEmpty(PCQueue Q)
 {
-  return (Q->len == 0);
+  return (PCQueue_CmiMemoryAtomicLoad(Q->len, std::memory_order_acquire) == 0);
 }
 
-//not a thread-safe call
 static int PCQueueLength(PCQueue Q)
 {
-  return Q->len;
+  return PCQueue_CmiMemoryAtomicLoad(Q->len, std::memory_order_acquire);
 }
 static char *PCQueueTop(PCQueue Q)
 {
@@ -418,7 +362,7 @@ static char *PCQueuePop(PCQueue Q)
       if (Q->head == (char **)Q->bufEnd ) { 
 	Q->head = (char **)Q->data;
       }
-      PCQueue_CmiMemoryAtomicDecrement(Q->len);
+      PCQueue_CmiMemoryAtomicDecrement(Q->len, std::memory_order_release);
 
     }
 
@@ -463,7 +407,7 @@ static void PCQueuePush(PCQueue Q, char *data)
   }
 #endif
 
-  PCQueue_CmiMemoryAtomicIncrement(Q->len);
+  PCQueue_CmiMemoryAtomicIncrement(Q->len, std::memory_order_release);
 
 #if CMK_PCQUEUE_LOCK || CMK_PCQUEUE_PUSH_LOCK
   CmiUnlock(Q->lock);
