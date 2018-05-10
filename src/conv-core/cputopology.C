@@ -235,12 +235,28 @@ static int _noip = 0;
 
 using namespace CpuTopoDetails;
 
+static void printTopology(int numNodes)
+{
+  // assume all nodes have same number of cores
+  const int ways = CmiNumCores();
+  if (ways > 1)
+    CmiPrintf("Charm++> Running on %d hosts (%d sockets x %d cores x %d PUs = %d-way SMP)\n",
+              numNodes, CmiHwlocTopologyLocal.num_sockets,
+              CmiHwlocTopologyLocal.num_cores / CmiHwlocTopologyLocal.num_sockets,
+              CmiHwlocTopologyLocal.num_pus / CmiHwlocTopologyLocal.num_cores,
+              ways);
+  else
+    CmiPrintf("Charm++> Running on %d hosts\n", numNodes);
+
+  if (ways != CmiHwlocTopologyLocal.num_pus)
+    CmiPrintf("Charm++> Warning: Internally-determined PU count does not match hwloc's result!\n");
+}
+
 /* called on PE 0 */
 static void cpuTopoHandler(void *m)
 {
   _procInfo *rec;
   hostnameMsg *msg = (hostnameMsg *)m;
-  char str[256];
   int tag, tag1, pe;
 
   if (topomsg == NULL) {
@@ -276,13 +292,8 @@ static void cpuTopoHandler(void *m)
     rec->rank ++;
   }
 
-    // assume all nodes have same number of cores
-  int ncores = CmiNumCores();
-  if (ncores > 1)
-    sprintf(str, "Charm++> Running on %d unique compute nodes (%d-way SMP).\n", CmmEntries(hostTable), ncores);
-  else
-    sprintf(str, "Charm++> Running on %d unique compute nodes.\n", CmmEntries(hostTable));
-  CmiPrintf(str);
+  printTopology(CmmEntries(hostTable));
+
     // clean up CmmTable
   hostnameMsg *tmpm;
   tag = CmmWildCard;
@@ -514,7 +525,7 @@ extern "C" void LrtsInitCpuTopo(char **argv)
       cpuTopo.nodeIDs[i] = nid;
     }
     cpuTopo.sort();
-    if (CmiMyPe()==0)  CmiPrintf("Charm++> Running on %d unique compute nodes (%d-way SMP).\n", cpuTopo.numNodes, CmiNumCores());
+    if (CmiMyPe()==0) printTopology(cpuTopo.numNodes);
   }
   CmiNodeAllBarrier();
 #elif CMK_CRAYXE || CMK_CRAYXC
@@ -543,7 +554,7 @@ extern "C" void LrtsInitCpuTopo(char **argv)
 	cpuTopo.nodeIDs[i] = nid;
     }
     cpuTopo.sort();
-    if (CmiMyPe()==0)  CmiPrintf("Charm++> Running on %d unique compute nodes (%d-way SMP).\n", cpuTopo.numNodes, CmiNumCores());
+    if (CmiMyPe()==0) printTopology(cpuTopo.numNodes);
   }
   CmiNodeAllBarrier();
 
