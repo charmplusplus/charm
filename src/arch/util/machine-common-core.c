@@ -1353,12 +1353,13 @@ if (  MSG_STATISTIC)
 
     if (_Cmi_mynode==0) {
 #if !CMK_SMP 
-      if (!quietMode) printf("Charm++> Running in non-SMP mode: numPes %d\n",_Cmi_numnodes);
+      if (!quietMode) printf("Charm++> Running in non-SMP mode: %d processes (PEs)\n", _Cmi_numnodes);
       MACHSTATE1(4,"running nonsmp %d", _Cmi_mynode)
 #else
 
 #if !CMK_MULTICORE
-      if (!quietMode) printf("Charm++> Running in SMP mode: numNodes %d,  %d worker threads per process\n", CmiNumNodes(),_Cmi_mynodesize);
+      if (!quietMode) printf("Charm++> Running in SMP mode: %d processes, %d worker threads (PEs) + %c comm threads per process, %d PEs total\n",
+                             CmiNumNodes(), _Cmi_mynodesize, Cmi_smp_mode_setting == COMM_THREAD_NOT_EXIST ? '0' : '1', CmiNumPes());
       if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV) {
         if (!quietMode) printf("Charm++> The comm. thread both sends and receives messages\n");
       } else if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV) {
@@ -1371,7 +1372,7 @@ if (  MSG_STATISTIC)
         CmiAbort("Charm++> Invalid SMP mode setting\n");
       }
 #else
-      if (!quietMode) printf("Charm++> Running in Multicore mode:  %d threads\n", _Cmi_mynodesize);
+      if (!quietMode) printf("Charm++> Running in Multicore mode: %d threads (PEs)\n", _Cmi_mynodesize);
 #endif
       
 #endif
