@@ -199,19 +199,6 @@ protected:
     // flush log buffer immediately
     virtual void traceFlushLog() {}
 
-    //for tracing function calls
-    virtual void regFunc(const char *name, int &idx, int idxSpecifiedByUser=0) {
-      (void)name; (void)idx; (void)idxSpecifiedByUser;
-    }
-    virtual void beginFunc(const char *name,const char *file,int line) {
-      (void)name; (void)file; (void)line;
-    }
-    virtual void beginFunc(int idx,const char *file,int line) {
-      (void)idx; (void)file; (void)line;
-    }
-    virtual void endFunc(const char *name) { (void)name; }
-    virtual void endFunc(int idx) { (void)idx; }
-
     /* Memory tracing */
     virtual void malloc(void *where, int size, void **stack, int stackSize) {
       (void)where; (void)size; (void)stack; (void)stackSize;
@@ -357,12 +344,6 @@ public:
     void traceCommSetMsgID(char *msg)  { ALLDO(traceCommSetMsgID(msg)); }
     void traceGetMsgID(char *msg, int *pe, int *event) { ALLDO(traceGetMsgID(msg, pe, event)); }
     void traceSetMsgID(char *msg, int pe, int event) { ALLDO(traceSetMsgID(msg, pe, event)); }
-    /*Calls for tracing function begins and ends*/
-    inline void regFunc(const char *name, int &idx, int idxSpecifiedByUser=0){ ALLDO(regFunc(name, idx, idxSpecifiedByUser)); }
-    inline void beginFunc(const char *name,const char *file,int line){ ALLDO(beginFunc(name,file,line)); };
-    inline void beginFunc(int idx,const char *file,int line){ ALLDO(beginFunc(idx,file,line)); };
-    inline void endFunc(const char *name){ ALLDO(endFunc(name)); }
-    inline void endFunc(int idx){ ALLDO(endFunc(idx)); }
 
     /* Phase Demarcation */
     inline void endPhase() { ALLDO(endPhase()); }

@@ -53,11 +53,6 @@ void traceWriteSts(void) {}
 void traceFlushLog(void) {}
 int  traceAvailable(void) {return 0;}
 
-int traceRegisterFunction(const char *name, int idx) { return -1; }
-void traceBeginFuncIndexProj(int idx, const char* name, int lineNo) {}
-void traceEndFuncIndexProj(int idx) {}
-void traceBeginFuncProj(const char *name,const char *file,int line){}
-void traceEndFuncProj(const char *name){}
 void traceUserSuppliedNote(const char *note) {}
 void traceUserSuppliedData(int data) {}
 void traceUserSuppliedBracketedNote(const char *note, int eventID, double bt, double et) {}

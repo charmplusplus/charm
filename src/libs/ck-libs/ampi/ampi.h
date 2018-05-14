@@ -1452,22 +1452,8 @@ int AMPI_GPU_Invoke(workRequest *to_call);
 /* Execute this shell command (just like "system()") */
 int AMPI_System(const char *cmd);
 
-extern int traceRegisterFunction(const char *name, int idx);
-extern void traceBeginFuncProj(const char *, const char *, int);
-extern void traceEndFuncProj(const char *);
-extern void traceBeginFuncIndexProj(int, const char *, int);
-extern void traceEndFuncIndexProj(int);
-
 /* Determine approximate depth of stack at the point of this call */
 extern long ampiCurrentStackUsage(void);
-
-#define AMPI_Trace_register_function_id(x, id) traceRegisterFunction(x, id);
-#define AMPI_Trace_begin_function_id(id) traceBeginFuncIndexProj(id, __FILE__, __LINE__);
-#define AMPI_Trace_end_function_id(id) traceEndFuncIndexProj(id);
-
-#define AMPI_Trace_register_function_name(x) traceRegisterFunction(x, -999);
-#define AMPI_Trace_begin_function_name(name) traceBeginFuncProj(name, __FILE__, __LINE__);
-#define AMPI_Trace_end_function_name(name) traceEndFuncProj(name);
 
 #ifdef __cplusplus
 }

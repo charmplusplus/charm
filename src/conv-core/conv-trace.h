@@ -59,14 +59,6 @@ void traceSetMsgID(char *msg, int pe, int event);
 /* Support for machine layers to register their user events to projections */
 void registerMachineUserEventsFunction(void (*eventRegistrationFunc)());
 
-int traceRegisterFunction(const char*, int idx
-#ifdef __cplusplus
-=-999
-#endif
-);
-void traceBeginFuncIndexProj(int, const char* file, int);
-void traceEndFuncIndexProj(int);
-
 CMI_EXTERNC
 void traceClose(void);
 CMI_EXTERNC

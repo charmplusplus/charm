@@ -1026,11 +1026,6 @@ from disk (from the same directory where the trace logs are
 stored). This is done via the ``Load Entry Colors'' button.
 \end{itemize}
 
-Time Profile also reacts to the presence of data about AMPI
-functions (See section \ref{sec::AMPI functions}). When such data is
-detected, an extra tabbed window displays a graph similar to entry
-method profiles, but for AMPI functions only.
-
 This tool's performance is tied to the number of intervals desired by
 the user. We recommend that the user stick to visualizing 1,000
 intervals or less.
@@ -1080,44 +1075,6 @@ down by entry point.  An example is show in Figure \ref{performance counters}.
 \subsection{ Online Live Analysis}
 \input{ccs_streaming}
 \subsection{Multirun Analysis}
-
-\subsection{Function Tool}
-\label{sec::function tool}
-The Function Tool view presents a graph that is a usage profile (See
-section \ref{sec::usage profile}) of AMPI function information. This
-view allows the analyst to choose to display the time spent by each
-function or the number of calls made over the selected time range.
-
-In the case of AMPI functions, the events are properly nested. The
-information displayed is currently that of {\em inclusive time}
-(i.e. if function B's calls are nested within function A's, the time
-spent in function B contribute to both function B's and function A's
-displayed performance information). There are plans to implement the
-presentation of AMPI function information based on {\em exclusive
-time} (i.e. time within functions are computed by subtracting the
-measured time spent minus the time spent by any calls to nested
-functions).
-
-%\subsection{POSE Analysis}
-
-\subsection{AMPI Usage Profile}
-
-The AMPI Usage Profile view presents a graph similar to Function
-Tool's (See section \ref{sec::function tool}) with several
-modifications:
-
-\begin{enumerate}
-\item In it's per-processor mode, displayed via the tabbed window
-``Per Processor'', the information displayed includes the time spent
-by other events outside of AMPI. This is displayed as a white bar
-marked ``Others'' when moused-over. This allows the analyst to compare
-the time spent by events within AMPI functions along with other
-recorded events. In contrast, Function Tool shows only AMPI function
-events.
-\item In it's per-function mode, displayed via the tabbed window ``Per
-Function'', the information is displayed with each bar on the x-axis
-showing the percentage utilization for a different AMPI function.
-\end{enumerate}
 
 \subsection{Noise Miner}
 \input{View_NoiseMiner}

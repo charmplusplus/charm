@@ -508,17 +508,6 @@ void LogPool::writeSts(void)
 
 void LogPool::writeSts(TraceProjections *traceProj){
   writeSts();
-  if (traceProj != NULL) {
-    CkHashtableIterator  *funcIter = traceProj->getfuncIterator();
-    funcIter->seekStart();
-    int numFuncs = traceProj->getFuncNumber();
-    fprintf(stsfp,"TOTAL_FUNCTIONS %d \n",numFuncs);
-    while(funcIter->hasNext()) {
-      StrKey *key;
-      int *obj = (int *)funcIter->next((void **)&key);
-      fprintf(stsfp,"FUNCTION %d %s \n",*obj,key->getStr());
-    }
-  }
   fprintf(stsfp, "END\n");
   fclose(stsfp);
 }
@@ -1027,18 +1016,6 @@ void LogEntry::pup(PUP::er &p)
     case END_TRACE:
       p|itime;
       break;
-    case BEGIN_FUNC:
-	p | itime;
-	p | mIdx;
-	p | event;
-	if(!p.isUnpacking()){
-		p(fName,flen-1);
-	}
-	break;
-    case END_FUNC:
-	p | itime;
-	p | mIdx;
-	break;
     case END_PHASE:
       p|eIdx; // FIXME: actually the phase ID
       p|itime;
@@ -1724,68 +1701,6 @@ int TraceProjections::idxRegistered(int idx)
 	    return 1;
     }
     return 0;
-}
-
-void TraceProjections::regFunc(const char *name, int &idx, int idxSpecifiedByUser){
-    StrKey k(name);
-    int num = funcHashtable.get(k);
-    
-    if(num!=0) {
-	return;
-	//as for mpi programs, the same function may be registered for several times
-	//CmiError("\"%s has been already registered! Please change the name!\"\n", name);
-    }
-    
-    int isIdxExisting=0;
-    if(idxSpecifiedByUser)
-	isIdxExisting=idxRegistered(idx);
-    if(isIdxExisting){
-	return;
-	//same reason with num!=0
-	//CmiError("The identifier %d for the trace function has been already registered!", idx);
-    }
-
-    if(idxSpecifiedByUser) {
-    	StrKey newKey = StrKey(name);
-    	int &ref = funcHashtable.put(newKey);
-    	ref=idx;
-        funcCount++;
-	idxVec.push_back(idx);	
-    } else {
-    	StrKey newKey = StrKey(name);
-    	int &ref = funcHashtable.put(newKey);
-    	ref=funcCount;
-    	num = funcCount;
-    	funcCount++;
-    	idx = num;
-	idxVec.push_back(idx);
-    }
-}
-
-void TraceProjections::beginFunc(const char *name,char *file,int line){
-	StrKey k(name);
-	unsigned short  num = (unsigned short)funcHashtable.get(k);
-	beginFunc(num,file,line);
-}
-
-void TraceProjections::beginFunc(int idx,char *file,int line){
-	if(idx <= 0){
-		CmiError("Unregistered function id %d being used in %s:%d \n",idx,file,line);
-	}	
-	_logPool->add(BEGIN_FUNC,TraceTimer(),idx,line,file);
-}
-
-void TraceProjections::endFunc(const char *name){
-	StrKey k(name);
-	int num = funcHashtable.get(k);
-	endFunc(num);	
-}
-
-void TraceProjections::endFunc(int num){
-	if(num <= 0){
-		printf("endFunc without start :O\n");
-	}
-	_logPool->add(END_FUNC,TraceTimer(),num,0,NULL);
 }
 
 // specialized PUP:ers for handling trace projections logs

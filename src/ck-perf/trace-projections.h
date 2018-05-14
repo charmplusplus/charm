@@ -480,8 +480,6 @@ private:
     int funcCount;
     int currentPhaseID;
 
-    CkHashtableT<StrKey,int> funcHashtable;
-
     CkQ<NestedEvent> nestedEvents;
     
     LogEntry* lastPhaseEvent;
@@ -547,15 +545,6 @@ public:
     void traceGetMsgID(char *msg, int *pe, int *event);
     void traceSetMsgID(char *msg, int pe, int event);
     void traceFlushLog() { _logPool->flushLogBuffer(); }
-
-    //functions that perform function tracing
-    CkHashtableIterator *getfuncIterator(){return funcHashtable.iterator();};
-    int getFuncNumber(){return funcHashtable.numObjects();};
-    void regFunc(const char *name, int &idx, int idxSpecifiedByUser=0);
-    void beginFunc(const char *name,char *file,int line);
-    void beginFunc(int idx,char *file,int line);
-    void endFunc(const char *name);
-    void endFunc(int num);
 
     /* start recognizing phases in trace-projections */
     /* _TRACE_END_PHASE must be called collectively on all processors */

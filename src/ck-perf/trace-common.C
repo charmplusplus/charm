@@ -885,47 +885,6 @@ void TraceArray::creationMulticast(envelope *env, int ep, int num,
     ALLDO(creationMulticast(env, ep, num, pelist));
 }
 
-/*
-extern "C" 
-void registerFunction(const char *name){
-	_TRACE_ONLY(CkpvAccess(_traces)->regFunc(name));
-}
-*/
-
-extern "C"
-int traceRegisterFunction(const char* name, int idx) {
-#if CMK_TRACE_ENABLED
-  if(idx==-999){
-    CkpvAccess(_traces)->regFunc(name, idx);
-  } else {
-    CkpvAccess(_traces)->regFunc(name, idx, 1);
-  }
-  return idx;
-#else
-  return 0;
-#endif
-}
-
-extern "C" 
-void traceBeginFuncProj(const char *name,const char *file,int line){
-	 _TRACE_ONLY(CkpvAccess(_traces)->beginFunc(name,file,line));
-}
-
-extern "C"
-void traceBeginFuncIndexProj(int idx,const char *file,int line){
-	 _TRACE_ONLY(CkpvAccess(_traces)->beginFunc(idx,file,line));
-}
-
-extern "C" 
-void traceEndFuncProj(const char *name){
-	 _TRACE_ONLY(CkpvAccess(_traces)->endFunc(name));
-}
-
-extern "C" 
-void traceEndFuncIndexProj(int idx){
-	 _TRACE_ONLY(CkpvAccess(_traces)->endFunc(idx));
-}
-
 #if CMK_SMP_TRACE_COMMTHREAD
 extern "C"
 int traceBeginCommOp(char *msg){

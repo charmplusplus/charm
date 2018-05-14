@@ -46,9 +46,6 @@
 
 #define  CREATION_MULTICAST 21
 
-#define	 BEGIN_FUNC         22
-#define	 END_FUNC           23
-
 /* Memory tracing */
 #define  MEMORY_MALLOC      24
 #define  MEMORY_FREE        25

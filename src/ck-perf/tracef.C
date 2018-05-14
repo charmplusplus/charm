@@ -33,9 +33,6 @@ FDECL {
 #define ftraceuserbracketevent   FTN_NAME(FTRACEUSERBRACKETEVENT, ftraceuserbracketevent)
 #define ftraceUserEvent   	 FTN_NAME(FTRACEUSEREVENT, ftraceuserevent)
 #define ftraceFlushLog   	 FTN_NAME(FTRACEFLUSHLOG, ftraceflushlog)
-#define ftraceRegisterFunc	 FTN_NAME(FTRACEREGISTERFUNC,ftraceregisterfunc) 
-#define ftraceBeginFunc		 FTN_NAME(FTRACEBEGINFUNC,ftracebeginfunc)
-#define ftraceEndFunc		 FTN_NAME(FTRACEENDFUNC,ftraceendfunc)
 
 #define fbgprintf		 FTN_NAME(FBGPRINTF, fbgprintf)
 
@@ -87,20 +84,6 @@ void ftraceUserEvent(int *e)
 void ftraceFlushLog()
 {
   traceFlushLog();
-}
-
-void ftraceRegisterFunc(char *name,int *outIdx,int lenName){
-	char *newstr = FortrantoCString(name,lenName);
-	*outIdx = traceRegisterFunction(newstr);
-	delete [] newstr;
-}
-
-void ftraceBeginFunc(int *idx){
-	traceBeginFuncIndexProj(*idx,(char*)"FORTRAN",0);
-}
-
-void ftraceEndFunc(int *idx){
-	traceEndFuncIndexProj(*idx);
 }
 
 #if CMK_BIGSIM_CHARM
