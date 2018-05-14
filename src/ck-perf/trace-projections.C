@@ -334,24 +334,7 @@ void LogPool::createSts(const char *fix)
     CmiAbort("Error!!\n");
   }
   delete[] fname;
-}  
-
-void LogPool::createTopo(const char *fix)
-{
-  CkAssert(CkMyPe() == 0);
-  // create the topo file
-  char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(fix)+strlen(".topo")+2];
-  sprintf(fname, "%s%s.topo", CkpvAccess(traceRoot), fix);
-  do
-    {
-      topofp = fopen(fname, "w");
-    } while (!stsfp && (errno == EINTR || errno == EMFILE));
-  if(stsfp==0){
-    CmiPrintf("Cannot open projections topo file for writing due to %s\n", strerror(errno));
-    CmiAbort("Error!!\n");
-  }
-  delete[] fname;
-}  
+}
 
 void LogPool::createRC()
 {
@@ -558,13 +541,6 @@ void LogPool::writeRC(void)
     */
 #endif //PROJ_ANALYSIS
   fclose(rcfp);
-}
-
-void LogPool::writeTopo(void)
-{
-  TopoManager tmgr;
-  tmgr.printAllocation(topofp);
-  fclose(topofp);
 }
 
 void LogPool::writeStatis(void)
@@ -1137,7 +1113,6 @@ TraceProjections::TraceProjections(char **argv):
   if (CkMyPe() == 0) {
     _logPool->createSts();
     _logPool->createRC();
-    _logPool->createTopo();
   }
   funcCount=1;
 
@@ -1239,7 +1214,6 @@ void TraceProjections::traceClose(void)
   if(CkMyPe()==0){
     _logPool->writeSts(this);
     _logPool->writeRC();
-    _logPool->writeTopo();
   }
   CkpvAccess(_trace)->endComputation();
   delete _logPool;              // will write
@@ -1278,7 +1252,6 @@ void TraceProjections::closeTrace() {
     // CkPrintf("Pe 0 will now write sts and projrc files\n");
     _logPool->writeSts(this);
     _logPool->writeRC();
-    _logPool->writeTopo();
     // CkPrintf("Pe 0 has now written sts and projrc files\n");
 
     CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);

@@ -270,7 +270,6 @@ class LogPool {
     FILE *deltafp;
     FILE *stsfp;
     FILE *rcfp;
-    FILE *topofp;
     FILE *statisfp;
     char *fname;
     char *dfname;
@@ -327,7 +326,6 @@ class LogPool {
 #endif
     void createFile(const char *fix="");
     void createSts(const char *fix="");
-    void createTopo(const char *fix="");
     void createRC();
     void openLog(const char *mode);
     void closeLog(void);
@@ -336,7 +334,6 @@ class LogPool {
     void writeSts(void);
     void writeSts(TraceProjections *traceProj);
     void writeRC(void);
-    void writeTopo();
     void writeStatis();
     void initializePhases() {
       keepPhase = new bool[numPhases];
