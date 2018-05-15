@@ -77,7 +77,8 @@ static int CmiNodesDim;
 /* ###End of Broadcast related definitions ### */
 
 #if CMK_SMP_TRACE_COMMTHREAD
-extern double TraceTimerCommon(void);
+CMI_EXTERNC
+double TraceTimerCommon(void);
 #endif
 
 static void handleOneBcastMsg(int size, char *msg);
