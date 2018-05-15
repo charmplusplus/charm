@@ -116,9 +116,9 @@ void Template::setExtern(int e) {
 }
 
 void Template::genVars(XStr& str) {
-  str << " < ";
+  str << " <";
   if (tspec) tspec->genShort(str);
-  str << " > ";
+  str << "> ";
 }
 
 void Template::genSpec(XStr& str, bool printDefault) {

@@ -261,7 +261,7 @@ static void disambig_proxy(XStr& str, const XStr& super) {
 XStr Chare::virtualPupDef(const XStr& name) {
   XStr str;
   str << "virtual_pup(PUP::er &p) {"
-      << "\n    recursive_pup<" << name << " >(dynamic_cast<" << name << "* >(this), p);"
+      << "\n    recursive_pup<" << name << ">(dynamic_cast<" << name << "*>(this), p);"
       << "\n}";
   return str;
 }
@@ -836,7 +836,7 @@ void Chare::genDefs(XStr& str) {
         << "\n  void " << virtualPupDef(baseName(true))
         << "\n  void parent_pup(PUP::er &p) {";
     for (TypeList* t = b; t; t = t->next) {
-      str << "\n    recursive_pup< " << t->type << " >(this, p);";
+      str << "\n    recursive_pup<" << t->type << ">(this, p);";
     }
     str << "\n    p|thisProxy;"
         << "\n  }"

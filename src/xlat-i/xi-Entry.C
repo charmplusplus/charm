@@ -281,9 +281,9 @@ XStr Entry::epStr(bool isForRedn, bool templateCall) {
     str << "marshall" << entryCount;
 
   if (tspec && templateCall) {
-    str << "< ";
+    str << "<";
     tspec->genShort(str);
-    str << " >";
+    str << ">";
   }
 
   return str;
@@ -463,7 +463,7 @@ void Entry::genArrayDecl(XStr& str) {
         pl = pl->next;
       }
       if (tspec || fwdNum > 1) {
-        str << "    template < ";
+        str << "    template <";
         if (tspec) {
           tspec->genLong(str);
           if (fwdNum > 1)
@@ -471,7 +471,7 @@ void Entry::genArrayDecl(XStr& str) {
         }
         if (fwdNum > 1)
           str << fwdStr;
-        str << " >\n";
+        str << ">\n";
       }
       str << "    " << retType << " " << name << "(" << paramType(1, 1, 0, 1) << ") ;\n";
     } else if (isLocal()) {
@@ -521,7 +521,7 @@ void Entry::genArrayDefs(XStr& str) {
         pl = pl->next;
       }
       if (fwdNum > 1)
-        str << "template < " << fwdStr << " >\n";
+        str << "template <" << fwdStr << ">\n";
       str << makeDecl(retStr, 1) << "::" << name << "(" << paramType(0, 1, 0, 1) << ") \n";
     } else if (isLocal())
       str << makeDecl(retStr, 1) << "::" << name << "(" << paramType(0, 1, 0) << ") \n";
@@ -555,9 +555,9 @@ void Entry::genArrayDefs(XStr& str) {
       if (!retType->isVoid()) inlineCall << retType << " retValue = ";
       inlineCall << "obj->" << (tspec ? "template " : "") << name;
       if (tspec) {
-        inlineCall << "< ";
+        inlineCall << "<";
         tspec->genShort(inlineCall);
-        inlineCall << " >";
+        inlineCall << ">";
       }
       inlineCall << "(";
       param->unmarshallForward(inlineCall, true);
@@ -988,8 +988,8 @@ XStr Entry::dataItemType() {
   if (container->isGroup()) {
     itemType << param->param->type;
   } else if (container->isArray()) {
-    itemType << "ArrayDataItem< " << param->param->type << ", " << aggregatorIndexType()
-             << " >";
+    itemType << "ArrayDataItem<" << param->param->type << ", " << aggregatorIndexType()
+             << ">";
   }
   return itemType;
 }
@@ -999,12 +999,12 @@ XStr Entry::aggregatorType() {
   if (container->isGroup()) {
     groupType << "GroupMeshStreamer<" << param->param->type << ", "
               << container->baseName() << ", SimpleMeshRouter"
-              << ", " << container->indexName() << "::_callmarshall_" << epStr() << " >";
+              << ", " << container->indexName() << "::_callmarshall_" << epStr() << ">";
   } else if (container->isArray()) {
     groupType << "ArrayMeshStreamer<" << param->param->type << ", "
               << aggregatorIndexType() << ", " << container->baseName() << ", "
               << "SimpleMeshRouter, " << container->indexName() << "::_callmarshall_"
-              << epStr() << " >";
+              << epStr() << ">";
   }
   return groupType;
 }
@@ -1015,12 +1015,12 @@ XStr Entry::aggregatorGlobalType(XStr& scope) {
     groupType << "GroupMeshStreamer<" << param->param->type << ", " << scope
               << container->baseName() << ", SimpleMeshRouter"
               << ", " << scope << container->indexName() << "::_callmarshall_" << epStr()
-              << " >";
+              << ">";
   } else if (container->isArray()) {
     groupType << "ArrayMeshStreamer<" << param->param->type << ", "
               << aggregatorIndexType() << ", " << scope << container->baseName() << ", "
               << "SimpleMeshRouter, " << scope << container->indexName()
-              << "::_callmarshall_" << epStr() << " >";
+              << "::_callmarshall_" << epStr() << ">";
   }
   return groupType;
 }
@@ -1122,7 +1122,7 @@ void Entry::genTramInstantiation(XStr& str) {
 
 XStr Entry::tramBaseType() {
   XStr baseTypeString;
-  baseTypeString << "MeshStreamer<" << dataItemType() << ", SimpleMeshRouter >";
+  baseTypeString << "MeshStreamer<" << dataItemType() << ", SimpleMeshRouter>";
 
   return baseTypeString;
 }
@@ -1130,7 +1130,7 @@ XStr Entry::tramBaseType() {
 void Entry::genTramRegs(XStr& str) {
   if (isTramTarget()) {
     XStr messageTypeString;
-    messageTypeString << "MeshStreamerMessage< " << dataItemType() << " >";
+    messageTypeString << "MeshStreamerMessage<" << dataItemType() << ">";
 
     XStr baseTypeString = tramBaseType();
 
@@ -1218,7 +1218,7 @@ void Entry::genPythonDefs(XStr& str) {
     str << "  PythonObject *pythonObj = (PythonObject "
            "*)PyLong_AsVoidPtr(PyDict_GetItemString(dict,\"__charmObject__\"));\n";
     str << "  " << container->baseName() << " *object = static_cast<"
-        << container->baseName() << " *>(pythonObj);\n";
+        << container->baseName() << "*>(pythonObj);\n";
     str << "  object->pyWorkers[pyNumber].arg=arg;\n";
     str << "  object->pyWorkers[pyNumber].result=&CtvAccess(pythonReturnValue);\n";
     str << "  object->pyWorkers[pyNumber].pythread=PyThreadState_Get();\n";
@@ -2432,9 +2432,9 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
     } else {  // Regular entry method: call "obj->bar(parameters)"
       str << "  impl_obj->" << (tspec ? "template " : "") << (containsWhenConstruct ? "_sdag_fnc_" : "" ) << name;
       if (tspec) {
-        str << "< ";
+        str << "<";
         tspec->genShort(str);
-        str << " >";
+        str << ">";
       }
     }
 
@@ -2667,7 +2667,7 @@ void Entry::genDefs(XStr& str) {
   // variable warning otherwise
   if (!isMigrationConstructor()) {
     str << "  " << container->baseName() << "* impl_obj = static_cast<"
-        << container->baseName() << " *>(impl_obj_void);\n";
+        << container->baseName() << "*>(impl_obj_void);\n";
   }
   if (!isLocal()) {
     if (isThreaded()) str << callThread(epStr());
@@ -2693,8 +2693,8 @@ void Entry::genDefs(XStr& str) {
   if (hasCallMarshall) {
     str << makeDecl("int") << "::_callmarshall_" << epStr()
         << "(char* impl_buf, void* impl_obj_void) {\n";
-    str << "  " << containerType << "* impl_obj = static_cast< " << containerType
-        << " *>(impl_obj_void);\n";
+    str << "  " << containerType << "* impl_obj = static_cast<" << containerType
+        << "*>(impl_obj_void);\n";
     if (!isLocal()) {
       if (!param->hasConditional()) {
         genCall(str, preCall, false, true);
@@ -2808,9 +2808,9 @@ void Entry::genReg(XStr& str) {
 
   if (external) {
     str << "  CkIndex_" << label << "::idx_" << name;
-    if (targs) str << "< " << targs << " >";
-    str << "( static_cast< " << retType << " (" << label << "::*)(" << paramType(0, 0)
-        << ") >(NULL) );\n";
+    if (targs) str << "<" << targs << ">";
+    str << "( static_cast<" << retType << " (" << label << "::*)(" << paramType(0, 0)
+        << ")>(NULL) );\n";
     return;
   }
 

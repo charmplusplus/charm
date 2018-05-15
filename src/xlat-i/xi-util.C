@@ -176,9 +176,9 @@ XStr generateTemplateSpec(TVarList* tspec, bool printDefault) {
   XStr str;
 
   if (tspec) {
-    str << "template < ";
+    str << "template <";
     tspec->genLong(str, printDefault);
-    str << " > ";
+    str << "> ";
   }
 
   return str;

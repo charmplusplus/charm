@@ -242,7 +242,7 @@ void ParamList::marshall(XStr& str, XStr& entry) {
     // Now that we know the size, allocate the packing buffer
     if (hasConditional())
       str << "  MarshallMsg_" << entry << " *impl_msg=CkAllocateMarshallMsgT<MarshallMsg_"
-          << entry << " >(impl_off,impl_e_opts);\n";
+          << entry << ">(impl_off,impl_e_opts);\n";
     else
       str << "  CkMarshallMsg *impl_msg=CkAllocateMarshallMsg(impl_off,impl_e_opts);\n";
     // Second pass: write the data

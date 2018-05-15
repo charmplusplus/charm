@@ -32,40 +32,40 @@ void NamedType::genProxyName(XStr& str, forWhom forElement) {
   if (scope) str << scope;
   str << prefix;
   str << name;
-  if (tparams) str << "<" << tparams << " >";
+  if (tparams) str << "<" << tparams << ">";
 }
 
 void NamedType::print(XStr& str) {
   if (useTypename) str << "typename ";
   if (scope) str << scope;
   str << name;
-  if (tparams) str << "<" << tparams << " >";
+  if (tparams) str << "<" << tparams << ">";
 }
 
 void NamedType::genIndexName(XStr& str) {
   if (scope) str << scope;
   str << Prefix::Index;
   str << name;
-  if (tparams) str << "<" << tparams << " >";
+  if (tparams) str << "<" << tparams << ">";
 }
 
 void NamedType::genMsgProxyName(XStr& str) {
   if (scope) str << scope;
   str << Prefix::Message;
   str << name;
-  if (tparams) str << "<" << tparams << " >";
+  if (tparams) str << "<" << tparams << ">";
 }
 
 void NamedEllipsisType::print(XStr& str) {
   if (scope) str << scope;
   str << nameWithEllipsis;
-  if (tparams) str << "<" << tparams << " >";
+  if (tparams) str << "<" << tparams << ">";
 }
 
 void NamedEllipsisType::printWithoutEllipsis(XStr& str) {
   if (scope) str << scope;
   str << name;
-  if (tparams) str << "<" << tparams << " >";
+  if (tparams) str << "<" << tparams << ">";
 }
 
 void PtrType::print(XStr& str) {
