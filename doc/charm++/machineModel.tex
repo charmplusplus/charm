@@ -37,28 +37,35 @@ private caches between them. Each chip may contain multiple cores, and
 each core may support multiple hardware threads (SMT for example).
 
 \charmpp{} recognizes two logical entities: a PE (processing element) and 
-a ``node''.   In a \charmpp{} program, a PE is a
+a logical node, or simply ``node''. In a \charmpp{} program, a PE is a
 unit of mapping and scheduling: each PE has a scheduler with an
 associated pool of messages. Each chare is assumed to reside on one PE
-at a time. Depending on the runtime command-line parameters, a PE may
-be associated with a subset of cores or hardware threads. One or more PEs
-make up of a logical ``node'', the unit that one may partition a physical node
-into. In the implementation, a separate
-process exists for each logical node and all PEs within the logical node share
-the same memory address space. The \charmpp{} runtime system optimizes
-communication within a logical node by using shared memory. 
-%one may partition a
-%physical node into one or more logical nodes. What \charmpp{} calls a
-%``node'' is this logical node. 
+at a time. A logical node is implemented as an OS process. In non-SMP mode
+there is no distinction between a PE and a logical node. Otherwise, a PE takes
+the form of an OS thread, and a logical node may contain one or more PEs.
+Physical nodes may be partitioned into one or more logical nodes. Since PEs
+within a logical node share the same memory address space, the \charmpp{}
+runtime system optimizes communication between them by using shared memory.
+Depending on the runtime command-line parameters, a PE may optionally
+be associated with a subset of cores or hardware threads.
 
-For example, on a machine with 16-core nodes, where each core has two
-hardware threads, one may launch a \charmpp{} program with one or multiple
-(logical) nodes per physical node. One may choose 32 PEs per (logical) node,
-and one logical node per physical node. Alternatively, one can launch
-it with 12 PEs per logical node, and 1 logical node per physical
-node. One can also choose to partition the physical node, and launch
-it with 4 logical nodes per physical node (for example), and 4 PEs per
-node. It is not a general practice in \charmpp{} to oversubscribe the underlying
+A \charmpp{} program can be launched with one or more
+(logical) nodes per physical node. For example, on a machine with a four-core
+processor, where each core has two hardware threads, common configurations in
+non-SMP mode would be one node per core (four nodes/PEs total) or one node per
+hardware thread (eight nodes/PEs total). In SMP mode, the most common choice to
+fully subscribe the physical node would be one logical node containing
+{\em seven} PEs--one OS thread is set aside per process for network
+communications. (When built in the ``multicore'' mode that lacks network
+support, a comm thread is unnecessary, and eight PEs can be used in this case.
+A comm thread is also omitted when using some high-performance network layers
+such as PAMI.)
+Alternatively, one can choose to partition the physical node into multiple
+logical nodes, each containing multiple PEs. One example would be {\em three}
+PEs per logical node and two logical nodes per physical node, again reserving
+a comm thread per logical node.
+
+It is not a general practice in \charmpp{} to oversubscribe the underlying
 physical cores or hardware threads on each node. In other words, a
 \charmpp{} program is usually not launched with more PEs than there
 are physical cores or hardware threads allocated to it. More information about

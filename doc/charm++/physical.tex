@@ -1,19 +1,25 @@
 
-The following calls provide information about the mapping of physical hardware to
- the logical processing elements(PE) in Charm++.
-A processing element (PE) refers to a single unit of mapping and scheduling,
-whereas a physical node refers to an actual hardware node 
-(or, more precisely, an operating system instance on which Charm++ processes execute,
- or, in networking terminology, a host).
+The following calls provide information about the division and mapping of
+physical hardware in Charm++.
+A processing element (PE) is a unit of mapping and scheduling, which takes the
+form of an OS thread in SMP mode and an OS process in non-SMP mode.
+A logical node (often shortened to ``node'') refers to an OS process: a set of
+one or more PEs that share memory (i.e. an address space).
+A physical node refers to an individual hardware machine (or, more precisely,
+an operating system instance on which Charm++ processes execute, or, in
+networking terminology, a host).
 
+Communication between PEs on the same logical node is faster than communication
+between different logical nodes because OS threads share the same address
+space and can directly interact through shared memory.
+Communication between PEs on the same {\em physical} node may also be faster
+than between different physical nodes depending on the availability of OS
+features such as POSIX shared memory and Cross Memory Attach, the abilities of
+the network interconnect in use, and the speed of network loopback.
 
-Note that a physical node is different from a logical node. A logical node is a set of processing elements that share
-one or more PEs. One may partition a physical node into multiple logical nodes.
-In the implementation, a separate process exists for each logical node and all PEs within the logical node
- share the same memory address space.
-In theory, communication between PEs in the same physical node is faster than communication
- between different physical nodes, since various interconnect layers can be bypassed.
-PEs are ranked in range 0 to {\em CmiNumPes()}.
+PEs are ranked in the range 0 to {\em CmiNumPes()}. Likewise, logical nodes are
+ranked from 0 to {\em CmiNumNodes()}, and physical nodes are ranked from 0 to
+{\em CmiNumPhysicalNodes()}.
 
 %\section{Physical Node API}
 

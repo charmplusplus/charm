@@ -1,9 +1,11 @@
 The following calls provide information about the machine upon which the
-parallel program is executed. A processing element (PE) refers to a single CPU,
-whereas a node refers to a single machine -- a set of processing elements that share
-memory (i.e. an address space).  PEs and nodes are ranked separately starting
-from zero, i.e., PEs are ranked in range 0 to {\em CmiNumPes()}, and nodes are
-ranked in range 0 to {\em CmiNumNodes()}.
+parallel program is executed.
+A processing element (PE) is a unit of mapping and scheduling, which takes the
+form of an OS thread in SMP mode and an OS process in non-SMP mode.
+A node (specifically, a logical node) refers to an OS process: a set of one or
+more PEs that share memory (i.e. an address space).
+PEs and nodes are ranked separately starting from zero: PEs are ranked from 0
+to {\em CmiNumPes()}, and nodes are ranked from 0 to {\em CmiNumNodes()}.
 
 %\section{Network Topology}
 Charm++ provides a unified abstraction for querying topology of IBM's BG/L, BG/P

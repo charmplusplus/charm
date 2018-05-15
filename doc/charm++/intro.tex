@@ -77,10 +77,11 @@ pool and execute them, with the proviso that two different methods
 cannot be simultaneously executing on the same chare object (say, on
 different processors). Although one can define a reasonable
 theoretical operational semantics of \charm in this fashion, a more
-practical description of execution is useful to understand \charm: On
-each PE (``PE'' stands for a ``Processing Element''. PEs are akin to
-processor cores; see section \ref{sec:machine} for a precise
-description), there is a scheduler operating with its own private pool
+practical description of execution is useful to understand \charm.
+A \charmpp{} application's execution is distributed among Processing Elements
+(PEs), which are OS threads or processes depending on the selected \charmpp{}
+build options. (See section \ref{sec:machine} for a precise description.)
+On each PE, there is a scheduler operating with its own private pool
 of messages. Each instantiated chare has one PE which is where it
 currently resides. The pool on each PE includes messages meant for
 Chares residing on that PE, and seeds for new Chares that are
