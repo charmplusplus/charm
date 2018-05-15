@@ -235,7 +235,7 @@ static void traceCommonInit(char **argv)
 
 /** Write out the common parts of the .sts file. */
 void traceWriteSTS(FILE *stsfp,int nUserEvents) {
-  fprintf(stsfp, "MACHINE %s\n",CMK_MACHINE_NAME);
+  fprintf(stsfp, "MACHINE \"%s\"\n",CMK_MACHINE_NAME);
 #if CMK_SMP_TRACE_COMMTHREAD
   //Assuming there's only 1 comm thread now! --Chao Mei
   //considering the extra comm thread per node
@@ -251,9 +251,9 @@ void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "TOTAL_EVENTS %d\n", (int)nUserEvents);
   size_t i;
   for(i=0;i<_chareTable.size();i++)
-    fprintf(stsfp, "CHARE %d %s %d\n", (int)i, _chareTable[i]->name, _chareTable[i]->ndims);
+    fprintf(stsfp, "CHARE %d \"%s\" %d\n", (int)i, _chareTable[i]->name, _chareTable[i]->ndims);
   for(i=0;i<_entryTable.size();i++)
-    fprintf(stsfp, "ENTRY CHARE %d %s %d %d\n", (int)i, _entryTable[i]->name,
+    fprintf(stsfp, "ENTRY CHARE %d \"%s\" %d %d\n", (int)i, _entryTable[i]->name,
                  (int)_entryTable[i]->chareIdx, (int)_entryTable[i]->msgIdx);
   for(i=0;i<_msgTable.size();i++)
     fprintf(stsfp, "MESSAGE %d %u\n", (int)i, (int)_msgTable[i]->size);
