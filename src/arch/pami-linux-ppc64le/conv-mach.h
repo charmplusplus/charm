@@ -28,7 +28,8 @@
 #define CMK_TIMER_USE_RDTSC                                0
 #define CMK_TIMER_USE_PPC64                                0
 
-#define CMK_THREADS_USE_CONTEXT                            1
+#define CMK_THREADS_USE_CONTEXT                            0
+#define CMK_THREADS_USE_FCONTEXT                           1
 #define CMK_THREADS_USE_JCONTEXT                           0
 #define CMK_THREADS_USE_PTHREADS                           0
 

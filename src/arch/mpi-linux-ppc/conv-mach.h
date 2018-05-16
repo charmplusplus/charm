@@ -28,7 +28,8 @@
 #define CMK_TIMER_USE_TIMES                                0
 #define CMK_TIMER_USE_RDTSC				   0
 
-#define CMK_THREADS_USE_CONTEXT                            1
+#define CMK_THREADS_USE_CONTEXT                            0
+#define CMK_THREADS_USE_FCONTEXT                           1
 #define CMK_THREADS_USE_PTHREADS                           0
 
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
