@@ -107,7 +107,7 @@ Perfect forwarding has been implemented to allow for seamless passing of both
 lvalue and rvalue references. Note that calls with rvalue references must take
 place in the same translation unit as the .decl.h file to allow for the
 appropriate template instantiations. Alternatively, the method can be made
-templated and referenced from multiple translation units via CK_TEMPLATES_ONLY.
+templated and referenced from multiple translation units via \texttt{CK\_TEMPLATES\_ONLY}.
 An explicit instantiation of all lvalue references is provided for
 compatibility with existing code.
 If the recipient resides on a different PE, a regular
