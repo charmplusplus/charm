@@ -6,6 +6,7 @@ completion \
 fib \
 groupsection \
 hello \
+immediateEntryMethod \
 integrate \
 integratePUPable \
 integrateArray \

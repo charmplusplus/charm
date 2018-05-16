@@ -55,6 +55,7 @@ int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx,
   if (ck_ep_flags & CK_EP_INTRINSIC) e->inCharm=true;
   if (ck_ep_flags & CK_EP_TRACEDISABLE) e->traceEnabled=false;
   if (ck_ep_flags & CK_EP_APPWORK) e->appWork=true;
+  if (ck_ep_flags & CK_EP_IMMEDIATE) e->isImmediate=true;
 #if ADAPT_SCHED_MEM
   if (ck_ep_flags & CK_EP_MEMCRITICAL){
      e->isMemCritical=true;

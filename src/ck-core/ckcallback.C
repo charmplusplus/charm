@@ -281,6 +281,10 @@ void CkCallback::send(int length,const void *data) const
 */
 void CkCallback::send(void *msg) const
 {
+  // Variable is set with CK_MSG_IMMEDIATE when callback is pointing to an
+  // immediate entry method
+  int opts = 0;
+
 #if CMK_CHARMPY
   if (isCkExtReductionCb) { // callback target is external
     CkCallbackSendExt(*this, msg);
@@ -321,66 +325,68 @@ void CkCallback::send(void *msg) const
 	case sendChare: //Send message to a chare
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.chare.hasRefnum) CkSetRefNum(msg, d.chare.refnum);
-		CkSendMsg(d.chare.ep,msg,&d.chare.id);
+		CkSendMsg(d.chare.ep, msg, &d.chare.id);
 		break;
 	case isendChare: //inline send-to-chare
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.chare.hasRefnum) CkSetRefNum(msg, d.chare.refnum);
-		CkSendMsgInline(d.chare.ep,msg,&d.chare.id);
+		CkSendMsgInline(d.chare.ep, msg, &d.chare.id);
 		break;
 	case sendGroup: //Send message to a group element
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.group.hasRefnum) CkSetRefNum(msg, d.group.refnum);
-		CkSendMsgBranch(d.group.ep,msg,d.group.onPE,d.group.id);
+		CkSendMsgBranch(d.group.ep, msg, d.group.onPE, d.group.id);
 		break;
 	case sendNodeGroup: //Send message to a group element
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.group.hasRefnum) CkSetRefNum(msg, d.group.refnum);
-		CkSendMsgNodeBranch(d.group.ep,msg,d.group.onPE,d.group.id);
+                if (_entryTable[d.group.ep]->isImmediate) opts = CK_MSG_IMMEDIATE;
+		CkSendMsgNodeBranch(d.group.ep, msg, d.group.onPE, d.group.id, opts);
 		break;
 	case isendGroup: //inline send-to-group element
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.group.hasRefnum) CkSetRefNum(msg, d.group.refnum);
-		CkSendMsgBranchInline(d.group.ep,msg,d.group.onPE,d.group.id);
+		CkSendMsgBranchInline(d.group.ep, msg, d.group.onPE, d.group.id);
 		break;
 	case isendNodeGroup: //inline send-to-group element
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.group.hasRefnum) CkSetRefNum(msg, d.group.refnum);
-		CkSendMsgNodeBranchInline(d.group.ep,msg,d.group.onPE,d.group.id);
+                if (_entryTable[d.group.ep]->isImmediate) opts = CK_MSG_IMMEDIATE;
+		CkSendMsgNodeBranchInline(d.group.ep, msg, d.group.onPE, d.group.id, opts);
 		break;
 	case sendArray: //Send message to an array element
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.array.hasRefnum) CkSetRefNum(msg, d.array.refnum);
-
 		CkSetMsgArrayIfNotThere(msg);
-		CkSendMsgArray(d.array.ep,msg,d.array.id,d.array.idx.asChild());
+		CkSendMsgArray(d.array.ep, msg, d.array.id, d.array.idx.asChild());
 		break;
 	case isendArray: //inline send-to-array element
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.array.hasRefnum) CkSetRefNum(msg, d.array.refnum);
-		CkSendMsgArrayInline(d.array.ep,msg,d.array.id,d.array.idx.asChild());
+		CkSendMsgArrayInline(d.array.ep, msg, d.array.id, d.array.idx.asChild());
 		break;
 	case bcastGroup:
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.group.hasRefnum) CkSetRefNum(msg, d.group.refnum);
-		CkBroadcastMsgBranch(d.group.ep,msg,d.group.id);
+		CkBroadcastMsgBranch(d.group.ep, msg, d.group.id);
 		break;
 	case bcastNodeGroup:
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.group.hasRefnum) CkSetRefNum(msg, d.group.refnum);
-		CkBroadcastMsgNodeBranch(d.group.ep,msg,d.group.id);
+                if (_entryTable[d.group.ep]->isImmediate) opts = CK_MSG_IMMEDIATE;
+		CkBroadcastMsgNodeBranch(d.group.ep, msg, d.group.id, opts);
 		break;
 	case bcastArray:
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.array.hasRefnum) CkSetRefNum(msg, d.array.refnum);
-		CkBroadcastMsgArray(d.array.ep,msg,d.array.id);
+		CkBroadcastMsgArray(d.array.ep, msg, d.array.id);
 		break;
 	case bcastSection: {
 		if(!msg)msg=CkAllocSysMsg();
                 if (d.section.hasRefnum) CkSetRefNum(msg, d.section.refnum);
                 CkSectionInfo sinfo(d.section.sinfo);
                 CkSectionID secID(sinfo, d.section._elems, d.section._nElems, d.section.pelist, d.section.npes);
-		CkBroadcastMsgSection(d.section.ep,msg,secID);
+		CkBroadcastMsgSection(d.section.ep, msg, secID);
                 secID._elems = NULL;
                 secID.pelist = NULL;
 		break;

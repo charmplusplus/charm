@@ -2792,7 +2792,10 @@ XStr Entry::genRegEp(bool isForRedn) {
   // it to CkReductionMsg not CkMarshallMsg)
   if (!isForRedn && (attribs & SNOKEEP)) str << "+CK_EP_NOKEEP";
   if (attribs & SNOTRACE) str << "+CK_EP_TRACEDISABLE";
-  if (attribs & SIMMEDIATE) str << "+CK_EP_TRACEDISABLE";
+  if (attribs & SIMMEDIATE) {
+     str << "+CK_EP_TRACEDISABLE";
+     str << "+CK_EP_IMMEDIATE";
+  }
   if (attribs & SAPPWORK) str << "+CK_EP_APPWORK";
 
   /*MEICHAO*/

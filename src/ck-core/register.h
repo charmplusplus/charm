@@ -82,6 +82,8 @@ class EntryInfo {
     bool traceEnabled;
     /// Method doesn't keep (and delete) message passed in to it.
     bool noKeep;
+    /// Method is an immediate entry method and can bypass scheduler
+    bool isImmediate;
     /// true if this EP is charm internal functions
     bool inCharm;
     bool appWork;
@@ -99,7 +101,7 @@ class EntryInfo {
 #if CMK_CHARMDEBUG
       ,messagePup(0)
 #endif
-      ,traceEnabled(true), noKeep(false), inCharm(false), appWork(false)
+      ,traceEnabled(true), noKeep(false), isImmediate(false), inCharm(false), appWork(false)
       ,name(n)
     { }
 };
