@@ -59,10 +59,10 @@ if navmenu:
         # Add a toc within the navmenu
         navmenuTOC = BeautifulSoup(open("tmp-navmenu.html"), "lxml")
         navmenuTOC = navmenuTOC.find('ul','manual-toc').extract()
-        navmenuTOC.append( BeautifulSoup("".join([
-        '<li><a href="http://charm.cs.illinois.edu">PPL Homepage</a></li>',
-        '<li><a href="http://charm.cs.illinois.edu/help">Other Manuals</a></li>'])
-        ) )
+        navmenuTOC.append(BeautifulSoup("".join([
+            '<li><a href="http://charm.cs.illinois.edu">PPL Homepage</a></li>',
+            '<li><a href="http://charm.cs.illinois.edu/help">Other Manuals</a></li>'
+        ]), "lxml"))
         navmenu.append(navmenuTOC)
 
     # Insert navigation symbols to prev and next links
