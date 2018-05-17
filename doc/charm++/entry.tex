@@ -63,7 +63,7 @@ performance analysis.
 \index{immediate}\item[immediate] entry methods are executed in an
 ``immediate'' fashion as they skip the message scheduling while other normal
 entry methods do not. Immediate entry methods should be only associated with
-NodeGroup objects although it is not checked during compilation. If the
+NodeGroup objects, otherwise a compilation error will result. If the
 destination of such entry method is on the local node, then the method will be
 executed in the context of the regular PE regardless the execution mode of
 \charmpp{} runtime. However, in the SMP mode, if the destination of the method
