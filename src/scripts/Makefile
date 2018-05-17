@@ -162,6 +162,12 @@ test: bigsim LIBS
 	$(MAKE) -C ../tests test
 	$(MAKE) -C ../examples test
 
+test-tests: bigsim LIBS
+	$(MAKE) -C ../tests test
+
+test-examples: bigsim LIBS
+	$(MAKE) -C ../examples test
+
 test-converse: converse
 	$(MAKE) -C ../tests test-converse
 
