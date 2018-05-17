@@ -197,7 +197,7 @@ CheckDir() {
 }
 
 TestIfCompiler() {
-  compilerName=`echo $1 | sed -e 's/-[0-9\.]+$//'`
+  compilerName=`echo $1 | sed 's/-[0-9\.][0-9\.]*$//'`
   for dir in $OPT_DIRS
   do
     [ -f $dir/cc-$compilerName.sh ] && return 1
@@ -721,7 +721,7 @@ then
 fi
 if test -n "$COMPILER"
 then
-      i=`echo $COMPILER | sed -e 's/-[0-9\.]+$//'`
+      i=`echo $COMPILER | sed 's/-[0-9\.][0-9\.]*$//'`
       echo "CMK_COMPILER_SUFFIX=${COMPILER#$i}" >> $ConvSh
       echo '#include "'cc-$i.h'"' >> $ConvHeader
       echo '. $CHARMINC/'"cc-$i.sh" >> $ConvSh
