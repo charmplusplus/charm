@@ -56,19 +56,25 @@ invocations on each PE. If a user frees the message or modifies its contents,
 a runtime error may result. An example can be found in \examplerefdir{histogram\_group}.
 
 \index{notrace}\item[notrace] entry methods will not be traced during execution. As a result, they will not be considered and displayed in Projections for
-performance analysis.
+  performance analysis. Additionally, \texttt{immediate} entry methods are by default \texttt{notrace} and will
+not be traced during execution.
 
 \index{appwork}\item[appwork] this entry method will be marked as executing application work. It will be used for performance analysis.
 
 \index{immediate}\item[immediate] entry methods are executed in an
 ``immediate'' fashion as they skip the message scheduling while other normal
-entry methods do not. Immediate entry methods should be only associated with
+entry methods do not. Immediate entry methods can only be associated with
 NodeGroup objects, otherwise a compilation error will result. If the
 destination of such entry method is on the local node, then the method will be
 executed in the context of the regular PE regardless the execution mode of
 \charmpp{} runtime. However, in the SMP mode, if the destination of the method
 is on the remote node, then the method will be executed in the context of the
-communication thread.  
+communication thread. For that reason, immediate entry methods should be used
+for code that is performance critical and does not take too long in terms of
+execution time because long running entry methods can delay communication by
+occupying the communication thread for entry method execution rather than
+remote communication.
+
 %are entry functions in which 
 %short messages can be executed in an ``immediate'' fashion when they are
 %received either by an interrupt (Network version) or by a communication thread
@@ -80,8 +86,10 @@ execution of immediate entry methods from being delayed by entry functions that
 could take a long time to finish. Immediate entry methods are implicitly
 ``exclusive'' on each node, meaning that one execution of immediate message
 will not be interrupted by another. Function \kw{CmiProbeImmediateMsg()} can be
-called in user codes to probe and process immediate messages periodically. An
-example ``immediatering'' can be found in \testrefdir{megatest}.
+called in user codes to probe and process immediate messages periodically. Also
+note that \texttt{immediate} entry methods are by default \texttt{notrace} and are
+not traced during execution. An example of \texttt{immediate} entry method,
+``immediatering'' can be found in \testrefdir{megatest}.
 
 \index{expedited}\item[expedited] entry methods skip the priority-based message
 queue in \charmpp{} runtime. It is useful for messages that require prompt
