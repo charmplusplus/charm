@@ -4,7 +4,7 @@
 #include <sys/uio.h>
 
 // Method checks if process has permissions to use CMA
-int CmiInitCma(int cma_min_threshold, int cma_max_threshold) {
+int CmiInitCma() {
   char buffer   = '0';
   int cma_works = 0;
   int fd;
@@ -29,15 +29,17 @@ int CmiInitCma(int cma_min_threshold, int cma_max_threshold) {
   } else {
     cma_works = 1;
   }
+  return cma_works;
+}
 
-  if(cma_works && _Cmi_mynode == 0) {
+// Method to display thresholds for regular messaging using CMA
+void CmiDisplayCMAThresholds(int cma_min_threshold, int cma_max_threshold) {
+  if(_Cmi_mynode == 0) {
       if(cma_min_threshold > cma_max_threshold) {
         CmiAbort("CMA size thresholds incorrect! Values should satisfy cma_min_threshold <= cma_min_threshold condition");
       }
       CmiPrintf("Charm++> CMA enabled for within node transfers of messages(sized between %d & %d bytes)\n", cma_min_threshold, cma_max_threshold);
   }
-
-  return cma_works;
 }
 
 /* Used to read from a list of remote buffers and write into a

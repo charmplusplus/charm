@@ -443,8 +443,11 @@ CmiCommHandle CmiInterSendNetworkFunc(int destPE, int partition, int size, char 
 #include "machine-commthd-util.c"
 #if CMK_USE_CMA
 // cma_min_thresold and cma_max_threshold specify the range of sizes between which CMA will be used for SHM messaging
-int cma_works, cma_min_threshold, cma_max_threshold;
+int cma_works, cma_reg_msg, cma_min_threshold, cma_max_threshold;
 #include "machine-cma.c"
+int CmiDoesCMAWork() {
+  return cma_works;
+}
 #endif
 
 /* ===== Beginning of Common Function Definitions ===== */
@@ -534,9 +537,9 @@ static INLINE_KEYWORD void handleOneRecvedMsg(int size, char *msg) {
 
 #if CMK_USE_CMA
     // If CMA message, perform CMA read to get the payload message
-    if(cma_works && CMI_MSG_TYPE(msg) == CMK_CMA_MD_MSG) {
+    if(cma_reg_msg && CMI_MSG_TYPE(msg) == CMK_CMA_MD_MSG) {
       handleOneCmaMdMsg(&size, &msg);  // size & msg are modififed
-    } else if(cma_works && CMI_MSG_TYPE(msg) == CMK_CMA_ACK_MSG) {
+    } else if(cma_reg_msg && CMI_MSG_TYPE(msg) == CMK_CMA_ACK_MSG) {
       handleOneCmaAckMsg(size, msg);
       return;
     }
@@ -631,7 +634,7 @@ CmiCommHandle CmiInterSendNetworkFunc(int destPE, int partition, int size, char 
         int destNode = CmiGetNodeGlobal(destLocalNode,partition); 
 
 #if CMK_USE_CMA
-        if(cma_works && partition == CmiMyPartition() && CmiPeOnSamePhysicalNode(CmiMyPe(), destPE)) {
+        if(cma_reg_msg && partition == CmiMyPartition() && CmiPeOnSamePhysicalNode(CmiMyPe(), destPE)) {
           if(CMI_MSG_TYPE(msg) == CMK_REG_MSG && cma_min_threshold <= size && size <= cma_max_threshold) {
             CmiSendMessageCma(&msg, &size); // size & msg are modififed
           }
@@ -1433,21 +1436,27 @@ if (  MSG_STATISTIC)
       // Disable CMA
       if (CmiGetArgFlagDesc(argv,"+cma_disable","Disable use of CMA for SHM transport")) {
         cma_works = 0;
+        cma_reg_msg = false;
       }
     }
 
-    //TODO: Remove this to enable CMA following network threshold determination
-    cma_works = 0;
-
     if(cma_works) {
-      // Initialize CMA if it is not disabled
-      cma_works = CmiInitCma(cma_min_threshold, cma_max_threshold);
+      // Initialize CMA if it is not disable to check if the OS supports it
+      cma_works = CmiInitCma();
       /* To use CMA, check that the global variable cma_works flag is set to 1.
        * If it is 0, it indicates that CMA calls are supported but operations do
        * not have the right permissions for usage. If cma_works is 0, CMA cannot be
        * used by the RTS. CMA_HAS_CMA being disabled indicates that CMA calls are not
        * even supported by the OS.
        */
+
+      // Enable/disable disable regular messaging
+      // TODO: Unset this flag to get CMA working for regular messages
+      cma_reg_msg = 0;
+
+      // Display CMA thresholds for regular messages if it is enabled
+      if(cma_reg_msg)
+        CmiDisplayCMAThresholds(cma_min_threshold, cma_max_threshold);
     }
 #endif
 
