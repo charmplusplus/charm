@@ -718,15 +718,16 @@ void ParamList::unmarshall(XStr& str, bool isInline, bool isFirst)  // Pass-by-v
 // Do forwarding for rvalue references, used for inline and local entry methods
 void ParamList::unmarshallForward(XStr& str,
                                   bool isInline,
-                                  bool isFirst)
+                                  bool isFirst,
+                                  int fwdNum)
 {
   if (!isInline)
     unmarshall(str, isInline, isFirst);
   if (isReference()) {
-    str << "std::forward<" << param->type << ">(" << param->getName() << ")";
+    str << "std::forward<Fwd" << fwdNum++ << ">(" << param->getName() << ")";
     if (next) {
       str << ", ";
-      next->unmarshallForward(str, isInline, false);
+      next->unmarshallForward(str, isInline, false, fwdNum);
     }
   } else {
     unmarshall(str, isInline, isFirst);

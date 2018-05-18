@@ -12,11 +12,22 @@ extern int fortranMode;
 // this Member's container with the given return type, e.g.
 // template<int N,class foo> void CProxy_bar<N,foo>
 // Works with non-templated Chares as well.
-XStr Member::makeDecl(const XStr& returnType, int forProxy, bool isStatic) {
+XStr Member::makeDecl(const XStr& returnType, int forProxy, bool isStatic, XStr fwdStr) {
   XStr str;
 
   if (container->isTemplated()) str << container->tspec(false) << "\n";
-  str << generateTemplateSpec(tspec, false) << "\n";
+  const bool doFwd = fwdStr != "";
+  if (tspec || doFwd) {
+    str << "template <";
+    if (tspec) {
+      tspec->genLong(str, false);
+      if (doFwd)
+        str << ", ";
+    }
+    if (doFwd)
+      str << fwdStr;
+    str << ">\n";
+  }
   if (isStatic) str << "static ";
   str << returnType << " ";
   if (forProxy == 1)

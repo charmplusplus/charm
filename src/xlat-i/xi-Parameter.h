@@ -153,7 +153,7 @@ class ParamList {
   void beginUnmarshallSDAGCall(XStr& str, bool usesImplBuf);
   void beginRednWrapperUnmarshall(XStr& str, bool isSDAGGen);
   void unmarshall(XStr& str, bool isInline = false, bool isFirst = true);
-  void unmarshallForward(XStr& str, bool isInline = false, bool isFirst = true);
+  void unmarshallForward(XStr& str, bool isInline = false, bool isFirst = true, int fwdNum = 1);
   void unmarshallSDAGCall(XStr& str, int isFirst = 1);
   void unmarshallAddress(XStr& str, int isFirst = 1);
   void pupAllValues(XStr& str);

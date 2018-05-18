@@ -28,7 +28,7 @@ class Member : public Construct {
   virtual int isSdag(void) { return 0; }
   virtual void collectSdagCode(SdagCollection*) { return; }
   virtual void collectSdagCode(WhenStatementEChecker*) { return; }
-  XStr makeDecl(const XStr& returnType, int forProxy = 0, bool isStatic = false);
+  XStr makeDecl(const XStr& returnType, int forProxy = 0, bool isStatic = false, XStr fwdStr = XStr());
   virtual void genPythonDecls(XStr&) {}
   virtual void genIndexDecls(XStr&) {}
   virtual void genPythonDefs(XStr&) {}

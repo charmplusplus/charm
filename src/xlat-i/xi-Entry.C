@@ -462,14 +462,15 @@ void Entry::genArrayDecl(XStr& str) {
         }
         pl = pl->next;
       }
-      if (tspec || fwdNum > 1) {
+      const bool doFwd = fwdNum > 1;
+      if (tspec || doFwd) {
         str << "    template <";
         if (tspec) {
           tspec->genLong(str);
-          if (fwdNum > 1)
+          if (doFwd)
             str << ", ";
         }
-        if (fwdNum > 1)
+        if (doFwd)
           str << fwdStr;
         str << ">\n";
       }
@@ -516,13 +517,11 @@ void Entry::genArrayDefs(XStr& str) {
         if (!p->isRdma() && p->arrLen == NULL && !p->conditional && p->byReference) {
           if (fwdNum > 1)
             fwdStr << ", ";
-          fwdStr << "typename Fwd" << fwdNum++;
+          fwdStr << "typename Fwd" << fwdNum++; // << " = " << p->type;
         }
         pl = pl->next;
       }
-      if (fwdNum > 1)
-        str << "template <" << fwdStr << ">\n";
-      str << makeDecl(retStr, 1) << "::" << name << "(" << paramType(0, 1, 0, 1) << ") \n";
+      str << makeDecl(retStr, 1, false, fwdStr) << "::" << name << "(" << paramType(0, 1, 0, 1) << ") \n";
     } else if (isLocal())
       str << makeDecl(retStr, 1) << "::" << name << "(" << paramType(0, 1, 0) << ") \n";
     else
@@ -642,7 +641,8 @@ void Entry::genArrayDefs(XStr& str) {
         }
         pl = pl->next;
       }
-      if (fwdNum > 1) {
+      const bool doFwd = fwdNum > 1;
+      if (doFwd) {
         str << "// explicit instantiation for compatibility\n";
         str << "template " << makeDecl(retStr, 1) << "::" << name << "<" << fwdStr << ">(" << paramType(0, 1, 0) << ");\n";
       }
