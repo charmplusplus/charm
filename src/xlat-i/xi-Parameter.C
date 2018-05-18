@@ -332,7 +332,7 @@ void Parameter::pup(XStr& str) {
   } else if (!conditional) {
     if (byReference) {
       str << "    //Have to cast away const-ness to get pup routine\n";
-      str << "    implP|(" << type << " &)" << name << ";\n";
+      str << "    implP|(typename std::remove_cv<typename std::remove_reference<" << type << ">::type>::type &)" << name << ";\n";
     } else if (!isRdma())
       str << "    implP|" << name << ";\n";
   }

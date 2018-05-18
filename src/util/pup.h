@@ -91,12 +91,12 @@ namespace PUP {
     template <typename T>
     struct TemporaryObjectHolder<T, true>
     {
-      T t{reconstruct()};
+      typename std::remove_cv<typename std::remove_reference<T>::type>::type t{reconstruct()};
     };
     template <typename T>
     struct TemporaryObjectHolder<T, false>
     {
-      T t{};
+      typename std::remove_cv<typename std::remove_reference<T>::type>::type t{};
     };
     template <typename T>
     void operator|(er &p, TemporaryObjectHolder<T> &t) {
