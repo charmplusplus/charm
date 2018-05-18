@@ -22,6 +22,8 @@ CMK_LD_SHARED_ABSOLUTE_PATH=true
 
 CMK_DEFS='-mmacosx-version-min=10.7 -D_DARWIN_C_SOURCE'
 
+. $CHARMINC/conv-mach-gfortran.sh
+
 # Assumes gfortran compiler:
-CMK_CF77="gfortran -mmacosx-version-min=10.7"
-CMK_CF90="gfortran -mmacosx-version-min=10.7"
+CMK_CF77="$CMK_CF77 -mmacosx-version-min=10.7"
+CMK_CF90="$CMK_CF90 -mmacosx-version-min=10.7"
