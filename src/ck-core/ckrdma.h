@@ -187,9 +187,19 @@ class CkNcpyBuffer{
 
   void setMode(unsigned short int mode_) { mode = mode_; }
 
-  void put(CkNcpyBuffer &destination);
+  void memcpyGet(CkNcpyBuffer &source);
+  void memcpyPut(CkNcpyBuffer &destination);
+
+#if CMK_USE_CMA
+  void cmaGet(CkNcpyBuffer &source);
+  void cmaPut(CkNcpyBuffer &destination);
+#endif
+
+  void rdmaGet(CkNcpyBuffer &source);
+  void rdmaPut(CkNcpyBuffer &destination);
 
   void get(CkNcpyBuffer &source);
+  void put(CkNcpyBuffer &destination);
 
   // Deregister(Unpin) the memory that is registered for the buffer
   void deregisterMem() {
@@ -217,5 +227,7 @@ class CkNcpyBuffer{
   }
 
 };
+
+enum class ncpyTransferMode : char { MEMCPY, CMA, RDMA };
 
 #endif

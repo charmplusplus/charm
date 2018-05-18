@@ -92,6 +92,8 @@ void CmiIssueRputUsingCMA(
 // Allocation from pool
 void *CmiRdmaAlloc(int size);
 
+int CmiDoesCMAWork(void);
+
 #if !CMK_ONESIDED_DIRECT_IMPL
 // Function declaration used for the generic implementation of the Nocopy Direct API
 void CmiOnesidedDirectInit(void);

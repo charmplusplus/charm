@@ -3,10 +3,6 @@
  */
 #include "converse.h"
 
-#if CMK_USE_CMA
-extern int cma_works;
-#endif
-
 // Methods required to keep the Nocopy Direct API functional on non-LRTS layers
 #if !CMK_USE_LRTS
 void CmiSetRdmaCommonInfo(void *info, const void *ptr, int size) {
@@ -103,21 +99,6 @@ void CmiIssueRget(
   unsigned short int *destMode,
   int size) {
 
-#if CMK_USE_CMA
-  // check if remote PE is on the same physical node
-  if(cma_works && CmiPeOnSamePhysicalNode(srcPe, destPe)) {
-
-    CmiIssueRgetUsingCMA(srcAddr, srcInfo, srcPe,
-                         destAddr, destInfo, destPe,
-                         size);
-
-    // directy invoke the acks
-    ncpyAckHandlerFn(srcAck, srcPe, srcAddr);
-    ncpyAckHandlerFn(destAck, destPe, destAddr);
-    return;
-  }
-#endif
-
   // Send a getRequestMsg to other PE requesting it to send the array
   getRequestMsg *getReqMsg = (getRequestMsg *)CmiAlloc(sizeof(getRequestMsg) + srcAckSize + destAckSize);
   getReqMsg->srcPe = srcPe;
@@ -153,21 +134,6 @@ void CmiIssueRput(
   int srcPe,
   unsigned short int *srcMode,
   int size) {
-
-#if CMK_USE_CMA
-  // check if remote PE is on the same physical node
-  if(cma_works && CmiPeOnSamePhysicalNode(srcPe, destPe)) {
-
-    CmiIssueRputUsingCMA(destAddr, destInfo, destPe,
-                         srcAddr, srcInfo, srcPe,
-                         size);
-
-    // directy invoke the acks
-    ncpyAckHandlerFn(srcAck, srcPe, srcAddr);
-    ncpyAckHandlerFn(destAck, destPe, destAddr);
-    return;
-  }
-#endif
 
   // Send a rdmaPayloadMsg to the other PE sending the array
   rdmaPayloadMsg *recvMsg = (rdmaPayloadMsg *)CmiAlloc(sizeof(rdmaPayloadMsg) + size + destAckSize);

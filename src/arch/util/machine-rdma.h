@@ -288,19 +288,6 @@ void CmiIssueRget(
   unsigned short int *destMode,
   int size) {
 
-#if CMK_USE_CMA
-  // check if remote PE is on the same physical node
-  if(cma_works && CmiPeOnSamePhysicalNode(srcPe, destPe)) {
-
-    CmiIssueRgetUsingCMA(srcAddr, srcInfo, srcPe,
-                         destAddr, destInfo, destPe,
-                         size);
-    // directy invoke the acks
-    ncpyAckHandlerFn(srcAck, srcPe, srcAddr);
-    ncpyAckHandlerFn(destAck, destPe, destAddr);
-    return;
-  }
-#endif
   // Use network RDMA for a PE on a remote host
   LrtsIssueRget(srcAddr,
                 (char*)srcInfo + CmiGetRdmaCommonInfoSize(),
@@ -333,20 +320,6 @@ void CmiIssueRput(
   unsigned short int *srcMode,
   int size) {
 
-#if CMK_USE_CMA
-  // check if remote PE is on the same physical node
-  if(cma_works && CmiPeOnSamePhysicalNode(srcPe, destPe)) {
-
-    CmiIssueRputUsingCMA(destAddr, destInfo, destPe,
-                         srcAddr, srcInfo, srcPe,
-                         size);
-
-    // directy invoke the acks
-    ncpyAckHandlerFn(srcAck, srcPe, srcAddr);
-    ncpyAckHandlerFn(destAck, destPe, destAddr);
-    return;
-  }
-#endif
   // Use network RDMA for a PE on a remote host
   LrtsIssueRput(destAddr,
                 (char*)destInfo + CmiGetRdmaCommonInfoSize(),

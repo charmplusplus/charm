@@ -333,45 +333,53 @@ void CkRdmaAckHandler(void *cbPtr, int pe, const void *ptr) {
 #endif
 }
 
-// Perform a nocopy put operation into the passed destination using this source
-void CkNcpyBuffer::put(CkNcpyBuffer &destination){
-  if(mode == CK_BUFFER_NOREG || destination.mode == CK_BUFFER_NOREG) {
-    CkAbort("Cannot perform RDMA operations in CK_BUFFER_NOREG mode\n");
-  }
+// Returns ncpyTransferMode::MEMCPY if both the PEs are the same and memcpy can be used
+// Returns ncpyTransferMode::CMA if both the PEs are in the same physical node and CMA can be used
+// Returns ncpyTransferMode::RDMA if RDMA needs to be used
+ncpyTransferMode findTransferMode(int srcPe, int destPe) {
+  if(CmiNodeOf(srcPe)==CmiNodeOf(destPe))
+    return ncpyTransferMode::MEMCPY;
+#if CMK_USE_CMA
+  else if(CmiDoesCMAWork() && CmiPeOnSamePhysicalNode(srcPe, destPe))
+    return ncpyTransferMode::CMA;
+#endif
+  else
+    return ncpyTransferMode::RDMA;
+}
 
-  // Check that the count for both the counters matches
-  CkAssert(cnt <= destination.cnt);
+// Get Methods
+void CkNcpyBuffer::memcpyGet(CkNcpyBuffer &source) {
+  // memcpy the data from the source buffer into the destination buffer
+  memcpy((void *)ptr, source.ptr, cnt);
+}
 
-  // Check that this object is local when put is called
-  CkAssert(CkNodeOf(pe) == CkMyNode());
+#if CMK_USE_CMA
+void CkNcpyBuffer::cmaGet(CkNcpyBuffer &source) {
+  CmiIssueRgetUsingCMA(source.ptr,
+                       source.layerInfo,
+                       source.pe,
+                       ptr,
+                       layerInfo,
+                       pe,
+                       cnt);
+}
+#endif
 
-  if(CkNodeOf(destination.pe) == CkMyNode()) {
-    // memcpy the data from the source buffer into the destination buffer
-    memcpy((void *)destination.ptr, ptr, cnt);
-
-    //Invoke the source callback
-    cb.send(sizeof(void *), &ptr);
-
-    //Invoke the destination callback
-    destination.cb.send(sizeof(void *), &destination.ptr);
-
-  } else {
-
-    // Issue the Rput call
-    CmiIssueRput(destination.ptr,
-                 destination.layerInfo,
-                 &destination.cb,
-                 sizeof(CkCallback),
-                 destination.pe,
-                 &destination.mode,
-                 ptr,
-                 layerInfo,
-                 &cb,
-                 sizeof(CkCallback),
-                 CkMyPe(),
-                 &mode,
-                 cnt);
-  }
+void CkNcpyBuffer::rdmaGet(CkNcpyBuffer &source) {
+  // Issue the Rget call
+  CmiIssueRget(source.ptr,
+               source.layerInfo,
+               &source.cb,
+               sizeof(CkCallback),
+               source.pe,
+               &source.mode,
+               ptr,
+               layerInfo,
+               &cb,
+               sizeof(CkCallback),
+               CkMyPe(),
+               &mode,
+               cnt);
 }
 
 // Perform a nocopy get operation into this destination using the passed source
@@ -380,39 +388,112 @@ void CkNcpyBuffer::get(CkNcpyBuffer &source){
     CkAbort("Cannot perform RDMA operations in CK_BUFFER_NOREG mode\n");
   }
 
-  // Check that the count for both the counters matches
+  // Check that the source buffer fits into the destination buffer
   CkAssert(source.cnt <= cnt);
 
   // Check that this object is local when get is called
   CkAssert(CkNodeOf(pe) == CkMyNode());
 
-  //Check if it is a within-process sending
-  if(CmiNodeOf(source.pe) == CkMyNode()) {
+  ncpyTransferMode transferMode = findTransferMode(source.pe, pe);
 
-    // memcpy the data from the source buffer into the destination buffer
-    memcpy((void *)ptr, source.ptr, cnt);
+  //Check if it is a within-process sending
+  if(transferMode == ncpyTransferMode::MEMCPY) {
+    memcpyGet(source);
 
     //Invoke the receiver's callback
     cb.send(sizeof(void *), &ptr);
 
     //Invoke the sender's callback
     source.cb.send(sizeof(void *), &source.ptr);
+#if CMK_USE_CMA
+  } else if(transferMode == ncpyTransferMode::CMA) {
 
+    cmaGet(source);
+
+    //Invoke the receiver's callback
+    cb.send(sizeof(void *), &ptr);
+
+    //Invoke the sender's callback
+    source.cb.send(sizeof(void *), &source.ptr);
+#endif
+  } else if (transferMode == ncpyTransferMode::RDMA) {
+    rdmaGet(source);
   } else {
+    CkAbort("Invalid ncpyTransferMode");
+  }
+}
 
-    // Issue the Rget call
-    CmiIssueRget(source.ptr,
-                 source.layerInfo,
-                 &source.cb,
-                 sizeof(CkCallback),
-                 source.pe,
-                 &source.mode,
-                 ptr,
-                 layerInfo,
-                 &cb,
-                 sizeof(CkCallback),
-                 CkMyPe(),
-                 &mode,
-                 cnt);
+// Put Methods
+void CkNcpyBuffer::memcpyPut(CkNcpyBuffer &destination) {
+  // memcpy the data from the source buffer into the destination buffer
+  memcpy((void *)destination.ptr, ptr, cnt);
+}
+
+#if CMK_USE_CMA
+void CkNcpyBuffer::cmaPut(CkNcpyBuffer &destination) {
+  CmiIssueRputUsingCMA(destination.ptr,
+                       destination.layerInfo,
+                       destination.pe,
+                       ptr,
+                       layerInfo,
+                       pe,
+                       cnt);
+}
+#endif
+
+void CkNcpyBuffer::rdmaPut(CkNcpyBuffer &destination) {
+  // Issue the Rput call
+  CmiIssueRput(destination.ptr,
+               destination.layerInfo,
+               &destination.cb,
+               sizeof(CkCallback),
+               destination.pe,
+               &destination.mode,
+               ptr,
+               layerInfo,
+               &cb,
+               sizeof(CkCallback),
+               CkMyPe(),
+               &mode,
+               cnt);
+}
+
+// Perform a nocopy put operation into the passed destination using this source
+void CkNcpyBuffer::put(CkNcpyBuffer &destination){
+  if(mode == CK_BUFFER_NOREG || destination.mode == CK_BUFFER_NOREG) {
+    CkAbort("Cannot perform RDMA operations in CK_BUFFER_NOREG mode\n");
+  }
+  // Check that the source buffer fits into the destination buffer
+  CkAssert(cnt <= destination.cnt);
+
+  // Check that this object is local when put is called
+  CkAssert(CkNodeOf(pe) == CkMyNode());
+
+  ncpyTransferMode transferMode = findTransferMode(pe, destination.pe);
+
+  //Check if it is a within-process sending
+  if(transferMode == ncpyTransferMode::MEMCPY) {
+    memcpyPut(destination);
+
+    //Invoke the source callback
+    cb.send(sizeof(void *), &ptr);
+
+    //Invoke the destination callback
+    destination.cb.send(sizeof(void *), &destination.ptr);
+
+#if CMK_USE_CMA
+  } else if(transferMode == ncpyTransferMode::CMA) {
+    cmaPut(destination);
+
+    //Invoke the source callback
+    cb.send(sizeof(void *), &ptr);
+
+    //Invoke the destination callback
+    destination.cb.send(sizeof(void *), &destination.ptr);
+#endif
+  } else if (transferMode == ncpyTransferMode::RDMA) {
+    rdmaPut(destination);
+  } else {
+    CkAbort("Invalid ncpyTransferMode");
   }
 }
