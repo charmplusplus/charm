@@ -115,6 +115,9 @@ $(L)/libtmgr.a:
 $(L)/libckmain.a: main.o
 	$(CHARMC) -o $@ $^
 
+$(L)/libckmainf.a: mainf.o
+	-$(CHARMC) -o $@ $^ || touch $@
+
 translators: charmxi conv-cpm
 
 msa: charm++
@@ -657,7 +660,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
            pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \
 					 trace-controlPoints.o mpi-interoperate.o ckregex.o
 
-charm-core: converse $(L)/libck.a $(L)/libckf.a $(L)/libckmain.a
+charm-core: converse $(L)/libck.a $(L)/libckf.a $(L)/libckmain.a $(L)/libckmainf.a
 charm-target: loadbalancers default_libs $(L)/libmpi-mainmodule.a tmgr
 
 CHARMLIBS: charm++ CONVLIBS $(BIGSIM)
@@ -681,6 +684,9 @@ charmf.o:  charmf.C $(CKHEADERS) charmf.h
 charmmod.o: charmmod.f90
 	-$(CHARMC) -c charmmod.f90 || touch $@
 	-$(CHARMC) -cpmod ../include charm.M
+
+mainf.o: mainf.f90
+	-$(CHARMC) -o $@ -c $< || touch $@
 
 ## Tracing libraries (profiling, -tracemode)
 LIBTRACE_PROJ=trace-projections.o
@@ -902,11 +908,10 @@ pvmc_groups.o: pvmc_groups.c pvmc.h pvm3.h converse.h
 pvmc_main.o: pvmc_main.c pvmc.h pvm3.h converse.h
 	$(CHARMC) -o $@ pvmc_main.c
 
-$(L)/libf90charm.a: charmxi f90main.ci f90main.h f90main.C futil.f90
+$(L)/libf90charm.a: charmxi f90main.ci f90main.h f90main.C
 	$(CHARMC) f90main.ci
 	$(CHARMC) -c -DAMPI_FORTRAN=1 f90main.C
-	-$(CHARMC) -c futil.f90
-	-$(CHARMC) -o $@ f90main.o futil.o
+	-$(CHARMC) -o $@ f90main.o
 
 ##############################################################################
 # adding this entry for files which do not belong to any of other locations

@@ -66,6 +66,7 @@ USE_F90_LIBRARIES="0"
 USE_F77_LIBRARIES="0"  
 F90_MODDIR=
 AMPIMAIN=""
+AMPIF=""
 COPYTO=""        
 MODCOPIES=""        
 MODULES=""
@@ -440,7 +441,7 @@ do
 		# Parse out some fake languages (that are actually modules)
 		case "$1" in
 		"ampi") AddModules tcharmmain ampi ;;
-		"ampif") AddModules tcharmmain ampif ; USE_F90_LIBRARIES="1" ;;
+		"ampif") AddModules tcharmmain ampif ; USE_F90_LIBRARIES="1" ; AMPIF="1" ;;
 		"armci") AddModules tcharmmain armci ;;
 		"armcif") AddModules tcharmmain armci ; USE_F90_LIBRARIES="1" ;;
 		"fem") AddModules tcharmmain fem ; AMPIMAIN="femmain";;
@@ -1571,10 +1572,10 @@ case "$PARADIGM" in
 "f90charm")
 	MAKE_LDXX="1"
 	MIDDLE_LIBS="-lck $MIDDLE_LIBS -lconv-machine $CORE_LIBS "
-        if [ "$NO_MAIN" = "" ]
-        then
-	  MIDDLE_LIBS="-lckmain $MIDDLE_LIBS"
-        fi
+	if [ -z "$NO_MAIN" ]
+	then
+		MIDDLE_LIBS="-lckmainf $MIDDLE_LIBS"
+	fi
 	if [ "$TAU_TRACE_MPI" = "1" ]
 	then
 		TAU_LIBS="$TAU_MPI_FLIBS $TAU_LIBS"
@@ -1585,10 +1586,16 @@ case "$PARADIGM" in
 "charm"|"charm++"|"f90charm"|"ckbluegene"|"bgcharm++")
 	MAKE_LDXX="1"
 	MIDDLE_LIBS="-lck $MIDDLE_LIBS -lconv-machine $CORE_LIBS "
-        if [ "$NO_MAIN" = "" ]
-        then
-	  MIDDLE_LIBS="-lckmain $MIDDLE_LIBS"
-        fi
+	if [ -z "$NO_MAIN" ]
+	then
+		if [ -n "$AMPIF" ]
+		then
+			MIDDLE_LIBS="-lckmainf $MIDDLE_LIBS"
+		elif [ -z "$AMPIMAIN" ]
+		then
+			MIDDLE_LIBS="-lckmain $MIDDLE_LIBS"
+		fi
+	fi
 	if [ "$TAU_TRACE_MPI" = "1" ]
 	then
 		TAU_LIBS="$TAU_MPI_LIBS $TAU_LIBS"
@@ -1600,9 +1607,23 @@ case "$PARADIGM" in
 	MAKE_LD="1"
 	MIDDLE_LIBS="$MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
 	;;
-"converse++"|"bluegene"|"bigsim"|"bgconverse++")
+"converse++"|"bgconverse++")
 	MAKE_LDXX="1"
 	MIDDLE_LIBS="$MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
+	;;
+"bluegene"|"bigsim")
+	MAKE_LDXX="1"
+	MIDDLE_LIBS="$MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
+	if [ -z "$NO_MAIN" ]
+	then
+		if [ -n "$AMPIF" ]
+		then
+			MIDDLE_LIBS="-lckmainf $MIDDLE_LIBS"
+		elif [ -z "$AMPIMAIN" ]
+		then
+			MIDDLE_LIBS="-lckmain $MIDDLE_LIBS"
+		fi
+	fi
 	;;
 "c"|"C"|"c++"|"C++"|"f90"|"f77")
   ;;

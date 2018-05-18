@@ -267,7 +267,7 @@ int BGMach::read(char *file)
   return 0;
 }
 
-int main(int argc,char *argv[])
+extern "C" int charm_main(int argc, char **argv)
 {
   ConverseInit(argc,argv,(CmiStartFn)bgMain,0,0);
   return 0;
