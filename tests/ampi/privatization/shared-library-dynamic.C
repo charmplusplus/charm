@@ -1,5 +1,5 @@
 
-#include "test.h"
+#include "test-cxx.h"
 
 #if defined test_dynamiclib
 

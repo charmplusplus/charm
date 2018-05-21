@@ -2,6 +2,10 @@
 AMPICC=../../../bin/ampicxx $(OPTS)
 
 
+LANGUAGES := \
+  cxx \
+
+
 # for constructing individual build rules
 VARIANTS := \
   control \
@@ -15,13 +19,28 @@ CANDIDATES := \
   swapglobals \
   tlsglobals \
 
+
+# Define what options to pass to charmc for each method.
+OPTS_cxx_control :=
+OPTS_cxx_swapglobals := -swapglobals
+OPTS_cxx_tlsglobals := -tlsglobals
+OPTS_cxx_roseomptlsglobals := -roseomptlsglobals
+
+# Define the features that each privatization method supports.
+FEATURES_cxx_control := staticvars sharedlib dynamiclib
+FEATURES_cxx_swapglobals :=
+FEATURES_cxx_tlsglobals := staticvars sharedlib
+FEATURES_cxx_roseomptlsglobals := staticvars sharedlib
+
+
+# Determine which methods to test in the current environment and target.
 TARGETS :=
 
 define TEST_TARGET_AVAILABILITY
-  AMPICC_OUTPUT_$1 := $$(shell $$(AMPICC) -print-building-blocks -$1)
-  ifeq (,$$(findstring Error: -$1,$$(AMPICC_OUTPUT_$1)))
+  AMPICC_OUTPUT_$1 := $$(shell $$(AMPICC) -print-building-blocks $$(OPTS_cxx_$1))
+  ifeq (,$$(findstring Error:,$$(AMPICC_OUTPUT_$1)))
     ifeq (,$$(findstring Warning: -$1,$$(AMPICC_OUTPUT_$1)))
-      TARGETS += $1
+      TARGETS += cxx-$1
     endif
   endif
 endef
@@ -40,46 +59,41 @@ ifeq (,$(TARGETS))
 	@echo $(EMPTY_MESSAGE)
 endif
 
-everything: $(foreach i,$(VARIANTS),$i)
-test-everything: $(foreach i,$(VARIANTS),test-$i)
-
-# Define the features that each privatization method supports.
-FEATURES_control := staticvars sharedlib dynamiclib
-FEATURES_swapglobals :=
-FEATURES_tlsglobals := staticvars sharedlib
-FEATURES_roseomptlsglobals := staticvars sharedlib
+everything: $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$j-$i))
+test-everything: $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),test-$j-$i))
 
 
 add_if_contains = $(subst $2,$3,$(findstring $2,$1))
 
 define VARIANT_RULES
 
+$1: $$(foreach j,$$(LANGUAGES),$$j-$1)
+
 # link
-$1: $1.o $1-other-object.o | lib$1-static-library.a $$(call add_if_contains,$$(FEATURES_$1),sharedlib,lib$1-shared-library.so) $$(call add_if_contains,$$(FEATURES_$1),dynamiclib,lib$1-shared-library-dynamic.so)
-	$$(AMPICC) -o $$@ $$(subst -control,,-$1) $$^ -balancer RotateLB -rpath-origin -L. -l$1-static-library $$(call add_if_contains,$$(FEATURES_$1),sharedlib,-l$1-shared-library) $$(call add_if_contains,$$(FEATURES_$1),dynamiclib,-ldl)
+cxx-$1: $1-test.o $1-test-cxx.o cxx-$1-other-object.o | libcxx-$1-static-library.a $$(call add_if_contains,$$(FEATURES_cxx_$1),sharedlib,libcxx-$1-shared-library.so) $$(call add_if_contains,$$(FEATURES_cxx_$1),dynamiclib,libcxx-$1-shared-library-dynamic.so)
+	$$(AMPICC) -o $$@ $$(OPTS_cxx_$1) $$^ -balancer RotateLB -rpath-origin -L. -lcxx-$1-static-library $$(call add_if_contains,$$(FEATURES_cxx_$1),sharedlib,-lcxx-$1-shared-library) $$(call add_if_contains,$$(FEATURES_cxx_$1),dynamiclib,-ldl)
 
-lib$1-%.so: $1-%-so.o
-	$$(AMPICC) -o $$@ $$(subst -control,,-$1) -shared -standalone $$<
+libcxx-$1-%.so: cxx-$1-%-so.o
+	$$(AMPICC) -o $$@ $$(OPTS_cxx_$1) -shared -standalone $$<
 
-lib$1-%.a: $1-%.o
+libcxx-$1-%.a: cxx-$1-%.o
 	ar cr $$@ $$^
 	ranlib $$@
 
-$1-%.o: %.C
-	$$(AMPICC) -o $$@ $$(subst -control,,-$1) -Dtest_using_$1 -Dprivatization_method=$1 $$(foreach i,$$(FEATURES_$1),-Dtest_$$i) -c $$<
+$1-%.o cxx-$1-%.o: %.C
+	$$(AMPICC) -o $$@ $$(OPTS_cxx_$1) -Dtest_using_$1 -Dprivatization_method=$1 $$(foreach i,$$(FEATURES_cxx_$1),-Dtest_$$i) -c $$<
 
-$1-%-so.o: %.C
-	$$(AMPICC) -o $$@ $$(subst -control,,-$1) -Dtest_using_$1 -Dprivatization_method=$1 $$(foreach i,$$(FEATURES_$1),-Dtest_$$i) -shared -c $$<
-
-$1.o: test.C
-	$$(AMPICC) -o $$@ $$(subst -control,,-$1) -Dtest_using_$1 -Dprivatization_method=$1 $$(foreach i,$$(FEATURES_$1),-Dtest_$$i) -c $$<
+$1-%-so.o cxx-$1-%-so.o: %.C
+	$$(AMPICC) -o $$@ $$(OPTS_cxx_$1) -Dtest_using_$1 -Dprivatization_method=$1 $$(foreach i,$$(FEATURES_cxx_$1),-Dtest_$$i) -shared -c $$<
 
 # test
-test-$1: $1
-	$$(call run, ./$1 +p1 +vp2 )
-	$$(call run, ./$1 +p1 +vp4 )
-	$$(call run, ./$1 +p2 +vp2 )
-	$$(call run, ./$1 +p2 +vp4 )
+test-cxx-$1: cxx-$1
+	$$(call run, ./cxx-$1 +p1 +vp2 )
+	$$(call run, ./cxx-$1 +p1 +vp4 )
+	$$(call run, ./cxx-$1 +p2 +vp2 )
+	$$(call run, ./cxx-$1 +p2 +vp4 )
+
+test-$1: $$(foreach j,$$(LANGUAGES),test-$$j-$1)
 
 endef
 
@@ -87,7 +101,7 @@ $(foreach i,$(VARIANTS),$(eval $(call VARIANT_RULES,$i)))
 
 
 clean:
-	rm -f *.o *.a *.so $(foreach i,$(VARIANTS),$i) charmrun ampirun
+	rm -f *.o *.a *.so $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$j-$i)) charmrun ampirun
 
 .SUFFIXES:
-.PHONY: all test everything test-everything $(foreach i,$(VARIANTS),test-$i)
+.PHONY: all test everything test-everything $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),test-$j-$i) test-$i $i)

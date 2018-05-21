@@ -1,5 +1,5 @@
 
-#include "test.h"
+#include "test-cxx.h"
 
 test_thread_local int extern_global_staticlibrary;
 
