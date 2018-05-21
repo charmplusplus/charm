@@ -592,15 +592,3 @@ While serializing an arbitrary data structure into a flat buffer, one must be
 very wary of any possible alignment problems.  Thus, if possible, the buffer
 itself should be declared to be a flat struct.  This will allow the \CC\
 compiler to ensure proper alignment of all its member fields.
-
-
-
-\subsubsection{Immediate Messages}
-
-Immediate messages are special messages that skip the Charm scheduler, they
-can be executed in an ``immediate'' fashion even in the middle of 
-a normal running entry method. 
-They are supported only in nodegroup.
-
-
-

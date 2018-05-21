@@ -2,6 +2,17 @@
 
 CProxy_main mainProxy;
 
+class immMessage : public CMessage_immMessage{
+public:
+  int i;
+  double d;
+  immMessage() {i=0; d=0;}
+  immMessage(int i_, double d_) {
+    i = i_;
+    d = d_;
+  }
+};
+
 class main : public CBase_main{
   int counter;
   CProxy_NG1 ng1Proxy;
@@ -37,6 +48,14 @@ class main : public CBase_main{
     cb.send();
   }
 
+  void invokeImmediateEntryMethodWithMessage() {
+    if(++counter != CkNumNodes()) return;
+    counter = 0;
+    CkPrintf("\n[PE: %d][Node: %d][Rank: %d] ******** Invoking Immediate Entry Method with immediate message *******\n", CkMyPe(), CkMyNode(), CkMyRank());
+    immMessage *iMsg = new immMessage(20,8.66);
+    ng1Proxy.immediateEntryMethodWithMessage(iMsg);
+  }
+
   void done() {
     if(++counter != CkNumNodes()) return;
     CkExit();
@@ -64,8 +83,16 @@ class NG1 : public CBase_NG1{
       mainProxy.invokeImmediateEntryMethodCb();
     } else {
       CkPrintf("[PE: %d][Node: %d][Rank: %d] Invoked immediate entry method through callback\n", CkMyPe(), CkMyNode(), CkMyRank());
-      mainProxy.done();
+      mainProxy.invokeImmediateEntryMethodWithMessage();
     }
+  }
+
+  void immediateEntryMethodWithMessage(immMessage *iMsg) {
+    CkPrintf("[PE: %d][Node: %d][Rank: %d] Invoked immediate entry method with immediate Message\n", CkMyPe(), CkMyNode(), CkMyRank());
+    CkAssert(iMsg->i == 20);
+    CkAssert(fabs(iMsg->d - 8.66)< 0.000001);
+    delete iMsg;
+    mainProxy.done();
   }
 };
 
