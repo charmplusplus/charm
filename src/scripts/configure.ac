@@ -2481,6 +2481,32 @@ EOF
   /bin/rm -f conftest.f90
 fi
 
+### check for OpenMP availability ###
+cat > $tc <<EOT
+#include <stdio.h>
+#include <omp.h>
+
+int main(void)
+{
+  int iam = 0, np = 1;
+
+  #pragma omp parallel default(shared) private(iam, np)
+  {
+    np = omp_get_num_threads();
+    iam = omp_get_thread_num();
+    printf("Hello from thread %d of %d\n", iam, np);
+  }
+
+  return 0;
+}
+EOT
+test_linkc "whether OpenMP is supported" "yes" "no" "$CMK_C_OPENMP"
+if test $pass -eq 1
+then
+	add_flag "CMK_HAS_OPENMP='1'" "OpenMP"
+fi
+
+
 # for hwloc
 eval "`./charmc -print-building-blocks $OPTS`"
 export CC="$(get_full_command_name "$CMK_SEQ_CC")"

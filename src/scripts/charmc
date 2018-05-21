@@ -996,6 +996,11 @@ fi
 
 if [ "$USE_OPENMP" = "yes" -o "$CMK_OMP" = "1" -a -z "$SEQUENTIAL" -a -z "$NATIVE" ]
 then
+    if [ "$CMK_HAS_OPENMP" != "1" ]
+    then
+      echo "Error: OpenMP is unavailable!"
+      exit 1
+    fi
     [ -n "$VERBOSE" ] && echo OpenMP support enabled
     OPTS_CC="$OPTS_CC $CMK_C_OPENMP"
     OPTS_CXX="$OPTS_CXX $CMK_C_OPENMP"
