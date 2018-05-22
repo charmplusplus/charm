@@ -619,6 +619,13 @@ then
   DESTINATION="$DESTINATION-$DESTINATION_SUFFIX"
 fi
 
+# make sure $DESTINATION is more than '/' characters, because we `rm -rf` it
+if [ -z "${DESTINATION#"${DESTINATION%%[^/]*}"}" ]
+then
+  echo 'Error: $DESTINATION is the filesystem root.'
+  exit 1
+fi
+
 if test -n "$BOPTS"
 then
     # pxshm+smp note: When combining the 'smp' and 'pxshm' directives, it is
@@ -733,18 +740,11 @@ then
   Echo "File structure already created; skipping directly to make"
 else
 
-[ -d $DESTINATION ] || Echo "Creating dir: $DESTINATION"
-[ -d $DESTINATION ] || mkdir $DESTINATION
-[ -d $DESTINATION/tmp ] || Echo "Creating dir: $DESTINATION/tmp"
-[ -d $DESTINATION/tmp ] || mkdir $DESTINATION/tmp
+rm -rf "$DESTINATION"
 
-rm -f $DESTINATION/tmp/Makefile
-rm -f $DESTINATION/tmp/Make.depends
-rm -f $DESTINATION/tmp/Make.cidepends
-rm -f $DESTINATION/tmp/Make.lb
-rm -f $DESTINATION/tmp/Make.gpu
-rm -f $DESTINATION/tmp/Makefile.machine
-rm -f $DESTINATION/tmp/Make.extlib
+Echo "Creating dir: $DESTINATION"
+Echo "Creating dir: $DESTINATION/tmp"
+mkdir -p "$DESTINATION/tmp"
 
 echo "TARGET=${UFCONTEXT_HEADER_NAME}" > $DESTINATION/tmp/uFcontext.mk
 
