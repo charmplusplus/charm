@@ -728,6 +728,11 @@ fi
 # ---------- begin file structure creation ----------
 # ===================================================
 
+if [ -f "$DESTINATION/tmp/basics" ]
+then
+  Echo "File structure already created; skipping directly to make"
+else
+
 [ -d $DESTINATION ] || Echo "Creating dir: $DESTINATION"
 [ -d $DESTINATION ] || mkdir $DESTINATION
 [ -d $DESTINATION/tmp ] || Echo "Creating dir: $DESTINATION/tmp"
@@ -899,6 +904,8 @@ echo "SRCBASE=$srcbase" > $DESTINATION/tmp/charmpath.mk
 echo "CONFIG_OPTS=\"$CONFIG_OPTS\"" > "$DESTINATION/tmp/config_opts.sh"
 chmod +x "$DESTINATION/tmp/config_opts.sh"
 echo "OPTSATBUILDTIME += $OPTS" > "$DESTINATION/tmp/buildopts.mk"
+
+fi
 
 # ===================================================
 # ----------- end file structure creation -----------
