@@ -1690,7 +1690,6 @@ void _initCharm(int unused_argc, char **argv)
 
 }
 
-#ifndef __BIGSIM__
 int charm_main(int argc, char **argv)
 {
   int stack_top=0;
@@ -1700,7 +1699,6 @@ int charm_main(int argc, char **argv)
 
   return 0;
 }
-#endif
 
 void charm_main_fortran_wrapper_(int *argc, char **argv)
 {
