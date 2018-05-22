@@ -619,12 +619,120 @@ then
   DESTINATION="$DESTINATION-$DESTINATION_SUFFIX"
 fi
 
+if test -n "$BOPTS"
+then
+    # pxshm+smp note: When combining the 'smp' and 'pxshm' directives, it is
+    #                 important that they be included in $ConvHeader in that
+    #                 exact order. See bug #717.
+    MYTMP=""
+    HAS_PXSHM=0
+    HAS_SMP=0
+    for i in $BOPTS; do
+      if [ "$i" = "smp" ]; then
+        HAS_SMP=1
+      elif [ "$i" = "pxshm" ]; then
+        HAS_PXSHM=1
+      elif [ "$i" = "omp" ]; then
+        BUILD_OMP=1
+        MYTMP="$MYTMP $i"
+      else
+        MYTMP="$MYTMP $i"
+      fi
+    done
+    if [ $HAS_PXSHM -eq 1 ]; then
+      MYTMP="pxshm $MYTMP"
+    fi
+    if [ $HAS_SMP -eq 1 ]; then
+      MYTMP="smp $MYTMP"
+    elif [ $BUILD_OMP -eq 1 ]; then
+      BUILD_OMP=2 #this means omp keyword inserted without smp keyword"
+    fi
+fi
+
+# build for Charmpy
+if [ "$PROGRAM" = "charmpy" ]; then
+    if [ -n "$BOPTS" ] && [ "$HAS_SMP" -eq 1 ]; then
+        echo "Error: SMP mode is currently not supported with charmpy. Choose a non-smp version."
+        exit 1
+    fi
+
+    if [ `echo "$BASEVERSION" | grep -c "multicore"` -gt 0 ]; then
+        echo "Error: multicore is currently not supported with charmpy. Choose a non-smp version."
+        exit 1
+    fi
+
+    if test `echo "$CONFIG_OPTS" | grep -c "\--enable-charmpy"` -eq 0
+    then
+        CONFIG_OPTS="$CONFIG_OPTS --enable-charmpy"
+    fi
+
+    if test `echo "$BASEVERSION" | grep -c "win"` -gt 0
+    then
+        BUILD_SHARED=""
+    else
+        BUILD_SHARED="-build-shared"
+    fi
+fi
+
+if test -n "$WITH_PRODUCTION"
+then
+    # Prepend optimize so that an explicit -no-optimize still works
+    OPTS="-optimize -production $OPTS"
+    CONFIG_OPTS="--disable-controlpoint --disable-tracing --disable-tracing-commthread --disable-charmdebug --disable-replay --disable-error-checking --disable-stats $CONFIG_OPTS"
+fi
+
+# build with Tau
+WITH_TAU=0
+if [ "$PROGRAM" = "Tau" ]
+then
+	Echo "TAU>>>> makefile config option: $TAU_MAKEFILE"
+	if [ -n "$TAU_MAKEFILE" -a -f $TAU_MAKEFILE ]
+	then
+	  #Setting up TAU trace library:
+	  Echo "TAU>>>> configuring with this TAU makefile: $TAU_MAKEFILE"
+
+          WITH_TAU=1
+	else
+	  Echo "TAU>>>> ERROR could not find Makefile: $TAU_MAKEFILE, ignored"
+          TAU_MAKEFILE=""
+	fi
+fi
+
+if [ "$PROGRAM" = "ChaNGa" ]
+then
+  #Setting lbuserdata when the build is ChaNGa
+  CONFIG_OPTS="--enable-lbuserdata $CONFIG_OPTS"
+fi
+
+if test $BUILD_EMULATOR = 1
+then
+  # export BIGSIM so that make targets can depend on it
+  MAKEOPTS="$MAKEOPTS BIGSIM=bigsim"
+  PROGRAM="$PROGRAM bigsim"
+fi
+
+if [ $BUILD_OMP = 2 ]
+then
+  case $DESTINATION in
+    "multicore"*)
+      BUILD_OMP=1
+      ;;
+    *)
+      echo "OpenMP support should be built in SMP mode"
+      exit 1
+      ;;
+  esac
+fi
+
+# ===================================================
+# ---------- begin file structure creation ----------
+# ===================================================
+
 [ -d $DESTINATION ] || Echo "Creating dir: $DESTINATION"
 [ -d $DESTINATION ] || mkdir $DESTINATION
 [ -d $DESTINATION/tmp ] || Echo "Creating dir: $DESTINATION/tmp"
 [ -d $DESTINATION/tmp ] || mkdir $DESTINATION/tmp
 
-Echo "Copying src/scripts/Makefile to $DESTINATION/tmp"
 rm -f $DESTINATION/tmp/Makefile
 rm -f $DESTINATION/tmp/Make.depends
 rm -f $DESTINATION/tmp/Make.cidepends
@@ -681,6 +789,7 @@ EOF
   $DESTINATION/tmp/system_ln $DESTINATION/include/VERSION VERSION
 fi
 
+Echo "Copying src/scripts/Makefile to $DESTINATION/tmp"
 $DESTINATION/tmp/system_ln "$srcbase/scripts/Make.depends" $DESTINATION/tmp/Make.depends
 $DESTINATION/tmp/system_ln "$srcbase/scripts/Make.cidepends" $DESTINATION/tmp/Make.cidepends
 if test -f "$srcbaseabs/ck-ldb/Make.lb"
@@ -736,35 +845,8 @@ then
       echo '#include "'cc-$i.h'"' >> $ConvHeader
       echo '. $CHARMINC/'"cc-$i.sh" >> $ConvSh
 fi
-if test -n "$BOPTS"
+if test -n "$MYTMP"
 then
-    # pxshm+smp note: When combining the 'smp' and 'pxshm' directives, it is
-    #                 important that they be included in $ConvHeader in that
-    #                 exact order. See bug #717.
-    MYTMP=""
-    HAS_PXSHM=0
-    HAS_SMP=0
-    for i in $BOPTS; do
-      if [ "$i" = "smp" ]; then
-        HAS_SMP=1
-      elif [ "$i" = "pxshm" ]; then
-        HAS_PXSHM=1
-      elif [ "$i" = "omp" ]; then
-        BUILD_OMP=1
-        MYTMP="$MYTMP $i"
-      else
-        MYTMP="$MYTMP $i"
-      fi
-    done
-    if [ $HAS_PXSHM -eq 1 ]; then
-      MYTMP="pxshm $MYTMP"
-    fi
-    if [ $HAS_SMP -eq 1 ]; then
-      MYTMP="smp $MYTMP"
-    elif [ $BUILD_OMP -eq 1 ]; then
-      BUILD_OMP=2 #this means omp keyword inserted without smp keyword"
-    fi
-
     BOPTS=$MYTMP
     for i in $BOPTS
     do
@@ -774,31 +856,6 @@ then
       fi
       echo '. $CHARMINC/'"conv-mach-$i.sh" >> $ConvSh
     done
-fi
-
-# build for Charmpy
-if [ "$PROGRAM" = "charmpy" ]; then
-    if [ -n "$BOPTS" ] && [ "$HAS_SMP" -eq 1 ]; then
-        echo "Error: SMP mode is currently not supported with charmpy. Choose a non-smp version."
-        exit 1
-    fi
-
-    if [ `echo "$BASEVERSION" | grep -c "multicore"` -gt 0 ]; then
-        echo "Error: multicore is currently not supported with charmpy. Choose a non-smp version."
-        exit 1
-    fi
-
-    if test `echo "$CONFIG_OPTS" | grep -c "\--enable-charmpy"` -eq 0
-    then
-        CONFIG_OPTS="$CONFIG_OPTS --enable-charmpy"
-    fi
-
-    if test `echo "$BASEVERSION" | grep -c "win"` -gt 0
-    then
-        BUILD_SHARED=""
-    else
-        BUILD_SHARED="-build-shared"
-    fi
 fi
 
 if test  "$BUILD_SHARED"  = "-build-shared"
@@ -816,26 +873,6 @@ fi
 if test -n "$WITH_PRODUCTION"
 then
     echo '#define CMK_OPTIMIZE 1' >> $ConvHeader
-    # Prepend optimize so that an explicit -no-optimize still works
-    OPTS="-optimize -production $OPTS"
-    CONFIG_OPTS="--disable-controlpoint --disable-tracing --disable-tracing-commthread --disable-charmdebug --disable-replay --disable-error-checking --disable-stats $CONFIG_OPTS"
-fi
-
-# build with Tau
-WITH_TAU=0
-if [ "$PROGRAM" = "Tau" ]
-then
-	Echo "TAU>>>> makefile config option: $TAU_MAKEFILE"
-	if [ -n "$TAU_MAKEFILE" -a -f $TAU_MAKEFILE ]
-	then
-	  #Setting up TAU trace library:
-	  Echo "TAU>>>> configuring with this TAU makefile: $TAU_MAKEFILE"
-
-          WITH_TAU=1
-	else
-	  Echo "TAU>>>> ERROR could not find Makefile: $TAU_MAKEFILE, ignored"
-          TAU_MAKEFILE=""
-	fi
 fi
 
 if test $WITH_TAU -eq 1
@@ -853,35 +890,19 @@ then
     echo "CMK_WITH_TAU=\"true\"" >> $ConvSh
 fi
 
-if [ "$PROGRAM" = "ChaNGa" ]
-then
-  #Setting lbuserdata when the build is ChaNGa
-  CONFIG_OPTS="--enable-lbuserdata $CONFIG_OPTS"
-fi
-
 echo $BASEVERSION > $DESTINATION/tmp/.vdir
 echo $BASEVERSION | sed -e 's@-.*@@' > $DESTINATION/tmp/.gdir
 
-if test $BUILD_EMULATOR = 1
-then
-  # export BIGSIM so that make targets can depend on it
-  MAKEOPTS="$MAKEOPTS BIGSIM=bigsim"
-  PROGRAM="$PROGRAM bigsim"
-fi
+echo 'BUILDOPTS="'$OPTS'"'  >> $ConvSh
+echo "SRCBASE=$srcbase" > $DESTINATION/tmp/charmpath.mk
 
+echo "CONFIG_OPTS=\"$CONFIG_OPTS\"" > "$DESTINATION/tmp/config_opts.sh"
+chmod +x "$DESTINATION/tmp/config_opts.sh"
+echo "OPTSATBUILDTIME += $OPTS" > "$DESTINATION/tmp/buildopts.mk"
 
-if [ $BUILD_OMP = 2 ]
-then
-  case $DESTINATION in
-    "multicore"*)
-      BUILD_OMP=1
-      ;;
-    *)
-      echo "OpenMP support should be built in SMP mode"
-      exit 1
-      ;;
-  esac
-fi
+# ===================================================
+# ----------- end file structure creation -----------
+# ===================================================
 
 printError()
 {
@@ -893,14 +914,8 @@ printError()
 	exit $MAKEEXIT
 }
 
-echo 'BUILDOPTS="'$OPTS'"'  >> $ConvSh
-echo "SRCBASE=$srcbase" > $DESTINATION/tmp/charmpath.mk
-
 Echo "Performing '$MAKE $MAKEOPTS basics OPTS="$OPTS" QUIET="$QUIET" CONFIG_OPTS="$CONFIG_OPTS"' in $DESTINATION/tmp"
 cd $DESTINATION/tmp 
-echo "CONFIG_OPTS=\"$CONFIG_OPTS\"" > config_opts.sh
-chmod +x config_opts.sh
-echo "OPTSATBUILDTIME += $OPTS" > buildopts.mk
 $MAKE $MAKEOPTS basics OPTS="$OPTS $BUILD_SHARED" QUIET="$QUIET"
 MAKEEXIT=$?
 [ $MAKEEXIT -ne 0 ] && printError
