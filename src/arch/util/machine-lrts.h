@@ -26,7 +26,7 @@ void LrtsPostCommonInit(int everReturn);
 /* ### Beginning of Machine-running Related Functions ### */
 void LrtsAdvanceCommunication(int whileidle);
 void LrtsDrainResources(void); /* used when exit */
-void LrtsExit(void);
+void LrtsExit(int exitcode=0);
 CMK_NORETURN void LrtsAbort(const char *message);
 /* ### End of Machine-running Related Functions ### */
 void LrtsPostNonLocal(void);

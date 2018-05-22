@@ -1307,7 +1307,7 @@ void LrtsDrainResources(void) {
     MACHSTATE(2, "} Machine exit barrier end");
 }
 
-void LrtsExit(void) {
+void LrtsExit(int exitcode) {
     int i;
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
     int doPrint = 0;
@@ -1352,7 +1352,7 @@ void LrtsExit(void) {
 #endif
       MPI_Finalize();
 #endif
-      exit(0);
+      exit(exitcode);
     }
 }
 

@@ -4569,7 +4569,7 @@ void  LrtsFree(void *msg)
     }
 }
 
-void LrtsExit(void)
+void LrtsExit(int exitcode)
 {
 #if CMK_WITH_STATS
 #if CMK_SMP
@@ -4585,7 +4585,7 @@ void LrtsExit(void)
     if(!CharmLibInterOperate || userDrivenMode) {
       PMI_Barrier();
       PMI_Finalize();
-      exit(0);
+      exit(exitcode);
     }
 }
 

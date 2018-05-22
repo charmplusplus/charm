@@ -578,7 +578,7 @@ ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 CMI_EXTERNC_VARIABLE int quietModeRequested;
 CMI_EXTERNC_VARIABLE int quietMode;
 
-void ConverseExit(void)
+void ConverseExit(int exitcode)
 {
   if (quietModeRequested) quietMode = 1;
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
@@ -590,7 +590,7 @@ void ConverseExit(void)
 #if CMK_CRAYXE
   shmem_finalize();
 #endif
-  exit(0);
+  exit(exitcode);
 }
 
 /* lock

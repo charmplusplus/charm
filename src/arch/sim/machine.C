@@ -92,9 +92,9 @@ void CmiAbort(const char *message)
   CMI_NORETURN_FUNCTION_END
 }
 
-void ConverseExit(void)
+void ConverseExit(int exitcode)
 {
-  exit(0);
+  exit(exitcode);
 }
 
 /********************* MESSAGE SEND FUNCTIONS ******************/

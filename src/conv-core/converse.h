@@ -1697,7 +1697,22 @@ int 	   CmmGetLastTag(CmmTable t, int ntags, int *tags);
 /******** ConverseInit and ConverseExit ********/
 
 void ConverseInit(int, char**, CmiStartFn, int, int);
-void ConverseExit(void);
+
+/* Optional parameter for ConverseExit() - based on
+https://stackoverflow.com/a/28074198/1250282 */
+
+void realConverseExit(int exitcode);
+
+#define CONVEXIT_1(x) realConverseExit(x)
+#define CONVEXIT_0() CONVEXIT_1(0) /* Default ConverseExit() exit code: 0 */
+
+#define CONV_FUNC_CHOOSER(_f1, _f2, _f3, ...) _f3
+#define CONV_FUNC_RECOMPOSER(argsWithParentheses) CONV_FUNC_CHOOSER argsWithParentheses
+#define CONV_CHOOSE_FROM_ARG_COUNT(...) CONV_FUNC_RECOMPOSER((__VA_ARGS__, CONVEXIT_2, CONVEXIT_1, ))
+#define CONV_NO_ARG_EXPANDER() ,,CONVEXIT_0
+#define CONV_MACRO_CHOOSER(...) CONV_CHOOSE_FROM_ARG_COUNT(CONV_NO_ARG_EXPANDER __VA_ARGS__ ())
+#define ConverseExit(...) CONV_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
+
 
 #if CMK_SHRINK_EXPAND
 void ConverseCleanup(void);

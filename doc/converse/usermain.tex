@@ -56,11 +56,13 @@ fn(argc, argv)}.  Meanwhile, on those processors which {\em did}
 automatically invoke {\tt main}, ConverseInit returns.  Shutdown is
 initiated when the processors that {\em did} automatically invoke {\tt
 main} call ConverseExit, and when the other processors return from
-{\tt fn}.  In this mode, all polling for messages must be done
+{\tt fn}.  The optional exit code is returned to the calling shell.
+If no value is specified, an exit code of zero is returned.
+In this mode, all polling for messages must be done
 manually (probably using CsdScheduler explicitly).  This option is not
 supported by the sim version.
 
-\function{void ConverseExit(void)}
+\function{void ConverseExit(int exitcode /*optional*/)}
 \index{ConverseExit}
 \desc{This function is only used in ConverseInit-returns mode, described
 above.}

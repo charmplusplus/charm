@@ -184,6 +184,7 @@ int    _exitHandlerIdx;
 static Stats** _allStats = 0;
 #endif
 static bool   _exitStarted = false;
+static int _exitcode;
 
 static InitCallTable _initCallTable;
 
@@ -633,7 +634,7 @@ static void _exitHandler(envelope *env)
       }
 #else
       CmiFree(env);
-      ConverseExit();
+      ConverseExit(_exitcode);
 #endif
       break;
     case ReqStatMsg:
@@ -679,7 +680,7 @@ static void _exitHandler(envelope *env)
       //everyone exits here - there may be issues with leftover messages in the queue
 #if !CMK_WITH_STATS && !CMK_WITH_WARNINGS
       DEBUGF(("[%d] Calling converse exit from ReqStatMsg \n",CkMyPe()));
-      ConverseExit();
+      ConverseExit(_exitcode);
       if(CharmLibInterOperate)
 	CpvAccess(interopExitFlag) = 1;
 #endif
@@ -707,7 +708,7 @@ static void _exitHandler(envelope *env)
 
     case StatDoneMsg:
       DEBUGF(("[%d] Calling converse exit from StatDoneMsg \n",CkMyPe()));
-      ConverseExit();
+      ConverseExit(_exitcode);
       if (CharmLibInterOperate)
         CpvAccess(interopExitFlag) = 1;
       break;
@@ -726,7 +727,7 @@ static void _exitHandler(envelope *env)
     }
     case WarnDoneMsg:
       DEBUGF(("[%d] Calling converse exit from WarnDoneMsg \n",CkMyPe()));
-      ConverseExit();
+      ConverseExit(_exitcode);
       if (CharmLibInterOperate)
         CpvAccess(interopExitFlag) = 1;
       break;
@@ -1009,14 +1010,16 @@ void CkCleanup()
 
 CkQ<CkExitFn> _CkExitFnVec;
 
-// triger exit on PE 0,
-// which traverses _CkExitFnVec to call every registered user exit functions.
-// Every user exit functions should end with CkExit() to continue the chain
-extern "C"
-void CkExit(void)
+// Trigger exit on PE 0,
+// which traverses _CkExitFnVec to call every registered user exit function.
+// Every user exit function should end with CkExit() to continue the chain.
+void CkExit(int exitcode)
 {
   DEBUGF(("[%d] CkExit called \n",CkMyPe()));
     // always send to PE 0
+
+  // Store exit code for use in ConverseExit
+  _exitcode = exitcode;
   envelope *env = _allocEnv(StartExitMsg);
   env->setSrcPe(CkMyPe());
   CmiSetHandler(env, _exitHandlerIdx);

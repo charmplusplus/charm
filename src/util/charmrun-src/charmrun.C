@@ -2191,9 +2191,17 @@ static int req_handle_printerrsyn(ChMessage *msg, SOCKET fd)
   return REQ_OK;
 }
 
+static int _exitcode = 0;
+
 static int req_handle_ending(ChMessage *msg, SOCKET fd)
 {
   req_ending++;
+
+  if (msg->data) {
+    int exitcode = atoi(msg->data);
+    if (exitcode)
+      _exitcode = exitcode;
+  }
 
 #if CMK_SHRINK_EXPAND
   // When using shrink-expand, only PE 0 will send an "ending" request.
@@ -2213,8 +2221,8 @@ static int req_handle_ending(ChMessage *msg, SOCKET fd)
     for (const nodetab_process & p : my_process_table)
       skt_close(p.req_client);
     if (arg_verbose)
-      printf("Charmrun> Graceful exit.\n");
-    exit(0);
+      printf("Charmrun> Graceful exit with exit code %d.\n", _exitcode);
+    exit(_exitcode);
   }
   return REQ_OK;
 }

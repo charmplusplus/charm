@@ -777,7 +777,7 @@ void LrtsDrainResources(void)
   CmiNodeBarrier();
 }
 
-void LrtsExit(void)
+void LrtsExit(int exitcode)
 {
 #if !CMK_BLUEGENEQ
   CmiBarrier();
@@ -802,12 +802,12 @@ void LrtsExit(void)
 #if CMK_BLUEGENEQ
       Delay(100000);
 #endif
-      exit(0);
+      exit(exitcode);
     }
     else
-      pthread_exit(0);
+      pthread_exit(exitcode);
 #else
-    exit(0);
+    exit(exitcode);
 #endif
   }
 }

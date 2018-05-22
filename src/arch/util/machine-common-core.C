@@ -58,6 +58,8 @@ CsvDeclare(CMIQueue, nodeBcastQ);
 #endif
 #endif
 
+static int _exitcode;
+
 #if CMK_WITH_STATS
 static int  MSG_STATISTIC = 0;
 int     msg_histogram[22];
@@ -306,7 +308,6 @@ static void AdvanceCommunication(int whenidle);
 static void CommunicationServer(int sleepTime);
 CMI_EXTERNC
 void CommunicationServerThread(int sleepTime);
-void ConverseExit(void);
 
 /* Functions providing incoming network messages */
 void *CmiGetNonLocal(void);
@@ -1655,7 +1656,7 @@ static void CommunicationServer(int sleepTime) {
         CmiExitXpmem();
 #endif
         CmiNodeAllBarrier();
-        LrtsExit();
+        LrtsExit(_exitcode);
     }
 #endif
 }
@@ -1667,7 +1668,7 @@ void CommunicationServerThread(int sleepTime) {
 #endif
 }
 
-void ConverseExit(void) {
+void ConverseExit(int exitcode) {
     int i;
     if (quietModeRequested) quietMode = 1;
 #if !CMK_SMP || CMK_SMP_NO_COMMTHD
@@ -1705,9 +1706,11 @@ if (MSG_STATISTIC)
 #if CMK_USE_XPMEM
     CmiExitXpmem();
 #endif
-    LrtsExit();
+    LrtsExit(exitcode);
 #else
     /* In SMP, the communication thread will exit */
+    if (CmiMyRank() == 0)
+        _exitcode = exitcode;
     std::atomic_fetch_add_explicit(&commThdExit, 1, std::memory_order_release); /* atomic increment */
     CmiNodeAllBarrier();
 #if CMK_SMP_NO_COMMTHD

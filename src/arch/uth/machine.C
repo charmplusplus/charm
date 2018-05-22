@@ -283,7 +283,7 @@ static void CmiCallMain(void *ignored)
   ConverseExit();
 }
 
-void ConverseExit(void)
+void ConverseExit(int exitcode)
 {
   ConverseCommonExit();
   CmiThreads[CmiMyPe()] = 0;

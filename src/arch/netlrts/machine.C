@@ -346,7 +346,6 @@ static void charmrun_abort(const char*);
 
 static void KillEveryone(const char *msg)
 {
-  printf("XYZ    FOOBAR exit\n");
   charmrun_abort(msg);
   machine_exit(1);
 }
@@ -954,7 +953,7 @@ extern double evacTime;
  killing ourselves if charmrun dies.
 */
 
-/*This flag prevents simultanious outgoing
+/*This flag prevents simultaneous outgoing
 messages on the charmrun socket.  It is protected
 by the commlock.*/
 static int Cmi_charmrun_fd_sendflag=0;
@@ -1939,19 +1938,21 @@ void LrtsPostCommonInit(int everReturn)
     
 }
 
-void LrtsExit(void)
+void LrtsExit(int exitcode)
 {
   int i;
   machine_initiated_shutdown=1;
 
   CmiStdoutFlush();
   if (Cmi_charmrun_fd==-1) {
-    exit(0);
+    exit(exitcode);
   }
   else {
+    char tmp[16];
+    sprintf(tmp, "%d", exitcode);
     Cmi_check_delay = 1.0;      /* speed up checking of charmrun */
     for(i = 0; i < CmiMyNodeSize(); i++) {
-      ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes charmrun to go away, every PE needs to report */
+      ctrl_sendone_locking("ending",tmp,strlen(tmp)+1,NULL,0); /* this causes charmrun to go away, every PE needs to report */
     }
     while(1) {
 #if CMK_USE_PXSHM

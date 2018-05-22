@@ -1953,18 +1953,20 @@ void LrtsPostCommonInit(int everReturn)
     
 }
 
-void LrtsExit(void)
+void LrtsExit(int exitcode)
 {
   int i;
   machine_initiated_shutdown=1;
 
   CmiStdoutFlush();
   if (Cmi_charmrun_fd==-1) {
-    exit(0); /*Standalone version-- just leave*/
+    exit(exitcode); /*Standalone version-- just leave*/
   } else {
+    char tmp[16];
+    sprintf(tmp, "%d", exitcode);
     Cmi_check_delay = 1.0;      /* speed up checking of charmrun */
     for(i = 0; i < CmiMyNodeSize(); i++) {
-      ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes charmrun to go away, every PE needs to report */
+      ctrl_sendone_locking("ending",tmp,strlen(tmp)+1,NULL,0); /* this causes charmrun to go away, every PE needs to report */
     }
     while(1) CommunicationServerNet(5, COMM_SERVER_FROM_SMP);
   }

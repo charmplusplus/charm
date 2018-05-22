@@ -52,7 +52,22 @@ extern "C" {
 #define CkAssert                CmiAssert
 #define CkSetPeHelpsOtherThreads CmiSetPeHelpsOtherThreads
 
-extern void  CkExit(void);
+void realCkExit(int exitcode);
+
+/* Optional parameter for CkExit() - based on
+https://stackoverflow.com/a/28074198/1250282 */
+
+#define CKEXIT_1(x) realCkExit(x)
+#define CKEXIT_0() CKEXIT_1(0) /* Default CkExit() exit code: 0 */
+
+#define CKEXIT_FUNC_CHOOSER(_f1, _f2, _f3, ...) _f3
+#define CKEXIT_FUNC_RECOMPOSER(argsWithParentheses) CKEXIT_FUNC_CHOOSER argsWithParentheses
+#define CKEXIT_CHOOSE_FROM_ARG_COUNT(...) CKEXIT_FUNC_RECOMPOSER((__VA_ARGS__, CKEXIT_2, CKEXIT_1, ))
+#define CKEXIT_NO_ARG_EXPANDER() ,,CKEXIT_0
+#define CKEXIT_MACRO_CHOOSER(...) CKEXIT_CHOOSE_FROM_ARG_COUNT(CKEXIT_NO_ARG_EXPANDER __VA_ARGS__ ())
+#define CkExit(...) CKEXIT_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
+
+
 #if CMK_SHRINK_EXPAND
 extern void  CkCleanup(void);
 #endif

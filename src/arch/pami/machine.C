@@ -1019,7 +1019,7 @@ void spin_wait_barrier (void) {
   //barrier complete
 }
 
-void ConverseExit(void) {
+void ConverseExit(int exitcode) {
 
   if (quietModeRequested) quietMode = 1;
 
@@ -1062,12 +1062,12 @@ void ConverseExit(void) {
 #if CMK_BLUEGENEQ
     Delay(100000);
 #endif
-    exit(0); 
+    exit(exitcode); 
   }
   else
-    pthread_exit(0);
+    pthread_exit(exitcode);
 #else
-  exit(0);
+  exit(exitcode);
 #endif
 }
 

@@ -24,7 +24,7 @@
  */ 
 
 void ConverseInit(int, char**, CmiStartFn, int, int);
-void ConverseExit(void);
+void ConverseExit(int exitcode);
 
 void CmiAbort(const char *);
 

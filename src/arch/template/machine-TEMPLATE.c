@@ -69,7 +69,7 @@ static void LrtsAdvanceCommunication(void)
 static void LrtsDrainResources(void) /* used when exit */
 {
 }
-static void LrtsExit(void)
+static void LrtsExit(int exitcode)
 {
 }
 static void LrtsPostNonLocal(void)

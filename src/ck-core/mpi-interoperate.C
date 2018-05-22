@@ -1,5 +1,3 @@
-extern "C" void CkExit(void);
-
 #include "mpi-interoperate.h"
 //#define PERFORM_DEBUG 1
 #if PERFORM_DEBUG
@@ -134,8 +132,8 @@ void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
   StartInteropScheduler();
 }
 
-#undef CkExit
-#define CkExit CkExit
+// #undef CkExit
+// #define CkExit CkExit
 extern "C"
 void CharmLibExit() {
   _cleanUp = 1;

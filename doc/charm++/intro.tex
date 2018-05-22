@@ -150,7 +150,10 @@ chares, and groups.  It can also be used to initialize shared \kw{readonly}
 objects.
 
 \charm program execution is terminated by the \kw{CkExit} call.  Like the
-\kw{exit} system call, \kw{CkExit} never returns. The Charm RTS ensures
+\kw{exit} system call, \kw{CkExit} never returns, and it optionally accepts
+an integer value to specify the exit code that is returned to the
+calling shell. If no exit code is specified, a value of zero (indicating
+successful execution) is returned. The Charm RTS ensures
 that no more messages are processed and no entry methods are called after a
 \kw{CkExit}. \kw{CkExit} need not be called on all processors; it is enough
 to call it from just one processor at the end of the computation.

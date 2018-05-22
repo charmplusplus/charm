@@ -20,6 +20,8 @@ extern "C" void LibCkExit(void);
 
 extern "C" void StartCharmScheduler();
 extern "C" void StopCharmScheduler();
+
+#undef CkExit
 #define CkExit LibCkExit
 
 #if defined(AMPI)

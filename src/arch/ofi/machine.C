@@ -1375,7 +1375,7 @@ void LrtsFree(void *msg)
 #endif /* USE_MEMPOOL */
 }
 
-void LrtsExit()
+void LrtsExit(int exitcode)
 {
     int        ret;
     int        i;
@@ -1434,7 +1434,7 @@ void LrtsExit()
             MACHSTATE1(2, "runtime_fini() returned %i", ret);
             CmiAbort("OFI::LrtsExit failed");
         }
-        exit(0);
+        exit(exitcode);
     }
 
     MACHSTATE(2, "} OFI::LrtsExit");
