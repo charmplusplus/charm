@@ -1513,7 +1513,7 @@ void TraceProjections::beginExecute(int event, int msgType, int ep, int srcPe,
     if (! nestedEvents.isEmpty()) {
       endExecuteLocal();
     }
-    nestedEvents.enq(NestedEvent(event, msgType, ep, srcPe, mlen, idx));
+    nestedEvents.push(NestedEvent(event, msgType, ep, srcPe, mlen, idx));
   }
   beginExecuteLocal(event, msgType, ep, srcPe, mlen, idx);
 }
