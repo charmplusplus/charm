@@ -128,7 +128,11 @@ can be built or downloaded from our web site.
 The \charmpp{} C++ and Fortran user include files (.h).
 
 \item[\kw{charm/lib}]
-The libraries (.a) that comprise \charmpp{}.
+The static libraries (.a) that comprise \charmpp{}.
+
+\item[\kw{charm/lib_so}]
+The shared libraries (.so/.dylib) that comprise \charmpp{},
+if \charmpp{} is compiled with the \texttt{--build-shared} option.
 
 \item[\kw{charm/examples}]
 Example \charmpp{} programs.
@@ -139,9 +143,6 @@ Source code for \charmpp{} itself.
 \item[\kw{charm/tmp}]
 Directory where \charmpp{} is built.
 
-%\item[\kw{charm/tools}]
-%Visualization tools for \charmpp{} programs.
-
 \item[\kw{charm/tests}]
 Test \charmpp{} programs used by autobuild.
 
@@ -150,10 +151,5 @@ Test \charmpp{} programs used by autobuild.
 \section{Reducing disk usage}
 
 The charm directory contains a collection of example-programs and
-test-programs.  These may be deleted with no other effects. You may 
+test-programs.  These may be deleted with no other effects. You may
 also {\tt strip} all the binaries in {\tt charm/bin}.
-
-
-
-
-
