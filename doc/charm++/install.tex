@@ -1,9 +1,14 @@
-\charmpp{} can be installed either from the source code or using a precompiled
-binary package. Building from the source code provides more flexibility, since one 
+\charmpp{} can be installed manually from the source code or using a precompiled
+binary package. We also provide a source code package for the
+\emph{Spack} package manager.
+Building from the source code provides more flexibility, since one
 can choose the options as desired. However, a precompiled binary may be slightly
 easier to get running.
- 
-\section{Downloading \charmpp{}}
+
+
+\section{Manual installation}
+
+\subsection{Downloading \charmpp{}}
 
 \charmpp{} can be downloaded using one of the following methods:
 
@@ -14,12 +19,13 @@ binaries) can be downloaded from our website at {\em http://charm.cs.illinois.ed
 from our source archive using {\em git clone http://charm.cs.illinois.edu/gerrit/charm}.
 \end{itemize}
 
-If you download the source code from the website, you will have to unpack it 
-using a tool capable of extracting gzip'd tar files, such as tar (on Unix) 
-or WinZIP (under Windows).  \charmpp{} will be extracted to a directory 
-called ``charm''. 
+If you download the source code from the website, you will have to unpack it
+using a tool capable of extracting gzip'd tar files, such as tar (on Unix)
+or WinZIP (under Windows).  \charmpp{} will be extracted to a directory
+called ``charm''.
 
-\section{Installation}
+\subsection{Installation}
+\label{sec:manualinstall}
 
 A typical prototype command for building \charmpp{} from the source code is:
 \vspace{5pt}\\
@@ -35,7 +41,7 @@ used to build a shared memory version, {\em -j8} is given to build in parallel
 etc.
 \end {description}
 
-In Table~\ref{tab:buildlist}, a list of build commands is provided for some of the commonly 
+In Table~\ref{tab:buildlist}, a list of build commands is provided for some of the commonly
 used systems. Note that, in general, options such as {\em smp},
 \verb|--with-production|, compiler specifiers etc can be used with all targets.
 It is advisable to build with \verb|--with-production| to obtain the best
@@ -111,6 +117,45 @@ Note that some are only effective when passed with \verb|-D| from the
 command line while configuring from a blank slate. To build with all defaults,
 \verb|cmake .| is sufficient, though invoking CMake from a separate location
 (ex: \verb|mkdir mybuild && cd mybuild && cmake ../charm|) is recommended.
+
+\section{Installation through the Spack package manager}
+
+\charmpp{} can also be installed through the Spack package manager (\url{https://spack.io/}).
+
+A basic command to install \charmpp{} through Spack is the following:
+
+\begin{alltt}
+	$ spack install charm
+\end{alltt}
+
+By default, the mpi network backend with smp support is built. You can specify
+other backends by providing the \texttt{backend} parameter to spack. It is
+also possible to specify other options, as listed in
+Section~\ref{sec:manualinstall}, by adding them to the Spack command prepended
+by a '\texttt{+}'. For example, to build the netlrts version of \charmpp{} with
+the integrated OpenMP support, you can use the following command:
+
+\begin{alltt}
+	$ spack install charm backend=netlrts +omp
+\end{alltt}
+
+To disable an option, prepend it with a '\texttt{\textasciitilde}'. For example,
+to build \charmpp{} with smp support disabled, you can use the following command:
+
+\begin{alltt}
+	$ spack install charm ~smp
+\end{alltt}
+
+By default, the newest released version of \charmpp{} is built. You can select
+another version with the '\texttt{@}' option (for example, \texttt{@6.8.1}). To
+build the current git version of \charmpp{}, specify the \texttt{@develop}
+version:
+
+\begin{alltt}
+	$ spack install charm@develop
+\end{alltt}
+
+\section{\charmpp{} installation directories}
 
 The main directories in a \charmpp{} installation are:
 
