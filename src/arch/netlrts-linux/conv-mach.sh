@@ -52,3 +52,7 @@ else
 fi
 
 fi
+
+CMK_CF77="$CMK_CF77 -m32"
+CMK_CF90="$CMK_CF90 -m32"
+CMK_CF90_FIXED="$CMK_CF90_FIXED -m32"
