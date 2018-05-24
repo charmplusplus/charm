@@ -71,7 +71,8 @@ void allocNewTLSSeg(tlsseg_t* t, CthThread th) {
     t->memseg = (Addr)( ((char *)(t->memseg)) + t->size );
     /* printf("[%d] 2 ALIGN %d MEM %p SIZE %d\n", CmiMyPe(), t->align, t->memseg, t->size); */
   } else {
-    t->memseg = (Addr)NULL;
+    /* since we don't have a PT_TLS section to copy, keep whatever the system gave us */
+    t->memseg = (Addr)getTLS();
     t->size = 0;
     t->align = 0;
   }
