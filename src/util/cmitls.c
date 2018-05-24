@@ -6,6 +6,10 @@
 
 #if !CMK_CHARMPY && CMK_HAS_ELF_H && CMK_HAS_TLS_VARIABLES
 
+void* getTLS(void) CMI_NOOPTIMIZE;
+void setTLS(void* newptr) CMI_NOOPTIMIZE;
+void* swapTLS(void* newptr) CMI_NOOPTIMIZE;
+
 extern void* __executable_start;
 CMI_EXTERNC_VARIABLE int quietModeRequested;
 
@@ -82,43 +86,71 @@ void currentTLS(tlsseg_t*) CMI_NOOPTIMIZE;
  *     } */
 
 void currentTLS(tlsseg_t* cur) {
+  cur->memseg = (Addr)getTLS();
+}
+
+void* getTLS(void) {
+  void* ptr;
 #if CMK_TLS_SWITCHING64
   asm volatile ("movq %%fs:0x0, %0\n\t"
-                : "=r"(cur->memseg));
+                : "=r"(ptr));
 #elif CMK_TLS_SWITCHING32
   asm volatile ("movl %%gs:0x0, %0\n\t"
-                : "=r"(cur->memseg));
+                : "=r"(ptr));
 #else
   fprintf(stderr, "TLS globals are not supported.");
   abort();
 #endif
+  return ptr;
 }
 
 void switchTLS(tlsseg_t* cur, tlsseg_t* next) {
+  cur->memseg = (Addr)swapTLS((void*)next->memseg);
+}
+
+void* swapTLS(void* newptr) {
+  void* oldptr;
 #if CMK_TLS_SWITCHING64
 #if 0
   asm volatile ("movq %%fs:0x0, %0\n\t"
-                : "=r"(cur->memseg));
-  if (cur->memseg == next->memseg) return;      /* same */
+                : "=r"(oldptr));
+  if (oldptr == newptr) /* same */
+    return oldptr;
   asm volatile ("movq %0, %%fs:0x0\n\t"
                 :
-                : "r"(next->memseg));
+                : "r"(newptr));
 #else
   asm volatile ("movq %%fs:0x0, %0\n\t"
                 "movq %1, %%fs:0x0\n\t"
-                : "=r"(cur->memseg)
-                : "r"(next->memseg));
+                : "=&r"(oldptr)
+                : "r"(newptr));
 #endif
 #elif CMK_TLS_SWITCHING32
   asm volatile ("movl %%gs:0x0, %0\n\t"
                 "movl %1, %%gs:0x0\n\t"
-                : "=r"(cur->memseg)
-                : "r"(next->memseg));
+                : "=&r"(oldptr)
+                : "r"(newptr));
+#else
+  fprintf(stderr, "TLS globals are not supported.");
+  abort();
+#endif
+  return oldptr;
+}
+
+/* for calling from a debugger */
+void setTLS(void* newptr) {
+#if CMK_TLS_SWITCHING64
+  asm volatile ("movq %0, %%fs:0x0\n\t"
+                :
+                : "r"(newptr));
+#elif CMK_TLS_SWITCHING32
+  asm volatile ("movl %0, %%gs:0x0\n\t"
+                :
+                : "r"(newptr));
 #else
   fprintf(stderr, "TLS globals are not supported.");
   abort();
 #endif
 }
-
 
 #endif
