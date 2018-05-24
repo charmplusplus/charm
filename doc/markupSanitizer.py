@@ -94,5 +94,4 @@ newhead.append(titl)
 soup.html.body.insert_before(newhead)
 
 # Print cleaned up markup to stdout
-print( soup.prettify(formatter="html") )
-
+print( soup.encode("utf-8") )
