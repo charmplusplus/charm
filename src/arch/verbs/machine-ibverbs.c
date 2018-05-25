@@ -1730,53 +1730,48 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 	}
 	if(header->code == INFIRDMA_DIRECT_REG_AND_PUT){
 		// Register the source buffer and perform PUT
-		CmiVerbsRdmaReverseOp_t *regAndPutMsg = (CmiVerbsRdmaReverseOp_t *)(buffer->buf+sizeof(struct infiPacketHeader));
-		struct ibv_mr *mr = registerDirectMemory(regAndPutMsg->srcAddr, regAndPutMsg->size);
-
-		void *ref = CmiGetNcpyAck(regAndPutMsg->srcAddr,
-		                          (char *)regAndPutMsg + sizeof(CmiVerbsRdmaReverseOp_t)+ regAndPutMsg->ackSize, //srcAck
-		                          regAndPutMsg->srcPe,
-		                          regAndPutMsg->destAddr,
-		                          (char *)regAndPutMsg + sizeof(CmiVerbsRdmaReverseOp_t), //destAck
-		                          regAndPutMsg->destPe,
-		                          regAndPutMsg->ackSize);
+		NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(buffer->buf+sizeof(struct infiPacketHeader));
 		
+		NcpyOperationInfo *newNcpyOpInfo = (NcpyOperationInfo *)CmiAlloc(ncpyOpInfo->ncpyOpInfoSize);
+		memcpy((char *)newNcpyOpInfo, (char *)ncpyOpInfo, ncpyOpInfo->ncpyOpInfoSize);
+		
+		resetNcpyOpInfoPointers(newNcpyOpInfo);
+		
+		struct ibv_mr *mr = registerDirectMemory(newNcpyOpInfo->srcPtr, newNcpyOpInfo->size);
 		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)malloc(sizeof(struct infiRdmaPacket));
 		rdmaPacket->type = INFI_ONESIDED_DIRECT;
-		rdmaPacket->localBuffer = ref;
+		rdmaPacket->localBuffer = newNcpyOpInfo;
 		
-		postRdma((uint64_t)regAndPutMsg->srcAddr,
+		postRdma((uint64_t)(newNcpyOpInfo->srcPtr),
 		        mr->lkey,
-		        (uint64_t)regAndPutMsg->destAddr,
-		        regAndPutMsg->rem_key,
-		        regAndPutMsg->size,
-		        regAndPutMsg->destPe,
+		        (uint64_t)(newNcpyOpInfo->destPtr),
+            ((CmiVerbsRdmaPtr_t *)(newNcpyOpInfo->destLayerInfo))->key,
+		        newNcpyOpInfo->size,
+		        newNcpyOpInfo->destPe,
 		        (uint64_t)rdmaPacket,
 		        IBV_WR_RDMA_WRITE);
 	}
 	if(header->code == INFIRDMA_DIRECT_REG_AND_GET){
 		// Register the destination buffer and perform GET
-		CmiVerbsRdmaReverseOp_t *regAndGetMsg = (CmiVerbsRdmaReverseOp_t *)(buffer->buf+sizeof(struct infiPacketHeader));
-		struct ibv_mr *mr = registerDirectMemory(regAndGetMsg->destAddr, regAndGetMsg->size);
-
-		void *ref = CmiGetNcpyAck(regAndGetMsg->srcAddr,
-		                          (char *)regAndGetMsg + sizeof(CmiVerbsRdmaReverseOp_t)+ regAndGetMsg->ackSize, //srcAck
-		                          regAndGetMsg->srcPe,
-		                          regAndGetMsg->destAddr,
-		                          (char *)regAndGetMsg + sizeof(CmiVerbsRdmaReverseOp_t), //destAck
-		                          regAndGetMsg->destPe,
-		                          regAndGetMsg->ackSize);
+		NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(buffer->buf+sizeof(struct infiPacketHeader));
+		
+		NcpyOperationInfo *newNcpyOpInfo = (NcpyOperationInfo *)CmiAlloc(ncpyOpInfo->ncpyOpInfoSize);
+		memcpy(newNcpyOpInfo, ncpyOpInfo, ncpyOpInfo->ncpyOpInfoSize);
+		
+		resetNcpyOpInfoPointers(newNcpyOpInfo);
+		
+		struct ibv_mr *mr = registerDirectMemory(newNcpyOpInfo->destPtr, newNcpyOpInfo->size);
 		
 		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)malloc(sizeof(struct infiRdmaPacket));
 		rdmaPacket->type = INFI_ONESIDED_DIRECT;
-		rdmaPacket->localBuffer = ref;
+		rdmaPacket->localBuffer = newNcpyOpInfo;
 		
-		postRdma((uint64_t)regAndGetMsg->destAddr,
+		postRdma((uint64_t)newNcpyOpInfo->destPtr,
 		        mr->lkey,
-		        (uint64_t)regAndGetMsg->srcAddr,
-		        regAndGetMsg->rem_key,
-		        regAndGetMsg->size,
-		        regAndGetMsg->srcPe,
+		        (uint64_t)newNcpyOpInfo->srcPtr,
+		        ((CmiVerbsRdmaPtr_t *)(newNcpyOpInfo->srcLayerInfo))->key,
+		        newNcpyOpInfo->size,
+		        newNcpyOpInfo->srcPe,
 		        (uint64_t)rdmaPacket,
 		        IBV_WR_RDMA_READ);
 	}

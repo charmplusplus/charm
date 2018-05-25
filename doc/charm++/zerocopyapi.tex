@@ -147,6 +147,51 @@ void destinationDone() \{
 \}
 \end{alltt}
 
+The callback methods can also take a pointer to a \texttt{CkDataMsg} message. This message can be
+used to access the original pointer passed into the buffer and another optional reference pointer that was
+initially set for the \kw{CkNcpyBuffer} object using the method \texttt{setRef}. The following code snippet
+illustrates the accessing of the original buffer pointer in the callback method by casting the \texttt{data}
+field of the \texttt{CkDataMsg} object into a \texttt{CkNcpyAck} object.
+
+\begin{alltt}
+// Invoked by the runtime on source (Index 0)
+void sourceDone(CkDataMsg *msg) \{
+    // Cast msg->data to a CkNcpyAck
+    CkNcpyAck *ack = (CkNcpyAck *)(msg->data);
+
+    // access buffer pointer and free it
+    free(ack->ptr);
+\}
+\end{alltt}
+
+The following code snippet illustrates the usage of the \texttt{setRef} method.
+
+\begin{alltt}
+const void *refPtr = &index;
+CkNcpyBuffer source(arr1, arr1Size * sizeof(int), srcCb, CK_BUFFER_UNREG);
+source.setRef(refPtr);
+\end{alltt}
+
+Similar to the buffer pointer, the user set arbitrary reference pointer can be also accessed in the
+callback method. This is shown in the next code snippet.
+
+\begin{alltt}
+// Invoked by the runtime on source (Index 0)
+void sourceDone(CkDataMsg *msg) \{
+    // update the buffer to the next pointer
+    updateBuffer();
+
+    // Cast msg->data to a CkNcpyAck
+    CkNcpyAck *ack = (CkNcpyAck *)(msg->data);
+
+    // access buffer pointer and free it
+    free(ack->ptr);
+
+    // get reference pointer
+    const void *refPtr = ack->ref;
+\}
+\end{alltt}
+
 Both the source and destination buffers are of the same type i.e. \kw{CkNcpyBuffer}.
 What distinguishes a source buffer from a destination buffer is the way the \kw{get} or
 \kw{put} call is made. A valid \kw{get} call using two \kw{CkNcpyBuffer} objects \texttt{obj1} and

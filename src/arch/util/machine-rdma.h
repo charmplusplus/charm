@@ -186,7 +186,7 @@ void CmiIssueRgets(void *recv, int pe){
 #if CMK_ONESIDED_DIRECT_IMPL
 
 // Function Pointer to the individual Acknowledement handler function for the Direct API
-RdmaSingleAckHandlerFn ncpyAckHandlerFn;
+RdmaAckHandlerFn ncpyAckHandlerFn;
 
 typedef struct _cmi_rdma_direct_ack {
   const void *srcAddr;
@@ -200,33 +200,15 @@ typedef struct _cmi_rdma_direct_ack {
 void LrtsSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode);
 void LrtsSetRdmaNcpyAck(RdmaAckHandlerFn fn);
 void LrtsIssueRget(
-  const void* srcAddr,
-  void *srcInfo,
-  void *srcAck,
-  int srcAckSize,
-  int srcPe,
+  NcpyOperationInfo *ncpyOpInfo,
   unsigned short int *srcMode,
-  const void* destAddr,
-  void *destInfo,
-  void *destAck,
-  int destAckSize,
-  int destPe,
-  unsigned short int *destMode,
-  int size);
+  unsigned short int *destMode);
+
 void LrtsIssueRput(
-  const void* destAddr,
-  void *destInfo,
-  void *destAck,
-  int destAckSize,
-  int destPe,
-  unsigned short int *destMode,
-  const void* srcAddr,
-  void *srcInfo,
-  void *srcAck,
-  int srcAckSize,
-  int srcPe,
+  NcpyOperationInfo *ncpyOpInfo,
   unsigned short int *srcMode,
-  int size);
+  unsigned short int *destMode);
+
 void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode);
 
 /* Set the machine specific information for a nocopy pointer */
@@ -234,106 +216,33 @@ void CmiSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short 
   LrtsSetRdmaBufferInfo(info, ptr, size, mode);
 }
 
-void *CmiGetNcpyAck(const void *srcAddr, void *srcAck, int srcPe, const void *destAddr, void *destAck, int destPe, int ackSize) {
-  CmiRdmaDirectAck *directAck = (CmiRdmaDirectAck *)malloc(sizeof(CmiRdmaDirectAck) + 2*ackSize);
-  directAck->srcAddr = srcAddr;
-  directAck->srcPe = srcPe;
-  directAck->destAddr = destAddr;
-  directAck->destPe = destPe;
-  directAck->ackSize = ackSize;
-
-  // copy source ack
-  memcpy((char *)directAck + sizeof(CmiRdmaDirectAck), srcAck, ackSize);
-
-  // copy destination ack
-  memcpy((char *)directAck + sizeof(CmiRdmaDirectAck) + ackSize, destAck, ackSize);
-
-  return (void *)directAck;
-}
-
 void CmiInvokeNcpyAck(void *ack) {
-  CmiRdmaDirectAck *directAck = (CmiRdmaDirectAck *)ack;
-
-  // Retrieve source ack
-  void *srcAck = (char *)directAck + sizeof(CmiRdmaDirectAck);
-
-  // Retrieve destination ack
-  void *destAck = (char *)srcAck + directAck->ackSize;
-
-  ncpyAckHandlerFn(srcAck, directAck->srcPe, directAck->srcAddr);
-  ncpyAckHandlerFn(destAck, directAck->destPe, directAck->destAddr);
-
-  // free the allocated ack information
-  free(directAck);
+  ncpyAckHandlerFn(ack);
 }
 
 /* Set the ack handler function used in the Direct API */
-void CmiSetRdmaNcpyAck(RdmaSingleAckHandlerFn fn){
+void CmiSetRdmaNcpyAck(RdmaAckHandlerFn fn){
   ncpyAckHandlerFn = fn;
 }
 
 /* Perform an RDMA Get operation into the local destination address from the remote source address*/
 void CmiIssueRget(
-  const void* srcAddr,
-  void *srcInfo,
-  void *srcAck,
-  int srcAckSize,
-  int srcPe,
+  NcpyOperationInfo *ncpyOpInfo,
   unsigned short int *srcMode,
-  const void* destAddr,
-  void *destInfo,
-  void *destAck,
-  int destAckSize,
-  int destPe,
-  unsigned short int *destMode,
-  int size) {
+  unsigned short int *destMode) {
 
   // Use network RDMA for a PE on a remote host
-  LrtsIssueRget(srcAddr,
-                (char*)srcInfo + CmiGetRdmaCommonInfoSize(),
-                srcAck,
-                srcAckSize,
-                srcPe,
-                srcMode,
-                destAddr,
-                (char*)destInfo + CmiGetRdmaCommonInfoSize(),
-                destAck,
-                destAckSize,
-                destPe,
-                destMode,
-                size);
+  LrtsIssueRget(ncpyOpInfo, srcMode, destMode);
 }
 
 /* Perform an RDMA Put operation into the remote destination address from the local source address */
 void CmiIssueRput(
-  const void* destAddr,
-  void *destInfo,
-  void *destAck,
-  int destAckSize,
-  int destPe,
-  unsigned short int *destMode,
-  const void* srcAddr,
-  void *srcInfo,
-  void *srcAck,
-  int srcAckSize,
-  int srcPe,
+  NcpyOperationInfo *ncpyOpInfo,
   unsigned short int *srcMode,
-  int size) {
+  unsigned short int *destMode) {
 
   // Use network RDMA for a PE on a remote host
-  LrtsIssueRput(destAddr,
-                (char*)destInfo + CmiGetRdmaCommonInfoSize(),
-                destAck,
-                destAckSize,
-                destPe,
-                destMode,
-                srcAddr,
-                (char*)srcInfo + CmiGetRdmaCommonInfoSize(),
-                srcAck,
-                srcAckSize,
-                srcPe,
-                srcMode,
-                size);
+  LrtsIssueRput(ncpyOpInfo, srcMode, destMode);
 }
 
 /* De-register registered memory for pointer */

@@ -232,7 +232,8 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       memory-isomalloc.h debug-conv.h debug-conv++.h conv-autoconfig.h \
       conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh \
       blue.h blue-conv.h bgconverse.h cmipool.h mempool.h cmiqueue.h \
-      cmidirect.h cmidirectmanytomany.h cmitls.h lrtslock.h conv-rdma.h lrts-common.h
+      cmidirect.h cmidirectmanytomany.h cmitls.h lrtslock.h conv-rdma.h lrts-common.h  \
+      conv-header.h
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
@@ -240,7 +241,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h ckliststring.h \
 	cksequence.h ckstatistics.h ckvector3d.h conv-lists.h ckcomplex.h \
 	sockRoutines.h sockRoutines.c cmimemcpy.h simd.h SSE-Double.h SSE-Float.h \
-	crc32.h ckBIconfig.h rand48_replacement.h ckregex.h spanningTree.h
+	crc32.h ckBIconfig.h rand48_replacement.h ckregex.h spanningTree.h cmirdmautils.h
 
 CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h ckIgetControl.h cktiming.h debug-charm.h\
@@ -458,7 +459,7 @@ LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 	ckimage.o ckdll.o ckhashtable.o sockRoutines.o			\
 	conv-lists.o persist-comm.o mempool.o graph.o \
 	crc32.o  lz4.o partitioning_strategies.o hilbert.o \
-	spanningTree.o
+	spanningTree.o cmirdmautils.o
 
 LIBCONV_UTILF=pup_f.o
 
@@ -664,7 +665,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   NullLB.o LBSimulation.o modifyScheduler.o \
 	   charmProjections.o cktiming.o ckbitvector.o \
            pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \
-					 trace-controlPoints.o mpi-interoperate.o ckregex.o
+					 trace-controlPoints.o mpi-interoperate.o ckregex.o cmirdmautils.o
 
 charm-core: converse $(L)/libck.a $(L)/libckf.a $(L)/libckmain.a $(L)/libckmainf.a
 charm-target: loadbalancers default_libs $(L)/libmpi-mainmodule.a tmgr

@@ -1,0 +1,70 @@
+#ifndef _CKRDMAUTILS_H
+#define _CKRDMAUTILS_H
+
+#include "conv-header.h"
+
+// Structure that can be used across layers
+typedef struct ncpystruct{
+
+  // Used in the MPI layer
+#if CMK_CONVERSE_MPI
+  char core[CmiMsgHeaderSizeBytes];
+  int tag;
+#endif
+
+  const void *srcPtr;
+  int srcPe;
+  char *origSrcLayerInfoPtr;
+  char *srcLayerInfo;
+  int srcLayerSize;
+  char *srcAck;
+  int srcAckSize;
+  const void *srcRef;
+
+  const void *destPtr;
+  int destPe;
+  char *origDestLayerInfoPtr;
+  char *destLayerInfo;
+  int destLayerSize;
+  char *destAck;
+  int destAckSize;
+  const void *destRef;
+
+  // Variables used for ack handling
+  int ackMode; // 0 for call both src and dest acks
+               // 1 for call just src ack
+               // 2 for call just dest ack
+  int freeMe; // 1 for free, 0 for do not free
+
+  int ncpyOpInfoSize;
+  int size;
+
+}NcpyOperationInfo;
+
+int getNcpyOpInfoTotalSize(
+  int srcLayerSize,
+  int srcAckSize,
+  int destLayerSize,
+  int destAckSize);
+
+void setNcpyOpInfo(
+    const void *srcPtr,
+    char *srcLayerInfo,
+    int srcLayerSize,
+    char *srcAck,
+    int srcAckSize,
+    int srcPe,
+    const void *srcRef,
+    const void *destPtr,
+    char *destLayerInfo,
+    int destLayerSize,
+    char *destAck,
+    int destAckSize,
+    int destPe,
+    const void *destRef,
+    int size,
+    NcpyOperationInfo *ncpyOpInfo);
+
+
+void resetNcpyOpInfoPointers(NcpyOperationInfo *ncpyOpInfo);
+#endif

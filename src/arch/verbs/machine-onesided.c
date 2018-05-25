@@ -170,76 +170,51 @@ struct ibv_mr* registerDirectMemory(const void *addr, int size) {
 
 // Perform an RDMA Get call into the local destination address from the remote source address
 void LrtsIssueRget(
-  const void* srcAddr,
-  void *srcInfo,
-  void *srcAck,
-  int srcAckSize,
-  int srcPe,
+  NcpyOperationInfo *ncpyOpInfo,
   unsigned short int *srcMode,
-  const void* destAddr,
-  void *destInfo,
-  void *destAck,
-  int destAckSize,
-  int destPe,
-  unsigned short int *destMode,
-  int size) {
-
-  CmiAssert(srcAckSize == destAckSize);
+  unsigned short int *destMode) {
 
   // Register local buffer if it is not registered
   if(*destMode == CMK_BUFFER_UNREG) {
-    CmiVerbsRdmaPtr_t *dest_info = (CmiVerbsRdmaPtr_t *)destInfo;
-    dest_info->mr = registerDirectMemory(destAddr, size);
+    CmiVerbsRdmaPtr_t *dest_info = (CmiVerbsRdmaPtr_t *)(ncpyOpInfo->destLayerInfo);
+    dest_info->mr = registerDirectMemory(ncpyOpInfo->destPtr, ncpyOpInfo->size);
     dest_info->key = dest_info->mr->rkey;
     *destMode = CMK_BUFFER_REG;
+
+    // set registration info in the origDestLayerInfoPtr
+    ((CmiVerbsRdmaPtr_t *)(ncpyOpInfo->origDestLayerInfoPtr))->mr = dest_info->mr;
+    ((CmiVerbsRdmaPtr_t *)(ncpyOpInfo->origDestLayerInfoPtr))->key = dest_info->key;
   }
 
   if(*srcMode == CMK_BUFFER_UNREG) {
     // Remote buffer is unregistered, send a message to register it and perform PUT
-    int mdMsgSize = sizeof(CmiVerbsRdmaReverseOp_t) + destAckSize + srcAckSize;
-    CmiVerbsRdmaReverseOp_t *regAndPutMsg = (CmiVerbsRdmaReverseOp_t *)CmiAlloc(mdMsgSize);
-    regAndPutMsg->destAddr = destAddr;
-    regAndPutMsg->destPe   = destPe;
-    regAndPutMsg->destMode = *destMode;
-    regAndPutMsg->srcAddr  = srcAddr;
-    regAndPutMsg->srcPe    = srcPe;
-    regAndPutMsg->srcMode  = *srcMode;
-    regAndPutMsg->rem_mr   = ((CmiVerbsRdmaPtr_t *)destInfo)->mr;
-    regAndPutMsg->rem_key  = regAndPutMsg->rem_mr->rkey;
-    regAndPutMsg->ackSize  = destAckSize;
-    regAndPutMsg->size     = size;
-
-    memcpy((char*)regAndPutMsg + sizeof(CmiVerbsRdmaReverseOp_t), destAck, destAckSize);
-    memcpy((char*)regAndPutMsg + sizeof(CmiVerbsRdmaReverseOp_t) + srcAckSize, srcAck, srcAckSize);
-
     infiPacket packet;
     MallocInfiPacket(packet);
 
-    packet->size = mdMsgSize;
-    packet->buf  = (char *)regAndPutMsg;
+    packet->size = ncpyOpInfo->ncpyOpInfoSize;
+    packet->buf  = (char *)ncpyOpInfo;
     packet->header.code = INFIRDMA_DIRECT_REG_AND_PUT;
     packet->ogm  = NULL;
 
-    struct ibv_mr *packetKey = METADATAFIELD(regAndPutMsg)->key;
-    OtherNode node = &nodes[CmiNodeOf(srcPe)];
-    EnqueuePacket(node, packet, mdMsgSize, packetKey);
+    struct ibv_mr *packetKey = METADATAFIELD(ncpyOpInfo)->key;
+    OtherNode node = &nodes[CmiNodeOf(ncpyOpInfo->srcPe)];
+    EnqueuePacket(node, packet, ncpyOpInfo->ncpyOpInfoSize, packetKey);
 
   } else {
-    void *ref = CmiGetNcpyAck(srcAddr, srcAck, srcPe, destAddr, destAck, destPe, srcAckSize);
 
     struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)malloc(sizeof(struct infiRdmaPacket));
     rdmaPacket->type = INFI_ONESIDED_DIRECT;
-    rdmaPacket->localBuffer = ref;
+    rdmaPacket->localBuffer = ncpyOpInfo;
 
-    CmiVerbsRdmaPtr_t *dest_info = (CmiVerbsRdmaPtr_t *)destInfo;
-    CmiVerbsRdmaPtr_t *src_info = (CmiVerbsRdmaPtr_t *)srcInfo;
+    CmiVerbsRdmaPtr_t *dest_info = (CmiVerbsRdmaPtr_t *)(ncpyOpInfo->destLayerInfo);
+    CmiVerbsRdmaPtr_t *src_info = (CmiVerbsRdmaPtr_t *)(ncpyOpInfo->srcLayerInfo);
 
-    postRdma((uint64_t)destAddr,
+    postRdma((uint64_t)(ncpyOpInfo->destPtr),
             dest_info->key,
-            (uint64_t)srcAddr,
+            (uint64_t)(ncpyOpInfo->srcPtr),
             src_info->key,
-            size,
-            srcPe,
+            ncpyOpInfo->size,
+            ncpyOpInfo->srcPe,
             (uint64_t)rdmaPacket,
             IBV_WR_RDMA_READ);
   }
@@ -247,78 +222,50 @@ void LrtsIssueRget(
 
 // Perform an RDMA Put call into the remote destination address from the local source address
 void LrtsIssueRput(
-  const void* destAddr,
-  void *destInfo,
-  void *destAck,
-  int destAckSize,
-  int destPe,
-  unsigned short int *destMode,
-  const void* srcAddr,
-  void *srcInfo,
-  void *srcAck,
-  int srcAckSize,
-  int srcPe,
+  NcpyOperationInfo *ncpyOpInfo,
   unsigned short int *srcMode,
-  int size) {
-
-  CmiAssert(srcAckSize == destAckSize);
+  unsigned short int *destMode) {
 
   // Register local buffer if it is not registered
   if(*srcMode == CMK_BUFFER_UNREG) {
-    CmiVerbsRdmaPtr_t *src_info = (CmiVerbsRdmaPtr_t *)srcInfo;
-    src_info->mr = registerDirectMemory(srcAddr, size);
+    CmiVerbsRdmaPtr_t *src_info = (CmiVerbsRdmaPtr_t *)(ncpyOpInfo->srcLayerInfo);
+    src_info->mr = registerDirectMemory(ncpyOpInfo->srcPtr, ncpyOpInfo->size);
     src_info->key = src_info->mr->rkey;
     *srcMode = CMK_BUFFER_REG;
+
+    // set registration info in the origSrcLayerInfoPtr
+    ((CmiVerbsRdmaPtr_t *)(ncpyOpInfo->origSrcLayerInfoPtr))->mr = src_info->mr;
+    ((CmiVerbsRdmaPtr_t *)(ncpyOpInfo->origSrcLayerInfoPtr))->key = src_info->key;
   }
 
   if(*destMode == CMK_BUFFER_UNREG) {
     // Remote buffer is unregistered, send a message to register it and perform GET
-    int mdMsgSize = sizeof(CmiVerbsRdmaReverseOp_t) + destAckSize + srcAckSize;
-    CmiVerbsRdmaReverseOp_t *regAndGetMsg = (CmiVerbsRdmaReverseOp_t *)CmiAlloc(mdMsgSize);
-    regAndGetMsg->srcAddr  = srcAddr;
-    regAndGetMsg->srcPe    = srcPe;
-    regAndGetMsg->srcMode  = *srcMode;
-
-    regAndGetMsg->destAddr = destAddr;
-    regAndGetMsg->destPe   = destPe;
-    regAndGetMsg->destMode = *destMode;
-
-    regAndGetMsg->rem_mr   = ((CmiVerbsRdmaPtr_t *)srcInfo)->mr;
-    regAndGetMsg->rem_key  = regAndGetMsg->rem_mr->rkey;
-    regAndGetMsg->ackSize  = srcAckSize;
-    regAndGetMsg->size     = size;
-
-    memcpy((char*)regAndGetMsg + sizeof(CmiVerbsRdmaReverseOp_t), destAck, destAckSize);
-    memcpy((char*)regAndGetMsg + sizeof(CmiVerbsRdmaReverseOp_t) + srcAckSize, srcAck, srcAckSize);
-
     infiPacket packet;
     MallocInfiPacket(packet);
 
-    packet->size = mdMsgSize;
-    packet->buf  = (char *)regAndGetMsg;
+    packet->size = ncpyOpInfo->ncpyOpInfoSize;
+    packet->buf  = (char *)ncpyOpInfo;
     packet->header.code = INFIRDMA_DIRECT_REG_AND_GET;
     packet->ogm  = NULL;
 
-    struct ibv_mr *packetKey = METADATAFIELD(regAndGetMsg)->key;
-    OtherNode node = &nodes[CmiNodeOf(destPe)];
-    EnqueuePacket(node, packet, mdMsgSize, packetKey);
+    struct ibv_mr *packetKey = METADATAFIELD(ncpyOpInfo)->key;
+    OtherNode node = &nodes[CmiNodeOf(ncpyOpInfo->destPe)];
+    EnqueuePacket(node, packet, ncpyOpInfo->ncpyOpInfoSize, packetKey);
 
   } else {
-    void *ref = CmiGetNcpyAck(srcAddr, srcAck, srcPe, destAddr, destAck, destPe, srcAckSize);
-
     struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)malloc(sizeof(struct infiRdmaPacket));
     rdmaPacket->type = INFI_ONESIDED_DIRECT;
-    rdmaPacket->localBuffer = ref;
+    rdmaPacket->localBuffer = ncpyOpInfo;
 
-    CmiVerbsRdmaPtr_t *src_info = (CmiVerbsRdmaPtr_t *)srcInfo;
-    CmiVerbsRdmaPtr_t *dest_info = (CmiVerbsRdmaPtr_t *)destInfo;
+    CmiVerbsRdmaPtr_t *src_info = (CmiVerbsRdmaPtr_t *)(ncpyOpInfo->srcLayerInfo);
+    CmiVerbsRdmaPtr_t *dest_info = (CmiVerbsRdmaPtr_t *)(ncpyOpInfo->destLayerInfo);
 
-    postRdma((uint64_t)srcAddr,
+    postRdma((uint64_t)(ncpyOpInfo->srcPtr),
             src_info->key,
-            (uint64_t)destAddr,
+            (uint64_t)(ncpyOpInfo->destPtr),
             dest_info->key,
-            size,
-            destPe,
+            ncpyOpInfo->size,
+            ncpyOpInfo->destPe,
             (uint64_t)rdmaPacket,
             IBV_WR_RDMA_WRITE);
   }

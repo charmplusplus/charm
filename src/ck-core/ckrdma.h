@@ -105,7 +105,23 @@ int getRdmaBufSize(envelope *env);
 
 // Ack handler function which invokes the callbacks on the source and destination PEs
 void CkRdmaAckHandler(void *cookie);
-void CkRdmaAckHandler(void *cbPtr, int pe, const void *ptr);
+void CkRdmaDirectAckHandler(void *ack);
+
+// Class to represent an acknowledgement structure
+class CkNcpyAck{
+  public:
+  // pointer to the buffer
+  const void *ptr;
+
+  // reference pointer
+  // This is an optional arbitrary pointer set by the user before performing the get/put
+  // operation. It is returned back in the CkNcpyAck object.
+  const void *ref;
+
+  CkNcpyAck(const void *ptr_, const void *ref_) : ptr(ptr_), ref(ref_) {}
+};
+
+PUPbytes(CkNcpyAck);
 
 // Class to represent an RDMA buffer
 class CkNcpyBuffer{
@@ -139,15 +155,16 @@ class CkNcpyBuffer{
   // mode
   unsigned short int mode;
 
-  CkNcpyBuffer() : ptr(NULL), pe(-1), mode(CK_BUFFER_UNREG) {}
+  // reference pointer
+  const void *ref;
 
-  CkNcpyBuffer(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int mode_=CK_BUFFER_UNREG)
-  {
+  CkNcpyBuffer() : ptr(NULL), pe(-1), ref(NULL), mode(CK_BUFFER_UNREG) {}
+
+  CkNcpyBuffer(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int mode_=CK_BUFFER_UNREG) {
     init(ptr_, cnt_, cb_, mode_);
   }
 
-  void init(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int mode_=CK_BUFFER_UNREG)
-  {
+  void init(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int mode_=CK_BUFFER_UNREG) {
     ptr  = ptr_;
     cnt  = cnt_;
     cb   = cb_;
@@ -157,6 +174,14 @@ class CkNcpyBuffer{
 
     // Register memory everytime new values are initialized
     registerMem();
+  }
+
+  void setRef(const void *ref_) {
+    ref = ref_;
+  }
+
+  const void *getRef() {
+    return ref;
   }
 
   // Register(Pin) the memory for the buffer
@@ -218,6 +243,7 @@ class CkNcpyBuffer{
 
   void pup(PUP::er &p) {
     p((char *)&ptr, sizeof(ptr));
+    p((char *)&ref, sizeof(ref));
     p|cnt;
     p|cb;
     p|pe;

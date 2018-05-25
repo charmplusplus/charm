@@ -1,6 +1,8 @@
 #ifndef _CONV_RDMA_H
 #define _CONV_RDMA_H
 
+#include "cmirdmautils.h"
+
 typedef void (*RdmaSingleAckCallerFn)(void *cbPtr, int pe, const void *ptr);
 typedef void (*RdmaAckCallerFn)(void *token);
 
@@ -24,7 +26,7 @@ void CmiSetRdmaCommonInfo(void *info, const void *ptr, int size);
 int CmiGetRdmaCommonInfoSize(void);
 
 void CmiSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode);
-void CmiSetRdmaNcpyAck(RdmaSingleAckCallerFn fn);
+void CmiSetRdmaNcpyAck(RdmaAckCallerFn fn);
 
 /* CmiIssueRget initiates an RDMA read operation, transferring 'size' bytes of data from the address space of 'srcPe' to local address, 'destAddr'.
  * When the runtime invokes srcAck on the source (target), it indicates safety to overwrite or free the srcAddr buffer.
@@ -32,19 +34,9 @@ void CmiSetRdmaNcpyAck(RdmaSingleAckCallerFn fn);
  * destAddr buffer.
  */
 void CmiIssueRget(
-  const void* srcAddr,
-  void *srcInfo,
-  void *srcAck,
-  int srcAckSize,
-  int srcPe,
+  NcpyOperationInfo *ncpyOpInfo,
   unsigned short int *srcMode,
-  const void* destAddr,
-  void *destInfo,
-  void *destAck,
-  int destAckSize,
-  int destPe,
-  unsigned short int *destMode,
-  int size);
+  unsigned short int *destMode);
 
 /* CmiIssueRput initiates an RDMA write operation, transferring 'size' bytes of data from the local address, 'srcAddr' to the address space of 'destPe'.
  * When the runtime invokes srcAck on the source (initiator), it indicates safety to overwrite or free the srcAddr buffer.
@@ -53,19 +45,9 @@ void CmiIssueRget(
  */
 
 void CmiIssueRput(
-  const void* destAddr,
-  void *destInfo,
-  void *destAck,
-  int destAckSize,
-  int destPe,
-  unsigned short int *destMode,
-  const void* srcAddr,
-  void *srcInfo,
-  void *srcAck,
-  int srcAckSize,
-  int srcPe,
+  NcpyOperationInfo *ncpyOpInfo,
   unsigned short int *srcMode,
-  int size);
+  unsigned short int *destMode);
 
 void CmiDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode);
 

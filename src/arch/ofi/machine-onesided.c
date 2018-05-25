@@ -221,29 +221,32 @@ static inline void ofi_onesided_direct_operation_callback(struct fi_cq_tagged_en
 }
 
 void process_onesided_reg_and_put(struct fi_cq_tagged_entry *e, OFIRequest *req) {
-  CmiOfiRdmaReverseOp_t *regAndPutMsg = (CmiOfiRdmaReverseOp_t *)(req->data.rma_ncpy_ack);
-  struct fid_mr *mr = registerDirectMemory(regAndPutMsg->srcAddr, regAndPutMsg->size);
-  void *ref = CmiGetNcpyAck(regAndPutMsg->srcAddr,
-                           (char *)regAndPutMsg + sizeof(CmiOfiRdmaReverseOp_t)+ regAndPutMsg->ackSize, //srcAck
-                           regAndPutMsg->srcPe,
-                           regAndPutMsg->destAddr,
-                           (char *)regAndPutMsg + sizeof(CmiOfiRdmaReverseOp_t), //destAck
-                           regAndPutMsg->destPe,
-                           regAndPutMsg->ackSize);
 
-  const char *rbuf  = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (const char*)regAndPutMsg->destAddr;
+  char *data = (char *)req->data.rma_ncpy_ack;
+
+  // Allocate a new receiver buffer to receive other messages
+  req->data.recv_buffer = CmiAlloc(context.eager_maxsize);
+
+  NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(data);
+  resetNcpyOpInfoPointers(ncpyOpInfo);
+
+  // Do not free as this message
+  ncpyOpInfo->freeMe = 0;
+
+  struct fid_mr *mr = registerDirectMemory(ncpyOpInfo->srcPtr, ncpyOpInfo->size);
+  const char *rbuf  = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (const char*)(ncpyOpInfo->destPtr);
 
   // Allocate a completion object for tracking write completion and ack handling
   CmiOfiRdmaComp_t* rdmaComp = (CmiOfiRdmaComp_t *)malloc(sizeof(CmiOfiRdmaComp_t));
-  rdmaComp->ack_info         = ref;
+  rdmaComp->ack_info         = ncpyOpInfo;
   rdmaComp->completion_count = 0;
 
   ofi_post_nocopy_operation(
-      (char*)regAndPutMsg->srcAddr,
+      (char*)(ncpyOpInfo->srcPtr),
       rbuf,
-      CmiNodeOf(regAndPutMsg->destPe),
-      regAndPutMsg->rem_key,
-      regAndPutMsg->size,
+      CmiNodeOf(ncpyOpInfo->destPe),
+      ((CmiOfiRdmaPtr_t *)(ncpyOpInfo->destLayerInfo))->key,
+      ncpyOpInfo->size,
       mr,
       ofi_onesided_direct_operation_callback,
       (void *)rdmaComp,
@@ -252,29 +255,29 @@ void process_onesided_reg_and_put(struct fi_cq_tagged_entry *e, OFIRequest *req)
 }
 
 void process_onesided_reg_and_get(struct fi_cq_tagged_entry *e, OFIRequest *req) {
-  CmiOfiRdmaReverseOp_t *regAndGetMsg = (CmiOfiRdmaReverseOp_t *)(req->data.rma_ncpy_ack);
-  struct fid_mr *mr = registerDirectMemory(regAndGetMsg->destAddr, regAndGetMsg->size);
-  void *ref = CmiGetNcpyAck(regAndGetMsg->srcAddr,
-                           (char *)regAndGetMsg + sizeof(CmiOfiRdmaReverseOp_t)+ regAndGetMsg->ackSize, //srcAck
-                           regAndGetMsg->srcPe,
-                           regAndGetMsg->destAddr,
-                           (char *)regAndGetMsg + sizeof(CmiOfiRdmaReverseOp_t), //destAck
-                           regAndGetMsg->destPe,
-                           regAndGetMsg->ackSize);
 
-  const char *rbuf  = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (const char*)regAndGetMsg->srcAddr;
+  char *data = (char *)req->data.rma_ncpy_ack;
+
+  // Allocate a new receiver buffer to receive other messages
+  req->data.recv_buffer = CmiAlloc(context.eager_maxsize);
+
+  NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(data);
+  resetNcpyOpInfoPointers(ncpyOpInfo);
+
+  struct fid_mr *mr = registerDirectMemory(ncpyOpInfo->destPtr, ncpyOpInfo->size);
+  const char *rbuf  = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (const char*)(ncpyOpInfo->srcPtr);
 
   // Allocate a completion object for tracking write completion and ack handling
   CmiOfiRdmaComp_t* rdmaComp = (CmiOfiRdmaComp_t *)malloc(sizeof(CmiOfiRdmaComp_t));
-  rdmaComp->ack_info         = ref;
+  rdmaComp->ack_info         = ncpyOpInfo;
   rdmaComp->completion_count = 0;
 
   ofi_post_nocopy_operation(
-      (char*)regAndGetMsg->destAddr,
+      (char*)(ncpyOpInfo->destPtr),
       rbuf,
-      CmiNodeOf(regAndGetMsg->srcPe),
-      regAndGetMsg->rem_key,
-      regAndGetMsg->size,
+      CmiNodeOf(ncpyOpInfo->srcPe),
+      ((CmiOfiRdmaPtr_t *)(ncpyOpInfo->srcLayerInfo))->key,
+      ncpyOpInfo->size,
       mr,
       ofi_onesided_direct_operation_callback,
       (void *)rdmaComp,
@@ -285,49 +288,26 @@ void process_onesided_reg_and_get(struct fi_cq_tagged_entry *e, OFIRequest *req)
 
 // Perform an RDMA Get call into the local destination address from the remote source address
 void LrtsIssueRget(
-  const void* srcAddr,
-  void *srcInfo,
-  void *srcAck,
-  int srcAckSize,
-  int srcPe,
+  NcpyOperationInfo *ncpyOpInfo,
   unsigned short int *srcMode,
-  const void* destAddr,
-  void *destInfo,
-  void *destAck,
-  int destAckSize,
-  int destPe,
-  unsigned short int *destMode,
-  int size) {
+  unsigned short int *destMode) {
 
   OFIRequest *req;
-  CmiAssert(destAckSize == srcAckSize);
 
   // Register local buffer if it is not registered
   if(*destMode == CMK_BUFFER_UNREG) {
-    CmiOfiRdmaPtr_t *dest_info = (CmiOfiRdmaPtr_t *)destInfo;
-    dest_info->mr = registerDirectMemory(destAddr, size);
+    CmiOfiRdmaPtr_t *dest_info = (CmiOfiRdmaPtr_t *)(ncpyOpInfo->destLayerInfo);
+    dest_info->mr = registerDirectMemory(ncpyOpInfo->destPtr, ncpyOpInfo->size);
     dest_info->key = fi_mr_key(dest_info->mr);
     *destMode = CMK_BUFFER_REG;
+
+    // set registration info in the origDestLayerInfoPtr
+    ((CmiOfiRdmaPtr_t *)(ncpyOpInfo->origDestLayerInfoPtr))->mr = dest_info->mr;
+    ((CmiOfiRdmaPtr_t *)(ncpyOpInfo->origDestLayerInfoPtr))->key = dest_info->key;
   }
 
   if(*srcMode == CMK_BUFFER_UNREG) {
     // Remote buffer is unregistered, send a message to register it and perform PUT
-    int mdMsgSize = sizeof(CmiOfiRdmaReverseOp_t) + destAckSize + srcAckSize;
-    CmiOfiRdmaReverseOp_t *regAndPutMsg = (CmiOfiRdmaReverseOp_t *)CmiAlloc(mdMsgSize);
-    regAndPutMsg->destAddr = destAddr;
-    regAndPutMsg->destPe   = destPe;
-    regAndPutMsg->destMode = *destMode;
-    regAndPutMsg->srcAddr  = srcAddr;
-    regAndPutMsg->srcPe    = srcPe;
-    regAndPutMsg->srcMode  = *srcMode;
-    regAndPutMsg->rem_mr   = ((CmiOfiRdmaPtr_t *)destInfo)->mr;
-    regAndPutMsg->rem_key  = fi_mr_key(regAndPutMsg->rem_mr);
-    regAndPutMsg->ackSize  = destAckSize;
-    regAndPutMsg->size     = size;
-
-    memcpy((char*)regAndPutMsg + sizeof(CmiOfiRdmaReverseOp_t), destAck, destAckSize);
-    memcpy((char*)regAndPutMsg + sizeof(CmiOfiRdmaReverseOp_t) + srcAckSize, srcAck, srcAckSize);
-
 #if USE_OFIREQUEST_CACHE
     req = alloc_request(context.request_cache);
 #else
@@ -337,36 +317,35 @@ void LrtsIssueRget(
 
     ZERO_REQUEST(req);
 
-    req->destNode = CmiNodeOf(srcPe);
-    req->destPE   = srcPe;
-    req->size     = mdMsgSize;
+    req->destNode = CmiNodeOf(ncpyOpInfo->srcPe);
+    req->destPE   = ncpyOpInfo->srcPe;
+    req->size     = ncpyOpInfo->ncpyOpInfoSize;
     req->callback = send_short_callback;
-    req->data.short_msg = regAndPutMsg;
+    req->data.short_msg = ncpyOpInfo;
 
-    ofi_send(regAndPutMsg,
-             mdMsgSize,
-             CmiNodeOf(srcPe),
+    ofi_send(ncpyOpInfo,
+             ncpyOpInfo->ncpyOpInfoSize,
+             CmiNodeOf(ncpyOpInfo->srcPe),
              OFI_RDMA_DIRECT_REG_AND_PUT,
              req);
   } else {
-    void *ref = CmiGetNcpyAck(srcAddr, srcAck, srcPe, destAddr, destAck, destPe, srcAckSize);
 
-    CmiOfiRdmaPtr_t *dest_info = (CmiOfiRdmaPtr_t *)destInfo;
-    CmiOfiRdmaPtr_t *src_info = (CmiOfiRdmaPtr_t *)srcInfo;
+    CmiOfiRdmaPtr_t *dest_info = (CmiOfiRdmaPtr_t *)(ncpyOpInfo->destLayerInfo);
+    CmiOfiRdmaPtr_t *src_info = (CmiOfiRdmaPtr_t *)(ncpyOpInfo->srcLayerInfo);
 
-    const char *rbuf        = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (const char*)srcAddr;
+    const char *rbuf        = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (const char*)(ncpyOpInfo->srcPtr);
 
     // Allocate a completion object for tracking read completion and ack handling
     CmiOfiRdmaComp_t* rdmaComp = (CmiOfiRdmaComp_t *)malloc(sizeof(CmiOfiRdmaComp_t));
-    rdmaComp->ack_info         = ref;
+    rdmaComp->ack_info         = ncpyOpInfo;
     rdmaComp->completion_count = 0;
 
     ofi_post_nocopy_operation(
-        (char*)destAddr,
+        (char*)(ncpyOpInfo->destPtr),
         rbuf,
-        CmiNodeOf(srcPe),
+        CmiNodeOf(ncpyOpInfo->srcPe),
         src_info->key,
-        size,
+        ncpyOpInfo->size,
         dest_info->mr,
         ofi_onesided_direct_operation_callback,
         (void *)rdmaComp,
@@ -377,49 +356,26 @@ void LrtsIssueRget(
 
 // Perform an RDMA Put call into the remote destination address from the local source address
 void LrtsIssueRput(
-  const void* destAddr,
-  void *destInfo,
-  void *destAck,
-  int destAckSize,
-  int destPe,
-  unsigned short int *destMode,
-  const void* srcAddr,
-  void *srcInfo,
-  void *srcAck,
-  int srcAckSize,
-  int srcPe,
+  NcpyOperationInfo *ncpyOpInfo,
   unsigned short int *srcMode,
-  int size) {
+  unsigned short int *destMode) {
 
   OFIRequest *req;
-  CmiAssert(destAckSize == srcAckSize);
 
   // Register local buffer if it is not registered
   if(*srcMode == CMK_BUFFER_UNREG) {
-    CmiOfiRdmaPtr_t *src_info = (CmiOfiRdmaPtr_t *)srcInfo;
-    src_info->mr = registerDirectMemory(srcAddr, size);
+    CmiOfiRdmaPtr_t *src_info = (CmiOfiRdmaPtr_t *)(ncpyOpInfo->srcLayerInfo);
+    src_info->mr = registerDirectMemory(ncpyOpInfo->srcPtr, ncpyOpInfo->size);
     src_info->key = fi_mr_key(src_info->mr);
     *srcMode = CMK_BUFFER_REG;
+
+    // set registration info in the origSrcLayerInfoPtr
+    ((CmiOfiRdmaPtr_t *)(ncpyOpInfo->origSrcLayerInfoPtr))->mr = src_info->mr;
+    ((CmiOfiRdmaPtr_t *)(ncpyOpInfo->origSrcLayerInfoPtr))->key = src_info->key;
   }
 
   if(*destMode == CMK_BUFFER_UNREG) {
     // Remote buffer is unregistered, send a message to register it and perform PUT
-    int mdMsgSize = sizeof(CmiOfiRdmaReverseOp_t) + srcAckSize + destAckSize;
-    CmiOfiRdmaReverseOp_t *regAndGetMsg = (CmiOfiRdmaReverseOp_t *)CmiAlloc(mdMsgSize);
-    regAndGetMsg->srcAddr = srcAddr;
-    regAndGetMsg->srcPe   = srcPe;
-    regAndGetMsg->srcMode = *srcMode;
-    regAndGetMsg->destAddr  = destAddr;
-    regAndGetMsg->destPe    = destPe;
-    regAndGetMsg->destMode  = *destMode;
-    regAndGetMsg->rem_mr   = ((CmiOfiRdmaPtr_t *)srcInfo)->mr;
-    regAndGetMsg->rem_key  = fi_mr_key(regAndGetMsg->rem_mr);
-    regAndGetMsg->ackSize  = srcAckSize;
-    regAndGetMsg->size     = size;
-
-    memcpy((char*)regAndGetMsg + sizeof(CmiOfiRdmaReverseOp_t), destAck, destAckSize);
-    memcpy((char*)regAndGetMsg + sizeof(CmiOfiRdmaReverseOp_t) + srcAckSize, srcAck, srcAckSize);
-
 #if USE_OFIREQUEST_CACHE
     req = alloc_request(context.request_cache);
 #else
@@ -429,37 +385,35 @@ void LrtsIssueRput(
 
     ZERO_REQUEST(req);
 
-    req->destNode = CmiNodeOf(destPe);
-    req->destPE   = destPe;
-    req->size     = mdMsgSize;
+    req->destNode = CmiNodeOf(ncpyOpInfo->destPe);
+    req->destPE   = ncpyOpInfo->destPe;
+    req->size     = ncpyOpInfo->ncpyOpInfoSize;
     req->callback = send_short_callback;
-    req->data.short_msg = regAndGetMsg;
+    req->data.short_msg = ncpyOpInfo;
 
-    ofi_send(regAndGetMsg,
-             mdMsgSize,
-             CmiNodeOf(destPe),
+    ofi_send(ncpyOpInfo,
+             ncpyOpInfo->ncpyOpInfoSize,
+             CmiNodeOf(ncpyOpInfo->destPe),
              OFI_RDMA_DIRECT_REG_AND_GET,
              req);
   } else {
 
-    void *ref = CmiGetNcpyAck(srcAddr, srcAck, srcPe, destAddr, destAck, destPe, srcAckSize);
+    CmiOfiRdmaPtr_t *dest_info = (CmiOfiRdmaPtr_t *)(ncpyOpInfo->destLayerInfo);
+    CmiOfiRdmaPtr_t *src_info = (CmiOfiRdmaPtr_t *)(ncpyOpInfo->srcLayerInfo);
 
-    CmiOfiRdmaPtr_t *src_info = (CmiOfiRdmaPtr_t *)srcInfo;
-    CmiOfiRdmaPtr_t *dest_info = (CmiOfiRdmaPtr_t *)destInfo;
-
-    const char *rbuf         = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (const char*)destAddr;
+    const char *rbuf        = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (const char*)(ncpyOpInfo->destPtr);
 
     // Allocate a completion object for tracking write completion and ack handling
     CmiOfiRdmaComp_t* rdmaComp = (CmiOfiRdmaComp_t *)malloc(sizeof(CmiOfiRdmaComp_t));
-    rdmaComp->ack_info         = ref;
+    rdmaComp->ack_info         = ncpyOpInfo;
     rdmaComp->completion_count = 0;
 
     ofi_post_nocopy_operation(
-        (char*)srcAddr,
+        (char*)(ncpyOpInfo->srcPtr),
         rbuf,
-        CmiNodeOf(destPe),
+        CmiNodeOf(ncpyOpInfo->destPe),
         dest_info->key,
-        size,
+        ncpyOpInfo->size,
         src_info->mr,
         ofi_onesided_direct_operation_callback,
         (void *)rdmaComp,

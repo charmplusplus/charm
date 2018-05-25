@@ -187,26 +187,6 @@ typedef struct _cmi_ofi_rzv_rdma_completion {
   int  completion_count;
 }CmiOfiRdmaComp_t;
 
-/* Machine specific metadata information required to register a buffer and perform
- * an RDMA operation with a remote buffer. This metadata information is used to perform
- * registration and a PUT operation when the remote buffer wants to perform a GET with an
- * unregistered buffer. Similary, the metadata information is used to perform registration
- * and a GET operation when the remote buffer wants to perform a PUT with an unregistered
- * buffer.*/
-typedef struct _cmi_ofi_rdma_reverse_op {
-  const void *destAddr;
-  int destPe;
-  int destMode;
-  const void *srcAddr;
-  int srcPe;
-  int srcMode;
-
-  struct fid_mr *rem_mr;
-  uint64_t rem_key;
-  int ackSize;
-  int size;
-} CmiOfiRdmaReverseOp_t;
-
 // Set the machine specific information for a nocopy pointer
 void LrtsSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode);
 

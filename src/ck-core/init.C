@@ -1284,7 +1284,7 @@ void _initCharm(int unused_argc, char **argv)
 	CkMessageWatcherInit(argv,CkpvAccess(_coreState));
 	
 	// Set the ack handler function used for the direct nocopy api
-	CmiSetRdmaNcpyAck(CkRdmaAckHandler);
+	CmiSetRdmaNcpyAck(CkRdmaDirectAckHandler);
 
 	/**
 	  The rank-0 processor of each node calls the 

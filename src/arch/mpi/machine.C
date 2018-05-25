@@ -639,18 +639,25 @@ static void ReleasePostedMessages(void) {
 
                 //free callback structure, CmiRdmaAck allocated in CmiSetRdmaAck
                 free(ack);
-            } else if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_RECV || msg_tmp->type == ONESIDED_BUFFER_DIRECT_SEND) {
-                // Get the ack information
-                CmiMPIRzvRdmaAckInfo_t *ack = (CmiMPIRzvRdmaAckInfo_t *)(msg_tmp->ref);
+            } else if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_RECV) {
+                // MPI_Irecv posted as a part of the Direct API was completed
+                NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(msg_tmp->ref);
+                // Invoke the destination ack
+                ncpyOpInfo->ackMode = 2;
+                CmiInvokeNcpyAck(ncpyOpInfo);
 
-                // Call Ack function
-                ncpyAckHandlerFn(
-                                       (char *)msg_tmp->ref + sizeof(CmiMPIRzvRdmaAckInfo_t),
-                                       ack->pe,
-                                       msg_tmp->msg);
+            } else if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_SEND) {
+                // MPI_Isend posted as a part of the Direct API was completed
+                NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(msg_tmp->ref);
+                // Invoke the source ack
+                ncpyOpInfo->ackMode = 1;
+                CmiInvokeNcpyAck(ncpyOpInfo);
 
-                // free the ack information
-                free(ack);
+            }
+            else if(msg_tmp->type == POST_DIRECT_SEND || msg_tmp->type == POST_DIRECT_RECV) {
+                // do nothing as the received message is a NcpyOperationInfo object
+                // which is freed in the above code (either ONESIDED_BUFFER_DIRECT_RECV or
+                // ONESIDED_BUFFER_DIRECT_SEND)
             }
             else
 #endif
@@ -879,35 +886,32 @@ static int PumpMsgs(void) {
             if(CMI_MSGTYPE(msg) == REGULAR) {
               handleOneRecvedMsg(nbytes, msg);
             } else if(CMI_MSGTYPE(msg) == POST_DIRECT_RECV || CMI_MSGTYPE(msg) == POST_DIRECT_SEND) {
-              CmiMPIRzvRdmaPostInfo_t *postInfo = (CmiMPIRzvRdmaPostInfo_t *)(msg + CmiMsgHeaderSizeBytes);
 
-              // Allocate a local ack
-              CmiMPIRzvRdmaAckInfo_t *ackNew = (CmiMPIRzvRdmaAckInfo_t *)malloc(sizeof(CmiMPIRzvRdmaAckInfo_t) + postInfo->ackSize);
-              ackNew->tag = postInfo->tag;
-              memcpy((char *)ackNew + sizeof(CmiMPIRzvRdmaAckInfo_t),
-                     (char *)postInfo + sizeof(CmiMPIRzvRdmaPostInfo_t),
-                     postInfo->ackSize);
+              NcpyOperationInfo *ncpyOpInfoMsg = (NcpyOperationInfo *)msg;
+              resetNcpyOpInfoPointers(ncpyOpInfoMsg);
 
               int postMsgType, myPe, otherPe;
+              const void *myBuffer;
               if(CMI_MSGTYPE(msg) == POST_DIRECT_RECV) {
                 // Direct Buffer destination, post MPI_Irecv
                 postMsgType = ONESIDED_BUFFER_DIRECT_RECV;
-                myPe = postInfo->destPe;
-                otherPe = postInfo->srcPe;
+                myPe = ncpyOpInfoMsg->destPe;
+                otherPe = ncpyOpInfoMsg->srcPe;
+                myBuffer = ncpyOpInfoMsg->destPtr;
               }
               else {
                 // Direct Buffer Source, post MPI_Isend
                 postMsgType = ONESIDED_BUFFER_DIRECT_SEND;
-                myPe = postInfo->srcPe;
-                otherPe = postInfo->destPe;
+                myPe = ncpyOpInfoMsg->srcPe;
+                otherPe = ncpyOpInfoMsg->destPe;
+                myBuffer = ncpyOpInfoMsg->srcPtr;
               }
 
-              ackNew->pe = myPe;
-              MPIPostOneBuffer(postInfo->buffer,
-                               (void *)ackNew,
-                               postInfo->size,
+              MPIPostOneBuffer(myBuffer,
+                               ncpyOpInfoMsg,
+                               ncpyOpInfoMsg->size,
                                otherPe,
-                               postInfo->tag,
+                               ncpyOpInfoMsg->tag,
                                postMsgType);
 
             } else {
