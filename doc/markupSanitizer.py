@@ -24,6 +24,8 @@ soup = BeautifulSoup(open(fileName), "lxml")
 # replace them with code tags
 for t in soup('tt'):
     t.wrap( soup.new_tag('code') )
+    # Remove first space to fix wrong indentation
+    t.string=t.get_text().replace(' ', '', 1)
     t.unwrap()
 
 # Rewrap all div class=alltt blocks in pre tags
