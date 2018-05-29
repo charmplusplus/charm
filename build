@@ -620,7 +620,7 @@ then
 fi
 
 # make sure $DESTINATION is more than '/' characters, because we `rm -rf` it
-if [ -z "${DESTINATION#"${DESTINATION%%[^/]*}"}" ]
+if [ -z "${DESTINATION#"${DESTINATION%%[!/]*}"}" ]
 then
   echo 'Error: $DESTINATION is the filesystem root.'
   exit 1
