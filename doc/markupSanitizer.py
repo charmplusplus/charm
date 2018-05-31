@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup,NavigableString
 import sys
 import os
 
@@ -24,8 +24,12 @@ soup = BeautifulSoup(open(fileName), "lxml")
 # replace them with code tags
 for t in soup('tt'):
     t.wrap( soup.new_tag('code') )
+
     # Remove first space to fix wrong indentation
-    t.string=t.get_text().replace(' ', '', 1)
+    tmp = t.contents[0]
+    if isinstance(tmp, NavigableString) and tmp.startswith('\n'):
+        t.contents[0].replace_with(soup.new_string(tmp.replace('\n ', '\n', 1)))
+
     t.unwrap()
 
 # Rewrap all div class=alltt blocks in pre tags
