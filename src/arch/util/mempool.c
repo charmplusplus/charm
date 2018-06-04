@@ -50,7 +50,7 @@ INLINE_KEYWORD int which_pow2(size_t size)
 INLINE_KEYWORD void fillblock(mempool_type *mptr,block_header *block_head,size_t pool_size,int expansion)
 {
   int         i,power;
-  size_t      loc,left,prev;
+  size_t      loc,left,prev,taken;
   slot_header *head;
   void        *pool;
 
@@ -59,13 +59,9 @@ INLINE_KEYWORD void fillblock(mempool_type *mptr,block_header *block_head,size_t
   }
 
   pool = block_head;
-  if(expansion) {
-    left = pool_size-sizeof(block_header);
-    loc = (char*)pool+sizeof(block_header)-(char*)mptr;
-  } else {
-    left = pool_size-sizeof(mempool_type);
-    loc = (char*)pool+sizeof(mempool_type)-(char*)mptr;
-  }
+  taken = expansion ? sizeof(block_header) : sizeof(mempool_type);
+  left = pool_size - taken;
+  loc = (char*)pool + taken - (char*)mptr;
   power = which_pow2(left);
   if(left < cutOffPoints[power]) {
     power--;
@@ -166,11 +162,8 @@ int checkblock(mempool_type *mptr,block_header *current,int power)
     }
     powiter++;
   }
-  if(head_free == NULL) {
-    return 0;
-  } else {
-    return 1;
-  }
+
+  return head_free != NULL;
 }
 
 void removeblocks(mempool_type *mptr)
@@ -207,10 +200,8 @@ void removeblocks(mempool_type *mptr)
 
 mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool_freeblock freefn, size_t limit)
 {
-  int i,power;
-  size_t end,left,prev,next;
+  int power;
   mempool_type *mptr;
-  slot_header *head;
   mem_handle_t  mem_hndl;
 
   void *pool = allocfn(&pool_size, &mem_hndl, 0);

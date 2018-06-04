@@ -4087,12 +4087,13 @@ static void *alloc_persistent_mempool_block(size_t *size, gni_mem_handle_t *mem_
 // ptr is a block head pointer
 void free_mempool_block(void *ptr, gni_mem_handle_t mem_hndl)
 {
+    block_header *bh = (block_header *)ptr;
     if(!(IsMemHndlZero(mem_hndl)))
     {
-        MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &mem_hndl, &omdh, GetSizeFromBlockHeader(ptr));
+        MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &mem_hndl, &omdh, GetSizeFromBlockHeader(bh));
     }
 #if LARGEPAGE
-    my_free_huge_pages(ptr, GetSizeFromBlockHeader(ptr));
+    my_free_huge_pages(ptr, GetSizeFromBlockHeader(bh));
 #else
     free(ptr);
 #endif
