@@ -64,7 +64,7 @@
 
 #define CMK_NO_ISO_MALLOC                                  1
 
-#define CMK_ONESIDED_IMPL                                  1
+#define CMK_ONESIDED_IMPL                                  !CMK_ENABLE_ASYNC_PROGRESS
 
 #endif
 
