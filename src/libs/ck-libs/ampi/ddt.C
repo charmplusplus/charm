@@ -814,12 +814,21 @@ CkDDT_Contiguous::CkDDT_Contiguous(int nCount, int bindex, CkDDT_DataType* oldTy
   refCount = 1;
   baseType->incRefCount();
   size = count * baseSize;
-  extent = count * baseExtent;
   numElements = count * baseType->getNumElements();
-  lb = baseType->getLB();
-  ub = lb + extent;
-  trueExtent = extent;
-  trueLB = lb;
+
+  if(baseType->getLB() > baseType->getUB()) {
+    lb = baseType->getLB() + (baseExtent*(count-1));
+    ub = baseType->getUB();
+    trueLB = baseType->getTrueLB() + (baseExtent*(count-1));
+    trueExtent = baseType->getTrueLB() + baseType->getTrueExtent() - ((count-1)*baseExtent);
+  } else {
+    lb = baseType->getLB();
+    ub = lb + count * baseExtent;
+    trueLB = baseType->getTrueLB();
+    trueExtent = ((count - 1) * baseExtent) + baseType->getTrueExtent();
+  }
+
+  extent = ub - lb;
 
   if (extent != size || count == 0) {
     iscontig = false;
@@ -889,21 +898,46 @@ CkDDT_Vector::CkDDT_Vector(int nCount, int blength, int stride, int bindex, CkDD
   numElements = count * baseType->getNumElements();
   size = count *  blockLength * baseSize ;
 
-  if (strideLength < 0) {
-    extent = blockLength*baseExtent + (-1)*strideLength*(count-1)*baseExtent;
-  }
-  else {
-    extent = (count*blockLength + ((strideLength-blockLength)*(count-1))) * baseExtent;
+  int absBaseExtent = std::abs(baseExtent);
+  int absStrideLength = std::abs(strideLength);
+
+  if(baseType->getLB() > baseType->getUB()) {
+    if (strideLength > 0) {
+      // Negative Extent with positive stride
+      lb = baseType->getUB() + (((strideLength*count)-2-(absStrideLength-blockLength))*baseExtent);
+      ub = baseType->getUB();
+      trueLB = lb - baseType->getLB();
+    } else {
+      // Negative extent and stride
+      lb = baseType->getLB() + ((blockLength-1)*baseExtent);
+      ub = baseType->getUB() + (strideLength*(count-1)*baseExtent);
+      trueLB = baseType->getLB() - baseType->getUB() + (blockLength*baseExtent);
+    }
+  } else {
+    if (strideLength > 0) {
+      // Positive extent and stride
+      lb = baseType->getLB();
+      ub = lb + (count*blockLength + ((strideLength-blockLength)*(count-1))) * baseExtent;
+      trueLB = baseType->getTrueLB();
+    } else {
+      // Negative stride and positive extent
+      lb = baseType->getLB() + (strideLength*baseExtent*(count-1));
+      ub = lb + blockLength*baseExtent + absStrideLength*(count-1)*baseExtent;
+      trueLB = baseType->getTrueLB() + ((count-1) * strideLength * baseType->getExtent());
+    }
   }
 
-  lb = baseType->getLB();
-  if (strideLength < 0) {
-    lb += (strideLength*baseExtent*(count-1));
-  }
-  ub = lb + extent;
+  extent = ub - lb;
 
-  trueExtent = extent;
-  trueLB = lb;
+  if (absStrideLength < blockLength) {
+    trueExtent =
+      ((count-1) * stride * absBaseExtent) +
+      (blockLength * absBaseExtent) -
+      (absBaseExtent - baseType->getTrueExtent());
+  } else {
+    trueExtent = (((absStrideLength*count)-(absStrideLength-blockLength))*absBaseExtent) - (absBaseExtent - baseType->getTrueExtent());
+  }
+
   if (extent != size || count == 0) {
     iscontig = false;
   }
@@ -1542,8 +1576,16 @@ CkDDT_Struct::CkDDT_Struct(int nCount, const int* arrBlock,
       extent += (saveExtent - (extent % saveExtent));
   }
 
-  trueExtent = extent;
-  trueLB = lb;
+  trueLB = -1;
+  trueExtent = 0;
+  for (int i=0; i<count; i++) {
+    if (!(arrayDataType[i]->getType() == CkDDT_LB || arrayDataType[i]->getType() == CkDDT_UB)) {
+      if (trueLB > arrayDisplacements[i] || trueLB == -1) {
+        trueLB = arrayDisplacements[i];
+      }
+    }
+    trueExtent += arrayDataType[i]->getTrueExtent() * arrBlock[i];
+  }
 
   /* set iscontig */
   if (extent != size || count == 0) {
