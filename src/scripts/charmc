@@ -1015,7 +1015,6 @@ then
     OPTS_CC="$OPTS_CC -mno-tls-direct-seg-refs -ftls-model=initial-exec"
     OPTS_CXX="$OPTS_CXX -mno-tls-direct-seg-refs -ftls-model=initial-exec"
     OPTS_F90="$OPTS_F90 -mno-tls-direct-seg-refs -ftls-model=initial-exec"
-    OPTS_LD="$OPTS_LD -Wl,--allow-multiple-definition"
 fi
 
 # Look up and add the dependencies for module $1
