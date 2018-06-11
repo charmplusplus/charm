@@ -192,6 +192,10 @@ void sourceDone(CkDataMsg *msg) \{
 \}
 \end{alltt}
 
+The usage of \texttt{CkDataMsg} and \texttt{setRef} in order to access the original
+pointer and the arbitrary reference pointer is illustrated in
+\examplerefdir{zerocopy/direct\textunderscore api/unreg/simple\textunderscore get}
+
 Both the source and destination buffers are of the same type i.e. \kw{CkNcpyBuffer}.
 What distinguishes a source buffer from a destination buffer is the way the \kw{get} or
 \kw{put} call is made. A valid \kw{get} call using two \kw{CkNcpyBuffer} objects \texttt{obj1} and

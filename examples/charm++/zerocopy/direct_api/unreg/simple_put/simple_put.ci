@@ -10,8 +10,8 @@ mainmodule simple_put {
   array [1D] Ping1 {
     entry Ping1(int size);
     entry void start();
-    entry void putSenderDone(CkDataMsg *m);
-    entry void putReceiverDone(CkDataMsg *m);
+    entry void putSenderDone();
+    entry void putReceiverDone();
     entry void recvNcpyInfo(CkNcpyBuffer dest1, CkNcpyBuffer dest2, CkNcpyBuffer dest3);
     entry void sendValidationData();
     entry void validatePutData(int iArr2[size], double dArr2[size], char cArr2[size], int size);

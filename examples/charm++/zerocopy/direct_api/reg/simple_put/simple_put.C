@@ -73,13 +73,13 @@ public:
       assignValues(dArr1, size);
       assignCharValues(cArr1, size);
       // Set PUT Sender callback
-      cb = CkCallback(CkIndex_Ping1::putSenderDone(NULL), thisProxy[thisIndex]);
+      cb = CkCallback(CkIndex_Ping1::putSenderDone(), thisProxy[thisIndex]);
     } else {
       iArr1 = new int[size];
       cArr1 = new char[size];
       dArr1 = new double[size];
       // Set PUT Receiver callback
-      cb = CkCallback(CkIndex_Ping1::putReceiverDone(NULL), thisProxy[thisIndex]);
+      cb = CkCallback(CkIndex_Ping1::putReceiverDone(), thisProxy[thisIndex]);
     }
 
     otherIndex = (thisIndex + 1) % 2;
@@ -101,7 +101,7 @@ public:
   }
 
   // Executed on Index 0 (which calls put)
-  void putSenderDone(CkDataMsg *m){
+  void putSenderDone(){
     CkAssert(thisIndex == 0);
     cbCounter++;
     if(cbCounter == 3) {
@@ -112,11 +112,10 @@ public:
       CkPrintf("[%d][%d][%d] Put Source Done\n", thisIndex, CkMyPe(), CkMyNode());
       sendValidationData();
     }
-    delete m;
   }
 
   // Executed on Index 1 (which receives data from put)
-  void putReceiverDone(CkDataMsg *m){
+  void putReceiverDone(){
     CkAssert(thisIndex == 1);
     cbCounter++;
     if(cbCounter == 3) {
@@ -127,7 +126,6 @@ public:
       CkPrintf("[%d][%d][%d] Put Destination Done\n", thisIndex, CkMyPe(), CkMyNode());
       thisProxy[otherIndex].sendValidationData();
     }
-    delete m;
   }
 
   // Executed on Index 0

@@ -18,7 +18,6 @@ public:
     }
     int size = atoi(m->argv[1]);
     mainProxy = thisProxy;
-    delete m;
     arr1 = CProxy_Ping1::ckNew(size, 2);
     count = 0;
     arr1[0].start();
@@ -74,8 +73,8 @@ public:
     assignValues(dArr1, size);
     assignCharValues(cArr1, size);
 
-    sendCb = CkCallback(CkIndex_Ping1::senderCallback(NULL), thisProxy[thisIndex]);
-    recvCb = CkCallback(CkIndex_Ping1::receiverCallback(NULL), thisProxy[thisIndex]);
+    sendCb = CkCallback(CkIndex_Ping1::senderCallback(), thisProxy[thisIndex]);
+    recvCb = CkCallback(CkIndex_Ping1::receiverCallback(), thisProxy[thisIndex]);
 
     otherIndex = (thisIndex + 1) % 2;
     sendCbCounter = 0;
@@ -102,7 +101,7 @@ public:
     thisProxy[otherIndex].recvNcpyInfo(mySrc1, mySrc2, mySrc3, myDest1, myDest2, myDest3);
   }
 
-  void senderCallback(CkDataMsg *m){
+  void senderCallback(){
     sendCbCounter++;
     if(sendCbCounter == 3) {
       // Release Resources for my sources
@@ -117,10 +116,9 @@ public:
         mainProxy.maindone();
       }
     }
-    delete m;
   }
 
-  void receiverCallback(CkDataMsg *m){
+  void receiverCallback(){
     recvCbCounter++;
     if(recvCbCounter == 3) {
 
@@ -153,7 +151,6 @@ public:
         mainProxy.maindone();
       }
     }
-    delete m;
   }
 
   // Executed on Index 1

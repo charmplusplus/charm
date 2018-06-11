@@ -75,13 +75,13 @@ public:
       assignValues(dArr1, size);
       assignCharValues(cArr1, size);
       // Set GET Sender callback
-      cb = CkCallback(CkIndex_Ping1::getSenderDone(NULL), thisProxy[thisIndex]);
+      cb = CkCallback(CkIndex_Ping1::getSenderDone(), thisProxy[thisIndex]);
     } else {
       iArr1 = (int *)CkRdmaAlloc(size * sizeof(int));
       cArr1 = (char *)CkRdmaAlloc(size * sizeof(char));
       dArr1 = (double *)CkRdmaAlloc(size * sizeof(double));
       // Set GET Receiver callback
-      cb = CkCallback(CkIndex_Ping1::getReceiverDone(NULL), thisProxy[thisIndex]);
+      cb = CkCallback(CkIndex_Ping1::getReceiverDone(), thisProxy[thisIndex]);
     }
 
     otherIndex = (thisIndex + 1) % 2;
@@ -103,7 +103,7 @@ public:
   }
 
   // Executed on Index 0
-  void getSenderDone(CkDataMsg *m){
+  void getSenderDone(){
     CkAssert(thisIndex == 0);
     cbCounter++;
     if(cbCounter == 3) {
@@ -114,11 +114,10 @@ public:
       CkPrintf("[%d][%d][%d] Get Source Done\n", thisIndex, CkMyPe(), CkMyNode());
       sendValidationData();
     }
-    delete m;
   }
 
   // Executed on Index 1 (which receives data from get)
-  void getReceiverDone(CkDataMsg *m){
+  void getReceiverDone(){
     CkAssert(thisIndex == 1);
     cbCounter++;
     if(cbCounter == 3) {
@@ -129,7 +128,6 @@ public:
       CkPrintf("[%d][%d][%d] Get Destination Done\n", thisIndex, CkMyPe(), CkMyNode());
       thisProxy[otherIndex].sendValidationData();
     }
-    delete m;
   }
 
   // Executed on Index 0

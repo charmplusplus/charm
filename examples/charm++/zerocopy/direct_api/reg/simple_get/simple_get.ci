@@ -10,8 +10,8 @@ mainmodule simple_get {
   array [1D] Ping1 {
     entry Ping1(int size);
     entry void start();
-    entry void getSenderDone(CkDataMsg *m);
-    entry void getReceiverDone(CkDataMsg *m);
+    entry void getSenderDone();
+    entry void getReceiverDone();
     entry void recvNcpyInfo(CkNcpyBuffer src1, CkNcpyBuffer src2, CkNcpyBuffer src3);
     entry void sendValidationData();
     entry void validateGetData(int iArr2[size], double dArr2[size], char cArr2[size], int size);
