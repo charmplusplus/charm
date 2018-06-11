@@ -5,7 +5,7 @@ void _initOnesided( pami_context_t *contexts, int nc);
 // Machine specific information for a nocopy pointer
 typedef struct _cmi_pami_rzv_rdma_ptr {
   pami_memregion_t    mregion;
-  int                 offset;
+  size_t              offset;
 } CmiPAMIRzvRdmaPtr_t;
 
 void rdma_direct_get_dispatch (
@@ -30,6 +30,25 @@ DUMB_STATIC_ASSERT(sizeof(CmiPAMIRzvRdmaPtr_t) == CMK_NOCOPY_DIRECT_BYTES);
 // Set the machine specific information for a nocopy pointer
 void LrtsSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode){
   CmiPAMIRzvRdmaPtr_t *rdmaInfo = (CmiPAMIRzvRdmaPtr_t *)info;
-  memcpy(rdmaInfo->mregion, &cmi_pami_memregion[0].mregion, sizeof(pami_memregion_t));
+#if CMK_BLUEGENEQ
   rdmaInfo->offset = (size_t)(ptr) - (size_t)cmi_pami_memregion[0].baseVA;
+  memcpy(rdmaInfo->mregion, &cmi_pami_memregion[0].mregion, sizeof(pami_memregion_t));
+#else // ppc64le
+  rdmaInfo->offset = (size_t)(ptr);
+  size_t bytes_out;
+  pami_memregion_t mregion;
+
+#if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
+  int c = CmiMyNode() % cmi_pami_numcontexts;
+  pami_context_t my_context = cmi_pami_contexts[c];
+#else
+  pami_context_t my_context= MY_CONTEXT();
+#endif // end of CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
+
+  PAMI_Memregion_create (my_context,
+                         (void *)ptr,
+                         size,
+                         &bytes_out,
+                         &mregion);
+#endif
 }

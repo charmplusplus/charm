@@ -45,6 +45,10 @@
 
 #define LIBCOLL                                            1
 
-#define CMK_ONESIDED_IMPL                                  0
+#define CMK_ONESIDED_IMPL                                  !CMK_ENABLE_ASYNC_PROGRESS
+
+#define CMK_ONESIDED_DIRECT_IMPL                           CMK_ONESIDED_IMPL
+
+#define CMK_NOCOPY_DIRECT_BYTES                            200
 
 #endif

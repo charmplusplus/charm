@@ -32,6 +32,7 @@ pami_result_t getData(
   pami_memregion_t *mregion,
   int size)
 {
+#if CMK_BLUEGENEQ
   pami_rget_simple_t  rget;
   rget.rma.dest    = origin;
   rget.rma.bytes   = size;
@@ -61,6 +62,45 @@ pami_result_t getData(
     PAMIX_CONTEXT_UNLOCK(context);
   MACHSTATE2(3, "[%d]PAMI_Rget result: %d\n", CmiMyPe(), res);
   return res;
+
+#else
+  size_t bytes_out;
+  pami_memregion_t local_mregion;
+
+  PAMI_Memregion_create(context,
+                        buffer,
+                        size,
+                        &bytes_out,
+                        &local_mregion); 
+
+  pami_get_simple_t get;
+  memset(&get, 0, sizeof(get));
+  get.rma.dest = origin;
+  get.rma.bytes = size;
+  get.rma.cookie = cookie;
+  get.rma.done_fn = done_fn;
+  get.rma.hints.buffer_registered = PAMI_HINT_ENABLE;
+  get.rma.hints.use_rdma = PAMI_HINT_ENABLE;
+  get.rma.hints.use_shmem = PAMI_HINT_DEFAULT;
+  get.rma.hints.remote_async_progress = PAMI_HINT_DEFAULT;
+  get.addr.local = buffer;
+  get.addr.remote = (void *)offset;
+
+  int to_lock = 0;
+#if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
+  to_lock = CpvAccess(uselock);
+#endif
+
+  if(to_lock)
+    PAMIX_CONTEXT_LOCK(context);
+
+  pami_result_t res = PAMI_Get (context, &get);
+
+  if(to_lock)
+    PAMIX_CONTEXT_UNLOCK(context);
+  MACHSTATE2(3, "[%d]PAMI_Get result: %d\n", CmiMyPe(), res);
+  return res;
+#endif
 }
 
 //function to perform Rput
