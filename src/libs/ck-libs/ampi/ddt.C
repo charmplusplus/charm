@@ -1117,12 +1117,33 @@ CkDDT_Indexed::CkDDT_Indexed(int nCount, const int* arrBlock, const CkDDT_Aint* 
     }
 
     extent = positiveExtent + (-1)*negativeExtent;
+
     if (count == 0) {
-      lb = baseType->getLB();
+        lb = 0;
+        ub = 0;
     } else {
-      lb = baseType->getLB() + *std::min_element(&arrayDisplacements[0],&arrayDisplacements[0] + nCount)*baseExtent;
+        int i=0;
+        while (arrayBlockLength[i] == 0) {
+            /* Find lowest index that isn't empty */
+            i++;
+            if (i == count -1) {
+                i = 0;
+                break;
+            }
+        }
+
+        lb = baseType->getLB() + arrayDisplacements[i]*baseExtent;
+
+        int j = count-1;
+        while (arrayBlockLength[j] == 0) {
+            /* Find highest index that isn't empty */
+            j--;
+            if (j == 0) {
+                break;
+            }
+        }
+        ub = baseType->getLB() + (arrayBlockLength[j] + arrayDisplacements[j])*baseExtent;
     }
-    ub = lb + extent;
 
     trueExtent = extent;
     trueLB = lb;
@@ -1222,9 +1243,30 @@ CkDDT_HIndexed::CkDDT_HIndexed(int nCount, const int* arrBlock, const CkDDT_Aint
   }
 
   if (count == 0) {
-    lb = baseType->getLB();
+    lb = 0;
+    ub = 0;
   } else {
-    lb = baseType->getLB() + *std::min_element(&arrDisp[0],&arrDisp[0]+nCount);
+    int i=0;
+    while (arrayBlockLength[i] == 0) {
+      /* Find lowest index that isn't empty */
+      i++;
+      if (i == count -1) {
+        i = 0;
+        break;
+      }
+    }
+
+    lb = baseType->getLB() + arrayDisplacements[i];
+
+    int j = count-1;
+    while (arrayBlockLength[j] == 0) {
+      /* Find highest index that isn't empty */
+      j--;
+      if (j == 0) {
+        break;
+      }
+    }
+    ub = baseType->getLB() + (arrayBlockLength[j]*baseExtent) +  arrayDisplacements[j];
   }
   extent = ub - lb;
 
@@ -1533,8 +1575,8 @@ CkDDT_HIndexed_Block::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[
 
 CkDDT_Struct::CkDDT_Struct(int nCount, const int* arrBlock,
                        const CkDDT_Aint* arrDisp, const int *bindex, CkDDT_DataType** arrBase)
-    : CkDDT_DataType(CkDDT_STRUCT, 0, 0, nCount, numeric_limits<CkDDT_Aint>::max(),
-    numeric_limits<CkDDT_Aint>::min(), 0, 0, 0, NULL, 0, 0, 0, 0),
+    : CkDDT_DataType(CkDDT_STRUCT, 0, 0, nCount, 0,
+    0, 0, 0, 0, NULL, 0, 0, 0, 0),
     arrayBlockLength(nCount), arrayDisplacements(nCount),
     index(nCount), arrayDataType(nCount)
 {
