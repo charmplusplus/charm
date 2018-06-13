@@ -2258,8 +2258,12 @@ void CkLocMgr::pup(PUP::er &p){
             }
 
         p | count;
-        p | pe_list;
-        p | idx_list;
+        // syncft code depends on this exact arrangement:
+        for (int i=0; i<count; i++)
+        {
+          p | idx_list[i];
+          p | pe_list[i];
+        }
 #endif
 
 	}
