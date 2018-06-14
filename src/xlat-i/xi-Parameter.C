@@ -744,7 +744,7 @@ void ParamList::unmarshallAddress(XStr& str,
     if (param->isArray())
       str << param->getName();  // Arrays are already pointers
     else
-      str << "& " << param->getName();  // Take address of simple types and structs
+      str << "& " << param->getName() << ".t";  // Take address of simple types and structs
     if (next) {
       str << ", ";
       next->unmarshallAddress(str, 0);
