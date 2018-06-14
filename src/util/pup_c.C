@@ -158,9 +158,9 @@ CDECL void pup_pointers(pup_er p,void **arr,size_t nItems) {mp(arr,nItems,(void*
 #define PUP_BASIC_DATATYPEF(typeUP,typelo,type) \
  FDECL void FTN_NAME(FPUP_##typeUP,fpup_##typelo)(pup_er p,type *v) \
    {mp(*v);} \
- FDECL void FTN_NAME(FPUP_##typeUP##SG,fpup_##typelo##sg)(pup_er p,type *arr,size_t *nItems) \
+ FDECL void FTN_NAME(FPUP_##typeUP##SG,fpup_##typelo##sg)(pup_er p,type *arr,int *nItems) \
    {mp(arr,*nItems);} \
- FDECL void FTN_NAME(FPUP_##typeUP##S,fpup_##typelo##s)(pup_er p,type *arr,size_t *nItems) \
+ FDECL void FTN_NAME(FPUP_##typeUP##S,fpup_##typelo##s)(pup_er p,type *arr,int *nItems) \
    {mp(arr,*nItems);}
 
 PUP_BASIC_DATATYPEF(CHAR,char,char)
@@ -196,7 +196,7 @@ CDECL void pup_bytes(pup_er p,void *ptr,size_t nBytes)
   mp((char *)ptr,nBytes);
 }
 
-FDECL void FTN_NAME(FPUP_BYTES,fpup_bytes)(pup_er p,void *ptr,size_t *nBytes)
+FDECL void FTN_NAME(FPUP_BYTES,fpup_bytes)(pup_er p,void *ptr,int *nBytes)
 {
   mp((char *)ptr,*nBytes);
 }
