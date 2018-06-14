@@ -102,8 +102,10 @@
         integer myIndex
         integer size, k, res
         REAL*4  D(size)
+        REAL*8  n
 
-        res = doWork(objPtr%obj%n * 0.00001)
+        n = objPtr%obj%n
+        res = doWork(n * 0.00001)
 
         objPtr%obj%iteration = objPtr%obj%iteration+1
         IF (MOD(objPtr%obj%iteration, 5) .eq. 0) THEN
