@@ -2717,6 +2717,24 @@ then
 	add_flag "CMK_HAS_OPENMP='1'" "OpenMP"
 fi
 
+### check for Lustre FS availability ###
+cat > $tc <<EOT
+#include <stdio.h>
+#include <lustre/lustreapi.h>
+#include <lustre/lustre_user.h>
+
+int main() {
+  llapi_printf(LLAPI_MSG_NORMAL, "Lustre FS is available");
+  return 0;
+}
+EOT
+test_linkc "whether has lustre fs" "yes" "no" "-llustreapi"
+AC_DEFINE_UNQUOTED(CMK_HAS_LUSTREFS, $pass, [whether has lustrefs])
+if test $pass -eq 1
+then
+        add_flag 'CMK_LUSTREAPI="-llustreapi"' "lustreapi"
+fi
+
 
 # for hwloc
 eval "`./charmc -print-building-blocks $OPTS`"

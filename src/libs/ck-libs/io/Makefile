@@ -3,7 +3,8 @@ CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 MODULE=CkIO
 LIB = $(CDIR)/lib/libmodule$(MODULE).a
-LIBOBJ = ckio.o
+DEP = $(CDIR)/lib/libmodule$(MODULE).dep
+LIBOBJ = ckio.o fs_parameters.o
 
 GENHEADERS = $(MODULE).decl.h $(MODULE).def.h $(MODULE)_impl.decl.h $(MODULE)_impl.def.h
 HEADERS = ckio.h $(GENHEADERS)
@@ -11,13 +12,17 @@ HEADERS = ckio.h $(GENHEADERS)
 all: $(LIBDEST)$(LIB)
 
 $(LIB): $(LIBOBJ)
-	$(CHARMC) -o $(LIB) $(LIBOBJ) 
+	$(CHARMC) -o $(LIB) $(LIBOBJ)
+	(cd $(CDIR)/tmp; . ./conv-mach-opt.sh && echo "$$CMK_LUSTREAPI") > $(DEP)
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
 	touch headers
 
 ckio.o: ckio.C headers
+	$(CHARMC) -c $<
+
+fs_parameters.o: fs_parameters.c
 	$(CHARMC) -c $<
 
 $(GENHEADERS): ckio.ci.stamp
