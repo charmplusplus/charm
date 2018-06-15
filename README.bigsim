@@ -234,7 +234,7 @@ For more information, please refer to the BigSim and Projections manuals.
 	./charmrun +p1 jacobi 4 4 2 5 +vp32 +x32 +y1 +z1 +cth1 +wth1 +bglog
 
 4- download BigSim's simulator
-	git clone git://charm.cs.uiuc.edu/BigFastSim
+	git clone https://charm.cs.illinois.edu/gerrit/BigFastSim
 
 5- build BigFastSim:
 	cd BigFastSim/Release
@@ -249,7 +249,7 @@ For more information, please refer to the BigSim and Projections manuals.
 	./seqSimulator -tproj
 
 8- download and make Projections:
-	git clone git://charm.cs.uiuc.edu/projections.git
+	git clone https://charm.cs.illinois.edu/gerrit/projections
 	cd projections
 	ant
 
