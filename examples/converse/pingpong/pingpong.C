@@ -159,6 +159,24 @@ CmiStartFn mymain(int argc, char *argv[])
   CpvInitialize(int,factor);
   CpvInitialize(bool,warmUp);
 
+  // Register Handlers
+  CpvInitialize(int,warmUpDoneHandler);
+  CpvAccess(warmUpDoneHandler) = CmiRegisterHandler((CmiHandler) warmUpDoneHandlerFunc);
+  CpvInitialize(int,exitHandler);
+  CpvAccess(exitHandler) = CmiRegisterHandler((CmiHandler) exitHandlerFunc);
+  CpvInitialize(int,node0Handler);
+  CpvAccess(node0Handler) = CmiRegisterHandler((CmiHandler) node0HandlerFunc);
+  CpvInitialize(int,node1Handler);
+  CpvAccess(node1Handler) = CmiRegisterHandler((CmiHandler) node1HandlerFunc);
+
+  //set warmup run
+  CpvAccess(warmUp) = true;
+
+  CpvInitialize(double,startTime);
+  CpvInitialize(double,endTime);
+
+  int otherPe = CmiMyPe() ^ 1;
+
   // Set runtime cpuaffinity
   CmiInitCPUAffinity(argv);
 
@@ -188,23 +206,6 @@ CmiStartFn mymain(int argc, char *argv[])
   }
 
   CpvAccess(msgSize)= CpvAccess(minMsgSize) + CmiMsgHeaderSizeBytes;
-
-  //set warmup run
-  CpvAccess(warmUp) = true;
-
-  CpvInitialize(int,warmUpDoneHandler);
-  CpvAccess(warmUpDoneHandler) = CmiRegisterHandler((CmiHandler) warmUpDoneHandlerFunc);
-  CpvInitialize(int,exitHandler);
-  CpvAccess(exitHandler) = CmiRegisterHandler((CmiHandler) exitHandlerFunc);
-  CpvInitialize(int,node0Handler);
-  CpvAccess(node0Handler) = CmiRegisterHandler((CmiHandler) node0HandlerFunc);
-  CpvInitialize(int,node1Handler);
-  CpvAccess(node1Handler) = CmiRegisterHandler((CmiHandler) node1HandlerFunc);
-
-  CpvInitialize(double,startTime);
-  CpvInitialize(double,endTime);
-
-  int otherPe = CmiMyPe() ^ 1;
 
 #if USE_PERSISTENT
   if (CmiMyPe() < CmiNumPes())

@@ -157,12 +157,7 @@ CmiStartFn mymain(int argc, char *argv[])
 {
     CpvInitialize(int,msgSize);
     CpvInitialize(int,cycleNum);
-    
-    // Set runtime cpuaffinity
-    CmiInitCPUAffinity(argv);
-
-    // Initialize CPU topology
-    CmiInitCPUTopology(argv);
+    CpvInitialize(int,recvNum);
 
     CpvAccess(msgSize)= 4 + CmiMsgHeaderSizeBytes;
     
@@ -177,7 +172,13 @@ CmiStartFn mymain(int argc, char *argv[])
     CpvInitialize(double,endTime);
     
     int otherPe = CmiMyPe() ^ 1;
-    
+
+    // Set runtime cpuaffinity
+    CmiInitCPUAffinity(argv);
+
+    // Initialize CPU topology
+    CmiInitCPUTopology(argv);
+
 #if USE_PERSISTENT
     h = CmiCreatePersistent(otherPe, maxMsgSize+1024);
 #endif
