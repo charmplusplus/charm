@@ -2386,7 +2386,7 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
       str << "  int index3 = impl_obj->thisIndex.z;\n";
     }
     str << "  ::";
-    str << fortranify(name);
+    str << fortranify(container->baseName(), "_Entry_", name);
     str << "((char **)(impl_obj->user_data)";
     str << ", &index1";
     if (dim == (const char*)"2D" || dim == (const char*)"3D") str << ", &index2";
@@ -2496,7 +2496,7 @@ void Entry::genDefs(XStr& str) {
     // This is called from C++
     str << "extern \"C\" ";
     str << "void ";
-    str << fortranify(name);
+    str << fortranify(container->baseName(), "_Entry_", name);
     str << "(char **";
     str << ", " << container->indexList();
     if (!param->isVoid()) {

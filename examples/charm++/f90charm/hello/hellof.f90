@@ -66,7 +66,7 @@
       END SUBROUTINE
 
 !    define fortran entry function
-      SUBROUTINE SayHi(objPtr, myIndex, data, data2, len, s)
+      SUBROUTINE Hello_Entry_SayHi(objPtr, myIndex, data, data2, len, s)
         USE HelloMod
         IMPLICIT NONE
 

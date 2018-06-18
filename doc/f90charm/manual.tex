@@ -85,7 +85,7 @@ the Chare's user data and perform any initialization.
   For each Chare entry method you have declared, you should write the corresponding 
 Fortran90 subroutine for it:
 
-  \verb+SUBROUTINE entry(charePtr, myIndex, data1, data2 ... )+
+  \verb+SUBROUTINE <ChareName>_Entry_<EntryName>(charePtr, myIndex, data1, data2 ... )+
 
   Note, the first argument is the Chare pointer as you declared previously, the second argument is the array index which will be passed from the Charm runtime. 
 The rest of the parameters should be the same as you declare the entry methods
@@ -247,7 +247,7 @@ Now that you have the chare and the chare constructor function, you can start
       ## p1, p2, etc represent user parameters
       ## the "objPtr, myIndex" stuff is required in every Entry Point.
       ## CkExit() must be called by the chare to terminate.
-      SUBROUTINE SayHi(objPtr, myIndex, data, data2, len, s)
+      SUBROUTINE Hello_Entry_SayHi(objPtr, myIndex, data, data2, len, s)
       USE HelloMod
       IMPLICIT NONE
 

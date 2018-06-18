@@ -35,7 +35,7 @@
         objPtr%obj%next = MOD( index+1, nElements)
         objPtr%obj%iteration = 0
         objPtr%obj%count = 0
-        call nextStep(objPtr, index)
+        call BalanceMe_Entry_nextStep(objPtr, index)
       END SUBROUTINE
 
 !   user MUST write this puper subroutine
@@ -75,7 +75,7 @@
         integer index
 
           ! load balancing finish, start next step
-        call nextStep(objPtr, index)
+        call BalanceMe_Entry_nextStep(objPtr, index)
       END SUBROUTINE
 
       INTEGER FUNCTION doWork(workTime)
@@ -93,7 +93,7 @@
      END FUNCTION
 
 !    define fortran entry function
-      SUBROUTINE nbrData(objPtr, myIndex, size, D, k)
+      SUBROUTINE BalanceMe_Entry_nbrData(objPtr, myIndex, size, D, k)
         USE LdbDemoMod
         IMPLICIT NONE
         INTEGER doWork
@@ -116,7 +116,7 @@
         ENDIF
       END SUBROUTINE
 
-      SUBROUTINE nextStep(objPtr, myIndex)
+      SUBROUTINE BalanceMe_Entry_nextStep(objPtr, myIndex)
         USE LdbDemoMod
         IMPLICIT NONE
 
@@ -127,7 +127,7 @@
 
       END SUBROUTINE
 
-      SUBROUTINE barrier(objPtr, myIndex)
+      SUBROUTINE BalanceMe_Entry_barrier(objPtr, myIndex)
         USE LdbDemoMod
         IMPLICIT NONE
 
