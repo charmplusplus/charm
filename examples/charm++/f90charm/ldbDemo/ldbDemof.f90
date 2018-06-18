@@ -146,8 +146,7 @@
             call CkPrintf("ALL done in %F seconds.\n$$", t1-objPtr%obj%t0)
             call CkExit()
           ELSE
-             ! broadcast using "-1"
-            call BalanceMe_Invoke_nextStep(objPtr%aid, -1);
+            call BalanceMe_Broadcast_nextStep(objPtr%aid);
           ENDIF
         ENDIF
       END SUBROUTINE

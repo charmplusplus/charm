@@ -2645,20 +2645,35 @@ void Entry::genDefs(XStr& str) {
     str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
     str << "\n";
     str << "  " << container->proxyName() << " h(*aid);\n";
-    str << "  if (*index1 == -1) \n";
-    str << "    h." << name << "(";
-    if (!param->isVoid()) param->printValue(str);
-    str << ");\n";
-    str << "  else\n";
     if (dim == (const char*)"1D")
-      str << "    h[*index1]." << name << "(";
+      str << "  h[*index1]." << name << "(";
     else if (dim == (const char*)"2D")
-      str << "    h[CkArrayIndex2D(*index1, *index2)]." << name << "(";
+      str << "  h[CkArrayIndex2D(*index1, *index2)]." << name << "(";
     else if (dim == (const char*)"3D")
-      str << "    h[CkArrayIndex3D(*index1, *index2, *index3)]." << name << "(";
+      str << "  h[CkArrayIndex3D(*index1, *index2, *index3)]." << name << "(";
     if (!param->isVoid()) param->printValue(str);
     str << ");\n";
     str << "}\n";
+
+    if (container->isArray()) {
+      str << "extern \"C\" ";
+      str << "void ";
+      str << fortranify(container->baseName(), "_Broadcast_", name);
+      str << "(void** aindex";
+      if (!param->isVoid()) {
+        str << ", ";
+        param->printAddress(str);
+      }
+      str << ")\n";
+      str << "{\n";
+      str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
+      str << "\n";
+      str << "  " << container->proxyName() << " h(*aid);\n";
+        str << "  h." << name << "(";
+      if (!param->isVoid()) param->printValue(str);
+      str << ");\n";
+      str << "}\n";
+    }
 
     if (isReductionTarget()) {
       str << "extern \"C\" ";

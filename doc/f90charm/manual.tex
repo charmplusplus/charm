@@ -111,7 +111,9 @@ if it is 1D array:
 
   This subroutine will send a message to the array element with the index
 as myIndex. Similarly for arrays with higher dimensions, replace myIndex by
-corresponding number of array indices.
+corresponding number of array indices. Broadcasts are supported as well:
+
+  \verb+<ChareName>_Broadcast_<EntryName>(charePtr, data1, data2 ... )+
 
 There are several others things you need to know.
 
