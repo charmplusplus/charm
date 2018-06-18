@@ -2634,7 +2634,7 @@ void Entry::genDefs(XStr& str) {
     str << "extern \"C\" ";
     str << "void ";
     str << fortranify("SendTo_", container->baseName(), "_", name);
-    str << "(long* aindex";
+    str << "(void** aindex";
     str << ", " << container->indexList();
     if (!param->isVoid()) {
       str << ", ";

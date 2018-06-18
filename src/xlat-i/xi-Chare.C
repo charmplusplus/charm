@@ -628,13 +628,13 @@ void Chare::genDefs(XStr& str) {
     str << "\n";
     if (dim == (const char*)"1D") {
       str << "extern \"C\" void " << fortranify(baseName(), "_cknew")
-          << "(int *numElem, long *aindex)\n";
+          << "(int *numElem, void **aindex)\n";
       str << "{\n";
       str << "    CkArrayID *aid = new CkArrayID;\n";
       str << "    *aid = CProxy_" << baseName() << "::ckNew(*numElem); \n";
     } else if (dim == (const char*)"2D") {
       str << "extern \"C\" void " << fortranify(baseName(), "_cknew")
-          << "(int *numx, int *numy, long *aindex)\n";
+          << "(int *numx, int *numy, void **aindex)\n";
       str << "{\n";
       str << "    CkArrayID *aid = new CkArrayID;\n";
       str << "    *aid = CProxy_" << baseName() << "::ckNew(); \n";
@@ -645,7 +645,7 @@ void Chare::genDefs(XStr& str) {
       str << "    p.doneInserting(); \n";
     } else if (dim == (const char*)"3D") {
       str << "extern \"C\" void " << fortranify(baseName(), "_cknew")
-          << "(int *numx, int *numy, int *numz, long *aindex)\n";
+          << "(int *numx, int *numy, int *numz, void **aindex)\n";
       str << "{\n";
       str << "    CkArrayID *aid = new CkArrayID;\n";
       str << "    *aid = CProxy_" << baseName() << "::ckNew(); \n";
@@ -656,13 +656,13 @@ void Chare::genDefs(XStr& str) {
       str << "          p[CkArrayIndex3D(i, j, k)].insert(); \n";
       str << "    p.doneInserting(); \n";
     }
-    str << "    *aindex = (long)aid;\n";
+    str << "    *aindex = (void*)aid;\n";
     str << "}\n";
 
     // Define the Fortran interface function for AtSync
     if (dim == (const char*)"1D") {
       str << "extern \"C\" void " << fortranify(baseName(), "_atsync")
-          << "(long* aindex, int *index1)\n";
+          << "(void** aindex, int *index1)\n";
       str << "{\n";
       str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
       str << "\n";
@@ -670,7 +670,7 @@ void Chare::genDefs(XStr& str) {
       str << "  h[*index1].ckLocal()->AtSync();\n";
     } else if (dim == (const char*)"2D") {
       str << "extern \"C\" void " << fortranify(baseName(), "_atsync")
-          << "(long* aindex, int *index1, int *index2)\n";
+          << "(void** aindex, int *index1, int *index2)\n";
       str << "{\n";
       str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
       str << "\n";
@@ -678,7 +678,7 @@ void Chare::genDefs(XStr& str) {
       str << "  h[CkArrayIndex2D(*index1, *index2)].ckLocal()->AtSync();\n";
     } else if (dim == (const char*)"3D") {
       str << "extern \"C\" void " << fortranify(baseName(), "_atsync")
-          << "(long* aindex, int *index1, int *index2, int *index3)\n";
+          << "(void** aindex, int *index1, int *index2, int *index3)\n";
       str << "{\n";
       str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
       str << "\n";
@@ -691,7 +691,7 @@ void Chare::genDefs(XStr& str) {
     if (dim == (const char*)"1D") {
       str << "extern \"C\" void "
           << fortranify(baseName(), "_contribute")
-          << "(long* aindex, int *index1, int *size, void *data, int *op, int (*target)())\n";
+          << "(void** aindex, int *index1, int *size, void *data, int *op, int (*target)())\n";
       str << "{\n";
       str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
       str << "  CProxy_" << baseName() << " h(*aid);\n";
@@ -700,7 +700,7 @@ void Chare::genDefs(XStr& str) {
     else if (dim == (const char*)"2D") {
       str << "extern \"C\" void "
           << fortranify(baseName(), "_contribute")
-          << "(long* aindex, int *index1, int *index2, int *size, void *data, int *op, int (*target)())\n";
+          << "(void** aindex, int *index1, int *index2, int *size, void *data, int *op, int (*target)())\n";
       str << "{\n";
       str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
       str << "  CProxy_" << baseName() << " h(*aid);\n";
@@ -709,7 +709,7 @@ void Chare::genDefs(XStr& str) {
     else if (dim == (const char*)"3D") {
       str << "extern \"C\" void "
           << fortranify(baseName(), "_contribute")
-          << "(long* aindex, int *index1, int *index2, int *index3, int *size, void *data, int *op, int (*target)())\n";
+          << "(void** aindex, int *index1, int *index2, int *index3, int *size, void *data, int *op, int (*target)())\n";
       str << "{\n";
       str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
       str << "  CProxy_" << baseName() << " h(*aid);\n";
