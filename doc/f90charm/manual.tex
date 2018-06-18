@@ -107,7 +107,7 @@ a 3D array:
 And for each entry method, this function is available for use in F90 program
 if it is 1D array:
 
-  \verb+SendTo_<ChareName>_<Entry>(charePtr, myIndex, data1, data2 ... )+
+  \verb+<ChareName>_Invoke_<EntryName>(charePtr, myIndex, data1, data2 ... )+
 
   This subroutine will send a message to the array element with the index
 as myIndex. Similarly for arrays with higher dimensions, replace myIndex by
@@ -260,7 +260,7 @@ Now that you have the chare and the chare constructor function, you can start
 
       objPtr%obj%data = 20
       if (myIndex < 4) then
-          call SendTo_Hello_SayHi(objPtr%aid, myIndex+1, 1, data2, len, s);
+          call Hello_Invoke_SayHi(objPtr%aid, myIndex+1, 1, data2, len, s);
       else 
           call CkExit()
       endif
@@ -296,7 +296,7 @@ program by sending the first message.
           s(i) = i;
       enddo
       d = 2.50
-      call SendTo_Hello_SayHi(aid, 0, 1, d, 4, s(3:6));
+      call Hello_Invoke_SayHi(aid, 0, 1, d, 4, s(3:6));
 
       END
 \end{verbatim}

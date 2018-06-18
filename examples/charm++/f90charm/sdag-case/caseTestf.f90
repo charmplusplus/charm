@@ -45,5 +45,5 @@
         integer*8  aid
 
         call CaseTestArray_CkNew(1, aid)
-        call SendTo_CaseTestArray_run(aid, 0)
+        call CaseTestArray_Invoke_run(aid, 0)
       END SUBROUTINE

@@ -85,7 +85,7 @@
         if (newIndex1 .eq. 5) newIndex1 = 0
       endif
       if (newIndex1 .ne. 0 .or. newIndex2 .ne. 0) then
-          call SendTo_Hello_SayHi(objPtr%aid, newIndex1, newIndex2, 1, data2, len, s);
+          call Hello_Invoke_SayHi(objPtr%aid, newIndex1, newIndex2, 1, data2, len, s);
       else 
 	  call CkExit()
       endif
@@ -108,7 +108,7 @@
 	  s(i) = i;
       enddo
       d = 2.50
-      call SendTo_Hello_SayHi(aid, 0, 0, 1, d, 4, s(3:6));
+      call Hello_Invoke_SayHi(aid, 0, 0, 1, d, 4, s(3:6));
 
       END
 

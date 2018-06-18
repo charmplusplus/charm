@@ -112,7 +112,7 @@
            ! AtSync to start load balancing
           call BalanceMe_atSync(objPtr%aid, myIndex)
         ELSE
-          call SendTo_BalanceMe_barrier(objPtr%aid, 0)
+          call BalanceMe_Invoke_barrier(objPtr%aid, 0)
         ENDIF
       END SUBROUTINE
 
@@ -123,7 +123,7 @@
         TYPE(LdbDemoPtr) objPtr
         integer myIndex
 
-        call SendTo_BalanceMe_nbrData(objPtr%aid, objPtr%obj%next, objPtr%obj%n, objPtr%obj%myData, myIndex)
+        call BalanceMe_Invoke_nbrData(objPtr%aid, objPtr%obj%next, objPtr%obj%n, objPtr%obj%myData, myIndex)
 
       END SUBROUTINE
 
@@ -147,7 +147,7 @@
             call CkExit()
           ELSE
              ! broadcast using "-1"
-            call SendTo_BalanceMe_nextStep(objPtr%aid, -1);
+            call BalanceMe_Invoke_nextStep(objPtr%aid, -1);
           ENDIF
         ENDIF
       END SUBROUTINE

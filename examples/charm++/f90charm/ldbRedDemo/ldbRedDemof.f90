@@ -125,7 +125,7 @@
         TYPE(LdbDemoPtr) objPtr
         integer myIndex
 
-        call SendTo_BalanceMe_nbrData(objPtr%aid, objPtr%obj%next, objPtr%obj%n, objPtr%obj%myData, myIndex)
+        call BalanceMe_Invoke_nbrData(objPtr%aid, objPtr%obj%next, objPtr%obj%n, objPtr%obj%myData, myIndex)
 
       END SUBROUTINE
 
@@ -151,7 +151,7 @@
           call CkExit()
         ELSE
            ! broadcast using "-1"
-          call SendTo_BalanceMe_nextStep(objPtr%aid, -1);
+          call BalanceMe_Invoke_nextStep(objPtr%aid, -1);
         ENDIF
       END SUBROUTINE
 

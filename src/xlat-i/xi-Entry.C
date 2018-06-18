@@ -2633,7 +2633,7 @@ void Entry::genDefs(XStr& str) {
     // This is called from Fortran to send the message to a chare.
     str << "extern \"C\" ";
     str << "void ";
-    str << fortranify("SendTo_", container->baseName(), "_", name);
+    str << fortranify(container->baseName(), "_Invoke_", name);
     str << "(void** aindex";
     str << ", " << container->indexList();
     if (!param->isVoid()) {
