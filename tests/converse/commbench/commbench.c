@@ -146,6 +146,9 @@ void commbench_init(int argc, char** argv) {
   // Initialize CPU topology
   CmiInitCPUTopology(argv);
 
+  // Update the argc after runtime parameters are extracted out
+  argc = CmiGetArgc(argv);
+
   for (numtests = 0; tests[numtests].name; numtests++)
     ;
   CpvAccess(test_bank_size) = numtests;

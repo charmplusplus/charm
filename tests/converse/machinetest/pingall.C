@@ -180,6 +180,9 @@ CmiStartFn mymain(int argc, char** argv)
     // Initialize CPU topology
     CmiInitCPUTopology(argv);
 
+    // Update the argc after runtime parameters are extracted out
+    argc = CmiGetArgc(argv);
+ 
     if(CmiMyRank() == CmiMyNodeSize()) return 0;
     
     if(argc > 1)
