@@ -1,22 +1,26 @@
-TEST_TOOLS=$(shell CHARMINC=../../../../include/; if test -f ./conv-config.sh; then . ./conv-config.sh; echo $$BGP_FLOOR; fi )
+DIRS = \
+  loadlog \
+  buildlog \
 
-DIRS= loadlog buildlog
+TESTDIRS = $(DIRS)
 
-all:
-	for d in $(DIRS); do \
-		($(MAKE) -C $$d all OPTS='$(OPTS)' || exit 1) || exit 1; \
-	done
-
-ifeq "$(TEST_TOOLS)" ""
-test:
-	for d in $(DIRS); do \
-		($(MAKE) -C $$d test OPTS='$(OPTS)' || exit 1) || exit 1; \
-	done
-else
-test:
+ifneq (,$(shell CHARMINC=../../../../include/; if test -f ./conv-config.sh; then . ./conv-config.sh; echo $$BGP_FLOOR; fi))
+  TESTDIRS =
 endif
 
-clean:
-	for d in $(DIRS); do ($(MAKE) -C $$d clean OPTS='$(OPTS)'); done
+all: $(foreach i,$(DIRS),build-$i)
+
+test: $(foreach i,$(TESTDIRS),test-$i)
+
+clean: $(foreach i,$(DIRS),clean-$i)
 	rm -f TAGS #*#
 	rm -f core *~
+
+$(foreach i,$(DIRS),build-$i):
+	$(MAKE) -C $(subst build-,,$@) all OPTS='$(OPTS)'
+
+$(foreach i,$(DIRS),test-$i):
+	$(MAKE) -C $(subst test-,,$@) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
+$(foreach i,$(DIRS),clean-$i):
+	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'

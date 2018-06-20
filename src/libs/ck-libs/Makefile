@@ -39,8 +39,9 @@ NDMeshStreamer: completion
 
 pythonCCS:
 	-(CHARMINC=../../../include;. $$CHARMINC/conv-config.sh; \
-	if test "$$CMK_BUILD_PYTHON" != ""; then ($(MAKE) -C $@ all OPTS='$(OPTS)' || exit 1); fi)
+	if test "$$CMK_BUILD_PYTHON" != ""; then ($(MAKE) -C $@ all OPTS='$(OPTS)'); fi)
 
+clean: $(foreach i,$(DIRS),clean-$i)
 
-clean:
-	for d in $(DIRS); do (cd $$d && $(MAKE) clean OPTS='$(OPTS)'); done
+$(foreach i,$(DIRS),clean-$i):
+	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'

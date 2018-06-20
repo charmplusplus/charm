@@ -1,17 +1,25 @@
-DIRS=migration template case anytimeMigration randomMsgCase
+DIRS = \
+  migration \
+  template \
+  case \
+  anytimeMigration \
+  randomMsgCase \
 
-all:
-	for d in $(DIRS); do \
-	    ($(MAKE) -C $$d all OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
-	done
+TESTDIRS = $(DIRS)
 
-test:
-	for d in $(DIRS); do \
-	    ($(MAKE) -C $$d test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
-	done
+all: $(foreach i,$(DIRS),build-$i)
 
-# No test implemented yet
-bgtest:
+test: $(foreach i,$(TESTDIRS),test-$i)
 
-clean:
-	for d in $(DIRS); do ($(MAKE) -C $$d clean OPTS='$(OPTS)'); done
+clean: $(foreach i,$(DIRS),clean-$i)
+	rm -f TAGS #*#
+	rm -f core *~
+
+$(foreach i,$(DIRS),build-$i):
+	$(MAKE) -C $(subst build-,,$@) all OPTS='$(OPTS)'
+
+$(foreach i,$(DIRS),test-$i):
+	$(MAKE) -C $(subst test-,,$@) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
+$(foreach i,$(DIRS),clean-$i):
+	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'

@@ -1,23 +1,36 @@
-DIRS=charm++ converse ampi armci bigsim collide
+DIRS = \
+  charm++ \
+  converse \
+  ampi \
+  armci \
+  bigsim \
+  collide \
 
-all:
-	for d in $(DIRS); do \
-		($(MAKE) -C $$d all OPTS='$(OPTS)' || exit 1) || exit 1; \
-	done
+BGDIRS = \
+  charm++ \
+  ampi \
+  armci \
 
-test:
-	for d in $(DIRS); do \
-		($(MAKE) -C $$d test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
-	done
+TESTDIRS = $(DIRS)
 
-bgtest:
-	for d in charm++ ampi armci; do \
-		($(MAKE) -C $$d bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
-	done
+all: $(foreach i,$(DIRS),build-$i)
 
-clean:
-	for d in $(DIRS); do \
-		($(MAKE) -C $$d clean OPTS='$(OPTS)'); \
-	done
+test: $(foreach i,$(TESTDIRS),test-$i)
+
+bgtest: $(foreach i,$(filter $(BGDIRS),$(TESTDIRS)),bgtest-$i)
+
+clean: $(foreach i,$(DIRS),clean-$i)
 	rm -f TAGS #*#
 	rm -f core *~
+
+$(foreach i,$(DIRS),build-$i):
+	$(MAKE) -C $(subst build-,,$@) all OPTS='$(OPTS)'
+
+$(foreach i,$(DIRS),test-$i):
+	$(MAKE) -C $(subst test-,,$@) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
+$(foreach i,$(DIRS),bgtest-$i):
+	$(MAKE) -C $(subst bgtest-,,$@) bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
+$(foreach i,$(DIRS),clean-$i):
+	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'

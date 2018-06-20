@@ -228,6 +228,8 @@ do
 	-MM|-M)
 		DODEPS="yes"
 		;;
+	-MG|-MP)
+		;;
 	-L)
 		LIBDIR="`cygpath -w $1`"
 		LIBDIRS="$LIBDIRS `cygpath -u $LIBDIR`"

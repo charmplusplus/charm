@@ -1,26 +1,33 @@
-DIRS = randomAccessGroup randomAccessArray aggregateRandomAccessGroup aggregateRandomAccessArray
+DIRS = \
+  randomAccessGroup \
+  randomAccessArray \
+  aggregateRandomAccessGroup \
+  aggregateRandomAccessArray \
 
-all:
-	CHARMINC=../../../include . ../../../tmp/conv-config.sh ; \
-	if [ "$$CMK_COMPILER" = "bgxlc" ] ; \
-	then \
-	  echo "Skipping test whose compilation will fail under BG XLC"; exit 0 ; \
-	fi ; \
-	for d in $(DIRS); do \
-		($(MAKE) -C $$d all OPTS='$(OPTS)' || exit 1) || exit 1; \
-	done
+TESTDIRS = $(DIRS)
 
-test:
-	CHARMINC=../../../include . ../../../tmp/conv-config.sh ; \
-	if [ "$$CMK_COMPILER" = "bgxlc" ] ; \
-	then \
-	  echo "Skipping test whose compilation will fail under BG XLC"; exit 0 ; \
-	fi ; \
-	for d in $(DIRS); do \
-		($(MAKE) -C $$d test OPTS='$(OPTS)'  TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
-	done
+ifneq (,$(shell CHARMINC=../../../include . ../../../tmp/conv-config.sh ; [ "$$CMK_COMPILER" = "bgxlc" ] && echo "skip"))
+  TESTDIRS =
+endif
 
-clean:
-	for d in $(DIRS); do ($(MAKE) -C $$d clean OPTS='$(OPTS)'); done
+all: $(foreach i,$(DIRS),build-$i)
+
+test: $(foreach i,$(TESTDIRS),test-$i)
+
+bgtest: $(foreach i,$(TESTDIRS),bgtest-$i)
+
+clean: $(foreach i,$(DIRS),clean-$i)
 	rm -f TAGS #*#
 	rm -f core *~
+
+$(foreach i,$(DIRS),build-$i):
+	$(MAKE) -C $(subst build-,,$@) all OPTS='$(OPTS)'
+
+$(foreach i,$(DIRS),test-$i):
+	$(MAKE) -C $(subst test-,,$@) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
+$(foreach i,$(DIRS),bgtest-$i):
+	$(MAKE) -C $(subst bgtest-,,$@) bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
+$(foreach i,$(DIRS),clean-$i):
+	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'

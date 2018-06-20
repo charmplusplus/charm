@@ -2,41 +2,45 @@
 -include ../tmp/buildopts.mk
 OPTS += $(OPTSATBUILDTIME)
 
-DIRS=util charm++ converse ampi
+DIRS = \
+  util \
+  charm++ \
+  converse \
+  ampi \
 
-all:
-	for d in $(DIRS); do \
-		($(MAKE) -C $$d all OPTS='$(OPTS)' || exit 1) || exit 1; \
-	done
+BGDIRS = \
+  charm++ \
+  ampi \
 
-test:
-	for d in $(DIRS); do \
-		($(MAKE) -C $$d test OPTS='$(OPTS)' || exit 1) || exit 1; \
-	done
+FTDIRS = \
+  charm++ \
+  ampi \
 
-bgtest:
-	for d in charm++ ampi; do \
-		($(MAKE) -C $$d bgtest OPTS='$(OPTS)' || exit 1) || exit 1; \
-	done
+TESTDIRS = $(DIRS)
 
-syncfttest causalfttest mpisyncfttest mlogfttest:
-	for d in charm++ ampi; do \
-		($(MAKE) -C $$d $@ OPTS='$(OPTS)' || exit 1) || exit 1; \
-	done
+all: $(foreach i,$(DIRS),build-$i)
 
-test-converse:
-	$(MAKE) -C converse test OPTS='$(OPTS)'
+test: $(foreach i,$(TESTDIRS),test-$i)
 
-test-charm:
-	$(MAKE) -C charm++ test OPTS='$(OPTS)'
+bgtest: $(foreach i,$(filter $(BGDIRS),$(TESTDIRS)),bgtest-$i)
 
-test-AMPI:
-	$(MAKE) -C ampi test OPTS='$(OPTS)'
+syncfttest causalfttest mpisyncfttest mlogfttest: $(foreach i,$(filter $(FTDIRS),$(TESTDIRS)),test-$i)
 
-clean:
-	for d in $(DIRS); do \
-		($(MAKE) -C $$d clean OPTS='$(OPTS)'); \
-	done
+clean: $(foreach i,$(DIRS),clean-$i)
 	rm -f TAGS #*#
 	rm -f core *~
 
+$(foreach i,$(DIRS),build-$i):
+	$(MAKE) -C $(subst build-,,$@) all OPTS='$(OPTS)'
+
+$(foreach i,$(DIRS),test-$i):
+	$(MAKE) -C $(subst test-,,$@) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
+$(foreach i,$(DIRS),bgtest-$i):
+	$(MAKE) -C $(subst bgtest-,,$@) bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
+$(foreach i,$(DIRS),clean-$i):
+	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'
+
+test-AMPI: test-ampi
+test-charm: test-charm++

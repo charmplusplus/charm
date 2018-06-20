@@ -1,29 +1,32 @@
-DIRS= emulator
+DIRS = \
+  emulator \
 # Disabled due to host/target incompatibility described in bug #89
-#DIRS += tools
+#  tools \
 
-BUILD_TRACING=$(shell CHARMINC=../../tmp; if test -f $$CHARMINC/conv-config.sh; then . $$CHARMINC/conv-config.sh; echo $$CMK_TRACE_ENABLED; fi )
-
-ifneq "$(BUILD_TRACING)" "0"
-DIRS += sdag
+ifneq (0,$(shell CHARMINC=../../tmp; if test -f $$CHARMINC/conv-config.sh; then . $$CHARMINC/conv-config.sh; echo $$CMK_TRACE_ENABLED; fi))
+  DIRS += sdag
 endif
 
-all:
-	for d in $(DIRS); do \
-		($(MAKE) -C $$d all OPTS='$(OPTS)' || exit 1) || exit 1; \
-	done
+TESTDIRS = $(DIRS)
 
-test:
-	for d in $(DIRS); do \
-		($(MAKE) -C $$d test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
-	done
+all: $(foreach i,$(DIRS),build-$i)
 
-bgtest:
-	for d in sdag; do \
-		($(MAKE) -C $$d test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
-	done
+test: $(foreach i,$(TESTDIRS),test-$i)
 
-clean:
-	for d in $(DIRS); do ($(MAKE) -C $$d clean OPTS='$(OPTS)'); done
+bgtest: $(foreach i,$(TESTDIRS),bgtest-$i)
+
+clean: $(foreach i,$(DIRS),clean-$i)
 	rm -f TAGS #*#
 	rm -f core *~
+
+$(foreach i,$(DIRS),build-$i):
+	$(MAKE) -C $(subst build-,,$@) all OPTS='$(OPTS)'
+
+$(foreach i,$(DIRS),test-$i):
+	$(MAKE) -C $(subst test-,,$@) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
+$(foreach i,$(DIRS),bgtest-$i):
+	$(MAKE) -C $(subst bgtest-,,$@) bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
+
+$(foreach i,$(DIRS),clean-$i):
+	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'
