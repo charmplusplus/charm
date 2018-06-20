@@ -686,7 +686,9 @@ void Chare::genDefs(XStr& str) {
       str << "  h[CkArrayIndex3D(*index1, *index2, *index3)].ckLocal()->AtSync();\n";
     }
     str << "}\n";
-  }
+
+    str << "/* FORTRAN END */\n\n";
+  } // fortranMode
 
   templateGuardBegin(isTemplated(), str);
   if (!type->isTemplated()) {

@@ -2385,7 +2385,10 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
       str << "  int index2 = impl_obj->thisIndex.y;\n";
       str << "  int index3 = impl_obj->thisIndex.z;\n";
     }
-    str << "  ::" << fortranify(name) << "((char **)(impl_obj->user_data), &index1";
+    str << "  ::";
+    str << fortranify(name);
+    str << "((char **)(impl_obj->user_data)";
+    str << ", &index1";
     if (dim == (const char*)"2D" || dim == (const char*)"3D") str << ", &index2";
     if (dim == (const char*)"3D") str << ", &index3";
     if (!param->isVoid()) {
@@ -2608,8 +2611,11 @@ void Entry::genDefs(XStr& str) {
     dim << ((Array*)container)->dim();
     // Declare the Fortran Entry Function
     // This is called from C++
-    str << "extern \"C\" void " << fortranify(name) << "(char **, "
-        << container->indexList();
+    str << "extern \"C\" ";
+    str << "void ";
+    str << fortranify(name);
+    str << "(char **";
+    str << ", " << container->indexList();
     if (!param->isVoid()) {
       str << ", ";
       param->printAddress(str);
@@ -2618,10 +2624,11 @@ void Entry::genDefs(XStr& str) {
 
     // Define the Fortran interface function
     // This is called from Fortran to send the message to a chare.
-    str << "extern \"C\" void "
-        //<< container->proxyName() << "_"
-        << fortranify("SendTo_", container->baseName(), "_", name) << "(long* aindex, "
-        << container->indexList();
+    str << "extern \"C\" ";
+    str << "void ";
+    str << fortranify("SendTo_", container->baseName(), "_", name);
+    str << "(long* aindex";
+    str << ", " << container->indexList();
     if (!param->isVoid()) {
       str << ", ";
       param->printAddress(str);
@@ -2645,6 +2652,7 @@ void Entry::genDefs(XStr& str) {
     if (!param->isVoid()) param->printValue(str);
     str << ");\n";
     str << "}\n";
+
     str << "/* FORTRAN SECTION END */\n";
   }
 
