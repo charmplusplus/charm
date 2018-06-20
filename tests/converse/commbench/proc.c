@@ -63,7 +63,7 @@ static void collectNumbers(ProcMsg* msg) {
       CpvAccess(parPI) = 4.0 * CpvAccess(success) / NTRIALS;
       npes = iround(CpvAccess(Time1) / CpvAccess(TimeN));
       CmiPrintf("[proc] Tseq = %le seconds, Tpar = %le seconds\n",
-                CpvAccess(Time1), CpvAccess(TimeN));
+          CpvAccess(Time1), CpvAccess(TimeN));
       CmiPrintf("[proc] CmiNumPes() reported %d processors\n", CmiNumPes());
       CmiPrintf("[proc] But actual number of processors is %d\n", npes);
       CmiPrintf("[proc] FYI, appox PI (seq) = %lf\n", CpvAccess(seqPI));

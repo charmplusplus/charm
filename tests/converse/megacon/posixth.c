@@ -129,10 +129,10 @@ void posixth_main(int argc, char **argv)
   if (CrnRand()&1) CthYield();
   errck(Cpthread_mutex_destroy(&dummymutex));
   if (CrnRand()&1) CthYield();
-  
+
   if (CpvAccess(total)!=160) posixth_fail();
   if (CpvAccess(leaves)!=260) posixth_fail();
-  
+
   if (CrnRand()&1) CthYield();
   errck(Cpthread_mutex_destroy(&CpvAccess(total_mutex)));
   if (CrnRand()&1) CthYield();
@@ -142,7 +142,7 @@ void posixth_main(int argc, char **argv)
   if (CrnRand()&1) CthYield();
   errck(Cpthread_cond_destroy(&CpvAccess(donecond)));
   if (CrnRand()&1) CthYield();
-  
+
   Cpm_megacon_ack(CpmSend(0));
 }
 
@@ -166,5 +166,4 @@ void posixth_moduleinit()
   CpvInitialize(Cpthread_mutex_t, fibs_mutex);
   CpvInitialize(int,              fibs);
   CpvInitialize(Cpthread_cond_t,  donecond);
-  
 }

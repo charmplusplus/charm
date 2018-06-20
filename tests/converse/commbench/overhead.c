@@ -13,13 +13,13 @@ static struct testdata {
   int numiter;
   double time;
 } sizes[] = {
-    {0, 1024, 0.0},
-    {16, 1024, 0.0},
-    {256, 1024, 0.0},
-    {4096, 1024, 0.0},
-    {65536, 1024, 0.0},
-    {1048576, 1024, 0.0},
-    {-1, -1, 0.0},
+  {0, 1024, 0.0},
+  {16, 1024, 0.0},
+  {256, 1024, 0.0},
+  {4096, 1024, 0.0},
+  {65536, 1024, 0.0},
+  {1048576, 1024, 0.0},
+  {-1, -1, 0.0},
 };
 
 static const char sync_outstr[] = "[overhead] (%s) %le seconds per %d bytes\n";
@@ -29,7 +29,7 @@ static void print_results(const char* func) {
 
   while (sizes[i].size != (-1)) {
     CmiPrintf(sync_outstr, func, sizes[i].time / sizes[i].numiter,
-              sizes[i].size);
+        sizes[i].size);
     i++;
   }
 }
@@ -118,7 +118,7 @@ static void free_handler(void* msg) {
       CmiSetHandler(msg, CpvAccess(free_handler));
       CpvAccess(starttime) = CmiWallTimer();
       CmiSyncSendAndFree(CmiMyPe(), CmiMsgHeaderSizeBytes + sizes[idx].size,
-                         msg);
+          msg);
     }
   }
 }

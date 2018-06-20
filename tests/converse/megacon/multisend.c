@@ -9,7 +9,7 @@ typedef struct {
 
 typedef struct
 {
-  char core[CmiMsgHeaderSizeBytes]; 
+  char core[CmiMsgHeaderSizeBytes];
   int me;
   double data[10];
 } multisendmsg;
@@ -55,12 +55,13 @@ void multisend_done_handler(multisendmsg *msg)
 
 void multisend_init(void)
 {
-/*
+
+#if 0
   if(CmiNumPes() < 2) {
     CmiPrintf("Multisend requires at least 2 processors. skipping...\n");
     Cpm_megacon_ack(CpmSend(0));
-  } else 
-*/
+  } else
+#endif
   {
     int m,i;
     int sizes[nMulti];
@@ -76,8 +77,8 @@ void multisend_init(void)
       sizes[m]=sizeof(multisendmsg)-sizeof(double)*m;
       msgs[m]=(char *)msg;
     }
-    CmiMultipleSend(1%CmiNumPes(), nMulti, sizes, msgs);  
-    for (m=0;m<nMulti;m++) 
+    CmiMultipleSend(1%CmiNumPes(), nMulti, sizes, msgs);
+    for (m=0;m<nMulti;m++)
       if (m!=0)
         CmiFree(msgs[m]);
   }
@@ -90,16 +91,16 @@ void multisend_moduleinit()
   CpvInitialize(int*, multisend_index);
   CpvInitialize(int, multisend_done_index);
   CpvInitialize(int, multisend_replies);
-  
+
   CpvAccess(multisend_index)=(int *)CmiAlloc(nMulti*sizeof(int));
   for (m=0;m<nMulti;m++) {
     multisend_info *i=(multisend_info *)CmiAlloc(sizeof(multisend_info));
     i->me=m;
     CpvAccess(multisend_index)[m]=CmiRegisterHandlerEx(
-    	(CmiHandlerEx)multisend_handler,i);
+        (CmiHandlerEx)multisend_handler,i);
   }
 
-  CpvAccess(multisend_done_index) = 
+  CpvAccess(multisend_done_index) =
     CmiRegisterHandler((CmiHandler)multisend_done_handler);
 }
 

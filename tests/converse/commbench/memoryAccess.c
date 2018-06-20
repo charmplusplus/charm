@@ -95,7 +95,7 @@ void memoryTest() {
     size = 1;
     for (i = 0; i < POWER; i++, size *= 2) {
       CmiPrintf("%d\t%d\t%E\t%E\t%E\t%E\n", size, CLUBMALLOC, times[i][0],
-                times[i][1], times[i][2], times[i][3]);
+          times[i][1], times[i][2], times[i][3]);
     }
   }
 
