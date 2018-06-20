@@ -147,7 +147,7 @@ CmiHandler node1HandlerFunc(char *msg)
 
 
 //Converse main. Initialize variables and register handlers
-CmiStartFn mymain()
+CmiStartFn mymain(int argc, char *argv[])
 {
     CpvInitialize(int,msgSize);
     CpvInitialize(int,recvNum);
@@ -172,6 +172,13 @@ CmiStartFn mymain()
     CpvInitialize(double,endTime);
     
     int otherPe = CmiMyPe() ^ 1;
+
+    // Set runtime cpuaffinity
+    CmiInitCPUAffinity(argv);
+
+    // Initialize CPU topology
+    CmiInitCPUTopology(argv);
+
     
 #if USE_PERSISTENT
     h = CmiCreatePersistent(otherPe, maxMsgSize+1024);
