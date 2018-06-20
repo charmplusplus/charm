@@ -37,23 +37,23 @@ void multicast_start_cycle(bchare c)
 {
   struct mesg_s m={{0},CmiMyPe(),c,0x12345678}; struct mesg_s *mp;
   switch (c->totalsent) {
-  case 0:
-    CmiSetHandler(&m, CpvAccess(multicast_recv_idx));
-    m.reply_ptr = c; m.reply_pe = CmiMyPe(); m.magic = 0x12345678;
-    CmiSyncMulticast(c->grp, sizeof(struct mesg_s),&m);
-    c->totalsent++;
-    break;
-  case 1:
-  case 2:
-    mp = (mesg)CmiAlloc(sizeof(struct mesg_s));
-    CmiSetHandler(mp, CpvAccess(multicast_recv_idx));
-    mp->reply_ptr = c; mp->reply_pe = CmiMyPe();mp->magic = 0x12345678;
-    CmiSyncMulticastAndFree(c->grp, sizeof(struct mesg_s), mp);
-    c->totalsent++;
-    break;
-  case 3:
-    free(c);
-    Cpm_megacon_ack(CpmSend(0));
+    case 0:
+      CmiSetHandler(&m, CpvAccess(multicast_recv_idx));
+      m.reply_ptr = c; m.reply_pe = CmiMyPe(); m.magic = 0x12345678;
+      CmiSyncMulticast(c->grp, sizeof(struct mesg_s),&m);
+      c->totalsent++;
+      break;
+    case 1:
+    case 2:
+      mp = (mesg)CmiAlloc(sizeof(struct mesg_s));
+      CmiSetHandler(mp, CpvAccess(multicast_recv_idx));
+      mp->reply_ptr = c; mp->reply_pe = CmiMyPe();mp->magic = 0x12345678;
+      CmiSyncMulticastAndFree(c->grp, sizeof(struct mesg_s), mp);
+      c->totalsent++;
+      break;
+    case 3:
+      free(c);
+      Cpm_megacon_ack(CpmSend(0));
   }
 }
 
@@ -98,9 +98,3 @@ void multicast_moduleinit()
   CpvAccess(multicast_recv_idx) = CmiRegisterHandler((CmiHandler)multicast_recv);
   CpvAccess(multicast_reply_idx) = CmiRegisterHandler((CmiHandler)multicast_reply);
 }
-
-
-
-
-
-

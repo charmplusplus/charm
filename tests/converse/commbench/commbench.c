@@ -1,14 +1,14 @@
 /**************************************************************************
-* DESCRIPTION:
-*
-* To add a test to commbench, you have to:
-*
-*   1. write a testname_moduleinit function that initializes the module.
-*   2. write a testname_init function that starts the test.
-*   3. declare the testname_init function inside this module.
-*   4. extend the tests[] table in this module to include the new test.
-*
-**************************************************************************/
+ * DESCRIPTION:
+ *
+ * To add a test to commbench, you have to:
+ *
+ *   1. write a testname_moduleinit function that initializes the module.
+ *   2. write a testname_init function that starts the test.
+ *   3. declare the testname_init function inside this module.
+ *   4. extend the tests[] table in this module to include the new test.
+ *
+ **************************************************************************/
 
 #include <stdio.h>
 #include <converse.h>
@@ -49,18 +49,18 @@ struct testinfo {
   void (*initiator)(void);
   void (*initializer)(void);
 } tests[] = {
-    {"memoryAccess", memoryAccess_init, memoryAccess_moduleinit},
-    {"overhead", overhead_init, overhead_moduleinit},
-    {"timer", timer_init, timer_moduleinit},
-    {"proc", proc_init, proc_moduleinit},
-    {"smputil", smputil_init, smputil_moduleinit},
-    {"pingpong", pingpong_init, pingpong_moduleinit},
-    {"pingpong-cachemiss", pingpong_cachemiss_init, pingpong_cachemiss_moduleinit},
-    {"flood", flood_init, flood_moduleinit},
-    {"broadcast", broadcast_init, broadcast_moduleinit},
-    {"reduction", reduction_init, reduction_moduleinit},
-    {"ctxt", ctxt_init, ctxt_moduleinit},
-    {0, 0, 0},
+  {"memoryAccess", memoryAccess_init, memoryAccess_moduleinit},
+  {"overhead", overhead_init, overhead_moduleinit},
+  {"timer", timer_init, timer_moduleinit},
+  {"proc", proc_init, proc_moduleinit},
+  {"smputil", smputil_init, smputil_moduleinit},
+  {"pingpong", pingpong_init, pingpong_moduleinit},
+  {"pingpong-cachemiss", pingpong_cachemiss_init, pingpong_cachemiss_moduleinit},
+  {"flood", flood_init, flood_moduleinit},
+  {"broadcast", broadcast_init, broadcast_moduleinit},
+  {"reduction", reduction_init, reduction_moduleinit},
+  {"ctxt", ctxt_init, ctxt_moduleinit},
+  {0, 0, 0},
 };
 
 /******************************************************************************
@@ -131,7 +131,7 @@ void commbench_init(int argc, char** argv) {
   CpvInitialize(int, shutdown_handler);
   CpvInitialize(int, ack_handler);
   CpvAccess(shutdown_handler) =
-      CmiRegisterHandler((CmiHandler)commbench_shutdown);
+    CmiRegisterHandler((CmiHandler)commbench_shutdown);
   CpvAccess(ack_handler) = CmiRegisterHandler((CmiHandler)commbench_ack);
   for (i = 0; (tests[i].initializer); i++) (tests[i].initializer)();
   CpvInitialize(int, test_bank_size);

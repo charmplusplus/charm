@@ -12,16 +12,16 @@ static struct testdata {
   int size;
   int numiter;
 } sizes[] = {
-    {16, 400},
-    {64, 400},
-    {256, 100},
-    {1024, 100},
-    {4096, 100},
-    {16384, 100},
-    {65536, 40},
-    {524288, 10},
-    {1048576, 4},
-    {-1, -1},
+  {16, 400},
+  {64, 400},
+  {256, 100},
+  {1024, 100},
+  {4096, 100},
+  {16384, 100},
+  {65536, 40},
+  {524288, 10},
+  {1048576, 4},
+  {-1, -1},
 };
 
 typedef struct message_ {
@@ -39,7 +39,7 @@ static void fillMessage(Message* msg) {
   for (i = 0; i < items; i++) msg->data[i] = i + 0x1234;
 }
 
-/*
+#if 0
 static void checkMessage(Message *msg)
 {
   int i, size, items;
@@ -49,7 +49,8 @@ static void checkMessage(Message *msg)
     if(msg->data[i] != (i+0x1234))
       CmiAbort("[flood] Data corrupted. Run megacon !!\n");
   }
-}*/
+}
+#endif
 
 typedef struct Time_ {
   char core[CmiMsgHeaderSizeBytes];
@@ -113,16 +114,19 @@ static void recvTime(TimeMessage* msg) {
     CmiPrintf("[flood] CmiSyncSend %d \n", MSGNUMS);
     for (j = 0; j < pva(numSizes); j++) {
       CmiPrintf("flood %d       \t%.4f GBytes/sec\n", sizes[j].size,
-                sizes[j].size * MSGNUMS / pva(gavg)[j] / 1e9);
-      /*    CmiPrintf("[flood] size=%d\taverageTime=%le seconds\n",
-                                  sizes[j].size, pva(gavg)[j]);
-            CmiPrintf("[flood] size=%d\tmaxTime=%le seconds\t[%d->%d]\n",
-                        sizes[j].size,
-         pva(gmax)[j],pva(gmaxSrc)[j],pva(gmaxDest)[j]);
-            CmiPrintf("[flood] size=%d\tminTime=%le seconds\t[%d->%d]\n",
-                        sizes[j].size,
-         pva(gmin)[j],pva(gminSrc)[j],pva(gminDest)[j]);
-      */
+          sizes[j].size * MSGNUMS / pva(gavg)[j] / 1e9);
+
+#if 0
+      CmiPrintf("[flood] size=%d\taverageTime=%le seconds\n",
+          sizes[j].size, pva(gavg)[j]);
+      CmiPrintf("[flood] size=%d\tmaxTime=%le seconds\t[%d->%d]\n",
+          sizes[j].size,
+          pva(gmax)[j],pva(gmaxSrc)[j],pva(gmaxDest)[j]);
+      CmiPrintf("[flood] size=%d\tminTime=%le seconds\t[%d->%d]\n",
+          sizes[j].size,
+          pva(gmin)[j],pva(gminSrc)[j],pva(gminDest)[j]);
+#endif
+
     }
     CmiSetHandler(&m, pva(ack_handler));
     CmiSyncSend(0, sizeof(EmptyMsg), &m);
@@ -159,7 +163,7 @@ static void startNextNbr(EmptyMsg* msg) {
     tm = (TimeMessage*)CmiAlloc(size);
     for (i = 0; i < CmiNumPes(); i++)
       memcpy(tm->data + i * pva(numSizes), pva(times)[i],
-             sizeof(double) * pva(numSizes));
+          sizeof(double) * pva(numSizes));
     tm->srcNode = CmiMyPe();
     CmiSetHandler(tm, pva(timeHandler));
     CmiSyncSendAndFree(0, size, tm);
@@ -205,8 +209,8 @@ static void startNextIter(Message* msg) {
       pva(endtime) = CmiWallTimer();
       /* checkMessage(msg); */
       pva(times)[pva(nextNbr)][pva(nextSize)] =
-          (pva(endtime) - pva(starttime)) /
-          (2.0 * sizes[pva(nextSize)].numiter);
+        (pva(endtime) - pva(starttime)) /
+        (2.0 * sizes[pva(nextSize)].numiter);
       pva(nextIter) = -1;
       CmiSetHandler(&m, pva(sizeHandler));
       CmiSyncSend(CmiMyPe(), sizeof(EmptyMsg), &m);
@@ -216,7 +220,7 @@ static void startNextIter(Message* msg) {
   } else {
     CmiSetHandler(msg, pva(bounceHandler));
     CmiSyncSendAndFree(pva(nextNbr), sizeof(Message) + sizes[msg->idx].size,
-                       msg);
+        msg);
   }
 }
 

@@ -76,16 +76,16 @@ CpmInvokable vars_control()
 
   CthAwaken(t1); CthAwaken(t2);
   c.countdown = 2; c.pending = CthSelf(); CthSuspend();
-  
+
   CthAwaken(t1); CthAwaken(t2);
   c.countdown = 2; c.pending = CthSelf(); CthSuspend();
-  
+
   Cpm_vars_set_cpv_and_csv(CpmSend(CpmALL), &c);
   c.countdown = CmiNumPes(); c.pending = CthSelf(); CthSuspend();
-  
+
   Cpm_vars_check_cpv_and_csv(CpmSend(CpmALL), &c);
   c.countdown = CmiNumPes(); c.pending = CthSelf(); CthSuspend();
-  
+
   Cpm_megacon_ack(CpmSend(0));
 }
 
@@ -99,18 +99,18 @@ void vars_moduleinit()
   CpmInitializeThisModule();
   CtvInitialize(int, ctv1);
   if (!CtvInitialized(ctv1)) {
-      CmiPrintf("ctv initialization test failed.\n");
-      exit(1);
+    CmiPrintf("ctv initialization test failed.\n");
+    exit(1);
   }
   CpvInitialize(int, cpv1);
   if (!CpvInitialized(cpv1)) {
-      CmiPrintf("cpv initialization test failed.\n");
-      exit(1);
+    CmiPrintf("cpv initialization test failed.\n");
+    exit(1);
   }
   CsvInitialize(int, csv1);
   if (!CsvInitialized(csv1)) {
-      CmiPrintf("csv initialization test failed.\n");
-      exit(1);
+    CmiPrintf("csv initialization test failed.\n");
+    exit(1);
   }
 }
 

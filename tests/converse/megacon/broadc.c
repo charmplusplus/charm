@@ -36,22 +36,22 @@ void broadc_start_cycle(bchare c)
 {
   struct mesg_s m={{0},CmiMyPe(),c,0x12345678}; struct mesg_s *mp; CmiCommHandle h;
   switch (c->totalsent) {
-  case 0:
-    CmiSetHandler(&m, CpvAccess(broadc_recv_idx));
-    CmiSyncBroadcastAll(sizeof(struct mesg_s),&m);
-    c->totalsent++;
-    break;
-  case 1:
-  case 2:
-    mp = (mesg)CmiAlloc(sizeof(struct mesg_s));
-    CmiSetHandler(mp, CpvAccess(broadc_recv_idx));
-    mp->reply_ptr = c; mp->reply_pe = CmiMyPe(); mp->magic = 0x12345678;
-    CmiSyncBroadcastAllAndFree(sizeof(struct mesg_s),mp);
-    c->totalsent++;
-    break;
-  case 3:
-    free(c);
-    Cpm_megacon_ack(CpmSend(0));
+    case 0:
+      CmiSetHandler(&m, CpvAccess(broadc_recv_idx));
+      CmiSyncBroadcastAll(sizeof(struct mesg_s),&m);
+      c->totalsent++;
+      break;
+    case 1:
+    case 2:
+      mp = (mesg)CmiAlloc(sizeof(struct mesg_s));
+      CmiSetHandler(mp, CpvAccess(broadc_recv_idx));
+      mp->reply_ptr = c; mp->reply_pe = CmiMyPe(); mp->magic = 0x12345678;
+      CmiSyncBroadcastAllAndFree(sizeof(struct mesg_s),mp);
+      c->totalsent++;
+      break;
+    case 3:
+      free(c);
+      Cpm_megacon_ack(CpmSend(0));
   }
 }
 

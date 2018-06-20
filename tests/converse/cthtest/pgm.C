@@ -1,10 +1,10 @@
 /**
-Tests out Cth routines, by running a set of threads
-that create new threads.  The pattern of creations
-and yeilds is deterministic but complicated.
+  Tests out Cth routines, by running a set of threads
+  that create new threads.  The pattern of creations
+  and yeilds is deterministic but complicated.
 
-Orion Lawlor, olawlor@acm.org, 2004/2/20
-*/
+  Orion Lawlor, olawlor@acm.org, 2004/2/20
+  */
 #include <stdio.h>
 #include "converse.h"
 #include <stdlib.h>
@@ -43,9 +43,9 @@ void runThread(void* msg) {
 
   for (int iter = 0; iter < NITER; iter++) {
     VERBOSE(char buf[NITER + 2];
-            for (int i = 0; i < NITER + 1; i++) buf[i] = ' '; buf[0] = myId;
-            buf[1 + iter] = '0' + (iter % 10); buf[NITER + 1] = 0;
-            printf("%s\n", buf);)
+        for (int i = 0; i < NITER + 1; i++) buf[i] = ' '; buf[0] = myId;
+        buf[1 + iter] = '0' + (iter % 10); buf[NITER + 1] = 0;
+        printf("%s\n", buf);)
     if ((iter % 2) == 0) {  // (rand()%NITER)<5) {
       CthYield();
     }
@@ -61,7 +61,7 @@ void runThread(void* msg) {
   if (nThreadFinish == NSPAWN) {  // We're the last thread: leave
     double timeElapsed = CmiWallTimer() - timeStart;
     printf(" %d threads ran successfully (%.3f us per context switch)\n",
-           nThreadFinish, 1.0e6 * timeElapsed / (NITER * NSPAWN));
+          nThreadFinish, 1.0e6 * timeElapsed / (NITER * NSPAWN));
     CsdExitScheduler();
   }
 }

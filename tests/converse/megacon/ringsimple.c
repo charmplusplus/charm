@@ -5,7 +5,7 @@ void Cpm_megacon_ack(CpmDestination);
 
 typedef struct
 {
-  char core[CmiMsgHeaderSizeBytes]; 
+  char core[CmiMsgHeaderSizeBytes];
   int hops, ringno;
   int data[10];
 } ringmsg;
@@ -51,6 +51,3 @@ void ringsimple_moduleinit()
   CpvInitialize(int, ringsimple_hop_index);
   CpvAccess(ringsimple_hop_index) = CmiRegisterHandler((CmiHandler)ringsimple_hop);
 }
-
-
-
