@@ -2366,7 +2366,7 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
   }
 
   str << preCall;
-  if (!isConstructor() && fortranMode) {
+  if (!isConstructor() && fortranMode && !isWhenEntry && !sdagCon) {
     if (!container->isArray()) {  // Currently, only arrays are supported
       cerr << (char*)container->baseName()
            << ": only chare arrays are currently supported\n";

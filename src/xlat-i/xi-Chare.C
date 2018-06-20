@@ -572,8 +572,10 @@ void Chare::genDefs(XStr& str) {
         << "(char **, void *, " << indexList() << ");\n";
     str << "\n";
     XStr dim = ((Array*)this)->dim();
-    str << "class " << baseName() << " : public ArrayElement" << dim << "\n";
+    str << "class " << baseName() << " : public CBase_" << baseName() << "\n";
     str << "{\n";
+    if (hasSdagEntry)
+      str << "  " << baseName() << "_SDAG_CODE\n";
     str << "public:\n";
     str << "  char user_data[64];\n";
     str << "public:\n";
@@ -601,7 +603,6 @@ void Chare::genDefs(XStr& str) {
 
     str << "  virtual void pup(PUP::er &p)\n";
     str << "  {\n";
-    str << "    ArrayElement" << dim << "::pup(p);\n";
     str << "    p(user_data, 64);\n";
     str << "    CkArrayID *aid = &thisArrayID;\n";
     str << "    ::" << fortranify(baseName(), "_pup")
