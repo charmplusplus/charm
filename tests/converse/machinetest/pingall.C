@@ -27,6 +27,7 @@ CpvDeclare(int,exitHandler);
 CpvDeclare(int,node0Handler);
 CpvDeclare(int,node1Handler);
 CpvDeclare(int,ackHandler);
+CpvDeclare(int,startOperationHandler);
 CpvStaticDeclare(double,startTime);
 CpvStaticDeclare(double,endTime);
 
@@ -113,6 +114,18 @@ CmiHandler exitHandlerFunc(char *msg)
     return 0;
 }
 
+// Converse handler for beginning operation
+CmiHandler startOperationHandlerFunc(char *msg)
+{
+    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE, ApplIdleStart, NULL);
+    CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE, ApplIdleEnd, NULL);
+
+    if ((CmiMyPe() < CmiNumPes()/2) || CpvAccess(twoway))
+      startPingpong();
+
+    return 0;
+}
+
 CmiHandler node0HandlerFunc(char *msg)
 {
     CpvAccess(cycleNum)++;
@@ -158,6 +171,8 @@ CmiStartFn mymain(int argc, char** argv)
     CpvAccess(node1Handler) = CmiRegisterHandler((CmiHandler) node1HandlerFunc);
     CpvInitialize(int,ackHandler);
     CpvAccess(ackHandler) = CmiRegisterHandler((CmiHandler) ackHandlerFunc);
+    CpvInitialize(int,startOperationHandler);
+    CpvAccess(startOperationHandler) = CmiRegisterHandler((CmiHandler) startOperationHandlerFunc);
     
     CpvInitialize(double,startTime);
     CpvInitialize(double,endTime);
@@ -171,18 +186,18 @@ CmiStartFn mymain(int argc, char** argv)
     CpvInitialize(int,twoway);
     CpvAccess(twoway) = 0;
 
-    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE, ApplIdleStart, NULL);
-    CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE, ApplIdleEnd, NULL);
-
     // Set runtime cpuaffinity
     CmiInitCPUAffinity(argv);
 
     // Initialize CPU topology
     CmiInitCPUTopology(argv);
 
+    // Wait for all PEs of the node to complete topology init
+    CmiNodeAllBarrier();
+
     // Update the argc after runtime parameters are extracted out
     argc = CmiGetArgc(argv);
- 
+
     if(CmiMyRank() == CmiMyNodeSize()) return 0;
     
     if(argc > 1)
@@ -195,9 +210,16 @@ CmiStartFn mymain(int argc, char** argv)
         CmiPrintf("Starting Pingpong with twoway traffic\n");
     }
 
-    if ((CmiMyPe() < CmiNumPes()/2) || CpvAccess(twoway))
-      startPingpong();
+    // Node 0 waits till all processors finish their topology processing
+    if(CmiMyPe() == 0) {
+        // Signal all PEs to begin computing
+        char *startOperationMsg = (char *)CmiAlloc(CmiMsgHeaderSizeBytes);
+        CmiSetHandler((char *)startOperationMsg, CpvAccess(startOperationHandler));
+        CmiSyncBroadcastAndFree(CmiMsgHeaderSizeBytes, startOperationMsg);
 
+        // start operation locally on PE 0
+        startOperationHandlerFunc(NULL);
+    }
     return 0;
 }
 

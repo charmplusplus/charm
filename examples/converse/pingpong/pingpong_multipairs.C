@@ -22,6 +22,7 @@ CpvDeclare(int,reduceHandler);
 CpvDeclare(int,startRingHandler);
 CpvDeclare(int,node0Handler);
 CpvDeclare(int,node1Handler);
+CpvDeclare(int,startOperationHandler);
 CpvStaticDeclare(double,startTime);
 CpvStaticDeclare(double,endTime);
 
@@ -145,6 +146,24 @@ CmiHandler node1HandlerFunc(char *msg)
     return 0;
 }
 
+// Converse handler for beginning operation
+CmiHandler startOperationHandlerFunc(char *msg)
+{
+#if USE_PERSISTENT
+    h = CmiCreatePersistent(otherPe, maxMsgSize+1024);
+#endif
+    if(CmiMyPe() == 0)
+    {
+        CmiPrintf("Multiple pair send/recv\n bytes \t\t latency(us)\t bandwidth(MBytes/sec)\n");
+    }
+    if (CmiMyPe() <CmiNumPes()/2)
+    {
+        void *sendmsg = CmiAlloc(CmiMsgHeaderSizeBytes);
+        CmiSetHandler(sendmsg,CpvAccess(startRingHandler));
+        CmiSyncSendAndFree(CmiMyPe(), CmiMsgHeaderSizeBytes, sendmsg);
+    }
+    return 0;
+}
 
 //Converse main. Initialize variables and register handlers
 CmiStartFn mymain(int argc, char *argv[])
@@ -167,6 +186,8 @@ CmiStartFn mymain(int argc, char *argv[])
     CpvAccess(node0Handler) = CmiRegisterHandler((CmiHandler) node0HandlerFunc);
     CpvInitialize(int,node1Handler);
     CpvAccess(node1Handler) = CmiRegisterHandler((CmiHandler) node1HandlerFunc);
+    CpvInitialize(int,startOperationHandler);
+    CpvAccess(startOperationHandler) = CmiRegisterHandler((CmiHandler) startOperationHandlerFunc);
     
     CpvInitialize(double,startTime);
     CpvInitialize(double,endTime);
@@ -179,20 +200,19 @@ CmiStartFn mymain(int argc, char *argv[])
     // Initialize CPU topology
     CmiInitCPUTopology(argv);
 
-    
-#if USE_PERSISTENT
-    h = CmiCreatePersistent(otherPe, maxMsgSize+1024);
-#endif
-    if(CmiMyPe() == 0)
-    {
-        CmiPrintf("Multiple pair send/recv\n bytes \t\t latency(us)\t bandwidth(MBytes/sec)\n");
+    // Wait for all PEs of the node to complete topology init
+    CmiNodeAllBarrier();
+
+    // Node 0 waits till all processors finish their topology processing
+    if(CmiMyPe() == 0) {
+        // Signal all PEs to begin computing
+        char *startOperationMsg = (char *)CmiAlloc(CmiMsgHeaderSizeBytes);
+        CmiSetHandler((char *)startOperationMsg, CpvAccess(startOperationHandler));
+        CmiSyncBroadcastAndFree(CmiMsgHeaderSizeBytes, startOperationMsg);
+
+        // start operation locally on PE 0
+        startOperationHandlerFunc(NULL);
     }
-    if (CmiMyPe() <CmiNumPes()/2)
-    {
-        void *sendmsg = CmiAlloc(CmiMsgHeaderSizeBytes);
-        CmiSetHandler(sendmsg,CpvAccess(startRingHandler));
-        CmiSyncSendAndFree(CmiMyPe(), CmiMsgHeaderSizeBytes, sendmsg);
-   }    
     return 0;
 }
 

@@ -20,6 +20,7 @@ CpvDeclare(int,warmUpDoneHandler);
 CpvDeclare(int,exitHandler);
 CpvDeclare(int,node0Handler);
 CpvDeclare(int,node1Handler);
+CpvDeclare(int,startOperationHandler);
 CpvStaticDeclare(double,startTime);
 CpvStaticDeclare(double,endTime);
 
@@ -146,6 +147,18 @@ CmiHandler node1HandlerFunc(char *msg)
   return 0;
 }
 
+// Converse handler for beginning operation
+CmiHandler startOperationHandlerFunc(char *msg)
+{
+#if USE_PERSISTENT
+  if (CmiMyPe() < CmiNumPes())
+    h = CmiCreateCompressPersistent(otherPe, CpvAccess(maxMsgSize)+1024, 200, CMI_FLOATING);
+#endif
+
+  if (CmiMyPe() == 0)
+    startWarmUp();
+  return 0;
+}
 
 //Converse main. Initialize variables and register handlers
 CmiStartFn mymain(int argc, char *argv[])
@@ -168,6 +181,8 @@ CmiStartFn mymain(int argc, char *argv[])
   CpvAccess(node0Handler) = CmiRegisterHandler((CmiHandler) node0HandlerFunc);
   CpvInitialize(int,node1Handler);
   CpvAccess(node1Handler) = CmiRegisterHandler((CmiHandler) node1HandlerFunc);
+  CpvInitialize(int,startOperationHandler);
+  CpvAccess(startOperationHandler) = CmiRegisterHandler((CmiHandler) startOperationHandlerFunc);
 
   //set warmup run
   CpvAccess(warmUp) = true;
@@ -182,6 +197,9 @@ CmiStartFn mymain(int argc, char *argv[])
 
   // Initialize CPU topology
   CmiInitCPUTopology(argv);
+
+  // Wait for all PEs of the node to complete topology init
+  CmiNodeAllBarrier();
 
   // Update the argc after runtime parameters are extracted out
   argc = CmiGetArgc(argv);
@@ -207,14 +225,16 @@ CmiStartFn mymain(int argc, char *argv[])
 
   CpvAccess(msgSize)= CpvAccess(minMsgSize) + CmiMsgHeaderSizeBytes;
 
-#if USE_PERSISTENT
-  if (CmiMyPe() < CmiNumPes())
-    h = CmiCreateCompressPersistent(otherPe, CpvAccess(maxMsgSize)+1024, 200, CMI_FLOATING);
-#endif
+  // Node 0 waits till all processors finish their topology processing
+  if(CmiMyPe() == 0) {
+    // Signal all PEs to begin computing
+    char *startOperationMsg = (char *)CmiAlloc(CmiMsgHeaderSizeBytes);
+    CmiSetHandler((char *)startOperationMsg, CpvAccess(startOperationHandler));
+    CmiSyncBroadcastAndFree(CmiMsgHeaderSizeBytes, startOperationMsg);
 
-  if (CmiMyPe() == 0)
-    startWarmUp();
-
+    // start operation locally on PE 0
+    startOperationHandlerFunc(NULL);
+  }
   return 0;
 }
 
