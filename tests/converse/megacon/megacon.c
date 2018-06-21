@@ -245,6 +245,9 @@ void megacon_init(int argc, char **argv)
   // Initialize CPU topology
   CmiInitCPUTopology(argv);
 
+  // Wait for all PEs of the node to complete topology init
+  CmiNodeAllBarrier();
+
   // Update the argc after runtime parameters are extracted out
   argc = CmiGetArgc(argv);
 

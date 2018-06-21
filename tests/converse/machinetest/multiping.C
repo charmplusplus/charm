@@ -31,6 +31,7 @@ CpvDeclare(int,exitHandler);
 CpvDeclare(int,node0Handler);
 CpvDeclare(int,node1Handler);
 CpvDeclare(int,ackHandler);
+CpvDeclare(int,startOperationHandler);
 CpvStaticDeclare(double,startTime);
 CpvStaticDeclare(double,endTime);
 
@@ -124,6 +125,17 @@ CmiHandler exitHandlerFunc(char *msg)
     return 0;
 }
 
+// Converse handler for beginning operation
+CmiHandler startOperationHandlerFunc(char *msg)
+{
+    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE, ApplIdleStart, NULL);
+    CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE, ApplIdleEnd, NULL);
+
+    if ((CmiMyPe() < CmiNumPes()/2) || CpvAccess(twoway))
+        startOperation();
+    return 0;
+}
+
 //The handler that sends out K_FACTOR messages
 CmiHandler node0HandlerFunc(char *msg)
 {
@@ -186,6 +198,8 @@ CmiStartFn mymain(int argc, char **argv)
     CpvAccess(node1Handler) = CmiRegisterHandler((CmiHandler) node1HandlerFunc);
     CpvInitialize(int,ackHandler);
     CpvAccess(ackHandler) = CmiRegisterHandler((CmiHandler) ackHandlerFunc);
+    CpvInitialize(int,startOperationHandler);
+    CpvAccess(startOperationHandler) = CmiRegisterHandler((CmiHandler) startOperationHandlerFunc);
     
     CpvInitialize(double,startTime);
     CpvInitialize(double,endTime);
@@ -205,6 +219,9 @@ CmiStartFn mymain(int argc, char **argv)
     // Initialize CPU topology
     CmiInitCPUTopology(argv);
 
+    // Wait for all PEs of the node to complete topology init
+    CmiNodeAllBarrier();
+
     // Update the argc after runtime parameters are extracted out
     argc = CmiGetArgc(argv);
 
@@ -216,9 +233,6 @@ CmiStartFn mymain(int argc, char **argv)
 
     int otherPe = CmiMyPe() ^ 1;
     
-    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE, ApplIdleStart, NULL);
-    CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE, ApplIdleEnd, NULL);
-
     if(CmiMyRank() == CmiMyNodeSize()) return 0;
 
     if(CmiMyPe() == 0) {
@@ -230,9 +244,17 @@ CmiStartFn mymain(int argc, char **argv)
                       CpvAccess(kFactor));
     }
 
-    if ((CmiMyPe() < CmiNumPes()/2) || CpvAccess(twoway))
-        startOperation();
-    
+
+    // Node 0 waits till all processors finish their topology processing
+    if(CmiMyPe() == 0) {
+        // Signal all PEs to begin computing
+        char *startOperationMsg = (char *)CmiAlloc(CmiMsgHeaderSizeBytes);
+        CmiSetHandler((char *)startOperationMsg, CpvAccess(startOperationHandler));
+        CmiSyncBroadcastAndFree(CmiMsgHeaderSizeBytes, startOperationMsg);
+
+        // start operation locally on PE 0
+        startOperationHandlerFunc(NULL);
+    }
     return 0;
 }
 
