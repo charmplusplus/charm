@@ -1952,6 +1952,7 @@ typedef enum : uint8_t {
 struct CkExtContributeInfo
 {
     int cbEpIdx;
+    int fid; // future ID (if reduction target is future)
     void* data;
     int numelems;
     int dataSize;
@@ -2028,6 +2029,7 @@ void CkExtContributeToChare(CkExtContributeInfo* contribute_params, int onPE, vo
     targetChareID.objPtr = objPtr;
 
     CkCallback cb(contribute_params->cbEpIdx, targetChareID);
+    if (contribute_params->fid > 0) cb.setRefnum(contribute_params->fid);
     CkExtContributeTo(contribute_params, cb);
 }
 
@@ -2050,6 +2052,7 @@ void CkExtContributeToArray(CkExtContributeInfo* contribute_params, int aid, int
         // callback broadcasts to all elements of array
         cb = CkCallback(contribute_params->cbEpIdx, arrayId);
     }
+    if (contribute_params->fid > 0) cb.setRefnum(contribute_params->fid);
 
     CkExtContributeTo(contribute_params, cb);
 }
@@ -2070,6 +2073,7 @@ void CkExtContributeToGroup(CkExtContributeInfo* contribute_params, int gid, int
         // callback to specific PE
         cb = CkCallback(contribute_params->cbEpIdx, pe, groupId);
     }
+    if (contribute_params->fid > 0) cb.setRefnum(contribute_params->fid);
 
     CkExtContributeTo(contribute_params, cb);
 }

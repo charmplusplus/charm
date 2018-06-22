@@ -2288,9 +2288,9 @@ extern "C" void registerArrayResumeFromSyncExtCallback(void (*cb)(int, int, int 
   ArrayResumeFromSyncExtCallback = cb;
 }
 
-void (*CPickleDataExtCallback)(void*, int, int, char**, int*) = NULL;
-extern "C" void registerCPickleDataExtCallback(void (*cb)(void*, int, int, char**, int*)) {
-  CPickleDataExtCallback = cb;
+void (*CreateReductionTargetMsgExt)(void*, int, int, int, char**, int*) = NULL;
+extern "C" void registerCreateReductionTargetMsgExtCallback(void (*cb)(void*, int, int, int, char**, int*)) {
+  CreateReductionTargetMsgExt = cb;
 }
 
 int (*PyReductionExt)(char**, int*, int, char**) = NULL;
