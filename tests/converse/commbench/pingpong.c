@@ -1,6 +1,5 @@
+#include "commbench.h"  // includes converse.h
 #include <stdlib.h>
-#include <converse.h>
-#include "commbench.h"
 
 #define pva CpvAccess
 #define pvd CpvStaticDeclare
@@ -10,16 +9,8 @@ static struct testdata {
   int size;
   int numiter;
 } sizes[] = {
-  {16, 1},
-  {128, 400},
-  {512, 100},
-  {2048, 100},
-  {8192, 100},
-  {32768, 100},
-  {131072, 20},
-  {1048576, 10},
-  {8388608, 4},
-  {-1, -1},
+    {16, 1},      {128, 400},   {512, 100},    {2048, 100},  {8192, 100},
+    {32768, 100}, {131072, 20}, {1048576, 10}, {8388608, 4}, {-1, -1},
 };
 
 typedef struct message_ {
@@ -102,16 +93,15 @@ static void recvTime(TimeMessage* msg) {
     }
   }
   if (pva(numRecv) == CmiNumPes()) {
-    for (j = 0; j < pva(numSizes); j++)
-      pva(gavg)[j] /= (CmiNumPes() * (CmiNumPes() - 1));
+    for (j = 0; j < pva(numSizes); j++) pva(gavg)[j] /= (CmiNumPes() * (CmiNumPes() - 1));
     CmiPrintf("[pingpong] CmiSyncSend\n");
     for (j = 0; j < pva(numSizes); j++) {
       CmiPrintf("[pingpong] size=%d\taverageTime=%le seconds\n", sizes[j].size,
-          pva(gavg)[j]);
-      CmiPrintf("[pingpong] size=%d\tmaxTime=%le seconds\t[%d->%d]\n",
-          sizes[j].size, pva(gmax)[j], pva(gmaxSrc)[j], pva(gmaxDest)[j]);
-      CmiPrintf("[pingpong] size=%d\tminTime=%le seconds\t[%d->%d]\n",
-          sizes[j].size, pva(gmin)[j], pva(gminSrc)[j], pva(gminDest)[j]);
+                pva(gavg)[j]);
+      CmiPrintf("[pingpong] size=%d\tmaxTime=%le seconds\t[%d->%d]\n", sizes[j].size,
+                pva(gmax)[j], pva(gmaxSrc)[j], pva(gmaxDest)[j]);
+      CmiPrintf("[pingpong] size=%d\tminTime=%le seconds\t[%d->%d]\n", sizes[j].size,
+                pva(gmin)[j], pva(gminSrc)[j], pva(gminDest)[j]);
     }
     CmiSetHandler(&m, pva(ack_handler));
     CmiSyncSend(0, sizeof(EmptyMsg), &m);
@@ -147,8 +137,7 @@ static void startNextNbr(EmptyMsg* msg) {
     size = sizeof(TimeMessage) + pva(numSizes) * CmiNumPes() * sizeof(double);
     tm = (TimeMessage*)CmiAlloc(size);
     for (i = 0; i < CmiNumPes(); i++)
-      memcpy(tm->data + i * pva(numSizes), pva(times)[i],
-          sizeof(double) * pva(numSizes));
+      memcpy(tm->data + i * pva(numSizes), pva(times)[i], sizeof(double) * pva(numSizes));
     tm->srcNode = CmiMyPe();
     CmiSetHandler(tm, pva(timeHandler));
     CmiSyncSendAndFree(0, size, tm);
@@ -188,15 +177,14 @@ static void startNextIter(Message* msg) {
     pva(endtime) = CmiWallTimer();
     checkMessage(msg);
     pva(times)[pva(nextNbr)][pva(nextSize)] =
-      (pva(endtime) - pva(starttime)) / (2.0 * sizes[pva(nextSize)].numiter);
+        (pva(endtime) - pva(starttime)) / (2.0 * sizes[pva(nextSize)].numiter);
     pva(nextIter) = -1;
     CmiSetHandler(&m, pva(sizeHandler));
     CmiSyncSend(CmiMyPe(), sizeof(EmptyMsg), &m);
     CmiFree(msg);
   } else {
     CmiSetHandler(msg, pva(bounceHandler));
-    CmiSyncSendAndFree(pva(nextNbr), sizeof(Message) + sizes[msg->idx].size,
-        msg);
+    CmiSyncSendAndFree(pva(nextNbr), sizeof(Message) + sizes[msg->idx].size, msg);
   }
 }
 

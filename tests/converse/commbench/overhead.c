@@ -1,5 +1,4 @@
-#include "converse.h"
-#include "commbench.h"
+#include "commbench.h"  // includes converse.h
 
 CpvStaticDeclare(int, numiter);
 CpvStaticDeclare(int, nextidx);
@@ -13,13 +12,8 @@ static struct testdata {
   int numiter;
   double time;
 } sizes[] = {
-  {0, 1024, 0.0},
-  {16, 1024, 0.0},
-  {256, 1024, 0.0},
-  {4096, 1024, 0.0},
-  {65536, 1024, 0.0},
-  {1048576, 1024, 0.0},
-  {-1, -1, 0.0},
+    {0, 1024, 0.0},     {16, 1024, 0.0},      {256, 1024, 0.0}, {4096, 1024, 0.0},
+    {65536, 1024, 0.0}, {1048576, 1024, 0.0}, {-1, -1, 0.0},
 };
 
 static const char sync_outstr[] = "[overhead] (%s) %le seconds per %d bytes\n";
@@ -28,8 +22,7 @@ static void print_results(const char* func) {
   int i = 0;
 
   while (sizes[i].size != (-1)) {
-    CmiPrintf(sync_outstr, func, sizes[i].time / sizes[i].numiter,
-        sizes[i].size);
+    CmiPrintf(sync_outstr, func, sizes[i].time / sizes[i].numiter, sizes[i].size);
     i++;
   }
 }
@@ -50,8 +43,7 @@ static void check_message(void* msg, int size) {
   int i;
 
   for (i = start; i < end; i++)
-    if (imsg[i] != i)
-      CmiAbort("[overhead] Message corrupted. Run megacon again !!\n");
+    if (imsg[i] != i) CmiAbort("[overhead] Message corrupted. Run megacon again !!\n");
 }
 
 static void sync_handler(void* msg) {
@@ -117,8 +109,7 @@ static void free_handler(void* msg) {
       fill_message(msg, sizes[idx].size);
       CmiSetHandler(msg, CpvAccess(free_handler));
       CpvAccess(starttime) = CmiWallTimer();
-      CmiSyncSendAndFree(CmiMyPe(), CmiMsgHeaderSizeBytes + sizes[idx].size,
-          msg);
+      CmiSyncSendAndFree(CmiMyPe(), CmiMsgHeaderSizeBytes + sizes[idx].size, msg);
     }
   }
 }

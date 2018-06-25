@@ -10,9 +10,8 @@
  *
  **************************************************************************/
 
+#include "commbench.h"  // includes converse.h
 #include <stdio.h>
-#include <converse.h>
-#include "commbench.h"
 
 /******************************************************************************
  *
@@ -49,18 +48,18 @@ struct testinfo {
   void (*initiator)(void);
   void (*initializer)(void);
 } tests[] = {
-  {"memoryAccess", memoryAccess_init, memoryAccess_moduleinit},
-  {"overhead", overhead_init, overhead_moduleinit},
-  {"timer", timer_init, timer_moduleinit},
-  {"proc", proc_init, proc_moduleinit},
-  {"smputil", smputil_init, smputil_moduleinit},
-  {"pingpong", pingpong_init, pingpong_moduleinit},
-  {"pingpong-cachemiss", pingpong_cachemiss_init, pingpong_cachemiss_moduleinit},
-  {"flood", flood_init, flood_moduleinit},
-  {"broadcast", broadcast_init, broadcast_moduleinit},
-  {"reduction", reduction_init, reduction_moduleinit},
-  {"ctxt", ctxt_init, ctxt_moduleinit},
-  {0, 0, 0},
+    {"memoryAccess", memoryAccess_init, memoryAccess_moduleinit},
+    {"overhead", overhead_init, overhead_moduleinit},
+    {"timer", timer_init, timer_moduleinit},
+    {"proc", proc_init, proc_moduleinit},
+    {"smputil", smputil_init, smputil_moduleinit},
+    {"pingpong", pingpong_init, pingpong_moduleinit},
+    {"pingpong-cachemiss", pingpong_cachemiss_init, pingpong_cachemiss_moduleinit},
+    {"flood", flood_init, flood_moduleinit},
+    {"broadcast", broadcast_init, broadcast_moduleinit},
+    {"reduction", reduction_init, reduction_moduleinit},
+    {"ctxt", ctxt_init, ctxt_moduleinit},
+    {0, 0, 0},
 };
 
 /******************************************************************************
@@ -130,8 +129,7 @@ void commbench_init(int argc, char** argv) {
   int numtests, i;
   CpvInitialize(int, shutdown_handler);
   CpvInitialize(int, ack_handler);
-  CpvAccess(shutdown_handler) =
-    CmiRegisterHandler((CmiHandler)commbench_shutdown);
+  CpvAccess(shutdown_handler) = CmiRegisterHandler((CmiHandler)commbench_shutdown);
   CpvAccess(ack_handler) = CmiRegisterHandler((CmiHandler)commbench_ack);
   for (i = 0; (tests[i].initializer); i++) (tests[i].initializer)();
   CpvInitialize(int, test_bank_size);

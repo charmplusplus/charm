@@ -13,8 +13,7 @@
  *
  *****************************************************************************/
 
-#include "converse.h"
-#include "commbench.h"
+#include "commbench.h"  // includes converse.h
 
 typedef double* pdouble;
 
@@ -38,17 +37,10 @@ static struct testdata {
   int numiter;
   double time;
 } sizes[] = {
-  {4, MAXITER, 0.0},
-  {16, MAXITER, 0.0},
-  {64, MAXITER, 0.0},
-  {256, MAXITER, 0.0},
-  {1024, MAXITER, 0.0},
-  {4096, MAXITER, 0.0},
-  {16384, MAXITER, 0.0},
-  {65536, MAXITER, 0.0},
-  {262144, MAXITER / 2, 0.0},
-  {1048576, MAXITER / 4, 0.0},
-  {-1, -1, 0.0},
+    {4, MAXITER, 0.0},           {16, MAXITER, 0.0},    {64, MAXITER, 0.0},
+    {256, MAXITER, 0.0},         {1024, MAXITER, 0.0},  {4096, MAXITER, 0.0},
+    {16384, MAXITER, 0.0},       {65536, MAXITER, 0.0}, {262144, MAXITER / 2, 0.0},
+    {1048576, MAXITER / 4, 0.0}, {-1, -1, 0.0},
 };
 
 typedef struct _timemsg {
@@ -72,8 +64,7 @@ static void print_results(const char* func) {
   int i = 0;
 
   while (sizes[i].size != (-1)) {
-    CmiPrintf(sync_outstr, func, sizes[i].time / sizes[i].numiter,
-        sizes[i].size);
+    CmiPrintf(sync_outstr, func, sizes[i].time / sizes[i].numiter, sizes[i].size);
     i++;
   }
 }
@@ -177,11 +168,11 @@ static void bcast_central(void* msg) {
   CmiAssert(CmiMyPe() == 0);
   if (CpvAccess(currentPe) == 0) {
     CpvAccess(lasttime) =
-      tmsg->time - CpvAccess(starttime) + CpvAccess(timediff)[tmsg->srcpe];
-  } else if ((tmsg->time - CpvAccess(starttime) +
-        CpvAccess(timediff)[tmsg->srcpe]) > CpvAccess(lasttime)) {
+        tmsg->time - CpvAccess(starttime) + CpvAccess(timediff)[tmsg->srcpe];
+  } else if ((tmsg->time - CpvAccess(starttime) + CpvAccess(timediff)[tmsg->srcpe]) >
+             CpvAccess(lasttime)) {
     CpvAccess(lasttime) =
-      tmsg->time - CpvAccess(starttime) + CpvAccess(timediff)[tmsg->srcpe];
+        tmsg->time - CpvAccess(starttime) + CpvAccess(timediff)[tmsg->srcpe];
   }
   CmiFree(msg);
   CpvAccess(currentPe)++;
@@ -193,8 +184,8 @@ static void bcast_central(void* msg) {
       CpvAccess(currentPe) = 0;
       CmiSetHandler(msg, CpvAccess(bcast_reply));
       CpvAccess(starttime) = CmiWallTimer();
-      CmiSyncBroadcastAllAndFree(
-          CmiMsgHeaderSizeBytes + sizes[CpvAccess(nextidx)].size, msg);
+      CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes + sizes[CpvAccess(nextidx)].size,
+                                 msg);
     } else {
       CpvAccess(numiter) = 0;
       CpvAccess(nextidx)++;
@@ -208,8 +199,8 @@ static void bcast_central(void* msg) {
         CpvAccess(currentPe) = 0;
         CmiSetHandler(msg, CpvAccess(bcast_reply));
         CpvAccess(starttime) = CmiWallTimer();
-        CmiSyncBroadcastAllAndFree(
-            CmiMsgHeaderSizeBytes + sizes[CpvAccess(nextidx)].size, msg);
+        CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes + sizes[CpvAccess(nextidx)].size,
+                                   msg);
       }
     }
   }
@@ -244,8 +235,7 @@ void broadcast_moduleinit(void) {
   CpvAccess(bcast_handler) = CmiRegisterHandler((CmiHandler)bcast_handler);
   CpvAccess(bcast_reply) = CmiRegisterHandler((CmiHandler)bcast_reply);
   CpvAccess(bcast_central) = CmiRegisterHandler((CmiHandler)bcast_central);
-  CpvAccess(reduction_handler) =
-    CmiRegisterHandler((CmiHandler)reduction_handler);
+  CpvAccess(reduction_handler) = CmiRegisterHandler((CmiHandler)reduction_handler);
   CpvAccess(sync_starter) = CmiRegisterHandler((CmiHandler)sync_starter);
   CpvAccess(sync_reply) = CmiRegisterHandler((CmiHandler)sync_reply);
 }

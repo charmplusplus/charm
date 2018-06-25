@@ -5,8 +5,8 @@
 
   Orion Lawlor, olawlor@acm.org, 2004/2/20
   */
-#include <stdio.h>
 #include "converse.h"
+#include <stdio.h>
 #include <stdlib.h>
 
 #define NITER 10000 /* Each thread yields this many times */
@@ -42,10 +42,9 @@ void runThread(void* msg) {
   VERBOSE(printf("Created thread %c at %p\n", myId, &myId);)
 
   for (int iter = 0; iter < NITER; iter++) {
-    VERBOSE(char buf[NITER + 2];
-        for (int i = 0; i < NITER + 1; i++) buf[i] = ' '; buf[0] = myId;
-        buf[1 + iter] = '0' + (iter % 10); buf[NITER + 1] = 0;
-        printf("%s\n", buf);)
+    VERBOSE(char buf[NITER + 2]; for (int i = 0; i < NITER + 1; i++) buf[i] = ' ';
+            buf[0] = myId; buf[1 + iter] = '0' + (iter % 10); buf[NITER + 1] = 0;
+            printf("%s\n", buf);)
     if ((iter % 2) == 0) {  // (rand()%NITER)<5) {
       CthYield();
     }
@@ -60,8 +59,8 @@ void runThread(void* msg) {
   nThreadFinish++;
   if (nThreadFinish == NSPAWN) {  // We're the last thread: leave
     double timeElapsed = CmiWallTimer() - timeStart;
-    printf(" %d threads ran successfully (%.3f us per context switch)\n",
-          nThreadFinish, 1.0e6 * timeElapsed / (NITER * NSPAWN));
+    printf(" %d threads ran successfully (%.3f us per context switch)\n", nThreadFinish,
+           1.0e6 * timeElapsed / (NITER * NSPAWN));
     CsdExitScheduler();
   }
 }

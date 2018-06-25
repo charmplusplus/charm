@@ -1,17 +1,16 @@
-#include <stdio.h>
 #include <converse.h>
+#include <stdio.h>
 void Cpm_megacon_ack(CpmDestination);
 
 /* an accumulator datatype, which can have one pending thread */
 
-#define STACKSIZE_DEFAULT  (51200)
+#define STACKSIZE_DEFAULT (51200)
 
-typedef struct accum_s
-{
-  int total; int countdown;
+typedef struct accum_s {
+  int total;
+  int countdown;
   CthThread pending;
-}
-*accum;
+} * accum;
 
 CpmDeclareSimple(accum);
 #define CpmPack_accum(x)
@@ -19,33 +18,32 @@ CpmDeclareSimple(accum);
 
 #include "fibthr.cpm.h"
 
-int randpe()
-{
+int randpe() {
   /* return ((rand()&0x7FFFFFFF)>>11) % CmiNumPes(); */
-  return ((CrnRand()&0x7FFFFFFF)>>11) % CmiNumPes();
+  return ((CrnRand() & 0x7FFFFFFF) >> 11) % CmiNumPes();
 }
 
 /* a function to add a number to an accumulator */
 
-CpmInvokable accum_add(accum a, int val)
-{
+CpmInvokable accum_add(accum a, int val) {
   a->total += val;
-  a->countdown --;
-  if ((a->countdown==0)&&(a->pending))
-    CthAwaken(a->pending);
+  a->countdown--;
+  if ((a->countdown == 0) && (a->pending)) CthAwaken(a->pending);
 }
 
 /* The fib function: calculate fib of N, then add it to the specified accum */
 
-CpmInvokable fibthr(int n, int pe, accum resp)
-{
+CpmInvokable fibthr(int n, int pe, accum resp) {
   int result;
-  if (n<2) result = n;
+  if (n < 2)
+    result = n;
   else {
     struct accum_s acc;
-    acc.total = 0; acc.countdown = 2; acc.pending = CthSelf();
-    Cpm_fibthr(CpmMakeThreadSize(randpe(),STACKSIZE_DEFAULT), n-1, CmiMyPe(), &acc);
-    Cpm_fibthr(CpmMakeThreadSize(randpe(),STACKSIZE_DEFAULT), n-2, CmiMyPe(), &acc);
+    acc.total = 0;
+    acc.countdown = 2;
+    acc.pending = CthSelf();
+    Cpm_fibthr(CpmMakeThreadSize(randpe(), STACKSIZE_DEFAULT), n - 1, CmiMyPe(), &acc);
+    Cpm_fibthr(CpmMakeThreadSize(randpe(), STACKSIZE_DEFAULT), n - 2, CmiMyPe(), &acc);
     CthSuspend();
     result = acc.total;
   }
@@ -54,11 +52,12 @@ CpmInvokable fibthr(int n, int pe, accum resp)
 
 /* The top-level function */
 
-CpmInvokable fibtop(int n)
-{
+CpmInvokable fibtop(int n) {
   struct accum_s acc;
-  acc.total = 0; acc.countdown = 1; acc.pending = CthSelf();
-  Cpm_fibthr(CpmMakeThreadSize(randpe(),STACKSIZE_DEFAULT), n, CmiMyPe(), &acc);
+  acc.total = 0;
+  acc.countdown = 1;
+  acc.pending = CthSelf();
+  Cpm_fibthr(CpmMakeThreadSize(randpe(), STACKSIZE_DEFAULT), n, CmiMyPe(), &acc);
   CthSuspend();
   if (acc.total != 144) {
     CmiPrintf("Failure in fibtop\n");
@@ -67,12 +66,6 @@ CpmInvokable fibtop(int n)
   Cpm_megacon_ack(CpmSend(0));
 }
 
-void fibthr_init()
-{
-  Cpm_fibtop(CpmMakeThreadSize(0,STACKSIZE_DEFAULT), 12);
-}
+void fibthr_init() { Cpm_fibtop(CpmMakeThreadSize(0, STACKSIZE_DEFAULT), 12); }
 
-void fibthr_moduleinit()
-{
-  CpmInitializeThisModule();
-}
+void fibthr_moduleinit() { CpmInitializeThisModule(); }

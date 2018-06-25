@@ -1,22 +1,19 @@
-#include <stdio.h>
 #include <converse.h>
+#include <stdio.h>
 
 void Cpm_megacon_ack(CpmDestination);
 
-typedef struct priotest_chare_s
-{
+typedef struct priotest_chare_s {
   int numreceived;
   int totalexpected;
-}
-*priotest_chare;
+} * priotest_chare;
 CpmDeclareSimple(priotest_chare);
 #define CpmPack_priotest_chare(p) (0)
 #define CpmUnpack_priotest_chare(p) (0)
 
 #include "priotest.cpm.h"
 
-CpmInvokable priotest_bink(priotest_chare c, int n)
-{
+CpmInvokable priotest_bink(priotest_chare c, int n) {
   if (n != c->numreceived) {
     CmiError("priotest: message received in wrong order.\n");
     exit(1);
@@ -28,8 +25,7 @@ CpmInvokable priotest_bink(priotest_chare c, int n)
   }
 }
 
-CpmInvokable priotest_send()
-{
+CpmInvokable priotest_send() {
   int me = CmiMyPe();
   priotest_chare c = (priotest_chare)CmiAlloc(sizeof(struct priotest_chare_s));
   c->numreceived = 0;
@@ -44,12 +40,6 @@ CpmInvokable priotest_send()
   Cpm_priotest_bink(CpmEnqueueIFIFO(me, 7), c, 7);
 }
 
-void priotest_init()
-{
-  Cpm_priotest_send(CpmSend(CpmALL));
-}
+void priotest_init() { Cpm_priotest_send(CpmSend(CpmALL)); }
 
-void priotest_moduleinit()
-{
-  CpmInitializeThisModule();
-}
+void priotest_moduleinit() { CpmInitializeThisModule(); }

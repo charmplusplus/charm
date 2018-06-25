@@ -1,5 +1,4 @@
-#include <converse.h>
-#include "commbench.h"
+#include "commbench.h"  // includes converse.h
 
 #define NITER 1000000
 
@@ -12,7 +11,7 @@ void ctxt_init(void) {
   for (i = 0; i < NITER; i++) CthYield();
   endtime = CmiWallTimer();
   CmiPrintf("[ctxt] Thread Context Switching Overhead = %le seconds\n",
-      (endtime - starttime) / NITER);
+            (endtime - starttime) / NITER);
   CmiSetHandler(&msg, CpvAccess(ack_handler));
   CmiSyncSend(0, sizeof(EmptyMsg), &msg);
 }

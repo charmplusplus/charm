@@ -1,5 +1,4 @@
-#include <converse.h>
-#include "commbench.h"
+#include "commbench.h"  // includes converse.h
 
 #define NVARITER 10000000
 #define NLOCKITER 1000000
@@ -28,7 +27,7 @@ static void barrierHandler(EmptyMsg* msg) {
     endtime = CmiWallTimer();
     if (CmiMyPe() == 0) {
       CmiPrintf("[smputil] Barrier Overhead: %le seconds\n",
-          (endtime - starttime - loopOverhead) / NBARRITER);
+                (endtime - starttime - loopOverhead) / NBARRITER);
       CmiSetHandler(msg, CpvAccess(ack_handler));
       CmiSyncSend(0, sizeof(EmptyMsg), msg);
     }
@@ -94,17 +93,17 @@ void smputil_init(void) {
   for (i = 0; i < NVARITER; i++) stackVar += 1.0;
   endtime = CmiWallTimer();
   CmiPrintf("[smputil] StackVar Access Overhead: %le seconds\n",
-      (endtime - starttime - loopOverhead) / NVARITER);
+            (endtime - starttime - loopOverhead) / NVARITER);
   starttime = CmiWallTimer();
   for (i = 0; i < NVARITER; i++) CpvAccess(privateVar) += 1.0;
   endtime = CmiWallTimer();
   CmiPrintf("[smputil] ProcPrivateVar Access Overhead: %le seconds\n",
-      (endtime - starttime - loopOverhead) / NVARITER);
+            (endtime - starttime - loopOverhead) / NVARITER);
   starttime = CmiWallTimer();
   for (i = 0; i < NVARITER; i++) CsvAccess(sharedVar) += 1.0;
   endtime = CmiWallTimer();
   CmiPrintf("[smputil] SharedVar Access Overhead: %le seconds\n",
-      (endtime - starttime - loopOverhead) / NVARITER);
+            (endtime - starttime - loopOverhead) / NVARITER);
   starttime = CmiWallTimer();
   for (i = 0; i < NBARRITER; i++)
     ;
@@ -117,7 +116,7 @@ void smputil_init(void) {
   }
   endtime = CmiWallTimer();
   CmiPrintf("[smputil] LockUnlock Overhead: %le seconds\n",
-      (endtime - starttime - loopOverhead) / NLOCKITER);
+            (endtime - starttime - loopOverhead) / NLOCKITER);
 
   endtime = memoryAllocTest();
   CmiPrintf(

@@ -7,80 +7,72 @@
   - Sameer Kumar (03/08/05)
  *******************************************************************/
 
-
-#include <stdlib.h>
 #include <converse.h>
+#include <stdlib.h>
 #define ENABLE_TIMER 0
 
-//Iterations for each message size
-enum {nCycles = 200};
+// Iterations for each message size
+enum { nCycles = 200 };
 
-//Max message size
+// Max message size
 enum { maxMsgSize = 1 << 18 };
 
-CpvDeclare(int,msgSize);
-CpvDeclare(int,cycleNum);
-CpvDeclare(int,sizeNum);
+CpvDeclare(int, msgSize);
+CpvDeclare(int, cycleNum);
+CpvDeclare(int, sizeNum);
 CpvDeclare(int, ackCount);
 CpvDeclare(int, twoway);
-CpvDeclare(int,exitHandler);
-CpvDeclare(int,node0Handler);
-CpvDeclare(int,node1Handler);
-CpvDeclare(int,ackHandler);
-CpvDeclare(int,startOperationHandler);
-CpvStaticDeclare(double,startTime);
-CpvStaticDeclare(double,endTime);
+CpvDeclare(int, exitHandler);
+CpvDeclare(int, node0Handler);
+CpvDeclare(int, node1Handler);
+CpvDeclare(int, ackHandler);
+CpvDeclare(int, startOperationHandler);
+CpvStaticDeclare(double, startTime);
+CpvStaticDeclare(double, endTime);
 
 CpvDeclare(double, IdleStartTime);
 CpvDeclare(double, IdleTime);
 
-//Registering idle handlers
-void ApplIdleStart(void *, double start)
-{
-  CpvAccess(IdleStartTime)= start; //CmiWallTimer();
+// Registering idle handlers
+void ApplIdleStart(void*, double start) {
+  CpvAccess(IdleStartTime) = start;  // CmiWallTimer();
   return;
 }
 
-void ApplIdleEnd(void *, double cur)
-{
-  if(CpvAccess(IdleStartTime) < 0)
-    return;
+void ApplIdleEnd(void*, double cur) {
+  if (CpvAccess(IdleStartTime) < 0) return;
 
-  CpvAccess(IdleTime) += cur /*CmiWallTimer()*/-CpvAccess(IdleStartTime);
-  CpvAccess(IdleStartTime)=-1;
+  CpvAccess(IdleTime) += cur /*CmiWallTimer()*/ - CpvAccess(IdleStartTime);
+  CpvAccess(IdleStartTime) = -1;
   return;
 }
 
-//Start ping pong
+// Start ping pong
 
-void startPingpong()
-{
+void startPingpong() {
   CpvAccess(cycleNum) = 0;
-  CpvAccess(msgSize) = (CpvAccess(msgSize)-CmiMsgHeaderSizeBytes)*2 +
-    CmiMsgHeaderSizeBytes;
+  CpvAccess(msgSize) =
+      (CpvAccess(msgSize) - CmiMsgHeaderSizeBytes) * 2 + CmiMsgHeaderSizeBytes;
 
-  char *msg = (char *)CmiAlloc(CpvAccess(msgSize));
-  *((int *)(msg+CmiMsgHeaderSizeBytes)) = CpvAccess(msgSize);
+  char* msg = (char*)CmiAlloc(CpvAccess(msgSize));
+  *((int*)(msg + CmiMsgHeaderSizeBytes)) = CpvAccess(msgSize);
 
-  CmiSetHandler(msg,CpvAccess(node0Handler));
+  CmiSetHandler(msg, CpvAccess(node0Handler));
   CmiSyncSendAndFree(CmiMyPe(), CpvAccess(msgSize), msg);
 
   CpvAccess(startTime) = CmiWallTimer();
   CpvAccess(IdleTime) = 0.0;
 }
 
-void pingpongFinished(char *msg)
-{
+void pingpongFinished(char* msg) {
   CmiFree(msg);
   double cycle_time =
-    (1e6*(CpvAccess(endTime)-CpvAccess(startTime)))/(2.*nCycles);
-  double compute_time = cycle_time -
-    (1e6*(CpvAccess(IdleTime)))/(2.*nCycles);
+      (1e6 * (CpvAccess(endTime) - CpvAccess(startTime))) / (2. * nCycles);
+  double compute_time = cycle_time - (1e6 * (CpvAccess(IdleTime))) / (2. * nCycles);
 
 #if ENABLE_TIMER
   CmiPrintf("[%d] %d \t %5.3lfus \t %5.3lfus\n", CmiMyPe(),
-      CpvAccess(msgSize) - CmiMsgHeaderSizeBytes,
-      cycle_time, compute_time);
+            CpvAccess(msgSize) - CmiMsgHeaderSizeBytes, cycle_time, compute_time);
 #endif
 
   CpvAccess(sizeNum)++;
@@ -88,102 +80,95 @@ void pingpongFinished(char *msg)
   if (CpvAccess(msgSize) < maxMsgSize)
     startPingpong();
   else {
-    void *sendmsg = CmiAlloc(CmiMsgHeaderSizeBytes);
-    CmiSetHandler(sendmsg,CpvAccess(ackHandler));
+    void* sendmsg = CmiAlloc(CmiMsgHeaderSizeBytes);
+    CmiSetHandler(sendmsg, CpvAccess(ackHandler));
     CmiSyncSendAndFree(0, CmiMsgHeaderSizeBytes, sendmsg);
   }
 }
 
-CmiHandler ackHandlerFunc(char *msg)
-{
+CmiHandler ackHandlerFunc(char* msg) {
   CmiFree(msg);
   CpvAccess(ackCount)++;
-  int max = CpvAccess(twoway) ? CmiNumPes() : CmiNumPes()/2;
-  if(CpvAccess(ackCount) == max) {
-    void *sendmsg = CmiAlloc(CmiMsgHeaderSizeBytes);
-    CmiSetHandler(sendmsg,CpvAccess(exitHandler));
-    CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes,sendmsg);
+  int max = CpvAccess(twoway) ? CmiNumPes() : CmiNumPes() / 2;
+  if (CpvAccess(ackCount) == max) {
+    void* sendmsg = CmiAlloc(CmiMsgHeaderSizeBytes);
+    CmiSetHandler(sendmsg, CpvAccess(exitHandler));
+    CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes, sendmsg);
   }
   return 0;
 }
 
-CmiHandler exitHandlerFunc(char *msg)
-{
+CmiHandler exitHandlerFunc(char* msg) {
   CmiFree(msg);
   CsdExitScheduler();
   return 0;
 }
 
 // Converse handler for beginning operation
-CmiHandler startOperationHandlerFunc(char *msg)
-{
+CmiHandler startOperationHandlerFunc(char* msg) {
   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE, ApplIdleStart, NULL);
   CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE, ApplIdleEnd, NULL);
 
-  if ((CmiMyPe() < CmiNumPes()/2) || CpvAccess(twoway))
-    startPingpong();
+  if ((CmiMyPe() < CmiNumPes() / 2) || CpvAccess(twoway)) startPingpong();
 
   return 0;
 }
 
-CmiHandler node0HandlerFunc(char *msg)
-{
+CmiHandler node0HandlerFunc(char* msg) {
   CpvAccess(cycleNum)++;
 
   if (CpvAccess(cycleNum) == nCycles) {
     CpvAccess(endTime) = CmiWallTimer();
     pingpongFinished(msg);
-  }
-  else {
-    CmiSetHandler(msg,CpvAccess(node1Handler));
-    *((int *)(msg+CmiMsgHeaderSizeBytes)) = CpvAccess(msgSize);
+  } else {
+    CmiSetHandler(msg, CpvAccess(node1Handler));
+    *((int*)(msg + CmiMsgHeaderSizeBytes)) = CpvAccess(msgSize);
 
     int dest = CmiNumPes() - CmiMyPe() - 1;
-    CmiSyncSendAndFree(dest,CpvAccess(msgSize),msg);
+    CmiSyncSendAndFree(dest, CpvAccess(msgSize), msg);
   }
 
   return 0;
 }
 
-CmiHandler node1HandlerFunc(char *msg)
-{
-  int msgSize = *((int *)(msg+CmiMsgHeaderSizeBytes));
-  CmiSetHandler(msg,CpvAccess(node0Handler));
+CmiHandler node1HandlerFunc(char* msg) {
+  int msgSize = *((int*)(msg + CmiMsgHeaderSizeBytes));
+  CmiSetHandler(msg, CpvAccess(node0Handler));
 
   int dest = CmiNumPes() - CmiMyPe() - 1;
-  CmiSyncSendAndFree(dest,msgSize,msg);
+  CmiSyncSendAndFree(dest, msgSize, msg);
   return 0;
 }
 
-CmiStartFn mymain(int argc, char** argv)
-{
-  CpvInitialize(int,msgSize);
-  CpvInitialize(int,cycleNum);
-  CpvInitialize(int,sizeNum);
+CmiStartFn mymain(int argc, char** argv) {
+  CpvInitialize(int, msgSize);
+  CpvInitialize(int, cycleNum);
+  CpvInitialize(int, sizeNum);
   CpvAccess(sizeNum) = 1;
-  CpvAccess(msgSize)= CmiMsgHeaderSizeBytes + 8;
+  CpvAccess(msgSize) = CmiMsgHeaderSizeBytes + 8;
 
-  CpvInitialize(int,exitHandler);
-  CpvAccess(exitHandler) = CmiRegisterHandler((CmiHandler) exitHandlerFunc);
-  CpvInitialize(int,node0Handler);
-  CpvAccess(node0Handler) = CmiRegisterHandler((CmiHandler) node0HandlerFunc);
-  CpvInitialize(int,node1Handler);
-  CpvAccess(node1Handler) = CmiRegisterHandler((CmiHandler) node1HandlerFunc);
-  CpvInitialize(int,ackHandler);
-  CpvAccess(ackHandler) = CmiRegisterHandler((CmiHandler) ackHandlerFunc);
-  CpvInitialize(int,startOperationHandler);
-  CpvAccess(startOperationHandler) = CmiRegisterHandler((CmiHandler) startOperationHandlerFunc);
+  CpvInitialize(int, exitHandler);
+  CpvAccess(exitHandler) = CmiRegisterHandler((CmiHandler)exitHandlerFunc);
+  CpvInitialize(int, node0Handler);
+  CpvAccess(node0Handler) = CmiRegisterHandler((CmiHandler)node0HandlerFunc);
+  CpvInitialize(int, node1Handler);
+  CpvAccess(node1Handler) = CmiRegisterHandler((CmiHandler)node1HandlerFunc);
+  CpvInitialize(int, ackHandler);
+  CpvAccess(ackHandler) = CmiRegisterHandler((CmiHandler)ackHandlerFunc);
+  CpvInitialize(int, startOperationHandler);
+  CpvAccess(startOperationHandler) =
+      CmiRegisterHandler((CmiHandler)startOperationHandlerFunc);
 
-  CpvInitialize(double,startTime);
-  CpvInitialize(double,endTime);
+  CpvInitialize(double, startTime);
+  CpvInitialize(double, endTime);
 
   CpvInitialize(double, IdleStartTime);
   CpvInitialize(double, IdleTime);
 
-  CpvInitialize(int,ackCount);
+  CpvInitialize(int, ackCount);
   CpvAccess(ackCount) = 0;
 
-  CpvInitialize(int,twoway);
+  CpvInitialize(int, twoway);
   CpvAccess(twoway) = 0;
 
   // Set runtime cpuaffinity
@@ -198,23 +183,22 @@ CmiStartFn mymain(int argc, char** argv)
   // Update the argc after runtime parameters are extracted out
   argc = CmiGetArgc(argv);
 
-  if(CmiMyRank() == CmiMyNodeSize()) return 0;
+  if (CmiMyRank() == CmiMyNodeSize()) return 0;
 
-  if(argc > 1)
-    CpvAccess(twoway) = atoi(argv[1]);
+  if (argc > 1) CpvAccess(twoway) = atoi(argv[1]);
 
-  if(CmiMyPe() == 0) {
-    if(!CpvAccess(twoway))
+  if (CmiMyPe() == 0) {
+    if (!CpvAccess(twoway))
       CmiPrintf("Starting Pingpong with oneway traffic \n");
     else
       CmiPrintf("Starting Pingpong with twoway traffic\n");
   }
 
   // Node 0 waits till all processors finish their topology processing
-  if(CmiMyPe() == 0) {
+  if (CmiMyPe() == 0) {
     // Signal all PEs to begin computing
-    char *startOperationMsg = (char *)CmiAlloc(CmiMsgHeaderSizeBytes);
-    CmiSetHandler((char *)startOperationMsg, CpvAccess(startOperationHandler));
+    char* startOperationMsg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
+    CmiSetHandler((char*)startOperationMsg, CpvAccess(startOperationHandler));
     CmiSyncBroadcastAndFree(CmiMsgHeaderSizeBytes, startOperationMsg);
 
     // start operation locally on PE 0
@@ -223,8 +207,7 @@ CmiStartFn mymain(int argc, char** argv)
   return 0;
 }
 
-int main(int argc,char *argv[])
-{
-  ConverseInit(argc,argv,(CmiStartFn)mymain,0,0);
+int main(int argc, char* argv[]) {
+  ConverseInit(argc, argv, (CmiStartFn)mymain, 0, 0);
   return 0;
 }

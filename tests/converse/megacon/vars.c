@@ -1,14 +1,12 @@
-#include <stdio.h>
 #include <converse.h>
+#include <stdio.h>
 
 void Cpm_megacon_ack(CpmDestination);
 
-typedef struct vars_chare_s
-{
+typedef struct vars_chare_s {
   int countdown;
   CthThread pending;
-}
-*vars_chare;
+} * vars_chare;
 
 CpmDeclareSimple(vars_chare);
 #define CpmPack_vars_chare(x) (0)
@@ -20,15 +18,12 @@ CtvDeclare(int, ctv1);
 CpvDeclare(int, cpv1);
 CsvDeclare(int, csv1);
 
-CpmInvokable vars_ack(vars_chare c)
-{
+CpmInvokable vars_ack(vars_chare c) {
   c->countdown--;
-  if ((c->countdown==0)&&(c->pending))
-    CthAwaken(c->pending);
+  if ((c->countdown == 0) && (c->pending)) CthAwaken(c->pending);
 }
 
-void vars_check_ctv_privacy(void *v)
-{
+void vars_check_ctv_privacy(void* v) {
   vars_chare c = (vars_chare)v;
   int me = (size_t)CthSelf();
   CtvAccess(ctv1) = me;
@@ -43,16 +38,13 @@ void vars_check_ctv_privacy(void *v)
   CthSuspend();
 }
 
-CpmInvokable vars_set_cpv_and_csv(vars_chare c)
-{
+CpmInvokable vars_set_cpv_and_csv(vars_chare c) {
   CpvAccess(cpv1) = CmiMyPe();
-  if (CmiMyRank() == 0)
-    CsvAccess(csv1) = 0x12345678;
+  if (CmiMyRank() == 0) CsvAccess(csv1) = 0x12345678;
   Cpm_vars_ack(CpmSend(0), c);
 }
 
-CpmInvokable vars_check_cpv_and_csv(vars_chare c)
-{
+CpmInvokable vars_check_cpv_and_csv(vars_chare c) {
   if (CpvAccess(cpv1) != CmiMyPe()) {
     CmiPrintf("cpv privacy test failed.\n");
     exit(1);
@@ -64,38 +56,43 @@ CpmInvokable vars_check_cpv_and_csv(vars_chare c)
   Cpm_vars_ack(CpmSend(0), c);
 }
 
-CpmInvokable vars_control()
-{
+CpmInvokable vars_control() {
   struct vars_chare_s c;
-  CthThread t1,t2;
+  CthThread t1, t2;
 
-  t1 = CthCreate(vars_check_ctv_privacy, (void *)&c, 0);
-  t2 = CthCreate(vars_check_ctv_privacy, (void *)&c, 0);
+  t1 = CthCreate(vars_check_ctv_privacy, (void*)&c, 0);
+  t2 = CthCreate(vars_check_ctv_privacy, (void*)&c, 0);
   CthSetStrategyDefault(t1);
   CthSetStrategyDefault(t2);
 
-  CthAwaken(t1); CthAwaken(t2);
-  c.countdown = 2; c.pending = CthSelf(); CthSuspend();
+  CthAwaken(t1);
+  CthAwaken(t2);
+  c.countdown = 2;
+  c.pending = CthSelf();
+  CthSuspend();
 
-  CthAwaken(t1); CthAwaken(t2);
-  c.countdown = 2; c.pending = CthSelf(); CthSuspend();
+  CthAwaken(t1);
+  CthAwaken(t2);
+  c.countdown = 2;
+  c.pending = CthSelf();
+  CthSuspend();
 
   Cpm_vars_set_cpv_and_csv(CpmSend(CpmALL), &c);
-  c.countdown = CmiNumPes(); c.pending = CthSelf(); CthSuspend();
+  c.countdown = CmiNumPes();
+  c.pending = CthSelf();
+  CthSuspend();
 
   Cpm_vars_check_cpv_and_csv(CpmSend(CpmALL), &c);
-  c.countdown = CmiNumPes(); c.pending = CthSelf(); CthSuspend();
+  c.countdown = CmiNumPes();
+  c.pending = CthSelf();
+  CthSuspend();
 
   Cpm_megacon_ack(CpmSend(0));
 }
 
-void vars_init()
-{
-  Cpm_vars_control(CpmMakeThreadSize(0,0));
-}
+void vars_init() { Cpm_vars_control(CpmMakeThreadSize(0, 0)); }
 
-void vars_moduleinit()
-{
+void vars_moduleinit() {
   CpmInitializeThisModule();
   CtvInitialize(int, ctv1);
   if (!CtvInitialized(ctv1)) {
@@ -113,4 +110,3 @@ void vars_moduleinit()
     exit(1);
   }
 }
-

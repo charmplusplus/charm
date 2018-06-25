@@ -14,8 +14,7 @@
  *
  ***************************************************************************/
 
-#include <converse.h>
-#include "commbench.h"
+#include "commbench.h"  // includes converse.h
 
 #define CLUBMALLOC 1000
 #define RANDMALLOC 1000
@@ -94,8 +93,8 @@ void memoryTest() {
     CmiPrintf("Size\tIterations\tMalloc\tWrite\tRead\tFree\n");
     size = 1;
     for (i = 0; i < POWER; i++, size *= 2) {
-      CmiPrintf("%d\t%d\t%E\t%E\t%E\t%E\n", size, CLUBMALLOC, times[i][0],
-          times[i][1], times[i][2], times[i][3]);
+      CmiPrintf("%d\t%d\t%E\t%E\t%E\t%E\n", size, CLUBMALLOC, times[i][0], times[i][1],
+                times[i][2], times[i][3]);
     }
   }
 

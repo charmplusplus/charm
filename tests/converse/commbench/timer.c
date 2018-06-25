@@ -1,5 +1,4 @@
-#include <converse.h>
-#include "commbench.h"
+#include "commbench.h"  // includes converse.h
 
 #define NITER 1000000
 
@@ -12,22 +11,20 @@ void timer_init(void) {
   for (i = 0; i < NITER; i++) CmiCpuTimer();
   endtime = CmiWallTimer();
   CmiPrintf("[timer] (CmiCpuTimer) %le seconds per call\n",
-      (endtime - starttime) / NITER);
+            (endtime - starttime) / NITER);
   starttime = CmiWallTimer();
   for (i = 0; i < NITER; i++) CmiWallTimer();
   endtime = CmiWallTimer();
   CmiPrintf("[timer] (CmiWallTimer) %le seconds per call\n",
-      (endtime - starttime) / NITER);
+            (endtime - starttime) / NITER);
   starttime = CmiCpuTimer();
   while ((endtime = CmiCpuTimer()) == starttime)
     ;
-  CmiPrintf("[timer] (CmiCpuTimer) %le seconds resolution\n",
-      endtime - starttime);
+  CmiPrintf("[timer] (CmiCpuTimer) %le seconds resolution\n", endtime - starttime);
   starttime = CmiWallTimer();
   while ((endtime = CmiWallTimer()) == starttime)
     ;
-  CmiPrintf("[timer] (CmiWallTimer) %le seconds resolution\n",
-      endtime - starttime);
+  CmiPrintf("[timer] (CmiWallTimer) %le seconds resolution\n", endtime - starttime);
   CmiSetHandler(&msg, CpvAccess(ack_handler));
   CmiSyncSend(0, sizeof(EmptyMsg), &msg);
 }

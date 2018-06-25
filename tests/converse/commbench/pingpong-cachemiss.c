@@ -1,6 +1,5 @@
+#include "commbench.h"  // includes converse.h
 #include <stdlib.h>
-#include <converse.h>
-#include "commbench.h"
 
 #define pva CpvAccess
 #define pvd CpvStaticDeclare
@@ -10,16 +9,8 @@ static struct testdata {
   int size;
   int numiter;
 } sizes[] = {
-  {16, 4000},
-  {128, 4000},
-  {512, 1000},
-  {2048, 1000},
-  {8192, 1000},
-  {32768, 100},
-  {131072, 100},
-  {1048576, 40},
-  {4194304, 10},
-  {-1, -1},
+    {16, 4000},   {128, 4000},   {512, 1000},   {2048, 1000},  {8192, 1000},
+    {32768, 100}, {131072, 100}, {1048576, 40}, {4194304, 10}, {-1, -1},
 };
 
 typedef struct message_ {
@@ -29,7 +20,6 @@ typedef struct message_ {
   int iter;
   int data[1];
 } Message;
-
 
 #if 0
 static void fillMessage(Message* msg) {
@@ -123,7 +113,6 @@ static void recvTime(TimeMessage* msg) {
           sizes[j].size,
           pva(gmin)[j],pva(gminSrc)[j],pva(gminDest)[j]);
 #endif
-
     }
     CmiSetHandler(&m, pva(ack_handler));
     CmiSyncSend(0, sizeof(EmptyMsg), &m);
@@ -161,8 +150,7 @@ static void startNextNbr(EmptyMsg* msg) {
     size = sizeof(TimeMessage) + pva(numSizes) * CmiNumNodes() * sizeof(double);
     tm = (TimeMessage*)CmiAlloc(size);
     for (i = 0; i < CmiNumNodes(); i++)
-      memcpy(tm->data + i * pva(numSizes), pva(times)[i],
-          sizeof(double) * pva(numSizes));
+      memcpy(tm->data + i * pva(numSizes), pva(times)[i], sizeof(double) * pva(numSizes));
     tm->srcNode = CmiMyNode();
     CmiSetHandler(tm, pva(timeHandler));
     CmiSyncSendAndFree(0, size, tm);
@@ -187,10 +175,9 @@ static void startNextSize(EmptyMsg* msg) {
   } else {
     int size = sizeof(Message) + sizes[pva(nextSize)].size;
 
-    pva(buffer_msgs) =
-      (char*)malloc((sizes[pva(nextSize)].numiter) * sizeof(Message*));
+    pva(buffer_msgs) = (char*)malloc((sizes[pva(nextSize)].numiter) * sizeof(Message*));
     for (i = 0; i < sizes[pva(nextSize)].numiter; i++) {
-      mm = (Message *)CmiAlloc(size);
+      mm = (Message*)CmiAlloc(size);
       mm->srcpe = CmiMyPe();
       mm->idx = pva(nextSize);
       CmiSetHandler(mm, pva(bounceHandler));
@@ -224,7 +211,7 @@ static void startNextIter(Message* msg) {
     pva(buffer_msgs) = 0;
 
     pva(times)[pva(nextNbr)][pva(nextSize)] =
-      (pva(endtime) - pva(starttime)) / (2.0 * sizes[pva(nextSize)].numiter);
+        (pva(endtime) - pva(starttime)) / (2.0 * sizes[pva(nextSize)].numiter);
     pva(nextIter) = -1;
     CmiSetHandler(&m, pva(sizeHandler));
     CmiSyncSend(CmiMyPe(), sizeof(EmptyMsg), &m);
@@ -377,6 +364,6 @@ void pingpong_cachemiss_moduleinit(void) {
   pvi(int, startHandler);
   pva(startHandler) = CmiRegisterHandler((CmiHandler)startMessage);
 
-  pvi(char *, buffer_msgs);
+  pvi(char*, buffer_msgs);
   pva(buffer_msgs) = 0;
 }

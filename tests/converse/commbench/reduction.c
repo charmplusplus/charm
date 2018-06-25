@@ -11,8 +11,7 @@
  *
  *****************************************************************************/
 
-#include "converse.h"
-#include "commbench.h"
+#include "commbench.h"  // includes converse.h
 
 typedef double* pdouble;
 
@@ -40,17 +39,10 @@ static struct testdata {
   int numiter;
   double time;
 } sizes[] = {
-  {4, MAXITER, 0.0},
-  {16, MAXITER, 0.0},
-  {64, MAXITER, 0.0},
-  {256, MAXITER, 0.0},
-  {1024, MAXITER, 0.0},
-  {4096, MAXITER, 0.0},
-  {16384, MAXITER, 0.0},
-  {65536, MAXITER, 0.0},
-  {262144, MAXITER, 0.0},
-  {1048576, MAXITER, 0.0},
-  {-1, -1, 0.0},
+    {4, MAXITER, 0.0},       {16, MAXITER, 0.0},    {64, MAXITER, 0.0},
+    {256, MAXITER, 0.0},     {1024, MAXITER, 0.0},  {4096, MAXITER, 0.0},
+    {16384, MAXITER, 0.0},   {65536, MAXITER, 0.0}, {262144, MAXITER, 0.0},
+    {1048576, MAXITER, 0.0}, {-1, -1, 0.0},
 };
 
 typedef struct _varmsg {
@@ -79,8 +71,7 @@ static void print_results(const char* func) {
   int i = 0;
 
   while (sizes[i].size != (-1)) {
-    CmiPrintf(sync_outstr, func, sizes[i].time / sizes[i].numiter,
-        sizes[i].size);
+    CmiPrintf(sync_outstr, func, sizes[i].time / sizes[i].numiter, sizes[i].size);
     i++;
   }
 }
@@ -130,11 +121,11 @@ static void reduction_central(void* msg) {
   ptimemsg tmsg = (ptimemsg)msg;
   if (CpvAccess(currentPe) == 0) {
     CpvAccess(lasttime) =
-      CpvAccess(endtime) - tmsg->time - CpvAccess(timediff)[tmsg->srcpe];
-  } else if ((CpvAccess(endtime) - tmsg->time -
-        CpvAccess(timediff)[tmsg->srcpe]) > CpvAccess(lasttime)) {
+        CpvAccess(endtime) - tmsg->time - CpvAccess(timediff)[tmsg->srcpe];
+  } else if ((CpvAccess(endtime) - tmsg->time - CpvAccess(timediff)[tmsg->srcpe]) >
+             CpvAccess(lasttime)) {
     CpvAccess(lasttime) =
-      CpvAccess(endtime) - tmsg->time - CpvAccess(timediff)[tmsg->srcpe];
+        CpvAccess(endtime) - tmsg->time - CpvAccess(timediff)[tmsg->srcpe];
   }
   CmiFree(msg);
   CpvAccess(currentPe)++;
@@ -218,12 +209,9 @@ void reduction_moduleinit(void) {
   CpvAccess(currentPe) = 0;
   CpvAccess(flip) = 0;
   CpvAccess(timediff) = (pdouble)malloc(CmiNumPes() * sizeof(double));
-  CpvAccess(reduction_starter) =
-    CmiRegisterHandler((CmiHandler)reduction_starter);
-  CpvAccess(reduction_handler) =
-    CmiRegisterHandler((CmiHandler)reduction_handler);
-  CpvAccess(reduction_central) =
-    CmiRegisterHandler((CmiHandler)reduction_central);
+  CpvAccess(reduction_starter) = CmiRegisterHandler((CmiHandler)reduction_starter);
+  CpvAccess(reduction_handler) = CmiRegisterHandler((CmiHandler)reduction_handler);
+  CpvAccess(reduction_central) = CmiRegisterHandler((CmiHandler)reduction_central);
   CpvAccess(sync_starter) = CmiRegisterHandler((CmiHandler)sync_starter);
   CpvAccess(sync_reply) = CmiRegisterHandler((CmiHandler)sync_reply);
 }
