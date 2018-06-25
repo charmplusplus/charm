@@ -114,82 +114,59 @@ static void add_exclude(int core)
 #include <sys/processor.h>
 #endif
 
-int set_cpu_affinity(unsigned int cpuid) {
-  hwloc_topology_t topology;
-  // Allocate and initialize topology object.
-  cmi_hwloc_topology_init(&topology);
-  // Perform the topology detection.
-  cmi_hwloc_topology_load(topology);
+static int set_process_affinity(hwloc_topology_t topology, hwloc_cpuset_t cpuset)
+{
+#ifdef _WIN32
+  HANDLE process = GetCurrentProcess();
+#else
+  pid_t process = getpid();
+#endif
 
-  hwloc_cpuset_t cpuset = cmi_hwloc_bitmap_alloc();
-  cmi_hwloc_bitmap_set(cpuset, cpuid);
-
-  // And try to bind ourself there. */
-  if (cmi_hwloc_set_cpubind(topology, cpuset, 0)) {
+  if (cmi_hwloc_set_proc_cpubind(topology, process, cpuset, HWLOC_CPUBIND_PROCESS|HWLOC_CPUBIND_STRICT))
+  {
     char *str;
     int error = errno;
     cmi_hwloc_bitmap_asprintf(&str, cpuset);
     CmiPrintf("HWLOC> Couldn't bind to cpuset %s: %s\n", str, strerror(error));
     free(str);
-    cmi_hwloc_bitmap_free(cpuset);
-    cmi_hwloc_topology_destroy(topology);
     return -1;
   }
 
 #if CMK_CHARMDEBUG
   char *str;
   cmi_hwloc_bitmap_asprintf(&str, cpuset);
-  CmiPrintf("HWLOC> [%d] Bound to cpu: %d cpuset: %s\n", CmiMyPe(), cpuid, str);
+  CmiPrintf("HWLOC> [%d] Process %p bound to cpuset: %s\n", CmiMyPe(), process, str);
   free(str);
 #endif
 
-  cmi_hwloc_bitmap_free(cpuset);
-  cmi_hwloc_topology_destroy(topology);
   return 0;
 }
 
 #if CMK_SMP
-int set_thread_affinity(int cpuid) {
-
-  hwloc_topology_t topology;
-
-  // Allocate and initialize topology object.
-  cmi_hwloc_topology_init(&topology);
-  // Perform the topology detection.
-  cmi_hwloc_topology_load(topology);
-
-  hwloc_cpuset_t cpuset = cmi_hwloc_bitmap_alloc();
-  cmi_hwloc_bitmap_set(cpuset, cpuid);
-
+static int set_thread_affinity(hwloc_topology_t topology, hwloc_cpuset_t cpuset)
+{
 #ifdef _WIN32
   HANDLE thread = GetCurrentThread();
 #else
   pthread_t thread = pthread_self();
 #endif
 
-
-  // And try to bind ourself there. */
-  if (cmi_hwloc_set_thread_cpubind(topology, thread, cpuset, HWLOC_CPUBIND_THREAD|HWLOC_CPUBIND_STRICT) == -1) {
-//  if (cmi_hwloc_set_cpubind(topology, cpuset, HWLOC_CPUBIND_THREAD|HWLOC_CPUBIND_STRICT) == -1) {
+  if (cmi_hwloc_set_thread_cpubind(topology, thread, cpuset, HWLOC_CPUBIND_THREAD|HWLOC_CPUBIND_STRICT))
+  {
     char *str;
     int error = errno;
     cmi_hwloc_bitmap_asprintf(&str, cpuset);
     CmiPrintf("HWLOC> Couldn't bind to cpuset %s: %s\n", str, strerror(error));
     free(str);
-    cmi_hwloc_bitmap_free(cpuset);
-    cmi_hwloc_topology_destroy(topology);
     return -1;
   }
 
 #if CMK_CHARMDEBUG
   char *str;
   cmi_hwloc_bitmap_asprintf(&str, cpuset);
-  CmiPrintf("HWLOC> [%d] Thread %p bound to cpu: %d cpuset: %s\n", CmiMyPe(), thread, cpuid, str);
+  CmiPrintf("HWLOC> [%d] Thread %p bound to cpuset: %s\n", CmiMyPe(), thread, str);
   free(str);
 #endif
-
-  cmi_hwloc_bitmap_free(cpuset);
-  cmi_hwloc_topology_destroy(topology);
 
   return 0;
 }
@@ -209,315 +186,22 @@ int CmiSetCPUAffinity(int mycore)
 
   CpvAccess(myCPUAffToCore) = core;
 
-  /* set cpu affinity */
+  hwloc_topology_t topology;
+
+  cmi_hwloc_topology_init(&topology);
+  cmi_hwloc_topology_load(topology);
+
+  hwloc_cpuset_t cpuset = cmi_hwloc_bitmap_alloc();
+  cmi_hwloc_bitmap_set(cpuset, core);
+
 #if CMK_SMP
-  return set_thread_affinity(core);
+  set_thread_affinity(topology, cpuset);
 #else
-  return set_cpu_affinity(core);
-  /* print_cpu_affinity(); */
-#endif
-}
-
-CMI_EXTERNC_VARIABLE int CmiMyLocalRank;
-
-void CmiMapHosts(int mylocalrank, int proc_per_host)
-{
-  hwloc_topology_t topology;
-  hwloc_cpuset_t cpuset;
-  hwloc_obj_t obj;
-  int depth, npus, nsockets, index, nthreads;
-
-  if (mylocalrank == -1) {
-      CmiAbort("Error: Default affinity with +processPerHost is not compatible with this launching scheme.");
-  }
-
-  cmi_hwloc_topology_init(&topology);
-  cmi_hwloc_topology_load(topology);
-  depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PU);
-  npus = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
-
-  nthreads = CmiMyNodeSize();
-#if CMK_SMP
-  nthreads += 1;
-#endif
-  index = mylocalrank % proc_per_host;
-  /* now divide the cpuset to proc_per_socket partitions */
-  if (proc_per_host * nthreads <= npus) {
-      int idx = -1;
-      int range = npus / proc_per_host;
-      int pos = index * range + range / nthreads * CmiMyRank();
-      obj = cmi_hwloc_get_obj_by_depth(topology, depth, pos);
-      idx = cmi_hwloc_bitmap_next(obj->cpuset, -1);
-      // CmiPrintf("[%d] bind to idx: %d\n", CmiMyPe(), idx);
-      CmiSetCPUAffinity(idx);
-  }
-  else {
-      CmiPrintf("Warning: not implemented for cpu affinity under oversubscription.\n");
-  }
-  cmi_hwloc_topology_destroy(topology);
-}
-
-static void CmiMapHostsBySocket(int mylocalrank, int proc_per_host)
-{
-  hwloc_topology_t topology;
-  unsigned long loading_flags;
-  hwloc_cpuset_t cpuset;
-  hwloc_obj_t obj;
-  int depth, npus_per_socket, npus, nsockets, ncores, index, nthreads;
-  int err, idx = -1;
-
-  if (mylocalrank == -1) {
-      CmiAbort("Error: Default affinity with +processPerHost is not compatible with this launching scheme.");
-  }
-
-  cmi_hwloc_topology_init(&topology);
-  loading_flags = HWLOC_TOPOLOGY_FLAG_IO_BRIDGES | HWLOC_TOPOLOGY_FLAG_IO_DEVICES;
-  err = cmi_hwloc_topology_set_flags(topology, loading_flags);
-  if (err < 0)
-    CmiAbort("hwloc_topology_set_flags() failed, PCI devices will not be loaded in the topology \n");
-
-  cmi_hwloc_topology_load(topology);
-  depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PACKAGE);
-  nsockets = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
-  depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_CORE);
-  ncores = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
-  depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PU);
-  npus = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
-
-  if (CmiMyRank() < CmiMyNodeSize()) {
-    nthreads = CmiMyNodeSize() + 1;
-    int nthsocket = mylocalrank * CmiMyNodeSize() + CmiMyRank();
-    int pos = nthsocket * (npus/nsockets);
-    obj = cmi_hwloc_get_obj_by_depth(topology, depth, pos);
-    idx = cmi_hwloc_bitmap_next(obj->cpuset, -1);
-    //printf("[%d] bind to idx: %d\n", CmiMyPe(), idx);
-
-    CmiSetCPUAffinity(idx);
-    cmi_hwloc_topology_destroy(topology);
-    return;
-  }
-
-  // this is comm thread
-  // TODO: find one close to NIC
-  // TODO: Code for openFabrics
-#if CMK_USE_IBVERBS
-  struct ibv_device **dev_list;
-  hwloc_bitmap_t set;
-  hwloc_obj_t osdev;
-  char *string;
-  struct ibv_device *dev;
-  int count;
-
-  // printf("ibv_get_device_list found %d devices\n", count);
-  CmiAssert(npus/nsockets > 1);
-  dev_list = ibv_get_device_list(&count);
-  if (!dev_list) {
-    CmiAbort("ibv_get_device_list failed\n");
-  }
-  dev = dev_list[0];
-  set = cmi_hwloc_bitmap_alloc();
-  err = cmi_hwloc_ibv_get_device_cpuset(topology, dev, set);
-# if 0
-  cmi_hwloc_bitmap_asprintf(&string, set);
-  printf("found cpuset %s for %dth device\n", string, i);
-  free(string);
-# endif
-# if 0
-  obj = NULL;
-  while ((obj = hwloc_get_next_obj_covering_cpuset_by_type(topology, set, HWLOC_OBJ_NODE, obj)) == NULL);
-  if (obj) {
-    obj = cmi_hwloc_get_obj_by_depth(topology, depth, obj->os_index);
-    idx = cmi_hwloc_bitmap_last(obj->cpuset, -1);
-# endif
-  idx = hwloc_bitmap_last(set);
-  hwloc_bitmap_free(set);
-#else
-  obj = cmi_hwloc_get_obj_by_depth(topology, depth, npus-1);
-  idx = cmi_hwloc_bitmap_next(obj->cpuset, -1);
+  set_process_affinity(topology, cpuset);
 #endif
 
-  CmiSetCPUAffinity(idx);
-  cmi_hwloc_topology_destroy(topology);
-}
+  cmi_hwloc_bitmap_free(cpuset);
 
-void CmiMapHostsByCore(int mylocalrank, int proc_per_host)
-{
-  hwloc_topology_t topology;
-  hwloc_cpuset_t cpuset;
-  hwloc_obj_t obj;
-  int depth, npus, nsockets, ncores, index, nthreads;
-
-  if (mylocalrank == -1) {
-      CmiAbort("Error: Default affinity with +processPerHost is not compatible with this launching scheme.");
-  }
-
-  cmi_hwloc_topology_init(&topology);
-  cmi_hwloc_topology_load(topology);
-  depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_CORE);
-  ncores = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
-  depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PU);
-  npus = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
-
-  nthreads = CmiMyNodeSize() + 1;
-  /* now divide the cpuset to proc_per_socket partitions */
-  if (proc_per_host * nthreads <= npus) {
-      int idx = -1;
-      int nthcore = mylocalrank * nthreads + CmiMyRank();
-      int pos = nthcore * (npus/ncores);
-      obj = cmi_hwloc_get_obj_by_depth(topology, depth, pos);
-      idx = cmi_hwloc_bitmap_next(obj->cpuset, -1);
-//printf("[%d] bind to idx: %d\n", CmiMyPe(), idx);
-      CmiSetCPUAffinity(idx);
-  }
-  else {
-      CmiPrintf("Warning: not implemented for cpu affinity under oversubscription.\n");
-  }
-  cmi_hwloc_topology_destroy(topology);
-}
-
-void CmiMapSockets(int mylocalrank, int proc_per_socket)
-{
-  hwloc_topology_t topology;
-  hwloc_cpuset_t cpuset;
-  hwloc_obj_t obj;
-  int depth, npus_per_socket_per_pe, npus, nsockets, index, whichsocket, nthreads;
-  int m;
-
-  if (mylocalrank == -1) {
-      CmiAbort("Error: Default affinity with +processPerSocket is not compatible with the launching scheme.");
-  }
-
-  cmi_hwloc_topology_init(&topology);
-  cmi_hwloc_topology_load(topology);
-  depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PU);
-  npus = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
-  depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PACKAGE);
-  nsockets = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
-
-  nthreads = CmiMyNodeSize();
-#if CMK_SMP
-  nthreads += 1;
-#endif
-  whichsocket = mylocalrank / proc_per_socket;
-  index = mylocalrank % proc_per_socket;
-  obj = cmi_hwloc_get_obj_by_depth(topology, depth, whichsocket);
-#if 0
-  {
-    char *str;
-    cmi_hwloc_bitmap_asprintf(&str, obj->cpuset);
-    CmiPrintf("HWLOC> [%d] %d %d %d %d cpuset %s\n", CmiMyPe(), mylocalrank, nlocalranks, proc_per_socket, nthreads, str);
-  }
-#endif
-  /* now divide the cpuset to proc_per_socket partitions */
-  npus_per_socket_per_pe = npus / nsockets / proc_per_socket;
-  m = npus_per_socket_per_pe / nthreads;
-  if (m >= 1) {
-      int idx = -1;
-      int i;
-      int pos = index * npus_per_socket_per_pe + m * CmiMyRank();
-      for (i=0; i<=pos; i++)
-      {
-          idx = cmi_hwloc_bitmap_next(obj->cpuset, idx);
-      }
-      // CmiPrintf("[%d:%d] bind to socket: %d pos: %d idx: %d\n", CmiMyPe(), CmiMyRank(), whichsocket, pos, idx);
-      CmiSetCPUAffinity(idx);
-  }
-  else {
-      CmiPrintf("Warning: not implemented for cpu affinity under oversubscription.\n");
-  }
-  cmi_hwloc_topology_destroy(topology);
-}
-
-
-void CmiMapCores(int mylocalrank, int proc_per_core)
-{
-  hwloc_topology_t topology;
-  hwloc_cpuset_t cpuset;
-  hwloc_obj_t obj;
-  int depth, ncores, npus, npus_per_core, index, whichcore, nthreads;
-
-  if (mylocalrank == -1) {
-      CmiAbort("Error: Default affinity with +processPerCore is not compatible with the launching scheme.");
-  }
-
-  cmi_hwloc_topology_init(&topology);
-  cmi_hwloc_topology_load(topology);
-  depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PU);
-  npus = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
-  depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_CORE);
-  ncores = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
-
-  nthreads = CmiMyNodeSize();
-#if CMK_SMP
-  nthreads += 1;
-#endif
-  whichcore = mylocalrank / proc_per_core;
-  index = mylocalrank % proc_per_core;
-  obj = cmi_hwloc_get_obj_by_depth(topology, depth, whichcore);
-#if 0
-  {
-    char *str;
-    cmi_hwloc_bitmap_asprintf(&str, obj->cpuset);
-    CmiPrintf("HWLOC> [%d] %d %d %d cpuset %s\n", CmiMyPe(), mylocalrank, nlocalranks, proc_per_core, str);
-  }
-#endif
-  /* now divide the cpuset to proc_per_socket partitions */
-  npus_per_core = npus / ncores;
-  if (npus_per_core / proc_per_core / nthreads >= 1) {
-      int idx = -1;
-      int i;
-      /* pos is relative to the core */
-      int pos = npus_per_core / proc_per_core * index + npus_per_core / proc_per_core / nthreads * CmiMyRank();
-      for (i=0; i<=pos; i++)
-      {
-          idx = cmi_hwloc_bitmap_next(obj->cpuset, idx);
-      }
-      // CmiPrintf("[%d] bind to idx: %d\n", CmiMyPe(), idx);
-      CmiSetCPUAffinity(idx);
-  }
-  else {
-      CmiPrintf("Warning: not implemented for cpu affinity under oversubscription.\n");
-  }
-}
-
-void CmiMapPUs(int mylocalrank, int proc_per_pu)
-{
-  hwloc_topology_t topology;
-  hwloc_cpuset_t cpuset;
-  hwloc_obj_t obj;
-  int depth, npus_per_socket, npus, nsockets, index, nthreads;
-
-  if (mylocalrank == -1) {
-      CmiAbort("Error: Default affinity with +processPerPU is not compatible with the launching scheme.");
-  }
-
-  cmi_hwloc_topology_init(&topology);
-  cmi_hwloc_topology_load(topology);
-  depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PU);
-  npus = cmi_hwloc_get_nbobjs_by_depth(topology, depth);
-
-  nthreads = CmiMyNodeSize();
-#if CMK_SMP
-  nthreads += 1;
-#endif
-  index = mylocalrank;
-  obj = cmi_hwloc_get_obj_by_depth(topology, depth, index);
-#if 0
-  {
-    char *str;
-    cmi_hwloc_bitmap_asprintf(&str, obj->cpuset);
-    CmiPrintf("HWLOC> [%d] %d %d %d cpuset %s\n", CmiMyPe(), mylocalrank, nlocalranks, proc_per_pu, str);
-  }
-#endif
-  /* now divide the cpuset to proc_per_socket partitions */
-  if (proc_per_pu * nthreads == 1) {
-      cpuset = cmi_hwloc_bitmap_alloc();
-      int idx = cmi_hwloc_bitmap_next(obj->cpuset, -1);
-      CmiSetCPUAffinity(idx);
-  }
-  else {
-      CmiPrintf("Warning: not implemented for cpu affinity under oversubscription.\n");
-  }
   cmi_hwloc_topology_destroy(topology);
 }
 
@@ -934,34 +618,131 @@ void CmiCheckAffinity(void)
 #endif
 }
 
+CMI_EXTERNC_VARIABLE int CmiMyLocalRank;
+
+static void bind_process_only(hwloc_obj_type_t process_unit)
+{
+  hwloc_topology_t topology;
+  hwloc_cpuset_t cpuset;
+  cmi_hwloc_topology_init(&topology);
+  cmi_hwloc_topology_load(topology);
+
+
+  int process_unitcount = cmi_hwloc_get_nbobjs_by_type(topology, process_unit);
+
+  int process_assignment = CmiMyLocalRank % process_unitcount;
+
+  hwloc_obj_t process_obj = cmi_hwloc_get_obj_by_type(topology, process_unit, process_assignment);
+  set_process_affinity(topology, process_obj->cpuset);
+
+
+  cmi_hwloc_topology_destroy(topology);
+}
+
+#if CMK_SMP
+static void bind_threads_only(hwloc_obj_type_t thread_unit)
+{
+  hwloc_topology_t topology;
+  hwloc_cpuset_t cpuset;
+  cmi_hwloc_topology_init(&topology);
+  cmi_hwloc_topology_load(topology);
+
+
+  int thread_unitcount = cmi_hwloc_get_nbobjs_by_type(topology, thread_unit);
+
+  int thread_assignment = CmiMyRank() % thread_unitcount;
+
+  hwloc_obj_t thread_obj = cmi_hwloc_get_obj_by_type(topology, thread_unit, thread_assignment);
+  hwloc_cpuset_t thread_cpuset = hwloc_bitmap_dup(thread_obj->cpuset);
+  hwloc_bitmap_singlify(thread_cpuset);
+  set_thread_affinity(topology, thread_cpuset);
+  hwloc_bitmap_free(thread_cpuset);
+
+
+  cmi_hwloc_topology_destroy(topology);
+}
+
+static void bind_process_and_threads(hwloc_obj_type_t process_unit, hwloc_obj_type_t thread_unit)
+{
+  hwloc_topology_t topology;
+  hwloc_cpuset_t cpuset;
+  cmi_hwloc_topology_init(&topology);
+  cmi_hwloc_topology_load(topology);
+
+
+  int process_unitcount = cmi_hwloc_get_nbobjs_by_type(topology, process_unit);
+
+  int process_assignment = CmiMyLocalRank % process_unitcount;
+
+  hwloc_obj_t process_obj = cmi_hwloc_get_obj_by_type(topology, process_unit, process_assignment);
+  set_process_affinity(topology, process_obj->cpuset);
+
+  int thread_unitcount = cmi_hwloc_get_nbobjs_inside_cpuset_by_type(topology, process_obj->cpuset, thread_unit);
+
+  int thread_assignment = CmiMyRank() % thread_unitcount;
+
+  hwloc_obj_t thread_obj = cmi_hwloc_get_obj_inside_cpuset_by_type(topology, process_obj->cpuset, thread_unit, thread_assignment);
+  hwloc_cpuset_t thread_cpuset = hwloc_bitmap_dup(thread_obj->cpuset);
+  hwloc_bitmap_singlify(thread_cpuset);
+  set_thread_affinity(topology, thread_cpuset);
+  hwloc_bitmap_free(thread_cpuset);
+
+
+  cmi_hwloc_topology_destroy(topology);
+}
+#endif
+
 static int set_default_affinity(void)
 {
   char *s;
   int n = -1;
-  if ((s = getenv("CmiProcessPerHost")))
+
+  if ((s = getenv("CmiProcessPerSocket")))
   {
     n = atoi(s);
+#if CMK_SMP
     if (getenv("CmiOneWthPerCore"))
-      CmiMapHostsByCore(CmiMyLocalRank, n);
-    else if (getenv("CmiOneWthPerSocket"))
-      CmiMapHostsBySocket(CmiMyLocalRank, n);
+      bind_process_and_threads(HWLOC_OBJ_PACKAGE, HWLOC_OBJ_CORE);
+    else if (getenv("CmiOneWthPerPU"))
+      bind_process_and_threads(HWLOC_OBJ_PACKAGE, HWLOC_OBJ_PU);
     else
-      CmiMapHosts(CmiMyLocalRank, n); // scatter
-  }
-  else if ((s = getenv("CmiProcessPerSocket")))
-  {
-    n = atoi(s);
-    CmiMapSockets(CmiMyLocalRank, n);
+#endif
+      bind_process_only(HWLOC_OBJ_PACKAGE);
   }
   else if ((s = getenv("CmiProcessPerCore")))
   {
     n = atoi(s);
-    CmiMapCores(CmiMyLocalRank, n);
+#if CMK_SMP
+    if (getenv("CmiOneWthPerPU"))
+      bind_process_and_threads(HWLOC_OBJ_CORE, HWLOC_OBJ_PU);
+    else
+#endif
+      bind_process_only(HWLOC_OBJ_CORE);
   }
   else if ((s = getenv("CmiProcessPerPU")))
   {
     n = atoi(s);
-    CmiMapPUs(CmiMyLocalRank, n);
+    bind_process_only(HWLOC_OBJ_PU);
+  }
+  else // if ((s = getenv("CmiProcessPerHost")))
+  {
+#if CMK_SMP
+    if (getenv("CmiOneWthPerSocket"))
+    {
+      n = 0;
+      bind_threads_only(HWLOC_OBJ_PACKAGE);
+    }
+    else if (getenv("CmiOneWthPerCore"))
+    {
+      n = 0;
+      bind_threads_only(HWLOC_OBJ_CORE);
+    }
+    else if (getenv("CmiOneWthPerPU"))
+    {
+      n = 0;
+      bind_threads_only(HWLOC_OBJ_PU);
+    }
+#endif
   }
 
   return n != -1;

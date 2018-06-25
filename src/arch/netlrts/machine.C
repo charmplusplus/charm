@@ -1540,6 +1540,7 @@ static void node_addresses_obtain(char **argv)
 	nodeInfo->nPE = ChMessageInt_new(_Cmi_mynodesize);
 	nodeInfo->dataport = ChMessageInt_new(0);
 	nodeInfo->IP = _skt_invalid_ip;
+	nodeInfo->nProcessesInPhysNode = ChMessageInt_new(1);
   }
   else 
   {
@@ -1600,6 +1601,7 @@ static void node_addresses_obtain(char **argv)
     ChNodeinfo *d = (ChNodeinfo *) (n32+ChInitNodetabFields);
     Lrts_myNode = ChMessageInt(n32[1]);
     _Cmi_myphysnode_numprocesses = ChMessageInt(d[Lrts_myNode].nProcessesInPhysNode);
+    CmiMyLocalRank = Lrts_myNode % _Cmi_myphysnode_numprocesses;
 
     node_addresses_store(&nodetabmsg);
     ChMessage_free(&nodetabmsg);
