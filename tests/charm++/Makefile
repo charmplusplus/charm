@@ -3,6 +3,7 @@ DIRS = \
   alignment \
   pingpong \
   simplearrayhello \
+  provisioning \
   load_balancing \
   chkpt \
   delegation \
