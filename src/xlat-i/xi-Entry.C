@@ -2489,6 +2489,25 @@ void Entry::genDefs(XStr& str) {
   } else
     genChareDefs(str);
 
+  if (!isConstructor() && fortranMode) {
+    str << "/* FORTRAN SECTION */\n";
+
+    // Declare the Fortran Entry Function
+    // This is called from C++
+    str << "extern \"C\" ";
+    str << "void ";
+    str << fortranify(name);
+    str << "(char **";
+    str << ", " << container->indexList();
+    if (!param->isVoid()) {
+      str << ", ";
+      param->printAddress(str);
+    }
+    str << ");\n";
+
+    str << "/* FORTRAN SECTION END */\n";
+  }
+
   if (container->isMainChare() || container->isChare() || container->isForElement()) {
     if (isReductionTarget()) {
       XStr retStr;
@@ -2609,18 +2628,6 @@ void Entry::genDefs(XStr& str) {
 
     XStr dim;
     dim << ((Array*)container)->dim();
-    // Declare the Fortran Entry Function
-    // This is called from C++
-    str << "extern \"C\" ";
-    str << "void ";
-    str << fortranify(name);
-    str << "(char **";
-    str << ", " << container->indexList();
-    if (!param->isVoid()) {
-      str << ", ";
-      param->printAddress(str);
-    }
-    str << ");\n";
 
     // Define the Fortran interface function
     // This is called from Fortran to send the message to a chare.
