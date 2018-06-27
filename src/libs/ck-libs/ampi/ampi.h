@@ -23,15 +23,28 @@
     return_type P##function_name(__VA_ARGS__);
 #endif
 
-/* Allow applications to terminate cleanly with exit() */
 CLINKAGE void AMPI_Exit(int exitCode);
+/* Allow applications to terminate cleanly with exit():
+ * In C++ applications, this can conflict with user-defined
+ * exit routines inside namespaces, such as Foo::exit(), so
+ * we allow turning off AMPI's renaming of exit() with
+ * -DAMPI_RENAME_EXIT=0. Same for 'atexit' below... */
+#ifndef AMPI_RENAME_EXIT
+#define AMPI_RENAME_EXIT 1
+#endif
+#if AMPI_RENAME_EXIT
 #define exit(status) AMPI_Exit(status)
-
+#endif
 
 /* Notify AMPI when atexit() is used in order to prevent running MPI_Finalize()
    in a function registered with atexit. Only applies when including mpi.h. */
 CLINKAGE void ampiMarkAtexit(void);
+#ifndef AMPI_RENAME_ATEXIT
+#define AMPI_RENAME_ATEXIT 1
+#endif
+#if AMPI_RENAME_ATEXIT
 #define atexit(...) do {atexit(__VA_ARGS__); atexit((void (*)())ampiMarkAtexit);} while(0)
+#endif
 
 /*
 Silently rename the user's main routine.
