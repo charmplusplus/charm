@@ -281,6 +281,26 @@ static const char *skipstuff(const char *p)
   return p;
 }
 
+static char *cstring_join(const std::vector<const char *> & vec, const char *separator)
+{
+  const size_t separator_length = strlen(separator);
+  size_t length = 0;
+  for (const char *p : vec)
+    length += strlen(p) + separator_length;
+
+  char * const str = (char *)malloc(length + 1);
+
+  if (0 < vec.size())
+    strcpy(str, vec[0]);
+  for (int i = 1; i < vec.size(); ++i)
+  {
+    strcat(str, separator);
+    strcat(str, vec[i]);
+  }
+
+  return str;
+}
+
 #if CMK_USE_SSH
 static const char *getenv_ssh()
 {
@@ -973,8 +993,11 @@ static void arg_init(int argc, const char **argv)
     arg_scalable_start = 0;
     arg_quiet = 0;
     arg_verbose = 1;
-    /*Pass ++debug along to program (used by machine.C)*/
-    arg_argv[arg_argc++] = "++debug";
+    if (arg_debug || arg_debug_no_pause)
+    {
+      /*Pass ++debug along to program (used by machine.C)*/
+      arg_argv[arg_argc++] = "++debug";
+    }
   }
   /* pass ++quiet to program */
   if (arg_quiet) arg_argv[arg_argc++] = "++quiet";
@@ -1020,7 +1043,11 @@ static void arg_init(int argc, const char **argv)
 
   /* default debugger is gdb */
   if (!arg_debugger)
+#ifdef __APPLE__
+    arg_debugger = "lldb";
+#else
     arg_debugger = "gdb";
+#endif
   /* default xterm is xterm */
   if (!arg_xterm)
     arg_xterm = "xterm";
@@ -4898,6 +4925,28 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
         fprintf(f, " -e $F_DBG \"%s\" -c /tmp/charmrun_gdb.$$ \n", arg_nodeprog_r);
       else
         fprintf(f, " -e $F_DBG \"%s\" -x /tmp/charmrun_gdb.$$ \n", arg_nodeprog_r);
+    } else if (strcmp(dbg, "lldb") == 0) {
+      fprintf(f, "cat > /tmp/charmrun_lldb.$$ << END_OF_SCRIPT\n");
+      fprintf(f, "platform shell -- /bin/rm -f /tmp/charmrun_lldb.$$\n");
+      // must launch before configuring signals, or else:
+      // "error: No current process; cannot handle signals until you have a valid process."
+      // use -s to stop at the entry point
+      fprintf(f, "process launch -X true -s --");
+      fprint_arg(f, argv);
+      fprintf(f, "\n");
+      fprintf(f, "process handle -s false -n false SIGPIPE SIGWINCH\n");
+      if (arg_debug_commands)
+        fprintf(f, "%s\n", arg_debug_commands);
+      if (arg_debug_no_pause)
+        fprintf(f, "continue\n");
+      else
+        fprintf(f, "# Use \"continue\" or \"c\" to begin execution.\n");
+      fprintf(f, "END_OF_SCRIPT\n");
+      if (arg_runscript)
+        fprintf(f, "\"%s\" ", arg_runscript);
+      fprintf(f, "$F_XTERM");
+      fprintf(f, " -title 'Node %d (%s)' ", nodeno, h->name);
+      fprintf(f, " -e $F_DBG \"%s\" -s /tmp/charmrun_lldb.$$ \n", arg_nodeprog_r);
     } else if (strcmp(dbg, "dbx") == 0) {
       fprintf(f, "cat > /tmp/charmrun_dbx.$$ << END_OF_SCRIPT\n");
       fprintf(f, "sh /bin/rm -f /tmp/charmrun_dbx.$$\n");
@@ -5417,58 +5466,66 @@ static void start_nodes_local(std::vector<nodetab_process> & process_table)
 #endif
   envp[envc + n] = 0;
 
-  int dparamoutc=0;
-  int dparamoutmax=7;
-
   /* insert xterm gdb in front of command line and pass args to gdb */
   char **dparamp;
-  if(arg_debug || arg_debug_no_pause) {
-    int argstringlen=0;
-    int dparamc;
-    for (dparamc = 0, argstringlen=0; pparam_argv[dparamc]; dparamc++)
-      { 
-        if(dparamc>1) argstringlen+=strlen(pparam_argv[dparamc]);
-      }
-    if(arg_debug_no_pause) dparamoutmax+=2;
-
-    dparamp = (char **) malloc((dparamoutmax) * sizeof(void *));
+  std::vector<char *> dparamv;
+  if (arg_debug || arg_debug_no_pause || arg_in_xterm)
+  {
     char *abs_xterm=find_abs_path(arg_xterm);
     if(!abs_xterm)
-      {
-      fprintf(stderr, "Charmrun> cannot find xterm for gdb, please add it to your path\n");
+    {
+      fprintf(stderr, "Charmrun> cannot find xterm for debugging, please add it to your path\n");
       exit(1);
-      }
-    dparamp[dparamoutc++] = strdup(abs_xterm);
-    dparamp[dparamoutc++] = strdup("-e");
-    dparamp[dparamoutc++] = strdup(arg_debugger);
-    dparamp[dparamoutc++] = strdup(pparam_argv[1]);
-    dparamp[dparamoutc++] = strdup("-ex");
-    dparamp[dparamoutc] = (char *) malloc(argstringlen + 11 + dparamc);
-    strcpy(dparamp[dparamoutc], "set args");
-    for(int i=2; i< dparamc; i++)
+    }
+
+    dparamv.push_back(strdup(abs_xterm));
+    dparamv.push_back(strdup("-title"));
+    dparamv.push_back(strdup(pparam_argv[1]));
+    dparamv.push_back(strdup("-e"));
+
+    std::vector<const char *> cparamv;
+    if (arg_debug || arg_debug_no_pause)
+    {
+      const bool isLLDB = strcmp(arg_debugger, "lldb") == 0;
+      const char *commandflag = isLLDB ? "-o" : "-ex";
+      const char *argsflag = isLLDB ? "--" : "--args";
+
+      cparamv.push_back(arg_debugger);
+
+      if (arg_debug_no_pause)
       {
-	strcat(dparamp[dparamoutc], " ");
-	strcat(dparamp[dparamoutc], pparam_argv[i]);
+        cparamv.push_back(commandflag);
+        cparamv.push_back("r");
       }
-    if(arg_debug_no_pause)
-      {
-	dparamp[++dparamoutc] = strdup("-ex");
-	dparamp[++dparamoutc] = strdup("r");
-      }
-    dparamp[++dparamoutc]=0;  // null terminate your argv or face the wrath of
-    // undefined behavior
+
+      cparamv.push_back(argsflag);
+    }
+
+    for (int i = 1; pparam_argv[i] != nullptr; ++i)
+      cparamv.push_back(pparam_argv[i]);
+
+    if (!(arg_debug || arg_debug_no_pause))
+      cparamv.push_back("; echo \"program exited with code $?\" ; read eoln");
+
+    dparamv.push_back(cstring_join(cparamv, " "));
+
     if (arg_verbose)
-      {
-	printf("Charmrun> gdb args : ");
-	for (int i = 0; i < dparamoutc; i++)
-	  printf(" %s ",dparamp[i]);
-	printf("\n");
-      }
+    {
+      printf("Charmrun> xterm args:");
+      for (const char *p : dparamv)
+        printf(" %s", p);
+      printf("\n");
+    }
+
+    // null terminate your argv or face the wrath of undefined behavior
+    dparamv.push_back(nullptr);
+
+    dparamp = dparamv.data();
   }
   else
-    {
-      dparamp=(char **) (pparam_argv+1);
-    }
+  {
+    dparamp = (char **)(pparam_argv+1);
+  }
 
   for (const nodetab_process & p : process_table)
   {
@@ -5503,11 +5560,8 @@ static void start_nodes_local(std::vector<nodetab_process> & process_table)
       exit(1);
     }
   }
-  if(arg_debug || arg_debug_no_pause)
-    {
-      for(;dparamoutc>=0;dparamoutc--) free(dparamp[dparamoutc]);
-      free(dparamp);
-    }
+  for (char *p : dparamv)
+    free(p);
   for (int i = envc, i_end = envc + n; i < i_end; ++i)
     free(envp[i]);
   free(envp);
