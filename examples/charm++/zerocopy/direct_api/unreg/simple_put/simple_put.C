@@ -92,9 +92,9 @@ public:
   void start()
   {
     CkAssert(thisIndex == 1);
-    myDest1 = CkNcpyBuffer(iArr1, size*sizeof(int), cb);
-    myDest2 = CkNcpyBuffer(dArr1, size*sizeof(double), cb);
-    myDest3 = CkNcpyBuffer(cArr1, size*sizeof(char), cb);
+    myDest1 = CkNcpyBuffer(iArr1, size*sizeof(int), cb, CK_BUFFER_UNREG);
+    myDest2 = CkNcpyBuffer(dArr1, size*sizeof(double), cb, CK_BUFFER_UNREG);
+    myDest3 = CkNcpyBuffer(cArr1, size*sizeof(char), cb, CK_BUFFER_UNREG);
 
     // Send my destinations to Index 0; Index 0 performs Puts into these destinations
     thisProxy[otherIndex].recvNcpyInfo(myDest1, myDest2, myDest3);
@@ -148,9 +148,9 @@ public:
   {
     CkAssert(thisIndex == 0);
     // Create nocopy sources for me to Put into
-    mySrc1 = CkNcpyBuffer(iArr1, size*sizeof(int), cb);
-    mySrc2 = CkNcpyBuffer(dArr1, size*sizeof(double), cb);
-    mySrc3 = CkNcpyBuffer(cArr1, size*sizeof(char), cb);
+    mySrc1 = CkNcpyBuffer(iArr1, size*sizeof(int), cb, CK_BUFFER_UNREG);
+    mySrc2 = CkNcpyBuffer(dArr1, size*sizeof(double), cb, CK_BUFFER_UNREG);
+    mySrc3 = CkNcpyBuffer(cArr1, size*sizeof(char), cb, CK_BUFFER_UNREG);
 
     // Perform Puts from my sources into Index 1's destinations
     mySrc1.put(dest1);

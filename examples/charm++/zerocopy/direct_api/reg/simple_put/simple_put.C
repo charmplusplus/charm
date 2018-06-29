@@ -92,7 +92,7 @@ public:
   void start()
   {
     CkAssert(thisIndex == 1);
-    myDest1 = CkNcpyBuffer(iArr1, size*sizeof(int), cb, CK_BUFFER_REG);
+    myDest1 = CkNcpyBuffer(iArr1, size*sizeof(int), cb); // not using any mode uses CK_BUFFER_REG
     myDest2 = CkNcpyBuffer(dArr1, size*sizeof(double), cb, CK_BUFFER_REG);
     myDest3 = CkNcpyBuffer(cArr1, size*sizeof(char), cb, CK_BUFFER_REG);
 

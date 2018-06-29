@@ -92,9 +92,9 @@ public:
   void start()
   {
     CkAssert(thisIndex == 0);
-    mySrc1 = CkNcpyBuffer(iArr1, size*sizeof(int), cb, CK_BUFFER_REG);
-    mySrc2 = CkNcpyBuffer(dArr1, size*sizeof(double), cb, CK_BUFFER_REG);
-    mySrc3 = CkNcpyBuffer(cArr1, size*sizeof(char), cb, CK_BUFFER_REG);
+    mySrc1 = CkNcpyBuffer(iArr1, size*sizeof(int), cb);
+    mySrc2 = CkNcpyBuffer(dArr1, size*sizeof(double), cb);
+    mySrc3 = CkNcpyBuffer(cArr1, size*sizeof(char), cb);
 
     // Send my sources to Index 1; Index 1 performs Gets from these sources
     thisProxy[otherIndex].recvNcpyInfo(mySrc1, mySrc2, mySrc3);
@@ -148,9 +148,9 @@ public:
   {
     CkAssert(thisIndex == 1);
     // Create nocopy destination for me to Get into
-    myDest1 = CkNcpyBuffer(iArr1, size*sizeof(int), cb, CK_BUFFER_REG);
-    myDest2 = CkNcpyBuffer(dArr1, size*sizeof(double), cb, CK_BUFFER_REG);
-    myDest3 = CkNcpyBuffer(cArr1, size*sizeof(char), cb, CK_BUFFER_REG);
+    myDest1 = CkNcpyBuffer(iArr1, size*sizeof(int), cb);
+    myDest2 = CkNcpyBuffer(dArr1, size*sizeof(double), cb);
+    myDest3 = CkNcpyBuffer(cArr1, size*sizeof(char), cb);
 
     // Perform Get from Index 0's sources into my destinations
     myDest1.get(src1);

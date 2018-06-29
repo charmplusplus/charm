@@ -87,17 +87,17 @@ public:
   void start()
   {
     CkAssert(thisIndex == 0);
-    mySrc1 = CkNcpyBuffer(iArr1, size*sizeof(int), sendCb, CK_BUFFER_REG);
-    mySrc2 = CkNcpyBuffer(dArr1, size*sizeof(double), sendCb, CK_BUFFER_REG);
-    mySrc3 = CkNcpyBuffer(cArr1, size*sizeof(char), sendCb, CK_BUFFER_REG);
+    mySrc1 = CkNcpyBuffer(iArr1, size*sizeof(int), sendCb);
+    mySrc2 = CkNcpyBuffer(dArr1, size*sizeof(double), sendCb);
+    mySrc3 = CkNcpyBuffer(cArr1, size*sizeof(char), sendCb);
 
     iArr2 = new int[size];
     dArr2 = new double[size];
     cArr2 = new char[size];
 
-    myDest1 = CkNcpyBuffer(iArr2, size*sizeof(int), recvCb, CK_BUFFER_REG);
-    myDest2 = CkNcpyBuffer(dArr2, size*sizeof(double), recvCb, CK_BUFFER_REG);
-    myDest3 = CkNcpyBuffer(cArr2, size*sizeof(char), recvCb, CK_BUFFER_REG);
+    myDest1 = CkNcpyBuffer(iArr2, size*sizeof(int), recvCb);
+    myDest2 = CkNcpyBuffer(dArr2, size*sizeof(double), recvCb);
+    myDest3 = CkNcpyBuffer(cArr2, size*sizeof(char), recvCb);
 
     thisProxy[otherIndex].recvNcpyInfo(mySrc1, mySrc2, mySrc3, myDest1, myDest2, myDest3);
   }
@@ -133,9 +133,9 @@ public:
         CkPrintf("[%d][%d][%d] Get call completed\n", thisIndex, CkMyPe(), CkMyNode());
 
         // Create a nocopy sources for me to Put from into destinations received
-        mySrc1 = CkNcpyBuffer(iArr1, sizeof(int)*size, sendCb, CK_BUFFER_REG);
-        mySrc2 = CkNcpyBuffer(dArr1, sizeof(double)*size, sendCb, CK_BUFFER_REG);
-        mySrc3 = CkNcpyBuffer(cArr1, sizeof(char)*size, sendCb, CK_BUFFER_REG);
+        mySrc1 = CkNcpyBuffer(iArr1, sizeof(int)*size, sendCb);
+        mySrc2 = CkNcpyBuffer(dArr1, sizeof(double)*size, sendCb);
+        mySrc3 = CkNcpyBuffer(cArr1, sizeof(char)*size, sendCb);
 
         // Index 1 Putting to 0
         mySrc1.put(otherDest1);
@@ -165,9 +165,9 @@ public:
     otherDest3 = dest3;
 
     // Create nocopy destinations for me to Get from sources received
-    myDest1 = CkNcpyBuffer(iArr1, size*sizeof(int), recvCb, CK_BUFFER_REG);
-    myDest2 = CkNcpyBuffer(dArr1, size*sizeof(double), recvCb, CK_BUFFER_REG);
-    myDest3 = CkNcpyBuffer(cArr1, size*sizeof(char), recvCb, CK_BUFFER_REG);
+    myDest1 = CkNcpyBuffer(iArr1, size*sizeof(int), recvCb);
+    myDest2 = CkNcpyBuffer(dArr1, size*sizeof(double), recvCb);
+    myDest3 = CkNcpyBuffer(cArr1, size*sizeof(char), recvCb);
 
     // Index 1 Getting from 0
     myDest1.get(src1);

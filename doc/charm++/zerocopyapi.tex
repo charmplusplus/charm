@@ -48,7 +48,7 @@ object and an optional mode parameter.
 \begin{alltt}
 CkCallback srcCb(CkIndex_Ping1::sourceDone, thisProxy[thisIndex]);
 // CkNcpyBuffer object representing the source buffer
-CkNcpyBuffer source(arr1, arr1Size * sizeof(int), srcCb, CK_BUFFER_UNREG);
+CkNcpyBuffer source(arr1, arr1Size * sizeof(int), srcCb, CK_BUFFER_REG);
 \end{alltt}
 
 When used inside a \kw{CkNcpyBuffer} object that represents the source buffer
@@ -62,7 +62,7 @@ determine the network registration mode for the buffer. It is only relevant
 on networks requiring explicit memory registration for performing RDMA operations.
 These networks include GNI, OFI and Verbs. When the mode is not specified by
 the user, the default mode is considered to be
-CK\textunderscore BUFFER\textunderscore UNREG.
+CK\textunderscore BUFFER\textunderscore REG.
 
 Similarly, to receive an array using the Zero copy Direct API, define another
 \kw{CkNcpyBuffer} object on the receiver chare object specifying the
@@ -78,7 +78,7 @@ parameter.
 \begin{alltt}
 CkCallback destCb(CkIndex_Ping1::destinationDone, thisProxy[thisIndex]);
 // CkNcpyBuffer object representing the destination buffer
-CkNcpyBuffer dest(arr2, arr2Size * sizeof(int), destCb, CK_BUFFER_UNREG);
+CkNcpyBuffer dest(arr2, arr2Size * sizeof(int), destCb, CK_BUFFER_REG);
 \end{alltt}
 
 Once the source \kw{CkNcpyBuffer} and destination \kw{CkNcpyBuffer} objects have
@@ -168,7 +168,7 @@ The following code snippet illustrates the usage of the \texttt{setRef} method.
 
 \begin{alltt}
 const void *refPtr = &index;
-CkNcpyBuffer source(arr1, arr1Size * sizeof(int), srcCb, CK_BUFFER_UNREG);
+CkNcpyBuffer source(arr1, arr1Size * sizeof(int), srcCb, CK_BUFFER_REG);
 source.setRef(refPtr);
 \end{alltt}
 
@@ -231,28 +231,27 @@ network memory management is not necessary (Netlrts) or is internally handled by
 layer networking API (PAMI, MPI), these switches are still supported to maintain API
 consistency by all behaving in the similar default mode of operation.
 
-\paragraph{\texttt{CK\textunderscore BUFFER\textunderscore UNREG}:}
-\texttt{CK\textunderscore BUFFER\textunderscore UNREG} is the default mode that
-is used when no mode is passed. When this mode is passed, the buffer
-is initially unregistered and it is registered only for network transfers where
-registration is absolutely required. For example, if the target buffer is on the same
-PE or same logical node (or process), since the \kw{get} internally performs a memcpy,
-registration is avoided for non-network transfers. On the other hand, if the target buffer
-resides on a remote PE on a different logical node, the \kw{get} is implemented through
-an RDMA call requiring registration. In such a case, there is a small message sent by
-the RTS to register and perform the RDMA operation. Upon registration, the runtime
-modifies the state of \kw{CkNcpyBuffer} object to
-\texttt{CK\textunderscore BUFFER\textunderscore REG} from
-\texttt{CK\textunderscore BUFFER\textunderscore UNREG}. This mode is demonstrated in
-\examplerefdir{zerocopy/direct\textunderscore api/unreg}
-
 \paragraph{\texttt{CK\textunderscore BUFFER\textunderscore REG}:}
-\texttt{CK\textunderscore BUFFER\textunderscore REG} doesn't distinguish between
+\texttt{CK\textunderscore BUFFER\textunderscore REG} is the default mode that
+is used when no mode is passed. This mode doesn't distinguish between
 non-network and network data transfers. When this mode is passed, the buffer
 is registered immediately and this can be used for both non-network sends (memcpy)
 and network sends without requiring an extra message being sent by the runtime system
 for the latter case. This mode is demonstrated in
 \examplerefdir{zerocopy/direct\textunderscore api/reg}
+
+\paragraph{\texttt{CK\textunderscore BUFFER\textunderscore UNREG}:}
+When this mode is passed, the buffer is initially unregistered and it is
+registered only for network transfers where registration is absolutely required.
+For example, if the target buffer is on the same PE or same logical node (or process),
+since the \kw{get} internally performs a memcpy, registration is avoided for non-network
+transfers. On the other hand, if the target buffer resides on a remote PE on a different
+logical node, the \kw{get} is implemented through an RDMA call requiring registration.
+In such a case, there is a small message sent by the RTS to register and perform
+the RDMA operation. Upon registration, the runtime modifies the state of \kw{CkNcpyBuffer}
+object to \texttt{CK\textunderscore BUFFER\textunderscore REG} from
+\texttt{CK\textunderscore BUFFER\textunderscore UNREG}. This mode is demonstrated in
+\examplerefdir{zerocopy/direct\textunderscore api/unreg}
 
 \paragraph{\texttt{CK\textunderscore BUFFER\textunderscore PREREG}:}
 This mode is only beneficial by implementations that use pre-registered memory pools.
