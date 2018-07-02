@@ -20,7 +20,7 @@ jacobi: jacobi.C
 
 jacobi.iso: jacobi.C
 	$(CHARMC) -c -DNO_PUP jacobi.C -o jacobi.iso.o
-	-$(CHARMC) -o jacobi.iso jacobi.iso.o -module CommonLBs -memory isomalloc -Wl,--allow-multiple-definition
+	-$(CHARMC) -o jacobi.iso jacobi.iso.o -module CommonLBs -memory isomalloc
 
 jacobi.tls: jacobi.C
 	-$(CHARMC) -c -tlsglobal jacobi.C -o jacobi.tls.o 

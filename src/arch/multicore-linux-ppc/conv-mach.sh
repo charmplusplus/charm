@@ -2,8 +2,6 @@
 
 CMK_DEFS=' -D_REENTRANT '
 CMK_LIBS="$CMK_LIBS -lpthread"
-#CMK_LD="$CMK_CC -Wl,--allow-multiple-definition "
-#CMK_LDXX="$CMK_CXX -Wl,--allow-multiple-definition "
 CMK_XIOPTS=''
 CMK_QT='generic64-light'
 
