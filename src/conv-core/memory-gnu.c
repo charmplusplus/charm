@@ -8,6 +8,8 @@ This version of ptmalloc3 is hacked in following ways:
    - Merge thread files to generate  memory-gnu-threads.h
 */
 
+#define CMI_MEMORY_GNU
+
 #define malloc   mm_malloc
 #define free	 mm_free
 #define calloc   mm_calloc
@@ -185,6 +187,10 @@ void *(*__morecore)(ptrdiff_t) = __default_morecore;
 #endif /* _LIBC */
 
 /* CHARM++ ADD BEGIN */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Forward Declarations
 void* public_mALLOc(size_t bytes);
 void public_fREe(void* mem);
@@ -199,6 +205,10 @@ int public_mTRIm(size_t s);
 size_t public_mUSABLe(void* mem);
 int public_mALLOPt(int p, int v);
 void public_mSTATs(void);
+
+#ifdef __cplusplus
+}
+#endif
 /* CHARM++ ADD END */
 
 #if !defined _LIBC && (!defined __GNUC__ || __GNUC__<3)

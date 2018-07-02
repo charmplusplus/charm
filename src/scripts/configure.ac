@@ -1656,6 +1656,18 @@ EOT
 test_link "whether has mallinfo" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_MALLINFO, $pass, [whether has mallinfo])
 
+#### test for __morecore ###
+cat > $t <<EOT
+#include <cstddef>
+int main() {
+  extern void *(*__morecore)(ptrdiff_t);
+  __morecore(0);
+  return 0;
+}
+EOT
+test_link "whether expects __morecore symbol" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_EXPECTS_MORECORE, $pass, [whether expects __morecore symbol])
+
 #### test for popen ###
 cat > $t <<EOT
 #include <stdio.h>

@@ -98,6 +98,8 @@ int cpdInSystem=1; /*Start inside the system (until we start executing user code
 #if CMK_MEMORY_BUILD_OS
 #if CMK_MEMORY_BUILD_OS_WRAPPED
 
+struct mallinfo;
+
 CMI_EXTERNC void initialize_memory_wrapper(void);
 CMI_EXTERNC void * initialize_memory_wrapper_calloc(size_t nelem, size_t size);
 CMI_EXTERNC void * initialize_memory_wrapper_malloc(size_t size);
@@ -114,6 +116,7 @@ void * (*mm_memalign)(size_t,size_t) = initialize_memory_wrapper_memalign;
 void * (*mm_valloc)(size_t) = initialize_memory_wrapper_valloc;
 void (*mm_free)(void*) = initialize_memory_wrapper_free;
 void (*mm_cfree)(void*) = initialize_memory_wrapper_cfree;
+struct mallinfo (*mm_mallinfo)(void) = NULL;
 
 void * initialize_memory_wrapper_calloc(size_t nelem, size_t size) {
   static int calloc_wrapper = 0;
@@ -164,13 +167,13 @@ void initialize_memory_wrapper_cfree(void *ptr) {
 #define mm_memalign (*mm_memalign)
 #define mm_valloc   (*mm_valloc)
 
-#else
+#else /* CMK_MEMORY_BUILD_OS_WRAPPED */
 #define mm_malloc   malloc
 #define mm_calloc   calloc
 #define mm_memalign memalign
 #define mm_free     free
-#endif
-#endif
+#endif /* CMK_MEMORY_BUILD_OS_WRAPPED */
+#endif /* CMK_MEMORY_BUILD_OS */
 
 CMK_TYPEDEF_UINT8 _memory_allocated = 0;
 CMK_TYPEDEF_UINT8 _memory_allocated_max = 0; /* High-Water Mark */
@@ -263,7 +266,7 @@ static void (*old_free_hook) (void*, const void*);
 #else /* CMK_MEMORY_BUILD_GNU_HOOKS */
 #define BEFORE_MALLOC_CALL   /*empty*/
 #define AFTER_MALLOC_CALL    /*empty*/
-#endif
+#endif /* CMK_MEMORY_BUILD_GNU_HOOKS */
 
 #if CMK_MEMORY_BUILD_VERBOSE
 #include "memory-verbose.c"
@@ -313,7 +316,7 @@ void (* __MALLOC_HOOK_VOLATILE __malloc_initialize_hook) (void) = my_init_hook;
 #else
 void (* __malloc_initialize_hook) (void) = my_init_hook;
 #endif
-#else
+#else /* CMK_MEMORY_BUILD_GNU_HOOKS */
 void *malloc(size_t size) CMK_THROW { return meta_malloc(size); }
 void free(void *ptr) CMK_THROW { meta_free(ptr); }
 void *calloc(size_t nelem, size_t size) CMK_THROW { return meta_calloc(nelem,size); }
@@ -322,9 +325,9 @@ void *realloc(void *ptr, size_t size) CMK_THROW { return meta_realloc(ptr,size);
 CMI_EXTERNC
 void *memalign(size_t align, size_t size) CMK_THROW { return meta_memalign(align,size); }
 void *valloc(size_t size) CMK_THROW { return meta_valloc(size); }
-#endif
+#endif /* CMK_MEMORY_BUILD_GNU_HOOKS */
 
-#endif
+#endif /* CMK_MEMORY_BUILD_OS_WRAPPED || CMK_MEMORY_BUILD_GNU_HOOKS */
 
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
@@ -427,7 +430,14 @@ INLINE static CMK_TYPEDEF_UINT8 MemusageMallinfo(void){
     /* IA64 seems to ignore mi.uordblks, but updates mi.hblkhd correctly */
     if (skip_mallinfo) return 0;
     else {
-    struct mallinfo mi = mallinfo();
+    struct mallinfo mi;
+#if CMK_MEMORY_BUILD_OS_WRAPPED && !CMK_MEMORY_BUILD_GNU_HOOKS
+    if (mm_mallinfo == NULL)
+      initialize_memory_wrapper();
+    mi = (*mm_mallinfo)();
+#else
+    mi = mallinfo();
+#endif
     CMK_TYPEDEF_UINT8 memtotal = (CMK_TYPEDEF_UINT8) mi.uordblks;   /* malloc */
     CMK_TYPEDEF_UINT8 memtotal2 = (CMK_TYPEDEF_UINT8) mi.usmblks;   /* unused */
     memtotal2 += (CMK_TYPEDEF_UINT8) mi.hblkhd;               /* mmap */
@@ -551,7 +561,7 @@ void CmiResetMinMemory(void) {}
 #undef MEM_LOCK_AROUND
 #define MEM_LOCK_AROUND(code)   code
 
-#else       /* of CMK_MEMORY_BUILD_OS */
+#else /* CMK_MEMORY_BUILD_OS */
 
 /*************************************************************
 *Not* using the system malloc-- first pick the implementation:
@@ -636,7 +646,7 @@ static void *meta_valloc(size_t size)
 {
   return mm_valloc(size);
 }
-#endif
+#endif /* 0 */
 
 
 /*******************************************************************
@@ -774,7 +784,7 @@ void CmiResetMinMemory(void) {
   _memory_allocated_min=_memory_allocated;
 }
 
-#endif /* ! CMK_MEMORY_BUILD_BUILTIN*/
+#endif /* CMK_MEMORY_BUILD_OS */
 
 #ifndef CMK_MEMORY_HAS_NOMIGRATE
 /*Default implementations of the nomigrate routines:*/
@@ -956,6 +966,54 @@ void CmiFreeAligned(void* ptr) {
   free ((void*)((char*)ptr - offset));
 }
 
+
+// Replace remaining symbols found in glibc's malloc.o to avoid linker errors
+// See: https://charm.cs.illinois.edu/redmine/issues/1325
+
+#if (CMK_MEMORY_BUILD_OS && CMK_MEMORY_BUILD_OS_WRAPPED && !CMK_MEMORY_BUILD_GNU_HOOKS) || !CMK_MEMORY_BUILD_OS
+
+#if !defined CMI_MEMORY_GNU || !defined _LIBC
+CMI_EXTERNC void * __libc_memalign (size_t alignment, size_t bytes) { return memalign(alignment, bytes); }
+
+#if CMK_EXPECTS_MORECORE
+CMI_EXTERNC void * __default_morecore (ptrdiff_t);
+void *(*__morecore)(ptrdiff_t) = __default_morecore;
+#endif
+#endif
+
+#if !defined CMI_MEMORY_GNU || defined _LIBC
+#include <errno.h>
+
+CMI_EXTERNC
+int posix_memalign (void **outptr, size_t align, size_t size) CMK_THROW
+{
+  void *ptr;
+  const size_t division = align / sizeof(void *);
+
+  if (align % sizeof(void *) != 0 || ((division-1) & division) != 0 || align == 0)
+    return EINVAL;
+
+  ptr = memalign(align, size);
+
+  if (ptr == NULL)
+    return ENOMEM;
+
+  *outptr = ptr;
+  return 0;
+}
+#endif
+
+#if defined CMI_MEMORY_GNU && defined _LIBC
+CMI_EXTERNC int mallopt (int param_number, int value) { return __libc_mallopt(param_number, value); }
+#elif !defined CMI_MEMORY_GNU || defined _LIBC
+CMI_EXTERNC int mallopt (int param_number, int value) { return 1; }
+#endif
+
+CMI_EXTERNC void __malloc_fork_lock_parent (void) { }
+CMI_EXTERNC void __malloc_fork_unlock_parent (void) { }
+CMI_EXTERNC void __malloc_fork_unlock_child (void) { }
+
+#endif
 
 
 /** @} */
