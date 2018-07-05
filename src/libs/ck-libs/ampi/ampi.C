@@ -1299,6 +1299,8 @@ void ampiParent::pup(PUP::er &p) {
   p|resumeOnRecv;
   p|resumeOnColl;
   p|numBlockedReqs;
+  p|bsendBufferSize;
+  p((char *)&bsendBuffer, sizeof(void *));
 
 #if AMPI_PRINT_MSG_SIZES
   p|msgSizes;
@@ -1316,6 +1318,8 @@ void ampiParent::init(){
   resumeOnRecv = false;
   resumeOnColl = false;
   numBlockedReqs = 0;
+  bsendBufferSize = 0;
+  bsendBuffer = NULL;
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(thisIndex)){
     char fname[128];
@@ -3869,21 +3873,30 @@ AMPI_API_IMPL(int, MPI_Bsend, const void *buf, int count, MPI_Datatype datatype,
                               int dest, int tag, MPI_Comm comm)
 {
   AMPI_API("AMPI_Bsend");
+  // FIXME: we don't actually use the buffer set in MPI_Buffer_attach
+  //        for buffering of messages sent via MPI_Bsend
   return MPI_Send(buf, count, datatype, dest, tag, comm);
 }
 
 AMPI_API_IMPL(int, MPI_Buffer_attach, void *buffer, int size)
 {
-  AMPI_API("MPI_Buffer_attach");
-  /* No-op implementation */
+  AMPI_API("AMPI_Buffer_attach");
+#if AMPI_ERROR_CHECKING
+  if (size < 0) {
+    return ampiErrhandler("AMPI_Buffer_attach", MPI_ERR_ARG);
+  }
+#endif
+  // NOTE: we don't really use this buffer for Bsend's,
+  //       we only keep track of it so that it can be
+  //       returned by MPI_Buffer_detach.
+  getAmpiParent()->attachBuffer(buffer, size);
   return MPI_SUCCESS;
 }
 
 AMPI_API_IMPL(int, MPI_Buffer_detach, void *buffer, int *size)
 {
   AMPI_API("AMPI_Buffer_detach");
-  /* No-op implementation */
-  *size = 0;
+  getAmpiParent()->detachBuffer(buffer, size);
   return MPI_SUCCESS;
 }
 

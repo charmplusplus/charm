@@ -1950,6 +1950,8 @@ class ampiParent : public CBase_ampiParent {
   MPI_Aint* win_size_storage;
   void** win_base_storage;
   CkPupPtrVec<KeyvalNode> kvlist;
+  void* bsendBuffer;   // NOTE: we don't actually use this for buffering of MPI_Bsend's,
+  int bsendBufferSize; //       we only keep track of it to return it from MPI_Buffer_detach
 
   // Intercommunicator creation:
   bool isTmpRProxySet;
@@ -1967,6 +1969,14 @@ class ampiParent : public CBase_ampiParent {
  public:
   void prepareCtv(void);
 
+  inline void attachBuffer(void *buffer, int size) {
+    bsendBuffer = buffer;
+    bsendBufferSize = size;
+  }
+  inline void detachBuffer(void *buffer, int *size) {
+    *(void **)buffer = bsendBuffer;
+    *size = bsendBufferSize;
+  }
   inline bool isSplit(MPI_Comm comm) const {
     return (comm>=MPI_COMM_FIRST_SPLIT && comm<MPI_COMM_FIRST_GROUP);
   }
