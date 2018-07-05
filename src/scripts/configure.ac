@@ -1331,6 +1331,31 @@ test_cxx "whether switching TLS register (32-bit) is supported" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_TLS_SWITCHING32, $strictpass, [Allows switching TLS in 32-bit.])
 fi
 
+### test for dl_iterate_phdr ###
+
+cat > $tc <<EOT
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#ifndef __USE_GNU
+# define __USE_GNU
+#endif
+#include <link.h>
+#include <stddef.h>
+static int callback(struct dl_phdr_info* info, size_t size, void* data)
+{
+  return 0;
+}
+int main()
+{
+  dl_iterate_phdr(callback, NULL);
+  return 0;
+}
+EOT
+test_linkc "whether has dl_iterate_phdr" "yes" "no" ""
+AC_DEFINE_UNQUOTED([CMK_HAS_DL_ITERATE_PHDR], $pass, [whether has dl_iterate_phdr])
+
+
 #### test if we can build OFI ####
 if test "$CMK_BUILD_OFI" = 1
 then

@@ -8,6 +8,7 @@
 
 /* These macros are needed for:
  * dlfcn.h: RTLD_DEFAULT
+ * link.h: dl_iterate_phdr
  */
 #ifndef _GNU_SOURCE
 # define _GNU_SOURCE
@@ -16,6 +17,17 @@
 # define __USE_GNU
 #endif
 #include "dlfcn.h"
+
+#if CMK_HAS_DL_ITERATE_PHDR
+# include <link.h>
+#endif
+
+/*
+ * For a description of the system TLS implementations this file works with, see:
+ * "ELF Handling For Thread-Local Storage"
+ * https://www.akkadia.org/drepper/tls.pdf
+ * Of note are sections 3.4.2 (IA-32, a.k.a. x86) and 3.4.6 (x86-64).
+ */
 
 void* getTLS(void) CMI_NOOPTIMIZE;
 void setTLS(void* newptr) CMI_NOOPTIMIZE;
@@ -30,7 +42,12 @@ void CmiTLSInit(void)
   if (CmiMyRank() == 0)
   {
     if (!quietModeRequested && CmiMyPe() == 0)
+    {
       CmiPrintf("Charm++> -tlsglobals enabled for privatization of thread-local variables.\n");
+#if !CMK_HAS_DL_ITERATE_PHDR
+      CmiPrintf("Charm++> Warning: Unable to examine TLS segments of shared objects.\n");
+#endif
+    }
 
     /* Use dynamic linking in case Charm++ shared objects are used by a binary lacking
      * conv-static.o, such as in the case of CharmPy. */
@@ -81,16 +98,34 @@ Phdr* getTLSPhdrEntry(void) {
   return NULL;
 }
 
+#if CMK_HAS_DL_ITERATE_PHDR
+static int count_so_tls_sizes(struct dl_phdr_info* info, size_t size, void* data)
+{
+  size_t i;
+  tlsseg_t* t = (tlsseg_t*)data;
+
+  for (i = 0; i < info->dlpi_phnum; i++)
+  {
+    const Phdr* hdr = &info->dlpi_phdr[i];
+    if (hdr->p_type == PT_TLS)
+      t->size += hdr->p_memsz;
+  }
+}
+#endif
+
 void allocNewTLSSeg(tlsseg_t* t, CthThread th) {
   Phdr* phdr;
 
   phdr = getTLSPhdrEntry();
   if (phdr != NULL) {
     t->align = phdr->p_align;
-    t->size = CMIALIGN(phdr->p_memsz, phdr->p_align);
+    t->size = phdr->p_memsz;
+#if CMK_HAS_DL_ITERATE_PHDR
+    dl_iterate_phdr(count_so_tls_sizes, t); /* count the PT_TLS sections in shared objects */
+#endif
+    t->size = CMIALIGN(t->size, phdr->p_align);
     t->memseg = (Addr)CmiIsomallocAlign(t->align, t->size, th);
-    memset((void*)t->memseg, 0, t->size);
-    memcpy((void*)t->memseg, (void*) (phdr->p_vaddr), (size_t)(phdr->p_filesz));
+    memcpy((void*)t->memseg, (char *)getTLS() - t->size, t->size);
     t->memseg = (Addr)( ((char *)(t->memseg)) + t->size );
     /* printf("[%d] 2 ALIGN %d MEM %p SIZE %d\n", CmiMyPe(), t->align, t->memseg, t->size); */
   } else {
