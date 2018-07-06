@@ -31,13 +31,19 @@ CMK_CF77="mpif77 -auto -fPIC "
 CMK_CF90="mpif90 -auto -fPIC "
 CMK_CF90_FIXED="$CMK_CF90 -132 -FI "
 F90DIR=`which ifort 2> /dev/null`
-if test -h "$F90DIR"
-then
-  F90DIR=`readlink $F90DIR`
-fi
 if test -x "$F90DIR"
 then
-  F90LIBDIR="`dirname $F90DIR`/../lib"
+  F90DIR=`dirname $F90DIR`
+  Minor=`basename $F90DIR`
+  F90LIBDIR="$F90DIR/../lib/$Minor"
+  if ! test -x "$F90LIBDIR"
+  then
+    F90LIBDIR="$F90DIR/../lib"
+    if ! test -x "$F90LIBDIR"
+    then
+      F90LIBDIR="$F90DIR/../../compiler/lib/$Minor"
+    fi
+  fi
   F90MAIN="$F90LIBDIR/for_main.o"
 fi
 # for_main.o is important for main() in f90 code
