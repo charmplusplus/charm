@@ -1703,7 +1703,7 @@ int charm_main(int argc, char **argv)
   return 0;
 }
 
-void charm_main_fortran_wrapper_(int *argc, char **argv)
+void FTN_NAME(CHARM_MAIN_FORTRAN_WRAPPER, charm_main_fortran_wrapper)(int *argc, char **argv)
 {
   charm_main(*argc, argv);
 }
