@@ -11,7 +11,7 @@ static int print_test_result(int rank, int my_wth, const char * name, bool resul
   return result ? 0 : 1;
 }
 
-void test_privatization_(int & failed, int & rank, int & my_wth, int & global)
+void test_privatization(int & failed, int & rank, int & my_wth, int & global)
 {
   MPI_Barrier(MPI_COMM_WORLD);
 
@@ -42,7 +42,7 @@ void test_privatization_(int & failed, int & rank, int & my_wth, int & global)
 }
 
 
-void privatization_test_framework_(void)
+void privatization_test_framework(void)
 {
   int rank;            /* process id */
   int p;               /* number of processes */
@@ -54,13 +54,13 @@ void privatization_test_framework_(void)
 
 
   int failed_before = 0;
-  perform_test_batch_(failed_before, rank, my_wth);
+  perform_test_batch(failed_before, rank, my_wth);
 
   if (rank == 0) printf("Requesting migration.\n");
   AMPI_Migrate(AMPI_INFO_LB_SYNC);
 
   int failed_after = 0;
-  perform_test_batch_(failed_after, rank, my_wth);
+  perform_test_batch(failed_after, rank, my_wth);
 
   if (failed_before != failed_after) printf("[%d](%d) Migration caused a test inconsistency.\n", rank, my_wth);
 
