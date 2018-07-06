@@ -1259,13 +1259,6 @@ OPTS_CXX="$OPTS $TAU_DEFS $TAU_INCLUDE $OPTS_CXX"
 OPTS_F90="$OPTS $OPTS_F90"
 OPTS_LD="$OPTS $OPTS_LD"
 
-if [ -n "$F90_MAIN" ] 
-then
-# for_main needs to be placed at beginning
-	CMK_LD="$CMK_LD $CMK_F90MAINLIBS"
-	CMK_LDXX="$CMK_LDXX $CMK_F90MAINLIBS"
-fi
-
 # There's really no analog for this in the Bourne shell: 
 #  -------- C Shell ------> onintr failure
 # Luckily, it's irrelevant as long as nobody sends us a ^Z.
@@ -1579,6 +1572,7 @@ case "$PARADIGM" in
 	if [ -z "$NO_MAIN" ]
 	then
 		MIDDLE_LIBS="-lckmainf $MIDDLE_LIBS"
+		F90_MAIN="1"
 	fi
 	if [ "$TAU_TRACE_MPI" = "1" ]
 	then
@@ -1595,6 +1589,7 @@ case "$PARADIGM" in
 		if [ -n "$AMPIF" ]
 		then
 			MIDDLE_LIBS="-lckmainf $MIDDLE_LIBS"
+			F90_MAIN="1"
 		elif [ -z "$AMPIMAIN" ]
 		then
 			MIDDLE_LIBS="-lckmain $MIDDLE_LIBS"
@@ -1672,6 +1667,12 @@ else
   ALL_LIBS="$OBJECTFILES $modInitObj $ALL_LIBS"
 fi
 
+if [ -n "$F90_MAIN" ]
+then
+# for_main needs to be placed at beginning
+	CMK_LD_FLAGS="$CMK_F90MAINLIBS $CMK_LD_FLAGS"
+	CMK_LDXX_FLAGS="$CMK_F90MAINLIBS $CMK_LDXX_FLAGS"
+fi
 
 ########################################################################
 #
