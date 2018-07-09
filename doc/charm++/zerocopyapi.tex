@@ -61,8 +61,7 @@ can be passed as the callback parameter. The optional mode operator is used to
 determine the network registration mode for the buffer. It is only relevant
 on networks requiring explicit memory registration for performing RDMA operations.
 These networks include GNI, OFI and Verbs. When the mode is not specified by
-the user, the default mode is considered to be
-CK\textunderscore BUFFER\textunderscore REG.
+the user, the default mode is considered to be {\tt CK\_BUFFER\_REG}
 
 Similarly, to receive an array using the Zero copy Direct API, define another
 \kw{CkNcpyBuffer} object on the receiver chare object specifying the
@@ -194,7 +193,7 @@ void sourceDone(CkDataMsg *msg) \{
 
 The usage of \texttt{CkDataMsg} and \texttt{setRef} in order to access the original
 pointer and the arbitrary reference pointer is illustrated in
-\examplerefdir{zerocopy/direct\textunderscore api/unreg/simple\textunderscore get}
+\examplerefdir{zerocopy/direct\_api/unreg/simple\_get}
 
 Both the source and destination buffers are of the same type i.e. \kw{CkNcpyBuffer}.
 What distinguishes a source buffer from a destination buffer is the way the \kw{get} or
@@ -221,9 +220,9 @@ the same object to perform \kw{get} or \kw{put}. However, it is
 important to note that in order to access them, it is required
 to store them in a local variable or as a data member of the class. This pattern
 of using the same objects across iterations is demonstrated in
-\examplerefdir{zerocopy/direct\textunderscore api/reg/pingpong}.
+\examplerefdir{zerocopy/direct\_api/reg/pingpong}.
 
-This API is demonstrated in \examplerefdir{zerocopy/direct\textunderscore api}
+This API is demonstrated in \examplerefdir{zerocopy/direct\_api}
 
 \subsubsection{Memory Registration and Modes of Operation}
 
@@ -235,16 +234,16 @@ network memory management is not necessary (Netlrts) or is internally handled by
 layer networking API (PAMI, MPI), these switches are still supported to maintain API
 consistency by all behaving in the similar default mode of operation.
 
-\paragraph{\texttt{CK\textunderscore BUFFER\textunderscore REG}:}
-\texttt{CK\textunderscore BUFFER\textunderscore REG} is the default mode that
+\paragraph{{\tt CK\_BUFFER\_REG}}:
+{\tt CK\_BUFFER\_REG} is the default mode that
 is used when no mode is passed. This mode doesn't distinguish between
 non-network and network data transfers. When this mode is passed, the buffer
 is registered immediately and this can be used for both non-network sends (memcpy)
 and network sends without requiring an extra message being sent by the runtime system
 for the latter case. This mode is demonstrated in
-\examplerefdir{zerocopy/direct\textunderscore api/reg}
+\examplerefdir{zerocopy/direct\_api/reg}
 
-\paragraph{\texttt{CK\textunderscore BUFFER\textunderscore UNREG}:}
+\paragraph{{\tt CK\_BUFFER\_REG}}:
 When this mode is passed, the buffer is initially unregistered and it is
 registered only for network transfers where registration is absolutely required.
 For example, if the target buffer is on the same PE or same logical node (or process),
@@ -253,25 +252,24 @@ transfers. On the other hand, if the target buffer resides on a remote PE on a d
 logical node, the \kw{get} is implemented through an RDMA call requiring registration.
 In such a case, there is a small message sent by the RTS to register and perform
 the RDMA operation. Upon registration, the runtime modifies the state of \kw{CkNcpyBuffer}
-object to \texttt{CK\textunderscore BUFFER\textunderscore REG} from
-\texttt{CK\textunderscore BUFFER\textunderscore UNREG}. This mode is demonstrated in
-\examplerefdir{zerocopy/direct\textunderscore api/unreg}
+object to {\tt CK\_BUFFER\_REG} from {\tt CK\_BUFFER\_UNREG}. This mode is demonstrated in
+\examplerefdir{zerocopy/direct\_api/unreg}
 
-\paragraph{\texttt{CK\textunderscore BUFFER\textunderscore PREREG}:}
+\paragraph{{\tt CK\_BUFFER\_PREREG}}:
 This mode is only beneficial by implementations that use pre-registered memory pools.
 In \charmpp{}, GNI and Verbs machine layers use pre-registered memory pools for avoiding
 registration costs. On other machine layers, this mode is supported, but it behaves similar
-to \texttt{CK\textunderscore BUFFER\textunderscore REG}. A custom allocator, \texttt{CkRdmaAlloc}
+to {\tt CK\_BUFFER\_REG}. A custom allocator, \texttt{CkRdmaAlloc}
 can be used to allocate a buffer from a pool of pre-registered memory to avoid the expensive malloc
 and memory registration costs. For a buffer allocated through \texttt{CkRdmaAlloc}, the mode
-\texttt{CK\textunderscore BUFFER\textunderscore PREREG} should be passed to indicate the use of a
+{\tt CK\_BUFFER\_PREREG} should be passed to indicate the use of a
 mempooled buffer to the RTS. A buffer allocated with \texttt{CkRdmaAlloc} can be deallocated by
 calling a custom deallocator, \texttt{CkRdmaFree}. Although the allocator \texttt{CkRdmaAlloc} and
 deallocator, \texttt{CkRdmaFree} are beneficial on GNI and Verbs, the allocators are functional on other
 networks and allocate regular memory similar to a \texttt{malloc} call. This mode is demonstrated in
-\examplerefdir{zerocopy/direct\textunderscore api/prereg}
+\examplerefdir{zerocopy/direct\_api/prereg}
 
-\paragraph{\texttt{CK\textunderscore BUFFER\textunderscore NOREG}:}
+\paragraph{{\tt CK\_BUFFER\_NOREG}:}
 This mode is used for just storing pointer information without any actual networking
 or registration information. It cannot be used for performing any zerocopy operations.
 This mode was added as it was useful for implementing a runtime system feature.
@@ -286,8 +284,8 @@ method on the \kw{CkNcpyBuffer} object.
 \subsubsection{Other Methods}
 In addition to \texttt{deregisterMem()}, there are other methods in a \kw{CkNcpyBuffer} object
 that offer other utilities. The
-\texttt{init(const void *ptr, size\textunderscore t cnt, CkCallback \&cb,
-unsigned short int mode=CK\textunderscore BUFFER\textunderscore UNREG)}
+{\tt init(const void *ptr, size\_t cnt, CkCallback \&cb,
+unsigned short int mode=CK\_BUFFER\_UNREG)}
 method can be used to re-initialize the \kw{CkNcpyBuffer} object to new values similar to the ones that
 were passed in the constructor. For example, after using a \kw{CkNcpyBuffer} object called \texttt{srcInfo},
 the user can re-initialize the same object with other values. This is shown in the following code snippet.
@@ -302,7 +300,7 @@ been de-registered. Note that it is not required to call \texttt{registerMem} af
 using \texttt{init} as \texttt{registerMem} is internally called on every new initialization. The usage of
 \texttt{registerMem} is illustrated in the following code snippet. Additionally, also note that following
 de-registration, if intended to register again, it is required to call \texttt{registerMem} even in the
-\texttt{CK\textunderscore BUFFER\textunderscore PREREG} mode when the buffer is allocated from a preregistered
+{\tt CK\_BUFFER\_PREREG} mode when the buffer is allocated from a preregistered
 mempool. This is required to set the registration memory handles and will not incur any registration costs.
 
 \begin{alltt}
@@ -383,7 +381,7 @@ CkCallback cb2(CkIndex_Foo::zerocopySent2(NULL), thisProxy[thisIndex]);
 arrayProxy[0].foo(500000, CkSendBuffer(arrPtr1, cb1), 1024000, CkSendBuffer(arrPtr2, cb2));
 \end{alltt}
 
-This API is demonstrated in \examplerefdir{zerocopy/entry\textunderscore method\textunderscore api}
+This API is demonstrated in \examplerefdir{zerocopy/entry\_method\_api}
 and \testrefdir{pingpong}
 
 \vspace{0.1in}
@@ -402,7 +400,7 @@ behaves like a regular entry method that copies its arguments.
 
 Table~\ref{tab:rdmathreshold} displays the message size thresholds for the zero copy entry method
 send API on popular systems and build architectures. These results were obtained by running
-\examplerefdir{zerocopy/entry\textunderscore method\textunderscore api/pingpong} in non-SMP mode
+\examplerefdir{zerocopy/entry\_method\_api/pingpong} in non-SMP mode
 on production builds. For message sizes greater than or equal to the displayed thresholds,
 the zero copy API is found to perform better than the regular message send API. For network layers
 that are not pamilrts, gni, verbs, ofi or mpi, the generic implementation is used.
