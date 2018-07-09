@@ -740,7 +740,9 @@ then
   Echo "File structure already created; skipping directly to make"
 else
 
-rm -rf "$DESTINATION"
+for d in bin doc examples include lib lib_so tests tmp; do
+  rm -rf "$DESTINATION/$d"
+done
 
 Echo "Creating dir: $DESTINATION"
 Echo "Creating dir: $DESTINATION/tmp"
