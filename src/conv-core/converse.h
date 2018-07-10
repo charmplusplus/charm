@@ -835,6 +835,7 @@ void CmiMemoryMarkBlock(void *blk); /* ignore this allocation, for -memory leak 
 void CmiMemorySweep(const char *where); /* print current allocations, for -memory leak */
 CMK_TYPEDEF_UINT8 CmiMemoryUsage();
 const char *CmiMemoryUsageReporter();
+CMK_TYPEDEF_UINT8 CmiMaxMemoryUsageR(void);
 CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage();
 void CmiResetMaxMemory();
 CMK_TYPEDEF_UINT8 CmiMinMemoryUsage();

@@ -1453,8 +1453,13 @@ fi
 
 #### test for getrusage with RUSAGE_THREAD ###
 cat > $tc <<EOT
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#ifndef __USE_GNU
+# define __USE_GNU
+#endif
 #include <sys/time.h>
-#define __USE_GNU   1
 #include <sys/resource.h>
 int main() {
   struct rusage usage;

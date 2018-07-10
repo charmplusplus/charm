@@ -40,6 +40,15 @@
  *
  *****************************************************************************/
 
+/* These macros are needed for:
+ * sys/resource.h: rusage, getrusage
+ */
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#ifndef __USE_GNU
+# define __USE_GNU
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
