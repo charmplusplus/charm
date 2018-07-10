@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
+#include <stack>
 
 #include "trace.h"
 #include "trace-common.h"
@@ -480,7 +481,8 @@ private:
     int funcCount;
     int currentPhaseID;
 
-    CkQ<NestedEvent> nestedEvents;
+    // Using a vector as the container instead of a deque empirically performs better
+    std::stack<NestedEvent, std::vector<NestedEvent>> nestedEvents;
     
     LogEntry* lastPhaseEvent;
 

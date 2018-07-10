@@ -1511,10 +1511,10 @@ void TraceProjections::beginExecute(int event, int msgType, int ep, int srcPe,
 				    int mlen, CmiObjId *idx, void *obj )
 {
   if (traceNestedEvents) {
-    if (! nestedEvents.isEmpty()) {
+    if (!nestedEvents.empty()) {
       endExecuteLocal();
     }
-    nestedEvents.push(NestedEvent(event, msgType, ep, srcPe, mlen, idx));
+    nestedEvents.emplace(event, msgType, ep, srcPe, mlen, idx);
   }
   beginExecuteLocal(event, msgType, ep, srcPe, mlen, idx);
 }
@@ -1546,11 +1546,11 @@ void TraceProjections::beginExecuteLocal(int event, int msgType, int ep, int src
 
 void TraceProjections::endExecute(void)
 {
-  if (traceNestedEvents) nestedEvents.deq();
+  if (traceNestedEvents && !nestedEvents.empty()) nestedEvents.pop();
   endExecuteLocal();
   if (traceNestedEvents) {
-    if (! nestedEvents.isEmpty()) {
-      NestedEvent &ne = nestedEvents.peek();
+    if (!nestedEvents.empty()) {
+      NestedEvent &ne = nestedEvents.top();
       beginExecuteLocal(ne.event, ne.msgType, ne.ep, ne.srcPe, ne.ml, ne.idx);
     }
   }
