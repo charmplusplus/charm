@@ -1646,6 +1646,11 @@ else
   ALL_LIBS="$ALL_LIBS $CMK_SYSLIBS"
 fi
 
+if [ "$BUILD_SHARE" = "0" ]
+then
+  ALL_LIBS="$ALL_LIBS $CHARMLIB/conv-static.o"
+fi
+
 if [ -n "$LINK_CXX_STL" ]
 then
   ALL_LIBS="$ALL_LIBS -lstdc++"

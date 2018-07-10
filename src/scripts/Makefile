@@ -437,6 +437,7 @@ THREADLIBS=$(L)/libthreads-default.a $(L)/libthreads-default-tls.a  \
 	  $(L)/libthreads-uJcontext-memoryalias.a
 
 CVLIBS=$(L)/libconv-core.a \
+	$(L)/conv-static.o \
 	$(L)/libconv-machine.a \
 	$(L)/libconv-util.a $(L)/libconv-utilf.a \
 	$(CLBLIBS) $(TRACELIBS) $(MEMLIBS) $(THREADLIBS) \
@@ -480,7 +481,7 @@ hwloc-target:  conv-autoconfig.h
 	 cp -f hwloc/src/.libs/libhwloc_embedded.*$$CMK_SHARED_SUF* ../lib_so/ ) || true
 	touch $@
 
-charmrun-target: hwloc-target charmrun  sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h sockRoutines-seq.o $(L)/libck.a $(L)/libhwloc_embedded.a $(CVLIBS)
+charmrun-target: hwloc-target charmrun  sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h sockRoutines-seq.o $(L)/libck.a $(L)/libhwloc_embedded.a $(CVLIBS) conv-static.o
 	if [ -f charmrun ] ; then ( cp -f charmrun ../bin ) ; fi
 
 QUICK_THREADS: $(CVHEADERS)
@@ -501,6 +502,9 @@ $(L)/libconv-core.a: $(LIBCONV_CORE)
 
 $(L)/libconv-partition.a: custom_partitioner.o set_partition_params.o
 	$(CHARMC) -o $@ $^
+
+$(L)/conv-static.o: conv-static.o
+	cp -f $< $@
 
 $(L)/libconv-machine.a: machine.o
 	$(CHARMC) -o $@ $<

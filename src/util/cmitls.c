@@ -4,25 +4,53 @@
 #include "converse.h"
 #include "cmitls.h"
 
-#if !CMK_CHARMPY && CMK_HAS_ELF_H && CMK_HAS_TLS_VARIABLES
+#if CMK_HAS_ELF_H && CMK_HAS_TLS_VARIABLES && CMK_DLL_USE_DLOPEN && CMK_HAS_RTLD_DEFAULT
+
+/* These macros are needed for:
+ * dlfcn.h: RTLD_DEFAULT
+ */
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#ifndef __USE_GNU
+# define __USE_GNU
+#endif
+#include "dlfcn.h"
 
 void* getTLS(void) CMI_NOOPTIMIZE;
 void setTLS(void* newptr) CMI_NOOPTIMIZE;
 void* swapTLS(void* newptr) CMI_NOOPTIMIZE;
 
-extern void* __executable_start;
 CMI_EXTERNC_VARIABLE int quietModeRequested;
 
+static void* CmiTLSExecutableStart;
+
+void CmiTLSInit(void)
+{
+  if (CmiMyRank() == 0)
+  {
+    if (!quietModeRequested && CmiMyPe() == 0)
+      CmiPrintf("Charm++> -tlsglobals enabled for privatization of thread-local variables.\n");
+
+    /* Use dynamic linking in case Charm++ shared objects are used by a binary lacking
+     * conv-static.o, such as in the case of CharmPy. */
+    void** pCmiExecutableStart = (void**)dlsym(RTLD_DEFAULT, "CmiExecutableStart");
+    if (pCmiExecutableStart != NULL)
+      CmiTLSExecutableStart = *pCmiExecutableStart;
+    else
+      CmiPrintf("Charm++> Error: \"CmiExecutableStart\" symbol not found. -tlsglobals disabled.\n");
+  }
+}
+
 static Addr getCodeSegAddr(void) {
-  return (Addr) &__executable_start;
+  return (Addr) CmiTLSExecutableStart;
 }
 
 static Ehdr* getELFHeader(void) {
   return (Ehdr*) getCodeSegAddr();
 }
 
-static Phdr* getProgramHeader(void) {
-  Ehdr* ehdr = getELFHeader();
+static Phdr* getProgramHeader(Ehdr* ehdr) {
   return (Phdr*)((char *)ehdr + ehdr->e_phoff);
 }
 
@@ -32,8 +60,11 @@ Phdr* getTLSPhdrEntry(void) {
   Phdr* progHeader;
 
   elfHeader = getELFHeader();
+  if (elfHeader == NULL)
+    return NULL;
+
   phnum = elfHeader->e_phnum;
-  progHeader = getProgramHeader();
+  progHeader = getProgramHeader(elfHeader);
   for (i = 0; i < phnum; i++) {
     if (progHeader[i].p_type == PT_TLS) {
 #if CMK_ERROR_CHECKING
@@ -52,14 +83,6 @@ Phdr* getTLSPhdrEntry(void) {
 
 void allocNewTLSSeg(tlsseg_t* t, CthThread th) {
   Phdr* phdr;
-
-  if (!quietModeRequested && CmiMyPe() == 0) {
-    static int firstTime = 1;
-    if (firstTime) {
-      CmiPrintf("Charm++> -tlsglobals enabled for privatization of thread-local variables.\n");
-      firstTime = 0;
-    }
-  }
 
   phdr = getTLSPhdrEntry();
   if (phdr != NULL) {

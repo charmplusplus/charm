@@ -3,7 +3,7 @@
 
 #include "conv-config.h"
 
-#if !CMK_CHARMPY && CMK_HAS_ELF_H && CMK_HAS_TLS_VARIABLES
+#if CMK_HAS_ELF_H && CMK_HAS_TLS_VARIABLES && CMK_DLL_USE_DLOPEN && CMK_HAS_RTLD_DEFAULT
 
 #include <elf.h>
 #include <string.h>
@@ -41,6 +41,7 @@ typedef int  tlsseg_t;            /* place holder */
 
 #endif
 
+void CmiTLSInit(void);
 void allocNewTLSSeg(tlsseg_t* t, CthThread th);
 void switchTLS(tlsseg_t*, tlsseg_t*);
 void currentTLS(tlsseg_t*);

@@ -1283,6 +1283,18 @@ test_linkc "whether synchronization primitives (__sync_synchronize) works in C" 
 AC_DEFINE_UNQUOTED(CMK_C_SYNC_SYNCHRONIZE_PRIMITIVE, $pass, [whether sync_synchronize primitives works in C])
 
 
+### test for __executable_start ###
+
+cat > $tc <<EOT
+extern int __executable_start;
+int main()
+{
+  return __executable_start;
+}
+EOT
+test_linkc "whether has __executable_start" "yes" "no" ""
+AC_DEFINE_UNQUOTED([CMK_HAS_EXECUTABLE_START], $pass, [whether has __executable_start])
+
 ### test if switching TLS register ###
 if test $in64bit = 1
 then
@@ -1840,6 +1852,40 @@ then
 	AC_DEFINE_UNQUOTED(CMK_DLL_USE_DLOPEN, 1, [dlopen])
 fi
 
+cat > $tc <<EOT
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#ifndef __USE_GNU
+# define __USE_GNU
+#endif
+#include <dlfcn.h>
+#include <stddef.h>
+int main()
+{
+  return dlsym(RTLD_DEFAULT, "main") != NULL;
+}
+EOT
+test_cc "whether has RTLD_DEFAULT" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_RTLD_DEFAULT, $pass, [whether has RTLD_DEFAULT])
+
+cat > $tc <<EOT
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#ifndef __USE_GNU
+# define __USE_GNU
+#endif
+#include <dlfcn.h>
+#include <stddef.h>
+int main()
+{
+  return dlsym(RTLD_NEXT, "main") != NULL;
+}
+EOT
+test_cc "whether has RTLD_NEXT" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_RTLD_NEXT, $pass, [whether has RTLD_NEXT])
+
 ### test gethostname ####
 cat > $tc <<EOT
 #ifdef _WIN32
@@ -1988,6 +2034,28 @@ EOT
 test_link "whether has support for shm transport using Cross Memory Attach" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_CMA, $pass, [whether supports cma])
 
+#### check if -rdynamic works ####
+cat > $t <<EOT
+int main() {
+  return 0;
+}
+EOT
+TRACE_LINK_FLAG=''
+CAN_EXPORT_SYMBOLS='0'
+for i in '-rdynamic' '-Wl,--export-dynamic'; do
+  test_link "whether has $i" "yes" "no" "$i"
+  if test "$strictpass" = '1'; then
+    TRACE_LINK_FLAG="$i"
+    CAN_EXPORT_SYMBOLS='1'
+    break
+  fi
+done
+
+if test "$CAN_EXPORT_SYMBOLS" = '1'; then
+  add_flag 'CMK_LD="$CMK_LD '$TRACE_LINK_FLAG'"' "exporting program symbols to shared objects"
+  add_flag 'CMK_LDXX="$CMK_LDXX '$TRACE_LINK_FLAG'"' "exporting program symbols to shared objects"
+fi
+
 #### check if glibc backtrace exists ####
 cat > $t <<EOT
 #include "cmibacktrace.c"
@@ -1999,15 +2067,8 @@ int main() {
 	return 0;
 }
 EOT
-TRACE_LINK_FLAG="-rdynamic"
 test_link "whether glibc backtrace works" "yes" "no" "-DCMK_USE_BACKTRACE=1 $TRACE_LINK_FLAG"
 AC_DEFINE_UNQUOTED(CMK_USE_BACKTRACE, $pass, [whether glibc backtrace works])
-
-if test $strictpass -eq 1
-then 
-	add_flag 'CMK_LD="$CMK_LD '$TRACE_LINK_FLAG'"' "backtrace"
-	add_flag 'CMK_LDXX="$CMK_LDXX '$TRACE_LINK_FLAG'"' "backtrace"
-fi
 
 #### test sleep ####
 cat > $t <<EOT

@@ -582,6 +582,7 @@ static void CthBaseInit(char **argv)
   CpvAccess(Cth_serialNo) = 1;
 
 #if CMK_THREADS_BUILD_TLS
+  CmiTLSInit();
   CthCpvInitialize(tlsseg_t, _ctgTLS);
   CmiThreadIs_flag |= CMI_THREAD_IS_TLS;
   currentTLS(&CthCpvAccess(_ctgTLS));

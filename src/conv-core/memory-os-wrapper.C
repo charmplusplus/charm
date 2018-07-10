@@ -1,3 +1,17 @@
+#include "conv-config.h"
+
+#if CMK_DLL_USE_DLOPEN && CMK_HAS_RTLD_NEXT
+
+/* These macros are needed for:
+ * dlfcn.h: RTLD_NEXT
+ */
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#ifndef __USE_GNU
+# define __USE_GNU
+#endif
+
 #include <sys/types.h>
 #include <dlfcn.h>
 
@@ -19,3 +33,5 @@ extern "C" void initialize_memory_wrapper() {
   mm_free = (void (*)(void*)) dlsym(RTLD_NEXT, "free");
   mm_cfree = (void (*)(void*)) dlsym(RTLD_NEXT, "cfree");
 }
+
+#endif
