@@ -536,8 +536,15 @@ void Entry::genArrayDefs(XStr& str) {
       str << "  ckCheck();\n";
       XStr inlineCall;
       if (!isNoTrace())
+        // Create a dummy envelope to represent the "message send" to the local/inline method
+        // so that Projections can trace the method back to its caller
         inlineCall
-            << "    _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,(" << epIdx()
+            << "    envelope env;\n"
+            << "    env.setMsgtype(ForArrayEltMsg);\n"
+            << "    env.setTotalsize(0);\n"
+            << "    _TRACE_CREATION_DETAILED(&env, " << epIdx() << ");\n"
+            << "    _TRACE_CREATION_DONE(1);\n"
+            << "    _TRACE_BEGIN_EXECUTE_DETAILED(CpvAccess(curPeEvent),ForArrayEltMsg,(" << epIdx()
             << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(), obj);\n";
       if (isAppWork()) inlineCall << "    _TRACE_BEGIN_APPWORK();\n";
       inlineCall << "#if CMK_LBDB_ON\n"
@@ -860,7 +867,14 @@ void Entry::genGroupDefs(XStr& str) {
       str << "  " << container->baseName() << " *obj = ckLocalBranch();\n";
       str << "  CkAssert(obj);\n";
       if (!isNoTrace())
-        str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForBocMsg,(" << epIdx()
+        // Create a dummy envelope to represent the "message send" to the local/inline method
+        // so that Projections can trace the method back to its caller
+        str << "  envelope env;\n"
+            << "  env.setMsgtype(ForBocMsg);\n"
+            << "  env.setTotalsize(0);\n"
+            << "  _TRACE_CREATION_DETAILED(&env, " << epIdx() << ");\n"
+            << "  _TRACE_CREATION_DONE(1);\n"
+            << "  _TRACE_BEGIN_EXECUTE_DETAILED(CpvAccess(curPeEvent),ForBocMsg,(" << epIdx()
             << "),CkMyPe(),0,NULL, NULL);\n";
       if (isAppWork()) str << " _TRACE_BEGIN_APPWORK();\n";
       str << "#if CMK_LBDB_ON\n"

@@ -37,6 +37,9 @@ extern "C" void traceAddThreadListeners(CthThread tid, envelope *e);
 // tracing is wanted for each module
 CkpvExtern(int, traceOnPe);
 
+// eventID used for tracing of 'local' entry methods
+CpvExtern(int, curPeEvent);
+
 // A hack. We need to somehow tell the pup framework what size
 // long_long is wrt PAPI.
 #if CMK_HAS_COUNTER_PAPI

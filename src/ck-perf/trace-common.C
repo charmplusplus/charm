@@ -61,6 +61,7 @@ int _unpackMsg, _unpackChare, _unpackEP;
 int _sdagMsg, _sdagChare, _sdagEP;
 
 CtvDeclare(int, curThreadEvent);
+CpvDeclare(int, curPeEvent);
 
 #if CMK_BIGSIM_CHARM
 extern "C" double TraceTimerCommon(){return TRACE_TIMER();}
@@ -102,9 +103,12 @@ static void traceCommonInit(char **argv)
   CkpvInitialize(char*, traceRoot);
   CkpvInitialize(char*, partitionRoot);
   CkpvInitialize(int, traceRootBaseLength);
-
+  /* Ctv variable to store Cthread Local event ID for Cthread tracing */
   CtvInitialize(int,curThreadEvent);
   CtvAccess(curThreadEvent)=0;
+  /* Cpv variable to store current PE event ID for [local] and [inline] method tracing */
+  CpvInitialize(int, curPeEvent);
+  CpvAccess(curPeEvent)=0;
 
   char subdir[20];
   if(CmiNumPartitions() > 1) {

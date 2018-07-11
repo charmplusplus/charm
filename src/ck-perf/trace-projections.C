@@ -1342,6 +1342,7 @@ void TraceProjections::creation(envelope *e, int ep, int num)
   } else {
     int type=e->getMsgtype();
     e->setEvent(curevent);
+    CpvAccess(curPeEvent) = curevent;
     if (num > 1) {
       _logPool->add(CREATION_BCAST, type, ep, curTime,
 		    curevent++, CkMyPe(), e->getTotalsize(), 
