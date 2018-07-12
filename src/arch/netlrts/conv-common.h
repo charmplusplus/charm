@@ -57,3 +57,5 @@
 #define CMK_CMA_MIN                                        32768
 
 #define CMK_CMA_MAX                                        INT_MAX
+
+#define CMK_CONVERSE_MPI                                   0

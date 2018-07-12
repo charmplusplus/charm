@@ -61,6 +61,6 @@
 /*Replaced by CMK_NOT_USE_TLS_THREAD as the default case*/
 /*#define CMK_USE_TLS_THREAD                                 1 */
 
+#define CMK_CONVERSE_MPI                                   0
+
 #endif
-
-

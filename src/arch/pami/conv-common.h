@@ -38,3 +38,4 @@
 
 #define CMK_PERSISTENT_COMM                                0
 
+#define CMK_CONVERSE_MPI                                   0

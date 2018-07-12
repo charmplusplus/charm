@@ -67,6 +67,8 @@
 #undef NODE_0_IS_CONVHOST
 #define NODE_0_IS_CONVHOST                                 1
 
+#define CMK_CONVERSE_MPI                                   0
+
 #endif
 
 

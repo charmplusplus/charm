@@ -63,8 +63,8 @@
 /*#define CMK_MMAP_PROBE                                      1 */
 
 /*#define CMK_PCQUEUE_LOCK                                   1  */
-#define CMK_NOT_USE_TLS_THREAD                                1 
+#define CMK_NOT_USE_TLS_THREAD                             1
+
+#define CMK_CONVERSE_MPI                                   0
 
 #endif
-
-

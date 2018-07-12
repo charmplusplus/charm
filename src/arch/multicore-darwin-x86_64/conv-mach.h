@@ -69,5 +69,6 @@
 #define CMK_PCQUEUE_LOCK                                   1
 #endif
 
-#endif
+#define CMK_CONVERSE_MPI                                   0
 
+#endif

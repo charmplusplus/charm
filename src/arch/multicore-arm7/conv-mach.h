@@ -91,3 +91,5 @@
 
 
 #define CMK_SMP						   1
+
+#define CMK_CONVERSE_MPI                                   0
