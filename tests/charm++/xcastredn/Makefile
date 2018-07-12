@@ -48,25 +48,31 @@ test: all
 	@echo "########################################################################################"
 	$(call run, $(EXECFLAGS) ./$(TARGET) $(ARGS))
 
-
-####### Pattern rules
-# Rule to generate dependency information for C++ source files
-%.d: %.C
-	$(info Generating dependencies for $<)
-	@$(CXX) -M -MG $(CPPFLAGS) $(INCDIRS:%=-I%) -I$(CHARMINC) $< | perl $(CHARMBIN)/dep.pl $(CHARMINC) > $@
-#	@$(SHELL) -ec 'g++ -MM -MG $(CPPFLAGS) $(INCDIRS:%=-I%) $< \
-#	| sed '\''s/\($*\)\.o[ :]*/\1.o $@ : /g'\'' > $@; \
-#	[ -s $@ ] || rm -f $@'
-
-# Rule to generate dependency info for charm++ interface (ci) definition files
-%.di: %.ci
-	$(info Generating dependencies for $<)
-	@$(CXX) -M $< > $@
-
 %.ci.stamp: %.ci
 	$(CXX) $< && touch $@
 
-# Include the generated files containing dependency info
--include $(SRC:.C=.d)
--include $(INTF:.ci=.di)
+# Dependencies
 
+convMsgHandlers.o: \
+  convMsgHandlers.C \
+  reductionBenchmark.h \
+  reductionBenchmark.decl.h \
+  convMsgHandlers.h \
+  myChareArray.h \
+  testController.h \
+  reductionBenchmark.def.h \
+
+myChareArray.o: \
+  myChareArray.C \
+  myChareArray.h \
+  reductionBenchmark.h \
+  reductionBenchmark.decl.h \
+  convMsgHandlers.h \
+
+testController.o: \
+  testController.C \
+  testController.h \
+  reductionBenchmark.h \
+  reductionBenchmark.decl.h \
+
+reductionBenchmark.decl.h reductionBenchmark.def.h: reductionBenchmark.ci.stamp
