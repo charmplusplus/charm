@@ -1488,7 +1488,7 @@ BAL_OBJ="-lldb-$BALANCE -lconv-ldb"
 # Isomalloc does not work on BGQ or Windows:
 if [ "$CMK_BLUEGENEQ" = "1" -o "$CMK_COMPILER" = "msvc" ] && [ "$MEMORY" = "isomalloc" -o "$MEMORY" = "os-isomalloc" ]
 then
-  Abort "Isomalloc is not supported on BlueGene/Q or Windows."
+  Abort "Error: Isomalloc is not supported on BlueGene/Q or Windows."
 fi
 
 # Isomalloc does not work on Darwin at all, so use os-isomalloc instead:
