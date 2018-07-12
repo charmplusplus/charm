@@ -29,8 +29,6 @@ DIRS = \
 
 # skip sdag, megatest and commtest
 BGDIRS = \
-  megatest \
-  alignment \
   pingpong \
   simplearrayhello \
   load_balancing \
