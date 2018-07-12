@@ -805,7 +805,7 @@ void LrtsExit(int exitcode)
       exit(exitcode);
     }
     else
-      pthread_exit(exitcode);
+      pthread_exit(&exitcode);
 #else
     exit(exitcode);
 #endif

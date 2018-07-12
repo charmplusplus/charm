@@ -1062,10 +1062,10 @@ void ConverseExit(int exitcode) {
 #if CMK_BLUEGENEQ
     Delay(100000);
 #endif
-    exit(exitcode); 
+    exit(exitcode);
   }
   else
-    pthread_exit(exitcode);
+    pthread_exit(&exitcode);
 #else
   exit(exitcode);
 #endif
