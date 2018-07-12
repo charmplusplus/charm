@@ -1674,6 +1674,15 @@ then
 	CMK_LDXX_FLAGS="$CMK_F90MAINLIBS $CMK_LDXX_FLAGS"
 fi
 
+if [ -n "$F90_MAIN" -o "$USE_F90_LIBRARIES" = '1' ]
+then
+  if [ "$CMK_CAN_LINK_FORTRAN" != '1' ]
+  then
+    echo "Error: Configure testing was unable to link a Fortran program."
+    exit 1
+  fi
+fi
+
 ########################################################################
 #
 # Finalize command parameters

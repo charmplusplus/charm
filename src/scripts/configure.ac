@@ -2486,6 +2486,37 @@ EOF
   /bin/rm -f conftest.f90
 fi
 
+### test if the C++ linker succeeds with a Fortran entry point ##
+
+cat > conftest.f90 <<EOF
+      PROGRAM empty
+      END PROGRAM
+EOF
+test_link_fortran_main() {
+  AC_MSG_CHECKING("$1")
+  echo "### $1" >> $charmout
+  cat conftest.f90 >> $charmout
+  echo $CMK_CF90 -c conftest.f90 -o test.o $4 >> $charmout
+  $CMK_CF90 -c conftest.f90 -o test.o $4 > out 2>&1
+  if test $? -ne 0
+  then
+    test_result 1 "$1" "$2" "$3"
+  else
+    echo $CMK_LDXX $CMK_LDXX_FLAGS -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $CMK_F90LIBS $CMK_F90MAINLIBS $4 $5 >> $charmout
+    $CMK_LDXX $CMK_LDXX_FLAGS -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $CMK_F90LIBS $CMK_F90MAINLIBS $4 $5 >> out 2>&1
+    ret=$?
+    test ! -x testlink && ret=1
+    test_result $ret "$1" "$2" "$3"
+  fi
+  cat out >> $charmout
+}
+test_link_fortran_main "whether the C++ linker succeeds with a Fortran entry point" "yes" "no" ""
+/bin/rm -f conftest.f90 test.o testlink out
+if test $pass -eq 1
+then
+  add_flag "CMK_CAN_LINK_FORTRAN='1'" "Fortran"
+fi
+
 ### check for OpenMP availability ###
 cat > $tc <<EOT
 #include <stdio.h>
