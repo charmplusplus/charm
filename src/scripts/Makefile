@@ -665,7 +665,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   NullLB.o LBSimulation.o modifyScheduler.o \
 	   charmProjections.o cktiming.o ckbitvector.o \
            pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \
-					 trace-controlPoints.o mpi-interoperate.o ckregex.o cmirdmautils.o
+					 trace-controlPoints.o mpi-interoperate.o ckregex.o
 
 charm-core: converse $(L)/libck.a $(L)/libckf.a $(L)/libckmain.a $(L)/libckmainf.a
 charm-target: loadbalancers default_libs $(L)/libmpi-mainmodule.a tmgr
