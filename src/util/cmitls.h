@@ -3,7 +3,8 @@
 
 #include "conv-config.h"
 
-#if CMK_HAS_ELF_H && CMK_HAS_TLS_VARIABLES && CMK_DLL_USE_DLOPEN && CMK_HAS_RTLD_DEFAULT
+#if CMK_HAS_TLS_VARIABLES && CMK_HAS_ELF_H \
+    && ((CMK_DLL_USE_DLOPEN && CMK_HAS_RTLD_DEFAULT) || CMK_HAS_DL_ITERATE_PHDR)
 
 #include <elf.h>
 #include <string.h>

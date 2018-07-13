@@ -4,7 +4,8 @@
 #include "converse.h"
 #include "cmitls.h"
 
-#if CMK_HAS_ELF_H && CMK_HAS_TLS_VARIABLES && CMK_DLL_USE_DLOPEN && CMK_HAS_RTLD_DEFAULT
+#if CMK_HAS_TLS_VARIABLES && CMK_HAS_ELF_H \
+    && ((CMK_DLL_USE_DLOPEN && CMK_HAS_RTLD_DEFAULT) || CMK_HAS_DL_ITERATE_PHDR)
 
 /* These macros are needed for:
  * dlfcn.h: RTLD_DEFAULT
@@ -16,10 +17,11 @@
 #ifndef __USE_GNU
 # define __USE_GNU
 #endif
-#include "dlfcn.h"
 
 #if CMK_HAS_DL_ITERATE_PHDR
 # include <link.h>
+#else
+# include <dlfcn.h>
 #endif
 
 /*
@@ -35,7 +37,9 @@ void* swapTLS(void* newptr) CMI_NOOPTIMIZE;
 
 CMI_EXTERNC_VARIABLE int quietModeRequested;
 
+#if !CMK_HAS_DL_ITERATE_PHDR
 static void* CmiTLSExecutableStart;
+#endif
 
 void CmiTLSInit(void)
 {
@@ -49,6 +53,7 @@ void CmiTLSInit(void)
 #endif
     }
 
+#if !CMK_HAS_DL_ITERATE_PHDR
     /* Use dynamic linking in case Charm++ shared objects are used by a binary lacking
      * conv-static.o, such as in the case of CharmPy. */
     void** pCmiExecutableStart = (void**)dlsym(RTLD_DEFAULT, "CmiExecutableStart");
@@ -56,9 +61,11 @@ void CmiTLSInit(void)
       CmiTLSExecutableStart = *pCmiExecutableStart;
     else
       CmiPrintf("Charm++> Error: \"CmiExecutableStart\" symbol not found. -tlsglobals disabled.\n");
+#endif
   }
 }
 
+#if !CMK_HAS_DL_ITERATE_PHDR
 static Addr getCodeSegAddr(void) {
   return (Addr) CmiTLSExecutableStart;
 }
@@ -97,9 +104,8 @@ Phdr* getTLSPhdrEntry(void) {
   }
   return NULL;
 }
-
-#if CMK_HAS_DL_ITERATE_PHDR
-static int count_so_tls_sizes(struct dl_phdr_info* info, size_t size, void* data)
+#else
+static int count_tls_sizes(struct dl_phdr_info* info, size_t size, void* data)
 {
   size_t i;
   tlsseg_t* t = (tlsseg_t*)data;
@@ -108,22 +114,35 @@ static int count_so_tls_sizes(struct dl_phdr_info* info, size_t size, void* data
   {
     const Phdr* hdr = &info->dlpi_phdr[i];
     if (hdr->p_type == PT_TLS)
+    {
       t->size += hdr->p_memsz;
+      if (t->align < hdr->p_align)
+        t->align = hdr->p_align;
+    }
   }
+
+  return 0;
 }
 #endif
 
 void allocNewTLSSeg(tlsseg_t* t, CthThread th) {
-  Phdr* phdr;
-
-  phdr = getTLSPhdrEntry();
+#if CMK_HAS_DL_ITERATE_PHDR
+  t->size = 0;
+  t->align = 0;
+  dl_iterate_phdr(count_tls_sizes, t); /* count all PT_TLS sections */
+#else
+  Phdr* phdr = getTLSPhdrEntry();
   if (phdr != NULL) {
     t->align = phdr->p_align;
     t->size = phdr->p_memsz;
-#if CMK_HAS_DL_ITERATE_PHDR
-    dl_iterate_phdr(count_so_tls_sizes, t); /* count the PT_TLS sections in shared objects */
+  } else {
+    t->size = 0;
+    t->align = 0;
+  }
 #endif
-    t->size = CMIALIGN(t->size, phdr->p_align);
+
+  if (t->size > 0) {
+    t->size = CMIALIGN(t->size, t->align);
     t->memseg = (Addr)CmiIsomallocAlign(t->align, t->size, th);
     memcpy((void*)t->memseg, (char *)getTLS() - t->size, t->size);
     t->memseg = (Addr)( ((char *)(t->memseg)) + t->size );
@@ -131,8 +150,6 @@ void allocNewTLSSeg(tlsseg_t* t, CthThread th) {
   } else {
     /* since we don't have a PT_TLS section to copy, keep whatever the system gave us */
     t->memseg = (Addr)getTLS();
-    t->size = 0;
-    t->align = 0;
   }
 }
 
