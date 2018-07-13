@@ -426,6 +426,11 @@ void ReceiveDatagram(int node)
  * penging message queue.
  ***********************************************************************/
 
+#if !defined(_WIN32)
+static struct msghdr mh;
+static struct iovec iov[2];
+#endif
+
 int TransmitImplicitDgram(ImplicitDgram dg)
 {
   ChMessageHeader msg;
@@ -449,10 +454,21 @@ int TransmitImplicitDgram(ImplicitDgram dg)
   if (-1==skt_sendN(dest->sock,head,len))
     CmiAbort("EnqueueOutgoingDgram"); 
   */
+
+#if !defined(_WIN32)
+  iov[0].iov_base = &len;
+  iov[0].iov_len  = sizeof(int);
+  iov[1].iov_base = head;
+  iov[1].iov_len  = len;
+
+  if (-1==skt_sendmsg(dest->sock, &mh, 2, sizeof(int) + len))
+    CmiAbort("EnqueueOutgoingDgram");
+#else
   if (-1==skt_sendN(dest->sock,(const char *)&len,sizeof(len))) 
     CmiAbort("EnqueueOutgoingDgram"); 
   if (-1==skt_sendN(dest->sock,(const char *)head,len)) 
     CmiAbort("EnqueueOutgoingDgram"); 
+#endif
     
   *head = temp;
   dest->stat_send_pkt++;
@@ -603,6 +619,13 @@ static void open_tcp_sockets(void)
 void CmiCommunicationInit(char **argv)
 {
   open_tcp_sockets();
+
+#if !defined(_WIN32)
+  memset(&mh, 0, sizeof(mh));
+  mh.msg_iovlen = 2;
+  mh.msg_iov = iov;
+#endif
+
 }
 
 /*@}*/

@@ -579,7 +579,37 @@ int skt_sendV(SOCKET fd,int nBuffers,const void **bufs,int *lens)
 	}
 }
 
-
+#if !defined(_WIN32)
+int skt_sendmsg(SOCKET hSocket, struct msghdr *mh, int num_bufs, int nBytes)
+{
+  while (nBytes > 0) {
+    skt_ignore_SIGPIPE = 1;
+    int bytes_sent = sendmsg(hSocket, mh, 0);
+    skt_ignore_SIGPIPE = 0;
+    if (bytes_sent <= 0) {
+      return skt_abort(hSocket, 93700+hSocket, "Error on socket send!");
+    } else if (bytes_sent < nBytes) {
+      // this should happen very rarely
+      int offset = 0;
+      for (int i=0; i < num_bufs; i++) {
+        int l = mh->msg_iov[i].iov_len;
+        if ((offset + l) <= bytes_sent) {
+          mh->msg_iov[i].iov_len = 0; // all bytes from this buffer have been sent
+          offset += l;
+        } else {
+          // bytes from this buffer have been partially sent
+          int buf_transmitted = (bytes_sent - offset);
+          mh->msg_iov[i].iov_len  -= buf_transmitted;
+          mh->msg_iov[i].iov_base = (char*)mh->msg_iov[i].iov_base + buf_transmitted;
+          break;
+        }
+      }
+    }
+    nBytes -= bytes_sent;
+  }
+  return 0;
+}
+#endif
 
 /***********************************************
   Routines for manipulating simple binary messages,

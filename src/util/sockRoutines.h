@@ -183,6 +183,9 @@ void skt_setSockBuf(SOCKET skt, int bufsize);
 int skt_sendN(SOCKET hSocket, const void *pBuff, int nBytes);
 int skt_recvN(SOCKET hSocket,       void *pBuff, int nBytes);
 int skt_sendV(SOCKET fd, int nBuffers, const void **buffers, int *lengths);
+#if !defined(_WIN32)
+int skt_sendmsg(SOCKET hSocket, struct msghdr *mh, int num_bufs, int total_bytes);
+#endif
 
 int skt_tcp_no_nagle(SOCKET fd);
 
