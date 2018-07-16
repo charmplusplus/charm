@@ -117,7 +117,7 @@ void Entry::check() {
           "and take a single argument",
           first_line_);
 
-    if (!((container->isGroup() && !container->isNodeGroup()) || container->isArray()))
+    if (!external && !((container->isGroup() && !container->isNodeGroup()) || container->isArray()))
       XLAT_ERROR_NOCOL(
           "'aggregate' entry methods can only be used in regular groups and chare arrays",
           first_line_);
