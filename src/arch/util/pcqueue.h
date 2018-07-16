@@ -474,8 +474,8 @@ void ReportOverflow()
  */
 typedef struct FreeNodePoolStruct
 {
-  std::atomic_uint push;
-  std::atomic_uint pull;
+  std::atomic<unsigned int> push;
+  std::atomic<unsigned int> pull;
   std::atomic<uintptr_t> nodes[NodePoolSize];
 } *FreeNodePool;
 
@@ -486,8 +486,8 @@ typedef struct FreeNodePoolStruct
  */
 typedef struct MPSCQueueStruct
 {
-  std::atomic_uint push;
-  char pad1[CMI_CACHE_LINE_SIZE - sizeof(std::atomic_uint)]; // align to cache line
+  std::atomic<unsigned int> push;
+  char pad1[CMI_CACHE_LINE_SIZE - sizeof(std::atomic<unsigned int>)]; // align to cache line
   unsigned int pull;
   char pad2[CMI_CACHE_LINE_SIZE - sizeof(unsigned int)]; // align to cache line
   std::atomic<uintptr_t> *nodes;
@@ -799,7 +799,7 @@ static void MPSCQueuePush(MPSCQueue Q, char *data)
 typedef struct MPMCDataNodeStruct
 {
   std::atomic<uintptr_t> *data;
-  std::atomic_uint num_popped;
+  std::atomic<unsigned int> num_popped;
 } *MPMCDataNode;
 
 /*
@@ -809,8 +809,8 @@ typedef struct MPMCDataNodeStruct
  */
 typedef struct FreeMPMCNodePoolStruct
 {
-  std::atomic_uint push;
-  std::atomic_uint pull;
+  std::atomic<unsigned int> push;
+  std::atomic<unsigned int> pull;
   std::atomic<uintptr_t> nodes[NodePoolSize];
 } *FreeMPMCNodePool;
 
@@ -821,10 +821,10 @@ typedef struct FreeMPMCNodePoolStruct
  */
 typedef struct MPMCQueueStruct
 {
-  std::atomic_uint push;
-  char pad1[CMI_CACHE_LINE_SIZE - sizeof(std::atomic_uint)]; // align to cache line
-  std::atomic_uint pull;
-  char pad2[CMI_CACHE_LINE_SIZE - sizeof(std::atomic_uint)]; // align to cache line
+  std::atomic<unsigned int> push;
+  char pad1[CMI_CACHE_LINE_SIZE - sizeof(std::atomic<unsigned int>)]; // align to cache line
+  std::atomic<unsigned int> pull;
+  char pad2[CMI_CACHE_LINE_SIZE - sizeof(std::atomic<unsigned int>)]; // align to cache line
   std::atomic<uintptr_t> *nodes;
   char pad3[CMI_CACHE_LINE_SIZE - sizeof(std::atomic<uintptr_t> *)]; // align to cache line
   FreeMPMCNodePool freeMPMCNodePool;
