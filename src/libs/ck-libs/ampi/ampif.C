@@ -705,7 +705,7 @@ void mpi_type_hindexed(int* count, int* arrBlength, MPI_Aint* arrDisp,
   *ierr = MPI_Type_hindexed(*count, arrBlength, arrDisp, *oldtype, newtype);
 }
 
-void mpi_type_create_indexed_block(int* count, int* Blength, MPI_Aint* arr,
+void mpi_type_create_indexed_block(int* count, int* Blength, int* arr,
                                    int* oldtype, int* newtype, int* ierr)
 {
   *ierr = MPI_Type_create_indexed_block(*count, *Blength, arr, *oldtype, newtype);

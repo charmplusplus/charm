@@ -5995,7 +5995,7 @@ AMPI_API_IMPL(int, MPI_Type_hindexed, int count, int* arrBlength, MPI_Aint* arrD
   return MPI_Type_create_hindexed(count, arrBlength, arrDisp, oldtype, newtype);
 }
 
-AMPI_API_IMPL(int, MPI_Type_create_indexed_block, int count, int Blength, const MPI_Aint *arr,
+AMPI_API_IMPL(int, MPI_Type_create_indexed_block, int count, int Blength, const int *arr,
                                                   MPI_Datatype oldtype, MPI_Datatype *newtype)
 {
   AMPI_API("AMPI_Type_create_indexed_block");

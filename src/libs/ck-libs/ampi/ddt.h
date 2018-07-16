@@ -350,6 +350,9 @@ class CkDDT_Indexed_Block : public CkDDT_DataType
 
   protected:
     int BlockLength;
+    // The MPI Standard has arrDisp as an array of int's to MPI_Type_create_indexed_block, but
+    // as an array of MPI_Aint's to MPI_Type_create_hindexed_block, so we store it as Aint's
+    // internally and convert from int to Aint in Indexed_Block's constructor:
     vector<CkDDT_Aint> arrayDisplacements;
 
   private:
@@ -557,7 +560,7 @@ class CkDDT {
                  CkDDT_Type* newtype);
   void newHIndexed(int count, const int* arrbLength, const CkDDT_Aint* arrDisp , CkDDT_Type oldtype,
                   CkDDT_Type* newtype);
-  void newIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
+  void newIndexedBlock(int count, int Blocklength, const int *arrDisp, CkDDT_Type oldtype,
                       CkDDT_Type *newtype);
   void newHIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
                        CkDDT_Type *newtype);

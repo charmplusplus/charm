@@ -358,10 +358,17 @@ CkDDT::newHIndexed(int count, const int* arrbLength, const CkDDT_Aint* arrDisp,
 }
 
 void
-CkDDT::newIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
-                  CkDDT_Type *newType)
+CkDDT::newIndexedBlock(int count, int Blocklength, const int *arrDisp, CkDDT_Type oldtype,
+                       CkDDT_Type *newType)
 {
-  CkDDT_DataType *type = new CkDDT_Indexed_Block(count, Blocklength, arrDisp, oldtype, typeTable[oldtype]);
+  // Convert arrDisp from an array of int's to an array of CkDDT_Aint's. This is needed because
+  // MPI_Type_create_indexed_block takes ints and MPI_Type_create_hindexed_block takes MPI_Aint's
+  // and we use Indexed_Block to represent both of those datatypes internally.
+  std::vector<CkDDT_Aint> arrDispAint(count);
+  for (int i=0; i<count; i++) {
+    arrDispAint[i] = static_cast<CkDDT_Aint>(arrDisp[i]);
+  }
+  CkDDT_DataType *type = new CkDDT_Indexed_Block(count, Blocklength, arrDispAint.data(), oldtype, typeTable[oldtype]);
   *newType = insertType(type, CkDDT_INDEXED_BLOCK);
 }
 

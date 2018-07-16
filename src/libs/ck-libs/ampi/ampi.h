@@ -993,7 +993,7 @@ AMPI_API_DEF(int, MPI_Type_indexed, int count, const int* arrBlength, const int*
                       MPI_Datatype oldtype, MPI_Datatype *newtype)
 AMPI_API_DEF(int, MPI_Type_create_hindexed, int count, const int* arrBlength, const MPI_Aint* arrDisp,
                               MPI_Datatype oldtype, MPI_Datatype *newtype)
-AMPI_API_DEF(int, MPI_Type_create_indexed_block, int count, int Blength, const MPI_Aint *arrDisp,
+AMPI_API_DEF(int, MPI_Type_create_indexed_block, int count, int Blength, const int *arrDisp,
                                    MPI_Datatype oldtype, MPI_Datatype *newtype)
 AMPI_API_DEF(int, MPI_Type_create_hindexed_block, int count, int Blength, const MPI_Aint *arrDisp,
                                     MPI_Datatype oldtype, MPI_Datatype *newtype)
