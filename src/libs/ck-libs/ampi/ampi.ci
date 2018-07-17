@@ -44,6 +44,7 @@ module ampi {
     entry EXPEDITED void setInitDoneFlag();
     entry EXPEDITED void unblock(void);
     entry EXPEDITED void ssend_ack(int);
+    entry EXPEDITED void injectMsg(int size, char buf[size]);
     entry EXPEDITED void generic(AmpiMsg *);
     entry EXPEDITED void genericRdma(nocopy char buf[size], int size, CMK_REFNUM_TYPE seq, int tag,
                                      int srcRank, MPI_Comm destcomm, int ssendReq);

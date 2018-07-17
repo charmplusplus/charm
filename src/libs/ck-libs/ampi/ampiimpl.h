@@ -2473,6 +2473,7 @@ class ampi final : public CBase_ampi {
   void setInitDoneFlag() noexcept;
 
   void unblock() noexcept;
+  void injectMsg(int size, char* buf) noexcept;
   void generic(AmpiMsg *) noexcept;
   void genericRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank,
                    MPI_Comm destcomm, int ssendReq) noexcept;

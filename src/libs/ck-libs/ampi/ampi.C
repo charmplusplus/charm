@@ -2624,6 +2624,11 @@ void ampi::ssend_ack(int sreq_idx) noexcept {
   }
 }
 
+void ampi::injectMsg(int size, char* buf) noexcept
+{
+  generic(makeAmpiMsg(thisIndex, 0, thisIndex, (void*)buf, size, MPI_CHAR, MPI_COMM_WORLD, 0));
+}
+
 void ampi::generic(AmpiMsg* msg) noexcept
 {
   MSG_ORDER_DEBUG(

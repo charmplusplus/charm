@@ -2,8 +2,8 @@ CDIR := $(shell cd ../../../.. && pwd)
 -include $(CDIR)/include/conv-mach-opt.mak
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-HEADERS=ampi.h ampif.h mpio.h mpiof.h ampiimpl.h
-HEADDEP=$(HEADERS) ampiimpl.h ddt.h ampi.decl.h \
+HEADERS=ampi.h ampif.h mpio.h mpiof.h ampiimpl.h ampi-interoperate.h ampi.decl.h
+HEADDEP=$(HEADERS) ampiimpl.h ddt.h \
 		../tcharm/tcharm.h ../tcharm/tcharm_impl.h
 COMPAT=compat_ampius.o compat_ampifus.o compat_ampi.o \
        compat_ampim.o compat_ampifm.o compat_ampicm.o \
@@ -81,6 +81,9 @@ headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
 	cp ampi.h $(CDIR)/include/mpi.h
 	cp ampif.h $(CDIR)/include/mpif.h
+	cp ampiimpl.h $(CDIR)/include/          # For AMPI + Charm++ interop
+	cp ddt.h $(CDIR)/include/               # For AMPI + Charm++ interop
+	cp ampi-interoperate.h $(CDIR)/include/ # For AMPI + Charm++ interop
 	cp ampiCC $(CDIR)/bin/ampicc
 	cp ampiCC $(CDIR)/bin/ampiCC
 	cp ampiCC $(CDIR)/bin/ampicxx

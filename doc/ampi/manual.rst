@@ -1182,6 +1182,17 @@ this data:
    ierr = MPI_Recv(InitialTime, 1, MPI_DOUBLE, tag,
                    36, MPI_Comm_Universe(Solids_Comm), &stat);
 
+Charm++ Interoperability
+------------------------
+
+There is preliminary support for interoperating AMPI programs with Charm++
+programs. This allows users to launch an AMPI program with an arbitrary number
+of virtual processes in the same executable as a Charm++ program that contains
+arbitrary collections of chares, with both AMPI ranks and chares being co-scheduled
+by the runtime system. We also provide an entry method ``void injectMsg(int n, char buf[n])``
+for chares to communicate with AMPI ranks. An example program can be found in
+``examples/charm++/AMPI-interop``.
+
 Extensions for Sequential Re-run of a Parallel Node
 ---------------------------------------------------
 
