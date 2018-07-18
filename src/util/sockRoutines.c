@@ -591,7 +591,8 @@ int skt_sendmsg(SOCKET hSocket, struct msghdr *mh, int num_bufs, int nBytes)
     } else if (bytes_sent < nBytes) {
       // this should happen very rarely
       int offset = 0;
-      for (int i=0; i < num_bufs; i++) {
+      int i;
+      for (i=0; i < num_bufs; i++) {
         int l = mh->msg_iov[i].iov_len;
         if ((offset + l) <= bytes_sent) {
           mh->msg_iov[i].iov_len = 0; // all bytes from this buffer have been sent
