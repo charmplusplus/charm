@@ -1,4 +1,3 @@
-PMI_LIBS="$CRAY_PMI_POST_LINK_OPTS"
 
 PGCC=`CC -V 2>&1 | grep pgCC`
 ICPC=`CC -V 2>&1 | grep Intel`
@@ -14,8 +13,8 @@ CMK_LDXX="$CMK_CXX "
 
 CMK_CPP_C_FLAGS="-E"
 
-CMK_LIBS='-lckqt'
-CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/,$PMI_LIBS "
+CMK_LIBS="-lckqt $CRAY_PMI_POST_LINK_OPTS $CRAY_UGNI_POST_LINK_OPTS -dynamic -lugni -lpmi"
+CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 
 
 CMK_QT="generic64-light"
