@@ -8191,12 +8191,28 @@ AMPI_API_IMPL(int, MPI_Comm_dup, MPI_Comm comm, MPI_Comm *newcomm)
   return MPI_SUCCESS;
 }
 
+AMPI_API_IMPL(int, MPI_Comm_idup, MPI_Comm comm, MPI_Comm *newcomm, MPI_Request *request)
+{
+  AMPI_API("AMPI_Comm_idup");
+  // FIXME: implement non-blocking comm_dup
+  *request = MPI_REQUEST_NULL;
+  return MPI_Comm_dup(comm, newcomm);
+}
+
 AMPI_API_IMPL(int, MPI_Comm_dup_with_info, MPI_Comm comm, MPI_Info info, MPI_Comm *dest)
 {
   AMPI_API("AMPI_Comm_dup_with_info");
   MPI_Comm_dup(comm, dest);
   MPI_Comm_set_info(*dest, info);
   return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_Comm_idup_with_info, MPI_Comm comm, MPI_Info info, MPI_Comm *dest, MPI_Request *request)
+{
+  AMPI_API("AMPI_Comm_idup_with_info");
+  // FIXME: implement non-blocking comm_dup_with_info
+  *request = MPI_REQUEST_NULL;
+  return MPI_Comm_dup_with_info(comm, info, dest);
 }
 
 AMPI_API_IMPL(int, MPI_Comm_split, MPI_Comm src, int color, int key, MPI_Comm *dest)

@@ -152,7 +152,9 @@ FDECL {
 #define mpi_comm_rank FTN_NAME( MPI_COMM_RANK , mpi_comm_rank )
 #define mpi_comm_size FTN_NAME( MPI_COMM_SIZE , mpi_comm_size )
 #define mpi_comm_dup FTN_NAME( MPI_COMM_DUP , mpi_comm_dup )
+#define mpi_comm_idup FTN_NAME( MPI_COMM_IDUP , mpi_comm_idup )
 #define mpi_comm_dup_with_info FTN_NAME( MPI_COMM_DUP_WITH_INFO , mpi_comm_dup_with_info )
+#define mpi_comm_idup_with_info FTN_NAME( MPI_COMM_IDUP_WITH_INFO , mpi_comm_idup_with_info )
 #define mpi_comm_split FTN_NAME( MPI_COMM_SPLIT , mpi_comm_split )
 #define mpi_comm_split_type FTN_NAME( MPI_COMM_SPLIT_TYPE , mpi_comm_split_type )
 #define mpi_comm_free FTN_NAME( MPI_COMM_FREE , mpi_comm_free )
@@ -1276,9 +1278,19 @@ void mpi_comm_dup(int *comm, int *newcomm, int *ierr)
   *ierr = MPI_Comm_dup(*comm, newcomm);
 }
 
+void mpi_comm_idup(int *comm, int *newcomm, int* request, int *ierr)
+{
+  *ierr = MPI_Comm_idup(*comm, newcomm, request);
+}
+
 void mpi_comm_dup_with_info(int *comm, int *info, int *newcomm, int *ierr)
 {
   *ierr = MPI_Comm_dup_with_info(*comm, *info, newcomm);
+}
+
+void mpi_comm_idup_with_info(int *comm, int *info, int *newcomm, int *request, int *ierr)
+{
+  *ierr = MPI_Comm_idup_with_info(*comm, *info, newcomm, request);
 }
 
 void mpi_comm_split(int* src, int* color, int* key, int *dest, int *ierr)

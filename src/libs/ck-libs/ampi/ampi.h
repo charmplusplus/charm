@@ -694,8 +694,12 @@ typedef void (*MPI_MigrateFn)(void);
 #define PMPI_Comm_split_type APMPI_Comm_split_type
 #define  MPI_Comm_dup  AMPI_Comm_dup
 #define PMPI_Comm_dup APMPI_Comm_dup
+#define  MPI_Comm_idup  AMPI_Comm_idup
+#define PMPI_Comm_idup APMPI_Comm_idup
 #define  MPI_Comm_dup_with_info  AMPI_Comm_dup_with_info
 #define PMPI_Comm_dup_with_info APMPI_Comm_dup_with_info
+#define  MPI_Comm_idup_with_info  AMPI_Comm_idup_with_info
+#define PMPI_Comm_idup_with_info APMPI_Comm_idup_with_info
 #define  MPI_Comm_free  AMPI_Comm_free
 #define PMPI_Comm_free APMPI_Comm_free
 #define  MPI_Comm_test_inter  AMPI_Comm_test_inter
@@ -1204,7 +1208,9 @@ AMPI_API_DEF(int, MPI_Comm_compare, MPI_Comm comm1,MPI_Comm comm2, int *result)
 AMPI_API_DEF(int, MPI_Comm_split, MPI_Comm src, int color, int key, MPI_Comm *dest)
 AMPI_API_DEF(int, MPI_Comm_split_type, MPI_Comm src, int split_type, int key, MPI_Info info, MPI_Comm *dest)
 AMPI_API_DEF(int, MPI_Comm_dup, MPI_Comm src, MPI_Comm *dest)
+AMPI_API_DEF(int, MPI_Comm_idup, MPI_Comm comm, MPI_Comm *newcomm, MPI_Request *request)
 AMPI_API_DEF(int, MPI_Comm_dup_with_info, MPI_Comm src, MPI_Info info, MPI_Comm *dest)
+AMPI_API_DEF(int, MPI_Comm_idup_with_info, MPI_Comm src, MPI_Info info, MPI_Comm *dest, MPI_Request *request)
 AMPI_API_DEF(int, MPI_Comm_free, MPI_Comm *comm)
 AMPI_API_DEF(int, MPI_Comm_test_inter, MPI_Comm comm, int *flag)
 AMPI_API_DEF(int, MPI_Comm_remote_size, MPI_Comm comm, int *size)
@@ -1511,9 +1517,6 @@ int MPI_Unpack_external(const char datarep[], const void *inbuf, MPI_Aint insize
 /* A.2.3 Collective Communication C Bindings */
 
 /* A.2.4 Groups, Contexts, Communicators, and Caching C Bindings */
-/*
-int MPI_Comm_idup(MPI_Comm comm, MPI_Comm *newcomm, MPI_Request *request);
-*/
 
 /* A.2.6 MPI Environmental Management C Bindings */
 /*
