@@ -451,7 +451,7 @@ LIBCONV_CORE=convcore.o conv-conds.o conv-taskQ.o queueing.o msgmgr.o \
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o mem-arena.o conv-counter.o memory-darwin-clang.o \
 	global-nop.o cmipool.o cpuaffinity.o cputopology.o  \
-	cmitls.o memoryaffinity.o commitid.o sdag.o conv-interoperate.o conv-rdma.o
+	cmitls.o memoryaffinity.o commitid.o conv-interoperate.o conv-rdma.o \
 
 LIBCONV_LDB = topology.o generate.o edgelist.o
 
@@ -669,7 +669,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   NullLB.o LBSimulation.o modifyScheduler.o \
 	   charmProjections.o cktiming.o ckbitvector.o \
            pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \
-					 trace-controlPoints.o mpi-interoperate.o ckregex.o
+           trace-controlPoints.o mpi-interoperate.o ckregex.o sdag.o \
 
 charm-core: converse $(L)/libck.a $(L)/libckf.a $(L)/libckmain.a $(L)/libckmainf.a
 charm-target: loadbalancers default_libs $(L)/libmpi-mainmodule.a tmgr

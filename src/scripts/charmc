@@ -1634,7 +1634,12 @@ fi
 
 if [ -z "$STANDALONE" ]
 then
-  ALL_LIBS="$LANG_LIBS $PRE_LIBRARIES $MIDDLE_LIBS $BAL_OBJ $CMK_LIBS $POST_LIBRARIES -lmoduleNDMeshStreamer -lmodulecompletion"
+  ALL_LIBS="$LANG_LIBS $PRE_LIBRARIES $MIDDLE_LIBS $BAL_OBJ $CMK_LIBS $POST_LIBRARIES"
+  case "$PARADIGM" in
+  "charm"|"charm++"|"f90charm"|"ckbluegene"|"bgcharm++")
+    ALL_LIBS="$ALL_LIBS -lmoduleNDMeshStreamer -lmodulecompletion"
+    ;;
+  esac
 else
   ALL_LIBS="$USER_PRE_LIBRARIES $USER_POST_LIBRARIES"
 fi
