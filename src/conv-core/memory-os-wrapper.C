@@ -27,13 +27,24 @@ extern "C" void (*mm_cfree)(void*);
 extern "C" struct mallinfo (*mm_mallinfo)(void);
 
   
+extern char initialize_memory_wrapper_status;
+char initialize_memory_wrapper_status;
+
 extern "C" void initialize_memory_wrapper() {
-  mm_malloc = (void *(*)(size_t)) dlsym(RTLD_NEXT, "malloc");
+  initialize_memory_wrapper_status = 1;
+
+  // wait to install these all at once because dlsym calls them, and a mismatch would be bad
+  void * (*os_malloc)(size_t) = (void *(*)(size_t)) dlsym(RTLD_NEXT, "malloc");
+  void * (*os_calloc)(size_t,size_t) = (void *(*)(size_t,size_t)) dlsym(RTLD_NEXT, "calloc");
+  void (*os_free)(void*) = (void (*)(void*)) dlsym(RTLD_NEXT, "free");
+
+  mm_malloc = os_malloc;
+  mm_calloc = os_calloc;
+  mm_free = os_free;
+
   mm_realloc = (void *(*)(void*,size_t)) dlsym(RTLD_NEXT, "realloc");
-  mm_calloc = (void *(*)(size_t,size_t)) dlsym(RTLD_NEXT, "calloc");
   mm_memalign = (void *(*)(size_t,size_t)) dlsym(RTLD_NEXT, "memalign");
   mm_valloc = (void *(*)(size_t)) dlsym(RTLD_NEXT, "valloc");
-  mm_free = (void (*)(void*)) dlsym(RTLD_NEXT, "free");
   mm_cfree = (void (*)(void*)) dlsym(RTLD_NEXT, "cfree");
   mm_mallinfo = (struct mallinfo (*)(void)) dlsym(RTLD_NEXT, "mallinfo");
 }

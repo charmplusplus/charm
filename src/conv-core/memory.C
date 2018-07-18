@@ -118,18 +118,52 @@ void (*mm_free)(void*) = initialize_memory_wrapper_free;
 void (*mm_cfree)(void*) = initialize_memory_wrapper_cfree;
 struct mallinfo (*mm_mallinfo)(void) = NULL;
 
+static char fake_malloc_buffer[1024];
+static char* fake_malloc_buffer_pos = fake_malloc_buffer;
+
+static void* fake_malloc(size_t size)
+{
+  void *ptr = fake_malloc_buffer_pos;
+  fake_malloc_buffer_pos += size;
+  if (fake_malloc_buffer_pos > fake_malloc_buffer + sizeof(fake_malloc_buffer))
+  {
+    static char have_warned = 0; // in case malloc is called inside (f)printf
+    if (!have_warned)
+    {
+      have_warned = 1;
+      CmiPrintf("Error: fake_malloc has run out of space (%u / %u)\n",
+                (unsigned int) (fake_malloc_buffer_pos - fake_malloc_buffer),
+                (unsigned int) sizeof(fake_malloc_buffer));
+    }
+    exit(1);
+  }
+  return ptr;
+}
+static void* fake_calloc(size_t nelem, size_t size)
+{
+  const size_t total = nelem * size;
+  void *ptr = fake_malloc(total);
+  memset(ptr, 0, total);
+  return ptr;
+}
+#if 0
+static void fake_free(void* ptr)
+{
+}
+#endif
+
+extern char initialize_memory_wrapper_status;
+
 void * initialize_memory_wrapper_calloc(size_t nelem, size_t size) {
-  static int calloc_wrapper = 0;
-  if (calloc_wrapper) return NULL;
-  calloc_wrapper = 1;
+  if (initialize_memory_wrapper_status)
+    return fake_calloc(nelem, size);
   initialize_memory_wrapper();
   return (*mm_calloc)(nelem,size);
 }
 
 void * initialize_memory_wrapper_malloc(size_t size) {
-  static int malloc_wrapper = 0;
-  if (malloc_wrapper) return NULL;
-  malloc_wrapper = 1;
+  if (initialize_memory_wrapper_status)
+    return fake_malloc(size);
   initialize_memory_wrapper();
   return (*mm_malloc)(size);
 }
@@ -150,6 +184,8 @@ void * initialize_memory_wrapper_valloc(size_t size) {
 }
 
 void initialize_memory_wrapper_free(void *ptr) {
+  if (initialize_memory_wrapper_status)
+    return;
   initialize_memory_wrapper();
   (*mm_free)(ptr);
 }
