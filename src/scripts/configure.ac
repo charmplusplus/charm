@@ -492,7 +492,7 @@ test_linkso() {
 test_finish() {
 	rm -f $t $tc testlink test.o	> /dev/null 2>&1
 	/bin/rm -f out
-	test $1 -eq 1 && echo "*** Please find detailed output in charmconfig.out ***"
+	test $1 -eq 1 && echo "*** Please find detailed output in tmp/charmconfig.out ***"
 	exit $1
 }
 
