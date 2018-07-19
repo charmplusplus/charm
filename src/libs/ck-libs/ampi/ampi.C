@@ -8427,6 +8427,32 @@ AMPI_API_IMPL(int, MPI_Status_set_elements, MPI_Status *sts, MPI_Datatype dtype,
   AMPI_API("AMPI_Status_set_elements");
   if(sts == MPI_STATUS_IGNORE || sts == MPI_STATUSES_IGNORE)
     return MPI_SUCCESS;
+
+#if AMPI_ERROR_CHECKING
+  int ret = checkData("AMPI_Status_set_elements", dtype);
+  if (ret!=MPI_SUCCESS)
+    return(ret);
+#endif
+
+  CkDDT_DataType* dttype = getDDT()->getType(dtype);
+  int basesize = dttype->getBaseSize();
+  if(basesize==0) basesize = dttype->getSize();
+  sts->MPI_LENGTH = basesize * count;
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_Status_set_elements_x, MPI_Status *sts, MPI_Datatype dtype, MPI_Count count)
+{
+  AMPI_API("AMPI_Status_set_elements_x");
+  if(sts == MPI_STATUS_IGNORE || sts == MPI_STATUSES_IGNORE)
+    return MPI_SUCCESS;
+
+#if AMPI_ERROR_CHECKING
+  int ret = checkData("AMPI_Status_set_elements_x", dtype);
+  if (ret!=MPI_SUCCESS)
+    return(ret);
+#endif
+
   CkDDT_DataType* dttype = getDDT()->getType(dtype);
   int basesize = dttype->getBaseSize();
   if(basesize==0) basesize = dttype->getSize();

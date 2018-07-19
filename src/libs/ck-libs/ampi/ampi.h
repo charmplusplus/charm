@@ -530,6 +530,8 @@ typedef void (*MPI_MigrateFn)(void);
 #define PMPI_Address APMPI_Address
 #define  MPI_Status_set_elements  AMPI_Status_set_elements
 #define PMPI_Status_set_elements APMPI_Status_set_elements
+#define  MPI_Status_set_elements_x  AMPI_Status_set_elements_x
+#define PMPI_Status_set_elements_x APMPI_Status_set_elements_x
 #define  MPI_Get_elements  AMPI_Get_elements
 #define PMPI_Get_elements APMPI_Get_elements
 #define  MPI_Get_elements_x  AMPI_Get_elements_x
@@ -1039,6 +1041,7 @@ AMPI_API_DEF(int, MPI_Type_free_keyval, int *type_keyval)
 AMPI_API_DEF(int, MPI_Get_address, const void* location, MPI_Aint *address)
 AMPI_API_DEF(int, MPI_Address, void* location, MPI_Aint *address)
 AMPI_API_DEF(int, MPI_Status_set_elements, MPI_Status *status, MPI_Datatype datatype, int count)
+AMPI_API_DEF(int, MPI_Status_set_elements_x, MPI_Status *status, MPI_Datatype datatype, MPI_Count count)
 AMPI_API_DEF(int, MPI_Get_elements, const MPI_Status *status, MPI_Datatype datatype, int *count)
 AMPI_API_DEF(int, MPI_Get_elements_x, const MPI_Status *status, MPI_Datatype datatype, MPI_Count *count)
 AMPI_API_DEF(int, MPI_Pack, const void *inbuf, int incount, MPI_Datatype dtype, void *outbuf,
@@ -1561,7 +1564,6 @@ int MPI_Win_unlock_all(MPI_Win win);
 /*
 int MPI_Grequest_complete(MPI_Request request);
 int MPI_Grequest_start(MPI_Grequest_query_function *query_fn, MPI_Grequest_free_function *free_fn, MPI_Grequest_cancel_function *cancel_fn, void *extra_state, MPI_Request *request);
-int MPI_Status_set_elements_x(MPI_Status *status, MPI_Datatype datatype, MPI_Count count);
 */
 
 /* A.2.11 I/O C Bindings */
