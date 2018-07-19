@@ -50,9 +50,9 @@ int main(int argc, char **argv)
 
     MPI_Type_free(&struct_type);
 
-    MPI_Finalize();
-
     printf(" No Errors\n");
+
+    MPI_Finalize();
 
     return 0;
 }

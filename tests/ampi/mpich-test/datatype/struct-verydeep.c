@@ -216,9 +216,10 @@ int main(int argc, char **argv)
     /*MPIDU_Datatype_debug(hdf5type, 32); */
 
     MPI_Type_free(&hdf5type);
-    MPI_Finalize();
 
     printf(" No Errors\n");
+
+    MPI_Finalize();
 
     return 0;
 }
