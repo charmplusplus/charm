@@ -6050,6 +6050,28 @@ AMPI_API_IMPL(int, MPI_Type_free, MPI_Datatype *datatype)
 AMPI_API_IMPL(int, MPI_Type_get_extent, MPI_Datatype datatype, MPI_Aint *lb, MPI_Aint *extent)
 {
   AMPI_API("AMPI_Type_get_extent");
+
+#if AMPI_ERROR_CHECKING
+  int ret = checkData("AMPI_Type_get_extent", datatype);
+  if (ret!=MPI_SUCCESS)
+    return(ret);
+#endif
+
+  *lb = getDDT()->getLB(datatype);
+  *extent = getDDT()->getExtent(datatype);
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_Type_get_extent_x, MPI_Datatype datatype, MPI_Count *lb, MPI_Count *extent)
+{
+  AMPI_API("AMPI_Type_get_extent_x");
+
+#if AMPI_ERROR_CHECKING
+  int ret = checkData("AMPI_Type_get_extent_x", datatype);
+  if (ret!=MPI_SUCCESS)
+    return(ret);
+#endif
+
   *lb = getDDT()->getLB(datatype);
   *extent = getDDT()->getExtent(datatype);
   return MPI_SUCCESS;
@@ -6065,6 +6087,28 @@ AMPI_API_IMPL(int, MPI_Type_extent, MPI_Datatype datatype, MPI_Aint *extent)
 AMPI_API_IMPL(int, MPI_Type_get_true_extent, MPI_Datatype datatype, MPI_Aint *true_lb, MPI_Aint *true_extent)
 {
   AMPI_API("AMPI_Type_get_true_extent");
+
+#if AMPI_ERROR_CHECKING
+  int ret = checkData("AMPI_Type_get_true_extent", datatype);
+  if (ret!=MPI_SUCCESS)
+    return(ret);
+#endif
+
+  *true_lb = getDDT()->getTrueLB(datatype);
+  *true_extent = getDDT()->getTrueExtent(datatype);
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_Type_get_true_extent_x, MPI_Datatype datatype, MPI_Count *true_lb, MPI_Count *true_extent)
+{
+  AMPI_API("AMPI_Type_get_true_extent_x");
+
+#if AMPI_ERROR_CHECKING
+  int ret = checkData("AMPI_Type_get_true_extent_x", datatype);
+  if (ret!=MPI_SUCCESS)
+    return(ret);
+#endif
+
   *true_lb = getDDT()->getTrueLB(datatype);
   *true_extent = getDDT()->getTrueExtent(datatype);
   return MPI_SUCCESS;

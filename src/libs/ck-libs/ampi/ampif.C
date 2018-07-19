@@ -52,8 +52,10 @@ FDECL {
 #define mpi_type_commit FTN_NAME( MPI_TYPE_COMMIT , mpi_type_commit )
 #define mpi_type_free FTN_NAME( MPI_TYPE_FREE , mpi_type_free )
 #define mpi_type_get_extent FTN_NAME( MPI_TYPE_GET_EXTENT , mpi_type_get_extent )
+#define mpi_type_get_extent_x FTN_NAME( MPI_TYPE_GET_EXTENT_X , mpi_type_get_extent_x )
 #define mpi_type_extent FTN_NAME( MPI_TYPE_EXTENT , mpi_type_extent )
 #define mpi_type_get_true_extent FTN_NAME( MPI_TYPE_GET_TRUE_EXTENT , mpi_get_true_extent )
+#define mpi_type_get_true_extent_x FTN_NAME( MPI_TYPE_GET_TRUE_EXTENT_X , mpi_get_true_extent_x )
 #define mpi_type_size FTN_NAME( MPI_TYPE_SIZE , mpi_type_size )
 #define mpi_type_size_x FTN_NAME( MPI_TYPE_SIZE_X , mpi_type_size_x )
 #define mpi_type_lb FTN_NAME( MPI_TYPE_LB , mpi_type_lb )
@@ -755,6 +757,11 @@ void  mpi_type_get_extent(int* type, MPI_Aint* lb, MPI_Aint* extent, int* ierr)
   *ierr = MPI_Type_get_extent(*type, lb, extent);
 }
 
+void  mpi_type_get_extent_x(int* type, MPI_Count* lb, MPI_Count* extent, int* ierr)
+{
+  *ierr = MPI_Type_get_extent_x(*type, lb, extent);
+}
+
 void  mpi_type_extent(int* type, MPI_Aint* extent, int* ierr)
 {
   *ierr = MPI_Type_extent(*type, extent);
@@ -763,6 +770,11 @@ void  mpi_type_extent(int* type, MPI_Aint* extent, int* ierr)
 void mpi_type_get_true_extent(int* datatype, MPI_Aint* true_lb, MPI_Aint* true_extent, int* ierr)
 {
   *ierr = MPI_Type_get_true_extent(*datatype, true_lb, true_extent);
+}
+
+void mpi_type_get_true_extent_x(int* datatype, MPI_Count* true_lb, MPI_Count* true_extent, int* ierr)
+{
+  *ierr = MPI_Type_get_true_extent_x(*datatype, true_lb, true_extent);
 }
 
 void  mpi_type_size(int* type, int* size, int* ierr)
