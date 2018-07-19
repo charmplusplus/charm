@@ -1953,6 +1953,9 @@ void ampi::pup(PUP::er &p)
         case AMPI_ATA_REQ:
           blockingReq = new ATAReq;
           break;
+        case AMPI_G_REQ:
+          blockingReq = new GReq;
+          break;
         case AMPI_INVALID_REQ:
           CkAbort("AMPI> error trying to PUP an invalid request!");
           break;
@@ -3515,6 +3518,11 @@ void ATAReq::print() const { //not complete for reqs
   CkPrintf("In ATAReq: num_reqs=%d\n", reqs.size());
 }
 
+void GReq::print() const {
+  AmpiRequest::print();
+  CkPrintf("In GReq: this=%p\n", this);
+}
+
 void SendReq::print() const {
   AmpiRequest::print();
   CkPrintf("In SendReq: this=%p, persistent=%d\n", this, (int)persistent);
@@ -3577,6 +3585,9 @@ void AmpiRequestList::pup(PUP::er &p, AmpiRequestPool* pool) {
             break;
           case AMPI_ATA_REQ:
             reqs[i] = new ATAReq;
+            break;
+          case AMPI_G_REQ:
+            reqs[i] = new GReq;
             break;
           case AMPI_INVALID_REQ:
             CkAbort("AMPI> error trying to PUP an invalid request!");
@@ -5463,6 +5474,13 @@ int ATAReq::wait(MPI_Status *sts){
   return 0;
 }
 
+int GReq::wait(MPI_Status *sts){
+  MPI_Status tmpStatus;
+  (*queryFn)(extraState, (sts == MPI_STATUS_IGNORE || sts == MPI_STATUSES_IGNORE) ? &tmpStatus : sts);
+  complete = true;
+  return 0;
+}
+
 AMPI_API_IMPL(int, MPI_Wait, MPI_Request *request, MPI_Status *sts)
 {
   AMPI_API("AMPI_Wait");
@@ -5812,6 +5830,12 @@ bool SsendReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) {
   return complete;
 }
 
+bool GReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/){
+  MPI_Status tmpStatus;
+  (*queryFn)(extraState, (sts == MPI_STATUS_IGNORE || sts == MPI_STATUSES_IGNORE) ? &tmpStatus : sts);
+  return complete;
+}
+
 bool ATAReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/){
   AmpiRequestList& reqList = getReqs();
   int i = 0;
@@ -6053,6 +6077,38 @@ AMPI_API_IMPL(int, MPI_Request_free, MPI_Request *request)
   return MPI_SUCCESS;
 }
 
+AMPI_API_IMPL(int, MPI_Grequest_start, MPI_Grequest_query_function *query_fn, MPI_Grequest_free_function *free_fn,
+                                       MPI_Grequest_cancel_function *cancel_fn, void *extra_state, MPI_Request *request)
+{
+  AMPI_API("AMPI_Grequest_start");
+
+  ampi* ptr = getAmpiInstance(MPI_COMM_SELF); // All GReq's are posted to MPI_COMM_SELF
+  GReq *newreq = new GReq(query_fn, free_fn, cancel_fn, extra_state);
+  *request = ptr->postReq(newreq);
+
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_Grequest_complete, MPI_Request request)
+{
+  AMPI_API("AMPI_Grequest_complete");
+
+#if AMPI_ERROR_CHECKING
+  if (request == MPI_REQUEST_NULL) {
+    return ampiErrhandler("AMPI_Grequest_complete", MPI_ERR_REQUEST);
+  }
+  if (getReqs()[request]->getType() != AMPI_G_REQ) {
+    return ampiErrhandler("AMPI_Grequest_complete", MPI_ERR_REQUEST);
+  }
+#endif
+
+  ampiParent* parent = getAmpiParent();
+  AmpiRequestList& reqs = parent->getReqs();
+  reqs[request]->complete = true;
+
+  return MPI_SUCCESS;
+}
+
 AMPI_API_IMPL(int, MPI_Cancel, MPI_Request *request)
 {
   AMPI_API("AMPI_Cancel");
@@ -6060,7 +6116,7 @@ AMPI_API_IMPL(int, MPI_Cancel, MPI_Request *request)
   checkRequest(*request);
   AmpiRequestList& reqs = getReqs();
   AmpiRequest& req = *reqs[*request];
-  if(req.getType() == AMPI_I_REQ) {
+  if(req.getType() == AMPI_I_REQ || req.getType() == AMPI_G_REQ) {
     req.cancel();
     return MPI_SUCCESS;
   }

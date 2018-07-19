@@ -995,6 +995,7 @@ enum AmpiReqType : uint8_t {
   AMPI_REDN_REQ    = 5,
   AMPI_GATHER_REQ  = 6,
   AMPI_GATHERV_REQ = 7,
+  AMPI_G_REQ       = 8
 };
 
 inline void operator|(PUP::er &p, AmpiReqType &r) {
@@ -1090,7 +1091,7 @@ class AmpiRequest {
 
   /// Returns the type of request:
   ///  AMPI_I_REQ, AMPI_ATA_REQ, AMPI_SEND_REQ, AMPI_SSEND_REQ,
-  ///  AMPI_REDN_REQ, AMPI_GATHER_REQ, AMPI_GATHERV_REQ
+  ///  AMPI_REDN_REQ, AMPI_GATHER_REQ, AMPI_GATHERV_REQ, AMPI_G_REQ
   virtual AmpiReqType getType() const =0;
 
   /// Returns whether this request will need to be matched.
@@ -1386,6 +1387,35 @@ class ATAReq : public AmpiRequest {
   void pup(PUP::er &p) override {
     AmpiRequest::pup(p);
     p|reqs;
+  }
+  void print() const override;
+};
+
+class GReq : public AmpiRequest {
+ private:
+  int (*queryFn)(void*, MPI_Status*);
+  int (*freeFn)(void*);
+  int (*cancelFn)(void*, int);
+  void* extraState;
+
+ public:
+  GReq(int (*q)(void*, MPI_Status*), int (*f)(void*), int (*c)(void*, int), void* es)
+    : queryFn(q), freeFn(f), cancelFn(c), extraState(es) {}
+  GReq() {}
+  ~GReq() { (*freeFn)(extraState); }
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) override;
+  int wait(MPI_Status *sts) override;
+  void receive(ampi *ptr, AmpiMsg *msg) override {}
+  void receive(ampi *ptr, CkReductionMsg *msg) override {}
+  void cancel() override { (*cancelFn)(extraState, complete); }
+  AmpiReqType getType() const override { return AMPI_G_REQ; }
+  bool isUnmatched() const override { return false; }
+  void pup(PUP::er &p) override {
+    AmpiRequest::pup(p);
+    p((char *)queryFn, sizeof(void *));
+    p((char *)freeFn, sizeof(void *));
+    p((char *)cancelFn, sizeof(void *));
+    p((char *)extraState, sizeof(void *));
   }
   void print() const override;
 };

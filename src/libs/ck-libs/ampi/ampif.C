@@ -27,6 +27,8 @@ FDECL {
 #define mpi_testsome FTN_NAME( MPI_TESTSOME , mpi_testsome )
 #define mpi_request_get_status FTN_NAME(MPI_REQUEST_GET_STATUS , mpi_request_get_status)
 #define mpi_request_free FTN_NAME(MPI_REQUEST_FREE , mpi_request_free)
+#define mpi_grequest_start FTN_NAME(MPI_GREQUEST_START , mpi_grequest_start)
+#define mpi_grequest_complete FTN_NAME(MPI_GREQUEST_COMPLETE , mpi_grequest_complete)
 #define mpi_cancel FTN_NAME(MPI_CANCEL, mpi_cancel)
 #define mpi_test_cancelled FTN_NAME(MPI_TEST_CANCELLED, mpi_test_cancelled)
 #define mpi_status_set_cancelled FTN_NAME( MPI_STATUS_SET_CANCELLED , mpi_status_set_cancelled )
@@ -644,6 +646,17 @@ void mpi_request_get_status(int *request, int *flag, int *status, int *ierr)
 void mpi_request_free(int *request, int *ierr)
 {
   *ierr = MPI_Request_free((MPI_Request *)request);
+}
+
+void mpi_grequest_start(int (*query_fn)(void*,MPI_Status*), int (*free_fn)(void*),
+                        int (*cancel_fn)(void*,int), void *extra_state, int *request, int *ierr)
+{
+  *ierr = MPI_Grequest_start(query_fn, free_fn, cancel_fn, extra_state, request);
+}
+
+void mpi_grequest_complete(int *request, int *ierr)
+{
+  *ierr = MPI_Grequest_complete(*request);
 }
 
 void mpi_cancel(int *request, int *ierr)

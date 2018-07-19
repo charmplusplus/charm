@@ -371,6 +371,10 @@ int MPI_TYPE_NULL_COPY_FN   ( MPI_Datatype, int, void *, void *, void *, int * )
 int MPI_TYPE_NULL_DELETE_FN ( MPI_Datatype, int, void *, void * );
 int MPI_TYPE_DUP_FN         ( MPI_Datatype, int, void *, void *, void *, int * );
 
+typedef int MPI_Grequest_query_function(void *extra_state, MPI_Status *status);
+typedef int MPI_Grequest_free_function(void *extra_state);
+typedef int MPI_Grequest_cancel_function(void *extra_state, int complete);
+
 #include "pup_c.h"
 
 typedef void (*MPI_PupFn)(pup_er, void*);
@@ -445,6 +449,10 @@ typedef void (*MPI_MigrateFn)(void);
 #define PMPI_Request_get_status APMPI_Request_get_status
 #define  MPI_Request_free  AMPI_Request_free
 #define PMPI_Request_free APMPI_Request_free
+#define  MPI_Grequest_start  AMPI_Grequest_start
+#define PMPI_Grequest_start APMPI_Grequest_start
+#define  MPI_Grequest_complete  AMPI_Grequest_complete
+#define PMPI_Grequest_complete APMPI_Grequest_complete
 #define  MPI_Cancel  AMPI_Cancel
 #define PMPI_Cancel APMPI_Cancel
 #define  MPI_Test_cancelled  AMPI_Test_cancelled
@@ -995,6 +1003,9 @@ AMPI_API_DEF(int, MPI_Testsome, int incount, MPI_Request *array_of_requests, int
                   int *array_of_indices, MPI_Status *array_of_statuses)
 AMPI_API_DEF(int, MPI_Request_get_status, MPI_Request request, int *flag, MPI_Status *sts)
 AMPI_API_DEF(int, MPI_Request_free, MPI_Request *request)
+AMPI_API_DEF(int, MPI_Grequest_start, MPI_Grequest_query_function *query_fn, MPI_Grequest_free_function *free_fn,\
+                  MPI_Grequest_cancel_function *cancel_fn, void *extra_state, MPI_Request *request)
+AMPI_API_DEF(int, MPI_Grequest_complete, MPI_Request request)
 AMPI_API_DEF(int, MPI_Cancel, MPI_Request *request)
 AMPI_API_DEF(int, MPI_Test_cancelled, const MPI_Status *status, int *flag) /* FIXME: always returns success */
 AMPI_API_DEF(int, MPI_Status_set_cancelled, MPI_Status *status, int flag)
@@ -1589,10 +1600,6 @@ int MPI_Win_unlock_all(MPI_Win win);
 */
 
 /* A.2.10 External Interfaces C Bindings */
-/*
-int MPI_Grequest_complete(MPI_Request request);
-int MPI_Grequest_start(MPI_Grequest_query_function *query_fn, MPI_Grequest_free_function *free_fn, MPI_Grequest_cancel_function *cancel_fn, void *extra_state, MPI_Request *request);
-*/
 
 /* A.2.11 I/O C Bindings */
 /*
