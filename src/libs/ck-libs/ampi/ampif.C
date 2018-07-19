@@ -55,6 +55,7 @@ FDECL {
 #define mpi_type_extent FTN_NAME( MPI_TYPE_EXTENT , mpi_type_extent )
 #define mpi_type_get_true_extent FTN_NAME( MPI_TYPE_GET_TRUE_EXTENT , mpi_get_true_extent )
 #define mpi_type_size FTN_NAME( MPI_TYPE_SIZE , mpi_type_size )
+#define mpi_type_size_x FTN_NAME( MPI_TYPE_SIZE_X , mpi_type_size_x )
 #define mpi_type_lb FTN_NAME( MPI_TYPE_LB , mpi_type_lb )
 #define mpi_type_ub FTN_NAME( MPI_TYPE_UB , mpi_type_ub )
 /* mpi_type_set_name is defined in ampifimpl.f90, see ampif_type_set_name defined below */
@@ -767,6 +768,11 @@ void mpi_type_get_true_extent(int* datatype, MPI_Aint* true_lb, MPI_Aint* true_e
 void  mpi_type_size(int* type, int* size, int* ierr)
 {
   *ierr = MPI_Type_size(*type, size);
+}
+
+void  mpi_type_size_x(int* type, MPI_Count* size, int* ierr)
+{
+  *ierr = MPI_Type_size_x(*type, size);
 }
 
 void mpi_type_lb(int* datatype, MPI_Aint* displacement, int* ierr)

@@ -496,6 +496,8 @@ typedef void (*MPI_MigrateFn)(void);
 #define PMPI_Type_get_true_extent APMPI_Type_get_true_extent
 #define  MPI_Type_size  AMPI_Type_size
 #define PMPI_Type_size APMPI_Type_size
+#define  MPI_Type_size_x  AMPI_Type_size_x
+#define PMPI_Type_size_x APMPI_Type_size_x
 #define  MPI_Type_lb  AMPI_Type_lb
 #define PMPI_Type_lb APMPI_Type_lb
 #define  MPI_Type_ub  AMPI_Type_ub
@@ -1014,6 +1016,7 @@ AMPI_API_DEF(int, MPI_Type_get_extent, MPI_Datatype datatype, MPI_Aint *lb, MPI_
 AMPI_API_DEF(int, MPI_Type_extent, MPI_Datatype datatype, MPI_Aint *extent)
 AMPI_API_DEF(int, MPI_Type_get_true_extent, MPI_Datatype datatype, MPI_Aint *true_lb, MPI_Aint *true_extent)
 AMPI_API_DEF(int, MPI_Type_size, MPI_Datatype datatype, int *size)
+AMPI_API_DEF(int, MPI_Type_size_x, MPI_Datatype datatype, MPI_Count *size)
 AMPI_API_DEF(int, MPI_Type_lb, MPI_Datatype datatype, MPI_Aint* displacement)
 AMPI_API_DEF(int, MPI_Type_ub, MPI_Datatype datatype, MPI_Aint* displacement)
 AMPI_API_DEF(int, MPI_Type_set_name, MPI_Datatype datatype, const char *name)
@@ -1495,7 +1498,6 @@ int MPI_Type_create_darray(int size, int rank, int ndims, const int array_of_gsi
 int MPI_Type_create_subarray(int ndims, const int array_of_sizes[], const int array_of_subsizes[], const int array_of_starts[], int order, MPI_Datatype oldtype, MPI_Datatype *newtype); //provided by ROMIO
 int MPI_Type_get_extent_x(MPI_Datatype datatype, MPI_Count *lb, MPI_Count *extent);
 int MPI_Type_get_true_extent_x(MPI_Datatype datatype, MPI_Count *true_lb, MPI_Count *true_extent);
-int MPI_Type_size_x(MPI_Datatype datatype, MPI_Count *size);
 int MPI_Unpack_external(const char datarep[], const void *inbuf, MPI_Aint insize, MPI_Aint *position, void *outbuf, int outcount, MPI_Datatype datatype);
 */
 

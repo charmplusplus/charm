@@ -6073,6 +6073,27 @@ AMPI_API_IMPL(int, MPI_Type_get_true_extent, MPI_Datatype datatype, MPI_Aint *tr
 AMPI_API_IMPL(int, MPI_Type_size, MPI_Datatype datatype, int *size)
 {
   AMPI_API("AMPI_Type_size");
+
+#if AMPI_ERROR_CHECKING
+  int ret = checkData("AMPI_Type_size", datatype);
+  if (ret!=MPI_SUCCESS)
+    return ret;
+#endif
+
+  *size=getDDT()->getSize(datatype);
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_Type_size_x, MPI_Datatype datatype, MPI_Count *size)
+{
+  AMPI_API("AMPI_Type_size_x");
+
+#if AMPI_ERROR_CHECKING
+  int ret = checkData("AMPI_Type_size_x", datatype);
+  if (ret!=MPI_SUCCESS)
+    return ret;
+#endif
+
   *size=getDDT()->getSize(datatype);
   return MPI_SUCCESS;
 }
