@@ -675,7 +675,7 @@ FEM_Async_Migrate(void)
 CDECL void 
 FEM_Done(void)
 {
-  TCHARM_Done();
+  TCHARM_Done(0);
 }
 
 CDECL int 

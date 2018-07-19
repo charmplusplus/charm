@@ -76,8 +76,8 @@ FORTRAN_AS_C_RETURN(int,TCHARM_REGISTER,TCHARM_Register,tcharm_register,
 
 CDECL void *TCHARM_Get_userdata(int id) {return 0;}
 
-CDECL void TCHARM_Done(void) { /* fallthrough */ }
-FORTRAN_AS_C(TCHARM_DONE,TCHARM_Done,tcharm_done,(void),())
+CDECL void TCHARM_Done(int exitcode) { /* fallthrough */ }
+FORTRAN_AS_C(TCHARM_DONE,TCHARM_Done,tcharm_done,(int *exitcode),(*exitcode))
 
 CDECL void TCHARM_Barrier(void) { /* fallthrough */ }
 FORTRAN_AS_C(TCHARM_BARRIER,TCHARM_Barrier,tcharm_barrier,(void),())

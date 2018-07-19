@@ -29,7 +29,7 @@ CDECL int ARMCI_Init(void) {
 
 CDECL int ARMCI_Finalize(void) {
   TCHARM_API_TRACE("ARMCI_Finalize", "armci");
-  TCHARM_Done();
+  TCHARM_Done(0);
   return 0;
 }
 

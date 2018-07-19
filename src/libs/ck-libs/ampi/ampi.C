@@ -3867,14 +3867,9 @@ void AMPI_Exit(int exitCode)
   // application with ampicc), exit cleanly when the application calls exit().
   AMPI_API_INIT("AMPI_Exit");
   CkpvAccess(msgPool).clear();
-  if (exitCode) {
-    char err[64];
-    sprintf(err, "Application terminated with exit code %d.\n", exitCode);
-    CkAbort(err);
-  }
 
   if (!atexit_called)
-    TCHARM_Done();
+    TCHARM_Done(exitCode);
 }
 
 FDECL

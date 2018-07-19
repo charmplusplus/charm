@@ -197,7 +197,7 @@ class TCharm: public CBase_TCharm
 #endif
 
 	//Thread finished running
-	void done(void);
+	void done(int exitcode);
 
 	//Register user data to be packed with the thread
 	int add(const UserData &d);

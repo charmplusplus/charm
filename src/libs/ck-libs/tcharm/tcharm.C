@@ -174,7 +174,7 @@ static void startTCharmThread(TCharmInitMsg *msg)
        TCHARM_Thread_data_start_fn threadFn = getTCharmThreadFunction(msg->threadFn);
 	threadFn(msg->data);
 	TCharm::deactivateThread();
-	CtvAccess(_curTCharm)->done();
+	CtvAccess(_curTCharm)->done(0);
 }
 
 TCharm::TCharm(TCharmInitMsg *initMsg_)
@@ -634,13 +634,15 @@ void TCharm::atBarrier(void){
 }
 
 //Called when the thread is done running
-void TCharm::done(void) {
+void TCharm::done(int exitcode) {
 	//CmiPrintStackTrace(0);
 	DBG("TCharm thread "<<thisIndex<<" done")
 	if (exitWhenDone) {
 		//Contribute to a synchronizing reduction
+		CkReductionMsg *exitmsg = CkReductionMsg::buildNew(sizeof(int), &exitcode, CkReduction::max_int);
 		CkCallback cb(CkIndex_TCharm::atExit(NULL), CkArrayIndex1D(0), thisProxy);
-		contribute(cb);
+		exitmsg->setCallback(cb);
+		contribute(exitmsg);
 	}
 	isSelfDone = true;
 	stop();
@@ -649,13 +651,14 @@ void TCharm::done(void) {
 void TCharm::atExit(CkReductionMsg* msg) {
 	DBGX("TCharm::atExit1> exiting");
 	//thisProxy.unsetFlags();
+	int exitcode = *(int*)msg->getData();
 
 	// NOTE: We use an explicit message rather than a [reductiontarget] entry method
 	//       here so that we can delete the msg explicitly *before* calling CkExit(),
 	//       otherwise the underlying message is leaked (and valgrind reports it).
 	delete msg;
 
-	CkExit();
+	CkExit(exitcode);
 	//CkPrintf("After CkExit()!!!!!!!\n");
 }
 
@@ -951,14 +954,14 @@ CDECL void TCHARM_Barrier(void)
 }
 FORTRAN_AS_C(TCHARM_BARRIER,TCHARM_Barrier,tcharm_barrier,(void),())
 
-CDECL void TCHARM_Done(void)
+CDECL void TCHARM_Done(int exitcode)
 {
 	TCHARMAPI("TCHARM_Done");
 	TCharm *c=TCharm::getNULL();
-	if (!c) CkExit();
-	else c->done();
+	if (!c) CkExit(exitcode);
+	else c->done(exitcode);
 }
-FORTRAN_AS_C(TCHARM_DONE,TCHARM_Done,tcharm_done,(void),())
+FORTRAN_AS_C(TCHARM_DONE,TCHARM_Done,tcharm_done,(int *exitcode),(*exitcode))
 
 
 CDECL double TCHARM_Wall_timer(void)
