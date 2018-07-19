@@ -1,6 +1,6 @@
 #! /bin/sh
-mpirun="./charmrun ++local ++quiet "
-PARALLEL="+p" # How to specify the number of ranks (-np in a normal mpirun command)
+mpirun="./ampirun "
+PARALLEL="-np" # How to specify the number of ranks (-np in a normal mpirun command)
 STOPFILE=$HOME/.stopmpichtests
 #
 # If the programs are not available, run make.
@@ -285,17 +285,16 @@ CheckOutput split_coll
 CleanExe split_coll
 #
 OutTime
-# psimple is not supported in AMPI 6.8.0 (no PMPI support)
-# testfiles="$testfiles psimple.out"
-# \rm -f psimple.out
-# MakeExe psimple
-# \rm -f $FILENAME*
-# echo '**** Testing psimple.c ****'
-# $mpirun $PARALLEL 4 ./psimple -fname $FILENAME "$@" >> psimple.out 2>&1
-# CheckOutput psimple
-# CleanExe psimple
-# #
-# OutTime
+testfiles="$testfiles psimple.out"
+\rm -f psimple.out
+MakeExe psimple
+\rm -f $FILENAME*
+echo '**** Testing psimple.c ****'
+$mpirun $PARALLEL 4 ./psimple -fname $FILENAME "$@" >> psimple.out 2>&1
+CheckOutput psimple
+CleanExe psimple
+#
+OutTime
 testfiles="$testfiles error.out"
 \rm -f error.out
 MakeExe error
@@ -340,15 +339,14 @@ if [ @NOF77@ = 0 ] ; then
     CleanExe fcoll_test
 #
     OutTime
-    # pfcoll_test is not supported in AMPI 6.8.0 (no PMPI support)
-    # testfiles="$testfiles pfcoll_test.out"
-    # \rm -f pfcoll_test.out
-    # MakeExe pfcoll_test
-    # \rm -f $FILENAME*
-    # echo '**** Testing pfcoll_test.f ****'
-    # $mpirun $PARALLEL 4 ./pfcoll_test -fname $FILENAME "$@" >> pfcoll_test.out 2>&1
-    # CheckOutput pfcoll_test
-    # CleanExe pfcoll_test
+    testfiles="$testfiles pfcoll_test.out"
+    \rm -f pfcoll_test.out
+    MakeExe pfcoll_test
+    \rm -f $FILENAME*
+    echo '**** Testing pfcoll_test.f ****'
+    $mpirun $PARALLEL 4 ./pfcoll_test -fname $FILENAME "$@" >> pfcoll_test.out 2>&1
+    CheckOutput pfcoll_test
+    CleanExe pfcoll_test
 #
 echo ""
 fi
