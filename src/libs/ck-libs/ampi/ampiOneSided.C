@@ -1305,6 +1305,13 @@ AMPI_API_IMPL(int, MPI_Win_create_errhandler, MPI_Win_errhandler_function *win_e
   return MPI_SUCCESS;
 }
 
+AMPI_API_IMPL(int, MPI_Win_call_errhandler, MPI_Win win, int errorcode)
+{
+  AMPI_API("AMPI_Win_call_errhandler");
+  CkPrintf("WARNING: AMPI does not support MPI_Win_call_errhandler (errorcode = %d)\n", errorcode);
+  return MPI_SUCCESS;
+}
+
 AMPI_API_IMPL(int, MPI_Win_get_errhandler, MPI_Win win, MPI_Errhandler *errhandler)
 {
   AMPI_API("AMPI_Win_get_errhandler");

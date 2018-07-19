@@ -859,6 +859,8 @@ typedef void (*MPI_MigrateFn)(void);
 #define PMPI_Win_free APMPI_Win_free
 #define  MPI_Win_create_errhandler  AMPI_Win_create_errhandler
 #define PMPI_Win_create_errhandler APMPI_Win_create_errhandler
+#define  MPI_Win_call_errhandler  AMPI_Win_call_errhandler
+#define PMPI_Win_call_errhandler APMPI_Win_call_errhandler
 #define  MPI_Win_get_errhandler  AMPI_Win_get_errhandler
 #define PMPI_Win_get_errhandler APMPI_Win_get_errhandler
 #define  MPI_Win_set_errhandler  AMPI_Win_set_errhandler
@@ -1366,6 +1368,7 @@ AMPI_API_DEF(int, MPI_Win_create, void *base, MPI_Aint size, int disp_unit,
 AMPI_API_DEF(int, MPI_Win_free, MPI_Win *win)
 AMPI_API_DEF(int, MPI_Win_create_errhandler, MPI_Win_errhandler_function *win_errhandler_fn,
                                MPI_Errhandler *errhandler)
+AMPI_API_DEF(int, MPI_Win_call_errhandler, MPI_Win win, int errorcode)
 AMPI_API_DEF(int, MPI_Win_get_errhandler, MPI_Win win, MPI_Errhandler *errhandler)
 AMPI_API_DEF(int, MPI_Win_set_errhandler, MPI_Win win, MPI_Errhandler errhandler)
 AMPI_API_DEF(int, MPI_Win_create_keyval, MPI_Win_copy_attr_function *copy_fn,
@@ -1539,7 +1542,6 @@ int MPI_File_call_errhandler(MPI_File fh, int errorcode);
 int MPI_File_create_errhandler(MPI_File_errhandler_function *file_errhandler_fn, MPI_Errhandler *errhandler);
 int MPI_File_get_errhandler(MPI_File file, MPI_Errhandler *errhandler);
 int MPI_File_set_errhandler(MPI_File file, MPI_Errhandler errhandler);
-int MPI_Win_call_errhandler(MPI_Win win, int errorcode);
 */
 
 /* A.2.7 The Info Object C Bindings */

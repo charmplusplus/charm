@@ -237,6 +237,7 @@ FDECL {
 #define mpi_win_create FTN_NAME ( MPI_WIN_CREATE , mpi_win_create )
 #define mpi_win_free  FTN_NAME ( MPI_WIN_FREE  , mpi_win_free )
 #define mpi_win_create_errhandler FTN_NAME ( MPI_WIN_CREATE_ERRHANDLER , mpi_win_create_errhandler )
+#define mpi_win_call_errhandler FTN_NAME ( MPI_WIN_CALL_ERRHANDLER , mpi_win_call_errhandler )
 #define mpi_win_get_errhandler FTN_NAME ( MPI_WIN_GET_ERRHANDLER , mpi_win_get_errhandler )
 #define mpi_win_set_errhandler FTN_NAME ( MPI_WIN_SET_ERRHANDLER , mpi_win_set_errhandler )
 #define mpi_win_create_keyval FTN_NAME ( MPI_WIN_CREATE_KEYVAL , mpi_win_create_keyval )
@@ -1737,6 +1738,10 @@ void mpi_win_free(int *win, int *ierr) {
 void mpi_win_create_errhandler(MPI_Win_errhandler_function *win_errhandler_fn,
                                int *errhandler, int *ierr){
   *ierr = MPI_Win_create_errhandler(win_errhandler_fn, errhandler);
+}
+
+void mpi_win_call_errhandler(MPI_Win *win, int *errcode, int *ierr){
+  *ierr = MPI_Win_call_errhandler(*win, *errcode);
 }
 
 void mpi_win_get_errhandler(MPI_Win *win, int *errhandler, int *ierr){
