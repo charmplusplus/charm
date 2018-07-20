@@ -26,7 +26,8 @@ public:
       blockSize = atoi(m->argv[1]);
       numBlocks = atoi(m->argv[2]);
     } else {
-      CkAbort("Usage: matmul blockSize numBlocks");
+      CkPrintf("Usage: matmul blockSize numBlocks");
+      CkExit(1);
     }
 
     mainProxy = thisProxy;

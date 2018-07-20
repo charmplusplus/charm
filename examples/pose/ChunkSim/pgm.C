@@ -14,7 +14,7 @@ main::main(CkArgMsg *m)
 
   if(m->argc!=4) {
     CkPrintf("Usage: asim <numTeams> <numWorkers> <endTime>\n");
-    CkExit();
+    CkExit(1);
   }
   numTeams = atoi(m->argv[1]);
   numWorkers = atoi(m->argv[2]);

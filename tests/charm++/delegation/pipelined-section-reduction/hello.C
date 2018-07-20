@@ -40,7 +40,8 @@ public:
   main(CkArgMsg* m)
   {
     if(m->argc < 6) {
-      CkAbort("Usage: hello <nElements> <completeMsgSize> <nFrags> <nReductioins> <sectionSize>\n");
+      CkPrintf("Usage: hello <nElements> <completeMsgSize> <nFrags> <nReductioins> <sectionSize>\n");
+      CkExit(1);
     }
     NumElements = atoi(m->argv[1]);
     CompleteMsgSize = atoi(m->argv[2]);

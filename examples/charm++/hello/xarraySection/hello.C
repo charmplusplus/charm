@@ -30,7 +30,7 @@ public:
     if (m->argc > 3) sectionSize = atoi(m->argv[3]); else sectionSize = numElements;
     if (m->argc > 4) maxIter     = atoi(m->argv[4]);
     if (m->argc > 5)
-    { CkPrintf("Syntax: %s [numElements numArrays sectionSize maxIter]",m->argv[0]); CkAbort("Wrong Usage\n"); }
+    { CkPrintf("Syntax: %s [numElements numArrays sectionSize maxIter]",m->argv[0]); CkExit(1); }
     delete m;
 
     CkPrintf("Running a cross-array section demo.\n");

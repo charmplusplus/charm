@@ -11,7 +11,7 @@ Main::Main(CkArgMsg* m)
 
   if(m->argc!=3) {
     CkPrintf("USAGE: pgm <typeOfRmaOp> <with/wo Callback>\n");
-    CkExit();
+    CkExit(1);
   }
   arr[0].startRMA(atoi(m->argv[1]), atoi(m->argv[2]));
   delete m;

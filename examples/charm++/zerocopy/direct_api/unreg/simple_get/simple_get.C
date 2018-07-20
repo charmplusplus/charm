@@ -13,10 +13,12 @@ public:
   main(CkArgMsg *m)
   {
     if(CkNumPes()>2) {
-      CkAbort("Run this program on 1 or 2 processors only.\n");
+      CkPrintf("Run this program on 1 or 2 processors only.\n");
+      CkExit(1);
     }
     if(m->argc !=2 ) {
-      CkAbort("Usage: ./simple_get <array size>\n");
+      CkPrintf("Usage: ./simple_get <array size>\n");
+      CkExit(1);
     }
     int size = atoi(m->argv[1]);
     mainProxy = thisProxy;

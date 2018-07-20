@@ -34,8 +34,10 @@ main::main(CkArgMsg *msg)
 {
   int reported;
   int validateBoundOrder=0;
-  if(msg->argc<4)
-    CkAbort("Usage: startupTest arrSize1 arrSize2 WasteUnits validateBoundOrder\n Where arrsize is int >0 wasteunit is double >0 validateBoundOrder is 1 or 0\n");
+  if(msg->argc<4) {
+    CkPrintf("Usage: startupTest arrSize1 arrSize2 WasteUnits validateBoundOrder\n Where arrsize is int >0 wasteunit is double >0 validateBoundOrder is 1 or 0\n");
+    CkExit(1);
+  }
   //get arrsize and wastetime from cmd line
   arrSize=atoi(msg->argv[1]);
   int arrSize2=atoi(msg->argv[2]);

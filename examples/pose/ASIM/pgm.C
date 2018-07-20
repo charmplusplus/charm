@@ -19,7 +19,7 @@ main::main(CkArgMsg *m)
 
   if(m->argc<10) {
     CkPrintf("Usage: asim <numObjs> <numMsgs> <msgSize> <distribution> <connectivitiy> <locality> <endTime> [ -g[f|m|c|z] | -t<granularity> ] <pattern>\n");
-    CkExit();
+    CkExit(1);
   }
   numObjs = atoi(m->argv[1]);
   map = (int *)malloc(numObjs*sizeof(int));
@@ -42,7 +42,7 @@ main::main(CkArgMsg *m)
     distribution = UNIFORM;
   else {
     CkPrintf("Invalid distribution type: %s\n", m->argv[4]);
-    CkExit();
+    CkExit(1);
   }
 
   if (strcmp(m->argv[5], "SPARSE") == 0)
@@ -53,7 +53,7 @@ main::main(CkArgMsg *m)
     connectivity = FULL;
   else {
     CkPrintf("Invalid connectivity type: %s\n", m->argv[5]);
-    CkExit();
+    CkExit(1);
   }
 
   locality = atoi(m->argv[6]);

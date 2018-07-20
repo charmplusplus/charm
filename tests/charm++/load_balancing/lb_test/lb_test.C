@@ -136,9 +136,9 @@ void main::arg_error(char* argv0)
   CmiPrintf("\n"
 	   "The program creates a ring of element_count array elements,\n"
 	   "which all compute and send to their neighbor.\n"
-	   "Computation proceeds across the entire ring simultaniously.\n"
+	   "Computation proceeds across the entire ring simultaneously.\n"
 	   "Orion Sky Lawlor, olawlor@acm.org, PPL, 10/14/1999\n");
-  CmiAbort("Abort!");
+  CkExit(1);
 }
 
 class Lb_array : public CBase_Lb_array {

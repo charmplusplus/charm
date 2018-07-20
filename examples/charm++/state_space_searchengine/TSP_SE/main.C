@@ -178,7 +178,7 @@ public:
         {
             CkPrintf("Usage: tsp type(0-random graph, 1 inputfile, 2 inputfile) (Size of Problem) initialgrain\n");
             delete m;
-            CkExit();
+            CkExit(1);
         }
         int type = atoi(m->argv[1]);
         if(type == 0)

@@ -14,13 +14,13 @@ class Main : public CBase_Main{
     Main(CkArgMsg *m){
       if(m->argc!=2){
         ckout<<"Usage: zerocopy <numelements>"<<endl;
-        CkExit();
+        CkExit(1);
       }
       numElements = atoi(m->argv[1]);
       delete m;
       if(numElements%2 != 0){
         ckout<<"Argument <numelements> should be even"<<endl;
-        CkExit();
+        CkExit(1);
       }
 
       CProxy_RRMap rrMap = CProxy_RRMap::ckNew();

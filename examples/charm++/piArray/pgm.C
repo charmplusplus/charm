@@ -9,7 +9,7 @@ main::main(CkArgMsg * m)
   if(m->argc != 3)
   {
     CkPrintf("Usage: pgm <nsamples> <nchares>\n");
-    CkAbort("");
+    CkExit(1);
   }
 
   ns = atoi(m->argv[1]);

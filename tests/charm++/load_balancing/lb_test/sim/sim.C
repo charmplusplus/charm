@@ -389,8 +389,8 @@ void main::arg_error(char* argv0)
   CkPrintf("\n"
 	   " The program creates a ring of element_count array elements,\n"
 	   "which all compute and send to their neighbor cycle_count.\n"
-	   "Computation proceeds across the entire ring simultaniously.\n");
-  CkExit();
+	   "Computation proceeds across the entire ring simultaneously.\n");
+  CkExit(1);
 }
 
 #include "sim.def.h"

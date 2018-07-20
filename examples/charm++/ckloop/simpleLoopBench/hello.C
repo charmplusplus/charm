@@ -76,6 +76,7 @@ Main::Main(CkArgMsg* m) {
 	}
     else{		
 		CkPrintf("Usage: -t(#iterations) -c(#chunks) -a(#test instances) -m(running mode, 1 for use Charm threads; 2 for use pthreads )  -p(#threads)\n");
+        CkExit(1);
 	}
     delete m;
 	

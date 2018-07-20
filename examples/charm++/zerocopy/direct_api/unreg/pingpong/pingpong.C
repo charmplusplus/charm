@@ -13,7 +13,8 @@ class main : public CBase_main
   main(CkArgMsg *m)
   {
     if(CkNumPes()>2) {
-      CkAbort("Run this program on 1 or 2 processors only.\n");
+      CkPrintf("Run this program on 1 or 2 processors only.\n");
+      CkExit(1);
     }
     if(m->argc == 5) {
       minSize = atoi(m->argv[1])/2; // Start with a smaller size to run a warm up phase
@@ -27,7 +28,8 @@ class main : public CBase_main
       smallIter = 1000;
       bigIter = 100;
     } else {
-      CkAbort("Usage: ./pingpong <min size> <max size> <small message iter> <big message iter>\n");
+      CkPrintf("Usage: ./pingpong <min size> <max size> <small message iter> <big message iter>\n");
+      CkExit(1);
     }
     delete m;
     size = minSize;

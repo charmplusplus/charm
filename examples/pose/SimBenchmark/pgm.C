@@ -17,7 +17,7 @@ main::main(CkArgMsg *m)
   POSE_init();
   if(m->argc<7) {
     CkPrintf("Usage: simb <#objsPerProc> <#msgsPerObj> <msgSize(MIXED,SMALL,MEDIUM,LARGE)> <locality(%)> [ -g[f|m|c|z] | -t<granularity> ] <density(msgsPerVTU)>\n");
-    CkExit();
+    CkExit(1);
   }
   numObjs = atoi(m->argv[1]);
   totalObjs = numObjs * CkNumPes();

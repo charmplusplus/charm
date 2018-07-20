@@ -21,7 +21,7 @@ class Main : public CBase_Main {
 	Main(CkArgMsg* msg){
 		if (msg->argc < 2) {
 			ckout << "Usage: " << msg->argv[0] << " [number of chares]" << endl;
-			CkExit();
+			CkExit(1);
 		}
 		numchares = atoi(msg->argv[1]);
 		ckout<<"Numchares: " << numchares << endl;

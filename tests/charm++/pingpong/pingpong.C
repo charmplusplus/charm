@@ -113,8 +113,10 @@ public:
       payload=atoi(m->argv[1]);
     if(m->argc>2)
       iterations=atoi(m->argv[2]);
-    if(m->argc>3)
+    if(m->argc>3) {
       CkPrintf("Usage: pgm +pN [payload] [iterations]\n Where N [1-2], payload (default %d) is integer >0 iterations (default %d) is integer >0 ", PAYLOAD, NITER);
+      CkExit(1);
+    }
     CkPrintf("Pingpong with payload: %d iterations: %d\n", payload,iterations);
     mainProxy = thishandle;
     gid = CProxy_PingG::ckNew();

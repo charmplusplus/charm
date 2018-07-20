@@ -82,7 +82,7 @@ public:
         if (m->argc!=4) {
             CkPrintf("Usage: %s <#elements> <#iterations> <msg size>\n", m->argv[0]);
             delete m;
-            CkExit();
+            CkExit(1);
         }
 
         int numElems = atoi(m->argv[1]);
