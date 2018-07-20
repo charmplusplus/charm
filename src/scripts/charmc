@@ -959,7 +959,16 @@ if [ -n "$CHARMDEBUG" -a -z "$SEQUENTIAL" -a -z "$NATIVE" ]; then
     	OPTS_CPP="$OPTS_CPP -O0 -g"
 fi
 
-[ -n "$RPATH_ORIGIN" -a "$CMK_MACOSX" != "1" -a "$CMK_COMPILER" != "msvc" ] && OPTS_LD="$OPTS_LD -Wl,-rpath,\\\$ORIGIN"
+# The purpose of the -rpath-origin option is for the resulting binary to have
+# the literal text '$ORIGIN' in the RPATH field of its ELF header, essentially
+# saying that it is okay for the binary to look in the same directory as itself
+# for the shared objects it needs. Unfortunately, POSIX shells will interpret
+# this text as a variable instead of passing in the string itself, requiring
+# the string to be escaped.
+# Additionally, some platforms do not need any special parameters.
+if [ -n "$RPATH_ORIGIN" -a "$CMK_MACOSX" != "1" -a "$CMK_COMPILER" != "msvc" ]; then
+  OPTS_LD="$OPTS_LD '-Wl,-rpath,\$ORIGIN'"
+fi
 
 PROCESSED_MODULES=""
 
