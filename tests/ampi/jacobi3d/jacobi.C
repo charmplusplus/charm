@@ -15,6 +15,10 @@ extern "C" void BgPrintf(const char *);
 #define CKPT_FREQ 100
 #define NO_PUP
 
+/*
+ * These globals variables are written once to the same value on
+ * all ranks and so are safe wrt to AMPI's virtualization.
+ */
 int NX, NY, NZ;
 
 class chunk {
