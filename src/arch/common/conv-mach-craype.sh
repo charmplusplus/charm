@@ -75,7 +75,26 @@ if test -n "$ICPC"
 then
 CMK_CF77="ftn -auto "
 CMK_CF90="ftn -auto "
-CMK_F90LIBS="-lifcore -lifport -lifcore "
+
+F90DIR=`which ifort 2> /dev/null`
+if test -x "$F90DIR"
+then
+  F90DIR=`dirname $F90DIR`
+  Minor=`basename $F90DIR`
+  F90LIBDIR="$F90DIR/../lib/$Minor"
+  if ! test -x "$F90LIBDIR"
+  then
+    F90LIBDIR="$F90DIR/../lib"
+    if ! test -x "$F90LIBDIR"
+    then
+      F90LIBDIR="$F90DIR/../../compiler/lib/$Minor"
+    fi
+  fi
+  F90MAIN="$F90LIBDIR/for_main.o"
+fi
+CMK_F90MAINLIBS="$F90MAIN"
+CMK_F90LIBS="-L$F90LIBDIR -lifcore -lifport -lifcore"
+CMK_F77LIBS="$CMK_F90LIBS"
 else
 CMK_CF77="ftn "
 CMK_CF90="ftn "
