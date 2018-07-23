@@ -5466,6 +5466,8 @@ int ATAReq::wait(MPI_Status *sts){
 
 int GReq::wait(MPI_Status *sts){
   MPI_Status tmpStatus;
+  if (pollFn)
+    (*pollFn)(extraState, (sts == MPI_STATUS_IGNORE || sts == MPI_STATUSES_IGNORE) ? &tmpStatus : sts);
   (*queryFn)(extraState, (sts == MPI_STATUS_IGNORE || sts == MPI_STATUSES_IGNORE) ? &tmpStatus : sts);
   complete = true;
   return 0;
@@ -5822,6 +5824,8 @@ bool SsendReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) {
 
 bool GReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/){
   MPI_Status tmpStatus;
+  if (pollFn)
+    (*pollFn)(extraState, (sts == MPI_STATUS_IGNORE || sts == MPI_STATUSES_IGNORE) ? &tmpStatus : sts);
   (*queryFn)(extraState, (sts == MPI_STATUS_IGNORE || sts == MPI_STATUSES_IGNORE) ? &tmpStatus : sts);
   return complete;
 }

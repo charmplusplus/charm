@@ -974,6 +974,11 @@ typedef void (*MPI_MigrateFn)(void);
 #define PMPI_Info_dup APMPI_Info_dup
 #define  MPI_Info_free  AMPI_Info_free
 #define PMPI_Info_free APMPI_Info_free
+
+/***MPIX***/
+#define  MPIX_Grequest_start  AMPIX_Grequest_start
+#define PMPIX_Grequest_start APMPIX_Grequest_start
+
 #endif //CMK_CONVERSE_MPI
 
 /***pt2pt***/
@@ -1466,6 +1471,15 @@ AMPI_API_DEF(int, MPI_Info_get_nkeys, MPI_Info info, int *nkeys)
 AMPI_API_DEF(int, MPI_Info_get_nthkey, MPI_Info info, int n, char *key)
 AMPI_API_DEF(int, MPI_Info_dup, MPI_Info info, MPI_Info *newinfo)
 AMPI_API_DEF(int, MPI_Info_free, MPI_Info *info)
+
+
+/***MPIX***/
+typedef int MPIX_Grequest_poll_function(void *extra_state, MPI_Status *status);
+
+AMPI_API_DEF(int, MPIX_Grequest_start, MPI_Grequest_query_function *query_fn,
+  MPI_Grequest_free_function *free_fn, MPI_Grequest_cancel_function *cancel_fn,
+  MPIX_Grequest_poll_function *poll_fn, void *extra_state, MPI_Request *request)
+
 
 /***Fortran-C bindings***/
 #define MPI_Comm_c2f(comm) (MPI_Fint)(comm)

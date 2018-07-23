@@ -1393,14 +1393,17 @@ class ATAReq : public AmpiRequest {
 
 class GReq : public AmpiRequest {
  private:
-  int (*queryFn)(void*, MPI_Status*);
-  int (*freeFn)(void*);
-  int (*cancelFn)(void*, int);
+  MPI_Grequest_query_function* queryFn;
+  MPI_Grequest_free_function* freeFn;
+  MPI_Grequest_cancel_function* cancelFn;
+  MPIX_Grequest_poll_function* pollFn;
   void* extraState;
 
  public:
-  GReq(int (*q)(void*, MPI_Status*), int (*f)(void*), int (*c)(void*, int), void* es)
-    : queryFn(q), freeFn(f), cancelFn(c), extraState(es) {}
+  GReq(MPI_Grequest_query_function* q, MPI_Grequest_free_function* f, MPI_Grequest_cancel_function* c, void* es)
+    : queryFn(q), freeFn(f), cancelFn(c), extraState(es), pollFn(nullptr) {}
+  GReq(MPI_Grequest_query_function *q, MPI_Grequest_free_function* f, MPI_Grequest_cancel_function* c, MPIX_Grequest_poll_function* p, void* es)
+    : queryFn(q), freeFn(f), cancelFn(c), pollFn(p), extraState(es) {}
   GReq() {}
   ~GReq() { (*freeFn)(extraState); }
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) override;
@@ -1415,6 +1418,7 @@ class GReq : public AmpiRequest {
     p((char *)queryFn, sizeof(void *));
     p((char *)freeFn, sizeof(void *));
     p((char *)cancelFn, sizeof(void *));
+    p((char *)pollFn, sizeof(void *));
     p((char *)extraState, sizeof(void *));
   }
   void print() const override;

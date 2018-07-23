@@ -8,7 +8,7 @@ COMPAT=compat_ampius.o compat_ampifus.o compat_ampi.o \
        compat_ampim.o compat_ampifm.o compat_ampicm.o \
 	   compat_ampicpp.o
 OBJS=ampi.o ampif.o ampiOneSided.o \
-     ampiMisc.o ddt.o mpich-alltoall.o  
+     ampiMisc.o ddt.o mpich-alltoall.o ampi_mpix.o
 
 AMPI_LIB=libmoduleampi
 AMPI_LIBDIR=$(CDIR)/lib
@@ -113,6 +113,8 @@ compat_ampicm.o: compat_ampicm.C
 
 compat_ampi.o: compat_ampi.c
 	$(CHARMC) -c compat_ampi.c
+
+ampi_mpix.o: ampi_mpix.C $(HEADDEP)
 
 compat_ampicpp.o: compat_ampicpp.C
 	$(CHARMC) -c compat_ampicpp.C
