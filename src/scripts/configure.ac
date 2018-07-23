@@ -416,8 +416,8 @@ test_link() {
         then
           test_result 1 "$1" "$2" "$3"
         else
-          echo $CMK_LDXX $CMK_LDXX_FLAGS -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 $5 >> $charmout
-          $CMK_LDXX $CMK_LDXX_FLAGS -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 $5 >> out 2>&1
+          echo $CMK_LDXX $CMK_LDXX_FLAGS $CMK_LINK_BINARY -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 $5 >> $charmout
+          $CMK_LDXX $CMK_LDXX_FLAGS $CMK_LINK_BINARY -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 $5 >> out 2>&1
           ret=$?
 	  test ! -x testlink && ret=1
           test_result $ret "$1" "$2" "$3"
@@ -449,8 +449,8 @@ test_linkc() {
         then
           test_result 1 "$1" "$2" "$3"
         else
-          echo $CMK_LD $CMK_LD_FLAGS -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 >> $charmout
-          $CMK_LD $CMK_LD_FLAGS -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 >> out 2>&1
+          echo $CMK_LD $CMK_LD_FLAGS $CMK_LINK_BINARY -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 >> $charmout
+          $CMK_LD $CMK_LD_FLAGS $CMK_LINK_BINARY -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 >> out 2>&1
           test_result $? "$1" "$2" "$3"
         fi
  	strictpass=$pass
@@ -2304,7 +2304,7 @@ int main() {
     return 0;
 }
 EOT
-test_linkc "whether PMI_Get_nid exists" "yes" "no" ""
+test_linkc "whether PMI_Get_nid exists" "yes" "no" "$CMK_CRAY_LIBS"
 AC_DEFINE_UNQUOTED(CMK_HAS_PMI_GET_NID, $pass, [whether PMI_Get_nid exists])
 
 #### test if Cray mesh topology will work ####
@@ -2381,7 +2381,7 @@ int main() {
     return 0;
 }
 EOT
-test_linkc "whether GNI_GetBIConfig exists" "yes" "no" ""
+test_linkc "whether GNI_GetBIConfig exists" "yes" "no" "$CMK_CRAY_LIBS"
 AC_DEFINE_UNQUOTED(CMK_BALANCED_INJECTION_API, $pass, [whether Cray gni_pub has GNI_GetBIConfig])
 fi # end of BIConfig test
 
@@ -2600,8 +2600,8 @@ test_link_fortran_main() {
   then
     test_result 1 "$1" "$2" "$3"
   else
-    echo $CMK_LDXX $CMK_LDXX_FLAGS -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $CMK_F90LIBS $CMK_F90MAINLIBS $4 $5 >> $charmout
-    $CMK_LDXX $CMK_LDXX_FLAGS -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $CMK_F90LIBS $CMK_F90MAINLIBS $4 $5 >> out 2>&1
+    echo $CMK_LDXX $CMK_LDXX_FLAGS $CMK_LINK_BINARY -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $CMK_F90LIBS $CMK_F90MAINLIBS $4 $5 >> $charmout
+    $CMK_LDXX $CMK_LDXX_FLAGS $CMK_LINK_BINARY -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $CMK_F90LIBS $CMK_F90MAINLIBS $4 $5 >> out 2>&1
     ret=$?
     test ! -x testlink && ret=1
     test_result $ret "$1" "$2" "$3"
