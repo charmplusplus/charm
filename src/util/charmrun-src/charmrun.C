@@ -3704,9 +3704,9 @@ static void req_all_clients_connected()
         break;
     }
 
-    // account for comm thread, except when `++processPerX 1 ++oneWthPerX` is requested
+    // account for comm thread, except when space is unavailable
     // assumes that proc_per.xyz == 1, which is enforced in this situation during arg checking
-    if (onewth_unit != proc_per.unit() && threads_per_host + calculated_processes_per_host > p0.num_pus)
+    if (threads_per_host > calculated_processes_per_host && threads_per_host + calculated_processes_per_host > p0.num_pus)
       threads_per_host -= calculated_processes_per_host;
 
     if (threads_per_host == 0)
