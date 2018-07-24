@@ -1397,13 +1397,16 @@ class GReq : public AmpiRequest {
   MPI_Grequest_free_function* freeFn;
   MPI_Grequest_cancel_function* cancelFn;
   MPIX_Grequest_poll_function* pollFn;
+  MPIX_Grequest_wait_function* waitFn;
   void* extraState;
 
  public:
   GReq(MPI_Grequest_query_function* q, MPI_Grequest_free_function* f, MPI_Grequest_cancel_function* c, void* es)
-    : queryFn(q), freeFn(f), cancelFn(c), extraState(es), pollFn(nullptr) {}
+    : queryFn(q), freeFn(f), cancelFn(c), pollFn(nullptr), waitFn(nullptr), extraState(es) {}
   GReq(MPI_Grequest_query_function *q, MPI_Grequest_free_function* f, MPI_Grequest_cancel_function* c, MPIX_Grequest_poll_function* p, void* es)
-    : queryFn(q), freeFn(f), cancelFn(c), pollFn(p), extraState(es) {}
+    : queryFn(q), freeFn(f), cancelFn(c), pollFn(p), waitFn(nullptr), extraState(es) {}
+  GReq(MPI_Grequest_query_function *q, MPI_Grequest_free_function* f, MPI_Grequest_cancel_function* c, MPIX_Grequest_poll_function* p, MPIX_Grequest_wait_function* w, void* es)
+    : queryFn(q), freeFn(f), cancelFn(c), pollFn(p), waitFn(w), extraState(es) {}
   GReq() {}
   ~GReq() { (*freeFn)(extraState); }
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) override;
@@ -1419,6 +1422,7 @@ class GReq : public AmpiRequest {
     p((char *)freeFn, sizeof(void *));
     p((char *)cancelFn, sizeof(void *));
     p((char *)pollFn, sizeof(void *));
+    p((char *)waitFn, sizeof(void *));
     p((char *)extraState, sizeof(void *));
   }
   void print() const override;
@@ -2373,6 +2377,24 @@ class ampiParent : public CBase_ampiParent {
 #endif
 };
 
+// Store a generalized request class created by MPIX_Grequest_class_create
+class greq_class_desc {
+public:
+  MPI_Grequest_query_function *query_fn;
+  MPI_Grequest_free_function *free_fn;
+  MPI_Grequest_cancel_function *cancel_fn;
+  MPIX_Grequest_poll_function *poll_fn;
+  MPIX_Grequest_wait_function *wait_fn;
+
+  void pup(PUP::er &p) {
+    p((char *)query_fn, sizeof(void *));
+    p((char *)free_fn, sizeof(void *));
+    p((char *)cancel_fn, sizeof(void *));
+    p((char *)poll_fn, sizeof(void *));
+    p((char *)wait_fn, sizeof(void *));
+  }
+};
+
 /*
 An ampi manages the communication of one thread over
 one MPI communicator.
@@ -2401,6 +2423,9 @@ class ampi : public CBase_ampi {
    */
   Amm<AmpiRequest *> postedReqs;
   Amm<AmpiMsg *> unexpectedMsgs;
+
+  // Store generalized request classes created by MPIX_Grequest_class_create
+  vector<greq_class_desc> greq_classes;
 
  private:
   ampiCommStruct myComm;

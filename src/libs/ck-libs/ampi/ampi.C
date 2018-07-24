@@ -1972,6 +1972,8 @@ void ampi::pup(PUP::er &p)
   unexpectedMsgs.pup(p, AmmPupUnexpectedMsgs);
   postedReqs.pup(p, AmmPupPostedReqs);
 
+  p|greq_classes;
+
   p|oorder;
 }
 

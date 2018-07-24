@@ -978,6 +978,10 @@ typedef void (*MPI_MigrateFn)(void);
 /***MPIX***/
 #define  MPIX_Grequest_start  AMPIX_Grequest_start
 #define PMPIX_Grequest_start APMPIX_Grequest_start
+#define  MPIX_Grequest_class_create  AMPIX_Grequest_class_create
+#define PMPIX_Grequest_class_create APMPIX_Grequest_class_create
+#define  MPIX_Grequest_class_allocate  AMPIX_Grequest_class_allocate
+#define PMPIX_Grequest_class_allocate APMPIX_Grequest_class_allocate
 
 #endif //CMK_CONVERSE_MPI
 
@@ -1474,11 +1478,20 @@ AMPI_API_DEF(int, MPI_Info_free, MPI_Info *info)
 
 
 /***MPIX***/
+typedef int MPIX_Grequest_class;
 typedef int MPIX_Grequest_poll_function(void *extra_state, MPI_Status *status);
+typedef int MPIX_Grequest_wait_function(int count, void **array_of_states,
+  double timeout, MPI_Status *status);
 
 AMPI_API_DEF(int, MPIX_Grequest_start, MPI_Grequest_query_function *query_fn,
   MPI_Grequest_free_function *free_fn, MPI_Grequest_cancel_function *cancel_fn,
   MPIX_Grequest_poll_function *poll_fn, void *extra_state, MPI_Request *request)
+AMPI_API_DEF(int, MPIX_Grequest_class_create, MPI_Grequest_query_function *query_fn,
+  MPI_Grequest_free_function *free_fn, MPI_Grequest_cancel_function *cancel_fn,
+  MPIX_Grequest_poll_function *poll_fn, MPIX_Grequest_wait_function *wait_fn,
+  MPIX_Grequest_class *greq_class)
+AMPI_API_DEF(int, MPIX_Grequest_class_allocate, MPIX_Grequest_class greq_class,
+  void *extra_state, MPI_Request *request)
 
 
 /***Fortran-C bindings***/
