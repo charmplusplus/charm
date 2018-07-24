@@ -18,7 +18,7 @@ typedef CmiInt8   mem_handle_t;
 typedef void * (* mempool_newblockfn)(size_t *size, mem_handle_t *mem_hndl, int expand_flag);
 typedef void (* mempool_freeblock)(void *ptr, mem_handle_t mem_hndl);
 
-#define cutOffNum 20
+#define cutOffNum CMK_MEMPOOL_CUTOFFNUM
 
 //given x as mptr get
 #define   MEMPOOL_GetBlockHead(x)   (&((x)->block_head))

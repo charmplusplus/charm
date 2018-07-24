@@ -906,6 +906,20 @@ else
   fi
 fi
 
+AC_ARG_WITH([mempool-cutoff],
+            [AS_HELP_STRING([--with-mempool-cutoff=N],
+                            [exponent of the maximum power of two to use for bin sizes in the mempool])],
+            [], [with_mempool_cutoff=26])
+
+if test "$((6 < $with_mempool_cutoff && $with_mempool_cutoff < 32))" = '1'
+then
+  Echo "Using mempool cutoff... 2^$with_mempool_cutoff"
+  AC_DEFINE_UNQUOTED(CMK_MEMPOOL_CUTOFFNUM, $((with_mempool_cutoff - 6)), [mempool cutoff])
+else
+  Echo "Invalid number ($with_mempool_cutoff) specified for mempool cutoff. Valid range: 7 <= N <= 31"
+  test_finish 1
+fi
+
 #### Check if compiler if 64 bit ####
 cat > $t <<EOT
 #include <stdio.h>
