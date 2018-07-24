@@ -1049,6 +1049,35 @@ CMI_EXTERNC void __malloc_fork_lock_parent (void) { }
 CMI_EXTERNC void __malloc_fork_unlock_parent (void) { }
 CMI_EXTERNC void __malloc_fork_unlock_child (void) { }
 
+#if defined __APPLE__
+// strdup is statically linked against malloc on macOS
+char * strdup (const char *str)
+{
+  const size_t length = strlen(str);
+  const size_t bufsize = length + 1;
+  char * const buf = (char *)malloc(bufsize);
+
+  if (buf == nullptr)
+    return nullptr;
+
+  memcpy(buf, str, bufsize);
+  return buf;
+}
+char * strndup (const char *str, size_t n)
+{
+  const size_t length = strnlen(str, n);
+  const size_t bufsize = length + 1;
+  char * const buf = (char *)malloc(bufsize);
+
+  if (buf == nullptr)
+    return nullptr;
+
+  memcpy(buf, str, length);
+  buf[length] = '\0';
+  return buf;
+}
+#endif
+
 #endif
 
 

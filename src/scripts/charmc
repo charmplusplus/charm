@@ -1500,13 +1500,6 @@ then
   Abort "Error: Isomalloc is not supported on BlueGene/Q or Windows."
 fi
 
-# Isomalloc does not work on Darwin at all, so use os-isomalloc instead:
-if [ "$MEMORY" = "isomalloc" -a "$CMK_MACOSX" = 1 ]
-then
-  MEMORY="os-isomalloc"
-  echo "Warning: changing '-memory isomalloc' to '-memory os-isomalloc' on Darwin build targets."
-fi
-
 MEM_OBJ="-lmemory-${MEMORY}"
 
 # For memory wrapping around the OS allocator, need to add also the wrapper object
