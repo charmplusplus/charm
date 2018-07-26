@@ -340,8 +340,8 @@ FDECL {
 #endif
 
 #if CMK_CUDA
-#define ampi_gpu_invoke FTN_NAME ( AMPI_GPU_INVOKE  , ampi_gpu_invoke )
-#define ampi_gpu_iinvoke FTN_NAME ( AMPI_GPU_IINVOKE  , ampi_gpu_iinvoke )
+#define ampi_gpu_invoke_wr FTN_NAME ( AMPI_GPU_INVOKE_WR  , ampi_gpu_invoke_wr )
+#define ampi_gpu_iinvoke_wr FTN_NAME ( AMPI_GPU_IINVOKE_WR  , ampi_gpu_iinvoke_wr )
 #endif
 
 #define REDUCERF(caps, nocaps) \
@@ -2235,6 +2235,14 @@ void endtracebigsim(char* msg, char* param){
   endTraceBigSim(msg, param);
 }
 #endif
+
+void ampi_gpu_iinvoke_wr(int *to_call, int *request, int *ierr) {
+  *ierr = AMPI_GPU_Iinvoke_wr((hapiWorkRequest *)to_call, request);
+}
+
+void ampi_gpu_invoke_wr(int *to_call, int *ierr) {
+  *ierr = AMPI_GPU_Invoke_wr((hapiWorkRequest *)to_call);
+}
 
 /* Fortran2003 standard cmd line arg parsing functions:
  *    - command_argument_count() returns the number of arguments

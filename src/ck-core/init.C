@@ -1520,7 +1520,7 @@ void _initCharm(int unused_argc, char **argv)
     if (CmiMyRank() < CmiMyNodeSize()) {
       CmiNodeBarrier();
     }
-    registerCallbacks();
+    hapiRegisterCallbacks();
 #endif
 
     if(CmiMyPe() == 0) {

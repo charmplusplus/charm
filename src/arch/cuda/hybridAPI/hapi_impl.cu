@@ -149,7 +149,7 @@ public:
 #endif
 
 #ifdef HAPI_INSTRUMENT_WRS
-  CkVec<CkVec<CkVec<RequestTimeInfo> > > avg_times_;
+  CkVec<CkVec<CkVec<hapiRequestTimeInfo> > > avg_times_;
   bool init_instr_;
 #endif
 
@@ -170,11 +170,11 @@ public:
   void destroyStreams();
   cudaStream_t getNextStream();
   cudaStream_t getStream(int);
-  void allocateBuffers(workRequest*);
-  void hostToDeviceTransfer(workRequest*);
-  void deviceToHostTransfer(workRequest*);
-  void freeBuffers(workRequest*);
-  void runKernel(workRequest*);
+  void allocateBuffers(hapiWorkRequest*);
+  void hostToDeviceTransfer(hapiWorkRequest*);
+  void deviceToHostTransfer(hapiWorkRequest*);
+  void freeBuffers(hapiWorkRequest*);
+  void runKernel(hapiWorkRequest*);
 };
 
 // Declare GPU Manager as a process-shared object.
@@ -316,9 +316,9 @@ cudaStream_t GPUManager::getStream(int i) {
 }
 
 // Allocates device buffers.
-void GPUManager::allocateBuffers(workRequest* wr) {
+void GPUManager::allocateBuffers(hapiWorkRequest* wr) {
   for (int i = 0; i < wr->getBufferCount(); i++) {
-    bufferInfo& bi = wr->buffers[i];
+    hapiBufferInfo& bi = wr->buffers[i];
     int index = bi.id;
     int size = bi.size;
 
@@ -391,9 +391,9 @@ void recordEvent(cudaStream_t stream, void* cb, void* cb_msg) {
 #endif
 
 // Initiates host-to-device data transfer.
-void GPUManager::hostToDeviceTransfer(workRequest* wr) {
+void GPUManager::hostToDeviceTransfer(hapiWorkRequest* wr) {
   for (int i = 0; i < wr->getBufferCount(); i++) {
-    bufferInfo& bi = wr->buffers[i];
+    hapiBufferInfo& bi = wr->buffers[i];
     int index = bi.id;
     int size = bi.size;
     host_buffers_[index] = bi.host_buffer;
@@ -411,9 +411,9 @@ void GPUManager::hostToDeviceTransfer(workRequest* wr) {
 }
 
 // Initiates device-to-host data transfer.
-void GPUManager::deviceToHostTransfer(workRequest* wr) {
+void GPUManager::deviceToHostTransfer(hapiWorkRequest* wr) {
   for (int i = 0; i < wr->getBufferCount(); i++) {
-    bufferInfo& bi = wr->buffers[i];
+    hapiBufferInfo& bi = wr->buffers[i];
     int index = bi.id;
     int size = bi.size;
 
@@ -430,9 +430,9 @@ void GPUManager::deviceToHostTransfer(workRequest* wr) {
 }
 
 // Frees device buffers.
-void GPUManager::freeBuffers(workRequest* wr) {
+void GPUManager::freeBuffers(hapiWorkRequest* wr) {
   for (int i = 0; i < wr->getBufferCount(); i++) {
-    bufferInfo& bi = wr->buffers[i];
+    hapiBufferInfo& bi = wr->buffers[i];
     int index = bi.id;
 
     if (bi.need_free) {
@@ -447,7 +447,7 @@ void GPUManager::freeBuffers(workRequest* wr) {
   }
 }
 
-inline void lockAndFreeBuffersDeleteWr(workRequest* wr) {
+inline void lockAndFreeBuffersDeleteWr(hapiWorkRequest* wr) {
 #if CMK_SMP || CMK_MULTICORE
   CmiLock(CsvAccess(gpu_manager).progress_lock_);
 #endif
@@ -459,14 +459,14 @@ inline void lockAndFreeBuffersDeleteWr(workRequest* wr) {
   CmiUnlock(CsvAccess(gpu_manager).progress_lock_);
 #endif
 
-  // free workRequest
+  // free hapiWorkRequest
   delete wr;
 }
 
 // Run the user's kernel for the given work request.
 // This used to be a switch statement defined by the user to allow the runtime
 // to execute the correct kernel.
-void GPUManager::runKernel(workRequest* wr) {
+void GPUManager::runKernel(hapiWorkRequest* wr) {
 	if (wr->runKernel) {
 		wr->runKernel(wr, wr->stream, device_buffers_);
 	}
@@ -478,7 +478,7 @@ static void* hostToDeviceCallback(void* arg) {
 #ifdef HAPI_NVTX_PROFILE
   NVTXTracer nvtx_range("hostToDeviceCallback", NVTXColor::Asbestos);
 #endif
-  workRequest* wr = *((workRequest**)((char*)arg + CmiMsgHeaderSizeBytes + sizeof(int)));
+  hapiWorkRequest* wr = *((hapiWorkRequest**)((char*)arg + CmiMsgHeaderSizeBytes + sizeof(int)));
   CUDACallbackManager(wr->host_to_device_cb);
 
   return NULL;
@@ -489,7 +489,7 @@ static void* kernelCallback(void* arg) {
 #ifdef HAPI_NVTX_PROFILE
   NVTXTracer nvtx_range("kernelCallback", NVTXColor::Asbestos);
 #endif
-  workRequest* wr = *((workRequest**)((char*)arg + CmiMsgHeaderSizeBytes + sizeof(int)));
+  hapiWorkRequest* wr = *((hapiWorkRequest**)((char*)arg + CmiMsgHeaderSizeBytes + sizeof(int)));
   CUDACallbackManager(wr->kernel_cb);
 
   return NULL;
@@ -501,7 +501,7 @@ static void* deviceToHostCallback(void* arg) {
 #ifdef HAPI_NVTX_PROFILE
   NVTXTracer nvtx_range("deviceToHostCallback", NVTXColor::Asbestos);
 #endif
-  workRequest* wr = *((workRequest**)((char*)arg + CmiMsgHeaderSizeBytes + sizeof(int)));
+  hapiWorkRequest* wr = *((hapiWorkRequest**)((char*)arg + CmiMsgHeaderSizeBytes + sizeof(int)));
 
   // invoke user callback
   if (wr->device_to_host_cb) {
@@ -578,12 +578,12 @@ enum CallbackStage {
   AfterDeviceToHost
 };
 
-static void addCallback(workRequest *wr, CallbackStage stage) {
+static void addCallback(hapiWorkRequest *wr, CallbackStage stage) {
   // create converse message to be delivered to this PE after CUDA callback
   char *conv_msg = (char *)CmiAlloc(CmiMsgHeaderSizeBytes + sizeof(int) +
-                                  sizeof(workRequest *)); // FIXME memory leak?
+                                  sizeof(hapiWorkRequest *)); // FIXME memory leak?
   *((int *)(conv_msg + CmiMsgHeaderSizeBytes)) = CmiMyRank();
-  *((workRequest **)(conv_msg + CmiMsgHeaderSizeBytes + sizeof(int))) = wr;
+  *((hapiWorkRequest **)(conv_msg + CmiMsgHeaderSizeBytes + sizeof(int))) = wr;
 
   int handlerIdx;
   switch (stage) {
@@ -609,7 +609,7 @@ static void addCallback(workRequest *wr, CallbackStage stage) {
 
 /******************** DEPRECATED ********************/
 // User calls this function to offload work to the GPU.
-void hapiEnqueue(workRequest* wr) {
+void hapiEnqueue(hapiWorkRequest* wr) {
 #ifdef HAPI_NVTX_PROFILE
   NVTXTracer nvtx_range("enqueue", NVTXColor::Pomegranate);
 #endif
@@ -670,9 +670,9 @@ void hapiEnqueue(workRequest* wr) {
 }
 
 /******************** DEPRECATED ********************/
-// Creates a workRequest object on the heap and returns it to the user.
-workRequest* hapiCreateWorkRequest() {
-  return (new workRequest);
+// Creates a hapiWorkRequest object on the heap and returns it to the user.
+hapiWorkRequest* hapiCreateWorkRequest() {
+  return (new hapiWorkRequest);
 }
 
 #ifdef HAPI_MEMPOOL
@@ -765,7 +765,7 @@ void exitHybridAPI() {
 
 /******************** DEPRECATED ********************/
 // Need to be updated with the Tracing API.
-static inline void gpuEventStart(workRequest* wr, int* index,
+static inline void gpuEventStart(hapiWorkRequest* wr, int* index,
                                  WorkRequestStage event, ProfilingStage stage) {
 #ifdef HAPI_TRACE
   gpuEventTimer* shared_gpu_events_ = CsvAccess(gpu_manager).gpu_events_;
@@ -799,13 +799,13 @@ static inline void gpuEventEnd(int index) {
 #endif // HAPI_TRACE
 }
 
-static inline void workRequestStartTime(workRequest* wr) {
+static inline void hapiWorkRequestStartTime(hapiWorkRequest* wr) {
 #ifdef HAPI_INSTRUMENT_WRS
   wr->phase_start_time = CmiWallTimer();
 #endif
 }
 
-static inline void profileWorkRequestEvent(workRequest* wr,
+static inline void profileWorkRequestEvent(hapiWorkRequest* wr,
                                            WorkRequestStage event) {
 #ifdef HAPI_INSTRUMENT_WRS
   if (initializedInstrument()) {
@@ -814,7 +814,7 @@ static inline void profileWorkRequestEvent(workRequest* wr,
     char type = wr->comp_type;
     char phase = wr->comp_phase;
 
-    CkVec<RequestTimeInfo> &vec = wr->avg_times_[index][type];
+    CkVec<hapiRequestTimeInfo> &vec = wr->avg_times_[index][type];
     if (vec.length() <= phase){
       vec.growAtLeast(phase);
       vec.length() = phase+1;
@@ -1059,7 +1059,7 @@ static bool initializedInstrument() {
   return init_instr_;
 }
 
-RequestTimeInfo* hapiQueryInstrument(int chare, char type, char phase) {
+hapiRequestTimeInfo* hapiQueryInstrument(int chare, char type, char phase) {
   if (phase < avg_times_[chare][type].length()) {
     return &avg_times_[chare][type][phase];
   }
@@ -1096,9 +1096,9 @@ void hapiPollEvents() {
       if (hev.cb != FREE_BUFF_FLAG) {
         ((CkCallback*)hev.cb)->send(hev.cb_msg);
       }
-      // Hack cb field to serve as a flag and cb_msg as a pointer to the workRequest
+      // Hack cb field to serve as a flag and cb_msg as a pointer to the hapiWorkRequest
       else { // free buffers
-        lockAndFreeBuffersDeleteWr(static_cast<workRequest*>(hev.cb_msg));
+        lockAndFreeBuffersDeleteWr(static_cast<hapiWorkRequest*>(hev.cb_msg));
       }
       cudaEventDestroy(hev.event);
       queue.pop();

@@ -1,7 +1,7 @@
 -include ../../../common.mk
 CHARMC = ../../../../bin/charmc $(USE_WR) $(OPTS)
 
-# use deprecated workRequest for GPU offloading
+# use deprecated hapiWorkRequest for GPU offloading
 USE_WR = #-DUSE_WR
 
 # set CUDATOOLKIT_HOME to the CUDA toolkit directory

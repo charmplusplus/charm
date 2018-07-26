@@ -2933,7 +2933,7 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
   }
 }
 
-void ampi::processAmpiMsg(AmpiMsg *msg, const void* buf, MPI_Datatype type, int count) noexcept
+void ampi::processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count) noexcept
 {
   int ssendReq = msg->getSsendReq();
   if (ssendReq > 0) { // send an ack to sender
@@ -2961,7 +2961,7 @@ void ampi::processRdmaMsg(const void *sbuf, int slength, int ssendReq, int srank
   ddt->serialize((char*)rbuf, (char*)sbuf, rcount, slength, UNPACK);
 }
 
-void ampi::processRednMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype type, int count) noexcept
+void ampi::processRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count) noexcept
 {
   // The first sizeof(AmpiOpHeader) bytes in the redn msg data are reserved
   // for an AmpiOpHeader if our custom AmpiReducer type was used.
@@ -3016,7 +3016,7 @@ void ampi::processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Data
   delete [] results;
 }
 
-void ampi::processGatherMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype type, int recvCount) noexcept
+void ampi::processGatherMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int recvCount) noexcept
 {
   CkReduction::tupleElement* results = NULL;
   int numReductions = 0;
@@ -3040,7 +3040,7 @@ void ampi::processGatherMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype t
   delete [] results;
 }
 
-void ampi::processGathervMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype type,
+void ampi::processGathervMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type,
                              int* recvCounts, int* displs) noexcept
 {
   CkReduction::tupleElement* results = NULL;
@@ -6239,7 +6239,7 @@ AMPI_API_IMPL(int, MPI_Send_init, const void *buf, int count, MPI_Datatype type,
   }
 #endif
 
-  SendReq* sreq = getAmpiParent()->reqPool.newSendReq(buf, count, type, dest, tag, comm, getDDT());
+  SendReq* sreq = getAmpiParent()->reqPool.newSendReq((void*)buf, count, type, dest, tag, comm, getDDT());
   sreq->setPersistent(true);
   *req = getAmpiInstance(comm)->postReq(sreq);
   return MPI_SUCCESS;
@@ -6275,7 +6275,7 @@ AMPI_API_IMPL(int, MPI_Ssend_init, const void *buf, int count, MPI_Datatype type
 #endif
 
   ampi* ptr = getAmpiInstance(comm);
-  SsendReq* sreq = getAmpiParent()->reqPool.newSsendReq(buf, count, type, dest, tag, comm, ptr->getRank(), getDDT());
+  SsendReq* sreq = getAmpiParent()->reqPool.newSsendReq((void*)buf, count, type, dest, tag, comm, ptr->getRank(), getDDT());
   sreq->setPersistent(true);
   *req = ptr->postReq(sreq);
   return MPI_SUCCESS;
@@ -10820,6 +10820,114 @@ int AMPI_Set_end_event(void)
   return MPI_SUCCESS;
 }
 #endif // CMK_BIGSIM_CHARM
+
+#if CMK_CUDA
+GPUReq::GPUReq()
+{
+  comm = MPI_COMM_SELF;
+  MPI_Comm_rank(comm, &src);
+  buf = getAmpiInstance(comm);
+}
+
+bool GPUReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/)
+{
+  return complete;
+}
+
+int GPUReq::wait(MPI_Status *sts)
+{
+  (void)sts;
+  while (!complete) {
+    getAmpiParent()->block();
+  }
+  return 0;
+}
+
+void GPUReq::receive(ampi *ptr, AmpiMsg *msg)
+{
+  CkAbort("GPUReq::receive should never be called");
+}
+
+void GPUReq::receive(ampi *ptr, CkReductionMsg *msg)
+{
+  CkAbort("GPUReq::receive should never be called");
+}
+
+void GPUReq::setComplete()
+{
+  complete = true;
+}
+
+void GPUReq::print() const {
+  AmpiRequest::print();
+}
+
+void AMPI_GPU_complete(void *request, void* dummy)
+{
+  GPUReq *req = static_cast<GPUReq *>(request);
+  req->setComplete();
+  ampi *ptr = static_cast<ampi *>(req->buf);
+  ptr->unblock();
+}
+
+/* Submit hapiWorkRequest and corresponding GPU request. */
+CDECL
+int AMPI_GPU_Iinvoke_wr(hapiWorkRequest *to_call, MPI_Request *request)
+{
+  AMPI_API("AMPI_GPU_Iinvoke");
+
+  ampi* ptr = getAmpiInstance(MPI_COMM_WORLD);
+  GPUReq* newreq = new GPUReq();
+  *request = ptr->postReq(newreq);
+
+  // A callback that completes the corresponding request
+  CkCallback *cb = new CkCallback(&AMPI_GPU_complete, newreq);
+  to_call->setCallback(cb);
+
+  hapiEnqueue(to_call);
+}
+
+/* Submit GPU request that will be notified of completion once the previous
+ * operations in the given CUDA stream are complete */
+CDECL
+int AMPI_GPU_Iinvoke(cudaStream_t stream, MPI_Request *request)
+{
+  AMPI_API("AMPI_GPU_Iinvoke");
+
+  ampi* ptr = getAmpiInstance(MPI_COMM_WORLD);
+  GPUReq* newreq = new GPUReq();
+  *request = ptr->postReq(newreq);
+
+  // A callback that completes the corresponding request
+  CkCallback *cb = new CkCallback(&AMPI_GPU_complete, newreq);
+
+  hapiAddCallback(stream, cb);
+}
+
+CDECL
+int AMPI_GPU_Invoke_wr(hapiWorkRequest *to_call)
+{
+  AMPI_API("AMPI_GPU_Invoke");
+
+  MPI_Request req;
+  AMPI_GPU_Iinvoke_wr(to_call, &req);
+  MPI_Wait(&req, MPI_STATUS_IGNORE);
+
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_GPU_Invoke(cudaStream_t stream)
+{
+  AMPI_API("AMPI_GPU_Invoke");
+
+  MPI_Request req;
+  AMPI_GPU_Iinvoke(stream, &req);
+  MPI_Wait(&req, MPI_STATUS_IGNORE);
+
+  return MPI_SUCCESS;
+}
+#endif // CMK_CUDA
 
 #include "ampi.def.h"
 

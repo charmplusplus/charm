@@ -12,15 +12,15 @@
 to a CUDA-enabled GPU device.
 
   The original design by Lukasz was as follows:
-  1) Create a workRequest object and populate it with information about buffers
+  1) Create a hapiWorkRequest object and populate it with information about buffers
      and kernel execution parameters.
-  2) Enqueue the workRequest into a queue managed by GPU Manager, which is a
+  2) Enqueue the hapiWorkRequest into a queue managed by GPU Manager, which is a
      process-shared entity.
   3) All PEs (schedulers) poll the queue at a certain interval.
   4) Progress of the first 3 elements are examined and moved forward as needed.
      3 CUDA streams are used for this: 1 for host-to-device data transfer,
      1 for device-to-host data transfer, and 1 for kernel execution.
-  5) When a workRequest has progressed to the last state (all data transfers
+  5) When a hapiWorkRequest has progressed to the last state (all data transfers
      and kernel execution complete), the associated Charm++ callback function
      is invoked.
 

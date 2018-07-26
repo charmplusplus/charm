@@ -1030,7 +1030,8 @@ enum AmpiReqType : uint8_t {
   AMPI_REDN_REQ    = 5,
   AMPI_GATHER_REQ  = 6,
   AMPI_GATHERV_REQ = 7,
-  AMPI_G_REQ       = 8
+  AMPI_G_REQ       = 8,
+  AMPI_GPU_REQ     = 9
 };
 
 inline void operator|(PUP::er &p, AmpiReqType &r) {
@@ -1056,7 +1057,7 @@ using Isend, Irecv, Ialltoall, Send_init, etc.
 */
 class AmpiRequest {
  public:
-  const void *buf    = nullptr;
+  void *buf          = nullptr;
   int count          = 0;
   MPI_Datatype type  = MPI_DATATYPE_NULL;
   int tag            = MPI_ANY_TAG; // the order must match MPI_Status
@@ -1183,7 +1184,7 @@ class IReq final : public AmpiRequest {
   bool persistent = false; // Is this a persistent recv request?
   int length      = 0; // recv'ed length in bytes
 
-  IReq(const void *buf_, int count_, MPI_Datatype type_, int src_, int tag_,
+  IReq(void *buf_, int count_, MPI_Datatype type_, int src_, int tag_,
        MPI_Comm comm_, CkDDT *ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
   {
     buf   = buf_;
@@ -1224,7 +1225,7 @@ class RednReq final : public AmpiRequest {
  public:
   MPI_Op op = MPI_OP_NULL;
 
-  RednReq(const void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_,
+  RednReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_,
           MPI_Op op_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
   {
     buf   = buf_;
@@ -1254,7 +1255,7 @@ class RednReq final : public AmpiRequest {
 
 class GatherReq final : public AmpiRequest {
  public:
-  GatherReq(const void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_,
+  GatherReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_,
             CkDDT *ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
   {
     buf   = buf_;
@@ -1285,7 +1286,7 @@ class GathervReq final : public AmpiRequest {
   vector<int> recvCounts;
   vector<int> displs;
 
-  GathervReq(const void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_, const int *rc,
+  GathervReq(void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_, const int *rc,
              const int *d, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
   {
     buf   = buf_;
@@ -1324,7 +1325,7 @@ class SendReq final : public AmpiRequest {
     comm = comm_;
     AMPI_REQUEST_COMMON_INIT
   }
-  SendReq(const void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_,
+  SendReq(void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_,
           MPI_Comm comm_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
   {
     buf   = buf_;
@@ -1365,7 +1366,7 @@ class SsendReq final : public AmpiRequest {
     comm = comm_;
     AMPI_REQUEST_COMMON_INIT
   }
-  SsendReq(const void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_, MPI_Comm comm_,
+  SsendReq(void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_, MPI_Comm comm_,
            CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
   {
     buf   = buf_;
@@ -1376,7 +1377,7 @@ class SsendReq final : public AmpiRequest {
     comm  = comm_;
     AMPI_REQUEST_COMMON_INIT
   }
-  SsendReq(const void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_, MPI_Comm comm_,
+  SsendReq(void* buf_, int count_, MPI_Datatype type_, int dest_, int tag_, MPI_Comm comm_,
            int src_, CkDDT* ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
   {
     buf   = buf_;
@@ -1405,6 +1406,22 @@ class SsendReq final : public AmpiRequest {
   }
   void print() const noexcept override;
 };
+
+#if CMK_CUDA
+class GPUReq : public AmpiRequest {
+ public:
+  GPUReq();
+  ~GPUReq() {}
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) override;
+  int wait(MPI_Status *sts) override;
+  void receive(ampi *ptr, AmpiMsg *msg) override;
+  void receive(ampi *ptr, CkReductionMsg *msg) override;
+  AmpiReqType getType() const override { return AMPI_GPU_REQ; }
+  bool isUnmatched() const override { return false; }
+  void setComplete();
+  void print() const override;
+};
+#endif
 
 class ATAReq final : public AmpiRequest {
  public:
@@ -1744,7 +1761,7 @@ class AmpiRequestPool {
       return NULL;
     }
   }
-  inline IReq* newIReq(const void* buf, int count, MPI_Datatype type, int src, int tag,
+  inline IReq* newIReq(void* buf, int count, MPI_Datatype type, int src, int tag,
                        MPI_Comm comm, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) noexcept {
     if (validReqs.all()) {
       return new IReq(buf, count, type, src, tag, comm, ddt, sts);
@@ -1793,7 +1810,7 @@ class AmpiRequestPool {
       return NULL;
     }
   }
-  inline SendReq* newSendReq(const void* buf, int count, MPI_Datatype type, int destRank, int tag,
+  inline SendReq* newSendReq(void* buf, int count, MPI_Datatype type, int destRank, int tag,
                              MPI_Comm comm, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) noexcept {
     if (validReqs.all()) {
       return new SendReq(buf, count, type, destRank, tag, comm, ddt, sts);
@@ -1843,7 +1860,7 @@ class AmpiRequestPool {
       return NULL;
     }
   }
-  inline SsendReq* newSsendReq(const void* buf, int count, MPI_Datatype type, int dest, int tag,
+  inline SsendReq* newSsendReq(void* buf, int count, MPI_Datatype type, int dest, int tag,
                                MPI_Comm comm, int src, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) noexcept {
     if (validReqs.all()) {
       return new SsendReq(buf, count, type, dest, tag, comm, src, ddt, sts);
@@ -2546,14 +2563,14 @@ class ampi final : public CBase_ampi {
   }
   MPI_Request delesend(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
                        MPI_Comm destcomm, CProxy_ampi arrproxy, int ssend, AmpiSendType sendType) noexcept;
-  inline void processAmpiMsg(AmpiMsg *msg, const void* buf, MPI_Datatype type, int count) noexcept;
-  inline void processRdmaMsg(const void *sbuf, int slength, int ssendReq, int srank, const void* rbuf,
+  inline void processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count) noexcept;
+  inline void processRdmaMsg(const void *sbuf, int slength, int ssendReq, int srank, void* rbuf,
                              int rcount, MPI_Datatype rtype, MPI_Comm comm) noexcept;
-  inline void processRednMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype type, int count) noexcept;
+  inline void processRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count) noexcept;
   inline void processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int count,
                                            MPI_User_function* func) noexcept;
-  inline void processGatherMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype type, int recvCount) noexcept;
-  inline void processGathervMsg(CkReductionMsg *msg, const void* buf, MPI_Datatype type,
+  inline void processGatherMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, int recvCount) noexcept;
+  inline void processGathervMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type,
                                int* recvCounts, int* displs) noexcept;
   inline AmpiMsg * getMessage(int t, int s, MPI_Comm comm, int *sts) const noexcept;
   int recv(int t,int s,void* buf,int count,MPI_Datatype type,MPI_Comm comm,MPI_Status *sts=NULL) noexcept;

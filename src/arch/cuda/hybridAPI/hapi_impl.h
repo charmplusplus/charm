@@ -13,7 +13,7 @@ void exitHybridAPI();
 void initEventQueues();
 
 // Registers callback handler functions.
-void registerCallbacks();
+void hapiRegisterCallbacks();
 
 // Polls for GPU work completion. Does not do anything if HAPI_CUDA_CALLBACK is defined.
 void hapiPollEvents();

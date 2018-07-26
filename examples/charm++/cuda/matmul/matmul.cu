@@ -96,7 +96,7 @@ __global__ void matMul(float* C, float* A, float* B, int wA, int wB) {
 }
 
 #ifdef USE_WR
-void run_MATMUL_KERNEL(workRequest* wr, cudaStream_t kernel_stream,
+void run_MATMUL_KERNEL(hapiWorkRequest* wr, cudaStream_t kernel_stream,
                        void** devBuffers) {
   matMul<<<wr->grid_dim, wr->block_dim, wr->shared_mem, kernel_stream>>>(
       (float*)devBuffers[wr->getBufferID(C_INDEX)],
@@ -105,7 +105,7 @@ void run_MATMUL_KERNEL(workRequest* wr, cudaStream_t kernel_stream,
       *((int*)wr->getUserData()));
 }
 
-void run_BLAS_KERNEL(workRequest* wr, cudaStream_t kernel_stream,
+void run_BLAS_KERNEL(hapiWorkRequest* wr, cudaStream_t kernel_stream,
                      void** devBuffers) {
   int size = *((int*)wr->getUserData());
   float alpha = 1.0f;
@@ -139,7 +139,7 @@ void cudaMatMul(int matrixSize, float* h_A, float* h_B, float* h_C, float* d_A,
                ceil((float)matrixSize / dimBlock.y));
 #ifdef USE_WR
   // DEPRECATED
-  workRequest* wr = hapiCreateWorkRequest();
+  hapiWorkRequest* wr = hapiCreateWorkRequest();
   wr->setExecParams(dimGrid, dimBlock);
   wr->setStream(stream);
   wr->addBuffer(h_A, size, true, false, true);

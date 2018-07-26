@@ -1,30 +1,30 @@
-#include <stdlib.h>
 #include <stdio.h>
-#include "wr.h"
-
-extern workRequestQueue* wrQueue;
+#include "hapi.h"
 
 __global__ void helloKernel() {
 
 }
 
-void run_hello(workRequest *wr, cudaStream_t kernel_stream, void **devBuffers) {
-  printf("calling kernel\n");
-  helloKernel<<<wr->dimGrid,wr->dimBlock,wr->smemSize,kernel_stream>>>();
+#if USE_WR
+void run_hello(hapiWorkRequest* wr, cudaStream_t kernel_stream, void** devBuffers) {
+  printf("Calling kernel...\n");
+  helloKernel<<<wr->grid_dim, wr->block_dim, wr->shared_mem, kernel_stream>>>();
 }
 
-extern "C"
-void *kernelSetup() {
-  workRequest *wr = new workRequest;
-  wr = (workRequest*) malloc(sizeof(workRequest));
-
-  wr->dimGrid.x = 1;
-  wr->dimBlock.x = 1;
-  wr->smemSize = 0;
-  wr->traceName = "hello";
-  wr->runKernel = run_hello;
-  wr->nBuffers = 0;
-  wr->bufferInfo = NULL;
+hapiWorkRequest* setupWorkRequest(cudaStream_t stream) {
+  hapiWorkRequest* wr = hapiCreateWorkRequest();
+  wr->setExecParams(dim3(1), dim3(1));
+  wr->setRunKernel(run_hello);
+  wr->setStream(stream);
 
   return wr;
 }
+#else
+void invokeKernel(cudaStream_t stream) {
+  dim3 grid_dim(1, 1);
+  dim3 block_dim(16, 16);
+
+  printf("Calling kernel...\n");
+  helloKernel<<<grid_dim, block_dim, 0, stream>>>();
+}
+#endif

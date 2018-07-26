@@ -6,6 +6,12 @@
 #include "conv-config.h"
 #include "charm-api.h" /* for CLINKAGE */
 
+#ifdef __cplusplus
+#if CMK_CUDA
+#include "hapi.h"
+#endif
+#endif
+
 /* NON-standard define: this lets people #ifdef on
    AMPI, e.g. to portably use AMPI extensions to the MPI standard. */
 #define AMPI
@@ -1557,10 +1563,13 @@ void beginTraceBigSim(char* msg);
 void endTraceBigSim(char* msg, char* param);
 #endif
 
+#ifdef __cplusplus
 #if CMK_CUDA
-typedef struct workRequest workRequest;
-int AMPI_GPU_Iinvoke(workRequest *to_call, MPI_Request *request);
-int AMPI_GPU_Invoke(workRequest *to_call);
+int AMPI_GPU_Iinvoke_wr(hapiWorkRequest *to_call, MPI_Request *request);
+int AMPI_GPU_Iinvoke(cudaStream_t stream, MPI_Request *request);
+int AMPI_GPU_Invoke_wr(hapiWorkRequest *to_call);
+int AMPI_GPU_Invoke(cudaStream_t stream);
+#endif
 #endif
 
 /* Execute this shell command (just like "system()") */

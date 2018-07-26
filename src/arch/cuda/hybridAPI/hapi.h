@@ -23,9 +23,9 @@
 
 /******************** DEPRECATED ********************/
 // Contains information about a device buffer, which is used by
-// the runtime to perform appropriate operations. Each bufferInfo should
-// be associated with a workRequest.
-typedef struct bufferInfo {
+// the runtime to perform appropriate operations. Each hapiBufferInfo should
+// be associated with a hapiWorkRequest.
+typedef struct hapiBufferInfo {
   // ID of buffer in the runtime system's buffer table
   int id;
 
@@ -43,29 +43,29 @@ typedef struct bufferInfo {
   // size of buffer in bytes
   size_t size;
 
-  bufferInfo(int _id = -1) : id(_id), transfer_to_device(false),
+  hapiBufferInfo(int _id = -1) : id(_id), transfer_to_device(false),
     transfer_to_host(false) {}
 
-  bufferInfo(void* _host_buffer, size_t _size, bool _transfer_to_device,
+  hapiBufferInfo(void* _host_buffer, size_t _size, bool _transfer_to_device,
       bool _transfer_to_host, bool _need_free, int _id = -1) :
     host_buffer(_host_buffer), size(_size), transfer_to_device(_transfer_to_device),
     transfer_to_host(_transfer_to_host), need_free(_need_free), id(_id) {}
 
-} bufferInfo;
+} hapiBufferInfo;
 
 /******************** DEPRECATED ********************/
 // Data structure that ties a kernel, associated buffers, and other variables
-// required by the runtime. The user gets a workRequest from the runtime,
+// required by the runtime. The user gets a hapiWorkRequest from the runtime,
 // fills it in, and enqueues it. The memory associated with it is managed
 // by the runtime.
-typedef struct workRequest {
+typedef struct hapiWorkRequest {
   // parameters for kernel execution
   dim3 grid_dim;
   dim3 block_dim;
   int shared_mem;
 
   // contains information about buffers associated with the kernel
-  std::vector<bufferInfo> buffers;
+  std::vector<hapiBufferInfo> buffers;
 
   // Charm++ callback functions to be executed after certain stages of
   // GPU execution
@@ -80,9 +80,9 @@ typedef struct workRequest {
 
   // Pointer to host-side function that actually invokes the kernel.
   // The user implements this function, using the given CUDA stream and
-  // device buffers (which are indexed by bufferInfo->id).
+  // device buffers (which are indexed by hapiBufferInfo->id).
   // Could be set to NULL if no kernel needs to be executed.
-  void (*runKernel)(struct workRequest* wr, cudaStream_t kernel_stream,
+  void (*runKernel)(struct hapiWorkRequest* wr, cudaStream_t kernel_stream,
                     void** device_buffers);
 
   // flag used for control by the system
@@ -104,7 +104,7 @@ typedef struct workRequest {
   char comp_phase;
 #endif
 
-  workRequest() :
+  hapiWorkRequest() :
     grid_dim(0), block_dim(0), shared_mem(0), host_to_device_cb(NULL),
     kernel_cb(NULL), device_to_host_cb(NULL), runKernel(NULL), state(0),
     user_data(NULL), free_user_data(false), stream(NULL)
@@ -117,7 +117,7 @@ typedef struct workRequest {
 #endif
   }
 
-  ~workRequest() {
+  ~hapiWorkRequest() {
     if (free_user_data)
       std::free(user_data);
   }
@@ -164,7 +164,7 @@ typedef struct workRequest {
   }
 #endif
 
-  void setRunKernel(void (*_runKernel)(struct workRequest*, cudaStream_t, void**)) {
+  void setRunKernel(void (*_runKernel)(struct hapiWorkRequest*, cudaStream_t, void**)) {
     runKernel = _runKernel;
   }
 
@@ -192,17 +192,17 @@ typedef struct workRequest {
     return user_data;
   }
 
-} workRequest;
+} hapiWorkRequest;
 
 /******************** DEPRECATED ********************/
-// Create a workRequest object for the user. The runtime manages the associated
+// Create a hapiWorkRequest object for the user. The runtime manages the associated
 // memory, so the user only needs to set it up properly.
-workRequest* hapiCreateWorkRequest();
+hapiWorkRequest* hapiCreateWorkRequest();
 
 /******************** DEPRECATED ********************/
 // Add a work request into the "queue". Currently all specified data transfers
 // and kernel execution are directly put into a CUDA stream.
-void hapiEnqueue(workRequest* wr);
+void hapiEnqueue(hapiWorkRequest* wr);
 
 // The runtime queries the compute capability of the device, and creates as
 // many streams as the maximum number of concurrent kernels.
@@ -241,18 +241,18 @@ void hapiPoolFree(void*);
 #endif
 
 #ifdef HAPI_INSTRUMENT_WRS
-struct RequestTimeInfo {
+struct hapiRequestTimeInfo {
   double transfer_time;
   double kernel_time;
   double cleanup_time;
   int n;
 
-  RequestTimeInfo() : transfer_time(0.0), kernel_time(0.0), cleanup_time(0.0),
+  hapiRequestTimeInfo() : transfer_time(0.0), kernel_time(0.0), cleanup_time(0.0),
     n(0) {}
 };
 
 void hapiInitInstrument(int n_chares, char n_types);
-RequestTimeInfo* hapiQueryInstrument(int chare, char type, char phase);
+hapiRequestTimeInfo* hapiQueryInstrument(int chare, char type, char phase);
 #endif
 
 #endif // __HAPI_H_

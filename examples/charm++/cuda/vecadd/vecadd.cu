@@ -18,7 +18,7 @@ __global__ void vecAdd(float* C, float* A, float* B, int n) {
 }
 
 #ifdef USE_WR
-void run_VECADD_KERNEL(workRequest* wr, cudaStream_t kernel_stream,
+void run_VECADD_KERNEL(hapiWorkRequest* wr, cudaStream_t kernel_stream,
                        void** devBuffers) {
   vecAdd<<<wr->grid_dim, wr->block_dim, wr->shared_mem, kernel_stream>>>(
       (float*)devBuffers[wr->getBufferID(C_INDEX)],
@@ -40,7 +40,7 @@ void cudaVecAdd(int vectorSize, float* h_A, float* h_B, float* h_C, float* d_A,
 
 #ifdef USE_WR
   // DEPRECATED
-  workRequest* wr = hapiCreateWorkRequest();
+  hapiWorkRequest* wr = hapiCreateWorkRequest();
   wr->setExecParams(dimGrid, dimBlock);
   wr->setStream(stream);
   wr->addBuffer(h_A, size, true, false, true);
