@@ -55,11 +55,11 @@ $(ROMIO): | AMPI AMPIF
 		-noprofile \
 		-mpiolib=$@
 
-	# Cygwin only supports NTFS
-	if [ $(shell uname -o) == "Cygwin" ]; then \
+	@# Cygwin only supports NTFS
+	case `uname` in CYGWIN*|cygwin*|Cygwin*) \
 		echo -e "#undef UFS\n#undef NFS\n#define ROMIO_NTFS\n" >> romio/adio/include/romioconf.h; \
 		sed -i s,ufs\ nfs,, romio/Makefile; \
-	fi
+	esac
 	cp romio/include/mpio.h romio/include/mpiof.h $(CDIR)/include
 	$(MAKE) -C romio
 	if [ -n "$(ROMIOLIBSHARED)" ]; then \
