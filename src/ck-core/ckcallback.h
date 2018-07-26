@@ -345,6 +345,10 @@ public:
 	
 	bool isInvalid(void) const {return type==invalid;}
 
+	bool requiresMsgConstruction() const {
+		return (type != ignore && type != ckExit && type != invalid);
+	}
+
         /// Does this callback point at something that may not be at the same
         /// address after a checkpoint/restart cycle?
         bool containsPointer() const;

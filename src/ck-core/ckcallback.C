@@ -39,7 +39,10 @@ public:
 		c.send(msg.getMessage());
 	}
 	void call(CkCallback &&c, int length, const char *data) {
-		c.send(CkDataMsg::buildNew(length,data));
+		if(c.requiresMsgConstruction())
+			c.send(CkDataMsg::buildNew(length,data));
+		else
+			c.send(NULL); // do not construct CkDataMsg
 	}
 };
 
@@ -273,7 +276,10 @@ static void CkCallbackSendExt(const CkCallback &cb, void *msg)
 
 void CkCallback::send(int length,const void *data) const
 {
-	send(CkDataMsg::buildNew(length,data));
+	if(requiresMsgConstruction())
+		send(CkDataMsg::buildNew(length,data));
+	else
+		send(NULL); // do not construct CkDataMsg
 }
 
 /*Libraries should call this from their "done" entry points.
