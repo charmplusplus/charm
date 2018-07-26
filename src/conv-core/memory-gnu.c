@@ -252,7 +252,11 @@ static tsd_key_t arena_key;
 static mutex_t list_lock;
 
 /* Arena structure */
+#ifdef __APPLE__
+struct alignas(16) malloc_arena {
+#else
 struct malloc_arena {
+#endif
   /* Serialize access.  */
   mutex_t mutex;
 
