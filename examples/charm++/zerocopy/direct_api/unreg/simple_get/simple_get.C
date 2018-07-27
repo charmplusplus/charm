@@ -98,14 +98,17 @@ public:
     // arbitrary pointer pointing to valCounter
     const void *refPtr = &valCounter;
 
+    cb.setRefNum(1);
     mySrc1 = CkNcpyBuffer(iArr1, size*sizeof(int), cb, CK_BUFFER_UNREG);
     ACK_DEBUG(("[%d][%d][%d] Setting source Ref: Buffer Ptr: %p, Reference Ptr: %p\n", thisIndex, CkMyPe(), CkMyNode(), iArr1, refPtr));
     mySrc1.setRef(refPtr);
 
+    cb.setRefNum(2);
     mySrc2 = CkNcpyBuffer(dArr1, size*sizeof(double), cb, CK_BUFFER_UNREG);
     ACK_DEBUG(("[%d][%d][%d] Setting source Ref: Buffer Ptr: %p, Reference Ptr: %p\n", thisIndex, CkMyPe(), CkMyNode(), dArr1, refPtr));
     mySrc2.setRef(refPtr);
 
+    cb.setRefNum(3);
     mySrc3 = CkNcpyBuffer(cArr1, size*sizeof(char), cb, CK_BUFFER_UNREG);
     ACK_DEBUG(("[%d][%d][%d] Setting source Ref: Buffer Ptr: %p, Reference Ptr: %p\n", thisIndex, CkMyPe(), CkMyNode(), cArr1, refPtr));
     mySrc3.setRef(refPtr);
@@ -121,10 +124,12 @@ public:
 
     // Cast m->data as (CkNcpyAck *)
     CkNcpyAck *ack = (CkNcpyAck *)(m->data);
-    ACK_DEBUG(("[%d][%d][%d] In source callback : Buffer Ptr: %p, Reference Ptr: %p\n", thisIndex, CkMyPe(), CkMyNode(), ack->ptr, ack->ref));
+    ACK_DEBUG(("[%d][%d][%d] In source callback : Buffer Ptr: %p, Reference Ptr: %p and refnum is %d\n", thisIndex, CkMyPe(), CkMyNode(), ack->ptr, ack->ref, CkGetRefNum(m)));
+
+    int refNum = CkGetRefNum(m);
 
     void *srcPointer;
-    switch(cbCounter) {
+    switch(refNum) {
       case 1 : srcPointer = iArr1; break;
       case 2 : srcPointer = dArr1; break;
       case 3 : srcPointer = cArr1; break;
@@ -155,10 +160,12 @@ public:
 
     // Cast m->data as (CkNcpyAck *)
     CkNcpyAck *ack = (CkNcpyAck *)(m->data);
-    ACK_DEBUG(("[%d][%d][%d] In destination callback : Buffer Ptr: %p, Reference Ptr: %p\n", thisIndex, CkMyPe(), CkMyNode(), ack->ptr, ack->ref));
+    ACK_DEBUG(("[%d][%d][%d] In destination callback : Buffer Ptr: %p, Reference Ptr: %p and refnum is %d\n", thisIndex, CkMyPe(), CkMyNode(), ack->ptr, ack->ref, CkGetRefNum(m)));
+
+    int refNum = CkGetRefNum(m);
 
     void *destPointer;
-    switch(cbCounter) {
+    switch(refNum) {
       case 1 : destPointer = iArr1; break;
       case 2 : destPointer = dArr1; break;
       case 3 : destPointer = cArr1; break;
@@ -206,14 +213,17 @@ public:
     const void *refPtr = &valCounter;
 
     // Create nocopy destination for me to Get into
+    cb.setRefNum(1);
     myDest1 = CkNcpyBuffer(iArr1, size*sizeof(int), cb, CK_BUFFER_UNREG);
     ACK_DEBUG(("[%d][%d][%d] Setting destination Ref: Buffer Ptr: %p, Reference Ptr: %p\n", thisIndex, CkMyPe(), CkMyNode(), iArr1, refPtr));
     myDest1.setRef(refPtr);
 
+    cb.setRefNum(2);
     myDest2 = CkNcpyBuffer(dArr1, size*sizeof(double), cb, CK_BUFFER_UNREG);
     ACK_DEBUG(("[%d][%d][%d] Setting destination Ref: Buffer Ptr: %p, Reference Ptr: %p\n", thisIndex, CkMyPe(), CkMyNode(), dArr1, refPtr));
     myDest2.setRef(refPtr);
 
+    cb.setRefNum(3);
     myDest3 = CkNcpyBuffer(cArr1, size*sizeof(char), cb, CK_BUFFER_UNREG);
     ACK_DEBUG(("[%d][%d][%d] Setting destination Ref: Buffer Ptr: %p, Reference Ptr: %p\n", thisIndex, CkMyPe(), CkMyNode(), cArr1, refPtr));
     myDest3.setRef(refPtr);

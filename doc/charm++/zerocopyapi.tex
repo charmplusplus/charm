@@ -208,7 +208,11 @@ Since callbacks in \charmpp{} allow to store a reference number, these
 callbacks passed into \kw{CkNcpyBuffer} can be set with a
 reference number using the method \texttt{cb.setRefNum(num)}. Upon callback
 invocation, these reference numbers can be used to identify the buffers that
-were passed into the \kw{CkNcpyBuffer} objects. This is
+were passed into the \kw{CkNcpyBuffer} objects. Upon callback invocation, the
+reference number of the callback can be accessed using the \texttt{CkDataMsg}
+argument of the callback function. For a callback using a \texttt{CkDataMsg *msg},
+the reference number is obtained by using the method \texttt{CkGetRefNum(msg);}.
+This is illustrated in \examplerefdir{zerocopy/direct\_api/unreg/simple\_get}.
 specifically useful where there is an indexed collection of buffers, where the
 reference number can be used to index the collection.
 
