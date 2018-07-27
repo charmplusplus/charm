@@ -800,14 +800,14 @@ CkDDT_DataType::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
   *na = 0;
   *nd = 0;
   *combiner = CkDDT_COMBINER_NAMED;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 int
 CkDDT_DataType::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const
 {
   CkPrintf("CkDDT_DataType::getContents: Shouldn't call getContents on primitive datatypes!\n");
-  return -1;
+  return MPI_ERR_TYPE;
 }
 
 CkDDT_Contiguous::CkDDT_Contiguous(int nCount, int bindex, CkDDT_DataType* oldType)
@@ -879,7 +879,7 @@ CkDDT_Contiguous::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
   *na = 0;
   *nd = 1;
   *combiner = CkDDT_COMBINER_CONTIGUOUS;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 int
@@ -887,7 +887,7 @@ CkDDT_Contiguous::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], i
 {
   i[0] = count;
   d[0] = baseIndex;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CkDDT_Vector::CkDDT_Vector(int nCount, int blength, int stride, int bindex, CkDDT_DataType* oldType)
@@ -996,7 +996,7 @@ CkDDT_Vector::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
   *na = 0;
   *nd = 1;
   *combiner = CkDDT_COMBINER_VECTOR;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 int
@@ -1006,7 +1006,7 @@ CkDDT_Vector::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d
   i[1] = blockLength;
   i[2] = strideLength;
   d[0] = baseIndex;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CkDDT_HVector::CkDDT_HVector(int nCount, int blength, int stride,  int bindex,
@@ -1088,7 +1088,7 @@ CkDDT_HVector::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
   *na = 1;
   *nd = 1;
   *combiner = CkDDT_COMBINER_HVECTOR;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 int
@@ -1098,7 +1098,7 @@ CkDDT_HVector::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int 
   i[1] = blockLength;
   a[0] = strideLength;
   d[0] = baseIndex;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CkDDT_Indexed::CkDDT_Indexed(int nCount, const int* arrBlock, const CkDDT_Aint* arrDisp, int bindex,
@@ -1222,7 +1222,7 @@ CkDDT_Indexed::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
   *na = 0;
   *nd = 1;
   *combiner = CkDDT_COMBINER_INDEXED;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 int
@@ -1234,7 +1234,7 @@ CkDDT_Indexed::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int 
     i[z+i[0]+1] = arrayDisplacements[z];
   }
   d[0] = baseIndex;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CkDDT_HIndexed::CkDDT_HIndexed(int nCount, const int* arrBlock, const CkDDT_Aint* arrDisp,  int bindex,
@@ -1341,7 +1341,7 @@ CkDDT_HIndexed::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
   *na = count;
   *nd = 1;
   *combiner = CkDDT_COMBINER_HINDEXED;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 int
@@ -1353,7 +1353,7 @@ CkDDT_HIndexed::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int
     a[z] = arrayDisplacements[z];
   }
   d[0] = baseIndex;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, const CkDDT_Aint *ArrDisp, int index,
@@ -1456,7 +1456,7 @@ CkDDT_Indexed_Block::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
   *na = 0;
   *nd = 1;
   *combiner = CkDDT_COMBINER_INDEXED_BLOCK;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 int
@@ -1468,7 +1468,7 @@ CkDDT_Indexed_Block::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[]
     i[z+2] = arrayDisplacements[z];
   }
   d[0] = baseIndex;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, const CkDDT_Aint *ArrDisp, int index,
@@ -1565,7 +1565,7 @@ CkDDT_HIndexed_Block::getEnvelope(int *ni, int *na, int *nd, int *combiner) cons
   *na = count;
   *nd = 1;
   *combiner = CkDDT_COMBINER_HINDEXED_BLOCK;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 int
@@ -1577,7 +1577,7 @@ CkDDT_HIndexed_Block::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[
     a[z] = arrayDisplacements[z];
   }
   d[0] = baseIndex;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 CkDDT_Struct::CkDDT_Struct(int nCount, const int* arrBlock,
@@ -1731,7 +1731,7 @@ CkDDT_Struct::getEnvelope(int *ni, int *na, int *nd, int *combiner) const
   *na = count;
   *nd = count;
   *combiner = CkDDT_COMBINER_STRUCT;
-  return 0;
+  return MPI_SUCCESS;
 }
 
 int
@@ -1743,7 +1743,7 @@ CkDDT_Struct::getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d
     a[z] = arrayDisplacements[z];
     d[z] = index[z];
   }
-  return 0;
+  return MPI_SUCCESS;
 }
 
 const vector<int> &
