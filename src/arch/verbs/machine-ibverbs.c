@@ -1737,7 +1737,7 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		
 		resetNcpyOpInfoPointers(newNcpyOpInfo);
 		
-		struct ibv_mr *mr = registerDirectMemory(newNcpyOpInfo->srcPtr, newNcpyOpInfo->size);
+		struct ibv_mr *mr = registerDirectMemory(newNcpyOpInfo->srcPtr, newNcpyOpInfo->srcSize);
 		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)malloc(sizeof(struct infiRdmaPacket));
 		rdmaPacket->type = INFI_ONESIDED_DIRECT;
 		rdmaPacket->localBuffer = newNcpyOpInfo;
@@ -1745,8 +1745,8 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		postRdma((uint64_t)(newNcpyOpInfo->srcPtr),
 		        mr->lkey,
 		        (uint64_t)(newNcpyOpInfo->destPtr),
-            ((CmiVerbsRdmaPtr_t *)(newNcpyOpInfo->destLayerInfo))->key,
-		        newNcpyOpInfo->size,
+            ((CmiVerbsRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->key,
+		        newNcpyOpInfo->srcSize,
 		        newNcpyOpInfo->destPe,
 		        (uint64_t)rdmaPacket,
 		        IBV_WR_RDMA_WRITE);
@@ -1760,7 +1760,7 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		
 		resetNcpyOpInfoPointers(newNcpyOpInfo);
 		
-		struct ibv_mr *mr = registerDirectMemory(newNcpyOpInfo->destPtr, newNcpyOpInfo->size);
+		struct ibv_mr *mr = registerDirectMemory(newNcpyOpInfo->destPtr, newNcpyOpInfo->srcSize);
 		
 		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)malloc(sizeof(struct infiRdmaPacket));
 		rdmaPacket->type = INFI_ONESIDED_DIRECT;
@@ -1769,8 +1769,8 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		postRdma((uint64_t)newNcpyOpInfo->destPtr,
 		        mr->lkey,
 		        (uint64_t)newNcpyOpInfo->srcPtr,
-		        ((CmiVerbsRdmaPtr_t *)(newNcpyOpInfo->srcLayerInfo))->key,
-		        newNcpyOpInfo->size,
+		        ((CmiVerbsRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->key,
+		        newNcpyOpInfo->srcSize,
 		        newNcpyOpInfo->srcPe,
 		        (uint64_t)rdmaPacket,
 		        IBV_WR_RDMA_READ);

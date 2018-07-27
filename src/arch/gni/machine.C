@@ -2366,10 +2366,10 @@ static void PumpNetworkSmsg()
                 CMI_GNI_UNLOCK(smsg_mailbox_lock)
 
                 post_rdma((uint64_t)newNcpyOpInfo->destPtr,
-                          ((CmiGNIRzvRdmaPtr_t *)(newNcpyOpInfo->destLayerInfo))->mem_hndl,
+                          ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
                           (uint64_t)newNcpyOpInfo->srcPtr,
-                          ((CmiGNIRzvRdmaPtr_t *)(newNcpyOpInfo->srcLayerInfo))->mem_hndl,
-                          newNcpyOpInfo->size,
+                          ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
+                          newNcpyOpInfo->srcSize,
                           (uint64_t)newNcpyOpInfo,
                           CmiNodeOf(newNcpyOpInfo->destPe),
                           GNI_POST_RDMA_PUT,
@@ -2444,16 +2444,16 @@ static void PumpNetworkSmsg()
                 resetNcpyOpInfoPointers(newNcpyOpInfo);
 
                 // Register source buffer
-                ((CmiGNIRzvRdmaPtr_t *)(newNcpyOpInfo->srcLayerInfo))->mem_hndl =
-                                              registerDirectMem(newNcpyOpInfo->srcPtr,
-                                                                newNcpyOpInfo->size,
+                ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl = 
+                                            registerDirectMem(newNcpyOpInfo->srcPtr,
+                                                                newNcpyOpInfo->srcSize,
                                                                 GNI_MEM_READ_ONLY);
 
                 post_rdma((uint64_t)newNcpyOpInfo->destPtr,
-                          ((CmiGNIRzvRdmaPtr_t *)(newNcpyOpInfo->destLayerInfo))->mem_hndl,
+                          ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
                           (uint64_t)newNcpyOpInfo->srcPtr,
-                          ((CmiGNIRzvRdmaPtr_t *)(newNcpyOpInfo->srcLayerInfo))->mem_hndl,
-                          newNcpyOpInfo->size,
+                          ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
+                          newNcpyOpInfo->srcSize,
                           (uint64_t)newNcpyOpInfo,
                           CmiNodeOf(newNcpyOpInfo->destPe),
                           GNI_POST_RDMA_PUT,
@@ -2474,16 +2474,16 @@ static void PumpNetworkSmsg()
 
                 resetNcpyOpInfoPointers(newNcpyOpInfo);
 
-                ((CmiGNIRzvRdmaPtr_t *)(newNcpyOpInfo->destLayerInfo))->mem_hndl =
+                ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl =
                                               registerDirectMem(newNcpyOpInfo->destPtr,
-                                                                newNcpyOpInfo->size,
+                                                                newNcpyOpInfo->srcSize,
                                                                 GNI_MEM_READWRITE);
 
                 post_rdma((uint64_t)newNcpyOpInfo->srcPtr,
-                          ((CmiGNIRzvRdmaPtr_t *)(newNcpyOpInfo->srcLayerInfo))->mem_hndl,
+                          ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
                           (uint64_t)newNcpyOpInfo->destPtr,
-                          ((CmiGNIRzvRdmaPtr_t *)(newNcpyOpInfo->destLayerInfo))->mem_hndl,
-                          newNcpyOpInfo->size,
+                          ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
+                          newNcpyOpInfo->srcSize,
                           (uint64_t)newNcpyOpInfo,
                           CmiNodeOf(newNcpyOpInfo->srcPe),
                           GNI_POST_RDMA_GET,

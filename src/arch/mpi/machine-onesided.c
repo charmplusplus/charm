@@ -81,10 +81,7 @@ void MPIPostOneBuffer(const void *buffer, void *ref, int size, int pe, int tag, 
 /* Support for Nocopy Direct API */
 
 // Perform an RDMA Get call into the local destination address from the remote source address
-void LrtsIssueRget(
-  NcpyOperationInfo *ncpyOpInfoMsg,
-  unsigned short int *srcMode,
-  unsigned short int *destMode) {
+void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfoMsg) {
 
   // Generate a new tag
   int tag = getNewMPITag();
@@ -115,14 +112,11 @@ void LrtsIssueRget(
 
   // Post an MPI_Irecv for the destination buffer with the tag
   // ONESIDED_BUFFER_DIRECT_RECV indicates that the method should post an irecv
-  MPIPostOneBuffer(ncpyOpInfoMsg->destPtr, ncpyOpInfoMsg, ncpyOpInfoMsg->size, ncpyOpInfoMsg->srcPe, tag, ONESIDED_BUFFER_DIRECT_RECV);
+  MPIPostOneBuffer(ncpyOpInfoMsg->destPtr, ncpyOpInfoMsg, ncpyOpInfoMsg->srcSize, ncpyOpInfoMsg->srcPe, tag, ONESIDED_BUFFER_DIRECT_RECV);
 }
 
 // Perform an RDMA Put call into the remote destination address from the local source address
-void LrtsIssueRput(
-  NcpyOperationInfo *ncpyOpInfoMsg,
-  unsigned short int *srcMode,
-  unsigned short int *destMode) {
+void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfoMsg) {
 
   // Generate a new tag
   int tag = getNewMPITag();
@@ -152,7 +146,7 @@ void LrtsIssueRput(
 
   // Post an MPI_ISend for the source buffer with the tag
   // ONESIDED_BUFFER_DIRECT_SEND indicates that the method should post an isend
-  MPIPostOneBuffer(ncpyOpInfoMsg->srcPtr, ncpyOpInfoMsg, ncpyOpInfoMsg->size, ncpyOpInfoMsg->destPe, tag, ONESIDED_BUFFER_DIRECT_SEND);
+  MPIPostOneBuffer(ncpyOpInfoMsg->srcPtr, ncpyOpInfoMsg, ncpyOpInfoMsg->srcSize, ncpyOpInfoMsg->destPe, tag, ONESIDED_BUFFER_DIRECT_SEND);
 }
 
 // Method invoked to deregister source memory (Empty method to maintain API consistency)

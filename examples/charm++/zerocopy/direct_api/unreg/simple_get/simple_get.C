@@ -124,9 +124,9 @@ public:
     CkAssert(thisIndex == 0);
     cbCounter++;
 
-    // Cast m->data as (CkNcpyAck *)
-    CkNcpyAck *ack = (CkNcpyAck *)(m->data);
-    ACK_DEBUG(("[%d][%d][%d] In source callback : Buffer Ptr: %p, Reference Ptr: %p and refnum is %d\n", thisIndex, CkMyPe(), CkMyNode(), ack->ptr, ack->ref, CkGetRefNum(m)));
+    // Cast m->data as (CkNcpyBuffer *)
+    CkNcpyBuffer *src = (CkNcpyBuffer *)(m->data);
+    ACK_DEBUG(("[%d][%d][%d] In source callback : Buffer Ptr: %p, Reference Ptr: %p and refnum is %d\n", thisIndex, CkMyPe(), CkMyNode(), src->ptr, src->ref, CkGetRefNum(m)));
 
     int refNum = CkGetRefNum(m);
 
@@ -139,10 +139,10 @@ public:
     }
 
     // Verify that source pointer is equal to the buffer pointer returned
-    CkAssert(srcPointer == ack->ptr);
+    CkAssert(srcPointer == src->ptr);
 
     // Verify that reference pointer is equal to the reference pointer returned
-    CkAssert(&valCounter == ack->ref);
+    CkAssert(&valCounter == src->ref);
 
     if(cbCounter == 3) {
       // Release Resources for my sources
@@ -160,9 +160,9 @@ public:
     CkAssert(thisIndex == 1);
     cbCounter++;
 
-    // Cast m->data as (CkNcpyAck *)
-    CkNcpyAck *ack = (CkNcpyAck *)(m->data);
-    ACK_DEBUG(("[%d][%d][%d] In destination callback : Buffer Ptr: %p, Reference Ptr: %p and refnum is %d\n", thisIndex, CkMyPe(), CkMyNode(), ack->ptr, ack->ref, CkGetRefNum(m)));
+    // Cast m->data as (CkNcpyBuffer *)
+    CkNcpyBuffer *dest = (CkNcpyBuffer *)(m->data);
+    ACK_DEBUG(("[%d][%d][%d] In destination callback : Buffer Ptr: %p, Reference Ptr: %p and refnum is %d\n", thisIndex, CkMyPe(), CkMyNode(), dest->ptr, dest->ref, CkGetRefNum(m)));
 
     int refNum = CkGetRefNum(m);
 
@@ -175,12 +175,10 @@ public:
     }
 
     // Verify that destination pointer is equal to the buffer pointer returned
-    CkAssert(destPointer == ack->ptr);
+    CkAssert(destPointer == dest->ptr);
 
     // Verify that reference pointer is equal to the reference pointer returned
-    CkAssert(&valCounter == ack->ref);
-
-
+    CkAssert(&valCounter == dest->ref);
 
     if(cbCounter == 3) {
       // Release Resources for my destinations

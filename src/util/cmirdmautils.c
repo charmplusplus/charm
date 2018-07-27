@@ -17,6 +17,9 @@ void setNcpyOpInfo(
     int srcLayerSize,
     char *srcAck,
     int srcAckSize,
+    int srcSize,
+    unsigned short int srcMode,
+    unsigned short int isSrcRegistered,
     int srcPe,
     const void *srcRef,
     const void *destPtr,
@@ -24,9 +27,11 @@ void setNcpyOpInfo(
     int destLayerSize,
     char *destAck,
     int destAckSize,
+    int destSize,
+    unsigned short int destMode,
+    unsigned short int isDestRegistered,
     int destPe,
     const void *destRef,
-    int size,
     NcpyOperationInfo *ncpyOpInfo) {
 
   // memcpy srcLayerInfo
@@ -49,20 +54,23 @@ void setNcpyOpInfo(
   ncpyOpInfo->srcRef = srcRef;
   ncpyOpInfo->srcLayerSize = srcLayerSize;
   ncpyOpInfo->srcAckSize = srcAckSize;
-  ncpyOpInfo->origSrcLayerInfoPtr = srcLayerInfo;
+  ncpyOpInfo->srcSize = srcSize;
+  ncpyOpInfo->srcMode = srcMode;
+  ncpyOpInfo->isSrcRegistered = isSrcRegistered;
 
   ncpyOpInfo->destPtr = destPtr;
   ncpyOpInfo->destPe = destPe;
   ncpyOpInfo->destRef = destRef;
   ncpyOpInfo->destLayerSize = destLayerSize;
   ncpyOpInfo->destAckSize = destAckSize;
-  ncpyOpInfo->origDestLayerInfoPtr = destLayerInfo;
+  ncpyOpInfo->destSize = destSize;
+  ncpyOpInfo->destMode = destMode;
+  ncpyOpInfo->isDestRegistered = isDestRegistered;
 
   ncpyOpInfo->ackMode = 0;
   ncpyOpInfo->freeMe  = 1;
 
   ncpyOpInfo->ncpyOpInfoSize = sizeof(NcpyOperationInfo) + srcLayerSize + destLayerSize + srcAckSize + destAckSize;
-  ncpyOpInfo->size = size;
 }
 
 

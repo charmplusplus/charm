@@ -324,31 +324,51 @@ void CkRdmaDirectAckHandler(void *ack) {
 
   NcpyOperationInfo *info = (NcpyOperationInfo *)(ack);
 
+  CkCallback *srcCb = (CkCallback *)(info->srcAck);
+  CkCallback *destCb = (CkCallback *)(info->destAck);
+
+  // reconstruct the CkNcpyBuffer object for the source
+  CkNcpyBuffer src;
+  src.ptr = info->srcPtr;
+  src.pe  = info->srcPe;
+  src.cnt = info->srcSize;
+  src.ref = info->srcRef;
+  src.mode = info->srcMode;
+  src.isRegistered = info->isSrcRegistered;
+  memcpy((char *)(&src.cb), srcCb, info->srcAckSize); // initialize cb
+  memcpy((char *)(src.layerInfo), info->srcLayerInfo, info->srcLayerSize); // initialize layerInfo
+
+  CkNcpyBuffer dest;
+  dest.ptr = info->destPtr;
+  dest.pe  = info->destPe;
+  dest.cnt = info->destSize;
+  dest.ref = info->destRef;
+  dest.mode = info->destMode;
+  dest.isRegistered = info->isDestRegistered;
+  memcpy((char *)(&dest.cb), destCb, info->destAckSize); // initialize cb
+  memcpy((char *)(dest.layerInfo), info->destLayerInfo, info->destLayerSize); // initialize layerInfo
+
   if(info->ackMode == 0 || info->ackMode == 1) {
-    //Invoke the sender's callback
-    CkNcpyAck srcAck(info->srcPtr, info->srcRef);
 
 #if CMK_SMP
     //call to callbackgroup to call the callback when calling from comm thread
     //this adds one more trip through the scheduler
-    _ckcallbackgroup[info->srcPe].call(*(CkCallback *)(info->srcAck), sizeof(CkNcpyAck), (const char *)(&srcAck));
+    _ckcallbackgroup[info->srcPe].call(*(CkCallback *)(info->srcAck), sizeof(CkNcpyBuffer), (const char *)(&src));
 #else
     //Invoke the destination callback
-    ((CkCallback *)(info->srcAck))->send(sizeof(CkNcpyAck), &srcAck);
+    ((CkCallback *)(info->srcAck))->send(sizeof(CkNcpyBuffer), &src);
 #endif
   }
 
   if(info->ackMode == 0 || info->ackMode == 2) {
-    //Invoke the receiver's callback
-    CkNcpyAck destAck(info->destPtr, info->destRef);
 
 #if CMK_SMP
     //call to callbackgroup to call the callback when calling from comm thread
     //this adds one more trip through the scheduler
-    _ckcallbackgroup[info->destPe].call(*(CkCallback *)(info->destAck), sizeof(CkNcpyAck), (const char *)(&destAck));
+    _ckcallbackgroup[info->destPe].call(*(CkCallback *)(info->destAck), sizeof(CkNcpyBuffer), (const char *)(&dest));
 #else
     //Invoke the destination callback
-    ((CkCallback *)(info->destAck))->send(sizeof(CkNcpyAck), &destAck);
+    ((CkCallback *)(info->destAck))->send(sizeof(CkNcpyBuffer), &dest);
 #endif
   }
 
@@ -390,10 +410,18 @@ void CkNcpyBuffer::cmaGet(CkNcpyBuffer &source) {
 
 void CkNcpyBuffer::rdmaGet(CkNcpyBuffer &source) {
 
-  int layerInfoSize = CMK_NOCOPY_DIRECT_BYTES;
+  int layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
   int ackSize = sizeof(CkCallback);
 
-  // Create a general object that can be used across layers
+  if(mode == CK_BUFFER_UNREG) {
+    // register it because it is required for RGET
+    CmiSetRdmaBufferInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, mode);
+
+    isRegistered = true;
+    mode = CK_BUFFER_REG;
+  }
+
+  // Create a general object that can be used across layers and can store the state of the CkNcpyBuffer objects
   int ncpyObjSize = getNcpyOpInfoTotalSize(
                       layerInfoSize,
                       ackSize,
@@ -403,25 +431,28 @@ void CkNcpyBuffer::rdmaGet(CkNcpyBuffer &source) {
   NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)CmiAlloc(ncpyObjSize);
 
   setNcpyOpInfo(source.ptr,
-                (char *)(&(source.layerInfo[0])) + CmiGetRdmaCommonInfoSize(),
+                (char *)(source.layerInfo),
                 layerInfoSize,
                 (char *)(&source.cb),
                 ackSize,
+                source.cnt,
+                source.mode,
+                source.isRegistered,
                 source.pe,
                 source.ref,
                 ptr,
-                (char *)(&(layerInfo[0])) + CmiGetRdmaCommonInfoSize(),
+                (char *)(layerInfo),
                 layerInfoSize,
                 (char *)(&cb),
                 ackSize,
+                cnt,
+                mode,
+                isRegistered,
                 pe,
                 ref,
-                cnt,
                 ncpyOpInfo);
 
-  CmiIssueRget(ncpyOpInfo,
-               &source.mode,
-               &mode);
+  CmiIssueRget(ncpyOpInfo);
 }
 
 // Perform a nocopy get operation into this destination using the passed source
@@ -442,26 +473,22 @@ void CkNcpyBuffer::get(CkNcpyBuffer &source){
   if(transferMode == ncpyTransferMode::MEMCPY) {
     memcpyGet(source);
 
-    //Invoke the receiver's callback
-    CkNcpyAck srcAck(ptr, ref);
-    cb.send(sizeof(CkNcpyAck), &srcAck);
+    //Invoke the source callback
+    source.cb.send(sizeof(CkNcpyBuffer), &source);
 
-    //Invoke the sender's callback
-    CkNcpyAck destAck(source.ptr, source.ref);
-    source.cb.send(sizeof(CkNcpyAck), &destAck);
+    //Invoke the destination callback
+    cb.send(sizeof(CkNcpyBuffer), this);
 
 #if CMK_USE_CMA
   } else if(transferMode == ncpyTransferMode::CMA) {
 
     cmaGet(source);
 
-    //Invoke the receiver's callback
-    CkNcpyAck srcAck(ptr, ref);
-    cb.send(sizeof(CkNcpyAck), &srcAck);
+    //Invoke the source callback
+    source.cb.send(sizeof(CkNcpyBuffer), &source);
 
-    //Invoke the sender's callback
-    CkNcpyAck destAck(source.ptr, source.ref);
-    source.cb.send(sizeof(CkNcpyAck), &destAck);
+    //Invoke the destination callback
+    cb.send(sizeof(CkNcpyBuffer), this);
 
 #endif
   } else if (transferMode == ncpyTransferMode::RDMA) {
@@ -491,10 +518,18 @@ void CkNcpyBuffer::cmaPut(CkNcpyBuffer &destination) {
 
 void CkNcpyBuffer::rdmaPut(CkNcpyBuffer &destination) {
 
-  int layerInfoSize = CMK_NOCOPY_DIRECT_BYTES;
+  int layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
   int ackSize = sizeof(CkCallback);
 
-  // Create a general object that can be used across layers
+  if(mode == CK_BUFFER_UNREG) {
+    // register it because it is required for RPUT
+    CmiSetRdmaBufferInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, mode);
+
+    isRegistered = true;
+    mode = CK_BUFFER_REG;
+  }
+
+  // Create a general object that can be used across layers that can store the state of the CkNcpyBuffer objects
   int ncpyObjSize = getNcpyOpInfoTotalSize(
                       layerInfoSize,
                       ackSize,
@@ -504,25 +539,28 @@ void CkNcpyBuffer::rdmaPut(CkNcpyBuffer &destination) {
   NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)CmiAlloc(ncpyObjSize);
 
   setNcpyOpInfo(ptr,
-                (char *)(&(layerInfo[0])) + CmiGetRdmaCommonInfoSize(),
+                (char *)(layerInfo),
                 layerInfoSize,
                 (char *)(&cb),
                 ackSize,
+                cnt,
+                mode,
+                isRegistered,
                 pe,
                 ref,
                 destination.ptr,
-                (char *)(&(destination.layerInfo[0])) + CmiGetRdmaCommonInfoSize(),
+                (char *)(destination.layerInfo),
                 layerInfoSize,
                 (char *)(&destination.cb),
                 ackSize,
+                destination.cnt,
+                destination.mode,
+                destination.isRegistered,
                 destination.pe,
                 destination.ref,
-                cnt,
                 ncpyOpInfo);
 
-  CmiIssueRput(ncpyOpInfo,
-               &mode,
-               &destination.mode);
+  CmiIssueRput(ncpyOpInfo);
 }
 
 // Perform a nocopy put operation into the passed destination using this source
@@ -542,25 +580,21 @@ void CkNcpyBuffer::put(CkNcpyBuffer &destination){
   if(transferMode == ncpyTransferMode::MEMCPY) {
     memcpyPut(destination);
 
-    //Invoke the source callback
-    CkNcpyAck srcAck(ptr, ref);
-    cb.send(sizeof(CkNcpyAck), &srcAck);
-
     //Invoke the destination callback
-    CkNcpyAck destAck(destination.ptr, destination.ref);
-    destination.cb.send(sizeof(CkNcpyAck), &destAck);
+    destination.cb.send(sizeof(CkNcpyBuffer), &destination);
+
+    //Invoke the source callback
+    cb.send(sizeof(CkNcpyBuffer), this);
 
 #if CMK_USE_CMA
   } else if(transferMode == ncpyTransferMode::CMA) {
     cmaPut(destination);
 
-    //Invoke the source callback
-    CkNcpyAck srcAck(ptr, ref);
-    cb.send(sizeof(CkNcpyAck), &srcAck);
-
     //Invoke the destination callback
-    CkNcpyAck destAck(destination.ptr, destination.ref);
-    destination.cb.send(sizeof(CkNcpyAck), &destAck);
+    destination.cb.send(sizeof(CkNcpyBuffer), &destination);
+
+    //Invoke the source callback
+    cb.send(sizeof(CkNcpyBuffer), this);
 
 #endif
   } else if (transferMode == ncpyTransferMode::RDMA) {

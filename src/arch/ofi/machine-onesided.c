@@ -233,7 +233,7 @@ void process_onesided_reg_and_put(struct fi_cq_tagged_entry *e, OFIRequest *req)
   // Do not free as this message
   ncpyOpInfo->freeMe = 0;
 
-  struct fid_mr *mr = registerDirectMemory(ncpyOpInfo->srcPtr, ncpyOpInfo->size);
+  struct fid_mr *mr = registerDirectMemory(ncpyOpInfo->srcPtr, ncpyOpInfo->srcSize);
   const char *rbuf  = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (const char*)(ncpyOpInfo->destPtr);
 
   // Allocate a completion object for tracking write completion and ack handling
@@ -245,8 +245,8 @@ void process_onesided_reg_and_put(struct fi_cq_tagged_entry *e, OFIRequest *req)
       (char*)(ncpyOpInfo->srcPtr),
       rbuf,
       CmiNodeOf(ncpyOpInfo->destPe),
-      ((CmiOfiRdmaPtr_t *)(ncpyOpInfo->destLayerInfo))->key,
-      ncpyOpInfo->size,
+      ((CmiOfiRdmaPtr_t *)((char *)(ncpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->key,
+      ncpyOpInfo->srcSize,
       mr,
       ofi_onesided_direct_operation_callback,
       (void *)rdmaComp,
@@ -264,7 +264,7 @@ void process_onesided_reg_and_get(struct fi_cq_tagged_entry *e, OFIRequest *req)
   NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(data);
   resetNcpyOpInfoPointers(ncpyOpInfo);
 
-  struct fid_mr *mr = registerDirectMemory(ncpyOpInfo->destPtr, ncpyOpInfo->size);
+  struct fid_mr *mr = registerDirectMemory(ncpyOpInfo->destPtr, ncpyOpInfo->srcSize);
   const char *rbuf  = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (const char*)(ncpyOpInfo->srcPtr);
 
   // Allocate a completion object for tracking write completion and ack handling
@@ -276,8 +276,8 @@ void process_onesided_reg_and_get(struct fi_cq_tagged_entry *e, OFIRequest *req)
       (char*)(ncpyOpInfo->destPtr),
       rbuf,
       CmiNodeOf(ncpyOpInfo->srcPe),
-      ((CmiOfiRdmaPtr_t *)(ncpyOpInfo->srcLayerInfo))->key,
-      ncpyOpInfo->size,
+      ((CmiOfiRdmaPtr_t *)((char *)(ncpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->key,
+      ncpyOpInfo->srcSize,
       mr,
       ofi_onesided_direct_operation_callback,
       (void *)rdmaComp,
@@ -287,26 +287,11 @@ void process_onesided_reg_and_get(struct fi_cq_tagged_entry *e, OFIRequest *req)
 
 
 // Perform an RDMA Get call into the local destination address from the remote source address
-void LrtsIssueRget(
-  NcpyOperationInfo *ncpyOpInfo,
-  unsigned short int *srcMode,
-  unsigned short int *destMode) {
+void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo) {
 
   OFIRequest *req;
 
-  // Register local buffer if it is not registered
-  if(*destMode == CMK_BUFFER_UNREG) {
-    CmiOfiRdmaPtr_t *dest_info = (CmiOfiRdmaPtr_t *)(ncpyOpInfo->destLayerInfo);
-    dest_info->mr = registerDirectMemory(ncpyOpInfo->destPtr, ncpyOpInfo->size);
-    dest_info->key = fi_mr_key(dest_info->mr);
-    *destMode = CMK_BUFFER_REG;
-
-    // set registration info in the origDestLayerInfoPtr
-    ((CmiOfiRdmaPtr_t *)(ncpyOpInfo->origDestLayerInfoPtr))->mr = dest_info->mr;
-    ((CmiOfiRdmaPtr_t *)(ncpyOpInfo->origDestLayerInfoPtr))->key = dest_info->key;
-  }
-
-  if(*srcMode == CMK_BUFFER_UNREG) {
+  if(ncpyOpInfo->srcMode == CMK_BUFFER_UNREG) {
     // Remote buffer is unregistered, send a message to register it and perform PUT
 #if USE_OFIREQUEST_CACHE
     req = alloc_request(context.request_cache);
@@ -330,8 +315,8 @@ void LrtsIssueRget(
              req);
   } else {
 
-    CmiOfiRdmaPtr_t *dest_info = (CmiOfiRdmaPtr_t *)(ncpyOpInfo->destLayerInfo);
-    CmiOfiRdmaPtr_t *src_info = (CmiOfiRdmaPtr_t *)(ncpyOpInfo->srcLayerInfo);
+    CmiOfiRdmaPtr_t *dest_info = (CmiOfiRdmaPtr_t *)((char *)ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize());
+    CmiOfiRdmaPtr_t *src_info = (CmiOfiRdmaPtr_t *)((char *)ncpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize());
 
     const char *rbuf        = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (const char*)(ncpyOpInfo->srcPtr);
 
@@ -345,7 +330,7 @@ void LrtsIssueRget(
         rbuf,
         CmiNodeOf(ncpyOpInfo->srcPe),
         src_info->key,
-        ncpyOpInfo->size,
+        ncpyOpInfo->srcSize,
         dest_info->mr,
         ofi_onesided_direct_operation_callback,
         (void *)rdmaComp,
@@ -355,26 +340,11 @@ void LrtsIssueRget(
 }
 
 // Perform an RDMA Put call into the remote destination address from the local source address
-void LrtsIssueRput(
-  NcpyOperationInfo *ncpyOpInfo,
-  unsigned short int *srcMode,
-  unsigned short int *destMode) {
+void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
 
   OFIRequest *req;
 
-  // Register local buffer if it is not registered
-  if(*srcMode == CMK_BUFFER_UNREG) {
-    CmiOfiRdmaPtr_t *src_info = (CmiOfiRdmaPtr_t *)(ncpyOpInfo->srcLayerInfo);
-    src_info->mr = registerDirectMemory(ncpyOpInfo->srcPtr, ncpyOpInfo->size);
-    src_info->key = fi_mr_key(src_info->mr);
-    *srcMode = CMK_BUFFER_REG;
-
-    // set registration info in the origSrcLayerInfoPtr
-    ((CmiOfiRdmaPtr_t *)(ncpyOpInfo->origSrcLayerInfoPtr))->mr = src_info->mr;
-    ((CmiOfiRdmaPtr_t *)(ncpyOpInfo->origSrcLayerInfoPtr))->key = src_info->key;
-  }
-
-  if(*destMode == CMK_BUFFER_UNREG) {
+  if(ncpyOpInfo->destMode == CMK_BUFFER_UNREG) {
     // Remote buffer is unregistered, send a message to register it and perform PUT
 #if USE_OFIREQUEST_CACHE
     req = alloc_request(context.request_cache);
@@ -398,8 +368,8 @@ void LrtsIssueRput(
              req);
   } else {
 
-    CmiOfiRdmaPtr_t *dest_info = (CmiOfiRdmaPtr_t *)(ncpyOpInfo->destLayerInfo);
-    CmiOfiRdmaPtr_t *src_info = (CmiOfiRdmaPtr_t *)(ncpyOpInfo->srcLayerInfo);
+    CmiOfiRdmaPtr_t *dest_info = (CmiOfiRdmaPtr_t *)((char *)(ncpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize());
+    CmiOfiRdmaPtr_t *src_info = (CmiOfiRdmaPtr_t *)((char *)(ncpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize());
 
     const char *rbuf        = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (const char*)(ncpyOpInfo->destPtr);
 
@@ -413,7 +383,7 @@ void LrtsIssueRput(
         rbuf,
         CmiNodeOf(ncpyOpInfo->destPe),
         dest_info->key,
-        ncpyOpInfo->size,
+        ncpyOpInfo->srcSize,
         src_info->mr,
         ofi_onesided_direct_operation_callback,
         (void *)rdmaComp,

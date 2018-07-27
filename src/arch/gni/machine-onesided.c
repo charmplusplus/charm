@@ -351,25 +351,9 @@ void LrtsSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short
 }
 
 // Perform an RDMA Get call into the local destination address from the remote source address
-void LrtsIssueRget(
-  NcpyOperationInfo *ncpyOpInfo,
-  unsigned short int *srcMode,
-  unsigned short int *destMode) {
+void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo) {
 
-  // Register local buffer if it is not registered
-  if(*destMode == CMK_BUFFER_UNREG) {
-    ((CmiGNIRzvRdmaPtr_t *)(ncpyOpInfo->destLayerInfo))->mem_hndl =
-                                      registerDirectMem(ncpyOpInfo->destPtr,
-                                                        ncpyOpInfo->size,
-                                                        GNI_MEM_READWRITE);
-    *destMode = CMK_BUFFER_REG;
-
-    // set mem_hndl in the origDestLayerInfoPtr
-    ((CmiGNIRzvRdmaPtr_t *)(ncpyOpInfo->origDestLayerInfoPtr))->mem_hndl =
-                            ((CmiGNIRzvRdmaPtr_t *)(ncpyOpInfo->destLayerInfo))->mem_hndl;
-  }
-
-  if(*srcMode == CMK_BUFFER_UNREG) {
+  if(ncpyOpInfo->srcMode == CMK_BUFFER_UNREG) {
     // Remote buffer is unregistered, send a message to register it and perform PUT
 
 #if CMK_SMP
@@ -398,7 +382,7 @@ void LrtsIssueRget(
 
     uint64_t src_addr = (uint64_t)(ncpyOpInfo->srcPtr);
     uint64_t dest_addr = (uint64_t)(ncpyOpInfo->destPtr);
-    uint64_t length    = (uint64_t)(ncpyOpInfo->size);
+    uint64_t length    = (uint64_t)(ncpyOpInfo->srcSize);
 
     //check alignment as Rget in GNI requires 4 byte alignment for src_addr, dest_adder and size
     if(((src_addr % 4)==0) && ((dest_addr % 4)==0) && ((length % 4)==0)) {
@@ -410,10 +394,10 @@ void LrtsIssueRget(
       // perform GET directly
       gni_return_t status = post_rdma(
                             src_addr,
-                            ((CmiGNIRzvRdmaPtr_t *)(ncpyOpInfo->srcLayerInfo))->mem_hndl,
+                            ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
                             dest_addr,
-                            ((CmiGNIRzvRdmaPtr_t *)(ncpyOpInfo->destLayerInfo))->mem_hndl,
-                            ncpyOpInfo->size,
+                            ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
+                            ncpyOpInfo->srcSize,
                             (uint64_t)ncpyOpInfo,
                             CmiNodeOf(ncpyOpInfo->srcPe),
                             GNI_POST_RDMA_GET,
@@ -440,25 +424,8 @@ void LrtsIssueRget(
 }
 
 // Perform an RDMA Put call into the remote destination address from the local source address
-void LrtsIssueRput(
-  NcpyOperationInfo *ncpyOpInfo,
-  unsigned short int *srcMode,
-  unsigned short int *destMode) {
-
-  // Register local buffer if it is not registered
-  if(*srcMode == CMK_BUFFER_UNREG) {
-    ((CmiGNIRzvRdmaPtr_t *)(ncpyOpInfo->srcLayerInfo))->mem_hndl =
-                                      registerDirectMem(ncpyOpInfo->srcPtr,
-                                                        ncpyOpInfo->size,
-                                                        GNI_MEM_READ_ONLY);
-    *srcMode = CMK_BUFFER_REG;
-
-    // set mem_hndl in the origSrcLayerInfoPtr
-    ((CmiGNIRzvRdmaPtr_t *)(ncpyOpInfo->origSrcLayerInfoPtr))->mem_hndl =
-                            ((CmiGNIRzvRdmaPtr_t *)(ncpyOpInfo->srcLayerInfo))->mem_hndl;
-  }
-
-  if(*destMode == CMK_BUFFER_UNREG) {
+void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
+  if(ncpyOpInfo->destMode == CMK_BUFFER_UNREG) {
     // Remote buffer is unregistered, send a message to register it and perform GET
 
     // send all the data to the source to register and perform a get
@@ -495,10 +462,10 @@ void LrtsIssueRput(
 #else // nonsmp mode
     // perform PUT directly
     gni_return_t status = post_rdma(dest_addr,
-                          ((CmiGNIRzvRdmaPtr_t *)(ncpyOpInfo->destLayerInfo))->mem_hndl,
+                          ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
                           src_addr,
-                          ((CmiGNIRzvRdmaPtr_t *)(ncpyOpInfo->srcLayerInfo))->mem_hndl,
-                          ncpyOpInfo->size,
+                          ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
+                          ncpyOpInfo->srcSize,
                           (uint64_t)ncpyOpInfo,
                           CmiNodeOf(ncpyOpInfo->destPe),
                           GNI_POST_RDMA_PUT,
@@ -537,10 +504,10 @@ void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int m
 void _performOneRgetForWorkerThread(MSG_LIST *ptr) {
   NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(ptr->msg);
   post_rdma((uint64_t)ncpyOpInfo->srcPtr,
-            ((CmiGNIRzvRdmaPtr_t *)(ncpyOpInfo->srcLayerInfo))->mem_hndl,
+            ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
             (uint64_t)ncpyOpInfo->destPtr,
-            ((CmiGNIRzvRdmaPtr_t *)(ncpyOpInfo->destLayerInfo))->mem_hndl,
-            ncpyOpInfo->size,
+            ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
+            ncpyOpInfo->srcSize,
             (uint64_t)ncpyOpInfo,
             ptr->destNode,
             GNI_POST_RDMA_GET,
@@ -551,10 +518,10 @@ void _performOneRgetForWorkerThread(MSG_LIST *ptr) {
 void _performOneRputForWorkerThread(MSG_LIST *ptr) {
   NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(ptr->msg);
   post_rdma((uint64_t)ncpyOpInfo->destPtr,
-            ((CmiGNIRzvRdmaPtr_t *)(ncpyOpInfo->destLayerInfo))->mem_hndl,
+            ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
             (uint64_t)ncpyOpInfo->srcPtr,
-            ((CmiGNIRzvRdmaPtr_t *)(ncpyOpInfo->srcLayerInfo))->mem_hndl,
-            ncpyOpInfo->size,
+            ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
+            ncpyOpInfo->srcSize,
             (uint64_t)ncpyOpInfo,
             ptr->destNode,
             GNI_POST_RDMA_PUT,

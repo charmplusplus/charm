@@ -37,9 +37,7 @@ static void getRequestHandler(ConverseRdmaMsg *getReqMsg){
   ncpyOpInfo->freeMe = 0;
 
   // Get is implemented internally using a call to Put
-  CmiIssueRput(ncpyOpInfo,
-               NULL,
-               NULL);
+  CmiIssueRput(ncpyOpInfo);
 }
 
 // Invoked when this PE receives a large array as the target of an Rput or the initiator of an Rget
@@ -52,7 +50,7 @@ static void putDataHandler(ConverseRdmaMsg *payloadMsg) {
   // copy the received messsage into the user's destination address
   memcpy((char *)ncpyOpInfo->destPtr,
          (char *)payloadMsg + sizeof(ConverseRdmaMsg) + ncpyOpInfo->ncpyOpInfoSize,
-         ncpyOpInfo->size);
+         ncpyOpInfo->srcSize);
 
   // Invoke the destination ack
   ncpyOpInfo->ackMode = 2;
@@ -72,10 +70,7 @@ void CmiSetRdmaNcpyAck(RdmaAckCallerFn fn) {
   ncpyAckHandlerFn = fn;
 }
 
-void CmiIssueRget(
-  NcpyOperationInfo *ncpyOpInfo,
-  unsigned short int *srcMode,
-  unsigned short int *destMode) {
+void CmiIssueRget(NcpyOperationInfo *ncpyOpInfo) {
 
   int ncpyOpInfoSize = ncpyOpInfo->ncpyOpInfoSize;
 
@@ -94,13 +89,10 @@ void CmiIssueRget(
   CmiFree(ncpyOpInfo);
 }
 
-void CmiIssueRput(
-  NcpyOperationInfo *ncpyOpInfo,
-  unsigned short int *srcMode,
-  unsigned short int *destMode) {
+void CmiIssueRput(NcpyOperationInfo *ncpyOpInfo) {
 
   int ncpyOpInfoSize = ncpyOpInfo->ncpyOpInfoSize;
-  int size = ncpyOpInfo->size;
+  int size = ncpyOpInfo->srcSize;
 
   // Send a ConverseRdmaMsg to the other PE sending the array
   ConverseRdmaMsg *payloadMsg = (ConverseRdmaMsg *)CmiAlloc(sizeof(ConverseRdmaMsg) + ncpyOpInfoSize + size);

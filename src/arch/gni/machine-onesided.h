@@ -183,36 +183,10 @@ typedef struct _cmi_gni_rzv_rdma_reverse_op {
 void LrtsSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode);
 
 // Perform an RDMA Get call into the local destination address from the remote source address
-void LrtsIssueRget(
-  const void* srcAddr,
-  void *srcInfo,
-  void *srcAck,
-  int srcAckSize,
-  int srcPe,
-  unsigned short int *srcMode,
-  const void* destAddr,
-  void *destInfo,
-  void *destAck,
-  int destAckSize,
-  int destPe,
-  unsigned short int *destMode,
-  int size);
+void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo);
 
 // Perform an RDMA Put call into the remote destination address from the local source address
-void LrtsIssueRput(
-  const void* destAddr,
-  void *destInfo,
-  void *destAck,
-  int destAckSize,
-  int destPe,
-  unsigned short int *destMode,
-  const void* srcAddr,
-  void *srcInfo,
-  void *srcAck,
-  int srcAckSize,
-  int srcPe,
-  unsigned short int *srcMode,
-  int size);
+void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo);
 
 // Method performs RDMA operations
 gni_return_t post_rdma(

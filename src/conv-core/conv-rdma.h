@@ -33,10 +33,7 @@ void CmiSetRdmaNcpyAck(RdmaAckCallerFn fn);
  * When the runtime invokes destAck on the destination (initiator), it indicates that the data has been successfully received in the
  * destAddr buffer.
  */
-void CmiIssueRget(
-  NcpyOperationInfo *ncpyOpInfo,
-  unsigned short int *srcMode,
-  unsigned short int *destMode);
+void CmiIssueRget(NcpyOperationInfo *ncpyOpInfo);
 
 /* CmiIssueRput initiates an RDMA write operation, transferring 'size' bytes of data from the local address, 'srcAddr' to the address space of 'destPe'.
  * When the runtime invokes srcAck on the source (initiator), it indicates safety to overwrite or free the srcAddr buffer.
@@ -44,10 +41,7 @@ void CmiIssueRget(
  * destAddr buffer.
  */
 
-void CmiIssueRput(
-  NcpyOperationInfo *ncpyOpInfo,
-  unsigned short int *srcMode,
-  unsigned short int *destMode);
+void CmiIssueRput(NcpyOperationInfo *ncpyOpInfo);
 
 void CmiDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode);
 

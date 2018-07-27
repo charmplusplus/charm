@@ -199,15 +199,9 @@ typedef struct _cmi_rdma_direct_ack {
 /* Support for Nocopy Direct API */
 void LrtsSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode);
 void LrtsSetRdmaNcpyAck(RdmaAckHandlerFn fn);
-void LrtsIssueRget(
-  NcpyOperationInfo *ncpyOpInfo,
-  unsigned short int *srcMode,
-  unsigned short int *destMode);
+void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo);
 
-void LrtsIssueRput(
-  NcpyOperationInfo *ncpyOpInfo,
-  unsigned short int *srcMode,
-  unsigned short int *destMode);
+void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo);
 
 void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode);
 
@@ -226,23 +220,15 @@ void CmiSetRdmaNcpyAck(RdmaAckHandlerFn fn){
 }
 
 /* Perform an RDMA Get operation into the local destination address from the remote source address*/
-void CmiIssueRget(
-  NcpyOperationInfo *ncpyOpInfo,
-  unsigned short int *srcMode,
-  unsigned short int *destMode) {
-
+void CmiIssueRget(NcpyOperationInfo *ncpyOpInfo) {
   // Use network RDMA for a PE on a remote host
-  LrtsIssueRget(ncpyOpInfo, srcMode, destMode);
+  LrtsIssueRget(ncpyOpInfo);
 }
 
 /* Perform an RDMA Put operation into the remote destination address from the local source address */
-void CmiIssueRput(
-  NcpyOperationInfo *ncpyOpInfo,
-  unsigned short int *srcMode,
-  unsigned short int *destMode) {
-
+void CmiIssueRput(NcpyOperationInfo *ncpyOpInfo) {
   // Use network RDMA for a PE on a remote host
-  LrtsIssueRput(ncpyOpInfo, srcMode, destMode);
+  LrtsIssueRput(ncpyOpInfo);
 }
 
 /* De-register registered memory for pointer */

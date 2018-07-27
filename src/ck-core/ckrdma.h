@@ -107,29 +107,13 @@ int getRdmaBufSize(envelope *env);
 void CkRdmaAckHandler(void *cookie);
 void CkRdmaDirectAckHandler(void *ack);
 
-// Class to represent an acknowledgement structure
-class CkNcpyAck{
-  public:
-  // pointer to the buffer
-  const void *ptr;
-
-  // reference pointer
-  // This is an optional arbitrary pointer set by the user before performing the get/put
-  // operation. It is returned back in the CkNcpyAck object.
-  const void *ref;
-
-  CkNcpyAck(const void *ptr_, const void *ref_) : ptr(ptr_), ref(ref_) {}
-};
-
-PUPbytes(CkNcpyAck);
-
 // Class to represent an RDMA buffer
 class CkNcpyBuffer{
-  private:
+
+  public:
   // bool to indicate registration for current values of ptr and cnt on pe
   bool isRegistered;
 
-  public:
   // pointer to the buffer
   const void *ptr;
 

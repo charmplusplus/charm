@@ -212,7 +212,7 @@ void ncpyOpInfo_recv_done(pami_context_t ctxt, void *clientdata, pami_result_t r
 #if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
   CpvAccess(uselock) = 0;
 #endif
-  LrtsIssueRget(ncpyOpInfo, NULL, NULL);
+  LrtsIssueRget(ncpyOpInfo);
 #if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
   CpvAccess(uselock) = 1;
 #endif
@@ -265,10 +265,7 @@ void rzv_rdma_direct_recv_done (pami_context_t     ctxt,
 }
 
 // Perform an RDMA Get call into the local destination address from the remote source address
-void LrtsIssueRget(
-  NcpyOperationInfo *ncpyOpInfo,
-  unsigned short int *srcMode,
-  unsigned short int *destMode) {
+void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo) {
 
 #if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
   int c = CmiMyNode() % cmi_pami_numcontexts;
@@ -283,7 +280,7 @@ void LrtsIssueRget(
   size_t dst_context = 0;
 #endif
 
-  CmiPAMIRzvRdmaPtr_t *src_Info = (CmiPAMIRzvRdmaPtr_t *)(ncpyOpInfo->srcLayerInfo);
+  CmiPAMIRzvRdmaPtr_t *src_Info = (CmiPAMIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize());
 
   INCR_ORECVS();
 
@@ -291,14 +288,11 @@ void LrtsIssueRget(
   pami_endpoint_t origin;
   PAMI_Endpoint_create (cmi_pami_client, (pami_task_t)CmiNodeOf(ncpyOpInfo->srcPe), dst_context, &origin);
 
-  getData(my_context, origin, (void *)(ncpyOpInfo->destPtr), ncpyOpInfo, dst_context, rzv_rdma_direct_recv_done, src_Info->offset, &src_Info->mregion, ncpyOpInfo->size);
+  getData(my_context, origin, (void *)(ncpyOpInfo->destPtr), ncpyOpInfo, dst_context, rzv_rdma_direct_recv_done, src_Info->offset, &src_Info->mregion, ncpyOpInfo->srcSize);
 }
 
 // Perform an RDMA Put call into the remote destination address from the local source address
-void LrtsIssueRput(
-  NcpyOperationInfo *ncpyOpInfo,
-  unsigned short int *srcMode,
-  unsigned short int *destMode) {
+void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
 
   // Create end point for destination node
   pami_endpoint_t target;

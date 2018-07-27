@@ -14,20 +14,24 @@ typedef struct ncpystruct{
 
   const void *srcPtr;
   int srcPe;
-  char *origSrcLayerInfoPtr;
   char *srcLayerInfo;
   int srcLayerSize;
   char *srcAck;
   int srcAckSize;
+  int srcSize;
+  unsigned short int srcMode;
+  unsigned short int isSrcRegistered;
   const void *srcRef;
 
   const void *destPtr;
   int destPe;
-  char *origDestLayerInfoPtr;
   char *destLayerInfo;
   int destLayerSize;
   char *destAck;
   int destAckSize;
+  int destSize;
+  unsigned short int destMode;
+  unsigned short int isDestRegistered;
   const void *destRef;
 
   // Variables used for ack handling
@@ -37,7 +41,6 @@ typedef struct ncpystruct{
   int freeMe; // 1 for free, 0 for do not free
 
   int ncpyOpInfoSize;
-  int size;
 
 }NcpyOperationInfo;
 
@@ -48,23 +51,27 @@ int getNcpyOpInfoTotalSize(
   int destAckSize);
 
 void setNcpyOpInfo(
-    const void *srcPtr,
-    char *srcLayerInfo,
-    int srcLayerSize,
-    char *srcAck,
-    int srcAckSize,
-    int srcPe,
-    const void *srcRef,
-    const void *destPtr,
-    char *destLayerInfo,
-    int destLayerSize,
-    char *destAck,
-    int destAckSize,
-    int destPe,
-    const void *destRef,
-    int size,
-    NcpyOperationInfo *ncpyOpInfo);
-
+  const void *srcPtr,
+  char *srcLayerInfo,
+  int srcLayerSize,
+  char *srcAck,
+  int srcAckSize,
+  int srcSize,
+  unsigned short int srcMode,
+  unsigned short int isSrcRegistered,
+  int srcPe,
+  const void *srcRef,
+  const void *destPtr,
+  char *destLayerInfo,
+  int destLayerSize,
+  char *destAck,
+  int destAckSize,
+  int destSize,
+  unsigned short int destMode,
+  unsigned short int isdestRegistered,
+  int destPe,
+  const void *destRef,
+  NcpyOperationInfo *ncpyOpInfo);
 
 void resetNcpyOpInfoPointers(NcpyOperationInfo *ncpyOpInfo);
 #endif

@@ -147,19 +147,23 @@ void destinationDone() \{
 \end{alltt}
 
 The callback methods can also take a pointer to a \texttt{CkDataMsg} message. This message can be
-used to access the original pointer passed into the buffer and another optional reference pointer that was
-initially set for the \kw{CkNcpyBuffer} object using the method \texttt{setRef}. The following code snippet
-illustrates the accessing of the original buffer pointer in the callback method by casting the \texttt{data}
-field of the \texttt{CkDataMsg} object into a \texttt{CkNcpyAck} object.
+used to access the original buffer information object i.e. the \texttt{CkNcpyBuffer} objects used for the
+zero copy transfer. The buffer information object available in the callback allows access to all its
+information including the buffer pointer and the arbitrary reference pointer set using the method
+\texttt{setRef}. It is important to note that only the source \texttt{CkNcpyBuffer} object is accessible
+using the \texttt{CkDataMsg} in the source callback and similarly, the destination \texttt{CkNcpyBuffer} object
+is accessible using the \texttt{CkDataMsg} in the destination callback.
+The following code snippet illustrates the accessing of the original buffer pointer in the callback
+method by casting the \texttt{data} field of the \texttt{CkDataMsg} object into a \texttt{CkNcpyBuffer} object.
 
 \begin{alltt}
 // Invoked by the runtime on source (Index 0)
 void sourceDone(CkDataMsg *msg) \{
-    // Cast msg->data to a CkNcpyAck
-    CkNcpyAck *ack = (CkNcpyAck *)(msg->data);
+    // Cast msg->data to a CkNcpyBuffer to get the source buffer information object
+    CkNcpyBuffer *source = (CkNcpyBuffer *)(msg->data);
 
     // access buffer pointer and free it
-    free(ack->ptr);
+    free(source->ptr);
 \}
 \end{alltt}
 
@@ -180,14 +184,14 @@ void sourceDone(CkDataMsg *msg) \{
     // update the buffer to the next pointer
     updateBuffer();
 
-    // Cast msg->data to a CkNcpyAck
-    CkNcpyAck *ack = (CkNcpyAck *)(msg->data);
+    // Cast msg->data to a CkNcpyBuffer
+    CkNcpyBuffer *src = (CkNcpyBuffer *)(msg->data);
 
     // access buffer pointer and free it
-    free(ack->ptr);
+    free(src->ptr);
 
     // get reference pointer
-    const void *refPtr = ack->ref;
+    const void *refPtr = src->ref;
 \}
 \end{alltt}
 

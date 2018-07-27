@@ -886,7 +886,7 @@ static int PumpMsgs(void) {
 
               MPIPostOneBuffer(myBuffer,
                                ncpyOpInfoMsg,
-                               ncpyOpInfoMsg->size,
+                               ncpyOpInfoMsg->srcSize,
                                otherPe,
                                ncpyOpInfoMsg->tag,
                                postMsgType);
