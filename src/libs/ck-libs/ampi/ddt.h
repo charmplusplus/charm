@@ -128,6 +128,7 @@ class CkDDT_DataType
   MPI_Aint trueLB;
   MPI_Aint baseExtent;
   CkDDT_DataType *baseType;
+  vector<int> keyvals;
   string name;
 
  public:
@@ -198,6 +199,7 @@ class CkDDT_DataType
     }
     return -1;
   }
+  vector<int>& getKeyvals() { return keyvals; }
   void setName(const char *src) { CkDDT_SetName(name, src); }
   void getName(char *dest, int *len) const {
     int length = *len = name.size();

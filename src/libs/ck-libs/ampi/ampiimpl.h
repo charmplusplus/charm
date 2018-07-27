@@ -347,6 +347,8 @@ class win_obj {
                        // top of queue is the one holding the lock
                        // queue is empty if lock is not applied
 
+  vector<int> keyvals; // list of keyval attributes
+
   void setName(const char *src);
   void getName(char *src,int *len);
 
@@ -360,6 +362,8 @@ class win_obj {
   int create(const char *name, void *base, MPI_Aint size, int disp_unit,
              MPI_Comm comm);
   int free();
+
+  vector<int>& getKeyvals() { return keyvals; }
 
   int put(void *orgaddr, int orgcnt, int orgunit,
           MPI_Aint targdisp, int targcnt, int targunit);
@@ -598,6 +602,35 @@ class ampiDistGraphTopology : public ampiTopology {
   inline void setnbors(const vector<int> &nbors_) {nbors = nbors_; nbors.shrink_to_fit();}
 };
 
+/* KeyValue class for attribute caching */
+class KeyvalNode {
+ public:
+  void *val;
+  MPI_Copy_function *copy_fn;
+  MPI_Delete_function *delete_fn;
+  void *extra_state;
+  int refCount;
+  bool isValSet;
+
+  KeyvalNode() : val(NULL), copy_fn(NULL), delete_fn(NULL), extra_state(NULL), refCount(1), isValSet(false) { }
+  KeyvalNode(MPI_Copy_function *cf, MPI_Delete_function *df, void* es) :
+             val(NULL), copy_fn(cf), delete_fn(df), extra_state(es), refCount(1), isValSet(false) { }
+  bool hasVal() const { return isValSet; }
+  void clearVal() { isValSet = false; }
+  void setVal(void *v) { val = v; isValSet = true; }
+  void* getVal() const { return val; }
+  void incRefCount() { refCount++; }
+  int decRefCount() { CkAssert(refCount > 0); refCount--; return refCount; }
+  void pup(PUP::er& p) {
+    p((char *)val, sizeof(void *));
+    p((char *)copy_fn, sizeof(void *));
+    p((char *)delete_fn, sizeof(void *));
+    p((char *)extra_state, sizeof(void *));
+    p|refCount;
+    p|isValSet;
+  }
+};
+
 //Describes an AMPI communicator
 class ampiCommStruct {
  private:
@@ -613,7 +646,7 @@ class ampiCommStruct {
   int topoType; // Type of virtual topology: MPI_CART, MPI_GRAPH, MPI_DIST_GRAPH, or MPI_UNDEFINED
 
   // For communicator attributes (MPI_*_get_attr): indexed by keyval
-  vector<void *> keyvals;
+  vector<int> keyvals;
 
   // For communicator names
   std::string commName;
@@ -721,8 +754,8 @@ class ampiCommStruct {
     if (isWorld && indices.size()!=size) makeWorldIndices();
     return indices;
   }
-  const vector<int> &getRemoteIndices(void) const {return remoteIndices;}
-  vector<void *> &getKeyvals(void) {return keyvals;}
+  const vector<int> &getRemoteIndices() const {return remoteIndices;}
+  vector<int> &getKeyvals() {return keyvals;}
 
   void setName(const char *src) {
     CkDDT_SetName(commName, src);
@@ -772,6 +805,7 @@ class ampiCommStruct {
     p|isInter;
     p|indices;
     p|remoteIndices;
+    p|keyvals;
     p|commName;
     p|topoType;
     if (topoType != MPI_UNDEFINED) {
@@ -1935,20 +1969,6 @@ PUPmarshall(AmpiSeqQ)
 inline CProxy_ampi ampiCommStruct::getProxy(void) const {return ampiID;}
 const ampiCommStruct &universeComm2CommStruct(MPI_Comm universeNo);
 
-/* KeyValue class for caching */
-class KeyvalNode {
- public:
-  MPI_Copy_function *copy_fn;
-  MPI_Delete_function *delete_fn;
-  void *extra_state;
-  /* value is associated with getKeyvals of communicator */
-  KeyvalNode(void): copy_fn(NULL), delete_fn(NULL), extra_state(NULL) { }
-  KeyvalNode(MPI_Copy_function *cf, MPI_Delete_function *df, void* es):
-             copy_fn(cf), delete_fn(df), extra_state(es) { }
-  // KeyvalNode is not supposed to be pup'ed
-  void pup(PUP::er& p){ /* empty */ }
-};
-
 /*
 An ampiParent holds all the communicators and the TCharm thread
 for its children, which are bound to it.
@@ -2172,6 +2192,11 @@ class ampiParent : public CBase_ampiParent {
     return universeComm2CommStruct(comm);
   }
 
+  inline vector<int>& getKeyvals(MPI_Comm comm) {
+    ampiCommStruct &cs = *(ampiCommStruct *)&comm2CommStruct(comm);
+    return cs.getKeyvals();
+  }
+
   inline ampi *comm2ampi(MPI_Comm comm) const {
     if (comm==MPI_COMM_WORLD) return worldPtr;
     if (comm==worldNo) return worldPtr;
@@ -2274,18 +2299,16 @@ class ampiParent : public CBase_ampiParent {
 
   int createKeyval(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn,
                   int *keyval, void* extra_state);
-  int freeKeyval(int *keyval);
   bool getBuiltinKeyval(int keyval, void *attribute_val);
   int setUserKeyval(MPI_Comm comm, int keyval, void *attribute_val);
-  bool getUserKeyval(MPI_Comm comm, int keyval, void *attribute_val, int *flag);
+  bool getUserKeyval(MPI_Comm comm, vector<int>& keyvals, int keyval, void *attribute_val, int *flag);
+  int dupUserKeyvals(MPI_Comm old_comm, MPI_Comm new_comm);
+  int freeUserKeyval(int context, vector<int>& keyvals, int *keyval);
+  int freeUserKeyvals(int context, vector<int>& keyvals);
 
-  int setCommAttr(MPI_Comm comm, int keyval, void *attribute_val);
-  int getCommAttr(MPI_Comm comm, int keyval, void *attribute_val, int *flag);
-  int deleteCommAttr(MPI_Comm comm, int keyval);
-
-  int setWinAttr(MPI_Win win, int keyval, void *attribute_val);
-  int getWinAttr(MPI_Win win, int keyval, void *attribute_val, int *flag);
-  int deleteWinAttr(MPI_Win win, int keyval);
+  int setAttr(MPI_Comm comm, vector<int>& keyvals, int keyval, void *attribute_val);
+  int getAttr(MPI_Comm comm, vector<int>& keyvals, int keyval, void *attribute_val, int *flag);
+  int deleteAttr(MPI_Comm comm, vector<int>& keyvals, int keyval);
 
   int addWinStruct(WinStruct *win);
   WinStruct *getWinStruct(MPI_Win win) const;

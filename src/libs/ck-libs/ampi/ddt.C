@@ -574,6 +574,7 @@ CkDDT_DataType::pupType(PUP::er  &p, CkDDT* ddt)
   p|iscontig;
   p|isAbsolute;
   p|numElements;
+  p|keyvals;
   p|name;
   if (p.isUnpacking()) {
     baseType = NULL;
