@@ -383,6 +383,9 @@ public:
 	
 	void pup(PUP::er &p);
 
+        // Added to keep setter name more consistent with the getter CkGetRefNum
+        void setRefNum(CMK_REFNUM_TYPE refnum) { setRefnum(refnum); }
+
         void setRefnum(CMK_REFNUM_TYPE refnum) {
 		switch(type) {
                 case sendChare:
