@@ -9,50 +9,6 @@
 using std::vector;
 using std::string;
 
-#define CkDDT_TYPE_NULL          -1
-#define CkDDT_DOUBLE              0
-#define CkDDT_INT                 1
-#define CkDDT_FLOAT               2
-#define CkDDT_COMPLEX             3
-#define CkDDT_LOGICAL             4
-#define CkDDT_C_BOOL              5
-#define CkDDT_CHAR                6
-#define CkDDT_BYTE                7
-#define CkDDT_PACKED              8
-#define CkDDT_SHORT               9
-#define CkDDT_LONG                10
-#define CkDDT_UNSIGNED_CHAR       11
-#define CkDDT_UNSIGNED_SHORT      12
-#define CkDDT_UNSIGNED            13
-#define CkDDT_UNSIGNED_LONG       14
-#define CkDDT_LONG_DOUBLE         15
-#define CkDDT_FLOAT_INT           16
-#define CkDDT_DOUBLE_INT          17
-#define CkDDT_LONG_INT            18
-#define CkDDT_2INT                19
-#define CkDDT_SHORT_INT           20
-#define CkDDT_LONG_DOUBLE_INT     21
-#define CkDDT_2FLOAT              22
-#define CkDDT_2DOUBLE             23
-#define CkDDT_LB                  24
-#define CkDDT_UB                  25
-#define CkDDT_LONG_LONG_INT       26
-#define CkDDT_DOUBLE_COMPLEX      27
-#define CkDDT_SIGNED_CHAR         28
-#define CkDDT_UNSIGNED_LONG_LONG  29
-#define CkDDT_WCHAR               30
-#define CkDDT_INT8_T              31
-#define CkDDT_INT16_T             32
-#define CkDDT_INT32_T             33
-#define CkDDT_INT64_T             34
-#define CkDDT_UINT8_T             35
-#define CkDDT_UINT16_T            36
-#define CkDDT_UINT32_T            37
-#define CkDDT_UINT64_T            38
-#define CkDDT_FLOAT_COMPLEX       39
-#define CkDDT_LONG_DOUBLE_COMPLEX 40
-#define CkDDT_AINT                41
-
 #define CkDDT_MAX_PRIMITIVE_TYPE  41
 
 #define CkDDT_CONTIGUOUS          42
@@ -75,8 +31,6 @@ using std::string;
 #define CkDDT_COMBINER_INDEXED_BLOCK  8
 #define CkDDT_COMBINER_HINDEXED_BLOCK 9
 
-typedef intptr_t CkDDT_Aint;
-
 /* Helper function to set names (used by AMPI too).
  * Leading whitespaces are significant, trailing spaces are not. */
 inline void CkDDT_SetName(string &dst, const char *src)
@@ -89,8 +43,7 @@ inline void CkDDT_SetName(string &dst, const char *src)
   dst.assign(src, len);
 }
 
-typedef int CkDDT_Type ;
-class CkDDT ;
+class CkDDT;
 
 /* This class maintains the data for primitive data types
  * and also acts as Base Class
@@ -141,12 +94,12 @@ class CkDDT_DataType {
     int baseSize;
     int baseIndex;
     int numElements;
-    CkDDT_Aint extent;
-    CkDDT_Aint ub;
-    CkDDT_Aint lb;
-    CkDDT_Aint trueExtent;
-    CkDDT_Aint trueLB;
-    CkDDT_Aint baseExtent;
+    MPI_Aint extent;
+    MPI_Aint ub;
+    MPI_Aint lb;
+    MPI_Aint trueExtent;
+    MPI_Aint trueLB;
+    MPI_Aint baseExtent;
     CkDDT_DataType *baseType;
     string name;
 
@@ -155,23 +108,23 @@ class CkDDT_DataType {
     CkDDT_DataType() { }
     virtual ~CkDDT_DataType() { }
     CkDDT_DataType(int type);
-    CkDDT_DataType(int datatype, int size, CkDDT_Aint extent, int count, CkDDT_Aint lb, CkDDT_Aint ub,
-            bool iscontig, int baseSize, CkDDT_Aint baseExtent, CkDDT_DataType* baseType,
-            int numElements, int baseIndex, CkDDT_Aint trueExtent, CkDDT_Aint trueLB);
-    CkDDT_DataType(const CkDDT_DataType &obj, CkDDT_Aint _lb, CkDDT_Aint _extent);
+    CkDDT_DataType(int datatype, int size, MPI_Aint extent, int count, MPI_Aint lb, MPI_Aint ub,
+            bool iscontig, int baseSize, MPI_Aint baseExtent, CkDDT_DataType* baseType,
+            int numElements, int baseIndex, MPI_Aint trueExtent, MPI_Aint trueLB);
+    CkDDT_DataType(const CkDDT_DataType &obj, MPI_Aint _lb, MPI_Aint _extent);
     CkDDT_DataType(const CkDDT_DataType& obj);
 
     virtual bool isContig(void) const;
     virtual int getSize(int count=1) const;
-    virtual CkDDT_Aint getExtent(void) const;
+    virtual MPI_Aint getExtent(void) const;
     virtual int getBaseSize(void) const;
-    virtual CkDDT_Aint getLB(void) const;
-    virtual CkDDT_Aint getUB(void) const;
-    virtual CkDDT_Aint getTrueExtent(void) const;
-    virtual CkDDT_Aint getTrueLB(void) const;
+    virtual MPI_Aint getLB(void) const;
+    virtual MPI_Aint getUB(void) const;
+    virtual MPI_Aint getTrueExtent(void) const;
+    virtual MPI_Aint getTrueLB(void) const;
     virtual int getBaseIndex(void) const;
     virtual CkDDT_DataType* getBaseType(void) const;
-    virtual CkDDT_Aint getBaseExtent(void) const;
+    virtual MPI_Aint getBaseExtent(void) const;
     virtual int getCount(void) const;
     virtual int getType(void) const;
     virtual int getNumElements(void) const;
@@ -181,14 +134,14 @@ class CkDDT_DataType {
 
     virtual int getEnvelope(int *num_integers, int *num_addresses, int *num_datatypes, int *combiner) const;
     virtual int getContents(int max_integers, int max_addresses, int max_datatypes,
-                           int array_of_integers[], CkDDT_Aint array_of_addresses[], int array_of_datatypes[]) const;
+                           int array_of_integers[], MPI_Aint array_of_addresses[], int array_of_datatypes[]) const;
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
 
     void setName(const char *src);
     void getName(char *dest, int *len) const;
     void setAbsolute(bool arg);
 
-    void setSize(CkDDT_Aint lb, CkDDT_Aint extent);
+    void setSize(MPI_Aint lb, MPI_Aint extent);
 };
 
 /*
@@ -208,7 +161,7 @@ class CkDDT_Contiguous : public CkDDT_DataType {
   virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
   virtual void pupType(PUP::er &p, CkDDT* ddt) ;
   virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
-  virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+  virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
 };
 
 /*
@@ -233,13 +186,13 @@ class CkDDT_Vector : public CkDDT_DataType {
   public:
     CkDDT_Vector(int count, int blklen, int stride, int index,
                 CkDDT_DataType* type);
-    CkDDT_Vector(const CkDDT_Vector &obj, CkDDT_Aint _lb, CkDDT_Aint _extent);
+    CkDDT_Vector(const CkDDT_Vector &obj, MPI_Aint _lb, MPI_Aint _extent);
     CkDDT_Vector() { } ;
     ~CkDDT_Vector() { } ;
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
-    virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+    virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
 };
 
 /*
@@ -263,12 +216,12 @@ class CkDDT_HVector : public CkDDT_Vector {
     CkDDT_HVector() { } ;
     CkDDT_HVector(int nCount,int blength,int strideLen,int index,
                 CkDDT_DataType* type);
-    CkDDT_HVector(const CkDDT_HVector &obj, CkDDT_Aint _lb, CkDDT_Aint _extent);
+    CkDDT_HVector(const CkDDT_HVector &obj, MPI_Aint _lb, MPI_Aint _extent);
     ~CkDDT_HVector() { } ;
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual void pupType(PUP::er &p, CkDDT* ddt);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
-    virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+    virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
 };
 
 /*
@@ -287,20 +240,20 @@ class CkDDT_Indexed : public CkDDT_DataType {
 
   protected:
     vector<int> arrayBlockLength;
-    vector<CkDDT_Aint> arrayDisplacements;
+    vector<MPI_Aint> arrayDisplacements;
 
   private:
     CkDDT_Indexed& operator=(const CkDDT_Indexed& obj) ;
 
   public:
-    CkDDT_Indexed(int count, const int* arrBlock, const CkDDT_Aint* arrDisp, int index,
+    CkDDT_Indexed(int count, const int* arrBlock, const MPI_Aint* arrDisp, int index,
                 CkDDT_DataType* type);
     CkDDT_Indexed() { } ;
     ~CkDDT_Indexed() ;
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
-    virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+    virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
 };
 
 /*
@@ -322,13 +275,13 @@ class CkDDT_HIndexed : public CkDDT_Indexed {
 
   public:
     CkDDT_HIndexed() { } ;
-    CkDDT_HIndexed(int count, const int* arrBlock, const CkDDT_Aint* arrDisp, int index,
+    CkDDT_HIndexed(int count, const int* arrBlock, const MPI_Aint* arrDisp, int index,
                  CkDDT_DataType* type);
-    CkDDT_HIndexed(const CkDDT_HIndexed &obj, CkDDT_Aint _lb, CkDDT_Aint _extent);
+    CkDDT_HIndexed(const CkDDT_HIndexed &obj, MPI_Aint _lb, MPI_Aint _extent);
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual void pupType(PUP::er &p, CkDDT* ddt);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
-    virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+    virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
 };
 
 /*
@@ -353,20 +306,20 @@ class CkDDT_Indexed_Block : public CkDDT_DataType
     // The MPI Standard has arrDisp as an array of int's to MPI_Type_create_indexed_block, but
     // as an array of MPI_Aint's to MPI_Type_create_hindexed_block, so we store it as Aint's
     // internally and convert from int to Aint in Indexed_Block's constructor:
-    vector<CkDDT_Aint> arrayDisplacements;
+    vector<MPI_Aint> arrayDisplacements;
 
   private:
     CkDDT_Indexed_Block& operator=(const CkDDT_Indexed_Block &obj);
 
   public:
-    CkDDT_Indexed_Block(int count, int Blength, const CkDDT_Aint *ArrDisp, int index, CkDDT_DataType *type);
+    CkDDT_Indexed_Block(int count, int Blength, const MPI_Aint *ArrDisp, int index, CkDDT_DataType *type);
     CkDDT_Indexed_Block() { };
-    CkDDT_Indexed_Block(const CkDDT_Indexed_Block &obj, CkDDT_Aint _lb, CkDDT_Aint _extent);
+    CkDDT_Indexed_Block(const CkDDT_Indexed_Block &obj, MPI_Aint _lb, MPI_Aint _extent);
     ~CkDDT_Indexed_Block() ;
     virtual size_t serialize(char *userdata, char *buffer, int num, int dir) const;
     virtual void pupType(PUP::er &p, CkDDT *ddt);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
-    virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+    virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
 };
 
 /*
@@ -391,14 +344,14 @@ class CkDDT_HIndexed_Block : public CkDDT_Indexed_Block
     CkDDT_HIndexed_Block& operator=(const CkDDT_HIndexed_Block &obj);
 
   public:
-    CkDDT_HIndexed_Block(int count, int Blength, const CkDDT_Aint *ArrDisp, int index, CkDDT_DataType *type);
+    CkDDT_HIndexed_Block(int count, int Blength, const MPI_Aint *ArrDisp, int index, CkDDT_DataType *type);
     CkDDT_HIndexed_Block() { };
-    CkDDT_HIndexed_Block(const CkDDT_HIndexed_Block &obj, CkDDT_Aint _lb, CkDDT_Aint _extent);
+    CkDDT_HIndexed_Block(const CkDDT_HIndexed_Block &obj, MPI_Aint _lb, MPI_Aint _extent);
     ~CkDDT_HIndexed_Block() ;
     virtual size_t serialize(char *userdata, char *buffer, int num, int dir) const;
     virtual void pupType(PUP::er &p, CkDDT *ddt);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
-    virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+    virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
 };
 
 /*
@@ -418,7 +371,7 @@ class CkDDT_Struct : public CkDDT_DataType {
 
   protected:
     vector<int> arrayBlockLength;
-    vector<CkDDT_Aint> arrayDisplacements;
+    vector<MPI_Aint> arrayDisplacements;
     vector<int> index;
     vector<CkDDT_DataType*> arrayDataType;
 
@@ -427,13 +380,13 @@ class CkDDT_Struct : public CkDDT_DataType {
 
   public:
     CkDDT_Struct() { } ;
-    CkDDT_Struct(int count, const int* arrBlock, const CkDDT_Aint* arrDisp, const int *index,
+    CkDDT_Struct(int count, const int* arrBlock, const MPI_Aint* arrDisp, const int *index,
                CkDDT_DataType **type);
-    CkDDT_Struct(const CkDDT_Struct &obj, CkDDT_Aint _lb, CkDDT_Aint _extent);
+    CkDDT_Struct(const CkDDT_Struct &obj, MPI_Aint _lb, MPI_Aint _extent);
     virtual size_t serialize(char* userdata, char* buffer, int num, int dir) const;
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
-    virtual int getContents(int ni, int na, int nd, int i[], CkDDT_Aint a[], int d[]) const;
+    virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
     virtual const vector<int>& getBaseIndices() const;
     virtual const vector<CkDDT_DataType*>& getBaseTypes() const;
 };
@@ -463,109 +416,109 @@ class CkDDT {
   public:
 
   CkDDT(void*) {} // emulates migration constructor
-  CkDDT(void) : typeTable(CkDDT_MAX_PRIMITIVE_TYPE+1, nullptr), types(CkDDT_MAX_PRIMITIVE_TYPE+1, CkDDT_TYPE_NULL)
+  CkDDT(void) : typeTable(CkDDT_MAX_PRIMITIVE_TYPE+1, nullptr), types(CkDDT_MAX_PRIMITIVE_TYPE+1, MPI_DATATYPE_NULL)
   {
-    typeTable[0] = new CkDDT_DataType(CkDDT_DOUBLE);
-    types[0] = CkDDT_DOUBLE;
-    typeTable[1] = new CkDDT_DataType(CkDDT_INT);
-    types[1] = CkDDT_INT;
-    typeTable[2] = new CkDDT_DataType(CkDDT_FLOAT);
-    types[2] = CkDDT_FLOAT;
-    typeTable[3] = new CkDDT_DataType(CkDDT_COMPLEX);
-    types[3] = CkDDT_COMPLEX;
-    typeTable[4] = new CkDDT_DataType(CkDDT_LOGICAL);
-    types[4] = CkDDT_LOGICAL;
-    typeTable[5] = new CkDDT_DataType(CkDDT_C_BOOL);
-    types[5] = CkDDT_C_BOOL;
-    typeTable[6] = new CkDDT_DataType(CkDDT_CHAR);
-    types[6] = CkDDT_CHAR;
-    typeTable[7] = new CkDDT_DataType(CkDDT_BYTE);
-    types[7] = CkDDT_BYTE;
-    typeTable[8] = new CkDDT_DataType(CkDDT_PACKED);
-    types[8] = CkDDT_PACKED;
-    typeTable[9] = new CkDDT_DataType(CkDDT_SHORT);
-    types[9] = CkDDT_SHORT;
-    typeTable[10] = new CkDDT_DataType(CkDDT_LONG);
-    types[10] = CkDDT_LONG;
-    typeTable[11] = new CkDDT_DataType(CkDDT_UNSIGNED_CHAR);
-    types[11] = CkDDT_UNSIGNED_CHAR;
-    typeTable[12] = new CkDDT_DataType(CkDDT_UNSIGNED_SHORT);
-    types[12] = CkDDT_UNSIGNED_SHORT;
-    typeTable[13] = new CkDDT_DataType(CkDDT_UNSIGNED);
-    types[13] = CkDDT_UNSIGNED;
-    typeTable[14] = new CkDDT_DataType(CkDDT_UNSIGNED_LONG);
-    types[14] = CkDDT_UNSIGNED_LONG;
-    typeTable[15] = new CkDDT_DataType(CkDDT_LONG_DOUBLE);
-    types[15] = CkDDT_LONG_DOUBLE;
-    typeTable[16] = new CkDDT_DataType(CkDDT_FLOAT_INT);
-    types[16] = CkDDT_FLOAT_INT;
-    typeTable[17] = new CkDDT_DataType(CkDDT_DOUBLE_INT);
-    types[17] = CkDDT_DOUBLE_INT;
-    typeTable[18] = new CkDDT_DataType(CkDDT_LONG_INT);
-    types[18] = CkDDT_LONG_INT;
-    typeTable[19] = new CkDDT_DataType(CkDDT_2INT);
-    types[19] = CkDDT_2INT;
-    typeTable[20] = new CkDDT_DataType(CkDDT_SHORT_INT);
-    types[20] = CkDDT_SHORT_INT;
-    typeTable[21] = new CkDDT_DataType(CkDDT_LONG_DOUBLE_INT);
-    types[21] = CkDDT_LONG_DOUBLE_INT;
-    typeTable[22] = new CkDDT_DataType(CkDDT_2FLOAT);
-    types[22] = CkDDT_2FLOAT;
-    typeTable[23] = new CkDDT_DataType(CkDDT_2DOUBLE);
-    types[23] = CkDDT_2DOUBLE;
-    typeTable[24] = new CkDDT_DataType(CkDDT_LB);
-    types[24] = CkDDT_LB;
-    typeTable[25] = new CkDDT_DataType(CkDDT_UB);
-    types[25] = CkDDT_UB;
-    typeTable[26] = new CkDDT_DataType(CkDDT_LONG_LONG_INT);
-    types[26] = CkDDT_LONG_LONG_INT;
-    typeTable[27] = new CkDDT_DataType(CkDDT_DOUBLE_COMPLEX);
-    types[27] = CkDDT_DOUBLE_COMPLEX;
-    typeTable[28] = new CkDDT_DataType(CkDDT_SIGNED_CHAR);
-    types[28] = CkDDT_SIGNED_CHAR;
-    typeTable[29] = new CkDDT_DataType(CkDDT_UNSIGNED_LONG_LONG);
-    types[29] = CkDDT_UNSIGNED_LONG_LONG;
-    typeTable[30] = new CkDDT_DataType(CkDDT_WCHAR);
-    types[30] = CkDDT_WCHAR;
-    typeTable[31] = new CkDDT_DataType(CkDDT_INT8_T);
-    types[31] = CkDDT_INT8_T;
-    typeTable[32] = new CkDDT_DataType(CkDDT_INT16_T);
-    types[32] = CkDDT_INT16_T;
-    typeTable[33] = new CkDDT_DataType(CkDDT_INT32_T);
-    types[33] = CkDDT_INT32_T;
-    typeTable[34] = new CkDDT_DataType(CkDDT_INT64_T);
-    types[34] = CkDDT_INT64_T;
-    typeTable[35] = new CkDDT_DataType(CkDDT_UINT8_T);
-    types[35] = CkDDT_UINT8_T;
-    typeTable[36] = new CkDDT_DataType(CkDDT_UINT16_T);
-    types[36] = CkDDT_UINT16_T;
-    typeTable[37] = new CkDDT_DataType(CkDDT_UINT32_T);
-    types[37] = CkDDT_UINT32_T;
-    typeTable[38] = new CkDDT_DataType(CkDDT_UINT64_T);
-    types[38] = CkDDT_UINT64_T;
-    typeTable[39] = new CkDDT_DataType(CkDDT_FLOAT_COMPLEX);
-    types[39] = CkDDT_FLOAT_COMPLEX;
-    typeTable[40] = new CkDDT_DataType(CkDDT_LONG_DOUBLE_COMPLEX);
-    types[40] = CkDDT_LONG_DOUBLE_COMPLEX;
-    typeTable[41] = new CkDDT_DataType(CkDDT_AINT);
-    types[41] = CkDDT_AINT;
+    typeTable[0] = new CkDDT_DataType(MPI_DOUBLE);
+    types[0] = MPI_DOUBLE;
+    typeTable[1] = new CkDDT_DataType(MPI_INT);
+    types[1] = MPI_INT;
+    typeTable[2] = new CkDDT_DataType(MPI_FLOAT);
+    types[2] = MPI_FLOAT;
+    typeTable[3] = new CkDDT_DataType(MPI_COMPLEX);
+    types[3] = MPI_COMPLEX;
+    typeTable[4] = new CkDDT_DataType(MPI_LOGICAL);
+    types[4] = MPI_LOGICAL;
+    typeTable[5] = new CkDDT_DataType(MPI_C_BOOL);
+    types[5] = MPI_C_BOOL;
+    typeTable[6] = new CkDDT_DataType(MPI_CHAR);
+    types[6] = MPI_CHAR;
+    typeTable[7] = new CkDDT_DataType(MPI_BYTE);
+    types[7] = MPI_BYTE;
+    typeTable[8] = new CkDDT_DataType(MPI_PACKED);
+    types[8] = MPI_PACKED;
+    typeTable[9] = new CkDDT_DataType(MPI_SHORT);
+    types[9] = MPI_SHORT;
+    typeTable[10] = new CkDDT_DataType(MPI_LONG);
+    types[10] = MPI_LONG;
+    typeTable[11] = new CkDDT_DataType(MPI_UNSIGNED_CHAR);
+    types[11] = MPI_UNSIGNED_CHAR;
+    typeTable[12] = new CkDDT_DataType(MPI_UNSIGNED_SHORT);
+    types[12] = MPI_UNSIGNED_SHORT;
+    typeTable[13] = new CkDDT_DataType(MPI_UNSIGNED);
+    types[13] = MPI_UNSIGNED;
+    typeTable[14] = new CkDDT_DataType(MPI_UNSIGNED_LONG);
+    types[14] = MPI_UNSIGNED_LONG;
+    typeTable[15] = new CkDDT_DataType(MPI_LONG_DOUBLE);
+    types[15] = MPI_LONG_DOUBLE;
+    typeTable[16] = new CkDDT_DataType(MPI_FLOAT_INT);
+    types[16] = MPI_FLOAT_INT;
+    typeTable[17] = new CkDDT_DataType(MPI_DOUBLE_INT);
+    types[17] = MPI_DOUBLE_INT;
+    typeTable[18] = new CkDDT_DataType(MPI_LONG_INT);
+    types[18] = MPI_LONG_INT;
+    typeTable[19] = new CkDDT_DataType(MPI_2INT);
+    types[19] = MPI_2INT;
+    typeTable[20] = new CkDDT_DataType(MPI_SHORT_INT);
+    types[20] = MPI_SHORT_INT;
+    typeTable[21] = new CkDDT_DataType(MPI_LONG_DOUBLE_INT);
+    types[21] = MPI_LONG_DOUBLE_INT;
+    typeTable[22] = new CkDDT_DataType(MPI_2FLOAT);
+    types[22] = MPI_2FLOAT;
+    typeTable[23] = new CkDDT_DataType(MPI_2DOUBLE);
+    types[23] = MPI_2DOUBLE;
+    typeTable[24] = new CkDDT_DataType(MPI_LB);
+    types[24] = MPI_LB;
+    typeTable[25] = new CkDDT_DataType(MPI_UB);
+    types[25] = MPI_UB;
+    typeTable[26] = new CkDDT_DataType(MPI_LONG_LONG_INT);
+    types[26] = MPI_LONG_LONG_INT;
+    typeTable[27] = new CkDDT_DataType(MPI_DOUBLE_COMPLEX);
+    types[27] = MPI_DOUBLE_COMPLEX;
+    typeTable[28] = new CkDDT_DataType(MPI_SIGNED_CHAR);
+    types[28] = MPI_SIGNED_CHAR;
+    typeTable[29] = new CkDDT_DataType(MPI_UNSIGNED_LONG_LONG);
+    types[29] = MPI_UNSIGNED_LONG_LONG;
+    typeTable[30] = new CkDDT_DataType(MPI_WCHAR);
+    types[30] = MPI_WCHAR;
+    typeTable[31] = new CkDDT_DataType(MPI_INT8_T);
+    types[31] = MPI_INT8_T;
+    typeTable[32] = new CkDDT_DataType(MPI_INT16_T);
+    types[32] = MPI_INT16_T;
+    typeTable[33] = new CkDDT_DataType(MPI_INT32_T);
+    types[33] = MPI_INT32_T;
+    typeTable[34] = new CkDDT_DataType(MPI_INT64_T);
+    types[34] = MPI_INT64_T;
+    typeTable[35] = new CkDDT_DataType(MPI_UINT8_T);
+    types[35] = MPI_UINT8_T;
+    typeTable[36] = new CkDDT_DataType(MPI_UINT16_T);
+    types[36] = MPI_UINT16_T;
+    typeTable[37] = new CkDDT_DataType(MPI_UINT32_T);
+    types[37] = MPI_UINT32_T;
+    typeTable[38] = new CkDDT_DataType(MPI_UINT64_T);
+    types[38] = MPI_UINT64_T;
+    typeTable[39] = new CkDDT_DataType(MPI_FLOAT_COMPLEX);
+    types[39] = MPI_FLOAT_COMPLEX;
+    typeTable[40] = new CkDDT_DataType(MPI_LONG_DOUBLE_COMPLEX);
+    types[40] = MPI_LONG_DOUBLE_COMPLEX;
+    typeTable[41] = new CkDDT_DataType(MPI_AINT);
+    types[41] = MPI_AINT;
   }
 
-  void newContiguous(int count, CkDDT_Type  oldType, CkDDT_Type* newType);
-  void newVector(int count, int blocklength, int stride, CkDDT_Type oldtype,
-                CkDDT_Type* newtype);
-  void newHVector(int count, int blocklength, int stride, CkDDT_Type oldtype,
-                 CkDDT_Type* newtype);
-  void newIndexed(int count, const int* arrbLength, CkDDT_Aint* arrDisp , CkDDT_Type oldtype,
-                 CkDDT_Type* newtype);
-  void newHIndexed(int count, const int* arrbLength, const CkDDT_Aint* arrDisp , CkDDT_Type oldtype,
-                  CkDDT_Type* newtype);
-  void newIndexedBlock(int count, int Blocklength, const int *arrDisp, CkDDT_Type oldtype,
-                      CkDDT_Type *newtype);
-  void newHIndexedBlock(int count, int Blocklength, const CkDDT_Aint *arrDisp, CkDDT_Type oldtype,
-                       CkDDT_Type *newtype);
-  void newStruct(int count, const int* arrbLength, const CkDDT_Aint* arrDisp , const CkDDT_Type *oldtype,
-                CkDDT_Type* newtype);
+  void newContiguous(int count, MPI_Datatype  oldType, MPI_Datatype* newType);
+  void newVector(int count, int blocklength, int stride, MPI_Datatype oldtype,
+                MPI_Datatype* newtype);
+  void newHVector(int count, int blocklength, int stride, MPI_Datatype oldtype,
+                 MPI_Datatype* newtype);
+  void newIndexed(int count, const int* arrbLength, MPI_Aint* arrDisp , MPI_Datatype oldtype,
+                 MPI_Datatype* newtype);
+  void newHIndexed(int count, const int* arrbLength, const MPI_Aint* arrDisp , MPI_Datatype oldtype,
+                  MPI_Datatype* newtype);
+  void newIndexedBlock(int count, int Blocklength, const int *arrDisp, MPI_Datatype oldtype,
+                      MPI_Datatype *newtype);
+  void newHIndexedBlock(int count, int Blocklength, const MPI_Aint *arrDisp, MPI_Datatype oldtype,
+                       MPI_Datatype *newtype);
+  void newStruct(int count, const int* arrbLength, const MPI_Aint* arrDisp , const MPI_Datatype *oldtype,
+                MPI_Datatype* newtype);
   int insertType(CkDDT_DataType* ptr, int type);
   void freeType(int index);
   void  pup(PUP::er &p);
@@ -573,18 +526,18 @@ class CkDDT {
 
   bool isContig(int nIndex) const;
   int getSize(int nIndex, int count=1) const;
-  CkDDT_Aint getExtent(int nIndex) const;
-  CkDDT_Aint getLB(int nIndex) const;
-  CkDDT_Aint getUB(int nIndex) const;
-  CkDDT_Aint getTrueExtent(int nIndex) const;
-  CkDDT_Aint getTrueLB(int nIndex) const;
+  MPI_Aint getExtent(int nIndex) const;
+  MPI_Aint getLB(int nIndex) const;
+  MPI_Aint getUB(int nIndex) const;
+  MPI_Aint getTrueExtent(int nIndex) const;
+  MPI_Aint getTrueLB(int nIndex) const;
   void createDup(int nIndexOld, int *nIndexNew);
   int getEnvelope(int nIndex, int *num_integers, int *num_addresses, int *num_datatypes, int *combiner) const;
   int getContents(int nIndex, int max_integers, int max_addresses, int max_datatypes,
-                 int array_of_integers[], CkDDT_Aint array_of_addresses[], int array_of_datatypes[]);
+                 int array_of_integers[], MPI_Aint array_of_addresses[], int array_of_datatypes[]);
   void setName(int nIndex, const char *name);
   void getName(int nIndex, char *name, int *len) const;
-  void createResized(CkDDT_Type oldtype, CkDDT_Aint lb, CkDDT_Aint extent, CkDDT_Type *newtype);
+  void createResized(MPI_Datatype oldtype, MPI_Aint lb, MPI_Aint extent, MPI_Datatype *newtype);
   ~CkDDT() ;
 };
 
