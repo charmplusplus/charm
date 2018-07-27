@@ -317,7 +317,8 @@ do
 		LINK="$LINK $base.o"
 		DOCOMPILE="yes"
 		;;
-        -fno-lifetime-dse)
+	-fno-lifetime-dse|-rdynamic)
+		# Error out so configure knows not to pass us these arguments, avoiding the below warning.
 		exit 1
 		;;
 # Default
