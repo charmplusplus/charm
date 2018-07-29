@@ -1,0 +1,17 @@
+enable_language(C ASM)
+set(CMAKE_ASM_COMPILER ${CMAKE_BINARY_DIR}/bin/charmc)
+
+if (${CHARM_OS} STREQUAL "darwin")
+    set(ufcontext_sources jump_x86_64_sysv_macho_gas.S ontop_x86_64_sysv_macho_gas.S make_x86_64_sysv_macho_gas.S)
+elseif(${CHARM_OS} STREQUAL "linux")
+    if(${CHARM_CPU} MATCHES "ppc")
+        set(ufcontext_sources jump_ppc64_sysv_elf_gas.S make_ppc64_sysv_elf_gas.S ontop_ppc64_sysv_elf_gas.S)
+    else()
+       set(ufcontext_sources jump_x86_64_sysv_elf_gas.S ontop_x86_64_sysv_elf_gas.S make_x86_64_sysv_elf_gas.S)
+    endif()
+elseif(${CHARM_OS} STREQUAL "win")
+    set(ufcontext_sources ontop_x86_64_ms_pe_gas.asm jump_x86_64_ms_pe_gas.asm make_x86_64_ms_pe_gas.asm)
+endif()
+
+add_library(boost-context OBJECT ${ufcontext_sources})
+set_target_properties(boost-context PROPERTIES LINKER_LANGUAGE CXX)
