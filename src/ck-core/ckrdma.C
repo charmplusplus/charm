@@ -327,26 +327,31 @@ void CkRdmaDirectAckHandler(void *ack) {
   CkCallback *srcCb = (CkCallback *)(info->srcAck);
   CkCallback *destCb = (CkCallback *)(info->destAck);
 
-  // reconstruct the CkNcpyBuffer object for the source
-  CkNcpyBuffer src;
-  src.ptr = info->srcPtr;
-  src.pe  = info->srcPe;
-  src.cnt = info->srcSize;
-  src.ref = info->srcRef;
-  src.mode = info->srcMode;
-  src.isRegistered = info->isSrcRegistered;
-  memcpy((char *)(&src.cb), srcCb, info->srcAckSize); // initialize cb
-  memcpy((char *)(src.layerInfo), info->srcLayerInfo, info->srcLayerSize); // initialize layerInfo
+  CkNcpyBuffer src, dest;
 
-  CkNcpyBuffer dest;
-  dest.ptr = info->destPtr;
-  dest.pe  = info->destPe;
-  dest.cnt = info->destSize;
-  dest.ref = info->destRef;
-  dest.mode = info->destMode;
-  dest.isRegistered = info->isDestRegistered;
-  memcpy((char *)(&dest.cb), destCb, info->destAckSize); // initialize cb
-  memcpy((char *)(dest.layerInfo), info->destLayerInfo, info->destLayerSize); // initialize layerInfo
+  if(srcCb->requiresMsgConstruction()) {
+    // reconstruct the CkNcpyBuffer object for the source
+    src.ptr = info->srcPtr;
+    src.pe  = info->srcPe;
+    src.cnt = info->srcSize;
+    src.ref = info->srcRef;
+    src.mode = info->srcMode;
+    src.isRegistered = info->isSrcRegistered;
+    memcpy((char *)(&src.cb), srcCb, info->srcAckSize); // initialize cb
+    memcpy((char *)(src.layerInfo), info->srcLayerInfo, info->srcLayerSize); // initialize layerInfo
+  }
+
+  if(destCb->requiresMsgConstruction()) {
+    // reconstruct the CkNcpyBuffer object for the destination
+    dest.ptr = info->destPtr;
+    dest.pe  = info->destPe;
+    dest.cnt = info->destSize;
+    dest.ref = info->destRef;
+    dest.mode = info->destMode;
+    dest.isRegistered = info->isDestRegistered;
+    memcpy((char *)(&dest.cb), destCb, info->destAckSize); // initialize cb
+    memcpy((char *)(dest.layerInfo), info->destLayerInfo, info->destLayerSize); // initialize layerInfo
+  }
 
   if(info->ackMode == 0 || info->ackMode == 1) {
 
