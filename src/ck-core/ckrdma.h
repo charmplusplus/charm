@@ -110,10 +110,22 @@ void CkRdmaDirectAckHandler(void *ack);
 // Class to represent an RDMA buffer
 class CkNcpyBuffer{
 
-  public:
+  private:
+
   // bool to indicate registration for current values of ptr and cnt on pe
   bool isRegistered;
 
+  // machine specific information about the buffer
+  #ifdef __GNUC__
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wpedantic"
+  #endif
+  char layerInfo[CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES];
+  #ifdef __GNUC__
+  #pragma GCC diagnostic pop
+  #endif
+
+  public:
   // pointer to the buffer
   const void *ptr;
 
@@ -126,23 +138,13 @@ class CkNcpyBuffer{
   // home pe
   int pe;
 
-  #ifdef __GNUC__
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wpedantic"
-  #endif
-  // machine specific information about the buffer
-  char layerInfo[CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES];
-  #ifdef __GNUC__
-  #pragma GCC diagnostic pop
-  #endif
-
   // mode
   unsigned short int mode;
 
   // reference pointer
   const void *ref;
 
-  CkNcpyBuffer() : ptr(NULL), pe(-1), ref(NULL), mode(CK_BUFFER_REG) {}
+  CkNcpyBuffer() : isRegistered(false), ptr(NULL), pe(-1), ref(NULL), mode(CK_BUFFER_REG) {}
 
   CkNcpyBuffer(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int mode_=CK_BUFFER_REG) {
     init(ptr_, cnt_, cb_, mode_);
@@ -236,6 +238,7 @@ class CkNcpyBuffer{
     PUParray(p, layerInfo, CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES);
   }
 
+  friend void CkRdmaDirectAckHandler(void *ack);
 };
 
 enum class ncpyTransferMode : char { MEMCPY, CMA, RDMA };
