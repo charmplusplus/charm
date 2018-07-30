@@ -68,6 +68,10 @@ void heap_addItem(MsgHeap* h, priormsg* packet) {
     h->msgs[i]=packet;
 }
 
+int heap_isEmpty(MsgHeap *h) {
+    return h->size==0;
+}
+
 priormsg* heap_extractMin(MsgHeap* h) {
     priormsg* max;
     if (heap_isEmpty(h))
@@ -77,10 +81,6 @@ priormsg* heap_extractMin(MsgHeap* h) {
     h->size=h->size-1;
     heap_heapify(h,0);
     return max;
-}
-
-int heap_isEmpty(MsgHeap *h) {
-    return h->size==0;
 }
 
 int heap_isFull(MsgHeap *h) {
