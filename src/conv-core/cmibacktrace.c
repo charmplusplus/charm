@@ -42,6 +42,7 @@ char **CmiBacktraceLookup(void **srcPtrs,int nLevels) {
 }
 
 #else /*Backtrace not available-- use do-nothing version*/
+#include <stddef.h> /* for NULL */
 void CmiBacktraceRecord(void **retPtrs,int nSkip,int *nLevels) {
 	*nLevels=0;
 }
