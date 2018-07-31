@@ -168,9 +168,10 @@ void TopoLB::computePartitions(CentralLB::LDStats *stats,int count,int *newmap)
         int senderID = stats->getHash(cdata.sender);
         for (j=0; j<nobjs; j++) {
            int recverID = stats->getHash(objs[j]);
-           if((senderID == -1)||(recverID == -1))
+           if((senderID == -1)||(recverID == -1)) {
               if (_lb_args.migObjOnly()) continue;
               else CkAbort("Error in search\n");
+           }
            comm[senderID][recverID] += cdata.messages;
            comm[recverID][senderID] += cdata.messages;
         }
