@@ -30,6 +30,8 @@ static char* strsignal(int sig) {
   sprintf(outbuf, "%d", sig);
   return outbuf;
 }
+#include <process.h>
+#define getpid _getpid
 #else
 #include <unistd.h> /*For getpid()*/
 #endif
