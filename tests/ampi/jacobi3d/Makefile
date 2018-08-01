@@ -10,7 +10,7 @@ PARAMETERS := -memory isomalloc
 
 # Ignore this test on platforms that don't support Isomalloc:
 define TEST_TARGET_AVAILABILITY
-  AMPICC_OUTPUT_$1 := $$(shell $$(AMPICC) -print-building-blocks $$(PARAMETERS))
+  AMPICC_OUTPUT_$1 := $$(shell $$(AMPICC) -print-building-blocks $$(PARAMETERS) 2>&1)
   ifeq (,$$(findstring Error:,$$(AMPICC_OUTPUT_$1)))
     TARGETS += $1
   endif

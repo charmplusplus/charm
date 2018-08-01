@@ -43,14 +43,14 @@ FEATURES_cxx_roseomptlsglobals := staticvars sharedlib
 TARGETS :=
 
 define TEST_TARGET_AVAILABILITY
-  AMPICC_OUTPUT_$1 := $$(shell $$(AMPICC) -print-building-blocks $$(OPTS_cxx_$1))
+  AMPICC_OUTPUT_$1 := $$(shell $$(AMPICC) -print-building-blocks $$(OPTS_cxx_$1) 2>&1)
   ifeq (,$$(findstring Error:,$$(AMPICC_OUTPUT_$1)))
     ifeq (,$$(findstring Warning: -$1,$$(AMPICC_OUTPUT_$1)))
       TARGETS += cxx-$1
     endif
   endif
 
-  AMPIF90_OUTPUT_$1 := $$(shell $$(AMPIF90) -print-building-blocks $$(OPTS_f90_$1))
+  AMPIF90_OUTPUT_$1 := $$(shell $$(AMPIF90) -print-building-blocks $$(OPTS_f90_$1) 2>&1)
   ifeq (,$$(findstring Error:,$$(AMPIF90_OUTPUT_$1)))
     ifeq (,$$(findstring Warning: -$1,$$(AMPIF90_OUTPUT_$1)))
       TARGETS += f90-$1
