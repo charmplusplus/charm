@@ -32,6 +32,18 @@
 #ifndef CONVERSE_H
 #define CONVERSE_H
 
+#if defined __APPLE__
+# define CMK_THREADLOCAL __thread
+#elif defined __cplusplus && (__cplusplus >= 201103L || (defined _MSC_VER && _MSC_VER >= 1900))
+# define CMK_THREADLOCAL thread_local
+#elif defined __STDC_VERSION__ && __STDC_VERSION__ >= 201112L
+# define CMK_THREADLOCAL _Thread_local
+#elif defined _MSC_VER
+# define CMK_THREADLOCAL __declspec(thread)
+#else
+# define CMK_THREADLOCAL __thread
+#endif
+
 #ifdef __cplusplus
 # define CMI_EXTERNC extern "C"
 #else
@@ -406,7 +418,7 @@ extern CmiNodeLock CmiMemLock_lock;
 
 
 #if (CMK_BLUEGENEQ || CMK_PAMI_LINUX_PPC8) && CMK_ENABLE_ASYNC_PROGRESS
-extern __thread int32_t _cmi_bgq_incommthread;
+extern CMK_THREADLOCAL int32_t _cmi_bgq_incommthread;
 #define CmiInCommThread()  (_cmi_bgq_incommthread)
 #else
 #define CmiInCommThread()  (CmiMyRank() == CmiMyNodeSize())
@@ -566,20 +578,20 @@ for each processor in the node.
 #ifdef CMK_CPV_IS_SMP
 
 #if CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD
-#define CpvDeclare(t,v) __thread t* CMK_TAG(Cpv_,v) = NULL;   \
+#define CpvDeclare(t,v) CMK_THREADLOCAL t* CMK_TAG(Cpv_,v) = NULL;   \
                         int CMK_TAG(Cpv_inited_,v) = 0;  \
                         t ** CMK_TAG(Cpv_addr_,v)
-#define CpvExtern(t,v)  extern __thread t* CMK_TAG(Cpv_,v);  \
+#define CpvExtern(t,v)  extern CMK_THREADLOCAL t* CMK_TAG(Cpv_,v);  \
                         extern int CMK_TAG(Cpv_inited_,v);  \
                         extern t ** CMK_TAG(Cpv_addr_,v)
 #ifdef __cplusplus
-#define CpvCExtern(t,v) extern "C"  __thread t* CMK_TAG(Cpv_,v);  \
+#define CpvCExtern(t,v) extern "C" CMK_THREADLOCAL t* CMK_TAG(Cpv_,v);  \
                         extern "C" int CMK_TAG(Cpv_inited_,v);  \
                         extern "C" t ** CMK_TAG(Cpv_addr_,v)
 #else
 #define CpvCExtern(t,v)    CpvExtern(t,v)
 #endif
-#define CpvStaticDeclare(t,v) static __thread t* CMK_TAG(Cpv_,v) = NULL;   \
+#define CpvStaticDeclare(t,v) static CMK_THREADLOCAL t* CMK_TAG(Cpv_,v) = NULL;   \
                         static int CMK_TAG(Cpv_inited_,v) = 0;  \
                         static t ** CMK_TAG(Cpv_addr_,v)
 #define CpvInitialize(t,v)\

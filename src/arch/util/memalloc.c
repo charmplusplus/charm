@@ -44,7 +44,7 @@ static int _nodeStart;
 extern int  Cmi_nodestart; /* First processor in this address space */
 
 #if CMK_ENABLE_ASYNC_PROGRESS
-extern __thread int32_t _comm_thread_id;
+extern CMK_THREADLOCAL int32_t _comm_thread_id;
 #endif
 
 CMI_EXTERNC

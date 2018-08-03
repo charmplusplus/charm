@@ -38,7 +38,7 @@ struct helpdesc { qt_helper_t *hfn; qt_t *jb; void *oldptr; void *newptr; };
 #define MAXTABLE 1000
 
 #if CMK_SMP && CMK_HAS_TLS_VARIABLES
-#define TLS_SPECIFIER         __thread
+#define TLS_SPECIFIER CMK_THREADLOCAL
 #else
 #define TLS_SPECIFIER
 #endif

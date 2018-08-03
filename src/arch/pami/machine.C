@@ -162,9 +162,9 @@ static PPCAtomicMutex *node_recv_mutex;
 
 #if CMK_SMP && !CMK_MULTICORE
 //The random seed to pick destination context
-__thread uint32_t r_seed = 0xdeadbeef;
-__thread int32_t _cmi_bgq_incommthread = 0;
-__thread int32_t _comm_thread_id = 0;
+CMK_THREADLOCAL uint32_t r_seed = 0xdeadbeef;
+CMK_THREADLOCAL int32_t _cmi_bgq_incommthread = 0;
+CMK_THREADLOCAL int32_t _comm_thread_id = 0;
 #endif
 
 void ConverseRunPE(int everReturn);

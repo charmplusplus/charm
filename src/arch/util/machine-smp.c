@@ -264,7 +264,7 @@ extern int _cleanUp;
 extern void CharmScheduler(void);
 
 #if CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD
-static __thread struct CmiStateStruct     Cmi_mystate;
+static CMK_THREADLOCAL struct CmiStateStruct     Cmi_mystate;
 static CmiState     *Cmi_state_vector;
 
 CmiState CmiGetState(void) {

@@ -22,10 +22,16 @@
 #define __ICC__
 #endif
 
-#ifdef __MSC__
-#define CMK_THREADLOCAL __declspec(thread)
+#if defined __APPLE__
+# define CMK_THREADLOCAL __thread
+#elif defined __cplusplus && (__cplusplus >= 201103L || (defined _MSC_VER && _MSC_VER >= 1900))
+# define CMK_THREADLOCAL thread_local
+#elif defined __STDC_VERSION__ && __STDC_VERSION__ >= 201112L
+# define CMK_THREADLOCAL _Thread_local
+#elif defined _MSC_VER
+# define CMK_THREADLOCAL __declspec(thread)
 #else
-#define CMK_THREADLOCAL __thread
+# define CMK_THREADLOCAL __thread
 #endif
 
 #define _XOPEN_SOURCE
