@@ -4092,7 +4092,7 @@ exclusive
    is executing on node N, and another one is scheduled to run on the
    same node, the second exclusive method will wait to execute until the
    first one finishes. An example can be found in
-   ``tests/charm++/pingpong``.
+   ``benchmarks/charm++/pingpong``.
 
 nokeep
    entry methods take only a message as their lone argument, and the
@@ -4686,7 +4686,7 @@ be dynamically allocated. Additionally, the objects are also reusable
 across iteration boundaries i.e. after sending the CkNcpyBuffer object,
 the remote PE can use the same object to perform get or put. This
 pattern of using the same objects across iterations is demonstrated in
-``examples/charm++/zerocopy/direct_api/reg/pingpong``.
+``benchmarks/charm++/zerocopy/direct_api/reg/pingpong``.
 
 This API is demonstrated in ``examples/charm++/zerocopy/direct_api``
 
@@ -4881,7 +4881,7 @@ associated with each nocopy array.
 
 This API is demonstrated in
 ``examples/charm++/zerocopy/entry_method_api`` and
-``tests/charm++/pingpong``
+``benchmarks/charm++/pingpong``
 
 It should be noted that calls to entry methods with nocopy specified
 parameters are currently only supported for point to point operations
@@ -4898,7 +4898,7 @@ behaves like a regular entry method that copies its arguments.
 Table :numref:`tab:rdmathreshold` displays the
 message size thresholds for the zero copy entry method send API on
 popular systems and build architectures. These results were obtained by
-running ``examples/charm++/zerocopy/entry_method_api/pingpong`` in
+running ``benchmarks/charm++/zerocopy/entry_method_api/pingpong`` in
 non-SMP mode on production builds. For message sizes greater than or
 equal to the displayed thresholds, the zero copy API is found to perform
 better than the regular message send API. For network layers that are

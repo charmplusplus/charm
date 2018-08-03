@@ -226,7 +226,7 @@ libraries by specifying ``-language ampi`` as an argument to the
    $ charmc -o hello hello.C -language ampi
 
 Sample applications in AMPI can be found in the directory
-charm/examples/ampi, specifically charm/examples/ampi/pingpong.
+``charm/examples/ampi``. See also ``charm/benchmarks/ampi/pingpong``.
 
 Running a BigSim Application
 ----------------------------

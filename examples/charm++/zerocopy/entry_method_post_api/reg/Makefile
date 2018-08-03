@@ -1,5 +1,4 @@
 DIRS = \
-  pingpong \
   simpleZeroCopy \
   nodegroupTest \
 

@@ -5,7 +5,6 @@ DIRS = \
   entry_method_post_api \
   entry_method_bcast_post_api \
   large_readonly \
-  benchmarks \
 
 TESTDIRS = $(DIRS)
 

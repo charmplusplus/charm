@@ -1125,7 +1125,7 @@ Example
 -------
 
 For example code showing how to use TRAM, see ``examples/charm++/TRAM`` and
-``tests/charm++/streamingAllToAll`` in the Charm++ repository.
+``benchmarks/charm++/streamingAllToAll`` in the Charm++ repository.
 
 .. _gpumanager:
 

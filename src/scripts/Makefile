@@ -35,9 +35,16 @@ CXXFLAGS=-I.
 
 all: charm++ bigsim LIBS AMPI f90charm TSM SM PVM doc everylb
 
-all-test: bigsim LIBS
+all-test: all-test-tests all-test-examples all-test-benchmarks
+
+all-test-tests: bigsim LIBS
 	$(MAKE) -C ../tests all
+
+all-test-examples: bigsim LIBS
 	$(MAKE) -C ../examples all
+
+all-test-benchmarks: bigsim LIBS
+	$(MAKE) -C ../benchmarks all
 
 charm++: charm-target
 	@echo "$(OPTS)" > OPTS
@@ -157,6 +164,7 @@ LIBS: CONVLIBS CHARMLIBS everylb
 bgtest: bigsim LIBS
 	$(MAKE) -C ../tests bgtest
 	$(MAKE) -C ../examples bgtest
+	$(MAKE) -C ../benchmarks bgtest
 
 syncfttest causalfttest mpisyncfttest mlogfttest: charm++ LIBS
 	$(MAKE) -C ../tests $@
@@ -164,6 +172,7 @@ syncfttest causalfttest mpisyncfttest mlogfttest: charm++ LIBS
 test: bigsim LIBS
 	$(MAKE) -C ../tests test
 	$(MAKE) -C ../examples test
+	$(MAKE) -C ../benchmarks test
 
 test-tests: bigsim LIBS
 	$(MAKE) -C ../tests test
@@ -171,14 +180,38 @@ test-tests: bigsim LIBS
 test-examples: bigsim LIBS
 	$(MAKE) -C ../examples test
 
+test-benchmarks: bigsim LIBS
+	$(MAKE) -C ../benchmarks test
+
 test-converse: converse
 	$(MAKE) -C ../tests test-converse
+	$(MAKE) -C ../benchmarks test-converse
 
 test-charm: charm++
 	$(MAKE) -C ../tests test-charm
+	$(MAKE) -C ../benchmarks test-charm
 
 test-AMPI: AMPI
 	$(MAKE) -C ../tests test-AMPI
+	$(MAKE) -C ../benchmarks test-AMPI
+
+test-tests-converse: converse
+	$(MAKE) -C ../tests test-converse
+
+test-tests-charm: charm++
+	$(MAKE) -C ../tests test-charm
+
+test-tests-AMPI: AMPI
+	$(MAKE) -C ../tests test-AMPI
+
+test-benchmarks-converse: converse
+	$(MAKE) -C ../benchmarks test-converse
+
+test-benchmarks-charm: charm++
+	$(MAKE) -C ../benchmarks test-charm
+
+test-benchmarks-AMPI: AMPI
+	$(MAKE) -C ../benchmarks test-AMPI
 
 ps-doc: basics
 	$(MAKE) -C ../doc ps
@@ -340,6 +373,7 @@ dirs+sources:
 ifeq (false,$(CMK_NO_BUILD_SHARED))
 	rm -rf ../lib_so ; mkdir ../lib_so; touch ../lib_so/.charmso
 endif
+	rm -rf ../benchmarks
 	rm -rf ../examples
 	rm -rf ../tests
 	rm -rf ../doc ; ln -s ../doc ../doc
@@ -369,6 +403,7 @@ endif
 	./gathertree $(SRCBASE)/arch/$(CMK_GDIR) .
 	test -f $(SRCBASE)/arch/$(CMK_GDIR)/gdir_link && cat $(SRCBASE)/arch/$(CMK_GDIR)/gdir_link > .gdir.new && ./gathertree $(SRCBASE)/arch/`cat .gdir.new`      . || true
 	./gatherflat $(SRCBASE)/arch/$(CMK_VDIR) .
+	./gathertree $(SRCBASE)/../benchmarks           ../benchmarks
 	./gathertree $(SRCBASE)/../examples             ../examples
 	./gathertree $(SRCBASE)/../tests                ../tests
 	rm -f ../bin/dep.pl ; cp dep.pl ../bin/
@@ -1019,17 +1054,12 @@ clean:
 	if [ -d charmrun-src ] ; then ( $(MAKE) -C charmrun-src clean ) ; fi
 	-( $(MAKE) -C doc clean )
 	( $(MAKE) -C libs clean )
+	( $(MAKE) -C ../benchmarks clean )
 	( $(MAKE) -C ../examples clean )
 	( $(MAKE) -C ../tests clean )
 
 veryclean:
-	rm -rf ../bin
-	rm -rf ../lib
-	rm -rf ../src
-	rm -rf ../examples
-	rm -rf ../tests
-	rm -rf ../include
-	rm -rf ../doc
+	rm -rf ../bin ../lib ../src ../benchmarks ../examples ../tests ../include ../doc
 	mv Makefile .Makefile
 	mv Make.depends .Make.depends
 	rm -rf [a-z]* [A-Z]*

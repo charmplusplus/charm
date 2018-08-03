@@ -247,6 +247,8 @@ target directory will look like:
 
 netlrts-linux-x86_64/
    |
+   ---  benchmarks/		# benchmark programs
+   |
    ---  bin/			# all executables
    |
    ---  doc/			# documentations
@@ -257,9 +259,9 @@ netlrts-linux-x86_64/
    |
    ---  lib_so/			# dynamic libraries
    |
-   ---  examples/		# all example programs
+   ---  examples/		# example programs
    |
-   ---  tests/			# all test programs
+   ---  tests/			# test programs
    |
    ---  tmp/			# Charm++ build directory
 
