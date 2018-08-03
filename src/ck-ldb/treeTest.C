@@ -69,7 +69,7 @@ void TreeModel::treeTest(const DataMatrix& X, vector<double>& Ysoft) const {
         if (reld->data[i] == 1) select[c++] = i;
       Xrel = new DataMatrix(c, X.num_cols);
       X.subset_rows(select, c, *Xrel);
-      delete select;
+      delete [] select;
     }
 
     if (Xrel->num_rows * Xrel->num_cols == 0) {
