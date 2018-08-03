@@ -195,7 +195,7 @@ struct LDCommDescComp {
 };
 
 void LBCommTable::GetCommInfo(int& bytes, int& msgs, int& outsidepemsgs, int&
-    outsidepebytes, int& num_nghbor, int& hops, int& hopbytes, CkVec<LBObj*>& objs) {
+    outsidepebytes, int& num_nghbor, int& hops, int& hopbytes) {
 
   LBCommData* curtable=set;
   TableState* curstate=state;

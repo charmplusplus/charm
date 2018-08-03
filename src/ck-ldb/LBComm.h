@@ -113,7 +113,7 @@ public:
   int CommCount() { return in_use; };
   void GetCommData(LDCommData* data);
   void GetCommInfo(int& bytes, int& msgs, int& withinpebytes,
-      int& outsidepebytes, int& num_nghbor, int& hops, int& hopbytes, CkVec<LBObj*>& objs);
+      int& outsidepebytes, int& num_nghbor, int& hops, int& hopbytes);
 	
 private:
   void NewTable(int _sz) {

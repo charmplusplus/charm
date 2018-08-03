@@ -87,9 +87,9 @@ public:
   inline LBOM *LbOM(LDOMHandle h) 
        { return oms[h.handle]; };
   inline LBObj *LbObj(const LDObjHandle &h) const 
-       { return objs[h.handle]; };
+       { return objs[h.handle].obj; };
   inline LBObj *LbObjIdx(int h) const 
-       { return objs[h]; };
+       { return objs[h].obj; };
   void DumpDatabase(void);
 
   inline void TurnStatsOn(void) 
@@ -132,7 +132,7 @@ public:
 
   inline void GetCommInfo(int& bytes, int& msgs, int& withinbytes, int& acrossbytes, int& num_nghbors, int& hops, int& hopbytes) {
     if (commTable)
-      commTable->GetCommInfo(bytes, msgs, withinbytes, acrossbytes, num_nghbors, hops, hopbytes, objs);
+      commTable->GetCommInfo(bytes, msgs, withinbytes, acrossbytes, num_nghbors, hops, hopbytes);
   };
 
   void MetaLBResumeWaitingChares(int lb_ideal_period);
@@ -181,7 +181,7 @@ public:
   inline void SetRunningObj(const LDObjHandle &_h) 
        { runningObj = _h.handle; obj_running = true; };
   inline const LDObjHandle &RunningObj() const 
-       { return objs[runningObj]->GetLDObjHandle(); };
+       { return objs[runningObj].obj->GetLDObjHandle(); };
   inline void NoRunningObj() 
        { obj_running = false; };
   inline bool ObjIsRunning() const 
@@ -257,8 +257,15 @@ private:
     void* data;
   };
 
+  struct LBObjEntry {
+    LBObj* obj;
+    LDObjIndex next;
+
+    LBObjEntry(LBObj* obj, LDObjIndex next = -1) : obj(obj), next(next) {}
+  };
+
   typedef CkVec<LBOM*> OMList;
-  typedef CkVec<LBObj*> ObjList;
+  typedef std::vector<LBObjEntry> ObjList;
   typedef CkVec<MigrateCB*> MigrateCBList;
   typedef CkVec<StartLBCB*> StartLBCBList;
   typedef CkVec<MigrationDoneCB*> MigrationDoneCBList;
@@ -268,8 +275,8 @@ private:
   int omCount;
   int oms_registering;
 
+  LDObjIndex objsEmptyHead;
   ObjList objs;
-  int objCount;
 
   bool statsAreOn;
   MigrateCBList migrateCBList;
@@ -298,11 +305,9 @@ public:
   int useMem();
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     int validObjHandle(LDObjHandle h ){
-            if(objCount == 0)
+            if(h.handle >= objs.size())
                 return 0;
-            if(h.handle > objCount)
-                return 0;
-            if(objs[h.handle] == NULL)
+            if(objs[h.handle].obj == NULL)
                 return 0;
 
             return 1;
@@ -310,7 +315,7 @@ public:
 #endif
 
 
-  int getObjCount() {return objCount;}
+  int getObjCount() {return objs.size();}
   const ObjList& getObjs() {return objs;}
 
 
