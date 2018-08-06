@@ -2143,9 +2143,16 @@ test_cxx "whether personality() and ADDR_NO_RANDOMIZE exist" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_ADDR_NO_RANDOMIZE, $pass, [whether personality() and ADDR_NO_RANDOMIZE exist])
 
 
+# enable/disable zlib
+AC_ARG_ENABLE([zlib],
+            [AS_HELP_STRING([--enable-zlib],
+              [enable zlib support])],
+            [enable_zlib=$enableval],
+            [enable_zlib=yes])
+
 #### test if has zlib ####
 # bproc doesnot like -lz in any case
-if test -z "$CMK_BPROC"
+if test -z "$CMK_BPROC" && test "$enable_zlib" = "yes"
 then
 
 cat > $t <<EOT
@@ -2161,7 +2168,7 @@ test_link "whether has zlib" "yes" "no" "-lz"
 AC_DEFINE_UNQUOTED(CMK_USE_ZLIB, $pass, [whether has zlib])
 if test $pass -eq 1
 then 
-	add_flag 'CMK_LIBS="$CMK_LIBS -lz"' "zlib"
+	add_flag 'CMK_SYSLIBS="$CMK_SYSLIBS -lz"' "zlib"
 fi
 
 fi
