@@ -8,25 +8,15 @@ void LrtsIssueRgets(void *recv, int pe){
   int i;
   CmiMPIRzvRdmaRecvList_t *recvInfo = (CmiMPIRzvRdmaRecvList_t *)recv;
   MPI_Request reqBufferRecv;
-  int srcRank = recvInfo->srcRank;
+  int srcPe = recvInfo->srcPe;
 
   for(i=0; i<recvInfo->numOps; i++){
     void *buffer = recvInfo->rdmaOp[i].buffer;
     int size = recvInfo->rdmaOp[i].size;
     int srcTag = recvInfo->rdmaOp[i].tag;
 
-    if(MPI_SUCCESS != MPI_Irecv(buffer, size, MPI_BYTE, srcRank, srcTag, charmComm, &reqBufferRecv))
-      CmiAbort("LrtsIssueRgets: MPI_Irecv failed!\n");
-    recvInfo->rdmaOp[i].req = reqBufferRecv;
+    MPIPostOneBuffer(buffer, (char *)(&(recvInfo->rdmaOp[i])), size, srcPe, srcTag, ONESIDED_BUFFER_RECV);  
   }
-
-  //Add receiver's information to the list to wait on it for completion
-  CpvAccess(RdmaRecvQueueLen)++;
-  if (CpvAccess(recvRdmaBuffers)==0)
-    CpvAccess(recvRdmaBuffers) = recvInfo;
-  else
-    CpvAccess(endRdmaBuffer)->next = recvInfo;
-  CpvAccess(endRdmaBuffer) = recvInfo;
 }
 
 // Post MPI_Isend or MPI_Irecv to send/recv the RDMA buffer
@@ -45,10 +35,10 @@ void MPISendOrRecvOneBuffer(SMSG_LIST *smsg, int tag){
   dstrank=node;
 #endif
 
-  if(smsg->type == ONESIDED_BUFFER_DIRECT_SEND || smsg->type == ONESIDED_BUFFER) {
+  if(smsg->type == ONESIDED_BUFFER_DIRECT_SEND || smsg->type == ONESIDED_BUFFER_SEND) {
     if (MPI_SUCCESS != MPI_Isend((void *)msg, size, MPI_BYTE, dstrank, tag, charmComm, &(smsg->req)))
       CmiAbort("LrtsSendBuffer: MPI_Isend failed!\n");
-  } else if(smsg->type == ONESIDED_BUFFER_DIRECT_RECV) {
+  } else if(smsg->type == ONESIDED_BUFFER_DIRECT_RECV || smsg->type == ONESIDED_BUFFER_RECV) {
     if (MPI_SUCCESS != MPI_Irecv((void *)msg, size, MPI_BYTE, dstrank, tag, charmComm, &(smsg->req)))
       CmiAbort("LrtsSendBuffer: MPI_Irecv failed!\n");
   } else {

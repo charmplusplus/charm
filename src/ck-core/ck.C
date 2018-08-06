@@ -2021,7 +2021,7 @@ void CkSendMsgNodeBranchImmediate(int eIdx, void *msg, int node, CkGroupID gID)
 extern "C"
 void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int opts)
 {
-  if (node==CkMyNode())
+  if (node==CkMyNode() && ((envelope *)(UsrToEnv(msg)))->isRdma() == false)
   {
     CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
     void *obj = CksvAccess(_nodeGroupTable)->find(gID).getObj();

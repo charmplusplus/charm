@@ -6,7 +6,7 @@ typedef struct _cmi_mpi_rzv_rdma_op{
 
 typedef struct _cmi_mpi_rzv_rdma{
   int numOps;
-  int srcRank;
+  int srcPe;
   CmiMPIRzvRdmaOp_t rdmaOp[0];
 } CmiMPIRzvRdma_t;
 
@@ -15,17 +15,17 @@ typedef struct _cmi_mpi_rzv_rdma_recv_op {
   void *src_info;
   int size;
   int tag;
-  int hasCompleted;
+  int opIndex;
   MPI_Request req;
 } CmiMPIRzvRdmaRecvOp_t;
 
 //Receiver's rdma buffer information is stored as a list to wait for completion of the recv requests
 typedef struct _cmi_mpi_rzv_rdma_recv_list {
-  int srcRank;
+  int srcPe;
   int numOps;
+  int counter;
   int msgLen;
   void *msg;
-  struct _cmi_mpi_rzv_rdma_recv_list* next;
   CmiMPIRzvRdmaRecvOp_t rdmaOp[0];
 } CmiMPIRzvRdmaRecvList_t;
 
@@ -96,9 +96,9 @@ void LrtsSetRdmaRecvInfo(void *rdmaRecv, int numOps, void *msg, void *rdmaSend, 
   CmiMPIRzvRdma_t *rdmaSendInfo = (CmiMPIRzvRdma_t *)rdmaSend;
 
   rdmaRecvInfo->numOps = numOps;
-  rdmaRecvInfo->srcRank = rdmaSendInfo->srcRank;
+  rdmaRecvInfo->counter = 0;
+  rdmaRecvInfo->srcPe = rdmaSendInfo->srcPe;
   rdmaRecvInfo->msg = msg;
-  rdmaRecvInfo->next = 0;
   rdmaRecvInfo->msgLen = msgSize;
 }
 
@@ -110,16 +110,14 @@ void LrtsSetRdmaRecvOpInfo(void *rdmaRecvOp, void *buffer, void *src_ref, int si
   rdmaRecvOpInfo->size = size;
   rdmaRecvOpInfo->src_info = src_ref;
 
+  rdmaRecvOpInfo->opIndex = opIndex;
   rdmaRecvOpInfo->tag = rdmaSendInfo->rdmaOp[opIndex].tag;
-  rdmaRecvOpInfo->hasCompleted = 0;
 }
 
 void LrtsSetRdmaInfo(void *dest, int destPE, int numOps){
   CmiMPIRzvRdma_t *rdma = (CmiMPIRzvRdma_t *)dest;
   rdma->numOps = numOps;
-  /* srcRank is a global variable that stores the sender rank as we cannot
-   * call MPI_Comm_rank from this thread as it is worker thread */
-  rdma->srcRank = srcRank;
+  rdma->srcPe = CmiMyPe();
 }
 
 void LrtsSetRdmaOpInfo(void *dest, const void *ptr, int size, void *ack, int destPE){
@@ -134,7 +132,7 @@ void LrtsSetRdmaOpInfo(void *dest, const void *ptr, int size, void *ack, int des
   rdmaOpInfo->tag = rdmaOp->tag;
 
   // Post the RDMA buffer with the generated tag using MPI_Isend. Post MPI_Isend directly for non-smp or through the comm thread for smp mode
-  MPIPostOneBuffer(ptr, (void *)rdmaOpInfo, size, destPE, rdmaOp->tag, ONESIDED_BUFFER);
+  MPIPostOneBuffer(ptr, (void *)rdmaOpInfo, size, destPE, rdmaOp->tag, ONESIDED_BUFFER_SEND);
 }
 
 // Structure used for the Nocopy Direct API to request an MPI rank to post a buffer

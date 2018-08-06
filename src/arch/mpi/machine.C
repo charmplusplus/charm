@@ -37,7 +37,8 @@ static char* strsignal(int sig) {
 
 /* Msg types to have different actions taken for different message types
  * REGULAR                     - Regular Charm++ message
- * ONESIDED_BUFFER             - Nocopy Entry Method API buffer
+ * ONESIDED_BUFFER_SEND        - Nocopy Entry Method API Send buffer
+ * ONESIDED_BUFFER_RECV        - Nocopy Entry Method API Recv buffer
  * ONESIDED_BUFFER_DIRECT_RECV - Nocopy Direct API Recv buffer
  * ONESIDED_BUFFER_DIRECT_SEND - Nocopy Direct API Send buffer
  * POST_DIRECT_RECV            - Metadata message with Direct Recv buffer information
@@ -45,7 +46,7 @@ static char* strsignal(int sig) {
  * */
 
 #define CMI_MSGTYPE(msg)            ((CmiMsgHeaderBasic *)msg)->msgType
-enum mpiMsgTypes { REGULAR, ONESIDED_BUFFER, ONESIDED_BUFFER_DIRECT_RECV, ONESIDED_BUFFER_DIRECT_SEND, POST_DIRECT_RECV, POST_DIRECT_SEND};
+enum mpiMsgTypes { REGULAR, ONESIDED_BUFFER_SEND, ONESIDED_BUFFER_RECV, ONESIDED_BUFFER_DIRECT_RECV, ONESIDED_BUFFER_DIRECT_SEND, POST_DIRECT_RECV, POST_DIRECT_SEND};
 
 /* =======Beginning of Definitions of Performance-Specific Macros =======*/
 /* Whether to use multiple send queue in SMP mode */
@@ -632,13 +633,26 @@ static void ReleasePostedMessages(void) {
                 prev->next = temp;
 #if CMK_ONESIDED_IMPL
             //if rdma msg, call the callback
-            if(msg_tmp->type == ONESIDED_BUFFER) {
+            if(msg_tmp->type == ONESIDED_BUFFER_SEND) {
                 CmiMPIRzvRdmaOpInfo_t *rdmaOpInfo = (CmiMPIRzvRdmaOpInfo_t *)msg_tmp->ref;
                 CmiRdmaAck *ack = (CmiRdmaAck *) rdmaOpInfo->ack;
                 ack->fnPtr(ack->token);
 
                 //free callback structure, CmiRdmaAck allocated in CmiSetRdmaAck
                 free(ack);
+            } else if(msg_tmp->type == ONESIDED_BUFFER_RECV) {
+
+                // get hold of CmiMPIRzvRdmaRecvList_t
+                CmiMPIRzvRdmaRecvOp_t *rdmaRecvOpInfo = (CmiMPIRzvRdmaRecvOp_t *)msg_tmp->ref;
+
+                CmiMPIRzvRdmaRecvList_t *rdmaRecvInfo = (CmiMPIRzvRdmaRecvList_t *)((char *)(rdmaRecvOpInfo)
+                                                        - rdmaRecvOpInfo->opIndex * LrtsGetRdmaOpRecvInfoSize()
+                                                        - LrtsGetRdmaGenRecvInfoSize());
+
+                rdmaRecvInfo->counter++;
+                if(rdmaRecvInfo->counter == rdmaRecvInfo->numOps) {
+                    handleOneRecvedMsg(rdmaRecvInfo->msgLen, (char *)rdmaRecvInfo->msg);
+                }
             } else if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_RECV) {
                 // MPI_Irecv posted as a part of the Direct API was completed
                 NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(msg_tmp->ref);
@@ -707,43 +721,6 @@ static int PumpMsgs(void) {
 #endif
 
     while (1) {
-#if CMK_ONESIDED_IMPL
-        //Wait for the completion of rdma buffers (recvs posted in LrtsIssueRgets)
-        while(recvBufferTmp != 0){
-          allOpsDone=1;
-
-          for(i=0; i<recvBufferTmp->numOps; i++){
-            if(recvBufferTmp->rdmaOp[i].hasCompleted == 0){
-
-              if(MPI_Test(&(recvBufferTmp->rdmaOp[i].req), &opDone, MPI_STATUS_IGNORE) != MPI_SUCCESS)
-                CmiAbort("ReleasePostedMessages: MPI_Test for Rdma buffers failed!\n");
-              //recv has completed
-              if(opDone)
-                recvBufferTmp->rdmaOp[i].hasCompleted = 1;
-              else
-                allOpsDone = 0;
-            }
-          }
-          //all recvs for this message have completed i.e numops number of recvs
-          if(allOpsDone){
-            handleOneRecvedMsg(recvBufferTmp->msgLen, (char *)recvBufferTmp->msg);
-            //remove from the list
-            CpvAccess(RdmaRecvQueueLen)--;
-            temp = recvBufferTmp->next;
-            if(prev==0)
-              CpvAccess(recvRdmaBuffers)=temp;
-            else
-              prev->next = temp;
-
-            recvBufferTmp = temp;
-          }
-          else{
-            prev = recvBufferTmp;
-            recvBufferTmp = recvBufferTmp->next;
-          }
-        }
-        CpvAccess(endRdmaBuffer) = prev;
-#endif
         int doSyncRecv = 1;
 #if CMI_EXERT_RECV_CAP
         if (recvCnt==RECV_CAP) break;
@@ -1103,9 +1080,13 @@ static int SendMsgBuf(void) {
 #endif
 
 #if CMK_ONESIDED_IMPL
-            if(msg_tmp->type == ONESIDED_BUFFER) {
+            if(msg_tmp->type == ONESIDED_BUFFER_SEND) {
                 CmiMPIRzvRdmaOpInfo_t *rdmaOpInfo = (CmiMPIRzvRdmaOpInfo_t *)(msg_tmp->ref);
                 MPISendOrRecvOneBuffer(msg_tmp, rdmaOpInfo->tag);
+            }
+            else if(msg_tmp->type == ONESIDED_BUFFER_RECV) {
+                CmiMPIRzvRdmaRecvOp_t *rdmaRecvOpInfo = (CmiMPIRzvRdmaRecvOp_t *)(msg_tmp->ref);
+                MPISendOrRecvOneBuffer(msg_tmp, rdmaRecvOpInfo->tag);
             }
             else if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_RECV || msg_tmp->type == ONESIDED_BUFFER_DIRECT_SEND) {
                 CmiMPIRzvRdmaAckInfo_t *ack = (CmiMPIRzvRdmaAckInfo_t *)(msg_tmp->ref);

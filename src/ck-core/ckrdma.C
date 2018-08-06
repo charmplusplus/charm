@@ -7,7 +7,7 @@
 #include "cmirdmautils.h"
 
 
-#if CMK_SMP && CMK_IMMEDIATE_MSG
+#if CMK_SMP
 /*readonly*/ extern CProxy_ckcallback_group _ckcallbackgroup;
 #endif
 
@@ -91,8 +91,7 @@ envelope* CkRdmaCreateMetadataMsg(envelope *env, int pe){
 void CkHandleRdmaCookie(void *cookie){
   CkRdmaWrapper *w = (CkRdmaWrapper *)cookie;
   CkCallback *cb= w->callback;
-
-#if CMK_SMP && CMK_IMMEDIATE_MSG
+#if CMK_SMP
   //call to callbackgroup to call the callback when calling from comm thread
   //this add one more trip through the scheduler
   _ckcallbackgroup[w->srcPe].call(*cb, sizeof(void *), (char*)&w->ptr);
@@ -189,15 +188,15 @@ void CkRdmaIssueRgets(envelope *env){
   //Receiver's machine specific info is at an offset, after the sender md and the receiver's buffer
   char *recv_md = ((char *)copyenv) + CK_ALIGN(msgsize, 16) + bufsize;
 
-  CkUnpackMessage(&copyenv);
-  CkUpdateRdmaPtrs(copyenv, msgsize, recv_md, ((char *)env) + msgsize);
-  CkPackRdmaPtrs(((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf);
-  CkPackMessage(&copyenv);
-
   /* Set the total size of the message excluding the receiver's machine specific info
    * which is not required when the receiver's entry method executes
    */
   copyenv->setTotalsize(CK_ALIGN(msgsize, 16) + bufsize);
+
+  CkUnpackMessage(&copyenv);
+  CkUpdateRdmaPtrs(copyenv, msgsize, recv_md, ((char *)env) + msgsize);
+  CkPackRdmaPtrs(((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf);
+  CkPackMessage(&copyenv);
 
   // Set rdma to be false to prevent message handler on the receiver
   // from intercepting it
