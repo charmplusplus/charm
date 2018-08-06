@@ -1972,6 +1972,7 @@ MakeSO() {
 	then
 	  soLibs="$CXX_NO_AS_NEEDED $LDXX_WHOLE_ARCHIVE_PRE $soLibs $LDXX_WHOLE_ARCHIVE_POST"
 	fi
+	soLibs="$soLibs $CMK_SYSLIBS"
 	if [ -n "$LINK_CXX_STL" ]
 	then
 	  soLibs="$soLibs -lstdc++"
