@@ -2158,7 +2158,7 @@ int main() {
 }
 EOT
 test_link "whether has zlib" "yes" "no" "-lz"
-AC_DEFINE_UNQUOTED(CMK_PROJECTIONS_USE_ZLIB, $pass, [whether has zlib])
+AC_DEFINE_UNQUOTED(CMK_USE_ZLIB, $pass, [whether has zlib])
 if test $pass -eq 1
 then 
 	add_flag 'CMK_LIBS="$CMK_LIBS -lz"' "zlib"

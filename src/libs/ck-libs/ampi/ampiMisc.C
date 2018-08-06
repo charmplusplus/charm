@@ -380,7 +380,7 @@ AMPI_API_IMPL(int, MPI_Info_free, MPI_Info *info)
 }
 
 #ifdef AMPIMSGLOG
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
 /*zDisk PUP::er's*/
 void PUP::tozDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
 { gzwrite(F,p,itemSize*n);}

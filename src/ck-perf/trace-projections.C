@@ -177,7 +177,7 @@ void TraceProjections::traceAddThreadListeners(CthThread tid, envelope *e)
 
 void LogPool::openLog(const char *mode)
 {
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
   if(compressed) {
     do {
       zfp = gzopen(fname, mode);
@@ -205,7 +205,7 @@ void LogPool::openLog(const char *mode)
 
 void LogPool::closeLog(void)
 {
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
   if(compressed) {
     gzclose(zfp);
     return;
@@ -288,7 +288,7 @@ void LogPool::createFile(const char *fix)
 
   char pestr[10];
   sprintf(pestr, "%d", CkMyPe());
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
   int len;
   if(compressed)
     len = strlen(pathPlusFilePrefix)+strlen(".logold")+strlen(pestr)+strlen(".gz")+3;
@@ -299,7 +299,7 @@ void LogPool::createFile(const char *fix)
 #endif
 
   fname = new char[len];
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
   if(compressed) {
     sprintf(fname, "%s.%s.log.gz", pathPlusFilePrefix,pestr);
   }
@@ -384,7 +384,7 @@ void LogPool::writeHeader()
   if (headerWritten) return;
   headerWritten = true;
   if(!binary) {
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
     if(compressed) {
       gzprintf(zfp, "PROJECTIONS-RECORD %d\n", numEntries);
     } 
@@ -418,7 +418,7 @@ void LogPool::write(int writedelta)
   if (binary) {
     p = new PUP::toDisk(writedelta?deltafp:fp);
   }
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
   else if (compressed) {
     p = new toProjectionsGZFile(writedelta?deltazfp:zfp);
   }
@@ -1058,7 +1058,7 @@ TraceProjections::TraceProjections(char **argv):
   CmiGetArgIntDesc(argv,"+trace-subdirs", &nSubdirs, "Number of subdirectories into which traces will be written");
 
 
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
   int compressed = true;
   CmiGetArgFlagDesc(argv,"+gz-trace","Write log files pre-compressed with gzip");
   int disableCompressed = CmiGetArgFlagDesc(argv,"+no-gz-trace","Disable writing log files pre-compressed with gzip");
@@ -1084,7 +1084,7 @@ TraceProjections::TraceProjections(char **argv):
   _logPool->setNumSubdirs(nSubdirs);
   _logPool->setBinary(binary);
   _logPool->setWriteSummaryFiles(writeSummaryFiles);
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
   _logPool->setCompressed(compressed);
 #endif
   if (CkMyPe() == 0) {
@@ -1758,7 +1758,7 @@ void fromProjectionsFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
     };
 }
 
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
 void toProjectionsGZFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
 {
   for (int i=0;i<n;i++) 

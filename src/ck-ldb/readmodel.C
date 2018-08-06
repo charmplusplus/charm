@@ -31,7 +31,9 @@
  */
 
 #include "RandomForestModel.h"
+#if CMK_USE_ZLIB
 #include "zlib.h"
+#endif
 #include <stdio.h>
 #ifndef PATH_MAX
 #define PATH_MAX 65535
@@ -41,6 +43,7 @@
 using namespace rfmodel;
 
 void ForestModel::readModel(const char* dir) {
+#if CMK_USE_ZLIB
   treeModels.resize(NUM_TREES);
 
   gzFile pFile;
@@ -118,6 +121,7 @@ void ForestModel::readModel(const char* dir) {
   }
 
   gzclose(pFile);
+#endif
 
   return;
 }

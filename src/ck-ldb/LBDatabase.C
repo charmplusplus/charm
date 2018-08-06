@@ -179,6 +179,7 @@ void _loadbalancerInit()
                       "Use this directory to read model for MetaLB");
 
   if (_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr) {
+#if CMK_USE_ZLIB
     if (CkMyRank() == 0) {
       lbRegistry.addRuntimeBalancer("GreedyLB");
       lbRegistry.addRuntimeBalancer("GreedyRefineLB");
@@ -198,6 +199,10 @@ void _loadbalancerInit()
       while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer"))
         ;
     }
+#else
+    if (CkMyPe() == 0)
+      CkAbort("MetaLB random forest model not supported because Charm++ was built without zlib support.\n");
+#endif
   } else {
     if (CkMyPe() == 0 && _lb_args.metaLbOn())
       CkPrintf(

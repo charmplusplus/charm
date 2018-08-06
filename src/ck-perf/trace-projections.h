@@ -15,7 +15,7 @@
 #include "trace-common.h"
 #include "ckhashtable.h"
 
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
 #include <zlib.h>
 #endif
 
@@ -258,7 +258,7 @@ class LogPool {
     bool hasFlushed;
     bool headerWritten;
     bool fileCreated;
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
     bool compressed;
 #endif
     unsigned int poolSize;
@@ -275,7 +275,7 @@ class LogPool {
     char *fname;
     char *dfname;
     char *pgmname;
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
     gzFile deltazfp;
     gzFile zfp;
 #endif
@@ -322,7 +322,7 @@ class LogPool {
     void setBinary(int b) { binary = (b!=0); }
     void setNumSubdirs(int n) { nSubdirs = n; }
     void setWriteSummaryFiles(int n) { writeSummaryFiles = (n!=0)? true : false;}
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
     void setCompressed(int c) { compressed = c; }
 #endif
     void createFile(const char *fix="");
@@ -581,7 +581,7 @@ class fromProjectionsFile : public fromTextFile {
   fromProjectionsFile(FILE *f_) :fromTextFile(f_) {}
 };
 
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
 class toProjectionsGZFile : public PUP::er {
   gzFile f;
  protected:

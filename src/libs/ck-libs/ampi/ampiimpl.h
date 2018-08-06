@@ -60,7 +60,7 @@ static int msgLogWrite;
 static int msgLogRead;
 static char *msgLogFilename;
 
-#if CMK_PROJECTIONS_USE_ZLIB && 0
+#if CMK_USE_ZLIB && 0
 #include <zlib.h>
 namespace PUP{
 class zdisk : public er {
@@ -2327,7 +2327,7 @@ class ampiParent : public CBase_ampiParent {
 #if AMPIMSGLOG
   /* message logging */
   int pupBytes;
-#if CMK_PROJECTIONS_USE_ZLIB && 0
+#if CMK_USE_ZLIB && 0
   gzFile fMsgLog;
   PUP::tozDisk *toPUPer;
   PUP::fromzDisk *fromPUPer;
