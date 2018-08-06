@@ -145,12 +145,6 @@ typedef struct _cmi_mpi_rzv_rdma_post_info {
   int destPe;
 }CmiMPIRzvRdmaPostInfo_t;
 
-// Structure used for the Nocopy Direct API for acknowledgement handling
-typedef struct _cmi_mpi_rzv_rdma_ack_info {
-  int pe;
-  int tag;
-}CmiMPIRzvRdmaAckInfo_t;
-
 // Set the machine specific information for a nocopy pointer (Empty method to maintain API consistency)
 void LrtsSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode){
 }

@@ -328,7 +328,7 @@ void CkRdmaDirectAckHandler(void *ack) {
     //Invoke the sender's callback
     CkNcpyAck srcAck(info->srcPtr, info->srcRef);
 
-#if CMK_SMP && CMK_IMMEDIATE_MSG
+#if CMK_SMP
     //call to callbackgroup to call the callback when calling from comm thread
     //this adds one more trip through the scheduler
     _ckcallbackgroup[info->srcPe].call(*(CkCallback *)(info->srcAck), sizeof(CkNcpyAck), (const char *)(&srcAck));
@@ -342,7 +342,7 @@ void CkRdmaDirectAckHandler(void *ack) {
     //Invoke the receiver's callback
     CkNcpyAck destAck(info->destPtr, info->destRef);
 
-#if CMK_SMP && CMK_IMMEDIATE_MSG
+#if CMK_SMP
     //call to callbackgroup to call the callback when calling from comm thread
     //this adds one more trip through the scheduler
     _ckcallbackgroup[info->destPe].call(*(CkCallback *)(info->destAck), sizeof(CkNcpyAck), (const char *)(&destAck));

@@ -1089,8 +1089,8 @@ static int SendMsgBuf(void) {
                 MPISendOrRecvOneBuffer(msg_tmp, rdmaRecvOpInfo->tag);
             }
             else if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_RECV || msg_tmp->type == ONESIDED_BUFFER_DIRECT_SEND) {
-                CmiMPIRzvRdmaAckInfo_t *ack = (CmiMPIRzvRdmaAckInfo_t *)(msg_tmp->ref);
-                MPISendOrRecvOneBuffer(msg_tmp, ack->tag);
+                NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(msg_tmp->ref);
+                MPISendOrRecvOneBuffer(msg_tmp, ncpyOpInfo->tag);
             }
             else
 #endif
