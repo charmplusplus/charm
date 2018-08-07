@@ -19,8 +19,8 @@ cksparsecontiguousreducer.o: cksparsecontiguousreducer.C cksparsecontiguousreduc
 
 CkSparseContiguousReducer.decl.h CkSparseContiguousReducer.def.h: INTERFACE
 
-INTERFACE: cksparsecontiguousreducer.ci
-	$(CHARMC) -c cksparsecontiguousreducer.ci
+INTERFACE: CkSparseContiguousReducer.ci
+	$(CHARMC) -c CkSparseContiguousReducer.ci
 	touch $@
 
 clean:

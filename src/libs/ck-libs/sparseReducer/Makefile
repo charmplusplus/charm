@@ -24,8 +24,8 @@ $(LIB): $(LIBOBJ)
 cksparsereducer.o: cksparsereducer.C cksparsereducer.h CkSparseReducer.decl.h CkSparseReducer.def.h
 	$(CHARMC) -c cksparsereducer.C
 
-CkSparseReducer.decl.h: cksparsereducer.ci
-	$(CHARMC) -c cksparsereducer.ci
+CkSparseReducer.decl.h: CkSparseReducer.ci
+	$(CHARMC) -c CkSparseReducer.ci
 
 clean:
 	rm -f conv-host *.o *.decl.h *.def.h core  $(LIB)

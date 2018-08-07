@@ -18,13 +18,13 @@ headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/msa/
 	touch headers
 
-msa-distArray.o: msa-distArray.C msa-DistPageMgr.ci headers
+msa-distArray.o: msa-distArray.C msa.ci headers
 	$(CHARMC) -c msa-distArray.C
 
 $(MODULE).def.h: $(MODULE).decl.h
 
-$(MODULE).decl.h: msa-DistPageMgr.ci
-	$(CHARMC) -c msa-DistPageMgr.ci
+$(MODULE).decl.h: msa.ci
+	$(CHARMC) -c msa.ci
 
 clean:
 	rm -f conv-host *.o *.decl.h *.def.h core $(LIB) headers

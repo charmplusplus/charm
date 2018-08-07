@@ -12,7 +12,7 @@
 #include <vector>
 #include "msa-common.h"
 
-// forward decl needed in msa-DistPageMgr.ci, i.e. in msa.decl.h
+// forward decl needed in msa.ci, i.e. in msa.decl.h
 
 /// Stores a list of indices to be written out.
 struct MSA_WriteSpan_t {

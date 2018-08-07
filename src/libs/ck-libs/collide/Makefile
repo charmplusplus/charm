@@ -45,8 +45,8 @@ threadCollide.o: threadCollide.C $(HEADDEP)
 
 collide.decl.h collide.def.h: INTERFACE.threadCollide
 
-INTERFACE.threadCollide: threadCollide.ci
-	$(CHARMC) threadCollide.ci
+INTERFACE.threadCollide: collide.ci
+	$(CHARMC) collide.ci
 	touch $@
 
 collidecharm.decl.h collidecharm.def.h: INTERFACE.collidecharm

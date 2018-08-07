@@ -34,8 +34,8 @@ $(LIBDEST): $(LIBOBJ)
 
 CkDummy.def.h: CkDummy.decl.h
 
-CkDummy.decl.h : ckdummy.ci $(CDIR)/bin/charmxi
-	$(CHARMC) -c ckdummy.ci
+CkDummy.decl.h : CkDummy.ci $(CDIR)/bin/charmxi
+	$(CHARMC) -c CkDummy.ci
 
 clean:
 	rm -f conv-host *.o *.decl.h *.def.h core  $(LIB)

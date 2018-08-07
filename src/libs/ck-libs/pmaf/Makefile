@@ -7,14 +7,14 @@ all:	$(OBJECTS)
 pgm.o:	pgm.C pgm.h Pgm.def.h Pgm.decl.h 
 	$(CHARMC) -c pgm.C
 
-Pgm.def.h Pgm.decl.h:	pgm.ci
-	$(CHARMC) pgm.ci
+Pgm.def.h Pgm.decl.h:	Pgm.ci
+	$(CHARMC) Pgm.ci
 
 chunk.o:chunk.C chunk.h PMAF.def.h PMAF.decl.h
 	$(CHARMC) -c chunk.C
 
-PMAF.def.h PMAF.decl.h:	chunk.ci
-	$(CHARMC) chunk.ci
+PMAF.def.h PMAF.decl.h:	PMAF.ci
+	$(CHARMC) PMAF.ci
 
 element.o:	element.C element.h
 	$(CHARMC) -c element.C

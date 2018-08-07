@@ -38,8 +38,8 @@ PythonCCS.decl.h PythonCCS.def.h: PythonCCS.ci
 charmdebug-python.o: charmdebug-python.C $(HEADDEP)
 	$(CHARMC) -c $(FLAGS) -I. charmdebug-python.C
 
-charmdebug_python.decl.h charmdebug_python.def.h: charmdebug-python.ci
-	$(CHARMXI) charmdebug-python.ci
+charmdebug_python.decl.h charmdebug_python.def.h: charmdebug_python.ci
+	$(CHARMXI) charmdebug_python.ci
 
 pythonIncludes.h:
 	(CHARMINC=../../../../include;. $$CHARMINC/conv-config.sh; \

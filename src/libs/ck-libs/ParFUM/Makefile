@@ -33,8 +33,8 @@ ParFUM.def.h: ParFUM.decl.h
 ParFUM.decl.h: ParFUM.ci
 	$(CHARMC) ParFUM.ci
 ParFUM_Adapt.def.h: ParFUM_Adapt.decl.h
-ParFUM_Adapt.decl.h: mesh_modify.ci
-	$(CHARMC) mesh_modify.ci
+ParFUM_Adapt.decl.h: ParFUM_Adapt.ci
+	$(CHARMC) ParFUM_Adapt.ci
 ParFUM_SA.def.h: ParFUM_SA.decl.h
 ParFUM_SA.decl.h: ParFUM_SA.ci
 	$(CHARMC) ParFUM_SA.ci

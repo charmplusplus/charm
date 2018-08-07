@@ -20,7 +20,7 @@ headers: $(HEADERS)
 ckio.o: ckio.C headers
 	$(CHARMC) -c $<
 
-$(GENHEADERS): ckio.ci.stamp
+$(GENHEADERS): CkIO.ci.stamp
 %.ci.stamp: %.ci
 	$(CHARMC) -c $<
 	touch $@
