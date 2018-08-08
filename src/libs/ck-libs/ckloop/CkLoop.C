@@ -60,7 +60,7 @@ static void *ndhThreadWork(void *id) {
 
     //further improvement of this affinity setting!!
     int myPhyRank = (myId+mainHelperPhyRank)%numPhysicalPEs;
-    //printf("thread[%d]: affixed to rank %d\n", myId, myPhyRank);
+    //CkPrintf("thread[%d]: affixed to rank %d\n", myId, myPhyRank);
     myPhyRank = myId;
     CmiSetCPUAffinity(myPhyRank);
 
@@ -73,7 +73,7 @@ static void *ndhThreadWork(void *id) {
     __sync_add_and_fetch(&gCrtCnt, 1);
 
     while (1) {
-        //printf("thread[%ld]: on core %d with main %d\n", myId, HelperOnCore(), mainHelperPhyRank);
+        //CkPrintf("thread[%ld]: on core %d with main %d\n", myId, HelperOnCore(), mainHelperPhyRank);
         if (exitFlag) break;
         pthread_mutex_lock(&thdLock);
         pthread_cond_wait(&thdCondition, &thdLock);
@@ -140,6 +140,8 @@ void FuncCkLoop::exit() {
 /* Note: Those event ids should be unique globally!! */
 #define CKLOOP_TOTAL_WORK_EVENTID  139
 #define CKLOOP_FINISH_SIGNAL_EVENTID 143
+#define CKLOOP_STATIC_CHUNK_WORK 998
+#define CKLOOP_DYNAMIC_CHUNK_WORK 999
 
 static FuncCkLoop *globalCkLoop = NULL;
 
@@ -318,7 +320,7 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
                 one->ptr = (void *)curLoop;
                 envelope *env = UsrToEnv(one);
                 env->setObjPtr(thisHelper->ckGetChareID().objPtr);
-                //printf("[%d] sending a msg %p (env=%p) to [%d]\n", CmiMyRank(), one, env, i);
+                //CkPrintf("[%d] sending a msg %p (env=%p) to [%d]\n", CmiMyRank(), one, env, i);
                 CmiPushPE(i, (void *)(env));
             }
             for (int i=0; i<CmiMyRank(); i++) {
@@ -327,7 +329,7 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
                 one->ptr = (void *)curLoop;
                 envelope *env = UsrToEnv(one);
                 env->setObjPtr(thisHelper->ckGetChareID().objPtr);
-                //printf("[%d] sending a msg %p (env=%p) to [%d]\n", CmiMyRank(), one, env, i);
+                //CkPrintf("[%d] sending a msg %p (env=%p) to [%d]\n", CmiMyRank(), one, env, i);
                 CmiPushPE(i, (void *)(env));
             }
         }
@@ -360,17 +362,121 @@ void FuncCkLoop::parallelizeFunc(HelperFn func, int paramNum, void * param,
     if(curLoop) curLoop->stealWork();
     TRACE_BRACKET(CKLOOP_TOTAL_WORK_EVENTID);
 
-    //printf("[%d]: parallelize func %p with [%d ~ %d] divided into %d chunks using loop=%p\n", CkMyPe(), func, lowerRange, upperRange, numChunks, curLoop);
+    //CkPrintf("[%d]: parallelize func %p with [%d ~ %d] divided into %d chunks using loop=%p\n", CkMyPe(), func, lowerRange, upperRange, numChunks, curLoop);
 
     TRACE_START(CKLOOP_FINISH_SIGNAL_EVENTID);
     curLoop->waitLoopDone(sync);
     TRACE_BRACKET(CKLOOP_FINISH_SIGNAL_EVENTID);
 
-    //printf("[%d]: finished parallelize func %p with [%d ~ %d] divided into %d chunks using loop=%p\n", CkMyPe(), func, lowerRange, upperRange, numChunks, curLoop);
+    //CkPrintf("[%d]: finished parallelize func %p with [%d ~ %d] divided into %d chunks using loop=%p\n", CkMyPe(), func, lowerRange, upperRange, numChunks, curLoop);
 
     if (type!=CKLOOP_NONE)
         reduce(curLoop->getRedBufs(), redResult, type, numChunks);
     return;
+}
+
+CpvStaticDeclare(int, chunkHandler);
+CpvStaticDeclare(int, hybridHandler);
+
+void FuncCkLoop::parallelizeFuncHybrid(float staticFraction, HelperFn func, int paramNum, void * param,
+                                     int numChunks, int lowerRange,
+                                     int upperRange, int sync,
+                                     void *redResult, REDUCTION_TYPE type,
+                                     CallerFn cfunc,
+                                     int cparamNum, void * cparam) {
+  double _start; //may be used for tracing
+  if (numChunks > MAX_CHUNKS) {
+    numChunks = MAX_CHUNKS;
+  }
+
+#ifdef CMK_PAPI_PROFILING
+  int num_hwcntrs = 2;
+  int Events[2] = {PAPI_L2_DCM, PAPI_L3_DCM}; // Obtain L1 and L2 data cache misses.
+  long_long values[2];
+#endif
+
+#ifdef CMK_PAPI_PROFILING
+  if (PAPI_start_counters(Events, num_hwcntrs) != PAPI_OK) CkPrintf("Error with creating event set \n");
+#endif
+
+  //for using nodequeue
+  TRACE_START(CKLOOP_TOTAL_WORK_EVENTID);
+  /*
+ CkPrintf("debug [%d]:, CkMyRank=%d: funchybrid. \n", CkMyPe(), CkMyRank());
+  FuncSingleHelper *thisHelper = helperPtr[CkMyRank()];
+#if ALLOW_MULTIPLE_UNSYNC
+  CkPrintf("debug: %d: funchybrid. 1b thisHelper: %d \n", CkMyPe(), (long) thisHelper);
+      ConverseNotifyMsg *notifyMsg = thisHelper->getNotifyMsg();
+CkPrintf("ptr %d\n", (long) notifyMsg->ptr);
+#else
+  CkPrintf("debug: %d: funchybrid. 1c \n", CkMyPe());
+      ConverseNotifyMsg *notifyMsg = thisHelper->notifyMsg;
+#endif
+  CkPrintf("debug: %d: funchybrid. 2 \n", CkMyPe());
+      curLoop = (CurLoopInfo *)(notifyMsg->ptr);
+  */
+
+  //curLoop = new CurLoopInfo(FuncCkLoop::MAX_CHUNKS);
+
+  CurLoopInfo* curLoop = new CurLoopInfo(numHelpers);
+  curLoop->set(numChunks, func, lowerRange, upperRange, paramNum, param);
+  curLoop->setStaticFraction(staticFraction);
+  curLoop->setReductionType(type);
+  void** redBufs = curLoop->getRedBufs();
+  if(type == CKLOOP_INT_SUM)
+    for(int i=0; i<numHelpers; i++)
+      *((int*)redBufs[i]) = 0;
+  else if((type == CKLOOP_DOUBLE_SUM) || (type == CKLOOP_DOUBLE_MAX))
+    for(int i=0; i<numHelpers; i++)
+      *((double*)redBufs[i]) = 0.0;
+  else if(type == CKLOOP_FLOAT_SUM)
+    for(int i=0; i<numHelpers; i++)
+      *((float*)redBufs[i]) = 0.0;
+  LoopChunkMsg* msg = new LoopChunkMsg;
+  msg->loopRec = curLoop;
+  CmiSetHandler(msg, CpvAccess(hybridHandler));
+  for (int i=1; i<numHelpers; i++) {
+    CmiPushPE(i, (void*)msg); // New work coming, send message to other ranks to notify the ranks.
+  }
+  // Call the function on the caller PE before it starts working on chunks
+  if (cfunc != NULL) {
+    cfunc(cparamNum, cparam); //user code
+  }
+  curLoop->doWorkForMyPe();
+  // Rank 0 processor continues dequeuing its dynamic chunks from its own task queue.
+#if CMK_SMP && CMK_TASKQUEUE
+  while(1) {
+      void* msg = TaskQueuePop((TaskQueue)CpvAccess(CsdTaskQueue));
+      if (msg == NULL) break;
+      CmiHandleMessage(msg);
+  }
+#endif
+  // TODO: Should core 0 steal?
+  // If so, do randomized steals in a loop until all chunks are done.
+  curLoop->waitLoopDoneHybrid(1);
+  // NOTE: use 1 in parameter of function waitLoopDone to force exit.
+
+  // CkPrintf("DEBUG: Exiting loop : numChunks = %d \t numStaticChunksCompleted = %d \t numDynamicChunksFired = %d \t numDynamicChunksCompleted = %d \t \n", numChunks, curLoop->numStaticChunksCompleted, curLoop->numDynamicChunksFired, curLoop->numDynamicChunksCompleted);
+
+  TRACE_BRACKET(CKLOOP_TOTAL_WORK_EVENTID);
+
+#ifdef CMK_PAPI_PROFILING
+ if (PAPI_stop_counters(values, num_hwcntrs) != PAPI_OK)   CkPrintf("Error with stopping counters!\n");
+#endif
+
+#ifdef CMK_PAPI_PROFILING
+    if (PAPI_read_counters(values, num_hwcntrs) != PAPI_OK)  CkPrintf("Error with reading counters!\n");
+#endif
+
+  //CkPrintf("[%d]: parallelize func %p with [%d ~ %d] divided into %d chunks using loop=%p\n", CkMyPe(), func, lowerRange, upperRange, numChunks, curLoop);
+  TRACE_START(CKLOOP_FINISH_SIGNAL_EVENTID);
+  TRACE_BRACKET(CKLOOP_FINISH_SIGNAL_EVENTID);
+  //CkPrintf("[%d]: finished parallelize func %p with [%d ~ %d] divided into %d chunks using loop=%p\n", CkMyPe(), func, lowerRange, upperRange, numChunks, curLoop);
+  if (type!=CKLOOP_NONE)
+    reduce(curLoop->getRedBufs(), redResult, type, numHelpers);
+
+  delete curLoop;
+  delete msg;
 }
 
 #define COMPUTE_REDUCTION(T) {\
@@ -449,6 +555,13 @@ static int _ckloopEP;
 CpvStaticDeclare(int, NdhStealWorkHandler);
 static void RegisterCkLoopHdlrs() {
     CpvInitialize(int, NdhStealWorkHandler);
+
+    // The following four lines are for the hybrid static/dynamic scheduler.
+    CpvInitialize(int, hybridHandler);
+    CpvAccess(hybridHandler) = CmiRegisterHandler((CmiHandler)hybridHandlerFunc);
+    CpvInitialize(int, chunkHandler);
+    CpvAccess(chunkHandler) = CmiRegisterHandler((CmiHandler)executeChunk);
+
 #if CMK_TRACE_ENABLED
     CpvInitialize(envelope*, dummyEnv);
     CpvAccess(dummyEnv) = envelope::alloc(ForChareMsg,0,0); //Msgtype is the same as the one used for TRACE_BEGIN_EXECUTED_DETAILED
@@ -678,6 +791,89 @@ void CkLoop_Exit(CProxy_FuncCkLoop ckLoop) {
     ckLoop.exit();
 }
 
+void hybridHandlerFunc(LoopChunkMsg *msg)
+{
+  CurLoopInfo* loop = msg->loopRec;
+  loop->doWorkForMyPe(); // Do or enqueue work for the current loop for my PE.
+}
+
+void CurLoopInfo::doWorkForMyPe() {
+  int numHelpers = CmiMyNodeSize();
+  int myRank = CmiMyRank();
+  if (upperIndex-lowerIndex < numHelpers)
+    numHelpers = upperIndex-lowerIndex;
+  int myStaticBegin = lowerIndex + myRank*(upperIndex - lowerIndex)/numHelpers;
+
+  int myDynamicBegin = myStaticBegin + ((upperIndex - lowerIndex)/numHelpers)*staticFraction;
+  int lastDynamic = lowerIndex + (myRank+1)*(upperIndex - lowerIndex)/numHelpers;
+  if(lastDynamic > upperIndex) lastDynamic = upperIndex; // for the last PE.
+
+  int i, j;
+
+  // TODO: make numChunks smaller as needed.
+
+  chunkSize = (upperIndex - lowerIndex)/numChunks;
+  if(chunkSize == 0) chunkSize = 1;
+  LoopChunkMsg* msgBlock = new LoopChunkMsg[1 + (lastDynamic - myDynamicBegin)/chunkSize];
+  // TODO: msgBlock should be freed when the whole CkLoop loop is done and all stealers have finished using it.
+
+  // Enqueue dynamic work first, because before a PE starts work on static, other PE's should be ready to steal from its dynamic.
+  // TODO: the order of enqueues should be reversed since the task queue is run as a stack.
+  /* for (i=myDynamicBegin, j=0; i<lastDynamic; i+=chunkSize, j++)
+   {
+     LoopChunkMsg* msg = (LoopChunkMsg*)(&(msgBlock[j]));
+     msg->startIndex = i;
+      msg->endIndex = i + chunkSize > lastDynamic ? lastDynamic : i+chunkSize;
+      msg->loopRec = this;
+      CmiSetHandler(msg, CpvAccess(chunkHandler));
+      CsdTaskEnqueue(msg);
+      } */
+
+  //TODO: test with    400  404
+
+  // TODO: size : 402 / 404 4 threads.
+  // TODO: size:
+#if CMK_SMP && CMK_TASKQUEUE
+  for (i=lastDynamic, j=0; i>myDynamicBegin; i-=chunkSize, j++)
+    {
+      LoopChunkMsg* msg = (LoopChunkMsg*)(&(msgBlock[j]));
+      //  msg->startIndex = i;
+      // msg->endIndex = i + chunkSize > lastDynamic ? lastDynamic : i+chunkSize;
+      msg->endIndex = i;
+      msg->startIndex = i - chunkSize  < myDynamicBegin ? myDynamicBegin  :  i - chunkSize;
+      msg->loopRec = this;
+      CmiSetHandler(msg, CpvAccess(chunkHandler));
+      CsdTaskEnqueue(msg);
+    }
+#endif
+
+  double _start; //may be used for tracing
+  TRACE_START(CKLOOP_STATIC_CHUNK_WORK);
+  // do PE's static part
+  double x = 0.0;
+  fnPtr(myStaticBegin, myDynamicBegin, (void*) &x, paramNum, param);
+  TRACE_BRACKET(CKLOOP_STATIC_CHUNK_WORK);
+  // TODO: the code block below may not be needed since the hybrid scheduler doesn't use finishFlag.
+  /* int tmp  = (myDynamicBegin - myStaticBegin)/chunkSize;
+     finishFlag+= tmp; */
+
+  //CkPrintf("DEBUG: chunk [%d:\t %d] function returned %f for reduction\n" , myStaticBegin, myDynamicBegin, x);
+
+  localReduce(x, type);
+  numDynamicChunksFired += j;
+  numStaticRegionsCompleted++;
+}
+
+void executeChunk(LoopChunkMsg *msg) {
+  double _start; //may be used for tracing
+  TRACE_START(CKLOOP_DYNAMIC_CHUNK_WORK);
+  // This is the function executed when a task is dequeued from the task queue in the hybrid scheduler.
+  CurLoopInfo* linfo = msg->loopRec;
+  linfo->runChunk(msg->startIndex, msg->endIndex);
+  TRACE_BRACKET(CKLOOP_DYNAMIC_CHUNK_WORK);
+  /* free(msg); */ // Free not needed since we are using a block allocation in doWorkForMyPe().
+}
+
 void CkLoop_Parallelize(HelperFn func,
                             int paramNum, void * param,
                             int numChunks, int lowerRange, int upperRange,
@@ -688,6 +884,25 @@ void CkLoop_Parallelize(HelperFn func,
     if ( numChunks > upperRange - lowerRange + 1 ) numChunks = upperRange - lowerRange + 1;
     globalCkLoop->parallelizeFunc(func, paramNum, param, numChunks, lowerRange,
         upperRange, sync, redResult, type, cfunc, cparamNum, cparam);
+}
+
+void CkLoop_ParallelizeHybrid(float staticFraction,
+             HelperFn func,
+             int paramNum, void * param,
+             int numChunks, int lowerRange, int upperRange,
+             int sync,
+             void *redResult, REDUCTION_TYPE type,
+             CallerFn cfunc,
+             int cparamNum, void* cparam) {
+#if CMK_SMP && CMK_TASKQUEUE
+  if (0 != CkMyRank()) CkAbort("CkLoop_ParallelizeHybrid() must be called from rank 0 PE on a node.\n");
+  if (numChunks > upperRange - lowerRange + 1) numChunks = upperRange - lowerRange + 1;
+  // Not doing anything with loop history for now.
+  globalCkLoop->parallelizeFuncHybrid(staticFraction, func, paramNum, param, numChunks, lowerRange, upperRange, sync, redResult, type, cfunc, cparamNum, cparam);
+#else
+  globalCkLoop->parallelizeFunc(func, paramNum, param, numChunks, lowerRange,
+        upperRange, sync, redResult, type, cfunc, cparamNum, cparam);
+#endif
 }
 
 void CkLoop_SetSchedPolicy(CkLoop_sched schedPolicy) {

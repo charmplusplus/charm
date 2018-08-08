@@ -267,6 +267,16 @@ enum CkElementCreation_t : uint8_t {
 typedef void (*CkLocFn)(CkArray *,void *,CkLocRec *,CkArrayIndex *);
 #endif
 
+// Returns rank 0 for a pe for drone mode
+#if CMK_DRONE_MODE
+#define CMK_RANK_0(pe) ({\
+  CkNodeOf(pe)*CkNodeSize(0);\
+})
+#else
+  #define CMK_RANK_0(pe) ({\
+  pe;\
+})
+#endif
 
 /**
  * A group which manages the location of an indexed set of
@@ -297,14 +307,14 @@ typedef std::unordered_map<CmiUInt8, CkLocRec*> LocRecHash;
 
 //Interface used by external users:
 	/// Home mapping
-	inline int homePe(const CkArrayIndex &idx) const {return map->homePe(mapHandle,idx);}
+	inline int homePe(const CkArrayIndex &idx) const {return CMK_RANK_0(map->homePe(mapHandle,idx));}
         inline int homePe(const CmiUInt8 id) const {
           if (compressor)
-            return homePe(compressor->decompress(id));
+            return CMK_RANK_0(homePe(compressor->decompress(id)));
 
-          return id >> 24;
+          return CMK_RANK_0(id >> 24);
         }
-	inline int procNum(const CkArrayIndex &idx) const {return map->procNum(mapHandle,idx);}
+	inline int procNum(const CkArrayIndex &idx) const {return CMK_RANK_0(map->procNum(mapHandle,idx));}
 	inline bool isHome (const CkArrayIndex &idx) const {return (bool)(homePe(idx)==CkMyPe());}
   int whichPE(const CkArrayIndex &idx) const;
   int whichPE(const CmiUInt8 id) const;

@@ -27,7 +27,7 @@ class CProxy_FuncCkLoop;
 extern CProxy_FuncCkLoop CkLoop_Init(int numThreads=0);
 
 /* used to free resources if using the library in non-SMP mode. It should be called on just one PE, say PE 0 */
-extern void CkLoop_Exit(CProxy_FuncCkLoop ckLoop); 
+extern void CkLoop_Exit(CProxy_FuncCkLoop ckLoop);
 
 extern void CkLoop_Parallelize(
     HelperFn func, /* the function that finishes a partial work on another thread */
@@ -39,6 +39,19 @@ extern void CkLoop_Parallelize(
     CallerFn cfunc=NULL, /* caller PE will call this function before ckloop is done and before starting to work on its chunks */
     int cparamNum=0, void *cparam=NULL /* the input parameters to the above function */
 );
+
+extern void CkLoop_ParallelizeHybrid(
+    float staticFraction,
+    HelperFn func, /* the function that finishes a partial work on another thread */
+    int paramNum, void * param, /* the input parameters for the above func */
+    int numChunks, /* number of chunks to be partitioned */
+    int lowerRange, int upperRange, /* the loop-like parallelization happens in [lowerRange, upperRange] */
+    int sync=1, /* whether the flow will continue unless all chunks have finished */
+    void *redResult=NULL, REDUCTION_TYPE type=CKLOOP_NONE, /* the reduction result, ONLY SUPPORT SINGLE VAR of TYPE int/float/double */
+    CallerFn cfunc=NULL, /* caller PE will call this function before ckloop is done and before starting to work on its chunks */
+    int cparamNum=0, void *cparam=NULL /* the input parameters to the above function */
+);
+
 
 extern void CkLoop_SetSchedPolicy(CkLoop_sched schedPolicy);
 

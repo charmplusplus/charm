@@ -1178,6 +1178,12 @@ void CentralLB::ProcessReceiveMigration()
     MigrateInfo& move = m->moves[i];
     const int me = CkMyPe();
     if (move.from_pe == me && move.to_pe != me) {
+#if CMK_DRONE_MODE
+      int to_pe_rank0 = CMK_RANK_0(move.to_pe);
+      if(move.from_pe == to_pe_rank0) continue;
+      move.to_pe = to_pe_rank0;
+#endif
+
       DEBUGF(("[%d] migrating object to %d\n",move.from_pe,move.to_pe));
       // migrate object, in case it is already gone, inform toPe
 #if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
@@ -1201,6 +1207,10 @@ void CentralLB::ProcessReceiveMigration()
             }
 #endif
     } else if (move.from_pe != me && move.to_pe == me) {
+#if CMK_DRONE_MODE
+      int to_pe_rank0 = CMK_RANK_0(move.to_pe);
+      if(me != to_pe_rank0) continue;
+#endif
        DEBUGF(("[%d] expecting object from %d\n",move.to_pe,move.from_pe));
       if (!move.async_arrival) migrates_expected++;
       else future_migrates_expected++;

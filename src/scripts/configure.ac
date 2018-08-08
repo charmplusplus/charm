@@ -191,6 +191,38 @@ else
 fi
 
 
+# enable task queue
+AC_ARG_ENABLE([task_queue],
+            [AS_HELP_STRING([--enable-task-queue],
+              [enable task queue])],
+            [enable_task_queue=$enableval],
+            [enable_task_queue=no])
+
+if test "$enable_task_queue" = "no"
+then
+  Echo "Task Queue is disabled"
+  AC_DEFINE_UNQUOTED(CMK_TASKQUEUE, 0, [disable task queue])
+else
+  Echo "Task Queue is enabled"
+  AC_DEFINE_UNQUOTED(CMK_TASKQUEUE, 1, [enable task queue])
+fi
+
+# enable drone mode
+AC_ARG_ENABLE([drone_mode],
+            [AS_HELP_STRING([--enable-drone-mode],
+              [enable drone mode])],
+            [enable_drone_mode=$enableval],
+            [enable_drone_mode=no])
+
+if test "$enable_drone_mode" = "no"
+then
+  Echo "Drone mode is disabled"
+  AC_DEFINE_UNQUOTED(CMK_DRONE_MODE, 0, [disable drone mode])
+else
+  Echo "Drone mode is enabled"
+  AC_DEFINE_UNQUOTED(CMK_DRONE_MODE, 1, [enable drone mode])
+fi
+
 AC_ARG_ENABLE([charmdebug],
             [AS_HELP_STRING([--enable-charmdebug],
               [enable charmDebug])], ,

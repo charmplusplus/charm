@@ -1809,10 +1809,12 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	}
 #endif
 #if CMK_SMP && CMK_TASKQUEUE
+#if CMK_OMP
 	msg = CmiSuspendedTaskPop();
 	if (msg != NULL) {
 	  return (msg);
 	}
+#endif
 	msg = TaskQueuePop((TaskQueue)s->taskQ);
 	if (msg != NULL) {
 	  return (msg);
@@ -2252,7 +2254,7 @@ void CthSchedInit()
   CpvInitialize(CthThread, CthSleepingStandins);
   CpvInitialize(int      , CthResumeNormalThreadIdx);
   CpvInitialize(int      , CthResumeSchedulingThreadIdx);
-#if CMK_SMP && CMK_TASKQUEUE
+#if CMK_OMP
   CpvInitialize(int      , CthResumeStealableThreadIdx);
   CpvInitialize(int      , CthResumeSuspendedStealableThreadIdx);
 #endif

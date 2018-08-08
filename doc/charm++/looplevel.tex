@@ -25,6 +25,8 @@ shared-memory multithreading runtime will waste computational power because
 those dedicated cores are not utilized at all during most of the application's
 execution time. This case indicates the necessity of a unified
 runtime supporting both types of parallelism.
+
+
 \section{CkLoop library}
 The \emph{CkLoop} library is an add-on to the \charmpp{} runtime to achieve such
 a unified runtime.  The library implements a simple OpenMP-like shared-memory
@@ -97,10 +99,60 @@ Examples using this library can be found in \examplerefdir{ckloop} and the
 widely used molecular dynamics simulation application
 NAMD\footnote{http://www.ks.uiuc.edu/Research/namd}.
 
+\subsection{The CkLoop Hybrid library}
+The CkLoop\_Hybrid library is a mode of CkLoop that incorporates specific
+adaptive scheduling strategies aimed at providing a tradeoff between dynamic
+load balance and spatial locality. It is used in a build of Charm++ where all
+chares are placed on core 0 of each node (called the drone-mode, or
+all-drones-mode). It incorporates a strategy called staggered static-dynamic
+scheduling (from dissertation work of Vivek Kale). The iteration space is
+first tentatively divided approximately equally to all available PEs. Each
+PE's share of the iteration space is divided into a static portion, specified by
+the staticFraction parameter below, and the remaining dynamic portion. The dynamic
+portion of a PE is divided into chunks of specified chunksize, and enqueued in
+the task-queue associated with that PE. Each PE works on its static portion,
+and then on its own task queue (thus preserving spatial locality, as well as
+persistence of allocations across outer iterations), and after finishing that,
+steals work from other PE’s task queues.
+
+CkLoopHybrid support requires the SMP mode of \charmpp{} and the additional flags --enable-drone-mode and
+--enable-task-queue to be passed as build options when Charm++ is built.
+
+The changes to the CkLoop API call are the following:
+
+\begin{itemize}
+  \item \textbf{CkLoop\_Init} does not need to be called
+  \item \textbf{CkLoop\_SetSchedPolicy} is not supported
+  \item \textbf{CkLoop\_Exit} does not need to be called
+  \item \textbf{CkLoop\_Parallelize} call is similar to CkLoop but has an additional
+  variable that provides the fraction of iterations that are statically scheduled:
+  \begin{verbatim}
+void CkLoop_ParallelizeHybrid(
+float staticFraction,
+HelperFn func, /* the function that finishes partial work on another thread */
+int paramNum, /* the number of parameters for func */
+void * param, /* the input parameters for the above func */
+int numChunks, /* number of chunks to be partitioned */
+int lowerRange, /* lower range of the loop-like parallelization [lowerRange, upperRange] */
+int upperRange, /* upper range of the loop-like parallelization [lowerRange, upperRange] */
+int sync=1, /* toggle implicit barrier after each parallelized loop */
+void *redResult=NULL, /* the reduction result, ONLY SUPPORT SINGLE VAR of TYPE int/float/double */
+REDUCTION_TYPE type=CKLOOP_NONE /* type of the reduction result */
+CallerFn cfunc=NULL, /* caller PE will call this function before ckloop is done and before starting to work on its chunks */
+int cparamNum=0, void *cparam=NULL /* the input parameters to the above function */
+)
+\end{verbatim}
+
+\end{itemize}
+
+Reduction is supported for type CKLOOP\_INT\_SUM, CKLOOP\_FLOAT\_SUM,
+CKLOOP\_DOUBLE\_SUM. It is recommended to use this mode without reduction.
+
+
 \section{Charm++/Converse Runtime Scheduler Integrated OpenMP}
-The compiler-provided OpenMP runtime library can work with Charm++ but it creates its own thread pool so that Charm++ 
-and OpenMP can have oversubscription problem. The integrated OpenMP runtime library parallelizes OpenMP regions in each chare 
-and runs on the Charm++ runtime without oversubscription. The integrated runtime creates OpenMP user-level threads, which can migrate among PEs within 
+The compiler-provided OpenMP runtime library can work with Charm++ but it creates its own thread pool so that Charm++
+and OpenMP can have oversubscription problem. The integrated OpenMP runtime library parallelizes OpenMP regions in each chare
+and runs on the Charm++ runtime without oversubscription. The integrated runtime creates OpenMP user-level threads, which can migrate among PEs within
 a node. This fine-grained parallelism by the integrated runtime helps resolve load imbalance within a node easily. When PEs become idle, they help other busy PEs within a node via work-stealing.
 \subsection{Instructions to build and use the integrated OpenMP library}
 \subsubsection{Instructions to build}
@@ -118,19 +170,19 @@ The following is the list of compilers which are verified to support this integr
   \item Clang: 3.7 or newer
 \end{itemize}
 
-You can use this integrated OpenMP with clang on IBM Bluegene machines without special compilation flags.  
+You can use this integrated OpenMP with clang on IBM Bluegene machines without special compilation flags.
 (Don't need to add -fopenmp or -openmp on Bluegene clang)
 
-On Linux, the OpenMP supported version of clang has been installed in default recently. For example, 
+On Linux, the OpenMP supported version of clang has been installed in default recently. For example,
 Ubuntu has been released with clang higher than 3.7 since 15.10.
 Depending on which version of clang is installed in your working environments, you should follow additional instructions
-to use this integrated OpenMP with Clang. The following is the instruction to use 
-clang on Ubuntu where the default clang is older than 3.7. If you want to use clang on other Linux 
-distributions, you can use package managers on those Linux distributions to install clang and OpenMP library. 
+to use this integrated OpenMP with Clang. The following is the instruction to use
+clang on Ubuntu where the default clang is older than 3.7. If you want to use clang on other Linux
+distributions, you can use package managers on those Linux distributions to install clang and OpenMP library.
 This installation of clang will add headers for OpenMP environmental routines and allow you to parse the OpenMP directives.
 However, on Ubuntu, the installation of clang doesn't come with its OpenMP runtime library so it results in an error message saying that
 it fails to link the compiler provided OpenMP library. This library is not needed to use the integrated OpenMP runtime but you
-need to avoid this error to succeed compiling your codes. The following is the instruction to avoid the error. 
+need to avoid this error to succeed compiling your codes. The following is the instruction to avoid the error.
 
 \begin{verbatim}
 /* When you want to compile Integrated OpenMP on Ubuntu where the pre-installed clang
@@ -140,13 +192,13 @@ sudo apt-get install clang-3.8 //you can use any version of clang higher than 3.
 sudo ln -svT /usr/bin/clang-3.8 /usr/bin/clang
 sudo ln -svT /usr/bin/clang++-3.8 /usr/bin/clang
 
-$(CHARM_DIR)/build charm++ multicore-linux64 clang omp --with-production -j8 
+$(CHARM_DIR)/build charm++ multicore-linux64 clang omp --with-production -j8
 echo '!<arch>' > $(CHARM_DIR)/lib/libomp.a //Dummy library. This will make you avoid the error message.
 \end{verbatim}
 
-On Mac, the Apple-provided clang installed in default doesn't have OpenMP feature. We're working on the support of 
+On Mac, the Apple-provided clang installed in default doesn't have OpenMP feature. We're working on the support of
 this library on Mac with OpenMP enabled clang which can be downloaded and installed through `Homebrew or MacPorts`.
-Currently, this integrated library is built and compiled on Mac with the normal GCC which can be downloaded and 
+Currently, this integrated library is built and compiled on Mac with the normal GCC which can be downloaded and
 installed via Homebrew and MacPorts. If installed globally, GCC will be accessible by appending the major version
 number and adding it to the invocation of the Charm++ build script. For example:\\
 \begin{verbatim}
@@ -179,25 +231,25 @@ In addition, this library will be supported on Windows in the next release of Ch
 
 \subsubsection{How to use the integrated OpenMP on Charm++}
 
-To use this library on your applications, you have to add `-module OmpCharm' in compile flags 
-to link this library instead of the compiler-provided library in compilers. Without `-module OmpCharm', 
-your application will use the compiler-provided OpenMP library which running on its own separate runtime. 
-(You don't need to add `-fopenmp or -openmp' with gcc and icc. These flags are included 
+To use this library on your applications, you have to add `-module OmpCharm' in compile flags
+to link this library instead of the compiler-provided library in compilers. Without `-module OmpCharm',
+your application will use the compiler-provided OpenMP library which running on its own separate runtime.
+(You don't need to add `-fopenmp or -openmp' with gcc and icc. These flags are included
 in the predefined compile options when you build Charm++ with `omp')
 
-This integrated OpenMP adjusts the number of OpenMP instances on each chare so the number of 
+This integrated OpenMP adjusts the number of OpenMP instances on each chare so the number of
 OpenMP instances can be changed for each OpenMP region over execution.
-If your code shares some data structures among OpenMP instances in a parallel region, you can set the size of 
-the data structures before the start of the OpenMP region with ``omp\_get\_max\_threads()'' 
-and use the data structure within each OpenMP instance with ``omp\_get\_thread\_num()''. 
-After the OpenMP region, you can iterate over the data structure to combine partial results 
-with ``CmiGetCurKnownOmpThreads()''. ``CmiGetCurKnownOmpThreads() returns the number of OpenMP 
+If your code shares some data structures among OpenMP instances in a parallel region, you can set the size of
+the data structures before the start of the OpenMP region with ``omp\_get\_max\_threads()''
+and use the data structure within each OpenMP instance with ``omp\_get\_thread\_num()''.
+After the OpenMP region, you can iterate over the data structure to combine partial results
+with ``CmiGetCurKnownOmpThreads()''. ``CmiGetCurKnownOmpThreads() returns the number of OpenMP
 threads for the latest OpenMP region on the PE where a chare is running.'' The following is an
-example to describe how you can use shared data structures for OpenMP regions on the integrated 
+example to describe how you can use shared data structures for OpenMP regions on the integrated
 OpenMP with Charm++.
 \begin{verbatim}
 /* Maximum possible number of OpenMP threads in the upcoming OpenMP region.
-   Users can restrict this number with 'omp_set_num_threads()' for each chare 
+   Users can restrict this number with 'omp_set_num_threads()' for each chare
    and the environmental variable, 'OMP_NUM_THREADS' for all chares.
    By default, omp_get_max_threads() returns the number of PEs for each logical node.
 */
@@ -205,7 +257,7 @@ int maxAvailableThreads = omp_get_max_threads();
 int *partialResult = new int[maxAvailableThreads]{0};
 
 /* Partial sum for subsets of iterations assigned to each OpenMP thread.
-   The integrated OpenMP runtime decides how many OpenMP threads to create 
+   The integrated OpenMP runtime decides how many OpenMP threads to create
    with some heuristics internally.
 */
 #pragma omp parallel for
@@ -220,8 +272,8 @@ for (int j = 0; j < CmiCurKnownOmpThreads(); j++)
 \end{verbatim}
 
 \subsection{The list of supported pragmas}
-This library is forked from LLVM OpenMP Library supporting OpenMP 4.0. Among many number of 
-directives specified in OpenMP 4.0,  limited set of directives are supported. 
+This library is forked from LLVM OpenMP Library supporting OpenMP 4.0. Among many number of
+directives specified in OpenMP 4.0,  limited set of directives are supported.
 The following list of supported pragmas is verified from the openmp conformance test suite which forked from LLVM OpenMP library and ported to Charm++ program running multiple OpenMP instances on chares. The test suite can be found in \emph{tests/converse/openmp\_test}.
 \begin{verbatim}
 /* omp_<directive>_<clauses> */
@@ -275,10 +327,10 @@ omp_single_private
 \end{verbatim}
 The other directives in OpenMP standard will be supported in the next version.
 
-A simple example using this library can be found in \examplerefdir{openmp}. You can compare ckloop 
-and the integrated OpenMP with this example. You can see that the total execution time of 
-this example with enough big size of problem is faster with OpenMP than CkLoop thanks to 
-load balancing through work-stealing between threads within a node while the execution 
+A simple example using this library can be found in \examplerefdir{openmp}. You can compare ckloop
+and the integrated OpenMP with this example. You can see that the total execution time of
+this example with enough big size of problem is faster with OpenMP than CkLoop thanks to
+load balancing through work-stealing between threads within a node while the execution
 time of each chare can be slower on OpenMP because idle PEs helping busy PEs.
 \section{API to control which PEs participating in CkLoop/OpenMP work}
 User may want certain PE not to be involved in other PE's loop-level parallelization for some cases because it may add latency to works in the PE by helping other PEs. User can enable or disable each PE to participate in the loop-level parallelization through the following API.

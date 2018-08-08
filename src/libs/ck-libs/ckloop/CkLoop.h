@@ -2,6 +2,8 @@
 #define _CKLOOP_H
 #include <assert.h>
 
+#include "converse.h"
+#include "taskqueue.h"
 #include "charm++.h"
 #include "CkLoopAPI.h"
 #include <atomic>
@@ -31,8 +33,11 @@ class CurLoopInfo {
     friend class FuncSingleHelper;
 
 private:
+    float staticFraction;
     std::atomic<int> curChunkIdx;
     int numChunks;
+    int chunkSize;
+    REDUCTION_TYPE type; // only used in hybrid mode
     HelperFn fnPtr;
     int lowerIndex;
     int upperIndex;
@@ -47,6 +52,11 @@ private:
     //a tag to indicate whether the task for this new loop has been inited
     //this tag is needed to prevent other helpers to run the old task
     std::atomic<int> inited;
+
+    // For Hybrid mode:
+    std::atomic<int> numStaticRegionsCompleted{0};
+    std::atomic<int> numDynamicChunksCompleted{0};
+    std::atomic<int> numDynamicChunksFired{0};
 
 public:
     CurLoopInfo(int maxChunks):numChunks(0),fnPtr(NULL), lowerIndex(-1), upperIndex(0),
@@ -84,6 +94,54 @@ public:
         CmiUnlock(loop_info_inited_lock);
     }
 
+    void setReductionType(REDUCTION_TYPE p) {
+      type = p;
+    }
+
+    void setStaticFraction(float _staticFraction) {
+      staticFraction = _staticFraction;
+    }
+
+    #define LOCALSUM(T) *((T*) redBufs[CmiMyRank()]) += (T) x;
+
+    void localReduce(double x, REDUCTION_TYPE type) {
+      // TODO: add more data types here
+      switch(type)
+        {
+        case CKLOOP_INT_SUM: {
+          LOCALSUM(int)
+        break;
+        }
+        case CKLOOP_FLOAT_SUM: {
+          LOCALSUM(float)
+        break;
+        }
+        case CKLOOP_DOUBLE_SUM: {
+          LOCALSUM(double)
+        break;
+        }
+        case CKLOOP_DOUBLE_MAX: {
+          if( *((double *)(redBufs[CmiMyRank()])) < x ) *((double *)(redBufs[CmiMyRank()])) = x;
+          break;
+        }
+        default:
+          break;
+        }
+    }
+
+     //This function is called from hybrid scheduler functions.
+     void runChunk(int sInd, int eInd) {
+       int myRank = CmiMyRank();
+       int numHelpers = CmiMyNodeSize();
+       int nextPesStaticBegin = lowerIndex + (myRank+1)*(upperIndex - lowerIndex)/numHelpers;
+       double x;  // Just allocating an 8-byte scalar.
+       fnPtr(sInd, eInd, (void*) &x, paramNum, param); // Calling user's function to do one chunk of iterations.
+
+       // "Add" *x to *(redBufs[myRank]). The meaning of "Add" depends on the type.
+       localReduce(x, type);
+       numDynamicChunksCompleted++;
+     }
+
     void waitLoopDone(int sync) {
         //while(!__sync_bool_compare_and_swap(&finishFlag, numChunks, 0));
         if (sync) while (finishFlag.load(std::memory_order_relaxed)!=numChunks);
@@ -93,9 +151,26 @@ public:
         inited = 0;
         CmiUnlock(loop_info_inited_lock);
     }
+
+    void waitLoopDoneHybrid(int sync) {
+        int count = 0;
+        int numHelpers = CmiMyNodeSize();
+        if (sync)
+        while ((numStaticRegionsCompleted != numHelpers) || (numDynamicChunksCompleted != numDynamicChunksFired))
+        {
+            // debug print in case the function is stuck in an infinite loop.
+            // count++; if ((count % 100000) == 0);
+            // printf("DEBUG: nsrc= %d \t ndcf = %d \t ndcc = %d \n" , (int) numStaticRegionsCompleted, (int) numDynamicChunksFired, (int) numDynamicChunksCompleted);
+        };
+        CmiLock(loop_info_inited_lock);
+        inited = 0;
+        CmiUnlock(loop_info_inited_lock);
+    }
+
     int getNextChunkIdx() {
         return curChunkIdx.fetch_add(1, std::memory_order_relaxed) + 1;
     }
+
     void reportFinished(int counter) {
         if (counter==0) return;
         finishFlag.fetch_add(counter, std::memory_order_release);
@@ -111,7 +186,17 @@ public:
     }
 
     void stealWork();
+    void doWorkForMyPe();
 };
+
+// To be used for hybridHandler and chunkHandler.
+typedef struct loopChunkMsg
+{
+  char hdr[CmiMsgHeaderSizeBytes];
+  CurLoopInfo* loopRec;
+  int startIndex;
+  int endIndex;
+} LoopChunkMsg;
 
 /* FuncCkLoop is a nodegroup object */
 
@@ -199,12 +284,24 @@ public:
                          CallerFn cfunc=NULL, /* the caller PE will call this function before starting to work on the chunks */
                          int cparamNum=0, void* cparam=NULL /* the input parameters to the above function */
                         );
+    void parallelizeFuncHybrid(float sf,
+               HelperFn func, /* the function that finishes a partial work on another thread */
+               int paramNum, void * param, /* the input parameters for the above func */
+               int numChunks, /* number of chunks to be partitioned. Note that some of the chunks may be subsumed into a large static section. */
+               int lowerRange, int upperRange, /* the loop-like parallelization happens in [lowerRange, upperRange] */
+               int sync=1, /* whether the flow will continue until all chunks have finished */
+               void *redResult=NULL, REDUCTION_TYPE type=CKLOOP_NONE, /* the reduction result, ONLY SUPPORT SINGLE VAR of TYPE int/float/double */
+               CallerFn cfunc=NULL, /* the caller PE will call this function before starting to work on the chunks */
+               int cparamNum=0, void* cparam=NULL /* the input parameters to the above function */
+               );
     void destroyHelpers();
     void reduce(void **redBufs, void *redBuf, REDUCTION_TYPE type, int numChunks);
     void pup(PUP::er &p);
 };
 
+void executeChunk(LoopChunkMsg* msg);
 void SingleHelperStealWork(ConverseNotifyMsg *msg);
+void hybridHandlerFunc(LoopChunkMsg *msg);
 
 /* FuncSingleHelper is a chare located on every core of a node */
 //allowing arbitrary combination of sync and unsync parallelizd loops
