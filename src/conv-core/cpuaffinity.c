@@ -133,10 +133,13 @@ static int set_process_affinity(hwloc_topology_t topology, hwloc_cpuset_t cpuset
   }
 
 #if CMK_CHARMDEBUG
-  char *str;
-  cmi_hwloc_bitmap_asprintf(&str, cpuset);
-  CmiPrintf("HWLOC> [%d] Process %p bound to cpuset: %s\n", CmiMyPe(), process, str);
-  free(str);
+  if (CmiPhysicalNodeID(CmiMyPe()) == 0)
+  {
+    char *str;
+    cmi_hwloc_bitmap_asprintf(&str, cpuset);
+    CmiPrintf("HWLOC> [%d] Process %p bound to cpuset: %s\n", CmiMyPe(), process, str);
+    free(str);
+  }
 #endif
 
   return 0;
@@ -162,10 +165,13 @@ static int set_thread_affinity(hwloc_topology_t topology, hwloc_cpuset_t cpuset)
   }
 
 #if CMK_CHARMDEBUG
-  char *str;
-  cmi_hwloc_bitmap_asprintf(&str, cpuset);
-  CmiPrintf("HWLOC> [%d] Thread %p bound to cpuset: %s\n", CmiMyPe(), thread, str);
-  free(str);
+  if (CmiPhysicalNodeID(CmiMyPe()) == 0)
+  {
+    char *str;
+    cmi_hwloc_bitmap_asprintf(&str, cpuset);
+    CmiPrintf("HWLOC> [%d] Thread %p bound to cpuset: %s\n", CmiMyPe(), thread, str);
+    free(str);
+  }
 #endif
 
   return 0;
