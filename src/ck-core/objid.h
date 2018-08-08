@@ -19,8 +19,12 @@ class ObjID {
         ObjID(const CkGroupID gid, const CmiUInt8 eid)
             : id( ((CmiUInt8)gid.idx << ELEMENT_BITS) | eid)
         {
-            CmiAssert( (CmiUInt8)gid.idx <= (COLLECTION_MASK >> ELEMENT_BITS) );
-            CmiAssert( eid <= ELEMENT_MASK );
+            if ( (CmiUInt8)gid.idx > (COLLECTION_MASK >> ELEMENT_BITS) ) {
+              CmiAbort("Failed to create a new ObjID due to running out of collection bits!");
+            }
+            if ( eid > ELEMENT_MASK ) {
+              CmiAbort("Failed to create a new ObjID due to running out of element bits!");
+            }
         }
 
         // should tag system be query-able
@@ -35,8 +39,8 @@ class ObjID {
         inline CmiUInt8 getID() const { return id & (COLLECTION_MASK | ELEMENT_MASK); }
 
         enum bits {
-          ELEMENT_BITS    = 48,
-          COLLECTION_BITS = 13,
+          ELEMENT_BITS    = 36,
+          COLLECTION_BITS = 25,
           TYPE_TAG_BITS   = 3
         };
         enum masks : CmiUInt8 {
