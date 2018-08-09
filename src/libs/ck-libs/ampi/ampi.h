@@ -24,9 +24,11 @@
 #endif
 
 #ifdef __cplusplus
-# define AMPI_API_CAST(type, obj) (reinterpret_cast<type>(obj))
+# define AMPI_API_STATIC_CAST(type, obj)      (static_cast<type>(obj))
+# define AMPI_API_REINTERPRET_CAST(type, obj) (reinterpret_cast<type>(obj))
 #else
-# define AMPI_API_CAST(type, obj) ((type)(obj))
+# define AMPI_API_STATIC_CAST(type, obj)      ((type)(obj))
+# define AMPI_API_REINTERPRET_CAST(type, obj) ((type)(obj))
 #endif
 
 CLINKAGE void AMPI_Exit(int exitCode);
@@ -216,9 +218,9 @@ typedef long long int MPI_Offset;
 #define MPI_KEYVAL_INVALID (-1)
 #define MPI_INFO_NULL      (-1)
 
-#define MPI_IN_PLACE    AMPI_API_CAST(void *, -1L)
+#define MPI_IN_PLACE    AMPI_API_REINTERPRET_CAST(void *, -1L)
 
-#define MPI_BOTTOM      AMPI_API_CAST(void *, -2L)
+#define MPI_BOTTOM      AMPI_API_REINTERPRET_CAST(void *, -2L)
 #define MPI_UNDEFINED   (-32766)
 
 #define MPI_IDENT       0
@@ -290,23 +292,23 @@ typedef int MPI_Group;
 
 typedef int MPI_Info;
 
-#define MPI_COMM_SELF               AMPI_API_CAST(MPI_Comm, 1000000) /*MPI_COMM_SELF is the first split comm */
-#define MPI_COMM_FIRST_SPLIT        AMPI_API_CAST(MPI_Comm, 1000000) /*Communicator from MPI_Comm_split */
-#define MPI_COMM_FIRST_GROUP        AMPI_API_CAST(MPI_Comm, 2000000) /*Communicator from MPI_Comm_group */
-#define MPI_COMM_FIRST_CART         AMPI_API_CAST(MPI_Comm, 3000000) /*Communicator from MPI_Cart_create */
-#define MPI_COMM_FIRST_GRAPH        AMPI_API_CAST(MPI_Comm, 4000000) /*Communicator from MPI_Graph_create */
-#define MPI_COMM_FIRST_DIST_GRAPH   AMPI_API_CAST(MPI_Comm, 5000000) /*Communicator from MPI_Dist_Graph_create */
-#define MPI_COMM_FIRST_INTER        AMPI_API_CAST(MPI_Comm, 6000000) /*Communicator from MPI_Intercomm_create*/
-#define MPI_COMM_FIRST_INTRA        AMPI_API_CAST(MPI_Comm, 7000000) /*Communicator from MPI_Intercomm_merge*/
-#define MPI_COMM_FIRST_RESVD        AMPI_API_CAST(MPI_Comm, 8000000) /*Communicator reserved for now*/
-#define MPI_COMM_WORLD              AMPI_API_CAST(MPI_Comm, 9000000) /*Start of universe*/
+#define MPI_COMM_SELF               AMPI_API_STATIC_CAST(MPI_Comm, 1000000) /*MPI_COMM_SELF is the first split comm */
+#define MPI_COMM_FIRST_SPLIT        AMPI_API_STATIC_CAST(MPI_Comm, 1000000) /*Communicator from MPI_Comm_split */
+#define MPI_COMM_FIRST_GROUP        AMPI_API_STATIC_CAST(MPI_Comm, 2000000) /*Communicator from MPI_Comm_group */
+#define MPI_COMM_FIRST_CART         AMPI_API_STATIC_CAST(MPI_Comm, 3000000) /*Communicator from MPI_Cart_create */
+#define MPI_COMM_FIRST_GRAPH        AMPI_API_STATIC_CAST(MPI_Comm, 4000000) /*Communicator from MPI_Graph_create */
+#define MPI_COMM_FIRST_DIST_GRAPH   AMPI_API_STATIC_CAST(MPI_Comm, 5000000) /*Communicator from MPI_Dist_Graph_create */
+#define MPI_COMM_FIRST_INTER        AMPI_API_STATIC_CAST(MPI_Comm, 6000000) /*Communicator from MPI_Intercomm_create*/
+#define MPI_COMM_FIRST_INTRA        AMPI_API_STATIC_CAST(MPI_Comm, 7000000) /*Communicator from MPI_Intercomm_merge*/
+#define MPI_COMM_FIRST_RESVD        AMPI_API_STATIC_CAST(MPI_Comm, 8000000) /*Communicator reserved for now*/
+#define MPI_COMM_WORLD              AMPI_API_STATIC_CAST(MPI_Comm, 9000000) /*Start of universe*/
 #define MPI_MAX_COMM_WORLDS  8
 extern MPI_Comm MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS];
 
-#define MPI_INFO_ENV                AMPI_API_CAST(MPI_Info, 0)
-#define AMPI_INFO_LB_SYNC           AMPI_API_CAST(MPI_Info, 1)
-#define AMPI_INFO_LB_ASYNC          AMPI_API_CAST(MPI_Info, 2)
-#define AMPI_INFO_CHKPT_IN_MEMORY   AMPI_API_CAST(MPI_Info, 3)
+#define MPI_INFO_ENV                AMPI_API_STATIC_CAST(MPI_Info, 0)
+#define AMPI_INFO_LB_SYNC           AMPI_API_STATIC_CAST(MPI_Info, 1)
+#define AMPI_INFO_LB_ASYNC          AMPI_API_STATIC_CAST(MPI_Info, 2)
+#define AMPI_INFO_CHKPT_IN_MEMORY   AMPI_API_STATIC_CAST(MPI_Info, 3)
 
 /* the size of MPI_Status must conform to MPI_STATUS_SIZE in ampif.h */
 struct AmpiMsg;
@@ -316,8 +318,8 @@ typedef struct {
   struct AmpiMsg *msg;
 } MPI_Status;
 
-#define MPI_STATUS_IGNORE   AMPI_API_CAST(MPI_Status *, 0)
-#define MPI_STATUSES_IGNORE AMPI_API_CAST(MPI_Status *, 0)
+#define MPI_STATUS_IGNORE   AMPI_API_REINTERPRET_CAST(MPI_Status *, 0)
+#define MPI_STATUSES_IGNORE AMPI_API_REINTERPRET_CAST(MPI_Status *, 0)
 
 /* type for MPI messages used in MPI_Mprobe, MPI_Mrecv, MPI_Improbe, MPI_Imrecv */
 typedef int MPI_Message;
