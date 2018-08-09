@@ -154,6 +154,10 @@ std::string readFile(const char* interfaceFile) {
   if (interfaceFile) {
     cur_file = interfaceFile;
     in = new std::ifstream(interfaceFile);
+    if(in->fail()) {
+      cout << "Error: failed to open input file '" << interfaceFile << "'." << endl;
+      exit(1);
+    }
   } else {
     cur_file = (origFile != NULL) ? origFile : "STDIN";
     in = &std::cin;
