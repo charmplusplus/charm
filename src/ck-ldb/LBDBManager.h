@@ -315,7 +315,6 @@ public:
 #endif
 
 
-  int getObjCount() {return objs.size();}
   const ObjList& getObjs() {return objs;}
 
 

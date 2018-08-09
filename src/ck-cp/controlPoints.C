@@ -694,8 +694,6 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
     LBDatabase * myLBdatabase = LBDatabaseObj();
     LBDB * myLBDB = myLBdatabase->getLBDB();       // LBDB is Defined in LBDBManager.h
     const CkVec<LBObj*> objs = myLBDB->getObjs();
-    const int objCount = myLBDB->getObjCount();
-    CkPrintf("LBDB info: objCount=%d objs contains %d LBObj* \n", objCount, objs.length());
     
     LBRealType maxObjWallTime = -1.0;
     
