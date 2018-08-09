@@ -789,27 +789,104 @@ void free_reentrant(void *mem)
 /** Return number of bytes currently allocated, if possible. */
 CMK_TYPEDEF_UINT8 CmiMemoryUsage(void)
 {
-  return _memory_allocated;
+  int i;
+  struct malloc_arena* ar_ptr;
+
+  if(__malloc_initialized < 0)
+    ptmalloc_init ();
+
+  size_t uordblks = 0;
+
+  for (i=0, ar_ptr = &main_arena;; ++i)
+  {
+    struct malloc_state* msp = (struct malloc_state *)arena_to_mspace(ar_ptr);
+
+    mstate ms = (mstate)msp;
+    if (!ok_magic(ms)) {
+      USAGE_ERROR_ACTION(ms,ms);
+    }
+    mstate m = ms;
+
+    if (!PREACTION(m)) {
+      check_malloc_state(m);
+      if (is_initialized(m)) {
+        size_t mfree = m->topsize + TOP_FOOT_SIZE;
+        msegmentptr s = &m->seg;
+        while (s != 0) {
+          mchunkptr q = align_as_chunk(s->base);
+          while (segment_holds(s, q) &&
+                 q != m->top && q->head != FENCEPOST_HEAD) {
+            size_t sz = chunksize(q);
+            if (!cinuse(q)) {
+              mfree += sz;
+            }
+            q = next_chunk(q);
+          }
+          s = s->next;
+        }
+
+        uordblks += m->footprint - mfree;
+      }
+
+      POSTACTION(m);
+    }
+
+    ar_ptr = ar_ptr->next;
+    if (ar_ptr == &main_arena)
+      break;
+  }
+
+  return uordblks;
 }
 
 /** Return number of maximum number of bytes allocated since the last call to CmiResetMaxMemory(), if possible. */
 CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage(void)
 {
-  return _memory_allocated_max;
+  int i;
+  struct malloc_arena* ar_ptr;
+
+  if(__malloc_initialized < 0)
+    ptmalloc_init ();
+
+  size_t usmblks = 0;
+
+  for (i=0, ar_ptr = &main_arena;; ++i)
+  {
+    struct malloc_state* msp = (struct malloc_state *)arena_to_mspace(ar_ptr);
+
+    mstate ms = (mstate)msp;
+    if (!ok_magic(ms)) {
+      USAGE_ERROR_ACTION(ms,ms);
+    }
+    mstate m = ms;
+
+    if (!PREACTION(m)) {
+      check_malloc_state(m);
+      if (is_initialized(m)) {
+        usmblks += m->max_footprint;
+      }
+
+      POSTACTION(m);
+    }
+
+    ar_ptr = ar_ptr->next;
+    if (ar_ptr == &main_arena)
+      break;
+  }
+
+  return usmblks;
 }
 
 /** Reset the mechanism that records the highest seen (high watermark) memory usage. */
 void CmiResetMaxMemory(void) {
-  _memory_allocated_max=_memory_allocated;
 }
 
 CMK_TYPEDEF_UINT8 CmiMinMemoryUsage(void)
 {
-  return _memory_allocated_min;
+  return 0;
 }
 
 void CmiResetMinMemory(void) {
-  _memory_allocated_min=_memory_allocated;
 }
 
 #endif /* CMK_MEMORY_BUILD_OS */
