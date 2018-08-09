@@ -159,51 +159,64 @@ typedef long long int MPI_Offset;
 #define MPI_INT                  1
 #define MPI_INTEGER              MPI_INT
 #define MPI_FLOAT                2
-#define MPI_COMPLEX              3
-#define MPI_LOGICAL              4
-#define MPI_C_BOOL               5
-#define MPI_CHAR                 6
-#define MPI_BYTE                 7
-#define MPI_PACKED               8
-#define MPI_SHORT                9
-#define MPI_LONG                10
-#define MPI_UNSIGNED_CHAR       11
-#define MPI_UNSIGNED_SHORT      12
-#define MPI_UNSIGNED            13
-#define MPI_UNSIGNED_LONG       14
-#define MPI_LONG_DOUBLE         15
-/* tuple types */
-#define MPI_FLOAT_INT           16
-#define MPI_DOUBLE_INT          17
-#define MPI_LONG_INT            18
-#define MPI_2INT                19
-#define MPI_SHORT_INT           20
-#define MPI_LONG_DOUBLE_INT     21
-#define MPI_2FLOAT              22
-#define MPI_2DOUBLE             23
-/* special types */
-#define MPI_LB                  24
-#define MPI_UB                  25
+#define MPI_LOGICAL              3
+#define MPI_C_BOOL               4
+#define MPI_CHAR                 5
+#define MPI_BYTE                 6
+#define MPI_PACKED               7
+#define MPI_SHORT                8
+#define MPI_LONG                 9
+#define MPI_UNSIGNED_CHAR       10
+#define MPI_UNSIGNED_SHORT      11
+#define MPI_UNSIGNED            12
+#define MPI_UNSIGNED_LONG       13
+#define MPI_LONG_DOUBLE         14
 /* mpi-2+ types */
-#define MPI_LONG_LONG_INT       26
+#define MPI_LONG_LONG_INT       15
 #define MPI_LONG_LONG           MPI_LONG_LONG_INT
 #define MPI_OFFSET              MPI_LONG_LONG
-#define MPI_DOUBLE_COMPLEX      27
-#define MPI_SIGNED_CHAR         28
-#define MPI_UNSIGNED_LONG_LONG  29
-#define MPI_WCHAR               30
-#define MPI_INT8_T              31
-#define MPI_INT16_T             32
-#define MPI_INT32_T             33
-#define MPI_INT64_T             34
-#define MPI_UINT8_T             35
-#define MPI_UINT16_T            36
-#define MPI_UINT32_T            37
-#define MPI_UINT64_T            38
-#define MPI_FLOAT_COMPLEX       39
-#define MPI_LONG_DOUBLE_COMPLEX 40
-#define MPI_AINT                41
+#define MPI_SIGNED_CHAR         16
+#define MPI_UNSIGNED_LONG_LONG  17
+#define MPI_WCHAR               18
+#define MPI_INT8_T              19
+#define MPI_INT16_T             20
+#define MPI_INT32_T             21
+#define MPI_INT64_T             22
+#define MPI_UINT8_T             23
+#define MPI_UINT16_T            24
+#define MPI_UINT32_T            25
+#define MPI_UINT64_T            26
+#define MPI_AINT                27
 #define MPI_COUNT               MPI_AINT
+/*
+ * CkDDT_MAX_BASIC_TYPE is defined in ddt.h
+ * and is tied to the above values, if the above
+ * indexes change or values are added/deleted
+ * you may need to change CkDDT_MAX_BASIC_TYPE
+ */
+/* special types */
+#define MPI_LB                  28
+#define MPI_UB                  29
+/* tuple types */
+#define MPI_FLOAT_INT           30
+#define MPI_DOUBLE_INT          31
+#define MPI_LONG_INT            32
+#define MPI_2INT                33
+#define MPI_SHORT_INT           34
+#define MPI_LONG_DOUBLE_INT     35
+#define MPI_2FLOAT              36
+#define MPI_2DOUBLE             37
+/* mpi-2+ types */
+#define MPI_COMPLEX             38
+#define MPI_FLOAT_COMPLEX       39
+#define MPI_DOUBLE_COMPLEX      40
+#define MPI_LONG_DOUBLE_COMPLEX 41
+/*
+ * CkDDT_MAX_PRIMITIVE_TYPE is defined in ddt.h
+ * and is tied to the above values, if the above
+ * indexes change or values are added/deleted
+ * you may need to change CkDDT_MAX_PRIMITIVE_TYPE
+ */
 
 #define MPI_ANY_TAG        MPI_TAG_UB_VALUE+1
 #define MPI_REQUEST_NULL   (-1)

@@ -12,6 +12,21 @@
 using std::vector;
 using std::string;
 
+/*
+  An MPI basic datatype is a type that corresponds
+  to the basic datatypes of the host language
+    MPI_Get_elements returns the number of the
+    basic types in a more complex datatype such
+    as an MPI struct or MPI vector
+*/
+#define CkDDT_MAX_BASIC_TYPE      27
+
+/*
+  CkDDT_MAX_PRIMITIVE_TYPE indicates the highest
+  datatype defined in the MPI standard
+    Do not free datatypes less than or equal to
+    this value
+*/
 #define CkDDT_MAX_PRIMITIVE_TYPE  41
 
 #define CkDDT_CONTIGUOUS          42
@@ -82,7 +97,7 @@ class CkDDT;
 
   Methods:
 
-  getSize -  returns the size of the datatype. 
+  getSize -  returns the size of the datatype.
   getExtent - returns the extent of the datatype.
 
   incRefCount - increment the reference count.
@@ -137,14 +152,26 @@ class CkDDT_DataType {
     virtual int getEnvelope(int *num_integers, int *num_addresses, int *num_datatypes, int *combiner) const;
     virtual int getContents(int max_integers, int max_addresses, int max_datatypes,
                            int array_of_integers[], MPI_Aint array_of_addresses[], int array_of_datatypes[]) const;
-    virtual size_t serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const {
-      size_t bufSize = num * size;
+
+    virtual size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const
+    {
       DDTDEBUG("CkDDT_Datatype::serialize %s %d objects of type %d (%d bytes)\n",
-               (dir==PACK)?"packing":"unpacking", num, datatype, (int)bufSize);
-      CkAssert(datatype <= CkDDT_MAX_PRIMITIVE_TYPE);
-      CkAssert(iscontig);
-      serializeContig(userdata, buffer, bufSize, dir);
-      return bufSize;
+               (dir==PACK)?"packing":"unpacking", num, datatype, bufSize);
+      size_t bufSize = std::min((size_t)num * (size_t)size, (size_t)msgLength);
+      if (iscontig) {
+        serializeContig(userdata, buffer, bufSize, dir);
+        return bufSize;
+      }
+      else {
+        for (int i=0; i<num; i++) {
+          if(bufSize < size) {
+            break;
+          }
+          serializeContig(userdata + i*extent, buffer + i*size, size, dir);
+          bufSize -= size;
+        }
+        return msgLength - bufSize;
+      }
     }
 
     virtual bool isContig() const { return iscontig; }
@@ -161,6 +188,7 @@ class CkDDT_DataType {
     virtual int getCount() const { return count; }
     virtual int getType() const { return datatype; }
     virtual int getNumElements() const { return numElements; }
+    virtual int getNumBasicElements(int bytes) const;
     virtual void incRefCount() {
       CkAssert(refCount > 0);
       if (datatype > CkDDT_MAX_PRIMITIVE_TYPE)
@@ -197,10 +225,11 @@ class CkDDT_Contiguous : public CkDDT_DataType {
  public:
   CkDDT_Contiguous() { };
   CkDDT_Contiguous(int count, int index, CkDDT_DataType* oldType);
-  virtual size_t serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const;
+  virtual size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const;
   virtual void pupType(PUP::er &p, CkDDT* ddt) ;
   virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
   virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
+  virtual int getNumBasicElements(int bytes) const;
 };
 
 /*
@@ -228,10 +257,11 @@ class CkDDT_Vector : public CkDDT_DataType {
     CkDDT_Vector(const CkDDT_Vector &obj, MPI_Aint _lb, MPI_Aint _extent);
     CkDDT_Vector() { } ;
     ~CkDDT_Vector() { } ;
-    virtual size_t serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const;
+    virtual size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const;
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
+    virtual int getNumBasicElements(int bytes) const;
 };
 
 /*
@@ -257,10 +287,46 @@ class CkDDT_HVector : public CkDDT_Vector {
                 CkDDT_DataType* type);
     CkDDT_HVector(const CkDDT_HVector &obj, MPI_Aint _lb, MPI_Aint _extent);
     ~CkDDT_HVector() { } ;
-    virtual size_t serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const;
+    virtual size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const;
     virtual void pupType(PUP::er &p, CkDDT* ddt);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
+    virtual int getNumBasicElements(int bytes) const;
+};
+
+/*
+  The HIndexed type allows one to specify a noncontiguous data
+  layout where displacements between
+  successive blocks need not be equal.
+  This allows one to gather arbitrary entries from an array
+  and make a single buffer out of it.
+  Unlike Indexed type , block displacements are arbitrary
+  number of bytes.
+
+  arrayBlockLength - holds the array of block lengths
+  arrayDisplacements - holds the array of displacements.
+*/
+
+class CkDDT_HIndexed : public CkDDT_DataType {
+
+  protected:
+    vector<int> arrayBlockLength;
+    vector<MPI_Aint> arrayDisplacements;
+
+  private:
+    CkDDT_HIndexed& operator=(const CkDDT_HIndexed& obj);
+
+  public:
+    CkDDT_HIndexed(int count, const int* arrBlock, const MPI_Aint* arrBytesDisp, int index,
+                CkDDT_DataType* type);
+    // CkDDT_HIndexed(const CkDDT_HIndexed &obj, MPI_Aint _lb, MPI_Aint _extent);
+    CkDDT_HIndexed() { } ;
+    ~CkDDT_HIndexed() ;
+    virtual size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const;
+    virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
+    virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
+    virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
+    virtual int getNumBasicElements(int bytes) const;
 };
 
 /*
@@ -275,90 +341,21 @@ class CkDDT_HVector : public CkDDT_Vector {
   arrayDisplacements - holds the array of displacements.
 */
 
-class CkDDT_Indexed : public CkDDT_DataType {
-
-  protected:
-    vector<int> arrayBlockLength;
-    vector<MPI_Aint> arrayDisplacements;
+class CkDDT_Indexed : public CkDDT_HIndexed {
 
   private:
     CkDDT_Indexed& operator=(const CkDDT_Indexed& obj) ;
 
   public:
-    CkDDT_Indexed(int count, const int* arrBlock, const MPI_Aint* arrDisp, int index,
-                CkDDT_DataType* type);
     CkDDT_Indexed() { } ;
-    ~CkDDT_Indexed() ;
-    virtual size_t serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const;
-    virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
-    virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
-    virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
-};
-
-/*
-  The HIndexed type allows one to specify a noncontiguous data
-  layout where displacements between
-  successive blocks need not be equal.
-  This allows one to gather arbitrary entries from an array
-  and make a single buffer out of it. 
-  Unlike Indexed type , block displacements are arbitrary
-  number of bytes.
-
-  arrayBlockLength - holds the array of block lengths 
-  arrayDisplacements - holds the array of displacements.
-*/
-class CkDDT_HIndexed : public CkDDT_Indexed {
-
-  private:
-    CkDDT_HIndexed& operator=(const CkDDT_HIndexed& obj);
-
-  public:
-    CkDDT_HIndexed() { } ;
-    CkDDT_HIndexed(int count, const int* arrBlock, const MPI_Aint* arrDisp, int index,
-                 CkDDT_DataType* type);
-    CkDDT_HIndexed(const CkDDT_HIndexed &obj, MPI_Aint _lb, MPI_Aint _extent);
-    virtual size_t serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const;
+    CkDDT_Indexed(int count, const int* arrBlock, const MPI_Aint* arrBytesDisp,
+      const MPI_Aint* arrDisp, int index, CkDDT_DataType* type);
+    CkDDT_Indexed(const CkDDT_Indexed &obj, MPI_Aint _lb, MPI_Aint _extent);
+    virtual size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const;
     virtual void pupType(PUP::er &p, CkDDT* ddt);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
-};
-
-/*
-  The Indexed_Block type allows one to specify a noncontiguous data
-  layout where displacements between
-  successive blocks need not be equal.
-  This allows one to gather arbitrary entries from an array
-  and make a single buffer out of it.
-  All block displacements are measured  in units of oldtype extent.
-  The only difference between this Datatype and CkDDT_Indexed is the fact that
-    all blockLengths are the same here, so there is no array of BlockLengths
-
-  BlockLength - the length of all blocks
-  arrayDisplacements - holds the array of displacements.
-*/
-
-class CkDDT_Indexed_Block : public CkDDT_DataType
-{
-
-  protected:
-    int BlockLength;
-    // The MPI Standard has arrDisp as an array of int's to MPI_Type_create_indexed_block, but
-    // as an array of MPI_Aint's to MPI_Type_create_hindexed_block, so we store it as Aint's
-    // internally and convert from int to Aint in Indexed_Block's constructor:
-    vector<MPI_Aint> arrayDisplacements;
-
-  private:
-    CkDDT_Indexed_Block& operator=(const CkDDT_Indexed_Block &obj);
-
-  public:
-    CkDDT_Indexed_Block(int count, int Blength, const MPI_Aint *ArrDisp, int index, CkDDT_DataType *type);
-    CkDDT_Indexed_Block() { };
-    CkDDT_Indexed_Block(const CkDDT_Indexed_Block &obj, MPI_Aint _lb, MPI_Aint _extent);
-    ~CkDDT_Indexed_Block() ;
-    virtual size_t serialize(char *userdata, char *buffer, int num, CkDDT_Dir dir) const;
-    virtual void pupType(PUP::er &p, CkDDT *ddt);
-    virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
-    virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
+    virtual int getNumBasicElements(int bytes) const;
 };
 
 /*
@@ -376,21 +373,60 @@ class CkDDT_Indexed_Block : public CkDDT_DataType
   arrayDisplacements - holds the array of displacements.
 */
 
-class CkDDT_HIndexed_Block : public CkDDT_Indexed_Block
+class CkDDT_HIndexed_Block : public CkDDT_DataType
 {
-  
+  protected:
+    int BlockLength;
+    // The MPI Standard has arrDisp as an array of int's to MPI_Type_create_indexed_block, but
+    // as an array of MPI_Aint's to MPI_Type_create_hindexed_block, so we store it as Aint's
+    // internally and convert from int to Aint in Indexed_Block's constructor:
+    vector<MPI_Aint> arrayDisplacements;
+
   private:
     CkDDT_HIndexed_Block& operator=(const CkDDT_HIndexed_Block &obj);
 
   public:
-    CkDDT_HIndexed_Block(int count, int Blength, const MPI_Aint *ArrDisp, int index, CkDDT_DataType *type);
+    CkDDT_HIndexed_Block(int count, int Blength, const MPI_Aint *arrBytesDisp, int index, CkDDT_DataType *type);
     CkDDT_HIndexed_Block() { };
     CkDDT_HIndexed_Block(const CkDDT_HIndexed_Block &obj, MPI_Aint _lb, MPI_Aint _extent);
     ~CkDDT_HIndexed_Block() ;
-    virtual size_t serialize(char *userdata, char *buffer, int num, CkDDT_Dir dir) const;
+    virtual size_t serialize(char *userdata, char *buffer, int num, int msgLength, CkDDT_Dir dir) const;
     virtual void pupType(PUP::er &p, CkDDT *ddt);
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
+    virtual int getNumBasicElements(int bytes) const;
+};
+
+/*
+  The Indexed_Block type allows one to specify a noncontiguous data
+  layout where displacements between
+  successive blocks need not be equal.
+  This allows one to gather arbitrary entries from an array
+  and make a single buffer out of it.
+  All block displacements are measured  in units of oldtype extent.
+  The only difference between this Datatype and CkDDT_Indexed is the fact that
+    all blockLengths are the same here, so there is no array of BlockLengths
+
+  BlockLength - the length of all blocks
+  arrayDisplacements - holds the array of displacements.
+*/
+
+class CkDDT_Indexed_Block : public CkDDT_HIndexed_Block
+{
+
+  private:
+    CkDDT_Indexed_Block& operator=(const CkDDT_Indexed_Block &obj);
+
+  public:
+    CkDDT_Indexed_Block(int count, int Blength, const MPI_Aint *arrBytesDisp, const int *ArrDisp, int index, CkDDT_DataType *type);
+    CkDDT_Indexed_Block() { };
+    CkDDT_Indexed_Block(const CkDDT_Indexed_Block &obj, MPI_Aint _lb, MPI_Aint _extent);
+    ~CkDDT_Indexed_Block() ;
+    virtual size_t serialize(char *userdata, char *buffer, int num, int msgLength, CkDDT_Dir dir) const;
+    virtual void pupType(PUP::er &p, CkDDT *ddt);
+    virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
+    virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
+    virtual int getNumBasicElements(int bytes) const;
 };
 
 /*
@@ -422,27 +458,30 @@ class CkDDT_Struct : public CkDDT_DataType {
     CkDDT_Struct(int count, const int* arrBlock, const MPI_Aint* arrDisp, const int *index,
                CkDDT_DataType **type);
     CkDDT_Struct(const CkDDT_Struct &obj, MPI_Aint _lb, MPI_Aint _extent);
-    virtual size_t serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const;
+    virtual size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const;
     virtual  void pupType(PUP::er &p, CkDDT* ddt) ;
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
     virtual const vector<int>& getBaseIndices() const;
     virtual const vector<CkDDT_DataType*>& getBaseTypes() const;
+    virtual int getNumBasicElements(int bytes) const;
 };
 
 /*
   This class maintains the typeTable of the derived datatypes.
   First few entries of the table contain primitive datatypes.
-  index - holds the current available index in the table where 
+  index - holds the current available index in the table where
           new datatype can be allocated.
   typeTable - holds the table of CkDDT_DataType
 
-  Type_Contiguous - 
+  Type_Contiguous -
   Type_Vector -
   Type_HVector -
-  Type_Indexed - 
+  Type_Indexed -
+  Type_Indexed_Block -
   Type_HIndexed -
-  Type_Struct - builds the new type 
+  Type_HIndexed_Block -
+  Type_Struct - builds the new type
                 Contiguous/Vector/Hvector/Indexed/HIndexed/Struct  from the old
                 Type provided and stores the new type in the table.
 */
@@ -452,95 +491,101 @@ class CkDDT {
     vector<CkDDT_DataType*> typeTable;
     vector<int> types; //used for pup
 
+  void addBasic(int type) {
+    CkAssert(types.size() > type && types[type] == MPI_DATATYPE_NULL);
+    typeTable[type]               = new CkDDT_DataType(type);
+    types[type]                   = type;
+  }
+
+  void addStruct(const char* name, int type, int val, int idx, int offset) {
+    CkAssert(types.size() > type && types[type] == MPI_DATATYPE_NULL);
+    const int bLengths[2]           = {1, 1};
+    MPI_Datatype bTypes[2]          = {val, idx};
+    CkDDT_DataType* nTypes[2]       = {getType(val), getType(idx)};
+    MPI_Aint offsets[2]             = {0, offset};
+    typeTable[type]                 = new CkDDT_Struct(2, bLengths, offsets, bTypes, nTypes);
+    typeTable[type]->setName(name);
+    types[type]                     = CkDDT_STRUCT;
+  }
+
   public:
 
   CkDDT(void*) {} // emulates migration constructor
   CkDDT(void) : typeTable(CkDDT_MAX_PRIMITIVE_TYPE+1, nullptr), types(CkDDT_MAX_PRIMITIVE_TYPE+1, MPI_DATATYPE_NULL)
   {
-    typeTable[0] = new CkDDT_DataType(MPI_DOUBLE);
-    types[0] = MPI_DOUBLE;
-    typeTable[1] = new CkDDT_DataType(MPI_INT);
-    types[1] = MPI_INT;
-    typeTable[2] = new CkDDT_DataType(MPI_FLOAT);
-    types[2] = MPI_FLOAT;
-    typeTable[3] = new CkDDT_DataType(MPI_COMPLEX);
-    types[3] = MPI_COMPLEX;
-    typeTable[4] = new CkDDT_DataType(MPI_LOGICAL);
-    types[4] = MPI_LOGICAL;
-    typeTable[5] = new CkDDT_DataType(MPI_C_BOOL);
-    types[5] = MPI_C_BOOL;
-    typeTable[6] = new CkDDT_DataType(MPI_CHAR);
-    types[6] = MPI_CHAR;
-    typeTable[7] = new CkDDT_DataType(MPI_BYTE);
-    types[7] = MPI_BYTE;
-    typeTable[8] = new CkDDT_DataType(MPI_PACKED);
-    types[8] = MPI_PACKED;
-    typeTable[9] = new CkDDT_DataType(MPI_SHORT);
-    types[9] = MPI_SHORT;
-    typeTable[10] = new CkDDT_DataType(MPI_LONG);
-    types[10] = MPI_LONG;
-    typeTable[11] = new CkDDT_DataType(MPI_UNSIGNED_CHAR);
-    types[11] = MPI_UNSIGNED_CHAR;
-    typeTable[12] = new CkDDT_DataType(MPI_UNSIGNED_SHORT);
-    types[12] = MPI_UNSIGNED_SHORT;
-    typeTable[13] = new CkDDT_DataType(MPI_UNSIGNED);
-    types[13] = MPI_UNSIGNED;
-    typeTable[14] = new CkDDT_DataType(MPI_UNSIGNED_LONG);
-    types[14] = MPI_UNSIGNED_LONG;
-    typeTable[15] = new CkDDT_DataType(MPI_LONG_DOUBLE);
-    types[15] = MPI_LONG_DOUBLE;
-    typeTable[16] = new CkDDT_DataType(MPI_FLOAT_INT);
-    types[16] = MPI_FLOAT_INT;
-    typeTable[17] = new CkDDT_DataType(MPI_DOUBLE_INT);
-    types[17] = MPI_DOUBLE_INT;
-    typeTable[18] = new CkDDT_DataType(MPI_LONG_INT);
-    types[18] = MPI_LONG_INT;
-    typeTable[19] = new CkDDT_DataType(MPI_2INT);
-    types[19] = MPI_2INT;
-    typeTable[20] = new CkDDT_DataType(MPI_SHORT_INT);
-    types[20] = MPI_SHORT_INT;
-    typeTable[21] = new CkDDT_DataType(MPI_LONG_DOUBLE_INT);
-    types[21] = MPI_LONG_DOUBLE_INT;
-    typeTable[22] = new CkDDT_DataType(MPI_2FLOAT);
-    types[22] = MPI_2FLOAT;
-    typeTable[23] = new CkDDT_DataType(MPI_2DOUBLE);
-    types[23] = MPI_2DOUBLE;
-    typeTable[24] = new CkDDT_DataType(MPI_LB);
-    types[24] = MPI_LB;
-    typeTable[25] = new CkDDT_DataType(MPI_UB);
-    types[25] = MPI_UB;
-    typeTable[26] = new CkDDT_DataType(MPI_LONG_LONG_INT);
-    types[26] = MPI_LONG_LONG_INT;
-    typeTable[27] = new CkDDT_DataType(MPI_DOUBLE_COMPLEX);
-    types[27] = MPI_DOUBLE_COMPLEX;
-    typeTable[28] = new CkDDT_DataType(MPI_SIGNED_CHAR);
-    types[28] = MPI_SIGNED_CHAR;
-    typeTable[29] = new CkDDT_DataType(MPI_UNSIGNED_LONG_LONG);
-    types[29] = MPI_UNSIGNED_LONG_LONG;
-    typeTable[30] = new CkDDT_DataType(MPI_WCHAR);
-    types[30] = MPI_WCHAR;
-    typeTable[31] = new CkDDT_DataType(MPI_INT8_T);
-    types[31] = MPI_INT8_T;
-    typeTable[32] = new CkDDT_DataType(MPI_INT16_T);
-    types[32] = MPI_INT16_T;
-    typeTable[33] = new CkDDT_DataType(MPI_INT32_T);
-    types[33] = MPI_INT32_T;
-    typeTable[34] = new CkDDT_DataType(MPI_INT64_T);
-    types[34] = MPI_INT64_T;
-    typeTable[35] = new CkDDT_DataType(MPI_UINT8_T);
-    types[35] = MPI_UINT8_T;
-    typeTable[36] = new CkDDT_DataType(MPI_UINT16_T);
-    types[36] = MPI_UINT16_T;
-    typeTable[37] = new CkDDT_DataType(MPI_UINT32_T);
-    types[37] = MPI_UINT32_T;
-    typeTable[38] = new CkDDT_DataType(MPI_UINT64_T);
-    types[38] = MPI_UINT64_T;
-    typeTable[39] = new CkDDT_DataType(MPI_FLOAT_COMPLEX);
-    types[39] = MPI_FLOAT_COMPLEX;
-    typeTable[40] = new CkDDT_DataType(MPI_LONG_DOUBLE_COMPLEX);
-    types[40] = MPI_LONG_DOUBLE_COMPLEX;
-    typeTable[41] = new CkDDT_DataType(MPI_AINT);
-    types[41] = MPI_AINT;
+    addBasic(MPI_DOUBLE);
+    addBasic(MPI_INT);
+    addBasic(MPI_FLOAT);
+    addBasic(MPI_LOGICAL);
+    addBasic(MPI_C_BOOL);
+    addBasic(MPI_CHAR);
+    addBasic(MPI_BYTE);
+    addBasic(MPI_PACKED);
+    addBasic(MPI_SHORT);
+    addBasic(MPI_LONG);
+    addBasic(MPI_UNSIGNED_CHAR);
+    addBasic(MPI_UNSIGNED_SHORT);
+    addBasic(MPI_UNSIGNED);
+    addBasic(MPI_UNSIGNED_LONG);
+    addBasic(MPI_LONG_DOUBLE);
+    addBasic(MPI_LONG_LONG_INT);
+    addBasic(MPI_SIGNED_CHAR);
+    addBasic(MPI_UNSIGNED_LONG_LONG);
+    addBasic(MPI_WCHAR);
+    addBasic(MPI_INT8_T);
+    addBasic(MPI_INT16_T);
+    addBasic(MPI_INT32_T);
+    addBasic(MPI_INT64_T);
+    addBasic(MPI_UINT8_T);
+    addBasic(MPI_UINT16_T);
+    addBasic(MPI_UINT32_T);
+    addBasic(MPI_UINT64_T);
+    addBasic(MPI_AINT);
+    addBasic(MPI_LB);
+    addBasic(MPI_UB);
+
+    /*
+      Following types have multiple elements, for serialize to know where to write data
+      the following types must be inserted as structs
+    */
+
+    // Contiguous
+    typedef struct { int val; int idx; } IntInt;
+    addStruct("MPI_2INT", MPI_2INT, MPI_INT, MPI_INT, offsetof(IntInt, idx));
+
+    typedef struct { float val; float idx; } FloatFloat;
+    addStruct("MPI_2FLOAT", MPI_2FLOAT, MPI_FLOAT, MPI_FLOAT, offsetof(FloatFloat, idx));
+
+    typedef struct { double val; double idx; } DoubleDouble;
+    addStruct("MPI_2DOUBLE", MPI_2DOUBLE, MPI_DOUBLE, MPI_DOUBLE, offsetof(DoubleDouble, idx));
+
+    typedef struct { float val; int idx; } FloatInt;
+    addStruct("MPI_FLOAT_INT", MPI_FLOAT_INT, MPI_FLOAT, MPI_INT, offsetof(FloatInt, idx));
+    // Not Contiguous
+
+    typedef struct { double val; int idx; } DoubleInt;
+    addStruct("MPI_DOUBLE_INT", MPI_DOUBLE_INT, MPI_DOUBLE, MPI_INT, offsetof(DoubleInt, idx));
+
+    typedef struct { long val; int idx; } LongInt;
+    addStruct("MPI_LONG_INT", MPI_LONG_INT, MPI_LONG, MPI_INT, offsetof(LongInt, idx));
+
+    typedef struct { short val; int idx; } ShortInt;
+    addStruct("MPI_SHORT_INT", MPI_SHORT_INT, MPI_SHORT, MPI_INT, offsetof(ShortInt, idx));
+
+    typedef struct { long double val; int idx; } LongdoubleInt;
+    addStruct("MPI_LONG_DOUBLE_INT", MPI_LONG_DOUBLE_INT, MPI_LONG_DOUBLE, MPI_INT, offsetof(LongdoubleInt, idx));
+
+    // Complex datatypes
+    typedef struct { float val; float idx; } FloatComplex;
+    addStruct("MPI_FLOAT_COMPLEX", MPI_FLOAT_COMPLEX, MPI_FLOAT, MPI_FLOAT, offsetof(FloatComplex, idx));
+    addStruct("MPI_COMPLEX", MPI_COMPLEX      , MPI_FLOAT, MPI_FLOAT, offsetof(FloatComplex, idx));
+
+    typedef struct { double val; double idx; } DoubleComplex;
+    addStruct("MPI_DOUBLE_COMPLEX", MPI_DOUBLE_COMPLEX, MPI_DOUBLE, MPI_DOUBLE, offsetof(DoubleComplex, idx));
+
+    typedef struct { long double val; long double idx; } LongDoubleComplex;
+    addStruct("MPI_LONG_DOUBLE_COMPLEX", MPI_LONG_DOUBLE_COMPLEX, MPI_LONG_DOUBLE, MPI_LONG_DOUBLE, offsetof(LongDoubleComplex, idx));
+
   }
 
   void newContiguous(int count, MPI_Datatype  oldType, MPI_Datatype* newType);
