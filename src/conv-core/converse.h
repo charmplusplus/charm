@@ -32,13 +32,14 @@
 #ifndef CONVERSE_H
 #define CONVERSE_H
 
-#if defined __APPLE__
-# define CMK_THREADLOCAL __thread
-#elif defined __cplusplus && (__cplusplus >= 201103L || (defined _MSC_VER && _MSC_VER >= 1900))
-# define CMK_THREADLOCAL thread_local
-#elif defined __STDC_VERSION__ && __STDC_VERSION__ >= 201112L
-# define CMK_THREADLOCAL _Thread_local
-#elif defined _MSC_VER
+/*
+ * We cannot use thread_local here because "extern thread_local" variables
+ * have additional initialization semantics that the RTS does not consider.
+ * https://stackoverflow.com/a/13123870
+ *
+ * KEEPINSYNC: GKlib.h
+ */
+#if defined _MSC_VER
 # define CMK_THREADLOCAL __declspec(thread)
 #else
 # define CMK_THREADLOCAL __thread
