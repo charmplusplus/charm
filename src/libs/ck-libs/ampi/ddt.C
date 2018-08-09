@@ -251,10 +251,17 @@ CkDDT::newHVector(int count, int blocklength, int stride,
 
 void
 CkDDT::newIndexed(int count, const int* arrbLength, MPI_Aint* arrDisp,
-                  MPI_Datatype oldtype, MPI_Datatype* newType)
+                  MPI_Datatype oldtypeIdx, MPI_Datatype* newType)
 {
+  CkDDT_DataType* oldtype = typeTable[oldtypeIdx];
+
+  vector<MPI_Aint> dispBytesArr(count);
+  for(int i=0; i<count; i++) {
+    dispBytesArr[i] = arrDisp[i] * oldtype->getExtent();
+  }
+
   CkDDT_DataType* type =
-    new CkDDT_Indexed(count, arrbLength, arrDisp, oldtype, typeTable[oldtype]);
+    new CkDDT_Indexed(count, arrbLength, dispBytesArr.data(), arrDisp, oldtypeIdx, oldtype);
   *newType = insertType(type, CkDDT_INDEXED);
 }
 
@@ -268,17 +275,21 @@ CkDDT::newHIndexed(int count, const int* arrbLength, const MPI_Aint* arrDisp,
 }
 
 void
-CkDDT::newIndexedBlock(int count, int Blocklength, const int *arrDisp, MPI_Datatype oldtype,
+CkDDT::newIndexedBlock(int count, int Blocklength, const int *arrDisp, MPI_Datatype oldtypeIdx,
                        MPI_Datatype *newType)
 {
   // Convert arrDisp from an array of int's to an array of MPI_Aint's. This is needed because
   // MPI_Type_create_indexed_block takes ints and MPI_Type_create_hindexed_block takes MPI_Aint's
-  // and we use Indexed_Block to represent both of those datatypes internally.
-  std::vector<MPI_Aint> arrDispAint(count);
+  // and we use HIndexed_Block to represent both of those datatypes internally.
+
+  CkDDT_DataType* oldtype = typeTable[oldtypeIdx];
+
+  std::vector<MPI_Aint> arrDispBytes(count);
   for (int i=0; i<count; i++) {
-    arrDispAint[i] = static_cast<MPI_Aint>(arrDisp[i]);
+    arrDispBytes[i] = static_cast<MPI_Aint>(arrDisp[i] * oldtype->getExtent());
   }
-  CkDDT_DataType *type = new CkDDT_Indexed_Block(count, Blocklength, arrDispAint.data(), oldtype, typeTable[oldtype]);
+  CkDDT_DataType *type = new CkDDT_Indexed_Block(count, Blocklength, arrDispBytes.data(), arrDisp, oldtypeIdx, oldtype);
+
   *newType = insertType(type, CkDDT_INDEXED_BLOCK);
 }
 
@@ -304,205 +315,176 @@ CkDDT::newStruct(int count, const int* arrbLength, const MPI_Aint* arrDisp,
   *newType = insertType(type, CkDDT_STRUCT);
 }
 
-typedef struct { float val; int idx; } FloatInt;
-typedef struct { double val; int idx; } DoubleInt;
-typedef struct { long val; int idx; } LongInt;
-typedef struct { int val; int idx; } IntInt;
-typedef struct { short val; int idx; } ShortInt;
-typedef struct { long double val; int idx; } LongdoubleInt;
-typedef struct { float val; float idx; } FloatFloat;
-typedef struct { double val; double idx; } DoubleDouble;
-
 CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
 {
   count = 1;
   switch(datatype) {
     case MPI_DOUBLE:
-      size = sizeof(double);
+      size         = sizeof(double);
+      numElements  = 1;
       name = "MPI_DOUBLE";
       break;
     case MPI_INT:
-      size = sizeof(signed int);
+      size         = sizeof(signed int);
+      numElements  = 1;
       name = "MPI_INT";
       break;
     case MPI_FLOAT:
-      size = sizeof(float);
+      size         = sizeof(float);
+      numElements  = 1;
       name = "MPI_FLOAT";
       break;
     case MPI_CHAR:
-      size = sizeof(char);
+      size         = sizeof(char);
+      numElements  = 1;
       name = "MPI_CHAR";
       break;
     case MPI_BYTE:
-      size = 1 ;
+      size         = 1 ;
+      numElements  = 1;
       name = "MPI_BYTE";
       break;
     case MPI_PACKED:
-      size = 1 ;
+      size         = 1 ;
+      numElements  = 1;
       name = "MPI_PACKED";
-      break;
-    case MPI_COMPLEX:
-      size =  2 * sizeof(float) ;
-      name = "MPI_COMPLEX";
-      break;
-    case MPI_FLOAT_COMPLEX:
-      size =  2 * sizeof(float) ;
-      name = "MPI_FLOAT_COMPLEX";
-      break;
-    case MPI_DOUBLE_COMPLEX:
-      size =  2 * sizeof(double) ;
-      name = "MPI_DOUBLE_COMPLEX";
-      break;
-    case MPI_LONG_DOUBLE_COMPLEX:
-      size =  2 * sizeof(long double) ;
-      name = "MPI_LONG_DOUBLE_COMPLEX";
       break;
     case MPI_C_BOOL:
       /* Should be C99 _Bool instead of C++ bool, but MSVC doesn't support that */
-      size = sizeof(bool) ;
+      size         = sizeof(bool) ;
+      numElements  = 1;
       name = "MPI_C_BOOL";
       break;
     case MPI_LOGICAL:
-      size =  sizeof(int) ;
+      size         =  sizeof(int) ;
+      numElements  = 1;
       name = "MPI_LOGICAL";
       break;
     case MPI_SHORT:
-      size = sizeof(signed short int);
+      size         = sizeof(signed short int);
+      numElements  = 1;
       name = "MPI_SHORT";
-      break ;
+      break;
     case MPI_LONG:
-      size = sizeof(signed long);
+      size         = sizeof(signed long);
+      numElements  = 1;
       name = "MPI_LONG";
-      break ;
+      break;
     case MPI_UNSIGNED_CHAR:
-      size = sizeof(unsigned char);
+      size         = sizeof(unsigned char);
+      numElements  = 1;
       name = "MPI_UNSIGNED_CHAR";
       break;
     case MPI_UNSIGNED_SHORT:
-      size = sizeof(unsigned short);
+      size         = sizeof(unsigned short);
+      numElements  = 1;
       name = "MPI_UNSIGNED_SHORT";
       break;
     case MPI_UNSIGNED:
-      size = sizeof(unsigned);
+      size         = sizeof(unsigned);
+      numElements  = 1;
       name = "MPI_UNSIGNED";
-      break ;
+      break;
     case MPI_UNSIGNED_LONG:
-      size = sizeof(unsigned long);
+      size         = sizeof(unsigned long);
+      numElements  = 1;
       name = "MPI_UNSIGNED_LONG";
-      break ;
+      break;
     case MPI_LONG_DOUBLE:
-      size = sizeof(long double);
+      size         = sizeof(long double);
+      numElements  = 1;
       name = "MPI_LONG_DOUBLE";
-      break ;
-    case MPI_FLOAT_INT:
-      size = sizeof(FloatInt);
-      name = "MPI_FLOAT_INT";
-      break;
-    case MPI_DOUBLE_INT:
-      size = sizeof(DoubleInt);
-      name = "MPI_DOUBLE_INT";
-      break;
-    case MPI_LONG_INT:
-      size = sizeof(LongInt);
-      name = "MPI_LONG_INT";
-      break;
-    case MPI_2INT:
-      size = sizeof(IntInt);
-      name = "MPI_2INT";
-      break;
-    case MPI_SHORT_INT:
-      size = sizeof(ShortInt);
-      name = "MPI_SHORT_INT";
-      break;
-    case MPI_LONG_DOUBLE_INT:
-      size = sizeof(LongdoubleInt);
-      name = "MPI_LONG_DOUBLE_INT";
-      break;
-    case MPI_2FLOAT:
-      size = sizeof(FloatFloat);
-      name = "MPI_2FLOAT";
-      break;
-    case MPI_2DOUBLE:
-      size = sizeof(DoubleDouble);
-      name = "MPI_2DOUBLE";
       break;
     case MPI_SIGNED_CHAR:
-      size = sizeof(signed char);
+      size         = sizeof(signed char);
+      numElements  = 1;
       name = "MPI_SIGNED_CHAR";
       break;
     case MPI_UNSIGNED_LONG_LONG:
-      size = sizeof(unsigned long long);
+      size         = sizeof(unsigned long long);
+      numElements  = 1;
       name = "MPI_UNSIGNED_LONG_LONG";
       break;
     case MPI_WCHAR:
-      size = sizeof(wchar_t);
+      size         = sizeof(wchar_t);
+      numElements  = 1;
       name = "MPI_WCHAR";
       break;
     case MPI_INT8_T:
-      size = sizeof(int8_t);
+      size         = sizeof(int8_t);
+      numElements  = 1;
       name = "MPI_INT8_T";
       break;
     case MPI_INT16_T:
-      size = sizeof(int16_t);
+      size         = sizeof(int16_t);
+      numElements  = 1;
       name = "MPI_INT16_T";
       break;
     case MPI_INT32_T:
-      size = sizeof(int32_t);
+      size         = sizeof(int32_t);
+      numElements  = 1;
       name = "MPI_INT32_T";
       break;
     case MPI_INT64_T:
-      size = sizeof(int64_t);
+      size         = sizeof(int64_t);
+      numElements  = 1;
       name = "MPI_INT64_T";
       break;
     case MPI_UINT8_T:
-      size = sizeof(uint8_t);
+      size         = sizeof(uint8_t);
+      numElements  = 1;
       name = "MPI_UINT8_T";
       break;
     case MPI_UINT16_T:
-      size = sizeof(uint16_t);
+      size         = sizeof(uint16_t);
+      numElements  = 1;
       name = "MPI_UINT16_T";
       break;
     case MPI_UINT32_T:
-      size = sizeof(uint32_t);
+      size         = sizeof(uint32_t);
+      numElements  = 1;
       name = "MPI_UINT32_T";
       break;
     case MPI_UINT64_T:
-      size = sizeof(uint64_t);
+      size         = sizeof(uint64_t);
+      numElements  = 1;
       name = "MPI_UINT64_T";
       break;
     case MPI_AINT:
-      size = sizeof(MPI_Aint);
+      size         = sizeof(MPI_Aint);
+      numElements  = 1;
       name = "MPI_AINT";
       break;
     case MPI_LB:
-      size = 0;
+      size         = 0;
+      numElements  = 0;
       name = "MPI_LB";
       break;
     case MPI_UB:
-      size = 0;
+      size         = 0;
+      numElements  = 0;
       name = "MPI_UB";
       break;
 #if CMK_LONG_LONG_DEFINED
     case MPI_LONG_LONG_INT:
-      size = sizeof(signed long long);
+      size         = sizeof(signed long long);
       name = "MPI_LONG_LONG_INT";
       break;
 #endif
     default:
-      size = 0;
+      CkAbort("CkDDT: Trying to make primitive type with unsupported type");
   }
 
+  trueExtent  = size;
   extent      = size;
   lb          = 0;
   ub          = size;
-  trueExtent  = size;
   trueLB      = 0;
   iscontig    = true;
   baseType    = NULL;
   baseSize    = 0;
   baseExtent  = 0;
   baseIndex   = -1;
-  numElements = 1;
   refCount    = 1;
 
   DDTDEBUG("CkDDT_DataType constructor: type=%d, size=%d, extent=%ld, iscontig=%d\n",
@@ -587,6 +569,17 @@ CkDDT_DataType::setSize(MPI_Aint _lb, MPI_Aint _extent)
   }
 }
 
+int
+CkDDT_DataType::getNumBasicElements(int bytes) const
+{
+  int extent = this->getSize();
+  if (extent == 0) {
+    return 0;
+  } else {
+    return (bytes/extent) * this->getNumElements();
+  }
+}
+
 void
 CkDDT_DataType::pupType(PUP::er  &p, CkDDT* ddt)
 {
@@ -662,20 +655,25 @@ CkDDT_Contiguous::CkDDT_Contiguous(int nCount, int bindex, CkDDT_DataType* oldTy
 }
 
 size_t
-CkDDT_Contiguous::serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const
+CkDDT_Contiguous::serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const
 {
   DDTDEBUG("CkDDT_Contiguous::serialize, %s %d objects of type %d (iscontig=%d)\n",
            (dir==PACK)?"packing":"unpacking", num, baseType->getType(), (int)iscontig);
   size_t bytesCopied = 0  ;
   if (iscontig) {
     bytesCopied = (size_t)num * (size_t)count * (size_t)baseSize ;
-    serializeContig(userdata, buffer, bytesCopied, dir);
+    serializeContig(userdata, buffer, std::min(bytesCopied, (size_t)msgLength), dir);
   }
   else {
     for(; num; num--) {
-      bytesCopied += baseType->serialize(userdata, buffer, count, dir) ;
+      int bytesProcessed = baseType->serialize(userdata, buffer, count, msgLength, dir);
+      bytesCopied += bytesProcessed;
+      msgLength -= bytesProcessed;
       buffer += size;
       userdata += extent;
+      if(msgLength == 0) {
+        return bytesCopied;
+      }
     }
   }
   return bytesCopied ;
@@ -704,6 +702,12 @@ CkDDT_Contiguous::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int
   i[0] = count;
   d[0] = baseIndex;
   return MPI_SUCCESS;
+}
+
+int
+CkDDT_Contiguous::getNumBasicElements(int bytes) const
+{
+  return this->getBaseType()->getNumBasicElements(bytes);
 }
 
 CkDDT_Vector::CkDDT_Vector(int nCount, int blength, int stride, int bindex, CkDDT_DataType* oldType)
@@ -773,22 +777,28 @@ CkDDT_Vector::CkDDT_Vector(int nCount, int blength, int stride, int bindex, CkDD
 }
 
 size_t
-CkDDT_Vector::serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const
+CkDDT_Vector::serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const
 {
   DDTDEBUG("CkDDT_Vector::serialize, %s %d objects of type %d (iscontig=%d)\n",
            (dir==PACK)?"packing":"unpacking", num, baseType->getType(), (int)iscontig);
+
   size_t bytesCopied = 0 ;
   if (iscontig) {
     bytesCopied = (size_t)num * (size_t)count * (size_t)blockLength * (size_t)baseSize ;
-    serializeContig(userdata, buffer, bytesCopied, dir);
+    serializeContig(userdata, buffer, std::min(bytesCopied, (size_t)msgLength), dir);
   }
   else {
     for(;num;num--) {
       char* saveUserdata = userdata;
       for(int i = 0 ; i < count; i++) {
-        bytesCopied += baseType->serialize(userdata, buffer, blockLength, dir);
-        buffer += (blockLength*baseSize) ;
+        int bytesProcessed = baseType->serialize(userdata, buffer, blockLength, msgLength, dir);
+        bytesCopied += bytesProcessed;
+        msgLength -= bytesProcessed;
+        buffer += (blockLength*baseSize);
         userdata += (strideLength*baseExtent);
+        if(msgLength == 0) {
+          return bytesCopied;
+        }
       }
       userdata = saveUserdata + extent;
     }
@@ -823,6 +833,12 @@ CkDDT_Vector::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]
   i[2] = strideLength;
   d[0] = baseIndex;
   return MPI_SUCCESS;
+}
+
+int
+CkDDT_Vector::getNumBasicElements(int bytes) const
+{
+  return this->getBaseType()->getNumBasicElements(bytes);
 }
 
 CkDDT_HVector::CkDDT_HVector(int nCount, int blength, int stride,  int bindex,
@@ -868,22 +884,27 @@ CkDDT_HVector::CkDDT_HVector(int nCount, int blength, int stride,  int bindex,
 }
 
 size_t
-CkDDT_HVector::serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const
+CkDDT_HVector::serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const
 {
   DDTDEBUG("CkDDT_HVector::serialize, %s %d objects of type %d (iscontig=%d)\n",
            (dir==PACK)?"packing":"unpacking", num, baseType->getType(), (int)iscontig);
   size_t bytesCopied = 0 ;
   if (iscontig) {
     bytesCopied = (size_t)num * (size_t)count * (size_t)blockLength * (size_t)baseSize ;
-    serializeContig(userdata, buffer, bytesCopied, dir);
+    serializeContig(userdata, buffer, std::min(bytesCopied, (size_t)msgLength), dir);
   }
   else {
     for(;num;num--) {
       char* saveUserdata = userdata;
       for(int i = 0 ; i < count; i++) {
-        bytesCopied += baseType->serialize(userdata, buffer, blockLength, dir);
+        int bytesProcessed = baseType->serialize(userdata, buffer, blockLength, msgLength, dir);
+        bytesCopied += bytesProcessed;
+        msgLength -= bytesProcessed;
         buffer += (blockLength*baseSize);
         userdata += strideLength;
+        if(msgLength == 0) {
+          return bytesCopied;
+        }
       }
       userdata = saveUserdata + extent;
     }
@@ -917,81 +938,23 @@ CkDDT_HVector::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[
   return MPI_SUCCESS;
 }
 
-CkDDT_Indexed::CkDDT_Indexed(int nCount, const int* arrBlock, const MPI_Aint* arrDisp, int bindex,
-                         CkDDT_DataType* base)
-    : CkDDT_DataType(CkDDT_INDEXED, 0, 0, nCount, numeric_limits<MPI_Aint>::max(),
-		     numeric_limits<MPI_Aint>::min(), 0, base->getSize(), base->getExtent(),
-		     base, nCount* base->getNumElements(), bindex, 0, 0),
-    arrayBlockLength(nCount), arrayDisplacements(nCount)
+int
+CkDDT_HVector::getNumBasicElements(int bytes) const
 {
-    MPI_Aint positiveExtent = 0;
-    MPI_Aint negativeExtent = 0;
-    for(int i=0; i<count; i++) {
-        arrayBlockLength[i] = arrBlock[i] ;
-        arrayDisplacements[i] = arrDisp[i] ;
-        size += ( arrBlock[i] * baseSize) ;
-        if (arrayDisplacements[i] < 0) {
-          negativeExtent = std::min(arrayDisplacements[i]*baseExtent, negativeExtent);
-          positiveExtent = std::max((arrayDisplacements[i] + arrayBlockLength[i])*baseExtent, positiveExtent);
-        }
-        else {
-          positiveExtent = std::max((arrayDisplacements[i] + arrayBlockLength[i])*baseExtent, positiveExtent);
-        }
-    }
+  return this->getBaseType()->getNumBasicElements(bytes);
+}
 
-    extent = positiveExtent + (-1)*negativeExtent;
-
-    if (count == 0) {
-        lb = 0;
-        ub = 0;
-    } else {
-        int i=0;
-        while (arrayBlockLength[i] == 0) {
-            /* Find lowest index that isn't empty */
-            i++;
-            if (i == count -1) {
-                i = 0;
-                break;
-            }
-        }
-
-        lb = baseType->getLB() + arrayDisplacements[i]*baseExtent;
-
-        int j = count-1;
-        while (arrayBlockLength[j] == 0) {
-            /* Find highest index that isn't empty */
-            j--;
-            if (j == 0) {
-                break;
-            }
-        }
-        ub = baseType->getLB() + (arrayBlockLength[j] + arrayDisplacements[j])*baseExtent;
-    }
-
-    trueExtent = extent;
-    trueLB = lb;
-
-    /* set iscontig */
-    if (extent != size || count == 0) {
-        iscontig = false;
-    }
-    else if (count == 1) {
-        iscontig = baseType->isContig();
-    }
-    else {
-        bool contig = true;
-        for (int j=0; j<count; j++) {
-            if (arrayDisplacements[j] != 1 || arrayBlockLength[j] != 1) {
-                contig = false;
-                break;
-            }
-        }
-        iscontig = (contig && baseType->isContig());
-    }
+CkDDT_Indexed::CkDDT_Indexed(int nCount, const int* arrBlock, const MPI_Aint* arrBytesDisp, const MPI_Aint* arrDisp, int bindex, CkDDT_DataType* base)
+    : CkDDT_HIndexed(nCount, arrBlock, arrBytesDisp, bindex, base)
+{
+  for(int i=0; i<count; i++) {
+    arrayDisplacements[i] = arrDisp[i];
+  }
+  datatype = CkDDT_INDEXED;
 }
 
 size_t
-CkDDT_Indexed::serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const
+CkDDT_Indexed::serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const
 {
   DDTDEBUG("CkDDT_Indexed::serialize, %s %d objects of type %d (iscontig=%d)\n",
            (dir==PACK)?"packing":"unpacking", num, baseType->getType(), (int)iscontig);
@@ -1000,27 +963,32 @@ CkDDT_Indexed::serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) c
   if (iscontig) {
     /* arrayBlockLength is either of size 1 or contains all 1s */
     bytesCopied = (size_t)num * (size_t)count * (size_t)arrayBlockLength[1] * (size_t)baseSize ;
-    serializeContig(userdata, buffer, bytesCopied, dir);
+    serializeContig(userdata, buffer, std::min(bytesCopied, (size_t)msgLength), dir);
   }
   else {
-    for(;num;num--) {
-      char* saveUserdata = userdata;
+    char* saveUserdata = userdata;
+    for(int iter=0; iter<num; iter++) {
       for(int i = 0 ; i < count; i++) {
-        userdata = saveUserdata + baseExtent * arrayDisplacements[i] ;
+        userdata = saveUserdata + (baseExtent * arrayDisplacements[i]) + (iter * extent);
+
         for(int j = 0; j < arrayBlockLength[i] ; j++) {
-          bytesCopied +=  baseType->serialize(userdata, buffer, 1, dir);
+          int bytesProcessed = baseType->serialize(userdata, buffer, 1, msgLength, dir);
+          bytesCopied += bytesProcessed;
+          msgLength -= bytesProcessed;
           buffer += baseSize;
           userdata += baseExtent;
+          CkAssert(msgLength>=0);
+          if(msgLength == 0) {
+            return bytesCopied;
+          }
         }
       }
       userdata = saveUserdata + extent;
     }
   }
+
   return bytesCopied ;
 }
-
-CkDDT_Indexed::~CkDDT_Indexed()
-{}
 
 void
 CkDDT_Indexed::pupType(PUP::er &p, CkDDT* ddt)
@@ -1053,45 +1021,48 @@ CkDDT_Indexed::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[
   return MPI_SUCCESS;
 }
 
+int
+CkDDT_Indexed::getNumBasicElements(int bytes) const
+{
+  return this->getBaseType()->getNumBasicElements(bytes);
+}
+
 CkDDT_HIndexed::CkDDT_HIndexed(int nCount, const int* arrBlock, const MPI_Aint* arrDisp,  int bindex,
                            CkDDT_DataType* base)
-    : CkDDT_Indexed(nCount, arrBlock, arrDisp, bindex, base)
+    : CkDDT_DataType(CkDDT_HINDEXED, 0, 0, nCount, 0, 0, 0,
+      base->getSize(), base->getExtent(), base, 0, bindex, 0, 0),
+      arrayBlockLength(nCount),
+      arrayDisplacements(nCount)
 {
   datatype = CkDDT_HINDEXED;
-  size = 0;
-  ub = numeric_limits<MPI_Aint>::min();
-  for (int i = 0; i<count; i++) {
-      size += (arrBlock[i] * baseSize);
-      ub = std::max(arrBlock[i]*baseExtent + baseType->getLB() + arrayDisplacements[i], ub);
-  }
 
+  size = 0;
   if (count == 0) {
     lb = 0;
     ub = 0;
+    extent = 0;
   } else {
-    int i=0;
-    while (arrayBlockLength[i] == 0) {
-      /* Find lowest index that isn't empty */
-      i++;
-      if (i == count -1) {
-        i = 0;
-        break;
+    bool validElem = false;
+    MPI_Aint positiveExtent = 0;
+    MPI_Aint negativeExtent = 0;
+    for(int i=0; i<count; i++) {
+      arrayBlockLength[i] = arrBlock[i] ;
+      arrayDisplacements[i] = arrDisp[i] ;
+      size += ( arrBlock[i] * baseSize) ;
+      if (arrayBlockLength[i] > 0) {
+        if (!validElem) {
+          negativeExtent = arrayDisplacements[i];
+          positiveExtent = arrayDisplacements[i] + (arrayBlockLength[i]*baseExtent);
+          validElem = true;
+        }
+        negativeExtent = std::min(arrayDisplacements[i], negativeExtent);
+        positiveExtent = std::max(arrayDisplacements[i] + (arrayBlockLength[i]*baseExtent), positiveExtent);
       }
     }
-
-    lb = baseType->getLB() + arrayDisplacements[i];
-
-    int j = count-1;
-    while (arrayBlockLength[j] == 0) {
-      /* Find highest index that isn't empty */
-      j--;
-      if (j == 0) {
-        break;
-      }
-    }
-    ub = baseType->getLB() + (arrayBlockLength[j]*baseExtent) +  arrayDisplacements[j];
+    lb = baseType->getLB() + negativeExtent;
+    ub = baseType->getLB() + positiveExtent;
+    extent = positiveExtent + (-1)*negativeExtent;
   }
-  extent = ub - lb;
 
   trueExtent = extent;
   trueLB = lb;
@@ -1116,7 +1087,7 @@ CkDDT_HIndexed::CkDDT_HIndexed(int nCount, const int* arrBlock, const MPI_Aint* 
 }
 
 size_t
-CkDDT_HIndexed::serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const
+CkDDT_HIndexed::serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const
 {
   DDTDEBUG("CkDDT_HIndexed::serialize, %s %d objects of type %d (iscontig=%d)\n",
            (dir==PACK)?"packing":"unpacking", num, baseType->getType(), (int)iscontig);
@@ -1125,7 +1096,7 @@ CkDDT_HIndexed::serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) 
   if (iscontig) {
     /* arrayBlockLength is either of size 1 or contains all 1s */
     bytesCopied = (size_t)num * (size_t)count * (size_t)arrayBlockLength[0] * (size_t)baseSize ;
-    serializeContig(userdata, buffer, bytesCopied, dir);
+    serializeContig(userdata, buffer, std::min(bytesCopied, (size_t)msgLength), dir);
   }
   else {
     for(;num;num--) {
@@ -1133,9 +1104,14 @@ CkDDT_HIndexed::serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) 
       for(int i = 0 ; i < count; i++) {
         userdata = (isAbsolute) ? (char*)arrayDisplacements[i] : saveUserdata+arrayDisplacements[i];
         for(int j = 0; j < arrayBlockLength[i] ; j++) {
-          bytesCopied += baseType->serialize(userdata, buffer, 1, dir);
+          int bytesProcessed = baseType->serialize(userdata, buffer, 1, msgLength, dir);
+          bytesCopied += bytesProcessed;
+          msgLength -= bytesProcessed;
           buffer += baseSize;
           userdata += baseExtent;
+          if(msgLength == 0) {
+            return bytesCopied;
+          }
         }
       }
       userdata = saveUserdata + extent;
@@ -1144,10 +1120,16 @@ CkDDT_HIndexed::serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) 
   return bytesCopied ;
 }
 
+CkDDT_HIndexed::~CkDDT_HIndexed()
+{}
+
 void
 CkDDT_HIndexed::pupType(PUP::er &p, CkDDT* ddt)
 {
-  CkDDT_Indexed::pupType(p, ddt);
+  CkDDT_DataType::pupType(p, ddt);
+  p|arrayBlockLength;
+  p|arrayDisplacements;
+  if (p.isUnpacking()) baseType = ddt->getType(baseIndex);
 }
 
 int
@@ -1172,64 +1154,27 @@ CkDDT_HIndexed::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d
   return MPI_SUCCESS;
 }
 
-CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, const MPI_Aint *ArrDisp, int index,
-  CkDDT_DataType *type)     : CkDDT_DataType(CkDDT_INDEXED_BLOCK, 0, 0, count, numeric_limits<MPI_Aint>::max(),
-         numeric_limits<MPI_Aint>::min(), 0, type->getSize(), type->getExtent(),
-         type, count * type->getNumElements(), index, 0, 0),
-    BlockLength(Blength), arrayDisplacements(count)
+int
+CkDDT_HIndexed::getNumBasicElements(int bytes) const
 {
-  MPI_Aint positiveExtent = 0;
-  MPI_Aint negativeExtent = 0;
+  return this->getBaseType()->getNumBasicElements(bytes);
+}
+
+CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, const MPI_Aint *arrBytesDisp, const int *ArrDisp, int index,
+  CkDDT_DataType *type)
+    : CkDDT_HIndexed_Block(count, Blength, arrBytesDisp, index, type)
+{
   for(int i=0; i<count; i++) {
-    arrayDisplacements[i] = ArrDisp[i] ;
-    size += ( BlockLength * baseSize) ;
-    if (arrayDisplacements[i] < 0) {
-      negativeExtent = std::min(arrayDisplacements[i]*baseExtent,negativeExtent);
-      positiveExtent = std::max((arrayDisplacements[i]+BlockLength)*baseExtent, positiveExtent);
-    }
-    else {
-      positiveExtent = std::max((arrayDisplacements[i]+BlockLength)*baseExtent, positiveExtent);
-    }
+    arrayDisplacements[i] = static_cast<MPI_Aint>(ArrDisp[i]);
   }
-
-  extent = positiveExtent + (-1)*negativeExtent;
-  if (count == 0) {
-    lb = baseType->getLB();
-  } else {
-    lb = baseType->getLB() + *std::min_element(&arrayDisplacements[0], &arrayDisplacements[0] + count)*baseExtent;
-  }
-  ub = lb + extent;
-
-  trueExtent = extent;
-  trueLB = lb;
-
-  /* set iscontig */
-  if (extent != size || count == 0) {
-    iscontig = false;
-  }
-  else if (count == 1) {
-    iscontig = baseType->isContig();
-  }
-  else if (BlockLength != 1) {
-    iscontig = false;
-  }
-  else {
-    bool contig = true;
-    for (int j=0; j<count; j++) {
-      if (arrayDisplacements[j] != 1) {
-        contig = false;
-        break;
-      }
-    }
-    iscontig = (contig && baseType->isContig());
-  }
+  datatype = CkDDT_INDEXED_BLOCK;
 }
 
 CkDDT_Indexed_Block::~CkDDT_Indexed_Block()
 {}
 
 size_t
-CkDDT_Indexed_Block::serialize(char *userdata, char *buffer, int num, CkDDT_Dir dir) const
+CkDDT_Indexed_Block::serialize(char *userdata, char *buffer, int num, int msgLength, CkDDT_Dir dir) const
 {
   DDTDEBUG("CkDDT_Indexed_Block::serialize, %s %d objects of type %d (iscontig=%d)\n",
            (dir==PACK)?"packing":"unpacking", num, baseType->getType(), (int)iscontig);
@@ -1237,17 +1182,22 @@ CkDDT_Indexed_Block::serialize(char *userdata, char *buffer, int num, CkDDT_Dir 
 
   if (iscontig) {
     bytesCopied = (size_t)num * (size_t)count * (size_t)BlockLength * (size_t)baseSize ;
-    serializeContig(userdata, buffer, bytesCopied, dir);
+    serializeContig(userdata, buffer, std::min(bytesCopied, (size_t)msgLength), dir);
   }
   else {
     for(;num;num--) {
       char* saveUserdata = userdata;
       for(int i = 0 ; i < count; i++) {
-        userdata = saveUserdata + baseExtent * arrayDisplacements[i] ;
+        userdata = saveUserdata + baseExtent * arrayDisplacements[i];
         for(int j = 0; j < BlockLength ; j++) {
-          bytesCopied +=  baseType->serialize(userdata, buffer, 1, dir);
+          int bytesProcessed = baseType->serialize(userdata, buffer, 1, msgLength, dir);
+          bytesCopied += bytesProcessed;
+          msgLength -= bytesProcessed;
           buffer += baseSize;
           userdata += baseExtent;
+          if(msgLength == 0) {
+            return bytesCopied;
+          }
         }
       }
       userdata = saveUserdata + extent;
@@ -1259,10 +1209,7 @@ CkDDT_Indexed_Block::serialize(char *userdata, char *buffer, int num, CkDDT_Dir 
 void
 CkDDT_Indexed_Block::pupType(PUP::er &p, CkDDT *ddt)
 {
-  CkDDT_DataType::pupType(p, ddt);
-  p|BlockLength;
-  p|arrayDisplacements;
-  if (p.isUnpacking()) baseType = ddt->getType(baseIndex);
+  CkDDT_HIndexed_Block::pupType(p, ddt);
 }
 
 int
@@ -1287,30 +1234,40 @@ CkDDT_Indexed_Block::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], 
   return MPI_SUCCESS;
 }
 
-CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, const MPI_Aint *ArrDisp, int index,
-  CkDDT_DataType *type)     : CkDDT_Indexed_Block(count, Blength,ArrDisp,index,type)
+int
+CkDDT_Indexed_Block::getNumBasicElements(int bytes) const
 {
+  return this->getBaseType()->getNumBasicElements(bytes);
+}
+
+CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, const MPI_Aint *ArrDisp, int index,
+  CkDDT_DataType *type)     :
+    CkDDT_DataType(CkDDT_INDEXED_BLOCK, 0, 0, count, 0, 0, 0, type->getSize(),
+    type->getExtent(), type, count * type->getNumElements(), index, 0, 0),
+    BlockLength(Blength), arrayDisplacements(count)
+{
+  datatype = CkDDT_HINDEXED_BLOCK;
+
+  bool validElem = false;
   MPI_Aint positiveExtent = 0;
   MPI_Aint negativeExtent = 0;
   for(int i=0; i<count; i++) {
     arrayDisplacements[i] = ArrDisp[i] ;
-    size += ( BlockLength * baseSize) ;
-    if (this->arrayDisplacements[i] < 0) {
-      negativeExtent = std::min(arrayDisplacements[i],negativeExtent);
-      positiveExtent = std::max(arrayDisplacements[i] + BlockLength*baseExtent, positiveExtent);
-    }
-    else {
-      positiveExtent = std::max(arrayDisplacements[i] + BlockLength*baseExtent, positiveExtent);
-    }
-  }
+    size += Blength * baseSize;
+    if (Blength > 0) {
 
-  extent = positiveExtent + (-1)*negativeExtent;
-  if (count == 0) {
-    lb = baseType->getLB();
-  } else {
-    lb = baseType->getLB() + *std::min_element(&arrayDisplacements[0], &arrayDisplacements[0] + count);
+      if (!validElem) {
+        negativeExtent = arrayDisplacements[i];
+        positiveExtent = arrayDisplacements[i] + (Blength*baseExtent);
+        validElem = true;
+      }
+      negativeExtent = std::min(arrayDisplacements[i], negativeExtent);
+      positiveExtent = std::max(arrayDisplacements[i] + (Blength*baseExtent), positiveExtent);
+    }
   }
-  ub = lb + extent;
+  lb = baseType->getLB() + negativeExtent;
+  ub = baseType->getLB() + positiveExtent;
+  extent = positiveExtent + (-1)*negativeExtent;
 
   trueExtent = extent;
   trueLB = lb;
@@ -1341,7 +1298,7 @@ CkDDT_HIndexed_Block::~CkDDT_HIndexed_Block()
 {}
 
 size_t
-CkDDT_HIndexed_Block::serialize(char *userdata, char *buffer, int num, CkDDT_Dir dir) const
+CkDDT_HIndexed_Block::serialize(char *userdata, char *buffer, int num, int msgLength, CkDDT_Dir dir) const
 {
   DDTDEBUG("CkDDT_HIndexed_Block::serialize, %s %d objects of type %d (iscontig=%d)\n",
            (dir==PACK)?"packing":"unpacking", num, baseType->getType(), (int)iscontig);
@@ -1349,7 +1306,7 @@ CkDDT_HIndexed_Block::serialize(char *userdata, char *buffer, int num, CkDDT_Dir
 
   if (iscontig) {
     bytesCopied = (size_t)num * (size_t)count * (size_t)BlockLength * (size_t)baseSize ;
-    serializeContig(userdata, buffer, bytesCopied, dir);
+    serializeContig(userdata, buffer, std::min(bytesCopied, (size_t)msgLength), dir);
   }
   else {
     for(;num;num--) {
@@ -1357,9 +1314,14 @@ CkDDT_HIndexed_Block::serialize(char *userdata, char *buffer, int num, CkDDT_Dir
       for(int i = 0 ; i < count; i++) {
         userdata = (isAbsolute) ? (char*)arrayDisplacements[i] : saveUserdata+arrayDisplacements[i];
         for(int j = 0; j < BlockLength ; j++) {
-          bytesCopied +=  baseType->serialize(userdata, buffer, 1, dir);
+          int bytesProcessed = baseType->serialize(userdata, buffer, 1, msgLength, dir);
+          bytesCopied += bytesProcessed;
+          msgLength -= bytesProcessed;
           buffer += baseSize;
           userdata += baseExtent ;
+          if(msgLength == 0) {
+            return bytesCopied;
+          }
         }
       }
       userdata = saveUserdata + extent;
@@ -1371,7 +1333,10 @@ CkDDT_HIndexed_Block::serialize(char *userdata, char *buffer, int num, CkDDT_Dir
 void
 CkDDT_HIndexed_Block::pupType(PUP::er &p, CkDDT *ddt)
 {
-  CkDDT_Indexed_Block::pupType(p, ddt);
+  CkDDT_DataType::pupType(p, ddt);
+  p|BlockLength;
+  p|arrayDisplacements;
+  if (p.isUnpacking()) baseType = ddt->getType(baseIndex);
 }
 
 int
@@ -1395,6 +1360,13 @@ CkDDT_HIndexed_Block::getContents(int ni, int na, int nd, int i[], MPI_Aint a[],
   d[0] = baseIndex;
   return MPI_SUCCESS;
 }
+
+int
+CkDDT_HIndexed_Block::getNumBasicElements(int bytes) const
+{
+  return this->getBaseType()->getNumBasicElements(bytes);
+}
+
 
 CkDDT_Struct::CkDDT_Struct(int nCount, const int* arrBlock,
                        const MPI_Aint* arrDisp, const int *bindex, CkDDT_DataType** arrBase)
@@ -1441,15 +1413,31 @@ CkDDT_Struct::CkDDT_Struct(int nCount, const int* arrBlock,
       extent += (saveExtent - (extent % saveExtent));
   }
 
-  trueLB = -1;
-  trueExtent = 0;
+  trueLB = 0;
+  MPI_Aint trueUB = 0;
+  int trueUBi = 0;
+  bool trueLB_set = false;
+  bool trueUB_set = false;
+  bool empty = true;
   for (int i=0; i<count; i++) {
     if (!(arrayDataType[i]->getType() == MPI_LB || arrayDataType[i]->getType() == MPI_UB)) {
-      if (trueLB > arrayDisplacements[i] || trueLB == -1) {
+      if (trueLB > arrayDisplacements[i] || !trueLB_set) {
+        trueLB_set = true;
         trueLB = arrayDisplacements[i];
       }
+      empty = false;
+      if (trueUB < arrayDisplacements[i] || !trueUB_set) {
+        trueUBi = i;
+        trueUB_set = true;
+        trueUB = arrayDisplacements[i];
+      }
     }
-    trueExtent += arrayDataType[i]->getTrueExtent() * arrBlock[i];
+  }
+
+  if(empty) {
+    trueExtent = 0;
+  } else {
+    trueExtent = trueUB + (arrayDataType[trueUBi]->getExtent()*arrayBlockLength[trueUBi]) - trueLB;
   }
 
   /* set iscontig */
@@ -1484,7 +1472,7 @@ CkDDT_Struct::CkDDT_Struct(int nCount, const int* arrBlock,
 }
 
 size_t
-CkDDT_Struct::serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) const
+CkDDT_Struct::serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const
 {
   size_t bytesCopied = 0;
 
@@ -1494,7 +1482,7 @@ CkDDT_Struct::serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) co
     /* arrayBlockLength is either of size 1 or contains all 1s */
     for (int i=0; i<count; i++)
       bytesCopied += (size_t)num * (size_t)arrayBlockLength[0] * (size_t)arrayDataType[i]->getSize();
-    serializeContig(userdata, buffer, bytesCopied, dir);
+    serializeContig(userdata, buffer, std::min(bytesCopied, (size_t)msgLength), dir);
   }
   else {
     char* sbuf = userdata;
@@ -1509,11 +1497,17 @@ CkDDT_Struct::serialize(char* userdata, char* buffer, int num, CkDDT_Dir dir) co
           DDTDEBUG("CkDDT_Struct::serialize %s block of type %d (size %d) from offset %d to offset %d\n",
                    (dir==PACK)?"packing":"unpacking", arrayDataType[i]->getType(),
                    saveSize, userdata + (j*saveExtent) + arrayDisplacements[i]-sbuf, buffer-dbuf);
-          bytesCopied += arrayDataType[i]->serialize(
+          if(msgLength == 0) {
+            return bytesCopied;
+          }
+          int bytesProcessed = arrayDataType[i]->serialize(
                          arrayDisplacements[i] + j*saveExtent + (isAbsolute ? absoluteAddr : userdata),
                          buffer,
                          1,
+                         msgLength,
                          dir);
+          bytesCopied += bytesProcessed;
+          msgLength -= bytesProcessed;
           buffer += saveSize;
         }
       }
@@ -1573,4 +1567,42 @@ CkDDT_Struct::getBaseTypes() const
 {
   return arrayDataType;
 }
+
+int
+CkDDT_Struct::getNumBasicElements(int bytes) const
+{
+  int size = this->getSize();
+  if(size == 0) {
+    return 0;
+  }
+
+  int rem = bytes%size;
+  vector<CkDDT_DataType*> types = this->getBaseTypes();
+  int basicTypes = 0;
+  for(int i=0; i<types.size(); i++) {
+    basicTypes += types[i]->getNumBasicElements(types[i]->getSize());
+  }
+
+  int count = (bytes/size) * basicTypes;
+
+  if (rem == 0) {
+    return count;
+  }
+
+  for(int i=0; i<types.size(); i++) {
+
+    int type_size = types[i]->getSize();
+    if(type_size*arrayBlockLength[i] > rem) {
+      return count + types[i]->getNumBasicElements(rem);
+    } else {
+      count += types[i]->getNumBasicElements(type_size)*arrayBlockLength[i];
+      rem -= type_size*arrayBlockLength[i];
+    }
+    if(rem == 0) {
+      return count;
+    }
+  }
+  return count;
+}
+
 
