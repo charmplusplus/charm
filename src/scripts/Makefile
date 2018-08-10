@@ -598,7 +598,6 @@ $(eval $(call libmem,gnu,                                    ,-DCMK_MEMORY_BUILD
 $(eval $(call libmem,verbose,             memory-verbose.c   ,-DCMK_MEMORY_BUILD_VERBOSE -touch-on-failure))
 $(eval $(call libmem,paranoid,            memory-paranoid.c  ,-DCMK_MEMORY_BUILD_PARANOID -touch-on-failure))
 $(eval $(call libmem,leak,                memory-leak.c      ,-DCMK_MEMORY_BUILD_LEAK -touch-on-failure))
-$(eval $(call libmem,cache,               memory-cache.c     ,-DCMK_MEMORY_BUILD_CACHE -touch-on-failure))
 $(eval $(call libmem,isomalloc,           memory-isomalloc.c ,-DCMK_MEMORY_BUILD_ISOMALLOC -touch-on-failure))
 $(eval $(call libmem,charmdebug,          memory-charmdebug.c,-DCMK_MEMORY_BUILD_CHARMDEBUG -optimize -touch-on-failure))
 $(eval $(call libmem,charmdebug-slot,     memory-charmdebug.c,-DCMK_MEMORY_BUILD_CHARMDEBUG -DCMK_SEPARATE_SLOT -optimize -touch-on-failure))

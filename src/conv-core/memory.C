@@ -8,10 +8,10 @@
  the current and past memory usage. 
 
  There are several possible implementations provided here-- the user
- can link in whichever is best using the -malloc option with charmc.
+ can link in whichever is best using the -memory option with charmc.
 
  The major possibilities here are empty (use the system's malloc),
- GNU (use malloc-gnu.c), and meta (use malloc-cache.c or malloc-paranoid.c).
+ GNU (use memory-gnu.c), and meta (use e.g. memory-paranoid.c).
  On machines without sbrk(), only the system's malloc is available.
 
  The CMK_MEMORY_BUILD_* symbols come in from the compiler command line.
@@ -314,10 +314,6 @@ static void (*old_free_hook) (void*, const void*);
 
 #if CMK_MEMORY_BUILD_LEAK
 #include "memory-leak.c"
-#endif
-
-#if CMK_MEMORY_BUILD_CACHE
-#include "memory-cache.c"
 #endif
 
 #if CMK_MEMORY_BUILD_ISOMALLOC
@@ -632,10 +628,6 @@ static void meta_init(char **argv) {
 
 #if CMK_MEMORY_BUILD_LEAK
 #include "memory-leak.c"
-#endif
-
-#if CMK_MEMORY_BUILD_CACHE
-#include "memory-cache.c"
 #endif
 
 #if CMK_MEMORY_BUILD_ISOMALLOC
