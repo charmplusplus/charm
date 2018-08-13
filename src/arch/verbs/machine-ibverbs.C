@@ -443,16 +443,104 @@ static void checkAllQps(void){
 static void send_partial_init(void);
 #endif
 
+/*
+ * This function should really be provided as part of libibverbs.
+ * Instead it was found in IB ACM, specifically: ibacm/src/acm.c
+ * It is not copyrightable, being "functional rather than creative" (Lexmark v. SCC).
+ */
+static enum ibv_rate cmi_get_ibv_rate(uint8_t width, uint8_t speed)
+{
+  switch (width)
+  {
+  case 1: /* 1x */
+    switch (speed)
+    {
+    case 1: return IBV_RATE_2_5_GBPS;
+    case 2: return IBV_RATE_5_GBPS;
+    case 4: /* fall through */
+    case 8: return IBV_RATE_10_GBPS;
+    case 16: return IBV_RATE_14_GBPS;
+    case 32: return IBV_RATE_25_GBPS;
+    default: return IBV_RATE_MAX;
+    }
+  case 2: /* 4x */
+    switch (speed)
+    {
+    case 1: return IBV_RATE_10_GBPS;
+    case 2: return IBV_RATE_20_GBPS;
+    case 4: /* fall through */
+    case 8: return IBV_RATE_40_GBPS;
+    case 16: return IBV_RATE_56_GBPS;
+    case 32: return IBV_RATE_100_GBPS;
+    default: return IBV_RATE_MAX;
+    }
+  case 4: /* 8x */
+    switch (speed)
+    {
+    case 1: return IBV_RATE_20_GBPS;
+    case 2: return IBV_RATE_40_GBPS;
+    case 4: /* fall through */
+    case 8: return IBV_RATE_80_GBPS;
+    case 16: return IBV_RATE_112_GBPS;
+    case 32: return IBV_RATE_200_GBPS;
+    default: return IBV_RATE_MAX;
+    }
+  case 8: /* 12x */
+    switch (speed)
+    {
+    case 1: return IBV_RATE_30_GBPS;
+    case 2: return IBV_RATE_60_GBPS;
+    case 4: /* fall through */
+    case 8: return IBV_RATE_120_GBPS;
+    case 16: return IBV_RATE_168_GBPS;
+    case 32: return IBV_RATE_300_GBPS;
+    default: return IBV_RATE_MAX;
+    }
+  default:
+    return IBV_RATE_MAX;
+  }
+}
+
+struct cmi_ibv_device_port_info
+{
+  struct ibv_device* device;
+  int mbps = 0;
+  uint8_t port;
+  uint8_t link_layer = 0;
+
+  cmi_ibv_device_port_info(struct ibv_device* d, uint8_t p) :
+    device{d}, port{p}
+  {
+  }
+};
+
+static bool operator< (const cmi_ibv_device_port_info& a, const cmi_ibv_device_port_info& b)
+{
+  // Prefer non-Ethernet (i.e. Infiniband) over Ethernet.
+  int a_ethernet = a.link_layer == IBV_LINK_LAYER_ETHERNET;
+  int b_ethernet = b.link_layer == IBV_LINK_LAYER_ETHERNET;
+  if (a_ethernet != b_ethernet)
+    return a_ethernet < b_ethernet;
+
+  // Prefer higher throughput.
+  if (a.mbps != b.mbps)
+    return a.mbps > b.mbps;
+
+  // As a tiebreaker, choose the smaller hardware port number.
+  return a.port < b.port;
+}
+
+#include <vector>
+#include <algorithm>
+
 static void CmiMachineInit(char** argv)
 {
   struct ibv_device** devList;
-  struct ibv_device* dev;
-  int ibPort;
   int i;
   int calcMaxSize;
   infiPacket* pktPtrs;
   struct infiRdmaPacket** rdmaPktPtrs;
-  int num_devices, idev;
+  int num_devices;
 #define MAX_DEVICE_NAME 120
   char* usr_ibv_device_name = NULL;
   int ibv_device_name_set = 0;
@@ -484,12 +572,70 @@ static void CmiMachineInit(char** argv)
   context->localAddr = (struct infiAddr*)malloc(sizeof(struct infiAddr) * Lrts_numNodes);
   MACHSTATE1(3, "context->localAddr allocated %p", context->localAddr);
 
-  idev = 0;
+  std::vector<cmi_ibv_device_port_info> potential_devices;
+  for (int d = 0; d < num_devices; ++d)
+  {
+    struct ibv_device* dev = devList[d];
+    if (dev == nullptr)
+      continue;
 
-  // try all devices, can't assume device 0 is IB, it may be ethernet
-loop:
-  dev = devList[idev];
-  CmiEnforce(dev != NULL);
+    if (ibv_device_name_set)
+    {
+      if (strcmp(usr_ibv_device_name, ibv_get_device_name(dev)) != 0)
+        continue;
+
+      ibv_device_name_set = 2;
+    }
+
+    struct ibv_context* ctx = ibv_open_device(dev);
+    if (ctx == nullptr)
+      continue;
+
+    struct ibv_device_attr device_attr;
+
+    if (ibv_query_device(ctx, &device_attr))
+    {
+      ibv_close_device(ctx);
+      continue;
+    }
+
+    for (int p = 1; p <= device_attr.phys_port_cnt; ++p)
+    {
+      struct ibv_port_attr port_attr;
+
+      if (ibv_query_port(ctx, p, &port_attr))
+        continue;
+
+      if (port_attr.state != IBV_PORT_ACTIVE)
+        continue;
+
+      cmi_ibv_device_port_info info(dev, p);
+
+#if CMK_IBV_PORT_ATTR_HAS_LINK_LAYER
+      info.link_layer = port_attr.link_layer;
+#endif
+      info.mbps = ibv_rate_to_mbps(cmi_get_ibv_rate(port_attr.active_width, port_attr.active_speed));
+
+      potential_devices.push_back(info);
+    }
+
+    ibv_close_device(ctx);
+  }
+
+  if (potential_devices.empty())
+  {
+    if (ibv_device_name_set == 2)
+      CmiAbort("Requested IBV device not usable!");
+    else if (ibv_device_name_set == 1)
+      CmiAbort("Requested IBV device not found!");
+    else
+      CmiAbort("No valid IBV device found!");
+  }
+
+  // If fallbacks are desired, use std::stable_sort instead.
+  const cmi_ibv_device_port_info& device_port_info = *std::min_element(potential_devices.begin(), potential_devices.end());
+  struct ibv_device* dev = device_port_info.device;
+  uint8_t ibPort = device_port_info.port;
 
   MACHSTATE1(3, "device name %s", ibv_get_device_name(dev));
 
@@ -497,38 +643,6 @@ loop:
   context->context = ibv_open_device(dev);
   CmiEnforce(context->context != NULL);
 
-  // test ibPort
-  int MAXPORT = 8;
-  for (ibPort = 1; ibPort < MAXPORT; ibPort++)
-  {
-    struct ibv_port_attr attr;
-    if (ibv_query_port(context->context, ibPort, &attr) != 0) continue;
-#if CMK_IBV_PORT_ATTR_HAS_LINK_LAYER
-    if (attr.link_layer == IBV_LINK_LAYER_INFINIBAND) break;
-#else
-    break;
-#endif
-  }
-  if (ibPort == MAXPORT)
-  {
-    if (++idev == num_devices)
-      CmiAbort("No valid IB port found!");
-    else
-      goto loop;
-  }
-  if (ibv_device_name_set)
-  {
-    if (strcmp(usr_ibv_device_name, ibv_get_device_name(dev)) == 0)
-    {
-      MACHSTATE2(3, "device %d selected for user requested IBVDeviceName %s\n", idev,
-                 ibv_get_device_name(dev));
-    }
-    else
-    {  // force increment to next device
-      if (ibPort != MAXPORT) ++idev;
-      goto loop;
-    }
-  }
   context->ibPort = ibPort;
   MACHSTATE1(3, "use port %d", ibPort);
 
