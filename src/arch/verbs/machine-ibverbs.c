@@ -443,232 +443,253 @@ static void checkAllQps(void){
 static void send_partial_init(void);
 #endif
 
-static void CmiMachineInit(char **argv){
-	struct ibv_device **devList;
-	struct ibv_device *dev;
-	int ibPort;
-	int i;
-	int calcMaxSize;
-	infiPacket *pktPtrs;
-	struct infiRdmaPacket **rdmaPktPtrs;
-        int num_devices, idev;
+static void CmiMachineInit(char** argv)
+{
+  struct ibv_device** devList;
+  struct ibv_device* dev;
+  int ibPort;
+  int i;
+  int calcMaxSize;
+  infiPacket* pktPtrs;
+  struct infiRdmaPacket** rdmaPktPtrs;
+  int num_devices, idev;
 #define MAX_DEVICE_NAME 120
-        char *usr_ibv_device_name=NULL;
-        int ibv_device_name_set=0;
+  char* usr_ibv_device_name = NULL;
+  int ibv_device_name_set = 0;
 
 #if CMK_SMP
-        ibv_fork_init();
+  ibv_fork_init();
 #endif
-		 
-	MACHSTATE(3,"CmiMachineInit {");
-	MACHSTATE2(3,"Lrts_numNodes %d CmiNumNodes() %d",Lrts_numNodes,CmiNumNodes());
-	MACHSTATE1(3,"CmiMyNodeSize() %d",CmiMyNodeSize());
-	
-	//TODO: make the device and ibport configureable by commandline parameter
-	//Check example for how to do that
-	devList =  ibv_get_device_list(&num_devices);
-        CmiEnforce(num_devices > 0);
-	CmiEnforce(devList != NULL);
-	if (CmiGetArgStringDesc(argv,"+IBVDeviceName",&usr_ibv_device_name,"User set IBV device name"))
-          {
-	    MACHSTATE1(3,"IBVDeviceName set %s",usr_ibv_device_name);
-	    ibv_device_name_set=1;
-          }
 
-	context = (struct infiContext *)malloc(sizeof(struct infiContext));
-	MACHSTATE1(3,"context allocated %p",context);
-	
-	//localAddr will store the local addresses of all the qps
-	context->localAddr = (struct infiAddr *)malloc(sizeof(struct infiAddr)*Lrts_numNodes);
-	MACHSTATE1(3,"context->localAddr allocated %p",context->localAddr);
+  MACHSTATE(3, "CmiMachineInit {");
+  MACHSTATE2(3, "Lrts_numNodes %d CmiNumNodes() %d", Lrts_numNodes, CmiNumNodes());
+  MACHSTATE1(3, "CmiMyNodeSize() %d", CmiMyNodeSize());
 
-        idev = 0;
+  // TODO: make the device and ibport configureable by commandline parameter
+  // Check example for how to do that
+  devList = ibv_get_device_list(&num_devices);
+  CmiEnforce(num_devices > 0);
+  CmiEnforce(devList != NULL);
+  if (CmiGetArgStringDesc(argv, "+IBVDeviceName", &usr_ibv_device_name,
+                          "User set IBV device name"))
+  {
+    MACHSTATE1(3, "IBVDeviceName set %s", usr_ibv_device_name);
+    ibv_device_name_set = 1;
+  }
 
-        // try all devices, can't assume device 0 is IB, it may be ethernet
+  context = (struct infiContext*)malloc(sizeof(struct infiContext));
+  MACHSTATE1(3, "context allocated %p", context);
+
+  // localAddr will store the local addresses of all the qps
+  context->localAddr = (struct infiAddr*)malloc(sizeof(struct infiAddr) * Lrts_numNodes);
+  MACHSTATE1(3, "context->localAddr allocated %p", context->localAddr);
+
+  idev = 0;
+
+  // try all devices, can't assume device 0 is IB, it may be ethernet
 loop:
-	dev = devList[idev];
-	CmiEnforce(dev != NULL);
+  dev = devList[idev];
+  CmiEnforce(dev != NULL);
 
-	MACHSTATE1(3,"device name %s",ibv_get_device_name(dev));
+  MACHSTATE1(3, "device name %s", ibv_get_device_name(dev));
 
-	//the context for this infiniband device 
-	context->context = ibv_open_device(dev);
-	CmiEnforce(context->context != NULL);
+  // the context for this infiniband device
+  context->context = ibv_open_device(dev);
+  CmiEnforce(context->context != NULL);
 
-        // test ibPort
-        int MAXPORT = 8;
-        for (ibPort = 1; ibPort < MAXPORT; ibPort++) {
-          struct ibv_port_attr attr;
-          if (ibv_query_port(context->context, ibPort, &attr) != 0) continue;
+  // test ibPort
+  int MAXPORT = 8;
+  for (ibPort = 1; ibPort < MAXPORT; ibPort++)
+  {
+    struct ibv_port_attr attr;
+    if (ibv_query_port(context->context, ibPort, &attr) != 0) continue;
 #if CMK_IBV_PORT_ATTR_HAS_LINK_LAYER
-          if (attr.link_layer == IBV_LINK_LAYER_INFINIBAND)  break;
+    if (attr.link_layer == IBV_LINK_LAYER_INFINIBAND) break;
 #else
-          break;
+    break;
 #endif
-          
-        }
-        if (ibPort == MAXPORT) {
-          if (++idev == num_devices)
-            CmiAbort("No valid IB port found!");
-          else
-            goto loop;
-        }
-	if(ibv_device_name_set)
-	  {
-	    if(strcmp(usr_ibv_device_name,ibv_get_device_name(dev))==0)
-	      {
-		MACHSTATE2(3, "device %d selected for user requested IBVDeviceName %s\n",idev, ibv_get_device_name(dev));
-	      }
-	    else
-	      { // force increment to next device
-		if(ibPort != MAXPORT) ++idev;
-		goto loop;
-	      }
-	  }
-	context->ibPort = ibPort;
-	MACHSTATE1(3,"use port %d", ibPort);
-	
-	MACHSTATE1(3,"device opened %p",context->context);
+  }
+  if (ibPort == MAXPORT)
+  {
+    if (++idev == num_devices)
+      CmiAbort("No valid IB port found!");
+    else
+      goto loop;
+  }
+  if (ibv_device_name_set)
+  {
+    if (strcmp(usr_ibv_device_name, ibv_get_device_name(dev)) == 0)
+    {
+      MACHSTATE2(3, "device %d selected for user requested IBVDeviceName %s\n", idev,
+                 ibv_get_device_name(dev));
+    }
+    else
+    {  // force increment to next device
+      if (ibPort != MAXPORT) ++idev;
+      goto loop;
+    }
+  }
+  context->ibPort = ibPort;
+  MACHSTATE1(3, "use port %d", ibPort);
 
-/*	FD_ZERO(&context->asyncFds);
-	FD_SET(context->context->async_fd,&context->asyncFds);
-	context->tmo.tv_sec=0;
-	context->tmo.tv_usec=0;
-	
-	MACHSTATE(3,"asyncFds zeroed and set");*/
+  MACHSTATE1(3, "device opened %p", context->context);
 
-	//protection domain
-	context->pd = ibv_alloc_pd(context->context);
-	CmiEnforce(context->pd != NULL);
-	MACHSTATE2(3,"pd %p pd->handle %d",context->pd,context->pd->handle);
+#if 0
+  FD_ZERO(&context->asyncFds);
+  FD_SET(context->context->async_fd, &context->asyncFds);
+  context->tmo.tv_sec = 0;
+  context->tmo.tv_usec = 0;
 
-  /******** At this point we know that this node is more or less serviceable
-	So, this is a good point for sending the partial init message for the fast
-	start case
-	Moreover, no work dependent on the number of nodes has started yet.
-	************/
+  MACHSTATE(3, "asyncFds zeroed and set");
+#endif
+
+  // protection domain
+  context->pd = ibv_alloc_pd(context->context);
+  CmiEnforce(context->pd != NULL);
+  MACHSTATE2(3, "pd %p pd->handle %d", context->pd, context->pd->handle);
+
+  /********
+   * At this point we know that this node is more or less serviceable
+   * So, this is a good point for sending the partial init message for the
+   * fast start case.
+   * Moreover, no work dependent on the number of nodes has started yet.
+   ********/
 
 #if CMK_IBVERBS_FAST_START
   if (Cmi_charmrun_fd != -1)
     send_partial_init();
 #endif
 
+  context->header.nodeNo = Lrts_myNode;
 
-	context->header.nodeNo = Lrts_myNode;
+  mtu_size = 1200;
+  packetSize = mtu_size * 4;
+  dataSize = packetSize - sizeof(struct infiPacketHeader);
 
-	mtu_size=1200;
-	packetSize = mtu_size*4;
-	dataSize = packetSize-sizeof(struct infiPacketHeader);
-	
-	calcMaxSize=8000;
-/*	if(Lrts_numNodes*50 > calcMaxSize){
-		calcMaxSize = Lrts_numNodes*50;
-		if(calcMaxSize > 10000){
-			calcMaxSize = 10000;
-		}
-	}*/
-	maxRecvBuffers=calcMaxSize;
+  calcMaxSize = 8000;
+#if 0
+  if (Lrts_numNodes * 50 > calcMaxSize)
+  {
+    calcMaxSize = Lrts_numNodes * 50;
+    if (calcMaxSize > 10000)
+    {
+      calcMaxSize = 10000;
+    }
+  }
+#endif
+  maxRecvBuffers = calcMaxSize;
 
-	//increase if ibv_post_send fails or program hangs
-	if (CmiGetArgIntDesc(argv,"+IBVMaxSendTokens",&maxTokens,"User set IBV Max Outstanding Send Tokens") == 0)
-	  maxTokens = 1000; // this value may need to be tweaked later
-	context->tokensLeft=maxTokens;
-	context->qp=NULL;
-	//tokensPerProcessor=4;
-	if(Lrts_numNodes > 1){
+  // increase if ibv_post_send fails or program hangs
+  if (CmiGetArgIntDesc(argv, "+IBVMaxSendTokens", &maxTokens,
+                       "User set IBV Max Outstanding Send Tokens") == 0)
+    maxTokens = 1000;  // this value may need to be tweaked later
+  context->tokensLeft = maxTokens;
+  context->qp = NULL;
+  // tokensPerProcessor=4;
+  if (Lrts_numNodes > 1)
+  {
 #if !CMK_IBVERBS_FAST_START
-		/* a barrier to make sure all nodes initialized the device */
-  		ChMessage msg;
-    		ctrl_sendone_nolock("barrier",NULL,0,NULL,0);
-  		ChMessage_recv(Cmi_charmrun_fd,&msg);
+    /* a barrier to make sure all nodes initialized the device */
+    ChMessage msg;
+    ctrl_sendone_nolock("barrier", NULL, 0, NULL, 0);
+    ChMessage_recv(Cmi_charmrun_fd, &msg);
 #endif
-		createLocalQps(dev,ibPort,Lrts_myNode,Lrts_numNodes,context->localAddr);
-	}
-	
-        if (Cmi_charmrun_fd == -1) return;
-	
-	//TURN ON RDMA
-	rdma=1;
-//	rdmaThreshold=32768;
-	rdmaThreshold=22000;
-	firstBinSize = 128;
-	CmiAssert(rdmaThreshold > firstBinSize);
-	/*	blockAllocRatio=16;
-		blockThreshold=8;*/
+    createLocalQps(dev, ibPort, Lrts_myNode, Lrts_numNodes, context->localAddr);
+  }
 
-	blockAllocRatio=128;
-	blockThreshold=9;
+  if (Cmi_charmrun_fd == -1) return;
 
-
+  // TURN ON RDMA
+  rdma = 1;
+  // rdmaThreshold=32768;
+  rdmaThreshold = 22000;
+  firstBinSize = 128;
+  CmiAssert(rdmaThreshold > firstBinSize);
+#if 0
+  blockAllocRatio = 16;
+  blockThreshold = 8;
+#endif
+  blockAllocRatio = 128;
+  blockThreshold = 9;
 
 #if !THREAD_MULTI_POOL
-	initInfiCmiChunkPools();
+  initInfiCmiChunkPools();
 #endif
 
-	/*create the pool of send packets*/
-	sendPacketPoolSize = maxTokens/2;	
-	if(sendPacketPoolSize > 2000){
-		sendPacketPoolSize = 2000;
-	}
-	
-	context->infiPacketFreeList=NULL;
-	pktPtrs = (infiPacket *)malloc(sizeof(infiPacket)*sendPacketPoolSize);
+  /*create the pool of send packets*/
+  sendPacketPoolSize = maxTokens / 2;
+  if (sendPacketPoolSize > 2000)
+  {
+    sendPacketPoolSize = 2000;
+  }
 
-	//Silly way of allocating the memory buffers (slow as well) but simplifies the code
+  context->infiPacketFreeList = NULL;
+  pktPtrs = (infiPacket*)malloc(sizeof(infiPacket) * sendPacketPoolSize);
+
+  // Silly way of allocating the memory buffers (slow as well) but simplifies
+  // the code
 #if !THREAD_MULTI_POOL
-	for(i=0;i<sendPacketPoolSize;i++){
-		MallocInfiPacket(pktPtrs[i]);	
-	}
+  for (i = 0; i < sendPacketPoolSize; i++)
+  {
+    MallocInfiPacket(pktPtrs[i]);
+  }
 
-	for(i=0;i<sendPacketPoolSize;i++){
-		FreeInfiPacket(pktPtrs[i]);	
-	}
-	free(pktPtrs);
+  for (i = 0; i < sendPacketPoolSize; i++)
+  {
+    FreeInfiPacket(pktPtrs[i]);
+  }
+  free(pktPtrs);
 #endif
-	
-	context->bufferedBcastList=NULL;
-	context->bufferedRdmaAcks = NULL;
-	context->bufferedRdmaRequests = NULL;
-	context->insideProcessBufferedBcasts=0;
-	
-	
-	if(rdma){
-/*		int numPkts;
-		int k;
-		if( Lrts_numNodes*4 < maxRecvBuffers/4){
-			numPkts = Lrts_numNodes*4;
-		}else{
-			numPkts = maxRecvBuffers/4;
-		}
-		
-		rdmaPktPtrs = (struct infiRdmaPacket **)malloc(numPkts*sizeof(struct infiRdmaPacket));
-		for(k=0;k<numPkts;k++){
-			rdmaPktPtrs[k] = CmiAlloc(sizeof(struct infiRdmaPacket));
-		}
-		
-		for(k=0;k<numPkts;k++){
-			CmiFree(rdmaPktPtrs[k]);
-		}
-		free(rdmaPktPtrs);*/
-	}
-	
-/*	context->infiBufferedRecvList = NULL;*/
-#if CMK_IBVERBS_STATS	
-	regCount =0;
-	regTime  = 0;
 
-	pktCount=0;
-	msgCount=0;
+  context->bufferedBcastList = NULL;
+  context->bufferedRdmaAcks = NULL;
+  context->bufferedRdmaRequests = NULL;
+  context->insideProcessBufferedBcasts = 0;
 
-	processBufferedCount=0;
-	processBufferedTime=0;
+  if (rdma)
+  {
+#if 0
+    int numPkts;
+    int k;
+    if (Lrts_numNodes * 4 < maxRecvBuffers / 4)
+    {
+      numPkts = Lrts_numNodes * 4;
+    }
+    else
+    {
+      numPkts = maxRecvBuffers / 4;
+    }
 
-	minTokensLeft = maxTokens;
-#endif	
+    rdmaPktPtrs =
+        (struct infiRdmaPacket**)malloc(numPkts * sizeof(struct infiRdmaPacket));
+    for (k = 0; k < numPkts; k++)
+    {
+      rdmaPktPtrs[k] = CmiAlloc(sizeof(struct infiRdmaPacket));
+    }
 
-	
+    for (k = 0; k < numPkts; k++)
+    {
+      CmiFree(rdmaPktPtrs[k]);
+    }
+    free(rdmaPktPtrs);
+#endif
+  }
 
-	MACHSTATE(3,"} CmiMachineInit");
+  // context->infiBufferedRecvList = NULL;
+#if CMK_IBVERBS_STATS
+  regCount = 0;
+  regTime = 0;
+
+  pktCount = 0;
+  msgCount = 0;
+
+  processBufferedCount = 0;
+  processBufferedTime = 0;
+
+  minTokensLeft = maxTokens;
+#endif
+
+  MACHSTATE(3, "} CmiMachineInit");
 }
 
 void CmiCommunicationInit(char **argv)
