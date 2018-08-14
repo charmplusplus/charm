@@ -9,9 +9,12 @@ qt: md/setjmp_d.h qt.c md/setjmp64_.c
 	../system_ln  md/setjmp_d.h qtmd.h
 	$(CHARMC) -c -o qt.o qt.c
 	$(CHARMC) -c -o qtmds.o md/setjmp64_.c
+	$(CHARMC) -o libckqt.a qt.o qtmds.o
+
+	$(CHARMC_SHARED) -c -o qt_shared.o qt.c
+	$(CHARMC_SHARED) -c -o qtmds_shared.o md/setjmp64_.c
 	CHARMINC=..; . ../conv-config.sh;	\
-	$(CHARMC_SHARED) -o libckqt.$$CMK_SHARED_SUF qt.o qtmds.o
-	$(CHARMC) -o libckqt.a qt.o qtmds.o 
+	$(CHARMC_SHARED) -o libckqt.$$CMK_SHARED_SUF qt_shared.o qtmds_shared.o
 
 stp:
 	$(CC) -c stp.c

@@ -1982,16 +1982,16 @@ MakeSO() {
 	Do_res=$?
 	if [ $Do_res -ne 0 ]
 	then
-	    if [ -n $NOABORT ]
+	    if [ -n "$NOABORT" ]
 	    then
 		touch $OBJECT
 	    else
-		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-		echo "!!  Failed to compile Charm++ shared library. You can disable shared  !!"
-		echo "!!  lib compilation by providing --no-build-shared build option like: !!"
-		echo "!!     ./build charm++ netlrts-linux --no-build-shared -O             !!"
-		echo "!!  or reexecute this charmc command with --no-build-shared compile option        !!"
-		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+		echo "!!  Failed to compile Charm++ shared library. You can disable shared   !!"
+		echo "!!  lib compilation by providing --no-build-shared build option like:  !!"
+		echo "!!     ./build charm++ netlrts-linux --no-build-shared -O              !!"
+		echo "!!  or reexecute this charmc command with the --no-build-shared option !!"
+		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 		Abort "Command $soCmd returned error code $Do_res"
 	    fi
 	fi
