@@ -650,7 +650,7 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int b
 
 #if CMK_USE_IBVERBS
 
-#include "machine-ibverbs.c"
+#include "machine-ibverbs.C"
 
 #elif CMK_USE_IBUD
 #include "machine-ibud.c"

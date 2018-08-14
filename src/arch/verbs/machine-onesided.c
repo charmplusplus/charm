@@ -1,5 +1,5 @@
 /*
- * included in machine-ibverbs.c
+ * included in machine-ibverbs.C
  * Jaemin Choi
  */
 
