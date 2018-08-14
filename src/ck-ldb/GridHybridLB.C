@@ -31,19 +31,19 @@ GridHybridLB::GridHybridLB (const CkLBOptions &opt) : CBase_GridHybridLB (opt)
     CkPrintf ("CharmLB> GridHybridLB created.\n");
   }
 
-  if (value = getenv ("CK_LDB_GRIDHYBRIDLB_MODE")) {
+  if ((value = getenv ("CK_LDB_GRIDHYBRIDLB_MODE"))) {
     CK_LDB_GridHybridLB_Mode = atoi (value);
   } else {
     CK_LDB_GridHybridLB_Mode = CK_LDB_GRIDHYBRIDLB_MODE;
   }
 
-  if (value = getenv ("CK_LDB_GRIDHYBRIDLB_BACKGROUND_LOAD")) {
+  if ((value = getenv ("CK_LDB_GRIDHYBRIDLB_BACKGROUND_LOAD"))) {
     CK_LDB_GridHybridLB_Background_Load = atoi (value);
   } else {
     CK_LDB_GridHybridLB_Background_Load = CK_LDB_GRIDHYBRIDLB_BACKGROUND_LOAD;
   }
 
-  if (value = getenv ("CK_LDB_GRIDHYBRIDLB_LOAD_TOLERANCE")) {
+  if ((value = getenv ("CK_LDB_GRIDHYBRIDLB_LOAD_TOLERANCE"))) {
     CK_LDB_GridHybridLB_Load_Tolerance = atof (value);
   } else {
     CK_LDB_GridHybridLB_Load_Tolerance = CK_LDB_GRIDHYBRIDLB_LOAD_TOLERANCE;
@@ -64,19 +64,19 @@ GridHybridLB::GridHybridLB (CkMigrateMessage *msg) : CBase_GridHybridLB (msg)
 
   lbname = (char *) "GridHybridLB";
 
-  if (value = getenv ("CK_LDB_GRIDHYBRIDLB_MODE")) {
+  if ((value = getenv ("CK_LDB_GRIDHYBRIDLB_MODE"))) {
     CK_LDB_GridHybridLB_Mode = atoi (value);
   } else {
     CK_LDB_GridHybridLB_Mode = CK_LDB_GRIDHYBRIDLB_MODE;
   }
 
-  if (value = getenv ("CK_LDB_GRIDHYBRIDLB_BACKGROUND_LOAD")) {
+  if ((value = getenv ("CK_LDB_GRIDHYBRIDLB_BACKGROUND_LOAD"))) {
     CK_LDB_GridHybridLB_Background_Load = atoi (value);
   } else {
     CK_LDB_GridHybridLB_Background_Load = CK_LDB_GRIDHYBRIDLB_BACKGROUND_LOAD;
   }
 
-  if (value = getenv ("CK_LDB_GRIDHYBRIDLB_LOAD_TOLERANCE")) {
+  if ((value = getenv ("CK_LDB_GRIDHYBRIDLB_LOAD_TOLERANCE"))) {
     CK_LDB_GridHybridLB_Load_Tolerance = atof (value);
   } else {
     CK_LDB_GridHybridLB_Load_Tolerance = CK_LDB_GRIDHYBRIDLB_LOAD_TOLERANCE;
