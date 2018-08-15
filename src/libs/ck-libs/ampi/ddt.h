@@ -126,6 +126,7 @@ class CkDDT_DataType {
     int refCount;
     int baseSize;
     int baseIndex;
+    int numContigBlocks;
     int numElements;
     MPI_Aint extent;
     MPI_Aint ub;
@@ -189,6 +190,9 @@ class CkDDT_DataType {
     virtual int getType() const { return datatype; }
     virtual int getNumElements() const { return numElements; }
     virtual int getNumBasicElements(int bytes) const;
+    virtual int getNumContigBlocks() const;
+    virtual size_t getAddresses(char* userdata, char** addresses, int* bLengths) const;
+    virtual size_t getNumMsgBlocks();
     virtual void incRefCount() {
       CkAssert(refCount > 0);
       if (datatype > CkDDT_MAX_PRIMITIVE_TYPE)
@@ -230,6 +234,8 @@ class CkDDT_Contiguous : public CkDDT_DataType {
   virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
   virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
   virtual int getNumBasicElements(int bytes) const;
+  virtual size_t getAddresses(char* userdata, char** addresses, int* bLengths) const;
+  virtual size_t getNumMsgBlocks();
 };
 
 /*
@@ -262,6 +268,8 @@ class CkDDT_Vector : public CkDDT_DataType {
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
     virtual int getNumBasicElements(int bytes) const;
+    virtual size_t getAddresses(char* userdata, char** addresses, int* bLengths) const;
+    virtual size_t getNumMsgBlocks();
 };
 
 /*
@@ -292,6 +300,9 @@ class CkDDT_HVector : public CkDDT_Vector {
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
     virtual int getNumBasicElements(int bytes) const;
+    virtual size_t getAddresses(char* userdata, char** addresses, int* bLengths) const;
+    virtual size_t getNumMsgBlocks();
+    // virtual size_t getMsgAddresses();
 };
 
 /*
@@ -327,6 +338,8 @@ class CkDDT_HIndexed : public CkDDT_DataType {
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
     virtual int getNumBasicElements(int bytes) const;
+    virtual size_t getAddresses(char* userdata, char** addresses, int* bLengths) const;
+    virtual size_t getNumMsgBlocks();
 };
 
 /*
@@ -356,6 +369,8 @@ class CkDDT_Indexed : public CkDDT_HIndexed {
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
     virtual int getNumBasicElements(int bytes) const;
+    virtual size_t getAddresses(char* userdata, char** addresses, int* bLengths) const;
+    virtual size_t getNumMsgBlocks();
 };
 
 /*
@@ -395,6 +410,8 @@ class CkDDT_HIndexed_Block : public CkDDT_DataType
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
     virtual int getNumBasicElements(int bytes) const;
+    virtual size_t getAddresses(char* userdata, char** addresses, int* bLengths) const;
+    virtual size_t getNumMsgBlocks();
 };
 
 /*
@@ -427,6 +444,8 @@ class CkDDT_Indexed_Block : public CkDDT_HIndexed_Block
     virtual int getEnvelope(int *ni, int *na, int *nd, int *combiner) const;
     virtual int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const;
     virtual int getNumBasicElements(int bytes) const;
+    virtual size_t getAddresses(char* userdata, char** addresses, int* bLengths) const;
+    virtual size_t getNumMsgBlocks();
 };
 
 /*
@@ -465,6 +484,8 @@ class CkDDT_Struct : public CkDDT_DataType {
     virtual const vector<int>& getBaseIndices() const;
     virtual const vector<CkDDT_DataType*>& getBaseTypes() const;
     virtual int getNumBasicElements(int bytes) const;
+    virtual size_t getAddresses(char* userdata, char** addresses, int* bLengths) const;
+    virtual size_t getNumMsgBlocks();
 };
 
 /*

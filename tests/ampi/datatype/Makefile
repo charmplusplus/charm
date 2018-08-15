@@ -1,7 +1,7 @@
 -include ../../common.mk
 CHARMC=../../../bin/ampicxx $(OPTS)
 
-all: datatype
+all: datatype addresses
 
 datatype: datatype.o
 	$(CHARMC) -o datatype datatype.o
@@ -9,8 +9,17 @@ datatype: datatype.o
 datatype.o: datatype.C
 	$(CHARMC) -c datatype.C
 
+addresses: addresses.o
+	$(CHARMC) -o addresses addresses.o
+
+addresses.o: addresses.C
+	$(CHARMC) -c addresses.C
+
 test: datatype
 	$(call run, ./datatype +p1 +vp4)
+
+test_addresses: addresses
+	$(call run, ./addresses +p1 +vp1 ++local ++quiet)
 
 bgtest: datatype
 	$(call run, ./datatype +p1 +vp4 +x1 +y1 +z1 )

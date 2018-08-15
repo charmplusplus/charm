@@ -619,6 +619,33 @@ CkDDT_DataType::getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d
   return MPI_ERR_TYPE;
 }
 
+int
+CkDDT_DataType::getNumContigBlocks(void) const
+{
+  return numContigBlocks;
+}
+
+size_t
+CkDDT_DataType::getAddresses(char* userdata, char** addresses, int* bLengths) const
+{
+  if(iscontig) {
+    addresses[0] = userdata;
+    bLengths[0] = size;
+  }
+
+  addresses[0] = userdata;
+  bLengths[0] = size;
+
+  // Will there be a problem with using resized here?
+
+  return count;
+}
+
+size_t
+CkDDT_DataType::getNumMsgBlocks(void) {
+  return numElements;
+}
+
 CkDDT_Contiguous::CkDDT_Contiguous(int nCount, int bindex, CkDDT_DataType* oldType)
 {
   datatype = CkDDT_CONTIGUOUS;
@@ -708,6 +735,33 @@ int
 CkDDT_Contiguous::getNumBasicElements(int bytes) const
 {
   return this->getBaseType()->getNumBasicElements(bytes);
+}
+
+size_t
+CkDDT_Contiguous::getAddresses(char* userdata, char** addresses, int* bLengths) const
+{
+  if(iscontig) {
+    addresses[0] = userdata + this->trueLB;
+    bLengths[0] = size;
+    return MPI_SUCCESS;
+  }
+
+  int idx = 0;
+
+  for(int i=0; i<count; i++) {
+    idx += baseType->getAddresses(userdata + trueLB + (i*baseExtent), addresses + idx, bLengths + idx);
+  }
+
+  return idx;
+}
+
+size_t
+CkDDT_Contiguous::getNumMsgBlocks() {
+  if(iscontig) {
+    return 1;
+  } else {
+    return count * baseType->getNumMsgBlocks();
+  }
 }
 
 CkDDT_Vector::CkDDT_Vector(int nCount, int blength, int stride, int bindex, CkDDT_DataType* oldType)
@@ -841,6 +895,43 @@ CkDDT_Vector::getNumBasicElements(int bytes) const
   return this->getBaseType()->getNumBasicElements(bytes);
 }
 
+size_t
+CkDDT_Vector::getAddresses(char* userdata, char** addresses, int* bLengths) const
+{
+  if(iscontig) {
+    addresses[0] = userdata;
+    bLengths[0] = size;
+    return MPI_SUCCESS;
+  }
+
+  if(baseType->isContig()) {
+    for(int i=0; i<count; i++) {
+      addresses[i] = userdata + i*strideLength*baseExtent;
+      bLengths[i] = blockLength*baseExtent;
+    }
+  }
+
+  int idx = 0;
+  for(int i=0; i<count; i++) {
+    for(int j=0; j<blockLength; j++) {
+      idx += baseType->getAddresses(userdata + (i*strideLength*baseExtent) + (j*blockLength*baseExtent), addresses + idx, bLengths + idx);
+    }
+  }
+
+  return count;
+}
+
+size_t
+CkDDT_Vector::getNumMsgBlocks() {
+  if(iscontig) {
+    return 1;
+  } else if(baseType->isContig()) {
+    return count;
+  } else {
+    return count * baseType->getNumMsgBlocks();
+  }
+}
+
 CkDDT_HVector::CkDDT_HVector(int nCount, int blength, int stride,  int bindex,
                          CkDDT_DataType* oldType)
 {
@@ -944,6 +1035,33 @@ CkDDT_HVector::getNumBasicElements(int bytes) const
   return this->getBaseType()->getNumBasicElements(bytes);
 }
 
+size_t
+CkDDT_HVector::getAddresses(char* userdata, char** addresses, int* bLengths) const
+{
+  if(iscontig) {
+    addresses[0] = userdata;
+    bLengths[0] = size;
+  }
+
+  for(int i=0; i<count; i++) {
+    addresses[i] = userdata + (i*strideLength*baseExtent);
+    bLengths[i] = blockLength;
+  }
+  return count;
+}
+
+size_t
+CkDDT_HVector::getNumMsgBlocks() {
+
+  if(iscontig) {
+    return 1;
+  } else if(baseType->isContig()) {
+    return count;
+  } else {
+    return count * baseType->getNumMsgBlocks();
+  }
+}
+
 CkDDT_Indexed::CkDDT_Indexed(int nCount, const int* arrBlock, const MPI_Aint* arrBytesDisp, const MPI_Aint* arrDisp, int bindex, CkDDT_DataType* base)
     : CkDDT_HIndexed(nCount, arrBlock, arrBytesDisp, bindex, base)
 {
@@ -1025,6 +1143,37 @@ int
 CkDDT_Indexed::getNumBasicElements(int bytes) const
 {
   return this->getBaseType()->getNumBasicElements(bytes);
+}
+
+size_t
+CkDDT_Indexed::getAddresses(char* userdata, char** addresses, int* bLengths) const
+{
+  if(iscontig) {
+    addresses[0] = userdata;
+    bLengths[0] = size;
+  }
+
+  for(int i=0; i<count; i++) {
+    addresses[i] = userdata + (i*arrayDisplacements[i]*baseExtent);
+    bLengths[i] = arrayBlockLength[i];
+  }
+  return count;
+}
+
+size_t
+CkDDT_Indexed::getNumMsgBlocks() {
+  if(iscontig) {
+    return 1;
+  } else if(baseType->isContig()) {
+    return count;
+  } else {
+    // Account for overlapping blocklengths?
+    size_t result = 0;
+    for(int i=0; i<count; i++) {
+      result += arrayBlockLength[i] * baseType->getNumMsgBlocks();
+    }
+    return result;
+  }
 }
 
 CkDDT_HIndexed::CkDDT_HIndexed(int nCount, const int* arrBlock, const MPI_Aint* arrDisp,  int bindex,
@@ -1160,6 +1309,37 @@ CkDDT_HIndexed::getNumBasicElements(int bytes) const
   return this->getBaseType()->getNumBasicElements(bytes);
 }
 
+size_t
+CkDDT_HIndexed::getAddresses(char* userdata, char** addresses, int* bLengths) const
+{
+    if(iscontig) {
+    addresses[0] = userdata;
+    bLengths[0] = size;
+  }
+
+  for(int i=0; i<count; i++) {
+    addresses[i] = userdata + (i*arrayDisplacements[i]);
+    bLengths[i] = arrayBlockLength[i];
+  }
+  return count;
+}
+
+size_t
+CkDDT_HIndexed::getNumMsgBlocks() {
+  if(iscontig) {
+    return 1;
+  } else if(baseType->isContig()) {
+    return count;
+  } else {
+    // Account for overlapping blocklengths?
+    size_t result = 0;
+    for(int i=0; i<count; i++) {
+      result += arrayBlockLength[i] * baseType->getNumMsgBlocks();
+    }
+    return result;
+  }
+}
+
 CkDDT_Indexed_Block::CkDDT_Indexed_Block(int count, int Blength, const MPI_Aint *arrBytesDisp, const int *ArrDisp, int index,
   CkDDT_DataType *type)
     : CkDDT_HIndexed_Block(count, Blength, arrBytesDisp, index, type)
@@ -1238,6 +1418,33 @@ int
 CkDDT_Indexed_Block::getNumBasicElements(int bytes) const
 {
   return this->getBaseType()->getNumBasicElements(bytes);
+}
+
+size_t
+CkDDT_Indexed_Block::getAddresses(char* userdata, char** addresses, int* bLengths) const
+{
+  if(iscontig) {
+    addresses[0] = userdata;
+    bLengths[0] = size;
+  }
+
+  for(int i=0; i<count; i++) {
+    addresses[i] = userdata + (i*arrayDisplacements[i]*baseExtent);
+    bLengths[i] = BlockLength;
+  }
+  return count;
+}
+
+size_t
+CkDDT_Indexed_Block::getNumMsgBlocks() {
+  if(iscontig) {
+    return 1;
+  } else if(baseType->isContig()) {
+    return count;
+  } else {
+    // Account for overlapping blocklengths?
+    return count * BlockLength * baseType->getNumMsgBlocks();
+  }
 }
 
 CkDDT_HIndexed_Block::CkDDT_HIndexed_Block(int count, int Blength, const MPI_Aint *ArrDisp, int index,
@@ -1365,6 +1572,33 @@ int
 CkDDT_HIndexed_Block::getNumBasicElements(int bytes) const
 {
   return this->getBaseType()->getNumBasicElements(bytes);
+}
+
+size_t
+CkDDT_HIndexed_Block::getAddresses(char* userdata, char** addresses, int* bLengths) const
+{
+  if(iscontig) {
+    addresses[0] = userdata;
+    bLengths[0] = size;
+  }
+
+  for(int i=0; i<count; i++) {
+    addresses[i] = userdata + (i*arrayDisplacements[i]);
+    bLengths[i] = BlockLength;
+  }
+  return count;
+}
+
+size_t
+CkDDT_HIndexed_Block::getNumMsgBlocks() {
+  if(iscontig) {
+    return 1;
+  } else if(baseType->isContig()) {
+    return count;
+  } else {
+    // Account for overlapping blocklengths?
+    return count * BlockLength * baseType->getNumMsgBlocks();
+  }
 }
 
 
@@ -1605,4 +1839,36 @@ CkDDT_Struct::getNumBasicElements(int bytes) const
   return count;
 }
 
+size_t
+CkDDT_Struct::getAddresses(char* userdata, char** addresses, int* bLengths) const
+{
+  if(iscontig) {
+    addresses[0] = userdata;
+    bLengths[0] = size;
+  }
+
+  for(int i=0; i<count; i++) {
+    addresses[i] = userdata + (i*arrayDisplacements[i]);
+    bLengths[i] = arrayBlockLength[i]*arrayDataType[i]->getSize();
+  }
+  return count;
+}
+
+size_t
+CkDDT_Struct::getNumMsgBlocks() {
+  if(iscontig) {
+    return 1;
+  } else {
+    size_t result=0;
+
+    for (int i=0; i<count; i++) {
+      if(arrayDataType[i]->isContig()) {
+        result++;
+      } else {
+        result += arrayBlockLength[i] * arrayDataType[i]->getNumMsgBlocks();
+      }
+    }
+    return result;
+  }
+}
 

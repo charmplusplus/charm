@@ -10677,5 +10677,19 @@ int AMPI_Set_end_event(void)
 }
 #endif // CMK_BIGSIM_CHARM
 
+AMPI_API_IMPL(int, TEMP_Get_Msg_Blocks_Count, MPI_Datatype dtype, int* count)
+{
+  AMPI_API("AMPI_Get_Msg_Blocks_Count");
+  *count = getDDT()->getType(dtype)->getNumMsgBlocks();
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, TEMP_Get_Msg_Blocks_Addresses, MPI_Datatype dtype, char* userdata, char** addresses, int* bLengths)
+{
+  AMPI_API("AMPI_Get_Msg_Blocks_Addresses");
+  getDDT()->getType(dtype)->getAddresses(userdata, addresses, bLengths);
+  return MPI_SUCCESS;
+}
+
 #include "ampi.def.h"
 

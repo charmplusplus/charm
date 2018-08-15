@@ -575,6 +575,10 @@ typedef void (*MPI_MigrateFn)(void);
 #define  MPI_Pack_size  AMPI_Pack_size
 #define PMPI_Pack_size APMPI_Pack_size
 
+// TEMP functions for testing for Addresses
+#define  TEMP_Get_Msg_Blocks_Count  AMPI_Get_Msg_Blocks_Count
+#define  TEMP_Get_Msg_Blocks_Addresses  AMPI_Get_Msg_Blocks_Addresses
+
 /***collectives***/
 #define  MPI_Barrier  AMPI_Barrier
 #define PMPI_Barrier APMPI_Barrier
@@ -1217,6 +1221,10 @@ AMPI_API_DEF(int, MPI_Neighbor_allgatherv, const void* sendbuf, int sendcount, M
 AMPI_API_DEF(int, MPI_Ineighbor_allgatherv, const void* sendbuf, int sendcount, MPI_Datatype sendtype,
                               void* recvbuf, const int* recvcounts, const int* displs, MPI_Datatype recvtype,
                               MPI_Comm comm, MPI_Request *request)
+
+// TEMP functions for testing for Addresses
+AMPI_API_DEF(int, TEMP_Get_Msg_Blocks_Count, MPI_Datatype dtype, int* count)
+AMPI_API_DEF(int, TEMP_Get_Msg_Blocks_Addresses, MPI_Datatype dtype, char* userdata, char** addresses, int* bLengths)
 
 /***ops***/
 AMPI_API_DEF(int, MPI_Op_create, MPI_User_function *function, int commute, MPI_Op *op)
