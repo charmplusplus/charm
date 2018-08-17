@@ -1059,6 +1059,7 @@ CmiPrintStackTrace(0);
         sprintf(msgBuf,"Fatal error on Partition %d PE %d> ", CmiMyPartition(), CmiMyPe());
     }
   	ctrl_sendone_nolock("abort",msgBuf,strlen(msgBuf),s,strlen(s)+1);
+  	skt_close(Cmi_charmrun_fd);
   }
 }
 
