@@ -384,9 +384,9 @@ void CkMulticastMgr::resetSection(CProxySection_ArrayBase &proxy)
   mCastEntry *oldentry = (mCastEntry *)info.get_val();
   DEBUGF(("[%d] resetSection: old entry:%p new entry:%p\n", CkMyPe(), oldentry, entry));
 
-  const CkArrayIndex *al = sid->_elems;
+  const std::vector<CkArrayIndex> &al = sid->_elems;
   CmiAssert(info.get_aid() == aid);
-  prepareCookie(entry, *sid, al, sid->_nElems, aid);
+  prepareCookie(entry, *sid, al.data(), sid->_elems.size(), aid);
 
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
 
@@ -866,10 +866,10 @@ void CkMulticastMgr::resetCookie(CkSectionInfo s)
 
 void CkMulticastMgr::SimpleSend(int ep,void *m, CkArrayID a, CkSectionID &sid, int opts)
 {
-  DEBUGF(("[%d] SimpleSend: nElems:%d\n", CkMyPe(), sid._nElems));
+  DEBUGF(("[%d] SimpleSend: nElems:%d\n", CkMyPe(), sid._elems.size()));
     // set an invalid cookie since we don't have it
   ((multicastGrpMsg *)m)->_cookie = CkSectionInfo(-1, NULL, 0, a);
-  for (int i=0; i< sid._nElems-1; i++) {
+  for (int i=0; i< sid._elems.size()-1; i++) {
      CProxyElement_ArrayBase ap(a, sid._elems[i]);
      void *newMsg=CkCopyMsg((void **)&m);
 #if CMK_MESSAGE_LOGGING
@@ -878,8 +878,8 @@ void CkMulticastMgr::SimpleSend(int ep,void *m, CkArrayID a, CkSectionID &sid, i
 #endif
      ap.ckSend((CkArrayMessage *)newMsg,ep,opts|CK_MSG_LB_NOTRACE);
   }
-  if (sid._nElems > 0) {
-     CProxyElement_ArrayBase ap(a, sid._elems[sid._nElems-1]);
+  if (!sid._elems.empty()) {
+     CProxyElement_ArrayBase ap(a, sid._elems[sid._elems.size()-1]);
      ap.ckSend((CkArrayMessage *)m,ep,opts|CK_MSG_LB_NOTRACE);
   }
 }

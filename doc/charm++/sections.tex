@@ -31,12 +31,12 @@ of all the array section members through either explicit enumeration, or an inde
 For example, for a 3D array:
 
 \begin{alltt}
-  CkVec<CkArrayIndex3D> elems;    // add array indices
+  std::vector<CkArrayIndex3D> elems;  // add array indices
   for (int i=0; i<10; i++)
     for (int j=0; j<20; j+=2)
       for (int k=0; k<30; k+=2)
-         elems.push_back(CkArrayIndex3D(i, j, k));
-  CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, elems.getVec(), elems.size());
+         elems.emplace_back(i, j, k);
+  CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, elems);
 \end{alltt}
 
 Alternatively, one can do the same thing by providing the index range [lbound:ubound:stride]
@@ -53,9 +53,8 @@ For user-defined array index other than CkArrayIndex1D to CkArrayIndex6D,
 one needs to use the generic array index type: CkArrayIndex.
 
 \begin{alltt}
-  CkArrayIndex *elems;    // add array indices
-  int numElems;
-  CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, elems, numElems);
+  std::vector<CkArrayIndex> elems;  // add array indices
+  CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, elems);
 \end{alltt}
 
 \subsection{Group sections}
@@ -246,12 +245,11 @@ Note: cross section logic also works for groups with analogous characteristics.
 Given three arrays declared thusly:
 
 \begin{alltt}
-	  CkArrayID *aidArr= new CkArrayID[3];
-	  CProxy\_multisectiontest\_array1d *Aproxy= new CProxy\_multisectiontest\_array1d[3];
-	  for(int i=0;i<3;i++)
+	  std::vector<CkArrayID> aidArr(3);
+	  for (int i=0; i<3; i++)
 	    \{
-	      Aproxy[i]=CProxy\_multisectiontest\_array1d::ckNew(masterproxy.ckGetGroupID(),ArraySize);	  
-	      aidArr[i]=Aproxy[i].ckGetArrayID();
+	      CProxy\_multisectiontest\_array1d Aproxy = CProxy\_multisectiontest\_array1d::ckNew(masterproxy.ckGetGroupID(), ArraySize);
+	      aidArr[i] = Aproxy.ckGetArrayID();
 	    \}
 \end{alltt}
 
@@ -259,23 +257,19 @@ One can make a section including the  lower half elements of all three
 arrays as follows:
 
 \begin{alltt}
-	  int aboundary=ArraySize/2;
-	  int afloor=aboundary;
-	  int aceiling=ArraySize-1;
-	  int asectionSize=aceiling-afloor+1;
+	  int aboundary = ArraySize/2;
+	  int afloor = aboundary;
+	  int aceiling = ArraySize-1;
+	  int asectionSize = aceiling-afloor+1;
 	  // cross section lower half of each array
-	  CkArrayIndex **aelems= new CkArrayIndex*[3];
-	  aelems[0]= new CkArrayIndex[asectionSize];
-	  aelems[1]= new CkArrayIndex[asectionSize];
-	  aelems[2]= new CkArrayIndex[asectionSize];
-	  int *naelems=new int[3];
-	  for(int k=0;k<3;k++)
+	  std::vector<std::vector<CkArrayIndex> > aelems(3);
+	  for (int k=0; k<3; k++)
 	    \{
-	      naelems[k]=asectionSize;
-	      for(int i=afloor,j=0;i<=aceiling;i++,j++)
-	        aelems[k][j]=CkArrayIndex1D(i);
+	      aelems[k].resize(asectionSize);
+	      for (int i=afloor,j=0; i<=aceiling; i++,j++)
+	        aelems[k][j] = CkArrayIndex1D(i);
 	    \}
-	  CProxySection\_multisectiontest\_array1d arrayLowProxy(3,aidArr,aelems,naelems);
+	  CProxySection\_multisectiontest\_array1d arrayLowProxy(aidArr, aelems);
 \end{alltt}
 
 The resulting cross section proxy, as in the example \uw{arrayLowProxy},

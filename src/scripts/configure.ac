@@ -306,6 +306,8 @@ fi
 
 AC_DEFINE_UNQUOTED(CMK_LBID_64BIT, 1, [enable 64 bit LB ID])
 
+AC_DEFINE_UNQUOTED(CMK_CKSECTIONINFO_STL, 1, [enable STL CkSectionInfo])
+
 AC_ARG_WITH([qlogic],
             [AS_HELP_STRING([--with-qlogic],
               [QLogic based Infiniband])],[with_qlogic=yes],

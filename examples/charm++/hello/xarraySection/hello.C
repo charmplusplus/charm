@@ -42,27 +42,23 @@ public:
     int afloor = 0, aceiling = sectionSize-1;
 
     // Allocate space
-    std::vector<CProxy_Hello> arrayOfArrays(numArrays);
     std::vector<CkArrayID> arrID(numArrays);
-    std::vector<int> nelems(numArrays);
-    std::vector<CkArrayIndex *> elems(numArrays);
+    std::vector<std::vector<CkArrayIndex> > elems(numArrays);
 
     // Create a list of array section members
     for(int k=0; k < numArrays; k++)
     {
         // Create the array
-        arrayOfArrays[k] = CProxy_Hello::ckNew(k, mcastMgrGID, numElements);
+        CProxy_Hello array = CProxy_Hello::ckNew(k, mcastMgrGID, numElements);
         // Store the AID
-        arrID[k]  = arrayOfArrays[k].ckGetArrayID();
+        arrID[k]  = array.ckGetArrayID();
         // Create a list of section member indices in this array
-        nelems[k] = sectionSize;
-        elems[k]  = new CkArrayIndex[sectionSize];
+        elems[k].resize(sectionSize);
         for(int i=afloor,j=0; i <= aceiling; i++,j++)
             elems[k][j] = CkArrayIndex1D(i);
     }
     // Create the x-array-section
-    sectionProxy = CProxySection_Hello(numArrays, arrID.data(), elems.data(), nelems.data());
-    for (auto elem : elems) delete [] elem;
+    sectionProxy = CProxySection_Hello(arrID, elems);
 
     // Delegate the section comm to the CkMulticast library
     sectionProxy.ckSectionDelegate(mcastMgr);

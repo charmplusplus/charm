@@ -1420,11 +1420,15 @@ void Array::genSubDecls(XStr& str) {
              "int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
              "      return CkSectionID(aid, elems, nElems, factor);\n"
              "    } \n"
+             "    static CkSectionID ckNew(const CkArrayID &aid, const std::vector<CkArrayIndex1D> &elems, "
+             "int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
+             "      return CkSectionID(aid, elems, factor);\n"
+             "    } \n"
              "    static CkSectionID ckNew(const CkArrayID &aid, int l, int u, int s, "
              "int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
              "      std::vector<CkArrayIndex1D> al;\n"
-             "      for (int i=l; i<=u; i+=s) al.push_back(CkArrayIndex1D(i));\n"
-             "      return CkSectionID(aid, al.data(), al.size(), factor);\n"
+             "      for (int i=l; i<=u; i+=s) al.emplace_back(i);\n"
+             "      return CkSectionID(aid, al, factor);\n"
              "    } \n";
     } else if (indexSuffix == (const char*)"2D") {
       str << "    " << etype
@@ -1437,13 +1441,17 @@ void Array::genSubDecls(XStr& str) {
              "int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
              "      return CkSectionID(aid, elems, nElems, factor);\n"
              "    } \n"
+             "    static CkSectionID ckNew(const CkArrayID &aid, const std::vector<CkArrayIndex2D> &elems, "
+             "int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
+             "      return CkSectionID(aid, elems, factor);\n"
+             "    } \n"
              "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, "
              "int l2, int u2, int s2, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
              "      std::vector<CkArrayIndex2D> al;\n"
              "      for (int i=l1; i<=u1; i+=s1) \n"
              "        for (int j=l2; j<=u2; j+=s2) \n"
-             "          al.push_back(CkArrayIndex2D(i, j));\n"
-             "      return CkSectionID(aid, al.data(), al.size(), factor);\n"
+             "          al.emplace_back(i, j);\n"
+             "      return CkSectionID(aid, al, factor);\n"
              "    } \n";
     } else if (indexSuffix == (const char*)"3D") {
       str << "    " << etype
@@ -1456,6 +1464,10 @@ void Array::genSubDecls(XStr& str) {
              "int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
              "      return CkSectionID(aid, elems, nElems, factor);\n"
              "    } \n"
+             "    static CkSectionID ckNew(const CkArrayID &aid, const std::vector<CkArrayIndex3D> &elems, "
+             "int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
+             "      return CkSectionID(aid, elems, factor);\n"
+             "    } \n"
              "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, "
              "int l2, int u2, int s2, int l3, int u3, int s3, int "
              "factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
@@ -1463,8 +1475,8 @@ void Array::genSubDecls(XStr& str) {
              "      for (int i=l1; i<=u1; i+=s1) \n"
              "        for (int j=l2; j<=u2; j+=s2) \n"
              "          for (int k=l3; k<=u3; k+=s3) \n"
-             "          al.push_back(CkArrayIndex3D(i, j, k));\n"
-             "      return CkSectionID(aid, al.data(), al.size(), factor);\n"
+             "          al.emplace_back(i, j, k);\n"
+             "      return CkSectionID(aid, al, factor);\n"
              "    } \n";
     } else if (indexSuffix == (const char*)"4D") {
       str << "    " << etype
@@ -1477,6 +1489,10 @@ void Array::genSubDecls(XStr& str) {
              "int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
              "      return CkSectionID(aid, elems, nElems, factor);\n"
              "    } \n"
+             "    static CkSectionID ckNew(const CkArrayID &aid, const std::vector<CkArrayIndex4D> &elems, "
+             "int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
+             "      return CkSectionID(aid, elems, factor);\n"
+             "    } \n"
              "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, "
              "int l2, int u2, int s2, int l3, int u3, int s3, int l4, int u4, int s4, "
              "int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
@@ -1485,8 +1501,8 @@ void Array::genSubDecls(XStr& str) {
              "        for (int j=l2; j<=u2; j+=s2) \n"
              "          for (int k=l3; k<=u3; k+=s3) \n"
              "            for (int l=l4; l<=u4; l+=s4) \n"
-             "              al.push_back(CkArrayIndex4D(i, j, k, l));\n"
-             "      return CkSectionID(aid, al.data(), al.size(), factor);\n"
+             "              al.emplace_back(i, j, k, l);\n"
+             "      return CkSectionID(aid, al, factor);\n"
              "    } \n";
     } else if (indexSuffix == (const char*)"5D") {
       str << "    " << etype
@@ -1499,6 +1515,10 @@ void Array::genSubDecls(XStr& str) {
              "int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
              "      return CkSectionID(aid, elems, nElems, factor);\n"
              "    } \n"
+             "    static CkSectionID ckNew(const CkArrayID &aid, const std::vector<CkArrayIndex5D> &elems, "
+             "int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
+             "      return CkSectionID(aid, elems, factor);\n"
+             "    } \n"
              "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, "
              "int l2, int u2, int s2, int l3, int u3, int s3, int l4, int u4, int s4, "
              "int l5, int u5, int s5, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
@@ -1508,8 +1528,8 @@ void Array::genSubDecls(XStr& str) {
              "          for (int k=l3; k<=u3; k+=s3) \n"
              "            for (int l=l4; l<=u4; l+=s4) \n"
              "              for (int m=l5; m<=u5; m+=s5) \n"
-             "                al.push_back(CkArrayIndex5D(i, j, k, l, m));\n"
-             "      return CkSectionID(aid, al.data(), al.size(), factor);\n"
+             "                al.emplace_back(i, j, k, l, m);\n"
+             "      return CkSectionID(aid, al, factor);\n"
              "    } \n";
     } else if (indexSuffix == (const char*)"6D") {
       str << "    " << etype
@@ -1522,6 +1542,10 @@ void Array::genSubDecls(XStr& str) {
              "int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
              "      return CkSectionID(aid, elems, nElems, factor);\n"
              "    } \n"
+             "    static CkSectionID ckNew(const CkArrayID &aid, const std::vector<CkArrayIndex6D> &elems, "
+             "int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
+             "      return CkSectionID(aid, elems, factor);\n"
+             "    } \n"
              "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, "
              "int l2, int u2, int s2, int l3, int u3, int s3, int l4, int u4, int s4, "
              "int l5, int u5, int s5, int l6, int u6, int s6, int "
@@ -1533,8 +1557,8 @@ void Array::genSubDecls(XStr& str) {
              "            for (int l=l4; l<=u4; l+=s4) \n"
              "              for (int m=l5; m<=u5; m+=s5) \n"
              "                for (int n=l6; n<=u6; n+=s6) \n"
-             "                  al.push_back(CkArrayIndex6D(i, j, k, l, m, n));\n"
-             "      return CkSectionID(aid, al.data(), al.size(), factor);\n"
+             "                  al.emplace_back(i, j, k, l, m, n);\n"
+             "      return CkSectionID(aid, al, factor);\n"
              "    } \n";
     }
 
@@ -1544,10 +1568,21 @@ void Array::genSubDecls(XStr& str) {
     genProxyNames(str, "", NULL, "(aid,elems,nElems,CK_DELCTOR_ARGS)", ", ");
     str << " {}\n";
     str << "    " << ptype
+        << "(const CkArrayID &aid, const std::vector<CkArrayIndex> &elems, CK_DELCTOR_PARAM) \n"
+           "        :";
+    genProxyNames(str, "", NULL, "(aid,elems,CK_DELCTOR_ARGS)", ", ");
+    str << " {}\n";
+    str << "    " << ptype
         << "(const CkArrayID &aid, CkArrayIndex *elems, int nElems, int "
            "factor=USE_DEFAULT_BRANCH_FACTOR) \n"
            "        :";
     genProxyNames(str, "", NULL, "(aid,elems,nElems, factor)", ", ");
+    str << " {}\n";
+    str << "    " << ptype
+        << "(const CkArrayID &aid, const std::vector<CkArrayIndex> &elems, int "
+           "factor=USE_DEFAULT_BRANCH_FACTOR) \n"
+           "        :";
+    genProxyNames(str, "", NULL, "(aid,elems, factor)", ", ");
     str << " { ckAutoDelegate(); }\n";
     str << "    " << ptype
         << "(const CkSectionID &sid)  \n"
@@ -1561,10 +1596,21 @@ void Array::genSubDecls(XStr& str) {
     genProxyNames(str, "", NULL, "(n,aid,elems,nElems,CK_DELCTOR_ARGS)", ", ");
     str << " {}\n";
     str << "    " << ptype
+        << "(const std::vector<CkArrayID> &aid, const std::vector<std::vector<CkArrayIndex> > &elems, "
+           "CK_DELCTOR_PARAM) \n"
+           "        :";
+    genProxyNames(str, "", NULL, "(aid,elems,CK_DELCTOR_ARGS)", ", ");
+    str << " {}\n";
+    str << "    " << ptype
         << "(int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int "
            "*nElems) \n"
            "        :";
     genProxyNames(str, "", NULL, "(n,aid,elems,nElems)", ", ");
+    str << " { ckAutoDelegate(); }\n";
+    str << "    " << ptype
+        << "(const std::vector<CkArrayID> &aid, const std::vector<std::vector<CkArrayIndex> > &elems) \n"
+           "        :";
+    genProxyNames(str, "", NULL, "(aid,elems)", ", ");
     str << " { ckAutoDelegate(); }\n";
     str << "    " << ptype
         << "(int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int "
@@ -1572,14 +1618,27 @@ void Array::genSubDecls(XStr& str) {
            "        :";
     genProxyNames(str, "", NULL, "(n,aid,elems,nElems, factor)", ", ");
     str << " { ckAutoDelegate(); }\n";
+    str << "    " << ptype
+        << "(const std::vector<CkArrayID> &aid, const std::vector<std::vector<CkArrayIndex> > &elems, "
+           "int factor) \n"
+           "        :";
+    genProxyNames(str, "", NULL, "(aid,elems, factor)", ", ");
+    str << " { ckAutoDelegate(); }\n";
     str << "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex *elems, int "
            "nElems) {\n"
            "      return CkSectionID(aid, elems, nElems);\n"
+           "    } \n";
+    str << "    static CkSectionID ckNew(const CkArrayID &aid, const std::vector<CkArrayIndex> &elems) {\n "
+           "      return CkSectionID(aid, elems);\n"
            "    } \n";
 
     str << "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex *elems, int "
            "nElems, int factor) {\n"
            "      return CkSectionID(aid, elems, nElems, factor);\n"
+           "    } \n";
+    str << "    static CkSectionID ckNew(const CkArrayID &aid, const std::vector<CkArrayIndex> &elems, int "
+           "factor) {\n"
+           "      return CkSectionID(aid, elems, factor);\n"
            "    } \n";
 
     str << "    void ckAutoDelegate(int opts=1) {\n"

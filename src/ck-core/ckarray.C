@@ -551,24 +551,33 @@ CProxyElement_ArrayBase::CProxyElement_ArrayBase(const ArrayElement *e)
 	:CProxy_ArrayBase(e), _idx(e->ckGetArrayIndex())
 	{}
 
-CProxySection_ArrayBase::CProxySection_ArrayBase(const CkArrayID &aid, const CkArrayIndex *elems, const int nElems, int factor) :CProxy_ArrayBase(aid), _nsid(1) {
-    _sid = new CkSectionID(aid, elems, nElems, factor);
+CProxySection_ArrayBase::CProxySection_ArrayBase(const CkArrayID &aid, const CkArrayIndex *elems, const int nElems, int factor) :CProxy_ArrayBase(aid) {
+    _sid.emplace_back(aid, elems, nElems, factor);
 }
 
+CProxySection_ArrayBase::CProxySection_ArrayBase(const CkArrayID &aid, const std::vector<CkArrayIndex> &elems, int factor) :CProxy_ArrayBase(aid) {
+    _sid.emplace_back(aid, elems, factor);
+}
 
-CProxySection_ArrayBase::CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems, int factor) :CProxy_ArrayBase(aid[0]), _nsid(n) {
-    if (_nsid == 1) _sid = new CkSectionID(aid[0], elems[0], nElems[0], factor);
-    else if (_nsid > 1) {
-    _sid = new CkSectionID[n];
-    for (int i=0; i<n; ++i) _sid[i] = CkSectionID(aid[i], elems[i], nElems[i], factor);
-    } else _sid = NULL;
+CProxySection_ArrayBase::CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems, int factor) :CProxy_ArrayBase(aid[0]) {
+    _sid.resize(n);
+    for (int i=0; i<_sid.size(); i++) {
+      _sid[i] = CkSectionID(aid[i], elems[i], nElems[i], factor);
+    }
+}
+
+CProxySection_ArrayBase::CProxySection_ArrayBase(const std::vector<CkArrayID> &aid, const std::vector<std::vector<CkArrayIndex> > &elems, int factor) :CProxy_ArrayBase(aid[0]) {
+    _sid.resize(aid.size());
+    for (int i=0; i<_sid.size(); i++) {
+      _sid[i] = CkSectionID(aid[i], elems[i], factor);
+    }
 }
 
 
 void CProxySection_ArrayBase::ckAutoDelegate(int opts){
-    if(_nsid < 1)
+    if(_sid.empty())
       CmiAbort("Auto Delegation before setting up CkSectionID\n");
-    CkArray *ckarr = CProxy_CkArray(_sid->get_aid()).ckLocalBranch();
+    CkArray *ckarr = CProxy_CkArray(_sid[0].get_aid()).ckLocalBranch();
     if(ckarr->isSectionAutoDelegated()){
     	CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(ckarr->getmCastMgr()).ckLocalBranch();
     	ckSectionDelegate(mCastGrp, opts);
@@ -577,9 +586,9 @@ void CProxySection_ArrayBase::ckAutoDelegate(int opts){
 
 
 void CProxySection_ArrayBase::setReductionClient(CkCallback *cb) {
-    if(_nsid < 1)
+    if(_sid.empty())
       CmiAbort("setReductionClient before setting up CkSectionID\n");
-    CkArray *ckarr = CProxy_CkArray(_sid->get_aid()).ckLocalBranch();
+    CkArray *ckarr = CProxy_CkArray(_sid[0].get_aid()).ckLocalBranch();
     if(ckarr->isSectionAutoDelegated()){
       CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(ckarr->getmCastMgr()).ckLocalBranch();
       mCastGrp->setReductionClient(*this, cb);
@@ -591,9 +600,9 @@ void CProxySection_ArrayBase::setReductionClient(CkCallback *cb) {
 
 
 void CProxySection_ArrayBase::resetSection(){
-    if(_nsid < 1)
+    if(_sid.empty())
       CmiAbort("resetSection before setting up CkSectionID\n");
-    CkArray *ckarr = CProxy_CkArray(_sid->get_aid()).ckLocalBranch();
+    CkArray *ckarr = CProxy_CkArray(_sid[0].get_aid()).ckLocalBranch();
     if(ckarr->isSectionAutoDelegated()){
       CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(ckarr->getmCastMgr()).ckLocalBranch();
       mCastGrp->resetSection(*this);
@@ -742,13 +751,7 @@ void CProxyElement_ArrayBase::pup(PUP::er &p)
 void CProxySection_ArrayBase::pup(PUP::er &p)
 {
   CProxy_ArrayBase::pup(p);
-  p | _nsid;
-  if (p.isUnpacking()) {
-    if (_nsid == 1) _sid = new CkSectionID;
-    else if (_nsid > 1) _sid = new CkSectionID[_nsid];
-    else _sid = NULL;
-  }
-  for (int i=0; i<_nsid; ++i) _sid[i].pup(p);
+  p | _sid;
 }
 
 /*
@@ -1207,18 +1210,18 @@ void CkBroadcastMsgSection(int entryIndex, void *msg, CkSectionID sID, int opts 
 void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts)
 {
 	if (ckIsDelegated()) //Just call our delegateMgr
-	  ckDelegatedTo()->ArraySectionSend(ckDelegatedPtr(), ep, msg, _nsid, _sid, opts);
+	  ckDelegatedTo()->ArraySectionSend(ckDelegatedPtr(), ep, msg, _sid.size(), _sid.data(), opts);
 	else {
 	  // send through all
-	  for (int k=0; k<_nsid; ++k) {
-	    for (int i=0; i< _sid[k]._nElems-1; i++) {
+	  for (int k=0; k<_sid.size(); ++k) {
+	    for (int i=0; i< _sid[k]._elems.size()-1; i++) {
 	      CProxyElement_ArrayBase ap(_sid[k]._cookie.get_aid(), _sid[k]._elems[i]);
 	      void *newMsg=CkCopyMsg((void **)&msg);
 	      ap.ckSend((CkArrayMessage *)newMsg,ep,opts);
 	    }
-	    if (_sid[k]._nElems > 0) {
-	      void *newMsg= (k<_nsid-1) ? CkCopyMsg((void **)&msg) : msg;
-	      CProxyElement_ArrayBase ap(_sid[k]._cookie.get_aid(), _sid[k]._elems[_sid[k]._nElems-1]);
+	    if (!_sid[k]._elems.empty()) {
+	      void *newMsg= (k<_sid.size()-1) ? CkCopyMsg((void **)&msg) : msg;
+	      CProxyElement_ArrayBase ap(_sid[k]._cookie.get_aid(), _sid[k]._elems[_sid[k]._elems.size()-1]);
 	      ap.ckSend((CkArrayMessage *)newMsg,ep,opts);
 	    }
 	  }

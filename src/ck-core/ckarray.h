@@ -186,58 +186,62 @@ PUPmarshall(CProxyElement_ArrayBase)
 
 class CProxySection_ArrayBase:public CProxy_ArrayBase {
 private:
-	int _nsid;
-	CkSectionID *_sid;
+  std::vector<CkSectionID> _sid;
 public:
-	CProxySection_ArrayBase(): _nsid(0), _sid(NULL) {}
+	CProxySection_ArrayBase() =default;
 	CProxySection_ArrayBase(const CkArrayID &aid,
 		const CkArrayIndex *elems, const int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR);
 	CProxySection_ArrayBase(const CkArrayID &aid,
+		const std::vector<CkArrayIndex> &elems, int factor=USE_DEFAULT_BRANCH_FACTOR);
+	CProxySection_ArrayBase(const CkArrayID &aid,
 		const CkArrayIndex *elems, const int nElems, CK_DELCTOR_PARAM)
-		:CProxy_ArrayBase(aid,CK_DELCTOR_ARGS), _nsid(1) { _sid = new CkSectionID(aid, elems, nElems); }
+		:CProxy_ArrayBase(aid,CK_DELCTOR_ARGS) { _sid.emplace_back(aid, elems, nElems); }
+	CProxySection_ArrayBase(const CkArrayID &aid,
+		const std::vector<CkArrayIndex> &elems, CK_DELCTOR_PARAM)
+		:CProxy_ArrayBase(aid,CK_DELCTOR_ARGS) { _sid.emplace_back(aid, elems); }
 	CProxySection_ArrayBase(const CkSectionID &sid)
-		:CProxy_ArrayBase(sid._cookie.get_aid()), _nsid(1) { _sid = new CkSectionID(sid); }
+		:CProxy_ArrayBase(sid._cookie.get_aid()) { _sid.emplace_back(sid); }
 	CProxySection_ArrayBase(const CkSectionID &sid, CK_DELCTOR_PARAM)
-		:CProxy_ArrayBase(sid._cookie.get_aid(), CK_DELCTOR_ARGS), _nsid(1) { _sid = new CkSectionID(sid); }
+		:CProxy_ArrayBase(sid._cookie.get_aid(), CK_DELCTOR_ARGS) { _sid.emplace_back(sid); }
         CProxySection_ArrayBase(const CProxySection_ArrayBase &cs)
-		:CProxy_ArrayBase(cs), _nsid(cs._nsid) {
-      if (_nsid == 1) _sid = new CkSectionID(*cs._sid);
-      else if (_nsid > 1) {
-        _sid = new CkSectionID[_nsid];
-        for (int i=0; i<_nsid; ++i) _sid[i] = cs._sid[i];
-      } else _sid = NULL;
+		:CProxy_ArrayBase(cs) {
+        _sid.resize(cs._sid.size());
+        for (int i=0; i<_sid.size(); ++i) {
+          _sid[i] = cs._sid[i];
+        }
     }
         CProxySection_ArrayBase(const CProxySection_ArrayBase &cs, CK_DELCTOR_PARAM)
-		:CProxy_ArrayBase(cs.ckGetArrayID(),CK_DELCTOR_ARGS), _nsid(cs._nsid) {
-      if (_nsid == 1) _sid = new CkSectionID(cs.ckGetArrayID(), cs.ckGetArrayElements(), cs.ckGetNumElements());
-      else if (_nsid > 1) {
-        _sid = new CkSectionID[_nsid];
-        for (int i=0; i<_nsid; ++i) _sid[i] = cs._sid[i];
-      } else _sid = NULL;
+		:CProxy_ArrayBase(cs.ckGetArrayID(),CK_DELCTOR_ARGS) {
+        _sid.resize(cs._sid.size());
+        for (int i=0; i<_sid.size(); ++i) {
+          _sid[i] = cs._sid[i];
+        }
     }
     CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems, int factor=USE_DEFAULT_BRANCH_FACTOR);
+    CProxySection_ArrayBase(const std::vector<CkArrayID> &aid, const std::vector<std::vector<CkArrayIndex> > &elems, int factor=USE_DEFAULT_BRANCH_FACTOR);
     CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems,CK_DELCTOR_PARAM)
-        :CProxy_ArrayBase(aid[0],CK_DELCTOR_ARGS), _nsid(n) {
-      if (_nsid == 1) _sid = new CkSectionID(aid[0], elems[0], nElems[0]);
-      else if (_nsid > 1) {
-      _sid = new CkSectionID[n];
-      for (int i=0; i<n; ++i) _sid[i] = CkSectionID(aid[i], elems[i], nElems[i]);
-      } else _sid = NULL;
+        :CProxy_ArrayBase(aid[0],CK_DELCTOR_ARGS) {
+        _sid.resize(n);
+        for (int i=0; i<_sid.size(); ++i) {
+          _sid[i] = CkSectionID(aid[i], elems[i], nElems[i]);
+        }
+    }
+    CProxySection_ArrayBase(const std::vector<CkArrayID> &aid, const std::vector<std::vector<CkArrayIndex> > &elems, CK_DELCTOR_PARAM)
+        :CProxy_ArrayBase(aid[0],CK_DELCTOR_ARGS) {
+        _sid.resize(aid.size());
+        for (int i=0; i<_sid.size(); ++i) {
+          _sid[i] = CkSectionID(aid[i], elems[i]);
+        }
     }
 
-    ~CProxySection_ArrayBase() {
-      if (_nsid == 1) delete _sid;
-      else if (_nsid > 1) delete[] _sid;
-    }
+    ~CProxySection_ArrayBase() =default;
 
     CProxySection_ArrayBase &operator=(const CProxySection_ArrayBase &cs) {
       CProxy_ArrayBase::operator=(cs);
-      _nsid = cs._nsid;
-      if (_nsid == 1) _sid = new CkSectionID(*cs._sid);
-      else if (_nsid > 1) {
-        _sid = new CkSectionID[_nsid];
-        for (int i=0; i<_nsid; ++i) _sid[i] = cs._sid[i];
-      } else _sid = NULL;
+      _sid.resize(cs._sid.size());
+      for (int i=0; i<_sid.size(); ++i) {
+        _sid[i] = cs._sid[i];
+      }
       return *this;
     }
     
@@ -255,16 +259,16 @@ public:
 	void ckSend(CkArrayMessage *m, int ep, int opts = 0) ;
 
 //	ArrayElement *ckLocal(void) const;
-    inline int ckGetNumSubSections() const { return _nsid; }
-	inline CkSectionInfo &ckGetSectionInfo() {return _sid->_cookie;}
-	inline CkSectionID *ckGetSectionIDs() {return _sid;}
+    inline int ckGetNumSubSections() const { return _sid.size(); }
+	inline CkSectionInfo &ckGetSectionInfo() {return _sid[0]._cookie;}
+	inline CkSectionID *ckGetSectionIDs() {return _sid.data();}
 	inline CkSectionID &ckGetSectionID() {return _sid[0];}
 	inline CkSectionID &ckGetSectionID(int i) {return _sid[i];}
 	inline CkArrayID ckGetArrayIDn(int i) const {return _sid[i]._cookie.get_aid();}
-    inline CkArrayIndex *ckGetArrayElements() const {return _sid[0]._elems;}
-    inline CkArrayIndex *ckGetArrayElements(int i) const {return _sid[i]._elems;}
-    inline int ckGetNumElements() const { return _sid[0]._nElems; }
-	inline int ckGetNumElements(int i) const { return _sid[i]._nElems; }
+    inline CkArrayIndex *ckGetArrayElements() const {return const_cast<CkArrayIndex *>(_sid[0]._elems.data());}
+    inline CkArrayIndex *ckGetArrayElements(int i) const {return const_cast<CkArrayIndex *>(_sid[i]._elems.data());}
+    inline int ckGetNumElements() const { return _sid[0]._elems.size(); }
+	inline int ckGetNumElements(int i) const { return _sid[i]._elems.size(); }
 	inline int ckGetBfactor() const { return _sid[0].bfactor; }
 	void pup(PUP::er &p);
 };

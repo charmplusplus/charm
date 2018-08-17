@@ -256,13 +256,13 @@ void CkDelegateMgr::GroupSend(CkDelegateData *pd,int ep,void *m,int onPE,CkGroup
 void CkDelegateMgr::GroupBroadcast(CkDelegateData *pd,int ep,void *m,CkGroupID g)
   { CkBroadcastMsgBranch(ep,m,g); }
 void CkDelegateMgr::GroupSectionSend(CkDelegateData *pd,int ep,void *m,int nsid,CkSectionID *s)
-  { CkSendMsgBranchMulti(ep,m,s->_cookie.get_aid(),s->npes,s->pelist); }
+  { CkSendMsgBranchMulti(ep,m,s->_cookie.get_aid(),s->pelist.size(),s->pelist.data()); }
 void CkDelegateMgr::NodeGroupSend(CkDelegateData *pd,int ep,void *m,int onNode,CkNodeGroupID g)
   { CkSendMsgNodeBranch(ep,m,onNode,g); }
 void CkDelegateMgr::NodeGroupBroadcast(CkDelegateData *pd,int ep,void *m,CkNodeGroupID g)
   { CkBroadcastMsgNodeBranch(ep,m,g); }
 void CkDelegateMgr::NodeGroupSectionSend(CkDelegateData *pd,int ep,void *m,int nsid,CkSectionID *s)
-  { CkSendMsgNodeBranchMulti(ep,m,s->_cookie.get_aid(),s->npes,s->pelist); }
+  { CkSendMsgNodeBranchMulti(ep,m,s->_cookie.get_aid(),s->pelist.size(),s->pelist.data()); }
 void CkDelegateMgr::ArrayCreate(CkDelegateData *pd,int ep,void *m,const CkArrayIndex &idx,int onPE,CkArrayID a)
 {
 	CProxyElement_ArrayBase ap(a,idx);
@@ -402,14 +402,19 @@ void CProxy::pup(PUP::er &p) {
 
 /**** Array sections */
 #define CKSECTIONID_CONSTRUCTOR_DEF(index) \
-CkSectionID::CkSectionID(const CkArrayID &aid, const CkArrayIndex##index *elems, const int nElems, int factor): _nElems(nElems), bfactor(factor) { \
+CkSectionID::CkSectionID(const CkArrayID &aid, const CkArrayIndex##index *elems, const int nElems, int factor): bfactor(factor) { \
+  _elems.assign(elems, elems+nElems);  \
   _cookie.get_aid() = aid;	\
   _cookie.get_pe() = CkMyPe();	\
-  _elems = new CkArrayIndex[nElems];	\
-  for (int i=0; i<nElems; i++) _elems[i] = elems[i];	\
-  pelist = NULL;	\
-  npes  = 0;	\
-}
+} \
+CkSectionID::CkSectionID(const CkArrayID &aid, const std::vector<CkArrayIndex##index> &elems, int factor): bfactor(factor) { \
+  _elems.resize(elems.size()); \
+  for (int i=0; i<_elems.size(); ++i) { \
+    _elems[i] = static_cast<CkArrayIndex>(elems[i]); \
+  } \
+  _cookie.get_aid() = aid;	\
+  _cookie.get_pe() = CkMyPe();	\
+} \
 
 CKSECTIONID_CONSTRUCTOR_DEF(1D)
 CKSECTIONID_CONSTRUCTOR_DEF(2D)
@@ -419,60 +424,34 @@ CKSECTIONID_CONSTRUCTOR_DEF(5D)
 CKSECTIONID_CONSTRUCTOR_DEF(6D)
 CKSECTIONID_CONSTRUCTOR_DEF(Max)
 
-CkSectionID::CkSectionID(const CkGroupID &gid, const int *_pelist, const int _npes, int factor): _nElems(0), _elems(NULL), npes(_npes), bfactor(factor) {
-  pelist = new int[npes];
-  for (int i=0; i<npes; i++) pelist[i] = _pelist[i];
+CkSectionID::CkSectionID(const CkGroupID &gid, const int *_pelist, const int _npes, int factor): bfactor(factor) {
+  _cookie.get_aid() = gid;
+  pelist.assign(_pelist, _pelist+_npes);
+}
+
+CkSectionID::CkSectionID(const CkGroupID &gid, const std::vector<int>& _pelist, int factor): pelist(_pelist), bfactor(factor) {
   _cookie.get_aid() = gid;
 }
 
 CkSectionID::CkSectionID(const CkSectionID &sid) {
-  int i;
   _cookie = sid._cookie;
-  _nElems = sid._nElems;
+  pelist = sid.pelist;
+  _elems = sid._elems;
   bfactor = sid.bfactor;
-  if (_nElems > 0) {
-    _elems = new CkArrayIndex[_nElems];
-    for (i=0; i<_nElems; i++) _elems[i] = sid._elems[i];
-  } else _elems = NULL;
-  npes = sid.npes;
-  if (npes > 0) {
-    pelist = new int[npes];
-    for (i=0; i<npes; ++i) pelist[i] = sid.pelist[i];
-  } else pelist = NULL;
 }
 
 void CkSectionID::operator=(const CkSectionID &sid) {
-  int i;
   _cookie = sid._cookie;
-  _nElems = sid._nElems;
+  pelist = sid.pelist;
+  _elems = sid._elems;
   bfactor = sid.bfactor;
-  if (_nElems > 0) {
-    _elems = new CkArrayIndex[_nElems];
-    for (i=0; i<_nElems; i++) _elems[i] = sid._elems[i];
-  } else _elems = NULL;
-  npes = sid.npes;
-  if (npes > 0) {
-    pelist = new int[npes];
-    for (i=0; i<npes; ++i) pelist[i] = sid.pelist[i];
-  } else pelist = NULL;
 }
 
 void CkSectionID::pup(PUP::er &p) {
-    p | _cookie;
-    p | bfactor;
-    p(_nElems);
-    if (_nElems > 0) {
-      if (p.isUnpacking()) _elems = new CkArrayIndex[_nElems];
-      for (int i=0; i< _nElems; i++) p | _elems[i];
-      npes = 0;
-      pelist = NULL;
-    } else {
-      // If _nElems is zero, than this section describes processors instead of array elements
-      _elems = NULL;
-      p(npes);
-      if (p.isUnpacking()) pelist = new int[npes];
-      p(pelist, npes);
-    }
+  p | _cookie;
+  p | pelist;
+  p | _elems;
+  p | bfactor;
 }
 
 /**** Tiny random API routines */
