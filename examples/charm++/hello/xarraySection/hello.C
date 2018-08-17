@@ -42,10 +42,10 @@ public:
     int afloor = 0, aceiling = sectionSize-1;
 
     // Allocate space
-    CProxy_Hello *arrayOfArrays = new CProxy_Hello[numArrays];
-    CkArrayID *arrID            = new CkArrayID[numArrays];
-    int *nelems                 = new int[numArrays];
-    CkArrayIndex **elems     = new CkArrayIndex*[numArrays];
+    std::vector<CProxy_Hello> arrayOfArrays(numArrays);
+    std::vector<CkArrayID> arrID(numArrays);
+    std::vector<int> nelems(numArrays);
+    std::vector<CkArrayIndex *> elems(numArrays);
 
     // Create a list of array section members
     for(int k=0; k < numArrays; k++)
@@ -61,7 +61,8 @@ public:
             elems[k][j] = CkArrayIndex1D(i);
     }
     // Create the x-array-section
-    sectionProxy = CProxySection_Hello(numArrays, arrID, elems, nelems);
+    sectionProxy = CProxySection_Hello(numArrays, arrID.data(), elems.data(), nelems.data());
+    for (auto elem : elems) delete [] elem;
 
     // Delegate the section comm to the CkMulticast library
     sectionProxy.ckSectionDelegate(mcastMgr);
