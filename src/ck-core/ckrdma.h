@@ -144,7 +144,7 @@ class CkNcpyBuffer{
   // reference pointer
   const void *ref;
 
-  CkNcpyBuffer() : isRegistered(false), ptr(NULL), pe(-1), ref(NULL), mode(CK_BUFFER_REG) {}
+  CkNcpyBuffer() : isRegistered(false), ptr(NULL), cnt(0), pe(-1), mode(CK_BUFFER_REG), ref(NULL) {}
 
   CkNcpyBuffer(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int mode_=CK_BUFFER_REG) {
     init(ptr_, cnt_, cb_, mode_);
