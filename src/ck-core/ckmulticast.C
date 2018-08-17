@@ -1275,6 +1275,16 @@ inline CkReductionMsg *CkMulticastMgr::buildContributeMsg(int dataSize,void *dat
 }
 
 
+void CkMulticastMgr::contribute(CkSectionInfo &id, int userFlag, int fragSize)
+{
+  CkCallback cb;
+  contribute(0, NULL, CkReduction::nop, id, cb, userFlag, fragSize);
+}
+
+void CkMulticastMgr::contribute(CkSectionInfo &id, const CkCallback &cb, int userFlag, int fragSize)
+{
+  contribute(0, NULL, CkReduction::nop, id, cb, userFlag, fragSize);
+}
 
 void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id, int userFlag, int fragSize)
 {
@@ -1283,7 +1293,7 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
 }
 
 
-void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id, CkCallback &cb, int userFlag, int fragSize)
+void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id, const CkCallback &cb, int userFlag, int fragSize)
 {
   if (id.get_val() == NULL || id.get_redNo() == -1) 
     CmiAbort("contribute: SectionID is not initialized\n");

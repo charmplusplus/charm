@@ -733,6 +733,16 @@ void Chare::genDefs(XStr& str) {
   if (isArray() && hasSection && !isTemplateInstantiation()) {
     if (isTemplated()) str << tspec(false) << "\n";
     str << "void " << sectionName()
+        << "::contribute(CkSectionInfo &sid, int userData, int fragSize)\n";
+    str << "{\n";
+    str << "   CkArray *ckarr = CProxy_CkArray(sid.get_aid()).ckLocalBranch();\n";
+    str << "   CkMulticastMgr *mCastGrp = "
+           "CProxy_CkMulticastMgr(ckarr->getmCastMgr()).ckLocalBranch();\n";
+    str << "   mCastGrp->contribute(sid, userData, fragSize);\n";
+    str << "}\n\n";
+
+    if (isTemplated()) str << tspec(false) << "\n";
+    str << "void " << sectionName()
         << "::contribute(int dataSize,void *data,CkReduction::reducerType type, "
            "CkSectionInfo &sid, int userData, int fragSize)\n";
     str << "{\n";
@@ -756,8 +766,18 @@ void Chare::genDefs(XStr& str) {
 
     if (isTemplated()) str << tspec(false) << "\n";
     str << "void " << sectionName()
+        << "::contribute(CkSectionInfo &sid, const CkCallback &cb, int userData, int fragSize)\n";
+    str << "{\n";
+    str << "   CkArray *ckarr = CProxy_CkArray(sid.get_aid()).ckLocalBranch();\n";
+    str << "   CkMulticastMgr *mCastGrp = "
+           "CProxy_CkMulticastMgr(ckarr->getmCastMgr()).ckLocalBranch();\n";
+    str << "   mCastGrp->contribute(sid, cb, userData, fragSize);\n";
+    str << "}\n\n";
+
+    if (isTemplated()) str << tspec(false) << "\n";
+    str << "void " << sectionName()
         << "::contribute(int dataSize,void *data,CkReduction::reducerType type, "
-           "CkSectionInfo &sid, CkCallback &cb, int userData, int fragSize)\n";
+           "CkSectionInfo &sid, const CkCallback &cb, int userData, int fragSize)\n";
     str << "{\n";
     str << "   CkArray *ckarr = CProxy_CkArray(sid.get_aid()).ckLocalBranch();\n";
     str << "   CkMulticastMgr *mCastGrp = "
@@ -770,7 +790,7 @@ void Chare::genDefs(XStr& str) {
     str << "template <typename T>\n";
     str << "void " << sectionName()
         << "::contribute(std::vector<T> &data, CkReduction::reducerType type, "
-           "CkSectionInfo &sid, CkCallback &cb, int userData, int fragSize)\n";
+           "CkSectionInfo &sid, const CkCallback &cb, int userData, int fragSize)\n";
     str << "{\n";
     str << "   CkArray *ckarr = CProxy_CkArray(sid.get_aid()).ckLocalBranch();\n";
     str << "   CkMulticastMgr *mCastGrp = "
@@ -1580,17 +1600,19 @@ void Array::genSubDecls(XStr& str) {
         << "::resetSection();\n"
            "    } \n";
 
+    str << "    static void contribute(CkSectionInfo &sid, int userData=-1, int fragSize=-1);\n";
     str << "    static void contribute(int dataSize,void *data,CkReduction::reducerType "
            "type, CkSectionInfo &sid, int userData=-1, int fragSize=-1);\n";
     str << "    template <typename T>\n"
            "    static void contribute(std::vector<T> &data, CkReduction::reducerType "
            "type, CkSectionInfo &sid, int userData=-1, int fragSize=-1);\n";
+    str << "    static void contribute(CkSectionInfo &sid, const CkCallback &cb, int userData=-1, int fragSize=-1);\n";
     str << "    static void contribute(int dataSize,void *data,CkReduction::reducerType "
-           "type, CkSectionInfo &sid, CkCallback &cb, int userData=-1, int "
+           "type, CkSectionInfo &sid, const CkCallback &cb, int userData=-1, int "
            "fragSize=-1);\n";
     str << "    template <typename T>\n"
            "    static void contribute(std::vector<T> &data, CkReduction::reducerType "
-           "type, CkSectionInfo &sid, CkCallback &cb, int userData=-1, int "
+           "type, CkSectionInfo &sid, const CkCallback &cb, int userData=-1, int "
            "fragSize=-1);\n";
   }
 

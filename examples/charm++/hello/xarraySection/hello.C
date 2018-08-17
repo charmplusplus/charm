@@ -130,8 +130,7 @@ public:
         isCookieSet = true;
     }
     // Contribute to the section reduction
-    CkCallback cb(CkIndex_Main::rednPong(NULL), mainProxy);
-    mcastMgr->contribute(sizeof(int), &(msg->hiNo), CkReduction::sum_int, sectionCookie, cb);
+    mcastMgr->contribute(sizeof(int), &(msg->hiNo), CkReduction::sum_int, sectionCookie, CkCallback(CkIndex_Main::rednPong(NULL), mainProxy));
     delete msg;
   }
 

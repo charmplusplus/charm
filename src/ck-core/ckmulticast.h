@@ -95,14 +95,18 @@ class CkMulticastMgr: public CkDelegateMgr
         /// Configure a client to accept the reduction result
         void setReductionClient(CProxySection_ArrayBase &, CkCallback *cb);
         /// reduction trigger
+        void contribute(CkSectionInfo &sid, int userData=-1, int fragSize=-1);
+        void contribute(CkSectionInfo &sid, const CkCallback& cb, int userData=-1, int fragSize=-1);
         void contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &sid, int userData=-1, int fragSize=-1);
         template <typename T>
         void contribute(std::vector<T> &data, CkReduction::reducerType type, CkSectionInfo &sid, int userData=-1, int fragSize=-1)
         { contribute(sizeof(T)*data.size(), data.data(), type, sid, userData, fragSize); }
         /// reduction trigger with a callback
-        void contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &sid, CkCallback &cb, int userData=-1, int fragSize=-1);
+        void contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &sid, const CkCallback &cb,
+                        int userData=-1, int fragSize=-1);
         template <typename T>
-        void contribute(std::vector<T> &data, CkReduction::reducerType type, CkSectionInfo &sid, CkCallback &cb, int userData=-1, int fragSize=-1)
+        void contribute(std::vector<T> &data, CkReduction::reducerType type, CkSectionInfo &sid, const CkCallback &cb,
+                        int userData=-1, int fragSize=-1)
         { contribute(sizeof(T)*data.size(), data.data(), type, sid, cb, userData, fragSize); }
         /// @note: User should be careful while passing non-default value of fragSize. fragSize%sizeof(data_type) should be zero
 
