@@ -1051,8 +1051,8 @@ void Entry::genTramTypes() {
     typeString << aggregatorType();
     nameString << aggregatorName();
     itemTypeString << dataItemType();
-    container->tramInstances.push_back(TramInfo(
-        typeString.get_string(), nameString.get_string(), itemTypeString.get_string()));
+    container->tramInstances.emplace_back(
+        typeString.get_string(), nameString.get_string(), itemTypeString.get_string());
     tramInstanceIndex = container->tramInstances.size();
   }
 }
