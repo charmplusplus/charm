@@ -147,6 +147,15 @@ int CheckSocketsReady(int withDelayMs, int output)
   int nreadable,i;
   CMK_PIPE_DECL(withDelayMs);
 
+#if defined(_WIN32)
+  // running standalone (without charmrun), there are no sockets to read/write.
+  // On Windows, calling select with empty fdsets returns WSAEINVAL error,
+  // so nreadable would be -1 below and initiate an infinite recursion
+  // and stack overflow.
+  // BTW, calling CheckSocketsReady() recursively on error is a really bad idea to me
+  if ((Cmi_charmrun_fd == -1) && (CmiNumNodes() == 1)) return 0; // nothing to read, return 0
+#endif
+
   CMK_PIPE_SETUP;
   nreadable=CMK_PIPE_CALL();
 
