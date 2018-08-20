@@ -28,7 +28,7 @@ static void qt_args_1(qt_t *rjb, void *u, void *t,
   }
   rhelp->hfn(rhelp->jb, rhelp->oldptr, rhelp->newptr);
   only(u, t, userf);
-  write(2,"Never get here 2.\n",18);
+  (void)!write(2,"Never get here 2.\n",18);
 }
 
 qt_t *qt_args(qt_t *sp, void *u, void *t,
@@ -40,7 +40,7 @@ qt_t *qt_args(qt_t *sp, void *u, void *t,
   if (result==0) {
     SHIFTSP(sp);
     qt_args_1((qt_t*)jb,u,t,userf,only);
-    write(2,"Never get here 1.\n",18);
+    (void)!write(2,"Never get here 1.\n",18);
   }
   return result;
 }
