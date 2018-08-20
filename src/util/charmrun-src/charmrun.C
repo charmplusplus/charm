@@ -4442,7 +4442,10 @@ static void start_nodes_local(std::vector<nodetab_process> & process_table)
                         NULL, /*&sa,*/ /* process SA */
                         NULL, /*&sa,*/ /* thread SA */
                         FALSE,         /* inherit flag */
-#if 1
+#if CMK_CHARMPY
+                        // don't disable console output on rank 0 process (need to be able to see python syntax errors, etc)
+                        CREATE_NEW_PROCESS_GROUP | (p.nodeno == 0 ? 0 : DETACHED_PROCESS),
+#elif 1
                         CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS,
 #else
                         CREATE_NEW_PROCESS_GROUP | CREATE_NEW_CONSOLE,

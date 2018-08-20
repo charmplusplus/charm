@@ -960,7 +960,16 @@ static int Cmi_charmrun_fd_sendflag=0;
 
 /* ctrl_sendone */
 static int sendone_abort_fn(SOCKET skt,int code,const char *msg) {
+#if !defined(_WIN32)
+	// on Windows, this is sometimes reached during normal program termination,
+	// so printing an error makes no sense. The message is not seen normally
+	// since processes are spawned by charmrun as DETACHED_PROCESS by default and
+	// have no console output.
+	// With CMK_CHARMPY=1 on Windows, charmrun spawns one process in same console,
+	// because any output before charm starts needs to be seen (e.g. Python syntax errors)
+	// so this print needs to be disabled
 	fprintf(stderr,"Socket error %d in ctrl_sendone! %s\n",code,msg);
+#endif
 	machine_exit(1);
 	return -1;
 }
