@@ -105,7 +105,10 @@ CMI_EXTERNC void * initialize_memory_wrapper_calloc(size_t nelem, size_t size);
 CMI_EXTERNC void * initialize_memory_wrapper_malloc(size_t size);
 CMI_EXTERNC void * initialize_memory_wrapper_realloc(void *ptr, size_t size);
 CMI_EXTERNC void * initialize_memory_wrapper_memalign(size_t align, size_t size);
+CMI_EXTERNC int initialize_memory_wrapper_posix_memalign(void **memptr, size_t align, size_t size);
+CMI_EXTERNC void * initialize_memory_wrapper_aligned_alloc(size_t align, size_t size);
 CMI_EXTERNC void * initialize_memory_wrapper_valloc(size_t size);
+CMI_EXTERNC void * initialize_memory_wrapper_pvalloc(size_t size);
 CMI_EXTERNC void initialize_memory_wrapper_free(void *ptr);
 CMI_EXTERNC void initialize_memory_wrapper_cfree(void *ptr);
 
@@ -113,7 +116,10 @@ void * (*mm_malloc)(size_t) = initialize_memory_wrapper_malloc;
 void * (*mm_calloc)(size_t,size_t) = initialize_memory_wrapper_calloc;
 void * (*mm_realloc)(void*,size_t) = initialize_memory_wrapper_realloc;
 void * (*mm_memalign)(size_t,size_t) = initialize_memory_wrapper_memalign;
+int (*mm_posix_memalign)(void **,size_t,size_t) = initialize_memory_wrapper_posix_memalign;
+void * (*mm_aligned_alloc)(size_t,size_t) = initialize_memory_wrapper_aligned_alloc;
 void * (*mm_valloc)(size_t) = initialize_memory_wrapper_valloc;
+void * (*mm_pvalloc)(size_t) = initialize_memory_wrapper_pvalloc;
 void (*mm_free)(void*) = initialize_memory_wrapper_free;
 void (*mm_cfree)(void*) = initialize_memory_wrapper_cfree;
 struct mallinfo (*mm_mallinfo)(void) = NULL;
@@ -178,9 +184,24 @@ void * initialize_memory_wrapper_memalign(size_t align, size_t size) {
   return (*mm_memalign)(align,size);
 }
 
+int initialize_memory_wrapper_posix_memalign(void **memptr, size_t align, size_t size) {
+  initialize_memory_wrapper();
+  return (*mm_posix_memalign)(memptr,align,size);
+}
+
+void * initialize_memory_wrapper_aligned_alloc(size_t align, size_t size) {
+  initialize_memory_wrapper();
+  return (*mm_aligned_alloc)(align,size);
+}
+
 void * initialize_memory_wrapper_valloc(size_t size) {
   initialize_memory_wrapper();
   return (*mm_valloc)(size);
+}
+
+void * initialize_memory_wrapper_pvalloc(size_t size) {
+  initialize_memory_wrapper();
+  return (*mm_pvalloc)(size);
 }
 
 void initialize_memory_wrapper_free(void *ptr) {
@@ -201,12 +222,17 @@ void initialize_memory_wrapper_cfree(void *ptr) {
 #define mm_cfree    (*mm_cfree)
 #define mm_realloc  (*mm_realloc)
 #define mm_memalign (*mm_memalign)
+#define mm_posix_memalign (*mm_posix_memalign)
+#define mm_aligned_alloc (*mm_aligned_alloc)
 #define mm_valloc   (*mm_valloc)
+#define mm_pvalloc  (*mm_pvalloc)
 
 #else /* CMK_MEMORY_BUILD_OS_WRAPPED */
 #define mm_malloc   malloc
 #define mm_calloc   calloc
 #define mm_memalign memalign
+#define mm_posix_memalign posix_memalign
+#define mm_aligned_alloc aligned_alloc
 #define mm_free     free
 #endif /* CMK_MEMORY_BUILD_OS_WRAPPED */
 #endif /* CMK_MEMORY_BUILD_OS */
@@ -356,7 +382,13 @@ void cfree(void *ptr) CMK_THROW { meta_cfree(ptr); }
 void *realloc(void *ptr, size_t size) CMK_THROW { return meta_realloc(ptr,size); }
 CMI_EXTERNC
 void *memalign(size_t align, size_t size) CMK_THROW { return meta_memalign(align,size); }
+CMI_EXTERNC
+int posix_memalign(void **outptr, size_t align, size_t size) CMK_THROW { return meta_posix_memalign(outptr,align,size); }
+CMI_EXTERNC
+void *aligned_alloc(size_t align, size_t size) CMK_THROW { return meta_aligned_alloc(align,size); }
 void *valloc(size_t size) CMK_THROW { return meta_valloc(size); }
+CMI_EXTERNC
+void *pvalloc(size_t size) CMK_THROW { return meta_pvalloc(size); }
 #endif /* CMK_MEMORY_BUILD_GNU_HOOKS */
 
 #endif /* CMK_MEMORY_BUILD_OS_WRAPPED || CMK_MEMORY_BUILD_GNU_HOOKS */
@@ -606,7 +638,10 @@ void CmiResetMinMemory(void) {}
 #define meta_cfree    mm_cfree
 #define meta_realloc  mm_realloc
 #define meta_memalign mm_memalign
+#define meta_posix_memalign mm_posix_memalign
+#define meta_aligned_alloc mm_aligned_alloc
 #define meta_valloc   mm_valloc
+#define meta_pvalloc  mm_pvalloc
 
 #include "memory-gnu.c"
 static void meta_init(char **argv) {
@@ -670,9 +705,21 @@ static void *meta_memalign(size_t align, size_t size)
 {
   return mm_memalign(align,size);
 }
+static int meta_posix_memalign(void **outptr, size_t align, size_t size)
+{
+  return mm_posix_memalign(outptr,align,size);
+}
+static void *meta_aligned_alloc(size_t align, size_t size)
+{
+  return mm_aligned_alloc(align,size);
+}
 static void *meta_valloc(size_t size)
 {
   return mm_valloc(size);
+}
+static void *meta_pvalloc(size_t size)
+{
+  return mm_pvalloc(size);
 }
 #endif /* 0 */
 
@@ -754,10 +801,36 @@ void *memalign(size_t align, size_t size) CMK_THROW
   return result;
 }
 
+CMI_EXTERNC
+int posix_memalign (void **outptr, size_t align, size_t size) CMK_THROW
+{
+  int result;
+  MEM_LOCK_AROUND( result = meta_posix_memalign(outptr, align, size); )
+  if (result!=0) CmiOutOfMemory(align*size);
+  return result;
+}
+
+CMI_EXTERNC
+void *aligned_alloc(size_t align, size_t size) CMK_THROW
+{
+  void *result;
+  MEM_LOCK_AROUND( result = meta_aligned_alloc(align, size); )
+  if (result==NULL) CmiOutOfMemory(align*size);
+  return result;
+}
+
 void *valloc(size_t size) CMK_THROW
 {
   void *result;
   MEM_LOCK_AROUND( result = meta_valloc(size); )
+  if (result==NULL) CmiOutOfMemory(size);
+  return result;
+}
+
+void *pvalloc(size_t size) CMK_THROW
+{
+  void *result;
+  MEM_LOCK_AROUND( result = meta_pvalloc(size); )
   if (result==NULL) CmiOutOfMemory(size);
   return result;
 }
@@ -1084,28 +1157,6 @@ CMI_EXTERNC void * __libc_memalign (size_t alignment, size_t bytes) { return mem
 CMI_EXTERNC void * __default_morecore (ptrdiff_t);
 void *(*__morecore)(ptrdiff_t) = __default_morecore;
 #endif
-#endif
-
-#if !defined CMI_MEMORY_GNU || defined _LIBC
-#include <errno.h>
-
-CMI_EXTERNC
-int posix_memalign (void **outptr, size_t align, size_t size) CMK_THROW
-{
-  void *ptr;
-  const size_t division = align / sizeof(void *);
-
-  if (align % sizeof(void *) != 0 || ((division-1) & division) != 0 || align == 0)
-    return EINVAL;
-
-  ptr = memalign(align, size);
-
-  if (ptr == NULL)
-    return ENOMEM;
-
-  *outptr = ptr;
-  return 0;
-}
 #endif
 
 #if defined CMI_MEMORY_GNU && defined _LIBC

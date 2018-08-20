@@ -72,6 +72,23 @@ static void *meta_memalign(size_t align, size_t size)
   return ret;
 }
 
+static int meta_posix_memalign(void **outptr, size_t align, size_t size)
+{
+  void *origptr = *outptr;
+  int ret=mm_posix_memalign(outptr,align,size);
+  if (memInit) CmiPrintf("CMI_MEMORY(%d)> posix_memalign(%p,%p,%d), %p => %d, %p\n",
+			 CmiMyPe(),outptr,align,size,origptr,ret,*outptr);
+  return ret;
+}
+
+static void *meta_aligned_alloc(size_t align, size_t size)
+{
+  void *ret=mm_aligned_alloc(align,size);
+  if (memInit) CmiPrintf("CMI_MEMORY(%d)> aligned_alloc(%p,%d) => %p\n",
+			 CmiMyPe(),align,size,ret);
+  return ret;
+}
+
 static void *meta_valloc(size_t size)
 {
   void *ret=mm_valloc(size);
@@ -80,4 +97,11 @@ static void *meta_valloc(size_t size)
   return ret;
 }
 
+static void *meta_pvalloc(size_t size)
+{
+  void *ret=mm_pvalloc(size);
+  if (memInit) CmiPrintf("CMI_MEMORY(%d)> pvalloc(%d) => %p\n",
+			 CmiMyPe(),size,ret);
+  return ret;
+}
 

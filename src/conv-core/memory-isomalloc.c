@@ -172,9 +172,54 @@ static void *meta_memalign(size_t align, size_t size)
 	return ret;
 }
 
+static int meta_posix_memalign(void **outptr, size_t align, size_t size)
+{
+	int ret = 0;
+	if (CpvInitialized(isomalloc_blocklist) && CpvAccess(isomalloc_blocklist))
+	{ /*Isomalloc a new block and link it in*/
+		ISOMALLOC_PUSH /*Disable isomalloc while inside isomalloc*/
+#if CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS
+		if (CmiIsFortranLibraryCall()==1) {
+		  ret=mm_posix_memalign(outptr, align, size);
+		}
+		else
+#endif
+		  *outptr = CmiIsomallocBlockListMallocAlign(pushed_blocklist,align,size);
+		ISOMALLOC_POP
+	}
+	else /*Just use regular posix_memalign*/
+		ret=mm_posix_memalign(outptr, align, size);
+	return ret;
+}
+
+static void *meta_aligned_alloc(size_t align, size_t size)
+{
+	void *ret=NULL;
+	if (CpvInitialized(isomalloc_blocklist) && CpvAccess(isomalloc_blocklist))
+	{ /*Isomalloc a new block and link it in*/
+		ISOMALLOC_PUSH /*Disable isomalloc while inside isomalloc*/
+#if CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS
+		if (CmiIsFortranLibraryCall()==1) {
+		  ret=mm_aligned_alloc(align, size);
+		}
+		else
+#endif
+		  ret=CmiIsomallocBlockListMallocAlign(pushed_blocklist,align,size);
+		ISOMALLOC_POP
+	}
+	else /*Just use regular aligned_alloc*/
+		ret=mm_aligned_alloc(align, size);
+	return ret;
+}
+
 static void *meta_valloc(size_t size)
 {
-	return meta_malloc(size);
+	return meta_memalign(CMK_MEMORY_PAGESIZE, size);
+}
+
+static void *meta_pvalloc(size_t size)
+{
+	return meta_memalign(CMK_MEMORY_PAGESIZE, (size + CMK_MEMORY_PAGESIZE - 1) & ~(CMK_MEMORY_PAGESIZE - 1));
 }
 
 #define CMK_MEMORY_HAS_NOMIGRATE

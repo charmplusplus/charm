@@ -65,10 +65,34 @@ void *meta_memalign(size_t align, size_t size)
   return result;    
 }
 
+int meta_posix_memalign(void **outptr, size_t align, size_t size)
+{
+  int result;
+  MEM_LOCK_AROUND( result = mm_posix_memalign(outptr, align, size); )
+  if (result!=0) CmiOutOfMemory(align*size);
+  return result;
+}
+
+void *meta_aligned_alloc(size_t align, size_t size)
+{
+  void *result;
+  MEM_LOCK_AROUND( result = mm_aligned_alloc(align, size); )
+  if (result==NULL) CmiOutOfMemory(align*size);
+  return result;
+}
+
 void *meta_valloc(size_t size)
 {
   void *result;
   MEM_LOCK_AROUND( result = mm_valloc(size); )
+  if (result==NULL) CmiOutOfMemory(size);
+  return result;
+}
+
+void *meta_pvalloc(size_t size)
+{
+  void *result;
+  MEM_LOCK_AROUND( result = mm_pvalloc(size); )
   if (result==NULL) CmiOutOfMemory(size);
   return result;
 }

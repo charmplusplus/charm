@@ -16,7 +16,10 @@ This version of ptmalloc3 is hacked in following ways:
 #define cfree	 mm_cfree
 #define realloc  mm_realloc
 #define memalign mm_memalign
+#define posix_memalign mm_posix_memalign
+#define aligned_alloc mm_aligned_alloc
 #define valloc   mm_valloc
+#define pvalloc  mm_pvalloc
 
 extern CMK_TYPEDEF_UINT8 _memory_allocated;
 extern CMK_TYPEDEF_UINT8 _memory_allocated_max;
@@ -151,6 +154,7 @@ int __malloc_initialized = -1;
 #define public_iCOMALLOc __libc_independent_comalloc
 #define public_gET_STATe __malloc_get_state
 #define public_sET_STATe __malloc_set_state
+#define public_aLIGNED_ALLOc aligned_alloc
 #define malloc_getpagesize __getpagesize()
 #define open             __open
 #define mmap             __mmap
@@ -183,6 +187,7 @@ void *(*__morecore)(ptrdiff_t) = __default_morecore;
 #define public_iCOMALLOc independent_comalloc
 #define public_gET_STATe malloc_get_state
 #define public_sET_STATe malloc_set_state
+#define public_aLIGNED_ALLOc aligned_alloc
 
 #endif /* _LIBC */
 
@@ -196,6 +201,7 @@ void* public_mALLOc(size_t bytes);
 void public_fREe(void* mem);
 void* public_rEALLOc(void* oldmem, size_t bytes);
 void* public_mEMALIGn(size_t alignment, size_t bytes);
+void* public_aLIGNED_ALLOc(size_t alignment, size_t bytes);
 void* public_vALLOc(size_t bytes);
 int public_pMEMALIGn (void **memptr, size_t alignment, size_t size) CMK_THROW;
 void* public_cALLOc(size_t n_elements, size_t elem_size);
@@ -987,6 +993,15 @@ libc_hidden_def (public_mEMALIGn)
 #endif
 
 void*
+public_aLIGNED_ALLOc(size_t alignment, size_t bytes)
+{
+  return public_mEMALIGn(alignment, bytes);
+}
+#ifdef libc_hidden_def
+libc_hidden_def (public_aLIGNED_ALLOc)
+#endif
+
+void*
 public_vALLOc(size_t bytes)
 {
   struct malloc_arena* ar_ptr;
@@ -999,12 +1014,42 @@ public_vALLOc(size_t bytes)
     return 0;
   if (ar_ptr != &main_arena)
     bytes += FOOTER_OVERHEAD;
-  p = mspace_memalign(arena_to_mspace(ar_ptr), 4096, bytes);
+  p = mspace_memalign(arena_to_mspace(ar_ptr), CMK_MEMORY_PAGESIZE, bytes);
 
   if (p && ar_ptr != &main_arena)
     set_non_main_arena(p, ar_ptr);
   (void)mutex_unlock(&ar_ptr->mutex);
   
+  /* CHARM++ ADD BEGIN */
+  if (p != NULL) {
+    _memory_allocated += chunksize(mem2chunk(p));
+
+    UPDATE_MEMUSAGE
+  }
+  /* CHARM++ ADD END */
+
+  return p;
+}
+
+void*
+public_pVALLOc(size_t bytes)
+{
+  struct malloc_arena* ar_ptr;
+  void *p;
+
+  if(__malloc_initialized < 0)
+    ptmalloc_init ();
+  arena_get(ar_ptr, bytes + FOOTER_OVERHEAD + MIN_CHUNK_SIZE);
+  if(!ar_ptr)
+    return 0;
+  if (ar_ptr != &main_arena)
+    bytes += FOOTER_OVERHEAD;
+  p = mspace_memalign(arena_to_mspace(ar_ptr), CMK_MEMORY_PAGESIZE, (bytes + CMK_MEMORY_PAGESIZE - 1) & ~(CMK_MEMORY_PAGESIZE - 1));
+
+  if (p && ar_ptr != &main_arena)
+    set_non_main_arena(p, ar_ptr);
+  (void)mutex_unlock(&ar_ptr->mutex);
+
   /* CHARM++ ADD BEGIN */
   if (p != NULL) {
     _memory_allocated += chunksize(mem2chunk(p));
@@ -1275,5 +1320,8 @@ public_mSTATs(void)
 #undef cfree    
 #undef realloc  
 #undef memalign 
+#undef posix_memalign
+#undef aligned_alloc
 #undef valloc   
+#undef pvalloc
 

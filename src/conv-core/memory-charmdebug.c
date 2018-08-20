@@ -32,7 +32,10 @@ static void *meta_malloc(size_t size);
 static void *meta_calloc(size_t nelem, size_t size);
 static void *meta_realloc(void *oldBuffer, size_t newSize);
 static void *meta_memalign(size_t align, size_t size);
+static int meta_posix_memalign(void **outptr, size_t align, size_t size);
+static void *meta_aligned_alloc(size_t align, size_t size);
 static void *meta_valloc(size_t size);
+static void *meta_pvalloc(size_t size);
 #else
 
 void CmiBacktraceRecordHuge(void **retPtrs,int *nLevels);
@@ -1651,8 +1654,70 @@ static void *meta_memalign(size_t align, size_t size) {
   return user;
 }
 
+static int meta_posix_memalign(void **outptr, size_t align, size_t size) {
+  int overhead = align;
+  int ret;
+  char *alloc;
+  Slot *s;
+  void *user;
+
+  while (overhead < SLOTSPACE+sizeof(SlotStack)) overhead += align;
+  /* Allocate the required size + the overhead needed to keep the user alignment */
+  dumpStackFrames();
+
+  BEFORE_MALLOC_CALL;
+  ret = mm_posix_memalign(outptr,align,overhead+size+numStackFrames*sizeof(void*));
+  alloc=(char *)*outptr;
+  AFTER_MALLOC_CALL;
+  if (ret != 0)
+    return ret;
+  s=(Slot*)(alloc+overhead-SLOTSPACE);
+  user=setSlot(&s,size);
+  s->magic = SLOTMAGIC_VALLOC + (s->magic&0xF);
+  s->extraStack = (SlotStack *)alloc; /* use the extra space as stack */
+  s->extraStack->protectedMemory = NULL;
+  s->extraStack->protectedMemoryLength = 0;
+  memory_allocated_user_total += size;
+#if ! CMK_BIGSIM_CHARM
+  traceMalloc_c(user, size, s->from, s->stackLen);
+#endif
+  *outptr = user;
+  return 0;
+}
+
+static void *meta_aligned_alloc(size_t align, size_t size) {
+  int overhead = align;
+  char *alloc;
+  Slot *s;
+  void *user;
+
+  while (overhead < SLOTSPACE+sizeof(SlotStack)) overhead += align;
+  /* Allocate the required size + the overhead needed to keep the user alignment */
+  dumpStackFrames();
+
+  BEFORE_MALLOC_CALL;
+  alloc=(char *)mm_aligned_alloc(align,overhead+size+numStackFrames*sizeof(void*));
+  AFTER_MALLOC_CALL;
+  s=(Slot*)(alloc+overhead-SLOTSPACE);
+  user=setSlot(&s,size);
+  s->magic = SLOTMAGIC_VALLOC + (s->magic&0xF);
+  s->extraStack = (SlotStack *)alloc; /* use the extra space as stack */
+  s->extraStack->protectedMemory = NULL;
+  s->extraStack->protectedMemoryLength = 0;
+  memory_allocated_user_total += size;
+#if ! CMK_BIGSIM_CHARM
+  traceMalloc_c(user, size, s->from, s->stackLen);
+#endif
+  return user;
+}
+
 static void *meta_valloc(size_t size) {
   return meta_memalign(meta_getpagesize(),size);
+}
+
+static void *meta_pvalloc(size_t size) {
+  size_t pagesize = meta_getpagesize();
+  return meta_memalign(pagesize, (size + pagesize - 1) & ~(pagesize - 1));
 }
 
 void setProtection(char* mem, char *ptr, int len, int flag) {

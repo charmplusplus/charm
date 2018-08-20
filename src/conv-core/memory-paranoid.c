@@ -380,7 +380,38 @@ static void *meta_memalign(size_t align, size_t size)
   s->magic=SLOTMAGIC_VALLOC;
   return user;  
 }
+
+static int meta_posix_memalign(void **outptr, size_t align, size_t size)
+{
+  /*Allocate a whole extra page for our slot structure*/
+  int ret = mm_posix_memalign(outptr,align,meta_getpagesize()+size+PADLEN);
+  if (ret != 0)
+    return ret;
+  char *alloc=(char *)*outptr;
+  Slot *s=(Slot *)(alloc+meta_getpagesize()-sizeof(Slot));
+  void *user=setSlot(s,size);
+  s->magic=SLOTMAGIC_VALLOC;
+  *outptr = user;
+  return 0;
+}
+
+static void *meta_aligned_alloc(size_t align, size_t size)
+{
+  /*Allocate a whole extra page for our slot structure*/
+  char *alloc=(char *)mm_aligned_alloc(align,meta_getpagesize()+size+PADLEN);
+  Slot *s=(Slot *)(alloc+meta_getpagesize()-sizeof(Slot));
+  void *user=setSlot(s,size);
+  s->magic=SLOTMAGIC_VALLOC;
+  return user;
+}
+
 static void *meta_valloc(size_t size)
 {
   return meta_memalign(meta_getpagesize(),size);
+}
+
+static void *meta_pvalloc(size_t size)
+{
+  size_t pagesize = meta_getpagesize();
+  return meta_memalign(pagesize, (size + pagesize - 1) & ~(pagesize - 1));
 }
