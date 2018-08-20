@@ -436,7 +436,7 @@ static void printOut(VerticesListType *vertices)
  int * adj;
  Vertex * vertexRecs;
  FILE *fp;
- char filename[20];
+ char filename[40];
  
  adj = vertices->adjArray;
  vertexRecs = vertices->vertexArray;
