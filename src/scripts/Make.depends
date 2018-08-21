@@ -2528,11 +2528,6 @@ global-nop.o: global-nop.c converse.h conv-config.h conv-autoconfig.h \
  conv-random.h conv-lists.h conv-trace.h persistent.h conv-rdma.h \
  debug-conv.h
 
-graph.o: graph.c converse.h conv-config.h conv-autoconfig.h conv-common.h \
- lrts-common.h conv-mach.h conv-mach-opt.h cmiqueue.h pup_c.h lrtslock.h \
- queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
- conv-trace.h persistent.h conv-rdma.h debug-conv.h graph.h
-
 hilbert.o: hilbert.C hilbert.h
 
 init.o: init.C ckcheckpoint.h pup.h converse.h conv-config.h \

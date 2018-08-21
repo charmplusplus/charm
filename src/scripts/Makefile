@@ -287,7 +287,7 @@ BLUE_HEADERS = blue_types.h bigsim_timing.h blue_defs.h bigsim_logs.h blue.h blu
 
 ALLHEADERS=$(CKHEADERS) \
     simplemsg.h sm.h pvmc.h pvm3.h sdag.h vector2d.h \
-	graph.h bitvecset.h ckset.h LBSimulation.h  \
+	bitvecset.h ckset.h LBSimulation.h  \
 	$(BLUE_HEADERS)
 
 basics: headers
@@ -458,7 +458,7 @@ LIBCONV_LDB = topology.o generate.o edgelist.o
 LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 	pup_xlater.o pup_c.o pup_paged.o pup_cmialloc.o			\
 	ckimage.o ckdll.o ckhashtable.o sockRoutines.o			\
-	conv-lists.o persist-comm.o mempool.o graph.o \
+	conv-lists.o persist-comm.o mempool.o \
 	crc32.o  lz4.o partitioning_strategies.o hilbert.o \
 	spanningTree.o cmirdmautils.o
 
@@ -545,10 +545,10 @@ $(L)/libldb-none.a: cldb.none.c $(CVHEADERS)
 $(L)/libldb-rand.a: cldb.rand.c cldb.h $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.rand.c
 
-$(L)/libldb-neighbor.a: cldb.neighbor.c cldb.neighbor.h graph.h $(CVHEADERS)
+$(L)/libldb-neighbor.a: cldb.neighbor.c cldb.neighbor.h $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.neighbor.c
 
-$(L)/libldb-workstealing.a: cldb.workstealing.c cldb.workstealing.h graph.h $(CVHEADERS)
+$(L)/libldb-workstealing.a: cldb.workstealing.c cldb.workstealing.h $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.workstealing.c
 
 $(L)/libldb-spray.a: cldb.spray.c $(CVHEADERS)
