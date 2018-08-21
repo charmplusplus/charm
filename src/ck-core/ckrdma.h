@@ -167,7 +167,7 @@ class CkNcpyBuffer{
       CmiSetRdmaCommonInfo(&layerInfo[0], ptr, cnt);
 
       /* Set the pointer layerInfo unconditionally for layers that don't require pinning (MPI, PAMI)
-       * or if mode is REG, PREREG on layers that require pinning (GNI, Verbs, OFI) */
+       * or if mode is REG, PREREG on layers that require pinning (GNI, Verbs, OFI, UCX) */
 #if CMK_REG_REQUIRED
       if(mode == CK_BUFFER_REG || mode == CK_BUFFER_PREREG)
 #endif
