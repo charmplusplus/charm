@@ -570,13 +570,11 @@ $(L)/libldb-bluegene.a: cldb.bluegene.c $(CVHEADERS)
 ## Memory allocation libraries (-memory)
 MEM_DEPS=memory-gnu.c memory-gnu-internal.c converse.h conv-mach.h $(CVHEADERS)
 
-libmemory-%.C: memory.C
-	cp $< $@
-
 # $1 is the name of the module, $2 is any additional dependency beyond memory.C and $(MEM_DEPS), $3 is extra arguments to charmc
 define libmem
-$(L)/libmemory-$1.a: libmemory-$1.C $(MEM_DEPS) $2
-	$(CHARMC) -I. -o $$@ $3 $$<
+$(L)/libmemory-$1.a: memory.C $(MEM_DEPS) $2
+	$(CHARMC) -I. -o libmemory-$1.o $3 $$<
+	$(CHARMC) -I. -o $$@ $3 libmemory-$1.o
 endef
 
 $(eval $(call libmem,default,                           ,-DCMK_MEMORY_BUILD_DEFAULT))
@@ -608,16 +606,14 @@ $(eval $(call libmem,charmdebug-mmap-slot,memory-charmdebug.c,-DCMK_MEMORY_BUILD
 
 LIBTHREADSDEPS = $(CVHEADERS) QUICK_THREADS
 
-libthreads-%.c: threads.c
-	cp $< $@
-
 # $1 is the name of the module, $2 is any additional dependency beyond threads.c and $(LIBTHREADSDEPS), $3 is extra arguments to charmc, $4 is an option to include 'boost-context'
 define libthreads
-$(L)/libthreads-$1.a: libthreads-$1.c $(LIBTHREADSDEPS) $2
+$(L)/libthreads-$1.a: threads.c $(LIBTHREADSDEPS) $2
+	$(CHARMC) -IQuickThreads -I. -o libthreads-$1.o $3 $$<
 	if [ `ls boost-context/*.o 2>/dev/null | wc -l` -gt 0 -a  $4 -eq 1 ]; then \
-		$(CHARMC) -IQuickThreads -I. -o $$@ $3 boost-context/*.o $$<; \
+		$(CHARMC) -IQuickThreads -I. -o $$@ $3 boost-context/*.o libthreads-$1.o; \
 	else \
-		$(CHARMC) -IQuickThreads -I. -o $$@ $3 $$<; \
+		$(CHARMC) -IQuickThreads -I. -o $$@ $3 libthreads-$1.o; \
 	fi;
 endef
 
