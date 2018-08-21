@@ -202,6 +202,23 @@ if($skip_choosing eq "false"){
 }
 
 
+# check for UCX
+
+if($skip_choosing eq "false"){
+  my $ucx_found = index(`cc $tempfile -Wl,-lucp 2>&1`, "-lucp") == -1;
+  my $pmix_found = index(`cc $tempfile -Wl,-lpmix 2>&1`, "-lpmix") == -1;
+
+  if ($ucx_found and $pmix_found) {
+    print "\nI found that you have UCX libs available in your toolchain.\nDo you want to build Charm++ targeting UCX? [Y/n]: ";
+    my $p = promptUserYN();
+    if($p eq "yes" || $p eq "default") {
+      $converse_network_type = "ucx";
+      $skip_choosing = "true";
+    }
+  }
+}
+
+
 # check for Verbs
 
 if($skip_choosing eq "false"){
@@ -263,6 +280,7 @@ Choose an interconnect from below: [1-10]
 	 5) Blue Gene/Q
 	 6) Intel Omni-Path (ofi)
 	 7) PAMI
+	 8) UCX
 
 EOF
 
@@ -288,6 +306,9 @@ EOF
 		last;
 	  } elsif($line eq "7"){
 		$converse_network_type = "pamilrts";
+		last;
+	  } elsif($line eq "8"){
+		$converse_network_type = "ucx";
 		last;
 	  } else {
 		print "Invalid option, please try again :P\n"

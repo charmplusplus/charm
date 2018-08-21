@@ -1552,6 +1552,32 @@ fi
 
 fi
 
+#### test if we can build UCX ####
+if test "$CMK_BUILD_UCX" = 1
+then
+cat > $tc <<EOT
+#include <ucp/api/ucp.h>
+int main(int argc, char **argv)
+{
+  unsigned major, minor, number;
+  ucp_get_version(&major, &minor, &number);
+  return 0;
+}
+EOT
+test_cc "whether build on UCX" "yes" "no" "-lucp"
+AC_DEFINE_UNQUOTED(CMK_BUILD_ON_UCX, $strictpass, [build UCX.])
+BUILD_UCX=$strictpass
+
+if test $BUILD_UCX -eq 0
+then
+  echo "Error: Unable to compile UCX"
+  test_finish 1
+else
+  test_linkc "whether -lucp" "ok" "no" "-lucp"
+fi
+
+fi
+
 #### test if we can build MPI ####
 if test "$CMK_BUILD_MPI" = 1
 then
