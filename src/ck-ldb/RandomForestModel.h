@@ -194,4 +194,5 @@ struct ForestModel {
   void readModel(const char* dir);
   int forestTest(std::vector<double>& X, int num_rows, int num_cols);
 };
-};
+
+}
