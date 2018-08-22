@@ -344,6 +344,11 @@ private:
 A demonstration of bound arrays can be found in
 \testrefdir{startupTest}
 
+Note that if any bound array element sets {\it usesAtSync=true} in its constructor, then users
+must ensure that {\it AtSync()} is called on all of those array elements. If a bound array
+element does not have the usesAtSync flag set to true, then it will migrate along with any
+elements it is bound to when they migrate. In this case, such an array element does not need
+to call {\it AtSync()} itself.
 
 \subsection{Dynamic Insertion}
 \label{dynamic_insertion}
