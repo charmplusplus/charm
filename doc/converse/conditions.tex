@@ -82,4 +82,31 @@ This call registers a function via a pointer to it, {\tt fnp},  that will be
 called at least {\tt msLater} milliseconds later. 
 The registered function {\tt fnp} is actually called the first time the
 scheduler gets control after {\tt deltaT} milliseconds have elapsed. 
+The default polling resolution for timed callbacks is 5 ms.
 
+\function{double CcdSetResolution(newResolution)}
+\args{double newResolution;}
+
+This call sets the polling resolution for completion of timed callbacks.
+{\tt newResolution} is the updated time in seconds. The default polling resolution
+for timed callbacks is 5 ms. The resolution cannot be any longer than this but
+it can be set arbitrarily short. Shorter resolution times can result in a
+performance decrease due to more time being spent polling for callbacks but may be
+preferred in cases where these need to be triggered quickly and/or are on the
+critical path of an application.
+This function also returns the old resolution in seconds in case it needs to be
+reset to a non-default value.
+
+\function{double CcdResetResolution()}
+
+This call returns the time based callback polling resolution to its default,
+5 milliseconds. It returns the previously set resolution in seconds.
+
+\function{double CcdIncreaseResolution(newResolution)}
+\args{double newResolution;}
+
+This is a ``safe'' version of {\tt CcdSetResolution} that only ever sets the
+resolution to a shorter time.
+The same caveats about short polling times affecting performance still apply,
+This function returns the previous (and potentially current, if it was shorter
+than {\tt newResolution},) resolution in seconds.

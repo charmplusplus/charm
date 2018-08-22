@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include "converse.h"
 
@@ -215,6 +216,8 @@ typedef struct {
 CpvStaticDeclare(ccd_cond_callbacks, conds);   
 
 
+// Default resolution of .005 seconds aka 5 milliseconds
+#define CCD_DEFAULT_RESOLUTION 5.0e-3
 
 /*Make sure this matches the CcdPERIODIC_* list in converse.h*/
 #define CCD_PERIODIC_MAX 13
@@ -227,6 +230,7 @@ const static double periodicCallInterval[CCD_PERIODIC_MAX]=
 typedef struct {
 	int nSkip;/*Number of opportunities to skip*/
 	double lastCheck;/*Time of last check*/
+	double resolution;
 	double nextCall[CCD_PERIODIC_MAX];
 } ccd_periodic_callbacks;
 
@@ -431,6 +435,7 @@ void CcdModuleInit(char **ignored)
    CpvAccess(pcb).lastCheck = curTime;
    for (i=0;i<CCD_PERIODIC_MAX;i++)
 	   CpvAccess(pcb).nextCall[i]=curTime+periodicCallInterval[i];
+   CpvAccess(pcb).resolution = CCD_DEFAULT_RESOLUTION;
    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,CcdCallBacksReset,0);
    CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE,CcdCallBacksReset,0);
 }
@@ -532,6 +537,52 @@ void CcdRaiseCondition(int condnum)
 }
 
 
+/**
+ * Internal helper function that updates the polling resolution for time
+ * based callbacks to minimum of two arguments and ensures appropriate
+ * counters etc are reset
+ */
+double CcdSetMinResolution(double newResolution, double minResolution) {
+  ccd_periodic_callbacks* o = &CpvAccess(pcb);
+  double oldResolution = o->resolution;
+
+  o->resolution = fmin(newResolution, minResolution);
+
+  // Ensure we don't miss the new quantum
+  if (o->resolution < oldResolution) {
+    CcdCallBacksReset(NULL, CmiWallTimer());
+  }
+
+  return oldResolution;
+}
+
+/**
+ * Set the polling resolution for time based callbacks
+ */
+double CcdSetResolution(double newResolution) {
+  return CcdSetMinResolution(newResolution, CCD_DEFAULT_RESOLUTION);
+}
+
+/**
+ * Reset the polling resolution for time based callbacks to its default value
+ */
+double CcdResetResolution() {
+  ccd_periodic_callbacks* o = &CpvAccess(pcb);
+  double oldResolution = o->resolution;
+
+  o->resolution = CCD_DEFAULT_RESOLUTION;
+
+  return oldResolution;
+}
+
+/**
+ * "Safe" operation that only ever increases the polling resolution for time
+ * based callbacks
+ */
+double CcdIncreaseResolution(double newResolution) {
+  return CcdSetMinResolution(newResolution, CpvAccess(pcb).resolution);
+}
+
 /* 
  * Trigger callbacks periodically, and also the time-indexed
  * functions if their time has arrived
@@ -548,9 +599,10 @@ void CcdCallBacks(void)
 #if 1
 /* Dynamically adjust the number of messages to skip */
   double elapsed = curWallTime - o->lastCheck;
-#define targetElapsed 5.0e-3
-  if (elapsed<targetElapsed) nSkip*=2; /* too short: process more */
-  else /* elapsed>targetElapsed */ nSkip/=2; /* too long: process fewer */
+  // Adjust the number of skipped messages by a multiple between .5, if we
+  // skipped too many messages last time, and 2, if we skipped too few.
+  // Ideally elapsed = resolution and we keep nSkip the same i.e. multiply by 1
+  nSkip = (int)(nSkip * fmax(0.5, fmin(2.0, o->resolution / elapsed)));
   
 /* Keep skipping within a sensible range */
 #define minSkip 1u
