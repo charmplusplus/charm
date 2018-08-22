@@ -1154,15 +1154,15 @@ void CmiFreeAligned(void* ptr) {
 CMI_EXTERNC void * __libc_memalign (size_t alignment, size_t bytes) { return memalign(alignment, bytes); }
 
 #if CMK_EXPECTS_MORECORE
-CMI_EXTERNC void * __default_morecore (ptrdiff_t);
+CMI_EXTERNC void * __default_morecore (ptrdiff_t) CMK_THROW;
 void *(*__morecore)(ptrdiff_t) = __default_morecore;
 #endif
 #endif
 
 #if defined CMI_MEMORY_GNU && defined _LIBC
-CMI_EXTERNC int mallopt (int param_number, int value) { return __libc_mallopt(param_number, value); }
+CMI_EXTERNC int mallopt (int param_number, int value) CMK_THROW { return __libc_mallopt(param_number, value); }
 #elif !defined CMI_MEMORY_GNU || defined _LIBC
-CMI_EXTERNC int mallopt (int param_number, int value) { return 1; }
+CMI_EXTERNC int mallopt (int param_number, int value) CMK_THROW { return 1; }
 #endif
 
 CMI_EXTERNC void __malloc_fork_lock_parent (void) { }
