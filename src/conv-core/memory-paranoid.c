@@ -77,7 +77,7 @@ static int memory_fillphase=0;
 static void fill_uninit(char *loc,int len)
 {
 	int fill=memory_fill;
-	char fillChar;
+	int fillChar;
 	if (fill==-1) /*Alternate zero and DE fill*/
 		fill=(memory_fillphase++)%2;
 	if (fill!=0) fillChar=0xDE;
