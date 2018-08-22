@@ -2005,6 +2005,7 @@ void *foo(void *a,int l,int fd) {
 EOT
 test_cxx "whether the mmap() syscall exists" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_MMAP, $pass, [whether the mmap() syscall exists])
+add_flag "CMK_HAS_MMAP=$pass"
 
 #### check if mmap accepts MAP_ANON ####
 cat > $t <<EOT

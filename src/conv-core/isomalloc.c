@@ -1791,11 +1791,7 @@ static void init_ranges(char **argv)
 #else
     slotsize=16*1024;
 #endif 
-#if CMK_HAS_GETPAGESIZE
-    pagesize = getpagesize();
-#endif
-    if (pagesize < CMK_MEMORY_PAGESIZE)
-      pagesize = CMK_MEMORY_PAGESIZE;
+    pagesize = CmiGetPageSize();
     slotsize=(slotsize+pagesize-1) & ~(pagesize-1);
 
 #if ISOMALLOC_DEBUG

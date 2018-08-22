@@ -2086,13 +2086,14 @@ static void CthOnly(void *arg, void *vt, qt_userf_t fn)
 static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size,int Migratable)
 {
   CthThread result; qt_t *stack, *stackbase, *stackp;
+  const size_t pagesize = CmiGetPageSize();
   int doProtect=(!Migratable) && CMK_STACKPROTECT;
   result=CthThreadInit();
   if (doProtect) 
   { /*Can only protect on a page boundary-- allocate an extra page and align stack*/
     if (size==0) size=CthCpvAccess(_defaultStackSize);
-    size = (size+(CMK_MEMORY_PAGESIZE*2)-1) & ~(CMK_MEMORY_PAGESIZE-1);
-    stack = (qt_t*)CthMemAlign(CMK_MEMORY_PAGESIZE, size);
+    size = (size+(pagesize*2)-1) & ~(pagesize-1);
+    stack = (qt_t*)CthMemAlign(pagesize, size);
     B(result)->stack = stack;
     B(result)->stacksize = size;
   } else
@@ -2107,12 +2108,12 @@ static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size,int Migratable
   if (doProtect) {
 #ifdef QT_GROW_UP
     /*Stack grows up-- protect highest page of stack*/
-    result->protect = ((char*)stack) + size - CMK_MEMORY_PAGESIZE;
+    result->protect = ((char*)stack) + size - pagesize;
 #else
     /*Stack grows down-- protect lowest page in stack*/
     result->protect = ((char*)stack);
 #endif
-    result->protlen = CMK_MEMORY_PAGESIZE;
+    result->protlen = pagesize;
     CthMemoryProtect(stack, result->protect, result->protlen);
   }
 

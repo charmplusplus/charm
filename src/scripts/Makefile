@@ -399,42 +399,101 @@ CLBLIBS=$(L)/libldb-rand.a $(L)/libldb-spray.a   $(L)/libldb-workstealing.a  $(L
 
 TRACELIBS = $(L)/libtrace-converse.a $(L)/libtracef_f.a 
 
-BUILD_TRACING=$(shell CHARMINC=.; if test -f ./conv-config.sh; then . ./conv-config.sh; echo $$CMK_TRACE_ENABLED; fi )
+BUILD_TRACING := $(shell CHARMINC=.; if test -f ./conv-config.sh; then . ./conv-config.sh; echo $$CMK_TRACE_ENABLED; fi )
 
 ifneq "$(BUILD_TRACING)" "0"
-TRACELIBS += $(L)/libtrace-projections.a $(L)/libtrace-controlPoints.a  $(L)/libtrace-summary.a \
-             $(L)/libtrace-utilization.a  $(L)/libtrace-simple.a \
-             $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
-	     $(L)/libtrace-projector.a $(L)/libtrace-all.a  \
-             $(L)/libtrace-memory.a $(L)/libtrace-perfReport.a
+
+TRACELIBS += \
+  $(L)/libtrace-projections.a \
+  $(L)/libtrace-controlPoints.a \
+  $(L)/libtrace-summary.a \
+  $(L)/libtrace-utilization.a \
+  $(L)/libtrace-simple.a \
+  $(L)/libtrace-counter.a \
+  $(L)/libtrace-bluegene.a \
+  $(L)/libtrace-projector.a \
+  $(L)/libtrace-all.a \
+  $(L)/libtrace-memory.a \
+  $(L)/libtrace-perfReport.a \
+
 endif
 
-MEMLIBS=$(L)/libmemory-default.a $(L)/libmemory-os.a $(L)/libmemory-gnu.a \
-          $(L)/libmemory-verbose.a  $(L)/libmemory-paranoid.a \
-	  $(L)/libmemory-leak.a $(L)/libmemory-isomalloc.a \
-	  $(L)/libmemory-os-verbose.a $(L)/libmemory-os-isomalloc.a \
-	  $(L)/libmemory-os-leak.a $(L)/libmemory-os-paranoid.a \
-          $(L)/libmemory-os-lock.a $(L)/libmemory-os-wrapper.a
+CMK_HAS_MMAP := $(shell CHARMINC=.; if test -f ./conv-config.sh; then . ./conv-config.sh; echo $$CMK_HAS_MMAP; fi )
 
-BUILD_CHARMDEBUG=$(shell CHARMINC=.; if test -f ./conv-config.sh; then . ./conv-config.sh; echo $$CMK_CHARMDEBUG; fi )
+MEMLIBS = \
+  $(L)/libmemory-default.a \
+  $(L)/libmemory-os.a \
+  $(L)/libmemory-os-verbose.a \
+  $(L)/libmemory-os-isomalloc.a \
+  $(L)/libmemory-os-leak.a \
+  $(L)/libmemory-os-paranoid.a \
+  $(L)/libmemory-os-lock.a \
+  $(L)/libmemory-os-wrapper.a \
+
+ifneq ($(CMK_HAS_MMAP),0)
+
+MEMLIBS += \
+  $(L)/libmemory-gnu.a \
+  $(L)/libmemory-verbose.a \
+  $(L)/libmemory-paranoid.a \
+  $(L)/libmemory-leak.a \
+  $(L)/libmemory-isomalloc.a \
+
+endif
+
+BUILD_CHARMDEBUG := $(shell CHARMINC=.; if test -f ./conv-config.sh; then . ./conv-config.sh; echo $$CMK_CHARMDEBUG; fi )
 
 ifneq "$(BUILD_CHARMDEBUG)" "0"
-MEMLIBS += $(L)/libmemory-charmdebug.a $(L)/libmemory-charmdebug-mmap.a \
-	  $(L)/libmemory-charmdebug-slot.a  \
-          $(L)/libmemory-charmdebug-mmap-slot.a \
-	  $(L)/libmemory-os-charmdebug.a $(L)/libmemory-hooks-charmdebug.a
+ifneq ($(CMK_HAS_MMAP),0)
+
+MEMLIBS += \
+  $(L)/libmemory-charmdebug.a \
+  $(L)/libmemory-charmdebug-mmap.a \
+  $(L)/libmemory-charmdebug-slot.a \
+  $(L)/libmemory-charmdebug-mmap-slot.a \
+  $(L)/libmemory-hooks-charmdebug.a \
+
 endif
 
-THREADLIBS=$(L)/libthreads-default.a $(L)/libthreads-default-tls.a  \
-          $(L)/libthreads-qt.a 	$(L)/libthreads-qt-tls.a  \
-	  $(L)/libthreads-context.a $(L)/libthreads-context-tls.a  \
-	  $(L)/libthreads-uFcontext.a $(L)/libthreads-uFcontext-tls.a \
-	  $(L)/libthreads-uJcontext.a  $(L)/libthreads-uJcontext-tls.a \
-	  $(L)/libthreads-pthreads.a $(L)/libthreads-fibers.a \
-	  $(L)/libthreads-stackcopy.a $(L)/libthreads-memoryalias.a \
-          $(L)/libthreads-qt-memoryalias.a	\
-	  $(L)/libthreads-context-memoryalias.a	\
-	  $(L)/libthreads-uJcontext-memoryalias.a
+MEMLIBS += \
+  $(L)/libmemory-os-charmdebug.a \
+
+endif
+
+ifneq ($(findstring -win-,$(shell cat .vdir)),)
+  IS_WINDOWS := 1
+else
+  IS_WINDOWS := 0
+endif
+
+THREADLIBS = \
+  $(L)/libthreads-default.a \
+  $(L)/libthreads-default-tls.a \
+  $(L)/libthreads-qt.a \
+  $(L)/libthreads-qt-tls.a \
+  $(L)/libthreads-uFcontext.a \
+  $(L)/libthreads-uFcontext-tls.a \
+  $(L)/libthreads-stackcopy.a \
+
+ifneq ($(IS_WINDOWS),0)
+
+THREADLIBS += \
+  $(L)/libthreads-fibers.a \
+
+else
+
+THREADLIBS += \
+  $(L)/libthreads-context.a \
+  $(L)/libthreads-context-tls.a \
+  $(L)/libthreads-uJcontext.a \
+  $(L)/libthreads-uJcontext-tls.a \
+  $(L)/libthreads-pthreads.a \
+  $(L)/libthreads-memoryalias.a \
+  $(L)/libthreads-qt-memoryalias.a \
+  $(L)/libthreads-context-memoryalias.a \
+  $(L)/libthreads-uJcontext-memoryalias.a \
+
+endif
 
 CVLIBS=$(L)/libconv-core.a \
 	$(L)/conv-static.o \

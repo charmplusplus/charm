@@ -1014,7 +1014,7 @@ public_vALLOc(size_t bytes)
     return 0;
   if (ar_ptr != &main_arena)
     bytes += FOOTER_OVERHEAD;
-  p = mspace_memalign(arena_to_mspace(ar_ptr), CMK_MEMORY_PAGESIZE, bytes);
+  p = mspace_memalign(arena_to_mspace(ar_ptr), CmiGetPageSize(), bytes);
 
   if (p && ar_ptr != &main_arena)
     set_non_main_arena(p, ar_ptr);
@@ -1036,6 +1036,7 @@ public_pVALLOc(size_t bytes)
 {
   struct malloc_arena* ar_ptr;
   void *p;
+  size_t pagesize;
 
   if(__malloc_initialized < 0)
     ptmalloc_init ();
@@ -1044,7 +1045,8 @@ public_pVALLOc(size_t bytes)
     return 0;
   if (ar_ptr != &main_arena)
     bytes += FOOTER_OVERHEAD;
-  p = mspace_memalign(arena_to_mspace(ar_ptr), CMK_MEMORY_PAGESIZE, (bytes + CMK_MEMORY_PAGESIZE - 1) & ~(CMK_MEMORY_PAGESIZE - 1));
+  pagesize = CmiGetPageSize();
+  p = mspace_memalign(arena_to_mspace(ar_ptr), pagesize, (bytes + pagesize - 1) & ~(pagesize - 1));
 
   if (p && ar_ptr != &main_arena)
     set_non_main_arena(p, ar_ptr);

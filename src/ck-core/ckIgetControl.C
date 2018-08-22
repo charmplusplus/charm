@@ -134,7 +134,7 @@ getAvailMemory(int grainsize)
   unsigned long size = chunk;
   char *data = NULL, *olddata = NULL;
   unsigned long init_pf = 0;
-  int pagesize = getpagesize();
+  int pagesize = CmiGetPageSize();
 /*
   if(grainsize >= 10*1024*1024)
     subchunk = 20*1024*1024;    

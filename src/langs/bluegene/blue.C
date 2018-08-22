@@ -1811,7 +1811,7 @@ if(bgUseOutOfCore){
 #if BIGSIM_OUT_OF_CORE
   //initialize variables related to get precise
   //physical memory usage info for a process
-  bgMemPageSize = getpagesize();
+  bgMemPageSize = CmiGetPageSize();
   memset(bgMemStsFile, 0, 25); 
   sprintf(bgMemStsFile, "/proc/%d/statm", getpid());
 #endif

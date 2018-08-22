@@ -878,6 +878,7 @@ int CmiMemoryIs(int flag); /* return state of this flag */
 int CmiThreadIs(int flag); /* return state of this flag */
 
 void CmiMkdir(const char *dirName);
+int CmiGetPageSize(void);
 
 double   CmiCpuTimer(void);
 

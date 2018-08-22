@@ -214,12 +214,13 @@ static void *meta_aligned_alloc(size_t align, size_t size)
 
 static void *meta_valloc(size_t size)
 {
-	return meta_memalign(CMK_MEMORY_PAGESIZE, size);
+	return meta_memalign(CmiGetPageSize(), size);
 }
 
 static void *meta_pvalloc(size_t size)
 {
-	return meta_memalign(CMK_MEMORY_PAGESIZE, (size + CMK_MEMORY_PAGESIZE - 1) & ~(CMK_MEMORY_PAGESIZE - 1));
+	const size_t pagesize = CmiGetPageSize();
+	return meta_memalign(pagesize, (size + pagesize - 1) & ~(pagesize - 1));
 }
 
 #define CMK_MEMORY_HAS_NOMIGRATE

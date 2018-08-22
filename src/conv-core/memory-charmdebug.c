@@ -1058,8 +1058,6 @@ static void checkBackup(void) {
 
 #include <signal.h>
 
-static int meta_getpagesize(void);
-
 static int CpdMprotect = 0;
 
 static void** unProtectedPages = NULL;
@@ -1074,7 +1072,7 @@ static void CpdMMAPhandler(int sig, siginfo_t *si, void *unused){
     CpdFreeze();
   }
   lastAddressSegv = si->si_addr;
-  pageToUnprotect = (void*)(uintptr_t)((CmiUInt8)(uintptr_t)si->si_addr & ~(meta_getpagesize()-1));
+  pageToUnprotect = (void*)(uintptr_t)((CmiUInt8)(uintptr_t)si->si_addr & ~(CmiGetPageSize()-1));
   mprotect(pageToUnprotect, 4, PROT_READ|PROT_WRITE);
   if (unProtectedPagesSize >= unProtectedPagesMaxSize) {
     void **newUnProtectedPages;
@@ -1401,17 +1399,6 @@ static void freeSlot(Slot *s) {
 
 /********** meta_ routines ***********/
 
-/* Return the system page size */
-static int meta_getpagesize(void) {
-  static int cache=0;
-#if defined(CMK_GETPAGESIZE_AVAILABLE)
-  if (cache==0) cache=getpagesize();
-#else
-  if (cache==0) cache=8192;
-#endif
-  return cache;
-}
-
 /* Only display startup status messages from processor 0 */
 static void status(const char *msg) {
   if (CmiMyPe()==0 && !CmiArgGivingUsage()) {
@@ -1571,7 +1558,7 @@ static void meta_free(void *mem) {
       freeSlot(s);
       BEFORE_MALLOC_CALL;
       mm_free(ptr);
-      /*mm_free(((char *)mem)-meta_getpagesize());*/
+      /*mm_free(((char *)mem)-CmiGetPageSize());*/
       AFTER_MALLOC_CALL;
     }
     else if ((s->magic&~FLAGS_MASK)==SLOTMAGIC)
@@ -1712,11 +1699,11 @@ static void *meta_aligned_alloc(size_t align, size_t size) {
 }
 
 static void *meta_valloc(size_t size) {
-  return meta_memalign(meta_getpagesize(),size);
+  return meta_memalign(CmiGetPageSize(),size);
 }
 
 static void *meta_pvalloc(size_t size) {
-  size_t pagesize = meta_getpagesize();
+  const size_t pagesize = CmiGetPageSize();
   return meta_memalign(pagesize, (size + pagesize - 1) & ~(pagesize - 1));
 }
 
@@ -1786,7 +1773,7 @@ void * MemoryToSlot(void *ptr) {
   int i;
 #if defined(CPD_USE_MMAP) && defined(CMK_SEPARATE_SLOT)
   for (i=0; i<1000; ++i) {
-    sl = UserToSlot((void*)(intptr_t)(((CmiUInt8)(intptr_t)ptr)-i*meta_getpagesize() & ~(meta_getpagesize()-1)));
+    sl = UserToSlot((void*)(intptr_t)(((CmiUInt8)(intptr_t)ptr)-i*CmiGetPageSize() & ~(CmiGetPageSize()-1)));
     if (sl != NULL) return sl;
   }
 #endif
@@ -1795,7 +1782,7 @@ void * MemoryToSlot(void *ptr) {
 
 /*void PrintDebugStackTrace(void *ptr) {
   int i;
-  Slot *sl = UserToSlot((void*)(((CmiUInt8)ptr) & ~(meta_getpagesize()-1)));
+  Slot *sl = UserToSlot((void*)(((CmiUInt8)ptr) & ~(CmiGetPageSize()-1)));
   if (sl != NULL) {
     CmiPrintf("%d %d ",sl->chareID,sl->stackLen);
     for (i=0; i<sl->stackLen; ++i) CmiPrintf("%p ",sl->from[i]);

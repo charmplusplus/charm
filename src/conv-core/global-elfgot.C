@@ -290,10 +290,7 @@ CtgGlobalList::CtgGlobalList() {
     int padding = 0;
 
 #if UNPROTECT_GOT && CMK_HAS_MPROTECT
-    size_t pagesize = CMK_MEMORY_PAGESIZE;
-#if CMK_HAS_GETPAGESIZE
-    pagesize = getpagesize();
-#endif
+    const size_t pagesize = CmiGetPageSize();
 #endif
 
     // Figure out which relocation data entries refer to global data:

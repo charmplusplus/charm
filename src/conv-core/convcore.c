@@ -3290,7 +3290,7 @@ void CmiTmpInit(char **argv) {
   Cross-platform directory creation
 
   ****************************************************************************/
-#ifdef _MSC_VER
+#ifdef _WIN32
 /* Windows directory creation: */
 #include <windows.h>
 
@@ -3298,17 +3298,28 @@ void CmiMkdir(const char *dirName) {
 	CreateDirectory(dirName,NULL);
 }
 
-#else /* !_MSC_VER */
+int CmiGetPageSize(void)
+{
+  SYSTEM_INFO system_info;
+  GetSystemInfo(&system_info);
+  return system_info.dwPageSize;
+}
+#else
 /* UNIX directory creation */
 #include <unistd.h> 
 #include <sys/stat.h> /* from "mkdir" man page */
 #include <sys/types.h>
 
 void CmiMkdir(const char *dirName) {
-#ifndef _WIN32
 	mkdir(dirName,0777);
+}
+
+int CmiGetPageSize(void)
+{
+#if CMK_HAS_GETPAGESIZE
+  return getpagesize();
 #else
-	mkdir(dirName);
+  return CMK_MEMORY_PAGESIZE;
 #endif
 }
 
