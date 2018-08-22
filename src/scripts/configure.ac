@@ -723,6 +723,7 @@ then
         # For the rest of configure, append this to compilation flags
         OPTS_CC="$CMK_ENABLE_C11 $OPTS_CC"
 fi
+fi # endif USER_ASKED_FOR_NEW_STD
 
 #### check if C++ compiler supports cpp11 compilation flags ####
 cat > $t <<EOT
@@ -742,9 +743,6 @@ then
         # For the rest of configure, append this to compilation flags
         OPTS_CXX="$CMK_ENABLE_CPP11 $OPTS_CXX"
 fi
-
-fi # endif USER_ASKED_FOR_NEW_STD
-
 
 # Perform the tests
 

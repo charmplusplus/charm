@@ -985,12 +985,15 @@ then
     then
         OPTS_CC="$OPTS $CMK_ENABLE_C11"
     fi
-    # and if configure confirmed that the underlying compiler knows abt CPP11, enable it
-    if [ "$CMK_COMPILER_KNOWS_CPP11" = "1" ]
-    then
-        OPTS_CXX="$OPTS $CMK_ENABLE_CPP11"
-    fi
 fi
+
+# if configure confirmed that the underlying compiler knows abt CPP11, enable it
+if [ "$CMK_COMPILER_KNOWS_CPP11" = "1" ]
+then
+    OPTS_CXX="$OPTS $CMK_ENABLE_CPP11"
+    CMK_NATIVE_CXX_FLAGS="$CMK_NATIVE_CXX_FLAGS $CMK_ENABLE_CPP11" # assumes CMK_NATIVE_CXX uses same flag as CMK_CXX
+fi
+
 
 if [ "$ROSE_OMP_TLS_GLOBALS" = "yes" ]
 then
