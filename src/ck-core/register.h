@@ -184,7 +184,8 @@ class ChareInfo {
 
     ChareInfo(const char *n, size_t s, ChareType t) : name(n), size(s) {
       defCtor=migCtor=-1;
-      isIrr = numbases = 0;
+      isIrr = false;
+      numbases = 0;
       chareType = t;
       inCharm = false;
       mainChareIdx = -1;
