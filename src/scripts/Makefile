@@ -350,7 +350,6 @@ dirs+sources:
 	./gatherflat $(SRCBASE)/ck-core          .
 	./gatherflat $(SRCBASE)/ck-perf          .
 	./gatherflat $(SRCBASE)/ck-pics          .
-	./gatherflat $(SRCBASE)/ck-tune          .
 	./gatherflat $(SRCBASE)/ck-ldb           .
 	./gatherflat $(SRCBASE)/ck-cp            .
 	./gatherflat $(SRCBASE)/langs/simplemsg  .
