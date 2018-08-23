@@ -406,6 +406,30 @@ test_cxx() {
 	/bin/rm -f out
 }
 
+# Test: tries to compile C++ file $t (described by $1) using native compiler.
+#  If successful, prints $2 and sets $pass/clears $fail
+#  If failure, prints $3 and sets $pass/clears $fail
+#  additional arguments to c++ compiler are passed as $4
+test_native_cxx() {
+        AC_MSG_CHECKING("$1")
+	echo "### $1" >> $charmout
+	cat $t >> $charmout
+	echo $CMK_NATIVE_CXX $CMK_NATIVE_CXX_FLAGS -I../include -I. $CMK_INCDIR $CMK_SYSINC $OPTS_CXX -c $t -o test.o $4 >> $charmout
+	$CMK_NATIVE_CXX $CMK_NATIVE_CXX_FLAGS -I../include -I. $CMK_INCDIR $CMK_SYSINC $OPTS_CXX -c $t -o test.o $4 > out 2>&1
+	test_result $? "$1" "$2" "$3"
+	strictpass=$pass
+	strictfail=$fail
+        if test $pass -eq 1
+	then
+          if grep -i "warn" out > /dev/null 2>&1 || grep -i "(W)" out > /dev/null 2>&1
+	  then
+	    strictpass="0" && strictfail="1"
+          fi
+        fi
+	cat out >> $charmout
+	/bin/rm -f out
+}
+
 # Testlink: tries to compile and link a C++ file $t (described by $1).
 #  If successful, prints $2 and sets $pass/clears $fail
 #  If failure, prints $3 and sets $pass/clears $fail
@@ -655,6 +679,20 @@ then
   test_finish 1
 fi
 
+test_native_cxx "whether native C++ compiler supports C++11 without flags" "yes" "no" ""
+if test $strictpass -ne 1
+then
+  # Flags for g++/clang++/icpc/xlC++, pgCC, and CrayCC respectively
+  for i in "-std=c++11" "--c++11" "-h std=c++11"; do
+    test_native_cxx "whether C++ compiler supports C++11 with '$i'" "yes" "no" "$i"
+    if test $strictpass -eq 1
+    then
+      add_flag "$(echo CMK_NATIVE_CXX_FLAGS=\"\$CMK_NATIVE_CXX_FLAGS $i\")" "Enable C++11 support"
+      break
+    fi
+done
+fi
+
 # Workaround for bug #1045 appearing in GCC >6.x
 test_cxx "whether C++ compiler accepts -fno-lifetime-dse" "yes" "no" "-fno-lifetime-dse"
 if test $strictpass -eq 1
@@ -724,25 +762,6 @@ then
         OPTS_CC="$CMK_ENABLE_C11 $OPTS_CC"
 fi
 fi # endif USER_ASKED_FOR_NEW_STD
-
-#### check if C++ compiler supports cpp11 compilation flags ####
-cat > $t <<EOT
-#include <iostream>
-
-int foo()
-{
-  return 0;
-}
-EOT
-test_cxx "whether c++ compiler knows of the cpp11 standard" "ok" "no" "$CMK_ENABLE_CPP11"
-AC_DEFINE_UNQUOTED(CMK_COMPILER_KNOWS_CPP11, $pass, [whether c++ compiler knows of the cpp11 standard] )
-if test $pass -eq 1
-then
-        # Record results for charmc's future use
-        add_flag 'CMK_COMPILER_KNOWS_CPP11="1"' "cpp11"
-        # For the rest of configure, append this to compilation flags
-        OPTS_CXX="$CMK_ENABLE_CPP11 $OPTS_CXX"
-fi
 
 # Perform the tests
 
