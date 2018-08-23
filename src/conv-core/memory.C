@@ -232,7 +232,11 @@ void initialize_memory_wrapper_cfree(void *ptr) {
 #define mm_calloc   calloc
 #define mm_memalign memalign
 #define mm_posix_memalign posix_memalign
+#if (defined __cplusplus && __cplusplus >= 201703L) || (defined __STDC_VERSION__ && __STDC_VERSION__ >= 201112L)
 #define mm_aligned_alloc aligned_alloc
+#else
+#define mm_aligned_alloc memalign
+#endif
 #define mm_free     free
 #endif /* CMK_MEMORY_BUILD_OS_WRAPPED */
 #endif /* CMK_MEMORY_BUILD_OS */
