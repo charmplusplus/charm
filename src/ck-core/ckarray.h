@@ -206,14 +206,14 @@ public:
         CProxySection_ArrayBase(const CProxySection_ArrayBase &cs)
 		:CProxy_ArrayBase(cs) {
         _sid.resize(cs._sid.size());
-        for (int i=0; i<_sid.size(); ++i) {
+        for (size_t i=0; i<_sid.size(); ++i) {
           _sid[i] = cs._sid[i];
         }
     }
         CProxySection_ArrayBase(const CProxySection_ArrayBase &cs, CK_DELCTOR_PARAM)
 		:CProxy_ArrayBase(cs.ckGetArrayID(),CK_DELCTOR_ARGS) {
         _sid.resize(cs._sid.size());
-        for (int i=0; i<_sid.size(); ++i) {
+        for (size_t i=0; i<_sid.size(); ++i) {
           _sid[i] = cs._sid[i];
         }
     }
@@ -222,14 +222,14 @@ public:
     CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems,CK_DELCTOR_PARAM)
         :CProxy_ArrayBase(aid[0],CK_DELCTOR_ARGS) {
         _sid.resize(n);
-        for (int i=0; i<_sid.size(); ++i) {
+        for (size_t i=0; i<_sid.size(); ++i) {
           _sid[i] = CkSectionID(aid[i], elems[i], nElems[i]);
         }
     }
     CProxySection_ArrayBase(const std::vector<CkArrayID> &aid, const std::vector<std::vector<CkArrayIndex> > &elems, CK_DELCTOR_PARAM)
         :CProxy_ArrayBase(aid[0],CK_DELCTOR_ARGS) {
         _sid.resize(aid.size());
-        for (int i=0; i<_sid.size(); ++i) {
+        for (size_t i=0; i<_sid.size(); ++i) {
           _sid[i] = CkSectionID(aid[i], elems[i]);
         }
     }
@@ -239,7 +239,7 @@ public:
     CProxySection_ArrayBase &operator=(const CProxySection_ArrayBase &cs) {
       CProxy_ArrayBase::operator=(cs);
       _sid.resize(cs._sid.size());
-      for (int i=0; i<_sid.size(); ++i) {
+      for (size_t i=0; i<_sid.size(); ++i) {
         _sid[i] = cs._sid[i];
       }
       return *this;

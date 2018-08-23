@@ -94,7 +94,7 @@ int CpdPythonGroup::nextIteratorUpdate(PyObject *&data, PyObject *result, void *
     return 0;
   }
   if (nextElement > 0) {
-    if (nextElement == arriter.elems.size()) {
+    if ((size_t)nextElement == arriter.elems.size()) {
       nextElement = 0;
       arriter.elems.removeAll();
       return 0;

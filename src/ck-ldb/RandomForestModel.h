@@ -55,7 +55,7 @@ struct DataMatrix {
   }
   DataMatrix(const vector<double>& d, int nrows, int ncols)
       : data(d), num_rows(nrows), num_cols(ncols) {
-    CkAssert(d.size() == nrows * ncols);
+    CkAssert(d.size() == (size_t)nrows * (size_t)ncols);
   }
 
   inline double& data_at(int x, int y) { return data[x * num_cols + y]; }
