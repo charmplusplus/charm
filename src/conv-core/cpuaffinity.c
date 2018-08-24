@@ -660,10 +660,10 @@ static void bind_threads_only(hwloc_obj_type_t thread_unit)
   int thread_assignment = CmiMyRank() % thread_unitcount;
 
   hwloc_obj_t thread_obj = cmi_hwloc_get_obj_by_type(topology, thread_unit, thread_assignment);
-  hwloc_cpuset_t thread_cpuset = hwloc_bitmap_dup(thread_obj->cpuset);
-  hwloc_bitmap_singlify(thread_cpuset);
+  hwloc_cpuset_t thread_cpuset = cmi_hwloc_bitmap_dup(thread_obj->cpuset);
+  cmi_hwloc_bitmap_singlify(thread_cpuset);
   set_thread_affinity(topology, thread_cpuset);
-  hwloc_bitmap_free(thread_cpuset);
+  cmi_hwloc_bitmap_free(thread_cpuset);
 
 
   cmi_hwloc_topology_destroy(topology);
@@ -689,10 +689,10 @@ static void bind_process_and_threads(hwloc_obj_type_t process_unit, hwloc_obj_ty
   int thread_assignment = CmiMyRank() % thread_unitcount;
 
   hwloc_obj_t thread_obj = cmi_hwloc_get_obj_inside_cpuset_by_type(topology, process_obj->cpuset, thread_unit, thread_assignment);
-  hwloc_cpuset_t thread_cpuset = hwloc_bitmap_dup(thread_obj->cpuset);
-  hwloc_bitmap_singlify(thread_cpuset);
+  hwloc_cpuset_t thread_cpuset = cmi_hwloc_bitmap_dup(thread_obj->cpuset);
+  cmi_hwloc_bitmap_singlify(thread_cpuset);
   set_thread_affinity(topology, thread_cpuset);
-  hwloc_bitmap_free(thread_cpuset);
+  cmi_hwloc_bitmap_free(thread_cpuset);
 
 
   cmi_hwloc_topology_destroy(topology);
