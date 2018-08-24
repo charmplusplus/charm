@@ -209,6 +209,7 @@ int CmiSetCPUAffinity(int mycore)
   cmi_hwloc_bitmap_free(cpuset);
 
   cmi_hwloc_topology_destroy(topology);
+  return 0;
 }
 
 /* This implementation assumes the default x86 CPU mask size used by Linux */
