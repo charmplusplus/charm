@@ -1,4 +1,5 @@
 -include ../../common.mk
+-include ../../include/conv-mach-opt.mak
 OPTS=-O3 
 MPIOPTS=-O3
 CHARMC=../../../bin/ampicxx $(OPTS)
@@ -18,15 +19,13 @@ pipe: pingpong-pipeline.c
 
 # This test runs longer on BGQ, so reduce the number of iterations run there:
 test: all
-	CHARMINC=../../../include . ../../../tmp/conv-mach.sh ; \
-	if [ "$$CMK_BLUEGENEQ" = "1" ] ; \
-	then \
-	  $(call run, +p1 ./pgm 1000 16 +vp2) ; \
-	  $(call run, +p2 ./pgm 100 16 +vp2) ; \
-	else \
-	  $(call run, +p1 ./pgm 100000 16 +vp2) ; \
-	  $(call run, +p2 ./pgm 10000 16 +vp2) ; \
-	fi ;
+ifeq ($(CMK_BLUEGENEQ),1)
+	$(call run, +p1 ./pgm 1000 16 +vp2)
+	$(call run, +p2 ./pgm 100 16 +vp2)
+else
+	$(call run, +p1 ./pgm 100000 16 +vp2)
+	$(call run, +p2 ./pgm 10000 16 +vp2)
+endif
 
 bgtest: all
 	$(call run, +p1 ./pgm 10 16 +vp2 +x1 +y1 +z1 )

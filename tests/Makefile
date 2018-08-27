@@ -1,5 +1,5 @@
 # Temporary hack that needs to be removed / replaced
--include ../tmp/buildopts.mk
+-include ../include/conv-mach-opt.mak
 OPTS += $(OPTSATBUILDTIME)
 
 DIRS = \

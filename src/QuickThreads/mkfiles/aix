@@ -1,4 +1,6 @@
-CC=../../bin/charmc -I. -ma $(OPTS)
+CHARMDIR := ../..
+-include $(CHARMDIR)/include/conv-mach-opt.mak
+CHARMC := $(CHARMDIR)/bin/charmc -I. -ma $(OPTS)
 
 all: qt stp testpgm
 
@@ -8,8 +10,7 @@ qt: md/setjmp_d.h qt.c md/setjmp.c
 	$(CC) -c -o qt.o qt.c
 	$(CC) -c -o qtmds.o md/setjmp.c
 	$(CC) -o libckqt.a qt.o qtmds.o
-	CHARMINC=..; . ../conv-config.sh;	\
-	$(CC) -shared -o libckqt.$$CMK_SHARED_SUF qt.o qtmds.o
+	$(CC) -shared -o libckqt.$(CMK_SHARED_SUF) qt.o qtmds.o
 
 stp:
 	$(CC) -c stp.c

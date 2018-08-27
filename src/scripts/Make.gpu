@@ -1,4 +1,5 @@
-BUILD_GPU_MANAGER=$(shell CHARMINC=.; if test -f ./conv-config.sh; then . ./conv-config.sh; echo $$BUILD_CUDA; fi )
+-include conv-mach-opt.mak
+BUILD_GPU_MANAGER := $(BUILD_CUDA)
 
 ifeq "$(BUILD_GPU_MANAGER)" "1"
 hybridAPI:

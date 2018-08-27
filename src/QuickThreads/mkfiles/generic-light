@@ -1,5 +1,6 @@
-
-CHARMC = ../../bin/charmc -seq -I. -U_FORTIFY_SOURCE
+CHARMDIR := ../..
+-include $(CHARMDIR)/include/conv-mach-opt.mak
+CHARMC := $(CHARMDIR)/bin/charmc -seq -I. -U_FORTIFY_SOURCE
 
 all: qt stp testpgm
 
@@ -8,8 +9,7 @@ qt: md/setjmp_d.h qt.c md/setjmp_m.c
 	../system_ln md/setjmp_d.h qtmd.h
 	$(CHARMC) -pedantic -c -o qt.o qt.c
 	$(CHARMC) -c -o qtmds.o md/setjmp_m.c
-	CHARMINC=..; . ../conv-config.sh;	\
-	$(CHARMC) -shared -o libckqt.$$CMK_SHARED_SUF qt.o qtmds.o
+	$(CHARMC) -shared -o libckqt.$(CMK_SHARED_SUF) qt.o qtmds.o
 	$(CHARMC) -o libckqt.a qt.o qtmds.o 
 
 stp:

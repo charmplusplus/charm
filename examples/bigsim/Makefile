@@ -1,9 +1,11 @@
+-include ../../../include/conv-mach-opt.mak
+
 DIRS = \
   emulator \
 # Disabled due to host/target incompatibility described in bug #89
 #  tools \
 
-ifneq (0,$(shell CHARMINC=../../tmp; if test -f $$CHARMINC/conv-config.sh; then . $$CHARMINC/conv-config.sh; echo $$CMK_TRACE_ENABLED; fi))
+ifneq (0,$(CMK_TRACE_ENABLED))
   DIRS += sdag
 endif
 

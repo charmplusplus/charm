@@ -26,6 +26,7 @@ L=../lib
 INC=../include
 
 include charmpath.mk
+include conv-mach-opt.mak
 
 CC=$(CHARMC)
 CXX=$(CHARMC)
@@ -325,15 +326,13 @@ headerlinks: dirs+sources Makefile $(ALLHEADERS)
 	touch headerlinks
 
 dirs+sources:
-#	rm -f .gdir
-#	(cd .. ; basename "`pwd`" | sed -e 's@-.*@@') 	> .gdir
 	pwd
 	find . -type l -exec rm {} \;
 	rm -rf QuickThreads
 	rm -rf hwloc
 	rm -rf libs
 	rm -rf ../bin ; mkdir ../bin
-	if case `cat .vdir` in *win64*) true;; *-win-*) true;; *) false;; esac; then \
+	if case $(CMK_VDIR) in *win64*) true;; *-win-*) true;; *) false;; esac; then \
 		cp -f $(SRCBASE)/arch/win/unix2nt* ../bin; \
 		cp -f $(SRCBASE)/arch/win/createlink.exe ../bin; \
 	fi
@@ -365,9 +364,9 @@ dirs+sources:
 	./gathertree $(SRCBASE)/langs            langs
 	./gathertree $(SRCBASE)/langs/jade       langs/jade
 	./gathertree $(SRCBASE)/arch/common      .
-	./gathertree $(SRCBASE)/arch/`cat .gdir` .
-	test -f $(SRCBASE)/arch/`cat .gdir`/gdir_link && cat $(SRCBASE)/arch/`cat .gdir`/gdir_link > .gdir.new && ./gathertree $(SRCBASE)/arch/`cat .gdir.new`      . || true
-	./gatherflat $(SRCBASE)/arch/`cat .vdir` .
+	./gathertree $(SRCBASE)/arch/$(CMK_GDIR) .
+	test -f $(SRCBASE)/arch/$(CMK_GDIR)/gdir_link && cat $(SRCBASE)/arch/$(CMK_GDIR)/gdir_link > .gdir.new && ./gathertree $(SRCBASE)/arch/`cat .gdir.new`      . || true
+	./gatherflat $(SRCBASE)/arch/$(CMK_VDIR) .
 	./gathertree $(SRCBASE)/../examples             ../examples
 	./gathertree $(SRCBASE)/../tests                ../tests
 	rm -f ../bin/dep.pl ; cp dep.pl ../bin/
@@ -380,11 +379,11 @@ dirs+sources:
 #	-ln -s ../../java/bin ../bin/charmjavabin
 #	-ln -s charmjavabin/* ../bin/
 #	-ln -s ../java ..
-#	rm -f .gdir
 	rm -rf ../include ; mkdir ../include
 	-./system_ln  ../tmp/conv-*.*h ../include
 	-./system_ln  ../tmp/cc-*.*h ../include
 	-./system_ln  ../tmp/conv-mach-opt.sh ../include
+	-./system_ln  ../tmp/conv-mach-opt.mak ../include
 	if [ -x ./special.sh ] ; then SRCBASE=$(SRCBASE) ./special.sh ; fi
 	if [ ! -f conv-common.h ] ; then ( touch conv-common.h ) ; fi
 	touch dirs+sources
@@ -398,9 +397,9 @@ CLBLIBS=$(L)/libldb-rand.a $(L)/libldb-spray.a   $(L)/libldb-workstealing.a  $(L
 
 TRACELIBS = $(L)/libtrace-converse.a $(L)/libtracef_f.a 
 
-BUILD_TRACING := $(shell CHARMINC=.; if test -f ./conv-config.sh; then . ./conv-config.sh; echo $$CMK_TRACE_ENABLED; fi )
+BUILD_TRACING := $(CMK_TRACE_ENABLED)
 
-ifneq "$(BUILD_TRACING)" "0"
+ifneq ($(BUILD_TRACING),0)
 
 TRACELIBS += \
   $(L)/libtrace-projections.a \
@@ -416,8 +415,6 @@ TRACELIBS += \
   $(L)/libtrace-perfReport.a \
 
 endif
-
-CMK_HAS_MMAP := $(shell CHARMINC=.; if test -f ./conv-config.sh; then . ./conv-config.sh; echo $$CMK_HAS_MMAP; fi )
 
 MEMLIBS = \
   $(L)/libmemory-default.a \
@@ -440,9 +437,9 @@ MEMLIBS += \
 
 endif
 
-BUILD_CHARMDEBUG := $(shell CHARMINC=.; if test -f ./conv-config.sh; then . ./conv-config.sh; echo $$CMK_CHARMDEBUG; fi )
+BUILD_CHARMDEBUG := $(CMK_CHARMDEBUG)
 
-ifneq "$(BUILD_CHARMDEBUG)" "0"
+ifneq ($(BUILD_CHARMDEBUG),0)
 ifneq ($(CMK_HAS_MMAP),0)
 
 MEMLIBS += \
@@ -456,7 +453,7 @@ MEMLIBS += \
 endif
 endif
 
-ifneq ($(findstring -win-,$(shell cat .vdir)),)
+ifneq ($(findstring -win64,$(CMK_VDIR))$(findstring -win-,$(CMK_VDIR)),)
   IS_WINDOWS := 1
 else
   IS_WINDOWS := 0
@@ -531,9 +528,7 @@ hwloc-target:  conv-autoconfig.h
 	( cp -f hwloc/src/.libs/libhwloc_embedded.a $(L) )
 	( cp -f hwloc/include/hwloc.h $(INC) )
 	( cp -LRf hwloc/include/hwloc $(INC) )
-	(CHARMINC=.; . ./conv-config.sh; \
-	 test -d ../lib_so && \
-	 cp -f hwloc/src/.libs/libhwloc_embedded.*$$CMK_SHARED_SUF* ../lib_so/ ) || true
+	( test -d ../lib_so && cp -f hwloc/src/.libs/libhwloc_embedded.*$(CMK_SHARED_SUF)* ../lib_so/ ) || true
 	touch $@
 
 charmrun-target: hwloc-target charmrun  sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h sockRoutines-seq.o $(L)/libck.a $(L)/libhwloc_embedded.a $(CVLIBS) conv-static.o
@@ -544,9 +539,7 @@ QUICK_THREADS: $(CVHEADERS)
 	( cd QuickThreads;./configure )
 	( $(MAKE) -C QuickThreads qt  OPTS='$(OPTS) -Wno-error' ) || ( echo "Did you try to build netlrts-linux on a 64-bit system? Try netlrts-linux-x86_64" && false )
 	cp -f QuickThreads/libckqt.a ../lib/
-	-(CHARMINC=.; . ./conv-config.sh; \
-	  test -d ../lib_so && \
-	  cp -f QuickThreads/libckqt.$$CMK_SHARED_SUF ../lib_so/ ) || true
+	-( test -d ../lib_so && cp -f QuickThreads/libckqt.$(CMK_SHARED_SUF) ../lib_so/ ) || true
 	touch QUICK_THREADS
 
 CONVLIBS: converse
@@ -1094,8 +1087,6 @@ dependsCaseSensitive: cidepends
 	      echo '' >> $(DEPENDFILE) ; \
         done;  \
 
-# The build script should have spit out the build options into this makefile
--include buildopts.mk
 # If OPTS was not defined, use the build time options
 export OPTS ?= $(OPTSATBUILDTIME)
 ifeq ($(strip $(OPTS)),)

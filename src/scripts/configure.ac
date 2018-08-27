@@ -25,6 +25,11 @@ sed -e '/Option added by configure/d' ../include/conv-mach-opt.sh  | sed -e '/^$
 cp -f conv-mach-opt.sh.clean   ../include/conv-mach-opt.sh
 rm -f conv-mach-opt.sh.clean
 
+#clean up conv-mach-opt.mak
+sed -e '/Option added by configure/d' ../include/conv-mach-opt.mak  | sed -e '/^$/d' > conv-mach-opt.mak.clean
+cp -f conv-mach-opt.mak.clean   ../include/conv-mach-opt.mak
+rm -f conv-mach-opt.mak.clean
+
 CHARMINC="."
 CHARMBIN="../bin"
 test -r ./conv-config.sh && . ./conv-config.sh
@@ -68,8 +73,42 @@ remove_flag() {
      /bin/rm -f tmp.$$
 }
 
+# add into conv-mach-opt.mak
+# add_make_flag $1 $2
+# $2 is description
+add_make_flag() {
+        key=`echo $1 | cut -d'=' -f1`
+        last=`grep "$key=" ../include/conv-mach-opt.mak 2>/dev/null | tail -1 | sed -e 's/ *#.*$//'`
+        skip=0
+	if test -n "$last" -a  "$last" = "$1"
+	then
+	  skip=1
+        fi
+	if test $skip = 0
+        then
+	  # The lack of whitespace around $1 here is necessary.
+	  cat >> ../include/conv-mach-opt.mak << EOT
+
+$1# Option added by configure script's $2 section
+EOT
+	fi
+}
+
+# remove_make_flag $1
+remove_make_flag() {
+     sed -e '/^'"$1"'=/d' ../include/conv-mach-opt.mak > tmp.$$
+     cp tmp.$$ ../include/conv-mach-opt.mak
+     /bin/rm -f tmp.$$
+}
+
 add_flag "OPTS_CC='$OPTS_CC'"   'Pass through user-provided C compiler options'
 add_flag "OPTS_CXX='$OPTS_CXX'" 'Pass through user-provided C++ compiler options'
+add_make_flag "CMK_COMPILER:=$CMK_COMPILER" 'basic setup'
+add_make_flag "CMK_SMP:=$CMK_SMP" 'basic setup'
+add_make_flag "CMK_SHARED_SUF:=$CMK_SHARED_SUF" 'basic setup'
+add_make_flag "CMK_NO_PARTITIONS:=$CMK_NO_PARTITIONS" 'basic setup'
+add_make_flag "CMK_BLUEGENEQ:=$CMK_BLUEGENEQ" 'basic setup'
+add_make_flag "BUILD_CUDA:=$BUILD_CUDA" 'basic setup'
 
 # enable/disable error checking
 AC_ARG_ENABLE([error-checking],
@@ -129,10 +168,12 @@ then
   Echo "Charm tracing is disabled"
   AC_DEFINE_UNQUOTED(CMK_TRACE_ENABLED, 0, [disable tracing])
   add_flag CMK_TRACE_ENABLED=0
+  add_make_flag 'CMK_TRACE_ENABLED:=0' 'tracing'
 else
   Echo "Charm tracing is enabled"
   AC_DEFINE_UNQUOTED(CMK_TRACE_ENABLED, 1, [enable tracing])
   add_flag CMK_TRACE_ENABLED=1
+  add_make_flag 'CMK_TRACE_ENABLED:=1' 'tracing'
 fi
 
 AC_ARG_ENABLE([tracing-commthread],
@@ -160,10 +201,12 @@ then
   Echo "CharmDebug is disabled" 
   AC_DEFINE_UNQUOTED(CMK_CHARMDEBUG, 0, [disable charmdebug])
   add_flag CMK_CHARMDEBUG=0
+  add_make_flag 'CMK_CHARMDEBUG:=0'
 else
   Echo "CharmDebug is enabled" 
   AC_DEFINE_UNQUOTED(CMK_CHARMDEBUG, 1, [enable charmdebug])
   add_flag CMK_CHARMDEBUG=1
+  add_make_flag 'CMK_CHARMDEBUG:=1'
 fi
 
 AC_ARG_ENABLE([replay],
@@ -324,7 +367,7 @@ fi
 #
 AC_MSG_CHECKING(machine name)
 version=`pwd | awk -F/ '{print $(NF-1)}'`
-base_version=`cat .vdir`
+base_version="$CMK_VDIR"
 AC_DEFINE_UNQUOTED(CMK_MACHINE_NAME, "$version",[machine name])
 AC_MSG_RESULT($version)
 AC_SUBST(base_version)
@@ -1446,7 +1489,7 @@ then
   test_finish 1
 fi
 
-if test $BUILD_MPI -eq 1 -a -z "$BGP_FLOOR"
+if test $BUILD_MPI -eq 1
 then
   test_linkc "whether need to specify MPI library" "no" "yes" ""
   if test $pass -ne 1
@@ -2025,6 +2068,7 @@ EOT
 test_cxx "whether the mmap() syscall exists" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_MMAP, $pass, [whether the mmap() syscall exists])
 add_flag "CMK_HAS_MMAP=$pass"
+add_make_flag "CMK_HAS_MMAP:=$pass"
 
 #### check if mmap accepts MAP_ANON ####
 cat > $t <<EOT
@@ -2257,6 +2301,7 @@ AC_DEFINE_UNQUOTED(CMK_USE_LIBJPEG, $pass, [whether has libjpeg])
 if test $pass -eq 1
 then
         add_flag 'CMK_LIBJPEG="-ljpeg"' "libjpeg"
+        add_make_flag 'CMK_LIBJPEG:=-ljpeg' 'libjpeg'
 fi
 
 #### check if PAPI exists ####
@@ -2307,6 +2352,7 @@ AC_DEFINE_UNQUOTED(CMK_PYTHON_VERSION, ${PYTHON_VERSION}, [Python version])
 if test $pass -eq 1
 then
 	add_flag "CMK_BUILD_PYTHON=$PYTHON_VERSION" "python"
+	add_make_flag "CMK_BUILD_PYTHON:=$PYTHON_VERSION" 'python'
 fi
 
 ## Cray specific test
@@ -2431,6 +2477,7 @@ test_linkso "whether can build shared library" "yes" "no" ""
 if test $pass -eq 0
 then 
 	add_flag 'CMK_NO_BUILD_SHARED="true"' "build-shared"
+	add_make_flag 'CMK_NO_BUILD_SHARED:=true' 'build-shared'
 else
 	BUILD_SHARED=1
         if test "$BUILD_MPI" = "1"
@@ -2452,6 +2499,7 @@ EOT
 	if test $BUILD_SHARED -eq 0
 	then
 		add_flag 'CMK_NO_BUILD_SHARED="true"' "build-shared"
+		add_make_flag 'CMK_NO_BUILD_SHARED:=true' 'build-shared'
 	fi
 fi
 

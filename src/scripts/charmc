@@ -1375,7 +1375,7 @@ fi
 
 if [ "$TLSGLOBALS" = "1" ]
 then
-    if [ `cat $CHARMBIN/../tmp/.gdir` = "uth" ]
+    if [ "$CMK_GDIR" = "uth" ]
     then
       echo "Error: -tlsglobals is not supported with the uth machine layer."
       exit 1

@@ -1,3 +1,5 @@
+-include ../../../include/conv-mach-opt.mak
+
 DIRS = \
   randomAccessGroup \
   randomAccessArray \
@@ -6,7 +8,7 @@ DIRS = \
 
 TESTDIRS = $(DIRS)
 
-ifneq (,$(shell CHARMINC=../../../include . ../../../tmp/conv-config.sh ; [ "$$CMK_COMPILER" = "bgxlc" ] && echo "skip"))
+ifeq ($(CMK_COMPILER),bgxlc)
   TESTDIRS =
 endif
 

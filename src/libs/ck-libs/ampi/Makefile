@@ -1,4 +1,5 @@
-CDIR=$(shell cd ../../../.. && pwd)
+CDIR := $(shell cd ../../../.. && pwd)
+-include $(CDIR)/include/conv-mach-opt.mak
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 HEADERS=ampi.h ampif.h mpio.h mpiof.h ampiimpl.h
@@ -18,15 +19,15 @@ COMPATLIB=$(AMPI_LIBDIR)/libampi-compat.a
 ROMIOLIB=$(AMPI_LIBDIR)/libampiromio
 ROMIOLIBSHARED=
 
-AMPI_STATIC_ONLY=$(shell CHARMINC=$(CDIR)/tmp ; . $(CDIR)/tmp/conv-config.sh ; echo $$CMK_NO_BUILD_SHARED)
+AMPI_STATIC_ONLY := $(CMK_NO_BUILD_SHARED)
 
-SHARED_SUF=$(shell CHARMINC=$(CDIR)/tmp ; . $(CDIR)/tmp/conv-config.sh ; echo $$CMK_SHARED_SUF)
+SHARED_SUF := $(CMK_SHARED_SUF)
 
-ifeq ($(AMPI_STATIC_ONLY), false)
+ifeq ($(AMPI_STATIC_ONLY),false)
 	ROMIOLIBSHARED=$(CDIR)/lib_so/libampiromio.$(SHARED_SUF)
 endif
 
-USE_ROMIO=$(shell CHARMINC=$(CDIR)/tmp ; . $(CDIR)/tmp/conv-config.sh ; echo $$CMK_AMPI_WITH_ROMIO)
+USE_ROMIO := $(CMK_AMPI_WITH_ROMIO)
 
 ifeq ($(USE_ROMIO),true)
 	ROMIO=$(ROMIOLIB).a
