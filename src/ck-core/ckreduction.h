@@ -344,6 +344,8 @@ struct CkReductionTypesExt {
     int external_py = CkReduction::external_py;
 };
 
+extern "C" CkReductionTypesExt charm_reducers;
+
 //A CkReductionMsg is sent up the reduction tree-- it
 // carries a contribution, or several reduced contributions.
 class CkReductionMsg : public CMessage_CkReductionMsg
