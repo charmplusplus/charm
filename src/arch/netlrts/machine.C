@@ -2084,9 +2084,6 @@ void ConverseCleanup(void)
 #else
       signal(SIGALRM, SIG_IGN);
 #endif
-#if CMK_USE_IBVERBS
-      CmiMachineCleanup();
-#endif
       //put references to the controlling tty back on normal fd so that
       //CmiStdoutInit  refers to the tty not the old pipe
       dup2(writeStdout[0], 1);

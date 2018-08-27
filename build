@@ -63,7 +63,6 @@ syntax() {
   echo 'Platform specific options (choose multiple if apply):'
   echo '  smp             support for SMP, multithreaded charm on each node'
   echo '  omp             support for the integrated LLVM OpenMP runtime'
-  echo '  ibverbs         use Infiniband Verbs for communication (only for netlrts-linux-x86_64; prefer verbs-*)'
   echo '  tcp             use TCP sockets for communication (only for netlrts)'
   echo '  pthreads        compile with pthreads Converse threads'
   echo ''
