@@ -632,6 +632,10 @@ static void ReleasePostedMessages(void) {
             else
                 prev->next = temp;
 #if CMK_ONESIDED_IMPL
+            // Update end_sent for consistent states during possible insertions
+            if(CpvAccess(end_sent) == msg_tmp) {
+              CpvAccess(end_sent) = prev;
+            }
             //if rdma msg, call the callback
             if(msg_tmp->type == ONESIDED_BUFFER_SEND) {
                 CmiMPIRzvRdmaOpInfo_t *rdmaOpInfo = (CmiMPIRzvRdmaOpInfo_t *)msg_tmp->ref;
@@ -693,7 +697,6 @@ static void ReleasePostedMessages(void) {
         }
 #endif
     }
-    CpvAccess(end_sent) = prev;
     MACHSTATE(2,"} ReleasePostedMessages end");
 }
 
