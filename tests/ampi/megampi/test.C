@@ -352,7 +352,9 @@ for (int loop=0;loop<nLoop;loop++) {
 		if(rank == 1 || rank > 3)
 		  testFailed("Testing construction of group and new communicator");		
 	      }
-	      MPI_Comm_free(&newcomm);
+	      if (newcomm != MPI_COMM_NULL) {
+	        MPI_Comm_free(&newcomm);
+	      }
 	    }
 	  }
 	
@@ -484,7 +486,9 @@ for (int loop=0;loop<nLoop;loop++) {
 	    MPI_Win_free(&win);
 	  }
 	  MPI_Group_free(&group);
-	  MPI_Comm_free(&comm);
+	  if (comm != MPI_COMM_NULL) {
+	    MPI_Comm_free(&comm);
+	  }
 	}
 
 	if (1 && loop!=nLoop-1)
