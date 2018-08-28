@@ -251,7 +251,7 @@ and network sends without requiring an extra message being sent by the runtime s
 for the latter case. This mode is demonstrated in
 \examplerefdir{zerocopy/direct\_api/reg}
 
-\paragraph{{\tt CK\_BUFFER\_REG}}:
+\paragraph{{\tt CK\_BUFFER\_UNREG}}:
 When this mode is passed, the buffer is initially unregistered and it is
 registered only for network transfers where registration is absolutely required.
 For example, if the target buffer is on the same PE or same logical node (or process),
