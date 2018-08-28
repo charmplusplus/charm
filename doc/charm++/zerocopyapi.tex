@@ -274,8 +274,10 @@ and memory registration costs. For a buffer allocated through \texttt{CkRdmaAllo
 mempooled buffer to the RTS. A buffer allocated with \texttt{CkRdmaAlloc} can be deallocated by
 calling a custom deallocator, \texttt{CkRdmaFree}. Although the allocator \texttt{CkRdmaAlloc} and
 deallocator, \texttt{CkRdmaFree} are beneficial on GNI and Verbs, the allocators are functional on other
-networks and allocate regular memory similar to a \texttt{malloc} call. This mode is demonstrated in
-\examplerefdir{zerocopy/direct\_api/prereg}
+networks and allocate regular memory similar to a \texttt{malloc} call. Importantly, it should be
+noted that with the {\tt CK\_BUFFER\_PREREG} mode, the allocated buffer's pointer should be used
+without any offsets. Using a buffer pointer with an offset will cause a segmentation fault.
+This mode is demonstrated in \examplerefdir{zerocopy/direct\_api/prereg}
 
 \paragraph{{\tt CK\_BUFFER\_NOREG}:}
 This mode is used for just storing pointer information without any actual networking
