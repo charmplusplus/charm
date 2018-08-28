@@ -353,7 +353,7 @@ void LrtsSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short
 // Perform an RDMA Get call into the local destination address from the remote source address
 void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo) {
 
-  if(ncpyOpInfo->srcMode == CMK_BUFFER_UNREG) {
+  if(ncpyOpInfo->isSrcRegistered == 0) {
     // Remote buffer is unregistered, send a message to register it and perform PUT
 
 #if CMK_SMP
@@ -493,7 +493,7 @@ void deregisterDirectMem(gni_mem_handle_t mem_hndl, int pe) {
 
 // Method invoked to deregister memory handle
 void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode){
-  if(mode == CMK_BUFFER_REG || (mode == CMK_BUFFER_PREREG && SIZEFIELD(ptr) >= BIG_MSG)) {
+  if(mode == CMK_BUFFER_REG) {
     CmiGNIRzvRdmaPtr_t *destInfo = (CmiGNIRzvRdmaPtr_t *)info;
     deregisterDirectMem(destInfo->mem_hndl, pe);
   }

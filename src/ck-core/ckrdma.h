@@ -191,8 +191,8 @@ class CkNcpyBuffer{
 #endif
       {
         CmiSetRdmaBufferInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, mode);
+        isRegistered = true;
       }
-      isRegistered = true;
     }
   }
 
@@ -221,10 +221,11 @@ class CkNcpyBuffer{
       return;
 
 #if CMK_REG_REQUIRED
-    CmiDeregisterMem(ptr, layerInfo + CmiGetRdmaCommonInfoSize(), pe, mode);
+    if(mode != CK_BUFFER_PREREG && mode != CK_BUFFER_NOREG) {
+      CmiDeregisterMem(ptr, layerInfo + CmiGetRdmaCommonInfoSize(), pe, mode);
+      isRegistered = false;
+    }
 #endif
-
-    isRegistered = false;
   }
 
   void pup(PUP::er &p) {

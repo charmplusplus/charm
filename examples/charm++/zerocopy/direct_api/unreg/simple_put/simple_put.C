@@ -61,8 +61,6 @@ class Ping1 : public CBase_Ping1
   int size;
   int otherIndex, cbCounter, valCounter;
   CkCallback cb;
-  CkNcpyBuffer myDest1, myDest2, myDest3;
-  CkNcpyBuffer mySrc1, mySrc2, mySrc3;
 
 public:
   Ping1(int size)
@@ -75,13 +73,13 @@ public:
       assignValues(dArr1, size);
       assignCharValues(cArr1, size);
       // Set PUT Sender callback
-      cb = CkCallback(CkIndex_Ping1::putSenderDone(), thisProxy[thisIndex]);
+      cb = CkCallback(CkIndex_Ping1::putSenderDone(NULL), thisProxy[thisIndex]);
     } else {
       iArr1 = new int[size];
       cArr1 = new char[size];
       dArr1 = new double[size];
       // Set PUT Receiver callback
-      cb = CkCallback(CkIndex_Ping1::putReceiverDone(), thisProxy[thisIndex]);
+      cb = CkCallback(CkIndex_Ping1::putReceiverDone(NULL), thisProxy[thisIndex]);
     }
 
     otherIndex = (thisIndex + 1) % 2;
@@ -94,37 +92,39 @@ public:
   void start()
   {
     CkAssert(thisIndex == 1);
-    myDest1 = CkNcpyBuffer(iArr1, size*sizeof(int), cb, CK_BUFFER_UNREG);
-    myDest2 = CkNcpyBuffer(dArr1, size*sizeof(double), cb, CK_BUFFER_UNREG);
-    myDest3 = CkNcpyBuffer(cArr1, size*sizeof(char), cb, CK_BUFFER_UNREG);
+    CkNcpyBuffer myDest1(iArr1, size*sizeof(int), cb, CK_BUFFER_UNREG);
+    CkNcpyBuffer myDest2(dArr1, size*sizeof(double), cb, CK_BUFFER_UNREG);
+    CkNcpyBuffer myDest3(cArr1, size*sizeof(char), cb, CK_BUFFER_UNREG);
 
     // Send my destinations to Index 0; Index 0 performs Puts into these destinations
     thisProxy[otherIndex].recvNcpyInfo(myDest1, myDest2, myDest3);
   }
 
   // Executed on Index 0 (which calls put)
-  void putSenderDone(){
+  void putSenderDone(CkDataMsg *m){
     CkAssert(thisIndex == 0);
     cbCounter++;
+
+    // Cast m->data as (CkNcpyBuffer *)
+    CkNcpyBuffer *src = (CkNcpyBuffer *)(m->data);
+    src->deregisterMem();
+
     if(cbCounter == 3) {
-      // Release Resources for my sources
-      mySrc1.deregisterMem();
-      mySrc2.deregisterMem();
-      mySrc3.deregisterMem();
       CkPrintf("[%d][%d][%d] Put Source Done\n", thisIndex, CkMyPe(), CkMyNode());
       sendValidationData();
     }
   }
 
   // Executed on Index 1 (which receives data from put)
-  void putReceiverDone(){
+  void putReceiverDone(CkDataMsg *m){
     CkAssert(thisIndex == 1);
     cbCounter++;
+
+    // Cast m->data as (CkNcpyBuffer *)
+    CkNcpyBuffer *dest = (CkNcpyBuffer *)(m->data);
+    dest->deregisterMem();
+
     if(cbCounter == 3) {
-      // Release Resources for my destinations
-      myDest1.deregisterMem();
-      myDest2.deregisterMem();
-      myDest3.deregisterMem();
       CkPrintf("[%d][%d][%d] Put Destination Done\n", thisIndex, CkMyPe(), CkMyNode());
       thisProxy[otherIndex].sendValidationData();
     }
@@ -148,9 +148,9 @@ public:
   {
     CkAssert(thisIndex == 0);
     // Create nocopy sources for me to Put into
-    mySrc1 = CkNcpyBuffer(iArr1, size*sizeof(int), cb, CK_BUFFER_UNREG);
-    mySrc2 = CkNcpyBuffer(dArr1, size*sizeof(double), cb, CK_BUFFER_UNREG);
-    mySrc3 = CkNcpyBuffer(cArr1, size*sizeof(char), cb, CK_BUFFER_UNREG);
+    CkNcpyBuffer mySrc1(iArr1, size*sizeof(int), cb, CK_BUFFER_UNREG);
+    CkNcpyBuffer mySrc2(dArr1, size*sizeof(double), cb, CK_BUFFER_UNREG);
+    CkNcpyBuffer mySrc3(cArr1, size*sizeof(char), cb, CK_BUFFER_UNREG);
 
     // Perform Puts from my sources into Index 1's destinations
     mySrc1.put(dest1);

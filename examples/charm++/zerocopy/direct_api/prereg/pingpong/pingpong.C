@@ -232,8 +232,8 @@ class Ping1 : public CBase_Ping1
   }
 
   void freeBuffer(){
-    CmiRdmaFree(nocopyMsg);
-    CmiRdmaFree(otherMsg);
+    CkRdmaFree(nocopyMsg);
+    CkRdmaFree(otherMsg);
     if(thisIndex == 0){
       thisProxy[1].freeBuffer();
     }

@@ -63,8 +63,6 @@ class Ping1 : public CBase_Ping1
   int size;
   int otherIndex, cbCounter, valCounter;
   CkCallback cb;
-  CkNcpyBuffer myDest1, myDest2, myDest3;
-  CkNcpyBuffer mySrc1, mySrc2, mySrc3;
 
 public:
   Ping1(int size)
@@ -101,17 +99,17 @@ public:
     const void *refPtr = &valCounter;
 
     cb.setRefNum(1);
-    mySrc1 = CkNcpyBuffer(iArr1, size*sizeof(int), cb, CK_BUFFER_UNREG);
+    CkNcpyBuffer mySrc1(iArr1, size*sizeof(int), cb, CK_BUFFER_UNREG);
     ACK_DEBUG(("[%d][%d][%d] Setting source Ref: Buffer Ptr: %p, Reference Ptr: %p\n", thisIndex, CkMyPe(), CkMyNode(), iArr1, refPtr));
     mySrc1.setRef(refPtr);
 
     cb.setRefNum(2);
-    mySrc2 = CkNcpyBuffer(dArr1, size*sizeof(double), cb, CK_BUFFER_UNREG);
+    CkNcpyBuffer mySrc2(dArr1, size*sizeof(double), cb, CK_BUFFER_UNREG);
     ACK_DEBUG(("[%d][%d][%d] Setting source Ref: Buffer Ptr: %p, Reference Ptr: %p\n", thisIndex, CkMyPe(), CkMyNode(), dArr1, refPtr));
     mySrc2.setRef(refPtr);
 
     cb.setRefNum(3);
-    mySrc3 = CkNcpyBuffer(cArr1, size*sizeof(char), cb, CK_BUFFER_UNREG);
+    CkNcpyBuffer mySrc3(cArr1, size*sizeof(char), cb, CK_BUFFER_UNREG);
     ACK_DEBUG(("[%d][%d][%d] Setting source Ref: Buffer Ptr: %p, Reference Ptr: %p\n", thisIndex, CkMyPe(), CkMyNode(), cArr1, refPtr));
     mySrc3.setRef(refPtr);
 
@@ -144,11 +142,10 @@ public:
     // Verify that reference pointer is equal to the reference pointer returned
     CkAssert(&valCounter == src->ref);
 
+    // Deregister the source object
+    src->deregisterMem();
+
     if(cbCounter == 3) {
-      // Release Resources for my sources
-      mySrc1.deregisterMem();
-      mySrc2.deregisterMem();
-      mySrc3.deregisterMem();
       CkPrintf("[%d][%d][%d] Get Source Done\n", thisIndex, CkMyPe(), CkMyNode());
       sendValidationData();
     }
@@ -180,11 +177,10 @@ public:
     // Verify that reference pointer is equal to the reference pointer returned
     CkAssert(&valCounter == dest->ref);
 
+    // Deregister the destination object
+    dest->deregisterMem();
+
     if(cbCounter == 3) {
-      // Release Resources for my destinations
-      myDest1.deregisterMem();
-      myDest2.deregisterMem();
-      myDest3.deregisterMem();
       CkPrintf("[%d][%d][%d] Get Destination Done\n", thisIndex, CkMyPe(), CkMyNode());
       thisProxy[otherIndex].sendValidationData();
     }
@@ -214,17 +210,17 @@ public:
 
     // Create nocopy destination for me to Get into
     cb.setRefNum(1);
-    myDest1 = CkNcpyBuffer(iArr1, size*sizeof(int), cb, CK_BUFFER_UNREG);
+    CkNcpyBuffer myDest1(iArr1, size*sizeof(int), cb, CK_BUFFER_UNREG);
     ACK_DEBUG(("[%d][%d][%d] Setting destination Ref: Buffer Ptr: %p, Reference Ptr: %p\n", thisIndex, CkMyPe(), CkMyNode(), iArr1, refPtr));
     myDest1.setRef(refPtr);
 
     cb.setRefNum(2);
-    myDest2 = CkNcpyBuffer(dArr1, size*sizeof(double), cb, CK_BUFFER_UNREG);
+    CkNcpyBuffer myDest2(dArr1, size*sizeof(double), cb, CK_BUFFER_UNREG);
     ACK_DEBUG(("[%d][%d][%d] Setting destination Ref: Buffer Ptr: %p, Reference Ptr: %p\n", thisIndex, CkMyPe(), CkMyNode(), dArr1, refPtr));
     myDest2.setRef(refPtr);
 
     cb.setRefNum(3);
-    myDest3 = CkNcpyBuffer(cArr1, size*sizeof(char), cb, CK_BUFFER_UNREG);
+    CkNcpyBuffer myDest3(cArr1, size*sizeof(char), cb, CK_BUFFER_UNREG);
     ACK_DEBUG(("[%d][%d][%d] Setting destination Ref: Buffer Ptr: %p, Reference Ptr: %p\n", thisIndex, CkMyPe(), CkMyNode(), cArr1, refPtr));
     myDest3.setRef(refPtr);
 

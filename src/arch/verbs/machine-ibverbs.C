@@ -1872,15 +1872,20 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		
 		resetNcpyOpInfoPointers(newNcpyOpInfo);
 		
-		struct ibv_mr *mr = registerDirectMemory(newNcpyOpInfo->srcPtr, newNcpyOpInfo->srcSize);
+		registerDirectMemory(newNcpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize(),
+		                     newNcpyOpInfo->srcPtr,
+		                     newNcpyOpInfo->srcSize);
+		// Set the source as registered
+		newNcpyOpInfo->isSrcRegistered = 1;
+		
 		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)malloc(sizeof(struct infiRdmaPacket));
 		rdmaPacket->type = INFI_ONESIDED_DIRECT;
 		rdmaPacket->localBuffer = newNcpyOpInfo;
 		
 		postRdma((uint64_t)(newNcpyOpInfo->srcPtr),
-		        mr->lkey,
+		        ((CmiVerbsRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->key,
 		        (uint64_t)(newNcpyOpInfo->destPtr),
-            ((CmiVerbsRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->key,
+		        ((CmiVerbsRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->key,
 		        newNcpyOpInfo->srcSize,
 		        newNcpyOpInfo->destPe,
 		        (uint64_t)rdmaPacket,
@@ -1895,14 +1900,18 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		
 		resetNcpyOpInfoPointers(newNcpyOpInfo);
 		
-		struct ibv_mr *mr = registerDirectMemory(newNcpyOpInfo->destPtr, newNcpyOpInfo->srcSize);
+		registerDirectMemory(newNcpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(),
+		                     newNcpyOpInfo->destPtr,
+		                     newNcpyOpInfo->srcSize);
+		// Set the destination as registered
+		newNcpyOpInfo->isDestRegistered = 1;
 		
 		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)malloc(sizeof(struct infiRdmaPacket));
 		rdmaPacket->type = INFI_ONESIDED_DIRECT;
 		rdmaPacket->localBuffer = newNcpyOpInfo;
 		
 		postRdma((uint64_t)newNcpyOpInfo->destPtr,
-		        mr->lkey,
+		        ((CmiVerbsRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->key,
 		        (uint64_t)newNcpyOpInfo->srcPtr,
 		        ((CmiVerbsRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->key,
 		        newNcpyOpInfo->srcSize,

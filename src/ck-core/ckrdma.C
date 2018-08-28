@@ -423,7 +423,6 @@ void CkNcpyBuffer::rdmaGet(CkNcpyBuffer &source) {
     CmiSetRdmaBufferInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, mode);
 
     isRegistered = true;
-    mode = CK_BUFFER_REG;
   }
 
   // Create a general object that can be used across layers and can store the state of the CkNcpyBuffer objects
@@ -531,7 +530,6 @@ void CkNcpyBuffer::rdmaPut(CkNcpyBuffer &destination) {
     CmiSetRdmaBufferInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, mode);
 
     isRegistered = true;
-    mode = CK_BUFFER_REG;
   }
 
   // Create a general object that can be used across layers that can store the state of the CkNcpyBuffer objects

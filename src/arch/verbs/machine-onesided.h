@@ -190,5 +190,5 @@ void LrtsIssueRput(
   unsigned short int *srcMode,
   int size);
 
-struct ibv_mr* registerDirectMemory(const void *addr, int size);
+void registerDirectMemory(void *info, const void *addr, int size);
 

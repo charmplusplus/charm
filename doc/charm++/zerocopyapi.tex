@@ -224,9 +224,7 @@ Note that the \kw{CkNcpyBuffer} objects can be
 either statically declared or be dynamically allocated.
 Additionally, the objects are also reusable across iteration boundaries i.e.
 after sending the \kw{CkNcpyBuffer} object, the remote PE can use
-the same object to perform \kw{get} or \kw{put}. However, it is
-important to note that in order to access them, it is required
-to store them in a local variable or as a data member of the class. This pattern
+the same object to perform \kw{get} or \kw{put}. This pattern
 of using the same objects across iterations is demonstrated in
 \examplerefdir{zerocopy/direct\_api/reg/pingpong}.
 
@@ -259,8 +257,7 @@ since the \kw{get} internally performs a memcpy, registration is avoided for non
 transfers. On the other hand, if the target buffer resides on a remote PE on a different
 logical node, the \kw{get} is implemented through an RDMA call requiring registration.
 In such a case, there is a small message sent by the RTS to register and perform
-the RDMA operation. Upon registration, the runtime modifies the state of \kw{CkNcpyBuffer}
-object to {\tt CK\_BUFFER\_REG} from {\tt CK\_BUFFER\_UNREG}. This mode is demonstrated in
+the RDMA operation. This mode is demonstrated in
 \examplerefdir{zerocopy/direct\_api/unreg}
 
 \paragraph{{\tt CK\_BUFFER\_PREREG}}:

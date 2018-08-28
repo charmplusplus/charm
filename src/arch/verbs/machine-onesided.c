@@ -155,23 +155,26 @@ void LrtsSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short
   if (!mr) {
     CmiAbort("Memory Registration Failed in LrtsSetRdmaBufferInfo!\n");
   }
-  CmiVerbsRdmaPtr_t *rdmaSrc = (CmiVerbsRdmaPtr_t *)info;
-  rdmaSrc->mr = mr;
-  rdmaSrc->key = mr->rkey;
+  CmiVerbsRdmaPtr_t *rdmaInfo = (CmiVerbsRdmaPtr_t *)info;
+  rdmaInfo->mr = mr;
+  rdmaInfo->key = mr->rkey;
 }
 
-struct ibv_mr* registerDirectMemory(const void *addr, int size) {
+void registerDirectMemory(void *info, const void *addr, int size) {
   struct ibv_mr *mr = ibv_reg_mr(context->pd, (void *)addr, size, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ);
   if (!mr) {
     CmiAbort("Memory Registration inside registerDirectMemory!\n");
   }
-  return mr;
+  CmiVerbsRdmaPtr_t *rdmaInfo = (CmiVerbsRdmaPtr_t *)info;
+  rdmaInfo->mr = mr;
+  rdmaInfo->key = mr->rkey;
 }
 
 // Perform an RDMA Get call into the local destination address from the remote source address
 void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo) {
 
-  if(ncpyOpInfo->srcMode == CMK_BUFFER_UNREG) {
+  if(ncpyOpInfo->isSrcRegistered == 0) {
+
     // Remote buffer is unregistered, send a message to register it and perform PUT
     infiPacket packet;
     MallocInfiPacket(packet);
@@ -208,7 +211,7 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo) {
 // Perform an RDMA Put call into the remote destination address from the local source address
 void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
 
-  if(ncpyOpInfo->destMode == CMK_BUFFER_UNREG) {
+  if(ncpyOpInfo->isDestRegistered == 0) {
     // Remote buffer is unregistered, send a message to register it and perform GET
     infiPacket packet;
     MallocInfiPacket(packet);
@@ -244,10 +247,9 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
 
 // Method invoked to deregister a memory handle
 void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode){
-  if(mode == CMK_BUFFER_REG) {
-    CmiVerbsRdmaPtr_t *rdmadest = (CmiVerbsRdmaPtr_t *)info;
-    if (ibv_dereg_mr(rdmadest->mr)) {
-      CmiAbort("ibv_dereg_mr() failed at LrtsDeregisterMem\n");
-    }
+  CmiVerbsRdmaPtr_t *rdmadest = (CmiVerbsRdmaPtr_t *)info;
+
+  if (ibv_dereg_mr(rdmadest->mr)) {
+    CmiAbort("ibv_dereg_mr() failed at LrtsDeregisterMem\n");
   }
 }
