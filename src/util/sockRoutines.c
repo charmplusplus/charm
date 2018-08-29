@@ -610,6 +610,19 @@ int skt_sendmsg(SOCKET hSocket, struct msghdr *mh, int num_bufs, int nBytes)
   }
   return 0;
 }
+#else
+int skt_sendmsg(SOCKET hSocket, WSABUF *buffers, int num_bufs, int nBytes)
+{
+  DWORD bytes_sent = 0;
+  int rc;
+  skt_ignore_SIGPIPE = 1;
+  rc = WSASend(hSocket, buffers, num_bufs, &bytes_sent, 0, NULL, NULL);
+  skt_ignore_SIGPIPE = 0;
+  if ((rc != 0) || (bytes_sent != nBytes))  {
+    return skt_abort(hSocket, 93700+hSocket, "Error on socket send!");
+  }
+  return 0;
+}
 #endif
 
 /***********************************************

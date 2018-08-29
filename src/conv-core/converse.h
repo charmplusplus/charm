@@ -495,6 +495,9 @@ extern void         CmiDestroyLock(CmiNodeLock lock);
 
 #if CMK_SHARED_VARS_NT_THREADS /*Used only by win versions*/
 
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 #include "lrtslock.h"
 

@@ -12,9 +12,9 @@ cpu affinity.
 
 #define _GNU_SOURCE
 
-#include "hwloc.h"
 #include "converse.h"
 #include "sockRoutines.h"
+#include "hwloc.h"
 
 #if CMK_USE_IBVERBS
 #include <infiniband/verbs.h>

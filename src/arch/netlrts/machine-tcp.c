@@ -438,6 +438,8 @@ void ReceiveDatagram(int node)
 #if !defined(_WIN32)
 static struct msghdr mh;
 static struct iovec iov[2];
+#else
+static WSABUF iov[2];
 #endif
 
 int TransmitImplicitDgram(ImplicitDgram dg)
@@ -473,10 +475,13 @@ int TransmitImplicitDgram(ImplicitDgram dg)
   if (-1==skt_sendmsg(dest->sock, &mh, 2, sizeof(int) + len))
     CmiAbort("EnqueueOutgoingDgram");
 #else
-  if (-1==skt_sendN(dest->sock,(const char *)&len,sizeof(len))) 
-    CmiAbort("EnqueueOutgoingDgram"); 
-  if (-1==skt_sendN(dest->sock,(const char *)head,len)) 
-    CmiAbort("EnqueueOutgoingDgram"); 
+  iov[0].buf = (char*)&len;
+  iov[0].len = sizeof(int);
+  iov[1].buf = (char*)head;
+  iov[1].len = len;
+
+  if (-1==skt_sendmsg(dest->sock, iov, 2, sizeof(int) + len))
+    CmiAbort("EnqueueOutgoingDgram");
 #endif
     
   *head = temp;
