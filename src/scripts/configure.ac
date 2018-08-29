@@ -155,7 +155,7 @@ AC_ARG_ENABLE([charmdebug],
               [enable charmDebug])], ,
             [enable_charmdebug=yes])
 
-if test "$enable_charmdebug" = "no"
+if test "$enable_charmdebug" = "no" -o "$CMK_CCS_AVAILABLE" = '0'
 then
   Echo "CharmDebug is disabled" 
   AC_DEFINE_UNQUOTED(CMK_CHARMDEBUG, 0, [disable charmdebug])
@@ -185,7 +185,7 @@ AC_ARG_ENABLE([ccs],
               [enable CCS])], ,
             [enable_ccs=yes])
 
-if test "$enable_ccs" = "no"
+if test "$enable_ccs" = "no" -o "$CMK_CCS_AVAILABLE" = '0'
 then
   Echo "CCS is disabled" 
   AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 0, [disable ccs])
