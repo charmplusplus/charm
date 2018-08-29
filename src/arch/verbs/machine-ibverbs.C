@@ -444,60 +444,63 @@ static void send_partial_init(void);
 #endif
 
 /*
- * This function should really be provided as part of libibverbs.
- * Instead it was found in IB ACM, specifically: ibacm/src/acm.c
+ * This function was adapted from:
+ * acm_get_rate(), ibacm/src/acm.c
+ * ibv_rate_to_mbps(), libibverbs/verbs.c
+ * IB ACM is not necessarily installed on Infiniband machines, and older
+ * versions of libibverbs do not have ibv_rate_to_mbps() or all the enums.
  * It is not copyrightable, being "functional rather than creative" (Lexmark v. SCC).
  */
-static enum ibv_rate cmi_get_ibv_rate(uint8_t width, uint8_t speed)
+static int cmi_get_ibv_mbps(uint8_t width, uint8_t speed)
 {
   switch (width)
   {
   case 1: /* 1x */
     switch (speed)
     {
-    case 1: return IBV_RATE_2_5_GBPS;
-    case 2: return IBV_RATE_5_GBPS;
+    case 1: return 2500; // IBV_RATE_2_5_GBPS
+    case 2: return 5000; // IBV_RATE_5_GBPS
     case 4: /* fall through */
-    case 8: return IBV_RATE_10_GBPS;
-    case 16: return IBV_RATE_14_GBPS;
-    case 32: return IBV_RATE_25_GBPS;
-    default: return IBV_RATE_MAX;
+    case 8: return 10000; // IBV_RATE_10_GBPS
+    case 16: return 14062; // IBV_RATE_14_GBPS
+    case 32: return 25781; // IBV_RATE_25_GBPS
+    default: return -1; // IBV_RATE_MAX
     }
   case 2: /* 4x */
     switch (speed)
     {
-    case 1: return IBV_RATE_10_GBPS;
-    case 2: return IBV_RATE_20_GBPS;
+    case 1: return 10000; // IBV_RATE_10_GBPS
+    case 2: return 20000; // IBV_RATE_20_GBPS
     case 4: /* fall through */
-    case 8: return IBV_RATE_40_GBPS;
-    case 16: return IBV_RATE_56_GBPS;
-    case 32: return IBV_RATE_100_GBPS;
-    default: return IBV_RATE_MAX;
+    case 8: return 40000; // IBV_RATE_40_GBPS
+    case 16: return 56250; // IBV_RATE_56_GBPS
+    case 32: return 103125; // IBV_RATE_100_GBPS
+    default: return -1; // IBV_RATE_MAX
     }
   case 4: /* 8x */
     switch (speed)
     {
-    case 1: return IBV_RATE_20_GBPS;
-    case 2: return IBV_RATE_40_GBPS;
+    case 1: return 20000; // IBV_RATE_20_GBPS
+    case 2: return 40000; // IBV_RATE_40_GBPS
     case 4: /* fall through */
-    case 8: return IBV_RATE_80_GBPS;
-    case 16: return IBV_RATE_112_GBPS;
-    case 32: return IBV_RATE_200_GBPS;
-    default: return IBV_RATE_MAX;
+    case 8: return 80000; // IBV_RATE_80_GBPS
+    case 16: return 112500; // IBV_RATE_112_GBPS
+    case 32: return 206250; // IBV_RATE_200_GBPS
+    default: return -1; // IBV_RATE_MAX
     }
   case 8: /* 12x */
     switch (speed)
     {
-    case 1: return IBV_RATE_30_GBPS;
-    case 2: return IBV_RATE_60_GBPS;
+    case 1: return 30000; // IBV_RATE_30_GBPS
+    case 2: return 60000; // IBV_RATE_60_GBPS
     case 4: /* fall through */
-    case 8: return IBV_RATE_120_GBPS;
-    case 16: return IBV_RATE_168_GBPS;
-    case 32: return IBV_RATE_300_GBPS;
-    default: return IBV_RATE_MAX;
+    case 8: return 120000; // IBV_RATE_120_GBPS
+    case 16: return 168750; // IBV_RATE_168_GBPS
+    case 32: return 309375; // IBV_RATE_300_GBPS
+    default: return -1; // IBV_RATE_MAX
     }
   default:
-    return IBV_RATE_MAX;
+    return -1; // IBV_RATE_MAX
   }
 }
 
@@ -614,7 +617,7 @@ static void CmiMachineInit(char** argv)
 #if CMK_IBV_PORT_ATTR_HAS_LINK_LAYER
       info.link_layer = port_attr.link_layer;
 #endif
-      info.mbps = ibv_rate_to_mbps(cmi_get_ibv_rate(port_attr.active_width, port_attr.active_speed));
+      info.mbps = cmi_get_ibv_mbps(port_attr.active_width, port_attr.active_speed);
 
       potential_devices.push_back(info);
     }
