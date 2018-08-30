@@ -47,20 +47,23 @@ void compareArray(T *&aArr, T *&bArr, int size, int startIdx=0){
 template<class T>
 void copyArray(T *&dest, T *&src, int size){
   if(dest != NULL)
-    free(dest);
-  dest = new T[size];
+    CkRdmaFree(dest);
+  //dest = new T[size];
+  dest = (T *)CkRdmaAlloc(sizeof(T) * size);
   memcpy(dest,src,size*sizeof(T));
 }
 
 template<class T>
 void assignValues(T *&arr, int size){
-  arr = new T[size];
+  //arr = new T[size];
+  arr = (T *)CkRdmaAlloc(sizeof(T) * size);
   for(int i=0; i<size; i++)
      arr[i] = rand() % 100 + 1;
 }
 
 void assignCharValues(char *&arr, int size){
-  arr = new char[size];
+  //arr = new char[size];
+  arr = (char *)CkRdmaAlloc(sizeof(char) * size);
   for(int i=0; i<size; i++)
      arr[i] = (char)(rand() % 125 + 1);
 }
@@ -123,8 +126,8 @@ class zerocopyObject : public CBase_zerocopyObject{
       // sdagRun only uses iArr1 and dArr2
       // other others needn't be pupped/unpupped
       if (p.isUnpacking()){
-        iArr1 = new int[iSize1];
-        dArr2 = new double[dSize2];
+        iArr1 = (int *)CkRdmaAlloc(iSize1 * sizeof(int));
+        dArr2 = (double *)CkRdmaAlloc(dSize2 * sizeof(double));
         j=0;
         firstMigrationPending = false;
       }
@@ -135,19 +138,19 @@ class zerocopyObject : public CBase_zerocopyObject{
     ~zerocopyObject() {
       if(firstMigrationPending) {
         // delete on first migration on all chares
-        delete [] cArr1;
+        CkRdmaFree(cArr1);
 
         if(thisIndex < numElements/2) {
           // delete on first migration on the first set of chares
           // as it is deleted in the callback on the other set
-          delete [] iArr2;
-          delete [] dArr1;
+          CkRdmaFree(iArr2);
+          CkRdmaFree(dArr1);
         }
 
       }
       // delete everytime after migration as they are pupped to be used for sdagRun
-      delete [] dArr2;
-      delete [] iArr1;
+      CkRdmaFree(dArr2);
+      CkRdmaFree(iArr1);
     }
 
     zerocopyObject(CkMigrateMessage *m){}
@@ -155,7 +158,8 @@ class zerocopyObject : public CBase_zerocopyObject{
     void zerocopySent(CkDataMsg *m){
       // Get access to the array information sent via zerocopy
       CkNcpyBuffer *src = (CkNcpyBuffer *)(m->data);
-      free((void *)(src->ptr));
+      //free((void *)(src->ptr));
+      CkRdmaFree((void *)(src->ptr));
       delete m;
 
       if(++mixedZeroCopySentCounter == 2)
@@ -179,7 +183,7 @@ class zerocopyObject : public CBase_zerocopyObject{
       dSize2 = 79;
       cSize1 = 32;
 
-      iOffset1 = 3;
+      iOffset1 = 100;
       cOffset1 = 2;
 
       mainProxy = mProxy;
@@ -201,7 +205,8 @@ class zerocopyObject : public CBase_zerocopyObject{
         DEBUG(ckout<<"["<<CkMyPe()<<"] "<<thisIndex<<"->"<<destIndex<<": Regular send completed"<<endl;)
         if(thisIndex == 0)
           CkPrintf("send: completed\n");
-        thisProxy[destIndex].zerocopySend(iSize1-iOffset1, CkSendBuffer(iArr1+iOffset1), dSize1, CkSendBuffer(dArr1), cSize1-cOffset1, CkSendBuffer(cArr1 + cOffset1));
+        // cannot use PREREG mode for offset buffers
+        thisProxy[destIndex].zerocopySend(iSize1-iOffset1, CkSendBuffer(iArr1+iOffset1), dSize1, CkSendBuffer(dArr1, CK_BUFFER_PREREG), cSize1-cOffset1, CkSendBuffer(cArr1 + cOffset1));
       }
       else{
         thisProxy[destIndex].send(n1, ptr1, n2, ptr2, n3, ptr3);
@@ -216,13 +221,13 @@ class zerocopyObject : public CBase_zerocopyObject{
         DEBUG(ckout<<"["<<CkMyPe()<<"] "<<thisIndex<<"->"<<destIndex<<": ZeroCopy send completed"<<endl;)
         if(thisIndex == 0)
           CkPrintf("zerocopySend: completed\n");
-        thisProxy[destIndex].mixedSend(iSize1, iArr1, dSize1, CkSendBuffer(dArr1), iSize2, CkSendBuffer(iArr2), dSize2, dArr2);
+        thisProxy[destIndex].mixedSend(iSize1, iArr1, dSize1, CkSendBuffer(dArr1, CK_BUFFER_PREREG), iSize2, CkSendBuffer(iArr2, CK_BUFFER_PREREG), dSize2, dArr2);
       }
       else{
         copyArray(iArr1, ptr1, n1);
         copyArray(dArr1, ptr2, n2);
         copyArray(cArr1, ptr3, n3);
-        thisProxy[destIndex].zerocopySend(n1, CkSendBuffer(iArr1), n2, CkSendBuffer(dArr1), n3, CkSendBuffer(cArr1));
+        thisProxy[destIndex].zerocopySend(n1, CkSendBuffer(iArr1, CK_BUFFER_PREREG), n2, CkSendBuffer(dArr1, CK_BUFFER_PREREG), n3, CkSendBuffer(cArr1, CK_BUFFER_PREREG));
       }
     }
 
@@ -242,7 +247,7 @@ class zerocopyObject : public CBase_zerocopyObject{
         copyArray(dArr1, ptr2, n2);
         copyArray(iArr2, ptr3, n3);
         copyArray(dArr2, ptr4, n4);
-        thisProxy[destIndex].mixedSend(n1, iArr1, n2, CkSendBuffer(dArr1, cb), n3, CkSendBuffer(iArr2, cb), n4, dArr2);
+        thisProxy[destIndex].mixedSend(n1, iArr1, n2, CkSendBuffer(dArr1, cb, CK_BUFFER_PREREG), n3, CkSendBuffer(iArr2, cb, CK_BUFFER_PREREG), n4, dArr2);
       }
     }
 
@@ -260,7 +265,7 @@ class zerocopyObject : public CBase_zerocopyObject{
       //load balance
       if(iter % LBPERIOD_ITER == 0)
         AtSync();
-      else if(iter<=40)
+      else if(iter<=100)
         thisProxy[thisIndex].sdagRun();
       else {
         CkCallback reductionCb(CkReductionTarget(Main, done), mainProxy);

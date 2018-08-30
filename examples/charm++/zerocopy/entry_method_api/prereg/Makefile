@@ -1,8 +1,7 @@
 DIRS = \
-  unreg \
-  prereg \
-  reg \
-  misc \
+  pingpong \
+  simpleZeroCopy \
+  stencil3d \
 
 TESTDIRS = $(DIRS)
 
