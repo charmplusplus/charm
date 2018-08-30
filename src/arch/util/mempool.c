@@ -14,6 +14,11 @@ Heavily modified by Nikhil Jain 11/28/2011
 */
 
 #define MEMPOOL_DEBUG 0
+#if MEMPOOL_DEBUG
+#define DEBUG_PRINT(...) CmiPrintf(__VA_ARGS__)
+#else
+#define DEBUG_PRINT(...)
+#endif
 
 #include "converse.h"
 #include <stdio.h>
@@ -81,9 +86,7 @@ INLINE_KEYWORD void fillblock(mempool_type* mptr, block_header* block_head, size
     small allocations. Please report the bug to Charm++ developers.\n");
   }
 
-#if MEMPOOL_DEBUG
-  CmiPrintf("Left is %d, Max power obtained is %d\n", left, power);
-#endif
+  DEBUG_PRINT("Left is %d, Max power obtained is %d\n", left, power);
 
   for (i = power; i >= 0; i--)
   {
@@ -266,9 +269,7 @@ mempool_type* mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool
 #endif
   fillblock(mptr, &mptr->block_head, pool_size, 0);
   mptr->large_blocks = 0;
-#if MEMPOOL_DEBUG
-  CmiPrintf("Initialized pool of size %zd\n", pool_size);
-#endif
+  DEBUG_PRINT("Initialized pool of size %zd\n", pool_size);
   return mptr;
 }
 
@@ -320,9 +321,7 @@ void* mempool_malloc(mempool_type* mptr, size_t size, int expand)
   }
 
   bestfit_size = cutOffPoints[power];
-#if MEMPOOL_DEBUG
-  CmiPrintf("Request size is %d, power value is %d, size is %d\n", size, power, cutOffPoints[power]);
-#endif
+  DEBUG_PRINT("Request size is %d, power value is %d, size is %d\n", size, power, cutOffPoints[power]);
 
   head_free = NULL;
   current = &mptr->block_head;
@@ -344,9 +343,7 @@ void* mempool_malloc(mempool_type* mptr, size_t size, int expand)
   {
     if (!expand) return NULL;
 
-#if MEMPOOL_DEBUG
-    CmiPrintf("Expanding size %lld limit %lld\n", mptr->size, mptr->limit);
-#endif
+    DEBUG_PRINT("Expanding size %lld limit %lld\n", mptr->size, mptr->limit);
     //free blocks which are not being used
     if ((mptr->size > mptr->limit) && (mptr->limit > 0))
     {
@@ -358,9 +355,7 @@ void* mempool_malloc(mempool_type* mptr, size_t size, int expand)
     pool = mptr->newblockfn(&expand_size, &mem_hndl, expand);
     if (pool == NULL)
     {
-#if MEMPOOL_DEBUG
-      CmiPrintf("Mempool-Did not get memory while expanding\n");
-#endif
+      DEBUG_PRINT("Mempool-Did not get memory while expanding\n");
       return NULL;
     }
 
@@ -406,9 +401,7 @@ void* mempool_malloc(mempool_type* mptr, size_t size, int expand)
 #if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
     CmiUnlock(mptr->mempoolLock);
 #endif
-#if MEMPOOL_DEBUG
-    CmiPrintf("Malloc done\n");
-#endif
+    DEBUG_PRINT("Malloc done\n");
     return (char*)head_free + sizeof(used_header);
   }
 
@@ -423,16 +416,12 @@ void* mempool_large_malloc(mempool_type* mptr, size_t size, int expand)
   large_block_header *current, *first_block = NULL;
 
   size_t expand_size = size + sizeof(large_block_header) + sizeof(used_header);
-#if MEMPOOL_DEBUG
-  CmiPrintf("Mempool-Large block allocation\n");
-#endif
+  DEBUG_PRINT("Mempool-Large block allocation\n");
   pool = mptr->newblockfn(&expand_size, &mem_hndl, expand);
 
   if (pool == NULL)
   {
-#if MEMPOOL_DEBUG
-    CmiPrintf("Mempool-Did not get memory while expanding\n");
-#endif
+    DEBUG_PRINT("Mempool-Did not get memory while expanding\n");
     return NULL;
   }
 
@@ -463,9 +452,7 @@ void* mempool_large_malloc(mempool_type* mptr, size_t size, int expand)
 #if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
   CmiUnlock(mptr->mempoolLock);
 #endif
-#if MEMPOOL_DEBUG
-  CmiPrintf("Large malloc done\n");
-#endif
+  DEBUG_PRINT("Large malloc done\n");
   return (char*)head_free + sizeof(used_header);
 }
 
@@ -493,10 +480,7 @@ void mempool_free(mempool_type* mptr, void* ptr_free)
   slot_header *to_free, *first, *current;
   slot_header *used_next, *temp;
 
-#if MEMPOOL_DEBUG
-  CmiPrintf("Free request for %lld\n",
-            ((char*)ptr_free - (char*)mptr - sizeof(used_header)));
-#endif
+  DEBUG_PRINT("Free request for %lld\n", ((char*)ptr_free - (char*)mptr - sizeof(used_header)));
 
   to_free = (slot_header*)((char*)ptr_free - sizeof(used_header));
 
@@ -519,9 +503,7 @@ void mempool_free(mempool_type* mptr, void* ptr_free)
     }
     mptr->size -= largeblockhead->size;
     mptr->freeblockfn(largeblockhead, largeblockhead->mem_hndl);
-#if MEMPOOL_DEBUG
-    CmiPrintf("Large free done\n");
-#endif
+    DEBUG_PRINT("Large free done\n");
     return;
   }
 
@@ -589,7 +571,7 @@ void mempool_free(mempool_type* mptr, void* ptr_free)
 
 #if MEMPOOL_DEBUG
   if (CmiMyPe() == 0)
-    CmiPrintf("Free was for %zd, merging for %zd, power %d\n", to_free->size, size, power);
+    DEBUG_PRINT("Free was for %zd, merging for %zd, power %d\n", to_free->size, size, power);
 #endif
 
   loc = (char*)first - (char*)mptr;
@@ -632,9 +614,7 @@ void mempool_free(mempool_type* mptr, void* ptr_free)
   {
     current->gnext = 0;
   }
-#if MEMPOOL_DEBUG
-  CmiPrintf("Free done\n");
-#endif
+  DEBUG_PRINT("Free done\n");
 }
 
 #if CMK_CONVERSE_UGNI
