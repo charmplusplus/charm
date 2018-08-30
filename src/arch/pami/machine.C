@@ -1205,12 +1205,12 @@ void  CmiGeneralFreeSend(int destPE, int size, char* msg) {
 pami_result_t machine_send_handoff (pami_context_t context, void *msg);
 
 CMI_EXTERNC
-void  machine_send       (pami_context_t      context, 
-			  int                 node, 
-			  int                 rank, 
-			  int                 size, 
-			  char              * msg, 
-			  int                 to_lock)__attribute__((always_inline));
+void  machine_send       (pami_context_t      context,
+			  int                 node,
+			  int                 rank,
+			  int                 size,
+			  char              * msg,
+			  int                 to_lock);
 
 void CmiGeneralFreeSendN(int node, int rank, int size, char * msg, int to_lock)
 {
