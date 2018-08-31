@@ -916,7 +916,7 @@ echo "SRCBASE=$srcbase" > $DESTINATION/tmp/charmpath.mk
 
 echo "CONFIG_OPTS=\"$CONFIG_OPTS\"" > "$DESTINATION/tmp/config_opts.sh"
 chmod +x "$DESTINATION/tmp/config_opts.sh"
-echo "OPTSATBUILDTIME+=$OPTS" >> $ConvMak
+echo "OPTSATBUILDTIME:=$OPTS" >> $ConvMak
 
 fi
 
