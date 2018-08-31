@@ -451,12 +451,9 @@ MEMLIBS += \
   $(L)/libmemory-charmdebug-slot.a \
   $(L)/libmemory-charmdebug-mmap-slot.a \
   $(L)/libmemory-hooks-charmdebug.a \
-
-endif
-
-MEMLIBS += \
   $(L)/libmemory-os-charmdebug.a \
 
+endif
 endif
 
 ifneq ($(findstring -win-,$(shell cat .vdir)),)
