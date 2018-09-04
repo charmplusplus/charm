@@ -46,10 +46,12 @@ extern "C"
 int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx,
 	int ck_ep_flags)
 {
+#if !CMK_CHARMPY    // charmpy can support dynamic registration of Chares after program start
   if (__registerDone) {
     CkPrintf("Charm++: late entry method registration happened after init\nEntry point: %s, addr: %p\n", name, call);
     CkAbort("Did you forget to instantiate a templated entry method in a .ci file?\n");
   }
+#endif
   EntryInfo *e = new EntryInfo(name, call?call:ckInvalidCallFn, msgIdx, chareIdx);
   if (ck_ep_flags & CK_EP_NOKEEP) e->noKeep=true;
   if (ck_ep_flags & CK_EP_INTRINSIC) e->inCharm=true;
