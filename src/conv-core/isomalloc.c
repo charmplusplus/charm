@@ -107,9 +107,16 @@ static int read_randomflag(void)
   return random_flag;
 }
 
+/*
+ * "User" here means:
+ * 1. Not including CmiIsomallocBlock
+ * 2. Including CmiIsomallocBlockList for memory-isomalloc allocations
+ */
 struct CmiIsomallocBlock {
   CmiInt8 slot;   /* First mapped slot */
   CmiInt8 length; /* Length of (user portion of) mapping, in bytes*/
+  CmiInt8 align;  /* User-requested alignment */
+  CmiInt8 alignoffset; /* User-requested position that is aligned */
 };
 typedef struct CmiIsomallocBlock CmiIsomallocBlock;
 
@@ -2121,7 +2128,7 @@ static void all_slotOP(const slotOP *op,CmiInt8 s,CmiInt8 n)
 
 /************** External interface ***************/
 #if CMK_USE_MEMPOOL_ISOMALLOC
-void *CmiIsomalloc(size_t size, CthThread tid)
+static CmiIsomallocBlock *isomalloc_internal_alloc_block(size_t size, CthThread tid)
 {
   CmiInt8 s,n,i;
   CmiIsomallocBlock *blk;
@@ -2140,11 +2147,10 @@ void *CmiIsomalloc(size_t size, CthThread tid)
     blk = (CmiIsomallocBlock*)mempool_malloc(CtvAccess(threadpool),size+sizeof(CmiIsomallocBlock),1);
   }
   blk->slot=(CmiInt8)(uintptr_t)blk;
-  blk->length=size;
-  return block2pointer(blk);
+  return blk;
 }
 #else
-void *CmiIsomalloc(size_t size, CthThread tid)
+static CmiIsomallocBlock *isomalloc_internal_alloc_block(size_t size, CthThread tid)
 {
   CmiInt8 s,n,i;
   CmiIsomallocBlock *blk;
@@ -2168,38 +2174,42 @@ void *CmiIsomalloc(size_t size, CthThread tid)
   }
   if (!blk) map_failed(s,n);
   blk->slot=s;
-  blk->length=size;
-  return block2pointer(blk);
+  return blk;
 }
 #endif
+
+void *CmiIsomalloc(size_t size, CthThread tid)
+{
+  CmiIsomallocBlock *blk = isomalloc_internal_alloc_block(size + sizeof(CmiIsomallocBlock), tid);
+  blk->length = size;
+  blk->align = 0;
+  blk->alignoffset = 0;
+  return block2pointer(blk);
+}
 
 #define MALLOC_ALIGNMENT           ALIGN_BYTES
 #define MINSIZE                    (sizeof(CmiIsomallocBlock))
 
-/** return an aligned isomalloc memory, the alignment occurs after the
- *  first 'reserved' bytes.  Total requested size is (size+reserved)
- */
-static void *_isomallocAlign(size_t align, size_t size, size_t reserved, CthThread t) {
-  void *ptr;
-  CmiIntPtr ptr2align;
-  CmiInt8 s;
-
+static size_t isomalloc_internal_validate_align(size_t align)
+{
   if (align < MINSIZE) align = MINSIZE;
   /* make sure alignment is power of 2 */
   if ((align & (align - 1)) != 0) {
     size_t a = MALLOC_ALIGNMENT * 2;
     while ((unsigned long)a < (unsigned long)align) a <<= 1;
-    align = a;
+    return a;
   }
-  s = size + reserved + align;
-  ptr = CmiIsomalloc(s,t);
-  ptr2align = (CmiIntPtr)ptr;
-  ptr2align += reserved;
+  return align;
+}
+
+static void *isomalloc_internal_perform_alignment(CmiIsomallocBlock *blk, size_t align, size_t alignoffset)
+{
+  void *ptr = block2pointer(blk);
+  CmiIntPtr ptr2align = (CmiIntPtr)ptr + alignoffset;
   if (ptr2align % align != 0) { /* misaligned */
-    CmiIsomallocBlock *blk = pointer2block(ptr);  /* save block */
     CmiIsomallocBlock savedblk = *blk;
     ptr2align = (ptr2align + align - 1) & -((CmiInt8) align);
-    ptr2align -= reserved;
+    ptr2align -= alignoffset;
     ptr = (void*)ptr2align;
     blk = pointer2block(ptr);      /* restore block */
     *blk = savedblk;
@@ -2207,9 +2217,21 @@ static void *_isomallocAlign(size_t align, size_t size, size_t reserved, CthThre
   return ptr;
 }
 
+/* alignment occurs after blocklistsize bytes */
+static void *isomalloc_internal_alloc_aligned(size_t useralign, size_t usersize, size_t blocklistsize, CthThread tid)
+{
+  size_t size = usersize + blocklistsize;
+  size_t align = isomalloc_internal_validate_align(useralign);
+  CmiIsomallocBlock *blk = isomalloc_internal_alloc_block(size + sizeof(CmiIsomallocBlock) + align, tid);
+  blk->length = size;
+  blk->align = align;
+  blk->alignoffset = blocklistsize;
+  return isomalloc_internal_perform_alignment(blk, align, blocklistsize);
+}
+
 void *CmiIsomallocAlign(size_t align, size_t size, CthThread t)
 {
-  return _isomallocAlign(align, size, 0, t);
+  return isomalloc_internal_alloc_aligned(align, size, 0, t);
 }
 
 int CmiIsomallocEnabled(void)
@@ -2220,7 +2242,7 @@ int CmiIsomallocEnabled(void)
 void CmiIsomallocPup(pup_er p,void **blockPtrPtr)
 {
   CmiIsomallocBlock *blk;
-  CmiInt8 s,length;
+  CmiInt8 s,length,align,alignoffset;
   CmiInt8 n;
 #if CMK_USE_MEMPOOL_ISOMALLOC
   CmiAbort("Incorrect pup is called\n");
@@ -2232,11 +2254,15 @@ void CmiIsomallocPup(pup_er p,void **blockPtrPtr)
     blk=pointer2block(*blockPtrPtr);
     s=blk->slot;
     length=blk->length;
+    align=blk->align;
+    alignoffset=blk->alignoffset;
   }
 
   pup_int8(p,&s);
   pup_int8(p,&length);
-  n=length2slots(length);
+  pup_int8(p,&align);
+  pup_int8(p,&alignoffset);
+  n=length2slots(length + sizeof(CmiIsomallocBlock) + align);
 
   if (pup_isUnpacking(p)) 
   { /*Must allocate a new block in its old location*/
@@ -2247,8 +2273,11 @@ void CmiIsomallocPup(pup_er p,void **blockPtrPtr)
     blk=map_slots(s,n);
     if (!blk) map_failed(s,n);
     blk->slot=s;
-    blk->length=length;
-    *blockPtrPtr=block2pointer(blk);
+
+    blk->length = length;
+    blk->align = align;
+    blk->alignoffset = alignoffset;
+    *blockPtrPtr = align > 0 ? isomalloc_internal_perform_alignment(blk, align, alignoffset) : block2pointer(blk);
   }
 
   /*Pup the allocated data*/
@@ -2547,7 +2576,7 @@ void *CmiIsomallocBlockListMalloc(CmiIsomallocBlockList *l,size_t nBytes)
 void *CmiIsomallocBlockListMallocAlign(CmiIsomallocBlockList *l,size_t align,size_t nBytes)
 {
   CmiIsomallocBlockList *n; /*Newly created slot*/
-  n=(CmiIsomallocBlockList *)_isomallocAlign(align,nBytes,sizeof(CmiIsomallocBlockList),NULL);
+  n=(CmiIsomallocBlockList *)isomalloc_internal_alloc_aligned(align,nBytes,sizeof(CmiIsomallocBlockList),NULL);
   /*Link the new block into the circular blocklist*/
   n->prev=l;
   n->next=l->next;
