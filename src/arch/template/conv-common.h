@@ -45,9 +45,6 @@
    to a processors are implemented in convcore.c (1) or in machine.C (1). */
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
 
-/* Enable the CCS protocol if set to 1. */
-#define CMK_CCS_AVAILABLE                                  1
-
 /* Defines if there is a "charmrun" program running on the system, which
    interacts with possible connecting clients (0), or if there is no such
    program, and processor 0 does the job (1). Currently only netlrts- versions

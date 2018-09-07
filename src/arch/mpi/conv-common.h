@@ -37,8 +37,6 @@
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
 
-#define CMK_CCS_AVAILABLE                                  1
-
 #define NODE_0_IS_CONVHOST                                 1
 
 #define CMK_IMMEDIATE_MSG				   1

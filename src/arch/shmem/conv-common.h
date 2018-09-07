@@ -22,8 +22,6 @@
 
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
 
-#define CMK_CCS_AVAILABLE                                  1
-
 #define CMK_HANDLE_SIGUSR                                  1
 
 #define NODE_0_IS_CONVHOST                                 1
