@@ -34,6 +34,8 @@ generalized by Orion Lawlor November 2001.  B-tree implementation
 added by Ryan Mokos in July 2008.
  *************************************************************************/
 
+#include "pup.h"
+#include "pup_stl.h"
 #include "converse.h"
 #include "memory-isomalloc.h"
 
@@ -43,6 +45,14 @@ added by Ryan Mokos in July 2008.
 #define DEBUG_PRINT(...) CmiPrintf(__VA_ARGS__)
 #else
 #define DEBUG_PRINT(...)
+#endif
+
+#define ISOMEMPOOL_DEBUG 0
+
+#if ISOMEMPOOL_DEBUG
+#define IMP_DBG(...) CmiPrintf(__VA_ARGS__)
+#else
+#define IMP_DBG(...)
 #endif
 
 /* b-tree definitions */
@@ -70,7 +80,7 @@ added by Ryan Mokos in July 2008.
 #include <sys/personality.h>
 #endif
 
-#if CMK_USE_MEMPOOL_ISOMALLOC
+#if CMK_USE_MEMPOOL_ISOMALLOC && !USE_ISOMEMPOOL
 #include "mempool.h"
 extern int cutOffPoints[cutOffNum];
 #endif 
@@ -113,10 +123,15 @@ static int read_randomflag(void)
  * 2. Including CmiIsomallocBlockList for memory-isomalloc allocations
  */
 struct CmiIsomallocBlock {
+#if !CMK_USE_MEMPOOL_ISOMALLOC && !USE_ISOMEMPOOL
   CmiInt8 slot;   /* First mapped slot */
   CmiInt8 length; /* Length of (user portion of) mapping, in bytes*/
   CmiInt8 align;  /* User-requested alignment */
   CmiInt8 alignoffset; /* User-requested position that is aligned */
+#else
+  void *start; /* What the underlying allocator actually returned */
+  CmiInt8 length;
+#endif
 };
 typedef struct CmiIsomallocBlock CmiIsomallocBlock;
 
@@ -148,6 +163,9 @@ static char *isomallocEnd=NULL;
 static void *slot2addr(CmiInt8 slot) {
   return isomallocStart+((memRange_t)slotsize)*((memRange_t)slot);
 }
+static CmiInt8 addr2slot(const void *addr) {
+  return (CmiInt8)(uintptr_t)((const char *)addr - isomallocStart) / slotsize;
+}
 static int slot2pe(CmiInt8 slot) {
   return (int)(slot/numslots);
 }
@@ -155,15 +173,9 @@ static CmiInt8 pe2slot(int pe) {
   return pe*numslots;
 }
 /* Return the number of slots in a block with n user data bytes */
-#if CMK_USE_MEMPOOL_ISOMALLOC
 static size_t length2slots(size_t nBytes) {
   return (nBytes+slotsize-1)/slotsize;
 }
-#else
-static size_t length2slots(size_t nBytes) {
-  return (sizeof(CmiIsomallocBlock)+nBytes+slotsize-1)/slotsize;
-}
-#endif
 
 /* doubly-linked list node */
 struct _dllnode {
@@ -1303,9 +1315,7 @@ static void map_failed(CmiInt8 s,CmiInt8 n)
 
 CpvStaticDeclare(slotset *, myss); /*My managed slots*/
 
-#if CMK_USE_MEMPOOL_ISOMALLOC
-CtvDeclare(mempool_type *, threadpool); /*Thread managed pools*/
-
+#if CMK_USE_MEMPOOL_ISOMALLOC && !USE_ISOMEMPOOL
 //alloc function to be used by mempool
 void * isomallocfn (size_t *size, mem_handle_t *mem_hndl, int expand_flag)
 {
@@ -1660,7 +1670,7 @@ static void init_ranges(char **argv)
   if (CmiMyRank()==0 && numslots==0)
   { /* Find the largest unused region of virtual address space */
     /*Round slot size up to nearest page size*/
-#if CMK_USE_MEMPOOL_ISOMALLOC
+#if CMK_USE_MEMPOOL_ISOMALLOC || USE_ISOMEMPOOL
     slotsize=1024*1024;
 #else
     slotsize=16*1024;
@@ -1895,13 +1905,6 @@ static void init_ranges(char **argv)
   CpvInitialize(slotset *, myss);
   CpvAccess(myss) = NULL;
 
-#if CMK_USE_MEMPOOL_ISOMALLOC
-  CmiLock(_smp_mutex);
-  CtvInitialize(mempool_type *, threadpool);
-  CtvAccess(threadpool) = NULL;
-  CmiUnlock(_smp_mutex);
-#endif
-
   if (isomallocStart!=NULL) {
     CpvAccess(myss) = new_slotset(pe2slot(CmiMyPe()), numslots);
   }
@@ -1993,12 +1996,1292 @@ static void all_slotOP(const slotOP *op,CmiInt8 s,CmiInt8 n)
     one_slotOP(op,pe,s,n);
 }
 
+#if USE_ISOMEMPOOL
+
+/************** Isomempool ***************/
+
+#if ISOMEMPOOL_DEBUG
+# define VERIFY_RBTREE
+#endif
+
+struct isomempool
+{
+  /*
+   * The main purpose of this class is batching, to avoid wasting mmapped space.
+   *
+   * Definitions:
+   * Blocks are the units of storage underlying the pool.
+   * Regions are divisions within a block, either allocated space or empty space between
+   * allocations.
+   *
+   * The pool prefixes each allocation with a small header forming a doubly linked list,
+   * to allow flexible insertion, removal, and examination of neighbors.
+   *
+   * Each block has a header containing its "num_slots", which corresponds to its size. In
+   * combination with the pointer to the block's beginning, this is all the information
+   * necessary to unmap, migrate, and remap. Block headers also form a linked list of all
+   * blocks in the pool.
+   *
+   * Calls to alloc() are accelerated by a cache structure keyed with relevant information:
+   * a red-black tree of free space segments keyed by their sizes.
+   *
+   * Each Isomalloc context has its own mempool.
+   *
+   * Potential future improvements:
+   * - Store RBTree::Nodes in their own blocks to improve cache locality of lookup
+   * - Examine if __restrict is helpful anywhere
+   * - Use blocks and the Isomalloc context instead of malloc_reentrant in slot btree
+   * - Merge adjacent blocks, if worth the bookkeeping
+   * - Simplify the code. Less time bookkeeping = more time in the user's code.
+   */
+
+  using BitCarrier = unsigned char;
+
+  struct RegionHeader
+  {
+    // tag structs
+    struct Occupied
+    {
+      explicit Occupied(bool v = false) : value{v} { }
+      explicit Occupied(uintptr_t v) : value{(bool)v} { }
+      operator bool() const { return value; }
+    private:
+      bool value;
+    };
+    struct Last
+    {
+      explicit Last(bool v = false) : value{v} { }
+      explicit Last(uintptr_t v) : value{(bool)v} { }
+      operator bool() const { return value; }
+    private:
+      bool value;
+    };
+
+    RegionHeader(RegionHeader *p, RegionHeader *n, Occupied o, Last l)
+      : prevfield{p}
+      , nextfield{n}
+      , occupiedfield{o}
+      , lastfield{l}
+    {
+      IMP_DBG("[%p] RegionHeader::RegionHeader(%p, %p, %u, %u)\n",
+              this, p, n, (int)(bool)o, (int)(bool)l);
+    }
+    RegionHeader(RegionHeader *p, RegionHeader *n, Occupied o, BitCarrier l)
+      : prevfield{p}
+      , nextfield{n}
+      , occupiedfield{o}
+      , lastfield{l}
+    {
+      IMP_DBG("[%p] RegionHeader::RegionHeader(%p, %p, %u, %u)\n",
+              this, p, n, (int)(bool)o, (int)(bool)l);
+    }
+
+    RegionHeader * prev() const
+    {
+      return prevfield;
+    }
+    RegionHeader * next() const
+    {
+      return nextfield;
+    }
+
+    void setPrev(RegionHeader *ptr)
+    {
+      IMP_DBG("[%p] RegionHeader::setPrev(%p)\n", this, ptr);
+
+      prevfield = ptr;
+    }
+    void setNext(RegionHeader *ptr)
+    {
+      IMP_DBG("[%p] RegionHeader::setNext(%p)\n", this, ptr);
+
+      nextfield = ptr;
+    }
+
+    BitCarrier occupied() const
+    {
+      return occupiedfield;
+    }
+    bool isOccupied() const
+    {
+      return occupiedfield;
+    }
+    void setOccupied(bool o)
+    {
+      IMP_DBG("[%p] RegionHeader::setOccupied(%u)\n", this, (unsigned int)o);
+
+      occupiedfield = (BitCarrier)o;
+    }
+    void setOccupied(BitCarrier o)
+    {
+      IMP_DBG("[%p] RegionHeader::setOccupied(%u)\n", this, (unsigned int)o);
+
+      occupiedfield = o;
+    }
+
+    BitCarrier last() const
+    {
+      return lastfield;
+    }
+    void setLast(bool l)
+    {
+      IMP_DBG("[%p] RegionHeader::setLast(%u)\n", this, (unsigned int)l);
+
+      lastfield = (BitCarrier)l;
+    }
+    void setLast(BitCarrier l)
+    {
+      IMP_DBG("[%p] RegionHeader::setLast(%u)\n", this, (unsigned int)l);
+
+      lastfield = l;
+    }
+
+    bool isFirst() const
+    {
+      return ((const BlockHeader *)prev())->firstRegion() == this;
+    }
+    bool isLast() const
+    {
+      return lastfield;
+    }
+
+    bool prevIsEmpty() const
+    {
+      return !isFirst() && !prev()->isOccupied();
+    }
+    bool nextIsEmpty() const
+    {
+      return !isLast() && !next()->isOccupied();
+    }
+
+    size_t size() const
+    {
+      return (const uint8_t *)next() - (const uint8_t *)this;
+    }
+
+  private:
+    RegionHeader * prevfield;
+    RegionHeader * nextfield;
+    unsigned char occupiedfield;
+    unsigned char lastfield;
+  };
+
+  using Occupied = RegionHeader::Occupied;
+  using Last = RegionHeader::Last;
+
+  struct BlockHeader
+  {
+    void setFirstRegion(RegionHeader *p)
+    {
+      IMP_DBG("[%p] BlockHeader::setFirstRegion(%p)\n", this, p);
+
+      first_region = p;
+    }
+
+    RegionHeader * firstRegion() const
+    {
+      return first_region;
+    }
+
+  private:
+    // alignment_filler requires some kind of measurement instead of adding sizeof(BlockHeader)
+    RegionHeader *first_region;
+  public:
+    BlockHeader *prev, *next;
+    CmiInt8 num_slots;
+  };
+
+  struct IsomallocBlockRecord
+  {
+    IsomallocBlockRecord() = delete;
+    IsomallocBlockRecord(const BlockHeader *block_header)
+      : slot{addr2slot(block_header)}
+      , num_slots{block_header->num_slots}
+    {
+    }
+    IsomallocBlockRecord(uintptr_t block_location, CmiInt8 n)
+      : slot{addr2slot((const void *)block_location)}
+      , num_slots{n}
+    {
+    }
+    IsomallocBlockRecord(size_t requested_size)
+    {
+      const CmiInt8 n = length2slots(requested_size);
+
+      /* Always satisfy mallocs with local slots: */
+      const CmiInt8 s = get_slots(CpvAccess(myss), n);
+      if (s == -1)
+      {
+        CmiError("Not enough address space left on processor %d to isomalloc %d bytes!\n",
+                  CmiMyPe(), requested_size);
+        CmiAbort("Out of virtual address space for isomalloc");
+      }
+
+      slot = s;
+      num_slots = n;
+    }
+
+    CmiInt8 numSlots() const
+    {
+      return num_slots;
+    }
+    uint8_t *ptr() const
+    {
+      return (uint8_t *)slot2addr(slot);
+    }
+    size_t size() const
+    {
+      return numSlots() * slotsize;
+    }
+    uint8_t *endpoint() const
+    {
+      return ptr() + size();
+    }
+
+    void *map() const
+    {
+      grab_slots(CpvAccess(myss), slot, numSlots());
+      return remap();
+    }
+    void *remap() const
+    {
+      void *myptr;
+      for (int i = 0; i < 5; i++)
+      {
+        myptr = map_slots(slot, numSlots());
+        if (myptr != nullptr)
+          break;
+
+#if CMK_HAS_USLEEP
+        const auto err = errno;
+        if (err == ENOMEM)
+        {
+          usleep(rand() % 1000);
+          continue;
+        }
+        else
+          break;
+#endif
+      }
+      if (myptr == nullptr)
+        map_failed(slot, numSlots());
+
+      IMP_DBG("Isomalloc block %p-%p mapped (%zu)\n", ptr(), ptr() + size(), size());
+
+      return (uint8_t *)myptr;
+    }
+    void unmap() const
+    {
+      call_munmap(ptr(), size());
+      IMP_DBG("Isomalloc block %p-%p unmapped (%zu)\n", ptr(), ptr() + size(), size());
+    }
+
+  private:
+    CmiInt8 slot;
+    CmiInt8 num_slots;
+  };
+
+  struct RBTree
+  {
+    enum color : uintptr_t
+    {
+      RED = 0,
+      BLACK = 1
+    };
+
+    struct Node
+    {
+      // tag structs
+      struct Color
+      {
+        explicit Color(uintptr_t v) : value{v} { }
+        Color(RBTree::color v = RED) : value{(uintptr_t)v} { }
+        operator uintptr_t() const { return value; }
+        operator RBTree::color() const { return (RBTree::color)value; }
+      private:
+        uintptr_t value;
+      };
+
+      size_t key() const
+      {
+        return size();
+      }
+      size_t size() const
+      {
+        return header()->size();
+      }
+      uint8_t * ptr() const
+      {
+        return (uint8_t *)location();
+      }
+      RegionHeader * header() const
+      {
+        return (RegionHeader *)location();
+      }
+      uintptr_t location() const
+      {
+        return (uintptr_t)this - sizeof(RegionHeader);
+      }
+
+      // tree node data
+      Node * leftField{};
+      Node * rightField{};
+      Node * parentField{};
+      Color colorField{};
+
+      bool isRoot() const
+      {
+        return parentField == nullptr;
+      }
+      Node * parent()
+      {
+        return parentField;
+      }
+      Node * left()
+      {
+        return leftField;
+      }
+      Node * right()
+      {
+        return rightField;
+      }
+      RBTree::color color() const
+      {
+        return colorField;
+      }
+      void setColor(RBTree::color c)
+      {
+        colorField = c;
+      }
+
+      Node * grandparent()
+      {
+        CmiAssert(!this->isRoot());           /* Not the root node */
+        CmiAssert(!this->parent()->isRoot()); /* Not child of root */
+        return this->parent()->parent();
+      }
+      Node * sibling()
+      {
+        CmiAssert(!this->isRoot());           /* Root node has no sibling */
+        if (this == this->parent()->left())
+          return this->parent()->right();
+        else
+          return this->parent()->left();
+      }
+      Node * parent_sibling()
+      {
+        CmiAssert(!this->isRoot());           /* Root node has no parent-sibling */
+        CmiAssert(!this->parent()->isRoot()); /* Children of root have no parent-sibling */
+        return this->parent()->sibling();
+      }
+      Node * maximum_node()
+      {
+        Node * n = this;
+        Node * right;
+        while ((right = n->right()) != nullptr)
+        {
+          n = right;
+        }
+        return n;
+      }
+    };
+
+    Node * lookup_region(size_t, size_t, size_t);
+    void insert(Node *);
+    void remove(Node *);
+
+    void pup(PUP::er & p)
+    {
+      if (p.isUnpacking())
+      {
+        uintptr_t r;
+        p | r;
+        root = (Node *)r;
+      }
+      else
+      {
+        uintptr_t r = (uintptr_t)root;
+        p | r;
+      }
+    }
+
+  private:
+
+    Node * root{};
+
+    static color node_color(const RBTree::Node * n)
+    {
+      return n == nullptr ? BLACK : n->color();
+    }
+
+    void replace_node(Node * oldn, Node * newn);
+    void rotate_left(Node * n);
+    void rotate_right(Node * n);
+
+    void insert_case1(Node * n);
+    void insert_case2(Node * n);
+    void insert_case3(Node * n);
+    void insert_case4(Node * n);
+    void insert_case5(Node * n);
+
+    void delete_case1(Node * n);
+    void delete_case2(Node * n);
+    void delete_case3(Node * n);
+    void delete_case4(Node * n);
+    void delete_case5(Node * n);
+    void delete_case6(Node * n);
+
+#ifdef VERIFY_RBTREE
+    void verify_properties();
+    static void verify_property_1(Node * n);
+    static void verify_property_2(Node * root);
+    static void verify_property_4(Node * n);
+    static void verify_property_5_helper(Node * n, int black_count, int * path_black_count);
+    static void verify_property_5(Node * root);
+#endif
+  };
+
+  using EmptyRegion = RBTree::Node;
+
+  static constexpr size_t minimum_alignment = ALIGN_BYTES;
+
+  // roughly the threshold where bookkeeping for a free region takes more space than the region itself
+  static constexpr size_t minimum_empty_region_size = sizeof(RegionHeader) + sizeof(EmptyRegion);
+  static_assert(minimum_empty_region_size > 0, "region sizes cannot be zero");
+  static_assert(minimum_empty_region_size >= sizeof(RegionHeader), "regions must allow space for a header");
+
+  isomempool()
+  {
+    IMP_DBG("[%p] isomempool::isomempool()\n", this);
+  }
+
+  ~isomempool()
+  {
+    IMP_DBG("[%p] isomempool::~isomempool()\n", this);
+
+    clearBlocks();
+  }
+
+  void print_contents() const
+  {
+    CmiPrintf("[%p] isomempool::print_contents()\n", this);
+
+    size_t count = num_blocks;
+    CmiPrintf("Blocks: %zu\n", count);
+
+    BlockHeader *block_header = first_block;
+    for (size_t i = 0; i < count; ++i)
+    {
+      const uintptr_t address = (uintptr_t)block_header;
+      const size_t size = block_header->num_slots * slotsize;
+      CmiPrintf("  0x%016zx-0x%016zx %zu\n", address, address + size, size);
+
+      const RegionHeader *node = block_header->firstRegion();
+      bool isLast;
+      do
+      {
+        const RegionHeader *next = node->next();
+
+        const size_t size = (const uint8_t *)next - (const uint8_t *)node;
+        CmiPrintf("    0x%016zx-0x%016zx %zu\n", node, next, size);
+
+        isLast = node->isLast();
+        node = next;
+      }
+      while (!isLast);
+
+      block_header = block_header->next;
+    }
+  }
+
+  static size_t get_alignment_filler(const void *ptr, size_t alignment)
+  {
+    CmiAssert((alignment & (alignment-1)) == 0); // assuming alignment is a power of two or zero
+    return (alignment - ((uintptr_t)ptr & (alignment-1))) & (alignment-1);
+    // return (alignment - ptr % alignment) % alignment; // non-power of two version
+  }
+
+  static size_t minimum_alignment_filler(const void *ptr)
+  {
+    return get_alignment_filler(ptr, minimum_alignment);
+  }
+
+  void *alloc(size_t size, const size_t alignment = minimum_alignment, size_t alignment_offset = 0);
+  void free(void *user_ptr);
+
+  void pup(PUP::er & p);
+
+private:
+
+  // canonical data
+  BlockHeader *first_block{};
+  size_t num_blocks{};
+  RBTree empty_tree;
+
+
+  void *allocFromEmptyRegion(const size_t size, EmptyRegion * target, const size_t alignment_filler)
+  {
+    const size_t region_size = target->size();
+    RegionHeader * const empty_header = target->header();
+    empty_tree.remove(target);
+
+    IMP_DBG("[%p] isomempool::alloc(%zu, ..., ...) adding to block by erasing and filling region %p of size %zu\n",
+            this, size, empty_header, region_size);
+
+    CmiAssert(!empty_header->prevIsEmpty());
+    CmiAssert(!empty_header->nextIsEmpty());
+
+    // Extract information from the empty region's header before it is (potentially) overwritten.
+    const bool empty_header_first = empty_header->isFirst();
+    RegionHeader * const empty_header_prev = empty_header->prev();
+    RegionHeader * const empty_header_next = empty_header->next();
+    const auto empty_header_last = empty_header->last();
+
+    const auto header_ptr = (RegionHeader *)((uint8_t *)empty_header + alignment_filler);
+
+    RegionHeader * header_prev;
+    RegionHeader * header_next;
+    BitCarrier header_last;
+
+    if (alignment_filler >= minimum_empty_region_size + minimum_alignment_filler(empty_header))
+    {
+      // Record a new empty region preceding the new occupied region.
+      IMP_DBG("[%p] isomempool::alloc(%zu, ..., ...) inserting empty region {%zu, %p} left pad existing region\n",
+              this, size, alignment_filler, empty_header);
+
+      header_prev = new (empty_header) RegionHeader{empty_header_prev, header_ptr,
+                                                    Occupied{false}, Last{false}};
+
+      auto empty_region = new (header_prev + 1) EmptyRegion{};
+      empty_tree.insert(empty_region);
+
+      if (empty_header_first)
+      {
+        const auto block_header = (BlockHeader *)empty_header_prev;
+        block_header->setFirstRegion(header_prev);
+      }
+      else
+      {
+        empty_header_prev->setNext(header_prev);
+        empty_header_prev->setLast(false);
+      }
+
+      CmiAssert(!header_prev->prevIsEmpty());
+    }
+    else
+    {
+      // Directly link the new occupied region to the erased empty region's left neighbor.
+      header_prev = empty_header_prev;
+
+      if (empty_header_first)
+      {
+        const auto block_header = (BlockHeader *)empty_header_prev;
+        block_header->setFirstRegion(header_ptr);
+      }
+    }
+
+    const size_t size_difference = region_size - size - alignment_filler;
+    auto follow_ptr = (uint8_t *)header_ptr + size;
+    const size_t follow_alignment_filler = minimum_alignment_filler(follow_ptr);
+    follow_ptr += follow_alignment_filler;
+
+    if (size_difference >= minimum_empty_region_size + follow_alignment_filler)
+    {
+      // Record a new empty region following the new occupied region.
+      IMP_DBG("[%p] isomempool::alloc(%zu, ..., ...) inserting empty region {%zu, %p} right pad existing region\n",
+              this, size, size_difference, follow_ptr);
+
+      header_next = new (follow_ptr) RegionHeader{header_ptr,
+                                                  empty_header_next, Occupied{false}, empty_header_last};
+
+      auto empty_region = new (header_next + 1) EmptyRegion{};
+      empty_tree.insert(empty_region);
+
+      if (!header_next->isLast())
+        empty_header_next->setPrev(header_next);
+
+      CmiAssert(!header_next->nextIsEmpty());
+
+      header_last = Last{false};
+    }
+    else
+    {
+      // Directly link the new occupied region to the erased empty region's right neighbor.
+      header_next = empty_header_next;
+      header_last = empty_header_last;
+    }
+
+    // Instantiate the new region and connect its neighbors to it.
+    const auto header = new (header_ptr) RegionHeader{header_prev, header_next, Occupied{true}, header_last};
+
+    if (!header->isFirst())
+    {
+      header_prev->setNext(header);
+      header_prev->setLast(false);
+    }
+    if (!header->isLast())
+      header_next->setPrev(header);
+
+    return header + 1;
+  }
+
+  void *allocFromNewBlock(const size_t size, const size_t alignment, const size_t alignment_offset)
+  {
+    const IsomallocBlockRecord block{sizeof(BlockHeader) + size + alignment};
+    const size_t block_size = block.size();
+
+    IMP_DBG("[%p] isomempool::alloc(%zu, %zu, %zu) creating block %p of size %zu\n",
+            this, size, alignment, alignment_offset, block.ptr(), block_size);
+
+    // Construct a new block.
+    const auto block_header = new (block.map()) BlockHeader{};
+    const auto block_header_sentinel = (RegionHeader *)block_header;
+
+    block_header->num_slots = block.numSlots();
+    block_header->prev = nullptr;
+    block_header->next = first_block;
+    if (first_block != nullptr)
+      first_block->prev = block_header;
+    first_block = block_header;
+    ++num_blocks;
+
+    const auto block_data_ptr = (uint8_t *)(block_header + 1);
+    const size_t alignment_filler = get_alignment_filler(block_data_ptr + alignment_offset, alignment);
+    const auto header_ptr = (RegionHeader *)(block_data_ptr + alignment_filler);
+
+    RegionHeader * header_prev;
+    RegionHeader * header_next;
+    BitCarrier header_last;
+
+    if (alignment_filler >= minimum_empty_region_size + minimum_alignment_filler(block_data_ptr))
+    {
+      // Record a new empty region preceding the new occupied region.
+      IMP_DBG("[%p] isomempool::alloc(%zu, %zu, %zu) inserting empty region {%zu, %p} (left pad new block)\n",
+              this, size, alignment, alignment_offset, alignment_filler, block_data_ptr);
+
+      header_prev = new (block_data_ptr) RegionHeader{block_header_sentinel, header_ptr,
+                                                      Occupied{false}, Last{false}};
+
+      auto empty_region = new (header_prev + 1) EmptyRegion{};
+      empty_tree.insert(empty_region);
+
+      block_header->setFirstRegion(header_prev);
+    }
+    else
+    {
+      // Mark the new occupied region as the first in the block.
+      header_prev = block_header_sentinel;
+
+      block_header->setFirstRegion(header_ptr);
+    }
+
+    const size_t size_difference = block_size - sizeof(BlockHeader) - size - alignment_filler;
+    auto follow_ptr = (uint8_t *)header_ptr + size;
+    const size_t follow_alignment_filler = minimum_alignment_filler(follow_ptr);
+    follow_ptr += follow_alignment_filler;
+
+    if (size_difference >= minimum_empty_region_size + follow_alignment_filler)
+    {
+      // Record a new empty region following the new occupied region.
+      IMP_DBG("[%p] isomempool::alloc(%zu, %zu, %zu) inserting empty region {%zu, %p} (right pad new block)\n",
+              this, size, alignment, alignment_offset, size_difference, follow_ptr);
+
+      header_next = new (follow_ptr) RegionHeader{header_ptr,
+                                                  (RegionHeader *)block.endpoint(),
+                                                  Occupied{false}, Last{true}};
+
+      auto empty_region = new (header_next + 1) EmptyRegion{};
+      empty_tree.insert(empty_region);
+
+      header_last = Last{false};
+    }
+    else
+    {
+      // Mark the new occupied region as the last in the block.
+      header_next = (RegionHeader *)block.endpoint();
+      header_last = Last{true};
+    }
+
+    const auto header = new (header_ptr) RegionHeader{header_prev, header_next, Occupied{true}, header_last};
+
+    return header + 1;
+  }
+
+  void clearBlocks()
+  {
+    size_t count = num_blocks;
+
+    BlockHeader *block_header = first_block;
+    for (size_t i = 0; i < count; ++i)
+    {
+      const IsomallocBlockRecord block{block_header};
+      block_header = block_header->next;
+      block.unmap();
+    }
+
+    first_block = nullptr;
+    num_blocks = 0;
+  }
+};
+
+void *isomempool::alloc(size_t size, const size_t alignment, size_t alignment_offset)
+{
+  IMP_DBG("[%p] isomempool::alloc(%zu, %zu, %zu)...\n", this, size, alignment, alignment_offset);
+
+  size += sizeof(RegionHeader);
+  alignment_offset += sizeof(RegionHeader);
+
+  // Find the smallest empty region that can fit the data.
+  EmptyRegion * node = empty_tree.lookup_region(size, alignment, alignment_offset);
+
+  // Perform the allocation.
+  void *ret = node != nullptr
+              ? allocFromEmptyRegion(size, node, get_alignment_filler(node->ptr() + alignment_offset, alignment))
+              : allocFromNewBlock(size, alignment, alignment_offset);
+
+  IMP_DBG("[%p] isomempool::alloc(%zu, %zu, %zu) -> %p\n", this, size, alignment, alignment_offset, ret);
+
+  return ret;
+}
+
+void isomempool::free(void *user_ptr)
+{
+  const auto orig_header = (RegionHeader *)user_ptr - 1;
+  auto header = orig_header;
+
+  IMP_DBG("[%p] isomempool::free(%p)... {header = %p}\n", this, user_ptr, orig_header);
+
+  if (orig_header->prevIsEmpty())
+  {
+    // Merge with the free region to the left.
+    RegionHeader * const header_prev = orig_header->prev();
+    RegionHeader * const header_next = orig_header->next();
+    const auto header_last = orig_header->last();
+
+    auto empty_region = (EmptyRegion *)(header_prev + 1);
+    IMP_DBG("[%p] isomempool::free(%p) erasing empty region {%zu, %p} (left)\n",
+            this, user_ptr, empty_region->size(), header_prev);
+    empty_tree.remove(empty_region);
+
+    header = header_prev;
+    header_prev->setNext(header_next);
+    header_prev->setLast(header_last);
+    if (!header_last)
+      header_next->setPrev(header_prev);
+  }
+
+  if (orig_header->nextIsEmpty())
+  {
+    // Merge with the free region to the right.
+    RegionHeader * const header_next = header->next();
+    RegionHeader * const header_next_next = header_next->next();
+    const auto header_next_last = header_next->last();
+
+    const auto empty_region = (EmptyRegion *)(header_next + 1);
+    IMP_DBG("[%p] isomempool::free(%p) erasing empty region {%zu, %p} (right)\n",
+            this, user_ptr, empty_region->size(), header_next);
+    empty_tree.remove(empty_region);
+
+    header->setNext(header_next_next);
+    header->setLast(header_next_last);
+    if (!header_next_last)
+      header_next_next->setPrev(header);
+  }
+
+  if (header->isFirst() && header->isLast()) // Is it the only remaining region in the block?
+  {
+    // Free the underlying block.
+    const auto block_header = (BlockHeader *)header->prev();
+
+    if (block_header->prev != nullptr)
+      block_header->prev->next = block_header->next;
+    else
+      first_block = block_header->next;
+
+    if (block_header->next != nullptr)
+      block_header->next->prev = block_header->prev;
+
+    --num_blocks;
+
+    const IsomallocBlockRecord block{block_header};
+    block.unmap();
+  }
+  else
+  {
+    // Record the new empty region.
+    CmiAssert(!header->prevIsEmpty() && !header->nextIsEmpty());
+
+    header->setOccupied(false);
+
+    auto empty_region = new (header + 1) EmptyRegion{};
+    empty_tree.insert(empty_region);
+
+    IMP_DBG("[%p] isomempool::free(%p) inserted empty region {%zu, %p}\n",
+            this, user_ptr, empty_region->size(), header);
+  }
+}
+
+void isomempool::pup(PUP::er & p)
+{
+  IMP_DBG("[%p] isomempool::pup()%s%s%s%s\n", this, p.isSizing() ? " sizing" : "",
+          p.isPacking() ? " packing" : "", p.isUnpacking() ? " unpacking" : "", p.isDeleting() ? " deleting" : "");
+
+  p | empty_tree;
+
+  if (p.isUnpacking())
+  {
+    size_t count;
+    p | count;
+    num_blocks = count;
+
+    auto unpack = [this, &p]() -> BlockHeader *
+    {
+      uintptr_t address;
+      CmiInt8 num_slots;
+
+      p | address;
+      p | num_slots;
+
+      const IsomallocBlockRecord block{address, num_slots};
+      block.remap();
+
+      p((char *)address, num_slots * slotsize);
+
+      const auto block_header = (BlockHeader *)address;
+      // no need to reconnect the linked list thanks to isomalloc
+
+      return block_header;
+    };
+
+    if (count > 0)
+    {
+      // unpack the first block separately so we can retrieve its address
+      first_block = unpack();
+      for (size_t i = 1; i < count; ++i)
+        unpack();
+    }
+    else
+    {
+      first_block = nullptr;
+    }
+  }
+  else
+  {
+    size_t count = num_blocks;
+    p | count;
+
+    BlockHeader *block_header = first_block;
+    for (size_t i = 0; i < count; ++i)
+    {
+      uintptr_t address = (uintptr_t)block_header;
+      CmiInt8 num_slots = block_header->num_slots;
+
+      p | address;
+      p | num_slots;
+
+      p((char *)address, num_slots * slotsize);
+
+      block_header = block_header->next;
+    }
+  }
+
+  if (p.isDeleting())
+  {
+    clearBlocks();
+  }
+}
+
+/*
+Red-black tree code sourced from:
+https://web.archive.org/web/20151002014345/http://en.literateprograms.org:80/Special:Downloadcode/Red-black_tree_(C)
+
+Its authors have released all rights to it and placed it
+in the public domain under the Creative Commons CC0 1.0 waiver.
+https://creativecommons.org/publicdomain/zero/1.0/
+*/
+
+auto isomempool::RBTree::lookup_region(size_t size, size_t alignment, size_t alignment_offset) -> Node *
+{
+  Node * n = this->root;
+  Node * result = nullptr;
+  while (n != nullptr)
+  {
+    signed long long comp_result = get_alignment_filler(n->ptr() + alignment_offset, alignment) + size - n->size();
+    if (comp_result == 0)
+    {
+      return n;
+    }
+    else if (comp_result < 0)
+    {
+      result = n;
+      n = n->left();
+    }
+    else
+    {
+      CmiAssert(comp_result > 0);
+      n = n->right();
+    }
+  }
+  return result;
+}
+
+void isomempool::RBTree::replace_node(Node * oldn, Node * newn)
+{
+  Node * parent = oldn->parent();
+  if (oldn->isRoot())
+  {
+    this->root = newn;
+  }
+  else
+  {
+    if (oldn == parent->left())
+      parent->leftField = newn;
+    else
+      parent->rightField = newn;
+  }
+  if (newn != nullptr)
+  {
+    newn->parentField = oldn->parent();
+  }
+}
+
+void isomempool::RBTree::rotate_left(Node * n)
+{
+  Node * r = n->right();
+  replace_node(n, r);
+  n->rightField = r->left();
+  if (r->left() != nullptr)
+  {
+    r->left()->parentField = n;
+  }
+  r->leftField = n;
+  n->parentField = r;
+}
+void isomempool::RBTree::rotate_right(Node * n)
+{
+  Node * L = n->left();
+  replace_node(n, L);
+  n->leftField = L->right();
+  if (L->right() != nullptr)
+  {
+    L->right()->parentField = n;
+  }
+  L->rightField = n;
+  n->parentField = L;
+}
+
+void isomempool::RBTree::insert_case1(Node * n)
+{
+  if (n->isRoot())
+    n->setColor(BLACK);
+  else
+    insert_case2(n);
+}
+void isomempool::RBTree::insert_case2(Node * n)
+{
+  if (n->parent()->color() == BLACK)
+    return; /* Tree is still valid */
+  else
+    insert_case3(n);
+}
+void isomempool::RBTree::insert_case3(Node * n)
+{
+  if (node_color(n->parent_sibling()) == RED)
+  {
+    n->parent()->setColor(BLACK);
+    n->parent_sibling()->setColor(BLACK);
+    n->grandparent()->setColor(RED);
+    insert_case1(n->grandparent());
+  }
+  else
+  {
+    insert_case4(n);
+  }
+}
+void isomempool::RBTree::insert_case4(Node * n)
+{
+  Node * parent = n->parent();
+  if (n == parent->right() && parent == n->grandparent()->left())
+  {
+    rotate_left(parent);
+    n = n->left();
+  }
+  else if (n == parent->left() && parent == n->grandparent()->right())
+  {
+    rotate_right(parent);
+    n = n->right();
+  }
+  insert_case5(n);
+}
+void isomempool::RBTree::insert_case5(Node * n)
+{
+  Node * parent = n->parent();
+  parent->setColor(BLACK);
+  n->grandparent()->setColor(RED);
+  if (n == parent->left() && parent == n->grandparent()->left())
+  {
+    rotate_right(n->grandparent());
+  }
+  else
+  {
+    CmiAssert(n == parent->right() && parent == n->grandparent()->right());
+    rotate_left(n->grandparent());
+  }
+}
+
+void isomempool::RBTree::insert(Node * inserted_node)
+{
+  if (this->root == nullptr)
+  {
+    this->root = inserted_node;
+    inserted_node->parentField = nullptr;
+    inserted_node->setColor(BLACK);
+  }
+  else
+  {
+    Node * n = this->root;
+    while (1)
+    {
+      signed long long comp_result = inserted_node->key() - n->key();
+      if (comp_result < 0)
+      {
+        if (n->left() == nullptr)
+        {
+          n->leftField = inserted_node;
+          break;
+        }
+        else
+        {
+          n = n->left();
+        }
+      }
+      else
+      {
+        if (n->right() == nullptr)
+        {
+          n->rightField = inserted_node;
+          break;
+        }
+        else
+        {
+          n = n->right();
+        }
+      }
+    }
+    inserted_node->parentField = n;
+    insert_case2(inserted_node);
+  }
+
+#ifdef VERIFY_RBTREE
+  this->verify_properties();
+#endif
+}
+
+void isomempool::RBTree::delete_case1(Node * n)
+{
+  if (n->isRoot())
+    return;
+  else
+    delete_case2(n);
+}
+void isomempool::RBTree::delete_case2(Node * n)
+{
+  if (node_color(n->sibling()) == RED)
+  {
+    Node * parent = n->parent();
+    parent->setColor(RED);
+    n->sibling()->setColor(BLACK);
+    if (n == parent->left())
+      rotate_left(parent);
+    else
+      rotate_right(parent);
+  }
+  delete_case3(n);
+}
+void isomempool::RBTree::delete_case3(Node * n)
+{
+  Node * parent = n->parent();
+  if (parent->color() == BLACK && node_color(n->sibling()) == BLACK &&
+      node_color(n->sibling()->left()) == BLACK && node_color(n->sibling()->right()) == BLACK)
+  {
+    n->sibling()->setColor(RED);
+    delete_case1(parent);
+  }
+  else
+    delete_case4(n);
+}
+void isomempool::RBTree::delete_case4(Node * n)
+{
+  Node * parent = n->parent();
+  if (parent->color() == RED && node_color(n->sibling()) == BLACK &&
+      node_color(n->sibling()->left()) == BLACK && node_color(n->sibling()->right()) == BLACK)
+  {
+    n->sibling()->setColor(RED);
+    parent->setColor(BLACK);
+  }
+  else
+    delete_case5(n);
+}
+void isomempool::RBTree::delete_case5(Node * n)
+{
+  Node * parent = n->parent();
+  if (n == parent->left() && node_color(n->sibling()) == BLACK &&
+      node_color(n->sibling()->left()) == RED && node_color(n->sibling()->right()) == BLACK)
+  {
+    n->sibling()->setColor(RED);
+    n->sibling()->left()->setColor(BLACK);
+    rotate_right(n->sibling());
+  }
+  else if (n == parent->right() && node_color(n->sibling()) == BLACK &&
+           node_color(n->sibling()->right()) == RED && node_color(n->sibling()->left()) == BLACK)
+  {
+    n->sibling()->setColor(RED);
+    n->sibling()->right()->setColor(BLACK);
+    rotate_left(n->sibling());
+  }
+  delete_case6(n);
+}
+void isomempool::RBTree::delete_case6(Node * n)
+{
+  Node * parent = n->parent();
+  n->sibling()->setColor(parent->color());
+  parent->setColor(BLACK);
+  if (n == parent->left())
+  {
+    CmiAssert(node_color(n->sibling()->right()) == RED);
+    n->sibling()->right()->setColor(BLACK);
+    rotate_left(parent);
+  }
+  else
+  {
+    CmiAssert(node_color(n->sibling()->left()) == RED);
+    n->sibling()->left()->setColor(BLACK);
+    rotate_right(parent);
+  }
+}
+
+void isomempool::RBTree::remove(Node * n)
+{
+  auto remove_internal = [this](Node * n)
+  {
+    CmiAssert(n->left() == nullptr || n->right() == nullptr);
+
+    Node * child = n->right() == nullptr ? n->left() : n->right();
+    if (node_color(n) == BLACK)
+    {
+      n->setColor(node_color(child));
+      delete_case1(n);
+    }
+    replace_node(n, child);
+    if (n->isRoot() && child != nullptr)  // root should be black
+      child->setColor(BLACK);
+
+#ifdef VERIFY_RBTREE
+    this->verify_properties();
+#endif
+  };
+
+  if (n->left() != nullptr && n->right() != nullptr)
+  {
+    /* Copy key/value from predecessor and then delete it instead */
+    Node * pred = n->left()->maximum_node();
+    remove_internal(pred);
+    replace_node(n, pred);
+    pred->setColor(n->color());
+    pred->leftField = n->leftField;
+    pred->rightField = n->rightField;
+    if (pred->left())
+      pred->left()->parentField = pred;
+    if (pred->right())
+      pred->right()->parentField = pred;
+  }
+  else
+  {
+    remove_internal(n);
+  }
+}
+
+#ifdef VERIFY_RBTREE
+void isomempool::RBTree::verify_property_1(Node * n)
+{
+  CmiAssert(node_color(n) == RED || node_color(n) == BLACK);
+  if (n == nullptr) return;
+  verify_property_1(n->left());
+  verify_property_1(n->right());
+}
+void isomempool::RBTree::verify_property_2(Node * root)
+{
+  CmiAssert(node_color(root) == BLACK);
+}
+void isomempool::RBTree::verify_property_4(Node * n)
+{
+  if (node_color(n) == RED)
+  {
+    CmiAssert(node_color(n->left()) == BLACK);
+    CmiAssert(node_color(n->right()) == BLACK);
+    CmiAssert(n->parent()->color() == BLACK);
+  }
+  if (n == nullptr) return;
+  verify_property_4(n->left());
+  verify_property_4(n->right());
+}
+void isomempool::RBTree::verify_property_5_helper(Node * n, int black_count, int * path_black_count)
+{
+  if (node_color(n) == BLACK)
+  {
+    black_count++;
+  }
+  if (n == nullptr)
+  {
+    if (*path_black_count == -1)
+    {
+      *path_black_count = black_count;
+    }
+    else
+    {
+      CmiAssert(black_count == *path_black_count);
+    }
+    return;
+  }
+  verify_property_5_helper(n->left(), black_count, path_black_count);
+  verify_property_5_helper(n->right(), black_count, path_black_count);
+}
+void isomempool::RBTree::verify_property_5(Node * root)
+{
+  int black_count_path = -1;
+  verify_property_5_helper(root, 0, &black_count_path);
+}
+
+void isomempool::RBTree::verify_properties()
+{
+  verify_property_1(this->root);
+  verify_property_2(this->root);
+  /* Property 3 is implicit */
+  verify_property_4(this->root);
+  verify_property_5(this->root);
+}
+#endif
+#endif
+
 /************** External interface ***************/
-#if CMK_USE_MEMPOOL_ISOMALLOC
+#if USE_ISOMEMPOOL
+static CmiIsomallocBlock *isomalloc_internal_alloc_block(size_t size, isomempool *pool)
+{
+  CmiIsomallocBlock *blk = (CmiIsomallocBlock*)pool->alloc(size);
+  blk->start = blk;
+  return blk;
+}
+static CmiIsomallocBlock *isomalloc_internal_alloc_block_aligned(size_t size, size_t align, size_t align_offset, isomempool *pool)
+{
+  CmiIsomallocBlock *blk = (CmiIsomallocBlock*)pool->alloc(size, align, align_offset);
+  blk->start = blk;
+  return blk;
+}
+#elif CMK_USE_MEMPOOL_ISOMALLOC
 static CmiIsomallocBlock *isomalloc_internal_alloc_block(size_t size, mempool_type *pool)
 {
   CmiIsomallocBlock *blk = (CmiIsomallocBlock*)mempool_malloc(pool, size, 1);
-  blk->slot = (CmiInt8)(uintptr_t)blk;
+  blk->start = blk;
   return blk;
 }
 #else
@@ -2030,22 +3313,28 @@ static CmiIsomallocBlock *isomalloc_internal_alloc_block(size_t size)
 }
 #endif
 
-#if CMK_USE_MEMPOOL_ISOMALLOC
+#if USE_ISOMEMPOOL
+void* CmiIsomallocFromIsomempool(size_t size, isomempool *pool)
+{
+  CmiIsomallocBlock *blk = isomalloc_internal_alloc_block(size + sizeof(CmiIsomallocBlock), pool);
+  return block2pointer(blk);
+}
+#elif CMK_USE_MEMPOOL_ISOMALLOC
 void* CmiIsomallocFromPool(size_t size, mempool_type *pool)
+{
+  CmiIsomallocBlock *blk = isomalloc_internal_alloc_block(size + sizeof(CmiIsomallocBlock), pool);
+  return block2pointer(blk);
+}
 #else
 void *CmiIsomallocPlain(int size)
-#endif
 {
-  CmiIsomallocBlock *blk = isomalloc_internal_alloc_block(size + sizeof(CmiIsomallocBlock)
-#if CMK_USE_MEMPOOL_ISOMALLOC
-    , pool
-#endif
-    );
+  CmiIsomallocBlock *blk = isomalloc_internal_alloc_block(size + sizeof(CmiIsomallocBlock));
   blk->length = size;
   blk->align = 0;
   blk->alignoffset = 0;
   return block2pointer(blk);
 }
+#endif
 
 #define MALLOC_ALIGNMENT           ALIGN_BYTES
 #define MINSIZE                    (sizeof(CmiIsomallocBlock))
@@ -2082,15 +3371,21 @@ static void *isomalloc_internal_alloc_aligned(size_t useralign, size_t usersize,
 {
   size_t size = usersize + blocklistsize;
   size_t align = isomalloc_internal_validate_align(useralign);
-  CmiIsomallocBlock *blk = isomalloc_internal_alloc_block(size + sizeof(CmiIsomallocBlock) + align
-#if CMK_USE_MEMPOOL_ISOMALLOC
-    , list->pool
-#endif
-    );
+
+#if USE_ISOMEMPOOL
+  size_t align_offset = sizeof(CmiIsomallocBlock) + blocklistsize;
+  CmiIsomallocBlock *blk = isomalloc_internal_alloc_block_aligned(size + sizeof(CmiIsomallocBlock), align, align_offset, list->pool);
+  return block2pointer(blk);
+#elif CMK_USE_MEMPOOL_ISOMALLOC
+  CmiIsomallocBlock *blk = isomalloc_internal_alloc_block(size + sizeof(CmiIsomallocBlock) + align, list->pool);
+  return isomalloc_internal_perform_alignment(blk, align, blocklistsize);
+#else
+  CmiIsomallocBlock *blk = isomalloc_internal_alloc_block(size + sizeof(CmiIsomallocBlock) + align);
   blk->length = size;
   blk->align = align;
   blk->alignoffset = blocklistsize;
   return isomalloc_internal_perform_alignment(blk, align, blocklistsize);
+#endif
 }
 
 int CmiIsomallocEnabled(void)
@@ -2098,14 +3393,12 @@ int CmiIsomallocEnabled(void)
   return (isomallocStart!=NULL);
 }
 
+#if !CMK_USE_MEMPOOL_ISOMALLOC && !USE_ISOMEMPOOL
 void CmiIsomallocPup(pup_er p,void **blockPtrPtr)
 {
   CmiIsomallocBlock *blk;
   CmiInt8 s,length,align,alignoffset;
   CmiInt8 n;
-#if CMK_USE_MEMPOOL_ISOMALLOC
-  CmiAbort("Incorrect pup is called\n");
-#endif
   if (isomallocStart==NULL) CmiAbort("isomalloc is disabled-- cannot use IsomallocPup");
 
   if (!pup_isUnpacking(p)) 
@@ -2148,16 +3441,23 @@ void CmiIsomallocPup(pup_er p,void **blockPtrPtr)
     *blockPtrPtr=NULL; /*Zero out user's pointer*/
   }
 }
+#endif
 
-void CmiIsomallocFree(void *blockPtr)
+#if USE_ISOMEMPOOL
+static void CmiIsomallocFree(isomempool *pool, void *blockPtr)
+#else
+static void CmiIsomallocFree(void *blockPtr)
+#endif
 {
   if (isomallocStart==NULL) {
     disabled_unmap(pointer2block(blockPtr));
   }
   else if (blockPtr!=NULL)
   {
-#if CMK_USE_MEMPOOL_ISOMALLOC
-    mempool_free_thread((void*)(uintptr_t)pointer2block(blockPtr)->slot);
+#if USE_ISOMEMPOOL
+    pool->free(pointer2block(blockPtr)->start);
+#elif CMK_USE_MEMPOOL_ISOMALLOC
+    mempool_free_thread(pointer2block(blockPtr)->start);
 #else
     CmiIsomallocBlock *blk=pointer2block(blockPtr);
     CmiInt8 s=blk->slot; 
@@ -2242,7 +3542,11 @@ CmiIsomallocBlockList *CmiIsomallocBlockListNew(void)
 {
   CmiIsomallocBlockList *ret;
 
-#if CMK_USE_MEMPOOL_ISOMALLOC
+#if USE_ISOMEMPOOL
+  isomempool *pool = new isomempool{};
+  ret = (CmiIsomallocBlockList *)CmiIsomallocFromIsomempool(sizeof(*ret), pool);
+  ret->pool = pool;
+#elif CMK_USE_MEMPOOL_ISOMALLOC
   mempool_type *pool = mempool_init(2*(sizeof(CmiIsomallocBlock)+sizeof(mempool_header)) + sizeof(mempool_type),
                                     isomallocfn, isofreefn, 0);
   ret = (CmiIsomallocBlockList *)CmiIsomallocFromPool(sizeof(*ret), pool);
@@ -2259,11 +3563,53 @@ CmiIsomallocBlockList *CmiIsomallocBlockListNew(void)
 /* BIGSIM_OOC DEBUGGING */
 static void print_myslots(void);
 
+#if USE_ISOMEMPOOL
+void CmiIsomallocBlockListPup(pup_er cpup,CmiIsomallocBlockList **lp)
+{
+  PUP::er & p = *(PUP::er *)cpup;
+
+  isomempool *pool;
+  unsigned char dopup;
+  if (!p.isUnpacking())
+  {
+    CmiAssert(*lp);
+    pool = (*lp)->pool;
+    dopup = pool != nullptr;
+  }
+
+  p | dopup;
+  if (!dopup)
+    return;
+
+  if (p.isUnpacking())
+    pool = new isomempool{};
+
+  p | *pool;
+
+  p((char *)lp, sizeof(void *));
+
+  if (p.isUnpacking())
+  {
+    CmiIsomallocBlockList *head = *lp, *node = head;
+    do
+    {
+      node->pool = pool;
+      node = node->next;
+    }
+    while (node != head);
+  }
+
+  if (p.isDeleting())
+  {
+    delete pool;
+    *lp = nullptr;
+  }
+}
+#elif CMK_USE_MEMPOOL_ISOMALLOC
 /*Pup all the blocks in this list.  This amounts to two circular
   list traversals.  Because everything's isomalloc'd, we don't even
   have to restore the pointers-- they'll be restored automatically!
   */
-#if CMK_USE_MEMPOOL_ISOMALLOC
 void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp)
 {
   mempool_type *mptr;
@@ -2393,7 +3739,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp)
       newblock = map_slots(slot,size/slotsize);
       pup_bytes(p,newblock,size);
     }
-#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_UGNI)
+#if (CMK_USE_MEMPOOL_ISOMALLOC && !USE_ISOMEMPOOL) || (CMK_SMP && CMK_CONVERSE_UGNI)
     mptr->mempoolLock = CmiCreateLock();
 #endif  
   }
@@ -2449,19 +3795,27 @@ void CmiIsomallocBlockListDelete(CmiIsomallocBlockList *l)
 {
   CmiIsomallocBlockList *start=l;
   CmiIsomallocBlockList *cur=start;
-#if CMK_USE_MEMPOOL_ISOMALLOC
-  mempool_type *pool;
-#endif
   if (cur==NULL) return; /*Already deleted*/
-#if CMK_USE_MEMPOOL_ISOMALLOC
-  pool = cur->pool;
+#if USE_ISOMEMPOOL
+  isomempool *pool = cur->pool;
+#elif CMK_USE_MEMPOOL_ISOMALLOC
+  mempool_type *pool = cur->pool;
 #endif
   do {
     CmiIsomallocBlockList *doomed=cur;
     cur=cur->next; /*Have to stash next before deleting cur*/
+#if USE_ISOMEMPOOL
+    CmiIsomallocFree(pool, doomed);
+#else
     CmiIsomallocFree(doomed);
+#endif
   } while (cur!=start);
-#if CMK_USE_MEMPOOL_ISOMALLOC
+#if USE_ISOMEMPOOL
+# if ISOMEMPOOL_DEBUG
+  pool->print_contents();
+# endif
+  delete pool;
+#elif CMK_USE_MEMPOOL_ISOMALLOC
   mempool_destroy(pool);
 #endif
 }
@@ -2470,8 +3824,12 @@ void CmiIsomallocBlockListDelete(CmiIsomallocBlockList *l)
 void *CmiIsomallocBlockListMalloc(CmiIsomallocBlockList *l,size_t nBytes)
 {
   CmiIsomallocBlockList *n; /*Newly created slot*/
-#if CMK_USE_MEMPOOL_ISOMALLOC
+#if USE_ISOMEMPOOL
+  n = (CmiIsomallocBlockList *)CmiIsomallocFromIsomempool(sizeof(CmiIsomallocBlockList)+nBytes, l->pool);
+  n->pool = l->pool;
+#elif CMK_USE_MEMPOOL_ISOMALLOC
   n = (CmiIsomallocBlockList *)CmiIsomallocFromPool(sizeof(CmiIsomallocBlockList)+nBytes, l->pool);
+  n->pool = l->pool;
 #else
   n = (CmiIsomallocBlockList *)CmiIsomallocPlain(sizeof(CmiIsomallocBlockList)+nBytes);
 #endif
@@ -2508,7 +3866,11 @@ void CmiIsomallocBlockListFree(void *block)
   /*Link ourselves out of the blocklist*/
   n->prev->next=n->next;
   n->next->prev=n->prev;
+#if USE_ISOMEMPOOL
+  CmiIsomallocFree(n->pool, n);
+#else
   CmiIsomallocFree(n);
+#endif
 }
 
 /* BIGSIM_OOC DEBUGGING */

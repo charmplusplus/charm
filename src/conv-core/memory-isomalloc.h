@@ -8,6 +8,8 @@ migratable heap allocation to arbitrary clients.
 #include <stddef.h>
 #include "conv-config.h"
 
+#define USE_ISOMEMPOOL 1
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -15,7 +17,6 @@ extern "C" {
 /****** Isomalloc: Migratable Memory Allocation ********/
 /*Simple block-by-block interface:*/
 void  CmiIsomallocPup(pup_er p,void **block);
-void  CmiIsomallocFree(void *block);
 int   CmiIsomallocEnabled();
 void  CmiEnableIsomalloc();
 void  CmiDisableIsomalloc();
@@ -23,14 +24,18 @@ void  CmiDisableIsomalloc();
 CmiInt8   CmiIsomallocLength(void *block);
 int   CmiIsomallocInRange(void *addr);
 
-#if CMK_USE_MEMPOOL_ISOMALLOC
+#if USE_ISOMEMPOOL
+struct isomempool;
+#elif CMK_USE_MEMPOOL_ISOMALLOC
 struct mempool_type;
 #endif
 
 /*List-of-blocks interface:*/
 struct CmiIsomallocBlockList {/*Circular doubly-linked list of blocks:*/
   struct CmiIsomallocBlockList *prev, *next;
-#if CMK_USE_MEMPOOL_ISOMALLOC
+#if USE_ISOMEMPOOL
+  struct isomempool *pool;
+#elif CMK_USE_MEMPOOL_ISOMALLOC
   struct mempool_type *pool;
 #endif
   /*actual data of block follows here...*/

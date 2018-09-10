@@ -388,7 +388,11 @@ TCharm::~TCharm()
   //BIGSIM_OOC DEBUGGING
   //CmiPrintf("TCharm destructor called with heapBlocks=%p!\n", heapBlocks);
 
-  if (heapBlocks) CmiIsomallocBlockListDelete(heapBlocks);
+  if (heapBlocks)
+  {
+    CmiIsomallocBlockListDelete(heapBlocks);
+    heapBlocks = nullptr;
+  }
 
   CthFree(tid);
 #if CMI_SWAPGLOBALS
@@ -433,7 +437,11 @@ void TCharm::ckAboutToMigrate(){
 // clear the data before restarting from disk
 void TCharm::clear()
 {
-  if (heapBlocks) CmiIsomallocBlockListDelete(heapBlocks);
+  if (heapBlocks)
+  {
+    CmiIsomallocBlockListDelete(heapBlocks);
+    heapBlocks = nullptr;
+  }
   CthFree(tid);
   delete initMsg;
 }
@@ -588,6 +596,12 @@ void TCharm::atExit(CkReductionMsg* msg) noexcept {
 	//       here so that we can delete the msg explicitly *before* calling CkExit(),
 	//       otherwise the underlying message is leaked (and valgrind reports it).
 	delete msg;
+
+	if (heapBlocks)
+	{
+		CmiIsomallocBlockListDelete(heapBlocks);
+		heapBlocks = nullptr;
+	}
 
 	CkExit(exitcode);
 	//CkPrintf("After CkExit()!!!!!!!\n");
