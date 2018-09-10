@@ -1310,15 +1310,15 @@ static void disable_isomalloc(const char *why)
 #if ! CMK_HAS_MMAP
 /****************** Manipulate memory map (Win32 non-version) *****************/
 static void *call_mmap_fixed(void *addr,size_t len) {
-  CmiAbort("isomalloc.c: mmap_fixed should never be called here.");
+  CmiAbort("isomalloc.C: mmap_fixed should never be called here.");
   return NULL;
 }
 static void *call_mmap_anywhere(size_t len) {
-  CmiAbort("isomalloc.c: mmap_anywhere should never be called here.");
+  CmiAbort("isomalloc.C: mmap_anywhere should never be called here.");
   return NULL;
 }
 static void call_munmap(void *addr,size_t len) {
-  CmiAbort("isomalloc.c: munmap should never be called here.");
+  CmiAbort("isomalloc.C: munmap should never be called here.");
 }
 
   static int 
@@ -2139,7 +2139,7 @@ static CmiIsomallocBlock *isomalloc_internal_alloc_block(size_t size)
 {
   CmiInt8 s,n,i;
   CmiIsomallocBlock *blk;
-  if (isomallocStart==NULL) return disabled_map(size);
+  if (isomallocStart==NULL) return (CmiIsomallocBlock *)disabled_map(size);
   n=length2slots(size);
   /*Always satisfy mallocs with local slots:*/
   s=get_slots(CpvAccess(myss),n);
@@ -2317,6 +2317,7 @@ int CmiIsomallocInRange(void *addr)
 
 int _sync_iso_warned = 0;
 
+CMI_EXTERNC
 void CmiIsomallocInit(char **argv)
 {
 #if CMK_NO_ISO_MALLOC
