@@ -2,6 +2,7 @@ DIRS = \
   pingpong \
   simpleZeroCopy \
   stencil3d \
+  simpleVec \
 
 TESTDIRS = $(DIRS)
 
