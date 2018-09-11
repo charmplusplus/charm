@@ -1699,13 +1699,20 @@ class AmpiMsgPool {
 #define AMPI_REQ_POOL_SIZE 64
 #endif
 
-// pooledReqSize is the size of the largest AmpiRequest object that is pooled:
-static const size_t ireqSize = sizeof(IReq);
-static const size_t sreqSize = sizeof(SendReq);
-static const size_t ssreqSize = sizeof(SsendReq);
-static const size_t pooledReqSize = (ireqSize >= sreqSize && ireqSize >= ssreqSize) ? ireqSize :
-                                    (sreqSize >= ireqSize && sreqSize >= ssreqSize) ? sreqSize :
-                                    (ssreqSize);
+// Helper macro for pool size and alignment calculations
+#define DefinePooledReqX(name, func) \
+static const size_t ireq##name = func(IReq); \
+static const size_t sreq##name = func(SendReq); \
+static const size_t ssreq##name = func(SsendReq); \
+static const size_t pooledReq##name = (ireq##name >= sreq##name && ireq##name >= ssreq##name) ? ireq##name : \
+                                      (sreq##name >= ireq##name && sreq##name >= ssreq##name) ? sreq##name : \
+                                      (ssreq##name);
+
+// This defines 'static const size_t pooledReqSize = ... ;'
+DefinePooledReqX(Size, sizeof)
+
+// This defines 'static const size_t pooledReqAlign = ... ;'
+DefinePooledReqX(Align, alignof)
 
 // Pool of IReq, SendReq, and SsendReq objects:
 // These are different sizes, but we use a single pool for them so
@@ -1716,7 +1723,7 @@ class AmpiRequestPool {
  private:
   std::bitset<AMPI_REQ_POOL_SIZE> validReqs; // reqs in the pool are either valid (being used by a real req) or invalid
   int startIdx; // start next search from this index
-  std::array<char, AMPI_REQ_POOL_SIZE*pooledReqSize> reqs; // pool of memory for requests
+  alignas(pooledReqAlign) std::array<char, AMPI_REQ_POOL_SIZE*pooledReqSize> reqs; // pool of memory for requests
 
  public:
   AmpiRequestPool() : startIdx(0) {}
