@@ -27,6 +27,7 @@ DIRS = \
   charmxi_parsing \
   jacobi3d \
   jacobi3d-sdag \
+  zerocopy \
 
 # skip sdag, megatest and commtest
 BGDIRS = \

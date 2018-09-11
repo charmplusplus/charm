@@ -3,6 +3,7 @@
  */
 
 #include "charm++.h"
+#include "ck.h"
 #include "converse.h"
 #include "cmirdmautils.h"
 
@@ -322,6 +323,9 @@ int getRdmaBufSize(envelope *env){
 // Ack handler function which invokes the callback
 void CkRdmaDirectAckHandler(void *ack) {
 
+  // Process QD to mark completion of the outstanding RDMA operation
+  QdProcess(1);
+
   NcpyOperationInfo *info = (NcpyOperationInfo *)(ack);
 
   CkCallback *srcCb = (CkCallback *)(info->srcAck);
@@ -496,7 +500,22 @@ void CkNcpyBuffer::get(CkNcpyBuffer &source){
 
 #endif
   } else if (transferMode == ncpyTransferMode::RDMA) {
+
+    int outstandingRdmaOps = 1; // used by true-RDMA layers
+
+#if CMK_ONESIDED_IMPL
+#if CMK_CONVERSE_MPI
+    outstandingRdmaOps += 1; // MPI layer invokes CmiDirectAckHandler twice as sender and receiver post separately
+#endif
+#else
+    outstandingRdmaOps += 1; // non-RDMA layers invoke CmiDirectAckHandler twice using regular messages
+#endif
+
+    // Create QD to ensure that outstanding rdmaGet call is accounted for
+    QdCreate(outstandingRdmaOps);
+
     rdmaGet(source);
+
   } else {
     CkAbort("Invalid ncpyTransferMode");
   }
@@ -601,7 +620,22 @@ void CkNcpyBuffer::put(CkNcpyBuffer &destination){
 
 #endif
   } else if (transferMode == ncpyTransferMode::RDMA) {
+
+    int outstandingRdmaOps = 1; // used by true-RDMA layers
+
+#if CMK_ONESIDED_IMPL
+#if CMK_CONVERSE_MPI
+    outstandingRdmaOps += 1; // MPI layer invokes CmiDirectAckHandler twice as sender and receiver post separately
+#endif
+#else
+    outstandingRdmaOps += 1; // non-RDMA layers invoke CmiDirectAckHandler twice using regular messages
+#endif
+
+    // Create QD to ensure that outstanding rdmaGet call is accounted for
+    QdCreate(outstandingRdmaOps);
+
     rdmaPut(destination);
+
   } else {
     CkAbort("Invalid ncpyTransferMode");
   }
