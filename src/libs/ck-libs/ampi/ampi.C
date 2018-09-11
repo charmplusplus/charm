@@ -4649,8 +4649,8 @@ void ampi::irednResult(CkReductionMsg *msg)
 {
   MSG_ORDER_DEBUG(CkPrintf("[%d] irednResult called on comm %d\n", thisIndex, myComm.getComm()));
 
-  RednReq* rednReq = (RednReq*)postedReqs.get(MPI_REDN_TAG, AMPI_COLL_SOURCE);
-  if (rednReq == NULL)
+  AmpiRequest* req = postedReqs.get(MPI_REDN_TAG, AMPI_COLL_SOURCE);
+  if (req == NULL)
     CkAbort("AMPI> recv'ed a non-blocking reduction unexpectedly!\n");
 
 #if CMK_BIGSIM_CHARM
@@ -4661,13 +4661,13 @@ void ampi::irednResult(CkReductionMsg *msg)
 #endif
 #if AMPIMSGLOG
   if(msgLogRead){
-    PUParray(*(getAmpiParent()->fromPUPer), (char *)rednReq, sizeof(int));
+    PUParray(*(getAmpiParent()->fromPUPer), (char *)req, sizeof(int));
     return;
   }
 #endif
 
-  handleBlockedReq(rednReq);
-  rednReq->receive(this, msg);
+  handleBlockedReq(req);
+  req->receive(this, msg);
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(getAmpiParent()->thisIndex)){

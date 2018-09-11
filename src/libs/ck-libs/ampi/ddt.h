@@ -213,7 +213,7 @@ class CkDDT_DataType
  * Contiguous constructs a typemap consisting of the
  * replication of a datatype into contiguous locations.
  */
-class CkDDT_Contiguous : public CkDDT_DataType
+class CkDDT_Contiguous final : public CkDDT_DataType
 {
  public:
   CkDDT_Contiguous() = default;
@@ -263,7 +263,7 @@ class CkDDT_Vector : public CkDDT_DataType
  * while the HVector type allows a stride which consists of an arbitrary
  * number of bytes. HVector thus derives from Vector.
  */
-class CkDDT_HVector : public CkDDT_Vector
+class CkDDT_HVector final : public CkDDT_Vector
 {
  public:
   CkDDT_HVector() = default;
@@ -322,7 +322,7 @@ class CkDDT_HIndexed_Block : public CkDDT_DataType
  * The only difference between this datatype and Indexed is the fact that
  * all block lengths are the same here, so there is no array of block lengths.
  */
-class CkDDT_Indexed_Block : public CkDDT_HIndexed_Block
+class CkDDT_Indexed_Block final : public CkDDT_HIndexed_Block
 {
  public:
   CkDDT_Indexed_Block() = default;
@@ -376,7 +376,7 @@ class CkDDT_HIndexed : public CkDDT_DataType
  * are measured in units of oldtype extent, otherwise it is the same as HIndexed,
  * and so it derives from HIndexed.
  */
-class CkDDT_Indexed : public CkDDT_HIndexed
+class CkDDT_Indexed final : public CkDDT_HIndexed
 {
  public:
   CkDDT_Indexed() = default;
@@ -403,7 +403,7 @@ class CkDDT_Indexed : public CkDDT_HIndexed
  * arrayIndex - array of type indices
  * arrayDataType - array of DataTypes
  */
-class CkDDT_Struct : public CkDDT_DataType
+class CkDDT_Struct final : public CkDDT_DataType
 {
  protected:
   vector<int> arrayBlockLength;

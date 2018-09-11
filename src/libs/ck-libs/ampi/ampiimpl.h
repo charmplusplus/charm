@@ -475,7 +475,7 @@ class ampiTopology {
   virtual void setDestWeights(const vector<int> &destWeights) {CkAbort("AMPI: instance of invalid Virtual Topology class.");}
 };
 
-class ampiCartTopology : public ampiTopology {
+class ampiCartTopology final : public ampiTopology {
  private:
   int ndims;
   vector<int> dims, periods, nbors;
@@ -510,7 +510,7 @@ class ampiCartTopology : public ampiTopology {
   inline void setnbors(const vector<int> &n) {nbors = n; nbors.shrink_to_fit();}
 };
 
-class ampiGraphTopology : public ampiTopology {
+class ampiGraphTopology final : public ampiTopology {
  private:
   int nvertices;
   vector<int> index, edges, nbors;
@@ -545,7 +545,7 @@ class ampiGraphTopology : public ampiTopology {
   inline void setnbors(const vector<int> &n) {nbors = n; nbors.shrink_to_fit();}
 };
 
-class ampiDistGraphTopology : public ampiTopology {
+class ampiDistGraphTopology final : public ampiTopology {
  private:
   int inDegree, outDegree;
   bool sourcesWeighted, destsWeighted;
@@ -1177,7 +1177,7 @@ class AmpiRequest {
   }                                        \
 }
 
-class IReq : public AmpiRequest {
+class IReq final : public AmpiRequest {
  public:
   bool cancelled  = false; // track if request is cancelled
   bool persistent = false; // Is this a persistent recv request?
@@ -1220,7 +1220,7 @@ class IReq : public AmpiRequest {
   void print() const override;
 };
 
-class RednReq : public AmpiRequest {
+class RednReq final : public AmpiRequest {
  public:
   MPI_Op op = MPI_OP_NULL;
 
@@ -1252,7 +1252,7 @@ class RednReq : public AmpiRequest {
   void print() const override;
 };
 
-class GatherReq : public AmpiRequest {
+class GatherReq final : public AmpiRequest {
  public:
   GatherReq(const void *buf_, int count_, MPI_Datatype type_, MPI_Comm comm_,
             CkDDT *ddt_, AmpiReqSts sts_=AMPI_REQ_PENDING)
@@ -1280,7 +1280,7 @@ class GatherReq : public AmpiRequest {
   void print() const override;
 };
 
-class GathervReq : public AmpiRequest {
+class GathervReq final : public AmpiRequest {
  public:
   vector<int> recvCounts;
   vector<int> displs;
@@ -1314,7 +1314,7 @@ class GathervReq : public AmpiRequest {
   void print() const override;
 };
 
-class SendReq : public AmpiRequest {
+class SendReq final : public AmpiRequest {
   bool persistent = false; // is this a persistent send request?
 
  public:
@@ -1354,7 +1354,8 @@ class SendReq : public AmpiRequest {
   void print() const override;
 };
 
-class SsendReq : public AmpiRequest {
+class SsendReq final : public AmpiRequest {
+ private:
   bool persistent = false; // is this a persistent Ssend request?
 
  public:
@@ -1405,7 +1406,7 @@ class SsendReq : public AmpiRequest {
   void print() const override;
 };
 
-class ATAReq : public AmpiRequest {
+class ATAReq final : public AmpiRequest {
  public:
   vector<MPI_Request> reqs;
 
@@ -1426,7 +1427,7 @@ class ATAReq : public AmpiRequest {
   void print() const override;
 };
 
-class GReq : public AmpiRequest {
+class GReq final : public AmpiRequest {
  private:
   MPI_Grequest_query_function* queryFn;
   MPI_Grequest_free_function* freeFn;
@@ -1551,7 +1552,7 @@ inline void pupFromBuf(const void *data,T &t) {
 
 #define COLL_SEQ_IDX      -1
 
-class AmpiMsg : public CMessage_AmpiMsg {
+class AmpiMsg final : public CMessage_AmpiMsg {
  private:
   int ssendReq; //Index to the sender's request
   int tag; //MPI tag
@@ -1974,7 +1975,7 @@ const ampiCommStruct &universeComm2CommStruct(MPI_Comm universeNo);
 An ampiParent holds all the communicators and the TCharm thread
 for its children, which are bound to it.
 */
-class ampiParent : public CBase_ampiParent {
+class ampiParent final : public CBase_ampiParent {
  private:
   TCharm *thread;
   CProxy_TCharm threads;
@@ -2422,7 +2423,7 @@ public:
 An ampi manages the communication of one thread over
 one MPI communicator.
 */
-class ampi : public CBase_ampi {
+class ampi final : public CBase_ampi {
  private:
   friend class IReq; // for checking resumeOnRecv
   friend class SendReq;
