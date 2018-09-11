@@ -334,9 +334,6 @@ class ampiParent;
 
 class win_obj {
  public:
-  std::string winName;
-  bool initflag;
-
   void *baseAddr;
   MPI_Aint winSize;
   int disp_unit;
@@ -346,6 +343,8 @@ class win_obj {
   LockQueue lockQueue; // queue of waiting processors for the lock
                        // top of queue is the one holding the lock
                        // queue is empty if lock is not applied
+  std::string winName;
+  bool initflag;
 
   vector<int> keyvals; // list of keyval attributes
 
@@ -631,14 +630,19 @@ class KeyvalNode {
   }
 };
 
+enum AmpiCommType : uint8_t {
+   WORLD = 0
+  ,INTRA = 1
+  ,INTER = 2
+};
+
 //Describes an AMPI communicator
 class ampiCommStruct {
  private:
   MPI_Comm comm; //Communicator
   CkArrayID ampiID; //ID of corresponding ampi array
   int size; //Number of processes in communicator
-  bool isWorld; //true if ranks are 0..size-1?
-  bool isInter; // false: intra-communicator; true: inter-communicator
+  AmpiCommType commType; //COMM_WORLD, intracomm, intercomm?
   vector<int> indices;  //indices[r] gives the array index for rank r
   vector<int> remoteIndices;  // remote group for inter-communicator
 
@@ -659,18 +663,18 @@ class ampiCommStruct {
   }
 
  public:
-  ampiCommStruct(int ignored=0) {size=-1;isWorld=false;isInter=false;ampiTopo=NULL;topoType=MPI_UNDEFINED;}
+  ampiCommStruct(int ignored=0) : size(-1), commType(INTRA), ampiTopo(NULL), topoType(MPI_UNDEFINED) {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,int size_)
-    :comm(comm_), ampiID(id_),size(size_), isWorld(true), isInter(false), ampiTopo(NULL), topoType(MPI_UNDEFINED) {}
+    :comm(comm_), ampiID(id_),size(size_), commType(WORLD), ampiTopo(NULL), topoType(MPI_UNDEFINED) {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
                  int size_,const vector<int> &indices_)
-                :comm(comm_), ampiID(id_),size(size_),isWorld(false),
-                 isInter(false), indices(indices_),
+                :comm(comm_), ampiID(id_), size(size_),
+                 commType(INTRA), indices(indices_),
                  ampiTopo(NULL), topoType(MPI_UNDEFINED) {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
                  int size_,const vector<int> &indices_,
                  const vector<int> &remoteIndices_)
-                :comm(comm_),ampiID(id_),size(size_),isWorld(false),isInter(true),
+                :comm(comm_),ampiID(id_),size(size_),commType(INTER),
                  indices(indices_),remoteIndices(remoteIndices_),
                  ampiTopo(NULL), topoType(MPI_UNDEFINED) {}
 
@@ -699,8 +703,7 @@ class ampiCommStruct {
     comm           = obj.comm;
     ampiID         = obj.ampiID;
     size           = obj.size;
-    isWorld        = obj.isWorld;
-    isInter        = obj.isInter;
+    commType       = obj.commType;
     indices        = obj.indices;
     remoteIndices  = obj.remoteIndices;
     keyvals        = obj.keyvals;
@@ -729,8 +732,7 @@ class ampiCommStruct {
     comm           = obj.comm;
     ampiID         = obj.ampiID;
     size           = obj.size;
-    isWorld        = obj.isWorld;
-    isInter        = obj.isInter;
+    commType       = obj.commType;
     indices        = obj.indices;
     remoteIndices  = obj.remoteIndices;
     keyvals        = obj.keyvals;
@@ -746,12 +748,12 @@ class ampiCommStruct {
     return ampiTopo;
   }
 
-  inline bool isinter(void) const {return isInter;}
+  inline bool isinter(void) const {return commType==INTER;}
   void setArrayID(const CkArrayID &nID) {ampiID=nID;}
 
   MPI_Comm getComm(void) const {return comm;}
   inline const vector<int> &getIndices(void) const {
-    if (isWorld && indices.size()!=size) makeWorldIndices();
+    if (commType==WORLD && indices.size()!=size) makeWorldIndices();
     return indices;
   }
   const vector<int> &getRemoteIndices() const {return remoteIndices;}
@@ -775,19 +777,19 @@ class ampiCommStruct {
 #if CMK_ERROR_CHECKING
     if (r>=size) CkAbort("AMPI> You passed in an out-of-bounds process rank!");
 #endif
-    if (isWorld) return r;
+    if (commType == WORLD) return r;
     else return indices[r];
   }
   int getIndexForRemoteRank(int r) const {
 #if CMK_ERROR_CHECKING
     if (r>=remoteIndices.size()) CkAbort("AMPI> You passed in an out-of-bounds process rank!");
 #endif
-    if (isWorld) return r;
+    if (commType==WORLD) return r;
     else return remoteIndices[r];
   }
   //Get the rank for this array index (Warning: linear time)
   int getRankForIndex(int i) const {
-    if (isWorld) return i;
+    if (commType==WORLD) return i;
     else {
       for (int r=0;r<indices.size();r++)
         if (indices[r]==i) return r;
@@ -801,8 +803,7 @@ class ampiCommStruct {
     p|comm;
     p|ampiID;
     p|size;
-    p|isWorld;
-    p|isInter;
+    p|commType;
     p|indices;
     p|remoteIndices;
     p|keyvals;
@@ -1983,8 +1984,7 @@ class ampiParent : public CBase_ampiParent {
   bool resumeOnRecv, resumeOnColl;
   AmpiRequestList ampiReqs;
   AmpiRequestPool reqPool;
-  CkDDT *myDDT;
-  CkDDT myDDTsto;
+  CkDDT myDDT;
 
  private:
   MPI_Comm worldNo; //My MPI_COMM_WORLD
@@ -2171,7 +2171,7 @@ class ampiParent : public CBase_ampiParent {
   void ResumeThread(void);
   TCharm* getTCharmThread() const {return thread;}
   inline ampiParent* blockOnRecv(void);
-  inline CkDDT* getDDT() const { return myDDT; }
+  inline CkDDT* getDDT() { return &myDDT; }
 
 #if CMK_LBDB_ON
   void setMigratable(bool mig) {
@@ -2362,7 +2362,7 @@ class ampiParent : public CBase_ampiParent {
   }
   inline AmpiOpHeader op2AmpiOpHeader(MPI_Op op, MPI_Datatype type, int count) const {
     CkAssert(op>MPI_OP_NULL && op<ops.size());
-    int size = myDDT->getType(type)->getSize(count);
+    int size = myDDT.getType(type)->getSize(count);
     return AmpiOpHeader(ops[op].func, type, count, size);
   }
   inline void applyOp(MPI_Datatype datatype, MPI_Op op, int count, const void* invec, void* inoutvec) const {
@@ -2604,7 +2604,7 @@ class ampi : public CBase_ampi {
   void topoDup(int topoType, int rank, MPI_Comm comm, MPI_Comm *newcomm);
 
   inline AmpiRequestList& getReqs() { return parent->ampiReqs; }
-  CkDDT *getDDT(void) const {return parent->myDDT;}
+  CkDDT *getDDT() {return &parent->myDDT;}
   CthThread getThread() const { return thread->getThread(); }
 
  public:

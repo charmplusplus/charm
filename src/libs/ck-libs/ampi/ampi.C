@@ -31,7 +31,7 @@
 CMI_EXTERNC_VARIABLE const char * const CmiCommitID;
 
 static CkDDT *getDDT(void) {
-  return getAmpiParent()->myDDT;
+  return &getAmpiParent()->myDDT;
 }
 
 /* if error checking is disabled, ampiErrhandler is defined as a macro in ampiimpl.h */
@@ -1234,7 +1234,6 @@ ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int nRanks_)
   worldPtr=NULL;
   userAboutToMigrateFn=NULL;
   userJustMigratedFn=NULL;
-  myDDT=&myDDTsto;
   prepareCtv();
 
   // Allocate an empty groupStruct to represent MPI_EMPTY_GROUP
@@ -1257,7 +1256,6 @@ ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int nRanks_)
 ampiParent::ampiParent(CkMigrateMessage *msg):CBase_ampiParent(msg) {
   thread=NULL;
   worldPtr=NULL;
-  myDDT=&myDDTsto;
 
   init();
 
@@ -1272,7 +1270,7 @@ void ampiParent::pup(PUP::er &p) {
   p|threads;
   p|worldNo;
   p|worldStruct;
-  myDDT->pup(p);
+  p|myDDT;
   p|splitComm;
   p|groupComm;
   p|cartComm;
