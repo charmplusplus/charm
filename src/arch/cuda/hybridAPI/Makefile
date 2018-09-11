@@ -2,8 +2,8 @@ CHARMDIR=../..
 -include $(CHARMDIR)/include/conv-mach-opt.mak
 CUDA_PATH=$(CUDA_DIR)
 NVCC=$(CUDA_PATH)/bin/nvcc
-NVCC_FLAGS=-c -use_fast_math -std=c++11 -DHAPI_MEMPOOL # -device-debug -deviceemu
-NVCC_INC=-I$(CUDA_PATH)/include -I..
+NVCC_FLAGS=-c -use_fast_math -std=c++11 -DHAPI_MEMPOOL -DHAPI_TRACE # -device-debug -deviceemu
+NVCC_INC=-I$(CUDA_PATH)/include -I$(CUDA_PATH)/extras/CUPTI/include -I..
 
 all: libs
 	cp libcudahybridapi.a $(CHARMDIR)/lib
