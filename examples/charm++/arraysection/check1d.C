@@ -1,5 +1,5 @@
 #include <math.h>
-#include "check.decl.h"
+#include "check1d.decl.h"
 #include "ckmulticast.h"
 
 /* readonly */ CProxy_Main mainProxy;
@@ -80,4 +80,4 @@ public:
 	}
 };
 
-#include "check.def.h"
+#include "check1d.def.h"

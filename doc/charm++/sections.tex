@@ -91,15 +91,14 @@ If the section is created from inside an array element there is no such risk.
 \label {array_section_multicast}
 
 Once the proxy is obtained at section creation time, the user can broadcast to all the
-section members, or send messages to one member using its offset index within the section, like this:
+section members, like this:
 
 \begin{alltt}
   CProxySection_Hello proxy;
   proxy.someEntry(...)          // section broadcast
-  proxy[0].someEntry(...)       // send to the first element in the section
 \end{alltt}
 
-See examples/charm++/arraysection for an example on how sections are used.
+See examples/charm++/arraysection for examples on how sections are used.
 
 You can send the section proxy in a message to another processor, and still
 safely invoke the entry functions on the section proxy.
