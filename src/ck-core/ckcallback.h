@@ -193,10 +193,18 @@ public:
 	      return (d.cfn.fn == other.d.cfn.fn &&
 		  d.cfn.onPE == other.d.cfn.onPE &&
 		  d.cfn.param == other.d.cfn.param);
+	    case bcastSection:
+	      return (d.section._elems == other.d.section._elems &&
+		d.section.pelist && other.d.section.pelist &&
+		d.section.sinfo == other.d.section.sinfo &&
+		d.section._nElems == other.d.section._nElems &&
+		d.section.npes == other.d.section.npes &&
+		d.section.ep == other.d.section.ep &&
+		((d.section.hasRefnum && other.d.section.hasRefnum) &&
+		 (d.section.refnum == other.d.section.refnum)));
 	    case ignore:
 	    case ckExit:
 	    case invalid:
-	    case bcastSection:
 	      return true;
 	    default:
 	      CkAbort("Inconsistent CkCallback type");
@@ -337,10 +345,6 @@ public:
 
 	~CkCallback() {
 	  thread_destroy();
-          if (bcastSection == type) {
-            if (d.section._elems != NULL) delete [] d.section._elems;
-            if (d.section.pelist != NULL) delete [] d.section.pelist;
-          }
 	}
 	
 	bool isInvalid(void) const {return type==invalid;}

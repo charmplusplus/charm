@@ -44,6 +44,10 @@ public:
     int pe;
     /// Counter tracking the last reduction that has traversed this section (used by CkMulticast)
     int redNo;
+
+    bool operator==(CkSectionInfoStruct &other) {
+      return (val == other.val && aid == other.aid && pe == other.pe && redNo == other.redNo);
+    }
   };
 
   CkSectionInfoStruct info;
@@ -153,7 +157,7 @@ public:
               int factor=USE_DEFAULT_BRANCH_FACTOR): _cookie(c), bfactor(factor)
   {
     _elems.assign(e, e+n);
-    pelist.assign(_pelist, _pelist+n);
+    pelist.assign(_pelist, _pelist+_npes);
   }
   CkSectionID(CkSectionInfo &c, const std::vector<CkArrayIndex>& e, const std::vector<int>& _pelist,
               int factor=USE_DEFAULT_BRANCH_FACTOR): _cookie(c), _elems(e),
