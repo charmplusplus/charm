@@ -4,13 +4,10 @@ mainmodule check {
 	readonly CProxy_Check checkArray;
 	readonly int numchares;
 
-	//message used to send particles to computes
 	message sectionBcastMsg;
 
-
-
 	mainchare Main {
-		entry Main(CkArgMsg* msg);
+		entry [nokeep] Main(CkArgMsg* msg);
 		entry [reductiontarget] void done(int q, int output[q]);
 	};
 

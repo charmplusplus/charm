@@ -9,7 +9,7 @@
 struct sectionBcastMsg : public CkMcastBaseMsg, public CMessage_sectionBcastMsg {
 	int k;
 	sectionBcastMsg(int _k) : k(_k) {}
-	void pup(PUP::er &p){
+	void pup(PUP::er &p) {
 		CMessage_sectionBcastMsg::pup(p);
 		p|k;
 	}
@@ -17,22 +17,22 @@ struct sectionBcastMsg : public CkMcastBaseMsg, public CMessage_sectionBcastMsg 
 
 class Main : public CBase_Main {
 	int sum;
-	public:
-	Main(CkArgMsg* msg){
+
+public:
+	Main(CkArgMsg* msg) {
 		if (msg->argc < 2) {
 			ckout << "Usage: " << msg->argv[0] << " [number of chares]" << endl;
 			CkExit(1);
 		}
 		numchares = atoi(msg->argv[1]);
-		ckout<<"Numchares: " << numchares << endl;
-		checkArray = CProxy_Check::ckNew(numchares);
-		checkArray.createSection();
+		ckout << "Numchares: " << numchares << endl;
 		sum = 0;
 		mainProxy = thisProxy;
+		checkArray = CProxy_Check::ckNew(numchares);
+		checkArray.createSection();
 	}
-	//Main(CkMigrateMessage* msg){}
-	//void pup(PUP::er &p){}
-	void done(int q, int output[q]){
+
+	void done(int q, int output[]) {
 		CkAssert(q == 2);
 		int expected[2];
 		int n = ((numchares - 1) % 2 == 0) ? (numchares - 1) : (numchares - 2);
@@ -47,27 +47,27 @@ class Main : public CBase_Main {
 	}
 };
 
-
 class Check : public CBase_Check {
 	CProxySection_Check secProxy;
-	public:
+
+public:
 	Check() {}
-	Check(CkMigrateMessage* msg) {}
-	void createSection(){
-		if(thisIndex == 0) {
-			CkVec<CkArrayIndex1D> elems;    // add array indices
-			for (int i = 0; i < numchares; i += 2)
-				elems.push_back(CkArrayIndex1D(i));
-			secProxy = CProxySection_Check(checkArray.ckGetArrayID(), elems.getVec(), elems.size(), 4);
-			//Use setReductionClient or alternatively use callback
-			//secProxy.setReductionClient(new CkCallback(CkReductionTarget(Main,done), mainProxy));
+
+	void createSection() {
+		if (thisIndex == 0) {
+			std::vector<CkArrayIndex> elems;  // add array indices
+			elems.reserve(numchares / 2);
+			for (int i = 0; i < numchares; i += 2) {
+				elems.emplace_back(i);
+			}
+			secProxy = CProxySection_Check::ckNew(checkArray.ckGetArrayID(), elems);
 			sectionBcastMsg *msg = new sectionBcastMsg(1);
 			secProxy.recvMsg(msg);
 		}
 	}
 
-	void recvMsg(sectionBcastMsg *msg){
-		ckout<< "ArrayIndex: " << thisIndex << " - " << CkMyPe() << endl;
+	void recvMsg(sectionBcastMsg *msg) {
+		ckout << "ArrayIndex: " << thisIndex << " - " << CkMyPe() << endl;
 		int k = msg->k;
 		std::vector<int> outVals(2);
 		outVals[0] = k + thisIndex;
@@ -76,9 +76,8 @@ class Check : public CBase_Check {
 		CkGetSectionInfo(cookie, msg);
 		CkCallback cb(CkReductionTarget(Main, done), mainProxy);
 		CProxySection_Check::contribute(outVals, CkReduction::sum_int, cookie, cb);
-		CkFreeMsg(msg);
+		delete msg;
 	}
 };
-
 
 #include "check.def.h"
