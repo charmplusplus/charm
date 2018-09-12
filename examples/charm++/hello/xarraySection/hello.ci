@@ -9,7 +9,7 @@ mainmodule hello {
   };
 
   array [1D] Hello {
-    entry Hello(int aNum, CkGroupID mcastMgrGID);
+    entry Hello(int aNum);
     entry void mcastPing(pingMsg *msg);
   };
 };

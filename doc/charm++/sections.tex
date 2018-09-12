@@ -106,9 +106,9 @@ safely invoke the entry functions on the section proxy.
 
 \subsection{Optimized multicast via CkMulticast}
 
-\charmpp{} has an inbuilt CkMulticast library that optimizes section communications.
-By default, charm RTS will use this library for array sections. For group sections,
-the user must manually delegate to CkMulticast (see \ref{Manual Delegation}).
+\charmpp{} has a built-in CkMulticast library that optimizes section communications.
+By default, the \charmpp{} runtime system will use this library for array and cross-array sections. For group sections,
+the user must manually delegate the section proxy to CkMulticast (see \ref{Manual Delegation}).
 
 By default, CkMulticast builds a spanning tree for multicast/reduction
 with a factor of 2 (binary tree). One can specify a different branching factor when creating the

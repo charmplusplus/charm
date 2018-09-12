@@ -20,11 +20,7 @@ ARGS      = 10 3 3
 # Specify the compilers, run script, flags etc.
 CXX       = $(CHARMBIN)/charmc
 CHARMC    = $(CHARMBIN)/charmc
-OPT       = -O0 -g
-CPPFLAGS +=
 CXXFLAGS += -language charm++ $(OPT)
-LDFLAGS  += -module CkMulticast
-LDLIBS   +=
 EXECFLAGS = +p$(NP)
 ifdef $(NODELIST)
   EXECFLAGS += ++nodelist $(NODELIST)
@@ -38,7 +34,7 @@ endif
 all: $(TARGET)
 
 $(TARGET): $(OBJ)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+	$(CXX) $(CXXFLAGS) -o $@ $^
 
 clean:
 	$(RM) $(wildcard *.decl.h *.def.h *.d *.di *.o *.log *.projrc *.sts *.stamp) $(TARGET) charmrun
