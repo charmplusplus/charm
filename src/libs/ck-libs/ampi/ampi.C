@@ -2597,7 +2597,7 @@ void ampi::ssend_ack(int sreq_idx) noexcept {
   else {
     sreq_idx -= 2;              // start from 2
     AmpiRequestList& reqs = getReqs();
-    SsendReq *sreq = (SsendReq *)reqs[sreq_idx];
+    AmpiRequest *sreq = reqs[sreq_idx];
     sreq->complete = true;
     handleBlockedReq(sreq);
     resumeThreadIfReady();
@@ -2667,10 +2667,10 @@ void ampi::inorder(AmpiMsg* msg) noexcept
   //Check posted recvs:
   int tag = msg->getTag();
   int srcRank = msg->getSrcRank();
-  IReq* ireq = (IReq*)postedReqs.get(tag, srcRank);
-  if (ireq) { // receive posted
-    handleBlockedReq(ireq);
-    ireq->receive(this, msg);
+  AmpiRequest* req = postedReqs.get(tag, srcRank);
+  if (req) { // receive posted
+    handleBlockedReq(req);
+    req->receive(this, msg);
   } else {
     unexpectedMsgs.put(msg);
   }
@@ -2725,10 +2725,10 @@ void ampi::inorderRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int sr
   )
 
   //Check posted recvs:
-  IReq* ireq = (IReq*)postedReqs.get(tag, srcRank);
-  if (ireq) { // receive posted
-    handleBlockedReq(ireq);
-    ireq->receiveRdma(this, buf, size, ssendReq, srcRank, comm);
+  AmpiRequest* req = postedReqs.get(tag, srcRank);
+  if (req) { // receive posted
+    handleBlockedReq(req);
+    req->receiveRdma(this, buf, size, ssendReq, srcRank, comm);
   } else {
     AmpiMsg* msg = rdma2AmpiMsg(buf, size, seq, tag, srcRank, ssendReq);
     unexpectedMsgs.put(msg);
@@ -2747,10 +2747,10 @@ void ampi::completedRdmaSend(CkDataMsg *msg) noexcept
   )
 
   AmpiRequestList& reqList = getReqs();
-  SendReq& sreq = (SendReq&)(*reqList[reqIdx]);
-  sreq.complete = true;
+  AmpiRequest* sreq = reqList[reqIdx];
+  sreq->complete = true;
 
-  handleBlockedReq(&sreq);
+  handleBlockedReq(sreq);
   resumeThreadIfReady();
   // CkDataMsg is allocated & freed by the runtime, so do not delete msg
 }
@@ -2814,7 +2814,7 @@ MPI_Request ampi::send(int t, int sRank, const void* buf, int count, MPI_Datatyp
   MPI_Request req = delesend(t,sRank,buf,count,type,rank,destcomm,dest.getProxy(),ssendReq,sendType);
   if (sendType == BLOCKING_SEND && req != MPI_REQUEST_NULL) {
     AmpiRequestList& reqList = getReqs();
-    SendReq *sreq = (SendReq*)reqList[req];
+    AmpiRequest *sreq = reqList[req];
     sreq->wait(MPI_STATUS_IGNORE);
     reqList.free(parent->reqPool, req, parent->getDDT());
     req = MPI_REQUEST_NULL;
