@@ -2293,7 +2293,7 @@ void CmiIsomallocPup(pup_er p,void **blockPtrPtr)
 void CmiIsomallocFree(void *blockPtr)
 {
   if (isomallocStart==NULL) {
-    disabled_unmap(blockPtr);
+    disabled_unmap(pointer2block(blockPtr));
   }
   else if (blockPtr!=NULL)
   {
