@@ -125,25 +125,25 @@ command line while configuring from a blank slate. To build with all defaults,
 A basic command to install \charmpp{} through Spack is the following:
 
 \begin{alltt}
-	$ spack install charm
+	$ spack install charmpp
 \end{alltt}
 
-By default, the netlrts network backend with smp support is built. You can specify
+By default, the netlrts network backend with SMP support is built. You can specify
 other backends by providing the \texttt{backend} parameter to spack. It is
 also possible to specify other options, as listed in
 Section~\ref{sec:manualinstall}, by adding them to the Spack command prepended
-by a '\texttt{+}'. For example, to build the mpi version of \charmpp{} with
+by a '\texttt{+}'. For example, to build the MPI version of \charmpp{} with
 the integrated OpenMP support, you can use the following command:
 
 \begin{alltt}
-	$ spack install charm backend=mpi +omp
+	$ spack install charmpp backend=mpi +omp
 \end{alltt}
 
 To disable an option, prepend it with a '\texttt{\textasciitilde}'. For example,
-to build \charmpp{} with smp support disabled, you can use the following command:
+to build \charmpp{} with SMP support disabled, you can use the following command:
 
 \begin{alltt}
-	$ spack install charm ~smp
+	$ spack install charmpp ~smp
 \end{alltt}
 
 By default, the newest released version of \charmpp{} is built. You can select
@@ -152,7 +152,7 @@ build the current git version of \charmpp{}, specify the \texttt{@develop}
 version:
 
 \begin{alltt}
-	$ spack install charm@develop
+	$ spack install charmpp@develop
 \end{alltt}
 
 \section{\charmpp{} installation directories}
