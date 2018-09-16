@@ -91,12 +91,22 @@ class CkMcastBaseMsg {
 public:
   /// Current info about the state of this section
   CkSectionInfo _cookie;
-  /// A magic number to detect msg corruption
-  char magic;
   unsigned short ep;
+#if CMK_ERROR_CHECKING
+ private:
+  /// A magic number to detect msg corruption
+  char magic = _SECTION_MAGIC;
+#endif
 
-  CkMcastBaseMsg(): magic(_SECTION_MAGIC) {}
-  static inline bool checkMagic(CkMcastBaseMsg *m) { return m->magic == _SECTION_MAGIC; }
+ public:
+  CkMcastBaseMsg() = default;
+  static inline bool checkMagic(CkMcastBaseMsg *m) {
+#if CMK_ERROR_CHECKING
+    return m->magic == _SECTION_MAGIC;
+#else
+    return true;
+#endif
+  }
   inline int &gpe(void)      { return _cookie.get_pe(); }
   inline int &redno(void)    { return _cookie.get_redNo(); }
   inline void *&entry(void) { return _cookie.get_val(); }
