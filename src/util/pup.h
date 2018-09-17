@@ -86,7 +86,7 @@ namespace PUP {
    */
   struct reconstruct {};
   namespace detail {
-    template <typename T, bool b = std::is_constructible<reconstruct, T>::value>
+    template <typename T, bool b = std::is_constructible<T, reconstruct>::value>
     struct TemporaryObjectHolder { };
     template <typename T>
     struct TemporaryObjectHolder<T, true>
