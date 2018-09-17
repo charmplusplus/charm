@@ -161,6 +161,16 @@ namespace PUP {
   {
     c.clear();
   }
+  template <class K, class V>
+  void reserve_if_applicable(std::map<K, V> &c, size_t nElem)
+  {
+    c.clear();
+  }
+  template <class K, class V>
+  void reserve_if_applicable(std::multimap<K, V> &c, size_t nElem)
+  {
+    c.clear();
+  }
 
   //Impl. util: pup the length of a container
   template <class container>
@@ -220,27 +230,32 @@ namespace PUP {
     p.syncComment(sync_end_array);
   }
 
-  //Map objects don't have a "push_back", while vector and list
-  //  don't have an "insert", so PUP_stl_map isn't PUP_stl_container
-  template <class container,class dtype>
+  template <class container, class K, class V>
   inline void PUP_stl_map(er &p,container &c) {
     p.syncComment(sync_begin_list);
     size_t nElem=PUP_stl_container_size(p,c);
-    if (p.isUnpacking()) 
+    if (p.isUnpacking())
       { //Unpacking: Extract each element and insert:
-	for (size_t i=0;i<nElem;i++) {
-          detail::TemporaryObjectHolder<dtype> n;
-          p|n;
-          c.emplace(std::move(n.t));
-	} 
+        reserve_if_applicable(c, nElem);
+        for (size_t i=0;i<nElem;i++)
+        {
+          detail::TemporaryObjectHolder<K> k;
+          detail::TemporaryObjectHolder<V> v;
+
+          // keep in sync with std::pair
+          p.syncComment(sync_index);
+          p | k;
+          p.syncComment(sync_item);
+          p | v;
+
+          c.emplace(std::piecewise_construct, std::forward_as_tuple(std::move(k.t)), std::forward_as_tuple(std::move(v.t)));
+        }
       }
     else
     {
-      for (typename container::iterator it=c.begin(); it!=c.end(); ++it)
+      for (auto& kv : c)
       {
-        p.syncComment(sync_item);
-        // Cast away the constness (needed for std::set)
-        p|*(dtype *)&(*it);
+        p | kv;
       }
     }
     p.syncComment(sync_end_list);
@@ -272,16 +287,30 @@ namespace PUP {
 
   template <class V,class T,class Cmp> 
   inline void operator|(er &p,typename std::map<V,T,Cmp> &m)
-  { PUP_stl_map<std::map<V,T,Cmp>,std::pair<V,T> >(p,m); }
+  { PUP_stl_map<std::map<V,T,Cmp>,V,T >(p,m); }
   template <class V,class T,class Cmp> 
   inline void operator|(er &p,typename std::multimap<V,T,Cmp> &m)
-  { PUP_stl_map<std::multimap<V,T,Cmp>,std::pair<const V,T> >(p,m); }
+  { PUP_stl_map<std::multimap<V,T,Cmp>,V,T >(p,m); }
+  /// \warning This does not work with custom hash functions that have state
+  template <class V,class T,class Cmp>
+  inline void operator|(er &p,typename std::unordered_map<V,T,Cmp> &m)
+  { PUP_stl_map<std::unordered_map<V,T,Cmp>,V,T >(p,m); }
+  template <class V,class T,class Cmp>
+  inline void operator|(er &p,typename std::unordered_multimap<V,T,Cmp> &m)
+  { PUP_stl_map<std::unordered_multimap<V,T,Cmp>,V,T >(p,m); }
+
   template <class T>
   inline void operator|(er &p,typename std::set<T> &m)
-  { PUP_stl_map<std::set<T>,T >(p,m); }
+  { PUP_stl_container<std::set<T>,T >(p,m); }
   template <class T,class Cmp>
   inline void operator|(er &p,typename std::multiset<T,Cmp> &m)
-  { PUP_stl_map<std::multiset<T,Cmp>,T >(p,m); }
+  { PUP_stl_container<std::multiset<T,Cmp>,T >(p,m); }
+  template <class T>
+  inline void operator|(er &p,typename std::unordered_set<T> &m)
+  { PUP_stl_container<std::unordered_set<T>,T >(p,m); }
+  template <class T,class Cmp>
+  inline void operator|(er &p,typename std::unordered_multiset<T,Cmp> &m)
+  { PUP_stl_container<std::unordered_multiset<T,Cmp>,T >(p,m); }
 
   // Specialized to work with vector<bool>, which doesn't
   // have data() or shrink_to_fit() members
@@ -322,55 +351,6 @@ using Requires = typename requires_impl<
   template <typename T, std::size_t N>
   inline void operator|(er& p, std::array<T, N>& a) {
     pup(p, a);
-  }
-
-  /// \warning This does not work with custom hash functions that have state
-  template <typename K, typename V, typename H>
-  inline void pup(PUP::er& p, std::unordered_map<K, V, H>& m) {
-    size_t number_elem = PUP_stl_container_size(p, m);
-
-    if (p.isUnpacking()) {
-      for (size_t i = 0; i < number_elem; ++i) {
-        std::pair<K, V> kv;
-        p | kv;
-        m.emplace(std::move(kv));
-      }
-    } else {
-      for (auto& kv : m) {
-        p | kv;
-      }
-    }
-  }
-
-  /// \warning This does not work with custom hash functions that have state
-  template <typename K, typename V, typename H>
-  inline void operator|(er& p, std::unordered_map<K, V, H>& m) {
-    pup(p, m);
-  }
-
-  template <typename T>
-  inline void pup(PUP::er& p, std::unordered_set<T>& s) {
-    size_t number_elem = PUP_stl_container_size(p, s);
-
-    if (p.isUnpacking()) {
-      for (size_t i = 0; i < number_elem; ++i) {
-        T element;
-        p | element;
-        s.emplace(std::move(element));
-      }
-    } else {
-      // This intentionally is not a reference because at least with stdlibc++
-      // the reference code does not compile because it turns the dereferenced
-      // iterator into a value
-      for (T e : s) {
-        p | e;
-      }
-    }
-  }
-
-  template <class T>
-  inline void operator|(er& p, std::unordered_set<T>& s) {
-    pup(p, s);
   }
 
   template <typename T, Requires<std::is_enum<T>::value> = nullptr>
