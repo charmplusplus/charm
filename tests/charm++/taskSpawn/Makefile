@@ -18,5 +18,5 @@ taskSpawn.o: taskSpawn.C taskSpawn.decl.h
 	$(CHARMC) -c taskSpawn.C
 
 test: all
-	$(call run, ./taskSpawn +p4 500000 1000 )
+	$(call run, ./taskSpawn +p4 50000 100 )
 

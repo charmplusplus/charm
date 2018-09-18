@@ -260,7 +260,7 @@ class zerocopyObject : public CBase_zerocopyObject{
       //load balance
       if(iter % LBPERIOD_ITER == 0)
         AtSync();
-      else if(iter<=100)
+      else if(iter<=40)
         thisProxy[thisIndex].sdagRun();
       else {
         CkCallback reductionCb(CkReductionTarget(Main, done), mainProxy);
