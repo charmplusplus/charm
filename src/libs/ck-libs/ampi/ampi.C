@@ -873,7 +873,7 @@ void FTN_NAME(AMPICURRENTSTACKUSAGE, ampicurrentstackusage)(void){
 }
 
 CDECL
-void AMPI_threadstart(void *data) noexcept;
+void AMPI_threadstart(void *data);
 static int AMPI_threadstart_idx = -1;
 
 #if CMK_TRACE_ENABLED
@@ -1010,7 +1010,7 @@ class MPI_threadstart_t {
   MPI_MainFn fn;
   MPI_threadstart_t() noexcept {}
   MPI_threadstart_t(MPI_MainFn fn_) noexcept :fn(fn_) {}
-  void start() noexcept {
+  void start() {
     char **argv=CmiCopyArgs(CkGetArgv());
     int argc=CkGetArgc();
 
@@ -1040,7 +1040,7 @@ class MPI_threadstart_t {
 PUPmarshall(MPI_threadstart_t)
 
 CDECL
-void AMPI_threadstart(void *data) noexcept
+void AMPI_threadstart(void *data)
 {
   STARTUP_DEBUG("MPI_threadstart")
   MPI_threadstart_t t;
