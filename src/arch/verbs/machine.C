@@ -1635,14 +1635,19 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
     node = nodes_by_pe[dst];
     rank = dst - node->nodestart;
     if (node->nodestart != Cmi_nodestartGlobal) {
-#if !CMK_SMP_NOT_RELAX_LOCK	  		
+
+        // Lock around sending as there are multiple senders
+#if CMK_SMP
         LOCK_AND_SET();
-#endif		
+#endif
+
         DeliverViaNetwork(ogm, node, rank, DGRAM_ROOTPE_MASK, 0);
         GarbageCollectMsg(ogm);
-#if !CMK_SMP_NOT_RELAX_LOCK	  		
+
+#if CMK_SMP
         UNLOCK_AND_UNSET();
-#endif		
+#endif
+
   }
 #if CMK_MULTICORE
   network = 0;
@@ -1689,16 +1694,7 @@ CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freem
   CMI_MSG_SIZE(data)=size;
   ogm=PrepareOutgoing(pe,size,'F',data);
 
-#if CMK_SMP_NOT_RELAX_LOCK  
-  int acqLock = 0;
-  LOCK_AND_SET();
-#endif  
-  
-  sendonnetwork = DeliverOutgoingMessage(ogm);
-  
-#if CMK_SMP_NOT_RELAX_LOCK  
-  UNLOCK_AND_UNSET();
-#endif
+  sendonnetwork = DeliverOutgoingMessage(ogm); // Lock exists inside DeliverOutgoingMessage
 
 //#if CMK_SMP
 //  if (sendonnetwork!=0)   /* only call server when we send msg on network in SMP */

@@ -175,6 +175,13 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo) {
 
   if(ncpyOpInfo->isSrcRegistered == 0) {
 
+    int acqLock = 0;
+
+    // Lock around sending the small message
+#if CMK_SMP
+    LOCK_AND_SET();
+#endif
+
     // Remote buffer is unregistered, send a message to register it and perform PUT
     infiPacket packet;
     MallocInfiPacket(packet);
@@ -187,6 +194,10 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo) {
     struct ibv_mr *packetKey = METADATAFIELD(ncpyOpInfo)->key;
     OtherNode node = &nodes[CmiNodeOf(ncpyOpInfo->srcPe)];
     EnqueuePacket(node, packet, ncpyOpInfo->ncpyOpInfoSize, packetKey);
+
+#if CMK_SMP
+    UNLOCK_AND_UNSET();
+#endif
 
   } else {
 
@@ -212,6 +223,14 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo) {
 void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
 
   if(ncpyOpInfo->isDestRegistered == 0) {
+
+    int acqLock = 0;
+
+    // Lock around sending the small message
+#if CMK_SMP
+    LOCK_AND_SET();
+#endif
+
     // Remote buffer is unregistered, send a message to register it and perform GET
     infiPacket packet;
     MallocInfiPacket(packet);
@@ -225,6 +244,10 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
     CmiVerbsRdmaPtr_t *dest_info = (CmiVerbsRdmaPtr_t *)((char *)(ncpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize());
     OtherNode node = &nodes[CmiNodeOf(ncpyOpInfo->destPe)];
     EnqueuePacket(node, packet, ncpyOpInfo->ncpyOpInfoSize, packetKey);
+
+#if CMK_SMP
+    UNLOCK_AND_UNSET();
+#endif
 
   } else {
     struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)malloc(sizeof(struct infiRdmaPacket));
