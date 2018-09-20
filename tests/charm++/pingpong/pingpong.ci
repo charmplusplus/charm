@@ -61,9 +61,9 @@ mainmodule pingpong {
     //charm++ zero copy message send api for parameters marked "nocopy"
     entry [exclusive] void recv_zerocopy(nocopy char msg[size], int size);
 
-    //old charm++ api using RDMA
-    entry [exclusive] void recvRDMA();
-    entry [exclusive] void recvHandle(char ptr[size], int size);
+    //charm++ zero copy direct api
+    entry [exclusive] void recvHandle(CkNcpyBuffer destInfo);
+    entry [exclusive] void destRDMACompleted(CkDataMsg *msg);
   }
   array [Fancy] PingF {
     entry PingF();

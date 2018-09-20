@@ -4,20 +4,6 @@
 #define NITER 1000
 #define PAYLOAD 100
 
-#if ! CMK_SMP            /* only test RDMA when non-SMP */
-
-#if CMK_DIRECT || defined(CMK_USE_IBVERBS)
-#define USE_RDMA 1
-#endif
-
-#endif
-
-#ifdef USE_RDMA
-extern "C" {
-#include "cmidirect.h"
-}
-#endif
-
 class Fancy
 {
   char _str[12];
@@ -195,15 +181,9 @@ public:
           phase = 5; 
         }
         break;
-#ifndef USE_RDMA
       case 10:
         ngid[0].start(reportTime);
         break;
-#else
-      case 10:
-	  ngid[0].startRDMA(reportTime);
-	  break;
-#endif
 
       default:
         CkExit();
@@ -454,11 +434,9 @@ class PingN : public CBase_PingN
   bool printResult; 
   int niter;
   int me, nbr;
-#ifdef USE_RDMA 
-  struct infiDirectUserHandle shandle,rhandle;
-  char *rbuff;
-  char *sbuff;
-#endif
+  CkNcpyBuffer mySrcInfo, otherDestInfo;
+  char *destBuffer;
+  char *sourceBuffer;
   double start_time, end_time;
 
   // for recv_zerocopy having an nocopy parameter
@@ -478,25 +456,28 @@ public:
     // Unlike other entry methods, the entry method with the nocopy parameter
     // uses a character buffer
     zerocopyMsg = new char[payload];
-#ifdef USE_RDMA 
-    rbuff=(char *) malloc(payload*sizeof(char));
-    sbuff=(char *) malloc(payload*sizeof(char));
-    memset(sbuff, 0, payload);
+    destBuffer=(char *) malloc(payload*sizeof(char));
+    sourceBuffer=(char *) malloc(payload*sizeof(char));
+
+    memset(sourceBuffer, 0, payload);
     // setup persistent comm sender and receiver side
     double OOB=9999999999.0;
-    rhandle=CmiDirect_createHandle(nbr,rbuff,payload*sizeof(char),PingN::Wrapper_To_CallBack,(void *) this,OOB);
-    thisProxy[nbr].recvHandle((char*) &rhandle,sizeof(struct infiDirectUserHandle));
-#endif
+
+    CkCallback srcCb(CkCallback::ignore);
+    mySrcInfo = CkNcpyBuffer(sourceBuffer, payload * sizeof(char), srcCb);
+
+    CkCallback destCb(CkIndex_PingN::destRDMACompleted(NULL), thisProxy[thisIndex]);
+    CkNcpyBuffer myDestInfo = CkNcpyBuffer(destBuffer, payload * sizeof(char), destCb);
+
+    thisProxy[nbr].recvHandle(myDestInfo);
   }
+
   PingN(CkMigrateMessage *m) {}
-  void recvHandle(char *ptr,int size)
+
+  void recvHandle(CkNcpyBuffer myDestInfo)
   {
 
-#ifdef USE_RDMA 
-    struct infiDirectUserHandle *_shandle=(struct infiDirectUserHandle *) ptr;
-    shandle=*_shandle;
-    CmiDirect_assocLocalBuffer(&shandle,sbuff,payload);
-#endif
+    otherDestInfo = myDestInfo;
   }
   void start(bool reportTime)
   {
@@ -510,11 +491,10 @@ public:
     printResult = reportTime; 
     niter=0;
     start_time = CkWallTimer();
-#ifdef USE_RDMA 
-    CmiDirect_put(&shandle);
-#else
-    CkAbort("do not call startRDMA if you don't actually have RDMA");
-#endif
+
+    // perform PUT
+    mySrcInfo.put(otherDestInfo);
+
   }
 
   void recv(PingMsg *msg)
@@ -547,12 +527,15 @@ public:
         end_time = CkWallTimer();
         int titer = (CkNumNodes()==1)?(iterations/2) : iterations;
         if (printResult) {
-          CkPrintf("Roundtrip time for NodeGroups (zero copy message send api) is %lf us\n",
+          CkPrintf("Roundtrip time for NodeGroups (zero copy entry method message send api) is %lf us\n",
                    1.0e6*(end_time-start_time)/titer);
           delete[] zerocopyMsg;
         }
         niter=0;
-        mainProxy.maindone();
+        start_time = CkWallTimer();
+
+        // perform PUT
+        mySrcInfo.put(otherDestInfo);
       } else {
         thisProxy[nbr].recv_zerocopy(CkSendBuffer(zerocopyMsg), size);
       }
@@ -560,49 +543,34 @@ public:
       thisProxy[nbr].recv_zerocopy(CkSendBuffer(zerocopyMsg), size);
     }
   }
-  static void Wrapper_To_CallBack(void* pt2Object){
-    // explicitly cast to a pointer to PingN
-    PingN* mySelf = (PingN*) pt2Object;
 
-    // call member
-    if(CkNumNodes() == 0){
-      mySelf->recvRDMA();
-    }else{
-      (mySelf->thisProxy)[CkMyNode()].recvRDMA();   
-    }
+  // callback invoked when the Zerocopy operation associated with mySrcInfo and otherDestInfo completes
+  void destRDMACompleted(CkDataMsg *msg) {
+    recvRDMA();
   }
-  // not an entry method, called via Wrapper_To_Callback
+
+  // not an entry method, called via destRDMACompleted
   void recvRDMA()
   {
-#ifdef USE_RDMA 
-    CmiDirect_ready(&rhandle);
-#endif
     if(me==0) {
       niter++;
       if(niter==iterations) {
         end_time = CkWallTimer();
         int titer = (CkNumNodes()==1)?(iterations/2) : iterations;
         if (printResult) {
-          CkPrintf("Roundtrip time for NodeGroups RDMA is %lf us\n",
+          CkPrintf("Roundtrip time for NodeGroups (zero copy direct api) is %lf us\n",
                    1.0e6*(end_time-start_time)/titer);
         }
         mainProxy.maindone();
       } else {
-#ifdef USE_RDMA 
-	CmiDirect_put(&shandle);
-#else
-	CkAbort("do not call startRDMA if you don't actually have RDMA");
-#endif
+        // perform PUT
+        mySrcInfo.put(otherDestInfo);
       }
     } else {
-#ifdef USE_RDMA 
-      CmiDirect_put(&shandle);
-#else
-      CkAbort("do not call startRDMA if you don't actually have RDMA");
-#endif
+      // perform PUT
+      mySrcInfo.put(otherDestInfo);
     }
   }
-
 };
 
 
