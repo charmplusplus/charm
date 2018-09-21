@@ -684,8 +684,6 @@ int CMI_Progress_finalize(int start, int ncontexts) {
 }
 #endif
 
-#include "manytomany.c"
-
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
     int n, i, count;
@@ -904,9 +902,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #endif
 #endif
     
-    //Initialize the manytomany api
-    _cmidirect_m2m_initialize (cmi_pami_contexts, _n);
-
     //printf ("Starting Threads\n");
     CmiStartThreads(argv);
 

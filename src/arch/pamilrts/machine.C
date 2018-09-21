@@ -569,8 +569,6 @@ int CMI_Progress_finalize(int start, int ncontexts) {
 }
 #endif
 
-#include "manytomany.c"
-
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
   int n, i, count;
@@ -740,7 +738,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #endif //End of SPECIFIC_PCQUEUE
 
 #endif //End of CMK_SMP
-  //Initialize the manytomany api
+
 #if CMK_PERSISTENT_COMM
   _initPersistent(cmi_pami_contexts, _n);
 #endif      
@@ -748,8 +746,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #if CMK_ONESIDED_IMPL
   _initOnesided(cmi_pami_contexts, _n);
 #endif
-
-  _cmidirect_m2m_initialize (cmi_pami_contexts, _n);
 }
 
 void LrtsPreCommonInit(int everReturn)
