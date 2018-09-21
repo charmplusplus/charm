@@ -137,14 +137,30 @@ void ofi_post_nocopy_operation(
                         &rma_req->context));
     } else if(operation == OFI_WRITE_OP) {
       // Perform an RDMA write or put operation
-      OFI_RETRY(fi_write(context.ep,
-                        lbuf,
-                        chunk_size,
-                        (lmr) ? fi_mr_desc(lmr) : NULL,
-                        remoteNodeNo,
-                        (uint64_t)rbuf,
-                        rkey,
-                        &rma_req->context));
+      struct iovec l_iovec{};
+      l_iovec.iov_base = (void*)lbuf;
+      l_iovec.iov_len = chunk_size;
+
+      struct fi_rma_iov rma_iov{};
+      rma_iov.addr = (uint64_t)rbuf;
+      rma_iov.len = chunk_size;
+      rma_iov.key = rkey;
+
+      void *desc = (lmr ? fi_mr_desc(lmr) : NULL);
+
+      struct fi_msg_rma msg{};
+      msg.msg_iov = &l_iovec;
+      msg.desc = &desc;
+      msg.iov_count = 1;
+      msg.addr = (fi_addr_t)remoteNodeNo;
+      msg.rma_iov = &rma_iov;
+      msg.rma_iov_count = 1;
+      msg.context = &rma_req->context;
+      msg.data = 0;
+
+      OFI_RETRY(fi_writemsg(context.ep,
+                           &msg,
+                           FI_DELIVERY_COMPLETE));
     } else {
       CmiAbort("ofi_post_nocopy_operation: Invalid RDMA operation\n");
     }
