@@ -235,8 +235,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       memory-isomalloc.h debug-conv.h debug-conv++.h conv-autoconfig.h \
       conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh conv-mach-common.h \
       blue.h blue-conv.h bgconverse.h cmipool.h mempool.h cmiqueue.h \
-      cmidirect.h cmidirectmanytomany.h cmitls.h lrtslock.h conv-rdma.h lrts-common.h  \
-      conv-header.h
+      cmitls.h lrtslock.h conv-rdma.h lrts-common.h conv-header.h
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
@@ -274,7 +273,6 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
           TraceSummary.decl.h TraceAutoPerf.decl.h TraceProjections.decl.h \
           TraceSimple.decl.h TraceControlPoints.decl.h TraceTau.decl.h \
 	  TraceUtilization.decl.h BlueGene.decl.h \
-	  ckdirect.h \
 	  ControlPoints.decl.h PathHistory.decl.h \
 	  pathHistory.h envelope-path.h \
 	  XArraySectionReducer.h \
