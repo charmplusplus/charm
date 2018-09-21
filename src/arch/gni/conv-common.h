@@ -12,8 +12,6 @@
 
 #define CMI_MACH_TRACE_USEREVENTS                          0
 
-#define  CMK_DIRECT                                             0
-
 //#define  DELTA_COMPRESS                                     1
 
 #define CMK_HANDLE_SIGUSR                                  0
