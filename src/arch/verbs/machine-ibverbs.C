@@ -73,7 +73,6 @@ static int processBufferedCount;
 #define CMK_IBVERBS_TOKENS_FLOW 1
 #define CMK_IBVERBS_INCTOKENS 0 //never turn this on 
 #define CMK_IBVERBS_DEBUG 0
-#define CMI_DIRECT_DEBUG 0
 #define WC_LIST_SIZE 32
 /*#define WC_BUFFER_SIZE 100*/
 
@@ -121,7 +120,6 @@ Data Structures
 #define INFIPACKETCODE_INCTOKENS 2
 #define INFIRDMA_START 4
 #define INFIRDMA_ACK 8
-#define INFIDIRECT_REQUEST 16
 #define INFIPACKETCODE_INCTOKENSACK 32
 #define INFIDUMMYPACKET 64
 
@@ -140,7 +138,6 @@ struct infiPacketHeader{
 	Types of rdma packets
 */
 #define INFI_MESG 1 
-#define INFI_DIRECT 2
 #if CMK_ONESIDED_IMPL
 #define INFI_ONESIDED 3
 #define INFI_ONESIDED_DIRECT 4
@@ -1416,12 +1413,9 @@ static inline void processAsyncEvents(void){
 	
 }
 
-static void pollCmiDirectQ(void);
-
 static inline  void CommunicationServer_nolock(int toBuffer) {
 	int processed;
 	if(CmiNumNodesGlobal() <= 1){
-		pollCmiDirectQ();
 		return;
 	}
 	MACHSTATE(2,"CommServer_nolock{");
@@ -1429,8 +1423,6 @@ static inline  void CommunicationServer_nolock(int toBuffer) {
 //	processAsyncEvents();
 	
 //	checkAllQps();
-
-	pollCmiDirectQ();
 
 	processed = pollRecvCq(toBuffer);
 	
@@ -1915,10 +1907,6 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		        IBV_WR_RDMA_READ);
 	}
 
-/*	if(header->code & INFIDIRECT_REQUEST){
-		struct infiDirectRequestPacket *directRequestPacket = (struct infiDirectRequestPacket *)(buffer->buf+sizeof(struct infiPacketHeader));
-		processDirectRequest(directRequestPacket);
-	}*/
 	{
 		struct ibv_sge list = {
 			(uintptr_t) buffer->buf,
@@ -2050,11 +2038,6 @@ static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 
 	struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *) rdmaWC->wr_id;
 
-	// CmiDirect Put
-	if (rdmaWC->opcode == IBV_WC_RDMA_WRITE && rdmaPacket->type == INFI_DIRECT) {
-		// Nothing needs to be done on the sender side once a CmiDirect Put is complete
-		return;
-	}
 /*	if(rdmaPacket->type == INFI_DIRECT){
 		processDirectWC(rdmaPacket);
 		return;
@@ -2953,459 +2936,6 @@ void infi_CmiFree(void *ptr){
 	}*/
 }
 #endif
-
-/*********************************************************************************************
-This section is for CmiDirect. This is a variant of the  persistent communication in which 
-the user can transfer data between processors without using Charm++ messages. This lets the user
-send and receive data from the middle of his arrays without any copying on either send or receive
-side
-*********************************************************************************************/
-
-struct infiDirectRequestPacket{
-	int senderProc;
-	int handle;
-	struct ibv_mr senderKey;
-	void *senderBuf;
-	int senderBufSize;
-};
-
-#include "cmidirect.h"
-
-#define MAXHANDLES 512
-
-struct infiDirectHandleStruct;
-
-
-typedef struct directPollingQNodeStruct {
-	struct infiDirectHandleStruct *handle;
-	struct directPollingQNodeStruct *next;
-	double *lastDouble;
-} directPollingQNode;
-
-typedef struct infiDirectHandleStruct{
-	int id;
-	void *buf;
-	int size;
-	struct ibv_mr *key;
-	void (*callbackFnPtr)(void *);
-	void *callbackData;
-//	struct infiDirectRequestPacket *packet;
-	struct infiDirectUserHandle userHandle;
-	struct infiRdmaPacket *rdmaPacket;
-	directPollingQNode pollingQNode;
-}	infiDirectHandle;
-
-typedef struct infiDirectHandleTableStruct{
-	infiDirectHandle handles[MAXHANDLES];
-	struct infiDirectHandleTableStruct *next;
-} infiDirectHandleTable;
-
-
-// data structures 
-
-directPollingQNode *headDirectPollingQ=NULL,*tailDirectPollingQ=NULL;
-
-static infiDirectHandleTable **sendHandleTable=NULL;
-static infiDirectHandleTable **recvHandleTable=NULL;
-
-static int *recvHandleCount=NULL;
-
-void addHandleToPollingQ(infiDirectHandle *handle){
-//	directPollingQNode *newNode = malloc(sizeof(directPollingQNode));
-	directPollingQNode *newNode = &(handle->pollingQNode);
-	newNode->handle = handle;
-	newNode->next = NULL;
-	if(headDirectPollingQ==NULL){
-		/*empty pollingQ*/
-		headDirectPollingQ = newNode;
-		tailDirectPollingQ = newNode;
-	}else{
-		tailDirectPollingQ->next = newNode;
-		tailDirectPollingQ = newNode;
-	}
-};
-/*
-infiDirectHandle *removeHandleFromPollingQ(){
-	if(headDirectPollingQ == NULL){
-		//polling Q is empty
-		return NULL;
-	}
-	directPollingQNode *retNode = headDirectPollingQ;
-	if(headDirectPollingQ == tailDirectPollingQ){
-		//PollingQ has one node 
-		headDirectPollingQ = tailDirectPollingQ = NULL;
-	}else{
-		headDirectPollingQ = headDirectPollingQ->next;
-	}
-	infiDirectHandle *retHandle = retNode->handle;
-	free(retNode);
-	return retHandle;
-}*/
-
-static inline infiDirectHandleTable **createHandleTable(void){
-	infiDirectHandleTable **table = (infiDirectHandleTable **)malloc(Lrts_numNodes*sizeof(infiDirectHandleTable *));
-	int i;
-	for(i=0;i<Lrts_numNodes;i++){
-		table[i] = NULL;
-	}
-	return table;
-}
-
-static inline void calcHandleTableIdx(int handle,int *tableIdx,int *idx){
-	*tableIdx = handle/MAXHANDLES;
-	*idx = handle%MAXHANDLES;
-};
-
-static inline void initializeLastDouble(void *recvBuf,int recvBufSize,double initialValue)
-{
-	/** initialize the last double in the buffer to bufize***/
-	int index = recvBufSize - sizeof(double);
-	double *lastDouble = (double *)(((char *)recvBuf)+index);
-	*lastDouble = initialValue;
-}
-
-
-/**
- To be called on the receiver to create a handle and return its number
-**/
-struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf, int recvBufSize, void (*callbackFnPtr)(void *), void *callbackData,double initialValue){
-	int newHandle;
-	int tableIdx,idx;
-	int i;
-	infiDirectHandleTable *table;
-	struct infiDirectUserHandle userHandle;
-	
-	CmiAssert(recvBufSize > sizeof(double));
-	
-	if(recvHandleTable == NULL){
-		recvHandleTable = createHandleTable();
-		recvHandleCount = (int *)malloc(sizeof(int)*CmiNumNodesGlobal());
-		for(i=0;i<CmiNumNodesGlobal();i++){
-			recvHandleCount[i] = -1;
-		}
-	}
-	if(recvHandleTable[senderNode] == NULL){
-		recvHandleTable[senderNode] = (infiDirectHandleTable *)malloc(sizeof(infiDirectHandleTable));
-		recvHandleTable[senderNode]->next = NULL;		
-	}
-	
-	newHandle = ++recvHandleCount[senderNode];
-	CmiAssert(newHandle >= 0);
-	
-	calcHandleTableIdx(newHandle,&tableIdx,&idx);
-	
-	table = recvHandleTable[senderNode];
-	for(i=0;i<tableIdx;i++){
-		if(table->next ==NULL){
-			table->next = (infiDirectHandleTable *)malloc(sizeof(infiDirectHandleTable));
-			table->next->next = NULL;
-		}
-		table = table->next;
-	}
-	table->handles[idx].id = newHandle;
-	table->handles[idx].buf = recvBuf;
-	table->handles[idx].size = recvBufSize;
-#if CMI_DIRECT_DEBUG
-	CmiPrintf("[%d] RDMA create addr %p %d sizeof(struct ibv_mr) %d\n",CmiMyNodeGlobal(),table->handles[idx].buf,recvBufSize,sizeof(struct ibv_mr));
-#endif
-	table->handles[idx].callbackFnPtr = callbackFnPtr;
-	table->handles[idx].callbackData = callbackData;
-	table->handles[idx].key = ibv_reg_mr(context->pd, recvBuf, recvBufSize,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
-	CmiAssert(table->handles[idx].key != NULL);
-#if CMK_IBVERBS_STATS
-	numCurReg++;
-	numReg++;
-#endif
-/*	table->handles[idx].rdmaPacket = CmiAlloc(sizeof(struct infiRdmaPacket));
-	table->handles[idx].rdmaPacket->type = INFI_DIRECT;
-	table->handles[idx].rdmaPacket->localBuffer = &(table->handles[idx]);*/
-	
-	userHandle.handle = newHandle;
-	userHandle.recverNode = CmiMyNodeGlobal();
-	userHandle.senderNode = senderNode;
-	userHandle.recverBuf = recvBuf;
-	userHandle.recverBufSize = recvBufSize;
-	memcpy(userHandle.recverKey,table->handles[idx].key,sizeof(struct ibv_mr));
-	userHandle.initialValue = initialValue;
-	
-	table->handles[idx].userHandle = userHandle;
-	
-	initializeLastDouble(recvBuf,recvBufSize,initialValue);
-
-  {
-	 int index = table->handles[idx].size - sizeof(double);
-   table->handles[idx].pollingQNode.lastDouble = (double *)(((char *)table->handles[idx].buf)+index);
-	} 
-	
-	addHandleToPollingQ(&(table->handles[idx]));
-	
-//	MACHSTATE4(3," Newhandle created %d senderProc %d recvBuf %p recvBufSize %d",newHandle,senderProc,recvBuf,recvBufSize);
-	
-	return userHandle;
-}
-
-/****
- To be called on the sender to attach the sender's buffer to this handle
-******/
-void CmiDirect_assocLocalBuffer(struct infiDirectUserHandle *userHandle,void *sendBuf,int sendBufSize){
-	int tableIdx,idx;
-	int i;
-	int handle = userHandle->handle;
-	int recverNode  = userHandle->recverNode;
-
-	infiDirectHandleTable *table;
-
-	if(sendHandleTable == NULL){
-		sendHandleTable = createHandleTable();
-	}
-	if(sendHandleTable[recverNode] == NULL){
-		sendHandleTable[recverNode] = (infiDirectHandleTable *)malloc(sizeof(infiDirectHandleTable));
-		sendHandleTable[recverNode]->next = NULL;
-	}
-	
-	CmiAssert(handle >= 0);
-	calcHandleTableIdx(handle,&tableIdx,&idx);
-	
-	table = sendHandleTable[recverNode];
-	for(i=0;i<tableIdx;i++){
-		if(table->next ==NULL){
-			table->next = (infiDirectHandleTable *)malloc(sizeof(infiDirectHandleTable));
-			table->next->next = NULL;
-		}
-		table = table->next;
-	}
-
-	table->handles[idx].id = handle;
-	table->handles[idx].buf = sendBuf;
-
-	table->handles[idx].size = sendBufSize;
-#if CMI_DIRECT_DEBUG
-	CmiPrintf("[%d] RDMA assoc addr %p %d remote addr %p \n",CmiMyPe(),table->handles[idx].buf,sendBufSize,userHandle->recverBuf);
-#endif
-	table->handles[idx].callbackFnPtr = NULL;
-	table->handles[idx].callbackData = NULL;
-	table->handles[idx].key =  ibv_reg_mr(context->pd, sendBuf, sendBufSize,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
-	CmiAssert(table->handles[idx].key != NULL);
-#if CMK_IBVERBS_STATS
-	numCurReg++;
-	numReg++;
-#endif
-	table->handles[idx].userHandle = *userHandle;
-	CmiAssert(sendBufSize == table->handles[idx].userHandle.recverBufSize);
-	
-	table->handles[idx].rdmaPacket = (struct infiRdmaPacket *)CmiAlloc(sizeof(struct infiRdmaPacket));
-	table->handles[idx].rdmaPacket->type = INFI_DIRECT;
-	table->handles[idx].rdmaPacket->localBuffer = &(table->handles[idx]);
-	
-	
-/*	table->handles[idx].packet = (struct infiDirectRequestPacket *)CmiAlloc(sizeof(struct infiDirectRequestPacket));
-	table->handles[idx].packet->senderProc = Lrts_myNode;
-	table->handles[idx].packet->handle = handle;
-	table->handles[idx].packet->senderKey = *(table->handles[idx].key);
-	table->handles[idx].packet->senderBuf = sendBuf;
-	table->handles[idx].packet->senderBufSize = sendBufSize;*/
-	
-	MACHSTATE4(3,"idx %d recverProc %d handle %d sendBuf %p",idx,recverNode,handle,sendBuf);
-};
-
-
-
-
-
-/****
-To be called on the sender to do the actual data transfer
-******/
-void CmiDirect_put(struct infiDirectUserHandle *userHandle){
-	int handle = userHandle->handle;
-	int recverNode = userHandle->recverNode;
-	if(recverNode == CmiMyNodeGlobal()){
-		/*when the sender and receiver are on the same
-		processor, just look up the sender and receiver
-		buffers and do a memcpy*/
-
-		infiDirectHandleTable *senderTable;
-		infiDirectHandleTable *recverTable;
-		
-		int tableIdx,idx,i;
-
-		
-		/*find entry for this handle in sender table*/
-		calcHandleTableIdx(handle,&tableIdx,&idx);
-		CmiAssert(sendHandleTable!= NULL);
-		senderTable = sendHandleTable[CmiMyNodeGlobal()];
-		CmiAssert(senderTable != NULL);
-		for(i=0;i<tableIdx;i++){
-			senderTable = senderTable->next;
-		}
-
-		/**find entry for this handle in recver table*/
-		recverTable = recvHandleTable[recverNode];
-		CmiAssert(recverTable != NULL);
-		for(i=0;i< tableIdx;i++){
-			recverTable = recverTable->next;
-		}
-		
-		CmiAssert(senderTable->handles[idx].size == recverTable->handles[idx].size);
-		memcpy(recverTable->handles[idx].buf,senderTable->handles[idx].buf,senderTable->handles[idx].size);
-#if CMI_DIRECT_DEBUG
-		CmiPrintf("[%d] RDMA memcpy put addr %p receiver %p, size %d\n",CmiMyPe(),senderTable->handles[idx].buf,recverTable->handles[idx].buf,senderTable->handles[idx].size);
-#endif
-		// The polling Q should find you and handle the callback and pollingq entry
-		//		(*(recverTable->handles[idx].callbackFnPtr))(recverTable->handles[idx].callbackData);
-		
-
-	}else{
-		infiPacket packet;
-		int tableIdx,idx;
-		int i;
-		OtherNode node;
-		infiDirectHandleTable *table;
-
-		calcHandleTableIdx(handle,&tableIdx,&idx);
-
-		table = sendHandleTable[recverNode];
-		CmiAssert(table != NULL);
-		for(i=0;i<tableIdx;i++){
-			table = table->next;
-		}
-
-//		MACHSTATE2(3,"CmiDirect_put to recverProc %d handle %d",recverProc,handle);
-#if CMI_DIRECT_DEBUG
-		CmiPrintf("[%d] RDMA put addr %p\n",CmiMyPe(),table->handles[idx].buf);
-#endif
-
-		
-		{
-			
-			OtherNode node = &nodes[table->handles[idx].userHandle.recverNode];
-			struct ibv_sge list = {
-				(uintptr_t )table->handles[idx].buf,
-				(uint32_t)table->handles[idx].size,
-				table->handles[idx].key->lkey,
-			};
-			
-			struct ibv_mr *remoteKey = (struct ibv_mr *)table->handles[idx].userHandle.recverKey;
-
-			struct ibv_send_wr *bad_wr;
-			struct ibv_send_wr wr = { 0 };
-			wr.wr_id = (uint64_t)table->handles[idx].rdmaPacket;
-			wr.sg_list = &list;
-			wr.num_sge = 1;
-			wr.opcode = IBV_WR_RDMA_WRITE;
-			wr.send_flags = IBV_SEND_SIGNALED;
-			wr.wr.rdma.remote_addr = (uint64_t )table->handles[idx].userHandle.recverBuf;
-			wr.wr.rdma.rkey = remoteKey->rkey;
-
-			/** post and rdma_read that is a rdma get*/
-			if(ibv_post_send(node->infiData->qp,&wr,&bad_wr)){
-				CmiAbort("ibv_post_send failed");
-			}
-		}
-
-	/*	MallocInfiPacket (packet);
-		{
-			packet->size = sizeof(struct infiDirectRequestPacket);
-			packet->buf = (char *)(table->handles[idx].packet);
-			struct ibv_mr *packetKey = METADATAFIELD((void *)table->handles[idx].packet)->key;
-			EnqueuePacket(node,packet,sizeof(struct infiDirectRequestPacket),packetKey);
-		}*/
-	}
-
-};
-
-/**** need not be called the first time *********/
-void CmiDirect_readyMark(struct infiDirectUserHandle *userHandle){
-  initializeLastDouble(userHandle->recverBuf,userHandle->recverBufSize,userHandle->initialValue);
-}
-
-/**** need not be called the first time *********/
-void CmiDirect_readyPollQ(struct infiDirectUserHandle *userHandle){
-	int handle = userHandle->handle;
-	int tableIdx,idx,i;
-	infiDirectHandleTable *table;
-	calcHandleTableIdx(handle,&tableIdx,&idx);
-	
-	table = recvHandleTable[userHandle->senderNode];
-	CmiAssert(table != NULL);
-	for(i=0;i<tableIdx;i++){
-		table = table->next;
-	}
-#if CMI_DIRECT_DEBUG
-  CmiPrintf("[%d] CmiDirect_ready receiver %p\n",CmiMyNodeGlobal(),userHandle->recverBuf);
-#endif	
-	addHandleToPollingQ(&(table->handles[idx]));
-	
-
-}
-
-/**** need not be called the first time *********/
-void CmiDirect_ready(struct infiDirectUserHandle *userHandle){
-	int handle = userHandle->handle;
-	int tableIdx,idx,i;
-	infiDirectHandleTable *table;
-	
-	initializeLastDouble(userHandle->recverBuf,userHandle->recverBufSize,userHandle->initialValue);
-
-	calcHandleTableIdx(handle,&tableIdx,&idx);
-	
-	table = recvHandleTable[userHandle->senderNode];
-	CmiAssert(table != NULL);
-	for(i=0;i<tableIdx;i++){
-		table = table->next;
-	}
-#if CMI_DIRECT_DEBUG
-  CmiPrintf("[%d] CmiDirect_ready receiver %p\n",CmiMyNodeGlobal(),userHandle->recverBuf);
-#endif	
-	addHandleToPollingQ(&(table->handles[idx]));
-	
-}
-
-
-static int receivedDirectMessage(infiDirectHandle *handle){
-//	int index = handle->size - sizeof(double);
-//	double *lastDouble = (double *)(((char *)handle->buf)+index);
-	if(*(handle->pollingQNode.lastDouble) == handle->userHandle.initialValue){
-		return 0;
-	}else{
-		(*(handle->callbackFnPtr))(handle->callbackData);	
-		return 1;
-	}
-	
-}
-
-
-static void pollCmiDirectQ(void){
-	directPollingQNode *ptr = headDirectPollingQ, *prevPtr=NULL;
-	while(ptr != NULL){
-		if(receivedDirectMessage(ptr->handle)){
-#if CMI_DIRECT_DEBUG
-      CmiPrintf("[%d] polling detected recvd message at buf %p\n",CmiMyNodeGlobal(),ptr->handle->userHandle.recverBuf);
-#endif
-			directPollingQNode *delPtr = ptr;
-			/** has been received and delete this node***/
-			if(prevPtr == NULL){
-				/** first in the pollingQ**/
-				if(headDirectPollingQ == tailDirectPollingQ){
-					/**only node in pollingQ****/
-					headDirectPollingQ = tailDirectPollingQ = NULL;
-				}else{
-					headDirectPollingQ = headDirectPollingQ->next;
-				}
-			}else{
-				if(ptr == tailDirectPollingQ){
-					/**last node is being deleted**/
-					tailDirectPollingQ = prevPtr;
-				}
-				prevPtr->next = ptr->next;
-			}
-			ptr = ptr->next;
-		//	free(delPtr);
-		}else{
-			prevPtr = ptr;
-			ptr = ptr->next;
-		}
-	}
-}
 
 void CmiMachineCleanup(void){
         MACHSTATE(3, "CmiMachineCleanup")

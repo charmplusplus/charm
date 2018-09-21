@@ -970,15 +970,8 @@ static inline  void CommunicationServer_lock(int toBuffer) {
 }
 
 static inline  void CommunicationServer_nolock(int toBuffer) {
-/*
-	if(Lrts_numNodes <= 1){
-		pollCmiDirectQ();
-		return;
-	} 
-*/
 	MACHSTATE(2,"CommServer_nolock{");
         
-//	pollCmiDirectQ();	// FIXME: not sure what this does...
   
 	pollCq(toBuffer,context->sendCq);
 	pollCq(toBuffer,context->recvCq);
