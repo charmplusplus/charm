@@ -196,15 +196,14 @@ typedef long long int MPI_Offset;
 #define MPI_UINT64_T            26
 #define MPI_AINT                27
 #define MPI_COUNT               MPI_AINT
-/*
- * CkDDT_MAX_BASIC_TYPE is defined in ddt.h
- * and is tied to the above values, if the above
- * indexes change or values are added/deleted
- * you may need to change CkDDT_MAX_BASIC_TYPE
- */
-/* special types */
 #define MPI_LB                  28
 #define MPI_UB                  29
+/*
+ * AMPI_MAX_BASIC_TYPE is defined in ddt.h
+ * and is tied to the above values, if the above
+ * indexes change or values are added/deleted
+ * you may need to change AMPI_MAX_BASIC_TYPE
+ */
 /* tuple types */
 #define MPI_FLOAT_INT           30
 #define MPI_DOUBLE_INT          31
@@ -220,10 +219,10 @@ typedef long long int MPI_Offset;
 #define MPI_DOUBLE_COMPLEX      40
 #define MPI_LONG_DOUBLE_COMPLEX 41
 /*
- * CkDDT_MAX_PRIMITIVE_TYPE is defined in ddt.h
+ * AMPI_MAX_PREDEFINED_TYPE is defined in ddt.h
  * and is tied to the above values, if the above
  * indexes change or values are added/deleted
- * you may need to change CkDDT_MAX_PRIMITIVE_TYPE
+ * you may need to change AMPI_MAX_PREDEFINED_TYPE
  */
 
 #define MPI_ANY_TAG        MPI_TAG_UB_VALUE+1
@@ -272,6 +271,12 @@ typedef void (MPI_User_function)(void *invec, void *inoutvec,
 #define MPI_MINLOC  11
 #define MPI_REPLACE 12
 #define MPI_NO_OP   13
+/*
+ * AMPI_MAX_PREDEFINED_OP is defined in ampiimpl.h
+ * and is tied to the above values, if the above
+ * indexes change or values are added/deleted
+ * you may need to change AMPI_MAX_PREDEFINED_TYPE
+ */
 
 #define MPI_UNWEIGHTED 0
 #define MPI_CART       1

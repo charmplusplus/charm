@@ -1996,6 +1996,9 @@ PUPmarshall(AmpiSeqQ)
 inline CProxy_ampi ampiCommStruct::getProxy() const noexcept {return ampiID;}
 const ampiCommStruct &universeComm2CommStruct(MPI_Comm universeNo) noexcept;
 
+// Max value of a predefined MPI_Op (values defined in ampi.h)
+#define AMPI_MAX_PREDEFINED_OP 13
+
 /*
 An ampiParent holds all the communicators and the TCharm thread
 for its children, which are bound to it.
@@ -2028,7 +2031,8 @@ class ampiParent final : public CBase_ampiParent {
   CkPupPtrVec<groupStruct> groups; // "Wild" groups that don't have a communicator
   CkPupPtrVec<WinStruct> winStructList; //List of windows for one-sided communication
   CkPupPtrVec<InfoStruct> infos; // list of all MPI_Infos
-  vector<OpStruct> ops; // list of all MPI_Ops
+  const std::array<MPI_User_function*, AMPI_MAX_PREDEFINED_OP+1>& predefinedOps; // owned by ampiNodeMgr
+  vector<OpStruct> userOps; // list of any user-defined MPI_Ops
   vector<AmpiMsg *> matchedMsgs; // for use with MPI_Mprobe and MPI_Mrecv
 
   /* MPI_*_get_attr C binding returns a *pointer* to an integer,
@@ -2352,44 +2356,68 @@ class ampiParent final : public CBase_ampiParent {
   void defineInfoEnv(int nRanks_) noexcept;
   void defineInfoMigration() noexcept;
 
-  void initOps(void) noexcept;
+  // An 'MPI_Op' is an integer that indexes into either:
+  //   A) an array of predefined ops owned by ampiNodeMgr, or
+  //   B) a vector of user-defined ops owned by ampiParent
+  // The MPI_Op is compared to AMPI_MAX_PREDEFINED_OP to disambiguate.
   inline int createOp(MPI_User_function *fn, bool isCommutative) noexcept {
     // Search thru non-predefined op's for any invalidated ones:
-    for (int i=MPI_NO_OP+1; i<ops.size(); i++) {
-      if (ops[i].isFree()) {
-        ops[i].init(fn, isCommutative);
-        return i;
+    for (int i=0; i<userOps.size(); i++) {
+      if (userOps[i].isFree()) {
+        userOps[i].init(fn, isCommutative);
+        return AMPI_MAX_PREDEFINED_OP + 1 + i;
       }
     }
     // No invalid entries, so create a new one:
-    ops.emplace_back(fn, isCommutative);
-    return ops.size()-1;
+    userOps.emplace_back(fn, isCommutative);
+    return AMPI_MAX_PREDEFINED_OP + userOps.size();
   }
   inline void freeOp(MPI_Op op) noexcept {
     // Don't free predefined op's:
-    if (op > MPI_NO_OP) {
-      // Invalidate op, then free all invalid op's from the back of the op's vector
-      ops[op].free();
-      while (ops.back().isFree()) {
-        ops.pop_back();
+    if (!opIsPredefined(op)) {
+      // Invalidate op, then free all invalid op's from the back of the userOp's vector
+      int opIdx = op - 1 - AMPI_MAX_PREDEFINED_OP;
+      CkAssert(opIdx < userOps.size());
+      userOps[opIdx].free();
+      while (!userOps.empty() && userOps.back().isFree()) {
+        userOps.pop_back();
       }
     }
   }
   inline bool opIsPredefined(MPI_Op op) const noexcept {
-    return (op>=MPI_OP_NULL && op<=MPI_NO_OP);
+    return (op <= AMPI_MAX_PREDEFINED_OP);
   }
   inline bool opIsCommutative(MPI_Op op) const noexcept {
-    CkAssert(op>MPI_OP_NULL && op<ops.size());
-    return ops[op].isCommutative;
+    if (opIsPredefined(op)) {
+      return true; // all predefined ops are commutative
+    }
+    else {
+      int opIdx = op - 1 - AMPI_MAX_PREDEFINED_OP;
+      CkAssert(opIdx < userOps.size());
+      return userOps[opIdx].isCommutative;
+    }
   }
   inline MPI_User_function* op2User_function(MPI_Op op) const noexcept {
-    CkAssert(op>MPI_OP_NULL && op<ops.size());
-    return ops[op].func;
+    if (opIsPredefined(op)) {
+      return predefinedOps[op];
+    }
+    else {
+      int opIdx = op - 1 - AMPI_MAX_PREDEFINED_OP;
+      CkAssert(opIdx < userOps.size());
+      return userOps[opIdx].func;
+    }
   }
   inline AmpiOpHeader op2AmpiOpHeader(MPI_Op op, MPI_Datatype type, int count) const noexcept {
-    CkAssert(op>MPI_OP_NULL && op<ops.size());
-    int size = myDDT.getType(type)->getSize(count);
-    return AmpiOpHeader(ops[op].func, type, count, size);
+    if (opIsPredefined(op)) {
+      int size = myDDT.getType(type)->getSize(count);
+      return AmpiOpHeader(predefinedOps[op], type, count, size);
+    }
+    else {
+      int opIdx = op - 1 - AMPI_MAX_PREDEFINED_OP;
+      CkAssert(opIdx < userOps.size());
+      int size = myDDT.getType(type)->getSize(count);
+      return AmpiOpHeader(userOps[opIdx].func, type, count, size);
+    }
   }
   inline void applyOp(MPI_Datatype datatype, MPI_Op op, int count, const void* invec, void* inoutvec) const noexcept {
     // inoutvec[i] = invec[i] op inoutvec[i]

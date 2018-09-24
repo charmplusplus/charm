@@ -885,6 +885,25 @@ static int AMPI_threadstart_idx = -1;
 CsvExtern(funcmap*, tcharm_funcmap);
 #endif
 
+// Predefined datatype's and op's are readonly, so store them only once per process here:
+static const std::array<const CkDDT_DataType *, AMPI_MAX_PREDEFINED_TYPE+1> ampiPredefinedTypes = CkDDT::createPredefinedTypes();
+
+static constexpr std::array<MPI_User_function*, AMPI_MAX_PREDEFINED_OP+1> ampiPredefinedOps = {{
+  MPI_MAX_USER_FN,
+  MPI_MIN_USER_FN,
+  MPI_SUM_USER_FN,
+  MPI_PROD_USER_FN,
+  MPI_LAND_USER_FN,
+  MPI_BAND_USER_FN,
+  MPI_LOR_USER_FN,
+  MPI_BOR_USER_FN,
+  MPI_LXOR_USER_FN,
+  MPI_BXOR_USER_FN,
+  MPI_MAXLOC_USER_FN,
+  MPI_REPLACE_USER_FN,
+  MPI_NO_OP_USER_FN
+}};
+
 static void ampiNodeInit() noexcept
 {
 #if CMK_TRACE_ENABLED
@@ -1073,25 +1092,6 @@ void ampiCreateMain(MPI_MainFn mainFn, const char *name,int nameLen)
 
 static CProxy_ampiWorlds ampiWorldsGroup;
 
-void ampiParent::initOps() noexcept
-{
-  ops.resize(MPI_NO_OP+1);
-  ops[MPI_MAX]     = OpStruct(MPI_MAX_USER_FN);
-  ops[MPI_MIN]     = OpStruct(MPI_MIN_USER_FN);
-  ops[MPI_SUM]     = OpStruct(MPI_SUM_USER_FN);
-  ops[MPI_PROD]    = OpStruct(MPI_PROD_USER_FN);
-  ops[MPI_LAND]    = OpStruct(MPI_LAND_USER_FN);
-  ops[MPI_BAND]    = OpStruct(MPI_BAND_USER_FN);
-  ops[MPI_LOR]     = OpStruct(MPI_LOR_USER_FN);
-  ops[MPI_BOR]     = OpStruct(MPI_BOR_USER_FN);
-  ops[MPI_LXOR]    = OpStruct(MPI_LXOR_USER_FN);
-  ops[MPI_BXOR]    = OpStruct(MPI_BXOR_USER_FN);
-  ops[MPI_MAXLOC]  = OpStruct(MPI_MAXLOC_USER_FN);
-  ops[MPI_MINLOC]  = OpStruct(MPI_MINLOC_USER_FN);
-  ops[MPI_REPLACE] = OpStruct(MPI_REPLACE_USER_FN);
-  ops[MPI_NO_OP]   = OpStruct(MPI_NO_OP_USER_FN);
-}
-
 // Create MPI_COMM_SELF from MPI_COMM_WORLD
 static void createCommSelf() noexcept {
   STARTUP_DEBUG("ampiInit> creating MPI_COMM_SELF")
@@ -1182,12 +1182,12 @@ static ampi *ampiInit(char **argv) noexcept
     TRACE_BG_ADD_TAG("AMPI_START");
 #endif
 
-  getAmpiParent()->initOps(); // initialize reduction operations
-  vector<int>& keyvals = getAmpiParent()->getKeyvals(MPI_COMM_WORLD);
-  getAmpiParent()->setAttr(MPI_COMM_WORLD, keyvals, MPI_UNIVERSE_SIZE, &_nchunks);
+  ampiParent* pptr = getAmpiParent();
+  vector<int>& keyvals = pptr->getKeyvals(MPI_COMM_WORLD);
+  pptr->setAttr(MPI_COMM_WORLD, keyvals, MPI_UNIVERSE_SIZE, &_nchunks);
   ptr->setCommName("MPI_COMM_WORLD");
 
-  getAmpiParent()->ampiInitCallDone = 0;
+  pptr->ampiInitCallDone = 0;
 
   CProxy_ampi cbproxy = ptr->getProxy();
   CkCallback cb(CkReductionTarget(ampi, allInitDone), cbproxy[0]);
@@ -1231,7 +1231,8 @@ class ampiWorlds : public CBase_ampiWorlds {
 
 //-------------------- ampiParent -------------------------
 ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int nRanks_) noexcept
-:threads(threads_), worldNo(worldNo_), isTmpRProxySet(false), ampiReqs(64, &reqPool)
+  : threads(threads_), worldNo(worldNo_), isTmpRProxySet(false), ampiReqs(64, &reqPool),
+    myDDT(ampiPredefinedTypes), predefinedOps(ampiPredefinedOps)
 {
   int barrier = 0x1234;
   STARTUP_DEBUG("ampiParent> starting up")
@@ -1258,7 +1259,9 @@ ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int nRanks_) noe
 #endif
 }
 
-ampiParent::ampiParent(CkMigrateMessage *msg) noexcept :CBase_ampiParent(msg) {
+ampiParent::ampiParent(CkMigrateMessage *msg) noexcept
+  : CBase_ampiParent(msg), myDDT(ampiPredefinedTypes), predefinedOps(ampiPredefinedOps)
+{
   thread=NULL;
   worldPtr=NULL;
 
@@ -1287,7 +1290,7 @@ void ampiParent::pup(PUP::er &p) noexcept {
   p|groups;
   p|winStructList;
   p|infos;
-  p|ops;
+  p|userOps;
 
   p|reqPool;
   ampiReqs.pup(p, &reqPool);
@@ -6481,7 +6484,7 @@ AMPI_API_IMPL(int, MPI_Type_free, MPI_Datatype *datatype)
 
   if (datatype == nullptr) {
     return ampiErrhandler("AMPI_Type_free", MPI_ERR_ARG);
-  } else if (*datatype <= CkDDT_MAX_PRIMITIVE_TYPE) {
+  } else if (*datatype <= AMPI_MAX_PREDEFINED_TYPE) {
     return ampiErrhandler("AMPI_Type_free", MPI_ERR_TYPE);
   }
 #endif
