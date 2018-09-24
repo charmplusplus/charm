@@ -482,6 +482,146 @@ using Requires = typename requires_impl<
     pup(p, t);
   }
 
+
+  //Adding random numberengines defined in the header <Random>.
+  //To pup an engine we need to pup it's state and create a new engine with the same state after unpacking
+  template<
+    class UIntType, size_t w, size_t n, size_t m, size_t r,
+    UIntType a, size_t u, UIntType d, size_t s,UIntType b, size_t t,UIntType c, size_t l, UIntType f>
+  inline void pup(PUP::er& p, std::mersenne_twister_engine<UIntType, w, n, m, r,
+                             a, u, d, s, b, t, c, l, f>& engine){
+    std::stringstream o;
+    std::string state;
+
+    if(p.isUnpacking()){
+      p | state;
+      o.str(state);
+      o>>engine;
+    }
+    else{
+      o<<engine;
+      state=o.str();
+      p | state;
+    }
+  }
+
+  template<class UIntType, size_t w, size_t n, size_t m, size_t r,
+    UIntType a, size_t u, UIntType d, size_t s,UIntType b, size_t t,UIntType c, size_t l, UIntType f>
+  inline void operator|(PUP::er& p, std::mersenne_twister_engine<UIntType, w, n, m, r,
+                        a, u, d, s, b, t, c, l, f>& engine) {
+    pup(p,engine);
+  }
+
+  template<class UIntType, UIntType a, UIntType c, UIntType m>
+  inline void pup(PUP::er& p, std::linear_congruential_engine<UIntType, a, c, m>& engine){
+    std::stringstream o;
+    std::string state;
+
+    if(p.isUnpacking()){
+      p | state;
+      o.str(state);
+      o>>engine;
+    }
+    else{
+      o<<engine;
+      state=o.str();
+      p | state;
+    }
+  }
+
+  template<class UIntType, UIntType a, UIntType c, UIntType m>
+  inline void operator|(PUP::er& p, std::linear_congruential_engine<UIntType, a, c, m>& engine) {
+    pup(p,engine);
+  }
+
+  template<class UIntType, size_t w, size_t s, size_t r>
+  inline void pup(PUP::er& p, std::subtract_with_carry_engine<UIntType, w, s, r>& engine){
+    std::stringstream o;
+    std::string state;
+
+    if(p.isUnpacking()){
+      p | state;
+      o.str(state);
+      o>>engine;
+    }
+    else{
+      o<<engine;
+      state=o.str();
+      p | state;
+    }
+  }
+
+  template<class UIntType, size_t w, size_t s, size_t r>
+  inline void operator|(PUP::er& p, std::subtract_with_carry_engine<UIntType, w, s, r>& engine) {
+    pup(p,engine);
+  }
+
+  template<class Engine, size_t P, size_t R>
+  inline void pup(PUP::er& p, std::discard_block_engine<Engine, P, R>& engine) {
+    std::stringstream o;
+    std::string state;
+
+    if(p.isUnpacking()){
+      p | state;
+      o.str(state);
+      o>>engine;
+    }
+    else{
+      o<<engine;
+      state=o.str();
+      p | state;
+    }
+  }
+
+  template<class Engine, size_t P, size_t R>
+  inline void operator|(PUP::er& p, std::discard_block_engine<Engine, P, R>& engine) {
+    pup(p,engine);
+  }
+
+  template<class Engine, std::size_t W, class UIntType>
+  inline void pup(PUP::er& p, std::independent_bits_engine<Engine, W, UIntType>& engine) {
+    std::stringstream o;
+    std::string state;
+
+    if(p.isUnpacking()){
+      p | state;
+      o.str(state);
+      o>>engine;
+    }
+    else{
+      o<<engine;
+      state=o.str();
+      p | state;
+    }
+  }
+
+  template<class Engine, std::size_t W, class UIntType>
+  inline void operator|(PUP::er& p, std::independent_bits_engine<Engine, W, UIntType>& engine) {
+    pup(p,engine);
+  }
+
+  template<class Engine, std::size_t K>
+  inline void pup(PUP::er& p, std::shuffle_order_engine<Engine, K>& engine) {
+    std::stringstream o;
+    std::string state;
+
+    if(p.isUnpacking()){
+      p | state;
+      o.str(state);
+      o>>engine;
+    }
+    else{
+      o<<engine;
+      state=o.str();
+      p | state;
+    }
+  }
+
+  template<class Engine, std::size_t K>
+  inline void operator|(PUP::er& p, std::shuffle_order_engine<Engine, K>& engine) {
+    pup(p,engine);
+  }
+
 } // end of namespace PUP
 
 #endif
