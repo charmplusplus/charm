@@ -1,5 +1,5 @@
-#ifndef __HAPI_SRC_H_
-#define __HAPI_SRC_H_
+#ifndef __HAPI_IMPL_H_
+#define __HAPI_IMPL_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,4 +41,4 @@ typedef struct _bufferPool {
 }
 #endif
 
-#endif // __HAPI_SRC_H_
+#endif // __HAPI_IMPL_H_

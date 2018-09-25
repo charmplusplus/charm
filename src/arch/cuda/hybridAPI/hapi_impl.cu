@@ -1,5 +1,5 @@
 #include "hapi.h"
-#include "hapi_src.h"
+#include "hapi_impl.h"
 #include "converse.h"
 #include "ckcallback.h"
 #include <stdio.h>
@@ -537,15 +537,17 @@ static void* lightCallback(void *arg) {
 }
 
 // Register callback functions. All PEs need to call this.
-void registerCallbacks() {
-  CmiAssignOnce(&CsvAccess(gpu_manager).host_to_device_cb_idx_,
-      CmiRegisterHandler((CmiHandler)hostToDeviceCallback));
-  CmiAssignOnce(&CsvAccess(gpu_manager).kernel_cb_idx_,
-      CmiRegisterHandler((CmiHandler)kernelCallback));
-  CmiAssignOnce(&CsvAccess(gpu_manager).device_to_host_cb_idx_,
-      CmiRegisterHandler((CmiHandler)deviceToHostCallback));
-  CmiAssignOnce(&CsvAccess(gpu_manager).light_cb_idx_,
-      CmiRegisterHandler((CmiHandler)lightCallback));
+void hapiRegisterCallbacks() {
+  // FIXME: Potential race condition on assignments, but CmiAssignOnce
+  // causes a hang at startup.
+  CsvAccess(gpu_manager).host_to_device_cb_idx_
+    = CmiRegisterHandler((CmiHandler)hostToDeviceCallback);
+  CsvAccess(gpu_manager).kernel_cb_idx_
+    = CmiRegisterHandler((CmiHandler)kernelCallback);
+  CsvAccess(gpu_manager).device_to_host_cb_idx_
+    = CmiRegisterHandler((CmiHandler)deviceToHostCallback);
+  CsvAccess(gpu_manager).light_cb_idx_
+    = CmiRegisterHandler((CmiHandler)lightCallback);
 }
 
 // Callback function invoked by the CUDA runtime certain parts of GPU work are

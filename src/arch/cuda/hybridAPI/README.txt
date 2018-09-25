@@ -65,10 +65,10 @@ and is set as the default.
   Contains functions that utilize NVIDIA's NVTX feature.
   To be included in user's CUDA source code.
 
-<hapi_src.h>
+<hapi_impl.h>
   Contains function declarations used by the Charm++ runtime.
 
-<hapi_src.cu>
+<hapi_impl.cu>
   Contains the actual implementation of HAPI functionalities.
 
 4. NVCC Flags

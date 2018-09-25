@@ -17,8 +17,8 @@ libcudahybridapi.a: hybridapi.o
 	-rm -f $@
 	ar q $@ hybridapi.o
 
-hybridapi.o: hapi_src.cu hapi_src.h hapi.h hapi_nvtx.h
-	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) -o hybridapi.o hapi_src.cu
+hybridapi.o: hapi_impl.cu hapi_impl.h hapi.h hapi_nvtx.h
+	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) -o hybridapi.o hapi_impl.cu
 
 clean:
 	rm -f *.o *.a
