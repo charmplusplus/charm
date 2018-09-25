@@ -1410,16 +1410,16 @@ class SsendReq final : public AmpiRequest {
 #if CMK_CUDA
 class GPUReq : public AmpiRequest {
  public:
-  GPUReq();
-  ~GPUReq() {}
-  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) override;
-  int wait(MPI_Status *sts) override;
-  void receive(ampi *ptr, AmpiMsg *msg) override;
-  void receive(ampi *ptr, CkReductionMsg *msg) override;
-  AmpiReqType getType() const override { return AMPI_GPU_REQ; }
-  bool isUnmatched() const override { return false; }
-  void setComplete();
-  void print() const override;
+  GPUReq() noexcept;
+  ~GPUReq() noexcept {}
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
+  int wait(MPI_Status *sts) noexcept override;
+  void receive(ampi *ptr, AmpiMsg *msg) noexcept override;
+  void receive(ampi *ptr, CkReductionMsg *msg) noexcept override;
+  AmpiReqType getType() const noexcept override { return AMPI_GPU_REQ; }
+  bool isUnmatched() const noexcept override { return false; }
+  void setComplete() noexcept;
+  void print() const noexcept override;
 };
 #endif
 

@@ -2236,13 +2236,15 @@ void endtracebigsim(char* msg, char* param){
 }
 #endif
 
-void ampi_gpu_iinvoke_wr(int *to_call, int *request, int *ierr) {
+#if CMK_CUDA
+void ampi_gpu_iinvoke_wr(int *to_call, int *request, int *ierr) noexcept {
   *ierr = AMPI_GPU_Iinvoke_wr((hapiWorkRequest *)to_call, request);
 }
 
-void ampi_gpu_invoke_wr(int *to_call, int *ierr) {
+void ampi_gpu_invoke_wr(int *to_call, int *ierr) noexcept {
   *ierr = AMPI_GPU_Invoke_wr((hapiWorkRequest *)to_call);
 }
+#endif
 
 /* Fortran2003 standard cmd line arg parsing functions:
  *    - command_argument_count() returns the number of arguments

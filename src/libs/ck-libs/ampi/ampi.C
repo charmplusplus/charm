@@ -2948,7 +2948,7 @@ void ampi::processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count)
 }
 
 // RDMA version of ampi::processAmpiMsg
-void ampi::processRdmaMsg(const void *sbuf, int slength, int ssendReq, int srank, const void* rbuf,
+void ampi::processRdmaMsg(const void *sbuf, int slength, int ssendReq, int srank, void* rbuf,
                           int rcount, MPI_Datatype rtype, MPI_Comm comm) noexcept
 {
   if (ssendReq > 0) { // send an ack to sender
@@ -10822,19 +10822,19 @@ int AMPI_Set_end_event(void)
 #endif // CMK_BIGSIM_CHARM
 
 #if CMK_CUDA
-GPUReq::GPUReq()
+GPUReq::GPUReq() noexcept
 {
   comm = MPI_COMM_SELF;
   MPI_Comm_rank(comm, &src);
   buf = getAmpiInstance(comm);
 }
 
-bool GPUReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/)
+bool GPUReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept
 {
   return complete;
 }
 
-int GPUReq::wait(MPI_Status *sts)
+int GPUReq::wait(MPI_Status *sts) noexcept
 {
   (void)sts;
   while (!complete) {
@@ -10843,26 +10843,26 @@ int GPUReq::wait(MPI_Status *sts)
   return 0;
 }
 
-void GPUReq::receive(ampi *ptr, AmpiMsg *msg)
+void GPUReq::receive(ampi *ptr, AmpiMsg *msg) noexcept
 {
   CkAbort("GPUReq::receive should never be called");
 }
 
-void GPUReq::receive(ampi *ptr, CkReductionMsg *msg)
+void GPUReq::receive(ampi *ptr, CkReductionMsg *msg) noexcept
 {
   CkAbort("GPUReq::receive should never be called");
 }
 
-void GPUReq::setComplete()
+void GPUReq::setComplete() noexcept
 {
   complete = true;
 }
 
-void GPUReq::print() const {
+void GPUReq::print() const noexcept {
   AmpiRequest::print();
 }
 
-void AMPI_GPU_complete(void *request, void* dummy)
+void AMPI_GPU_complete(void *request, void* dummy) noexcept
 {
   GPUReq *req = static_cast<GPUReq *>(request);
   req->setComplete();
