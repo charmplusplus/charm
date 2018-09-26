@@ -1405,8 +1405,8 @@ then
 	else
 		LD_VERSION=`printf "$LD_VERSION_TEXT" | grep -Eo 'GNU ld (\([^)]*\) )?(version )?[-0-9._a-zA-Z]+' | awk '{print $NF}'`
 		LD_VERSION_MAJOR=`printf $LD_VERSION | cut -d. -f1`
-		LD_VERSION_MINOR=`printf $LD_VERSION | cut -d. -f2`
-		if [ "$LD_VERSION_MAJOR" -eq 2 -a "$LD_VERSION_MINOR" -gt 23 ]
+		LD_VERSION_MINOR=`printf $LD_VERSION | cut -d. -f2 | cut -d- -f1`
+		if [ "$LD_VERSION_MAJOR" -gt 2 ] || [ "$LD_VERSION_MAJOR" -eq 2 -a "$LD_VERSION_MINOR" -gt 23 ]
 		then
 			echo "Warning: -swapglobals may not work with GNU ld >= 2.24."
 			echo "For some versions, an experimental patch is available:"
