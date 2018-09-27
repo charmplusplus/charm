@@ -33,8 +33,8 @@ typedef struct _ccd_cblist {
   unsigned int len;
   int first, last;
   int first_free;
-  ccd_cblist_elem *elems;
   int flag;
+  ccd_cblist_elem *elems;
 } ccd_cblist;
 
 
@@ -201,7 +201,7 @@ static void call_cblist_remove(ccd_cblist *l,double curWallTime)
 
 
 #define CBLIST_INIT_LEN   8
-#define MAXNUMCONDS       512
+#define MAXNUMCONDS       128
 
 /**
  * Lists of conditional callbacks that are maintained by the scheduler
@@ -236,7 +236,7 @@ CpvDeclare(int, _ccd_numchecks);
 
 
 
-#define MAXTIMERHEAPENTRIES       256
+#define MAXTIMERHEAPENTRIES       128
 
 /**
  * Structure used to manage callbacks in a heap
@@ -276,7 +276,7 @@ static void ccd_heap_swap(int index1, int index2)
 /**
  * Expand the ccd_heap to make more room.
  *
- * Double the heap size and copy everything over. Initial 256 is reasonably 
+ * Double the heap size and copy everything over. Initial 128 is reasonably 
  * big, so expanding won't happen often.
  *
  * Had a bug previously due to late expansion, should work now - Gengbin 12/4/03
@@ -443,6 +443,7 @@ void CcdModuleInit(char **ignored)
  */
 int CcdCallOnCondition(int condnum, CcdVoidFn fnp, void *arg)
 {
+  CmiAssert(condnum < MAXNUMCONDS);
   return append_elem(&(CpvAccess(conds).condcb[condnum]), fnp, arg, CcdIGNOREPE);
 } 
 
@@ -452,6 +453,7 @@ int CcdCallOnCondition(int condnum, CcdVoidFn fnp, void *arg)
  */
 int CcdCallOnConditionOnPE(int condnum, CcdVoidFn fnp, void *arg, int pe)
 {
+  CmiAssert(condnum < MAXNUMCONDS);
   return append_elem(&(CpvAccess(conds).condcb[condnum]), fnp, arg, pe);
 } 
 
@@ -461,6 +463,7 @@ int CcdCallOnConditionOnPE(int condnum, CcdVoidFn fnp, void *arg, int pe)
  */
 int CcdCallOnConditionKeep(int condnum, CcdVoidFn fnp, void *arg)
 {
+  CmiAssert(condnum < MAXNUMCONDS);
   return append_elem(&(CpvAccess(conds).condcb_keep[condnum]), fnp, arg, CcdIGNOREPE);
 } 
 
@@ -470,6 +473,7 @@ int CcdCallOnConditionKeep(int condnum, CcdVoidFn fnp, void *arg)
  */
 int CcdCallOnConditionKeepOnPE(int condnum, CcdVoidFn fnp, void *arg, int pe)
 {
+  CmiAssert(condnum < MAXNUMCONDS);
   return append_elem(&(CpvAccess(conds).condcb_keep[condnum]), fnp, arg, pe);
 } 
 
@@ -479,6 +483,7 @@ int CcdCallOnConditionKeepOnPE(int condnum, CcdVoidFn fnp, void *arg, int pe)
  */
 void CcdCancelCallOnCondition(int condnum, int idx)
 {
+  CmiAssert(condnum < MAXNUMCONDS);
   remove_elem(&(CpvAccess(conds).condcb[condnum]), idx);
 }
 
@@ -488,6 +493,7 @@ void CcdCancelCallOnCondition(int condnum, int idx)
  */
 void CcdCancelCallOnConditionKeep(int condnum, int idx)
 {
+  CmiAssert(condnum < MAXNUMCONDS);
   remove_elem(&(CpvAccess(conds).condcb_keep[condnum]), idx);
 }
 
@@ -519,6 +525,7 @@ void CcdCallFnAfter(CcdVoidFn fnp, void *arg, double deltaT)
  */
 void CcdRaiseCondition(int condnum)
 {
+  CmiAssert(condnum < MAXNUMCONDS);
   double curWallTime=CmiWallTimer();
   call_cblist_remove(&(CpvAccess(conds).condcb[condnum]),curWallTime);
   call_cblist_keep(&(CpvAccess(conds).condcb_keep[condnum]),curWallTime);
