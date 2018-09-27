@@ -283,14 +283,10 @@ mCastEntry::mCastEntry (mCastEntry *old):
   int i;
   aid = old->aid;
   parentGrp = old->parentGrp;
-  for (i=0; i<old->allElem.size(); i++)
-    allElem.push_back(old->allElem[i]);
-  for (i=0; i<old->allGrpElem.size(); i++)
-    allGrpElem.push_back(old->allGrpElem[i]);
+  allElem = old->allElem;
+  allGrpElem = old->allGrpElem;
 #if CMK_LBDB_ON
-  CmiAssert(old->allElem.size() == old->allObjKeys.size());
-  for (i=0; i<old->allObjKeys.size(); i++)
-    allObjKeys.push_back(old->allObjKeys[i]);
+  allObjKeys = old->allObjKeys;
 #endif
   pe = old->pe;
   red.storedCallback = old->red.storedCallback;
@@ -314,14 +310,17 @@ void CkMulticastMgr::setSection(CkSectionInfo &_id, CkArrayID aid, CkArrayIndex 
     // Create a multicast entry
     mCastEntry *entry = new mCastEntry(aid);
     // Push all the section member indices into the entry
+    entry->allElem.resize(n);
+    entry->allObjKeys.reserve(n);
     for (int i=0; i<n; i++) {
-        entry->allElem.push_back(al[i]);
+        entry->allElem[i] = al[i];
 #if CMK_LBDB_ON
-    CmiUInt8 _key;
-    if(CProxy_ArrayBase(aid).ckLocMgr()->lookupID(al[i], _key))
-      entry->allObjKeys.push_back(_key);
+        CmiUInt8 _key;
+        if(CProxy_ArrayBase(aid).ckLocMgr()->lookupID(al[i], _key))
+            entry->allObjKeys.push_back(_key);
 #endif
     }
+    entry->allObjKeys.shrink_to_fit();
     entry->bfactor = factor;
     //  entry->aid = aid;
     _id.get_aid() = aid;
@@ -350,14 +349,17 @@ void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
   mCastEntry *entry = new mCastEntry(aid);
 
   const CkArrayIndex *al = proxy.ckGetArrayElements();
+  entry->allElem.resize(proxy.ckGetNumElements());
+  entry->allObjKeys.reserve(proxy.ckGetNumElements());
   for (int i=0; i<proxy.ckGetNumElements(); i++) {
-    entry->allElem.push_back(al[i]);
+    entry->allElem[i] = al[i];
 #if CMK_LBDB_ON
     CmiUInt8 _key;
     if(CProxy_ArrayBase(aid).ckLocMgr()->lookupID(al[i], _key))
       entry->allObjKeys.push_back(_key);
 #endif
   }
+  entry->allObjKeys.shrink_to_fit();
   if(proxy.ckGetBfactor() == USE_DEFAULT_BRANCH_FACTOR)
     entry->bfactor = dfactor;
   else
@@ -404,14 +406,17 @@ void CkMulticastMgr::resetSection(CProxySection_ArrayBase &proxy)
 /// Build a mCastEntry object with relevant section info and set the section cookie to point to this object
 void CkMulticastMgr::prepareCookie(mCastEntry *entry, CkSectionID &sid, const CkArrayIndex *al, int count, CkArrayID aid)
 {
+  entry->allElem.resize(count);
+  entry->allObjKeys.reserve(count);
   for (int i=0; i<count; i++) {
-    entry->allElem.push_back(al[i]);
+    entry->allElem[i] = al[i];
 #if CMK_LBDB_ON
     CmiUInt8 _key;
     if(CProxy_ArrayBase(aid).ckLocMgr()->lookupID(al[i], _key))
       entry->allObjKeys.push_back(_key);
 #endif
   }
+  entry->allObjKeys.shrink_to_fit();
   if(sid.bfactor == USE_DEFAULT_BRANCH_FACTOR)
     entry->bfactor = dfactor;
   else
@@ -426,8 +431,9 @@ void CkMulticastMgr::prepareCookie(mCastEntry *entry, CkSectionID &sid, const Ck
 /// similar to prepareCookie, but for group sections
 void CkMulticastMgr::prepareGrpCookie(mCastEntry *entry, CkSectionID &sid, const int *pelist, int count, CkGroupID gid)
 {
+  entry->allGrpElem.resize(count);
   for (int i=0; i<count; i++) {
-    entry->allGrpElem.push_back(pelist[i]);
+    entry->allGrpElem[i] = pelist[i];
   }
 
   if(sid.bfactor == USE_DEFAULT_BRANCH_FACTOR)
@@ -669,7 +675,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
 
     const int numpes = msg->nIdx;
     std::unordered_map<int, int> peIdx;    // pe -> idx in msg->peElems
-    //if (!entry->isGrpSec()) peIdx.reserve(numpes);   // requires full C++11 support (hold off until 6.8.0 release)
+    if (!entry->isGrpSec()) peIdx.reserve(numpes);
     std::vector<int> mySubTreePEs;
     mySubTreePEs.reserve(numpes);
     // The first PE in my subtree should be me, the tree root (as required by the spanning tree builder)
@@ -690,7 +696,10 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
         if (pe != CkMyPe()) {
           mySubTreePEs.push_back(pe);
         } else {
-          for (int j=msg->peElems[i2+1]; j < msg->peElems[i2+3]; j++)
+          int begin = msg->peElems[i2+1];
+          int end = msg->peElems[i2+3];
+          entry->localElem.reserve(entry->localElem.size() + (end - begin));
+          for (int j=begin; j < end; j++)
             entry->localElem.push_back(msg->arrIdx[j]);
         }
       }
