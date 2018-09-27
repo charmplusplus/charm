@@ -189,8 +189,8 @@ void setMemoryOwnedBy(void *p, int id);
 
 #ifdef __cplusplus
 /* In C++, use new so t's constructor gets called */
-# define CpvInit_Alloc(t,n) new t[n]
-# define CpvInit_Alloc_scalar(t) new t
+# define CpvInit_Alloc(t,n) new t[n]{}
+# define CpvInit_Alloc_scalar(t) new t{}
 #else
 # define CpvInit_Alloc(t,n) (t *)calloc(n,sizeof(t))
 # define CpvInit_Alloc_scalar(t) (t *)calloc(1,sizeof(t))
