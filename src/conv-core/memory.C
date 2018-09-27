@@ -1027,7 +1027,7 @@ void CmiOutOfMemoryInit(void) {
 #if CMK_MEMORY_PREALLOCATE_HACK
   memory_preallocate_hack();
 #endif
-  MEM_LOCK_AROUND( memory_lifeRaft=(char *)mm_malloc(65536/2); )
+  MEM_LOCK_AROUND( memory_lifeRaft=(char *)mm_malloc(16384); )
   }
 }
 
