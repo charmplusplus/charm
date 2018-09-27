@@ -1031,7 +1031,9 @@ enum AmpiReqType : uint8_t {
   AMPI_GATHER_REQ  = 6,
   AMPI_GATHERV_REQ = 7,
   AMPI_G_REQ       = 8,
+#if CMK_CUDA
   AMPI_GPU_REQ     = 9
+#endif
 };
 
 inline void operator|(PUP::er &p, AmpiReqType &r) {
@@ -1836,7 +1838,6 @@ class AmpiRequestPool {
           validReqs[i] = 1;
           SsendReq* sreq = new (&reqs[i*pooledReqSize]) SsendReq();
           startIdx = i+1;
-          CkPrintf("Creating SsendReq from pool 0\n");
           return sreq;
         }
       }

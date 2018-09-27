@@ -2018,6 +2018,11 @@ void ampi::pup(PUP::er &p) noexcept
         case AMPI_G_REQ:
           blockingReq = new GReq;
           break;
+#if CMK_CUDA
+        case AMPI_GPU_REQ:
+          CkAbort("AMPI> error trying to PUP a non-migratable GPU request!");
+          break;
+#endif
         case AMPI_INVALID_REQ:
           CkAbort("AMPI> error trying to PUP an invalid request!");
           break;
@@ -3643,6 +3648,11 @@ void AmpiRequestList::pup(PUP::er &p, AmpiRequestPool* pool) noexcept {
           case AMPI_G_REQ:
             reqs[i] = new GReq;
             break;
+#if CMK_CUDA
+          case AMPI_GPU_REQ:
+            CkAbort("AMPI> error trying to PUP a non-migratable GPU request!");
+            break;
+#endif
           case AMPI_INVALID_REQ:
             CkAbort("AMPI> error trying to PUP an invalid request!");
             break;
@@ -10825,8 +10835,9 @@ int AMPI_Set_end_event(void)
 GPUReq::GPUReq() noexcept
 {
   comm = MPI_COMM_SELF;
-  MPI_Comm_rank(comm, &src);
-  buf = getAmpiInstance(comm);
+  ampi* ptr = getAmpiInstance(comm);
+  src = ptr->getRank();
+  buf = ptr;
 }
 
 bool GPUReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept
