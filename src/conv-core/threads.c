@@ -454,7 +454,7 @@ static void *CthAllocateStack(CthThreadBase *th,int *stackSize,int useMigratable
   void *ret=NULL;
   if (*stackSize==0) *stackSize=CthCpvAccess(_defaultStackSize);
   th->stacksize=*stackSize;
-  if (!useMigratable) {
+  if (!useMigratable || !CmiIsomallocEnabled()) {
     ret=malloc(*stackSize); 
   } else {
     th->isMigratable=1;
@@ -462,8 +462,8 @@ static void *CthAllocateStack(CthThreadBase *th,int *stackSize,int useMigratable
     th->aliasStackHandle=CthAliasCreate(*stackSize);
     ret=CMK_THREADS_ALIAS_LOCATION;
 #else /* isomalloc */
-  if (th->isomallocBlockList == NULL && CmiIsomallocEnabled())
-    th->isomallocBlockList = CmiIsomallocBlockListNew();
+    if (th->isomallocBlockList == NULL)
+      th->isomallocBlockList = CmiIsomallocBlockListNew();
 #if defined(__APPLE__) && CMK_64BIT
       /* MAC OS needs 16-byte aligned stack */
     ret=CmiIsomallocBlockListMallocAlign(th->isomallocBlockList, 16, *stackSize);
@@ -516,7 +516,10 @@ static void CthThreadBaseFree(CthThreadBase *th)
   th->stack=NULL;
 
   if (th->isomallocBlockList)
+  {
     CmiIsomallocBlockListDelete(th->isomallocBlockList);
+    th->isomallocBlockList = NULL;
+  }
 }
 
 #if CMK_THREADS_BUILD_TLS
