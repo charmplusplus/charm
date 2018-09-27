@@ -2201,7 +2201,7 @@ void ampi::splitPhase1(CkReductionMsg *msg) noexcept
 
       //FIXME: create a new communicator for each color, instead of
       // (confusingly) re-using the same MPI_Comm number for each.
-      lastComm=ampiCommStruct(newComm,lastAmpi,indices.size(),indices);
+      lastComm=ampiCommStruct(newComm,lastAmpi,indices);
     }
     int newRank=c-lastRoot;
     int newIdx=lastComm.getIndexForRank(newRank);
@@ -2249,7 +2249,7 @@ void ampi::splitPhaseInter(CkReductionMsg *msg) noexcept
       }
 
       if (c==0) {
-        lastComm=ampiCommStruct(newComm,lastAmpi,indices.size(),indices, myComm.getRemoteIndices());
+        lastComm=ampiCommStruct(newComm,lastAmpi,indices, myComm.getRemoteIndices());
         for (int i=0; i<indices.size(); i++) {
           lastAmpi[indices[i]].insert(parentProxy,lastComm);
         }
@@ -2276,16 +2276,7 @@ void ampiParent::splitChildRegister(const ampiCommStruct &s) noexcept {
 //   1. reduction to make sure all members have called
 //   2. the root in the old communicator create the new array
 //   3. ampiParent::register is called to register new array as new comm
-class vecStruct {
- public:
-  int nextgroup;
-  groupStruct vec;
-  vecStruct() noexcept : nextgroup(-1){}
-  vecStruct(int nextgroup_, groupStruct vec_) noexcept
-    : nextgroup(nextgroup_), vec(vec_) { }
-};
-
-void ampi::commCreate(const groupStruct vec,MPI_Comm* newcomm) noexcept {
+void ampi::commCreate(const vector<int>& vec,MPI_Comm* newcomm) noexcept {
   int rootIdx=vec[0];
   tmpVec = vec;
   CkCallback cb(CkReductionTarget(ampi,commCreatePhase1),CkArrayIndex1D(rootIdx),myComm.getProxy());
@@ -2302,7 +2293,7 @@ void ampi::commCreate(const groupStruct vec,MPI_Comm* newcomm) noexcept {
 }
 
 void ampi::insertNewChildAmpiElements(MPI_Comm nextComm, CProxy_ampi newAmpi) noexcept {
-  ampiCommStruct newCommStruct = ampiCommStruct(nextComm, newAmpi, tmpVec.size(), tmpVec);
+  ampiCommStruct newCommStruct = ampiCommStruct(nextComm, newAmpi, tmpVec);
   for (int i = 0; i < tmpVec.size(); ++i)
     newAmpi[tmpVec[i]].insert(parentProxy, newCommStruct);
   newAmpi.doneInserting();
@@ -2339,7 +2330,7 @@ MPI_Comm ampi::cartCreate0D() noexcept {
   }
 }
 
-MPI_Comm ampi::cartCreate(groupStruct vec, int ndims, const int* dims) noexcept {
+MPI_Comm ampi::cartCreate(vector<int>& vec, int ndims, const int* dims) noexcept {
   if (ndims == 0) {
     return cartCreate0D();
   }
@@ -2378,7 +2369,7 @@ void ampiParent::cartChildRegister(const ampiCommStruct &s) noexcept {
   thread->resume(); //Matches suspend at end of ampi::cartCreate
 }
 
-void ampi::graphCreate(const groupStruct vec,MPI_Comm* newcomm) noexcept {
+void ampi::graphCreate(const vector<int>& vec,MPI_Comm* newcomm) noexcept {
   int rootIdx=vec[0];
   tmpVec = vec;
   CkCallback cb(CkReductionTarget(ampi,commCreatePhase1),CkArrayIndex1D(rootIdx),
@@ -2404,7 +2395,7 @@ void ampiParent::graphChildRegister(const ampiCommStruct &s) noexcept {
   thread->resume(); //Matches suspend at end of ampi::graphCreate
 }
 
-void ampi::distGraphCreate(const groupStruct vec, MPI_Comm* newcomm) noexcept
+void ampi::distGraphCreate(const vector<int>& vec, MPI_Comm* newcomm) noexcept
 {
   int rootIdx = vec[0];
   tmpVec = vec;
@@ -2433,7 +2424,7 @@ void ampiParent::distGraphChildRegister(const ampiCommStruct &s) noexcept
   thread->resume(); //Matches suspend at end of ampi::distGraphCreate
 }
 
-void ampi::intercommCreate(const groupStruct remoteVec, const int root, MPI_Comm tcomm, MPI_Comm *ncomm) noexcept {
+void ampi::intercommCreate(const vector<int>& remoteVec, const int root, MPI_Comm tcomm, MPI_Comm *ncomm) noexcept {
   if (thisIndex==root) { // not everybody gets the valid rvec
     tmpVec = remoteVec;
   }
@@ -2447,8 +2438,8 @@ void ampi::intercommCreate(const groupStruct remoteVec, const int root, MPI_Comm
 void ampi::intercommCreatePhase1(MPI_Comm nextInterComm) noexcept {
 
   CProxy_ampi newAmpi = createNewChildAmpiSync();
-  groupStruct lgroup = myComm.getIndices();
-  ampiCommStruct newCommstruct = ampiCommStruct(nextInterComm,newAmpi,lgroup.size(),lgroup,tmpVec);
+  const vector<int>& lgroup = myComm.getIndices();
+  ampiCommStruct newCommstruct = ampiCommStruct(nextInterComm,newAmpi,lgroup,tmpVec);
   for(int i=0;i<lgroup.size();i++){
     int newIdx=lgroup[i];
     newAmpi[newIdx].insert(parentProxy,newCommstruct);
@@ -2467,8 +2458,8 @@ void ampiParent::interChildRegister(const ampiCommStruct &s) noexcept {
 
 void ampi::intercommMerge(int first, MPI_Comm *ncomm) noexcept { // first valid only at local root
   if(myRank == 0 && first == 1){ // first (lower) group creates the intracommunicator for the higher group
-    groupStruct lvec = myComm.getIndices();
-    groupStruct rvec = myComm.getRemoteIndices();
+    vector<int> lvec = myComm.getIndices();
+    vector<int> rvec = myComm.getRemoteIndices();
     int rsize = rvec.size();
     tmpVec = lvec;
     for(int i=0;i<rsize;i++)
@@ -8848,7 +8839,7 @@ AMPI_API_IMPL(int, MPI_Intercomm_create, MPI_Comm localComm, int localLeader, MP
     MPI_Status sts;
     vector<int> localVec;
     localVec = localPtr->getIndices();
-    // local leader exchanges groupStruct with remote leader
+    // local leader exchanges groups with remote leader
     peerPtr->send(tag, peerPtr->getRank(), localVec.data(), localVec.size(), MPI_INT, remoteLeader, peerComm);
     peerPtr->probe(tag, remoteLeader, peerComm, &sts);
     MPI_Get_count(&sts, MPI_INT, &remoteSize);
@@ -9303,11 +9294,10 @@ AMPI_API_IMPL(int, MPI_Comm_group, MPI_Comm comm, MPI_Group *group)
 AMPI_API_IMPL(int, MPI_Group_union, MPI_Group group1, MPI_Group group2, MPI_Group *newgroup)
 {
   AMPI_API("AMPI_Group_union");
-  groupStruct vec1, vec2, newvec;
   ampiParent *ptr = getAmpiParent();
-  vec1 = ptr->group2vec(group1);
-  vec2 = ptr->group2vec(group2);
-  newvec = unionOp(vec1,vec2);
+  vector<int> vec1 = ptr->group2vec(group1);
+  vector<int> vec2 = ptr->group2vec(group2);
+  vector<int> newvec = unionOp(vec1,vec2);
   *newgroup = ptr->saveGroupStruct(newvec);
   return MPI_SUCCESS;
 }
@@ -9315,11 +9305,10 @@ AMPI_API_IMPL(int, MPI_Group_union, MPI_Group group1, MPI_Group group2, MPI_Grou
 AMPI_API_IMPL(int, MPI_Group_intersection, MPI_Group group1, MPI_Group group2, MPI_Group *newgroup)
 {
   AMPI_API("AMPI_Group_intersection");
-  groupStruct vec1, vec2, newvec;
   ampiParent *ptr = getAmpiParent();
-  vec1 = ptr->group2vec(group1);
-  vec2 = ptr->group2vec(group2);
-  newvec = intersectOp(vec1,vec2);
+  vector<int> vec1 = ptr->group2vec(group1);
+  vector<int> vec2 = ptr->group2vec(group2);
+  vector<int> newvec = intersectOp(vec1,vec2);
   *newgroup = ptr->saveGroupStruct(newvec);
   return MPI_SUCCESS;
 }
@@ -9327,11 +9316,10 @@ AMPI_API_IMPL(int, MPI_Group_intersection, MPI_Group group1, MPI_Group group2, M
 AMPI_API_IMPL(int, MPI_Group_difference, MPI_Group group1, MPI_Group group2, MPI_Group *newgroup)
 {
   AMPI_API("AMPI_Group_difference");
-  groupStruct vec1, vec2, newvec;
   ampiParent *ptr = getAmpiParent();
-  vec1 = ptr->group2vec(group1);
-  vec2 = ptr->group2vec(group2);
-  newvec = diffOp(vec1,vec2);
+  vector<int> vec1 = ptr->group2vec(group1);
+  vector<int> vec2 = ptr->group2vec(group2);
+  vector<int> newvec = diffOp(vec1,vec2);
   *newgroup = ptr->saveGroupStruct(newvec);
   return MPI_SUCCESS;
 }
@@ -9355,9 +9343,8 @@ AMPI_API_IMPL(int, MPI_Group_translate_ranks, MPI_Group group1, int n, const int
 {
   AMPI_API("AMPI_Group_translate_ranks");
   ampiParent *ptr = getAmpiParent();
-  groupStruct vec1, vec2;
-  vec1 = ptr->group2vec(group1);
-  vec2 = ptr->group2vec(group2);
+  vector<int> vec1 = ptr->group2vec(group1);
+  vector<int> vec2 = ptr->group2vec(group2);
   translateRanksOp(n, vec1, ranks1, vec2, ranks2);
   return MPI_SUCCESS;
 }
@@ -9366,9 +9353,8 @@ AMPI_API_IMPL(int, MPI_Group_compare, MPI_Group group1,MPI_Group group2, int *re
 {
   AMPI_API("AMPI_Group_compare");
   ampiParent *ptr = getAmpiParent();
-  groupStruct vec1, vec2;
-  vec1 = ptr->group2vec(group1);
-  vec2 = ptr->group2vec(group2);
+  vector<int> vec1 = ptr->group2vec(group1);
+  vector<int> vec2 = ptr->group2vec(group2);
   *result = compareVecOp(vec1, vec2);
   return MPI_SUCCESS;
 }
@@ -9376,10 +9362,9 @@ AMPI_API_IMPL(int, MPI_Group_compare, MPI_Group group1,MPI_Group group2, int *re
 AMPI_API_IMPL(int, MPI_Group_incl, MPI_Group group, int n, const int *ranks, MPI_Group *newgroup)
 {
   AMPI_API("AMPI_Group_incl");
-  groupStruct vec, newvec;
   ampiParent *ptr = getAmpiParent();
-  vec = ptr->group2vec(group);
-  newvec = inclOp(n,ranks,vec);
+  vector<int> vec = ptr->group2vec(group);
+  vector<int> newvec = inclOp(n,ranks,vec);
   *newgroup = ptr->saveGroupStruct(newvec);
   return MPI_SUCCESS;
 }
@@ -9387,10 +9372,9 @@ AMPI_API_IMPL(int, MPI_Group_incl, MPI_Group group, int n, const int *ranks, MPI
 AMPI_API_IMPL(int, MPI_Group_excl, MPI_Group group, int n, const int *ranks, MPI_Group *newgroup)
 {
   AMPI_API("AMPI_Group_excl");
-  groupStruct vec, newvec;
   ampiParent *ptr = getAmpiParent();
-  vec = ptr->group2vec(group);
-  newvec = exclOp(n,ranks,vec);
+  vector<int> vec = ptr->group2vec(group);
+  vector<int> newvec = exclOp(n,ranks,vec);
   *newgroup = ptr->saveGroupStruct(newvec);
   return MPI_SUCCESS;
 }
@@ -9398,11 +9382,10 @@ AMPI_API_IMPL(int, MPI_Group_excl, MPI_Group group, int n, const int *ranks, MPI
 AMPI_API_IMPL(int, MPI_Group_range_incl, MPI_Group group, int n, int ranges[][3], MPI_Group *newgroup)
 {
   AMPI_API("AMPI_Group_range_incl");
-  groupStruct vec, newvec;
   int ret;
   ampiParent *ptr = getAmpiParent();
-  vec = ptr->group2vec(group);
-  newvec = rangeInclOp(n,ranges,vec,&ret);
+  vector<int> vec = ptr->group2vec(group);
+  vector<int> newvec = rangeInclOp(n,ranges,vec,&ret);
   if(ret != MPI_SUCCESS){
     *newgroup = MPI_GROUP_EMPTY;
     return ampiErrhandler("AMPI_Group_range_incl", ret);
@@ -9415,11 +9398,10 @@ AMPI_API_IMPL(int, MPI_Group_range_incl, MPI_Group group, int n, int ranges[][3]
 AMPI_API_IMPL(int, MPI_Group_range_excl, MPI_Group group, int n, int ranges[][3], MPI_Group *newgroup)
 {
   AMPI_API("AMPI_Group_range_excl");
-  groupStruct vec, newvec;
   int ret;
   ampiParent *ptr = getAmpiParent();
-  vec = ptr->group2vec(group);
-  newvec = rangeExclOp(n,ranges,vec,&ret);
+  vector<int> vec = ptr->group2vec(group);
+  vector<int> newvec = rangeExclOp(n,ranges,vec,&ret);
   if(ret != MPI_SUCCESS){
     *newgroup = MPI_GROUP_EMPTY;
     return ampiErrhandler("AMPI_Group_range_excl", ret);
@@ -9441,7 +9423,7 @@ AMPI_API_IMPL(int, MPI_Comm_create, MPI_Comm comm, MPI_Group group, MPI_Comm* ne
   int rank_in_group, key, color, zero;
   MPI_Group group_of_comm;
 
-  groupStruct vec = getAmpiParent()->group2vec(group);
+  vector<int> vec = getAmpiParent()->group2vec(group);
   if(vec.size()==0){
     AMPI_DEBUG("AMPI> In MPI_Comm_create, creating an empty communicator");
     *newcomm = MPI_COMM_NULL;
@@ -9703,7 +9685,7 @@ AMPI_API_IMPL(int, MPI_Cart_create, MPI_Comm comm_old, int ndims, const int *dim
   MPI_Cart_map(comm_old, ndims, dims, periods, &newrank);//no change in rank
 
   ampiParent *ptr = getAmpiParent();
-  groupStruct vec = ptr->group2vec(ptr->comm2group(comm_old));
+  vector<int> vec = ptr->group2vec(ptr->comm2group(comm_old));
   *comm_cart = getAmpiInstance(comm_old)->cartCreate(vec, ndims, dims);
 
   if (*comm_cart != MPI_COMM_NULL) {
@@ -9735,7 +9717,7 @@ AMPI_API_IMPL(int, MPI_Graph_create, MPI_Comm comm_old, int nnodes, const int *i
   MPI_Graph_map(comm_old, nnodes, index, edges, &newrank);
 
   ampiParent *ptr = getAmpiParent();
-  groupStruct vec = ptr->group2vec(ptr->comm2group(comm_old));
+  vector<int> vec = ptr->group2vec(ptr->comm2group(comm_old));
   getAmpiInstance(comm_old)->graphCreate(vec, comm_graph);
   ampiTopology &topo = *ptr->getGraph(*comm_graph).getTopology();
 
@@ -9777,7 +9759,7 @@ AMPI_API_IMPL(int, MPI_Dist_graph_create_adjacent, MPI_Comm comm_old, int indegr
 #endif
 
   ampiParent *ptr = getAmpiParent();
-  groupStruct vec = ptr->group2vec(ptr->comm2group(comm_old));
+  vector<int> vec = ptr->group2vec(ptr->comm2group(comm_old));
   getAmpiInstance(comm_old)->distGraphCreate(vec,comm_dist_graph);
   ampiCommStruct &c = ptr->getDistGraph(*comm_dist_graph);
   ampiTopology *topo = c.getTopology();
@@ -9831,7 +9813,7 @@ AMPI_API_IMPL(int, MPI_Dist_graph_create, MPI_Comm comm_old, int n, const int so
 #endif
 
   ampiParent *ptr = getAmpiParent();
-  groupStruct vec = ptr->group2vec(ptr->comm2group(comm_old));
+  vector<int> vec = ptr->group2vec(ptr->comm2group(comm_old));
   getAmpiInstance(comm_old)->distGraphCreate(vec,comm_dist_graph);
   ampiCommStruct &c = ptr->getDistGraph(*comm_dist_graph);
   ampiTopology *topo = c.getTopology();

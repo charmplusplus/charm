@@ -630,6 +630,58 @@ class KeyvalNode {
   }
 };
 
+// Only store Group ranks explicitly when they can't be
+// lazily and transiently created via std::iota()
+class groupStruct {
+ private:
+  int sz; // -1 if ranks is valid, otherwise the size to pass to std::iota()
+  vector<int> ranks;
+
+ private:
+  bool ranksIsIota() const noexcept {
+    for (int i=0; i<ranks.size(); i++)
+      if (ranks[i] != i)
+        return false;
+    return true;
+  }
+
+ public:
+  groupStruct() noexcept : sz(0) {}
+  groupStruct(int s) noexcept : sz(s) {}
+  groupStruct(vector<int> r) noexcept : sz(-1), ranks(std::move(r)) {
+    if (ranksIsIota()) {
+      sz = ranks.size();
+      ranks.clear();
+    }
+    ranks.shrink_to_fit();
+  }
+  groupStruct &operator=(const groupStruct &obj) noexcept {
+    sz = obj.sz;
+    ranks = obj.ranks;
+    return *this;
+  }
+  ~groupStruct() = default;
+  void pup(PUP::er& p) noexcept {
+    p|sz;
+    p|ranks;
+  }
+  bool isIota() const noexcept {return (sz != -1);}
+  int operator[](int i) const noexcept {return (isIota()) ? i : ranks[i];}
+  int size() const noexcept {return (isIota()) ? sz : ranks.size();}
+  vector<int> getRanks() const noexcept {
+    if (isIota()) {
+      // Lazily create ranks:
+      vector<int> tmpRanks(sz);
+      std::iota(tmpRanks.begin(), tmpRanks.end(), 0);
+      tmpRanks.shrink_to_fit();
+      return tmpRanks;
+    }
+    else {
+      return ranks;
+    }
+  }
+};
+
 enum AmpiCommType : uint8_t {
    WORLD = 0
   ,INTRA = 1
@@ -643,8 +695,8 @@ class ampiCommStruct {
   CkArrayID ampiID; //ID of corresponding ampi array
   int size; //Number of processes in communicator
   AmpiCommType commType; //COMM_WORLD, intracomm, intercomm?
-  vector<int> indices;  //indices[r] gives the array index for rank r
-  vector<int> remoteIndices;  // remote group for inter-communicator
+  groupStruct indices;  //indices[r] gives the array index for rank r
+  groupStruct remoteIndices;  // remote group for inter-communicator
 
   ampiTopology *ampiTopo; // Virtual topology
   int topoType; // Type of virtual topology: MPI_CART, MPI_GRAPH, MPI_DIST_GRAPH, or MPI_UNDEFINED
@@ -655,28 +707,23 @@ class ampiCommStruct {
   // For communicator names
   std::string commName;
 
-  // Lazily fill world communicator indices
-  void makeWorldIndices() const noexcept {
-    vector<int> &ind = const_cast<vector<int> &>(indices);
-    ind.resize(size);
-    std::iota(ind.begin(), ind.end(), 0);
-  }
-
  public:
-  ampiCommStruct(int ignored=0) noexcept : size(-1), commType(INTRA), ampiTopo(NULL), topoType(MPI_UNDEFINED) {}
+  ampiCommStruct(int ignored=0) noexcept
+    : size(-1), commType(INTRA), ampiTopo(NULL), topoType(MPI_UNDEFINED)
+  {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,int size_) noexcept
-    :comm(comm_), ampiID(id_),size(size_), commType(WORLD), ampiTopo(NULL), topoType(MPI_UNDEFINED) {}
-  ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
-                 int size_,const vector<int> &indices_) noexcept
-                :comm(comm_), ampiID(id_), size(size_),
-                 commType(INTRA), indices(indices_),
-                 ampiTopo(NULL), topoType(MPI_UNDEFINED) {}
-  ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,
-                 int size_,const vector<int> &indices_,
+    : comm(comm_), ampiID(id_),size(size_), indices(size_), commType(WORLD),
+      ampiTopo(NULL), topoType(MPI_UNDEFINED)
+  {}
+  ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_, const vector<int> &indices_) noexcept
+    : comm(comm_), ampiID(id_), size(indices_.size()), commType(INTRA), indices(indices_),
+      ampiTopo(NULL), topoType(MPI_UNDEFINED)
+  {}
+  ampiCommStruct(MPI_Comm comm_, const CkArrayID &id_, const vector<int> &indices_,
                  const vector<int> &remoteIndices_) noexcept
-                :comm(comm_),ampiID(id_),size(size_),commType(INTER),
-                 indices(indices_),remoteIndices(remoteIndices_),
-                 ampiTopo(NULL), topoType(MPI_UNDEFINED) {}
+    : comm(comm_), ampiID(id_), size(indices_.size()), commType(INTER), indices(indices_),
+      remoteIndices(remoteIndices_), ampiTopo(NULL), topoType(MPI_UNDEFINED)
+  {}
 
   ~ampiCommStruct() noexcept {
     if (ampiTopo != NULL)
@@ -752,11 +799,8 @@ class ampiCommStruct {
   void setArrayID(const CkArrayID &nID) noexcept {ampiID=nID;}
 
   MPI_Comm getComm() const noexcept {return comm;}
-  inline const vector<int> &getIndices() const noexcept {
-    if (commType==WORLD && indices.size()!=size) makeWorldIndices();
-    return indices;
-  }
-  const vector<int> &getRemoteIndices() const noexcept {return remoteIndices;}
+  inline vector<int> getIndices() const noexcept {return indices.getRanks();}
+  inline vector<int> getRemoteIndices() const noexcept {return remoteIndices.getRanks();}
   vector<int> &getKeyvals() noexcept {return keyvals;}
 
   void setName(const char *src) noexcept {
@@ -777,22 +821,21 @@ class ampiCommStruct {
 #if CMK_ERROR_CHECKING
     if (r>=size) CkAbort("AMPI> You passed in an out-of-bounds process rank!");
 #endif
-    if (commType == WORLD) return r;
-    else return indices[r];
+    return indices[r];
   }
   int getIndexForRemoteRank(int r) const noexcept {
 #if CMK_ERROR_CHECKING
-    if (r>=remoteIndices.size()) CkAbort("AMPI> You passed in an out-of-bounds process rank!");
+    if (r>=remoteIndices.size()) CkAbort("AMPI> You passed in an out-of-bounds intercomm remote process rank!");
 #endif
-    if (commType==WORLD) return r;
-    else return remoteIndices[r];
+    return remoteIndices[r];
   }
   //Get the rank for this array index (Warning: linear time)
   int getRankForIndex(int i) const noexcept {
-    if (commType==WORLD) return i;
+    if (indices.isIota()) return i;
     else {
-      for (int r=0;r<indices.size();r++)
-        if (indices[r]==i) return r;
+      const vector<int>& ind = indices.getRanks();
+      for (int r=0;r<ind.size();r++)
+        if (ind[r]==i) return r;
       return -1; /*That index isn't in this communicator*/
     }
   }
@@ -847,10 +890,8 @@ class mpi_comm_worlds{
   }
 };
 
-typedef vector<int> groupStruct;
-
-// groupStructure operations
-inline void outputOp(groupStruct vec) noexcept {
+// group operations
+inline void outputOp(const vector<int>& vec) noexcept {
   if (vec.size() > 50) {
     CkPrintf("vector too large to output!\n");
     return;
@@ -862,7 +903,7 @@ inline void outputOp(groupStruct vec) noexcept {
   CkPrintf("}\n");
 }
 
-inline int getPosOp(int idx, groupStruct vec) noexcept {
+inline int getPosOp(int idx, const vector<int>& vec) noexcept {
   for (int r=0; r<vec.size(); r++) {
     if (vec[r] == idx) {
       return r;
@@ -871,8 +912,8 @@ inline int getPosOp(int idx, groupStruct vec) noexcept {
   return MPI_UNDEFINED;
 }
 
-inline groupStruct unionOp(groupStruct vec1, groupStruct vec2) noexcept {
-  groupStruct newvec(vec1);
+inline vector<int> unionOp(const vector<int>& vec1, const vector<int>& vec2) noexcept {
+  vector<int> newvec(vec1);
   for (int i=0; i<vec2.size(); i++) {
     if (getPosOp(vec2[i], vec1) == MPI_UNDEFINED) {
       newvec.push_back(vec2[i]);
@@ -881,8 +922,8 @@ inline groupStruct unionOp(groupStruct vec1, groupStruct vec2) noexcept {
   return newvec;
 }
 
-inline groupStruct intersectOp(groupStruct vec1, groupStruct vec2) noexcept {
-  groupStruct newvec;
+inline vector<int> intersectOp(const vector<int>& vec1, const vector<int>& vec2) noexcept {
+  vector<int> newvec;
   for (int i=0; i<vec1.size(); i++) {
     if (getPosOp(vec1[i], vec2) != MPI_UNDEFINED) {
       newvec.push_back(vec1[i]);
@@ -891,8 +932,8 @@ inline groupStruct intersectOp(groupStruct vec1, groupStruct vec2) noexcept {
   return newvec;
 }
 
-inline groupStruct diffOp(groupStruct vec1, groupStruct vec2) noexcept {
-  groupStruct newvec;
+inline vector<int> diffOp(const vector<int>& vec1, const vector<int>& vec2) noexcept {
+  vector<int> newvec;
   for (int i=0; i<vec1.size(); i++) {
     if (getPosOp(vec1[i], vec2) == MPI_UNDEFINED) {
       newvec.push_back(vec1[i]);
@@ -901,14 +942,15 @@ inline groupStruct diffOp(groupStruct vec1, groupStruct vec2) noexcept {
   return newvec;
 }
 
-inline int* translateRanksOp(int n, groupStruct vec1, const int* ranks1, groupStruct vec2, int *ret) noexcept {
+inline int* translateRanksOp(int n, const vector<int>& vec1, const int* ranks1,
+                             const vector<int>& vec2, int *ret) noexcept {
   for (int i=0; i<n; i++) {
     ret[i] = (ranks1[i] == MPI_PROC_NULL) ? MPI_PROC_NULL : getPosOp(vec1[ranks1[i]], vec2);
   }
   return ret;
 }
 
-inline int compareVecOp(groupStruct vec1, groupStruct vec2) noexcept {
+inline int compareVecOp(const vector<int>& vec1, const vector<int>& vec2) noexcept {
   int pos, ret = MPI_IDENT;
   if (vec1.size() != vec2.size()) {
     return MPI_UNEQUAL;
@@ -925,16 +967,16 @@ inline int compareVecOp(groupStruct vec1, groupStruct vec2) noexcept {
   return ret;
 }
 
-inline groupStruct inclOp(int n, const int* ranks, groupStruct vec) noexcept {
-  groupStruct retvec(n);
+inline vector<int> inclOp(int n, const int* ranks, const vector<int>& vec) noexcept {
+  vector<int> retvec(n);
   for (int i=0; i<n; i++) {
     retvec[i] = vec[ranks[i]];
   }
   return retvec;
 }
 
-inline groupStruct exclOp(int n, const int* ranks, groupStruct vec) noexcept {
-  groupStruct retvec;
+inline vector<int> exclOp(int n, const int* ranks, const vector<int>& vec) noexcept {
+  vector<int> retvec;
   bool add = true;
   for (int j=0; j<vec.size(); j++) {
     for (int i=0; i<n; i++) {
@@ -953,8 +995,9 @@ inline groupStruct exclOp(int n, const int* ranks, groupStruct vec) noexcept {
   return retvec;
 }
 
-inline groupStruct rangeInclOp(int n, int ranges[][3], groupStruct vec, int *flag) noexcept {
-  groupStruct retvec;
+inline vector<int> rangeInclOp(int n, int ranges[][3], const vector<int>& vec,
+                               int *flag) noexcept {
+  vector<int> retvec;
   int first, last, stride;
   for (int i=0; i<n; i++) {
     first  = ranges[i][0];
@@ -967,14 +1010,15 @@ inline groupStruct rangeInclOp(int n, int ranges[][3], groupStruct vec, int *fla
     }
     else {
       *flag = MPI_ERR_ARG;
-      return groupStruct();
+      return vector<int>();
     }
   }
   *flag = MPI_SUCCESS;
   return retvec;
 }
 
-inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec, int *flag) noexcept {
+inline vector<int> rangeExclOp(int n, int ranges[][3], const vector<int>& vec,
+                               int *flag) noexcept {
   vector<int> ranks;
   int first, last, stride;
   for (int i=0; i<n; i++) {
@@ -988,7 +1032,7 @@ inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec, int *fla
     }
     else {
       *flag = MPI_ERR_ARG;
-      return groupStruct();
+      return vector<int>();
     }
   }
   *flag = MPI_SUCCESS;
@@ -2269,17 +2313,19 @@ class ampiParent final : public CBase_ampiParent {
              isCart(comm) || isGraph(comm) || isDistGraph(comm) || isIntra(comm) );
     //isInter omitted because its comm number != its group number
   }
-  inline const groupStruct group2vec(MPI_Group group) const noexcept {
-    if(group == MPI_GROUP_NULL || group == MPI_GROUP_EMPTY)
-      return groupStruct();
-    if(hasComm(group))
+  inline vector<int> group2vec(MPI_Group group) const noexcept {
+    if (group == MPI_GROUP_NULL || group == MPI_GROUP_EMPTY) {
+      return vector<int>();
+    }
+    else if (hasComm(group)) {
       return comm2CommStruct((MPI_Comm)group).getIndices();
-    if(isInGroups(group))
-      return *groups[group];
-    CkAbort("ampiParent::group2vec: Invalid group id!");
-    return *groups[0]; //meaningless return
+    }
+    else {
+      CkAssert(isInGroups(group));
+      return groups[group]->getRanks();
+    }
   }
-  inline MPI_Group saveGroupStruct(groupStruct vec) noexcept {
+  inline MPI_Group saveGroupStruct(const vector<int>& vec) noexcept {
     if (vec.empty()) return MPI_GROUP_EMPTY;
     int idx = groups.size();
     groups.resize(idx+1);
@@ -2287,7 +2333,7 @@ class ampiParent final : public CBase_ampiParent {
     return (MPI_Group)idx;
   }
   inline int getRank(const MPI_Group group) const noexcept {
-    groupStruct vec = group2vec(group);
+    vector<int> vec = group2vec(group);
     return getPosOp(thisIndex,vec);
   }
   inline AmpiRequestList &getReqs() noexcept { return ampiReqs; }
@@ -2506,7 +2552,7 @@ class ampi final : public CBase_ampi {
 
  private:
   ampiCommStruct myComm;
-  groupStruct tmpVec; // stores temp group info
+  vector<int> tmpVec; // stores temp group info
   CProxy_ampi remoteProxy; // valid only for intercommunicator
   CkPupPtrVec<win_obj> winObjects;
 
@@ -2627,12 +2673,12 @@ class ampi final : public CBase_ampi {
   int intercomm_ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm intercomm, MPI_Request *request) noexcept;
   static void bcastraw(void* buf, int len, CkArrayID aid) noexcept;
   void split(int color,int key,MPI_Comm *dest, int type) noexcept;
-  void commCreate(const groupStruct vec,MPI_Comm *newcomm) noexcept;
+  void commCreate(const vector<int>& vec,MPI_Comm *newcomm) noexcept;
   MPI_Comm cartCreate0D() noexcept;
-  MPI_Comm cartCreate(groupStruct vec, int ndims, const int* dims) noexcept;
-  void graphCreate(const groupStruct vec, MPI_Comm *newcomm) noexcept;
-  void distGraphCreate(const groupStruct vec, MPI_Comm *newcomm) noexcept;
-  void intercommCreate(const groupStruct rvec, int root, MPI_Comm tcomm, MPI_Comm *ncomm) noexcept;
+  MPI_Comm cartCreate(vector<int>& vec, int ndims, const int* dims) noexcept;
+  void graphCreate(const vector<int>& vec, MPI_Comm *newcomm) noexcept;
+  void distGraphCreate(const vector<int>& vec, MPI_Comm *newcomm) noexcept;
+  void intercommCreate(const vector<int>& rvec, int root, MPI_Comm tcomm, MPI_Comm *ncomm) noexcept;
 
   inline bool isInter() const noexcept { return myComm.isinter(); }
   void intercommMerge(int first, MPI_Comm *ncomm) noexcept;
