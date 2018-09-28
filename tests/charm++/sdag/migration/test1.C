@@ -47,6 +47,13 @@ public:
   }
 
   Cell(CkMigrateMessage *m) { }
+
+  // It is not currently safe to call migrateMe() from inside an SDAG
+  // entry method, so we wrap the call to migrateMe() in a non-SDAG
+  // entry method for now. See redmine issue #480 for more details.
+  void callMigrateMe(int pe) {
+    migrateMe(pe);
+  }
 };
 
 #include "test1.def.h"

@@ -541,7 +541,7 @@ class CkArray : public CkReductionMgr {
   CkCallback initCallback;
   CProxy_CkArray thisProxy;
   // Separate mapping and storing the element pointers to speed iteration in broadcast
-  std::map<CmiUInt8, unsigned int> localElems;
+  std::unordered_map<CmiUInt8, unsigned int> localElems;
   std::vector<CkMigratable *> localElemVec;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     int *children;
@@ -588,7 +588,7 @@ public:
   }
 
   virtual CkMigratable* getEltFromArrMgr(const CmiUInt8 id) {
-    std::map<CmiUInt8, unsigned int>::iterator itr = localElems.find(id);
+    const auto itr = localElems.find(id);
     return ( itr == localElems.end() ? NULL : localElemVec[itr->second] );
   }
   virtual void putEltInArrMgr(const CmiUInt8 id, CkMigratable* elt)
@@ -597,10 +597,25 @@ public:
     localElemVec.push_back(elt);
   }
   virtual void eraseEltFromArrMgr(const CmiUInt8 id)
-  { localElems.erase(id); }
+  {
+    auto itr = localElems.find(id);
+    if (itr != localElems.end()) {
+      unsigned int offset = itr->second;
+      localElems.erase(itr);
+      // Do not delete the CkMigratable itself (unlike in deleteElt)
+
+      if (offset != localElemVec.size() - 1) {
+        CkMigratable *moved = localElemVec[localElemVec.size()-1];
+        localElemVec[offset] = moved;
+        localElems[moved->ckGetID()] = offset;
+      }
+
+      localElemVec.pop_back();
+    }
+  }
 
   void deleteElt(const CmiUInt8 id) {
-    std::map<CmiUInt8, unsigned int>::iterator itr = localElems.find(id);
+    auto itr = localElems.find(id);
     if (itr != localElems.end()) {
       unsigned int offset = itr->second;
       localElems.erase(itr);
