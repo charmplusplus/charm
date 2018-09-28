@@ -201,7 +201,7 @@ static void call_cblist_remove(ccd_cblist *l,double curWallTime)
 
 
 #define CBLIST_INIT_LEN   8
-#define MAXNUMCONDS       128
+#define MAXNUMCONDS       (CcdUSERMAX + 1)
 
 /**
  * Lists of conditional callbacks that are maintained by the scheduler

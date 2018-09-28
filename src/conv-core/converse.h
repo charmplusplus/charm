@@ -1727,32 +1727,38 @@ typedef void (*CcdVoidFn)(void *userParam,double curWallTime);
 #define CcdPROCESSOR_STILL_IDLE 2
 
 /*Periodic calls*/
-#define CcdPERIODIC       16 /*every few ms*/
-#define CcdPERIODIC_10ms  17 /*every 10ms (100Hz)*/
-#define CcdPERIODIC_100ms 18 /*every 100ms (10Hz)*/
-#define CcdPERIODIC_1second  19 /*every second*/
-#define CcdPERIODIC_1s       19 /*every second*/
-#define CcdPERIODIC_5s       20 /*every second*/
-#define CcdPERIODIC_5seconds 20 /*every second*/
-#define CcdPERIODIC_10second 21 /*every 10 seconds*/
-#define CcdPERIODIC_10seconds 21 /*every 10 seconds*/
-#define CcdPERIODIC_10s      21 /*every 10 seconds*/
-#define CcdPERIODIC_1minute  22 /*every minute*/
-#define CcdPERIODIC_2minute  23 /*every 2 minute*/
-#define CcdPERIODIC_5minute  24 /*every 5 minute*/
-#define CcdPERIODIC_10minute 25 /*every 10 minutes*/
-#define CcdPERIODIC_1hour    26 /*every hour*/
-#define CcdPERIODIC_12hour   27 /*every 12 hours*/
-#define CcdPERIODIC_1day     28 /*every day*/
+#define CcdPERIODIC           3 /*every few ms*/
+#define CcdPERIODIC_10ms      4 /*every 10ms (100Hz)*/
+#define CcdPERIODIC_100ms     5 /*every 100ms (10Hz)*/
+#define CcdPERIODIC_1second   6 /*every second*/
+#define CcdPERIODIC_1s        6 /*every second*/
+#define CcdPERIODIC_5s        7 /*every second*/
+#define CcdPERIODIC_5seconds  7 /*every second*/
+#define CcdPERIODIC_10second  8 /*every 10 seconds*/
+#define CcdPERIODIC_10seconds 8 /*every 10 seconds*/
+#define CcdPERIODIC_10s       8 /*every 10 seconds*/
+#define CcdPERIODIC_1minute   9 /*every minute*/
+#define CcdPERIODIC_2minute  10 /*every 2 minute*/
+#define CcdPERIODIC_5minute  11 /*every 5 minute*/
+#define CcdPERIODIC_10minute 12 /*every 10 minutes*/
+#define CcdPERIODIC_1hour    13 /*every hour*/
+#define CcdPERIODIC_12hour   14 /*every 12 hours*/
+#define CcdPERIODIC_1day     15 /*every day*/
 
 /*Other conditions*/
-#define CcdQUIESCENCE 30
-#define CcdTOPOLOGY_AVAIL  31
-#define CcdSIGUSR1 32+1
-#define CcdSIGUSR2 32+2
+#define CcdQUIESCENCE        16
+#define CcdTOPOLOGY_AVAIL    17
+#define CcdSIGUSR1           18
+#define CcdSIGUSR2           19
 
 /*User-defined conditions start here*/
-#define CcdUSER    48
+#define CcdUSER              20
+
+/*User-defined conditions end here*/
+/*Conditionally defined so users can build with larger CcdUSERMAX values*/
+#ifndef CcdUSERMAX
+#define CcdUSERMAX          127
+#endif
 
 #define CcdIGNOREPE   -2
 #if CMK_CONDS_USE_SPECIAL_CODE

@@ -39,8 +39,8 @@ Be aware that this condition is thus raised asynchronously, from
 within a signal handler, and all the usual signal handler restrictions apply.
 \item[CcdSIGUSR2] Raised when the system receives the UNIX signal SIGUSR2.
 \item[CcdUSER] The system never raises this or any larger conditions.
-They can be used by the user for application-specific use.  All conditions
-from CcdUSER to CcdUSER+256 are so available.
+They can be used by the user for application-specific use.
+\item[CcdUSERMAX] All conditions from CcdUSER to CcdUSERMAX (inclusive) are available.
 \end{description}
 
 \function{int CcdCallOnCondition(condnum,fnp,arg)}
