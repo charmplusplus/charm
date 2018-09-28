@@ -141,35 +141,61 @@ namespace PUP {
   /**************** Containers *****************/
 
   template <class container>
-  void reserve_if_applicable(container &c, size_t nElem)
+  inline void reserve_if_applicable(container &c, size_t nElem)
   {
     c.clear();
     c.reserve(nElem);
   }
   template <class dtype>
-  void reserve_if_applicable(std::deque<dtype> &c, size_t nElem)
+  inline void reserve_if_applicable(std::deque<dtype> &c, size_t nElem)
   {
     c.clear();
   }
   template <class dtype>
-  void reserve_if_applicable(std::list<dtype> &c, size_t nElem)
+  inline void reserve_if_applicable(std::list<dtype> &c, size_t nElem)
   {
     c.clear();
   }
   template <class dtype>
-  void reserve_if_applicable(std::forward_list<dtype> &c, size_t nElem)
+  inline void reserve_if_applicable(std::set<dtype> &c, size_t nElem)
+  {
+    c.clear();
+  }
+  template <class dtype>
+  inline void reserve_if_applicable(std::multiset<dtype> &c, size_t nElem)
   {
     c.clear();
   }
   template <class K, class V>
-  void reserve_if_applicable(std::map<K, V> &c, size_t nElem)
+  inline void reserve_if_applicable(std::map<K, V> &c, size_t nElem)
   {
     c.clear();
   }
   template <class K, class V>
-  void reserve_if_applicable(std::multimap<K, V> &c, size_t nElem)
+  inline void reserve_if_applicable(std::multimap<K, V> &c, size_t nElem)
   {
     c.clear();
+  }
+
+  template <class container, class... Args>
+  inline void emplace(container &c, Args&&... args)
+  {
+    c.emplace(std::forward<Args>(args)...);
+  }
+  template <class dtype, class... Args>
+  inline void emplace(std::vector<dtype> &c, Args&&... args)
+  {
+    c.emplace_back(std::forward<Args>(args)...);
+  }
+  template <class dtype, class... Args>
+  inline void emplace(std::deque<dtype> &c, Args&&... args)
+  {
+    c.emplace_back(std::forward<Args>(args)...);
+  }
+  template <class dtype, class... Args>
+  inline void emplace(std::list<dtype> &c, Args&&... args)
+  {
+    c.emplace_back(std::forward<Args>(args)...);
   }
 
   //Impl. util: pup the length of a container
@@ -192,7 +218,7 @@ namespace PUP {
         p.syncComment(sync_item);
         detail::TemporaryObjectHolder<dtype> n;
         p|n;
-        c.emplace_back(std::move(n.t));
+        emplace(c, std::move(n.t));
       }
     }
     else
@@ -227,6 +253,40 @@ namespace PUP {
     p.syncComment(sync_begin_array);
     size_t nElem=PUP_stl_container_size(p,c);
     PUP_stl_container_items<container, dtype>(p, c, nElem);
+    p.syncComment(sync_end_array);
+  }
+
+  // forward_list does not have: .size(), .emplace(), .emplace_back()
+  template <class dtype>
+  inline void PUP_stl_forward_list(er &p,std::forward_list<dtype> &c) {
+    p.syncComment(sync_begin_array);
+    size_t nElem;
+    if (p.isUnpacking())
+    {
+      p | nElem;
+      auto iter = c.before_begin();
+      for (size_t i = 0; i < nElem; ++i)
+      {
+        p.syncComment(sync_item);
+        detail::TemporaryObjectHolder<dtype> n;
+        p|n;
+        iter = c.emplace_after(iter, std::move(n.t));
+      }
+    }
+    else
+    {
+      nElem = 0;
+      for (auto& n: c)
+      {
+        ++nElem;
+      }
+      p | nElem;
+      for (auto& n : c)
+      {
+        p.syncComment(sync_item);
+        p | n;
+      }
+    }
     p.syncComment(sync_end_array);
   }
 
@@ -283,7 +343,7 @@ namespace PUP {
   { PUP_stl_container<std::list<T>,T>(p,v); }
   template <class T>
   inline void operator|(er &p,typename std::forward_list<T> &fl)
-  { PUP_stl_container<std::forward_list<T>,T>(p,fl); }
+  { PUP_stl_forward_list<T>(p,fl); }
 
   template <class V,class T,class Cmp> 
   inline void operator|(er &p,typename std::map<V,T,Cmp> &m)
