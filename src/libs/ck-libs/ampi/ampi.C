@@ -137,10 +137,10 @@ inline int checkBuf(const char* func, const void *buf, int count) noexcept {
   return MPI_SUCCESS;
 }
 
-inline int errorCheck(const char* func, MPI_Comm comm, int ifComm, int count,
-                      int ifCount, MPI_Datatype data, int ifData, int tag,
-                      int ifTag, int rank, int ifRank, const void *buf1, int ifBuf1,
-                      const void *buf2=0, int ifBuf2=0) noexcept {
+int errorCheck(const char* func, MPI_Comm comm, bool ifComm, int count,
+               bool ifCount, MPI_Datatype data, bool ifData, int tag,
+               bool ifTag, int rank, bool ifRank, const void *buf1,
+               bool ifBuf1, const void *buf2=nullptr, bool ifBuf2=false) noexcept {
   int ret;
   if (ifComm) {
     ret = checkCommunicator(func, comm);
