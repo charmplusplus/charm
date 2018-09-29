@@ -17,8 +17,13 @@
 #include "register.h" // for _chareTable, _entryTable
 #endif
 
-/* change this to MPI_ERRORS_RETURN to not abort on errors */
+// Default is to abort on error, but users can build
+// AMPI with -DAMPI_ERRHANDLER_RETURN=1 to change it:
+#if AMPI_ERRHANDLER_RETURN
+#define AMPI_ERRHANDLER MPI_ERRORS_RETURN
+#else
 #define AMPI_ERRHANDLER MPI_ERRORS_ARE_FATAL
+#endif
 
 /* change this define to "x" to trace all send/recv's */
 #define MSG_ORDER_DEBUG(x) //x /* empty */
