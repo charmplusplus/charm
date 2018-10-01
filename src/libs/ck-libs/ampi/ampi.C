@@ -2101,6 +2101,16 @@ void ampi::split(int color,int key,MPI_Comm *dest, int type) noexcept
     MPI_Comm newComm=parent->getNextGraph()-1;
     *dest=newComm;
   }
+  else if (type == MPI_DIST_GRAPH) {
+    ampiSplitKey splitKey(parent->getNextDistGraph(),color,key,myRank);
+    int rootIdx=myComm.getIndexForRank(0);
+    CkCallback cb(CkIndex_ampi::splitPhase1(0),CkArrayIndex1D(rootIdx),myComm.getProxy());
+    contribute(sizeof(splitKey),&splitKey,CkReduction::concat,cb);
+
+    thread->suspend(); //Resumed by ampiParent::distGraphChildRegister
+    MPI_Comm newComm=parent->getNextDistGraph()-1;
+    *dest=newComm;
+  }
   else if (type == MPI_INTER) {
     ampiSplitKey splitKey(parent->getNextInter(),color,key,myRank);
     int rootIdx=myComm.getIndexForRank(0);
@@ -2400,7 +2410,7 @@ void ampi::distGraphCreate(const groupStruct vec, MPI_Comm* newcomm) noexcept
   contribute(sizeof(nextDistGraph), &nextDistGraph, CkReduction::max_int, cb);
 
   if (getPosOp(thisIndex,vec) >= 0) {
-    thread->suspend();
+    thread->suspend(); //Resumed by ampiParent::distGraphChildRegister
     MPI_Comm retcomm = parent->getNextDistGraph()-1;
     *newcomm = retcomm;
   }
@@ -2417,7 +2427,7 @@ void ampiParent::distGraphChildRegister(const ampiCommStruct &s) noexcept
     distGraphComm.length() = idx+1;
   }
   distGraphComm[idx] = new ampiCommStruct(s,MPI_DIST_GRAPH);
-  thread->resume();
+  thread->resume(); //Matches suspend at end of ampi::distGraphCreate
 }
 
 void ampi::intercommCreate(const groupStruct remoteVec, const int root, MPI_Comm tcomm, MPI_Comm *ncomm) noexcept {
@@ -8721,6 +8731,9 @@ AMPI_API_IMPL(int, MPI_Comm_split, MPI_Comm src, int color, int key, MPI_Comm *d
     }
     else if (getAmpiParent()->isGraph(src)) {
       ptr->split(color, key, dest, MPI_GRAPH);
+    }
+    else if (getAmpiParent()->isDistGraph(src)) {
+      ptr->split(color, key, dest, MPI_DIST_GRAPH);
     }
     else {
       ptr->split(color, key, dest, MPI_UNDEFINED);
