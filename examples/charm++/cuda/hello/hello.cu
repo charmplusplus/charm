@@ -16,7 +16,9 @@ void kernelSetup(cudaStream_t stream, void* cb) {
   wr->setExecParams(dim3(1, 1), dim3(1, 1));
   wr->setStream(stream);
   wr->setCallback(cb);
+#ifdef HAPI_TRACE
   wr->setTraceName("hello");
+#endif
   wr->setRunKernel(runHello);
 
   hapiEnqueue(wr);

@@ -47,7 +47,9 @@ void cudaVecAdd(int vectorSize, float* h_A, float* h_B, float* h_C, float* d_A,
   wr->addBuffer(h_B, size, true, false, true);
   wr->addBuffer(h_C, size, false, true, true);
   wr->setCallback(cb);
+#ifdef HAPI_TRACE
   wr->setTraceName("vecadd");
+#endif
   wr->setRunKernel(run_VECADD_KERNEL);
   wr->copyUserData(&vectorSize, sizeof(int));
 
