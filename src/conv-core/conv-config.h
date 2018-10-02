@@ -25,6 +25,15 @@
 */ 
 #include "conv-common.h"
 
+/*
+ Include the common header for all layers and all architectures
+ (charm/src/arch/common/conv-mach-common.h)
+
+ This header declares properties common for all
+ machine layer implementations and all architectures
+ */
+#include "conv-mach-common.h"
+
 /* 
  Include the system/platform header.
   (e.g., charm/src/arch/netlrts-linux/conv-mach.h )
