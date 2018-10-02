@@ -192,8 +192,6 @@ public:
 
 #include "ckcallback.h"
 
-#include "ckrdmawrapper.h"
-
 #include "ckrdma.h"
 
 /********************* Superclass of all Chares ******************/

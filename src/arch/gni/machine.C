@@ -105,7 +105,7 @@ static int   RDMA_pending = 0;
 enum CMK_SMSG_TYPE {
   CHARM_SMSG=1,
   NONCHARM_SMSG,
-  NONCHARM_SMSG_DONT_FREE
+  SMSG_DONT_FREE
 };
 
 #define USE_LRTS_MEMPOOL                  1
@@ -2323,37 +2323,6 @@ static void PumpNetworkSmsg()
             }
 #endif
 #if CMK_ONESIDED_IMPL
-            case RDMA_ACK_TAG:
-            {
-                CmiGNIAckOp_t *ack_data = (CmiGNIAckOp_t *)header;
-                CmiRdmaAck * ack = ack_data->ack;
-                gni_mem_handle_t mem_hndl = ack_data->mem_hndl;
-                GNI_SmsgRelease(ep_hndl_array[inst_id]);
-                CMI_GNI_UNLOCK(smsg_mailbox_lock)
-
-                // call the fnPtr to handle the ack
-                ack->fnPtr(ack->token);
-
-                // free callback structure, CmiRdmaAck allocated in CmiSetRdmaAck
-                free(ack);
-
-                // Deregister registered sender memory used for GET
-                status = GNI_MemDeregister(nic_hndl, &mem_hndl);
-                GNI_RC_CHECK("GNI_MemDeregister on Sender for GET operation", status);
-                break;
-            }
-            case RDMA_PUT_MD_TAG:
-            {
-                CmiGNIRzvRdmaRecv_t *recvInfo = (CmiGNIRzvRdmaRecv_t *)header;
-                recvInfoSize = LrtsGetRdmaRecvInfoSize(recvInfo->numOps);
-                CmiGNIRzvRdmaRecv_t *newRecvInfo = (CmiGNIRzvRdmaRecv_t *)malloc(recvInfoSize);
-                memcpy(newRecvInfo, recvInfo, recvInfoSize);
-                GNI_SmsgRelease(ep_hndl_array[inst_id]);
-                CMI_GNI_UNLOCK(smsg_mailbox_lock)
-
-                LrtsIssueRputs((void *)newRecvInfo, recvInfo->destNode);
-                break;
-            }
             case RDMA_PUT_MD_DIRECT_TAG:
             {
                 NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)header;
@@ -2364,6 +2333,8 @@ static void PumpNetworkSmsg()
 
                 GNI_SmsgRelease(ep_hndl_array[inst_id]);
                 CMI_GNI_UNLOCK(smsg_mailbox_lock)
+
+                resetNcpyOpInfoPointers(newNcpyOpInfo);
 
                 post_rdma((uint64_t)newNcpyOpInfo->destPtr,
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
@@ -2377,36 +2348,7 @@ static void PumpNetworkSmsg()
 
                 break;
             }
-            case RDMA_PUT_DONE_TAG:
-            {
-                CmiGNIRzvRdmaRecv_t *recvInfo = (CmiGNIRzvRdmaRecv_t *)header;
-
-                /* copy the received message (recvInfo) into newRecvInfo as
-                 * recvInfo is invalid after SmsgRelease call
-                 */
-                recvInfoSize = LrtsGetRdmaRecvInfoSize(recvInfo->numOps);
-                CmiGNIRzvRdmaRecv_t *newRecvInfo = (CmiGNIRzvRdmaRecv_t *)malloc(recvInfoSize);
-                memcpy(newRecvInfo, recvInfo, recvInfoSize);
-                GNI_SmsgRelease(ep_hndl_array[inst_id]);
-                CMI_GNI_UNLOCK(smsg_mailbox_lock)
-
-                char *msg = (char *)newRecvInfo->msg;
-                int size = CmiGetMsgSize(msg);
-
-                handleOneRecvedMsg(size, msg);
-
-                int i;
-                for(i=0; i<newRecvInfo->numOps;i++){
-                    CmiGNIRzvRdmaRecvOp_t * recvOp = &newRecvInfo->rdmaOp[i];
-                    // Deregister registered receiver memory used for PUT
-                    status = GNI_MemDeregister(nic_hndl, &(recvOp->remote_mem_hndl));
-                    GNI_RC_CHECK("GNI_MemDeregister on Receiver for PUT operation", status);
-                }
-                // free newRecvInfo as it is no longer used
-                free(newRecvInfo);
-                break;
-            }
-            case RDMA_PUT_DONE_DIRECT_TAG:
+           case RDMA_PUT_DONE_DIRECT_TAG:
             {
                 // Direct API when PUT is used instead of a GET
                 // This tag implies the completion of an indirect PUT operation used for the Direct API
@@ -2443,8 +2385,11 @@ static void PumpNetworkSmsg()
 
                 resetNcpyOpInfoPointers(newNcpyOpInfo);
 
+                // Free the NcpyOperationInfo in a reverse API operation
+                newNcpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO;
+
                 // Register source buffer
-                ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl = 
+                ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl =
                                             registerDirectMem(newNcpyOpInfo->srcPtr,
                                                                 newNcpyOpInfo->srcSize,
                                                                 GNI_MEM_READ_ONLY);
@@ -3232,7 +3177,7 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
             case NONCHARM_SMSG:
                 free(addr);
                 break;
-            case NONCHARM_SMSG_DONT_FREE:
+            case SMSG_DONT_FREE:
                 break;
             default:
                 CmiAbort("Invalid SmsgsIndex");
@@ -3371,7 +3316,7 @@ INLINE_KEYWORD gni_return_t _sendOneBufferedSmsg(SMSG_QUEUE *queue, MSG_LIST *pt
 {
     CONTROL_MSG         *control_msg_tmp;
     gni_return_t        status = GNI_RC_ERROR_RESOURCE;
-    int                 numRdmaOps, recvInfoSize, msgSize;
+    int                 numRdmaOps, recvInfoSize, msgSize, msgMode;
     NcpyOperationInfo *ncpyOpInfo;
 
     MACHSTATE5(8, "noempty-smsg  %d (%d,%d,%d) tag=%d \n", ptr->destNode, buffered_send_msg, buffered_recv_msg, register_memory_size, ptr->tag); 
@@ -3440,37 +3385,12 @@ INLINE_KEYWORD gni_return_t _sendOneBufferedSmsg(SMSG_QUEUE *queue, MSG_LIST *pt
 #endif
         break;
 #endif
-    case RDMA_ACK_TAG:
-        status = send_smsg_message(queue, ptr->destNode, ptr->msg, sizeof(CmiGNIAckOp_t), ptr->tag, 1, ptr, NONCHARM_SMSG, 1);
-#if !CMK_SMSGS_FREE_AFTER_EVENT
-        if(status == GNI_RC_SUCCESS) {
-          free(ptr->msg);
-        }
-#endif
-        break;
-
-    case RDMA_PUT_MD_TAG:
-        numRdmaOps = ((CmiGNIRzvRdmaRecv_t *)(ptr->msg))->numOps;
-        recvInfoSize = LrtsGetRdmaRecvInfoSize(numRdmaOps);
-        status = send_smsg_message(queue, ptr->destNode, ptr->msg, recvInfoSize, ptr->tag, 1, ptr, NONCHARM_SMSG_DONT_FREE, 0);
-        break;
-
-     case RDMA_PUT_DONE_TAG:
-        numRdmaOps = ((CmiGNIRzvRdmaRecv_t *)(ptr->msg))->numOps;
-        recvInfoSize = LrtsGetRdmaRecvInfoSize(numRdmaOps);
-        status = send_smsg_message(queue, ptr->destNode, ptr->msg, recvInfoSize, ptr->tag, 1, ptr, NONCHARM_SMSG, 1);
-#if !CMK_SMSGS_FREE_AFTER_EVENT
-        if(status == GNI_RC_SUCCESS) {
-          free(ptr->msg);
-        }
-#endif
-        break;
-
      case RDMA_PUT_MD_DIRECT_TAG:
         ncpyOpInfo = (NcpyOperationInfo *)(ptr->msg);
-        status = send_smsg_message(queue, ptr->destNode, ptr->msg, ncpyOpInfo->ncpyOpInfoSize, ptr->tag, 1, ptr, CHARM_SMSG, 1);
+        msgMode = (ncpyOpInfo->freeMe == CMK_FREE_NCPYOPINFO) ? CHARM_SMSG : SMSG_DONT_FREE;
+        status = send_smsg_message(queue, ptr->destNode, ptr->msg, ncpyOpInfo->ncpyOpInfoSize, ptr->tag, 1, ptr, msgMode, 1);
 #if !CMK_SMSGS_FREE_AFTER_EVENT
-        if(status == GNI_RC_SUCCESS) {
+        if(status == GNI_RC_SUCCESS && msgMode) {
           CmiFree(ptr->msg);
         }
 #endif
@@ -3480,9 +3400,10 @@ INLINE_KEYWORD gni_return_t _sendOneBufferedSmsg(SMSG_QUEUE *queue, MSG_LIST *pt
      case RDMA_REG_AND_PUT_MD_DIRECT_TAG:
         //msgSize = sizeof(CmiGNIRzvRdmaReverseOp_t) + 2*(((CmiGNIRzvRdmaReverseOp_t *)(ptr->msg))->ackSize);
         ncpyOpInfo = (NcpyOperationInfo *)(ptr->msg);
-        status = send_smsg_message(queue, ptr->destNode, ptr->msg, ncpyOpInfo->ncpyOpInfoSize, ptr->tag, 1, ptr, CHARM_SMSG, 1);
+        msgMode = (ncpyOpInfo->freeMe == CMK_FREE_NCPYOPINFO) ? CHARM_SMSG : SMSG_DONT_FREE;
+        status = send_smsg_message(queue, ptr->destNode, ptr->msg, ncpyOpInfo->ncpyOpInfoSize, ptr->tag, 1, ptr, msgMode, 1);
 #if !CMK_SMSGS_FREE_AFTER_EVENT
-        if(status == GNI_RC_SUCCESS) {
+        if(status == GNI_RC_SUCCESS && msgMode) {
           CmiFree(ptr->msg);
         }
 #endif

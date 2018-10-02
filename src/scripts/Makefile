@@ -251,7 +251,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  cksection.h ckmessage.h cklocrec.h ckmigratable.h \
 	  ckarrayindex.h ckarrayoptions.h ckarray.h cklocation.h ckmulticast.h ckreduction.h \
-	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h ckrdmawrapper.h ckrdma.h\
+	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h ckrdma.h\
           ckmessagelogging.h ckcausalmlog.h ckobjid.h\
 	  ckobjQ.h readonly.h charm++_type_traits.h \
           $(UTILHEADERS) \

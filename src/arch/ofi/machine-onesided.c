@@ -1,24 +1,4 @@
-void ofi_onesided_all_ops_done(char *msg) {
-  int stdlen = ((CmiMsgHeaderBasic *) msg)->size;
-  // Invoke the message handler
-  handleOneRecvedMsg(stdlen, msg);
-}
-
-void process_onesided_completion_ack(struct fi_cq_tagged_entry *e, OFIRequest *req)
-{
-  struct fid *mr;
-  OfiRdmaAck_t *ofiAck = (OfiRdmaAck_t *)req->data.rma_ncpy_ack;
-  CmiRdmaAck *ack = (CmiRdmaAck *)(ofiAck->src_ref);
-  // Invoke the ack handler function
-  ack->fnPtr(ack->token);
-
-  // Deregister the buffer
-  mr = (struct fid *)(ofiAck->src_mr);
-  CmiAssert(mr);
-  fi_close(mr);
-}
-
-void registerDirectMemory(void *info, const void *addr, int size) {
+struct fid_mr* registerDirectMemory(void *info, const void *addr, int size) {
   CmiOfiRdmaPtr_t *rdmaInfo = (CmiOfiRdmaPtr_t *)info;
   uint64_t requested_key = 0;
   int ret;
@@ -41,58 +21,6 @@ void registerDirectMemory(void *info, const void *addr, int size) {
   rdmaInfo->key = fi_mr_key(rdmaInfo->mr);
 }
 
-
-static inline void ofi_onesided_send_ack_callback(struct fi_cq_tagged_entry *e, OFIRequest *req)
-{
-#if USE_OFIREQUEST_CACHE
-  free_request(req);
-#else
-  CmiFree(req);
-#endif
-}
-
-static inline void ofi_onesided_read_callback(struct fi_cq_tagged_entry *e, OFIRequest *req)
-{
-  CmiOfiRdmaRecvOp_t *rdmaRecvOpInfo = (CmiOfiRdmaRecvOp_t *)(req->data.rma_ncpy_info);
-  rdmaRecvOpInfo->completion_count--;
-  struct fid* memregion;
-
-  if(0 == rdmaRecvOpInfo->completion_count) {
-    CmiOfiRdmaRecv_t *recvInfo = (CmiOfiRdmaRecv_t *)((char *)rdmaRecvOpInfo
-                        - rdmaRecvOpInfo->opIndex * sizeof(CmiOfiRdmaRecvOp_t)
-                        - sizeof(CmiOfiRdmaRecv_t));
-
-    req->callback      = ofi_onesided_send_ack_callback;
-
-    // Send an acknowledgement message to the sender to indicate the completion of the RDMA operation
-    ofi_send(&(rdmaRecvOpInfo->ack),
-             sizeof(OfiRdmaAck_t),
-             rdmaRecvOpInfo->src_nodeNo,
-             OFI_RDMA_OP_ACK,
-             req);
-
-    recvInfo->comOps++;
-
-    // Store the memregion for registration
-    memregion = (struct fid *)rdmaRecvOpInfo->mr;
-
-    if(recvInfo->comOps == recvInfo->numOps) {
-      // All the RDMA operations for one entry method have completed
-      ofi_onesided_all_ops_done((char*)recvInfo->msg);
-    }
-
-    // Deregister the memory region
-    if(memregion)
-      fi_close(memregion);
-
-  } else {
-#if USE_OFIREQUEST_CACHE
-    free_request(req);
-#else
-    CmiFree(req);
-#endif
-  }
-}
 
 void ofi_post_nocopy_operation(
   char *lbuf,
@@ -171,26 +99,6 @@ void ofi_post_nocopy_operation(
   }
 }
 
-void LrtsIssueRgets(void *recv, int pe) {
-  CmiOfiRdmaRecv_t* recvInfo = (CmiOfiRdmaRecv_t *)recv;
-  int i;
-  for(i = 0; i < recvInfo->numOps; i++) {
-    CmiOfiRdmaRecvOp_t *rdmaRecvOpInfo = &(recvInfo->rdmaOp[i]);
-    const char *rbuf        = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (const char*)rdmaRecvOpInfo->src_buf;
-    ofi_post_nocopy_operation(
-        (char *)rdmaRecvOpInfo->buf,
-        rbuf,
-        rdmaRecvOpInfo->src_nodeNo,
-        rdmaRecvOpInfo->src_key,
-        rdmaRecvOpInfo->len,
-        rdmaRecvOpInfo->mr,
-        ofi_onesided_read_callback,
-        (void *)rdmaRecvOpInfo,
-        &(rdmaRecvOpInfo->completion_count),
-        OFI_READ_OP);
-  }
-}
-
 /* Support for Nocopy Direct API */
 // Method called on the completion of a direct onesided operation
 
@@ -226,8 +134,8 @@ void process_onesided_reg_and_put(struct fi_cq_tagged_entry *e, OFIRequest *req)
   NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(data);
   resetNcpyOpInfoPointers(ncpyOpInfo);
 
-  // Do not free as this message
-  ncpyOpInfo->freeMe = 0;
+  // Free the NcpyOperationInfo in a reverse API operation
+  ncpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO;
 
   registerDirectMemory(ncpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize(),
                        ncpyOpInfo->srcPtr,
@@ -262,6 +170,9 @@ void process_onesided_reg_and_get(struct fi_cq_tagged_entry *e, OFIRequest *req)
 
   NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(data);
   resetNcpyOpInfoPointers(ncpyOpInfo);
+
+  // Free this message
+  ncpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO;
 
   registerDirectMemory(ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(),
                        ncpyOpInfo->destPtr,
@@ -303,6 +214,14 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo) {
     CmiAssert(req);
 
     ZERO_REQUEST(req);
+
+    // set OpMode for reverse operation
+    setReverseModeForNcpyOpInfo(ncpyOpInfo);
+
+    if(ncpyOpInfo->freeMe == CMK_FREE_NCPYOPINFO)
+      req->freeMe   = 1;// free ncpyOpInfo
+    else
+      req->freeMe   = 0;// do not free ncpyOpInfo
 
     req->destNode = CmiNodeOf(ncpyOpInfo->srcPe);
     req->destPE   = ncpyOpInfo->srcPe;

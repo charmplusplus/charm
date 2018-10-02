@@ -153,9 +153,9 @@ class zerocopyObject : public CBase_zerocopyObject{
     zerocopyObject(CkMigrateMessage *m){}
 
     void zerocopySent(CkDataMsg *m){
-      //to get access to the array sent via zerocopy
-      void *ptr = *((void **)(m->data));
-      free(ptr);
+      // Get access to the array information sent via zerocopy
+      CkNcpyBuffer *src = (CkNcpyBuffer *)(m->data);
+      free((void *)(src->ptr));
       delete m;
 
       if(++mixedZeroCopySentCounter == 2)

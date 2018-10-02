@@ -108,7 +108,7 @@ void ParamList::printTypes(XStr& str, int withDefaultValues, int useConst) {
 
 int Parameter::print(XStr& str, int withDefaultValues, int useConst, int fwdNum) {
   if (isRdma()) {
-    str << "CkRdmaWrapper rdmawrapper_" << name;
+    str << "CkNcpyBuffer ncpyBuffer_" << name;
   } else if (arrLen != NULL) {  // Passing arrays by const pointer-reference
     if (useConst) str << "const ";
     str << type << " *";
@@ -304,8 +304,9 @@ void Parameter::marshallRdmaParameters(XStr& str, bool genRdma) {
     Type* dt = type->deref();  // Type, without &
     if (genRdma) {
       str << "  impl_num_rdma_fields++;\n";
-      str << "  rdmawrapper_" << name << ".cnt=sizeof(" << dt << ")*(" << arrLen
+      str << "  ncpyBuffer_" << name << ".cnt=sizeof(" << dt << ")*(" << arrLen
           << ");\n";
+      str << "  ncpyBuffer_" << name << ".registerMem()" << ";\n";
     } else {
       marshallArraySizes(str, dt);
     }
@@ -315,7 +316,7 @@ void Parameter::marshallRdmaParameters(XStr& str, bool genRdma) {
 void Parameter::pupRdma(XStr& str, bool genRdma) {
   if (isRdma()) {
     if (genRdma)
-      str << "    implP|rdmawrapper_" << name << ";\n";
+      str << "    implP|ncpyBuffer_" << name << ";\n";
     else
       pupArray(str);
   }
@@ -341,14 +342,13 @@ void Parameter::pup(XStr& str) {
 void Parameter::marshallRdmaArrayData(XStr& str) {
   if (isRdma()) {
     str << "  memcpy(impl_buf+impl_off_" << name << ","
-        << "rdmawrapper_" << name << ".ptr"
+        << "ncpyBuffer_" << name << ".ptr"
         << ",impl_cnt_" << name << ");\n";
-    str << "  rdmawrapper_" << name << ".callback->send("
-        << "sizeof(void *)"
+    str << "  ncpyBuffer_" << name << ".cb.send("
+        << "sizeof(CkNcpyBuffer)"
         << ","
-        << "&rdmawrapper_" << name << ".ptr"
+        << "&ncpyBuffer_" << name
         << ");\n";
-    str << "  free(rdmawrapper_" << name << ".callback);\n";
   }
 }
 
@@ -512,8 +512,8 @@ void Parameter::beginUnmarshallRdma(XStr& str,
   Type* dt = type->deref();                          // Type, without &
   if (isRdma()) {
     if (genRdma) {
-      str << "  CkRdmaWrapper rdmawrapper_" << name << ";\n";
-      str << "  implP|rdmawrapper_" << name << ";\n";
+      str << "  CkNcpyBuffer ncpyBuffer_" << name << ";\n";
+      str << "  implP|ncpyBuffer_" << name << ";\n";
     } else
       beginUnmarshallArray(str);
   }
@@ -537,7 +537,7 @@ void Parameter::beginUnmarshallSDAGCallRdma(XStr& str, bool genRdma) {
       if (isFirstRdma()) {
         str << "  implP|genClosure->num_rdma_fields;\n";
       }
-      str << "  implP|genClosure->rdmawrapper_" << name << ";\n";
+      str << "  implP|genClosure->ncpyBuffer_" << name << ";\n";
     } else {
       beginUnmarshallArray(str);
     }
@@ -633,8 +633,8 @@ void Parameter::unmarshallRegArrayDataSDAG(XStr& str) {
 
 void Parameter::adjustUnmarshalledRdmaPtrsSDAG(XStr& str) {
   if (isRdma()) {
-    str << "  rdmawrapper_" << name << ".ptr = ";
-    str << "(void *)(impl_buf + (size_t)(rdmawrapper_" << name << ".ptr));\n";
+    str << "  ncpyBuffer_" << name << ".ptr = ";
+    str << "(void *)(impl_buf + (size_t)(ncpyBuffer_" << name << ".ptr));\n";
   }
 }
 
@@ -698,7 +698,7 @@ void ParamList::unmarshall(XStr& str, bool isInline, bool isFirst)  // Pass-by-v
     if (param->isRdma()) {
       str << "\n#if CMK_ONESIDED_IMPL\n";
       str << "(" << (param->getType())->deref() << " *)";
-      str << "rdmawrapper_" << param->getName() << ".ptr";
+      str << "ncpyBuffer_" << param->getName() << ".ptr";
       str << "\n#else\n";
       str << param->getName();
       str << "\n#endif\n";
@@ -771,7 +771,7 @@ void Parameter::pupAllValues(XStr& str) {
            "  implDestP.synchronize(PUP::sync_end_array);\n";
   } else if (isRdma()) {
     str << "#if CMK_ONESIDED_IMPL\n";
-    str << "  implDestP|rdmawrapper_" << name << ";\n";
+    str << "  implDestP|ncpyBuffer_" << name << ";\n";
     str << "#else\n";
     str << "  implDestP.synchronize(PUP::sync_begin_array);\n"
            "  { for (int impl_i=0;impl_i*(sizeof(*"

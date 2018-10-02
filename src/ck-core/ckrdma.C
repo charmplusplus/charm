@@ -12,392 +12,7 @@
 /*readonly*/ extern CProxy_ckcallback_group _ckcallbackgroup;
 #endif
 
-#if CMK_ONESIDED_IMPL
-/* Sender Functions */
-
-/*
- * Add the machine specific information if metadata message
- * sent across network. Do nothing if message is sent to same PE/Node
- */
-void CkRdmaPrepareMsg(envelope **env, int pe){
-  if(CmiNodeOf(pe)!=CmiMyNode()){
-    envelope *prevEnv = *env;
-    *env = CkRdmaCreateMetadataMsg(prevEnv, pe);
-    CkFreeMsg(EnvToUsr(prevEnv));
-  }
-#if CMK_SMP && CMK_IMMEDIATE_MSG
-  //Reset the immediate bit if it is a within node/pe message
-  else
-    CmiResetImmediate(*env);
-#endif
-}
-
-/*
- * Add machine specific information to the msg. This includes information
- * information both common and specific to each rdma parameter
- * Metdata message format: <-env-><-msg-><-migen-><-mispec1-><-mispec2->..<-mispecn->
- * migen: machine info generic to rdma operation
- * mispec: machine info specific to rdma operation for n rdma operations
- */
-envelope* CkRdmaCreateMetadataMsg(envelope *env, int pe){
-
-  int numops = getRdmaNumOps(env);
-  int msgsize = env->getTotalsize();
-
-  //CmiGetRdmaInfoSize returns the size of machine specific information
-  // for numops RDMA operations
-  int mdsize = msgsize + CmiGetRdmaInfoSize(numops);
-
-  //pack before copying
-  CkPackMessage(&env);
-
-  //Allocate a new metadata message, set machine specific info
-  envelope *copyenv = (envelope *)CmiAlloc(mdsize);
-  memcpy(copyenv, env, msgsize);
-  copyenv->setTotalsize(mdsize);
-#if CMK_SMP && CMK_IMMEDIATE_MSG
-  CmiBecomeImmediate(copyenv);
-#endif
-
-  //Set the generic information
-  char *md = (char *)copyenv + msgsize;
-  CmiSetRdmaInfo(md, pe, numops);
-  md += CmiGetRdmaGenInfoSize();
-
-  //Set the rdma op specific information
-  CkUnpackMessage(&copyenv);
-  PUP::fromMem up((void *)(((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf));
-  PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf));
-  up|numops;
-  p|numops;
-  for(int i=0; i<numops; i++){
-    CkRdmaWrapper w; up|w;
-    CkRdmaWrapper *wack = new CkRdmaWrapper(w);
-    void *ack = CmiSetRdmaAck(CkHandleRdmaCookie, wack);
-    w.callback = (CkCallback *)ack;
-    p|w;
-    CmiSetRdmaOpInfo(md, w.ptr, w.cnt, w.callback, pe);
-    md += CmiGetRdmaOpInfoSize();
-  }
-  CkPackMessage(&copyenv);
-
-  //return the env with the machine specific information
-  return copyenv;
-}
-
-/*
- * Method called on sender when ack is received
- * Access the CkRdmaWrapper using the cookie passed and invoke callback
- */
-void CkHandleRdmaCookie(void *cookie){
-  CkRdmaWrapper *w = (CkRdmaWrapper *)cookie;
-  CkCallback *cb= w->callback;
-#if CMK_SMP
-  //call the callbackgroup on my node's first PE when callback requires to be called from comm thread
-  //this adds one more trip through the scheduler
-  _ckcallbackgroup[CmiNodeFirst(CmiMyNode())].call(*cb, sizeof(void *), (char*)&w->ptr);
-#else
-  //direct call to callback when calling from worker thread
-  cb->send(sizeof(void *), &w->ptr);
-#endif
-
-  delete cb;
-  delete (CkRdmaWrapper *)cookie;
-}
-
-
-/* Receiver Functions */
-
-/*
- * Method called when received message is on the same PE/Node
- * This involves a direct copy from the sender's buffer into the receiver's buffer
- * A new message is allocated with size = existing message size + sum of all rdma buffers.
- * The newly allocated message contains the existing marshalled message along with
- * space for the rdma buffers which are copied from the source buffers.
- * The buffer and the message are allocated contiguously to free the buffer
- * when the message gets free.
- */
-envelope* CkRdmaCopyMsg(envelope *env){
-  int numops, bufsize, msgsize;
-  bufsize = getRdmaBufSize(env);
-  msgsize = env->getTotalsize();
-
-  CkPackMessage(&env);
-  envelope *copyenv = (envelope *)CmiAlloc(CK_ALIGN(msgsize, 16) + bufsize);
-  memcpy(copyenv, env, msgsize);
-  copyenv->setTotalsize(CK_ALIGN(msgsize, 16) + bufsize);
-  copyenv->setRdma(false);
-
-  char* buf = (char *)copyenv + CK_ALIGN(msgsize, 16);
-  CkUnpackMessage(&copyenv);
-  PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf));
-  PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf);
-  up|numops;
-  p|numops;
-  for(int i=0; i<numops; i++){
-    CkRdmaWrapper w;
-    up|w;
-    //Copy the buffer from the source pointer to the message
-    memcpy(buf, w.ptr, w.cnt);
-
-    //Invoke callback as it is safe to rewrite into the source buffer
-    (w.callback)->send(sizeof(void *), &w.ptr);
-    delete w.callback;
-
-    //Update the CkRdmaWrapper pointer of the new message
-    w.ptr = buf;
-
-    //Update the pointer
-    buf += CK_ALIGN(w.cnt, 16);
-    p|w;
-  }
-  CkPackRdmaPtrs(((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf);
-  CkPackMessage(&copyenv);
-  return copyenv;
-}
-
-/*
- * Extract rdma based information from the metadata message,
- * allocate buffers and issue RDMA get call
- */
-void CkRdmaIssueRgets(envelope *env){
-  /*
-   * Determine the buffer size('bufsize') and the message size('msgsize')
-   * from the metadata message. 'msgSize' is the metadata message size
-   * without the sender's machine specific information.
-   */
-  int numops, bufsize, msgsize;
-  bufsize = getRdmaBufSize(env);
-  numops = getRdmaNumOps(env);
-  msgsize = env->getTotalsize() - CmiGetRdmaInfoSize(numops);
-
-  /* Allocate the receiver's message, which contains the metadata message sent by the sender
-   * (without its machine specific info) of size 'msgSize', the entire receiver's buffer of
-   * size 'bufsize', and the receiver's machine specific info of size 'CmiGetRdmaRecvInfoSize(numops)'.
-   * The receiver's machine specific info is added to this message to avoid separately freeing it
-   * in the machine layer.
-   */
-  envelope *copyenv = (envelope *)CmiAlloc(CK_ALIGN(msgsize, 16) + bufsize + CmiGetRdmaRecvInfoSize(numops));
-
-  //Copy the metadata message(without the machine specific info) into the buffer
-  memcpy(copyenv, env, msgsize);
-
-#if CMK_SMP && CMK_IMMEDIATE_MSG
-  CmiResetImmediate(copyenv);
-#endif
-
-  //Receiver's machine specific info is at an offset, after the sender md and the receiver's buffer
-  char *recv_md = ((char *)copyenv) + CK_ALIGN(msgsize, 16) + bufsize;
-
-  /* Set the total size of the message excluding the receiver's machine specific info
-   * which is not required when the receiver's entry method executes
-   */
-  copyenv->setTotalsize(CK_ALIGN(msgsize, 16) + bufsize);
-
-  CkUnpackMessage(&copyenv);
-  CkUpdateRdmaPtrs(copyenv, msgsize, recv_md, ((char *)env) + msgsize);
-  CkPackRdmaPtrs(((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf);
-  CkPackMessage(&copyenv);
-
-  // Set rdma to be false to prevent message handler on the receiver
-  // from intercepting it
-  copyenv->setRdma(false);
-
-  // Free the existing message
-  CkFreeMsg(EnvToUsr(env));
-
-  //Call the lower layer API for performing RDMA gets
-  CmiIssueRgets(recv_md, copyenv->getSrcPe());
-}
-
-
-/*
- * Method called to update machine specific information for receiver
- * using the metadata message given by the sender along with updating
- * pointers of the CkRdmawrappers
- * - assumes that the msg is unpacked
- */
-void CkUpdateRdmaPtrs(envelope *env, int msgsize, char *recv_md, char *src_md){
-  PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
-  PUP::fromMem up((void *)(((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
-  int numops;
-  up|numops;
-  p|numops;
-
-  //Use the metadata info to set the machine info for receiver
-  //generic info for all RDMA operations
-  CmiSetRdmaRecvInfo(recv_md, numops, env, src_md, env->getTotalsize());
-  recv_md += CmiGetRdmaGenRecvInfoSize();
-  char *buf = ((char *)env) + CK_ALIGN(msgsize, 16);
-  for(int i=0; i<numops; i++){
-    CkRdmaWrapper w;
-    up|w;
-    //Set RDMA operation specific info
-    CmiSetRdmaRecvOpInfo(recv_md, buf, w.callback, w.cnt, i, src_md);
-    recv_md += CmiGetRdmaOpRecvInfoSize();
-    w.ptr = buf;
-    buf += CK_ALIGN(w.cnt, 16);
-    p|w;
-  }
-}
-
-
-/*
- * Method called to pack rdma pointers inside CkRdmaWrappers in the message
- * Assumes that msg is unpacked
- */
-void CkPackRdmaPtrs(char *msgBuf){
-  PUP::toMem p((void *)msgBuf);
-  PUP::fromMem up((void *)msgBuf);
-  int numops;
-  up|numops;
-  p|numops;
-
-  //Pack Rdma pointers in CkRdmaWrappers
-  for(int i=0; i<numops; i++){
-    CkRdmaWrapper w;
-    up|w;
-    w.ptr = (void *)((char *)w.ptr - (char *)msgBuf);
-    p|w;
-  }
-}
-
-
-/*
- * Method called to unpack rdma pointers inside CkRdmaWrappers in the message
- * Assumes that msg is unpacked
- */
-void CkUnpackRdmaPtrs(char *msgBuf){
-  PUP::toMem p((void *)msgBuf);
-  PUP::fromMem up((void *)msgBuf);
-  int numops;
-  up|numops;
-  p|numops;
-
-  //Unpack Rdma pointers in CkRdmaWrappers
-  for(int i=0; i<numops; i++){
-    CkRdmaWrapper w;
-    up|w;
-    w.ptr = (void *)((char *)msgBuf + (size_t)w.ptr);
-    p|w;
-  }
-}
-
-
-//Determine the number of rdma ops from the message
-int getRdmaNumOps(envelope *env){
-  int numops;
-  CkUnpackMessage(&env);
-  PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
-  up|numops;
-  CkPackMessage(&env);
-  return numops;
-}
-
-/*
- * Determine the total size of the buffers to be copied
- * This is to be allocated at the end of the message
- */
-int getRdmaBufSize(envelope *env){
-  /*
-   * Determine the number of rdma operations and the sum of all
-   * rdma buffer sizes by iterating over the ckrdmawrappers in the message
-   */
-  int numops, bufsize=0;
-  CkUnpackMessage(&env);
-  PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
-  up|numops;
-  for(int i=0; i<numops; i++){
-    CkRdmaWrapper w; up|w;
-    bufsize += CK_ALIGN(w.cnt, 16);
-  }
-  CkPackMessage(&env);
-  return bufsize;
-}
-
-#endif
-/* End of CMK_ONESIDED_IMPL */
-
-/* Support for Direct Nocopy API */
-
-// Ack handler function which invokes the callback
-void CkRdmaDirectAckHandler(void *ack) {
-
-  // Process QD to mark completion of the outstanding RDMA operation
-  QdProcess(1);
-
-  NcpyOperationInfo *info = (NcpyOperationInfo *)(ack);
-
-  CkCallback *srcCb = (CkCallback *)(info->srcAck);
-  CkCallback *destCb = (CkCallback *)(info->destAck);
-
-  CkNcpyBuffer src, dest;
-
-  if(srcCb->requiresMsgConstruction()) {
-    // reconstruct the CkNcpyBuffer object for the source
-    src.ptr = info->srcPtr;
-    src.pe  = info->srcPe;
-    src.cnt = info->srcSize;
-    src.ref = info->srcRef;
-    src.mode = info->srcMode;
-    src.isRegistered = info->isSrcRegistered;
-    memcpy((char *)(&src.cb), srcCb, info->srcAckSize); // initialize cb
-    memcpy((char *)(src.layerInfo), info->srcLayerInfo, info->srcLayerSize); // initialize layerInfo
-  }
-
-  if(destCb->requiresMsgConstruction()) {
-    // reconstruct the CkNcpyBuffer object for the destination
-    dest.ptr = info->destPtr;
-    dest.pe  = info->destPe;
-    dest.cnt = info->destSize;
-    dest.ref = info->destRef;
-    dest.mode = info->destMode;
-    dest.isRegistered = info->isDestRegistered;
-    memcpy((char *)(&dest.cb), destCb, info->destAckSize); // initialize cb
-    memcpy((char *)(dest.layerInfo), info->destLayerInfo, info->destLayerSize); // initialize layerInfo
-  }
-
-  if(info->ackMode == 0 || info->ackMode == 1) {
-
-#if CMK_SMP
-    //call the callbackgroup on my node's first PE when callback requires to be called from comm thread
-    //this adds one more trip through the scheduler
-    _ckcallbackgroup[CmiNodeFirst(CmiMyNode())].call(*srcCb, sizeof(CkNcpyBuffer), (const char *)(&src));
-#else
-    //Invoke the destination callback
-    srcCb->send(sizeof(CkNcpyBuffer), &src);
-#endif
-  }
-
-  if(info->ackMode == 0 || info->ackMode == 2) {
-
-#if CMK_SMP
-    //call the callbackgroup on my node's first PE when callback requires to be called from comm thread
-    //this adds one more trip through the scheduler
-    _ckcallbackgroup[CmiNodeFirst(CmiMyNode())].call(*destCb, sizeof(CkNcpyBuffer), (const char *)(&dest));
-#else
-    //Invoke the destination callback
-    destCb->send(sizeof(CkNcpyBuffer), &dest);
-#endif
-  }
-
-  if(info->freeMe)
-    CmiFree(info);
-}
-
-// Returns CkNcpyMode::MEMCPY if both the PEs are the same and memcpy can be used
-// Returns CkNcpyMode::CMA if both the PEs are in the same physical node and CMA can be used
-// Returns CkNcpyMode::RDMA if RDMA needs to be used
-CkNcpyMode findTransferMode(int srcPe, int destPe) {
-  if(CmiNodeOf(srcPe)==CmiNodeOf(destPe))
-    return CkNcpyMode::MEMCPY;
-#if CMK_USE_CMA
-  else if(CmiDoesCMAWork() && CmiPeOnSamePhysicalNode(srcPe, destPe))
-    return CkNcpyMode::CMA;
-#endif
-  else
-    return CkNcpyMode::RDMA;
-}
+/*********************************** Zerocopy Direct API **********************************/
 
 // Get Methods
 void CkNcpyBuffer::memcpyGet(CkNcpyBuffer &source) {
@@ -408,12 +23,12 @@ void CkNcpyBuffer::memcpyGet(CkNcpyBuffer &source) {
 #if CMK_USE_CMA
 void CkNcpyBuffer::cmaGet(CkNcpyBuffer &source) {
   CmiIssueRgetUsingCMA(source.ptr,
-                       source.layerInfo,
-                       source.pe,
-                       ptr,
-                       layerInfo,
-                       pe,
-                       cnt);
+         source.layerInfo,
+         source.pe,
+         ptr,
+         layerInfo,
+         pe,
+         cnt);
 }
 #endif
 
@@ -658,3 +273,411 @@ CkNcpyStatus CkNcpyBuffer::put(CkNcpyBuffer &destination){
     CkAbort("Invalid CkNcpyMode");
   }
 }
+
+// reconstruct the CkNcpyBuffer object for the source
+void constructSourceBufferObject(NcpyOperationInfo *info, CkNcpyBuffer &src) {
+  src.ptr = info->srcPtr;
+  src.pe  = info->srcPe;
+  src.cnt = info->srcSize;
+  src.ref = info->srcRef;
+  src.mode = info->srcMode;
+  src.isRegistered = info->isSrcRegistered;
+  memcpy((char *)(&src.cb), info->srcAck, info->srcAckSize); // initialize cb
+  memcpy((char *)(src.layerInfo), info->srcLayerInfo, info->srcLayerSize); // initialize layerInfo
+}
+
+// reconstruct the CkNcpyBuffer object for the destination
+void constructDestinationBufferObject(NcpyOperationInfo *info, CkNcpyBuffer &dest) {
+  dest.ptr = info->destPtr;
+  dest.pe  = info->destPe;
+  dest.cnt = info->destSize;
+  dest.ref = info->destRef;
+  dest.mode = info->destMode;
+  dest.isRegistered = info->isDestRegistered;
+  memcpy((char *)(&dest.cb), info->destAck, info->destAckSize); // initialize cb
+  memcpy((char *)(dest.layerInfo), info->destLayerInfo, info->destLayerSize); // initialize layerInfo
+}
+
+void invokeSourceCallback(NcpyOperationInfo *info) {
+  CkCallback *srcCb = (CkCallback *)(info->srcAck);
+  if(srcCb->requiresMsgConstruction()) {
+    if(info->ackMode == CMK_SRC_DEST_ACK || info->ackMode == CMK_SRC_ACK) {
+      CkNcpyBuffer src;
+      constructSourceBufferObject(info, src);
+      //Invoke the sender's callback
+      invokeCallback(info->srcAck, info->srcPe, src);
+    }
+  }
+}
+
+void invokeDestinationCallback(NcpyOperationInfo *info) {
+  CkCallback *destCb = (CkCallback *)(info->destAck);
+  if(destCb->requiresMsgConstruction()) {
+    if(info->ackMode == CMK_SRC_DEST_ACK || info->ackMode == CMK_DEST_ACK) {
+      CkNcpyBuffer dest;
+      constructDestinationBufferObject(info, dest);
+      //Invoke the receiver's callback
+      invokeCallback(info->destAck, info->destPe, dest);
+    }
+  }
+}
+
+void handleDirectApiCompletion(NcpyOperationInfo *info) {
+  invokeSourceCallback(info);
+  invokeDestinationCallback(info);
+
+  if(info->freeMe == CMK_FREE_NCPYOPINFO)
+    CmiFree(info);
+}
+
+// Ack handler function which invokes the callback
+void CkRdmaDirectAckHandler(void *ack) {
+
+  // Process QD to mark completion of the outstanding RDMA operation
+  QdProcess(1);
+
+  NcpyOperationInfo *info = (NcpyOperationInfo *)(ack);
+
+  CkCallback *srcCb = (CkCallback *)(info->srcAck);
+  CkCallback *destCb = (CkCallback *)(info->destAck);
+
+  switch(info->opMode) {
+    case CMK_DIRECT_API    : handleDirectApiCompletion(info); // Ncpy Direct API
+                             break;
+#if CMK_ONESIDED_IMPL
+    case CMK_EM_API        : handleEntryMethodApiCompletion(info); // Ncpy EM API invoked through a GET
+                             break;
+
+    case CMK_EM_API_REVERSE: handleReverseEntryMethodApiCompletion(info); // Ncpy EM API invoked through a PUT
+                             break;
+#endif
+    default                : CmiAbort("Unknown opMode");
+                             break;
+  }
+}
+
+// Helper methods
+void invokeCallback(void *cb, int pe, CkNcpyBuffer &buff) {
+
+#if CMK_SMP
+    //call to callbackgroup to call the callback when calling from comm thread
+    //this adds one more trip through the scheduler
+    _ckcallbackgroup[pe].call(*(CkCallback *)(cb), sizeof(CkNcpyBuffer), (const char *)(&buff));
+#else
+    //Invoke the destination callback
+    ((CkCallback *)(cb))->send(sizeof(CkNcpyBuffer), &buff);
+#endif
+}
+
+// Returns CkNcpyMode::MEMCPY if both the PEs are the same and memcpy can be used
+// Returns CkNcpyMode::CMA if both the PEs are in the same physical node and CMA can be used
+// Returns CkNcpyMode::RDMA if RDMA needs to be used
+CkNcpyMode findTransferMode(int srcPe, int destPe) {
+  if(CmiNodeOf(srcPe)==CmiNodeOf(destPe))
+    return CkNcpyMode::MEMCPY;
+#if CMK_USE_CMA
+  else if(CmiDoesCMAWork() && CmiPeOnSamePhysicalNode(srcPe, destPe))
+    return CkNcpyMode::CMA;
+#endif
+  else
+    return CkNcpyMode::RDMA;
+}
+
+
+
+
+
+
+/*********************************** Zerocopy Entry Method API ****************************/
+#if CMK_ONESIDED_IMPL
+/*
+ * Extract ncpy buffer information from the metadata message, allocate buffers
+ * and issue ncpy calls (either memcpy or cma read or rdma get). Main method called on
+ * the destination to perform zerocopy operations as a part of the Zerocopy Entry Method
+ * API
+ */
+envelope* CkRdmaIssueRgets(envelope *env){
+  // Iterate over the ncpy buffer and either perform the operations
+  int numops, bufsize, msgsize;
+  bufsize = getRdmaBufSize(env);
+  numops = getRdmaNumOps(env);
+  msgsize = env->getTotalsize();
+
+  CkNcpyMode ncpyMode = findTransferMode(env->getSrcPe(), CkMyPe());
+
+  int totalMsgSize = CK_ALIGN(msgsize, 16) + bufsize;
+  char *ref;
+  int layerInfoSize, ncpyObjSize, extraSize;
+
+  if(ncpyMode == CkNcpyMode::RDMA) {
+
+    layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
+
+    ncpyObjSize = getNcpyOpInfoTotalSize(
+                  layerInfoSize,
+                  sizeof(CkCallback),
+                  layerInfoSize,
+                  0);
+
+    extraSize = ncpyObjSize - sizeof(NcpyOperationInfo);
+
+    totalMsgSize += sizeof(NcpyEmInfo) + numops*(sizeof(NcpyEmBufferInfo) + extraSize);
+  }
+
+  // Allocate the new message which stores the receiver buffers
+  envelope *copyenv = (envelope *)CmiAlloc(totalMsgSize);
+
+  //Copy the metadata message(without the machine specific info) into the buffer
+  memcpy(copyenv, env, msgsize);
+
+  /* Set the total size of the message excluding the receiver's machine specific info
+   * which is not required when the receiver's entry method executes
+   */
+  copyenv->setTotalsize(totalMsgSize);
+
+  // Set rdma flag to be false to prevent message handler on the receiver
+  // from intercepting it
+  copyenv->setRdma(false);
+
+  if(ncpyMode == CkNcpyMode::RDMA) {
+    ref = (char *)copyenv + CK_ALIGN(msgsize, 16) + bufsize;
+
+    NcpyEmInfo *ncpyEmInfo = (NcpyEmInfo *)ref;
+    ncpyEmInfo->numOps = numops;
+    ncpyEmInfo->counter = 0;
+    ncpyEmInfo->msg = copyenv;
+  }
+
+  char *buf = (char *)copyenv + CK_ALIGN(msgsize, 16);
+
+  CkUnpackMessage(&copyenv);
+  PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf));
+  PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf);
+  up|numops;
+  p|numops;
+
+  for(int i=0; i<numops; i++){
+    // source buffer
+    CkNcpyBuffer source;
+    up|source;
+
+    // destination buffer
+    CkNcpyBuffer dest((const void *)buf, CK_BUFFER_UNREG);
+    dest.cnt = source.cnt;
+
+    // Set the common layerInfo for the destination
+    CmiSetRdmaCommonInfo(dest.layerInfo, dest.ptr, dest.cnt);
+
+    if(ncpyMode == CkNcpyMode::MEMCPY) {
+
+      dest.memcpyGet(source);
+
+      // Invoke source callback
+      source.cb.send(sizeof(CkNcpyBuffer), &source);
+
+#if CMK_USE_CMA
+    } else if(ncpyMode == CkNcpyMode::CMA) {
+
+      dest.cmaGet(source);
+
+      // Invoke source callback
+      source.cb.send(sizeof(CkNcpyBuffer), &source);
+
+#endif
+    } else if(ncpyMode == CkNcpyMode::RDMA) {
+
+      if(dest.mode == CK_BUFFER_UNREG) {
+        // register it because it is required for RGET
+        CmiSetRdmaBufferInfo(dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.ptr, dest.cnt, dest.mode);
+
+        dest.isRegistered = true;
+      }
+
+      NcpyEmBufferInfo *ncpyEmBufferInfo = (NcpyEmBufferInfo *)(ref + sizeof(NcpyEmInfo) + i *(sizeof(NcpyEmBufferInfo) + extraSize));
+      ncpyEmBufferInfo->index = i;
+
+      NcpyOperationInfo *ncpyOpInfo = &(ncpyEmBufferInfo->ncpyOpInfo);
+
+      setNcpyOpInfo(source.ptr,
+                    (char *)(source.layerInfo),
+                    layerInfoSize,
+                    (char *)(&source.cb),
+                    sizeof(CkCallback),
+                    source.cnt,
+                    source.mode,
+                    source.isRegistered,
+                    source.pe,
+                    source.ref,
+                    dest.ptr,
+                    (char *)(dest.layerInfo),
+                    layerInfoSize,
+                    NULL,
+                    0,
+                    dest.cnt,
+                    dest.mode,
+                    dest.isRegistered,
+                    dest.pe,
+                    (char *)(ncpyEmBufferInfo), // destRef
+                    ncpyOpInfo);
+
+      // set opMode for entry method API
+      ncpyOpInfo->opMode = CMK_EM_API;
+      ncpyOpInfo->freeMe = CMK_DONT_FREE_NCPYOPINFO; // Since ncpyOpInfo is a part of the charm message, don't explicitly free it
+                                                     // It'll be freed when the message is freed by the RTS after the execution of the entry method
+      ncpyOpInfo->refPtr = ncpyEmBufferInfo;
+
+      // Do no launch Rgets here as they could potentially cause a race condition in the SMP mode
+      // The race condition is caused when an RGET completes and invokes the CkRdmaDirectAckHandler
+      // on the comm. thread as the message is being inside this for loop on the worker thread
+
+    } else {
+      CkAbort("Invalid Mode");
+    }
+
+    //Update the CkRdmaWrapper pointer of the new message
+    source.ptr = buf;
+
+    //Update the pointer
+    buf += CK_ALIGN(source.cnt, 16);
+    p|source;
+  }
+
+  CkPackRdmaPtrs(((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf);
+
+  if(ncpyMode == CkNcpyMode::MEMCPY || ncpyMode == CkNcpyMode::CMA ) {
+    // All operations have completed
+    CkPackMessage(&copyenv);
+    return copyenv; // to indicate the completion of the gets
+    // copyenv represents the new message which consists of the destination buffers
+
+  } else{
+
+    // Launch rgets
+    for(int i=0; i<numops; i++){
+      NcpyEmBufferInfo *ncpyEmBufferInfo = (NcpyEmBufferInfo *)(ref + sizeof(NcpyEmInfo) + i *(sizeof(NcpyEmBufferInfo) + extraSize));
+      NcpyOperationInfo *ncpyOpInfo = &(ncpyEmBufferInfo->ncpyOpInfo);
+      CmiIssueRget(ncpyOpInfo);
+    }
+    return NULL; // to indicate an async operation which may not be complete
+  }
+}
+
+// Method called to unpack rdma pointers
+void CkPackRdmaPtrs(char *msgBuf){
+  PUP::toMem p((void *)msgBuf);
+  PUP::fromMem up((void *)msgBuf);
+  int numops;
+  up|numops;
+  p|numops;
+
+  // Pack ncpy pointers in CkNcpyBuffer
+  for(int i=0; i<numops; i++){
+    CkNcpyBuffer w;
+    up|w;
+    w.ptr = (void *)((char *)w.ptr - (char *)msgBuf);
+    p|w;
+  }
+}
+
+// Method called to unpack rdma pointers
+void CkUnpackRdmaPtrs(char *msgBuf){
+  PUP::toMem p((void *)msgBuf);
+  PUP::fromMem up((void *)msgBuf);
+  int numops;
+  up|numops;
+  p|numops;
+
+  // Unpack ncpy pointers in CkNcpyBuffer
+  for(int i=0; i<numops; i++){
+    CkNcpyBuffer w;
+    up|w;
+    w.ptr = (void *)((char *)msgBuf + (size_t)w.ptr);
+    p|w;
+  }
+}
+
+//Determine the number of ncpy ops from the message
+int getRdmaNumOps(envelope *env){
+  int numops;
+  CkUnpackMessage(&env);
+  PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
+  up|numops;
+  CkPackMessage(&env);
+  return numops;
+}
+
+// Get the sum of ncpy buffer sizes using the metadata message
+int getRdmaBufSize(envelope *env){
+  /*
+   * Determine the number of ncpy operations and the sum of all
+   * ncpy buffer sizes by iterating over the CkNcpyBuffers in the message
+   */
+  int numops, bufsize=0;
+  CkUnpackMessage(&env);
+  PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
+  up|numops;
+  for(int i=0; i<numops; i++){
+    CkNcpyBuffer w; up|w;
+    bufsize += CK_ALIGN(w.cnt, 16);
+  }
+  CkPackMessage(&env);
+  return bufsize;
+}
+
+void handleEntryMethodApiCompletion(NcpyOperationInfo *info) {
+  invokeSourceCallback(info);
+  if(info->ackMode == CMK_SRC_DEST_ACK || info->ackMode == CMK_DEST_ACK) {
+    // Invoke the ackhandler function to update the counter
+    CkRdmaEMAckHandler(info->destPe, info->refPtr);
+  }
+}
+
+void handleReverseEntryMethodApiCompletion(NcpyOperationInfo *info) {
+  invokeSourceCallback(info);
+  if(info->ackMode == CMK_SRC_DEST_ACK || info->ackMode == CMK_DEST_ACK) {
+    // Send a message to the receiver to invoke the ackhandler function to update the counter
+    CmiInvokeRemoteAckHandler(info->destPe, info->refPtr);
+  }
+  if(info->freeMe == CMK_FREE_NCPYOPINFO)
+    CmiFree(info);
+}
+
+// Ack handler function called when a Zerocopy Entry Method buffer completes
+void CkRdmaEMAckHandler(int destPe, void *ack) {
+
+  NcpyEmBufferInfo *emBuffInfo = (NcpyEmBufferInfo *)(ack);
+
+  char *ref = (char *)(emBuffInfo);
+
+  int layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
+  int ncpyObjSize = getNcpyOpInfoTotalSize(
+                    layerInfoSize,
+                    sizeof(CkCallback),
+                    layerInfoSize,
+                    0);
+
+
+  NcpyEmInfo *ncpyEmInfo = (NcpyEmInfo *)(ref - (emBuffInfo->index) * (sizeof(NcpyEmBufferInfo) + ncpyObjSize - sizeof(NcpyOperationInfo)) - sizeof(NcpyEmInfo));
+  ncpyEmInfo->counter++; // A zerocopy get completed, update the counter
+
+#if CMK_REG_REQUIRED
+  NcpyOperationInfo *ncpyOpInfo = &(emBuffInfo->ncpyOpInfo);
+  // De-register the destination buffer
+  CmiDeregisterMem(ncpyOpInfo->destPtr, ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->destPe, ncpyOpInfo->destMode);
+#endif
+
+  // Check if all rdma operations are complete
+  if(ncpyEmInfo->counter == ncpyEmInfo->numOps) {
+
+    // invoke the charm message handler to enqueue the messsage
+#if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRES
+    // invoked from the comm thread, so send message to the worker thread
+    CmiPushPE(CmiRankOf(destPe), ncpyEmInfo->msg);
+#else
+    // invoked from the worker thread, process message
+    CmiHandleMessage(ncpyEmInfo->msg);
+#endif
+  }
+}
+#endif
+/* End of CMK_ONESIDED_IMPL */

@@ -3,22 +3,6 @@
   Nitin Bhat 03/07/2017
 */
 
-//Post MPI_Irecvs to receive the RDMA buffers
-void LrtsIssueRgets(void *recv, int pe){
-  int i;
-  CmiMPIRzvRdmaRecvList_t *recvInfo = (CmiMPIRzvRdmaRecvList_t *)recv;
-  MPI_Request reqBufferRecv;
-  int srcPe = recvInfo->srcPe;
-
-  for(i=0; i<recvInfo->numOps; i++){
-    void *buffer = recvInfo->rdmaOp[i].buffer;
-    int size = recvInfo->rdmaOp[i].size;
-    int srcTag = recvInfo->rdmaOp[i].tag;
-
-    MPIPostOneBuffer(buffer, (char *)(&(recvInfo->rdmaOp[i])), size, srcPe, srcTag, ONESIDED_BUFFER_RECV);  
-  }
-}
-
 // Post MPI_Isend or MPI_Irecv to send/recv the RDMA buffer
 // Used by both non-SMP and SMP modes
 void MPISendOrRecvOneBuffer(SMSG_LIST *smsg, int tag){

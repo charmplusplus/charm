@@ -11,13 +11,6 @@ void _initOnesided( pami_context_t *contexts, int nc){
   pami_dispatch_callback_function pfn;
   int i = 0;
   for (i = 0; i < nc; ++i) {
-    pfn.p2p = ack_rdma_pkt_dispatch;
-    PAMI_Dispatch_set (contexts[i],
-      CMI_PAMI_ONESIDED_ACK_DISPATCH,
-      pfn,
-      NULL,
-      options);
-
     pfn.p2p = rdma_direct_get_dispatch;
     PAMI_Dispatch_set (contexts[i],
       CMI_PAMI_DIRECT_GET_DISPATCH,
@@ -25,24 +18,6 @@ void _initOnesided( pami_context_t *contexts, int nc){
       NULL,
       options);
  }
-}
-
-//function called on completion of the rdma operation
-void rzv_rdma_recv_done   (pami_context_t     ctxt,
-    void             * clientdata,
-    pami_result_t      result)
-{
-  CmiPAMIRzvRdmaRecvOp_t* recvOpInfo = (CmiPAMIRzvRdmaRecvOp_t *)clientdata;
-  CmiPAMIRzvRdmaRecv_t* recvInfo = (CmiPAMIRzvRdmaRecv_t *)(
-                                        ((char *)recvOpInfo)
-                                      - recvOpInfo->opIndex * sizeof(CmiPAMIRzvRdmaRecvOp_t)
-                                      - sizeof(CmiPAMIRzvRdmaRecv_t));
-
-  rdma_sendAck(ctxt, recvOpInfo, recvInfo->src_ep);
-  recvInfo->comOps++;
-  if(recvInfo->comOps == recvInfo->numOps){
-    recv_done(ctxt, recvInfo->msg, PAMI_SUCCESS);
-  }
 }
 
 //function to perform Rget
@@ -129,71 +104,6 @@ pami_result_t putData(
     PAMIX_CONTEXT_UNLOCK(context);
   MACHSTATE2(3, "[%d]PAMI_Rput result: %d\n", CmiMyPe(), res);
   return res;
-}
-
-
-void LrtsIssueRgets(void *recv, int pe){
-
-  CmiPAMIRzvRdmaRecv_t* recvInfo = (CmiPAMIRzvRdmaRecv_t*)recv;
-
-#if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
-  int c = CmiMyNode() % cmi_pami_numcontexts;
-  pami_context_t my_context = cmi_pami_contexts[c];
-#else
-  pami_context_t my_context= MY_CONTEXT();
-#endif
-
-  INCR_ORECVS();
-
-
-  pami_endpoint_t      origin;
-  PAMI_Endpoint_create (cmi_pami_client, (pami_task_t)CmiNodeOf(pe), recvInfo->dstContext, &origin);
-  recvInfo->src_ep = origin;
-
-  int i;
-  for(i=0; i<recvInfo->numOps; i++){
-    void *buffer = recvInfo->rdmaOp[i].buffer;
-    int offset = recvInfo->rdmaOp[i].offset;
-    int size = recvInfo->rdmaOp[i].size;
-    MACHSTATE5(3, "[%d]LrtsIssueRgets, recv:%p, origin: %u, dst_context: %d, offset: %d\n", CmiMyPe(), recvInfo, origin, recvInfo->dstContext, offset);
-    getData(my_context, origin, buffer, &recvInfo->rdmaOp[i],
-          recvInfo->dstContext, rzv_rdma_recv_done, offset, &recvInfo->mregion, size);
-  }
-}
-
-//function to send the acknowledgement to the sender
-void  rdma_sendAck (
-    pami_context_t      context,
-    CmiPAMIRzvRdmaRecvOp_t* recvOpInfo,
-    int src_ep)
-{
-  pami_send_immediate_t parameters;
-  parameters.dispatch        = CMI_PAMI_ONESIDED_ACK_DISPATCH;
-  parameters.header.iov_base = &recvOpInfo->src_info;
-  parameters.header.iov_len  = sizeof(void *);
-  parameters.data.iov_base   = NULL;
-  parameters.data.iov_len    = 0;
-  parameters.dest            = src_ep;
-  PAMI_Send_immediate (context, &parameters);
-}
-
-
-// function called on the sender on receiving acknowledgement from the receiver to signal the completion of the rdma operation
-void ack_rdma_pkt_dispatch (
-    pami_context_t       context,
-    void               * clientdata,
-    const void         * header_addr,
-    size_t               header_size,
-    const void         * pipe_addr,
-    size_t               pipe_size,
-    pami_endpoint_t      origin,
-    pami_recv_t         * recv)
-{
-  CmiAssert(sizeof(void *) == header_size);
-  CmiRdmaAck *ack = *((CmiRdmaAck **) header_addr);
-  ack->fnPtr(ack->token);
-  //free callback structure, CmiRdmaAck allocated in CmiSetRdmaAck
-  free(ack);
 }
 
 /* Support for Nocopy Direct API */

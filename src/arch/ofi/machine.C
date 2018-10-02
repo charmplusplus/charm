@@ -136,7 +136,6 @@ CpvDeclare(mempool_type*, mempool);
 #define OFI_RDMA_DIRECT_REG_AND_PUT 0x4ULL
 #define OFI_RDMA_DIRECT_REG_AND_GET 0x5ULL
 
-#define OFI_RDMA_OP_ACK 0x7ULL
 #define OFI_OP_NAMES 0x8ULL
 
 #define OFI_READ_OP 1
@@ -674,7 +673,9 @@ void send_short_callback(struct fi_cq_tagged_entry *e, OFIRequest *req)
     msg = (char *)req->data.short_msg;
     CmiAssert(msg);
     MACHSTATE1(3, "--> msg=%p", msg);
-    CmiFree(msg);
+
+    if(req->freeMe)
+      CmiFree(msg);
 
 #if USE_OFIREQUEST_CACHE
     free_request(req);
@@ -1144,9 +1145,6 @@ void recv_callback(struct fi_cq_tagged_entry *e, OFIRequest *req)
         break;
     case OFI_OP_ACK:
         process_long_send_ack(e, req);
-        break;
-    case OFI_RDMA_OP_ACK:
-        process_onesided_completion_ack(e, req);
         break;
     case OFI_RDMA_DIRECT_REG_AND_PUT:
         process_onesided_reg_and_put(e, req);

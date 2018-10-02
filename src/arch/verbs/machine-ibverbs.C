@@ -1855,17 +1855,6 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 			processRdmaRequest(rdmaPacket,nodeNo,0);
 		}*/
 	}
-	if(rdma && header->code == INFIRDMA_ACK){
-		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)(buffer->buf+sizeof(struct infiPacketHeader)) ;
-#if CMK_ONESIDED_IMPL
-		if (rdmaPacket->type == INFI_ONESIDED)
-			verbsOnesidedReceivedAck(rdmaPacket);
-		else
-#endif
-		{
-			processRdmaAck(rdmaPacket);
-		}
-	}
 	if(header->code == INFIRDMA_DIRECT_REG_AND_PUT){
 		// Register the source buffer and perform PUT
 		NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(buffer->buf+sizeof(struct infiPacketHeader));
@@ -1880,6 +1869,9 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		                     newNcpyOpInfo->srcSize);
 		// Set the source as registered
 		newNcpyOpInfo->isSrcRegistered = 1;
+		
+		// Free the NcpyOperationInfo in a reverse API operation
+		newNcpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO;
 		
 		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)malloc(sizeof(struct infiRdmaPacket));
 		rdmaPacket->type = INFI_ONESIDED_DIRECT;
@@ -2068,20 +2060,6 @@ static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 		return;
 	}*/
 //	CmiAssert(rdmaPacket->type == INFI_MESG);
-#if CMK_ONESIDED_IMPL
-	// Zerocopy Entry Method API
-	if (rdmaPacket->type == INFI_ONESIDED) {
-
-#if CMK_IBVERBS_TOKENS_FLOW
-		context->tokensLeft++;
-#endif
-
-		verbsOnesidedOpDone((CmiVerbsRdmaRecvOp_t *)rdmaPacket->localBuffer);
-		free(rdmaPacket);
-
-		return;
-	}
-#endif
 #if CMK_ONESIDED_DIRECT_IMPL
 	// Zerocopy Direct API
 	if (rdmaPacket->type == INFI_ONESIDED_DIRECT) {

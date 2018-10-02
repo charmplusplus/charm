@@ -28,11 +28,6 @@ inline void _CldEnqueue(int pe, void *msg, int infofn) {
     CmiFree(msg);
     return;
   }
-#if CMK_ONESIDED_IMPL
-  if(((envelope *)msg)->isRdma()){
-    CkRdmaPrepareMsg((envelope **)&msg, pe);
-  }
-#endif
   CldEnqueue(pe, msg, infofn);
 }
 inline void _CldEnqueueMulti(int npes, int *pes, void *msg, int infofn) {
@@ -54,30 +49,15 @@ inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
     CmiFree(msg);
     return;
   }
-#if CMK_ONESIDED_IMPL
-  if(((envelope *)msg)->isRdma()){
-    CkRdmaPrepareMsg((envelope **)&msg, CmiNodeFirst(node));
-  }
-#endif
   CldNodeEnqueue(node, msg, infofn);
 }
 #else
 
 inline void _CldEnqueue(int pe, void *msg, int infofn) {
-#if CMK_ONESIDED_IMPL
-  if(((envelope *)msg)->isRdma()){
-    CkRdmaPrepareMsg((envelope **)&msg, pe);
-  }
-#endif
   CldEnqueue(pe, msg, infofn);
 }
 
 inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
-#if CMK_ONESIDED_IMPL
-  if(((envelope *)msg)->isRdma()){
-    CkRdmaPrepareMsg((envelope **)&msg, CmiNodeFirst(node));
-  }
-#endif
   CldNodeEnqueue(node, msg, infofn);
 }
 #define _CldEnqueueMulti  CldEnqueueMulti

@@ -1213,18 +1213,15 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
 
 #if CMK_ONESIDED_IMPL
   if(env->isRdma()){
-    //Receiver copies the buffer from the sender when they share
-    //the address space
-    if(CmiNodeOf(env->getSrcPe())==CmiMyNode()){
-      envelope *prevEnv = env;
-      env = CkRdmaCopyMsg(prevEnv);
+    envelope *prevEnv = env;
+    env = CkRdmaIssueRgets(prevEnv);
+    if(env) {
+      // Within pe or logical node, env points to new message with data
+
+      // Free prevEnv
       CkFreeMsg(EnvToUsr(prevEnv));
-    }
-    //Receiver issues Rdma Get calls to fetch data over network
-    else{
-      CkRdmaIssueRgets(env);
-      //return because the new message with the rdma buffer is again passed
-      //to the process handler after the Rdma Get call completion
+    } else{
+      // async rdma call in place, asynchronous return and ack handling
       return;
     }
   }
@@ -1421,13 +1418,6 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
   }
 #endif
 
-#if CMK_ONESIDED_IMPL
-  if(env->isRdma()){
-    CkRdmaPrepareMsg(&env, pe);
-    //CkPrintf("[%d] _skipCldEnqueue metadata-msg: %d \n", CkMyPe(), env->getTotalsize());
-  }
-#endif
-
 #if CMK_FAULT_EVAC
   if(pe == CkMyPe() ){
     if(!CmiNodeAlive(CkMyPe())){
@@ -1529,13 +1519,6 @@ static void _noCldEnqueue(int pe, envelope *env)
   }
 #endif
 
-#if CMK_ONESIDED_IMPL
-  if(env->isRdma()){
-    CkRdmaPrepareMsg(&env, pe);
-    //CkPrintf("[%d] _noCldEnqueue metadata-msg: %d \n", CkMyPe(), env->getTotalsize());
-  }
-#endif
-
   CkPackMessage(&env);
   int len=env->getTotalsize();
   if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, (char *)env); }
@@ -1559,12 +1542,6 @@ void _noCldNodeEnqueue(int node, envelope *env)
   }
 #endif
 
-#if CMK_ONESIDED_IMPL
-  if(env->isRdma()){
-    CkRdmaPrepareMsg(&env, CmiNodeFirst(node));
-    //CkPrintf("[%d] noCldEnqueue metadata-msg: %d \n", CkMyPe(), env->getTotalsize());
-  }
-#endif
   CkPackMessage(&env);
   int len=env->getTotalsize();
   if (node==CLD_BROADCAST) { 

@@ -383,9 +383,6 @@ void Entry::genChareDefs(XStr& str) {
       opts << ",0";
       if (isSkipscheduler()) opts << "+CK_MSG_EXPEDITED";
       if (isInline()) opts << "+CK_MSG_INLINE";
-      if (param->hasRdma()) {
-        opts << "+CK_MSG_RDMA";
-      }
       str << "    CkSendMsg(" << params << opts << ");\n";
       str << "  }\n";
     }
@@ -621,9 +618,6 @@ void Entry::genArrayDefs(XStr& str) {
         if (isInline()) opts << "+CK_MSG_INLINE";
         if (!isIget()) {
           if (container->isForElement() || container->isForSection()) {
-            if (param->hasRdma()) {
-              opts << "+CK_MSG_RDMA";
-            }
             str << "  ckSend(impl_amsg, " << epIdx() << opts << ");\n";
           } else
             str << "  ckBroadcast(impl_amsg, " << epIdx() << opts << ");\n";
@@ -923,9 +917,6 @@ void Entry::genGroupDefs(XStr& str) {
               << parampg << ");\n";
         }
         str << "  } else {\n";
-        if (param->hasRdma()) {
-          opts << "+CK_MSG_RDMA";
-        }
         str << "    CkSendMsg" << node << "Branch"
             << "(" << parampg << opts << ");\n";
         str << "  }\n";
@@ -2140,8 +2131,8 @@ void Entry::genClosure(XStr& decls, bool isDef) {
           structure << "      "
                     << "int num_rdma_fields;\n";
         structure << "      "
-                  << "CkRdmaWrapper "
-                  << "rdmawrapper_" << sv->name << ";\n";
+                  << "CkNcpyBuffer "
+                  << "ncpyBuffer_" << sv->name << ";\n";
         structure << "#else\n";
         structure << "      " << sv->type << " "
                   << "*" << sv->name << ";\n";
@@ -2155,10 +2146,10 @@ void Entry::genClosure(XStr& decls, bool isDef) {
                  << " num_rdma_fields;}\n";
         }
         getter << "      "
-               << "CkRdmaWrapper "
+               << "CkNcpyBuffer "
                << "& "
                << "getP" << i << "() { return "
-               << "rdmawrapper_" << sv->name << ";}\n";
+               << "ncpyBuffer_" << sv->name << ";}\n";
         getter << "#else\n";
         getter << sv->type << " "
                << "*";
@@ -2179,12 +2170,12 @@ void Entry::genClosure(XStr& decls, bool isDef) {
          * to adjust the pointer back to the actual buffer that exists within the message.
          */
         toPup << "        if (__p.isPacking()) {\n";
-        toPup << "          rdmawrapper_" << sv->name << ".ptr = ";
-        toPup << "(void *)((char *)(rdmawrapper_" << sv->name << ".ptr) - impl_buf);\n";
+        toPup << "          ncpyBuffer_" << sv->name << ".ptr = ";
+        toPup << "(void *)((char *)(ncpyBuffer_" << sv->name << ".ptr) - impl_buf);\n";
         toPup << "        }\n";
         toPup << "        "
               << "__p | "
-              << "rdmawrapper_" << sv->name << ";\n";
+              << "ncpyBuffer_" << sv->name << ";\n";
         toPup << "#endif\n";
       } else {
         structure << "      ";
@@ -2217,9 +2208,9 @@ void Entry::genClosure(XStr& decls, bool isDef) {
       if (sv->isMessage()) {
         isMessage = true;
         if (sv->isRdma()) {
-          structure << "CkRdmaWrapper"
+          structure << "CkNcpyBuffer"
                     << " "
-                    << "rdmawrapper_" << sv->name << ";\n";
+                    << "ncpyBuffer_" << sv->name << ";\n";
         } else {
           structure << sv->type << " " << sv->name << ";\n";
         }

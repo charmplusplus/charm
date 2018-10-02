@@ -1,4 +1,5 @@
 #include "cmirdmautils.h"
+#include "converse.h" // for CmiAbort usage to avoid undeclared warning
 
 #include <stdio.h>
 #include <string.h>
@@ -34,20 +35,39 @@ void setNcpyOpInfo(
     const void *destRef,
     NcpyOperationInfo *ncpyOpInfo) {
 
+  char *base = (char *)ncpyOpInfo + sizeof(NcpyOperationInfo);
+
+  ncpyOpInfo->srcLayerInfo = NULL;
+  ncpyOpInfo->destLayerInfo = NULL;
+  ncpyOpInfo->srcAck = NULL;
+  ncpyOpInfo->destAck = NULL;
+
   // memcpy srcLayerInfo
-  memcpy((char *)ncpyOpInfo + sizeof(NcpyOperationInfo), srcLayerInfo, srcLayerSize);
-  ncpyOpInfo->srcLayerInfo = (char *)ncpyOpInfo + sizeof(NcpyOperationInfo);
+  if(srcLayerInfo != NULL && srcLayerSize != 0) {
+    memcpy(base, srcLayerInfo, srcLayerSize);
+    ncpyOpInfo->srcLayerInfo = base;
+    base = base + srcLayerSize;
+  }
+
   // memcpy srcAckInfo
-  memcpy(ncpyOpInfo->srcLayerInfo + srcLayerSize, srcAck, srcAckSize);
-  ncpyOpInfo->srcAck = ncpyOpInfo->srcLayerInfo + srcLayerSize;
+  if(srcAck != NULL && srcAckSize != 0) {
+    memcpy(base, srcAck, srcAckSize);
+    ncpyOpInfo->srcAck = base;
+    base = base + srcAckSize;
+  }
 
   // memcpy destLayerInfo
-  memcpy(ncpyOpInfo->srcAck + srcAckSize, destLayerInfo, destLayerSize);
-  ncpyOpInfo->destLayerInfo = ncpyOpInfo->srcAck + srcAckSize;
+  if(srcLayerInfo != NULL && destLayerSize != 0) {
+    memcpy(base, destLayerInfo, destLayerSize);
+    ncpyOpInfo->destLayerInfo = base;
+    base = base + destLayerSize;
+  }
 
   // memcpy destAck Info
-  memcpy(ncpyOpInfo->destLayerInfo + destLayerSize, destAck, destAckSize);
-  ncpyOpInfo->destAck = ncpyOpInfo->destLayerInfo + destLayerSize;
+  if(destAck != NULL && destAckSize != 0) {
+    memcpy(base, destAck, destAckSize);
+    ncpyOpInfo->destAck = base;
+  }
 
   ncpyOpInfo->srcPtr = srcPtr;
   ncpyOpInfo->srcPe = srcPe;
@@ -67,19 +87,46 @@ void setNcpyOpInfo(
   ncpyOpInfo->destMode = destMode;
   ncpyOpInfo->isDestRegistered = isDestRegistered;
 
-  ncpyOpInfo->ackMode = 0;
-  ncpyOpInfo->freeMe  = 1;
+  ncpyOpInfo->opMode  = CMK_DIRECT_API; // default operation mode is CMK_DIRECT_API
+  ncpyOpInfo->ackMode = CMK_SRC_DEST_ACK; // default ack mode is CMK_SRC_DEST_ACK
+  ncpyOpInfo->freeMe  = CMK_FREE_NCPYOPINFO; // default ack mode is CMK_FREE_NCPYOPINFO
 
   ncpyOpInfo->ncpyOpInfoSize = sizeof(NcpyOperationInfo) + srcLayerSize + destLayerSize + srcAckSize + destAckSize;
 }
 
 
 void resetNcpyOpInfoPointers(NcpyOperationInfo *ncpyOpInfo) {
-  ncpyOpInfo->srcLayerInfo = (char *)ncpyOpInfo + sizeof(NcpyOperationInfo);
 
-  ncpyOpInfo->srcAck = (char *)(ncpyOpInfo->srcLayerInfo) + ncpyOpInfo->srcLayerSize;
+  char *base = (char *)ncpyOpInfo + sizeof(NcpyOperationInfo);
 
-  ncpyOpInfo->destLayerInfo = (char *)(ncpyOpInfo->srcAck) + ncpyOpInfo->srcAckSize;
+  if(ncpyOpInfo->srcLayerInfo) {
+    ncpyOpInfo->srcLayerInfo = base;
+    base = base + ncpyOpInfo->srcLayerSize;
+  }
 
-  ncpyOpInfo->destAck = (char *)(ncpyOpInfo->destLayerInfo) + ncpyOpInfo->destLayerSize;
+  if(ncpyOpInfo->srcAck) {
+    ncpyOpInfo->srcAck = base;
+    base = base + ncpyOpInfo->srcAckSize;
+  }
+
+  if(ncpyOpInfo->destLayerInfo) {
+    ncpyOpInfo->destLayerInfo = base;
+    base = base + ncpyOpInfo->destLayerSize;
+  }
+
+  if(ncpyOpInfo->destAck) {
+    ncpyOpInfo->destAck = base;
+  }
+
+}
+
+void setReverseModeForNcpyOpInfo(NcpyOperationInfo *ncpyOpInfo) {
+  switch(ncpyOpInfo->opMode) {
+    case CMK_EM_API          : ncpyOpInfo->opMode = CMK_EM_API_REVERSE;
+                               break;
+    case CMK_DIRECT_API      : // Do nothing
+                               break;
+    default                  : CmiAbort("Unknown opcode");
+                               break;
+  }
 }

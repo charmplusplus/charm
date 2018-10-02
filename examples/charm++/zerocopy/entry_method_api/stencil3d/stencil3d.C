@@ -150,7 +150,8 @@ class Stencil: public CBase_Stencil {
 
     // callback function called on completion of sending ghosts
     void completedSendingGhost(CkDataMsg *msg){
-      void *ptr = *((void **)(msg->data)); // we don't free the ghost array as it is reused across iterations
+      CkNcpyBuffer *src = (CkNcpyBuffer *)(msg->data);
+      void *ptr = (void *)(src->ptr); // we don't free the ghost array as it is reused across iterations
       delete msg;
       counter++;
       // Advance to next step on completion of sending ghosts to the 6 neighbors

@@ -3,30 +3,20 @@
 
 #include "cmirdmautils.h"
 
-typedef void (*RdmaSingleAckCallerFn)(void *cbPtr, int pe, const void *ptr);
-typedef void (*RdmaAckCallerFn)(void *token);
-
-void *CmiSetRdmaAck(RdmaAckCallerFn fn, void *token);
-void CmiSetRdmaInfo(void *dest, int destPE, int numOps);
-void CmiSetRdmaOpInfo(void *dest, const void *ptr, int size, void *ack, int destPE);
-int CmiGetRdmaOpInfoSize(void);
-int CmiGetRdmaGenInfoSize(void);
-
-int CmiGetRdmaInfoSize(int numOps);
-void CmiSetRdmaRecvInfo(void *dest, int numOps, void *msg, void *rdmaInfo, int msgSize);
-void CmiSetRdmaRecvOpInfo(void *dest, void *buffer, void *src_ref, int size, int opIndex, void *rdmaInfo);
-int CmiGetRdmaOpRecvInfoSize(void);
-int CmiGetRdmaGenRecvInfoSize(void);
-int CmiGetRdmaRecvInfoSize(int numOps);
-
-void CmiIssueRgets(void *recv, int pe);
+typedef void (*RdmaEMAckCallerFn)(int destPe, void *token);
+typedef void (*RdmaDirectAckCallerFn)(void *token);
 
 /* Support for Direct API */
 void CmiSetRdmaCommonInfo(void *info, const void *ptr, int size);
 int CmiGetRdmaCommonInfoSize(void);
 
 void CmiSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode);
-void CmiSetRdmaNcpyAck(RdmaAckCallerFn fn);
+
+// Function to set the ack handler for the Direct API
+void CmiSetDirectNcpyAckHandler(RdmaDirectAckCallerFn fn);
+
+// Function to set the ack handler for the Entry Method API
+void CmiSetEMNcpyAckHandler(RdmaEMAckCallerFn fn);
 
 /* CmiIssueRget initiates an RDMA read operation, transferring 'size' bytes of data from the address space of 'srcPe' to local address, 'destAddr'.
  * When the runtime invokes srcAck on the source (target), it indicates safety to overwrite or free the srcAddr buffer.
@@ -70,9 +60,10 @@ void *CmiRdmaAlloc(int size);
 
 int CmiDoesCMAWork(void);
 
-#if !CMK_ONESIDED_DIRECT_IMPL
-// Function declaration used for the generic implementation of the Nocopy Direct API
+// Method used to send an ack after completion of a reverse rdma operation
+void CmiInvokeRemoteAckHandler(int pe, void *ref);
+
+// Function declaration for onesided initialization
 void CmiOnesidedDirectInit(void);
-#endif
 
 #endif

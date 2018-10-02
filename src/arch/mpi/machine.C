@@ -610,6 +610,7 @@ static void ReleasePostedMessages(void) {
     SMSG_LIST *msg_tmp=CpvAccess(sent_msgs);
     SMSG_LIST *prev=0;
     SMSG_LIST *temp;
+
     int done;
     MPI_Status sts;
 
@@ -641,41 +642,28 @@ static void ReleasePostedMessages(void) {
             if(CpvAccess(end_sent) == msg_tmp) {
               CpvAccess(end_sent) = prev;
             }
-            //if rdma msg, call the callback
-            if(msg_tmp->type == ONESIDED_BUFFER_SEND) {
-                CmiMPIRzvRdmaOpInfo_t *rdmaOpInfo = (CmiMPIRzvRdmaOpInfo_t *)msg_tmp->ref;
-                CmiRdmaAck *ack = (CmiRdmaAck *) rdmaOpInfo->ack;
-                ack->fnPtr(ack->token);
-
-                //free callback structure, CmiRdmaAck allocated in CmiSetRdmaAck
-                free(ack);
-            } else if(msg_tmp->type == ONESIDED_BUFFER_RECV) {
-
-                // get hold of CmiMPIRzvRdmaRecvList_t
-                CmiMPIRzvRdmaRecvOp_t *rdmaRecvOpInfo = (CmiMPIRzvRdmaRecvOp_t *)msg_tmp->ref;
-
-                CmiMPIRzvRdmaRecvList_t *rdmaRecvInfo = (CmiMPIRzvRdmaRecvList_t *)((char *)(rdmaRecvOpInfo)
-                                                        - rdmaRecvOpInfo->opIndex * LrtsGetRdmaOpRecvInfoSize()
-                                                        - LrtsGetRdmaGenRecvInfoSize());
-
-                rdmaRecvInfo->counter++;
-                if(rdmaRecvInfo->counter == rdmaRecvInfo->numOps) {
-                    handleOneRecvedMsg(rdmaRecvInfo->msgLen, (char *)rdmaRecvInfo->msg);
-                }
-            } else if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_RECV) {
+            if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_RECV) {
                 // MPI_Irecv posted as a part of the Direct API was completed
                 NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(msg_tmp->ref);
+
                 // Invoke the destination ack
-                ncpyOpInfo->ackMode = 2;
+                ncpyOpInfo->ackMode = CMK_DEST_ACK; // Only invoke destination ack
+
+                // On the destination the NcpyOperationInfo is freed for the Direct API
+                // but not freed for the Entry Method API as it a part of the parameter marshalled message
+                // and is enentually freed by the RTS
                 CmiInvokeNcpyAck(ncpyOpInfo);
 
             } else if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_SEND) {
                 // MPI_Isend posted as a part of the Direct API was completed
                 NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(msg_tmp->ref);
                 // Invoke the source ack
-                ncpyOpInfo->ackMode = 1;
-                CmiInvokeNcpyAck(ncpyOpInfo);
+                ncpyOpInfo->ackMode = CMK_SRC_ACK; // Only invoke the source ack
 
+                // Free the NcpyOperationInfo on the source
+                ncpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO;
+
+                CmiInvokeNcpyAck(ncpyOpInfo);
             }
             else if(msg_tmp->type == POST_DIRECT_SEND || msg_tmp->type == POST_DIRECT_RECV) {
                 // do nothing as the received message is a NcpyOperationInfo object
@@ -710,13 +698,6 @@ static int PumpMsgs(void) {
     char *msg;
     MPI_Status sts;
     int recd=0;
-
-#if CMK_ONESIDED_IMPL
-    CmiMPIRzvRdmaRecvList_t *recvBufferTmp = CpvAccess(recvRdmaBuffers);
-    CmiMPIRzvRdmaRecvList_t *prev = 0;
-    CmiMPIRzvRdmaRecvList_t *temp;
-    int opDone, allOpsDone, i;
-#endif
 
 #if CMI_EXERT_RECV_CAP || CMI_DYNAMIC_EXERT_CAP
     int recvCnt=0;
@@ -1088,15 +1069,7 @@ static int SendMsgBuf(void) {
 #endif
 
 #if CMK_ONESIDED_IMPL
-            if(msg_tmp->type == ONESIDED_BUFFER_SEND) {
-                CmiMPIRzvRdmaOpInfo_t *rdmaOpInfo = (CmiMPIRzvRdmaOpInfo_t *)(msg_tmp->ref);
-                MPISendOrRecvOneBuffer(msg_tmp, rdmaOpInfo->tag);
-            }
-            else if(msg_tmp->type == ONESIDED_BUFFER_RECV) {
-                CmiMPIRzvRdmaRecvOp_t *rdmaRecvOpInfo = (CmiMPIRzvRdmaRecvOp_t *)(msg_tmp->ref);
-                MPISendOrRecvOneBuffer(msg_tmp, rdmaRecvOpInfo->tag);
-            }
-            else if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_RECV || msg_tmp->type == ONESIDED_BUFFER_DIRECT_SEND) {
+            if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_RECV || msg_tmp->type == ONESIDED_BUFFER_DIRECT_SEND) {
                 NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(msg_tmp->ref);
                 MPISendOrRecvOneBuffer(msg_tmp, ncpyOpInfo->tag);
             }
@@ -1813,16 +1786,6 @@ void LrtsPostCommonInit(int everReturn) {
     CpvAccess(sent_msgs) = NULL;
     CpvAccess(end_sent) = NULL;
     CpvAccess(MsgQueueLen) = 0;
-
-#if CMK_ONESIDED_IMPL
-    //List for storing the receiver's rdma request information
-    CpvInitialize(CmiMPIRzvRdmaRecvList_t *, recvRdmaBuffers);
-    CpvInitialize(CmiMPIRzvRdmaRecvList_t *, endRdmaBuffer);
-    CpvInitialize(int, RdmaRecvQueueLen);
-    CpvAccess(recvRdmaBuffers) = NULL;
-    CpvAccess(endRdmaBuffer) = NULL;
-    CpvAccess(RdmaRecvQueueLen) = 0;
-#endif
 
 #if CMI_MACH_TRACE_USEREVENTS && CMK_TRACE_ENABLED && !CMK_TRACE_IN_CHARM
     CpvInitialize(double, projTraceStart);

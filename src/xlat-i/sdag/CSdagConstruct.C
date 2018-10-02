@@ -303,13 +303,13 @@ int SdagConstruct::unravelClosuresBegin(XStr& defs, bool child) {
                  << "getP" << i++ << "();\n";
           }
           indentBy(defs, cur + 2);
-          defs << "CkRdmaWrapper "
-               << "& rdmawrapper_" << var.name << " = ";
+          defs << "CkNcpyBuffer "
+               << "& ncpyBuffer_" << var.name << " = ";
           defs << "gen" << cur << "->"
                << "getP" << i << "();\n";
           indentBy(defs, cur + 2);
           defs << var.type << "* " << var.name << " = "
-               << "(" << var.type << "*) (rdmawrapper_" << var.name << ".ptr);\n";
+               << "(" << var.type << "*) (ncpyBuffer_" << var.name << ".ptr);\n";
           defs << "#else\n";
           indentBy(defs, cur + 2);
           defs << var.type << "*"
