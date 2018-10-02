@@ -2849,30 +2849,32 @@ class ampi final : public CBase_ampi {
 
   inline CMK_REFNUM_TYPE getSeqNo(int destRank, MPI_Comm destcomm, int tag) noexcept;
   AmpiMsg *makeBcastMsg(const void *buf,int count,MPI_Datatype type,MPI_Comm destcomm) noexcept;
-  AmpiMsg *makeSyncMsg(int t,int sRank,const void *buf,int count,
-                       MPI_Datatype type,CProxy_ampi destProxy,
-                       int destIdx,int ssendReq,CMK_REFNUM_TYPE seq) noexcept;
-  AmpiMsg *makeNcpyShmMsg(int t, int sRank, const void* buf, int count,
-                          MPI_Datatype type, int ssendReq, int seq) noexcept;
-  AmpiMsg *makeNcpyMsg(int t, int sRank, const void* buf, int count,
-                       MPI_Datatype type, int ssendReq, int seq) noexcept;
-  AmpiMsg *makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
-                       MPI_Datatype type,MPI_Comm destcomm) noexcept;
-  AmpiMsg *makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
-                       MPI_Datatype type,MPI_Comm destcomm,CMK_REFNUM_TYPE seq) noexcept;
+  AmpiMsg *makeSyncMsg(const void* buf, int count, MPI_Datatype type, int srcRank,
+                       int tag, MPI_Comm comm, CProxy_ampi destProxy, int destIdx,
+                       int ssendReq, CMK_REFNUM_TYPE seq) noexcept;
+  AmpiMsg* makeNcpyShmMsg(const void* buf, int count, MPI_Datatype type, int srcRank,
+                          int tag, int ssendReq, CMK_REFNUM_TYPE seq) noexcept;
+  AmpiMsg* makeNcpyMsg(const void* buf, int count, MPI_Datatype type, int srcRank,
+                       int tag, int ssendReq, CMK_REFNUM_TYPE seq) noexcept;
+  AmpiMsg *makeAmpiMsg(const void* buf, int count, MPI_Datatype type, int destRank,
+                       int tag, MPI_Comm comm, int srcRank) noexcept;
+  AmpiMsg *makeAmpiMsg(const void* buf, int count, MPI_Datatype type, int destRank,
+                       int tag, MPI_Comm comm, int srcRank, CMK_REFNUM_TYPE seq) noexcept;
 
-  MPI_Request send(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
-                   MPI_Comm destcomm, AmpiSendType sendType=BLOCKING_SEND, MPI_Request=MPI_REQUEST_NULL) noexcept;
+  MPI_Request send(const void* buf, int count, MPI_Datatype type, int destRank, int tag,
+                   MPI_Comm comm, AmpiSendType sendType=BLOCKING_SEND,
+                   MPI_Request reqIdx=MPI_REQUEST_NULL) noexcept;
   static void sendraw(int t, int s, void* buf, int len, CkArrayID aid, int idx) noexcept;
-  inline MPI_Request sendSyncMsg(int t, int sRank, const void* buf, MPI_Datatype type, int count,
-                                 int rank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi destElem,
-                                 int destIdx, AmpiSendType sendType, MPI_Request reqIdx) noexcept;
-  inline MPI_Request sendLocalInOrderMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type,
-                                         int count, int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq,
-                                         ampi* destPtr, AmpiSendType sendType, MPI_Request reqIdx) noexcept;
-  inline MPI_Request sendRdmaMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type, int destIdx,
-                                 int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi arrProxy,
-                                 MPI_Request reqIdx) noexcept;
+  inline MPI_Request sendSyncMsg(const void* buf, int count, MPI_Datatype type, int destRank,
+                                 int tag, MPI_Comm comm, AmpiSendType sendType,
+                                 MPI_Request reqIdx, int srcRank, CMK_REFNUM_TYPE seq,
+                                 ampi* destPtr, CProxy_ampi arrProxy, int destIdx) noexcept;
+  inline MPI_Request sendLocalInOrderMsg(const void* buf, int count, MPI_Datatype type, int destRank,
+                                         int tag, MPI_Comm comm, AmpiSendType sendType, MPI_Request reqIdx,
+                                         int srcRank, CMK_REFNUM_TYPE seq, int size, ampi* destPtr) noexcept;
+  inline MPI_Request sendRdmaMsg(const void* buf, int size, MPI_Datatype type, int destRank,
+                                 int tag, MPI_Comm comm, int reqIdx, CMK_REFNUM_TYPE seq,
+                                 CProxy_ampi arrProxy, int destIdx) noexcept;
   inline bool destLikelyWithinProcess(CProxy_ampi arrProxy, int destIdx) const noexcept {
 #if CMK_MULTICORE
     return true;
@@ -2885,8 +2887,8 @@ class ampi final : public CBase_ampi {
     return (destPtr != NULL);
 #endif
   }
-  inline MPI_Request delesend(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
-                              MPI_Comm destcomm, CProxy_ampi arrproxy, AmpiSendType sendType, MPI_Request req) noexcept;
+  inline MPI_Request delesend(const void* buf, int count, MPI_Datatype type, int destRank, int tag,
+                              MPI_Comm comm, AmpiSendType sendType, MPI_Request reqIdx) noexcept;
   inline bool processSsendMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
   inline bool processSsendNcpyShmMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
   inline bool processSsendNcpyMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
