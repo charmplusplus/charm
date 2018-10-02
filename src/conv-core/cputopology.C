@@ -248,8 +248,11 @@ static void printTopology(int numNodes)
   else
     CmiPrintf("Charm++> Running on %d hosts\n", numNodes);
 
+#if !CMK_BLUEGENEQ
+  // ignore BG/Q's reserved socket
   if (ways != CmiHwlocTopologyLocal.num_pus)
     CmiPrintf("Charm++> Warning: Internally-determined PU count does not match hwloc's result!\n");
+#endif
 }
 
 /* called on PE 0 */
