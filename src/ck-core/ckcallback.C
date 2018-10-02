@@ -552,20 +552,27 @@ void CcsRegisterHandler(const char *ccs_handlername,const CkCallback &cb) {
 	_ckcallbackgroup.registerCcsCallback(ccs_handlername,cb);
 }
 
+#if CMK_ERROR_CHECKING
 enum {dataMsgTag=0x7ed2beef};
+#endif
+
 CkDataMsg *CkDataMsg::buildNew(int length,const void *data)
 {
 	CkDataMsg *msg=new (&length,0) CkDataMsg;
 	msg->length=length;
 	memcpy(msg->data,data,length);
+#if CMK_ERROR_CHECKING
 	msg->checkTag=dataMsgTag;
+#endif
 	return msg;
 }
 
 void CkDataMsg::check(void)
 {
+#if CMK_ERROR_CHECKING
 	if (checkTag!=dataMsgTag)
 		CkAbort("CkDataMsg corrupted-- bad tag.");
+#endif
 }
 
 void CkCallbackInit() {
