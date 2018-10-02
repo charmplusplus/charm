@@ -1,4 +1,5 @@
 DIRS = \
+  largedata \
   zerocopy_with_qd \
 
 TESTDIRS = $(DIRS)
