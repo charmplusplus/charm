@@ -3542,13 +3542,14 @@ static inline bool handle_MPI_PROC_NULL(int src, MPI_Comm comm, MPI_Status* sts)
   return false;
 }
 
-int ampi::recv(int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm comm, MPI_Status *sts) noexcept
+int ampi::recv(void* buf, int count, MPI_Datatype type, int src, int tag,
+               MPI_Comm comm, MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept
 {
   MSG_ORDER_DEBUG(
-    CkPrintf("AMPI vp %d blocking recv: tag=%d, src=%d, comm=%d\n",thisIndex,t,s,comm);
+    CkPrintf("AMPI vp %d blocking recv: tag=%d, src=%d, comm=%d\n",thisIndex,tag,src,comm);
   )
   MPI_Request req;
-  irecv(buf, count, type, s, t, comm, &req);
+  irecv(buf, count, type, src, tag, comm, &req);
   return parent->wait(&req, sts);
 }
 
@@ -3701,7 +3702,7 @@ void ampi::bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm des
     oorder.incCollSeqOutgoing();
   }
 
-  if (-1==recv(MPI_BCAST_TAG, root, buf, count, type, destcomm)) CkAbort("AMPI> Error in broadcast");
+  recv(buf, count, type, root, MPI_BCAST_TAG, destcomm);
 }
 
 int ampi::intercomm_bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm intercomm) noexcept
@@ -3718,7 +3719,7 @@ int ampi::intercomm_bcast(int root, void* buf, int count, MPI_Datatype type, MPI
 
   if (root!=MPI_PROC_NULL && root!=MPI_ROOT) {
     // remote group ranks
-    if (-1==recv(MPI_BCAST_TAG, root, buf, count, type, intercomm)) CkAbort("AMPI> Error in intercomm broadcast");
+    recv(buf, count, type, root, MPI_BCAST_TAG, intercomm);
   }
   return MPI_SUCCESS;
 }
@@ -3780,8 +3781,7 @@ int ampi::intercomm_scatter(int root, const void *sendbuf, int sendcount, MPI_Da
   }
 
   if (root!=MPI_PROC_NULL && root!=MPI_ROOT) { //remote group ranks
-    if(-1==recv(MPI_SCATTER_TAG, root, recvbuf, recvcount, recvtype, intercomm))
-      CkAbort("AMPI> Error in intercomm MPI_Scatter recv");
+    recv(recvbuf, recvcount, recvtype, root, MPI_SCATTER_TAG, intercomm);
   }
 
   return MPI_SUCCESS;
@@ -3829,8 +3829,7 @@ int ampi::intercomm_scatterv(int root, const void* sendbuf, const int* sendcount
   }
 
   if (root != MPI_PROC_NULL && root != MPI_ROOT) { // remote group ranks
-    if (-1 == recv(MPI_SCATTER_TAG, root, recvbuf, recvcount, recvtype, intercomm))
-      CkAbort("AMPI> Error in intercomm MPI_Scatterv recv");
+    recv(recvbuf, recvcount, recvtype, root, MPI_SCATTER_TAG, intercomm);
   }
 
   return MPI_SUCCESS;
@@ -4505,15 +4504,15 @@ AMPI_API_IMPL(int, MPI_Issend, const void *buf, int count, MPI_Datatype type, in
   return MPI_SUCCESS;
 }
 
-AMPI_API_IMPL(int, MPI_Recv, void *msg, int count, MPI_Datatype type, int src, int tag,
+AMPI_API_IMPL(int, MPI_Recv, void *buf, int count, MPI_Datatype type, int src, int tag,
                              MPI_Comm comm, MPI_Status *status)
 {
   AMPI_API("AMPI_Recv");
 
-  handle_MPI_BOTTOM(msg, type);
+  handle_MPI_BOTTOM(buf, type);
 
 #if AMPI_ERROR_CHECKING
-  int ret = errorCheck("AMPI_Recv", comm, 1, count, 1, type, 1, tag, 1, src, 1, msg, 1);
+  int ret = errorCheck("AMPI_Recv", comm, 1, count, 1, type, 1, tag, 1, src, 1, buf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
@@ -4522,25 +4521,25 @@ AMPI_API_IMPL(int, MPI_Recv, void *msg, int count, MPI_Datatype type, int src, i
   ampiParent* pptr = getAmpiParent();
   if(msgLogRead){
     (*(pptr->fromPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->fromPUPer), (char *)msg, (pptr->pupBytes));
+    PUParray(*(pptr->fromPUPer), (char *)buf, (pptr->pupBytes));
     PUParray(*(pptr->fromPUPer), (char *)status, sizeof(MPI_Status));
     return MPI_SUCCESS;
   }
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  if(-1==ptr->recv(tag,src,msg,count,type,comm,status)) CkAbort("AMPI> Error in MPI_Recv");
+  int err = ptr->recv(buf, count, type, src, tag, comm, status);
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
     (pptr->pupBytes) = getDDT()->getSize(type) * count;
     (*(pptr->toPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->toPUPer), (char *)msg, (pptr->pupBytes));
+    PUParray(*(pptr->toPUPer), (char *)buf, (pptr->pupBytes));
     PUParray(*(pptr->toPUPer), (char *)status, sizeof(MPI_Status));
   }
 #endif
 
-  return MPI_SUCCESS;
+  return err;
 }
 
 AMPI_API_IMPL(int, MPI_Probe, int src, int tag, MPI_Comm comm, MPI_Status *status)
@@ -7153,12 +7152,12 @@ AMPI_API_IMPL(int, MPI_Irsend, const void *buf, int count, MPI_Datatype type, in
   return MPI_Isend(buf, count, type, dest, tag, comm, request);
 }
 
-void ampi::irecv(void *buf, int count, MPI_Datatype type, int src,
-                 int tag, MPI_Comm comm, MPI_Request *request) noexcept
+int ampi::irecv(void *buf, int count, MPI_Datatype type, int src,
+                int tag, MPI_Comm comm, MPI_Request *request) noexcept
 {
   if (src==MPI_PROC_NULL) {
     *request = MPI_REQUEST_NULL;
-    return;
+    return MPI_SUCCESS;
   }
 
   if (isInter()) {
@@ -7190,6 +7189,7 @@ void ampi::irecv(void *buf, int count, MPI_Datatype type, int src,
     PUParray(*(pptr->toPUPer), (char *)request, sizeof(MPI_Request));
   }
 #endif
+  return MPI_SUCCESS;
 }
 
 AMPI_API_IMPL(int, MPI_Irecv, void *buf, int count, MPI_Datatype type, int src,
@@ -7210,9 +7210,7 @@ AMPI_API_IMPL(int, MPI_Irecv, void *buf, int count, MPI_Datatype type, int src,
   USER_CALL_DEBUG("AMPI_Irecv("<<type<<","<<src<<","<<tag<<","<<comm<<")");
   ampi *ptr = getAmpiInstance(comm);
 
-  ptr->irecv(buf, count, type, src, tag, comm, request);
-
-  return MPI_SUCCESS;
+  return ptr->irecv(buf, count, type, src, tag, comm, request);
 }
 
 AMPI_API_IMPL(int, MPI_Ireduce, const void *sendbuf, void *recvbuf, int count,
@@ -7809,8 +7807,7 @@ AMPI_API_IMPL(int, MPI_Scatter, const void *sendbuf, int sendcount, MPI_Datatype
     }
   }
   else {
-    if(-1==ptr->recv(MPI_SCATTER_TAG, root, recvbuf, recvcount, recvtype, comm))
-      CkAbort("AMPI> Error in MPI_Scatter recv");
+    ptr->recv(recvbuf, recvcount, recvtype, root, MPI_SCATTER_TAG, comm);
   }
 
 #if AMPIMSGLOG
@@ -7966,8 +7963,7 @@ AMPI_API_IMPL(int, MPI_Scatterv, const void *sendbuf, const int *sendcounts, con
     }
   }
   else {
-    if(-1==ptr->recv(MPI_SCATTER_TAG, root, recvbuf, recvcount, recvtype, comm))
-      CkAbort("AMPI> Error in MPI_Scatterv recv");
+    ptr->recv(recvbuf, recvcount, recvtype, root, MPI_SCATTER_TAG, comm);
   }
 
 #if AMPIMSGLOG
@@ -9237,8 +9233,7 @@ AMPI_API_IMPL(int, MPI_Intercomm_create, MPI_Comm localComm, int localLeader, MP
     peerPtr->probe(tag, remoteLeader, peerComm, &sts);
     MPI_Get_count(&sts, MPI_INT, &remoteSize);
     remoteVec.resize(remoteSize);
-    if (-1==peerPtr->recv(tag, remoteLeader, remoteVec.data(), remoteSize, MPI_INT, peerComm))
-      CkAbort("AMPI> Error in MPI_Intercomm_create");
+    peerPtr->recv(remoteVec.data(), remoteSize, MPI_INT, remoteLeader, tag, peerComm);
 
     if (remoteSize==0) {
       AMPI_DEBUG("AMPI> In MPI_Intercomm_create, creating an empty communicator\n");
@@ -9271,8 +9266,7 @@ AMPI_API_IMPL(int, MPI_Intercomm_merge, MPI_Comm intercomm, int high, MPI_Comm *
 
   if(lrank==0){
     MPI_Request req = ptr->send(&lhigh, 1, MPI_INT, 0, MPI_ATA_TAG, intercomm, I_SEND);
-    if(-1==ptr->recv(MPI_ATA_TAG,0,&rhigh,1,MPI_INT,intercomm))
-      CkAbort("AMPI> Error in MPI_Intercomm_create");
+    ptr->recv(&rhigh,1,MPI_INT,0,MPI_ATA_TAG,intercomm);
     MPI_Wait(&req, MPI_STATUS_IGNORE);
 
     if((lhigh && rhigh) || (!lhigh && !rhigh)){ // same value: smaller root goes first (first=1 if local goes first)
@@ -11211,10 +11205,7 @@ int AMPI_Set_start_event(MPI_Comm comm)
   ptr->contribute(msg);
 
   /*HACK: Use recv() to block until the reduction data comes back*/
-  if(-1==ptr->recv(MPI_BCAST_TAG, -1, NULL, 0, MPI_INT, MPI_COMM_WORLD))
-    CkAbort("AMPI> MPI_Allreduce called with different values on different processors!");
-
-  return MPI_SUCCESS;
+  return ptr->recv(NULL, 0, MPI_INT, -1, MPI_BCAST_TAG, MPI_COMM_WORLD);
 }
 
 CDECL

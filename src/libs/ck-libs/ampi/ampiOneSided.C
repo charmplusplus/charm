@@ -1131,7 +1131,7 @@ AMPI_API_IMPL(int, MPI_Win_start, MPI_Group group, int assertion, MPI_Win win)
   for (int i=0; i<subsetGroupRanks.size(); i++) {
     if (subsetGroupRanks[i] != MPI_UNDEFINED) {
       subsetGroupRanks[actualRanks++] = i;
-      ptr->recv(MPI_EPOCH_START_TAG, subsetGroupRanks[actualRanks-1], NULL, 0, MPI_INT, winStruct->comm, MPI_STATUS_IGNORE);
+      ptr->recv(NULL, 0, MPI_INT, subsetGroupRanks[actualRanks-1], MPI_EPOCH_START_TAG, winStruct->comm, MPI_STATUS_IGNORE);
     }
   }
 

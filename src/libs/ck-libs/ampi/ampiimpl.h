@@ -2901,13 +2901,10 @@ class ampi final : public CBase_ampi {
   inline void processGathervMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type,
                                int* recvCounts, int* displs) noexcept;
   inline AmpiMsg * getMessage(int t, int s, MPI_Comm comm, int *sts) const noexcept;
-  int recv(int t,int s,void* buf,int count,MPI_Datatype type,MPI_Comm comm,MPI_Status *sts=NULL) noexcept;
-  void irecv(void *buf, int count, MPI_Datatype type, int src,
-             int tag, MPI_Comm comm, MPI_Request *request) noexcept;
-  void mrecv(int tag, int src, void* buf, int count, MPI_Datatype datatype, MPI_Comm comm,
-             MPI_Status* status, MPI_Message* message) noexcept;
-  void imrecv(void* buf, int count, MPI_Datatype datatype, int src, int tag, MPI_Comm comm,
-              MPI_Request* request, MPI_Message* message) noexcept;
+  int recv(void* buf, int count, MPI_Datatype type, int src, int tag,
+           MPI_Comm comm, MPI_Status *sts=MPI_STATUS_IGNORE) noexcept;
+  int irecv(void *buf, int count, MPI_Datatype type, int src,
+            int tag, MPI_Comm comm, MPI_Request *request) noexcept;
   void sendrecv(const void *sbuf, int scount, MPI_Datatype stype, int dest, int stag,
                 void *rbuf, int rcount, MPI_Datatype rtype, int src, int rtag,
                 MPI_Comm comm, MPI_Status *sts) noexcept;
