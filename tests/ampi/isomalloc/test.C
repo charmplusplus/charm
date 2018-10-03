@@ -11,6 +11,13 @@
 #include <random>
 #include <chrono>
 #include <algorithm>
+#include <functional>
+#include <type_traits>
+
+// for getrusage
+#include <sys/time.h>
+#include <sys/resource.h>
+
 #include "mpi.h"
 
 #define STRINGIZE(x) #x
@@ -133,15 +140,43 @@ static inline constexpr size_t countof(T const (&)[N]) noexcept
   return N;
 }
 
+static inline void request_migration()
+{
+  AMPI_Migrate(AMPI_INFO_LB_SYNC);
+}
+
+using clock_type = typename std::conditional<
+  std::chrono::high_resolution_clock::is_steady,
+  std::chrono::high_resolution_clock, std::chrono::steady_clock>::type;
+using time_point = typename std::chrono::time_point<clock_type>;
+using duration_type = typename std::chrono::duration<unsigned long long, std::nano>;
+
 static void malloc_stress(int rank, int p, uint32_t randomseed)
 {
+  // This function avoids heap allocations other than the test itself.
+
   std::mt19937 generator{randomseed};
 
   static constexpr size_t maxallocs = 2048;
   static constexpr size_t maxsegments = 8;
-  unsigned char *ptr[maxallocs];
-  unsigned int sizes[maxallocs];
-  unsigned int segments[maxsegments];
+  static constexpr size_t maxtests = 32;
+
+  struct alloc_type
+  {
+    unsigned char *ptr;
+    unsigned int size;
+  };
+  alloc_type allocations[maxallocs]{};
+  alloc_type * allocation_queue[maxallocs*2]{};
+
+  unsigned int segments[maxsegments]{}; // segment boundaries
+
+  struct test_type
+  {
+    const char *description1, *description2;
+    unsigned long long duration_count;
+  };
+  test_type tests[maxtests]{};
 
   size_t numallocs = 0;
   size_t numsegments = 1;
@@ -152,113 +187,422 @@ static void malloc_stress(int rank, int p, uint32_t randomseed)
 
   for (size_t i = rank; i < countof(primes); i += p)
   {
-    sizes[numallocs++] = primes[i];
+    allocations[numallocs++].size = primes[i];
   }
   segments[numsegments++] = numallocs;
 
   for (size_t i = rank; i < countof(largeprimes); i += p)
   {
-    sizes[numallocs++] = largeprimes[i];
+    allocations[numallocs++].size = largeprimes[i];
   }
   segments[numsegments++] = numallocs;
 
   for (size_t i = rank; i < countof(largeprimes); i += p)
   {
-    sizes[numallocs++] = primes[countof(primes)-1-i];
-    sizes[numallocs++] = largeprimes[i];
+    allocations[numallocs++].size = primes[countof(primes)-1-i];
+    allocations[numallocs++].size = largeprimes[i];
   }
   segments[numsegments++] = numallocs;
 
-  const size_t migrationinterval = numallocs / 5;
 
-  auto tests = [&]()
+  const size_t queuesize = numallocs * 2;
+
+#ifdef MIGRATION_OVERKILL
+  const size_t migrationinterval = numallocs / 31; // prime number divisor
+  size_t eventnum = 0;
+#endif
+
+  size_t testnum = 0;
+
+  auto alloc_loop = [&](const size_t a_begin, const size_t a_end)
   {
-    // test, freeing after every segment
+    for (size_t a = a_begin; a < a_end; ++a)
     {
-      size_t event = 0;
+      alloc_type & allocation = *(allocation_queue[a]);
+      const size_t size = allocation.size;
+      const unsigned char rankbyte = rank & 0xFF;
 
-      for (size_t s = 1; s < numsegments; ++s)
+      const auto ptr = allocation.ptr = (unsigned char*)malloc(size);
+      if (ptr == nullptr)
       {
-        for (size_t a = segments[s-1], a_end = segments[s]; a < a_end; ++a)
-        {
-          const size_t size = sizes[a];
-          const unsigned char rankbyte = rank & 0xFF;
-          ptr[a] = (unsigned char*)malloc(size);
-          ptr[a][0] = ptr[a][size-1] = rankbyte;
-          ++event;
-          if (event == migrationinterval)
-          {
-            event = 0;
-            AMPI_Migrate(AMPI_INFO_LB_SYNC);
-          }
-        }
-
-        AMPI_Migrate(AMPI_INFO_LB_SYNC);
-
-        for (size_t a = segments[s-1], a_end = segments[s]; a < a_end; ++a)
-        {
-          const size_t size = sizes[a];
-          const unsigned char rankbyte = rank & 0xFF;
-          if (ptr[a][0] != rankbyte || ptr[a][size-1] != rankbyte)
-            MPI_Abort(MPI_COMM_WORLD, 1);
-          free(ptr[a]);
-          ++event;
-          if (event == migrationinterval)
-          {
-            event = 0;
-            AMPI_Migrate(AMPI_INFO_LB_SYNC);
-          }
-        }
+        printf("Error: malloc() failure in rank %d, test %zu, allocation %zu\n", rank, testnum, a);
+        MPI_Abort(MPI_COMM_WORLD, 1);
       }
-    }
+      ptr[0] = ptr[size-1] = rankbyte;
 
-    // test, freeing at the end
-    {
-      size_t event = 0;
-
-      for (size_t a = 0; a < numallocs; ++a)
+#ifdef MIGRATION_OVERKILL
+      ++eventnum;
+      if (eventnum == migrationinterval)
       {
-        const size_t size = sizes[a];
-        const unsigned char rankbyte = rank & 0xFF;
-        ptr[a] = (unsigned char*)malloc(size);
-        ptr[a][0] = ptr[a][size-1] = rankbyte;
-        ++event;
-        if (event == migrationinterval)
-        {
-          event = 0;
-          AMPI_Migrate(AMPI_INFO_LB_SYNC);
-        }
+        eventnum = 0;
+        request_migration();
       }
-
-      AMPI_Migrate(AMPI_INFO_LB_SYNC);
-
-      for (size_t a = 0; a < numallocs; ++a)
-      {
-        const size_t size = sizes[a];
-        const unsigned char rankbyte = rank & 0xFF;
-        if (ptr[a][0] != rankbyte || ptr[a][size-1] != rankbyte)
-          MPI_Abort(MPI_COMM_WORLD, 1);
-        free(ptr[a]);
-        ++event;
-        if (event == migrationinterval)
-        {
-          event = 0;
-          AMPI_Migrate(AMPI_INFO_LB_SYNC);
-        }
-      }
+#endif
     }
   };
 
+  auto free_loop = [&](const size_t a_begin, const size_t a_end)
+  {
+    for (size_t a = a_begin; a < a_end; ++a)
+    {
+      alloc_type & allocation = *(allocation_queue[a]);
+      const size_t size = allocation.size;
+      const unsigned char rankbyte = rank & 0xFF;
 
-  // test with the original order
-  tests();
-  // test with shuffling within segment
-  for (size_t s = 1; s < numsegments; ++s)
-    std::shuffle(sizes + segments[s-1], sizes + segments[s], generator);
-  tests();
-  // test with shuffling across entire test set
-  std::shuffle(sizes, sizes + numallocs, generator);
-  tests();
+      const auto ptr = allocation.ptr;
+      if (ptr[0] != rankbyte || ptr[size-1] != rankbyte)
+      {
+        printf("Error: Correctness failure in rank %d, test %zu, allocation %zu\n", rank, testnum, a);
+        MPI_Abort(MPI_COMM_WORLD, 2);
+      }
+      free(ptr);
+      allocation.ptr = nullptr;
+
+#ifdef MIGRATION_OVERKILL
+      ++eventnum;
+      if (eventnum == migrationinterval)
+      {
+        eventnum = 0;
+        request_migration();
+      }
+#endif
+    }
+  };
+
+  auto undetermined_loop = [&](const size_t a_begin, const size_t a_end)
+  {
+    for (size_t a = a_begin; a < a_end; ++a)
+    {
+      alloc_type & allocation = *(allocation_queue[a]);
+      const size_t size = allocation.size;
+      const unsigned char rankbyte = rank & 0xFF;
+
+      auto ptr = allocation.ptr;
+      if (ptr == nullptr)
+      {
+        ptr = allocation.ptr = (unsigned char*)malloc(size);
+        if (ptr == nullptr)
+        {
+          printf("Error: malloc() failure in rank %d, test %zu, allocation %zu\n", rank, testnum, a);
+          MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        ptr[0] = ptr[size-1] = rankbyte;
+      }
+      else
+      {
+        if (ptr[0] != rankbyte || ptr[size-1] != rankbyte)
+        {
+          printf("Error: Correctness failure in rank %d, test %zu, allocation %zu\n", rank, testnum, a);
+          MPI_Abort(MPI_COMM_WORLD, 2);
+        }
+        allocation.ptr = nullptr;
+        free(ptr);
+      }
+
+#ifdef MIGRATION_OVERKILL
+      ++eventnum;
+      if (eventnum == migrationinterval)
+      {
+        eventnum = 0;
+        request_migration();
+      }
+#endif
+    }
+  };
+
+  auto reset_queue = [&]()
+  {
+    alloc_type ** q = allocation_queue;
+    for (alloc_type * al = allocations, * al_end = al + numallocs; al < al_end; ++al)
+      *(q++) = al;
+  };
+
+  // tests freeing after every segment
+  auto test_by_segment = [&](std::function<void(size_t)> between = [](size_t){}, std::function<void(size_t)> after = [](size_t){})
+  {
+#ifdef MIGRATION_OVERKILL
+    eventnum = 0;
+#endif
+
+    if (testnum == maxtests)
+    {
+      printf("Error: Increase maxtests.\n");
+      MPI_Abort(MPI_COMM_WORLD, 10);
+    }
+
+    unsigned long long test_duration_count = 0;
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    for (size_t s = 1; s < numsegments; ++s)
+    {
+      const time_point t_0 = clock_type::now();
+      alloc_loop(segments[s-1], segments[s]);
+      const time_point t_1 = clock_type::now();
+
+      request_migration();
+      between(s);
+
+      const time_point t_2 = clock_type::now();
+      free_loop(segments[s-1], segments[s]);
+      const time_point t_3 = clock_type::now();
+
+      request_migration();
+      after(s);
+
+      const duration_type test_duration = (t_3 - t_2) + (t_1 - t_0);
+      test_duration_count += test_duration.count();
+    }
+
+    unsigned long long duration_count = 0;
+    MPI_Reduce(&test_duration_count, &duration_count, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, 0, MPI_COMM_WORLD);
+    tests[testnum].duration_count = duration_count;
+
+    ++testnum;
+  };
+
+  // tests freeing at the end
+  auto test_all = [&](std::function<void()> between = [](){}, std::function<void()> after = [](){})
+  {
+#ifdef MIGRATION_OVERKILL
+    eventnum = 0;
+#endif
+
+    if (testnum == maxtests)
+    {
+      printf("Error: Increase maxtests.\n");
+      MPI_Abort(MPI_COMM_WORLD, 10);
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    const time_point t_0 = clock_type::now();
+    alloc_loop(0, numallocs);
+    const time_point t_1 = clock_type::now();
+
+    request_migration();
+    between();
+
+    const time_point t_2 = clock_type::now();
+    free_loop(0, numallocs);
+    const time_point t_3 = clock_type::now();
+
+    request_migration();
+    after();
+
+    const duration_type test_duration = (t_3 - t_2) + (t_1 - t_0);
+    unsigned long long test_duration_count = test_duration.count();
+
+    unsigned long long duration_count = 0;
+    MPI_Reduce(&test_duration_count, &duration_count, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, 0, MPI_COMM_WORLD);
+    tests[testnum].duration_count = duration_count;
+
+    ++testnum;
+  };
+
+  // tests with alloc and free interspersed
+  auto test_mixed = [&]()
+  {
+#ifdef MIGRATION_OVERKILL
+    eventnum = 0;
+#endif
+
+    if (testnum == maxtests)
+    {
+      printf("Error: Increase maxtests.\n");
+      MPI_Abort(MPI_COMM_WORLD, 10);
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    const time_point t_0 = clock_type::now();
+    undetermined_loop(0, numallocs*2);
+    const time_point t_1 = clock_type::now();
+
+    request_migration();
+
+    const duration_type test_duration = t_1 - t_0;
+    unsigned long long test_duration_count = test_duration.count();
+
+    unsigned long long duration_count = 0;
+    MPI_Reduce(&test_duration_count, &duration_count, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, 0, MPI_COMM_WORLD);
+    tests[testnum].duration_count = duration_count;
+
+    ++testnum;
+  };
+
+  auto shuffle_segment = [&](size_t s)
+  {
+    std::shuffle(allocation_queue + segments[s-1], allocation_queue + segments[s], generator);
+  };
+  auto shuffle_segments = [&]()
+  {
+    for (size_t s = 1; s < numsegments; ++s)
+      shuffle_segment(s);
+  };
+  auto shuffle_all = [&]()
+  {
+    std::shuffle(allocation_queue, allocation_queue + numallocs, generator);
+  };
+
+  auto reverse_segment = [&](size_t s)
+  {
+    std::reverse(allocation_queue + segments[s-1], allocation_queue + segments[s]);
+  };
+  auto reverse_segments = [&]()
+  {
+    for (size_t s = 1; s < numsegments; ++s)
+      reverse_segment(s);
+  };
+  auto reverse_all = [&]()
+  {
+    std::reverse(allocation_queue, allocation_queue + numallocs);
+  };
+
+  auto shuffle_segments_and_reverse_all = [&]()
+  {
+    shuffle_segments();
+    reverse_all();
+  };
+
+  auto tests_static = [&](const char *desc1)
+  {
+    // allocate and free in the original order
+
+    tests[testnum].description1 = desc1;
+    tests[testnum].description2 = "FIFO free, batched by segment";
+    test_by_segment();
+
+    tests[testnum].description1 = desc1;
+    tests[testnum].description2 = "FIFO free, one batch";
+    test_all();
+
+
+    // allocate in the original order, free in the reverse order
+
+    tests[testnum].description1 = desc1;
+    tests[testnum].description2 = "LIFO free, batched by segment";
+    test_by_segment(reverse_segment, reverse_segment);
+
+    tests[testnum].description1 = desc1;
+    tests[testnum].description2 = "LIFO free within segments, one batch";
+    test_all(reverse_segments, reverse_segments);
+
+    tests[testnum].description1 = desc1;
+    tests[testnum].description2 = "LIFO free overall, one batch";
+    test_all(reverse_all, reverse_all);
+  };
+
+  auto tests_dynamic = [&](const char *desc1)
+  {
+    tests[testnum].description1 = desc1;
+    tests[testnum].description2 = "within segments, batched by segment";
+    test_by_segment(shuffle_segment);
+
+    tests[testnum].description1 = desc1;
+    tests[testnum].description2 = "within segments, FIFO segment order, one batch";
+    test_all(shuffle_segments);
+
+    tests[testnum].description1 = desc1;
+    tests[testnum].description2 = "within segments, LIFO segment order, one batch";
+    test_all(shuffle_segments_and_reverse_all); // reverse the segment order
+
+    tests[testnum].description1 = desc1;
+    tests[testnum].description2 = "overall, one batch";
+    test_all(shuffle_all);
+  };
+
+  auto tests_mixed = [&](const char *desc1)
+  {
+    {
+      alloc_type ** q = allocation_queue;
+      for (size_t s = 1; s < numsegments; ++s)
+      {
+        const size_t a_begin = segments[s-1], a_end = segments[s];
+
+        alloc_type ** const q_begin = q;
+
+        alloc_type * const al_begin = allocations + a_begin, * const al_end = allocations + a_end;
+        for (alloc_type * al = al_begin; al < al_end; ++al)
+          *(q++) = al;
+        for (alloc_type * al = al_begin; al < al_end; ++al)
+          *(q++) = al;
+
+        std::shuffle(q_begin, q, generator);
+      }
+    }
+    tests[testnum].description1 = desc1;
+    tests[testnum].description2 = "within segments, batched by segment";
+    test_mixed();
+
+    {
+      alloc_type ** q = allocation_queue;
+      for (alloc_type * al = allocations, * al_end = al + numallocs; al < al_end; ++al)
+        *(q++) = al;
+      for (alloc_type * al = allocations, * al_end = al + numallocs; al < al_end; ++al)
+        *(q++) = al;
+    }
+    std::shuffle(allocation_queue, allocation_queue + queuesize, generator);
+    tests[testnum].description1 = desc1;
+    tests[testnum].description2 = "overall, one batch";
+    test_mixed();
+  };
+
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  const time_point t_0 = clock_type::now();
+
+  reset_queue();
+
+  tests_static("distinct phases, without shuffling, ");
+
+  shuffle_segments();
+  tests_static("distinct phases, static shuffle within segments, ");
+
+  shuffle_all();
+  tests_static("distinct phases, static shuffle overall, ");
+
+  shuffle_all();
+  tests_dynamic("distinct phases, shuffling between phases ");
+
+  tests_mixed("one phase, shuffled ");
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  const time_point t_1 = clock_type::now();
+
+
+  const duration_type overall_duration = t_1 - t_0;
+  unsigned long long overall_duration_count = overall_duration.count();
+
+  // print results
+  if (rank == 0)
+  {
+    unsigned long long total_duration_count = 0;
+
+    printf("malloc stress test results:\n");
+    printf("   # - duration (ns) - description\n");
+    for (size_t t = 0; t < testnum; ++t)
+    {
+      const test_type & test = tests[t];
+
+      total_duration_count += test.duration_count;
+
+      printf("%4zu - %13llu - %s%s\n", t+1, test.duration_count, test.description1, test.description2);
+    }
+    printf(" all - %13llu - total\n", total_duration_count);
+
+    struct rusage usage;
+    getrusage(RUSAGE_SELF, &usage);
+
+    printf("memory usage high water mark ("
+#ifdef __APPLE__
+      "bytes"
+#else
+      "kilobytes"
+#endif
+      "): %lu\n", usage.ru_maxrss);
+    printf("overall test duration (ns) including migration, shuffling, barriers, etc: %llu\n", overall_duration_count);
+  }
 }
 
 int main(int argc, char** argv)
@@ -285,20 +629,9 @@ int main(int argc, char** argv)
   }
 
   if (rank == 0)
-    printf("memory test: ./" isomalloc_method_str " +vp%i %" PRIu32 "\n", p, randomseed);
-
-  MPI_Barrier(MPI_COMM_WORLD);
-  const auto t_0 = std::chrono::steady_clock::now();
+    printf("memory test: ./" isomalloc_method_str " (...) +vp%i %" PRIu32 "\n", p, randomseed);
 
   malloc_stress(rank, p, randomseed);
-
-  MPI_Barrier(MPI_COMM_WORLD);
-  const auto t_1 = std::chrono::steady_clock::now();
-
-  const std::chrono::duration<double> duration = t_1 - t_0;
-
-  if (rank == 0)
-    printf("malloc stress test completed in %f seconds\n", duration);
 
   MPI_Finalize();
 

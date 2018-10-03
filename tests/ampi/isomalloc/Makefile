@@ -25,7 +25,10 @@ endef
 
 $(foreach i,$(CANDIDATES),$(eval $(call TEST_TARGET_AVAILABILITY,$i)))
 
+# command pieces
+TESTFLAGS := +balancer RotateLB +LBPeriod 0.01
 
+# build rules
 all: $(foreach i,$(TARGETS),$i)
 test: $(foreach i,$(TARGETS),test-$i)
 
@@ -36,17 +39,17 @@ test-everything: $(foreach i,$(VARIANTS),test-$i)
 define VARIANT_RULES
 
 $1: $1.o
-	$$(AMPICC) -o $$@ $$^ -balancer RotateLB -memory $1
+	$$(AMPICC) -o $$@ $$^ -module CommonLBs -memory $1
 
 $1.o: test.C
 	$$(AMPICC) -o $$@ -memory $1 -Disomalloc_method=$1 -c $$<
 
 test-$1: $1
-	$$(call run, ./$1 +p1 +vp1 )
-	$$(call run, ./$1 +p1 +vp2 )
-	$$(call run, ./$1 +p1 +vp4 )
-	$$(call run, ./$1 +p2 +vp2 )
-	$$(call run, ./$1 +p2 +vp4 )
+	$$(call run, ./$1 +p1 +vp1 $(TESTFLAGS) )
+	$$(call run, ./$1 +p1 +vp2 $(TESTFLAGS) )
+	$$(call run, ./$1 +p1 +vp4 $(TESTFLAGS) )
+	$$(call run, ./$1 +p2 +vp2 $(TESTFLAGS) )
+	$$(call run, ./$1 +p2 +vp4 $(TESTFLAGS) )
 
 endef
 
