@@ -1488,8 +1488,18 @@ BAL_OBJ="-lldb-$BALANCE -lconv-ldb"
 
 # Check for valid choice of MEMORY
 
+# Set the default expansions of unprefixed variants
+case "$MEMORY" in
+  'verbose'|'paranoid'|'leak'|'isomalloc')
+    MEMORY="os-$MEMORY"
+    ;;
+  charmdebug*)
+    MEMORY="gnu-$MEMORY"
+    ;;
+esac
+
 # Isomalloc does not work on BGQ or Windows:
-if [ "$CMK_BLUEGENEQ" = "1" -o "$CMK_COMPILER" = "msvc" ] && [ "$MEMORY" = "isomalloc" -o "$MEMORY" = "os-isomalloc" ]
+if [ "$CMK_BLUEGENEQ" = "1" -o "$CMK_COMPILER" = "msvc" ] && [ "$MEMORY" = "${MEMORY%isomalloc}isomalloc" ]
 then
   Abort "Error: Isomalloc is not supported on BlueGene/Q or Windows."
 fi

@@ -3,7 +3,7 @@ AMPICC=../../../bin/ampicxx $(OPTS)
 
 
 VARIANTS := \
-  isomalloc \
+  gnu-isomalloc \
   os-isomalloc \
 
 

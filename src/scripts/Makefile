@@ -430,10 +430,10 @@ ifneq ($(CMK_HAS_MMAP),0)
 
 MEMLIBS += \
   $(L)/libmemory-gnu.a \
-  $(L)/libmemory-verbose.a \
-  $(L)/libmemory-paranoid.a \
-  $(L)/libmemory-leak.a \
-  $(L)/libmemory-isomalloc.a \
+  $(L)/libmemory-gnu-verbose.a \
+  $(L)/libmemory-gnu-paranoid.a \
+  $(L)/libmemory-gnu-leak.a \
+  $(L)/libmemory-gnu-isomalloc.a \
 
 endif
 
@@ -443,10 +443,10 @@ ifneq ($(BUILD_CHARMDEBUG),0)
 ifneq ($(CMK_HAS_MMAP),0)
 
 MEMLIBS += \
-  $(L)/libmemory-charmdebug.a \
-  $(L)/libmemory-charmdebug-mmap.a \
-  $(L)/libmemory-charmdebug-slot.a \
-  $(L)/libmemory-charmdebug-mmap-slot.a \
+  $(L)/libmemory-gnu-charmdebug.a \
+  $(L)/libmemory-gnu-charmdebug-mmap.a \
+  $(L)/libmemory-gnu-charmdebug-slot.a \
+  $(L)/libmemory-gnu-charmdebug-mmap-slot.a \
   $(L)/libmemory-hooks-charmdebug.a \
   $(L)/libmemory-os-charmdebug.a \
 
@@ -640,15 +640,15 @@ $(eval $(call libmem,hooks-charmdebug,,-DCMK_MEMORY_BUILD_GNU_HOOKS -DCMK_MEMORY
 
 # If the system doesn't have sbrk, these compilations may fail.
 #  This is OK, but then we can't use "-memory gnu" or friends.
-$(eval $(call libmem,gnu,                                    ,-DCMK_MEMORY_BUILD_GNU -touch-on-failure))
-$(eval $(call libmem,verbose,             memory-verbose.c   ,-DCMK_MEMORY_BUILD_VERBOSE -touch-on-failure))
-$(eval $(call libmem,paranoid,            memory-paranoid.c  ,-DCMK_MEMORY_BUILD_PARANOID -touch-on-failure))
-$(eval $(call libmem,leak,                memory-leak.c      ,-DCMK_MEMORY_BUILD_LEAK -touch-on-failure))
-$(eval $(call libmem,isomalloc,           memory-isomalloc.c ,-DCMK_MEMORY_BUILD_ISOMALLOC -touch-on-failure))
-$(eval $(call libmem,charmdebug,          memory-charmdebug.c,-DCMK_MEMORY_BUILD_CHARMDEBUG -optimize -touch-on-failure))
-$(eval $(call libmem,charmdebug-slot,     memory-charmdebug.c,-DCMK_MEMORY_BUILD_CHARMDEBUG -DCMK_SEPARATE_SLOT -optimize -touch-on-failure))
-$(eval $(call libmem,charmdebug-mmap,     memory-charmdebug.c,-DCMK_MEMORY_BUILD_CHARMDEBUG -DCPD_USE_MMAP -optimize -touch-on-failure))
-$(eval $(call libmem,charmdebug-mmap-slot,memory-charmdebug.c,-DCMK_MEMORY_BUILD_CHARMDEBUG -DCPD_USE_MMAP -DCMK_SEPARATE_SLOT -optimize -touch-on-failure))
+$(eval $(call libmem,gnu,                                        ,-DCMK_MEMORY_BUILD_GNU -touch-on-failure))
+$(eval $(call libmem,gnu-verbose,             memory-verbose.c   ,-DCMK_MEMORY_BUILD_VERBOSE -touch-on-failure))
+$(eval $(call libmem,gnu-paranoid,            memory-paranoid.c  ,-DCMK_MEMORY_BUILD_PARANOID -touch-on-failure))
+$(eval $(call libmem,gnu-leak,                memory-leak.c      ,-DCMK_MEMORY_BUILD_LEAK -touch-on-failure))
+$(eval $(call libmem,gnu-isomalloc,           memory-isomalloc.c ,-DCMK_MEMORY_BUILD_ISOMALLOC -touch-on-failure))
+$(eval $(call libmem,gnu-charmdebug,          memory-charmdebug.c,-DCMK_MEMORY_BUILD_CHARMDEBUG -optimize -touch-on-failure))
+$(eval $(call libmem,gnu-charmdebug-slot,     memory-charmdebug.c,-DCMK_MEMORY_BUILD_CHARMDEBUG -DCMK_SEPARATE_SLOT -optimize -touch-on-failure))
+$(eval $(call libmem,gnu-charmdebug-mmap,     memory-charmdebug.c,-DCMK_MEMORY_BUILD_CHARMDEBUG -DCPD_USE_MMAP -optimize -touch-on-failure))
+$(eval $(call libmem,gnu-charmdebug-mmap-slot,memory-charmdebug.c,-DCMK_MEMORY_BUILD_CHARMDEBUG -DCPD_USE_MMAP -DCMK_SEPARATE_SLOT -optimize -touch-on-failure))
 
 ## Thread libraries (-thread)
 
