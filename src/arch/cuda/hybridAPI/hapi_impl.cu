@@ -56,11 +56,11 @@ typedef struct hapiEvent {
   cudaEvent_t event;
   void* cb;
   void* cb_msg;
-} hapiEvent;
+  hapiWorkRequest* wr; // if this is not NULL, buffers and request itself are deallocated
 
-// Generate a globally unique pointer to use as a flag
-static char free_buff_flag_sentinel;
-#define FREE_BUFF_FLAG ((void*)&free_buff_flag_sentinel)
+  hapiEvent(cudaEvent_t event_, void* cb_, void* cb_msg_, hapiWorkRequest* wr_ = NULL)
+            : event(event_), cb(cb_), cb_msg(cb_msg_), wr(wr_) {}
+} hapiEvent;
 
 CpvDeclare(std::queue<hapiEvent>, hapi_event_queue);
 #endif
@@ -134,10 +134,12 @@ public:
   int n_streams_;
   int last_stream_id_;
 
+#ifdef HAPI_CUDA_CALLBACK
   int host_to_device_cb_idx_;
   int kernel_cb_idx_;
   int device_to_host_cb_idx_;
   int light_cb_idx_; // for lightweight version
+#endif
 
   int running_kernel_idx_;
   int data_setup_idx_;
@@ -371,16 +373,13 @@ void GPUManager::allocateBuffers(hapiWorkRequest* wr) {
 }
 
 #ifndef HAPI_CUDA_CALLBACK
-void recordEvent(cudaStream_t stream, void* cb, void* cb_msg) {
+void recordEvent(cudaStream_t stream, void* cb, void* cb_msg, hapiWorkRequest* wr = NULL) {
   // create CUDA event and insert into stream
   cudaEvent_t ev;
   cudaEventCreateWithFlags(&ev, cudaEventDisableTiming);
   cudaEventRecord(ev, stream);
 
-  hapiEvent hev;
-  hev.event = ev;
-  hev.cb = cb;
-  hev.cb_msg = cb_msg;
+  hapiEvent hev(ev, cb, cb_msg, wr);
 
   // push event information in queue
   CpvAccess(hapi_event_queue).push(hev);
@@ -399,6 +398,7 @@ void GPUManager::hostToDeviceTransfer(hapiWorkRequest* wr) {
     host_buffers_[index] = bi.host_buffer;
 
     if (bi.transfer_to_device && size > 0) {
+      // TODO should be changed back to async for performance
       hapiCheck(cudaMemcpy(device_buffers_[index], host_buffers_[index], size,
                                 cudaMemcpyHostToDevice));
 
@@ -418,6 +418,7 @@ void GPUManager::deviceToHostTransfer(hapiWorkRequest* wr) {
     int size = bi.size;
 
     if (bi.transfer_to_host && size > 0) {
+      // TODO should be changed back to async for performance
       hapiCheck(cudaMemcpy(host_buffers_[index], device_buffers_[index], size,
                                 cudaMemcpyDeviceToHost));
 
@@ -447,7 +448,7 @@ void GPUManager::freeBuffers(hapiWorkRequest* wr) {
   }
 }
 
-inline void lockAndFreeBuffersDeleteWr(hapiWorkRequest* wr) {
+inline static void hapiWorkRequestCleanup(hapiWorkRequest* wr) {
 #if CMK_SMP || CMK_MULTICORE
   CmiLock(CsvAccess(gpu_manager).progress_lock_);
 #endif
@@ -473,6 +474,7 @@ void GPUManager::runKernel(hapiWorkRequest* wr) {
 	// else, might be only for data transfer (or might be a bug?)
 }
 
+#ifdef HAPI_CUDA_CALLBACK
 // Invokes user's host-to-device callback.
 static void* hostToDeviceCallback(void* arg) {
 #ifdef HAPI_NVTX_PROFILE
@@ -480,6 +482,9 @@ static void* hostToDeviceCallback(void* arg) {
 #endif
   hapiWorkRequest* wr = *((hapiWorkRequest**)((char*)arg + CmiMsgHeaderSizeBytes + sizeof(int)));
   CUDACallbackManager(wr->host_to_device_cb);
+
+  // inform QD that the host-to-device transfer is complete
+  QdProcess(1);
 
   return NULL;
 }
@@ -491,6 +496,9 @@ static void* kernelCallback(void* arg) {
 #endif
   hapiWorkRequest* wr = *((hapiWorkRequest**)((char*)arg + CmiMsgHeaderSizeBytes + sizeof(int)));
   CUDACallbackManager(wr->kernel_cb);
+
+  // inform QD that the kernel is complete
+  QdProcess(1);
 
   return NULL;
 }
@@ -508,9 +516,9 @@ static void* deviceToHostCallback(void* arg) {
     CUDACallbackManager(wr->device_to_host_cb);
   }
 
-  lockAndFreeBuffersDeleteWr(wr);
+  hapiWorkRequestCleanup(wr);
 
-  // notify process to QD
+  // inform QD that device-to-host transfer is complete
   QdProcess(1);
 
   return NULL;
@@ -535,9 +543,11 @@ static void* lightCallback(void *arg) {
 
   return NULL;
 }
+#endif // HAPI_CUDA_CALLBACK
 
 // Register callback functions. All PEs need to call this.
 void hapiRegisterCallbacks() {
+#ifdef HAPI_CUDA_CALLBACK
   // FIXME: Potential race condition on assignments, but CmiAssignOnce
   // causes a hang at startup.
   CsvAccess(gpu_manager).host_to_device_cb_idx_
@@ -548,8 +558,10 @@ void hapiRegisterCallbacks() {
     = CmiRegisterHandler((CmiHandler)deviceToHostCallback);
   CsvAccess(gpu_manager).light_cb_idx_
     = CmiRegisterHandler((CmiHandler)lightCallback);
+#endif
 }
 
+#ifdef HAPI_CUDA_CALLBACK
 // Callback function invoked by the CUDA runtime certain parts of GPU work are
 // complete. It sends a converse message to the original PE to free the relevant
 // device memory and invoke the user's callback. The reason for this method is
@@ -573,7 +585,6 @@ static void CUDART_CB CUDACallback(cudaStream_t stream, cudaError_t status,
   }
 }
 
-#ifdef HAPI_CUDA_CALLBACK
 enum CallbackStage {
   AfterHostToDevice,
   AfterKernel,
@@ -616,9 +627,6 @@ void hapiEnqueue(hapiWorkRequest* wr) {
   NVTXTracer nvtx_range("enqueue", NVTXColor::Pomegranate);
 #endif
 
-  // notify create to QD
-  QdCreate(1);
-
 #if CMK_SMP || CMK_MULTICORE
   CmiLock(CsvAccess(gpu_manager).progress_lock_);
 #endif
@@ -631,6 +639,10 @@ void hapiEnqueue(hapiWorkRequest* wr) {
 
   // add host-to-device transfer callback
   if (wr->host_to_device_cb) {
+    // while there is an ongoing workrequest, quiescence should not be detected
+    // even if all PEs seem idle
+    QdCreate(1);
+
 #ifdef HAPI_CUDA_CALLBACK
     addCallback(wr, AfterHostToDevice);
 #else
@@ -643,6 +655,8 @@ void hapiEnqueue(hapiWorkRequest* wr) {
 
   // add kernel callback
   if (wr->kernel_cb) {
+    QdCreate(1);
+
 #ifdef HAPI_CUDA_CALLBACK
     addCallback(wr, AfterKernel);
 #else
@@ -654,16 +668,17 @@ void hapiEnqueue(hapiWorkRequest* wr) {
   CsvAccess(gpu_manager).deviceToHostTransfer(wr);
 
   // add device-to-host transfer callback
+  QdCreate(1);
 #ifdef HAPI_CUDA_CALLBACK
   // always invoked to free memory
   addCallback(wr, AfterDeviceToHost);
 #else
   if (wr->device_to_host_cb) {
-    recordEvent(wr->stream, wr->device_to_host_cb, NULL);
+    recordEvent(wr->stream, wr->device_to_host_cb, NULL, wr);
   }
-
-  // free device buffers
-  recordEvent(wr->stream, FREE_BUFF_FLAG, wr);
+  else {
+    recordEvent(wr->stream, NULL, NULL, wr);
+  }
 #endif
 
 #if CMK_SMP || CMK_MULTICORE
@@ -1088,26 +1103,34 @@ void hapiClearInstrument() {
 }
 #endif // HAPI_INSTRUMENT_WRS
 
+// Poll HAPI events stored in the PE's queue. Current strategy is to process
+// all successive completed events in the queue starting from the front.
+// TODO Maybe we should make one pass of all events in the queue instead,
+// since there might be completed events later in the queue.
 void hapiPollEvents() {
 #ifndef HAPI_CUDA_CALLBACK
   std::queue<hapiEvent>& queue = CpvAccess(hapi_event_queue);
   while (!queue.empty()) {
     hapiEvent hev = queue.front();
     if (cudaEventQuery(hev.event) == cudaSuccess) {
-      // Check that this event isn't a special case i.e. just doing a callback
-      if (hev.cb != FREE_BUFF_FLAG) {
+      // invoke Charm++ callback if one was given
+      if (hev.cb) {
         ((CkCallback*)hev.cb)->send(hev.cb_msg);
       }
-      // Hack cb field to serve as a flag and cb_msg as a pointer to the hapiWorkRequest
-      else { // free buffers
-        lockAndFreeBuffersDeleteWr(static_cast<hapiWorkRequest*>(hev.cb_msg));
+
+      // clean up hapiWorkRequest
+      if (hev.wr) {
+        hapiWorkRequestCleanup(hev.wr);
       }
       cudaEventDestroy(hev.event);
       queue.pop();
       CpvAccess(n_hapi_events)--;
+
+      // inform QD that an event was processed
+      QdProcess(1);
     }
     else {
-      // FIXME maybe we should make one pass of all entries?
+      // stop going through the queue once we encounter a non-successful event
       break;
     }
   }
@@ -1173,7 +1196,8 @@ void hapiAddCallback(cudaStream_t stream, void* cb, void* cb_msg) {
 */
 #endif
 
-  // notify create to QD
+  // while there is an ongoing workrequest, quiescence should not be detected
+  // even if all PEs seem idle
   QdCreate(1);
 }
 

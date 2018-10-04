@@ -180,6 +180,10 @@ CpvDeclare(char *, _validProcessors);
 
 #if CMK_CUDA
 CpvExtern(int, n_hapi_events);
+CMI_EXTERNC
+void hapiPollEvents();
+CMI_EXTERNC
+void exitHybridAPI();
 #endif
 
 /*****************************************************************************
