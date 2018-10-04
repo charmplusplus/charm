@@ -93,9 +93,9 @@ void CkHandleRdmaCookie(void *cookie){
   CkRdmaWrapper *w = (CkRdmaWrapper *)cookie;
   CkCallback *cb= w->callback;
 #if CMK_SMP
-  //call to callbackgroup to call the callback when calling from comm thread
-  //this add one more trip through the scheduler
-  _ckcallbackgroup[w->srcPe].call(*cb, sizeof(void *), (char*)&w->ptr);
+  //call the callbackgroup on my node's first PE when callback requires to be called from comm thread
+  //this adds one more trip through the scheduler
+  _ckcallbackgroup[CmiNodeFirst(CmiMyNode())].call(*cb, sizeof(void *), (char*)&w->ptr);
 #else
   //direct call to callback when calling from worker thread
   cb->send(sizeof(void *), &w->ptr);
@@ -360,24 +360,24 @@ void CkRdmaDirectAckHandler(void *ack) {
   if(info->ackMode == 0 || info->ackMode == 1) {
 
 #if CMK_SMP
-    //call to callbackgroup to call the callback when calling from comm thread
+    //call the callbackgroup on my node's first PE when callback requires to be called from comm thread
     //this adds one more trip through the scheduler
-    _ckcallbackgroup[info->srcPe].call(*(CkCallback *)(info->srcAck), sizeof(CkNcpyBuffer), (const char *)(&src));
+    _ckcallbackgroup[CmiNodeFirst(CmiMyNode())].call(*srcCb, sizeof(CkNcpyBuffer), (const char *)(&src));
 #else
     //Invoke the destination callback
-    ((CkCallback *)(info->srcAck))->send(sizeof(CkNcpyBuffer), &src);
+    srcCb->send(sizeof(CkNcpyBuffer), &src);
 #endif
   }
 
   if(info->ackMode == 0 || info->ackMode == 2) {
 
 #if CMK_SMP
-    //call to callbackgroup to call the callback when calling from comm thread
+    //call the callbackgroup on my node's first PE when callback requires to be called from comm thread
     //this adds one more trip through the scheduler
-    _ckcallbackgroup[info->destPe].call(*(CkCallback *)(info->destAck), sizeof(CkNcpyBuffer), (const char *)(&dest));
+    _ckcallbackgroup[CmiNodeFirst(CmiMyNode())].call(*destCb, sizeof(CkNcpyBuffer), (const char *)(&dest));
 #else
     //Invoke the destination callback
-    ((CkCallback *)(info->destAck))->send(sizeof(CkNcpyBuffer), &dest);
+    destCb->send(sizeof(CkNcpyBuffer), &dest);
 #endif
   }
 
