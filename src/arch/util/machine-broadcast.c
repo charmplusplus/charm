@@ -50,6 +50,24 @@ static void processBcastQs(void) {
 #endif
 }
 
+// Method to forward the received proc message to my child nodes
+static INLINE_KEYWORD void forwardProcBcastMsg(int size, char *msg) {
+#if CMK_BROADCAST_SPANNING_TREE
+  SendSpanningChildrenProc(size, msg);
+#elif CMK_BROADCAST_HYPERCUBE
+  SendHyperCubeProc(size, msg);
+#endif
+#if CMK_BROADCAST_SPANNING_TREE && CMK_BROADCAST_USE_CMIREFERENCE
+  /* same message may be sent out, make a copy of it */
+  if (CmiNumNodes()>1 && CmiGetReference(msg)>1) {
+    void *newmsg;
+    newmsg = CopyMsg(msg, size);
+    CmiFree(msg);
+    msg = newmsg;
+  }
+#endif
+}
+
 static INLINE_KEYWORD void processProcBcastMsg(int size, char *msg) {
     /* Since this function is only called on intermediate nodes,
      * the rank of this msg should be 0.
@@ -57,33 +75,39 @@ static INLINE_KEYWORD void processProcBcastMsg(int size, char *msg) {
     CmiAssert(CMI_DEST_RANK(msg)==0);
     /*CmiPushPE(CMI_DEST_RANK(msg), msg);*/
 
-    //CmiPrintf("[%d][%d] Received the bcast message \n", CmiMyPe(), CmiMyNode());
-#if CMK_BROADCAST_SPANNING_TREE
-    SendSpanningChildrenProc(size, msg);
-#elif CMK_BROADCAST_HYPERCUBE
-    SendHyperCubeProc(size, msg);
+    // Forward regular messages, do not forward ncpy bcast messages as those messages
+    // are forwarded separately after the completion of the payload transfer
+#if CMK_ONESIDED_IMPL
+    if(!CMI_IS_ZC_BCAST(msg))
 #endif
-#if CMK_BROADCAST_SPANNING_TREE && CMK_BROADCAST_USE_CMIREFERENCE
-      /* same message may be sent out, make a copy of it */
-    if (CmiNumNodes()>1 && CmiGetReference(msg)>1) {
-      void *newmsg;
-      newmsg = CopyMsg(msg, size);
-      CmiFree(msg);
-      msg = newmsg;
-    }
-#endif
+      forwardProcBcastMsg(size, msg);
+
     CmiPushPE(0, msg);
 
 }
 
-
 #if CMK_NODE_QUEUE_AVAILABLE
-static INLINE_KEYWORD void processNodeBcastMsg(int size, char *msg) {
+// Method to forward the received node message to my child nodes
+static INLINE_KEYWORD void forwardNodeBcastMsg(int size, char *msg) {
 #if CMK_BROADCAST_SPANNING_TREE
-    SendSpanningChildrenNode(size, msg);
+  SendSpanningChildrenNode(size, msg);
 #elif CMK_BROADCAST_HYPERCUBE
-    SendHyperCubeNode(size, msg);
+  SendHyperCubeNode(size, msg);
 #endif
+}
+
+// API to forward node bcast msg
+void CmiForwardNodeBcastMsg(int size, char *msg) {
+  forwardNodeBcastMsg(size, msg);
+}
+
+static INLINE_KEYWORD void processNodeBcastMsg(int size, char *msg) {
+    // Forward regular messages, do not forward ncpy bcast messages as those messages
+    // are forwarded separately after the completion of the payload transfer
+#if CMK_ONESIDED_IMPL
+    if(!CMI_IS_ZC_BCAST(msg))
+#endif
+      forwardNodeBcastMsg(size, msg);
 
     /* In SMP mode, this push operation needs to be executed
      * after forwarding broadcast messages. If it is executed
@@ -93,6 +117,18 @@ static INLINE_KEYWORD void processNodeBcastMsg(int size, char *msg) {
      * 
      */
     CmiPushNode(msg);
+}
+#endif
+
+// API to forward proc bcast msg
+void CmiForwardProcBcastMsg(int size, char *msg) {
+  forwardProcBcastMsg(size, msg);
+}
+
+#if CMK_SMP
+// API to forward message to peer PEs
+void CmiForwardMsgToPeers(int size, char *msg) {
+  SendToPeers(size, msg);
 }
 #endif
 
@@ -202,9 +238,14 @@ static void SendSpanningChildrenProc(int size, char *msg) {
     int startnode = CMI_BROADCAST_ROOT(msg)-1;
     SendSpanningChildren(size, msg, 0, startnode);
 #if CMK_SMP
-    /* second send msgs to my peers on this node */
-    SendToPeers(size, msg);
-#endif
+    // Forward regular messages, do not forward ncpy bcast messages as those messages
+    // are forwarded separately after the completion of the payload transfer
+#if CMK_ONESIDED_IMPL
+    if(!CMI_IS_ZC_BCAST(msg))
+#endif // end of CMK_ONESIDED_IMPL
+      /* second send msgs to my peers on this node */
+      SendToPeers(size, msg);
+#endif // end of CMK_SMP
 }
 
 /* send msg along the hypercube in broadcast. (Sameer) */
@@ -215,10 +256,16 @@ static void SendHyperCubeProc(int size, char *msg) {
     if (startpe > CmiNumPes()) startnode = startpe - CmiNumPes();
 #endif
     SendHyperCube(size, msg, 0, startnode);
+
 #if CMK_SMP
-    /* second send msgs to my peers on this node */
-    SendToPeers(size, msg);
-#endif
+    // Forward regular messages, do not forward ncpy bcast messages as those messages
+    // are forwarded separately after the completion of the payload transfer
+#if CMK_ONESIDED_IMPL
+    if(!CMI_IS_ZC_BCAST(msg))
+#endif // end of CMK_ONESIDED_IMPL
+      /* second send msgs to my peers on this node */
+      SendToPeers(size, msg);
+#endif // end of CMK_SMP
 }
 
 #if CMK_NODE_QUEUE_AVAILABLE

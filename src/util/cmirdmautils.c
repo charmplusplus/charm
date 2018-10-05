@@ -126,6 +126,8 @@ void setReverseModeForNcpyOpInfo(NcpyOperationInfo *ncpyOpInfo) {
                                break;
     case CMK_DIRECT_API      : // Do nothing
                                break;
+    case CMK_BCAST_EM_API    : ncpyOpInfo->opMode = CMK_BCAST_EM_API_REVERSE;
+                               break;
     default                  : CmiAbort("Unknown opcode");
                                break;
   }

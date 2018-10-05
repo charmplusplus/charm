@@ -526,106 +526,92 @@ void Entry::genArrayDefs(XStr& str) {
           << ") \n";  // no const
     str << "{\n";
     // regular broadcast and section broadcast for an entry method with rdma
-    if (param->hasRdma() && !container->isForElement()) {
-      str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy "
-             "parameters\");\n";
+    str << "  ckCheck();\n";
+    XStr inlineCall;
+    if (!isNoTrace())
+      inlineCall
+          << "    _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,(" << epIdx()
+          << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(), obj);\n";
+    if (isAppWork()) inlineCall << "    _TRACE_BEGIN_APPWORK();\n";
+    inlineCall << "#if CMK_LBDB_ON\n"
+               << "    LDObjHandle objHandle;\n"
+               << "    int objstopped=0;\n"
+               << "    objHandle = obj->timingBeforeCall(&objstopped);\n"
+               << "#endif\n";
+    inlineCall << "#if CMK_CHARMDEBUG\n"
+                  "    CpdBeforeEp("
+               << epIdx()
+               << ", obj, NULL);\n"
+                  "#endif\n";
+    inlineCall << "    ";
+    if (!retType->isVoid()) inlineCall << retType << " retValue = ";
+    inlineCall << "obj->" << (tspec ? "template " : "") << name;
+    if (tspec) {
+      inlineCall << "<";
+      tspec->genShort(inlineCall);
+      inlineCall << ">";
+    }
+    inlineCall << "(";
+    param->unmarshallForward(inlineCall, true);
+    inlineCall << ");\n";
+    inlineCall << "#if CMK_CHARMDEBUG\n"
+                  "    CpdAfterEp("
+               << epIdx()
+               << ");\n"
+                  "#endif\n";
+    inlineCall << "#if CMK_LBDB_ON\n    "
+                  "obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
+    if (isAppWork()) inlineCall << "    _TRACE_END_APPWORK();\n";
+    if (!isNoTrace()) inlineCall << "    _TRACE_END_EXECUTE();\n";
+    if (!retType->isVoid()) {
+      inlineCall << "    return retValue;\n";
     } else {
-      str << "  ckCheck();\n";
-      XStr inlineCall;
-      if (!isNoTrace())
-        // Create a dummy envelope to represent the "message send" to the local/inline method
-        // so that Projections can trace the method back to its caller
-        inlineCall
-            << "    envelope env;\n"
-            << "    env.setMsgtype(ForArrayEltMsg);\n"
-            << "    env.setTotalsize(0);\n"
-            // NOTE: extra parentheses around the second argument to _TRACE_CREATION_DETAILED here
-            //       are needed for templated entry methods
-            << "    _TRACE_CREATION_DETAILED(&env, (" << epIdx() << "));\n"
-            << "    _TRACE_CREATION_DONE(1);\n"
-            << "    _TRACE_BEGIN_EXECUTE_DETAILED(CpvAccess(curPeEvent),ForArrayEltMsg,(" << epIdx()
-            << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(), obj);\n";
-      if (isAppWork()) inlineCall << "    _TRACE_BEGIN_APPWORK();\n";
-      inlineCall << "#if CMK_LBDB_ON\n"
-                 << "    LDObjHandle objHandle;\n"
-                 << "    int objstopped=0;\n"
-                 << "    objHandle = obj->timingBeforeCall(&objstopped);\n"
-                 << "#endif\n";
-      inlineCall << "#if CMK_CHARMDEBUG\n"
-                    "    CpdBeforeEp("
-                 << epIdx()
-                 << ", obj, NULL);\n"
-                    "#endif\n";
-      inlineCall << "    ";
-      if (!retType->isVoid()) inlineCall << retType << " retValue = ";
-      inlineCall << "obj->" << (tspec ? "template " : "") << name;
-      if (tspec) {
-        inlineCall << "<";
-        tspec->genShort(inlineCall);
-        inlineCall << ">";
-      }
-      inlineCall << "(";
-      param->unmarshallForward(inlineCall, true);
-      inlineCall << ");\n";
-      inlineCall << "#if CMK_CHARMDEBUG\n"
-                    "    CpdAfterEp("
-                 << epIdx()
-                 << ");\n"
-                    "#endif\n";
-      inlineCall << "#if CMK_LBDB_ON\n    "
-                    "obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
-      if (isAppWork()) inlineCall << "    _TRACE_END_APPWORK();\n";
-      if (!isNoTrace()) inlineCall << "    _TRACE_END_EXECUTE();\n";
-      if (!retType->isVoid()) {
-        inlineCall << "    return retValue;\n";
-      } else {
-        inlineCall << "    return;\n";
-      }
+      inlineCall << "    return;\n";
+    }
 
-      XStr prepareMsg;
-      prepareMsg << marshallMsg();
-      prepareMsg << "  UsrToEnv(impl_msg)->setMsgtype(ForArrayEltMsg);\n";
-      prepareMsg << "  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;\n";
-      prepareMsg << "  impl_amsg->array_setIfNotThere(" << ifNot << ");\n";
+    XStr prepareMsg;
+    prepareMsg << marshallMsg();
+    prepareMsg << "  UsrToEnv(impl_msg)->setMsgtype(ForArrayEltMsg);\n";
+    prepareMsg << "  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;\n";
+    prepareMsg << "  impl_amsg->array_setIfNotThere(" << ifNot << ");\n";
 
-      if (!isLocal()) {
-        if (isInline() && container->isForElement()) {
-          str << "  " << container->baseName() << " *obj = ckLocal();\n";
-          str << "  if (obj) {\n" << inlineCall << "  }\n";
-        }
-        str << prepareMsg;
-      } else {
+    if (!isLocal()) {
+      if (isInline() && container->isForElement()) {
         str << "  " << container->baseName() << " *obj = ckLocal();\n";
-        str << "#if CMK_ERROR_CHECKING\n";
-        str << "  if (obj==NULL) CkAbort(\"Trying to call a LOCAL entry method on a "
-               "non-local element\");\n";
-        str << "#endif\n";
-        str << inlineCall;
+        str << "  if (obj) {\n" << inlineCall << "  }\n";
       }
-      if (isIget()) {
-        str << "  CkFutureID f=CkCreateAttachedFutureSend(impl_amsg," << epIdx()
-            << ",ckGetArrayID(),ckGetIndex(),&CProxyElement_ArrayBase::ckSendWrapper);"
-            << "\n";
-      }
+      str << prepareMsg;
+    } else {
+      str << "  " << container->baseName() << " *obj = ckLocal();\n";
+      str << "#if CMK_ERROR_CHECKING\n";
+      str << "  if (obj==NULL) CkAbort(\"Trying to call a LOCAL entry method on a "
+             "non-local element\");\n";
+      str << "#endif\n";
+      str << inlineCall;
+    }
+    if (isIget()) {
+      str << "  CkFutureID f=CkCreateAttachedFutureSend(impl_amsg," << epIdx()
+          << ",ckGetArrayID(),ckGetIndex(),&CProxyElement_ArrayBase::ckSendWrapper);"
+          << "\n";
+    }
 
-      if (isSync()) {
-        str << syncPreCall() << "ckSendSync(impl_amsg, " << epIdx() << ");\n";
-        str << syncPostCall();
-      } else if (!isLocal()) {
-        XStr opts;
-        opts << ",0";
-        if (isSkipscheduler()) opts << "+CK_MSG_EXPEDITED";
-        if (isInline()) opts << "+CK_MSG_INLINE";
-        if (!isIget()) {
-          if (container->isForElement() || container->isForSection()) {
-            str << "  ckSend(impl_amsg, " << epIdx() << opts << ");\n";
-          } else
-            str << "  ckBroadcast(impl_amsg, " << epIdx() << opts << ");\n";
-        }
+    if (isSync()) {
+      str << syncPreCall() << "ckSendSync(impl_amsg, " << epIdx() << ");\n";
+      str << syncPostCall();
+    } else if (!isLocal()) {
+      XStr opts;
+      opts << ",0";
+      if (isSkipscheduler()) opts << "+CK_MSG_EXPEDITED";
+      if (isInline()) opts << "+CK_MSG_INLINE";
+      if (!isIget()) {
+        if (container->isForElement() || container->isForSection()) {
+          str << "  ckSend(impl_amsg, " << epIdx() << opts << ");\n";
+        } else
+          str << "  ckBroadcast(impl_amsg, " << epIdx() << opts << ");\n";
       }
-      if (isIget()) {
-        str << "  return f;\n";
-      }
+    }
+    if (isIget()) {
+      str << "  return f;\n";
     }
     str << "}\n";
 
@@ -850,10 +836,6 @@ void Entry::genGroupDefs(XStr& str) {
   str << makeDecl(retStr, 1) << "::" << name << "(" << msgTypeStr << ")\n";
   str << "{\n";
   // regular broadcast and section broadcast for an entry method with rdma
-  if (param->hasRdma() && !container->isForElement()) {
-    str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy "
-           "parameters\");\n";
-  } else {
     str << "  ckCheck();\n";
     if (!isLocal()) str << marshallMsg();
 
@@ -943,7 +925,6 @@ void Entry::genGroupDefs(XStr& str) {
             << ");\n";
       }
     }
-  }
   str << "}\n";
 
   // entry method on multiple PEs declaration
@@ -951,25 +932,16 @@ void Entry::genGroupDefs(XStr& str) {
       !container->isNodeGroup()) {
     str << "" << makeDecl(retStr, 1) << "::" << name << "(" << paramComma(0, 0)
         << "int npes, int *pes" << eo(0) << ") {\n";
-    if (param->hasRdma()) {
-      str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy "
              "parameters\");\n";
-    } else {
-      str << marshallMsg();
-      str << "  CkSendMsg" << node << "BranchMulti(" << paramg << ", npes, pes" << opts
-          << ");\n";
-    }
+    str << marshallMsg();
+    str << "  CkSendMsg" << node << "BranchMulti(" << paramg << ", npes, pes" << opts
+        << ");\n";
     str << "}\n";
     str << "" << makeDecl(retStr, 1) << "::" << name << "(" << paramComma(0, 0)
         << "CmiGroup &grp" << eo(0) << ") {\n";
-    if (param->hasRdma()) {
-      str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy "
-             "parameters\");\n";
-    } else {
-      str << marshallMsg();
-      str << "  CkSendMsg" << node << "BranchGroup(" << paramg << ", grp" << opts
-          << ");\n";
-    }
+    str << marshallMsg();
+    str << "  CkSendMsg" << node << "BranchGroup(" << paramg << ", grp" << opts
+        << ");\n";
     str << "}\n";
   }
 }
@@ -2470,6 +2442,15 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
         param->unmarshall(str);
         str << ");\n";
       }
+      // pack pointers if it's a broadcast message
+      if(param->hasRdma() && !container->isForElement()) {
+        // pack rdma pointers for broadcast unmarshall
+        // this is done to support broadcasts before all chare array elements are
+        // finished with their EM execution using the same msg
+        str << "#if CMK_ONESIDED_IMPL\n";
+        str << "  CkPackRdmaPtrs(impl_buf_begin);\n";
+        str << "#endif\n";
+      }
     }
   }
 }
@@ -3007,5 +2988,6 @@ int Entry::isReductionTarget(void) { return (attribs & SREDUCE); }
 
 char* Entry::getEntryName() { return name; }
 int Entry::getLine() { return line; }
+Chare* Entry::getContainer(void) const { return container; }
 
 }  // namespace xi

@@ -47,6 +47,10 @@ enum class CkNcpyMode : char { MEMCPY, CMA, RDMA };
 // RDMA transfers use a remote asynchronous call and hence return CkNcpyStatus::incomplete
 enum class CkNcpyStatus : char { incomplete, complete };
 
+// P2P mode is used for EM P2P API
+// BCAST mode is used for EM BCAST API
+enum class ncpyEmApiMode : char { P2P, BCAST };
+
 // Class to represent an Zerocopy buffer
 // CkSendBuffer(....) passed by the user internally translates to a CkNcpyBuffer
 class CkNcpyBuffer{
@@ -85,7 +89,10 @@ class CkNcpyBuffer{
   // reference pointer
   const void *ref;
 
-  CkNcpyBuffer() : isRegistered(false), ptr(NULL), cnt(0), pe(-1), mode(CK_BUFFER_REG), ref(NULL) {}
+  // bcast ack handling pointer
+  const void *bcastAckInfo;
+
+  CkNcpyBuffer() : isRegistered(false), ptr(NULL), cnt(0), pe(-1), mode(CK_BUFFER_REG), ref(NULL), bcastAckInfo(NULL) {}
 
   explicit CkNcpyBuffer(const void *address, unsigned short int mode_=CK_BUFFER_REG) {
     ptr = address;
@@ -105,6 +112,10 @@ class CkNcpyBuffer{
 
   CkNcpyBuffer(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int mode_=CK_BUFFER_REG) {
     init(ptr_, cnt_, cb_, mode_);
+  }
+
+  void print() {
+    CkPrintf("[%d][%d][%d] CkNcpyBuffer print: ptr:%p, size:%d, pe:%d, mode=%d, ref:%p, bcastAckInfo:%p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ptr, cnt, pe, mode, ref, bcastAckInfo);
   }
 
   void init(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int mode_=CK_BUFFER_REG) {
@@ -185,6 +196,7 @@ class CkNcpyBuffer{
   void pup(PUP::er &p) {
     p((char *)&ptr, sizeof(ptr));
     p((char *)&ref, sizeof(ref));
+    p((char *)&bcastAckInfo, sizeof(bcastAckInfo));
     p|cnt;
     p|cb;
     p|pe;
@@ -195,10 +207,12 @@ class CkNcpyBuffer{
 
   friend void CkRdmaDirectAckHandler(void *ack);
 
+  friend void CkRdmaEMBcastAckHandler(void *ack);
+
   friend void constructSourceBufferObject(NcpyOperationInfo *info, CkNcpyBuffer &src);
   friend void constructDestinationBufferObject(NcpyOperationInfo *info, CkNcpyBuffer &dest);
 
-  friend envelope* CkRdmaIssueRgets(envelope *env);
+  friend envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg);
 };
 
 // Ack handler for the Zerocopy Direct API
@@ -215,13 +229,12 @@ void invokeCallback(void *cb, int pe, CkNcpyBuffer &buff);
 // Returns CkNcpyMode::RDMA if RDMA needs to be used
 CkNcpyMode findTransferMode(int srcPe, int destPe);
 
-
 void invokeSourceCallback(NcpyOperationInfo *info);
 
 void invokeDestinationCallback(NcpyOperationInfo *info);
 
-
-
+// Method to enqueue a message after the completion of an payload transfer
+void enqueueNcpyMessage(int destPe, void *msg);
 
 /*********************************** Zerocopy Entry Method API ****************************/
 #define CkSendBuffer(...) CkNcpyBuffer(__VA_ARGS__)
@@ -241,8 +254,12 @@ void invokeDestinationCallback(NcpyOperationInfo *info);
 struct NcpyEmInfo{
   int numOps; // number of zerocopy operations i.e number of buffers sent using CkSendBuffer
   int counter; // used for tracking the number of completed RDMA operations
+  int pe;
+  ncpyEmApiMode mode; // used to distinguish between p2p and bcast
   void *msg; // pointer to the Charm++ message which will be enqueued after completion of all Rgets
+  void *forwardMsg; // used for the ncpy broadcast api
 };
+
 
 // This structure is used to store the buffer information specific to each buffer being sent
 // using the Zerocopy Entry Method API. A variable of the structure stores the information associated
@@ -252,11 +269,12 @@ struct NcpyEmBufferInfo{
   NcpyOperationInfo ncpyOpInfo; // Stores all the information required for the zerocopy operation
 };
 
+
 /*
  * Extract ncpy buffer information from the metadata message,
  * allocate buffers and issue ncpy calls (either memcpy or cma read or rdma get)
  */
-envelope* CkRdmaIssueRgets(envelope *env);
+envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg = NULL);
 
 void handleEntryMethodApiCompletion(NcpyOperationInfo *info);
 
@@ -274,6 +292,49 @@ void getRdmaNumopsAndBufsize(envelope *env, int &numops, int &bufsize);
 
 // Ack handler function for the nocopy EM API
 void CkRdmaEMAckHandler(int destPe, void *ack);
+
+
+
+/***************************** Zerocopy Bcast Entry Method API ****************************/
+struct NcpyBcastAckInfo{
+  int numChildren;
+  int counter;
+  bool isRoot;
+  int pe;
+  int numops;
+};
+
+struct NcpyBcastRootAckInfo : public NcpyBcastAckInfo {
+  CkNcpyBuffer src[0];
+};
+
+struct NcpyBcastInterimAckInfo : public NcpyBcastAckInfo {
+  NcpyEmInfo *ncpyEmInfo;
+  void *msg;
+};
+
+// Method called on the bcast source to store some information for ack handling
+void CkRdmaPrepareBcastMsg(envelope *env);
+
+// Method called on intermediate nodes after RGET to switch old source pointers with my pointers
+void CkReplaceSourcePtrsInBcastMsg(envelope *prevEnv, envelope *env, void *bcastAckInfo, int origPe);
+
+// Method called to extract the parent bcastAckInfo from the received message for ack handling
+const void *getParentBcastAckInfo(void *msg, int &srcPe);
+
+// Allocate a NcpyBcastInterimAckInfo and forward the message to my children
+void allocateObjAndReplacePointers(envelope *myMsg, envelope *myChildrenMsg, int pe, NcpyEmInfo *ncpyEmInfo);
+
+void forwardMessageToChildNodes(envelope *myChildrenMsg, UChar msgType);
+
+void forwardMessageToPeerNodes(envelope *myMsg, UChar msgType);
+
+void handleBcastEntryMethodApiCompletion(NcpyOperationInfo *info);
+
+void handleBcastReverseEntryMethodApiCompletion(NcpyOperationInfo *info);
+
+// Method called on the root node and other intermediate parent nodes on completion of RGET through ZC Bcast
+void CkRdmaEMBcastAckHandler(void *ack);
 
 #endif /* End of CMK_ONESIDED_IMPL */
 

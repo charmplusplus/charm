@@ -2,6 +2,7 @@
 #include "xi-Parameter.h"
 #include "xi-Type.h"
 #include "xi-Value.h"
+#include "xi-Chare.h"
 
 namespace xi {
 
@@ -194,7 +195,7 @@ void ParamList::callEach(rdmafn_t f, XStr& str, bool isArray) {
 int ParamList::hasConditional() { return orEach(&Parameter::isConditional); }
 
 /** marshalling: pack fields into flat byte buffer **/
-void ParamList::marshall(XStr& str, XStr& entry) {
+void ParamList::marshall(XStr& str, XStr& entry_str) {
   if (isVoid())
     str << "  void *impl_msg = CkAllocSysMsg(impl_e_opts);\n";
   else if (isMarshalled()) {
@@ -242,8 +243,8 @@ void ParamList::marshall(XStr& str, XStr& entry) {
     str << "  }\n";
     // Now that we know the size, allocate the packing buffer
     if (hasConditional())
-      str << "  MarshallMsg_" << entry << " *impl_msg=CkAllocateMarshallMsgT<MarshallMsg_"
-          << entry << ">(impl_off,impl_e_opts);\n";
+      str << "  MarshallMsg_" << entry_str << " *impl_msg=CkAllocateMarshallMsgT<MarshallMsg_"
+          << entry_str << ">(impl_off,impl_e_opts);\n";
     else
       str << "  CkMarshallMsg *impl_msg=CkAllocateMarshallMsg(impl_off,impl_e_opts);\n";
     // Second pass: write the data
@@ -266,7 +267,11 @@ void ParamList::marshall(XStr& str, XStr& entry) {
     }
     if (hasrdma) {
       str << "#if CMK_ONESIDED_IMPL\n";
-      str << "  UsrToEnv(impl_msg)->setRdma(true);\n";
+      if(entry->getContainer()->isForElement()) {
+        str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_P2P_SEND_MSG;\n";
+      } else { // Mark a Ncpy Bcast message to intercept it in the send code path
+        str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_BCAST_SEND_MSG;\n";
+      }
       str << "#else\n";
       if (!hasArrays) str << "  char *impl_buf=impl_msg->msgBuf+impl_arrstart;\n";
       callEach(&Parameter::marshallRdmaArrayData, str);
@@ -417,7 +422,8 @@ void ParamList::beginRednWrapperUnmarshall(XStr& str, bool needsClosure) {
         if (!needsClosure) {
           if (hasRdma()) {
             str << "#if CMK_ONESIDED_IMPL\n";
-            str << "  CkUnpackRdmaPtrs(impl_buf);\n";
+            str << "  char *impl_buf_begin = impl_buf;\n";
+            str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
             str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
             callEach(&Parameter::beginUnmarshallRdma, str, true);
             str << "#else\n";
@@ -428,7 +434,8 @@ void ParamList::beginRednWrapperUnmarshall(XStr& str, bool needsClosure) {
         } else {
           if (hasRdma()) {
             str << "#if CMK_ONESIDED_IMPL\n";
-            str << "  CkUnpackRdmaPtrs(impl_buf);\n";
+            str << "  char *impl_buf_begin = impl_buf;\n";
+            str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
             callEach(&Parameter::beginUnmarshallSDAGCallRdma, str, true);
             str << "#else\n";
             callEach(&Parameter::beginUnmarshallSDAGCallRdma, str, false);
@@ -451,7 +458,8 @@ void ParamList::beginRednWrapperUnmarshall(XStr& str, bool needsClosure) {
       if (!needsClosure) {
         if (hasRdma()) {
           str << "#if CMK_ONESIDED_IMPL\n";
-          str << "  CkUnpackRdmaPtrs(impl_buf);\n";
+          str << "  char *impl_buf_begin = impl_buf;\n";
+          str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
           str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
           callEach(&Parameter::beginUnmarshallRdma, str, true);
           str << "#else\n";
@@ -483,7 +491,8 @@ void ParamList::beginUnmarshall(XStr& str) {
     str << "  PUP::fromMem implP(impl_buf);\n";
     if (hasRdma()) {
       str << "#if CMK_ONESIDED_IMPL\n";
-      str << "  CkUnpackRdmaPtrs(impl_buf);\n";
+      str << "  char *impl_buf_begin = impl_buf;\n";
+      str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
       str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields; \n";
       callEach(&Parameter::beginUnmarshallRdma, str, true);
       str << "#else\n";
@@ -570,7 +579,8 @@ void ParamList::beginUnmarshallSDAGCall(XStr& str, bool usesImplBuf) {
         << ";\n";
     if (hasRdma()) {
       str << "#if CMK_ONESIDED_IMPL\n";
-      str << "  CkUnpackRdmaPtrs(impl_buf);\n";
+      str << "  char *impl_buf_begin = impl_buf;\n";
+      str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
       callEach(&Parameter::beginUnmarshallSDAGCallRdma, str, true);
       str << "#else\n";
       callEach(&Parameter::beginUnmarshallSDAGCallRdma, str, false);

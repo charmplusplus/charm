@@ -103,7 +103,7 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo) {
     struct ibv_mr *packetKey;
     if(ncpyOpInfo->opMode == CMK_DIRECT_API) {
       packetKey = METADATAFIELD(ncpyOpInfo)->key;
-    } else if(ncpyOpInfo->opMode == CMK_EM_API) {
+    } else if(ncpyOpInfo->opMode == CMK_EM_API || ncpyOpInfo->opMode == CMK_BCAST_EM_API) {
       // Register the small message in order to send it to the other side
       packetKey = ibv_reg_mr(context->pd, (void *)ncpyOpInfo, ncpyOpInfo->ncpyOpInfoSize, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ);
       if (!packetKey) {

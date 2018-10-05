@@ -1286,11 +1286,12 @@ void _initCharm(int unused_argc, char **argv)
     CkpvAccess(envelopeEventID) = 0;
 	CkMessageWatcherInit(argv,CkpvAccess(_coreState));
 	
-	// Set the ack handler function used for the direct nocopy api and the entry method nocopy api
+	// Set the ack handler function used for the direct nocopy api
 	CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
 
 #if CMK_ONESIDED_IMPL
-	CmiSetEMNcpyAckHandler(CkRdmaEMAckHandler);
+	// Set the ack handler function used for the entry method p2p api and entry method bcast api
+	CmiSetEMNcpyAckHandler(CkRdmaEMAckHandler, CkRdmaEMBcastAckHandler);
 #endif
 	/**
 	  The rank-0 processor of each node calls the 

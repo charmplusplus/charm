@@ -212,6 +212,8 @@ class Entry : public Member {
   int getLine();
   void genTramRegs(XStr& str);
   void genTramPups(XStr& scope, XStr& decls, XStr& defs);
+
+  Chare* getContainer(void) const;
 };
 
 // TODO(Ralf): why not simply use list<Entry*> instead?

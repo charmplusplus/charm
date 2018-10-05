@@ -3,6 +3,7 @@ DIRS = \
   prereg \
   reg \
   misc \
+  simpleBcast \
 
 TESTDIRS = $(DIRS)
 

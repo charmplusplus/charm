@@ -1212,15 +1212,23 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
   MESSAGE_PHASE_CHECK(env);
 
 #if CMK_ONESIDED_IMPL
-  if(env->isRdma()){
+  if(CMI_ZC_MSGTYPE(env) == CMK_ZC_P2P_SEND_MSG || CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_SEND_MSG){
     envelope *prevEnv = env;
-    env = CkRdmaIssueRgets(prevEnv);
+
+    ncpyEmApiMode mode = ncpyEmApiMode::P2P; // Ncpy p2p API
+
+    if(env->getMsgtype() == ForBocMsg || env->getMsgtype() == ForNodeBocMsg) {
+      mode = ncpyEmApiMode::BCAST; // Ncpy Bcast API
+    }
+
+    env = CkRdmaIssueRgets(env, mode, prevEnv);
+
     if(env) {
-      // Within pe or logical node, env points to new message with data
+      // memcpyGet or cmaGet completed, env contains the payload and will be enqueued
 
       // Free prevEnv
       CkFreeMsg(EnvToUsr(prevEnv));
-    } else{
+    } else {
       // async rdma call in place, asynchronous return and ack handling
       return;
     }
@@ -1420,6 +1428,12 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
   }
 #endif
 
+#if CMK_ONESIDED_IMPL
+  // Store source information to handle acknowledgements on completion
+  if(CMI_IS_ZC_BCAST(env))
+    CkRdmaPrepareBcastMsg(env);
+#endif
+
 #if CMK_FAULT_EVAC
   if(pe == CkMyPe() ){
     if(!CmiNodeAlive(CkMyPe())){
@@ -1521,6 +1535,12 @@ static void _noCldEnqueue(int pe, envelope *env)
   }
 #endif
 
+#if CMK_ONESIDED_IMPL
+  // Store source information to handle acknowledgements on completion
+  if(CMI_IS_ZC_BCAST(env))
+    CkRdmaPrepareBcastMsg(env);
+#endif
+
   CkPackMessage(&env);
   int len=env->getTotalsize();
   if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, (char *)env); }
@@ -1542,6 +1562,12 @@ void _noCldNodeEnqueue(int node, envelope *env)
     CmiFree(env);
     return;
   }
+#endif
+
+#if CMK_ONESIDED_IMPL
+  // Store source information to handle acknowledgements on completion
+  if(CMI_IS_ZC_BCAST(env))
+    CkRdmaPrepareBcastMsg(env);
 #endif
 
   CkPackMessage(&env);
@@ -1658,7 +1684,7 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
   envelope *env = UsrToEnv(msg);
 #if CMK_ERROR_CHECKING
   //Allow rdma metadata messages marked as immediate to go through
-  if (opts & CK_MSG_IMMEDIATE && !env->isRdma()) {
+  if (opts & CK_MSG_IMMEDIATE && (CMI_ZC_MSGTYPE(env) == CMK_REG_NO_ZC_MSG)) {
     CmiAbort("Immediate message is not allowed in Chare!");
   }
 #endif
@@ -1850,7 +1876,7 @@ void CkSendMsgBranch(int eIdx, void *msg, int pe, CkGroupID gID, int opts)
   }
   envelope *env=UsrToEnv(msg);
   //Allow rdma metadata messages marked as immediate to go through
-  if (opts & CK_MSG_IMMEDIATE && !env->isRdma()) {
+  if (opts & CK_MSG_IMMEDIATE && (CMI_ZC_MSGTYPE(env) == CMK_REG_NO_ZC_MSG)) {
     CkSendMsgBranchImmediate(eIdx,msg,pe,gID);
     return;
   }
@@ -1979,7 +2005,7 @@ void CkSendMsgNodeBranchImmediate(int eIdx, void *msg, int node, CkGroupID gID)
 extern "C"
 void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int opts)
 {
-  if (node==CkMyNode() && ((envelope *)(UsrToEnv(msg)))->isRdma() == false)
+  if (node==CkMyNode() && CMI_ZC_MSGTYPE((envelope *)(UsrToEnv(msg))) == CMK_REG_NO_ZC_MSG)
   {
     CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
     void *obj = CksvAccess(_nodeGroupTable)->find(gID).getObj();

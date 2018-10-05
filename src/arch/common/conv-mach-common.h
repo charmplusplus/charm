@@ -45,7 +45,9 @@ enum ncpyRegModes {
 enum ncpyOperationMode {
   CMK_DIRECT_API          = 0,
   CMK_EM_API              = 1,
-  CMK_EM_API_REVERSE      = 2
+  CMK_EM_API_REVERSE      = 2,
+  CMK_BCAST_EM_API        = 3,
+  CMK_BCAST_EM_API_REVERSE= 4
 };
 
 // Enum for the method of acknowledglement handling after the completion of a zerocopy operation
@@ -61,4 +63,12 @@ enum ncpyAckMode {
 enum ncpyFreeNcpyOpInfoMode {
   CMK_FREE_NCPYOPINFO           = 0,
   CMK_DONT_FREE_NCPYOPINFO           = 1
+};
+
+// Enum for the type of converse message
+// TODO: Convert to a bool variable post C++ conversion
+enum cmiZCMsgType {
+  CMK_REG_NO_ZC_MSG = 0,
+  CMK_ZC_P2P_SEND_MSG = 1,
+  CMK_ZC_BCAST_SEND_MSG = 2
 };
