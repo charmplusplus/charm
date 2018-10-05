@@ -1,8 +1,5 @@
 DIRS = \
-  unreg \
-  prereg \
-  reg \
-  misc \
+  zcpy_immediate \
 
 TESTDIRS = $(DIRS)
 
