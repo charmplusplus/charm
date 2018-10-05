@@ -355,6 +355,8 @@ void CkRdmaDirectAckHandler(void *ack) {
 
     case CMK_BCAST_EM_API_REVERSE : handleBcastReverseEntryMethodApiCompletion(info); // Ncpy EM Bcast API invoked through a PUT
                                     break;
+    case CMK_READONLY_BCAST       : readonlyGetCompleted(info);
+                                    break;
 #endif
     default                       : CkAbort("CkRdmaDirectAckHandler: Unknown ncpyOpInfo->opMode");
                                     break;
@@ -570,8 +572,7 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
     up|source;
 
     // destination buffer
-    CkNcpyBuffer dest((const void *)buf, CK_BUFFER_UNREG);
-    dest.cnt = source.cnt;
+    CkNcpyBuffer dest((const void *)buf, source.cnt, CK_BUFFER_UNREG);
 
     // Set the common layerInfo for the destination
     CmiSetRdmaCommonInfo(dest.layerInfo, dest.ptr, dest.cnt);
@@ -1034,5 +1035,148 @@ void CkRdmaEMBcastAckHandler(void *ack) {
   }
 }
 
+
+
+/***************************** Zerocopy Readonly Bcast Support ****************************/
+
+extern int _roRdmaDoneHandlerIdx,_initHandlerIdx;
+CksvExtern(int, _numPendingRORdmaTransfers);
+extern UInt numZerocopyROops, curROIndex;
+extern NcpyROBcastAckInfo *roBcastAckInfo;
+
+void readonlyUpdateNumops() {
+  //update numZerocopyROops
+  numZerocopyROops++;
+}
+
+// Method to allocate an object on the source for de-registration after bcast completes
+void readonlyAllocateOnSource() {
+
+  if(_topoTree == NULL) CkAbort("CkRdmaIssueRgets:: topo tree has not been calculated \n");
+  CmiSpanningTreeInfo &t = *_topoTree;
+
+  // allocate the buffer to keep track of the completed operations
+  roBcastAckInfo = (NcpyROBcastAckInfo *)CmiAlloc(sizeof(NcpyROBcastAckInfo) + numZerocopyROops * sizeof(NcpyROBcastBuffAckInfo));
+
+  roBcastAckInfo->counter = 0;
+  roBcastAckInfo->isRoot = (t.parent == -1);
+  roBcastAckInfo->numChildren = t.child_count;
+  roBcastAckInfo->numops = numZerocopyROops;
+}
+
+// Method to initialize the allocated object with each source buffer's information
+void readonlyCreateOnSource(CkNcpyBuffer &src) {
+  src.bcastAckInfo = roBcastAckInfo;
+
+  NcpyROBcastBuffAckInfo *buffAckInfo = &(roBcastAckInfo->buffAckInfo[curROIndex]);
+
+  buffAckInfo->ptr = src.ptr;
+  buffAckInfo->mode = src.mode;
+  buffAckInfo->pe = src.pe;
+
+  // store the source layer information for de-registration
+  memcpy(buffAckInfo->layerInfo, src.layerInfo, CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES);
+
+  curROIndex++;
+}
+
+// Method to perform an get for Readonly transfer
+int readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr) {
+  CkNcpyMode transferMode = findTransferMode(src.pe, dest.pe);
+  if(transferMode == CkNcpyMode::MEMCPY) {
+    CmiAbort("memcpy: should not happen\n");
+  }
+#if CMK_USE_CMA
+  else if(transferMode == CkNcpyMode::CMA) {
+    dest.cmaGet(src);
+  }
+#endif
+  else {
+
+    CksvAccess(_numPendingRORdmaTransfers)++;
+
+    int layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
+    int ackSize = 0;
+    int ncpyObjSize = getNcpyOpInfoTotalSize(
+                      layerInfoSize,
+                      ackSize,
+                      layerInfoSize,
+                      ackSize);
+    NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)CmiAlloc(ncpyObjSize);
+    setNcpyOpInfo(src.ptr,
+                  (char *)(src.layerInfo),
+                  layerInfoSize,
+                  NULL,
+                  ackSize,
+                  src.cnt,
+                  src.mode,
+                  src.isRegistered,
+                  src.pe,
+                  src.ref,
+                  dest.ptr,
+                  (char *)(dest.layerInfo),
+                  layerInfoSize,
+                  NULL,
+                  ackSize,
+                  dest.cnt,
+                  dest.mode,
+                  dest.isRegistered,
+                  dest.pe,
+                  dest.ref,
+                  ncpyOpInfo);
+
+    ncpyOpInfo->opMode = CMK_READONLY_BCAST;
+    ncpyOpInfo->refPtr = refPtr;
+
+    readonlyCreateOnSource(dest);
+
+    CmiIssueRget(ncpyOpInfo);
+  }
+}
+
+void readonlyGetCompleted(NcpyOperationInfo *ncpyOpInfo) {
+
+  if(_topoTree == NULL) CkAbort("CkRdmaIssueRgets:: topo tree has not been calculated \n");
+  CmiSpanningTreeInfo &t = *_topoTree;
+
+  CksvAccess(_numPendingRORdmaTransfers)--;
+
+  if(CksvAccess(_numPendingRORdmaTransfers) == 0) {
+
+    if(t.child_count != 0) {  // Intermediate Node
+
+      envelope *env = (envelope *)(ncpyOpInfo->refPtr);
+
+      // send a message to my child nodes
+      CmiForwardProcBcastMsg(env->getTotalsize(), (char *)env);
+
+      //TODO:QD support
+
+    } else {
+
+      // deregister dest buffer
+      CmiDeregisterMem(ncpyOpInfo->destPtr, ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->destPe, ncpyOpInfo->destMode);
+
+      // Send a message to the parent to signal completion in order to deregister
+      envelope *compEnv = _allocEnv(ROChildCompletionMsg);
+      compEnv->setSrcPe(CkMyPe());
+      CmiSetHandler(compEnv, _roRdmaDoneHandlerIdx);
+      CmiSyncSendAndFree(ncpyOpInfo->srcPe, compEnv->getTotalsize(), (char *)compEnv);
+    }
+
+#if CMK_SMP
+    // Send a message to my first node to signal completion
+    envelope *sigEnv = _allocEnv(ROPeerCompletionMsg);
+    sigEnv->setSrcPe(CkMyPe());
+    CmiSetHandler(sigEnv, _roRdmaDoneHandlerIdx);
+    //CmiSetHandler(sigEnv, _initHandlerIdx);
+    CmiSyncSendAndFree(CmiNodeFirst(CmiMyNode()), sigEnv->getTotalsize(), (char *)sigEnv);
+#else
+    // Directly call checkInitDone
+    checkForInitDone();
+#endif
+
+  }
+}
 #endif
 /* End of CMK_ONESIDED_IMPL */

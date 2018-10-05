@@ -113,6 +113,15 @@ UInt  _numInitMsgs = 0;
  * given node, this value must be seen by all processors in a node.
  */
 CksvDeclare(UInt,_numInitNodeMsgs);
+
+#if CMK_ONESIDED_IMPL
+UInt  numZerocopyROops;
+UInt  curROIndex;
+NcpyROBcastAckInfo *roBcastAckInfo;
+int   _roRdmaDoneHandlerIdx;
+CksvDeclare(int,  _numPendingRORdmaTransfers);
+#endif
+
 int   _infoIdx;
 int   _charmHandlerIdx;
 int   _initHandlerIdx;
@@ -883,11 +892,8 @@ void _initDone(void)
  */
 static void _triggerHandler(envelope *env)
 {
-  if (_numExpectInitMsgs && CkpvAccess(_numInitsRecd) + CksvAccess(_numInitNodeMsgs) == _numExpectInitMsgs)
-  {
-    DEBUGF(("Calling Init Done from _triggerHandler\n"));
-    _initDone();
-  }
+  DEBUGF(("Calling Init Done from _triggerHandler\n"));
+  checkForInitDone();
   if (env!=NULL) CmiFree(env);
 }
 
@@ -902,12 +908,38 @@ static inline void _processRODataMsg(envelope *env)
 {
   //Unpack each readonly:
   if(!CmiMyRank()) {
+#if CMK_ONESIDED_IMPL && CMK_SMP
+    if(CMI_IS_ZC_BCAST(env)) {
+      // Send message to peers
+      CmiForwardMsgToPeers(env->getTotalsize(), (char *)env);
+    }
+#endif
+
+    //Unpack each readonly
     PUP::fromMem pu((char *)EnvToUsr(env));
+
+#if CMK_ONESIDED_IMPL
+    pu|numZerocopyROops;
+    if(numZerocopyROops > 0) {
+      readonlyAllocateOnSource();
+    }
+#endif
+
     for(size_t i=0;i<_readonlyTable.size();i++) {
       _readonlyTable[i]->pupData(pu);
     }
+
+#if CMK_ONESIDED_IMPL
+    if(CMI_IS_ZC_BCAST(env)) {
+      if(findTransferMode(env->getSrcPe(), CkMyPe()) == CkNcpyMode::CMA) {
+        // Forward the env after replacing the pointers
+        CmiForwardProcBcastMsg(env->getTotalsize(), (char *)env);
+      }
+    }
+#endif
+  } else {
+    CmiFree(env);
   }
-  CmiFree(env);
 }
 
 /**
@@ -930,6 +962,56 @@ static void _roRestartHandler(void *msg)
   // to trigger initDone() on all ranks
   // we therefore needs to make sure initDone() is exactly 
   _triggerHandler(NULL);
+}
+
+#if CMK_ONESIDED_IMPL
+static void _roRdmaDoneHandler(envelope *env) {
+
+  switch(env->getMsgtype()) {
+    case ROPeerCompletionMsg:
+      checkForInitDone();
+      if (env!=NULL) CmiFree(env);
+      break;
+    case ROChildCompletionMsg:
+      roBcastAckInfo->counter++;
+      if(roBcastAckInfo->counter == roBcastAckInfo->numChildren) {
+        // deregister
+        for(int i=0; i < roBcastAckInfo->numops; i++) {
+          NcpyROBcastBuffAckInfo *buffAckInfo = &(roBcastAckInfo->buffAckInfo[i]);
+          CmiDeregisterMem(buffAckInfo->ptr,
+                           buffAckInfo->layerInfo +CmiGetRdmaCommonInfoSize(),
+                           buffAckInfo->pe,
+                           buffAckInfo->mode);
+        }
+
+        if(roBcastAckInfo->isRoot != 1) {
+          if(_topoTree == NULL) CkAbort("CkRdmaIssueRgets:: topo tree has not been calculated \n");
+          CmiSpanningTreeInfo &t = *_topoTree;
+
+          //forward message to root
+          // Send a message to the parent to signal completion in order to deregister
+          envelope *compEnv = _allocEnv(ROChildCompletionMsg);
+          compEnv->setSrcPe(CkMyPe());
+          CmiSetHandler(compEnv, _roRdmaDoneHandlerIdx);
+          CmiSyncSendAndFree(t.parent, compEnv->getTotalsize(), (char *)compEnv);
+        }
+      }
+      break;
+    default:
+      CmiAbort("Invalid msg type\n");
+      break;
+  }
+}
+#endif
+
+void checkForInitDone() {
+
+  bool noPendingRORdmaTransfers = true;
+#if CMK_ONESIDED_IMPL
+  noPendingRORdmaTransfers = (CksvAccess(_numPendingRORdmaTransfers) == 0);
+#endif
+  if (_numExpectInitMsgs && CkpvAccess(_numInitsRecd) + CksvAccess(_numInitNodeMsgs) == _numExpectInitMsgs && noPendingRORdmaTransfers)
+    _initDone();
 }
 
 /**
@@ -991,9 +1073,7 @@ static void _initHandler(void *msg, CkCoreState *ck)
       CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
   }
   DEBUGF(("[%d,%.6lf] _numExpectInitMsgs %d CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs) %d+%d\n",CmiMyPe(),CmiWallTimer(),_numExpectInitMsgs,CkpvAccess(_numInitsRecd),CksvAccess(_numInitNodeMsgs)));
-  if(_numExpectInitMsgs&&(CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs)==_numExpectInitMsgs)) {
-    _initDone();
-  }
+  checkForInitDone();
 }
 
 #if CMK_SHRINK_EXPAND
@@ -1200,6 +1280,10 @@ void _initCharm(int unused_argc, char **argv)
 	CksvInitialize(bool, _triggersSent);
 	CksvAccess(_triggersSent) = false;
 
+#if CMK_ONESIDED_IMPL
+	CksvInitialize(int, _numPendingRORdmaTransfers);
+#endif
+
 	CkpvInitialize(_CkOutStream*, _ckout);
 	CkpvInitialize(_CkErrStream*, _ckerr);
 	CkpvInitialize(Stats*, _myStats);
@@ -1218,6 +1302,11 @@ void _initCharm(int unused_argc, char **argv)
 	{
 	  	CksvAccess(_numNodeGroups) = 1; //make 0 an invalid group number
           	CksvAccess(_numInitNodeMsgs) = 0;
+
+#if CMK_ONESIDED_IMPL
+		CksvAccess(_numPendingRORdmaTransfers) = 0;
+#endif
+
 		CksvAccess(_nodeLock) = CmiCreateLock();
 		CksvAccess(_nodeGroupTable) = new GroupTable();
 		CksvAccess(_nodeGroupTable)->init();
@@ -1244,6 +1333,11 @@ void _initCharm(int unused_argc, char **argv)
 	CmiAssignOnce(&_charmHandlerIdx, CkRegisterHandler(_bufferHandler));
 	CmiAssignOnce(&_initHandlerIdx, CkRegisterHandlerEx(_initHandler, CkpvAccess(_coreState)));
 	CmiAssignOnce(&_roRestartHandlerIdx, CkRegisterHandler(_roRestartHandler));
+
+#if CMK_ONESIDED_IMPL
+	CmiAssignOnce(&_roRdmaDoneHandlerIdx, CkRegisterHandler(_roRdmaDoneHandler));
+#endif
+
 	CmiAssignOnce(&_exitHandlerIdx, CkRegisterHandler(_exitHandler));
 	//added for interoperabilitY
 	CmiAssignOnce(&_libExitHandlerIdx, CkRegisterHandler(_libExitHandler));
@@ -1659,20 +1753,45 @@ void _initCharm(int unused_argc, char **argv)
 			_numInitMsgs++;
 		}
 
+#if CMK_ONESIDED_IMPL
+		numZerocopyROops = 0;
+		curROIndex = 0;
+#endif
+
 		//Determine the size of the RODataMessage
 		PUP::sizer ps;
+
+#if CMK_ONESIDED_IMPL
+		ps|numZerocopyROops;
+#endif
+
 		for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(ps);
+
+#if CMK_ONESIDED_IMPL
+		if(numZerocopyROops > 0)
+			readonlyAllocateOnSource();
+#endif
 
 		//Allocate and fill out the RODataMessage
 		envelope *env = _allocEnv(RODataMsg, ps.size());
 		PUP::toMem pp((char *)EnvToUsr(env));
+#if CMK_ONESIDED_IMPL
+		pp|numZerocopyROops;
+#endif
 		for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pp);
 
 		env->setCount(++_numInitMsgs);
 		env->setSrcPe(CkMyPe());
 		CmiSetHandler(env, _initHandlerIdx);
 		DEBUGF(("[%d,%.6lf] RODataMsg being sent of size %d \n",CmiMyPe(),CmiWallTimer(),env->getTotalsize()));
-		CmiSyncBroadcastAndFree(env->getTotalsize(), (char *)env);
+		CmiSyncBroadcast(env->getTotalsize(), (char *)env);
+#if CMK_ONESIDED_IMPL && CMK_SMP
+		if(numZerocopyROops > 0) {
+			// Send message to peers
+			CmiForwardMsgToPeers(env->getTotalsize(), (char *)env);
+		}
+#endif
+		CmiFree(env);
 		CpvAccess(_qd)->create(CkNumPes()-1);
 		_initDone();
 	} else {

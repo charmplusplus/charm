@@ -47,7 +47,8 @@ enum ncpyOperationMode {
   CMK_EM_API              = 1,
   CMK_EM_API_REVERSE      = 2,
   CMK_BCAST_EM_API        = 3,
-  CMK_BCAST_EM_API_REVERSE= 4
+  CMK_BCAST_EM_API_REVERSE= 4,
+  CMK_READONLY_BCAST      = 5
 };
 
 // Enum for the method of acknowledglement handling after the completion of a zerocopy operation

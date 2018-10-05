@@ -110,6 +110,11 @@ class CkNcpyBuffer{
     isRegistered = false;
   }
 
+  explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, unsigned short int mode_) {
+    cb = CkCallback(CkCallback::ignore);
+    init(ptr_, cnt_, mode_);
+  }
+
   CkNcpyBuffer(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int mode_=CK_BUFFER_REG) {
     init(ptr_, cnt_, cb_, mode_);
   }
@@ -119,9 +124,13 @@ class CkNcpyBuffer{
   }
 
   void init(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int mode_=CK_BUFFER_REG) {
+    cb   = cb_;
+    init(ptr_, cnt_, mode_);
+  }
+
+  void init(const void *ptr_, size_t cnt_, unsigned short int mode_=CK_BUFFER_REG) {
     ptr  = ptr_;
     cnt  = cnt_;
-    cb   = cb_;
     pe   = CkMyPe();
     mode = mode_;
 
@@ -213,6 +222,8 @@ class CkNcpyBuffer{
   friend void constructDestinationBufferObject(NcpyOperationInfo *info, CkNcpyBuffer &dest);
 
   friend envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg);
+  friend int readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr);
+  friend void readonlyCreateOnSource(CkNcpyBuffer &src);
 };
 
 // Ack handler for the Zerocopy Direct API
@@ -335,6 +346,49 @@ void handleBcastReverseEntryMethodApiCompletion(NcpyOperationInfo *info);
 
 // Method called on the root node and other intermediate parent nodes on completion of RGET through ZC Bcast
 void CkRdmaEMBcastAckHandler(void *ack);
+
+
+
+/***************************** Zerocopy Readonly Bcast Support ****************************/
+
+/* Support for Zerocopy Broadcast of large readonly variables */
+CkpvExtern(int, _numPendingRORdmaTransfers);
+
+struct NcpyROBcastBuffAckInfo {
+  const void *ptr;
+
+  int mode;
+
+  int pe;
+
+  // machine specific information about the buffer
+  #ifdef __GNUC__
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wpedantic"
+  #endif
+  char layerInfo[CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES];
+  #ifdef __GNUC__
+  #pragma GCC diagnostic pop
+  #endif
+};
+
+struct NcpyROBcastAckInfo {
+  int numChildren;
+  int counter;
+  bool isRoot;
+  int numops;
+  NcpyROBcastBuffAckInfo buffAckInfo[0];
+};
+
+void readonlyUpdateNumops();
+
+void readonlyAllocateOnSource();
+
+void readonlyCreateOnSource(CkNcpyBuffer &src);
+
+int readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr);
+
+void readonlyGetCompleted(NcpyOperationInfo *ncpyOpInfo);
 
 #endif /* End of CMK_ONESIDED_IMPL */
 

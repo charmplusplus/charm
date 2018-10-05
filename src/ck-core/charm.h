@@ -316,32 +316,36 @@ extern void CkMigrateExt(int aid, int ndims, int *index, int toPe);
  *   Make sure the two remain synchronized if changing this one.
  ***/
 typedef enum {
-  NewChareMsg     =1,               // Singleton chare creation message
-  NewVChareMsg    =2,               // Singleton virtual chare creation message
-  BocInitMsg      =3,               // Group creation message
-  ForChareMsg     =4,               // Singleton chare entry method message (non creation)
-  ForBocMsg       =5,               // Group entry method message (non creation)
-  ForVidMsg       =6,               // Singleton virtual chare entry method message (non creation)
-  FillVidMsg      =7,               // Message sent to fill a VidBlock on a virtual chare PE
-  DeleteVidMsg    =8,               // Message sent to delete a VidBlock on a virtual chare PE
-  RODataMsg       =9,               // Readonly Data Message (for user declared readonly variables)
-  ROMsgMsg        =10,              // Readonly message Message (for user declared readonly messages)
-  StartExitMsg    =11,              // Exit sequence trigger message
-  ExitMsg         =12,              // Exit sequence trigger message using user registered exit function
-  ReqStatMsg      =13,              // Request stats and warnings message
-  StatMsg         =14,              // Stats data message (Reduction)
-  StatDoneMsg     =15,              // Signal completion of stats reduction (Broadcast)
-  NodeBocInitMsg  =16,              // Nodegroup creation message
-  ForNodeBocMsg   =17,              // Nodegroup entry method message (non creation)
-  ArrayEltInitMsg =18,              // Array Element Initialization message
-  ForArrayEltMsg  =19,              // Array Element entry method message
-  ForIDedObjMsg   =20,
+  NewChareMsg          =1,               // Singleton chare creation message
+  NewVChareMsg         =2,               // Singleton virtual chare creation message
+  BocInitMsg           =3,               // Group creation message
+  ForChareMsg          =4,               // Singleton chare entry method message (non creation)
+  ForBocMsg            =5,               // Group entry method message (non creation)
+  ForVidMsg            =6,               // Singleton virtual chare entry method message (non creation)
+  FillVidMsg           =7,               // Message sent to fill a VidBlock on a virtual chare PE
+  DeleteVidMsg         =8,               // Message sent to delete a VidBlock on a virtual chare PE
+  RODataMsg            =9,               // Readonly Data Message (for user declared readonly variables)
+  ROMsgMsg             =10,              // Readonly message Message (for user declared readonly messages)
+  ROPeerCompletionMsg  =11,              // Message to signal completion of RO Data transfer using Zcpy API
+                                         // ^(used by child nodes to signal completion to their parent node in the bcast spanning tree)
+  ROChildCompletionMsg =12,              // Message to signal completion of RO Data transfer using Zcpy API
+                                         // ^(used by peer nodes to signal completion to the 0th node)
+  StartExitMsg         =13,              // Exit sequence trigger message
+  ExitMsg              =14,              // Exit sequence trigger message using user registered exit function
+  ReqStatMsg           =15,              // Request stats and warnings message
+  StatMsg              =16,              // Stats data message (Reduction)
+  StatDoneMsg          =17,              // Signal completion of stats reduction (Broadcast)
+  NodeBocInitMsg       =18,              // Nodegroup creation message
+  ForNodeBocMsg        =19,              // Nodegroup entry method message (non creation)
+  ArrayEltInitMsg      =20,              // Array Element Initialization message
+  ForArrayEltMsg       =21,              // Array Element entry method message
+  ForIDedObjMsg        =22,
 #if CMK_LOCKLESS_QUEUE
-  WarnMsg         =21,              // Warning data message (Reduction)
-  WarnDoneMsg     =22,              // Signal completion of warnings reduction (Broadcast)
-  LAST_CK_ENVELOPE_TYPE =23         // Used for error-checking
+  WarnMsg              =23,              // Warning data message (Reduction)
+  WarnDoneMsg          =24,              // Signal completion of warnings reduction (Broadcast)
+  LAST_CK_ENVELOPE_TYPE =25              // Used for error-checking
 #else
-  LAST_CK_ENVELOPE_TYPE =21         // Used for error-checking
+  LAST_CK_ENVELOPE_TYPE =23              // Used for error-checking
 #endif
 } CkEnvelopeType;
 

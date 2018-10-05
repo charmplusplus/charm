@@ -2,6 +2,7 @@ DIRS = \
   direct_api \
   entry_method_api \
   entry_method_bcast_api \
+  large_readonly \
 
 TESTDIRS = $(DIRS)
 

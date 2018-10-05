@@ -36,3 +36,14 @@ enum cmiCMAMsgType {
 #undef  CMK_COMMON_NOCOPY_DIRECT_BYTES // previous definition is in conv-mach-common.h
 #define CMK_COMMON_NOCOPY_DIRECT_BYTES sizeof(pid_t)
 #endif
+
+#if CMK_ONESIDED_IMPL
+// This macro is used to specify the threshold size in bytes, above which
+// the Zerocopy API is used to broadcast large readonly variables to all
+// processes
+#define CMK_ONESIDED_RO_THRESHOLD      1048576
+
+// TODO: Modify and move this variable to <layer>/conv-common.h by running experiments on each layer
+// CMK_ONESIDED_RO_THRESHOLD is currently set to 1 MiB arbitrarily until the experiments are conducted
+
+#endif

@@ -72,13 +72,110 @@ void Readonly::genDefs(XStr& str) {
     str << "(void *_impl_pup_er) {\n";
     str << "  PUP::er &_impl_p=*(PUP::er *)_impl_pup_er;\n";
     if (dims) {
+      // Setting CMK_ONESIDED_RO_DISABLE provides a compile time switch to turn off RO ZC Bcast
+      str <<"#if !CMK_ONESIDED_RO_DISABLE && CMK_ONESIDED_IMPL\n";
+      // Conditional to selectively pup ncpy buffers
+      str <<"  if(";
+      dims->printValueProduct(str);
+      str <<" * sizeof(";
+      type->print(str);
+      str << ") >= CMK_ONESIDED_RO_THRESHOLD) {\n";
+      str <<"    CkNcpyBuffer myBuffer(& "<< qName();
+      dims->printZeros(str);
+      str <<", (";
+      dims->printValueProduct(str);
+      str <<" * sizeof(";
+      type->print(str);
+      str <<")), CK_BUFFER_REG);\n";
+      str <<"    if(_impl_p.isPacking() || _impl_p.isSizing()) {\n";
+      str <<"      _impl_p|myBuffer;\n";
+      str <<"      if(_impl_p.isSizing())\n";
+      str <<"        readonlyUpdateNumops();\n";
+      str <<"      else\n";
+      str <<"        readonlyCreateOnSource(myBuffer);\n";
+      str <<"    }\n";
+      str <<"    if(_impl_p.isPacking()) {\n";
+      str <<"      PUP::toMem &_impl_p_toMem = *(PUP::toMem *)_impl_pup_er;\n";
+      str <<"      envelope *env = UsrToEnv(_impl_p_toMem.get_orig_pointer());\n";
+      str <<"      CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_SEND_MSG;\n";
+      str <<"    }\n";
+      str <<"    if(_impl_p.isUnpacking()) {\n";
+      str <<"      PUP::fromMem &_impl_p_fromMem = *(PUP::fromMem *)_impl_pup_er;\n";
+      str <<"      char *ptr = _impl_p_fromMem.get_current_pointer();\n";
+      str <<"      PUP::toMem _impl_p_toMem = (PUP::toMem)((void *)ptr);\n";
+      str <<"      envelope *env = UsrToEnv(_impl_p_toMem.get_orig_pointer());\n";
+      str <<"      CkNcpyBuffer srcBuffer;\n";
+      str <<"      _impl_p|srcBuffer;\n";
+      str <<"      _impl_p_toMem|myBuffer;\n";
+      str <<"      readonlyGet(srcBuffer, myBuffer, (void *)env);\n";
+      str <<"    }\n";
+      str <<"  } else\n";
+      str <<"#endif\n";
+      str << "  {\n";
       str << "  _impl_p(&" << qName();
       dims->printZeros(str);
       str << ", (";
       dims->printValueProduct(str);
       str << ") );\n";
+      str << "  }\n";
     } else {
-      str << "  _impl_p|" << qName() << ";\n";
+      if(strcmp("vector",type->getBaseName()) == 0) {
+        // Setting CMK_ONESIDED_RO_DISABLE provides a compile time switch to turn off RO ZC Bcast
+        str <<"#if !CMK_ONESIDED_RO_DISABLE && CMK_ONESIDED_IMPL\n";
+        NamedType *nType = (NamedType *)type;
+
+        // Determine if the vector is going to be using ZC bcast
+        str <<"  bool vecUsesZC = false;\n";
+        str <<"  if(_impl_p.isPacking() || _impl_p.isSizing()) {\n";
+        // Add conditional to selectively pup ncpy buffers
+        str <<"    vecUsesZC = (" << qName() <<".size()";
+        str <<" * sizeof(" << nType->getTparams() <<")";
+        str <<" >= CMK_ONESIDED_RO_THRESHOLD);\n";
+        str <<"  }\n";
+
+        str <<"  _impl_p|vecUsesZC;\n";
+
+        str <<"  if(vecUsesZC) {\n";
+        str <<"    if(_impl_p.isPacking() || _impl_p.isSizing()) {\n";
+        str <<"      CkNcpyBuffer myBuffer("<< qName() << ".data()";
+        str <<", " << "sizeof(" << nType->getTparams() << ") * "<< qName() <<".size()";
+        str <<", CK_BUFFER_REG);\n";
+        str <<"      _impl_p|myBuffer;\n";
+        str <<"      if(_impl_p.isSizing())\n";
+        str <<"        readonlyUpdateNumops();\n";
+        str <<"      else\n";
+        str <<"        readonlyCreateOnSource(myBuffer);\n";
+        str <<"    }\n";
+        str <<"    if(_impl_p.isPacking()) {\n";
+        str <<"      PUP::toMem &_impl_p_toMem_orig = *(PUP::toMem *)_impl_pup_er;\n";
+        str <<"      envelope *env = UsrToEnv(_impl_p_toMem_orig.get_orig_pointer());\n";
+        str <<"      CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_SEND_MSG;\n";
+        str <<"    }\n";
+        str <<"    if(_impl_p.isUnpacking()) {\n";
+        str <<"      PUP::fromMem &_impl_p_fromMem = *(PUP::fromMem *)_impl_pup_er;\n";
+        str <<"      PUP::toMem &_impl_p_toMem_orig = *(PUP::toMem *)_impl_pup_er;\n";
+        str <<"      envelope *env = UsrToEnv(_impl_p_toMem_orig.get_orig_pointer());\n";
+        str <<"      char *ptr = _impl_p_fromMem.get_current_pointer();\n";
+        str <<"      PUP::toMem _impl_p_toMem = (PUP::toMem)((void *)ptr);\n";
+        str <<"      CkNcpyBuffer srcBuffer;\n";
+        str <<"      _impl_p|srcBuffer;\n";
+        str <<"      size_t nElem = ";
+        str <<"(srcBuffer.cnt)/sizeof("<<nType->getTparams()<<");\n";
+        str <<"      " << qName() <<".resize(nElem);\n";
+        str <<"      " << qName() <<".shrink_to_fit();\n";
+        str <<"      CkNcpyBuffer myBuffer("<< qName() << ".data()";
+        str <<", " << "srcBuffer.cnt, CK_BUFFER_REG);\n";
+        str <<"      _impl_p_toMem|myBuffer;\n";
+        str <<"      readonlyGet(srcBuffer, myBuffer, (void *)env);\n";
+        str <<"    }\n";
+        str <<"  } else\n";
+        str <<"#endif\n";
+        str <<"  {\n";
+        str <<"    _impl_p|" << qName() << ";\n";
+        str <<"  }\n";
+      } else {
+        str <<"  _impl_p|" << qName() << ";\n";
+      }
     }
     str << "}\n";
     templateGuardEnd(str);
