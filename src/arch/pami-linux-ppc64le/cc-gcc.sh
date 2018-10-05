@@ -6,8 +6,8 @@ CMK_CXX='g++ '
 CMK_LD='g++ '
 CMK_LDXX='g++ '
 
-CMK_C_OPTIMIZE='-O3 -g'
-CMK_CXX_OPTIMIZE='-O3 -g'
+CMK_C_OPTIMIZE='-O3'
+CMK_CXX_OPTIMIZE='-O3'
 
 CMK_RANLIB='ranlib'
 CMK_LIBS='-lckqt '
