@@ -8778,9 +8778,10 @@ AMPI_API_IMPL(int, MPI_Comm_free, MPI_Comm *comm)
 {
   AMPI_API("AMPI_Comm_free");
   ampiParent* parent = getAmpiParent();
-  int ret;
+  int ret = MPI_SUCCESS;
   if (*comm != MPI_COMM_NULL) {
-    ret = parent->freeUserKeyvals(*comm, parent->getKeyvals(*comm));
+    // FIXME: free user-defined attribute keyvals owned by this communicator
+    //ret = parent->freeUserKeyvals(*comm, parent->getKeyvals(*comm));
     if (*comm != MPI_COMM_WORLD && *comm != MPI_COMM_SELF) {
       ampi* ptr = getAmpiInstance(*comm);
       ptr->barrier();
