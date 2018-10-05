@@ -331,6 +331,16 @@ This function creates a user event that marks a specific point in time.
 Eg. {\tt traceUserEvent(10);}
 
 \item
+{\tt void traceBeginUserBracketEvent(int EventNum) }
+
+{\tt void traceEndUserBracketEvent(int EventNum) }
+
+These functions record a user event spanning a time interval. The
+tracing framework automatically associates the call with the time it
+was made, so timestamps are not explicitly passed in as they are with
+{\tt traceUserBracketEvent}.
+
+\item
 {\tt void traceUserBracketEvent(int EventNum, double StartTime, double EndTime) }
 
 This function records a user event spanning a time interval from {\tt StartTime} to {\tt EndTime}. Both {\tt StartTime} and {\tt EndTime} should be obtained from a call to {\tt CmiWallTimer()} at the appropriate point in the program.
