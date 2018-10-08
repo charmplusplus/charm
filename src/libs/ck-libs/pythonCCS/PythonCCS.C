@@ -907,7 +907,7 @@ static void initializePythonDefault(void) {
   //CsvAccess(pyLock) = CmiCreateLock();
   CtvInitialize(PyObject *,pythonReturnValue);
 
-  PythonCCS::reduceString = CkReduction::addReducer(pythonCombinePrint);
+  PythonCCS::reduceString = CkReduction::addReducer(pythonCombinePrint, false, "pythonCombinePrint");
 
   Py_Initialize();
   PyEval_InitThreads();

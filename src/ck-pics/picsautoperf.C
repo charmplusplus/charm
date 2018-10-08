@@ -736,7 +736,7 @@ extern "C" void traceAutoPerfExitFunction() {
 
 void _initTraceAutoPerfNode()
 {
-  PerfDataReductionType = CkReduction::addReducer(PerfDataReduction);
+  PerfDataReductionType = CkReduction::addReducer(PerfDataReduction, false, "PerfDataReduction");
 }
 
 void _initTraceAutoPerfBOC()

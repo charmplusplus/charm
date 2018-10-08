@@ -952,7 +952,7 @@ static void ampiNodeInit() noexcept
 #endif
   }
 
-  AmpiReducer = CkReduction::addReducer(AmpiReducerFunc, true /*streamable*/);
+  AmpiReducer = CkReduction::addReducer(AmpiReducerFunc, true /*streamable*/, "AmpiReducerFunc");
 
   CkAssert(AMPI_threadstart_idx == -1);    // only initialize once
   AMPI_threadstart_idx = TCHARM_Register_thread_function(AMPI_threadstart);

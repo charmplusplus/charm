@@ -84,7 +84,7 @@ CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
 
 /*global*/ CkReduction::reducerType lbDataCollectionType;
 /*initnode*/ void registerLBDataCollection(void) {
-  lbDataCollectionType = CkReduction::addReducer(lbDataCollection, true);
+  lbDataCollectionType = CkReduction::addReducer(lbDataCollection, true, "lbDataCollection");
 }
 
 CkGroupID _metalb;

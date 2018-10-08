@@ -1795,11 +1795,11 @@ CkReduction::CkReduction() {} //Dummy private constructor
 
 //Add the given reducer to the list.  Returns the new reducer's
 // reducerType.  Must be called in the same order on every node.
-CkReduction::reducerType CkReduction::addReducer(reducerFn fn, bool streamable)
+CkReduction::reducerType CkReduction::addReducer(reducerFn fn, bool streamable, const char* name)
 {
   CkAssert(CmiMyRank() == 0);
   reducerType index = (reducerType)reducerTable().size();
-  reducerTable().emplace_back(fn, streamable);
+  reducerTable().emplace_back(fn, streamable, name);
   return index;
 }
 

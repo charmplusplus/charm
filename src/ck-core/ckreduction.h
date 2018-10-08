@@ -253,7 +253,7 @@ public:
 
 	//Add the given reducer to the list.  Returns the new reducer's
 	// reducerType.  Must be called in the same order on every node.
-	static reducerType addReducer(reducerFn fn, bool streamable=false);
+	static reducerType addReducer(reducerFn fn, bool streamable=false, const char* name=NULL);
 
 private:
 	friend class CkReductionMgr;

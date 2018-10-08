@@ -182,8 +182,8 @@ CkReductionMsg *allMeasuresReduction(int nMsg,CkReductionMsg **msgs){
 
 /// Registers the control point framework's reduction handlers at startup on each PE
 /*initproc*/ void registerCPReductions(void) {
-  idleTimeReductionType=CkReduction::addReducer(idleTimeReduction);
-  allMeasuresReductionType=CkReduction::addReducer(allMeasuresReduction);
+  idleTimeReductionType=CkReduction::addReducer(idleTimeReduction, false, "idleTimeReduction");
+  allMeasuresReductionType=CkReduction::addReducer(allMeasuresReduction, false, "allMeasuresReduction");
 }
 
 

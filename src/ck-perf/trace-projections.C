@@ -1813,9 +1813,9 @@ void TraceProjections::endPhase() {
 
 void registerOutlierReduction() {
   outlierReductionType =
-    CkReduction::addReducer(outlierReduction);
+    CkReduction::addReducer(outlierReduction, false, "outlierReduction");
   minMaxReductionType =
-    CkReduction::addReducer(minMaxReduction);
+    CkReduction::addReducer(minMaxReduction, false "minMaxReduction");
 }
 
 /**
