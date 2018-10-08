@@ -38,7 +38,7 @@ CStateVar::CStateVar(ParamList* pl)
       type(new XStr(pl->param->type->isMessage() ? *(pl->param->type->deref())
                                                  : *(pl->param->getType()))),
       numPtrs(0),
-      name(new XStr(pl->getGivenName())),
+      name(new XStr(pl->getGivenName() ? pl->getGivenName() : "noGivenName")),
       byRef(pl->isReference() ? new XStr("&") : NULL),
       declaredRef(pl->declaredReference() ? new XStr("&") : NULL),
       byConst(pl->isConst()),
