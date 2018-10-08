@@ -268,16 +268,6 @@ int _kq = -1;
 
 #define PRINTBUFSIZE 16384
 
-#ifdef __ONESIDED_IMPL
-#ifdef __ONESIDED_NO_HARDWARE
-int putSrcHandler;
-int putDestHandler;
-int getSrcHandler;
-int getDestHandler;
-#include "conv-onesided.c"
-#endif
-#endif
-
 static void CommunicationServerNet(int withDelayMs, int where);
 //static void CommunicationServer(int withDelayMs);
 
@@ -1935,16 +1925,6 @@ void LrtsPostCommonInit(int everReturn)
     CmiPrintf("Charm++: Machine layer will randomly corrupt every %d'th message (rand %d)\n",
     	CMK_RANDOMLY_CORRUPT_MESSAGES,rand());
 #endif
-
-#ifdef __ONESIDED_IMPL
-#ifdef __ONESIDED_NO_HARDWARE
-  putSrcHandler = CmiRegisterHandler((CmiHandler)handlePutSrc);
-  putDestHandler = CmiRegisterHandler((CmiHandler)handlePutDest);
-  getSrcHandler = CmiRegisterHandler((CmiHandler)handleGetSrc);
-  getDestHandler = CmiRegisterHandler((CmiHandler)handleGetDest);
-#endif
-#endif
-    
 }
 
 void LrtsExit(int exitcode)

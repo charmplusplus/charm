@@ -2154,9 +2154,6 @@ extern void setMemoryTypeMessage(void*); /* for memory debugging */
 #if CMK_CELL
 #include "cell-api.h"
 #endif
-#ifdef __ONESIDED_IMPL
-#include "conv-onesided.h"
-#endif
 
 #include "conv-rdma.h"
 

@@ -55,10 +55,6 @@
 
 #define CMK_LBDB_ON					   1
 
-#define __ONESIDED_IMPL 1
-
-#define __ONESIDED_NO_HARDWARE  1
-
 #endif
 
 
