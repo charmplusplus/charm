@@ -1815,7 +1815,7 @@ void registerOutlierReduction() {
   outlierReductionType =
     CkReduction::addReducer(outlierReduction, false, "outlierReduction");
   minMaxReductionType =
-    CkReduction::addReducer(minMaxReduction, false "minMaxReduction");
+    CkReduction::addReducer(minMaxReduction, false, "minMaxReduction");
 }
 
 /**
