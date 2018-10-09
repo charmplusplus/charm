@@ -242,6 +242,6 @@ class CkNcpyBuffer{
   friend void CkRdmaDirectAckHandler(void *ack);
 };
 
-enum class ncpyTransferMode : char { MEMCPY, CMA, RDMA };
+enum class CkNcpyMode : char { MEMCPY, CMA, RDMA };
 
 #endif

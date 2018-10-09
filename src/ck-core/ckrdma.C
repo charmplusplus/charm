@@ -385,18 +385,18 @@ void CkRdmaDirectAckHandler(void *ack) {
     CmiFree(info);
 }
 
-// Returns ncpyTransferMode::MEMCPY if both the PEs are the same and memcpy can be used
-// Returns ncpyTransferMode::CMA if both the PEs are in the same physical node and CMA can be used
-// Returns ncpyTransferMode::RDMA if RDMA needs to be used
-ncpyTransferMode findTransferMode(int srcPe, int destPe) {
+// Returns CkNcpyMode::MEMCPY if both the PEs are the same and memcpy can be used
+// Returns CkNcpyMode::CMA if both the PEs are in the same physical node and CMA can be used
+// Returns CkNcpyMode::RDMA if RDMA needs to be used
+CkNcpyMode findTransferMode(int srcPe, int destPe) {
   if(CmiNodeOf(srcPe)==CmiNodeOf(destPe))
-    return ncpyTransferMode::MEMCPY;
+    return CkNcpyMode::MEMCPY;
 #if CMK_USE_CMA
   else if(CmiDoesCMAWork() && CmiPeOnSamePhysicalNode(srcPe, destPe))
-    return ncpyTransferMode::CMA;
+    return CkNcpyMode::CMA;
 #endif
   else
-    return ncpyTransferMode::RDMA;
+    return CkNcpyMode::RDMA;
 }
 
 // Get Methods
@@ -475,10 +475,10 @@ void CkNcpyBuffer::get(CkNcpyBuffer &source){
   // Check that this object is local when get is called
   CkAssert(CkNodeOf(pe) == CkMyNode());
 
-  ncpyTransferMode transferMode = findTransferMode(source.pe, pe);
+  CkNcpyMode transferMode = findTransferMode(source.pe, pe);
 
   //Check if it is a within-process sending
-  if(transferMode == ncpyTransferMode::MEMCPY) {
+  if(transferMode == CkNcpyMode::MEMCPY) {
     memcpyGet(source);
 
     //Invoke the source callback
@@ -488,7 +488,7 @@ void CkNcpyBuffer::get(CkNcpyBuffer &source){
     cb.send(sizeof(CkNcpyBuffer), this);
 
 #if CMK_USE_CMA
-  } else if(transferMode == ncpyTransferMode::CMA) {
+  } else if(transferMode == CkNcpyMode::CMA) {
 
     cmaGet(source);
 
@@ -499,7 +499,7 @@ void CkNcpyBuffer::get(CkNcpyBuffer &source){
     cb.send(sizeof(CkNcpyBuffer), this);
 
 #endif
-  } else if (transferMode == ncpyTransferMode::RDMA) {
+  } else if (transferMode == CkNcpyMode::RDMA) {
 
     int outstandingRdmaOps = 1; // used by true-RDMA layers
 
@@ -517,7 +517,7 @@ void CkNcpyBuffer::get(CkNcpyBuffer &source){
     rdmaGet(source);
 
   } else {
-    CkAbort("Invalid ncpyTransferMode");
+    CkAbort("Invalid CkNcpyMode");
   }
 }
 
@@ -596,10 +596,10 @@ void CkNcpyBuffer::put(CkNcpyBuffer &destination){
   // Check that this object is local when put is called
   CkAssert(CkNodeOf(pe) == CkMyNode());
 
-  ncpyTransferMode transferMode = findTransferMode(pe, destination.pe);
+  CkNcpyMode transferMode = findTransferMode(pe, destination.pe);
 
   //Check if it is a within-process sending
-  if(transferMode == ncpyTransferMode::MEMCPY) {
+  if(transferMode == CkNcpyMode::MEMCPY) {
     memcpyPut(destination);
 
     //Invoke the destination callback
@@ -609,7 +609,7 @@ void CkNcpyBuffer::put(CkNcpyBuffer &destination){
     cb.send(sizeof(CkNcpyBuffer), this);
 
 #if CMK_USE_CMA
-  } else if(transferMode == ncpyTransferMode::CMA) {
+  } else if(transferMode == CkNcpyMode::CMA) {
     cmaPut(destination);
 
     //Invoke the destination callback
@@ -619,7 +619,7 @@ void CkNcpyBuffer::put(CkNcpyBuffer &destination){
     cb.send(sizeof(CkNcpyBuffer), this);
 
 #endif
-  } else if (transferMode == ncpyTransferMode::RDMA) {
+  } else if (transferMode == CkNcpyMode::RDMA) {
 
     int outstandingRdmaOps = 1; // used by true-RDMA layers
 
@@ -637,6 +637,6 @@ void CkNcpyBuffer::put(CkNcpyBuffer &destination){
     rdmaPut(destination);
 
   } else {
-    CkAbort("Invalid ncpyTransferMode");
+    CkAbort("Invalid CkNcpyMode");
   }
 }
