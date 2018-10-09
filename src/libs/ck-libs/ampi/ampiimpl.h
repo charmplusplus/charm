@@ -2501,7 +2501,7 @@ class ampi final : public CBase_ampi {
 
   inline ampi* blockOnRecv() noexcept;
   inline ampi* blockOnColl() noexcept;
-  inline ampi* blockOnRedn(AmpiRequest *req) noexcept;
+  inline void setBlockingReq(AmpiRequest *req) noexcept;
   MPI_Request postReq(AmpiRequest* newreq) noexcept;
 
   inline CMK_REFNUM_TYPE getSeqNo(int destRank, MPI_Comm destcomm, int tag) noexcept;

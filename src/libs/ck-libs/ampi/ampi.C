@@ -2566,20 +2566,15 @@ ampi* ampi::blockOnRecv() noexcept {
   return dis;
 }
 
-ampi* ampi::blockOnColl() noexcept {
+void ampi::setBlockingReq(AmpiRequest *req) noexcept {
+  CkAssert(blockingReq == NULL);
+  CkAssert(parent->resumeOnColl == false);
+  blockingReq = req;
   parent->resumeOnColl = true;
-  MPI_Comm comm = myComm.getComm();
-  thread->suspend();
-  ampi *dis = getAmpiInstance(comm);
-  dis->parent->resumeOnColl = false;
-  return dis;
 }
 
 // block on (All)Reduce or (All)Gather(v)
-ampi* ampi::blockOnRedn(AmpiRequest *req) noexcept {
-
-  blockingReq = req;
-
+ampi* ampi::blockOnColl() noexcept {
 #if CMK_BIGSIM_CHARM
   void *curLog; // store current log in timeline
   _TRACE_BG_TLINE_END(&curLog);
@@ -2588,7 +2583,11 @@ ampi* ampi::blockOnRedn(AmpiRequest *req) noexcept {
 #endif
 #endif
 
-  ampi* dis = blockOnColl();
+  CkAssert(parent->resumeOnColl == true);
+  MPI_Comm comm = myComm.getComm();
+  thread->suspend();
+  ampi *dis = getAmpiInstance(comm);
+  dis->parent->resumeOnColl = false;
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   CpvAccess(_currentObj) = dis;
@@ -4491,14 +4490,18 @@ AMPI_API_IMPL(int, MPI_Sendrecv_replace, void* buf, int count, MPI_Datatype data
 
 void ampi::barrier() noexcept
 {
+  CkAssert(parent->resumeOnColl == false);
+  parent->resumeOnColl = true;
   CkCallback barrierCB(CkReductionTarget(ampi, barrierResult), getProxy());
   contribute(barrierCB);
   thread->suspend(); //Resumed by ampi::barrierResult
+  getAmpiParent()->resumeOnColl = false;
 }
 
 void ampi::barrierResult() noexcept
 {
   MSG_ORDER_DEBUG(CkPrintf("[%d] barrierResult called\n", thisIndex));
+  CkAssert(parent->resumeOnColl == true);
   thread->resume();
 }
 
@@ -4531,11 +4534,9 @@ AMPI_API_IMPL(int, MPI_Barrier, MPI_Comm comm)
 
 void ampi::ibarrier(MPI_Request *request) noexcept
 {
+  *request = postReq(parent->reqPool.newReq<IReq>(nullptr, 0, MPI_INT, AMPI_COLL_SOURCE, MPI_ATA_TAG, myComm.getComm(), getDDT()));
   CkCallback ibarrierCB(CkReductionTarget(ampi, ibarrierResult), getProxy());
   contribute(ibarrierCB);
-
-  // use an IReq to non-block the caller and get a request ptr
-  *request = postReq(parent->reqPool.newReq<IReq>(nullptr, 0, MPI_INT, AMPI_COLL_SOURCE, MPI_ATA_TAG, myComm.getComm(), getDDT()));
 }
 
 void ampi::ibarrierResult() noexcept
@@ -4686,9 +4687,11 @@ void ampi::rednResult(CkReductionMsg *msg) noexcept
 {
   MSG_ORDER_DEBUG(CkPrintf("[%d] rednResult called on comm %d\n", thisIndex, myComm.getComm()));
 
+#if CMK_ERROR_CHECKING
   if (blockingReq == NULL) {
     CkAbort("AMPI> recv'ed a blocking reduction unexpectedly!\n");
   }
+#endif
 
 #if CMK_BIGSIM_CHARM
   TRACE_BG_ADD_TAG("AMPI_generic");
@@ -4699,9 +4702,8 @@ void ampi::rednResult(CkReductionMsg *msg) noexcept
 
   blockingReq->receive(this, msg);
 
-  if (parent->resumeOnColl) {
-    thread->resume();
-  }
+  CkAssert(parent->resumeOnColl);
+  thread->resume();
   // [nokeep] entry method, so do not delete msg
 }
 
@@ -4938,16 +4940,19 @@ AMPI_API_IMPL(int, MPI_Reduce, const void *inbuf, void *outbuf, int count, MPI_D
   }
 #endif
 
+  if (rank == root) {
+    ptr->setBlockingReq(new RednReq(outbuf, count, type, comm, op, getDDT()));
+  }
+
   int rootIdx=ptr->comm2CommStruct(comm).getIndexForRank(root);
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,rank,size,op);
-
   CkCallback reduceCB(CkIndex_ampi::rednResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy());
   msg->setCallback(reduceCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Reduce called on comm %d root %d \n",ptr->thisIndex,comm,rootIdx));
   ptr->contribute(msg);
 
-  if (ptr->thisIndex == rootIdx){
-    ptr = ptr->blockOnRedn(new RednReq(outbuf, count, type, comm, op, getDDT()));
+  if (rank == root) {
+    ptr = ptr->blockOnColl();
 
 #if AMPI_SYNC_REDUCE
     AmpiMsg *msg = new (0, 0) AmpiMsg(0, 0, MPI_REDN_TAG, -1, rootIdx, 0);
@@ -5008,12 +5013,14 @@ AMPI_API_IMPL(int, MPI_Allreduce, const void *inbuf, void *outbuf, int count, MP
   }
 #endif
 
+  ptr->setBlockingReq(new RednReq(outbuf, count, type, comm, op, getDDT()));
+
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type), inbuf, count, type, rank, size, op);
   CkCallback allreduceCB(CkIndex_ampi::rednResult(0),ptr->getProxy());
   msg->setCallback(allreduceCB);
   ptr->contribute(msg);
 
-  ptr->blockOnRedn(new RednReq(outbuf, count, type, comm, op, getDDT()));
+  ptr->blockOnColl();
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -5055,13 +5062,12 @@ AMPI_API_IMPL(int, MPI_Iallreduce, const void *inbuf, void *outbuf, int count, M
     return copyDatatype(type,count,type,count,inbuf,outbuf);
   }
 
+  *request = ptr->postReq(new RednReq(outbuf,count,type,comm,op,getDDT()));
+
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,rank,size,op);
   CkCallback allreduceCB(CkIndex_ampi::irednResult(0),ptr->getProxy());
   msg->setCallback(allreduceCB);
   ptr->contribute(msg);
-
-  // use a RednReq to non-block the caller and get a request ptr
-  *request = ptr->postReq(new RednReq(outbuf,count,type,comm,op,getDDT()));
 
   return MPI_SUCCESS;
 }
@@ -6904,20 +6910,18 @@ AMPI_API_IMPL(int, MPI_Ireduce, const void *sendbuf, void *recvbuf, int count,
     return copyDatatype(type,count,type,count,sendbuf,recvbuf);
   }
 
-  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),sendbuf,count,type,rank,size,op);
-  int rootIdx=ptr->comm2CommStruct(comm).getIndexForRank(root);
-
-  CkCallback reduceCB(CkIndex_ampi::irednResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy());
-  msg->setCallback(reduceCB);
-  ptr->contribute(msg);
-
-  if (ptr->thisIndex == rootIdx){
-    // use a RednReq to non-block the caller and get a request ptr
+  if (rank == root){
     *request = ptr->postReq(new RednReq(recvbuf,count,type,comm,op,getDDT()));
   }
   else {
     *request = ptr->postReq(new RednReq(recvbuf,count,type,comm,op,getDDT(),AMPI_REQ_COMPLETED));
   }
+
+  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),sendbuf,count,type,rank,size,op);
+  int rootIdx=ptr->comm2CommStruct(comm).getIndexForRank(root);
+  CkCallback reduceCB(CkIndex_ampi::irednResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy());
+  msg->setCallback(reduceCB);
+  ptr->contribute(msg);
 
   return MPI_SUCCESS;
 }
@@ -7009,13 +7013,15 @@ AMPI_API_IMPL(int, MPI_Allgather, const void *sendbuf, int sendcount, MPI_Dataty
   if(size == 1)
     return copyDatatype(sendtype,sendcount,recvtype,recvcount,sendbuf,recvbuf);
 
+  ptr->setBlockingReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT()));
+
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback allgatherCB(CkIndex_ampi::rednResult(0), ptr->getProxy());
   msg->setCallback(allgatherCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Allgather called on comm %d\n", ptr->thisIndex, comm));
   ptr->contribute(msg);
 
-  ptr->blockOnRedn(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT()));
+  ptr->blockOnColl();
 
   return MPI_SUCCESS;
 }
@@ -7057,14 +7063,13 @@ AMPI_API_IMPL(int, MPI_Iallgather, const void *sendbuf, int sendcount, MPI_Datat
     return copyDatatype(sendtype,sendcount,recvtype,recvcount,sendbuf,recvbuf);
   }
 
+  *request = ptr->postReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT()));
+
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback allgatherCB(CkIndex_ampi::irednResult(0), ptr->getProxy());
   msg->setCallback(allgatherCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Iallgather called on comm %d\n", ptr->thisIndex, comm));
   ptr->contribute(msg);
-
-  // use a RednReq to non-block the caller and get a request ptr
-  *request = ptr->postReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT()));
 
   return MPI_SUCCESS;
 }
@@ -7100,13 +7105,15 @@ AMPI_API_IMPL(int, MPI_Allgatherv, const void *sendbuf, int sendcount, MPI_Datat
   if(size == 1)
     return copyDatatype(sendtype,sendcount,recvtype,recvcounts[0],sendbuf,recvbuf);
 
+  ptr->setBlockingReq(new GathervReq(recvbuf, size, recvtype, comm, recvcounts, displs, getDDT()));
+
   CkReductionMsg* msg = makeGathervMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback allgathervCB(CkIndex_ampi::rednResult(0), ptr->getProxy());
   msg->setCallback(allgathervCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Allgatherv called on comm %d\n", ptr->thisIndex, comm));
   ptr->contribute(msg);
 
-  ptr->blockOnRedn(new GathervReq(recvbuf, ptr->getSize(), recvtype, comm, recvcounts, displs, getDDT()));
+  ptr->blockOnColl();
 
   return MPI_SUCCESS;
 }
@@ -7149,15 +7156,14 @@ AMPI_API_IMPL(int, MPI_Iallgatherv, const void *sendbuf, int sendcount, MPI_Data
     return copyDatatype(sendtype,sendcount,recvtype,recvcounts[0],sendbuf,recvbuf);
   }
 
+  *request = ptr->postReq(new GathervReq(recvbuf, size, recvtype, comm,
+                                         recvcounts, displs, getDDT()));
+
   CkReductionMsg* msg = makeGathervMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback allgathervCB(CkIndex_ampi::irednResult(0), ptr->getProxy());
   msg->setCallback(allgathervCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Iallgatherv called on comm %d\n", ptr->thisIndex, comm));
   ptr->contribute(msg);
-
-  // use a GathervReq to non-block the caller and get a request ptr
-  *request = ptr->postReq(new GathervReq(recvbuf, ptr->getSize(), recvtype,
-                                         comm, recvcounts, displs, getDDT()));
 
   return MPI_SUCCESS;
 }
@@ -7204,6 +7210,10 @@ AMPI_API_IMPL(int, MPI_Gather, const void *sendbuf, int sendcount, MPI_Datatype 
   }
 #endif
 
+  if (rank == root) {
+    ptr->setBlockingReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT()));
+  }
+
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback gatherCB(CkIndex_ampi::rednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
@@ -7211,8 +7221,8 @@ AMPI_API_IMPL(int, MPI_Gather, const void *sendbuf, int sendcount, MPI_Datatype 
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Gather called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
   ptr->contribute(msg);
 
-  if(rank==root) {
-    ptr->blockOnRedn(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT()));
+  if (rank == root) {
+    ptr->blockOnColl();
   }
 
 #if AMPIMSGLOG
@@ -7274,20 +7284,19 @@ AMPI_API_IMPL(int, MPI_Igather, const void *sendbuf, int sendcount, MPI_Datatype
   }
 #endif
 
+  if (rank == root) {
+    *request = ptr->postReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT()));
+  }
+  else {
+    *request = ptr->postReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT(), AMPI_REQ_COMPLETED));
+  }
+
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback gatherCB(CkIndex_ampi::irednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
   msg->setCallback(gatherCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Igather called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
   ptr->contribute(msg);
-
-  if(rank==root) {
-    // use a GatherReq to non-block the caller and get a request ptr
-    *request = ptr->postReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT()));
-  }
-  else {
-    *request = ptr->postReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT(), AMPI_REQ_COMPLETED));
-  }
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
@@ -7347,6 +7356,10 @@ AMPI_API_IMPL(int, MPI_Gatherv, const void *sendbuf, int sendcount, MPI_Datatype
   }
 #endif
 
+  if (rank == root) {
+    ptr->setBlockingReq(new GathervReq(recvbuf, size, recvtype, comm, recvcounts, displs, getDDT()));
+  }
+
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
   CkReductionMsg* msg = makeGathervMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback gathervCB(CkIndex_ampi::rednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
@@ -7354,8 +7367,8 @@ AMPI_API_IMPL(int, MPI_Gatherv, const void *sendbuf, int sendcount, MPI_Datatype
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Gatherv called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
   ptr->contribute(msg);
 
-  if(rank==root) {
-    ptr->blockOnRedn(new GathervReq(recvbuf, ptr->getSize(), recvtype, comm, recvcounts, displs, getDDT()));
+  if (rank == root) {
+    ptr->blockOnColl();
   }
 
 #if AMPIMSGLOG
@@ -7425,23 +7438,21 @@ AMPI_API_IMPL(int, MPI_Igatherv, const void *sendbuf, int sendcount, MPI_Datatyp
   }
 #endif
 
-  int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
+  if (rank == root) {
+    *request = ptr->postReq(new GathervReq(recvbuf, size, recvtype, comm,
+                                           recvcounts, displs, getDDT()));
+  }
+  else {
+    *request = ptr->postReq(new GathervReq(recvbuf, size, recvtype, comm,
+                                           recvcounts, displs, getDDT(), AMPI_REQ_COMPLETED));
+  }
 
+  int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
   CkReductionMsg* msg = makeGathervMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback gathervCB(CkIndex_ampi::irednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
   msg->setCallback(gathervCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Igatherv called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
   ptr->contribute(msg);
-
-  if(rank==root) {
-    // use a GathervReq to non-block the caller and get a request ptr
-    *request = ptr->postReq(new GathervReq(recvbuf, ptr->getSize(), recvtype,
-                                           comm, recvcounts, displs, getDDT()));
-  }
-  else {
-    *request = ptr->postReq(new GathervReq(recvbuf, ptr->getSize(), recvtype,
-                                           comm, recvcounts, displs, getDDT(), AMPI_REQ_COMPLETED));
-  }
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
