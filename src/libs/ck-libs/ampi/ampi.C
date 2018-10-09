@@ -900,6 +900,7 @@ static constexpr std::array<MPI_User_function*, AMPI_MAX_PREDEFINED_OP+1> ampiPr
   MPI_LXOR_USER_FN,
   MPI_BXOR_USER_FN,
   MPI_MAXLOC_USER_FN,
+  MPI_MINLOC_USER_FN,
   MPI_REPLACE_USER_FN,
   MPI_NO_OP_USER_FN
 }};
