@@ -208,6 +208,18 @@ Similarly, a valid \kw{put} call using two \kw{CkNcpyBuffer} objects \texttt{obj
 \texttt{obj2} is performed as \texttt{obj1.put(obj2)}, where \texttt{obj1} is the local source buffer
 object and \texttt{obj2} is the remote destination buffer object that was passed to this PE.
 
+In addition to the callbacks, the return values of \kw{get} and \kw{put} also indicate the
+completion of data transfer between the buffers. When the source and destination buffers are
+within the same process or on different processes within the same CMA-enabled physical node,
+the zerocopy data transfer happens immediately without an asynchronous
+RDMA call. In such cases, both the methods, \kw{get} and \kw{put} return an enum value of
+\kw{CkNcpyStatus::complete}. This value of the API indicates the completion of the zerocopy data
+transfer. On the other hand, in the case of an asynchronous RDMA call, the data transfer is not immediate
+and the return enum value of the \kw{get} and \kw{put} methods is \kw{CkNcpyStatus::incomplete}.
+This indicates that the data transfer is in-progress and not necessarily complete. Use of
+\kw{CkNcpyStatus} in an application is illustrated in
+\examplerefdir{zerocopy/direct\_api/reg/simple\_get}.
+
 Since callbacks in \charmpp{} allow to store a reference number, these
 callbacks passed into \kw{CkNcpyBuffer} can be set with a
 reference number using the method \texttt{cb.setRefNum(num)}. Upon callback

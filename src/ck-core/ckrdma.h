@@ -107,6 +107,10 @@ int getRdmaBufSize(envelope *env);
 void CkRdmaAckHandler(void *cookie);
 void CkRdmaDirectAckHandler(void *ack);
 
+enum class CkNcpyMode : char { MEMCPY, CMA, RDMA };
+
+enum class CkNcpyStatus : char { incomplete, complete };
+
 // Class to represent an RDMA buffer
 class CkNcpyBuffer{
 
@@ -209,8 +213,8 @@ class CkNcpyBuffer{
   void rdmaGet(CkNcpyBuffer &source);
   void rdmaPut(CkNcpyBuffer &destination);
 
-  void get(CkNcpyBuffer &source);
-  void put(CkNcpyBuffer &destination);
+  CkNcpyStatus get(CkNcpyBuffer &source);
+  CkNcpyStatus put(CkNcpyBuffer &destination);
 
   // Deregister(Unpin) the memory that is registered for the buffer
   void deregisterMem() {
@@ -241,7 +245,5 @@ class CkNcpyBuffer{
 
   friend void CkRdmaDirectAckHandler(void *ack);
 };
-
-enum class CkNcpyMode : char { MEMCPY, CMA, RDMA };
 
 #endif

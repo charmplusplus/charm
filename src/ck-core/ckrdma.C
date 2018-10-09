@@ -464,7 +464,7 @@ void CkNcpyBuffer::rdmaGet(CkNcpyBuffer &source) {
 }
 
 // Perform a nocopy get operation into this destination using the passed source
-void CkNcpyBuffer::get(CkNcpyBuffer &source){
+CkNcpyStatus CkNcpyBuffer::get(CkNcpyBuffer &source){
   if(mode == CK_BUFFER_NOREG || source.mode == CK_BUFFER_NOREG) {
     CkAbort("Cannot perform RDMA operations in CK_BUFFER_NOREG mode\n");
   }
@@ -487,6 +487,9 @@ void CkNcpyBuffer::get(CkNcpyBuffer &source){
     //Invoke the destination callback
     cb.send(sizeof(CkNcpyBuffer), this);
 
+    // rdma data transfer complete
+    return CkNcpyStatus::complete;
+
 #if CMK_USE_CMA
   } else if(transferMode == CkNcpyMode::CMA) {
 
@@ -497,6 +500,9 @@ void CkNcpyBuffer::get(CkNcpyBuffer &source){
 
     //Invoke the destination callback
     cb.send(sizeof(CkNcpyBuffer), this);
+
+    // rdma data transfer complete
+    return CkNcpyStatus::complete;
 
 #endif
   } else if (transferMode == CkNcpyMode::RDMA) {
@@ -515,6 +521,9 @@ void CkNcpyBuffer::get(CkNcpyBuffer &source){
     QdCreate(outstandingRdmaOps);
 
     rdmaGet(source);
+
+    // rdma data transfer incomplete
+    return CkNcpyStatus::incomplete;
 
   } else {
     CkAbort("Invalid CkNcpyMode");
@@ -586,7 +595,7 @@ void CkNcpyBuffer::rdmaPut(CkNcpyBuffer &destination) {
 }
 
 // Perform a nocopy put operation into the passed destination using this source
-void CkNcpyBuffer::put(CkNcpyBuffer &destination){
+CkNcpyStatus CkNcpyBuffer::put(CkNcpyBuffer &destination){
   if(mode == CK_BUFFER_NOREG || destination.mode == CK_BUFFER_NOREG) {
     CkAbort("Cannot perform RDMA operations in CK_BUFFER_NOREG mode\n");
   }
@@ -608,6 +617,9 @@ void CkNcpyBuffer::put(CkNcpyBuffer &destination){
     //Invoke the source callback
     cb.send(sizeof(CkNcpyBuffer), this);
 
+    // rdma data transfer complete
+    return CkNcpyStatus::complete;
+
 #if CMK_USE_CMA
   } else if(transferMode == CkNcpyMode::CMA) {
     cmaPut(destination);
@@ -617,6 +629,9 @@ void CkNcpyBuffer::put(CkNcpyBuffer &destination){
 
     //Invoke the source callback
     cb.send(sizeof(CkNcpyBuffer), this);
+
+    // rdma data transfer complete
+    return CkNcpyStatus::complete;
 
 #endif
   } else if (transferMode == CkNcpyMode::RDMA) {
@@ -635,6 +650,9 @@ void CkNcpyBuffer::put(CkNcpyBuffer &destination){
     QdCreate(outstandingRdmaOps);
 
     rdmaPut(destination);
+
+    // rdma data transfer incomplete
+    return CkNcpyStatus::incomplete;
 
   } else {
     CkAbort("Invalid CkNcpyMode");
