@@ -1230,8 +1230,84 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #include "ckcallback-ccs.h"
 
 
+#if CMK_TRACE_ENABLED // Only get pretty function names if tracing is on
+template<typename... tArgs>
+int CkRegisterEp(const std::string& name, CkCallFnPtr call, int msgIdx, int chareIdx, int ck_ep_flags) {
+  std::string combined(name);
 
+  size_t argStart = name.find('(');
+  if (argStart == std::string::npos)
+    argStart = name.length();
 
+#if defined(__GNUG__) || defined(__clang__)
+  std::string functionName = __PRETTY_FUNCTION__;
+  std::string templateString = functionName.substr(functionName.find("tArgs = ") + 8);
+#ifdef __clang__
+  // Clang seems to use the format [tArgs = <args>], so remove the closing ]
+  // (the opening one will have been removed by the substr above)
+  if (templateString.rfind(']') != std::string::npos)
+    templateString.erase(templateString.rfind(']'));
+#else // __GNUG__
+  // Gcc seems to use the format [with tArgs = {args}; ...]
+  // so find and extract the substring bounded by {}
+  // Assumes that there are no occurrences of '}' inside tArgs
+  size_t openingPos = templateString.find('{'), closingPos = templateString.find('}');
+  if (openingPos != std::string::npos && closingPos != std::string::npos && closingPos > openingPos + 1)
+    templateString = templateString.substr(openingPos + 1, closingPos - openingPos - 1);
+  templateString = "<" + templateString + ">";
+#endif
+#elif defined(_MSC_VER)
+  // Vc++ seems to use the format int __cdecl CkRegisterEp<class tArgs>(...)
+  // so find '<' and try to match with '>' until a full expression is found
+  std::string functionName = __FUNCSIG__;
+  std::string templateString;
+  size_t openingIndex = functionName.find('<');
+  if (openingIndex != std::string::npos) {
+    int count = 1;
+    size_t index = openingIndex + 1;
+    while (count > 0 && index < functionName.length()) {
+      switch (functionName[index]) {
+        case '<':
+          count++;
+          break;
+        case '>':
+          count--;
+          break;
+        default:
+          break;
+      }
+
+      index++;
+    }
+
+    // if we've found a matching set of <>, then fill in args, otherwise leave empty
+    if (count == 0) {
+      templateString = functionName.substr(openingIndex, index - openingIndex + 1);
+    }
+  }
+#else
+  // { ()... } is a pack expansion, calls typeid(var).name() for each var in tArgs
+  std::vector<std::string> tArgNames = { (typeid(tArgs).name())... };
+
+  std::string templateString = "<";
+  for (auto it = tArgNames.begin(); it != tArgNames.end(); it++) {
+    templateString += *it;
+    if (it + 1 != tArgNames.end())
+      templateString += ", ";
+  }
+  templateString += ">";
+#endif
+
+  combined.insert(argStart, templateString);
+
+  return CkRegisterEp(combined.c_str(), call, msgIdx, chareIdx, ck_ep_flags);
+}
+#else // !CMK_TRACE_ENABLED
+template<typename... tArgs>
+int CkRegisterEp(const char* name, CkCallFnPtr call, int msgIdx, int chareIdx, int ck_ep_flags) {
+  return CkRegisterEp(name, call, msgIdx, chareIdx, ck_ep_flags);
+}
+#endif
 
 CkMarshallMsg *CkAllocateMarshallMsgNoninline(int size,const CkEntryOptions *opts);
 inline CkMarshallMsg *CkAllocateMarshallMsg(int size,const CkEntryOptions *opts=NULL)

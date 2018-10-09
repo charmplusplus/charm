@@ -102,8 +102,24 @@ class EntryInfo {
       ,messagePup(0)
 #endif
       ,traceEnabled(true), noKeep(false), isImmediate(false), inCharm(false), appWork(false)
+#if !CMK_TRACE_ENABLED // if tracing is disabled, then n will always be a string literal
       ,name(n)
     { }
+#else // if tracing is enabled, allocate and free string buffers because lifetime of n may
+      // not be the entire program (see templated version of CkRegisterEp in charm++.h)
+    {
+      size_t len = strlen(n);
+      // This is freed via the name pointer in the destructor
+      char* temp = new char[len + 1];
+      strcpy(temp, n);
+      name = temp;
+    }
+
+    ~EntryInfo()
+    {
+      delete [] name;
+    }
+#endif
 };
 
 /**

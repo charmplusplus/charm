@@ -2820,7 +2820,13 @@ void Entry::genDefs(XStr& str) {
 
 XStr Entry::genRegEp(bool isForRedn) {
   XStr str;
-  str << "CkRegisterEp(\"";
+  str << "CkRegisterEp";
+  if (tspec) {
+    str << "<";
+    tspec->genShort(str);
+    str << ">";
+  }
+  str << "(\"";
   if (isForRedn)
     str << "redn_wrapper_" << name << "(CkReductionMsg *impl_msg)\",\n";
   else
