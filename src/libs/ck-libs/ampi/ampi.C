@@ -2991,21 +2991,16 @@ void ampi::processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Data
   msg->toTuple(&results, &numReductions);
 
   // Contributions are unordered and consist of a (srcRank, data) tuple
-  CkReduction::setElement *currentSrc  = (CkReduction::setElement*)results[0].data;
-  CkReduction::setElement *currentData = (CkReduction::setElement*)results[1].data;
+  int *srcRank         = (int*)(results[0].data);
+  char *data           = (char*)(results[1].data);
   CkDDT_DataType *ddt  = getDDT()->getType(type);
   int contributionSize = ddt->getSize(count);
-  int commSize = getSize();
+  int commSize         = getSize();
 
   // Store pointers to each contribution's data at index 'srcRank' in contributionData
   vector<void *> contributionData(commSize);
   for (int i=0; i<commSize; i++) {
-    CkAssert(currentSrc && currentData);
-    int srcRank = *((int*)currentSrc->data);
-    CkAssert(currentData->dataSize == contributionSize);
-    contributionData[srcRank] = currentData->data;
-    currentSrc  = currentSrc->next();
-    currentData = currentData->next();
+    contributionData[srcRank[i]] = &data[i * contributionSize];
   }
 
   if (ddt->isContig()) {
@@ -3018,13 +3013,15 @@ void ampi::processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Data
     }
   }
   else {
+    int contributionExtent = ddt->getExtent() * count;
+
     // Deserialize rank 0's contribution into buf first
-    ddt->serialize((char*)contributionData[0], (char*)buf, count, msg->getLength(), UNPACK);
+    ddt->serialize((char*)contributionData[0], (char*)buf, count, contributionExtent, UNPACK);
 
     // Invoke the MPI_User_function on the deserialized contributions in 'rank' order
-    vector<char> deserializedBuf(ddt->getExtent() * count);
+    vector<char> deserializedBuf(contributionExtent);
     for (int i=1; i<commSize; i++) {
-      ddt->serialize((char*)contributionData[i], deserializedBuf.data(), count, msg->getLength(), UNPACK);
+      ddt->serialize((char*)contributionData[i], deserializedBuf.data(), count, contributionExtent, UNPACK);
       (*func)(deserializedBuf.data(), buf, &count, &type);
     }
   }
@@ -3036,21 +3033,22 @@ void ampi::processGatherMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, i
   CkReduction::tupleElement* results = NULL;
   int numReductions = 0;
   msg->toTuple(&results, &numReductions);
+  CkAssert(numReductions == 2);
 
   // Re-order the gather data based on the rank of the contributor
-  CkReduction::setElement *currentSrc  = (CkReduction::setElement*)results[0].data;
-  CkReduction::setElement *currentData = (CkReduction::setElement*)results[1].data;
+  int *srcRank           = (int*)(results[0].data);
+  char *data             = (char*)(results[1].data);
   CkDDT_DataType *ddt    = getDDT()->getType(type);
   int contributionSize   = ddt->getSize(recvCount);
   int contributionExtent = ddt->getExtent()*recvCount;
+  int commSize           = getSize();
 
-  for (int i=0; i<getSize(); i++) {
-    CkAssert(currentSrc && currentData);
-    int srcRank = *((int*)currentSrc->data);
-    CkAssert(currentData->dataSize == contributionSize);
-    ddt->serialize(&(((char*)buf)[srcRank*contributionExtent]), currentData->data, recvCount, contributionSize, UNPACK);
-    currentSrc  = currentSrc->next();
-    currentData = currentData->next();
+  for (int i=0; i<commSize; i++) {
+    ddt->serialize(&(((char*)buf)[srcRank[i] * contributionExtent]),
+                   &data[i * contributionSize],
+                   recvCount,
+                   contributionSize,
+                   UNPACK);
   }
   delete [] results;
 }
@@ -3061,21 +3059,25 @@ void ampi::processGathervMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type,
   CkReduction::tupleElement* results = NULL;
   int numReductions = 0;
   msg->toTuple(&results, &numReductions);
+  CkAssert(numReductions == 3);
 
   // Re-order the gather data based on the rank of the contributor
-  CkReduction::setElement *currentSrc  = (CkReduction::setElement*)results[0].data;
-  CkReduction::setElement *currentData = (CkReduction::setElement*)results[1].data;
+  int *srcRank           = (int*)(results[0].data);
+  int *dataSize          = (int*)(results[1].data);
+  char *data             = (char*)(results[2].data);
   CkDDT_DataType *ddt    = getDDT()->getType(type);
   int contributionSize   = ddt->getSize();
   int contributionExtent = ddt->getExtent();
+  int commSize           = getSize();
 
-  for (int i=0; i<getSize(); i++) {
-    CkAssert(currentSrc && currentData);
-    int srcRank = *((int*)currentSrc->data);
-    CkAssert(currentData->dataSize == contributionSize*recvCounts[srcRank]);
-    ddt->serialize(&((char*)buf)[displs[srcRank]*contributionExtent], currentData->data, recvCounts[srcRank], contributionSize * recvCounts[srcRank], UNPACK);
-    currentSrc  = currentSrc->next();
-    currentData = currentData->next();
+  int currDataOffset = 0;
+  for (int i=0; i<commSize; i++) {
+    ddt->serialize(&((char*)buf)[displs[srcRank[i]] * contributionExtent],
+                   &data[currDataOffset],
+                   recvCounts[srcRank[i]],
+                   contributionSize * recvCounts[srcRank[i]],
+                   UNPACK);
+    currDataOffset += dataSize[i];
   }
   delete [] results;
 }
@@ -4734,14 +4736,14 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
     AMPI_DEBUG("[%d] In makeRednMsg, using a non-commutative user-defined operation\n", parent->thisIndex);
     const int tupleSize = 2;
     CkReduction::tupleElement tupleRedn[tupleSize];
-    tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set);
+    tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::concat);
     if (!ddt->isContig()) {
       vector<char> sbuf(szdata);
       ddt->serialize((char*)inbuf, sbuf.data(), count, szdata, PACK);
-      tupleRedn[1] = CkReduction::tupleElement(szdata, sbuf.data(), CkReduction::set);
+      tupleRedn[1] = CkReduction::tupleElement(szdata, sbuf.data(), CkReduction::concat);
     }
     else {
-      tupleRedn[1] = CkReduction::tupleElement(szdata, (void*)inbuf, CkReduction::set);
+      tupleRedn[1] = CkReduction::tupleElement(szdata, (void*)inbuf, CkReduction::concat);
     }
     msg = CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
   }
@@ -6868,20 +6870,42 @@ AMPI_API_IMPL(int, MPI_Ireduce, const void *sendbuf, void *recvbuf, int count,
   return MPI_SUCCESS;
 }
 
+// Gather's are done via a 2-tuple reduction consisting of (srcRank, contributionData)
 static CkReductionMsg *makeGatherMsg(const void *inbuf, int count, MPI_Datatype type, int rank) noexcept
 {
   CkDDT_DataType* ddt = getDDT()->getType(type);
   int szdata = ddt->getSize(count);
   const int tupleSize = 2;
   CkReduction::tupleElement tupleRedn[tupleSize];
-  tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::set);
+  tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::concat);
 
   if (ddt->isContig()) {
-    tupleRedn[1] = CkReduction::tupleElement(szdata, (void*)inbuf, CkReduction::set);
+    tupleRedn[1] = CkReduction::tupleElement(szdata, (void*)inbuf, CkReduction::concat);
   } else {
     vector<char> sbuf(szdata);
     ddt->serialize((char*)inbuf, sbuf.data(), count, szdata, PACK);
-    tupleRedn[1] = CkReduction::tupleElement(szdata, sbuf.data(), CkReduction::set);
+    tupleRedn[1] = CkReduction::tupleElement(szdata, sbuf.data(), CkReduction::concat);
+  }
+
+  return CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
+}
+
+// Gatherv's are done via a 3-tuple reduction consisting of (srcRank, contributionSize, contributionData)
+static CkReductionMsg *makeGathervMsg(const void *inbuf, int count, MPI_Datatype type, int rank) noexcept
+{
+  CkDDT_DataType* ddt = getDDT()->getType(type);
+  int szdata = ddt->getSize(count);
+  const int tupleSize = 3;
+  CkReduction::tupleElement tupleRedn[tupleSize];
+  tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::concat);
+  tupleRedn[1] = CkReduction::tupleElement(sizeof(int), &szdata, CkReduction::concat);
+
+  if (ddt->isContig()) {
+    tupleRedn[2] = CkReduction::tupleElement(szdata, (void*)inbuf, CkReduction::concat);
+  } else {
+    vector<char> sbuf(szdata);
+    ddt->serialize((char*)inbuf, sbuf.data(), count, szdata, PACK);
+    tupleRedn[2] = CkReduction::tupleElement(szdata, sbuf.data(), CkReduction::concat);
   }
 
   return CkReductionMsg::buildFromTuple(tupleRedn, tupleSize);
@@ -7006,7 +7030,7 @@ AMPI_API_IMPL(int, MPI_Allgatherv, const void *sendbuf, int sendcount, MPI_Datat
   if(ptr->getSize() == 1)
     return copyDatatype(sendtype,sendcount,recvtype,recvcounts[0],sendbuf,recvbuf);
 
-  CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
+  CkReductionMsg* msg = makeGathervMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback allgathervCB(CkIndex_ampi::rednResult(0), ptr->getProxy());
   msg->setCallback(allgathervCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Allgatherv called on comm %d\n", ptr->thisIndex, comm));
@@ -7054,7 +7078,7 @@ AMPI_API_IMPL(int, MPI_Iallgatherv, const void *sendbuf, int sendcount, MPI_Data
     return copyDatatype(sendtype,sendcount,recvtype,recvcounts[0],sendbuf,recvbuf);
   }
 
-  CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
+  CkReductionMsg* msg = makeGathervMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback allgathervCB(CkIndex_ampi::irednResult(0), ptr->getProxy());
   msg->setCallback(allgathervCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Iallgatherv called on comm %d\n", ptr->thisIndex, comm));
@@ -7250,7 +7274,7 @@ AMPI_API_IMPL(int, MPI_Gatherv, const void *sendbuf, int sendcount, MPI_Datatype
 #endif
 
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
-  CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
+  CkReductionMsg* msg = makeGathervMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback gathervCB(CkIndex_ampi::rednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
   msg->setCallback(gathervCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Gatherv called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
@@ -7328,7 +7352,7 @@ AMPI_API_IMPL(int, MPI_Igatherv, const void *sendbuf, int sendcount, MPI_Datatyp
 
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
 
-  CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
+  CkReductionMsg* msg = makeGathervMsg(sendbuf, sendcount, sendtype, rank);
   CkCallback gathervCB(CkIndex_ampi::irednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
   msg->setCallback(gathervCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Igatherv called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
