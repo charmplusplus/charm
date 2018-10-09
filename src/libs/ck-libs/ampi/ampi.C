@@ -2644,6 +2644,33 @@ void ampi::generic(AmpiMsg* msg) noexcept
   resumeThreadIfReady();
 }
 
+// Same as ampi::generic except it's [nokeep] and msg is sequenced
+void ampi::bcastResult(AmpiMsg* msg) noexcept
+{
+  MSG_ORDER_DEBUG(
+    CkPrintf("AMPI vp %d bcast arrival: tag=%d, src=%d, comm=%d (seq %d) resumeOnRecv %d\n",
+             thisIndex, msg->getTag(), msg->getSrcRank(), getComm(), msg->getSeq(), parent->resumeOnRecv);
+  )
+#if CMK_BIGSIM_CHARM
+  TRACE_BG_ADD_TAG("AMPI_generic");
+  msg->event = NULL;
+#endif
+
+  CkAssert(msg->getSeq() != 0);
+  int seqIdx = msg->getSeqIdx();
+  int n=oorder.put(seqIdx,msg);
+  if (n>0) { // This message was in-order
+    inorderBcast(msg); // inorderBcast() is [nokeep]-aware, unlike inorder()
+    if (n>1) { // It enables other, previously out-of-order messages
+      while((msg=oorder.getOutOfOrder(seqIdx))!=0) {
+        inorder(msg); // not inorderBcast(), b/c we need to free the msg
+      }
+    }
+  }
+  // [nokeep] entry method, so do not delete msg
+  resumeThreadIfReady();
+}
+
 inline static AmpiRequestList &getReqs() noexcept;
 
 void AmpiRequestList::freeNonPersReq(int &idx) noexcept {
@@ -2682,6 +2709,32 @@ void ampi::inorder(AmpiMsg* msg) noexcept
     handleBlockedReq(req);
     req->receive(this, msg);
   } else {
+    unexpectedMsgs.put(msg);
+  }
+}
+
+void ampi::inorderBcast(AmpiMsg* msg) noexcept
+{
+  MSG_ORDER_DEBUG(
+    CkPrintf("AMPI vp %d inorder bcast: tag=%d, src=%d, comm=%d (seq %d)\n",
+             thisIndex, msg->getTag(), msg->getSrcRank(), getComm(), msg->getSeq());
+  )
+
+#if CMK_BIGSIM_CHARM
+  _TRACE_BG_TLINE_END(&msg->event); // store current log
+  msg->eventPe = CkMyPe();
+#endif
+
+  //Check posted recvs:
+  int tag = msg->getTag();
+  int srcRank = msg->getSrcRank();
+  AmpiRequest* req = postedReqs.get(tag, srcRank);
+  if (req) { // receive posted
+    handleBlockedReq(req);
+    req->receive(this, msg, false/*=deleteMsg*/);
+  } else {
+    // Reference the [nokeep] msg so it isn't freed by the runtime
+    CmiReference(UsrToEnv(msg));
     unexpectedMsgs.put(msg);
   }
 }
@@ -3353,7 +3406,7 @@ void ampi::bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm des
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
-    thisProxy.generic(makeBcastMsg(buf, count, type, destcomm));
+    thisProxy.bcastResult(makeBcastMsg(buf, count, type, destcomm));
   }
   else { // Non-root ranks need to increment the outgoing sequence number for collectives
     oorder.incCollSeqOutgoing();
@@ -3368,7 +3421,7 @@ int ampi::intercomm_bcast(int root, void* buf, int count, MPI_Datatype type, MPI
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
-    remoteProxy.generic(makeBcastMsg(buf, count, type, intercomm));
+    remoteProxy.bcastResult(makeBcastMsg(buf, count, type, intercomm));
   }
   else { // Non-root ranks need to increment the outgoing sequence number for collectives
     oorder.incCollSeqOutgoing();
@@ -3387,7 +3440,7 @@ void ampi::ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm de
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
-    thisProxy.generic(makeAmpiMsg(AMPI_COLL_DEST, MPI_BCAST_TAG, root, buf, count, type, destcomm));
+    thisProxy.bcastResult(makeBcastMsg(buf, count, type, destcomm));
   }
   else { // Non-root ranks need to increment the outgoing sequence number for collectives
     oorder.incCollSeqOutgoing();
@@ -3403,7 +3456,7 @@ int ampi::intercomm_ibcast(int root, void* buf, int count, MPI_Datatype type, MP
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
-    remoteProxy.generic(makeAmpiMsg(AMPI_COLL_DEST, MPI_BCAST_TAG, getRank(), buf, count, type, intercomm));
+    remoteProxy.bcastResult(makeBcastMsg(buf, count, type, intercomm));
   }
   else { // Non-root ranks need to increment the outgoing sequence number for collectives
     oorder.incCollSeqOutgoing();
@@ -5996,7 +6049,7 @@ bool ATAReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept {
   return complete;
 }
 
-void IReq::receive(ampi *ptr, AmpiMsg *msg) noexcept
+void IReq::receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg/*=true*/) noexcept
 {
   ptr->processAmpiMsg(msg, buf, type, count);
   complete = true;
@@ -6009,7 +6062,10 @@ void IReq::receive(ampi *ptr, AmpiMsg *msg) noexcept
   event = msg->event;
   eventPe = msg->eventPe;
 #endif
-  CkpvAccess(msgPool).deleteAmpiMsg(msg);
+  // in case of an inorder bcast, msg is [nokeep] and shouldn't be freed
+  if (deleteMsg) {
+    CkpvAccess(msgPool).deleteAmpiMsg(msg);
+  }
 }
 
 void IReq::receiveRdma(ampi *ptr, char *sbuf, int slength, int ssendReq, int srcRank, MPI_Comm scomm) noexcept
@@ -10968,7 +11024,7 @@ int GPUReq::wait(MPI_Status *sts) noexcept
   return 0;
 }
 
-void GPUReq::receive(ampi *ptr, AmpiMsg *msg) noexcept
+void GPUReq::receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg/*=true*/) noexcept
 {
   CkAbort("GPUReq::receive should never be called");
 }

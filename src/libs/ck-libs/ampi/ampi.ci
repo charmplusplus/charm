@@ -50,6 +50,7 @@ module ampi {
     entry EXPEDITED_NOKEEP void completedRdmaSend(CkDataMsg *msg);
     entry EXPEDITED_REDN void barrierResult(void);
     entry EXPEDITED_REDN void ibarrierResult(void);
+    entry EXPEDITED_NOKEEP void bcastResult(AmpiMsg *);
     entry EXPEDITED_NOKEEP void rednResult(CkReductionMsg *msg);
     entry EXPEDITED_NOKEEP void irednResult(CkReductionMsg *msg);
     entry EXPEDITED_THREADED void splitPhase1(CkReductionMsg *msg);

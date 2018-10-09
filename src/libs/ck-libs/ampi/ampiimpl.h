@@ -1148,7 +1148,7 @@ class AmpiRequest {
   virtual bool isPersistent() const noexcept { return false; }
 
   /// Receive an AmpiMsg
-  virtual void receive(ampi *ptr, AmpiMsg *msg) noexcept =0;
+  virtual void receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept =0;
 
   /// Receive a CkReductionMsg
   virtual void receive(ampi *ptr, CkReductionMsg *msg) noexcept =0;
@@ -1251,7 +1251,7 @@ class IReq final : public AmpiRequest {
   void setPersistent(bool p) noexcept override { persistent = p; }
   bool isPersistent() const noexcept override { return persistent; }
   void start(MPI_Request reqIdx) noexcept override;
-  void receive(ampi *ptr, AmpiMsg *msg) noexcept override;
+  void receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override;
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
   void receiveRdma(ampi *ptr, char *sbuf, int slength, int ssendReq, int srcRank, MPI_Comm scomm) noexcept override;
   int getNumReceivedBytes(CkDDT *ptr) const noexcept override {
@@ -1289,7 +1289,7 @@ class RednReq final : public AmpiRequest {
   void cancel() noexcept override {}
   AmpiReqType getType() const noexcept override { return AMPI_REDN_REQ; }
   bool isUnmatched() const noexcept override { return !complete; }
-  void receive(ampi *ptr, AmpiMsg *msg) noexcept override {}
+  void receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override {}
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override;
   void pup(PUP::er &p) noexcept override {
     AmpiRequest::pup(p);
@@ -1318,7 +1318,7 @@ class GatherReq final : public AmpiRequest {
   void cancel() noexcept override {}
   AmpiReqType getType() const noexcept override { return AMPI_GATHER_REQ; }
   bool isUnmatched() const noexcept override { return !complete; }
-  void receive(ampi *ptr, AmpiMsg *msg) noexcept override {}
+  void receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override {}
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override;
   void pup(PUP::er &p) noexcept override {
     AmpiRequest::pup(p);
@@ -1350,7 +1350,7 @@ class GathervReq final : public AmpiRequest {
   int wait(MPI_Status *sts) noexcept override;
   AmpiReqType getType() const noexcept override { return AMPI_GATHERV_REQ; }
   bool isUnmatched() const noexcept override { return !complete; }
-  void receive(ampi *ptr, AmpiMsg *msg) noexcept override {}
+  void receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override {}
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override;
   void pup(PUP::er &p) noexcept override {
     AmpiRequest::pup(p);
@@ -1388,7 +1388,7 @@ class SendReq final : public AmpiRequest {
   void setPersistent(bool p) noexcept override { persistent = p; }
   bool isPersistent() const noexcept override { return persistent; }
   void start(MPI_Request reqIdx) noexcept override;
-  void receive(ampi *ptr, AmpiMsg *msg) noexcept override {}
+  void receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override {}
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
   AmpiReqType getType() const noexcept override { return AMPI_SEND_REQ; }
   bool isUnmatched() const noexcept override { return false; }
@@ -1440,7 +1440,7 @@ class SsendReq final : public AmpiRequest {
   void setPersistent(bool p) noexcept override { persistent = p; }
   bool isPersistent() const noexcept override { return persistent; }
   void start(MPI_Request reqIdx) noexcept override;
-  void receive(ampi *ptr, AmpiMsg *msg) noexcept override {}
+  void receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override {}
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
   AmpiReqType getType() const noexcept override { return AMPI_SSEND_REQ; }
   bool isUnmatched() const noexcept override { return false; }
@@ -1459,7 +1459,7 @@ class GPUReq : public AmpiRequest {
   ~GPUReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
   int wait(MPI_Status *sts) noexcept override;
-  void receive(ampi *ptr, AmpiMsg *msg) noexcept override;
+  void receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override;
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override;
   AmpiReqType getType() const noexcept override { return AMPI_GPU_REQ; }
   bool isUnmatched() const noexcept override { return false; }
@@ -1477,7 +1477,7 @@ class ATAReq final : public AmpiRequest {
   ~ATAReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
   int wait(MPI_Status *sts) noexcept override;
-  void receive(ampi *ptr, AmpiMsg *msg) noexcept override {}
+  void receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override {}
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
   int getCount() const noexcept { return reqs.size(); }
   AmpiReqType getType() const noexcept override { return AMPI_ATA_REQ; }
@@ -1509,7 +1509,7 @@ class GReq final : public AmpiRequest {
   ~GReq() noexcept { (*freeFn)(extraState); }
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
   int wait(MPI_Status *sts) noexcept override;
-  void receive(ampi *ptr, AmpiMsg *msg) noexcept override {}
+  void receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override {}
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
   void cancel() noexcept override { (*cancelFn)(extraState, complete); }
   AmpiReqType getType() const noexcept override { return AMPI_G_REQ; }
@@ -2443,6 +2443,7 @@ class ampi final : public CBase_ampi {
 
  private:
   void inorder(AmpiMsg *msg) noexcept;
+  void inorderBcast(AmpiMsg *msg) noexcept;
   void inorderRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank,
                    MPI_Comm comm, int ssendReq) noexcept;
 
@@ -2470,6 +2471,7 @@ class ampi final : public CBase_ampi {
   void ssend_ack(int sreq) noexcept;
   void barrierResult() noexcept;
   void ibarrierResult() noexcept;
+  void bcastResult(AmpiMsg *msg) noexcept;
   void rednResult(CkReductionMsg *msg) noexcept;
   void irednResult(CkReductionMsg *msg) noexcept;
 
