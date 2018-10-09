@@ -1,6 +1,6 @@
 DIRS = \
-  zcpy_immediate \
-  cb_invoke_noninline \
+  simple_get \
+  simple_put \
 
 TESTDIRS = $(DIRS)
 

@@ -111,6 +111,8 @@ enum class CkNcpyMode : char { MEMCPY, CMA, RDMA };
 
 enum class CkNcpyStatus : char { incomplete, complete };
 
+enum class CkNcpyCallbackMode : char { CB_INVOKE_ALL, CB_INVOKE_NONINLINE };
+
 // Class to represent an RDMA buffer
 class CkNcpyBuffer{
 
@@ -213,8 +215,8 @@ class CkNcpyBuffer{
   void rdmaGet(CkNcpyBuffer &source);
   void rdmaPut(CkNcpyBuffer &destination);
 
-  CkNcpyStatus get(CkNcpyBuffer &source);
-  CkNcpyStatus put(CkNcpyBuffer &destination);
+  CkNcpyStatus get(CkNcpyBuffer &source, CkNcpyCallbackMode cbMode = CkNcpyCallbackMode::CB_INVOKE_ALL);
+  CkNcpyStatus put(CkNcpyBuffer &destination, CkNcpyCallbackMode cbMode = CkNcpyCallbackMode::CB_INVOKE_ALL);
 
   // Deregister(Unpin) the memory that is registered for the buffer
   void deregisterMem() {

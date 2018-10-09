@@ -464,7 +464,7 @@ void CkNcpyBuffer::rdmaGet(CkNcpyBuffer &source) {
 }
 
 // Perform a nocopy get operation into this destination using the passed source
-CkNcpyStatus CkNcpyBuffer::get(CkNcpyBuffer &source){
+CkNcpyStatus CkNcpyBuffer::get(CkNcpyBuffer &source, CkNcpyCallbackMode cbMode){
   if(mode == CK_BUFFER_NOREG || source.mode == CK_BUFFER_NOREG) {
     CkAbort("Cannot perform RDMA operations in CK_BUFFER_NOREG mode\n");
   }
@@ -484,8 +484,9 @@ CkNcpyStatus CkNcpyBuffer::get(CkNcpyBuffer &source){
     //Invoke the source callback
     source.cb.send(sizeof(CkNcpyBuffer), &source);
 
-    //Invoke the destination callback
-    cb.send(sizeof(CkNcpyBuffer), this);
+    //Invoke the destination callback if cbMode is CB_INVOKE_ALL
+    if(cbMode == CkNcpyCallbackMode::CB_INVOKE_ALL)
+      cb.send(sizeof(CkNcpyBuffer), this);
 
     // rdma data transfer complete
     return CkNcpyStatus::complete;
@@ -498,8 +499,9 @@ CkNcpyStatus CkNcpyBuffer::get(CkNcpyBuffer &source){
     //Invoke the source callback
     source.cb.send(sizeof(CkNcpyBuffer), &source);
 
-    //Invoke the destination callback
-    cb.send(sizeof(CkNcpyBuffer), this);
+    //Invoke the destination callback if cbMode is CB_INVOKE_ALL
+    if(cbMode == CkNcpyCallbackMode::CB_INVOKE_ALL)
+      cb.send(sizeof(CkNcpyBuffer), this);
 
     // rdma data transfer complete
     return CkNcpyStatus::complete;
@@ -595,7 +597,7 @@ void CkNcpyBuffer::rdmaPut(CkNcpyBuffer &destination) {
 }
 
 // Perform a nocopy put operation into the passed destination using this source
-CkNcpyStatus CkNcpyBuffer::put(CkNcpyBuffer &destination){
+CkNcpyStatus CkNcpyBuffer::put(CkNcpyBuffer &destination, CkNcpyCallbackMode cbMode){
   if(mode == CK_BUFFER_NOREG || destination.mode == CK_BUFFER_NOREG) {
     CkAbort("Cannot perform RDMA operations in CK_BUFFER_NOREG mode\n");
   }
@@ -614,8 +616,9 @@ CkNcpyStatus CkNcpyBuffer::put(CkNcpyBuffer &destination){
     //Invoke the destination callback
     destination.cb.send(sizeof(CkNcpyBuffer), &destination);
 
-    //Invoke the source callback
-    cb.send(sizeof(CkNcpyBuffer), this);
+    //Invoke the source callback if cbMode is CB_INVOKE_ALL
+    if(cbMode == CkNcpyCallbackMode::CB_INVOKE_ALL)
+      cb.send(sizeof(CkNcpyBuffer), this);
 
     // rdma data transfer complete
     return CkNcpyStatus::complete;
@@ -627,8 +630,9 @@ CkNcpyStatus CkNcpyBuffer::put(CkNcpyBuffer &destination){
     //Invoke the destination callback
     destination.cb.send(sizeof(CkNcpyBuffer), &destination);
 
-    //Invoke the source callback
-    cb.send(sizeof(CkNcpyBuffer), this);
+    //Invoke the source callback if cbMode is CB_INVOKE_ALL
+    if(cbMode == CkNcpyCallbackMode::CB_INVOKE_ALL)
+      cb.send(sizeof(CkNcpyBuffer), this);
 
     // rdma data transfer complete
     return CkNcpyStatus::complete;

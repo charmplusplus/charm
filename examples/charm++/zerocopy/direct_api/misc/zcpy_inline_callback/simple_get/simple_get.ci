@@ -1,0 +1,18 @@
+mainmodule simple_get {
+
+  readonly CProxy_main mainProxy;
+
+  mainchare main {
+    entry main(CkArgMsg *m);
+    entry void maindone();
+  };
+
+  array [1D] Ping1 {
+    entry Ping1(int size);
+    entry void start();
+    entry [inline] void getSenderDone(CkDataMsg *m);
+    entry [inline] void getReceiverDone(CkDataMsg *m);
+    entry void recvNcpyInfo(CkNcpyBuffer src);
+  };
+
+};
