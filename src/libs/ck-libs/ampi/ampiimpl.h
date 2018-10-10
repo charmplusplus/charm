@@ -1942,12 +1942,12 @@ class ampiParent final : public CBase_ampiParent {
   bool resumeOnRecv, resumeOnColl;
   AmpiRequestList ampiReqs;
   AmpiRequestPool reqPool;
+  AmpiRequest *blockingReq;
   CkDDT myDDT;
 
  private:
   MPI_Comm worldNo; //My MPI_COMM_WORLD
   ampi *worldPtr; //AMPI element corresponding to MPI_COMM_WORLD
-  ampiCommStruct worldStruct;
 
   CkPupPtrVec<ampiCommStruct> splitComm;     //Communicators from MPI_Comm_split
   CkPupPtrVec<ampiCommStruct> groupComm;     //Communicators from MPI_Comm_group
@@ -2138,9 +2138,11 @@ class ampiParent final : public CBase_ampiParent {
   }
 #endif
 
+  const ampiCommStruct &getWorldStruct() const noexcept;
+
   inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) const noexcept {
-    if (comm==MPI_COMM_WORLD) return worldStruct;
-    if (comm==worldNo) return worldStruct;
+    if (comm==MPI_COMM_WORLD) return getWorldStruct();
+    if (comm==worldNo) return getWorldStruct();
     if (isSplit(comm)) return getSplit(comm);
     if (isGroup(comm)) return getGroup(comm);
     if (isCart(comm)) return getCart(comm);
@@ -2419,8 +2421,6 @@ class ampi final : public CBase_ampi {
   ampiParent *parent;
   CProxy_ampiParent parentProxy;
   TCharm *thread;
-
-  AmpiRequest *blockingReq;
   int myRank;
   AmpiSeqQ oorder;
 
@@ -2498,6 +2498,7 @@ class ampi final : public CBase_ampi {
   inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) const noexcept {
     return parent->comm2CommStruct(comm);
   }
+  inline const ampiCommStruct &getCommStruct() const noexcept { return myComm; }
 
   inline ampi* blockOnRecv() noexcept;
   inline ampi* blockOnColl() noexcept;

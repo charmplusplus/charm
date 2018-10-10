@@ -1277,7 +1277,6 @@ PUPfunctionpointer(MPI_MigrateFn)
 void ampiParent::pup(PUP::er &p) noexcept {
   p|threads;
   p|worldNo;
-  p|worldStruct;
   p|myDDT;
   p|splitComm;
   p|groupComm;
@@ -1309,6 +1308,61 @@ void ampiParent::pup(PUP::er &p) noexcept {
   p|bsendBufferSize;
   p((char *)&bsendBuffer, sizeof(void *));
 
+  // pup blockingReq
+  AmpiReqType reqType;
+  if (!p.isUnpacking()) {
+    if (blockingReq) {
+      reqType = blockingReq->getType();
+    } else {
+      reqType = AMPI_INVALID_REQ;
+    }
+  }
+  p|reqType;
+  if (reqType != AMPI_INVALID_REQ) {
+    if (p.isUnpacking()) {
+      switch (reqType) {
+        case AMPI_I_REQ:
+          blockingReq = new IReq;
+          break;
+        case AMPI_REDN_REQ:
+          blockingReq = new RednReq;
+          break;
+        case AMPI_GATHER_REQ:
+          blockingReq = new GatherReq;
+          break;
+        case AMPI_GATHERV_REQ:
+          blockingReq = new GathervReq;
+          break;
+        case AMPI_SEND_REQ:
+          blockingReq = new SendReq;
+          break;
+        case AMPI_SSEND_REQ:
+          blockingReq = new SsendReq;
+          break;
+        case AMPI_ATA_REQ:
+          blockingReq = new ATAReq;
+          break;
+        case AMPI_G_REQ:
+          blockingReq = new GReq;
+          break;
+#if CMK_CUDA
+        case AMPI_GPU_REQ:
+          CkAbort("AMPI> error trying to PUP a non-migratable GPU request!");
+          break;
+#endif
+        case AMPI_INVALID_REQ:
+          CkAbort("AMPI> error trying to PUP an invalid request!");
+          break;
+      }
+    }
+    blockingReq->pup(p);
+  } else {
+    blockingReq = NULL;
+  }
+  if (p.isDeleting()) {
+    delete blockingReq; blockingReq = NULL;
+  }
+
 #if AMPI_PRINT_MSG_SIZES
   p|msgSizes;
 #endif
@@ -1327,6 +1381,7 @@ void ampiParent::init() noexcept{
   numBlockedReqs = 0;
   bsendBufferSize = 0;
   bsendBuffer = NULL;
+  blockingReq = NULL;
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(thisIndex)){
     char fname[128];
@@ -1408,6 +1463,10 @@ ampiParent::~ampiParent() noexcept {
   finalize();
 }
 
+const ampiCommStruct& ampiParent::getWorldStruct() const noexcept {
+  return worldPtr->getCommStruct();
+}
+
 //Children call this when they are first created or just migrated
 TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration) noexcept
 {
@@ -1419,7 +1478,6 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration) n
     //they don't need to re-register on migration.
     if (worldPtr!=NULL) CkAbort("One ampiParent has two MPI_COMM_WORLDs");
     worldPtr=ptr;
-    worldStruct=s;
   }
 
   if (forMigration) { //Restore AmpiRequest*'s in postedReqs:
@@ -1892,7 +1950,6 @@ void Amm<T>::pup(PUP::er& p, AmmPupMessageFn msgpup) noexcept
 void ampi::init() noexcept {
   parent=NULL;
   thread=NULL;
-  blockingReq=NULL;
 
 #if CMK_FAULT_EVAC
   AsyncEvacuate(false);
@@ -1988,67 +2045,9 @@ void ampi::pup(PUP::er &p) noexcept
   p|myRank;
   p|tmpVec;
   p|remoteProxy;
-
-  // pup blockingReq
-  AmpiReqType reqType;
-  if (!p.isUnpacking()) {
-    if (blockingReq) {
-      reqType = blockingReq->getType();
-    } else {
-      reqType = AMPI_INVALID_REQ;
-    }
-  }
-  p|reqType;
-  if (reqType != AMPI_INVALID_REQ) {
-    if (p.isUnpacking()) {
-      switch (reqType) {
-        case AMPI_I_REQ:
-          blockingReq = new IReq;
-          break;
-        case AMPI_REDN_REQ:
-          blockingReq = new RednReq;
-          break;
-        case AMPI_GATHER_REQ:
-          blockingReq = new GatherReq;
-          break;
-        case AMPI_GATHERV_REQ:
-          blockingReq = new GathervReq;
-          break;
-        case AMPI_SEND_REQ:
-          blockingReq = new SendReq;
-          break;
-        case AMPI_SSEND_REQ:
-          blockingReq = new SsendReq;
-          break;
-        case AMPI_ATA_REQ:
-          blockingReq = new ATAReq;
-          break;
-        case AMPI_G_REQ:
-          blockingReq = new GReq;
-          break;
-#if CMK_CUDA
-        case AMPI_GPU_REQ:
-          CkAbort("AMPI> error trying to PUP a non-migratable GPU request!");
-          break;
-#endif
-        case AMPI_INVALID_REQ:
-          CkAbort("AMPI> error trying to PUP an invalid request!");
-          break;
-      }
-    }
-    blockingReq->pup(p);
-  } else {
-    blockingReq = NULL;
-  }
-  if (p.isDeleting()) {
-    delete blockingReq; blockingReq = NULL;
-  }
-
   unexpectedMsgs.pup(p, AmmPupUnexpectedMsgs);
   postedReqs.pup(p, AmmPupPostedReqs);
-
   p|greq_classes;
-
   p|oorder;
 }
 
@@ -2059,8 +2058,6 @@ ampi::~ampi() noexcept
     unexpectedMsgs.flushMsgs();
     postedReqs.freeAll();
   }
-
-  delete blockingReq; blockingReq = NULL;
 }
 
 //------------------------ Communicator Splitting ---------------------
@@ -2567,9 +2564,9 @@ ampi* ampi::blockOnRecv() noexcept {
 }
 
 void ampi::setBlockingReq(AmpiRequest *req) noexcept {
-  CkAssert(blockingReq == NULL);
+  CkAssert(parent->blockingReq == NULL);
   CkAssert(parent->resumeOnColl == false);
-  blockingReq = req;
+  parent->blockingReq = req;
   parent->resumeOnColl = true;
 }
 
@@ -2597,10 +2594,10 @@ ampi* ampi::blockOnColl() noexcept {
   if(CpvAccess(traceOn)) CthTraceResume(dis->thread->getThread());
 #endif
   TRACE_BG_AMPI_BREAK(dis->thread->getThread(), "RECV_RESUME", NULL, 0, 0);
-  if (dis->blockingReq->eventPe == CkMyPe()) _TRACE_BG_ADD_BACKWARD_DEP(dis->blockingReq->event);
+  if (dis->parent->blockingReq->eventPe == CkMyPe()) _TRACE_BG_ADD_BACKWARD_DEP(dis->parent->blockingReq->event);
 #endif
 
-  delete dis->blockingReq; dis->blockingReq = NULL;
+  delete dis->parent->blockingReq; dis->parent->blockingReq = NULL;
   return dis;
 }
 
@@ -4688,7 +4685,7 @@ void ampi::rednResult(CkReductionMsg *msg) noexcept
   MSG_ORDER_DEBUG(CkPrintf("[%d] rednResult called on comm %d\n", thisIndex, myComm.getComm()));
 
 #if CMK_ERROR_CHECKING
-  if (blockingReq == NULL) {
+  if (parent->blockingReq == NULL) {
     CkAbort("AMPI> recv'ed a blocking reduction unexpectedly!\n");
   }
 #endif
@@ -4700,7 +4697,7 @@ void ampi::rednResult(CkReductionMsg *msg) noexcept
   msg->eventPe = CkMyPe();
 #endif
 
-  blockingReq->receive(this, msg);
+  parent->blockingReq->receive(this, msg);
 
   CkAssert(parent->resumeOnColl);
   thread->resume();
