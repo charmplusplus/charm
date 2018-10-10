@@ -1,6 +1,7 @@
 DIRS = \
   direct_api \
   entry_method_api \
+  entry_method_bcast_api \
 
 TESTDIRS = $(DIRS)
 

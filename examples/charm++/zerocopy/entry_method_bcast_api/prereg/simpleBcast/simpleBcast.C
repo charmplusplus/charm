@@ -6,7 +6,6 @@ CProxy_Main mainProxy;
 
 template<class T>
 void assignValues(T *&arr, int size){
-  arr = new T[size];
   for(int i=0; i<size; i++)
      arr[i] = i;
 }
@@ -32,8 +31,6 @@ class Main : public CBase_Main{
       size = CkNumPes() * 10; // default with 10 chare array elements per pe
     }
 
-    delete m;
-
     counter = 0;
     mainProxy = thisProxy;
 
@@ -47,8 +44,8 @@ class Main : public CBase_Main{
     CProxy_zcNodegroup ngrpProxy = CProxy_zcNodegroup::ckNew();
 
     // allocate a large array
-    int bufferSize = 200000;
-    int *buffer = new int[bufferSize];
+    int bufferSize = 2000000;
+    int *buffer = (int *)CkRdmaAlloc(sizeof(int) * bufferSize);
     assignValues(buffer, bufferSize);
 
     // create a callback method
@@ -58,19 +55,18 @@ class Main : public CBase_Main{
     CkCallback doneCb = CkCallback(CkReductionTarget(Main, done), thisProxy);
 
     // invoking bcast on chare array
-    arrProxy.recvLargeArray(CkSendBuffer(buffer, cb), bufferSize, doneCb);
+    arrProxy.recvLargeArray(CkSendBuffer(buffer, cb, CK_BUFFER_PREREG), bufferSize, doneCb);
 
     // invoking bcast on group
-    grpProxy.recvLargeArray(CkSendBuffer(buffer, cb), bufferSize, doneCb);
+    grpProxy.recvLargeArray(CkSendBuffer(buffer, cb, CK_BUFFER_PREREG), bufferSize, doneCb);
 
     // invoking bcast on nodegroup
-    ngrpProxy.recvLargeArray(CkSendBuffer(buffer, cb), bufferSize, doneCb);
+    ngrpProxy.recvLargeArray(CkSendBuffer(buffer, cb, CK_BUFFER_PREREG), bufferSize, doneCb);
   }
 
   void zerocopySent(CkDataMsg *m) {
     CkPrintf("[%d][%d][%d] Source callback invoked\n", CkMyPe(), CkMyNode(), CmiMyRank());
     done();
-    delete m;
   }
 
   void done() {

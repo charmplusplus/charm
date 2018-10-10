@@ -2,7 +2,6 @@ DIRS = \
   unreg \
   prereg \
   reg \
-  misc \
 
 TESTDIRS = $(DIRS)
 
