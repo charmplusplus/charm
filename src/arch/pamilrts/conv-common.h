@@ -50,3 +50,5 @@
 #define CMK_USE_COMMON_LOCK                                1
 
 #define CMK_CONVERSE_MPI                                   0
+
+#define CMK_CONVERSE_PAMI                                  1

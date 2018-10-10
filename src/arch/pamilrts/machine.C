@@ -173,6 +173,10 @@ static void CmiNetworkBarrier(int async);
 #include "machine-lrts.h"
 #include "machine-common-core.C"
 
+#if CMK_SMP
+extern pthread_t *_Cmi_mypidlist;
+#endif
+
 #if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRESS
 CpvDeclare(int, uselock);
 #endif
@@ -784,7 +788,7 @@ void LrtsExit(int exitcode)
   CmiBarrier();
 #endif
 
-  int rank0 = 0;
+  int rank0 = 0, i = 0;
   CmiBarrier();
   if (CmiMyRank() == 0) {
     rank0 = 1;
@@ -799,9 +803,9 @@ void LrtsExit(int exitcode)
   if(!CharmLibInterOperate || userDrivenMode) {
 #if CMK_SMP
     if (rank0) {
-#if CMK_BLUEGENEQ
-      Delay(100000);
-#endif
+      // Wait for other threads (except me and the comm thread) to exit and join
+      for(i=0; i< (_Cmi_mynodesize - 1) ; i++)
+        pthread_join(_Cmi_mypidlist[i], NULL);
       exit(exitcode);
     }
     else

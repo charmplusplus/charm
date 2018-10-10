@@ -215,6 +215,10 @@ static void CmiStartThreads(char **argv) {
 //int received_immediate;
 //int received_broadcast;
 
+#if CMK_SMP
+extern pthread_t *_Cmi_mypidlist;
+#endif
+
 void _alias_rank (int rank);
 
 /*Add a message to this processor's receive queue, pe is a rank */
@@ -1046,7 +1050,7 @@ void ConverseExit(int exitcode) {
   CmiBarrier();
 #endif
 
-  int rank0 = 0;
+  int rank0 = 0, i = 0;
   if (CmiMyRank() == 0) {
       rank0 = 1;
 #if CMK_SMP && CMK_ENABLE_ASYNC_PROGRESS
@@ -1059,9 +1063,9 @@ void ConverseExit(int exitcode) {
 #if CMK_SMP
   CmiNodeBarrier();
   if (rank0) {
-#if CMK_BLUEGENEQ
-    Delay(100000);
-#endif
+    // Wait for other threads (except me and the comm thread) to exit and join
+    for(i=0; i< (_Cmi_mynodesize - 1) ; i++)
+      pthread_join(_Cmi_mypidlist[i], NULL);
     exit(exitcode);
   }
   else

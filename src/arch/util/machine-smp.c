@@ -460,6 +460,11 @@ static void *call_startfn(void *vindex)
 CMI_EXTERNC void PerrorExit(const char*);
 #endif
 
+#if CMK_CONVERSE_PAMI
+// Array used by the 'rank 0' thread to wait for other threads using pthread_join
+pthread_t *_Cmi_mypidlist;
+#endif
+
 static void CmiStartThreads(char **argv)
 {
   pthread_t pid;
@@ -518,6 +523,13 @@ static void CmiStartThreads(char **argv)
     start = 1;
     end = tocreate;                       /* skip rank 0 main thread */
   }
+
+#if CMK_CONVERSE_PAMI
+  // allocate space for the pids
+  _Cmi_mypidlist = (pthread_t *)malloc(sizeof(pthread_t)*(end - start +1));
+  int numThreads = 0;
+#endif
+
   for (i=start; i<=end; i++) {        
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
@@ -526,6 +538,9 @@ static void CmiStartThreads(char **argv)
       CmiPrintf("CmiStartThreads: %s(%d)\n", strerror(errno), errno);
       PerrorExit("pthread_create");
     }
+#if CMK_CONVERSE_PAMI
+    _Cmi_mypidlist[numThreads++] = pid; // store the pid in the array
+#endif
     pthread_attr_destroy(&attr);
   }
 #if ! (CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD)
