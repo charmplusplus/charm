@@ -11,12 +11,11 @@ mainmodule test1 {
   array [2D] Cell {
     entry Cell();
     entry void finished(int number);
-    entry void callMigrateMe(int pe);
     entry void process(void) {
       serial "print test" {
         CkPrintf("Migrating from PE %d\n", CkMyPe());
         thisProxy[thisIndex].process2();
-        thisProxy[thisIndex].callMigrateMe(0);
+        this->migrateMe(0);
       }
     };
     entry void process2(void) {
