@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <queue>
 #include <atomic>
+#include "cuda.h"
 
 #ifdef HAPI_NVTX_PROFILE
 #include "hapi_nvtx.h"
