@@ -67,6 +67,10 @@ void TCharm::nodeInit()
     CsvAccess(tcharm_funcmap) = new funcmap();
   }
 #endif
+
+  // Assumes no anytime migration and only static insertion
+  _isAnytimeMigration = false;
+  _isStaticInsertion = true;
 }
 
 void TCharm::procInit()
@@ -695,31 +699,34 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
   CkAssert(CkpvAccess(mapCreated)==true);
 
   if(haveConfigurableRRMap()){
-    CkPrintf("USING ConfigurableRRMap\n");
+    CkPrintf("TCharm> using ConfigurableRRMap\n");
     mapID=CProxy_ConfigurableRRMap::ckNew();
+    opts.setMap(mapID);
   } else if(mapping==NULL){
 #if CMK_BIGSIM_CHARM
     mapID=CProxy_BlockMap::ckNew();
+    opts.setMap(mapID);
 #else
-#if __FAULT__
-	mapID=CProxy_RRMap::ckNew();
-#else
-    mapID=CkCreatePropMap();
-#endif
+    /* do nothing: use the default map */
 #endif
   } else if(0 == strcmp(mapping,"BLOCK_MAP")) {
-    CkPrintf("USING BLOCK_MAP\n");
+    CkPrintf("TCharm> using BLOCK_MAP\n");
     mapID = CProxy_BlockMap::ckNew();
+    opts.setMap(mapID);
   } else if(0 == strcmp(mapping,"RR_MAP")) {
-    CkPrintf("USING RR_MAP\n");
+    CkPrintf("TCharm> using RR_MAP\n");
     mapID = CProxy_RRMap::ckNew();
+    opts.setMap(mapID);
   } else if(0 == strcmp(mapping,"MAPFILE")) {
-    CkPrintf("Reading map from file\n");
+    CkPrintf("TCharm> reading map from mapfile\n");
     mapID = CProxy_ReadFileMap::ckNew();
-  } else {  // "PROP_MAP" or anything else
+    opts.setMap(mapID);
+  } else if(0 == strcmp(mapping,"PROP_MAP")) {
+    CkPrintf("TCharm> using PROP_MAP\n");
     mapID = CkCreatePropMap();
+    opts.setMap(mapID);
   }
-  opts.setMap(mapID);
+  opts.setStaticInsertion(true);
   opts.setSectionAutoDelegate(false);
   return CProxy_TCharm::ckNew(msg,opts);
 }
