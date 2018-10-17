@@ -1363,8 +1363,13 @@ if (  MSG_STATISTIC)
 #else
 
 #if !CMK_MULTICORE
-      if (!quietMode) printf("Charm++> Running in SMP mode: %d processes, %d worker threads (PEs) + %c comm threads per process, %d PEs total\n",
-                             CmiNumNodes(), _Cmi_mynodesize, Cmi_smp_mode_setting == COMM_THREAD_NOT_EXIST ? '0' : '1', CmiNumPes());
+      if (!quietMode) {
+        // NOTE: calling CmiNumPes() here it sometimes returns zero
+        int commThdsPerProcess = (Cmi_smp_mode_setting != COMM_THREAD_NOT_EXIST);
+        int totalPes = CmiNumNodes() * _Cmi_mynodesize;
+        printf("Charm++> Running in SMP mode: %d processes, %d worker threads (PEs) + %d comm threads per process, %d PEs total\n",
+               CmiNumNodes(), _Cmi_mynodesize, commThdsPerProcess, totalPes);
+      }
       if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV) {
         if (!quietMode) printf("Charm++> The comm. thread both sends and receives messages\n");
       } else if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV) {
