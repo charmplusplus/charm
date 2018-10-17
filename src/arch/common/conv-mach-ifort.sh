@@ -29,9 +29,9 @@ then
   F90MAIN="$F90LIBDIR/for_main.o"
 fi
 # for_main.o is important for main() in f90 code
-CMK_F90MAINLIBS="$F90MAIN "
 if test -z "$ICC_STATIC"
 then
+CMK_F90MAINLIBS="$F90MAIN "
 CMK_F90LIBS="-L$F90LIBDIR -lifcore -lifport -lifcore "
 else
 CMK_F90LIBS="$F90LIBDIR/libifcore.a $F90LIBDIR/libifport.a $F90LIBDIR/libifcore.a "
