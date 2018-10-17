@@ -43,7 +43,16 @@ CMK_F90_USE_MODDIR=''
 F90DIR=`which ifort 2> /dev/null`
 if test -x "$F90DIR"
 then
-  F90DIR=`dirname $F90DIR`
+  MYDIR="$PWD"
+  cd `dirname "$F90DIR"`
+  if test -L 'ifort'
+  then
+    F90DIR=`readlink ifort`
+    cd `dirname "$F90DIR"`
+  fi
+  F90DIR=`pwd -P`
+  cd "$MYDIR"
+
   Minor=`basename $F90DIR`
   F90LIBDIR="$F90DIR/../lib/$Minor"
   if ! test -x "$F90LIBDIR"
