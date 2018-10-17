@@ -52,7 +52,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include "hrctimer.h"
 #ifndef __STDC_FORMAT_MACROS
 # define __STDC_FORMAT_MACROS
 #endif
@@ -1035,7 +1035,6 @@ double CmiInitTime(void)
 
 void CmiTimerInit(char **argv)
 {
-  struct timeval tv;
   struct rusage ru;
   CpvInitialize(double, inittime_virtual);
 
@@ -1049,8 +1048,7 @@ void CmiTimerInit(char **argv)
 #endif
 if(CmiMyRank() == 0) /* initialize only  once */
   {
-    gettimeofday(&tv,0);
-    inittime_wallclock = (tv.tv_sec * 1.0) + (tv.tv_usec*0.000001);
+    inittime_wallclock = inithrc();
 #ifndef RUSAGE_WHO
     CpvAccess(inittime_virtual) = inittime_wallclock;
 #else
@@ -1088,18 +1086,9 @@ static double lastT = -1.0;
 
 double CmiWallTimer(void)
 {
-  struct timeval tv;
   double currenttime;
-
-  gettimeofday(&tv,0);
-  currenttime = (tv.tv_sec * 1.0) + (tv.tv_usec * 0.000001);
-#if CMK_ERROR_CHECKING
-  if (lastT > 0.0 && currenttime < lastT) {
-    currenttime = lastT;
-  }
-  lastT = currenttime;
-#endif
-  return _absoluteTime?currenttime:currenttime - inittime_wallclock;
+  currenttime = gethrctime();
+  return _absoluteTime?currenttime+inittime_wallclock:currenttime;
 }
 
 double CmiTimer(void)
@@ -1295,10 +1284,9 @@ static inline uint64_t PPC64_TimeBase(void)
   return result;
 }
 
-uint64_t __micro_timer (void) {
-  struct timeval tv;
-  gettimeofday( &tv, 0 );
-  return tv.tv_sec * 1000000ULL + tv.tv_usec;
+uint64_t __micro_timer (void)
+{
+  return gethrctime_micro();
 }
 
 void CmiTimerInit(char **argv)

@@ -2444,7 +2444,7 @@ convcore.o: convcore.C converse.h conv-header.h conv-config.h \
  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
  conv-trace.h persistent.h conv-rdma.h cmirdmautils.h debug-conv.h \
  sockRoutines.h conv-ccs.h ccs-server.h ckhashtable.h pup.h \
- memory-isomalloc.h quiescence.h cmibacktrace.c
+ memory-isomalloc.h quiescence.h cmibacktrace.c hrctimer.h
 
 converseProjections.o: converseProjections.C converse.h conv-header.h \
  conv-config.h conv-autoconfig.h conv-common.h conv-mach-common.h \
@@ -2626,6 +2626,8 @@ global-nop.o: global-nop.c converse.h conv-header.h conv-config.h \
  conv-trace.h persistent.h conv-rdma.h cmirdmautils.h debug-conv.h
 
 hilbert.o: hilbert.C hilbert.h
+
+hrctimer.o: hrctimer.C hrctimer.h
 
 init.o: init.C ckcheckpoint.h pup.h converse.h conv-header.h \
  conv-config.h conv-autoconfig.h conv-common.h conv-mach-common.h \
