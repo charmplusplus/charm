@@ -269,13 +269,9 @@ typedef void (*CkLocFn)(CkArray *,void *,CkLocRec *,CkArrayIndex *);
 
 // Returns rank 0 for a pe for drone mode
 #if CMK_DRONE_MODE
-#define CMK_RANK_0(pe) ({\
-  CkNodeOf(pe)*CkNodeSize(0);\
-})
+#define CMK_RANK_0(pe) (CkNodeOf(pe)*CkNodeSize(0))
 #else
-  #define CMK_RANK_0(pe) ({\
-  pe;\
-})
+#define CMK_RANK_0(pe) pe
 #endif
 
 /**
