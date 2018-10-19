@@ -2764,7 +2764,9 @@ test_linkc "whether has lustre fs" "yes" "no" "-llustreapi"
 AC_DEFINE_UNQUOTED(CMK_HAS_LUSTREFS, $pass, [whether has lustrefs])
 if test $pass -eq 1
 then
-        add_flag 'CMK_LUSTREAPI="-llustreapi"' "lustreapi"
+  add_make_flag 'CMK_LUSTREAPI:=-llustreapi' "lustreapi"
+else
+  add_make_flag 'CMK_LUSTREAPI:=' "lustreapi"
 fi
 
 

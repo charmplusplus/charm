@@ -1,4 +1,5 @@
 CDIR=../../../..
+-include $(CDIR)/include/conv-mach-opt.mak
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 MODULE=CkIO
@@ -13,7 +14,7 @@ all: $(LIBDEST)$(LIB)
 
 $(LIB): $(LIBOBJ)
 	$(CHARMC) -o $(LIB) $(LIBOBJ)
-	(cd $(CDIR)/tmp; . ./conv-mach-opt.sh && echo "$$CMK_LUSTREAPI") > $(DEP)
+	echo "$(CMK_LUSTREAPI)" > $(DEP)
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
