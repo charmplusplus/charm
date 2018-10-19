@@ -923,7 +923,7 @@ static void ampiNodeInit() noexcept
   }
   for (int i=0; i<_entryTable.size(); i++){
     if (strcmp(_entryTable[i]->name, "dummy_thread_ep") == 0)
-      _entryTable[i]->name = "rank";
+      _entryTable[i]->setName("rank");
   }
 #endif
 

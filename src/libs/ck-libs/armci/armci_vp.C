@@ -44,7 +44,7 @@ void armciNodeInit(void) {
   }
   for (int i=0; i<_entryTable.size(); i++){
     if (strcmp(_entryTable[i]->name, "dummy_thread_ep") == 0)
-      _entryTable[i]->name = "thread";
+      _entryTable[i]->setName("thread");
   }
 #endif
   CmiAssert(armciLibStart_idx == -1);

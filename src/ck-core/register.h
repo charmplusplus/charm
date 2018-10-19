@@ -87,6 +87,7 @@ class EntryInfo {
     /// true if this EP is charm internal functions
     bool inCharm;
     bool appWork;
+    bool ownsName; // if entry is templated or setName() is called, then free name in dtor
 #ifdef ADAPT_SCHED_MEM
    /// true if this EP is used to be rescheduled when adjusting memory usage
    bool isMemCritical;
@@ -95,31 +96,41 @@ class EntryInfo {
     /// Human-readable name of entry method, including parameters.
     const char *name;
 
-    EntryInfo(const char *n, CkCallFnPtr c, int m, int ci) : 
+    EntryInfo(const char *n, CkCallFnPtr c, int m, int ci, bool ownsN=false) :
       call(c), msgIdx(m), chareIdx(ci),
       marshallUnpack(0)
 #if CMK_CHARMDEBUG
       ,messagePup(0)
 #endif
-      ,traceEnabled(true), noKeep(false), isImmediate(false), inCharm(false), appWork(false)
-#if !CMK_TRACE_ENABLED // if tracing is disabled, then n will always be a string literal
-      ,name(n)
-    { }
-#else // if tracing is enabled, allocate and free string buffers because lifetime of n may
-      // not be the entire program (see templated version of CkRegisterEp in charm++.h)
+      ,traceEnabled(true), noKeep(false), isImmediate(false), inCharm(false), appWork(false),
+      ownsName(ownsN), name(n)
     {
-      size_t len = strlen(n);
-      // This is freed via the name pointer in the destructor
-      char* temp = new char[len + 1];
-      strcpy(temp, n);
-      name = temp;
+      if (ownsName) initName(n);
     }
 
     ~EntryInfo()
     {
-      delete [] name;
+      if (ownsName) delete [] name;
     }
-#endif
+
+    /// For changing the name after initialization
+    void setName(const char* new_name)
+    {
+      if (ownsName) delete [] name;
+      initName(new_name);
+    }
+
+  private:
+    // Should only be called from ctor or setName
+    void initName(const char* new_name)
+    {
+      size_t len = strlen(new_name);
+      // This is freed via the name pointer in the destructor
+      char* temp = new char[len + 1];
+      strcpy(temp, new_name);
+      name = temp;
+      ownsName = true;
+    }
 };
 
 /**

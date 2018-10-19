@@ -42,9 +42,9 @@ void ckInvalidCallFn(void *msg,void *obj) {
   CkAbort("Charm++: Invalid entry method executed.  Perhaps there is an unregistered module?");
 }
 
-extern "C"
-int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx,
-	int ck_ep_flags)
+static
+int CkRegisterEpInternal(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx,
+	int ck_ep_flags, bool isTemplated)
 {
 #if !CMK_CHARMPY    // charmpy can support dynamic registration of Chares after program start
   if (__registerDone) {
@@ -52,7 +52,7 @@ int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx,
     CkAbort("Did you forget to instantiate a templated entry method in a .ci file?\n");
   }
 #endif
-  EntryInfo *e = new EntryInfo(name, call?call:ckInvalidCallFn, msgIdx, chareIdx);
+  EntryInfo *e = new EntryInfo(name, call?call:ckInvalidCallFn, msgIdx, chareIdx, isTemplated);
   if (ck_ep_flags & CK_EP_NOKEEP) e->noKeep=true;
   if (ck_ep_flags & CK_EP_INTRINSIC) e->inCharm=true;
   if (ck_ep_flags & CK_EP_TRACEDISABLE) e->traceEnabled=false;
@@ -68,6 +68,18 @@ int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx,
   }
 #endif
   return _entryTable.add(e);
+}
+
+extern "C"
+int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx, int ck_ep_flags)
+{
+  return CkRegisterEpInternal(name, call, msgIdx, chareIdx, ck_ep_flags, false /*=isTemplated*/);
+}
+
+extern "C"
+int CkRegisterEpTemplated(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx, int ck_ep_flags)
+{
+  return CkRegisterEpInternal(name, call, msgIdx, chareIdx, ck_ep_flags, true /*=isTemplated*/);
 }
 
 extern "C"

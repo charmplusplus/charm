@@ -184,8 +184,10 @@ typedef enum{
 typedef void  (*CkCallFnPtr) (void *msg, void *obj);
 /** Register this entry point, with this call function and flags.
     Returns the entry point's index in the _entryTable. */
-extern int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, 
-                        int chareIdx,int ck_ep_flags);
+extern int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx,
+                        int chareIdx, int ck_ep_flags);
+extern int CkRegisterEpTemplated(const char *name, CkCallFnPtr call, int msgIdx,
+                                 int chareIdx, int ck_ep_flags);
 
 /** Register this type of chare (group, or array), with this size.
     Returns the Chare's index in the _chareTable. */

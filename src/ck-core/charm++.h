@@ -1230,7 +1230,6 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #include "ckcallback-ccs.h"
 
 
-#if CMK_TRACE_ENABLED // Only get pretty function names if tracing is on
 template<typename... tArgs>
 int CkRegisterEp(const std::string& name, CkCallFnPtr call, int msgIdx, int chareIdx, int ck_ep_flags) {
   std::string combined(name);
@@ -1300,14 +1299,8 @@ int CkRegisterEp(const std::string& name, CkCallFnPtr call, int msgIdx, int char
 
   combined.insert(argStart, templateString);
 
-  return CkRegisterEp(combined.c_str(), call, msgIdx, chareIdx, ck_ep_flags);
+  return CkRegisterEpTemplated(combined.c_str(), call, msgIdx, chareIdx, ck_ep_flags);
 }
-#else // !CMK_TRACE_ENABLED
-template<typename... tArgs>
-int CkRegisterEp(const char* name, CkCallFnPtr call, int msgIdx, int chareIdx, int ck_ep_flags) {
-  return CkRegisterEp(name, call, msgIdx, chareIdx, ck_ep_flags);
-}
-#endif
 
 CkMarshallMsg *CkAllocateMarshallMsgNoninline(int size,const CkEntryOptions *opts);
 inline CkMarshallMsg *CkAllocateMarshallMsg(int size,const CkEntryOptions *opts=NULL)
