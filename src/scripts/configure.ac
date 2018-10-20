@@ -920,7 +920,23 @@ else
   test_finish 1
 fi
 
-#### Check if compiler if 64 bit ####
+# enable mpich tests
+AC_ARG_ENABLE([ampi-mpich-tests],
+            [AS_HELP_STRING([--enable-ampi-mpich-tests],
+            [enable mpich tests for ampi])],
+            [enable_ampi_mpich_tests=yes],
+            [enable_ampi_mpich_tests=no])
+
+if test "$enable_ampi_mpich_tests" = "yes"
+then
+  AC_DEFINE([AMPI_ERRHANDLER_RETURN], [1], [enable ampi fatal error return])
+  AC_DEFINE([AMPI_WITH_UNIMPL_DEFS], [1], [enable ampi no-op definitions])
+  add_make_flag "BUILD_MPICH_TESTS:=true" 'mpich tests setup'
+else
+  AC_DEFINE([AMPI_ERRHANDLER_RETURN], [0], [disable ampi fatal error return])
+fi
+
+#### Check if compiler is 64 bit ####
 cat > $t <<EOT
 #include <stdio.h>
 

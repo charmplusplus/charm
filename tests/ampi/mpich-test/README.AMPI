@@ -1,9 +1,14 @@
-To configure the mpich-3.2 test suite to use AMPI, do:
+Modified 10/30/2018 Zeran Zhu zzhu35@illinois.edu
 
-CC=${PWD}/../../../bin/ampicc CFLAGS="-g -O0" MPICC=${PWD}/../../../bin/ampicc CXX=${PWD}/../../../bin/ampicxx CXXFLAGS="-g -O0" MPICXX=${PWD}/../../../bin/ampicxx MPI_SIZEOF_AINT=8 MPI_SIZEOF_OFFSET=8 ./configure --enable-strictmpi --disable-threads --disable-spawn --disable-cxx --disable-checkfaults --disable-checkpointing --disable-ft-tests --disable-romio --disable-fortran --disable-long-double --disable-long-double-complex --disable-maintainer_mode
+* updated autoconf and Makefile to accept build options
+* created AMPI all passing testlist automatic generation script (based on original runtests) "generate_ampi_testlist" Usage:
+	./generate_ampi_testlist -tests=testlist -xmlfile=summary.xml
+	This will run mpich test suites with AMPI and save all passing and non-timeout (60s) tests to testlist.ampi in the toplevel build directory.
+	Verify changes and commit/push updated testlist.ampi as needed.
+* build AMPI with flag "--enable-ampi-mpich-tests" will enable AMPI test automation with mpich test suites
+	once seeing the flag, autoconfig sets compiler macro AMPI_ERRHANDLER_RETURN = 1, AMPI_WITH_UNIMPL_DEFS = 1, and the Makefile macro BUILD_MPICH_TESTS:=true
+* running "make test" with TESTOPTS in tests/ampi will automatically configure, compile and run all tests including mpich-tests using AMPI
 
+To manually configure the mpich-3.2 test suite to use AMPI, do:
 
-To configure with Fortran90 support:
-
-CC=${PWD}/../../../bin/ampicc MPICC=${PWD}/../../../bin/ampicc CXX=${PWD}/../../../bin/ampicxx MPICXX=${PWD}/../../../bin/ampicxx MPIFC=${PWD}/../../../bin/ampif90 MPIF77=${PWD}/../../../bin/ampif77 FCFLAGS="-g -O0" FC=${PWD}/../../../bin/ampif90 FCLD=${PWD}/../../../bin/ampif90 MPI_SIZEOF_AINT=8 MPI_SIZEOF_OFFSET=8 ./configure --enable-strictmpi --disable-threads --disable-spawn --disable-cxx --disable-checkfaults --disable-checkpointing --disable-ft-tests --disable-romio --disable-long-double --disable-long-double-complex --disable-maintainer_mode
-
+./configure.sh

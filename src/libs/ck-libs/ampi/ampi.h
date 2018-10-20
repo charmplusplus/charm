@@ -1588,8 +1588,6 @@ extern long ampiCurrentStackUsage(void);
 
 /* If compiling the MPICH test suite, enable these no-op definitions
  * for the MPI features that AMPI does not yet support. */
-//#define AMPI_WITH_UNIMPL_DEFS
-
 #ifdef AMPI_WITH_UNIMPL_DEFS
 
 // MPI-2 Constants
@@ -1638,8 +1636,6 @@ typedef int (MPI_Grequest_query_function)(void *, MPI_Status *);
 #define MPI_Comm_join (void*)
 #define MPI_Publish_name (void*)
 #define MPI_Unpublish_name (void*)
-#define MPI_Grequest_start (void*)
-#define MPI_Grequest_complete (void*)
 #define MPI_Pack_external (void*)
 #define MPI_Pack_external_size (void*)
 #define MPI_Type_match_size (void*)
