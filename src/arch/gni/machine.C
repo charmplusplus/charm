@@ -4634,11 +4634,11 @@ static int _absoluteTime = 0;
 static int _is_global = 0;
 static struct timespec start_ts;
 
-INLINE_KEYWORD int CmiTimerIsSynchronized(void) {
+int CmiTimerIsSynchronized(void) {
     return 0;
 }
 
-INLINE_KEYWORD int CmiTimerAbsolute(void) {
+int CmiTimerAbsolute(void) {
     return _absoluteTime;
 }
 
