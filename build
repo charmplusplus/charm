@@ -650,6 +650,9 @@ then
     fi
     if [ $HAS_SMP -eq 1 ]; then
       MYTMP="smp $MYTMP"
+      if [ $BUILD_OMP -eq 1 ]; then
+        CONFIG_OPTS="--enable-task-queue $CONFIG_OPTS"
+      fi
     elif [ $BUILD_OMP -eq 1 ]; then
       BUILD_OMP=2 #this means omp keyword inserted without smp keyword"
     fi
