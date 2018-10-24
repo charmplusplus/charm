@@ -597,7 +597,7 @@ void CmiEnableNonblockingIO(int fd) { }
 
 static skt_ip_t   Cmi_self_IP;
 static skt_ip_t   Cmi_charmrun_IP; /*Address of charmrun machine*/
-static int        Cmi_charmrun_port;
+static int        Cmi_charmrun_sa_family; /*Whether Charmrun is using IPv4 or IPv6*/
 /* Magic number to be used for sanity check in messege header */
 static int 				Cmi_net_magic;
 
@@ -655,17 +655,20 @@ static void parse_netstart(void)
   ns = getenv("NETSTART");
   if (ns!=0) 
   {/*Read values set by Charmrun*/
+        int Cmi_charmrun_port;
         char Cmi_charmrun_name[1024];
-        nread = sscanf(ns, "%d%s%d%d%d",
+        nread = sscanf(ns, "%d%s%d%d%d%d",
                  &Lrts_myNode,
                  Cmi_charmrun_name, &Cmi_charmrun_port,
-                 &Cmi_charmrun_pid, &port);
+                 &Cmi_charmrun_pid, &port,
+                 &Cmi_charmrun_sa_family);
 	Cmi_charmrun_IP=skt_lookup_ip(Cmi_charmrun_name);
 
-        if (nread!=5) {
+        if (nread!=6) {
                 fprintf(stderr,"Error parsing NETSTART '%s'\n",ns);
                 exit(1);
         }
+        skt_set_port(&Cmi_charmrun_IP, Cmi_charmrun_port);
         if (getenv("CmiLocal") != NULL) {      /* ++local */
           /* CmiMyLocalRank is used for setting default cpu affinity */
           CmiMyLocalRank = Lrts_myNode;
@@ -674,7 +677,6 @@ static void parse_netstart(void)
   {/*No charmrun-- set flag values for standalone operation*/
   	Lrts_myNode=0;
   	Cmi_charmrun_IP=_skt_invalid_ip;
-  	Cmi_charmrun_port=0;
   	Cmi_charmrun_pid=0;
         dataport = -1;
   }
@@ -1392,9 +1394,9 @@ static void CmiStdoutFlush(void) {
 
 static void open_charmrun_socket(void)
 {
-  dataskt=skt_datagram(&dataport, Cmi_os_buffer_size);
+  dataskt=skt_datagram(&dataport, Cmi_os_buffer_size, Cmi_charmrun_sa_family == 6 ? AF_INET6 : AF_INET);
   MACHSTATE2(5, "skt_connect at dataskt:%d Cmi_charmrun_port:%d", dataskt, Cmi_charmrun_port);
-  Cmi_charmrun_fd = skt_connect(Cmi_charmrun_IP, Cmi_charmrun_port, 1800);
+  Cmi_charmrun_fd = skt_connect(&Cmi_charmrun_IP, 1800);
   MACHSTATE2(5, "Opened connection to charmrun at socket %d, dataport=%d", Cmi_charmrun_fd, dataport);
   skt_tcp_no_nagle(Cmi_charmrun_fd);
 }
@@ -1454,8 +1456,8 @@ static void send_singlenodeinfo(void)
      Set IP in case it is mpiexec mode where charmrun does not have IP yet */
   me.info.nPE = ChMessageInt_new(0);
   /* me.info.IP = _skt_invalid_ip; */
-  me.info.IP = skt_innode_my_ip();
-  me.info.dataport = ChMessageInt_new(dataport);
+  me.info.addr = skt_innode_my_ip();
+  skt_set_port(&me.info.addr, dataport);
 #endif
 
   /* Send our node info. to charmrun.
@@ -1484,8 +1486,7 @@ static void node_addresses_obtain(char **argv)
 	n32[0] = ChMessageInt_new(1);
 	n32[1] = ChMessageInt_new(Lrts_myNode);
 	nodeInfo->nPE = ChMessageInt_new(_Cmi_mynodesize);
-	nodeInfo->dataport = ChMessageInt_new(0);
-	nodeInfo->IP = _skt_invalid_ip;
+	nodeInfo->addr = _skt_invalid_ip;
 	nodeInfo->nProcessesInPhysNode = ChMessageInt_new(1);
   }
   else 
@@ -1987,7 +1988,11 @@ static void obtain_idleFn(void) {sleep(0);}
 
 static int net_default_skt_abort(SOCKET skt,int code,const char *msg)
 {
-  fprintf(stderr,"Fatal socket error: code %d-- %s\n",code,msg);
+  char buf[256];
+  const int err = errno;
+  buf[0] = '\0';
+  strerror_r(err, buf, sizeof(buf));
+  fprintf(stderr,"Fatal socket error: code %d -- %s -- %s\n", code, msg, buf);
   machine_exit(1);
   return -1;
 }
@@ -2060,7 +2065,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   MACHSTATE2(5,"Init: (netpoll=%d), (idlepoll=%d)",Cmi_netpoll,Cmi_idlepoll);
 
   skt_set_idle(obtain_idleFn);
-  if (!skt_ip_match(Cmi_charmrun_IP,_skt_invalid_ip)) {
+  if (skt_ip_is_valid(&Cmi_charmrun_IP)) {
   	set_signals();
     open_charmrun_socket();
   } else {/*Standalone operation*/

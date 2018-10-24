@@ -8,9 +8,7 @@
  *
  *  SOCKET is just a #define for "unsigned int".
  *
- *  skt_ip_t is a flat bytes structure to hold an IP address--
- *  this is either 4 bytes (for IPv4) or 16 bytes (for IPv6).
- *  It is always in network byte order.
+ *  skt_ip_t is a union of struct sockaddr types when available
  *
  *  Errors are handled in the library by calling a user-overridable
  *  abort function.
@@ -44,7 +42,7 @@
  *     Performs the whole socket/bind/listen procedure.
  *     Returns the actual port of the socket and the file descriptor.
  *
- * SOCKET skt_server_ip(unsigned int *port,skt_ip_t *ip)
+ * SOCKET skt_server_ip(skt_ip_t *ip)
  *
  *   - create a TCP server socket on the given port and IP
  *     Use 0 for any port and _skt_invalid_ip for any IP.
@@ -52,13 +50,13 @@
  *     Returns the actual port and IP address of the socket
  *     and the file descriptor.
  *
- * SOCKET skt_accept(SOCKET src_fd,skt_ip_t *pip, unsigned int *port)
+ * SOCKET skt_accept(SOCKET src_fd, skt_ip_t * addr)
  *
  *   - accepts a TCP connection to the specified server socket.  Returns the
  *     IP of the caller, the port number of the caller, and the file
  *     descriptor to talk to the caller.
  *
- * SOCKET skt_connect(skt_ip_t ip, int port, int timeout)
+ * SOCKET skt_connect(const skt_ip_t * addr, int timeout)
  *
  *   - Opens a TCP connection to the specified server.  Returns a socket for
  *     communication.
@@ -152,27 +150,37 @@ void skt_set_idle(skt_idleFn f);
 skt_abortFn skt_set_abort(skt_abortFn f);
 
 /*DNS*/
-typedef struct {/*IPv4 IP address*/
-  unsigned char data[4];
+typedef union skt_ip_t
+{
+  /* following the .s{a,in,in6}_* naming convention */
+  struct sockaddr a;
+  struct sockaddr_in in;
+  struct sockaddr_in6 in6;
 } skt_ip_t;
+
+void skt_assign_addr(skt_ip_t *addr, const struct sockaddr *sock);
+size_t skt_get_size(const skt_ip_t *addr);
 extern skt_ip_t _skt_invalid_ip;
 skt_ip_t skt_my_ip(void);
 skt_ip_t skt_lookup_ip(const char *name);
 skt_ip_t skt_innode_my_ip(void); /* inner node version */
 skt_ip_t skt_innode_lookup_ip(const char *name);
 
-char *skt_print_ip(char *dest, skt_ip_t addr);
-int skt_ip_match(skt_ip_t a, skt_ip_t b);
-struct sockaddr_in skt_build_addr(skt_ip_t IP, int port);
+char *skt_print_ip(char *dest, size_t destsiz, const skt_ip_t *addr);
+char *skt_print_host(char *dest, size_t destsiz, const skt_ip_t *addr);
+int skt_ip_is_valid(const skt_ip_t *addr);
+void skt_set_port(skt_ip_t *addr, unsigned int port);
+unsigned int skt_get_port(const skt_ip_t *addr);
+int skt_is_loopback(const skt_ip_t *addr);
 
 /*UDP*/
-SOCKET skt_datagram(unsigned int *port, int bufsize);
+SOCKET skt_datagram(unsigned int *port, int bufsize, int sa_family);
 
 /*TCP*/
-SOCKET skt_server(unsigned int *port);
-SOCKET skt_server_ip(unsigned int *port, skt_ip_t *ip);
-SOCKET skt_accept(SOCKET src_fd, skt_ip_t *pip, unsigned int *port);
-SOCKET skt_connect(skt_ip_t ip, int port, int timeout);
+SOCKET skt_server(unsigned int *port, int sa_family);
+SOCKET skt_server_ip(skt_ip_t *addr, int sa_family);
+SOCKET skt_accept(SOCKET src_fd, skt_ip_t *addr);
+SOCKET skt_connect(const skt_ip_t * addr, int timeout);
 
 /*Utility*/
 void skt_close(SOCKET fd);
@@ -283,9 +291,8 @@ typedef struct {
   ChMessageInt_t nProcessesInPhysNode; /* Number of distinct OS processes on
                                           this physical hardware node */
   ChMessageInt_t nPE; /* Number of worker threads in this OS process */
-  ChMessageInt_t dataport; /* node's data port (UDP or GM) */
   ChMessageInt_t mach_id;  /* node's hardware address (GM-only) */
-  skt_ip_t IP; /* node's IP address */
+  skt_ip_t addr; /* node's IP address */
 } ChNodeinfo;
 
 typedef struct {

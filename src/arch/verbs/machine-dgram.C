@@ -224,10 +224,8 @@ typedef struct FutureMessageStruct {
 typedef struct OtherNodeStruct
 {
   int nodestart, nodesize;
-  skt_ip_t IP;
   unsigned int mach_id;
-  unsigned int dataport;
-  struct sockaddr_in addr;
+  skt_ip_t addr;
 
   unsigned int             send_last;    /* seqno of last dgram sent */
   ImplicitDgram           *send_window;  /* datagrams sent, not acked */
@@ -344,9 +342,6 @@ int CmiLongSendQueue(int forNode,int longerThan) {
 }
 #endif
 
-extern void CmiGmConvertMachineID(unsigned int *mach_id);
-extern void CmiAmmassoNodeAddressesStoreHandler(int pe, struct sockaddr_in *addr, int port);
-
 /* initnode node table reply format:
  +------------------------------------------------------- 
  | 4 bytes  |   Number of nodes n                       ^
@@ -380,17 +375,12 @@ static void node_addresses_store(ChMessage *msg)
     MACHSTATE2(3,"node %d nodesize %d",i,nodes[i].nodesize);
     nodes[i].mach_id = ChMessageInt(d[i].mach_id);
 
-    nodes[i].IP=d[i].IP;
     if (i==Lrts_myNode) {
       Cmi_nodestart=nodes[i].nodestart;
       _Cmi_mynodesize=nodes[i].nodesize;
-      Cmi_self_IP=nodes[i].IP;
+      Cmi_self_IP=nodes[i].addr;
     }
-
-#if !CMK_USE_IBVERBS
-    nodes[i].dataport = ChMessageInt(d[i].dataport);
-    nodes[i].addr = skt_build_addr(nodes[i].IP,nodes[i].dataport);
-#endif
+    nodes[i].addr = d[i].addr;
 
     nodestart+=nodes[i].nodesize;
 

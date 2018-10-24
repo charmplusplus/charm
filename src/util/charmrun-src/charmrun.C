@@ -321,7 +321,8 @@ static char *getenv_display()
   if (p == 0)
     return NULL;
   if ((e[0] == ':') || (strncmp(e, "unix:", 5) == 0)) {
-    sprintf(result, "%s:%s", skt_print_ip(ipBuf, skt_my_ip()), p + 1);
+    skt_ip_t ip = skt_my_ip();
+    sprintf(result, "%s:%s", skt_print_ip(ipBuf, sizeof(ipBuf), &ip), p + 1);
   } else
     strcpy(result, e);
   return result;
@@ -1301,8 +1302,6 @@ static char *nodetab_file_find()
 
 struct nodetab_host
 {
-  static skt_ip_t resolve(const char *name);
-
   double speed = 1.0; /*Relative speed of each CPU*/
 
   const char *name = "SET_H->NAME"; /*Host DNS name*/
@@ -1317,7 +1316,7 @@ struct nodetab_host
   char *ext = nullptr;        /* Command suffix */
   pathfixlist pathfixes = nullptr;
 
-  skt_ip_t ip = _skt_invalid_ip;      /*IP address of host*/
+  skt_ip_t addr = _skt_invalid_ip;      /*IP address of host*/
   int cpus = 1;     /* # of physical CPUs*/
   int nice = -100;     /* process priority */
 //  int forks = 0;    /* number of processes to fork on remote node */
@@ -1331,16 +1330,17 @@ struct nodetab_host
 #endif
 };
 
-skt_ip_t nodetab_host::resolve(const char *name)
+static skt_ip_t lookup_ip_or_exit(const char *name)
 {
   skt_ip_t ip = skt_innode_lookup_ip(name);
-  if (skt_ip_match(ip, _skt_invalid_ip)) {
+  if (!skt_ip_is_valid(&ip))
+  {
 #ifdef CMK_BPROC
     /* only the master node is used */
     if (!(1 <= arg_requested_pes && atoi(name) == -1))
 #endif
     {
-      fprintf(stderr, "ERROR> Cannot obtain IP address of %s\n", name);
+      fprintf(stderr, "ERROR> Cannot resolve \"%s\"\n", name);
       exit(1);
     }
   }
@@ -1448,14 +1448,14 @@ static const char *nodetab_args(const char *args, nodetab_host *h)
   return args;
 }
 
+static const char ipv4_loopback_str[] = "127.0.0.1";
+
 /* setup nodetab as localhost only */
 static void nodetab_init_for_local()
 {
-
-  static const char hostname[] = "127.0.0.1";
   nodetab_host * h = new nodetab_host{};
-  h->name = hostname; // should strdup if leaks are fixed
-  h->ip = nodetab_host::resolve(hostname);
+  h->name = ipv4_loopback_str; // should strdup if leaks are fixed
+  h->addr = lookup_ip_or_exit(ipv4_loopback_str);
   host_table.push_back(h);
 }
 
@@ -1533,9 +1533,12 @@ static void nodetab_init_with_nodelist()
           }
           else
           {
+            const char *hostname_c = hostname.c_str();
+            skt_ip_t ip = lookup_ip_or_exit(hostname_c);
+
             nodetab_host *host = new nodetab_host{group};
-            host->name = strdup(hostname.c_str());
-            host->ip = nodetab_host::resolve(hostname.c_str());
+            host->name = strdup(hostname_c);
+            host->addr = ip;
             host->hostno = hostno++;
             temp_hosts.insert({hostname, host});
             nodetab_args(b3, host);
@@ -1554,6 +1557,7 @@ static void nodetab_init_with_nodelist()
         exit(1);
       }
     }
+
     lineNo++;
   }
   fclose(f);
@@ -1563,7 +1567,7 @@ static void nodetab_init_with_nodelist()
 
   const size_t temp_hosts_size = temp_hosts.size();
   if (temp_hosts_size == 0) {
-    fprintf(stderr, "ERROR> No hosts in group %s\n", arg_nodegroup);
+    fprintf(stderr, "ERROR> No valid hosts in group %s\n", arg_nodegroup);
     exit(1);
   }
 
@@ -1615,23 +1619,25 @@ static void nodeinfo_populate(nodetab_process & p)
   i.nPE = ChMessageInt_new(p.PEs);
   i.nProcessesInPhysNode = ChMessageInt_new(p.host->processes);
 
+  const unsigned int dataport = skt_get_port(&i.addr);
+
   if (arg_mpiexec)
-    p.host->ip = i.IP; /* get IP */
+    p.host->addr = i.addr; /* get IP */
   else
-    i.IP = p.host->ip;
+  {
+    i.addr = p.host->addr;
+    skt_set_port(&i.addr, dataport);
+  }
 
 #if !CMK_USE_IBVERBS
-  unsigned int dataport = ChMessageInt(i.dataport);
   if (0 == dataport) {
     fprintf(stderr, "Node %d could not initialize network!\n", node);
     exit(1);
   }
-  p.dataport = dataport;
   if (arg_verbose) {
     char ips[200];
-    skt_print_ip(ips, i.IP);
-    printf("Charmrun> client %d connected (IP=%s data_port=%d)\n", node, ips,
-           dataport);
+    printf("Charmrun> client %d connected (IP=%s port=%d)\n", node,
+           skt_print_ip(ips, sizeof(ips), &i.addr), dataport);
   }
 #endif
 }
@@ -3164,7 +3170,6 @@ static int client_connect_problem_skt(SOCKET skt, int code, const char *msg)
 static SOCKET errorcheck_one_client_connect(void)
 {
   static int numClientsConnected = 0;
-  unsigned int clientPort; /*These are actually ignored*/
   skt_ip_t clientIP;
   if (arg_verbose)
     printf("Charmrun> Waiting for %d-th client to connect.\n", numClientsConnected);
@@ -3175,7 +3180,7 @@ static SOCKET errorcheck_one_client_connect(void)
     exit(1);
   }
 
-  const SOCKET req_client = skt_accept(server_fd, &clientIP, &clientPort);
+  const SOCKET req_client = skt_accept(server_fd, &clientIP);
 
   /* FIXME: will this ever be triggered? It seems the skt_abort handler here is
    *        'client_connect_problem', which calls exit(1), so we'd exit
@@ -3955,42 +3960,47 @@ static void req_start_server(void)
   if (arg_shrinkexpand) { // Need port information
     char *ns = getenv("NETSTART");
     if (ns != 0) { /*Read values set by Charmrun*/
-      int node_num, old_charmrun_pid, port;
+      int node_num, old_charmrun_pid, port, sa_family_portable;
       char old_charmrun_name[1024 * 1000];
-      int nread = sscanf(ns, "%d%s%d%d%d", &node_num, old_charmrun_name,
-                         &server_port, &old_charmrun_pid, &port);
-      if (nread != 5) {
+      int nread = sscanf(ns, "%d%s%d%d%d%d", &node_num, old_charmrun_name,
+                         &server_port, &old_charmrun_pid, &port, &sa_family_portable);
+      if (nread != 6) {
         fprintf(stderr, "Error parsing NETSTART '%s'\n", ns);
         exit(1);
       }
     }
   }
 #endif
+  int sa_family = AF_INET;
+
   if (arg_local)
     /* local execution, use localhost always */
-    strcpy(server_addr, "127.0.0.1");
+    strcpy(server_addr, ipv4_loopback_str);
   else if (arg_charmrunip != NULL)
     /* user specify the IP at +useip */
     strcpy(server_addr, arg_charmrunip);
   else if ((arg_charmrunip = getenv("CHARMRUN_IP")) != NULL)
     /* user specify the env  */
     strcpy(server_addr, arg_charmrunip);
-  else if (skt_ip_match(ip, _skt_invalid_ip)) {
+  else if (!skt_ip_is_valid(&ip)) {
     fprintf(stderr, "Charmrun> Warning-- cannot find IP address for your hostname.  "
            "Using loopback.\n");
-    strcpy(server_addr, "127.0.0.1");
-  } else if (arg_usehostname || skt_ip_match(ip, skt_lookup_ip("127.0.0.1")))
+    strcpy(server_addr, ipv4_loopback_str);
+  } else if (arg_usehostname || skt_is_loopback(&ip))
     /*Use symbolic host name as charmrun address*/
     gethostname(server_addr, sizeof(server_addr));
   else
-    skt_print_ip(server_addr, ip);
+  {
+    skt_print_ip(server_addr, sizeof(server_addr), &ip);
+    sa_family = ip.a.sa_family;
+  }
 
 #if CMK_SHRINK_EXPAND
   server_port = arg_charmrun_port;
 #else
   server_port = 0;
 #endif
-  server_fd = skt_server(&server_port);
+  server_fd = skt_server(&server_port, sa_family);
 
   if (arg_verbose) {
     printf("Charmrun> Charmrun = %s, port = %d\n", server_addr, server_port);
@@ -4083,8 +4093,8 @@ static void nodelist_obtain(void)
 static void init_mynodes(void)
 {
   parse_netstart();
-  if (!skt_ip_match(parent_charmrun_IP, _skt_invalid_ip)) {
-    dataskt = skt_server(&dataport);
+  if (skt_ip_is_valid(&parent_charmrun_IP)) {
+    dataskt = skt_server(&dataport, parent_charmrun_IP.a.sa_family);
     parent_charmrun_fd =
         skt_connect(parent_charmrun_IP, parent_charmrun_port, 1800);
   } else {
@@ -4157,10 +4167,7 @@ int main(int argc, const char **argv, char **envp)
   {
     char ips[200];
     for (const nodetab_host * h : host_table)
-    {
-      skt_print_ip(ips, h->ip);
-      printf("Charmrun> added host \"%s\", IP:%s\n", h->name, ips);
-    }
+      printf("Charmrun> added host \"%s\", IP: %s\n", h->name, skt_print_ip(ips, sizeof(ips), &h->addr));
   }
 
 #ifdef HSTART
@@ -4336,21 +4343,34 @@ int main(int argc, const char **argv, char **envp)
   }
 }
 
+static int portable_sa_family(int sa_family)
+{
+  switch (sa_family)
+  {
+  case AF_INET:
+    return 4;
+  case AF_INET6:
+    return 6;
+  default:
+    return 0;
+  }
+}
+
 /*This little snippet creates a NETSTART
 environment variable entry for the given node #.
 It uses the idiotic "return reference to static buffer"
 string return idiom.
 */
-static char *create_netstart(int node)
+static char *create_netstart(const nodetab_process &p)
 {
   static char dest[1536];
   int port = 0;
   if (arg_mpiexec)
-    sprintf(dest, "$CmiMyNode %s %d %d %d", server_addr, server_port,
-            getpid() & 0x7FFF, port);
+    sprintf(dest, "$CmiMyNode %s %d %d %d %d", server_addr, server_port,
+            getpid() & 0x7FFF, port, portable_sa_family(p.host->addr.a.sa_family));
   else
-    sprintf(dest, "%d %s %d %d %d", node, server_addr, server_port,
-            getpid() & 0x7FFF, port);
+    sprintf(dest, "%d %s %d %d %d %d", p.nodeno, server_addr, server_port,
+            getpid() & 0x7FFF, port, portable_sa_family(p.host->addr.a.sa_family));
   return dest;
 }
 
@@ -4391,7 +4411,7 @@ static void start_nodes_daemon(std::vector<nodetab_process> & process_table)
       printf("Charmrun> Starting node program %d on '%s' as %s.\n", p.nodeno,
              h->name, arg_nodeprog_r);
     free(arg_nodeprog_r);
-    sprintf(task.env, "NETSTART=%s", create_netstart(p.nodeno));
+    sprintf(task.env, "NETSTART=%s", create_netstart(p));
 
     char nodeArgBuffer[5120]; /*Buffer to hold assembled program arguments*/
     char *argBuf;
@@ -4406,7 +4426,9 @@ static void start_nodes_daemon(std::vector<nodetab_process> & process_table)
 
     /*Send request out to remote node*/
     char statusCode = 'N'; /*Default error code-- network problem*/
-    int fd = skt_connect(h->ip, DAEMON_IP_PORT, 30);
+    skt_ip_t daemon_addr = h->addr;
+    skt_set_port(&daemon_addr, DAEMON_IP_PORT);
+    int fd = skt_connect(&daemon_addr, 30);
     if (fd !=
         INVALID_SOCKET) { /*Contact!  Ask the daemon to start the program*/
       skt_sendN(fd, (const char *) &task, sizeof(task));
@@ -4472,7 +4494,7 @@ static void start_nodes_local(std::vector<nodetab_process> & process_table)
   {
     STARTUPINFO si = {0}; /* startup info for the process spawned */
 
-    sprintf(environment, "NETSTART=%s", create_netstart(p.nodeno));
+    sprintf(environment, "NETSTART=%s", create_netstart(p));
     /*Paste all system environment strings */
     envCat(environment, GetEnvironmentStrings());
 
@@ -4569,7 +4591,7 @@ static void nodetab_init_for_scyld()
     sprintf(hostname, "%d", i);
     nodetab_host * h = new nodetab_host{};
     h->name = strdup(hostname);
-    h->ip = nodetab_host::resolve(hostname);
+    h->ip = lookup_ip_or_exit(hostname);
     h->hostno = hostno++;
     host_table.push_back(h);
   }
@@ -4594,7 +4616,7 @@ static void start_nodes_scyld(void)
 
     if (arg_verbose)
       printf("Charmrun> start node program on slave node: %d.\n", bproc_nodeno);
-    sprintf(envp[0], "NETSTART=%s", create_netstart(p.nodeno));
+    sprintf(envp[0], "NETSTART=%s", create_netstart(p));
 
     int pid = fork();
     if (pid < 0)
@@ -4857,7 +4879,7 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
     netstart = create_netstart(mynodes_start + nodeno);
   else
 #endif
-    netstart = create_netstart(nodeno);
+    netstart = create_netstart(p);
   fprintf(f, "NETSTART=\"%s\";export NETSTART\n", netstart);
 
   fprintf(f, "CmiMyNodeSize='%d'; export CmiMyNodeSize\n", h->cpus);
@@ -5631,7 +5653,7 @@ static void start_nodes_local(std::vector<nodetab_process> & process_table)
   {
     if (arg_verbose)
       printf("Charmrun> start %d node program on localhost.\n", p.nodeno);
-    sprintf(envp[envc], "NETSTART=%s", create_netstart(p.nodeno));
+    sprintf(envp[envc], "NETSTART=%s", create_netstart(p));
     sprintf(envp[envc + 1], "CmiNumNodes=%d", 0);
 
     int pid = fork();
@@ -5761,9 +5783,8 @@ static void reconnect_crashed_client(nodetab_process & crashed)
   }
 
   skt_ip_t clientIP;
-  unsigned int clientPort;
 
-  const SOCKET req_client = skt_accept(server_fd, &clientIP, &clientPort);
+  const SOCKET req_client = skt_accept(server_fd, &clientIP);
 
   if (req_client == SOCKET_ERROR) {
     client_connect_problem(crashed, "Failure in restarted node accept");

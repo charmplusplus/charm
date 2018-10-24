@@ -68,7 +68,7 @@ static void printSvr(CcsServer *svr)
 {
   char ipBuf[200];
   int i;
-  DEBUGF(("hostIP: %s\n", skt_print_ip(ipBuf,svr->hostIP)));
+  DEBUGF(("hostIP: %s\n", skt_print_ip(ipBuf, sizeof(ipBuf), &svr->hostIP)));
   DEBUGF(("hostPort: %d\n", svr->hostPort));
   DEBUGF(("authentication: %d\n", svr->isAuth));
   DEBUGF(("replyFd: %d\n", svr->replyFd));
@@ -160,7 +160,8 @@ int CcsConnectIpWithTimeout(CcsServer *svr, skt_ip_t ip, int port,
     svr->level=0; /*HACK: hardcoded at security level 0*/
     svr->key=*key;
     CCS_RAND_new(&svr->rand);
-    fd=skt_connect(svr->hostIP, svr->hostPort,timeout);
+    // assume ip already contains the requested port
+    fd=skt_connect(&svr->hostIP, timeout);
 
     if (NULL!=(err=CcsImpl_authInit(fd,svr))) {
       fprintf(stderr,"CCS Client error> %s\n",err);
@@ -232,7 +233,7 @@ int CcsSendRequestGeneric(CcsServer *svr, const char *hdlrID, int pe, int *pes, 
   if (svr->replyFd!=-1) skt_close(svr->replyFd); /*We'll never ask for reply*/
 
   /*Connect to conv-host, and send the message */
-  svr->replyFd=skt_connect(svr->hostIP, svr->hostPort,timeout);
+  svr->replyFd=skt_connect(&svr->hostIP, timeout);
   if (svr->replyFd==-1) return -1;
   
   if (svr->isAuth==1) 

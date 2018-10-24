@@ -589,9 +589,8 @@ static void open_tcp_sockets(void)
   numpes = Lrts_numNodes;
   MACHSTATE2(2,"  open_tcp_sockets (%d:%d)", mype, numpes);
   for (i=0; i<mype; i++) {
-    unsigned int clientPort;
     skt_ip_t clientIP;
-    skt = skt_accept(dataskt, &clientIP,&clientPort);
+    skt = skt_accept(dataskt, &clientIP);
     if (skt<0) KillEveryoneCode(98246554);
 #if NO_NAGLE_ALG
     skt_tcp_no_nagle(skt);
@@ -610,7 +609,7 @@ static void open_tcp_sockets(void)
 #endif
   }
   for (pe=mype+1; pe<numpes; pe++) {
-    skt = skt_connect(nodes[pe].IP, nodes[pe].dataport, 300);
+    skt = skt_connect(&nodes[pe].addr, 300);
     if (skt<0) KillEveryoneCode(894788843);
 #if NO_NAGLE_ALG
     skt_tcp_no_nagle(skt);

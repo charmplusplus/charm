@@ -139,8 +139,7 @@ void TransmitAckDatagram(OtherNode node)
   while(retval==(-1))
     retval = sendto(dataskt, (char *)&ack,
 	 DGRAM_HEADER_SIZE + Cmi_window_size + sizeof(unsigned int), 0,
-	 (struct sockaddr *)&(node->addr),
-	 sizeof(struct sockaddr_in));
+	 &node->addr.a, sizeof(skt_ip_t));
   node->stat_send_ack++;
 }
 
@@ -172,7 +171,7 @@ void TransmitImplicitDgram(ImplicitDgram dg)
   retval = (-1);
   while(retval==(-1))
     retval = sendto(dataskt, (char *)head, len + DGRAM_HEADER_SIZE, 0,
-	      (struct sockaddr *)&(dest->addr), sizeof(struct sockaddr_in));
+	      &dest->addr.a, sizeof(skt_ip_t));
   *head = temp;
   dest->stat_send_pkt++;
 }
@@ -198,7 +197,7 @@ void TransmitImplicitDgram1(ImplicitDgram dg)
   retval = (-1);
   while (retval == (-1))
     retval = sendto(dataskt, (char *)head, len + DGRAM_HEADER_SIZE, 0,
-	      (struct sockaddr *)&(dest->addr), sizeof(struct sockaddr_in));
+	      &dest->addr.a, sizeof(skt_ip_t));
   *head = temp;
   dest->stat_resend_pkt++;
 }

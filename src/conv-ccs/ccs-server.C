@@ -351,9 +351,10 @@ void CcsServer_new(skt_ip_t *ret_ip,int *use_port,const char *authFile)
   security=CcsSecMan_default(authFile);
   skt_init();
   ip=skt_my_ip();
-  ccs_server_fd=skt_server(&port);
+  ccs_server_fd=skt_server(&port, ip.a.sa_family);
+  skt_set_port(&ip, port);
   printf("ccs: %s\nccs: Server IP = %s, Server port = %u $\n", 
-           CMK_CCS_VERSION, skt_print_ip(ip_str,ip), port);
+           CMK_CCS_VERSION, skt_print_ip(ip_str, sizeof(ip_str), &ip), port);
   fflush(stdout);
   if (ret_ip!=NULL) *ret_ip=ip;
   if (use_port!=NULL) *use_port=port;
@@ -419,17 +420,18 @@ int CcsServer_recvRequest(CcsImplHeader *hdr,void **reqData)
   skt_abortFn old=skt_set_abort(req_abortFn);
 
   CCSDBG(("CCS Receiving connection...\n"));
-  fd=skt_accept(ccs_server_fd,&ip,&port);
+  fd=skt_accept(ccs_server_fd, &ip);
 
-  CCSDBG(("CCS   Connected to IP=%s, port=%d...\n",skt_print_ip(ip_str,ip),port));
+  skt_print_ip(ip_str, sizeof(ip_str), &ip);
+  port = skt_get_port(&ip);
+
+  CCSDBG(("CCS   Connected to IP=%s, port=%d...\n",ip_str,port));
   hdr->attr.ip=ip;
-  hdr->attr.port=ChMessageInt_new(port);
 
   if (0==CcsServer_recvRequestData(fd,hdr,reqData))
   {
     fprintf(stdout,"During CCS Client IP:port (%s:%d) processing.\n",
-	    skt_print_ip(ip_str,ip),
-	    port);
+	    ip_str, port);
     skt_close(fd);
     ret=0;
   }

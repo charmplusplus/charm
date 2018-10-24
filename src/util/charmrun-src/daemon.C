@@ -47,7 +47,7 @@ int main()
   
   int remotefd;         /* Remote Process Connecting */
   skt_ip_t remoteIP;         /* Remote Process's IP */
-  unsigned int remotePortNumber; /* Port on which remote port is connecting */
+  skt_ip_t myip = skt_my_ip();
   
   taskStruct task;      /* Information about the task to be performed */
   time_t curTime;
@@ -71,7 +71,7 @@ int main()
   skt_set_abort(abort_writelog);
   
   /* Initialise "Listening Socket" */
-  myfd=skt_server(&myPortNumber);
+  myfd=skt_server(&myPortNumber, myip.a.sa_family);
   
   while(1) {
     char ip_str[200];
@@ -101,11 +101,12 @@ int main()
     }
 
     /* Accept & log a TCP connection from a client */
-    remotefd=skt_accept(myfd, &remoteIP, &remotePortNumber); 
+    remotefd=skt_accept(myfd, &remoteIP);
     
     curTime=time(NULL);
     fprintf(logfile,"Connection from IP %s, port %d at %s",
-	    skt_print_ip(ip_str,remoteIP),remotePortNumber,
+	    skt_print_ip(ip_str, sizeof(ip_str), &remoteIP),
+	    skt_get_port(&remoteIP),
 	    ctime(&curTime));
     fflush(logfile);
     
