@@ -348,7 +348,9 @@ public:
   }
 };
 
+#if CMK_HAS_GET_MYADDRESS
 #include <rpc/rpc.h>
+#endif
 
 size_t hostInfoLength(void *) {return 1;}
 
@@ -359,7 +361,8 @@ void hostInfo(void *itemIter, pup_er pp, CpdListItemsRequest *req) {
 #if CMK_HAS_GET_MYADDRESS
   get_myaddress(&addr);
 #else
-  CmiAbort("hostInfo: get_myaddress does not work on this machine");
+  CmiAbort("CharmDebug: get_myaddress() does not work on this machine, are you missing "
+           "the rpc/rpc.h header (usually found in the glibc-dev package)?");
 #endif
   char *address = (char*)&addr.sin_addr.s_addr;
   PUPv(address, 4);
