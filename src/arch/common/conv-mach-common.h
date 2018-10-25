@@ -71,5 +71,6 @@ enum ncpyFreeNcpyOpInfoMode {
 enum cmiZCMsgType {
   CMK_REG_NO_ZC_MSG = 0,
   CMK_ZC_P2P_SEND_MSG = 1,
-  CMK_ZC_BCAST_SEND_MSG = 2
+  CMK_ZC_P2P_RECV_MSG = 2,
+  CMK_ZC_BCAST_SEND_MSG = 3
 };

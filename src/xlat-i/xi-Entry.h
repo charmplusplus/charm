@@ -64,6 +64,9 @@ class Entry : public Member {
   void genCall(XStr& dest, const XStr& preCall, bool redn_wrapper = false,
                bool usesImplBuf = false);
 
+  void genRegularCall(XStr& dest, const XStr& preCall, bool redn_wrapper = false,
+               bool usesImplBuf = false, bool isRdmaPost = false);
+
   XStr epStr(bool isForRedn = false, bool templateCall = false);
   XStr epIdx(int fromProxy = 1, bool isForRedn = false);
   XStr epRegFn(int fromProxy = 1, bool isForRedn = false);

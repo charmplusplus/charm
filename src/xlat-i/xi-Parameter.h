@@ -11,7 +11,7 @@ class Value;
 
 /**************** Parameter types & lists (for marshalling) ************/
 class Parameter {
-  bool rdma;
+  int rdma;
   bool firstRdma;
 
  public:
@@ -65,7 +65,7 @@ class Parameter {
   Parameter(int Nline, Type* Ntype, const char* Nname = 0, const char* NarrLen = 0,
             Value* Nvalue = 0);
   void setConditional(int c);
-  void setRdma(bool r);
+  void setRdma(int r);
   void setFirstRdma(bool fr);
   int print(XStr& str, int withDefaultValues = 0, int useConst = 1, int fwdNum = 0);
   void printAddress(XStr& str);
@@ -76,6 +76,9 @@ class Parameter {
   int isCkMigMsgPtr(void) const;
   int isArray(void) const;
   int isRdma(void) const;
+  int isSendRdma(void) const;
+  int isRecvRdma(void) const;
+  int getRdma(void) const;
   int isFirstRdma(void) const;
   int isConditional(void) const;
   Type* getType(void) { return type; }
@@ -84,6 +87,7 @@ class Parameter {
   void setGivenName(const char* s) { given_name = s; }
   const char* getName(void) const { return name; }
   void printMsg(XStr& str);
+  void storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen);
   int operator==(const Parameter& parm) const;
 
   // DMK - Added for accelerator options
@@ -107,8 +111,10 @@ class ParamList {
   int orEach(pred_t f);
   typedef void (Parameter::*fn_t)(XStr& str);
   typedef void (Parameter::*rdmafn_t)(XStr& str, bool genRegArray);
+  typedef void (Parameter::*rdmarecvfn_t)(XStr& str, bool genRdma, bool isSDAGGen);
   void callEach(fn_t f, XStr& str);
   void callEach(rdmafn_t f, XStr& str, bool genRegArray);
+  void callEach(rdmarecvfn_t f, XStr& str, bool genRdma, bool isSDAGGen);
   void encloseFlag(XStr& str);
   bool manyPointers;
 
@@ -133,8 +139,12 @@ class ParamList {
   int isVoid(void) const;
   int isPointer(void) const;
   int hasRdma(void);
+  int hasSendRdma(void);
+  int hasRecvRdma(void);
   int isRdma(void);
+  int getRdma(void);
   int isFirstRdma(void);
+  int isRecvRdma(void);
   const char* getGivenName(void) const;
   void setGivenName(const char* s);
   const char* getName(void) const;
@@ -152,14 +162,15 @@ class ParamList {
   void beginUnmarshallSDAG(XStr& str);
   void beginUnmarshallSDAGCall(XStr& str, bool usesImplBuf);
   void beginRednWrapperUnmarshall(XStr& str, bool isSDAGGen);
-  void unmarshall(XStr& str, bool isInline = false, bool isFirst = true);
-  void unmarshallForward(XStr& str, bool isInline = false, bool isFirst = true, int fwdNum = 1);
+  void unmarshall(XStr& str, bool isInline = false, bool isFirst = true, bool isRdmaPost=false);
+  void unmarshallForward(XStr& str, bool isInline = false, bool isFirst = true, bool isRdmaPost = false, int fwdNum = 1);
   void unmarshallSDAGCall(XStr& str, int isFirst = 1);
   void unmarshallAddress(XStr& str, int isFirst = 1);
   void pupAllValues(XStr& str);
   void endUnmarshall(XStr& str);
   int operator==(ParamList& plist);
   void checkParamList();
+  void storePostedRdmaPtrs(XStr& str, bool isSDAGGen);
 };
 
 }  // namespace xi

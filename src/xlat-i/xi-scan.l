@@ -112,6 +112,7 @@ struct rwentry rwtable[] = {
 {  "expedited",  SKIPSCHED },
 {  "aggregate", AGGREGATE },
 {  "nocopy",  NOCOPY },
+{  "nocopypost",  NOCOPYPOST },
 {  "inline",  	INLINE },
 {  "local",      LOCAL },
 {  "virtual",    VIRTUAL },

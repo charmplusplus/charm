@@ -393,10 +393,13 @@ CkNcpyMode findTransferMode(int srcPe, int destPe) {
 void enqueueNcpyMessage(int destPe, void *msg){
   // invoke the charm message handler to enqueue the messsage
 #if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRES
-  // invoked from the comm thread, so send message to the worker thread
-  CmiPushPE(CmiRankOf(destPe), msg);
+  if(destPe == CkMyPe()) // invoked from the same worker thread, call message handler directly
+    CmiHandleMessage(msg);
+  else                   // invoked from the comm thread, so send message to the worker thread
+    CmiPushPE(CmiRankOf(destPe), msg);
 #else
-  // invoked from the worker thread, process message
+  // invoked from the same logical node (process), call message handler directly
+  // or invoked from the same worker thread, call message handler directly
   CmiHandleMessage(msg);
 #endif
 }
@@ -427,7 +430,9 @@ void CkRdmaEMAckHandler(int destPe, void *ack) {
   ncpyEmInfo->counter++; // Operation completed, update counter
 
 #if CMK_REG_REQUIRED
-  if(ncpyEmInfo->mode == ncpyEmApiMode::P2P || (ncpyEmInfo->mode == ncpyEmApiMode::BCAST && t.child_count == 0)) { // EM P2P API or EM BCAST API's child node
+  if(ncpyEmInfo->mode == ncpyEmApiMode::P2P_SEND ||
+     ncpyEmInfo->mode == ncpyEmApiMode::P2P_RECV ||
+     (ncpyEmInfo->mode == ncpyEmApiMode::BCAST && t.child_count == 0)) { // EM P2P API or EM BCAST API's child node
     NcpyOperationInfo *ncpyOpInfo = &(emBuffInfo->ncpyOpInfo);
     // De-register the destination buffer
     CmiDeregisterMem(ncpyOpInfo->destPtr, ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->destPe, ncpyOpInfo->destMode);
@@ -437,10 +442,16 @@ void CkRdmaEMAckHandler(int destPe, void *ack) {
   if(ncpyEmInfo->counter == ncpyEmInfo->numOps) {
     // All operations have been completed
 
-    if(ncpyEmInfo->mode == ncpyEmApiMode::P2P) { // EM P2P API
+    if(ncpyEmInfo->mode == ncpyEmApiMode::P2P_SEND || ncpyEmInfo->mode == ncpyEmApiMode::P2P_RECV) { // EM P2P API
+
+      ncpyEmApiMode p2pMode = ncpyEmInfo->mode; // store mode in a temp variable as it could be freed 
+                                                // when enqueued for P2P_SEND as it a part of the allocated message
 
       // enqueue message
       enqueueNcpyMessage(destPe, ncpyEmInfo->msg);
+
+      if(p2pMode == ncpyEmApiMode::P2P_RECV)
+        CmiFree(ncpyEmInfo);
 
     } else if(ncpyEmInfo->mode == ncpyEmApiMode::BCAST) { // EM BCAST API
 
@@ -478,8 +489,221 @@ void CkRdmaEMAckHandler(int destPe, void *ack) {
   }
 }
 
+
+void performEmApiMemcpy(CkNcpyBuffer &source, CkNcpyBuffer &dest, ncpyEmApiMode emMode) {
+  dest.memcpyGet(source);
+
+  if(emMode == ncpyEmApiMode::P2P_SEND || emMode == ncpyEmApiMode::P2P_RECV) {
+    // Invoke source callback
+    source.cb.send(sizeof(CkNcpyBuffer), &source);
+  } // send a message to the parent to indicate completion
+  else if (emMode == ncpyEmApiMode::BCAST) {
+    // Invoke the bcast handler
+    CkRdmaEMBcastAckHandler((void *)source.bcastAckInfo);
+  }
+}
+
+#if CMK_USE_CMA
+void performEmApiCmaTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, int child_count, ncpyEmApiMode emMode) {
+  dest.cmaGet(source);
+
+  if(emMode == ncpyEmApiMode::P2P_SEND || emMode == ncpyEmApiMode::P2P_RECV) {
+    // Invoke source callback
+    source.cb.send(sizeof(CkNcpyBuffer), &source);
+  }
+  else if (emMode == ncpyEmApiMode::BCAST) {
+    if(child_count != 0) {
+      if(dest.mode == CK_BUFFER_UNREG) {
+        // register it because it is required for RGET performed by child nodes
+        CmiSetRdmaBufferInfo(dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.ptr, dest.cnt, dest.mode);
+        dest.isRegistered = true;
+      }
+    }
+  }
+}
+#endif
+
+void performEmApiRget(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, char *ref, int extraSize, ncpyEmApiMode emMode) {
+
+  int layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
+  if(dest.mode == CK_BUFFER_UNREG) {
+    // register it because it is required for RGET
+    CmiSetRdmaBufferInfo(dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.ptr, dest.cnt, dest.mode);
+
+    dest.isRegistered = true;
+  }
+
+  NcpyEmBufferInfo *ncpyEmBufferInfo = (NcpyEmBufferInfo *)(ref + sizeof(NcpyEmInfo) + opIndex *(sizeof(NcpyEmBufferInfo) + extraSize));
+  ncpyEmBufferInfo->index = opIndex;
+
+  NcpyOperationInfo *ncpyOpInfo = &(ncpyEmBufferInfo->ncpyOpInfo);
+  setNcpyOpInfo(source.ptr,
+                (char *)(source.layerInfo),
+                layerInfoSize,
+                (char *)(&source.cb),
+                sizeof(CkCallback),
+                source.cnt,
+                source.mode,
+                source.isRegistered,
+                source.pe,
+                source.ref,
+                dest.ptr,
+                (char *)(dest.layerInfo),
+                layerInfoSize,
+                NULL,
+                0,
+                dest.cnt,
+                dest.mode,
+                dest.isRegistered,
+                dest.pe,
+                (char *)(ncpyEmBufferInfo), // destRef
+                ncpyOpInfo);
+
+  // set opMode
+  if(emMode == ncpyEmApiMode::BCAST)
+    ncpyOpInfo->opMode = CMK_BCAST_EM_API;  // mode for bcast
+  else if(emMode == ncpyEmApiMode::P2P_SEND || emMode == ncpyEmApiMode::P2P_RECV)
+    ncpyOpInfo->opMode = CMK_EM_API;  // mode for p2p
+  else
+    CmiAbort("Invalid Mode\n");
+
+  ncpyOpInfo->freeMe = CMK_DONT_FREE_NCPYOPINFO; // Since ncpyOpInfo is a part of the charm message, don't explicitly free it
+                                                 // It'll be freed when the message is freed by the RTS after the execution of the entry method
+  ncpyOpInfo->refPtr = ncpyEmBufferInfo;
+
+  // Do no launch Rgets here as they could potentially cause a race condition in the SMP mode
+  // The race condition is caused when an RGET completes and invokes the CkRdmaDirectAckHandler
+  // on the comm. thread as the message is being inside this for loop on the worker thread
+}
+
+void performEmApiNcpyTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, int child_count, char *ref, int extraSize, CkNcpyMode ncpyMode, ncpyEmApiMode emMode){
+
+  switch(ncpyMode) {
+    case CkNcpyMode::MEMCPY: performEmApiMemcpy(source, dest, emMode);
+                                   break;
+#if CMK_USE_CMA
+    case CkNcpyMode::CMA   : performEmApiCmaTransfer(source, dest, child_count, emMode);
+                                   break;
+#endif
+    case CkNcpyMode::RDMA  : performEmApiRget(source, dest, opIndex, ref, extraSize, emMode);
+                                   break;
+
+    default                      : CkAbort("Invalid Mode");
+                                   break;
+  }
+}
+
+
+void preprocessRdmaCaseForRgets(int &layerInfoSize, int &ncpyObjSize, int &extraSize, int &totalMsgSize, int &numops) {
+    layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
+
+    ncpyObjSize = getNcpyOpInfoTotalSize(
+                  layerInfoSize,
+                  sizeof(CkCallback),
+                  layerInfoSize,
+                  0);
+
+    extraSize = ncpyObjSize - sizeof(NcpyOperationInfo);
+
+    totalMsgSize += sizeof(NcpyEmInfo) + numops*(sizeof(NcpyEmBufferInfo) + extraSize);
+}
+
+void setNcpyEmInfo(char *ref, envelope *env, int &msgsize, int &numops, void *forwardMsg, ncpyEmApiMode emMode) {
+
+    NcpyEmInfo *ncpyEmInfo = (NcpyEmInfo *)ref;
+    ncpyEmInfo->numOps = numops;
+    ncpyEmInfo->counter = 0;
+    ncpyEmInfo->msg = env;
+
+    ncpyEmInfo->forwardMsg = forwardMsg; // useful only for BCAST, NULL for P2P
+    ncpyEmInfo->pe = CkMyPe();
+    ncpyEmInfo->mode = emMode; // P2P or BCAST
+}
+
 /*
- * Extract ncpy buffer information from the metadata message, allocate buffers
+ * Extract ncpy buffer information from the metadata message
+ * and issue ncpy calls (either memcpy or cma read or rdma get). Main method called on
+ * the destination to perform zerocopy operations as a part of the Zerocopy Entry Method
+ * API
+ */
+envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, void **arrPtrs){
+
+  if(emMode == ncpyEmApiMode::BCAST)
+    CkAbort("CkRdmaIssueRgets:: topo tree has not been calculated \n");
+
+  // Iterate over the ncpy buffer and either perform the operations
+  int msgsize = env->getTotalsize();
+
+  int refSize = 0;
+  char *ref;
+  int layerInfoSize, ncpyObjSize, extraSize;
+
+  CkNcpyMode ncpyMode = findTransferMode(env->getSrcPe(), CkMyPe());
+  if(_topoTree == NULL) CkAbort("CkRdmaIssueRgets:: topo tree has not been calculated \n");
+  CmiSpanningTreeInfo &t = *_topoTree;
+
+  layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
+
+  if(ncpyMode == CkNcpyMode::RDMA) {
+    preprocessRdmaCaseForRgets(layerInfoSize, ncpyObjSize, extraSize, refSize, numops);
+    ref = (char *)CmiAlloc(refSize);
+  }
+
+  // Make the message a regular message to prevent message handler on the receiver
+  // from intercepting it
+  CMI_ZC_MSGTYPE(env) = CMK_REG_NO_ZC_MSG;
+
+  if(ncpyMode == CkNcpyMode::RDMA) {
+    setNcpyEmInfo(ref, env, msgsize, numops, forwardMsg, emMode);
+  }
+
+  PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
+  PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
+  up|numops;
+  p|numops;
+
+  // source buffer
+  CkNcpyBuffer source;
+
+  for(int i=0; i<numops; i++){
+    up|source;
+
+    // destination buffer
+    CkNcpyBuffer dest((const void *)arrPtrs[i], source.cnt, CK_BUFFER_UNREG);
+
+    performEmApiNcpyTransfer(source, dest, i, t.child_count, ref, extraSize, ncpyMode, emMode);
+
+    //Update the CkRdmaWrapper pointer of the new message
+    source.ptr = arrPtrs[i];
+
+    memcpy(source.layerInfo, dest.layerInfo, layerInfoSize);
+
+    p|source;
+  }
+
+  // free the list of pointers as their values have been stored
+  delete [] arrPtrs;
+
+  CkPackRdmaPtrs(((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
+
+  if(ncpyMode == CkNcpyMode::MEMCPY || ncpyMode == CkNcpyMode::CMA) {
+    // All operations have completed
+    enqueueNcpyMessage(CkMyPe(), env);
+
+  } else{
+
+    // Launch rgets
+    for(int i=0; i<numops; i++){
+      NcpyEmBufferInfo *ncpyEmBufferInfo = (NcpyEmBufferInfo *)(ref + sizeof(NcpyEmInfo) + i *(sizeof(NcpyEmBufferInfo) + extraSize));
+      NcpyOperationInfo *ncpyOpInfo = &(ncpyEmBufferInfo->ncpyOpInfo);
+      CmiIssueRget(ncpyOpInfo);
+    }
+    return NULL; // to indicate an async operation which may not be complete
+  }
+}
+
+/*
+ * Extract ncpy buffer information from the metadata message, used passed buffers
  * and issue ncpy calls (either memcpy or cma read or rdma get). Main method called on
  * the destination to perform zerocopy operations as a part of the Zerocopy Entry Method
  * API
@@ -493,28 +717,18 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
   CkPackMessage(&env); // Pack message to ensure corret copying into copyenv
 
   msgsize = env->getTotalsize();
+  int totalMsgSize = CK_ALIGN(msgsize, 16) + bufsize;
+  char *ref;
+  int layerInfoSize, ncpyObjSize, extraSize;
 
   CkNcpyMode ncpyMode = findTransferMode(env->getSrcPe(), CkMyPe());
   if(_topoTree == NULL) CkAbort("CkRdmaIssueRgets:: topo tree has not been calculated \n");
   CmiSpanningTreeInfo &t = *_topoTree;
 
-  int totalMsgSize = CK_ALIGN(msgsize, 16) + bufsize;
-  char *ref;
-  int layerInfoSize, ncpyObjSize, extraSize;
-
   layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
 
   if(ncpyMode == CkNcpyMode::RDMA) {
-
-    ncpyObjSize = getNcpyOpInfoTotalSize(
-                  layerInfoSize,
-                  sizeof(CkCallback),
-                  layerInfoSize,
-                  0);
-
-    extraSize = ncpyObjSize - sizeof(NcpyOperationInfo);
-
-    totalMsgSize += sizeof(NcpyEmInfo) + numops*(sizeof(NcpyEmBufferInfo) + extraSize);
+    preprocessRdmaCaseForRgets(layerInfoSize, ncpyObjSize, extraSize, totalMsgSize, numops);
   }
 
   // Allocate the new message which stores the receiver buffers
@@ -534,11 +748,7 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
 
   if(ncpyMode == CkNcpyMode::RDMA) {
     ref = (char *)copyenv + CK_ALIGN(msgsize, 16) + bufsize;
-
-    NcpyEmInfo *ncpyEmInfo = (NcpyEmInfo *)ref;
-    ncpyEmInfo->numOps = numops;
-    ncpyEmInfo->counter = 0;
-    ncpyEmInfo->msg = copyenv;
+    setNcpyEmInfo(ref, copyenv, msgsize, numops, forwardMsg, emMode);
   }
 
   char *buf = (char *)copyenv + CK_ALIGN(msgsize, 16);
@@ -549,22 +759,6 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
   up|numops;
   p|numops;
 
-  if(ncpyMode == CkNcpyMode::RDMA) {
-
-    ncpyObjSize = getNcpyOpInfoTotalSize(
-                  layerInfoSize,
-                  sizeof(CkCallback),
-                  layerInfoSize,
-                  0);
-
-    extraSize = ncpyObjSize - sizeof(NcpyOperationInfo);
-
-    NcpyEmInfo *ncpyEmInfo = (NcpyEmInfo *)ref;
-    ncpyEmInfo->forwardMsg = forwardMsg; // useful only for BCAST, NULL for P2P
-    ncpyEmInfo->pe = CkMyPe();
-    ncpyEmInfo->mode = emMode; // P2P or BCAST
-  }
-
   // source buffer
   CkNcpyBuffer source;
 
@@ -574,92 +768,7 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
     // destination buffer
     CkNcpyBuffer dest((const void *)buf, source.cnt, CK_BUFFER_UNREG);
 
-    // Set the common layerInfo for the destination
-    CmiSetRdmaCommonInfo(dest.layerInfo, dest.ptr, dest.cnt);
-
-    if(ncpyMode == CkNcpyMode::MEMCPY) {
-
-      dest.memcpyGet(source);
-
-      if(emMode == ncpyEmApiMode::P2P) {
-        // Invoke source callback
-        source.cb.send(sizeof(CkNcpyBuffer), &source);
-      } // send a message to the parent to indicate completion
-      else if (emMode == ncpyEmApiMode::BCAST) {
-        // Invoke the bcast handler
-        CkRdmaEMBcastAckHandler((void *)source.bcastAckInfo);
-      }
-
-#if CMK_USE_CMA
-    } else if(ncpyMode == CkNcpyMode::CMA) {
-
-      dest.cmaGet(source);
-
-      if(emMode == ncpyEmApiMode::P2P) {
-        // Invoke source callback
-        source.cb.send(sizeof(CkNcpyBuffer), &source);
-      }
-      else if (emMode == ncpyEmApiMode::BCAST && dest.mode == CK_BUFFER_UNREG && t.child_count != 0) {
-        // register intermediate nodes for Bcast operations for child nodes to Rget
-        CmiSetRdmaBufferInfo(dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.ptr, dest.cnt, dest.mode);
-        dest.isRegistered = true;
-      }
-#endif
-    } else if(ncpyMode == CkNcpyMode::RDMA) {
-
-      if(dest.mode == CK_BUFFER_UNREG) {
-        // register it because it is required for RGET
-        CmiSetRdmaBufferInfo(dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.ptr, dest.cnt, dest.mode);
-
-        dest.isRegistered = true;
-      }
-
-      NcpyEmBufferInfo *ncpyEmBufferInfo = (NcpyEmBufferInfo *)(ref + sizeof(NcpyEmInfo) + i *(sizeof(NcpyEmBufferInfo) + extraSize));
-      ncpyEmBufferInfo->index = i;
-
-      NcpyOperationInfo *ncpyOpInfo = &(ncpyEmBufferInfo->ncpyOpInfo);
-
-      setNcpyOpInfo(source.ptr,
-                    (char *)(source.layerInfo),
-                    layerInfoSize,
-                    (char *)(&source.cb),
-                    sizeof(CkCallback),
-                    source.cnt,
-                    source.mode,
-                    source.isRegistered,
-                    source.pe,
-                    source.ref,
-                    dest.ptr,
-                    (char *)(dest.layerInfo),
-                    layerInfoSize,
-                    NULL,
-                    0,
-                    dest.cnt,
-                    dest.mode,
-                    dest.isRegistered,
-                    dest.pe,
-                    (char *)(ncpyEmBufferInfo), // destRef
-                    ncpyOpInfo);
-
-      // set opMode
-      if(emMode == ncpyEmApiMode::BCAST)
-        ncpyOpInfo->opMode = CMK_BCAST_EM_API;  // mode for bcast
-      else if(emMode == ncpyEmApiMode::P2P)
-        ncpyOpInfo->opMode = CMK_EM_API;  // mode for p2p
-      else
-        CkAbort("CkRdmaIssueRgets: Invalid ncpyEmApiMode");
-
-      ncpyOpInfo->freeMe = CMK_DONT_FREE_NCPYOPINFO; // Since ncpyOpInfo is a part of the charm message, don't explicitly free it
-                                                     // It'll be freed when the message is freed by the RTS after the execution of the entry method
-      ncpyOpInfo->refPtr = ncpyEmBufferInfo;
-
-      // Do no launch Rgets here as they could potentially cause a race condition in the SMP mode
-      // The race condition is caused when an RGET completes and invokes the CkRdmaDirectAckHandler
-      // on the comm. thread as the message is being inside this for loop on the worker thread
-
-    } else {
-      CkAbort("CkRdmaIssueRgets: Invalid CkNcpyMode");
-    }
+    performEmApiNcpyTransfer(source, dest, i, t.child_count, ref, extraSize, ncpyMode, emMode);
 
     //Update the CkRdmaWrapper pointer of the new message
     source.ptr = buf;
@@ -674,7 +783,7 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
   // Substitute buffer pointers by their offsets from msgBuf to handle migration
   CkPackRdmaPtrs(((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf);
 
-  if(ncpyMode == CkNcpyMode::MEMCPY || (emMode == ncpyEmApiMode::P2P && ncpyMode == CkNcpyMode::CMA)) {
+  if(ncpyMode == CkNcpyMode::MEMCPY || (emMode == ncpyEmApiMode::P2P_SEND && ncpyMode == CkNcpyMode::CMA)) {
 
     if(emMode == ncpyEmApiMode::BCAST) {
 

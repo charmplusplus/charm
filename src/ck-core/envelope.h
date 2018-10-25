@@ -349,7 +349,6 @@ public:
       env->setPacked(0);
       env->setGroupDepNum((int)groupDepNumRequest);
       _SET_USED(env, 0);
-      env->setRef(0);
       env->setEpIdx(0);
       env->setIsVarSysMsg(0);
 

@@ -1,9 +1,7 @@
 DIRS = \
-  direct_api \
-  entry_method_api \
-  entry_method_bcast_api \
-  entry_method_post_api \
-  large_readonly \
+  pingpong \
+  simpleZeroCopy \
+  nodegroupTest \
 
 TESTDIRS = $(DIRS)
 

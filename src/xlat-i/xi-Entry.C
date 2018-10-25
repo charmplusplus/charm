@@ -2095,17 +2095,31 @@ void Entry::genClosure(XStr& decls, bool isDef) {
                   << "CkNcpyBuffer "
                   << "ncpyBuffer_" << sv->name << ";\n";
         structure << "#else\n";
+        if (sv->isFirstRdma() && sv->isRecvRdma())
+          structure << "      "
+                    << "int num_rdma_fields;\n";
         structure << "      " << sv->type << " "
                   << "*" << sv->name << ";\n";
         structure << "#endif\n";
-        getter << "#if CMK_ONESIDED_IMPL\n";
         if (sv->isFirstRdma()) {
+          getter << "#if CMK_ONESIDED_IMPL\n";
           getter << "      "
                  << "int "
                  << "& "
-                 << "getP" << i++ << "() { return "
+                 << "getP" << i << "() { return "
                  << " num_rdma_fields;}\n";
+          getter << "#else\n";
+          if (sv->isRecvRdma()) {
+            getter << "      "
+                   << "int "
+                   << "& "
+                   << "getP" << i << "() { return "
+                   << " num_rdma_fields;}\n";
+          }
+          getter << "#endif\n";
+          i++;
         }
+        getter << "#if CMK_ONESIDED_IMPL\n";
         getter << "      "
                << "CkNcpyBuffer "
                << "& "
@@ -2137,6 +2151,12 @@ void Entry::genClosure(XStr& decls, bool isDef) {
         toPup << "        "
               << "__p | "
               << "ncpyBuffer_" << sv->name << ";\n";
+        toPup << "#else\n";
+        if(sv->isFirstRdma() && sv->isRecvRdma()) {
+          toPup << "        "
+                << "__p | "
+                << "num_rdma_fields;\n";
+        }
         toPup << "#endif\n";
       } else {
         structure << "      ";
@@ -2398,6 +2418,33 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
   }
 
   else {  // Normal case: call regular method
+    if(param->hasRecvRdma()) {
+      str << "#if CMK_ONESIDED_IMPL\n";
+      str << "  if(CMI_ZC_MSGTYPE(env) == CMK_ZC_P2P_RECV_MSG) {\n";
+      str << "#endif\n";
+        genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
+      str << "#if CMK_ONESIDED_IMPL\n";
+      str << "  } else {\n";
+      str << "#endif\n";
+    }
+    genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
+    if(param->hasRecvRdma()) {
+      str << "#if CMK_ONESIDED_IMPL\n";
+      str << "  }\n";
+      str << "#endif\n";
+    }
+  }
+}
+
+void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool usesImplBuf, bool isRdmaPost) {
+    bool isArgcArgv = false;
+    bool isMigMain = false;
+    bool isSDAGGen = sdagCon || isWhenEntry;
+    bool needsClosure = isSDAGGen && (param->isMarshalled() ||
+                                      (param->isVoid() && isWhenEntry && redn_wrapper));
+
+
+
     if (isArgcArgv) str << "  CkArgMsg *m=(CkArgMsg *)impl_msg;\n";  // Hack!
 
     if (isMigrationConstructor() && container->isArray()) {
@@ -2428,30 +2475,60 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
       if (isSDAGGen) {
         str << "(";
         if (param->isMessage()) {
-          param->unmarshall(str);
+          param->unmarshall(str, false, true, isRdmaPost);
         } else if (needsClosure) {
-          str << "genClosure";
+          if(isRdmaPost)
+            param->unmarshall(str, false, true, isRdmaPost);
+          else
+            str << "genClosure";
         }
+        // Add CkNcpyBufferPost as the last parameter
+        if(isRdmaPost) str << ",ncpyPost";
         str << ");\n";
         if (needsClosure) {
-          str << "  genClosure->deref();\n";
+          if(!isRdmaPost)
+            str << "  genClosure->deref();\n";
         }
       } else {
         str << "(";
-        param->unmarshall(str);
+        param->unmarshall(str, false, true, isRdmaPost);
+        // Add CkNcpyBufferPost as the last parameter
+        if(isRdmaPost) str << ",ncpyPost";
         str << ");\n";
       }
+      if(isRdmaPost) {
+        str << "#if CMK_ONESIDED_IMPL\n";
+        // Allocate an array of rdma pointers
+        if(isSDAGGen)
+          str << "  void **buffPtrs = new void*[genClosure->num_rdma_fields];\n";
+        else
+          str << "  void **buffPtrs = new void*[impl_num_rdma_fields];\n";
+        str << "  int ptrIndex = 0;\n";
+        str << "#endif\n";
+        param->storePostedRdmaPtrs(str, isSDAGGen);
+        str << "#if CMK_ONESIDED_IMPL\n";
+        str << "  CkRdmaIssueRgets(env, ncpyEmApiMode::P2P_RECV, NULL, ";
+        if(isSDAGGen)
+          str << " genClosure->num_rdma_fields, ";
+        else
+          str << " impl_num_rdma_fields, ";
+        str << " buffPtrs);\n";
+        str << "#else\n";
+
+        str << "#endif\n";
+      }
       // pack pointers if it's a broadcast message
-      if(param->hasRdma() && !container->isForElement()) {
+      if(param->hasRdma() && !container->isForElement() && !isRdmaPost) {
         // pack rdma pointers for broadcast unmarshall
         // this is done to support broadcasts before all chare array elements are
         // finished with their EM execution using the same msg
         str << "#if CMK_ONESIDED_IMPL\n";
-        str << "  CkPackRdmaPtrs(impl_buf_begin);\n";
+        if(param->hasRecvRdma())
+          str << "  if(CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_MSG)\n";
+        str << "    CkPackRdmaPtrs(impl_buf_begin);\n";
         str << "#endif\n";
       }
     }
-  }
 }
 
 void Entry::genDefs(XStr& str) {
@@ -2705,6 +2782,7 @@ void Entry::genDefs(XStr& str) {
       else
         str << "  CkMarshallMsg *impl_msg_typed=(CkMarshallMsg *)impl_msg;\n";
       str << "  char *impl_buf=impl_msg_typed->msgBuf;\n";
+      str << "  envelope *env = UsrToEnv(impl_msg_typed);\n";
     }
     genCall(str, preCall, false, false);
     param->endUnmarshall(str);
@@ -2721,6 +2799,7 @@ void Entry::genDefs(XStr& str) {
         << "(char* impl_buf, void* impl_obj_void) {\n";
     str << "  " << containerType << "* impl_obj = static_cast<" << containerType
         << "*>(impl_obj_void);\n";
+    str << "  envelope *env = UsrToEnv(impl_buf);\n";
     if (!isLocal()) {
       if (!param->hasConditional()) {
         genCall(str, preCall, false, true);
@@ -2750,6 +2829,7 @@ void Entry::genDefs(XStr& str) {
       else
         str << "  CkMarshallMsg *impl_msg_typed=(CkMarshallMsg *)impl_msg;\n";
       str << "  char *impl_buf=impl_msg_typed->msgBuf;\n";
+      str << "  envelope *env = UsrToEnv(impl_msg_typed);\n";
       param->beginUnmarshall(str);
       param->pupAllValues(str);
     } else {

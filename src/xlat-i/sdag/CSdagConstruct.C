@@ -305,15 +305,27 @@ int SdagConstruct::unravelClosuresBegin(XStr& defs, bool child) {
       // not be brought into scope
       if (!var.isCounter && !var.isSpeculator && !var.isBgParentLog) {
         if (var.isRdma) {
-          defs << "#if CMK_ONESIDED_IMPL\n";
           if (var.isFirstRdma) {
+            defs << "#if CMK_ONESIDED_IMPL\n";
             indentBy(defs, cur + 2);
             defs << "int "
                  << "& num_rdma_fields = ";
             defs << "gen" << cur;
             defs << "->"
-                 << "getP" << i++ << "();\n";
+                 << "getP" << i << "();\n";
+            defs << "#else\n";
+            if(var.isRecvRdma) {
+              indentBy(defs, cur + 2);
+              defs << "int "
+                   << "& num_rdma_fields = ";
+              defs << "gen" << cur;
+              defs << "->"
+                   << "getP" << i << "();\n";
+            }
+            i++;
+            defs << "#endif\n";
           }
+          defs << "#if CMK_ONESIDED_IMPL\n";
           indentBy(defs, cur + 2);
           defs << "CkNcpyBuffer "
                << "& ncpyBuffer_" << var.name << " = ";

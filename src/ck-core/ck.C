@@ -617,7 +617,12 @@ static inline void _invokeEntryNoTrace(int epIdx,envelope *env,void *obj)
 {
   void *msg = EnvToUsr(env);
   _SET_USED(env, 0);
-  CkDeliverMessageFree(epIdx,msg,obj);
+#if CMK_ONESIDED_IMPL
+  if(CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_P2P_RECV_MSG)
+    CkDeliverMessageReadonly(epIdx,msg,obj); // Do not free a P2P_RECV_MSG
+  else
+#endif
+    CkDeliverMessageFree(epIdx,msg,obj);
 }
 
 static inline void _invokeEntry(int epIdx,envelope *env,void *obj)
@@ -1169,7 +1174,12 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
     if (msg->array_hops()>1) {
       CProxy_ArrayBase(env->getArrayMgr()).ckLocMgr()->multiHop(msg);
     }
-    iter->second->ckInvokeEntry(env->getEpIdx(), msg, !(opts & CK_MSG_KEEP));
+    bool doFree = !(opts & CK_MSG_KEEP);
+#if CMK_ONESIDED_IMPL
+    if(CMI_ZC_MSGTYPE(env) == CMK_ZC_P2P_RECV_MSG) // Do not free a P2P_RECV_MSG
+      doFree = false;
+#endif
+    iter->second->ckInvokeEntry(env->getEpIdx(), msg, doFree);
   } else {
     // Otherwise fallback to delivery through the array manager
     CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getArrayMgr());
@@ -1200,7 +1210,7 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
     envelope *prevEnv = env;
 
     // Determine mode depending on the message
-    ncpyEmApiMode mode = (CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_SEND_MSG) ? ncpyEmApiMode::BCAST : ncpyEmApiMode::P2P;
+    ncpyEmApiMode mode = (CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_SEND_MSG) ? ncpyEmApiMode::BCAST : ncpyEmApiMode::P2P_SEND;
 
     env = CkRdmaIssueRgets(env, mode, prevEnv);
 

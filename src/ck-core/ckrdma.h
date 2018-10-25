@@ -47,9 +47,10 @@ enum class CkNcpyMode : char { MEMCPY, CMA, RDMA };
 // RDMA transfers use a remote asynchronous call and hence return CkNcpyStatus::incomplete
 enum class CkNcpyStatus : char { incomplete, complete };
 
-// P2P mode is used for EM P2P API
-// BCAST mode is used for EM BCAST API
-enum class ncpyEmApiMode : char { P2P, BCAST };
+// P2P_SEND mode is used for EM P2P Send API
+// BCAST mode is used for EM BCAST Send API
+// P2P_RECV mode is used for EM P2P Recv API
+enum class ncpyEmApiMode : char { P2P_SEND, BCAST, P2P_RECV };
 
 // Class to represent an Zerocopy buffer
 // CkSendBuffer(....) passed by the user internally translates to a CkNcpyBuffer
@@ -222,9 +223,19 @@ class CkNcpyBuffer{
   friend void constructDestinationBufferObject(NcpyOperationInfo *info, CkNcpyBuffer &dest);
 
   friend envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg);
+  friend envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, void **arrPtrs);
   friend void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr);
   friend void readonlyCreateOnSource(CkNcpyBuffer &src);
+
+
+  friend void performEmApiNcpyTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, int child_count, char *ref, int extraSize, CkNcpyMode ncpyMode, ncpyEmApiMode emMode);
+
+  friend void performEmApiRget(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, char *ref, int extraSize, ncpyEmApiMode emMode);
+
+  friend void performEmApiCmaTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, int child_count, ncpyEmApiMode emMode);
 };
+
+struct CkNcpyBufferPost {};
 
 // Ack handler for the Zerocopy Direct API
 // Invoked on the completion of any RDMA operation calling using the Direct API
@@ -286,6 +297,8 @@ struct NcpyEmBufferInfo{
  * allocate buffers and issue ncpy calls (either memcpy or cma read or rdma get)
  */
 envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg = NULL);
+
+envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, void **arrPtrs);
 
 void handleEntryMethodApiCompletion(NcpyOperationInfo *info);
 
