@@ -1,0 +1,7 @@
+Hello World with Kokkos (Distributed)
+
+Demonstrates basic interoperability with Kokkos.
+Paths to include and lib folders of Kokkos (KOKKOS_INC and KOKKOS_LIB, respecitvely)
+need to be set as environment variables or provided to the Makefile.
+Uses nodegroup to allow a separate instance of Kokkos to run on each process.
+The tricky part is getting argc and argv fed correctly to Kokkos::initialize().
