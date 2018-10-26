@@ -431,7 +431,9 @@ void free_reentrant(void *mem) { free(mem); }
 /*CMK_TYPEDEF_UINT8 CmiMemoryUsage() { return 0; }*/
 
 #if ! CMK_HAS_SBRK
-int sbrk(int s) { return 0; }
+namespace {
+  int sbrk(int s) { return 0; }
+}
 #endif
 
 #if CMK_C_INLINE
