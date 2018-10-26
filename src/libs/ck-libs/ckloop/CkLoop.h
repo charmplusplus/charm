@@ -26,7 +26,7 @@
 #if CMK_TRACE_ENABLED
 CpvDeclare(envelope*, dummyEnv);
 #endif
-CpvExtern(int, isHelperOn);
+CpvCExtern(int, isHelperOn);
 class FuncSingleHelper;
 
 class CurLoopInfo {
