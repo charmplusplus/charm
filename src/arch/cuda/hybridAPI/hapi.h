@@ -234,7 +234,7 @@ void hapiErrorDie(cudaError_t, const char*, const char*, int);
 
 #ifdef HAPI_MEMPOOL
 // Allocate memory from a pool of page-locked memory.
-void* hapiPoolMalloc(int);
+void* hapiPoolMalloc(size_t);
 
 // Return page-locked memory to the pool.
 void hapiPoolFree(void*);

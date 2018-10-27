@@ -323,7 +323,7 @@ void GPUManager::allocateBuffers(hapiWorkRequest* wr) {
   for (int i = 0; i < wr->getBufferCount(); i++) {
     hapiBufferInfo& bi = wr->buffers[i];
     int index = bi.id;
-    int size = bi.size;
+    size_t size = bi.size;
 
     // if index value is invalid, use an available ID
     if (index < 0 || index >= NUM_BUFFERS) {
@@ -360,12 +360,12 @@ void GPUManager::allocateBuffers(hapiWorkRequest* wr) {
       bi.id = index;
     }
 
-    if (device_buffers_[index] == NULL && size > 0) {
+    if (device_buffers_[index] == NULL) {
       // allocate device memory
       hapiCheck(cudaMalloc((void **)&device_buffers_[index], size));
 
 #ifdef HAPI_DEBUG
-      printf("[HAPI] allocated buffer %d at %p, time: %.2f, size: %d\n",
+      printf("[HAPI] allocated buffer %d at %p, time: %.2f, size: %zu\n",
              index, device_buffers_[index], cutGetTimerValue(timerHandle),
              size);
 #endif
@@ -395,17 +395,17 @@ void GPUManager::hostToDeviceTransfer(hapiWorkRequest* wr) {
   for (int i = 0; i < wr->getBufferCount(); i++) {
     hapiBufferInfo& bi = wr->buffers[i];
     int index = bi.id;
-    int size = bi.size;
+    size_t size = bi.size;
     host_buffers_[index] = bi.host_buffer;
 
-    if (bi.transfer_to_device && size > 0) {
+    if (bi.transfer_to_device) {
       // TODO should be changed back to async for performance
       hapiCheck(cudaMemcpy(device_buffers_[index], host_buffers_[index], size,
                                 cudaMemcpyHostToDevice));
 
 #ifdef HAPI_DEBUG
       printf("[HAPI] transferring buffer %d from host to device, time: %.2f, "
-             "size: %d\n", index, cutGetTimerValue(timerHandle), size);
+             "size: %zu\n", index, cutGetTimerValue(timerHandle), size);
 #endif
     }
   }
@@ -416,16 +416,16 @@ void GPUManager::deviceToHostTransfer(hapiWorkRequest* wr) {
   for (int i = 0; i < wr->getBufferCount(); i++) {
     hapiBufferInfo& bi = wr->buffers[i];
     int index = bi.id;
-    int size = bi.size;
+    size_t size = bi.size;
 
-    if (bi.transfer_to_host && size > 0) {
+    if (bi.transfer_to_host) {
       // TODO should be changed back to async for performance
       hapiCheck(cudaMemcpy(host_buffers_[index], device_buffers_[index], size,
                                 cudaMemcpyDeviceToHost));
 
 #ifdef HAPI_DEBUG
       printf("[HAPI] transferring buffer %d from device to host, time %.2f, "
-             "size: %d\n", index, cutGetTimerValue(timerHandle), size);
+             "size: %zu\n", index, cutGetTimerValue(timerHandle), size);
 #endif
     }
   }
@@ -932,7 +932,7 @@ static void releasePool(CkVec<BufferPool> &pools){
   pools.free();
 }
 
-static int findPool(int size){
+static int findPool(size_t size){
   int boundary_array_len = CsvAccess(gpu_manager).mempool_boundaries_.length();
   if (size <= CsvAccess(gpu_manager).mempool_boundaries_[0]) {
     return 0;
@@ -944,7 +944,7 @@ static int findPool(int size){
     BufferPool newpool;
     hapiCheck(cudaMallocHost((void**)&newpool.head, size + sizeof(Header)));
     if (newpool.head == NULL) {
-      printf("[HAPI (%d)] findPool: failed to allocate newpool %d head, size %d\n",
+      printf("[HAPI (%d)] findPool: failed to allocate newpool %d head, size %zu\n",
              CmiMyPe(), boundary_array_len, size);
       CmiAbort("[HAPI] failed newpool allocation");
     }
@@ -969,11 +969,11 @@ static int findPool(int size){
   return -1;
 }
 
-static void* getBufferFromPool(int pool, int size){
+static void* getBufferFromPool(int pool, size_t size){
   Header* ret;
 
   if (pool < 0 || pool >= CsvAccess(gpu_manager).mempool_free_bufs_.length()) {
-    printf("[HAPI (%d)] getBufferFromPool, pool: %d, size: %d invalid pool\n",
+    printf("[HAPI (%d)] getBufferFromPool, pool: %d, size: %zu invalid pool\n",
            CmiMyPe(), pool, size);
 #ifdef HAPI_MEMPOOL_DEBUG
     printf("[HAPI (%d)] num: %d\n", CmiMyPe(),
@@ -986,7 +986,7 @@ static void* getBufferFromPool(int pool, int size){
     hapiCheck(cudaMallocHost((void**)&hd, sizeof(Header) +
                              CsvAccess(gpu_manager).mempool_free_bufs_[pool].size));
 #ifdef HAPI_MEMPOOL_DEBUG
-    printf("[HAPI (%d)] getBufferFromPool, pool: %d, size: %d expand by 1\n",
+    printf("[HAPI (%d)] getBufferFromPool, pool: %d, size: %zu expand by 1\n",
            CmiMyPe(), pool, size);
 #endif
     if (hd == NULL) {
@@ -1015,7 +1015,7 @@ static void returnBufferToPool(int pool, Header* hd) {
 #endif
 }
 
-void* hapiPoolMalloc(int size) {
+void* hapiPoolMalloc(size_t size) {
 #if CMK_SMP || CMK_MULTICORE
   CmiLock(CsvAccess(gpu_manager).buffer_lock_);
 #endif
@@ -1024,7 +1024,7 @@ void* hapiPoolMalloc(int size) {
   void* buf = getBufferFromPool(pool, size);
 
 #ifdef HAPI_MEMPOOL_DEBUG
-  printf("[HAPI (%d)] hapiPoolMalloc size %d pool %d left %d\n",
+  printf("[HAPI (%d)] hapiPoolMalloc size %zu pool %d left %d\n",
          CmiMyPe(), size, pool,
          CsvAccess(gpu_manager).mempool_free_bufs_[pool].num);
 #endif
@@ -1041,7 +1041,7 @@ void hapiPoolFree(void* ptr) {
   int pool = hd->slot;
 
 #ifdef HAPI_MEMPOOL_DEBUG
-  int size = hd->size;
+  size_t size = hd->size;
 #endif
 
 #if CMK_SMP || CMK_MULTICORE
@@ -1055,7 +1055,7 @@ void hapiPoolFree(void* ptr) {
 #endif
 
 #ifdef HAPI_MEMPOOL_DEBUG
-  printf("[HAPI (%d)] hapiPoolFree size %d pool %d left %d\n",
+  printf("[HAPI (%d)] hapiPoolFree size %zu pool %d left %d\n",
          CmiMyPe(), size, pool,
          CsvAccess(gpu_manager).mempool_free_bufs_[pool].num);
 #endif

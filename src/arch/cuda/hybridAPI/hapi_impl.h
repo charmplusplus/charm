@@ -24,7 +24,7 @@ typedef struct _header {
   struct _header *next;
   int slot;
 #ifdef HAPI_MEMPOOL_DEBUG
-  int size;
+  size_t size;
 #endif
 } Header;
 
