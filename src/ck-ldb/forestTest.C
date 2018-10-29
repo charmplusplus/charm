@@ -39,9 +39,9 @@ int ForestModel::forestTest(std::vector<double>& X, int num_rows, int num_cols) 
   // X is NxD, where rows are data points
 
   int numTrees = NUM_TREES;
-  vector<double> Ysoft(LB_CLASSES);
+  std::vector<double> Ysoft(LB_CLASSES);
 
-  vector<double> model_Ysoft(LB_CLASSES);
+  std::vector<double> model_Ysoft(LB_CLASSES);
   DataMatrix Xarray(X, num_rows, num_cols);
 
   // Assuming initialization to 0s

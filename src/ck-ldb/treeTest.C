@@ -35,7 +35,7 @@
 using namespace rfmodel;
 
 // Test a tree
-void TreeModel::treeTest(const DataMatrix& X, vector<double>& Ysoft) const {
+void TreeModel::treeTest(const DataMatrix& X, std::vector<double>& Ysoft) const {
   //[N, D]= size(X); //Returns number of rows and columns in matrix X
   int N = X.num_rows;
   int D = X.num_cols;
@@ -45,7 +45,7 @@ void TreeModel::treeTest(const DataMatrix& X, vector<double>& Ysoft) const {
   int numInternals = (nd + 1) / 2 - 1;
 
   // Propagate data down the tree using weak classifiers at each node
-  vector<double> dataix(N * nd, 0.0);
+  std::vector<double> dataix(N * nd, 0.0);
 
   for (int n = 1; n <= numInternals; n++) {
     DataMatrix* reld;
