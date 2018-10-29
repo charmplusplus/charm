@@ -20,14 +20,17 @@ get_full_command_name()
     fi
 }
 
+ConvSh='../tmp/conv-mach-opt.sh'
+ConvMak='../tmp/conv-mach-opt.mak'
+
 #clean up conv-mach-opt.sh
-sed -e '/Option added by configure/d' ../include/conv-mach-opt.sh  | sed -e '/^$/d' > conv-mach-opt.sh.clean
-cp -f conv-mach-opt.sh.clean   ../include/conv-mach-opt.sh
+sed -e '/Option added by configure/d' "$ConvSh" | sed -e '/^$/d' > conv-mach-opt.sh.clean
+cp -f conv-mach-opt.sh.clean   "$ConvSh"
 rm -f conv-mach-opt.sh.clean
 
 #clean up conv-mach-opt.mak
-sed -e '/Option added by configure/d' ../include/conv-mach-opt.mak  | sed -e '/^$/d' > conv-mach-opt.mak.clean
-cp -f conv-mach-opt.mak.clean   ../include/conv-mach-opt.mak
+sed -e '/Option added by configure/d' "$ConvMak" | sed -e '/^$/d' > conv-mach-opt.mak.clean
+cp -f conv-mach-opt.mak.clean   "$ConvMak"
 rm -f conv-mach-opt.mak.clean
 
 CHARMINC="."
@@ -50,8 +53,9 @@ Echo() {
 # add_flag $1 $2
 # $2 is description
 add_flag() {
-        key=`echo $1 | cut -d'=' -f1`
-        last=`grep "$key=" ../include/conv-mach-opt.sh 2>/dev/null | tail -1 | sed -e 's/ *#.*$//'`
+        key=$1
+        key="${key%%=*}"
+        last=`grep -w "$key" "$ConvSh" 2>/dev/null | tail -1 | sed -e 's/ *#.*$//'`
         skip=0
 	if test -n "$last" -a  "$last" = "$1" 
 	then
@@ -59,7 +63,7 @@ add_flag() {
         fi
 	if test $skip = 0
         then
-	  cat >> ../include/conv-mach-opt.sh << EOT
+	  cat >> "$ConvSh" << EOT
 
 $1   # Option added by configure script's $2 section
 EOT
@@ -68,8 +72,8 @@ EOT
 
 # remove_flag $1
 remove_flag() {
-     sed -e '/^'"$1"'=/d' ../include/conv-mach-opt.sh > tmp.$$
-     cp tmp.$$ ../include/conv-mach-opt.sh
+     sed -e '/^'"$1"'=/d' "$ConvSh" > tmp.$$
+     cp tmp.$$ "$ConvSh"
      /bin/rm -f tmp.$$
 }
 
@@ -77,8 +81,10 @@ remove_flag() {
 # add_make_flag $1 $2
 # $2 is description
 add_make_flag() {
-        key=`echo $1 | cut -d'=' -f1`
-        last=`grep "$key=" ../include/conv-mach-opt.mak 2>/dev/null | tail -1 | sed -e 's/ *#.*$//'`
+        key=$1
+        key="${key%%=*}"
+        key="${key%%:*}"
+        last=`grep -w "$key" "$ConvMak" 2>/dev/null | tail -1 | sed -e 's/ *#.*$//'`
         skip=0
 	if test -n "$last" -a  "$last" = "$1"
 	then
@@ -87,7 +93,7 @@ add_make_flag() {
 	if test $skip = 0
         then
 	  # The lack of whitespace around $1 here is necessary.
-	  cat >> ../include/conv-mach-opt.mak << EOT
+	  cat >> "$ConvMak" << EOT
 
 $1# Option added by configure script's $2 section
 EOT
@@ -96,8 +102,8 @@ EOT
 
 # remove_make_flag $1
 remove_make_flag() {
-     sed -e '/^'"$1"'=/d' ../include/conv-mach-opt.mak > tmp.$$
-     cp tmp.$$ ../include/conv-mach-opt.mak
+     sed -e '/^'"$1"'=/d' "$ConvMak" > tmp.$$
+     cp tmp.$$ "$ConvMak"
      /bin/rm -f tmp.$$
 }
 
@@ -812,7 +818,7 @@ EOT
 fi
 
 # Figure out if the user has asked to enable the latest language standards
-USER_ASKED_FOR_NEW_STD=`echo "$BUILDOPTS" | grep "-use-new-std" | wc -l`
+USER_ASKED_FOR_NEW_STD=`echo "$BUILDOPTS" | grep "\-use-new-std" | wc -l`
 
 # If the user has asked for the newer standards, check if the compilers know about them
 if test $USER_ASKED_FOR_NEW_STD -ge 1
