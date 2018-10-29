@@ -602,8 +602,10 @@ void CcdCallBacks(void)
   // Adjust the number of skipped messages by a multiple between .5, if we
   // skipped too many messages last time, and 2, if we skipped too few.
   // Ideally elapsed = resolution and we keep nSkip the same i.e. multiply by 1
-  nSkip = (int)(nSkip * fmax(0.5, fmin(2.0, o->resolution / elapsed)));
-  
+  if (elapsed > 0.0) {
+    nSkip = (int)(nSkip * fmax(0.5, fmin(2.0, o->resolution / elapsed)));
+  }
+
 /* Keep skipping within a sensible range */
 #define minSkip 1u
 #define maxSkip 20u
