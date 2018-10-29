@@ -14,12 +14,12 @@ CMK_CC_FLAGS="$CMK_CC_FLAGS $CMK_AMD64"
 
 CMK_CLANG_CXX_FLAGS="-stdlib=libc++"
 CMK_REAL_COMPILER=`$MPICXX -show 2>/dev/null | cut -d' ' -f1 `
-case "$CMK_REAL_COMPILER" in
-  g++)
+case "${CMK_REAL_COMPILER##*/}" in
+  gcc|g++|gcc-*|g++-*)
     CMK_CXX_FLAGS="$CMK_CXX_FLAGS $CMK_AMD64"
     CMK_COMPILER='gcc'
     ;;
-  clang)
+  clang|clang++|clang-*|clang++-*)
     CMK_CXX_FLAGS="$CMK_CXX_FLAGS $CMK_AMD64 $CMK_CLANG_CXX_FLAGS"
     CMK_COMPILER='clang'
     ;;
