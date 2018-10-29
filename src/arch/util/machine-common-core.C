@@ -1087,7 +1087,7 @@ void CmiCreatePartitions(char **argv) {
 
   //creates partitions, reset _Cmi_mynode to be the new local rank
   if(_partitionInfo.numPartitions > _Cmi_numnodes_global) {
-    CmiAbort("Number of partitions requested in greater than the number of nodes\n");
+    CmiAbort("Number of partitions requested is greater than the number of nodes\n");
   }
   create_partition_map(argv);
   
