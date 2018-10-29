@@ -437,9 +437,7 @@ MEMLIBS += \
 
 endif
 
-BUILD_CHARMDEBUG := $(CMK_CHARMDEBUG)
-
-ifneq ($(BUILD_CHARMDEBUG),0)
+ifneq ($(CMK_CHARMDEBUG),0)
 ifneq ($(CMK_HAS_MMAP),0)
 
 MEMLIBS += \
@@ -447,8 +445,14 @@ MEMLIBS += \
   $(L)/libmemory-gnu-charmdebug-mmap.a \
   $(L)/libmemory-gnu-charmdebug-slot.a \
   $(L)/libmemory-gnu-charmdebug-mmap-slot.a \
-  $(L)/libmemory-hooks-charmdebug.a \
   $(L)/libmemory-os-charmdebug.a \
+
+ifneq ($(CMK_HAS_MALLOC_HOOK),0)
+
+MEMLIBS += \
+  $(L)/libmemory-hooks-charmdebug.a \
+
+endif
 
 endif
 endif

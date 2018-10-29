@@ -1452,6 +1452,20 @@ test_linkc "whether has dl_iterate_phdr" "yes" "no" ""
 AC_DEFINE_UNQUOTED([CMK_HAS_DL_ITERATE_PHDR], $pass, [whether has dl_iterate_phdr])
 
 
+### test for __malloc_hook ###
+
+cat > $tc <<EOT
+extern int __malloc_hook;
+int main()
+{
+  return __malloc_hook;
+}
+EOT
+test_linkc "whether has __malloc_hook" "yes" "no" ""
+AC_DEFINE_UNQUOTED([CMK_HAS_MALLOC_HOOK], $pass, [whether has __malloc_hook])
+add_make_flag "CMK_HAS_MALLOC_HOOK:=$pass" 'whether has __malloc_hook'
+
+
 #### test if we can build OFI ####
 if test "$CMK_BUILD_OFI" = 1
 then
