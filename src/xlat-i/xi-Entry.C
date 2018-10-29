@@ -542,7 +542,9 @@ void Entry::genArrayDefs(XStr& str) {
             << "    envelope env;\n"
             << "    env.setMsgtype(ForArrayEltMsg);\n"
             << "    env.setTotalsize(0);\n"
-            << "    _TRACE_CREATION_DETAILED(&env, " << epIdx() << ");\n"
+            // NOTE: extra parentheses around the second argument to _TRACE_CREATION_DETAILED here
+            //       are needed for templated entry methods
+            << "    _TRACE_CREATION_DETAILED(&env, (" << epIdx() << "));\n"
             << "    _TRACE_CREATION_DONE(1);\n"
             << "    _TRACE_BEGIN_EXECUTE_DETAILED(CpvAccess(curPeEvent),ForArrayEltMsg,(" << epIdx()
             << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(), obj);\n";
