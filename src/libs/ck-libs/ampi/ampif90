@@ -22,7 +22,7 @@ eval processArgs "$@"
 
 [ -f $CHARMBIN/../lib/libampiromio.a -a -z "$STANDALONE" ] && ROMIO=-lampiromio
 
-ln $CHARMBIN/../include/mpif.h .
+cp -n $CHARMBIN/../include/mpif.h .
 $CHARMBIN/charmc -language ampif -default-to-aout $@ $ROMIO
 status=$?
 /bin/rm -f mpif.h

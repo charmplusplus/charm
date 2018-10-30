@@ -32,7 +32,7 @@ if test "$charmarch" = "mpi"
 then
     dirName=ampicc.inc.$$
     mkdir $dirName
-    ln $CHARMBIN/../include/mpi.h $dirName/mpi.h   2>/dev/null
+    cp -n $CHARMBIN/../include/mpi.h $dirName/mpi.h   2>/dev/null
     AMPICC_EXTRA_OPTIONS="-I./$dirName"
 fi
 
