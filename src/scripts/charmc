@@ -1848,7 +1848,7 @@ do
         case "$FILE_EXT" in
         .c|.s|.S|.C|.cc|.cxx|.cpp|.c++|.cu|.f|.F|.f90|.F90|.fpp|.FPP|.f77|.F77)
 		[ $VERBOSE ] && echo "Compiling $FILE"
-		DoNoErrCheck $RM $BASEO $BASE.f.o
+		DoNoErrCheck $RM $BASEO `stripExtention $BASEO`.f.o
         esac
 #	fi
 	if [ ! -z "$SKIPLINK" ] 
