@@ -887,6 +887,12 @@ trap 'End 1' 2
 # Process original command-line arguments
 eval processArgs "$@"
 
+# Do not skip linking if user explicitly specified an output file
+# This allows generating dependencies while compiling
+if [ "$GENDEPENDS" = "yes" -a "$EXPLICIT_OBJECT" = "yes" ]; then
+	SKIPLINK=""
+fi
+
 USER_POST_LIBRARIES="$POST_LIBRARIES"
 USER_PRE_LIBRARIES="$PRE_LIBRARIES"
 
