@@ -52,7 +52,7 @@ GPU Manager is not included by default when building \charmpp{}. In order to use
 GPU Manager, the user must build \charmpp{} using the \cuda{} option, e.g.
 
 \begin{alltt}
-./build charm++ netlrts-linux-x86_64 cuda -j8
+./build charm++ netlrts-linux-x86\_64 cuda -j8
 \end{alltt}
 
 Building GPU Manager requires an installation of the CUDA toolkit on the system.
@@ -70,7 +70,7 @@ definition of CUDA kernels and a function that serves as an entry point from
 the \charmpp{} application to use GPU capabilities. CUDA/HAPI calls for data
 transfers or kernel invocations would be placed inside this function, although
 they could also be put in a \code{.C} file provided that the right header files
-are included (\code{<cuda_runtime.h> or "hapi.h"}). The user should make sure
+are included (\code{<cuda\_runtime.h> or "hapi.h"}). The user should make sure
 that the CUDA kernel definitions are compiled by \code{nvcc}, however.
 
 After the necessary data transfers and kernel invocations, \code{hapiAddCallback}
@@ -80,25 +80,25 @@ offloaded work to the GPU, allowing the provided \charmpp{} callback to be
 invoked once it is complete. The non-blocking API has the following prototype:
 
 \begin{alltt}
-  void hapiAddCallback(cudaStream_t stream, CkCallback* callback);
+  void hapiAddCallback(cudaStream\_t stream, CkCallback* callback);
 \end{alltt}
 
 Other HAPI calls:
 
 \begin{alltt}
   void hapiCreateStreams();
-  cudaStream_t hapiGetStream();
+  cudaStream\_t hapiGetStream();
 
-  cudaError_t hapiMalloc(void** devPtr, size_t size);
-  cudaError_t hapiFree(void* devPtr);
-  cudaError_t hapiMallocHost(void** ptr, size_t size);
-  cudaError_t hapiFreeHost(void* ptr);
+  cudaError\_t hapiMalloc(void** devPtr, size\_t size);
+  cudaError\_t hapiFree(void* devPtr);
+  cudaError\_t hapiMallocHost(void** ptr, size\_t size);
+  cudaError\_t hapiFreeHost(void* ptr);
 
   void* hapiPoolMalloc(int size);
   void hapiPoolFree(void* ptr);
 
-  cudaError_t hapiMemcpyAsync(void* dst, const void* src, size_t count,
-                              cudaMemcpyKind kind, cudaStream_t stream = 0);
+  cudaError\_t hapiMemcpyAsync(void* dst, const void* src, size\_t count,
+                              cudaMemcpyKind kind, cudaStream\_t stream = 0);
 
   hapiCheck(code);
 \end{alltt}
@@ -110,8 +110,8 @@ out a stream created by the runtime in a round-robin fashion. The
 CUDA API calls, and \code{hapiPool} functions provides memory pool functionalities
 which are used to obtain/free device memory without interrupting the GPU.
 \code{hapiCheck} is used to check if the input code block executes without errors.
-The given code should return \code{cudaError_t} for it to work.
+The given code should return \code{cudaError\_t} for it to work.
 
 Example \charmpp{} applications using CUDA can be found under
-\code{examples/charm++/cuda}. Codes under #ifdef USE_WR use the hapiWorkRequest
+\code{examples/charm++/cuda}. Codes under \#ifdef USE\_WR use the hapiWorkRequest
 scheme, which is now deprecated.
