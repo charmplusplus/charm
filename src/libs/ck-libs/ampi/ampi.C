@@ -11497,7 +11497,7 @@ int AMPI_GPU_Iinvoke(cudaStream_t stream, MPI_Request *request)
   // A callback that completes the corresponding request
   CkCallback *cb = new CkCallback(&AMPI_GPU_complete, newreq);
 
-  hapiAddCallback(stream, cb);
+  hapiAddCallback(stream, cb, NULL);
 }
 
 CLINKAGE

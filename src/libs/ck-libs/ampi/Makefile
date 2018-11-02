@@ -2,7 +2,9 @@ CDIR := $(shell cd ../../../.. && pwd)
 -include $(CDIR)/include/conv-mach-opt.mak
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-HEADERS=ampi.h ampif.h mpio.h mpiof.h ampiimpl.h ampi-interoperate.h ampi.decl.h
+HEADERS=ampi.h ampif.h mpio.h mpiof.h ampiimpl.h \
+		ampi-interoperate.h ampi.decl.h \
+		ampi_functions.h mpio_functions.h
 HEADDEP=$(HEADERS) ampiimpl.h ddt.h \
 		../tcharm/tcharm.h ../tcharm/tcharm_impl.h
 COMPAT=compat_ampius.o compat_ampifus.o compat_ampi.o \
@@ -49,7 +51,7 @@ $(ROMIO): | AMPI AMPIF
 		--enable-f77=`test -f $(DESTF) && echo yes || echo no` \
 		--srcdir=`pwd`
 
-	cp romio/include/mpio.h romio/include/mpiof.h $(CDIR)/include
+	cp romio/include/mpio.h romio/include/mpiof.h romio/include/mpio_functions.h $(CDIR)/include
 	$(MAKE) -C romio
 	cp romio/lib/libmpio.a $@
 	if [ -n "$(ROMIOLIBSHARED)" ]; then \
