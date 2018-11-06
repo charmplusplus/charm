@@ -40,6 +40,8 @@ using std::vector;
     ret name(__VA_ARGS__)
 #endif
 
+extern char * ampi_binary_path;
+
 #if AMPIMSGLOG
 #include "ckliststring.h"
 static CkListString msgLogRanks;

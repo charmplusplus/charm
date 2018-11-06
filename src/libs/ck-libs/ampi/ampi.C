@@ -904,8 +904,94 @@ static constexpr std::array<MPI_User_function*, AMPI_MAX_PREDEFINED_OP+1> ampiPr
   MPI_NO_OP_USER_FN
 }};
 
+#if defined _WIN32
+# ifndef WIN32_LEAN_AND_MEAN
+#  define WIN32_LEAN_AND_MEAN
+# endif
+# ifndef NOMINMAX
+#  define NOMINMAX
+# endif
+# include <windows.h>
+#elif defined __APPLE__
+# include <unistd.h>
+# include <libproc.h>
+#elif CMK_HAS_REALPATH || CMK_HAS_READLINK
+# ifndef _GNU_SOURCE
+#  define _GNU_SOURCE
+# endif
+# ifndef __USE_GNU
+#  define __USE_GNU
+# endif
+# include <unistd.h>
+#endif
+
+char * ampi_binary_path;
+
+static void getAmpiBinaryPath() noexcept
+{
+#if defined _WIN32
+  ssize_t bufsize = MAX_PATH;
+  DWORD n;
+  do
+  {
+    ampi_binary_path = (char *)realloc(ampi_binary_path, bufsize);
+    SetLastError(0);
+    n = GetModuleFileName(NULL, ampi_binary_path, bufsize);
+    bufsize *= 2;
+  }
+  while (n == bufsize || GetLastError() == ERROR_INSUFFICIENT_BUFFER);
+
+  if (n == 0)
+  {
+    CkError("ERROR> GetModuleFileName(): %d\n", (int)GetLastError());
+    free(ampi_binary_path);
+    ampi_binary_path = nullptr;
+  }
+#elif defined __APPLE__
+  ampi_binary_path = (char *)malloc(PROC_PIDPATHINFO_MAXSIZE);
+  pid_t pid = getpid();
+  int n = proc_pidpath(pid, ampi_binary_path, PROC_PIDPATHINFO_MAXSIZE);
+
+  if (n == 0)
+  {
+    CkError("ERROR> proc_pidpath(): %s\n", strerror(errno));
+    free(ampi_binary_path);
+    ampi_binary_path = nullptr;
+  }
+#elif CMK_HAS_REALPATH
+  ampi_binary_path = realpath("/proc/self/exe", nullptr);
+  if (ampi_binary_path == nullptr)
+    CkError("ERROR> realpath(): %s\n", strerror(errno));
+#elif CMK_HAS_READLINK
+  ssize_t bufsize = 256;
+  ssize_t n;
+  do
+  {
+    ampi_binary_path = (char *)realloc(ampi_binary_path, bufsize);
+    n = readlink("/proc/self/exe", ampi_binary_path, bufsize-1);
+    bufsize *= 2;
+  }
+  while (n == bufsize-1);
+
+  if (n == -1)
+  {
+    CkError("ERROR> readlink(): %s\n", strerror(errno));
+    free(ampi_binary_path);
+    ampi_binary_path = nullptr;
+  }
+  else
+  {
+    ampi_binary_path[n] = '\0';
+  }
+#else
+  CkAbort("Could not get path to current binary!");
+#endif
+}
+
 static void ampiNodeInit() noexcept
 {
+  getAmpiBinaryPath();
+
 #if CMK_TRACE_ENABLED
   TCharm::nodeInit(); // make sure tcharm_funcmap is set up
   int funclength = sizeof(funclist)/sizeof(char*);

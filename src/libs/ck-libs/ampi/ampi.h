@@ -24,12 +24,18 @@
 
 /* Macros to define the AMPI'fied name of an MPI function, plus the AMPI'fied
  * PMPI name. */
+#ifdef AMPI_USE_FUNCPTR
+  #define AMPI_FUNCPTR(x) (* x)
+#else
+  #define AMPI_FUNCPTR(x) x
+#endif
+
 #define AMPI_CUSTOM_API_DEF(return_type, function_name, ...) \
-  extern return_type function_name(__VA_ARGS__);
+  extern return_type AMPI_FUNCPTR(function_name)(__VA_ARGS__);
 #if AMPI_HAVE_PMPI
   #define AMPI_API_DEF(return_type, function_name, ...) \
-    extern return_type function_name(__VA_ARGS__);             \
-    extern return_type P##function_name(__VA_ARGS__);
+    extern return_type AMPI_FUNCPTR(function_name)(__VA_ARGS__);             \
+    extern return_type AMPI_FUNCPTR(P##function_name)(__VA_ARGS__);
 #else
   #define AMPI_API_DEF AMPI_CUSTOM_API_DEF
 #endif
@@ -70,7 +76,7 @@ instead of as an actual "main".
 */
 #ifdef __cplusplus /* C++ version-- rename "main" as "AMPI_Main_cpp" */
 #  define main AMPI_Main_cpp
-int AMPI_Main_cpp(int argc,char **argv); /* prototype for C++ main routine */
+CLINKAGE int AMPI_Main_cpp(int argc,char **argv); /* prototype for C++ main routine */
 int AMPI_Main_cpp(void); /* prototype for C++ main routines without args, as in autoconf tests */
 
 extern "C" {
