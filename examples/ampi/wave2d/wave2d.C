@@ -5,20 +5,17 @@
 #include <cmath>
 #include "mpi.h"
 
-#if USE_LIVEVIZ
-#include "liveViz.h"
-#endif
-
 #define NumIters        5000
 #define TotalDataWidth  800
 #define TotalDataHeight 800
 #define NumInitPerturbs 5
 
-#define nbor(a,b) (a*comm_dim+b)
-#define mod(a,b)  (((a)+b)%b)
+#define nbor(a,b) ((a*comm_dim)+b)
+#define mod(a,b)  ((a+b)%b)
 
-struct indexStruct { int x, y; };
-enum { left=0, right, up, down };
+enum : int { left=0, right, up, down }; // used as an MPI tag
+
+void update_live_viz_buffer(int w, int h, double* p, unsigned char* i);
 
 int main(int argc, char **argv) {
   int my_rank, comm_size, num_wths, flag;
@@ -39,14 +36,6 @@ int main(int argc, char **argv) {
     MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_NUM_WTHS, &num_wths, &flag);
     printf("Running wave2d on %d VPs on %d processors\n", comm_size, num_wths);
   }
-
-#if USE_LIVEVIZ
-  // Setup liveviz
-  CkArrayOptions opts(comm_size);
-  CkCallback cb(CkIndex_Wave::requestNextFrame(NULL), arrayProxy);
-  liveVizConfig cfg(liveVizConfig::pix_color, true);
-  liveVizInit(cfg, arrayProxy, cb, opts);
-#endif
 
   const int my_x = my_rank / comm_dim;
   const int my_y = my_rank % comm_dim;
@@ -92,6 +81,11 @@ int main(int argc, char **argv) {
     }
   }
 
+#if AMPI_WITH_LIVE_VIZ
+  unsigned char *intensity = new unsigned char[3*my_width*my_height]; // liveViz pixel buffer
+  AMPI_Init_live_viz(my_x*my_width, my_y*my_height, my_width, my_height, intensity);
+#endif
+
   for (int iter = 0; iter < NumIters; iter++) {
     // Exchange edge buffers with neighboring ranks
     MPI_Irecv(buffers[right], my_height, MPI_DOUBLE, right_nbor, right, MPI_COMM_WORLD, &request[0]);
@@ -99,7 +93,7 @@ int main(int argc, char **argv) {
     MPI_Irecv(buffers[up],    my_width,  MPI_DOUBLE, up_nbor,    up,    MPI_COMM_WORLD, &request[2]);
     MPI_Irecv(buffers[down],  my_width,  MPI_DOUBLE, down_nbor,  down,  MPI_COMM_WORLD, &request[3]);
 
-    for (int i = 0; i < my_height; i++) { left_edge[i]  = pressure[i*my_width]; }
+    for (int i = 0; i < my_height; i++) { left_edge[i] = pressure[i*my_width]; }
     MPI_Isend(left_edge, my_height, MPI_DOUBLE, left_nbor, right, MPI_COMM_WORLD, &request[4]);
     for (int i = 0; i < my_height; i++) { right_edge[i] = pressure[i*my_width + my_width-1]; }
     MPI_Isend(right_edge, my_height, MPI_DOUBLE, right_nbor, left, MPI_COMM_WORLD, &request[5]);
@@ -113,9 +107,9 @@ int main(int argc, char **argv) {
     for (int i = 0; i < my_height; i++) {
       for (int j = 0; j < my_width; j++) {
         // Current time's pressures for neighboring array locations
-        double L = (j==0          ? buffers[left][i]  : pressure[i*my_width+j-1]);
+        double L = (j==0           ? buffers[left][i]  : pressure[i*my_width+j-1]);
         double R = (j==my_width-1  ? buffers[right][i] : pressure[i*my_width+j+1]);
-        double U = (i==0          ? buffers[up][j]    : pressure[(i-1)*my_width+j]);
+        double U = (i==0           ? buffers[up][j]    : pressure[(i-1)*my_width+j]);
         double D = (i==my_height-1 ? buffers[down][j]  : pressure[(i+1)*my_width+j]);
         // Current time's pressure for this array location
         double curr = pressure[i*my_width+j];
@@ -131,6 +125,13 @@ int main(int argc, char **argv) {
     pressure_old = pressure;
     pressure = pressure_new;
     pressure_new = tmp;
+
+    // Continuously update the liveViz buffer, which liveViz/AMPI
+    // will use in the background periodically
+    //if (iter % 10 == 0)
+    {
+      update_live_viz_buffer(my_width, my_height, pressure, intensity);
+    }
 
     //MPI_Barrier(MPI_COMM_WORLD);
     if (my_rank == 0 && iter % 20 == 0) {
@@ -155,28 +156,24 @@ int main(int argc, char **argv) {
   delete [] buffers[down];
   delete [] right_edge;
   delete [] left_edge;
+#if AMPI_WITH_LIVE_VIZ
+  delete [] intensity;
+#endif
   MPI_Finalize();
   return 0;
 }
 
-#if USE_LIVEVIZ
-// Provide my portion of the image to the graphical liveViz client
-void requestNextFrame(liveVizRequestMsg *m) {
-  // Draw my part of the image, plus a nice 1px border along my right/bottom boundary
-  int sx = my_x*my_width; // Where my portion of the image is located
-  int sy = my_y*my_height;
-  int w = my_width; // Size of my rectangular portion of the image
-  int h = my_height;
-
+// Update the portion of the image that the graphical liveViz client will illustrate
+void update_live_viz_buffer(int w, int h, double* pressure, unsigned char* intensity)
+{
+#if AMPI_WITH_LIVE_VIZ
   // Set the output pixel values for my rectangle
   // Each RGB component is a char which can have 256 possible values.
-  unsigned char *intensity = new unsigned char[3*w*h];
-  for (int i = 0; i < my_height; i++) {
-    for (int j = 0; j < my_width; j++) {
-      double p = pressure[i*my_width+j];
+  for (int i = 0; i < h; i++) {
+    for (int j = 0; j < w; j++) {
+      double p = pressure[i*w+j];
       if (p > 255.0) p = 255.0;   // Keep values in valid range
       if (p < -255.0) p = -255.0; // Keep values in valid range
-
       if (p > 0) { // Positive values are red
         intensity[3*(i*w+j)+0] = 255;   // RED component
         intensity[3*(i*w+j)+1] = 255-p; // GREEN component
@@ -188,7 +185,6 @@ void requestNextFrame(liveVizRequestMsg *m) {
       }
     }
   }
-
   // Draw a green border on right and bottom of this rank's pixel buffer.
   // This will overwrite some pressure values at these pixels.
   for (int i = 0; i < h; i++) {
@@ -201,8 +197,6 @@ void requestNextFrame(liveVizRequestMsg *m) {
     intensity[3*((h-1)*w+i)+1] = 255; // GREEN component
     intensity[3*((h-1)*w+i)+2] = 0;   // BLUE component
   }
-
-  liveVizDeposit(m, sx, sy, w, h, intensity, this);
-  delete [] intensity;
-}
 #endif
+}
+

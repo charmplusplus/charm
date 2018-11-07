@@ -1,6 +1,6 @@
 CDIR := $(shell cd ../../../.. && pwd)
 -include $(CDIR)/include/conv-mach-opt.mak
-CHARMC=$(CDIR)/bin/charmc $(OPTS)
+CHARMC=$(CDIR)/bin/charmc -DAMPI_WITH_LIVE_VIZ=1 $(OPTS)
 
 HEADERS=ampi.h ampif.h mpio.h mpiof.h ampiimpl.h
 HEADDEP=$(HEADERS) ampiimpl.h ddt.h ampi.decl.h \
@@ -121,7 +121,7 @@ compat_ampicpp.o: compat_ampicpp.C
 	$(CHARMC) -c compat_ampicpp.C
 
 ampi.o: ampi.C $(HEADDEP)
-	$(CHARMC) -c ampi.C
+	$(CHARMC) -c ampi.C -module liveViz
 
 ampif.o: ampif.C $(HEADDEP)
 	$(CHARMC) -c ampif.C

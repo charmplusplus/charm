@@ -1163,6 +1163,13 @@ static ampi *ampiInit(char **argv) noexcept
     arr = CProxy_ampi(m->aid);
     delete m;
 
+#if AMPI_WITH_LIVE_VIZ
+    // Initialize liveViz here, since the the chare array isn't exposed to AMPI users
+    CkCallback liveVizCB(CkIndex_ampi::liveVizRequestNextFrame(NULL), arr);
+    liveVizConfig cfg(liveVizConfig::pix_color, true);
+    liveVizInit(cfg, arr, liveVizCB, opts);
+#endif
+
     //Broadcast info. to the mpi_worlds array
     // FIXME: remove race condition from MPI_COMM_UNIVERSE broadcast
     ampiCommStruct newComm(new_world,arr,_nchunks);
@@ -1958,6 +1965,14 @@ void ampi::setInitDoneFlag() noexcept {
   parent->getTCharmThread()->start();
 }
 
+#if AMPI_WITH_LIVE_VIZ
+// Called periodically by liveViz to get the next frame from all chare array elements.
+// The AMPI user is reponsible to continuously updating 'lvBuffer'.
+void ampi::liveVizRequestNextFrame(liveVizRequestMsg *msg) noexcept {
+  liveVizDeposit(msg, lvWidthOffset, lvHeightOffset, lvWidth, lvHeight, lvBuffer, this);
+}
+#endif
+
 static void AmmPupUnexpectedMsgs(PUP::er& p,void **msg) noexcept {
   CkPupMessage(p,msg,1);
   if (p.isDeleting()) delete (AmpiMsg *)*msg;
@@ -2051,6 +2066,11 @@ void ampi::pup(PUP::er &p) noexcept
   p|greq_classes;
 
   p|oorder;
+
+#if AMPI_WITH_LIVE_VIZ
+  p|lvWidthOffset; p|lvHeightOffset; p|lvWidth; p|lvHeight;
+  p((char *)&lvBuffer, sizeof(unsigned char*)); // Assumes Isomalloc or no migration
+#endif
 }
 
 ampi::~ampi() noexcept
@@ -10586,6 +10606,19 @@ int AMPI_Migrate(MPI_Info hints)
 
 #if CMK_BIGSIM_CHARM
   TRACE_BG_ADD_TAG("AMPI_MIGRATE");
+#endif
+  return MPI_SUCCESS;
+}
+
+CDECL
+int AMPI_Init_live_viz(int wOffset, int hOffset, int w, int h, unsigned char* buf)
+{
+  AMPI_API("AMPI_Init_live_viz");
+#if AMPI_WITH_LIVE_VIZ
+  // Set up the size of the window, the part of the window that this element will contribute,
+  // and the buffer that the AMPI user will continuously update.
+  CkAssert(buf != NULL);
+  getAmpiInstance(MPI_COMM_WORLD)->liveVizSetup(wOffset, hOffset, w, h, buf);
 #endif
   return MPI_SUCCESS;
 }

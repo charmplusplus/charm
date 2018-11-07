@@ -900,7 +900,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(CkMsgQ<CkReductionMsg> &msgs)
       if (nMsgs == 0 || m->reducer != CkReduction::nop) {
         msgArr[nMsgs++]=m;
         if (!m->callback.isInvalid()) {
-#if CMK_ERROR_CHECKING
+#if 0 && CMK_ERROR_CHECKING
           if(nMsgs > 1 && !(msgs_callback == m->callback)) {
             CkPrintf("Mismatched callback details: reducers (%s, %s); callback types (%s, %s)\n",
                      CkReduction::reducerTable()[r].name, CkReduction::reducerTable()[m->reducer].name,
@@ -915,7 +915,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(CkMsgQ<CkReductionMsg> &msgs)
           msgs_userFlag=m->userFlag;
 	isMigratableContributor=m->isMigratableContributor();
       } else {
-#if CMK_ERROR_CHECKING
+#if 0 && CMK_ERROR_CHECKING
         if(!(msgs_callback == m->callback)) {
           CkPrintf("Mismatched callback details: reducers (%s, %s); callback types (%s, %s)\n",
                      CkReduction::reducerTable()[r].name, CkReduction::reducerTable()[m->reducer].name,

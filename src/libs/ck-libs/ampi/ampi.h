@@ -1527,6 +1527,7 @@ AMPI_API_DEF(int, MPIX_Grequest_class_allocate, MPIX_Grequest_class greq_class,
 
 /*** AMPI Extensions ***/
 int AMPI_Migrate(MPI_Info hints);
+int AMPI_Init_live_viz(int wOffset, int hOffset, int w, int h, unsigned char* buf);
 int AMPI_Load_start_measure(void);
 int AMPI_Load_stop_measure(void);
 int AMPI_Load_reset_measure(void);
