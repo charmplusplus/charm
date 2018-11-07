@@ -1,6 +1,7 @@
 #!/bin/sh
 CHARMBIN=`dirname $0`
 
+[ -z "$AMPICC_MODE" ] && AMPICC_MODE='ampi'
 STANDALONE=""
 
 processArgs() {
@@ -24,27 +25,33 @@ done
 
 eval processArgs "$@"
 
-charmarch=$(cat $CHARMBIN/../tmp/.gdir)
-
 AMPICC_EXTRA_OPTIONS=""
 
-if test "$charmarch" = "mpi"
+if test "$AMPICC_MODE" = 'ampi'
 then
+  charmarch=$(cat $CHARMBIN/../tmp/.gdir)
+
+  if test "$charmarch" = "mpi"
+  then
     dirName=ampicc.inc.$$
     mkdir $dirName
     cp -n $CHARMBIN/../include/mpi.h $dirName/mpi.h   2>/dev/null
-    AMPICC_EXTRA_OPTIONS="-I./$dirName"
+    AMPICC_EXTRA_OPTIONS="$AMPICC_EXTRA_OPTIONS -I./$dirName"
+  fi
 fi
 
 [ -f $CHARMBIN/../lib/libampiromio.a -a -z "$STANDALONE" ] && ROMIO=-lampiromio
 
-$CHARMBIN/charmc -language ampi -default-to-aout $AMPICC_EXTRA_OPTIONS $@ $ROMIO
+$CHARMBIN/charmc -language $AMPICC_MODE -default-to-aout $AMPICC_EXTRA_OPTIONS $@ $ROMIO
 status=$?
 
-if test "$charmarch" = "mpi"
+if test "$AMPICC_MODE" = 'ampi'
 then
+  if test "$charmarch" = "mpi"
+  then
     /bin/rm -f $dirName/mpi.h 2>/dev/null
     rmdir $dirName
+  fi
 fi
 
 # Copy ampirun, but do not overwrite it if it already exists.
