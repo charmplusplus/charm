@@ -88,6 +88,9 @@ module ampi {
     entry EXPEDITED_IGET AmpiMsg *winRemoteIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype,
                                                 MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
                                                 int winIndex);
+#if AMPI_WITH_LIVE_VIZ
+    entry EXPEDITED void liveVizRequestNextFrame(liveVizRequestMsg *msg);
+#endif
   };
 
   group [migratable] ampiWorlds {

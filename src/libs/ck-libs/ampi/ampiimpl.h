@@ -11,6 +11,12 @@
 #include "ddt.h"
 #include "charm++.h"
 
+#if AMPI_WITH_LIVE_VIZ
+// Must copy all liveViz headers (including *.{decl,def}.h)
+// into the AMPI build subdirectory
+#include "liveViz.h"
+#endif
+
 using std::vector;
 
 //Uncomment for debug print statements
@@ -2769,6 +2775,15 @@ class ampi final : public CBase_ampi {
   int intercomm_iscatterv(int root, const void* sendbuf, const int* sendcounts, const int* displs,
                           MPI_Datatype sendtype, void* recvbuf, int recvcount,
                           MPI_Datatype recvtype, MPI_Comm intercomm, MPI_Request* request) noexcept;
+
+#if AMPI_WITH_LIVE_VIZ
+  void liveVizSetup(int wOffset, int hOffset, int w, int h, unsigned char* buf) noexcept {
+    lvWidthOffset = wOffset, lvHeightOffset = hOffset; lvWidth = w; lvHeight = h; lvBuffer = buf;
+  }
+  void liveVizRequestNextFrame(liveVizRequestMsg *msg) noexcept;
+  int lvWidthOffset, lvHeightOffset, lvWidth, lvHeight;
+  unsigned char* lvBuffer;
+#endif
 };
 
 ampiParent *getAmpiParent() noexcept;
