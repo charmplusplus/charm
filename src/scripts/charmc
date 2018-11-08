@@ -2355,7 +2355,7 @@ then
   if [ -x $CHARMBIN/$targ ]
   then
 	DoNoErrCheck $RM $targ
-	DoNoErrCheck $CP $CHARMBIN/$targ $targ
+	DoNoErrCheck $CP $CHARMBIN/$targ $targ 2> /dev/null
   fi
 fi
 
