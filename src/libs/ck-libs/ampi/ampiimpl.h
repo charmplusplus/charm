@@ -151,9 +151,14 @@ typedef void (*MPI_MigrateFn)(void);
 #define AMM_SRC   1
 #define AMM_NTAGS 2
 
-// Number of AmmEntry<T>'s in AmmEntryPool
-#ifndef AMPI_AMM_POOL_SIZE
-#define AMPI_AMM_POOL_SIZE 32
+// Number of AmmEntry<T>'s in AmmEntryPool for pt2pt msgs:
+#ifndef AMPI_AMM_PT2PT_POOL_SIZE
+#define AMPI_AMM_PT2PT_POOL_SIZE 32
+#endif
+
+// Number of AmmEntry<T>'s in AmmEntryPool for coll msgs:
+#ifndef AMPI_AMM_COLL_POOL_SIZE
+#define AMPI_AMM_COLL_POOL_SIZE 4
 #endif
 
 class AmpiRequestList;
@@ -172,7 +177,7 @@ class AmmEntry {
   ~AmmEntry() = default;
 };
 
-template <class T>
+template <class T, size_t N>
 class Amm {
  public:
   AmmEntry<T>* first;
@@ -180,8 +185,8 @@ class Amm {
 
  private:
   int startIdx;
-  std::bitset<AMPI_AMM_POOL_SIZE> validEntries;
-  std::array<AmmEntry<T>, AMPI_AMM_POOL_SIZE> entryPool;
+  std::bitset<N> validEntries;
+  std::array<AmmEntry<T>, N> entryPool;
 
  public:
   Amm() noexcept : first(NULL), lasth(&first), startIdx(0) { validEntries.reset();  }
@@ -1062,7 +1067,6 @@ extern int _mpi_nworlds;
 #define MPI_EPOCH_END_TAG   MPI_TAG_UB_VALUE+12
 
 #define AMPI_COLL_SOURCE 0
-#define AMPI_COLL_DEST   -1
 #define AMPI_COLL_COMM   MPI_COMM_WORLD
 
 enum AmpiReqType : uint8_t {
@@ -2429,8 +2433,13 @@ class ampi final : public CBase_ampi {
    * AMPI Message Matching (Amm) queues are indexed by the tag and sender.
    * Since ampi objects are per-communicator, there are separate Amm's per communicator.
    */
-  Amm<AmpiRequest *> postedReqs;
-  Amm<AmpiMsg *> unexpectedMsgs;
+  Amm<AmpiRequest *, AMPI_AMM_PT2PT_POOL_SIZE> postedReqs;
+  Amm<AmpiMsg *, AMPI_AMM_PT2PT_POOL_SIZE> unexpectedMsgs;
+
+  // Bcast requests / msgs must be kept separate from pt2pt,
+  // so we don't match them to wildcard recv's
+  Amm<AmpiRequest *, AMPI_AMM_COLL_POOL_SIZE> postedBcastReqs;
+  Amm<AmpiMsg *, AMPI_AMM_COLL_POOL_SIZE> unexpectedBcastMsgs;
 
   // Store generalized request classes created by MPIX_Grequest_class_create
   vector<greq_class_desc> greq_classes;
@@ -2443,7 +2452,7 @@ class ampi final : public CBase_ampi {
 
  private:
   void inorder(AmpiMsg *msg) noexcept;
-  void inorderBcast(AmpiMsg *msg) noexcept;
+  void inorderBcast(AmpiMsg *msg, bool deleteMsg) noexcept;
   void inorderRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank,
                    MPI_Comm comm, int ssendReq) noexcept;
 
@@ -2508,7 +2517,7 @@ class ampi final : public CBase_ampi {
   MPI_Request postReq(AmpiRequest* newreq) noexcept;
 
   inline CMK_REFNUM_TYPE getSeqNo(int destRank, MPI_Comm destcomm, int tag) noexcept;
-  AmpiMsg *makeBcastMsg(const void *buf,int count,MPI_Datatype type,MPI_Comm destcomm) noexcept;
+  AmpiMsg *makeBcastMsg(const void *buf,int count,MPI_Datatype type,int root,MPI_Comm destcomm) noexcept;
   AmpiMsg *makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
                        MPI_Datatype type,MPI_Comm destcomm, int ssendReq=0) noexcept;
 
@@ -2543,6 +2552,8 @@ class ampi final : public CBase_ampi {
              MPI_Status* status, MPI_Message* message) noexcept;
   void imrecv(void* buf, int count, MPI_Datatype datatype, int src, int tag, MPI_Comm comm,
               MPI_Request* request, MPI_Message* message) noexcept;
+  void irecvBcast(void *buf, int count, MPI_Datatype type, int src,
+                  MPI_Comm comm, MPI_Request *request) noexcept;
   void sendrecv(const void *sbuf, int scount, MPI_Datatype stype, int dest, int stag,
                 void *rbuf, int rcount, MPI_Datatype rtype, int src, int rtag,
                 MPI_Comm comm, MPI_Status *sts) noexcept;

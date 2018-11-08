@@ -1792,12 +1792,18 @@ int ampiParent::deleteAttr(int context, vector<int>& keyvals, int keyval) noexce
  * AMPI Message Matching (Amm) queues:
  *   AmpiMsg*'s and AmpiRequest*'s are matched based on 2 ints: [tag, src].
  */
-template class Amm<AmpiMsg *>;
-template class Amm<AmpiRequest *>;
+
+// Pt2pt msg queues:
+template class Amm<AmpiMsg *, AMPI_AMM_PT2PT_POOL_SIZE>;
+template class Amm<AmpiRequest *, AMPI_AMM_PT2PT_POOL_SIZE>;
+
+// Bcast msg queues:
+template class Amm<AmpiMsg *, AMPI_AMM_COLL_POOL_SIZE>;
+template class Amm<AmpiRequest *, AMPI_AMM_COLL_POOL_SIZE>;
 
 /* free all table entries but not the space pointed to by 'msg' */
-template<typename T>
-void Amm<T>::freeAll() noexcept
+template<typename T, size_t N>
+void Amm<T, N>::freeAll() noexcept
 {
   AmmEntry<T>* cur = first;
   while (cur) {
@@ -1808,8 +1814,8 @@ void Amm<T>::freeAll() noexcept
 }
 
 /* free all msgs */
-template<typename T>
-void Amm<T>::flushMsgs() noexcept
+template<typename T, size_t N>
+void Amm<T, N>::flushMsgs() noexcept
 {
   T msg = get(MPI_ANY_TAG, MPI_ANY_SOURCE);
   while (msg) {
@@ -1818,24 +1824,24 @@ void Amm<T>::flushMsgs() noexcept
   }
 }
 
-template<typename T>
-void Amm<T>::put(T msg) noexcept
+template<typename T, size_t N>
+void Amm<T, N>::put(T msg) noexcept
 {
   AmmEntry<T>* e = newEntry(msg);
   *lasth = e;
   lasth = &e->next;
 }
 
-template<typename T>
-void Amm<T>::put(int tag, int src, T msg) noexcept
+template<typename T, size_t N>
+void Amm<T, N>::put(int tag, int src, T msg) noexcept
 {
   AmmEntry<T>* e = newEntry(tag, src, msg);
   *lasth = e;
   lasth = &e->next;
 }
 
-template<typename T>
-bool Amm<T>::match(const int tags1[AMM_NTAGS], const int tags2[AMM_NTAGS]) const noexcept
+template<typename T, size_t N>
+bool Amm<T, N>::match(const int tags1[AMM_NTAGS], const int tags2[AMM_NTAGS]) const noexcept
 {
   if (tags1[AMM_TAG]==tags2[AMM_TAG] && tags1[AMM_SRC]==tags2[AMM_SRC]) {
     // tag and src match
@@ -1859,8 +1865,8 @@ bool Amm<T>::match(const int tags1[AMM_NTAGS], const int tags2[AMM_NTAGS]) const
   }
 }
 
-template<typename T>
-T Amm<T>::get(int tag, int src, int* rtags) noexcept
+template<typename T, size_t N>
+T Amm<T, N>::get(int tag, int src, int* rtags) noexcept
 {
   AmmEntry<T> *ent, **enth;
   T msg;
@@ -1884,8 +1890,8 @@ T Amm<T>::get(int tag, int src, int* rtags) noexcept
   }
 }
 
-template<typename T>
-T Amm<T>::probe(int tag, int src, int* rtags) noexcept
+template<typename T, size_t N>
+T Amm<T, N>::probe(int tag, int src, int* rtags) noexcept
 {
   AmmEntry<T> *ent, **enth;
   T msg;
@@ -1905,8 +1911,8 @@ T Amm<T>::probe(int tag, int src, int* rtags) noexcept
   }
 }
 
-template<typename T>
-int Amm<T>::size() const noexcept
+template<typename T, size_t N>
+int Amm<T, N>::size() const noexcept
 {
   int n = 0;
   AmmEntry<T> *e = first;
@@ -1917,8 +1923,8 @@ int Amm<T>::size() const noexcept
   return n;
 }
 
-template<typename T>
-void Amm<T>::pup(PUP::er& p, AmmPupMessageFn msgpup) noexcept
+template<typename T, size_t N>
+void Amm<T, N>::pup(PUP::er& p, AmmPupMessageFn msgpup) noexcept
 {
   int sz;
   if (!p.isUnpacking()) {
@@ -2047,6 +2053,8 @@ void ampi::pup(PUP::er &p) noexcept
   p|remoteProxy;
   unexpectedMsgs.pup(p, AmmPupUnexpectedMsgs);
   postedReqs.pup(p, AmmPupPostedReqs);
+  unexpectedBcastMsgs.pup(p, AmmPupUnexpectedMsgs);
+  postedBcastReqs.pup(p, AmmPupPostedReqs);
   p|greq_classes;
   p|oorder;
 }
@@ -2057,6 +2065,8 @@ ampi::~ampi() noexcept
     // in restarting, we need to flush messages
     unexpectedMsgs.flushMsgs();
     postedReqs.freeAll();
+    unexpectedBcastMsgs.flushMsgs();
+    postedBcastReqs.freeAll();
   }
 }
 
@@ -2660,10 +2670,10 @@ void ampi::bcastResult(AmpiMsg* msg) noexcept
   int seqIdx = msg->getSeqIdx();
   int n=oorder.put(seqIdx,msg);
   if (n>0) { // This message was in-order
-    inorderBcast(msg); // inorderBcast() is [nokeep]-aware, unlike inorder()
+    inorderBcast(msg, false); // inorderBcast() is [nokeep]-aware, unlike inorder()
     if (n>1) { // It enables other, previously out-of-order messages
       while((msg=oorder.getOutOfOrder(seqIdx))!=0) {
-        inorder(msg); // not inorderBcast(), b/c we need to free the msg
+        inorderBcast(msg, true);
       }
     }
   }
@@ -2713,7 +2723,7 @@ void ampi::inorder(AmpiMsg* msg) noexcept
   }
 }
 
-void ampi::inorderBcast(AmpiMsg* msg) noexcept
+void ampi::inorderBcast(AmpiMsg* msg, bool deleteMsg) noexcept
 {
   MSG_ORDER_DEBUG(
     CkPrintf("AMPI vp %d inorder bcast: tag=%d, src=%d, comm=%d (seq %d)\n",
@@ -2728,14 +2738,14 @@ void ampi::inorderBcast(AmpiMsg* msg) noexcept
   //Check posted recvs:
   int tag = msg->getTag();
   int srcRank = msg->getSrcRank();
-  AmpiRequest* req = postedReqs.get(tag, srcRank);
+  AmpiRequest* req = postedBcastReqs.get(tag, srcRank);
   if (req) { // receive posted
     handleBlockedReq(req);
-    req->receive(this, msg, false/*=deleteMsg*/);
+    req->receive(this, msg, deleteMsg);
   } else {
     // Reference the [nokeep] msg so it isn't freed by the runtime
     CmiReference(UsrToEnv(msg));
-    unexpectedMsgs.put(msg);
+    unexpectedBcastMsgs.put(msg);
   }
 }
 
@@ -2838,13 +2848,13 @@ void handle_MPI_BOTTOM(void* &buf1, MPI_Datatype type1, void* &buf2, MPI_Datatyp
   }
 }
 
-AmpiMsg *ampi::makeBcastMsg(const void *buf,int count,MPI_Datatype type,MPI_Comm destcomm) noexcept
+AmpiMsg *ampi::makeBcastMsg(const void *buf,int count,MPI_Datatype type,int root,MPI_Comm destcomm) noexcept
 {
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
-  CMK_REFNUM_TYPE seq = getSeqNo(AMPI_COLL_DEST, destcomm, MPI_BCAST_TAG);
+  CMK_REFNUM_TYPE seq = getSeqNo(root, destcomm, MPI_BCAST_TAG);
   // Do not use the msg pool for bcasts:
-  AmpiMsg *msg = new (len, 0) AmpiMsg(seq, 0, MPI_BCAST_TAG, AMPI_COLL_DEST, len);
+  AmpiMsg *msg = new (len, 0) AmpiMsg(seq, MPI_REQUEST_NULL, MPI_BCAST_TAG, root, len);
   ddt->serialize((char*)buf, msg->getData(), count, msg->getLength(), PACK);
   return msg;
 }
@@ -2905,7 +2915,7 @@ void ampi::sendraw(int t, int sRank, void* buf, int len, CkArrayID aid, int idx)
 }
 
 CMK_REFNUM_TYPE ampi::getSeqNo(int destRank, MPI_Comm destcomm, int tag) noexcept {
-  int seqIdx = (destRank == AMPI_COLL_DEST) ? COLL_SEQ_IDX : destRank;
+  int seqIdx = (tag >= MPI_BCAST_TAG) ? COLL_SEQ_IDX : destRank;
   CMK_REFNUM_TYPE seq = 0;
   if (destcomm<=MPI_COMM_WORLD && tag<=MPI_BCAST_TAG) { //Not cross-module: set seqno
     seq = oorder.nextOutgoing(seqIdx);
@@ -3402,17 +3412,21 @@ int ampi::improbe(int tag, int source, MPI_Comm comm, MPI_Status *sts,
 
 void ampi::bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm destcomm) noexcept
 {
+  MPI_Request req;
+
   if (root==getRank()) {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
-    thisProxy.bcastResult(makeBcastMsg(buf, count, type, destcomm));
+    irecvBcast(buf, count, type, root, destcomm, &req);
+    thisProxy.bcastResult(makeBcastMsg(buf, count, type, root, destcomm));
   }
   else { // Non-root ranks need to increment the outgoing sequence number for collectives
     oorder.incCollSeqOutgoing();
+    irecvBcast(buf, count, type, root, destcomm, &req);
   }
 
-  if (-1==recv(MPI_BCAST_TAG, root, buf, count, type, destcomm)) CkAbort("AMPI> Error in broadcast");
+  MPI_Wait(&req, MPI_STATUS_IGNORE);
 }
 
 int ampi::intercomm_bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm intercomm) noexcept
@@ -3421,7 +3435,7 @@ int ampi::intercomm_bcast(int root, void* buf, int count, MPI_Datatype type, MPI
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
-    remoteProxy.bcastResult(makeBcastMsg(buf, count, type, intercomm));
+    remoteProxy.bcastResult(makeBcastMsg(buf, count, type, getRank(), intercomm));
   }
   else { // Non-root ranks need to increment the outgoing sequence number for collectives
     oorder.incCollSeqOutgoing();
@@ -3429,7 +3443,9 @@ int ampi::intercomm_bcast(int root, void* buf, int count, MPI_Datatype type, MPI
 
   if (root!=MPI_PROC_NULL && root!=MPI_ROOT) {
     // remote group ranks
-    if (-1==recv(MPI_BCAST_TAG, root, buf, count, type, intercomm)) CkAbort("AMPI> Error in intercomm broadcast");
+    MPI_Request req;
+    irecvBcast(buf, count, type, root, intercomm, &req);
+    MPI_Wait(&req, MPI_STATUS_IGNORE);
   }
   return MPI_SUCCESS;
 }
@@ -3440,14 +3456,14 @@ void ampi::ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm de
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
-    thisProxy.bcastResult(makeBcastMsg(buf, count, type, destcomm));
+    thisProxy.bcastResult(makeBcastMsg(buf, count, type, getRank(), destcomm));
   }
   else { // Non-root ranks need to increment the outgoing sequence number for collectives
     oorder.incCollSeqOutgoing();
   }
 
   // call irecv to post an IReq and check for any pending messages
-  irecv(buf, count, type, root, MPI_BCAST_TAG, destcomm, request);
+  irecvBcast(buf, count, type, root, destcomm, request);
 }
 
 int ampi::intercomm_ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm intercomm, MPI_Request *request) noexcept
@@ -3456,7 +3472,7 @@ int ampi::intercomm_ibcast(int root, void* buf, int count, MPI_Datatype type, MP
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = this;
 #endif
-    remoteProxy.bcastResult(makeBcastMsg(buf, count, type, intercomm));
+    remoteProxy.bcastResult(makeBcastMsg(buf, count, type, getRank(), intercomm));
   }
   else { // Non-root ranks need to increment the outgoing sequence number for collectives
     oorder.incCollSeqOutgoing();
@@ -3464,7 +3480,7 @@ int ampi::intercomm_ibcast(int root, void* buf, int count, MPI_Datatype type, MP
 
   if (root!=MPI_PROC_NULL && root!=MPI_ROOT) {
     // call irecv to post IReq and process pending messages
-    irecv(buf, count, type, root, MPI_BCAST_TAG, intercomm, request);
+    irecvBcast(buf, count, type, root, intercomm, request);
   }
   return MPI_SUCCESS;
 }
@@ -3620,6 +3636,7 @@ void AmpiSeqQ::putOutOfOrder(int seqIdx, AmpiMsg *msg) noexcept
   if (msg->getSeq() < el.getSeqIncoming())
     CkAbort("AMPI Logic error: received late out-of-order message!\n");
 #endif
+  if (seqIdx == COLL_SEQ_IDX) CmiReference(msg); // bcast msg is [nokeep]
   out.enq(msg);
   el.incNumOutOfOrder(); // We have another message in the out-of-order queue
 }
@@ -6867,6 +6884,26 @@ AMPI_API_IMPL(int, MPI_Irsend, const void *buf, int count, MPI_Datatype type, in
 {
   AMPI_API("AMPI_Irsend");
   return MPI_Isend(buf, count, type, dest, tag, comm, request);
+}
+
+void ampi::irecvBcast(void *buf, int count, MPI_Datatype type, int src,
+                      MPI_Comm comm, MPI_Request *request) noexcept
+{
+  if (isInter()) {
+    src = myComm.getIndexForRemoteRank(src);
+  }
+  AmpiRequestList& reqs = getReqs();
+  IReq *newreq = parent->reqPool.newReq<IReq>(buf, count, type, src, MPI_BCAST_TAG, comm, getDDT());
+  *request = reqs.insert(newreq);
+
+  AmpiMsg* msg = unexpectedBcastMsgs.get(MPI_BCAST_TAG, src);
+  // if msg has already arrived, do the receive right away
+  if (msg) {
+    newreq->receive(this, msg);
+  }
+  else { // ... otherwise post the receive
+    postedBcastReqs.put(newreq);
+  }
 }
 
 void ampi::irecv(void *buf, int count, MPI_Datatype type, int src,
