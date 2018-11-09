@@ -1,10 +1,10 @@
 
-Building Charm++ shared library for Charmpy
-===========================================
+Building Charm++ shared library for Charm4py
+============================================
 
-- Build libcharm for non-SMP mode using '--build-shared --enable-charmpy'
+- Build libcharm for non-SMP mode using 'charm4py' build target.
   For example, on a regular Linux machine:
-  ./build libcharm netlrts-linux-x86_64 -j8 --with-production --build-shared --enable-charmpy
+  ./build charm4py netlrts-linux-x86_64 -j8 --with-production
 
   NOTE: We are currently requiring non-smp mode because in the most common Python implementation
   (CPython), multiple threads cannot run Python code concurrently due to the Global Interpreter Lock
@@ -20,7 +20,7 @@ needs to be modified to include the module.
 Developer documentation
 =======================
 
-Chares that are defined and that run outside of the C/C++ runtime (e.g. Python objects in a Charmpy
+Chares that are defined and that run outside of the C/C++ runtime (e.g. Python objects in a Charm4py
 program) require lightweight objects acting as counterpart inside the C/C++ runtime.
 These C++ objects are:
 
@@ -28,7 +28,7 @@ These C++ objects are:
 
 and their function is mainly to relay received messages to their external counterpart.
 
-To allow use of the C++ runtime from external clients (e.g. Charmpy), changes to the
+To allow use of the C++ runtime from external clients (e.g. Charm4py), changes to the
 following files have been made:
 
 charm++.h
@@ -55,7 +55,7 @@ ckarray.h/C
 init.C
   Changes to circumvent linking issues (see 'Improve/support external module linking'
   below for details)
-  NOTE: These changes are only enabled if building Charm with charmpy support.
+  NOTE: These changes are only enabled if building Charm with charm4py support.
 
 TODO
 ====
@@ -74,7 +74,7 @@ void _createTraces(char **argv);
 These are typically defined in a moduleInit.C or similar file created by charmc
 during linking of final program executable.
 
-Problem is that when accesing the Charm shared library from Charmpy, these functions
+Problem is that when accesing the Charm shared library from Charm4py, these functions
 are never defined, so I have disabled calls to them in some cases, or bypassed with alternative
 code with #if CMK_CHARMPY macro.
 

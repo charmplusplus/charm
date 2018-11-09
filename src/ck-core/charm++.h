@@ -367,7 +367,7 @@ class IrrGroup : public Chare {
 extern void (*GroupMsgRecvExtCallback)(int, int, int, char *, int);        // callback to forward received msg to external Group chare
 extern void (*ChareMsgRecvExtCallback)(int, void*, int, int, char *, int); // callback to forward received msg to external Chare
 
-/// Supports readonlies outside of the C/C++ runtime. See README.charmpy
+/// Supports readonlies outside of the C/C++ runtime. See README.charm4py
 class ReadOnlyExt {
 public:
   static void *ro_data; // on PE 0, points to the readonly data that is broadcast to every PE
@@ -378,7 +378,7 @@ public:
 };
 
 /// Lightweight object to support mainchares defined outside of the C/C++ runtime.
-/// Relays messages to appropiate external chare. See README.charmpy
+/// Relays messages to appropiate external chare. See README.charm4py
 class MainchareExt: public Chare {
 public:
   MainchareExt(CkArgMsg *m);
@@ -1131,7 +1131,7 @@ typedef CProxySection_Group CProxySection_IrrGroup;
 #include "ckreduction.h"
 
 /// Lightweight object to support chares defined outside of the C/C++ runtime
-/// Relays messages to appropiate external chare. See README.charmpy
+/// Relays messages to appropiate external chare. See README.charm4py
 class GroupExt: public Group {
 public:
   GroupExt(void *impl_msg);

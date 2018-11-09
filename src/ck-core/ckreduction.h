@@ -191,7 +191,7 @@ public:
         // Combine multiple data/reducer pairs into one reduction
         tuple,
 
-        // Perform reduction using external reducer defined in Python (for CharmPy)
+        // Perform reduction using external reducer defined in Python (for Charm4py)
         external_py
 	} reducerType;
 
@@ -276,7 +276,7 @@ private:
 PUPbytes(CkReduction::reducerType)
 
 //CkReductionTypesExt struct to expose the reducerTypes for external
-//modules like CharmPy
+//modules like Charm4py
         /*  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

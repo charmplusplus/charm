@@ -17,7 +17,7 @@ syntax() {
   echo ''
   echo 'Usage: build <target> <version> <options> [charmc-options ...]'
   echo ''
-  echo '<targets>: converse charm++ LIBS AMPI charmpy bigemulator msa'
+  echo '<targets>: converse charm++ LIBS AMPI charm4py bigemulator msa'
   echo '<targets>: doc ps-doc pdf-doc html-doc'
   if test $more = 1
   then
@@ -25,7 +25,7 @@ syntax() {
   echo '  charm++         compile Charm++ core only'
   echo '  AMPI            compile Adaptive MPI on top of Charm++'
   echo '  LIBS            compile additional parallel libraries with Charm++ core'
-  echo '  charmpy         compile shared library version of Charm++ for Charmpy'
+  echo '  charm4py        compile shared library version of Charm++ for charm4py'
   echo '  bigemulator     build additional BigSim libraries'
   echo '  msa             build Multiphase Shared Arrays(MSA) library'
   echo '  Tau             build the TAU tracing library for generating TAU performance data' 
@@ -658,15 +658,16 @@ then
     fi
 fi
 
-# build for Charmpy
-if [ "$PROGRAM" = "charmpy" ]; then
+# build for Charm4py
+if [ "$PROGRAM" = "charmpy" ] || [ "$PROGRAM" = "charm4py" ]; then
+
     if [ -n "$BOPTS" ] && [ "$HAS_SMP" -eq 1 ]; then
-        echo "Error: SMP mode is currently not supported with charmpy. Choose a non-smp version."
+        echo "Error: SMP mode is currently not supported with charm4py. Choose a non-smp version."
         exit 1
     fi
 
     if [ `echo "$BASEVERSION" | grep -c "multicore"` -gt 0 ]; then
-        echo "Error: multicore is currently not supported with charmpy. Choose a non-smp version."
+        echo "Error: multicore is currently not supported with charm4py. Choose a non-smp version."
         exit 1
     fi
 

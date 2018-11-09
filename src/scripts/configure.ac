@@ -345,16 +345,16 @@ fi
 
 AC_ARG_ENABLE([charmpy],
             [AS_HELP_STRING([--enable-charmpy],
-              [enable CharmPy support])],
+              [enable charm4py support])],
             [enable_charmpy=$enableval],
             [enable_charmpy=no])
 
 if test "$enable_charmpy" = "yes"
 then
-  Echo "CharmPy support is enabled"
+  Echo "charm4py support is enabled"
   AC_DEFINE_UNQUOTED(CMK_CHARMPY, 1, [enable charmpy])
 else
-  Echo "CharmPy support is disabled"
+  Echo "charm4py support is disabled"
   AC_DEFINE_UNQUOTED(CMK_CHARMPY, 0, [disable charmpy])
 fi
 
@@ -782,7 +782,7 @@ then
     OPTS_CXX="$OPTS_CXX -fno-lifetime-dse"
 fi
 
-# Determine compiler/linker flags to build libcharm.so for charmpy
+# Determine compiler/linker flags to build libcharm.so for charm4py
 if test "$enable_charmpy" = "yes"
 then
 
@@ -812,7 +812,7 @@ EOT
 
   if test -z $got_opt_whole_archive
   then
-    echo "Don't know how to build libcharm.so for Charmpy"
+    echo "Don't know how to build libcharm.so for Charm4py"
     test_finish 1
   fi
 fi

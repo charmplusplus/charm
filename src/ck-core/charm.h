@@ -112,7 +112,7 @@ extern void* CkPriorityPtr(void *msg);
 
 /******************************************************************************
  *
- * Functions be to called from external clients (e.g. CharmPy)
+ * Functions be to called from external clients (e.g. Charm4py)
  *
  *****************************************************************************/
 

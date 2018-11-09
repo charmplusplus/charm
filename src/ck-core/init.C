@@ -1343,7 +1343,7 @@ void _initCharm(int unused_argc, char **argv)
                   Load balancers are currently registered in Charm++ through a C file that is generated and
                   and compiled by charmc when making an executable. That file contains appropriate calls to
                   register whatever load balancers are being linked in.
-                  Without an executable (charmpy just uses libcharm.so), the load balancers in libcharm.so
+                  Without an executable (charm4py just uses libcharm.so), the load balancers in libcharm.so
                   have to somehow be registered during init.
                   With the planned load balancing framework, load balancer registration will hopefully go away,
                   at least for strategies used in central/hybrid, because they will stop being chares.
@@ -1359,7 +1359,7 @@ void _initCharm(int unused_argc, char **argv)
 #if !CMK_CHARMPY
 		CkRegisterMainModule();
 #else
-                // CkRegisterMainModule doesn't exist in charmpy because there is no executable.
+                // CkRegisterMainModule doesn't exist in charm4py because there is no executable.
                 // Instead, we go to Python to register user chares from there
 		if (CkRegisterMainModuleCallback)
 			CkRegisterMainModuleCallback();

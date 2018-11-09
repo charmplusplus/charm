@@ -220,10 +220,10 @@ CkCallback::CkCallback(ArrayElement *p, int ep,bool doInline) {
 
 #if CMK_CHARMPY
 
-// currently this is only used with Charmpy, so we are only enabling it for that case
-// to guarantee best performance for non-charmpy applications
+// currently this is only used with Charm4py, so we are only enabling it for that case
+// to guarantee best performance for non-charm4py applications
 
-// function pointer to interact with Charmpy to generate callback msg
+// function pointer to interact with Charm4py to generate callback msg
 extern void (*CreateReductionTargetMsgExt)(void*, int, int, int, char**, int*);
 
 static void CkCallbackSendExt(const CkCallback &cb, void *msg)

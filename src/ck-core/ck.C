@@ -2186,14 +2186,14 @@ void CthEnqueueBigSimThread(CthThreadToken* token, int s,
                                    int pb,unsigned int *prio);
 #endif
 
-//------------------- External client support (e.g. CharmPy) ----------------
+//------------------- External client support (e.g. Charm4py) ----------------
 
 static std::vector< std::vector<char> > ext_args;
 static std::vector<char*> ext_argv;
 
 // This is just a wrapper for ConverseInit that copies command-line args into a private
 // buffer.
-// To be called from external clients like charmpy. This wrapper avoids issues with
+// To be called from external clients like charm4py. This wrapper avoids issues with
 // ctypes and cffi.
 extern "C" void StartCharmExt(int argc, char **argv) {
 #if !defined(_WIN32) && !NODE_0_IS_CONVHOST

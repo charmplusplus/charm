@@ -56,7 +56,7 @@ void CmiTLSInit(void)
 
 #if !CMK_HAS_DL_ITERATE_PHDR
     /* Use dynamic linking in case Charm++ shared objects are used by a binary lacking
-     * conv-static.o, such as in the case of CharmPy. */
+     * conv-static.o, such as in the case of Charm4py. */
     void** pCmiExecutableStart = (void**)dlsym(RTLD_DEFAULT, "CmiExecutableStart");
     if (pCmiExecutableStart != NULL)
       CmiTLSExecutableStart = *pCmiExecutableStart;

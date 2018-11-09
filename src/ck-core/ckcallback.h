@@ -139,7 +139,7 @@ public:
 	callbackType type;
 	callbackData d;
 #if CMK_CHARMPY
-	// NOTE with charmpy, CkCallback objects are not pup'ed, so this field doesn't
+	// NOTE with charm4py, CkCallback objects are not pup'ed, so this field doesn't
 	// need to be added to pup routine. But this could change in the future if the field
 	// is used in other contexts
 	bool isCkExtReductionCb = false;

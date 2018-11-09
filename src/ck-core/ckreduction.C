@@ -1779,7 +1779,7 @@ static CkReductionMsg *external_py(int nMsgs, CkReductionMsg **msg)
         //CkPrintf("[msg %d] size: %d data: %s\n", i, msg_sizes[i], msg_data[i]);
     }
 
-    // send msg_data to CharmPy to perform reduction with Python reducer
+    // send msg_data to Charm4py to perform reduction with Python reducer
     // expected : pickle([reducer.__name__, result])
     char* reduction_result;
     int reduction_result_size = PyReductionExt(msg_data.data(), msg_sizes.data(), nMsgs, &reduction_result);
@@ -1949,7 +1949,7 @@ typedef enum : uint8_t {
     nodegroup
 } extContributorType;
 
-// Structure to store contribute parameters from external clients (e.g. CharmPy)
+// Structure to store contribute parameters from external clients (e.g. Charm4py)
 struct CkExtContributeInfo
 {
     int cbEpIdx;
@@ -1985,7 +1985,7 @@ Group* getExtContributor<Group>(CkExtContributeInfo* contribute_params)
     return (Group*)CkLocalBranch(gId);
 }
 
-// Functions to perform reduction over contributors from external clients (e.g. CharmPy)
+// Functions to perform reduction over contributors from external clients (e.g. Charm4py)
 
 // Generic function to extract CkExtContributeInfo and perform reduction
 template <class T>
@@ -2017,7 +2017,7 @@ void CkExtContributeTo(CkExtContributeInfo* contribute_params, CkCallback& cb)
         default : CkAbort("Invalid external contributor type!\n");
     }
 #else
-    CkAbort("Charmpy support must be enabled to use CkExtContributeTo");
+    CkAbort("charm4py support must be enabled to use CkExtContributeTo");
 #endif
 }
 
