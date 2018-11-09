@@ -36,7 +36,12 @@
   \ifx\pdfoutput\relax \let\pdfunknown\relax
    \RequirePackage{hyperref}\let\html@new=\renewcommand
   \else
-   \RequirePackage{hyperref}\let\html@new=\newcommand
+   \ifcase\pdfoutput
+    \let\pdfunknown\relax    \let\html@new=\newcommand
+   \else
+     \RequirePackage[pdftex]{hyperref}\let\html@new=\newcommand
+   \fi
+
   \fi
  \fi
 \else

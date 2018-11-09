@@ -1,6 +1,7 @@
 IDIR	= ../doc
 LNCMD	= test ! -f pplmanual.sty && ln -f -s ../pplmanual.sty .
-RMCMD	= rm -f ./pplmanual.sty
+LN2CMD	= test ! -f html.sty && ln -f -s ../html.sty .
+RMCMD	= rm -f ./pplmanual.sty ./html.sty
 WEBDIR	= /www/manuals
 DIRS	= converse convext charm++ libraries f90charm pose \
 	ampi bigsim projections tcharm debugger faq \
@@ -12,18 +13,18 @@ all: pdf ps html
 
 ps:
 	[ -d $(IDIR)/ps ] || mkdir $(IDIR)/ps
-	for d in $(DIRS); do (cd $$d; $(LNCMD); $(MAKE) ps) || exit 1; done
+	for d in $(DIRS); do (cd $$d; $(LNCMD); $(LN2CMD); $(MAKE) ps) || exit 1; done
 
 pdf:
 	[ -d $(IDIR)/pdf ] || mkdir $(IDIR)/pdf
-	for d in $(DIRS); do (cd $$d; $(LNCMD); $(MAKE) pdf) || exit 1; done
+	for d in $(DIRS); do (cd $$d; $(LNCMD); $(LN2CMD); $(MAKE) pdf) || exit 1; done
 
 html:
 	[ -d $(IDIR)/html ] || mkdir $(IDIR)/html
-	for d in $(DIRS); do (cd $$d; $(LNCMD); $(MAKE) html) || exit 1; done
+	for d in $(DIRS); do (cd $$d; $(LNCMD); $(LN2CMD); $(MAKE) html) || exit 1; done
 
 doc:
-	for d in $(DIRS); do (cd $$d; $(LNCMD); $(MAKE) doc) || exit 1; done
+	for d in $(DIRS); do (cd $$d; $(LNCMD); $(LN2CMD); $(MAKE) doc) || exit 1; done
 
 web: doc
 	-rm -rf $(WEBDIR)/backup
