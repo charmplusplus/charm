@@ -11,8 +11,11 @@
 using std::list;
 #include <algorithm>
 using std::for_each;
+
+#if __cplusplus < 201103L
 #include <functional>
 using std::mem_fun;
+#endif
 
 namespace xi {
 SdagConstruct::SdagConstruct(EToken t, SdagConstruct* construct1) {
@@ -67,7 +70,11 @@ SdagConstruct::~SdagConstruct() {
 void SdagConstruct::numberNodes(void) {
   if (constructs != 0)
     for_each(constructs->begin(), constructs->end(),
+#if __cplusplus < 201103L
              mem_fun(&SdagConstruct::numberNodes));
+#else
+             [](SdagConstruct * c) { c->numberNodes(); } );
+#endif
 }
 
 XStr* SdagConstruct::createLabel(const char* str, int nodeNum) {
@@ -84,7 +91,12 @@ void SdagConstruct::labelNodes() {
   if (label_str != 0) label = createLabel(label_str, nodeNum);
 
   if (constructs != 0)
-    for_each(constructs->begin(), constructs->end(), mem_fun(&SdagConstruct::labelNodes));
+    for_each(constructs->begin(), constructs->end(),
+#if __cplusplus < 201103L
+             mem_fun(&SdagConstruct::labelNodes));
+#else
+             [](SdagConstruct * c) { c->labelNodes(); } );
+#endif
 }
 
 void EntryList::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct* thisWhen) {
@@ -560,7 +572,11 @@ void SdagConstruct::setNext(SdagConstruct* n, int boe) {
 // for trace
 void SdagConstruct::generateTrace() {
   for_each(constructs->begin(), constructs->end(),
+#if __cplusplus < 201103L
            mem_fun(&SdagConstruct::generateTrace));
+#else
+           [](SdagConstruct * c) { c->generateTrace(); } );
+#endif
   if (con1) con1->generateTrace();
   if (con2) con2->generateTrace();
   if (con3) con3->generateTrace();
