@@ -1120,9 +1120,8 @@ class AmpiRequest {
 #endif
 
  public:
-  AmpiRequest() noexcept {}
-  /// Close this request (used by free and cancel)
-  virtual ~AmpiRequest() noexcept {}
+  AmpiRequest() =default;
+  virtual ~AmpiRequest() =default;
 
   /// Activate this persistent request.
   ///  Only meaningful for persistent Ireq, SendReq, and SsendReq requests.
@@ -1241,8 +1240,8 @@ class IReq final : public AmpiRequest {
     comm  = comm_;
     AMPI_REQUEST_COMMON_INIT
   }
-  IReq() noexcept {}
-  ~IReq() noexcept {}
+  IReq() =default;
+  ~IReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
   int wait(MPI_Status *sts) noexcept override;
   void cancel() noexcept override { if (!complete) cancelled = true; }
@@ -1283,8 +1282,8 @@ class RednReq final : public AmpiRequest {
     op    = op_;
     AMPI_REQUEST_COMMON_INIT
   }
-  RednReq() noexcept {}
-  ~RednReq() noexcept {}
+  RednReq() =default;
+  ~RednReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
   int wait(MPI_Status *sts) noexcept override;
   void cancel() noexcept override {}
@@ -1312,8 +1311,8 @@ class GatherReq final : public AmpiRequest {
     comm  = comm_;
     AMPI_REQUEST_COMMON_INIT
   }
-  GatherReq() noexcept {}
-  ~GatherReq() noexcept {}
+  GatherReq() =default;
+  ~GatherReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
   int wait(MPI_Status *sts) noexcept override;
   void cancel() noexcept override {}
@@ -1345,8 +1344,8 @@ class GathervReq final : public AmpiRequest {
     displs.assign(d, d+count);
     AMPI_REQUEST_COMMON_INIT
   }
-  GathervReq() noexcept {}
-  ~GathervReq() noexcept {}
+  GathervReq() =default;
+  ~GathervReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
   int wait(MPI_Status *sts) noexcept override;
   AmpiReqType getType() const noexcept override { return AMPI_GATHERV_REQ; }
@@ -1434,8 +1433,8 @@ class SsendReq final : public AmpiRequest {
     comm  = comm_;
     AMPI_REQUEST_COMMON_INIT
   }
-  SsendReq() noexcept {}
-  ~SsendReq() noexcept {}
+  SsendReq() =default;
+  ~SsendReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
   int wait(MPI_Status *sts) noexcept override;
   void setPersistent(bool p) noexcept override { persistent = p; }
@@ -1457,7 +1456,7 @@ class SsendReq final : public AmpiRequest {
 class GPUReq : public AmpiRequest {
  public:
   GPUReq() noexcept;
-  ~GPUReq() noexcept {}
+  ~GPUReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
   int wait(MPI_Status *sts) noexcept override;
   void receive(ampi *ptr, AmpiMsg *msg) noexcept override;
@@ -1474,8 +1473,8 @@ class ATAReq final : public AmpiRequest {
   vector<MPI_Request> reqs;
 
   ATAReq(int numReqs_) noexcept : reqs(numReqs_) {}
-  ATAReq() noexcept {}
-  ~ATAReq() noexcept {}
+  ATAReq() =default;
+  ~ATAReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
   int wait(MPI_Status *sts) noexcept override;
   void receive(ampi *ptr, AmpiMsg *msg) noexcept override {}
@@ -1506,7 +1505,7 @@ class GReq final : public AmpiRequest {
     : queryFn(q), freeFn(f), cancelFn(c), pollFn(p), waitFn(nullptr), extraState(es) {}
   GReq(MPI_Grequest_query_function *q, MPI_Grequest_free_function* f, MPI_Grequest_cancel_function* c, MPIX_Grequest_poll_function* p, MPIX_Grequest_wait_function* w, void* es) noexcept
     : queryFn(q), freeFn(f), cancelFn(c), pollFn(p), waitFn(w), extraState(es) {}
-  GReq() noexcept {}
+  GReq() =default;
   ~GReq() noexcept { (*freeFn)(extraState); }
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
   int wait(MPI_Status *sts) noexcept override;
@@ -1785,144 +1784,30 @@ DefinePooledReqX(Align, alignof)
 class AmpiRequestPool {
  private:
   std::bitset<AMPI_REQ_POOL_SIZE> validReqs; // reqs in the pool are either valid (being used by a real req) or invalid
-  int startIdx; // start next search from this index
+  int startIdx = 0; // start next search from this index
   alignas(pooledReqAlign) std::array<char, AMPI_REQ_POOL_SIZE*pooledReqSize> reqs; // pool of memory for requests
 
  public:
-  AmpiRequestPool() noexcept : startIdx(0) {}
+  AmpiRequestPool() =default;
   ~AmpiRequestPool() =default;
-  inline IReq* newIReq() noexcept {
+  template <typename T, typename... Args>
+  inline T* newReq(Args&&... args) noexcept {
     if (validReqs.all()) {
-      return new IReq();
+      return new T(std::forward<Args>(args)...);
     } else {
       for (int i=startIdx; i<validReqs.size(); i++) {
         if (!validReqs[i]) {
           validReqs[i] = 1;
-          IReq* ireq = new (&reqs[i*pooledReqSize]) IReq();
           startIdx = i+1;
-          return ireq;
+          T* req = new (&reqs[i*pooledReqSize]) T(std::forward<Args>(args)...);
+          return req;
         }
       }
       CkAbort("AMPI> failed to find a free request in pool!");
       return NULL;
     }
   }
-  inline IReq* newIReq(void* buf, int count, MPI_Datatype type, int src, int tag,
-                       MPI_Comm comm, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) noexcept {
-    if (validReqs.all()) {
-      return new IReq(buf, count, type, src, tag, comm, ddt, sts);
-    } else {
-      for (int i=startIdx; i<validReqs.size(); i++) {
-        if (!validReqs[i]) {
-          validReqs[i] = 1;
-          IReq* ireq = new (&reqs[i*pooledReqSize]) IReq(buf, count, type, src, tag, comm, ddt, sts);
-          startIdx = i+1;
-          return ireq;
-        }
-      }
-      CkAbort("AMPI> failed to find a free request in pool!");
-      return NULL;
-    }
-  }
-  inline SendReq* newSendReq() noexcept {
-    if (validReqs.all()) {
-      return new SendReq();
-    } else {
-      for (int i=startIdx; i<validReqs.size(); i++) {
-        if (!validReqs[i]) {
-          validReqs[i] = 1;
-          SendReq* sreq = new (&reqs[i*pooledReqSize]) SendReq();
-          startIdx = i+1;
-          return sreq;
-        }
-      }
-      CkAbort("AMPI> failed to find a free request in pool!");
-      return NULL;
-    }
-  }
-  inline SendReq* newSendReq(MPI_Datatype type, MPI_Comm comm, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) noexcept {
-    if (validReqs.all()) {
-      return new SendReq(type, comm, ddt, sts);
-    } else {
-      for (int i=startIdx; i<validReqs.size(); i++) {
-        if (!validReqs[i]) {
-          validReqs[i] = 1;
-          SendReq* sreq = new (&reqs[i*pooledReqSize]) SendReq(type, comm, ddt, sts);
-          startIdx = i+1;
-          return sreq;
-        }
-      }
-      CkAbort("AMPI> failed to find a free request in pool!");
-      return NULL;
-    }
-  }
-  inline SendReq* newSendReq(void* buf, int count, MPI_Datatype type, int destRank, int tag,
-                             MPI_Comm comm, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) noexcept {
-    if (validReqs.all()) {
-      return new SendReq(buf, count, type, destRank, tag, comm, ddt, sts);
-    } else {
-      for (int i=startIdx; i<validReqs.size(); i++) {
-        if (!validReqs[i]) {
-          validReqs[i] = 1;
-          SendReq* sreq = new (&reqs[i*pooledReqSize]) SendReq(buf, count, type, destRank, tag, comm, ddt, sts);
-          startIdx = i+1;
-          return sreq;
-        }
-      }
-      CkAbort("AMPI> failed to find a free request in pool!");
-      return NULL;
-    }
-  }
-  inline SsendReq* newSsendReq() noexcept {
-    if (validReqs.all()) {
-      return new SsendReq();
-    } else {
-      for (int i=startIdx; i<validReqs.size(); i++) {
-        if (!validReqs[i]) {
-          validReqs[i] = 1;
-          SsendReq* sreq = new (&reqs[i*pooledReqSize]) SsendReq();
-          startIdx = i+1;
-          return sreq;
-        }
-      }
-      CkAbort("AMPI> failed to find a free request in pool!");
-      return NULL;
-    }
-  }
-  inline SsendReq* newSsendReq(MPI_Datatype type, MPI_Comm comm, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) noexcept {
-    if (validReqs.all()) {
-      return new SsendReq(type, comm, ddt, sts);
-    } else {
-      for (int i=startIdx; i<validReqs.size(); i++) {
-        if (!validReqs[i]) {
-          validReqs[i] = 1;
-          SsendReq* sreq = new (&reqs[i*pooledReqSize]) SsendReq(type, comm, ddt, sts);
-          startIdx = i+1;
-          return sreq;
-        }
-      }
-      CkAbort("AMPI> failed to find a free request in pool!");
-      return NULL;
-    }
-  }
-  inline SsendReq* newSsendReq(void* buf, int count, MPI_Datatype type, int dest, int tag,
-                               MPI_Comm comm, int src, CkDDT* ddt, AmpiReqSts sts=AMPI_REQ_PENDING) noexcept {
-    if (validReqs.all()) {
-      return new SsendReq(buf, count, type, dest, tag, comm, src, ddt, sts);
-    } else {
-      for (int i=startIdx; i<validReqs.size(); i++) {
-        if (!validReqs[i]) {
-          validReqs[i] = 1;
-          SsendReq* sreq = new (&reqs[i*pooledReqSize]) SsendReq(buf, count, type, dest, tag, comm, src, ddt, sts);
-          startIdx = i+1;
-          return sreq;
-        }
-      }
-      CkAbort("AMPI> failed to find a free request in pool!");
-      return NULL;
-    }
-  }
-  inline void deleteAmpiRequest(AmpiRequest* req) noexcept {
+  inline void deleteReq(AmpiRequest* req) noexcept {
     if (req->isPooledType() &&
         ((char*)req >= &reqs.front() && (char*)req <= &reqs.back()))
     {

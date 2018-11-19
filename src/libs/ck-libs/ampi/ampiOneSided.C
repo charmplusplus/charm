@@ -225,7 +225,7 @@ int ampi::winPut(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank
             (orgtotalsize >= AMPI_SMP_RDMA_THRESHOLD && destLikelyWithinProcess(thisProxy, rank)))
     {
       AmpiRequestList& reqs = getReqs();
-      SendReq* ampiReq = parent->reqPool.newSendReq(orgtype, myComm.getComm(), getDDT());
+      SendReq* ampiReq = parent->reqPool.newReq<SendReq>(orgtype, myComm.getComm(), getDDT());
       MPI_Request req = reqs.insert(ampiReq);
       CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
       completedSendCB.setRefnum(req);
@@ -412,7 +412,7 @@ int ampi::winAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, i
             (orgtotalsize >= AMPI_SMP_RDMA_THRESHOLD && destLikelyWithinProcess(thisProxy, rank)))
     {
       AmpiRequestList& reqs = getReqs();
-      SendReq* ampiReq = parent->reqPool.newSendReq(orgtype, myComm.getComm(), getDDT());
+      SendReq* ampiReq = parent->reqPool.newReq<SendReq>(orgtype, myComm.getComm(), getDDT());
       MPI_Request req = reqs.insert(ampiReq);
       CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
       completedSendCB.setRefnum(req);
@@ -477,7 +477,7 @@ int ampi::winGetAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype
             (orgtotalsize >= AMPI_SMP_RDMA_THRESHOLD && destLikelyWithinProcess(thisProxy, rank)))
     {
       AmpiRequestList& reqs = getReqs();
-      SendReq* ampiReq = parent->reqPool.newSendReq(orgtype, myComm.getComm(), getDDT());
+      SendReq* ampiReq = parent->reqPool.newReq<SendReq>(orgtype, myComm.getComm(), getDDT());
       MPI_Request req = reqs.insert(ampiReq);
       CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
       completedSendCB.setRefnum(req);
@@ -852,7 +852,7 @@ AMPI_API_IMPL(int, MPI_Rput, const void *orgaddr, int orgcnt, MPI_Datatype orgty
   if (targtype > AMPI_MAX_PREDEFINED_TYPE) {CkAbort("AMPI does not currently support RMA with derived datatypes.");}
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
-  *request = ptr->postReq(getAmpiParent()->reqPool.newSendReq(orgtype, winStruct->comm, ptr->getDDT(), AMPI_REQ_COMPLETED));
+  *request = ptr->postReq(getAmpiParent()->reqPool.newReq<SendReq>(orgtype, winStruct->comm, ptr->getDDT(), AMPI_REQ_COMPLETED));
   return ptr->winPut(orgaddr, orgcnt, orgtype, rank, targdisp, targcnt, targtype, winStruct);
 }
 /*
@@ -871,7 +871,7 @@ AMPI_API_IMPL(int, MPI_Rget, void *orgaddr, int orgcnt, MPI_Datatype orgtype, in
   if (targtype > AMPI_MAX_PREDEFINED_TYPE) {CkAbort("AMPI does not currently support RMA with derived datatypes.");}
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
-  *request = ptr->postReq(getAmpiParent()->reqPool.newSendReq(orgtype, winStruct->comm, ptr->getDDT(), AMPI_REQ_COMPLETED));
+  *request = ptr->postReq(getAmpiParent()->reqPool.newReq<SendReq>(orgtype, winStruct->comm, ptr->getDDT(), AMPI_REQ_COMPLETED));
   return ptr->winGet(orgaddr, orgcnt, orgtype, rank, targdisp, targcnt, targtype, winStruct);
 }
 
@@ -891,7 +891,7 @@ AMPI_API_IMPL(int, MPI_Raccumulate, const void *orgaddr, int orgcnt, MPI_Datatyp
   if (targtype > AMPI_MAX_PREDEFINED_TYPE) {CkAbort("AMPI does not currently support RMA with derived datatypes.");}
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
-  *request = ptr->postReq(getAmpiParent()->reqPool.newSendReq(orgtype, winStruct->comm, ptr->getDDT(), AMPI_REQ_COMPLETED));
+  *request = ptr->postReq(getAmpiParent()->reqPool.newReq<SendReq>(orgtype, winStruct->comm, ptr->getDDT(), AMPI_REQ_COMPLETED));
   return ptr->winAccumulate(orgaddr, orgcnt, orgtype, rank,
                             targdisp, targcnt, targtype, op, winStruct);
 }
@@ -914,7 +914,7 @@ AMPI_API_IMPL(int, MPI_Rget_accumulate, const void *orgaddr, int orgcnt, MPI_Dat
   if (targtype > AMPI_MAX_PREDEFINED_TYPE) {CkAbort("AMPI does not currently support RMA with derived datatypes.");}
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
-  *request = ptr->postReq(getAmpiParent()->reqPool.newSendReq(orgtype, winStruct->comm, ptr->getDDT(), AMPI_REQ_COMPLETED));
+  *request = ptr->postReq(getAmpiParent()->reqPool.newReq<SendReq>(orgtype, winStruct->comm, ptr->getDDT(), AMPI_REQ_COMPLETED));
   return ptr->winGetAccumulate(orgaddr, orgcnt, orgtype, resaddr, rescnt, restype,
                                rank, targdisp, targcnt, targtype, op, winStruct);
 }
