@@ -1,19 +1,18 @@
 /** \file stencil3d.C
-
  *  This example is the nocopy verison of the stencil example
  *  in examples/charm++/load_balancing/stencil3d *
- *	      *****************
- *	   *		   *  *
- *   ^	*****************     *
- *   |	*		*     *
- *   |	*		*     *
- *   |	*		*     *
- *   Y	*		*     *
- *   |	*		*     *
- *   |	*		*     *
- *   |	*		*  *
- *   ~	*****************    Z
- *	<------ X ------>
+ *        *****************
+ *        *       *       *
+ *   ^    *****************     *
+ *   |    *       *       *
+ *   |    *       *       *
+ *   |    *       *       *
+ *   Y    *       *       *
+ *   |    *       *       *
+ *   |    *       *       *
+ *   |    *       *       *
+ *   ~    *****************    Z
+ *        <------ X ------>
  *
  *   X: left, right --> wrap_x
  *   Y: top, bottom --> wrap_y
@@ -45,22 +44,22 @@ int myrand(int numpes) {
 
 // We want to wrap entries around, and because mod operator %
 // sometimes misbehaves on negative values. -1 maps to the highest value.
-#define wrap_x(a)	(((a)+num_chare_x)%num_chare_x)
-#define wrap_y(a)	(((a)+num_chare_y)%num_chare_y)
-#define wrap_z(a)	(((a)+num_chare_z)%num_chare_z)
+#define wrap_x(a)    (((a)+num_chare_x)%num_chare_x)
+#define wrap_y(a)    (((a)+num_chare_y)%num_chare_y)
+#define wrap_z(a)    (((a)+num_chare_z)%num_chare_z)
 
-#define index(a,b,c)	((a)+(b)*(blockDimX+2)+(c)*(blockDimX+2)*(blockDimY+2))
+#define index(a,b,c)    ((a)+(b)*(blockDimX+2)+(c)*(blockDimX+2)*(blockDimY+2))
 
-#define MAX_ITER	40
-#define LBPERIOD_ITER	5    // LB is called every LBPERIOD_ITER number of program iterations
-#define CHANGELOAD	30
-#define LEFT		1
-#define RIGHT		2
-#define TOP		3
-#define BOTTOM		4
-#define FRONT		5
-#define BACK		6
-#define DIVIDEBY7      	0.14285714285714285714
+#define MAX_ITER         100
+#define LBPERIOD_ITER    5     // LB is called every LBPERIOD_ITER number of program iterations
+#define CHANGELOAD       30
+#define LEFT             1
+#define RIGHT            2
+#define TOP              3
+#define BOTTOM           4
+#define FRONT            5
+#define BACK             6
+#define DIVIDEBY7        0.14285714285714285714
 
 /** \class Main
  *
@@ -140,10 +139,18 @@ class Stencil: public CBase_Stencil {
     double *new_temperature;
     CkCallback cb;
 
+    // ghost arrays
+    double *leftGhost;
+    double *rightGhost;
+    double *topGhost;
+    double *bottomGhost;
+    double *frontGhost;
+    double *backGhost;
+
+
     // callback function called on completion of sending ghosts
     void completedSendingGhost(CkDataMsg *msg){
-      void *ptr = *((void **)(msg->data));
-      free(ptr);
+      void *ptr = *((void **)(msg->data)); // we don't free the ghost array as it is reused across iterations
       delete msg;
       counter++;
       // Advance to next step on completion of sending ghosts to the 6 neighbors
@@ -172,6 +179,15 @@ class Stencil: public CBase_Stencil {
       iterations = 0;
       imsg = 0;
       constrainBC();
+
+      // Allocate ghost arrays
+      leftGhost   = new double[blockDimY*blockDimZ];
+      rightGhost  = new double[blockDimY*blockDimZ];
+      topGhost    = new double[blockDimX*blockDimZ];
+      bottomGhost = new double[blockDimX*blockDimZ];
+      frontGhost  = new double[blockDimX*blockDimY];
+      backGhost   = new double[blockDimX*blockDimY];
+
       // start measuring time
       if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0)
         startTime = CkWallTimer();
@@ -196,6 +212,12 @@ class Stencil: public CBase_Stencil {
         temperature = new double[size];
         new_temperature = new double[size];
         counter = 0;
+        leftGhost   = new double[blockDimY*blockDimZ];
+        rightGhost  = new double[blockDimY*blockDimZ];
+        topGhost    = new double[blockDimX*blockDimZ];
+        bottomGhost = new double[blockDimX*blockDimZ];
+        frontGhost  = new double[blockDimX*blockDimY];
+        backGhost   = new double[blockDimX*blockDimY];
       }
       p(temperature, size);
       p(new_temperature, size);
@@ -206,19 +228,17 @@ class Stencil: public CBase_Stencil {
     ~Stencil() {
       delete [] temperature;
       delete [] new_temperature;
+      delete [] leftGhost;
+      delete [] rightGhost;
+      delete [] topGhost;
+      delete [] bottomGhost;
+      delete [] frontGhost;
+      delete [] backGhost;
     }
 
     // Send ghost faces to the six neighbors
     void begin_iteration(void) {
       iterations++;
-
-      // Copy different faces into messages
-      double *leftGhost =  new double[blockDimY*blockDimZ];
-      double *rightGhost =  new double[blockDimY*blockDimZ];
-      double *topGhost =  new double[blockDimX*blockDimZ];
-      double *bottomGhost =  new double[blockDimX*blockDimZ];
-      double *frontGhost =  new double[blockDimX*blockDimY];
-      double *backGhost =  new double[blockDimX*blockDimY];
 
       for(int k=0; k<blockDimZ; ++k)
         for(int j=0; j<blockDimY; ++j) {
