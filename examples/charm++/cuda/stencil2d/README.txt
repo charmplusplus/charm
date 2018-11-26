@@ -26,10 +26,10 @@ doing stencil on the CPU, which increases the effectiveness of the overlap of
 heterogeneous tasks provided by HAPI.
 
 Usage: ./stencil2d -s [grid size] -b [block size] -i [iterations]
-                   -u/g: CUDA/HAPI -r [offload ratio]
+                   -u/y: CUDA/HAPI -r [offload ratio]
                    -t [thread coarsening size]
 
-Example: ./stencil2d -s 4096 -b 256 -i 100 -g -r 0.5 -t 4
+Example: ./stencil2d -s 4096 -b 256 -i 100 -y -r 0.5 -t 4
          This will run with 16 x 16 = 256 chares, with 128 chares performing
          stencil on the CPU and the other 128 chares on the GPU. Each thread
          will calculate 4 x 4 = 16 elements.

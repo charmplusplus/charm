@@ -5,7 +5,7 @@
 #endif
 #include <string>
 
-#define CHARM_MODE 10
+#define CPU_MODE 10
 #define CUDA_MODE 11
 #define HAPI_MODE 12
 
@@ -15,7 +15,7 @@
 #define BOTTOM 4
 #define DIVIDEBY5 0.2
 
-#define USE_CUSTOM_MAP 1 // set to 1 to use GPU handler PEs
+#define USE_CUSTOM_MAP 1 // Should be set to 1 to use GPU handler PEs
 
 /* readonly */ CProxy_Main mainProxy;
 /* readonly */ int grid_x;
@@ -32,8 +32,8 @@
 /* readonly */ int gpu_pes;
 
 extern void invokeKernel(cudaStream_t stream, double* d_temperature,
-                         double* d_new_temperature, double* ghost_ptrs[],
-                         int block_x, int block_y, int thread_size);
+                         double* d_new_temperature, int block_x, int block_y,
+                         int thread_size);
 
 // Calculate the number of digits.
 int numDigits(int n) {
@@ -72,12 +72,12 @@ class CustomMap : public CkArrayMap {
             penum = elem % (CkNumPes() - gpu_pes);
           }
           else {
-            penum = 0; // no normal PEs; place all CPU chares on PE 0
+            penum = 0; // No normal PEs; place all CPU chares on PE 0
           }
         }
       }
       else {
-        // no GPU PE
+        // No GPU PE
         penum = elem % CkNumPes();
       }
 
@@ -102,18 +102,18 @@ class Main : public CBase_Main {
 #ifdef USE_NVTX
     NVTXTracer nvtx_range("Main::Main", NVTXColor::Turquoise);
 #endif
-    // default values
+    // Set default values
     mainProxy = thisProxy;
     grid_x = grid_y = 1024;
     block_x = block_y = 128;
     num_iters = 10;
-    global_exec_mode = CHARM_MODE;
+    global_exec_mode = CPU_MODE;
     thread_size = 1;
     offload_ratio = 0.0;
     gpu_prio = false;
     gpu_pes = 0;
 
-    // handle arguments
+    // Process arguments
     int c;
     bool sFlag = false;
     bool bFlag = false;
@@ -165,7 +165,7 @@ class Main : public CBase_Main {
       CkAbort("array_size_Y % block_size_Y != 0!");
     if (offload_ratio < 0.0f || offload_ratio > 1.0f)
       CkAbort("offload_ratio should be between 0 and 1!");
-    if (offload_ratio > 0.0f && global_exec_mode == CHARM_MODE) {
+    if (offload_ratio > 0.0f && global_exec_mode == CPU_MODE) {
       CkPrintf("Offload ratio set higher than 0 but GPU mode not set!\n"
                "Reverting offload ratio to 0...\n");
       offload_ratio = 0.0f;
@@ -179,13 +179,13 @@ class Main : public CBase_Main {
     num_chares_x = grid_x / block_x;
     num_chares_y = grid_y / block_y;
 
-    // print info
+    // Print info
     CkPrintf("\n[CUDA 2D stencil example]\n");
     CkPrintf("Execution mode: %s\n",
-             ((global_exec_mode == CHARM_MODE)
-                  ? "Charm++ only"
-                  : ((global_exec_mode == CUDA_MODE) ? "Charm++ with CUDA"
-                                                     : "Charm++ with HAPI")));
+             ((global_exec_mode == CPU_MODE)
+                  ? "CPU only"
+                  : ((global_exec_mode == CUDA_MODE) ? "CPU + CUDA"
+                                                     : "CPU + HAPI")));
     CkPrintf("Chares: %d x %d\n", num_chares_x, num_chares_y);
     CkPrintf("Grid dimensions: %d x %d\n", grid_x, grid_y);
     CkPrintf("Block dimensions: %d x %d\n", block_x, block_y);
@@ -197,7 +197,7 @@ class Main : public CBase_Main {
     CkPrintf("GPU handler PEs: %d\n\n", gpu_pes);
     delete m;
 
-    // create 2D chare array
+    // Create 2D chare array
 #if USE_CUSTOM_MAP
     CkArrayOptions opts(num_chares_x, num_chares_y);
     CProxy_CustomMap cmap = CProxy_CustomMap::ckNew();
@@ -207,10 +207,10 @@ class Main : public CBase_Main {
     stencils = CProxy_Stencil::ckNew(num_chares_x, num_chares_y);
 #endif
 
-    // start measuring initialization time
+    // Start measuring initialization time
     init_start_time = CkWallTimer();
 
-    // initialize workers
+    // Initialize workers
     stencils.init();
   }
 
@@ -221,12 +221,12 @@ class Main : public CBase_Main {
     CkPrintf("\nChare array initialization time: %lf seconds\n\n",
              CkWallTimer() - init_start_time);
 
-    // start measuring execution time
+    // Start measuring total execution time
     start_time = CkWallTimer();
 
-    // start computation
+    // Start stencil iterations
     CallbackMsg* m = new CallbackMsg();
-    stencils.run(m);
+    stencils.iterate(m);
   }
 
   void done(double time) {
@@ -271,8 +271,7 @@ class Stencil : public CBase_Stencil {
   Stencil() {}
 
   ~Stencil() {
-    // free memory and destroy stream
-    if (local_exec_mode == CUDA_MODE || local_exec_mode == CHARM_MODE) {
+    if (local_exec_mode == CUDA_MODE || local_exec_mode == HAPI_MODE) {
       hapiCheck(cudaFreeHost(temperature));
       hapiCheck(cudaFree(d_temperature));
       hapiCheck(cudaFree(d_new_temperature));
@@ -282,7 +281,7 @@ class Stencil : public CBase_Stencil {
       hapiCheck(cudaFreeHost(bottom_ghost));
 
       cudaStreamDestroy(stream);
-    } else {  // CHARM_MODE
+    } else { // CPU_MODE
       delete temperature;
       delete new_temperature;
       delete left_ghost;
@@ -299,11 +298,11 @@ class Stencil : public CBase_Stencil {
     NVTXTracer nvtx_range(std::to_string(thisFlatIndex) + " Stencil::initialize", NVTXColor::SunFlower);
 #endif
 
-    // determine execution mode
+    // Determine execution mode
 #if USE_CUSTOM_MAP
     local_exec_mode = global_exec_mode;
     if (thisFlatIndex >= num_chares_x * num_chares_y * offload_ratio) {
-      local_exec_mode = CHARM_MODE;
+      local_exec_mode = CPU_MODE;
     }
 #else
     int num_chares_pe = (num_chares_x * num_chares_y) / CkNumPes();
@@ -319,17 +318,16 @@ class Stencil : public CBase_Stencil {
 
     local_exec_mode = global_exec_mode;
     if (this_rank >= num_chares_pe * offload_ratio) {
-      local_exec_mode = CHARM_MODE;
+      local_exec_mode = CPU_MODE;
     }
 #endif
 
-    // calculate number of digits to use in final print
+    // Print execution mode and PE
     n_digits = numDigits(num_chares_x * num_chares_y);
-
     std::string mode_string;
     switch (local_exec_mode) {
-      case CHARM_MODE:
-        mode_string = "Charm";
+      case CPU_MODE:
+        mode_string = "CPU";
         break;
       case CUDA_MODE:
         mode_string = "CUDA";
@@ -340,9 +338,12 @@ class Stencil : public CBase_Stencil {
     }
     CkPrintf("[%*d] Mode: %s, PE: %d\n", n_digits, thisFlatIndex, mode_string.c_str(), CkMyPe());
 
+    // Initialize values
+    my_iter = 0;
     agg_time = 0.0;
     neighbors = 0;
 
+    // Check bounds and set number of valid neighbors
     left_bound = right_bound = top_bound = bottom_bound = false;
     if (thisIndex.x == 0)
       left_bound = true;
@@ -361,7 +362,7 @@ class Stencil : public CBase_Stencil {
     else
       neighbors++;
 
-    // allocate memory and create stream
+    // Allocate memory and create CUDA stream
     if (local_exec_mode == CUDA_MODE || local_exec_mode == HAPI_MODE) {
       hapiCheck(
           cudaMallocHost((void**)&temperature,
@@ -379,7 +380,7 @@ class Stencil : public CBase_Stencil {
       hapiCheck(cudaMallocHost((void**)&top_ghost, sizeof(double) * block_x));
 
       cudaStreamCreate(&stream);
-    } else {  // CHARM_MODE
+    } else {  // CPU_MODE
       temperature = new double[(block_x + 2) * (block_y + 2)];
       new_temperature = new double[(block_x + 2) * (block_y + 2)];
       left_ghost = new double[block_y];
@@ -388,68 +389,48 @@ class Stencil : public CBase_Stencil {
       bottom_ghost = new double[block_x];
     }
 
-    // initialize values
+    // Initialize temperature data
     for (int j = 0; j < block_y + 2; j++) {
       for (int i = 0; i < block_x + 2; i++) {
         temperature[(block_x + 2) * j + i] = 0.0;
-        if (local_exec_mode == CHARM_MODE) {
+        if (local_exec_mode == CPU_MODE) {
           new_temperature[(block_x + 2) * j + i] = 0.0;
         }
       }
     }
-    my_iter = 0;
 
-    // enforce boundary conditions
+    // Enforce boundary conditions
     constrainBC();
 
     CkCallback cb(CkReductionTarget(Main, initDone), mainProxy);
     contribute(cb);
   }
 
-  void run(CallbackMsg* m) {
-    delete m;
-    if (my_iter > 0) {
-      agg_time += CkWallTimer() - iter_start_time;
-    }
-    if (my_iter < num_iters) {
-      // continue next iteration
-      thisProxy(thisIndex.x, thisIndex.y).iterate();
-    } else {
-      // completed all iterations
-      CkPrintf("[%*d] Average time per iteration: %lf\n", n_digits,
-               thisFlatIndex, agg_time / num_iters);
-      CkCallback cb(CkReductionTarget(Main, done), mainProxy);
-      contribute(sizeof(double), &agg_time, CkReduction::sum_double, cb);
-    }
-  }
-
   void sendGhosts(void) {
 #ifdef USE_NVTX
     NVTXTracer nvtx_range(std::to_string(thisFlatIndex) + " Stencil::sendGhosts", NVTXColor::PeterRiver);
 #endif
-    my_iter++;
-    iter_start_time = CkWallTimer();
-
+    // Copy temperature data to the GPU on first iteration
     if ((local_exec_mode == CUDA_MODE || local_exec_mode == HAPI_MODE) &&
-        my_iter == 1) {
-      // copy temperature data to the GPU
+        my_iter == 0) {
       hapiCheck(
           cudaMemcpyAsync(d_temperature, temperature,
                           sizeof(double) * (block_x + 2) * (block_y + 2),
                           cudaMemcpyHostToDevice, stream));
     }
 
-    // copy different faces into messages
-    if (local_exec_mode == CHARM_MODE || my_iter == 1) {
+    // Copy different faces into messages.
+    // For GPU modes, the ghost data gets filled directly via cudaMemcpy.
+    if (local_exec_mode == CPU_MODE) {
       for (int j = 0; j < block_y; j++) {
-        left_ghost[j] = temperature[(block_x + 2) * (j + 1)];
+        left_ghost[j] = temperature[(block_x + 2) * (1 + j)];
         right_ghost[j] =
-            temperature[(block_x + 2) * (j + 1) + (block_x + 1)];
+            temperature[(block_x + 2) * (1 + j) + (block_x + 1)];
       }
 
       for (int i = 0; i < block_x; i++) {
-        bottom_ghost[i] = temperature[i + 1];
-        top_ghost[i] = temperature[(block_x + 2) * (block_y + 1) + (i + 1)];
+        bottom_ghost[i] = temperature[1 + i];
+        top_ghost[i] = temperature[(block_x + 2) * (block_y + 1) + (1 + i)];
       }
     }
 
@@ -465,6 +446,9 @@ class Stencil : public CBase_Stencil {
   }
 
   void processGhosts(int dir, int width, double* gh) {
+#ifdef USE_NVTX
+    NVTXTracer nvtx_range(std::to_string(thisFlatIndex) + " Stencil::processGhosts", NVTXColor::WetAsphalt);
+#endif
     switch (dir) {
       case LEFT:
         if (local_exec_mode == CUDA_MODE || local_exec_mode == HAPI_MODE) {
@@ -475,7 +459,7 @@ class Stencil : public CBase_Stencil {
               cudaMemcpyHostToDevice, stream));
         } else {
           for (int j = 0; j < width; j++) {
-            temperature[(block_x + 2) * (j + 1)] = gh[j];
+            temperature[(block_x + 2) * (1 + j)] = gh[j];
           }
         }
         break;
@@ -488,7 +472,7 @@ class Stencil : public CBase_Stencil {
               sizeof(double), block_y, cudaMemcpyHostToDevice, stream));
         } else {
           for (int j = 0; j < width; j++) {
-            temperature[(block_x + 2) * (j + 1) + (block_x + 1)] = gh[j];
+            temperature[(block_x + 2) * (1 + j) + (block_x + 1)] = gh[j];
           }
         }
         break;
@@ -529,38 +513,57 @@ class Stencil : public CBase_Stencil {
 
     CallbackMsg* m = new CallbackMsg();
     if (local_exec_mode == CUDA_MODE || local_exec_mode == HAPI_MODE) {
-      double* ghost_ptrs[4] = {left_ghost, right_ghost, bottom_ghost,
-                               top_ghost};
+      // Invoke 2D stencil kernel
+      invokeKernel(stream, d_temperature, d_new_temperature, block_x, block_y,
+                   thread_size);
 
-      // invoke 2D stencil kernel and ghost transfers
-      invokeKernel(stream, d_temperature, d_new_temperature, ghost_ptrs,
-                   block_x, block_y, thread_size);
+      // Transfer left ghost
+      hapiCheck(cudaMemcpy2DAsync(left_ghost, sizeof(double),
+            d_new_temperature + (block_x + 2),
+            (block_x + 2) * sizeof(double), sizeof(double),
+            block_y, cudaMemcpyDeviceToHost, stream));
 
-      // copy final temperature data back to host
-      if (my_iter == num_iters) {
+      // Transfer right ghost
+      hapiCheck(
+          cudaMemcpy2DAsync(right_ghost, sizeof(double),
+            d_new_temperature + (block_x + 2) + (block_x + 1),
+            (block_x + 2) * sizeof(double), sizeof(double),
+            block_y, cudaMemcpyDeviceToHost, stream));
+
+      // Transfer bottom ghost
+      hapiCheck(cudaMemcpyAsync(bottom_ghost, d_new_temperature + 1,
+            block_x * sizeof(double), cudaMemcpyDeviceToHost,
+            stream));
+
+      // Transfer top ghost
+      hapiCheck(cudaMemcpyAsync(
+            top_ghost, d_new_temperature + (block_x + 2) * (block_y + 1) + 1,
+            block_x * sizeof(double), cudaMemcpyDeviceToHost, stream));
+
+      // Copy final temperature data back to host (on last iteration)
+      if (my_iter == num_iters - 1) {
         hapiCheck(
             cudaMemcpyAsync(temperature, d_new_temperature,
                             sizeof(double) * (block_x + 2) * (block_y + 2),
                             cudaMemcpyDeviceToHost, stream));
       }
 
-      // wait for completion and continue
       if (local_exec_mode == CUDA_MODE) {
         cudaStreamSynchronize(stream);
 
-        thisProxy(thisIndex.x, thisIndex.y).run(m);
+        thisProxy(thisIndex.x, thisIndex.y).iterate(m);
       } else {
         CkArrayIndex2D myIndex = CkArrayIndex2D(thisIndex);
         CkCallback* cb =
-            new CkCallback(CkIndex_Stencil::run(NULL), myIndex, thisProxy);
+            new CkCallback(CkIndex_Stencil::iterate(NULL), myIndex, thisProxy);
         if (gpu_prio)
           CkSetQueueing(m, CK_QUEUEING_LIFO);
         hapiAddCallback(stream, cb, m);
       }
-    } else {  // CHARM_MODE
+    } else {  // CPU_MODE
       for (int i = 1; i <= block_x; ++i) {
         for (int j = 1; j <= block_y; ++j) {
-          // update my value based on the surrounding values
+          // Update my value based on the surrounding values
           new_temperature[j * (block_x + 2) + i] =
               (temperature[j * (block_x + 2) + (i - 1)] +
                temperature[j * (block_x + 2) + (i + 1)] +
@@ -575,7 +578,7 @@ class Stencil : public CBase_Stencil {
       temperature = new_temperature;
       new_temperature = tmp;
 
-      thisProxy(thisIndex.x, thisIndex.y).run(m);
+      thisProxy(thisIndex.x, thisIndex.y).iterate(m);
     }
   }
 
@@ -586,7 +589,7 @@ class Stencil : public CBase_Stencil {
     if (left_bound) {
       for (int j = 0; j < block_y + 2; ++j) {
         temperature[j * (block_x + 2)] = 1.0;
-        if (local_exec_mode == CHARM_MODE) {
+        if (local_exec_mode == CPU_MODE) {
           new_temperature[j * (block_x + 2)] = 1.0;
         }
       }
@@ -594,7 +597,7 @@ class Stencil : public CBase_Stencil {
     if (right_bound) {
       for (int j = 0; j < block_y + 2; ++j) {
         temperature[j * (block_x + 2) + (block_x + 1)] = 1.0;
-        if (local_exec_mode == CHARM_MODE) {
+        if (local_exec_mode == CPU_MODE) {
           new_temperature[j * (block_x + 2) + (block_x + 1)] = 1.0;
         }
       }
@@ -602,16 +605,16 @@ class Stencil : public CBase_Stencil {
     if (top_bound) {
       for (int i = 0; i < block_x + 2; ++i) {
         temperature[(block_y + 1) * (block_x + 2) + i] = 1.0;
-        if (local_exec_mode == CHARM_MODE) {
+        if (local_exec_mode == CPU_MODE) {
           new_temperature[(block_y + 1) * (block_x + 2) + i] = 1.0;
         }
       }
     }
     if (bottom_bound) {
       for (int i = 0; i < block_x + 2; ++i) {
-        temperature[1 + i] = 1.0;
-        if (local_exec_mode == CHARM_MODE) {
-          new_temperature[1 + i] = 1.0;
+        temperature[i] = 1.0;
+        if (local_exec_mode == CPU_MODE) {
+          new_temperature[i] = 1.0;
         }
       }
     }
