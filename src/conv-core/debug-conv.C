@@ -49,6 +49,13 @@ u_long ntohl(u_long netlong) {
   netlong = uaw.c[0]<<24 + uaw.c[1]<<16 + uaw.c[2]<<8 + uaw.c[3];
   return netlong;
 }
+#else
+#if defined _WIN32
+#include <winsock.h>
+#else
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#endif
 #endif
 
 /***************************************************

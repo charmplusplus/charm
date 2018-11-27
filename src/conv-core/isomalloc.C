@@ -1871,7 +1871,7 @@ static void init_ranges(char **argv)
             if (ss < s || ee > e)
                 CmiAbort("isomalloc_sync failed during restart, virtual memory regions do not overlap.");
             else {
-                freeRegion.start = (void *)ss;
+                freeRegion.start = (char *)ss;
                 freeRegion.len = (char *)ee -(char *)ss;
             }
             CmiPrintf("Charm++> Consolidated Isomalloc memory region at restart: %p - %p (%d MB).\n",freeRegion.start,freeRegion.start+freeRegion.len,freeRegion.len/meg);

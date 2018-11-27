@@ -88,7 +88,7 @@
 CMI_EXTERNC_VARIABLE const char * const CmiCommitID;
 
 #if CMI_QD
-extern void initQd(char **argv);
+CMI_EXTERNC void initQd(char **argv);
 #endif
 
 #if CMK_OUT_OF_CORE
