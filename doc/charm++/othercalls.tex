@@ -9,7 +9,7 @@ before the computation begins. You may choose to
 declare a regular  \CC\ subroutine \kw{initnode} in the .ci file
 to ask \charmpp{} to execute the routine exactly once on {\em every logical node} 
 before the computation begins, or to declare a regular  \CC\ subroutine 
-\kw{initproc} to be executed exactly once on {\em every processor}.
+\kw{initproc} to be executed exactly once on {\em every PE}.
 
 \begin{alltt}
 module foo \{
@@ -25,7 +25,7 @@ module foo \{
 
 This code will execute the routines \uw{fooNodeInit} and static 
 \uw{bar::barNodeInit} once on every logical node and \uw{fooProcInit}
-and \uw{bar::barProcInit} on every processor before the main computation 
+and \uw{bar::barProcInit} on every PE before the main computation
 starts.
 Initnode calls are always executed before initproc calls.
 Both init calls (declared as static member functions) can be used in chares, 
