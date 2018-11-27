@@ -1,10 +1,10 @@
-module Diffusion {
+module DiffusionLB {
 
   extern module DistBaseLB;
   initnode void lbinit(void);
 
-  group [migratable] Diffusion : DistBaseLB {
-    entry void Diffusion(const CkLBOptions &);
+  group [migratable] DiffusionLB : DistBaseLB {
+    entry void DiffusionLB(const CkLBOptions &);
     entry [reductiontarget] void PEStarted();
     entry void AddNeighbor(int node);
     entry void AtSync(void);

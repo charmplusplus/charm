@@ -14,6 +14,54 @@
 #endif
 #include <algorithm>
 
+#ifdef TORUS_3D
+int TCoord::D0 = 0;
+int TCoord::D1 = 0;
+#elif defined(TORUS_5D)
+int TCoord::D0 = 0;
+int TCoord::D1 = 0;
+int TCoord::D2 = 0;
+int TCoord::D3 = 0;
+#endif
+
+int TopoManager_isTorus(int dim);
+
+std::vector<int> TCoord::calculateNbs(const int *dims) {
+  std::vector<int> idxs;
+  for (int i=0; i < N_DIMS; i++) {
+    // dimension i
+
+    const int &x = coords[i];
+    const int &X = dims[i];
+
+    TCoord nb(*this);
+    if ((x+1) >= X) {
+      if (TopoManager_isTorus(i)) {
+        nb.coords[i] = 0;
+        nb.recalculateIndex();
+        idxs.push_back(nb.idx);
+      }
+    } else {
+      nb.coords[i] += 1;
+      nb.recalculateIndex();
+      idxs.push_back(nb.idx);
+    }
+
+    nb = *this;
+    if (x-1 < 0) {
+      if (TopoManager_isTorus(i)) {
+        nb.coords[i] = X - 1;
+        nb.recalculateIndex();
+        idxs.push_back(nb.idx);
+      }
+    } else {
+      nb.coords[i] -= 1;
+      nb.recalculateIndex();
+      idxs.push_back(nb.idx);
+    }
+  }
+  return idxs;
+}
 struct CompareRankDist {
   std::vector<int> peDist;
 
@@ -432,6 +480,16 @@ extern "C" void TopoManager_init(int numpes) {
   if(_tmgr) delete _tmgr;
   _tmgr = new TopoManager;
 #endif
+}
+
+int TopoManager_isTorus(int dim) {
+#ifndef __TPM_STANDALONE__
+  if(_tmgr == NULL) { TopoManager_reset(); }
+#else
+  if(_tmgr == NULL) { printf("ERROR: TopoManager NOT initialized. Aborting...\n"); exit(1); }
+#endif
+
+  return _tmgr->isTorus(dim);
 }
 
 #ifdef __TPM_STANDALONE__

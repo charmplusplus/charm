@@ -1,4 +1,4 @@
-#include "Diffusion.h"
+#include "DiffusionLB.h"
 
 #include "ck.h"
 #include "ckgraph.h"
@@ -6,7 +6,7 @@
 #include "LBDBManager.h"
 #include "LBSimulation.h"
 #include "elements.h"
-#include "HeapOps.C"
+#include "Heap_helper.C"
 #define DEBUGR(x) /*CmiPrintf x*/;
 #define DEBUGL(x) /*CmiPrintf x*/;
 #define NUM_NEIGHBORS 3
@@ -15,29 +15,29 @@
 // Percentage of error acceptable.
 #define THRESHOLD 2
 
-CreateLBFunc_Def(Diffusion, "The distributed graph refinement load balancer")
+CreateLBFunc_Def(DiffusionLB, "The distributed graph refinement load balancer")
 
 using std::vector;
 // TODO'S: 
 // Topology
 // Non migratable objects
 
-void Diffusion::staticMigrated(void* data, LDObjHandle h, int waitBarrier)
+void DiffusionLB::staticMigrated(void* data, LDObjHandle h, int waitBarrier)
 {
-  Diffusion *me = (Diffusion*)(data);
+  DiffusionLB *me = (DiffusionLB*)(data);
 
   me->Migrated(h, waitBarrier);
 }
 
-void Diffusion::staticAtSync(void* data)
+void DiffusionLB::staticAtSync(void* data)
 {
-  Diffusion *me = (Diffusion*)(data);
+  DiffusionLB *me = (DiffusionLB*)(data);
 
   me->AtSync();
 }
 
 // preprocess topology information: only done once
-void Diffusion::preprocess(const int explore_limit)
+void DiffusionLB::preprocess(const int explore_limit)
 {
   const int numProcs = CkNumPes();
   // initialize nDims, dims, ppn and num_coordinates 
@@ -233,12 +233,12 @@ void Diffusion::preprocess(const int explore_limit)
 }
 
 
-Diffusion::Diffusion(CkMigrateMessage *m) : CBase_Diffusion(m) {
+DiffusionLB::DiffusionLB(CkMigrateMessage *m) : CBase_DiffusionLB(m) {
 }
 
-Diffusion::Diffusion(const CkLBOptions &opt) : CBase_Diffusion(opt) {
+DiffusionLB::DiffusionLB(const CkLBOptions &opt) : CBase_DiffusionLB(opt) {
 #if CMK_LBDB_ON
-    lbname = "Diffusion";
+    lbname = "DiffusionLB";
     if (CkMyPe() == 0)
         CkPrintf("[%d] Diffusion created\n",CkMyPe());
     if (_lb_args.statsOn()) theLbdb->CollectStatsOn();
@@ -246,7 +246,7 @@ Diffusion::Diffusion(const CkLBOptions &opt) : CBase_Diffusion(opt) {
 #endif
 }
 
-Diffusion::~Diffusion()
+DiffusionLB::~DiffusionLB()
 {
 #if CMK_LBDB_ON
     delete [] statsList;
@@ -266,8 +266,8 @@ Diffusion::~Diffusion()
 #endif
 }
 
-void Diffusion::InitLB(const CkLBOptions &opt) {
-    thisProxy = CProxy_Diffusion(thisgroup);
+void DiffusionLB::InitLB(const CkLBOptions &opt) {
+    thisProxy = CProxy_DiffusionLB(thisgroup);
     receiver = theLbdb->
       AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),
                 (void*)(this));
@@ -314,7 +314,7 @@ void Diffusion::InitLB(const CkLBOptions &opt) {
     }
 }
 
-void Diffusion::AtSync() {
+void DiffusionLB::AtSync() {
 #if CMK_LBDB_ON
     if (!QueryBalanceNow(step()) || CkNumPes() == 1) {
         finalBalancing = 0;
@@ -353,7 +353,7 @@ void Diffusion::AtSync() {
                 thisProxy[nodes[neighbors[i]]].AddNeighbor(peNodes[nodeFirst]);
             }
         }
-        CkCallback cb(CkIndex_Diffusion::PEStarted(), thisProxy[0]);
+        CkCallback cb(CkIndex_DiffusionLB::PEStarted(), thisProxy[0]);
         contribute(cb); 
     }
     else {
@@ -364,20 +364,20 @@ void Diffusion::AtSync() {
 #endif
 }
 
-void Diffusion::PEStarted() {
+void DiffusionLB::PEStarted() {
     if(CkMyPe() == 0) {
-        CkCallback cb(CkIndex_Diffusion::ProcessAtSync(), thisProxy);
+        CkCallback cb(CkIndex_DiffusionLB::ProcessAtSync(), thisProxy);
         CkStartQD(cb); 
     }
 }
 
-void Diffusion::AddNeighbor(int node) {
+void DiffusionLB::AddNeighbor(int node) {
     toSend++;
     DEBUGR(("[%d] Send to neighbors node %d pe %d \n", CkMyPe(), node, nodes[node]));
     sendToNeighbors.push_back(node);
 }
 
-void Diffusion::ProcessAtSync()
+void DiffusionLB::ProcessAtSync()
 {
 #if CMK_LBDB_ON
   start_lb_time = 0;
@@ -414,7 +414,7 @@ void Diffusion::ProcessAtSync()
 #endif
 }
 
-void Diffusion::ComputeNeighbors() {
+void DiffusionLB::ComputeNeighbors() {
     // TODO: Juan's topology aware mapping
 
     preprocess(NUM_NEIGHBORS);
@@ -444,7 +444,7 @@ void Diffusion::ComputeNeighbors() {
 
 
 // Assembling the stats for the PE
-CLBStatsMsg* Diffusion::AssembleStats()
+CLBStatsMsg* DiffusionLB::AssembleStats()
 {
 #if CMK_LBDB_ON
   // build and send stats
@@ -502,7 +502,7 @@ CLBStatsMsg* Diffusion::AssembleStats()
 #endif
 }
 
-void Diffusion::ReceiveStats(CkMarshalledCLBStatsMessage &data)
+void DiffusionLB::ReceiveStats(CkMarshalledCLBStatsMessage &data)
 {
 #if CMK_LBDB_ON
     CLBStatsMsg *m = data.getMessage();
@@ -526,7 +526,7 @@ void Diffusion::ReceiveStats(CkMarshalledCLBStatsMessage &data)
 #endif  
 }
 
-double Diffusion::average() {
+double DiffusionLB::average() {
     double sum = 0;
     for(int i = 0; i < neighborCount; i++) {
         sum += loadNeighbors[i];
@@ -556,7 +556,7 @@ double Diffusion::average() {
     }
 }*/
 
-int Diffusion::GetPENumber(int& obj_id) {
+int DiffusionLB::GetPENumber(int& obj_id) {
     int i = 0;
     for(i = 0;i < nodeSize; i++) {
         if(obj_id < prefixObjects[i]) {
@@ -570,7 +570,7 @@ int Diffusion::GetPENumber(int& obj_id) {
     return i;
 }
 
-bool Diffusion::AggregateToSend() {
+bool DiffusionLB::AggregateToSend() {
     bool res = false;
     for(int i = 0; i < neighborCount; i++) {
         int node = neighbors[i];
@@ -589,7 +589,7 @@ bool Diffusion::AggregateToSend() {
     return res;
 }
 
-void Diffusion::InitializeObjHeap(BaseLB::LDStats *stats, int* obj_arr,int size,
+void DiffusionLB::InitializeObjHeap(BaseLB::LDStats *stats, int* obj_arr,int size,
     int* gain_val) {
     for(int obj = 0; obj <size; obj++) {
         obj_heap[obj]=obj_arr[obj];
@@ -598,7 +598,7 @@ void Diffusion::InitializeObjHeap(BaseLB::LDStats *stats, int* obj_arr,int size,
     heapify(obj_heap, ObjCompareOperator(&objs, gain_val), heap_pos);
 }
 
-void Diffusion::PseudoLoadBalancing() {
+void DiffusionLB::PseudoLoadBalancing() {
     DEBUGL(("[%d] GRD: Pseudo Load Balancing , iteration %d my_load %f my_loadB %f avgLoadNeighbor %f\n", CkMyPe(), itr, my_load, my_loadB, avgLoadNeighbor));
     double threshold = THRESHOLD*avgLoadNeighbor/100.0;
     
@@ -635,7 +635,7 @@ void Diffusion::PseudoLoadBalancing() {
 }
 
 
-void Diffusion::LoadBalancing() {
+void DiffusionLB::LoadBalancing() {
     DEBUGL(("[%d] GRD: Load Balancing \n", CkMyPe()));
     // iterate over the comm data and for each object, store its comm bytes to other neighbor nodes and own node.
     vector<vector<int>> objectComms;
@@ -846,7 +846,7 @@ void Diffusion::LoadBalancing() {
 }
 
 // Load is sent from overloaded to underloaded nodes, now we should load balance the PE's within the node
-void Diffusion::DoneNodeLB() {
+void DiffusionLB::DoneNodeLB() {
     entered = false;
     if(CkMyPe() == nodeFirst) {
         DEBUGR(("[%d] GRD: DoneNodeLB \n", CkMyPe()));
@@ -929,7 +929,7 @@ void Diffusion::DoneNodeLB() {
 
         // This QD is essential because, before the actual migration starts, load should be divided amongs intra node PE's.
         if (CkMyPe() == 0) {
-            CkCallback cb(CkIndex_Diffusion::MigrationEnded(), thisProxy);
+            CkCallback cb(CkIndex_DiffusionLB::MigrationEnded(), thisProxy);
             CkStartQD(cb);
         }
         /*for(int i = 0; i < nodeSize; i++) {
@@ -938,7 +938,7 @@ void Diffusion::DoneNodeLB() {
     }
 }
 
-double Diffusion::averagePE() {
+double DiffusionLB::averagePE() {
     int size = nodeSize;
     double sum = 0;
     for(int i = 0; i < size; i++) {
@@ -947,14 +947,14 @@ double Diffusion::averagePE() {
     return (sum/(size*1.0)); 
 }
 
-int Diffusion::FindObjectHandle(LDObjHandle h) {
+int DiffusionLB::FindObjectHandle(LDObjHandle h) {
     for(int i = 0; i < objectHandles.size(); i++)
         if(objectHandles[i].id == h.id)
             return i;
     return -1;  
 }
 
-void Diffusion::LoadReceived(int objId, int fromPE) {
+void DiffusionLB::LoadReceived(int objId, int fromPE) {
     // load is received, hence create a migrate message for the object with id objId.
     if(objId > myStats->n_objs) {
         DEBUGR(("[%d] GRD: objId %d total objects %d \n", objId, myStats->n_objs));
@@ -971,7 +971,7 @@ void Diffusion::LoadReceived(int objId, int fromPE) {
     DEBUGR(("[%d] GRD Load Received objId %d  with load %f and toPE %d total_migrates %d total_migratesActual %d migrates_expected %d migrates_completed %d\n", CkMyPe(), objId, myStats->objData[objId].wallTime, fromPE, total_migrates, total_migratesActual, migrates_expected, migrates_completed));
 }
 
-void Diffusion::MigrationEnded() {
+void DiffusionLB::MigrationEnded() {
     // TODO: not deleted
     entered = true;
     DEBUGR(("[%d] GRD Migration Ended total_migrates %d total_migratesActual %d \n", CkMyPe(), total_migrates, total_migratesActual));
@@ -997,12 +997,12 @@ void Diffusion::MigrationEnded() {
         }
     }
     if (CkMyPe() == 0) {
-        CkCallback cb(CkIndex_Diffusion::MigrationDone(), thisProxy);
+        CkCallback cb(CkIndex_DiffusionLB::MigrationDone(), thisProxy);
         CkStartQD(cb);
     }
 }
 
-void Diffusion::CascadingMigration(LDObjHandle h, double load) {
+void DiffusionLB::CascadingMigration(LDObjHandle h, double load) {
     double threshold = THRESHOLD*avgLoadNeighbor/100.0;
     int minNode = -1;
     int myPos = neighborPos[peNodes[nodeFirst]];
@@ -1045,7 +1045,7 @@ void Diffusion::CascadingMigration(LDObjHandle h, double load) {
     }
 }
 
-void Diffusion::LoadMetaInfo(LDObjHandle h, double load) {
+void DiffusionLB::LoadMetaInfo(LDObjHandle h, double load) {
     int idx = FindObjectHandle(h);
     if(idx == -1) {
         objectHandles.push_back(h);
@@ -1060,14 +1060,14 @@ void Diffusion::LoadMetaInfo(LDObjHandle h, double load) {
     }
 }
 
-void Diffusion::Migrated(LDObjHandle h, int waitBarrier)
+void DiffusionLB::Migrated(LDObjHandle h, int waitBarrier)
 {
     if(CkMyPe() == nodeFirst) {
         thisProxy[CkMyPe()].MigratedHelper(h, waitBarrier);
     }
 }
 
-void Diffusion::MigratedHelper(LDObjHandle h, int waitBarrier) {
+void DiffusionLB::MigratedHelper(LDObjHandle h, int waitBarrier) {
     DEBUGR(("[%d] GRD Migrated migrates_completed %d migrates_expected %d \n", CkMyPe(), migrates_completed, migrates_expected));
     int idx = FindObjectHandle(h);
     if(idx == -1) {
@@ -1083,7 +1083,7 @@ void Diffusion::MigratedHelper(LDObjHandle h, int waitBarrier) {
     }
 }
 
-void Diffusion::PrintDebugMessage(int len, double* result) {
+void DiffusionLB::PrintDebugMessage(int len, double* result) {
     avgB += result[2];
     if(result[0] > maxB) {
         maxB=result[0];
@@ -1124,7 +1124,7 @@ void Diffusion::PrintDebugMessage(int len, double* result) {
     }
 }
 
-void Diffusion::MigrationDone() {
+void DiffusionLB::MigrationDone() {
     DEBUGR(("[%d] GRD Migration Done \n", CkMyPe()));
 #if CMK_LBDB_ON
   migrates_completed = 0;
@@ -1213,7 +1213,7 @@ void Diffusion::MigrationDone() {
   // if sync resume invoke a barrier
   if(!_lb_args.debug() || CkMyPe() != nodeFirst) {
   if (finalBalancing && _lb_args.syncResume()) {
-    CkCallback cb(CkIndex_Diffusion::ResumeClients((CkReductionMsg*)(NULL)), 
+    CkCallback cb(CkIndex_DiffusionLB::ResumeClients((CkReductionMsg*)(NULL)), 
         thisProxy);
     contribute(0, NULL, CkReduction::sum_int, cb);
   }
@@ -1223,18 +1223,18 @@ void Diffusion::MigrationDone() {
 #endif
 }
 
-void Diffusion::ResumeClients(CkReductionMsg *msg) {
+void DiffusionLB::ResumeClients(CkReductionMsg *msg) {
   ResumeClients(1);
   delete msg;
 }
 
-void Diffusion::CallResumeClients() {
+void DiffusionLB::CallResumeClients() {
     CmiAssert(_lb_args.debug());
     DEBUGR(("[%d] GRD: Call Resume clients \n", CkMyPe()));
     thisProxy[CkMyPe()].ResumeClients(finalBalancing);
 }
 
-void Diffusion::ResumeClients(int balancing) {
+void DiffusionLB::ResumeClients(int balancing) {
 #if CMK_LBDB_ON
 
   if (CkMyPe() == 0 && balancing) {
@@ -1250,7 +1250,7 @@ void Diffusion::ResumeClients(int balancing) {
 }
 
 // Aggregates the stats messages of PE into LDStats, Computes total load of node
-void Diffusion::BuildStats()
+void DiffusionLB::BuildStats()
 {
     DEBUGR(("[%d] GRD Build Stats  and objects %d\n", CkMyPe(), nodeStats->n_objs));
 
@@ -1326,7 +1326,7 @@ void Diffusion::BuildStats()
     nodeStats->makeCommHash();
 }
 
-void Diffusion::AddToList(CLBStatsMsg* m, int rank) {
+void DiffusionLB::AddToList(CLBStatsMsg* m, int rank) {
     DEBUGR(("[%d] GRD Add To List num objects %d from rank %d load %f\n", CkMyPe(), m->n_objs, rank, m->total_walltime));
     nodeStats->n_objs += m->n_objs;
     nodeStats->n_comm += m->n_comm;
@@ -1346,5 +1346,5 @@ void Diffusion::AddToList(CLBStatsMsg* m, int rank) {
     procStat.available = true;
     procStat.n_objs = m->n_objs;
 }
-#include "Diffusion.def.h"
+#include "DiffusionLB.def.h"
 

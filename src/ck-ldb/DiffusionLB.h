@@ -16,19 +16,19 @@
 #include <unordered_map>
 #include<queue>
 
-#include "Diffusion.decl.h"
+#include "DiffusionLB.decl.h"
 
-void CreateDiffusion();
+void CreateDiffusionLB();
 
 /// for backward compatibility
 typedef LBMigrateMsg NLBMigrateMsg;
 
-class Diffusion : public CBase_Diffusion {
+class DiffusionLB : public CBase_DiffusionLB {
 public:
-    Diffusion_SDAG_CODE 
-    Diffusion(const CkLBOptions &);
-    Diffusion(CkMigrateMessage *m);
-    ~Diffusion();
+    DiffusionLB_SDAG_CODE 
+    DiffusionLB(const CkLBOptions &);
+    DiffusionLB(CkMigrateMessage *m);
+    ~DiffusionLB();
     static void staticAtSync(void*);
     static void staticMigrated(void* me, LDObjHandle h, int waitBarrier);
     void MigratedHelper(LDObjHandle h, int waitBarrier);
@@ -61,7 +61,7 @@ protected:
     virtual bool QueryBalanceNow(int) { return true; };  
 
 private:
-    CProxy_Diffusion thisProxy;
+    CProxy_DiffusionLB thisProxy;
 
     // aggregate load received
     int itr; // iteration count

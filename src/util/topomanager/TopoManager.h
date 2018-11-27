@@ -70,7 +70,55 @@ void TopoManager_createPartitions(int scheme, int numparts, int *nodeMap);
 #include "blue.h"
 #endif
 
+#if CMK_BLUEGENEQ
+#define TORUS_5D 1
+#define N_DIMS 5
+#else
+#define TORUS_3D 1
+#define N_DIMS 3
+#endif
+
 #include <vector>
+
+class TCoord {    // coordinate in the machine network topology
+public:
+  TCoord() : idx(0), ppn(0) {
+    memset(coords, 0, sizeof(int)*(N_DIMS+1));
+  }
+
+  TCoord(int *c) : ppn(0) {
+    memcpy(coords, c, sizeof(int)*N_DIMS);
+    recalculateIndex();
+  }
+
+  inline void recalculateIndex() {
+#ifdef TORUS_3D
+    idx = coords[0]*TCoord::D0 + coords[1]*TCoord::D1 + coords[2];
+#elif defined(TORUS_5D)
+    idx = coords[0]*TCoord::D0 + coords[1]*TCoord::D1 + coords[2]*TCoord::D2 + coords[3]*TCoord::D3 + coords[4];
+#endif
+  }
+
+  inline bool operator==(const TCoord &o) const {
+    if (this == &o) return true;
+    return (memcmp(coords, o.coords, sizeof(int)*N_DIMS) == 0);
+  }
+
+  std::vector<int> calculateNbs(const int *dims);
+
+#ifdef TORUS_3D
+  static int D0,D1;  // used for calculating index of coordinate in a 1D array
+#elif defined(TORUS_5D)
+  static int D0,D1,D2,D3;
+#endif
+
+  int coords[N_DIMS+1];
+  int idx;
+
+  std::vector<TCoord*> nbs;
+  int ppn;  // number of processors in this coordinate (allocated to this job)
+  int p;    // rank (global) of first processor in this coordinate
+};
 
 class TopoManager {
   public:
@@ -238,7 +286,28 @@ class TopoManager {
       CmiAssert(se>=0);
         return ((pe>se) ? se : pe);
     }
+
 #endif
+    inline int isTorus(int dim) {
+#if CMK_BLUEGENEQ
+      switch (dim) {
+        case 0: return torusA;
+        case 1: return torusB;
+        case 2: return torusC;
+        case 3: return torusD;
+        case 4: return 1;
+        default: return 0;
+      }
+#else
+      switch (dim) {
+        case 0: return torusX;
+        case 1: return torusY;
+        case 2: return torusZ;
+        case 3: return torusT;
+        default: return 0;
+      }
+#endif
+    }
   private:
     int dimX;	// dimension of the allocation in X (no. of processors)
     int dimY;	// dimension of the allocation in Y (no. of processors)
