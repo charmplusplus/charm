@@ -45,6 +45,7 @@
    using -DCMK_THREADS_BUILD_"type"=1 */
 #define CMK_THREADS_USE_CONTEXT                            0
 #define CMK_THREADS_USE_JCONTEXT                           0
+#define CMK_THREADS_USE_FCONTEXT                           1
 #define CMK_THREADS_USE_PTHREADS                           0
 
 /* Specifies what kind of timer to use, and the correspondent headers will be
