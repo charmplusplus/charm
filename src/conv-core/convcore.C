@@ -248,8 +248,8 @@ void infi_unregAndFreeMeta(void *ch);
 #endif
 
 #if CMK_SMP && CMK_BLUEGENEQ && SPECIFIC_PCQUEUE
-void * CmiAlloc_bgq (int     size);
-void   CmiFree_bgq  (void  * buf);
+CMI_EXTERNC void * CmiAlloc_bgq (int     size);
+CMI_EXTERNC void   CmiFree_bgq  (void  * buf);
 #endif
 
 #if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
