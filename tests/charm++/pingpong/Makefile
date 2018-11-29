@@ -28,9 +28,3 @@ test: all
 	@echo "Inter-processor Pingpong.."
 	$(call run, ./pgm +p2 )
 
-bgtest: all
-	@echo "Intra-processor Pingpong.."
-	$(call run, ./pgm +p1 +x1 +y1 +z1 )
-	@echo "Inter-processor Pingpong.."
-	$(call run, ./pgm +p2 +x2 +y1 +z1 )
-

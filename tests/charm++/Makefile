@@ -31,7 +31,6 @@ DIRS = \
 
 # skip sdag, megatest and commtest
 BGDIRS = \
-  pingpong \
   simplearrayhello \
   load_balancing \
   chkpt \
