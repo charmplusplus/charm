@@ -405,6 +405,11 @@ void ArrayElement::defrag(CkReductionMsg *msg)
 #endif
 }
 
+int ArrayElement::getRedNo(void) const
+{
+  return ((contributorInfo *)&listenerData[thisArray->reducer->ckGetOffset()])->redNo;
+}
+
 // Remote method: This removes the array element from its array manager which
 // also calls delete on this element. The superclass destructor then handles
 // cleanup of the associated location record from CkLocMgr.

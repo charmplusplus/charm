@@ -338,6 +338,9 @@ public:
   inline ck::ObjID ckGetID(void) const { return ck::ObjID(thisArrayID, myRec->getID()); }
 
   inline int ckGetArraySize(void) const { return numInitialElements; }
+
+  int getRedNo(void) const;
+
 protected:
   CkArray *thisArray;//My source array
   CkArrayID thisArrayID;//My source array's ID

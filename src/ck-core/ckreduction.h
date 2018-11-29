@@ -894,8 +894,10 @@ class Group : public CkReductionMgr
 	virtual void flushStates() {
 		CkReductionMgr::flushStates();
 		reductionInfo.redNo = 0;
- 	}
+	}
 	virtual void CkAddThreadListeners(CthThread tid, void *msg);
+
+	int getRedNo() const { return reductionInfo.redNo; }
 
 	CK_REDUCTION_CONTRIBUTE_METHODS_DECL
         CK_BARRIER_CONTRIBUTE_METHODS_DECL

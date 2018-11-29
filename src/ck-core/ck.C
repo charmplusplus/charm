@@ -2433,6 +2433,24 @@ void CkArrayDoneInsertingExt(int aid) {
 }
 
 extern "C"
+int CkGroupGetReductionNumber(int g_id) {
+  CkGroupID gId;
+  gId.idx = g_id;
+  return ((Group*)CkLocalBranch(gId))->getRedNo();
+}
+
+extern "C"
+int CkArrayGetReductionNumber(int aid, int ndims, int *index) {
+  CkGroupID gId;
+  gId.idx = aid;
+  CkArrayIndex arrayIndex(ndims, index);
+  CProxyElement_ArrayBase arrayProxy = CProxyElement_ArrayBase(gId, arrayIndex);
+  ArrayElement* arrayElement = arrayProxy.ckLocal();
+  CkAssert(arrayElement != NULL);
+  return arrayElement->getRedNo();
+}
+
+extern "C"
 void CkChareExtSend(int onPE, void *objPtr, int epIdx, char *msg, int msgSize) {
   //ckCheck();    // checks that gid is not zero
   int marshall_msg_size = (sizeof(char)*msgSize + 3*sizeof(int));
