@@ -31,9 +31,9 @@ instance of the library. There are two steps: including the module and creating
 an instance. 
 
 \begin{SaveVerbatim}{foodecl}
-  use FFT3D;Å 
-  library f1 : FFT3D(CHUNK=10,M=10,N=100);Å 
-  library f2 : FFT3D(CHUNK=8,M=8,N=64);Å
+  use FFT3D;
+  library f1 : FFT3D(CHUNK=10,M=10,N=100);
+  library f2 : FFT3D(CHUNK=8,M=8,N=64);
 \end{SaveVerbatim}
 \smallfbox{\BUseVerbatim{foodecl}}
 
@@ -48,7 +48,7 @@ parameters are the same, and the object name and function name are replaced with
 the library instance name and the keyword \code{call} connected with a colon. 
 
 \begin{SaveVerbatim}{foodecl}
-  (f1_outdata[*]) <- f1:call(f1_indata[*]);Å
+  (f1_outdata[*]) <- f1:call(f1_indata[*]);
 \end{SaveVerbatim}
 \smallfbox{\BUseVerbatim{foodecl}}
 
