@@ -8,7 +8,6 @@
 #include "ampiimpl.h"
 #include "tcharm.h"
 
-
 #if CMK_BIGSIM_CHARM
 #include "bigsim_logs.h"
 #endif
@@ -2991,16 +2990,25 @@ void ampi::processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Data
   msg->toTuple(&results, &numReductions);
 
   // Contributions are unordered and consist of a (srcRank, data) tuple
-  int *srcRank         = (int*)(results[0].data);
   char *data           = (char*)(results[1].data);
   CkDDT_DataType *ddt  = getDDT()->getType(type);
   int contributionSize = ddt->getSize(count);
   int commSize         = getSize();
 
   // Store pointers to each contribution's data at index 'srcRank' in contributionData
+  // If the max rank value fits into an unsigned short int, srcRanks are those, otherwise int's
   vector<void *> contributionData(commSize);
-  for (int i=0; i<commSize; i++) {
-    contributionData[srcRank[i]] = &data[i * contributionSize];
+  if (commSize < std::numeric_limits<unsigned short int>::max()) {
+    unsigned short int *srcRank = (unsigned short int*)(results[0].data);
+    for (int i=0; i<commSize; i++) {
+      contributionData[srcRank[i]] = &data[i * contributionSize];
+    }
+  }
+  else {
+    int *srcRank = (int*)(results[0].data);
+    for (int i=0; i<commSize; i++) {
+      contributionData[srcRank[i]] = &data[i * contributionSize];
+    }
   }
 
   if (ddt->isContig()) {
@@ -3036,19 +3044,32 @@ void ampi::processGatherMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type, i
   CkAssert(numReductions == 2);
 
   // Re-order the gather data based on the rank of the contributor
-  int *srcRank           = (int*)(results[0].data);
   char *data             = (char*)(results[1].data);
   CkDDT_DataType *ddt    = getDDT()->getType(type);
   int contributionSize   = ddt->getSize(recvCount);
   int contributionExtent = ddt->getExtent()*recvCount;
   int commSize           = getSize();
 
-  for (int i=0; i<commSize; i++) {
-    ddt->serialize(&(((char*)buf)[srcRank[i] * contributionExtent]),
-                   &data[i * contributionSize],
-                   recvCount,
-                   contributionSize,
-                   UNPACK);
+  // If the max rank value fits into an unsigned short int, srcRanks are those, otherwise int's
+  if (commSize < std::numeric_limits<unsigned short int>::max()) {
+    unsigned short int *srcRank = (unsigned short int*)(results[0].data);
+    for (int i=0; i<commSize; i++) {
+      ddt->serialize(&(((char*)buf)[srcRank[i] * contributionExtent]),
+                     &data[i * contributionSize],
+                     recvCount,
+                     contributionSize,
+                     UNPACK);
+    }
+  }
+  else {
+    int *srcRank = (int*)(results[0].data);
+    for (int i=0; i<commSize; i++) {
+      ddt->serialize(&(((char*)buf)[srcRank[i] * contributionExtent]),
+                     &data[i * contributionSize],
+                     recvCount,
+                     contributionSize,
+                     UNPACK);
+    }
   }
   delete [] results;
 }
@@ -3062,22 +3083,36 @@ void ampi::processGathervMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type,
   CkAssert(numReductions == 3);
 
   // Re-order the gather data based on the rank of the contributor
-  int *srcRank           = (int*)(results[0].data);
   int *dataSize          = (int*)(results[1].data);
   char *data             = (char*)(results[2].data);
   CkDDT_DataType *ddt    = getDDT()->getType(type);
   int contributionSize   = ddt->getSize();
   int contributionExtent = ddt->getExtent();
   int commSize           = getSize();
+  int currDataOffset     = 0;
 
-  int currDataOffset = 0;
-  for (int i=0; i<commSize; i++) {
-    ddt->serialize(&((char*)buf)[displs[srcRank[i]] * contributionExtent],
-                   &data[currDataOffset],
-                   recvCounts[srcRank[i]],
-                   contributionSize * recvCounts[srcRank[i]],
-                   UNPACK);
-    currDataOffset += dataSize[i];
+  // If the max rank value fits into an unsigned short int, srcRanks are those, otherwise int's
+  if (commSize < std::numeric_limits<unsigned short int>::max()) {
+    unsigned short int *srcRank = (unsigned short int*)(results[0].data);
+    for (int i=0; i<commSize; i++) {
+      ddt->serialize(&((char*)buf)[displs[srcRank[i]] * contributionExtent],
+                     &data[currDataOffset],
+                     recvCounts[srcRank[i]],
+                     contributionSize * recvCounts[srcRank[i]],
+                     UNPACK);
+      currDataOffset += dataSize[i];
+    }
+  }
+  else {
+    int *srcRank = (int*)(results[0].data);
+    for (int i=0; i<commSize; i++) {
+      ddt->serialize(&((char*)buf)[displs[srcRank[i]] * contributionExtent],
+                     &data[currDataOffset],
+                     recvCounts[srcRank[i]],
+                     contributionSize * recvCounts[srcRank[i]],
+                     UNPACK);
+      currDataOffset += dataSize[i];
+    }
   }
   delete [] results;
 }
@@ -4707,7 +4742,8 @@ void ampi::irednResult(CkReductionMsg *msg) noexcept
   // [nokeep] entry method, so do not delete msg
 }
 
-static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int count,int type,int rank,MPI_Op op) noexcept
+static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt, const void *inbuf, int count, int type,
+                                   int rank, int size, MPI_Op op) noexcept
 {
   CkReductionMsg *msg;
   ampiParent *parent = getAmpiParent();
@@ -4736,7 +4772,15 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
     AMPI_DEBUG("[%d] In makeRednMsg, using a non-commutative user-defined operation\n", parent->thisIndex);
     const int tupleSize = 2;
     CkReduction::tupleElement tupleRedn[tupleSize];
-    tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::concat);
+
+    // Contribute rank as an unsigned short int if the max rank value fits into it, otherwise as an int
+    if (size < std::numeric_limits<unsigned short int>::max()) {
+      unsigned short int ushortRank = static_cast<unsigned short int>(rank);
+      tupleRedn[0] = CkReduction::tupleElement(sizeof(unsigned short int), &ushortRank, CkReduction::concat);
+    } else {
+      tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::concat);
+    }
+
     if (!ddt->isContig()) {
       vector<char> sbuf(szdata);
       ddt->serialize((char*)inbuf, sbuf.data(), count, szdata, PACK);
@@ -4877,10 +4921,12 @@ AMPI_API_IMPL(int, MPI_Reduce, const void *inbuf, void *outbuf, int count, MPI_D
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
+  int rank = ptr->getRank();
+  int size = ptr->getSize();
 
-  if(getAmpiParent()->isInter(comm))
+  if(ptr->isInter())
     CkAbort("AMPI does not implement MPI_Reduce for Inter-communicators!");
-  if(ptr->getSize() == 1)
+  if(size == 1)
     return copyDatatype(type,count,type,count,inbuf,outbuf);
 
 #if AMPIMSGLOG
@@ -4893,7 +4939,7 @@ AMPI_API_IMPL(int, MPI_Reduce, const void *inbuf, void *outbuf, int count, MPI_D
 #endif
 
   int rootIdx=ptr->comm2CommStruct(comm).getIndexForRank(root);
-  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,ptr->getRank(),op);
+  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,rank,size,op);
 
   CkCallback reduceCB(CkIndex_ampi::rednResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy());
   msg->setCallback(reduceCB);
@@ -4941,10 +4987,12 @@ AMPI_API_IMPL(int, MPI_Allreduce, const void *inbuf, void *outbuf, int count, MP
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
+  int rank = ptr->getRank();
+  int size = ptr->getSize();
 
-  if(getAmpiParent()->isInter(comm))
+  if(ptr->isInter())
     CkAbort("AMPI does not implement MPI_Allreduce for Inter-communicators!");
-  if(ptr->getSize() == 1)
+  if(size == 1)
     return copyDatatype(type,count,type,count,inbuf,outbuf);
 
 #if CMK_BIGSIM_CHARM
@@ -4960,7 +5008,7 @@ AMPI_API_IMPL(int, MPI_Allreduce, const void *inbuf, void *outbuf, int count, MP
   }
 #endif
 
-  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type), inbuf, count, type, ptr->getRank(), op);
+  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type), inbuf, count, type, rank, size, op);
   CkCallback allreduceCB(CkIndex_ampi::rednResult(0),ptr->getProxy());
   msg->setCallback(allreduceCB);
   ptr->contribute(msg);
@@ -4997,15 +5045,17 @@ AMPI_API_IMPL(int, MPI_Iallreduce, const void *inbuf, void *outbuf, int count, M
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
+  int rank = ptr->getRank();
+  int size = ptr->getSize();
 
-  if(getAmpiParent()->isInter(comm))
+  if(ptr->isInter())
     CkAbort("AMPI does not implement MPI_Iallreduce for Inter-communicators!");
-  if(ptr->getSize() == 1){
+  if(size == 1){
     *request = ptr->postReq(new RednReq(outbuf,count,type,comm,op,getDDT(),AMPI_REQ_COMPLETED));
     return copyDatatype(type,count,type,count,inbuf,outbuf);
   }
 
-  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,ptr->getRank(),op);
+  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,rank,size,op);
   CkCallback allreduceCB(CkIndex_ampi::irednResult(0),ptr->getProxy());
   msg->setCallback(allreduceCB);
   ptr->contribute(msg);
@@ -6844,15 +6894,17 @@ AMPI_API_IMPL(int, MPI_Ireduce, const void *sendbuf, void *recvbuf, int count,
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
+  int rank = ptr->getRank();
+  int size = ptr->getSize();
 
-  if(getAmpiParent()->isInter(comm))
+  if(ptr->isInter())
     CkAbort("AMPI does not implement MPI_Ireduce for Inter-communicators!");
-  if(ptr->getSize() == 1){
+  if(size == 1){
     *request = ptr->postReq(new RednReq(recvbuf, count, type, comm, op, getDDT(), AMPI_REQ_COMPLETED));
     return copyDatatype(type,count,type,count,sendbuf,recvbuf);
   }
 
-  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),sendbuf,count,type,ptr->getRank(),op);
+  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),sendbuf,count,type,rank,size,op);
   int rootIdx=ptr->comm2CommStruct(comm).getIndexForRank(root);
 
   CkCallback reduceCB(CkIndex_ampi::irednResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy());
@@ -6871,13 +6923,20 @@ AMPI_API_IMPL(int, MPI_Ireduce, const void *sendbuf, void *recvbuf, int count,
 }
 
 // Gather's are done via a 2-tuple reduction consisting of (srcRank, contributionData)
-static CkReductionMsg *makeGatherMsg(const void *inbuf, int count, MPI_Datatype type, int rank) noexcept
+static CkReductionMsg *makeGatherMsg(const void *inbuf, int count, MPI_Datatype type, int rank, int size) noexcept
 {
   CkDDT_DataType* ddt = getDDT()->getType(type);
   int szdata = ddt->getSize(count);
   const int tupleSize = 2;
   CkReduction::tupleElement tupleRedn[tupleSize];
-  tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::concat);
+
+  // Contribute rank as an unsigned short int if the max rank value fits into it, otherwise as an int
+  if (size < std::numeric_limits<unsigned short int>::max()) {
+    unsigned short int ushortRank = static_cast<unsigned short int>(rank);
+    tupleRedn[0] = CkReduction::tupleElement(sizeof(unsigned short int), &ushortRank, CkReduction::concat);
+  } else {
+    tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::concat);
+  }
 
   if (ddt->isContig()) {
     tupleRedn[1] = CkReduction::tupleElement(szdata, (void*)inbuf, CkReduction::concat);
@@ -6891,13 +6950,21 @@ static CkReductionMsg *makeGatherMsg(const void *inbuf, int count, MPI_Datatype 
 }
 
 // Gatherv's are done via a 3-tuple reduction consisting of (srcRank, contributionSize, contributionData)
-static CkReductionMsg *makeGathervMsg(const void *inbuf, int count, MPI_Datatype type, int rank) noexcept
+static CkReductionMsg *makeGathervMsg(const void *inbuf, int count, MPI_Datatype type, int rank, int size) noexcept
 {
   CkDDT_DataType* ddt = getDDT()->getType(type);
   int szdata = ddt->getSize(count);
   const int tupleSize = 3;
   CkReduction::tupleElement tupleRedn[tupleSize];
-  tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::concat);
+
+  // Contribute rank as an unsigned short int if the max rank value fits into it, otherwise as an int
+  if (size < std::numeric_limits<unsigned short int>::max()) {
+    unsigned short int ushortRank = static_cast<unsigned short int>(rank);
+    tupleRedn[0] = CkReduction::tupleElement(sizeof(unsigned short int), &ushortRank, CkReduction::concat);
+  } else {
+    tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::concat);
+  }
+
   tupleRedn[1] = CkReduction::tupleElement(sizeof(int), &szdata, CkReduction::concat);
 
   if (ddt->isContig()) {
@@ -6919,6 +6986,7 @@ AMPI_API_IMPL(int, MPI_Allgather, const void *sendbuf, int sendcount, MPI_Dataty
 
   ampi *ptr = getAmpiInstance(comm);
   int rank = ptr->getRank();
+  int size = ptr->getSize();
 
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
   handle_MPI_IN_PLACE_gather((void*&)sendbuf, recvbuf, sendcount, sendtype,
@@ -6936,12 +7004,12 @@ AMPI_API_IMPL(int, MPI_Allgather, const void *sendbuf, int sendcount, MPI_Dataty
     return ret;
 #endif
 
-  if(getAmpiParent()->isInter(comm))
+  if(ptr->isInter())
     CkAbort("AMPI does not implement MPI_Allgather for Inter-communicators!");
-  if(ptr->getSize() == 1)
+  if(size == 1)
     return copyDatatype(sendtype,sendcount,recvtype,recvcount,sendbuf,recvbuf);
 
-  CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
+  CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback allgatherCB(CkIndex_ampi::rednResult(0), ptr->getProxy());
   msg->setCallback(allgatherCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Allgather called on comm %d\n", ptr->thisIndex, comm));
@@ -6960,6 +7028,7 @@ AMPI_API_IMPL(int, MPI_Iallgather, const void *sendbuf, int sendcount, MPI_Datat
 
   ampi *ptr = getAmpiInstance(comm);
   int rank = ptr->getRank();
+  int size = ptr->getSize();
 
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
   handle_MPI_IN_PLACE_gather((void*&)sendbuf, recvbuf, sendcount, sendtype,
@@ -6981,14 +7050,14 @@ AMPI_API_IMPL(int, MPI_Iallgather, const void *sendbuf, int sendcount, MPI_Datat
   }
 #endif
 
-  if(getAmpiParent()->isInter(comm))
+  if(ptr->isInter())
     CkAbort("AMPI does not implement MPI_Iallgather for Inter-communicators!");
-  if(ptr->getSize() == 1){
+  if(size == 1){
     *request = ptr->postReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT(), AMPI_REQ_COMPLETED));
     return copyDatatype(sendtype,sendcount,recvtype,recvcount,sendbuf,recvbuf);
   }
 
-  CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
+  CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback allgatherCB(CkIndex_ampi::irednResult(0), ptr->getProxy());
   msg->setCallback(allgatherCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Iallgather called on comm %d\n", ptr->thisIndex, comm));
@@ -7008,6 +7077,7 @@ AMPI_API_IMPL(int, MPI_Allgatherv, const void *sendbuf, int sendcount, MPI_Datat
 
   ampi *ptr = getAmpiInstance(comm);
   int rank = ptr->getRank();
+  int size = ptr->getSize();
 
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
   handle_MPI_IN_PLACE_gatherv((void*&)sendbuf, recvbuf, sendcount, sendtype,
@@ -7025,12 +7095,12 @@ AMPI_API_IMPL(int, MPI_Allgatherv, const void *sendbuf, int sendcount, MPI_Datat
     return ret;
 #endif
 
-  if(getAmpiParent()->isInter(comm))
+  if(ptr->isInter())
     CkAbort("AMPI does not implement MPI_Allgatherv for Inter-communicators!");
-  if(ptr->getSize() == 1)
+  if(size == 1)
     return copyDatatype(sendtype,sendcount,recvtype,recvcounts[0],sendbuf,recvbuf);
 
-  CkReductionMsg* msg = makeGathervMsg(sendbuf, sendcount, sendtype, rank);
+  CkReductionMsg* msg = makeGathervMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback allgathervCB(CkIndex_ampi::rednResult(0), ptr->getProxy());
   msg->setCallback(allgathervCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Allgatherv called on comm %d\n", ptr->thisIndex, comm));
@@ -7049,6 +7119,7 @@ AMPI_API_IMPL(int, MPI_Iallgatherv, const void *sendbuf, int sendcount, MPI_Data
 
   ampi *ptr = getAmpiInstance(comm);
   int rank = ptr->getRank();
+  int size = ptr->getSize();
 
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
   handle_MPI_IN_PLACE_gatherv((void*&)sendbuf, recvbuf, sendcount, sendtype,
@@ -7070,15 +7141,15 @@ AMPI_API_IMPL(int, MPI_Iallgatherv, const void *sendbuf, int sendcount, MPI_Data
   }
 #endif
 
-  if(getAmpiParent()->isInter(comm))
+  if(ptr->isInter())
     CkAbort("AMPI does not implement MPI_Iallgatherv for Inter-communicators!");
-  if(ptr->getSize() == 1){
+  if(size == 1){
     *request = ptr->postReq(new GathervReq(recvbuf, rank, recvtype, comm, recvcounts, displs,
                             getDDT(), AMPI_REQ_COMPLETED));
     return copyDatatype(sendtype,sendcount,recvtype,recvcounts[0],sendbuf,recvbuf);
   }
 
-  CkReductionMsg* msg = makeGathervMsg(sendbuf, sendcount, sendtype, rank);
+  CkReductionMsg* msg = makeGathervMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback allgathervCB(CkIndex_ampi::irednResult(0), ptr->getProxy());
   msg->setCallback(allgathervCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Iallgatherv called on comm %d\n", ptr->thisIndex, comm));
@@ -7099,6 +7170,7 @@ AMPI_API_IMPL(int, MPI_Gather, const void *sendbuf, int sendcount, MPI_Datatype 
 
   ampi *ptr = getAmpiInstance(comm);
   int rank = ptr->getRank();
+  int size = ptr->getSize();
 
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
   handle_MPI_IN_PLACE_gather((void*&)sendbuf, recvbuf, sendcount, sendtype,
@@ -7118,9 +7190,9 @@ AMPI_API_IMPL(int, MPI_Gather, const void *sendbuf, int sendcount, MPI_Datatype 
   }
 #endif
 
-  if(getAmpiParent()->isInter(comm))
+  if(ptr->isInter())
     CkAbort("AMPI does not implement MPI_Gather for Inter-communicators!");
-  if(ptr->getSize() == 1)
+  if(size == 1)
     return copyDatatype(sendtype,sendcount,recvtype,recvcount,sendbuf,recvbuf);
 
 #if AMPIMSGLOG
@@ -7133,7 +7205,7 @@ AMPI_API_IMPL(int, MPI_Gather, const void *sendbuf, int sendcount, MPI_Datatype 
 #endif
 
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
-  CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
+  CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback gatherCB(CkIndex_ampi::rednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
   msg->setCallback(gatherCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Gather called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
@@ -7162,6 +7234,7 @@ AMPI_API_IMPL(int, MPI_Igather, const void *sendbuf, int sendcount, MPI_Datatype
 
   ampi *ptr = getAmpiInstance(comm);
   int rank = ptr->getRank();
+  int size = ptr->getSize();
 
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
   handle_MPI_IN_PLACE_gather((void*&)sendbuf, recvbuf, sendcount, sendtype,
@@ -7185,9 +7258,9 @@ AMPI_API_IMPL(int, MPI_Igather, const void *sendbuf, int sendcount, MPI_Datatype
   }
 #endif
 
-  if(getAmpiParent()->isInter(comm))
+  if(ptr->isInter())
     CkAbort("AMPI does not implement MPI_Igather for Inter-communicators!");
-  if(ptr->getSize() == 1){
+  if(size == 1){
     *request = ptr->postReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT(), AMPI_REQ_COMPLETED));
     return copyDatatype(sendtype,sendcount,recvtype,recvcount,sendbuf,recvbuf);
   }
@@ -7202,7 +7275,7 @@ AMPI_API_IMPL(int, MPI_Igather, const void *sendbuf, int sendcount, MPI_Datatype
 #endif
 
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
-  CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank);
+  CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback gatherCB(CkIndex_ampi::irednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
   msg->setCallback(gatherCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Igather called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
@@ -7235,6 +7308,7 @@ AMPI_API_IMPL(int, MPI_Gatherv, const void *sendbuf, int sendcount, MPI_Datatype
 
   ampi *ptr = getAmpiInstance(comm);
   int rank = ptr->getRank();
+  int size = ptr->getSize();
 
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
   handle_MPI_IN_PLACE_gatherv((void*&)sendbuf, recvbuf, sendcount, sendtype,
@@ -7254,9 +7328,9 @@ AMPI_API_IMPL(int, MPI_Gatherv, const void *sendbuf, int sendcount, MPI_Datatype
   }
 #endif
 
-  if(getAmpiParent()->isInter(comm))
+  if(ptr->isInter())
     CkAbort("AMPI does not implement MPI_Gatherv for Inter-communicators!");
-  if(ptr->getSize() == 1)
+  if(size == 1)
     return copyDatatype(sendtype,sendcount,recvtype,recvcounts[0],sendbuf,recvbuf);
 
 #if AMPIMSGLOG
@@ -7274,7 +7348,7 @@ AMPI_API_IMPL(int, MPI_Gatherv, const void *sendbuf, int sendcount, MPI_Datatype
 #endif
 
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
-  CkReductionMsg* msg = makeGathervMsg(sendbuf, sendcount, sendtype, rank);
+  CkReductionMsg* msg = makeGathervMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback gathervCB(CkIndex_ampi::rednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
   msg->setCallback(gathervCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Gatherv called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
@@ -7305,6 +7379,7 @@ AMPI_API_IMPL(int, MPI_Igatherv, const void *sendbuf, int sendcount, MPI_Datatyp
 
   ampi *ptr = getAmpiInstance(comm);
   int rank = ptr->getRank();
+  int size = ptr->getSize();
 
   handle_MPI_BOTTOM((void*&)sendbuf, sendtype, recvbuf, recvtype);
   handle_MPI_IN_PLACE_gatherv((void*&)sendbuf, recvbuf, sendcount, sendtype,
@@ -7328,9 +7403,9 @@ AMPI_API_IMPL(int, MPI_Igatherv, const void *sendbuf, int sendcount, MPI_Datatyp
   }
 #endif
 
-  if(getAmpiParent()->isInter(comm))
+  if(ptr->isInter())
     CkAbort("AMPI does not implement MPI_Igatherv for Inter-communicators!");
-  if(ptr->getSize() == 1){
+  if(size == 1){
     *request = ptr->postReq(new GathervReq(recvbuf, rank, recvtype, comm, recvcounts, displs,
                             getDDT(), AMPI_REQ_COMPLETED));
     return copyDatatype(sendtype,sendcount,recvtype,recvcounts[0],sendbuf,recvbuf);
@@ -7352,7 +7427,7 @@ AMPI_API_IMPL(int, MPI_Igatherv, const void *sendbuf, int sendcount, MPI_Datatyp
 
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
 
-  CkReductionMsg* msg = makeGathervMsg(sendbuf, sendcount, sendtype, rank);
+  CkReductionMsg* msg = makeGathervMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback gathervCB(CkIndex_ampi::irednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
   msg->setCallback(gathervCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Igatherv called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
@@ -10835,10 +10910,12 @@ int AMPI_Set_start_event(MPI_Comm comm)
   CkAssert(comm == MPI_COMM_WORLD);
 
   ampi *ptr = getAmpiInstance(comm);
+  int rank = ptr->getRank();
+  int size = ptr->getSize();
 
   CkDDT_DataType *ddt_type = ptr->getDDT()->getType(MPI_INT);
 
-  CkReductionMsg *msg=makeRednMsg(ddt_type, NULL, 0, MPI_INT, ptr->getRank(), MPI_SUM);
+  CkReductionMsg *msg=makeRednMsg(ddt_type, NULL, 0, MPI_INT, rank, size, MPI_SUM);
   if (CkMyPe() == 0) {
     CkCallback allreduceCB(startCFnCall, ptr);
     msg->setCallback(allreduceCB);
