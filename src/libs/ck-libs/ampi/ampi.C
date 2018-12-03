@@ -11080,8 +11080,26 @@ AMPI_API_IMPL(int, MPI_Pcontrol, const int level, ...)
 
 /******** AMPI Extensions to the MPI standard *********/
 
-CLINKAGE
-int AMPI_Migrate(MPI_Info hints)
+CLINKAGE int AMPI_Init_universe(int * unicomm)
+{
+  AMPI_API("AMPI_Init_universe");
+  for(int i=0; i<_mpi_nworlds; i++) {
+    unicomm[i] = MPI_COMM_UNIVERSE[i];
+  }
+  return MPI_SUCCESS;
+}
+
+CLINKAGE char ** AMPI_Get_argv()
+{
+  return CkGetArgv();
+}
+
+CLINKAGE int AMPI_Get_argc()
+{
+  return CkGetArgc();
+}
+
+CLINKAGE int AMPI_Migrate(MPI_Info hints)
 {
   AMPI_API("AMPI_Migrate");
   int nkeys, exists;

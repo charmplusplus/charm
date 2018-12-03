@@ -552,6 +552,9 @@ AMPI_FUNC(int, MPIX_Grequest_class_allocate, MPIX_Grequest_class greq_class,
 
 
 /*** AMPI Extensions ***/
+AMPI_CUSTOM_FUNC(int, AMPI_Init_universe, int * unicomm)
+AMPI_CUSTOM_FUNC(char **, AMPI_Get_argv, void)
+AMPI_CUSTOM_FUNC(int, AMPI_Get_argc, void)
 AMPI_CUSTOM_FUNC(int, AMPI_Migrate, MPI_Info hints)
 AMPI_CUSTOM_FUNC(int, AMPI_Load_start_measure, void)
 AMPI_CUSTOM_FUNC(int, AMPI_Load_stop_measure, void)
