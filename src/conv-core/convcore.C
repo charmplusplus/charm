@@ -552,7 +552,7 @@ int CmiGetArgLongDesc(char **argv,const char *arg,CmiInt8 *optDest,const char *d
 				                "but none was provided\n", arg);
 				CmiAbort("Bad command-line argument\n");
                         }
-			if (sscanf(opt,"%" SCNu64,optDest)<1) {
+			if (sscanf(opt,"%" SCNd64,optDest)<1) {
 			/*Bad command line argument-- die*/
 				fprintf(stderr,"Cannot parse %s option '%s' "
 					"as a long integer.\n",arg,opt);
