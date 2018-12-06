@@ -130,7 +130,7 @@ tlsglobals-test-f90.o: test-f90-tlsglobals.f90
 
 
 clean:
-	rm -f *.o *.a *.so $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$j-$i)) charmrun ampirun
+	rm -f *.o *.a *.so *.mod $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$j-$i)) charmrun ampirun
 
 .SUFFIXES:
 .PHONY: all test everything test-everything $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),test-$j-$i) test-$i $i)
