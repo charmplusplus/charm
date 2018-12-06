@@ -53,6 +53,9 @@ int main(int argc, char **argv) {
                 inCK = 1;
             else if(strstr(lineptr, "tmp/convcore.c") != NULL)
                 inCONV = 1;
+	    else if(strstr(lineptr, "tmp/convcore.C") != NULL)
+                inCONV = 1;
+
         }
 
         free(lineptr);
@@ -68,7 +71,7 @@ int main(int argc, char **argv) {
     printf("\tlines......: %.1f%% (%d of %d lines)\n", ((double)(100 * LHck) / LFck), LHck, LFck);
     printf("\tfunctions..: %.1f%% (%d of %d functions)\n", ((double)(100 * FNHck) / FNFck), FNHck, FNFck);
 
-    printf("Summary convcore.c in %s:\n", argv[1]);
+    printf("Summary convcore.C in %s:\n", argv[1]);
     printf("\tlines......: %.1f%% (%d of %d lines)\n", ((double)(100 * LHconv) / LFconv), LHconv, LFconv);
     printf("\tfunctions..: %.1f%% (%d of %d functions)\n", ((double)(100 * FNHconv) / FNFconv), FNHconv, FNFconv);
 }
