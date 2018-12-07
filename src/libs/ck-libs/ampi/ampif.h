@@ -1,4 +1,10 @@
-       !!! Values here must match those in ampi.h !!!
+       !!! Values here must match those in ampi.h, or otherwise be !!!
+       !!! converted from the Fortran to the C value in ampif.C    !!!
+       !!! Note: we can't have more than 72 characters per line,   !!!
+       !!!       the first 6 characters per line must be blank,    !!!
+       !!!       and we can't have any line continuations in this  !!!
+       !!!       file in order to support all three of fixed-form, !!!
+       !!!       free-form, and line-extended fixed-form source.   !!!
 
        integer, parameter :: MPI_SUCCESS                   = 0
        integer, parameter :: MPI_ERR_BUFFER                = 1
@@ -171,10 +177,10 @@
        integer, parameter :: MPI_COMM        = 3
        integer, parameter :: MPI_ERROR       = 5
 
-       integer, dimension(MPI_STATUS_SIZE), parameter ::                &
-     & MPI_STATUS_IGNORE = (/-9,-9,-9,-9,-9,-9,-9,-9/)
-       integer, dimension(MPI_STATUS_SIZE), parameter ::                &
-     & MPI_STATUSES_IGNORE = (/-9,-9,-9,-9,-9,-9,-9,-9/)
+       integer, dimension(MPI_STATUS_SIZE) :: MPI_STATUS_IGNORE
+       parameter (MPI_STATUS_IGNORE = (/-9,-9,-9,-9,-9,-9,-9,-9/))
+       integer, dimension(MPI_STATUS_SIZE) :: MPI_STATUSES_IGNORE
+       parameter (MPI_STATUSES_IGNORE = (/-9,-9,-9,-9,-9,-9,-9,-9/))
 
        integer, parameter :: MPI_COMM_SELF        = 1000000
        integer, parameter :: MPI_COMM_FIRST_SPLIT = 1000000
