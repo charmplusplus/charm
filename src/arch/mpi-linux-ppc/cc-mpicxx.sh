@@ -56,6 +56,14 @@ then
     then
       F90LIBDIR="$F90DIR/../../lib/$Minor"
     fi
+    if ! test -x "$F90LIBDIR"
+    then
+      F90LIBDIR="$F90DIR/../../compiler/lib/${Minor}_lin"
+    fi
+    if ! test -x "$F90LIBDIR"
+    then
+      F90LIBDIR="$F90DIR/../../lib/${Minor}_lin"
+    fi
   fi
   F90MAIN="$F90LIBDIR/for_main.o"
 fi
