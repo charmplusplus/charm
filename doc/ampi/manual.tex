@@ -333,22 +333,35 @@ global offset table based automated mechanism.
 
 \subsubsection{Automatic Thread-Local Storage Swapping}
 Thread Local Store (TLS) was originally employed in kernel threads to
-localize variables and provide thread safety. It can be used by annotating
-global/static variable declarations in \CC{} with \emph{thread\_local}
-and in C with \emph{\_\_thread}. Thus, those variables will have one instance
-per extant thread. This keyword is not an official extension of the C language,
-though compiler writers are encouraged to implement this feature. Currently,
-the ELF object file format supports Thread Local Storage.
+localize variables to threads and provide thread safety. It can be used by annotating
+global/static variable declarations in \CC{} with \emph{thread\_local}, in C with \emph{\_\_thread}
+or C11 with \emph{thread\_local} or \emph{\_Thread\_local},
+and in Fortran with OpenMP's \emph{threadprivate} attribute. OpenMP is required for using tlsglobals
+in Fortran code since Fortran has no other method of using TLS. The \emph{\_\_thread} keyword is
+not an official extension of the C language, though compiler writers are encouraged to implement
+this feature. Currently, the ELF object file format supports Thread Local Storage.
 
 It handles both global and static variables and has no context-switching
 overhead. AMPI provides runtime support for privatizing thread-local variables to user-level threads
-by changing the TLS segment register when context switching between user-level threads.
+by changing the TLS segment register when context switching between user-level threads. The runtime
+overhead is that of changing a single pointer per user-level thread context switch.
 Currently, \charmpp{} supports it for x86/x86\_64 platforms when using GNU compilers.
 
 For the example above, the following changes to the code handle the global variables:
 \begin{alltt}
+// C++ example:
 thread_local int myrank;
 thread_local double xyz[100];
+
+// C example:
+__thread int myrank;
+__thread double xyz[100];
+
+! Fortran example:
+integer :: myrank
+real*8, dimension(100) :: xyz
+!$omp threadprivate(myrank)
+!$omp threadprivate(xyz)
 \end{alltt}
 
 The runtime system also should know that TLS-Globals is used at both compile and link time:
