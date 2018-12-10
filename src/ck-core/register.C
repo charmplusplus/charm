@@ -58,6 +58,7 @@ int CkRegisterEpInternal(const char *name, CkCallFnPtr call, int msgIdx, int cha
   if (ck_ep_flags & CK_EP_TRACEDISABLE) e->traceEnabled=false;
   if (ck_ep_flags & CK_EP_APPWORK) e->appWork=true;
   if (ck_ep_flags & CK_EP_IMMEDIATE) e->isImmediate=true;
+  if (ck_ep_flags & CK_EP_INLINE) e->isInline=true;
 #if ADAPT_SCHED_MEM
   if (ck_ep_flags & CK_EP_MEMCRITICAL){
      e->isMemCritical=true;

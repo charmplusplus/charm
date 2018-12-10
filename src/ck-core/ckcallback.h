@@ -44,10 +44,6 @@ public:
 	sendGroup, //Send to a group (d.group)
 	sendNodeGroup, //Send to a nodegroup (d.group)
 	sendArray, //Send to an array (d.array)
-	isendChare, //Inlined send to a chare (d.chare)
-	isendGroup, //Inlined send to a group (d.group)
-	isendNodeGroup, //Inlined send to a nodegroup (d.group)
-	isendArray, //Inlined send to an array (d.array)
 	bcastGroup, //Broadcast to a group (d.group)
 	bcastNodeGroup, //Broadcast to a nodegroup (d.group)
 	bcastArray, //Broadcast to an array (d.array)
@@ -67,10 +63,6 @@ public:
       case sendGroup: return "CkCallback::sendGroup";
       case sendNodeGroup: return "CkCallback::sendNodeGroup";
       case sendArray: return "CkCallback::sendArray";
-      case isendChare: return "CkCallback::isendChare";
-      case isendGroup: return "CkCallback::isendGroup";
-      case isendNodeGroup: return "CkCallback::isendNodeGroup";
-      case isendArray: return "CkCallback::isendArray";
       case bcastGroup: return "CkCallback::bcastGroup";
       case bcastNodeGroup: return "CkCallback::bcastNodeGroup";
       case bcastArray: return "CkCallback::bcastArray";
@@ -152,15 +144,12 @@ public:
 	    case resumeThread:
 	      return (d.thread.onPE == other.d.thread.onPE &&
 		  d.thread.cb == other.d.thread.cb);
-	    case isendChare:
 	    case sendChare:
 	      return (d.chare.ep == other.d.chare.ep &&
 		  d.chare.id.onPE == other.d.chare.id.onPE &&
 		  d.chare.hasRefnum == other.d.chare.hasRefnum &&
 		  d.chare.refnum == other.d.chare.refnum);
-	    case isendGroup:
 	    case sendGroup:
-	    case isendNodeGroup:
 	    case sendNodeGroup:
 	      return (d.group.ep == other.d.group.ep &&
 		  d.group.id == other.d.group.id &&
@@ -173,7 +162,6 @@ public:
 		  d.group.id == other.d.group.id &&
 		  d.group.hasRefnum == other.d.group.hasRefnum &&
 		  d.group.refnum == other.d.group.refnum);
-	    case isendArray:
 	    case sendArray:
 	      return (d.array.ep == other.d.array.ep &&
 		  d.array.id == other.d.array.id &&
@@ -254,7 +242,7 @@ public:
 #if CMK_REPLAYSYSTEM
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?isendChare:sendChare;
+      type=sendChare;
 	  d.chare.ep=ep; d.chare.id=id;
           d.chare.hasRefnum = false;
           d.chare.refnum = 0;
@@ -282,7 +270,7 @@ public:
 #if CMK_REPLAYSYSTEM
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?(isNodeGroup?isendNodeGroup:isendGroup):(isNodeGroup?sendNodeGroup:sendGroup); 
+      type=(isNodeGroup?sendNodeGroup:sendGroup);
       d.group.ep=ep; d.group.id=id; d.group.onPE=onPE;
 	  d.group.hasRefnum = false;
           d.group.refnum = 0;
@@ -310,7 +298,7 @@ public:
 #if CMK_REPLAYSYSTEM
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?isendArray:sendArray;
+      type=sendArray;
 	  d.array.ep=ep; d.array.id=id; d.array.idx = idx;
 	  d.array.hasRefnum = false;
           d.array.refnum = 0;
@@ -393,15 +381,12 @@ public:
         void setRefnum(CMK_REFNUM_TYPE refnum) {
 		switch(type) {
                 case sendChare:
-                case isendChare:
                   d.chare.hasRefnum = true;
                   d.chare.refnum = refnum;
                   break;
 
                 case sendGroup:
                 case sendNodeGroup:
-                case isendGroup:
-                case isendNodeGroup:
                 case bcastGroup:
                 case bcastNodeGroup:
                   d.group.hasRefnum = true;
@@ -409,7 +394,6 @@ public:
                   break;
 
                 case sendArray:
-                case isendArray:
                 case bcastArray:
                   d.array.hasRefnum = true;
                   d.array.refnum = refnum;

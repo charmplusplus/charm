@@ -2863,6 +2863,7 @@ XStr Entry::genRegEp(bool isForRedn) {
      str << "+CK_EP_TRACEDISABLE";
      str << "+CK_EP_IMMEDIATE";
   }
+  if (attribs & SINLINE) str << "+CK_EP_INLINE";
   if (attribs & SAPPWORK) str << "+CK_EP_APPWORK";
 
   /*MEICHAO*/

@@ -161,6 +161,7 @@ extern int CkRegisterMsg(const char *name, CkPackFnPtr pack,
 #define CK_EP_MEMCRITICAL (1<<5)
 #define CK_EP_APPWORK     (1<<6)
 #define CK_EP_IMMEDIATE   (1<<7)
+#define CK_EP_INLINE      (1<<8)
 
 /** type of a chare */
 #if CMK_MESSAGE_LOGGING
