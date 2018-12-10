@@ -90,30 +90,30 @@ void *CkCallback::impl_thread_delay(void) const
 /*These can't be defined in the .h file like the other constructors
  * because we need CkCallback before CProxyElement* are defined.
  */
-CkCallback::CkCallback(Chare *p, int ep, bool doInline) {
+CkCallback::CkCallback(Chare *p, int ep, bool forceInline) {
 #if CMK_ERROR_CHECKING
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?isendChare:sendChare;
+      type = (forceInline || _entryTable[ep]->isInline) ? isendChare : sendChare;
 	d.chare.ep=ep; 
 	d.chare.id=p->ckGetChareID();
         d.chare.hasRefnum= false;
         d.chare.refnum = 0;
 }
-CkCallback::CkCallback(Group *p, int ep, bool doInline) {
+CkCallback::CkCallback(Group *p, int ep, bool forceInline) {
 #if CMK_ERROR_CHECKING
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?isendGroup:sendGroup;
+      type = (forceInline || _entryTable[ep]->isInline) ? isendGroup : sendGroup;
 	d.group.ep=ep; d.group.id=p->ckGetGroupID(); d.group.onPE=CkMyPe();
         d.group.hasRefnum= false;
         d.group.refnum = 0;
 }
-CkCallback::CkCallback(NodeGroup *p, int ep, bool doInline) {
+CkCallback::CkCallback(NodeGroup *p, int ep, bool forceInline) {
 #if CMK_ERROR_CHECKING
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?isendNodeGroup:sendNodeGroup;
+      type = (forceInline || _entryTable[ep]->isInline) ? isendNodeGroup : sendNodeGroup;
 	d.group.ep=ep; d.group.id=p->ckGetGroupID(); d.group.onPE=CkMyNode();
         d.group.hasRefnum= false;
         d.group.refnum = 0;
@@ -129,21 +129,21 @@ CkCallback::CkCallback(int ep,const CProxy_NodeGroup &ngp) {
         d.group.refnum = 0;
 }
 
-CkCallback::CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,bool doInline) {
+CkCallback::CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,bool forceInline) {
 #if CMK_ERROR_CHECKING
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?isendNodeGroup:sendNodeGroup;
+      type = (forceInline || _entryTable[ep]->isInline) ? isendNodeGroup : sendNodeGroup;
 	d.group.ep=ep; d.group.id=ngp.ckGetGroupID(); d.group.onPE=onPE;
         d.group.hasRefnum= false;
         d.group.refnum = 0;
 }
 
-CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,bool doInline) {
+CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,bool forceInline) {
 #if CMK_ERROR_CHECKING
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?isendGroup:sendGroup;
+      type = (forceInline || _entryTable[ep]->isInline) ? isendGroup : sendGroup;
 	d.group.ep=ep; 
 	d.group.id=grpElt.ckGetGroupID(); 
 	d.group.onPE=grpElt.ckGetGroupPe();
@@ -151,11 +151,11 @@ CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,bool doInline) {
         d.group.refnum = 0;
 }
 
-CkCallback::CkCallback(int ep, const CProxyElement_NodeGroup &grpElt, bool doInline) {
+CkCallback::CkCallback(int ep, const CProxyElement_NodeGroup &grpElt, bool forceInline) {
 #if CMK_ERROR_CHECKING
   memset(this, 0, sizeof(CkCallback));
 #endif
-  type = doInline ? isendNodeGroup : sendNodeGroup;
+  type = (forceInline || _entryTable[ep]->isInline) ? isendNodeGroup : sendNodeGroup;
   d.group.ep = ep;
   d.group.id = grpElt.ckGetGroupID();
   d.group.onPE = grpElt.ckGetGroupPe();
@@ -163,11 +163,11 @@ CkCallback::CkCallback(int ep, const CProxyElement_NodeGroup &grpElt, bool doInl
   d.group.refnum = 0;
 }
 
-CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool doInline) {
+CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool forceInline) {
 #if CMK_ERROR_CHECKING
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?isendArray:sendArray;
+      type = (forceInline || _entryTable[ep]->isInline) ? isendArray : sendArray;
 	d.array.ep=ep; 
 	d.array.id=arrElt.ckGetArrayID(); 
 	d.array.idx = arrElt.ckGetIndex();
@@ -175,11 +175,11 @@ CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool doInlin
         d.array.refnum = 0;
 }
 
-CkCallback::CkCallback(int ep,CProxySection_ArrayBase &sectElt,bool doInline) {
+CkCallback::CkCallback(int ep,CProxySection_ArrayBase &sectElt,bool forceInline) {
 #if CMK_ERROR_CHECKING
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=bcastSection;
+      type=bcastSection; // forceInline currently ignored
       d.section.ep=ep; 
       CkSectionID secID=sectElt.ckGetSectionID(0); 
       d.section.sinfo = secID._cookie.info;
@@ -206,11 +206,11 @@ CkCallback::CkCallback(int ep, CkSectionID &id) {
       d.section.refnum = 0;
 }
 
-CkCallback::CkCallback(ArrayElement *p, int ep,bool doInline) {
+CkCallback::CkCallback(ArrayElement *p, int ep,bool forceInline) {
 #if CMK_ERROR_CHECKING
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?isendArray:sendArray;
+      type = (forceInline || _entryTable[ep]->isInline) ? isendArray : sendArray;
     d.array.ep=ep; 
 	d.array.id=p->ckGetArrayID(); 
 	d.array.idx = p->ckGetArrayIndex();

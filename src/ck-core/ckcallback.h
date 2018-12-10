@@ -16,6 +16,7 @@ Initial version by Orion Sky Lawlor, olawlor@acm.org, 2/8/2002
 #include "conv-ccs.h" /*for CcsDelayedReply struct*/
 #include "charm.h"
 #include "ckarrayindex.h"
+#include "register.h"
 
 typedef void (*CkCallbackFn)(void *param,void *message);
 typedef void (*Ck1CallbackFn)(void *message);
@@ -250,11 +251,11 @@ public:
 	}
 
     // Call a chare entry method
-	CkCallback(int ep,const CkChareID &id,bool doInline=false) {
+	CkCallback(int ep,const CkChareID &id,bool forceInline=false) {
 #if CMK_REPLAYSYSTEM
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?isendChare:sendChare;
+      type = (forceInline || _entryTable[ep]->isInline) ? isendChare : sendChare;
 	  d.chare.ep=ep; d.chare.id=id;
           d.chare.hasRefnum = false;
           d.chare.refnum = 0;
@@ -275,24 +276,24 @@ public:
 	}
 
     // Send to nodegroup element
-	CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,bool doInline=false);
+	CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,bool forceInline=false);
 
     // Send to group/nodegroup element
-	CkCallback(int ep,int onPE,const CkGroupID &id,bool doInline=false, bool isNodeGroup=false) {
+	CkCallback(int ep,int onPE,const CkGroupID &id,bool forceInline=false, bool isNodeGroup=false) {
 #if CMK_REPLAYSYSTEM
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?(isNodeGroup?isendNodeGroup:isendGroup):(isNodeGroup?sendNodeGroup:sendGroup); 
+      type = (forceInline || _entryTable[ep]->isInline) ?  (isNodeGroup?isendNodeGroup:isendGroup) : (isNodeGroup?sendNodeGroup:sendGroup);
       d.group.ep=ep; d.group.id=id; d.group.onPE=onPE;
 	  d.group.hasRefnum = false;
           d.group.refnum = 0;
         }
 
     // Send to specified group element
-	CkCallback(int ep,const CProxyElement_Group &grpElt,bool doInline=false);
+	CkCallback(int ep,const CProxyElement_Group &grpElt,bool forceInline=false);
 
     // Send to specified nodegroup element
-	CkCallback(int ep,const CProxyElement_NodeGroup &grpElt,bool doInline=false);
+	CkCallback(int ep,const CProxyElement_NodeGroup &grpElt,bool forceInline=false);
 
     // Bcast to array
 	CkCallback(int ep,const CkArrayID &id) {
@@ -306,34 +307,34 @@ public:
         }
 
     // Send to array element
-	CkCallback(int ep,const CkArrayIndex &idx,const CkArrayID &id,bool doInline=false) {
+	CkCallback(int ep,const CkArrayIndex &idx,const CkArrayID &id,bool forceInline=false) {
 #if CMK_REPLAYSYSTEM
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?isendArray:sendArray;
+      type = (forceInline || _entryTable[ep]->isInline) ? isendArray : sendArray;
 	  d.array.ep=ep; d.array.id=id; d.array.idx = idx;
 	  d.array.hasRefnum = false;
           d.array.refnum = 0;
         }
 
     // Bcast to array
-	CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool doInline=false);
+	CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool forceInline=false);
 	
 	//Bcast to section
-	CkCallback(int ep,CProxySection_ArrayBase &sectElt,bool doInline=false);
+	CkCallback(int ep,CProxySection_ArrayBase &sectElt,bool forceInline=false);
 	CkCallback(int ep, CkSectionID &sid);
 	
 	// Send to chare
-	CkCallback(Chare *p, int ep, bool doInline=false);
+	CkCallback(Chare *p, int ep, bool forceInline=false);
 
     // Send to group element on current PE
-	CkCallback(Group *p, int ep, bool doInline=false);
+	CkCallback(Group *p, int ep, bool forceInline=false);
 
     // Send to nodegroup element on current node
-	CkCallback(NodeGroup *p, int ep, bool doInline=false);
+	CkCallback(NodeGroup *p, int ep, bool forceInline=false);
 
     // Send to specified array element 
- 	CkCallback(ArrayElement *p, int ep,bool doInline=false);
+	CkCallback(ArrayElement *p, int ep,bool forceInline=false);
 
 	CkCallback(const CcsDelayedReply &reply) {
 #if CMK_REPLAYSYSTEM
