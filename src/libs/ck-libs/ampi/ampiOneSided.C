@@ -1315,14 +1315,14 @@ AMPI_API_IMPL(int, MPI_Win_set_name, MPI_Win win, const char *name)
 
 AMPI_API_IMPL(int, MPI_Win_set_info, MPI_Win win, MPI_Info info)
 {
-  AMPI_API("AMPI_Comm_set_info");
+  AMPI_API("AMPI_Win_set_info");
   /* FIXME: no-op implementation */
   return MPI_SUCCESS;
 }
 
 AMPI_API_IMPL(int, MPI_Win_get_info, MPI_Win win, MPI_Info *info)
 {
-  AMPI_API("AMPI_Comm_get_info");
+  AMPI_API("AMPI_Win_get_info");
   /* FIXME: no-op implementation */
   *info = MPI_INFO_NULL;
   return MPI_SUCCESS;
