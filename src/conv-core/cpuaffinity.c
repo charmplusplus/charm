@@ -604,6 +604,8 @@ void CmiCheckAffinity(void)
     while (affMsgsRecvd < N)
       CmiDeliverSpecificMsg(cpuPhyNodeAffinityRecvHandlerIdx);
 
+    CmiPrintf("[%d][%d][%d] CmiCheckAffinity N=%d, CPU_COUNT(&core_usage) =%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), N,  CPU_COUNT(&core_usage));
+
     // NOTE this test is simple and may not detect every possible case of
     // oversubscription
     if (CPU_COUNT(&core_usage) < N) {

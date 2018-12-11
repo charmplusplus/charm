@@ -1494,8 +1494,11 @@ if (  MSG_STATISTIC)
     CsvInitialize(CMIQueue, notifyCommThdMsgBuffer);
 #endif
 
+    printf("Before launching CmiStartThreads\n");
     CmiStartThreads(argv);
+    printf("After launching CmiStartThreads\n");
 
+    printf("Main thread invoking ConverseRunPE\n");
     ConverseRunPE(initret);
 }
 
@@ -1523,6 +1526,7 @@ static void ConverseRunPE(int everReturn) {
   CpvAccess(cmiArgDebugFlag) = 0;
 #endif
 
+    CmiPrintf("[%d][%d][%d] ConverseRunPE - about to call LrtsPreCommonInit\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
     LrtsPreCommonInit(everReturn);
 
 #if CMK_OFFLOAD_BCAST_PROCESS
@@ -1596,12 +1600,14 @@ static void ConverseRunPE(int everReturn) {
 
     /* communication thread */
     if (CmiMyRank() == CmiMyNodeSize()) {
+      //CmiAbort("only comm thread reaches here");
       Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
       if(!CharmLibInterOperate) {
         while (1) CommunicationServerThread(5);
       }
     } else { /* worker thread */
       if (!everReturn) {
+        //printf("Worker thread starting charm\n");
         Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
         if (Cmi_usrsched==0) CsdScheduler(-1);
         if(!CharmLibInterOperate) {

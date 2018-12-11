@@ -10,3 +10,5 @@
 #undef CMK_TIMER_USE_SPECIAL
 #define CMK_TIMER_USE_GETRUSAGE                            1
 #define CMK_TIMER_USE_SPECIAL                              0
+
+#define CMK_SMP_NO_COMMTHD                                 1

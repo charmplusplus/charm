@@ -284,16 +284,6 @@ typedef struct OFIContext {
     request_cache_t *request_cache;
 #endif
 
-#if CMK_SMP
-    /**
-     * Producer/Consumer Queue used in CMK_SMP mode:
-     *  - worker thread pushes messages to the queue
-     *  - comm thread pops and sends
-     * Locking is already done by PCQueue.
-     */
-    PCQueue send_queue;
-#endif
-
     /** Fabric Domain handle */
     struct fid_fabric *fabric;
 
@@ -486,6 +476,11 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     OFI_INFO("mempool right border size: %ld\n", context.mempool_rb_size);
 #endif
 
+#if CMK_SMP
+    // No comm thread for regular smp
+    Cmi_smp_mode_setting = COMM_THREAD_NOT_EXIST;
+#endif
+
     /**
      * Open fabric
      * The getinfo struct returns a fabric attribute struct that can be used to
@@ -611,13 +606,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         }
     }
 
-#if CMK_SMP
-    /**
-     * Initialize send queue.
-     */
-    context.send_queue = PCQueueCreate();
-#endif
-
     /**
      * Free providers info since it's not needed anymore.
      */
@@ -625,11 +613,14 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     hints = NULL;
     fi_freeinfo(providers);
     providers = NULL;
+
 }
 
 static inline
 void prepost_buffers()
 {
+
+    //CmiPrintf("[%d][%d][%d] prepost_buffers\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
     OFIRequest **reqs;
     ALIGNED_ALLOC(reqs, sizeof(void*) * context.num_recv_reqs);
 
@@ -866,10 +857,9 @@ CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mo
     }
 
 #if CMK_SMP
-    /* Enqueue message */
-    MACHSTATE2(2, " --> (PE=%i) enqueuing message (queue depth=%i)",
-               CmiMyPe(), PCQueueLength(context.send_queue));
-    PCQueuePush(context.send_queue, (char *)req);
+    /* Send directly */
+    //CmiPrintf("{%d][%d][%d] Worker thread sending stuff directly\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
+    sendMsg(req);
 #else
     /* Send directly */
     sendMsg(req);
@@ -1160,6 +1150,7 @@ void recv_callback(struct fi_cq_tagged_entry *e, OFIRequest *req)
     }
 
     MACHSTATE2(3, "Reposting recv req %p buf=%p", req, req->data.recv_buffer);
+    //CmiPrintf("{%d][%d][%d] Worker thread received stuff, now reposting\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
     OFI_RETRY(fi_trecv(context.ep,
                        req->data.recv_buffer,
                        context.eager_maxsize,
@@ -1233,30 +1224,6 @@ int process_completion_queue()
     return ret;
 }
 
-#if CMK_SMP
-static inline
-int process_send_queue()
-{
-    OFIRequest *req;
-    int ret = 0;
-    /**
-     * Comm thread sends the next message that is waiting in the send_queue.
-     */
-    req = (OFIRequest*)PCQueuePop(context.send_queue);
-    if (req)
-    {
-        MACHSTATE2(2, " --> (PE=%i) dequeuing message (queue depth: %i)",
-                CmiMyPe(), PCQueueLength(context.send_queue));
-        MACHSTATE5(2,
-                " --> dequeuing destNode=%i destPE=%i size=%d msg=%p mode=%d",
-                req->destNode, req->destPE, req->size, req->data, req->mode);
-        sendMsg(req);
-        ret = 1;
-    }
-    return ret;
-}
-#endif
-
 #if USE_MEMPOOL
 
 void *alloc_mempool_block(size_t *size, mem_handle_t *mem_hndl, int expand_flag)
@@ -1317,9 +1284,6 @@ void LrtsAdvanceCommunication(int whileidle)
     {
         processed_count = 0;
         processed_count += process_completion_queue();
-#if CMK_SMP
-        processed_count += process_send_queue();
-#endif
     } while (processed_count > 0);
 
     MACHSTATE(2, "} OFI::LrtsAdvanceCommunication done");
@@ -1383,6 +1347,8 @@ void LrtsExit(int exitcode)
 
     MACHSTATE(2, "OFI::LrtsExit {");
 
+    CmiPrintf("{%d][%d][%d] LrtsExit\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
+
     LrtsAdvanceCommunication(0);
 
     for (i = 0; i < context.num_recv_reqs; i++)
@@ -1398,9 +1364,6 @@ void LrtsExit(int exitcode)
 #endif
     }
 
-#if CMK_SMP
-    PCQueueDestroy(context.send_queue);
-#endif
 
     if (context.recv_reqs)
         free(context.recv_reqs);

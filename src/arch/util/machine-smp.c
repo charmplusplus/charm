@@ -155,6 +155,8 @@ static DWORD WINAPI call_startfn(LPVOID vindex)
 static DWORD WINAPI call_startfn(LPVOID vindex)
 {
   int index = (int)(intptr_t)vindex;
+
+  printf("Thread create function and index is %d\n", index);
  
   CmiState state = Cmi_state_vector + index;
   if(Cmi_state_key == 0xFFFFFFFF) PerrorExit("TlsAlloc");
@@ -413,6 +415,8 @@ void CommunicationServerThread(int sleepTime);
 static void *call_startfn(void *vindex)
 {
   size_t index = (size_t)vindex;
+
+  //printf("Thread create function and index is %d\n", index);
 #if CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD
   if (index<_Cmi_mynodesize) 
     CmiStateInit(index+Cmi_nodestart, index, &Cmi_mystate);
@@ -433,8 +437,9 @@ static void *call_startfn(void *vindex)
         CmiNodeAllBarrier();
       } else {
         if (CmiMyRank() == CmiMyNodeSize()) {
+          //CmiAbort("only comm thread reaches here");
           while (1) { CommunicationServerThread(5); }
-        } else { 
+        } else {
           CsdScheduler(-1);
         }
         break;
