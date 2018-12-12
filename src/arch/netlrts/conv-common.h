@@ -54,8 +54,6 @@
 
 #define CMK_ONESIDED_IMPL                                  CMK_MULTICORE
 
-#define CMK_ONESIDED_DIRECT_IMPL                           CMK_MULTICORE
-
 #define CMK_CMA_MIN                                        32768
 
 #define CMK_CMA_MAX                                        INT_MAX

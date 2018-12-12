@@ -13,7 +13,7 @@ int CmiGetRdmaCommonInfoSize() {
 }
 #endif
 
-#if !CMK_ONESIDED_DIRECT_IMPL
+#if !CMK_ONESIDED_IMPL
 /* Support for generic implementation */
 
 // Function Pointer to Acknowledement handler function for the Direct API

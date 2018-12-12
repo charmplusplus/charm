@@ -2060,7 +2060,7 @@ static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 		return;
 	}*/
 //	CmiAssert(rdmaPacket->type == INFI_MESG);
-#if CMK_ONESIDED_DIRECT_IMPL
+#if CMK_ONESIDED_IMPL
 	// Zerocopy Direct API
 	if (rdmaPacket->type == INFI_ONESIDED_DIRECT) {
 

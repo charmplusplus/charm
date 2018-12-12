@@ -83,7 +83,7 @@ void CmiIssueRputUsingCMA(
 }
 #endif
 
-#if CMK_ONESIDED_DIRECT_IMPL
+#if CMK_ONESIDED_IMPL
 
 // Function Pointer to the acknowledement handler function for the Direct API
 RdmaAckHandlerFn ncpyDirectAckHandlerFn;
@@ -136,5 +136,5 @@ void CmiDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mo
   LrtsDeregisterMem(ptr, info, pe, mode);
 }
 
-#endif /*End of CMK_ONESIDED_DIRECT_IMPL */
+#endif /*End of CMK_ONESIDED_IMPL */
 #endif
