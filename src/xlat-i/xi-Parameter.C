@@ -55,7 +55,8 @@ Parameter::Parameter(int Nline, Type* Ntype, const char* Nname, const char* Narr
       conditional(0),
       given_name(Nname),
       podType(false),
-      rdma(false) {
+      rdma(false),
+      firstRdma(false) {
   if (isMessage()) {
     name = "impl_msg";
   }
