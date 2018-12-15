@@ -51,7 +51,7 @@ Many of these concerns can be addressed using the processor virtualization and
 over-decomposition philosophy of \charmpp{}. Thus, the developer only sees 
 virtual processors and lets the runtime system deal with underlying physical 
 processors. This is implemented in \ampi{} by mapping MPI ranks to \charmpp{}
-user-level threads as illustrated in Figure\ref{fig_virt}. As an immediate and
+user-level threads as illustrated in Figure \ref{fig_virt}. As an immediate and
 simple benefit, the programmer can use as many virtual processors ("MPI ranks")
 as the problem can be easily decomposed to. For example, suppose the problem
 domain has $n*2^n$ parts that can be easily distributed but programming for
@@ -383,7 +383,7 @@ at both compile and link time (e.g. "ampicc -o prog prog.c -swapglobals"). This 
 any changes to the source code and works with any language (C, C++, Fortran, etc).
 However, it does not handle static variables, has a context switching
 overhead that grows with the number of global variables, and is incompatible with SMP builds
-of AMPI, where multiple virtual ranks can execute simulataneously on different scheduler threads
+of AMPI, where multiple virtual ranks can execute simultaneously on different scheduler threads
 within an OS process.
 Currently, this feature only works on x86 and x86\_64 platforms that fully support ELF,
 and it requires ld version 2.23 or older, or else a patched version of ld 2.24+ that we provide
@@ -552,7 +552,7 @@ patches for all files containing global variables which can then be applied to t
 
 Table \ref{tab:portability} shows portability of different schemes.
 
-\begin{table*}[!tb]
+\begin{table}[!tb]
 \begin{center}
 \begin{tabular}{|c||c|c|c|c|c|c|c|}
 \hline
@@ -573,7 +573,7 @@ TLS-Globals              & Yes     & Yes     & No      & No    & Maybe   & Maybe
 \label{tab:portability}
 \vspace{-1.0cm}
 \end{center}
-\end{table*}
+\end{table}
 \subsection{Extensions for Migrations}
 
 \ampi{} provides fully automated support for migrating MPI ranks between nodes of a
