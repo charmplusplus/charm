@@ -155,6 +155,13 @@ An executable named something other than {\tt mpiexec} can be
 used with the additional argument {\tt ++remote-shell} {\it runmpi},
 with `runmpi' replaced by the necessary name.
 
+To pass additional arguments to {\tt mpiexec}, specify {\tt ++remote-shell}
+and list them as part of the value after the executable name as follows:
+
+\begin{alltt}
+./charmrun ++mpiexec ++remote-shell "mpiexec --YourArgumentsHere" ./pgm
+\end{alltt}
+
 Use of this option can potentially provide a few benefits:
 
 \begin{itemize}
