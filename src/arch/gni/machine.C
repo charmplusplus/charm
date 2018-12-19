@@ -357,20 +357,17 @@ static int LOCAL_QUEUE_ENTRIES=20480;
 #define LMSG_INIT_TAG           0x33
 #define LMSG_PERSISTENT_INIT_TAG           0x34
 #define LMSG_OOB_INIT_TAG       0x35
-#define RDMA_ACK_TAG            0x36
-#define RDMA_PUT_MD_TAG         0x37
-#define RDMA_PUT_DONE_TAG       0x38
 
-#define RDMA_PUT_MD_DIRECT_TAG  0x39
-#define RDMA_PUT_DONE_DIRECT_TAG 0x40
-#define RDMA_DEREG_DIRECT_TAG    0x41
+#define RDMA_PUT_MD_DIRECT_TAG  0x36
+#define RDMA_PUT_DONE_DIRECT_TAG 0x37
+#define RDMA_DEREG_DIRECT_TAG    0x38
 
-#define RDMA_REG_AND_PUT_MD_DIRECT_TAG  0x42
-#define RDMA_REG_AND_GET_MD_DIRECT_TAG  0x43
+#define RDMA_REG_AND_PUT_MD_DIRECT_TAG  0x39
+#define RDMA_REG_AND_GET_MD_DIRECT_TAG  0x40
 
 #if CMK_SMP
-#define RDMA_COMM_PERFORM_GET_TAG     0x44
-#define RDMA_COMM_PERFORM_PUT_TAG     0x45
+#define RDMA_COMM_PERFORM_GET_TAG     0x41
+#define RDMA_COMM_PERFORM_PUT_TAG     0x42
 #endif
 
 #define DEBUG
@@ -3290,31 +3287,6 @@ INLINE_KEYWORD gni_return_t _sendOneBufferedSmsg(SMSG_QUEUE *queue, MSG_LIST *pt
 #endif
         break;
 #endif
-    case RDMA_ACK_TAG:
-        status = send_smsg_message(queue, ptr->destNode, ptr->msg, sizeof(CmiGNIAckOp_t), ptr->tag, 1, ptr, NONCHARM_SMSG, 1);
-#if !CMK_SMSGS_FREE_AFTER_EVENT
-        if(status == GNI_RC_SUCCESS) {
-          free(ptr->msg);
-        }
-#endif
-        break;
-
-    case RDMA_PUT_MD_TAG:
-        numRdmaOps = ((CmiGNIRzvRdmaRecv_t *)(ptr->msg))->numOps;
-        recvInfoSize = LrtsGetRdmaRecvInfoSize(numRdmaOps);
-        status = send_smsg_message(queue, ptr->destNode, ptr->msg, recvInfoSize, ptr->tag, 1, ptr, NONCHARM_SMSG_DONT_FREE, 0);
-        break;
-
-     case RDMA_PUT_DONE_TAG:
-        numRdmaOps = ((CmiGNIRzvRdmaRecv_t *)(ptr->msg))->numOps;
-        recvInfoSize = LrtsGetRdmaRecvInfoSize(numRdmaOps);
-        status = send_smsg_message(queue, ptr->destNode, ptr->msg, recvInfoSize, ptr->tag, 1, ptr, NONCHARM_SMSG, 1);
-#if !CMK_SMSGS_FREE_AFTER_EVENT
-        if(status == GNI_RC_SUCCESS) {
-          free(ptr->msg);
-        }
-#endif
-        break;
      case RDMA_PUT_MD_DIRECT_TAG:
         ncpyOpInfo = (NcpyOperationInfo *)(ptr->msg);
         msgMode = (ncpyOpInfo->freeMe == CMK_FREE_NCPYOPINFO) ? CHARM_SMSG : SMSG_DONT_FREE;
