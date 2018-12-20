@@ -3,10 +3,10 @@
 #include "ckarrayoptions.h"
 
 CkArrayOptions::CkArrayOptions(void)  // Default: empty array
-    : numInitial(),
-      start(),
+    : start(),
       end(),
       step(),
+      numInitial(),
       bounds(),
       map(_defaultArrayMapID) {
   init();

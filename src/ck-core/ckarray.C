@@ -833,9 +833,9 @@ CkArray::CkArray(CkArrayOptions &&opts,
 		 CkMarshalledMessage &&initMsg)
   : locMgr(CProxy_CkLocMgr::ckLocalBranch(opts.getLocationManager())),
     locMgrID(opts.getLocationManager()),
+    mCastMgrID(opts.getMcastManager()),
     sectionAutoDelegate(opts.isSectionAutoDelegated()),
     initCallback(opts.getInitCallback()),
-    mCastMgrID(opts.getMcastManager()),
     thisProxy(thisgroup),
     stableLocations(opts.staticInsertion && !opts.anytimeMigration),
     numInitial(opts.getNumInitial()), isInserting(true), numPesInited(0)

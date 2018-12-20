@@ -221,7 +221,7 @@ public:
 	/**
  	 * Default constructor.
  	 */ 
-	ChareMlogData():ticketTable(1000,0.3),snTable(100,0.4),teamTable(100,0.4){
+	ChareMlogData():teamTable(100,0.4),snTable(100,0.4),ticketTable(1000,0.3){
 		tCount = 0;
 		tProcessed = 0;
 		numberHoles = 0;

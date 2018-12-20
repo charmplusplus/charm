@@ -1841,7 +1841,7 @@ represented array elements.
 CkLocRec::CkLocRec(CkLocMgr *mgr,bool fromMigration,
                    bool ignoreArrival, const CkArrayIndex &idx_, CmiUInt8 id_)
   :myLocMgr(mgr),idx(idx_), id(id_),
-	 running(false),deletedMarker(NULL)
+	 deletedMarker(NULL),running(false)
 {
 #if CMK_LBDB_ON
 	DEBL((AA "Registering element %s with load balancer\n" AB,idx2str(idx)));
@@ -2110,8 +2110,8 @@ void CkLocMgr::callForAllRecords(CkLocFn fnPointer,CkArray *arr,void *data){
 
 /*************************** LocMgr: CREATION *****************************/
 CkLocMgr::CkLocMgr(CkArrayOptions opts)
-	:thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe())
-	, idCounter(1)
+	:idCounter(1), thisProxy(thisgroup),
+  thislocalproxy(thisgroup,CkMyPe())
         , bounds(opts.getBounds())
 {
 	DEBC((AA "Creating new location manager %d\n" AB,thisgroup));
@@ -3393,7 +3393,7 @@ CkLocRec *CkLocMgr::elementRec(const CkArrayIndex &idx) {
 #else
 //Include an out-of-bounds check if the element isn't found
   CmiUInt8 id;
-  CkLocRec *rec;
+  CkLocRec *rec = NULL;
   if (lookupID(idx, id) && (rec = elementNrec(id))) {
 	return rec;
   } else {

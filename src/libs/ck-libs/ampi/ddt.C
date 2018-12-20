@@ -503,15 +503,14 @@ CkDDT_DataType::CkDDT_DataType(int type) noexcept : datatype(type)
            type, size, extent, iscontig);
 }
 
-
 CkDDT_DataType::CkDDT_DataType(int datatype, int size, MPI_Aint extent, int count, MPI_Aint lb,
                                MPI_Aint ub, bool iscontig, int baseSize, MPI_Aint baseExtent,
                                CkDDT_DataType* baseType, int numElements, int baseIndex,
                                MPI_Aint trueExtent, MPI_Aint trueLB) noexcept :
-    datatype(datatype), refCount(1), size(size), extent(extent), count(count), lb(lb), ub(ub),
-    trueExtent(trueExtent), trueLB(trueLB), iscontig(iscontig), baseSize(baseSize),
-    baseExtent(baseExtent), baseType(baseType), numElements(numElements), baseIndex(baseIndex),
-    isAbsolute(false)
+    iscontig(iscontig), isAbsolute(false), size(size), count(count), datatype(datatype),
+    refCount(1), baseSize(baseSize), baseIndex(baseIndex), numElements(numElements),
+    extent(extent), ub(ub), lb(lb), trueExtent(trueExtent), trueLB(trueLB),
+    baseExtent(baseExtent), baseType(baseType)
 {
   if (baseType) {
     baseType->incRefCount();
@@ -519,22 +518,22 @@ CkDDT_DataType::CkDDT_DataType(int datatype, int size, MPI_Aint extent, int coun
 }
 
 CkDDT_DataType::CkDDT_DataType(const CkDDT_DataType &obj, MPI_Aint _lb/*=0*/, MPI_Aint _extent/*=0*/) noexcept :
-  datatype(obj.datatype)
-  ,refCount(1)
+  iscontig(obj.iscontig)
+  ,isAbsolute(obj.isAbsolute)
   ,size(obj.size)
-  ,extent(obj.extent)
   ,count(obj.count)
-  ,lb(obj.lb)
+  ,datatype(obj.datatype)
+  ,refCount(1)
+  ,baseSize(obj.baseSize)
+  ,baseIndex(obj.baseIndex)
+  ,numElements(obj.numElements)
+  ,extent(obj.extent)
   ,ub(obj.ub)
+  ,lb(obj.lb)
   ,trueExtent(obj.trueExtent)
   ,trueLB(obj.trueLB)
-  ,iscontig(obj.iscontig)
-  ,baseSize(obj.baseSize)
   ,baseExtent(obj.baseExtent)
   ,baseType(obj.baseType)
-  ,numElements(obj.numElements)
-  ,baseIndex(obj.baseIndex)
-  ,isAbsolute(obj.isAbsolute)
   ,name(obj.name)
 {
   if (baseType) {

@@ -689,7 +689,7 @@ void   build_synthetic_proc_id(tm_topology_t *topology){
 void update_comm_speed(double **comm_speed,int old_size,int new_size){
   double *old_tab,*new_tab;
   int i;
-  printf("comm speed [%p]: ",*comm_speed);
+  printf("comm speed [%p]: ", (void *)*comm_speed);
 
   old_tab=*comm_speed;
   new_tab=(double*)malloc(sizeof(double)*new_size);

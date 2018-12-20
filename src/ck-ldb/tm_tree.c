@@ -73,7 +73,7 @@ void set_node(tree_t *node,tree_t ** child, int arity,tree_t *parent,int id,doub
 
 void display_node(tree_t *node){
   printf("child : %p\narity : %d\nparent : %p\nid : %d\nval : %f\nuniq : %d\n\n" ,
-	 node->child,node->arity,node->parent,node->id,node->val,node->uniq);
+	 (void *)node->child,node->arity,(void *)node->parent,node->id,node->val,node->uniq);
 }
 void clone_tree(tree_t *newptr,tree_t *oldptr){
   int i;

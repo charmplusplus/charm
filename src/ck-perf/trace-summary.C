@@ -611,8 +611,8 @@ void BinEntry::write(FILE* fp)
   writeU(fp, getU());
 }
 
-TraceSummary::TraceSummary(char **argv):binStart(0.0),idleStart(0.0),
-					binTime(0.0),binIdle(0.0),msgNum(0)
+TraceSummary::TraceSummary(char **argv):msgNum(0),binStart(0.0),idleStart(0.0),
+					binTime(0.0),binIdle(0.0)
 {
   if (CkpvAccess(traceOnPe) == 0) return;
 

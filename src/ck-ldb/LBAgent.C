@@ -11,7 +11,7 @@
 
 #define PREF_RET_SIZE 5
 
-TopologyAgent::TopologyAgent(CentralLB::LDStats* lbDB,int p): stats(lbDB), Agent(p){
+TopologyAgent::TopologyAgent(CentralLB::LDStats* lbDB,int p): Agent(p), stats(lbDB){
 	int i;
 
 	LBtopoFn topofn;

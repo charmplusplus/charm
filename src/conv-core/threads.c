@@ -298,7 +298,7 @@ void CthAliasEnable(CthThreadBase *t) {
   if (!t->isMigratable) return;
   if (t==_curMappedStack) return; /* don't re-map */
   _curMappedStack=t;
-  if (0) printf("Mmapping in thread %p from runtime stack %p\n",t,&s);
+  CthDebug("Mmapping in thread %p from runtime stack %p\n", (void*)t, (void*)&s);
 
   /* Linux mmap flag MAP_POPULATE, to pre-fault in all the pages,
      only seems to slow down overall performance. */

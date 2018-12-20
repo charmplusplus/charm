@@ -37,7 +37,7 @@ public:
 
   Condition(std::string n, int _varIndex, Operator _op, int _baseIndex,
       double _threshold, CompareSymbol c) : varIndex(_varIndex),
-      baseIndex(_baseIndex), threshold(_threshold), thresholdIndex(-1),
+      baseIndex(_baseIndex), thresholdIndex(-1), threshold(_threshold),
       symbol(c), op(_op) {
       name = n;
   }

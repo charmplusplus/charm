@@ -957,8 +957,8 @@ void LogEntry::pup(PUP::er &p)
 	  space2 = ' ';
           p | space2;
 	  if (p.isUnpacking()) {
-	    userSuppliedNote = new char[length+1];
-	    userSuppliedNote[length] = '\0';
+	    userSuppliedNote = new char[length2+1];
+	    userSuppliedNote[length2] = '\0';
 	  }
    	  PUParray(p,userSuppliedNote, length2);
 	  break;
@@ -1029,9 +1029,9 @@ void LogEntry::pup(PUP::er &p)
 }
 
 TraceProjections::TraceProjections(char **argv): 
-  curevent(0), inEntry(false), computationStarted(false),
-	converseExit(false), endTime(0.0), traceNestedEvents(false),
-	currentPhaseID(0), lastPhaseEvent(NULL), _logPool(NULL)
+  _logPool(NULL), curevent(0), inEntry(false), computationStarted(false),
+	traceNestedEvents(false), converseExit(false),
+	currentPhaseID(0), lastPhaseEvent(NULL), endTime(0.0)
 {
   //  CkPrintf("Trace projections dummy constructor called on %d\n",CkMyPe());
   if (CkpvAccess(traceOnPe) == 0) return;

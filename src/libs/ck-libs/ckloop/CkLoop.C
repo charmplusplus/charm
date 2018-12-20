@@ -808,7 +808,7 @@ void CurLoopInfo::doWorkForMyPe() {
   int lastDynamic = lowerIndex + (myRank+1)*(upperIndex - lowerIndex)/numHelpers;
   if(lastDynamic > upperIndex) lastDynamic = upperIndex; // for the last PE.
 
-  int i, j;
+  int i, j = 0;
 
   // TODO: make numChunks smaller as needed.
 

@@ -717,7 +717,7 @@ class ampiCommStruct {
     : size(-1), commType(INTRA), ampiTopo(NULL), topoType(MPI_UNDEFINED)
   {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,int size_) noexcept
-    : comm(comm_), ampiID(id_),size(size_), indices(size_), commType(WORLD),
+    : comm(comm_), ampiID(id_),size(size_), commType(WORLD), indices(size_),
       ampiTopo(NULL), topoType(MPI_UNDEFINED)
   {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_, const vector<int> &indices_) noexcept

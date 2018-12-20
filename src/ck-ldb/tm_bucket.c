@@ -93,7 +93,7 @@ int bucket_id(int i,int j,bucket_list_t bucket_list){
 
 
 void  display_bucket(bucket_t *b){
-  printf("\tb.bucket=%p\n",b->bucket);
+  printf("\tb.bucket=%p\n",(void *)b->bucket);
   printf("\tb.bucket_len=%d\n",(int)b->bucket_len);
   printf("\tb.nb_elem=%d\n",(int)b->nb_elem);
 

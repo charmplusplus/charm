@@ -110,7 +110,7 @@ public:
 	threadCollide(const CProxy_TCharm &threads,
 		const CProxy_threadCollideMgr &mgr_,
     		const CollideHandle &collide_) 
-		:super(threads), mgr(mgr_), collide(collide_)
+		:super(threads), collide(collide_), mgr(mgr_)
 	{
 		arriving();
 		/// Wake up the blocked thread in COLLIDE_Init

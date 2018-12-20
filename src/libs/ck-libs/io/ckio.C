@@ -304,13 +304,13 @@ namespace Ck { namespace IO {
       public:
         WriteSession(FileToken file_, size_t offset_, size_t bytes_)
           : file(CkpvAccess(manager)->get(file_))
-          , token(file_)
           , sessionOffset(offset_)
           , myOffset((sessionOffset / file->opts.peStripe + thisIndex)
                      * file->opts.peStripe)
           , sessionBytes(bytes_)
           , myBytes(min(file->opts.peStripe, sessionOffset + sessionBytes - myOffset))
           , myBytesWritten(0)
+          , token(file_)
         {
           CkAssert(file->fd != -1);
           CkAssert(myOffset >= sessionOffset);

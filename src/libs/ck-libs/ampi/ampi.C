@@ -1231,8 +1231,8 @@ class ampiWorlds : public CBase_ampiWorlds {
 
 //-------------------- ampiParent -------------------------
 ampiParent::ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_,int nRanks_) noexcept
-  : threads(threads_), worldNo(worldNo_), isTmpRProxySet(false), ampiReqs(64, &reqPool),
-    myDDT(ampiPredefinedTypes), predefinedOps(ampiPredefinedOps)
+  : threads(threads_), ampiReqs(64, &reqPool), myDDT(ampiPredefinedTypes),
+    worldNo(worldNo_), predefinedOps(ampiPredefinedOps), isTmpRProxySet(false)
 {
   int barrier = 0x1234;
   STARTUP_DEBUG("ampiParent> starting up")

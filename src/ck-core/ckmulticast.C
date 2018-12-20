@@ -74,10 +74,10 @@ class reductionInfo {
         reductionMsgs futureMsgs;
 
     public:
-        reductionInfo(): storedCallback(NULL),
+        reductionInfo(): npProcessed(0),
+                         storedCallback(NULL),
                          storedClientParam(NULL),
-                         redNo(0),
-                         npProcessed(0) {
+                         redNo(0) {
             for (int8_t i=0; i<MAXFRAGS; i++)
                 lcount [i] = ccount [i] = gcount [i] = 0;
         }
@@ -167,10 +167,12 @@ class mCastEntry
         char flag;
 	char grpSec;
     public:
-        mCastEntry(CkArrayID _aid): aid(_aid), numChild(0), asm_msg(NULL), asm_fill(0),
-                    oldc(NULL), newc(NULL), needRebuild(0), flag(COOKIE_NOTREADY), grpSec(0), localGrpElem(0) {}
-        mCastEntry(CkGroupID _gid): aid(_gid), numChild(0), asm_msg(NULL), asm_fill(0),
-                    oldc(NULL), newc(NULL), needRebuild(0), flag(COOKIE_NOTREADY), grpSec(1), localGrpElem(0) {}
+        mCastEntry(CkArrayID _aid): aid(_aid), numChild(0), localGrpElem(0), asm_msg(NULL),
+                   asm_fill(0), oldc(NULL), newc(NULL), needRebuild(0),
+                   flag(COOKIE_NOTREADY), grpSec(0) {}
+        mCastEntry(CkGroupID _gid): aid(_gid), numChild(0), localGrpElem(0), asm_msg(NULL),
+                   asm_fill(0), oldc(NULL), newc(NULL), needRebuild(0),
+                   flag(COOKIE_NOTREADY), grpSec(1) {}
         mCastEntry(mCastEntry *);
         /// Check if this tree is only a branch and has a parent
         inline int hasParent() { return parentGrp.get_val()?1:0; }

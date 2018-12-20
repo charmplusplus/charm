@@ -65,7 +65,7 @@ static void callWorker(void *msg)
     memcpy(m, r, size);
     CmiSetHandler(msg2, CpvAccess(responseHandler));
     CmiSyncSendAndFree(0, msgSize, msg2);
-};
+}
 
 static void response(void *msg)
 {
