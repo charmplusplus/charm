@@ -797,12 +797,20 @@ private:
   int ref;
 #endif
 #if ALIGN_BYTES > 8
+  #if defined(__GNUC__) || defined(__clang__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wpedantic"
+  #pragma GCC diagnostic ignored "-Wunused-private-field"
+  #endif
   char align[ALIGN_BYTES
              - sizeof(int)*2
 #if (CMK_USE_IBVERBS || CMK_USE_IBUD)
              - sizeof(void *)
 #endif
             ];
+  #if defined(__GNUC__) || defined(__clang__)
+  #pragma GCC diagnostic pop
+  #endif
 #endif
 public:
   CmiChunkHeader() = default;

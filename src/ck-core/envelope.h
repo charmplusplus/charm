@@ -249,13 +249,14 @@ public:
 
     CMK_ENVELOPE_FT_FIELDS
 
-    #ifdef __GNUC__
+    #if defined(__GNUC__) || defined(__clang__)
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wpedantic"
+    #pragma GCC diagnostic ignored "-Wunused-private-field"
     #endif
     // padding to ensure ALIGN_BYTES alignment
     UChar align[CkMsgAlignOffset(sizeof(envelopeSizeHelper))];
-    #ifdef __GNUC__
+    #if defined(__GNUC__) || defined(__clang__)
     #pragma GCC diagnostic pop
     #endif
 
