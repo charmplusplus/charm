@@ -20,8 +20,8 @@ typedef struct _ccd_callback {
  */
 typedef struct _ccd_cblist_elem {
   ccd_callback cb;
-  int next;
-  int prev;
+  short int next;
+  short int prev;
 } ccd_cblist_elem;
 
 
@@ -30,11 +30,11 @@ typedef struct _ccd_cblist_elem {
  * A list of callbacks stored as an array and handled like a list
  */
 typedef struct _ccd_cblist {
-  unsigned int maxlen;
-  unsigned int len;
-  int first, last;
-  int first_free;
-  int flag;
+  unsigned short int maxlen;
+  unsigned short int len;
+  short int first, last;
+  short int first_free;
+  unsigned char flag;
   ccd_cblist_elem *elems;
 } ccd_cblist;
 
