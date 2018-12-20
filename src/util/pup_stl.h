@@ -29,6 +29,7 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 #include <list>
 #include <map>
 #include <memory>
+#include <random>
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
