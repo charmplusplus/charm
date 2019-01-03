@@ -800,7 +800,9 @@ private:
   #if defined(__GNUC__) || defined(__clang__)
   #pragma GCC diagnostic push
   #pragma GCC diagnostic ignored "-Wpedantic"
+  #if defined(__clang__)
   #pragma GCC diagnostic ignored "-Wunused-private-field"
+  #endif
   #endif
   char align[ALIGN_BYTES
              - sizeof(int)*2

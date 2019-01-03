@@ -252,7 +252,9 @@ public:
     #if defined(__GNUC__) || defined(__clang__)
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wpedantic"
+    #if defined(__clang__)
     #pragma GCC diagnostic ignored "-Wunused-private-field"
+    #endif
     #endif
     // padding to ensure ALIGN_BYTES alignment
     UChar align[CkMsgAlignOffset(sizeof(envelopeSizeHelper))];
