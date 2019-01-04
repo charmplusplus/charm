@@ -44,8 +44,8 @@ CCS Reply ----------------------------------
 #ifndef CMK_NO_SOCKETS
 /*Include the socket and message interface routines
   here *whole*, which keeps client linking simple.*/
-#include "sockRoutines.c"
-#include "ccs-auth.c"
+#include "sockRoutines.C"
+#include "ccs-auth.C"
 
 #define DEBUGF(x) /*printf x*/
 

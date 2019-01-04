@@ -420,7 +420,7 @@ void CmiNotifyIdleForMPI(void);
 #include "machine-common-core.C"
 
 #if USE_MPI_CTRLMSG_SCHEME
-#include "machine-ctrlmsg.c"
+#include "machine-ctrlmsg.C"
 #endif
 
 SMSG_LIST *allocateSmsgList(char *msg, int destNode, int size, int mode, int type, void *ref) {
@@ -602,7 +602,7 @@ int CheckAsyncMsgSent(CmiCommHandle c) {
 }
 
 #if CMK_ONESIDED_IMPL
-#include "machine-onesided.c"
+#include "machine-onesided.C"
 #endif
 
 /* ######Beginning of functions related with communication progress ###### */

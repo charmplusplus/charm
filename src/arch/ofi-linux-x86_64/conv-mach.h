@@ -41,7 +41,7 @@
    directly as normal c variables (1) */
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 
-/* decide which is the default implementation of the threads (see threads.c)
+/* decide which is the default implementation of the threads (see threads.C)
    Only one of the following can be 1. If none of them is selected, qthreads
    will be used as default. This default can be overwritten at compile time
    using -DCMK_THREADS_BUILD_"type"=1 */

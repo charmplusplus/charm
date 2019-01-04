@@ -92,9 +92,9 @@
 
 /* Runtime to exchange EP addresses during LrtsInit() */
 #if CMK_OFI_USE_PMI
-#include "runtime-pmi.c"
+#include "runtime-pmi.C"
 #elif CMK_OFI_USE_PMI2
-#include "runtime-pmi2.c"
+#include "runtime-pmi2.C"
 #endif
 
 #define USE_MEMPOOL 0
@@ -1774,5 +1774,5 @@ int fill_av(int myid,
 }
 
 #if CMK_ONESIDED_IMPL
-#include "machine-onesided.c"
+#include "machine-onesided.C"
 #endif

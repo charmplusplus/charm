@@ -1,7 +1,7 @@
 /*
  * =====================================================================================
  *
- *       Filename:  machine-persistent.c
+ *       Filename:  machine-persistent.C
  *
  *    Description:  
  *

@@ -1,11 +1,11 @@
 #include "converse.h"
 
 #include "sockRoutines.h"
-#include "sockRoutines.c"
+#include "sockRoutines.C"
 #include "ccs-auth.h"
-#include "ccs-auth.c"
+#include "ccs-auth.C"
 #include "ccs-server.h"
-#include "ccs-server.c"
+#include "ccs-server.C"
 
 #include <stdio.h>
 #include <string.h>

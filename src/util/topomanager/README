@@ -6,7 +6,7 @@ make -f Makefile_Cray
 On Blue Gene systems:
 make -f Makefile_BGQ
 
-For example and test, see topomanager_test.c
+For example and test, see topomanager_test.C
 To build test:
 > make -f Makefile_ARCH test
 where ARCH is the system architecture

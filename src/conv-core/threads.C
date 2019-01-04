@@ -267,7 +267,7 @@ int CthAliasCreate(int stackSize)
   int fd;
   sprintf(tmpName,"/tmp/charmThreadStackXXXXXX");
   fd=mkstemp(tmpName);
-  if (fd==-1) CmiAbort("threads.c> Cannot create /tmp file to contain thread stack");
+  if (fd==-1) CmiAbort("threads.C> Cannot create /tmp file to contain thread stack");
   unlink(tmpName); /* delete file when it gets closed */
 
   /* Make file big enough for stack, by writing one byte at end */
@@ -310,8 +310,8 @@ void CthAliasEnable(CthThreadBase *t) {
       PROT_READ|PROT_WRITE|PROT_EXEC, /* exec for gcc nested function thunks */
       flags, t->aliasStackHandle,0);
   if (s!=t->stack) {
-    perror("threads.c CthAliasEnable mmap");
-    CmiAbort("threads.c CthAliasEnable mmap failed");
+    perror("threads.C CthAliasEnable mmap");
+    CmiAbort("threads.C CthAliasEnable mmap failed");
   }
 }
 #else
@@ -1648,7 +1648,7 @@ static CMI_FORCE_INLINE void makeJcontext(uJcontext_t *ucp, uJcontext_fn_t func,
 #else /* CMK_THREADS_USE_JCONTEXT */
 /* Orion's setjmp-based context routines: */
 #include "uJcontext.h"
-#include "uJcontext.c"
+#include "uJcontext.C"
 
 #endif
 

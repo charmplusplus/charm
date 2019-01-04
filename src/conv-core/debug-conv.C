@@ -1,7 +1,7 @@
 /*
 Converse-level debugger support
 
-Collected from convcore.C, conv-ccs.c, register.c by
+Collected from convcore.C, conv-ccs.C, register.C by
 Orion Sky Lawlor, olawlor@acm.org, 4/10/2001
  */
 #include <stdio.h> /*for sscanf*/

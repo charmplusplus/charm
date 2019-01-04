@@ -2914,7 +2914,7 @@ static void PumpRemoteTransactions(gni_cq_handle_t rx_cqh)
 }
 #endif
 
-/* This code overlaps with code in machine-onesided.c in PumpOneSidedRDMATransactions() */
+/* This code overlaps with code in machine-onesided.C in PumpOneSidedRDMATransactions() */
 static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_lock)
 {
     gni_cq_entry_t          ev;
@@ -4534,9 +4534,9 @@ void LrtsBarrier(void)
     GNI_RC_CHECK("PMI_Barrier", status);
 }
 #if CMK_ONESIDED_IMPL
-#include "machine-onesided.c"
+#include "machine-onesided.C"
 #endif
 #if CMK_PERSISTENT_COMM
-#include "machine-persistent.c"
+#include "machine-persistent.C"
 #endif
 

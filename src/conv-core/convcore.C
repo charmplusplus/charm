@@ -601,7 +601,7 @@ void CmiDeprecateArgInt(char **argv,const char *arg,const char *desc,const char 
  * Stack tracing routines.
  *
  *****************************************************************************/
-#include "cmibacktrace.c"
+#include "cmibacktrace.C"
 
 /*
 Convert "X(Y) Z" to "Y Z"-- remove text prior to first '(', and supress
@@ -3654,7 +3654,7 @@ CMI_EXTERNC void CmiIsomallocInit(char **argv);
 void CmiIOInit(char **argv);
 #endif
 
-/* defined in cpuaffinity.c */
+/* defined in cpuaffinity.C */
 CMI_EXTERNC void CmiInitCPUAffinityUtil(void);
 
 static void CmiProcessPriority(char **argv)

@@ -6,7 +6,7 @@
  * addresses during the initialization.
  *
  * The idea is that there could be multiple ways of implementing
- * these functions. The example provided in runtime-pmi.c uses PMI.
+ * these functions. The example provided in runtime-pmi.C uses PMI.
  */
 int runtime_init(int *rank, int *jobsize);
 int runtime_fini();

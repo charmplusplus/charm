@@ -3,7 +3,7 @@
 #include "queueing.h"
 #include "cldb.h"
 
-#include "priorityqueue.c"
+#include "priorityqueue.C"
 
 #define IDLE_IMMEDIATE 		1
 #define TRACE_USEREVENTS        0

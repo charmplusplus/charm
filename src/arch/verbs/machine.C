@@ -220,7 +220,7 @@ int printf(const char *fmt, ...) {
 
 #include "machine-smp.h"
 
-// This is used by machine-pxshm.c, which is included by machine-common-core.C
+// This is used by machine-pxshm.C, which is included by machine-common-core.C
 // (itself included below.)
 static int Cmi_charmrun_pid;
 
@@ -263,7 +263,7 @@ int _kq = -1;
 #endif
 
 #if CMK_PERSISTENT_COMM
-#include "machine-persistent.c" 
+#include "machine-persistent.C"
 #endif
 
 #define PRINTBUFSIZE 16384
@@ -833,7 +833,7 @@ int* inProgress;
 /******************************************************************************
  *
  * OS Threads
- * SMP implementation moved to machine-smp.c
+ * SMP implementation moved to machine-smp.C
  *****************************************************************************/
 
 /************************ No kernel SMP threads ***************/
@@ -1018,7 +1018,7 @@ CmiPrintStackTrace(0);
 /* ctrl_getone */
 
 #ifdef __FAULT__
-#include "machine-recover.c"
+#include "machine-recover.C"
 #endif
 
 static void node_addresses_store(ChMessage *msg);
@@ -1390,7 +1390,7 @@ static void CmiStdoutFlush(void) {
  *
  ***************************************************************************/
 
-#include "machine-dgram.c"
+#include "machine-dgram.C"
 
 static void open_charmrun_socket(void)
 {

@@ -162,7 +162,7 @@ static void extract_args(char **argv)
   if (Cmi_comm_periodic_delay>60) Cmi_comm_periodic_delay=60;
   Cmi_comm_clock_delay=(int)(1000*Cmi_ack_delay);
   if (sizeof(DgramHeader)!=DGRAM_HEADER_SIZE) {
-    CmiAbort("DatagramHeader in machine-dgram.c is the wrong size!\n");
+    CmiAbort("DatagramHeader in machine-dgram.C is the wrong size!\n");
   }
 }
 
@@ -653,7 +653,7 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int b
 #include "machine-ibverbs.C"
 
 #elif CMK_USE_IBUD
-#include "machine-ibud.c"
+#include "machine-ibud.C"
 
 #endif
 

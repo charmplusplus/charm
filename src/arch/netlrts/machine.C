@@ -260,7 +260,7 @@ int _kq = -1;
 #endif
 
 #if CMK_PERSISTENT_COMM
-#include "machine-persistent.c" 
+#include "machine-persistent.C"
 #endif
 
 #define PRINTBUFSIZE 16384
@@ -839,7 +839,7 @@ static double         Cmi_check_delay = 3.0;
 /******************************************************************************
  *
  * OS Threads
- * SMP implementation moved to machine-smp.c
+ * SMP implementation moved to machine-smp.C
  *****************************************************************************/
 int* inProgress;
 
@@ -1072,7 +1072,7 @@ void charmrun_realloc(const char *s)
 /* ctrl_getone */
 
 #ifdef __FAULT__
-#include "machine-recover.c"
+#include "machine-recover.C"
 #endif
 
 static void node_addresses_store(ChMessage *msg);
@@ -1448,7 +1448,7 @@ static void CmiStdoutFlush(void) {
  *
  ***************************************************************************/
 
-#include "machine-dgram.c"
+#include "machine-dgram.C"
 
 static void open_charmrun_socket(void)
 {

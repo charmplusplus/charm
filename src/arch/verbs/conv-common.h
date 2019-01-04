@@ -17,7 +17,7 @@
 
 #define CMK_ONESIDED_IMPL                                  1
 
-/* the first 4 fields of the header are defined in machine-dgram.c
+/* the first 4 fields of the header are defined in machine-dgram.C
    and are used for the udp retransmission protocol implementation.
    The root parameter is for the communication library and is used in
    broadcast operations. The cmaMsgType parameter is used to identify the type

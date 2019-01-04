@@ -21,8 +21,8 @@ See LICENSE-SandiaOpenSHMEM in parent directory.
 Files copied from MPICH:
 
     - pmi.h
-    - simple_pmi.c
-    - simple_pmiutil.c
+    - simple_pmi.C
+    - simple_pmiutil.C
     - simple_pmiutil.h
 
 See LICENSE-MPICH in this directory.

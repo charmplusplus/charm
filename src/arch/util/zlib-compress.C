@@ -1,7 +1,7 @@
 /*
  * =====================================================================================
  *
- *       Filename:  compress.c
+ *       Filename:  compress.C
  *
  *    Description:  Compress messages before sending and uncompress after receiving 
  *

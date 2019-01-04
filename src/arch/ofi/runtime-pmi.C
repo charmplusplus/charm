@@ -15,8 +15,8 @@
 #include "runtime.h"
 
 #if CMK_OFI_USE_SIMPLEPMI
-#include "simple_pmi.c"
-#include "simple_pmiutil.c"
+#include "simple_pmi.C"
+#include "simple_pmiutil.C"
 #endif
 
 /* For encode/decode functions */

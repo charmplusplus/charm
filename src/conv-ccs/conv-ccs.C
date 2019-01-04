@@ -511,8 +511,8 @@ we only probe for new connections (with CcsServerCheck)
 occasionally.  
  */
 #include <signal.h>
-#include "ccs-server.c" /*Include implementation here in this case*/
-#include "ccs-auth.c"
+#include "ccs-server.C" /*Include implementation here in this case*/
+#include "ccs-auth.C"
 
 /*Check for ready Ccs messages:*/
 void CcsServerCheck(void)

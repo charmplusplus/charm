@@ -206,7 +206,7 @@ int CmiNodeOf(int pe);
 CMI_EXTERNC
 int CmiRankOf(int pe);
 
-/* optional, these functions are implemented in "machine-smp.c", so including
+/* optional, these functions are implemented in "machine-smp.C", so including
    this file avoid the necessity to reimplement them.
  */
 void CmiNodeBarrier(void);
@@ -226,7 +226,7 @@ void         CmiLock(CmiNodeLock lock);
 void         CmiUnlock(CmiNodeLock lock);
 int          CmiTryLock(CmiNodeLock lock);
 
-/* optional, these functions are implemented in "machine-smp.c", so including
+/* optional, these functions are implemented in "machine-smp.C", so including
    this file avoid the necessity to reimplement them.
  */
 void CmiNodeBarrier(void);
@@ -257,7 +257,7 @@ int CmiNodeOf(int pe);
 CMI_EXTERNC
 int CmiRankOf(int pe);
 
-/* optional, these functions are implemented in "machine-smp.c", so including
+/* optional, these functions are implemented in "machine-smp.C", so including
    this file avoid the necessity to reimplement them.
  */
 void CmiNodeBarrier(void);
@@ -334,13 +334,13 @@ void     CmiNodeSpanTreeChildren(int node, int *children) ;
  * If immediate messages are supported, the following function is needed. There
  * is an exeption if the machine progress is also defined (see later for this).
 
- * Moreover, the file "immediate.c" should be included, otherwise all its
+ * Moreover, the file "immediate.C" should be included, otherwise all its
  * functions and variables have to be redefined.
 */
 
 #if CMK_CCS_AVAILABLE
 
-#include "immediate.c"
+#include "immediate.C"
 
 #if ! CMK_MACHINE_PROGRESS_DEFINED /* Hack for some machines */
 void CmiProbeImmediateMsg(void);

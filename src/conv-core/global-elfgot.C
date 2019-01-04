@@ -494,6 +494,6 @@ CtgGlobals CtgCurrentGlobals(void){
 
 #else // CMI_SWAPGLOBALS
 
-#include "global-nop.c"
+#include "global-nop.C"
 
 #endif

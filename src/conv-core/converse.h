@@ -7,11 +7,11 @@
   These generally tell you what category the routine is in:
   - Cmi, Converse Machine Interface, the machine layer. (machine.C)
      Also used for various generic low-level features.
-  - Cth, Converse threads, user-level nonpreemptive threads. (threads.c) 
-  - Ccd, Converse condition detection, similar to signal handling. (conv-conds.c)
-  - Ccs, Converse client/server, socket access to parallel job. (conv-ccs.c; ccs-*)
+  - Cth, Converse threads, user-level nonpreemptive threads. (threads.C)
+  - Ccd, Converse condition detection, similar to signal handling. (conv-conds.C)
+  - Ccs, Converse client/server, socket access to parallel job. (conv-ccs.C; ccs-*)
   - Cpd, Converse parallel debugger. (debug-*)
-  - Crn, Converse random number generation. (random.c)
+  - Crn, Converse random number generation. (random.C)
   - Csd, Converse scheduler daemon.  (convcore.C)
   - Cqs, Converse prioritized queueing system. (queueing.c)
   - CQd, Converse quiesence detection. (quiescense.c)
@@ -1613,7 +1613,7 @@ struct CthThreadListener {
        CthThread thread;
 
        /** The next listener, or NULL at end of chain.
-           Set by CthAddListener, and used only by threads.c.
+           Set by CthAddListener, and used only by threads.C.
        */
        struct CthThreadListener *next;
 };

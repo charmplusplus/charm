@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include "conv-trace.h"
 
-CpvDeclare(int, traceOn); /* For threads.c */
+CpvDeclare(int, traceOn); /* For threads.C */
 #if CMK_TRACE_ENABLED && CMK_PROJECTOR
 CpvExtern(int, _traceCoreOn);   /* For cursed projector core */
 #endif

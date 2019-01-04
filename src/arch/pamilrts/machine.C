@@ -27,7 +27,7 @@
 
 #if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
 #include "PPCAtomicQueue.h"
-#include "memalloc.c"
+#include "memalloc.C"
 #endif
 
 #if CMK_SMP && CMK_PPC_ATOMIC_MUTEX
@@ -168,7 +168,7 @@ static void CmiNetworkBarrier(int async);
 #if SPECIFIC_PCQUEUE && CMK_SMP
 #define  QUEUE_NUMS     _Cmi_mynodesize + 3
 #include "lrtsqueue.h"
-#include "memalloc.c"
+#include "memalloc.C"
 #endif
 #include "machine-lrts.h"
 #include "machine-common-core.C"
@@ -1483,10 +1483,10 @@ void init_barrier () {
 #endif
 
 #if CMK_PERSISTENT_COMM
-#include "machine-persistent.c"
+#include "machine-persistent.C"
 #endif
 
 #if CMK_ONESIDED_IMPL
-#include "machine-onesided.c"
+#include "machine-onesided.C"
 #endif
 

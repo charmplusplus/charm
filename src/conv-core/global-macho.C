@@ -209,7 +209,7 @@ CtgGlobals CtgCurrentGlobals(void){
 
 #else
 
-#include "global-nop.c"
+#include "global-nop.C"
 
 #endif
 

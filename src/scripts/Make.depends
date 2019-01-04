@@ -1771,7 +1771,7 @@ bigsim_timing.o: bigsim_timing.C blue.h converse.h conv-header.h \
  cklists.h pup.h pup_stl.h conv-config.h bigsim_logs.h blue_defs.h \
  bigsim_network.h bigsim_ooc.h
 
-bitvecset.o: bitvecset.c bitvecset.h
+bitvecset.o: bitvecset.C bitvecset.h
 
 blue.o: blue.C cklists.h pup.h converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
@@ -2338,19 +2338,19 @@ cktiming.o: cktiming.C charm++.h charm.h converse.h conv-header.h \
  pathHistory.h PathHistory.decl.h ckcallback-ccs.h CkCallback.decl.h \
  cktiming.h
 
-cldb.o: cldb.c queueing.h conv-config.h conv-autoconfig.h conv-common.h \
+cldb.o: cldb.C queueing.h conv-config.h conv-autoconfig.h conv-common.h \
  conv-mach-common.h conv-mach.h conv-mach-opt.h lrts-common.h cldb.h \
  converse.h conv-header.h cmiqueue.h pup_c.h lrtslock.h conv-cpm.h \
  conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
  persistent.h conv-rdma.h cmirdmautils.h debug-conv.h
 
-cmipool.o: cmipool.c cmipool.h converse.h conv-header.h conv-config.h \
+cmipool.o: cmipool.C cmipool.h converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
  conv-mach-opt.h lrts-common.h cmiqueue.h pup_c.h lrtslock.h queueing.h \
  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
  conv-trace.h persistent.h conv-rdma.h cmirdmautils.h debug-conv.h
 
-cmirdmautils.o: cmirdmautils.c cmirdmautils.h conv-header.h conv-config.h \
+cmirdmautils.o: cmirdmautils.C cmirdmautils.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
  conv-mach-opt.h lrts-common.h converse.h cmiqueue.h pup_c.h lrtslock.h \
  queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
@@ -2363,7 +2363,7 @@ cmitls.o: cmitls.C converse.h conv-header.h conv-config.h \
  conv-trace.h persistent.h conv-rdma.h cmirdmautils.h debug-conv.h \
  cmitls.h memory-isomalloc.h
 
-commitid.o: commitid.c
+commitid.o: commitid.C
 
 controlPoints.o: controlPoints.C charm++.h charm.h converse.h \
  conv-header.h conv-config.h conv-autoconfig.h conv-common.h \
@@ -2393,20 +2393,20 @@ controlPoints.o: controlPoints.C charm++.h charm.h converse.h \
  trace-common.h trace-projections.h ckhashtable.h pup.h pathHistory.h \
  cp_effects.h ControlPoints.def.h
 
-conv-ccs.o: conv-ccs.c converse.h conv-header.h conv-config.h \
+conv-ccs.o: conv-ccs.C converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
  conv-mach-opt.h lrts-common.h cmiqueue.h pup_c.h lrtslock.h queueing.h \
  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
  conv-trace.h persistent.h conv-rdma.h cmirdmautils.h debug-conv.h \
  conv-ccs.h sockRoutines.h ccs-server.h ckhashtable.h pup.h
 
-conv-conds.o: conv-conds.c converse.h conv-header.h conv-config.h \
+conv-conds.o: conv-conds.C converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
  conv-mach-opt.h lrts-common.h cmiqueue.h pup_c.h lrtslock.h queueing.h \
  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
  conv-trace.h persistent.h conv-rdma.h cmirdmautils.h debug-conv.h
 
-conv-counter.o: conv-counter.c converse.h conv-header.h conv-config.h \
+conv-counter.o: conv-counter.C converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
  conv-mach-opt.h lrts-common.h cmiqueue.h pup_c.h lrtslock.h queueing.h \
  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
@@ -2425,7 +2425,7 @@ conv-lists.o: conv-lists.C conv-lists.h cklists.h pup.h converse.h \
  conv-random.h conv-trace.h persistent.h conv-rdma.h cmirdmautils.h \
  debug-conv.h pup_stl.h conv-config.h
 
-conv-rdma.o: conv-rdma.c converse.h conv-header.h conv-config.h \
+conv-rdma.o: conv-rdma.C converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
  conv-mach-opt.h lrts-common.h cmiqueue.h pup_c.h lrtslock.h queueing.h \
  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
@@ -2444,7 +2444,7 @@ convcore.o: convcore.C converse.h conv-header.h conv-config.h \
  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
  conv-trace.h persistent.h conv-rdma.h cmirdmautils.h debug-conv.h \
  sockRoutines.h conv-ccs.h ccs-server.h ckhashtable.h pup.h \
- memory-isomalloc.h quiescence.h cmibacktrace.c hrctimer.h
+ memory-isomalloc.h quiescence.h cmibacktrace.C hrctimer.h
 
 converseProjections.o: converseProjections.C converse.h conv-header.h \
  conv-config.h conv-autoconfig.h conv-common.h conv-mach-common.h \
@@ -2477,20 +2477,20 @@ cp_effects.o: cp_effects.C cp_effects.h charm++.h charm.h converse.h \
  ../include/TopoManager.h ../include/topomanager_config.h \
  ../include/converse.h ckarray.h
 
-cpm.o: cpm.c queueing.h conv-config.h conv-autoconfig.h conv-common.h \
+cpm.o: cpm.C queueing.h conv-config.h conv-autoconfig.h conv-common.h \
  conv-mach-common.h conv-mach.h conv-mach-opt.h lrts-common.h converse.h \
  conv-header.h conv-config.h cmiqueue.h pup_c.h lrtslock.h queueing.h \
  conv-cpm.h converse.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
  conv-trace.h persistent.h conv-rdma.h cmirdmautils.h debug-conv.h
 
-cpthreads.o: cpthreads.c cpthreads.h converse.h conv-header.h \
+cpthreads.o: cpthreads.C cpthreads.h converse.h conv-header.h \
  conv-config.h conv-autoconfig.h conv-common.h conv-mach-common.h \
  conv-mach.h conv-mach-opt.h lrts-common.h cmiqueue.h pup_c.h lrtslock.h \
  queueing.h conv-cpm.h converse.h conv-cpath.h conv-qd.h conv-random.h \
  conv-lists.h conv-trace.h persistent.h conv-rdma.h cmirdmautils.h \
  debug-conv.h
 
-cpuaffinity.o: cpuaffinity.c converse.h conv-header.h conv-config.h \
+cpuaffinity.o: cpuaffinity.C converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
  conv-mach-opt.h lrts-common.h cmiqueue.h pup_c.h lrtslock.h queueing.h \
  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
@@ -2507,7 +2507,7 @@ cputopology.o: cputopology.C converse.h conv-header.h conv-config.h \
  conv-trace.h persistent.h conv-rdma.h cmirdmautils.h debug-conv.h \
  sockRoutines.h
 
-crc32.o: crc32.c crc32.h
+crc32.o: crc32.C crc32.h
 
 custom_partitioner.o: custom_partitioner.C charm++.h charm.h converse.h \
  conv-header.h conv-config.h conv-autoconfig.h conv-common.h \
@@ -2593,7 +2593,7 @@ debug-message.o: debug-message.C ck.h qd.h ckcallback.h cksection.h \
  stats.h ../include/TopoManager.h ../include/topomanager_config.h \
  ../include/converse.h envelope.h queueing.h
 
-edgelist.o: edgelist.c graphdefs.h converse.h conv-header.h conv-config.h \
+edgelist.o: edgelist.C graphdefs.h converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
  conv-mach-opt.h lrts-common.h cmiqueue.h pup_c.h lrtslock.h queueing.h \
  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
@@ -2606,20 +2606,20 @@ forestTest.o: forestTest.C RandomForestModel.h charm.h converse.h \
  conv-random.h conv-lists.h conv-trace.h persistent.h conv-rdma.h \
  cmirdmautils.h debug-conv.h pup.h
 
-futures.o: futures.c converse.h conv-header.h conv-config.h \
+futures.o: futures.C converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
  conv-mach-opt.h lrts-common.h cmiqueue.h pup_c.h lrtslock.h queueing.h \
  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
  conv-trace.h persistent.h conv-rdma.h cmirdmautils.h debug-conv.h
 
-generate.o: generate.c converse.h conv-header.h conv-config.h \
+generate.o: generate.C converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
  conv-mach-opt.h lrts-common.h cmiqueue.h pup_c.h lrtslock.h queueing.h \
  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
  conv-trace.h persistent.h conv-rdma.h cmirdmautils.h debug-conv.h \
  graphdefs.h
 
-global-nop.o: global-nop.c converse.h conv-header.h conv-config.h \
+global-nop.o: global-nop.C converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
  conv-mach-opt.h lrts-common.h cmiqueue.h pup_c.h lrtslock.h queueing.h \
  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
@@ -2759,7 +2759,7 @@ manager.o: manager.C manager.h CentralLB.h BaseLB.h LBDatabase.h lbdb.h \
  pathHistory.h PathHistory.decl.h ckcallback-ccs.h CkCallback.decl.h \
  NullLB.decl.h BaseLB.decl.h CentralLB.decl.h CentralLBMsg.h
 
-mem-arena.o: mem-arena.c converse.h conv-header.h conv-config.h \
+mem-arena.o: mem-arena.C converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
  conv-mach-opt.h lrts-common.h cmiqueue.h pup_c.h lrtslock.h queueing.h \
  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
@@ -2768,7 +2768,7 @@ mem-arena.o: mem-arena.c converse.h conv-header.h conv-config.h \
 
 memory-darwin-clang.o: memory-darwin-clang.C
 
-memoryaffinity.o: memoryaffinity.c converse.h conv-header.h conv-config.h \
+memoryaffinity.o: memoryaffinity.C converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
  conv-mach-opt.h lrts-common.h cmiqueue.h pup_c.h lrtslock.h queueing.h \
  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
@@ -2882,7 +2882,7 @@ msgalloc.o: msgalloc.C ck.h qd.h ckcallback.h cksection.h charm.h \
  ckcallback-ccs.h CkCallback.decl.h stats.h ../include/TopoManager.h \
  ../include/topomanager_config.h ../include/converse.h
 
-msgmgr.o: msgmgr.c converse.h conv-header.h conv-config.h \
+msgmgr.o: msgmgr.C converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
  conv-mach-opt.h lrts-common.h cmiqueue.h pup_c.h lrtslock.h queueing.h \
  conv-cpm.h converse.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
@@ -2925,7 +2925,7 @@ pathHistory.o: pathHistory.C charm++.h charm.h converse.h conv-header.h \
  trace-projections.h trace.h trace-common.h ckhashtable.h pup.h \
  PathHistory.def.h
 
-persist-comm.o: persist-comm.c converse.h conv-header.h conv-config.h \
+persist-comm.o: persist-comm.C converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
  conv-mach-opt.h lrts-common.h cmiqueue.h pup_c.h lrtslock.h queueing.h \
  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
@@ -3104,13 +3104,13 @@ queueing.o: queueing.C queueing.h conv-config.h conv-autoconfig.h \
  conv-random.h conv-lists.h conv-trace.h persistent.h conv-rdma.h \
  cmirdmautils.h debug-conv.h
 
-quiescence.o: quiescence.c conv-config.h conv-autoconfig.h conv-common.h \
+quiescence.o: quiescence.C conv-config.h conv-autoconfig.h conv-common.h \
  conv-mach-common.h conv-mach.h conv-mach-opt.h lrts-common.h converse.h \
  conv-header.h cmiqueue.h pup_c.h lrtslock.h queueing.h conv-cpm.h \
  conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
  persistent.h conv-rdma.h cmirdmautils.h debug-conv.h quiescence.h
 
-random.o: random.c converse.h conv-header.h conv-config.h \
+random.o: random.C converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
  conv-mach-opt.h lrts-common.h cmiqueue.h pup_c.h lrtslock.h queueing.h \
  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
@@ -3155,11 +3155,11 @@ sdag.o: sdag.C sdag.h pup.h converse.h conv-header.h conv-config.h \
  middle.h conv-config.h middle-conv.h cklists.h pup_stl.h objid.h charm.h \
  debug-charm.h debug-conv++.h register.h cklists.h
 
-set_partition_params.o: set_partition_params.c
+set_partition_params.o: set_partition_params.C
 
 shared_alloc.o: shared_alloc.C shared-alloc.h
 
-sockRoutines.o: sockRoutines.c sockRoutines.h conv-config.h \
+sockRoutines.o: sockRoutines.C sockRoutines.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
  conv-mach-opt.h lrts-common.h converse.h conv-header.h cmiqueue.h \
  pup_c.h lrtslock.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h \
@@ -3190,13 +3190,13 @@ spanningTree.o: spanningTree.C spanningTree.h charm++.h charm.h \
  ../include/TopoManager.h ../include/topomanager_config.h \
  ../include/converse.h
 
-tm_bucket.o: tm_bucket.c tm_tree.h tm_bucket.h tm_timings.h
+tm_bucket.o: tm_bucket.C tm_tree.h tm_bucket.h tm_timings.h
 
-tm_mapping.o: tm_mapping.c tm_mapping.h tm_tree.h tm_timings.h
+tm_mapping.o: tm_mapping.C tm_mapping.h tm_tree.h tm_timings.h
 
-tm_timings.o: tm_timings.c tm_timings.h
+tm_timings.o: tm_timings.C tm_timings.h
 
-tm_tree.o: tm_tree.c tm_tree.h tm_timings.h tm_bucket.h
+tm_tree.o: tm_tree.C tm_tree.h tm_timings.h tm_bucket.h
 
 topology.o: topology.C converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
@@ -3267,7 +3267,7 @@ trace-controlPoints.o: trace-controlPoints.C charm++.h charm.h converse.h \
  trace-controlPoints.h trace-common.h trace-controlPointsBOC.h \
  TraceControlPoints.decl.h TraceControlPoints.def.h
 
-trace-converse.o: trace-converse.c conv-trace.h converse.h conv-header.h \
+trace-converse.o: trace-converse.C conv-trace.h converse.h conv-header.h \
  conv-config.h conv-autoconfig.h conv-common.h conv-mach-common.h \
  conv-mach.h conv-mach-opt.h lrts-common.h cmiqueue.h pup_c.h lrtslock.h \
  queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
