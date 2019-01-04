@@ -645,7 +645,7 @@ with the newly created library. Calls to TCHARM\_API\_TRACE macro must be
 added to the start of every user-callable method. In addition to tracing,
 these disable isomalloc allocation. 
 
-The charm-api.h macros CDECL, FDECL and
+The charm-api.h macros CLINKAGE, FLINKAGE and
 FTN\_NAME should be used to provide both C and FORTRAN versions of each 
 API call.  You should use the "MPI capitalization standard", where the library
 name is all caps, followed by a capitalized first word, with all subsequent 
@@ -663,14 +663,14 @@ int index will need to be decremented before use, or incremented before
 a return.
 
 \begin{alltt}
-CDECL void FOO\_Communicate(int x, double y, int * arr) \{
+CLINKAGE void FOO\_Communicate(int x, double y, int * arr) \{
    TCHARM\_API\_TRACE("FOO\_Communicate", "foo"); //2nd parameter is the name of the library
    FooChunk *f = CtvAccess(\_fooptr);
    f->doCommunicate(x, y, arr);
 \}
 
 //In fortran, everything is passed via pointers
-FDECL void FTN\_NAME(FOO_COMMUNICATE, foo_communicate)
+FLINKAGE void FTN\_NAME(FOO_COMMUNICATE, foo_communicate)
      (int *x, double *y, int *arr)
 \{
    TCHARM\_API\_TRACE("FOO_COMMUNICATE", "foo");

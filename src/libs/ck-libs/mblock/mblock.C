@@ -32,8 +32,8 @@ then resume the thread when the results arrive.
 // valid in routines called from driver().
 CtvStaticDeclare(MBlockChunk *, _mblkptr);
 
-CDECL void driver(void);
-FDECL void FTN_NAME(DRIVER,driver)(void);
+CLINKAGE void driver(void);
+FLINKAGE void FTN_NAME(DRIVER,driver)(void);
 
 static void callDrivers(void) {
 	driver();
@@ -60,7 +60,7 @@ void MBlockProcInit(void)
   TCHARM_Set_fallback_setup(MBlockFallbackSetup);
 }
 
-CDECL void MBLK_Init(int comm) {
+CLINKAGE void MBLK_Init(int comm) {
   if (TCHARM_Element()==0) {
      CkArrayID threads; int nThreads;
      CkArrayOptions opt=TCHARM_Attach_start(&threads,&nThreads);
@@ -474,27 +474,27 @@ static MBlockChunk *getCurMBlockChunk(void)
 
 /******************************* C Bindings **********************************/
 
-CDECL int 
+CLINKAGE int
 MBLK_Read(const char *prefix,int nDim) {
   getCurMBlockChunk() -> read(prefix,nDim);
   return MBLK_SUCCESS;
 }
 
-CDECL int 
+CLINKAGE int
 MBLK_Get_nblocks(int *n)
 {
   *n = TCHARM_Num_elements();
   return MBLK_SUCCESS;
 }
 
-CDECL int 
+CLINKAGE int
 MBLK_Get_myblock(int *m)
 {
   *m = TCHARM_Element();
   return MBLK_SUCCESS;
 }
 
-CDECL int 
+CLINKAGE int
 MBLK_Get_blocksize(int *dim)
 {
   MBLOCKAPI("MBLK_Get_blocksize");
@@ -505,7 +505,7 @@ MBLK_Get_blocksize(int *dim)
   return MBLK_SUCCESS;
 }
 
-CDECL int 
+CLINKAGE int
 MBLK_Get_nodelocs(const int *nodedim,double *nodeloc) {
   MBLOCKAPI("MBLK_Get_nodelocs");
   block *b=getCurMBlockChunk()->b;
@@ -529,34 +529,34 @@ MBLK_Get_nodelocs(const int *nodedim,double *nodeloc) {
   return MBLK_SUCCESS;
 }
 
-CDECL double 
+CLINKAGE double
 MBLK_Timer(void)
 {
   return TCHARM_Wall_timer();
 }
 
-CDECL void 
+CLINKAGE void
 MBLK_Print(const char *str)
 {
   MBLOCKAPI("MBLK_Print");
   CkPrintf("[%d] %s\n", TCHARM_Element(), str);
 }
 
-CDECL int 
+CLINKAGE int
 MBLK_Register(void *_ud,MBLK_PupFn _pup_ud, int *rid)
 {
   *rid=TCHARM_Register(_ud,_pup_ud);
   return MBLK_SUCCESS;
 }
 
-CDECL int 
+CLINKAGE int
 MBLK_Get_registered(int n, void **b)
 {
   *b=TCHARM_Get_userdata(n);
   return MBLK_SUCCESS;
 }
 
-CDECL int 
+CLINKAGE int
 MBLK_Migrate(void)
 {
   MBLOCKAPI("MBLK_Migrate");
@@ -564,7 +564,7 @@ MBLK_Migrate(void)
   return MBLK_SUCCESS;
 }
 
-CDECL int 
+CLINKAGE int
 MBLK_Create_field(int *dims,int isVoxel,
 		  int base_type, int vec_len, 
 		  int init_offset, int distance,
@@ -577,7 +577,7 @@ MBLK_Create_field(int *dims,int isVoxel,
   return ((*fid==(-1)) ? MBLK_FAILURE : MBLK_SUCCESS);
 }
 
-CDECL int
+CLINKAGE int
 MBLK_Update_field(int fid, int ghostWidth, void *grid)
 {
   MBLOCKAPI("MBLK_Update_field");
@@ -585,7 +585,7 @@ MBLK_Update_field(int fid, int ghostWidth, void *grid)
   return MBLK_Wait_update();
 }
 
-CDECL int
+CLINKAGE int
 MBLK_Iupdate_field(int fid, int ghostWidth, void *ingrid, void *outgrid)
 {
   MBLOCKAPI("MBLK_Iupdate_field");
@@ -593,7 +593,7 @@ MBLK_Iupdate_field(int fid, int ghostWidth, void *ingrid, void *outgrid)
   return MBLK_SUCCESS;
 }
 
-CDECL int
+CLINKAGE int
 MBLK_Test_update(int *status)
 {
   MBLOCKAPI("MBLK_Test_update");
@@ -601,14 +601,14 @@ MBLK_Test_update(int *status)
   return MBLK_SUCCESS; 
 }
 
-CDECL int
+CLINKAGE int
 MBLK_Wait_update(void)
 {
   MBLOCKAPI("MBLK_Wait_update");
   return getCurMBlockChunk()->wait_update();
 }
 
-CDECL int
+CLINKAGE int
 MBLK_Reduce_field(int fid, void *ingrid, void *outbuf, int op)
 {
   MBLOCKAPI("MBLK_Reduce_field");
@@ -616,7 +616,7 @@ MBLK_Reduce_field(int fid, void *ingrid, void *outbuf, int op)
   return MBLK_SUCCESS;
 }
 
-CDECL int
+CLINKAGE int
 MBLK_Reduce(int fid, void *inbuf, void *outbuf, int op)
 {
   MBLOCKAPI("MBLK_Reduce");
@@ -624,14 +624,14 @@ MBLK_Reduce(int fid, void *inbuf, void *outbuf, int op)
   return MBLK_SUCCESS;
 }
 
-CDECL int
+CLINKAGE int
 MBLK_Register_bc(const int bcnum, int ghostWidth,const MBLK_BcFn bcfn)
 {
   MBLOCKAPI("MBLK_Register_bc");
   return getCurMBlockChunk()->register_bc(bcnum, bcfn, extrudeMethod(ghostWidth), false);
 }
 
-CDECL int
+CLINKAGE int
 MBLK_Apply_bc(const int bcnum, void *p1,void *p2)
 {
   MBLOCKAPI("MBLK_Apply_bc");
@@ -639,7 +639,7 @@ MBLK_Apply_bc(const int bcnum, void *p1,void *p2)
   return retval;
 }
 
-CDECL int
+CLINKAGE int
 MBLK_Apply_bc_all(void *p1,void *p2)
 {
   MBLOCKAPI("MBLK_Apply_bc_all");
@@ -647,7 +647,7 @@ MBLK_Apply_bc_all(void *p1,void *p2)
   return retval;
 }
 
-CDECL void 
+CLINKAGE void
 MBLK_Print_block(void)
 {
   MBLOCKAPI("MBLK_Print_block");
@@ -658,13 +658,13 @@ MBLK_Print_block(void)
 /************************ Fortran Bindings *********************************/
 
 // Utility functions for Fortran
-FDECL int FTN_NAME(FOFFSETOF,foffsetof)
+FLINKAGE int FTN_NAME(FOFFSETOF,foffsetof)
   (void *first, void *second)
 {
   return (int)((char *)second - (char*)first);
 }
 
-FDECL void FTN_NAME(MBLK_READ, mblk_read)
+FLINKAGE void FTN_NAME(MBLK_READ, mblk_read)
   (const char *str, int *nDim,int *ret, int len)
 {
   /* skip over silly Fortran space-padded string */
@@ -676,13 +676,13 @@ FDECL void FTN_NAME(MBLK_READ, mblk_read)
   delete[] tmpstr;
 }
 
-FDECL void FTN_NAME(MBLK_GET_NBLOCKS, mblk_get_nblocks)
+FLINKAGE void FTN_NAME(MBLK_GET_NBLOCKS, mblk_get_nblocks)
   (int *n, int *ret)
 {
   *ret = MBLK_Get_nblocks(n);
 }
 
-FDECL void FTN_NAME(MBLK_GET_MYBLOCK, mblk_get_myblock)
+FLINKAGE void FTN_NAME(MBLK_GET_MYBLOCK, mblk_get_myblock)
   (int *m, int *ret)
 {
   *ret = MBLK_Get_myblock(m);
@@ -690,25 +690,25 @@ FDECL void FTN_NAME(MBLK_GET_MYBLOCK, mblk_get_myblock)
 static void c2f_index3d(int *idx) {
   idx[0]++; idx[1]++; idx[2]++;
 }
-FDECL void FTN_NAME(MBLK_GET_BLOCKSIZE, mblk_get_blocksize)
+FLINKAGE void FTN_NAME(MBLK_GET_BLOCKSIZE, mblk_get_blocksize)
   (int *dims, int *ret)
 {
   *ret = MBLK_Get_blocksize(dims);
 }
 
-FDECL void FTN_NAME(MBLK_GET_NODELOCS,mblk_get_nodelocs)
+FLINKAGE void FTN_NAME(MBLK_GET_NODELOCS,mblk_get_nodelocs)
   (const int *nodedim,double *nodeloc,int *ret) 
 {
   *ret = MBLK_Get_nodelocs(nodedim,nodeloc);
 }
 
-FDECL double FTN_NAME(MBLK_TIMER, mblk_timer)
+FLINKAGE double FTN_NAME(MBLK_TIMER, mblk_timer)
   (void)
 {
   return MBLK_Timer();
 }
 
-FDECL void FTN_NAME(MBLK_PRINT,mblk_print)
+FLINKAGE void FTN_NAME(MBLK_PRINT,mblk_print)
   (char *str, int len)
 {
   char *tmpstr = new char[len+1]; CHK(tmpstr);
@@ -718,80 +718,80 @@ FDECL void FTN_NAME(MBLK_PRINT,mblk_print)
   delete[] tmpstr;
 }
 
-FDECL void FTN_NAME(MBLK_PRINT_BLOCK,mblk_print_block)
+FLINKAGE void FTN_NAME(MBLK_PRINT_BLOCK,mblk_print_block)
   (void)
 {
   MBLK_Print_block();
 }
 
-FDECL void FTN_NAME(MBLK_CREATE_FIELD, mblk_create_field)
+FLINKAGE void FTN_NAME(MBLK_CREATE_FIELD, mblk_create_field)
   (int *dims,int *forVox,int *b, int *l, int *o, int *d, int *f, int *ret)
 {
   *ret = MBLK_Create_field(dims,*forVox,*b, *l, *o, *d, f);
 }
 
-FDECL void FTN_NAME(MBLK_UPDATE_FIELD, mblk_update_field)
+FLINKAGE void FTN_NAME(MBLK_UPDATE_FIELD, mblk_update_field)
   (int *fid, int *ghostWidth,void *grid, int *ret)
 {
   *ret = MBLK_Update_field(*fid,*ghostWidth, grid);
 }
 
-FDECL void FTN_NAME(MBLK_IUPDATE_FIELD, mblk_iupdate_field)
+FLINKAGE void FTN_NAME(MBLK_IUPDATE_FIELD, mblk_iupdate_field)
   (int *fid, int *ghostWidth, void *igrid, void *ogrid, int *ret)
 {
   *ret = MBLK_Iupdate_field(*fid,*ghostWidth, igrid, ogrid);
 }
 
-FDECL void FTN_NAME(MBLK_TEST_UPDATE, mblk_test_update)
+FLINKAGE void FTN_NAME(MBLK_TEST_UPDATE, mblk_test_update)
   (int *status, int *ret)
 {
   *ret = MBLK_Test_update(status);
 }
 
-FDECL void FTN_NAME(MBLK_WAIT_UPDATE, mblk_wait_update)
+FLINKAGE void FTN_NAME(MBLK_WAIT_UPDATE, mblk_wait_update)
   (int *ret)
 {
   *ret = MBLK_Wait_update();
 }
 
-FDECL void FTN_NAME(MBLK_REDUCE_FIELD, mblk_reduce_field)
+FLINKAGE void FTN_NAME(MBLK_REDUCE_FIELD, mblk_reduce_field)
   (int *fid, void *grid, void *out, int *op, int *ret)
 {
   *ret = MBLK_Reduce_field(*fid, grid, out, *op);
 }
 
-FDECL void FTN_NAME(MBLK_REDUCE, mblk_reduce)
+FLINKAGE void FTN_NAME(MBLK_REDUCE, mblk_reduce)
   (int *fid, void *in, void *out, int *op, int *ret)
 {
   *ret = MBLK_Reduce_field(*fid, in, out, *op);
 }
 
-FDECL void FTN_NAME(MBLK_REGISTER_BC, mblk_register_bc)
+FLINKAGE void FTN_NAME(MBLK_REGISTER_BC, mblk_register_bc)
   (int *bcnum, int *ghostWidth,MBLK_BcFn bcfn, int *ret)
 {
   MBLOCKAPI("MBLK_register_bc");
   *ret=getCurMBlockChunk()->register_bc(*bcnum, bcfn, extrudeMethod(*ghostWidth), true);	
 }
 
-FDECL void FTN_NAME(MBLK_APPLY_BC, mblk_apply_bc)
+FLINKAGE void FTN_NAME(MBLK_APPLY_BC, mblk_apply_bc)
   (int *bcnum, void *p1,void *p2, int *ret)
 {
   *ret = MBLK_Apply_bc(*bcnum, p1,p2);
 }
 
-FDECL void FTN_NAME(MBLK_APPLY_BC_ALL, mblk_apply_bc_all)
+FLINKAGE void FTN_NAME(MBLK_APPLY_BC_ALL, mblk_apply_bc_all)
   (void *p1,void *p2, int *ret)
 {
   *ret = MBLK_Apply_bc_all(p1,p2);
 }
 
-FDECL void FTN_NAME(MBLK_REGISTER, mblk_register)
+FLINKAGE void FTN_NAME(MBLK_REGISTER, mblk_register)
   (void *block, MBLK_PupFn pupfn, int *rid, int *ret)
 {
   *ret = MBLK_Register(block, pupfn, rid);
 }
 
-FDECL void FTN_NAME(MBLK_MIGRATE, mblk_migrate)
+FLINKAGE void FTN_NAME(MBLK_MIGRATE, mblk_migrate)
   (int *ret)
 {
   *ret = MBLK_Migrate();

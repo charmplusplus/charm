@@ -457,56 +457,56 @@ Author: Isaac Dooley 11-09-2005
 /// User functions for adaptivity
 
 void FEM_ADAPT_Init(int meshID);
-FDECL void FTN_NAME(FEM_ADAPT_INIT,fem_adapt_init)(int *meshID);
+FLINKAGE void FTN_NAME(FEM_ADAPT_INIT,fem_adapt_init)(int *meshID);
 
 
 void FEM_ADAPT_Refine(int meshID, int qm, int method, double factor, double *sizes);
-FDECL void FTN_NAME(FEM_ADAPT_REFINE,fem_adapt_refine)(int* meshID, 
+FLINKAGE void FTN_NAME(FEM_ADAPT_REFINE,fem_adapt_refine)(int* meshID,
         int *qm, int *method, double *factor, double *sizes);
 
 
 void FEM_ADAPT_Coarsen(int meshID, int qm, int method, double factor, 
         double *sizes);
-FDECL void FTN_NAME(FEM_ADAPT_COARSEN,fem_adapt_coarsen)(int* meshID, 
+FLINKAGE void FTN_NAME(FEM_ADAPT_COARSEN,fem_adapt_coarsen)(int* meshID,
         int *qm, int *method, double *factor, double *sizes);
 
 void FEM_ADAPT_AdaptMesh(int meshID, int qm, int method, double factor, double *sizes);
-FDECL void FTN_NAME(FEM_ADAPT_ADAPTMESH,fem_adapt_adaptmesh)(int* meshID, 
+FLINKAGE void FTN_NAME(FEM_ADAPT_ADAPTMESH,fem_adapt_adaptmesh)(int* meshID,
         int *qm, int *method, double *factor, double *sizes);
 
 void FEM_ADAPT_SetElementSizeField(int meshID, int elem, double size);
-FDECL void FTN_NAME(FEM_ADAPT_SETELEMENTSIZEFIELD,fem_adapt_setelementsizefield)(int *meshID, int *elem, double *size);
+FLINKAGE void FTN_NAME(FEM_ADAPT_SETELEMENTSIZEFIELD,fem_adapt_setelementsizefield)(int *meshID, int *elem, double *size);
 
 
 void FEM_ADAPT_SetElementsSizeField(int meshID, double *sizes);
-FDECL void FTN_NAME(FEM_ADAPT_SETELEMENTSSIZEFIELD,fem_adapt_setelementssizefield)(int *meshID, double *sizes);
+FLINKAGE void FTN_NAME(FEM_ADAPT_SETELEMENTSSIZEFIELD,fem_adapt_setelementssizefield)(int *meshID, double *sizes);
 
 
 void FEM_ADAPT_SetReferenceMesh(int meshID);
-FDECL void FTN_NAME(FEM_ADAPT_SETREFERENCEMESH, fem_adapt_setreferencemesh)(int* meshID);
+FLINKAGE void FTN_NAME(FEM_ADAPT_SETREFERENCEMESH, fem_adapt_setreferencemesh)(int* meshID);
 
 
 void FEM_ADAPT_GradateMesh(int meshID, double smoothness);
-FDECL void FTN_NAME(FEM_ADAPT_GRADATEMESH, fem_adapt_gradatemesh)(int* meshID, double* smoothness);
+FLINKAGE void FTN_NAME(FEM_ADAPT_GRADATEMESH, fem_adapt_gradatemesh)(int* meshID, double* smoothness);
 
 
 void FEM_ADAPT_TestMesh(int meshID);
-FDECL void FTN_NAME(FEM_ADAPT_TESTMESH, fem_adapt_testmesh)(int* meshID);
+FLINKAGE void FTN_NAME(FEM_ADAPT_TESTMESH, fem_adapt_testmesh)(int* meshID);
 
 
 int FEM_ADAPT_SimpleRefineMesh(int meshID, double targetA, double xmin=0.0, double ymin=0.0, double xmax=1.0, double ymax=1.0);
-FDECL void FTN_NAME(FEM_ADAPT_SIMPLEREFINEMESH, fem_adapt_simplerefinemesh)(int* meshID, double* targetA, double* xmin, double* ymin, double* xmax, double* ymax);
+FLINKAGE void FTN_NAME(FEM_ADAPT_SIMPLEREFINEMESH, fem_adapt_simplerefinemesh)(int* meshID, double* targetA, double* xmin, double* ymin, double* xmax, double* ymax);
 
 
 int FEM_ADAPT_SimpleCoarsenMesh(int meshID, double targetA, double xmin=0.0, double ymin=0.0, double xmax=1.0, double ymax=1.0);
-FDECL void FTN_NAME(FEM_ADAPT_SIMPLECOARSENMESH, fem_adapt_simplecoarsenmesh)(int* meshID, double* targetA, double* xmin, double* ymin, double* xmax, double* ymax);
+FLINKAGE void FTN_NAME(FEM_ADAPT_SIMPLECOARSENMESH, fem_adapt_simplecoarsenmesh)(int* meshID, double* targetA, double* xmin, double* ymin, double* xmax, double* ymax);
 
   // End Adaptivity interface
 
 
 /// User functions for parfum initialization
 void ParFUM_SA_Init(int meshId);
-FDECL void FTN_NAME(PARFUM_SA_INIT,parfum_sa_init)(int *meshId);
+FLINKAGE void FTN_NAME(PARFUM_SA_INIT,parfum_sa_init)(int *meshId);
 
 #ifdef __cplusplus
 }

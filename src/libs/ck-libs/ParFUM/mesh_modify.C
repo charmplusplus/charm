@@ -31,26 +31,26 @@ inline int is_shared(FEM_Mesh *m, int node){
 /* Some helper print functions that can be used for debugging 
    helper functions that print the various node/element connectivities
    calls the corresponding functions in the FEM_MUtil class to do the printing */
-CDECL void FEM_Print_n2n(int mesh, int nodeid){
+CLINKAGE void FEM_Print_n2n(int mesh, int nodeid){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Print_Mesh_Summary");
   m->getfmMM()->getfmUtil()->FEM_Print_n2n(m, nodeid);
 }
-CDECL void FEM_Print_n2e(int mesh, int eid){
+CLINKAGE void FEM_Print_n2e(int mesh, int eid){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Print_Mesh_Summary");
   m->getfmMM()->getfmUtil()->FEM_Print_n2e(m, eid);
 }
-CDECL void FEM_Print_e2n(int mesh, int eid){
+CLINKAGE void FEM_Print_e2n(int mesh, int eid){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Print_Mesh_Summary");
   m->getfmMM()->getfmUtil()->FEM_Print_e2n(m, eid);
 }
-CDECL void FEM_Print_e2e(int mesh, int eid){
+CLINKAGE void FEM_Print_e2e(int mesh, int eid){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Print_Mesh_Summary");
   m->getfmMM()->getfmUtil()->FEM_Print_e2e(m, eid);
 }
 
 /** Prints the mesh summary, i.e. number of valid nodes/elements (local/ghost)
  */
-CDECL void FEM_Print_Mesh_Summary(int mesh){
+CLINKAGE void FEM_Print_Mesh_Summary(int mesh){
   CkPrintf("---------------FEM_Print_Mesh_Summary-------------\n");
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Print_Mesh_Summary");
   // Print Node information
@@ -74,19 +74,19 @@ CDECL void FEM_Print_Mesh_Summary(int mesh){
 //========================Basic Adaptivity operations=======================
 /*These are the basic add/remove node/element operations */
 //The following functions translate the calls from meshId to mesh pointer
-CDECL int FEM_add_node(int mesh, int* adjacent_nodes, int num_adjacent_nodes, int *chunks, int numChunks, int forceShared){
+CLINKAGE int FEM_add_node(int mesh, int* adjacent_nodes, int num_adjacent_nodes, int *chunks, int numChunks, int forceShared){
   return FEM_add_node(FEM_Mesh_lookup(mesh,"FEM_add_node"), adjacent_nodes, num_adjacent_nodes, chunks, numChunks, forceShared);
 }
-CDECL void FEM_remove_node(int mesh,int node){
+CLINKAGE void FEM_remove_node(int mesh,int node){
   return FEM_remove_node(FEM_Mesh_lookup(mesh,"FEM_remove_node"), node);
 }
-CDECL int FEM_add_element(int mesh, int* conn, int conn_size, int elem_type, int chunkNo){
+CLINKAGE int FEM_add_element(int mesh, int* conn, int conn_size, int elem_type, int chunkNo){
   return FEM_add_element(FEM_Mesh_lookup(mesh,"FEM_add_element"), conn, conn_size, elem_type, chunkNo);
 }
-CDECL int FEM_remove_element(int mesh, int element, int elem_type, int permanent){
+CLINKAGE int FEM_remove_element(int mesh, int element, int elem_type, int permanent){
   return FEM_remove_element(FEM_Mesh_lookup(mesh,"FEM_remove_element"), element, elem_type, permanent);
 }
-CDECL int FEM_purge_element(int mesh, int element, int elem_type) {
+CLINKAGE int FEM_purge_element(int mesh, int element, int elem_type) {
   return FEM_purge_element(FEM_Mesh_lookup(mesh,"FEM_remove_element"), element, elem_type);
 }
 
@@ -1654,17 +1654,17 @@ int FEM_purge_element(FEM_Mesh *m, int elementid, int elemtype) {
 //========================Locking operations=======================
 /* These are the locking operations on nodes or chunks, depending on the locking scheme */
 //these are based on chunk locking: DEPRECATED
-CDECL int FEM_Modify_Lock(int mesh, int* affectedNodes, int numAffectedNodes, int* affectedElts, int numAffectedElts, int elemtype){
+CLINKAGE int FEM_Modify_Lock(int mesh, int* affectedNodes, int numAffectedNodes, int* affectedElts, int numAffectedElts, int elemtype){
   return FEM_Modify_Lock(FEM_Mesh_lookup(mesh,"FEM_Modify_Lock"), affectedNodes, numAffectedNodes, affectedElts, numAffectedElts, elemtype);
 }
-CDECL int FEM_Modify_Unlock(int mesh){
+CLINKAGE int FEM_Modify_Unlock(int mesh){
   return FEM_Modify_Unlock(FEM_Mesh_lookup(mesh,"FEM_Modify_Unlock"));
 }
 //these are based on node locking
-CDECL int FEM_Modify_LockN(int mesh, int nodeId, int readLock) {
+CLINKAGE int FEM_Modify_LockN(int mesh, int nodeId, int readLock) {
   return FEM_Modify_LockN(FEM_Mesh_lookup(mesh,"FEM_Modify_LockN"),nodeId, readLock);
 }
-CDECL int FEM_Modify_UnlockN(int mesh, int nodeId, int readLock) {
+CLINKAGE int FEM_Modify_UnlockN(int mesh, int nodeId, int readLock) {
   return FEM_Modify_UnlockN(FEM_Mesh_lookup(mesh,"FEM_Modify_UnlockN"),nodeId, readLock);
 }
 

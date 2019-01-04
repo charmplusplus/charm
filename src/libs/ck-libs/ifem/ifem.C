@@ -93,7 +93,7 @@ public:
 	}
 };
 
-CDECL void 
+CLINKAGE void
 IFEM_Solve_shared(ILSI_Solver s,ILSI_Param *p,
 	int fem_mesh, int fem_entity,int length,int width,
 	IFEM_Matrix_product_c A, void *ptr, 
@@ -106,7 +106,7 @@ IFEM_Solve_shared(ILSI_Solver s,ILSI_Param *p,
 	(s)(p,&comm,n,b,x);
 }
 
-FDECL void 
+FLINKAGE void
 FTN_NAME(IFEM_SOLVE_SHARED,ifem_solve_shared)
 	(ILSI_Solver s,ILSI_Param *p,
 	int *fem_mesh, int *fem_entity,int *length,int *width,
@@ -233,7 +233,7 @@ void BCapplier::solve(ILSI_Solver s,ILSI_Param *p,
 	for (i=0;i<bcCount;i++) x[at(i)]=bcValue[i];
 }
 
-CDECL void 
+CLINKAGE void
 IFEM_Solve_shared_bc(ILSI_Solver s,ILSI_Param *p,
 	int fem_mesh, int fem_entity,int length,int width,
 	int bcCount, const int *bcDOF, const double *bcValue,
@@ -245,7 +245,7 @@ IFEM_Solve_shared_bc(ILSI_Solver s,ILSI_Param *p,
 	bc.solve(s,p,fem_mesh,fem_entity,length,width,b,x);
 }
 
-FDECL void 
+FLINKAGE void
 FTN_NAME(IFEM_SOLVE_SHARED_BC,ifem_solve_shared_bc)
 	(ILSI_Solver s,ILSI_Param *p,
 	int *fem_mesh, int *fem_entity,int *length,int *width,

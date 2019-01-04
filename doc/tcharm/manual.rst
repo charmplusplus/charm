@@ -660,7 +660,7 @@ The overall scheme for writing a TCharm-based library "Foo" is:
    be added to the start of every user-callable method. In addition to
    tracing, these disable isomalloc allocation.
 
-   The charm-api.h macros CDECL, FDECL and FTN_NAME should be used to
+   The charm-api.h macros CLINKAGE, FLINKAGE and FTN_NAME should be used to
    provide both C and FORTRAN versions of each API call. You should use
    the "MPI capitalization standard", where the library name is all
    caps, followed by a capitalized first word, with all subsequent words
@@ -680,14 +680,14 @@ The overall scheme for writing a TCharm-based library "Foo" is:
 
    ::
 
-      CDECL void FOO_Communicate(int x, double y, int * arr) {
+      CLINKAGE void FOO_Communicate(int x, double y, int * arr) {
          TCHARM_API_TRACE("FOO_Communicate", "foo"); //2nd parameter is the name of the library
          FooChunk *f = CtvAccess(_fooptr);
          f->doCommunicate(x, y, arr);
       }
 
       //In fortran, everything is passed via pointers
-      FDECL void FTN_NAME(FOO_COMMUNICATE, foo_communicate)
+      FLINKAGE void FTN_NAME(FOO_COMMUNICATE, foo_communicate)
            (int *x, double *y, int *arr)
       {
          TCHARM_API_TRACE("FOO_COMMUNICATE", "foo");

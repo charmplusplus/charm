@@ -43,7 +43,7 @@ void FEM_REFINE2D_Init(){
   REFINE2D_Init();	
 }
 
-FDECL void FTN_NAME(FEM_REFINE2D_INIT,fem_refine2d_init)(void)
+FLINKAGE void FTN_NAME(FEM_REFINE2D_INIT,fem_refine2d_init)(void)
 {
   FEM_REFINE2D_Init();
 }
@@ -102,7 +102,7 @@ void FEM_REFINE2D_Newmesh(int meshID,int nodeID,int elemID,int nodeBoundary){
   delete [] tempMesh;
 }
 
-FDECL void FTN_NAME(FEM_REFINE2D_NEWMESH,fem_refine2d_newmesh)(int *meshID,int *nodeID,int *elemID, int *nodeBoundary)
+FLINKAGE void FTN_NAME(FEM_REFINE2D_NEWMESH,fem_refine2d_newmesh)(int *meshID,int *nodeID,int *elemID, int *nodeBoundary)
 {
   FEM_REFINE2D_Newmesh(*meshID,*nodeID,*elemID,*nodeBoundary);
 }
@@ -443,15 +443,15 @@ void FEM_Refine_Operation(FEM_Refine_Operation_Data *data,refineData &op){
 }
 
 
-FDECL void FTN_NAME(FEM_REFINE2D_SPLIT,fem_refine2d_split)(int *meshID,int *nodeID,double *coord,int *elemID,double *desiredAreas){
+FLINKAGE void FTN_NAME(FEM_REFINE2D_SPLIT,fem_refine2d_split)(int *meshID,int *nodeID,double *coord,int *elemID,double *desiredAreas){
 	FEM_REFINE2D_Split(*meshID,*nodeID,coord,*elemID,desiredAreas);
 }
 
-FDECL void FTN_NAME(FEM_REFINE2D_SPLIT_EDGE,fem_refine2d_split_edge)(int *meshID,int *nodeID,double *coord,int *elemID,double *desiredAreas,int *sparseID){
+FLINKAGE void FTN_NAME(FEM_REFINE2D_SPLIT_EDGE,fem_refine2d_split_edge)(int *meshID,int *nodeID,double *coord,int *elemID,double *desiredAreas,int *sparseID){
 	FEM_REFINE2D_Split(*meshID,*nodeID,coord,*elemID,desiredAreas,*sparseID);
 }
 
-FDECL void FTN_NAME(CMIMEMORYCHECK,cmimemorycheck)(){
+FLINKAGE void FTN_NAME(CMIMEMORYCHECK,cmimemorycheck)(){
 	CmiMemoryCheck();
 }
 
@@ -686,7 +686,7 @@ void FEM_Coarsen_Operation(FEM_Operation_Data *coarsen_data, coarsenData &operat
 };
 
 
-FDECL void FTN_NAME(FEM_REFINE2D_COARSEN,fem_refine2d_coarsen)(int *meshID,int *nodeID,double *coord,int *elemID,double *desiredAreas,int *sparseID){
+FLINKAGE void FTN_NAME(FEM_REFINE2D_COARSEN,fem_refine2d_coarsen)(int *meshID,int *nodeID,double *coord,int *elemID,double *desiredAreas,int *sparseID){
   FEM_REFINE2D_Coarsen(*meshID,*nodeID,coord,*elemID,desiredAreas,*sparseID);
 }
 

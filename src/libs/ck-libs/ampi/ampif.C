@@ -1,7 +1,7 @@
 #include "ampi.h"
 #include "ampiimpl.h"
 
-FDECL {
+FLINKAGE {
 #define mpi_send FTN_NAME( MPI_SEND , mpi_send )
 #define mpi_recv FTN_NAME( MPI_RECV , mpi_recv )
 #define mpi_mrecv FTN_NAME( MPI_MRECV , mpi_mrecv )

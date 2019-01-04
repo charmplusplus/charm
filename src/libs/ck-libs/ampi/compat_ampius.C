@@ -3,7 +3,7 @@
 
 extern int _ampi_fallback_setup_count;
 
-CDECL void AMPI_Setup(void)
+CLINKAGE void AMPI_Setup(void)
 {
 	_ampi_fallback_setup_count++;
 }

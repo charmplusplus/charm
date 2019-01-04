@@ -816,13 +816,13 @@ class Builtin_kvs{
 
 // ------------ startup support -----------
 int _ampi_fallback_setup_count = -1;
-CDECL void AMPI_Setup(void);
-FDECL void FTN_NAME(AMPI_SETUP,ampi_setup)(void);
+CLINKAGE void AMPI_Setup(void);
+FLINKAGE void FTN_NAME(AMPI_SETUP,ampi_setup)(void);
 
-FDECL void FTN_NAME(MPI_MAIN,mpi_main)(void);
+FLINKAGE void FTN_NAME(MPI_MAIN,mpi_main)(void);
 
 /*Main routine used when missing MPI_Setup routine*/
-CDECL
+CLINKAGE
 void AMPI_Fallback_Main(int argc,char **argv)
 {
   AMPI_Main_cpp();
@@ -835,7 +835,7 @@ void ampiCreateMain(MPI_MainFn mainFn, const char *name,int nameLen);
 /*Startup routine used if user *doesn't* write
   a TCHARM_User_setup routine.
  */
-CDECL
+CLINKAGE
 void AMPI_Setup_Switch(void) {
   _ampi_fallback_setup_count=0;
   FTN_NAME(AMPI_SETUP,ampi_setup)();
@@ -857,7 +857,7 @@ CkpvDeclare(Builtin_kvs, bikvs);
 CkpvDeclare(int, ampiThreadLevel);
 CkpvDeclare(AmpiMsgPool, msgPool);
 
-CDECL
+CLINKAGE
 long ampiCurrentStackUsage(void){
   int localVariable;
 
@@ -870,13 +870,13 @@ long ampiCurrentStackUsage(void){
     return  p2 - p1;
 }
 
-FDECL
+FLINKAGE
 void FTN_NAME(AMPICURRENTSTACKUSAGE, ampicurrentstackusage)(void){
   long usage = ampiCurrentStackUsage();
   CkPrintf("[%d] Stack usage is currently %ld\n", CkMyPe(), usage);
 }
 
-CDECL
+CLINKAGE
 void AMPI_threadstart(void *data);
 static int AMPI_threadstart_idx = -1;
 
@@ -1063,7 +1063,7 @@ class MPI_threadstart_t {
 };
 PUPmarshall(MPI_threadstart_t)
 
-CDECL
+CLINKAGE
 void AMPI_threadstart(void *data)
 {
   STARTUP_DEBUG("MPI_threadstart")
@@ -2146,7 +2146,7 @@ void ampi::split(int color,int key,MPI_Comm *dest, int type) noexcept
 #endif
 }
 
-CDECL
+CLINKAGE
 int compareAmpiSplitKey(const void *a_, const void *b_) {
   const ampiSplitKey *a=(const ampiSplitKey *)a_;
   const ampiSplitKey *b=(const ampiSplitKey *)b_;
@@ -4052,7 +4052,7 @@ void ampiMarkAtexit()
   atexit_called = true;
 }
 
-CDECL
+CLINKAGE
 void AMPI_Exit(int exitCode)
 {
   // If we are not actually running AMPI code (e.g., by compiling a serial
@@ -4064,7 +4064,7 @@ void AMPI_Exit(int exitCode)
     TCHARM_Done(exitCode);
 }
 
-FDECL
+FLINKAGE
 void FTN_NAME(MPI_EXIT,mpi_exit)(int *exitCode)
 {
   AMPI_Exit(*exitCode);
@@ -10702,7 +10702,7 @@ AMPI_API_IMPL(int, MPI_Pcontrol, const int level, ...)
 
 /******** AMPI Extensions to the MPI standard *********/
 
-CDECL
+CLINKAGE
 int AMPI_Migrate(MPI_Info hints)
 {
   AMPI_API("AMPI_Migrate");
@@ -10791,7 +10791,7 @@ int AMPI_Migrate(MPI_Info hints)
 }
 
 #if CMK_FAULT_EVAC
-CDECL
+CLINKAGE
 int AMPI_Evacuate(void)
 {
   //AMPI_API("AMPI_Evacuate");
@@ -10800,7 +10800,7 @@ int AMPI_Evacuate(void)
 }
 #endif
 
-CDECL
+CLINKAGE
 int AMPI_Migrate_to_pe(int dest)
 {
   AMPI_API("AMPI_Migrate_to_pe");
@@ -10811,7 +10811,7 @@ int AMPI_Migrate_to_pe(int dest)
   return MPI_SUCCESS;
 }
 
-CDECL
+CLINKAGE
 int AMPI_Set_migratable(int mig)
 {
   AMPI_API("AMPI_Set_migratable");
@@ -10823,7 +10823,7 @@ int AMPI_Set_migratable(int mig)
   return MPI_SUCCESS;
 }
 
-CDECL
+CLINKAGE
 int AMPI_Load_start_measure(void)
 {
   AMPI_API("AMPI_Load_start_measure");
@@ -10831,7 +10831,7 @@ int AMPI_Load_start_measure(void)
   return MPI_SUCCESS;
 }
 
-CDECL
+CLINKAGE
 int AMPI_Load_stop_measure(void)
 {
   AMPI_API("AMPI_Load_stop_measure");
@@ -10839,7 +10839,7 @@ int AMPI_Load_stop_measure(void)
   return MPI_SUCCESS;
 }
 
-CDECL
+CLINKAGE
 int AMPI_Load_reset_measure(void)
 {
   AMPI_API("AMPI_Load_reset_measure");
@@ -10847,7 +10847,7 @@ int AMPI_Load_reset_measure(void)
   return MPI_SUCCESS;
 }
 
-CDECL
+CLINKAGE
 int AMPI_Load_set_value(double value)
 {
   AMPI_API("AMPI_Load_set_value");
@@ -10860,7 +10860,7 @@ void _registerampif(void) {
   _registerampi();
 }
 
-CDECL
+CLINKAGE
 int AMPI_Register_main(MPI_MainFn mainFn,const char *name)
 {
   AMPI_API("AMPI_Register_main");
@@ -10871,7 +10871,7 @@ int AMPI_Register_main(MPI_MainFn mainFn,const char *name)
   return MPI_SUCCESS;
 }
 
-FDECL
+FLINKAGE
 void FTN_NAME(MPI_REGISTER_MAIN,mpi_register_main)
 (MPI_MainFn mainFn,const char *name,int nameLen)
 {
@@ -10882,7 +10882,7 @@ void FTN_NAME(MPI_REGISTER_MAIN,mpi_register_main)
   }
 }
 
-CDECL
+CLINKAGE
 int AMPI_Register_pup(MPI_PupFn fn, void *data, int *idx)
 {
   AMPI_API("AMPI_Register_pup");
@@ -10890,7 +10890,7 @@ int AMPI_Register_pup(MPI_PupFn fn, void *data, int *idx)
   return MPI_SUCCESS;
 }
 
-CDECL
+CLINKAGE
 int AMPI_Register_about_to_migrate(MPI_MigrateFn fn)
 {
   AMPI_API("AMPI_Register_about_to_migrate");
@@ -10899,7 +10899,7 @@ int AMPI_Register_about_to_migrate(MPI_MigrateFn fn)
   return MPI_SUCCESS;
 }
 
-CDECL
+CLINKAGE
 int AMPI_Register_just_migrated(MPI_MigrateFn fn)
 {
   AMPI_API("AMPI_Register_just_migrated");
@@ -10908,7 +10908,7 @@ int AMPI_Register_just_migrated(MPI_MigrateFn fn)
   return MPI_SUCCESS;
 }
 
-CDECL
+CLINKAGE
 int AMPI_Get_pup_data(int idx, void *data)
 {
   AMPI_API("AMPI_Get_pup_data");
@@ -10916,7 +10916,7 @@ int AMPI_Get_pup_data(int idx, void *data)
   return MPI_SUCCESS;
 }
 
-CDECL
+CLINKAGE
 int AMPI_Type_is_contiguous(MPI_Datatype datatype, int *flag)
 {
   AMPI_API("AMPI_Type_is_contiguous");
@@ -10924,7 +10924,7 @@ int AMPI_Type_is_contiguous(MPI_Datatype datatype, int *flag)
   return MPI_SUCCESS;
 }
 
-CDECL
+CLINKAGE
 int AMPI_Print(const char *str)
 {
   AMPI_API("AMPI_Print");
@@ -10933,7 +10933,7 @@ int AMPI_Print(const char *str)
   return MPI_SUCCESS;
 }
 
-CDECL
+CLINKAGE
 int AMPI_Suspend(void)
 {
   AMPI_API("AMPI_Suspend");
@@ -10941,7 +10941,7 @@ int AMPI_Suspend(void)
   return MPI_SUCCESS;
 }
 
-CDECL
+CLINKAGE
 int AMPI_Yield(void)
 {
   AMPI_API("AMPI_Yield");
@@ -10949,7 +10949,7 @@ int AMPI_Yield(void)
   return MPI_SUCCESS;
 }
 
-CDECL
+CLINKAGE
 int AMPI_Resume(int dest, MPI_Comm comm)
 {
   AMPI_API("AMPI_Resume");
@@ -10957,20 +10957,20 @@ int AMPI_Resume(int dest, MPI_Comm comm)
   return MPI_SUCCESS;
 }
 
-CDECL
+CLINKAGE
 int AMPI_System(const char *cmd)
 {
   return TCHARM_System(cmd);
 }
 
-CDECL
+CLINKAGE
 int AMPI_Trace_begin(void)
 {
   traceBegin();
   return MPI_SUCCESS;
 }
 
-CDECL
+CLINKAGE
 int AMPI_Trace_end(void)
 {
   traceEnd();
@@ -11004,7 +11004,7 @@ extern "C" void startCFnCall(void *param,void *msg)
   delete (CkReductionMsg*)msg;
 }
 
-CDECL
+CLINKAGE
 int AMPI_Set_start_event(MPI_Comm comm)
 {
   AMPI_API("AMPI_Set_start_event");
@@ -11030,7 +11030,7 @@ int AMPI_Set_start_event(MPI_Comm comm)
   return MPI_SUCCESS;
 }
 
-CDECL
+CLINKAGE
 int AMPI_Set_end_event(void)
 {
   AMPI_API("AMPI_Set_end_event");
@@ -11089,7 +11089,7 @@ void AMPI_GPU_complete(void *request, void* dummy) noexcept
 }
 
 /* Submit hapiWorkRequest and corresponding GPU request. */
-CDECL
+CLINKAGE
 int AMPI_GPU_Iinvoke_wr(hapiWorkRequest *to_call, MPI_Request *request)
 {
   AMPI_API("AMPI_GPU_Iinvoke");
@@ -11107,7 +11107,7 @@ int AMPI_GPU_Iinvoke_wr(hapiWorkRequest *to_call, MPI_Request *request)
 
 /* Submit GPU request that will be notified of completion once the previous
  * operations in the given CUDA stream are complete */
-CDECL
+CLINKAGE
 int AMPI_GPU_Iinvoke(cudaStream_t stream, MPI_Request *request)
 {
   AMPI_API("AMPI_GPU_Iinvoke");
@@ -11122,7 +11122,7 @@ int AMPI_GPU_Iinvoke(cudaStream_t stream, MPI_Request *request)
   hapiAddCallback(stream, cb);
 }
 
-CDECL
+CLINKAGE
 int AMPI_GPU_Invoke_wr(hapiWorkRequest *to_call)
 {
   AMPI_API("AMPI_GPU_Invoke");
@@ -11134,7 +11134,7 @@ int AMPI_GPU_Invoke_wr(hapiWorkRequest *to_call)
   return MPI_SUCCESS;
 }
 
-CDECL
+CLINKAGE
 int AMPI_GPU_Invoke(cudaStream_t stream)
 {
   AMPI_API("AMPI_GPU_Invoke");

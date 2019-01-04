@@ -11,7 +11,7 @@
 
 #include "fem.h"
 #include "fem_impl.h"
-#include "charm-api.h" /*for CDECL, FTN_NAME*/
+#include "charm-api.h" /*for CLINKAGE, FTN_NAME*/
 
 
 
@@ -28,7 +28,7 @@ FORTRAN_AS_C(CMIMEMORYCHECK,
 
 
 
-CDECL void 
+CLINKAGE void
 FEM_Mesh_create_node_elem_adjacency(int fem_mesh){
 	const char *caller="FEM_Mesh_create_node_elem_adjacency"; FEMAPI(caller);
 	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
@@ -40,7 +40,7 @@ FORTRAN_AS_C(FEM_MESH_CREATE_NODE_ELEM_ADJACENCY,
              (int *fem_mesh),  (*fem_mesh) )
 
 
-CDECL void 
+CLINKAGE void
 FEM_Mesh_create_node_node_adjacency(int fem_mesh){
 	const char *caller="FEM_Mesh_create_node_node_adjacency"; FEMAPI(caller);
 	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
@@ -52,7 +52,7 @@ FORTRAN_AS_C(FEM_MESH_CREATE_NODE_NODE_ADJACENCY,
              (int *fem_mesh),  (*fem_mesh) )
 
 
-CDECL void 
+CLINKAGE void
 FEM_Mesh_create_elem_elem_adjacency(int fem_mesh){
 	const char *caller="FEM_Mesh_create_elem_elem_adjacency"; FEMAPI(caller);
 	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
@@ -65,13 +65,13 @@ FORTRAN_AS_C(FEM_MESH_CREATE_ELEM_ELEM_ADJACENCY,
 
 
 
-CDECL void 
+CLINKAGE void
 FEM_Mesh_create_elem_node_adjacency(int fem_mesh){
   CkPrintf("WARNING: Do Not Call FEM_Mesh_create_elem_node_adjacency(), as the connectivity table should already exist\n");
 }
 
 
-CDECL void 
+CLINKAGE void
 FEM_Mesh_get2ElementsOnEdge(int fem_mesh, int n1, int n2, int *e1, int *e2){
 	const char *caller="FEM_Mesh_get2ElementsOnEdge"; FEMAPI(caller);
 	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);

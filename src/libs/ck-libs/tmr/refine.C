@@ -15,7 +15,7 @@ Modified by Terry Wilmarth, wilmarth@cse.uiuc.edu, 4/16/2002
 #include "refine.h"
 
 /********************* Attach *****************/
-CDECL void REFINE2D_Init(void) {
+CLINKAGE void REFINE2D_Init(void) {
   TCHARM_API_TRACE("REFINE2D_Init", "refine");
   TCharm *tc=TCharm::get();
   
@@ -39,13 +39,13 @@ CDECL void REFINE2D_Init(void) {
   mesh[rank].insert(cm);
   tc->suspend(); /* will resume from chunk constructor */
 }
-FDECL void FTN_NAME(REFINE2D_INIT,refine2d_init)(void)
+FLINKAGE void FTN_NAME(REFINE2D_INIT,refine2d_init)(void)
 {
   REFINE2D_Init();
 }
 
 /******************** NewMesh *******************/
-CDECL void REFINE2D_NewMesh(int nEl,int nGhost,const int *conn,const int *gid)
+CLINKAGE void REFINE2D_NewMesh(int nEl,int nGhost,const int *conn,const int *gid)
 {
   TCHARM_API_TRACE("REFINE2D_NewMesh", "refine");
   if (!CtvAccess(_refineChunk))
@@ -56,7 +56,7 @@ CDECL void REFINE2D_NewMesh(int nEl,int nGhost,const int *conn,const int *gid)
   CtvAccess(_refineChunk)->newMesh(nEl,nGhost,conn, gid, 0);
   CkWaitQD(); //Wait for all edge numbering messages to finish
 }
-FDECL void FTN_NAME(REFINE2D_NEWMESH,refine2d_newmesh)
+FLINKAGE void FTN_NAME(REFINE2D_NEWMESH,refine2d_newmesh)
 (int *nEl,int *nGhost,const int *conn,const int *gid)
 {
   TCHARM_API_TRACE("REFINE2D_NewMesh", "refine");
@@ -144,7 +144,7 @@ public:
 };
 
 // this function should be called from a thread
-CDECL void REFINE2D_Split(int nNode,double *coord,int nEl,double *desiredArea)
+CLINKAGE void REFINE2D_Split(int nNode,double *coord,int nEl,double *desiredArea)
 {
   TCHARM_API_TRACE("REFINE2D_Split", "refine");
   chunk *C = CtvAccess(_refineChunk);
@@ -157,7 +157,7 @@ CDECL void REFINE2D_Split(int nNode,double *coord,int nEl,double *desiredArea)
   C->multipleRefine(desiredArea, &client);
   CkWaitQD();
 }
-FDECL void FTN_NAME(REFINE2D_SPLIT,refine2d_split)
+FLINKAGE void FTN_NAME(REFINE2D_SPLIT,refine2d_split)
    (int *nNode,double *coord,int *nEl,double *desiredArea)
 {
   REFINE2D_Split(*nNode,coord,*nEl,desiredArea);
@@ -173,24 +173,24 @@ static refineResults *getResults(void) {
   return ret;
 }
 
-CDECL int REFINE2D_Get_Split_Length(void)
+CLINKAGE int REFINE2D_Get_Split_Length(void)
 {
   TCHARM_API_TRACE("REFINE2D_Get_Split_Length", "refine");
   return getResults()->countResults();
 }
-FDECL int FTN_NAME(REFINE2D_GET_SPLIT_LENGTH,refine2d_get_split_length)(void)
+FLINKAGE int FTN_NAME(REFINE2D_GET_SPLIT_LENGTH,refine2d_get_split_length)(void)
 {
   return REFINE2D_Get_Split_Length();
 }
 
-CDECL void REFINE2D_Get_Split
+CLINKAGE void REFINE2D_Get_Split
     (int splitNo,const int *conn,int *triDest,int *A,int *B,int *C,double *fracDest,int *flags)
 {
   TCHARM_API_TRACE("REFINE2D_Get_Split", "refine");
   refineResults *r=getResults();
   r->extract(splitNo,conn,triDest,A,B,C,fracDest,0,flags);
 }
-FDECL void FTN_NAME(REFINE2D_GET_SPLIT,refine2d_get_split)
+FLINKAGE void FTN_NAME(REFINE2D_GET_SPLIT,refine2d_get_split)
     (int *splitNo,const int *conn,int *triDest,int *A,int *B,int *C,double *fracDest, int *flags)
 {
   TCHARM_API_TRACE("REFINE2D_Get_Split", "refine");
@@ -253,10 +253,10 @@ static void checkConn(int nEl,const int *conn,int idxBase,int nNode)
   }
 }
 
-CDECL void REFINE2D_Check(int nEl,const int *conn,int nNodes) {
+CLINKAGE void REFINE2D_Check(int nEl,const int *conn,int nNodes) {
   checkConn(nEl,conn,0,nNodes);
 }
-FDECL void FTN_NAME(REFINE2D_CHECK,refine2d_check)
+FLINKAGE void FTN_NAME(REFINE2D_CHECK,refine2d_check)
   (int *nEl,const int *conn,int *nNodes)
 {
   checkConn(*nEl,conn,1,*nNodes);

@@ -1027,7 +1027,7 @@ void gotoNextPhase(){
   controlPointManagerProxy.ckLocalBranch()->gotoNextPhase();
 }
 
-FDECL void FTN_NAME(GOTONEXTPHASE,gotonextphase)()
+FLINKAGE void FTN_NAME(GOTONEXTPHASE,gotonextphase)()
 {
   gotoNextPhase();
 }
@@ -1211,13 +1211,13 @@ void controlPointTimingStamp() {
   controlPointManagerProxy.ckLocalBranch()->setTiming(duration);
 }
 
-FDECL void FTN_NAME(CONTROLPOINTTIMINGSTAMP,controlpointtimingstamp)()
+FLINKAGE void FTN_NAME(CONTROLPOINTTIMINGSTAMP,controlpointtimingstamp)()
 {
   controlPointTimingStamp();
 }
 
 
-FDECL void FTN_NAME(SETFRAMEWORKADVANCEPHASEF,setframeworkadvancephasef)(CMK_TYPEDEF_INT4 *value) 
+FLINKAGE void FTN_NAME(SETFRAMEWORKADVANCEPHASEF,setframeworkadvancephasef)(CMK_TYPEDEF_INT4 *value)
 {
   setFrameworkAdvancePhase(*value);
 }
@@ -2225,7 +2225,7 @@ int controlPoint(const char *name, int lb, int ub){
 }
 
 
-FDECL int FTN_NAME(CONTROLPOINT, controlpoint)(CMK_TYPEDEF_INT4 *lb, CMK_TYPEDEF_INT4 *ub){
+FLINKAGE int FTN_NAME(CONTROLPOINT, controlpoint)(CMK_TYPEDEF_INT4 *lb, CMK_TYPEDEF_INT4 *ub){
   CkAssert(CkMyPe() == 0);
   return controlPoint("FortranCP", *lb, *ub);
 }

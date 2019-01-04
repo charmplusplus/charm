@@ -1458,13 +1458,13 @@ that expands to a properly mangled fortran routine name. You pass the
 FTN_NAME macro two copies of the routine name: once in all uppercase,
 and again in all lowercase. The FTN_NAME macro then picks the
 appropriate name and applies any needed underscores. “charm-api.h” also
-includes a macro “FDECL” that makes the symbol linkable from fortran (in
+includes a macro “FLINKAGE” that makes the symbol linkable from fortran (in
 C++, this expands to extern “C”), so a complete Fortran subroutine looks
 like in C or C++:
 
 ::
 
-   FDECL void FTN_NAME(FOO,foo)(void);
+   FLINKAGE void FTN_NAME(FOO,foo)(void);
 
 This same syntax can be used for C/C++ routines called from fortran, or
 for calling fortran routines from C/C++. We strongly recommend using
@@ -1515,7 +1515,7 @@ C:
 ::
 
       /* C/C++ */
-      FDECL void FTN_NAME(BAR,bar)(int *i) {
+      FLINKAGE void FTN_NAME(BAR,bar)(int *i) {
           x=*i;
       }
 
@@ -1538,7 +1538,7 @@ C:
 ::
 
       /* C/C++ */
-      FDECL void FTN_NAME(BAR,bar)(int *arr) {
+      FLINKAGE void FTN_NAME(BAR,bar)(int *arr) {
           x=arr[0];
       }
 
@@ -1577,7 +1577,7 @@ C:
 ::
 
       /* C/C++ */
-      FDECL void FTN_NAME(BAR2,bar2)(int *arr,int *len1p,int *len2p) {
+      FLINKAGE void FTN_NAME(BAR2,bar2)(int *arr,int *len1p,int *len2p) {
           int i,j; int len1=*len1p, len2=*len2p;
           for (j=0;j<len2;j++)
           for (i=0;i<len1;i++)
@@ -1600,7 +1600,7 @@ C:
 ::
 
       /* C/C++ */
-      FDECL void FTN_NAME(BARS,bars)(char *str,int *arg,int strlen) {
+      FLINKAGE void FTN_NAME(BARS,bars)(char *str,int *arg,int strlen) {
           char *s=(char *)malloc(strlen+1);
           memcpy(s,str,strlen);
           s[strlen]=0; /* nul-terminate string */

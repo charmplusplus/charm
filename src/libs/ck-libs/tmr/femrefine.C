@@ -36,7 +36,7 @@ void FEM_REFINE2D_Init(){
   REFINE2D_Init();	
 }
 
-FDECL void FTN_NAME(FEM_REFINE2D_INIT,fem_refine2d_init)(void)
+FLINKAGE void FTN_NAME(FEM_REFINE2D_INIT,fem_refine2d_init)(void)
 {
   FEM_REFINE2D_Init();
 }
@@ -83,7 +83,7 @@ void FEM_REFINE2D_Newmesh(int meshID,int nodeID,int elemID){
 	delete [] tempMesh;
 }
 
-FDECL void FTN_NAME(FEM_REFINE2D_NEWMESH,fem_refine2d_newmesh)(int *meshID,int *nodeID,int *elemID){
+FLINKAGE void FTN_NAME(FEM_REFINE2D_NEWMESH,fem_refine2d_newmesh)(int *meshID,int *nodeID,int *elemID){
 	FEM_REFINE2D_Newmesh(*meshID,*nodeID,*elemID);
 }
 
@@ -342,6 +342,6 @@ void FEM_REFINE2D_Split(int meshID,int nodeID,double *coord,int elemID,double *d
 	
 }
 
-FDECL void FTN_NAME(FEM_REFINE2D_SPLIT,fem_refine2d_split)(int *meshID,int *nodeID,double *coord,int *elemID,double *desiredAreas){
+FLINKAGE void FTN_NAME(FEM_REFINE2D_SPLIT,fem_refine2d_split)(int *meshID,int *nodeID,double *coord,int *elemID,double *desiredAreas){
 	FEM_REFINE2D_Split(*meshID,*nodeID,coord,*elemID,desiredAreas);
 }

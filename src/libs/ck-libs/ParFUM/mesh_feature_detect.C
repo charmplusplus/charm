@@ -22,7 +22,7 @@
 
 using namespace std;
 
-CDECL void
+CLINKAGE void
 FEM_Mesh_detect_features(int fem_mesh) {
   const char *caller="FEM_Mesh_detect_features"; FEMAPI(caller);
   FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);

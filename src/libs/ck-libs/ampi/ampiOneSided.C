@@ -1202,7 +1202,7 @@ AMPI_API_IMPL(int, MPI_Win_test, MPI_Win win, int *flag)
 }
 
 // FIX PLACE II
-CDECL
+CLINKAGE
 int AMPI_Iget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
               MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win,
               MPI_Request *request) {
@@ -1214,7 +1214,7 @@ int AMPI_Iget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
 		       request);
 }
 
-CDECL
+CLINKAGE
 int AMPI_Iget_wait(MPI_Request *request, MPI_Status *status, MPI_Win win) {
   AMPI_API("AMPI_Iget_wait");
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
@@ -1223,7 +1223,7 @@ int AMPI_Iget_wait(MPI_Request *request, MPI_Status *status, MPI_Win win) {
   return  ptr->winIgetWait(request,status);
 }
 
-CDECL
+CLINKAGE
 int AMPI_Iget_free(MPI_Request *request, MPI_Status *status, MPI_Win win) {
   AMPI_API("AMPI_Iget_free");
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
@@ -1232,7 +1232,7 @@ int AMPI_Iget_free(MPI_Request *request, MPI_Status *status, MPI_Win win) {
   return  ptr->winIgetFree(request, status);
 }
 
-CDECL
+CLINKAGE
 int AMPI_Iget_data(void *data, MPI_Status status) {
   *((char**)data) = /*(void*)*/((AmpiMsg*)status.msg)->data;
   return MPI_SUCCESS;

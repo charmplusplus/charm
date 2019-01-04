@@ -279,7 +279,7 @@ CkArrayOptions TCHARMLIB_Bound_array(TCharm *tc,int mpi_comm) {
 	return opts;
 }
 
-CDECL collide_t COLLIDE_Init(int mpi_comm,
+CLINKAGE collide_t COLLIDE_Init(int mpi_comm,
 	const double *gridStart,const double *gridSize)
 {
 	COLLIDEAPI("COLLIDE_Init");
@@ -317,7 +317,7 @@ threadCollide *COLLIDE_Lookup(collide_t c) {
 	return ret;
 }
 
-CDECL void COLLIDE_Boxes(collide_t c,int nBox,const double *boxes)
+CLINKAGE void COLLIDE_Boxes(collide_t c,int nBox,const double *boxes)
 {
 	COLLIDEAPI("COLLIDE_Boxes");
 	COLLIDE_Lookup(c)->contribute(nBox,(const bbox3d *)boxes,NULL);
@@ -325,7 +325,7 @@ CDECL void COLLIDE_Boxes(collide_t c,int nBox,const double *boxes)
 FORTRAN_AS_C(COLLIDE_BOXES,COLLIDE_Boxes,collide_boxes,
 	(int *c,int *n,double *box),(*c,*n,box))
 
-CDECL void COLLIDE_Boxes_prio(collide_t c,int nBox,const double *boxes,const int *prio)
+CLINKAGE void COLLIDE_Boxes_prio(collide_t c,int nBox,const double *boxes,const int *prio)
 {
 	COLLIDEAPI("COLLIDE_Boxes_prio");
 	COLLIDE_Lookup(c)->contribute(nBox,(const bbox3d *)boxes,prio);
@@ -333,7 +333,7 @@ CDECL void COLLIDE_Boxes_prio(collide_t c,int nBox,const double *boxes,const int
 FORTRAN_AS_C(COLLIDE_BOXES_PRIO,COLLIDE_Boxes_prio,collide_boxes_prio,
 	(int *c,int *n,double *box,int *prio),(*c,*n,box,prio))
 
-CDECL int COLLIDE_Count(collide_t c) {
+CLINKAGE int COLLIDE_Count(collide_t c) {
 	COLLIDEAPI("COLLIDE_Count");
 	return COLLIDE_Lookup(c)->colls.size();
 }
@@ -352,16 +352,16 @@ static void getCollisionList(collide_t c,int *out,int indexBase) {
 	free(in);
 }
 
-CDECL void COLLIDE_List(collide_t c,int *out) {
+CLINKAGE void COLLIDE_List(collide_t c,int *out) {
 	COLLIDEAPI("COLLIDE_List");
 	getCollisionList(c,out,0);
 }
-FDECL void FTN_NAME(COLLIDE_LIST,collide_list)(collide_t *c,int *out) {
+FLINKAGE void FTN_NAME(COLLIDE_LIST,collide_list)(collide_t *c,int *out) {
 	COLLIDEAPI("COLLIDE_List");
 	getCollisionList(*c,out,1);
 }
 
-CDECL void COLLIDE_Destroy(collide_t c) {
+CLINKAGE void COLLIDE_Destroy(collide_t c) {
 	COLLIDEAPI("COLLIDE_Destroy");
 	/* FIXME: delete entire array */
 }

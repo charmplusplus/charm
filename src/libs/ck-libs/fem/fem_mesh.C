@@ -9,7 +9,7 @@ FEM Implementation file: mesh creation and user-data manipulation.
 #include <assert.h>
 #include "fem.h"
 #include "fem_impl.h"
-#include "charm-api.h" /*for CDECL, FTN_NAME*/
+#include "charm-api.h" /*for CLINKAGE, FTN_NAME*/
 #include "fem_mesh_modify.h"
 
 extern int femVersion;
@@ -58,13 +58,13 @@ static void checkIsSet(int fem_mesh,bool wantSet,const char *caller) {
 }
 
 /* Connectivity: Map calls to appropriate version of FEM_Mesh_data */
-CDECL void 
+CLINKAGE void
 FEM_Mesh_conn(int fem_mesh,int entity,
   	int *conn, int firstItem, int length, int width) 
 {
 	FEM_Mesh_data(fem_mesh,entity,FEM_CONN, conn, firstItem,length, FEM_INDEX_0, width);
 }
-FDECL void 
+FLINKAGE void
 FTN_NAME(FEM_MESH_CONN,fem_mesh_conn)(int *fem_mesh,int *entity,
   	int *conn, int *firstItem,int *length, int *width)
 {
@@ -72,14 +72,14 @@ FTN_NAME(FEM_MESH_CONN,fem_mesh_conn)(int *fem_mesh,int *entity,
 	FEM_Mesh_data(*fem_mesh,*entity,FEM_CONN, conn, *firstItem-1,*length, FEM_INDEX_1, *width);
 }
 
-CDECL void
+CLINKAGE void
 FEM_Mesh_set_conn(int fem_mesh,int entity,
   	const int *conn, int firstItem,int length, int width)
 {
 	checkIsSet(fem_mesh,true,"FEM_Mesh_set_conn");
 	FEM_Mesh_conn(fem_mesh,entity,(int *)conn,firstItem,length,width);
 }
-FDECL void
+FLINKAGE void
 FTN_NAME(FEM_MESH_SET_CONN,fem_mesh_set_conn)(int *fem_mesh,int *entity,
   	const int *conn, int *firstItem,int *length, int *width)
 {
@@ -87,14 +87,14 @@ FTN_NAME(FEM_MESH_SET_CONN,fem_mesh_set_conn)(int *fem_mesh,int *entity,
 	FTN_NAME(FEM_MESH_CONN,fem_mesh_conn)(fem_mesh,entity,(int *)conn,firstItem,length,width);
 }
 
-CDECL void
+CLINKAGE void
 FEM_Mesh_get_conn(int fem_mesh,int entity,
   	int *conn, int firstItem,int length, int width)
 {
 	checkIsSet(fem_mesh,false,"FEM_Mesh_get_conn");
 	FEM_Mesh_conn(fem_mesh,entity,conn,firstItem,length,width);
 }
-FDECL void
+FLINKAGE void
 FTN_NAME(FEM_MESH_GET_CONN,fem_mesh_get_conn)(int *fem_mesh,int *entity,
   	int *conn, int *firstItem,int *length, int *width)
 {
@@ -104,7 +104,7 @@ FTN_NAME(FEM_MESH_GET_CONN,fem_mesh_get_conn)(int *fem_mesh,int *entity,
 
 
 /* Data: map to FEM_Mesh_offset */
-CDECL void
+CLINKAGE void
 FEM_Mesh_data(int fem_mesh,int entity,int attr, 	
   	void *data, int firstItem,int length, int datatype,int width)
 {
@@ -118,7 +118,7 @@ FORTRAN_AS_C(FEM_MESH_DATA,FEM_Mesh_data,fem_mesh_data,
 )
 
 
-CDECL void
+CLINKAGE void
 FEM_Mesh_set_data(int fem_mesh,int entity,int attr, 	
   	const void *data, int firstItem,int length, int datatype,int width)
 {
@@ -130,7 +130,7 @@ FORTRAN_AS_C(FEM_MESH_SET_DATA,FEM_Mesh_set_data,fem_mesh_set_data,
 	(*fem_mesh,*entity,*attr,data,*firstItem-1,*length,*datatype,*width)
 )
 
-CDECL void
+CLINKAGE void
 FEM_Mesh_get_data(int fem_mesh,int entity,int attr, 	
   	void *data, int firstItem,int length, int datatype,int width)
 {
@@ -142,7 +142,7 @@ FORTRAN_AS_C(FEM_MESH_GET_DATA,FEM_Mesh_get_data,fem_mesh_get_data,
 	(*fem_mesh,*entity,*attr,data,*firstItem-1,*length,*datatype,*width)
 )
 
-CDECL void
+CLINKAGE void
 FEM_Mesh_data_layout(int fem_mesh,int entity,int attr, 	
   	void *data, int firstItem,int length, IDXL_Layout_t layout)
 {
@@ -156,7 +156,7 @@ FORTRAN_AS_C(FEM_MESH_DATA_LAYOUT,FEM_Mesh_data_layout,fem_mesh_data_layout,
 	(*fem_mesh,*entity,*attr,data,*firstItem-1,*length,*layout)
 )
 
-CDECL void
+CLINKAGE void
 FEM_Mesh_data_offset(int fem_mesh,int entity,int attr, 	
   	void *data, int firstItem,int length,
 	int type,int width, int offsetBytes,int distanceBytes,int skewBytes)
@@ -199,21 +199,21 @@ void FEM_Register_array_layout(int fem_mesh,int entity,int attr,
 }
 
 /*registration api */
-CDECL void 
+CLINKAGE void
 FEM_Register_array(int fem_mesh,int entity,int attr,
 	void *data, int datatype,int width)
 {	
 	FEM_Register_array(fem_mesh,entity,attr,data,datatype,width,0);
 }
 
-CDECL void
+CLINKAGE void
 FEM_Register_array_layout(int fem_mesh,int entity,int attr, 	
   	void *data, IDXL_Layout_t layout){
 	FEM_Register_array_layout(fem_mesh,entity,attr,data,layout,0);
 }
 
 
-CDECL void 
+CLINKAGE void
 FEM_Register_entity(int fem_mesh,int entity,void *data,
 		int len,int max,FEM_Mesh_alloc_fn fn) {
 		FEM_Register_entity_impl(fem_mesh,entity,data,len,max,fn);
@@ -233,7 +233,7 @@ FORTRAN_AS_C(FEM_REGISTER_ENTITY,FEM_Register_entity,fem_register_entity,
 
 
 // User data API:
-CDECL void 
+CLINKAGE void
 FEM_Mesh_pup(int fem_mesh,int dataTag,FEM_Userdata_fn fn,void *data) {
 	const char *caller="FEM_Mesh_pup"; FEMAPI(caller);
 	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
@@ -250,7 +250,7 @@ FORTRAN_AS_C(FEM_MESH_PUP,FEM_Mesh_pup,fem_mesh_pup,
 	(int *m,int *t,FEM_Userdata_fn fn,void *data), (*m,*t,fn,data))
 
 // Accessor API:
-CDECL void 
+CLINKAGE void
 FEM_Mesh_set_length(int fem_mesh,int entity,int newLength) {
 	const char *caller="FEM_Mesh_set_length"; FEMAPI(caller);
 	checkIsSet(fem_mesh,true,caller);
@@ -262,7 +262,7 @@ FORTRAN_AS_C(FEM_MESH_SET_LENGTH,FEM_Mesh_set_length,fem_mesh_set_length,
 )
 
 
-CDECL int 
+CLINKAGE int
 FEM_Mesh_get_length(int fem_mesh,int entity) {
 	const char *caller="FEM_Mesh_get_length"; FEMAPI(caller);
 	int len=FEM_Entity_lookup(fem_mesh,entity,caller)->size();
@@ -274,7 +274,7 @@ FORTRAN_AS_C_RETURN(int,
 )
 
 
-CDECL void 
+CLINKAGE void
 FEM_Mesh_set_width(int fem_mesh,int entity,int attr,int newWidth) {
 	const char *caller="FEM_Mesh_set_width";
 	FEMAPI(caller);
@@ -286,7 +286,7 @@ FORTRAN_AS_C(FEM_MESH_SET_WIDTH,FEM_Mesh_set_width,fem_mesh_set_width,
 	(*fem_mesh,*entity,*attr,*newWidth)
 )
 
-CDECL int 
+CLINKAGE int
 FEM_Mesh_get_width(int fem_mesh,int entity,int attr) {
 	const char *caller="FEM_Mesh_get_width";
 	FEMAPI(caller);
@@ -297,7 +297,7 @@ FORTRAN_AS_C_RETURN(int,
 	(int *fem_mesh,int *entity,int *attr),(*fem_mesh,*entity,*attr)
 )
 
-CDECL int 
+CLINKAGE int
 FEM_Mesh_get_datatype(int fem_mesh,int entity,int attr) {
 	const char *caller="FEM_Mesh_get_datatype";
 	FEMAPI(caller);
@@ -308,7 +308,7 @@ FORTRAN_AS_C_RETURN(int,
 	(int *fem_mesh,int *entity,int *attr),(*fem_mesh,*entity,*attr)
 )
 
-CDECL int 
+CLINKAGE int
 FEM_Mesh_is_set(int fem_mesh) /* return 1 if this is a writing mesh */
 {
 	return (FEM_Mesh_lookup(fem_mesh,"FEM_Mesh_is_get")->isSetting())?1:0;
@@ -318,7 +318,7 @@ FORTRAN_AS_C_RETURN(int,
 	(int *fem_mesh),(*fem_mesh)
 )
 
-CDECL int 
+CLINKAGE int
 FEM_Mesh_is_get(int fem_mesh) /* return 1 if this is a readable mesh */
 {
 	return (!FEM_Mesh_lookup(fem_mesh,"FEM_Mesh_is_get")->isSetting())?1:0;
@@ -328,18 +328,18 @@ FORTRAN_AS_C_RETURN(int,
 	(int *fem_mesh),(*fem_mesh)
 )
 
-CDECL void 
+CLINKAGE void
 FEM_Mesh_become_get(int fem_mesh) /* Make this a readable mesh */
 { FEM_Mesh_lookup(fem_mesh,"FEM_Mesh_become_get")->becomeGetting(); }
 FORTRAN_AS_C(FEM_MESH_BECOME_GET,FEM_Mesh_become_get,fem_mesh_become_get, (int *m),(*m))
 
-CDECL void 
+CLINKAGE void
 FEM_Mesh_become_set(int fem_mesh)
 { FEM_Mesh_lookup(fem_mesh,"FEM_Mesh_become_get")->becomeSetting(); }
 FORTRAN_AS_C(FEM_MESH_BECOME_SET,FEM_Mesh_become_set,fem_mesh_become_set, (int *m),(*m))
 
 
-CDECL IDXL_t 
+CLINKAGE IDXL_t
 FEM_Comm_shared(int fem_mesh,int entity) {
 	const char *caller="FEM_Comm_shared";
 	FEMAPI(caller); 
@@ -352,7 +352,7 @@ FORTRAN_AS_C_RETURN(int,
 	(int *fem_mesh,int *entity),(*fem_mesh,*entity)
 )
 
-CDECL IDXL_t 
+CLINKAGE IDXL_t
 FEM_Comm_ghost(int fem_mesh,int entity) {
 	const char *caller="FEM_Comm_ghost";
 	FEMAPI(caller);
@@ -419,7 +419,7 @@ FEM_Attribute *FEM_Attribute_lookup(int fem_mesh,int entity,int attr,const char 
 	return FEM_Entity_lookup(fem_mesh,entity,caller)->lookup(attr,caller);
 }
 
-CDECL int FEM_Mesh_get_entities(int fem_mesh, int *entities) {
+CLINKAGE int FEM_Mesh_get_entities(int fem_mesh, int *entities) {
 	const char *caller="FEM_Mesh_get_entities";
 	FEMAPI(caller); 
 	return FEM_Mesh_lookup(fem_mesh,caller)->getEntities(entities);
@@ -429,7 +429,7 @@ FORTRAN_AS_C_RETURN(int,
 	(int *mesh,int *ent), (*mesh,ent)
 )
 
-CDECL int FEM_Mesh_get_attributes(int fem_mesh,int entity,int *attributes) {
+CLINKAGE int FEM_Mesh_get_attributes(int fem_mesh,int entity,int *attributes) {
 	const char *caller="FEM_Mesh_get_attributes";
 	FEMAPI(caller);
 	return FEM_Entity_lookup(fem_mesh,entity,caller)->getAttrs(attributes);
@@ -441,7 +441,7 @@ FORTRAN_AS_C_RETURN(int,
 
 /************** FEM_Attribute ****************/
 
-CDECL const char *FEM_Get_datatype_name(int datatype,char *storage) {
+CLINKAGE const char *FEM_Get_datatype_name(int datatype,char *storage) {
 	switch(datatype) {
 	case FEM_BYTE: return "FEM_BYTE";
 	case FEM_INT: return "FEM_INT";
@@ -456,7 +456,7 @@ CDECL const char *FEM_Get_datatype_name(int datatype,char *storage) {
 
 /// Return the human-readable version of this FEM_ATTR code.
 ///  For example, FEM_attr2name(FEM_CONN)=="FEM_CONN".
-CDECL const char *FEM_Get_attr_name(int attr,char *storage) 
+CLINKAGE const char *FEM_Get_attr_name(int attr,char *storage)
 {
 	if (attr<FEM_ATTRIB_TAG_MAX) 
 	{ //It's a user tag:
@@ -1036,7 +1036,7 @@ int FEM_VarIndexAttribute::findInRow(int row,const ID &data){
 /********************** Entity **************************/
 
 /// Return the human-readable version of this entity code.
-CDECL const char *FEM_Get_entity_name(int entity,char *storage) 
+CLINKAGE const char *FEM_Get_entity_name(int entity,char *storage)
 {
 	char *dest=storage;
 	if (entity<FEM_ENTITY_FIRST || entity>=FEM_ENTITY_LAST) {
@@ -1981,7 +1981,7 @@ void FEM_writeMesh(FEM_Mesh *m,const char *prefix,int chunkNo,int nChunks)
 
 
 // Setup the entity FEM_IS_VALID tables
-CDECL void FEM_Mesh_allocate_valid_attr(int fem_mesh, int entity_type){  
+CLINKAGE void FEM_Mesh_allocate_valid_attr(int fem_mesh, int entity_type){
   FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,"FEM_Mesh_create_valid_elem");
   FEM_Entity *entity = m->lookup(entity_type,"FEM_Mesh_allocate_valid_attr");
   entity->allocateValid();
@@ -1993,7 +1993,7 @@ FORTRAN_AS_C(FEM_MESH_ALLOCATE_VALID_ATTR,
 
 
 // mark an entity as valid
-CDECL void FEM_set_entity_valid(int mesh, int entityType, int entityIdx){
+CLINKAGE void FEM_set_entity_valid(int mesh, int entityType, int entityIdx){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_");
   FEM_Entity *entity = m->lookup(entityType,"FEM_");
   entity->set_valid(entityIdx,true);
@@ -2005,7 +2005,7 @@ FORTRAN_AS_C(FEM_SET_ENTITY_VALID,
 
 
 // mark an entity as invalid
-CDECL void FEM_set_entity_invalid(int mesh, int entityType, int entityIdx){
+CLINKAGE void FEM_set_entity_invalid(int mesh, int entityType, int entityIdx){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Mesh_create_valid_elem");
   FEM_Entity *entity = m->lookup(entityType,"FEM_Mesh_allocate_valid_attr");
   return entity->set_invalid(entityIdx,true);
@@ -2017,7 +2017,7 @@ FORTRAN_AS_C(FEM_SET_ENTITY_INVALID,
 
 
 // Determine if an entity is valid
-CDECL int FEM_is_valid(int mesh, int entityType, int entityIdx){
+CLINKAGE int FEM_is_valid(int mesh, int entityType, int entityIdx){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Mesh_create_valid_elem");
   FEM_Entity *entity = m->lookup(entityType,"FEM_Mesh_allocate_valid_attr");
   return (entity->is_valid(entityIdx) != 0);
@@ -2029,7 +2029,7 @@ FORTRAN_AS_C(FEM_IS_VALID,
 
 
 // Count number of valid items for this entity type
-CDECL unsigned int FEM_count_valid(int mesh, int entityType){
+CLINKAGE unsigned int FEM_count_valid(int mesh, int entityType){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Mesh_create_valid_elem");
   FEM_Entity *entity = m->lookup(entityType,"FEM_Mesh_allocate_valid_attr");
   return entity->count_valid();

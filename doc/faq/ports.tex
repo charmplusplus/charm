@@ -155,11 +155,11 @@ You pass the FTN\_NAME macro
 two copies of the routine name: once in all uppercase, and again 
 in all lowercase.
 The FTN\_NAME macro then picks the appropriate name and applies any
-needed underscores.  ``charm-api.h'' also includes a macro ``FDECL''
+needed underscores.  ``charm-api.h'' also includes a macro ``FLINKAGE''
 that makes the symbol linkable from fortran (in C++, this expands
 to extern ``C''), so a complete Fortran subroutine looks like in C or C++:
 \begin{alltt}
-FDECL void FTN\_NAME(FOO,foo)(void);
+FLINKAGE void FTN\_NAME(FOO,foo)(void);
 \end{alltt}
 
 This same syntax can be used for C/C++ routines called from
@@ -212,7 +212,7 @@ SUBROUTINE BAR(i)
 END SUBROUTINE
 
 /* C/C++ */
-FDECL void FTN\_NAME(BAR,bar)(int *i) \{
+FLINKAGE void FTN\_NAME(BAR,bar)(int *i) \{
     x=*i;
 \}
 \end{alltt}
@@ -234,7 +234,7 @@ SUBROUTINE BAR(arr)
 END SUBROUTINE
 
 /* C/C++ */
-FDECL void FTN\_NAME(BAR,bar)(int *arr) \{
+FLINKAGE void FTN\_NAME(BAR,bar)(int *arr) \{
     x=arr[0];
 \}
 \end{alltt}
@@ -270,7 +270,7 @@ SUBROUTINE BAR2(arr,len1,len2)
 END SUBROUTINE
 
 /* C/C++ */
-FDECL void FTN\_NAME(BAR2,bar2)(int *arr,int *len1p,int *len2p) \{
+FLINKAGE void FTN\_NAME(BAR2,bar2)(int *arr,int *len1p,int *len2p) \{
     int i,j; int len1=*len1p, len2=*len2p;
     for (j=0;j<len2;j++)
     for (i=0;i<len1;i++)
@@ -292,7 +292,7 @@ SUBROUTINE CALL\_BARS(arg)
 END SUBROUTINE
 
 /* C/C++ */
-FDECL void FTN\_NAME(BARS,bars)(char *str,int *arg,int strlen) \{
+FLINKAGE void FTN\_NAME(BARS,bars)(char *str,int *arg,int strlen) \{
     char *s=(char *)malloc(strlen+1);
     memcpy(s,str,strlen);
     s[strlen]=0; /* nul-terminate string */

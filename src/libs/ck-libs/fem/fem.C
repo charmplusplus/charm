@@ -33,7 +33,7 @@ void FEM_Abort(const char *caller,const char *sprintf_msg,
 // This is our TCharm global ID:
 enum {FEM_globalID=33};
 
-CDECL void pupFEM_Chunk(pup_er cp) {
+CLINKAGE void pupFEM_Chunk(pup_er cp) {
 	PUP::er &p=*(PUP::er *)cp;
 	FEMchunk *c=(FEMchunk *)TCHARM_Get_global(FEM_globalID);
 	if (c==NULL) {
@@ -50,7 +50,7 @@ FEMchunk *FEMchunk::get(const char *caller) {
 	return c;
 }
 
-CDECL void FEM_Init(FEM_Comm_t defaultComm)
+CLINKAGE void FEM_Init(FEM_Comm_t defaultComm)
 {
 	IDXL_Init(defaultComm);
 	if (!femLock) femLock = CmiCreateLock();
@@ -77,7 +77,7 @@ void FEM_Mesh_list::bad(int l,int bad_code,const char *caller) const {
 		FEM_Abort(caller,"Re-used a deleted FEM Mesh ID %d",l);
 }
 
-CDECL int 
+CLINKAGE int
 FEM_Mesh_allocate(void) /* build new mesh */  
 {
 	const char *caller="FEM_Mesh_allocate";FEMAPI(caller);
@@ -100,7 +100,7 @@ inline T *clonePointerViaPup(T *old) {
 	return nu;
 }
 
-CDECL int
+CLINKAGE int
 FEM_Mesh_copy(int fem_mesh) {
 	const char *caller="FEM_Mesh_copy";FEMAPI(caller);
 	FEMchunk *c=FEMchunk::get(caller);
@@ -110,7 +110,7 @@ FORTRAN_AS_C_RETURN(int,
 	FEM_MESH_COPY,FEM_Mesh_copy,fem_mesh_copy, (int *m),(*m))
 
 
-CDECL void 
+CLINKAGE void
 FEM_Mesh_deallocate(int fem_mesh) /* delete this local mesh */
 {
 	if (fem_mesh!=-1) {
@@ -122,14 +122,14 @@ FEM_Mesh_deallocate(int fem_mesh) /* delete this local mesh */
 FORTRAN_AS_C(FEM_MESH_DEALLOCATE,FEM_Mesh_deallocate,fem_mesh_deallocate, (int *m),(*m))
 
 /* Mesh I/O */
-CDECL int 
+CLINKAGE int
 FEM_Mesh_read(const char *prefix,int partNo,int nParts) /* read parallel mesh from file */
 {
 	const char *caller="FEM_Mesh_read";FEMAPI(caller);
 	FEMchunk *c=FEMchunk::get(caller);
 	return c->meshes.put(FEM_readMesh(prefix,partNo,nParts));
 }
-FDECL int
+FLINKAGE int
 FTN_NAME(FEM_MESH_READ,fem_mesh_read)(const char *n,int *partNo,int *nParts,int len) {
 	char *s=new char[len+1]; strncpy(s,n,len); s[len]=(char)0;
 	int ret=FEM_Mesh_read(s,*partNo,*nParts);
@@ -137,14 +137,14 @@ FTN_NAME(FEM_MESH_READ,fem_mesh_read)(const char *n,int *partNo,int *nParts,int 
 	return ret;
 }
 
-CDECL void 
+CLINKAGE void
 FEM_Mesh_write(int fem_mesh,const char *prefix,int partNo,int nParts) /* write parallel mesh to files */
 {
 	const char *caller="FEM_Mesh_write";FEMAPI(caller);
 	FEMchunk *c=FEMchunk::get(caller);
 	FEM_writeMesh(c->meshes.lookup(fem_mesh,caller),prefix,partNo,nParts);
 }
-FDECL void
+FLINKAGE void
 FTN_NAME(FEM_MESH_WRITE,fem_mesh_write)(int *m,const char *n,int *partNo,int *nParts,int len) {
 	char *s=new char[len+1]; strncpy(s,n,len); s[len]=(char)0;
 	FEM_Mesh_write(*m,s,*partNo,*nParts);
@@ -152,7 +152,7 @@ FTN_NAME(FEM_MESH_WRITE,fem_mesh_write)(int *m,const char *n,int *partNo,int *nP
 }
 
 /* Mesh assembly/disassembly */
-CDECL int 
+CLINKAGE int
 FEM_Mesh_assemble(int nParts,const int *srcMeshes) {
 	const char *caller="FEM_Mesh_assemble";FEMAPI(caller);
 	FEMchunk *c=FEMchunk::get(caller);
@@ -218,7 +218,7 @@ public:
 	}
 };
 
-CDECL void 
+CLINKAGE void
 FEM_Mesh_partition(int fem_mesh,int nParts,int *destMeshes) {
 	const char *caller="FEM_Mesh_partition"; FEMAPI(caller);
 	FEMchunk *c=FEMchunk::get(caller);
@@ -236,7 +236,7 @@ FORTRAN_AS_C(FEM_MESH_PARTITION,FEM_Mesh_partition,fem_mesh_partition,
 
 /* Mesh communication */
 
-CDECL int 
+CLINKAGE int
 FEM_Mesh_recv(int fromRank,int tag,FEM_Comm_t comm_context)
 {
 	const char *caller="FEM_Mesh_recv";FEMAPI(caller);
@@ -250,7 +250,7 @@ FEM_Mesh_recv(int fromRank,int tag,FEM_Comm_t comm_context)
 FORTRAN_AS_C_RETURN(int,FEM_MESH_RECV,FEM_Mesh_recv,fem_mesh_recv, 
 	(int *from,int *tag,int *comm),(*from,*tag,*comm))
 
-CDECL void 
+CLINKAGE void
 FEM_Mesh_send(int fem_mesh,int toRank,int tag,FEM_Comm_t comm_context)
 {
 	const char *caller="FEM_Mesh_send";FEMAPI(caller);
@@ -262,7 +262,7 @@ FORTRAN_AS_C(FEM_MESH_SEND,FEM_Mesh_send,fem_mesh_send,
 	(int *mesh,int *to,int *tag,int *comm),(*mesh,*to,*tag,*comm))
 
 
-CDECL int 
+CLINKAGE int
 FEM_Mesh_reduce(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
 {
 	int tag=89374;
@@ -297,7 +297,7 @@ FORTRAN_AS_C_RETURN(int,FEM_MESH_REDUCE,FEM_Mesh_reduce,fem_mesh_reduce,
 extern int FEM_Mesh_Parallel_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context);
 #endif
 
-CDECL int 
+CLINKAGE int
 FEM_Mesh_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
 {
 #ifndef FEM_PARALLEL_PART
@@ -330,7 +330,7 @@ FORTRAN_AS_C_RETURN(int,FEM_MESH_BROADCAST,FEM_Mesh_broadcast,fem_mesh_broadcast
 	(int *mesh,int *rank,int *comm),(*mesh,*rank,*comm))
 
 
-CDECL void 
+CLINKAGE void
 FEM_Mesh_copy_globalno(int src_mesh,int dest_mesh)
 {
 	const char *caller="FEM_Mesh_copy_globalno";FEMAPI(caller);
@@ -340,7 +340,7 @@ FEM_Mesh_copy_globalno(int src_mesh,int dest_mesh)
 }
 
 /* Tiny accessors */
-CDECL int FEM_Mesh_default_read(void)  /* return default fem_mesh used for read (get) calls below */
+CLINKAGE int FEM_Mesh_default_read(void)  /* return default fem_mesh used for read (get) calls below */
 {
 	return FEMchunk::get("FEM_Mesh_default_read")->default_read;
 }
@@ -348,7 +348,7 @@ FORTRAN_AS_C_RETURN(int,
 	FEM_MESH_DEFAULT_READ,FEM_Mesh_default_read,fem_mesh_default_read,
 	(void),())
 
-CDECL int FEM_Mesh_default_write(void) /* return default fem_mesh used for write (set) calls below */
+CLINKAGE int FEM_Mesh_default_write(void) /* return default fem_mesh used for write (set) calls below */
 {
 	return FEMchunk::get("FEM_Mesh_default_write")->default_write;
 }
@@ -356,13 +356,13 @@ FORTRAN_AS_C_RETURN(int,
 	FEM_MESH_DEFAULT_WRITE,FEM_Mesh_default_write,fem_mesh_default_write,
 	(void),())
 
-CDECL void FEM_Mesh_set_default_read(int fem_mesh)
+CLINKAGE void FEM_Mesh_set_default_read(int fem_mesh)
 {
 	FEMchunk::get("FEM_Mesh_set_default_read")->default_read=fem_mesh;
 }
 FORTRAN_AS_C(FEM_MESH_SET_DEFAULT_READ,FEM_Mesh_set_default_read,fem_mesh_set_default_read,
 	(int *m),(*m))
-CDECL void FEM_Mesh_set_default_write(int fem_mesh)
+CLINKAGE void FEM_Mesh_set_default_write(int fem_mesh)
 {
 	FEMchunk::get("FEM_Mesh_set_default_write")->default_write=fem_mesh;
 }
@@ -406,13 +406,13 @@ FEM_Mesh *FEM_Mesh_lookup(int fem_mesh,const char *caller) {
 /****** Custom Partitioning API *******/
 
 //C bindings:
-CDECL void FEM_Set_partition(int *elem2chunk) {
+CLINKAGE void FEM_Set_partition(int *elem2chunk) {
 	FEMAPI("FEM_Set_partition");
 	FEM_curPartition().setPartition(elem2chunk,setMesh()->nElems(),0);
 }
 
 //Fortran bindings:
-FDECL void FTN_NAME(FEM_SET_PARTITION,fem_set_partition)
+FLINKAGE void FTN_NAME(FEM_SET_PARTITION,fem_set_partition)
 	(int *elem2chunk) 
 {
 	FEMAPI("FEM_Set_partition");
@@ -573,53 +573,53 @@ FEMchunk::readField(int fid, void *nodes, const char *fname)
 
 /******************************* C Bindings **********************************/
 
-CDECL int FEM_Register(void *_ud,FEM_PupFn _pup_ud)
+CLINKAGE int FEM_Register(void *_ud,FEM_PupFn _pup_ud)
 {
   FEMAPI("FEM_Register");
   return TCHARM_Register(_ud,_pup_ud);
 }
 
-CDECL void *FEM_Get_userdata(int n)
+CLINKAGE void *FEM_Get_userdata(int n)
 {
   FEMAPI("FEM_Get_userdata");
   return TCHARM_Get_userdata(n);
 }
 
-CDECL void FEM_Barrier(void) {TCHARM_Barrier();}
-FDECL void FTN_NAME(FEM_BARRIER,fem_barrier)(void) {TCHARM_Barrier();}
+CLINKAGE void FEM_Barrier(void) {TCHARM_Barrier();}
+FLINKAGE void FTN_NAME(FEM_BARRIER,fem_barrier)(void) {TCHARM_Barrier();}
 
-CDECL void
+CLINKAGE void
 FEM_Migrate(void)
 {
 //  TCHARM_Migrate();
   AMPI_Migrate();
 }
 
-CDECL void
+CLINKAGE void
 FEM_Async_Migrate(void)
 {
   TCHARM_Async_Migrate();
 }
 
-CDECL void 
+CLINKAGE void
 FEM_Done(void)
 {
   TCHARM_Done(0);
 }
 
-CDECL int 
+CLINKAGE int
 FEM_Create_simple_field(int base_type, int vec_len)
 {
   return IDXL_Layout_create(base_type,vec_len);
 }
 
-CDECL int 
+CLINKAGE int
 FEM_Create_field(int base_type, int vec_len, int init_offset, int distance)
 {
   return IDXL_Layout_offset(base_type,vec_len,init_offset,distance,0);
 }
 
-CDECL void
+CLINKAGE void
 FEM_Update_field(int fid, void *nodes)
 {
   int mesh=FEM_Mesh_default_read();
@@ -627,46 +627,46 @@ FEM_Update_field(int fid, void *nodes)
   IDXL_Comm_sendsum(0,list,fid,nodes);
 }
 
-CDECL void
+CLINKAGE void
 FEM_Reduce_field(int fid, const void *nodes, void *outbuf, int op)
 {
   const char *caller="FEM_Reduce_field"; FEMAPI(caller);
   FEMchunk::get(caller)->reduce_field(fid, nodes, outbuf, op);
 }
 
-CDECL void
+CLINKAGE void
 FEM_Reduce(int fid, const void *inbuf, void *outbuf, int op)
 {
   const char *caller="FEM_Reduce";FEMAPI(caller);
   FEMchunk::get(caller)->reduce(fid, inbuf, outbuf, op);
 }
 
-CDECL void
+CLINKAGE void
 FEM_Read_field(int fid, void *nodes, const char *fname)
 {
   const char *caller="FEM_Read_field";FEMAPI(caller);
   FEMchunk::get(caller)->readField(fid, nodes, fname);
 }
 
-CDECL int
+CLINKAGE int
 FEM_My_partition(void)
 {
   return TCHARM_Element();
 }
 
-CDECL int
+CLINKAGE int
 FEM_Num_partitions(void)
 {
   return TCHARM_Num_elements();
 }
 
-CDECL double
+CLINKAGE double
 FEM_Timer(void)
 {
   return TCHARM_Wall_timer();
 }
 
-CDECL void 
+CLINKAGE void
 FEM_Print(const char *str)
 {
   const char *caller="FEM_Print"; FEMAPI(caller);
@@ -680,33 +680,33 @@ static void do_print_partition(int fem_mesh,int idxBase) {
   cptr->print(fem_mesh,idxBase);
 }
 
-CDECL void 
+CLINKAGE void
 FEM_Mesh_print(int fem_mesh)
 {
   do_print_partition(fem_mesh,0);
 }
 
-CDECL void
+CLINKAGE void
 FEM_Print_partition(void) {
   do_print_partition(FEM_Mesh_default_read(),0);
 }
 
-CDECL int FEM_Get_comm_partners(void)
+CLINKAGE int FEM_Get_comm_partners(void)
 {
 	const char *caller="FEM_Get_Comm_Partners"; FEMAPI(caller);
 	return FEMchunk::get(caller)->getComm().size();
 }
-CDECL int FEM_Get_comm_partner(int partnerNo)
+CLINKAGE int FEM_Get_comm_partner(int partnerNo)
 {
 	const char *caller="FEM_Get_Comm_Partner"; FEMAPI(caller);
 	return FEMchunk::get(caller)->getComm().getLocalList(partnerNo).getDest();
 }
-CDECL int FEM_Get_comm_count(int partnerNo)
+CLINKAGE int FEM_Get_comm_count(int partnerNo)
 {
 	const char *caller="FEM_Get_Comm_Count"; FEMAPI(caller);
 	return FEMchunk::get(caller)->getComm().getLocalList(partnerNo).size();
 }
-CDECL void FEM_Get_comm_nodes(int partnerNo,int *nodeNos)
+CLINKAGE void FEM_Get_comm_nodes(int partnerNo,int *nodeNos)
 {
 	const char *caller="FEM_Get_comm_nodes"; FEMAPI(caller);
 	const int *nNo=FEMchunk::get(caller)->getComm().getLocalList(partnerNo).getVec();
@@ -717,54 +717,54 @@ CDECL void FEM_Get_comm_nodes(int partnerNo,int *nodeNos)
 
 /************************ Fortran Bindings *********************************/
 
-FDECL int FTN_NAME(FEM_REGISTER,fem_register)
+FLINKAGE int FTN_NAME(FEM_REGISTER,fem_register)
   (void *userData,FEM_PupFn _pup_ud)
 { 
   return FEM_Register(userData,_pup_ud);
 }
 
-FDECL void FTN_NAME(FEM_MIGRATE,fem_migrate)
+FLINKAGE void FTN_NAME(FEM_MIGRATE,fem_migrate)
   (void)
 {
   FEM_Migrate();
 }
 
-FDECL void FTN_NAME(FEM_ASYNC_MIGRATE,fem_async_migrate)
+FLINKAGE void FTN_NAME(FEM_ASYNC_MIGRATE,fem_async_migrate)
   (void)
 {
   FEM_Async_Migrate();
 }
 
-FDECL int FTN_NAME(FEM_CREATE_SIMPLE_FIELD,fem_create_simple_field)
+FLINKAGE int FTN_NAME(FEM_CREATE_SIMPLE_FIELD,fem_create_simple_field)
   (int *bt, int *vl)
 {
   return FEM_Create_simple_field(*bt, *vl);
 }
-FDECL int FTN_NAME(FEM_CREATE_FIELD,fem_create_field)
+FLINKAGE int FTN_NAME(FEM_CREATE_FIELD,fem_create_field)
   (int *bt, int *vl, int *io, int *d)
 {
   return FEM_Create_field(*bt, *vl, *io, *d);
 }
 
-FDECL void FTN_NAME(FEM_UPDATE_FIELD,fem_update_field)
+FLINKAGE void FTN_NAME(FEM_UPDATE_FIELD,fem_update_field)
   (int *fid, void *nodes)
 {
   FEM_Update_field(*fid, nodes);
 }
 
-FDECL void  FTN_NAME(FEM_REDUCE_FIELD,fem_reduce_field)
+FLINKAGE void  FTN_NAME(FEM_REDUCE_FIELD,fem_reduce_field)
   (int *fid, void *nodes, void *outbuf, int *op)
 {
   FEM_Reduce_field(*fid, nodes, outbuf, *op);
 }
 
-FDECL void FTN_NAME(FEM_REDUCE,fem_reduce)
+FLINKAGE void FTN_NAME(FEM_REDUCE,fem_reduce)
   (int *fid, void *inbuf, void *outbuf, int *op)
 {
   FEM_Reduce(*fid, inbuf, outbuf, *op);
 }
 
-FDECL void FTN_NAME(FEM_READ_FIELD,fem_read_field)
+FLINKAGE void FTN_NAME(FEM_READ_FIELD,fem_read_field)
   (int *fid, void *nodes, char *fname, int len)
 {
   char *tmp = new char[len+1]; CHK(tmp);
@@ -774,32 +774,32 @@ FDECL void FTN_NAME(FEM_READ_FIELD,fem_read_field)
   delete[] tmp;
 }
 
-FDECL int FTN_NAME(FEM_MY_PARTITION,fem_my_partition)
+FLINKAGE int FTN_NAME(FEM_MY_PARTITION,fem_my_partition)
   (void)
 {
   return FEM_My_partition()+1;
 }
 
-FDECL int FTN_NAME(FEM_NUM_PARTITIONS,fem_num_partitions)
+FLINKAGE int FTN_NAME(FEM_NUM_PARTITIONS,fem_num_partitions)
   (void)
 {
   return FEM_Num_partitions();
 }
 
-FDECL double FTN_NAME(FEM_TIMER,fem_timer)
+FLINKAGE double FTN_NAME(FEM_TIMER,fem_timer)
   (void)
 {
   return FEM_Timer();
 }
 
 // Utility functions for Fortran
-FDECL int FTN_NAME(FOFFSETOF,foffsetof)
+FLINKAGE int FTN_NAME(FOFFSETOF,foffsetof)
   (void *first, void *second)
 {
   return (int)((char *)second - (char*)first);
 }
 
-FDECL void FTN_NAME(FEM_PRINT,fem_print)
+FLINKAGE void FTN_NAME(FEM_PRINT,fem_print)
   (char *str, int len)
 {
   char *tmpstr = new char[len+1]; CHK(tmpstr);
@@ -809,37 +809,37 @@ FDECL void FTN_NAME(FEM_PRINT,fem_print)
   delete[] tmpstr;
 }
 
-FDECL void FTN_NAME(FEM_MESH_PRINT,fem_mesh_print)
+FLINKAGE void FTN_NAME(FEM_MESH_PRINT,fem_mesh_print)
   (int *m)
 {
   do_print_partition(*m,1);
 }
-FDECL void FTN_NAME(FEM_PRINT_PARTITION,fem_print_partition)(void) {
+FLINKAGE void FTN_NAME(FEM_PRINT_PARTITION,fem_print_partition)(void) {
   do_print_partition(FEM_Mesh_default_read(),0);
 }
 
-FDECL void FTN_NAME(FEM_DONE,fem_done)
+FLINKAGE void FTN_NAME(FEM_DONE,fem_done)
   (void)
 {
   FEM_Done();
 }
 
-FDECL int FTN_NAME(FEM_GET_COMM_PARTNERS,fem_get_comm_partners)
+FLINKAGE int FTN_NAME(FEM_GET_COMM_PARTNERS,fem_get_comm_partners)
 	(void)
 {
 	return FEM_Get_comm_partners();
 }
-FDECL int FTN_NAME(FEM_GET_COMM_PARTNER,fem_get_comm_partner)
+FLINKAGE int FTN_NAME(FEM_GET_COMM_PARTNER,fem_get_comm_partner)
 	(int *partnerNo)
 {
 	return FEM_Get_comm_partner(*partnerNo-1)+1;
 }
-FDECL int FTN_NAME(FEM_GET_COMM_COUNT,fem_get_comm_count)
+FLINKAGE int FTN_NAME(FEM_GET_COMM_COUNT,fem_get_comm_count)
 	(int *partnerNo)
 {
 	return FEM_Get_comm_count(*partnerNo-1);
 }
-FDECL void FTN_NAME(FEM_GET_COMM_NODES,fem_get_comm_nodes)
+FLINKAGE void FTN_NAME(FEM_GET_COMM_NODES,fem_get_comm_nodes)
 	(int *pNo,int *nodeNos)
 {
 	const char *caller="FEM_GET_COMM_NODES"; FEMAPI(caller);
@@ -889,7 +889,7 @@ FEM_Ghost_Stencil::FEM_Ghost_Stencil(int elType_, int n_,bool addNodes_,
 	}
 }
 
-CDECL void FEM_Add_ghost_stencil_type(int elType,int nElts,int addNodes,
+CLINKAGE void FEM_Add_ghost_stencil_type(int elType,int nElts,int addNodes,
 	const int *ends,const int *adj2)
 {
 	FEMAPI("FEM_Add_ghost_stencil_type");
@@ -897,7 +897,7 @@ CDECL void FEM_Add_ghost_stencil_type(int elType,int nElts,int addNodes,
 		elType, nElts, addNodes==1, ends, adj2, 0);
 	FEM_curPartition().addGhostStencil(s);
 }
-FDECL void FTN_NAME(FEM_ADD_GHOST_STENCIL_TYPE,fem_add_ghost_stencil_type)(
+FLINKAGE void FTN_NAME(FEM_ADD_GHOST_STENCIL_TYPE,fem_add_ghost_stencil_type)(
 	int *elType,int *nElts,int *addNodes,
 	const int *ends,const int *adj2)
 {
@@ -926,7 +926,7 @@ inline int globalElem2elType(const FEM_Mesh *m,int globalElem) {
  using one big array, instead of one array per element type.
  This one-piece format is more convenient for most users.
 */
-CDECL void FEM_Add_ghost_stencil(int nElts,int addNodes,
+CLINKAGE void FEM_Add_ghost_stencil(int nElts,int addNodes,
 	const int *ends,const int *adj)
 {
 	FEMAPI("FEM_Add_ghost_stencil");
@@ -963,7 +963,7 @@ CDECL void FEM_Add_ghost_stencil(int nElts,int addNodes,
 	}
 	FEM_curPartition().markGhostStencilLayer();
 }
-FDECL void FTN_NAME(FEM_ADD_GHOST_STENCIL,fem_add_ghost_stencil)(
+FLINKAGE void FTN_NAME(FEM_ADD_GHOST_STENCIL,fem_add_ghost_stencil)(
 	int *nElts,int *addNodes,
 	const int *ends,int *adj)
 {
@@ -975,14 +975,14 @@ FDECL void FTN_NAME(FEM_ADD_GHOST_STENCIL,fem_add_ghost_stencil)(
 }
 
 /******************** Ghost Layers *********************/
-CDECL void FEM_Add_ghost_layer(int nodesPerTuple,int doAddNodes)
+CLINKAGE void FEM_Add_ghost_layer(int nodesPerTuple,int doAddNodes)
 {
 	FEMAPI("FEM_Add_ghost_layer");
 	FEM_Ghost_Layer *cur=FEM_curPartition().addLayer();
 	cur->nodesPerTuple=nodesPerTuple;
 	cur->addNodes=(doAddNodes!=0);
 }
-FDECL void FTN_NAME(FEM_ADD_GHOST_LAYER,fem_add_ghost_layer)
+FLINKAGE void FTN_NAME(FEM_ADD_GHOST_LAYER,fem_add_ghost_layer)
 	(int *nodesPerTuple,int *doAddNodes)
 { FEM_Add_ghost_layer(*nodesPerTuple,*doAddNodes); }
 
@@ -998,13 +998,13 @@ static void add_ghost_elem(int elType,int tuplesPerElem,const int *elem2tuple,in
 		          tuplesPerElem*cur->nodesPerTuple,idxBase);
 }
 
-CDECL void FEM_Add_ghost_elem(int elType,int tuplesPerElem,const int *elem2tuple)
+CLINKAGE void FEM_Add_ghost_elem(int elType,int tuplesPerElem,const int *elem2tuple)
 { add_ghost_elem(elType,tuplesPerElem,elem2tuple,0); }
-FDECL void FTN_NAME(FEM_ADD_GHOST_ELEM,fem_add_ghost_elem)
+FLINKAGE void FTN_NAME(FEM_ADD_GHOST_ELEM,fem_add_ghost_elem)
 	(int *FelType,int *FtuplesPerElem,const int *elem2tuple)
 { add_ghost_elem(*FelType,*FtuplesPerElem,elem2tuple,1); }
 
-CDECL void FEM_Update_ghost_field(int fid, int elType, void *v_data)
+CLINKAGE void FEM_Update_ghost_field(int fid, int elType, void *v_data)
 {
 	int mesh=FEM_Mesh_default_read();
 	int entity;
@@ -1019,7 +1019,7 @@ CDECL void FEM_Update_ghost_field(int fid, int elType, void *v_data)
 	IDXL_Comm_recv(comm,src,fid,&data[nReal*bytesPerRec]); //Begin recv'ing ghosts after all reals
 	IDXL_Comm_wait(comm);
 }
-FDECL void FTN_NAME(FEM_UPDATE_GHOST_FIELD,fem_update_ghost_field)
+FLINKAGE void FTN_NAME(FEM_UPDATE_GHOST_FIELD,fem_update_ghost_field)
 	(int *fid, int *elemType, void *data)
 {
 	int fElType=*elemType;
@@ -1098,26 +1098,26 @@ void FEMchunk::exchangeGhostLists(int elemType,
 }
 
 //List exchange API
-CDECL void FEM_Exchange_ghost_lists(int elemType,int nIdx,const int *localIdx)
+CLINKAGE void FEM_Exchange_ghost_lists(int elemType,int nIdx,const int *localIdx)
 {
 	const char *caller="FEM_Exchange_Ghost_Lists"; FEMAPI(caller);
 	FEMchunk::get(caller)->exchangeGhostLists(elemType,nIdx,localIdx,0);
 }
-FDECL void FTN_NAME(FEM_EXCHANGE_GHOST_LISTS,fem_exchange_ghost_lists)
+FLINKAGE void FTN_NAME(FEM_EXCHANGE_GHOST_LISTS,fem_exchange_ghost_lists)
 	(int *elemType,int *nIdx,const int *localIdx)
 {
 	const char *caller="FEM_exchange_ghost_lists"; FEMAPI(caller);
 	FEMchunk::get(caller)->exchangeGhostLists(*elemType,*nIdx,localIdx,1);
 }
-CDECL int FEM_Get_ghost_list_length(void) 
+CLINKAGE int FEM_Get_ghost_list_length(void)
 {
 	const char *caller="FEM_Get_Ghost_List_Length"; FEMAPI(caller);
 	return FEMchunk::get(caller)->getList().size();
 }
-FDECL int FTN_NAME(FEM_GET_GHOST_LIST_LENGTH,fem_get_ghost_list_length)(void)
+FLINKAGE int FTN_NAME(FEM_GET_GHOST_LIST_LENGTH,fem_get_ghost_list_length)(void)
 { return FEM_Get_ghost_list_length();}
 
-CDECL void FEM_Get_ghost_list(int *dest)
+CLINKAGE void FEM_Get_ghost_list(int *dest)
 {
 	const char *caller="FEM_Get_Ghost_List"; FEMAPI(caller);
 	int i,len=FEM_Get_ghost_list_length();
@@ -1125,7 +1125,7 @@ CDECL void FEM_Get_ghost_list(int *dest)
 	for (i=0;i<len;i++) dest[i]=src[i];
 	FEMchunk::get(caller)->emptyList();
 }
-FDECL void FTN_NAME(FEM_GET_GHOST_LIST,fem_get_ghost_list)
+FLINKAGE void FTN_NAME(FEM_GET_GHOST_LIST,fem_get_ghost_list)
 	(int *dest)
 {
 	const char *caller="FEM_get_ghost_list"; FEMAPI(caller);
@@ -1196,7 +1196,7 @@ static CkVec<int> getRoccomPconn(int fem_mesh,int *ghost_len,const int *paneFmCh
 	return pconn;
 }
 
-CDECL void FEM_Get_roccom_pconn_size(int fem_mesh,int *total_len,int *ghost_len)
+CLINKAGE void FEM_Get_roccom_pconn_size(int fem_mesh,int *total_len,int *ghost_len)
 {
 	CkVec<int> pconn=getRoccomPconn(fem_mesh,ghost_len,NULL);
 	*total_len=pconn.size();
@@ -1205,7 +1205,7 @@ FORTRAN_AS_C(FEM_GET_ROCCOM_PCONN_SIZE,FEM_Get_roccom_pconn_size,fem_get_roccom_
         (int *mesh,int *tl,int *gl), (*mesh,tl,gl)
 )
 
-CDECL void FEM_Get_roccom_pconn(int fem_mesh,const int *paneFmChunk,int *dest)
+CLINKAGE void FEM_Get_roccom_pconn(int fem_mesh,const int *paneFmChunk,int *dest)
 {
 	CkVec<int> pconn=getRoccomPconn(fem_mesh,NULL,paneFmChunk);
 	for (unsigned int i=0;i<pconn.size();i++)
@@ -1237,7 +1237,7 @@ const int* makeIDXLside(const int *src,const int *paneFmChunk,IDXL_Side &s) {
 	return src;
 }
 
-CDECL void FEM_Set_roccom_pconn(int fem_mesh,const int *paneFmChunk,const int *src,int total_len,int ghost_len)
+CLINKAGE void FEM_Set_roccom_pconn(int fem_mesh,const int *paneFmChunk,const int *src,int total_len,int ghost_len)
 {
 	const char *caller="FEM_Set_roccom_pconn"; FEMAPI(caller);
 	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
@@ -1268,7 +1268,7 @@ int commState(int entityNo,const IDXL_Side &s)
     Based on shared node communication list, compute 
     FEM_NODE FEM_GLOBALNO and FEM_NODE_PRIMARY
 */
-CDECL void FEM_Make_node_globalno(int fem_mesh,FEM_Comm_t comm_context)
+CLINKAGE void FEM_Make_node_globalno(int fem_mesh,FEM_Comm_t comm_context)
 {
 	const char *caller="FEM_Make_node_globalno"; FEMAPI(caller);
 	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
@@ -1419,7 +1419,7 @@ FEMchunk::print(int fem_mesh,int idxBase)
  *
  */
 
-CDECL void FEM_Add_elem2face_tuples(int fem_mesh, int elem_type, int nodesPerTuple, int tuplesPerElem,const int *elem2tuple) 
+CLINKAGE void FEM_Add_elem2face_tuples(int fem_mesh, int elem_type, int nodesPerTuple, int tuplesPerElem,const int *elem2tuple)
 {
 	FEMAPI("FEM_Add_elem2face_tuples");
 	FEM_Mesh *m = FEM_Mesh_lookup(fem_mesh,"FEM_Add_elem2face_tuples");

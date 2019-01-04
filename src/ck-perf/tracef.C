@@ -25,7 +25,7 @@ static char * FortrantoCString(char *x,int len){
 }
 
 
-FDECL {
+FLINKAGE {
 
 #define ftracebegin              FTN_NAME(FTRACEBEGIN, ftracebegin)
 #define ftraceend		 FTN_NAME(FTRACEEND, ftraceend)
@@ -98,5 +98,5 @@ void fbgprintf(char *str, int len)
 }
 #endif
 
-}  // FDECL
+}  // FLINKAGE
 

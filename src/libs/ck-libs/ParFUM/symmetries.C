@@ -387,7 +387,7 @@ void FEM_Sym_Linear::pup(PUP::er &p) {
 }
 
 /********** High-Level (Faces & coordinates) API **********/
-CDECL void FEM_Add_linear_periodicity(
+CLINKAGE void FEM_Add_linear_periodicity(
 	int nFaces,int nPer,
 	const int *facesA,const int *facesB,
 	int nNodes,const double *nodeLocs
@@ -397,7 +397,7 @@ CDECL void FEM_Add_linear_periodicity(
 	FEM_curPartition().addLinearPeriodic(nFaces,nPer,
 		facesA,facesB,0,nNodes,(const CkVector3d *)nodeLocs);
 }
-FDECL void FTN_NAME(FEM_ADD_LINEAR_PERIODICITY,fem_add_linear_periodicity)(
+FLINKAGE void FTN_NAME(FEM_ADD_LINEAR_PERIODICITY,fem_add_linear_periodicity)(
 	int *nFaces,int *nPer,
 	const int *facesA,const int *facesB,
 	int *nNodes,const double *nodeLocs
@@ -408,7 +408,7 @@ FDECL void FTN_NAME(FEM_ADD_LINEAR_PERIODICITY,fem_add_linear_periodicity)(
 		facesA,facesB,1,*nNodes,(const CkVector3d *)nodeLocs);
 }
 
-CDECL void FEM_Sym_coordinates(int elType,double *d_locs)
+CLINKAGE void FEM_Sym_coordinates(int elType,double *d_locs)
 {
 	const char *caller="FEM_Sym_coordinates"; FEMAPI(caller);
 	
@@ -424,7 +424,7 @@ CDECL void FEM_Sym_coordinates(int elType,double *d_locs)
 		if (sym[i]!=(FEM_Symmetries_t)0)
 			sl.applyLoc(&locs[i],sym[i]);
 }
-FDECL void FTN_NAME(FEM_SYM_COORDINATES,fem_sym_coordinates)
+FLINKAGE void FTN_NAME(FEM_SYM_COORDINATES,fem_sym_coordinates)
 	(int *elType,double *locs)
 {
 	FEM_Sym_coordinates(zeroToMinusOne(*elType),locs);
@@ -433,13 +433,13 @@ FDECL void FTN_NAME(FEM_SYM_COORDINATES,fem_sym_coordinates)
 
 /********** Low-Level (canonicalization array) API **********/
 
-CDECL void FEM_Set_sym_nodes(const int *canon,const int *sym)
+CLINKAGE void FEM_Set_sym_nodes(const int *canon,const int *sym)
 {
 	const char *caller="FEM_Set_sym_nodes"; FEMAPI(caller);
 	int n=FEM_chunk::get(caller)->setMesh(caller)->node.size();
 	FEM_curPartition().setSymmetries(n,CkCopyArray(canon,n,0),sym);
 }
-FDECL void FTN_NAME(FEM_SET_SYM_NODES,fem_set_sym_nodes)
+FLINKAGE void FTN_NAME(FEM_SET_SYM_NODES,fem_set_sym_nodes)
 	(const int *canon,const int *sym)
 {
 	const char *caller="FEM_Set_sym_nodes"; FEMAPI(caller);

@@ -13,7 +13,7 @@
 #include "refine.h"
 
 /********************* Attach *****************/
-CDECL void REFINE2D_Init(void) {
+CLINKAGE void REFINE2D_Init(void) {
   TCHARM_API_TRACE("REFINE2D_Init", "refine");
   TCharm *tc=TCharm::get();
   
@@ -37,13 +37,13 @@ CDECL void REFINE2D_Init(void) {
   mesh[rank].insert(cm);
   tc->suspend(); /* will resume from chunk constructor */
 }
-FDECL void FTN_NAME(REFINE2D_INIT,refine2d_init)(void)
+FLINKAGE void FTN_NAME(REFINE2D_INIT,refine2d_init)(void)
 {
   REFINE2D_Init();
 }
 
 /******************** NewMesh *******************/
-CDECL void REFINE2D_NewMesh(int meshID,int nEl,int nGhost,int nnodes,const int *conn,const int *gid,const int *boundaries, const int *edgeBounds, const int *edgeConn, int nEdges)
+CLINKAGE void REFINE2D_NewMesh(int meshID,int nEl,int nGhost,int nnodes,const int *conn,const int *gid,const int *boundaries, const int *edgeBounds, const int *edgeConn, int nEdges)
 {
   TCHARM_API_TRACE("REFINE2D_NewMesh", "refine");
   if (!CtvAccess(_refineChunk))
@@ -55,7 +55,7 @@ CDECL void REFINE2D_NewMesh(int meshID,int nEl,int nGhost,int nnodes,const int *
   CkWaitQD();
 }
 /*
-FDECL void FTN_NAME(REFINE2D_NEWMESH,refine2d_newmesh)
+FLINKAGE void FTN_NAME(REFINE2D_NEWMESH,refine2d_newmesh)
 (int *nEl,int *nGhost,int nnodes,const int *conn,const int *gid,const int *boundaries, const int **edgeBoundaries)
 {
   TCHARM_API_TRACE("REFINE2D_NewMesh", "refine");
@@ -241,7 +241,7 @@ public:
 
 
 // this function should be called from a thread
-CDECL void REFINE2D_Split(int nNode,double *coord,int nEl,double *desiredArea,FEM_Refine_Operation_Data *refine_data)
+CLINKAGE void REFINE2D_Split(int nNode,double *coord,int nEl,double *desiredArea,FEM_Refine_Operation_Data *refine_data)
 {
   TCHARM_API_TRACE("REFINE2D_Split", "refine");
   chunk *C = CtvAccess(_refineChunk);
@@ -254,7 +254,7 @@ CDECL void REFINE2D_Split(int nNode,double *coord,int nEl,double *desiredArea,FE
   C->multipleRefine(desiredArea, &client);
 }
 
-CDECL void REFINE2D_Coarsen(int nNode, double *coord, int nEl,
+CLINKAGE void REFINE2D_Coarsen(int nNode, double *coord, int nEl,
 			    double *desiredArea, FEM_Operation_Data *data)
 {
   TCHARM_API_TRACE("REFINE2D_Coarsen", "coarsen");
@@ -269,7 +269,7 @@ CDECL void REFINE2D_Coarsen(int nNode, double *coord, int nEl,
 }
 
 
-FDECL void FTN_NAME(REFINE2D_SPLIT,refine2d_split)
+FLINKAGE void FTN_NAME(REFINE2D_SPLIT,refine2d_split)
    (int *nNode,double *coord,int *nEl,double *desiredArea,FEM_Refine_Operation_Data *data)
 {
   REFINE2D_Split(*nNode,coord,*nEl,desiredArea,data);
@@ -285,24 +285,24 @@ static refineResults *getResults(void) {
   return ret;
 }
 
-CDECL int REFINE2D_Get_Split_Length(void)
+CLINKAGE int REFINE2D_Get_Split_Length(void)
 {
   TCHARM_API_TRACE("REFINE2D_Get_Split_Length", "refine");
   return getResults()->countResults();
 }
-FDECL int FTN_NAME(REFINE2D_GET_SPLIT_LENGTH,refine2d_get_split_length)(void)
+FLINKAGE int FTN_NAME(REFINE2D_GET_SPLIT_LENGTH,refine2d_get_split_length)(void)
 {
   return REFINE2D_Get_Split_Length();
 }
 
-CDECL void REFINE2D_Get_Split
+CLINKAGE void REFINE2D_Get_Split
     (int splitNo,refineData *d)
 {
   TCHARM_API_TRACE("REFINE2D_Get_Split", "refine");
   refineResults *r=getResults();
   r->extract(splitNo,d);
 }
-FDECL void FTN_NAME(REFINE2D_GET_SPLIT,refine2d_get_split)
+FLINKAGE void FTN_NAME(REFINE2D_GET_SPLIT,refine2d_get_split)
     (int *splitNo,refineData *d)
 {
   TCHARM_API_TRACE("REFINE2D_Get_Split", "refine");
@@ -321,15 +321,15 @@ static coarsenResults *getCoarsenResults(void) {
 }
 
 
-CDECL int REFINE2D_Get_Collapse_Length(){
+CLINKAGE int REFINE2D_Get_Collapse_Length(){
   return getCoarsenResults()->countResults();
 }
 /*
-CDECL void REFINE2D_Get_Collapse(int i,int *conn,int *tri,int *nodeToThrow,int *nodeToKeep,double *nx,double *ny,int *flag,int idxbase){
+CLINKAGE void REFINE2D_Get_Collapse(int i,int *conn,int *tri,int *nodeToThrow,int *nodeToKeep,double *nx,double *ny,int *flag,int idxbase){
 	return getCoarsenResults()->extract(i,conn,tri,nodeToThrow,nodeToKeep,nx,ny,flag,idxbase);
 }*/
 
-CDECL void REFINE2D_Get_Collapse(int i,coarsenData *output){
+CLINKAGE void REFINE2D_Get_Collapse(int i,coarsenData *output){
 	getCoarsenResults()->extract(i,output);
 }
 
@@ -385,10 +385,10 @@ static void checkConn(int nEl,const int *conn,int idxBase,int nNode)
   }
 }
 
-CDECL void REFINE2D_Check(int nEl,const int *conn,int nNodes) {
+CLINKAGE void REFINE2D_Check(int nEl,const int *conn,int nNodes) {
   checkConn(nEl,conn,0,nNodes);
 }
-FDECL void FTN_NAME(REFINE2D_CHECK,refine2d_check)
+FLINKAGE void FTN_NAME(REFINE2D_CHECK,refine2d_check)
   (int *nEl,const int *conn,int *nNodes)
 {
   checkConn(*nEl,conn,1,*nNodes);

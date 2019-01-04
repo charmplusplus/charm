@@ -614,7 +614,7 @@ Callable from UserSetup:
 */
 
 // Read the command line to figure out how many threads to create:
-CDECL int TCHARM_Get_num_chunks()
+CLINKAGE int TCHARM_Get_num_chunks()
 {
 	TCHARMAPI("TCHARM_Get_num_chunks");
 	if (CkMyPe()!=0) CkAbort("TCHARM_Get_num_chunks should only be called on PE 0 during setup!");
@@ -625,7 +625,7 @@ CDECL int TCHARM_Get_num_chunks()
 	lastNumChunks=nChunks;
 	return nChunks;
 }
-FDECL int FTN_NAME(TCHARM_GET_NUM_CHUNKS,tcharm_get_num_chunks)()
+FLINKAGE int FTN_NAME(TCHARM_GET_NUM_CHUNKS,tcharm_get_num_chunks)()
 {
 	return TCHARM_Get_num_chunks();
 }
@@ -644,33 +644,33 @@ void TCHARM_Thread_options::sanityCheck() {
 TCHARM_Thread_options g_tcharmOptions(1);
 
 /*Set the size of the thread stack*/
-CDECL void TCHARM_Set_stack_size(int newStackSize)
+CLINKAGE void TCHARM_Set_stack_size(int newStackSize)
 {
 	TCHARMAPI("TCHARM_Set_stack_size");
 	g_tcharmOptions.stackSize=newStackSize;
 }
-FDECL void FTN_NAME(TCHARM_SET_STACK_SIZE,tcharm_set_stack_size)
+FLINKAGE void FTN_NAME(TCHARM_SET_STACK_SIZE,tcharm_set_stack_size)
 	(int *newSize)
 { TCHARM_Set_stack_size(*newSize); }
 
-CDECL void TCHARM_Set_exit() { g_tcharmOptions.exitWhenDone=true; }
+CLINKAGE void TCHARM_Set_exit() { g_tcharmOptions.exitWhenDone=true; }
 
 /*Create a new array of threads, which will be bound to by subsequent libraries*/
-CDECL void TCHARM_Create(int nThreads,
+CLINKAGE void TCHARM_Create(int nThreads,
 			int threadFn)
 {
 	TCHARMAPI("TCHARM_Create");
 	TCHARM_Create_data(nThreads,
 			 threadFn,NULL,0);
 }
-FDECL void FTN_NAME(TCHARM_CREATE,tcharm_create)
+FLINKAGE void FTN_NAME(TCHARM_CREATE,tcharm_create)
 	(int *nThreads,int threadFn)
 { TCHARM_Create(*nThreads,threadFn); }
 
 static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg);
 
 /*As above, but pass along (arbitrary) data to threads*/
-CDECL void TCHARM_Create_data(int nThreads,
+CLINKAGE void TCHARM_Create_data(int nThreads,
 		  int threadFn,
 		  void *threadData,int threadDataLen)
 {
@@ -685,7 +685,7 @@ CDECL void TCHARM_Create_data(int nThreads,
 	g_tcharmOptions=TCHARM_Thread_options(1);
 }
 
-FDECL void FTN_NAME(TCHARM_CREATE_DATA,tcharm_create_data)
+FLINKAGE void FTN_NAME(TCHARM_CREATE_DATA,tcharm_create_data)
 	(int *nThreads,
 		  int threadFn,
 		  void *threadData,int *threadDataLen)
@@ -756,20 +756,20 @@ void TCHARM_Suspend() {
 /***********************************
 Callable from worker thread
 */
-CDECL int TCHARM_Element()
+CLINKAGE int TCHARM_Element()
 { 
 	TCHARMAPI("TCHARM_Element");
 	return TCharm::get()->getElement();
 }
-CDECL int TCHARM_Num_elements()
+CLINKAGE int TCHARM_Num_elements()
 { 
 	TCHARMAPI("TCHARM_Num_elements");
 	return TCharm::get()->getNumElements();
 }
 
-FDECL int FTN_NAME(TCHARM_ELEMENT,tcharm_element)()
+FLINKAGE int FTN_NAME(TCHARM_ELEMENT,tcharm_element)()
 { return TCHARM_Element();}
-FDECL int FTN_NAME(TCHARM_NUM_ELEMENTS,tcharm_num_elements)()
+FLINKAGE int FTN_NAME(TCHARM_NUM_ELEMENTS,tcharm_num_elements)()
 { return TCHARM_Num_elements();}
 
 //Make sure this address will migrate with us when we move:
@@ -788,13 +788,13 @@ static void checkAddress(void *data)
 }
 
 /* Old "register"-based userdata: */
-CDECL int TCHARM_Register(void *data,TCHARM_Pup_fn pfn)
+CLINKAGE int TCHARM_Register(void *data,TCHARM_Pup_fn pfn)
 { 
 	TCHARMAPI("TCHARM_Register");
 	checkAddress(data);
 	return TCharm::get()->add(TCharm::UserData(pfn,TCharm::get()->getThread(),data));
 }
-FDECL int FTN_NAME(TCHARM_REGISTER,tcharm_register)
+FLINKAGE int FTN_NAME(TCHARM_REGISTER,tcharm_register)
 	(void *data,TCHARM_Pup_fn pfn)
 { 
 	TCHARMAPI("TCHARM_Register");
@@ -802,16 +802,16 @@ FDECL int FTN_NAME(TCHARM_REGISTER,tcharm_register)
 	return TCharm::get()->add(TCharm::UserData(pfn,TCharm::get()->getThread(),data));
 }
 
-CDECL void *TCHARM_Get_userdata(int id)
+CLINKAGE void *TCHARM_Get_userdata(int id)
 {
 	TCHARMAPI("TCHARM_Get_userdata");
 	return TCharm::get()->lookupUserData(id);
 }
-FDECL void *FTN_NAME(TCHARM_GET_USERDATA,tcharm_get_userdata)(int *id)
+FLINKAGE void *FTN_NAME(TCHARM_GET_USERDATA,tcharm_get_userdata)(int *id)
 { return TCHARM_Get_userdata(*id); }
 
 /* New hardcoded-ID userdata: */
-CDECL void TCHARM_Set_global(int globalID,void *new_value,TCHARM_Pup_global_fn pup_or_NULL)
+CLINKAGE void TCHARM_Set_global(int globalID,void *new_value,TCHARM_Pup_global_fn pup_or_NULL)
 {
 	TCHARMAPI("TCHARM_Set_global");
 	TCharm *tc=TCharm::get();
@@ -822,7 +822,7 @@ CDECL void TCHARM_Set_global(int globalID,void *new_value,TCHARM_Pup_global_fn p
 	}
 	tc->sud[globalID]=TCharm::UserData(pup_or_NULL,tc->getThread(),new_value);
 }
-CDECL void *TCHARM_Get_global(int globalID)
+CLINKAGE void *TCHARM_Get_global(int globalID)
 {
 	//Skip TCHARMAPI("TCHARM_Get_global") because there's no dynamic allocation here,
 	// and this routine should be as fast as possible.
@@ -831,7 +831,7 @@ CDECL void *TCHARM_Get_global(int globalID)
 	return v[globalID].getData();
 }
 
-CDECL void TCHARM_Migrate()
+CLINKAGE void TCHARM_Migrate()
 {
 	TCHARMAPI("TCHARM_Migrate");
 	if (CthMigratable() == 0) {
@@ -843,28 +843,28 @@ CDECL void TCHARM_Migrate()
 }
 FORTRAN_AS_C(TCHARM_MIGRATE,TCHARM_Migrate,tcharm_migrate,(void),())
 
-CDECL void TCHARM_Async_Migrate()
+CLINKAGE void TCHARM_Async_Migrate()
 {
 	TCHARMAPI("TCHARM_Async_Migrate");
 	TCharm::get()->async_migrate();
 }
 FORTRAN_AS_C(TCHARM_ASYNC_MIGRATE,TCHARM_Async_Migrate,tcharm_async_migrate,(void),())
 
-CDECL void TCHARM_Allow_Migrate()
+CLINKAGE void TCHARM_Allow_Migrate()
 {
 	TCHARMAPI("TCHARM_Allow_Migrate");
 	TCharm::get()->allow_migrate();
 }
 FORTRAN_AS_C(TCHARM_ALLOW_MIGRATE,TCHARM_Allow_Migrate,tcharm_allow_migrate,(void),())
 
-CDECL void TCHARM_Migrate_to(int destPE)
+CLINKAGE void TCHARM_Migrate_to(int destPE)
 {
 	TCHARMAPI("TCHARM_Migrate_to");
 	TCharm::get()->migrateTo(destPE);
 }
 
 #if CMK_FAULT_EVAC
-CDECL void TCHARM_Evacuate()
+CLINKAGE void TCHARM_Evacuate()
 {
 	TCHARMAPI("TCHARM_Migrate_to");
 	TCharm::get()->evacuate();
@@ -874,21 +874,21 @@ CDECL void TCHARM_Evacuate()
 FORTRAN_AS_C(TCHARM_MIGRATE_TO,TCHARM_Migrate_to,tcharm_migrate_to,
 	(int *destPE),(*destPE))
 
-CDECL void TCHARM_Yield()
+CLINKAGE void TCHARM_Yield()
 {
 	TCHARMAPI("TCHARM_Yield");
 	TCharm::get()->schedule();
 }
 FORTRAN_AS_C(TCHARM_YIELD,TCHARM_Yield,tcharm_yield,(void),())
 
-CDECL void TCHARM_Barrier()
+CLINKAGE void TCHARM_Barrier()
 {
 	TCHARMAPI("TCHARM_Barrier");
 	TCharm::get()->barrier();
 }
 FORTRAN_AS_C(TCHARM_BARRIER,TCHARM_Barrier,tcharm_barrier,(void),())
 
-CDECL void TCHARM_Done(int exitcode)
+CLINKAGE void TCHARM_Done(int exitcode)
 {
 	TCHARMAPI("TCHARM_Done");
 	TCharm *c=TCharm::getNULL();
@@ -898,7 +898,7 @@ CDECL void TCHARM_Done(int exitcode)
 FORTRAN_AS_C(TCHARM_DONE,TCHARM_Done,tcharm_done,(int *exitcode),(*exitcode))
 
 
-CDECL double TCHARM_Wall_timer()
+CLINKAGE double TCHARM_Wall_timer()
 {
   TCHARMAPI("TCHARM_Wall_timer");
   TCharm *c=TCharm::getNULL();
@@ -912,12 +912,12 @@ CDECL double TCHARM_Wall_timer()
 /*Include Fortran-style "iargc" and "getarg" routines.
 These are needed to get access to the command-line arguments from Fortran.
 */
-FDECL int FTN_NAME(TCHARM_IARGC,tcharm_iargc)() {
+FLINKAGE int FTN_NAME(TCHARM_IARGC,tcharm_iargc)() {
   TCHARMAPI("tcharm_iargc");
   return CkGetArgc()-1;
 }
 
-FDECL void FTN_NAME(TCHARM_GETARG,tcharm_getarg)
+FLINKAGE void FTN_NAME(TCHARM_GETARG,tcharm_getarg)
 	(int *i_p,char *dest,int destLen)
 {
   TCHARMAPI("tcharm_getarg");
@@ -933,14 +933,14 @@ FDECL void FTN_NAME(TCHARM_GETARG,tcharm_getarg)
 
 //These silly routines are used for serial startup:
 extern void _initCharm(int argc, char **argv);
-CDECL void TCHARM_Init(int *argc,char ***argv) {
+CLINKAGE void TCHARM_Init(int *argc,char ***argv) {
 	if (!tcharm_initted) {
 	  ConverseInit(*argc, *argv, (CmiStartFn) _initCharm,1,1);
 	  _initCharm(*argc,*argv);
 	}
 }
 
-FDECL void FTN_NAME(TCHARM_INIT,tcharm_init)()
+FLINKAGE void FTN_NAME(TCHARM_INIT,tcharm_init)()
 {
 	int argc=1;
 	const char *argv_sto[2]={"foo",NULL};
@@ -1039,7 +1039,7 @@ passing the request out of the thread to our array element
 before calling system().
 */
 
-CDECL int 
+CLINKAGE int
 TCHARM_System(const char *shell_command)
 {
 	return TCharm::get()->system(shell_command);

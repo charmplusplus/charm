@@ -430,8 +430,8 @@ public:
 #define TCHARMAPI(routineName) TCHARM_API_TRACE(routineName,"tcharm");
 
 //Node setup callbacks: called at startup on each node
-FDECL void FTN_NAME(TCHARM_USER_NODE_SETUP,tcharm_user_node_setup)(void);
-FDECL void FTN_NAME(TCHARM_USER_SETUP,tcharm_user_setup)(void);
+FLINKAGE void FTN_NAME(TCHARM_USER_NODE_SETUP,tcharm_user_node_setup)(void);
+FLINKAGE void FTN_NAME(TCHARM_USER_SETUP,tcharm_user_setup)(void);
 
 
 #endif
