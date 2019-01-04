@@ -39,7 +39,7 @@ FILE *debugLog = NULL;
 
 #if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
 #include "PPCAtomicQueue.h"
-#include "memalloc.c"
+#include "memalloc.C"
 #endif
 
 #if CMK_SMP && CMK_PPC_ATOMIC_MUTEX
@@ -180,9 +180,9 @@ int Cmi_commthread = 0;
 CMI_EXTERNC
 void PerrorExit (const char *err);
 
-#include "machine-smp.c"
+#include "machine-smp.C"
 CsvDeclare(CmiNodeState, NodeState);
-#include "immediate.c"
+#include "immediate.C"
 
 #if CMK_ENABLE_ASYNC_PROGRESS  
 //Immediate messages not supported yet
@@ -1916,7 +1916,7 @@ int CmiRankOf(int pe)      {
 }
 
 
-/* optional, these functions are implemented in "machine-smp.c", so including
+/* optional, these functions are implemented in "machine-smp.C", so including
    this file avoid the necessity to reimplement them.
  */
 void CmiNodeBarrier(void);

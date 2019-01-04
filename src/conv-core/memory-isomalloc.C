@@ -10,7 +10,7 @@ NOTE: isomalloc is threadsafe, so the isomallocs are not wrapped in CmiMemLock.
 
 #if ! CMK_MEMORY_BUILD_OS
 /* Use Gnumalloc as meta-meta malloc fallbacks (mm_*) */
-#include "memory-gnu.c"
+#include "memory-gnu.C"
 #endif
 
 #include "memory-isomalloc.h"

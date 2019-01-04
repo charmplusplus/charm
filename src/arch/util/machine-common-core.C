@@ -207,7 +207,7 @@ std::atomic<int> commThdExit {0};
 /**
  *  The macro defines whether to have a comm thd to offload some
  *  work such as forwarding bcast messages etc. This macro
- *  should be defined before including "machine-smp.c". Note
+ *  should be defined before including "machine-smp.C". Note
  *  that whether a machine layer in SMP mode could run w/o comm
  *  thread depends on the support of the underlying
  *  communication library.
@@ -320,7 +320,7 @@ static char *CopyMsg(char *msg, int len);
 
 /* ===== End of Common Function Declarations ===== */
 
-#include "machine-smp.c"
+#include "machine-smp.C"
 
 /* ===== Beginning of Idle-state Related Declarations =====  */
 typedef struct {
@@ -440,13 +440,13 @@ CmiCommHandle CmiInterSendNetworkFunc(int destPE, int partition, int size, char 
 
 /* ===== End of Processor/Node State-related Stuff =====*/
 
-#include "machine-broadcast.c"
-#include "immediate.c"
-#include "machine-commthd-util.c"
+#include "machine-broadcast.C"
+#include "immediate.C"
+#include "machine-commthd-util.C"
 #if CMK_USE_CMA
 // cma_min_thresold and cma_max_threshold specify the range of sizes between which CMA will be used for SHM messaging
 int cma_works, cma_reg_msg, cma_min_threshold, cma_max_threshold;
-#include "machine-cma.c"
+#include "machine-cma.C"
 int CmiDoesCMAWork() {
   return cma_works;
 }
@@ -609,10 +609,10 @@ void CmiInterSyncSendFn(int destPE, int partition, int size, char *msg) {
 }
 
 #if CMK_USE_PXSHM
-#include "machine-pxshm.c"
+#include "machine-pxshm.C"
 #endif
 #if CMK_USE_XPMEM
-#include "machine-xpmem.c"
+#include "machine-xpmem.C"
 #endif
 
 static int refcount = 0;

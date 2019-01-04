@@ -2,6 +2,6 @@
 
 LIBCONV_UTIL := ${LIBCONV_UTIL} cmimemcpy_qpx.o
 
-cmimemcpy_qpx.o: cmimemcpy_qpx.c cmimemcpy_qpx.h
+cmimemcpy_qpx.o: cmimemcpy_qpx.C cmimemcpy_qpx.h
 cmimemcpy_qpx.o: CFLAGS:=${CFLAGS} -O3
 

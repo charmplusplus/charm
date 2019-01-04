@@ -13,8 +13,8 @@
 //#define EXTERNAL_COMPRESS 1
 //#if EXTERNAL_COMPRESS
 //#else
-#include "compress.c"
-#include "compress-external.c"
+#include "compress.C"
+#include "compress-external.C"
 //#endif
 #include "machine-persistent.h"
 #define ENVELOP_SIZE 104

@@ -15,7 +15,7 @@
 #define CMK_MULTICAST_LIST_USE_COMMON_CODE                 1
 #define CMK_MULTICAST_GROUP_USE_COMMON_CODE                1
 
-/* the first 4 fields of the header are defined in machine-dgram.c
+/* the first 4 fields of the header are defined in machine-dgram.C
    and are used for the udp retransmission protocol implementation.
    The parameter root is for the communication library and is used in
    broadcast. Stratid was a field used previously for the strategy id

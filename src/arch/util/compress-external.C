@@ -1,5 +1,5 @@
-#include "zlib-compress.c"
-//#include "quicklz-compress.c"
+#include "zlib-compress.C"
+//#include "quicklz-compress.C"
 #include "lz4.h"
 static int compress_mode;
 #define     CMODE_NOCOMPRESS 0

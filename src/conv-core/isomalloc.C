@@ -2232,7 +2232,7 @@ void CmiIsomallocInit(char **argv)
 }
 
 /***************** BlockList interface *********
-  This was moved here from memory-isomalloc.c when it 
+  This was moved here from memory-isomalloc.C when it
   was realized that a list-of-isomalloc'd-blocks is useful for
   more than just isomalloc heaps.
   */

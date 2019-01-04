@@ -281,7 +281,7 @@ struct infiAddr {
 };
 
 /**
- Stored in the OtherNode structure in machine-dgram.c 
+ Stored in the OtherNode structure in machine-dgram.C
  Store the per node data for ibverbs layer
 */
 enum { INFI_HEADER_DATA=21,INFI_DATA};
@@ -2953,7 +2953,7 @@ void  LrtsBeginIdle(void) {}
 void  LrtsStillIdle(void) {}
 
 #if CMK_ONESIDED_IMPL
-#include "machine-onesided.c"
+#include "machine-onesided.C"
 #endif
 
 /*void processDirectRequest(struct infiDirectRequestPacket *directRequestPacket){

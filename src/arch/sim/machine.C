@@ -382,8 +382,8 @@ void CmiDestroyLock(CmiNodeLock lk)
 }
 
 #include "ext_func.h"
-#include "sim.c"
-#include "heap.c"
-#include "net.c"
-#include "simqmng.c"
-#include "simrand.c"
+#include "sim.C"
+#include "heap.C"
+#include "net.C"
+#include "simqmng.C"
+#include "simrand.C"

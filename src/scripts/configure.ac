@@ -2242,7 +2242,7 @@ fi
 
 #### check if glibc backtrace exists ####
 cat > $t <<EOT
-#include "cmibacktrace.c"
+#include "cmibacktrace.C"
 
 int main() {
 	int nLevels=1;

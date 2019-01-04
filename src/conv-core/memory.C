@@ -11,7 +11,7 @@
  can link in whichever is best using the -memory option with charmc.
 
  The major possibilities here are empty (use the system's malloc),
- GNU (use memory-gnu.c), and meta (use e.g. memory-paranoid.c).
+ GNU (use memory-gnu.C), and meta (use e.g. memory-paranoid.C).
  On machines without sbrk(), only the system's malloc is available.
 
  The CMK_MEMORY_BUILD_* symbols come in from the compiler command line.
@@ -335,27 +335,27 @@ static void (*old_free_hook) (void*, const void*);
 #endif /* CMK_MEMORY_BUILD_GNU_HOOKS */
 
 #if CMK_MEMORY_BUILD_VERBOSE
-#include "memory-verbose.c"
+#include "memory-verbose.C"
 #endif
 
 #if CMK_MEMORY_BUILD_PARANOID
-#include "memory-paranoid.c"
+#include "memory-paranoid.C"
 #endif
 
 #if CMK_MEMORY_BUILD_LEAK
-#include "memory-leak.c"
+#include "memory-leak.C"
 #endif
 
 #if CMK_MEMORY_BUILD_ISOMALLOC
-#include "memory-isomalloc.c"
+#include "memory-isomalloc.C"
 #endif
 
 #if CMK_MEMORY_BUILD_LOCK
-#include "memory-lock.c"
+#include "memory-lock.C"
 #endif
 
 #if CMK_MEMORY_BUILD_CHARMDEBUG
-#include "memory-charmdebug.c"
+#include "memory-charmdebug.C"
 #endif
 
 #if CMK_MEMORY_BUILD_GNU_HOOKS
@@ -649,7 +649,7 @@ void CmiResetMinMemory(void) {}
 #define meta_valloc   mm_valloc
 #define meta_pvalloc  mm_pvalloc
 
-#include "memory-gnu.c"
+#include "memory-gnu.C"
 static void meta_init(char **argv) {
   if (CmiMyRank()==0) CmiMemoryIs_flag |= CMI_MEMORY_IS_GNU;
 }
@@ -660,29 +660,29 @@ static void meta_init(char **argv) {
 #define AFTER_MALLOC_CALL    /*empty*/
 
 #if CMK_MEMORY_BUILD_VERBOSE
-#include "memory-verbose.c"
+#include "memory-verbose.C"
 #endif
 
 #if CMK_MEMORY_BUILD_PARANOID
-#include "memory-paranoid.c"
+#include "memory-paranoid.C"
 #endif
 
 #if CMK_MEMORY_BUILD_LEAK
-#include "memory-leak.c"
+#include "memory-leak.C"
 #endif
 
 #if CMK_MEMORY_BUILD_ISOMALLOC
-#include "memory-isomalloc.c"
+#include "memory-isomalloc.C"
 #endif
 
 #if CMK_MEMORY_BUILD_CHARMDEBUG
-#include "memory-charmdebug.c"
+#include "memory-charmdebug.C"
 #endif
 
 /*A trivial sample implementation of the meta_* calls:*/
 #if 0
 /* Use Gnumalloc as meta-meta malloc fallbacks (mm_*) */
-#include "memory-gnu.c"
+#include "memory-gnu.C"
 static void meta_init(char **argv)
 {
 

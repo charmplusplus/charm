@@ -1,10 +1,10 @@
 /*
 This version of ptmalloc3 is hacked in following ways:
-   - Renamed to file memory-gnu.c
+   - Renamed to file memory-gnu.C
    - Use mm_* routine names, as defined below.
    - Add UPDATE_MEMUSAGE
    - Add definitions for ONLY_MSPACES, MSPACES, USE_LOCKS
-   - Rename malloc.c to memory-gnu-internal.c and include here
+   - Rename malloc.c to memory-gnu-internal.C and include here
    - Merge thread files to generate  memory-gnu-threads.h
 */
 
@@ -84,7 +84,7 @@ PERFORMANCE OF THIS SOFTWARE.
 
 /* The following section is replicated from malloc.c */
 
-#include "memory-gnu-internal.c"
+#include "memory-gnu-internal.C"
 
 /* head field is or'ed with NON_MAIN_ARENA if the chunk was obtained
 from a non-main arena.  This is only set immediately before handing

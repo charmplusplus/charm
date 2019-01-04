@@ -1,6 +1,6 @@
 /*
  * Filippo's charm debug memory module, gioachin@uiuc.edu, 2005/10
- * based on Orion's memory-leak.c
+ * based on Orion's memory-leak.C
  *
  * This special version of malloc() and company is meant to be used in
  * conjunction with the parallel debugger CharmDebug.
@@ -14,7 +14,7 @@
 
 #if ! CMK_MEMORY_BUILD_OS
 /* Use Gnumalloc as meta-meta malloc fallbacks (mm_*) */
-#include "memory-gnu.c"
+#include "memory-gnu.C"
 #endif
 #include "tracec.h"
 #include <sys/mman.h>

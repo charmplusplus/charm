@@ -8,7 +8,7 @@ Orion Sky Lawlor, olawlor@acm.org, 6/22/2001
 
 #if ! CMK_MEMORY_BUILD_OS
 /* Use Gnumalloc as meta-meta malloc fallbacks (mm_*) */
-#include "memory-gnu.c"
+#include "memory-gnu.C"
 #endif
 
 static int memInit=0;
