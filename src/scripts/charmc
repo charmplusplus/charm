@@ -796,7 +796,7 @@ do
 		shift
 		;;
 
-	-l*|*.a)
+	-l*|*.a|*.so|*.so.*|*.dylib)
 		if [ -n "$POST_LANGUAGE" ]
 		then
 			POST_LIBRARIES="$POST_LIBRARIES $arg"
@@ -903,10 +903,6 @@ do
 
 	case "$FILE" in
 	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co)
-		# make sure to link against shared charm library if creating a shared object:
-		case "$FILE" in
-			*.so|*.so.*|*.dylib) CHARM_SHARED=1 ;;
-		esac
 		OBJECTFILES="$OBJECTFILES $FILE"
 		;;
 	*.c|*.s|*.S|*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu|*.f|*.F|*.f77|*.F77|*.f90|*.F90|*.fpp|*.FPP)
