@@ -49,7 +49,7 @@ inline void getPossiblePes(vector<int>& possible_pes, int randomly_obj_id,
 double upper_threshold;
 double lower_threshold;
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(CommAwareRefineLB, "always assign the heaviest obj onto lightest loaded processor.")
 

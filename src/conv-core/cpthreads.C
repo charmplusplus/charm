@@ -586,7 +586,7 @@ int Cpthread_init(void)
   return 0;
 }
 
-void CpthreadModuleInit(void)
+extern "C" void CpthreadModuleInit(void)
 {
   CtvInitialize(Cpthread_t, Cpthread_current);
   CtvInitialize(int,        Cpthread_errcode);

@@ -728,7 +728,6 @@ static IndexPool  persistPool;
 #define CHARM_MAGIC_NUMBER               126
 
 #if CMK_ERROR_CHECKING
-CMI_EXTERNC
 unsigned char computeCheckSum(unsigned char *data, int len);
 static int checksum_flag = 0;
 #define CMI_SET_CHECKSUM(msg, len)      \
@@ -3936,7 +3935,7 @@ void LrtsPreCommonInit(int everReturn){
 #endif
 }
 
-CMI_EXTERNC_VARIABLE int quietMode;
+extern int quietMode;
 
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
@@ -4258,7 +4257,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #endif
 }
 
-CMI_EXTERNC
 void* LrtsRdmaAlloc(int n_bytes, int header)
 {
     void *ptr = NULL;
@@ -4289,7 +4287,6 @@ void* LrtsRdmaAlloc(int n_bytes, int header)
     return ptr;
 }
 
-CMI_EXTERNC
 void  LrtsRdmaFree(void *msg)
 {
     int headersize = sizeof(CmiChunkHeader);
@@ -4318,7 +4315,6 @@ void  LrtsRdmaFree(void *msg)
     }
 }
 
-CMI_EXTERNC
 void* LrtsAlloc(int n_bytes, int header)
 {
     void *ptr = NULL;
@@ -4358,7 +4354,6 @@ void* LrtsAlloc(int n_bytes, int header)
     return ptr;
 }
 
-CMI_EXTERNC
 void  LrtsFree(void *msg)
 {
     int headersize = sizeof(CmiChunkHeader);

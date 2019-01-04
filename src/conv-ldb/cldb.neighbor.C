@@ -25,11 +25,10 @@ typedef struct CldProcInfo_s {
   int    idleprocEvt;		/* user event for processing idle req */
 } *CldProcInfo;
 
-CMI_EXTERNC_VARIABLE char *_lbtopo;			/* topology name string */
+extern char *_lbtopo;			/* topology name string */
 int _lbsteal = 0;                       /* work stealing flag */
 
-CMI_EXTERNC
-void gengraph(int, int, int, int *, int *);
+extern "C" void gengraph(int, int, int, int *, int *);
 
 CpvStaticDeclare(CldProcInfo, CldData);
 CpvStaticDeclare(int, CldLoadResponseHandlerIndex);

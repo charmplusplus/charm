@@ -12,7 +12,7 @@ load balancer around.
 
 #define NULLLB_CONVERSE                     1
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 void CreateNullLB(void) {
   // special seqno -1

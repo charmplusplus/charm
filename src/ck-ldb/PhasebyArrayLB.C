@@ -7,7 +7,7 @@
 
 extern LBAllocFn getLBAllocFn(const char *lbname);
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(PhasebyArrayLB, "Load balancer which balances many arrays together, specifically for CPAIMD")
 

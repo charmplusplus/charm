@@ -53,6 +53,10 @@ typedef struct ncpystruct{
 
 }NcpyOperationInfo;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int getNcpyOpInfoTotalSize(
   int srcLayerSize,
   int srcAckSize,
@@ -85,4 +89,9 @@ void setNcpyOpInfo(
 void resetNcpyOpInfoPointers(NcpyOperationInfo *ncpyOpInfo);
 
 void setReverseModeForNcpyOpInfo(NcpyOperationInfo *ncpyOpInfo);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif

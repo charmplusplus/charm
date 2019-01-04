@@ -15,7 +15,7 @@ Modified from the original: changed output format, and converted main to a param
 #include "converse.h"
 #include "graphdefs.h"
 
-int addEdge(VerticesListType *graph, EdgeListType *l,int fm,int to);
+void addEdge(VerticesListType *graph, EdgeListType *l,int fm,int to);
 void addspEdge(VerticesListType *graph, EdgeListType *, int, int);
 int edgeExists(VerticesListType *graph, int fm, int to);
 static Q * makeQueue(void);
@@ -30,6 +30,8 @@ int C; /* no. of connections per vertex */
 VerticesListType * InitVertices(EdgeListType * EdgeList, int V, int E);
 
 
+extern "C" void gengraph(int, int, int, int *, int *, int);
+
 /* For testing... 
 int main(int argc, char **argv)
 {
@@ -43,7 +45,6 @@ static void initGraph(VerticesListType *graph);
 static void diameter(VerticesListType *graph);
 static void AddEdges(VerticesListType *graph, EdgeListType *EdgeList, int V, int n);
 
-CMI_EXTERNC
 void gengraph(int pV, int pC, int pseed, int *pes, int *npe, int tofile)
 { int i;
   VerticesListType graph;

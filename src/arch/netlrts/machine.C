@@ -217,7 +217,7 @@ int printf(const char *fmt, ...) {
 static int        Cmi_charmrun_pid;
 static int        Cmi_charmrun_fd = -1;
 
-CMI_EXTERNC_VARIABLE int quietMode;
+extern int quietMode;
 
 /******************* Producer-Consumer Queues ************************/
 #include "pcqueue.h"
@@ -316,7 +316,6 @@ static int already_in_signal_handler=0;
 
 static void CmiDestroyLocks(void);
 
-CMI_EXTERNC
 void EmergencyExit(void);
 void MachineExit(void);
 
@@ -629,7 +628,7 @@ int    Cmi_myoldpe = 0;
 static int Cmi_charmrun_assigned_pe;
 #endif
 
-CMI_EXTERNC_VARIABLE int    CmiMyLocalRank;
+extern int    CmiMyLocalRank;
 
 #if ! defined(_WIN32)
 /* parse forks only used in non-smp mode */
@@ -918,7 +917,6 @@ static void CommunicationInterrupt(int ignored)
   MACHSTATE(2,"--END SIGIO--")
 }
 
-CMI_EXTERNC
 void CmiSignal(int sig1, int sig2, int sig3, void (*handler)(int));
 
 static void CmiDestroyLocks(void)

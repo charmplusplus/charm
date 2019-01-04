@@ -17,7 +17,6 @@ CpvExtern(int, _traceCoreOn);   /* For cursed projector core */
 int _threadEP=-123; /* for charmProjections.C */
 int traceBluegeneLinked = 0;
 
-CMI_EXTERNC
 void traceInit(char **argv) {
   CpvInitialize(int, traceOn);
   CpvAccess(traceOn)=0;
@@ -30,11 +29,8 @@ void traceInit(char **argv) {
 void traceMessageRecv(char *msg, int pe) {}
 void traceBeginIdle(void) {}
 void traceEndIdle(void) {}
-CMI_EXTERNC
 void traceResume(int event, int srcPE, CmiObjId *t) {}
-CMI_EXTERNC
 void traceSuspend(void) {}
-CMI_EXTERNC
 void traceAwaken(CthThread t) {}
 void traceUserEvent(int i) {}
 void traceUserBracketEvent(int a, double b, double c) {}
@@ -44,7 +40,6 @@ int traceRegisterUserStat(const char* evt, int e) { return -1; }
 void updateStatPair(int e, double stat, double time) {}
 void updateStat(int e, double stat) {}
 
-CMI_EXTERNC
 void traceClose(void) {}
 void traceCharmClose(void) {}
 void traceBegin(void) {}
@@ -73,9 +68,7 @@ void traceSetMsgID(char *msg, int pe, int event) {}
 
 /* This routine, included in Charm++ programs from init.C, needs to be present in converse as well.
    Here is a place where it gets included only in converse, and not in Charm++ (thus not generating conflicts). */
-CMI_EXTERNC
 void EmergencyExit(void) {}
-CMI_EXTERNC
 void CpdEndConditionalDeliver_master(void) {}
 
 

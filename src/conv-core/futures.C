@@ -116,7 +116,7 @@ void CfutureDestroy(Cfuture f)
   free(f.data);
 }
 
-void CfutureModuleInit(void)
+extern "C" void CfutureModuleInit(void)
 {
   CpvInitialize(int, CfutureStoreIndex);
   CpvAccess(CfutureStoreIndex) = CmiRegisterHandler((CmiHandler)CfutureStore);

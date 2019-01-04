@@ -14,7 +14,7 @@
 
 #define LOAD_OFFSET 0.05
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(GreedyAgentLB,"always assign the heaviest obj onto lightest loaded processor taking into account the topology")
 

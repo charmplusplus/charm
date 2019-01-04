@@ -15,7 +15,7 @@
 #include "ckgraph.h"
 #include <queue>
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(GraphBFTLB, "Algorithm which does breadth first traversal for communication aware load balancing")
 

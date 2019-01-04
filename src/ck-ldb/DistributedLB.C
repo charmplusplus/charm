@@ -7,7 +7,7 @@
 
 #include "elements.h"
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(DistributedLB, "The distributed load balancer")
 

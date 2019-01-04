@@ -283,7 +283,6 @@ static void reportMsgHistogramInfo(void);
 #define CHARM_MAGIC_NUMBER		 126
 
 #if CMK_ERROR_CHECKING
-CMI_EXTERNC
 unsigned char computeCheckSum(unsigned char *data, int len);
 static int checksum_flag = 0;
 #define CMI_SET_CHECKSUM(msg, len)	\
@@ -1217,7 +1216,6 @@ void CmiNotifyIdleForMPI(void) {
 /* Network progress function is used to poll the network when for
    messages. This flushes receive buffers on some  implementations*/
 #if CMK_MACHINE_PROGRESS_DEFINED
-CMI_EXTERNC
 void CommunicationServerThread(int);
 
 void CmiMachineProgressImpl(void) {
@@ -1369,7 +1367,7 @@ static const char *thread_level_tostring(int thread_level) {
 #endif
 }
 
-CMI_EXTERNC_VARIABLE int quietMode;
+extern int quietMode;
 
 /**
  *  Obtain the number of nodes, my node id, and consuming machine layer

@@ -12,11 +12,8 @@
 int               userDrivenMode; /* Set by CharmInit for interop in user driven mode */
 std::atomic<int> ckExitComplete {0};
 
-CMI_EXTERNC
 void CthInit(char **);
-CMI_EXTERNC
 void ConverseCommonInit(char **);
-CMI_EXTERNC
 void ConverseCommonExit(void);
 
 /***********************************************************************

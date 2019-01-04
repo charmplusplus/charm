@@ -19,7 +19,7 @@
 //#define RAND_COMM
 #define make_mapping 0
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(TopoCentLB,"Balance objects based on the network topology")
 

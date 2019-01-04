@@ -20,7 +20,7 @@
 #define VACATE_AFTER 30
 #define UNVACATE_AFTER 15
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(WSLB, "Workstation load balancer")
 

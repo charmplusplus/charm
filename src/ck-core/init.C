@@ -176,7 +176,7 @@ extern int userDrivenMode;
 extern void _libExitHandler(envelope *env);
 extern int _libExitHandlerIdx;
 CpvCExtern(int,interopExitFlag);
-extern "C" void StopInteropScheduler();
+void StopInteropScheduler();
 
 #if CMK_SHRINK_EXPAND
 //for shrink expand cleanup
@@ -243,8 +243,8 @@ void processRaiseEvacFile(char *raiseEvacFile);
 
 extern bool useNodeBlkMapping;
 
-CMI_EXTERNC_VARIABLE int quietMode;
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietMode;
+extern int quietModeRequested;
 
 // Modules are required to register command line opts they will parse. These
 // options are stored in the _optSet, and then when parsing command line opts
@@ -584,7 +584,7 @@ extern void _messageLoggingExit();
 
 #if __FAULT__
 //CpvExtern(int, CldHandlerIndex);
-//extern "C" void CldHandler(char *);
+//void CldHandler(char *);
 extern int index_skipCldHandler;
 extern void _skipCldHandler(void *converseMsg);
 
@@ -1084,7 +1084,6 @@ static void _initHandler(void *msg, CkCoreState *ck)
 }
 
 #if CMK_SHRINK_EXPAND
-extern "C"
 void CkCleanup()
 {
 	// always send to PE 0
@@ -1132,7 +1131,6 @@ void CkContinueExit()
    Tear down structures that must be cleaned up even when unclean exit happens.
    It is called by the machine layer whenever some problem occurs (it is thus up
    to the machine layer to call this function). */
-extern "C"
 void EmergencyExit(void) {
 #ifndef __BIGSIM__
   /* Delete _coreState to force any CkMessageWatcher to close down. */
@@ -1170,12 +1168,12 @@ extern void _initChareTables();
 extern void init_memcheckpt(char **argv);
 #endif
 extern "C" void initCharmProjections();
-extern "C" void CmiInitCPUTopology(char **argv);
-extern "C" void CmiCheckAffinity();
-extern "C" void CmiInitMemAffinity(char **argv);
-extern "C" void CmiInitPxshm(char **argv);
+void CmiInitCPUTopology(char **argv);
+void CmiCheckAffinity();
+void CmiInitMemAffinity(char **argv);
+void CmiInitPxshm(char **argv);
 
-//extern "C" void CldCallback();
+//void CldCallback();
 
 void _registerInitCall(CkInitCallFn fn, int isNodeCall)
 {
@@ -1200,11 +1198,11 @@ void InitCallTable::enumerateInitCalls()
 }
 
 CpvCExtern(int, cpdSuspendStartup);
-extern "C" void CpdFreeze(void);
+void CpdFreeze(void);
 
 extern int _dummy_dq;
 
-extern "C" void initQd(char **argv)
+void initQd(char **argv)
 {
 	CpvInitialize(QdState*, _qd);
 	CpvAccess(_qd) = new QdState();

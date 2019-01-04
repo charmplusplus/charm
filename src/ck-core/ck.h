@@ -19,10 +19,10 @@
 #endif
 
 // Flag that tells the system if we are replaying using Record/Replay
-CMI_EXTERNC_VARIABLE int _replaySystem;
+extern int _replaySystem;
 
 #if CMK_CHARMDEBUG
-extern "C" int ConverseDeliver(int pe);
+int ConverseDeliver(int pe);
 inline void _CldEnqueue(int pe, void *msg, int infofn) {
   if (!ConverseDeliver(pe)) {
     CmiFree(msg);

@@ -5,7 +5,6 @@
 
 /*extern VerticesListType graph; */
 
-CMI_EXTERNC
 EdgeListType * InitEdgeList(int E)
 {
   EdgeListType * edgesRec;

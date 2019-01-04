@@ -3,22 +3,22 @@
 
 #include "converse.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* 
  * These functions are called from Converse, and should be provided C binding
  * by the tracing strategies.
  */
 
-CMI_EXTERNC
 void traceInit(char **argv);
 void traceCharmInit(char **argv);	/* init trace module in ck */
 void traceMessageRecv(char *msg, int pe);
 void traceBeginIdle(void);
 void traceEndIdle(void);
-CMI_EXTERNC
 void traceResume(int,int,CmiObjId *);
-CMI_EXTERNC
 void traceSuspend(void);
-CMI_EXTERNC
 void traceAwaken(CthThread t);
 void traceUserEvent(int);
 void beginAppWork(void);
@@ -59,9 +59,7 @@ void traceSetMsgID(char *msg, int pe, int event);
 /* Support for machine layers to register their user events to projections */
 void registerMachineUserEventsFunction(void (*eventRegistrationFunc)());
 
-CMI_EXTERNC
 void traceClose(void);
-CMI_EXTERNC
 void traceCharmClose(void);          /* close trace in ck */
 void traceBegin(void);
 void traceEnd(void);
@@ -106,6 +104,10 @@ int  traceAvailable(void);
 #define TRACE_COMM_SET_MSGID(msg, pe, event) 
 #define TRACE_COMM_GET_MSGID(msg, pe, event) 
 #define TRACE_COMM_SET_COMM_MSGID(msg)
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif

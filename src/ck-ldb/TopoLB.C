@@ -26,7 +26,7 @@ Date: 04/19/2005
 #define _DIJKSTRA_LIKE_ 0
 #define _INIT_FROM_FILE  
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(TopoLB,"TopoLB: Balance objects based on the network topology")
 

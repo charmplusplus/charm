@@ -85,10 +85,10 @@
 #include "machineEvents.h"     /* projector */
 #endif
 
-CMI_EXTERNC_VARIABLE const char * const CmiCommitID;
+extern const char * const CmiCommitID;
 
 #if CMI_QD
-CMI_EXTERNC void initQd(char **argv);
+void initQd(char **argv);
 #endif
 
 #if CMK_OUT_OF_CORE
@@ -106,10 +106,9 @@ CmiSwitchToPEFnPtr CmiSwitchToPE;
 #endif
 
 CpvExtern(int, _traceCoreOn);   /* projector */
-CMI_EXTERNC void CcdModuleInit(char **);
-CMI_EXTERNC
+void CcdModuleInit(char **);
 void CmiMemoryInit(char **);
-CMI_EXTERNC void CldModuleInit(char **);
+void CldModuleInit(char **);
 
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
 #include <sys/types.h>
@@ -158,8 +157,7 @@ struct envelope;
 void traceAddThreadListeners(CthThread tid, struct envelope *env);
 #endif
 
-CMI_EXTERNC void seedBalancerExit(void);
-CMI_EXTERNC
+void seedBalancerExit(void);
 void EmergencyExit(void);
 
 //int cur_restart_phase = 1;      /* checkpointing/restarting phase counter */
@@ -180,9 +178,7 @@ CpvDeclare(char *, _validProcessors);
 
 #if CMK_CUDA
 CpvExtern(int, n_hapi_events);
-CMI_EXTERNC
 void hapiPollEvents();
-CMI_EXTERNC
 void exitHybridAPI();
 #endif
 
@@ -214,7 +210,6 @@ CpvDeclare(int,expIOBufferSize);
 #endif
 
 #if CMK_NODE_QUEUE_AVAILABLE
-CMI_EXTERNC
 void  *CmiGetNonLocalNodeQ();
 #endif
 
@@ -238,23 +233,20 @@ CpvDeclare(int,   _urgentSend);
 CmiNodeLock _smp_mutex;               /* for smp */
 
 #if CMK_USE_IBVERBS | CMK_USE_IBUD
-CMI_EXTERNC
 void *infi_CmiAlloc(int size);
-CMI_EXTERNC
 void infi_CmiFree(void *ptr);
 void infi_freeMultipleSend(void *ptr);
-CMI_EXTERNC
 void infi_unregAndFreeMeta(void *ch);
 #endif
 
 #if CMK_SMP && CMK_BLUEGENEQ && SPECIFIC_PCQUEUE
-CMI_EXTERNC void * CmiAlloc_bgq (int     size);
-CMI_EXTERNC void   CmiFree_bgq  (void  * buf);
+void * CmiAlloc_bgq (int     size);
+void   CmiFree_bgq  (void  * buf);
 #endif
 
 #if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
-CMI_EXTERNC void * CmiAlloc_ppcq (int     size);
-CMI_EXTERNC void   CmiFree_ppcq  (void  * buf);
+void * CmiAlloc_ppcq (int     size);
+void   CmiFree_ppcq  (void  * buf);
 #endif
 
 #if CMK_GRID_QUEUE_AVAILABLE
@@ -263,10 +255,10 @@ CpvDeclare(Queue, CsdGridQueue);
 #endif
 
 #if CMK_CRAYXE || CMK_CRAYXC || CMK_OFI
-CMI_EXTERNC void* LrtsAlloc(int, int);
-CMI_EXTERNC void* LrtsRdmaAlloc(int, int);
-CMI_EXTERNC void  LrtsFree(void*);
-CMI_EXTERNC void  LrtsRdmaFree(void*);
+void* LrtsAlloc(int, int);
+void* LrtsRdmaAlloc(int, int);
+void  LrtsFree(void*);
+void  LrtsRdmaFree(void*);
 #endif
 
 CpvStaticDeclare(int, cmiMyPeIdle);
@@ -278,8 +270,7 @@ CpvDeclare(void *, CmiSuspendedTaskQueue);
 
 CpvDeclare(int, isHelperOn);
 
-CMI_EXTERNC_VARIABLE int CmiMyLocalRank;
-
+extern int CmiMyLocalRank;
 int    CmiMyLocalRank;        /* local rank only for scalable startup */
 
 #if CMK_LOCKLESS_QUEUE
@@ -1514,7 +1505,6 @@ int CmiLongSendQueue(int forNode,int longerThanBytes) {
 
 #if CMK_SIGNAL_USE_SIGACTION
 #include <signal.h>
-CMI_EXTERNC
 void CmiSignal(int sig1, int sig2, int sig3, void (*handler)(int))
 {
   struct sigaction in, out ;
@@ -1532,7 +1522,6 @@ void CmiSignal(int sig1, int sig2, int sig3, void (*handler)(int))
 
 #if CMK_SIGNAL_USE_SIGACTION_WITH_RESTART
 #include <signal.h>
-CMI_EXTERNC
 void CmiSignal(int sig1, int sig2, int sig3, void (*handler)(int))
 {
   struct sigaction in, out ;
@@ -2097,7 +2086,6 @@ CthThread CthSuspendSchedulingThread(void)
 }
 
 /* Notice: For changes to the following function, make sure the function CthResumeNormalThreadDebug is also kept updated. */
-CMI_EXTERNC
 void CthResumeNormalThread(CthThreadToken* token)
 {
   CthThread t = token->thread;
@@ -3648,14 +3636,14 @@ static void CIdleTimeoutInit(char **argv)
  *
  *****************************************************************************/
 
-CMI_EXTERNC void CrnInit(void);
-CMI_EXTERNC void CmiIsomallocInit(char **argv);
+void CrnInit(void);
+void CmiIsomallocInit(char **argv);
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
 void CmiIOInit(char **argv);
 #endif
 
 /* defined in cpuaffinity.C */
-CMI_EXTERNC void CmiInitCPUAffinityUtil(void);
+void CmiInitCPUAffinityUtil(void);
 
 static void CmiProcessPriority(char **argv)
 {
@@ -3773,13 +3761,13 @@ static void checkTSanOptions(void)
 #endif
 
 #if CMK_CCS_AVAILABLE
-CMI_EXTERNC_VARIABLE int ccsRunning;
+extern int ccsRunning;
 int ccsRunning;
 #endif
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 int quietModeRequested;  // user has requested quiet mode
-CMI_EXTERNC_VARIABLE int quietMode;
+extern int quietMode;
 int quietMode; // quiet mode active (CmiPrintf's are disabled)
 CmiSpanningTreeInfo* _topoTree = NULL;
 
@@ -3808,7 +3796,6 @@ CmiSpanningTreeInfo* _topoTree = NULL;
   won't work properly until they're initialized.  For example,
   nobody can register handlers before calling CmiHandlerInit.
 */
-CMI_EXTERNC
 void ConverseCommonInit(char **argv)
 {
   CpvInitialize(int, _urgentSend);
@@ -3909,7 +3896,6 @@ void ConverseCommonInit(char **argv)
 #endif
 }
 
-CMI_EXTERNC
 void ConverseCommonExit(void)
 {
   CcsImpl_kill();
@@ -4080,7 +4066,6 @@ char *CmiCopyMsg(char *msg, int len)
   return copy;
 }
 
-CMI_EXTERNC
 unsigned char computeCheckSum(unsigned char *data, int len)
 {
   int i;

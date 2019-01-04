@@ -10,7 +10,7 @@
 #include "converse.h"
 #include "topology.h"
 
-CMI_EXTERNC_VARIABLE char *_lbtopo;			/* topology name string */
+extern char *_lbtopo;			/* topology name string */
 
 int LBTopology::get_hop_count(int src,int dest)
 {

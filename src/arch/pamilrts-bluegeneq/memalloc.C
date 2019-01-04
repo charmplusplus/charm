@@ -28,7 +28,6 @@ static int _nodeStart;
 L2MemStruct *sL2MemallocVec;
 L2MemStruct *bL2MemallocVec;
 
-CMI_EXTERNC
 void *CmiAlloc_bgq (int size) {
   CmiMemAllocHdr_bgq *hdr = NULL;
   char *buf;
@@ -75,7 +74,6 @@ void *CmiAlloc_bgq (int size) {
   return buf;
 }
 
-CMI_EXTERNC
 void CmiFree_bgq (void *buf) {
   CmiMemAllocHdr_bgq *hdr = (CmiMemAllocHdr_bgq *)((char*)buf - sizeof(CmiMemAllocHdr_bgq));  
   int rc = L2A_EAGAIN;

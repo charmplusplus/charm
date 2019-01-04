@@ -11,7 +11,7 @@
 #include "GridMetisLB.h"
 #include "manager.h"
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def (GridMetisLB, "Grid load balancer that uses Metis to optimize communication graph")
 

@@ -24,26 +24,23 @@ extern bool _ringexit;		    // for charm exit
 extern int _ringtoken;
 extern void _initCharm(int unused_argc, char **argv);
 extern void _sendReadonlies();
-extern "C" void CommunicationServerThread(int sleepTime);
+void CommunicationServerThread(int sleepTime);
 extern int CharmLibInterOperate;
 extern int userDrivenMode;
 
-extern "C" void StartInteropScheduler();
-extern "C" void StopInteropScheduler();
+void StartInteropScheduler();
+void StopInteropScheduler();
 
-extern "C"
 void StartCharmScheduler() {
   CmiNodeAllBarrier();
   StartInteropScheduler();
 }
 
-extern "C"
 void StopCharmScheduler() {
   StopInteropScheduler();
 }
 
 // triger LibExit on PE 0,
-extern "C"
 void LibCkExit(void)
 {
   // always send to PE 0
@@ -112,7 +109,6 @@ void _libExitHandler(envelope *env)
 // CharmBeginInit calls sets interop flags then calls ConverseInit. This
 // initializes the runtime, but does not start the scheduler or send readonlies.
 // It returns control the main after main chares have been created.
-extern "C"
 void CharmBeginInit(int argc, char** argv) {
 #if !defined CMK_USE_LRTS || !CMK_USE_LRTS
   CmiAbort("Interop is not supported in non-LRTS machine layers.");
@@ -129,7 +125,6 @@ void CharmBeginInit(int argc, char** argv) {
 // and perform other init such as group creation. They they call CharmFinishInit
 // to bcast readonlies and group creation messages. Control returns to caller
 // after all readonlies are received and all groups are created.
-extern "C"
 void CharmFinishInit() {
   if (CkMyPe() == 0) {
     _sendReadonlies();
@@ -140,7 +135,6 @@ void CharmFinishInit() {
 // CharmInit is the simplified initialization function for apps which have
 // mainchares or don't use readonlies and don't require groups to be created
 // before regular execution. It calls both CharmStartInit and CharmFinishInit.
-extern "C"
 void CharmInit(int argc, char** argv) {
   CharmBeginInit(argc, argv);
   CharmFinishInit();
@@ -150,7 +144,6 @@ void CharmInit(int argc, char** argv) {
 // to call Charm as a library. It does full initialization and starts the
 // scheduler. If Charm is built on MPI, multiple Charm instances can be created
 // using different communicators.
-extern "C"
 void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
 
 #if CMK_USE_LRTS && !CMK_HAS_INTEROP
@@ -177,7 +170,6 @@ void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
 // continue.
 #undef CkExit
 #define CkExit CKEXIT_0 // CKEXIT_0 and other CkExit macros defined in charm.h
-extern "C"
 void CharmLibExit() {
   _cleanUp = 1;
   CmiNodeAllBarrier();

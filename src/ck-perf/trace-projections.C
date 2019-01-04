@@ -1830,8 +1830,7 @@ void registerOutlierReduction() {
  * done.
  *
  */
-// FIXME: WHY extern "C"???
-extern "C" void TraceProjectionsExitHandler()
+static void TraceProjectionsExitHandler()
 {
 #if CMK_TRACE_ENABLED
 #if DEBUG_KMEANS

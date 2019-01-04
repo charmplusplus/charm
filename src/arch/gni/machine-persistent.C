@@ -18,7 +18,6 @@
 */
 
 #if   PERSISTENT_GET_BASE
-CMI_EXTERNC
 void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *msg)
 {
     PersistentSendsTable *slot = (PersistentSendsTable *)h;
@@ -68,7 +67,6 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *msg
     }
 }
 #else
-CMI_EXTERNC
 void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
 {
     gni_post_descriptor_t *pd;
@@ -281,7 +279,6 @@ int PumpPersistent()
 #error "Persistent communication must be compiled with LARGEPAGE on"
 #endif
 
-CMI_EXTERNC
 void *PerAlloc(int size)
 {
 #if CMK_PERSISTENT_COMM_PUT
@@ -302,7 +299,6 @@ void *PerAlloc(int size)
 #endif
 }
                                                                                 
-CMI_EXTERNC
 void PerFree(char *msg)
 {
 #if CMK_SMP
@@ -313,12 +309,10 @@ void PerFree(char *msg)
 }
 
 /* machine dependent init call */
-CMI_EXTERNC
 void persist_machine_init(void)
 {
 }
 
-CMI_EXTERNC
 void initSendSlot(PersistentSendsTable *slot)
 {
   int i;
@@ -337,7 +331,6 @@ void initSendSlot(PersistentSendsTable *slot)
   slot->prev = slot->next = NULL;
 }
 
-CMI_EXTERNC
 void initRecvSlot(PersistentReceivesTable *slot)
 {
   int i;
@@ -353,7 +346,6 @@ void initRecvSlot(PersistentReceivesTable *slot)
   slot->prev = slot->next = NULL;
 }
 
-CMI_EXTERNC
 void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
 {
   int i;
@@ -383,7 +375,6 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
 #endif
 }
 
-CMI_EXTERNC
 void clearRecvSlot(PersistentReceivesTable *slot)
 {
 #if CMK_PERSISTENT_COMM_PUT
@@ -399,7 +390,6 @@ void clearRecvSlot(PersistentReceivesTable *slot)
 #endif
 }
 
-CMI_EXTERNC
 PersistentHandle getPersistentHandle(PersistentHandle h, int toindex)
 {
 #if REMOTE_EVENT

@@ -32,7 +32,7 @@
 #define FUNCCALL_DEBUG(x) //x /* empty */
 
 /* For MPI_Get_library_version */
-CMI_EXTERNC_VARIABLE const char * const CmiCommitID;
+extern const char * const CmiCommitID;
 
 static CkDDT *getDDT() noexcept {
   return &getAmpiParent()->myDDT;

@@ -19,7 +19,7 @@ Status:
 #include "GreedyCommLB.h"
 #include "manager.h"
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(GreedyCommLB, "Greedy algorithm which takes communication graph into account")
 

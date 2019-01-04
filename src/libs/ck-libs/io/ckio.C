@@ -18,9 +18,7 @@ typedef int FileToken;
 #include <unistd.h>
 #endif
 
-extern "C" {
-  #include "fs_parameters.h"
-}
+#include "fs_parameters.h"
 
 using std::min;
 using std::max;

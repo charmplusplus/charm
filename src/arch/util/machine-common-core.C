@@ -78,7 +78,6 @@ static int CmiNodesDim;
 /* ###End of Broadcast related definitions ### */
 
 #if CMK_SMP_TRACE_COMMTHREAD
-CMI_EXTERNC
 double TraceTimerCommon(void);
 #endif
 
@@ -243,7 +242,7 @@ CpvDeclare(unsigned , networkProgressCount);
 int networkProgressPeriod;
 
 #if CMK_CCS_AVAILABLE
-CMI_EXTERNC_VARIABLE int ccsRunning;
+extern int ccsRunning;
 #endif
 
 /* ===== Beginning of Common Function Declarations ===== */
@@ -308,13 +307,11 @@ static void ConverseRunPE(int everReturn);
 /* Functions regarding machine running on every proc */
 static void AdvanceCommunication(int whenidle);
 static void CommunicationServer(int sleepTime);
-CMI_EXTERNC
 void CommunicationServerThread(int sleepTime);
 
 /* Functions providing incoming network messages */
 void *CmiGetNonLocal(void);
 #if CMK_NODE_QUEUE_AVAILABLE
-CMI_EXTERNC
 void *CmiGetNonLocalNodeQ(void);
 #endif
 /* Utiltiy functions */
@@ -396,36 +393,28 @@ CmiMyNodeQueue(void) {
 }
 #endif
 
-CMI_EXTERNC
 int CmiMyPe(void) {
     return CmiGetState()->pe;
 }
-CMI_EXTERNC
 int CmiNodeSpan(void) {
   return (CmiMyNodeSize() + 1);
 }
-CMI_EXTERNC
 int CmiMyPeGlobal(void) {
     return CmiGetPeGlobal(CmiGetState()->pe,CmiMyPartition());
 }
-CMI_EXTERNC
 int CmiMyRank(void) {
     return CmiGetState()->rank;
 }
-CMI_EXTERNC
 int CmiNodeSize(int node) {
     return _Cmi_mynodesize;
 }
 #if !CMK_MULTICORE // these are defined in converse.h
-CMI_EXTERNC
 int CmiNodeFirst(int node) {
     return node*_Cmi_mynodesize;
 }
-CMI_EXTERNC
 int CmiNodeOf(int pe) {
     return (pe/_Cmi_mynodesize);
 }
-CMI_EXTERNC
 int CmiRankOf(int pe) {
     return pe%_Cmi_mynodesize;
 }
@@ -461,6 +450,9 @@ static void PerrorExit(const char *msg) {
 }
 
 /* ##### Beginning of Functions Related with Message Sending OPs ##### */
+
+extern "C" void CmiPushImmediateMsg(void *);
+
 /*Add a message to this processor's receive queue, pe is a rank */
 void CmiPushPE(int rank,void *msg) {
     CmiState cs = CmiGetStateN(rank);
@@ -841,10 +833,8 @@ if (  MSG_STATISTIC)
 #endif
 
 #include "TopoManager.h"
-CMI_EXTERNC
-void createCustomPartitions(int numparts, int *partitionSize, int *nodeMap);
-CMI_EXTERNC
-void setDefaultPartitionParams(void);
+extern "C" void createCustomPartitions(int numparts, int *partitionSize, int *nodeMap);
+extern "C" void setDefaultPartitionParams(void);
 
 void create_topoaware_partitions(void) {
   int i, j, numparts_bak;
@@ -1145,8 +1135,8 @@ INLINE_KEYWORD int pe_gToLTranslate(int pe) {
 }
 //end of functions related to partition
 
-CMI_EXTERNC_VARIABLE int quietMode;
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietMode;
+extern int quietModeRequested;
 
 #if defined(_WIN32)
 #include <windows.h> /* for SetEnvironmentVariable() and routines for CMK_SHARED_VARS_NT_THREADS */
@@ -1501,9 +1491,7 @@ if (  MSG_STATISTIC)
     ConverseRunPE(initret);
 }
 
-CMI_EXTERNC
 void ConverseCommonInit(char **argv);
-CMI_EXTERNC
 void CthInit(char **argv);
 static void ConverseRunPE(int everReturn) {
     CmiState cs;
@@ -1645,7 +1633,6 @@ static INLINE_KEYWORD void AdvanceCommunication(int whenidle) {
 #endif
 }
 
-CMI_EXTERNC
 void ConverseCommonExit(void);
 
 static void CommunicationServer(int sleepTime) {

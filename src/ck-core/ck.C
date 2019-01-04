@@ -474,31 +474,26 @@ void QdProcess(int n) {
   CpvAccess(_qd)->process(n);
 }
 
-extern "C"
 void CkSetRefNum(void *msg, CMK_REFNUM_TYPE ref)
 {
   UsrToEnv(msg)->setRef(ref);
 }
 
-extern "C"
 CMK_REFNUM_TYPE CkGetRefNum(void *msg)
 {
   return UsrToEnv(msg)->getRef();
 }
 
-extern "C"
 int CkGetSrcPe(void *msg)
 {
   return UsrToEnv(msg)->getSrcPe();
 }
 
-extern "C"
 int CkGetSrcNode(void *msg)
 {
   return CmiNodeOf(CkGetSrcPe(msg));
 }
 
-extern "C"
 void *CkLocalBranch(CkGroupID gID) {
   return _localBranch(gID);
 }
@@ -511,7 +506,6 @@ void *_ckLocalNodeBranch(CkGroupID groupID) {
   return retval;
 }
 
-extern "C"
 void *CkLocalNodeBranch(CkGroupID groupID)
 {
   void *retval;
@@ -525,7 +519,6 @@ void *CkLocalNodeBranch(CkGroupID groupID)
   return retval;
 }
 
-extern "C"
 void *CkLocalChare(const CkChareID *pCid)
 {
 	int pe=pCid->onPE;
@@ -553,15 +546,15 @@ void *CkLocalChare(const CkChareID *pCid)
 
 CkpvDeclare(char**,Ck_argv);
 
-extern "C" char **CkGetArgv(void) {
+char **CkGetArgv(void) {
 	return CkpvAccess(Ck_argv);
 }
-extern "C" int CkGetArgc(void) {
+int CkGetArgc(void) {
 	return CmiGetArgc(CkpvAccess(Ck_argv));
 }
 
 /******************** Basic support *****************/
-extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
+void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         CpvAccess(_currentObj) = (Chare *)obj;
@@ -582,7 +575,7 @@ extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
     _msgTable[_entryTable[epIdx]->msgIdx]->dealloc(msg);
   }
 }
-extern "C" void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
+void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
 {
   //BIGSIM_OOC DEBUGGING
   //CkPrintf("CkDeliverMessageReadonly: name of entry fn: %s\n", _entryTable[epIdx]->name);
@@ -648,7 +641,6 @@ static inline void _invokeEntry(int epIdx,envelope *env,void *obj)
 
 /********************* Creation ********************/
 
-extern "C"
 void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
 {
   CkAssert(cIdx == _entryTable[eIdx]->chareIdx);
@@ -868,7 +860,6 @@ int _getGroupIdx(int numNodes,int myNode,int numGroups)
         return idx;
 }
 
-extern "C"
 CkGroupID CkCreateGroup(int cIdx, int eIdx, void *msg)
 {
   CkAssert(cIdx == _entryTable[eIdx]->chareIdx);
@@ -882,7 +873,6 @@ CkGroupID CkCreateGroup(int cIdx, int eIdx, void *msg)
   return gid;
 }
 
-extern "C"
 CkGroupID CkCreateNodeGroup(int cIdx, int eIdx, void *msg)
 {
   CkAssert(cIdx == _entryTable[eIdx]->chareIdx);
@@ -1687,7 +1677,6 @@ static inline int _prepareImmediateMsg(int eIdx,void *msg,const CkChareID *pCid)
   return destPE;
 }
 
-extern "C"
 void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
 {
   if (opts & CK_MSG_INLINE) {
@@ -1726,7 +1715,6 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
 #endif
 }
 
-extern "C"
 void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
 {
   if (pCid->onPE==CkMyPe())
@@ -1831,7 +1819,6 @@ static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID,
   _TRACE_CREATION_DONE(1); 	// since it only creates one creation event.
 }
 
-extern "C"
 void CkSendMsgBranchImmediate(int eIdx, void *msg, int destPE, CkGroupID gID)
 {
 #if CMK_IMMEDIATE_MSG && ! CMK_SMP
@@ -1856,7 +1843,6 @@ void CkSendMsgBranchImmediate(int eIdx, void *msg, int destPE, CkGroupID gID)
 #endif
 }
 
-extern "C"
 void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int opts)
 {
   if (destPE==CkMyPe())
@@ -1882,7 +1868,6 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int o
   CkSendMsgBranch(eIdx, msg, destPE, gID, opts & (~CK_MSG_INLINE));
 }
 
-extern "C"
 void CkSendMsgBranch(int eIdx, void *msg, int pe, CkGroupID gID, int opts)
 {
   if (opts & CK_MSG_INLINE) {
@@ -1905,7 +1890,6 @@ void CkSendMsgBranch(int eIdx, void *msg, int pe, CkGroupID gID, int opts)
   CkpvAccess(_coreState)->create();
 }
 
-extern "C"
 void CkSendMsgBranchMultiImmediate(int eIdx,void *msg,CkGroupID gID,int npes,int *pes)
 {
 #if CMK_IMMEDIATE_MSG && ! CMK_SMP
@@ -1921,7 +1905,6 @@ void CkSendMsgBranchMultiImmediate(int eIdx,void *msg,CkGroupID gID,int npes,int
   CpvAccess(_qd)->create(npes);
 }
 
-extern "C"
 void CkSendMsgBranchMulti(int eIdx,void *msg,CkGroupID gID,int npes,int *pes, int opts)
 {
   if (opts & CK_MSG_IMMEDIATE) {
@@ -1934,7 +1917,6 @@ void CkSendMsgBranchMulti(int eIdx,void *msg,CkGroupID gID,int npes,int *pes, in
   CpvAccess(_qd)->create(npes);
 }
 
-extern "C"
 void CkSendMsgBranchGroup(int eIdx,void *msg,CkGroupID gID,CmiGroup grp, int opts)
 {
   int npes;
@@ -1953,7 +1935,6 @@ void CkSendMsgBranchGroup(int eIdx,void *msg,CkGroupID gID,CmiGroup grp, int opt
   CpvAccess(_qd)->create(npes);
 }
 
-extern "C"
 void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID, int opts)
 {
   _sendMsgBranch(eIdx, msg, gID, CLD_BROADCAST_ALL, opts);
@@ -1997,7 +1978,6 @@ static inline void _sendMsgNodeBranchMulti(int eIdx, void *msg, CkGroupID gID,
   _TRACE_CREATION_DONE(1);  // since it only creates one creation event.
 }
 
-extern "C"
 void CkSendMsgNodeBranchImmediate(int eIdx, void *msg, int node, CkGroupID gID)
 {
 #if CMK_IMMEDIATE_MSG
@@ -2022,7 +2002,6 @@ void CkSendMsgNodeBranchImmediate(int eIdx, void *msg, int node, CkGroupID gID)
 #endif
 }
 
-extern "C"
 void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int opts)
 {
   if (node==CkMyNode()) {
@@ -2049,7 +2028,6 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int
   CkSendMsgNodeBranch(eIdx, msg, node, gID, opts & ~(CK_MSG_INLINE));
 }
 
-extern "C"
 void CkSendMsgNodeBranch(int eIdx, void *msg, int node, CkGroupID gID, int opts)
 {
   if (opts & CK_MSG_INLINE) {
@@ -2065,7 +2043,6 @@ void CkSendMsgNodeBranch(int eIdx, void *msg, int node, CkGroupID gID, int opts)
   CkpvAccess(_coreState)->create();
 }
 
-extern "C"
 void CkSendMsgNodeBranchMultiImmediate(int eIdx,void *msg,CkGroupID gID,int npes,int *nodes)
 {
 #if CMK_IMMEDIATE_MSG && ! CMK_SMP
@@ -2079,7 +2056,6 @@ void CkSendMsgNodeBranchMultiImmediate(int eIdx,void *msg,CkGroupID gID,int npes
   CpvAccess(_qd)->create(npes);
 }
 
-extern "C"
 void CkSendMsgNodeBranchMulti(int eIdx,void *msg,CkGroupID gID,int npes,int *nodes, int opts)
 {
   if (opts & CK_MSG_IMMEDIATE) {
@@ -2092,7 +2068,6 @@ void CkSendMsgNodeBranchMulti(int eIdx,void *msg,CkGroupID gID,int npes,int *nod
   CpvAccess(_qd)->create(npes);
 }
 
-extern "C"
 void CkBroadcastMsgNodeBranch(int eIdx, void *msg, CkGroupID gID, int opts)
 {
   _sendMsgNodeBranch(eIdx, msg, gID, CLD_BROADCAST_ALL, opts);
@@ -2101,13 +2076,10 @@ void CkBroadcastMsgNodeBranch(int eIdx, void *msg, CkGroupID gID, int opts)
 }
 
 //Needed by delegation manager:
-extern "C"
 int CkChareMsgPrep(int eIdx, void *msg,const CkChareID *pCid)
 { return _prepareMsg(eIdx,msg,pCid); }
-extern "C"
 void CkGroupMsgPrep(int eIdx, void *msg, CkGroupID gID)
 { _prepareMsgBranch(eIdx,msg,gID,ForBocMsg); }
-extern "C"
 void CkNodeGroupMsgPrep(int eIdx, void *msg, CkGroupID gID)
 { _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg); }
 
@@ -2136,7 +2108,6 @@ static void _prepareOutgoingArrayMsg(envelope *env,int type)
   CpvAccess(_qd)->create();
 }
 
-extern "C"
 void CkArrayManagerDeliver(int pe,void *msg, int opts) {
   envelope *env = UsrToEnv(msg);
   _prepareOutgoingArrayMsg(env,ForArrayEltMsg);
@@ -2224,7 +2195,7 @@ static std::vector<char*> ext_argv;
 // buffer.
 // To be called from external clients like charm4py. This wrapper avoids issues with
 // ctypes and cffi.
-extern "C" void StartCharmExt(int argc, char **argv) {
+void StartCharmExt(int argc, char **argv) {
 #if !defined(_WIN32) && !NODE_0_IS_CONVHOST
   // only do this in net layers if using charmrun, so that output of process 0
   // doesn't get duplicated
@@ -2249,17 +2220,17 @@ extern "C" void StartCharmExt(int argc, char **argv) {
 }
 
 void (*CkRegisterMainModuleCallback)() = NULL;
-extern "C" void registerCkRegisterMainModuleCallback(void (*cb)()) {
+void registerCkRegisterMainModuleCallback(void (*cb)()) {
   CkRegisterMainModuleCallback = cb;
 }
 
 void (*MainchareCtorExtCallback)(int, void*, int, int, char **) = NULL;
-extern "C" void registerMainchareCtorExtCallback(void (*cb)(int, void*, int, int, char **)) {
+void registerMainchareCtorExtCallback(void (*cb)(int, void*, int, int, char **)) {
   MainchareCtorExtCallback = cb;
 }
 
 void (*ReadOnlyRecvExtCallback)(int, char*) = NULL;
-extern "C" void registerReadOnlyRecvExtCallback(void (*cb)(int, char*)) {
+void registerReadOnlyRecvExtCallback(void (*cb)(int, char*)) {
   ReadOnlyRecvExtCallback = cb;
 }
 
@@ -2267,52 +2238,52 @@ void* ReadOnlyExt::ro_data = NULL;
 size_t ReadOnlyExt::data_size = 0;
 
 void (*ChareMsgRecvExtCallback)(int, void*, int, int, char *, int) = NULL;
-extern "C" void registerChareMsgRecvExtCallback(void (*cb)(int, void*, int, int, char *, int)) {
+void registerChareMsgRecvExtCallback(void (*cb)(int, void*, int, int, char *, int)) {
   ChareMsgRecvExtCallback = cb;
 }
 
 void (*GroupMsgRecvExtCallback)(int, int, int, char *, int) = NULL;
-extern "C" void registerGroupMsgRecvExtCallback(void (*cb)(int, int, int, char *, int)) {
+void registerGroupMsgRecvExtCallback(void (*cb)(int, int, int, char *, int)) {
   GroupMsgRecvExtCallback = cb;
 }
 
 void (*ArrayMsgRecvExtCallback)(int, int, int *, int, int, char *, int) = NULL;
-extern "C" void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char *, int)) {
+void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char *, int)) {
   ArrayMsgRecvExtCallback = cb;
 }
 
 int (*ArrayElemLeaveExt)(int, int, int *, char**, int) = NULL;
-extern "C" void registerArrayElemLeaveExtCallback(int (*cb)(int, int, int *, char**, int)) {
+void registerArrayElemLeaveExtCallback(int (*cb)(int, int, int *, char**, int)) {
   ArrayElemLeaveExt = cb;
 }
 
 void (*ArrayElemJoinExt)(int, int, int *, int, char*, int) = NULL;
-extern "C" void registerArrayElemJoinExtCallback(void (*cb)(int, int, int *, int, char*, int)) {
+void registerArrayElemJoinExtCallback(void (*cb)(int, int, int *, int, char*, int)) {
   ArrayElemJoinExt = cb;
 }
 
 void (*ArrayResumeFromSyncExtCallback)(int, int, int *) = NULL;
-extern "C" void registerArrayResumeFromSyncExtCallback(void (*cb)(int, int, int *)) {
+void registerArrayResumeFromSyncExtCallback(void (*cb)(int, int, int *)) {
   ArrayResumeFromSyncExtCallback = cb;
 }
 
 void (*CreateReductionTargetMsgExt)(void*, int, int, int, char**, int*) = NULL;
-extern "C" void registerCreateReductionTargetMsgExtCallback(void (*cb)(void*, int, int, int, char**, int*)) {
+void registerCreateReductionTargetMsgExtCallback(void (*cb)(void*, int, int, int, char**, int*)) {
   CreateReductionTargetMsgExt = cb;
 }
 
 int (*PyReductionExt)(char**, int*, int, char**) = NULL;
-extern "C" void registerPyReductionExtCallback(int (*cb)(char**, int*, int, char**)) {
+void registerPyReductionExtCallback(int (*cb)(char**, int*, int, char**)) {
     PyReductionExt = cb;
 }
 
 int (*ArrayMapProcNumExtCallback)(int, int, const int *) = NULL;
-extern "C" void registerArrayMapProcNumExtCallback(int (*cb)(int, int, const int *)) {
+void registerArrayMapProcNumExtCallback(int (*cb)(int, int, const int *)) {
   ArrayMapProcNumExtCallback = cb;
 }
 
-extern "C" int CkMyPeHook() { return CkMyPe(); }
-extern "C" int CkNumPesHook() { return CkNumPes(); }
+int CkMyPeHook() { return CkMyPe(); }
+int CkNumPesHook() { return CkNumPes(); }
 
 void ReadOnlyExt::setData(void *msg, size_t msgSize) {
   ro_data = malloc(msgSize);
@@ -2375,7 +2346,6 @@ ArrayMapExt::ArrayMapExt(void *impl_msg) {
 }
 
 // TODO options
-extern "C"
 int CkCreateGroupExt(int cIdx, int eIdx, int num_bufs, char **bufs, int *buf_sizes) {
   //static_cast<void>(impl_e_opts);
   CkAssert(num_bufs >= 1);
@@ -2395,7 +2365,6 @@ int CkCreateGroupExt(int cIdx, int eIdx, int num_bufs, char **bufs, int *buf_siz
 }
 
 // TODO options
-extern "C"
 int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, int num_bufs,
                      char **bufs, int *buf_sizes, int map_gid, char useAtSync) {
   //static_cast<void>(impl_e_opts);
@@ -2424,7 +2393,6 @@ int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, int num_bufs,
 }
 
 // TODO options
-extern "C"
 void CkInsertArrayExt(int aid, int ndims, int *index, int epIdx, int onPE, int num_bufs,
                       char **bufs, int *buf_sizes, char useAtSync) {
   CkAssert(num_bufs >= 1);
@@ -2445,7 +2413,6 @@ void CkInsertArrayExt(int aid, int ndims, int *index, int epIdx, int onPE, int n
   CProxy_ArrayBase(gId).ckInsertIdx((CkArrayMessage *)impl_msg, epIdx, onPE, newIdx);
 }
 
-extern "C"
 void CkMigrateExt(int aid, int ndims, int *index, int toPe) {
   //printf("[charm] CkMigrateMeExt called with aid: %d, ndims: %d, index: %d, toPe: %d\n",
         //aid, ndims, *index, toPe);
@@ -2458,21 +2425,18 @@ void CkMigrateExt(int aid, int ndims, int *index, int toPe) {
   arrayElement->migrateMe(toPe);
 }
 
-extern "C"
 void CkArrayDoneInsertingExt(int aid) {
   CkGroupID gId;
   gId.idx = aid;
   CProxy_ArrayBase(gId).doneInserting();
 }
 
-extern "C"
 int CkGroupGetReductionNumber(int g_id) {
   CkGroupID gId;
   gId.idx = g_id;
   return ((Group*)CkLocalBranch(gId))->getRedNo();
 }
 
-extern "C"
 int CkArrayGetReductionNumber(int aid, int ndims, int *index) {
   CkGroupID gId;
   gId.idx = aid;
@@ -2483,7 +2447,6 @@ int CkArrayGetReductionNumber(int aid, int ndims, int *index) {
   return arrayElement->getRedNo();
 }
 
-extern "C"
 void CkChareExtSend(int onPE, void *objPtr, int epIdx, char *msg, int msgSize) {
   //ckCheck();    // checks that gid is not zero
   int marshall_msg_size = (sizeof(char)*msgSize + 3*sizeof(int));
@@ -2500,7 +2463,6 @@ void CkChareExtSend(int onPE, void *objPtr, int epIdx, char *msg, int msgSize) {
   CkSendMsg(epIdx, impl_msg, &chareID);
 }
 
-extern "C"
 void CkChareExtSend_multi(int onPE, void *objPtr, int epIdx, int num_bufs, char **bufs, int *buf_sizes) {
   CkAssert(num_bufs >= 1);
   //ckCheck();    // checks that gid is not zero
@@ -2520,7 +2482,6 @@ void CkChareExtSend_multi(int onPE, void *objPtr, int epIdx, int num_bufs, char 
   CkSendMsg(epIdx, impl_msg, &chareID);
 }
 
-extern "C"
 void CkGroupExtSend(int gid, int pe, int epIdx, char *msg, int msgSize) {
   //ckCheck();    // checks that gid is not zero
   int marshall_msg_size = (sizeof(char)*msgSize + 3*sizeof(int));
@@ -2539,7 +2500,6 @@ void CkGroupExtSend(int gid, int pe, int epIdx, char *msg, int msgSize) {
     CkSendMsgBranch(epIdx, impl_msg, pe, gId, 0);
 }
 
-extern "C"
 void CkGroupExtSend_multi(int gid, int pe, int epIdx, int num_bufs, char **bufs, int *buf_sizes) {
   CkAssert(num_bufs >= 1);
   //ckCheck();    // checks that gid is not zero
@@ -2561,7 +2521,6 @@ void CkGroupExtSend_multi(int gid, int pe, int epIdx, int num_bufs, char **bufs,
     CkSendMsgBranch(epIdx, impl_msg, pe, gId, 0);
 }
 
-extern "C"
 void CkArrayExtSend(int aid, int *idx, int ndims, int epIdx, char *msg, int msgSize) {
   int marshall_msg_size = (sizeof(char)*msgSize + 3*sizeof(int));
   CkMarshallMsg *impl_msg = CkAllocateMarshallMsg(marshall_msg_size, NULL);
@@ -2584,7 +2543,6 @@ void CkArrayExtSend(int aid, int *idx, int ndims, int epIdx, char *msg, int msgS
   }
 }
 
-extern "C"
 void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs, char **bufs, int *buf_sizes) {
   CkAssert(num_bufs >= 1);
   int totalSize = 0;
@@ -2733,8 +2691,8 @@ private:
   }
 };
 
-extern "C" void CkMessageReplayQuiescence(void *rep, double time);
-extern "C" void CkMessageDetailReplayDone(void *rep, double time);
+void CkMessageReplayQuiescence(void *rep, double time);
+void CkMessageDetailReplayDone(void *rep, double time);
 
 class CkMessageReplay : public CkMessageWatcher {
   int counter;
@@ -2977,7 +2935,7 @@ public:
   }
 };
 
-extern "C" void CkMessageReplayQuiescence(void *rep, double time) {
+void CkMessageReplayQuiescence(void *rep, double time) {
 #if ! CMK_BIGSIM_CHARM
   CkPrintf("[%d] Quiescence detected\n",CkMyPe());
 #endif
@@ -2985,7 +2943,7 @@ extern "C" void CkMessageReplayQuiescence(void *rep, double time) {
   //CmiStartQD(CkMessageReplayQuiescence, replay);
 }
 
-extern "C" void CkMessageDetailReplayDone(void *rep, double time) {
+void CkMessageDetailReplayDone(void *rep, double time) {
   CkMessageDetailReplay *replay = (CkMessageDetailReplay *)rep;
   CkPrintf("[%d] Detailed replay finished after %f seconds. Exiting.\n",CkMyPe(),CkWallTimer()-replay->starttime);
   ConverseExit();
@@ -3001,7 +2959,7 @@ static bool CpdExecuteThreadResume(CthThreadToken *token) {
 }
 
 CpvExtern(int, CthResumeNormalThreadIdx);
-extern "C" void CthResumeNormalThreadDebug(CthThreadToken* token)
+void CthResumeNormalThreadDebug(CthThreadToken* token)
 {
   CthThread t = token->thread;
 
@@ -3131,7 +3089,6 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	}
 }
 
-extern "C"
 int CkMessageToEpIdx(void *msg) {
         envelope *env=UsrToEnv(msg);
 	int ep=env->getEpIdx();
@@ -3141,13 +3098,11 @@ int CkMessageToEpIdx(void *msg) {
 		return ep;
 }
 
-extern "C"
 int getCharmEnvelopeSize() {
   return sizeof(envelope);
 }
 
 /// Best-effort guess at whether @arg msg points at a charm envelope
-extern "C"
 int isCharmEnvelope(void *msg) {
     envelope *e = (envelope *)msg;
     if (SIZEFIELD(msg) < sizeof(envelope)) return 0;

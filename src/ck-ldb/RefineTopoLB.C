@@ -21,7 +21,7 @@ Date: 04/27/2005
 #define _make_new_grouping_ 0
 #define _USE_MAX_HOPBYTES_ 1
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(RefineTopoLB,"TopoLB: Balance objects based on the network topology")
 
