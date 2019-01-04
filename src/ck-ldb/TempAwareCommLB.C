@@ -99,7 +99,7 @@ inline void getPossiblePes(std::vector<int>& possible_pes, int randomly_obj_id,
 double upper_threshold_temp;
 double lower_threshold_temp;
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(TempAwareCommLB, "always assign the heaviest obj onto lightest loaded processor.")
 

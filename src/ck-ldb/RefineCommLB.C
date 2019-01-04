@@ -7,7 +7,7 @@
 #include "ckheap.h"
 #include "RefineCommLB.h"
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(RefineCommLB, "Average load among processors by moving objects away from overloaded processor, communication aware")
 

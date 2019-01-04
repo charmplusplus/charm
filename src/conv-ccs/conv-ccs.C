@@ -14,12 +14,10 @@
 # define read _read
 #endif
 
-CMI_EXTERNC
 void CpdEndConditionalDeliver_master(void);
 
 #if CMK_CCS_AVAILABLE
 
-CMI_EXTERNC
 int CcsReply(CcsImplHeader *rep,int repLen,const void *repData);
 
 /*****************************************************************************
@@ -164,7 +162,7 @@ void CcsCallerId(skt_ip_t *pip, unsigned int *pport)
   *pport = ChMessageInt(CpvAccess(ccsReq)->attr.port);
 }
 
-CMI_EXTERNC_VARIABLE int rep_fw_handler_idx;
+extern int rep_fw_handler_idx;
 int rep_fw_handler_idx;
 
 CcsDelayedReply CcsDelayReply(void)
@@ -228,7 +226,6 @@ delivery.
   Deliver the given message data to the given
 CCS handler.
 */
-CMI_EXTERNC
 void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
 {
   char *cmsg;
@@ -336,7 +333,6 @@ static void bg_req_fw_handler(char *msg) {
 }
 #define req_fw_handler bg_req_fw_handler
 #endif
-CMI_EXTERNC
 void req_fw_handler(char *msg);
 
 void CcsReleaseMessages(void) {
@@ -540,7 +536,6 @@ int _isCcsHandlerIdx(int hIdx) {
   return 0;
 }
 
-CMI_EXTERNC
 void CcsBuiltinsInit(char **argv);
 
 CpvDeclare(int, cmiArgDebugFlag);

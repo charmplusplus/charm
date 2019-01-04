@@ -36,7 +36,7 @@ void* getTLS(void) CMI_NOOPTIMIZE;
 void setTLS(void* newptr) CMI_NOOPTIMIZE;
 void* swapTLS(void* newptr) CMI_NOOPTIMIZE;
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 #if !CMK_HAS_DL_ITERATE_PHDR
 static void* CmiTLSExecutableStart;

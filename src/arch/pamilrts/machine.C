@@ -72,7 +72,6 @@ char *ALIGN_32(char *p) {
 
 #if CMK_ERROR_CHECKING
 static int checksum_flag = 0;
-CMI_EXTERNC
 unsigned char computeCheckSum(unsigned char *data, int len);
 
 #define CMI_SET_CHECKSUM(msg, len)      \
@@ -237,7 +236,7 @@ volatile int outstanding_recvs;
 #endif
 
 // Function declaration for ppc_msync
-CMI_EXTERNC void ppc_msync();
+void ppc_msync();
 
 #if CMK_SMP  && !CMK_ENABLE_ASYNC_PROGRESS
 #define PAMIX_CONTEXT_LOCK_INIT(x)
@@ -525,7 +524,7 @@ pamix_progress_register_fn  cmi_progress_register;
 pamix_progress_enable_fn    cmi_progress_enable;
 pamix_progress_disable_fn   cmi_progress_disable;
 
-CMI_EXTERNC_VARIABLE int quietMode;
+extern int quietMode;
 
 int CMI_Progress_init(int start, int ncontexts) {
   if ((CmiMyPe() == 0) && (!quietMode))

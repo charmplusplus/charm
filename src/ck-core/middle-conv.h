@@ -46,7 +46,7 @@
 #define CkElapse(x)   
 
 #if CMK_CHARMDEBUG
-extern "C" int ConverseDeliver(int pe);
+int ConverseDeliver(int pe);
 #else
 #define ConverseDeliver(pe)   1
 #endif

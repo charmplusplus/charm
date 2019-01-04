@@ -1294,7 +1294,7 @@ void BgSetWorkerThreadStart(BgStartHandler f)
   workStartFunc = f;
 }
 
-extern "C" void CthResumeNormalThread(CthThreadToken* token);
+void CthResumeNormalThread(CthThreadToken* token);
 
 // kernel function for processing a bluegene message
 void BgProcessMessageDefault(threadInfo *tinfo, char *msg)

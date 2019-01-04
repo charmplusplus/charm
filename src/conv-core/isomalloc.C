@@ -2187,7 +2187,6 @@ int CmiIsomallocInRange(void *addr)
 
 int _sync_iso_warned = 0;
 
-CMI_EXTERNC
 void CmiIsomallocInit(char **argv)
 {
 #if CMK_NO_ISO_MALLOC

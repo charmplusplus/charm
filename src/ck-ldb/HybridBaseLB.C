@@ -12,7 +12,7 @@
 
 #define  DEBUGF(x)     // CmiPrintf x;
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(HybridBaseLB, "HybridBase load balancer")
 

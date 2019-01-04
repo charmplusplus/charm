@@ -75,6 +75,8 @@ void CmiResetNotifyCommThdMsg(CmiNotifyCommThdMsg *msg, CmiCommThdFnPtr fn, int 
     msg->toKeep = toKeep;
 }
 
+extern "C" void CmiPushImmediateMsg(void *);
+
 void CmiNotifyCommThd(CmiNotifyCommThdMsg *msg){
    CmiPushImmediateMsg(msg);
 }

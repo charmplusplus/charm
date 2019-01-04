@@ -576,8 +576,7 @@ static int search_pemap(char *pecoremap, int pe)
 }
 
 #if CMK_CRAYXE || CMK_CRAYXC
-CMI_EXTERNC
-int getXTNodeID(int mpirank, int nummpiranks);
+CLINKAGE int getXTNodeID(int mpirank, int nummpiranks);
 #endif
 
 /**
@@ -587,7 +586,6 @@ int getXTNodeID(int mpirank, int nummpiranks);
  * has been set explicitly by this module, it will print error and abort if
  * oversubscription detected.
  */
-CMI_EXTERNC
 void CmiCheckAffinity(void)
 {
 #if !defined(_WIN32) && CMK_SMP && CMK_HAS_PTHREAD_SETAFFINITY && defined(CPU_OR)
@@ -630,7 +628,7 @@ void CmiCheckAffinity(void)
 #endif
 }
 
-CMI_EXTERNC_VARIABLE int CmiMyLocalRank;
+extern int CmiMyLocalRank;
 
 static void bind_process_only(hwloc_obj_type_t process_unit)
 {
@@ -770,7 +768,6 @@ static int set_default_affinity(void)
   return n != -1;
 }
 
-CMI_EXTERNC
 void CmiInitCPUAffinity(char **argv)
 {
   static skt_ip_t myip;
@@ -1058,11 +1055,9 @@ int CmiPrintCPUAffinity(void)
   return -1;
 }
 
-CMI_EXTERNC
 void CmiCheckAffinity(void) {
 }
 
-CMI_EXTERNC
 void CmiInitCPUAffinity(char **argv)
 {
   char *pemap = NULL;

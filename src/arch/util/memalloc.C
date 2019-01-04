@@ -47,7 +47,6 @@ extern int  Cmi_nodestart; /* First processor in this address space */
 extern CMK_THREADLOCAL int32_t _comm_thread_id;
 #endif
 
-CMI_EXTERNC
 void *CmiAlloc_ppcq (int size) {
   CmiMemAllocHdr_ppcq *hdr = NULL;
   char *buf;
@@ -122,7 +121,6 @@ void *CmiAlloc_ppcq (int size) {
   return buf;
 }
 
-CMI_EXTERNC
 void CmiFree_ppcq (void *buf) {
   CmiMemAllocHdr_ppcq *hdr = (CmiMemAllocHdr_ppcq *)((char*)buf - sizeof(CmiMemAllocHdr_ppcq));
   int rc = CMI_PPCQ_EAGAIN;

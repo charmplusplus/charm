@@ -1336,7 +1336,6 @@ void LrtsDrainResources() /* used when exiting */
     MACHSTATE(2, "} OFI::LrtsDrainResources");
 }
 
-CMI_EXTERNC
 void* LrtsAlloc(int n_bytes, int header)
 {
     void *ptr = NULL;
@@ -1355,7 +1354,6 @@ void* LrtsAlloc(int n_bytes, int header)
     return ptr;
 }
 
-CMI_EXTERNC
 void LrtsFree(void *msg)
 {
 #if USE_MEMPOOL

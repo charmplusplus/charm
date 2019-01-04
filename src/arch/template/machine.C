@@ -193,17 +193,11 @@ int _Cmi_mynodesize;
 int _Cmi_mynode;
 int _Cmi_numnodes;
 
-CMI_EXTERNC
 int CmiMyPe(void);
-CMI_EXTERNC
 int CmiMyRank(void);
-CMI_EXTERNC
 int CmiNodeFirst(int node);
-CMI_EXTERNC
 int CmiNodeSize(int node);
-CMI_EXTERNC
 int CmiNodeOf(int pe);
-CMI_EXTERNC
 int CmiRankOf(int pe);
 
 /* optional, these functions are implemented in "machine-smp.C", so including
@@ -244,17 +238,11 @@ int _Cmi_mynodesize;
 int _Cmi_mynode;
 int _Cmi_numnodes;
 
-CMI_EXTERNC
 int CmiMyPe(void);
-CMI_EXTERNC
 int CmiMyRank(void);
-CMI_EXTERNC
 int CmiNodeFirst(int node);
-CMI_EXTERNC
 int CmiNodeSize(int node);
-CMI_EXTERNC
 int CmiNodeOf(int pe);
-CMI_EXTERNC
 int CmiRankOf(int pe);
 
 /* optional, these functions are implemented in "machine-smp.C", so including

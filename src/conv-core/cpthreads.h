@@ -6,6 +6,10 @@
 /* for size_t */
 #include <sys/types.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define CPTHREAD_THREADS_MAX     1000000000
 #define CPTHREAD_KEYS_MAX        1000000000
 #define CPTHREAD_STACK_MIN       32768
@@ -185,6 +189,10 @@ void Cpthread_start_main(CmiStartFn fn, int argc, char **argv);
 #define pthread_yield                   (CthYield())
 
 #endif /* SUPPRESS_PTHREADS */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* CPTHREAD_H */
 

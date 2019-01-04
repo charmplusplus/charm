@@ -45,18 +45,6 @@
 # define CMK_THREADLOCAL __thread
 #endif
 
-#ifdef __cplusplus
-# define CMI_EXTERNC extern "C"
-#else
-# define CMI_EXTERNC
-#endif
-
-#if defined __cplusplus && defined _MSC_VER
-# define CMI_EXTERNC_VARIABLE extern "C"
-#else
-# define CMI_EXTERNC_VARIABLE extern
-#endif
-
 #if defined _MSC_VER
 # define CMI_FORCE_INLINE __forceinline
 #elif defined __GNUC__
@@ -369,13 +357,10 @@ extern int _Cmi_numnodes;
 extern int _Cmi_sleepOnIdle;
 extern int _Cmi_forceSpinOnIdle;
 
-CMI_EXTERNC
 int CmiMyPe(void);
-CMI_EXTERNC
 int CmiMyRank(void);
 #define CmiNumPes()         _Cmi_numpes
 #define CmiMyNodeSize()     _Cmi_mynodesize
-CMI_EXTERNC
 int CmiNodeSize(int node);
 #if CMK_MULTICORE
 #define CmiMyNode()         0
@@ -386,11 +371,8 @@ int CmiNodeSize(int node);
 #else
 #define CmiMyNode()         _Cmi_mynode
 #define CmiNumNodes()       _Cmi_numnodes
-CMI_EXTERNC
 int CmiNodeFirst(int node);
-CMI_EXTERNC
 int CmiNodeOf(int pe);
-CMI_EXTERNC
 int CmiRankOf(int pe);
 #endif
 
@@ -514,13 +496,10 @@ extern int _Cmi_numnodes;
 extern int _Cmi_sleepOnIdle;
 extern int _Cmi_forceSpinOnIdle;
 
-CMI_EXTERNC
 int CmiMyPe(void);
-CMI_EXTERNC
 int CmiMyRank(void);
 #define CmiNumPes()         _Cmi_numpes
 #define CmiMyNodeSize()     _Cmi_mynodesize
-CMI_EXTERNC
 int CmiNodeSize(int node);
 #if CMK_MULTICORE
 #define CmiMyNode()         0
@@ -531,11 +510,8 @@ int CmiNodeSize(int node);
 #else
 #define CmiMyNode()         _Cmi_mynode
 #define CmiNumNodes()       _Cmi_numnodes
-CMI_EXTERNC
 int CmiNodeFirst(int node);
-CMI_EXTERNC
 int CmiNodeOf(int pe);
-CMI_EXTERNC
 int CmiRankOf(int pe);
 #endif
 
@@ -871,8 +847,14 @@ struct infiCmiChunkMetaDataStruct *registerMultiSendMesg(char *msg,int msgSize);
 
 #endif
 
-CMI_EXTERNC void* malloc_nomigrate(size_t size);
-CMI_EXTERNC void free_nomigrate(void* ptr);
+#ifdef __cplusplus
+extern "C" {
+#endif
+void* malloc_nomigrate(size_t size);
+void free_nomigrate(void* ptr);
+#ifdef __cplusplus
+}
+#endif
 
 /**
    Allocate `size` bytes of memory usable as a message buffer.
@@ -1923,7 +1905,7 @@ extern "C"
 void CmiMachineProgressImpl();
 
 #if CMK_USE_PXSHM
-CMI_EXTERNC void CommunicationServerPxshm(void);
+void CommunicationServerPxshm(void);
 #define CmiNetworkProgress() {CpvAccess(networkProgressCount) ++; \
       if(CpvAccess(networkProgressCount) >=  networkProgressPeriod) { \
           CmiMachineProgressImpl(); \
@@ -2214,23 +2196,18 @@ extern double CmiLog2(double);
 
 #if CMK_GRID_QUEUE_AVAILABLE
 #if defined(__cplusplus)
-extern "C" int CmiGetCluster (int pe);
-extern "C" int CmiGridQueueGetInterval ();
-extern "C" int CmiGridQueueGetThreshold ();
-extern "C" void CmiGridQueueRegister (int gid, int nInts, int index1, int index2, int index3);
-extern "C" void CmiGridQueueDeregister (int gid, int nInts, int index1, int index2, int index3);
-extern "C" void CmiGridQueueDeregisterAll ();
-extern "C" int CmiGridQueueLookup (int gid, int nInts, int index1, int index2, int index3);
-extern "C" int CmiGridQueueLookupMsg (char *msg);
-#else
+extern "C" {
+#endif
 extern int CmiGetCluster (int pe);
-extern int CmiGridQueueGetInterval ();
-extern int CmiGridQueueGetThreshold ();
+extern int CmiGridQueueGetInterval (void);
+extern int CmiGridQueueGetThreshold (void);
 extern void CmiGridQueueRegister (int gid, int nInts, int index1, int index2, int index3);
 extern void CmiGridQueueDeregister (int gid, int nInts, int index1, int index2, int index3);
-extern void CmiGridQueueDeregisterAll ();
+extern void CmiGridQueueDeregisterAll (void);
 extern int CmiGridQueueLookup (int gid, int nInts, int index1, int index2, int index3);
 extern int CmiGridQueueLookupMsg (char *msg);
+#if defined(__cplusplus)
+}
 #endif
 #endif
 
@@ -2279,18 +2256,16 @@ CpvExtern(int, _urgentSend);
 #define CsdTaskPop() TaskQueuePop((TaskQueue)CpvAccess(CsdTaskQueue))
 #if CMK_OMP
 #if defined(__cplusplus)
-extern "C" int CmiGetCurKnownOmpThreads();
-#else
-extern int CmiGetCurKnownOmpThreads();
+extern "C"
 #endif
+int CmiGetCurKnownOmpThreads(void);
 #endif
 #endif
 CpvCExtern(int, isHelperOn);
 #if defined(__cplusplus)
-extern "C" void CmiSetPeHelpsOtherThreads(int);
-#else
-extern void CmiSetPeHelpsOtherThreads(int);
+extern "C"
 #endif
+void CmiSetPeHelpsOtherThreads(int);
 #endif /* CONVERSE_H */
 
 

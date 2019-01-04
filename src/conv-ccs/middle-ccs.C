@@ -16,9 +16,9 @@
 #endif
 
 #if CMK_CCS_AVAILABLE
-extern "C" void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData);
+void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData);
 
-extern "C" void req_fw_handler(char *msg)
+void req_fw_handler(char *msg)
 {
   int offset = CmiReservedHeaderSize + sizeof(CcsImplHeader);
   CcsImplHeader *hdr = (CcsImplHeader *)(msg+CmiReservedHeaderSize);
@@ -52,12 +52,12 @@ extern "C" void req_fw_handler(char *msg)
   CmiFree(msg);
 }
 
-CMI_EXTERNC_VARIABLE int rep_fw_handler_idx;
+extern int rep_fw_handler_idx;
 /**
  * Decide if the reply is ready to be forwarded to the waiting client,
  * or if combination is required (for broadcast/multicast CCS requests.
  */
-extern "C" int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
+int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
   int repPE = (int)ChMessageInt(rep->pe);
   if (repPE <= -1) {
     /* Reduce the message to get the final reply */
@@ -128,8 +128,6 @@ CpvDeclare(void *, debugQueue);
 CpvCExtern(int, freezeModeFlag);
 CpvDeclare(int, freezeModeFlag);
 
-extern "C" {
-
 /*
  Start the freeze-- call will not return until unfrozen
  via a CCS request.
@@ -157,8 +155,6 @@ int CpdIsFrozen(void) {
   return CpvAccess(freezeModeFlag);
 }
 
-}
-
 #if CMK_BIGSIM_CHARM
 #include "blue_impl.h"
 void BgProcessMessageFreezeMode(threadInfo *t, char *msg) {
@@ -182,9 +178,9 @@ void BgProcessMessageFreezeMode(threadInfo *t, char *msg) {
 #endif
 
 void PrintDebugStackTrace(void *);
-extern "C" void * MemoryToSlot(void *ptr);
-extern "C" int Slot_StackTrace(void *s, void ***stack);
-extern "C" int Slot_ChareOwner(void *s);
+void * MemoryToSlot(void *ptr);
+int Slot_StackTrace(void *s, void ***stack);
+int Slot_ChareOwner(void *s);
 
 #include <stdarg.h>
 void CpdNotify(int type, ...) {

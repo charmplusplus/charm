@@ -24,11 +24,8 @@
 enum boolean {false = 0, true = 1};
 enum {list_empty = -1 };
 
-CMI_EXTERNC
 void CthInit(char **);
-CMI_EXTERNC
 void ConverseCommonInit(char **);
-CMI_EXTERNC
 void ConverseCommonExit(void);
 
 /*
@@ -575,8 +572,8 @@ ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   ConverseRunPE(initret);
 }
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
-CMI_EXTERNC_VARIABLE int quietMode;
+extern int quietModeRequested;
+extern int quietMode;
 
 void ConverseExit(int exitcode)
 {

@@ -1586,7 +1586,7 @@ void init_memcheckpt(char **argv)
 }
 #endif
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 class CkMemCheckPTInit: public Chare {
 public:

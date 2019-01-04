@@ -13,7 +13,7 @@ CmiCommHandle LrtsAsyncListSendFn(int npes, int *pes, int len, char *msg);
 void LrtsFreeListSendFn(int npes, int *pes, int len, char *msg);
 
 #if CMK_PERSISTENT_COMM
-CMI_EXTERNC void LrtsSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m);
+void LrtsSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m);
 #endif
 
 /* ### Beginning of Machine-startup Related Functions ### */
@@ -31,11 +31,11 @@ CMK_NORETURN void LrtsAbort(const char *message);
 /* ### End of Machine-running Related Functions ### */
 void LrtsPostNonLocal(void);
 
-CMI_EXTERNC void* LrtsAlloc(int, int);
-CMI_EXTERNC void* LrtsRdmaAlloc(int, int);
+void* LrtsAlloc(int, int);
+void* LrtsRdmaAlloc(int, int);
 
-CMI_EXTERNC void  LrtsFree(void*);
-CMI_EXTERNC void  LrtsRdmaFree(void*);
+void  LrtsFree(void*);
+void  LrtsRdmaFree(void*);
 void  LrtsNotifyIdle(void);
 
 void  LrtsBeginIdle(void);

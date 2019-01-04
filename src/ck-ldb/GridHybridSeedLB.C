@@ -11,7 +11,7 @@
 #include "GridHybridSeedLB.h"
 #include "manager.h"
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def (GridHybridSeedLB, "Grid load balancer that uses hybrid seed technique to optimize communication graph")
 

@@ -53,8 +53,8 @@ char *ALIGN_32(char *p) {
   return((char *)((((unsigned long)p)+0x1f) & (~0x1FUL)));
 }
 
-CMI_EXTERNC_VARIABLE int quietMode;
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietMode;
+extern int quietModeRequested;
 
 /*To reduce the buffer used in broadcast and distribute the load from
   broadcasting node, define CMK_BROADCAST_SPANNING_TREE enforce the use of
@@ -98,7 +98,6 @@ CMI_EXTERNC_VARIABLE int quietModeRequested;
 
 #if CMK_ERROR_CHECKING
 static int checksum_flag = 0;
-CMI_EXTERNC
 unsigned char computeCheckSum(unsigned char *data, int len);
 
 #define CMI_SET_CHECKSUM(msg, len)      \
@@ -169,7 +168,7 @@ CMK_THREADLOCAL int32_t _comm_thread_id = 0;
 
 void ConverseRunPE(int everReturn);
 static void CommunicationServer(int sleepTime);
-CMI_EXTERNC void CommunicationServerThread(int sleepTime);
+void CommunicationServerThread(int sleepTime);
 
 static void CmiNetworkBarrier(int async);
 static void CmiSendPeer (int rank, int size, char *msg);
@@ -177,7 +176,6 @@ static void CmiSendPeer (int rank, int size, char *msg);
 //So far we dont define any comm threads
 int Cmi_commthread = 0;
 
-CMI_EXTERNC
 void PerrorExit (const char *err);
 
 #include "machine-smp.C"
@@ -332,11 +330,8 @@ static char     **Cmi_argvcopy;
 static CmiStartFn Cmi_startfn;   /* The start function */
 static int        Cmi_usrsched;  /* Continue after start function finishes? */
 
-CMI_EXTERNC
 void ConverseCommonInit(char **argv);
-CMI_EXTERNC
 void ConverseCommonExit(void);
-CMI_EXTERNC
 void CthInit(char **argv);
 
 static void SendMsgsUntil(int);
@@ -912,7 +907,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     ConverseRunPE(initret);
 }
 
-CMI_EXTERNC
 void PerrorExit (const char *err) {
   fprintf (stderr, "err\n\n");
     exit (-1);
@@ -1086,7 +1080,6 @@ void CmiAbort(const char * message) {
 }
 
 #if CMK_NODE_QUEUE_AVAILABLE
-CMI_EXTERNC
 char *CmiGetNonLocalNodeQ(void) {
     char *result = 0;
 
@@ -1203,7 +1196,6 @@ void  CmiGeneralFreeSend(int destPE, int size, char* msg) {
 
 pami_result_t machine_send_handoff (pami_context_t context, void *msg);
 
-CMI_EXTERNC
 void  machine_send       (pami_context_t      context,
 			  int                 node,
 			  int                 rank,
@@ -1874,43 +1866,31 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
 
-CMI_EXTERNC
 int CmiMyPe(void);
-CMI_EXTERNC
 int CmiMyRank(void);
-CMI_EXTERNC
 int CmiNodeFirst(int node);
-CMI_EXTERNC
 int CmiNodeSize(int node);
-CMI_EXTERNC
 int CmiNodeOf(int pe);
-CMI_EXTERNC
 int CmiRankOf(int pe);
 
-CMI_EXTERNC
 int CmiMyPe(void) {
     return CmiGetState()->pe;
 }
 
-CMI_EXTERNC
 int CmiMyRank(void) {
     return CmiGetState()->rank;
 }
 
-CMI_EXTERNC
 int CmiNodeFirst(int node) {
     return node*_Cmi_mynodesize;
 }
-CMI_EXTERNC
 int CmiNodeSize(int node)  {
     return _Cmi_mynodesize;
 }
 
-CMI_EXTERNC
 int CmiNodeOf(int pe)      {
     return (pe/_Cmi_mynodesize);
 }
-CMI_EXTERNC
 int CmiRankOf(int pe)      {
     return pe%_Cmi_mynodesize;
 }

@@ -299,7 +299,7 @@ CpmDestination CpmMakeThreadSize(int pe, int size)
  *
  *****************************************************************************/
 
-void CpmModuleInit(void)
+extern "C" void CpmModuleInit(void)
 {
   CpvInitialize(int, CpmThread2_Index);
   CpvAccess(CpmThread2_Index) = CmiRegisterHandler(CpmThread2);

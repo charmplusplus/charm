@@ -15,7 +15,7 @@
 #include "ckgraph.h"
 #include <scotch.h>
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(ScotchLB, "Load balancing using the Scotch graph partitioning library")
 

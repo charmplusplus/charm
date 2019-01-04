@@ -128,7 +128,6 @@ void CmiYield(void)
 
 #define CmiGetStateN(n) (Cmi_state_vector+(n))
 
-CMI_EXTERNC
 void CommunicationServerThread(int sleepTime);
 
 /*
@@ -405,9 +404,7 @@ static void *call_startfn(void *vindex)
 }
 */
 
-CMI_EXTERNC
 void StartInteropScheduler(void);
-CMI_EXTERNC
 void CommunicationServerThread(int sleepTime);
 
 static void *call_startfn(void *vindex)
@@ -457,7 +454,7 @@ static void *call_startfn(void *vindex)
 
 #if CMK_BLUEGENEQ && !CMK_USE_LRTS
 /* pami/machine.C defines its own version of this: */
-CMI_EXTERNC void PerrorExit(const char*);
+void PerrorExit(const char*);
 #endif
 
 #if CMK_CONVERSE_PAMI

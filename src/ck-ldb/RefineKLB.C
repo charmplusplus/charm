@@ -11,7 +11,7 @@
 #define _USE_RESIDUAL_MOVES_ 1
 //#include "heap.h"
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(RefineKLB, "Move objects away from overloaded processor to reach average")
 

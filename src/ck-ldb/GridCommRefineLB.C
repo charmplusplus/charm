@@ -49,7 +49,7 @@
 #include "GridCommRefineLB.h"
 #include "manager.h"
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def (GridCommRefineLB, "Grid communication load balancer (refines object mapping within each cluster)")
 

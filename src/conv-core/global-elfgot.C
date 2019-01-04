@@ -115,7 +115,7 @@ extern ELFXX_TYPE_Dyn _DYNAMIC[];      //The Dynamic section table pointer
 
 std::vector<char *>  _blacklist;
 static bool loaded = false;
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 static void readBlacklist()
 {

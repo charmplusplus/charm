@@ -5,7 +5,7 @@
 
 #include "DummyLB.h"
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(DummyLB, "Dummy load balancer, like a normal one but with empty strategy")
 

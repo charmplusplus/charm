@@ -8,7 +8,7 @@
 
 static bool   _libExitStarted = false;
 int    _libExitHandlerIdx;
-extern "C" int _cleanUp;
+extern int _cleanUp;
 
 #if CMK_CONVERSE_MPI
 extern MPI_Comm charmComm;
@@ -19,26 +19,23 @@ typedef int MPI_Comm;
 extern bool _ringexit;		    // for charm exit
 extern int _ringtoken;
 extern void _initCharm(int unused_argc, char **argv);
-extern "C" void CommunicationServerThread(int sleepTime);
+void CommunicationServerThread(int sleepTime);
 extern int CharmLibInterOperate;
-CMI_EXTERNC_VARIABLE int userDrivenMode;
+extern int userDrivenMode;
 
-extern "C" void StartInteropScheduler();
-extern "C" void StopInteropScheduler();
+void StartInteropScheduler();
+void StopInteropScheduler();
 
-extern "C"
 void StartCharmScheduler() {
   CmiNodeAllBarrier();
   StartInteropScheduler();
 }
 
-extern "C"
 void StopCharmScheduler() {
   StopInteropScheduler();
 }
 
 // triger LibExit on PE 0,
-extern "C"
 void LibCkExit(void)
 {
   // always send to PE 0
@@ -105,14 +102,12 @@ void _libExitHandler(envelope *env)
 // CharmInit simply calls CharmLibInit with userDrivenMode set to 1. This allows
 // user code to stop and start the charm scheduler multiple times throughout
 // execution without destroying its state.
-extern "C"
 void CharmInit(int argc, char **argv) {
   userDrivenMode = 1;
   CharmLibInit(0, argc, argv);
 }
 #endif
 
-extern "C"
 void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
 
 #if CMK_USE_LRTS && !CMK_HAS_INTEROP
@@ -134,7 +129,6 @@ void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
 
 #undef CkExit
 #define CkExit CKEXIT_0 // CKEXIT_0 and other CkExit macros defined in charm.h
-extern "C"
 void CharmLibExit() {
   _cleanUp = 1;
   CmiNodeAllBarrier();

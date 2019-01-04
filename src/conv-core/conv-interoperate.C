@@ -19,36 +19,32 @@ static std::atomic<int> interopCommThdExit{0};
 
 CpvCExtern(int,interopExitFlag);
 
-extern "C"
-{
-  int _cleanUp = 0;
+int _cleanUp = 0;
 
 #if CMK_USE_LRTS
-  extern void CommunicationServerThread(int sleepTime);
+extern void CommunicationServerThread(int sleepTime);
 #else
-  void CommunicationServerThread(int sleepTime) { }
+void CommunicationServerThread(int sleepTime) { }
 #endif
 
-  extern int CharmLibInterOperate;
+extern int CharmLibInterOperate;
 
-  void StartInteropScheduler() {
-    DEBUG(printf("[%d]Starting scheduler [%d]/[%d]\n",CmiMyPe(),CmiMyRank(),CmiMyNodeSize()););
-    if (CmiMyRank() == CmiMyNodeSize()) {
-      while (interopCommThdExit.load(std::memory_order_relaxed) != CmiMyNodeSize())
-      {
-        CommunicationServerThread(5);
-      }
-      DEBUG(printf("[%d] Commthread Exit Scheduler\n",CmiMyPe()););
-      interopCommThdExit = 0;
-    } else {
-      CsdScheduler(-1);
+void StartInteropScheduler() {
+  DEBUG(printf("[%d]Starting scheduler [%d]/[%d]\n",CmiMyPe(),CmiMyRank(),CmiMyNodeSize()););
+  if (CmiMyRank() == CmiMyNodeSize()) {
+    while (interopCommThdExit.load(std::memory_order_relaxed) != CmiMyNodeSize())
+    {
+      CommunicationServerThread(5);
     }
+    DEBUG(printf("[%d] Commthread Exit Scheduler\n",CmiMyPe()););
+    interopCommThdExit = 0;
+  } else {
+    CsdScheduler(-1);
   }
+}
 
-  void StopInteropScheduler() {
-    DEBUG(printf("[%d] Exit Scheduler\n",CmiMyPe()););
-    CpvAccess(interopExitFlag) = 1;
-    interopCommThdExit++;
-  }
-
-} // extern "C"
+void StopInteropScheduler() {
+  DEBUG(printf("[%d] Exit Scheduler\n",CmiMyPe()););
+  CpvAccess(interopExitFlag) = 1;
+  interopCommThdExit++;
+}

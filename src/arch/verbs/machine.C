@@ -305,7 +305,6 @@ static int already_in_signal_handler=0;
 
 static void CmiDestroyLocks(void);
 
-CMI_EXTERNC
 void EmergencyExit(void);
 void MachineExit(void);
 
@@ -608,7 +607,7 @@ static int    Cmi_idlepoll;
 static int    Cmi_syncprint;
 static int Cmi_print_stats = 0;
 
-CMI_EXTERNC_VARIABLE int    CmiMyLocalRank;
+extern int    CmiMyLocalRank;
 
 #if ! defined(_WIN32)
 /* parse forks only used in non-smp mode */
@@ -880,7 +879,6 @@ static void CommunicationInterrupt(int ignored)
   MACHSTATE(2,"--END SIGIO--")
 }
 
-CMI_EXTERNC
 void CmiSignal(int sig1, int sig2, int sig3, void (*handler)(int));
 
 static void CmiDestroyLocks(void)
@@ -1183,7 +1181,7 @@ static int InternalScanf(char *fmt, va_list l)
 /*New stdarg.h declarations*/
 void CmiPrintf(const char *fmt, ...)
 {
-  CMI_EXTERNC_VARIABLE int quietMode;
+  extern int quietMode;
   if (quietMode) return;
   CpdSystemEnter();
   {
