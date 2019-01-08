@@ -944,9 +944,6 @@ void ConverseRunPE(int everReturn) {
     CthInit(CmiMyArgv);
 
     CmiBarrier();
-    CmiBarrier();
-    CmiBarrier();
-    CmiBarrier();
 
     //printf ("Before Converse Common Init\n");
     ConverseCommonInit(CmiMyArgv);
@@ -1041,7 +1038,6 @@ void ConverseExit(int exitcode) {
   }
 
 #if !CMK_BLUEGENEQ
-  CmiBarrier();
   CmiBarrier();
 #endif
 

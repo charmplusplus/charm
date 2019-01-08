@@ -1044,8 +1044,6 @@ void CmiTimerInit(char **argv)
 #if !(__FAULT__)
   /* try to synchronize calling barrier */
   CmiBarrier();
-  CmiBarrier();
-  CmiBarrier();
 #endif
 if(CmiMyRank() == 0) /* initialize only  once */
   {
@@ -1154,7 +1152,6 @@ void CmiTimerInit(char **argv)
   struct rusage ru;
 
   CmiBarrier();
-  CmiBarrier();
 
   _cpu_speed_factor = 1.0/(readMHz()*1.0e6); 
   rdtsc(); rdtsc(); rdtsc(); rdtsc(); rdtsc();
@@ -1225,8 +1222,6 @@ void CmiTimerInit(char **argv)
 
   /* try to synchronize calling barrier */
 #if !(__FAULT__)
-  CmiBarrier();
-  CmiBarrier();
   CmiBarrier();
 #endif
   CpvAccess(inittime) = GetTimeBase (); 
@@ -1309,8 +1304,6 @@ void CmiTimerInit(char **argv)
 
   /* try to synchronize calling barrier */
 #if !(__FAULT__)
-  CmiBarrier();
-  CmiBarrier();
   CmiBarrier();
 #endif
   CpvAccess(inittime) = PPC64_TimeBase ();

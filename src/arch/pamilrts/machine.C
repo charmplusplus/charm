@@ -781,7 +781,6 @@ void LrtsExit(int exitcode)
 {
 #if !CMK_BLUEGENEQ
   CmiBarrier();
-  CmiBarrier();
 #endif
 
   int rank0 = 0, i = 0;

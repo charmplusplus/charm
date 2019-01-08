@@ -4488,8 +4488,6 @@ void CmiTimerInit(char **argv) {
         }
     } else { /* we don't have a synchronous timer, set our own start time */
         CmiBarrier();
-        CmiBarrier();
-        CmiBarrier();
         clock_gettime(CLOCK_MONOTONIC, &start_ts);
     }
     CmiNodeAllBarrier();          /* for smp */
