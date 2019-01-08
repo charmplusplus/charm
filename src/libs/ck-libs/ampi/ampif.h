@@ -107,18 +107,21 @@
        integer, parameter :: MPI_DOUBLE_COMPLEX    = MPI_COMPLEX16
        integer, parameter :: MPI_COMPLEX32         = 41
 
-       integer, parameter :: MPI_COMBINER_NAMED          = 1
-       integer, parameter :: MPI_COMBINER_CONTIGUOUS     = 2
-       integer, parameter :: MPI_COMBINER_VECTOR         = 3
-       integer, parameter :: MPI_COMBINER_HVECTOR        = 4
-       integer, parameter :: MPI_COMBINER_INDEXED        = 5
-       integer, parameter :: MPI_COMBINER_HINDEXED       = 6
-       integer, parameter :: MPI_COMBINER_STRUCT         = 7
-       integer, parameter :: MPI_COMBINER_DARRAY         = 8
-       integer, parameter :: MPI_COMBINER_RESIZED        = 9
-       integer, parameter :: MPI_COMBINER_SUBARRAY       = 10
-       integer, parameter :: MPI_COMBINER_INDEXED_BLOCK  = 11
-       integer, parameter :: MPI_COMBINED_HINDEXED_BLOCK = 12
+       integer, parameter :: MPI_COMBINER_NAMED            = 1
+       integer, parameter :: MPI_COMBINER_CONTIGUOUS       = 2
+       integer, parameter :: MPI_COMBINER_VECTOR           = 3
+       integer, parameter :: MPI_COMBINER_HVECTOR          = 4
+       integer, parameter :: MPI_COMBINER_HVECTOR_INTEGER  = 5
+       integer, parameter :: MPI_COMBINER_INDEXED          = 6
+       integer, parameter :: MPI_COMBINER_HINDEXED         = 7
+       integer, parameter :: MPI_COMBINER_HINDEXED_INTEGER = 8
+       integer, parameter :: MPI_COMBINER_STRUCT           = 9
+       integer, parameter :: MPI_COMBINER_STRUCT_INTEGER   = 10
+       integer, parameter :: MPI_COMBINER_DARRAY           = 11
+       integer, parameter :: MPI_COMBINER_RESIZED          = 12
+       integer, parameter :: MPI_COMBINER_SUBARRAY         = 13
+       integer, parameter :: MPI_COMBINER_INDEXED_BLOCK    = 14
+       integer, parameter :: MPI_COMBINED_HINDEXED_BLOCK   = 15
 
        integer, parameter :: MPI_TAG_UB_VALUE = 1073741824
 

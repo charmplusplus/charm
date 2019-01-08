@@ -405,18 +405,21 @@ typedef void (*MPI_PupFn)(pup_er, void*);
 typedef void (*MPI_MigrateFn)(void);
 
 /* for the datatype decoders */
-#define MPI_COMBINER_NAMED           1
-#define MPI_COMBINER_CONTIGUOUS      2
-#define MPI_COMBINER_VECTOR          3
-#define MPI_COMBINER_HVECTOR         4
-#define MPI_COMBINER_INDEXED         5
-#define MPI_COMBINER_HINDEXED        6
-#define MPI_COMBINER_STRUCT          7
-#define MPI_COMBINER_DARRAY          8
-#define MPI_COMBINER_RESIZED         9
-#define MPI_COMBINER_SUBARRAY       10
-#define MPI_COMBINER_INDEXED_BLOCK  11
-#define MPI_COMBINER_HINDEXED_BLOCK 12
+#define MPI_COMBINER_NAMED            1
+#define MPI_COMBINER_CONTIGUOUS       2
+#define MPI_COMBINER_VECTOR           3
+#define MPI_COMBINER_HVECTOR          4
+#define MPI_COMBINER_HVECTOR_INTEGER  5
+#define MPI_COMBINER_INDEXED          6
+#define MPI_COMBINER_HINDEXED         7
+#define MPI_COMBINER_HINDEXED_INTEGER 8
+#define MPI_COMBINER_STRUCT           9
+#define MPI_COMBINER_STRUCT_INTEGER   10
+#define MPI_COMBINER_DARRAY           11
+#define MPI_COMBINER_RESIZED          12
+#define MPI_COMBINER_SUBARRAY         13
+#define MPI_COMBINER_INDEXED_BLOCK    14
+#define MPI_COMBINER_HINDEXED_BLOCK   15
 
 #define MPI_BSEND_OVERHEAD 0
 
