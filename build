@@ -360,7 +360,7 @@ do
           	shift
  	  	;;
     --no-build-shared|--no-shared)
-		#BUILD_SHARED="-no-build-shared"; 
+		BUILD_SHARED='';
 		shift
 		;;
     --build-shared)
