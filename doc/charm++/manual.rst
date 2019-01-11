@@ -334,6 +334,15 @@ Sublime Text
 Syntax highlighting in Sublime Text (version 3 or newer) can be enabled
 by installing the *Charmci* package through Package Control.
 
+Emacs
+'''''
+
+Syntax highlighting in Emacs can be enabled by triggering C++ handling on the .ci file extension by adding the following line to your .emacs file.
+
+.. code-block:: emacs
+
+   (add-to-list 'auto-mode-alist '("\\.ci\\'" . c++-mode))
+
 Modules
 ~~~~~~~
 
