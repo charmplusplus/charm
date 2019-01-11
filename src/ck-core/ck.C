@@ -2344,14 +2344,16 @@ int CkCreateGroupExt(int cIdx, int eIdx, int num_bufs, char **bufs, int *buf_siz
 
 // TODO options
 extern "C"
-int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, int num_bufs, char **bufs, int *buf_sizes, int map_gid) {
+int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, int num_bufs,
+                     char **bufs, int *buf_sizes, int map_gid, char useAtSync) {
   //static_cast<void>(impl_e_opts);
   CkAssert(num_bufs >= 1);
   int totalSize = 0;
   for (int i=0; i < num_bufs; i++) totalSize += buf_sizes[i];
-  int marshall_msg_size = (sizeof(char)*totalSize + sizeof(int)*2);
+  int marshall_msg_size = (sizeof(char)*totalSize + sizeof(int)*2 + sizeof(char));
   CkMarshallMsg *impl_msg = CkAllocateMarshallMsg(marshall_msg_size, NULL);
   PUP::toMem implP((void *)impl_msg->msgBuf);
+  implP|useAtSync;
   implP|totalSize;
   implP|buf_sizes[0];
   for (int i=0; i < num_bufs; i++) implP(bufs[i], buf_sizes[i]);
@@ -2371,13 +2373,15 @@ int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, int num_bufs, cha
 
 // TODO options
 extern "C"
-void CkInsertArrayExt(int aid, int ndims, int *index, int epIdx, int onPE, int num_bufs, char **bufs, int *buf_sizes) {
+void CkInsertArrayExt(int aid, int ndims, int *index, int epIdx, int onPE, int num_bufs,
+                      char **bufs, int *buf_sizes, char useAtSync) {
   CkAssert(num_bufs >= 1);
   int totalSize = 0;
   for (int i=0; i < num_bufs; i++) totalSize += buf_sizes[i];
-  int marshall_msg_size = (sizeof(char)*totalSize + sizeof(int)*2);
+  int marshall_msg_size = (sizeof(char)*totalSize + sizeof(int)*2 + sizeof(char));
   CkMarshallMsg *impl_msg = CkAllocateMarshallMsg(marshall_msg_size, NULL);
   PUP::toMem implP((void *)impl_msg->msgBuf);
+  implP|useAtSync;
   implP|totalSize;
   implP|buf_sizes[0];
   for (int i=0; i < num_bufs; i++) implP(bufs[i], buf_sizes[i]);

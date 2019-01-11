@@ -501,6 +501,15 @@ public:
   }
 
   void ResumeFromSync() {
+    if (!usesAtSync) {
+      // not sure in which cases it is useful to receive resumeFromSync if
+      // usesAtSync=false, but for now I'm disabling it because it is
+      // unnecessary overhead. In non-lb scenarios with NullLB, every LBPeriod
+      // (which is 0.5 s by default), the lb infrastructure calls atsync and
+      // resumefromsync on every chare array element, even if usesAtSync=false.
+      // that part of the lb infrastructure should be fixed first.
+      return;
+    }
     ArrayResumeFromSyncExtCallback(((CkGroupID)thisArrayID).idx,
                             int(thisIndexMax.getDimension()),
                             thisIndexMax.data());
