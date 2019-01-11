@@ -10,7 +10,9 @@ qt: md/setjmp_d.h qt.c md/setjmp.c
 	$(CHARMC) -pedantic -c -o qt.o qt.c
 	$(CHARMC) -c -o qtmds.o md/setjmp.c
 	$(CHARMC) -o libckqt.a qt.o qtmds.o 
+ifeq (false,$(CMK_NO_BUILD_SHARED))
 	$(CHARMC) -shared -o libckqt.$(CMK_SHARED_SUF) qt.o qtmds.o
+endif
 
 stp:
 	$(CHARMC) -c stp.c

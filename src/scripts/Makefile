@@ -532,7 +532,9 @@ hwloc-target:  conv-autoconfig.h
 	( cp -f hwloc/src/.libs/libhwloc_embedded.a $(L) )
 	( cp -f hwloc/include/hwloc.h $(INC) )
 	( cp -LRf hwloc/include/hwloc $(INC) )
+ifeq (false,$(CMK_NO_BUILD_SHARED))
 	( test -d ../lib_so && cp -f hwloc/src/.libs/libhwloc_embedded.*$(CMK_SHARED_SUF)* ../lib_so/ ) || true
+endif
 	touch $@
 
 charmrun-target: hwloc-target charmrun  sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h sockRoutines-seq.o $(L)/libck.a $(L)/libhwloc_embedded.a $(CVLIBS) conv-static.o
@@ -543,7 +545,9 @@ QUICK_THREADS: $(CVHEADERS)
 	( cd QuickThreads;./configure )
 	( $(MAKE) -C QuickThreads qt  OPTS='$(OPTS) -Wno-error' ) || ( echo "Did you try to build netlrts-linux on a 64-bit system? Try netlrts-linux-x86_64" && false )
 	cp -f QuickThreads/libckqt.a ../lib/
+ifeq (false,$(CMK_NO_BUILD_SHARED))
 	-( test -d ../lib_so && cp -f QuickThreads/libckqt.$(CMK_SHARED_SUF) ../lib_so/ ) || true
+endif
 	touch QUICK_THREADS
 
 CONVLIBS: converse

@@ -2544,6 +2544,7 @@ if test $pass -eq 0
 then 
 	add_flag 'CMK_NO_BUILD_SHARED="true"' "build-shared"
 	add_make_flag 'CMK_NO_BUILD_SHARED:=true' 'build-shared'
+	CMK_NO_BUILD_SHARED='true'
 else
 	BUILD_SHARED=1
         if test "$BUILD_MPI" = "1"
@@ -2566,6 +2567,7 @@ EOT
 	then
 		add_flag 'CMK_NO_BUILD_SHARED="true"' "build-shared"
 		add_make_flag 'CMK_NO_BUILD_SHARED:=true' 'build-shared'
+		CMK_NO_BUILD_SHARED='true'
 	fi
 fi
 
@@ -2813,11 +2815,17 @@ AC_SUBST(CC_FOR_BUILD)
 export HWLOC_FLAGS="$CHARM_CC_FLAGS"
 export CFLAGS="$CMK_SEQ_CC_FLAGS"
 export AR="$(get_full_command_name "${CMK_SEQ_AR%% *}")"
-export am_libhwloc_embedded_la_rpath="-rpath $CHARMLIBSO"
-AC_SUBST(am_libhwloc_embedded_la_rpath)
 enable_embedded_mode='yes'
 enable_static='yes'
-enable_shared='yes'
+if test "$CMK_NO_BUILD_SHARED" = 'false'
+then
+  enable_shared='yes'
+  export am_libhwloc_embedded_la_rpath="-rpath $CHARMLIBSO"
+else
+  enable_shared='no'
+  export am_libhwloc_embedded_la_rpath=''
+fi
+AC_SUBST(am_libhwloc_embedded_la_rpath)
 enable_libnuma='no'
 enable_pci='no'
 enable_libudev='no'
