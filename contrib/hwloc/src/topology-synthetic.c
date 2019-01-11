@@ -1,6 +1,6 @@
 /*
  * Copyright © 2009 CNRS
- * Copyright © 2009-2017 Inria.  All rights reserved.
+ * Copyright © 2009-2018 Inria.  All rights reserved.
  * Copyright © 2009-2010 Université Bordeaux
  * Copyright © 2009-2011 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
@@ -461,7 +461,6 @@ hwloc_backend_synthetic_init(struct hwloc_synthetic_backend_data_s *data,
       errno = EINVAL;
       goto error;
     }
-    data->level[count-1].arity = (unsigned)item;
 
     totalarity *= item;
     data->level[count].totalwidth = totalarity;
@@ -487,6 +486,7 @@ hwloc_backend_synthetic_init(struct hwloc_synthetic_backend_data_s *data,
       goto error;
     }
 
+    data->level[count-1].arity = (unsigned)item;
     count++;
   }
 
@@ -610,7 +610,7 @@ hwloc_backend_synthetic_init(struct hwloc_synthetic_backend_data_s *data,
 	  curlevel->memorysize = 32*1024;
 	else
 	  /* *4 at each level, starting from 1MB for L2, unified */
-	  curlevel->memorysize = 256*1024 << (2*curlevel->depth);
+	  curlevel->memorysize = 256ULL*1024 << (2*curlevel->depth);
       }
 
     } else if (type == HWLOC_OBJ_NUMANODE && !curlevel->memorysize) {
@@ -945,8 +945,8 @@ static int hwloc_topology_export_synthetic_indexes(struct hwloc_topology * topol
   /* dump all indexes */
   cur = obj;
   while (cur) {
-    res = snprintf(tmp, tmplen, "%u%s", cur->os_index,
-		   cur->next_cousin ? "," : ")");
+    res = hwloc_snprintf(tmp, tmplen, "%u%s", cur->os_index,
+			 cur->next_cousin ? "," : ")");
     if (res < 0)
       return -1;
     ret += res;
@@ -1004,7 +1004,7 @@ static int hwloc_topology_export_synthetic_obj_attr(struct hwloc_topology * topo
     tmplen -= res;
 
     if (needindexes) {
-      res = snprintf(tmp, tmplen, "%sindexes=", prefix);
+      res = hwloc_snprintf(tmp, tmplen, "%sindexes=", prefix);
       if (res < 0)
 	return -1;
       ret += res;

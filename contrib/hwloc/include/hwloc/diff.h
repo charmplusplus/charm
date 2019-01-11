@@ -1,5 +1,5 @@
 /*
- * Copyright © 2013-2016 Inria.  All rights reserved.
+ * Copyright © 2013-2018 Inria.  All rights reserved.
  * See COPYING in top-level directory.
  */
 
@@ -43,6 +43,7 @@ extern "C" {
  * More complex differences such as adding or removing objects cannot
  * be represented in the difference structures and therefore return
  * errors.
+ * Differences between object sets cannot be represented either.
  *
  * It means that there is no need to apply the difference when
  * looking at the tree organization (how many levels, how many
@@ -280,6 +281,9 @@ HWLOC_DECLSPEC int hwloc_topology_diff_load_xmlbuffer(hwloc_topology_t topology,
  * This identifier is usually the name of the other XML file
  * that contains the reference topology.
  * This attribute is given back when reading the diff from XML.
+ *
+ * The returned buffer ends with a \0 that is included in the returned
+ * length.
  *
  * \note The XML buffer should later be freed with hwloc_free_xmlbuffer().
  *
