@@ -337,7 +337,9 @@ dirs+sources:
 		cp -f $(SRCBASE)/arch/win/createlink.exe ../bin; \
 	fi
 	rm -rf ../lib ; mkdir ../lib
+ifeq (false,$(CMK_NO_BUILD_SHARED))
 	rm -rf ../lib_so ; mkdir ../lib_so; touch ../lib_so/.charmso
+endif
 	rm -rf ../examples
 	rm -rf ../tests
 	rm -rf ../doc ; ln -s ../doc ../doc
@@ -991,12 +993,16 @@ OTHER_OBJS= mpi-mainmodule.o main.o custom_partitioner.o BlueGene.o set_partitio
 install:
 	@test ! -d $(DESTDIR)/include && mkdir -p $(DESTDIR)/include || true
 	@test ! -d $(DESTDIR)/lib && mkdir -p $(DESTDIR)/lib || true
+ifeq (false,$(CMK_NO_BUILD_SHARED))
 	@test ! -d $(DESTDIR)/lib_so && mkdir -p $(DESTDIR)/lib_so || true
+endif
 	@test ! -d $(DESTDIR)/bin && mkdir -p $(DESTDIR)/bin || true
 	# cp -f ../include/*   $(DESTDIR)/include
 	for f in ../include/*; do if test -f $$f; then cp -f $$f $(DESTDIR)/include; fi; done
 	cp -f ../lib/*       $(DESTDIR)/lib
+ifeq (false,$(CMK_NO_BUILD_SHARED))
 	cp -f ../lib_so/*    $(DESTDIR)/lib_so || true
+endif
 #	cp -f ../bin/*       $(DESTDIR)/bin
 	for f in ../bin/*; do if test -f $$f; then cp -f $$f $(DESTDIR)/bin; fi; done
 

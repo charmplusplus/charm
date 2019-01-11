@@ -786,7 +786,10 @@ else
 ln -f -s \$@
 EOF
   chmod +x $DESTINATION/tmp/system_ln
-  for newdir in `echo bin lib lib_so include tmp`
+  newdirlist='bin lib'
+  [ -n "$BUILD_SHARED" ] && newdirlist="$newdirlist lib_so"
+  newdirlist="$newdirlist include tmp"
+  for newdir in $newdirlist
   do
     Echo "Soft-linking over $newdir"
     if [ -r $newdir ]

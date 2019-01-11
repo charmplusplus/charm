@@ -1103,7 +1103,8 @@ then
 	# ignore BUILD_SHARE if the target is not .a or .so
 	case "$OBJECT" in
 	*.a|*.so|*.so.*|*.sl|*.dylib)
- 		OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO -L$CHARMLIBSO"
+		OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO"
+		[ -n "$CHARMLIBSO" ] && OPTS_LD="$OPTS_LD -L$CHARMLIBSO"
 		;;
 	*)	
 		BUILD_SHARE="0"
