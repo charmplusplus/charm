@@ -218,16 +218,12 @@ class CkCacheManager : public CBase_CkCacheManager<CkCacheKey> {
   /// number of chares that have checked in for the next iteration
   int syncdChares;
 
-  /// The number of arrays this Manager serves without support for writeback
-  int numLocMgr;
   /// The group ids of the location managers of the arrays this Manager serves
   /// with support for writeback
-  CkGroupID *locMgr;
-  /// The number of arrays this Manager serves with support for writeback
-  int numLocMgrWB;
+  std::vector<CkGroupID> locMgr;
   /// The group ids of the location managers of the arrays this Manager serves
   /// with support for writeback
-  CkGroupID *locMgrWB;
+  std::vector<CkGroupID> locMgrWB;
 
 #if COSMO_STATS > 0
   /// particles arrived from remote processors, this counts only the entries in the cache
@@ -314,40 +310,32 @@ class CkCacheManager : public CBase_CkCacheManager<CkCacheKey> {
   template<class CkCacheKey>
   CkCacheManager<CkCacheKey>::CkCacheManager(int size, CkGroupID gid) {
     init();
-    numLocMgr = 1;
-    numLocMgrWB = 0;
-    locMgr = new CkGroupID[1];
-    locMgr[0] = gid;
+    locMgr.emplace_back(gid);
     maxSize = (CmiUInt8)size * 1024 * 1024;
   }
 
   template<class CkCacheKey>
   CkCacheManager<CkCacheKey>::CkCacheManager(int size, int n, CkGroupID *gid) {
     init();
-    numLocMgr = n;
-    numLocMgrWB = 0;
-    locMgr = new CkGroupID[n];
-    for (int i=0; i<n; ++i) locMgr[i] = gid[i];
+    locMgr.reserve(n);
+    for (int i=0; i<n; ++i) locMgr.emplace_back(gid[i]);
     maxSize = (CmiUInt8)size * 1024 * 1024;
   }
 
   template<class CkCacheKey>
   CkCacheManager<CkCacheKey>::CkCacheManager(int size, int n, CkGroupID *gid, int nWB, CkGroupID *gidWB) {
     init();
-    numLocMgr = n;
-    locMgr = new CkGroupID[n];
-    for (int i=0; i<n; ++i) locMgr[i] = gid[i];
-    numLocMgrWB = nWB;
-    locMgrWB = new CkGroupID[nWB];
-    for (int i=0; i<nWB; ++i) locMgrWB[i] = gidWB[i];
+    locMgr.reserve(n);
+    for (int i=0; i<n; ++i) locMgr.emplace_back(gid[i]);
+    locMgrWB.reserve(nWB);
+    for (int i=0; i<nWB; ++i) locMgrWB.emplace_back(gidWB[i]);
     maxSize = (CmiUInt8)size * 1024 * 1024;
   }
 
   template<class CkCacheKey>
   void CkCacheManager<CkCacheKey>::init() {
     numChunks = 0;
-    numLocMgr = 0;
-    locMgr = NULL;
+    locMgr.clear();
     maxSize = 0;
     syncdChares = 0;
     cacheTable = NULL;
@@ -365,12 +353,8 @@ class CkCacheManager : public CBase_CkCacheManager<CkCacheKey> {
 
   template<class CkCacheKey>
   void CkCacheManager<CkCacheKey>::pup(PUP::er &p) {
-    p | numLocMgr;
-    if (p.isUnpacking()) locMgr = new CkGroupID[numLocMgr];
-    PUP::PUParray(p,locMgr,numLocMgr);
-    p | numLocMgrWB;
-    if (p.isUnpacking()) locMgrWB = new CkGroupID[numLocMgrWB];
-    PUP::PUParray(p,locMgrWB,numLocMgrWB);
+    p | locMgr;
+    p | locMgrWB;
     p | maxSize;
   }
 
@@ -518,12 +502,12 @@ inline void CkCacheManager<CkCacheKey>::recvData(CkCacheKey key, void *data, CkC
 
       localChares.reset();
       localCharesWB.reset();
-      for (int i=0; i<numLocMgr; ++i) {
-        CkLocMgr *mgr = (CkLocMgr *)CkLocalBranch(locMgr[i]);
+      for (auto & b : locMgr) {
+        CkLocMgr *mgr = (CkLocMgr *)CkLocalBranch(b);
         mgr->iterate(localChares);
       }
-      for (int i=0; i<numLocMgrWB; ++i) {
-        CkLocMgr *mgr = (CkLocMgr *)CkLocalBranch(locMgrWB[i]);
+      for (auto & b : locMgrWB) {
+        CkLocMgr *mgr = (CkLocMgr *)CkLocalBranch(b);
         mgr->iterate(localChares);
         mgr->iterate(localCharesWB);
       }

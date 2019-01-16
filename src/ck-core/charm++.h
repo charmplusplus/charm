@@ -108,7 +108,7 @@ public:
         return *this;
 	}
 	inline CkEntryOptions& setPriority(const CkBitVector &cbv) {
-		if ( cbv.data != NULL ) {
+		if ( !cbv.data.empty() ) {
 			if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO &&
                              queueingtype != CK_QUEUEING_ILIFO ) {
 				delete [] prioPtr;
@@ -119,7 +119,7 @@ public:
 			int dataLength = (prioBits + (sizeof(prio_t)*8 - 1)) /
 		                 	(sizeof(prio_t)*8);
 			prioPtr = new prio_t[dataLength];
-			memcpy((void *)prioPtr, cbv.data, dataLength*sizeof(prio_t));
+			memcpy((void *)prioPtr, cbv.data.data(), dataLength*sizeof(prio_t));
 		} else {
 			queueingtype=CK_QUEUEING_BFIFO;
 			prioBits=0;
@@ -945,56 +945,36 @@ PUPmarshall(CProxyElement_Group)
 #define GROUP_SECTION_PROXY 1
 class CProxySection_Group : public CProxy_Group {
 private:
-  int _nsid;
-  CkSectionID *_sid;
+  std::vector<CkSectionID> _sid;
 public:
   CProxySection_Group() { }
   CProxySection_Group(const CkGroupID &gid, const int *elems, const int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR)
-      :CProxy_Group(gid), _nsid(1) { _sid = new CkSectionID(gid, elems, nElems, factor); }
+      :CProxy_Group(gid), _sid({CkSectionID(gid, elems, nElems, factor)}) { }
   CProxySection_Group(const CkGroupID &gid, const int *elems, const int nElems, CK_DELCTOR_PARAM)
-      :CProxy_Group(gid,CK_DELCTOR_ARGS), _nsid(1) { _sid = new CkSectionID(gid, elems, nElems); }
+      :CProxy_Group(gid,CK_DELCTOR_ARGS), _sid({CkSectionID(gid, elems, nElems)}) { }
   CProxySection_Group(const CProxySection_Group &cs)
-      :CProxy_Group(cs.ckGetGroupID()), _nsid(cs._nsid) {
-    if (_nsid == 1) _sid = new CkSectionID(cs.ckGetGroupID(), cs.ckGetElements(), cs.ckGetNumElements());
-    else if (_nsid > 1) {
-      _sid = new CkSectionID[_nsid];
-      for (int i=0; i<_nsid; ++i) _sid[i] = cs._sid[i];
-    } else _sid = NULL;
-  }
+      :CProxy_Group(cs.ckGetGroupID()), _sid(cs._sid) { }
   CProxySection_Group(const CProxySection_Group &cs,CK_DELCTOR_PARAM)
-      :CProxy_Group(cs.ckGetGroupID(),CK_DELCTOR_ARGS), _nsid(cs._nsid) {
-    if (_nsid == 1) _sid = new CkSectionID(cs.ckGetGroupID(), cs.ckGetElements(), cs.ckGetNumElements());
-    else if (_nsid > 1) {
-      _sid = new CkSectionID[_nsid];
-      for (int i=0; i<_nsid; ++i) _sid[i] = cs._sid[i];
-    } else _sid = NULL;
-  }
+      :CProxy_Group(cs.ckGetGroupID(),CK_DELCTOR_ARGS), _sid(cs._sid) { }
   CProxySection_Group(const IrrGroup *g)
-      :CProxy_Group(g), _nsid(0) {}
+      :CProxy_Group(g) { }
   CProxySection_Group(const int n, const CkGroupID *gid,  int const * const *elems, const int *nElems, int factor=USE_DEFAULT_BRANCH_FACTOR)
-      :CProxy_Group(gid[0]), _nsid(n) {
-    _sid = new CkSectionID[n];
-    for (int i=0; i<n; ++i) _sid[i] = CkSectionID(gid[i], elems[i], nElems[i], factor);
+      :CProxy_Group(gid[0]) {
+    _sid.reserve(n);
+    for (int i=0; i<n; ++i) _sid.emplace_back(gid[i], elems[i], nElems[i], factor);
   }
   CProxySection_Group(const int n, const CkGroupID *gid, int const * const *elems, const int *nElems,CK_DELCTOR_PARAM)
-      :CProxy_Group(gid[0],CK_DELCTOR_ARGS), _nsid(n) {
-    _sid = new CkSectionID[n];
-    for (int i=0; i<n; ++i) _sid[i] = CkSectionID(gid[i], elems[i], nElems[i]);
+      :CProxy_Group(gid[0],CK_DELCTOR_ARGS) {
+    _sid.reserve(n);
+    for (int i=0; i<n; ++i) _sid.emplace_back(gid[i], elems[i], nElems[i]);
   }
   
   ~CProxySection_Group() {
-    if (_nsid == 1) delete _sid;
-    else if (_nsid > 1) delete[] _sid;
   }
   
   CProxySection_Group &operator=(const CProxySection_Group &cs) {
     CProxy_Group::operator=(cs);
-    _nsid = cs._nsid;
-    if (_nsid == 1) _sid = new CkSectionID(*cs._sid);
-    else if (_nsid > 1) {
-      _sid = new CkSectionID[_nsid];
-      for (int i=0; i<_nsid; ++i) _sid[i] = cs._sid[i];
-    } else _sid = NULL;
+    _sid = cs._sid;
     return *this;
   }
  
@@ -1002,9 +982,9 @@ public:
   { ckDelegate(d); d->initDelegateMgr(this, GROUP_SECTION_PROXY); } 
   //void ckSend(CkArrayMessage *m, int ep, int opts = 0) ;
 
-  inline int ckGetNumSections() const {return _nsid;}
+  inline int ckGetNumSections() const {return _sid.size();}
   inline CkSectionInfo &ckGetSectionInfo() {return _sid[0]._cookie;}
-  inline CkSectionID *ckGetSectionIDs() {return _sid; }
+  inline CkSectionID *ckGetSectionIDs() {return _sid.data(); }
   inline CkSectionID &ckGetSectionID() {return _sid[0]; }
   inline CkSectionID &ckGetSectionID(int i) {return _sid[i]; }
   inline CkGroupID ckGetGroupIDn(int i) const {return _sid[i]._cookie.get_aid();}
@@ -1015,13 +995,7 @@ public:
   inline int ckGetBfactor() const { return _sid[0].bfactor; }
   void pup(PUP::er &p) {
     CProxy_Group::pup(p);
-    p | _nsid;
-    if (p.isUnpacking()) {
-      if (_nsid == 1) _sid = new CkSectionID;
-      else if (_nsid > 1) _sid = new CkSectionID[_nsid];
-      else _sid = NULL;
-    }
-    for (int i=0; i<_nsid; ++i) p | _sid[i];
+    p | _sid;
   }
 };
 PUPmarshall(CProxySection_Group)

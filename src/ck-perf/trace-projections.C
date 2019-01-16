@@ -809,28 +809,6 @@ void LogPool::modLastEntryTimestamp(double ts)
   //pool[numEntries-1].cputime = ts;
 }
 
-// /** Constructor for a multicast log entry */
-// 
-//  THIS WAS MOVED TO trace-projections.h with the other constructors
-// 
-// LogEntry::LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
-// 	     int ml, CmiObjId *d, double rt, int numPe, int *pelist) 
-// {
-//     type = CREATION_MULTICAST; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
-//     if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=id.id[3]=-1; };
-//     recvTime = rt; 
-//     numpes = numPe;
-//     userSuppliedNote = NULL;
-//     if (pelist != NULL) {
-// 	pes = new int[numPe];
-// 	for (int i=0; i<numPe; i++) {
-// 	  pes[i] = pelist[i];
-// 	}
-//     } else {
-// 	pes= NULL;
-//     }
-// }
-
 //void LogEntry::addPapi(LONG_LONG_PAPI *papiVals)
 //{
 //#if CMK_HAS_COUNTER_PAPI
@@ -928,36 +906,14 @@ void LogEntry::pup(PUP::er &p)
 	break;
     case USER_SUPPLIED_NOTE:
 	  p|itime;
-	  int length;
-	  length=0;
-	  if (p.isPacking()) length = strlen(userSuppliedNote);
-          p | length;
-	  char space;
-	  space = ' ';
-          p | space;
-	  if (p.isUnpacking()) {
-	    userSuppliedNote = new char[length+1];
-	    userSuppliedNote[length] = '\0';
-	  }
-   	  PUParray(p,userSuppliedNote, length);
+	  p|userSuppliedNote;
 	  break;
     case USER_SUPPLIED_BRACKETED_NOTE:
       //CkPrintf("Writting out a USER_SUPPLIED_BRACKETED_NOTE\n");
 	  p|itime;
 	  p|iEndTime;
 	  p|event;
-	  int length2;
-	  length2=0;
-	  if (p.isPacking()) length2 = strlen(userSuppliedNote);
-          p | length2;
-	  char space2;
-	  space2 = ' ';
-          p | space2;
-	  if (p.isUnpacking()) {
-	    userSuppliedNote = new char[length2+1];
-	    userSuppliedNote[length2] = '\0';
-	  }
-   	  PUParray(p,userSuppliedNote, length2);
+	  p|userSuppliedNote;
 	  break;
     case MEMORY_USAGE_CURRENT:
       p | memUsage;
@@ -986,8 +942,7 @@ void LogEntry::pup(PUP::er &p)
       if (p.isPacking()) irecvtime = (CMK_TYPEDEF_UINT8)(1.0e6*recvTime);
       p|mIdx; p|eIdx; p|itime;
       p|event; p|pe; p|msglen; p|irecvtime; p|numpes;
-      if (p.isUnpacking()) pes = numpes?new int[numpes]:NULL;
-      for (i=0; i<numpes; i++) p|pes[i];
+      p|pes;
       if (p.isUnpacking()) recvTime = irecvtime/1.0e6;
       break;
     case MESSAGE_RECV:

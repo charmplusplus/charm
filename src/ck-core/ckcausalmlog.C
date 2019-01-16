@@ -2924,8 +2924,8 @@ void processReceivedTN(Chare *obj, int listSize, MCount *listTNs){
 			}else{
 				char objName[100];					
 				printf("[%d] Holes detected in the TNs for %s number %d \n",CkMyPe(),obj->mlogData->objID.toString(objName),numberHoles);
-				obj->mlogData->numberHoles = numberHoles;
-				obj->mlogData->ticketHoles = new MCount[numberHoles];
+				obj->mlogData->ticketHoles.clear();
+				obj->mlogData->ticketHoles.resize(numberHoles);
 				int countHoles=0;
 				for(int k=tProcessedIndex+1;k<vecsize;k++){
 					if((*obj->mlogData->receivedTNs)[k] != (*obj->mlogData->receivedTNs)[k-1]+1){
@@ -3769,11 +3769,7 @@ void MlogEntry::pup(PUP::er &p){
 void RestoredLocalMap::pup(PUP::er &p){
 	p | minSN;
 	p | maxSN;
-	p | count;
-	if(p.isUnpacking()){
-		TNArray = new MCount[count];
-	}
-	p(TNArray,count);
+	// p | TNArray; // unused?
 };
 
 /**********************************
@@ -3798,12 +3794,11 @@ MCount ChareMlogData::nextSN(const CkObjID &recver){
 MCount ChareMlogData::newTN(){
 	MCount TN;
 	if(currentHoles > 0){
-		int holeidx = numberHoles-currentHoles;
+		int holeidx = ticketHoles.size()-currentHoles;
 		TN = ticketHoles[holeidx];
 		currentHoles--;
 		if(currentHoles == 0){
-			delete []ticketHoles;
-			numberHoles = 0;
+			ticketHoles.clear();
 		}
 	}else{
 		TN = ++tCount;
@@ -3979,17 +3974,7 @@ void ChareMlogData::pup(PUP::er &p){
 	}
 	
 	p | currentHoles;
-	p | numberHoles;
-	if(p.isUnpacking()){
-		if(numberHoles > 0){
-			ticketHoles = new MCount[numberHoles];			
-		}else{
-			ticketHoles = NULL;
-		}
-	}
-	if(numberHoles > 0){
-		p(ticketHoles,numberHoles);
-	}
+	p | ticketHoles;
 	
 	snTable.pup(p);
 

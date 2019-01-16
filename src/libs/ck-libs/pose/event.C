@@ -2,9 +2,9 @@
 #include "pose.h"
 
 /// Basic Constructor
-Event::Event() :   spawnedList(NULL),msg (NULL), commitBfr(NULL),cpData(NULL),
+Event::Event() :   spawnedList(NULL),msg (NULL), cpData(NULL),
 		   serialCPdataSz(0), serialCPdata(NULL),
-		   next(NULL),prev(NULL), commitBfrLen(0), commitErr(0),
+		   next(NULL),prev(NULL), commitErr(0),
 		   done (0),   fnIdx(-1),  timestamp(POSE_UnsetTS),
 		   srt(0.0), svt (0)
 { 
@@ -20,7 +20,6 @@ Event::~Event()
   //double elapsed=CmiWallTimer()-start;
   //if (elapsed>50e-6)
   //CkPrintf("delete msg(%p) took %.6f\n", (void *)msg,elapsed);
-  if (commitBfr) free(commitBfr);
   while (spawnedList) {  // purge list of spawned events
     tmp = spawnedList;
     spawnedList = spawnedList->next;
@@ -35,17 +34,9 @@ void Event::pup(PUP::er &p)
   int msgSize, spawn = 0;
   SpawnedEvent *tmp = NULL;
   
-  evID.pup(p); p(fnIdx); p(timestamp); p(done); p(commitBfrLen); p(commitErr);
+  evID.pup(p); p(fnIdx); p(timestamp); p(done); p(commitErr);
   p(srt); p(ert); p(svt); p(evt);
-  // commitBfr
-  if (p.isUnpacking() && (commitBfrLen > 0)) { // unpack non-empty commitBfr
-    commitBfr = new char[commitBfrLen];
-    p(commitBfr, commitBfrLen);
-  }
-  else if (commitBfrLen > 0) // pack/size non-empty commitBfr
-    p(commitBfr, commitBfrLen);
-  else // unpack empty commitBfr
-    commitBfr = NULL;
+  p|commitBfr;
   
   // msg
   if (p.isUnpacking()) { // unpack msg
@@ -117,8 +108,6 @@ void Event::sanitize()
     /// Execution status: 0=not done, 1=done, 2=executing
     CmiAssert((done == 0) || (done == 1) || (done == 2));
     CmiAssert((commitErr == 0) || (commitErr == 1));
-    CmiAssert(((commitBfrLen == 0) && (commitBfr == NULL)) ||
-	      ((commitBfrLen > 0) && (commitBfr != NULL)));
     /// check commitBfr... not sure how
     /// check msg... not sure how
     /// check spawnedList... later

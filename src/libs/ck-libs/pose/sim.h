@@ -337,19 +337,18 @@ class sim : public CBase_sim {
   /// Used by buffered print functions
   void InternalCommitPrintf (const char *Fmt, va_list ap) {
     char *tmp;
-    size_t tmplen=myStrat->currentEvent->commitBfrLen + strlen(Fmt) + 1 +512;
+    size_t tmplen=myStrat->currentEvent->commitBfr.size() + strlen(Fmt) + 1 +512;
     if (!(tmp = (char *)malloc(tmplen * sizeof(char)))) {
       CkPrintf("ERROR: sim::CommitPrintf: OUT OF MEMORY!\n");
       CkExit();
     }
-    if (myStrat->currentEvent->commitBfr && myStrat->currentEvent->commitBfrLen) {
-      strcpy(tmp, myStrat->currentEvent->commitBfr);
-      free(myStrat->currentEvent->commitBfr);
+    if (myStrat->currentEvent->commitBfr.size()) {
+      strcpy(tmp, myStrat->currentEvent->commitBfr.data());
+      myStrat->currentEvent->commitBfr.clear();
       vsnprintf(tmp+strlen(tmp), tmplen, Fmt, ap); 
     }
     else vsnprintf(tmp, tmplen, Fmt, ap); 
-    myStrat->currentEvent->commitBfrLen = strlen(tmp) + 1;  
-    myStrat->currentEvent->commitBfr = tmp;
+    myStrat->currentEvent->commitBfr.assign(tmp, tmp + strlen(tmp) + 1);
   }
 };
 

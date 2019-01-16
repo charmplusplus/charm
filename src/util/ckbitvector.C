@@ -30,26 +30,18 @@
  *
  * ************************************************************************ */
 // Construct an empty bit vector
-CkBitVector::CkBitVector() : usedBits(0), data(NULL) {
+CkBitVector::CkBitVector() : usedBits(0) {
 }
 
 // Construct a copy of a bit vector
 CkBitVector::CkBitVector(const CkBitVector &b) : usedBits(b.usedBits) {
-  if ( b.data ) {
-    data = new prio_t[chunks(usedBits)];
-    memcpy(data, b.data, chunks(usedBits)*chunkSize());
-  } else {
-    data = NULL;
-  }
+  data = b.data;
 }
 
 // Construct a bit vector of the specified size.
 CkBitVector::CkBitVector(prio_t bits) : usedBits(bits) {
   if ( bits != 0 ) {
-    data = new prio_t[chunks(usedBits)];
-    memset(data, 0, chunks(usedBits)*chunkSize());
-  } else {
-    data = NULL;
+    data.resize(chunks(usedBits));
   }
 }
 
@@ -65,44 +57,35 @@ CkBitVector::CkBitVector(prio_t value, prio_t choices) {
   // choices
   usedBits = ilog2(choices);
   if ( usedBits != 0 ) {
-    data = new prio_t[chunks(usedBits)];
+    data.resize(chunks(usedBits));
     data[0] = value << (chunkBits() - usedBits);
-  } else {
-    data = NULL;
   }
 }
 
 // Nuke the memory occupied by a CkBitVector
 CkBitVector::~CkBitVector() {
-  wipeData();
 }
 
 // Clean out any memory I'm using.
 void CkBitVector::wipeData() {
-  if ( data ) {
-    delete [] data;
-    data = NULL;
-  }
-
+  data.clear();
   usedBits = 0;
 }
 
 
 // Copy a CkBitVector into this one.
 CkBitVector & CkBitVector::operator=(const CkBitVector &b) {
-  // Clean out any old cruft
-  wipeData();
+  usedBits = b.usedBits;
+  data = b.data;
 
-  // Was the other vector null?
-  if ( b.usedBits == 0 || b.data == NULL ) {
-    usedBits = 0;
-    data = NULL;
-  } else {
-    // Put in the new cruft
-    usedBits = b.usedBits;
-    data = new prio_t[chunks(usedBits)];
-    memcpy(data, b.data, chunks(usedBits)*chunkSize());
-  }
+  // Return the resultant bitvector
+  return *this;
+}
+
+// Move a CkBitVector into this one.
+CkBitVector & CkBitVector::operator=(CkBitVector &&b) {
+  usedBits = b.usedBits;
+  data = std::move(b.data);
 
   // Return the resultant bitvector
   return *this;
@@ -111,30 +94,21 @@ CkBitVector & CkBitVector::operator=(const CkBitVector &b) {
 
 // Zero all the bits in a vector
 CkBitVector & CkBitVector::Zero() {
-  // This won't work real well if the vector is empty
-  if ( data == NULL ) { return *this; }
-
-  // Zero out all the bits
-  memset(data, 0, chunkSize()*chunks(usedBits));
+  std::fill(data.begin(), data.end(), 0);
 
   return *this;
 }
 
 // Invert the bit vector
 CkBitVector & CkBitVector::Invert() {
-  // As usual, do nothing if I'm null.
-  if ( data == NULL ) { return *this; }
-
   // Invert all my bits. Only tricky one is the last block I need to mask
   // those bits beyond the end of the vector to make sure they don't get
   // set and corrupt an operation like shifting later.
-  int i;
-  for ( i = 0 ; i < chunks(usedBits) ; i++ ) {
-    data[i] = ~(data[i]);
+  for ( prio_t & d : data ) {
+    d = ~d;
   }
   if ( usedBits % chunkBits() != 0 ) {
-    i = chunks(usedBits) - 1;
-    data[i] = data[i] & ((~(unsigned int)0)<<(chunkBits()-(usedBits%chunkBits())));
+    data.back() &= ((~(unsigned int)0)<<(chunkBits()-(usedBits%chunkBits())));
   }
 
   return *this;
@@ -154,7 +128,7 @@ CkBitVector & CkBitVector::Clear(prio_t bit) {
   prio_t bitMask = ~(mask(bit));
 
   // Twiddle that bit to clear
-  data[index] = data[index] & bitMask;
+  data[index] &= bitMask;
 
   // Return the modified bitvector
   return *this;
@@ -172,7 +146,7 @@ CkBitVector & CkBitVector::Set(prio_t bit) {
   prio_t bitMask = mask(bit);
 
   // Twiddle that bit to set
-  data[index] = data[index] | bitMask;
+  data[index] |= bitMask;
 
   // Return the modified bitvector
   return *this;
@@ -199,7 +173,7 @@ bool CkBitVector::Test(prio_t bit) const {
 CkBitVector & CkBitVector::ShiftUp(prio_t bits) {
   // If data is null then we have nothing to work on
   // Also abort if we got a dud shift (0)
-  if ( ! data || bits == 0 ) { return *this; }
+  if ( bits == 0 ) { return *this; }
 
   // Shift by the whole and by the remainder at the same time
   prio_t whole = bits / chunkBits();
@@ -209,7 +183,7 @@ CkBitVector & CkBitVector::ShiftUp(prio_t bits) {
        data[i] = data[i+whole] << rem;
 
        if ( i+whole+1 < chunks(usedBits) ) {
-         data[i] = data[i] | (data[i+whole+1] >> (chunkBits()-rem));
+         data[i] |= data[i+whole+1] >> (chunkBits()-rem);
        }
      } else {
        data[i] = 0;
@@ -222,7 +196,7 @@ CkBitVector & CkBitVector::ShiftUp(prio_t bits) {
 CkBitVector & CkBitVector::ShiftDown(prio_t bits) {
   // If data is null then we have nothing to work on
   // Also abort if we got a dud shift (0)
-  if ( ! data || bits == 0 ) { return *this; }
+  if ( bits == 0 ) { return *this; }
 
   // Shift by the whole and by the remainder at the same time
   int whole = bits / chunkBits();
@@ -232,7 +206,7 @@ CkBitVector & CkBitVector::ShiftDown(prio_t bits) {
        data[i] = data[i-whole] >> rem;
 
        if ( i-whole-1 < chunks(usedBits) ) {
-         data[i] = data[i] | (data[i-whole-1] << (chunkBits()-rem));
+         data[i] |= data[i-whole-1] << (chunkBits()-rem);
        }
      } else {
        data[i] = 0;
@@ -251,42 +225,22 @@ CkBitVector & CkBitVector::ShiftDown(prio_t bits) {
 CkBitVector & CkBitVector::Resize(prio_t bits) {
   // If we got asked to size ourself to our current size, just chunk out
   if ( bits == usedBits ) { return *this; }
-
-  // If we're empty and got asked to resize, just set our size and allocate
-  // that much memory (remember to zero it!)
-  if ( ! data ) {
-    usedBits = bits;
-    data = new prio_t[chunks(usedBits)];
-    memset(data, 0, chunks(usedBits)*chunkSize());
-    return *this;
-  }
-
   // Asked to empty ourselves?
-  if ( bits == 0 ) {
+  else if ( bits == 0 ) {
     wipeData();
     return *this;
   }
-
   // Asked to grow?
-  if ( bits > usedBits ) {
+  else if ( bits > usedBits ) {
     prio_t shift = bits - usedBits;
-    prio_t *oldData = data;
-    data = new prio_t[chunks(bits)];
-    memset(data, 0, chunks(bits)*chunkSize());
-    memcpy(data, oldData, chunks(usedBits)*chunkSize());
-    delete [] oldData;
+    data.resize(chunks(bits));
     usedBits = bits;
     return ShiftDown(shift);
   }
-
   // Shrink?
-  if ( bits < usedBits ) {
+  else if ( bits < usedBits ) {
     ShiftUp(usedBits - bits);
-    prio_t *oldData = data;
-    data = new prio_t[chunks(bits)];
-    memset(data, 0, chunks(bits)*chunkSize());
-    memcpy(data, oldData, chunks(bits)*chunkSize());
-    delete [] oldData;
+    data.resize(chunks(bits));
     usedBits = bits;
     return *this;
   }
@@ -305,12 +259,9 @@ CkBitVector & CkBitVector::Union(CkBitVector const &b) {
     CkAbort("CkBitVector Union operands must be of the same length!");
   }
 
-  // As usual, do nothing if I'm null. Or if the other is null
-  if ( data == NULL || b.data == NULL ) { return *this; }
-
   // Union them into me
   for ( int i = 0 ; i < chunks(usedBits) ; i++ ) {
-    data[i] = data[i] | b.data[i];
+    data[i] |= b.data[i];
   }
 
   return *this;
@@ -323,12 +274,9 @@ CkBitVector & CkBitVector::Intersection(CkBitVector const &b) {
     CkAbort("CkBitVector Intersection operands must be of the same length!");
   }
 
-  // As usual, do nothing if I'm null. Or if the other is null
-  if ( data == NULL || b.data == NULL ) { return *this; }
-
   // Intersect them into me
   for ( int i = 0 ; i < chunks(usedBits) ; i++ ) {
-    data[i] = data[i] & b.data[i];
+    data[i] &= b.data[i];
   }
 
   return *this;
@@ -341,12 +289,9 @@ CkBitVector & CkBitVector::Difference(CkBitVector const &b) {
     CkAbort("CkBitVector Difference operands must be of the same length!");
   }
 
-  // As usual, do nothing if I'm null. Or if the other is null
-  if ( data == NULL || b.data == NULL ) { return *this; }
-
   // Take any bits they have set out of me
   for ( int i = 0 ; i < chunks(usedBits) ; i++ ) {
-    data[i] = data[i] & ~(b.data[i]);
+    data[i] &= ~(b.data[i]);
   }
 
   return *this;
@@ -358,7 +303,7 @@ CkBitVector & CkBitVector::Difference(CkBitVector const &b) {
 // one that is being copied into this, and shift it left/right a bit.
 CkBitVector & CkBitVector::Concat(CkBitVector const &b) {
   // If I'm null, just copy b into me.
-  if ( ! data ) {
+  if ( data.empty() ) {
     *this = b;
     return *this;
   }
@@ -384,7 +329,7 @@ CkBitVector & CkBitVector::Concat(CkBitVector const &b) {
 
 // Spit out the bit vector in chunk-sized chunks
 CkOutStream& operator<< (CkOutStream& ckos, CkBitVector const b ) {
-  if ( b.data ) {
+  if ( !b.data.empty() ) {
     char *buff = new char[b.usedBits+1];
     for ( int i = b.usedBits-1 ; i >= 0 ; i-- ) {
       buff[(b.usedBits-1)-i] = (b.Test(i) ? '1' : '0');
@@ -398,7 +343,7 @@ CkOutStream& operator<< (CkOutStream& ckos, CkBitVector const b ) {
 }
 
 CkErrStream& operator<< (CkErrStream& ckes, CkBitVector const b ) {
-  if ( b.data ) {
+  if ( !b.data.empty() ) {
     char *buff = new char[b.usedBits+1];
     for ( int i = b.usedBits-1 ; i >= 0 ; i-- ) {
       buff[(b.usedBits-1)-i] = (b.Test(i) ? '1' : '0');
@@ -449,15 +394,5 @@ int CkBitVector::Compare(const CkBitVector &b) const
 // Pack and unpack this bugger!
 void CkBitVector::pup(PUP::er &p) {
   p|usedBits;
-
-  if ( usedBits == 0 ) {
-    data = NULL;
-  } else {
-    if ( p.isUnpacking() ) {
-      delete [] data;
-      data = new prio_t[chunks(usedBits)];
-      memset(data, 0, chunks(usedBits)*chunkSize());
-    }
-    p(data, chunks(usedBits));
-  }
+  p|data;
 }

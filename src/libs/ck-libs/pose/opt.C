@@ -138,10 +138,9 @@ void opt::UndoEvent(Event *e)
     //CkPrintf("POSE_UNDO\n");
     parent->ResolveFn(((e->fnIdx) * -1), e->msg); // execute the anti-method
     parent->basicStats[1]++;
-    if (e->commitBfrLen > 0) free(e->commitBfr); // clean up buffered output
-    e->commitBfr = NULL;
+    e->commitBfr.clear();
     e->commitErr = 0;
-    e->done = e->commitBfrLen = 0;
+    e->done = 0;
 #ifdef MEM_TEMPORAL
     if (e->serialCPdata) {
       userObj->localTimePool->tmp_free(e->timestamp, e->serialCPdata);
@@ -436,10 +435,7 @@ void opt::RecoverState(Event *recoveryPoint)
 #else
   while ((ev != eq->front()) && (!ev->cpData)) { // search for checkpoint
 #endif
-    if (ev->commitBfrLen > 0)
-      free(ev->commitBfr);
-    ev->commitBfr = NULL;
-    ev->commitBfrLen = 0;
+    ev->commitBfr.clear();
     ev = ev->prev;
   }
   CmiAssert(ev != eq->front()); // ERROR: no checkpoint
@@ -448,10 +444,7 @@ void opt::RecoverState(Event *recoveryPoint)
   currentEvent = targetEvent = ev;
   parent->ResolveFn(((ev->fnIdx) * -1), ev->msg);
   parent->basicStats[1]++;
-  if (ev->commitBfrLen > 0)
-    free(ev->commitBfr);
-  ev->commitBfr = NULL;
-  ev->commitBfrLen = 0;
+  ev->commitBfr.clear();
 #ifdef MEM_TEMPORAL
   if (ev->serialCPdata) {
     userObj->localTimePool->tmp_free(ev->timestamp, ev->serialCPdata);

@@ -1094,7 +1094,7 @@ CLINKAGE const char *FEM_Get_entity_name(int entity,char *storage)
 FEM_Entity::FEM_Entity(FEM_Entity *ghost_) //Default constructor
   :length(0), max(0),ghost(ghost_), coord(0), sym(0), globalno(0), valid(0), meshSizing(0),
    ghostIDXL(ghost?&ghostSend:NULL, ghost?&ghost->ghostRecv:NULL),resize(NULL),
-   invalidList(NULL),first_invalid(0),last_invalid(0),invalidListLen(0),invalidListAllLen(0)
+   first_invalid(0),last_invalid(0),invalidListLen(0)
 {
 	//No attributes initially
 	if (femVersion == 0) {
@@ -1144,17 +1144,7 @@ void FEM_Entity::pup(PUP::er &p) {
 	p|first_invalid;
 	p|last_invalid;
 	p|invalidListLen;
-	p|invalidListAllLen;
-	if(p.isUnpacking()) {
-	  delete[] invalidList; //was just created in allocateValid
-	  if(invalidListAllLen>0) invalidList = new int[invalidListAllLen];
-	}
-	if(invalidListAllLen>0) {
-	  PUParray(p, (int*)invalidList, invalidListAllLen);
-	}
-	if(p.isDeleting()) {
-	  delete[] invalidList;
-	}
+	p|invalidList;
 
 	if (ghost!=NULL) {
 		p.comment(" ---- Ghost attributes ---- ");
@@ -1247,13 +1237,11 @@ void FEM_Entity::allocateValid(void) {
       valid->getChar()(i,0)=1;
     }
     if(true) { //maintains a list of invalid elements. FASTER
-      invalidListLen=0; invalidListAllLen=16;
-      invalidList = new int[invalidListAllLen];
+      invalidListLen=0;
+      invalidList.clear();
+      invalidList.resize(16, -1); //-1 means this position is empty
       //its ok to waste a few bytes for an entity, especially when it can
       //bring up the performance of the average case
-      for(int i=0; i<invalidListAllLen; i++) {
-	invalidList[i] = -1; //means this position is empty
-      }
     }
     else {
       first_invalid = last_invalid = 0;
@@ -1302,12 +1290,8 @@ void FEM_Entity::set_invalid(int idx, bool isNode){
   if(true) { //maintains a list of invalid elements. FASTER
     CkAssert(idx < size() && idx >=0);
     valid->getChar()(idx,0)=0;
-    if(invalidListLen==invalidListAllLen) {
-      invalidListAllLen = invalidListAllLen<<1;
-      int* tmp = invalidList;
-      invalidList = new int[invalidListAllLen];
-      memcpy(invalidList,tmp,invalidListLen*sizeof(int));
-      delete[] tmp;
+    if(invalidListLen==invalidList.size()) {
+      invalidList.resize(invalidListLen<<1, -1);
     }
     invalidList[invalidListLen] = idx;
     invalidListLen++;

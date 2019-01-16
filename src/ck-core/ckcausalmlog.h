@@ -96,16 +96,12 @@ class RestoredLocalMap;
  */
 class SNToTicket{
 	private:
-		Ticket initial[INITSIZE_SNTOTICKET];
-		Ticket *ticketVec;
+		std::vector<Ticket> ticketVec;
 		MCount startSN;
-		int currentSize;
 		MCount finishSN;
 	public:
 		SNToTicket(){
-			currentSize = INITSIZE_SNTOTICKET;
-			ticketVec = &initial[0];
-			memset(ticketVec,0,sizeof(Ticket)*currentSize);
+			ticketVec.resize(INITSIZE_SNTOTICKET);
 			startSN = 0;
 			finishSN = 0;
 		}
@@ -128,16 +124,9 @@ class SNToTicket{
 				startSN = SN;				
 			}
 			int index = SN-startSN;
-			if(index >= currentSize){
-				int oldSize = currentSize;
-				Ticket *old = ticketVec;
-				
-				currentSize = index*2;
-				ticketVec = new Ticket[currentSize];
-				memcpy(ticketVec,old,sizeof(Ticket)*oldSize);
-				if(old != &initial[0]){					
-					delete [] old;
-				}
+			const int oldSize = ticketVec.size();
+			if(index >= oldSize){
+				ticketVec.resize(index*2);
 			}
 			return ticketVec[index];
 		}
@@ -145,6 +134,7 @@ class SNToTicket{
 		inline Ticket get(MCount SN){
 			int index = SN-startSN;
 			CmiAssert(index >= 0);
+			const int currentSize = ticketVec.size();
 			if(index >= currentSize){
 				Ticket tn;
 				return tn;
@@ -155,15 +145,7 @@ class SNToTicket{
 
 		inline void pup(PUP::er &p){
 			p | startSN;
-			p | currentSize;
-			if(p.isUnpacking()){
-				if(currentSize > INITSIZE_SNTOTICKET){
-					ticketVec = new Ticket[currentSize];
-				}
-			}
-			for(int i=0;i<currentSize;i++){
-				p | ticketVec[i];
-			}
+			p | ticketVec;
 		}	
 };
 
@@ -188,7 +170,7 @@ public:
 	
 	//TODO: pup receivedTNs
 	std::vector<MCount> *receivedTNs; //used to store TNs received by senders during a restart
-	MCount *ticketHoles;
+	std::vector<MCount> ticketHoles;
 	int numberHoles;
 	int currentHoles;
 	// variable that keeps a count of the processors that have replied to a requests to resend messages. 
@@ -224,8 +206,7 @@ public:
 	ChareMlogData():teamTable(100,0.4),snTable(100,0.4),ticketTable(1000,0.3){
 		tCount = 0;
 		tProcessed = 0;
-		numberHoles = 0;
-		ticketHoles = NULL;
+		ticketHoles.clear();
 		currentHoles = 0;
 		restartFlag=false;
 		teamRecoveryFlag=0;
@@ -300,15 +281,11 @@ public:
  */
 class RestoredLocalMap {
 public:
-	MCount minSN,maxSN,count;
-	MCount *TNArray;
+	MCount minSN = 0, maxSN = 0;
+	// std::vector<MCount> TNArray; // unused?
 	RestoredLocalMap(){
-		minSN=maxSN=count=0;
-		TNArray=NULL;
 	};
 	RestoredLocalMap(int i){
-		minSN=maxSN=count=0;
-		TNArray=NULL;
 	};
 
 	virtual void pup(PUP::er &p);

@@ -268,7 +268,7 @@ public:
 	public:
 		bool add; //Add this kind of ghost element to the chunks
 		int tuplesPerElem; //# of tuples surrounding this element
-		intArrayPtr elem2tuple; //The tuples around this element [nodesPerTuple * tuplesPerElem]
+		std::vector<int> elem2tuple; //The tuples around this element [nodesPerTuple * tuplesPerElem]
 		elemGhostInfo(void) {add=false;tuplesPerElem=0;}
 		~elemGhostInfo(void) {}
 		void pup(PUP::er &p) {//CkAbort("FEM> Shouldn't call elemGhostInfo::pup!\n");
@@ -281,19 +281,7 @@ public:
 		for(int i=0;i<FEM_MAX_ELTYPE;i++){
 			p | elem[i].add;
 			p | elem[i].tuplesPerElem;
-			if(elem[i].tuplesPerElem == 0){
-				continue;
-			}
-			int *arr;
-			if(p.isUnpacking()){
-				arr = new int[nodesPerTuple*elem[i].tuplesPerElem];
-			}else{
-				arr = elem[i].elem2tuple;
-			}
-			p(arr,nodesPerTuple*elem[i].tuplesPerElem);
-			if(p.isUnpacking()){
-				elem[i].elem2tuple = arr;
-			}
+			p | elem[i].elem2tuple;
 		}
 	}
 };
@@ -469,7 +457,7 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
   public:
     //  int recentElType; // should not be here, but if it is it should be pup'ed
     int tuplesPerElem; //# of tuples surrounding this element, i.e. number of faces on an element
-    intArrayPtr elem2tuple; //The tuples around this element [nodesPerTuple * tuplesPerElem]
+    std::vector<int> elem2tuple; //The tuples around this element [nodesPerTuple * tuplesPerElem]
     elemAdjInfo(void) {/*add=false;*/tuplesPerElem=0;}
     ~elemAdjInfo(void) {}
     void pup(PUP::er &p) {//CkAbort("FEM> Shouldn't call elemGhostInfo::pup!\n");
@@ -485,19 +473,7 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
 	p | initialized;
     for(int i=0;i<FEM_MAX_ELTYPE;i++){
       p | elem[i].tuplesPerElem;
-	  if(elem[i].tuplesPerElem == 0){
-	continue;
-      }
-      int *arr;
-      if(p.isUnpacking()){
-	arr = new int[nodesPerTuple*elem[i].tuplesPerElem];
-      }else{
-	arr = elem[i].elem2tuple;
-      }
-      p(arr,nodesPerTuple*elem[i].tuplesPerElem);
-      if(p.isUnpacking()){
-	elem[i].elem2tuple = arr;
-      }
+      p | elem[i].elem2tuple;
     }
   }
 };

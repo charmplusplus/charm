@@ -1340,15 +1340,12 @@ public:
 struct ChunkReceiveBuffer {
   int bufferNumber;
   int receivedChunks;
-  char *buffer;
+  std::vector<char> buffer;
 
   void pup(PUP::er &p) {
     p|bufferNumber;
     p|receivedChunks;
-    if(p.isUnpacking()) {
-      buffer = new char[receivedChunks * CHUNK_SIZE];
-    }
-    PUParray(p, buffer, receivedChunks*CHUNK_SIZE);
+    p|buffer;
   }
 };
 
@@ -1356,11 +1353,11 @@ struct ChunkOutOfOrderBuffer {
   int bufferNumber;
   int receivedChunks;
   int sourcePe;
-  char *buffer;
+  std::vector<char> buffer;
 
   ChunkOutOfOrderBuffer() {}
 
-  ChunkOutOfOrderBuffer(int b, int r, int s, char *buf)
+  ChunkOutOfOrderBuffer(int b, int r, int s, std::vector<char> && buf)
     : bufferNumber(b), receivedChunks(r), sourcePe(s), buffer(buf) {}
 
   bool operator==(const ChunkDataItem &chunk) {
@@ -1372,10 +1369,7 @@ struct ChunkOutOfOrderBuffer {
     p|bufferNumber;
     p|receivedChunks;
     p|sourcePe;
-    if(p.isUnpacking()) {
-      buffer = new char[receivedChunks * CHUNK_SIZE];
-    }
-    PUParray(p, buffer, receivedChunks*CHUNK_SIZE);
+    p|buffer;
   }
 };
 
@@ -1484,10 +1478,10 @@ public:
 
     ChunkReceiveBuffer &last = lastReceived_[chunk.sourcePe];
 
-    if (last.buffer == NULL) {
+    if (last.buffer.empty()) {
       if (outOfOrderBuffers_.size() == 0) {
         // make common case fast
-        last.buffer = new char[chunk.numChunks * CHUNK_SIZE];
+        last.buffer.resize(chunk.numChunks * CHUNK_SIZE);
         last.receivedChunks = 0;
       }
       else {
@@ -1495,12 +1489,12 @@ public:
         std::list<ChunkOutOfOrderBuffer>::iterator storedBuffer =
           find(outOfOrderBuffers_.begin(), outOfOrderBuffers_.end(), chunk);
         if (storedBuffer != outOfOrderBuffers_.end()) {
-          last.buffer = storedBuffer->buffer;
+          last.buffer = std::move(storedBuffer->buffer);
           last.receivedChunks = storedBuffer->receivedChunks;
           outOfOrderBuffers_.erase(storedBuffer);
         }
         else {
-          last.buffer = new char[chunk.numChunks * CHUNK_SIZE];
+          last.buffer.resize(chunk.numChunks * CHUNK_SIZE);
           last.receivedChunks = 0;
         }
       }
@@ -1510,7 +1504,8 @@ public:
       // add last to list of out of order buffers
       ChunkOutOfOrderBuffer lastOutOfOrderBuffer(last.bufferNumber,
                                                  last.receivedChunks,
-                                                 chunk.sourcePe, last.buffer);
+                                                 chunk.sourcePe,
+                                                 std::move(last.buffer));
       outOfOrderBuffers_.push_front(lastOutOfOrderBuffer);
 
       //search through list of out of order buffers for this chunk's buffer
@@ -1521,18 +1516,19 @@ public:
         // allocate new buffer
         last.bufferNumber = chunk.bufferNumber;
         last.receivedChunks = 0;
-        last.buffer = new char[chunk.numChunks * CHUNK_SIZE];
+        last.buffer.clear();
+        last.buffer.resize(chunk.numChunks * CHUNK_SIZE);
       }
       else {
         // use existing buffer
         last.bufferNumber = storedBuffer->bufferNumber;
         last.receivedChunks = storedBuffer->receivedChunks;
-        last.buffer = storedBuffer->buffer;
+        last.buffer = std::move(storedBuffer->buffer);
         outOfOrderBuffers_.erase(storedBuffer);
       }
     }
 
-    char *receiveBuffer = last.buffer;
+    char *receiveBuffer = last.buffer.data();
 
     memcpy(receiveBuffer + chunk.chunkNumber * CHUNK_SIZE,
            chunk.rawData, chunk.chunkSize);
@@ -1540,10 +1536,7 @@ public:
       clientObj_->receiveArray(
                   (dtype *) receiveBuffer, chunk.numItems, chunk.sourcePe);
       last.receivedChunks = 0;
-      if (!userHandlesFreeing_) {
-        delete [] last.buffer;
-      }
-      last.buffer = NULL;
+      last.buffer.clear();
     }
 
   }

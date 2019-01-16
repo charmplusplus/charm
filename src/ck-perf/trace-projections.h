@@ -48,11 +48,11 @@ class LogEntry {
     int msglen;
     int nestedID; // Nested thread ID, e.g. virtual AMPI rank number
     CmiObjId   id;
-    int numpes;
-    int *pes;
+    int numpes = 0;
+    std::vector<int> pes;
     unsigned long memUsage;
     double stat;	//Used for storing User Stats
-    char *userSuppliedNote;
+    std::vector<char> userSuppliedNote;
 
     // this is taken out so as to provide a placeholder value for non-PAPI
     // versions (whose value is *always* zero).
@@ -60,15 +60,13 @@ class LogEntry {
 #if CMK_HAS_COUNTER_PAPI
     LONG_LONG_PAPI papiValues[NUMPAPIEVENTS];
 #endif
-    char *fName;
-    int flen;
+    std::vector<char> fName;
     int userSuppliedData;
     unsigned char type;
 
   public:
     
     LogEntry() {
-      fName=NULL;flen=0;pes=NULL;numpes=0;userSuppliedNote = NULL;
     }
 
     LogEntry(double tm, unsigned char t, unsigned short m=0, 
@@ -84,11 +82,8 @@ class LogEntry {
 #else
       //numPapiEvents = 0;
 #endif
-      userSuppliedNote = NULL;
-      fName = NULL;
-      flen=0;
-      pes=NULL;
       numpes=numPe;
+      pes.resize(numPe);
       stat=statVal;
     }
 
@@ -98,9 +93,6 @@ class LogEntry {
       type = _type;
       mIdx = _funcID;
       event = _lineNum;
-      userSuppliedNote = NULL;      
-      pes=NULL;
-      numpes=0;
       setFName(_fileName);
     }
 
@@ -110,9 +102,6 @@ class LogEntry {
       time = _time;
       type = _type;
       userSuppliedData = value;
-      userSuppliedNote = NULL;
-      pes=NULL;
-      numpes=0;
       setFName(_fileName);
     }
 
@@ -121,8 +110,6 @@ class LogEntry {
 	     int _lineNum,char *_fileName){
       time = _time;
       type = _type;
-      pes=NULL;
-      numpes=0;
       setFName(_fileName);
       if(note != NULL)
 	setUserSuppliedNote(note);
@@ -134,8 +121,6 @@ class LogEntry {
       time = bt;
       endTime = et;
       type = _type;
-      pes=NULL;
-      numpes=0;
       event = eventID;
       if(note != NULL)
 	setUserSuppliedNote(note);
@@ -157,28 +142,22 @@ class LogEntry {
       if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=id.id[3]=-1; };
       recvTime = rt; 
       numpes = numPe;
-      userSuppliedNote = NULL;
+      pes.resize(numPe);
       if (pelist != NULL) {
-	pes = new int[numPe];
-	for (int i=0; i<numPe; i++) {
-	  pes[i] = pelist[i];
-	}
-      } else {
-	pes= NULL;
+        for (int i=0; i<numPe; i++) {
+          pes[i] = pelist[i];
+        }
       }
-
     }
-
 
     void setFName(char *_fileName){
       if(_fileName == NULL){
-	fName = NULL;
-	flen = 0;
+        fName.clear();
       }else{
-	fName = new char[strlen(_fileName)+2];
-	fName[0] = ' ';
-	memcpy(fName+1,_fileName,strlen(_fileName)+1);
-	flen = strlen(fName)+1;
+        int flen = strlen(_fileName)+1;
+        fName.resize(flen+1);
+        fName[0] = ' ';
+        memcpy(fName.data()+1, _fileName, flen);
       }	
     }
 
@@ -196,8 +175,7 @@ class LogEntry {
     void setUserSuppliedNote(char *note){
 
       int length = strlen(note)+1;
-      userSuppliedNote = new char[length];
-      memcpy(userSuppliedNote,note,length);
+      userSuppliedNote.assign(note, note + length);
       for(int i=0;i<length;i++){
 	if(userSuppliedNote[i] == '\n' || userSuppliedNote[i] == '\r'){
 	  userSuppliedNote[i] = ' ';
@@ -212,10 +190,6 @@ class LogEntry {
       time = _time;
       type = _type;
       memUsage = _memUsage;
-      fName = NULL;
-      flen = 0;
-      pes=NULL;
-      numpes=0;
     }
 
 
@@ -234,8 +208,6 @@ class LogEntry {
 
     void pup(PUP::er &p);
     ~LogEntry(){
-      if (fName) delete [] fName;
-      if (userSuppliedNote) delete [] userSuppliedNote;
     }
 };
 

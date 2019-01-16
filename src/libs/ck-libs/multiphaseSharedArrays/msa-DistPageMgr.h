@@ -388,20 +388,18 @@ template <
 	unsigned int ENTRIES_PER_PAGE=MSA_DEFAULT_ENTRIES_PER_PAGE
 	>
 class MSA_PageT {
-    unsigned int n; // number of entries on this page.  Used to send page updates.
 	/** The contents of this page: array of ENTRIES_PER_PAGE items */
-	ENTRY *data;
+	std::vector<ENTRY> data;
 	/** Merger object */
 	MERGER m;
-	bool duplicate;
 
 public:
 
 	MSA_PageT()
-		: n(ENTRIES_PER_PAGE), data(new ENTRY[ENTRIES_PER_PAGE]), duplicate(false)
 		{
+			data.reserve(ENTRIES_PER_PAGE);
 			for (int i=0;i<ENTRIES_PER_PAGE;i++){
-				data[i]=m.getIdentity();
+				data.emplace_back(m.getIdentity());
 			}
 		}
 
@@ -410,38 +408,17 @@ public:
     // the pointer.  When it comes time to destruct the object, we
     // need to ensure we do NOT delete the data but just discard the
     // pointer.
-	MSA_PageT(ENTRY *d):data(d), duplicate(true), n(ENTRIES_PER_PAGE) {
+	MSA_PageT(const std::vector<ENTRY> & d):data(d) {
     }
-	MSA_PageT(ENTRY *d, unsigned int n_):data(d), duplicate(true), n(n_) {
+	MSA_PageT(std::vector<ENTRY> && d):data(d) {
+    }
+	MSA_PageT(ENTRY *d, unsigned int n_):data(d, d + n_) {
     }
 	virtual ~MSA_PageT() {
- 		if (!duplicate) {
-            delete [] data;
-        }
 	}
 
 	virtual void pup(PUP::er &p) {
-		p | n;
-		/*this pup routine was broken, It didnt consider the case
-		  in which n > 0 and data = NULL. This is possible when  
-		  sending empty pages. It also doesnt seem to do any allocation
-		  for the data variable while unpacking which seems to be wrong
-		*/
-		bool nulldata = false;
-		if(!p.isUnpacking()){
-			nulldata = (data == NULL);
-		}
-		p | nulldata;
-		if(nulldata){
-			data = NULL;
-			return;
-		}
-		if(p.isUnpacking()){
-			data = new ENTRY[n];
-		}
-		for (int i=0;i<n;i++){
-			p|data[i];
-		}	
+		p | data;
 	}
 
 	virtual void merge(MSA_PageT<ENTRY, MERGER, ENTRIES_PER_PAGE> &otherPage) {
@@ -1264,7 +1241,7 @@ class MSA_PageArray : public CBase_MSA_PageArray<ENTRY_TYPE, ENTRY_OPS_CLASS, EN
     typedef MSA_PageT<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> page_t;
     
 protected:
-    ENTRY_TYPE *epage;
+    std::vector<ENTRY_TYPE> epage;
     ENTRY_OPS_CLASS entryOpsObject;
     CProxy_CacheGroup_t cache;
 
@@ -1272,9 +1249,9 @@ protected:
 
     inline void allocatePage(MSA_Page_Fault_t access) // @@@
 		{
-			if(epage == NULL)
+			if(epage.empty())
 			{
-				epage = new ENTRY_TYPE[ENTRIES_PER_PAGE];
+				epage.resize(ENTRIES_PER_PAGE);
 				writeIdentity();
 			}
 		}
@@ -1292,7 +1269,7 @@ protected:
     // MSA_PageArray::
     inline void combine(const ENTRY_TYPE* buffer, unsigned int begin, unsigned int end)
 		{
-			ENTRY_TYPE* pagePtr = epage + begin;
+			ENTRY_TYPE* pagePtr = epage.data() + begin;
 			for(unsigned int i = 0; i < (end - begin); i++)
 				entryOpsObject.accumulate(pagePtr[i], buffer[i]);
 		}
@@ -1305,7 +1282,7 @@ protected:
 		}
 
 public:
-    inline MSA_PageArray() : epage(NULL) { }
+    inline MSA_PageArray() { }
     inline MSA_PageArray(CkMigrateMessage* m) { delete m; }
     
     void setCacheProxy(CProxy_CacheGroup_t &cache_)
@@ -1315,38 +1292,21 @@ public:
     
     void pup(PUP::er& p)
 		{
-			int epage_present=(epage!=0);
-			p|epage_present;
-			if (epage_present) {
-				if(p.isUnpacking())
-					allocatePage(Write_Fault);
-				for (int i=0;i<ENTRIES_PER_PAGE;i++)
-					p|epage[i];
-			}
+			p|epage;
 		}
     
     inline ~MSA_PageArray()
 		{
-			if(epage) delete [] epage;
 		}
 
     /// Request our page.
     ///   pe = to which to send page
     inline void GetPage(int pe)
 		{
-			if(epage == NULL) {
-				// send empty page
-				if (entryOpsObject.pupEveryElement())
-					cache[pe].ReceivePageWithPUP(pageNo(), page_t((ENTRY_TYPE*)NULL), 0);
-				else
-					cache[pe].ReceivePage(pageNo(), (ENTRY_TYPE*)NULL, 0);
-			} else {
-				// send page with data
-				if (entryOpsObject.pupEveryElement())
-					cache[pe].ReceivePageWithPUP(pageNo(), page_t(epage), ENTRIES_PER_PAGE);
-				else
-					cache[pe].ReceivePage(pageNo(), epage, ENTRIES_PER_PAGE);  // send page with data                
-			}
+			if (entryOpsObject.pupEveryElement())
+				cache[pe].ReceivePageWithPUP(pageNo(), page_t(epage), epage.size());
+			else
+				cache[pe].ReceivePage(pageNo(), epage.data(), epage.size());
 		}
 
     /// Receive a non-runlength encoded page from the network:
@@ -1401,7 +1361,7 @@ public:
     // MSA_PageArray::
     inline void Sync(bool clear)
 		{
-			if (clear && epage)
+			if (clear && !epage.empty())
 				writeIdentity();
 			MSADEBPRINT(printf("MSA_PageArray::Sync about to call contribute \n"););
 			CkCallback cb(CkIndex_MSA_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::SyncDone(NULL), cache);
@@ -1411,8 +1371,8 @@ public:
     inline void emit(int ID, int index)
 		{
 			//ckout << "p" << CkMyPe() << "ID" << ID;
-//         if(epage == NULL)
-//             ckout << "emit: epage is NULL" << endl;
+//         if(epage.size() >= index)
+//             ckout << "emit: index out of epage bounds" << endl;
 //         else
 //             ckout << "emit: " << epage[index] << endl;
 		}
