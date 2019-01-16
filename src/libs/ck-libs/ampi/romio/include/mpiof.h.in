@@ -1,6 +1,4 @@
 ! 
-!     $Id$    
-! 
 !     Copyright (C) 1997 University of Chicago. 
 !     See COPYRIGHT notice in top-level directory.
 !
@@ -31,8 +29,8 @@
       @FORTRAN_MPI_OFFSET@ MPI_DISPLACEMENT_CURRENT
       PARAMETER (MPI_DISPLACEMENT_CURRENT=-54278278)
 !
-@MPI_OFFSET_KIND1@
-@MPI_OFFSET_KIND2@
+!@MPI_OFFSET_KIND1@
+!@MPI_OFFSET_KIND2@
 !
 @MPI_FARRAY1@
 @MPI_FARRAY2@

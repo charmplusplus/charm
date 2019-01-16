@@ -1,6 +1,5 @@
 /* -*- Mode: C; c-basic-offset:4 ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -22,37 +21,42 @@ struct ADIOI_RequestD *ADIOI_Malloc_request(void)
     ADIOI_Req_node *curr, *ptr;
     int i;
 
-    if (!CtvAccess(ADIOI_Req_avail_head)) {
-	CtvAccess(ADIOI_Req_avail_head) = (ADIOI_Req_node *) 
-	              ADIOI_Malloc(NUM*sizeof(ADIOI_Req_node));  
-	curr = CtvAccess(ADIOI_Req_avail_head);
+    if (!ADIOI_Req_avail_head) {
+	ADIOI_Req_avail_head = (ADIOI_Req_node *) 
+	              ADIOI_Malloc(NUM*sizeof(ADIOI_Req_node));
+	if (ADIOI_Req_avail_head == NULL)
+	{
+	    /* FIXME: Insert error here */
+	    return NULL;
+	}
+	curr = ADIOI_Req_avail_head;
 	for (i=1; i<NUM; i++) {
-	    curr->next = CtvAccess(ADIOI_Req_avail_head)+i;
+	    curr->next = ADIOI_Req_avail_head+i;
 	    curr = curr->next;
 	}
 	curr->next = NULL;
-	CtvAccess(ADIOI_Req_avail_tail) = curr;
+	ADIOI_Req_avail_tail = curr;
 
 	/* keep track of malloced area that needs to be freed later */
-	if (!CtvAccess(ADIOI_Malloc_req_tail)) {
-	    CtvAccess(ADIOI_Malloc_req_tail) = (ADIOI_Malloc_req *)
+	if (!ADIOI_Malloc_req_tail) {
+	    ADIOI_Malloc_req_tail = (ADIOI_Malloc_req *)
 		ADIOI_Malloc(sizeof(ADIOI_Malloc_req)); 
-	    CtvAccess(ADIOI_Malloc_req_head) = CtvAccess(ADIOI_Malloc_req_tail);
-	    CtvAccess(ADIOI_Malloc_req_head)->ptr = CtvAccess(ADIOI_Req_avail_head);
-	    CtvAccess(ADIOI_Malloc_req_head)->next = NULL;
+	    ADIOI_Malloc_req_head = ADIOI_Malloc_req_tail;
+	    ADIOI_Malloc_req_head->ptr = ADIOI_Req_avail_head;
+	    ADIOI_Malloc_req_head->next = NULL;
 	}
 	else {
-	    CtvAccess(ADIOI_Malloc_req_tail)->next = (ADIOI_Malloc_req *)
+	    ADIOI_Malloc_req_tail->next = (ADIOI_Malloc_req *)
 		ADIOI_Malloc(sizeof(ADIOI_Malloc_req));
-	    CtvAccess(ADIOI_Malloc_req_tail) = CtvAccess(ADIOI_Malloc_req_tail)->next;
-	    CtvAccess(ADIOI_Malloc_req_tail)->ptr = CtvAccess(ADIOI_Req_avail_head);
-	    CtvAccess(ADIOI_Malloc_req_tail)->next = NULL;
+	    ADIOI_Malloc_req_tail = ADIOI_Malloc_req_tail->next;
+	    ADIOI_Malloc_req_tail->ptr = ADIOI_Req_avail_head;
+	    ADIOI_Malloc_req_tail->next = NULL;
 	}
     }
 
-    ptr = CtvAccess(ADIOI_Req_avail_head);
-    CtvAccess(ADIOI_Req_avail_head) = CtvAccess(ADIOI_Req_avail_head)->next;
-    if (!CtvAccess(ADIOI_Req_avail_head)) CtvAccess(ADIOI_Req_avail_tail) = NULL;
+    ptr = ADIOI_Req_avail_head;
+    ADIOI_Req_avail_head = ADIOI_Req_avail_head->next;
+    if (!ADIOI_Req_avail_head) ADIOI_Req_avail_tail = NULL;
     
     (ptr->reqd).cookie = ADIOI_REQ_COOKIE;
     return &(ptr->reqd);

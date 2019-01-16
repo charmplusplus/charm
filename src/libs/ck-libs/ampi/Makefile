@@ -17,19 +17,12 @@ DEST=$(AMPI_LIBDIR)/$(AMPI_LIB).a
 DESTF=$(AMPI_LIBDIR)/$(AMPI_LIB)f.a
 COMPATLIB=$(AMPI_LIBDIR)/libampi-compat.a
 ROMIOLIB=$(AMPI_LIBDIR)/libampiromio
-ROMIOLIBSHARED=
 
-AMPI_STATIC_ONLY := $(CMK_NO_BUILD_SHARED)
-
-SHARED_SUF := $(CMK_SHARED_SUF)
-
-ifeq ($(AMPI_STATIC_ONLY),false)
-	ROMIOLIBSHARED=$(CDIR)/lib_so/libampiromio.$(SHARED_SUF)
+ifeq ($(CMK_NO_BUILD_SHARED),false)
+	ROMIOLIBSHARED=$(CDIR)/lib_so/libampiromio.$(CMK_SHARED_SUF)
 endif
 
-USE_ROMIO := $(CMK_AMPI_WITH_ROMIO)
-
-ifeq ($(USE_ROMIO),true)
+ifeq ($(CMK_AMPI_WITH_ROMIO),true)
 	ROMIO=$(ROMIOLIB).a
 endif
 
@@ -44,32 +37,27 @@ all: AMPI AMPIF $(COMPATLIB) $(ROMIO)
 # AMPI and AMPIF are order-only dependencies (|), i.e., no up-to-date check
 # is done, in order to prevent ROMIO recompilation when AMPI changes.
 $(ROMIO): | AMPI AMPIF
-	cd romio && ./configure \
-		-mpiincdir=$(CDIR)/include \
-		-mpilib=$(CDIR)/lib/libmoduleampi.a \
-		-mpibindir=$(CDIR)/bin \
-		-cc=$(CDIR)/bin/ampicc \
-		-fc=$(CDIR)/bin/ampif77 \
-		-f90=$(CDIR)/bin/ampif90 \
-		-cflags="$(OPTS)" \
-		-fflags="$(OPTS)" \
-		-noprofile \
-		-mpiolib=$@
+	@echo "Building ROMIO"
+	cd romio && \
+		CFLAGS="$(OPTS)" \
+		FFLAGS="$(OPTS)" \
+		F77=$(CDIR)/bin/ampif90 \
+		CC=$(CDIR)/bin/ampicc \
+		./configure \
+		--disable-aio \
+		--enable-f77=`test -f $(DESTF) && echo yes || echo no` \
+		--srcdir=`pwd`
 
-	@# Cygwin only supports NTFS
-	case `uname` in CYGWIN*|cygwin*|Cygwin*) \
-		echo -e "#undef UFS\n#undef NFS\n#define ROMIO_NTFS\n" >> romio/adio/include/romioconf.h; \
-		sed -i s,ufs\ nfs,, romio/Makefile; \
-	esac
 	cp romio/include/mpio.h romio/include/mpiof.h $(CDIR)/include
 	$(MAKE) -C romio
+	cp romio/lib/libmpio.a $@
 	if [ -n "$(ROMIOLIBSHARED)" ]; then \
 		echo "Building dynamic ROMIO library: $(ROMIOLIBSHARED)"; \
 		find romio/ -name \*.o -exec $(CHARMC) -o $(ROMIOLIBSHARED) {} + ; \
 	fi
 	@echo "ROMIO built successfully"
 
-AMPI: $(DEST) 
+AMPI: $(DEST)
 	@echo "AMPI built successfully"
 
 AMPIF: $(DESTF)
@@ -93,7 +81,6 @@ headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
 	cp ampi.h $(CDIR)/include/mpi.h
 	cp ampif.h $(CDIR)/include/mpif.h
-#	cp mpiCC mpicc mpicxx mpif77 mpif90 $(CDIR)/bin
 	cp ampiCC $(CDIR)/bin/ampicc
 	cp ampiCC $(CDIR)/bin/ampiCC
 	cp ampiCC $(CDIR)/bin/ampicxx
@@ -133,13 +120,13 @@ ampiMisc.o: ampiMisc.C ampiimpl.h $(HEADDEP)
 	$(CHARMC) -c ampiMisc.C
 
 mpich-alltoall.o: mpich-alltoall.C $(HEADDEP)
-	$(CHARMC) -c mpich-alltoall.C 
+	$(CHARMC) -c mpich-alltoall.C
 
 ampi.decl.h ampi.def.h: ampi.ci
 	$(CHARMC) ampi.ci
 
 ddt.o: ddt.C ddt.h $(HEADDEP)
 
-clean: 
-	-rm -fr *.o *~ *.decl.h *.def.h gmon.out $(DEST) $(DESTF) $(COMPATLIB) conv-host charmrun headers *.mod
+clean:
+	rm -fr *.o *~ *.decl.h *.def.h gmon.out $(DEST) $(DESTF) $(COMPATLIB) conv-host charmrun headers *.mod
 	- cd romio && $(MAKE) clean
