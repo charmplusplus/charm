@@ -1,5 +1,6 @@
 DIRS = \
   simpleBcast \
+  ping_all \
 
 TESTDIRS = $(DIRS)
 
