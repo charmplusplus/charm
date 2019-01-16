@@ -931,12 +931,6 @@ static void arg_init(int argc, const char **argv)
     exit(1);
   }
 
-  /* Check for (but do *not* remove) the "-?", "-h", or "--help" flags */
-  for (int i = 0; argv[i]; i++) {
-    if (0 == strcmp(argv[i], "-?") || 0 == strcmp(argv[i], "-h") ||
-        0 == strcmp(argv[i], "--help"))
-      arg_help = 1;
-  }
   if (arg_help) {
     pparam_printdocs();
     /*exit(0);*/
