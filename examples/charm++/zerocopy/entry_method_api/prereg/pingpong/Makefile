@@ -16,10 +16,12 @@ pingpong.o: pingpong.C cifiles
 	$(CHARMC) -c pingpong.C
 
 test: all
-	@echo "Intra-processor Pingpong.."
-	$(call run, ./pgm +p1 )
-	@echo "Inter-processor Pingpong.."
-	$(call run, ./pgm +p2 )
+	$(call run, +p1 ./pgm 1024 8192 2 1)
+	$(call run, +p2 ./pgm 1024 8192 2 1)
+
+test-bench: all
+	$(call run, ./pgm +p1)
+	$(call run, ./pgm +p2)
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o pgm charmrun cifiles
