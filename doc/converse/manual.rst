@@ -16,7 +16,7 @@ the fact that hardware vendors don’t agree about which processors should
 execute ``main``. On some machines, every processor executes ``main``.
 On others, only one processor executes ``main``. All processors which
 don’t execute ``main`` are asleep when the program begins. The function
-ConverseInit is used to start the Converse system, and to wake up the
+``ConverseInit`` is used to start the Converse system, and to wake up the
 sleeping processors.
 
 ::
@@ -32,14 +32,14 @@ Normal Mode: ``schedmode=0, initret=0``
 
 When the user runs a program, some of the processors automatically
 invoke ``main``, while others remain asleep. All processors which
-automatically invoked ``main`` must call ConverseInit. This initializes
+automatically invoked ``main`` must call ``ConverseInit``. This initializes
 the entire Converse system. Converse then initiates, on *all*
 processors, the execution of the user-supplied start-function
 ``fn(argc, argv)``. When this function returns, Converse automatically
 calls ``CsdScheduler``, a function that polls for messages and executes
 their handlers (see chapter 2). Once ``CsdScheduler`` exits on all
 processors, the Converse system shuts down, and the user’s program
-terminates. Note that in this case, ConverseInit never returns. The user
+terminates. Note that in this case, ``ConverseInit`` never returns. The user
 is not allowed to poll for messages manually.
 
 User-calls-scheduler Mode: ``schedmode=1, initret=0``
@@ -51,7 +51,7 @@ initialization, and that the remainder of the lifespan of the program is
 spent in the (automatically-invoked) function ``CsdScheduler``, polling
 for messages. In user-calls-scheduler mode, however, it is assumed that
 the user-supplied start-function will perform the *entire computation*,
-including polling for messages. Thus, ConverseInit will not
+including polling for messages. Thus, ``ConverseInit`` will not
 automatically call ``CsdScheduler`` for you. When the user-supplied
 start-function ends, Converse shuts down. This mode is not supported on
 the sim version. This mode can be combined with ConverseInit-returns
@@ -59,12 +59,12 @@ mode below.
 
 ConverseInit-returns Mode: ``schedmode=1, initret=1``
 
-This option is used when you want ConverseInit to return. All processors
-which automatically invoked ``main`` must call ConverseInit. This
+This option is used when you want ``ConverseInit`` to return. All processors
+which automatically invoked ``main`` must call ``ConverseInit``. This
 initializes the entire Converse System. On all processors which *did
 not* automatically invoke ``main``, Converse initiates the user-supplied
 initialization function ``fn(argc, argv)``. Meanwhile, on those
-processors which *did* automatically invoke ``main``, ConverseInit
+processors which *did* automatically invoke ``main``, ``ConverseInit``
 returns. Shutdown is initiated when the processors that *did*
 automatically invoke ``main`` call ConverseExit, and when the other
 processors return from ``fn``. The optional exit code is returned to the
@@ -73,17 +73,23 @@ returned. In this mode, all polling for messages must be done manually
 (probably using CsdScheduler explicitly). This option is not supported
 by the sim version.
 
-void ConverseExit(int exitcode /*optional*/)
+::
+
+  void ConverseExit(int exitcode /*optional*/)
 
 This function is only used in ConverseInit-returns mode, described
 above.
 
-void CmiAbort(char \*msg)
+::
+
+  void CmiAbort(char *msg)
 
 This function can be used portably to abnormally terminate a Converse
 program. Before termination, it prints a message supplied as ``msg``.
 
-void CmiAssert(int expr)
+::
+
+  void CmiAssert(int expr)
 
 This macro terminates the Converse program after printing an informative
 message if ``expr`` evaluates to 0. It can be used in place of
@@ -134,11 +140,15 @@ nonetheless, and the user must be aware that this is (usually) required.
 
 The following functions are provided to define the handler numbers:
 
-typedef void (\*CmiHandler)(void \*)
+::
+
+  typedef void (*CmiHandler)(void *)
 
 Functions that handle Converse messages must be of this type.
 
-int CmiRegisterHandler(CmiHandler h)
+::
+
+  int CmiRegisterHandler(CmiHandler h)
 
 This represents the standard technique for associating numbers with
 functions. To use this technique, the Converse user registers each of
@@ -149,7 +159,9 @@ the same numbers on all processors. This insures global consistency.
 CmiRegisterHandler returns the number which was chosen for the function
 being registered.
 
-int CmiRegisterHandlerGlobal(CmiHandler h)
+::
+
+  int CmiRegisterHandlerGlobal(CmiHandler h)
 
 This represents a second registration technique. The Converse user
 registers his functions on processor zero, using
@@ -158,14 +170,18 @@ broadcasting those handler numbers to other processors, and installing
 them using CmiNumberHandler below. The user should take care not to
 invoke those handlers until they are fully installed.
 
-int CmiRegisterHandlerLocal(CmiHandler h)
+::
+
+  int CmiRegisterHandlerLocal(CmiHandler h)
 
 This function is used when one wishes to register functions in a manner
 that is not consistent across processors. This function chooses a
 locally-meaningful number for the function, and records it locally. No
 attempt is made to ensure consistency across processors.
 
-void CmiNumberHandler(int n, CmiHandler h)
+::
+
+  void CmiNumberHandler(int n, CmiHandler h)
 
 Forces the system to associate the specified handler number n with the
 specified handler function h. If the function number n was previously
@@ -209,7 +225,9 @@ message.
 
 The following functions are provided to help build message buffers:
 
-void \*CmiAlloc(int size)
+::
+
+  void *CmiAlloc(int size)
 
 Allocates memory of size size in heap and returns pointer to the usable
 space. There are some message-sending functions that accept only message
@@ -218,12 +236,16 @@ way to allocate message buffers. The returned pointer point to the
 message header, the user data will follow it. See CmiMsgHeaderSizeBytes
 for this.
 
-void CmiFree(void \*ptr)
+::
+
+  void CmiFree(void *ptr)
 
 This function frees the memory pointed to by ptr. ptr should be a
 pointer that was previously returned by CmiAlloc.
 
-#define CmiMsgHeaderSizeBytes
+::
+
+  #define CmiMsgHeaderSizeBytes
 
 This constant contains the size of the message header. When one
 allocates a message buffer, one must set aside enough space for the
@@ -231,16 +253,22 @@ header and the data. This macro helps you to do so. For example, if one
 want to allocate an array of 100 int, he should call the function this
 way:
 
-void CmiSetHandler(int \*MessageBuffer, int HandlerId)
+::
+
+  void CmiSetHandler(int *MessageBuffer, int HandlerId)
 
 This macro sets the handler number of a message to HandlerId.
 
-int CmiGetHandler(int \*MessageBuffer)
+::
+
+  int CmiGetHandler(int *MessageBuffer)
 
 This call returns the handler of a message in the form of a handler
 number.
 
-CmiHandler CmiGetHandlerFunction(int \*MessageBuffer)
+::
+
+  CmiHandler CmiGetHandlerFunction(int *MessageBuffer)
 
 This call returns the handler of a message in the form of a function
 pointer.
@@ -282,31 +310,37 @@ we provide several variations on each send function:
    processor. This means that when the message is received, any “free”
    processor within than node can handle it.
 
-void CmiSyncSend(unsigned int destPE, unsigned int size, void \*msg)
+::
+
+  void CmiSyncSend(unsigned int destPE, unsigned int size, void *msg)
 
 Sends msg of size size bytes to processor destPE. When it returns, you
 may reuse the message buffer.
 
-void CmiSyncNodeSend(unsigned int destNode, unsigned int size, void
-\*msg)
+::
+
+  void CmiSyncNodeSend(unsigned int destNode, unsigned int size, void *msg)
 
 Sends msg of size size bytes to node destNode. When it returns, you may
 reuse the message buffer.
 
-void CmiSyncSendAndFree(unsigned int destPE, unsigned int size, void
-\*msg)
+::
+
+  void CmiSyncSendAndFree(unsigned int destPE, unsigned int size, void *msg)
 
 Sends msg of size size bytes to processor destPE. When it returns, the
 message buffer has been freed using CmiFree.
 
-void CmiSyncNodeSendAndFree(unsigned int destNode, unsigned int size,
-void \*msg)
+::
+
+  void CmiSyncNodeSendAndFree(unsigned int destNode, unsigned int size, void *msg)
 
 Sends msg of size size bytes to node destNode. When it returns, the
 message buffer has been freed using CmiFree.
 
-CmiCommHandle CmiAsyncSend(unsigned int destPE, unsigned int size, void
-\*msg)
+::
+
+  CmiCommHandle CmiAsyncSend(unsigned int destPE, unsigned int size, void *msg)
 
 Sends msg of size size bytes to processor destPE. It returns a
 communication handle which can be tested using CmiAsyncMsgSent: when
@@ -314,8 +348,9 @@ this returns true, you may reuse the message buffer. If the returned
 communication handle is 0, message buffer can be reused immediately,
 thus saving a call to CmiAsyncMsgSent.
 
-CmiCommHandle CmiAsyncNodeSend(unsigned int destNode, unsigned int size,
-void \*msg)
+::
+
+  CmiCommHandle CmiAsyncNodeSend(unsigned int destNode, unsigned int size, void *msg)
 
 Sends msg of size size bytes to node destNode. It returns a
 communication handle which can be tested using CmiAsyncMsgSent: when
@@ -323,16 +358,22 @@ this returns true, you may reuse the message buffer. If the returned
 communication handle is 0, message buffer can be reused immediately,
 thus saving a call to CmiAsyncMsgSent.
 
-void CmiSyncVectorSend(int destPE, int len, int sizes[], char
-\*msgComps[]) Concatenates several pieces of data and sends them to
+::
+
+  void CmiSyncVectorSend(int destPE, int len, int sizes[], char *msgComps[])
+
+Concatenates several pieces of data and sends them to
 processor destPE. The data consists of len pieces residing in different
 areas of memory, which are logically concatenated. The msgComps array
 contains pointers to the pieces; the size of msgComps[i] is taken from
 sizes[i]. When it returns, sizes, msgComps and the message components
 specified in msgComps can be immediately reused.
 
-void CmiSyncVectorSendAndFree(int destPE, int len, int sizes[], char
-\*msgComps[]) Concatenates several pieces of data and sends them to
+::
+
+  void CmiSyncVectorSendAndFree(int destPE, int len, int sizes[], char *msgComps[])
+
+Concatenates several pieces of data and sends them to
 processor destPE. The data consists of len pieces residing in different
 areas of memory, which are logically concatenated. The msgComps array
 contains pointers to the pieces; the size of msgComps[i] is taken from
@@ -341,8 +382,11 @@ this function therefore, they should be dynamically allocated using
 CmiAlloc. However, the sizes and msgComps array themselves are not
 freed.
 
-CmiCommHandle CmiAsyncVectorSend(int destPE, int len, int sizes[], char
-\*msgComps[]) Concatenates several pieces of data and sends them to
+::
+
+  CmiCommHandle CmiAsyncVectorSend(int destPE, int len, int sizes[], char *msgComps[])
+
+Concatenates several pieces of data and sends them to
 processor destPE. The data consists of len pieces residing in different
 areas of memory, which are logically concatenated. The msgComps array
 contains pointers to the pieces; the size of msgComps[i] is taken from
@@ -354,18 +398,23 @@ parameters can be reused. If the returned communication handle is 0,
 message buffer can be reused immediately, thus saving a call to
 CmiAsyncMsgSent.
 
-int CmiAsyncMsgSent(CmiCommHandle handle)
+::
+
+  int CmiAsyncMsgSent(CmiCommHandle handle)
 
 Returns true if the communication specified by the given CmiCommHandle
 has proceeded to the point where the message buffer can be reused.
 
-void CmiReleaseCommHandle(CmiCommHandle handle)
+::
+
+  void CmiReleaseCommHandle(CmiCommHandle handle)
 
 Releases the communication handle handle and associated resources. It
 does not free the message buffer.
 
-void CmiMultipleSend(unsigned int destPE, int len, int sizes[], char
-\*msgComps[])
+::
+
+  void CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *msgComps[])
 
 This function allows the user to send multiple messages that may be
 destined for the SAME PE in one go. This is more efficient than sending
@@ -385,57 +434,74 @@ will not be able to provide the service to the user.)
 
 Broadcasting Messages
 ---------------------
+::
 
-void CmiSyncBroadcast(unsigned int size, void \*msg)
+  void CmiSyncBroadcast(unsigned int size, void *msg)
 
 Sends msg of length size bytes to all processors excluding the processor
 on which the caller resides.
 
-void CmiSyncNodeBroadcast(unsigned int size, void \*msg)
+::
+
+  void CmiSyncNodeBroadcast(unsigned int size, void *msg)
 
 Sends msg of length size bytes to all nodes excluding the node on which
 the caller resides.
 
-void CmiSyncBroadcastAndFree(unsigned int size, void \*msg)
+::
+
+  void CmiSyncBroadcastAndFree(unsigned int size, void *msg)
 
 Sends msg of length size bytes to all processors excluding the processor
 on which the caller resides. Uses CmiFree to deallocate the message
 buffer for msg when the broadcast completes. Therefore msg must point to
 a buffer allocated with CmiAlloc.
 
-void CmiSyncNodeBroadcastAndFree(unsigned int size, void \*msg)
+::
+
+  void CmiSyncNodeBroadcastAndFree(unsigned int size, void *msg)
 
 Sends msg of length size bytes to all nodes excluding the node on which
 the caller resides. Uses CmiFree to deallocate the message buffer for
 msg when the broadcast completes. Therefore msg must point to a buffer
 allocated with CmiAlloc.
 
-void CmiSyncBroadcastAll(unsigned int size, void \*msg)
+::
+
+  void CmiSyncBroadcastAll(unsigned int size, void *msg)
 
 Sends msg of length size bytes to all processors including the processor
 on which the caller resides. This function does not free the message
 buffer for msg.
 
-void CmiSyncNodeBroadcastAll(unsigned int size, void \*msg)
+::
+
+  void CmiSyncNodeBroadcastAll(unsigned int size, void *msg)
 
 Sends msg of length size bytes to all nodes including the node on which
 the caller resides. This function does not free the message buffer for
 msg.
 
-void CmiSyncBroadcastAllAndFree(unsigned int size, void \*msg)
+::
+
+  void CmiSyncBroadcastAllAndFree(unsigned int size, void *msg)
 
 Sends msg of length size bytes to all processors including the processor
 on which the caller resides. This function frees the message buffer for
 msg before returning, so msg must point to a dynamically allocated
 buffer.
 
-void CmiSyncNodeBroadcastAllAndFree(unsigned int size, void \*msg)
+::
+
+  void CmiSyncNodeBroadcastAllAndFree(unsigned int size, void *msg)
 
 Sends msg of length size bytes to all nodes including the node on which
 the caller resides. This function frees the message buffer for msg
 before returning, so msg must point to a dynamically allocated buffer.
 
-CmiCommHandle CmiAsyncBroadcast(unsigned int size, void \*msg)
+::
+
+  CmiCommHandle CmiAsyncBroadcast(unsigned int size, void *msg)
 
 Initiates asynchronous broadcast of message msg of length size bytes to
 all processors excluding the processor on which the caller resides. It
@@ -445,7 +511,9 @@ is 0, message buffer can be reused immediately, thus saving a call to
 CmiAsyncMsgSent. msg should not be overwritten or freed before the
 communication is complete.
 
-CmiCommHandle CmiAsyncNodeBroadcast(unsigned int size, void \*msg)
+::
+
+  CmiCommHandle CmiAsyncNodeBroadcast(unsigned int size, void *msg)
 
 Initiates asynchronous broadcast of message msg of length size bytes to
 all nodes excluding the node on which the caller resides. It returns a
@@ -455,7 +523,9 @@ message buffer can be reused immediately, thus saving a call to
 CmiAsyncMsgSent. msg should not be overwritten or freed before the
 communication is complete.
 
-CmiCommHandle CmiAsyncBroadcastAll(unsigned int size, void \*msg)
+::
+
+  CmiCommHandle CmiAsyncBroadcastAll(unsigned int size, void *msg)
 
 Initiates asynchronous broadcast of message msg of length size bytes to
 all processors including the processor on which the caller resides. It
@@ -465,7 +535,9 @@ is 0, message buffer can be reused immediately, thus saving a call to
 CmiAsyncMsgSent. msg should not be overwritten or freed before the
 communication is complete.
 
-CmiCommHandle CmiAsyncNodeBroadcastAll(unsigned int size, void \*msg)
+::
+
+  CmiCommHandle CmiAsyncNodeBroadcastAll(unsigned int size, void *msg)
 
 Initiates asynchronous broadcast of message msg of length size bytes to
 all nodes including the node on which the caller resides. It returns a
@@ -480,12 +552,16 @@ communication is complete.
 Multicasting Messages
 ---------------------
 
-typedef ... CmiGroup;
+::
+
+  typedef ... CmiGroup;
 
 A CmiGroup represents a set of processors. It is an opaque type. Group
 IDs are useful for the multicast functions below.
 
-CmiGroup CmiEstablishGroup(int npes, int \*pes);
+::
+
+  CmiGroup CmiEstablishGroup(int npes, int *pes);
 
 Converts an array of processor numbers into a group ID. Group IDs are
 useful for the multicast functions below. Caution: this call uses up
@@ -493,21 +569,25 @@ some resources. In particular, establishing a group uses some network
 bandwidth (one broadcast’s worth) and a small amount of memory on all
 processors.
 
-void CmiSyncMulticast(CmiGroup grp, unsigned int size, void \*msg)
+::
+
+  void CmiSyncMulticast(CmiGroup grp, unsigned int size, void *msg)
 
 Sends msg of length size bytes to all members of the specified group.
 Group IDs are created using CmiEstablishGroup.
 
-void CmiSyncMulticastAndFree(CmiGroup grp, unsigned int size, void
-\*msg)
+::
+
+  void CmiSyncMulticastAndFree(CmiGroup grp, unsigned int size, void *msg)
 
 Sends msg of length size bytes to all members of the specified group.
 Uses CmiFree to deallocate the message buffer for msg when the broadcast
 completes. Therefore msg must point to a buffer allocated with CmiAlloc.
 Group IDs are created using CmiEstablishGroup.
 
-CmiCommHandle CmiAsyncMulticast(CmiGroup grp, unsigned int size, void
-\*msg)
+::
+
+  CmiCommHandle CmiAsyncMulticast(CmiGroup grp, unsigned int size, void *msg)
 
 (Note: Not yet implemented.) Initiates asynchronous broadcast of message
 msg of length size bytes to all members of the specified group. It
@@ -518,20 +598,24 @@ CmiAsyncMsgSent. msg should not be overwritten or freed before the
 communication is complete. Group IDs are created using
 CmiEstablishGroup.
 
-void CmiSyncListSend(int npes, int \*pes, unsigned int size, void \*msg)
+::
+
+  void CmiSyncListSend(int npes, int *pes, unsigned int size, void *msg)
 
 Sends msg of length size bytes to npes processors in the array pes.
 
-void CmiSyncListSendAndFree(int npes, int \*pes, unsigned int size, void
-\*msg)
+::
+
+  void CmiSyncListSendAndFree(int npes, int *pes, unsigned int size, void *msg)
 
 Sends msg of length size bytes to npes processors in the array pes. Uses
 CmiFree to deallocate the message buffer for msg when the multicast
 completes. Therefore, msg must point to a buffer allocated with
 CmiAlloc.
 
-CmiCommHandle CmiAsyncListSend(int npes, int \*pes, unsigned int size,
-void \*msg)
+::
+
+  CmiCommHandle CmiAsyncListSend(int npes, int *pes, unsigned int size, void *msg)
 
 Initiates asynchronous multicast of message msg of length size bytes to
 npes processors in the array pes. It returns a communication handle
@@ -577,21 +661,32 @@ expanded by adding more nodes.
 The signatures for the functions in
 Table :numref:`table:reductions` are:
 
-void CmiReduce(void \*msg, int size, CmiReduceMergeFn mergeFn); void
-CmiReduceStruct(void \*data, CmiReducePupFn pupFn, CmiReduceMergeFn
-mergeFn, CmiHandler dest, CmiReduceDeleteFn deleteFn); void
-CmiReduceID(void \*msg, int size, CmiReduceMergeFn mergeFn,
-CmiReductionID id); void CmiReduceStructID(void \*data, CmiReducePupFn
-pupFn, CmiReduceMergeFn mergeFn, CmiHandler dest, CmiReduceDeleteFn
-deleteFn, CmiReductionID id); void CmiListReduce(int npes, int \*pes,
-void \*msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id); void
-CmiListReduceStruct(int npes, int \*pes, void \*data, CmiReducePupFn
-pupFn, CmiReduceMergeFn mergeFn, CmiHandler dest, CmiReduceDeleteFn
-deleteFn, CmiReductionID id); void CmiGroupReduce(CmiGroup grp, void
-\*msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id); void
-CmiGroupReduceStruct(CmiGroup grp, void \*data, CmiReducePupFn pupFn,
-CmiReduceMergeFn mergeFn, CmiHandler dest, CmiReduceDeleteFn deleteFn,
-CmiReductionID id);
+::
+
+  void CmiReduce(void *msg, int size, CmiReduceMergeFn mergeFn);
+
+  void CmiReduceStruct(void *data, CmiReducePupFn pupFn,
+  CmiReduceMergeFn mergeFn, CmiHandler dest, CmiReduceDeleteFn deleteFn);
+
+  void CmiReduceID(void *msg, int size, CmiReduceMergeFn mergeFn,
+  CmiReductionID id);
+
+  void CmiReduceStructID(void *data, CmiReducePupFn pupFn, CmiReduceMergeFn mergeFn,
+  CmiHandler dest, CmiReduceDeleteFn deleteFn, CmiReductionID id);
+
+  void CmiListReduce(int npes, int *pes, void *msg, int size,
+  CmiReduceMergeFn mergeFn, CmiReductionID id);
+
+  void CmiListReduceStruct(int npes, int *pes, void *data, CmiReducePupFn
+  pupFn, CmiReduceMergeFn mergeFn, CmiHandler dest, CmiReduceDeleteFn
+  deleteFn, CmiReductionID id);
+
+  void CmiGroupReduce(CmiGroup grp, void *msg, int size,
+  CmiReduceMergeFn mergeFn, CmiReductionID id);
+
+  void CmiGroupReduceStruct(CmiGroup grp, void *data, CmiReducePupFn pupFn,
+  CmiReduceMergeFn mergeFn, CmiHandler dest, CmiReduceDeleteFn deleteFn,
+  CmiReductionID id);
 
 In all the above, msg is the Converse message deposited by the local
 processor, size is the size of the message msg, and data is a pointer to
@@ -601,7 +696,10 @@ explicitly passed in “Struct” functions only, since for the message
 versions it is taken from the header of msg. Moreover there are several
 other function pointers passed in by the user:
 
-void \* (\*mergeFn)(int \*size, void \*local, void \**remote, int count)
+::
+
+  void * (*mergeFn)(int *size, void *local, void **remote, int count)
+
 Prototype for a CmiReduceMergeFn function pointer argument. This
 function is used in all the CmiReduce forms to merge the local
 message/data structure deposited on a processor with all the messages
@@ -624,16 +722,24 @@ allocated. Each element in remote is the complete incoming message
 it has been packed by the pup function (without any additional header)
 for struct reductions.
 
-void (\*pupFn)(pup_er p, void \*data) Prototype for a CmiReducePupFn
-function pointer argument. This function will use the PUP framework to
+::
+
+  void (*pupFn)(pup_er p, void *data)
+
+Prototype for a CmiReducePupFn function pointer argument.
+This function will use the PUP framework to
 pup the data passed in into a message for sending across the network.
 The data can be either the same data passed in as first parameter of any
 “Struct” function, or the return of the merge function. It will be
 called for sizing and packing. (Note: It will not be called for
 unpacking.)
 
-void (\*deleteFn)(void \*ptr) Prototype for a CmiReduceDeleteFn function
-pointer argument. This function is used to delete either the data
+::
+
+  void (*deleteFn)(void *ptr)
+
+Prototype for a CmiReduceDeleteFn function pointer argument.
+This function is used to delete either the data
 structure passed in as first parameter of any “Struct” function, or the
 return of the merge function. It can be as simple as “free” or as
 complicated as needed to delete complex structures. If this function is
@@ -660,17 +766,28 @@ CmiReductionID. It is up to the user to guarantee this.)
 A CmiReductionID can be obtained by the user in three ways, using one of
 the following functions:
 
-CmiReductionID CmiGetGlobalReduction() This function must be called on
+::
+
+  CmiReductionID CmiGetGlobalReduction()
+
+This function must be called on
 every processor, and in the same order if called multiple times. This
 would generally be inside initialization code, that can set aside some
 CmiReductionIDs for later use.
 
-CmiReductionID CmiGetDynamicReduction() This function may be called only
+::
+
+  CmiReductionID CmiGetDynamicReduction()
+
+This function may be called only
 on processor zero. It returns a unique ID, and it is up to the user to
 distribute this ID to any processor that needs it.
 
-void CmiGetDynamicReductionRemote(int handlerIdx, int pe, int dataSize,
-void \*data) This function may be called on any processor. The produced
+::
+
+  void CmiGetDynamicReductionRemote(int handlerIdx, int pe, int dataSize, void *data)
+
+This function may be called on any processor. The produced
 CmiReductionID is returned on the specified pe by sending a message to
 the specified handlerIdx. If pe is -1, then all processors will receive
 the notification message. data can be any data structure that the user
@@ -752,16 +869,18 @@ views scheduler’s queue as a single prioritized queue that includes
 messages directed at that processor and messages from the node-level
 queue sorted according to priorities.
 
-void CsdEnqueueGeneral(void \*Message, int strategy, int priobits, int
-\*prioptr)
+::
+
+  void CsdEnqueueGeneral(void *Message, int strategy, int priobits, int *prioptr)
 
 This call enqueues a message to the processor’s scheduler’s queue, to be
 sorted according to its priority and the queueing ``strategy``. The
 meaning of the priobits and prioptr fields depend on the value of
 strategy, which are explained below.
 
-void CsdNodeEnqueueGeneral(void \*Message, int strategy, int priobits,
-int \*prioptr)
+::
+
+  void CsdNodeEnqueueGeneral(void *Message, int strategy, int priobits, int *prioptr)
 
 This call enqueues a message to the node-level scheduler’s queue, to be
 sorted according to its priority and the queueing strategy. The meaning
@@ -807,7 +926,9 @@ emerged from the scheduler’s queue. It is normal to actually store the
 priority *in the message itself*, though it is up to the user to
 actually arrange storage for the priority.
 
-void CsdEnqueue(void \*Message)
+::
+
+  void CsdEnqueue(void *Message)
 
 This macro is a shorthand for
 
@@ -817,7 +938,9 @@ This macro is a shorthand for
 
 provided here for backward compatibility.
 
-void CsdNodeEnqueue(void \*Message)
+::
+
+  void CsdNodeEnqueue(void *Message)
 
 This macro is a shorthand for
 
@@ -827,7 +950,9 @@ This macro is a shorthand for
 
 provided here for backward compatibility.
 
-void CsdEnqueueFifo(void \*Message)
+::
+
+  void CsdEnqueueFifo(void *Message)
 
 This macro is a shorthand for
 
@@ -837,7 +962,9 @@ This macro is a shorthand for
 
 provided here for backward compatibility.
 
-void CsdNodeEnqueueFifo(void \*Message)
+::
+
+  void CsdNodeEnqueueFifo(void *Message)
 
 This macro is a shorthand for
 
@@ -847,7 +974,9 @@ This macro is a shorthand for
 
 provided here for backward compatibility.
 
-void CsdEnqueueLifo(void \*Message)
+::
+
+  void CsdEnqueueLifo(void *Message)
 
 This macro is a shorthand for
 
@@ -857,7 +986,9 @@ This macro is a shorthand for
 
 provided here for backward compatibility.
 
-void CsdNodeEnqueueLifo(void \*Message)
+::
+
+  void CsdNodeEnqueueLifo(void *Message)
 
 This macro is a shorthand for
 
@@ -867,12 +998,16 @@ This macro is a shorthand for
 
 provided here for backward compatibility.
 
-int CsdEmpty()
+::
+
+  int CsdEmpty()
 
 This function returns non-zero integer when the scheduler’s
 processor-level queue is empty, zero otherwise.
 
-int CsdNodeEmpty()
+::
+
+  int CsdNodeEmpty()
 
 This function returns non-zero integer when the scheduler’s node-level
 queue is empty, zero otherwise.
@@ -903,26 +1038,42 @@ In each iteration, a scheduler first looks for any message that has
 arrived from another processor, and delivers it. If there isn’t any, it
 selects a message from the locally enqueued messages, and delivers it.
 
-void CsdScheduleForever(void) Extract and deliver messages until the
+::
+
+  void CsdScheduleForever(void)
+
+Extract and deliver messages until the
 scheduler is stopped. Raises the idle handling converse signals. This is
 the scheduler to use in most Converse programs.
 
-int CsdScheduleCount(int n) Extract and deliver messages until :math:`n`
+::
+
+  int CsdScheduleCount(int n)
+
+Extract and deliver messages until :math:`n`
 messages have been delivered, then return 0. If the scheduler is stopped
 early, return :math:`n` minus the number of messages delivered so far.
 Raises the idle handling converse signals.
 
-void CsdSchedulePoll(void) Extract and deliver messages until no more
+::
+
+  void CsdSchedulePoll(void)
+
+Extract and deliver messages until no more
 messages are available, then return. This is useful for running
 non-networking code when the networking code has nothing to do.
 
-void CsdScheduler(int n)
+::
+
+  void CsdScheduler(int n)
 
 If :math:`n` is zero, call CsdSchedulePoll. If :math:`n` is negative,
 call CsdScheduleForever. If :math:`n` is positive, call
 CsdScheduleCount(\ :math:`n`).
 
-int CmiDeliverMsgs(int MaxMsgs)
+::
+
+  int CmiDeliverMsgs(int MaxMsgs)
 
 Retrieves messages from the network message queue and invokes
 corresponding handler functions for arrived messages. This function
@@ -931,14 +1082,18 @@ MaxMsgs messages have been retrieved and their handlers called. It
 returns the difference between total messages delivered and MaxMsgs. The
 handler is given a pointer to the message as its parameter.
 
-void CmiDeliverSpecificMsg(int HandlerId)
+::
+
+  void CmiDeliverSpecificMsg(int HandlerId)
 
 Retrieves messages from the network queue and delivers the first message
 with its handler field equal to HandlerId. This functions leaves alone
 all other messages. It returns after the invoked handler function
 returns.
 
-void CsdExitScheduler(void)
+::
+
+  void CsdExitScheduler(void)
 
 This call causes CsdScheduler to stop processing messages when control
 has returned back to it. The scheduler then returns to its calling
@@ -947,22 +1102,28 @@ routine.
 The Timer
 ---------
 
-double CmiTimer(void)
+::
+
+  double CmiTimer(void)
 
 Returns current value of the timer in seconds. This is typically the
-time spent since the ConverseInit call. The precision of this timer is
+time spent since the ``ConverseInit`` call. The precision of this timer is
 the best available on the particular machine, and usually has at least
 microsecond accuracy.
 
 Processor Ids
 -------------
 
-int CmiNumPe(void)
+::
+
+  int CmiNumPe(void)
 
 Returns the total number of processors on which the parallel program is
 being run.
 
-int CmiMyPe(void)
+::
+
+  int CmiMyPe(void)
 
 Returns the logical processor identifier of processor on which the
 caller resides. A processor Id is between ``0`` and ``CmiNumPe()-1``.
@@ -1025,21 +1186,45 @@ of portability.
 
 Macros for node-shared variables:
 
-CsvDeclare(type,variable) CsvStaticDeclare(type,variable)
-CsvExtern(type,variable) CsvInitialize(type,variable)
-CsvAccess(variable)
+::
+
+  CsvDeclare(type,variable)
+
+  CsvStaticDeclare(type,variable)
+
+  CsvExtern(type,variable)
+
+  CsvInitialize(type,variable)
+
+  CsvAccess(variable)
 
 Macros for PE-private variables:
 
-CpvDeclare(type,variable) CpvStaticDeclare(type,variable)
-CpvExtern(type,variable) CpvInitialize(type,variable)
-CpvAccess(variable)
+::
+
+  CpvDeclare(type,variable)
+
+  CpvStaticDeclare(type,variable)
+
+  CpvExtern(type,variable)
+
+  CpvInitialize(type,variable)
+
+  CpvAccess(variable)
 
 Macros for thread-private variables:
 
-CtvDeclare(type,variable) CtvStaticDeclare(type,variable)
-CtvExtern(type,variable) CtvInitialize(type,variable)
-CtvAccess(variable)
+::
+
+  CtvDeclare(type,variable)
+
+  CtvStaticDeclare(type,variable)
+
+  CtvExtern(type,variable)
+
+  CtvInitialize(type,variable)
+
+  CtvAccess(variable)
 
 A sample code to illustrate the usage of the macros is provided in
 the example below. There are a few rules that the user
@@ -1095,35 +1280,49 @@ machines, Converse provides the following functions and/or macros.
 shared-memory machines also, and have the effect of only one processor
 per node and only one thread per processor.)
 
-int CmiMyNode()
+::
+
+  int CmiMyNode()
 
 Returns the node number to which the calling processor belongs.
 
-int CmiNumNodes()
+::
+
+  int CmiNumNodes()
 
 Returns number of nodes in the system. Note that this is not the same as
 ``CmiNumPes()``.
 
-int CmiMyRank()
+::
+
+  int CmiMyRank()
 
 Returns the rank of the calling processor within a shared memory node.
 
-int CmiNodeFirst(int node)
+::
+
+  int CmiNodeFirst(int node)
 
 Returns the processor number of the lowest ranked processor on node
 ``node``
 
-int CmiNodeSize(int node)
+::
+
+  int CmiNodeSize(int node)
 
 Returns the number of processors that belong to the node ``node``.
 
-int CmiNodeOf(int pe)
+::
+
+  int CmiNodeOf(int pe)
 
 Returns the node number to which processor ``pe`` belongs. Indeed,
 ``CmiMyNode()`` is a utility macro that is aliased to
 ``CmiNodeOf(CmiMyPe())``.
 
-int CmiRankOf(int pe)
+::
+
+  int CmiRankOf(int pe)
 
 Returns the rank of processor ``pe`` in the node to which it belongs.
 
@@ -1132,36 +1331,50 @@ Returns the rank of processor ``pe`` in the node to which it belongs.
 Node-level Locks and other Synchronization Mechanisms
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-void CmiNodeBarrier()
+::
+
+  void CmiNodeBarrier()
 
 Provide barrier synchronization at the node level, i.e. all the
 processors belonging to the node participate in this barrier.
 
-typedef McDependentType CmiNodeLock
+::
+
+  typedef McDependentType CmiNodeLock
 
 This is the type for all the node-level locks in Converse.
 
-CmiNodeLock CmiCreateLock(void)
+::
+
+  CmiNodeLock CmiCreateLock(void)
 
 Creates, initializes and returns a new lock. Initially the lock is
 unlocked.
 
-void CmiLock(CmiNodeLock lock)
+::
+
+  void CmiLock(CmiNodeLock lock)
 
 Locks ``lock``. If the ``lock`` has been locked by other processor,
 waits for ``lock`` to be unlocked.
 
-void CmiUnlock(CmiNodeLock lock)
+::
+
+  void CmiUnlock(CmiNodeLock lock)
 
 Unlocks ``lock``. Processors waiting for the ``lock`` can then compete
 for acquiring ``lock``.
 
-int CmiTryLock(CmiNodeLock lock)
+::
+
+  int CmiTryLock(CmiNodeLock lock)
 
 Tries to lock ``lock``. If it succeeds in locking, it returns 0. If any
 other processor has already acquired the lock, it returns 1.
 
-voi CmiDestroyLock(CmiNodeLock lock)
+::
+
+  voi CmiDestroyLock(CmiNodeLock lock)
 
 Frees any memory associated with ``lock``. It is an error to perform any
 operations with ``lock`` after a call to this function.
@@ -1169,20 +1382,26 @@ operations with ``lock`` after a call to this function.
 Input/Output
 ------------
 
-void CmiPrintf(char \*format, arg1, arg2, ...)
+::
+
+  void CmiPrintf(char *format, arg1, arg2, ...)
 
 This function does an atomic ``printf()`` on ``stdout``. On machine with
 host, this is implemented on top of the messaging layer using
 asynchronous sends.
 
-int CmiScanf(char \*format, void \*arg1, void \*arg2, ...)
+::
+
+  int CmiScanf(char *format, void *arg1, void *arg2, ...)
 
 This function performs an atomic ``scanf`` from ``stdin``. The
 processor, on which the caller resides, blocks for input. On machines
 with host, this is implemented on top of the messaging layer using
 asynchronous send and blocking receive.
 
-void CmiError(char \*format, arg1, arg2, ...)
+::
+
+  void CmiError(char *format, arg1, arg2, ...)
 
 This function does an atomic ``printf()`` on ``stderr``. On machines
 with host, this is implemented on top of the messaging layer using
@@ -1200,30 +1419,42 @@ performance. The root of the spanning tree (processor based or
 node-based) is always 0, thus the CmiSpanTreeRoot call has been
 eliminated.
 
-int CmiSpanTreeParent(int procNum)
+::
+
+  int CmiSpanTreeParent(int procNum)
 
 This function returns the processor number of the parent of procNum in
 the spanning tree.
 
-int CmiNumSpanTreeChildren(int procNum)
+::
+
+  int CmiNumSpanTreeChildren(int procNum)
 
 Returns the number of children of procNum in the spanning tree.
 
-void CmiSpanTreeChildren(int procNum, int \*children)
+::
+
+  void CmiSpanTreeChildren(int procNum, int *children)
 
 This function fills the array children with processor numbers of
 children of procNum in the spanning tree.
 
-int CmiNodeSpanTreeParent(int nodeNum)
+::
+
+  int CmiNodeSpanTreeParent(int nodeNum)
 
 This function returns the node number of the parent of nodeNum in the
 spanning tree.
 
-int CmiNumNodeSpanTreeChildren(int nodeNum)
+::
+
+  int CmiNumNodeSpanTreeChildren(int nodeNum)
 
 Returns the number of children of nodeNum in the spanning tree.
 
-void CmiNodeSpanTreeChildren(int nodeNum, int \*children)
+::
+
+  void CmiNodeSpanTreeChildren(int nodeNum, int *children)
 
 This function fills the array children with node numbers of children of
 nodeNum in the spanning tree.
@@ -1248,7 +1479,9 @@ the correct locations, even on a new processor. This is especially
 useful when the format of the data structure is complex or unknown, as
 with thread stacks.
 
-void \*CmiIsomalloc(int size)
+::
+
+  void *CmiIsomalloc(int size)
 
 Allocate size bytes at a unique virtual address. Returns a pointer to
 the allocated region.
@@ -1256,7 +1489,9 @@ the allocated region.
 CmiIsomalloc makes allocations with page granularity (typically several
 kilobytes); so it is not recommended for small allocations.
 
-void CmiIsomallocFree(void \*doomedBlock)
+::
+
+  void CmiIsomallocFree(void *doomedBlock)
 
 Release the given block, which must have been previously returned by
 CmiIsomalloc. Also releases the used virtual address range, which the
@@ -1266,7 +1501,9 @@ After a CmiIsomallocFree, references to that block will likely result in
 a segmentation violation. It is illegal to call CmiIsomallocFree more
 than once on the same block.
 
-void CmiIsomallocPup(pup_er p,void \**block)
+::
+
+  void CmiIsomallocPup(pup_er p,void **block)
 
 Pack/Unpack the given block. This routine can be used to move blocks
 across processors, save blocks to disk, or checkpoint blocks.
@@ -1278,16 +1515,20 @@ Note- Use of this function to pup individual blocks is not supported any
 longer. All the blocks allocated via CmiIsomalloc are pupped by the RTS
 as one single unit.
 
-int CmiIsomallocLength(void \*block);
+::
+
+  int CmiIsomallocLength(void *block);
 
 Return the length, in bytes, of this isomalloc’d block.
 
-int CmiIsomallocInRange(void \*address)
+::
+
+  int CmiIsomallocInRange(void *address)
 
 Return 1 if the given address may have been previously allocated to this
 processor using Isomalloc; 0 otherwise.
-CmiIsomallocInRange(malloc(size)) is guaranteed to be zero;
-CmiIsomallocInRange(CmiIsomalloc(size)) is guaranteed to be one.
+``CmiIsomallocInRange(malloc(size))`` is guaranteed to be zero;
+``CmiIsomallocInRange(CmiIsomalloc(size))`` is guaranteed to be one.
 
 Threads
 =======
@@ -1302,30 +1543,40 @@ own thread schedulers.
 Basic Thread Calls
 ------------------
 
-typedef struct CthThreadStruct \*CthThread;
+::
+
+  typedef struct CthThreadStruct *CthThread;
 
 This is an opaque type defined in ``converse.h``. It represents a
 first-class thread object. No information is publicized about the
 contents of a CthThreadStruct.
 
-typedef void (CthVoidFn)(void \*);
+::
+
+  typedef void (CthVoidFn)(void *);
 
 This is a type defined in ``converse.h``. It represents a function that
 returns nothing.
 
-typedef CthThread (CthThFn)(void);
+::
+
+  typedef CthThread (CthThFn)(void);
 
 This is a type defined in ``converse.h``. It represents a function that
 returns a CthThread.
 
-CthThread CthSelf()
+::
+
+  CthThread CthSelf()
 
 Returns the currently-executing thread. Note: even the initial flow of
 control that inherently existed when the program began executing
 ``main`` counts as a thread. You may retrieve that thread object using
 ``CthSelf`` and use it like any other.
 
-CthThread CthCreate(CthVoidFn fn, void \*arg, int size)
+::
+
+  CthThread CthCreate(CthVoidFn fn, void *arg, int size)
 
 Creates a new thread object. The thread is not given control yet. To
 make the thread execute, you must push it into the scheduler queue,
@@ -1339,7 +1590,9 @@ thread of control that came into existence when your program was first
 (say, by calling ``CthSelf`` in ``main``), and it can be used like any
 other ``CthThread``.
 
-CthThread CthCreateMigratable(CthVoidFn fn, void \*arg, int size)
+::
+
+  CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size)
 
 Create a thread that can later be moved to other processors. Otherwise
 identical to CthCreate.
@@ -1348,7 +1601,9 @@ This is only a hint to the runtime system; some threads implementations
 cannot migrate threads, others always create migratable threads. In
 these cases, CthCreateMigratable is equivalent to CthCreate.
 
-CthThread CthPup(pup_er p,CthThread t)
+::
+
+  CthThread CthPup(pup_er p,CthThread t)
 
 Pack/Unpack a thread. This can be used to save a thread to disk, migrate
 a thread between processors, or checkpoint the state of a thread.
@@ -1356,7 +1611,9 @@ a thread between processors, or checkpoint the state of a thread.
 Only a suspended thread can be Pup’d. Only a thread created with
 CthCreateMigratable can be Pup’d.
 
-void CthFree(CthThread t)
+::
+
+  void CthFree(CthThread t)
 
 Frees thread ``t``. You may ONLY free the currently-executing thread
 (yes, this sounds strange, it’s historical). Naturally, the free will
@@ -1364,19 +1621,25 @@ actually be postponed until the thread suspends. To terminate itself, a
 thread calls ``CthFree(CthSelf())``, then gives up control to another
 thread.
 
-void CthSuspend()
+::
+
+  void CthSuspend()
 
 Causes the current thread to stop executing. The suspended thread will
 not start executing again until somebody pushes it into the scheduler
 queue again, using CthAwaken below. Control transfers to the next task
 in the scheduler queue.
 
-void CthAwaken(CthThread t)
+::
+
+  void CthAwaken(CthThread t)
 
 Pushes a thread into the scheduler queue. Caution: a thread must only be
 in the queue once. Pushing it in twice is a crashable error.
 
-void CthAwakenPrio(CthThread t, int strategy, int priobits, int \*prio)
+::
+
+  void CthAwakenPrio(CthThread t, int strategy, int priobits, int *prio)
 
 Pushes a thread into the scheduler queue with priority specified by
 ``priobits`` and ``prio`` and queueing strategy ``strategy``. Caution: a
@@ -1384,20 +1647,26 @@ thread must only be in the queue once. Pushing it in twice is a
 crashable error. ``prio`` is not copied internally, and is used when the
 scheduler dequeues the message, so it should not be reused until then.
 
-void CthYield()
+::
+
+  void CthYield()
 
 This function is part of the scheduler-interface. It simply executes
 ``{ CthAwaken(CthSelf()); CthSuspend(); }``. This combination gives up
 control temporarily, but ensures that control will eventually return.
 
-void CthYieldPrio(int strategy, int priobits, int \*prio)
+::
+
+  void CthYieldPrio(int strategy, int priobits, int *prio)
 
 This function is part of the scheduler-interface. It simply executes
 ``{CthAwakenPrio(CthSelf(),strategy,priobits,prio);CthSuspend();}``
 This combination gives up control temporarily, but ensures that control
 will eventually return.
 
-CthThread CthGetNext(CthThread t)
+::
+
+  CthThread CthGetNext(CthThread t)
 
 Each thread contains space for the user to store a “next” field (the
 functions listed here pay no attention to the contents of this field).
@@ -1406,7 +1675,9 @@ variables, and other synchronization abstractions to link threads
 together into queues. This function returns the contents of the next
 field.
 
-void CthSetNext(CthThread t, CthThread next)
+::
+
+  void CthSetNext(CthThread t, CthThread next)
 
 Each thread contains space for the user to store a “next” field (the
 functions listed here pay no attention to the contents of this field).
@@ -1459,14 +1730,18 @@ To achieve this, you must first implement a new kind of ready-queue. You
 must implement a function that inserts threads into this queue. The
 function must have this prototype:
 
-**void awakenfn(CthThread t, int strategy, int priobits, int \*prio);**
+::
+
+  void awakenfn(CthThread t, int strategy, int priobits, int *prio);
 
 When a thread suspends, it must choose a new thread to transfer control
 to. You must implement a function that makes the decision: which thread
 should the current thread transfer to. This function must have this
 prototype:
 
-**CthThread choosefn();**
+::
+
+  CthThread choosefn();
 
 Typically, the choosefn would choose a thread from your ready-queue.
 Alternately, it might choose to always transfer control to a central
@@ -1475,7 +1750,9 @@ scheduling thread.
 You then configure individual threads to actually use this new
 ready-queue. This is done using CthSetStrategy:
 
-void CthSetStrategy(CthThread t, CthAwkFn awakenfn, CthThFn choosefn)
+::
+
+  void CthSetStrategy(CthThread t, CthAwkFn awakenfn, CthThFn choosefn)
 
 Causes the thread to use the specified ``awakefn`` whenever you
 CthAwaken it, and the specified ``choosefn`` whenever you CthSuspend it.
@@ -1492,7 +1769,9 @@ will cause it to transfer control to a thread chosen by your
 You may reset a thread to its normal behavior using
 CthSetStrategyDefault:
 
-void CthSetStrategyDefault(CthThread t)
+::
+
+  void CthSetStrategyDefault(CthThread t)
 
 Restores the value of ``awakefn`` and ``choosefn`` to their default
 values. This implies that the next time you CthAwaken the specified
@@ -1505,7 +1784,9 @@ sure that control gets transferred to everywhere it needs to go.
 
 Scheduling threads may need to use this function as well:
 
-void CthResume(CthThread t)
+::
+
+  void CthResume(CthThread t)
 
 Immediately transfers control to thread ``t``. This routine is primarily
 intended for people who are implementing schedulers, not for end-users.
@@ -1620,15 +1901,21 @@ function pointer ``fnp``, with the specified argument ``arg``, when
 the condition indicated by ``condnum`` is raised next. Multiple
 functions may be registered for the same condition number.
 
-int CcdCallOnConditionKeep(condnum,fnp,arg) As above, but the
-association is permanent- the given function will be called again
-whenever this condition is raised.
+::
 
+  int CcdCallOnConditionKeep(condnum,fnp,arg)
+
+As above, but the association is permanent- the given function will
+be called again whenever this condition is raised.
 Returns an index that may be used to cancel the association later.
 
-void CcdCancelCallOnCondition(int condnum, int idx) void
-CcdCancelCallOnConditionKeep(int condnum, int idx) Delete the given
-index from the list of callbacks for the given condition. The
+::
+
+  void CcdCancelCallOnCondition(int condnum, int idx)
+
+  void CcdCancelCallOnConditionKeep(int condnum, int idx)
+
+Delete the given index from the list of callbacks for the given condition. The
 corresponding function will no longer be called when the condition is
 raised. Note that it is illegal to call these two functions to cancel
 callbacks from within ccd callbacks.
@@ -1740,46 +2027,85 @@ C interface (files “ccs-client.c” and “ccs-client.h”) and Java interface
 The C routines use the skt_abort error-reporting strategy; see
 “sockRoutines.h” for details. The C client API is:
 
-void CcsConnect(CcsServer \*svr, char \*host, int port); Connect to the
+::
+
+  void CcsConnect(CcsServer *svr, char *host, int port); Connect to the
+
 given CCS server. svr points to a pre-allocated CcsServer structure.
 
-void CcsConnectIp(CcsServer \*svr, int ip, int port); As above, but a
-numeric IP is specified.
+::
 
-int CcsNumNodes(CcsServer \*svr); int CcsNumPes(CcsServer \*svr); int
-CcsNodeFirst(CcsServer \*svr, int node); int CcsNodeSize(CcsServer
-\*svr,int node); These functions return information about the parallel
+  void CcsConnectIp(CcsServer *svr, int ip, int port);
+
+As above, but a numeric IP is specified.
+
+::
+
+  int CcsNumNodes(CcsServer *svr);
+
+  int CcsNumPes(CcsServer *svr);
+
+  int CcsNodeFirst(CcsServer *svr, int node);
+
+  int CcsNodeSize(CcsServer *svr,int node);
+
+These functions return information about the parallel
 machine; they are equivalent to the Converse calls CmiNumNodes,
 CmiNumPes, CmiNodeFirst, and CmiNodeSize.
 
-void CcsSendRequest(CcsServer \*svr, char \*hdlrID, int pe, unsigned int
-size, const char \*msg); Ask the server to execute the handler hdlrID on
+::
+
+  void CcsSendRequest(CcsServer *svr, char *hdlrID, int pe, unsigned int
+  size, const char *msg);
+
+Ask the server to execute the handler hdlrID on
 the given processor. The handler is passed the given data as a message.
 The data may be in any desired format (including binary).
 
-int CcsSendBroadcastRequest(CcsServer \*svr, const char \*hdlrID, int
-size, const void \*msg); As CcsSendRequest, only that the handler hdlrID
+::
+
+  int CcsSendBroadcastRequest(CcsServer *svr, const char *hdlrID, int
+  size, const void *msg);
+
+As CcsSendRequest, only that the handler hdlrID
 is invoked on all processors.
 
-int CcsSendMulticastRequest(CcsServer \*svr, const char \*hdlrID, int
-npes, int \*pes, int size, const void \*msg); As CcsSendRequest, only
-that the handler hdlrID is invoked on the processors specified in the
-array pes (of size npes).
+::
 
-int CcsRecvResponse(CcsServer \*svr, unsigned int maxsize, char
-\*recvBuffer, int timeout); Receive a response to the previous request
+  int CcsSendMulticastRequest(CcsServer *svr, const char *hdlrID,
+  int  npes, int *pes, int size, const void *msg);
+
+As CcsSendRequest, only that the handler hdlrID is invoked on the processors
+specified in the array pes (of size npes).
+
+::
+
+  int CcsRecvResponse(CcsServer *svr, unsigned int maxsize,
+  char *recvBuffer, int timeout);
+
+Receive a response to the previous request
 in-place. Timeout gives the number of seconds to wait before returning
 0; otherwise the number of bytes received is returned.
 
-int CcsRecvResponseMsg(CcsServer \*svr, unsigned int \*retSize,char
-\**newBuf, int timeout); As above, but receive a variable-length
+::
+
+  int CcsRecvResponseMsg(CcsServer *svr, unsigned int *retSize,
+  char **newBuf, int timeout);
+
+As above, but receive a variable-length
 response. The returned buffer must be free()’d after use.
 
-int CcsProbe(CcsServer \*svr); Return 1 if a response is available;
-otherwise 0.
+::
 
-void CcsFinalize(CcsServer \*svr); Closes connection and releases
-server.
+  int CcsProbe(CcsServer *svr);
+
+Return 1 if a response is available; otherwise 0.
+
+::
+
+  void CcsFinalize(CcsServer *svr);
+
+Closes connection and releases server.
 
 The Java routines throw an IOException on network errors. Use javadoc on
 CcsServer.java for the interface, which mirrors the C version above.
@@ -1802,9 +2128,14 @@ returning 0.
 
 The handler registration interface is:
 
-void CcsUseHandler(char \*id, int hdlr); int CcsRegisterHandler(char
-\*id, CmiHandler fn); Associate this handler ID string with this
-function. hdlr is a Converse handler index; fn is a function pointer.
+::
+
+  void CcsUseHandler(char *id, int hdlr);
+
+  int CcsRegisterHandler(char *id, CmiHandler fn);
+
+Associate this handler ID string with this function.
+hdlr is a Converse handler index; fn is a function pointer.
 The ID string cannot be more than 32 characters, including the
 terminating NULL.
 
@@ -1812,33 +2143,57 @@ After a handler has been registered to CCS, the user can also setup a
 merging function. This function will be passed in to CmiReduce to
 combine replies to multicast and broadcast requests.
 
-void CcsSetMergeFn(const char \*name, CmiReduceMergeFn newMerge);
+::
+
+  void CcsSetMergeFn(const char *name, CmiReduceMergeFn newMerge);
+
 Associate the given merge function to the CCS identified by id. This
 will be used for CCS request received as broadcast or multicast.
 
 These calls can be used from within a CCS handler:
 
-int CcsEnabled(void); Return 1 if CCS routines are available (from
+::
+
+  int CcsEnabled(void);
+
+Return 1 if CCS routines are available (from
 conv-mach.h). This routine does not determine if a CCS server port is
 actually open.
 
-int CcsIsRemoteRequest(void); Return 1 if this handler was called via
+::
+
+  int CcsIsRemoteRequest(void);
+
+Return 1 if this handler was called via
 CCS; 0 if it was called as the result of a normal Converse message.
 
-void CcsCallerId(skt_ip_t \*pip, unsigned int \*pport); Return the IP
-address and TCP port number of the CCS client that invoked this method.
+::
+
+  void CcsCallerId(skt_ip_t *pip, unsigned int *pport);
+
+Return the IP address and TCP port number of the CCS client that invoked this method.
 Can only be called from a CCS handler invoked remotely.
 
-void CcsSendReply(int size, const void \*reply); Send the given data
-back to the client as a reply. Can only be called from a CCS handler
+::
+
+  void CcsSendReply(int size, const void *reply);
+
+Send the given data back to the client as a reply. Can only be called from a CCS handler
 invoked remotely. In case of broadcast or multicast CCS requests, the
 handlers in all processors involved must call this function.
 
-CcsDelayedReply CcsDelayReply(void); Allows a CCS reply to be delayed
-until after the handler has completed. Returns a token used below.
+::
 
-void CcsSendDelayedReply(CcsDelayedReply d,int size, const void
-\*reply); Send a CCS reply for the given request. Unlike CcsSendReply,
+  CcsDelayedReply CcsDelayReply(void);
+
+Allows a CCS reply to be delayed until after the handler has completed.
+Returns a token used below.
+
+::
+
+  void CcsSendDelayedReply(CcsDelayedReply d,int size, const void *reply);
+
+Send a CCS reply for the given request. Unlike CcsSendReply,
 can be invoked from any handler on any processor.
 
 CCS: system handlers
@@ -1847,18 +2202,18 @@ CCS: system handlers
 The CCS runtime system provides several built-in CCS handlers, which are
 available in any Converse job:
 
-ccs_getinfo Takes an empty message, responds with information about the
+``ccs_getinfo`` Takes an empty message, responds with information about the
 parallel job. The response is in the form of network byte order
 (big-endian) 4-byte integers: first the number of parallel nodes, then
 the number of processors on each node. This handler is invoked by the
 client routine CcsConnect.
 
-ccs_killport Allows a client to be notified when a parallel run exits
+``ccs_killport`` Allows a client to be notified when a parallel run exits
 (for any reason). Takes one network byte order (big-endian) 4-byte
 integer: a TCP port number. The runtime writes “die
 n” to this port before exiting. There is no response data.
 
-perf_monitor Takes an empty message, responds (after a delay) with
+``perf_monitor`` Takes an empty message, responds (after a delay) with
 performance data. When CMK_WEB_MODE is enabled in conv-mach.h, the
 runtime system collects performance data. Every 2 seconds, this data is
 collected on processor 0 and sent to any clients that have invoked
@@ -1942,7 +2297,9 @@ The interface provides functions to register(pin) and unregister(unpin)
 memory on the NIC hardware. The emulated version of these operations do
 not do anything.
 
-int CmiRegisterMemory(void \*addr, unsigned int size);
+::
+
+  int CmiRegisterMemory(void *addr, unsigned int size);
 
 This function takes an allocated memory at starting address addr of
 length size and registers it with the hardware NIC, thus making this
@@ -1951,7 +2308,9 @@ making remote DMA operations on this memory possible. This directly
 calls the hardware driver function for registering the memory region and
 is usually an expensive operation, so should be used sparingly.
 
-int CmiUnRegisterMemory(void \*addr, unsigned int size);
+::
+
+  int CmiUnRegisterMemory(void *addr, unsigned int size);
 
 This function unregisters the memory at starting address addr of length
 size, making it no longer DMAable. This operation corresponds to
@@ -1959,7 +2318,7 @@ unpinning memory from the NIC hardware. This is also an expensive
 operation and should be sparingly used.
 
 For certain machine layers which support a DMA, we support the function
-void \*CmiDMAAlloc(int size);
+``void *CmiDMAAlloc(int size);``
 
 This operation allocates a memory region of length size from the DMAable
 region on the NIC hardware. The memory region returned is pinned to the
@@ -2003,30 +2362,38 @@ There are two different sets of RDMA operations
 to create a suitable data structure for this purpose. This is the reason
 this has been kept opaque from the programmer.
 
-void \*CmiPut(unsigned int sourceId, unsigned int targetId, void
-\*Saddr, void \*Taadr, unsigned int size);
+::
+
+  void *CmiPut(unsigned int sourceId, unsigned int targetId, void
+  *Saddr, void *Taadr, unsigned int size);
 
 This function is pretty self explanatory. It puts the memory location at
 Saddr on the machine specified by sourceId to Taddr on the machine
 specified by targetId. The memory region being RDMA’ed is of length size
 bytes.
 
-void \*CmiGet(unsigned int sourceId, unsigned int targetId, void
-\*Saddr, void \*Taadr, unsigned int size);
+::
+
+  void *CmiGet(unsigned int sourceId, unsigned int targetId, void
+  *Saddr, void *Taadr, unsigned int size);
 
 Similar to CmiPut except the direction of the data transfer is opposite;
 from target to source.
 
-void CmiPutCb(unsigned int sourceId, unsigned int targetId, void
-\*Saddr, void \*Taddr, unsigned int size, CmiRdmaCallbackFn fn, void
-\*param);
+::
+
+  void CmiPutCb(unsigned int sourceId, unsigned int targetId, void
+  *Saddr, void *Taddr, unsigned int size, CmiRdmaCallbackFn fn, void
+  *param);
 
 Similar to CmiPut except a callback is called when the operation
 completes.
 
-void CmiGetCb(unsigned int sourceId, unsigned int targetId, void
-\*Saddr, void \*Taddr, unsigned int size, CmiRdmaCallbackFn fn, void
-\*param);
+::
+
+  void CmiGetCb(unsigned int sourceId, unsigned int targetId, void
+  *Saddr, void *Taddr, unsigned int size, CmiRdmaCallbackFn fn, void
+  *param);
 
 Similar to CmiGet except a callback is called when the operation
 completes.
@@ -2041,7 +2408,9 @@ completion. One mechanism is for the programmer to check for completion.
 The other mechanism is through callback functions registered during the
 RDMA operations.
 
-int CmiWaitTest(void \*obj);
+::
+
+  int CmiWaitTest(void *obj);
 
 This function takes this RDMA handle and verifies if the operation
 corresponding to this handle has completed.
@@ -2059,7 +2428,9 @@ supplied default stream shared amongst all chares on the processor, or
 creating a private stream. Note that there is a limit on the number of
 private streams, which at the time of writing was 15,613.
 
-struct CrnStream;
+::
+
+  struct CrnStream;
 
 This structure contains the current state of a random number stream. The
 user is responsible for allocating the memory for this structure.
@@ -2067,38 +2438,52 @@ user is responsible for allocating the memory for this structure.
 Default Stream Calls
 --------------------
 
-void CrnSrand(int seed);
+::
+
+  void CrnSrand(int seed);
 
 Seeds the default random number generator with ``seed``.
 
-int CrnRand(void);
+::
+
+  int CrnRand(void);
 
 Returns the next random number in the default stream as an integer.
 
-int CrnDrand(void);
+::
+
+  int CrnDrand(void);
 
 Returns the next random number in the default stream as a double.
 
 Private Stream Calls
 --------------------
 
-void CrnInitStream(CrnStream \*dest, int seed, int type);
+::
+
+  void CrnInitStream(CrnStream *dest, int seed, int type);
 
 Initializes a new stream with its initial state stored in ``dest``. The
 user must supply a seed in ``seed``, as well as the ``type`` of the
 stream, where the ``type`` can be 0, 1, or 2.
 
-double CrnDouble(CrnStream \*genptr);
+::
+
+  double CrnDouble(CrnStream *genptr);
 
 Returns the next random number in the stream whose state is given by
 ``genptr``; the number is returned as a double.
 
-double CrnInt(CrnStream \*genptr);
+::
+
+  double CrnInt(CrnStream *genptr);
 
 Returns the next random number in the stream whose state is given by
 ``genptr``; the number is returned as an integer.
 
-double CrnFloat(CrnStream \*genptr);
+::
+
+  double CrnFloat(CrnStream *genptr);
 
 Returns the next random number in the stream whose state is given by
 ``genptr``; the number is returned as a float. (Note: This function is
@@ -2132,15 +2517,19 @@ Create / Destroy Persistent Handler
 The interface provides functions to crate and destroy handler on the
 processor for use of persistent communication.
 
-Persistenthandle CmiCreatePersistent(int destPE, int maxBytes);
+::
+
+  Persistenthandle CmiCreatePersistent(int destPE, int maxBytes);
 
 This function creates a persistent communication handler with dest PE
 and maximum bytes for this persistent communication. Machine layer will
 send message to destPE and setup a persistent communication. A buffer of
 size maxBytes is allocated in the destination PE.
 
-PersistentReq CmiCreateReceiverPersistent(int maxBytes);
-PersistentHandle CmiRegisterReceivePersistent(PersistentReq req);
+::
+
+  PersistentReq CmiCreateReceiverPersistent(int maxBytes);
+  PersistentHandle CmiRegisterReceivePersistent(PersistentReq req);
 
 Alternatively, a receiver can initiate the setting up of persistent
 communication. At receiver side, user calls
@@ -2150,12 +2539,16 @@ should call CmiRegisterReceivePersistent() to setup the persistent
 communication. The function returns a PersistentHandle which can then be
 used for the persistent communication.
 
-void CmiDestroyPersistent(PersistentHandle h);
+::
+
+  void CmiDestroyPersistent(PersistentHandle h);
 
 This function destroys a persistent communication specified by
 PersistentHandle h.
 
-void CmiDestroyAllPersistent();
+::
+
+  void CmiDestroyAllPersistent();
 
 This function will destroy all persistent communication on the local
 processor.
@@ -2166,7 +2559,9 @@ Persistent Operation
 This section presents functions that uses persistent handler for
 communications.
 
-void CmiUsePersistentHandle(PersistentHandle \*p, int n)
+::
+
+  void CmiUsePersistentHandle(PersistentHandle *p, int n)
 
 This function will ask Charm machine layer to use an array of
 PersistentHandle "p"(array size of n) for all the following
