@@ -197,7 +197,7 @@ class Stencil: public CBase_Stencil {
       // set period arbitrarily small so that LB occurs when AtSync is called
       // this is in case the default LBPERIOD is larger than the time to complete LBPERIOD_ITER
       // iterations
-      getLBDB()->SetLBPeriod(0);
+      getLBMgr()->SetLBPeriod(0);
 #endif
     }
 

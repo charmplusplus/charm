@@ -22,7 +22,7 @@ private:
   bool  readyMigrate;    /// status whether it is ready to migrate
   bool  enable_measure;
   int  nextPe;              /// next migration dest processor
-  LBDatabase *the_lbdb;
+  LBManager *lbmgr;
   MetaBalancer *the_metalb;
   LDObjHandle ldHandle;
 #endif
@@ -58,7 +58,7 @@ public:
 
 #if CMK_LBDB_ON
 public:
-  inline LBDatabase *getLBDB(void) const {return the_lbdb;}
+  inline LBManager *getLBMgr(void) const {return lbmgr;}
   inline MetaBalancer *getMetaBalancer(void) const {return the_metalb;}
   inline LDObjHandle getLdHandle() const{return ldHandle;}
   static void staticMigrate(LDObjHandle h, int dest);

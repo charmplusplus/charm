@@ -22,7 +22,6 @@ protected:
   bool barrierRegistered;//True iff barrier handle below is set
 
 private: //Load balancer state:
-  LDBarrierClient ldBarrierHandle;//Transient (not migrated)
   LDBarrierReceiver ldBarrierRecvHandle;//Transient (not migrated)
 public:
   CkArrayIndex thisIndexMax;
@@ -45,7 +44,7 @@ public:
   inline void ckStopTiming(void) {myRec->stopTiming();}
   //Begin load balancer measurements again (e.g., after CthSuspend)
   inline void ckStartTiming(void) {myRec->startTiming();}
-  inline LBDatabase *getLBDB(void) const {return myRec->getLBDB();}
+  inline LBManager *getLBMgr(void) const {return myRec->getLBMgr();}
   inline MetaBalancer *getMetaBalancer(void) const {return myRec->getMetaBalancer();}
 #else
   inline void ckStopTiming(void) { }
@@ -83,7 +82,7 @@ protected:
   virtual void CkAbort(const char *str) const;
 
 public:
-  virtual void ResumeFromSync(void);
+//  virtual void ResumeFromSync(void);
   virtual void UserSetLBLoad(void);  /// user define this when setLBLoad is true
   void setObjTime(double cputime);
   double getObjTime();

@@ -297,7 +297,8 @@ public:
   ~HybridBaseLB();
 
   static void staticAtSync(void*);
-  void AtSync(void); // Everything is at the PE barrier
+  void AtSync(void){CmiAbort("\nAtSync not implemented");}; // Everything is at the PE barrier
+  void InvokeLB();
   void ProcessAtSync(void);
 
   void ReceiveStats(CkMarshalledCLBStatsMessage &&m, int fromlevel); 

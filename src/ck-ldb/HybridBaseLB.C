@@ -39,11 +39,11 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): CBase_HybridBaseLB(opt)
 #if CMK_LBDB_ON
   lbname = (char *)"HybridBaseLB";
   thisProxy = CProxy_HybridBaseLB(thisgroup);
-  receiver = theLbdb->
+  receiver = lbmgr->
     AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),
 			    (void*)(this));
-  notifier = theLbdb->
-    NotifyMigrated((LDMigratedFn)(staticMigrated), (void*)(this));
+//  notifier = lbmgr->
+//    NotifyMigrated((LDMigratedFn)(staticMigrated), (void*)(this));
 
   statsStrategy = FULL;
 
@@ -78,7 +78,7 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): CBase_HybridBaseLB(opt)
   maxCommBytes = 0.0;
   maxMem = 0.0;
 
-  if (_lb_args.statsOn()) theLbdb->CollectStatsOn();
+  if (_lb_args.statsOn()) lbmgr->CollectStatsOn();
 
   group1_created = 0;             // base class need to call initTree()
 #endif
@@ -106,11 +106,11 @@ void HybridBaseLB::initTree()
 HybridBaseLB::~HybridBaseLB()
 {
 #if CMK_LBDB_ON
-  theLbdb = CProxy_LBDatabase(_lbdb).ckLocalBranch();
-  if (theLbdb) {
-    theLbdb->
-      RemoveNotifyMigrated(notifier);
-    //theLbdb->
+  lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
+  if (lbmgr) {
+//    lbmgr->
+//      RemoveNotifyMigrated(notifier);
+    //lbmgr->
     //  RemoveStartLBFn((LDStartLBFn)(staticStartLB));
   }
   delete tree;
@@ -150,7 +150,7 @@ void HybridBaseLB::FindNeighbors()
   }   // end if
 }
 
-void HybridBaseLB::AtSync()
+void HybridBaseLB::InvokeLB()
 {
 #if CMK_LBDB_ON
   //  CkPrintf("[%d] HybridBaseLB At Sync step %d!!!!\n",CkMyPe(),mystep);
@@ -195,18 +195,18 @@ CLBStatsMsg* HybridBaseLB::AssembleStats()
 {
 #if CMK_LBDB_ON
   // build and send stats
-  const int osz = theLbdb->GetObjDataSz();
-  const int csz = theLbdb->GetCommDataSz();
+  const int osz = lbmgr->GetObjDataSz();
+  const int csz = lbmgr->GetCommDataSz();
 
   CLBStatsMsg* msg = new CLBStatsMsg(osz, csz);
   msg->from_pe = CkMyPe();
 
   // Get stats
 #if CMK_LB_CPUTIMER
-  theLbdb->GetTime(&msg->total_walltime,&msg->total_cputime,
+  lbmgr->GetTime(&msg->total_walltime,&msg->total_cputime,
                    &msg->idletime, &msg->bg_walltime,&msg->bg_cputime);
 #else
-  theLbdb->GetTime(&msg->total_walltime,&msg->total_walltime,
+  lbmgr->GetTime(&msg->total_walltime,&msg->total_walltime,
                    &msg->idletime, &msg->bg_walltime,&msg->bg_walltime);
 #endif
 //  msg->pe_speed = myspeed;
@@ -214,9 +214,9 @@ CLBStatsMsg* HybridBaseLB::AssembleStats()
   msg->pe_speed = 1;
 
   msg->n_objs = osz;
-  theLbdb->GetObjData(msg->objData);
+  lbmgr->GetObjData(msg->objData);
   msg->n_comm = csz;
-  theLbdb->GetCommData(msg->commData);
+  lbmgr->GetCommData(msg->commData);
 
   return msg;
 #else
@@ -612,7 +612,7 @@ void HybridBaseLB::ReceiveMigration(LBMigrateMsg *msg)
         }
         else {
           // migrate the object
-          theLbdb->Migrate(move.obj,move.to_pe);
+          lbmgr->Migrate(move.obj,move.to_pe);
         }
       }
     }   // end if
@@ -1096,7 +1096,7 @@ void HybridBaseLB::PropagateInfo(Location *loc, int n, int fromlevel)
       }
       CmiAssert(outObjs[i].toPe != -1);
         // migrate now!
-      theLbdb->Migrate(outObjs[i].handle,outObjs[i].toPe);
+      lbmgr->Migrate(outObjs[i].handle,outObjs[i].toPe);
     }   // end for out
     // incoming
     lData->migrates_expected = 0;
@@ -1129,7 +1129,7 @@ void HybridBaseLB::MigrationDone(int balancing)
 
   DEBUGF(("[%d] HybridBaseLB::MigrationDone!\n", CkMyPe()));
 
-  theLbdb->incStep();
+  lbmgr->incStep();
 
   // reset 
   for (int i=0; i<tree->numLevels(); i++) 
@@ -1173,10 +1173,10 @@ void HybridBaseLB::ResumeClients(int balancing)
   }
 
   // zero out stats
-  theLbdb->ClearLoads();
+  lbmgr->ClearLoads();
 
-  theLbdb->ResumeClients();
-	theLbdb->SetMigrationCost(end_lb_time - start_lb_time);
+  lbmgr->ResumeClients();
+	lbmgr->SetMigrationCost(end_lb_time - start_lb_time);
 #endif
 }
 

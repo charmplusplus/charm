@@ -29,10 +29,10 @@ static void handler(char *bit_map)
     pending_realloc_state = REALLOC_MSG_RECEIVED;
 
     if((CkMyPe() == 0) && (load_balancer_created))
-    LBDatabaseObj()->set_avail_vector(bit_map);
+    LBManagerObj()->set_avail_vector(bit_map);
 
     se_avail_vector = (char *)malloc(sizeof(char) * CkNumPes());
-    LBDatabaseObj()->get_avail_vector(se_avail_vector);
+    LBManagerObj()->get_avail_vector(se_avail_vector);
 
     numProcessAfterRestart = *((int *)(bit_map + CkNumPes()));
 #endif

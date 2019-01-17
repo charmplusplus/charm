@@ -4,7 +4,7 @@
 
 #include "controlPoints.h"
 #include "trace-controlPoints.h"
-#include "LBDatabase.h"
+#include "LBManager.h"
 #include "controlPoints.h"
 #include "charm++.h"
 #include "trace-projections.h"
@@ -693,7 +693,7 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
 #if CMK_LBDB_ON && 0
     // TODO: This code is ifdef'd out but is broken, the list of LB objects will
     // likely have nullptrs in it, which this doesn't check for
-    LBDatabase * myLBdatabase = LBDatabaseObj();
+    LBManager * myLBdatabase = LBManagerObj();
     const std::vector<LBObjEntry> objs = myLBdatabase->getObjs();
     
     LBRealType maxObjWallTime = -1.0;

@@ -10,7 +10,7 @@
 #include <map>
 #include <algorithm>
 #include "stats.h"
-#include "LBDatabase.h" /* for set_avail_vector */
+#include "LBManager.h" /* for set_avail_vector */
 
 #include "lv3d0.decl.h" //For LV3D0_ViewMsg
 void _registerlv3d1(void);

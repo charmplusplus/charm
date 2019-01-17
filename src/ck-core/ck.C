@@ -13,7 +13,7 @@ clients, including the rest of Charm++, are actually C++.
 #include "pathHistory.h"
 
 #if CMK_LBDB_ON
-#include "LBDatabase.h"
+#include "LBManager.h"
 #endif // CMK_LBDB_ON
 
 #ifndef CMK_CHARE_USE_PTR
@@ -1054,10 +1054,10 @@ static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,Irr
   // if there is a running obj being measured, stop it temporarily
   LDObjHandle objHandle;
   int objstopped = 0;
-  LBDatabase *the_lbdb = (LBDatabase *)CkLocalBranch(_lbdb);
-  if (the_lbdb->RunningObject(&objHandle)) {
+  LBManager *the_lbmgr = (LBManager *)CkLocalBranch(_lbmgr);
+  if (the_lbmgr->RunningObject(&objHandle)) {
     objstopped = 1;
-    the_lbdb->ObjectStop(objHandle);
+    the_lbmgr->ObjectStop(objHandle);
   }
 #endif
 
@@ -1074,7 +1074,7 @@ static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,Irr
 #endif
 
 #if CMK_LBDB_ON
-  if (objstopped) the_lbdb->ObjectStart(objHandle);
+  if (objstopped) the_lbmgr->ObjectStart(objHandle);
 #endif
   _STATS_RECORD_PROCESS_BRANCH_1();
 }

@@ -234,10 +234,13 @@ class Chare {
 #ifndef CMK_CHARE_USE_PTR
     int chareIdx;                  // index in the chare obj table (chare_objs)
 #endif
+    int r_count;
+    bool atsync, atsync_notify;
     Chare(CkMigrateMessage *m);
     Chare();
     virtual ~Chare(); //<- needed for *any* child to have a virtual destructor
-
+    virtual void ResumeFromSync(void);
+    virtual void AtSyncBarrierReached(void);
     /// Pack/UnPack - tell the runtime how to serialize this class's
     /// data for migration, checkpoint, etc.
     virtual void pup(PUP::er &p);
@@ -1242,7 +1245,7 @@ void CmiMachineProgressImpl();
 
 #define CkNetworkProgress() {CpvAccess(networkProgressCount) ++; \
 if(CpvAccess(networkProgressCount) >=  networkProgressPeriod)  \
-    if (LBDatabaseObj()->getLBDB()->StatsOn() == 0) { \
+    if (LBManagerObj()->getLBDB()->StatsOn() == 0) { \
         CmiMachineProgressImpl(); \
         CpvAccess(networkProgressCount) = 0; \
     } \
@@ -1250,7 +1253,7 @@ if(CpvAccess(networkProgressCount) >=  networkProgressPeriod)  \
 
 #define CkNetworkProgressAfter(p) {CpvAccess(networkProgressCount) ++; \
 if(CpvAccess(networkProgressCount) >=  p)  \
-    if (LBDatabaseObj()->getLBDB()->StatsOn() == 0) { \
+    if (LBManagerObj()->getLBDB()->StatsOn() == 0) { \
         CmiMachineProgressImpl(); \
         CpvAccess(networkProgressCount) = 0; \
     } \
