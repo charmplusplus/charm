@@ -20,7 +20,7 @@
 # -- Project information -----------------------------------------------------
 
 project = 'Charm++'
-copyright = '2018, PPL'
+copyright = '2019, PPL'
 author = 'PPL'
 
 # The short X.Y version

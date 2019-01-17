@@ -60,3 +60,10 @@ Charm++ Documentation
    charj/manual
    jade/manual
    parfum/manual
+
+.. toctree::
+   :maxdepth: 1
+   :caption: License
+   :numbered: 0
+
+   license
