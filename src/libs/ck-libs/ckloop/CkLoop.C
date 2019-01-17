@@ -886,6 +886,31 @@ void CkLoop_Parallelize(HelperFn func,
         upperRange, sync, redResult, type, cfunc, cparamNum, cparam);
 }
 
+/**
+*
+* Author: Vivek Kale
+* Contributors: Harshitha Menon, Karthik Senthil Kumar
+*
+* The CkLoop_Hybrid library is a mode of CkLoop that incorporates specific
+* adaptive scheduling strategies aimed at providing a tradeoff between dynamic
+* load balance and spatial locality. It is used in a build of Charm++ where all
+* chares are placed on core 0 of each node (called the drone-mode, or
+* all-drones-mode). It incorporates a strategy called staggered static-dynamic
+* scheduling (from dissertation work of Vivek Kale). The iteration space is
+* first tentatively divided approximately equally to all available PEs. Each
+* PE's share of the iteration space is divided into a static portion, specified by
+* the staticFraction parameter below, and the remaining dynamic portion. The dynamic
+* portion of a PE is divided into chunks of specified chunksize, and enqueued in
+* the task-queue associated with that PE. Each PE works on its static portion,
+* and then on its own task queue (thus preserving spatial locality, as well as
+* persistence of allocations across outer iterations), and after finishing that,
+* steals work from other PE’s task queues.
+*
+* CkLoop_Hybrid support requires the SMP mode of Charm++ and the additional flags
+* --enable-drone-mode and --enable-task-queue to be passed as build options when
+* Charm++ is built.
+**/
+
 void CkLoop_ParallelizeHybrid(float staticFraction,
              HelperFn func,
              int paramNum, void * param,
