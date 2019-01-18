@@ -39,22 +39,26 @@ module DiffusionLB {
                     int nbor_nodeFirst = nbor*nodeSize;
                     double load_to_send = my_load;
                     thisProxy[nbor_nodeFirst].ReceiveLoadInfo(itr, load_to_send, CkMyNode());
-                }         
-                 
+                }
             }
 
             // Wait for all its neighbors load
             for(temp_itr = 0; temp_itr < neighborCount; temp_itr++) {
                 when ReceiveLoadInfo[itr](int itr, double load, int node) serial {
-                    int pos = neighborPos[node];
-                    loadNeighbors[pos] = load; 
+                  if(itr == 0 || itr == ITERATIONS-1) {
+                    DEBUGL(("\n[Pe-%d (node-%d)] revd load from node-%d\n", CkMyPe(), CkMyNode(), node));
+                  }
+                  int pos = 0;
+                  if(node > CkMyNode()) pos = 1;
+                  if(CkMyNode() == 0 || CkMyNode() == CkNumNodes()-1) pos = 0;
+                  loadNeighbors[pos] = load;
                 }
             }
 
             // Calculate average and do pseudo load balancing
             serial "Pseudo LB" {
                 avgLoadNeighbor = average();
-                DEBUGR(("[%d] GRD Received all loads of node, avg is %f and my_load %f \n", CkMyPe(), avgLoadNeighbor, my_load));
+                DEBUGR(("[PE-%d] Received all loads of node, avg is %f and my_load %f \n", CkMyPe(), avgLoadNeighbor, my_load));
                 PseudoLoadBalancing();
             }
 

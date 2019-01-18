@@ -100,18 +100,24 @@ void DiffusionLB::InitLB(const CkLBOptions &opt) {
       int count = 0;
 
       int nbor =  CkMyNode()-1;
-      if(nbor <0) nbor = CkNumNodes()-1;
 
-      neighbors.push_back(nbor);
-      neighborPos[count++] = nbor;
+      if(CkMyNode() > 0) {
+        neighbors.push_back(nbor);
+        neighborPos[count++] = nbor;
+      }
 
       for(int i=0;i<CkNumNodes();i++)
         nodes.push_back(i);
 
-      nbor =  (CkMyNode()+1)%CkNumNodes();
-      neighbors.push_back(nbor);
+      if(CkMyNode() < CkNumNodes() - 1) {
+        int nbor2 =  (CkMyNode()+1)%CkNumNodes();
+        neighbors.push_back(nbor2);
+      }
+
       neighborPos[count++] = nbor;
       neighborCount = 2;
+      if(CkMyNode() == 0 || CkMyNode() == CkNumNodes()-1)
+        neighborCount = 1;
     }
     for(int i=0;i<CkNumPes();i++)
     {
@@ -359,6 +365,7 @@ void DiffusionLB::ReceiveStats(CkMarshalledCLBStatsMessage &data)
 
 double DiffusionLB::average() {
     double sum = 0;
+    DEBUGL(("\n[PE-%d load = %lf] n[0]=%lf, n[1]=%lf, ncount=%d\n", CkMyPe(), my_load, loadNeighbors[0], loadNeighbors[1], neighborCount));
     for(int i = 0; i < neighborCount; i++) {
         sum += loadNeighbors[i];
     }
@@ -429,10 +436,11 @@ void DiffusionLB::InitializeObjHeap(BaseLB::LDStats *stats, int* obj_arr,int siz
 }
 
 void DiffusionLB::PseudoLoadBalancing() {
-    DEBUGL(("[%d] GRD: Pseudo Load Balancing , iteration %d my_load %f my_loadB %f avgLoadNeighbor %f\n", CkMyPe(), itr, my_load, my_loadB, avgLoadNeighbor));
+    DEBUGL(("[PE-%d] Pseudo Load Balancing , iteration %d my_load %f my_loadB %f avgLoadNeighbor %f\n", CkMyPe(), itr, my_load, my_loadB, avgLoadNeighbor));
     double threshold = THRESHOLD*avgLoadNeighbor/100.0;
     
     double totalOverload = my_load - avgLoadNeighbor;
+    avgLoadNeighbor = (avgLoadNeighbor+my_load)/2;
     double totalUnderLoad = 0.0;
     double tempToSend[neighborCount];
     for(int i = 0 ;i < neighborCount; i++)
@@ -440,10 +448,11 @@ void DiffusionLB::PseudoLoadBalancing() {
     if(totalOverload > 0)
     for(int i = 0; i < neighborCount; i++) {
         tempToSend[i] = 0;
-        if(loadNeighbors[i] < (avgLoadNeighbor - threshold)) {
+        if(loadNeighbors[i] < (avgLoadNeighbor - threshold) || (CkMyNode()==0 || CkMyNode() == CkNumNodes()-1)) {
             tempToSend[i] = avgLoadNeighbor - loadNeighbors[i];
             totalUnderLoad += avgLoadNeighbor - loadNeighbors[i];
-            DEBUGL(("[%d] iteration %d tempToSend %f avgLoadNeighbor %f loadNeighbors[i] %f to node %d\n", CkMyPe(), itr, tempToSend[i], avgLoadNeighbor, loadNeighbors[i], neighbors[i]));
+            DEBUGL(("[PE-%d] iteration %d tempToSend %f avgLoadNeighbor %f loadNeighbors[i] %f to node %d\n",
+                      CkMyPe(), itr, tempToSend[i], avgLoadNeighbor, loadNeighbors[i], neighbors[i]));
         }
     }
     if(totalUnderLoad > 0 && totalOverload > 0 && totalUnderLoad > totalOverload)
