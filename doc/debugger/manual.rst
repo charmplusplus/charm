@@ -9,10 +9,9 @@ Charm++ Debugger Manual
 Introduction
 ============
 
-The primary goal of the parallel debugger is to provide an integrated
-debugging environment which allows the programmer to examine the
-changing state of the parallel program during the course of its
-execution.
+The primary goal of the Charm++ parallel debugger is to provide an integrated
+debugging environment that allows the programmer to examine the
+changing state of parallel programs during the course of their execution.
 
 The Charm++ debugging system has a number of useful features for Charm++
 programmers. The system includes a Java GUI client program which runs on
@@ -23,8 +22,8 @@ communicate over the network using a secure protocol described in
 
 The system provides the following features:
 
--  Provides a means to easily access and view the major programmer
-   visible entities, including array elements and messages in queues,
+-  Provides a means to easily access and view the major programmer-visible
+   entities, including array elements and messages in queues,
    across the parallel machine during program execution. Objects and
    messages are extracted as raw data, and interpreted by the debugger.
 
@@ -48,9 +47,9 @@ into the Charm++ runtime.
 Building the Charm++ Debug Tool
 ===============================
 
-To get the Charm Debug tool, check out the source code from the
-repository. This will create a directory named ccs_tools. Move to this
-directory and build Charm Debug.
+To get the CharmDebug tool, check out the source code from the following
+repository. This will create a directory named ccs_tools. Change to this
+directory and build the project.
 
 .. code-block:: bash
 
@@ -58,12 +57,11 @@ directory and build Charm Debug.
    > cd ccs_tools
    > ant
 
-This will create the executable ``bin/charmdebug``, which should work.
+This will create the executable ``bin/charmdebug``.
 
 You can also download the binaries from the Charm++ downloads website
-and use it directly without building. (NOTE: Binaries may not be
-properly working in some platforms, so building from the source code is
-recommended.)
+and use it directly without building. (NOTE: Binaries may work properly
+on some platforms, so building from the source code is recommended.)
 
 Preparing the Charm++ Application for Debugging
 ===============================================
@@ -76,47 +74,49 @@ Build Charm++ using ``--enable-charmdebug`` option. For example:
 
 No instrumentation is required to use the Charm++ debugger. Being CCS
 based, you can use it to set and step through entry point breakpoints
-and examine Charm++ structures on any Charm++ application.
+and examine Charm++ structures in any Charm++ application.
 
-Nevertheless, for some features to be present some additional options
-might be required at either compile or link time:
+Nevertheless, for some features to be present, some additional options
+may be required at either compile or link time:
 
--  In order to provide a symbol conversion of the assembly code executed
-   by the application, the *-g* option is needed at compile time. This
-   conversion is needed to provide function names as well as source file
-   names and line numbers wherever useful. This is useful also to fully
+-  In order to provide a symbolic representation of the machine code executed
+   by the application, the ``-g`` option is needed at compile time. This
+   setting is needed to provide function names as well as source file
+   names and line numbers wherever useful. This is also important to fully
    utilize gdb (or any other serial debugger) on one or more processes.
 
--  Optimization options, with their nature of transforming the source
+-  Optimization options, by nature of transforming the source
    code, can produce a mismatch between the function displayed in the
    debugger (for example in a stack trace) and the functions present in
    the source code. To produce information coherent with source code,
-   optimization is discouraged.
+   optimization is discouraged. Newer versions of some compilers support
+   the ``-Og`` optimization level, which performs all optimizations that do
+   not inhibit debugging.
 
--  The link time option *-memory charmdebug* is only needed if you want
-   to use either the Memory view (see :numref:`sec-memory`) or the
-   Inspector framework (see :numref:`sec_inspector`) of Charm Debug.
+-  The link time option ``-memory charmdebug`` is only needed if you want
+   to use the Memory view (see :numref:`sec-memory`) or the
+   Inspector framework (see :numref:`sec_inspector`) in CharmDebug.
 
 Record Replay
 -------------
 
 The *Record Replay* feature is independent of the charmdebug
-application. It is a mechanism used to detect bugs that happen only once
-in a while depending on the order in which messages are processed. The
-program in consideration is first run in a record mode which produces a
-trace. When the program is run in replay mode it uses a previous trace
-gotten from a record run to ensure that messages are processed in the
+application. It is a mechanism used to detect bugs that happen rarely
+depending on the order in which messages are processed. The
+program in consideration is first executed in record mode which produces a
+trace. When the program is run in replay mode it uses previously recorded
+trace to ensure that messages are processed in the
 same order as the recorded run. The idea is to make use of a
-message-sequence number and a theorem says that the serial numbers will
+message sequence number to satisfy a theorem says that the serial numbers will
 be the same if the messages are processed in the same order.
 .. `\cite{rashmithesis}`
 
 *Record Replay* tracing is automatically enabled for Charm++ programs
-and requires nothing special to be done during compilation (linking with
-the option “*-tracemode recordreplay*” used to be necessary). At run
-time, the “*+record*” option is used, which records messages in order in
+and requires nothing special to be done during compilation. (Linking with
+the option ``-tracemode recordreplay`` used to be necessary). At run
+time, the ``+record`` option is used, which records messages in order in
 a file for each processor. The same execution order can be replayed
-using the “*+replay*” runtime option, which can be used at the same time
+using the ``+replay`` runtime option, which can be used at the same time
 as the other debugging tools in Charm++.
 
 *Note!* If your Charm++ is built with ``CMK_OPTIMIZE`` on, all tracing
@@ -125,7 +125,7 @@ will be disabled. So, use an unoptimized Charm++ to do your debugging.
 Running the Debugger
 ====================
 
-Charmdebug command line parameters
+CharmDebug command line parameters
 ----------------------------------
 
 ``-pes``
@@ -154,8 +154,8 @@ Charmdebug command line parameters
 Basic usage
 -----------
 
-To run an application locally via the debugger on 4 pes with command
-line options for your pgm (e.g. opt1 opt2 ):
+To run an application locally via the debugger on 4 PEs with command
+line options for your program (shown here as ``opt1 opt2``):
 
 .. code-block:: bash
 
@@ -168,7 +168,7 @@ the previous command line will become:
 
    > charmdebug -host cluster.inst.edu -user myname -sshtunnel pgm +p4 4 opt1 opt2
 
-Charmdebug can also be executed without any parameters. The user can
+CharmDebug can also be executed without any parameters. The user can
 then choose the application to launch and its command line parameters
 from within the ``File`` menu as shown in Figure :numref:`menu`.
 
@@ -180,7 +180,7 @@ from within the ``File`` menu as shown in Figure :numref:`menu`.
    Using the menu to set parameters for the Charm++ program
 
 *Note: charmdebug command line launching only works on netlrts-\* and
-verbs-\* builds of Charm++*
+verbs-\* builds of Charm++.*
 
 To replay a previously recorded session:
 
@@ -191,7 +191,7 @@ To replay a previously recorded session:
 Charm Debugging Related Options
 -------------------------------
 
-When using the charm debugger to launch your application, it will
+When using the Charm debugger to launch your application, it will
 automatically set these to defaults appropriate for most situations.
 
 ``+cpd``
@@ -241,13 +241,13 @@ automatically set these to defaults appropriate for most situations.
    to keep running the application with +record until the bug occurs.
    Then run the application under the debugger with the +replay option.
 
-Charmdebug limitations
+CharmDebug limitations
 ----------------------
 
 Clusters
 ~~~~~~~~
 
-Charmdebug is currently limited to applications started directly by the
+CharmDebug is currently limited to applications started directly by the
 debugger due to implementation peculiarities. It will be extended to
 support connection to remote running applications in the near future.
 
@@ -261,9 +261,9 @@ to the mpi-\* versions.
 Record Replay
 ~~~~~~~~~~~~~
 
-The ``record replay`` feature does not work well with spontaneous
+The *Record Replay* feature does not work well with spontaneous
 events. Load balancing is the most common form of spontaneous event in
-that it occurs periodically with no other causal event. As per
+that it occurs periodically with no other causal event.
 
 .. figure:: figs/snapshot3.png
    :name: snapshot3
@@ -272,17 +272,19 @@ that it occurs periodically with no other causal event. As per
 
    Parallel debugger when a break point is reached
 
-As per Rashmi’s thesis: *There are some unique issues for replay in the
-context of Charm because it provides high-level support for dynamic load
-balancing, quiescence detection and information sharing. Many of the
-load balancing strategies in Charm have a spontaneous component. The
-strategy periodically checks the sizes of the queues on the local
-processor. A replay load balancing strategy implements the known load
-redistribution. The behavior of the old balancing strategy is therefore
-not replayed only its effect is. Since minimal tracing is used by the
-replay mechanism the amount of perturbation due to tracing is reduced.
-The replay mechanism is proposed as a debugging support to replay
-asynchronous message arrival orders.*
+As per Rashmi’s thesis:
+
+   "There are some unique issues for replay in the
+   context of Charm because it provides high-level support for dynamic load
+   balancing, quiescence detection and information sharing. Many of the
+   load balancing strategies in Charm have a spontaneous component. The
+   strategy periodically checks the sizes of the queues on the local
+   processor. A replay load balancing strategy implements the known load
+   redistribution. The behavior of the old balancing strategy is therefore
+   not replayed only its effect is. Since minimal tracing is used by the
+   replay mechanism the amount of perturbation due to tracing is reduced.
+   The replay mechanism is proposed as a debugging support to replay
+   asynchronous message arrival orders."
 
 Moreover, if your application crashes without a clean shutdown, the log
 may be lost with the application.
@@ -294,16 +296,16 @@ Using the Debugger
 
 Once the debugger’s GUI loads, the programmer triggers the program
 execution by clicking the *Start* button. When starting by command line,
-the application is automatically started. The program starts off
+the application is automatically started. The program begins by
 displaying the user and system entry points as a list of check boxes,
-freezing at the onset. The user could choose to set breakpoints by
+pausing at the onset. The user could choose to set breakpoints by
 clicking on the corresponding entry points and kick off execution by
 clicking the *Continue* Button. Figure :numref:`snapshot3` shows a
 snapshot of the debugger when a breakpoint is reached. The program
 freezes when a breakpoint is reached.
 
 Clicking the *Freeze* button during the execution of the program freezes
-execution, while *Continue* button resumes execution. *Quit* button can
+execution, while *Continue* button resumes execution. The *Quit* button can
 be used to abort execution at any point of time. Entities (for instance,
 array elements) and their contents on any processor can be viewed at any
 point in time during execution as illustrated in Figure
@@ -321,7 +323,7 @@ Specific individual processes of the Charm++ program can be attached to
 instances of *gdb* as shown in Figure :numref:`gdb`. The programmer
 chooses which PEs to connect *gdb* processes to via the checkboxes on
 the right side. *Note!* While the program is suspended in gdb for step
-debugging, the high-level features such as object inspection will not
+debugging, high-level CharmDebug features such as object inspection will not
 work.
 
 .. figure:: figs/snapshot4-crop.png
@@ -423,10 +425,10 @@ Inspector framework
 ~~~~~~~~~~~~~~~~~~~
 
 Without any code rewriting of the application, CharmDebug is capable of
-loading a raw area of memory and parse it with a given type name. The
-result (as shown in Figure :numref:`fig:inspect`, is a browseable tree.
+loading a raw area of memory and parsing it with a given type name. The
+result (as shown in Figure :numref:`fig:inspect`, is a browsable tree.
 The initial type of a memory area is given by its virtual table pointer
-(Charm++ objects are virtual and therefore loadbable). In the case of
+(Charm++ objects are virtual and therefore loadable). In the case of
 memory slots not containing classes with virtual methods, no display
 will be possible.
 
@@ -494,8 +496,8 @@ The Converse Client-Server (CCS) module enables Converse
 .. `\cite{InterOpIPPS96}`
 programs to act as parallel servers,
 responding to requests from non-Converse programs. The CCS module is
-split into two parts - client and server. The server side is used by a
-Converse program while the client side is used by arbitrary non-Converse
+split into two parts -- client and server. The server side is used by
+Converse programs while the client side is used by arbitrary non-Converse
 programs. A CCS client accesses a running Converse program by talking to
 a ``server-host`` which receives the CCS requests and relays them to the
 appropriate processor. The ``server-host`` is ``charmrun``
@@ -505,20 +507,20 @@ processor for all other versions.
 
 In the case of the netlrts- version of Charm++, a Converse program is
 started as a server by running the Charm++ program using the additional
-runtime option “*++server*”. This opens the CCS server on any TCP port
+runtime option ``++server``. This opens the CCS server on any TCP port
 number. The TCP port number can be specified using the command-line
-option “*server-port*”. A CCS client connects to a CCS server, asks a
+option ``server-port``. A CCS client connects to a CCS server, asks a
 server PE to execute a pre-registered handler and receives the response
 data. The function ``CcsConnect`` takes a pointer to a ``CcsServer`` as
 an argument and connects to the given CCS server. The functions
-``CcsNumNodes``, ``CcsNumPes``, ``CcsNodeSize`` implemented as part of
-the client interface in Charm++ returns information about the parallel
+``CcsNumNodes``, ``CcsNumPes``, and ``CcsNodeSize`` implemented as part of
+the client interface in Charm++ return information about the parallel
 machine. The function ``CcsSendRequest`` takes a handler ID and the
 destination processor number as arguments and asks the server to execute
-the particular handler on the specified processor. ``CcsRecvResponse``
+the requested handler on the specified processor. ``CcsRecvResponse``
 receives a response to the previous request in-place. A timeout is also
-specified which gives the number of seconds to wait till the function
-returns a 0, otherwise the number of bytes received is returned.
+specified which gives the number of seconds to wait until the function
+returns 0, otherwise the number of bytes received is returned.
 
 Once a request arrives on a CCS server socket, the CCS server runtime
 looks up the appropriate registered handler and calls it. If no handler
@@ -529,7 +531,7 @@ handlers in the CCS server. A handler ID string and a function pointer
 are passed as parameters. A table of strings corresponding to
 appropriate function pointers is created. Various built-in functions are
 provided which can be called from within a CCS handler. The debugger
-behaves as a CCS client invoking appropriate handlers which makes use of
+behaves as a CCS client invoking appropriate handlers which make use of
 some of these functions. Some of the built-in functions are as follows.
 
 -  ``CcsSendReply`` - This function sends the data provided as an
