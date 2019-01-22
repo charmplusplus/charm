@@ -90,7 +90,7 @@ to the “liveVizDeposit” function:
 ::
 
     liveVizDeposit (m, startX, startY, width, height, imageBuff, this,
-                      max_image_data);
+                    max_image_data);
 
 You can also reduce floating-point image data using sum_float_image_data
 or max_float_image_data.
@@ -116,10 +116,10 @@ request.
 
 ::
 
-   extern "C"
-   void liveVizFloatToRGB(liveVizRequest &req,
-           const float *floatSrc, unsigned char *destRgb,
-           int nPixels);
+  extern "C"
+  void liveVizFloatToRGB(liveVizRequest &req,
+      const float *floatSrc, unsigned char *destRgb,
+      int nPixels);
 
 liveViz Initialization
 ----------------------
@@ -219,13 +219,13 @@ processor 0.
 
 ::
 
-     liveVizPollDeposit( this,
-                         startX,startY,            // Location of local piece
-                         localSizeX,localSizeY,    // Dimensions of the piece I'm depositing
-                         globalSizeX,globalSizeY,  // Dimensions of the entire image
-                         img,                      // Image byte array
-                         sum_image_data,           // Desired image combiner
-                         3                         // Bytes/pixel
+     liveVizPollDeposit(this,
+                        startX,startY,            // Location of local piece
+                        localSizeX,localSizeY,    // Dimensions of the piece I'm depositing
+                        globalSizeX,globalSizeY,  // Dimensions of the entire image
+                        img,                      // Image byte array
+                        sum_image_data,           // Desired image combiner
+                        3                         // Bytes/pixel
                        );
 
 The last two parameters are optional. By default they are set to
@@ -336,7 +336,7 @@ To use MSA in a Charm++ program:
 
 -  ``#include “msa/msa.h”`` in your header file.
 
--  Compile using ``charmc`` with the option “``-module msa``”
+-  Compile using ``charmc`` with the option ``-module msa``
 
 The API is as follows: See the example programs in
 ``charm/pgms/charm++/multiphaseSharedArrays``.
@@ -443,37 +443,33 @@ An example of Charm-FFT initialization using Charm_createFFT:
 
 ::
 
-   // .ci
+  // .ci
+  extern module fft_charm;
 
-       extern module fft_charm;
+  mainchare Main {
+      entry Main(CkArgMsg *m);
+  }
 
-       mainchare Main {
-           entry Main(CkArgMsg *m);
-       }
+  group Driver {
+      entry Driver(FFT_Type fft_type);
+      entry void proxyCreated(idMsg *msg);
+      entry void fftDone();
+  }
 
-       group Driver {
-           entry Driver(FFT_Type fft_type);
-           entry void proxyCreated(idMsg *msg);
-           entry void fftDone();
-       }
+  // .C
+  Main::Main(CkArgMsg *m) {
+      ...
+      /* Assume FFT of size N_x, N_y, N_z */
+      FFT_Type fft_type = CC
 
-   // .C
+      Charm_createFFT(N_x, N_y, N_z, z_x, z_y, y_x, y_z, x_yz, cutoff, hmati,
+                      fft_type, CkCallback(CkIndex_Driver::proxyCreated(NULL), driverProxy));
+  }
 
-       Main::Main(CkArgMsg *m) {
-
-           ...
-           /* Assume FFT of size N_x, N_y, N_z */
-           FFT_Type fft_type = CC
-
-           Charm_createFFT(N_x, N_y, N_z, z_x, z_y, y_x, y_z, x_yz, cutoff, hmati
-   , fft_type, CkCallback(CkIndex_Driver::proxyCreated(NULL), driverProxy));
-       }
-
-       Driver::proxyCreated(idMsg *msg) {
-
-           CProxy_fft2d fftProxy = msg-> id;
-           delete msg;
-       }
+  Driver::proxyCreated(idMsg *msg) {
+      CProxy_fft2d fftProxy = msg->id;
+      delete msg;
+  }
 
 In this example, an entry method *Driver::proxyCreated* will be called
 when an FFT instance has been created.
@@ -957,7 +953,7 @@ function for each client group and array:
 
 ::
 
-   void process(const dtype  &ran);
+   void process(const dtype &ran);
 
 Each item is delivered by the library using a separate call to process
 on the destination PE. The call is made locally, so process should not
@@ -1128,8 +1124,8 @@ follows:
 Example
 -------
 
-For example code showing how to use TRAM, see examples/charm++/TRAM and
-tests/charm++/streamingAllToAll in the Charm++ repository.
+For example code showing how to use TRAM, see ``examples/charm++/TRAM`` and
+``tests/charm++/streamingAllToAll`` in the Charm++ repository.
 
 .. _gpumanager:
 
@@ -1189,7 +1185,7 @@ Building GPU Manager
 --------------------
 
 GPU Manager is not included by default when building Charm++. In order
-to use GPU Manager, the user must build Charm++ using the ``CUDA``
+to use GPU Manager, the user must build Charm++ using the ``cuda``
 option, e.g.
 
 ::
