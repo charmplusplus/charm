@@ -10485,7 +10485,7 @@ To run a Charm++ program named “pgm” on four processors, type:
 Execution on platforms which use platform specific launchers, (i.e.,
 **aprun**, **ibrun**), can proceed without charmrun, or charmrun can be
 used in coordination with those launchers via the ``++mpiexec`` (see
-:numref:`mpiexec` parameter.
+Section :numref:`mpiexec`) parameter.
 
 Programs built using the network version of Charm++ can be run alone,
 without charmrun. This restricts you to using the processors on the
