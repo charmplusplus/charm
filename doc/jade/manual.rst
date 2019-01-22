@@ -8,8 +8,8 @@ Jade Language Manual
 Introduction
 ============
 
-This manual describes Jade, which is a new parallel programming language
-developed over Charm++ and Java. Charm++ is a C-based parallel
+This manual describes Jade, which is a parallel programming language
+developed over Charm++ and Java. Charm++ is a C++-based parallel
 programming library developed by Prof. L. V. Kalé and his students over
 the last 10 years at University of Illinois.
 
@@ -25,7 +25,8 @@ Terminology
 -----------
 
 Module
-   A module refers to
+  A module refers to a named container which is the top-level construct
+  in a program.
 
 Thread
    A thread is a lightweight process that owns a stack and machine
@@ -54,7 +55,7 @@ Object
 Charm++
 =======
 
-Charm++ is an object-oriented parallel programming library for C. It
+Charm++ is an object-oriented parallel programming library for C++. It
 differs from traditional message passing programming libraries (such as
 MPI) in that Charm++ is “message-driven”. Message-driven parallel
 programs do not block the processor waiting for a message to be
@@ -64,7 +65,7 @@ runtime system of Charm++ is called Converse, which implements a
 “scheduler” that chooses which message to schedule next
 (message-scheduling in Charm++ involves locating the object for which
 the message is intended, and executing the computation specified in the
-incoming message on that object). A parallel object in Charm++ is a C
+incoming message on that object). A parallel object in Charm++ is a C++
 object on which a certain computations can be asked to performed from
 remote processors.
 
@@ -110,7 +111,7 @@ readonly
        public static int readonly aReadOnly;
    }
 
-Accessed as C.aReadOnly;
+The readonly variable can be accessed as ``C.aReadOnly``.
 
 Must be initialized in the main of a mainchare. Value at the end of main
 is propagated to all processors. Then execution begins.
@@ -126,8 +127,6 @@ msa
    arr1[10] += 2;  // accumulate
    arr1.sync();    // sync
 
-Jade Status
------------
 
 Installing Jade
 ===============
@@ -151,13 +150,13 @@ libraries needed by Jade), specify ``<target>`` to be ``jade``. And
 script. Common compile time options such as
 ``-g, -O, -Ipath, -Lpath, -llib`` are accepted.
 
-To build a debugging version of Jade, use the option: “``-g``”. To build
+To build a debugging version of Jade, use the option: ``-g``. To build
 a production version of Jade, use the options:
-“``-O -DCMK_OPTIMIZE=1``”.
+``-O -DCMK_OPTIMIZE=1``.
 
 ``<version>`` depends on the machine, operating system, and the
 underlying communication library one wants to use for running Jade
-programs. See the charm/README file for details on picking the proper
+programs. See the ``charm/README`` file for details on picking the proper
 version. Following is an example of how to build Jade under linux and
 ethernet environment, with debugging info produced:
 
@@ -172,7 +171,7 @@ Compiling Jade Programs
 -----------------------
 
 Charm++ provides a cross-platform compile-and-link script called
-``charmc`` to compile C, C, Fortran, Charm++ and Jade programs. This
+``charmc`` to compile C, C++, Fortran, Charm++ and Jade programs. This
 script resides in the ``bin`` subdirectory in the Charm++ installation
 directory. The main purpose of this script is to deal with the
 differences of various compiler names and command-line options across
