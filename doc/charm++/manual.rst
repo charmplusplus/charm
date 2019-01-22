@@ -5234,7 +5234,7 @@ means of the following functions:
     void CkReleaseFuture(CkFuture fut)
     int CkProbeFuture(CkFuture fut)
     void *CkWaitFuture(CkFuture fut)
-    void  CkSendToFuture(CkFuture fut, void *msg)
+    void CkSendToFuture(CkFuture fut, void *msg)
 
 To illustrate the use of all these functions, a Fibonacci example in
 Charm++ using futures in presented below:
@@ -5243,7 +5243,7 @@ Charm++ using futures in presented below:
 
    chare fib {
      entry fib(bool amIroot, int n, CkFuture f);
-     entry  [threaded] void run(bool amIroot, int n, CkFuture f);
+     entry [threaded] void run(bool amIroot, int n, CkFuture f);
    };
 
 ::
@@ -5307,7 +5307,7 @@ consumed does not need to be known, just the number of producers is
 required.
 
 The completion detection feature is implemented in Charm++ as a module,
-and therefore is only included when “``-module completion``” is
+and therefore is only included when ``-module completion`` is
 specified when linking your application.
 
 First, the detector should be constructed. This call would typically
@@ -5500,8 +5500,8 @@ does not exist or is on another processor.
 ::
 
    A1 *a=a1[i].ckLocal();
-   if (a==NULL) //...is remote-- send message
-   else //...is local-- directly use members and methods of a
+   if (a==NULL) // ...is remote -- send message
+   else // ...is local -- directly use members and methods of a
 
 Note that if the element migrates or is deleted, any pointers obtained
 with ckLocal are no longer valid. It is best, then, to either avoid
@@ -5541,15 +5541,15 @@ segments all do exactly the same thing:
 
 ::
 
-   //Implicit CkArrayOptions
-     a1=CProxy_A1::ckNew(parameters,nElements);
+   // Implicit CkArrayOptions
+   a1=CProxy_A1::ckNew(parameters,nElements);
 
-   //Explicit CkArrayOptions
-     a1=CProxy_A1::ckNew(parameters,CkArrayOptions(nElements));
+   // Explicit CkArrayOptions
+   a1=CProxy_A1::ckNew(parameters,CkArrayOptions(nElements));
 
-   //Separate CkArrayOptions
-     CkArrayOptions opts(nElements);
-     a1=CProxy_A1::ckNew(parameters,opts);
+   // Separate CkArrayOptions
+   CkArrayOptions opts(nElements);
+   a1=CProxy_A1::ckNew(parameters,opts);
 
 Note that the “numElements” in an array element is simply the
 numElements passed in when the array was created. The true number of
@@ -5636,11 +5636,11 @@ CkArrayMap and defines these virtual methods:
    class CkArrayMap : public Group
    {
    public:
-     //...
+     // ...
 
-     //Return an ``arrayHdl'', given some information about the array
+     // Return an ``arrayHdl'', given some information about the array
      virtual int registerArray(CkArrayIndex& numElements,CkArrayID aid);
-     //Return the home processor number for this element of this array
+     // Return the home processor number for this element of this array
      virtual int procNum(int arrayHdl,const CkArrayIndex &element);
    }
 
@@ -5675,18 +5675,19 @@ map object named “BlockMap”:
 
 ::
 
-   //Create the map group
-     CProxy_BlockMap myMap=CProxy_BlockMap::ckNew();
-   //Make a new array using that map
-     CkArrayOptions opts(nElements);
-     opts.setMap(myMap);
-     a1=CProxy_A1::ckNew(parameters,opts);
+   // Create the map group
+   CProxy_BlockMap myMap=CProxy_BlockMap::ckNew();
+
+   // Make a new array using that map
+   CkArrayOptions opts(nElements);
+   opts.setMap(myMap);
+   a1=CProxy_A1::ckNew(parameters,opts);
 
 An example which constructs one element per physical node may be found
-in ``examples/charm++/PUP/pupDisk``
+in ``examples/charm++/PUP/pupDisk``.
 
 Other 3D Torus network oriented map examples are in
-``examples/charm++/topology``
+``examples/charm++/topology``.
 
 .. _array initial:
 
@@ -5703,15 +5704,15 @@ and overriding this virtual function of CkArrayMap:
 
 ::
 
-     virtual void populateInitial(int arrayHdl,int numInitial,
-   	void *msg,CkArray *mgr)
+   virtual void populateInitial(int arrayHdl,int numInitial,
+           void *msg,CkArray *mgr)
 
 In this call, arrayHdl is the value returned by registerArray,
 numInitial is the number of elements passed to CkArrayOptions, msg is
 the constructor message to pass, and mgr is the array to create.
 
-populateInitial creates new array elements using the method void
-CkArray::insertInitial(CkArrayIndex idx,void \*ctorMsg). For example, to
+populateInitial creates new array elements using the method ``void
+CkArray::insertInitial(CkArrayIndex idx,void \*ctorMsg)``. For example, to
 create one row of 2D array elements on each processor, you would write:
 
 ::
@@ -5745,12 +5746,12 @@ processor.
 
 ::
 
-   //Create the first array normally
-     aProxy=CProxy_A::ckNew(parameters,nElements);
-   //Create the second array bound to the first
-     CkArrayOptions opts(nElements);
-     opts.bindTo(aProxy);
-     bProxy=CProxy_B::ckNew(parameters,opts);
+   // Create the first array normally
+   aProxy=CProxy_A::ckNew(parameters,nElements);
+   // Create the second array bound to the first
+   CkArrayOptions opts(nElements);
+   opts.bindTo(aProxy);
+   bProxy=CProxy_B::ckNew(parameters,opts);
 
 An arbitrary number of arrays can be bound together- in the example
 above, we could create yet another array C and bind it to A or B. The
@@ -5792,23 +5793,23 @@ stored in *Alibrary*.
      void set_ptr(double *ptr) { dest = ptr; }
      virtual void pup(PUP::er &p);
    private:
-     double *dest;           // point to user data in user defined bound array
+     double *dest; // point to user data in user defined bound array
    };
 
    class UserArray: public CProxy_UserArray {
    public:
      virtual void pup(PUP::er &p) {
-                   p|len;
-                   if(p.isUnpacking()) {
-                     data = new double[len];
-                     Alibrary *myfellow = AlibraryProxy(thisIndex).ckLocal();
-                     myfellow->set_ptr(data);    // refresh data in bound array
-                   }
-                   p(data, len);
+       p|len;
+       if(p.isUnpacking()) {
+         data = new double[len];
+         Alibrary *myfellow = AlibraryProxy(thisIndex).ckLocal();
+         myfellow->set_ptr(data); // refresh data in bound array
+       }
+       p(data, len);
      }
    private:
-     CProxy_Alibrary  AlibraryProxy;   // proxy to my bound array
-     double *data;          // user allocated data pointer
+     CProxy_Alibrary AlibraryProxy; // proxy to my bound array
+     double *data; // user allocated data pointer
      int len;
    };
 
@@ -5841,29 +5842,29 @@ CProxy_Array::doneInserting before using the array.
 
 ::
 
-   //In the .C file:
+   // In the .C file:
    int x,y,z;
-   CProxy_A1 a1=CProxy_A1::ckNew();  //Creates a new, empty 1D array
+   CProxy_A1 a1=CProxy_A1::ckNew(); // Creates a new, empty 1D array
    for (x=...) {
-      a1[x  ].insert(parameters);  //Bracket syntax
-      a1(x+1).insert(parameters);  // or equivalent parenthesis syntax
+      a1[x  ].insert(parameters); // Bracket syntax
+      a1(x+1).insert(parameters); // or equivalent parenthesis syntax
    }
    a1.doneInserting();
 
-   CProxy_A2 a2=CProxy_A2::ckNew();   //Creates 2D array
+   CProxy_A2 a2=CProxy_A2::ckNew(); // Creates 2D array
    for (x=...) for (y=...)
-      a2(x,y).insert(parameters);  //Can't use brackets!
+      a2(x,y).insert(parameters); // Can't use brackets!
    a2.doneInserting();
 
-   CProxy_A3 a3=CProxy_A3::ckNew();   //Creates 3D array
+   CProxy_A3 a3=CProxy_A3::ckNew(); // Creates 3D array
    for (x=...) for (y=...) for (z=...)
       a3(x,y,z).insert(parameters);
    a3.doneInserting();
 
-   CProxy_AF aF=CProxy_AF::ckNew();   //Creates user-defined index array
+   CProxy_AF aF=CProxy_AF::ckNew(); // Creates user-defined index array
    for (...) {
-      aF[CkArrayIndexFoo(...)].insert(parameters); //Use brackets...
-      aF(CkArrayIndexFoo(...)).insert(parameters); //  ...or parenthesis
+      aF[CkArrayIndexFoo(...)].insert(parameters); // Use brackets...
+      aF(CkArrayIndexFoo(...)).insert(parameters); // ...or parenthesis
    }
    aF.doneInserting();
 
@@ -5902,7 +5903,7 @@ constructor, which must exist and be listed in the .ci file. A single
 array can have a mix of demand-creation and classic entry methods; and
 demand-created and normally created elements.
 
-A simple example of demand creation ``tests/charm++/demand_creation``
+A simple example of demand creation ``tests/charm++/demand_creation``.
 
 .. _asynchronous_array_creation:
 
@@ -5920,7 +5921,7 @@ chare array’s CkArrayID to the callback function.
    CProxy_SomeProxy::ckNew(parameters, nElements, CkCallback(CkIndex_MyClass::someFunction(NULL), thisProxy));
 
    void someFunction(CkArrayCreatedMsg *m) {
-       CProxy_AnotherProxy(m->aid)[index].myFunction();    // m->aid is CkArrayID
+       CProxy_AnotherProxy(m->aid)[index].myFunction(); // m->aid is CkArrayID
        delete m;
    }
 
@@ -5935,12 +5936,11 @@ further configure array characteristics.
 ::
 
    // Creating a 3-dimensional chare array with 2 parameters
-
    CkArrayOptions options(dimX, dimY, dimZ);
    CProxy_AnotherProxy::ckNew(param1, param2, options, CkCallback(CkIndex_SomeClass::anotherFunction(NULL), thisProxy));
 
 A demonstration of asynchronous array creation can be found in
-``examples/charm++/hello/darray``
+``examples/charm++/hello/darray``.
 
 .. _user-defined array index type:
 
@@ -5958,7 +5958,8 @@ Foo object as an array index by defining the class:
 ::
 
    #include <charm++.h>
-   class CkArrayIndexFoo:public CkArrayIndex {
+
+   class CkArrayIndexFoo : public CkArrayIndex {
        Foo f;
    public:
        CkArrayIndexFoo(const Foo &in)
@@ -5966,7 +5967,7 @@ Foo object as an array index by defining the class:
            f=in;
            nInts=sizeof(f)/sizeof(int);
        }
-       //Not required, but convenient: cast-to-foo operators
+       // Not required, but convenient: cast-to-foo operators
        operator Foo &() {return f;}
        operator const Foo &() const {return f;}
    };
@@ -5985,18 +5986,18 @@ You can then declare an array indexed by Foo objects with
 
 ::
 
-   //in the .ci file:
+   // in the .ci file:
    array [Foo] AF { entry AF(); ... }
 
-   //in the .h file:
+   // in the .h file:
    class AF : public CBase_AF
    { public: AF() {} ... }
 
-   //in the .C file:
-       Foo f;
-       CProxy_AF a=CProxy_AF::ckNew();
-       a[CkArrayIndexFoo(f)].insert();
-       ...
+   // in the .C file:
+   Foo f;
+   CProxy_AF a=CProxy_AF::ckNew();
+   a[CkArrayIndexFoo(f)].insert();
+   ...
 
 Note that since our CkArrayIndexFoo constructor is not declared with the
 explicit keyword, we can equivalently write the last line as:
@@ -6014,7 +6015,7 @@ The array index (an object of type Foo) is then accessible as
 ::
 
 
-   //in the .C file:
+   // in the .C file:
    AF::AF()
    {
        Foo myF=thisIndex;
@@ -6022,7 +6023,7 @@ The array index (an object of type Foo) is then accessible as
    }
 
 A demonstration of user defined indices can be seen in
-``examples/charm++/hello/fancyarray``
+``examples/charm++/hello/fancyarray``.
 
 .. _array section:
 
@@ -6046,8 +6047,8 @@ group sections need to be manually delegated to CkMulticast (see
 arrays and group sections via the CkMulticast library.
 
 Array and group sections work in mostly the same way. Check
-examples/charm++/groupsection for a group section example and
-examples/charm++/arraysection for an array section example.
+``examples/charm++/groupsection`` for a group section example and
+``examples/charm++/arraysection`` for an array section example.
 
 .. _section creation:
 
@@ -6140,7 +6141,7 @@ broadcast to all the section members, like this:
 ::
 
      CProxySection_Hello proxy;
-     proxy.someEntry(...)          // section broadcast
+     proxy.someEntry(...); // section broadcast
 
 See examples/charm++/arraysection for examples on how sections are used.
 
@@ -6205,7 +6206,7 @@ CkGetSectionInfo:
 
      void SayHi(HiMsg *msg)
      {
-       CkGetSectionInfo(cookie, msg);     // update section cookie every time
+       CkGetSectionInfo(cookie, msg); // update section cookie every time
        int data = thisIndex;
        CProxySection_Hello::contribute(sizeof(int), &data, CkReduction::sum_int, cookie, cb);
      }
@@ -6260,9 +6261,10 @@ resetSection.
    void Foo::pup(PUP::er & p) {
        // if I am multicast root and it is unpacking
       if (ismcastroot && p.isUnpacking()) {
-         CProxySection_Foo   fooProxy;    // proxy for the section
+         CProxySection_Foo fooProxy; // proxy for the section
          fooProxy.resetSection(fooProxy);
-           // you may want to reset reduction client to root
+
+         // you may want to reset reduction client to root
          CkCallback *cb = new CkCallback(...);
       }
    }
@@ -6289,31 +6291,29 @@ Given three arrays declared thusly:
 
 ::
 
-   	  std::vector<CkArrayID> aidArr(3);
-   	  for (int i=0; i<3; i++)
-   	    {
-   	      CProxy_multisectiontest_array1d Aproxy = CProxy_multisectiontest_array1d::ckNew(masterproxy.ckGetGroupID(), ArraySize);
-   	      aidArr[i] = Aproxy.ckGetArrayID();
-   	    }
+  std::vector<CkArrayID> aidArr(3);
+  for (int i=0; i<3; i++) {
+    CProxy_multisectiontest_array1d Aproxy = CProxy_multisectiontest_array1d::ckNew(masterproxy.ckGetGroupID(), ArraySize);
+    aidArr[i] = Aproxy.ckGetArrayID();
+  }
 
 One can make a section including the lower half elements of all three
 arrays as follows:
 
 ::
 
-   	  int aboundary = ArraySize/2;
-   	  int afloor = aboundary;
-   	  int aceiling = ArraySize-1;
-   	  int asectionSize = aceiling-afloor+1;
-   	  // cross section lower half of each array
-   	  std::vector<std::vector<CkArrayIndex> > aelems(3);
-   	  for (int k=0; k<3; k++)
-   	    {
-   	      aelems[k].resize(asectionSize);
-   	      for (int i=afloor,j=0; i<=aceiling; i++,j++)
-   	        aelems[k][j] = CkArrayIndex1D(i);
-   	    }
-   	  CProxySection_multisectiontest_array1d arrayLowProxy(aidArr, aelems);
+  int aboundary = ArraySize/2;
+  int afloor = aboundary;
+  int aceiling = ArraySize-1;
+  int asectionSize = aceiling-afloor+1;
+  // cross section lower half of each array
+  std::vector<std::vector<CkArrayIndex> > aelems(3);
+  for (int k=0; k<3; k++) {
+    aelems[k].resize(asectionSize);
+    for (int i=afloor,j=0; i<=aceiling; i++,j++)
+      aelems[k][j] = CkArrayIndex1D(i);
+  }
+  CProxySection_multisectiontest_array1d arrayLowProxy(aidArr, aelems);
 
 The resulting cross section proxy, as in the example arrayLowProxy, can
 then be used for multicasts in the same way as a normal array section.
@@ -6358,9 +6358,9 @@ managers):
      CkGroupID mCastGrpId = CProxy_CkMulticastMgr::ckNew();
      CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
 
-     sectProxy.ckSectionDelegate(mCastGrp);  // initialize section proxy
+     sectProxy.ckSectionDelegate(mCastGrp); // initialize section proxy
 
-     sectProxy.someEntry(...)           // multicast via delegation library as before
+     sectProxy.someEntry(...); // multicast via delegation library as before
 
 One can also set the default branching factor when creating a
 CkMulticastMgr group. Sections created via this manager will use the
@@ -6368,7 +6368,7 @@ specified branching factor for their multicast tree. For example,
 
 ::
 
-     CkGroupID mCastGrpId = CProxy_CkMulticastMgr::ckNew(3);   // factor is 3
+     CkGroupID mCastGrpId = CProxy_CkMulticastMgr::ckNew(3); // factor is 3
 
 Contributing using a custom CkMulticastMgr group:
 
@@ -6378,7 +6378,7 @@ Contributing using a custom CkMulticastMgr group:
 
      void SayHi(HiMsg *msg)
      {
-       CkGetSectionInfo(cookie, msg);     // update section cookie every time
+       CkGetSectionInfo(cookie, msg); // update section cookie every time
        int data = thisIndex;
        CkCallback cb(CkIndex_myArrayType::myReductionEntry(NULL),thisProxy);
        mcastGrp->contribute(sizeof(int), &data, CkReduction::sum_int, cookie, cb);
@@ -6397,17 +6397,18 @@ Writing the pup method:
 
 ::
 
-   void Foo::pup(PUP::er & p) {
-       // if I am multicast root and it is unpacking
+    void Foo::pup(PUP::er & p) {
+      // if I am multicast root and it is unpacking
       if (ismcastroot && p.isUnpacking()) {
-         CProxySection_Foo   fooProxy;    // proxy for the section
-         CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
-         mg->resetSection(fooProxy);
-           // you may want to reset reduction client to root
-         CkCallback *cb = new CkCallback(...);
-         mg->setReductionClient(mcp, cb);
+        CProxySection_Foo fooProxy; // proxy for the section
+        CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
+        mg->resetSection(fooProxy);
+
+        // you may want to reset reduction client to root
+        CkCallback *cb = new CkCallback(...);
+        mg->setReductionClient(mcp, cb);
       }
-   }
+    }
 
 .. _inheritance:
 
@@ -6509,20 +6510,20 @@ inherit from a regular C++ class. For example:
 
 ::
 
-   //In the .ci file:
-     message BaseMessage1;
-     message BaseMessage2;
+    // In the .ci file:
+    message BaseMessage1;
+    message BaseMessage2;
 
-   //In the .h file:
-     class Base {
-       // ...
-     };
-     class BaseMessage1 : public Base, public CMessage_BaseMessage1 {
-       // ...
-     };
-     class BaseMessage2 : public Base, public CMessage_BaseMessage2 {
-       // ...
-     };
+    // In the .h file:
+    class Base {
+      // ...
+    };
+    class BaseMessage1 : public Base, public CMessage_BaseMessage1 {
+      // ...
+    };
+    class BaseMessage2 : public Base, public CMessage_BaseMessage2 {
+      // ...
+    };
 
 Messages cannot contain virtual methods or virtual base classes unless
 you use a packed message. Parameter marshalling has complete support for
@@ -6626,7 +6627,7 @@ expected template signature:
 ::
 
    // A.h
-   #include ``A.decl.h''
+   #include "A.decl.h"
 
    template <class DType, int N=3>
    struct TMessage : public CMessage_TMessage<DType, N> {
@@ -6634,7 +6635,7 @@ expected template signature:
    };
 
    #define CK_TEMPLATES_ONLY
-   #include ``A.def.h''
+   #include "A.def.h"
    #undef CK_TEMPLATES_ONLY
 
 The distinguishing change is the additional requirement to include parts
@@ -6735,7 +6736,7 @@ contribution.
 ::
 
        double forces[2]=get_my_forces();
-       // When done, broadcast the CkReductionMsg to ``myReductionEntry''
+       // When done, broadcast the CkReductionMsg to "myReductionEntry"
        CkCallback cb(CkIndex_myArrayType::myReductionEntry(NULL), thisProxy);
        contribute(2*sizeof(double), forces,CkReduction::sum_double, cb);
 
@@ -6769,10 +6770,10 @@ and the corresponding callback function:
 example).
 
 If the target of a reduction is an entry method defined by a *when*
-clause in SDAG(Section :numref:`sec:sdag`), one may wish to set a
+clause in SDAG (Section :numref:`sec:sdag`), one may wish to set a
 reference number (or tag) that SDAG can use to match the resulting
 reduction message. To set the tag on a reduction message, call the
-CkCallback::setRefNum(CMK_REFNUM_TYPE refnum) method on the callback
+``CkCallback::setRefNum(CMK_REFNUM_TYPE refnum)`` method on the callback
 passed to the ``contribute()`` call.
 
 .. _new_type_reduction:
@@ -6804,12 +6805,12 @@ two machine ``short int``\ s would be:
 
    CkReductionMsg *sumTwoShorts(int nMsg,CkReductionMsg **msgs)
    {
-     //Sum starts off at zero
+     // Sum starts off at zero
      short ret[2]={0,0};
      for (int i=0;i<nMsg;i++) {
-       //Sanity check:
+       // Sanity check:
        CkAssert(msgs[i]->getSize()==2*sizeof(short));
-       //Extract this message's data
+       // Extract this message's data
        short *m=(short *)msgs[i]->getData();
        ret[0]+=m[0];
        ret[1]+=m[1];
@@ -6833,19 +6834,19 @@ function is registered and used in the following manner:
 
 ::
 
-   //In the .ci file:
-     initnode void registerSumTwoShorts(void);
+   // In the .ci file:
+   initnode void registerSumTwoShorts(void);
 
-   //In some .C file:
+   // In some .C file:
    /*global*/ CkReduction::reducerType sumTwoShortsType;
    /*initnode*/ void registerSumTwoShorts(void)
    {
      sumTwoShortsType=CkReduction::addReducer(sumTwoShorts);
    }
 
-   //In some member function, contribute data to the customized reduction:
-     short data[2]=...;
-     contribute(2*sizeof(short),data,sumTwoShortsType);
+   // In some member function, contribute data to the customized reduction:
+   short data[2]=...;
+   contribute(2*sizeof(short),data,sumTwoShortsType);
 
 | Note that typed reductions briefed in Section :numref:`reductions`
   can also be used for custom reductions. The target reduction client
@@ -6880,9 +6881,9 @@ argument to CkReduction::buildNew:
      // reuse msgs[0]'s memory:
      short *retData = (short*)msgs[0]->getData();
      for (int i=1;i<nMsg;i++) {
-       //Sanity check:
+       // Sanity check:
        CkAssert(msgs[i]->getSize()==2*sizeof(short));
-       //Extract this message's data
+       // Extract this message's data
        short *m=(short *)msgs[i]->getData();
        retData[0]+=m[0];
        retData[1]+=m[1];
@@ -11806,6 +11807,8 @@ Acknowledgements
 -  Harshitha Menon
 
 -  Isaac Dooley
+
+-  Jaemin Choi
 
 -  Jayant DeSouza
 
