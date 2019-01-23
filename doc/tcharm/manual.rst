@@ -482,52 +482,52 @@ Command-line Options
 The complete set of link-time arguments relevant to TCharm is:
 
 -memory isomalloc
-   Enable memory allocation that will automatically migrate with the
-   thread, as described in
-   Section :numref:`sec:isomalloc`.
+  Enable memory allocation that will automatically migrate with the
+  thread, as described in
+  Section :numref:`sec:isomalloc`.
 
 -balancer B
-   Enable this load balancing strategy. The current set of balancers B
-   includes RefineLB (make only small changes each time), MetisLB (remap
-   threads using graph partitioning library), HeapCentLB (remap threads
-   using a greedy algorithm), and RandCentLB (remap threads to random
-   processors). You can only have one balancer.
+  Enable this load balancing strategy. The current set of balancers B
+  includes RefineLB (make only small changes each time), MetisLB (remap
+  threads using graph partitioning library), HeapCentLB (remap threads
+  using a greedy algorithm), and RandCentLB (remap threads to random
+  processors). You can only have one balancer.
 
 -module F
-   Link in this framework. The current set of frameworks F includes
-   ampi, collide, fem, mblock, and netfem. You can link in multiple
-   frameworks.
+  Link in this framework. The current set of frameworks F includes
+  ampi, collide, fem, mblock, and netfem. You can link in multiple
+  frameworks.
 
 The complete set of command-line arguments relevant to TCharm is:
 
-+p N
-   Run on N physical processors.
+\+p N
+  Run on N physical processors.
 
 +vp N
-   Create N “virtual processors”, or threads. This is the value returned
-   by TCharmGetNumChunks.
+  Create N “virtual processors”, or threads. This is the value returned
+  by TCharmGetNumChunks.
 
 ++debug
-   Start each program in a debugger window. See Charm++ Installation and
-   Usage Manual for details.
+  Start each program in a debugger window. See Charm++ Installation and
+  Usage Manual for details.
 
-+tcharm_stacksize N
-   Create N-byte thread stacks. This value can be overridden using
-   TCharmSetStackSize().
++tcharm\_stacksize N
+  Create N-byte thread stacks. This value can be overridden using
+  TCharmSetStackSize().
 
-+tcharm_nomig
-   Disable thread migration. This can help determine whether a problem
-   you encounter is caused by our migration framework.
++tcharm\_nomig
+  Disable thread migration. This can help determine whether a problem
+  you encounter is caused by our migration framework.
 
-+tcharm_nothread
-   Disable threads entirely. This can help determine whether a problem
-   you encounter is caused by our threading framework. This generally
-   only works properly when using only one thread.
++tcharm\_nothread
+  Disable threads entirely. This can help determine whether a problem
+  you encounter is caused by our threading framework. This generally
+  only works properly when using only one thread.
 
-+tcharm_trace F
-   Trace all calls made to the framework F. This can help to understand
-   a complex program. This feature is not available if Charm++ was
-   compiled with CMK_OPTIMIZE.
++tcharm\_trace F
+  Trace all calls made to the framework F. This can help to understand
+  a complex program. This feature is not available if Charm++ was
+  compiled with CMK_OPTIMIZE.
 
 .. _sec:tlib:
 
@@ -539,16 +539,16 @@ writes a program for a library written on TCharm. This section gives an
 overview of how to go about writing a library in Charm++ that uses
 TCharm.
 
--  Compared to using plain MPI, TCharm provides the ability to access
-   all of Charm++, including arrays and groups.
+- Compared to using plain MPI, TCharm provides the ability to access
+  all of Charm++, including arrays and groups.
 
--  Compared to using plain Charm++, using TCharm with your library
-   automatically provides your users with a clean C/F90 API (described
-   in the preceding chapters) for basic thread memory management, I/O,
-   and migration. It also allows you to use a convenient
-   "thread->suspend()" and "thread->resume()" API for blocking a thread,
-   and works properly with the load balancer, unlike
-   CthSuspend/CthAwaken.
+- Compared to using plain Charm++, using TCharm with your library
+  automatically provides your users with a clean C/F90 API (described
+  in the preceding chapters) for basic thread memory management, I/O,
+  and migration. It also allows you to use a convenient
+  "thread->suspend()" and "thread->resume()" API for blocking a thread,
+  and works properly with the load balancer, unlike
+  CthSuspend/CthAwaken.
 
 The overall scheme for writing a TCharm-based library "Foo" is:
 
