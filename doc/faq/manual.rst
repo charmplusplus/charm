@@ -1130,7 +1130,7 @@ substitute "charmdebug" to "charmrun":
    shell> <path>/charmdebug ./myprogram
 
 You can find more detailed information in the debugger manual in
-`here <http://charm.cs.illinois.edu/manuals/html/debugger/manual-1p.html>`__.
+:ref:`charmdebug`.
 
 Can I use distributed debuggers like Allinea DDT and RogueWave TotalView?
 -------------------------------------------------------------------------

@@ -1,3 +1,5 @@
+.. _charmdebug:
+
 =======================
 Charm++ Debugger Manual
 =======================
