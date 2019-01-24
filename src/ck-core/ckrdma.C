@@ -397,10 +397,12 @@ CkNcpyMode findTransferMode(int srcPe, int destPe) {
  * API
  */
 envelope* CkRdmaIssueRgets(envelope *env){
-  // Iterate over the ncpy buffer and either perform the operations
-  int numops, bufsize, msgsize;
-  bufsize = getRdmaBufSize(env);
-  numops = getRdmaNumOps(env);
+  int numops=0, bufsize=0, msgsize=0;
+
+  CkUnpackMessage(&env); // Unpack message to access msgBuf inside getRdmaNumopsAndBufsize
+  getRdmaNumopsAndBufsize(env, numops, bufsize);
+  CkPackMessage(&env); // Pack message to ensure corret copying into copyenv
+
   msgsize = env->getTotalsize();
 
   CkNcpyMode ncpyMode = findTransferMode(env->getSrcPe(), CkMyPe());
@@ -542,11 +544,11 @@ envelope* CkRdmaIssueRgets(envelope *env){
     p|source;
   }
 
+  // Substitute buffer pointers by their offsets from msgBuf to handle migration
   CkPackRdmaPtrs(((CkMarshallMsg *)EnvToUsr(copyenv))->msgBuf);
 
   if(ncpyMode == CkNcpyMode::MEMCPY || ncpyMode == CkNcpyMode::CMA ) {
     // All operations have completed
-    CkPackMessage(&copyenv);
     return copyenv; // to indicate the completion of the gets
     // copyenv represents the new message which consists of the destination buffers
 
@@ -596,32 +598,19 @@ void CkUnpackRdmaPtrs(char *msgBuf){
   }
 }
 
-//Determine the number of ncpy ops from the message
-int getRdmaNumOps(envelope *env){
-  int numops;
-  CkUnpackMessage(&env);
-  PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
-  up|numops;
-  CkPackMessage(&env);
-  return numops;
-}
 
-// Get the sum of ncpy buffer sizes using the metadata message
-int getRdmaBufSize(envelope *env){
-  /*
-   * Determine the number of ncpy operations and the sum of all
-   * ncpy buffer sizes by iterating over the CkNcpyBuffers in the message
-   */
-  int numops, bufsize=0;
-  CkUnpackMessage(&env);
+// Determine the number of ncpy ops and the sum of the ncpy buffer sizes
+// from the metadata message
+void getRdmaNumopsAndBufsize(envelope *env, int &numops, int &bufsize) {
+  numops = 0;
+  bufsize = 0;
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
   up|numops;
   for(int i=0; i<numops; i++){
-    CkNcpyBuffer w; up|w;
+    CkNcpyBuffer w;
+    up|w;
     bufsize += CK_ALIGN(w.cnt, 16);
   }
-  CkPackMessage(&env);
-  return bufsize;
 }
 
 void handleEntryMethodApiCompletion(NcpyOperationInfo *info) {

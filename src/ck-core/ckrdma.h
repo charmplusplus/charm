@@ -268,11 +268,9 @@ void CkPackRdmaPtrs(char *msgBuf);
 // Method called to pack rdma pointers
 void CkUnpackRdmaPtrs(char *msgBuf);
 
-// Get the number of ncpy ops using the metadata message
-int getRdmaNumOps(envelope *env);
-
-// Get the sum of ncpy buffer sizes using the metadata message
-int getRdmaBufSize(envelope *env);
+// Determine the number of ncpy ops and the sum of the ncpy buffer sizes
+// from the metadata message
+void getRdmaNumopsAndBufsize(envelope *env, int &numops, int &bufsize);
 
 // Ack handler function for the nocopy EM API
 void CkRdmaEMAckHandler(int destPe, void *ack);
