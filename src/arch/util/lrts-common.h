@@ -18,9 +18,9 @@
 #endif // end of CMK_USE_CMA
 
 // Converse Message header contains msgtype which is set to one of these message types
-enum MsgType {
-  // CMK_REG_MSG refers to a message which contains the payload being sent
-  CMK_REG_MSG=0,
+enum cmiCMAMsgType {
+  // CMK_REG_NOCMA_MSG refers to a message which contains the payload being sent
+  CMK_REG_NO_CMA_MSG=0,
 
   // CMK_CMA_MD_MSG refers to a message which contains payload metadata (pe, pid, address, size) without the payload
   // This message is used by the receiving process (running on the same physical host) to perform a CMA read operation

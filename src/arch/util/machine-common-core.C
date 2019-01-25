@@ -14,8 +14,7 @@ FILE *debugLog = NULL;
 #endif
 
 // Macro for message type
-#define CMI_MSG_TYPE(msg)            ((CmiMsgHeaderBasic *)msg)->type
-#define CMI_SET_MSG_TYPE(msg, type)  CMI_MSG_TYPE(msg) = (type);
+#define CMI_CMA_MSGTYPE(msg)         ((CmiMsgHeaderBasic *)msg)->cmaMsgType
 
 /******* broadcast related  */
 #ifndef CMK_BROADCAST_SPANNING_TREE
@@ -539,9 +538,9 @@ static INLINE_KEYWORD void handleOneRecvedMsg(int size, char *msg) {
 
 #if CMK_USE_CMA
     // If CMA message, perform CMA read to get the payload message
-    if(cma_reg_msg && CMI_MSG_TYPE(msg) == CMK_CMA_MD_MSG) {
+    if(cma_reg_msg && CMI_CMA_MSGTYPE(msg) == CMK_CMA_MD_MSG) {
       handleOneCmaMdMsg(&size, &msg);  // size & msg are modififed
-    } else if(cma_reg_msg && CMI_MSG_TYPE(msg) == CMK_CMA_ACK_MSG) {
+    } else if(cma_reg_msg && CMI_CMA_MSGTYPE(msg) == CMK_CMA_ACK_MSG) {
       handleOneCmaAckMsg(size, msg);
       return;
     }
@@ -625,7 +624,7 @@ CpvExtern(int, _urgentSend);
 //that handles sending to any partition
 INLINE_KEYWORD CmiCommHandle CmiSendNetworkFunc(int destPE, int size, char *msg, int mode) {
   // Set the message as a regular message (defined in lrts-common.h)
-  CMI_SET_MSG_TYPE(msg, CMK_REG_MSG);
+  CMI_CMA_MSGTYPE(msg) = CMK_REG_NO_CMA_MSG;
   return CmiInterSendNetworkFunc(destPE, CmiMyPartition(), size, msg, mode);
 }
 //the generic function that replaces the older one
@@ -637,7 +636,7 @@ CmiCommHandle CmiInterSendNetworkFunc(int destPE, int partition, int size, char 
 
 #if CMK_USE_CMA
         if(cma_reg_msg && partition == CmiMyPartition() && CmiPeOnSamePhysicalNode(CmiMyPe(), destPE)) {
-          if(CMI_MSG_TYPE(msg) == CMK_REG_MSG && cma_min_threshold <= size && size <= cma_max_threshold) {
+          if(CMI_CMA_MSGTYPE(msg) == CMK_REG_NO_CMA_MSG && cma_min_threshold <= size && size <= cma_max_threshold) {
             CmiSendMessageCma(&msg, &size); // size & msg are modififed
           }
         }
@@ -694,7 +693,7 @@ void CmiInterFreeSendFn(int destPE, int partition, int size, char *msg) {
     CMI_SET_BROADCAST_ROOT(msg, 0);
 
     // Set the message as a regular message (defined in lrts-common.h)
-    CMI_SET_MSG_TYPE(msg, CMK_REG_MSG);
+    CMI_CMA_MSGTYPE(msg) = CMK_REG_NO_CMA_MSG;
 #if CMI_QD
     CQdCreate(CpvAccess(cQdState), 1);
 #endif
@@ -791,7 +790,7 @@ void CmiInterFreeNodeSendFn(int destNode, int partition, int size, char *msg) {
 #endif
     CMI_SET_BROADCAST_ROOT(msg, 0);
     // Set the message as a regular message (defined in lrts-common.h)
-    CMI_SET_MSG_TYPE(msg, CMK_REG_MSG);
+    CMI_CMA_MSGTYPE(msg) = CMK_REG_NO_CMA_MSG;
     if (destNode == CmiMyNode() && CmiMyPartition() == partition) {
         CmiSendNodeSelf(msg);
     } else {

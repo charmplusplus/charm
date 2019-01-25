@@ -20,11 +20,11 @@
 /* the first 4 fields of the header are defined in machine-dgram.c
    and are used for the udp retransmission protocol implementation.
    The root parameter is for the communication library and is used in
-   broadcast operations. The type parameter is used to identify the type
+   broadcast operations. The cmaMsgType parameter is used to identify the type
    of the message and used in the LRTS based CMA implementaion.
 */
 #define CMK_MSG_HEADER_BASIC   CMK_MSG_HEADER_EXT
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,hdl,type,xhdl,info,redID,rank; CmiInt4 root, size; CmiUInt1 zcMsgType:2;
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,hdl,xhdl,info,redID,rank; CmiInt4 root, size; CmiUInt1 zcMsgType:2, cmaMsgType:2;
 #define CMK_MSG_HEADER_EXT       { CMK_MSG_HEADER_EXT_ }
 #define CMK_MSG_HEADER_BIGSIM_  { CMK_MSG_HEADER_EXT_ CMK_BIGSIM_FIELDS }
 

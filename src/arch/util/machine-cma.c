@@ -114,7 +114,7 @@ void handleOneCmaMdMsg(int *sizePtr, char **msgPtr) {
 
   // Send the buffer md msg back as an ack msg to signal CMA read completion in order to free buffers
   // on the source process
-  CMI_SET_MSG_TYPE(*msgPtr, CMK_CMA_ACK_MSG);
+  CMI_CMA_MSGTYPE(*msgPtr) = CMK_CMA_ACK_MSG;
 
   CmiInterSendNetworkFunc(bufInfo->srcPE,
                           CmiMyPartition(),
@@ -158,7 +158,7 @@ void CmiSendMessageCma(char **msgPtr, int *sizePtr) {
   bufInfo->size    = *sizePtr;
 
   // Tag this message as a CMA buffer md message
-  CMI_SET_MSG_TYPE(cmaBufMdMsg, CMK_CMA_MD_MSG);
+  CMI_CMA_MSGTYPE(cmaBufMdMsg) = CMK_CMA_MD_MSG;
 
   // Reassign *sizePtr to store the size of the buffer md msg
   *sizePtr = CmiMsgHeaderSizeBytes + sizeof(CmaSrcBufferInfo_t);
