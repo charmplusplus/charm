@@ -1103,8 +1103,6 @@ extern void  CcdCallBacks(void);
 #else
 extern int CcdNumTimerCBs(void);
 CpvExtern(int, _ccd_numchecks);
-CpvExtern(int, _ccd_heaplen);
-CpvExtern(int, _ccd_num_timed_cond_cbs);
 #define CsdPeriodic() \
   do{ \
     if ((CcdNumTimerCBs() > 0) && (CpvAccess(_ccd_numchecks)-- <= 0)) { \
