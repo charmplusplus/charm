@@ -4950,6 +4950,15 @@ The intended behavior upon a callback’s invocation is specified through
 the choice of callback constructor used when creating the callback.
 Possible constructors are:
 
+#. CkCallback(int ep, const CkChareID &id) - When invoked, the callback
+   will send its message to the given entry method (specified by the
+   entry point index - ep) of the given Chare (specified by the chare
+   id). Note that a chare proxy will also work in place of a chare id:
+
+   ::
+
+      CkCallback(CkIndex_Foo::bar(NULL), thisProxy[thisIndex])
+
 #. CkCallback(void (\*CallbackFn)(void \*, void \*), void \*param) - When
    invoked, the callback will pass param and the result message to the
    given C function, which should have a prototype like:
@@ -4972,15 +4981,6 @@ Possible constructors are:
 
 #. CkCallback(CkCallback::ckExit) - When invoked, the callback will call
    CkExit(), ending the Charm++ program.
-
-#. CkCallback(int ep, const CkChareID &id) - When invoked, the callback
-   will send its message to the given entry method (specified by the
-   entry point index - ep) of the given Chare (specified by the chare
-   id). Note that a chare proxy will also work in place of a chare id:
-
-   ::
-
-      	CkCallback myCB(CkIndex_myChare::myEntry(NULL), myChareProxy);
 
 #. CkCallback(int ep, const CkArrayID &id) - When invoked, the callback
    will broadcast its message to the given entry method of the given

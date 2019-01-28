@@ -56,6 +56,15 @@ through the choice of callback constructor used when creating the callback.
 Possible constructors are: 
 
 \begin{enumerate}
+\item \kw{CkCallback(int ep, const CkChareID \&id)} - When invoked, the
+callback will send its message to the given entry method (specified by the
+entry point index - \kw{ep}) of the given
+Chare (specified by the chare \kw{id}).  Note that a chare proxy will also work in place of a chare id:
+
+\begin{alltt}
+  CkCallback(CkIndex_Foo::bar(NULL), thisProxy[thisIndex])
+\end{alltt}
+
 \item \kw{CkCallback(void (*CallbackFn)(void *, void *), void *param)} - 
 When invoked, the callback will pass \uw{param} and the result message
 to the given C function, which should have a prototype
@@ -79,15 +88,6 @@ other way.
 
 \item \kw{CkCallback(CkCallback::ckExit)} - When invoked, the callback
 will call CkExit(), ending the Charm++ program.
-
-\item \kw{CkCallback(int ep, const CkChareID \&id)} - When invoked, the 
-callback will send its message to the given entry method (specified by the 
-entry point index - \kw{ep}) of the given
-Chare (specified by the chare \kw{id}).  Note that a chare proxy will also work in place of a chare id:
-
-\begin{alltt}
-	CkCallback myCB(CkIndex_myChare::myEntry(NULL), myChareProxy);
-\end{alltt}
 
 \item \kw{CkCallback(int ep, const CkArrayID \&id)} - 
 When invoked,
