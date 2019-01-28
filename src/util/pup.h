@@ -719,14 +719,14 @@ public:
 #define PUPable_operator_inside(className)\
     friend inline void operator|(PUP::er &p,className &a) {a.pup(p);}\
     friend inline void operator|(PUP::er &p,className* &a) {\
-	PUP::able *pa=a;  p(&pa);  a=(className *)pa;\
+	PUP::able *pa=a;  p(&pa);  a=dynamic_cast<className *>(pa);\
     }
 
 //  Macros to be used outside a class body.
 #define PUPable_operator_outside(className)\
     inline void operator|(PUP::er &p,className &a) {a.pup(p);}\
     inline void operator|(PUP::er &p,className* &a) {\
-	PUP::able *pa=a;  p(&pa);  a=(className *)pa;\
+	PUP::able *pa=a;  p(&pa);  a=dynamic_cast<className *>(pa);\
     }
 
 //Declarations to include in a PUP::able's body.
