@@ -981,11 +981,7 @@ XStr Entry::aggregatorIndexType() {
   } else if (container->isArray()) {
     XStr dim, arrayIndexType;
     dim << ((Array*)container)->dim();
-    if (dim == "1D") {
-      indexType << "int";
-    } else {
-      indexType << "CkArrayIndex";
-    }
+     indexType << "CkArrayIndex";
   }
   return indexType;
 }
@@ -1088,13 +1084,7 @@ void Entry::genTramDefs(XStr& str) {
     str << "  const CkArrayIndex &myIndex = ckGetIndex();\n"
         << "  " << aggregatorName() << "->insertData<" << (isInline() ? "true" : "false")
         << ">(" << param->param->name;
-    if (dim == (const char*)"1D") {
-      str << ", "
-          << "myIndex.data()[0]);\n}\n";
-    } else {
-      str << ", "
-          << "myIndex);\n}\n";
-    }
+    str << ", " << "myIndex);\n}\n";
   }
 }
 
