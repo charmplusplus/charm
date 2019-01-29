@@ -584,9 +584,14 @@ void *CpdGetNextMessageConditional(CsdSchedulerState_t *s) {
   if ((msg=CdsFifo_Dequeue(s->localQ)) != NULL) return msg;
   CqsDequeue((Queue_struct*)s->schedQ,(void **)&msg);
   if (msg!=NULL) return msg;
-  read(conditionalPipe[0], &len, 4);
+  if (4 != read(conditionalPipe[0], &len, 4))
+    CmiAbort("CpdGetNextMessageConditional: len read failed");
   msg = CmiAlloc(len);
-  read(conditionalPipe[0], msg, len);
+  if (len != read(conditionalPipe[0], msg, len))
+  {
+    CmiFree(msg);
+    CmiAbort("CpdGetNextMessageConditional: msg read failed");
+  }
   return msg;
 }
 
@@ -598,8 +603,10 @@ extern "C" void CpdDeliverSingleMessage ();
 
 static pid_t CpdConditional_SetupComm() {
   int pipefd[2][2];
-  pipe(pipefd[0]); // parent to child
-  pipe(pipefd[1]); // child to parent
+  if (pipe(pipefd[0]) == -1)
+    CmiAbort("CpdConditional_SetupComm: parent to child pipe failed");
+  if (pipe(pipefd[1]) == -1)
+    CmiAbort("CpdConditional_SetupComm: child to parent pipe failed");
   
   if (conditionalShm == NULL) {
     struct shmid_ds dummy;
@@ -611,7 +618,9 @@ static pid_t CpdConditional_SetupComm() {
   }
   
   pid_t pid = fork();
-  if (pid > 0) {
+  if (pid < 0)
+    CmiAbort("CpdConditional_SetupComm: fork failed");
+  else if (pid > 0) {
     int bytes;
     CmiPrintf("parent %d\n",pid);
     close(pipefd[0][0]);
@@ -619,9 +628,14 @@ static pid_t CpdConditional_SetupComm() {
     conditionalPipe[0] = pipefd[1][0];
     conditionalPipe[1] = pipefd[0][1];
     //CpdConditionalDeliveryScheduler(pipefd[1][0], pipefd[0][1]);
-    read(conditionalPipe[0], &bytes, 4);
+    if (4 != read(conditionalPipe[0], &bytes, 4))
+      CmiAbort("CpdConditional_SetupComm: bytes read failed");
     char *buf = (char*)malloc(bytes);
-    read(conditionalPipe[0], buf, bytes);
+    if (bytes != read(conditionalPipe[0], buf, bytes))
+    {
+      free(buf);
+      CmiAbort("CpdConditional_SetupComm: buf read failed");
+    }
     CcsSendReply(bytes,buf);
     free(buf);
     return pid;
@@ -1013,7 +1027,7 @@ void CpdStartGdb(void)
      }
      pid = fork();
      if (pid < 0)
-        { perror("ERROR> forking to run debugger script\n"); exit(1); }
+        { CmiAbort("ERROR> forking to run debugger script\n"); }
      if (pid == 0)
      {
          //CmiPrintf("In child process to start script %s\n", gdbScript);

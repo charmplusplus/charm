@@ -253,9 +253,16 @@ void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
     int bytes;
     if (4==read(conditionalPipe[0], &bytes, 4)) {
       char *buf = (char *)malloc(bytes);
-      read(conditionalPipe[0], buf, bytes);
-      CcsSendReply(bytes,buf);
-      free(buf);
+      if (bytes == read(conditionalPipe[0], buf, bytes))
+      {
+        CcsSendReply(bytes,buf);
+        free(buf);
+      }
+      else
+      {
+        free(buf);
+        CpdEndConditionalDeliver_master();
+      }
     } else {
       /* the pipe has been closed */
       CpdEndConditionalDeliver_master();
