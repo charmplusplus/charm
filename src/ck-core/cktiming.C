@@ -252,7 +252,7 @@ if(num_params==18) sprintf(params, "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f
 if(num_params==19) sprintf(params, "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f", p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19);
 if(num_params==20) sprintf(params, "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f", p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19, p20);
 
-	char paramString[2048];
+	char paramString[2560];
 	sprintf(paramString, "params:{ %s }", params);
 	
 	char eventNameString[1024];
@@ -275,7 +275,7 @@ if(num_params==20) sprintf(params, "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f
 #endif
 
  
-  char timeString[512];
+  char timeString[4096];
   timeString[0] = 0;
   char stepString[128];
   stepString[0] = 0;

@@ -4291,7 +4291,7 @@ string return idiom.
 */
 static char *create_netstart(int node)
 {
-  static char dest[1024];
+  static char dest[1536];
   int port = 0;
   if (arg_mpiexec)
     sprintf(dest, "$CmiMyNode %s %d %d %d", server_addr, server_port,
@@ -4341,7 +4341,7 @@ static void start_nodes_daemon(std::vector<nodetab_process> & process_table)
     free(arg_nodeprog_r);
     sprintf(task.env, "NETSTART=%s", create_netstart(p.nodeno));
 
-    char nodeArgBuffer[5000]; /*Buffer to hold assembled program arguments*/
+    char nodeArgBuffer[5120]; /*Buffer to hold assembled program arguments*/
     char *argBuf;
     if (h->nice != -100) {
       if (arg_verbose)

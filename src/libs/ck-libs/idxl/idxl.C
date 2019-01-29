@@ -15,7 +15,7 @@ Orion Sky Lawlor, olawlor@acm.org, 1/7/2003
 
 void IDXL_Abort(const char *callingRoutine,const char *msg,int m0,int m1,int m2)
 {
-	char msg1[1024], msg2[1024];
+	char msg1[1024], msg2[1536];
 	sprintf(msg1,msg,m0,m1,m2);
 	sprintf(msg2,"Fatal error in IDXL routine %s:\n%s",callingRoutine,msg1);
 	CkAbort(msg2);
