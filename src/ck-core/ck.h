@@ -250,7 +250,7 @@ extern void _createGroup(CkGroupID groupID, envelope *env);
 extern void _createNodeGroup(CkGroupID groupID, envelope *env);
 extern int _getGroupIdx(int,int,int);
 static inline IrrGroup *_lookupGroupAndBufferIfNotThere(const CkCoreState *ck, const envelope *env,const CkGroupID &groupID);
-
+extern IrrGroup* _getCkLocalBranchFromGroupID(CkGroupID &gID);
 
 void QdCreate(int n);
 void QdProcess(int n);

@@ -291,7 +291,7 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
         if(hasSendRdma())
           str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_BCAST_SEND_MSG;\n";
         else if(hasrecvrdma)
-          str << "  CmiAbort(\"Zerocopy Recv API is not supported for broadcasts\");\n";
+          str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_BCAST_RECV_MSG;\n";
       }
       str << "#else\n";
       if (!hasArrays) str << "  char *impl_buf=impl_msg->msgBuf+impl_arrstart;\n";
@@ -447,7 +447,9 @@ void ParamList::beginRednWrapperUnmarshall(XStr& str, bool needsClosure) {
             str << "#if CMK_ONESIDED_IMPL\n";
             str << "  char *impl_buf_begin = impl_buf;\n";
             if(hasRecvRdma())
-              str << "  if(CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_MSG)\n";
+              //str << "  if(!CMI_IS_ZC_RECV(env))\n";
+              //str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG)\n";
+              str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
             str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
             str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
             callEach(&Parameter::beginUnmarshallRdma, str, true);
@@ -463,7 +465,9 @@ void ParamList::beginRednWrapperUnmarshall(XStr& str, bool needsClosure) {
             str << "#if CMK_ONESIDED_IMPL\n";
             str << "  char *impl_buf_begin = impl_buf;\n";
             if(hasRecvRdma())
-              str << "  if(CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_MSG)\n";
+              //str << "  if(!CMI_IS_ZC_RECV(env))\n";
+              //str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG)\n";
+              str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
             str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
             callEach(&Parameter::beginUnmarshallSDAGCallRdma, str, true);
             str << "#else\n";
@@ -489,7 +493,9 @@ void ParamList::beginRednWrapperUnmarshall(XStr& str, bool needsClosure) {
           str << "#if CMK_ONESIDED_IMPL\n";
           str << "  char *impl_buf_begin = impl_buf;\n";
           if(hasRecvRdma())
-            str << "  if(CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_MSG)\n";
+            //str << "  if(!CMI_IS_ZC_RECV(env))\n";
+            //str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG)\n";
+            str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
           str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
           str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
           callEach(&Parameter::beginUnmarshallRdma, str, true);
@@ -526,7 +532,9 @@ void ParamList::beginUnmarshall(XStr& str) {
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "  char *impl_buf_begin = impl_buf;\n";
       if(hasRecvRdma())
-        str << "  if(CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_MSG)\n";
+        //str << "  if(!CMI_IS_ZC_RECV(env))\n";
+        //str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG)\n";
+        str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
       str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
       str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields; \n";
       callEach(&Parameter::beginUnmarshallRdma, str, true);
@@ -561,8 +569,18 @@ void ParamList::storePostedRdmaPtrs(XStr& str, bool isSDAGGen) {
 void Parameter::storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen) {
   if(isRdma()) {
     if(genRdma) {
-      str << "  buffPtrs[ptrIndex++] = (void *)" << "ncpyBuffer_";
+      str << "  if(CMI_IS_ZC_RECV(env)) \n";
+      str << "    buffPtrs[ptrIndex++] = (void *)" << "ncpyBuffer_";
       str << name << "_ptr;\n";
+
+      str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) \n";
+      str << "    memcpy(" << "ncpyBuffer_" << name << "_ptr,";
+      if(isSDAGGen)
+        str << "genClosure->";
+      str << "ncpyBuffer_" << name << ".ptr,";
+      if(isSDAGGen)
+        str << "genClosure->";
+      str << "ncpyBuffer_" << name << ".cnt);\n";
     } else {
       Type* dt = type->deref();  // Type, without &
       // memcpy the pointer into the user passed buffer
@@ -661,7 +679,8 @@ void ParamList::beginUnmarshallSDAGCall(XStr& str, bool usesImplBuf) {
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "  char *impl_buf_begin = impl_buf;\n";
       if(hasRecvRdma())
-        str << "  if(CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_MSG)\n";
+        //str << "  if(!CMI_IS_ZC_RECV(env))\n";
+        str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
       str << "    CkUnpackRdmaPtrs(impl_buf_begin);\n";
       callEach(&Parameter::beginUnmarshallSDAGCallRdma, str, true);
       str << "#else\n";

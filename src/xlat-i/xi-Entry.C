@@ -2420,10 +2420,15 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
   else {  // Normal case: call regular method
     if(param->hasRecvRdma()) {
       str << "#if CMK_ONESIDED_IMPL\n";
-      str << "  if(CMI_ZC_MSGTYPE(env) == CMK_ZC_P2P_RECV_MSG) {\n";
+      str << "  if(CMI_IS_ZC_RECV(env) || CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
       str << "#endif\n";
-        genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
+      genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
       str << "#if CMK_ONESIDED_IMPL\n";
+      str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
+      //str << "#endif\n";
+      genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
+      //str << "#if CMK_ONESIDED_IMPL\n";
+      str << "    }\n";
       str << "  } else {\n";
       str << "#endif\n";
     }
@@ -2501,13 +2506,17 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
         // Allocate an array of rdma pointers
         if(isSDAGGen)
           str << "  void **buffPtrs = new void*[genClosure->num_rdma_fields];\n";
-        else
-          str << "  void **buffPtrs = new void*[impl_num_rdma_fields];\n";
+        else {
+          str << "  void **buffPtrs;\n";
+          str << "  if(CMI_IS_ZC_RECV(env)) \n";
+          str << "    buffPtrs = new void*[impl_num_rdma_fields];\n";
+        }
         str << "  int ptrIndex = 0;\n";
         str << "#endif\n";
         param->storePostedRdmaPtrs(str, isSDAGGen);
         str << "#if CMK_ONESIDED_IMPL\n";
-        str << "  CkRdmaIssueRgets(env, ncpyEmApiMode::P2P_RECV, NULL, ";
+        str << "  if(CMI_IS_ZC_RECV(env)) \n";
+        str << "    CkRdmaIssueRgets(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), NULL, ";
         if(isSDAGGen)
           str << " genClosure->num_rdma_fields, ";
         else
@@ -2524,7 +2533,10 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
         // finished with their EM execution using the same msg
         str << "#if CMK_ONESIDED_IMPL\n";
         if(param->hasRecvRdma())
-          str << "  if(CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_MSG)\n";
+          //str << "  if(!CMI_IS_ZC_RECV(env))\n";
+          //str << "  if(CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_MSG)\n";
+          //str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG)\n";
+          str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
         str << "    CkPackRdmaPtrs(impl_buf_begin);\n";
         str << "#endif\n";
       }

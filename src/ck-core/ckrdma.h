@@ -48,9 +48,10 @@ enum class CkNcpyMode : char { MEMCPY, CMA, RDMA };
 enum class CkNcpyStatus : char { incomplete, complete };
 
 // P2P_SEND mode is used for EM P2P Send API
-// BCAST mode is used for EM BCAST Send API
+// BCAST_SEND mode is used for EM BCAST Send API
 // P2P_RECV mode is used for EM P2P Recv API
-enum class ncpyEmApiMode : char { P2P_SEND, BCAST, P2P_RECV };
+// BCAST_RECV mode is used for EM BCAST Send API
+enum class ncpyEmApiMode : char { P2P_SEND, BCAST_SEND, P2P_RECV, BCAST_RECV };
 
 // Class to represent an Zerocopy buffer
 // CkSendBuffer(....) passed by the user internally translates to a CkNcpyBuffer
@@ -223,7 +224,7 @@ class CkNcpyBuffer{
   friend void constructDestinationBufferObject(NcpyOperationInfo *info, CkNcpyBuffer &dest);
 
   friend envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg);
-  friend envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, void **arrPtrs);
+  friend void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, void **arrPtrs);
   friend void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr);
   friend void readonlyCreateOnSource(CkNcpyBuffer &src);
 
@@ -233,6 +234,8 @@ class CkNcpyBuffer{
   friend void performEmApiRget(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, char *ref, int extraSize, ncpyEmApiMode emMode);
 
   friend void performEmApiCmaTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, int child_count, ncpyEmApiMode emMode);
+
+  friend void deregisterMemFromMsg(envelope *env);
 };
 
 struct CkNcpyBufferPost {};
@@ -298,7 +301,7 @@ struct NcpyEmBufferInfo{
  */
 envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg = NULL);
 
-envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, void **arrPtrs);
+void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, void **arrPtrs);
 
 void handleEntryMethodApiCompletion(NcpyOperationInfo *info);
 
@@ -317,6 +320,39 @@ void getRdmaNumopsAndBufsize(envelope *env, int &numops, int &bufsize);
 // Ack handler function for the nocopy EM API
 void CkRdmaEMAckHandler(int destPe, void *ack);
 
+void CkRdmaEMBcastPostAckHandler(void *msg);
+
+struct NcpyBcastRecvPeerAckInfo{
+#if CMK_SMP
+  std::atomic<int> numPeers;
+#else
+  int numPeers;
+#endif
+  void *bcastAckInfo;
+  void *msg;
+  int peerParentPe;
+#if CMK_SMP
+    int getNumPeers() const {
+       return numPeers.load(std::memory_order_acquire);
+    } 
+    void setNumPeers(int r) {
+       return numPeers.store(r, std::memory_order_release);
+    }
+    int incNumPeers() {
+        return numPeers.fetch_add(1, std::memory_order_release);
+    }
+    int decNumPeers() {
+         return numPeers.fetch_sub(1, std::memory_order_release);
+    }
+#else
+    int getNumPeers() const { return numPeers; }
+    void setNumPeers(int r) { numPeers = r; }
+    int incNumPeers() { return numPeers++; }
+    int decNumPeers() { return numPeers--; }
+#endif
+
+};
+
 
 
 /***************************** Zerocopy Bcast Entry Method API ****************************/
@@ -333,21 +369,26 @@ struct NcpyBcastRootAckInfo : public NcpyBcastAckInfo {
 };
 
 struct NcpyBcastInterimAckInfo : public NcpyBcastAckInfo {
-  NcpyEmInfo *ncpyEmInfo;
   void *msg;
+
+  // for RECV
+  bool isRecv;
+  bool isArray;
+  void *parentBcastAckInfo;
+  int origPe;
+
 };
 
 // Method called on the bcast source to store some information for ack handling
 void CkRdmaPrepareBcastMsg(envelope *env);
 
-// Method called on intermediate nodes after RGET to switch old source pointers with my pointers
-void CkReplaceSourcePtrsInBcastMsg(envelope *prevEnv, envelope *env, void *bcastAckInfo, int origPe);
+void CkReplaceSourcePtrsInBcastMsg(envelope *env, NcpyBcastInterimAckInfo *bcastAckInfo, int origPe);
 
 // Method called to extract the parent bcastAckInfo from the received message for ack handling
 const void *getParentBcastAckInfo(void *msg, int &srcPe);
 
-// Allocate a NcpyBcastInterimAckInfo and forward the message to my children
-void allocateObjAndReplacePointers(envelope *myMsg, envelope *myChildrenMsg, int pe, NcpyEmInfo *ncpyEmInfo);
+// Allocate a NcpyBcastInterimAckInfo and return the pointer
+NcpyBcastInterimAckInfo *allocateInterimNodeAckObj(envelope *myEnv, envelope *myChildEnv, int pe);
 
 void forwardMessageToChildNodes(envelope *myChildrenMsg, UChar msgType);
 
@@ -357,8 +398,23 @@ void handleBcastEntryMethodApiCompletion(NcpyOperationInfo *info);
 
 void handleBcastReverseEntryMethodApiCompletion(NcpyOperationInfo *info);
 
+void deregisterMemFromMsg(envelope *env);
+
+void handleMsgUsingCMAPostCompletionForSendBcast(envelope *copyenv, envelope *env, CkNcpyBuffer &source);
+
+void processBcastSendEmApiCompletion(NcpyEmInfo *ncpyEmInfo, int destPe);
+
+// Method called on intermediate nodes after RGET to switch old source pointers with my pointers
+void CkReplaceSourcePtrsInBcastMsg(envelope *prevEnv, envelope *env, void *bcastAckInfo, int origPe);
+
+void processBcastRecvEmApiCompletion(NcpyEmInfo *ncpyEmInfo, int destPe);
+
 // Method called on the root node and other intermediate parent nodes on completion of RGET through ZC Bcast
 void CkRdmaEMBcastAckHandler(void *ack);
+
+void handleMsgOnChildPostCompletionForRecvBcast(envelope *env);
+
+void handleMsgOnInterimPostCompletionForRecvBcast(envelope *env, NcpyBcastInterimAckInfo *bcastAckInfo, int pe);
 
 
 
@@ -402,6 +458,16 @@ void readonlyCreateOnSource(CkNcpyBuffer &src);
 void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr);
 
 void readonlyGetCompleted(NcpyOperationInfo *ncpyOpInfo);
+
+#if CMK_SMP
+void updatePeerCounterAndPush(envelope *env);
+#endif
+
+CkArray* getArrayMgrFromMsg(envelope *env);
+
+void sendAckMsgToParent(envelope *env);
+
+void sendRecvDoneMsgToPeers(envelope *env, CkArray *mgr);
 
 #endif /* End of CMK_ONESIDED_IMPL */
 

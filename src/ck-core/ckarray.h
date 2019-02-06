@@ -559,6 +559,8 @@ class CkArray : public CkReductionMgr {
     int *children;
     int numChildren;
 #endif
+
+  UShort recvBroadcastEpIdx;
 private:
   bool stableLocations;
 
@@ -570,6 +572,8 @@ public:
   CkGroupID &getGroupID(void) {return thisgroup;}
   CkGroupID &getmCastMgr(void) {return mCastMgrID;}
   bool isSectionAutoDelegated(void) {return sectionAutoDelegate;}
+
+  UShort &getRecvBroadcastEpIdx(void) {return recvBroadcastEpIdx;}
 
 //Access & information routines
   inline CkLocMgr *getLocMgr(void) {return locMgr;}
@@ -719,6 +723,9 @@ private:
   CkArrayBroadcaster *broadcaster; //Read-only copy of default broadcaster
 public:
   void flushStates();
+#if CMK_ONESIDED_IMPL
+  void forwardZCMsgToOtherElems(envelope *env);
+#endif
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	// the mlogft only support 1D arrays, then returning the number of elements in the first dimension

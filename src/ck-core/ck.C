@@ -618,8 +618,10 @@ static inline void _invokeEntryNoTrace(int epIdx,envelope *env,void *obj)
   void *msg = EnvToUsr(env);
   _SET_USED(env, 0);
 #if CMK_ONESIDED_IMPL
-  if(CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_P2P_RECV_MSG)
-    CkDeliverMessageReadonly(epIdx,msg,obj); // Do not free a P2P_RECV_MSG
+  if(CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_P2P_RECV_MSG ||
+     CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_BCAST_RECV_MSG ||
+     CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_BCAST_RECV_DONE_MSG)
+    CkDeliverMessageReadonly(epIdx,msg,obj); // Do not free a P2P_RECV_MSG or BCAST_RECV_MSG or a BCAST_RECV_DONE_MSG
   else
 #endif
     CkDeliverMessageFree(epIdx,msg,obj);
@@ -1089,7 +1091,19 @@ static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,Irr
     the_lbdb->ObjectStop(objHandle);
   }
 #endif
+
+#if CMK_ONESIDED_IMPL && CMK_SMP
+  unsigned short int msgType = CMI_ZC_MSGTYPE(env); // store msgType as msg could be freed
+#endif
+
   _invokeEntry(epIdx,env,obj);
+
+#if CMK_ONESIDED_IMPL && CMK_SMP
+  if(msgType == CMK_ZC_BCAST_RECV_DONE_MSG && CmiMyRank()!=0) {
+    updatePeerCounterAndPush(env);
+  }
+#endif
+
 #if CMK_LBDB_ON
   if (objstopped) the_lbdb->ObjectStart(objHandle);
 #endif
@@ -1106,6 +1120,14 @@ static inline void _processForBocMsg(CkCoreState *ck,envelope *env)
     ck->process(); // ck->process() updates mProcessed count used in QD
     _deliverForBocMsg(ck,env->getEpIdx(),env,obj);
   }
+}
+
+IrrGroup* _getCkLocalBranchFromGroupID(CkGroupID &gID) {
+  CkCoreState *ck = CkpvAccess(_coreState);
+  CmiImmediateLock(CkpvAccess(_groupTableImmLock));
+  IrrGroup *obj = ck->localBranch(gID);
+  CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
+  return obj;
 }
 
 static inline void _deliverForNodeBocMsg(CkCoreState *ck,int epIdx, envelope *env,void *obj)
@@ -1210,7 +1232,7 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
     envelope *prevEnv = env;
 
     // Determine mode depending on the message
-    ncpyEmApiMode mode = (CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_SEND_MSG) ? ncpyEmApiMode::BCAST : ncpyEmApiMode::P2P_SEND;
+    ncpyEmApiMode mode = (CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_SEND_MSG) ? ncpyEmApiMode::BCAST_SEND : ncpyEmApiMode::P2P_SEND;
 
     env = CkRdmaIssueRgets(env, mode, prevEnv);
 

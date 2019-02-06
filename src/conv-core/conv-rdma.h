@@ -16,7 +16,7 @@ void CmiSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short 
 void CmiSetDirectNcpyAckHandler(RdmaAckCallerFn fn);
 
 // Function to set the ack handler for the Entry Method API
-void CmiSetEMNcpyAckHandler(RdmaEMAckCallerFn fn, RdmaAckCallerFn bcastFn);
+void CmiSetEMNcpyAckHandler(RdmaEMAckCallerFn fn, RdmaAckCallerFn bcastFn, RdmaAckCallerFn bcastArrayFn);
 
 /* CmiIssueRget initiates an RDMA read operation, transferring 'size' bytes of data from the address space of 'srcPe' to local address, 'destAddr'.
  * When the runtime invokes srcAck on the source (target), it indicates safety to overwrite or free the srcAddr buffer.
@@ -65,6 +65,8 @@ void CmiInvokeRemoteAckHandler(int pe, void *ref);
 
 // Method used to send an ack to my parent after completion of an RGET in the receiver
 void CmiInvokeBcastAckHandler(int pe, void *ref);
+
+void CmiInvokeBcastPostAckHandler(int pe, void *ref);
 
 // Function declaration for onesided initialization
 void CmiOnesidedDirectInit(void);

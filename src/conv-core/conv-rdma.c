@@ -129,7 +129,10 @@ RdmaEMAckCallerFn ncpyEMAckHandlerFn; // P2P API ack handler function
 
 RdmaAckCallerFn ncpyEMBcastAckHandlerFn; // BCast API ack handler function
 
+RdmaAckCallerFn ncpyEMBcastPostAckHandlerFn; // BCast API ack handler function
+
 static int invoke_entry_method_ack_handler_idx, ncpy_bcast_ack_handler_idx;
+static int ncpy_bcast_post_handler_idx;
 
 // Ack Message is typically used in case of reverse operation (when a reverse put is used instead of a get)
 typedef struct _ackEntryMethodMsg{
@@ -148,6 +151,11 @@ static void ackEntryMethodHandler(ackEntryMethodMsg *msg) {
 static void bcastAckHandler(ackEntryMethodMsg *msg) {
   ncpyEMBcastAckHandlerFn(msg->ref);
 }
+
+static void bcastPostAckArrayHandler(ackEntryMethodMsg *msg) {
+  ncpyEMBcastPostAckHandlerFn(msg->ref);
+}
+
 // Method to create a ackEntryMethodMsg and send it
 void CmiInvokeRemoteAckHandler(int pe, void *ref) {
   ackEntryMethodMsg *msg = (ackEntryMethodMsg *)CmiAlloc(sizeof(ackEntryMethodMsg));
@@ -161,14 +169,19 @@ void CmiInvokeRemoteAckHandler(int pe, void *ref) {
 void CmiOnesidedDirectInit(void) {
   invoke_entry_method_ack_handler_idx = CmiRegisterHandler((CmiHandler)ackEntryMethodHandler);
   ncpy_bcast_ack_handler_idx = CmiRegisterHandler((CmiHandler)bcastAckHandler);
+
+  ncpy_bcast_post_handler_idx = CmiRegisterHandler((CmiHandler)bcastPostAckArrayHandler);
 }
 
-void CmiSetEMNcpyAckHandler(RdmaEMAckCallerFn fn, RdmaAckCallerFn bcastFn) {
+void CmiSetEMNcpyAckHandler(RdmaEMAckCallerFn fn, RdmaAckCallerFn bcastFn, RdmaAckCallerFn bcastArrayFn) {
   // set the EM Ack caller function
   ncpyEMAckHandlerFn = fn;
 
   // set the EM Bcast Ack caller function
   ncpyEMBcastAckHandlerFn = bcastFn;
+
+  // set the EM Bcast Post Ack caller function
+  ncpyEMBcastPostAckHandlerFn = bcastArrayFn;
 }
 
 void CmiInvokeBcastAckHandler(int pe, void *ref) {
@@ -177,6 +190,14 @@ void CmiInvokeBcastAckHandler(int pe, void *ref) {
   msg->ref = ref;
 
   CmiSetHandler(msg, ncpy_bcast_ack_handler_idx);
+  CmiSyncSendAndFree(pe, sizeof(ackEntryMethodMsg), msg);
+}
+
+void CmiInvokeBcastPostAckHandler(int pe, void *ref) {
+  ackEntryMethodMsg *msg = (ackEntryMethodMsg *)CmiAlloc(sizeof(ackEntryMethodMsg));
+  msg->ref = ref;
+
+  CmiSetHandler(msg, ncpy_bcast_post_handler_idx);
   CmiSyncSendAndFree(pe, sizeof(ackEntryMethodMsg), msg);
 }
 #endif
