@@ -378,6 +378,7 @@ element.
 .. code-block:: fortran
 
   SUBROUTINE FEM_Print(str)
+  CHARACTER*, INTENT(IN) ::  str
 
 Print the given string, with "[<chunk number>]" printed before the
 text.
