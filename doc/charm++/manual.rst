@@ -6909,11 +6909,11 @@ Serializing Complex Types
 -------------------------
 
 This section describes advanced functionality in the PUP framework. The
-first subsections describes features supporting complex objects, with
+first subsections describe features supporting complex objects, with
 multiple levels of inheritance, or with dynamic changes in heap usage.
 The latter subsections describe additional language bindings, and
 features supporting PUP modes which can be used to copy object state
-from and to long term storage for checkpointing, or other application
+from and to long-term storage for checkpointing, or other application
 level purposes.
 
 .. _sec:pupdynalloc:
@@ -6921,20 +6921,20 @@ level purposes.
 Dynamic Allocation
 ~~~~~~~~~~~~~~~~~~
 
-If your class has fields that are dynamically allocated, when unpacking
-these need to be allocated (in the usual way) before you pup them.
+If your class has fields that are dynamically allocated, when unpacking,
+these need to be allocated in the usual way before you pup them.
 Deallocation should be left to the class destructor as usual.
 
 No allocation
 ^^^^^^^^^^^^^
 
-The simplest case is when there is no dynamic allocation.
+The simplest case is when there is no dynamic allocation. Example:
 
-::
+.. code-block:: cpp
 
    class keepsFoo : public mySuperclass {
    private:
-       foo f; /* simple foo object*/
+       foo f; /* simple foo object */
    public:
        keepsFoo(void) { }
        void pup(PUP::er &p) {
@@ -6951,11 +6951,11 @@ The next simplest case is when we contain a class that is always
 allocated during our constructor, and deallocated during our destructor.
 Then no allocation is needed within the pup routine.
 
-::
+.. code-block:: cpp
 
    class keepsHeapFoo : public mySuperclass {
    private:
-       foo *f; /*Heap-allocated foo object*/
+       foo *f; /* Heap-allocated foo object */
    public:
        keepsHeapFoo(void) {
          f=new foo;
@@ -6964,7 +6964,7 @@ Then no allocation is needed within the pup routine.
          mySuperclass::pup(p);
          p|*f; // pup f's fields (calls f->pup(p))
        }
-       ~keepsHeapFoo() {delete f;}
+       ~keepsHeapFoo() { delete f; }
    };
 
 Allocation during pup
@@ -6972,24 +6972,24 @@ Allocation during pup
 
 If we need values obtained during the pup routine before we can allocate
 the class, we must allocate the class inside the pup routine. Be sure to
-protect the allocation with “if (p.isUnpacking())”.
+protect the allocation with ``if (p.isUnpacking())``.
 
-::
+.. code-block:: cpp
 
    class keepsOneFoo : public mySuperclass {
    private:
-       foo *f; /*Heap-allocated foo object*/
+       foo *f; /* Heap-allocated foo object */
    public:
-       keepsOneFoo(...) {f=new foo(...);}
-       keepsOneFoo() {f=NULL;} /* pup constructor */
+       keepsOneFoo(...) { f=new foo(...); }
+       keepsOneFoo() { f=NULL; } /* pup constructor */
        void pup(PUP::er &p) {
          mySuperclass::pup(p);
-         ...
+         // ...
          if (p.isUnpacking()) /* must allocate foo now */
             f=new foo(...);
-         p|*f;//pup f's fields
+         p|*f; // pup f's fields
        }
-       ~keepsOneFoo() {delete f;}
+       ~keepsOneFoo() { delete f; }
    };
 
 Allocatable array
@@ -7001,12 +7001,12 @@ pup the array length, do our allocation, and then pup the array data. We
 could allocate memory using malloc/free or other allocators in exactly
 the same way.
 
-::
+.. code-block:: cpp
 
    class keepsDoubles : public mySuperclass {
    private:
        int n;
-       double *arr;/*new'd array of n doubles*/
+       double *arr; /* new'd array of n doubles */
    public:
        keepsDoubles(int n_) {
          n=n_;
@@ -7016,32 +7016,32 @@ the same way.
 
        void pup(PUP::er &p) {
          mySuperclass::pup(p);
-         p|n;//pup the array length n
-         if (p.isUnpacking())  arr=new double[n];
-         PUParray(p,arr,n); //pup data in the array
+         p|n; // pup the array length n
+         if (p.isUnpacking()) arr=new double[n];
+         PUParray(p,arr,n); // pup data in the array
        }
 
-       ~keepsDoubles() {delete[] arr;}
+       ~keepsDoubles() { delete[] arr; }
    };
 
 NULL object pointer
 ^^^^^^^^^^^^^^^^^^^
 
-If our allocated object may be NULL, our allocation becomes much more
+If our allocated object may be ``NULL``, our allocation becomes much more
 complicated. We must first check and pup a flag to indicate whether the
 object exists, then depending on the flag, pup the object.
 
-::
+.. code-block:: cpp
 
    class keepsNullFoo : public mySuperclass {
    private:
        foo *f; /*Heap-allocated foo object, or NULL*/
    public:
-       keepsNullFoo(...) { if (...) f=new foo(...);}
-       keepsNullFoo() {f=NULL;}
+       keepsNullFoo(...) { if (...) f=new foo(...); }
+       keepsNullFoo() { f=NULL; }
        void pup(PUP::er &p) {
          mySuperclass::pup(p);
-         int has_f=(f!=NULL);
+         int has_f = (f!=NULL);
          p|has_f;
          if (has_f) {
            if (p.isUnpacking()) f=new foo;
@@ -7050,7 +7050,7 @@ object exists, then depending on the flag, pup the object.
            f=NULL;
          }
        }
-       ~keepsNullFoo() {delete f;}
+       ~keepsNullFoo() { delete f; }
    };
 
 This sort of code is normally much longer and more error-prone if split
@@ -7060,15 +7060,15 @@ Array of classes
 ^^^^^^^^^^^^^^^^
 
 An array of actual classes can be treated exactly the same way as an
-array of basic types. PUParray will pup each element of the array
+array of basic types. ``PUParray`` will pup each element of the array
 properly, calling the appropriate ``operator|``.
 
-::
+.. code-block:: cpp
 
    class keepsFoos : public mySuperclass {
    private:
        int n;
-       foo *arr;/*new'd array of n foos*/
+       foo *arr; /* new'd array of n foos */
    public:
        keepsFoos(int n_) {
          n=n_;
@@ -7078,55 +7078,55 @@ properly, calling the appropriate ``operator|``.
 
        void pup(PUP::er &p) {
          mySuperclass::pup(p);
-         p|n;//pup the array length n
+         p|n; // pup the array length n
          if (p.isUnpacking())  arr=new foo[n];
-         PUParray(p,arr,n); //pup each foo in the array
+         PUParray(p,arr,n); // pup each foo in the array
        }
 
-       ~keepsFoos() {delete[] arr;}
+       ~keepsFoos() { delete[] arr; }
    };
 
 Array of pointers to classes
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 An array of pointers to classes must handle each element separately,
-since the PUParray routine does not work with pointers. An “allocate”
+since the PUParray routine does not work with pointers. An "allocate"
 routine to set up the array could simplify this code. More ambitious is
-to construct a “smart pointer” class that includes a pup routine.
+to construct a "smart pointer" class that includes a pup routine.
 
-::
+.. code-block:: cpp
 
    class keepsFooPtrs : public mySuperclass {
    private:
        int n;
-       foo **arr;/*new'd array of n pointer-to-foos*/
+       foo **arr; /* new'd array of n pointer-to-foos */
    public:
        keepsFooPtrs(int n_) {
          n=n_;
          arr=new foo*[n]; // allocate array
-         for (int i=0;i<n;i++) arr[i]=new foo(...); // allocate i'th foo
+         for (int i=0; i<n; i++) arr[i]=new foo(...); // allocate i'th foo
        }
        keepsFooPtrs() { arr=NULL; }
 
        void pup(PUP::er &p) {
          mySuperclass::pup(p);
-         p|n;//pup the array length n
+         p|n; // pup the array length n
          if (p.isUnpacking()) arr=new foo*[n]; // allocate array
-         for (int i=0;i<n;i++) {
+         for (int i=0; i<n; i++) {
            if (p.isUnpacking()) arr[i]=new foo(...); // allocate i'th foo
-           p|*arr[i];  //pup the i'th foo
+           p|*arr[i];  // pup the i'th foo
          }
        }
 
        ~keepsFooPtrs() {
-          for (int i=0;i<n;i++) delete arr[i];
+          for (int i=0; i<n; i++) delete arr[i];
           delete[] arr;
         }
    };
 
 Note that this will not properly handle the case where some elements of
 the array are actually subclasses of foo, with virtual methods. The
-PUP::able framework described in the next section can be helpful in this
+``PUP::able`` framework described in the next section can be helpful in this
 case.
 
 .. _sec:pup::able:
@@ -7134,85 +7134,87 @@ case.
 Subclass allocation via PUP::able
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If the class foo above might have been a subclass, instead of simply
-using new foo above we would have had to allocate an object of the
+If the class *foo* above might have been a subclass, instead of simply
+using ``new foo`` above we would have had to allocate an object of the
 appropriate subclass. Since determining the proper subclass and calling
 the appropriate constructor yourself can be difficult, the PUP framework
 provides a scheme for automatically determining and dynamically
 allocating subobjects of the appropriate type.
 
-Your superclass must inherit from PUP::able, which provides the basic
+Your superclass must inherit from ``PUP::able``, which provides the basic
 machinery used to move the class. A concrete superclass and all its
 concrete subclasses require these four features:
 
--  A line declaring PUPable className; in the .ci file. This registers
-   the class’s constructor.
+-  A line declaring ``PUPable className;`` in the .ci file. This registers
+   the class' constructor.
 
--  A call to the macro PUPable_decl(className) in the class’s
+-  A call to the macro ``PUPable_decl(className)`` in the class'
    declaration, in the header file. This adds a virtual method to your
-   class to allow PUP::able to determine your class’s type.
+   class to allow PUP::able to determine your class' type.
 
--  A migration constructor—a constructor that takes CkMigrateMessage \*.
+-  A migration constructor — a constructor that takes ``CkMigrateMessage *``.
    This is used to create the new object on the receive side,
-   immediately before calling the new object’s pup routine.
+   immediately before calling the new object's pup routine.
 
--  A working, virtual pup method. You can omit this if your class has no
+-  A working, virtual ``pup`` method. You can omit this if your class has no
    data that needs to be packed.
 
-An abstract superclass—a superclass that will never actually be
-packed—only needs to inherit from PUP::able and include a
-PUPable_abstract(className) macro in their body. For these abstract
-classes, the .ci file, PUPable_decl macro, and constructor are not
+An abstract superclass — a superclass that will never actually be
+packed — only needs to inherit from ``PUP::able`` and include a
+``PUPable_abstract(className)`` macro in their body. For these abstract
+classes, the .ci file, ``PUPable_decl`` macro, and constructor are not
 needed.
 
-For example, if parent is a concrete superclass and child its subclass,
+For example, if *parent* is a concrete superclass and *child* its subclass:
 
-::
+.. code-block:: cpp
 
-   //In the .ci file:
-      PUPable parent;
-      PUPable child; //Could also have said ``PUPable parent, child;''
+   // --------- In the .ci file ---------
+   PUPable parent;
+   PUPable child; // Could also have said `PUPable parent, child;`
 
-   //In the .h file:
+   // --------- In the .h file ---------
    class parent : public PUP::able {
-       ... data members ...
+       // ... data members ...
    public:
-       ... other methods ...
+       // ... other methods ...
        parent() {...}
 
-       //PUP::able support: decl, migration constructor, and pup
+       // PUP::able support: decl, migration constructor, and pup
        PUPable_decl(parent);
        parent(CkMigrateMessage *m) : PUP::able(m) {}
        virtual void pup(PUP::er &p) {
-           PUP::able::pup(p);//Call base class
-           ... pup data members as usual ...
+           PUP::able::pup(p); // Call base class
+           // ... pup data members as usual ...
        }
    };
+
    class child : public parent {
-       ... more data members ...
-   public:    ... more methods, possibly virtual ...
+       // ... more data members ...
+   public:
+       // ... more methods, possibly virtual ...
        child() {...}
 
-       //PUP::able support: decl, migration constructor, and pup
+       // PUP::able support: decl, migration constructor, and pup
        PUPable_decl(child);
        child(CkMigrateMessage *m) : parent(m) {}
        virtual void pup(PUP::er &p) {
-           parent::pup(p);//Call base class
+           parent::pup(p); // Call base class
            // ... pup child's data members as usual ...
        }
    };
 
-With these declarations, then, we can automatically allocate and pup a
-pointer to a parent or child using the vertical bar PUP::er syntax,
+With these declarations, we can automatically allocate and pup a
+pointer to a parent or child using the vertical bar ``PUP::er`` syntax,
 which on the receive side will create a new object of the appropriate
 type:
 
-::
+.. code-block:: cpp
 
    class keepsParent {
-       parent *obj; //May actually point to a child class (or be NULL)
+       parent *obj; // May actually point to a child class (or be NULL)
    public:
-       ...
+       // ...
        ~keepsParent() {
            delete obj;
        }
@@ -7222,178 +7224,177 @@ type:
        }
    };
 
-This will properly pack, allocate, and unpack obj whether it is actually
+This will properly pack, allocate, and unpack ``obj`` whether it is actually
 a parent or child object. The child class can use all the usual
 C++ features, such as virtual functions and extra private data.
 
-If obj is NULL when packed, it will be restored to NULL when unpacked.
+If ``obj`` is ``NULL`` when packed, it will be restored to ``NULL`` when unpacked.
 For example, if the nodes of a binary tree are PUP::able, one may write
 a recursive pup routine for the tree quite easily:
 
-::
+.. code-block:: cpp
 
-   // In the .ci file:
-       PUPable treeNode;
+   // --------- In the .ci file ---------
+   PUPable treeNode;
 
-   // In the .h file
+   // --------- In the .h file ---------
    class treeNode : public PUP::able {
-       treeNode *left;//Left subtree
-       treeNode *right;//Right subtree
-       ... other fields ...
+       treeNode *left; // Left subtree
+       treeNode *right; // Right subtree
+       // ... other fields ...
    public:
        treeNode(treeNode *l=NULL, treeNode *r=NULL);
-       ~treeNode() {delete left; delete right;}
+       ~treeNode() { delete left; delete right; }
 
        // The usual PUP::able support:
        PUPable_decl(treeNode);
-       treeNode(CkMigrateMessage *m) : PUP::able(m) { left=right=NULL; }
+       treeNode(CkMigrateMessage *m) : PUP::able(m) { left = right = NULL; }
        void pup(PUP::er &p) {
-           PUP::able::pup(p);//Call base class
+           PUP::able::pup(p); // Call base class
            p|left;
            p|right;
-           ... pup other fields as usual ...
+           // ... pup other fields as usual ...
        }
    };
 
-This same implementation will also work properly even if the tree’s
-internal nodes are actually subclasses of treeNode.
+This same implementation will also work properly even if the tree's
+internal nodes are actually subclasses of ``treeNode``.
 
-You may prefer to use the macros PUPable_def(className) and
-PUPable_reg(className) rather than using PUPable in the .ci file.
-PUPable_def provides routine definitions used by the PUP::able
+You may prefer to use the macros ``PUPable_def(className)`` and
+``PUPable_reg(className)`` rather than using ``PUPable`` in the .ci file.
+``PUPable_def`` provides routine definitions used by the PUP::able
 machinery, and should be included in exactly one source file at file
-scope. PUPable_reg registers this class with the runtime system, and
+scope. ``PUPable_reg`` registers this class with the runtime system, and
 should be executed exactly once per node during program startup.
 
-Finally, a PUP::able superclass like parent above must normally be
+Finally, a ``PUP::able`` superclass like *parent* above must normally be
 passed around via a pointer or reference, because the object might
-actually be some subclass like child. Because pointers and references
+actually be some subclass like *child*. Because pointers and references
 cannot be passed across processors, for parameter marshalling you must
-use the special templated smart pointer classes CkPointer and
-CkReference, which only need to be listed in the .ci file.
+use the special templated smart pointer classes ``CkPointer`` and
+``CkReference``, which only need to be listed in the .ci file.
 
-A CkReference is a read-only reference to a PUP::able object—it is only
-valid for the duration of the method call. A CkPointer transfers
-ownership of the unmarshalled PUP::able to the method, so the pointer
+A ``CkReference`` is a read-only reference to a ``PUP::able`` object — it is only
+valid for the duration of the method call. A ``CkPointer`` transfers
+ownership of the unmarshalled ``PUP::able`` to the method, so the pointer
 can be kept and the object used indefinitely.
 
-For example, if the entry method bar needs a PUP::able parent object for
-in-call processing, you would use a CkReference like this:
+For example, if the entry method bar needs a ``PUP::able`` parent object for
+in-call processing, you would use a ``CkReference`` like this:
 
-::
+.. code-block:: cpp
 
-   // In the .ci file:
-       entry void barRef(int x,CkReference<parent> p);
+   // --------- In the .ci file ---------
+   entry void barRef(int x, CkReference<parent> p);
 
-   // In the .h file:
-       void barRef(int x,parent &p) {
-         // can use p here, but only during this method invocation
-       }
+   // --------- In the .h file ---------
+   void barRef(int x, parent &p) {
+     // can use p here, but only during this method invocation
+   }
 
-If the entry method needs to keep its parameter, use a CkPointer like
+If the entry method needs to keep its parameter, use a ``CkPointer`` like
 this:
 
-::
+.. code-block:: cpp
 
-   // In the .ci file:
-       entry void barPtr(int x,CkPointer<parent> p);
+   // --------- In the .ci file ---------
+   entry void barPtr(int x, CkPointer<parent> p);
 
-   // In the .h file:
-       void barPtr(int x,parent *p) {
-         // can keep this pointer indefinitely, but must eventually delete it
-       }
+   // --------- In the .h file ---------
+   void barPtr(int x, parent *p) {
+     // can keep this pointer indefinitely, but must eventually delete it
+   }
 
-Both CkReference and CkPointer are read-only from the send side—unlike
+Both ``CkReference`` and ``CkPointer`` are read-only from the send side — unlike
 messages, which are consumed when sent, the same object can be passed to
 several parameter marshalled entry methods. In the example above, we
 could do:
 
-::
+.. code-block:: cpp
 
-      parent *p=new child;
-      someProxy.barRef(x,*p);
-      someProxy.barPtr(x,p); // Makes a copy of p
+      parent *p = new child;
+      someProxy.barRef(x, *p);
+      someProxy.barPtr(x, p); // Makes a copy of p
       delete p; // We allocated p, so we destroy it.
 
 C and Fortran bindings
 ~~~~~~~~~~~~~~~~~~~~~~
 
-C and Fortran programmers can use a limited subset of the PUP::er
-capability. The routines all take a handle named pup_er. The routines
+C and Fortran programmers can use a limited subset of the ``PUP::er``
+capability. The routines all take a handle named ``pup_er``. The routines
 have the prototype:
 
-::
+.. code-block:: c
 
-   void pup_type(pup_er p,type *val);
-   void pup_types(pup_er p,type *vals,int nVals);
+   void pup_type(pup_er p, type *val);
+   void pup_types(pup_er p, type *vals, int nVals);
 
 The first call is for use with a single element; the second call is for
-use with an array. The supported types are char, short, int, long,
-uchar, ushort, uint, ulong, float, and double, which all have the usual
+use with an array. The supported types are ``char``, ``short``, ``int``, ``long``,
+``uchar``, ``ushort``, ``uint``, ``ulong``, ``float``, and ``double``, which all have the usual
 C meanings.
 
 A byte-packing routine
 
-::
+.. code-block:: c
 
-   void pup_bytes(pup_er p,void *data,int nBytes);
+   void pup_bytes(pup_er p, void *data, int nBytes);
 
 is also provided, but its use is discouraged for cross-platform puping.
 
-pup_isSizing, pup_isPacking, pup_isUnpacking, and pup_isDeleting calls
+``pup_isSizing``, ``pup_isPacking``, ``pup_isUnpacking``, and ``pup_isDeleting`` calls
 are also available. Since C and Fortran have no destructors, you should
-actually deallocate all data when passed a deleting pup_er.
+actually deallocate all data when passed a deleting ``pup_er``.
 
-C and Fortran users cannot use PUP::able objects, seeking, or write
-custom PUP::ers. Using the C++ interface is recommended.
+C and Fortran users cannot use ``PUP::able`` objects, seeking, or write
+custom ``PUP::ers``. Using the C++ interface is recommended.
 
 .. _sec:PUP:CommonPUPers:
 
 Common PUP::ers
 ~~~~~~~~~~~~~~~
 
-The most common PUP::ers used are PUP::sizer, PUP::toMem, and
-PUP::fromMem. These are sizing, packing, and unpacking PUP::ers,
+The most common *PUP::ers* used are ``PUP::sizer``, ``PUP::toMem``, and
+``PUP::fromMem``. These are sizing, packing, and unpacking PUP::ers,
 respectively.
 
-PUP::sizer simply sums up the sizes of the native binary representation
-of the objects it is passed. PUP::toMem copies the binary representation
+``PUP::sizer`` simply sums up the sizes of the native binary representation
+of the objects it is passed. ``PUP::toMem`` copies the binary representation
 of the objects passed into a preallocated contiguous memory buffer.
-PUP::fromMem copies binary data from a contiguous memory buffer into the
+``PUP::fromMem`` copies binary data from a contiguous memory buffer into the
 objects passed. All three support the size method, which returns the
 number of bytes used by the objects seen so far.
 
-Other common PUP::ers are PUP::toDisk, PUP::fromDisk, and PUP::xlater.
-The first two are simple filesystem variants of the PUP::toMem and
-PUP::fromMem classes; PUP::xlater translates binary data from an
-unpacking PUP::er into the machine’s native binary format, based on a
-machineInfo structure that describes the format used by the source
+Other common PUP::ers are ``PUP::toDisk``, ``PUP::fromDisk``, and ``PUP::xlater``.
+The first two are simple filesystem variants of the ``PUP::toMem`` and
+``PUP::fromMem`` classes; ``PUP::xlater`` translates binary data from an
+unpacking PUP::er into the machine's native binary format, based on a
+``machineInfo`` structure that describes the format used by the source
 machine.
 
-An example of PUP::toDisk is available in
-``examples/charm++/PUP/pupDisk``
+An example of ``PUP::toDisk`` is available in ``examples/charm++/PUP/pupDisk``.
 
 PUP::seekBlock
 ~~~~~~~~~~~~~~
 
 It may rarely occur that you require items to be unpacked in a different
 order than they are packed. That is, you want a seek capability.
-PUP::ers support a limited form of seeking.
+*PUP::ers* support a limited form of seeking.
 
-To begin a seek block, create a PUP::seekBlock object with your current
-PUP::er and the number of “sections” to create. Seek to a (0-based)
-section number with the seek method, and end the seeking with the
-endBlock method. For example, if we have two objects A and B, where A’s
+To begin a seek block, create a ``PUP::seekBlock`` object with your current
+``PUP::er`` and the number of "sections" to create. Seek to a (0-based)
+section number with the ``seek`` method, and end the seeking with the
+``endBlock`` method. For example, if we have two objects A and B, where A's
 pup depends on and affects some object B, we can pup the two with:
 
-::
+.. code-block:: cpp
 
    void pupAB(PUP::er &p)
    {
-     ... other fields ...
-     PUP::seekBlock s(p,2); //2 seek sections
+     // ... other fields ...
+     PUP::seekBlock s(p,2); // 2 seek sections
      if (p.isUnpacking())
-     {//In this case, pup B first
+     { // In this case, pup B first
        s.seek(1);
        B.pup(p);
      }
@@ -7401,35 +7402,35 @@ pup depends on and affects some object B, we can pup the two with:
      A.pup(p,B);
 
      if (!p.isUnpacking())
-     {//In this case, pup B last
+     { // In this case, pup B last
        s.seek(1);
        B.pup(p);
      }
-     s.endBlock(); //End of seeking block
-     ... other fields ...
+     s.endBlock(); // End of seeking block
+     // ... other fields ...
    };
 
 Note that without the seek block, A’s fields would be unpacked over B’s
-memory, with disastrous consequences. The packing or sizing path must
+memory, with *disastrous* consequences. The packing or sizing path must
 traverse the seek sections in numerical order; the unpack path may
-traverse them in any order. There is currently a small fixed limit of 3
+traverse them in any order. There is currently a small fixed limit of **3**
 on the maximum number of seek sections.
 
 Writing a PUP::er
 ~~~~~~~~~~~~~~~~~
 
 System-level programmers may occasionally find it useful to define their
-own PUP::er objects. The system PUP::er class is an abstract base class
+own ``PUP::er`` objects. The system ``PUP::er`` class is an abstract base class
 that funnels all incoming pup requests to a single subroutine:
 
-::
+.. code-block:: cpp
 
-       virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+       virtual void bytes(void *p, int n, size_t itemSize, dataType t);
 
 The parameters are, in order, the field address, the number of items,
 the size of each item, and the type of the items. The PUP::er is allowed
-to use these fields in any way. However, an isSizing or isPacking
-PUP::er may not modify the referenced user data; while an isUnpacking
+to use these fields in any way. However, an ``isSizing`` or ``isPacking``
+PUP::er may not modify the referenced user data; while an ``isUnpacking``
 PUP::er may not read the original values of the user data. If your
 PUP::er is not clearly packing (saving values to some format) or
 unpacking (restoring values), declare it as sizing PUP::er.
@@ -7445,16 +7446,12 @@ mapping and scheduling, which takes the form of an OS thread in SMP mode
 and an OS process in non-SMP mode. A node (specifically, a logical node)
 refers to an OS process: a set of one or more PEs that share memory
 (i.e. an address space). PEs and nodes are ranked separately starting
-from zero: PEs are ranked from 0 to *CmiNumPes()*, and nodes are ranked
-from 0 to *CmiNumNodes()*.
+from zero: PEs are ranked from ``0`` to ``CmiNumPes()``, and nodes are ranked
+from ``0`` to ``CmiNumNodes()``.
 
-Charm++ provides a unified abstraction for querying topology of IBM’s
-BG/L, BG/P and BG/Q, and Cray’s XT4, XT5 and XE6. Class TopoManager,
-which can be used by including TopoManager.h, contains following member
-functions:
-
-TopoManager():
-   Default constructor.
+Charm++ provides a unified abstraction for querying topology information of
+IBM's BG/Q and Cray's XE6. The ``TopoManager`` singleton object, which can be
+used by including ``TopoManager.h``, contains the following methods:
 
 getDimNX(), getDimNY(), getDimNZ():
    Returns the length of X, Y and Z dimensions (except BG/Q).
@@ -7463,7 +7460,7 @@ getDimNA(), getDimNB(), getDimNC(), getDimND(), getDimNE():
    Returns the length of A, B, C, D and E dimensions on BG/Q.
 
 getDimNT():
-   Returns the length of T dimension. TopoManager uses T dimension to
+   Returns the length of T dimension. TopoManager uses the T dimension to
    represent different cores that reside within a physical node.
 
 rankToCoordinates(int pe, int &x, int &y, int &z, int &t):
@@ -7485,17 +7482,17 @@ getHopsBetweenRanks(int pe1, int pe2):
 printAllocation(FILE \*fp):
    Outputs the allocation for a particular execution to the given file.
 
-For example, one can obtain rank of a processor, whose coordinates are
-known, on BG/P as well as on Cray XE6 using the following code:
+For example, one can obtain the rank of a processor, whose coordinates are
+known, on Cray XE6 using the following code:
 
-::
+.. code-block:: cpp
 
-   TopoManager tmgr;
-   int rank,x,y,z,t;
+   TopoManager *tmgr = TopoManager::getTopoManager();
+   int rank, x, y, z, t;
    x = y = z = t = 2;
-   rank = tmgr.coordinatesToRank(x,y,z,t);
+   rank = tmgr->coordinatesToRank(x, y, z, t);
 
-For more examples, please refer to examples/charm++/topology.
+For more examples, please refer to ``examples/charm++/topology``.
 
 .. _physical:
 
@@ -7506,10 +7503,10 @@ The following calls provide information about the division and mapping
 of physical hardware in Charm++. A processing element (PE) is a unit of
 mapping and scheduling, which takes the form of an OS thread in SMP mode
 and an OS process in non-SMP mode. A logical node (often shortened to
-“node”) refers to an OS process: a set of one or more PEs that share
+*node*) refers to an OS process: a set of one or more PEs that share
 memory (i.e. an address space). A physical node refers to an individual
 hardware machine (or, more precisely, an operating system instance on
-which Charm++ processes execute, or, in networking terminology, a host).
+which Charm++ processes execute, or, in networking terminology, a *host*).
 
 Communication between PEs on the same logical node is faster than
 communication between different logical nodes because OS threads share
@@ -7520,32 +7517,32 @@ OS features such as POSIX shared memory and Cross Memory Attach, the
 abilities of the network interconnect in use, and the speed of network
 loopback.
 
-PEs are ranked in the range 0 to *CmiNumPes()*. Likewise, logical nodes
-are ranked from 0 to *CmiNumNodes()*, and physical nodes are ranked from
-0 to *CmiNumPhysicalNodes()*.
+PEs are ranked in the range ``0`` to ``CmiNumPes()``. Likewise, logical nodes
+are ranked from ``0`` to ``CmiNumNodes()``, and physical nodes are ranked from
+``0`` to ``CmiNumPhysicalNodes()``.
 
 Charm++ provides a set of functions for querying information about the
-mapping of PE’s to physical nodes. Class cputopology.C, contains the
-following member functions:
+mapping of PE's to physical nodes. The ``cputopology.C`` module, contains the
+following globally accessible functions:
 
 int CmiPeOnSamePhysicalNode(int pe1, int pe2)
-   Returns 1 if PE’s pe1 and pe2 are on the same physical node and 0
+   Returns 1 if PEs ``pe1`` and ``pe2`` are on the same physical node and 0
    otherwise.
 
 int CmiNumPhysicalNodes()
    Returns the number of physical nodes that the program is running on.
 
 int CmiNumPesOnPhysicalNode(int node)
-   Returns the number of PE’s that reside within a physical node.
+   Returns the number of PEs that reside within a physical node.
 
 void CmiGetPesOnPhysicalNode(int node, int \**pelist, int \*num)
-   After execution pelist will point to a list of all PE’s that reside
-   within a physical node and num will point to the length of the list.
-   One should be careful to not free or alter pelist since it points to
-   system memory.
+   After execution ``pelist`` will point to a list of all PEs that reside
+   within a physical ``node`` and ``num`` will point to the length of the list.
+   One should be careful to not free or alter ``pelist`` since it points to
+   reserved memory.
 
 int CmiPhysicalRank(int pe)
-   Returns the rank of a PE among all PE’s running on the same physical
+   Returns the rank of a PE among all PEs running on the same physical
    node.
 
 int CmiPhysicalNodeID(int pe)
@@ -7559,7 +7556,7 @@ int CmiGetFirstPeOnPhysicalNode(int node)
 Checkpoint/Restart-Based Fault Tolerance
 ----------------------------------------
 
-Charm++ offers a couple of checkpoint/restart mechanisms. Each of these
+Charm++ offers two checkpoint/restart mechanisms. Each of these
 targets a specific need in parallel programming. However, both of them
 are based on the same infrastructure.
 
@@ -7587,7 +7584,7 @@ Split Execution
 
 There are several reasons for having to split the execution of an
 application. These include protection against job failure, a single
-execution needing to run beyond a machine’s job time limit, and resuming
+execution needing to run beyond a machine's job time limit, and resuming
 execution from an intermediate point with different parameters. All of
 these scenarios are supported by a mechanism to record execution state,
 and resume execution from it later.
@@ -7606,7 +7603,7 @@ allocation time expires and then restart from the checkpoint in a
 subsequent allocation.
 
 A third reason for having a split execution is when an application
-consists in *phases* and each phase may be run a different number of
+consists of *phases* and each phase may be run a different number of
 times with varying parameters. Consider, for instance, an application
 with two phases where the first phase only has a possible configuration
 (it is run only once). The second phase may have several configuration
@@ -7614,7 +7611,7 @@ with two phases where the first phase only has a possible configuration
 complete, the application checkpoints the result. Further executions of
 the second phase may just resume from that checkpoint.
 
-An example of Charm++’s support for split execution can be seen in
+An example of Charm++'s support for split execution can be seen in
 ``tests/charm++/chkpt/hello``.
 
 .. _sec:diskcheckpoint:
@@ -7624,19 +7621,19 @@ Checkpointing
 
 The API to checkpoint the application is:
 
-::
+.. code-block:: cpp
 
-     void CkStartCheckpoint(char* dirname,const CkCallback& cb);
+     void CkStartCheckpoint(char* dirname, const CkCallback& cb);
 
-The string *dirname* is the destination directory where the checkpoint
-files will be stored, and *cb* is the callback function which will be
+The string ``dirname`` is the destination directory where the checkpoint
+files will be stored, and ``cb`` is the callback function which will be
 invoked after the checkpoint is done, as well as when the restart is
 complete. Here is an example of a typical use:
 
-::
+.. code-block:: cpp
 
-     . . .  CkCallback cb(CkIndex_Hello::SayHi(),helloProxy);
-     CkStartCheckpoint("log",cb);
+     /* ... */ CkCallback cb(CkIndex_Hello::SayHi(), helloProxy);
+     CkStartCheckpoint("log", cb);
 
 A chare array usually has a PUP routine for the sake of migration. The
 PUP routine is also used in the checkpointing and restarting process.
@@ -7761,24 +7758,24 @@ Checkpointing
 The function that application developers can call to record a checkpoint
 in a chare-array-based application is:
 
-::
+.. code-block:: cpp
 
          void CkStartMemCheckpoint(CkCallback &cb)
 
-where *cb* has the same meaning as in
+where ``cb`` has the same meaning as in
 section :numref:`sec:diskcheckpoint`. Just like the above disk
 checkpoint described, it is up to the programmer to decide what to save.
 The programmer is responsible for choosing when to activate
 checkpointing so that the size of a global checkpoint state, and
 consequently the time to record it, is minimized.
 
-In AMPI applications, the user just needs to create an MPI_Info object
-with the key “ampi_checkpoint” and a value of either “in_memory” (for a
-double in-memory checkpoint) or “to_file=file_name” (to checkpoint to
-disk), and pass that object to the function AMPI_Migrate() as in the
+In AMPI applications, the user just needs to create an ``MPI_Info`` object
+with the key ``"ampi_checkpoint"`` and a value of either ``"in_memory"`` (for a
+double in-memory checkpoint) or ``"to_file=file_name"`` (to checkpoint to
+disk), and pass that object to the function ``AMPI_Migrate()`` as in the
 following:
 
-::
+.. code-block:: cpp
 
    // Setup
    MPI_Info in_memory, to_file;
@@ -7815,7 +7812,7 @@ However, if there are a pool of extra processors to replace the crashed
 ones, the fault-tolerance protocol can also take advantage of this to
 grab one free processor and let the program run on the same number of
 processors as before the crash. In order to achieve this, Charm++ needs
-to be compiled with the macro option *CK_NO_PROC_POOL* turned on.
+to be compiled with the macro option ``CK_NO_PROC_POOL`` turned on.
 
 Double in-disk checkpoint/restart
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -7824,9 +7821,9 @@ A variant of double memory checkpoint/restart, *double in-disk
 checkpoint/restart*, can be applied to applications with large memory
 footprint. In this scheme, instead of storing checkpoints in the memory,
 it stores them in the local disk. The checkpoint files are named
-“ckpt[CkMyPe]-[idx]-XXXXX” and are stored under the /tmp directory.
+``ckpt[CkMyPe]-[idx]-XXXXX`` and are stored under the ``/tmp`` directory.
 
-Users can pass the runtime option *+ftc_disk* to activate this mode. For
+Users can pass the runtime option ``+ftc_disk`` to activate this mode. For
 example:
 
 ::
@@ -7837,7 +7834,7 @@ Building Instructions
 ^^^^^^^^^^^^^^^^^^^^^
 
 In order to have the double local-storage checkpoint/restart
-functionality available, the parameter *syncft* must be provided at
+functionality available, the parameter ``syncft`` must be provided at
 build time:
 
 ::
@@ -7862,7 +7859,7 @@ point in time. You must create a text file with two columns. The first
 colum will store the PEs that will fail. The second column will store
 the time at which the corresponding PE will fail. Make sure all the
 failures occur after the first checkpoint. The runtime parameter
-*kill_file* has to be added to the command line along with the file
+``kill_file`` has to be added to the command line along with the file
 name:
 
 ::
@@ -7884,7 +7881,7 @@ place in the code. When it is called by a processor, the processor will
 hang and stop responding to any communication. A spare processor will
 replace the crashed processor and continue execution after getting the
 checkpoint of the crashed processor. To make it work, you need to add
-the command line option *+wp*, the number following that option is the
+the command line option ``+wp``, the number following that option is the
 working processors and the remaining are the spare processors in the
 system.
 
@@ -7919,7 +7916,7 @@ critical computation may also reduce the communication cost, thus
 leading to more performance improvement), dedicating physical cores on
 every node to the shared-memory multithreading runtime will waste
 computational power because those dedicated cores are not utilized at
-all during most of the application’s execution time. This case indicates
+all during most of the application's execution time. This case indicates
 the necessity of a unified runtime supporting both types of parallelism.
 
 CkLoop library
@@ -7932,26 +7929,26 @@ tasks spawned by the multithreading runtime. This library targets the
 SMP mode of Charm++.
 
 The *CkLoop* library is built in
-$CHARM_DIR/$MACH_LAYER/tmp/libs/ck-libs/ckloop by executing “make”. To
-use it for user applications, one has to include “CkLoopAPI.h” in the
+``$CHARM_DIR/$MACH_LAYER/tmp/libs/ck-libs/ckloop`` by executing ``make``. To
+use it for user applications, one has to include ``CkLoopAPI.h`` in the
 source code. The interface functions of this library are as follows:
 
 -  CProxy_FuncCkLoop **CkLoop_Init**\ (int numThreads=0): This function
    initializes the CkLoop library, and it only needs to be called once
    on a single PE during the initialization phase of the application.
-   The argument “numThreads” is only used in non-SMP mode, specifying
+   The argument ``numThreads`` is only used in non-SMP mode, specifying
    the number of threads to be created for the single-node shared-memory
    parallelism. It will be ignored in SMP mode.
 
 -  void **CkLoop_SetSchedPolicy**\ (CkLoop_sched
    schedPolicy=CKLOOP_NODE_QUEUE) : This function sets the scheduling
-   policy of CkLoop work, three options available: CKLOOP_NODE_QUEUE,
-   CKLOOP_TREE and CKLOOP_LIST. The default policy, CKLOOP_NODE_QUEUE on
+   policy of CkLoop work, three options available: ``CKLOOP_NODE_QUEUE``,
+   ``CKLOOP_TREE`` and ``CKLOOP_LIST``. The default policy, ``CKLOOP_NODE_QUEUE`` on
    supported environments is to use node_queue message so that master or
    another idle PE delievers the CkLoop work to all other PEs.
-   CKLOOP_TREE policy is set by default for builds not supporting a node
+   ``CKLOOP_TREE`` policy is set by default for builds not supporting a node
    queue. This policy delivers CkLoop messages on the implicit tree.
-   CKLOOP_LIST uses list to deliver the messages.
+   ``CKLOOP_LIST`` uses list to deliver the messages.
 
 -  void **CkLoop_Exit**\ (CProxy_FuncCkLoop ckLoop): This function is
    intended to be used in non-SMP mode, as it frees the resources (e.g.
@@ -7979,16 +7976,16 @@ source code. The interface functions of this library are as follows:
    | int cparamNum=0, void \*cparam=NULL /\* the input parameters to the
      above function \*/
    | )
-   | The “HelperFn” is defined as “typedef void (\*HelperFn)(int
-     first,int last, void \*result, int paramNum, void \*param);” and
-     the “result” is the buffer for reduction result on a single
-     simple-type variable. The “CallerFn” is defined as “typedef void
-     (\*CallerFn)(int paramNum, void \*param);”
+   | The "HelperFn" is defined as "typedef void (\*HelperFn)(int
+     first,int last, void \*result, int paramNum, void \*param);" and
+     the "result" is the buffer for reduction result on a single
+     simple-type variable. The "CallerFn" is defined as "typedef void
+     (\*CallerFn)(int paramNum, void \*param);"
 
 Lambda syntax for *CkLoop* is also supported. The interface for using
 lambda syntax is as follows:
 
--  ::
+.. code-block:: cpp
 
       void CkLoop_Parallelize(
       int numChunks, int lowerRange, int upperRange,
@@ -8015,17 +8012,17 @@ Charm++ where all chares are placed on core 0 of each node (called the
 drone-mode, or all-drones-mode). It incorporates a strategy called
 staggered static-dynamic scheduling (from dissertation work of Vivek
 Kale). The iteration space is first tentatively divided approximately
-equally to all available PEs. Each PE’s share of the iteration space is
+equally to all available PEs. Each PE's share of the iteration space is
 divided into a static portion, specified by the staticFraction parameter
 below, and the remaining dynamic portion. The dynamic portion of a PE is
 divided into chunks of specified chunksize, and enqueued in the
 task-queue associated with that PE. Each PE works on its static portion,
 and then on its own task queue (thus preserving spatial locality, as
 well as persistence of allocations across outer iterations), and after
-finishing that, steals work from other PE’s task queues.
+finishing that, steals work from other PE's task queues.
 
 CkLoopHybrid support requires the SMP mode of Charm++ and the additional
-flags -enable-drone-mode and -enable-task-queue to be passed as build
+flags ``-enable-drone-mode`` and ``-enable-task-queue`` to be passed as build
 options when Charm++ is built.
 
 The changes to the CkLoop API call are the following:
@@ -8040,7 +8037,7 @@ The changes to the CkLoop API call are the following:
    additional variable that provides the fraction of iterations that are
    statically scheduled:
 
-   ::
+   .. code-block:: cpp
 
       void CkLoop_ParallelizeHybrid(
       float staticFraction,
@@ -8057,8 +8054,8 @@ The changes to the CkLoop API call are the following:
       int cparamNum=0, void *cparam=NULL /* the input parameters to the above function */
       )
 
-Reduction is supported for type CKLOOP_INT_SUM, CKLOOP_FLOAT_SUM,
-CKLOOP_DOUBLE_SUM. It is recommended to use this mode without reduction.
+Reduction is supported for type ``CKLOOP_INT_SUM``, ``CKLOOP_FLOAT_SUM``,
+``CKLOOP_DOUBLE_SUM``. It is recommended to use this mode without reduction.
 
 Charm++/Converse Runtime Scheduler Integrated OpenMP
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -8079,17 +8076,17 @@ Instructions to build and use the integrated OpenMP library
 Instructions to build
 '''''''''''''''''''''
 
-| The OpenMP library can be built with ‘omp’ keyword and any smp version
-  of Charm++ including multicore build when you build Charm++ or AMPI.
+The OpenMP library can be built with ``omp`` keyword on any smp version
+of Charm++ including multicore build when you build Charm++ or AMPI,
+for example:
 
-.. code-block:: none
+.. code-block:: bash
 
-   e.g.) $CHARM_DIR/build charm++ multicore-linux64 omp
-         $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp
+   $CHARM_DIR/build charm++ multicore-linux64 omp
+   $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp
 
 This library is based on the LLVM OpenMP runtime library. So it supports
 the ABI used by clang, intel and gcc compilers.
-
 The following is the list of compilers which are verified to support
 this integrated library on Linux.
 
@@ -8099,9 +8096,9 @@ this integrated library on Linux.
 
 -  Clang: 3.7 or newer
 
-You can use this integrated OpenMP with clang on IBM Bluegene machines
-without special compilation flags. (Don’t need to add -fopenmp or
--openmp on Bluegene clang)
+You can use this integrated OpenMP with *clang* on IBM Blue Gene machines
+without special compilation flags (don't need to add -fopenmp or
+-openmp on Blue Gene clang).
 
 On Linux, the OpenMP supported version of clang has been installed in
 default recently. For example, Ubuntu has been released with clang
@@ -8113,29 +8110,29 @@ than 3.7. If you want to use clang on other Linux distributions, you can
 use package managers on those Linux distributions to install clang and
 OpenMP library. This installation of clang will add headers for OpenMP
 environmental routines and allow you to parse the OpenMP directives.
-However, on Ubuntu, the installation of clang doesn’t come with its
+However, on Ubuntu, the installation of clang doesn't come with its
 OpenMP runtime library so it results in an error message saying that it
 fails to link the compiler provided OpenMP library. This library is not
 needed to use the integrated OpenMP runtime but you need to avoid this
-error to succeed compiling your codes. The following is the instruction
-to avoid the error.
+error to succeed compiling your codes. The following are the instructions
+to avoid the error:
 
-.. code-block:: none
+.. code-block:: bash
 
-   /* When you want to compile Integrated OpenMP on Ubuntu where the pre-installed clang
-   is older than 3.7, you can use integrated openmp with the following instructions.
-   e.g.) Ubuntu 14.04, the version of default clang is 3.4.  */
+   # When you want to compile Integrated OpenMP on Ubuntu where the pre-installed clang
+   # is older than 3.7, you can use integrated openmp with the following instructions.
+   # e.g.) Ubuntu 14.04, the version of default clang is 3.4.
    sudo apt-get install clang-3.8 //you can use any version of clang higher than 3.8
    sudo ln -svT /usr/bin/clang-3.8 /usr/bin/clang
    sudo ln -svT /usr/bin/clang++-3.8 /usr/bin/clang
 
    $(CHARM_DIR)/build charm++ multicore-linux64 clang omp --with-production -j8
-   echo '!<arch>' > $(CHARM_DIR)/lib/libomp.a //Dummy library. This will make you avoid the error message.
+   echo '!<arch>' > $(CHARM_DIR)/lib/libomp.a  # Dummy library. This will make you avoid the error message.
 
 On Mac, the Apple-provided clang installed in default doesn’t have
-OpenMP feature. We’re working on the support of this library on Mac
+OpenMP feature. We're working on the support of this library on Mac
 with OpenMP enabled clang which can be downloaded and installed
-through ‘Homebrew or MacPorts‘. Currently, this integrated library is
+through Homebrew or MacPorts. Currently, this integrated library is
 built and compiled on Mac with the normal GCC which can be downloaded
 and installed via Homebrew and MacPorts. If installed globally, GCC
 will be accessible by appending the major version number and adding it
@@ -8149,25 +8146,26 @@ to the invocation of the Charm++ build script. For example:
 If this does not work, you should set environment variables so that the
 Charm++ build script uses the normal gcc installed from Homebrew or
 MacPorts. The following is an example using Homebrew on Mac OS X
-10.12.5.
+10.12.5:
 
-::
+.. code-block:: bash
 
-   /* Install Homebrew at https://brew.sh
-    * Install gcc using 'brew' */
+   # Install Homebrew from https://brew.sh
+   # Install gcc using 'brew' */
    brew install gcc
-   /* gcc, g++ and other binaries are installed at /usr/local/Cellar/gcc/<version>/bin
-    * You need to make symbolic links to the gcc binaries at /usr/local/bin
-    * In this example, gcc 7.1.0 is installed at the directory.
-    */
+
+   # gcc, g++ and other binaries are installed at /usr/local/Cellar/gcc/<version>/bin
+   # You need to make symbolic links to the gcc binaries at /usr/local/bin
+   # In this example, gcc 7.1.0 is installed at the directory.
    cd /usr/local/bin
    ln -sv /usr/local/Cellar/gcc/7.1.0/bin/gcc-7 gcc
    ln -sv /usr/local/Cellar/gcc/7.1.0/bin/g++-7 g++
    ln -sv /usr/local/Cellar/gcc/7.1.0/bin/gcc-nm-7 gcc-nm
    ln -sv /usr/local/Cellar/gcc/7.1.0/bin/gcc-ranlib-7 gcc-ranlib
    ln -sv /usr/local/Cellar/gcc/7.1.0/bin/gcc-ar-7 gcc-ar
-   /* Finally, you should set PATH variable so that these binaries are accessed first in the build script.
-      export PATH=/usr/local/bin:$PATH
+
+   # Finally, you should set PATH variable so that these binaries are accessed first in the build script.
+   export PATH=/usr/local/bin:$PATH
 
 In addition, this library will be supported on Windows in the next
 release of Charm++.
@@ -8175,29 +8173,29 @@ release of Charm++.
 How to use the integrated OpenMP on Charm++
 '''''''''''''''''''''''''''''''''''''''''''
 
-To use this library on your applications, you have to add ‘-module
-OmpCharm’ in compile flags to link this library instead of the
-compiler-provided library in compilers. Without ‘-module OmpCharm’, your
+To use this library on your applications, you have to add ``-module OmpCharm``
+in compile flags to link this library instead of the
+compiler-provided library in compilers. Without ``-module OmpCharm``, your
 application will use the compiler-provided OpenMP library which running
-on its own separate runtime. (You don’t need to add ‘-fopenmp or
--openmp’ with gcc and icc. These flags are included in the predefined
-compile options when you build Charm++ with ‘omp’)
+on its own separate runtime (you don't need to add ``-fopenmp`` or ``-openmp``
+with gcc and icc. These flags are included in the predefined
+compile options when you build Charm++ with ``omp``).
 
 This integrated OpenMP adjusts the number of OpenMP instances on each
 chare so the number of OpenMP instances can be changed for each OpenMP
 region over execution. If your code shares some data structures among
 OpenMP instances in a parallel region, you can set the size of the data
 structures before the start of the OpenMP region with
-“omp_get_max_threads()” and use the data structure within each OpenMP
-instance with “omp_get_thread_num()”. After the OpenMP region, you can
+``omp_get_max_threads()`` and use the data structure within each OpenMP
+instance with ``omp_get_thread_num()``. After the OpenMP region, you can
 iterate over the data structure to combine partial results with
-“CmiGetCurKnownOmpThreads()”. “CmiGetCurKnownOmpThreads() returns the
+``CmiGetCurKnownOmpThreads()``. ``CmiGetCurKnownOmpThreads()`` returns the
 number of OpenMP threads for the latest OpenMP region on the PE where a
-chare is running.” The following is an example to describe how you can
+chare is running. The following is an example to describe how you can
 use shared data structures for OpenMP regions on the integrated OpenMP
-with Charm++.
+with Charm++:
 
-::
+.. code-block:: cpp
 
    /* Maximum possible number of OpenMP threads in the upcoming OpenMP region.
       Users can restrict this number with 'omp_set_num_threads()' for each chare
@@ -8227,12 +8225,12 @@ The list of supported pragmas
 This library is forked from LLVM OpenMP Library supporting OpenMP 4.0.
 Among many number of directives specified in OpenMP 4.0, limited set of
 directives are supported. The following list of supported pragmas is
-verified from the openmp conformance test suite which forked from LLVM
+verified from the OpenMP conformance test suite which forked from LLVM
 OpenMP library and ported to Charm++ program running multiple OpenMP
 instances on chares. The test suite can be found in
-*tests/converse/openmp_test*.
+``tests/converse/openmp_test``.
 
-::
+.. code-block:: cpp
 
    /* omp_<directive>_<clauses> */
    omp_atomic
@@ -8287,7 +8285,7 @@ The other directives in OpenMP standard will be supported in the next
 version.
 
 A simple example using this library can be found in
-``examples/charm++/openmp``. You can compare ckloop and the integrated
+``examples/charm++/openmp``. You can compare CkLoop and the integrated
 OpenMP with this example. You can see that the total execution time of
 this example with enough big size of problem is faster with OpenMP than
 CkLoop thanks to load balancing through work-stealing between threads
@@ -8300,7 +8298,7 @@ API to control which PEs participating in CkLoop/OpenMP work
 User may want certain PE not to be involved in other PE’s loop-level
 parallelization for some cases because it may add latency to works in
 the PE by helping other PEs. User can enable or disable each PE to
-participate in the loop-level parallelization through the following API.
+participate in the loop-level parallelization through the following API:
 
 void **CkSetPeHelpsOtherThreads** (int value)
 
@@ -8312,7 +8310,7 @@ PE again by calling this API with value 1 after they disable it during
 certain procedure so that the PE can help others after that. The
 following example shows how this API can be used.
 
-::
+.. code-block:: cpp
 
    CkSetPeHelpsOtherThreads(0);
 
@@ -8330,39 +8328,41 @@ Codes and libraries written in Charm++ and MPI can also be used in an
 interoperable manner. Currently, this functionality is supported only if
 Charm++ is built using MPI, PAMILRTS, or GNI as the network layer (e.g.
 mpi-linux-x86_64 build). An example program to demonstrate the
-interoperation is available in examples/charm++/mpi-coexist. In the
+interoperation is available in ``examples/charm++/mpi-coexist``. In the
 following text, we will refer to this example program for the ease of
 understanding.
 
 Control Flow and Memory Structure
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-| The control flow and memory structure of a Charm++-MPI interoperable
-  program is similar to that of a pure MPI program that uses external
-  MPI libraries. The execution of program begins with pure MPI code’s
-  *main*. At some point after MPI_Init() has been invoked, the following
-  function call should be made to initialize Charm++:
-| **void CharmLibInit(MPI_Comm newComm, int argc, char \**argv)**
-| If Charm++ is build on top of MPI, *newComm* is the MPI communicator
-  that Charm++ will use for the setup and communication. All the MPI
-  ranks that belong to *newComm* should call this function collectively.
-  A collection of MPI ranks that make the CharmLibInit call defines a
-  new Charm++ instance. Different MPI ranks that belong to different
-  communicators can make this call independently, and separate Charm++
-  instances that are not aware of each other will be created. This
-  results in a space division. As of now, a particular MPI rank can only
-  be part of one unique Charm++ instance. For PAMILRTS and GNI, the
-  newComm argument is ignored. These layers do not support the space
-  division of given processors, but require all processors to make the
-  CharmLibInit call. The mode of interoperating here is called time
-  division, and can be used with MPI-based Charm++ also if the size of
-  newComm is same as MPI_COMM_WORLD. Arguments *argc and argv* should
-  contain the information required by Charm++ such as the load balancing
-  strategy etc.
+The control flow and memory structure of a Charm++-MPI interoperable
+program is similar to that of a pure MPI program that uses external
+MPI libraries. The execution of program begins with pure MPI code’s
+*main*. At some point after MPI_Init() has been invoked, the following
+function call should be made to initialize Charm++:
 
-During the initialization, the control is transferred from MPI to
+**void CharmLibInit(MPI_Comm newComm, int argc, char \**argv)**
+
+If Charm++ is build on top of MPI, ``newComm`` is the MPI communicator
+that Charm++ will use for the setup and communication. All the MPI
+ranks that belong to ``newComm`` should call this function collectively.
+A collection of MPI ranks that make the ``CharmLibInit`` call defines a
+new Charm++ instance. Different MPI ranks that belong to different
+communicators can make this call independently, and separate Charm++
+instances that are not aware of each other will be created. This
+results in a space division. As of now, a particular MPI rank can only
+be part of one unique Charm++ instance. For PAMILRTS and GNI, the
+``newComm`` argument is ignored. These layers do not support the space
+division of given processors, but require all processors to make the
+``CharmLibInit`` call. The mode of interoperating here is called time
+division, and can be used with MPI-based Charm++ also if the size of
+``newComm`` is same as ``MPI_COMM_WORLD``. Arguments ``argc`` and ``argv``
+should contain the information required by Charm++ such as the load balancing
+strategy, etc.
+
+During initialization, control is transferred from MPI to the
 Charm++ RTS on the MPI ranks that made the call. Along with basic setup,
-Charm++ RTS also invokes the constructors of all mainchares during
+the Charm++ RTS also invokes the constructors of all mainchares during
 initialization. Once the initial set up is done, control is transferred
 back to MPI as if returning from a function call. Since Charm++
 initialization is made via a function call from the pure MPI program,
@@ -8379,37 +8379,37 @@ with a pure MPI program:
 -  If the interoperable Charm++ library does not contain a main module,
    the Charm++ RTS provides a main module and the control is returned
    back to MPI after the initialization is complete. In the other case,
-   the library should explicitly call CkExit to mark the end of
-   initialization and the user should provide *-nomain-module* link time
+   the library should explicitly call ``CkExit`` to mark the end of
+   initialization and the user should provide ``-nomain-module`` link time
    flag when building the final executable.
 
--  *CkExit* should be used the same way *return* statement is used for
-   returning back from a function call. *CkExit* should be called only
+-  ``CkExit`` should be used the same way a *return* statement is used for
+   returning back from a function call. ``CkExit`` should be called only
    once from one of the processors. This unique call marks the transfer
    of control from Charm++ RTS to MPI.
 
--  Include *mpi-interoperate.h* - if not included in the files that call
-   *CkExit*, invoking *CkExit* will result in unspecified behavior.
+-  Include ``mpi-interoperate.h`` - if not included in the files that call
+   ``CkExit``, invoking ``CkExit`` will result in unspecified behavior.
 
--  Since the CharmLibInit call invokes the constructors of mainchares,
+-  Since the ``CharmLibInit`` call invokes the constructors of mainchares,
    the constructors of mainchares should only perform basic set up such
    as creation of chare arrays etc, i.e. the set up should not result in
    invocation of actual work, which should be done using interface
    functions (when desired from the pure MPI program). However, if the
-   main module is provided by the library, CharmLibInit behaves like a
-   regular Charm++ startup and execution which is stopped when CkExit is
+   main module is provided by the library, ``CharmLibInit`` behaves like a
+   regular Charm++ startup and execution which is stopped when ``CkExit`` is
    explicitly called by the library. One can also avoid use of
    mainchares, and perform the necessary initializations in an interface
    function as demonstrated in the interoperable library
-   examples/charm++/mpi-coexist/libs/hello.
+   ``examples/charm++/mpi-coexist/libs/hello``.
 
--  Interface functions - Every library needs to define interface
+-  *Interface functions* - Every library needs to define interface
    function(s) that can be invoked from pure MPI programs, and transfers
    the control to the Charm++ RTS. The interface functions are simple
    functions whose task is to start work for the Charm++ libraries. Here
    is an example interface function for the *hello* library.
 
-   ::
+   .. code-block:: cpp
 
       void HelloStart(int elems)
       {
@@ -8420,27 +8420,27 @@ with a pure MPI program:
         StartCharmScheduler(-1);
       }
 
-   This function creates a new chare (mainHello) defined in the *hello*
+   This function creates a new chare (``mainHello``) defined in the *hello*
    library which subsequently results in work being done in *hello*
    library. More examples of such interface functions can be found in hi
    (HiStart) and kNeighbor (kNeighbor) directories in
-   examples/charm++/mpi-coexist/libs. Note that a scheduler call
-   *StartCharmScheduler()* should be made from the interface functions
+   ``examples/charm++/mpi-coexist/libs``. Note that a scheduler call
+   ``StartCharmScheduler()`` should be made from the interface functions
    to start the message reception by Charm++ RTS.
 
 Writing Interoperable MPI Programs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 An MPI program that invokes Charm++ libraries should include
-*mpi-interoperate.h*. As mentioned earlier, an initialization call,
-*CharmLibInit* is required after invoking MPI_Init to perform the
-initial set up of Charm++. It is advisable to call an MPI_Barrier after
+``mpi-interoperate.h``. As mentioned earlier, an initialization call,
+``CharmLibInit`` is required after invoking ``MPI_Init`` to perform the
+initial set up of Charm++. It is advisable to call an ``MPI_Barrier`` after
 a control transfer between Charm++ and MPI to avoid any side effects.
 Thereafter, a Charm++ library can be invoked at any point using the
 interface functions. One may look at
-examples/charm++/mpi-coexist/multirun.cpp for a working example. Based
+``examples/charm++/mpi-coexist/multirun.cpp`` for a working example. Based
 on the way interfaces are defined, a library can be invoked multiple
-times. In the end, one should call *CharmLibExit* to free resources
+times. In the end, one should call ``CharmLibExit`` to free resources
 reserved by Charm++.
 
 Compilation and Execution
@@ -8448,19 +8448,19 @@ Compilation and Execution
 
 An interoperable Charm++ library can be compiled as usual using
 *charmc*. Instead of producing an executable in the end, one should
-create a library (*.a) as shown in
-examples/charm++/mpi-coexist/libs/hi/Makefile. The compilation process
+create a library (\*.a) as shown in
+``examples/charm++/mpi-coexist/libs/hi/Makefile``. The compilation process
 of the MPI program, however, needs modification. One has to include the
-charm directory (-I$(CHARMDIR)/include) to help the compiler find the
-location of included *mpi-interoperate.h*. The linking step to create
-the executable should be done using *charmc*, which in turn uses the
+charm directory (``-I$(CHARMDIR)/include``) to help the compiler find the
+location of included ``mpi-interoperate.h``. The linking step to create
+the executable should be done using ``charmc``, which in turn uses the
 compiler used to build charm. In the linking step, it is required to
-pass *-mpi* as an argument because of which *charmc* performs the
+pass ``-mpi`` as an argument because of which *charmc* performs the
 linking for interoperation. The charm libraries, which one wants to be
-linked, should be passed using *-module* option. Refer to
-examples/charm++/mpi-coexist/Makefile to view a working example. For
+linked, should be passed using ``-module`` option. Refer to
+``examples/charm++/mpi-coexist/Makefile`` to view a working example. For
 execution on BG/Q systems, the following additional argument should be
-added to the launch command: *-envs PAMI_CLIENTS=MPI,Converse*.
+added to the launch command: ``-envs PAMI_CLIENTS=MPI,Converse``.
 
 User Driven Mode
 ~~~~~~~~~~~~~~~~
@@ -8471,47 +8471,47 @@ intended for cases where the developer has direct control over the both
 the Charm++ code and the non-Charm++ code, and would like a more tightly
 coupled relation between the two. When executing in user driven mode,
 *main* is called on every rank as in the above example. To initialize
-the Charm++ runtime, a call to *CharmInit* should be called on every
+the Charm++ runtime, a call to ``CharmInit`` should be called on every
 rank:
 
-``void CharmInit(int argc, char **argv)``
+**void CharmInit(int argc, char **argv)**
 
-*CharmInit* starts the Charm++ runtime in user driven mode, and
+``CharmInit`` starts the Charm++ runtime in user driven mode, and
 executes the constructor of the main chare. Control returns to user
-code when a call to *CkExit* is made. Once control is returned, user
+code when a call to ``CkExit`` is made. Once control is returned, user
 code can do other work as needed, including creating chares, and
 invoking entry methods on proxies. Any messages created by the user
 code will be sent/received the next time the user calls
-*StartCharmScheduler*. Calls to *StartCharmScheduler* allow the
+``StartCharmScheduler``. Calls to ``StartCharmScheduler`` allow the
 Charm++ runtime to resume sending and processing messages, and control
-returns to user code when *CkExit* is called. The Charm++ scheduler
+returns to user code when ``CkExit`` is called. The Charm++ scheduler
 can be started and stopped in this fashion as many times as necessary.
-*CharmLibExit* should be called by the user code at the end of
+``CharmLibExit`` should be called by the user code at the end of
 execution.
 
 A small example of user driven interoperation can be found in
-examples/charm++/user-driven-interop.
+``examples/charm++/user-driven-interop``.
 
 .. _sec:partition:
 
 Partitioning in Charm++
 -----------------------
 
-With the latest 6.5.0 release, Charm++ has been augmented with support
+Starting with the 6.5.0 release, Charm++ was augmented with support
 for partitioning. The key idea is to divide the allocated set of nodes
 into subsets that run independent Charm++ instances. These Charm++
-instances (called partitions from now on) have a unique identifier, can
+instances (called *partitions* from now on) have a unique identifier, can
 be programmed to do different tasks, and can interact with each other.
 Addition of the partitioning scheme does not affect the existing code
 base or codes that do not want to use partitioning. Some of the use
-cases of partitioning are replicated NAMD, replica based fault
+cases of partitioning are replicated NAMD, replica-based fault
 tolerance, studying mapping performance etc. In some aspects,
 partitioning is similar to disjoint communicator creation in MPI.
 
 Overview
 ~~~~~~~~
 
-Charm++ stack has three components - Charm++, Converse and machine
+The Charm++ stack has three components - Charm++, Converse and a machine
 layer. In general, machine layer handles the exchange of messages among
 nodes, and interacts with the next layer in the stack - Converse.
 Converse is responsible for scheduling of tasks (including user code)
@@ -8529,21 +8529,21 @@ Converse API described later.
 Ranking
 ~~~~~~~
 
-Charm++ stack assigns a rank to every processing element (PE). In the
-non-partitioned version, a rank assigned to a PE is same at all three
-layers of Charm++ stack. This rank also (generally) coincides with the
+The Charm++ stack assigns a rank to every processing element (PE). In the
+non-partitioned version, a rank assigned to a PE is the same at all three
+layers of the Charm++ stack. This rank also generally coincides with the
 rank provided to processors/cores by the underlying job scheduler. The
 importance of these ranks derive from the fact that they are used for
 multiple purposes. Partitioning leads to segregation of the notion of
 ranks at different levels of Charm++ stack. What used to be the PE is
 now a local rank within a partition running a Charm++ instance. Existing
-methods such as ``CkMyPe()``, ``CkMyNode()``, ``CmiMyPe()``, etc
+methods such as ``CkMyPe()``, ``CkMyNode()``, ``CmiMyPe()``, etc.
 continue to provide these local ranks. Hence, existing codes do not
 require any change as long as inter-partition interaction is not
 required.
 
 On the other hand, machine layer is provided with the target ranks that
-are globally unique. These ranks can be obtained using functions with
+are globally unique. These ranks can be obtained using functions with the
 *Global* suffix such as ``CmiNumNodesGlobal()``, ``CmiMyNodeGlobal()``,
 ``CmiMyPeGlobal()`` etc.
 
@@ -8602,25 +8602,24 @@ who want to run multiple partitions in one single job.
    by plane during partitioning. A hilbert curve based traversal is used
    with scheme 2.
 
--  | Compilation parameter: ``-custom-part``, runtime parameter:
-     ``+use_custom_partition`` - enables use of user defined
-     partitioning. In order to implement a new partitioning scheme, a
-     user must link an object exporting a C function with following
-     prototype:
-   | extern “C” void createCustomPartitions(int numparts, int
-     \*partitionSize, int \*nodeMap);
+-  Compilation parameter: ``-custom-part``, runtime parameter:
+   ``+use_custom_partition`` - enables use of user defined
+   partitioning. In order to implement a new partitioning scheme, a
+   user must link an object exporting a C function with following
+   prototype:
+
+   | ``extern "C" void createCustomPartitions(int numparts, int *partitionSize, int *nodeMap);``
    | ``numparts`` (input) - number of partitions to be created.
-   | ``partitionSize`` (input) - an array that contains size of each
-     partition.
-   | ``nodeMap`` (output, preallocated) - a preallocated array of length
-     ``CmiNumNodesGlobal()``. Entry *i* in this array specifies the new
+   | ``partitionSize`` (input) - an array that contains the size of each partition.
+   | ``nodeMap`` (output, preallocated) - a preallocated array of length ``CmiNumNodesGlobal()``.
+     Entry *i* in this array specifies the new
      global node rank of a node with default node rank *i*. The entries
-     in this array are block wise divided to create partitions, i.e
+     in this array are block-wise divided to create partitions, i.e.
      entries 0 to partitionSize[0]-1 belong to partition 1,
      partitionSize[0] to partitionSize[0]+partitionSize[1]-1 to
      partition 2 and so on.
    | When this function is invoked to create partitions, TopoManager is
-     configured to view all the allocated node as one partition.
+     configured to view all the allocated nodes as one partition.
      Partition based API is yet to be initialized, and should not be
      used. A link time parameter ``-custom-part`` is required to be
      passed to ``charmc`` for successful compilation.
@@ -8631,8 +8630,8 @@ Redirecting output from individual partitions
 Output to standard output (stdout) from various partitions can be
 directed to separate files by passing the target path as a command line
 option. The run time parameter ``+stdout <path>`` is to be used for this
-purpose. The ``<path>`` may contain the C format specifier *%d*, which
-will be replaced by the partition number. In case, *%d* is specified
+purpose. The ``<path>`` may contain the C format specifier ``%d``, which
+will be replaced by the partition number. In case, ``%d`` is specified
 multiple times, only the first three instances from the left will be
 replaced by the partition number (other or additional format specifiers
 will result in undefined behavior). If a format specifier is not
@@ -8651,28 +8650,27 @@ Inter-partition Communication
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A new API was added to Converse to enable sending messages from one
-replica to another. Currently, following functions are available for the
-same
+replica to another. Currently, the following functions are available:
 
--  CmiInterSyncSend(local_rank, partition, size, message)
+-  **CmiInterSyncSend(local_rank, partition, size, message)**
 
--  CmiInterSyncSendAndFree(local_rank, partition, size, message)
+-  **CmiInterSyncSendAndFree(local_rank, partition, size, message)**
 
--  CmiInterSyncNodeSend(local_node, partition, size, message)
+-  **CmiInterSyncNodeSend(local_node, partition, size, message)**
 
--  CmiInterSyncNodeSendAndFree(local_node, partition, size, message)
+-  **CmiInterSyncNodeSendAndFree(local_node, partition, size, message)**
 
 Users who have coded in Converse will find these functions to be very
-similar to basic Converse functions for send - CmiSyncSend and
-CmiSyncSendAndFree. Given the local rank of a PE and the partition it
+similar to basic Converse functions for send - ``CmiSyncSend`` and
+``CmiSyncSendAndFree``. Given the local rank of a PE and the partition it
 belongs to, these two functions will pass the message to the machine
-layer. CmiInterSyncSend does not return till “message” is ready for
-reuse. CmiInterSyncSendAndFree passes the ownership of “message” to
-Charm++ RTS, which will free the message when the send is complete. Each
+layer. ``CmiInterSyncSend`` does not return until ``message`` is ready for
+reuse. ``CmiInterSyncSendAndFree`` passes the ownership of ``message`` to
+the Charm++ RTS, which will free the message when the send is complete. Each
 converse message contains a message header, which makes those messages
 active - they contain information about their handlers. These handlers
-can be registered using existing API in Charm++ - CmiRegisterHandler.
-CmiInterNodeSend and CmiInterNodeSendAndFree are counterparts to these
+can be registered using existing API in Charm++ - ``CmiRegisterHandler``.
+``CmiInterNodeSend`` and ``CmiInterNodeSendAndFree`` are counterparts to these
 functions that allow sending of a message to a node (in SMP mode).
 
 Expert-Level Functionality
