@@ -2507,6 +2507,9 @@ void CmiReductionHandleDynamicRequest(char *msg) {
 void CmiGetDynamicReductionRemote(int handlerIdx, int pe, int dataSize, void *data) {
   int size = CmiMsgHeaderSizeBytes+2*sizeof(int)+dataSize;
   char *msg = (char*)CmiAlloc(size);
+#if CMK_ONESIDED_IMPL
+  CMI_ZC_MSGTYPE(msg) = CMK_REG_NO_ZC_MSG;
+#endif
   int *values = (int*)(msg+CmiMsgHeaderSizeBytes);
   values[0] = pe;
   values[1] = dataSize;
@@ -2546,6 +2549,9 @@ void CmiSendReduce(CmiReduction *red) {
       msg_size = pup_size(p) + CmiReservedHeaderSize;
       pup_destroy(p);
       msg = CmiAlloc(msg_size);
+#if CMK_ONESIDED_IMPL
+      CMI_ZC_MSGTYPE(msg) = CMK_REG_NO_ZC_MSG;
+#endif
       p = pup_new_toMem((void*)(((char*)msg)+CmiReservedHeaderSize));
       (red->ops.pupFn)(p, mergedData);
       pup_destroy(p);
