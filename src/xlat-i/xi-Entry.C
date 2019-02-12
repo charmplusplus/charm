@@ -2324,6 +2324,9 @@ void Entry::genClosure(XStr& decls, bool isDef) {
 // It ends the current procedure with a call to awaken another thread,
 // and defines the thread function to handle that call.
 XStr Entry::callThread(const XStr& procName, int prependEntryName) {
+  if (isConstructor() || isMigrationConstructor())
+    die("Constructors may not be 'threaded'", first_line_);
+
   XStr str, procFull;
   procFull << "_callthr_";
   if (prependEntryName) procFull << name << "_";
@@ -2342,8 +2345,9 @@ XStr Entry::callThread(const XStr& procName, int prependEntryName) {
   str << makeDecl("void") << "::" << procFull << "(CkThrCallArg *impl_arg)\n";
   str << "{\n";
   str << "  void *impl_msg = impl_arg->msg;\n";
-  str << "  " << container->baseName() << " *impl_obj = (" << container->baseName()
-      << " *) impl_arg->obj;\n";
+  str << "  void *impl_obj_void = impl_arg->obj;\n";
+  str << "  " << container->baseName() << " *impl_obj = static_cast<"
+      << container->baseName() << " *>(impl_obj_void);\n";
   str << "  delete impl_arg;\n";
   return str;
 }
