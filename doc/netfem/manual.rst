@@ -133,17 +133,25 @@ sequence of NetFEM calls this application would make would be:
    These arrays, typical of a finite element analysis program, might be
    passed into NetFEM.
 
+
 Simple Interface
 ================
 
 The details of how to make each call are:
 
-| NetFEM NetFEM_Begin(int source, int step, int dim, int flavor);
-  integer function NetFEM_Begin(source,step,dim,flavor)
-| Begins describing a single piece of a mesh. Returns a handle that is
-  used for each subsequent call until NetFEM_End. This call, like all
-  NetFEM calls, is collective—every processor should make the same calls
-  in the same order.
+::
+
+     NetFEM NetFEM_Begin(int source, int step, int dim, int flavor);
+
+.. code-block:: fortran
+
+     integer function NetFEM_Begin(source,step,dim,flavor)
+       integer, intent(in) ::  source,step,dim,flavor
+
+Begins describing a single piece of a mesh. Returns a handle that is
+used for each subsequent call until NetFEM_End. This call, like all
+NetFEM calls, is collective—every processor should make the same calls
+in the same order.
 
 source identifies the piece of the mesh—use FEM_My_partition or CkMyPe.
 
@@ -162,13 +170,30 @@ out of your arrays. Or it can take the value NetFEM_WRITE, which writes
 out the data to files named “NetFEM/step/source.dat” for offline
 visualization.
 
-| void NetFEM_End(NetFEM n); subroutine NetFEM_End(n)
-| Finishes describing a single piece of a mesh, which then makes the
-  mesh available for display.
+::
 
-| void NetFEM_Nodes(NetFEM n,int nNodes,const double \*loc,const char
-  \*name); subroutine NetFEM_Nodes(n,nNodes,loc,name)
-| Describes the nodes in this piece of the mesh.
+     void NetFEM_End(NetFEM n);
+
+.. code-block:: fortran
+
+     subroutine NetFEM_End(n)
+       integer, intent(in) ::  n
+
+Finishes describing a single piece of a mesh, which then makes the
+mesh available for display.
+
+::
+
+     void NetFEM_Nodes(NetFEM n,int nNodes,const double *loc,const char *name);
+
+.. code-block:: fortran
+
+     subroutine NetFEM_Nodes(n,nNodes,loc,name)
+       integer, intent(in) ::  n, nNodes
+       double precision, intent(in) ::  loc(dim,nNodes)
+       character*(*), intent(in) ::  name
+
+Describes the nodes in this piece of the mesh.
 
 n is the NetFEM handle obtained from NetFEM_Begin.
 
@@ -184,13 +209,21 @@ name is a human-readable name for the node locations to display in the
 client. We recommend also including the location units here, for example
 "Position (m)".
 
-| void NetFEM_Elements(NetFEM n,int nElements,int nodePerEl,const int
-  \*conn,const char \*name); subroutine
-  NetFEM_Elements(n,nElements,nodePerEl,conn,name)
-| Describes the elements in this piece of the mesh. Unlike NetFEM_Nodes,
-  this call can be repeated if there are different types of elements
-  (For example, some meshes contain a mix of triangles and
-  quadrilaterals).
+
+::
+
+     void NetFEM_Elements(NetFEM n,int nElements,int nodePerEl,const int *conn,const char *name);
+
+.. code-block:: fortran
+
+     subroutine NetFEM_Elements(n,nElements,nodePerEl,conn,name)
+       integer, intent(in) ::  n, nElements, nodePerEl
+       integer, intent(in) ::  conn(nodePerEl,nElements)
+       character*(*), intent(in) ::  name
+
+Describes the elements in this piece of the mesh. Unlike NetFEM_Nodes,
+this call can be repeated if there are different types of elements
+(For example, some meshes contain a mix of triangles and quadrilaterals).
 
 n is the NetFEM handle obtained from NetFEM_Begin.
 
@@ -209,11 +242,20 @@ or conn((e-1)*nodePerEl+1).
 name is a human-readable name for the elements to display in the client.
 For example, this might be "Linear-Strain Triangles".
 
-| void NetFEM_Vector(NetFEM n,const double \*data,const char \*name);
-  subroutine NetFEM_Vector(n,data,name)
-| Describes a spatial vector associated with each node or element in the
-  mesh. Attaches the vector to the most recently listed node or element.
-  You can repeat this call several times to describe different vectors.
+::
+
+     void NetFEM_Vector(NetFEM n,const double *data,const char *name);
+
+.. code-block:: fortran
+
+     subroutine NetFEM_Vector(n,data,name)
+       integer, intent(in) ::  n
+       double precision, intent(in) ::  data(dim,lastEntity)
+       character*(*), intent(in) ::  name
+
+Describes a spatial vector associated with each node or element in the
+mesh. Attaches the vector to the most recently listed node or element.
+You can repeat this call several times to describe different vectors.
 
 n is the NetFEM handle obtained from NetFEM_Begin.
 
@@ -225,13 +267,22 @@ data[2*e]; in Fortran, element :math:`e`\ ’s vector is data(:,e).
 name is a human-readable name for this vector data. For example, this
 might be "Velocity (m/s)".
 
-| void NetFEM_Scalar(NetFEM n,const double \*data,int dataPer,const char
-  \*name); subroutine NetFEM_Scalar(n,data,dataPer,name)
-| Describes some scalar data associated with each node or element in the
-  mesh. Like NetFEM_Vector, this data is attached to the most recently
-  listed node or element and this call can be repeated. For a node or
-  element, you can make the calls to NetFEM_Vector and NetFEM_Scalar in
-  any order.
+::
+
+     void NetFEM_Scalar(NetFEM n,const double *data,int dataPer,const char *name);
+
+.. code-block:: fortran
+
+     subroutine NetFEM_Scalar(n,data,dataPer,name)
+       integer, intent(in) ::  n, dataPer
+       double precision, intent(in) ::  data(dataPer,lastEntity)
+       character*(*), intent(in) ::  name
+
+Describes some scalar data associated with each node or element in the
+mesh. Like NetFEM_Vector, this data is attached to the most recently
+listed node or element and this call can be repeated. For a node or
+element, you can make the calls to NetFEM_Vector and NetFEM_Scalar in
+any order.
 
 n is the NetFEM handle obtained from NetFEM_Begin.
 
@@ -278,24 +329,44 @@ arguments, can be used for this. For example, to describe the field
       TYPE(NODE), ALLOCATABLE :: n(:)
       ..., foffsetof(n(1),n(1)%loc),foffsetof(n(1),n(2)), ...
 
-| void NetFEM_Nodes_field(NetFEM n,int nNodes,FIELD,const void \*loc,const
-  char \*name);
-| subroutine NetFEM_Nodes_field(n,nNodes,FIELD,loc,name)
-| A FIELD version of NetFEM_Nodes.
+::
 
-| void NetFEM_Elements_field(NetFEM n,int nElements,int
-  nodePerEl,FIELD,int idxBase,const int \*conn,const char \*name);
-| subroutine NetFEM_Elements_field(n,nElements,nodePerEl,FIELD,idxBase,conn,name)
-| A FIELD version of NetFEM_Elements. This version also allows you to
-  control the starting node index of the connectivity array—in C, this is
-  normally 0; in Fortran, this is normally 1.
+      void NetFEM_Nodes_field(NetFEM n,int nNodes,FIELD,const void *loc,const char *name);
 
-| void NetFEM_Vector_field(NetFEM n,const double \*data,FIELD,const char
-  \*name);
-| subroutine NetFEM_Vector_field(n,data,FIELD,name)
-| A FIELD version of NetFEM_Vector.
+.. code-block:: fortran
 
-| void NetFEM_Scalar_field(NetFEM n,const double \*data,int
-  dataPer,FIELD,const char \*name); subroutine
-  NetFEM_Scalar(n,data,dataPer,FIELD,name)
-| A FIELD version of NetFEM_Scalar.
+      subroutine NetFEM_Nodes_field(n,nNodes,FIELD,loc,name)
+
+A FIELD version of NetFEM_Nodes.
+
+::
+
+      void NetFEM_Elements_field(NetFEM n,int nElements,int nodePerEl,FIELD,int idxBase,const int *conn,const char *name);
+
+.. code-block:: fortran
+
+      subroutine NetFEM_Elements_field(n,nElements,nodePerEl,FIELD,idxBase,conn,name)
+
+A FIELD version of NetFEM_Elements. This version also allows you to
+control the starting node index of the connectivity array—in C, this is
+normally 0; in Fortran, this is normally 1.
+
+::
+
+      void NetFEM_Vector_field(NetFEM n,const double *data,FIELD,const char *name);
+
+.. code-block:: fortran
+
+      subroutine NetFEM_Vector_field(n,data,FIELD,name)
+
+A FIELD version of NetFEM_Vector.
+
+::
+
+      void NetFEM_Scalar_field(NetFEM n,const double *data,int dataPer,FIELD,const char *name);
+
+.. code-block:: fortran
+
+      subroutine NetFEM_Scalar(n,data,dataPer,FIELD,name)
+
+A FIELD version of NetFEM_Scalar.
