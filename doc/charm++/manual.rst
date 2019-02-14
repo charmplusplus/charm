@@ -8765,7 +8765,7 @@ to analyze the performance of various centralized strategies using:
    [+LBSimProcs 900]
 
 Please note that this does not invoke the real application. In fact,
-”pgm” can be replaced with any generic application which calls
+"pgm" can be replaced with any generic application which calls
 centralized load balancer. An example can be found in
 ``tests/charm++/load_balancing/lb_test``.
 
@@ -8998,8 +8998,8 @@ to the Charm++ build system:
    libmoduleFooLB.dep. Run the script in charm/tmp, which creates the
    new Makefile named “Make.lb”.
 
-#. Run “make depends” to update dependence rule of Charm++ files. And
-   run “make charm++” to compile Charm++ which includes the new load
+#. Run ``make depends`` to update dependence rule of Charm++ files. And
+   run ``make charm++`` to compile Charm++ which includes the new load
    balancing strategy files.
 
 .. _lbdatabase:
@@ -9292,7 +9292,7 @@ read
    to the Charm++ object connected to the Python script, and return an
    object containing the data read (see :numref:`pythonServerRW` for a
    description of this functionality). An example of a call can be:
-   value = ck.read((number, param, var2, var3)) where the double
+   *value = ck.read((number, param, var2, var3))* where the double
    parenthesis are needed to create a single tuple object containing
    four values passed as a single paramter, instead of four different
    parameters.
@@ -9383,7 +9383,7 @@ PythonPrint
 In order to receive the output printed by the Python script, the client
 needs to send a PythonPrint request to the server. The constructor is:
 
-PythonPrint(CmiUInt4 interpreter, bool Wait=true, bool Kill=false);
+*PythonPrint(CmiUInt4 interpreter, bool Wait=true, bool Kill=false);*
 
 The interpreter for which the request is made is mandatory. The other
 parameters are optional. The wait parameter represents whether a reply
@@ -9430,7 +9430,7 @@ when using persistent interpreters, and a serialization of the scripts
 is needed, a PythonFinished request is available. The constructor is the
 following:
 
-PythonFinished(CmiUInt4 interpreter, bool Wait=true);
+*PythonFinished(CmiUInt4 interpreter, bool Wait=true);*
 
 The interpreter corresponds to the handle for which the request was
 sent, while the wait option refers to a blocking call (true), or
@@ -9598,7 +9598,7 @@ When in addition to the definition of the Charm++ object as python, an
 entry method is also defined as python, this entry method can be
 accessed directly by a Python script through the *charm* module. For
 example, the following definition will be accessible with the python
-call: result = charm.highMethod(var1, var2, var3) It can accept any
+call: *result = charm.highMethod(var1, var2, var3)* It can accept any
 number of parameters (even complex like tuples or dictionaries), and it
 can return an object as complex as needed.
 
@@ -9614,7 +9614,7 @@ in subsequent calls to return values to the Python code.
 The arguments passed by the Python caller can be retrieved using the
 function:
 
-PyObject \*pythonGetArg(int handle);
+*PyObject \*pythonGetArg(int handle);*
 
 which returns a PyObject. This object is a Tuple containing a vector of
 all parameters. It can be parsed using ``PyArg_ParseTuple`` to extract
@@ -9636,7 +9636,7 @@ one, except that it correctly handles Python internal locks.
 At the end of the computation, the following special function will
 return a value to the Python script:
 
-void pythonReturn(int handle, PyObject\* result);
+*void pythonReturn(int handle, PyObject\* result);*
 
 where the second parameter is the Python object representing the
 returned value. The function ``Py_BuildValue`` can be used to create
@@ -9660,7 +9660,7 @@ Intercepting Messages via Delegation
 *Delegation* is a means by which a library writer can intercept messages
 sent via a proxy. This is typically used to construct communication
 libraries. A library creates a special kind of Group called a
-DelegationManager, which receives the messages sent via a delegated
+*DelegationManager*, which receives the messages sent via a delegated
 proxy.
 
 There are two parts to the delegation interface- a very small
@@ -9720,11 +9720,11 @@ proxy is delegated.
 Manager Interface
 ~~~~~~~~~~~~~~~~~
 
-A delegation manager is a group which inherits from CkDelegateMgr and
-overrides certain virtual methods. Since CkDelegateMgr does not do any
+A delegation manager is a group which inherits from *CkDelegateMgr* and
+overrides certain virtual methods. Since *CkDelegateMgr* does not do any
 communication itself, it need not be mentioned in the .ci file; you can
 simply declare a group as usual and inherit the C++ implementation from
-CkDelegateMgr.
+*CkDelegateMgr*.
 
 Your delegation manager will be called by Charm++ any time a proxy
 delegated to it is used. Since any kind of proxy can be delegated, there
@@ -9753,27 +9753,27 @@ These routines are called on the send side only. They are called after
 parameter marshalling; but before the messages are packed. The
 parameters passed in have the following descriptions.
 
-#. ep The entry point begin called, passed as an index into the Charm++
+#. **ep** The entry point begin called, passed as an index into the Charm++
    entry table. This information is also stored in the message’s header;
    it is duplicated here for convenience.
 
-#. m The Charm++ message. This is a pointer to the start of the user
+#. **m** The Charm++ message. This is a pointer to the start of the user
    data; use the system routine UsrToEnv to get the corresponding
    envelope. The messages are not necessarily packed; be sure to use
    CkPackMessage.
 
-#. c The destination CkChareID. This information is already stored in
+#. **c** The destination CkChareID. This information is already stored in
    the message header.
 
-#. onPE The destination processor number. For chare messages, this
+#. **onPE** The destination processor number. For chare messages, this
    indicates the processor the chare lives on. For group messages, this
    indicates the destination processor. For array create messages, this
    indicates the desired processor.
 
-#. g The destination CkGroupID. This is also stored in the message
+#. **g** The destination CkGroupID. This is also stored in the message
    header.
 
-#. onNode The destination node.
+#. **onNode** The destination node.
 
 #. **idx** The destination array index. This may be looked up using the
    lastKnown method of the array manager, e.g., using:
@@ -9782,9 +9782,9 @@ parameters passed in have the following descriptions.
 
      int lastPE=CProxy_CkArray(a).ckLocalBranch()->lastKnown(idx);
 
-#. s The destination array section.
+#. **s** The destination array section.
 
-The CkDelegateMgr superclass implements all these methods; so you only
+The *CkDelegateMgr* superclass implements all these methods; so you only
 need to implement those you wish to optimize. You can also call the
 superclass to do the final delivery after you’ve sent your messages.
 
@@ -9850,7 +9850,7 @@ For a complete list of these functions, see ``cp_effects.h`` in
 ``charm/include``.
 
 The program, of course, has to adapt its behavior to use these new
-control point values. There are two ways for a the control point values
+control point values. There are two ways for the control point values
 to change over time. The program can request that a new phase (with its
 own control point values) be used whenever it wants, or the control
 point framework can automatically advance to a new phase periodically.
@@ -10003,7 +10003,7 @@ be found in ``examples/charm++/shrink_expand`` in the charm
 distribution.
 
 To enable shrink expand, Charm++ needs to be built with the
-``-enable-shrinkexpand`` option:
+``--enable-shrinkexpand`` option:
 
 ::
 
@@ -10114,7 +10114,7 @@ Charm++ can be downloaded using one of the following methods:
 If you download the source code from the website, you will have to
 unpack it using a tool capable of extracting gzip’d tar files, such as
 tar (on Unix) or WinZIP (under Windows). Charm++ will be extracted to a
-directory called “charm”.
+directory called ``charm``.
 
 .. _sec:manualinstall:
 
@@ -10215,7 +10215,7 @@ By default, the netlrts network backend with SMP support is built. You
 can specify other backends by providing the ``backend`` parameter to
 spack. It is also possible to specify other options, as listed in
 Section :numref:`sec:manualinstall`, by adding them to the Spack
-command prepended by a ’\ ``+``\ ’. For example, to build the MPI
+command prepended by a ``+``. For example, to build the MPI
 version of Charm++ with the integrated OpenMP support, you can use the
 following command:
 
@@ -10223,7 +10223,7 @@ following command:
 
    	$ spack install charmpp backend=mpi +omp
 
-To disable an option, prepend it with a ’\ ``~``\ ’. For example, to
+To disable an option, prepend it with a ``~``. For example, to
 build Charm++ with SMP support disabled, you can use the following
 command:
 
@@ -10232,7 +10232,7 @@ command:
    	$ spack install charmpp ~smp
 
 By default, the newest released version of Charm++ is built. You can
-select another version with the ’\ ``@``\ ’ option (for example,
+select another version with the ``@`` option (for example,
 ``@6.8.1``). To build the current git version of Charm++, specify the
 ``@develop`` version:
 
