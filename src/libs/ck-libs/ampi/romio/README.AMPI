@@ -1,12 +1,52 @@
-Here is a list of modifications and clarifications to the version of 
+Modifications
+=============
+
+Here is a list of modifications and clarifications to the version of
 ROMIO integrated into AMPI:
 
 * Used MPI_Info_* calls from AMPI, and darray calls from ROMIO.
-* Set -DHAVE_STATUS_SET_BYTES in configure and configure.in, and 
+* Set -DHAVE_STATUS_SET_BYTES in configure and configure.in, and
   add status setting call in adio/common/status_setb.c
 * Use AMPI's AMPI_Type_is_contiguous() extension in adio/common/iscontig.c
 * Excluded directories doc, lib, man, and test in the distribution.
   (lib will be generated in the building directory $CHARMDIR/tmp/)
-* The final library lib/$ARCH/libmpio.a is copied to 
+* The final library lib/$ARCH/libmpio.a is copied to
   $CHARMDIR/lib/libampiromio.a and the user is supposed to link
   with ampiromio at link time.
+* Global variables were privatized, as shown in the section below.
+
+
+Variable privatization
+======================
+
+ROMIO has several global variables that need to be privatized for AMPI.
+The following table contains the currently known global variables and how they
+are handled in this integrated version of ROMIO. Privatization is done with
+the Ctv* functions of Charm++.
+
+================ ========= =========================== ==================================
+Defined in       Type (nm) Variable name               Status
+================ ========= =========================== ==================================
+ad_init.c        D         ADIOI_DFLT_ERR_HANDLER      Privatized
+ad_init.c        S         ADIOI_Datarep_head          Privatized
+ad_init.c        S         ADIOI_Flatlist              Privatized
+ad_init.c        S         ADIOI_Ftable                Privatized
+ad_init.c        S         ADIOI_Ftable_max            Privatized
+ad_init.c        S         ADIOI_Ftable_ptr            Privatized
+ad_init.c        S         ADIOI_Reqtable              Privatized, missing in ioreq_c2f.c
+ad_init.c        S         ADIOI_Reqtable_max          Privatized, missing in ioreq_c2f.c
+ad_init.c        S         ADIOI_Reqtable_ptr          Privatized, missing in ioreq_c2f.c
+ad_init.c        D         ADIOI_syshints              Privatized
+ad_init.c        D         ADIO_Init_keyval            Privatized
+ad_init.c        D         ADIO_same_amode             Privatized
+cb_config_list.c D         ADIOI_cb_config_list_keyval Privatized
+ad_testfs.c      D         ADIO_TESTFS_operations      Not privatized (readonly)
+ad_ufs.c         D         ADIO_UFS_operations         Not privatized (readonly)
+ad_nfs.c         D         ADIO_NFS_operations         Not privatized (readonly)
+================ ========= =========================== ==================================
+
+The nm types are as follows:
+B - The symbol is in the uninitialized data section (BSS).
+D - The symbol is in the initialized data section.
+G - The symbol is in the initialized data section for small objects.
+S - The symbol is in the uninitialized data section for small objects.
