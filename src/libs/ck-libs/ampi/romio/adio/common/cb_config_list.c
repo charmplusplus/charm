@@ -38,7 +38,7 @@
 
 /* a couple of globals keep things simple */
 // AMPI: make variables thread-private
-CtvStaticDeclare(int, ADIOI_cb_config_list_keyval); //=MPI_KEYVAL_INVALID
+CtvDeclare(int, ADIOI_cb_config_list_keyval); //=MPI_KEYVAL_INVALID
 CtvStaticDeclare(char*, yylval);
 CtvStaticDeclare(char*, token_ptr);
 
