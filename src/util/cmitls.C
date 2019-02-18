@@ -5,8 +5,9 @@
 #include "cmitls.h"
 #include "memory-isomalloc.h"
 
-#if CMK_HAS_TLS_VARIABLES && CMK_HAS_ELF_H \
-    && ((CMK_DLL_USE_DLOPEN && CMK_HAS_RTLD_DEFAULT) || CMK_HAS_DL_ITERATE_PHDR)
+#if CMK_HAS_TLS_VARIABLES
+
+CMI_EXTERNC_VARIABLE int quietModeRequested;
 
 /* These macros are needed for:
  * dlfcn.h: RTLD_DEFAULT
@@ -19,11 +20,8 @@
 # define __USE_GNU
 #endif
 
-#if CMK_HAS_DL_ITERATE_PHDR
-# include <link.h>
-#else
-# include <dlfcn.h>
-#endif
+
+// ----- TLS segment pointer access -----
 
 /*
  * For a description of the system TLS implementations this file works with, see:
@@ -33,81 +31,60 @@
  */
 
 extern "C" {
-void* getTLS(void) CMI_NOOPTIMIZE;
-void setTLS(void* newptr) CMI_NOOPTIMIZE;
-void* swapTLS(void* newptr) CMI_NOOPTIMIZE;
+void* getTLS();
+void setTLS(void*);
+void* swapTLS(void*);
 }
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
-
-#if !CMK_HAS_DL_ITERATE_PHDR
-static void* CmiTLSExecutableStart;
-#endif
-
-void CmiTLSInit(void)
-{
-  if (CmiMyRank() == 0)
-  {
-    if (!quietModeRequested && CmiMyPe() == 0)
-    {
-      CmiPrintf("Charm++> -tlsglobals enabled for privatization of thread-local variables.\n");
-#if !CMK_HAS_DL_ITERATE_PHDR
-      CmiPrintf("Charm++> Warning: Unable to examine TLS segments of shared objects.\n");
-#endif
-    }
-
-#if !CMK_HAS_DL_ITERATE_PHDR
-    /* Use dynamic linking in case Charm++ shared objects are used by a binary lacking
-     * conv-static.o, such as in the case of Charm4py. */
-    void** pCmiExecutableStart = (void**)dlsym(RTLD_DEFAULT, "CmiExecutableStart");
-    if (pCmiExecutableStart != NULL)
-      CmiTLSExecutableStart = *pCmiExecutableStart;
-    else
-      CmiPrintf("Charm++> Error: \"CmiExecutableStart\" symbol not found. -tlsglobals disabled.\n");
-#endif
-  }
-}
-
-#if !CMK_HAS_DL_ITERATE_PHDR
-static Addr getCodeSegAddr(void) {
-  return (Addr) CmiTLSExecutableStart;
-}
-
-static Ehdr* getELFHeader(void) {
-  return (Ehdr*) getCodeSegAddr();
-}
-
-static Phdr* getProgramHeader(Ehdr* ehdr) {
-  return (Phdr*)((char *)ehdr + ehdr->e_phoff);
-}
-
-Phdr* getTLSPhdrEntry(void) {
-  int phnum, i;
-  Ehdr* elfHeader;
-  Phdr* progHeader;
-
-  elfHeader = getELFHeader();
-  if (elfHeader == NULL)
-    return NULL;
-
-  phnum = elfHeader->e_phnum;
-  progHeader = getProgramHeader(elfHeader);
-  for (i = 0; i < phnum; i++) {
-    if (progHeader[i].p_type == PT_TLS) {
-#if CMK_ERROR_CHECKING
-      /* sanity check */
-      /* align is power of 2 */
-      int align = progHeader[i].p_align;
-      CmiAssert(align > 0 && ( (align & (align-1)) == 0));
-      /* total size is not less than the size of .tdata (initializer data) */
-      CmiAssert(progHeader[i].p_memsz >= progHeader[i].p_filesz);
-#endif
-      return &progHeader[i];
-    }
-  }
-  return NULL;
-}
+#if CMK_TLS_SWITCHING_X86_64
+# define CMK_TLS_X86_MOV "movq"
+# define CMK_TLS_X86_REG "fs"
+#elif CMK_TLS_SWITCHING_X86
+# define CMK_TLS_X86_MOV "movl"
+# define CMK_TLS_X86_REG "gs"
 #else
+# define CMK_TLS_SWITCHING_UNAVAILABLE
+#endif
+
+void* getTLS()
+{
+#ifdef CMK_TLS_X86_MOV
+  void* ptr;
+  asm volatile (CMK_TLS_X86_MOV " %%" CMK_TLS_X86_REG ":0x0, %0\n"
+                : "=&r"(ptr));
+  return ptr;
+#else
+  return nullptr;
+#endif
+}
+
+void setTLS(void* newptr)
+{
+#ifdef CMK_TLS_X86_MOV
+  asm volatile (CMK_TLS_X86_MOV " %0, %%" CMK_TLS_X86_REG ":0x0\n\t"
+                :
+                : "r"(newptr));
+#endif
+}
+
+void* swapTLS(void* newptr)
+{
+  void* oldptr = getTLS();
+  setTLS(newptr);
+  return oldptr;
+}
+
+
+// ----- TLS segment size determination -----
+
+#if CMK_HAS_DL_ITERATE_PHDR
+
+# include <link.h>
+
+static inline void CmiTLSStatsInit(void)
+{
+}
+
 static int count_tls_sizes(struct dl_phdr_info* info, size_t size, void* data)
 {
   size_t i;
@@ -115,7 +92,7 @@ static int count_tls_sizes(struct dl_phdr_info* info, size_t size, void* data)
 
   for (i = 0; i < info->dlpi_phnum; i++)
   {
-    const Phdr* hdr = &info->dlpi_phdr[i];
+    const ElfW(Phdr) * hdr = &info->dlpi_phdr[i];
     if (hdr->p_type == PT_TLS)
     {
       t->size += hdr->p_memsz;
@@ -126,107 +103,155 @@ static int count_tls_sizes(struct dl_phdr_info* info, size_t size, void* data)
 
   return 0;
 }
-#endif
 
-void allocNewTLSSeg(tlsseg_t* t, CthThread th) {
-#if CMK_HAS_DL_ITERATE_PHDR
+static void populateTLSSegStats(tlsseg_t * t)
+{
   t->size = 0;
   t->align = 0;
   dl_iterate_phdr(count_tls_sizes, t); /* count all PT_TLS sections */
-#else
+}
+
+#elif CMK_HAS_ELF_H && CMK_DLL_USE_DLOPEN && CMK_HAS_RTLD_DEFAULT
+
+# include <dlfcn.h>
+# define CMK_TLS_NO_SHARED
+
+static void* CmiTLSExecutableStart;
+
+static inline Addr getCodeSegAddr()
+{
+  return (Addr) CmiTLSExecutableStart;
+}
+
+static inline Ehdr* getELFHeader()
+{
+  return (Ehdr*) getCodeSegAddr();
+}
+
+static inline Phdr* getProgramHeader(Ehdr* ehdr)
+{
+  return (Phdr*)((char *)ehdr + ehdr->e_phoff);
+}
+
+Phdr* getTLSPhdrEntry()
+{
+  int phnum, i;
+  Ehdr* elfHeader;
+  Phdr* progHeader;
+
+  elfHeader = getELFHeader();
+  if (elfHeader == NULL)
+    return NULL;
+
+  phnum = elfHeader->e_phnum;
+  progHeader = getProgramHeader(elfHeader);
+  for (i = 0; i < phnum; i++)
+  {
+    if (progHeader[i].p_type == PT_TLS)
+    {
+#if CMK_ERROR_CHECKING
+      /* sanity check */
+      /* align is power of 2 */
+      int align = progHeader[i].p_align;
+      CmiAssert(align > 0 && (align & (align-1)) == 0);
+      /* total size is not less than the size of .tdata (initializer data) */
+      CmiAssert(progHeader[i].p_memsz >= progHeader[i].p_filesz);
+#endif
+      return &progHeader[i];
+    }
+  }
+  return NULL;
+}
+
+static void CmiTLSStatsInit()
+{
+  /* Use dynamic linking in case Charm++ shared objects are used by a binary lacking
+   * conv-static.o, such as in the case of Charm4py. */
+  void** pCmiExecutableStart = (void**)dlsym(RTLD_DEFAULT, "CmiExecutableStart");
+  if (pCmiExecutableStart != NULL)
+    CmiTLSExecutableStart = *pCmiExecutableStart;
+  else
+    CmiPrintf("Charm++> Error: \"CmiExecutableStart\" symbol not found. -tlsglobals disabled.\n");
+}
+
+static void populateTLSSegStats(tlsseg_t * t)
+{
   Phdr* phdr = getTLSPhdrEntry();
-  if (phdr != NULL) {
+  if (phdr != NULL)
+  {
     t->align = phdr->p_align;
     t->size = phdr->p_memsz;
-  } else {
+  }
+  else
+  {
     t->size = 0;
     t->align = 0;
   }
+}
+
+#else
+
+static inline void CmiTLSStatsInit()
+{
+}
+
+static void populateTLSSegStats(tlsseg_t * t)
+{
+  t->size = 0;
+}
+
 #endif
 
-  if (t->size > 0) {
+
+// ----- CmiTLS implementation -----
+
+void CmiTLSInit()
+{
+#ifdef CMK_TLS_SWITCHING_UNAVAILABLE
+  CmiAbort("TLS globals are not supported.");
+#else
+  if (CmiMyRank() == 0)
+  {
+    if (!quietModeRequested && CmiMyPe() == 0)
+    {
+      CmiPrintf("Charm++> -tlsglobals enabled for privatization of thread-local variables.\n");
+#ifdef CMK_TLS_NO_SHARED
+      CmiPrintf("Charm++> Warning: Unable to examine TLS segments of shared objects.\n");
+#endif
+    }
+
+    CmiTLSStatsInit();
+  }
+#endif
+}
+
+void allocNewTLSSeg(tlsseg_t* t, CthThread th)
+{
+  populateTLSSegStats(t);
+
+  if (t->size > 0)
+  {
     t->size = CMIALIGN(t->size, t->align);
     t->memseg = (Addr)CmiIsomallocMallocAlignForThread(th, t->align, t->size);
     memcpy((void*)t->memseg, (char *)getTLS() - t->size, t->size);
     t->memseg = (Addr)( ((char *)(t->memseg)) + t->size );
     /* printf("[%d] 2 ALIGN %d MEM %p SIZE %d\n", CmiMyPe(), t->align, t->memseg, t->size); */
-  } else {
+  }
+  else
+  {
     /* since we don't have a PT_TLS section to copy, keep whatever the system gave us */
     t->memseg = (Addr)getTLS();
   }
 }
 
-extern "C" {
-void switchTLS(tlsseg_t* , tlsseg_t* ) CMI_NOOPTIMIZE;
-void currentTLS(tlsseg_t*) CMI_NOOPTIMIZE;
-}
-
-void currentTLS(tlsseg_t* cur) {
-  cur->memseg = (Addr)getTLS();
-}
-
-void* getTLS(void) {
-  void* ptr;
-#if CMK_TLS_SWITCHING64
-  asm volatile ("movq %%fs:0x0, %0\n\t"
-                : "=r"(ptr));
-#elif CMK_TLS_SWITCHING32
-  asm volatile ("movl %%gs:0x0, %0\n\t"
-                : "=r"(ptr));
-#else
-  fprintf(stderr, "TLS globals are not supported.");
-  abort();
-#endif
-  return ptr;
-}
-
-void switchTLS(tlsseg_t* cur, tlsseg_t* next) {
+void switchTLS(tlsseg_t* cur, tlsseg_t* next)
+{
   cur->memseg = (Addr)swapTLS((void*)next->memseg);
 }
 
-void* swapTLS(void* newptr) {
-  void* oldptr;
-#if CMK_TLS_SWITCHING64
-#if 0
-  asm volatile ("movq %%fs:0x0, %0\n\t"
-                : "=r"(oldptr));
-  if (oldptr == newptr) /* same */
-    return oldptr;
-  asm volatile ("movq %0, %%fs:0x0\n\t"
-                :
-                : "r"(newptr));
-#else
-  asm volatile ("movq %%fs:0x0, %0\n\t"
-                "movq %1, %%fs:0x0\n\t"
-                : "=&r"(oldptr)
-                : "r"(newptr));
-#endif
-#elif CMK_TLS_SWITCHING32
-  asm volatile ("movl %%gs:0x0, %0\n\t"
-                "movl %1, %%gs:0x0\n\t"
-                : "=&r"(oldptr)
-                : "r"(newptr));
-#else
-  fprintf(stderr, "TLS globals are not supported.");
-  abort();
-#endif
-  return oldptr;
-}
-
-/* for calling from a debugger */
-void setTLS(void* newptr) {
-#if CMK_TLS_SWITCHING64
-  asm volatile ("movq %0, %%fs:0x0\n\t"
-                :
-                : "r"(newptr));
-#elif CMK_TLS_SWITCHING32
-  asm volatile ("movl %0, %%gs:0x0\n\t"
-                :
-                : "r"(newptr));
-#else
-  fprintf(stderr, "TLS globals are not supported.");
-  abort();
-#endif
+void currentTLS(tlsseg_t* cur)
+{
+  cur->memseg = (Addr)getTLS();
 }
 
 #endif

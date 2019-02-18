@@ -3,7 +3,9 @@
 
 #include "conv-config.h"
 
-#if CMK_HAS_TLS_VARIABLES && CMK_HAS_ELF_H \
+#if CMK_HAS_TLS_VARIABLES
+
+#if CMK_HAS_ELF_H \
     && ((CMK_DLL_USE_DLOPEN && CMK_HAS_RTLD_DEFAULT) || CMK_HAS_DL_ITERATE_PHDR)
 
 #include <elf.h>
@@ -29,18 +31,19 @@ typedef Elf64_Ehdr Ehdr;
 typedef Elf64_Phdr Phdr;
 #endif
 
+#else
+
+typedef void * Addr;
+
+#endif
+
+#endif
+
 typedef struct tlsseg {
   Addr memseg;
   size_t size;
   size_t align;
 } tlsseg_t;
-
-
-#else
-
-typedef int  tlsseg_t;            /* place holder */
-
-#endif
 
 #ifdef __cplusplus
 extern "C" {
