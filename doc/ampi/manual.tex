@@ -339,7 +339,7 @@ or C11 with \emph{thread\_local} or \emph{\_Thread\_local},
 and in Fortran with OpenMP's \emph{threadprivate} attribute. OpenMP is required for using tlsglobals
 in Fortran code since Fortran has no other method of using TLS. The \emph{\_\_thread} keyword is
 not an official extension of the C language, though compiler writers are encouraged to implement
-this feature. Currently, the ELF object file format supports Thread Local Storage.
+this feature.
 
 It handles both global and static variables and has no context-switching
 overhead. AMPI provides runtime support for privatizing thread-local variables to user-level threads
@@ -563,7 +563,7 @@ Transformation           & Yes     & Yes     & Yes     & Yes   & Yes     & Yes  
 \hline
 GOT-Globals              & Yes     & Yes     & No      & No    & No      & Yes   & Yes   \\
 \hline
-TLS-Globals              & Yes     & Yes     & No      & No    & Maybe   & Maybe & Maybe \\
+TLS-Globals              & Yes     & Yes     & Yes     & No    & Maybe   & Maybe & Maybe \\
 \hline
 \end{tabular}
 \caption{Portability of current implementations of three privatization schemes.

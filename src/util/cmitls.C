@@ -38,7 +38,11 @@ void* swapTLS(void*);
 
 #if CMK_TLS_SWITCHING_X86_64
 # define CMK_TLS_X86_MOV "movq"
-# define CMK_TLS_X86_REG "fs"
+# ifdef __APPLE__
+#  define CMK_TLS_X86_REG "gs"
+# else
+#  define CMK_TLS_X86_REG "fs"
+# endif
 #elif CMK_TLS_SWITCHING_X86
 # define CMK_TLS_X86_MOV "movl"
 # define CMK_TLS_X86_REG "gs"
@@ -109,6 +113,147 @@ static void populateTLSSegStats(tlsseg_t * t)
   t->size = 0;
   t->align = 0;
   dl_iterate_phdr(count_tls_sizes, t); /* count all PT_TLS sections */
+}
+
+#elif defined __APPLE__
+
+// parts adapted from threadLocalVariables.c in dyld
+
+# include <mach-o/dyld.h>
+# include <mach-o/nlist.h>
+
+#if __LP64__
+  typedef struct mach_header_64 macho_header;
+# define MACHO_HEADER_MAGIC MH_MAGIC_64
+# define LC_SEGMENT_COMMAND LC_SEGMENT_64
+  typedef struct segment_command_64 macho_segment_command;
+  typedef struct section_64 macho_section;
+  typedef struct nlist_64 macho_nlist;
+#else
+  typedef struct mach_header macho_header;
+# define MACHO_HEADER_MAGIC MH_MAGIC
+# define LC_SEGMENT_COMMAND LC_SEGMENT
+  typedef struct segment_command macho_segment_command;
+  typedef struct section macho_section;
+  typedef struct nlist macho_nlist;
+#endif
+
+static size_t GetTLVSizeFromMachOHeader()
+{
+  size_t totalsize = 0;
+
+  for (uint32_t c = 0; c < _dyld_image_count(); ++c)
+  {
+    const struct mach_header * const mh_orig = _dyld_get_image_header(c);
+    if (mh_orig == nullptr)
+      continue;
+
+    CmiEnforce(mh_orig->magic == MACHO_HEADER_MAGIC);
+    const auto mh = (const macho_header *)mh_orig;
+    const auto mh_addr = (const char *)mh;
+
+    const uint8_t * start = nullptr;
+    unsigned long size = 0;
+    intptr_t slide = 0;
+    bool slideComputed = false;
+
+    uint64_t text_vmaddr = 0, linkedit_vmaddr = 0, linkedit_fileoff = 0;
+
+    const uint32_t cmd_count = mh->ncmds;
+    const auto cmds = (const struct load_command *)(mh_addr + sizeof(macho_header));
+    const struct load_command * cmd = cmds;
+    for (uint32_t i = 0; i < cmd_count; ++i)
+    {
+      const auto lc_type = cmd->cmd & ~LC_REQ_DYLD;
+      if (lc_type == LC_SEGMENT_COMMAND)
+      {
+        const auto seg = (const macho_segment_command *)cmd;
+
+        if (!slideComputed && seg->filesize != 0)
+        {
+          slide = (uintptr_t)mh - seg->vmaddr;
+          slideComputed = true;
+        }
+
+        if (strcmp(seg->segname, SEG_TEXT) == 0)
+          text_vmaddr = seg->vmaddr;
+        else if (strcmp(seg->segname, SEG_LINKEDIT) == 0)
+        {
+          linkedit_vmaddr = seg->vmaddr;
+          linkedit_fileoff = seg->fileoff;
+        }
+
+        // look for TLV sections, used by Apple's clang
+
+        const auto sectionsStart = (const macho_section *)((const char *)seg + sizeof(macho_segment_command));
+        const auto sectionsEnd = sectionsStart + seg->nsects;
+        for (auto sect = sectionsStart; sect < sectionsEnd; ++sect)
+        {
+          const auto section_type = sect->flags & SECTION_TYPE;
+          if (section_type == S_THREAD_LOCAL_ZEROFILL || section_type == S_THREAD_LOCAL_REGULAR)
+          {
+            if (start == nullptr)
+            {
+              // first of N contiguous TLV template sections: record as if this were the only section
+              start = (const uint8_t *)(sect->addr + slide);
+              size = sect->size;
+            }
+            else
+            {
+              // non-first of N contiguous TLV template sections: accumulate values
+              const auto newEnd = (const uint8_t *)(sect->addr + slide + sect->size);
+              size = newEnd - start;
+            }
+          }
+        }
+      }
+      else if (lc_type == LC_SYMTAB && text_vmaddr)
+      {
+        // look through all symbols for GNU emutls, used by GCC
+
+        const auto symcmd = (const struct symtab_command *)cmd;
+        auto strtab = (const char *)(linkedit_vmaddr + (symcmd->stroff - linkedit_fileoff) + slide);
+        auto symtab = (const macho_nlist *)(linkedit_vmaddr + (symcmd->symoff - linkedit_fileoff) + slide);
+
+        for (const macho_nlist * nl = symtab, * const nl_end = symtab + symcmd->nsyms; nl < nl_end; ++nl)
+        {
+          if ((nl->n_type & (N_TYPE & N_SECT)) != N_SECT)
+            continue;
+
+          static const char emutls_prefix[] = "___emutls_v.";
+          const char * const symname = strtab + nl->n_un.n_strx;
+          if (strncmp(symname, emutls_prefix, sizeof(emutls_prefix)-1) == 0)
+          {
+            const auto addr = (const size_t *)(nl->n_value + slide);
+            const size_t symsize = *addr;
+            totalsize += symsize;
+          }
+        }
+      }
+
+      cmd = (const struct load_command *)(((const char *)cmd) + cmd->cmdsize);
+    }
+
+    totalsize += size;
+  }
+
+  return totalsize;
+}
+
+static size_t CmiTLSSize;
+
+static inline void CmiTLSStatsInit(void)
+{
+  // calculate the TLS size once at startup
+  CmiTLSSize = GetTLVSizeFromMachOHeader();
+}
+
+static void populateTLSSegStats(tlsseg_t * t)
+{
+  // fill the struct with the cached size
+  t->size = CmiTLSSize;
+  // Apple uses alignment by 16
+  t->align = 16;
 }
 
 #elif CMK_HAS_ELF_H && CMK_DLL_USE_DLOPEN && CMK_HAS_RTLD_DEFAULT

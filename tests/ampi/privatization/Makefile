@@ -23,14 +23,10 @@ CANDIDATES := \
 
 
 # Define what options to pass to charmc for each method.
+$(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$(eval OPTS_$j_$i := -$i)))
 OPTS_cxx_control :=
-OPTS_cxx_swapglobals := -swapglobals
-OPTS_cxx_tlsglobals := -tlsglobals
-OPTS_cxx_roseomptlsglobals := -roseomptlsglobals
 OPTS_f90_control :=
-OPTS_f90_swapglobals := -swapglobals
-OPTS_f90_tlsglobals := -tlsglobals -fopenmp
-OPTS_f90_roseomptlsglobals := -roseomptlsglobals
+OPTS_f90_tlsglobals += -fopenmp
 
 # Define the features that each privatization method supports.
 FEATURES_cxx_control := staticvars sharedlib dynamiclib

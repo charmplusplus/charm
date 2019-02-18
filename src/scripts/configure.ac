@@ -782,6 +782,13 @@ then
     OPTS_CXX="$OPTS_CXX -fno-lifetime-dse"
 fi
 
+# Test for a flag tlsglobals sometimes depends on
+test_cxx "whether C++ compiler accepts -mno-tls-direct-seg-refs" "yes" "no" "-mno-tls-direct-seg-refs"
+if test $strictpass -eq 1
+then
+    add_flag 'CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS="1"' "tlsglobals"
+fi
+
 # Determine compiler/linker flags to build libcharm.so for charm4py
 if test "$enable_charmpy" = "yes"
 then

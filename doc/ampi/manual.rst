@@ -372,8 +372,7 @@ by annotating global/static variable declarations in C with
 attribute. OpenMP is required for using tlsglobals in Fortran code since
 Fortran has no other method of using TLS. The *__thread* keyword is not
 an official extension of the C language, though compiler writers are
-encouraged to implement this feature. Currently, the ELF object file
-format supports Thread Local Storage.
+encouraged to implement this feature.
 
 It handles both global and static variables and has no context-switching
 overhead. AMPI provides runtime support for privatizing thread-local
@@ -634,7 +633,7 @@ different schemes.
    ==================== === ====== ====== ==== ======= ===== =====
    Transformation       Yes Yes    Yes    Yes  Yes     Yes   Yes
    GOT-Globals          Yes Yes    No     No   No      Yes   Yes
-   TLS-Globals          Yes Yes    No     No   Maybe   Maybe Maybe
+   TLS-Globals          Yes Yes    Yes    No   Maybe   Maybe Maybe
    ==================== === ====== ====== ==== ======= ===== =====
 
 Extensions for Migrations

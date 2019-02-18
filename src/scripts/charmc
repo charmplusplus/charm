@@ -1018,9 +1018,11 @@ fi
 
 if [ "$TLSGLOBALS" = "1" ]
 then
-    OPTS_CC="$OPTS_CC -mno-tls-direct-seg-refs -ftls-model=initial-exec"
-    OPTS_CXX="$OPTS_CXX -mno-tls-direct-seg-refs -ftls-model=initial-exec"
-    OPTS_F90="$OPTS_F90 -mno-tls-direct-seg-refs -ftls-model=initial-exec"
+    TLSGLOBALS_OPTS='-ftls-model=initial-exec'
+    [ "$CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS" = '1' ] && TLSGLOBALS_OPTS="$TLSGLOBALS_OPTS -mno-tls-direct-seg-refs"
+    OPTS_CC="$OPTS_CC $TLSGLOBALS_OPTS"
+    OPTS_CXX="$OPTS_CXX $TLSGLOBALS_OPTS"
+    OPTS_F90="$OPTS_F90 $TLSGLOBALS_OPTS"
 fi
 
 # Look up and add the dependencies for module $1
@@ -1383,13 +1385,13 @@ then
       echo "Error: -tlsglobals is not supported with the uth machine layer."
       exit 1
     fi
-    if ! `$CMK_CC --version | grep -q gcc`
+    if [ "$CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS" != '1' ] && [ "$CMK_COMPILER" != 'clang' -o "$CMK_MACOSX" != '1' ]
     then
-      echo "Warning: -tlsglobals may not work with compilers other than GCC."
+      echo "Warning: -tlsglobals may not work with compilers that do not recognize -mno-tls-direct-seg-refs."
     fi
-    if ! `$CMK_LD -Wl,--version,-v 2>&1 | grep -q elf`
+    if [ "$CMK_HAS_ELF_H" != '1' -a "$CMK_MACOSX" != '1' ]
     then
-      echo "Warning: -tlsglobals may not work with a linker that does not report ELF support."
+      echo "Warning: -tlsglobals requires elf.h"
     fi
 fi
 
@@ -1524,11 +1526,7 @@ then
 fi
 if [ "$TLSGLOBALS"  = "1" ]
 then
-    # make sure we don't add an extra -tls
-  if ! echo $THREAD | grep '\-tls$' > /dev/null 2> /dev/null
-  then
-    THREAD=${THREAD}-tls
-  fi
+  THREAD=${THREAD%-tls}-tls
 fi
 
 THREAD_OBJ="-lthreads-${THREAD}"
