@@ -1,5 +1,6 @@
 DIRS = \
   p2pPingpong \
+  bcastPingAll \
 
 TESTDIRS = $(DIRS)
 
