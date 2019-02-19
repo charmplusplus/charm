@@ -117,16 +117,18 @@ IFEM_Solve_shared
 
 ::
 
-  void IFEM_Solve_shared(ILSI_Solver s,ILSI_Param *p, int fem_mesh, int
-    fem_entity,int length,int width, IFEM_Matrix_product_c A, void *ptr,
+  void IFEM_Solve_shared(ILSI_Solver s, ILSI_Param *p, int fem_mesh, int
+    fem_entity, int length, int width, IFEM_Matrix_product_c A, void *ptr,
     const double *b, double *x);
 
 .. code-block:: fortran
 
-  subroutine IFEM_Solve_shared(s,p,fem_mesh,fem_entity,length,width,A,ptr,b,x)
+  subroutine IFEM_Solve_shared(s, p, fem_mesh, fem_entity, length, width, A, ptr, b, x)
   external solver subroutine :: s
   double precision, intent(inout) :: p(ILSI PARAM)
-  integer, intent(in) :: fem mesh, fem entity, length,width external matrix-vector product subroutine :: A TYPE(varies), pointer :: ptr
+  integer, intent(in) :: fem mesh, fem entity, length, width
+  external matrix-vector product subroutine :: A
+  TYPE(varies), pointer :: ptr
   double precision, intent(in) :: b(width,length)
   double precision, intent(inout) :: x(width,length)
 
@@ -134,7 +136,7 @@ This routine solves the linear system :math:`A x = b` for the unknown
 vector :math:`x`. s and p give the particular linear solver to use,
 and are described in more detail in Section :numref:`sec:solver`.
 fem_mesh and fem_entity give the FEM framework mesh (often
-FEM_Mesh_default_read()) and entity (often FEM_NODE) with which the
+``FEM_Mesh_default_read()``) and entity (often ``FEM_NODE``) with which the
 known and unknown vectors are listed.
 
 width gives the number of degrees of freedom (entries in the vector) per
@@ -157,47 +159,47 @@ and the output values of the solver parameters p will have been written.
 ::
 
    // C++ Example
-     int mesh=FEM_Mesh_default_read();
-     int nNodes=FEM_Mesh_get_length(mesh,FEM_NODE);
-     int width=3; //A 3D problem
-     ILSI_Param solverParam;
-     struct myProblemData myData;
+   int mesh=FEM_Mesh_default_read();
+   int nNodes=FEM_Mesh_get_length(mesh,FEM_NODE);
+   int width=3; //A 3D problem
+   ILSI_Param solverParam;
+   struct myProblemData myData;
 
-     double *b=new double[nNodes*width];
-     double *x=new double[nNodes*width];
-     ... prepare solution target b and guess x ...
+   double *b=new double[nNodes*width];
+   double *x=new double[nNodes*width];
+   ... prepare solution target b and guess x ...
 
-     ILSI_Param_new(&solverParam);
-     solverParam.maxResidual=1.0e-4;
-     solverParam.maxIterations=500;
+   ILSI_Param_new(&solverParam);
+   solverParam.maxResidual=1.0e-4;
+   solverParam.maxIterations=500;
 
-     IFEM_Solve_shared(IFEM_CG_Solver,&solverParam,
-            mesh,FEM_NODE, nNodes,width,
-            myMatrixVectorProduct, &myData, b,x);
+   IFEM_Solve_shared(IFEM_CG_Solver,&solverParam,
+          mesh,FEM_NODE,nNodes,width,
+          myMatrixVectorProduct,&myData,b,x);
 
 .. code-block:: fortran
 
    ! F90 Example
-     include 'ifemf.h'
-     INTEGER :: mesh, nNodes,width
-     DOUBLE PRECISION, ALLOCATABLE :: b(:,:), x(:,:)
-     DOUBLE PRECISION :: solverParam(ILSI_PARAM)
-     TYPE(myProblemData) :: myData
+   include 'ifemf.h'
+   INTEGER :: mesh, nNodes,width
+   DOUBLE PRECISION, ALLOCATABLE :: b(:,:), x(:,:)
+   DOUBLE PRECISION :: solverParam(ILSI_PARAM)
+   TYPE(myProblemData) :: myData
 
-     mesh=FEM_Mesh_default_read()
-     nNodes=FEM_Mesh_get_length(mesh,FEM_NODE)
-     width=3   ! A 3D problem
+   mesh=FEM_Mesh_default_read()
+   nNodes=FEM_Mesh_get_length(mesh,FEM_NODE)
+   width=3   ! A 3D problem
 
-     ALLOCATE(b(width,nNodes), x(width,nNodes))
-     ... prepare solution target b and guess x ..
+   ALLOCATE(b(width,nNodes), x(width,nNodes))
+   ... prepare solution target b and guess x ..
 
-     ILSI_Param_new(&solverParam);
-     solverParam(1)=1.0e-4;
-     solverParam(2)=500;
+   ILSI_Param_new(&solverParam);
+   solverParam(1)=1.0e-4;
+   solverParam(2)=500;
 
-     IFEM_Solve_shared(IFEM_CG_Solver,solverParam,
-            mesh,FEM_NODE, nNodes,width,
-            myMatrixVectorProduct, myData, b,x);
+   IFEM_Solve_shared(IFEM_CG_Solver,solverParam,
+          mesh,FEM_NODE,nNodes,width,
+          myMatrixVectorProduct,myData,b,x);
 
 .. _sec:mvp:
 
@@ -210,16 +212,16 @@ subroutine name, but it must take these arguments:
 
 ::
 
-  void IFEM_Matrix_product(void *ptr,int length,int width, const double
+  void IFEM_Matrix_product(void *ptr, int length, int width, const double
     *src, double *dest);
 
 .. code-block:: fortran
 
-  subroutine IFEM_Matrix_product(ptr,length,width,src,dest)
+  subroutine IFEM_Matrix_product(ptr, length, width, src, dest)
   TYPE(varies), pointer :: ptr
-  integer, intent(in) :: length,width
-  double precision, intent(in) :: src(width,length)
-  double precision, intent(out) :: dest(width,length)
+  integer, intent(in) :: length, width
+  double precision, intent(in) :: src(width, length)
+  double precision, intent(out) :: dest(width, length)
 
 
 The framework calls this user-written routine when it requires a
@@ -271,11 +273,11 @@ consistent global matrix-vector product.
 .. code-block:: fortran
 
    ! F90 Example
-     TYPE(myProblemData)
-       INTEGER :: nElements
-       INTEGER, ALLOCATABLE :: conn(2,:)
-       DOUBLE PRECISION :: k
-     END TYPE
+   TYPE(myProblemData)
+     INTEGER :: nElements
+     INTEGER, ALLOCATABLE :: conn(2,:)
+     DOUBLE PRECISION :: k
+   END TYPE
 
    SUBROUTINE myMatrixVectorProduct(d,nNodes,dofPerNode,src,dest)
      include 'ifemf.h'
@@ -300,15 +302,15 @@ IFEM_Solve_shared_bc
 
 ::
 
-  void IFEM_Solve_shared_bc(ILSI_Solver s,ILSI_Param *p, int fem_mesh,
-  int fem_entity,int length,int width, int bcCount, const int *bcDOF,
+  void IFEM_Solve_shared_bc(ILSI_Solver s, ILSI_Param *p, int fem_mesh,
+  int fem_entity, int length, int width, int bcCount, const int *bcDOF,
   const double *bcValue, IFEM_Matrix_product_c A, void *ptr, const
   double *b, double *x);
 
 .. code-block:: fortran
 
-  subroutine IFEM_Solve_shared_bc(s,p,
-  fem_mesh,fem_entity,length,width, bcCount,bcDOF,bcValue, A,ptr,b,x)
+  subroutine IFEM_Solve_shared_bc(s, p, fem_mesh, fem_entity, length, width,
+  bcCount, bcDOF, bcValue, A, ptr, b, x)
   external solver subroutine :: s
   double precision, intent(inout) :: p(ILSI_PARAM)
   integer, intent(in) :: fem_mesh, fem_entity, length,width
@@ -320,7 +322,7 @@ IFEM_Solve_shared_bc
   double precision, intent(in) :: b(width,length)
   double precision, intent(inout) :: x(width,length)
 
-Like IFEM_Solve_shared, this routine solves the linear system
+Like ``IFEM_Solve_shared``, this routine solves the linear system
 :math:`A x = b` for the unknown vector :math:`x`. This routine,
 however, adds support for boundary conditions associated with
 :math:`x`. These so-called "essential" boundary conditions restrict
@@ -342,27 +344,28 @@ to 7.3 like this:
 ::
 
    // C++ Example
-     int bcCount=2;
-     int bcDOF[bcCount];
-     double bcValue[bcCount];
-     // Fix node ny's y coordinate
-     bcDOF[0]=ny*width+1; // y is coordinate 1
-     bcValue[0]=4.6;
-     // Fix node nz's z coordinate
-     bcDOF[1]=nz*width+2; // z is coordinate 2
-     bcValue[1]=2.0;
+   int bcCount=2;
+   int bcDOF[bcCount];
+   double bcValue[bcCount];
+   // Fix node ny's y coordinate
+   bcDOF[0]=ny*width+1; // y is coordinate 1
+   bcValue[0]=4.6;
+   // Fix node nz's z coordinate
+   bcDOF[1]=nz*width+2; // z is coordinate 2
+   bcValue[1]=2.0;
+
+.. code-block:: fortran
 
    ! F90 Example
-   // C++ Example
-     integer :: bcCount=2;
-     integer :: bcDOF(bcCount);
-     double precision :: bcValue(bcCount);
-     // Fix node ny's y coordinate
-     bcDOF(1)=(ny-1)*width+2; // y is coordinate 2
-     bcValue(1)=4.6;
-     // Fix node nz's z coordinate
-     bcDOF(2)=(nz-1)*width+3; // z is coordinate 3
-     bcValue(2)=2.0;
+   integer :: bcCount=2;
+   integer :: bcDOF(bcCount);
+   double precision :: bcValue(bcCount);
+   // Fix node ny's y coordinate
+   bcDOF(1)=(ny-1)*width+2; // y is coordinate 2
+   bcValue(1)=4.6;
+   // Fix node nz's z coordinate
+   bcDOF(2)=(nz-1)*width+3; // z is coordinate 3
+   bcValue(2)=2.0;
 
 Mathematically, what is happening is we are splitting the partially
 unknown vector :math:`x` into a completely unknown portion :math:`y` and
@@ -384,5 +387,3 @@ subroutine.
 One important missing feature is the ability to specify general linear
 constraints on the unknowns, rather than imposing specific values.
 
-Index
-=====
