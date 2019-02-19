@@ -3102,6 +3102,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -3297,7 +3298,7 @@ _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
-
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -3356,7 +3357,7 @@ _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
-
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -3422,7 +3423,7 @@ _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
-
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -3461,7 +3462,7 @@ _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
-
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -3501,7 +3502,7 @@ _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
-
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -3618,6 +3619,7 @@ struct s2 {int (*f) (double a);};
 int pairnames (int, char **, FILE *(*)(struct buf *, struct stat *, int), int, int);
 int argc;
 char **argv;
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -3859,7 +3861,7 @@ if test "${ac_cv_f77_compiler_gnu+set}" = set; then
   $as_echo_n "(cached) " >&6
 else
   cat >conftest.$ac_ext <<_ACEOF
-      program main
+      subroutine mpi_main
 #ifndef __GNUC__
        choke me
 #endif
@@ -3909,7 +3911,7 @@ if test "${ac_cv_prog_f77_g+set}" = set; then
 else
   FFLAGS=-g
 cat >conftest.$ac_ext <<_ACEOF
-      program main
+      subroutine mpi_main
 
       end
 _ACEOF
@@ -4606,6 +4608,7 @@ $as_echo_n "checking if pread64 is defined... " >&6; }
   rm -f conftest.c
   cat > conftest.c <<EOF
 #include <unistd.h>
+#include "mpi.h" // For AMPI renaming of main()
      main()
      {
          int fd=0, buf=0, i=0;
@@ -4644,6 +4647,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
 #include <aio.h>
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -4744,7 +4748,7 @@ char $ac_func ();
 #if defined __stub_$ac_func || defined __stub___$ac_func
 choke me
 #endif
-
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -5341,7 +5345,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 #include <stdarg.h>
 #include <string.h>
 #include <float.h>
-
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -5445,6 +5449,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 #endif
 
 #define XOR(e, f) (((e) && !(f)) || (!(e) && (f)))
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -5752,6 +5757,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 $ac_includes_default
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -5786,6 +5792,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 $ac_includes_default
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -5856,6 +5863,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 $ac_includes_default
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -5890,6 +5898,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 $ac_includes_default
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -5960,6 +5969,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 $ac_includes_default
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -5994,6 +6004,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 $ac_includes_default
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -6064,6 +6075,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 $ac_includes_default
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -6098,6 +6110,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 $ac_includes_default
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -6322,6 +6335,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 $ac_includes_default
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -6359,6 +6373,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 $ac_includes_default
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -6450,7 +6465,9 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 $ac_includes_default
+#include "mpi.h" // For AMPI renaming of main()
 int
+
 main ()
 {
 static int test_array [1 - 2 * !(((long int) (sizeof (int))) >= $ac_mid)];
@@ -6514,6 +6531,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 $ac_includes_default
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -6578,6 +6596,7 @@ static long int longval () { return (long int) (sizeof (int)); }
 static unsigned long int ulongval () { return (long int) (sizeof (int)); }
 #include <stdio.h>
 #include <stdlib.h>
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -6681,6 +6700,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 $ac_includes_default
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -6718,6 +6738,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 $ac_includes_default
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -6772,6 +6793,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 $ac_includes_default
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -6809,6 +6831,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 $ac_includes_default
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -6873,6 +6896,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 $ac_includes_default
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -6937,6 +6961,7 @@ static long int longval () { return (long int) (sizeof (void *)); }
 static unsigned long int ulongval () { return (long int) (sizeof (void *)); }
 #include <stdio.h>
 #include <stdlib.h>
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -7073,6 +7098,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 $ac_includes_default
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -7110,6 +7136,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 $ac_includes_default
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -7164,6 +7191,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 $ac_includes_default
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -7201,6 +7229,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 $ac_includes_default
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -7265,6 +7294,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 $ac_includes_default
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -7329,6 +7359,7 @@ static long int longval () { return (long int) (sizeof (long long)); }
 static unsigned long int ulongval () { return (long int) (sizeof (long long)); }
 #include <stdio.h>
 #include <stdlib.h>
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -7598,7 +7629,7 @@ fi
 { $as_echo "$as_me:$LINENO: checking for Fortran 90 KIND parameter for 8-byte integers" >&5
 $as_echo_n "checking for Fortran 90 KIND parameter for 8-byte integers... " >&6; }
 cat <<EOF > conftest.$ac_f90ext
-      program main
+      subroutine mpi_main
       integer i
       i = selected_int_kind(16)
       open(8, file="conftest.out", form="formatted")
@@ -7637,7 +7668,7 @@ fi
 $as_echo_n "checking for Fortran 90 KIND parameter for 4-byte integers... " >&6; }
 rm -f kind.f kind.$OBJEXT kind$EXEEXT
 cat <<EOF > kind.f
-      program main
+      subroutine mpi_main
       integer i
       i = selected_int_kind(8)
       open(8, file="k.out", form="formatted")
@@ -7679,7 +7710,7 @@ if test "$NOF77" = 0 ; then
     { $as_echo "$as_me:$LINENO: checking that we can use $FORTRAN_MPI_OFFSET to declare MPI_DISPLACMENT_CURRENT" >&5
 $as_echo_n "checking that we can use $FORTRAN_MPI_OFFSET to declare MPI_DISPLACMENT_CURRENT... " >&6; }
     cat >conftest.f <<EOF
-        program main
+        subroutine mpi_main
         $FORTRAN_MPI_OFFSET j
         end
 EOF
@@ -7696,7 +7727,7 @@ $as_echo_n "checking whether we can use KIND with the selected F77 compiler $F77
         ac_cv_f77_allows_offset_kind=no
         rm -f conftest*
         cat >conftest.f <<EOF
-        program main
+        subroutine mpi_main
         integer (kind=$MPI_OFFSET_KIND_VAL) j
         end
 EOF
@@ -7840,7 +7871,7 @@ $as_echo "no" >&6; }
 $as_echo_n "checking if MPI_OFFSET_KIND is defined in mpif.h... " >&6; }
   rm -f mpitest.f
   cat > mpitest.f <<EOF
-      program main
+      subroutine mpi_main
       implicit none
       include 'mpif.h'
       integer i
@@ -7960,6 +7991,7 @@ extern int PFoo(int);
 #pragma weak PFoo = Foo
 int Foo(int a) { return a; }
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -8091,6 +8123,7 @@ extern int PFoo(int);
 #pragma _HP_SECONDARY_DEF Foo PFoo
 int Foo(int a) { return a; }
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -8152,6 +8185,7 @@ extern int PFoo(int);
 #pragma _CRI duplicate PFoo as Foo
 int Foo(int a) { return a; }
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -8230,6 +8264,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 #include <fcntl.h>
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -8283,6 +8318,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 #include <fcntl.h>
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -8930,6 +8966,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 
 #include <pvfs.h>
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -8983,6 +9020,7 @@ cat >>conftest.$ac_ext <<_ACEOF
             typedef long long int int64_t;
 #include <pvfs.h>
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -9472,6 +9510,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 extern "C"
 #endif
 char aio_write ();
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -9564,6 +9603,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 extern "C"
 #endif
 char pthread_create ();
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -9654,6 +9694,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 extern "C"
 #endif
 char aio_write ();
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -9887,6 +9928,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 
 #include <sys/types.h>
 #include <aio.h>
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -9943,6 +9985,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 
 #include <sys/types.h>
 #include <sys/aio.h>
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -10287,6 +10330,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 #include <sys/aio.h>
 #endif
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -10357,6 +10401,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -10425,6 +10470,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 #include <sys/aio.h>
 #endif
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -10495,6 +10541,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 #include <sys/aio.h>
 #endif
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -10564,6 +10611,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 #include <sys/aio.h>
 #endif
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -10790,6 +10838,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 #include <sys/mount.h>
 #endif
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -10855,6 +10904,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 #include <sys/mount.h>
 #include <string.h>
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -11102,6 +11152,7 @@ char $ac_func ();
 choke me
 #endif
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -11177,6 +11228,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 #include <unistd.h>
 #endif
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -11426,6 +11478,7 @@ char $ac_func ();
 choke me
 #endif
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -11501,6 +11554,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 #include <sys/statvfs.h>
 #endif
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -11720,6 +11774,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 
 #include <unistd.h>
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -11782,6 +11837,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -11879,7 +11935,7 @@ _ACEOF
 $as_echo_n "checking if mpiof.h is included in mpif.h... " >&6; }
   rm -f mpitest.f
   cat > mpitest.f <<EOF
-      program main
+      subroutine mpi_main
       implicit none
       include 'mpif.h'
       integer i
@@ -11948,6 +12004,7 @@ char $ac_func ();
 choke me
 #endif
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -12459,6 +12516,7 @@ char $ac_func ();
 choke me
 #endif
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -12531,6 +12589,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 #include <string.h>
 int strdup(double, int, double, const char *);
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -12625,6 +12684,7 @@ char $ac_func ();
 choke me
 #endif
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -12697,6 +12757,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 #include <stdio.h>
 int snprintf(double, int, double, const char *);
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -12791,6 +12852,7 @@ char $ac_func ();
 choke me
 #endif
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -12863,6 +12925,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 #include <unistd.h>
 int lstat(double, int, double, const char *);
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -12957,6 +13020,7 @@ char $ac_func ();
 choke me
 #endif
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -13029,6 +13093,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 #include <unistd.h>
 int readlink(double, int, double, const char *);
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -13123,6 +13188,7 @@ char $ac_func ();
 choke me
 #endif
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -13195,6 +13261,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 #include <unistd.h>
 int fsync(double, int, double, const char *);
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -13289,6 +13356,7 @@ char $ac_func ();
 choke me
 #endif
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -13361,6 +13429,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 #include <unistd.h>
 int ftruncate(double, int, double, const char *);
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -13456,6 +13525,7 @@ char $ac_func ();
 choke me
 #endif
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -13527,6 +13597,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 #include <unistd.h>
 int lseek64(double, int, double, const char *);
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -13771,6 +13842,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 
                 #include <unistd.h>
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -14014,6 +14086,7 @@ char $ac_func ();
 choke me
 #endif
 
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -14092,6 +14165,7 @@ typedef int * int_ptr;
 	int foo (int_ptr $ac_kw ip) {
 	return ip[0];
        }
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -14167,6 +14241,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 int foo(int) __attribute__ ((pure));
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
@@ -14218,6 +14293,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 int foo(char *,...) __attribute__ ((format(printf,1,2)));
+#include "mpi.h" // For AMPI renaming of main()
 int
 main ()
 {
