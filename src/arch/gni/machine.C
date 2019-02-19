@@ -846,7 +846,8 @@ static void init_comm_stats(void)
             else  if( tag == ACK_TAG) comm_stats.try_ack_count++;  \
             else  if( tag == BIG_MSG_TAG) comm_stats.try_big_msg_ack_count++;  \
             else  if( tag == PUT_DONE_TAG ) comm_stats.try_put_done_count++;  \
-            comm_stats.try_smsg_count++; \ }
+            comm_stats.try_smsg_count++; \
+         }
 
 #define  RDMA_TRY_SEND(type)        if (print_stats && !stats_off) {IS_PUT(type)?comm_stats.try_rdma_put_count++:comm_stats.try_rdma_get_count++;}
 
