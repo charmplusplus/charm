@@ -24,7 +24,7 @@ behavior of the object. However, POSE is intended to perform best with a
 special type of *adaptive* synchronization strategy which changes it’s
 behavior on a per object basis. Thus, other synchronization strategies
 may not be properly maintained. There are two significant versions of
-the adaptive strategy, adapt4, a simple, stable version, and adept, the
+the adaptive strategy, *adapt4*, a simple, stable version, and *adept*, the
 development version.
 
 Developing a model in POSE
@@ -51,7 +51,7 @@ PDES in POSE
 ------------
 
 A simulation in POSE consists of a set of Charm++ chares performing
-timestamped events in parallel. In POSE, these chares are called posers.
+timestamped events in parallel. In POSE, these chares are called *posers*.
 POSE is designed to work with many such entities per processor. The more
 a system can be broken down into its parallel components when designing
 the simulation model, the more potential parallelism in the final
@@ -73,7 +73,7 @@ were executed. If this is the case, a rollback will occur. If not, the
 event is simply executed along with the others in the queue.
 
 Time can also pass on a poser within the course of executing an event.
-An elapse function is used to advance the OVT.
+An *elapse* function is used to advance the OVT.
 
 POSE maintains a global clock, the global virtual time (GVT), that
 represents the progress of the entire simulation.
@@ -194,23 +194,29 @@ currently not implemented in POSE.
 All event messages inherit from a POSE type ``eventMsg`` which includes
 data for timestamps and miscellaneous POSE statistics.
 
-| ``message myMessage;``
-| Posers are described similar to chares, with a few exceptions. First,
-  the ``poser`` keyword is used to denote that the class is a POSE
-  simulation object class. Second, event methods are tagged with the
-  keyword ``event`` in square brackets. Finally, three components are
-  specified which indicate how objects of the poser class are to be
-  simulated. The *sim* component controls the wrapper class and event
-  queue used by the object. The *strat* component controls the
-  synchronization strategy the object should use (*i.e.* adaptive or
-  basic optimistic). The *rep* component specifies the global state
-  representation, which controls how the global state is kept accurate
-  depending on the synchronization strategy being used (*i.e.*
-  checkpointing or no checkpointing). Currently, there is only one
-  wrapper type, ``sim``. This 3-tuple syntax is likely to become
-  obsolete, replaced simply by synchronization strategy only. Keeping
-  the global state accurate is largely a function of the synchronization
-  strategy used.
+A message is declared in the ``.ci`` file as follows:
+
+.. code-block:: none
+
+  message myMessage;
+
+
+Posers are described similar to chares, with a few exceptions. First,
+the ``poser`` keyword is used to denote that the class is a POSE
+simulation object class. Second, event methods are tagged with the
+keyword ``event`` in square brackets. Finally, three components are
+specified which indicate how objects of the poser class are to be
+simulated. The *sim* component controls the wrapper class and event
+queue used by the object. The *strat* component controls the
+synchronization strategy the object should use (*i.e.* adaptive or
+basic optimistic). The *rep* component specifies the global state
+representation, which controls how the global state is kept accurate
+depending on the synchronization strategy being used (*i.e.*
+checkpointing or no checkpointing). Currently, there is only one
+wrapper type, ``sim``. This 3-tuple syntax is likely to become
+obsolete, replaced simply by synchronization strategy only. Keeping
+the global state accurate is largely a function of the synchronization
+strategy used.
 
 .. code-block:: none
 
@@ -310,16 +316,22 @@ those.
 
 An event method should have the following form:
 
-| ``void mySim::myEventMethod(eventMsg *m) { // body of method };``
-| Again, :math:`m` is never deleted in the body of the event. A side
-  effect of optimistic synchronization and rollback is that we would
-  like the effects of event execution to be dependent only upon the
-  state encapsulated in the corresponding poser. Thus, accessing
-  arbitrary states outside of the simulation, such as by calling
-  ``rand``, is forbidden. We are planning to fix this problem by adding
-  a ``POSE_rand()`` operation which will generate a random number the
-  first time the event is executed, and will checkpoint the number for
-  use in subsequent re-executions should a rollback occur.
+::
+
+  void mySim::myEventMethod(eventMsg *m) {
+    // body of method
+  };
+
+
+Again, :math:`m` is never deleted in the body of the event. A side
+effect of optimistic synchronization and rollback is that we would
+like the effects of event execution to be dependent only upon the
+state encapsulated in the corresponding poser. Thus, accessing
+arbitrary states outside of the simulation, such as by calling
+``rand``, is forbidden. We are planning to fix this problem by adding
+a ``POSE_rand()`` operation which will generate a random number the
+first time the event is executed, and will checkpoint the number for
+use in subsequent re-executions should a rollback occur.
 
 Creation of Poser Objects
 -------------------------
@@ -414,9 +426,13 @@ OVT) to the timestamp of the event.
 It is also possible to elapse time on an object while the object is
 executing an event. This is accomplished thus:
 
-| ``elapse(42);``
-| The example above would simulate the passage of forty-two time units
-  by adding as much to the object’s current OVT.
+::
+
+ elapse(42);
+
+
+The example above would simulate the passage of forty-two time units
+by adding as much to the object’s current OVT.
 
 Interacting with a POSE Module and the POSE System
 --------------------------------------------------
@@ -458,7 +474,10 @@ each with a unique handle. The programmer is responsible for choosing
 and keeping track of the handles created for posers. Once all posers are
 created, the simulation can be started:
 
-| ``POSE_start();``
+::
+
+  POSE_start();
+
 
 Configuring POSE
 ================
@@ -547,7 +566,7 @@ POSE Command Line Options
 
 Command line options are handled like Charm++ command line parameters.
 For namespace purity all POSE command line options have a \_pose suffix.
-They can be inspected by appending a -h to an execution of a POSE
+They can be inspected by appending a ``-h`` to an execution of a POSE
 program. Command line options override any defaults set in the
 ``pose_config.h`` file
 
