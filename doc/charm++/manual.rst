@@ -48,6 +48,8 @@ the assignment at runtime as necessary. Charm++ is the main (and early)
 exemplar of this programming model. AMPI is another example within the
 Charm++ family of the same model.
 
+.. mainchare::
+
 Execution Model
 ---------------
 
@@ -347,11 +349,11 @@ Modules
 ~~~~~~~
 
 The top-level construct in a *ci* file is a named container for
-interface declarations called a module. Modules allow related
+interface declarations called a *module*. Modules allow related
 declarations to be grouped together, and cause generated code for these
 declarations to be grouped into files named after the module. Modules
 cannot be nested, but each *ci* file can have several modules. Modules
-are specified using the keyword module. A module name must be a valid
+are specified using the keyword *module*. A module name must be a valid
 C++ identifier.
 
 ::
@@ -386,14 +388,12 @@ user program entities.
 It should be noted that the generated files have no dependence on the
 name of the *ci* file, but only on the names of the modules. This can
 make automated dependency-based build systems slightly more complicated.
-We adopt some conventions to ease this process. This is described
-in :numref:`AppendixSectionDescribingPhilRamsWorkOnCi.stampAndCharmc-M`.
 
 Module Dependencies
 ~~~~~~~~~~~~~~~~~~~
 
 A module may depend on the parallel entities declared in another module.
-It can express this dependency using the extern keyword. externed
+It can express this dependency using the *extern* keyword. *extern* ed
 modules do not have to be present in the same *ci* file.
 
 ::
@@ -407,9 +407,9 @@ modules do not have to be present in the same *ci* file.
        ...
    };
 
-The extern keyword places an include statement for the decl.h file of
-the externed module in the generated code of the current module. Hence,
-decl.h files generated from externed modules are required during the
+The *extern* keyword places an include statement for the decl.h file of
+the *extern* ed module in the generated code of the current module. Hence,
+decl.h files generated from *extern* ed modules are required during the
 compilation of the source code for the current module. This is usually
 required anyway because of the dependencies between user program
 entities across the two modules.
@@ -420,11 +420,11 @@ The Main Module and Reachable Modules
 Charm++ software can contain several module definitions from several
 independently developed libraries / components. However, the user
 program must specify exactly one module as containing the starting point
-of the program’s execution. This module is called the mainmodule. Every
-Charm++ program has to contain precisely one mainmodule.
+of the program’s execution. This module is called the *mainmodule*. Every
+Charm++ program has to contain precisely one *mainmodule*.
 
-All modules that are “reachable” from the mainmodule via a chain of
-externed module dependencies are included in a Charm++ program. More
+All modules that are “reachable” from the *mainmodule* via a chain of
+*extern* ed module dependencies are included in a Charm++ program. More
 precisely, during program execution, the Charm++ runtime system will
 recognize only the user program entities that are declared in reachable
 modules. The decl.h and def.h files may be generated for other modules,
@@ -472,7 +472,7 @@ requires other declarations / definitions in the user program’s
 sequential code. Usually, this can be achieved by placing such user code
 before the point of inclusion of the decl.h file. However, this can
 become laborious if the decl.h file has to included in several places.
-Charm++ supports the keyword include in *ci* files to permit the
+Charm++ supports the keyword *include* in *ci* files to permit the
 inclusion of any header directly into the generated decl.h files.
 
 ::
@@ -503,7 +503,7 @@ The Charm++ framework implements its own main function and
 retains control until the parallel execution environment is initialized
 and ready for executing user code. Hence, the user program must not
 define a *main()* function. Control enters the user code via the
-mainchare of the mainmodule. This will be discussed in further detail
+*mainchare* of the *mainmodule*. This will be discussed in further detail
 in :numref:`mainchare`.
 
 Using the facilities described thus far, the parallel interface
@@ -515,12 +515,12 @@ software.
 Compiling Charm++ Programs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Charm++ provides a compiler-wrapper called charmc that handles all *ci*,
+Charm++ provides a compiler-wrapper called *charmc* that handles all *ci*,
 C, C++ and Fortran source files that are part of a user program. Users can
 invoke charmc to parse their interface descriptions, compile source code
 and link objects into binaries. It also links against the appropriate
 set of charm framework objects and libraries while producing a binary.
-charmc and its functionality is described in :numref:`sec:compile`.
+*charmc* and its functionality is described in :numref:`sec:compile`.
 
 .. _basic utility fns:
 
@@ -530,12 +530,15 @@ Utility Functions
 The following calls provide basic rank information and utilities useful
 when running a Charm++ program.
 
-void CkAssert(int expression) Aborts the program if expression is 0.
+``void CkAssert(int expression)``
+Aborts the program if expression is 0.
 
-void CkAbort(const char \*message) Causes the program to abort, printing
+``void CkAbort(const char \*message)``
+Causes the program to abort, printing
 the given error message. This function never returns.
 
-void CkExit() This call informs the Charm RTS that computation on all
+``void CkExit()``
+This call informs the Charm RTS that computation on all
 processors should terminate. This routine never returns, so any code
 after the call to CkExit() inside the function that calls it will not
 execute. Other processors will continue executing until they receive
@@ -543,7 +546,8 @@ notification to stop, so it is a good idea to ensure through
 synchronization that all useful work has finished before calling
 CkExit().
 
-double CkWallTimer()
+``double CkWallTimer()``
+Returns the elapsed wall time since the start of execution.
 
 Information about Logical Machine Entities
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -554,29 +558,38 @@ following functions provide basic information about such logical machine
 that a Charm++ program runs on. PE and “node” are numbered starting from
 zero.
 
-``int CkNumPes()`` returns the total number of PEs across all nodes.
+``int CkNumPes()``
+Returns the total number of PEs across all nodes.
 
-``int CkMyPe()`` returns the index of the PE on which the call was made.
+``int CkMyPe()``
+Returns the index of the PE on which the call was made.
 
-``int CkNumNodes()`` returns the total number of logical Charm++ nodes.
+``int CkNumNodes()``
+Returns the total number of logical Charm++ nodes.
 
-``int CkMyNode()`` returns the index of the “node” on which the call was
+``int CkMyNode()``
+Returns the index of the “node” on which the call was
 made.
 
-``int CkMyRank()`` returns the rank number of the PE on a “node” on which
+``int CkMyRank()``
+Returns the rank number of the PE on a “node” on which
 the call was made. PEs within a “node” are also ranked starting from
 zero.
 
-``int CkNodeFirst(int nd)`` returns the index of the first PE on the logical
+``int CkNodeFirst(int nd)``
+Returns the index of the first PE on the logical
 node :math:`nd`.
 
-``int CkNodeSize(int nd)`` returns the number of PEs on the logical node
+``int CkNodeSize(int nd)``
+Returns the number of PEs on the logical node
 :math:`nd` on which the call was made.
 
-``int CkNodeOf(int pe)`` returns the “node” number that PE :math:`pe`
+``int CkNodeOf(int pe)``
+Returns the “node” number that PE :math:`pe`
 belongs to.
 
-``int CkRankOf(int pe)`` returns the rank of the given PE within its node.
+``int CkRankOf(int pe)``
+Returns the rank of the given PE within its node.
 
 Terminal I/O
 ^^^^^^^^^^^^
@@ -593,7 +606,8 @@ special forms shown below. The special forms below are still useful,
 however, since they obey well-defined (but still lax) ordering
 requirements.
 
-``int CkPrintf(format [, arg]*)`` This call is used for atomic terminal
+``int CkPrintf(format [, arg]*)``
+This call is used for atomic terminal
 output. Its usage is similar to ``printf`` in C. However, CkPrintf has
 some special properties that make it more suited for parallel
 programming. CkPrintf routes all terminal output to a single end point
@@ -947,7 +961,7 @@ can be accessed in the same way as C++ “global” variables on any process.
 Compound data structures containing pointers can be made available as
 read-only variables using read-only messages(see
 section :numref:`messages`) or read-only arrays(see
-section :numref:`basic arrays`. Note that memory has to be
+section :numref:`basic arrays`). Note that memory has to be
 allocated for read-only messages by using new to create the message in
 the ``main`` function of the mainchare.
 
