@@ -668,15 +668,16 @@ LIBTHREADSDEPS = $(CVHEADERS) QUICK_THREADS
 define libthreads
 $(L)/libthreads-$1.a: threads.c $(LIBTHREADSDEPS) $2
 	$(CHARMC) -IQuickThreads -I. -o libthreads-$1.o $3 $$<
-	if [ `ls boost-context/*.o 2>/dev/null | wc -l` -gt 0 -a  $4 -eq 1 ]; then \
-		$(CHARMC) -IQuickThreads -I. -o $$@ $3 boost-context/*.o libthreads-$1.o; \
-	else \
-		$(CHARMC) -IQuickThreads -I. -o $$@ $3 libthreads-$1.o; \
-	fi;
+ifeq (1,$$(strip $4))
+	$(CHARMC) -IQuickThreads -I. -o $$@ $3 $$(wildcard boost-context/*.o) libthreads-$1.o
+else
+	$(CHARMC) -IQuickThreads -I. -o $$@ $3 libthreads-$1.o
+endif
 endef
 
 uFcontext_asm:
 	$(MAKE) -C boost-context
+	touch uFcontext_asm
 
 $(eval $(call libthreads,default,            uFcontext_asm,-DCMK_THREADS_BUILD_DEFAULT=1, 1 ))
 $(eval $(call libthreads,default-tls,        uFcontext_asm,-DCMK_THREADS_BUILD_DEFAULT -DCMK_THREADS_BUILD_TLS=1 -touch-on-failure, 1 ))
