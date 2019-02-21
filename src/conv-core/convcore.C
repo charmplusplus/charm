@@ -3652,7 +3652,7 @@ static void CmiProcessPriority(char **argv)
 #else
     HANDLE hProcess = GetCurrentProcess();
     DWORD dwPriorityClass = NORMAL_PRIORITY_CLASS;
-    char *prio_str = "NORMAL_PRIORITY_CLASS";
+    const char *prio_str = "NORMAL_PRIORITY_CLASS";
     BOOL status;
     /*
        <-20:      real time
