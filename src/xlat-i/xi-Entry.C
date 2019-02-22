@@ -154,7 +154,9 @@ Entry::Entry(int l, int a, Type* r, const char* n, ParamList* p, Value* sz,
       genClosureTypeNameProxyTemp(0),
       entryPtr(0),
       first_line_(fl),
-      last_line_(ll) {
+      last_line_(ll),
+      numRdmaSendParams(0),
+      numRdmaRecvParams(0) {
   line = l;
   container = NULL;
   entryCount = -1;
@@ -166,7 +168,13 @@ Entry::Entry(int l, int a, Type* r, const char* n, ParamList* p, Value* sz,
   ParamList* plist = p;
   while (plist != NULL) {
     plist->entry = this;
-    if (plist->param) plist->param->entry = this;
+    if (plist->param) {
+      plist->param->entry = this;
+      if (plist->param->getRdma() == CMK_ZC_P2P_SEND_MSG)
+        numRdmaSendParams++; // increment send 'rdma' param count
+      if (plist->param->getRdma() == CMK_ZC_P2P_RECV_MSG)
+        numRdmaRecvParams++; // increment recv 'rdma' param count
+    }
     plist = plist->next;
   }
 }
@@ -2095,9 +2103,6 @@ void Entry::genClosure(XStr& decls, bool isDef) {
                   << "CkNcpyBuffer "
                   << "ncpyBuffer_" << sv->name << ";\n";
         structure << "#else\n";
-        if (sv->isFirstRdma() && sv->isRecvRdma())
-          structure << "      "
-                    << "int num_rdma_fields;\n";
         structure << "      " << sv->type << " "
                   << "*" << sv->name << ";\n";
         structure << "#endif\n";
@@ -2108,14 +2113,6 @@ void Entry::genClosure(XStr& decls, bool isDef) {
                  << "& "
                  << "getP" << i << "() { return "
                  << " num_rdma_fields;}\n";
-          getter << "#else\n";
-          if (sv->isRecvRdma()) {
-            getter << "      "
-                   << "int "
-                   << "& "
-                   << "getP" << i << "() { return "
-                   << " num_rdma_fields;}\n";
-          }
           getter << "#endif\n";
           i++;
         }
@@ -2151,12 +2148,6 @@ void Entry::genClosure(XStr& decls, bool isDef) {
         toPup << "        "
               << "__p | "
               << "ncpyBuffer_" << sv->name << ";\n";
-        toPup << "#else\n";
-        if(sv->isFirstRdma() && sv->isRecvRdma()) {
-          toPup << "        "
-                << "__p | "
-                << "num_rdma_fields;\n";
-        }
         toPup << "#endif\n";
       } else {
         structure << "      ";
@@ -2504,14 +2495,7 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
       if(isRdmaPost) {
         str << "#if CMK_ONESIDED_IMPL\n";
         // Allocate an array of rdma pointers
-        if(isSDAGGen)
-          str << "  void **buffPtrs = new void*[genClosure->num_rdma_fields];\n";
-        else {
-          str << "  void **buffPtrs;\n";
-          str << "  if(CMI_IS_ZC_RECV(env)) \n";
-          str << "    buffPtrs = new void*[impl_num_rdma_fields];\n";
-        }
-        str << "  int ptrIndex = 0;\n";
+        str << "  void *buffPtrs["<< numRdmaRecvParams <<"];\n";
         str << "#endif\n";
         param->storePostedRdmaPtrs(str, isSDAGGen);
         str << "#if CMK_ONESIDED_IMPL\n";

@@ -194,8 +194,9 @@ void ParamList::callEach(rdmafn_t f, XStr& str, bool isArray) {
 
 void ParamList::callEach(rdmarecvfn_t f, XStr& str, bool genRdma, bool isSDAGGen) {
   ParamList* cur = this;
+  int count = 0; // Used for the index of buffPtrs for Zcpy Post API
   do {
-    ((cur->param)->*f)(str, genRdma, isSDAGGen);
+    ((cur->param)->*f)(str, genRdma, isSDAGGen, count);
   } while (NULL != (cur = cur->next));
 }
 
@@ -220,11 +221,9 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     bool hasrecvrdma = hasRecvRdma();
     if (hasrdma) {
       str << "#if CMK_ONESIDED_IMPL\n";
-      str << "  int impl_num_rdma_fields = 0; \n";
+      str << "  int impl_num_rdma_fields = "<<entry->numRdmaSendParams + entry->numRdmaRecvParams<<";\n";
       callEach(&Parameter::marshallRdmaParameters, str, true);
       str << "#else\n";
-      if(hasrecvrdma)
-        str << "  int impl_num_rdma_fields = 0; \n";
       if (!hasArrays) str << "  int impl_arrstart=0;\n";
       callEach(&Parameter::marshallRdmaParameters, str, false);
       str << "#endif\n";
@@ -238,8 +237,6 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
       // All rdma parameters have to be pupped at the start
       callEach(&Parameter::pupRdma, str, true);
       str << "#else\n";
-      if(hasrecvrdma)
-        str << "    implP|impl_num_rdma_fields;\n";
       callEach(&Parameter::pupRdma, str, false);
       if (!hasArrays) {
         str << "    impl_arrstart=CK_ALIGN(implP.size(),16);\n";
@@ -267,8 +264,6 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
       str << "    implP|impl_num_rdma_fields;\n";
       callEach(&Parameter::pupRdma, str, true);
       str << "#else\n";
-      if(hasrecvrdma)
-        str << "    implP|impl_num_rdma_fields;\n";
       callEach(&Parameter::pupRdma, str, false);
       str << "#endif\n";
     }
@@ -330,13 +325,10 @@ void Parameter::marshallRdmaParameters(XStr& str, bool genRdma) {
   if (isRdma()) {
     Type* dt = type->deref();  // Type, without &
     if (genRdma) {
-      str << "  impl_num_rdma_fields++;\n";
       str << "  ncpyBuffer_" << name << ".cnt=sizeof(" << dt << ")*(" << arrLen
           << ");\n";
       str << "  ncpyBuffer_" << name << ".registerMem()" << ";\n";
     } else {
-      if(isRecvRdma())
-        str << "  impl_num_rdma_fields++;\n";
       marshallArraySizes(str, dt);
     }
   }
@@ -454,8 +446,6 @@ void ParamList::beginRednWrapperUnmarshall(XStr& str, bool needsClosure) {
             str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
             callEach(&Parameter::beginUnmarshallRdma, str, true);
             str << "#else\n";
-            if(hasRecvRdma())
-              str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
             callEach(&Parameter::beginUnmarshallRdma, str, false);
             str << "#endif\n";
           }
@@ -500,8 +490,6 @@ void ParamList::beginRednWrapperUnmarshall(XStr& str, bool needsClosure) {
           str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
           callEach(&Parameter::beginUnmarshallRdma, str, true);
           str << "#else\n";
-          if(hasRecvRdma())
-            str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
           callEach(&Parameter::beginUnmarshallRdma, str, false);
           str << "#endif\n";
         }
@@ -539,8 +527,6 @@ void ParamList::beginUnmarshall(XStr& str) {
       str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields; \n";
       callEach(&Parameter::beginUnmarshallRdma, str, true);
       str << "#else\n";
-      if(hasRecvRdma())
-        str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
       callEach(&Parameter::beginUnmarshallRdma, str, false);
       str << "#endif\n";
       if (hasRecvRdma())
@@ -566,11 +552,11 @@ void ParamList::storePostedRdmaPtrs(XStr& str, bool isSDAGGen) {
   str << "#endif\n";
 }
 
-void Parameter::storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen) {
+void Parameter::storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, int &count) {
   if(isRdma()) {
     if(genRdma) {
       str << "  if(CMI_IS_ZC_RECV(env)) \n";
-      str << "    buffPtrs[ptrIndex++] = (void *)" << "ncpyBuffer_";
+      str << "    buffPtrs["<< count++ <<"] = (void *)" << "ncpyBuffer_";
       str << name << "_ptr;\n";
 
       str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) \n";
@@ -643,8 +629,6 @@ void Parameter::beginUnmarshallSDAGCallRdma(XStr& str, bool genRdma) {
         str << "("<<dt<< " *)" << " (genClosure->ncpyBuffer_" << name <<").ptr;\n";
       }
     } else {
-      if(isFirstRdma() && isRecvRdma())
-        str << "  implP|genClosure->num_rdma_fields;\n";
       beginUnmarshallArray(str);
     }
   }
@@ -722,8 +706,6 @@ void ParamList::beginUnmarshallSDAG(XStr& str) {
       str << "  implP|num_rdma_fields;\n";
       callEach(&Parameter::beginUnmarshallRdma, str, true);
       str << "#else\n";
-      if(hasRecvRdma())
-        str << "  implP|num_rdma_fields;\n";
       callEach(&Parameter::beginUnmarshallRdma, str, false);
       str << "#endif\n";
     }

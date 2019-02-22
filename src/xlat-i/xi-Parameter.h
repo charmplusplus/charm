@@ -87,7 +87,7 @@ class Parameter {
   void setGivenName(const char* s) { given_name = s; }
   const char* getName(void) const { return name; }
   void printMsg(XStr& str);
-  void storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen);
+  void storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, int &count);
   int operator==(const Parameter& parm) const;
 
   // DMK - Added for accelerator options
@@ -111,7 +111,7 @@ class ParamList {
   int orEach(pred_t f);
   typedef void (Parameter::*fn_t)(XStr& str);
   typedef void (Parameter::*rdmafn_t)(XStr& str, bool genRegArray);
-  typedef void (Parameter::*rdmarecvfn_t)(XStr& str, bool genRdma, bool isSDAGGen);
+  typedef void (Parameter::*rdmarecvfn_t)(XStr& str, bool genRdma, bool isSDAGGen, int &count);
   void callEach(fn_t f, XStr& str);
   void callEach(rdmafn_t f, XStr& str, bool genRegArray);
   void callEach(rdmarecvfn_t f, XStr& str, bool genRdma, bool isSDAGGen);

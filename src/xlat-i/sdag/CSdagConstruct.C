@@ -314,14 +314,6 @@ int SdagConstruct::unravelClosuresBegin(XStr& defs, bool child) {
             defs << "->"
                  << "getP" << i << "();\n";
             defs << "#else\n";
-            if(var.isRecvRdma) {
-              indentBy(defs, cur + 2);
-              defs << "int "
-                   << "& num_rdma_fields = ";
-              defs << "gen" << cur;
-              defs << "->"
-                   << "getP" << i << "();\n";
-            }
             i++;
             defs << "#endif\n";
           }

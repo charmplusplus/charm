@@ -47,6 +47,8 @@ class Entry : public Member {
   XStr* genClosureTypeNameProxyTemp;
   int line, entryCount;
   int first_line_, last_line_;
+  int numRdmaSendParams; // stores the number of rdma send parameters (marked nocopy)
+  int numRdmaRecvParams; // stores the number of rdma recv parameters (marked nocopypost)
 
  private:
   int attribs;

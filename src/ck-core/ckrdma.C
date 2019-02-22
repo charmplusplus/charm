@@ -856,9 +856,6 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
     p|source;
   }
 
-  // free the list of pointers as their values have been stored
-  delete [] arrPtrs;
-
 
   if(emMode == ncpyEmApiMode::P2P_RECV) {
     switch(ncpyMode) {
