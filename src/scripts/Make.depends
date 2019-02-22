@@ -2356,7 +2356,7 @@ cmirdmautils.o: cmirdmautils.c cmirdmautils.h conv-header.h conv-config.h \
  queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
  conv-trace.h persistent.h conv-rdma.h debug-conv.h
 
-cmitls.o: cmitls.c converse.h conv-header.h conv-config.h \
+cmitls.o: cmitls.C converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
  conv-mach-opt.h lrts-common.h cmiqueue.h pup_c.h lrtslock.h queueing.h \
  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \

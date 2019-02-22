@@ -42,9 +42,17 @@ typedef int  tlsseg_t;            /* place holder */
 
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void CmiTLSInit(void);
 void allocNewTLSSeg(tlsseg_t* t, CthThread th);
 void switchTLS(tlsseg_t*, tlsseg_t*);
 void currentTLS(tlsseg_t*);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

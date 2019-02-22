@@ -32,9 +32,11 @@
  * Of note are sections 3.4.2 (IA-32, a.k.a. x86) and 3.4.6 (x86-64).
  */
 
+extern "C" {
 void* getTLS(void) CMI_NOOPTIMIZE;
 void setTLS(void* newptr) CMI_NOOPTIMIZE;
 void* swapTLS(void* newptr) CMI_NOOPTIMIZE;
+}
 
 CMI_EXTERNC_VARIABLE int quietModeRequested;
 
@@ -154,8 +156,10 @@ void allocNewTLSSeg(tlsseg_t* t, CthThread th) {
   }
 }
 
+extern "C" {
 void switchTLS(tlsseg_t* , tlsseg_t* ) CMI_NOOPTIMIZE;
 void currentTLS(tlsseg_t*) CMI_NOOPTIMIZE;
+}
 
 void currentTLS(tlsseg_t* cur) {
   cur->memseg = (Addr)getTLS();
