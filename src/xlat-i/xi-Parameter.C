@@ -529,8 +529,11 @@ void ParamList::beginUnmarshall(XStr& str) {
       str << "#else\n";
       callEach(&Parameter::beginUnmarshallRdma, str, false);
       str << "#endif\n";
-      if (hasRecvRdma())
-        str << "  CkNcpyBufferPost ncpyPost;\n";
+      if (hasRecvRdma()) {
+        str << "  CkNcpyBufferPost ncpyPost[" << entry->numRdmaRecvParams << "];\n";
+        for(int index=0; index < entry->numRdmaRecvParams; index++)
+          str << "  ncpyPost[" <<index<<  "].mode = CK_BUFFER_REG;\n";
+      }
     }
     callEach(&Parameter::beginUnmarshall, str);
     str << "  impl_buf+=CK_ALIGN(implP.size(),16);\n";
@@ -658,8 +661,11 @@ void ParamList::beginUnmarshallSDAGCall(XStr& str, bool usesImplBuf) {
         << " genClosure = new " << *entry->genClosureTypeNameProxyTemp << "()"
         << ";\n";
     if (hasRdma()) {
-      if(hasRecvRdma())
-        str << "  CkNcpyBufferPost ncpyPost;\n";
+      if(hasRecvRdma()) {
+        str << "  CkNcpyBufferPost ncpyPost[" << entry->numRdmaRecvParams << "];\n";
+        for(int index=0; index < entry->numRdmaRecvParams; index++)
+          str << "  ncpyPost[" <<index<<  "].mode = CK_BUFFER_REG;\n";
+      }
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "  char *impl_buf_begin = impl_buf;\n";
       if(hasRecvRdma())

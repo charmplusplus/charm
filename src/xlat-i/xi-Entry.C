@@ -2505,7 +2505,7 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
           str << " genClosure->num_rdma_fields, ";
         else
           str << " impl_num_rdma_fields, ";
-        str << " buffPtrs);\n";
+        str << " buffPtrs, ncpyPost);\n";
         str << "#else\n";
 
         str << "#endif\n";

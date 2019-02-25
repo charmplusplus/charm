@@ -84,7 +84,7 @@ class zerocopyObject : public CBase_zerocopyObject{
       }
     }
 
-    void zerocopySend(int &n1, int *& ptr1, CkNcpyBufferPost) {
+    void zerocopySend(int &n1, int *& ptr1, CkNcpyBufferPost *) {
       CkAssert(iArr1 != NULL);
       ptr1 = iArr1;
     }

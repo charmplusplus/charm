@@ -53,6 +53,12 @@ enum class CkNcpyStatus : char { incomplete, complete };
 // BCAST_RECV mode is used for EM BCAST Send API
 enum class ncpyEmApiMode : char { P2P_SEND, BCAST_SEND, P2P_RECV, BCAST_RECV };
 
+// Struct passed in a ZC Post Entry Method to allow receiver side to post 
+struct CkNcpyBufferPost {
+  // mode
+  unsigned short int mode;
+};
+
 // Class to represent an Zerocopy buffer
 // CkSendBuffer(....) passed by the user internally translates to a CkNcpyBuffer
 class CkNcpyBuffer{
@@ -224,7 +230,8 @@ class CkNcpyBuffer{
   friend void constructDestinationBufferObject(NcpyOperationInfo *info, CkNcpyBuffer &dest);
 
   friend envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg);
-  friend void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, void **arrPtrs);
+  friend void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, void **arrPtrs, CkNcpyBufferPost *postStructs);
+
   friend void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr);
   friend void readonlyCreateOnSource(CkNcpyBuffer &src);
 
@@ -237,8 +244,6 @@ class CkNcpyBuffer{
 
   friend void deregisterMemFromMsg(envelope *env);
 };
-
-struct CkNcpyBufferPost {};
 
 // Ack handler for the Zerocopy Direct API
 // Invoked on the completion of any RDMA operation calling using the Direct API
@@ -301,7 +306,7 @@ struct NcpyEmBufferInfo{
  */
 envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg = NULL);
 
-void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, void **arrPtrs);
+void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, void **arrPtrs, CkNcpyBufferPost *postStructs);
 
 void handleEntryMethodApiCompletion(NcpyOperationInfo *info);
 

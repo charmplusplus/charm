@@ -242,11 +242,15 @@ class zerocopyObject : public CBase_zerocopyObject{
       }
     }
 
-    void zerocopySend(int &n1, int *& ptr1, int &n2, double *& ptr2, int &n3, char *& ptr3, CkNcpyBufferPost) {
+    void zerocopySend(int &n1, int *& ptr1, int &n2, double *& ptr2, int &n3, char *& ptr3, CkNcpyBufferPost *ncpyPost) {
       DEBUG(ckout<<"["<<CkMyPe()<<"] "<<thisIndex<<"->"<<destIndex<<": ZeroCopy send post"<<endl;)
       ptr1 = iArr1;
       ptr2 = dArr1;
       ptr3 = cArr1;
+
+      ncpyPost[0].mode = CK_BUFFER_REG;
+      ncpyPost[1].mode = CK_BUFFER_UNREG;
+      ncpyPost[2].mode = CK_BUFFER_REG;
     }
 
     void zerocopySend(int n1, int *ptr1, int n2, double *ptr2, int n3, char *ptr3){
@@ -265,7 +269,7 @@ class zerocopyObject : public CBase_zerocopyObject{
       }
     }
 
-    void mixedSend(int n1, int *ptr1, int n2, double *& ptr2, int n3, int *& ptr3, int n4, double *ptr4, CkNcpyBufferPost) {
+    void mixedSend(int n1, int *ptr1, int n2, double *& ptr2, int n3, int *& ptr3, int n4, double *ptr4, CkNcpyBufferPost *ncpyPost) {
       ptr2 = dArr1;
       ptr3 = iArr2;
     }
@@ -315,7 +319,7 @@ class zerocopyObject : public CBase_zerocopyObject{
       }
     }
 
-    void sdagRecv(int iter, int &n1, int *& ptr1, int &n2, double *&ptr2, CkNcpyBufferPost) {
+    void sdagRecv(int iter, int &n1, int *& ptr1, int &n2, double *&ptr2, CkNcpyBufferPost *ncpyPost) {
       ptr1 = iArr1;
       ptr2 = dArr2;
       // NOTE: The same arrays are used to receive the data for all the 'num' sdag iterations and

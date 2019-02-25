@@ -93,7 +93,7 @@ class zcArray : public CBase_zcArray {
     DEBUG(CkPrintf("[%d][%d][%d][%d] Array element: constructed and allocated buffer is %p\n", CkMyPe(), CkMyNode(), CmiMyRank(), thisIndex, myBuffer);)
   }
 
-  void recvLargeArray(int *&ptr1, int &n1, CkCallback doneCb, CkNcpyBufferPost) {
+  void recvLargeArray(int *&ptr1, int &n1, CkCallback doneCb, CkNcpyBufferPost *) {
     DEBUG(CkPrintf("[%d][%d][%d][%d] Array element: recvLargeArray Post \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex);)
     ptr1 = myBuffer;
     CkAssert(n1 == bufferSize);
@@ -115,7 +115,7 @@ class zcGroup : public CBase_zcGroup {
     DEBUG(CkPrintf("[%d][%d][%d] Group: constructed and allocated buffer is %p\n", CkMyPe(), CkMyNode(), CmiMyRank(), myBuffer);)
   }
 
-  void recvLargeArray(int *&ptr1, int &n1, CkCallback doneCb, CkNcpyBufferPost) {
+  void recvLargeArray(int *&ptr1, int &n1, CkCallback doneCb, CkNcpyBufferPost *) {
     DEBUG(CkPrintf("[%d][%d][%d] Group: recvLargeArray Post \n", CmiMyPe(), CmiMyNode(), CmiMyRank());)
     ptr1 = myBuffer;
     CkAssert(n1 == bufferSize);
@@ -137,7 +137,7 @@ class zcNodegroup : public CBase_zcNodegroup {
     DEBUG(CkPrintf("[%d][%d][%d] Nodegroup: constructed and allocated buffer is %p\n", CkMyPe(), CkMyNode(), CmiMyRank(), myBuffer);)
   }
 
-  void recvLargeArray(int *&ptr1, int &n1, CkCallback doneCb, CkNcpyBufferPost) {
+  void recvLargeArray(int *&ptr1, int &n1, CkCallback doneCb, CkNcpyBufferPost *) {
     DEBUG(CkPrintf("[%d][%d][%d] Nodegroup: recvLargeArray Post \n", CmiMyPe(), CmiMyNode(), CmiMyRank());)
     ptr1 = myBuffer;
     CkAssert(n1 == bufferSize);

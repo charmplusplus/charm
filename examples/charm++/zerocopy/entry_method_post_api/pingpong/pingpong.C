@@ -127,7 +127,7 @@ public:
     }
   }
 
-  void recv_send_receive_zerocopy(char *& msg, int & size, bool & warmUp, CkNcpyBufferPost) {
+  void recv_send_receive_zerocopy(char *& msg, int & size, bool & warmUp, CkNcpyBufferPost *) {
     // post the buffer
     msg = nocopyMsg;
   }

@@ -193,7 +193,9 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
 void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode){
   CmiVerbsRdmaPtr_t *rdmadest = (CmiVerbsRdmaPtr_t *)info;
 
-  if (ibv_dereg_mr(rdmadest->mr)) {
-    CmiAbort("ibv_dereg_mr() failed at LrtsDeregisterMem\n");
+  if(mode == CMK_BUFFER_REG) {
+    if (ibv_dereg_mr(rdmadest->mr)) {
+      CmiAbort("ibv_dereg_mr() failed at LrtsDeregisterMem\n");
+    }
   }
 }
