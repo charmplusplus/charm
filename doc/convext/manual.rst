@@ -36,28 +36,29 @@ message manager can store and retrieve arbitrary pointers according to a
 set of tags. The pointers do *not* necessarily need to be pointers to
 Converse messages. They can be pointers to anything.
 
-typedef struct CmmTableStruct \*CmmTable
+``typedef struct CmmTableStruct *CmmTable``
 
 This opaque type is defined in ``converse.h``. It represents a table
 which can be used to store messages. No information is publicized about
 the format of a CmmTableStruct.
 
-#define CmmWildCard (-1)
+``#define CmmWildCard (-1)``
 
 This #define is in ``converse.h``. The tag -1 is the “wild card” for the
 tag-based lookup functions in the message manager.
 
-CmmTable CmmNew();
+``CmmTable CmmNew();``
 
 This function creates a new message-table and returns it.
 
-void CmmPut(CmmTable t, int ntags, int \*tags, void \*msg) This function
-inserts a message into a message table, along with an array of tags.
-``ntags`` specifies the length of the ``tags`` array. The ``tags`` array
-contains the tags themselves. ``msg`` and ``t`` specify the message and
-table, respectively.
+``void CmmPut(CmmTable t, int ntags, int *tags, void *msg)``
 
-void \*CmmGet(CmmTable t, int ntags, int \*tags, int \*ret_tags)
+This function inserts a message into a message table, along with an
+array of tags. ``ntags`` specifies the length of the ``tags`` array. The
+``tags`` array contains the tags themselves. ``msg`` and ``t`` specify
+the message and table, respectively.
+
+``void *CmmGet(CmmTable t, int ntags, int *tags, int *ret_tags)``
 
 This function looks up a message from a message table. A message will be
 retrieved that “matches” the specified ``tags`` array. If a message is
@@ -73,12 +74,12 @@ to each other, or if ``either`` tag is equal to ``CmmWildCard`` (this
 means one can ``store`` messages with wildcard tags, making it easier to
 find those messages on retrieval).
 
-void \*CmmProbe(CmmTable t, int ntags, int \*tags, int \*ret_tags)
+``void *CmmProbe(CmmTable t, int ntags, int *tags, int *ret_tags)``
 
 This function is identical to ``CmmGet`` above, except that the message
 is not deleted from the table.
 
-void CmmFree(CmmTable t);
+``void CmmFree(CmmTable t);``
 
 This function frees a message-table t. WARNING: It also frees all the
 messages that have been inserted into the message table. It assumes that
@@ -101,52 +102,65 @@ Available Functions
 
 Following functions are available in this library:
 
-typedef int (\*CmsWorkerFn) (void \*, void \*); Prototype for the worker
-function. See below.
+``typedef int (*CmsWorkerFn) (void *, void *);``
 
-typedef int (\*CmsConsumerFn) (void \*, int); Prototype for the consumer
-function. See below.
+Prototype for the worker function. See below.
 
-void CmsInit(CmsWorkerFn worker, int max); This function must be called
-before firing any tasks for the workers. max is the largest possible
-number of tasks you will fire before calling either CmsAwaitResponses or
-CmsProcessResponses next. (So the system know how many it may have to
-buffer).
+``typedef int (*CmsConsumerFn) (void *, int);``
 
-int worker(void \*t, void \**r) The user writes this function. Its name
-does not have to be worker; It can be anything. worker can be any
-function that the use writes to perform the task on the slave
-processors. It must allocate and compute the response data structure,
-and return a pointer to it, by assigning to r; It must also return the
-size of the response data structure as its return value.
+Prototype for the consumer function. See below.
 
-void CmsFireTask(int ref, void \* t, int size) Creates task to be worked
-on by a worker. The task description is pointed to by t, and goes on for
-size bytes. ref must be a unique serial number between 0 and max (see
-CmsInit).
+``void CmsInit(CmsWorkerFn worker, int max);``
 
-void CmsAwaitResponses(void); This call allows the system to use
-processor 0 as a worker. It returns after all the tasks have sent back
-their responses. The responses themselves can be extracted using
-CmsGetResponse.
+This function must be called before firing any tasks for the workers.
+max is the largest possible number of tasks you will fire before calling
+either ``CmsAwaitResponses`` or ``CmsProcessResponses`` next. (So the
+system know how many it may have to buffer).
 
-void \*CmsGetResponse(int ref); Extracts the response associated with
-the reference number ref from the system’s buffers.
+``int worker(void *t, void **r)``
 
-void CmsProcessResponses(CmsConsumerFn consumer); Instead of using
-CmsAwaitResponses/CmsGetResponse pair, you can use this call alone. It
-turns the control over to the CMS system on processor 0, so it can be
-used as a worker. As soon as a response is available on processor 0, cms
-calls the user specified consumer function with two parameters: the
-response (a void \*) and an integer refnum. (Question: should the size
-of the response be passed as a parameter to the consumer? User can do
-that as an explicit field of the response themselves, if necessary.)
+The user writes this function. Its name does not have to be worker; It
+can be anything. worker can be any function that the use writes to
+perform the task on the slave processors. It must allocate and compute
+the response data structure, and return a pointer to it, by assigning to
+r; It must also return the size of the response data structure as its
+return value.
 
-void CmsExit(void); Must be called on all processors to terminate
-execution.
+``void CmsFireTask(int ref, void * t, int size)``
 
-Once either CmsProcessResponses or CmsAwaitResponses returns, you may
-fire the next batch of tasks via CmsFireTask again.
+Creates task to be worked on by a worker. The task description is
+pointed to by t, and goes on for size bytes. ref must be a unique serial
+number between 0 and max (see ``CmsInit``).
+
+``void CmsAwaitResponses(void);``
+
+This call allows the system to use processor 0 as a worker. It returns
+after all the tasks have sent back their responses. The responses
+themselves can be extracted using ``CmsGetResponse``.
+
+``void *CmsGetResponse(int ref);``
+
+Extracts the response associated with the reference number ref from the
+system’s buffers.
+
+``void CmsProcessResponses(CmsConsumerFn consumer);``
+
+Instead of using ``CmsAwaitResponses``/``CmsGetResponse`` pair, you can
+use this call alone. It turns the control over to the CMS system on
+processor 0, so it can be used as a worker. As soon as a response is
+available on processor 0, cms calls the user specified consumer function
+with two parameters: the response (a void \*) and an integer refnum.
+(Question: should the size of the response be passed as a parameter to
+the consumer? User can do that as an explicit field of the response
+themselves, if necessary.)
+
+
+``void CmsExit(void);``
+
+Must be called on all processors to terminate execution.
+
+Once either ``CmsProcessResponses`` or ``CmsAwaitResponses`` returns,
+you may fire the next batch of tasks via CmsFireTask again.
 
 Example Program
 ---------------
@@ -245,7 +259,7 @@ methods etc, we have tried to code the most efficient implementations of
 those data structures.
 
 Since these data structures are already part of Converse and Charm++,
-they are available to the users of these system free of cost ``:-<)``.
+they are available to the users of these system free of cost :-<).
 In this chapter we document the available functions.
 
 Queues, Lists, FIFOs etc.
@@ -254,40 +268,56 @@ Queues, Lists, FIFOs etc.
 This data structure is based on circular buffer, and can be used both
 like a FIFO and a Stack.
 
-Following functions are available for use in C:
+The following functions are available for use in C:
 
-typedef ... CdsFifo; An opaque data type representing a queue of
-``void*`` pointers.
+``typedef ... CdsFifo;``
 
-CdsFifo CdsFifo_Create(void); Creates a queue in memory and returns its
-pointer.
+An opaque data type representing a queue of ``void*`` pointers.
 
-CdsFifo CdsFifo_Create_len(int len); Creates a queue in memory with the
-initial buffer size of len entries and returns its pointer.
+``CdsFifo CdsFifo_Create(void);``
 
-void CdsFifo_Enqueue(CdsFifo q, void \*elt); Appends elt at the end of
-q.
+Creates a queue in memory and returns its pointer.
 
-void \*CdsFifo_Dequeue(CdsFifo q); Removes an element from the front of
-the q, and returns it. Returns 0 if the queue is empty.
+``CdsFifo CdsFifo_Create_len(int len);``
 
-void \*CdsFifo_Pop(CdsFifo q); Removes an element from the front of the
-q, and returns it. Returns 0 if the queue is empty. An alias for the
-dequeue function.
+Creates a queue in memory with the initial buffer size of len entries
+and returns its pointer.
 
-void CdsFifo_Push(CdsFifo q, void \*elt); Inserts elt in the beginning
-of q.
+``void CdsFifo_Enqueue(CdsFifo q, void *elt);``
 
-int CdsFifo_Empty(CdsFifo q); Returns 1 if the q is empty, 0 otherwise.
+Appends elt at the end of q.
 
-int CdsFifo_Length(CdsFifo q); Returns the length of the q.
+``void *CdsFifo_Dequeue(CdsFifo q);``
 
-int CdsFifo_Peek(CdsFifo q); Returns the element from the front of the q
-without removing it.
+Removes an element from the front of the q, and returns it. Returns 0 if
+the queue is empty.
 
-void CdsFifo_Destroy(CdsFifo q); Releases memory used by q.
+``void *CdsFifo_Pop(CdsFifo q);``
 
-Following Templates are available for use in C:
+Removes an element from the front of the q, and returns it. Returns 0 if
+the queue is empty. An alias for the dequeue function.
+
+``void CdsFifo_Push(CdsFifo q, void *elt);``
+
+Inserts elt in the beginning of q.
+
+``int CdsFifo_Empty(CdsFifo q);``
+
+Returns 1 if the q is empty, 0 otherwise.
+
+``int CdsFifo_Length(CdsFifo q);``
+
+Returns the length of the q.
+
+``int CdsFifo_Peek(CdsFifo q);``
+
+Returns the element from the front of the q without removing it.
+
+``void CdsFifo_Destroy(CdsFifo q);``
+
+Releases memory used by q.
+
+The following Templates are available for use in C++:
 
 ::
 
@@ -328,45 +358,45 @@ random number stream.
 Interface to the Converse Pseudorandom Number Generator module is as
 follows:
 
-typedef ... CrnStream;
+``typedef ... CrnStream;``
 
 State information for generating the next random number in the sequence.
 
-void CrnInitStream(CrnStream \*stream, int seed, int type)
+``void CrnInitStream(CrnStream *stream, int seed, int type)``
 
 Initializes the new random number stream ``stream`` of ``type`` using
 ``seed``. ``type`` can have values 0, 1, or 2 to represent three types
 of linear congruential random number generators.
 
-int CrnInt(CrnStream \*stream)
+``int CrnInt(CrnStream *stream)``
 
 Returns an integer between 0 and :math:`2^{31}-1` corresponding to the
 next random number in the sequence associated with ``stream``. Advances
 ``stream`` by one in the sequence.
 
-double CrnDouble(CrnStream \*stream)
+``double CrnDouble(CrnStream *stream)``
 
 Returns an double precision floating point number between 0 and 1
 corresponding to the next random number in the sequence associated with
 ``stream``. Advances ``stream`` by one in the sequence.
 
-float CrnFloat(CrnStream \*stream)
+``float CrnFloat(CrnStream *stream)``
 
 Returns a single precision floating point number between 0 and 1
 corresponding to the next random number in the sequence associated with
 ``stream``. Advances ``stream`` by one in the sequence.
 
-void CrnSrand(int seed)
+``void CrnSrand(int seed)``
 
 Specifies a different seed for the default random number stream.
 Replaces ``srand()``.
 
-int CrnRand(void)
+``int CrnRand(void)``
 
 Generate the next integer random number from the default random number
 stream. Replaces ``rand()``.
 
-double CrnDrand(void)
+``double CrnDrand(void)``
 
 Generate the next double precision random number from the default random
 number stream. Replaces ``drand48()``.
@@ -488,39 +518,39 @@ routing and handling information. The CPM module has many built-in
 functions that return *CpmDestination*\ s. Therefore, any of these can
 be used as the first argument to a launcher:
 
--  CpmSend(\ pe) - the message is transmitted to processor pe with
+-  **CpmSend(\ pe)** - the message is transmitted to processor pe with
    maximum priority.
 
--  CpmEnqueue(\ pe, queueing, priobits, prioptr) - The message is
-   transmitted to processor pe, where it is enqueued with the specified
-   queueing strategy and priority. The queueing, priobits, and prioptr
-   arguments are the same as for CqsEnqueueGeneral.
+-  **CpmEnqueue(\ pe, queueing, priobits, prioptr)** - The message is
+   transmitted to processor *pe*, where it is enqueued with the specified
+   queueing strategy and priority. The *queueing*, *priobits*, and *prioptr*
+   arguments are the same as for **CqsEnqueueGeneral**.
 
--  CpmEnqueueFIFO(\ pe) - the message is transmitted to processor pe and
+-  **CpmEnqueueFIFO(\ pe)** - the message is transmitted to processor pe and
    enqueued with the middle priority (zero), and FIFO relative to
    messages with the same priority.
 
--  CpmEnqueueLIFO(\ pe) - the message is transmitted to processor pe and
+-  **CpmEnqueueLIFO(\ pe)** - the message is transmitted to processor pe and
    enqueued with the middle priority (zero), and LIFO relative to
    messages with the same priority.
 
--  CpmEnqueueIFIFO(\ pe, prio) - the message is transmitted to processor
+-  **CpmEnqueueIFIFO(\ pe, prio)** - the message is transmitted to processor
    pe and enqueued with the specified integer-priority prio, and FIFO
    relative to messages with the same priority.
 
--  CpmEnqueueILIFO(\ pe, prio) - the message is transmitted to processor
+-  **CpmEnqueueILIFO(\ pe, prio)** - the message is transmitted to processor
    pe and enqueued with the specified integer-priority prio, and LIFO
    relative to messages with the same priority.
 
--  CpmEnqueueBFIFO(\ pe, priobits, prioptr) - the message is transmitted
+-  **CpmEnqueueBFIFO(\ pe, priobits, prioptr)** - the message is transmitted
    to processor pe and enqueued with the specified bitvector-priority,
    and FIFO relative to messages with the same priority.
 
--  CpmEnqueueBLIFO(\ pe, priobits, prioptr) - the message is transmitted
+-  **CpmEnqueueBLIFO(\ pe, priobits, prioptr)** - the message is transmitted
    to processor pe and enqueued with the specified bitvector-priority,
    and LIFO relative to messages with the same priority.
 
--  CpmMakeThread(\ pe) - The message is transmitted to processor pe
+-  **CpmMakeThread(\ pe)** - The message is transmitted to processor pe
    where a CthThread is created, and the thread invokes the specified
    function.
 
@@ -564,7 +594,7 @@ automatically as it handles single values.
 
 A second program, ``example2.c``, uses array arguments:
 
-.. code-block::c++
+.. code-block:: c++
    :linenos:
 
    #include "example2.cpm.h"
@@ -650,7 +680,7 @@ routines.
 The following program fragment shows the declaration of two user-defined
 types:
 
-.. code-block::c++
+.. code-block:: c++
   :linenos:
 
 
@@ -725,28 +755,28 @@ invent new kinds of destinations. Others can skip this section.
 
 The basic steps taken when sending a CPM message are:
 
--  1. The destination-structure is created. The first argument to the
+#. **The destination-structure is created.** The first argument to the
    launcher is a CpmDestination. Therefore, before the launcher is
    invoked, one typically calls a function (like CpmSend) to build the
    destination-structure.
 
--  2. The launcher allocates a message-buffer. The buffer contains space
+#. **The launcher allocates a message-buffer.** The buffer contains space
    to hold a function-pointer and the function’s arguments. It also
    contains space for an “envelope”, the size of which is determined by
    a field in the destination-structure.
 
--  3. The launcher stores the function-arguments in the message buffer.
+#. **The launcher stores the function-arguments in the message buffer.**
    In doing so, the launcher converts the arguments to a contiguous
    sequence of bytes.
 
--  4. The launcher sets the message’s handler. For every launcher, there
-   is a matching function called an invoker. The launcher’s job is to
+#. **The launcher sets the message’s handler.** For every launcher, there
+   is a matching function called an *invoker* The launcher’s job is to
    put the argument data in the message and send the message. The
-   invoker\ ’s job is to extract the argument data from the message and
+   *invoker*\ ’s job is to extract the argument data from the message and
    call the user’s function. The launcher uses ``CmiSetHandler`` to tell
-   Converse to handle the message by calling the appropriate invoker.
+   Converse to handle the message by calling the appropriate *invoker*.
 
--  5. The message is sent, received, and handled. The
+#. **The message is sent, received, and handled.** The
    destination-structure contains a pointer to a send-function. The
    send-function is responsible for choosing the message’s destination
    and making sure that it gets there and gets handled. The
@@ -754,7 +784,7 @@ The basic steps taken when sending a CPM message are:
    wishes. Eventually, though, the message should arrive at a
    destination and its handler should be called.
 
--  6. The user’s function is invoked. The invoker extracts the function
+#. **The user’s function is invoked.** The invoker extracts the function
    arguments from the message buffer and calls the user’s function.
 
 The *send-function* varies because messages take different routes to get
@@ -810,18 +840,18 @@ After CpmEnqueueFIFO builds the destination-structure, the launcher
 Cpm_print_integer is invoked. Cpm_print_integer performs all the steps
 normally taken by a launcher:
 
--  1. It allocates the message buffer. In this case, it sets aside just
+#. **It allocates the message buffer.** In this case, it sets aside just
    enough room for one int as an envelope, as dictated by the
    destination-structure’s envsize field.
 
--  2. It stores the function-arguments in the message-buffer. In this
+#. **It stores the function-arguments in the message-buffer.** In this
    case, the function-arguments are just the integer 12.
 
--  3. It sets the message’s handler. In this case, the message’s handler
+#. **It sets the message’s handler.** In this case, the message’s handler
    is set to a function that will extract the arguments and call
    print_integer.
 
--  4. It calls the send-function to send the message.
+#. **It calls the send-function to send the message.**
 
 The code for the send-function is here:
 
@@ -928,22 +958,24 @@ extremely helpful in AI search applications.
 The two assertions above should be qualified: **CldEnqueue** can use
 these sophisticated strategies, but it is also possible to configure it
 for different behavior. When you compile and link your program, you
-choose a load-balancing strategy. That means you link in one of several
+choose a *load-balancing strategy*. That means you link in one of several
 implementations of the load-balancer. Most are sophisticated, as
 described above. But some are simple and cheap, like the random
 strategy. The process of choosing a strategy is described in the manual
 *Converse Installation and Usage*.
 
-Before you send a message using **CldEnqueue**, you must write an info
+Before you send a message using **CldEnqueue**, you must write an *info*
 function with this prototype:
 
-void InfoFn(void \*msg, CldPackFn \*pfn, int \*len, int \*queueing, int
-\*priobits, unsigned int \*prioptr); The load balancer will call the
+``void InfoFn(void *msg, CldPackFn *pfn, int *len, int *queueing, int
+*priobits, unsigned int *prioptr);``
+
+The load balancer will call the
 info function when it needs to know various things about the message.
 The load balancer will pass in the message via the parameter ``msg``.
 The info function’s job is to “fill in” the other parameters. It must
 compute the length of the message, and store it at ``*len``. It must
-determine the pack function for the message, and store a pointer to it
+determine the *pack* function for the message, and store a pointer to it
 at ``*pfm``. It must identify the priority of the message, and the
 queueing strategy that must be used, storing this information at
 ``*queueing``, ``*priobits``, and ``*prioptr``. Caution: the priority
@@ -953,9 +985,10 @@ to the message itself.
 After the user of **CldEnqueue** writes the “info” function, the user
 must register it, using this:
 
-int CldRegisterInfoFn(CldInfoFn fn) Accepts a pointer to an
-info-function. Returns an integer index for the info-function. This
-index will be needed in CldEnqueue.
+``int CldRegisterInfoFn(CldInfoFn fn)``
+
+Accepts a pointer to an info-function. Returns an integer index for the
+info-function. This index will be needed in **CldEnqueue**.
 
 Normally, when you send a message, you pack up a bunch of data into a
 message, send it, and unpack it at the receiving end. It is sometimes
@@ -977,7 +1010,9 @@ other words, you should send the “short form” of the message, containing
 pointers. If the message is about to leave the address space, the load
 balancer will call your pack function, which must have this prototype:
 
-void PackFn(void \**msg) The pack function is handed a pointer to a
+``void PackFn(void **msg)``
+
+The pack function is handed a pointer to a
 pointer to the message (yes, a pointer to a pointer). The pack function
 is allowed to alter the message in place, or replace the message with a
 completely different message. The intent is that the pack function
@@ -991,9 +1026,10 @@ can be a no-op.
 
 Pack functions must be registered using this:
 
-int CldRegisterPackFn(CldPackFn fn) Accepts a pointer to an
-pack-function. Returns an integer index for the pack-function. This
-index will be needed in CldEnqueue.
+``int CldRegisterPackFn(CldPackFn fn)``
+
+Accepts a pointer to an pack-function. Returns an integer index for the
+pack-function. This index will be needed in **CldEnqueue**.
 
 Normally, **CldEnqueue** sends a message to a lightly-loaded processor.
 After doing this, it enqueues the message with the appropriate priority.
@@ -1005,7 +1041,7 @@ and lets you choose a processor yourself.
 
 The prototype for **CldEnqueue** is as follows:
 
-void CldEnqueue(int pe, void \*msg, int infofn)
+``void CldEnqueue(int pe, void *msg, int infofn)``
 
 The argument ``msg`` is a pointer to the message. The parameter
 ``infofn`` represents a function that can analyze the message. The
@@ -1014,7 +1050,7 @@ the parameter ``pe`` is ``CLD_ANYWHERE``, the message is sent to a
 lightly-loaded processor and enqueued with the appropriate priority. If
 the parameter ``pe`` is a processor number, the message is sent to the
 specified processor and enqueued with the appropriate priority.
-CldEnqueue frees the message buffer using CmiFree.
+**CldEnqueue** frees the message buffer using **CmiFree**.
 
 The following simple example illustrates how a Converse program can make
 use of the load balancers.
@@ -1109,7 +1145,7 @@ Introduction
 
 This manual details how to write your own general-purpose message-based
 load balancer for Converse. A Converse load balancer can be used by any
-Converse program, but also serves as a seed load balancer for Charm++
+Converse program, but also serves as a *seed* load balancer for Charm++
 chare creation messages. Specifically, to use a load balancer, you would
 pass messages to CldEnqueue rather than directly to the scheduler. This
 is the default behavior with chare creation message in Charm++. Thus,
@@ -1264,9 +1300,8 @@ message before we can send it off to a scheduler’s queue, either locally
 or remotely. For this, we have the info function. The prototype of an
 info function must be as follows:
 
-::
-
-  void ifn(msg, pfn, len, queueing, priobits, prioptr);
+``void ifn(void *msg, CldPackFn *pfn, int *len, int *queueing,
+int *priobits, unsigned int **prioptr);``
 
 Thus, to use the info function, we need to get the actual function via
 the handler index provided to **CldEnqueue**. Typically,
@@ -1454,7 +1489,7 @@ itc++queens program).
    CpvDeclare(int, CldLoadBalanceMessages);
    CpvDeclare(int, CldMessageChunks);
 
-The two register functions register info and pack functions, returning
+The two register functions register *info* and *pack* functions, returning
 an index for the functions. Info functions are used by the load balancer
 to extract the various components from a message. Amongst these
 components is the pack function index. If necessary, the pack function
@@ -1793,7 +1828,9 @@ This module defines a data type CPath, also known as an “array
 descriptor”. Arrays are created by the function CPathMakeArray, and
 individual threads are created using CPathMakeThread:
 
-void CPathMakeArray(CPath \*path, int threadfn, int mapfn, ...) This
+``void CPathMakeArray(CPath *path, int threadfn, int mapfn, ...)``
+
+This
 function initiates the creation of an array of threads. It fills in the
 array descriptor ``*path``. Each thread in the array starts executing
 the function represented by ``threadfn``. The function ``mapfn``
@@ -1801,9 +1838,10 @@ represents a mapping function, controlling the layout of the array. This
 parameter must be followed by the dimensions of the array, and then a
 zero.
 
-void CPathMakeThread(CPath \*path, int startfn, int pe) This function
-makes a zero-dimensional array of threads, in other words, just one
-thread.
+``void CPathMakeThread(CPath *path, int startfn, int pe)``
+
+This function makes a zero-dimensional array of threads, in other words,
+just one thread.
 
 Mapping Functions for Arrays of Threads
 ---------------------------------------
@@ -1815,20 +1853,26 @@ which is passed to CPathMakeArray. Mapping functions receive the array
 descriptor as a parameter, and may use it to determine the dimensions of
 the array.
 
-unsigned int MapFn(CPath \*path, int \*indices) This is a prototype map
+``unsigned int MapFn(CPath *path, int *indices)``
+
+This is a prototype map
 function, all mapping functions must have this parameter list. It
 accepts an array descriptor and a set of indices. It returns the
 processor number of the specified element.
 
-int CPathRegisterMapper(void \*mapfn) Accepts a pointer to a mapping
-function, and returns an integer index for the function. This number can
-be used as a parameter to CPathMakeArray.
+``int CPathRegisterMapper(void *mapfn)``
 
-int CPathArrayDimensions(CPath \*path) Returns the number of dimensions
-in the specified array.
+Accepts a pointer to a mapping function, and returns an integer index
+for the function. This number can be used as a parameter to
+CPathMakeArray.
 
-int CPathArrayDimension(CPath \*path, int n) Returns the nth dimension
-of the specified array.
+``int CPathArrayDimensions(CPath *path)``
+
+Returns the number of dimensions in the specified array.
+
+``int CPathArrayDimension(CPath *path, int n)``
+
+Returns the nth dimension of the specified array.
 
 Thread Functions for Arrays of Threads
 --------------------------------------
@@ -1838,15 +1882,18 @@ following prototype, and must be registered using the following
 registration function. The integer index returned by the registration
 process is the number which is passed to CPathMakeArray.
 
-void ThreadFn(CPath \*self, int \*indices) This is a prototype thread
+``void ThreadFn(CPath *self, int *indices)``
+
+This is a prototype thread
 function. All thread-functions must have these parameters. When an array
 of threads is created, each thread starts executing the specified thread
 function. The function receives a pointer to a copy of the array’s
 descriptor, and the array element’s indices.
 
-int CPathRegisterThreadFn(void \*mapfn) Accepts a pointer to a thread
-function, and returns an integer index for the function. This number can
-be used as a parameter to CPathMakeArray.
+``int CPathRegisterThreadFn(void *mapfn)``
+
+Accepts a pointer to a thread function, and returns an integer index for
+the function. This number can be used as a parameter to CPathMakeArray.
 
 Sending Messages to Threads
 ---------------------------
@@ -1855,7 +1902,9 @@ Threads may send messages to each other using CPathSend, which takes a
 complicated set of parameters. The parameters are most easily described
 by a context-free grammar:
 
-void CPathSend(dest-clause, tag-clause, data-clause, end-clause) Where:
+``void CPathSend(dest-clause, tag-clause, data-clause, end-clause)``
+
+Where:
 
 ::
 
@@ -1884,7 +1933,9 @@ the end of the parameter list.
 Messages sent with CPathSend can be received using CPathRecv, analyzed
 using CPathMsgDecodeBytes, and finally discarded with CPathMsgFree:
 
-void \*CPathRecv(tag-clause, end-clause) The tag-clause and end-clause
+``void *CPathRecv(tag-clause, end-clause)``
+
+The tag-clause and end-clause
 match the grammar for CPathSend. The function will wait until a message
 with the same tags shows up (it waits using the thread-blocking
 primitives, see Converse threads). If any position in the CPathRecv
@@ -1894,14 +1945,18 @@ data somewhere inside it. The data can be located using
 CPathMsgDecodeBytes, below. The opaque CPath message can be freed using
 CPathMsgFree below.
 
-void CPathMsgDecodeBytes(void \*msg, int \*len, void \*bytes) Given an
+``void CPathMsgDecodeBytes(void *msg, int *len, void *bytes)``
+
+Given an
 opaque CPath message (as sent by CPathSend and returned by CPathRecv),
 this function will locate the data inside it. The parameter ``*len`` is
 filled in with the data length, and ``*bytes`` is filled in with a
 pointer to the data bytes. Bear in mind that once you free the opaque
 CPath message, this pointer is no longer valid.
 
-void CPathMsgFree(void \*msg) Frees an opaque CPath message.
+``void CPathMsgFree(void *msg)``
+
+Frees an opaque CPath message.
 
 Performing Reductions over Array Elements
 -----------------------------------------
@@ -1910,8 +1965,10 @@ An set of threads may participate in a reduction. All the threads
 wishing to participate must call CPathReduce. The parameters to
 CPathReduce are most easily described by a context-free grammar:
 
-void CPathReduce(over-clause, tag-clause, red-clause, data-clause,
-dest-clause, end-clause) Where:
+``void CPathReduce(over-clause, tag-clause, red-clause, data-clause,
+dest-clause, end-clause)``
+
+Where:
 
 ::
 
@@ -1939,8 +1996,10 @@ to the recipient. The results can be received with CPathRecv using the
 same tags specified in the CPathReduce. The results may be analyzed with
 CPathMsgDecodeReduction, and freed with CPathMsgFree.
 
-void CPathMsgDecodeReduction(void \*msg,int \*vecsize,int \*eltsize,void
-\*bytes) This function accepts an opaque CPath message which was created
+``void CPathMsgDecodeReduction(void *msg, int *vecsize, int *eltsize, void
+*bytes)``
+
+This function accepts an opaque CPath message which was created
 by a reduction. It locates the data within the message, and determines
 the vecsize and eltsize.
 
@@ -1949,13 +2008,15 @@ and be registered with the following registration function. It is the
 number returned by the registration function which must be passed to
 CPathReduce:
 
-void ReduceFn(int vecsize, void \*data1, void \*data2) The reduce
-function accepts two equally-sized arrays of input data. It combines the
-two arrays pairwise, storing the results in array 1.
+``void ReduceFn(int vecsize, void *data1, void *data2)``
 
-int CPathRegisterReducer(void \*fn) Accepts a pointer to a reduction
-function, and returns an integer index for the function. This number can
-be used as a parameter to CPathReduce.
+The reduce function accepts two equally-sized arrays of input data. It
+combines the two arrays pairwise, storing the results in array 1.
+
+``int CPathRegisterReducer(void *fn)``
+
+Accepts a pointer to a reduction function, and returns an integer index
+for the function. This number can be used as a parameter to CPathReduce.
 
 .. [1]
    URL:\ \ ``http://www.ncsa.uiuc.edu/Apps/SPRNG/www/``
