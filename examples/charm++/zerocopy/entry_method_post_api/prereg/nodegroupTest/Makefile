@@ -1,6 +1,6 @@
--include ../../../../common.mk
--include ../../../../../include/conv-mach-opt.mak
-CHARMC=../../../../../bin/charmc $(OPTS)
+-include ../../../../../common.mk
+-include ../../../../../../include/conv-mach-opt.mak
+CHARMC=../../../../../../bin/charmc $(OPTS)
 
 all: nodegroupTest
 

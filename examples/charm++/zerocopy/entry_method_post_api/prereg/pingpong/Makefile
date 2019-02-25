@@ -1,5 +1,5 @@
--include ../../../../common.mk
-CHARMC=../../../../../bin/charmc $(OPTS)
+-include ../../../../../common.mk
+CHARMC=../../../../../../bin/charmc $(OPTS)
 
 all:	pgm
 
@@ -17,9 +17,9 @@ pingpong.o: pingpong.C cifiles
 
 test: all
 	@echo "Intra-processor Pingpong.."
-	$(call run, ./pgm +p1 )
+	$(call run, +p1 ./pgm 1024 8192 2 1)
 	@echo "Inter-processor Pingpong.."
-	$(call run, ./pgm +p2 )
+	$(call run, +p2 ./pgm 1024 8192 2 1)
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o pgm charmrun cifiles

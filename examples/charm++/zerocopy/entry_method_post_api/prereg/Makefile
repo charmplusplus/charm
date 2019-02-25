@@ -1,7 +1,7 @@
 DIRS = \
-  unreg \
-  prereg \
-  reg \
+  pingpong \
+  simpleZeroCopy \
+  nodegroupTest \
 
 TESTDIRS = $(DIRS)
 
