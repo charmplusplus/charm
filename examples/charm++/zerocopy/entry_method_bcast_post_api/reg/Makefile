@@ -1,7 +1,6 @@
 DIRS = \
-  unreg \
-  prereg \
-  reg \
+  ping_all \
+  simpleBcastPost \
 
 TESTDIRS = $(DIRS)
 
