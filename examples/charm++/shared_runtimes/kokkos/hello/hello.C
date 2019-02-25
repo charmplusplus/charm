@@ -13,7 +13,7 @@
 class Main : public CBase_Main {
 public:
   Main(CkArgMsg* m) {
-    // Pack arguments
+    // Pack arguments (optional)
     std::vector<std::string> args;
     for (int i = 0; i < m->argc; i++) {
       args.push_back(std::string(m->argv[i]));

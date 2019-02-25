@@ -1,5 +1,0 @@
-Hello World with Kokkos
-
-Demonstrates basic interoperability with Kokkos.
-Paths to include and lib folders of Kokkos (KOKKOS_INC and KOKKOS_LIB, respecitvely)
-need to be set as environment variables or provided to the Makefile.
