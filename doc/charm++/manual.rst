@@ -2912,8 +2912,7 @@ Below are the descriptions about the compiler and runtime options:
    -  | *-module CommonLBs*
       | links a special module CommonLBs which includes some commonly
         used Charm++ built-in load balancers. The commonly used load
-        balancers include
-        ``DummyLB, GreedyLB, GreedyRefineLB, CommLB, RandCentLB, RefineLB, RefineCommLB, RotateLB, DistributedLB, HybridLB, ComboCentLB, RefineSwapLB, NeighborLB, OrbLB, BlockLB, GreedyCommLB``
+        balancers include: *DummyLB, GreedyLB, GreedyRefineLB, CommLB, RandCentLB, RefineLB, RefineCommLB, RotateLB, DistributedLB, HybridLB, ComboCentLB, RefineSwapLB, NeighborLB, OrbLB, BlockLB, GreedyCommLB*
 
    -  | *-balancer GreedyCommLB*
       | links the load balancer GreedyCommLB and invokes it at runtime.
