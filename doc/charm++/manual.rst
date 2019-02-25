@@ -48,7 +48,7 @@ the assignment at runtime as necessary. Charm++ is the main (and early)
 exemplar of this programming model. AMPI is another example within the
 Charm++ family of the same model.
 
-.. mainchare::
+.. _mainchare:
 
 Execution Model
 ---------------
