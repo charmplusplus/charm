@@ -3,6 +3,14 @@ Charm++ Documentation
 =====================
 
 
+- Charm++ Tutorial: http://charmplusplus.org/tutorial/
+- Charm++ bug tracking: https://charm.cs.illinois.edu/redmine/projects/charm
+- Recent commit activity: http://charm.cs.illinois.edu/gerrit/gitweb?p=charm.git
+- Nightly regression tests: http://charm.cs.illinois.edu/autobuild/cur/
+- Charm++ mailing list: charm@cs.illinois.edu
+- Charm++ discourse group: https://charm.discourse.group
+
+
 .. toctree::
    :maxdepth: 1
    :caption: Charm++
