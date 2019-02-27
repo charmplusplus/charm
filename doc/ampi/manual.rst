@@ -383,6 +383,18 @@ is that of changing a single pointer per user-level thread context
 switch. Currently, Charm++ supports it for x86/x86_64 platforms when
 using GNU compilers.
 
+::
+
+   // C/C++ example:
+   int myrank;
+   double xyz[100];
+
+.. code-block:: fortran
+
+   ! Fortran example:
+   integer :: myrank
+   real*8, dimension(100) :: xyz
+
 For the example above, the following changes to the code handle the
 global variables:
 
@@ -448,7 +460,9 @@ variables.
 
 This scheme is demonstrated in the following examples. The original
 Fortran90 code contains a module ``shareddata``. This module is used in
-the main program and a subroutine ``subA``.
+the ``MPI_MAIN`` subroutine and a subroutine ``subA``. Note that
+``PROGRAM PGM`` was renamed to ``SUBROUTINE MPI_MAIN`` and ``END PROGRAM``
+was renamed to ``END SUBROUTINE``.
 
 .. code-block:: fortran
 
@@ -458,7 +472,7 @@ the main program and a subroutine ``subA``.
      DOUBLE PRECISION :: xyz(100)
    END MODULE
 
-   SUBROUTINE MPI_MAIN
+   SUBROUTINE MPI_MAIN                               ! Previously PROGRAM PGM
      USE shareddata
      include 'mpif.h'
      INTEGER :: i, ierr
@@ -469,7 +483,7 @@ the main program and a subroutine ``subA``.
      END DO
      CALL subA
      CALL MPI_Finalize(ierr)
-   END PROGRAM
+   END SUBROUTINE                                    ! Previously END PROGRAM
 
    SUBROUTINE subA
      USE shareddata
