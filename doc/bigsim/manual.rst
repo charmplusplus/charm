@@ -242,7 +242,7 @@ parameters to ``charmrun`` to define the simulated machine size:
 #. ``+vp``: define the number of processors of the hypothetical (future)
    system
 
-#. ``+x, +y`` and ``+z``: optionally define the size of the machine in
+#. ``+x``, ``+y`` and ``+z``: optionally define the size of the machine in
    three dimensions, these define the number of nodes along each
    dimension of the machine (assuming a torus/mesh topology);
 
@@ -356,21 +356,30 @@ msgPtr - pointer to the message to be sent to target node;
 nodeID - node ID of the target node, it is the serial number of a
 bluegene node in the emulator’s physical node.
 
-``void addBgThreadMessage(bgMsg *msgPtr, int threadID)`` add a message to a
+``void addBgThreadMessage(bgMsg *msgPtr, int threadID)``
+
+add a message to a
 thread’s affinity queue, these messages can be only executed by a
 specific thread indicated by threadID.
 
-``void addBgNodeMessage(bgMsg *msgPtr)`` add a message to a node’s
+``void addBgNodeMessage(bgMsg *msgPtr)``
+
+add a message to a node’s
 non-affinity queue, these messages can be executed by any thread in the
 node.
 
-``boolean checkReady()`` invoked by communication thread to see if there is
+``boolean checkReady()``
+
+invoked by communication thread to see if there is
 any unattended message in inBuffer.
 
-``bgMsg * getFullBuffer()`` invoked by communication thread to retrieve the
+``bgMsg * getFullBuffer()``
+
+invoked by communication thread to retrieve the
 unattended message in inBuffer.
 
 ``CmiHandler msgHandlerFunc(char *msg)``
+
 Handler function type that user
 can register to handle the message.
 
@@ -401,15 +410,19 @@ thread per node is determined either by the command line arguments or
 calling following functions:
 
 ``void BgSetSize(int sx, int sy, int sz)``
+
 set Blue Gene Machine size;
 
 ``void BgSetNumWorkThread(int num)``
+
 set number of worker threads per node;
 
 ``void BgSetNumCommThread(int num)``
+
 set number of communication threads per node;
 
 ``int BgRegisterHandler(BgHandler h)``
+
 register user message handler functions;
 
 For each simulated node, the execution starts at ``BgNodeStart(int argc,
