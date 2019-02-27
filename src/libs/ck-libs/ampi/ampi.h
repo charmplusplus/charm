@@ -290,21 +290,21 @@ typedef void (MPI_User_function)(void *invec, void *inoutvec,
 #define MPI_TAG_UB_VALUE  1073741824
 
 /* These are the builtin MPI keyvals, plus some AMPI specific ones. */
-#define MPI_TAG_UB             -1
-#define MPI_HOST               -2
-#define MPI_IO                 -3
-#define MPI_WTIME_IS_GLOBAL    -4
-#define MPI_APPNUM             -5
-#define MPI_UNIVERSE_SIZE      -6
-#define MPI_WIN_BASE           -7
-#define MPI_WIN_SIZE           -8
-#define MPI_WIN_DISP_UNIT      -9
-#define MPI_WIN_MODEL         -10
-#define MPI_WIN_CREATE_FLAVOR -11
-#define AMPI_MY_WTH           -12
-#define AMPI_NUM_WTHS         -13
-#define AMPI_MY_PROCESS       -14
-#define AMPI_NUM_PROCESSES    -15
+#define MPI_TAG_UB             -2
+#define MPI_HOST               -3
+#define MPI_IO                 -4
+#define MPI_WTIME_IS_GLOBAL    -5
+#define MPI_APPNUM             -6
+#define MPI_UNIVERSE_SIZE      -7
+#define MPI_WIN_BASE           -8
+#define MPI_WIN_SIZE           -9
+#define MPI_WIN_DISP_UNIT     -10
+#define MPI_WIN_MODEL         -11
+#define MPI_WIN_CREATE_FLAVOR -12
+#define AMPI_MY_WTH           -13
+#define AMPI_NUM_WTHS         -14
+#define AMPI_MY_PROCESS       -15
+#define AMPI_NUM_PROCESSES    -16
 
 /** Communicators give a communication context to a set of processors.
     An intercommunicator can be used for point to point messaging between two groups.
