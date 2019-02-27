@@ -1,4 +1,5 @@
 DIRS = \
+  hello \
   stencil3d \
   kNeighbor \
 
