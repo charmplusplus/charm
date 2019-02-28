@@ -9,9 +9,9 @@ Generating Performance Traces
 =============================
 
 Projections is a performance analysis/visualization framework that helps
-you understand and investigate performance-related problems in the
+you understand and investigate performance-related problems in
 (Charm++) applications. It is a framework with an event tracing
-component which allows to control the amount of information generated.
+component which allows for control over the amount of information generated.
 The tracing has low perturbation on the application. It also has a
 Java-based visualization and analysis component with various views that
 help present the performance information in a visually useful manner.
@@ -28,7 +28,7 @@ steps:
 
 The Charm++ runtime automatically records pertinent performance data for
 performance-related events during execution. These events include the
-start and end of entry method execution, message send from entry methods
+start and end of entry method executions, message sends from entry methods
 and scheduler idle time. This means *most* users do not need to manually
 insert code into their applications in order to generate trace data. In
 scenarios where special performance information not captured by the
@@ -59,9 +59,9 @@ as *tracemode(s)*). (see section :numref:`sec::trace modules`)
 Enabling Performance Tracing at Link/Run Time
 ---------------------------------------------
 
-Projections tracing modules dictate the type of performance data, data
-detail and data format each processor will record. They are also
-referred to as “tracemodes”. There are currently 2 tracemodes available.
+Projections tracing modules dictate the type of performance data,
+detail, and format each processor will record. They are also
+referred to as "tracemodes." There are currently 2 tracemodes available.
 Zero or more tracemodes may be specified at link-time. When no
 tracemodes are specified, no trace data is generated.
 
@@ -79,8 +79,8 @@ visualization and analysis.
 
 This tracemode creates a single symbol table file and :math:`p` ASCII
 log files for :math:`p` processors. The names of the log files will be
-NAME.#.log where NAME is the name of your executable and # is the
-processor #. The name of the symbol table file is NAME.sts where NAME is
+``NAME.#.log{.gz}`` where NAME is the name of your executable and # is the
+processor #. The name of the symbol table file is ``NAME.sts`` where NAME is
 the name of your executable.
 
 This is the main source of data needed by the performance visualizer.
@@ -104,7 +104,7 @@ tracemode:
    nested while recorded and issue a warning immediately.
 
 -  ``+trace-subdirs NUM``: divide the generated log files among ``NUM``
-   subdirectories of the trace root, each named ``PROGNAME.projdir.K``
+   subdirectories of the trace root, each named ``NAME.projdir.K``
 
 .. _sec::trace module summary:
 
@@ -124,8 +124,8 @@ is summarized within each processor.
 
 This tracemode will generate a single symbol table file and :math:`p`
 ASCII summary files for :math:`p` processors. The names of the summary
-files will be NAME.#.sum where NAME is the name of your executable and #
-is the processor #. The name of the symbol table file is NAME.sum.sts
+files will be ``NAME.#.sum`` where NAME is the name of your executable and #
+is the processor #. The name of the symbol table file is ``NAME.sum.sts``
 where NAME is the name of your executable.
 
 This tracemode can be used to control the amount of output generated in
@@ -133,7 +133,7 @@ a run. It is typically used in scenarios where a quick look at the
 overall utilization graph of the application is desired to identify
 smaller regions of time for more detailed study. Attempting to generate
 the same graph using the detailed logs of the prior tracemode may be
-unnecessarily time consuming or impossible.
+unnecessarily time consuming or resource intensive.
 
 The following is a list of runtime options available under this
 tracemode:
@@ -147,13 +147,13 @@ tracemode:
 
 -  ``+sumDetail``: Generates a additional set of files, one per
    processor, that stores the time spent by each entry method associated
-   with each time-bin. The names of “summary detail” files will be
-   NAME.#.sumd where NAME is the name of your executable and # is the
+   with each time-bin. The names of "summary detail" files will be
+   ``NAME.#.sumd`` where NAME is the name of your executable and # is the
    processor #.
 
 -  ``+sumonly``: Generates a single file that stores a single
    utilization value per time-bin, averaged across all processors. This
-   file bears the name NAME.sum where NAME is the name of your
+   file bears the name ``NAME.sum`` where NAME is the name of your
    executable. This runtime option currently overrides the
    ``+sumDetail`` option.
 
@@ -193,12 +193,12 @@ potentially unmanageable by the visualization tool. At the time of
 documentation, Projections is capable of handling data from 8000+
 processors but with somewhat severe tool responsiveness issues. We have
 developed an approach to mitigate this data size problem with options to
-trim-off “uninteresting” processors’ data by not writing such data at
+trim-off "uninteresting" processors’ data by not writing such data at
 the end of an application’s execution.
 
 This is currently done through heuristics to pick out interesting
 extremal (i.e. poorly behaved) processors and at the same time using a
-k-means clustering to pick out exemplar processors from equivalence
+:math:`k`-means clustering to pick out exemplar processors from equivalence
 classes to form a representative subset of processor data. The analyst
 is advised to also link in the summary module via ``+tracemode summary``
 and enable the ``+sumDetail`` option in order to retain some profile
@@ -208,7 +208,7 @@ data for processors whose data were dropped.
    the end of the application’s execution.
 
 -  ``+numClusters``: determines the number of clusters (equivalence
-   classes) to be used by the k-means clustering algorithm for
+   classes) to be used by the :math:`k`-means clustering algorithm for
    determining exemplar processors. Analysts should take advantage of
    their knowledge of natural application decomposition to guess at a
    good value for this.
@@ -234,7 +234,7 @@ calls on all processors and at well-defined points in the application.
 Users may choose to have instrumentation turned off at first (by command
 line option ``+traceoff`` - see section
 :numref:`sec::general options`) if some period of time in middle of
-the applicationś execution is of interest to the user.
+the applications' execution is of interest to the user.
 
 Alternatively, users may start the application with instrumentation
 turned on (default) and turn off tracing for specific sections of the
@@ -250,7 +250,7 @@ option applies to all processors in the application.
 
 -  ``void traceEnd()``
 
-   Prevents the runtime from tracing events (including all user events)
+   Disables the runtime from tracing events (including all user events)
    on the local processor where ``traceEnd`` is called.
 
 .. _sec::explicit flushing:
@@ -260,7 +260,8 @@ Explicit Flushing
 
 By default, when linking with ``-tracemode projections``, log files are
 flushed to disk whenever the number of entries on a processor reaches
-the logsize limit (see Section :numref:`sec::trace module projections`). However, this can occur at any time during the
+the logsize limit (see Section :numref:`sec::trace module
+projections`). However, this can occur at any time during the
 execution of the program, potentially causing performance perturbations.
 To address this, users can explicitly flush to disk using the
 ``traceFlushLog()`` function. Note that automatic flushing will still
@@ -281,7 +282,7 @@ events. User events are usually displayed in the Timeline view as
 vertical bars above the entry methods. Alternatively the user event can
 be displayed as a vertical bar that vertically spans the timelines for
 all processors. Follow these following basic steps for creating user
-events in a charm++ program:
+events in a Charm++ program:
 
 #. Register an event with an identifying string and either specify or
    acquire a globally unique event identifier. All user events that are
@@ -299,7 +300,7 @@ The functions available are as follows:
    event identifier is obtained from the runtime and returned. The
    string ``EventDesc`` must either be a constant string, or it can be a
    dynamically allocated string that is **NOT** freed by the program. If
-   the ``EventDesc`` contains a substring “\**\*” then the Projections
+   the ``EventDesc`` contains the substring "\**\*" then the Projections
    Timeline tool will draw the event vertically spanning all PE
    timelines.
 
@@ -307,18 +308,18 @@ The functions available are as follows:
    of the following methods to ensure the same value for any PEs
    generating the user events:
 
-   #. Call ``traceRegisterUserEvent`` on PE 0 in main::main without
-      specifying an event number, and store returned event number into a
+   #. Call ``traceRegisterUserEvent`` on PE 0 in ``main::main`` without
+      specifying an event number and store the returned event number into a
       readonly variable.
 
    #. Call ``traceRegisterUserEvent`` and specify the event number on
-      processor 0. Doing this on other processors would have no effect.
+      processor 0. Doing this on other processors has no effect.
       Afterwards, the event number can be used in the following user
       event calls.
 
    Eg. ``traceRegisterUserEvent("Time Step Begin", 10);``
 
-   Eg. ``eventID = traceRegisterUserEvent(“Time Step Begin”);``
+   Eg. ``eventID = traceRegisterUserEvent("Time Step Begin");``
 
 There are two main types of user events, bracketed and non bracketed.
 Non-bracketed user events mark a specific point in time. Bracketed user
@@ -358,9 +359,9 @@ The calls for recording user events are the following:
    ::
 
          traceRegisterUserEvent("Critical Code", 20); // on PE 0
-         double critStart = CmiWallTimer();;  // start time
+         double critStart = CmiWallTimer();  // start time
          // do the critical code
-         traceUserBracketEvent(20, critStart,CmiWallTimer());
+         traceUserBracketEvent(20, critStart, CmiWallTimer());
 
 -  ``void traceUserSuppliedData(int data)``
 
@@ -455,15 +456,13 @@ Building Projections
 
 To rebuild Projections (optional) from the source:
 
-#. Make sure your PATH contains the JDK commands “java”, “javac”, and
-   “jar”, as well as the build tools “gradle” and “make”.
+#. Make sure your PATH contains the JDK commands "java", "javac", and
+   "jar", as well as the build tools "gradle" and "make".
 
-#. Make sure that your versions of java and javac are at least 1.5. Do
-   this by running “java -version” and “javac -version”. Also, make sure
-   the environment variable JAVA_HOME is not pointing at an old version
-   of java.
+#. Make sure that you are using Java 8 or later. Do
+   this by running "java -version" and "javac -version".
 
-#. From ``PROJECTIONS_LOCATION/``, type “make”.
+#. From ``PROJECTIONS_LOCATION/``, type "make".
 
 #. The following files are placed in ‘bin’:
 
@@ -488,11 +487,11 @@ Starting Up
 
 Available options to the visualization component of Projections include:
 
--  ``-h or -help``: displays help information about available options.
+-  ``-h or --help``: displays help information about available options.
 
--  ``-V or -version``: displays current Projections version number.
+-  ``-V or --version``: displays current Projections version number.
 
--  ``-u or -use-version <ver>``: overrides the data interpretation
+-  ``-u or --use-version <ver>``: overrides the data interpretation
    behavior of Projections to explicitly use :math:`ver` instead of the
    current version. This is useful in scenarios where the latest version
    of Projections is not backward-compatible with older log formats.
@@ -513,7 +512,7 @@ Available options to the visualization component of Projections include:
 -  ``-print_usage``: tells Projections to also write to standard output
    the detailed graph numbers when viewing Usage Profiles (see later).
    This is useful for generating visuals that are better expressed by
-   tools such as gnuPlot than through screen captures of Projections
+   tools such as gnuplot than through screen captures of Projections
    plots.
 
 Supplying the optional ``NAME.sts`` file in the command line will cause
@@ -539,7 +538,7 @@ file, the main window will show a blank screen.
    explicitly load a new dataset. It brings up a dialog box that allows
    you to select the location of the dataset you wish to study. Navigate
    to the directory containing your data and select the .sts file. Click
-   on ‘Open’. If you have selected a valid file, Projections will load
+   on "Open". If you have selected a valid file, Projections will load
    in some preliminary data from the files and then activate the rest of
    the options under the menu item **Tools**. *Close current data*
    currently works the same way as *Close all data*. They unload all
@@ -816,7 +815,7 @@ The following menu options are available:
    Other color schemes are provided that can be used for some
    applications. The colors set as described above are the default
    coloring scheme. Other options for coloring the events are by event
-   id (chare array index), user supplied parameter, or memory usage. In
+   ID (chare array index), user supplied parameter, or memory usage. In
    order to color by a user supplied parameter such as timestep, the C
    function ``traceUserSuppliedData(int value);`` should be called
    within some entry methods. If such a method is called in an entry
@@ -828,7 +827,7 @@ The following menu options are available:
    memory usage. Red indicates high memory usage, and green indicates
    low memory usage. The actual memory usage can also be viewed in the
    tooltips that appear when the cursor is over an event. The memory
-   usage is only available in when using a Charm++ version that uses gnu
+   usage is only available in when using a Charm++ version that uses GNU
    memory.
 
 -  **Screenshot** contains 1 option: *Save as JPG or PNG* save the
@@ -860,11 +859,11 @@ The Timeline Window consists of two parts:
    time, the time spent packing, the number of messages it created, and
    which processor created the event.
 
-   Left clicking on an event bar will cause a window to popup. This
+   Hovering over an event bar will cause a window to popup. This
    window contains detailed information about the messages sent by the
    clicked upon event.
 
-   Right clicking on an event bar will cause a line to be drawn to the
+   Clicking on an event bar will cause a line to be drawn to the
    beginning of the event bar from the point where the message causing
    the event originated. This option may not be applicable for threaded
    events. If the message originated on a processor not currently
@@ -875,7 +874,7 @@ The Timeline Window consists of two parts:
 
    User events are displayed as bars above the ordinary event bars in
    the display area. If the name of the user event contains a substring
-   “\**\*” then the bar will vertically span the whole screen.
+   "\**\*" then the bar will vertically span the whole screen.
 
    Message pack times and send points can be displayed below the event
    bars. The message sends are small white tick marks, while the message
@@ -984,7 +983,7 @@ The following components are supported in this view:
    of the item, what percent of the usage it has, and the processor it
    is on.
 
--  **Control Panel** (located: bottom area) The panellets you adjust the
+-  **Control Panel** (located: bottom area) Allows for adjustments of the
    scales in both the X and Y directions. The X direction is useful if
    you are looking at a large number of processors. The Y direction is
    useful if there are small-percentage items for a processor. The
@@ -1029,19 +1028,19 @@ Projections’ standard graph (see :numref:`sec::misc`).
 The control panel allows you to switch between the following
 communication characteristics:
 
--  Number of Messages Sent by entry methods (initial default view);
+-  Number of messages sent by entry methods (initial default view)
 
--  Number of Bytes Sent by entry methods;
+-  Number of bytes sent by entry methods
 
--  Number of Messages Received by entry methods;
+-  Number of messages received by entry methods
 
--  Number of Bytes Received by entry methods;
+-  Number of bytes received by entry methods
 
--  Number of Messages Sent externally (physically) by entry methods;
+-  Number of messages sent externally (physically) by entry methods
 
--  Number of Bytes Sent externally (physically) by entry methods;
+-  Number of bytes sent externally (physically) by entry methods
 
--  and Number of hops messages traveled before being received by an
+-  Number of hops messages traveled before being received by an
    entry methods. This is available when the runtime option ``-bgsize``
    (See section :numref:`sec:startingUp`) is supplied.
 
@@ -1072,19 +1071,19 @@ Projections’ standard graph (see :numref:`sec::misc`).
 The control panel allows you to switch between the following
 communication characteristics:
 
--  Number of Messages Sent by entry methods (initial default view);
+-  Number of messages sent by entry methods (initial default view)
 
--  Number of Bytes Sent by entry methods;
+-  Number of bytes sent by entry methods
 
--  Number of Messages Received by entry methods;
+-  Number of messages received by entry methods
 
--  Number of Bytes Received by entry methods;
+-  Number of bytes received by entry methods
 
--  Number of Messages Sent externally (physically) by entry methods;
+-  Number of messages sent externally (physically) by entry methods
 
--  Number of Bytes Sent externally (physically) by entry methods;
+-  Number of bytes sent externally (physically) by entry methods
 
--  and Number of hops messages travelled before being received by an
+-  Number of hops messages travelled before being received by an
    entry methods (available only on trace logs generated on the Bluegene
    machine).
 
@@ -1131,16 +1130,16 @@ This tool has the following menu options:
    currently does not do anything. This will also be addressed in a
    later release of Projections.
 
-The tool has 2 buttons. “Open File” reloads the dialog box (described
+The tool has 2 buttons. "Open File" reloads the dialog box (described
 above) and allows the user to select a new processor’s data to be
-loaded. “Close Window” closes the current window.
+loaded. "Close Window" closes the current window.
 
 Histograms
 ~~~~~~~~~~
 
 This module (see figure :numref:`histogram`) allows you to examine the
 performance property distribution of all your entry points (EP). It
-gives a histogram of different number of EP’s that have the following
+gives a histogram of different number of EPs that have the following
 properties falling in different property bins:
 
 The dialog box for this view asks the following information from the
@@ -1167,7 +1166,7 @@ features you can use involving the various fields):
 
 The dialog box reports the selection of bins as specified by the user by
 displaying the minimum bin size (in units - microseconds or bytes) to
-the maximum bin size. “units” refer to microseconds for time-based
+the maximum bin size. "units" refer to microseconds for time-based
 histograms or bytes for histograms representing message sizes.
 
 Standard graph features can be employed for the main display of this
@@ -1204,7 +1203,7 @@ toggle buttons:
 The use of the tool is somewhat counterintuitive. The dialog box is
 created immediately and when the tool window is created, it is defaulted
 to a time-based histogram. You may change this histogram to a
-message-size-based histogram by selecting the “Message Size” radio
+message-size-based histogram by selecting the "Message Size" radio
 button which would then update the graph using the same parameters
 provided in the dialog box. This issue will be fixed in upcoming
 editions of Projections.
@@ -1212,13 +1211,13 @@ editions of Projections.
 The following features are, as of this writing, not implemented. They
 will be ready in a later release of Projections.
 
-The “Select Entries” button is intended to bring up a color selection
+The "Select Entries" button is intended to bring up a color selection
 and filtering window that allows you to filter away entry methods from
 the count. This offers more control over the analysis (e.g. when you
 already know EP 5 takes 20-30ms and you want to know if there are other
 entry points also takes 20-30ms).
 
-The “Out-of-Range EPs” button is intended to bring up a table detailing
+The "Out-of-Range EPs" button is intended to bring up a table detailing
 all the entry methods that fall into the overflow (last) bin. This list
 will, by default, be listed in descending order of time taken by the
 entry methods.
@@ -1264,14 +1263,14 @@ The view currently hard codes the number of intervals to 7,000
 independent of the time-range desired.
 
 Each processor has a row of colored bars in the display, different
-colors indicating different utilization at that time (White representing
-100 utilization (100 representing 0 a display of the processor usage of
-the specific processor at the specific time in the status bar below the
+colors indicating different utilization at that time (white representing
+100 utilization and black representing idle time). The usage of a
+processor at the specific time is displayed in the status bar below the
 graph. Vertical and horizontal zoom is enabled by two zooming bars to
 the right and lower of the graph. Panning is possible by clicking on any
 part of the display and dragging the mouse.
 
-The “by EP colors” radio button provides more detail by replacing the
+The "by EP colors" radio button provides more detail by replacing the
 utilization colors with the colors of the most significant entry method
 execution time in that time-interval on that processor represented by
 the cells (as illustrated in figure :numref:`overview-ep`).
@@ -1308,12 +1307,12 @@ as possible. The view employs a color temperature ranging from blue
 (cool - low utilization) to bright red (hot - high utilization) to
 represent utilization.
 
-You may manually update the frames by using the “:math:`<<`” or
-“:math:`>>`” buttons to visualize the preceding or next frames
-respectively. The “Auto” button toggles automatic animation given the
+You may manually update the frames by using the "<<" or
+">>" buttons to visualize the preceding or next frames
+respectively. The "Auto" button toggles automatic animation given the
 desired refresh rate.
 
-The “Frame Refresh Delay” field allows you to select the real time delay
+The "Frame Refresh Delay" field allows you to select the real time delay
 between frames. It is a time-based field (see section
 :numref:`sec::misc` for special features in using time-based fields).
 
@@ -1330,7 +1329,7 @@ visualization of the amount of time contributed by each entry method
 summed across all processors and displayed by user-adjustable time
 intervals.
 
-Time Profile’s dialog box is exactly the same as that of the Graph tool
+Time Profile's dialog box is exactly the same as that of the Graph tool
 (see section :numref:`sec::graph view`).
 
 .. figure:: fig/timeprofile.png
@@ -1345,22 +1344,22 @@ view (see section :numref:`sec::misc`).
 Under the tool options, one may:
 
 -  Filter the set of entry methods to be displayed on the graph via the
-   “Select Entry Points” button. One may also modify the color set used
+   "Select Entry Points" button. One may also modify the color set used
    for the entry methods via this option.
 
--  use the “Select New Range” button to reload the dialog box for the
+-  Use the "Select New Range" button to reload the dialog box for the
    tool and set new parameters for visualization (eg. different time
    range, different set of processors or different interval sizes).
 
--  store the current set of entry method colors to disk (to the same
+-  Store the current set of entry method colors to disk (to the same
    directory where the trace logs are stored). This is done via the
-   “Save Entry Colors” button.
+   "Save Entry Colors" button.
 
--  load the stored set of entry method colors (if it exists) from disk
+-  Load the stored set of entry method colors (if it exists) from disk
    (from the same directory where the trace logs are stored). This is
-   done via the “Load Entry Colors” button.
+   done via the "Load Entry Colors" button.
 
-This tool’s performance is tied to the number of intervals desired by
+This tool's performance is tied to the number of intervals desired by
 the user. We recommend that the user stick to visualizing 1,000
 intervals or less.
 
@@ -1417,20 +1416,20 @@ profile but only for processors whose behavior is “extreme”.
 
    Outlier Analysis Selection Dialog
 
-“Extreme” processors are identified through the application of
+"Extreme" processors are identified through the application of
 heuristics specific to the attribute that analysts wish to study applied
 to a specific activity type. You can specify the number of “extreme”
 processors are to be picked out by Projections by filling the
 appropriate number in the field “Outlier Threshold”. The default is to
 pick 10% of the total number of processors up to a cap of 20. As an
-example, an analyst may wish to find “extreme” processors with respect
+example, an analyst may wish to find "extreme" processors with respect
 to the idle time of normal Charm++ trace events.
 
 Figure :numref:`outlier dialog` shows the choices available to this
 tool. Specific to this view are two pull-down menus: *Attribute* and
 *Activity*.
 
-There are four *Activity* options:
+There are two *Activity* options:
 
 #. The *Projections* activity type refer to the entry methods executed
    by the Charm++ runtime system.
@@ -1466,10 +1465,10 @@ There are four *Attribute* options:
 
    Outlier Analysis View
 
-At the same time, a k-means clustering algorithm is applied to the data
+At the same time, a :math:`k`-means clustering algorithm is applied to the data
 to help identify processors with exemplar behavior that is
 representative of each cluster (or equivalence class) identified by the
-algorithm. You can control the value of k by filling in the appropriate
+algorithm. You can control the value of :math:`k` by filling in the appropriate
 number in the field “Number of Clusters”. The default value is 5.
 
 The result of applying the required heuristics to the appropriate
@@ -1486,11 +1485,11 @@ shows, over the user’s selected time range, from left to right:
 -  A bar representing the average activity profile of all outlier (or
    extreme) processors identified by the heuristics.
 
--  One bar representing the activity profile of the representative
+-  Bars representing the activity profile of a representative
    processor from each cluster of processors identified by the
-   application of the k-means clustering algorithm.
+   application of the :math:`k`-means clustering algorithm.
 
--  One bar representing the activity profile of each identified outlier
+-  Bars representing the activity profile of each identified outlier
    processor, sorted in order of significance (rightmost processor bar
    is the most significant).
 
@@ -1508,12 +1507,11 @@ Online Live Analysis
 
 Projections provides a continuous performance monitoring tool - CCS
 streaming. Different from other tools discussed above, which are used to
-visualize post-mortem data, ccs streaming visualizes the running
+visualize post-mortem data, CCS streaming visualizes the running
 programs. In order to use it, the Charm++ program needs to be linked
-with **-tracemode utilization**. The command line needs to include
-"++server ++server-port 2345". "2345" is the socket port number on
-server side. In projections ccs streaming tool, the port number should
-be same with that on server side.
+with ``-tracemode utilization``. The command line needs to include
+``++server ++server-port <port>``. ``<port>`` is the socket port
+number on the server side.
 
 Multirun Analysis
 ~~~~~~~~~~~~~~~~~
@@ -1561,7 +1559,7 @@ the event. Each noise component contains events of different types
 across one or more processors, but all the events within the noise
 component have similar noise durations.
 
-Clicking on the “view” button for a noise component opens a window
+Clicking on the "view" button for a noise component opens a window
 similar to figure :numref:`noiseminer2`. This second window
 displays up to 36 miniature timelines, each for a different event
 associated with the noise component.
@@ -1588,27 +1586,27 @@ A standard graph display (an example of which can be found with the Main
 Summary Graph - figure :numref:`mainwindow`) has the following
 features:
 
--  **Graph types** can be selected between “Line Graph” which connects
+-  **Graph types** can be selected between "Line Graph" which connects
    each data point with a colored line representing the appropriate data
-   entry. This information may be “stacked” or “unstacked” (controlled
-   by the checkbox to the right). A “stacked” graph places one data
-   point set (Y values) on top of another. An “unstacked” graph simply
+   entry. This information may be "stacked" or "unstacked" (controlled
+   by the checkbox to the right). A "stacked" graph places one data
+   point set (Y values) on top of another. An "unstacked" graph simply
    uses the data point’s Y value to directly determine the point’s
-   position; “Bar Graph” (the default) which draws a colored bar for
+   position; "Bar Graph" (the default) which draws a colored bar for
    each data entry and the value of the data point determines its height
-   or starting position (depending on whether the bar graph is “stacked”
-   or “unstacked”). A “Bar Graph” displayed in “unstacked” mode draws
+   or starting position (depending on whether the bar graph is "stacked"
+   or "unstacked"). A "Bar Graph" displayed in "unstacked" mode draws
    its bars in a tallest to shortest order so that the large Y values do
-   not cover over the small Y values; “Area Graph” is similar to a “Line
-   Graph” except that the area under the lines for a particular Y data
-   point set is also colored by the data’s appropriate color. “Area
-   Graph”s are always stacked.
+   not cover over the small Y values; "Area Graph" is similar to a "Line
+   Graph" except that the area under the lines for a particular Y data
+   point set is also colored by the data’s appropriate color. "Area
+   Graph"s are always stacked.
 
 -  **x-scale** allows the user to scale the X-Axis. This can be done by
    directly entering a scaling factor in the text field (simple numeric
-   field - see below) or by using the “:math:`<<`” or “:math:`>>`”
+   field - see below) or by using the ":math:`<<`" or ":math:`>>`"
    buttons to increase or decrease the scale by 0.25 each time. The
-   “Reset” button changes the scale factor back to 1.0. A scrollbar
+   "Reset" button changes the scale factor back to 1.0. A scrollbar
    automatically appears if the scale factor causes the canvas to be
    larger than the window.
 
@@ -1632,18 +1630,18 @@ employed in such a dialog box:
 -  **Moving from field to field** via the tab key causes the dialog box
    update the last field input by the user. It also performs a
    consistency check. Whenever it finds an inconsistency, it will move
-   mouse focus onto the offending field, disabling the “OK” button so as
+   mouse focus onto the offending field, disabling the "OK" button so as
    to force the user to fix the inconsistency. Examples of inconsistency
    includes: input that violates a field’s format; input whose value
    violates constraints (eg. start time larger than end time); or
    out-of-range stand-alone values.
 
--  **Available buttons** include “OK” which confirms the user’s choice
+-  **Available buttons** include "OK" which confirms the user’s choice
    of parameters. This button is only activated if the dialog box
-   considers the parameters’ input to be consistent. “Update” causes the
+   considers the parameters’ input to be consistent. "Update" causes the
    dialog box to update the last field input by the user and perform a
    consistency check. This is similar in behavior to the user tabbing
-   between fields. “Cancel” closes the dialog box without modifying any
+   between fields. "Cancel" closes the dialog box without modifying any
    parameters if the tool has already been loaded or aborts the tool’s
    load attempt otherwise.
 
@@ -1653,12 +1651,12 @@ employed in such a dialog box:
    or timestep of a computation without having to memorize or write on a
    piece of paper when exactly the phase or timestep occurred.
 
-   It consists of a pull-down text box and 2 buttons. “Add to History
-   List” adds the current time range to the pull-down list to the left
+   It consists of a pull-down text box and 2 buttons. "Add to History
+   List" adds the current time range to the pull-down list to the left
    of the button. The dialog box maintains up to 5 entries, replacing
-   older entries with newer ones. “Remove Selected History” removes the
-   currently selected entry in the history list. “Save History to Disk”
-   stores current history information to the file “ranges.hst” in the
+   older entries with newer ones. "Remove Selected History" removes the
+   currently selected entry in the history list. "Save History to Disk"
+   stores current history information to the file "ranges.hst" in the
    same directory where your logs are stored. Note that you will need
    write access to that directory to successfully store history
    information. A more flexible scheme is currently being developed and
@@ -1677,40 +1675,40 @@ otherwise specified, these can be of the following standard field with
 some format requirements:
 
 -  **Simple numeric fields**: An example can be found in figure
-   :numref:`standard dialog` for “Number of Bins:”. This field expects
+   :numref:`standard dialog` for "# of Time Bins:". This field expects
    a single number.
 
 -  **Time-Based Field**: An example can be found in figure
-   :numref:`standard dialog` for “Start Time:”. This field expects a
+   :numref:`standard dialog` for "Start Time:". This field expects a
    single simple or floating point number followed by a time-scale
    modifier. The following modifiers are supported: *none* - this is the
    default and means the input number represents time in microseconds. A
-   whole number is expected; *The characters “us”* - the input number
+   whole number is expected; *The characters "us"* - the input number
    represents time in microseconds. A whole number is expected; *The
-   characters “ms”* - the input number represents time in milliseconds.
+   characters "ms"* - the input number represents time in milliseconds.
    This can be a whole number or floating point number; or *The
-   character “s”* - the input number represents time in seconds. This
+   character "s"* - the input number represents time in seconds. This
    can be a whole number or floating point number.
 
 -  **Processor-Based Field**: An example can be found in figure
-   :numref:`standard dialog` for “Processors:”. This field expects a
-   single whole number; a list of whole numbers; a range; or a mixed
+   :numref:`standard dialog` for "Processors:". This field expects a
+   single whole number, a list of whole numbers, a range, or a mixed
    list of whole numbers and ranges. Here are some examples which makes
    the format clearer:
 
-   eg: Want to see processors 1,3,5,7: Enter ``1,3,5,7``
+   eg: Want to see processors 1, 3, 5, 7: Enter ``1,3,5,7``
 
-   eg: Want to see processors 1,2,3,4: Enter ``1-4``
+   eg: Want to see processors 1, 2, 3, 4: Enter ``1-4``
 
-   eg: Want to see processors 1,2,3,7: Enter ``1-3,7``
+   eg: Want to see processors 1, 2, 3, 7: Enter ``1-3,7``
 
-   eg: Want to see processors 1,3,4,5,7,8: Enter ``1,3-5,7-8``
+   eg: Want to see processors 1, 3, 4, 5, 7, 8: Enter ``1,3-5,7-8``
 
    Ranges also allow skip-factors. Here are some examples:
 
-   eg: Want to see processors 3,6,9,12,15: Enter ``3-15:3``
+   eg: Want to see processors 3, 6, 9, 12, 15: Enter ``3-15:3``
 
-   eg: Want to see processors 1,3,6,9,11,14: Enter ``1,3-9:3,11,14``
+   eg: Want to see processors 1, 3, 6, 9, 11, 14: Enter ``1,3-9:3,11,14``
 
    This feature is extremely flexible. It will normalize your input to a
    canonical form, tolerating duplication of entries as well as
