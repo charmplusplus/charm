@@ -1,0 +1,15 @@
+mainmodule vecadd {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Process processProxy;
+  readonly uint64_t n;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry [reductiontarget] void done();
+  };
+
+  nodegroup Process {
+    entry Process();
+    entry void run();
+  };
+};
