@@ -5,7 +5,7 @@
 
 if [[ $# -lt 1 ]]; then
     echo "$(basename $0): Display global writable variables in object files, libraries, and executables"
-    echo "Usage: $0 <file>"
+    echo "Usage: $0 <files>"
     exit 2
 fi
 
@@ -17,16 +17,30 @@ if [[ -z $symlist ]]; then
 else
     echo "The following global writable variables in '$*' were found:"
     echo
-    out="File Type Name\n"
+    out="File\tType\tName\n"
 
-    while read -r loc name type; do
-        loc=$(echo $loc | sed s,:$,,  ) # Remove trailing ':'
-        type=$(echo $type | awk '{print $1}') # Remove addresses
-        out+="$loc $type $name\n"
+    while read -r line; do
+        loc=${line%% *}
+        loc=${loc##.*[}
+        loc=${loc%%]:}
+        type=$(echo $line | awk '{print $(NF-2)}')
+        name=$(echo $line | awk '{$1 = $NF = $(NF-1) = $(NF-2) = ""; print}')
+
+        # Filter out things we don't need
+        [[
+               "$name" =~ ^.typeinfo.name.for
+            || "$name" =~ ^.typeinfo.for
+            || "$name" =~ ^.vtable.for
+            || "$name" =~ ^.construction.vtable.for
+            || "$name" =~ ^.VTT.for
+            || "$name" =~ ^._?Csv_ # Already privatized
+        ]] && continue
+
+        out+="$loc\t$type\t$name\n"
     done <<< "$symlist"
 
     # Print table with variables
-    printf "$out" | column -t -s ' '
+    printf "$out" | column -t -s $'\t'
 
     echo
     echo "Legend:"
