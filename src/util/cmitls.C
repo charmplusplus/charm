@@ -3,6 +3,13 @@
 
 #include "converse.h"
 #include "cmitls.h"
+
+#include <string.h>
+#include <stdlib.h>
+#if CMK_HAS_MALLOC_H
+#include <malloc.h>
+#endif
+
 #include "memory-isomalloc.h"
 
 #if CMK_HAS_TLS_VARIABLES
