@@ -208,32 +208,36 @@ typedef struct _insert_ret_val {
  * is the bin number.
  *****************************************************************/
 
-static int find_list_bin(CmiInt8 nslots) {
+static int find_list_bin(CmiInt8 nslots)
+{
   int list_bin     = 32;
   CmiInt8 comp_num = 0x100000000LL;
   int inc          = 16;
 
-  while (1) {
-    if ((nslots > (comp_num >> 1)) && (nslots <= comp_num)) {
+  while (1)
+  {
+    if ((comp_num >> 1) < nslots && nslots <= comp_num)
+    {
       /* found it */
       return list_bin;
-    } else if (nslots < comp_num) {
+    }
+    else if (nslots < comp_num)
+    {
       /* look left  */
       list_bin -= inc;
-      comp_num  = comp_num >> inc;
-      if ((inc = inc >> 1) == 0) {
+      comp_num >>= inc;
+      if ((inc >>= 1) == 0)
         inc = 1;
-      }
-    } else {
+    }
+    else
+    {
       /* look right */
       list_bin += inc;
-      comp_num  = comp_num << inc;
-      if ((inc = inc >> 1) == 0) {
+      comp_num <<= inc;
+      if ((inc >>= 1) == 0)
         inc = 1;
-      }
     }
   }
-
 }
 
 /*****************************************************************
@@ -242,25 +246,24 @@ static int find_list_bin(CmiInt8 nslots) {
  * sb.  This function also returns a pointer to that new dllnode.
  *****************************************************************/
 
-static dllnode *list_insert(slotset *ss, slotblock *sb) {
-
+static dllnode *list_insert(slotset *ss, slotblock *sb)
+{
   /* find the list bin to put the new dllnode in  */
   int list_bin = find_list_bin(sb->nslots);
 
   /* allocate memory for the new node */
-  dllnode *new_dlln = (dllnode *)(malloc_reentrant(sizeof(dllnode)));
+  auto new_dlln = (dllnode *)malloc_reentrant(sizeof(dllnode));
 
   /* insert the dllnode */
+  dllnode *& bin = ss->list_array[list_bin];
   new_dlln->previous = NULL;
-  new_dlln->next     = ss->list_array[list_bin];
+  new_dlln->next     = bin;
   new_dlln->sb       = sb;
-  if (ss->list_array[list_bin] != NULL) {
-    ss->list_array[list_bin]->previous = new_dlln;
-  }
-  ss->list_array[list_bin] = new_dlln;
+  if (bin != NULL)
+    bin->previous = new_dlln;
+  bin = new_dlln;
 
   return new_dlln;
-
 }
 
 /*****************************************************************
@@ -268,21 +271,21 @@ static dllnode *list_insert(slotset *ss, slotblock *sb) {
  * is pointed to by the slotblock sb.
  *****************************************************************/
 
-static void list_delete(slotset *ss, slotblock *sb) {
+static void list_delete(slotset *ss, slotblock *sb)
+{
+  dllnode * listblock = sb->listblock;
 
   /* remove the node from the list */
-  if (sb->listblock->next != NULL) {
-    sb->listblock->next->previous = sb->listblock->previous;
-  }
-  if (sb->listblock->previous != NULL) {
-    sb->listblock->previous->next = sb->listblock->next;
-  } else {  /* first element in the list */
-    ss->list_array[find_list_bin(sb->nslots)] = sb->listblock->next;
-  }
+  if (listblock->next != NULL)
+    listblock->next->previous = listblock->previous;
+
+  if (listblock->previous != NULL)
+    listblock->previous->next = listblock->next;
+  else /* first element in the list */
+    ss->list_array[find_list_bin(sb->nslots)] = listblock->next;
 
   /* free the memory from the node */
-  free_reentrant(sb->listblock);
-
+  free_reentrant(listblock);
 }
 
 /*****************************************************************
@@ -293,8 +296,8 @@ static void list_delete(slotset *ss, slotblock *sb) {
  * contains the number of slots that used to be in the slotblock.
  *****************************************************************/
 
-static void list_move(slotset *ss, dllnode *dlln, CmiInt8 old_nslots) {
-
+static void list_move(slotset *ss, dllnode *dlln, CmiInt8 old_nslots)
+{
   /* determine the bin the slotblock used to be in */
   int old_bin = find_list_bin(old_nslots);
 
@@ -302,46 +305,42 @@ static void list_move(slotset *ss, dllnode *dlln, CmiInt8 old_nslots) {
   int new_bin = find_list_bin(dlln->sb->nslots);
 
   /* if the old bin and new bin are different, move the slotblock */
-  if (new_bin != old_bin) {
+  if (new_bin != old_bin)
+  {
+    if (dlln->next != NULL)
+      dlln->next->previous = dlln->previous;
 
     /* remove from old bin */
-    if (dlln->previous == NULL) {  /* dlln is the 1st element in the list */
-      if (dlln->next != NULL) {
-        dlln->next->previous = NULL;
-      }
+    if (dlln->previous == NULL) /* dlln is the 1st element in the list */
       ss->list_array[old_bin] = dlln->next;
-    } else {
-      if (dlln->next != NULL) {
-        dlln->next->previous = dlln->previous;
-      }
+    else
       dlln->previous->next = dlln->next;
-    }
 
     /* insert at the beginning of the new bin */
     dlln->next     = ss->list_array[new_bin];
     dlln->previous = NULL;
-    if (dlln->next != NULL) {
+    if (dlln->next != NULL)
       dlln->next->previous = dlln;
-    }
+
     ss->list_array[new_bin] = dlln;
   }
-
 }
 
 /*****************************************************************
  * Creates a new b-tree node
  *****************************************************************/
 
-static btreenode *create_btree_node(void) {
-  int i;
-  btreenode *btn = (btreenode *)malloc_reentrant(sizeof(btreenode));
+static btreenode *create_btree_node()
+{
+  auto btn = (btreenode *)malloc_reentrant(sizeof(btreenode));
   btn->num_blocks = 0;
-  for (i = 0; i < TREE_NODE_SIZE; i++) {
-    btn->blocks[i].listblock = NULL;
-  }
-  for (i = 0; i < TREE_NODE_SIZE + 1; i++) {
-    btn->child[i] = NULL;
-  }
+
+  for (slotblock * b = btn->blocks, * const b_end = b + TREE_NODE_SIZE; b < b_end; ++b)
+    b->listblock = NULL;
+
+  for (btreenode ** c = btn->child, ** const c_end = c + TREE_NODE_SIZE + 1; c < c_end; ++c)
+    *c = NULL;
+
   return btn;
 }
 
@@ -350,89 +349,96 @@ static btreenode *create_btree_node(void) {
  * NULL if such a block cannot be found.
  *****************************************************************/
 
-static slotblock *find_btree_slotblock(btreenode *node, CmiInt8 startslot) {
-
+static slotblock *find_btree_slotblock(btreenode *node, CmiInt8 startslot)
+{
   /* check if this node exists */
-  if ((node == NULL) || (startslot < 0) || (node->num_blocks == 0)) {
+  if (node == NULL || startslot < 0 || node->num_blocks == 0)
+  {
     return NULL;
-  } else {
-
+  }
+  else
+  {
     /*** Binary search on this node ***/
+
     /* initialize */
     int index = node->num_blocks >> 1;
     int inc   = (index >> 1) + (node->num_blocks & 0x1);
-    CmiInt8 endslot;
 
     /* loop until a node is found */
-    while (1) {
+    while (1)
+    {
+      slotblock & block = node->blocks[index];
+      const CmiInt8 endslot = block.startslot + block.nslots - 1;
 
       /* if startslot is in current slotblock, this is the slotblock */
-      endslot = node->blocks[index].startslot + node->blocks[index].nslots - 1;
-      if ((startslot >= node->blocks[index].startslot) &&
-          (startslot <= endslot)) {
-        return &(node->blocks[index]);
+      if (block.startslot <= startslot && startslot <= endslot)
+      {
+        return &block;
       }
-
-      /* else, if startslot is less */
-      else if (startslot < node->blocks[index].startslot) {
-
+      else if (startslot < block.startslot) /* if startslot is less */
+      {
         /* if this is slotblock 0, take the left child */
-        if (index == 0) {
+        if (index == 0)
+        {
           return find_btree_slotblock(node->child[index], startslot);
         }
+        else /* check endslot of the slotblock to the left */
+        {
+          slotblock & leftblock = node->blocks[index-1];
+          const CmiInt8 leftblock_endslot = leftblock.startslot + leftblock.nslots - 1;
 
-        /* else check endslot of the slotblock to the left */
-        else {
-
-          /* if startslot > endslot-of-slotblock-to-the-left, take the
-             left child */
-          endslot = node->blocks[index-1].startslot + 
-            node->blocks[index-1].nslots - 1;
-          if (startslot > endslot) {
+          /* if startslot > endslot-of-slotblock-to-the-left,
+             take the left child */
+          if (startslot > leftblock_endslot)
+          {
             return find_btree_slotblock(node->child[index], startslot);
           }
-
-          /* else continue to search this node to the left */
-          else {
+          else /* continue to search this node to the left */
+          {
             index -= inc;
-            if ((inc = inc >> 1) == 0) {
+            if ((inc >>= 1) == 0)
               inc = 1;
-            }
           }
         }
       }
-
-      /* else, startslot must be greater */
-      else {
-
+      else /* startslot must be greater */
+      {
         /* if this is the last slotblock, take the right child */
-        if (index == node->num_blocks - 1) {
+        if (index == node->num_blocks-1)
+        {
           return find_btree_slotblock(node->child[index+1], startslot);
         }
-
-        /* else check startslot of the slotblock to the right */
-        else {
-
-          /* if startslot < startslot-of-slotblock-to-the-right, then
+        else /* check startslot of the slotblock to the right */
+        {
+          /* if startslot < startslot-of-slotblock-to-the-right,
              take the right child */
-          if (startslot < node->blocks[index+1].startslot) {
+          if (startslot < node->blocks[index+1].startslot)
+          {
             return find_btree_slotblock(node->child[index+1], startslot);
           }
-
-          /* else continue to search this node to the right */
-          else {
+          else /* continue to search this node to the right */
+          {
             index += inc;
-            if ((inc = inc >> 1) == 0) {
+            if ((inc >>= 1) == 0)
               inc = 1;
-            }
           }
         }
       }
-
     }
-
   }
+}
 
+static void copy_slotblock(slotblock & dst, const slotblock & src)
+{
+  dst = src;
+  dst.listblock->sb = &dst;
+}
+
+static void insert_slotblock(slotblock & block, slotset *ss, CmiInt8 startslot, CmiInt8 nslots)
+{
+  block.startslot = startslot;
+  block.nslots    = nslots;
+  block.listblock = list_insert(ss, &block);
 }
 
 /*****************************************************************
@@ -441,233 +447,156 @@ static slotblock *find_btree_slotblock(btreenode *node, CmiInt8 startslot) {
  *****************************************************************/
 
 static insert_ret_val btree_insert_int(slotset *ss, btreenode *node, 
-    CmiInt8 startslot, CmiInt8 nslots) {
-
-  insert_ret_val irv;
-
+    CmiInt8 startslot, CmiInt8 nslots)
+{
   /*** binary search for the place to insert ***/
+
+  auto helper = [&](const int index) -> insert_ret_val
+  {
+    if (node->child[index] != NULL) /* take child */
+    {
+      insert_ret_val irv = btree_insert_int(ss, node->child[index], startslot, nslots);
+      if (irv.btn != NULL) /* merge return value */
+      {
+        /* insert */
+        for (int i = node->num_blocks; i > index; i--)
+        {
+          copy_slotblock(node->blocks[i], node->blocks[i-1]);
+          node->child[i+1] = node->child[i];
+        }
+
+        copy_slotblock(node->blocks[index], irv.sb);
+        node->child[index+1] = irv.btn;
+        node->num_blocks++;
+
+        if (node->num_blocks == TREE_NODE_SIZE)
+        {
+          /* split node */
+          btreenode *new_node = create_btree_node();
+
+          for (int i = TREE_NODE_MID+1; i < TREE_NODE_SIZE; i++)
+          {
+            int j = i - (TREE_NODE_MID+1);
+            copy_slotblock(new_node->blocks[j], node->blocks[i]);
+          }
+
+          for (int i = TREE_NODE_MID+1; i <= TREE_NODE_SIZE; i++)
+            new_node->child[i-(TREE_NODE_MID+1)] = node->child[i];
+
+          node->num_blocks     = TREE_NODE_MID;
+          new_node->num_blocks = TREE_NODE_SIZE - TREE_NODE_MID - 1;
+
+          irv.sb  = node->blocks[TREE_NODE_MID];
+          irv.btn = new_node;
+        }
+        else
+        {
+          irv.btn = NULL;
+        }
+      }
+
+      return irv;
+    }
+    else /* insert */
+    {
+      insert_ret_val irv{};
+
+      for (int i = node->num_blocks; i > index; i--)
+        copy_slotblock(node->blocks[i], node->blocks[i-1]);
+
+      insert_slotblock(node->blocks[index], ss, startslot, nslots);
+      node->num_blocks++;
+
+      if (node->num_blocks == TREE_NODE_SIZE)
+      {
+        /* split node */
+        btreenode *new_node = create_btree_node();
+
+        for (int i = TREE_NODE_MID+1; i < TREE_NODE_SIZE; i++)
+        {
+          int j = i - (TREE_NODE_MID+1);
+          copy_slotblock(new_node->blocks[j], node->blocks[i]);
+        }
+
+        node->num_blocks     = TREE_NODE_MID;
+        new_node->num_blocks = TREE_NODE_SIZE - TREE_NODE_MID - 1;
+
+        irv.sb  = node->blocks[TREE_NODE_MID];
+        irv.btn = new_node;
+      }
+      else
+      {
+        irv.btn = NULL;
+      }
+
+      return irv;
+    }
+  };
 
   /* initialize */
   int index = node->num_blocks >> 1;
   int inc   = (index >> 1) + (node->num_blocks & 0x1);
 
   /* loop until an insertion happens */
-  while (1) {
-    if (startslot < node->blocks[index].startslot) {  /* look to the left */
-      if ((index == 0) || 
-          (startslot > node->blocks[index-1].startslot)) {
-        if (node->child[index] != NULL) {             /* take left child */
-          irv = btree_insert_int(ss, node->child[index], startslot, nslots);
-          if (irv.btn == NULL) {
-            return irv;
-          } else {                                    /* merge return value */
-            int i, j;                                 /*   insert on left   */
-            for (i = node->num_blocks; i > index; i--) {
-              node->blocks[i].startslot     = node->blocks[i-1].startslot;
-              node->blocks[i].nslots        = node->blocks[i-1].nslots;
-              node->blocks[i].listblock     = node->blocks[i-1].listblock;
-              node->blocks[i].listblock->sb = &(node->blocks[i]);
-              node->child[i+1]              = node->child[i];
-            }
-            node->blocks[index].startslot     = irv.sb.startslot;
-            node->blocks[index].nslots        = irv.sb.nslots;
-            node->blocks[index].listblock     = irv.sb.listblock;
-            node->blocks[index].listblock->sb = &(node->blocks[index]);
-            node->child[index+1]              = irv.btn;
-            node->num_blocks++;
-            if (node->num_blocks == TREE_NODE_SIZE) {   /* split node */
-              btreenode *new_node = create_btree_node();
-              for (i = TREE_NODE_MID + 1; i < TREE_NODE_SIZE; i++) {
-                j = i - (TREE_NODE_MID + 1);
-                new_node->blocks[j].startslot     = node->blocks[i].startslot;
-                new_node->blocks[j].nslots        = node->blocks[i].nslots;
-                new_node->blocks[j].listblock     = node->blocks[i].listblock;
-                new_node->blocks[j].listblock->sb = &(new_node->blocks[j]);
-              }
-              for (i = TREE_NODE_MID + 1; i <= TREE_NODE_SIZE; i++) {
-                new_node->child[i-(TREE_NODE_MID+1)] = node->child[i];
-              }
-              node->num_blocks     = TREE_NODE_MID;
-              new_node->num_blocks = TREE_NODE_SIZE - TREE_NODE_MID - 1;
-
-              irv.sb.startslot = node->blocks[TREE_NODE_MID].startslot;
-              irv.sb.nslots    = node->blocks[TREE_NODE_MID].nslots;
-              irv.sb.listblock = node->blocks[TREE_NODE_MID].listblock;
-              irv.btn          = new_node;
-              return irv;
-            } else {
-              irv.btn = NULL;
-              return irv;
-            }
-          }
-        } else {                                      /* insert to the left */
-          int i, j;
-          for (i = node->num_blocks; i > index; i--) {
-            node->blocks[i].startslot     = node->blocks[i-1].startslot;
-            node->blocks[i].nslots        = node->blocks[i-1].nslots;
-            node->blocks[i].listblock     = node->blocks[i-1].listblock;
-            node->blocks[i].listblock->sb = &(node->blocks[i]);
-          }
-          node->blocks[index].startslot = startslot;
-          node->blocks[index].nslots    = nslots;
-          node->blocks[index].listblock = list_insert(ss, &(node->blocks[index]));
-          node->num_blocks++;
-          if (node->num_blocks == TREE_NODE_SIZE) {   /* split node */
-            btreenode *new_node = create_btree_node();
-            for (i = TREE_NODE_MID + 1; i < TREE_NODE_SIZE; i++) {
-              j = i - (TREE_NODE_MID + 1);
-              new_node->blocks[j].startslot     = node->blocks[i].startslot;
-              new_node->blocks[j].nslots        = node->blocks[i].nslots;
-              new_node->blocks[j].listblock     = node->blocks[i].listblock;
-              new_node->blocks[j].listblock->sb = &(new_node->blocks[j]);
-            }
-            node->num_blocks     = TREE_NODE_MID;
-            new_node->num_blocks = TREE_NODE_SIZE - TREE_NODE_MID - 1;
-
-            irv.sb.startslot = node->blocks[TREE_NODE_MID].startslot;
-            irv.sb.nslots    = node->blocks[TREE_NODE_MID].nslots;
-            irv.sb.listblock = node->blocks[TREE_NODE_MID].listblock;
-            irv.btn          = new_node;
-            return irv;
-          } else {
-            irv.btn = NULL;
-            return irv;
-          }
-        }
-      } else {                                        /* search to the left */
-        index -= inc;
-        if ((inc = inc >> 1) == 0) {
-          inc = 1;
-        }
+  while (1)
+  {
+    if (startslot < node->blocks[index].startslot) /* look to the left */
+    {
+      if (index == 0 || startslot > node->blocks[index-1].startslot)
+      {
+        return helper(index);
       }
-
-    } else {                                          /* look to the right */
-
-      if ((index == node->num_blocks - 1) || 
-          (startslot < node->blocks[index+1].startslot)) {
-        if (node->child[index+1] != NULL) {           /* take right child */
-          irv = btree_insert_int(ss, node->child[index+1], startslot, nslots);
-          if (irv.btn == NULL) {
-            return irv;
-          } else {                                    /* merge return value */
-            int i, j;                                 /*   insert on right  */
-            for (i = node->num_blocks; i > index + 1; i--) {
-              node->blocks[i].startslot     = node->blocks[i-1].startslot;
-              node->blocks[i].nslots        = node->blocks[i-1].nslots;
-              node->blocks[i].listblock     = node->blocks[i-1].listblock;
-              node->blocks[i].listblock->sb = &(node->blocks[i]);
-              node->child[i+1]              = node->child[i];
-            }
-            node->blocks[index+1].startslot     = irv.sb.startslot;
-            node->blocks[index+1].nslots        = irv.sb.nslots;
-            node->blocks[index+1].listblock     = irv.sb.listblock;
-            node->blocks[index+1].listblock->sb = &(node->blocks[index+1]);
-            node->child[index+2]                = irv.btn;
-            node->num_blocks++;
-            if (node->num_blocks == TREE_NODE_SIZE) {   /* split node */
-              btreenode *new_node = create_btree_node();
-              for (i = TREE_NODE_MID + 1; i < TREE_NODE_SIZE; i++) {
-                j = i - (TREE_NODE_MID + 1);
-                new_node->blocks[j].startslot     = node->blocks[i].startslot;
-                new_node->blocks[j].nslots        = node->blocks[i].nslots;
-                new_node->blocks[j].listblock     = node->blocks[i].listblock;
-                new_node->blocks[j].listblock->sb = &(new_node->blocks[j]);
-              }
-              for (i = TREE_NODE_MID + 1; i <= TREE_NODE_SIZE; i++) {
-                new_node->child[i-(TREE_NODE_MID+1)] = node->child[i];
-              }
-              node->num_blocks     = TREE_NODE_MID;
-              new_node->num_blocks = TREE_NODE_SIZE - TREE_NODE_MID - 1;
-
-              irv.sb.startslot = node->blocks[TREE_NODE_MID].startslot;
-              irv.sb.nslots    = node->blocks[TREE_NODE_MID].nslots;
-              irv.sb.listblock = node->blocks[TREE_NODE_MID].listblock;
-              irv.btn          = new_node;
-              return irv;
-            } else {
-              irv.btn = NULL;
-              return irv;
-            }
-          }
-        } else {                                      /* insert to the right */
-          int i, j;
-          for (i = node->num_blocks; i > index + 1; i--) {
-            node->blocks[i].startslot     = node->blocks[i-1].startslot;
-            node->blocks[i].nslots        = node->blocks[i-1].nslots;
-            node->blocks[i].listblock     = node->blocks[i-1].listblock;
-            node->blocks[i].listblock->sb = &(node->blocks[i]);
-          }
-          node->blocks[index+1].startslot = startslot;
-          node->blocks[index+1].nslots    = nslots;
-          node->blocks[index+1].listblock = list_insert(ss, &(node->blocks[index+1]));
-          node->num_blocks++;
-          if (node->num_blocks == TREE_NODE_SIZE) {   /* split node */
-            btreenode *new_node = create_btree_node();
-            for (i = TREE_NODE_MID + 1; i < TREE_NODE_SIZE; i++) {
-              j = i - (TREE_NODE_MID + 1);
-              new_node->blocks[j].startslot     = node->blocks[i].startslot;
-              new_node->blocks[j].nslots        = node->blocks[i].nslots;
-              new_node->blocks[j].listblock     = node->blocks[i].listblock;
-              new_node->blocks[j].listblock->sb = &(new_node->blocks[j]);
-            }
-            node->num_blocks = TREE_NODE_MID;
-            new_node->num_blocks = TREE_NODE_SIZE - TREE_NODE_MID - 1;
-
-            irv.sb.startslot = node->blocks[TREE_NODE_MID].startslot;
-            irv.sb.nslots    = node->blocks[TREE_NODE_MID].nslots;
-            irv.sb.listblock = node->blocks[TREE_NODE_MID].listblock;
-            irv.btn          = new_node;
-            return irv;
-          } else {
-            irv.btn = NULL;
-            return irv;
-          }
-        }
-      } else {                                        /* search to the right */
-        index += inc;
-        if ((inc = inc >> 1) == 0) {
+      else /* search to the left */
+      {
+        index -= inc;
+        if ((inc >>= 1) == 0)
           inc = 1;
-        }
+      }
+    }
+    else /* look to the right */
+    {
+      if (index == node->num_blocks-1 || startslot < node->blocks[index+1].startslot)
+      {
+        return helper(index+1);
+      }
+      else /* search to the right */
+      {
+        index += inc;
+        if ((inc >>= 1) == 0)
+          inc = 1;
       }
     }
   }
-
 }
 
 static btreenode *btree_insert(slotset *ss, btreenode *node, 
-    CmiInt8 startslot, CmiInt8 nslots) {
-
+    CmiInt8 startslot, CmiInt8 nslots)
+{
   /* check the b-tree root: if it's empty, insert the element in the
      first position */
-  if (node->num_blocks == 0) {
-
-    node->num_blocks          = 1;
-    node->blocks[0].startslot = startslot;
-    node->blocks[0].nslots    = nslots;
-    node->blocks[0].listblock = list_insert(ss, &(node->blocks[0]));
-
-  } else {
-
+  if (node->num_blocks == 0)
+  {
+    node->num_blocks = 1;
+    insert_slotblock(node->blocks[0], ss, startslot, nslots);
+  }
+  else
+  {
     /* insert into the b-tree */
     insert_ret_val irv = btree_insert_int(ss, node, startslot, nslots);
 
     /* if something was returned, we need a new root */
-    if (irv.btn != NULL) {
+    if (irv.btn != NULL)
+    {
       btreenode *new_root  = create_btree_node();
       new_root->num_blocks = 1;
-      new_root->blocks[0].startslot     = irv.sb.startslot;
-      new_root->blocks[0].nslots        = irv.sb.nslots;
-      new_root->blocks[0].listblock     = irv.sb.listblock;
-      new_root->blocks[0].listblock->sb = &(new_root->blocks[0]);
+      copy_slotblock(new_root->blocks[0], irv.sb);
       new_root->child[0] = node;
       new_root->child[1] = irv.btn;
       node = new_root;
     }
-
   }
 
   return node;
-
 }
 
 /*****************************************************************
@@ -675,288 +604,222 @@ static btreenode *btree_insert(slotset *ss, btreenode *node,
  *****************************************************************/
 
 static void btree_delete_int(slotset *ss, btreenode *node, 
-    CmiInt8 startslot, slotblock *sb) {
-
-  int i, index, inc;
-  int def_child;
-  int num_left, num_right, left_pos, right_pos;
+    CmiInt8 startslot, slotblock *sb)
+{
+  int index;
 
   /* If sb is not NULL, we're sending sb down the tree to a leaf to be
      swapped with the next larger startslot so it can be deleted from
      a leaf node (deletions from non-leaf nodes are not allowed
      here).  At this point, the next larger startslot will always be
      found by taking the leftmost child.  */
-  if (sb != NULL) {
-
-    if (node->child[0] != NULL) {
+  if (sb != NULL)
+  {
+    if (node->child[0] != NULL)
+    {
       btree_delete_int(ss, node->child[0], startslot, sb);
       index = 0;
-
-    } else {
-
+    }
+    else
+    {
       /* we're now at a leaf node, so the slotblock can be deleted
 
          first, copy slotblock 0 to the block passed down (sb) and
          delete the list array node  */
       list_delete(ss, sb);
-      sb->startslot     = node->blocks[0].startslot;
-      sb->nslots        = node->blocks[0].nslots;
-      sb->listblock     = node->blocks[0].listblock;
-      sb->listblock->sb = sb;
+      copy_slotblock(*sb, node->blocks[0]);
 
       /* delete the slotblock */
-      for (i = 0; i < (node->num_blocks - 1); i++) {
-        node->blocks[i].startslot     = node->blocks[i+1].startslot;
-        node->blocks[i].nslots        = node->blocks[i+1].nslots;
-        node->blocks[i].listblock     = node->blocks[i+1].listblock;
-        node->blocks[i].listblock->sb = &(node->blocks[i]);
-      }
+      for (int i = 0; i < (node->num_blocks - 1); i++)
+        copy_slotblock(node->blocks[i], node->blocks[i+1]);
+
       node->num_blocks--;
 
       return;
-
     }
-
-  } else {
-
+  }
+  else
+  {
     /*** Binary search for the slotblock to delete ***/
 
     /* initialize */
     index = node->num_blocks >> 1;
-    inc = (index >> 1) + (node->num_blocks & 0x1);
+    int inc = (index >> 1) + (node->num_blocks & 0x1);
 
     /* loop until the slotblock with startslot is found */
-    while (1) {
-
-      if (startslot == node->blocks[index].startslot) {   /* found it */
-        if (node->child[index+1] != NULL) {               /* not a leaf */
+    while (1)
+    {
+      if (startslot == node->blocks[index].startslot) /* found it */
+      {
+        if (node->child[index+1] != NULL)
+        {               /* not a leaf */
           btree_delete_int(ss, node->child[index+1], 
               startslot, &(node->blocks[index]));
           break;
-        } else {                                          /* is a leaf */
+        }
+        else /* is a leaf */
+        {
           /* delete the slotblock */
           list_delete(ss, &(node->blocks[index]));
-          for (i = index; i < (node->num_blocks - 1); i++) {
-            node->blocks[i].startslot     = node->blocks[i+1].startslot;
-            node->blocks[i].nslots        = node->blocks[i+1].nslots;
-            node->blocks[i].listblock     = node->blocks[i+1].listblock;
-            node->blocks[i].listblock->sb = &(node->blocks[i]);
-          }
+          for (int i = index; i < (node->num_blocks - 1); i++)
+            copy_slotblock(node->blocks[i], node->blocks[i+1]);
+
           node->num_blocks--;
           return;
         }
-      } else {
-        if (startslot < node->blocks[index].startslot) {  /* look left */
-          if ((index == 0) ||                             /* take left child */
-              (startslot > node->blocks[index-1].startslot)) {
+      }
+      else
+      {
+        if (startslot < node->blocks[index].startslot) /* look left */
+        {
+          if (index == 0 || startslot > node->blocks[index-1].startslot)
+          {
+            /* take left child */
             btree_delete_int(ss, node->child[index], startslot, sb);
             break;
-          } else {                                        /* search left */
-            index -= inc;
-            if ((inc = inc >> 1) == 0) {
-              inc = 1;
-            }
           }
-        } else {                                          /* look right */
-          if ((index == node->num_blocks - 1) ||          /* take right child */
-              (startslot < node->blocks[index+1].startslot)) {
+          else /* search left */
+          {
+            index -= inc;
+            if ((inc >>= 1) == 0)
+              inc = 1;
+          }
+        }
+        else /* look right */
+        {
+          if (index == node->num_blocks - 1 || startslot < node->blocks[index+1].startslot)
+          {
+            /* take right child */
             btree_delete_int(ss, node->child[index+1], startslot, sb);
             break;
-          } else {                                        /* search right */
+          }
+          else /* search right */
+          {
             index += inc;
-            if ((inc = inc >> 1) == 0) {
+            if ((inc >>= 1) == 0)
               inc = 1;
-            }
           }
         }
       }
-
     }
-
   }
 
   /* At this point, the desired slotblock has been removed, and we're
      going back up the tree.  We must check for deficient nodes that
      require the rotating or combining of elements to maintain a
      balanced b-tree. */
-  def_child = -1;
+  int def_child = -1;
 
   /* check if one of the child nodes is deficient  */
-  if (node->child[index]->num_blocks < TREE_NODE_MID) {
+  if (node->child[index]->num_blocks < TREE_NODE_MID)
     def_child = index;
-  } else if (node->child[index+1]->num_blocks < TREE_NODE_MID) {
-    def_child = index + 1;
-  }
+  else if (node->child[index+1]->num_blocks < TREE_NODE_MID)
+    def_child = index+1;
 
-  if (def_child >= 0) {
+  if (def_child >= 0)
+  {
+    btreenode * dc = node->child[def_child];
 
     /* if there is a left sibling and it has enough elements, rotate */
     /* to the right */
-    if ((def_child != 0) && (node->child[def_child-1] != NULL) && 
-        (node->child[def_child-1]->num_blocks > TREE_NODE_MID)) {
+    if (def_child != 0 &&
+        node->child[def_child-1] != NULL &&
+        node->child[def_child-1]->num_blocks > TREE_NODE_MID)
+    {
+      btreenode * const dcleft = node->child[def_child-1];
+      slotblock & leftblock = node->blocks[def_child-1];
 
       /* move all elements in deficient child to the right */
-      for (i = node->child[def_child]->num_blocks; i > 0; i--) {
-        node->child[def_child]->blocks[i].startslot = 
-          node->child[def_child]->blocks[i-1].startslot;
-        node->child[def_child]->blocks[i].nslots = 
-          node->child[def_child]->blocks[i-1].nslots;
-        node->child[def_child]->blocks[i].listblock = 
-          node->child[def_child]->blocks[i-1].listblock;
-        node->child[def_child]->blocks[i].listblock->sb = 
-          &(node->child[def_child]->blocks[i]);
-      }
-      for (i = node->child[def_child]->num_blocks + 1; i > 0; i--) {
-        node->child[def_child]->child[i] = 
-          node->child[def_child]->child[i-1];
-      }
+      for (int i = dc->num_blocks; i > 0; i--)
+        copy_slotblock(dc->blocks[i], dc->blocks[i-1]);
+      for (int i = dc->num_blocks + 1; i > 0; i--)
+        dc->child[i] = dc->child[i-1];
 
       /* move parent element to the deficient child */
-      node->child[def_child]->blocks[0].startslot = 
-        node->blocks[def_child-1].startslot;
-      node->child[def_child]->blocks[0].nslots = 
-        node->blocks[def_child-1].nslots;
-      node->child[def_child]->blocks[0].listblock = 
-        node->blocks[def_child-1].listblock;
-      node->child[def_child]->blocks[0].listblock->sb = 
-        &(node->child[def_child]->blocks[0]);
-      node->child[def_child]->num_blocks++;
+      copy_slotblock(dc->blocks[0], leftblock);
+      dc->num_blocks++;
 
       /* move the right-most child of the parent's left child to the
          left-most child of the formerly deficient child  */
-      i = node->child[def_child-1]->num_blocks;
-      node->child[def_child]->child[0] = 
-        node->child[def_child-1]->child[i];
+      int j = dcleft->num_blocks;
+      dc->child[0] = dcleft->child[j];
 
       /* move largest element from left child up to the parent */
-      i--;
-      node->blocks[def_child-1].startslot = 
-        node->child[def_child-1]->blocks[i].startslot;
-      node->blocks[def_child-1].nslots = 
-        node->child[def_child-1]->blocks[i].nslots;
-      node->blocks[def_child-1].listblock = 
-        node->child[def_child-1]->blocks[i].listblock;
-      node->blocks[def_child-1].listblock->sb = 
-        &(node->blocks[def_child-1]);
-      node->child[def_child-1]->num_blocks--;
+      j--;
+      copy_slotblock(leftblock, dcleft->blocks[j]);
+      dcleft->num_blocks--;
 
     }
-
     /* otherwise, if there is a right sibling and it has enough */
     /* elements, rotate to the left */
-    else if (((def_child + 1) <= node->num_blocks) && 
-        (node->child[def_child+1] != NULL) && 
-        (node->child[def_child+1]->num_blocks > TREE_NODE_MID)) {
+    else if ((def_child+1) <= node->num_blocks &&
+             node->child[def_child+1] != NULL &&
+             node->child[def_child+1]->num_blocks > TREE_NODE_MID)
+    {
+      btreenode * const dcright = node->child[def_child+1];
+      slotblock & rightblock = node->blocks[def_child];
 
       /* move parent element to the deficient child */
-      i = node->child[def_child]->num_blocks;
-      node->child[def_child]->blocks[i].startslot = 
-        node->blocks[def_child].startslot;
-      node->child[def_child]->blocks[i].nslots = 
-        node->blocks[def_child].nslots;
-      node->child[def_child]->blocks[i].listblock = 
-        node->blocks[def_child].listblock;
-      node->child[def_child]->blocks[i].listblock->sb = 
-        &(node->child[def_child]->blocks[i]);
-      node->child[def_child]->num_blocks++;
+      int j = dc->num_blocks;
+      copy_slotblock(dc->blocks[j], rightblock);
+      dc->num_blocks++;
 
       /* move the left-most child of the parent's right child to the
          right-most child of the formerly deficient child  */
-      i++;
-      node->child[def_child]->child[i] = 
-        node->child[def_child+1]->child[0];
+      j++;
+      dc->child[j] = dcright->child[0];
 
       /* move smallest element from right child up to the parent */
-      node->blocks[def_child].startslot = 
-        node->child[def_child+1]->blocks[0].startslot;
-      node->blocks[def_child].nslots = 
-        node->child[def_child+1]->blocks[0].nslots;
-      node->blocks[def_child].listblock = 
-        node->child[def_child+1]->blocks[0].listblock;
-      node->blocks[def_child].listblock->sb = 
-        &(node->blocks[def_child]);
-      node->child[def_child+1]->num_blocks--;
+      copy_slotblock(rightblock, dcright->blocks[0]);
+      dcright->num_blocks--;
 
       /* move all elements in the parent's right child to the left  */
-      for (i = 0; i < node->child[def_child+1]->num_blocks; i++) {
-        node->child[def_child+1]->blocks[i].startslot = 
-          node->child[def_child+1]->blocks[i+1].startslot;
-        node->child[def_child+1]->blocks[i].nslots = 
-          node->child[def_child+1]->blocks[i+1].nslots;
-        node->child[def_child+1]->blocks[i].listblock = 
-          node->child[def_child+1]->blocks[i+1].listblock;
-        node->child[def_child+1]->blocks[i].listblock->sb = 
-          &(node->child[def_child+1]->blocks[i]);
-      }
-      for (i = 0; i < node->child[def_child+1]->num_blocks + 1; i++) {
-        node->child[def_child+1]->child[i] = 
-          node->child[def_child+1]->child[i+1];
-      }
+      for (int i = 0; i < dcright->num_blocks; i++)
+        copy_slotblock(dcright->blocks[i], dcright->blocks[i+1]);
+      for (int i = 0; i < dcright->num_blocks + 1; i++)
+        dcright->child[i] = dcright->child[i+1];
     }
-
     /* otherwise, merge the deficient node, parent, and the parent's
        other child (one of the deficient node's siblings) by dropping
        the parent down to the level of the children */
-    else {
+    else
+    {
+      btreenode * const left = node->child[index];
+      btreenode *& right = node->child[index+1];
 
       /* move the parent element into the left child node */
-      i = node->child[index]->num_blocks;
-      node->child[index]->blocks[i].startslot = 
-        node->blocks[index].startslot;
-      node->child[index]->blocks[i].nslots = 
-        node->blocks[index].nslots;
-      node->child[index]->blocks[i].listblock = 
-        node->blocks[index].listblock;
-      node->child[index]->blocks[i].listblock->sb = 
-        &(node->child[index]->blocks[i]);
-      node->child[index]->num_blocks++;
+      int j = left->num_blocks;
+      copy_slotblock(left->blocks[j], node->blocks[index]);
+      left->num_blocks++;
 
       /* move the elements and children of the right child node to the */
       /* left child node */
-      num_left  = node->child[index]->num_blocks;
-      num_right = node->child[index+1]->num_blocks;
-      right_pos = 0;
-      for (left_pos = num_left; left_pos < num_left + num_right; left_pos++) {
-        node->child[index]->blocks[left_pos].startslot = 
-          node->child[index+1]->blocks[right_pos].startslot;
-        node->child[index]->blocks[left_pos].nslots = 
-          node->child[index+1]->blocks[right_pos].nslots;
-        node->child[index]->blocks[left_pos].listblock = 
-          node->child[index+1]->blocks[right_pos].listblock;
-        node->child[index]->blocks[left_pos].listblock->sb = 
-          &(node->child[index]->blocks[left_pos]);
-        right_pos++;
-      }
-      right_pos = 0;
-      for (left_pos = num_left; left_pos < num_left + num_right + 1; left_pos++) {
-        node->child[index]->child[left_pos] = 
-          node->child[index+1]->child[right_pos];
-        right_pos++;
-      }
-      node->child[index]->num_blocks = num_left + num_right;
+      int num_left  = left->num_blocks;
+      int num_right = right->num_blocks;
+      for (int left_pos = num_left, right_pos = 0; left_pos < num_left + num_right; left_pos++, right_pos++)
+        copy_slotblock(left->blocks[left_pos], right->blocks[right_pos]);
+      for (int left_pos = num_left, right_pos = 0; left_pos < num_left + num_right + 1; left_pos++, right_pos++)
+        left->child[left_pos] = right->child[right_pos];
+
+      left->num_blocks = num_left + num_right;
 
       /* delete the right child node */
-      free_reentrant(node->child[index+1]);
-      node->child[index+1] = NULL;
+      free_reentrant(right);
+      right = NULL;
 
       /* update the parent node */
       node->num_blocks--;
-      for (i = index; i < node->num_blocks; i++) {
-        node->blocks[i].startslot     = node->blocks[i+1].startslot;
-        node->blocks[i].nslots        = node->blocks[i+1].nslots;
-        node->blocks[i].listblock     = node->blocks[i+1].listblock;
-        node->blocks[i].listblock->sb = &(node->blocks[i]);
-        node->child[i+1]              = node->child[i+2];
+      for (int i = index; i < node->num_blocks; i++)
+      {
+        copy_slotblock(node->blocks[i], node->blocks[i+1]);
+        node->child[i+1] = node->child[i+2];
       }
-
     }
-
   }
-
 }
 
-static btreenode *btree_delete(slotset *ss, btreenode *node, CmiInt8 startslot) {
-
+static btreenode *btree_delete(slotset *ss, btreenode *node, CmiInt8 startslot)
+{
   /* delete element from the b-tree */
   btree_delete_int(ss, node, startslot, NULL);
 
@@ -964,8 +827,10 @@ static btreenode *btree_delete(slotset *ss, btreenode *node, CmiInt8 startslot) 
      the left-most child of the root becomes the new root, unless the
      left-most child is NULL, in which case we leave the root node
      empty but not NULL */
-  if (node->num_blocks == 0) {
-    if (node->child[0] != NULL) {
+  if (node->num_blocks == 0)
+  {
+    if (node->child[0] != NULL)
+    {
       btreenode *new_root = node->child[0];
       free_reentrant(node);
       node = new_root;
@@ -973,7 +838,6 @@ static btreenode *btree_delete(slotset *ss, btreenode *node, CmiInt8 startslot) 
   }
 
   return node;
-
 }
 
 /*****************************************************************
@@ -981,37 +845,34 @@ static btreenode *btree_delete(slotset *ss, btreenode *node, CmiInt8 startslot) 
  * slots.  The slot numbers are [startslot, startslot + nslots - 1].
  *****************************************************************/
 
-static slotset *new_slotset(CmiInt8 startslot, CmiInt8 nslots) {
-  int i;
-  int list_bin;
-
-  /* CmiPrintf("*** New Isomalloc ***\n"); */
-
+static slotset *new_slotset(CmiInt8 startslot, CmiInt8 nslots)
+{
   /* allocate memory for the slotset */
-  slotset *ss = (slotset *)(malloc_reentrant(sizeof(slotset)));
+  auto ss = (slotset *)malloc_reentrant(sizeof(slotset));
 
   /* allocate memory for the b-tree */
   ss->btree_root = create_btree_node();
 
   /* initialize the b-tree */
-  ss->btree_root->num_blocks          = 1;
-  ss->btree_root->blocks[0].startslot = startslot;
-  ss->btree_root->blocks[0].nslots    = nslots;
+  ss->btree_root->num_blocks = 1;
+  slotblock & block = ss->btree_root->blocks[0];
+  block.startslot = startslot;
+  block.nslots    = nslots;
 
   /* initialize the list array */
-  for (i = 0; i < LIST_ARRAY_SIZE; i++) {
+  for (int i = 0; i < LIST_ARRAY_SIZE; i++)
     ss->list_array[i] = NULL;
-  }
-  list_bin = find_list_bin(nslots);
-  ss->list_array[list_bin] = (dllnode *)(malloc_reentrant(sizeof(dllnode)));
-  ss->list_array[list_bin]->previous = NULL;
-  ss->list_array[list_bin]->next = NULL;
-  ss->list_array[list_bin]->sb = &(ss->btree_root->blocks[0]);
 
-  ss->btree_root->blocks[0].listblock = ss->list_array[list_bin];
+  auto bin = (dllnode *)malloc_reentrant(sizeof(dllnode));
+  bin->previous = NULL;
+  bin->next = NULL;
+  bin->sb = &block;
+
+  int list_bin = find_list_bin(nslots);
+  ss->list_array[list_bin] = bin;
+  block.listblock = bin;
 
   return ss;
-
 }
 
 /*****************************************************************
@@ -1020,27 +881,26 @@ static slotset *new_slotset(CmiInt8 startslot, CmiInt8 nslots) {
  * slotblock exists.
  *****************************************************************/
 
-static CmiInt8 get_slots(slotset *ss, CmiInt8 nslots) {
-
+static CmiInt8 get_slots(slotset *ss, CmiInt8 nslots)
+{
   /* calculate the smallest bin (list) to look in first */
   int start_list = find_list_bin(nslots);
 
   /* search for a slotblock with enough slots */
-  int i;
-  dllnode *dlln;
-  for (i = start_list; i < LIST_ARRAY_SIZE; i++) {
-    dlln = ss->list_array[i];
-    while (dlln != NULL) {
-      if (dlln->sb->nslots >= nslots) {
+  for (int i = start_list; i < LIST_ARRAY_SIZE; i++)
+  {
+    dllnode *dlln = ss->list_array[i];
+    while (dlln != NULL)
+    {
+      if (dlln->sb->nslots >= nslots)
         return dlln->sb->startslot;
-      }
+
       dlln = dlln->next;
     }
   }
 
-  /* return -1 if no such slotblock exists */
-  return (-1);
-
+  /* no such slotblock exists */
+  return -1;
 }
 
 /*****************************************************************
@@ -1051,54 +911,51 @@ static CmiInt8 get_slots(slotset *ss, CmiInt8 nslots) {
  * finds a set of free slots.
  *****************************************************************/
 
-static void grab_slots(slotset *ss, CmiInt8 sslot, CmiInt8 nslots) {
-
-  CmiInt8 endslot;
+static void grab_slots(slotset *ss, CmiInt8 sslot, CmiInt8 nslots)
+{
   slotblock *sb = find_btree_slotblock(ss->btree_root, sslot);
 
-  if (sb == NULL) {
+  if (sb == NULL)
     CmiAbort("requested a non-existent slotblock\n");
-  } else {
 
-    if (sb->startslot == sslot) {
-
-      /* range is exact range of slotblock - delete block from tree */
-      if (sb->nslots == nslots) {
-        ss->btree_root = btree_delete(ss, ss->btree_root, sslot);
-      }
-
-      /* range is at beginning of slotblock - update block range */
-      else {
-        CmiInt8 old_nslots = sb->nslots;
-        sb->startslot     += nslots;
-        sb->nslots        -= nslots;
-        list_move(ss, sb->listblock, old_nslots);
-      }
-
-    } else {
-
-      /* range is at end of slotblock - update block range */
-      endslot = sb->startslot + sb->nslots - 1;
-      if (endslot == (sslot + nslots - 1)) {
-        CmiInt8 old_nslots = sb->nslots;
-        sb->nslots        -= nslots;
-        list_move(ss, sb->listblock, old_nslots);
-      }
-
-      /* range is in middle of slotblock - update block range with the */
-      /* new lower range and insert a block with the new upper range */
-      else {
-        CmiInt8 old_nslots = sb->nslots;
-        sb->nslots         = sslot - sb->startslot;
-        list_move(ss, sb->listblock, old_nslots);
-        ss->btree_root = btree_insert(ss, ss->btree_root, sslot + nslots, 
-            endslot - (sslot + nslots) + 1);
-      }
-
+  if (sb->startslot == sslot)
+  {
+    /* range is exact range of slotblock - delete block from tree */
+    if (sb->nslots == nslots)
+    {
+      ss->btree_root = btree_delete(ss, ss->btree_root, sslot);
+    }
+    /* range is at beginning of slotblock - update block range */
+    else
+    {
+      CmiInt8 old_nslots = sb->nslots;
+      sb->startslot     += nslots;
+      sb->nslots        -= nslots;
+      list_move(ss, sb->listblock, old_nslots);
+    }
+  }
+  else
+  {
+    /* range is at end of slotblock - update block range */
+    CmiInt8 endslot = sb->startslot + sb->nslots - 1;
+    if (endslot == (sslot + nslots - 1))
+    {
+      CmiInt8 old_nslots = sb->nslots;
+      sb->nslots        -= nslots;
+      list_move(ss, sb->listblock, old_nslots);
     }
 
+    /* range is in middle of slotblock - update block range with the */
+    /* new lower range and insert a block with the new upper range */
+    else
+    {
+      CmiInt8 old_nslots = sb->nslots;
+      sb->nslots         = sslot - sb->startslot;
+      list_move(ss, sb->listblock, old_nslots);
+      ss->btree_root = btree_insert(ss, ss->btree_root, sslot + nslots,
+          endslot - (sslot + nslots) + 1);
+    }
   }
-
 }
 
 /*****************************************************************
@@ -1107,37 +964,39 @@ static void grab_slots(slotset *ss, CmiInt8 sslot, CmiInt8 nslots) {
  * contiguous) or by creating a new slotblock
  *****************************************************************/
 
-static void free_slots(slotset *ss, CmiInt8 sslot, CmiInt8 nslots) {
-
+static void free_slots(slotset *ss, CmiInt8 sslot, CmiInt8 nslots)
+{
   slotblock *sb_low  = find_btree_slotblock(ss->btree_root, sslot - 1);
   slotblock *sb_high = find_btree_slotblock(ss->btree_root, sslot + nslots);
 
-  if (sb_low == NULL) {
-    if (sb_high == NULL) {
-
+  if (sb_low == NULL)
+  {
+    if (sb_high == NULL)
+    {
       /* there is no adjacent slotblock, so create a new one and */
       /* insert it in the b-tree */
       ss->btree_root = btree_insert(ss, ss->btree_root, sslot, nslots);
-
-    } else {
-
+    }
+    else
+    {
       /* there is an adjacent slotblock to the right, so update its range */
       CmiInt8 old_nslots = sb_high->nslots;
       sb_high->startslot = sslot;
       sb_high->nslots   += nslots;
       list_move(ss, sb_high->listblock, old_nslots);
-
     }
-  } else {
-    if (sb_high == NULL) {
-
+  }
+  else
+  {
+    if (sb_high == NULL)
+    {
       /* there is an adjacent slotblock to the left, so update its range */
       CmiInt8 old_nslots  = sb_low->nslots;
       sb_low->nslots     += nslots;
       list_move(ss, sb_low->listblock, old_nslots);
-
-    } else {
-
+    }
+    else
+    {
       /* there are adjacent slotblocks on both sides (i.e., the
          slots to be freed exactly span the gap between 2 slotblocks),
          so update the range of the lower slotblock and delete the
@@ -1146,23 +1005,25 @@ static void free_slots(slotset *ss, CmiInt8 sslot, CmiInt8 nslots) {
       sb_low->nslots     = sb_low->nslots + nslots + sb_high->nslots;
       list_move(ss, sb_low->listblock, old_nslots);
       ss->btree_root = btree_delete(ss, ss->btree_root, sb_high->startslot);
-
     }
   }
-
 }
 
 /*****************************************************************
  * Recursively free the allocated memory of the b-tree
  *****************************************************************/
 
-static void delete_btree(btreenode *node) {
-  int i;
-  for (i = 0; i <= node->num_blocks; i++) {
-    if (node->child[i] != NULL) {
+static void delete_btree(btreenode *node)
+{
+  for (int i = 0; i <= node->num_blocks; i++)
+  {
+    if (node->child[i] != NULL)
+    {
       delete_btree(node->child[i]);
       free_reentrant(node->child[i]);
-    } else {
+    }
+    else
+    {
       return;
     }
   }
@@ -1172,16 +1033,19 @@ static void delete_btree(btreenode *node) {
  * Free the allocated memory of the list array
  *****************************************************************/
 
-static void delete_list_array(slotset *ss) {
-  int i;
-  dllnode *dlln;
-  for (i = 0; i < LIST_ARRAY_SIZE; i++) {
-    dlln = ss->list_array[i];
-    if (dlln != NULL) {
-      while (dlln->next != NULL) {
+static void delete_list_array(slotset *ss)
+{
+  for (int i = 0; i < LIST_ARRAY_SIZE; i++)
+  {
+    dllnode *dlln = ss->list_array[i];
+    if (dlln != NULL)
+    {
+      while (dlln->next != NULL)
+      {
         dlln = dlln->next;
       }
-      while (dlln->previous != NULL) {
+      while (dlln->previous != NULL)
+      {
         dlln = dlln->previous;
         free_reentrant(dlln->next);
       }
@@ -1194,7 +1058,8 @@ static void delete_list_array(slotset *ss) {
  * Free the allocated memory of the slotset
  *****************************************************************/
 
-static void delete_slotset(slotset *ss) {
+static void delete_slotset(slotset *ss)
+{
   delete_btree(ss->btree_root);
   delete_list_array(ss);
   free_reentrant(ss->btree_root);
@@ -1207,27 +1072,28 @@ static void delete_slotset(slotset *ss) {
  *****************************************************************/
 
 /* prints the elements in a single b-tree node */
-static void print_btree_node(btreenode *node, int node_num) {
+static void print_btree_node(btreenode *node, int node_num)
+{
   int i;
   CmiPrintf("Node %2d: ", node_num);
-  for (i = 0; i < node->num_blocks; i++) {
+  for (i = 0; i < node->num_blocks; i++)
     CmiPrintf("%d:[%lld,%lld] ", i, node->blocks[i].startslot, node->blocks[i].nslots);
-  }
   CmiPrintf("\n");
 }
 
 /* returns 1 if there's another level to print; 0 if not */
-static int print_btree_level(btreenode *node, int level, int current_level, int node_num) {
-  int i, another_level;
-  for (i = 0; i <= node->num_blocks; i++) {
-    if (current_level == level) {
+static int print_btree_level(btreenode *node, int level, int current_level, int node_num)
+{
+  int another_level;
+  for (int i = 0; i <= node->num_blocks; i++)
+  {
+    if (current_level == level)
+    {
       print_btree_node(node, node_num);
-      if (node->child[0] == NULL) {
-        return 0;
-      } else {
-        return 1;
-      }
-    } else {
+      return node->child[0] != NULL;
+    }
+    else
+    {
       another_level = print_btree_level(node->child[i], level, 
           current_level + 1, i);
     }
@@ -1235,10 +1101,12 @@ static int print_btree_level(btreenode *node, int level, int current_level, int 
   return another_level;
 }
 
-static void print_btree_top_down(btreenode *node) {
+static void print_btree_top_down(btreenode *node)
+{
   int level = 0;
   int another_level;
-  do {
+  do
+  {
     CmiPrintf("B-tree Level %d\n", level);
     CmiPrintf("---------------\n");
     another_level = print_btree_level(node, level, 0, 0);
@@ -1248,23 +1116,24 @@ static void print_btree_top_down(btreenode *node) {
 }
 
 /*****************************************************************
- * Print the contents of the list arry on the screen
+ * Print the contents of the list array on the screen
  *****************************************************************/
 
-static void print_list_array(slotset *ss) {
-  int i;
-  dllnode *dlln;
+static void print_list_array(slotset *ss)
+{
   CmiPrintf("List Array\n");
   CmiPrintf("----------\n");
-  for (i = 0; i < LIST_ARRAY_SIZE; i++) {
+  for (int i = 0; i < LIST_ARRAY_SIZE; i++)
+  {
     CmiPrintf("List %2d: ", i);
-    dlln = ss->list_array[i];
-    while (dlln != NULL) {
-      if (dlln->previous != NULL) {
+    dllnode *dlln = ss->list_array[i];
+    while (dlln != NULL)
+    {
+      if (dlln->previous != NULL)
         CmiPrintf("<->");
-      } else {
+      else
         CmiPrintf(" ->");
-      }
+
       CmiPrintf("[%lld,%lld]", dlln->sb->startslot, dlln->sb->nslots);
       dlln = dlln->next;
     }
@@ -1273,7 +1142,8 @@ static void print_list_array(slotset *ss) {
 }
 
 #if ISOMALLOC_DEBUG
-static void print_slots(slotset *ss) {
+static void print_slots(slotset *ss)
+{
   print_btree_top_down(ss->btree_root);
   print_list_array(ss);
 }
