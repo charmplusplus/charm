@@ -212,14 +212,14 @@ void LBDB::DoneRegisteringObjects(LDOMHandle _h)
   // for an unregistered anonymous OM to join and control the barrier
   if (_h.id.id.idx == 0) {
     oms_registering--;
-    if (oms_registering == 0)
+    if (oms_registering == 0 && useBarrier)
       localBarrier.TurnOn();
   }
   else {
   LBOM* om = oms[_h.handle];
   if (om->RegisteringObjs()) {
     oms_registering--;
-    if (oms_registering == 0)
+    if (oms_registering == 0 && useBarrier)
       localBarrier.TurnOn();
     om->SetRegisteringObjs(false);
   }

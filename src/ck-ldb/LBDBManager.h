@@ -147,9 +147,9 @@ public:
   void RemoveNotifyMigrated(int handle);
 
   inline void TurnManualLBOn() 
-       { useBarrier = false; }
+       { useBarrier = false; LocalBarrierOff(); }
   inline void TurnManualLBOff() 
-       { useBarrier = true; }
+       { useBarrier = true; if (oms_registering == 0) LocalBarrierOn(); }
 
   int AddStartLBFn(LDStartLBFn fn, void* data);
   void TurnOnStartLBFn(int handle)
@@ -200,9 +200,9 @@ public:
   inline void TurnOffBarrierReceiver(LDBarrierReceiver h) 
        { localBarrier.TurnOffReceiver(h); };
   inline void AtLocalBarrier(LDBarrierClient h) 
-       { if (useBarrier) localBarrier.AtBarrier(h); };
+       { localBarrier.AtBarrier(h); };
   inline void DecreaseLocalBarrier(LDBarrierClient h, int c) 
-       { if (useBarrier) localBarrier.DecreaseBarrier(h, c); };
+       { localBarrier.DecreaseBarrier(h, c); };
   inline void ResumeClients() 
        { localBarrier.ResumeClients(); };
   inline void MeasuredObjTime(double wtime, double ctime) {
