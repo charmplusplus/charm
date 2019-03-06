@@ -34,16 +34,17 @@ extern "C" {
 #define CkWallTimer  	CmiWallTimer
 #define CkCpuTimer  	CmiCpuTimer
 
-#define CkMyPe		CmiMyPe
-#define CkMyRank	CmiMyRank
-#define CkMyNode	CmiMyNode
-#define CkNumPes	CmiNumPes
-#define CkNumNodes	CmiNumNodes
-#define CkNodeFirst	CmiNodeFirst
-#define CkNodeSize	CmiNodeSize
-#define CkMyNodeSize	CmiMyNodeSize
-#define CkNodeOf	CmiNodeOf
-#define CkRankOf	CmiRankOf
+#define CkMyPe			CmiMyPe
+#define CkMyRank		CmiMyRank
+#define CkMyNode		CmiMyNode
+#define CkNumPes		CmiNumPes
+#define CkNumNodes		CmiNumNodes
+#define CkNumPhysicalNodes	CmiNumPhysicalNodes
+#define CkNodeFirst		CmiNodeFirst
+#define CkNodeSize		CmiNodeSize
+#define CkMyNodeSize		CmiMyNodeSize
+#define CkNodeOf		CmiNodeOf
+#define CkRankOf		CmiRankOf
 
 #define CkPrintf                CmiPrintf
 #define CkScanf                 CmiScanf
