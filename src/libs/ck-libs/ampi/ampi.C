@@ -4848,15 +4848,17 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt, const void *inbuf, int c
     CkReduction::tupleElement tupleRedn[tupleSize];
 
     // Contribute rank as an unsigned short int if the max rank value fits into it, otherwise as an int
+    unsigned short int ushortRank;
     if (size < std::numeric_limits<unsigned short int>::max()) {
-      unsigned short int ushortRank = static_cast<unsigned short int>(rank);
+      ushortRank = static_cast<unsigned short int>(rank);
       tupleRedn[0] = CkReduction::tupleElement(sizeof(unsigned short int), &ushortRank, CkReduction::concat);
     } else {
       tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::concat);
     }
 
+    vector<char> sbuf;
     if (!ddt->isContig()) {
-      vector<char> sbuf(szdata);
+      sbuf.resize(szdata);
       ddt->serialize((char*)inbuf, sbuf.data(), count, szdata, PACK);
       tupleRedn[1] = CkReduction::tupleElement(szdata, sbuf.data(), CkReduction::concat);
     }
@@ -7030,17 +7032,19 @@ static CkReductionMsg *makeGatherMsg(const void *inbuf, int count, MPI_Datatype 
   CkReduction::tupleElement tupleRedn[tupleSize];
 
   // Contribute rank as an unsigned short int if the max rank value fits into it, otherwise as an int
+  unsigned short int ushortRank;
   if (size < std::numeric_limits<unsigned short int>::max()) {
-    unsigned short int ushortRank = static_cast<unsigned short int>(rank);
+    ushortRank = static_cast<unsigned short int>(rank);
     tupleRedn[0] = CkReduction::tupleElement(sizeof(unsigned short int), &ushortRank, CkReduction::concat);
   } else {
     tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::concat);
   }
 
+  vector<char> sbuf;
   if (ddt->isContig()) {
     tupleRedn[1] = CkReduction::tupleElement(szdata, (void*)inbuf, CkReduction::concat);
   } else {
-    vector<char> sbuf(szdata);
+    sbuf.resize(szdata);
     ddt->serialize((char*)inbuf, sbuf.data(), count, szdata, PACK);
     tupleRedn[1] = CkReduction::tupleElement(szdata, sbuf.data(), CkReduction::concat);
   }
@@ -7057,8 +7061,9 @@ static CkReductionMsg *makeGathervMsg(const void *inbuf, int count, MPI_Datatype
   CkReduction::tupleElement tupleRedn[tupleSize];
 
   // Contribute rank as an unsigned short int if the max rank value fits into it, otherwise as an int
+  unsigned short int ushortRank;
   if (size < std::numeric_limits<unsigned short int>::max()) {
-    unsigned short int ushortRank = static_cast<unsigned short int>(rank);
+    ushortRank = static_cast<unsigned short int>(rank);
     tupleRedn[0] = CkReduction::tupleElement(sizeof(unsigned short int), &ushortRank, CkReduction::concat);
   } else {
     tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::concat);
@@ -7066,10 +7071,11 @@ static CkReductionMsg *makeGathervMsg(const void *inbuf, int count, MPI_Datatype
 
   tupleRedn[1] = CkReduction::tupleElement(sizeof(int), &szdata, CkReduction::concat);
 
+  vector<char> sbuf;
   if (ddt->isContig()) {
     tupleRedn[2] = CkReduction::tupleElement(szdata, (void*)inbuf, CkReduction::concat);
   } else {
-    vector<char> sbuf(szdata);
+    sbuf.resize(szdata);
     ddt->serialize((char*)inbuf, sbuf.data(), count, szdata, PACK);
     tupleRedn[2] = CkReduction::tupleElement(szdata, sbuf.data(), CkReduction::concat);
   }

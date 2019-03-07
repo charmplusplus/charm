@@ -1532,6 +1532,10 @@ reduction that consists of two set reductions.
    msg->setCallback(allgathervCB);
    contribute(msg);
 
+Note that ``CkReduction::tupleElement`` only holds pointers to the data that
+will make up the reduction message, therefore any local variables used must
+remain in scope until ``CkReductionMsg::buildFromTuple`` completes.
+
 The result of this reduction is a single CkReductionMsg that can be
 processed as multiple reductions:
 
