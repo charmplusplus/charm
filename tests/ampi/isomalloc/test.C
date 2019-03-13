@@ -11,7 +11,6 @@
 #include <random>
 #include <chrono>
 #include <algorithm>
-#include <functional>
 #include <type_traits>
 
 // for getrusage
@@ -145,17 +144,11 @@ static inline void request_migration()
   AMPI_Migrate(AMPI_INFO_LB_SYNC);
 }
 
-using clock_type = typename std::conditional<
-  std::chrono::high_resolution_clock::is_steady,
-  std::chrono::high_resolution_clock, std::chrono::steady_clock>::type;
-using time_point = typename std::chrono::time_point<clock_type>;
-using duration_type = typename std::chrono::duration<unsigned long long, std::nano>;
-
-static void malloc_stress(int rank, int p, uint32_t randomseed)
+class malloc_stress
 {
-  // This function avoids heap allocations other than the test itself.
+  // This class avoids heap allocations other than the test itself.
 
-  std::mt19937 generator{randomseed};
+  const int rank, p;
 
   static constexpr size_t maxallocs = 2048;
   static constexpr size_t maxsegments = 8;
@@ -178,43 +171,60 @@ static void malloc_stress(int rank, int p, uint32_t randomseed)
   };
   test_type tests[maxtests]{};
 
+  unsigned long long overall_duration_count = 0;
+
+  // ideally these variables could be marked const after a certain point in execution
   size_t numallocs = 0;
   size_t numsegments = 1;
-  segments[0] = 0;
-
-
-  static_assert(countof(primes) + 3*countof(largeprimes) <= maxallocs, "increase maxallocs");
-
-  for (size_t i = rank; i < countof(primes); i += p)
-  {
-    allocations[numallocs++].size = primes[i];
-  }
-  segments[numsegments++] = numallocs;
-
-  for (size_t i = rank; i < countof(largeprimes); i += p)
-  {
-    allocations[numallocs++].size = largeprimes[i];
-  }
-  segments[numsegments++] = numallocs;
-
-  for (size_t i = rank; i < countof(largeprimes); i += p)
-  {
-    allocations[numallocs++].size = primes[countof(primes)-1-i];
-    allocations[numallocs++].size = largeprimes[i];
-  }
-  segments[numsegments++] = numallocs;
-
-
-  const size_t queuesize = numallocs * 2;
-
+  size_t queuesize;
 #ifdef MIGRATION_OVERKILL
-  const size_t migrationinterval = numallocs / 31; // prime number divisor
-  size_t eventnum = 0;
+  size_t migrationinterval;
 #endif
 
-  size_t testnum = 0;
+public:
 
-  auto alloc_loop = [&](const size_t a_begin, const size_t a_end)
+  using clock_type = typename std::conditional<
+    std::chrono::high_resolution_clock::is_steady,
+    std::chrono::high_resolution_clock, std::chrono::steady_clock>::type;
+  using time_point = typename std::chrono::time_point<clock_type>;
+  using duration_type = typename std::chrono::duration<unsigned long long, std::nano>;
+
+  malloc_stress(int rank_, int p_)
+    : rank{rank_}, p{p_}
+  {
+    // this assertion needs to match the way the structures are populated below
+    static_assert(countof(primes) + 3*countof(largeprimes) <= maxallocs, "increase maxallocs");
+
+    segments[0] = 0;
+
+    for (size_t i = rank; i < countof(primes); i += p)
+    {
+      allocations[numallocs++].size = primes[i];
+    }
+    segments[numsegments++] = numallocs;
+
+    for (size_t i = rank; i < countof(largeprimes); i += p)
+    {
+      allocations[numallocs++].size = largeprimes[i];
+    }
+    segments[numsegments++] = numallocs;
+
+    for (size_t i = rank; i < countof(largeprimes); i += p)
+    {
+      allocations[numallocs++].size = primes[countof(primes)-1-i];
+      allocations[numallocs++].size = largeprimes[i];
+    }
+    segments[numsegments++] = numallocs;
+
+    queuesize = numallocs * 2;
+#ifdef MIGRATION_OVERKILL
+    migrationinterval = numallocs / 31; // prime number divisor
+#endif
+  }
+
+private:
+
+  void alloc_loop(const size_t a_begin, const size_t a_end)
   {
     for (size_t a = a_begin; a < a_end; ++a)
     {
@@ -239,9 +249,9 @@ static void malloc_stress(int rank, int p, uint32_t randomseed)
       }
 #endif
     }
-  };
+  }
 
-  auto free_loop = [&](const size_t a_begin, const size_t a_end)
+  void free_loop(const size_t a_begin, const size_t a_end)
   {
     for (size_t a = a_begin; a < a_end; ++a)
     {
@@ -267,9 +277,9 @@ static void malloc_stress(int rank, int p, uint32_t randomseed)
       }
 #endif
     }
-  };
+  }
 
-  auto undetermined_loop = [&](const size_t a_begin, const size_t a_end)
+  void undetermined_loop(const size_t a_begin, const size_t a_end)
   {
     for (size_t a = a_begin; a < a_end; ++a)
     {
@@ -308,17 +318,19 @@ static void malloc_stress(int rank, int p, uint32_t randomseed)
       }
 #endif
     }
-  };
+  }
 
-  auto reset_queue = [&]()
+  void reset_queue()
   {
     alloc_type ** q = allocation_queue;
     for (alloc_type * al = allocations, * al_end = al + numallocs; al < al_end; ++al)
       *(q++) = al;
-  };
+  }
 
   // tests freeing after every segment
-  auto test_by_segment = [&](std::function<void(size_t)> between = [](size_t){}, std::function<void(size_t)> after = [](size_t){})
+  using operate_segment = void (malloc_stress::*)(size_t);
+
+  void test_by_segment(operate_segment between = &malloc_stress::identity_segment, operate_segment after = &malloc_stress::identity_segment)
   {
 #ifdef MIGRATION_OVERKILL
     eventnum = 0;
@@ -341,14 +353,14 @@ static void malloc_stress(int rank, int p, uint32_t randomseed)
       const time_point t_1 = clock_type::now();
 
       request_migration();
-      between(s);
+      (this->*between)(s);
 
       const time_point t_2 = clock_type::now();
       free_loop(segments[s-1], segments[s]);
       const time_point t_3 = clock_type::now();
 
       request_migration();
-      after(s);
+      (this->*after)(s);
 
       const duration_type test_duration = (t_3 - t_2) + (t_1 - t_0);
       test_duration_count += test_duration.count();
@@ -356,13 +368,15 @@ static void malloc_stress(int rank, int p, uint32_t randomseed)
 
     unsigned long long duration_count = 0;
     MPI_Reduce(&test_duration_count, &duration_count, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, 0, MPI_COMM_WORLD);
-    tests[testnum].duration_count = duration_count;
+    tests[testnum].duration_count += duration_count;
 
     ++testnum;
-  };
+  }
 
   // tests freeing at the end
-  auto test_all = [&](std::function<void()> between = [](){}, std::function<void()> after = [](){})
+  using operate_all = void (malloc_stress::*)();
+
+  void test_all(operate_all between = &malloc_stress::identity_all, operate_all after = &malloc_stress::identity_all)
   {
 #ifdef MIGRATION_OVERKILL
     eventnum = 0;
@@ -381,27 +395,27 @@ static void malloc_stress(int rank, int p, uint32_t randomseed)
     const time_point t_1 = clock_type::now();
 
     request_migration();
-    between();
+    (this->*between)();
 
     const time_point t_2 = clock_type::now();
     free_loop(0, numallocs);
     const time_point t_3 = clock_type::now();
 
     request_migration();
-    after();
+    (this->*after)();
 
     const duration_type test_duration = (t_3 - t_2) + (t_1 - t_0);
     unsigned long long test_duration_count = test_duration.count();
 
     unsigned long long duration_count = 0;
     MPI_Reduce(&test_duration_count, &duration_count, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, 0, MPI_COMM_WORLD);
-    tests[testnum].duration_count = duration_count;
+    tests[testnum].duration_count += duration_count;
 
     ++testnum;
-  };
+  }
 
   // tests with alloc and free interspersed
-  auto test_mixed = [&]()
+  void test_mixed()
   {
 #ifdef MIGRATION_OVERKILL
     eventnum = 0;
@@ -426,46 +440,49 @@ static void malloc_stress(int rank, int p, uint32_t randomseed)
 
     unsigned long long duration_count = 0;
     MPI_Reduce(&test_duration_count, &duration_count, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, 0, MPI_COMM_WORLD);
-    tests[testnum].duration_count = duration_count;
+    tests[testnum].duration_count += duration_count;
 
     ++testnum;
-  };
+  }
 
-  auto shuffle_segment = [&](size_t s)
+  void identity_segment(size_t) { }
+  void identity_all() { }
+
+  void shuffle_segment(size_t s)
   {
     std::shuffle(allocation_queue + segments[s-1], allocation_queue + segments[s], generator);
-  };
-  auto shuffle_segments = [&]()
+  }
+  void shuffle_segments()
   {
     for (size_t s = 1; s < numsegments; ++s)
       shuffle_segment(s);
-  };
-  auto shuffle_all = [&]()
+  }
+  void shuffle_all()
   {
     std::shuffle(allocation_queue, allocation_queue + numallocs, generator);
-  };
+  }
 
-  auto reverse_segment = [&](size_t s)
+  void reverse_segment(size_t s)
   {
     std::reverse(allocation_queue + segments[s-1], allocation_queue + segments[s]);
-  };
-  auto reverse_segments = [&]()
+  }
+  void reverse_segments()
   {
     for (size_t s = 1; s < numsegments; ++s)
       reverse_segment(s);
-  };
-  auto reverse_all = [&]()
+  }
+  void reverse_all()
   {
     std::reverse(allocation_queue, allocation_queue + numallocs);
-  };
+  }
 
-  auto shuffle_segments_and_reverse_all = [&]()
+  void shuffle_segments_and_reverse_all()
   {
     shuffle_segments();
     reverse_all();
-  };
+  }
 
-  auto tests_static = [&](const char *desc1)
+  void tests_static(const char *desc1)
   {
     // allocate and free in the original order
 
@@ -482,37 +499,37 @@ static void malloc_stress(int rank, int p, uint32_t randomseed)
 
     tests[testnum].description1 = desc1;
     tests[testnum].description2 = "LIFO free, batched by segment";
-    test_by_segment(reverse_segment, reverse_segment);
+    test_by_segment(&malloc_stress::reverse_segment, &malloc_stress::reverse_segment);
 
     tests[testnum].description1 = desc1;
     tests[testnum].description2 = "LIFO free within segments, one batch";
-    test_all(reverse_segments, reverse_segments);
+    test_all(&malloc_stress::reverse_segments, &malloc_stress::reverse_segments);
 
     tests[testnum].description1 = desc1;
     tests[testnum].description2 = "LIFO free overall, one batch";
-    test_all(reverse_all, reverse_all);
-  };
+    test_all(&malloc_stress::reverse_all, &malloc_stress::reverse_all);
+  }
 
-  auto tests_dynamic = [&](const char *desc1)
+  void tests_dynamic(const char *desc1)
   {
     tests[testnum].description1 = desc1;
     tests[testnum].description2 = "within segments, batched by segment";
-    test_by_segment(shuffle_segment);
+    test_by_segment(&malloc_stress::shuffle_segment);
 
     tests[testnum].description1 = desc1;
     tests[testnum].description2 = "within segments, FIFO segment order, one batch";
-    test_all(shuffle_segments);
+    test_all(&malloc_stress::shuffle_segments);
 
     tests[testnum].description1 = desc1;
     tests[testnum].description2 = "within segments, LIFO segment order, one batch";
-    test_all(shuffle_segments_and_reverse_all); // reverse the segment order
+    test_all(&malloc_stress::shuffle_segments_and_reverse_all); // reverse the segment order
 
     tests[testnum].description1 = desc1;
     tests[testnum].description2 = "overall, one batch";
-    test_all(shuffle_all);
-  };
+    test_all(&malloc_stress::shuffle_all);
+  }
 
-  auto tests_mixed = [&](const char *desc1)
+  void tests_mixed(const char *desc1)
   {
     {
       alloc_type ** q = allocation_queue;
@@ -546,50 +563,86 @@ static void malloc_stress(int rank, int p, uint32_t randomseed)
     tests[testnum].description1 = desc1;
     tests[testnum].description2 = "overall, one batch";
     test_mixed();
-  };
+  }
+
+  // these variables should be reset for each run
+  std::mt19937 generator;
+#ifdef MIGRATION_OVERKILL
+  size_t eventnum;
+#endif
+  size_t testnum;
+
+public:
+
+  unsigned long long run(uint32_t randomseed)
+  {
+    generator.seed(randomseed);
+#ifdef MIGRATION_OVERKILL
+    eventnum = 0;
+#endif
+    testnum = 0;
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    const time_point t_0 = clock_type::now();
+
+    reset_queue();
+
+    tests_static("distinct phases, without shuffling, ");
+
+    shuffle_segments();
+    tests_static("distinct phases, static shuffle within segments, ");
+
+    shuffle_all();
+    tests_static("distinct phases, static shuffle overall, ");
+
+    shuffle_all();
+    tests_dynamic("distinct phases, shuffling between phases ");
+
+    tests_mixed("one phase, shuffled ");
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    const time_point t_1 = clock_type::now();
 
 
-  MPI_Barrier(MPI_COMM_WORLD);
-  const time_point t_0 = clock_type::now();
+    const duration_type my_overall_duration = t_1 - t_0;
+    const unsigned long long my_overall_duration_count = my_overall_duration.count();
+    overall_duration_count += my_overall_duration_count;
 
-  reset_queue();
+    return my_overall_duration_count;
+  }
 
-  tests_static("distinct phases, without shuffling, ");
+  void average(size_t iterations)
+  {
+    for (size_t t = 0; t < testnum; ++t)
+    {
+      test_type & test = tests[t];
+      test.duration_count /= iterations;
+    }
 
-  shuffle_segments();
-  tests_static("distinct phases, static shuffle within segments, ");
+    overall_duration_count /= iterations;
+  }
 
-  shuffle_all();
-  tests_static("distinct phases, static shuffle overall, ");
-
-  shuffle_all();
-  tests_dynamic("distinct phases, shuffling between phases ");
-
-  tests_mixed("one phase, shuffled ");
-
-  MPI_Barrier(MPI_COMM_WORLD);
-  const time_point t_1 = clock_type::now();
-
-
-  const duration_type overall_duration = t_1 - t_0;
-  unsigned long long overall_duration_count = overall_duration.count();
-
-  // print results
-  if (rank == 0)
+  void print(size_t iterations) const
   {
     unsigned long long total_duration_count = 0;
 
-    printf("malloc stress test results:\n");
-    printf("   # - duration (ns) - description\n");
+    printf("detailed results:\n");
+    printf("              test # -  total duration (ns) -   avg. duration (ns) - description\n");
     for (size_t t = 0; t < testnum; ++t)
     {
       const test_type & test = tests[t];
 
       total_duration_count += test.duration_count;
 
-      printf("%4zu - %13llu - %s%s\n", t+1, test.duration_count, test.description1, test.description2);
+      printf("%20zu - %20llu - %20llu - %s%s\n", t+1,
+             test.duration_count, test.duration_count / iterations,
+             test.description1, test.description2);
     }
-    printf(" all - %13llu - total\n", total_duration_count);
+    printf("                 all - %20llu - %20llu - total\n",
+           total_duration_count, total_duration_count / iterations);
+
+    printf("overall test duration (ns) including migration, shuffling, barriers, etc: { total: %llu, average: %llu }\n",
+           overall_duration_count, overall_duration_count / iterations);
 
     struct rusage usage;
     getrusage(RUSAGE_SELF, &usage);
@@ -601,8 +654,19 @@ static void malloc_stress(int rank, int p, uint32_t randomseed)
       "kilobytes"
 #endif
       "): %lu\n", usage.ru_maxrss);
-    printf("overall test duration (ns) including migration, shuffling, barriers, etc: %llu\n", overall_duration_count);
   }
+};
+
+static uint32_t generate_randomseed(int rank)
+{
+  uint32_t randomseed;
+
+  if (rank == 0)
+    randomseed = std::chrono::system_clock::now().time_since_epoch().count();
+
+  MPI_Bcast(&randomseed, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
+
+  return randomseed;
 }
 
 int main(int argc, char** argv)
@@ -614,24 +678,57 @@ int main(int argc, char** argv)
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &p);
 
-  uint32_t randomseed;
+  malloc_stress test{rank, p};
 
-  if (argc > 1)
+  bool doIterations = false;
+  size_t iterations = 1;
+  uint32_t randomseed = generate_randomseed(rank);
+
+  if (argc > 2)
   {
-    randomseed = (uint32_t)atol(argv[1]);
+    if (strcmp(argv[1], "iterations") == 0)
+    {
+      doIterations = true;
+      iterations = (size_t)atoll(argv[2]);
+      if (iterations == 0)
+        iterations = 1;
+    }
+    else if (strcmp(argv[1], "randomseed") == 0)
+    {
+      randomseed = (uint32_t)atol(argv[2]);
+    }
+  }
+
+  if (doIterations)
+  {
+    if (rank == 0)
+    {
+      printf("malloc stress test: ./" isomalloc_method_str " (...) +vp%i iterations %zu\n", p, iterations);
+      printf("             round # -        duration (ns) - command\n");
+    }
+
+    for (size_t i = 0; i < iterations; ++i)
+    {
+      randomseed = generate_randomseed(rank);
+
+      const unsigned long long duration = test.run(randomseed);
+
+      if (rank == 0)
+        printf("%20zu - %20llu - ./" isomalloc_method_str " (...) +vp%i randomseed %" PRIu32 "\n",
+               i+1, duration, p, randomseed);
+    }
   }
   else
   {
     if (rank == 0)
-      randomseed = std::chrono::system_clock::now().time_since_epoch().count();
+      printf("malloc stress test: ./" isomalloc_method_str " (...) +vp%i randomseed %" PRIu32 "\n",
+             p, randomseed);
 
-    MPI_Bcast(&randomseed, 1, MPI_UINT32_T, 0, MPI_COMM_WORLD);
+    test.run(randomseed);
   }
 
   if (rank == 0)
-    printf("memory test: ./" isomalloc_method_str " (...) +vp%i %" PRIu32 "\n", p, randomseed);
-
-  malloc_stress(rank, p, randomseed);
+    test.print(iterations);
 
   MPI_Finalize();
 
