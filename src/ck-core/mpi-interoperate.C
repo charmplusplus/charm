@@ -132,8 +132,8 @@ void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
   StartInteropScheduler();
 }
 
-// #undef CkExit
-// #define CkExit CkExit
+#undef CkExit
+#define CkExit CKEXIT_0 // CKEXIT_0 and other CkExit macros defined in charm.h
 extern "C"
 void CharmLibExit() {
   _cleanUp = 1;
