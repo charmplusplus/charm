@@ -601,7 +601,7 @@ void getPETopoTreeEdges(int pe, int rootPE, int *pes, int numpes, unsigned int b
   }
 
   CmiSpanningTreeInfo t;
-  getNeighborsTopoTree_R(pes, pes + numpes, pe, -1, true, bfactor, t);
+  getNeighborsTopoTree_R(pes, pes + numpes, pe, -1, false, bfactor, t);
   *parent      = t.parent;
   *child_count = t.child_count;
   *children    = t.children;
