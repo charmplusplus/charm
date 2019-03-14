@@ -39,10 +39,10 @@ all: AMPI AMPIF $(COMPATLIB) $(ROMIO)
 $(ROMIO): | AMPI AMPIF
 	@echo "Building ROMIO"
 	cd romio && \
-		CFLAGS="$(OPTS)" \
-		FFLAGS="$(OPTS)" \
-		F77=$(CDIR)/bin/ampif90 \
-		CC=$(CDIR)/bin/ampicc \
+		CFLAGS="$(OPTS) -ampi-romio-configure" \
+		FFLAGS="$(OPTS) -ampi-romio-configure" \
+		F77="$(CDIR)/bin/ampif90" \
+		CC="$(CDIR)/bin/ampicc" \
 		./configure \
 		--disable-aio \
 		--enable-f77=`test -f $(DESTF) && echo yes || echo no` \

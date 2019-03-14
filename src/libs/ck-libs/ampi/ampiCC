@@ -2,7 +2,11 @@
 CHARMBIN=`dirname $0`
 
 [ -z "$AMPICC_MODE" ] && AMPICC_MODE='ampi'
-STANDALONE=""
+STANDALONE=''
+ROMIO_CONFIGURE=''
+MPITEST=''
+
+ARGS=''
 
 processArgs() {
 while [ ! $# -eq 0 ]
@@ -14,9 +18,22 @@ do
      exit 0
      ;;
   -standalone)
-     STANDALONE="true"
+     STANDALONE='true'
      ;;
+
+  # These arguments manage compilation of ROMIO's configure tests.
+  # Simple environment tests will be compiled as standalone binaries,
+  # while MPI tests will be compiled with AMPI.
+  -ampi-romio-configure) # Strictly for internal use.
+     ROMIO_CONFIGURE='true'
+     ;;
+  mpitest*) # mpitest.c, mpitest1.c, mpitest.f, etc
+     ARGS="$ARGS \"$arg\""
+     MPITEST='true'
+     ;;
+
   *)
+     ARGS="$ARGS \"$arg\""
      ;;
   esac
   shift
@@ -25,7 +42,7 @@ done
 
 eval processArgs "$@"
 
-AMPICC_EXTRA_OPTIONS=""
+AMPICC_EXTRA_OPTS=''
 
 if test "$AMPICC_MODE" = 'ampi'
 then
@@ -36,13 +53,17 @@ then
     dirName=ampicc.inc.$$
     mkdir $dirName
     cp -n $CHARMBIN/../include/mpi.h $dirName/mpi.h   2>/dev/null
-    AMPICC_EXTRA_OPTIONS="$AMPICC_EXTRA_OPTIONS -I./$dirName"
+    AMPICC_EXTRA_OPTS="$AMPICC_EXTRA_OPTS -I./$dirName"
   fi
 fi
 
-[ -f $CHARMBIN/../lib/libampiromio.a -a -z "$STANDALONE" ] && ROMIO=-lampiromio
+[ -n "$ROMIO_CONFIGURE" -a -z "$MPITEST" ] && STANDALONE='true'
 
-$CHARMBIN/charmc -language $AMPICC_MODE -default-to-aout $AMPICC_EXTRA_OPTIONS $@ $ROMIO
+[ -n "$STANDALONE" ] && ARGS="$ARGS -standalone"
+
+[ -f $CHARMBIN/../lib/libampiromio.a -a -z "$STANDALONE" -a -z "$ROMIO_CONFIGURE" ] && ROMIO='-lampiromio'
+
+$CHARMBIN/charmc -language $AMPICC_MODE -default-to-aout $AMPICC_EXTRA_OPTS $ARGS $ROMIO
 status=$?
 
 if test "$AMPICC_MODE" = 'ampi'
