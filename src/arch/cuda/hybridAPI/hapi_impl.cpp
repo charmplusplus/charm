@@ -77,10 +77,10 @@ void initEventQueues() {
 
 // Returns the CUDA device associated with the given PE.
 // TODO: should be updated to exploit the hardware topology instead of round robin
-static inline int getMyCudaDevice(int my_pe) {
+static inline int getMyCudaDevice(int my_node) {
   int device_count;
   hapiCheck(cudaGetDeviceCount(&device_count));
-  return my_pe % device_count;
+  return my_node % device_count;
 }
 
 // A function in ck.C which casts the void* to a CkCallback object and invokes
@@ -204,7 +204,7 @@ void GPUManager::init() {
 #endif
 
   // store CUDA device properties
-  hapiCheck(cudaGetDeviceProperties(&device_prop_, getMyCudaDevice(CmiMyPe())));
+  hapiCheck(cudaGetDeviceProperties(&device_prop_, getMyCudaDevice(CmiMyNode())));
 
 #ifdef HAPI_CUDA_CALLBACK
   // check if CUDA callback is supported
