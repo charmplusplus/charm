@@ -1254,26 +1254,26 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
 
   switch(env->getMsgtype()) {
 // Group support
-    case BocInitMsg :
+    case BocInitMsg : // Group creation message
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: BocInitMsg\n", CkMyPe());)
       // QD processing moved inside _processBocInitMsg because it is conditional
       //ck->process(); 
       if(env->isPacked()) CkUnpackMessage(&env);
       _processBocInitMsg(ck,env);
       break;
-    case NodeBocInitMsg :
+    case NodeBocInitMsg : // Nodegroup creation message
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: NodeBocInitMsg\n", CkMyPe());)
       if(env->isPacked()) CkUnpackMessage(&env);
       _processNodeBocInitMsg(ck,env);
       break;
-    case ForBocMsg :
+    case ForBocMsg : // Group entry method message (non creation)
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: ForBocMsg\n", CkMyPe());)
       // QD processing moved inside _processForBocMsg because it is conditional
       if(env->isPacked()) CkUnpackMessage(&env);
       _processForBocMsg(ck,env);
       // stats record moved inside _processForBocMsg because it is conditional
       break;
-    case ForNodeBocMsg :
+    case ForNodeBocMsg : // Nodegroup entry method message (non creation)
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: ForNodeBocMsg\n", CkMyPe());)
       // QD processing moved to _processForNodeBocMsg because it is conditional
       if(env->isPacked()) CkUnpackMessage(&env);
@@ -1282,37 +1282,39 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
       break;
 
 // Array support
-    case ForArrayEltMsg:
+    case ForArrayEltMsg: // Array element entry method message
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: ForArrayEltMsg\n", CkMyPe());)
       if(env->isPacked()) CkUnpackMessage(&env);
       _processArrayEltMsg(ck,env);
       break;
 
 // Chare support
-    case NewChareMsg :
+    case NewChareMsg : // Singleton chare creation message
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: NewChareMsg\n", CkMyPe());)
       if(env->isPacked()) CkUnpackMessage(&env);
       _processNewChareMsg(ck,env);
       break;
-    case NewVChareMsg :
+    case NewVChareMsg : // Singleton virtual chare creation message
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: NewVChareMsg\n", CkMyPe());)
       if(env->isPacked()) CkUnpackMessage(&env);
       _processNewVChareMsg(ck,env);
       break;
-    case ForChareMsg :
+    case ForChareMsg : // Singeton chare entry method message (non creation)
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: ForChareMsg\n", CkMyPe());)
       if(env->isPacked()) CkUnpackMessage(&env);
       _processForPlainChareMsg(ck,env);
       break;
-    case ForVidMsg   :
+    case ForVidMsg   : // Singleton virtual chare entry method message (non creation)
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: ForVidMsg\n", CkMyPe());)
       _processForVidMsg(ck,env);
       break;
-    case FillVidMsg  :
+    case FillVidMsg  : // Message sent back from the real chare PE to the virtual chare PE to
+                       // fill the VidBlock (called when the real chare is constructed)
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: FillVidMsg\n", CkMyPe());)
       _processFillVidMsg(ck,env);
       break;
-    case DeleteVidMsg  :
+    case DeleteVidMsg  : // Message sent back from the real chare PE to the virtual chare PE to
+                         // delete the Vidblock (called when the real chare is deleted by the destructor)
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: DeleteVidMsg\n", CkMyPe());)
       _processDeleteVidMsg(ck,env);
       break;

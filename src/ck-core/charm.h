@@ -316,32 +316,32 @@ extern void CkMigrateExt(int aid, int ndims, int *index, int toPe);
  *   Make sure the two remain synchronized if changing this one.
  ***/
 typedef enum {
-  NewChareMsg    =1,
-  NewVChareMsg   =2,
-  BocInitMsg     =3,
-  ForChareMsg    =4,
-  ForBocMsg      =5,
-  ForVidMsg      =6,
-  FillVidMsg     =7,
-  DeleteVidMsg   =8,
-  RODataMsg      =9,
-  ROMsgMsg       =10,
-  StartExitMsg   =11,
-  ExitMsg        =12,
-  ReqStatMsg     =13,
-  StatMsg        =14,
-  StatDoneMsg   =15,
-  NodeBocInitMsg =16,
-  ForNodeBocMsg  =17,
-  ArrayEltInitMsg =18,
-  ForArrayEltMsg  =19,
+  NewChareMsg     =1,               // Singleton chare creation message
+  NewVChareMsg    =2,               // Singleton virtual chare creation message
+  BocInitMsg      =3,               // Group creation message
+  ForChareMsg     =4,               // Singleton chare entry method message (non creation)
+  ForBocMsg       =5,               // Group entry method message (non creation)
+  ForVidMsg       =6,               // Singleton virtual chare entry method message (non creation)
+  FillVidMsg      =7,               // Message sent to fill a VidBlock on a virtual chare PE
+  DeleteVidMsg    =8,               // Message sent to delete a VidBlock on a virtual chare PE
+  RODataMsg       =9,               // Readonly Data Message (for user declared readonly variables)
+  ROMsgMsg        =10,              // Readonly message Message (for user declared readonly messages)
+  StartExitMsg    =11,              // Exit sequence trigger message
+  ExitMsg         =12,              // Exit sequence trigger message using user registered exit function
+  ReqStatMsg      =13,              // Request stats and warnings message
+  StatMsg         =14,              // Stats data message (Reduction)
+  StatDoneMsg     =15,              // Signal completion of stats reduction (Broadcast)
+  NodeBocInitMsg  =16,              // Nodegroup creation message
+  ForNodeBocMsg   =17,              // Nodegroup entry method message (non creation)
+  ArrayEltInitMsg =18,              // Array Element Initialization message
+  ForArrayEltMsg  =19,              // Array Element entry method message
   ForIDedObjMsg   =20,
 #if CMK_LOCKLESS_QUEUE
-  WarnMsg         =21,
-  WarnDoneMsg     =22,
-  LAST_CK_ENVELOPE_TYPE =23
+  WarnMsg         =21,              // Warning data message (Reduction)
+  WarnDoneMsg     =22,              // Signal completion of warnings reduction (Broadcast)
+  LAST_CK_ENVELOPE_TYPE =23         // Used for error-checking
 #else
-  LAST_CK_ENVELOPE_TYPE =21
+  LAST_CK_ENVELOPE_TYPE =21         // Used for error-checking
 #endif
 } CkEnvelopeType;
 

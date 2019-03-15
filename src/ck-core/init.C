@@ -596,7 +596,7 @@ static void _exitHandler(envelope *env)
 {
   DEBUGF(("exitHandler called on %d msgtype: %d\n", CkMyPe(), env->getMsgtype()));
   switch(env->getMsgtype()) {
-    case StartExitMsg:
+    case StartExitMsg: // Exit sequence trigger message
       CkAssert(CkMyPe()==0);
       if(_exitStarted) {
         CmiFree(env);
@@ -605,7 +605,7 @@ static void _exitHandler(envelope *env)
       _exitStarted = true;
 
       // else fall through
-    case ExitMsg:
+    case ExitMsg: // Exit sequence trigger message using user registered exit function
       CkAssert(CkMyPe()==0);
       if (!_CkExitFnVec.isEmpty()) {
         CmiFree(env);
@@ -637,7 +637,7 @@ static void _exitHandler(envelope *env)
       ConverseExit(_exitcode);
 #endif
       break;
-    case ReqStatMsg:
+    case ReqStatMsg: // Request stats and warnings message
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
       _messageLoggingExit();
 #endif
@@ -686,7 +686,7 @@ static void _exitHandler(envelope *env)
 #endif
       break;
 #if CMK_WITH_STATS
-    case StatMsg:
+    case StatMsg: // Stats data message (in response to ReqStatMsg)
     {
       CkAssert(CkMyPe()==0);
       statsHeader* header = (statsHeader*)EnvToUsr(env);
@@ -706,7 +706,7 @@ static void _exitHandler(envelope *env)
     }
     break;
 
-    case StatDoneMsg:
+    case StatDoneMsg: // Indicates completion of stats reduction
       DEBUGF(("[%d] Calling converse exit from StatDoneMsg \n",CkMyPe()));
       ConverseExit(_exitcode);
       if (CharmLibInterOperate)
@@ -714,7 +714,7 @@ static void _exitHandler(envelope *env)
       break;
 #endif
 #if CMK_WITH_WARNINGS
-    case WarnMsg:
+    case WarnMsg: // Warnings data message (in reponse to ReqStatMsg)
     {
       CkAssert(CkMyPe()==0);
       WarningMsg* msg = (WarningMsg*)EnvToUsr(env);
@@ -725,7 +725,7 @@ static void _exitHandler(envelope *env)
       CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char*)env);
       break;
     }
-    case WarnDoneMsg:
+    case WarnDoneMsg: // Indicates completion of warnings reduction
       DEBUGF(("[%d] Calling converse exit from WarnDoneMsg \n",CkMyPe()));
       ConverseExit(_exitcode);
       if (CharmLibInterOperate)
@@ -953,7 +953,7 @@ static void _initHandler(void *msg, CkCoreState *ck)
   }
   
   switch (env->getMsgtype()) {
-    case BocInitMsg:
+    case BocInitMsg: // Group creation message
       if (env->getGroupEpoch()==0) {
         CkpvAccess(_numInitsRecd)++;
         // _qd->process() or ck->process() to update QD counters is called inside _processBocInitMsg
@@ -963,7 +963,7 @@ static void _initHandler(void *msg, CkCoreState *ck)
         (*CkpvAccess(_bocInitVec))[env->getGroupNum().idx] = env;
       } else _bufferHandler(msg);
       break;
-    case NodeBocInitMsg:
+    case NodeBocInitMsg: // Nodegroup creation message
       if (env->getGroupEpoch()==0) {
         CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
         CksvAccess(_numInitNodeMsgs)++;
@@ -975,13 +975,13 @@ static void _initHandler(void *msg, CkCoreState *ck)
         // _qd->process() or ck->process() to update QD counters is called inside _processNodeBocInitMsg
       } else _bufferHandler(msg);
       break;
-    case ROMsgMsg:
+    case ROMsgMsg: // Readonly Message (for user declared readonly messages)
       CkpvAccess(_numInitsRecd)++;
       CpvAccess(_qd)->process();
       if(env->isPacked()) CkUnpackMessage(&env);
       _processROMsgMsg(env);
       break;
-    case RODataMsg:
+    case RODataMsg: // Readonly Data Message (for user declared readonly variables)
       CkpvAccess(_numInitsRecd)++;
       CpvAccess(_qd)->process();
       _numExpectInitMsgs = env->getCount();
