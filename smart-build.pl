@@ -36,7 +36,7 @@ sub promptUserYN {
 	}
   }
 }
-  
+
 
 # The beginning of the good stuff:
 print "\n============================================================\n";
@@ -247,14 +247,14 @@ if($skip_choosing eq "false"){
 }
 
 
-if($skip_choosing eq "false") { 
-  
+if($skip_choosing eq "false") {
+
   print "\nDo you have a special network interconnect? [y/N]: ";
   my $p = promptUserYN();
   if($p eq "yes"){
 
 	print << "EOF";
-	
+
 Choose an interconnect from below: [1-10]
 	 1) MPI
 	 2) Infiniband (verbs)
@@ -265,7 +265,7 @@ Choose an interconnect from below: [1-10]
 	 7) PAMI
 
 EOF
-	
+
 	while(my $line = <>){
 	  chomp $line;
 	  if($line eq "1"){
@@ -292,7 +292,7 @@ EOF
 	  } else {
 		print "Invalid option, please try again :P\n"
 	  }
-	}	
+	}
   }
 }
 
@@ -308,7 +308,7 @@ if($arch eq ""){
 	  	$arch = $arch . "-arm7";
 	  }
 }
-  
+
 # Fixup $arch to match the inconsistent directories in src/archs
 
 if($arch eq "netlrts-darwin"){
@@ -443,7 +443,7 @@ $explanations{"tsan"} = "Compile Charm++ with support for Thread Sanitizer";
   $opts = $1;
 
   my @option_list = split(" ", $opts);
-  
+
 
   # Prune out entries that would already have been chosen above, such as smp
   my @option_list_pruned = ();
@@ -512,14 +512,14 @@ $explanations{"tsan"} = "Compile Charm++ with support for Thread Sanitizer";
 
 # Choose compiler flags
 print << "EOF";
-	
+
 Choose a set of compiler flags [1-5]
 	1) none
 	2) debug mode                        -g -O0
 	3) production build [default]        --with-production
 	4) production build w/ projections   --with-production --enable-tracing
 	5) custom
-	
+
 EOF
 
 my $compiler_flags = "";
@@ -534,16 +534,16 @@ while(my $line = <>){
 	} elsif($line eq "4" ){
  		$compiler_flags = "--with-production --enable-tracing";
 		last;
-	} elsif($line eq "3" || $line eq ""){ 
+	} elsif($line eq "3" || $line eq ""){
                 $compiler_flags = "--with-production";
-                last; 
+                last;
         }  elsif($line eq "5"){
 
 		print "Enter compiler options: ";
 		my $input_line = <>;
 		chomp($input_line);
 		$compiler_flags = $input_line;
-		
+
 		last;
 	} else {
 		print "Invalid option, please try again :P\n"
@@ -580,18 +580,18 @@ while(my $line = <>){
 	} else {
 		print "Invalid option, please try again :P\n"
 	}
-	
+
 }
 
 # Determine whether to use a -j flag for faster building
 my $j = "";
     print << "EOF";
-    
+
 Do you want to compile in parallel?
         1) No
         2) Build with -j2
         3) Build with -j4
-        4) Build with -j8 
+        4) Build with -j8
         5) Build with -j16 [default]
         6) Build with -j32
         7) Build with -j
@@ -605,7 +605,7 @@ EOF
 	    last;
         } elsif($line eq "2") {
 	    $j = "-j2";
-	    last; 
+	    last;
 	} elsif($line eq "3") {
 	    $j = "-j4";
 	    last;
@@ -648,7 +648,7 @@ print "Do you want to start the build now? [Y/n]: ";
 my $p = promptUserYN();
 if($p eq "yes" || $p eq "default"){
   if(-e "$dirname/src/arch/$arch"){
-	print "Building with: ${build_line}\n";	
+	print "Building with: ${build_line}\n";
 	# Execute the build line
 	system($build_line);
   } else {
