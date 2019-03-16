@@ -297,6 +297,23 @@ EOF
 }
 
 
+# check for CUDA
+
+my $nvcc_found = "false";
+my $n = system("which nvcc > /dev/null 2>/dev/null") / 256;
+if($n == 0){
+  $nvcc_found = "true";
+}
+
+if($nvcc_found eq "true"){
+  print "\nI found that you have NVCC available in your path.\nDo you want to build Charm++ with GPU Manager support for CUDA? [y/N]: ";
+  my $p = promptUserYN();
+  if($p eq "yes") {
+    $options = "$options cuda";
+  }
+}
+
+
 # construct an $arch string if we did not explicitly set one above
 if($arch eq ""){
   $arch = "${converse_network_type}-${arch_os}";
@@ -347,7 +364,7 @@ if($opts =~ m/pxshm/){
 }
 
 if ($counter != 1) {
-    print "How do you want to handle SMP/Multicore: [1-$counter]\n";
+    print "\nHow do you want to handle SMP/Multicore: [1-$counter]\n";
     print $smp_opts;
 
     while(my $line = <>){
