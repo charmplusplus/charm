@@ -6,7 +6,7 @@ Modified 10/30/2018 Zeran Zhu zzhu35@illinois.edu
 	This will run mpich test suites with AMPI and save all passing and non-timeout (60s) tests to testlist.ampi in the toplevel build directory.
 	Verify changes and commit/push updated testlist.ampi as needed.
 * build AMPI with flag "--enable-ampi-mpich-tests" will enable AMPI test automation with mpich test suites
-	once seeing the flag, autoconfig sets compiler macro AMPI_ERRHANDLER_RETURN = 1, AMPI_WITH_UNIMPL_DEFS = 1, and the Makefile macro BUILD_MPICH_TESTS:=true
+	once seeing the flag, autoconfig sets compiler macro AMPI_ERRHANDLER_RETURN = 1 and the Makefile macro BUILD_MPICH_TESTS:=true
 * running "make test" with TESTOPTS in tests/ampi will automatically configure, compile and run all tests including mpich-tests using AMPI
 
 To manually configure the mpich-3.2 test suite to use AMPI, do:

@@ -1586,9 +1586,20 @@ int AMPI_System(const char *cmd);
 /* Determine approximate depth of stack at the point of this call */
 extern long ampiCurrentStackUsage(void);
 
-/* If compiling the MPICH test suite, enable these no-op definitions
- * for the MPI features that AMPI does not yet support. */
-#ifdef AMPI_WITH_UNIMPL_DEFS
+// Functions and constants unsupported in AMPI
+
+#if defined __cplusplus && __cplusplus >= 201402L
+# define AMPI_UNIMPLEMENTED [[deprecated("currently unimplemented in AMPI")]]
+#elif defined __GNUC__ || defined __clang__
+# define AMPI_UNIMPLEMENTED __attribute__((deprecated("currently unimplemented in AMPI")))
+#elif defined _MSC_VER
+# define AMPI_UNIMPLEMENTED __declspec(deprecated("currently unimplemented in AMPI"))
+#else
+# define AMPI_UNIMPLEMENTED
+#endif
+
+#define AMPI_API_DEF_NOIMPL(return_type, function_name, ...) \
+  AMPI_UNIMPLEMENTED AMPI_API_DEF(return_type, function_name, __VA_ARGS__)
 
 // MPI-2 Constants
 #define MPI_ARGV_NULL (char **)0
@@ -1620,26 +1631,8 @@ extern long ampiCurrentStackUsage(void);
 #define MPI_CXX_FLOAT_COMPLEX MPI_C_FLOAT_COMPLEX
 #define MPI_CXX_DOUBLE_COMPLEX MPI_C_DOUBLE_COMPLEX
 #define MPI_CXX_LONG_DOUBLE_COMPLEX MPI_C_LONG_DOUBLE_COMPLEX
-typedef int (MPI_Grequest_cancel_function)(void *, int);
-typedef int (MPI_Grequest_free_function)(void *);
-typedef int (MPI_Grequest_query_function)(void *, MPI_Status *);
 
 // MPI-2 Routines
-#define MPI_Comm_spawn (void*)
-#define MPI_Comm_spawn_multiple (void*)
-#define MPI_Open_port (void*)
-#define MPI_Close_port (void*)
-#define MPI_Comm_accept (void*)
-#define MPI_Comm_connect (void*)
-#define MPI_Comm_disconnect (void*)
-#define MPI_Comm_get_parent (void*)
-#define MPI_Comm_join (void*)
-#define MPI_Publish_name (void*)
-#define MPI_Unpublish_name (void*)
-#define MPI_Pack_external (void*)
-#define MPI_Pack_external_size (void*)
-#define MPI_Type_match_size (void*)
-#define MPI_Unpack_external (void*)
 #define MPI_Win_free_errhandler (void*)
 
 // MPI-3 Constants
@@ -1647,21 +1640,6 @@ typedef int (MPI_Grequest_query_function)(void *, MPI_Status *);
 #define MPI_ERR_RMA_ATTACH 55
 #define MPI_ERR_RMA_SHARED 56
 #define MPI_ERR_RMA_FLAVOR 57
-
-// MPI-3 Routines
-#define MPI_Win_allocate (void*)
-#define MPI_Win_allocate_shared (void*)
-#define MPI_Win_attach (void*)
-#define MPI_Win_create_dynamic (void*)
-#define MPI_Win_detach (void*)
-#define MPI_Win_flush (void*)
-#define MPI_Win_flush_all (void*)
-#define MPI_Win_flush_local (void*)
-#define MPI_Win_flush_local_all (void*)
-#define MPI_Win_lock_all (void*)
-#define MPI_Win_shared_query (void*)
-#define MPI_Win_sync (void*)
-#define MPI_Win_unlock_all (void*)
 
 // MPI_T interface
 typedef int MPI_T_enum;
@@ -1733,37 +1711,6 @@ typedef int MPI_T_pvar_session;
 #define MPI_T_ERR_PVAR_NO_STARTSTOP 78
 #define MPI_T_ERR_PVAR_NO_WRITE 79
 #define MPI_T_ERR_PVAR_NO_ATOMIC 80
-#define MPI_T_category_changed (void*)
-#define MPI_T_category_get_categories (void*)
-#define MPI_T_category_get_cvars (void*)
-#define MPI_T_category_get_index (void*)
-#define MPI_T_category_get_info (void*)
-#define MPI_T_category_get_num (void*)
-#define MPI_T_category_get_pvars (void*)
-#define MPI_T_cvar_get_index (void*)
-#define MPI_T_cvar_get_info (void*)
-#define MPI_T_cvar_get_num (void*)
-#define MPI_T_cvar_handle_alloc (void*)
-#define MPI_T_cvar_handle_free (void*)
-#define MPI_T_cvar_read (void*)
-#define MPI_T_cvar_write (void*)
-#define MPI_T_enum_get_info (void*)
-#define MPI_T_enum_get_item (void*)
-#define MPI_T_finalize MPI_Finalize
-#define MPI_T_init_thread(provided, required) (MPI_Init_thread(NULL,NULL,required,provided))
-#define MPI_T_pvar_get_index (void*)
-#define MPI_T_pvar_get_info (void*)
-#define MPI_T_pvar_get_num (void*)
-#define MPI_T_pvar_handle_alloc (void*)
-#define MPI_T_pvar_handle_free (void*)
-#define MPI_T_pvar_read (void*)
-#define MPI_T_pvar_readreset (void*)
-#define MPI_T_pvar_reset (void*)
-#define MPI_T_pvar_session_create (void*)
-#define MPI_T_pvar_session_free (void*)
-#define MPI_T_pvar_start (void*)
-#define MPI_T_pvar_stop (void*)
-#define MPI_T_pvar_write (void*)
 
 // MPIX FT interface (MPICH extensions needed to compile tests/ampi/mpich-test/)
 #define MPIX_ERR_PROC_FAILED 77
@@ -1775,141 +1722,310 @@ typedef int MPI_T_pvar_session;
 #define MPIX_Comm_failure_get_acked (void*)
 #define MPIX_Comm_revoke (void*)
 
-#endif //AMPI_WITH_UNIMPL_DEFS
 
-#ifdef __cplusplus
-}
-#endif
-
-#endif
-
-/* MPI 3.1 standards compliance overview
- * This overview contains all MPI 3.1 sections and lists all MPI functions not
- * supported in AMPI currently.
+/* MPI 3.1 standards compliance overview.
+ * This list contains all MPI functions not supported in AMPI currently.
 */
 
 /* A.2.1 Point-to-Point Communication C Bindings */
 
 /* A.2.2 Datatypes C Bindings */
-/*
-int MPI_Pack_external(const char datarep[], const void *inbuf, int incount, MPI_Datatype datatype, void *outbuf, MPI_Aint outsize, MPI_Aint *position);
-int MPI_Pack_external_size(const char datarep[], int incount, MPI_Datatype datatype, MPI_Aint *size);
-int MPI_Type_create_darray(int size, int rank, int ndims, const int array_of_gsizes[], const int array_of_distribs[], const int array_of_dargs[], const int array_of_psizes[], int order, MPI_Datatype oldtype, MPI_Datatype *newtype); //provided by ROMIO
-int MPI_Type_create_subarray(int ndims, const int array_of_sizes[], const int array_of_subsizes[], const int array_of_starts[], int order, MPI_Datatype oldtype, MPI_Datatype *newtype); //provided by ROMIO
-int MPI_Unpack_external(const char datarep[], const void *inbuf, MPI_Aint insize, MPI_Aint *position, void *outbuf, int outcount, MPI_Datatype datatype);
-*/
+
+#define  MPI_Pack_external  AMPI_Pack_external
+#define PMPI_Pack_external APMPI_Pack_external
+#define  MPI_Pack_external_size  AMPI_Pack_external_size
+#define PMPI_Pack_external_size APMPI_Pack_external_size
+#define  MPI_Unpack_external  AMPI_Unpack_external
+#define PMPI_Unpack_external APMPI_Unpack_external
+
+AMPI_API_DEF_NOIMPL(int, MPI_Pack_external, const char datarep[], const void *inbuf, int incount, MPI_Datatype datatype, void *outbuf, MPI_Aint outsize, MPI_Aint *position);
+AMPI_API_DEF_NOIMPL(int, MPI_Pack_external_size, const char datarep[], int incount, MPI_Datatype datatype, MPI_Aint *size);
+// AMPI_API_DEF_NOIMPL(int, MPI_Type_create_darray, int size, int rank, int ndims, const int array_of_gsizes[], const int array_of_distribs[], const int array_of_dargs[], const int array_of_psizes[], int order, MPI_Datatype oldtype, MPI_Datatype *newtype); //provided by ROMIO
+// AMPI_API_DEF_NOIMPL(int, MPI_Type_create_subarray, int ndims, const int array_of_sizes[], const int array_of_subsizes[], const int array_of_starts[], int order, MPI_Datatype oldtype, MPI_Datatype *newtype); //provided by ROMIO
+AMPI_API_DEF_NOIMPL(int, MPI_Unpack_external, const char datarep[], const void *inbuf, MPI_Aint insize, MPI_Aint *position, void *outbuf, int outcount, MPI_Datatype datatype);
 
 /* A.2.3 Collective Communication C Bindings */
 
 /* A.2.4 Groups, Contexts, Communicators, and Caching C Bindings */
 
 /* A.2.6 MPI Environmental Management C Bindings */
-/*
-int MPI_File_call_errhandler(MPI_File fh, int errorcode);
-int MPI_File_create_errhandler(MPI_File_errhandler_function *file_errhandler_fn, MPI_Errhandler *errhandler);
-int MPI_File_get_errhandler(MPI_File file, MPI_Errhandler *errhandler);
-int MPI_File_set_errhandler(MPI_File file, MPI_Errhandler errhandler);
-*/
+
+typedef void (MPI_File_errhandler_function)(MPI_File *file, int *err, ...);
+
+#define  MPI_File_call_errhandler  AMPI_File_call_errhandler
+#define PMPI_File_call_errhandler APMPI_File_call_errhandler
+#define  MPI_File_create_errhandler  AMPI_File_create_errhandler
+#define PMPI_File_create_errhandler APMPI_File_create_errhandler
+#define  MPI_File_get_errhandler  AMPI_File_get_errhandler
+#define PMPI_File_get_errhandler APMPI_File_get_errhandler
+#define  MPI_File_set_errhandler  AMPI_File_set_errhandler
+#define PMPI_File_set_errhandler APMPI_File_set_errhandler
+
+AMPI_API_DEF_NOIMPL(int, MPI_File_call_errhandler, MPI_File fh, int errorcode);
+AMPI_API_DEF_NOIMPL(int, MPI_File_create_errhandler, MPI_File_errhandler_function *file_errhandler_fn, MPI_Errhandler *errhandler);
+AMPI_API_DEF_NOIMPL(int, MPI_File_get_errhandler, MPI_File file, MPI_Errhandler *errhandler);
+AMPI_API_DEF_NOIMPL(int, MPI_File_set_errhandler, MPI_File file, MPI_Errhandler errhandler);
+
 
 /* A.2.7 The Info Object C Bindings */
 
 /* A.2.8 Process Creation and Management C Bindings */
-/*
-int MPI_Close_port(const char *port_name);
-int MPI_Comm_accept(const char *port_name, MPI_Info info, int root, MPI_Comm comm, MPI_Comm *newcomm);
-int MPI_Comm_connect(const char *port_name, MPI_Info info, int root, MPI_Comm comm, MPI_Comm *newcomm);
-int MPI_Comm_disconnect(MPI_Comm *comm);
-int MPI_Comm_get_parent(MPI_Comm *parent);
-int MPI_Comm_join(int fd, MPI_Comm *intercomm);
-int MPI_Comm_spawn(const char *command, char *argv[], int maxprocs, MPI_Info info, int root, MPI_Comm comm, MPI_Comm *intercomm, int array_of_errcodes[]);
-int MPI_Comm_spawn_multiple(int count, char *array_of_commands[], char **array_of_argv[], const int array_of_maxprocs[], const MPI_Info array_of_info[], int root, MPI_Comm comm, MPI_Comm *intercomm, int array_of_errcodes[]);
-int MPI_Lookup_name(const char *service_name, MPI_Info info, char *port_name);
-int MPI_Open_port(MPI_Info info, char *port_name);
-int MPI_Publish_name(const char *service_name, MPI_Info info, const char *port_name);
-int MPI_Unpublish_name(const char *service_name, MPI_Info info, const char *port_name);
-*/
+
+#define  MPI_Close_port  AMPI_Close_port
+#define PMPI_Close_port APMPI_Close_port
+#define  MPI_Comm_accept  AMPI_Comm_accept
+#define PMPI_Comm_accept APMPI_Comm_accept
+#define  MPI_Comm_connect  AMPI_Comm_connect
+#define PMPI_Comm_connect APMPI_Comm_connect
+#define  MPI_Comm_disconnect  AMPI_Comm_disconnect
+#define PMPI_Comm_disconnect APMPI_Comm_disconnect
+#define  MPI_Comm_get_parent  AMPI_Comm_get_parent
+#define PMPI_Comm_get_parent APMPI_Comm_get_parent
+#define  MPI_Comm_join  AMPI_Comm_join
+#define PMPI_Comm_join APMPI_Comm_join
+#define  MPI_Comm_spawn_multiple  AMPI_Comm_spawn_multiple
+#define PMPI_Comm_spawn_multiple APMPI_Comm_spawn_multiple
+#define  MPI_Lookup_name  AMPI_Lookup_name
+#define PMPI_Lookup_name APMPI_Lookup_name
+#define  MPI_Open_port  AMPI_Open_port
+#define PMPI_Open_port APMPI_Open_port
+#define  MPI_Publish_name  AMPI_Publish_name
+#define PMPI_Publish_name APMPI_Publish_name
+#define  MPI_Unpublish_name  AMPI_Unpublish_name
+#define PMPI_Unpublish_name APMPI_Unpublish_name
+#define  MPI_Comm_spawn  AMPI_Comm_spawn
+#define PMPI_Comm_spawn APMPI_Comm_spawn
+
+AMPI_API_DEF_NOIMPL(int, MPI_Close_port, const char *port_name);
+AMPI_API_DEF_NOIMPL(int, MPI_Comm_accept, const char *port_name, MPI_Info info, int root, MPI_Comm comm, MPI_Comm *newcomm);
+AMPI_API_DEF_NOIMPL(int, MPI_Comm_connect, const char *port_name, MPI_Info info, int root, MPI_Comm comm, MPI_Comm *newcomm);
+AMPI_API_DEF_NOIMPL(int, MPI_Comm_disconnect, MPI_Comm *comm);
+AMPI_API_DEF_NOIMPL(int, MPI_Comm_get_parent, MPI_Comm *parent);
+AMPI_API_DEF_NOIMPL(int, MPI_Comm_join, int fd, MPI_Comm *intercomm);
+AMPI_API_DEF_NOIMPL(int, MPI_Comm_spawn, const char *command, char *argv[], int maxprocs, MPI_Info info, int root, MPI_Comm comm, MPI_Comm *intercomm, int array_of_errcodes[]);
+AMPI_API_DEF_NOIMPL(int, MPI_Comm_spawn_multiple, int count, char *array_of_commands[], char **array_of_argv[], const int array_of_maxprocs[], const MPI_Info array_of_info[], int root, MPI_Comm comm, MPI_Comm *intercomm, int array_of_errcodes[]);
+AMPI_API_DEF_NOIMPL(int, MPI_Lookup_name, const char *service_name, MPI_Info info, char *port_name);
+AMPI_API_DEF_NOIMPL(int, MPI_Open_port, MPI_Info info, char *port_name);
+AMPI_API_DEF_NOIMPL(int, MPI_Publish_name, const char *service_name, MPI_Info info, const char *port_name);
+AMPI_API_DEF_NOIMPL(int, MPI_Unpublish_name, const char *service_name, MPI_Info info, const char *port_name);
+
 
 /* A.2.9 One-Sided Communications C Bindings */
-/*
-int MPI_Win_allocate(MPI_Aint size, int disp_unit, MPI_Info info, MPI_Comm comm, void *baseptr, MPI_Win *win);
-int MPI_Win_allocate_shared(MPI_Aint size, int disp_unit, MPI_Info info, MPI_Comm comm, void *baseptr, MPI_Win *win);
-int MPI_Win_attach(MPI_Win win, void *base, MPI_Aint size);
-int MPI_Win_create_dynamic(MPI_Info info, MPI_Comm comm, MPI_Win *win);
-int MPI_Win_detach(MPI_Win win, const void *base);
-int MPI_Win_flush(int rank, MPI_Win win);
-int MPI_Win_flush_all(MPI_Win win);
-int MPI_Win_flush_local(int rank, MPI_Win win);
-int MPI_Win_flush_local_all(MPI_Win win);
 
-int MPI_Win_lock_all(int assert, MPI_Win win);
-int MPI_Win_shared_query(MPI_Win win, int rank, MPI_Aint *size, int *disp_unit, void *baseptr);
-int MPI_Win_sync(MPI_Win win);
-int MPI_Win_unlock_all(MPI_Win win);
-*/
+#define  MPI_Win_allocate  AMPI_Win_allocate
+#define PMPI_Win_allocate APMPI_Win_allocate
+#define  MPI_Win_allocate_shared  AMPI_Win_allocate_shared
+#define PMPI_Win_allocate_shared APMPI_Win_allocate_shared
+#define  MPI_Win_attach  AMPI_Win_attach
+#define PMPI_Win_attach APMPI_Win_attach
+#define  MPI_Win_create_dynamic  AMPI_Win_create_dynamic
+#define PMPI_Win_create_dynamic APMPI_Win_create_dynamic
+#define  MPI_Win_detach  AMPI_Win_detach
+#define PMPI_Win_detach APMPI_Win_detach
+#define  MPI_Win_flush  AMPI_Win_flush
+#define PMPI_Win_flush APMPI_Win_flush
+#define  MPI_Win_flush_all  AMPI_Win_flush_all
+#define PMPI_Win_flush_all APMPI_Win_flush_all
+#define  MPI_Win_flush_local  AMPI_Win_flush_local
+#define PMPI_Win_flush_local APMPI_Win_flush_local
+#define  MPI_Win_flush_local_all  AMPI_Win_flush_local_all
+#define PMPI_Win_flush_local_all APMPI_Win_flush_local_all
+#define  MPI_Win_lock_all  AMPI_Win_lock_all
+#define PMPI_Win_lock_all APMPI_Win_lock_all
+#define  MPI_Win_shared_query  AMPI_Win_shared_query
+#define PMPI_Win_shared_query APMPI_Win_shared_query
+#define  MPI_Win_sync  AMPI_Win_sync
+#define PMPI_Win_sync APMPI_Win_sync
+#define  MPI_Win_unlock_all  AMPI_Win_unlock_all
+#define PMPI_Win_unlock_all APMPI_Win_unlock_all
+
+AMPI_API_DEF_NOIMPL(int, MPI_Win_allocate, MPI_Aint size, int disp_unit, MPI_Info info, MPI_Comm comm, void *baseptr, MPI_Win *win);
+AMPI_API_DEF_NOIMPL(int, MPI_Win_allocate_shared, MPI_Aint size, int disp_unit, MPI_Info info, MPI_Comm comm, void *baseptr, MPI_Win *win);
+AMPI_API_DEF_NOIMPL(int, MPI_Win_attach, MPI_Win win, void *base, MPI_Aint size);
+AMPI_API_DEF_NOIMPL(int, MPI_Win_create_dynamic, MPI_Info info, MPI_Comm comm, MPI_Win *win);
+AMPI_API_DEF_NOIMPL(int, MPI_Win_detach, MPI_Win win, const void *base);
+AMPI_API_DEF_NOIMPL(int, MPI_Win_flush, int rank, MPI_Win win);
+AMPI_API_DEF_NOIMPL(int, MPI_Win_flush_all, MPI_Win win);
+AMPI_API_DEF_NOIMPL(int, MPI_Win_flush_local, int rank, MPI_Win win);
+AMPI_API_DEF_NOIMPL(int, MPI_Win_flush_local_all, MPI_Win win);
+AMPI_API_DEF_NOIMPL(int, MPI_Win_lock_all, int assert, MPI_Win win);
+AMPI_API_DEF_NOIMPL(int, MPI_Win_shared_query, MPI_Win win, int rank, MPI_Aint *size, int *disp_unit, void *baseptr);
+AMPI_API_DEF_NOIMPL(int, MPI_Win_sync, MPI_Win win);
+AMPI_API_DEF_NOIMPL(int, MPI_Win_unlock_all, MPI_Win win);
+
 
 /* A.2.10 External Interfaces C Bindings */
 
 /* A.2.11 I/O C Bindings */
-/*
-int MPI_CONVERSION_FN_NULL(void *userbuf, MPI_Datatype datatype, int count, void *filebuf, MPI_Offset position, void *extra_state);
-int MPI_File_iread_all(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Request *request);
-int MPI_File_iread_at_all(MPI_File fh, MPI_Offset offset, void *buf, int count, MPI_Datatype datatype, MPI_Request *request);
-int MPI_File_iwrite_all(MPI_File fh, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request);
-int MPI_File_iwrite_at_all(MPI_File fh, MPI_Offset offset, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request);
-int MPI_Register_datarep(const char *datarep, MPI_Datarep_conversion_function *read_conversion_fn, MPI_Datarep_conversion_function *write_conversion_fn, MPI_Datarep_extent_function *dtype_file_extent_fn, void *extra_state);
-*/
+
+#define  MPI_CONVERSION_FN_NULL  AMPI_CONVERSION_FN_NULL
+#define PMPI_CONVERSION_FN_NULL APMPI_CONVERSION_FN_NULL
+#define  MPI_File_iread_all  AMPI_File_iread_all
+#define PMPI_File_iread_all APMPI_File_iread_all
+#define  MPI_File_iread_at_all  AMPI_File_iread_at_all
+#define PMPI_File_iread_at_all APMPI_File_iread_at_all
+#define  MPI_File_iwrite_all  AMPI_File_iwrite_all
+#define PMPI_File_iwrite_all APMPI_File_iwrite_all
+#define  MPI_File_iwrite_at_all  AMPI_File_iwrite_at_all
+#define PMPI_File_iwrite_at_all APMPI_File_iwrite_at_all
+
+AMPI_API_DEF_NOIMPL(int, MPI_CONVERSION_FN_NULL, void *userbuf, MPI_Datatype datatype, int count, void *filebuf, MPI_Offset position, void *extra_state);
+AMPI_API_DEF_NOIMPL(int, MPI_File_iread_all, MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Request *request);
+AMPI_API_DEF_NOIMPL(int, MPI_File_iread_at_all, MPI_File fh, MPI_Offset offset, void *buf, int count, MPI_Datatype datatype, MPI_Request *request);
+AMPI_API_DEF_NOIMPL(int, MPI_File_iwrite_all, MPI_File fh, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request);
+AMPI_API_DEF_NOIMPL(int, MPI_File_iwrite_at_all, MPI_File fh, MPI_Offset offset, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request);
+// AMPI_API_DEF_NOIMPL(int, MPI_Register_datarep, const char *datarep, MPI_Datarep_conversion_function *read_conversion_fn, MPI_Datarep_conversion_function *write_conversion_fn, MPI_Datarep_extent_function *dtype_file_extent_fn, void *extra_state); //Provided by ROMIO
+
 
 /* A.2.12 Language Bindings C Bindings */
-/*
-int MPI_Status_f082f(MPI_F08_status *f08_status, MPI_Fint *f_status);
-int MPI_Status_f2f08(MPI_Fint *f_status, MPI_F08_status *f08_status);
-int MPI_Type_create_f90_complex(int p, int r, MPI_Datatype *newtype);
-int MPI_Type_create_f90_integer(int r, MPI_Datatype *newtype);
-int MPI_Type_create_f90_real(int p, int r, MPI_Datatype *newtype);
-int MPI_Type_match_size(int typeclass, int size, MPI_Datatype *datatype);
-MPI_Fint MPI_Message_c2f(MPI_Message message);
-MPI_Message MPI_Message_f2c(MPI_Fint message);
-int MPI_Status_c2f(const MPI_Status *c_status, MPI_Fint *f_status);
-int MPI_Status_c2f08(const MPI_Status *c_status, MPI_F08_status *f08_status);
-int MPI_Status_f082c(const MPI_F08_status *f08_status, MPI_Status *c_status);
-int MPI_Status_f2c(const MPI_Fint *f_status, MPI_Status *c_status);
-*/
+
+#define  MPI_Status_f082f  AMPI_Status_f082f
+#define PMPI_Status_f082f APMPI_Status_f082f
+#define  MPI_Status_f2f08  AMPI_Status_f2f08
+#define PMPI_Status_f2f08 APMPI_Status_f2f08
+#define  MPI_Type_create_f90_complex  AMPI_Type_create_f90_complex
+#define PMPI_Type_create_f90_complex APMPI_Type_create_f90_complex
+#define  MPI_Type_create_f90_integer  AMPI_Type_create_f90_integer
+#define PMPI_Type_create_f90_integer APMPI_Type_create_f90_integer
+#define  MPI_Type_create_f90_real  AMPI_Type_create_f90_real
+#define PMPI_Type_create_f90_real APMPI_Type_create_f90_real
+#define  MPI_Type_match_size  AMPI_Type_match_size
+#define PMPI_Type_match_size APMPI_Type_match_size
+#define  MPI_Message_c2f  AMPI_Message_c2f
+#define PMPI_Message_c2f APMPI_Message_c2f
+#define  MPI_Message_f2c  AMPI_Message_f2c
+#define PMPI_Message_f2c APMPI_Message_f2c
+#define  MPI_Status_c2f  AMPI_Status_c2f
+#define PMPI_Status_c2f APMPI_Status_c2f
+#define  MPI_Status_c2f08  AMPI_Status_c2f08
+#define PMPI_Status_c2f08 APMPI_Status_c2f08
+#define  MPI_Status_f082c  AMPI_Status_f082c
+#define PMPI_Status_f082c APMPI_Status_f082c
+#define  MPI_Status_f2c  AMPI_Status_f2c
+#define PMPI_Status_f2c APMPI_Status_f2c
+
+typedef struct {
+  MPI_Fint count_lo, count_hi_and_cancelled, MPI_SOURCE, MPI_TAG, MPI_ERROR;
+} MPI_F08_status;
+
+AMPI_API_DEF_NOIMPL(int, MPI_Status_f082f, MPI_F08_status *f08_status, MPI_Fint *f_status);
+AMPI_API_DEF_NOIMPL(int, MPI_Status_f2f08, MPI_Fint *f_status, MPI_F08_status *f08_status);
+AMPI_API_DEF_NOIMPL(int, MPI_Type_create_f90_complex, int p, int r, MPI_Datatype *newtype);
+AMPI_API_DEF_NOIMPL(int, MPI_Type_create_f90_integer, int r, MPI_Datatype *newtype);
+AMPI_API_DEF_NOIMPL(int, MPI_Type_create_f90_real, int p, int r, MPI_Datatype *newtype);
+AMPI_API_DEF_NOIMPL(int, MPI_Type_match_size, int typeclass, int size, MPI_Datatype *datatype);
+AMPI_API_DEF_NOIMPL(MPI_Fint, MPI_Message_c2f, MPI_Message message);
+AMPI_API_DEF_NOIMPL(MPI_Message, MPI_Message_f2c, MPI_Fint message);
+AMPI_API_DEF_NOIMPL(int, MPI_Status_c2f, const MPI_Status *c_status, MPI_Fint *f_status);
+AMPI_API_DEF_NOIMPL(int, MPI_Status_c2f08, const MPI_Status *c_status, MPI_F08_status *f08_status);
+AMPI_API_DEF_NOIMPL(int, MPI_Status_f082c, const MPI_F08_status *f08_status, MPI_Status *c_status);
+AMPI_API_DEF_NOIMPL(int, MPI_Status_f2c, const MPI_Fint *f_status, MPI_Status *c_status);
+
 
 /* A.2.13 Tools / Profiling Interface C Bindings */
 
 /* A.2.14 Tools / MPI Tool Information Interface C Bindings */
-/*
-int MPI_T_category_changed(int *stamp);
-int MPI_T_category_get_categories(int cat_index, int len, int indices[]);
-int MPI_T_category_get_cvars(int cat_index, int len, int indices[]);
-int MPI_T_category_get_index(const char *name, int *cat_index);
-int MPI_T_category_get_info(int cat_index, char *name, int *name_len, char *desc, int *desc_len, int *num_cvars, int *num_pvars, int *num_categories);
-int MPI_T_category_get_num(int *num_cat);
-int MPI_T_category_get_pvars(int cat_index, int len, int indices[]);
-int MPI_T_cvar_get_index(const char *name, int *cvar_index);
-int MPI_T_cvar_get_info(int cvar_index, char *name, int *name_len, int *verbosity, MPI_Datatype *datatype, MPI_T_enum *enumtype, char *desc, int *desc_len, int *bind, int *scope);
-int MPI_T_cvar_get_num(int *num_cvar);
-int MPI_T_cvar_handle_alloc(int cvar_index, void *obj_handle, MPI_T_cvar_handle *handle, int *count);
-int MPI_T_cvar_handle_free(MPI_T_cvar_handle *handle);
-int MPI_T_cvar_read(MPI_T_cvar_handle handle, void* buf);
-int MPI_T_cvar_write(MPI_T_cvar_handle handle, const void* buf);
-int MPI_T_enum_get_info(MPI_T_enum enumtype, int *num, char *name, int *name_len);
-int MPI_T_enum_get_item(MPI_T_enum enumtype, int index, int *value, char *name, int *name_len);
-int MPI_T_finalize(void);
-int MPI_T_init_thread(int required, int *provided);
-int MPI_T_pvar_get_index(const char *name, int var_class, int *pvar_index);
-int MPI_T_pvar_get_info(int pvar_index, char *name, int *name_len, int *verbosity, int *var_class, MPI_Datatype *datatype, MPI_T_enum *enumtype, char *desc, int *desc_len, int *bind, int *readonly, int *continuous, int *atomic);
-int MPI_T_pvar_get_num(int *num_pvar);
-int MPI_T_pvar_handle_alloc(MPI_T_pvar_session session, int pvar_index, void *obj_handle, MPI_T_pvar_handle *handle, int *count);
-int MPI_T_pvar_handle_free(MPI_T_pvar_session session,MPI_T_pvar_handle *handle);
-int MPI_T_pvar_read(MPI_T_pvar_session session, MPI_T_pvar_handle handle,void* buf);
-int MPI_T_pvar_readreset(MPI_T_pvar_session session,MPI_T_pvar_handle handle, void* buf);
-int MPI_T_pvar_reset(MPI_T_pvar_session session, MPI_T_pvar_handle handle);
-int MPI_T_pvar_session_create(MPI_T_pvar_session *session);
-int MPI_T_pvar_session_free(MPI_T_pvar_session *session);
-int MPI_T_pvar_start(MPI_T_pvar_session session, MPI_T_pvar_handle handle);
-int MPI_T_pvar_stop(MPI_T_pvar_session session, MPI_T_pvar_handle handle);
-int MPI_T_pvar_write(MPI_T_pvar_session session, MPI_T_pvar_handle handle, const void* buf);
-*/
+
+#define  MPI_T_category_changed  AMPI_T_category_changed
+#define PMPI_T_category_changed APMPI_T_category_changed
+#define  MPI_T_category_get_categories  AMPI_T_category_get_categories
+#define PMPI_T_category_get_categories APMPI_T_category_get_categories
+#define  MPI_T_category_get_cvars  AMPI_T_category_get_cvars
+#define PMPI_T_category_get_cvars APMPI_T_category_get_cvars
+#define  MPI_T_category_get_index  AMPI_T_category_get_index
+#define PMPI_T_category_get_index APMPI_T_category_get_index
+#define  MPI_T_category_get_info  AMPI_T_category_get_info
+#define PMPI_T_category_get_info APMPI_T_category_get_info
+#define  MPI_T_category_get_num  AMPI_T_category_get_num
+#define PMPI_T_category_get_num APMPI_T_category_get_num
+#define  MPI_T_category_get_pvars  AMPI_T_category_get_pvars
+#define PMPI_T_category_get_pvars APMPI_T_category_get_pvars
+#define  MPI_T_cvar_get_index  AMPI_T_cvar_get_index
+#define PMPI_T_cvar_get_index APMPI_T_cvar_get_index
+#define  MPI_T_cvar_get_info  AMPI_T_cvar_get_info
+#define PMPI_T_cvar_get_info APMPI_T_cvar_get_info
+#define  MPI_T_cvar_get_num  AMPI_T_cvar_get_num
+#define PMPI_T_cvar_get_num APMPI_T_cvar_get_num
+#define  MPI_T_cvar_handle_alloc  AMPI_T_cvar_handle_alloc
+#define PMPI_T_cvar_handle_alloc APMPI_T_cvar_handle_alloc
+#define  MPI_T_cvar_handle_free  AMPI_T_cvar_handle_free
+#define PMPI_T_cvar_handle_free APMPI_T_cvar_handle_free
+#define  MPI_T_cvar_read  AMPI_T_cvar_read
+#define PMPI_T_cvar_read APMPI_T_cvar_read
+#define  MPI_T_cvar_write  AMPI_T_cvar_write
+#define PMPI_T_cvar_write APMPI_T_cvar_write
+#define  MPI_T_enum_get_info  AMPI_T_enum_get_info
+#define PMPI_T_enum_get_info APMPI_T_enum_get_info
+#define  MPI_T_enum_get_item  AMPI_T_enum_get_item
+#define PMPI_T_enum_get_item APMPI_T_enum_get_item
+#define  MPI_T_finalize  AMPI_T_finalize
+#define PMPI_T_finalize APMPI_T_finalize
+#define  MPI_T_init_thread  AMPI_T_init_thread
+#define PMPI_T_init_thread APMPI_T_init_thread
+#define  MPI_T_pvar_get_index  AMPI_T_pvar_get_index
+#define PMPI_T_pvar_get_index APMPI_T_pvar_get_index
+#define  MPI_T_pvar_get_info  AMPI_T_pvar_get_info
+#define PMPI_T_pvar_get_info APMPI_T_pvar_get_info
+#define  MPI_T_pvar_get_num  AMPI_T_pvar_get_num
+#define PMPI_T_pvar_get_num APMPI_T_pvar_get_num
+#define  MPI_T_pvar_handle_alloc  AMPI_T_pvar_handle_alloc
+#define PMPI_T_pvar_handle_alloc APMPI_T_pvar_handle_alloc
+#define  MPI_T_pvar_handle_free  AMPI_T_pvar_handle_free
+#define PMPI_T_pvar_handle_free APMPI_T_pvar_handle_free
+#define  MPI_T_pvar_read  AMPI_T_pvar_read
+#define PMPI_T_pvar_read APMPI_T_pvar_read
+#define  MPI_T_pvar_readreset  AMPI_T_pvar_readreset
+#define PMPI_T_pvar_readreset APMPI_T_pvar_readreset
+#define  MPI_T_pvar_reset  AMPI_T_pvar_reset
+#define PMPI_T_pvar_reset APMPI_T_pvar_reset
+#define  MPI_T_pvar_session_create  AMPI_T_pvar_session_create
+#define PMPI_T_pvar_session_create APMPI_T_pvar_session_create
+#define  MPI_T_pvar_session_free  AMPI_T_pvar_session_free
+#define PMPI_T_pvar_session_free APMPI_T_pvar_session_free
+#define  MPI_T_pvar_start  AMPI_T_pvar_start
+#define PMPI_T_pvar_start APMPI_T_pvar_start
+#define  MPI_T_pvar_stop  AMPI_T_pvar_stop
+#define PMPI_T_pvar_stop APMPI_T_pvar_stop
+#define  MPI_T_pvar_write  AMPI_T_pvar_write
+#define PMPI_T_pvar_write APMPI_T_pvar_write
+
+AMPI_API_DEF_NOIMPL(int, MPI_T_category_changed, int *stamp);
+AMPI_API_DEF_NOIMPL(int, MPI_T_category_get_categories, int cat_index, int len, int indices[]);
+AMPI_API_DEF_NOIMPL(int, MPI_T_category_get_cvars, int cat_index, int len, int indices[]);
+AMPI_API_DEF_NOIMPL(int, MPI_T_category_get_index, const char *name, int *cat_index);
+AMPI_API_DEF_NOIMPL(int, MPI_T_category_get_info, int cat_index, char *name, int *name_len, char *desc, int *desc_len, int *num_cvars, int *num_pvars, int *num_categories);
+AMPI_API_DEF_NOIMPL(int, MPI_T_category_get_num, int *num_cat);
+AMPI_API_DEF_NOIMPL(int, MPI_T_category_get_pvars, int cat_index, int len, int indices[]);
+AMPI_API_DEF_NOIMPL(int, MPI_T_cvar_get_index, const char *name, int *cvar_index);
+AMPI_API_DEF_NOIMPL(int, MPI_T_cvar_get_info, int cvar_index, char *name, int *name_len, int *verbosity, MPI_Datatype *datatype, MPI_T_enum *enumtype, char *desc, int *desc_len, int *bind, int *scope);
+AMPI_API_DEF_NOIMPL(int, MPI_T_cvar_get_num, int *num_cvar);
+AMPI_API_DEF_NOIMPL(int, MPI_T_cvar_handle_alloc, int cvar_index, void *obj_handle, MPI_T_cvar_handle *handle, int *count);
+AMPI_API_DEF_NOIMPL(int, MPI_T_cvar_handle_free, MPI_T_cvar_handle *handle);
+AMPI_API_DEF_NOIMPL(int, MPI_T_cvar_read, MPI_T_cvar_handle handle, void* buf);
+AMPI_API_DEF_NOIMPL(int, MPI_T_cvar_write, MPI_T_cvar_handle handle, const void* buf);
+AMPI_API_DEF_NOIMPL(int, MPI_T_enum_get_info, MPI_T_enum enumtype, int *num, char *name, int *name_len);
+AMPI_API_DEF_NOIMPL(int, MPI_T_enum_get_item, MPI_T_enum enumtype, int index, int *value, char *name, int *name_len);
+AMPI_API_DEF_NOIMPL(int, MPI_T_finalize, void);
+AMPI_API_DEF_NOIMPL(int, MPI_T_init_thread, int required, int *provided);
+AMPI_API_DEF_NOIMPL(int, MPI_T_pvar_get_index, const char *name, int var_class, int *pvar_index);
+AMPI_API_DEF_NOIMPL(int, MPI_T_pvar_get_info, int pvar_index, char *name, int *name_len, int *verbosity, int *var_class, MPI_Datatype *datatype, MPI_T_enum *enumtype, char *desc, int *desc_len, int *bind, int *readonly, int *continuous, int *atomic);
+AMPI_API_DEF_NOIMPL(int, MPI_T_pvar_get_num, int *num_pvar);
+AMPI_API_DEF_NOIMPL(int, MPI_T_pvar_handle_alloc, MPI_T_pvar_session session, int pvar_index, void *obj_handle, MPI_T_pvar_handle *handle, int *count);
+AMPI_API_DEF_NOIMPL(int, MPI_T_pvar_handle_free, MPI_T_pvar_session session,MPI_T_pvar_handle *handle);
+AMPI_API_DEF_NOIMPL(int, MPI_T_pvar_read, MPI_T_pvar_session session, MPI_T_pvar_handle handle,void* buf);
+AMPI_API_DEF_NOIMPL(int, MPI_T_pvar_readreset, MPI_T_pvar_session session,MPI_T_pvar_handle handle, void* buf);
+AMPI_API_DEF_NOIMPL(int, MPI_T_pvar_reset, MPI_T_pvar_session session, MPI_T_pvar_handle handle);
+AMPI_API_DEF_NOIMPL(int, MPI_T_pvar_session_create, MPI_T_pvar_session *session);
+AMPI_API_DEF_NOIMPL(int, MPI_T_pvar_session_free, MPI_T_pvar_session *session);
+AMPI_API_DEF_NOIMPL(int, MPI_T_pvar_start, MPI_T_pvar_session session, MPI_T_pvar_handle handle);
+AMPI_API_DEF_NOIMPL(int, MPI_T_pvar_stop, MPI_T_pvar_session session, MPI_T_pvar_handle handle);
+AMPI_API_DEF_NOIMPL(int, MPI_T_pvar_write, MPI_T_pvar_session session, MPI_T_pvar_handle handle, const void* buf);
+
 
 /* A.2.15 Deprecated C Bindings */
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
