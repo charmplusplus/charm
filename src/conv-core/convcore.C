@@ -68,6 +68,8 @@
 #define snprintf _snprintf
 #endif
 
+#include <atomic>
+
 #include "converse.h"
 #include "conv-trace.h"
 #include "sockRoutines.h"
@@ -293,7 +295,7 @@ int messageQueueOverflow;
  *
  *****************************************************************************/
 
-static int usageChecked=0; /* set when argv has been searched for a usage request */
+static std::atomic<char> usageChecked; /* set when argv has been searched for a usage request */
 static int printUsage=0; /* if set, print command-line usage information */
 static const char *CLAformatString="%20s %10s %s\n";
 
@@ -3755,8 +3757,8 @@ static void checkTSanOptions(void)
 #endif
 
 #if CMK_CCS_AVAILABLE
-extern int ccsRunning;
-int ccsRunning;
+extern std::atomic<char> ccsRunning;
+std::atomic<char> ccsRunning;
 #endif
 
 extern int quietModeRequested;
@@ -3892,7 +3894,8 @@ void ConverseCommonInit(char **argv)
 
 void ConverseCommonExit(void)
 {
-  CcsImpl_kill();
+  if (CmiMyRank() == 0)
+    CcsImpl_kill();
 
 #if CMK_TRACE_ENABLED
   traceClose();

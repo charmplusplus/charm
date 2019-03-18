@@ -180,36 +180,46 @@ static void traceCommonInit(char **argv)
     strcpy(CkpvAccess(selective), "");
   }
 
-  outlierAutomatic = true;
-  findOutliers = false;
-  numKSeeds = 10;
-  peNumKeep = CkNumPes();
-  outlierUsePhases = false;
-  entryThreshold = 0.0;
+  bool my_outlierAutomatic = true;
+  bool my_findOutliers = false;
+  int my_numKSeeds = 10;
+  int my_peNumKeep = CkNumPes();
+  bool my_outlierUsePhases = false;
+  double my_entryThreshold = 0.0;
   //For KMeans
-  if (outlierAutomatic) {
-    CmiGetArgIntDesc(argv, "+outlierNumSeeds", &numKSeeds,
+  // if (my_outlierAutomatic) // always true?
+  {
+    CmiGetArgIntDesc(argv, "+outlierNumSeeds", &my_numKSeeds,
 		     "Number of cluster seeds to apply at outlier analysis.");
     CmiGetArgIntDesc(argv, "+outlierPeNumKeep", 
-		     &peNumKeep, "Number of Processors to retain data");
-    CmiGetArgDoubleDesc(argv, "+outlierEpThresh", &entryThreshold,
+		     &my_peNumKeep, "Number of Processors to retain data");
+    CmiGetArgDoubleDesc(argv, "+outlierEpThresh", &my_entryThreshold,
 			"Minimum significance of entry points to be considered for clustering (%).");
-    findOutliers =
+    my_findOutliers =
       CmiGetArgFlagDesc(argv,"+outlier", "Find Outliers.");
-    outlierUsePhases = 
+    my_outlierUsePhases =
       CmiGetArgFlagDesc(argv,"+outlierUsePhases",
 			"Apply automatic outlier analysis to any available phases.");
-    if (outlierUsePhases) {
+    if (my_outlierUsePhases) {
       // if the user wants to use an outlier feature, it is assumed outlier
       //    analysis is desired.
-      findOutliers = true;
+      my_findOutliers = true;
     }
     if(root)
         free(root);
   }
 
-  
-  
+  if (CmiMyRank() == 0)
+  {
+    outlierAutomatic = my_outlierAutomatic;
+    findOutliers = my_findOutliers;
+    numKSeeds = my_numKSeeds;
+    peNumKeep = my_peNumKeep;
+    outlierUsePhases = my_outlierUsePhases;
+    entryThreshold = my_entryThreshold;
+  }
+
+
 #ifdef __BIGSIM__
   if(BgNodeRank()==0) {
 #else
@@ -462,10 +472,12 @@ static inline void _traceInit(char **argv)
   // FIXME: make sure it is safe to use argv in SMP version 
   // because CmiGetArgFlagDesc is destructive and this is called on all PEs.
   if( CmiGetArgFlagDesc(argv,"+CPEnableMeasurements","Enable recording of measurements for Control Points") ){
-    enableCPTracing = true;
+    if (CmiMyRank() == 0)
+      enableCPTracing = true;
     _createTracecontrolPoints(argv);   
   } else {
-    enableCPTracing = false;
+    if (CmiMyRank() == 0)
+      enableCPTracing = false;
   }
   
 

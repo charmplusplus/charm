@@ -173,6 +173,9 @@ void _loadbalancerInit()
   char *balancer = NULL;
   CmiArgGroup("Charm++","Load Balancer");
 
+  if (CmiMyRank() != 0)
+    return;
+
   // turn on MetaBalancer if set
   _lb_args.metaLbOn() = CmiGetArgFlagDesc(argv, "+MetaLB", "Turn on MetaBalancer");
   CmiGetArgStringDesc(argv, "+MetaLBModelDir", &_lb_args.metaLbModelDir(),

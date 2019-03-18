@@ -8,7 +8,9 @@
 #include <stdlib.h>
 #include "charm.h"
 
-extern bool _mainDone;
+#include <atomic>
+
+extern std::atomic<bool> _mainDone;
 
 class readonlybase {
 private:

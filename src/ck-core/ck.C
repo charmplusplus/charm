@@ -2954,7 +2954,8 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
     CmiArgGroup("Charm++","Record/Replay");
     bool forceReplay = false;
     char *procs = NULL;
-    _replaySystem = 0;
+    if (CmiMyRank() == 0)
+      _replaySystem = 0;
     if (CmiGetArgFlagDesc(argv,"+recplay-crc","Enable CRC32 checksum for message record-replay")) {
       if(CmiMyRank() == 0) _recplay_crc = 1;
     }

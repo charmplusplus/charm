@@ -3,6 +3,8 @@
  *revised by Yanhua, Gengbin
  */
 
+#include <atomic>
+
 #if CMK_C_INLINE
 #define INLINE_KEYWORD inline
 #else
@@ -200,7 +202,6 @@ void* CmiSuspendedTaskPop();
 #endif
 
 #if CMK_SMP
-#include <atomic>
 std::atomic<int> commThdExit {0};
 
 /**
@@ -240,7 +241,7 @@ CpvDeclare(unsigned , networkProgressCount);
 int networkProgressPeriod;
 
 #if CMK_CCS_AVAILABLE
-extern int ccsRunning;
+extern std::atomic<char> ccsRunning;
 #endif
 
 /* ===== Beginning of Common Function Declarations ===== */

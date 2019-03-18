@@ -91,7 +91,8 @@ void CentralLB::initLB(const CkLBOptions &opt)
   lbname = "CentralLB";
   thisProxy = CProxy_CentralLB(thisgroup);
   //  CkPrintf("Construct in %d\n",CkMyPe());
-  loadbalancer = thisgroup;
+  if (CmiMyRank() == 0)
+    loadbalancer = thisgroup;
   // create and turn on by default
   receiver = theLbdb->
     AddLocalBarrierReceiver((LDBarrierFn)(staticAtSync),(void*)(this));
@@ -131,7 +132,8 @@ void CentralLB::initLB(const CkLBOptions &opt)
 
   if (_lb_args.statsOn()) theLbdb->CollectStatsOn();
 
-  load_balancer_created = true;
+  if (CmiMyRank() == 0)
+    load_balancer_created = true;
 #endif
 #ifdef TEMP_LDB
 	logicalCoresPerNode=physicalCoresPerNode=4;

@@ -962,6 +962,11 @@ static void ampiNodeInit() noexcept
    // ASSUME NO ANYTIME MIGRATION and STATIC INSERTON
   _isAnytimeMigration = false;
   _isStaticInsertion = true;
+
+  CtvInitialize(ampiParent*, ampiPtr);
+  CtvInitialize(bool,ampiInitDone);
+  CtvInitialize(bool,ampiFinalized);
+  CtvInitialize(void*,stackBottom);
 }
 
 #if AMPI_PRINT_IDLE
@@ -978,11 +983,6 @@ static void EndIdle(void *dummy,double curWallTime) noexcept
 #endif
 
 static void ampiProcInit() noexcept {
-  CtvInitialize(ampiParent*, ampiPtr);
-  CtvInitialize(bool,ampiInitDone);
-  CtvInitialize(bool,ampiFinalized);
-  CtvInitialize(void*,stackBottom);
-
   CkpvInitialize(int, ampiThreadLevel);
   CkpvAccess(ampiThreadLevel) = MPI_THREAD_SINGLE;
 

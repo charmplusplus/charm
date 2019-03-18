@@ -293,9 +293,14 @@ void CQdCpvInit(void) {
 void CQdInit(void)
 {
   CQdCpvInit();
-  _CQdHandlerIdx = CmiRegisterHandler((CmiHandler)CQdHandler);
-  _CQdAnnounceHandlerIdx = 
-    CmiRegisterHandler((CmiHandler)CQdAnnounceHandler);
+  int cqdidx = CmiRegisterHandler((CmiHandler)CQdHandler);
+  int cqdhidx = CmiRegisterHandler((CmiHandler)CQdAnnounceHandler);
+
+  if (CmiMyRank() == 0)
+  {
+    _CQdHandlerIdx = cqdidx;
+    _CQdAnnounceHandlerIdx = cqdhidx;
+  }
 }
 
 void CmiStartQD(CQdVoidFn fn, void *arg)

@@ -13,6 +13,7 @@
 #include <iostream>
 #include <math.h>
 #include <climits>
+#include <atomic>
 
 #if CMK_WITH_CONTROLPOINT
 

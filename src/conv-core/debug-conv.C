@@ -23,13 +23,13 @@ CpvStaticDeclare(int, stepFlag);
 CpvCExtern(void *, debugQueue);
 CpvDeclare(void*, conditionalQueue);
 int conditionalPipe[2] = {0, 0};
-int _debugHandlerIdx;
+static int _debugHandlerIdx;
 
 char ** memoryBackup;
 
 /** Specify if we are replaying the processor from message logs, thus disable delivering of messages */
-extern int _replaySystem;
-int _replaySystem = 0;
+extern char _replaySystem;
+char _replaySystem = 0;
 int _conditionalDelivery = 0;
 
 #undef ConverseDeliver
@@ -355,7 +355,10 @@ void CpdInit(void)
   CcsRegisterHandler("debug/memory/mark",(CmiHandler)CpdMemoryMarkClean);
   CcsSetMergeFn("debug/memory/mark", CcsMerge_concat);
 
-  _debugHandlerIdx = CmiRegisterHandler((CmiHandler)handleDebugMessage);
+  int dbghandler = CmiRegisterHandler((CmiHandler)handleDebugMessage);
+  if (CmiMyRank() == 0)
+    _debugHandlerIdx = dbghandler;
+
 #if 0
   CpdInitializeObjectTable();
   CpdInitializeHandlerArray();

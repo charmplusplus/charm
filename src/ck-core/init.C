@@ -88,6 +88,8 @@ void CkRestartMain(const char* dirname, CkArgMsg* args);
 
 #include "TopoManager.h"
 
+#include <atomic>
+
 UChar _defaultQueueing = CK_QUEUEING_FIFO;
 
 UInt  _printCS = 0;
@@ -100,7 +102,7 @@ UInt  _printSS = 0;
  * by who it is set, provided that it becomes equal to the number of awaited messages
  * (which is always at least one ---the readonly data message).
  */
-UInt  _numExpectInitMsgs = 0;
+static std::atomic<UInt>  _numExpectInitMsgs;
 /**
  * This number is used only by processor zero to count how many messages it will
  * send out for the initialization process. After the readonly data message is sent
@@ -121,8 +123,8 @@ int   _bocHandlerIdx;
 int   _qdHandlerIdx;
 int   _qdCommHandlerIdx;
 int   _triggerHandlerIdx;
-bool  _mainDone = false;
-CksvDeclare(bool, _triggersSent);
+std::atomic<bool>  _mainDone;
+CksvDeclare(std::atomic<bool>, _triggersSent);
 
 CkOutStream ckout;
 CkErrStream ckerr;
@@ -1195,7 +1197,7 @@ void _initCharm(int unused_argc, char **argv)
 	CksvInitialize(UInt,_numInitNodeMsgs);
 	CkpvInitialize(int,_charmEpoch);
 	CkpvAccess(_charmEpoch)=0;
-	CksvInitialize(bool, _triggersSent);
+	CksvInitialize(std::atomic<bool>, _triggersSent);
 	CksvAccess(_triggersSent) = false;
 
 	CkpvInitialize(_CkOutStream*, _ckout);
@@ -1254,7 +1256,12 @@ void _initCharm(int unused_argc, char **argv)
 #ifdef __BIGSIM__
 	if(BgNodeRank()==0) 
 #endif
-	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
+	{
+
+		int iidx = CldRegisterInfoFn((CldInfoFn)_infoFn);
+		if (CkMyRank() == 0)
+			_infoIdx = iidx;
+	}
 
 	CmiAssignOnce(&_triggerHandlerIdx, CkRegisterHandler(_triggerHandler));
 	_ckModuleInit();
@@ -1285,11 +1292,15 @@ void _initCharm(int unused_argc, char **argv)
 	CkMessageWatcherInit(argv,CkpvAccess(_coreState));
 	
 	// Set the ack handler function used for the direct nocopy api and the entry method nocopy api
-	CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
+	if (CmiMyRank() == 0)
+	{
+		CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
 
 #if CMK_ONESIDED_IMPL
-	CmiSetEMNcpyAckHandler(CkRdmaEMAckHandler);
+		CmiSetEMNcpyAckHandler(CkRdmaEMAckHandler);
 #endif
+	}
+
 	/**
 	  The rank-0 processor of each node calls the 
 	  translator-generated "_register" routines. 
