@@ -8,10 +8,23 @@ unsupported in AMPI. Calling these functions aborts the application.
 #define AMPI_API_NOIMPL(return_type, function_name, ...) \
     AMPI_API_IMPL(return_type, function_name, __VA_ARGS__) \
     { \
-        AMPI_API(function_name); \
+        AMPI_API(STRINGIFY(function_name)); \
         CkAbort(STRINGIFY(function_name) " is not implemented in AMPI."); \
     }
 
+
+/* Disable deprecation warnings added in ampi.h */
+
+#if defined __GNUC__ || defined __clang__
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#elif defined _MSC_VER
+# pragma warning(push)
+# pragma warning(disable : 4996)
+#elif defined __INTEL_COMPILER
+# pragma warning push
+# pragma warning disable 1478
+#endif
 
 
 /* A.2.2 Datatypes C Bindings */
@@ -122,3 +135,12 @@ AMPI_API_NOIMPL(int, MPI_T_pvar_session_free, MPI_T_pvar_session *session);
 AMPI_API_NOIMPL(int, MPI_T_pvar_start, MPI_T_pvar_session session, MPI_T_pvar_handle handle);
 AMPI_API_NOIMPL(int, MPI_T_pvar_stop, MPI_T_pvar_session session, MPI_T_pvar_handle handle);
 AMPI_API_NOIMPL(int, MPI_T_pvar_write, MPI_T_pvar_session session, MPI_T_pvar_handle handle, const void* buf);
+
+
+#if defined __GNUC__ || defined __clang__
+# pragma GCC diagnostic pop
+#elif defined _MSC_VER
+# pragma warning(pop)
+#elif defined __INTEL_COMPILER
+# pragma warning pop
+#endif
