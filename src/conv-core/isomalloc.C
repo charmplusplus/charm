@@ -1569,9 +1569,6 @@ static int find_largest_free_region(memRegion_t *destRegion) {
     memRange_t p=(memRange_t)regions[i].start;
     p&=~(regions[i].len-1); /*Round start down to a len-boundary (mask off low bits)*/
     regions[i].start=(char *)p;
-#if CMK_MACOSX
-    if (regions[i].start+regions[i].len*2>regions[i].start) regions[i].len *= 2;
-#endif
     DEBUG_PRINT("[%d] Memory map: %p - %p (len: %lu => %lu) %s \n",CmiMyPe(),
                 regions[i].start,regions[i].start+regions[i].len,
                 old.len, regions[i].len, regions[i].type);
