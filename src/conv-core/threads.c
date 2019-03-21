@@ -1610,7 +1610,12 @@ Gengbin Zheng October, 2007
 
 #if CMK_THREADS_USE_CONTEXT
 /* system builtin context routines: */
+
+#if defined(__APPLE__)
+#include <sys/ucontext.h>
+#else
 #include <ucontext.h>
+#endif
 
 typedef ucontext_t uJcontext_t;
 typedef void (*uJcontext_fn_t)(void);
