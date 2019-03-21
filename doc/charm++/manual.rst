@@ -7172,11 +7172,16 @@ machinery used to move the class. A concrete superclass and all its
 concrete subclasses require these four features:
 
 -  A line declaring ``PUPable className;`` in the .ci file. This registers
-   the class' constructor.
+   the class' constructor. If ``className`` is a templated class, each concrete
+   instantiation should have its own fully specified ``PUPable`` declaration in
+   the .ci file.
 
 -  A call to the macro ``PUPable_decl(className)`` in the class'
    declaration, in the header file. This adds a virtual method to your
-   class to allow PUP::able to determine your class' type.
+   class to allow PUP::able to determine your class' type. If ``className`` is a
+   templated class, instead use ``PUPable_decl_base_template(baseClassName,
+   className)``, where ``baseClassName`` is the name of the base class. Both
+   class names should include template specifications if necessary.
 
 -  A migration constructor — a constructor that takes ``CkMigrateMessage *``.
    This is used to create the new object on the receive side,
@@ -7185,19 +7190,28 @@ concrete subclasses require these four features:
 -  A working, virtual ``pup`` method. You can omit this if your class has no
    data that needs to be packed.
 
+As an added note for ``PUP::able`` classes which are templated: just as with
+templated chares, you will also need to include the .def.h surrounded by
+``CK_TEMPLATES_ONLY`` preprocessor guards in an appropriate location, as
+described in Section :numref:`templates`.
+
 An abstract superclass — a superclass that will never actually be
 packed — only needs to inherit from ``PUP::able`` and include a
 ``PUPable_abstract(className)`` macro in their body. For these abstract
 classes, the .ci file, ``PUPable_decl`` macro, and constructor are not
 needed.
 
-For example, if *parent* is a concrete superclass and *child* its subclass:
+For example, if *parent* is a concrete superclass, and *child* and *tchild* are
+its subclasses:
 
 .. code-block:: cpp
 
    // --------- In the .ci file ---------
    PUPable parent;
    PUPable child; // Could also have said `PUPable parent, child;`
+   // One PUPable declaration per concrete intantiantion of tchild
+   PUPable tchild<int, double>;
+   PUPable tchild<char, Foo>;
 
    // --------- In the .h file ---------
    class parent : public PUP::able {
@@ -7229,6 +7243,28 @@ For example, if *parent* is a concrete superclass and *child* its subclass:
            // ... pup child's data members as usual ...
        }
    };
+
+   template <typename T1, typename T2>
+   class tchild : public parent {
+       // ... more data members ...
+   public:
+       // ... more methods, possibly virtual ...
+       tchild() { ... }
+
+       // PUP::able support for templated classes
+       // If parent were templated, we'd also include template args for parent
+       PUPable_decl_base_template(parent, tchild<T1,T2>);
+       tchild(CkMigrateMessage* m) : parent(m) {}
+       virtual void pup(PUP::er &p) {
+           parent::pup(p); // Call base class
+           // ... pup tchild's data memebers as usual ...
+       }
+   };
+
+   // Because tchild is a templated class with PUPable decls in the .ci file ...
+   #define CK_TEMPLATES_ONLY
+   #include "module_name.def.h"
+   #undef CK_TEMPLATES_ONLY
 
 With these declarations, we can automatically allocate and pup a
 pointer to a parent or child using the vertical bar ``PUP::er`` syntax,
