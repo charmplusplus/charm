@@ -1612,9 +1612,11 @@ Gengbin Zheng October, 2007
 /* system builtin context routines: */
 
 #if defined(__APPLE__)
-#include <sys/ucontext.h>
-#else
+#define _XOPEN_SOURCE
+#endif
 #include <ucontext.h>
+#if defined(__APPLE__)
+#undef _XOPEN_SOURCE
 #endif
 
 typedef ucontext_t uJcontext_t;
