@@ -250,9 +250,31 @@ public:
       checkForCompletedStages();
     }
   }
+  inline bool checkAllStagesCompleted() {
+    //checks if all stages have been completed
+    //if so, it resets the periodic flushing
+    if (myCompletionStatus_.stageIndex == finalCompletionStage) { //has already completed all stages
+#ifdef CMK_TRAM_VERBOSE_OUTPUT
+      CkPrintf("[%d] All done. Reducing to final callback ...\n", myIndex_);
+#endif
+      CkAssert(numDataItemsBuffered_ == 0);
+      isPeriodicFlushEnabled_ = false;
+      if (!userCallback_.isInvalid()) {
+        this->contribute(userCallback_);
+        userCallback_ = CkCallback();
+      }
+      return true;
+    }
+    else {
+      return false;
+    }
+  }
 
   inline void checkForCompletedStages() {
     int &currentStage = myCompletionStatus_.stageIndex;
+    if (checkAllStagesCompleted()) { //has already completed all stages
+      return;
+    }
     while (cntFinished_[currentStage] == myCompletionStatus_.numContributors &&
            cntMsgExpected_[currentStage] == cntMsgReceived_[currentStage]) {
 #ifdef CMK_TRAM_VERBOSE_OUTPUT
@@ -263,16 +285,7 @@ public:
                cntMsgReceived_[currentStage]);
 #endif
       myRouter_.updateCompletionProgress(myCompletionStatus_);
-      if (myCompletionStatus_.stageIndex == finalCompletionStage) {
-#ifdef CMK_TRAM_VERBOSE_OUTPUT
-        CkPrintf("[%d] All done. Reducing to final callback ...\n", myIndex_);
-#endif
-        CkAssert(numDataItemsBuffered_ == 0);
-        isPeriodicFlushEnabled_ = false;
-        if (!userCallback_.isInvalid()) {
-          this->contribute(userCallback_);
-          userCallback_ = CkCallback();
-        }
+      if (checkAllStagesCompleted()) { //has already completed all stages
         return;
       }
       else {
