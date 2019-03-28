@@ -1244,7 +1244,6 @@ double CmiTimer(void)
 #if CMK_TIMER_USE_PPC64
 
 #include <sys/time.h>
-#include <sys/time.h>
 #include <sys/platform/ppc.h>
 
 CpvStaticDeclare(uint64_t, inittime);
@@ -1282,11 +1281,6 @@ static inline uint64_t PPC64_TimeBase(void)
             : "=r"(result));
 
   return result;
-}
-
-uint64_t __micro_timer (void)
-{
-  return gethrctime_micro();
 }
 
 void CmiTimerInit(char **argv)
