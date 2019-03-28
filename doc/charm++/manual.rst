@@ -3657,6 +3657,8 @@ non-linear data structures via messages. However, we defer a more
 detailed description of their use to
 § :numref:`sec:messages/packed_msgs`.
 
+.. _memory allocation:
+
 Using Messages In Your Program
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -4318,15 +4320,15 @@ priorities will be dequeued and delivered before numerically greater
 priorities. The FIFO and LIFO queueing strategies then control the
 relative order in which messages of the same priority will be delivered.
 
-| To attach a priority field to a message, one needs to set aside space
-  in the message’s buffer while allocating the message . To achieve
-  this, the size of the priority field in bits should be specified as a
-  placement argument to the new operator, as described in
-  section :numref:`memory allocation`. Although the
-  size of the priority field is specified in bits, it is always padded
-  to an integral number of ``int``\ s. A pointer to the priority part of
-  the message buffer can be obtained with this call:
-| void \*CkPriorityPtr(MsgType msg)
+To attach a priority field to a message, one needs to set aside space
+in the message’s buffer while allocating the message . To achieve
+this, the size of the priority field in bits should be specified as a
+placement argument to the new operator, as described in
+section :numref:`memory allocation`. Although the
+size of the priority field is specified in bits, it is always padded
+to an integral number of ``int``\ s. A pointer to the priority part of
+the message buffer can be obtained with this call:
+``void *CkPriorityPtr(MsgType msg)``.
 
 Integer priorities are quite straightforward. One allocates a message
 with an extra integer parameter to “new” (see the first line of the
