@@ -1517,6 +1517,9 @@ void _initCharm(int unused_argc, char **argv)
     if (CmiMyRank() == 0) {
       initHybridAPI();
     }
+    else /* CmiMyRank() != 0 */ {
+      setHybridAPIDevice();
+    }
     initEventQueues();
 
     // ensure HAPI is initialized before registering callback functions

@@ -216,7 +216,7 @@ void GPUManager::init() {
 #endif
 
   // set which device to use
-  hapiCheck(cudaSetDevice(getMyCudaDevice(CmiMyPe())));
+  hapiCheck(cudaSetDevice(getMyCudaDevice(CmiMyNode())));
 
   // allocate host/device buffers array (both user and system-addressed)
   host_buffers_ = new void*[NUM_BUFFERS*2];
@@ -734,6 +734,12 @@ void initHybridAPI() {
 #endif
 
 #endif // HAPI_MEMPOOL
+}
+
+// Set HAPI device for non-0 ranks
+void setHybridAPIDevice() {
+  // set which device to use
+  hapiCheck(cudaSetDevice(getMyCudaDevice(CmiMyNode())));
 }
 
 // Clean up and delete memory used by HAPI.
