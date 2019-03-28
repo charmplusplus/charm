@@ -1894,16 +1894,18 @@ CcdUSERMAX
 
 ::
 
-   int CcdCallOnCondition(condnum,fnp,arg)
+   int CcdCallOnCondition(int condnum, CcdVoidFn fnp, void* arg)
 
 This call instructs the system to call the function indicated by the
 function pointer ``fnp``, with the specified argument ``arg``, when
 the condition indicated by ``condnum`` is raised next. Multiple
 functions may be registered for the same condition number.
+``CcdVoidFn`` is a function pointer with the signature ``void fnp(void
+*userParam, double curWallTime)``
 
 ::
 
-  int CcdCallOnConditionKeep(condnum,fnp,arg)
+  int CcdCallOnConditionKeep(int condnum, CcdVoidFn fnp, void* arg)
 
 As above, but the association is permanent- the given function will
 be called again whenever this condition is raised.
@@ -1922,7 +1924,7 @@ callbacks from within ccd callbacks.
 
 ::
 
-  void CcdRaiseCondition(condNum)
+  void CcdRaiseCondition(int condNum)
 
 
 When this function is called, it invokes all the functions whose
@@ -1931,7 +1933,7 @@ pointers were registered for the ``condNum`` via a *prior* call to
 
 ::
 
-  void CcdCallFnAfter(fnp, arg, msLater)
+  void CcdCallFnAfter(CcdVoidFn fnp, void* arg, double msLater)
 
 This call registers a function via a pointer to it, ``fnp``, that will
 be called at least ``msLater`` milliseconds later. The registered
@@ -1941,7 +1943,7 @@ polling resolution for timed callbacks is 5 ms.
 
 ::
 
-  double CcdSetResolution(newResolution)
+  double CcdSetResolution(double newResolution)
 
 This call sets the polling resolution for completion of timed
 callbacks. ``newResolution`` is the updated time in seconds. The
@@ -1964,7 +1966,7 @@ seconds.
 
 ::
 
-  double CcdIncreaseResolution(newResolution)
+  double CcdIncreaseResolution(double newResolution)
 
 This is a “safe” version of ``CcdSetResolution`` that only ever sets
 the resolution to a shorter time. The same caveats about short polling
