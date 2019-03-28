@@ -79,7 +79,11 @@ $(COMPATLIB): $(COMPAT)
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
-	cp ampi.h $(CDIR)/include/mpi.h
+
+	# Put AMPI's mpi.h in a separate directory to support the MPI machine layer and MPI interop
+	mkdir -p $(CDIR)/include/ampi/
+	cp ampi.h $(CDIR)/include/ampi/mpi.h
+
 	cp ampif.h $(CDIR)/include/mpif.h
 	cp ampiimpl.h $(CDIR)/include/          # For AMPI + Charm++ interop
 	cp ddt.h $(CDIR)/include/               # For AMPI + Charm++ interop

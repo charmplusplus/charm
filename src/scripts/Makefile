@@ -568,9 +568,7 @@ $(L)/libconv-machine.a: machine.o
 	$(CHARMC) -o $@ $<
 
 machine.o: machine.C $(CVHEADERS)
-	@-test -f $(INC)/mpi.h && mv -f $(INC)/mpi.h $(INC)/mpi.BAK || true
 	$(CHARMC) -I. -o $@ $<
-	@-test -f $(INC)/mpi.BAK && mv -f $(INC)/mpi.BAK $(INC)/mpi.h || true
 
 $(L)/libconv-util.a: $(LIBCONV_UTIL)
 	$(CHARMC) -o $@ $(LIBCONV_UTIL)
