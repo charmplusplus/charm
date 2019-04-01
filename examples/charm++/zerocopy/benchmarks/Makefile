@@ -1,6 +1,7 @@
 DIRS = \
   p2pPingpong \
   bcastPingAll \
+  readonlyBcast \
 
 TESTDIRS = $(DIRS)
 
