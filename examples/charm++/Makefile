@@ -1,5 +1,6 @@
 DIRS = \
   allToAll \
+  array_map \
   ckcallback \
   cksequence \
   completion \

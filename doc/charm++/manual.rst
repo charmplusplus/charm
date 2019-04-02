@@ -5661,36 +5661,40 @@ CkArrayMap and defines these virtual methods:
 
 .. code-block:: c++
 
-   class CkArrayMap : public Group
-   {
-   public:
-     // ...
+    class CkArrayMap : public Group {
+    public:
+      // ...
 
-     // Return an ``arrayHdl'', given some information about the array
-     virtual int registerArray(CkArrayIndex& numElements,CkArrayID aid);
-     // Return the home processor number for this element of this array
-     virtual int procNum(int arrayHdl,const CkArrayIndex &element);
-   }
+      // Return an arrayHdl, given some information about the array
+      virtual int registerArray(CkArrayIndex& numElements,CkArrayID aid);
+      // Return the home processor number for this element of this array
+      virtual int procNum(int arrayHdl,const CkArrayIndex &element);
+    };
 
 For example, a simple 1D blockmapping scheme. Actual mapping is handled
 in the procNum function.
 
 .. code-block:: c++
 
-   class BlockMap : public CkArrayMap
-   {
+    // In the .ci file:
+    group BlockMap : CkArrayMap {
+      entry BlockMap();
+    };
+
+    // In the .C/.h files
+    class BlockMap : public CkArrayMap {
     public:
-     BlockMap(void) {}
-     BlockMap(CkMigrateMessage *m){}
-     int registerArray(CkArrayIndex& numElements,CkArrayID aid) {
-       return 0;
-     }
-     int procNum(int /*arrayHdl*/,const CkArrayIndex &idx) {
-       int elem=*(int *)idx.data();
-       int penum =  (elem/(32/CkNumPes()));
-       return penum;
-     }
-   };
+      BlockMap(void) {}
+      BlockMap(CkMigrateMessage* m){}
+      int registerArray(CkArrayIndex& numElements,CkArrayID aid) {
+        return 0;
+      }
+      int procNum(int /*arrayHdl*/,const CkArrayIndex &idx) {
+        int elem = *(int*)idx.data();
+        int penum = (elem/(32/CkNumPes()));
+        return penum;
+      }
+    };
 
 Note that the first argument to the procNum method exists for reasons
 internal to the runtime system and is not used in the calculation of
@@ -5699,17 +5703,20 @@ processor numbers.
 Once you’ve instantiated a custom map object, you can use it to control
 the location of a new array’s elements using the setMap method of the
 CkArrayOptions object described above. For example, if you’ve declared a
-map object named “BlockMap”:
+map object named BlockMap:
 
 .. code-block:: c++
 
-   // Create the map group
-   CProxy_BlockMap myMap=CProxy_BlockMap::ckNew();
+    // Create the map group
+    CProxy_BlockMap myMap=CProxy_BlockMap::ckNew();
 
-   // Make a new array using that map
-   CkArrayOptions opts(nElements);
-   opts.setMap(myMap);
-   a1=CProxy_A1::ckNew(parameters,opts);
+    // Make a new array using that map
+    CkArrayOptions opts(nElements);
+    opts.setMap(myMap);
+    a1=CProxy_A1::ckNew(parameters,opts);
+
+A very basic example which also demonstrates how initial elements are created
+may be found in ``examples/charm++/array_map``
 
 An example which constructs one element per physical node may be found
 in ``examples/charm++/PUP/pupDisk``.
@@ -5722,45 +5729,46 @@ Other 3D Torus network oriented map examples are in
 Initial Elements
 ^^^^^^^^^^^^^^^^
 
-The map object described above can also be used to create the initial
-set of array elements in a distributed fashion. An array’s initial
-elements are created by its map object, by making a call to
-populateInitial on each processor.
+The map object described above can also be used to create the initial set of
+array elements in a distributed fashion. An array’s initial elements are
+created by its map object, by making a call to populateInitial on each
+processor. This function is defined in the CkArrayMap class to iterate through
+the index space of the initial elements (defined as a start index, end index,
+and step index) and call procNum for each index. If the PE returned by procNum
+is the same as the calling PE, then an object is created on that PE.
 
-You can create your own set of elements by creating your own map object
-and overriding this virtual function of CkArrayMap:
-
-.. code-block:: c++
-
-   virtual void populateInitial(int arrayHdl,int numInitial,
-           void *msg,CkArray *mgr)
-
-In this call, arrayHdl is the value returned by registerArray,
-numInitial is the number of elements passed to CkArrayOptions, msg is
-the constructor message to pass, and mgr is the array to create.
-
-populateInitial creates new array elements using the method ``void
-CkArray::insertInitial(CkArrayIndex idx,void \*ctorMsg)``. For example, to
-create one row of 2D array elements on each processor, you would write:
+If there is a more direct way to determine the elements to create on each PE,
+the populateInitial function can be overridden by using the following signature:
 
 .. code-block:: c++
 
-   void xyElementMap::populateInitial(int arrayHdl,int numInitial,
-   	void *msg,CkArray *mgr)
-   {
-     if (numInitial==0) return; //No initial elements requested
+    virtual void populateInitial(int arrayHdl, CkArrayOptions& options,
+        void* ctorMsg,CkArray* mgr)
 
-     //Create each local element
-     int y=CkMyPe();
-     for (int x=0;x<numInitial;x++) {
-       mgr->insertInitial(CkArrayIndex2D(x,y),CkCopyMsg(&msg));
-     }
-     mgr->doneInserting();
-     CkFreeMsg(msg);
-   }
+In this call, ``arrayHdl`` is the value returned by registerArray, ``options``
+contains the CkArrayOptions passed into the array at construction, ``ctorMsg``
+is the constructor message to pass, and ``mgr`` is the array manager which
+creates the elements.
 
-Thus calling ckNew(10) on a 3-processor machine would result in 30
-elements being created.
+To create an element, call ``void CkArray::insertInitial(CkArrayIndex
+idx,void\* ctorMsg)`` on ``mgr``, passing in the index and a copy of the
+constructor message. For example, to insert a 2D element (x,y), call:
+
+.. code-block:: c++
+
+    mgr->insertInitial(CkArrayIndex2D(x,y), CkCopyMsg(&msg));
+
+After inserting elements, inform the array manager that all elements have been
+created, and free the constructor message:
+
+.. code-block:: c++
+
+    mgr->doneInserting();
+    CkFreeMsg(msg);
+
+A simple example using populateInitial can be found in
+``examples/charm++/array_map``
+
 
 Bound Arrays
 ^^^^^^^^^^^^
