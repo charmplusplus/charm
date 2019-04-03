@@ -5976,79 +5976,73 @@ User-defined Array Indices
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Charm++ array indices are arbitrary collections of integers. To define a
-new array index, you create an ordinary C++ class which inherits from
-CkArrayIndex and sets the “nInts” member to the length, in integers, of
-the array index.
+new array index type, you create an ordinary C++ class which inherits from
+CkArrayIndex, allocates custom data in the space it has set aside for index
+data, and sets the “nInts” member to the length, in integers, of the custom
+index data.
 
 For example, if you have a structure or class named “Foo”, you can use a
 Foo object as an array index by defining the class:
 
 ::
 
-   #include <charm++.h>
+    // Include to inherit from CkArrayIndex
+    #include <charm++.h>
 
-   class CkArrayIndexFoo : public CkArrayIndex {
-       Foo f;
-   public:
-       CkArrayIndexFoo(const Foo &in)
-       {
-           f=in;
-           nInts=sizeof(f)/sizeof(int);
-       }
-       // Not required, but convenient: cast-to-foo operators
-       operator Foo &() {return f;}
-       operator const Foo &() const {return f;}
-   };
+    class CkArrayIndexFoo : public CkArrayIndex {
+    private:
+      Foo* f;
+    public:
+      CkArrayIndexFoo(const Foo &in) {
+        f = new (index) Foo(in);
+        nInts = sizeof(Foo)/sizeof(int);
+      }
+    };
 
-Note that Foo’s size must be an integral number of integers- you must
-pad it with zero bytes if this is not the case. Also, Foo must be a
-simple class- it cannot contain pointers, have virtual functions, or
-require a destructor. Finally, there is a Charm++ configuration-time
-option called CK_ARRAYINDEX_MAXLEN which is the largest allowable number
-of integers in an array index. The default is 3; but you may override
-this to any value by passing “-DCK_ARRAYINDEX_MAXLEN=n” to the
-Charm++ build script as well as all user code. Larger values will
-increase the size of each message.
+Note that Foo must be allocated using placement new pointing to the "index"
+member of CkArrayIndex. Furthermore, its size must be an integral number of
+integers- you must pad it with zero bytes if this is not the case. Also, Foo
+must be a simple class- it cannot contain pointers, have virtual functions, or
+require a destructor. Finally, there is a Charm++ configuration-time option
+called CK_ARRAYINDEX_MAXLEN which is the largest allowable number of integers
+in an array index. The default is 3; but you may override this to any value by
+passing “-DCK_ARRAYINDEX_MAXLEN=n” to the Charm++ build script as well as all
+user code. Larger values will increase the size of each message.
 
 You can then declare an array indexed by Foo objects with
 
 ::
 
-   // in the .ci file:
-   array [Foo] AF { entry AF(); ... }
+    // in the .ci file:
+    array [Foo] AF { entry AF(); ... }
 
-   // in the .h file:
-   class AF : public CBase_AF
-   { public: AF() {} ... }
+    // in the .h file:
+    class AF : public CBase_AF
+    { public: AF() {} ... }
 
-   // in the .C file:
-   Foo f;
-   CProxy_AF a=CProxy_AF::ckNew();
-   a[CkArrayIndexFoo(f)].insert();
-   ...
+    // in the .C file:
+    Foo f;
+    CProxy_AF a=CProxy_AF::ckNew();
+    a[CkArrayIndexFoo(f)].insert();
+    ...
 
 Note that since our CkArrayIndexFoo constructor is not declared with the
 explicit keyword, we can equivalently write the last line as:
 
 ::
 
-       a[f].insert();
+    a[f].insert();
 
-When you implement your array element class, as shown above you can
-inherit from CBase_ClassName, a class templated by the index type Foo.
-In the old syntax, you could also inherit directly from ArrayElementT.
-The array index (an object of type Foo) is then accessible as
-“thisIndex”. For example:
+The array index (an object of type Foo) is then accessible as “thisIndex”. For
+example:
 
 ::
 
-
-   // in the .C file:
-   AF::AF()
-   {
-       Foo myF=thisIndex;
-       functionTakingFoo(myF);
-   }
+    // in the .C file:
+    AF::AF() {
+      Foo myF=thisIndex;
+      functionTakingFoo(myF);
+    }
 
 A demonstration of user defined indices can be seen in
 ``examples/charm++/hello/fancyarray``.
