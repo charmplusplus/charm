@@ -39,6 +39,7 @@ all: AMPI AMPIF $(COMPATLIB) $(ROMIO)
 $(ROMIO): | AMPI AMPIF
 	@echo "Building ROMIO"
 	cd romio && \
+		MPI_LIB="" \
 		CFLAGS="$(OPTS) -ampi-romio-configure" \
 		FFLAGS="$(OPTS) -ampi-romio-configure" \
 		F77="$(CDIR)/bin/ampif90" \
