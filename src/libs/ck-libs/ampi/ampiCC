@@ -42,20 +42,13 @@ done
 
 eval processArgs "$@"
 
-AMPICC_EXTRA_OPTS=''
-
-if test "$AMPICC_MODE" = 'ampi'
-then
-  AMPICC_EXTRA_OPTS="$AMPICC_EXTRA_OPTS -I$CHARMBIN/../include/ampi"
-fi
-
 [ -n "$ROMIO_CONFIGURE" -a -z "$MPITEST" ] && STANDALONE='true'
 
 [ -n "$STANDALONE" ] && ARGS="$ARGS -standalone"
 
 [ -f $CHARMBIN/../lib/libampiromio.a -a -z "$STANDALONE" -a -z "$ROMIO_CONFIGURE" ] && ROMIO='-lampiromio'
 
-$CHARMBIN/charmc -language $AMPICC_MODE -default-to-aout $AMPICC_EXTRA_OPTS $ARGS $ROMIO
+$CHARMBIN/charmc -language $AMPICC_MODE -default-to-aout $ARGS $ROMIO
 status=$?
 
 # Copy ampirun, but do not overwrite it if it already exists.

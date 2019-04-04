@@ -66,6 +66,7 @@ USE_F90_LIBRARIES="0"
 USE_F77_LIBRARIES="0"  
 F90_MODDIR=
 AMPIMAIN=""
+AMPI=""
 AMPIF=""
 COPYTO=""        
 MODCOPIES=""        
@@ -440,7 +441,7 @@ do
 	"-language")
 		# Parse out some fake languages (that are actually modules)
 		case "$1" in
-		"ampi") AddModules tcharmmain ampi ;;
+		"ampi") AddModules tcharmmain ampi ; AMPI="1" ;;
 		"ampif") AddModules tcharmmain ampif ; USE_F90_LIBRARIES="1" ; AMPIF="1" ;;
 		"armci") AddModules tcharmmain armci ;;
 		"armcif") AddModules tcharmmain armci ; USE_F90_LIBRARIES="1" ;;
@@ -1376,6 +1377,11 @@ fi
 if [ "$AMPIMAIN" != "" ]
 then
 	OBJECTFILES="$CHARMLIB/lib$AMPIMAIN.o $OBJECTFILES"
+fi
+
+if [ -n "$AMPI" ]
+then
+  CMK_SYSINC="-I$CHARMINC/ampi $CMK_SYSINC"
 fi
 
 if [ "$TLSGLOBALS" = "1" ]
