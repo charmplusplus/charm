@@ -18,7 +18,6 @@ DIRS = \
   load_balancing \
   manyToMany \
   matmul \
-  mpi-coexist \
   namespace \
   piArray \
   PUP \
