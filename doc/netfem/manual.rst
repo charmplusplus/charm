@@ -1,6 +1,6 @@
-=====================
-Charm++ NetFEM Manual
-=====================
+================
+NetFEM Framework
+================
 
 .. contents::
    :depth: 3

@@ -1,6 +1,6 @@
-==================================
-Charm++ Frequently Asked Questions
-==================================
+==========================
+Frequently Asked Questions
+==========================
 
 .. contents::
    :depth: 3

@@ -1,6 +1,6 @@
-===================================
-Charm++ Multiblock Framework Manual
-===================================
+====================
+Multiblock Framework
+====================
 
 .. contents::
    :depth: 3

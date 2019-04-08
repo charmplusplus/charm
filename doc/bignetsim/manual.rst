@@ -1,6 +1,6 @@
-==============================================================
-BigSimulator (BigNetSim) for Extremely Large Parallel Machines
-==============================================================
+========================
+BigSimulator (BigNetSim)
+========================
 
 .. contents::
    :depth: 3

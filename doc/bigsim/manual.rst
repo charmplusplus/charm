@@ -1,6 +1,6 @@
-===============================================================
-BigSim Parallel Simulator for Extremely Large Parallel Machines
-===============================================================
+=========================
+BigSim Parallel Simulator
+=========================
 
 .. contents::
    :depth: 3

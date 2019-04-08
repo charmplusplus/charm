@@ -36,7 +36,7 @@ Charm++ Documentation
 
 .. toctree::
    :maxdepth: 1
-   :caption: BigSim (Blue Gene) Performance Simulator
+   :caption: BigSim (Blue Gene) Simulator
    :numbered:
 
    bigsim/manual

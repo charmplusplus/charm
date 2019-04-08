@@ -1,5 +1,5 @@
 ===================
-Adaptive MPI Manual
+Adaptive MPI (AMPI)
 ===================
 
 .. contents::

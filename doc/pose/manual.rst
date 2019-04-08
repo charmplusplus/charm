@@ -1,6 +1,6 @@
-=====================
-POSE Reference Manual
-=====================
+======================================================
+Parallel Object-Oriented Simulation Environment (POSE)
+======================================================
 
 .. contents::
    :depth: 3

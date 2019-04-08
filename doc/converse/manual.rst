@@ -1,6 +1,6 @@
-===========================
-Converse Programming Manual
-===========================
+====================
+Converse Programming
+====================
 
 .. contents::
    :depth: 3

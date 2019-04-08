@@ -1,6 +1,6 @@
-=======================================================================
-Charj Manual Compiler Support for Productive Parallel Programming  [1]_
-=======================================================================
+=====
+Charj
+=====
 
 .. contents::
    :depth: 3
@@ -166,6 +166,3 @@ Some Charm++ statements that can be used in a Charj program:
        CkWallTimer();
        thisProxy
        thisIndex
-
-.. [1]
-   last modified 12/14/2012 by Bilge Acun

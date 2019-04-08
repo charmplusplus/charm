@@ -1,8 +1,8 @@
 .. _charmdebug:
 
-=======================
-Charm++ Debugger Manual
-=======================
+================
+Charm++ Debugger
+================
 
 .. contents::
    :depth: 3

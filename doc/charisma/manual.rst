@@ -1,6 +1,6 @@
-===============
-Charisma Manual
-===============
+========
+Charisma
+========
 
 .. contents::
    :depth: 3

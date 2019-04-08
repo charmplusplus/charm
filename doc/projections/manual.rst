@@ -1,6 +1,6 @@
-==================
-Projections Manual
-==================
+===========
+Projections
+===========
 
 .. contents::
    :depth: 3

@@ -1,6 +1,6 @@
-==================================
-Converse Extensions Library Manual
-==================================
+===========================
+Converse Extensions Library
+===========================
 
 .. contents::
    :depth: 3

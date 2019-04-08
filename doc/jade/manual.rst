@@ -1,6 +1,6 @@
-====================
-Jade Language Manual
-====================
+=============
+Jade Language
+=============
 
 .. contents::
    :depth: 3
