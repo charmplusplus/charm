@@ -27,7 +27,7 @@ template <typename U> void execute_example(std::vector<U> &dataToCompare)
 
 main::main(CkArgMsg *m)
 {
-    std::vector<float> dataToCompare1{ 10.23, 20.92, 30.71 };
+    std::vector<float> dataToCompare1{ 10.23f, 20.92f, 30.71f };
     execute_example<float>(dataToCompare1);
 
     std::vector<int> dataToCompare2{ 10, 20, 30 };
