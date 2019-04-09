@@ -213,6 +213,22 @@ void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn)
   CmiSyncMulticastAndFree(grp, len, msg);
 }
 
+void CldEnqueueWithinNode(void *msg, int infofn)
+{
+  int len, queueing, priobits,i; unsigned int *prioptr, start, size;
+  CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
+  CldPackFn pfn;
+  ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  if (pfn && !CMI_MSG_READONLY(msg)) {
+    pfn(&msg);
+    ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  }
+  CldSwitchHandler((char *)msg, CpvAccess(CldHandlerIndex));
+  CmiSetInfo(msg,infofn);
+
+  CmiWithinNodeBroadcast(len, (char *)msg);
+}
+
 void CldEnqueueMulti(int npes, const int *pes, void *msg, int infofn)
 {
   int len, queueing, priobits,i; unsigned int *prioptr;

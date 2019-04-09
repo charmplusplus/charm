@@ -69,6 +69,8 @@
 #define CMI_IS_ZC(msg)                       (CMI_IS_ZC_P2P(msg) || CMI_IS_ZC_BCAST(msg))
 #endif
 
+#define CMI_MSG_READONLY(msg)                  ((CmiMsgHeaderBasic *)msg)->readonly
+
 #define CMIALIGN(x,n)       (size_t)((~((size_t)n-1))&((x)+(n-1)))
 /*#define ALIGN8(x)        (size_t)((~7)&((x)+7)) */
 #define ALIGN8(x)          CMIALIGN(x,8)
@@ -1382,6 +1384,8 @@ void          CmiSyncNodeBroadcastAllFn(int, char *);
 CmiCommHandle CmiAsyncNodeBroadcastAllFn(int, char *);
 void          CmiFreeNodeBroadcastAllFn(int, char *);
 
+void          CmiWithinNodeBroadcast(int, char*);
+
 /* if node queue is available, adding inter partition counterparts */
 void          CmiInterSyncNodeSendFn(int, int, int, char *);
 void          CmiInterFreeNodeSendFn(int, int, int, char *);
@@ -1715,7 +1719,10 @@ const char *CldGetStrategy(void);
 void CldEnqueue(int pe, void *msg, int infofn);
 void CldEnqueueMulti(int npes, const int *pes, void *msg, int infofn);
 void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn);
+// CldNodeEnqueue enqueues a single message for a node, whereas
+// CldEnqueueWithinNode enqueues a message for each PE on the node.
 void CldNodeEnqueue(int node, void *msg, int infofn);
+void CldEnqueueWithinNode(void *msg, int infofn);
 
 /****** CMM: THE MESSAGE MANAGER ******/
 

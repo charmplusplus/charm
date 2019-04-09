@@ -389,6 +389,30 @@ void CmiFreeNodeBroadcastAllFn(int size, char *msg) {
     CmiSendNodeSelf(msg);
 }
 #endif
+
+void CmiWithinNodeBroadcast(int size, char* msg) {
+  int nodefirst = CmiNodeFirst(CmiMyNode());
+  int nodelast = nodefirst + CmiNodeSize(CmiMyNode());
+  if (CMI_MSG_READONLY(msg)) {
+    for (int i = nodefirst; i < CmiMyPe(); i++) {
+      CmiReference(msg);
+      CmiFreeSendFn(i, size, msg);
+    }
+    for (int i = CmiMyPe() + 1; i < nodelast; i++) {
+      CmiReference(msg);
+      CmiFreeSendFn(i, size, msg);
+    }
+  } else {
+    for (int i = nodefirst; i < CmiMyPe(); i++) {
+      CmiSyncSendFn(i, size, msg);
+    }
+    for (int i = CmiMyPe() + 1; i < nodelast; i++) {
+      CmiSyncSendFn(i, size, msg);
+    }
+  }
+  CmiSyncSendAndFree(CmiMyPe(), size, msg);
+}
+
 /* ##### End of Functions Related with Message Sending OPs ##### */
 
 #if ! CMK_MULTICAST_LIST_USE_COMMON_CODE

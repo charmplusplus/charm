@@ -1,0 +1,25 @@
+mainmodule within_node_bcast {
+
+  message TestMessage;
+
+  readonly CProxy_TestNodeGroup ngProxy;
+  readonly CProxy_TestGroup gProxy;
+
+  mainchare Main {
+    entry Main(CkArgMsg* msg);
+    entry void runTests();
+    entry [reductiontarget] void testDone(int result);
+  };
+
+  nodegroup TestNodeGroup {
+    entry TestNodeGroup();
+    entry void recv(TestMessage* msg);
+    entry void recvCopy(TestMessage* msg);
+  };
+
+  group TestGroup {
+    entry TestGroup();
+    entry [nokeep] void recv(TestMessage* msg);
+    entry void recvCopy(TestMessage* msg);
+  };
+};
