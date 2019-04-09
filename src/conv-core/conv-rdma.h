@@ -76,4 +76,9 @@ void CmiForwardProcBcastMsg(int size, char *msg); // for forwarding proc message
 void CmiForwardNodeBcastMsg(int size, char *msg); // for forwarding node queue messages to my child nodes
 
 void CmiForwardMsgToPeers(int size, char *msg); // for forwarding messages to my peer PEs
+
+#if CMK_REG_REQUIRED
+void CmiInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *info);
+#endif
+
 #endif

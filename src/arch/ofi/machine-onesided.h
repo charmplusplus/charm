@@ -8,6 +8,7 @@ typedef void (*ofiCallbackFn)(struct fi_cq_tagged_entry *e, OFIRequest *req);
 inline void process_onesided_completion_ack(struct fi_cq_tagged_entry *e, OFIRequest *req);
 inline void process_onesided_reg_and_put(struct fi_cq_tagged_entry *e, OFIRequest *req);
 inline void process_onesided_reg_and_get(struct fi_cq_tagged_entry *e, OFIRequest *req);
+inline void process_onesided_dereg_and_ack(struct fi_cq_tagged_entry *e, OFIRequest *req);
 
 /* Support for Nocopy Direct API */
 // Structure representing the machine specific information for a source or destination buffer used in the direct API

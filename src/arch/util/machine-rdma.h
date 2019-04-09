@@ -105,6 +105,10 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo);
 
 void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode);
 
+#if CMK_REG_REQUIRED
+void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo);
+#endif
+
 /* Set the machine specific information for a nocopy pointer */
 void CmiSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode){
   LrtsSetRdmaBufferInfo(info, ptr, size, mode);
@@ -135,6 +139,12 @@ void CmiIssueRput(NcpyOperationInfo *ncpyOpInfo) {
 void CmiDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode){
   LrtsDeregisterMem(ptr, info, pe, mode);
 }
+
+#if CMK_REG_REQUIRED
+void CmiInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo) {
+  LrtsInvokeRemoteDeregAckHandler(pe, ncpyOpInfo);
+}
+#endif
 
 #endif /*End of CMK_ONESIDED_IMPL */
 #endif

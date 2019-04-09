@@ -107,7 +107,6 @@ class zerocopyObject : public CBase_zerocopyObject{
 
     void zerocopySent(CkDataMsg *msg) {
       CkNcpyBuffer *src = (CkNcpyBuffer *)(msg->data);
-      src->deregisterMem();
       CkRdmaFree((void *)src->ptr);
       delete msg;
 

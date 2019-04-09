@@ -347,6 +347,9 @@ void CkRdmaDirectAckHandler(void *ack) {
     case CMK_EM_API               : handleEntryMethodApiCompletion(info); // Ncpy EM API invoked through a GET
                                     break;
 
+    case CMK_EM_API_SRC_ACK_INVOKE: invokeSourceCallback(info);
+                                    break;
+
     case CMK_EM_API_REVERSE       : handleReverseEntryMethodApiCompletion(info); // Ncpy EM API invoked through a PUT
                                     break;
 
@@ -657,7 +660,14 @@ void getRdmaNumopsAndBufsize(envelope *env, int &numops, int &bufsize) {
 }
 
 void handleEntryMethodApiCompletion(NcpyOperationInfo *info) {
+
+#if CMK_REG_REQUIRED
+  // send a message to the source to de-register and invoke callback
+  CmiInvokeRemoteDeregAckHandler(info->srcPe, info);
+#else
   invokeSourceCallback(info);
+#endif
+
   if(info->ackMode == CMK_SRC_DEST_ACK || info->ackMode == CMK_DEST_ACK) {
     // Invoke the ackhandler function to update the counter
     CkRdmaEMAckHandler(info->destPe, info->refPtr);
@@ -665,11 +675,17 @@ void handleEntryMethodApiCompletion(NcpyOperationInfo *info) {
 }
 
 void handleReverseEntryMethodApiCompletion(NcpyOperationInfo *info) {
-  invokeSourceCallback(info);
+
   if(info->ackMode == CMK_SRC_DEST_ACK || info->ackMode == CMK_DEST_ACK) {
     // Send a message to the receiver to invoke the ackhandler function to update the counter
     CmiInvokeRemoteAckHandler(info->destPe, info->refPtr);
   }
+
+  CmiDeregisterMem(info->srcPtr, info->srcLayerInfo + CmiGetRdmaCommonInfoSize(), info->srcPe, info->srcMode);
+  info->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
+
+  invokeSourceCallback(info);
+
   if(info->freeMe == CMK_FREE_NCPYOPINFO)
     CmiFree(info);
 }

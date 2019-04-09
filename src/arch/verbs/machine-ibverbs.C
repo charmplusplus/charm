@@ -126,6 +126,8 @@ Data Structures
 #define INFIRDMA_DIRECT_REG_AND_PUT 17
 #define INFIRDMA_DIRECT_REG_AND_GET 18
 
+#define INFIRDMA_DIRECT_DEREG_AND_ACK 19
+
 struct infiPacketHeader{
 	char code;
 	int nodeNo;
@@ -1876,6 +1878,20 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		        newNcpyOpInfo->destPe,
 		        (uint64_t)rdmaPacket,
 		        IBV_WR_RDMA_WRITE);
+	}
+	if(header->code == INFIRDMA_DIRECT_DEREG_AND_ACK){
+		NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(buffer->buf+sizeof(struct infiPacketHeader));
+		
+		resetNcpyOpInfoPointers(ncpyOpInfo);
+		
+		// Deregister the source buffer
+		LrtsDeregisterMem(ncpyOpInfo->srcPtr, (char *)ncpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->srcPe, ncpyOpInfo->srcMode);
+		
+		ncpyOpInfo->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
+		
+		// Invoke source ack
+		ncpyOpInfo->opMode = CMK_EM_API_SRC_ACK_INVOKE;
+		CmiInvokeNcpyAck(ncpyOpInfo);
 	}
 	if(header->code == INFIRDMA_DIRECT_REG_AND_GET){
 		// Register the destination buffer and perform GET

@@ -162,8 +162,7 @@ class zerocopyObject : public CBase_zerocopyObject{
     void zerocopySent(CkDataMsg *m){
       // Get access to the array information sent via zerocopy
       CkNcpyBuffer *src = (CkNcpyBuffer *)(m->data);
-      // de-register the memory
-      src->deregisterMem();
+
       free((void *)(src->ptr));
 
       delete m;
@@ -178,9 +177,6 @@ class zerocopyObject : public CBase_zerocopyObject{
 
       // Get access to the array information sent via zerocopy
       CkNcpyBuffer *src = (CkNcpyBuffer *)(m->data);
-
-      // de-register the memory
-      src->deregisterMem();
 
       void *ptr = (void *)(src->ptr); // do not free pointer as it is used in the next iteration as well
 

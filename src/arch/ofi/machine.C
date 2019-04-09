@@ -136,6 +136,8 @@ CpvDeclare(mempool_type*, mempool);
 #define OFI_RDMA_DIRECT_REG_AND_PUT 0x4ULL
 #define OFI_RDMA_DIRECT_REG_AND_GET 0x5ULL
 
+#define OFI_RDMA_DIRECT_DEREG_AND_ACK 0x6ULL
+
 #define OFI_OP_NAMES 0x8ULL
 
 #define OFI_READ_OP 1
@@ -1151,6 +1153,9 @@ void recv_callback(struct fi_cq_tagged_entry *e, OFIRequest *req)
         break;
     case OFI_RDMA_DIRECT_REG_AND_GET:
         process_onesided_reg_and_get(e, req);
+        break;
+    case OFI_RDMA_DIRECT_DEREG_AND_ACK:
+        process_onesided_dereg_and_ack(e, req);
         break;
     default:
         MACHSTATE2(3, "--> unknown operation %x len=%ld", e->tag, e->len);

@@ -43,12 +43,13 @@ enum ncpyRegModes {
 // Enum for the type of zerocopy operation
 // TODO: Convert to typed enum post C++ conversion
 enum ncpyOperationMode {
-  CMK_DIRECT_API          = 0,
-  CMK_EM_API              = 1,
-  CMK_EM_API_REVERSE      = 2,
-  CMK_BCAST_EM_API        = 3,
-  CMK_BCAST_EM_API_REVERSE= 4,
-  CMK_READONLY_BCAST      = 5
+  CMK_DIRECT_API            = 0,
+  CMK_EM_API                = 1,
+  CMK_EM_API_SRC_ACK_INVOKE = 2,
+  CMK_EM_API_REVERSE        = 3,
+  CMK_BCAST_EM_API          = 4,
+  CMK_BCAST_EM_API_REVERSE  = 5,
+  CMK_READONLY_BCAST        = 6
 };
 
 // Enum for the method of acknowledglement handling after the completion of a zerocopy operation

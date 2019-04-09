@@ -363,3 +363,36 @@ void _performOneRputForWorkerThread(MSG_LIST *ptr) {
             DIRECT_SEND_RECV);
 }
 #endif
+
+
+void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo) {
+
+  // ncpyOpInfo is a part of the received message and can be freed before this send completes
+  // for that reason, it is copied into a new message
+  NcpyOperationInfo *newNcpyOpInfo = newNcpyOpInfo = (NcpyOperationInfo *)CmiAlloc(ncpyOpInfo->ncpyOpInfoSize);
+  memcpy(newNcpyOpInfo, ncpyOpInfo, ncpyOpInfo->ncpyOpInfoSize);
+
+  resetNcpyOpInfoPointers(newNcpyOpInfo);
+  newNcpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO;
+
+#if CMK_SMP
+  // send the small message to the other node through the comm thread
+  buffer_small_msgs(&smsg_queue, newNcpyOpInfo, newNcpyOpInfo->ncpyOpInfoSize,
+                        CmiNodeOf(newNcpyOpInfo->srcPe),
+                        RDMA_DEREG_AND_ACK_MD_DIRECT_TAG);
+#else // non-smp mode
+
+  // send the small message directly
+  gni_return_t status = send_smsg_message(&smsg_queue,
+                          CmiNodeOf(newNcpyOpInfo->srcPe),
+                          newNcpyOpInfo,
+                          newNcpyOpInfo->ncpyOpInfoSize,
+                          RDMA_DEREG_AND_ACK_MD_DIRECT_TAG,
+                          0, NULL, CHARM_SMSG, 1);
+#if !CMK_SMSGS_FREE_AFTER_EVENT
+  if(status == GNI_RC_SUCCESS && newNcpyOpInfo->freeMe == CMK_FREE_NCPYOPINFO) {
+    CmiFree(newNcpyOpInfo);
+  }
+#endif // end of !CMK_SMSGS_FREE_AFTER_EVENT
+#endif // end of CMK_SMP
+}

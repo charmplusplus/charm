@@ -199,3 +199,28 @@ void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int m
     }
   }
 }
+
+void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo) {
+  // Send a message to de-register remote buffer and invoke callback
+  infiPacket packet;
+  MallocInfiPacket(packet);
+
+  packet->size = ncpyOpInfo->ncpyOpInfoSize;
+  packet->buf  = (char *)ncpyOpInfo;
+  packet->header.code = INFIRDMA_DIRECT_DEREG_AND_ACK;
+  packet->ogm  = NULL;
+
+  struct ibv_mr *packetKey;
+  if(ncpyOpInfo->opMode == CMK_DIRECT_API) {
+    packetKey = METADATAFIELD(ncpyOpInfo)->key;
+  } else if(ncpyOpInfo->opMode == CMK_EM_API || ncpyOpInfo->opMode == CMK_BCAST_EM_API) {
+    // Register the small message in order to send it to the other side
+    packetKey = ibv_reg_mr(context->pd, (void *)ncpyOpInfo, ncpyOpInfo->ncpyOpInfoSize, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ);
+    if (!packetKey) {
+      CmiAbort("Memory Registration Failed in LrtsInvokeRemoteDeregAckHandler!\n");
+    }
+  }
+
+  OtherNode node = &nodes[CmiNodeOf(ncpyOpInfo->srcPe)];
+  EnqueuePacket(node, packet, ncpyOpInfo->ncpyOpInfoSize, packetKey);
+}

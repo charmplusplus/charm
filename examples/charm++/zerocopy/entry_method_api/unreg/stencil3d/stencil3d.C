@@ -144,8 +144,6 @@ class Stencil: public CBase_Stencil {
     void completedSendingGhost(CkDataMsg *msg){
       CkNcpyBuffer *src = (CkNcpyBuffer *)(msg->data);
       void *ptr = (void *)(src->ptr);
-      // deregister memory
-      src->deregisterMem();
       free(ptr);
 
       delete msg;
