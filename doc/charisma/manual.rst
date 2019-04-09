@@ -465,7 +465,7 @@ command for this step is as follows.
 
 .. code-block:: bash
 
-       > orchc [modulename].or
+   $ orchc [modulename].or
 
 2) Charm++ compiler, ``charmc``, is used to parse the Charm++ Interface
 (``.ci``) file, compile C/C++ code, and link and build the executable. The
@@ -473,9 +473,9 @@ typical commands are:
 
 .. code-block:: bash
 
-       > charmc [modulename].ci
-       > charmc [modulename].C -c
-       > charmc [modulename].o -o pgm -language charm++
+   $ charmc [modulename].ci
+   $ charmc [modulename].C -c
+   $ charmc [modulename].o -o pgm -language charm++
 
 Running the Charisma program is the same as running a Charm++ program,
 using Charm++'s job launcher ``charmrun`` (on some platforms like CSE's
@@ -483,7 +483,7 @@ Turing Cluster, use the customized job launcher ``rjq`` or ``rj``).
 
 .. code-block:: bash
 
-       > charmrun pgm +p4
+   $ charmrun pgm +p4
 
 Please refer to Charm++'s manual and tutorial for more details of
 building and running a Charm++ program.
@@ -617,9 +617,9 @@ At run-time, the load balancer is specified in command line after the
 launcher will automatically print out all available load balancers. For
 instance, the following command uses ``RefineLB``.
 
-::
+.. code-block:: bash
 
-       > ./charmrun ./pgm +p16 +balancer RefineLB
+   $ ./charmrun ./pgm +p16 +balancer RefineLB
 
 .. _secsparse:
 
@@ -739,7 +739,7 @@ The user compile these input files with the following command:
 
 .. code-block:: bash
 
-     > orchc jacobi.or
+   $ orchc jacobi.or
 
 The compiler generates the parallel code for sending out messages,
 organizing flow of control, and then it looks for sequential code files

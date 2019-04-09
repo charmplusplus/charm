@@ -54,10 +54,10 @@ Building ARMCI Support under The Charm++ Runtime System
 
 Build charm target ARMCI (instead of charm or AMPI):
 
-::
+.. code-block:: bash
 
-   > cd charm
-   > ./build ARMCI netlrts-linux -O3
+   $ cd charm
+   $ ./build ARMCI netlrts-linux -O3
 
 .. _sec::simple program:
 
@@ -125,19 +125,19 @@ Compiling the code with:
 
 .. code-block:: bash
 
-   > charm/bin/charmc -c hello.c /$(OPTS)
+   $ charm/bin/charmc -c hello.c /$(OPTS)
 
 Linking the program with:
 
 .. code-block:: bash
 
-   > charm/bin/charmc hello.o -o hello -swapglobals -memory isomalloc -language armci $(OPTS)
+   $ charm/bin/charmc hello.o -o hello -swapglobals -memory isomalloc -language armci $(OPTS)
 
 Run the program:
 
 .. code-block:: bash
 
-   > ./charmrun ./hello +p2 +vp8
+   $ ./charmrun ./hello +p2 +vp8
 
 .. _sec::data structures:
 

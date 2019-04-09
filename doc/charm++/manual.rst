@@ -7731,9 +7731,9 @@ i.e., restarting execution from a previously-created checkpoint. The
 command line option ``+restart DIRNAME`` is required to invoke this
 mode. For example:
 
-::
+.. code-block:: bash
 
-     > ./charmrun hello +p4 +restart log
+     $ ./charmrun hello +p4 +restart log
 
 Restarting is the reverse process of checkpointing. Charm++ allows
 restarting the old checkpoint on a different number of physical
@@ -8140,8 +8140,8 @@ for example:
 
 .. code-block:: bash
 
-   $CHARM_DIR/build charm++ multicore-linux64 omp
-   $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp
+   $ $CHARM_DIR/build charm++ multicore-linux64 omp
+   $ $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp
 
 This library is based on the LLVM OpenMP runtime library. So it supports
 the ABI used by clang, intel and gcc compilers.
@@ -8180,12 +8180,12 @@ to avoid the error:
    # When you want to compile Integrated OpenMP on Ubuntu where the pre-installed clang
    # is older than 3.7, you can use integrated openmp with the following instructions.
    # e.g.) Ubuntu 14.04, the version of default clang is 3.4.
-   sudo apt-get install clang-3.8 //you can use any version of clang higher than 3.8
-   sudo ln -svT /usr/bin/clang-3.8 /usr/bin/clang
-   sudo ln -svT /usr/bin/clang++-3.8 /usr/bin/clang
+   $ sudo apt-get install clang-3.8 //you can use any version of clang higher than 3.8
+   $ sudo ln -svT /usr/bin/clang-3.8 /usr/bin/clang
+   $ sudo ln -svT /usr/bin/clang++-3.8 /usr/bin/clang
 
-   $(CHARM_DIR)/build charm++ multicore-linux64 clang omp --with-production -j8
-   echo '!<arch>' > $(CHARM_DIR)/lib/libomp.a  # Dummy library. This will make you avoid the error message.
+   $ $CHARM_DIR/build charm++ multicore-linux64 clang omp --with-production -j8
+   $ echo '!<arch>' > $(CHARM_DIR)/lib/libomp.a  # Dummy library. This will make you avoid the error message.
 
 On Mac, the Apple-provided clang installed in default doesn’t have
 OpenMP feature. We're working on the support of this library on Mac
@@ -8198,8 +8198,8 @@ to the invocation of the Charm++ build script. For example:
 
 .. code-block:: bash
 
-   $CHARM_DIR/build charm++ multicore-linux64 omp gcc-7
-   $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp gcc-7
+   $ $CHARM_DIR/build charm++ multicore-linux64 omp gcc-7
+   $ $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp gcc-7
 
 If this does not work, you should set environment variables so that the
 Charm++ build script uses the normal gcc installed from Homebrew or
@@ -8210,20 +8210,20 @@ MacPorts. The following is an example using Homebrew on Mac OS X
 
    # Install Homebrew from https://brew.sh
    # Install gcc using 'brew' */
-   brew install gcc
+   $ brew install gcc
 
    # gcc, g++ and other binaries are installed at /usr/local/Cellar/gcc/<version>/bin
    # You need to make symbolic links to the gcc binaries at /usr/local/bin
    # In this example, gcc 7.1.0 is installed at the directory.
-   cd /usr/local/bin
-   ln -sv /usr/local/Cellar/gcc/7.1.0/bin/gcc-7 gcc
-   ln -sv /usr/local/Cellar/gcc/7.1.0/bin/g++-7 g++
-   ln -sv /usr/local/Cellar/gcc/7.1.0/bin/gcc-nm-7 gcc-nm
-   ln -sv /usr/local/Cellar/gcc/7.1.0/bin/gcc-ranlib-7 gcc-ranlib
-   ln -sv /usr/local/Cellar/gcc/7.1.0/bin/gcc-ar-7 gcc-ar
+   $ cd /usr/local/bin
+   $ ln -sv /usr/local/Cellar/gcc/7.1.0/bin/gcc-7 gcc
+   $ ln -sv /usr/local/Cellar/gcc/7.1.0/bin/g++-7 g++
+   $ ln -sv /usr/local/Cellar/gcc/7.1.0/bin/gcc-nm-7 gcc-nm
+   $ ln -sv /usr/local/Cellar/gcc/7.1.0/bin/gcc-ranlib-7 gcc-ranlib
+   $ ln -sv /usr/local/Cellar/gcc/7.1.0/bin/gcc-ar-7 gcc-ar
 
    # Finally, you should set PATH variable so that these binaries are accessed first in the build script.
-   export PATH=/usr/local/bin:$PATH
+   $ export PATH=/usr/local/bin:$PATH
 
 In addition, this library will be supported on Windows in the next
 release of Charm++.
@@ -8801,16 +8801,16 @@ options:
 Here is an example which collects the data for a 1000 processor run of a
 program
 
-::
+.. code-block:: bash
 
-   ./charmrun pgm +p1000 +balancer RandCentLB +LBDump 2 +LBDumpSteps 4 +LBDumpFile lbsim.dat
+   $ ./charmrun pgm +p1000 +balancer RandCentLB +LBDump 2 +LBDumpSteps 4 +LBDumpFile lbsim.dat
 
 This will collect data on files lbsim.dat.2,3,4,5. We can use this data
 to analyze the performance of various centralized strategies using:
 
-::
+.. code-block:: bash
 
-   ./charmrun pgm +balancer <Strategy to test> +LBSim 2 +LBSimSteps 4 +LBDumpFile lbsim.dat
+   $ ./charmrun pgm +balancer <Strategy to test> +LBSim 2 +LBSimSteps 4 +LBDumpFile lbsim.dat
    [+LBSimProcs 900]
 
 Please note that this does not invoke the real application. In fact,
@@ -10054,25 +10054,25 @@ distribution.
 To enable shrink expand, Charm++ needs to be built with the
 ``--enable-shrinkexpand`` option:
 
-::
+.. code-block:: bash
 
-   	./build charm++ netlrts-linux-x86_64 --enable-shrinkexpand
+   	$ ./build charm++ netlrts-linux-x86_64 --enable-shrinkexpand
 
 An example application launch command needs to include a load balancer,
 a nodelist file that contains all of the nodes that are going to be
 used, and a port number to listen the shrink/expand commands:
 
-::
+.. code-block:: bash
 
-   	./charmrun +p4 ./jacobi2d 200 20 +balancer GreedyLB ++nodelist ./mynodelistfile ++server ++server-port 1234
+   	$ ./charmrun +p4 ./jacobi2d 200 20 +balancer GreedyLB ++nodelist ./mynodelistfile ++server ++server-port 1234
 
 The CCS client to send shrink/expand commands needs to specify the
 hostname, port number, the old(current) number of processor and the
 new(future) number of processors:
 
-::
+.. code-block:: bash
 
-   	./client <hostname> <port> <oldprocs> <newprocs>
+   	$ ./client <hostname> <port> <oldprocs> <newprocs>
    	(./client valor 1234 4 8 //This will increase from 4 to 8 processors.)
 
 To make a Charm++ application malleable, first, pup routines for all of
@@ -11738,15 +11738,15 @@ single-process runs, it can be used directly:
 
 .. code-block:: bash
 
-   valgrind ...valgrind options... ./application_name ...application arguments...
+   $ valgrind ...valgrind options... ./application_name ...application arguments...
 
 When running in parallel, it is helpful to note a few useful adaptations
 of the above incantation, for various kinds of process launchers:
 
 .. code-block:: bash
 
-   ./charmrun +p2 `which valgrind` --log-file=VG.out.%p --trace-children=yes ./application_name ...application arguments...
-   aprun -n 2 `which valgrind` --log-file=VG.out.%p --trace-children=yes ./application_name ...application arguments...
+   $ ./charmrun +p2 `which valgrind` --log-file=VG.out.%p --trace-children=yes ./application_name ...application arguments...
+   $ aprun -n 2 `which valgrind` --log-file=VG.out.%p --trace-children=yes ./application_name ...application arguments...
 
 The first adaptation is to use :literal:`\`which valgrind\`` to obtain a
 full path to the valgrind binary, since parallel process launchers

@@ -481,7 +481,7 @@ Starting Up
 ~~~~~~~~~~~
 
 | From any location, type:
-| ``> PROJECTIONS_LOCATION/bin/projections [NAME.sts]``
+| ``$ PROJECTIONS_LOCATION/bin/projections [NAME.sts]``
 | where ``PROJECTIONS_LOCATION`` is the path to the main projections
   directory.
 

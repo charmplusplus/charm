@@ -55,9 +55,9 @@ directory and build the project.
 
 .. code-block:: bash
 
-   > git clone https://charm.cs.illinois.edu/gerrit/ccs_tools
-   > cd ccs_tools
-   > ant
+   $ git clone https://charm.cs.illinois.edu/gerrit/ccs_tools
+   $ cd ccs_tools
+   $ ant
 
 This will create the executable ``bin/charmdebug``.
 
@@ -72,7 +72,7 @@ Build Charm++ using ``--enable-charmdebug`` option. For example:
 
 .. code-block:: bash
 
-   > ./build charm++ netlrts-darwin-x86_64 --enable-charmdebug
+   $ ./build charm++ netlrts-darwin-x86_64 --enable-charmdebug
 
 No instrumentation is required to use the Charm++ debugger. Being CCS
 based, you can use it to set and step through entry point breakpoints
@@ -161,14 +161,14 @@ line options for your program (shown here as ``opt1 opt2``):
 
 .. code-block:: bash
 
-   > charmdebug pgm +p4 4 opt1 opt2
+   $ charmdebug pgm +p4 4 opt1 opt2
 
 If the application should be run in a remote cluster behind a firewall,
 the previous command line will become:
 
 .. code-block:: bash
 
-   > charmdebug -host cluster.inst.edu -user myname -sshtunnel pgm +p4 4 opt1 opt2
+   $ charmdebug -host cluster.inst.edu -user myname -sshtunnel pgm +p4 4 opt1 opt2
 
 CharmDebug can also be executed without any parameters. The user can
 then choose the application to launch and its command line parameters
@@ -188,7 +188,7 @@ To replay a previously recorded session:
 
 .. code-block:: bash
 
-   > charmdebug pgm +p4 opt1 opt2  +replay
+   $ charmdebug pgm +p4 opt1 opt2  +replay
 
 Charm Debugging Related Options
 -------------------------------

@@ -140,9 +140,9 @@ source.
 The build script for Charm++ is called ``build``. The syntax for this
 script is:
 
-::
+.. code-block:: bash
 
-   > build <target> <version> <opts>
+   $ build <target> <version> <opts>
 
 For building Jade(which also includes building Charm++ and other
 libraries needed by Jade), specify ``<target>`` to be ``jade``. And
@@ -160,9 +160,9 @@ programs. See the ``charm/README`` file for details on picking the proper
 version. Following is an example of how to build Jade under linux and
 ethernet environment, with debugging info produced:
 
-::
+.. code-block:: bash
 
-   > build jade netlrts-linux -g
+   $ build jade netlrts-linux -g
 
 Compiling and Running Jade Programs
 ===================================
@@ -189,10 +189,10 @@ compilers like ``cc``. To build an Jade program, the command line option
 you would use for other compilers can be used with ``charmc`` the same
 way. For example:
 
-::
+.. code-block:: bash
 
-   > charmc -language jade -c pgm.java -O3
-   > charmc -language jade -o pgm pgm.o -lm -O3
+   $ charmc -language jade -c pgm.java -O3
+   $ charmc -language jade -o pgm pgm.o -lm -O3
 
 Running
 -------
@@ -206,9 +206,9 @@ number of processors to run on, and the name of the program followed by
 Jade options (such as TBD) and the program arguments. A typical
 invocation of Jade program ``pgm`` with ``charmrun`` is:
 
-::
+.. code-block:: bash
 
-   > charmrun pgm +p16 +vp32 +tcharm_stacksize 3276800
+   $ charmrun pgm +p16 +vp32 +tcharm_stacksize 3276800
 
 Here, the Jade program ``pgm`` is run on 16 physical processors with 32
 chunks (which will be mapped 2 per processor initially), where each

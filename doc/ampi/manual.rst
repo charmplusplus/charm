@@ -420,7 +420,7 @@ compile and link time:
 
 .. code-block:: bash
 
-   ampicxx -o example example.C -tlsglobals
+   $ ampicxx -o example example.C -tlsglobals
 
 Automatic Global Offset Table Swapping
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1131,9 +1131,9 @@ option). In the above case, suppose one wants to create 128 ranks of
 Solids and 64 ranks of Fluids on 32 physical processors, one would
 specify those with multiple ``+vp`` options on the command line as:
 
-::
+.. code-block:: bash
 
-   > ./charmrun gen1.x +p 32 +vp 128 +vp 64
+   $ ./charmrun gen1.x +p 32 +vp 128 +vp 64
 
 This will ensure that multiple modules representing different complete
 applications can co-exist within the same executable. They can also
@@ -1219,17 +1219,17 @@ processors. To activate the feature, build AMPI module with variable
 (Linking with zlib "-lz" might be required with this, for generating
 compressed log file.)
 
-::
+.. code-block:: bash
 
-   > ./build AMPI netlrts-linux-x86_64 -DAMPIMSGLOG
+   $ ./build AMPI netlrts-linux-x86_64 -DAMPIMSGLOG
 
 The feature is used in two phases: writing (logging) the environment and
 repeating the run. The first logging phase is invoked by a parallel run
 of the AMPI program with some additional command line options.
 
-::
+.. code-block:: bash
 
-   > ./charmrun ./pgm +p4 +vp4 +msgLogWrite +msgLogRank 2 +msgLogFilename "msg2.log"
+   $ ./charmrun ./pgm +p4 +vp4 +msgLogWrite +msgLogRank 2 +msgLogFilename "msg2.log"
 
 In the above example, a parallel run with 4 worker threads and 4 AMPI
 ranks will be executed, and the changes in the MPI environment of worker
@@ -1240,9 +1240,9 @@ Unlike the first run, the re-run is a sequential program, so it is not
 invoked by charmrun (and omitting charmrun options like +p4 and +vp4),
 and additional command line options are required as well.
 
-::
+.. code-block:: bash
 
-   > ./pgm +msgLogRead +msgLogRank 2 +msgLogFilename "msg2.log"
+   $ ./pgm +msgLogRead +msgLogRank 2 +msgLogFilename "msg2.log"
 
 User Defined Initial Mapping
 ----------------------------
@@ -1261,7 +1261,7 @@ Round Robin
 
    .. code-block:: bash
 
-      > ./charmrun ./hello +p2 +vp8 +mapping RR_MAP
+      $ ./charmrun ./hello +p2 +vp8 +mapping RR_MAP
 
 Block Mapping
    This mapping scheme maps virtual processors to physical processor in
@@ -1272,7 +1272,7 @@ Block Mapping
 
    .. code-block:: bash
 
-      > ./charmrun ./hello +p2 +vp8 +mapping BLOCK_MAP
+      $ ./charmrun ./hello +p2 +vp8 +mapping BLOCK_MAP
 
 Proportional Mapping
    This scheme takes the processing capability of physical processors
@@ -1285,8 +1285,8 @@ Proportional Mapping
 
    .. code-block:: bash
 
-      > ./charmrun ./hello +p2 +vp8 +mapping PROP_MAP
-      > ./charmrun ./hello +p2 +vp8 +mapping PROP_MAP +balancer GreedyLB +LBTestPESpeed
+      $ ./charmrun ./hello +p2 +vp8 +mapping PROP_MAP
+      $ ./charmrun ./hello +p2 +vp8 +mapping PROP_MAP +balancer GreedyLB +LBTestPESpeed
 
 If you want to define your own mapping scheme, please contact us for
 assistance.
@@ -1354,11 +1354,11 @@ AMPI Example Applications
 
 Most benchmarks can be compiled with the provided top-level Makefile:
 
-::
+.. code-block:: bash
 
-       > git clone ssh://charm.cs.illinois.edu:9418/benchmarks/ampi-benchmarks
-       > cd ampi-benchmarks
-       > make -f Makefile.ampi
+       $ git clone ssh://charm.cs.illinois.edu:9418/benchmarks/ampi-benchmarks
+       $ cd ampi-benchmarks
+       $ make -f Makefile.ampi
 
 Mantevo project v3.0
 ~~~~~~~~~~~~~~~~~~~~
@@ -1505,16 +1505,16 @@ Kripke v1.1
 
    .. code-block:: bash
 
-      > mkdir build; cd build;
-      > cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain/linux-gcc-ampi.cmake
+      $ mkdir build; cd build;
+      $ cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain/linux-gcc-ampi.cmake
       -DENABLE_OPENMP=OFF
-      > make
+      $ make
 
    Run with:
 
    .. code-block:: bash
 
-      > ./charmrun +p8 ./src/tools/kripke +vp8 --zones 64,64,64 --procs 2,2,2 --nest ZDG
+      $ ./charmrun +p8 ./src/tools/kripke +vp8 --zones 64,64,64 --procs 2,2,2 --nest ZDG
 
 MCB v1.0.3 (2013)
 ^^^^^^^^^^^^^^^^^
@@ -1528,7 +1528,7 @@ MCB v1.0.3 (2013)
 
    .. code-block:: bash
 
-      > OMP_NUM_THREADS=1 ./charmrun +p4 ./../src/MCBenchmark.exe --weakScaling
+      $ OMP_NUM_THREADS=1 ./charmrun +p4 ./../src/MCBenchmark.exe --weakScaling
        --distributedSource --nCores=1 --numParticles=20000 --multiSigma --nThreadCore=1 +vp16
 
 .. _not-yet-ampi-zed-reason-1:
@@ -1732,16 +1732,16 @@ HYPRE-2.11.1
 
 -  Hypre-2.11.1 builds on top of AMPI using the configure command:
 
-   ::
+   .. code-block:: bash
 
-      > ./configure --with-MPI
-            CC=~/charm/bin/ampicc
-            CXX=~/charm/bin/ampicxx
-            F77=~/charm/bin/ampif77
-            --with-MPI-include=~/charm/include
-            --with-MPI-lib-dirs=~/charm/lib
+      $ ./configure --with-MPI \
+            CC=~/charm/bin/ampicc \
+            CXX=~/charm/bin/ampicxx \
+            F77=~/charm/bin/ampif77 \
+            --with-MPI-include=~/charm/include \
+            --with-MPI-lib-dirs=~/charm/lib \
             --with-MPI-libs=mpi --without-timing --without-print-errors
-      > make -j8
+      $ make -j8
 
 -  All HYPRE tests and examples pass tests with virtualization,
    migration, etc. except for those that use Hypre’s timing interface,
@@ -1846,9 +1846,9 @@ and follow the download links. Then build Charm++ and AMPI from source.
 The build script for Charm++ is called ``build``. The syntax for this
 script is:
 
-::
+.. code-block:: bash
 
-   > build <target> <version> <opts>
+   $ build <target> <version> <opts>
 
 For building AMPI (which also includes building Charm++ and other
 libraries needed by AMPI), specify ``<target>`` to be ``AMPI``. And
@@ -1865,34 +1865,34 @@ programs. See the charm/README file for details on picking the proper
 version. Here is an example of how to build a debug version of AMPI in a
 linux and ethernet environment:
 
-::
+.. code-block:: bash
 
-   > build AMPI netlrts-linux-x86_64 -g
+   $ ./build AMPI netlrts-linux-x86_64 -g
 
 And the following is an example of how to build a production version of
 AMPI on a Cray XC system, with MPI-level error checking in AMPI turned
 off:
 
-::
+.. code-block:: bash
 
-   > build AMPI gni-crayxc --with-production --disable-ampi-error-checking
+   $ ./build AMPI gni-crayxc --with-production --disable-ampi-error-checking
 
 AMPI can also be built with support for shared memory on any
 communication layer by adding "smp" as an option after the build target.
 For example, on an Infiniband Linux cluster:
 
-::
+.. code-block:: bash
 
-   > build AMPI verbs-linux-x86_64 smp --with-production
+   $ ./build AMPI verbs-linux-x86_64 smp --with-production
 
 AMPI ranks are implemented as user-level threads with a stack size
 default of 1MB. If the default is not correct for your program, you can
 specify a different default stack size (in bytes) at build time. The
 following build command illustrates this for an Intel Omni-Path system:
 
-::
+.. code-block:: bash
 
-   > build AMPI ofi-linux-x86_64 --with-production -DTCHARM_STACKSIZE_DEFAULT=16777216
+   $ ./build AMPI ofi-linux-x86_64 --with-production -DTCHARM_STACKSIZE_DEFAULT=16777216
 
 The same can be done for AMPI’s RDMA messaging threshold using
 ``AMPI_RDMA_THRESHOLD_DEFAULT`` and, for messages sent within the same
@@ -1916,19 +1916,19 @@ other compilers like cc. All the command line flags that you would use
 for other compilers can be used with the AMPI compilers the same way.
 For example:
 
-::
+.. code-block:: bash
 
-   > ampicc -c pgm.c -O3
-   > ampif90 -c pgm.f90 -O0 -g
-   > ampicc -o pgm pgm.o -lm -O3
+   $ ampicc -c pgm.c -O3
+   $ ampif90 -c pgm.f90 -O0 -g
+   $ ampicc -o pgm pgm.o -lm -O3
 
 To use Isomalloc for transparently migrating user heap data, link with
 *-memory isomalloc*. To use a Charm++ load balancer, link a strategy or
 a suite of strategies in with *-module <LB>*. For example:
 
-::
+.. code-block:: bash
 
-   > ampicc pgm.c -o pgm -O3 -memory isomalloc -module CommonLBs
+   $ ampicc pgm.c -o pgm -O3 -memory isomalloc -module CommonLBs
 
 Running AMPI programs
 ---------------------
@@ -1949,9 +1949,9 @@ and the stack size of every user-level thread) and the program
 arguments. A typical invocation of an AMPI program ``pgm`` with
 ``charmrun`` is:
 
-::
+.. code-block:: bash
 
-   > ./charmrun +p16 ./pgm +vp64
+   $ ./charmrun +p16 ./pgm +vp64
 
 Here, the AMPI program ``pgm`` is run on 16 physical processors with 64
 total virtual ranks (which will be mapped 4 per processor initially).
@@ -1964,9 +1964,9 @@ using the ``+tcharm_stacksize`` option, which can be used to decrease
 the size of the stack that must be migrated, as in the following
 example:
 
-::
+.. code-block:: bash
 
-   > ./charmrun +p16 ./pgm +vp128 +tcharm_stacksize 32K +balancer RefineLB
+   $ ./charmrun +p16 ./pgm +vp128 +tcharm_stacksize 32K +balancer RefineLB
 
 Running with ampirun
 ~~~~~~~~~~~~~~~~~~~~
@@ -1979,9 +1979,9 @@ with ``ampicc``.
 
 The basic usage of ampirun is as follows:
 
-::
+.. code-block:: bash
 
-   > ./ampirun -np 16 --host h1,h2,h3,h4 ./pgm
+   $ ./ampirun -np 16 --host h1,h2,h3,h4 ./pgm
 
 This command will create 16 (non-virtualized) ranks and distribute them
 on the hosts h1-h4.
@@ -1990,16 +1990,16 @@ When using the ``-vr`` option, AMPI will create the number of ranks
 specified by the ``-np`` parameter as virtual ranks, and will create
 only one process per host:
 
-::
+.. code-block:: bash
 
-   > ./ampirun -np 16 --host h1,h2,h3,h4 -vr ./pgm
+   $ ./ampirun -np 16 --host h1,h2,h3,h4 -vr ./pgm
 
 Other options (such as the load balancing strategy), can be specified in
 the same way as for charmrun:
 
-::
+.. code-block:: bash
 
-   > ./ampirun -np 16 ./pgm +balancer RefineLB
+   $ ./ampirun -np 16 ./pgm +balancer RefineLB
 
 Other options
 ~~~~~~~~~~~~~
@@ -2007,9 +2007,9 @@ Other options
 Note that for AMPI programs compiled with gfortran, users may need to
 set the following environment variable to see program output to stdout:
 
-::
+.. code-block:: bash
 
-   > export GFORTRAN_UNBUFFERED_ALL=1
+   $ export GFORTRAN_UNBUFFERED_ALL=1
 
 .. [1]
    Currently, AMPI supports the MPI-2.2 standard, and the MPI-3.1

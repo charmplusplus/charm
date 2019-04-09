@@ -88,23 +88,23 @@ compile Charm++. In short, the “build” script is the main tool for
 compiling Charm++. One needs to provide *target* and *platform*
 selections:
 
-::
+.. code-block:: bash
 
-    ./build <target> <platform> [options ...] [charmc-options ...]
+   $ ./build <target> <platform> [options ...] [charmc-options ...]
 
 For example, to compile on a 64-bit Linux machine, one would type:
 
-::
+.. code-block:: bash
 
-   ./build charm++ netlrts-linux-x86_64 -O2
+   $ ./build charm++ netlrts-linux-x86_64 -O2
 
 which builds essential Charm++ kernel using UDP sockets as the
 communication method; alternatively, it is possible to build the Charm++
 kernel on MPI using:
 
-::
+.. code-block:: bash
 
-   ./build charm++ mpi-linux-x86_64 -O2
+   $ ./build charm++ mpi-linux-x86_64 -O2
 
 For other platforms, netlrts-linux-x86_64 should be replaced by whatever
 platform is being used. See the charm/README file for a complete list of
@@ -117,9 +117,9 @@ The BigSim Emulator is implemented on top of Converse in Charm++. To
 compile the BigSim Emulator, one can compile Emulator libraries directly
 on top of normal Charm++ using “bgampi” as the compilation target, like
 
-::
+.. code-block:: bash
 
-   ./build bgampi netlrts-linux-x86_64 -O2
+   $ ./build bgampi netlrts-linux-x86_64 -O2
 
 With Emulator libraries, one can write BigSim applications using its low
 level machine API (defined in  :numref:`bgemulator`).
@@ -131,9 +131,9 @@ In order to build Charm++ or AMPI on top of BigSim Emulator (which
 itself is implemented on top of Converse), a special build option
 “bigemulator” needs to be specified:
 
-::
+.. code-block:: bash
 
-   ./build bgampi netlrts-linux-x86_64 bigemulator -O2
+   $ ./build bgampi netlrts-linux-x86_64 bigemulator -O2
 
 The “bgampi” option is the compilation *target* that tells “build” to
 compile BigSim Emulator libraries in addition to Charm++ kernel
@@ -172,9 +172,9 @@ In order to link against the BigSim library, one must specify
 ``-language bigsim`` as an argument to the ``charmc`` command, for
 example:
 
-::
+.. code-block:: bash
 
-   charmc -o hello hello.C -language bigsim
+   $ charmc -o hello hello.C -language bigsim
 
 Sample applications in low level machine API can be found in the
 directory charm/examples/bigsim/emulator/.
@@ -192,9 +192,9 @@ To compile a program written in Charm++ on the BigSim Emulator, one
 specifies ``-language charm++`` as an argument to the ``charmc``
 command:
 
-::
+.. code-block:: bash
 
-   charmc -o hello hello.C -language charm++
+   $ charmc -o hello hello.C -language charm++
 
 This will link both Charm++ runtime libraries and BigSim Emulator
 libraries.
@@ -221,9 +221,9 @@ link against the AMPI library as well as the BigSim Charm++ runtime
 libraries by specifying ``-language ampi`` as an argument to the
 ``charmc`` command:
 
-::
+.. code-block:: bash
 
-   charmc -o hello hello.C -language ampi
+   $ charmc -o hello hello.C -language ampi
 
 Sample applications in AMPI can be found in the directory
 charm/examples/ampi, specifically charm/examples/ampi/pingpong.
@@ -272,16 +272,16 @@ with one worker processor and one communication processor on each node,
 and use 100 real processors to run the simulation, the command to be
 issued should be:
 
-::
+.. code-block:: bash
 
-   ./charmrun +p100 ./hello +x40 +y40 +z40 +cth1 +wth1
+   $ ./charmrun +p100 ./hello +x40 +y40 +z40 +cth1 +wth1
 
 To run an AMPI program, one may also want to specify the number of
 virtual processors to run the MPI code by using ``+vp``. As an example,
 
-::
+.. code-block:: bash
 
-   ./charmrun +p100 ./hello +x40 +y40 +z40 +cth1 +wth1 +vp 128000
+   $ ./charmrun +p100 ./hello +x40 +y40 +z40 +cth1 +wth1 +vp 128000
 
 starts the simulation of a machine of size 40x40x40 with one worker
 processor in each node, running 128000 MPI tasks (2 MPI tasks on each

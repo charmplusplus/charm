@@ -231,11 +231,11 @@ commands:
 
 .. code-block:: bash
 
-    > cd charm/
-    > ./src/libs/ck-libs/fem/make_fem_alone.sh
-    > cd fem_alone/
-    > mpicc -I. -DFEM_ALONE=1 -c *.c *.C
-    > ar cr libfem_alone.a *.o
+   $ cd charm/
+   $ ./src/libs/ck-libs/fem/make_fem_alone.sh
+   $ cd fem_alone/
+   $ mpicc -I. -DFEM_ALONE=1 -c *.c *.C
+   $ ar cr libfem_alone.a *.o
 
 You will then have to build your application with the MPI compilers, and
 manually point to this “fem_alone” directory to find include files and
@@ -243,7 +243,7 @@ the new FEM library. A typical compiler invocation would be:
 
 .. code-block:: bash
 
-    > mpif90 -I$HOME/charm/fem_alone -L$HOME/charm/fem_alone foo.f90 -lfem_alone -o foo
+   $ mpif90 -I$HOME/charm/fem_alone -L$HOME/charm/fem_alone foo.f90 -lfem_alone -o foo
 
 This “standalone”, non-Charm++ method of building the FEM framework
 prevents the use of load balancing or the other features of Charm++, so
