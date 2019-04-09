@@ -95,7 +95,7 @@ Every mainchare’s main is executed at startup.
 threaded methods
 ----------------
 
-::
+.. code-block:: java
 
    class C {
        public threaded void start(CProxy_CacheGroup cg) { ... }
@@ -104,7 +104,7 @@ threaded methods
 readonly
 --------
 
-::
+.. code-block:: java
 
    class C {
        public static readonly CProxy_TheMain mainChare;
@@ -119,7 +119,7 @@ is propagated to all processors. Then execution begins.
 msa
 ---
 
-::
+.. code-block:: java
 
    arr1.enroll();
    int a = arr1[10]; // get

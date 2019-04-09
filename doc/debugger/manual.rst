@@ -474,7 +474,7 @@ debugging support in charm.
 The code below shows a simple class declaration that includes a ``pup``
 method.
 
-::
+.. code-block:: c++
 
      class foo {
       private:

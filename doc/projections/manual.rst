@@ -356,7 +356,7 @@ The calls for recording user events are the following:
 
    Eg.
 
-   ::
+   .. code-block:: c++
 
          traceRegisterUserEvent("Critical Code", 20); // on PE 0
          double critStart = CmiWallTimer();  // start time

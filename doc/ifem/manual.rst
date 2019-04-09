@@ -115,11 +115,11 @@ for the :math:`b` vector.
 IFEM_Solve_shared
 -----------------
 
-::
+.. code-block:: c++
 
-  void IFEM_Solve_shared(ILSI_Solver s, ILSI_Param *p, int fem_mesh, int
-    fem_entity, int length, int width, IFEM_Matrix_product_c A, void *ptr,
-    const double *b, double *x);
+   void IFEM_Solve_shared(ILSI_Solver s, ILSI_Param *p, int fem_mesh, int
+     fem_entity, int length, int width, IFEM_Matrix_product_c A, void *ptr,
+     const double *b, double *x);
 
 .. code-block:: fortran
 
@@ -156,7 +156,7 @@ Fortran, these arrays should be allocated like x(width,length).
 When this routine returns, x is the final value for the unknown vector,
 and the output values of the solver parameters p will have been written.
 
-::
+.. code-block:: c++
 
    // C++ Example
    int mesh=FEM_Mesh_default_read();
@@ -210,7 +210,7 @@ IFEM requires you to write a matrix-vector product routine that will
 evaluate :math:`A x` for various vectors :math:`x`. You may use any
 subroutine name, but it must take these arguments:
 
-::
+.. code-block:: c++
 
   void IFEM_Matrix_product(void *ptr, int length, int width, const double
     *src, double *dest);
@@ -242,7 +242,7 @@ After calling this routine, the framework will handle combining the
 overlapping portions of these vectors across processors to arrive at a
 consistent global matrix-vector product.
 
-::
+.. code-block:: c++
 
    // C++ Example
    #include "ifemc.h"
@@ -300,7 +300,7 @@ consistent global matrix-vector product.
 IFEM_Solve_shared_bc
 --------------------
 
-::
+.. code-block:: c++
 
   void IFEM_Solve_shared_bc(ILSI_Solver s, ILSI_Param *p, int fem_mesh,
   int fem_entity, int length, int width, int bcCount, const int *bcDOF,
@@ -341,7 +341,7 @@ For example, if :math:`width` is 3 in a 3d problem, we would set node
 :math:`ny`\ ’s y coordinate to 4.6 and node :math:`nz`\ ’s z coordinate
 to 7.3 like this:
 
-::
+.. code-block:: c++
 
    // C++ Example
    int bcCount=2;

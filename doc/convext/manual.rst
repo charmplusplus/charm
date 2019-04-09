@@ -165,7 +165,7 @@ you may fire the next batch of tasks via CmsFireTask again.
 Example Program
 ---------------
 
-::
+.. code-block:: c++
 
    #include "cms.h"
 
@@ -319,7 +319,7 @@ Releases memory used by q.
 
 The following Templates are available for use in C++:
 
-::
+.. code-block:: c++
 
    template<class T>
    class CkQ {
@@ -426,20 +426,20 @@ arrives and is handled, the user’s function is called.
 
 For example, if the CPM scanner sees the following function declaration
 
-::
+.. code-block:: c++
 
        CpmInvokable myfunc(int x, int y) { ... }
 
 The scanner will generate a launcher named ``Cpm_myfunc``. The launcher
 has this prototype:
 
-::
+.. code-block:: c++
 
        void Cpm_myfunc(CpmDestination destination, int x, int y);
 
 If one were to call ``Cpm_myfunc`` as follows:
 
-::
+.. code-block:: c++
 
        Cpm_myfunc(CpmSend(3), 8, 9);
 
@@ -558,7 +558,7 @@ All the functions shown above accept processor numbers as arguments.
 Instead of supplying a processor number, one can also supply the special
 symbols CPM_ALL or CPM_OTHERS, causing a broadcast. For example,
 
-::
+.. code-block:: c++
 
    Cpm_print_integer(CpmMakeThread(CPM_ALL), 5);
 
@@ -574,7 +574,7 @@ argument lists. In particular, the argument list of a CpmInvokable
 function can only contain cpm-single-arguments and cpm-array-arguments,
 as defined by this grammar:
 
-::
+.. code-block:: c++
 
        cpm-single-argument :== typeword varname
        cpm-array-argument  :== typeword '*' varname
@@ -623,7 +623,7 @@ A second program, ``example2.c``, uses array arguments:
 The word ``CpmStr`` is a CPM built-in type, it represents a
 null-terminated string:
 
-::
+.. code-block:: c++
 
    	typedef char *CpmStr;
 
@@ -647,7 +647,7 @@ types.
 
 CPM knows which type is which only through the following declarations:
 
-::
+.. code-block:: c++
 
        CpmDeclareSimple(typeword);
        CpmDeclarePointer(typeword);
@@ -800,7 +800,7 @@ We now show an example CPM command, and describe the steps that are
 taken when the command is executed. The command we will consider is this
 one:
 
-::
+.. code-block:: c++
 
    Cpm_print_integer(CpmEnqueueFIFO(3), 12);
 
@@ -810,7 +810,7 @@ Which sends a message to processor 3, ordering it to call
 The first step is taken by CpmEnqueueFIFO, which builds the
 CpmDestination. The following is the code for CpmEnqueueFIFO:
 
-::
+.. code-block:: c++
 
    typedef struct CpmDestinationSend_s
    {
@@ -855,7 +855,7 @@ normally taken by a launcher:
 
 The code for the send-function is here:
 
-::
+.. code-block:: c++
 
    void *CpmEnqueueFIFO1(CpmDestinationSend dest, int len, void *msg)
    {
@@ -882,7 +882,7 @@ handler will be called. The result will be that ``CpmEnqueueFIFO2`` will
 be called on the destination processor. Here is the code for
 ``CpmEnqueueFIFO2``:
 
-::
+.. code-block:: c++
 
    void CpmEnqueueFIFO2(void *msg)
    {
@@ -917,13 +917,13 @@ This pointer must be coerced to type CpmDestination.
 
 The send-function must have the following prototype:
 
-::
+.. code-block:: c++
 
        void sendfunction(CpmDestination dest, int msglen, void *msgptr)
 
 It can access the envelope of the message using CpmEnv:
 
-::
+.. code-block:: c++
 
        int *CpmEnv(void *msg);
 
@@ -1057,7 +1057,7 @@ use of the load balancers.
 
 ``hello.c:``
 
-::
+.. code-block:: c++
 
    #include <stdio.h>
    #include "converse.h"
@@ -1183,7 +1183,7 @@ Minimal Requirements
 The minimal requirements for a load balancer are illustrated by the
 following code.
 
-::
+.. code-block:: c++
 
    #include <stdio.h>
    #include "converse.h"
@@ -1278,7 +1278,7 @@ components of) the message ``msg``.
 Thus, an implementation of the **CldEnqueue** function might have the
 following structure:
 
-::
+.. code-block:: c++
 
    void CldEnqueue(int pe, void *msg, int infofn)
    {
@@ -1307,7 +1307,7 @@ Thus, to use the info function, we need to get the actual function via
 the handler index provided to **CldEnqueue**. Typically,
 **CldEnqueue** would contain the following declarations:
 
-::
+.. code-block:: c++
 
      int len, queueing, priobits;
      unsigned int *prioptr;
@@ -1316,7 +1316,7 @@ the handler index provided to **CldEnqueue**. Typically,
 
 Subsequently, a call to ``ifn`` would look like this:
 
-::
+.. code-block:: c++
 
      ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
 
@@ -1325,7 +1325,7 @@ queuing strategy and priority, and also a pack function, which will be
 used when we need to send the message elsewhere. For now, consider the
 case where the message is to be locally enqueued:
 
-::
+.. code-block:: c++
 
      ...
      else if (pe == CmiMyPe())
@@ -1344,7 +1344,7 @@ that it has room for extra handler information and a reference to the
 info function. Therefore, before we handle the last three cases of
 **CldEnqueue**, we have a little extra work to do:
 
-::
+.. code-block:: c++
 
      ...
      else
@@ -1371,7 +1371,7 @@ values may have changed in the packing process.
 
 Finally, we handle our last few cases:
 
-::
+.. code-block:: c++
 
      ...
          if (pe==CLD_BROADCAST)
@@ -1385,7 +1385,7 @@ Finally, we handle our last few cases:
 The above example also provides **CldHandler** which is used to receive
 messages that **CldEnqueue** forwards to other processors.
 
-::
+.. code-block:: c++
 
    CpvDeclare(int, CldHandlerIndex);
 
@@ -1409,7 +1409,7 @@ this more below.
 Finally, Converse initialization functions call **CldModuleInit** to
 initialize the load balancer module.
 
-::
+.. code-block:: c++
 
    void CldModuleInit()
    {
@@ -1431,7 +1431,7 @@ tokens of messages in a processor’s scheduler in a way that they can be
 removed and relocated to a different processor at any time. The
 interface for this module is as follows:
 
-::
+.. code-block:: c++
 
    void CldSwitchHandler(char *cmsg, int handler)
    void CldRestoreHandler(char *cmsg)
@@ -1464,7 +1464,7 @@ module. It is typically called from the load balancer’s
 
 The helper module also provides the following functions:
 
-::
+.. code-block:: c++
 
    void CldMultipleSend(int pe, int numToSend)
    int CldRegisterInfoFn(CldInfoFn fn)
@@ -1483,7 +1483,7 @@ You may want to use the three status variables. These can be used to
 keep track of what your LB is doing (see usage in cldb.neighbor.c and
 itc++queens program).
 
-::
+.. code-block:: c++
 
    CpvDeclare(int, CldRelocatedMessages);
    CpvDeclare(int, CldLoadBalanceMessages);
@@ -1526,7 +1526,7 @@ This means that messages can later be removed for relocation.
 **CldPutToken** adds the message to the token queue on the local
 processor.
 
-::
+.. code-block:: c++
 
    #include <stdio.h>
    #include "converse.h"
@@ -1738,7 +1738,7 @@ interchangeable with their pthread equivalents. In addition, you may
 prevent Converse from defining the pthread names at all with the
 preprocessor symbol SUPPRESS_PTHREADS:
 
-::
+.. code-block:: c++
 
    #define SUPPRESS_PTHREADS
    #include <cpthreads.h>
@@ -1788,7 +1788,7 @@ procedure, create a POSIX thread to run ``mymain``. We provide a
 convenience function to do this, called Cpthreads_start_main. The
 startup code will be much like this:
 
-::
+.. code-block:: c++
 
    void mystartup(int argc, char **argv)
    {
@@ -1906,7 +1906,7 @@ by a context-free grammar:
 
 Where:
 
-::
+.. code-block:: none
 
        dest-clause :== CPATH_DEST ',' pathptr ',' index ',' index ',' ...
        tag-clause  :== CPATH_TAG ',' tag
@@ -1970,7 +1970,7 @@ dest-clause, end-clause)``
 
 Where:
 
-::
+.. code-block:: none
 
        over-clause :== CPATH_OVER ',' pathptr ',' index ',' index ',' ...
        dest-clause :== CPATH_DEST ',' pathptr ',' index ',' index ',' ...

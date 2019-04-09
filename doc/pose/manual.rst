@@ -249,7 +249,7 @@ Currently, event messages are declared with no reference to what they
 might inherit from (unlike in Charm++). The translator takes care of
 this. In addition, they must define ``operator=``.
 
-::
+.. code-block:: c++
 
   class myMessage {
     public:
@@ -268,7 +268,7 @@ as well. In addition, a ``pup`` and ``operator=`` must be provided.
 The ``pup`` method should call the ``pup`` method of the global state
 representation class being used.
 
-::
+.. code-block:: c++
 
   class mySim {
     int anInt; float aFloat; char aString[20];
@@ -298,7 +298,7 @@ fit. It could be given an empty body and should still work for POSE.
 Poser entry constructors (those described in the ``.ci`` file) should
 follow the template below:
 
-::
+.. code-block:: c++
 
   mySim::mySim(myMessage *m)
   {
@@ -316,7 +316,7 @@ those.
 
 An event method should have the following form:
 
-::
+.. code-block:: c++
 
   void mySim::myEventMethod(eventMsg *m) {
     // body of method
@@ -338,7 +338,7 @@ Creation of Poser Objects
 
 Posers are created within a module using the following syntax:
 
-::
+.. code-block:: c++
 
   int hdl = 13; // handle should be unique
   myMessage *m = new myMessage;
@@ -351,7 +351,7 @@ simulation time zero, and can be referred to by the handle 13.
 Creating a poser from outside the module (*i.e.* from ``main``) is
 somewhat more complex:
 
-::
+.. code-block:: c++
 
   int hdl = 13;
   myMessage *m = new myMessage;
@@ -375,7 +375,7 @@ There are three ways to send events within a POSE module. The first and
 most commonly used way involves specifying and offset in simulation time
 from the current time. The syntax follows:
 
-::
+.. code-block:: c++
 
   aMsg = new eventMsg;
   POSE_invoke(myEventMethod(aMsg), mySim, hdl, 0);
@@ -393,7 +393,7 @@ are not a part of the simulation, they do not have a current time, or
 OVT, by which to specify an offset. The syntax is nearly identical to
 that above, only the last parameter is an absolute time.
 
-::
+.. code-block:: c++
 
   aMsg = new eventMsg;
   POSE_invoke_at(myEventMethod(aMsg), mySim, hdl, 56);
@@ -409,7 +409,7 @@ outside any module, but this is not recommended.
 The third approach is useful when an object send events to itself. It is
 simply a slightly shorter syntax for the same thing as ``POSE_invoke``:
 
-::
+.. code-block:: c++
 
   aMsg = new eventMsg;
   POSE_local_invoke(myEventMethod(aMsg), offset);
@@ -426,7 +426,7 @@ OVT) to the timestamp of the event.
 It is also possible to elapse time on an object while the object is
 executing an event. This is accomplished thus:
 
-::
+.. code-block:: c++
 
  elapse(42);
 
@@ -444,7 +444,7 @@ To interface these with a main program module, say :math:`Pgm` in files
 ``pgm.ci``, ``pgm.h`` and ``pgm.C``, the ``pgm.ci`` file must declare
 the POSE module as extern in the ``mainmodule Pgm`` block. For example:
 
-::
+.. code-block:: c++
 
   mainmodule Pgm {
     extern module <modname>;
@@ -474,7 +474,7 @@ each with a unique handle. The programmer is responsible for choosing
 and keeping track of the handles created for posers. Once all posers are
 created, the simulation can be started:
 
-::
+.. code-block:: c++
 
   POSE_start();
 
@@ -660,7 +660,7 @@ Glossary of POSE-specific Terms
      on. For example, to register the function ``wrapUp`` in the main
      module as a callback:
 
-   ::
+   .. code-block:: c++
 
         CProxy_main M(mainhandle);
         POSE_registerCallBack(CkCallback(CkIndex_main::wrapUp(), M));

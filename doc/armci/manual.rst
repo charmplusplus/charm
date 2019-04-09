@@ -70,7 +70,7 @@ other’s global address space in order to print “hello world”.
 
 The main function has to be compliant to ANSI C:
 
-::
+.. code-block:: c++
 
    #include <stdio.h>
    #include <stdlib.h>
@@ -153,7 +153,7 @@ arbitrary local and remote memory locations. It uses two arrays of
 pointers: one for source and one for destination addresses. The length
 of each array is equal to the number of segments.
 
-::
+.. code-block:: c++
 
    typedef struct {
      void *src_ptr_ar;
@@ -184,14 +184,14 @@ failure (See Section :numref:`sec::error codes` for details).
 Startup, Cleanup and Status Functions
 -------------------------------------
 
-::
+.. code-block:: c++
 
    int ARMCI_Init(void);
 
 Initializes the ARMCI library. This function must be called before any
 ARMCI functions may be used.
 
-::
+.. code-block:: c++
 
    int ARMCI_Finalize(void);
 
@@ -199,27 +199,27 @@ Shuts down the ARMCI library. No ARMCI functions may be called after
 this call is made. It must be used before terminating the program
 normally.
 
-::
+.. code-block:: c++
 
    void ARMCI_Cleanup(void);
 
 Releases system resources that the ARMCI library might be holding. This
 is intended to be used before terminating the program in case of error.
 
-::
+.. code-block:: c++
 
    void ARMCI_Error(char *msg, int code);
 
 Combines the functionality of ARMCI_Cleanup and Charm++’s CkAbort call.
 Prints to *stdout* and *stderr* ``msg`` followed by an integer ``code``.
 
-::
+.. code-block:: c++
 
    int ARMCI_Procs(int *procs);
 
 The number of processes is stored in the address ``procs``.
 
-::
+.. code-block:: c++
 
    int ARMCI_Myid(int *myid);
 
@@ -229,7 +229,7 @@ The id of the process making this call is stored in the address
 ARMCI Memory Allocation
 -----------------------
 
-::
+.. code-block:: c++
 
    int ARMCI_Malloc(void* ptr_arr[], int bytes);
 
@@ -239,21 +239,21 @@ process. The pointer address of each process’ allocated memory is stored
 at ``ptr_arr[]`` indexed by the process’ id (see ``ARMCI_Myid``). Each
 process gets a copy of ``ptr_arr``.
 
-::
+.. code-block:: c++
 
    int ARMCI_Free(void *ptr);
 
 Collective operation to free memory which was allocated by
 ``ARMCI_Malloc``.
 
-::
+.. code-block:: c++
 
    void *ARMCI_Malloc_local(int bytes);
 
 Local memory of size ``bytes`` allocated. Essentially a wrapper for
 ``malloc``.
 
-::
+.. code-block:: c++
 
    int ARMCI_Free_local(void *ptr);
 
@@ -263,7 +263,7 @@ wrapper for ``free``.
 Put and Get Communication
 -------------------------
 
-::
+.. code-block:: c++
 
    int ARMCI_Put(void *src, void *dst, int bytes, int proc);
 
@@ -271,7 +271,7 @@ Transfer contiguous data of size ``bytes`` from the local process memory
 (source) pointed to by ``src`` into the remote memory of process id
 ``proc`` pointed to by ``dst`` (remote memory pointer at destination).
 
-::
+.. code-block:: c++
 
    int ARMCI_NbPut(void *src, void* dst, int bytes, int proc,
                    armci_hdl_t *handle);
@@ -280,7 +280,7 @@ The non-blocking version of ``ARMCI_Put``. Passing a ``NULL`` value to
 ``handle`` makes this function perform an implicit handle non-blocking
 transfer.
 
-::
+.. code-block:: c++
 
    int ARMCI_PutS(void *src_ptr, int src_stride_ar[],
                   void *dst_ptr, int dst_stride_ar[],
@@ -301,7 +301,7 @@ process ``proc``\ ’s memory layout. ``count`` is an array of size
 As an example, assume two 2-dimensional C arrays residing on different
 processes.
 
-::
+.. code-block:: c++
 
              double A[10][20]; /* local process */
              double B[20][30]; /* remote process */
@@ -310,7 +310,7 @@ To put a block of data of 3x6 doubles starting at location (1,2) in
 ``A`` into location (3,4) in ``B``, the arguments to ``ARMCI_PutS`` will
 be as follows (assuming C/C++ memory layout):
 
-::
+.. code-block:: c++
 
              src_ptr = &A[0][0] + (1 * 20 + 2); /* location (1,2) */
              src_stride_ar[0] = 20 * sizeof(double);
@@ -321,7 +321,7 @@ be as follows (assuming C/C++ memory layout):
              stride_levels = 1;
              proc = /*<B's id> */;
 
-::
+.. code-block:: c++
 
    int ARMCI_NbPutS(void *src_ptr, int src_stride_ar[],
                     void *dst_ptr, int dst_stride_ar[],
@@ -332,7 +332,7 @@ The non-blocking version of ``ARMCI_PutS``. Passing a ``NULL`` value to
 ``handle`` makes this function perform an implicit handle non-blocking
 transfer.
 
-::
+.. code-block:: c++
 
    int ARMCI_Get(void *src, void *dst, int bytes, int proc);
 
@@ -340,7 +340,7 @@ Transfer contiguous data of size ``bytes`` from the remote process
 memory at process ``proc`` (source) pointed to by ``src`` into the local
 memory of the calling process pointed to by ``dst``.
 
-::
+.. code-block:: c++
 
    int ARMCI_NbGet(void *src, void *dst, int bytes, int proc,
                    armci_hdl_t *handle);
@@ -349,7 +349,7 @@ The non-blocking version of ``ARMCI_Get``. Passing a ``NULL`` value to
 ``handle`` makes this function perform an implicit handle non-blocking
 transfer.
 
-::
+.. code-block:: c++
 
    int ARMCI_GetS(void *src_ptr, int src_stride_ar[],
                   void* dst_ptr, int dst_stride_ar[],
@@ -359,7 +359,7 @@ Transfer strided data segments from remote process memory on process
 ``proc`` to the local memory of the calling process. The semantics of
 the parameters to this function are the same as that for ``ARMCI_PutS``.
 
-::
+.. code-block:: c++
 
    int ARMCI_NbGetS(void *src_ptr, int src_stride_ar[],
                     void* dst_ptr, int dst_stride_ar[],
@@ -373,7 +373,7 @@ transfer.
 Explicit Synchronization
 ------------------------
 
-::
+.. code-block:: c++
 
    int ARMCI_Wait(armci_hdl_t *handle);
    int ARMCI_WaitProc(int proc);
@@ -381,7 +381,7 @@ Explicit Synchronization
    int ARMCI_Test(armci_hdl_t *handle);
    int ARMCI_Barrier();
 
-::
+.. code-block:: c++
 
    int ARMCI_Fence(int proc);
 
@@ -389,7 +389,7 @@ Blocks the calling process until all *put* or *accumulate* operations
 the process issued to the remote process ``proc`` are completed at the
 destination.
 
-::
+.. code-block:: c++
 
    int ARMCI_AllFence(void);
 
@@ -401,7 +401,7 @@ operations it issued are completed on all remote destinations.
 Extensions to the Standard API
 ------------------------------
 
-::
+.. code-block:: c++
 
    void ARMCI_Migrate(void);
    void ARMCI_Async_Migrate(void);
@@ -417,7 +417,7 @@ List of Unimplemented Functions
 The following functions are supported on the standard ARMCI
 implementation but not yet supported in the Charm++ port.
 
-::
+.. code-block:: c++
 
    int ARMCI_GetV(...);
    int ARMCI_NbGetV(...);

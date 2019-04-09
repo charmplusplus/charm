@@ -143,7 +143,7 @@ Figure :numref:`fig:forcedecomp` (b).
 
 Hence, each chunk’s time loop has the structure:
 
-::
+.. code-block:: none
 
         chunk time loop
              element loop-- Element deformation applies forces to
@@ -169,7 +169,7 @@ and does the main work of the program. In the language of the TCHARM
 manual, init() runs in the serial context, and driver() runs in the
 parallel context.
 
-::
+.. code-block:: none
 
         subroutine init
              read the serial mesh and configuration data
@@ -196,7 +196,7 @@ FEM framework program using the MPI style. This is a more general, more
 flexible method of running the program, but it is more complicated than
 the classic mode. All FEM framework calls are available in either mode.
 
-::
+.. code-block:: none
 
       main program
          MPI_Init
@@ -326,7 +326,7 @@ or from whatever TCHARM code executes before the FEM_Attach.
 Utility
 -------
 
-::
+.. code-block:: c++
 
   int FEM_Num_partitions();
 
@@ -337,7 +337,7 @@ Utility
 Return the number of mesh chunks in the current computation. Can only be
 called from the driver routine.
 
-::
+.. code-block:: c++
 
   int FEM_My_partition();
 
@@ -348,7 +348,7 @@ called from the driver routine.
 Return the number of the current chunk, from 0 to num_partitions-1. Can
 only be called from the driver routine.
 
-::
+.. code-block:: c++
 
   double FEM_Timer();
 
@@ -359,7 +359,7 @@ only be called from the driver routine.
 Return the current wall clock time, in seconds. Resolution is
 machine-dependent, but is at worst 10ms.
 
-::
+.. code-block:: c++
 
   void FEM_Print_partition();
 
@@ -371,7 +371,7 @@ Print a debugging representation of the current chunk’s mesh. Prints the
 entire connectivity array, and data associated with each local node and
 element.
 
-::
+.. code-block:: c++
 
   void FEM_Print(const char *str);
 
@@ -513,7 +513,7 @@ FEM_ELEM+\ :math:`elType` is partitioned.
 Mesh Entity Manipulation
 ------------------------
 
-::
+.. code-block:: c++
 
   int FEM_Mesh_default_read(void);
 
@@ -529,7 +529,7 @@ Return the default reading mesh. This routine is valid:
 
 -  Anytime after a call to FEM_Mesh_set_default_read.
 
-::
+.. code-block:: c++
 
   int FEM_Mesh_default_write(void);
 
@@ -547,7 +547,7 @@ Return the default writing mesh. This routine is valid:
 
 -  Anytime after a call to FEM_Mesh_set_default_write.
 
-::
+.. code-block:: c++
 
   int FEM_Mesh_get_length(int mesh,int entity);
 
@@ -560,24 +560,24 @@ Return the number of entitys that exist in this mesh.
 This call can be used with any entity. For example, to get the number of
 nodes,
 
-::
+.. code-block:: c++
 
          nNodes=FEM_Mesh_get_length(mesh,FEM_NODE)
 
 To get the number of ghost nodes,
 
-::
+.. code-block:: c++
 
          nGhostNodes=FEM_Mesh_get_length(mesh,FEM_GHOST+FEM_NODE)
 
 To get the number of real elements of type 2,
 
-::
+.. code-block:: c++
 
      	nElem=FEM_Mesh_get_length(mesh,FEM_ELEM+2)
 
 
-::
+.. code-block:: c++
 
   void FEM_Mesh_data(int mesh,int entity,int attr, void *data, int
   first, int length, int datatype,int width);
@@ -605,7 +605,7 @@ the mesh.
    width values, and contains the data values of the attribute for the
    corresponding entity. This data must be formatted as one of:
 
-   ::
+   .. code-block:: fortran
 
             datatype :: data(width,length)
             datatype :: data(width*length)
@@ -630,7 +630,7 @@ the mesh.
 For example, to set the element connectivity, which is stored as 3
 integer node indices in nodes, you would:
 
-::
+.. code-block:: c++
 
   /* C version */
   int *nodes=new int[3*nElems];
@@ -650,7 +650,7 @@ To add a new node property with 2 double-precision numbers from an array
 mat (containing, for example, material properties), you would first pick
 an unused user data "tag", for example 13, and:
 
-::
+.. code-block:: c++
 
   /* C version */
   double *mat=new double[2*nNodes];
@@ -666,7 +666,7 @@ an unused user data "tag", for example 13, and:
 Entity Inquiry
 --------------
 
-::
+.. code-block:: c++
 
   int FEM_Mesh_get_width(int mesh,int entity,int attr);
 
@@ -678,7 +678,7 @@ Entity Inquiry
 Return the width of the attribute attr of entity of mesh. This is the
 value previously passed as “width” to FEM_Mesh_data.
 
-::
+.. code-block:: c++
 
   int FEM_Mesh_get_datatype(int mesh,int entity,int attr);
 
@@ -690,7 +690,7 @@ value previously passed as “width” to FEM_Mesh_data.
 Return the FEM data type of the attribute attr of entity of mesh. This
 is the value previously passed as “datatype” to FEM_Mesh_data.
 
-::
+.. code-block:: c++
 
   int FEM_Mesh_get_entities(int mesh,int *entities);
 
@@ -709,7 +709,7 @@ For example, a simple mesh might have two entity types: FEM_NODE and
 FEM_ELEM+1.
 
 
-::
+.. code-block:: c++
 
   int FEM_Mesh_get_attributes(int mesh,int entity,int *attributes);
 
@@ -727,7 +727,7 @@ For example, a simple element might have three attributes: FEM_CONN for
 node connectivity, FEM_GLOBALNO for global element numbers, and
 FEM_DATA+7 for a material type.
 
-::
+.. code-block:: c++
 
   const char *FEM_Get_entity_name(int entity,char *storage);
   const char *FEM_Get_attr_name(int attr,char *storage);
@@ -742,7 +742,7 @@ These routines are only available in C.
 
 Advanced Entity Manipulation
 ----------------------------
-::
+.. code-block:: c++
 
   void FEM_Mesh_data_offset(int mesh,int entity,int attr, void *data,
   int first, int length, int datatype,int width, int offsetBytes,int
@@ -762,7 +762,7 @@ See the documentation of IDXL_Layout_offset in
 Section :numref:`sec:IDXLLayoutoffset` for details on how to set
 offsetBytes, distanceBytes, and skewBytes.
 
-::
+.. code-block:: c++
 
   void FEM_Mesh_data_layout(int mesh,int entity,int attr, void *data,
   int firstItem, int length, IDXL_Layout_t layout);
@@ -797,7 +797,7 @@ describe local data and hence operate independently on each chunk.
 Mesh Routines
 -------------
 
-::
+.. code-block:: c++
 
   int FEM_Mesh_allocate(void);
 
@@ -808,7 +808,7 @@ Mesh Routines
 Create a new local mesh object. The mesh is initially empty, but it is a
 setting mesh, so call FEM_Mesh_data to fill the mesh with data.
 
-::
+.. code-block:: c++
 
   int FEM_Mesh_deallocate(int mesh);
 
@@ -819,7 +819,7 @@ setting mesh, so call FEM_Mesh_data to fill the mesh with data.
 
 Destroy this local mesh object, and its associated data.
 
-::
+.. code-block:: c++
 
   int FEM_Mesh_copy(int mesh);
 
@@ -831,7 +831,7 @@ Destroy this local mesh object, and its associated data.
 Create a new mesh object with a separate copy of the data stored in
 this old mesh object.
 
-::
+.. code-block:: c++
 
   void FEM_Mesh_write(int mesh,const char *prefix,int partNo,int
   nParts);
@@ -857,7 +857,7 @@ format is currently ASCII based, but it is subject to change. We
 strongly recommend using the FEM routines to read and write these files
 rather than trying to prepare or parse them yourself.
 
-::
+.. code-block:: c++
 
   int FEM_Mesh_read(const char *prefix,int partNo,int nParts);
 
@@ -871,7 +871,7 @@ Read a new mesh from the file “prefix_vppartNo_nParts.dat”. The new
 mesh begins in getting mode, so you can read the data out of the mesh
 using calls to FEM_Mesh_data.
 
-::
+.. code-block:: c++
 
   int FEM_Mesh_broadcast(int mesh,int fromRank,FEM_Comm_t comm_context);
 
@@ -890,7 +890,7 @@ processors.
 For example, if rank 0 has a mesh named “src”, we can partition src for
 all the processors by executing:
 
-::
+.. code-block:: c++
 
      m=FEM_Mesh_broadcast(src,0,MPI_COMM_WORLD);
 
@@ -898,7 +898,7 @@ The new, partitioned mesh is in getting mode, so you can read the
 partitioned data using calls to FEM_Mesh_data. This call does not affect
 mesh in any way.
 
-::
+.. code-block:: c++
 
   int FEM_Mesh_reduce(int mesh,int toRank,FEM_Comm_t comm_context);
 
@@ -919,7 +919,7 @@ mesh.
 Mesh Utility
 ------------
 
-::
+.. code-block:: c++
 
   int FEM_Mesh_is_get(int mesh)
 
@@ -931,7 +931,7 @@ Mesh Utility
 Return true if this mesh is in getting mode. A getting mesh returns
 values to FEM_Mesh_data.
 
-::
+.. code-block:: c++
 
   int FEM_Mesh_is_set(int mesh)
 
@@ -943,7 +943,7 @@ values to FEM_Mesh_data.
 Return true if this mesh is in setting mode. A setting mesh extracts
 values from FEM_Mesh_data.
 
-::
+.. code-block:: c++
 
   void FEM_Mesh_become_get(int mesh)
 
@@ -954,7 +954,7 @@ values from FEM_Mesh_data.
 
 Put this mesh in getting mode, so you can read back its values.
 
-::
+.. code-block:: c++
 
   void FEM_Mesh_become_set(int mesh)
 
@@ -965,7 +965,7 @@ Put this mesh in getting mode, so you can read back its values.
 
 Put this mesh in setting mode, so you can set its values.
 
-::
+.. code-block:: c++
 
   void FEM_Mesh_print(int mesh);
 
@@ -979,7 +979,7 @@ Print out a text description of the nodes and elements of this mesh.
 Advanced Mesh Manipulation
 --------------------------
 
-::
+.. code-block:: c++
 
   typedef void (*FEM_Userdata_fn)(pup_er p,void *data);
   void FEM_Mesh_pup(int mesh,int pupTag, FEM_Userdata_fn fn, void *data);
@@ -1010,7 +1010,7 @@ constants such as the timestep or material properties. data is made a
 part of the mesh, and it will be read and written, sent and received,
 partitioned and assembled with the mesh.
 
-::
+.. code-block:: c++
 
   void FEM_Mesh_send(int mesh,int toRank,int tag,FEM_Comm_t
   comm_context);
@@ -1026,7 +1026,7 @@ to mix direct MPI calls with your FEM calls.
 
 This call does not affect mesh.
 
-::
+.. code-block:: c++
 
   int FEM_Mesh_recv(int fromRank,int tag,FEM_Comm_t comm_context);
 
@@ -1042,7 +1042,7 @@ use MPI_ANY_TAG for tag to match any tag.
 
 The new mesh is returned in getting mode.
 
-::
+.. code-block:: c++
 
   void FEM_Mesh_partition(int mesh,int nParts,int *destMeshes);
 
@@ -1059,7 +1059,7 @@ The partitioned mesh is returned in getting mode. This is a local call;
 FEM_Mesh_broadcast is the collective version. This call does not affect
 the source mesh mesh.
 
-::
+.. code-block:: c++
 
   int FEM_Mesh_assemble(int nParts,const int *srcMeshes);
 
@@ -1080,7 +1080,7 @@ The assembled mesh is returned in getting mode. This is a local call;
 FEM_Mesh_reduce is the collective version. This call does not affect the
 source meshes.
 
-::
+.. code-block:: c++
 
   void FEM_Mesh_copy_globalno(int src_mesh,int dest_mesh);
 
@@ -1183,7 +1183,7 @@ all the ghost nodes after all the real nodes. The code to extract and
 renumber the connectivity of some 3-node triangles stored in FEM_ELEM+2
 would be:
 
-::
+.. code-block:: c++
 
    /* C version */
    int nReal=FEM_Mesh_get_length(mesh,FEM_ELEM+2);
@@ -1244,7 +1244,7 @@ The framework’s ghost handling is element-centric. You specify which
 kinds of elements should be ghosts and how they connect by listing their
 faces before partitioning.
 
-::
+.. code-block:: c++
 
   void FEM_Add_ghost_layer(int nodesPerFace,int doAddNodes);
 
@@ -1273,7 +1273,7 @@ node-adjacent ghosts, a face is a single node.
  Calling this routine several times creates several layers of ghost
  elements, and the different layers need not have the same parameters.
 
-::
+.. code-block:: c++
 
   void FEM_Add_ghost_elem(int elType,int facesPerElem,const int
      *elem2face);
@@ -1306,7 +1306,7 @@ The above two routines are always used together. For example, if your
 elements are 3-node triangles and you only require one shared node for
 inclusion in a single ghost layer, you would use:
 
-::
+.. code-block:: c++
 
   FEM_Add_ghost_layer(1,1); /* 1 node per face: node adjacency */
   const static int tri2node[]={0,1,2};
@@ -1315,7 +1315,7 @@ inclusion in a single ghost layer, you would use:
 If you require two shared nodes (a shared edge), the code will look
 like:
 
-::
+.. code-block:: c++
 
   FEM_Add_ghost_layer(2,1); /* 2 nodes per face: edge adjacency */
   const static int tri2edge[]={0,1,  1,2,  2,0};
@@ -1345,7 +1345,7 @@ right sides; ordinary cross-processor parallel ghosts lie along the top
 edge where this chunk joins up with the rest of the domain; and the
 external boundary along the bottom of the chunk has no ghosts.
 
-::
+.. code-block:: c++
 
   void FEM_Add_linear_periodicity( int nFaces,int nPer, const int
   *facesA,const int *facesB, int nNodes,const double *nodeLocs );
@@ -1366,7 +1366,7 @@ order is recovered by matching 3d locations in the nodeLocs array.
 This call can be repeated, for example if the domain is periodic along
 several directions. This call can only be issued from init().
 
-::
+.. code-block:: c++
 
   void FEM_Sym_coordinates(int elTypeOrMinusOne,double *locs);
 
@@ -1396,7 +1396,7 @@ Advanced Symmetries and Ghosts-Lower Layer
 The geometric symmetry layer in the preceding section is actually a thin
 wrapper around this lower, more difficult to use layer.
 
-::
+.. code-block:: c++
 
   void FEM_Set_sym_nodes(const int *canon,const int *sym);
 
@@ -1454,7 +1454,7 @@ Node canon sym
 12   4     12 (bottom+right)
 ==== ===== =================
 
-::
+.. code-block:: c++
 
   void FEM_Get_sym(int elTypeOrMinusOne,int *destSym);
 
@@ -1486,7 +1486,7 @@ remain part of the framework indefinitely. These routines always use the
 default mesh, as returned by FEM_Mesh_default_read and
 FEM_Mesh_default_write.
 
-::
+.. code-block:: c++
 
   void FEM_Set_elem(int elType,int nEl,int doublePerEl,int nodePerEl);
   void FEM_Get_elem(int elType,int *nEl,int *doublePerEl,int
@@ -1514,7 +1514,7 @@ no need to make them in linearly increasing order. However, for a given
 type of element FEM_Set_elem must be called before setting that
 element’s connectivity or data.
 
-::
+.. code-block:: c++
 
   void FEM_Set_elem_conn(int elType,const int *conn);
   void FEM_Get_elem_conn(int elType,int *conn);
@@ -1549,7 +1549,7 @@ stored contiguously).
 
 In this older interface, ghost nodes are indicated by invalid,
 
-::
+.. code-block:: c++
 
   void FEM_Set_node(int nNode,int doublePerNode);
   void FEM_Get_node(int
@@ -1572,7 +1572,7 @@ with each node.
 Old Mesh Data
 -------------
 
-::
+.. code-block:: c++
 
   void FEM_Set_node_data(const double *data);
   void FEM_Get_node_data(double *data);
@@ -1628,7 +1628,7 @@ Section :numref:`sec:ghostnum` is used in the new API.
    Old ghost element and node numbering. FEM_Get_ghost_returns
    :math:`g`, FEM_Get_returns :math:`n`.
 
-::
+.. code-block:: c++
 
   int FEM_Get_node_ghost(void);
   int FEM_Get_elem_ghost(int elemType);
@@ -1636,7 +1636,7 @@ Section :numref:`sec:ghostnum` is used in the new API.
 The examples below iterate over the real and ghost elements using the
 old numbering:
 
-::
+.. code-block:: c++
 
   // C version:
   int firstGhost,max;
@@ -1662,14 +1662,14 @@ old numbering:
 Old Backward Compatibility
 --------------------------
 
-::
+.. code-block:: c++
 
   void FEM_Set_mesh(int nElem, int nNodes, int nodePerEl,const int*
   conn);
 
 This is a convenience routine equivalent to:
 
-::
+.. code-block:: c++
 
   FEM_Set_node(nNodes,0);
   FEM_Set_elem(0,nElem,0,nodePerEl);
@@ -1696,7 +1696,7 @@ imposed force or position. The routines in this section are used to
 describe this kind of mesh-associated data—data that only applies to
 some “sparse” subset of the nodes or elements.
 
-::
+.. code-block:: c++
 
   void FEM_Set_sparse(int S_id,int nRec, const int *nodes,int
   nodesPerRec, const void *data,int dataPerRec,int dataType);
@@ -1732,7 +1732,7 @@ For example, if the first set of sparse data is 17 sparse data records,
 each containing 2 nodes stored in bNodes and 3 integers stored in bDesc,
 we would make the call:
 
-::
+.. code-block:: c++
 
   /*C version*/
   FEM_Set_sparse(0,17, bNodes,2, bDesc,3,FEM_INT);
@@ -1742,7 +1742,7 @@ we would make the call:
   ! Fortran version
   CALL FEM_Set_sparse(1,17, bNodes,2, bDesc,3,FEM_INT)
 
-::
+.. code-block:: c++
 
   void FEM_Set_sparse_elem(int S_id,const int *rec2elem);
 
@@ -1760,7 +1760,7 @@ within that type. For example, to attach the 3 sparse records at S_id
 to the elements numbered 10, 11, and 12 of the element type elType,
 use:
 
-::
+.. code-block:: c++
 
   /*C version*/
   int rec2elem[]={elType,10, elType,11, elType,12};
@@ -1774,7 +1774,7 @@ use:
   rec2elem(2,1)=10; rec2elem(2,2)=11; rec2elem(2,3)=12;
   CALL FEM_Set_sparse_elem(S_id,rec2elem)
 
-::
+.. code-block:: c++
 
   int FEM_Get_sparse_length(int S_id);
   void FEM_Get_sparse(int S_id,int *nodes,void *data);
@@ -1800,7 +1800,7 @@ In this old interface, there is no way to access sparse ghosts.
 Mesh Modification
 =================
 
-::
+.. code-block:: c++
 
   void FEM_Update_mesh(FEM_Update_mesh_fn routine, int
   callMeshUpdated,int doWhat);
@@ -1905,7 +1905,7 @@ Index List Calls
 You refer to an Index List via an opaque handle—in C, the integer
 typedef IDXL_t; in Fortran, a bare INTEGER.
 
-::
+.. code-block:: c++
 
   IDXL_t FEM_Comm_shared(int mesh,int entity);
 
@@ -1922,7 +1922,7 @@ the send/sum communication pattern.
 Must be called from driver. mesh must be a reading mesh. entity must be
 FEM_NODE. You may not call IDXL_Destroy on the returned list.
 
-::
+.. code-block:: c++
 
   IDXL_t FEM_Comm_ghost(int mesh,int entity);
 
@@ -1948,7 +1948,7 @@ This routine must be called from driver. mesh must be a reading mesh.
 entity must not include FEM_GHOST-ghosts are already included. You may
 not call IDXL_Destroy on the returned list.
 
-::
+.. code-block:: c++
 
   IDXL_t IDXL_Create(void);
 
@@ -1962,7 +1962,7 @@ IDXL_Copy or IDXL_Combine.
 Must be called from driver. You must eventually call IDXL_Destroy on the
 returned list.
 
-::
+.. code-block:: c++
 
   void IDXL_Combine(IDXL_t dest,IDXL_t src,int startSend,int startRecv);
 
@@ -1985,7 +1985,7 @@ twice.
 Advanced Index List Calls
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-::
+.. code-block:: c++
 
   void IDXL_Destroy(IDXL_t l);
 
@@ -1998,7 +1998,7 @@ Destroy this Index List, and free the list storage allocated by the
 framework. Only call this routine with lists you created using
 IDXL_Create; not lists obtained directly from the FEM framework.
 
-::
+.. code-block:: c++
 
   void IDXL_Print(IDXL_t l);
 
@@ -2011,7 +2011,7 @@ Print out the contents of this Index List. This routine shows both the
 send and receive indices on the list, for each chunk we communicate
 with.
 
-::
+.. code-block:: c++
 
   void IDXL_Copy(IDXL_t dest,IDXL_t src);
 
@@ -2023,7 +2023,7 @@ with.
 Copy the contents of the source Index List into the destination Index
 List, which should be empty.
 
-::
+.. code-block:: c++
 
   void IDXL_Shift(IDXL_t l,int startSend,int startRecv);
 
@@ -2034,7 +2034,7 @@ List, which should be empty.
 
 Like IDXL_Combine, but only shifts the indices within a single list.
 
-::
+.. code-block:: c++
 
   void IDXL_Add_entity(int newIdx,int nBetween,int *between);
 
@@ -2093,7 +2093,7 @@ In most programs, the data to be communicated is a dense array of data
 of one type. In this case, there is only one layout routine you need to
 know:
 
-::
+.. code-block:: c++
 
   IDXL_Layout_t IDXL_Layout_create(int type,int width);
 
@@ -2125,7 +2125,7 @@ IDXL_DOUBLE   double        DOUBLE PRECISION
 For example, if you keep a dense array with 3 doubles of force per node,
 you’d call this routine as:
 
-::
+.. code-block:: c++
 
   // C++ version:
   double *force=new double[3*n];
@@ -2150,7 +2150,7 @@ These advanced routines are only needed if you want to exchange data
 stored in an array of user-defined types. Most programs only need
 IDXL_Layout_create.
 
-::
+.. code-block:: c++
 
   IDXL_Layout_t IDXL_Layout_offset(int type, int width, int offsetBytes,
   int distanceBytes,int skewBytes);
@@ -2192,7 +2192,7 @@ In C, the offsetof and sizeof keywords are useful for finding these
 values. In Fortran, we provide a special routine called foffsetof that
 returns the distance, in bytes, between its two arguments.
 
-::
+.. code-block:: c++
 
   // C++ version:
   typedef struct {
@@ -2217,7 +2217,7 @@ returns the distance, in bytes, between its two arguments.
   &          foffsetof(nodes(1),nodes(1)%force),
   &          foffsetof(nodes(1),nodes(2)),0)
 
-::
+.. code-block:: c++
 
   void IDXL_Layout_destroy(IDXL_Layout_t layout);
 
@@ -2229,7 +2229,7 @@ returns the distance, in bytes, between its two arguments.
 Destroy this Layout. You only need call this routine if you repeatedly
 create layouts.
 
-::
+.. code-block:: c++
 
   int IDXL_Get_layout_type(IDXL_Layout_t layout);
 
@@ -2239,7 +2239,7 @@ create layouts.
 
 Return the IDXL datatype for this layout.
 
-::
+.. code-block:: c++
 
   int IDXL_Get_layout_width(IDXL_Layout_t layout);
 
@@ -2250,7 +2250,7 @@ Return the IDXL datatype for this layout.
 Return the layout width—the number of data items that are communicated
 per entity.
 
-::
+.. code-block:: c++
 
   int IDXL_Get_layout_distance(IDXL_Layout_t layout);
 
@@ -2267,7 +2267,7 @@ Layout Compatibility Routines
 Before IDXL was made a separate library, FEM included these routines,
 which are still preserved for backward compatibility.
 
-::
+.. code-block:: c++
 
   IDXL_Layout_t FEM_Create_simple_field(int type,int width);
 
@@ -2278,7 +2278,7 @@ which are still preserved for backward compatibility.
 
 This routine is completely interchangeable to IDXL_Layout_create.
 
-::
+.. code-block:: c++
 
   int FEM_Create_field(int type,int width,int offset,int distance);
 
@@ -2302,7 +2302,7 @@ to determine where to get and put the communicated data.
 Communication Routines
 ~~~~~~~~~~~~~~~~~~~~~~
 
-::
+.. code-block:: c++
 
   void IDXL_Comm_sendsum(IDXL_Comm_t comm,IDXL_t indices,IDXL_Layout_t
   layout,void *data);
@@ -2327,7 +2327,7 @@ It is a more general version of the old FEM routine FEM_Update_field.
 For example, to sum up the shared-node values in a 3d force vector
 indexed by node, you would use:
 
-::
+.. code-block:: c++
 
   // C++ version:
   double *force=new double[3*nNodes];
@@ -2349,7 +2349,7 @@ indexed by node, you would use:
   !... in the time loop ...
       CALL IDXL_Comm_sendsum(0,shared_indices,force_layout,force)
 
-::
+.. code-block:: c++
 
   void IDXL_Comm_sendrecv(IDXL_Comm_t comm,IDXL_t indices,IDXL_Layout_t
   layout,void *data);
@@ -2375,7 +2375,7 @@ FEM_Update_ghost_field. For example, to obtain 7 solution values per
 ghost element, storing gElem ghosts in the array just after the nElem
 regular elements, we could:
 
-::
+.. code-block:: c++
 
   // C++ version:
   double *elem=new double[7*(nElem+gElem)];
@@ -2404,7 +2404,7 @@ regular elements, we could:
 Advanced Communication Routines
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-::
+.. code-block:: c++
 
   IDXL_Comm_t IDXL_Comm_begin(int tag,int context);
 
@@ -2420,7 +2420,7 @@ Every call to this routine must eventually be matched by a call to
 IDXL_Comm_wait. Warning: for now, tag and context are ignored, and there
 can be only one outstanding communication operation.
 
-::
+.. code-block:: c++
 
   void IDXL_Comm_send(IDXL_Comm_t comm,IDXL_t indices,IDXL_Layout_t
   layout,const void *data);
@@ -2437,7 +2437,7 @@ this data array.
 This routine is always non-blocking; as the data array passed in will
 not be copied out until the call to IDXL_Comm_flush.
 
-::
+.. code-block:: c++
 
   void IDXL_Comm_recv(IDXL_Comm_t comm,IDXL_t indices,IDXL_Layout_t
   layout,void *data);
@@ -2454,7 +2454,7 @@ layout, into this data array.
 This routine is always non-blocking; as the data array passed in will
 not be copied into until the call to IDXL_Comm_wait.
 
-::
+.. code-block:: c++
 
   void IDXL_Comm_sum(IDXL_Comm_t comm,IDXL_t indices,IDXL_Layout_t
   layout,void *data);
@@ -2471,7 +2471,7 @@ with this layout, into this data array.
 This routine is always non-blocking; as the data array passed in will
 not be added to until the call to IDXL_Comm_wait.
 
-::
+.. code-block:: c++
 
   void IDXL_Comm_flush(IDXL_Comm_t comm);
 
@@ -2487,7 +2487,7 @@ large message is more efficient than sending many small messages.
 This routine is typically non-blocking, and may only be issued at most
 once per IDXL_Comm_begin.
 
-::
+.. code-block:: c++
 
   void IDXL_Comm_wait(IDXL_Comm_t comm);
 
@@ -2524,7 +2524,7 @@ ID to FEM_Update_field (which does the shared node communication),
 FEM_Reduce_field (which applies a reduction over node values), or one of
 the other routines described below.
 
-::
+.. code-block:: c++
 
   void FEM_Update_field(int Fid,void *nodes);
 
@@ -2548,7 +2548,7 @@ the same across all processors that share the node.
 
 This routine is equivalent to an IDXL_Comm_Sendsum operation.
 
-::
+.. code-block:: c++
 
   void FEM_Read_field(int Fid,void *nodes,char *fName);
 
@@ -2581,7 +2581,7 @@ other chunks.
 
 This routine has no IDXL equivalent.
 
-::
+.. code-block:: c++
 
   void FEM_Reduce_field(int Fid,const void *nodes,void *out,int op);
 
@@ -2614,7 +2614,7 @@ op must be one of:
 
 This routine has no IDXL equivalent.
 
-::
+.. code-block:: c++
 
   void FEM_Reduce(int Fid,const void *inVal,void *outVal,int op);
 
@@ -2634,7 +2634,7 @@ FEM_Reduce_field.
 May only be called from driver, and to complete, must be called from
 every chunk’s driver routine.
 
-::
+.. code-block:: c++
 
   ! C example
   double inArr[3], outArr[3];
@@ -2657,7 +2657,7 @@ Ghost Communication
 It is possible to get values for a chunk’s ghost nodes and elements from
 the neighbors. To do this, use:
 
-::
+.. code-block:: c++
 
   void FEM_Update_ghost_field(int Fid, int elTypeOrMinusOne, void
   *data);
@@ -2679,7 +2679,7 @@ Ghost List Exchange
 It is possible to exchange sparse lists of ghost elements between FEM
 chunks.
 
-::
+.. code-block:: c++
 
   void FEM_Exchange_ghost_lists(int elemType,int nIdx,const int
   *localIdx);
@@ -2695,7 +2695,7 @@ neighboring chunks that connect to its ghost elements on the other
 side. That is, if the element localIdx[i] has a ghost on some chunk c,
 localIdx[i] will be sent to and show up in the ghost list of chunk c.
 
-::
+.. code-block:: c++
 
   int FEM_Get_ghost_list_length(void);
 
@@ -2703,7 +2703,7 @@ Returns the number of entries in my
 ghost list—the number of my ghosts that other chunks passed to their
 call to FEM_Exchange_ghost_lists.
 
-::
+.. code-block:: c++
 
   void FEM_Get_ghost_list(int *retLocalIdx);
 
@@ -2742,7 +2742,7 @@ This creates the node and element adjacency information that is
 essential for the adaptivity operations. It also initializes all the
 mesh adaptivity related internal objects in the framework.
 
-::
+.. code-block:: c++
 
   void FEM_ADAPT_Init(int meshID)
 
@@ -2764,14 +2764,14 @@ smallest altitude and this value during mesh adaptivity is not allowed
 to go beyond a certain limit. Because the larger this value after a
 certain limit, the worse the element quality.
 
-::
+.. code-block:: c++
 
   void FEM_ADAPT_SetElementSizeField(int meshID, int elem, double size);
 
 For the mesh specified by meshID, for the element elem, we set the
 desired size for each element to be size.
 
-::
+.. code-block:: c++
 
   void FEM_ADAPT_SetElementSizeField(int meshID, double *sizes);
 
@@ -2779,14 +2779,14 @@ For the mesh specified by meshID, for the element elem, we set the
 desired size for each element from the corresponding entry in the sizes
 array.
 
-::
+.. code-block:: c++
 
   void FEM_ADAPT_SetReferenceMesh(int meshID);
 
 For each element int this mesh defined by meshID set its size to the
 average edge length of the corresponding element.
 
-::
+.. code-block:: c++
 
   void FEM_ADAPT_GradateMesh(int meshID, double smoothness);
 
@@ -2808,7 +2808,7 @@ operations to generate a mesh with higher quality elements while
 achieving the desired size (which is usually average edge length per
 element), or it could even be the area of each element.
 
-::
+.. code-block:: c++
 
   void FEM_ADAPT_Refine(int meshID, int qm, int method, double
   factor,double *sizes);
@@ -2821,7 +2821,7 @@ specified in the sizes array. In this array each entry corresponds to
 the corresponding element. Negative entries in sizes array indicate no
 refinement.
 
-::
+.. code-block:: c++
 
   void FEM_ADAPT_Coarsen(int meshID, int qm, int method, double
   factor,double *sizes);
@@ -2834,7 +2834,7 @@ specified in the sizes array. In this array each entry corresponds to
 the corresponding element. Negative entries in sizes array indicate no
 coarsening.
 
-::
+.. code-block:: c++
 
   void FEM_ADAPT_AdaptMesh(int meshID, int qm, int method, double
   factor,double *sizes);
@@ -2847,7 +2847,7 @@ also performs a mesh repair operation where it gets rid of some bad
 quality elements by Delaunay flip or coarsening as the geometry in the
 area demands.
 
-::
+.. code-block:: c++
 
   int FEM_ADAPT_SimpleRefineMesh(int meshID, double targetA, double xmin,
   double ymin, double xmax, double ymax);
@@ -2858,7 +2858,7 @@ meshID is given by targetA. This function only performs a series of
 refinements on the elements in this region. If the area is larger, then
 no coarsening is done.
 
-::
+.. code-block:: c++
 
   int FEM_ADAPT_SimpleCoarsenMesh(int meshID, double targetA, double xmin,
   double ymin, double xmax, double ymax);
@@ -2879,7 +2879,7 @@ adaptivity algorithms are designed to work on. There is a function that
 can be used to test various properties of a mesh, like area, quality,
 geometric consistency, idxl list correctness, etc.
 
-::
+.. code-block:: c++
 
   void FEM_ADAPT_TestMesh(int meshID);
 

@@ -81,7 +81,7 @@ A Charisma program or module has one "MainChare" class, and it does not
 require explicit instantiation since it is a singleton. The statement to
 declare MainChare looks like this:
 
-.. code-block:: cpp
+.. code-block:: c++
 
        class JacobiMain : MainChare;
 
@@ -91,7 +91,7 @@ the class types. The dimensionality information of the object array is
 given in a pair of brackets with each dimension size separated by a
 comma.
 
-.. code-block:: cpp
+.. code-block:: c++
 
        class JacobiWorker : ChareArray1D;
        obj workers : JacobiWorker[N];
@@ -345,7 +345,7 @@ code, and incorporate the sequential portion in the final header file.
 For example, if a molecular dynamics simulation has the following
 classes (as declared in the orchestration code):
 
-.. code-block:: cpp
+.. code-block:: c++
 
        class MDMain : MainChare;
        class Cell : ChareArray3D;
@@ -374,7 +374,7 @@ Second, in the body of the function, the keyword ``produce`` is used to
 connect the orchestration parameter and the local variables whose value
 will be sent out, in a format of a function call, as follows.
 
-.. code-block:: cpp
+.. code-block:: c++
 
        produce(produced_parameter, local_variable[, size_of_array]);
 
@@ -394,7 +394,7 @@ Since ``lb`` and ``rb`` are declared to have the local type and dimension of
 ``double [512]``, the producing statement should connect it with a local
 variable of ``double [512]``.
 
-.. code-block:: cpp
+.. code-block:: c++
 
        void JacobiWorker::produceBorders(outport lb, outport rb) {
          ...
@@ -416,7 +416,7 @@ specify the reduction operation. Built-in reduction operations are ``+``
 basic data types. For instance the following statements takes the sum of
 all local value of ``result`` and for output in ``sum``.
 
-.. code-block:: cpp
+.. code-block:: c++
 
        reduce(sum, result, "+");
 
@@ -425,13 +425,13 @@ function or operator defined to do the reduction. For example, assume we
 have a class called ``Force``, and we have an ``add`` function (or a ``+``
 operator) defined.
 
-.. code-block:: cpp
+.. code-block:: c++
 
        Force& Force::add(const Force& f);
 
 In the reduction to sum all the local forces, we can use
 
-.. code-block:: cpp
+.. code-block:: c++
 
        reduce(sumForces, localForce, "add");
 
@@ -509,7 +509,7 @@ for such info as problem size.
 Following the first line, the library's input and output parameters are
 posted with keywords ``inparam`` and ``outparam``.
 
-.. code-block:: cpp
+.. code-block:: c++
 
      module FFT3D(CHUNK, M, N);
      inparam indata;
@@ -526,7 +526,7 @@ To use a Charisma module library, the programmer first needs to create
 an instance of the library. There are two steps: including the module
 and creating an instance.
 
-.. code-block:: cpp
+.. code-block:: c++
 
      use FFT3D;
      library f1 : FFT3D(CHUNK=10, M=10, N=100);
@@ -544,7 +544,7 @@ output parameters are the same, and the object name and function name
 are replaced with the library instance name and the keyword ``call``
 connected with a colon.
 
-.. code-block:: cpp
+.. code-block:: c++
 
      (f1_outdata[*]) <- f1:call(f1_indata[*]);
 
@@ -576,7 +576,7 @@ Charm++ program. Please refer to the load balancing section in Charm++
 manual for more information on ``PUP`` functions. A typical example
 would look like this in user's sequential ``.C`` file:
 
-.. code-block:: cpp
+.. code-block:: c++
 
      void JacobiWorker::sequentialPup(PUP::er& p){
        p|myLeft; p|myRight; p|myUpper; p|myLower;
@@ -631,7 +631,7 @@ is created with all the elements populated. For instance, when we have
 the following declaration in the orchestration code, an array of NxNxN
 is created.
 
-.. code-block:: cpp
+.. code-block:: c#
 
        class Cell : ChareArray3D;
        obj cells : Cell[N,N,N];
@@ -648,7 +648,7 @@ this case, Charisma provides flexibility of declaring a sparse object
 array, with a ``sparse`` keyword following the object array declaration,
 as follows.
 
-.. code-block:: cpp
+.. code-block:: c#
 
        class CellPair : ChareArray6D;
        obj cellpairs : CellPair[N,N,N,N,N,N],sparse;
@@ -659,7 +659,7 @@ the elements to create. As an example, the following function
 essentially tells the system to generate all the NxNxNxNxNxN elements
 for the 6D array.
 
-.. code-block:: cpp
+.. code-block:: c++
 
      void getIndex_cellpairs(CkVec<CkArrayIndex6D>& vec) {
        int i,j,k,l,m,n;
@@ -702,7 +702,7 @@ sequential code are in ``JacobiWorker.h`` and ``JacobiWorker.C``. Note that
 ``JacobiWorker.h`` contains only the sequential portion of JacobiWorker's
 declaration.
 
-.. code-block:: cpp
+.. code-block:: c++
 
    #define N 512
    #define M 16
@@ -724,7 +724,7 @@ to show how consumed parameters (``rghost`` and ``lghost`` in
 ``JacobiWorker::compute``) and produced parameters (``lb`` and ``rb`` in
 ``JacobiWorker::produceBorders``) are handled.
 
-.. code-block:: cpp
+.. code-block:: c++
 
    void JacobiWorker::compute(double rghost[], double lghost[]) {
        /* local computation for updating elements*/

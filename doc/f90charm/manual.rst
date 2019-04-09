@@ -35,22 +35,22 @@ example:
 
 .. code-block:: fortran
 
-         ! ## Just replace Hello throughout with your chare's name. ##
-         ! ## and add your chare's personal data below where indicated ##
-         ! ## Everything else remains the same ##
-         MODULE HelloMod
+   ! ## Just replace Hello throughout with your chare's name. ##
+   ! ## and add your chare's personal data below where indicated ##
+   ! ## Everything else remains the same ##
+   MODULE HelloMod
 
-         TYPE Hello
-         ! ## your chare's data goes here, the integer below is an example ##
-         integer data
-         END TYPE
+   TYPE Hello
+   ! ## your chare's data goes here, the integer below is an example ##
+   integer data
+   END TYPE
 
-         TYPE HelloPtr
-         TYPE (Hello), POINTER :: obj
-         integer*8 aid
-         END TYPE
+   TYPE HelloPtr
+   TYPE (Hello), POINTER :: obj
+   integer*8 aid
+   END TYPE
 
-         END MODULE
+   END MODULE
 
 You can think of this module as a Chare declaration. Type [Hello]
 defines arbitrary user program data and HelloPtr defines the Chare
@@ -129,7 +129,7 @@ task to write a short C++ file including these two headers files. You
 should also provide definitions for readonly variables in this C++ file.
 It can be as simple as this:
 
-::
+.. code-block:: c++
 
    #include "hello.decl.h"
    int chunkSize;  // define readonly variables here
@@ -145,7 +145,7 @@ functions that the translator generates:
 
 Take the readonly variable chunkSize as an example:
 
-::
+.. code-block:: c++
 
    Set_Chunksize(chunkSize);
    Get_Chunksize(chunkSize);
@@ -157,7 +157,7 @@ Third, for the user’s convenience, several Charm++ runtime library functions
 have their Fortran interface defined in the F90Charm library. These
 currently include:
 
-::
+.. code-block:: c++
 
    CkExit()
    CkMyPe(integer mype)
@@ -188,7 +188,7 @@ In this step, you need to write a Charm++ interface file (.ci).
 In the file you can declare parallel chare arrays and their
 entry methods. The syntax is the same as in Charm++.
 
-::
+.. code-block:: c++
 
          // ## Just replace Hello throughout with your chare's name. ##
          // ## and add your chare's entry points below where indicated ##

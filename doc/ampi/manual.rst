@@ -223,7 +223,7 @@ extensions are available in C, C++, and Fortran, with the exception of
 ``AMPI_Command_argument_count`` and ``AMPI_Get_command_argument`` which
 are only available in Fortran.
 
-::
+.. code-block:: none
 
    AMPI_Migrate          AMPI_Register_pup            AMPI_Get_pup_data
    AMPI_Migrate_to_pe    AMPI_Set_migratable          AMPI_Evacuate
@@ -253,7 +253,7 @@ These attributes are accessible from any rank by calling
    call MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, my_wth, flag, ierr)
 
 
-::
+.. code-block:: c++
 
    // C/C++:
    int my_wth, flag;
@@ -382,7 +382,7 @@ is that of changing a single pointer per user-level thread context
 switch. Currently, Charm++ supports it for x86/x86_64 platforms when
 using GNU compilers.
 
-::
+.. code-block:: c++
 
    // C/C++ example:
    int myrank;
@@ -397,7 +397,7 @@ using GNU compilers.
 For the example above, the following changes to the code handle the
 global variables:
 
-::
+.. code-block:: c++
 
    // C++ example:
    thread_local int myrank;
@@ -492,7 +492,7 @@ was renamed to ``END SUBROUTINE``.
      END DO
    END SUBROUTINE
 
-::
+.. code-block:: c++
 
    //C Example
    #include <mpi.h>
@@ -533,7 +533,7 @@ first group the shared data into a user-defined type.
      END TYPE ! modified
    END MODULE
 
-::
+.. code-block:: c++
 
    //C Example
    struct shareddata{
@@ -572,7 +572,7 @@ take this data as argument.
      END DO
    END SUBROUTINE
 
-::
+.. code-block:: c++
 
    //C Example
    void MPI_Main{
@@ -732,7 +732,7 @@ Calling ``AMPI_Migrate`` on a rank with pending send requests (i.e. from
 MPI_Isend) is currently not supported, therefore users should always
 wait on any outstanding send requests before calling ``AMPI_Migrate``.
 
-::
+.. code-block:: c++
 
    // Main time-stepping loop
    for (int iter=0; iter < max_iters; iter++) {
@@ -809,7 +809,7 @@ Suppose the user data, chunk, is defined as a derived type in Fortran90:
      END TYPE chunk
    END MODULE
 
-::
+.. code-block:: c++
 
    //C Example
    struct chunk{
@@ -840,7 +840,7 @@ written as:
      call pup(p, c%byp)
    end subroutine
 
-::
+.. code-block:: c++
 
    //C Example
    void chunkpup(pup_er p, struct chunk c){
@@ -889,7 +889,7 @@ Suppose the type ``dchunk`` is declared as:
      END TYPE dchunk
    END MODULE
 
-::
+.. code-block:: c++
 
    //C Example
    struct dchunk{
@@ -927,7 +927,7 @@ Then the pack-unpack subroutine is written as:
 
    END SUBROUTINE
 
-::
+.. code-block:: c++
 
    //C Example
    void dchunkpup(pup_er p, struct dchunk c){
@@ -1033,7 +1033,7 @@ does not revoke its allocation). Any load imbalance resulting from the
 restart can then be managed by the runtime system. Use of this scheme is
 illustrated in the code snippet below.
 
-::
+.. code-block:: c++
 
    // Main time-stepping loop
    for (int iter=0; iter < max_iters; iter++) {
@@ -1070,7 +1070,7 @@ do appropriate unpacking based on data type, and return.
 for this get request including the data buffer. Finally,
 ``AMPI_Iget_data`` is the routine used to access the data.
 
-::
+.. code-block:: c++
 
 
    int AMPI_Iget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
@@ -1112,7 +1112,7 @@ and ``Solids_Main``\  [5]_ writing a subroutine called ``MPI_Setup``.
      CALL AMPI_Register_main(Fluids_Main)
    END SUBROUTINE
 
-::
+.. code-block:: c++
 
    //C Example
    void MPI_Setup(){
@@ -1171,7 +1171,7 @@ to send data to rank number 47 within the Fluids module, it calls:
    CALL MPI_Send(InitialTime, 1, MPI_Double_Precision, tag,
                  47, MPI_Comm_Universe(Fluids_Comm), ierr)
 
-::
+.. code-block:: c++
 
    //C Example
    int Fluids_Comm = 2;
@@ -1188,7 +1188,7 @@ this data:
    CALL MPI_Recv(InitialTime, 1, MPI_Double_Precision, tag,
                  36, MPI_Comm_Universe(Solids_Comm), stat, ierr)
 
-::
+.. code-block:: c++
 
    //C Example
    int Solids_Comm = 1;
@@ -1306,7 +1306,7 @@ Projections, link with ``ampicc -tracemode projections``.
 
 AMPI defines the following extensions for tracing support:
 
-::
+.. code-block:: none
 
    AMPI_Trace_begin                      AMPI_Trace_end
 

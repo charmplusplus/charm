@@ -50,10 +50,10 @@ needs to be complemented with a few more libraries from BigSim and with
 the Pose discrete-event simulator. These pieces can be built,
 respectively, with:
 
-::
+.. code-block:: bash
 
-   ./build bgampi netlrts-linux-x86_64 -O2
-   ./build pose netlrts-linux-x86_64 -O2
+   $ ./build bgampi netlrts-linux-x86_64 -O2
+   $ ./build pose netlrts-linux-x86_64 -O2
 
 Access to the discrete-event simulation is realized via a Charm++
 package originally named BigNetSim (now called BigSimulator). Assuming
@@ -62,7 +62,7 @@ obtained from the Web with a subversion checkout such as:
 
 .. code-block:: bash
 
-      svn co https://charm.cs.uiuc.edu/svn/repos/BigNetSim/
+   $ svn co https://charm.cs.uiuc.edu/svn/repos/BigNetSim/
 
 In the subdir ’trunk/’ created by the checkout, the file Makefile.common
 must be edited so that ’CHARMBASE’ points to the regular Charm++

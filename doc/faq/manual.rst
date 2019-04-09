@@ -313,7 +313,7 @@ thread blocking and unblocking and a return message are not needed.
 Another big advantage of asynchronous methods is that it’s easy to make
 things run in parallel. If I execute:
 
-::
+.. code-block:: c++
 
    a->foo();
    b->bar();
@@ -344,7 +344,7 @@ In order to make an entry method threaded, one should add the keyword
 *threaded* withing square brackets after the *entry* keyword in the
 interface file:
 
-::
+.. code-block:: c++
 
    module M {
      chare X {
@@ -358,7 +358,7 @@ If I don’t want to use threads, how can an asynchronous method return a value?
 The usual way to get data back to your caller is via another invocation
 in the opposite direction:
 
-::
+.. code-block:: c++
 
    void A::start(void) {
      b->giveMeSomeData();
@@ -383,7 +383,7 @@ called it, and what method to call a back on. For this kind of
 request/response code, you can abstract away the “where to return the
 data” with a *CkCallback* object:
 
-::
+.. code-block:: c++
 
    void A::start(void) {
      b->giveMeSomeData(CkCallback(CkIndex_A::hereIsTheData,thisProxy));
@@ -540,7 +540,7 @@ One can have class-static variables as read-onlies. Inside a chare,
 group or array declaration in the *.ci* file, one can have a readonly
 variable declaration. Thus:
 
-::
+.. code-block:: c++
 
    chare someChare {
      ...
@@ -730,7 +730,7 @@ After sizing and packing a migrating array element, the array manager
 in the non-leaf nodes of your inheritance hierarchy are *virtual
 destructors*, with declaration syntax:
 
-::
+.. code-block:: c++
 
    class foo : ... {
      ...
@@ -817,7 +817,7 @@ Migratable groups must declare a migration constructor (taking
 constructor *must* call the superclass migration constructor as in this
 example:
 
-::
+.. code-block:: c++
 
    class MyGroup : public CBase_MyGroup {
      ...
@@ -961,7 +961,7 @@ then pup all the elements.
 
 For example, if you have a 2D grid like this:
 
-::
+.. code-block:: c++
 
    class foo {
     private:
@@ -1186,7 +1186,7 @@ My debugging printouts seem to be out of order. How can I prevent this?
 Printouts from different processors do not normally stay ordered.
 Consider the code:
 
-::
+.. code-block:: c++
 
    ...somewhere... {
      CkPrintf("cause\n");
@@ -1462,7 +1462,7 @@ includes a macro “FLINKAGE” that makes the symbol linkable from fortran (in
 C++, this expands to extern “C”), so a complete Fortran subroutine looks
 like in C or C++:
 
-::
+.. code-block:: c++
 
    FLINKAGE void FTN_NAME(FOO,foo)(void);
 
@@ -1512,7 +1512,7 @@ C:
           x=i
       END SUBROUTINE
 
-::
+.. code-block:: c++
 
       /* C/C++ */
       FLINKAGE void FTN_NAME(BAR,bar)(int *i) {
@@ -1535,7 +1535,7 @@ C:
           x=arr(1)
       END SUBROUTINE
 
-::
+.. code-block:: c++
 
       /* C/C++ */
       FLINKAGE void FTN_NAME(BAR,bar)(int *arr) {
@@ -1574,7 +1574,7 @@ C:
           END DO
       END SUBROUTINE
 
-::
+.. code-block:: c++
 
       /* C/C++ */
       FLINKAGE void FTN_NAME(BAR2,bar2)(int *arr,int *len1p,int *len2p) {
@@ -1597,7 +1597,7 @@ C:
           CALL BARS('some string',arg);
       END SUBROUTINE
 
-::
+.. code-block:: c++
 
       /* C/C++ */
       FLINKAGE void FTN_NAME(BARS,bars)(char *str,int *arg,int strlen) {

@@ -489,7 +489,7 @@ Writing a BigSim Application
 Application Skeleton
 ~~~~~~~~~~~~~~~~~~~~
 
-::
+.. code-block:: c++
 
    Handler function prototypes;
    Node specific data type declarations;
@@ -511,7 +511,7 @@ Application Skeleton
 Sample Application 1
 ~~~~~~~~~~~~~~~~~~~~
 
-::
+.. code-block:: c++
 
    /* Application:
     *   Each node starting at [0,0,0] sends a packet to next node in
@@ -588,7 +588,7 @@ Sample Application 1
 Sample Application 2
 ~~~~~~~~~~~~~~~~~~~~
 
-.. code-block:: C
+.. code-block:: c++
 
 
    /* Application:
