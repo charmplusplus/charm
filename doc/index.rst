@@ -17,6 +17,13 @@ Charm++ Documentation
    :numbered:
 
    charm++/manual
+   charm++/01-basic_concepts
+   charm++/02-basic_programming
+   charm++/03-advanced_programming
+   charm++/04-expert_functionality
+   charm++/05-experimental_features
+   charm++/06-appendix
+
    ampi/manual
    f90charm/manual
    libraries/manual
