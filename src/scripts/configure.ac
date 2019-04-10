@@ -1162,6 +1162,10 @@ cat > $t <<EOT
 #include <ucontext.h>
 struct _libc_fpstate   fpstate;
 fpregset_t *fp;
+int main() {
+  ucontext_t context;
+  context.uc_mcontext.fpregs = 0;
+}
 EOT
 test_cxx "whether ucontext has FPU pointer" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_CONTEXT_FPU_POINTER, $pass, [whether ucontext has pointer])
