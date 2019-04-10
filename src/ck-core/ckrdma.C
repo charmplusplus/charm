@@ -1081,7 +1081,7 @@ void readonlyCreateOnSource(CkNcpyBuffer &src) {
 }
 
 // Method to perform an get for Readonly transfer
-int readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr) {
+void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr) {
   CkNcpyMode transferMode = findTransferMode(src.pe, dest.pe);
   if(transferMode == CkNcpyMode::MEMCPY) {
     CmiAbort("memcpy: should not happen\n");

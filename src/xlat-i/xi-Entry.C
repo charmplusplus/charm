@@ -932,7 +932,6 @@ void Entry::genGroupDefs(XStr& str) {
       !container->isNodeGroup()) {
     str << "" << makeDecl(retStr, 1) << "::" << name << "(" << paramComma(0, 0)
         << "int npes, int *pes" << eo(0) << ") {\n";
-             "parameters\");\n";
     str << marshallMsg();
     str << "  CkSendMsg" << node << "BranchMulti(" << paramg << ", npes, pes" << opts
         << ");\n";

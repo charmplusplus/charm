@@ -222,7 +222,7 @@ class CkNcpyBuffer{
   friend void constructDestinationBufferObject(NcpyOperationInfo *info, CkNcpyBuffer &dest);
 
   friend envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg);
-  friend int readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr);
+  friend void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr);
   friend void readonlyCreateOnSource(CkNcpyBuffer &src);
 };
 
@@ -386,7 +386,7 @@ void readonlyAllocateOnSource();
 
 void readonlyCreateOnSource(CkNcpyBuffer &src);
 
-int readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr);
+void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr);
 
 void readonlyGetCompleted(NcpyOperationInfo *ncpyOpInfo);
 
