@@ -1318,6 +1318,8 @@ void LrtsExit(int exitcode) {
     }
 }
 
+static int Cmi_truecrash;
+
 static void KillOnAllSigs(int sigNo) {
     static int already_in_signal_handler = 0;
     char *m;
@@ -1452,7 +1454,14 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 #endif
 
     {
+#if CMK_OPTIMIZE
+        Cmi_truecrash = 0;
+#else
+        Cmi_truecrash = 1;
+#endif
         int debug = CmiGetArgFlag(largv,"++debug");
+        if (CmiGetArgFlagDesc(*argv,"+truecrash","Do not install signal handlers") || debug ||
+            CmiNumNodes()<=32) Cmi_truecrash = 1;
         int debug_no_pause = CmiGetArgFlag(largv,"++debug-no-pause");
         if (debug || debug_no_pause) {  /*Pause so user has a chance to start and attach debugger*/
 #if CMK_HAS_GETPID
@@ -1538,8 +1547,8 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
         printf("Charm++: Running in idle blocking mode.\n");
     }
 
-#if CMK_CHARMDEBUG
     /* setup signal handlers */
+  if(!Cmi_truecrash) {
 #if !defined(_WIN32)
     struct sigaction sa;
     sa.sa_handler = KillOnAllSigs;
@@ -1564,7 +1573,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     sigaction(SIGQUIT, &sa, NULL);
     sigaction(SIGBUS, &sa, NULL);
 #endif /*UNIX*/
-#endif
+  }
 
 #if CMK_NO_OUTSTANDING_SENDS
     no_outstanding_sends=1;
