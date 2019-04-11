@@ -169,7 +169,6 @@ void _createTracesummary(char **argv)
 
 
 /// function call for starting a phase in trace summary logs 
-extern "C" 
 void CkSummary_StartPhase(int phase)
 {
    CkpvAccess(_trace)->startPhase(phase);
@@ -177,7 +176,6 @@ void CkSummary_StartPhase(int phase)
 
 
 /// function call for adding an event mark
-extern "C" 
 void CkSummary_MarkEvent(int eventType)
 {
    CkpvAccess(_trace)->addEventType(eventType);
@@ -1284,7 +1282,7 @@ void TraceSummaryBOC::write(void)
 
 }
 
-extern "C" void CombineSummary()
+static void CombineSummary()
 {
 #if CMK_TRACE_ENABLED
   CmiPrintf("[%d] CombineSummary called!\n", CkMyPe());

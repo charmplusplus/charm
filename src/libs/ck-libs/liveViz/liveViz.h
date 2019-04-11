@@ -94,7 +94,6 @@ inline void liveVizDeposit(liveVizRequestMsg *reqMsg,
   This routine will only be called on processor 0, at the
   end of a liveViz image assembly, in pix_float mode.
 */
-extern "C"
 void liveVizFloatToRGB(liveVizRequest &req, 
 	const float *floatSrc, unsigned char *destRgb,
 	int nPixels);

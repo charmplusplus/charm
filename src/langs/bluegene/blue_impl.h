@@ -100,6 +100,8 @@ typedef minMsgHeap 	    ckMsgQueue;
 typedef CkQ<bgCorrectionMsg *> 	    bgCorrectionQ;
 //typedef minHeap<bgCorrectionMsg *> 	    bgCorrectionQ;
 
+extern void defaultBgHandler(char *null, void *uPtr);
+
 /**
   definition of Handler Table;
   there are two kinds of handle tables: 

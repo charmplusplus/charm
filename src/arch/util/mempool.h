@@ -128,8 +128,7 @@ static_assert(sizeof(block_header) % 16 == 0, "block_header is not a multiple of
 static_assert(sizeof(large_block_header) % 16 == 0, "large_block_header is not a multiple of 16 bytes");
 static_assert(sizeof(mempool_type) % 16 == 0, "mempool_type is not a multiple of 16 bytes");
 
-extern "C"
-{
+extern "C" {
 #endif
 
 mempool_type* mempool_init(size_t pool_size, mempool_newblockfn newfn, mempool_freeblock freefn, size_t limit);

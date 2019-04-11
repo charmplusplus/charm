@@ -96,18 +96,15 @@ public:
 };
 
 /*********************** Empty comm *********************/
-extern "C"
-void empty_send_fn(void *data,int len, int dest,msg_comm *comm)
+static void empty_send_fn(void *data,int len, int dest,msg_comm *comm)
 {
 	msg_send_complete(comm,data,len);
 }
-extern "C"
-void empty_recv_fn(void *data,int len, int src,msg_comm *comm)
+static void empty_recv_fn(void *data,int len, int src,msg_comm *comm)
 {
 	msg_recv_complete(comm,data,len);
 }
-extern "C"
-void empty_finish_fn(msg_comm *comm)
+static void empty_finish_fn(msg_comm *comm)
 { }
 
 void emptyCommTest(void) {
@@ -119,7 +116,7 @@ void emptyCommTest(void) {
 }
 
 /*********************** Converse *********************/
-extern "C" void conv_kicker(void *startMsg);
+static void conv_kicker(void *startMsg);
 CpvDeclare(int,conv_kicker_idx);
 
 /** Called on every processor at startup time */
@@ -157,8 +154,7 @@ struct conv_msg_comm : public msg_comm {
 	int master; /* marker: I'm responsible for saying it's over */
 };
 
-extern "C"
-void conv_send_fn(void *data,int len, int dest,conv_msg_comm *comm)
+static void conv_send_fn(void *data,int len, int dest,conv_msg_comm *comm)
 {
 	if (verbose>=8) CmiPrintf("Processor %d send\n",CmiMyPe());
 	int mlen=sizeof(conv_msg_header)+len;
@@ -169,20 +165,17 @@ void conv_send_fn(void *data,int len, int dest,conv_msg_comm *comm)
 	CmiSyncSendAndFree(comm->send_pe,mlen,(char *)m);
 	msg_send_complete(comm,data,len);
 }
-extern "C"
-void conv_recv_fn(void *data,int len, int src,msg_comm *comm)
+static void conv_recv_fn(void *data,int len, int src,msg_comm *comm)
 {
 	/* ignored */
 }
-extern "C" 
-void conv_recv(conv_msg_header *m,conv_msg_comm *comm) {
+static void conv_recv(conv_msg_header *m,conv_msg_comm *comm) {
 	if (verbose>=8) CmiPrintf("Processor %d recv\n",CmiMyPe());
 	msg_recv_complete(comm,&m->data,m->len);
 	CmiFree(m);
 }
 
-extern "C"
-void conv_finish_fn(conv_msg_comm *comm)
+static void conv_finish_fn(conv_msg_comm *comm)
 {
 	if (comm->master)
 		mainProxy.done();
@@ -197,7 +190,8 @@ conv_msg_comm *makeComm(void) {
 }
 
 /** Called on every processor to initiate the test */
-extern "C" void conv_kicker(void *startMsg) {
+static void conv_kicker(void *startMsg)
+{
 	int isLocal=((conv_start_msg*)startMsg)->isLocal;
 	CmiFree(startMsg);
 	conv_msg_comm *comm=makeComm();
@@ -269,15 +263,13 @@ public:
   }
 };
 
-extern "C"
-void marshal_send_fn(void *data,int len, int dest,msg_comm *comm)
+static void marshal_send_fn(void *data,int len, int dest,msg_comm *comm)
 {
   ((helloComm *)comm)->hp[dest].recvMarshal(len,(char *)data);
   msg_send_complete(comm,data,len);
 }
 
-extern "C"
-void message_send_fn(void *data,int len, int dest,msg_comm *comm)
+static void message_send_fn(void *data,int len, int dest,msg_comm *comm)
 {
   myMsg *m=new(&len,0) myMsg;
   m->len=len;
@@ -286,14 +278,12 @@ void message_send_fn(void *data,int len, int dest,msg_comm *comm)
   msg_send_complete(comm,data,len);
 }
 
-extern "C"
-void ignore_recv_fn(void *data,int len, int dest,msg_comm *comm)
+static void ignore_recv_fn(void *data,int len, int dest,msg_comm *comm)
 { 
 	/* Charm decides when *it* wants you to recv, so this is useless */
 }
 
-extern "C"
-void array_finish_fn(msg_comm *comm) {
+static void array_finish_fn(msg_comm *comm) {
   ((helloComm *)comm)->h->contribute(0,0,CkReduction::sum_int,CkCallback(CkIndex_Main::done(),mainProxy));
 }
 

@@ -1782,22 +1782,19 @@ struct CkArrayThreadListener {
         CkMigratable *mig;
 };
 
-extern "C"
-void CkArrayThreadListener_suspend(struct CthThreadListener *l)
+static void CkArrayThreadListener_suspend(struct CthThreadListener *l)
 {
         CkArrayThreadListener *a=(CkArrayThreadListener *)l;
         a->mig->ckStopTiming();
 }
 
-extern "C"
-void CkArrayThreadListener_resume(struct CthThreadListener *l)
+static void CkArrayThreadListener_resume(struct CthThreadListener *l)
 {
         CkArrayThreadListener *a=(CkArrayThreadListener *)l;
         a->mig->ckStartTiming();
 }
 
-extern "C"
-void CkArrayThreadListener_free(struct CthThreadListener *l)
+static void CkArrayThreadListener_free(struct CthThreadListener *l)
 {
         CkArrayThreadListener *a=(CkArrayThreadListener *)l;
         delete a;

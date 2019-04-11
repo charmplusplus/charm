@@ -1876,7 +1876,6 @@ int CsdScheduler(int maxmsgs)
 /*
 	EVAC
 */
-extern void CkClearAllArrayElements(void);
 
 
 extern void machine_OffloadAPIProgress(void);

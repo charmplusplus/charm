@@ -127,8 +127,7 @@ struct TraceThreadListener {
   CmiObjId idx;
 };
 
-extern "C"
-void traceThreadListener_suspend(struct CthThreadListener *l)
+static void traceThreadListener_suspend(struct CthThreadListener *l)
 {
   TraceThreadListener *a=(TraceThreadListener *)l;
   /* here, we activate the appropriate trace codes for the appropriate
@@ -136,8 +135,7 @@ void traceThreadListener_suspend(struct CthThreadListener *l)
   traceSuspend();
 }
 
-extern "C"
-void traceThreadListener_resume(struct CthThreadListener *l) 
+static void traceThreadListener_resume(struct CthThreadListener *l)
 {
   TraceThreadListener *a=(TraceThreadListener *)l;
   /* here, we activate the appropriate trace codes for the appropriate
@@ -149,8 +147,7 @@ void traceThreadListener_resume(struct CthThreadListener *l)
   a->ml=0;
 }
 
-extern "C"
-void traceThreadListener_free(struct CthThreadListener *l) 
+static void traceThreadListener_free(struct CthThreadListener *l)
 {
   TraceThreadListener *a=(TraceThreadListener *)l;
   delete a;

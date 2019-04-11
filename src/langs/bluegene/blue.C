@@ -255,7 +255,7 @@ inline double Count2Time(long_long *papiValues, int n) {
      Handler Table, one per thread
 ****************************************************************************/
 
-extern "C" void defaultBgHandler(char *null, void *uPtr)
+void defaultBgHandler(char *null, void *uPtr)
 {
   CmiAbort("BG> Invalid Handler called!\n");
 }
@@ -525,7 +525,6 @@ double BgGetCurTime()
   return tCURRTIME;
 }
 
-extern "C" 
 void BgElapse(double t)
 {
 //  ASSERT(tTHREADTYPE == WORK_THREAD);
@@ -534,7 +533,6 @@ void BgElapse(double t)
 }
 
 // advance virtual timer no matter what scheme is used
-extern "C" 
 void BgAdvance(double t)
 {
 //  ASSERT(tTHREADTYPE == WORK_THREAD);
@@ -558,7 +556,6 @@ char * getFullBuffer()
  * called by a Converse handler or sendPacket()
  * add message msgPtr to a bluegene node's inbuffer queue 
  */
-extern "C"
 void addBgNodeInbuffer(char *msgPtr, int lnodeID)
 {
 #if CMK_ERROR_CHECKING

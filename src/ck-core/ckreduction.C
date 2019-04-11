@@ -2001,7 +2001,6 @@ void CkExtContribute(CkExtContributeInfo* contribute_params, CkCallback& cb)
     me->contribute(contribute_params->dataSize, contribute_params->data, contribute_params->redtype, cb);
 }
 
-extern "C"
 void CkExtContributeTo(CkExtContributeInfo* contribute_params, CkCallback& cb)
 {
 #if CMK_CHARMPY
@@ -2022,7 +2021,6 @@ void CkExtContributeTo(CkExtContributeInfo* contribute_params, CkCallback& cb)
 }
 
 // When a reduction contributes to a singleton chare
-extern "C"
 void CkExtContributeToChare(CkExtContributeInfo* contribute_params, int onPE, void* objPtr)
 {
     CkChareID targetChareID;
@@ -2035,7 +2033,6 @@ void CkExtContributeToChare(CkExtContributeInfo* contribute_params, int onPE, vo
 }
 
 // When a reduction contributes to an array element or broadcasts result to an array
-extern "C"
 void CkExtContributeToArray(CkExtContributeInfo* contribute_params, int aid, int* idx, int ndims)
 {
     CkCallback cb;
@@ -2059,7 +2056,6 @@ void CkExtContributeToArray(CkExtContributeInfo* contribute_params, int aid, int
 }
 
 // When a reduction contributes to a group chare element or broadcasts result to group
-extern "C"
 void CkExtContributeToGroup(CkExtContributeInfo* contribute_params, int gid, int pe)
 {
     CkCallback cb;
