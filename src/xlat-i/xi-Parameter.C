@@ -267,7 +267,8 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     }
     if (hasrdma) {
       str << "#if CMK_ONESIDED_IMPL\n";
-      if(entry->getContainer()->isForElement()) {
+      Chare *container = entry->getContainer();
+      if(container->isChare() || container->isForElement()) {
         str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_P2P_SEND_MSG;\n";
       } else { // Mark a Ncpy Bcast message to intercept it in the send code path
         str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_BCAST_SEND_MSG;\n";
