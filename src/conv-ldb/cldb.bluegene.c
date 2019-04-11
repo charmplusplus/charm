@@ -106,7 +106,7 @@ void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn)
   CldSwitchHandler((char *)msg, CpvAccess(CldHandlerIndex));
   CmiSetInfo(msg,infofn);
 */
-  BgSyncListSend(npes, pes, CmiGetHandler(msg), LARGE_WORK, len, msg);
+  BgSyncListSend(npes, pes, CmiGetHandler(msg), LARGE_WORK, len, (char *)msg);
 }
 
 void CldEnqueue(int pe, void *msg, int infofn)
