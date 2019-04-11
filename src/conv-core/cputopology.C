@@ -266,7 +266,9 @@ static void cpuTopoHandler(void *m)
     int i;
     hostTable = CmmNew();
     topomsg = (nodeTopoMsg *)CmiAlloc(sizeof(nodeTopoMsg)+CmiNumPes()*sizeof(int));
+#if CMK_ONESIDED_IMPL
     CMI_ZC_MSGTYPE(topomsg) = CMK_REG_NO_ZC_MSG;
+#endif
     CmiSetHandler((char *)topomsg, CpvAccess(cpuTopoRecvHandlerIdx));
     topomsg->nodes = (int *)((char*)topomsg + sizeof(nodeTopoMsg));
     for (i=0; i<CmiNumPes(); i++) topomsg->nodes[i] = -1;
@@ -343,7 +345,9 @@ static void * combineMessage(int *size, void *data, void **remote, int count)
   for (i=0; i<count; i++) nprocs += ((hostnameMsg *)remote[i])->n;
   *size = sizeof(hostnameMsg)+sizeof(_procInfo)*nprocs;
   hostnameMsg *msg = (hostnameMsg *)CmiAlloc(*size);
+#if CMK_ONESIDED_IMPL
   CMI_ZC_MSGTYPE(msg) = CMK_REG_NO_ZC_MSG;
+#endif
   msg->procs = (_procInfo*)((char*)msg + sizeof(hostnameMsg));
   msg->n = nprocs;
   CmiSetHandler((char *)msg, CpvAccess(cpuTopoHandlerIdx));
@@ -372,7 +376,9 @@ static void *emptyReduction(int *size, void *data, void **remote, int count)
   }
   *size = sizeof(topoDoneMsg);
   topoDoneMsg *msg = (topoDoneMsg *)CmiAlloc(sizeof(topoDoneMsg));
+#if CMK_ONESIDED_IMPL
   CMI_ZC_MSGTYPE(msg) = CMK_REG_NO_ZC_MSG;
+#endif
   CmiSetHandler((char *)msg, CpvAccess(topoDoneHandlerIdx));
   return msg;
 }
@@ -604,7 +610,9 @@ extern "C" void LrtsInitCpuTopo(char **argv)
 
     /* prepare a msg to send */
   msg = (hostnameMsg *)CmiAlloc(sizeof(hostnameMsg)+sizeof(_procInfo));
+#if CMK_ONESIDED_IMPL
   CMI_ZC_MSGTYPE(msg) = CMK_REG_NO_ZC_MSG;
+#endif
   msg->n = 1;
   msg->procs = (_procInfo*)((char*)msg + sizeof(hostnameMsg));
   CmiSetHandler((char *)msg, CpvAccess(cpuTopoHandlerIdx));
@@ -625,7 +633,9 @@ extern "C" void LrtsInitCpuTopo(char **argv)
 
   if (CmiNumNodes() > 1) {
     topoDoneMsg *msg2 = (topoDoneMsg *)CmiAlloc(sizeof(topoDoneMsg));
+#if CMK_ONESIDED_IMPL
     CMI_ZC_MSGTYPE(msg2) = CMK_REG_NO_ZC_MSG;
+#endif
     CmiSetHandler((char *)msg2, CpvAccess(topoDoneHandlerIdx));
     CmiReduce(msg2, sizeof(topoDoneMsg), emptyReduction);
     if ((CmiMyPe() == 0) || (CmiNumSpanTreeChildren(CmiMyPe()) > 0)) {

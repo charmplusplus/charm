@@ -23,7 +23,7 @@
 */
 #define CMK_MSG_HEADER_BASIC   CMK_MSG_HEADER_EXT
 
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,hdl,type,xhdl,info,redID,rank; CmiInt4 root, size; CmiUInt1 zcMsgType:2; CmiUInt1 cmaMsgType:2;
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,hdl,type,xhdl,info,redID,rank; CmiInt4 root, size; CmiUInt1 cmaMsgType:2;
 
 #define CMK_MSG_HEADER_EXT       { CMK_MSG_HEADER_EXT_ }
 #define CMK_MSG_HEADER_BIGSIM_  { CMK_MSG_HEADER_EXT_ CMK_BIGSIM_FIELDS }

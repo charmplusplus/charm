@@ -1665,9 +1665,11 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
   envelope *env = UsrToEnv(msg);
 #if CMK_ERROR_CHECKING
   //Allow rdma metadata messages marked as immediate to go through
-  if (opts & CK_MSG_IMMEDIATE && (CMI_ZC_MSGTYPE(env) == CMK_REG_NO_ZC_MSG)) {
-    CmiAbort("Immediate message is not allowed in Chare!");
-  }
+  if (opts & CK_MSG_IMMEDIATE)
+#if CMK_ONESIDED_IMPL
+    if (CMI_ZC_MSGTYPE(env) == CMK_REG_NO_ZC_MSG)
+#endif
+      CmiAbort("Immediate message is not allowed in Chare!");
 #endif
   int destPE=_prepareMsg(entryIdx,msg,pCid);
   // Before it traced the creation only if destPE!=-1 (i.e it did not when the
@@ -1857,9 +1859,14 @@ void CkSendMsgBranch(int eIdx, void *msg, int pe, CkGroupID gID, int opts)
   }
   envelope *env=UsrToEnv(msg);
   //Allow rdma metadata messages marked as immediate to go through
-  if (opts & CK_MSG_IMMEDIATE && (CMI_ZC_MSGTYPE(env) == CMK_REG_NO_ZC_MSG)) {
-    CkSendMsgBranchImmediate(eIdx,msg,pe,gID);
-    return;
+  if (opts & CK_MSG_IMMEDIATE) {
+#if CMK_ONESIDED_IMPL
+    if (CMI_ZC_MSGTYPE(env) == CMK_REG_NO_ZC_MSG)
+#endif
+    {
+      CkSendMsgBranchImmediate(eIdx,msg,pe,gID);
+      return;
+    }
   }
   _sendMsgBranch(eIdx, msg, gID, pe, opts);
   _STATS_RECORD_SEND_BRANCH_1();
@@ -1986,20 +1993,24 @@ void CkSendMsgNodeBranchImmediate(int eIdx, void *msg, int node, CkGroupID gID)
 extern "C"
 void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int opts)
 {
-  if (node==CkMyNode() && CMI_ZC_MSGTYPE((envelope *)(UsrToEnv(msg))) == CMK_REG_NO_ZC_MSG)
-  {
-    CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
-    void *obj = CksvAccess(_nodeGroupTable)->find(gID).getObj();
-    CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
-    if (obj!=NULL)
-    { //Just directly call the group:
-#if CMK_ERROR_CHECKING
-      envelope *env=_prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
-#else
-      envelope *env=UsrToEnv(msg);
+  if (node==CkMyNode()) {
+#if CMK_ONESIDED_IMPL
+    if (CMI_ZC_MSGTYPE(msg) == CMK_REG_NO_ZC_MSG)
 #endif
-      _deliverForNodeBocMsg(CkpvAccess(_coreState),eIdx,env,obj);
-      return;
+    {
+      CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
+      void *obj = CksvAccess(_nodeGroupTable)->find(gID).getObj();
+      CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
+      if (obj!=NULL)
+      { //Just directly call the group:
+#if CMK_ERROR_CHECKING
+        envelope *env=_prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
+#else
+        envelope *env=UsrToEnv(msg);
+#endif
+        _deliverForNodeBocMsg(CkpvAccess(_coreState),eIdx,env,obj);
+        return;
+      }
     }
   }
   //Can't inline-- send the usual way
