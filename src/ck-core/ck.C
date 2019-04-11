@@ -1199,11 +1199,8 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
   if(CMI_ZC_MSGTYPE(env) == CMK_ZC_P2P_SEND_MSG || CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_SEND_MSG){
     envelope *prevEnv = env;
 
-    ncpyEmApiMode mode = ncpyEmApiMode::P2P; // Ncpy p2p API
-
-    if(env->getMsgtype() == ForBocMsg || env->getMsgtype() == ForNodeBocMsg) {
-      mode = ncpyEmApiMode::BCAST; // Ncpy Bcast API
-    }
+    // Determine mode depending on the message
+    ncpyEmApiMode mode = (CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_SEND_MSG) ? ncpyEmApiMode::BCAST : ncpyEmApiMode::P2P;
 
     env = CkRdmaIssueRgets(env, mode, prevEnv);
 
