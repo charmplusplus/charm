@@ -1718,11 +1718,13 @@ class AmpiMsgPool {
     currMsgs = 0;
   }
   inline AmpiMsg* newAmpiMsg(CMK_REFNUM_TYPE seq, int ssendReq, int tag, int srcRank, int len) noexcept {
-    if (len > msgLength || msgs.empty()) {
-      return new (len, 0) AmpiMsg(seq, ssendReq, tag, srcRank, len);
+    if (msgs.empty() || msgs.front()->origLength < len) {
+      int newlen = std::max(msgLength, len);
+      AmpiMsg* msg = new (newlen, 0) AmpiMsg(seq, ssendReq, tag, srcRank, newlen);
+      msg->setLength(len);
+      return msg;
     } else {
       AmpiMsg* msg = msgs.front();
-      CkAssert(msg != NULL);
       msgs.pop_front();
       currMsgs--;
       msg->setSeq(seq);
