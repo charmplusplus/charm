@@ -1618,6 +1618,8 @@ inline void pupFromBuf(const void *data,T &t) noexcept {
 
 #define COLL_SEQ_IDX      -1
 
+class AmpiMsgPool;
+
 class AmpiMsg final : public CMessage_AmpiMsg {
  private:
   int ssendReq; //Index to the sender's request
@@ -1690,6 +1692,8 @@ class AmpiMsg final : public CMessage_AmpiMsg {
     }
     return m;
   }
+
+  friend AmpiMsgPool;
 };
 
 #define AMPI_MSG_POOL_SIZE   32 // Max # of AmpiMsg's allowed in the pool
@@ -1699,32 +1703,12 @@ class AmpiMsgPool {
  private:
   std::forward_list<AmpiMsg *> msgs; // list of free msgs
   int msgLength; // AmpiMsg::length of messages in the pool
-  int msgUsersize; // usersize of message envelopes in the pool
   int maxMsgs; // max # of msgs in the pool
   int currMsgs; // current # of msgs in the pool
 
  public:
-  AmpiMsgPool() noexcept : msgLength(0), msgUsersize(0), maxMsgs(0), currMsgs(0) {}
-  AmpiMsgPool(int _numMsgs, int _msgLength) noexcept {
-    msgLength = _msgLength;
-    maxMsgs = _numMsgs;
-    if (maxMsgs > 0 && msgLength > 0) {
-      /* Construct an AmpiMsg to find the usersize (and add it to the pool while it's here).
-       * The rest of the pool can be filled lazily. */
-      AmpiMsg* msg = new (msgLength, 0) AmpiMsg(0, 0, 0, 0, msgLength);
-      msgs.push_front(msg);
-      currMsgs = 1;
-      /* Usersize is the true size of the message envelope, not the length member
-       * of the AmpiMsg. AmpiMsg::length is used by Ssend msgs to convey the real
-       * msg payload's length, and is not the length of the Ssend msg itself, so
-       * it cannot be trusted when returning msgs to the pool. */
-      msgUsersize = UsrToEnv(msgs.front())->getUsersize();
-    }
-    else {
-      currMsgs = 0;
-      msgUsersize = 0;
-    }
-  }
+  AmpiMsgPool(int _numMsgs = 0, int _msgLength = 0) noexcept
+    : msgLength(_msgLength), maxMsgs(_numMsgs), currMsgs(0) {}
   ~AmpiMsgPool() =default;
   inline void clear() noexcept {
     while (!msgs.empty()) {
@@ -1750,8 +1734,9 @@ class AmpiMsgPool {
     }
   }
   inline void deleteAmpiMsg(AmpiMsg* msg) noexcept {
-    if (currMsgs != maxMsgs && UsrToEnv(msg)->getUsersize() == msgUsersize) {
-      CkAssert(msg != NULL);
+    /* msg->origLength is the true size of the message's data buffer, while
+     * msg->length is the space taken by the payload within it. */
+    if (currMsgs != maxMsgs && msg->origLength >= msgLength && msg->origLength < 2*msgLength) {
       msgs.push_front(msg);
       currMsgs++;
     } else {
@@ -1760,7 +1745,6 @@ class AmpiMsgPool {
   }
   void pup(PUP::er& p) {
     p|msgLength;
-    p|msgUsersize;
     p|maxMsgs;
     // Don't PUP the msgs in the free list or currMsgs, let the pool fill lazily
   }
