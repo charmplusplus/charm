@@ -1624,6 +1624,7 @@ class AmpiMsg final : public CMessage_AmpiMsg {
   int tag; //MPI tag
   int srcRank; //Communicator rank for source
   int length; //Number of bytes in this message
+  int origLength; // true size of allocation
   MPI_Comm comm; // Communicator
  public:
   char *data; //Payload
@@ -1636,10 +1637,10 @@ class AmpiMsg final : public CMessage_AmpiMsg {
  public:
   AmpiMsg() noexcept { data = NULL; }
   AmpiMsg(int sreq, int t, int sRank, int l) noexcept :
-    ssendReq(sreq), tag(t), srcRank(sRank), length(l)
+    ssendReq(sreq), tag(t), srcRank(sRank), length(l), origLength(l)
   { /* only called from AmpiMsg::pup() since the refnum (seq) will get pup'ed by the runtime */ }
   AmpiMsg(CMK_REFNUM_TYPE seq, int sreq, int t, int sRank, int l) noexcept :
-    ssendReq(sreq), tag(t), srcRank(sRank), length(l)
+    ssendReq(sreq), tag(t), srcRank(sRank), length(l), origLength(l)
   { CkSetRefNum(this, seq); }
   inline void setSsendReq(int s) noexcept { CkAssert(s >= 0); ssendReq = s; }
   inline void setSeq(CMK_REFNUM_TYPE s) noexcept { CkAssert(s >= 0); UsrToEnv(this)->setRef(s); }
@@ -1665,17 +1666,22 @@ class AmpiMsg final : public CMessage_AmpiMsg {
   inline MPI_Comm getComm() const noexcept { return comm; }
   static AmpiMsg* pup(PUP::er &p, AmpiMsg *m) noexcept
   {
-    int ssendReq, length, tag, srcRank, comm;
+    int ref, ssendReq, tag, srcRank, length, origLength;
+    MPI_Comm comm;
     if(p.isPacking() || p.isSizing()) {
+      ref = CkGetRefNum(m);
       ssendReq = m->ssendReq;
       tag = m->tag;
       srcRank = m->srcRank;
       length = m->length;
+      origLength = m->origLength;
       comm = m->comm;
     }
-    p(ssendReq); p(tag); p(srcRank); p(length); p(comm);
+    p(ref); p(ssendReq); p(tag); p(srcRank); p(length); p(origLength); p(comm);
     if(p.isUnpacking()) {
-      m = new (length, 0) AmpiMsg(ssendReq, tag, srcRank, length, comm);
+      m = new (origLength, 0) AmpiMsg(ref, ssendReq, tag, srcRank, origLength);
+      m->setLength(length);
+      m->setComm(comm);
     }
     p(m->data, length);
     if(p.isDeleting()) {
@@ -1705,7 +1711,7 @@ class AmpiMsgPool {
     if (maxMsgs > 0 && msgLength > 0) {
       /* Construct an AmpiMsg to find the usersize (and add it to the pool while it's here).
        * The rest of the pool can be filled lazily. */
-      AmpiMsg* msg = new (msgLength, 0) AmpiMsg(0, 0, 0, 0, 0);
+      AmpiMsg* msg = new (msgLength, 0) AmpiMsg(0, 0, 0, 0, msgLength);
       msgs.push_front(msg);
       currMsgs = 1;
       /* Usersize is the true size of the message envelope, not the length member
