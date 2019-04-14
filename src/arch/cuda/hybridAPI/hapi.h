@@ -19,7 +19,7 @@
 #else
 #  define hapiHostMalloc malloc
 #  define hapiHostFree   free
-#endif // HAPI_USE_MALLOCHOST
+#endif // HAPI_USE_CUDAMALLOCHOST
 
 /******************** DEPRECATED ********************/
 // Contains information about a device buffer, which is used by
@@ -220,9 +220,11 @@ void hapiAddCallback(cudaStream_t, void*, void* = NULL);
 // Thin wrappers for memory related CUDA API calls.
 cudaError_t hapiMalloc(void**, size_t);
 cudaError_t hapiFree(void*);
-cudaError_t hapiMallocHost(void**, size_t);
-cudaError_t hapiFreeHost(void*);
 cudaError_t hapiMemcpyAsync(void*, const void*, size_t, cudaMemcpyKind, cudaStream_t);
+
+// Explicit memory allocations using pinned memory pool.
+void* hapiPoolMalloc(size_t);
+void hapiPoolFree(void*);
 
 // Provides support for detecting errors with CUDA API calls.
 #ifndef HAPI_CHECK_OFF
@@ -231,14 +233,6 @@ cudaError_t hapiMemcpyAsync(void*, const void*, size_t, cudaMemcpyKind, cudaStre
 #define hapiCheck(code) code
 #endif
 void hapiErrorDie(cudaError_t, const char*, const char*, int);
-
-#ifdef HAPI_MEMPOOL
-// Allocate memory from a pool of page-locked memory.
-void* hapiPoolMalloc(size_t);
-
-// Return page-locked memory to the pool.
-void hapiPoolFree(void*);
-#endif
 
 #ifdef HAPI_INSTRUMENT_WRS
 struct hapiRequestTimeInfo {
