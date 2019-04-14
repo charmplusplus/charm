@@ -3085,6 +3085,12 @@ void *CmiAlloc(int size)
   res+=sizeof(CmiChunkHeader);
   CmiAssert((intptr_t)res % ALIGN_BYTES == 0);
 
+#if CMK_ONESIDED_IMPL
+  // Set zcMsgType in the converse message header to CMK_REG_NO_ZC_MSG
+  if(size >= CmiMsgHeaderSizeBytes)
+    CMI_ZC_MSGTYPE(res) = CMK_REG_NO_ZC_MSG;
+#endif
+
   SIZEFIELD(res)=size;
   REFFIELDSET(res, 1);
   return (void *)res;
@@ -3107,6 +3113,11 @@ void *CmiRdmaAlloc(int size) {
   res+=sizeof(CmiChunkHeader);
   CmiAssert((intptr_t)res % ALIGN_BYTES == 0);
 
+#if CMK_ONESIDED_IMPL
+  // Set zcMsgType in the converse message header to CMK_REG_NO_ZC_MSG
+  if(size >= CmiMsgHeaderSizeBytes)
+    CMI_ZC_MSGTYPE(res) = CMK_REG_NO_ZC_MSG;
+#endif
   SIZEFIELD(res)=size;
   REFFIELDSET(res, 1);
   return (void *)res;

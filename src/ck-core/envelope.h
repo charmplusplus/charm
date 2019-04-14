@@ -353,10 +353,6 @@ public:
       env->setEpIdx(0);
       env->setIsVarSysMsg(0);
 
-#if CMK_ONESIDED_IMPL
-      CMI_ZC_MSGTYPE(env) = CMK_REG_NO_ZC_MSG; // Set the default as CMK_REG_NO_ZC_MSG
-#endif
-
 #if USE_CRITICAL_PATH_HEADER_ARRAY
       env->pathHistory.reset();
 #endif
