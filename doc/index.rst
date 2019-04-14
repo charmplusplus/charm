@@ -4,7 +4,7 @@ Charm++ Documentation
 
 
 - Charm++ Tutorial: http://charmplusplus.org/tutorial/
-- Charm++ bug tracking: https://charm.cs.illinois.edu/redmine/projects/charm
+- Charm++ bug tracking: https://github.com/UIUC-PPL/charm/issues
 - Recent commit activity: http://charm.cs.illinois.edu/gerrit/gitweb?p=charm.git
 - Nightly regression tests: http://charm.cs.illinois.edu/autobuild/cur/
 - Charm++ mailing list: charm@cs.illinois.edu

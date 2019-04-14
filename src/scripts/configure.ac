@@ -753,7 +753,7 @@ then
   echo "Charm++ requires C++11 support, but doesn't know the flag to enable it"
   echo
   echo "For Intel's compiler please see"
-  echo "https://charm.cs.illinois.edu/redmine/issues/1560"
+  echo "https://github.com/UIUC-PPL/charm/issues/1560"
   echo "about making a suitable version of gcc/g++/libstdc++ available"
   echo
   echo "For Blue Gene/Q please use the Clang compiler"

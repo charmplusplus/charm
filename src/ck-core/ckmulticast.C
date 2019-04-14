@@ -1195,7 +1195,7 @@ void CkMulticastMgr::setReductionClient(CProxySection_ArrayBase &proxy, CkCallba
   if (numSubSections > 1)
   {
     /** @warning: setReductionClient in cross section reduction should be phased out
-     * Redmine Issue: https://charm.cs.illinois.edu/redmine/issues/1249
+     * Issue: https://github.com/UIUC-PPL/charm/issues/1249
      * Since finalCB is already set in initDelegateMgr it needs to be deleted here
      * There will still be a memory leak for the instantiation of XGroupSectionReducer object
      * Since this function will eventually be phased out, it is only a quick fix
@@ -1232,7 +1232,7 @@ void CkMulticastMgr::setReductionClient(CProxySection_Group &proxy, CkCallback *
   if (numSubSections > 1)
   {
     /** @warning: setReductionClient in cross section reduction should be phased out
-     * Redmine Issue: https://charm.cs.illinois.edu/redmine/issues/1249
+     * Issue: https://github.com/UIUC-PPL/charm/issues/1249
      * Since finalCB is already set in initDelegateMgr it needs to be deleted here
      * There will still be a memory leak for the instantiation of XGroupSectionReducer object
      * Since this function will eventually be phased out, it is only a quick fix
