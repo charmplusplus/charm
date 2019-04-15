@@ -3641,7 +3641,7 @@ void AmpiSeqQ::putOutOfOrder(int seqIdx, AmpiMsg *msg) noexcept
   if (msg->getSeq() < el.getSeqIncoming())
     CkAbort("AMPI Logic error: received late out-of-order message!\n");
 #endif
-  if (seqIdx == COLL_SEQ_IDX) CmiReference(msg); // bcast msg is [nokeep]
+  if (seqIdx == COLL_SEQ_IDX) CmiReference(UsrToEnv(msg)); // bcast msg is [nokeep]
   out.enq(msg);
   el.incNumOutOfOrder(); // We have another message in the out-of-order queue
 }
