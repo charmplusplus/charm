@@ -3400,6 +3400,7 @@ static void _CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *ms
   CmiMultipleSendHeader header;
   int m; /* Outgoing message */
 
+  CmiInitMsgHeader(header.convHeader, sizeof(CmiMultipleSendHeader));
 #if CMK_USE_IBVERBS
   infiCmiChunkHeader *msgHdr;
 #else

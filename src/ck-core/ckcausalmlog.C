@@ -1367,6 +1367,7 @@ void checkpointAlarm(void *_dummy,double curWallTime){
 		return;
 	}
 	CheckpointRequest request;
+	CmiInitMsgHeader(request.header, sizeof(CheckpointRequest));
 	request.PE = CkMyPe();
 	CmiSetHandler(&request,_checkpointRequestHandlerIdx);
 	CmiSyncBroadcastAll(sizeof(CheckpointRequest),(char *)&request);
@@ -1613,6 +1614,7 @@ void _storeCheckpointHandler(char *msg){
 	DEBUG(printf("[%d] For proc %d from number of migratedNoticeList cleared %d checkpointAckHandler %d\n",CmiMyPe(),sendingPE,count,_checkpointAckHandlerIdx));
 	
 	CheckPointAck ackMsg;
+	CmiInitMsgHeader(ackMsg.header, sizeof(CheckPointAck));
 	ackMsg.PE = CkMyPe();
 	ackMsg.dataSize = CpvAccess(_storedCheckpointData)->bufSize;
 	CmiSetHandler(&ackMsg,_checkpointAckHandlerIdx);
@@ -1844,7 +1846,7 @@ void clearUpMigratedRetainedLists(int PE){
  */
 void CkMlogRestart(const char * dummy, CkArgMsg * dummyMsg){
 	RestartRequest msg;
-
+	CmiInitMsgHeader(msg.header, sizeof(RestartRequest));
 	fprintf(stderr,"[%d] Restart started at %.6lf \n",CkMyPe(),CmiWallTimer());
 
 	// setting the restart flag
@@ -1878,7 +1880,7 @@ void _restartHandler(RestartRequest *restartMsg){
 	int i;
 	int numGroups = CkpvAccess(_groupIDTable)->size();
 	RestartRequest msg;
-	
+	CmiInitMsgHeader(msg.header, sizeof(RestartRequest));
 	fprintf(stderr,"[%d] Restart-team started at %.6lf \n",CkMyPe(),CmiWallTimer());
 
     // setting the restart flag
@@ -1924,6 +1926,7 @@ void _getRestartCheckpointHandler(RestartRequest *restartMsg){
 				//need to verify if the object actually exists .. it might not
 				//have been acked but it might exist on it
 				VerifyAckMsg msg;
+				CmiInitMsgHeader(msg.header, sizeof(VerifyAckMsg));
 				msg.migRecord = migratedNoticeList[i];
 				msg.index = i;
 				msg.fromPE = CmiMyPe();
@@ -2087,6 +2090,7 @@ void _getCheckpointHandler(RestartRequest *restartMsg){
 				//need to verify if the object actually exists .. it might not
 				//have been acked but it might exist on it
 				VerifyAckMsg msg;
+				CmiInitMsgHeader(msg.header, sizeof(VerifyAckMsg));
 				msg.migRecord = migratedNoticeList[i];
 				msg.index = i;
 				msg.fromPE = CmiMyPe();
@@ -2398,6 +2402,7 @@ void _updateHomeRequestHandler(RestartRequest *updateRequest){
 		for(int i=0;i<retainedObjectList.size();i++){
 			if(retainedObjectList[i]->acked == 0){
 				MigrationNotice migMsg;
+				CmiInitMsgHeader(migMsg.header, sizeof(MigrationNotice));
 				migMsg.migRecord = retainedObjectList[i]->migRecord;
 				migMsg.record = retainedObjectList[i];
 				CmiSetHandler((void *)&migMsg,_receiveMigrationNoticeHandlerIdx);
@@ -3162,6 +3167,7 @@ void _distributedLocationHandler(char *receivedMsg){
  * it that a particular expected object is not going to get to it */
 void sendDummyMigration(int restartPE,CkGroupID lbID,CkGroupID locMgrID,CkArrayIndexMax &idx,int locationPE){
 	DummyMigrationMsg buf;
+	CmiInitMsgHeader(buf.header, sizeof(DummyMigrationMsg));
 	buf.flag = MLOG_OBJECT;
 	buf.lbID = lbID;
 	buf.mgrID = locMgrID;
@@ -3178,6 +3184,7 @@ void sendDummyMigration(int restartPE,CkGroupID lbID,CkGroupID locMgrID,CkArrayI
 
 void sendDummyMigrationCounts(int *dummyCounts){
 	DummyMigrationMsg buf;
+	CmiInitMsgHeader(buf.header, sizeof(DummyMigrationMsg));
 	buf.flag = MLOG_COUNT;
 	buf.lbID = globalLBID;
 	CmiSetHandler(&buf,_dummyMigrationHandlerIdx);
@@ -3431,6 +3438,7 @@ void sendMlogLocation(int targetPE, envelope *env){
 	countLBToMigrate++;
 	
 	MigrationNotice migMsg;
+	CmiInitMsgHeader(migMsg.header, sizeof(MigrationNotice));
 	migMsg.migRecord.gID = msg->gid;
 	migMsg.migRecord.idx = msg->idx;
 	migMsg.migRecord.fromPE = CkMyPe();
@@ -3462,6 +3470,7 @@ void _receiveMigrationNoticeHandler(MigrationNotice *msg){
 	migratedNoticeList.push_back(msg->migRecord);
 
 	MigrationNoticeAck buf;
+	CmiInitMsgHeader(buf.header, sizeof(MigrationNoticeAck));
 	buf.record = msg->record;
 	CmiSetHandler((void *)&buf,_receiveMigrationNoticeAckHandlerIdx);
 	CmiSyncSend(getCheckPointPE(),sizeof(MigrationNoticeAck),(char *)&buf);
@@ -3601,6 +3610,7 @@ void garbageCollectMlog(){
 void informLocationHome(CkGroupID locMgrID,CkArrayIndexMax idx,int homePE,int currentPE){
 	double _startTime = CmiWallTimer();
 	CurrentLocationMsg msg;
+	CmiInitMsgHeader(msg.header, sizeof(CurrentLocationMsg));
 	msg.mgrID = locMgrID;
 	msg.idx = idx;
 	msg.locationPE = currentPE;
@@ -3646,6 +3656,7 @@ void _receiveLocationHandler(CurrentLocationMsg *data){
 
 void getGlobalStep(CkGroupID gID){
 	LBStepMsg msg;
+	CmiInitMsgHeader(msg.header, sizeof(LBStepMsg));
 	int destPE = 0;
 	msg.lbID = gID;
 	msg.fromPE = CmiMyPe();
