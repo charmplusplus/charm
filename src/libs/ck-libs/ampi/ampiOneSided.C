@@ -734,7 +734,7 @@ AMPI_API_IMPL(int, MPI_Win_create, void *base, MPI_Aint size, int disp_unit,
   parent->setAttr(*newwin, keyvals, MPI_WIN_BASE, &base);
   parent->setAttr(*newwin, keyvals, MPI_WIN_SIZE, &size);
   parent->setAttr(*newwin, keyvals, MPI_WIN_DISP_UNIT, &disp_unit);
-  ptr->barrier(); // synchronize all participating virtual processes
+  ptr = ptr->barrier(); // synchronize all participating virtual processes
   return MPI_SUCCESS;
 }
 
@@ -753,7 +753,7 @@ AMPI_API_IMPL(int, MPI_Win_free, MPI_Win *win)
   ampi *ptr = getAmpiInstance(winStruct->comm);
   ptr->deleteWinInstance(*win);
   /* Need a barrier here: to ensure that every process participates */
-  ptr->barrier();
+  ptr = ptr->barrier();
   *win = MPI_WIN_NULL;
   return MPI_SUCCESS;
 }
@@ -977,10 +977,9 @@ AMPI_API_IMPL(int, MPI_Win_fence, int assertion, MPI_Win win)
   AMPI_API("AMPI_Win_fence");
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   MPI_Comm comm = winStruct->comm;
-  ampi *ptr = getAmpiInstance(comm);
 
   // Wait until everyone reaches the fence
-  ptr->barrier();
+  ampi *unused = getAmpiInstance(comm)->barrier();
 
   // Complete all outstanding one-sided comm requests
   // no need to do this for the pseudo-implementation

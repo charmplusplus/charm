@@ -131,6 +131,15 @@
 #  endif
 # endif
 
+// must be placed before return type and at both declaration and definition
+#if defined __GNUC__ && __GNUC__ >= 4
+# define CMI_WARN_UNUSED_RESULT __attribute__ ((warn_unused_result))
+#elif defined _MSC_VER && _MSC_VER >= 1700
+# define CMI_WARN_UNUSED_RESULT _Check_return_
+#else
+# define CMI_WARN_UNUSED_RESULT
+#endif
+
 /* Paste the tokens x and y together, without any space between them.
    The ANSI C way to do this is the bizarre ## "token-pasting" 
    preprocessor operator.

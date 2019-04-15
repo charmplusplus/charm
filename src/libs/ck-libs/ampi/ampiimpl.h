@@ -2125,7 +2125,7 @@ class ampiParent final : public CBase_ampiParent {
   void Checkpoint(int len, const char* dname) noexcept;
   void ResumeThread() noexcept;
   TCharm* getTCharmThread() const noexcept {return thread;}
-  inline ampiParent* blockOnRecv() noexcept;
+  CMI_WARN_UNUSED_RESULT inline ampiParent* blockOnRecv() noexcept;
   inline CkDDT* getDDT() noexcept { return &myDDT; }
 
 #if CMK_LBDB_ON
@@ -2356,8 +2356,8 @@ class ampiParent final : public CBase_ampiParent {
 
   void init() noexcept;
   void finalize() noexcept;
-  void block() noexcept;
-  void yield() noexcept;
+  CMI_WARN_UNUSED_RESULT ampiParent* block() noexcept;
+  CMI_WARN_UNUSED_RESULT ampiParent* yield() noexcept;
 
 #if AMPI_PRINT_MSG_SIZES
 // Map of AMPI routine names to message sizes and number of messages:
@@ -2464,7 +2464,10 @@ class ampi final : public CBase_ampi {
   void allInitDone() noexcept;
   void setInitDoneFlag() noexcept;
 
-  void unblock() noexcept;
+  inline void unblock() noexcept {
+    thread->resume();
+  }
+
   void injectMsg(int size, char* buf) noexcept;
   void generic(AmpiMsg *) noexcept;
   void genericRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank,
@@ -2498,14 +2501,22 @@ class ampi final : public CBase_ampi {
     }
   }
 
+ private: // for this pointer safety after migration
+  CMI_WARN_UNUSED_RESULT static ampi* static_blockOnColl(ampi* dis) noexcept;
+  static int static_recv(ampi* dis,int t,int s,void* buf,int count,MPI_Datatype type,MPI_Comm comm,MPI_Status *sts) noexcept;
+  static void static_probe(ampi* dis,int t,int s,MPI_Comm comm,MPI_Status *sts) noexcept;
+  static void static_mprobe(ampi* dis, int t, int s, MPI_Comm comm, MPI_Status *sts, MPI_Message *message) noexcept;
+
  public: // to be used by MPI_* functions
   inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) const noexcept {
     return parent->comm2CommStruct(comm);
   }
   inline const ampiCommStruct &getCommStruct() const noexcept { return myComm; }
 
-  inline ampi* blockOnRecv() noexcept;
-  inline ampi* blockOnColl() noexcept;
+  CMI_WARN_UNUSED_RESULT inline ampi* blockOnRecv() noexcept;
+  CMI_WARN_UNUSED_RESULT CMI_FORCE_INLINE ampi* blockOnColl() noexcept {
+    return static_blockOnColl(this);
+  }
   inline void setBlockingReq(AmpiRequest *req) noexcept;
   MPI_Request postReq(AmpiRequest* newreq) noexcept;
 
@@ -2538,7 +2549,9 @@ class ampi final : public CBase_ampi {
   inline void processGathervMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type,
                                int* recvCounts, int* displs) noexcept;
   inline AmpiMsg * getMessage(int t, int s, MPI_Comm comm, int *sts) const noexcept;
-  int recv(int t,int s,void* buf,int count,MPI_Datatype type,MPI_Comm comm,MPI_Status *sts=NULL) noexcept;
+  CMI_FORCE_INLINE int recv(int t,int s,void* buf,int count,MPI_Datatype type,MPI_Comm comm,MPI_Status *sts=NULL) noexcept {
+    return static_recv(this, t, s, buf, count, type, comm, sts);
+  }
   void irecv(void *buf, int count, MPI_Datatype type, int src,
              int tag, MPI_Comm comm, MPI_Request *request) noexcept;
   void mrecv(int tag, int src, void* buf, int count, MPI_Datatype datatype, MPI_Comm comm,
@@ -2553,11 +2566,17 @@ class ampi final : public CBase_ampi {
   void sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
                         int dest, int sendtag, int source, int recvtag,
                         MPI_Comm comm, MPI_Status *status) noexcept;
-  void probe(int t,int s,MPI_Comm comm,MPI_Status *sts) noexcept;
-  void mprobe(int t, int s, MPI_Comm comm, MPI_Status *sts, MPI_Message *message) noexcept;
+  CMI_FORCE_INLINE void probe(int t,int s,MPI_Comm comm,MPI_Status *sts) noexcept {
+    return static_probe(this, t, s, comm, sts);
+  }
+  CMI_FORCE_INLINE void mprobe(int t, int s, MPI_Comm comm, MPI_Status *sts, MPI_Message *message) noexcept {
+    return static_mprobe(this, t, s, comm, sts, message);
+  }
   int iprobe(int t,int s,MPI_Comm comm,MPI_Status *sts) noexcept;
   int improbe(int t, int s, MPI_Comm comm, MPI_Status *sts, MPI_Message *message) noexcept;
-  void barrier() noexcept;
+  CMI_WARN_UNUSED_RESULT ampi * barrier() noexcept;
+  CMI_WARN_UNUSED_RESULT ampi * block() noexcept;
+  CMI_WARN_UNUSED_RESULT ampi * yield() noexcept;
   void ibarrier(MPI_Request *request) noexcept;
   void bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm comm) noexcept;
   int intercomm_bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm intercomm) noexcept;
@@ -2575,6 +2594,7 @@ class ampi final : public CBase_ampi {
   inline bool isInter() const noexcept { return myComm.isinter(); }
   void intercommMerge(int first, MPI_Comm *ncomm) noexcept;
 
+  inline ampiParent* getParent() const noexcept { return parent; }
   inline int getWorldRank() const noexcept {return parent->thisIndex;}
   /// Return our rank in this communicator
   inline int getRank() const noexcept {return myRank;}
@@ -2663,9 +2683,9 @@ class ampi final : public CBase_ampi {
                           MPI_Datatype recvtype, MPI_Comm intercomm, MPI_Request* request) noexcept;
 };
 
-ampiParent *getAmpiParent() noexcept;
+CMI_WARN_UNUSED_RESULT ampiParent *getAmpiParent() noexcept;
 bool isAmpiThread() noexcept;
-ampi *getAmpiInstance(MPI_Comm comm) noexcept;
+CMI_WARN_UNUSED_RESULT ampi *getAmpiInstance(MPI_Comm comm) noexcept;
 void checkComm(MPI_Comm comm) noexcept;
 void checkRequest(MPI_Request req) noexcept;
 void handle_MPI_BOTTOM(void* &buf, MPI_Datatype type) noexcept;

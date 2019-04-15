@@ -201,13 +201,13 @@ class TCharm: public CBase_TCharm
 
 	//Client-callable routines:
 	//Sleep till entire array is here
-	void barrier() noexcept;
+	CMI_WARN_UNUSED_RESULT TCharm * barrier() noexcept;
 
 	//Block, migrate to destPE, and resume
-	void migrateTo(int destPE) noexcept;
+	CMI_WARN_UNUSED_RESULT TCharm * migrateTo(int destPE) noexcept;
 
 #if CMK_FAULT_EVAC
-	void evacuate() noexcept;
+	CMI_WARN_UNUSED_RESULT TCharm * evacuate() noexcept;
 #endif
 
 	//Thread finished running
@@ -235,15 +235,15 @@ class TCharm: public CBase_TCharm
 	inline void startTiming() noexcept {ckStartTiming();}
 
 	//Block our thread, run the scheduler, and come back
-	void schedule() noexcept {
+	CMI_WARN_UNUSED_RESULT TCharm * schedule() noexcept {
 		DBG("thread schedule");
 		start(); // Calls CthAwaken
-		stop(); // Calls CthSuspend
+		return stop(); // Calls CthSuspend
 	}
 
 
 	//As above, but start/stop the thread itself, too.
-	void stop() noexcept { //Blocks; will not return until "start" called.
+	CMI_WARN_UNUSED_RESULT TCharm * stop() noexcept { //Blocks; will not return until "start" called.
 		#if CMK_ERROR_CHECKING
 		if (tid != CthSelf())
 			CkAbort("Called TCharm::stop from outside TCharm thread!\n");
@@ -254,6 +254,11 @@ class TCharm: public CBase_TCharm
 		isStopped=true;
 		DBG("thread suspended");
 
+		return stop_static();
+	}
+
+ private:
+	CMI_WARN_UNUSED_RESULT TCharm * stop_static() noexcept {
 		CthSuspend();
 		/* SUBTLE: We have to do the get() because "this" may have changed
 		 * during a migration-suspend.  If you access *any* members
@@ -262,8 +267,10 @@ class TCharm: public CBase_TCharm
 		TCharm *dis=TCharm::get();
 		dis->isStopped=false;
 		dis->startTiming();
+		return dis;
 	}
 
+ public:
 	void start() noexcept {
 		isStopped=false; // do not migrate while running
 		DBG("thread resuming soon");
@@ -271,7 +278,9 @@ class TCharm: public CBase_TCharm
 	}
 
 	//Aliases:
-	inline void suspend() noexcept {stop();}
+	inline CMI_WARN_UNUSED_RESULT TCharm * suspend() noexcept {
+		return stop();
+	}
 	inline void resume() noexcept {
 		//printf("in thcarm::resume, isStopped=%d\n", isStopped);
 		if (isStopped){
@@ -283,9 +292,9 @@ class TCharm: public CBase_TCharm
 	}
 
 	//Go to sync, block, possibly migrate, and then resume
-	void migrate() noexcept;
-	void async_migrate() noexcept;
-	void allow_migrate();
+	CMI_WARN_UNUSED_RESULT TCharm * migrate() noexcept;
+	CMI_WARN_UNUSED_RESULT TCharm * async_migrate() noexcept;
+	CMI_WARN_UNUSED_RESULT TCharm * allow_migrate();
 
 	//Entering thread context: turn stuff on
 	static void activateThread(void) noexcept {
