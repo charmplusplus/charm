@@ -388,7 +388,7 @@ MBlockChunk::wait_update(void)
 {
   if(update.wait_seqnum != (-1)) {
     DBG("sleeping for "<<nRecvPatches-nRecd<<" update messages")
-    thread->suspend();
+    TCharm * unused = thread->suspend();
     DBG("got all update messages for "<<seqnum)  
   }
   return MBLK_SUCCESS;
@@ -450,7 +450,7 @@ MBlockChunk::reduce(int fid, const void *inbuf, void *outbuf, int op)
   reduce_output = outbuf;
   contribute(len, (void *)inbuf, rtype, 
   	CkCallback(index_t::reductionResult(0),thisProxy) );
-  thread->suspend();
+  TCharm * unused = thread->suspend();
 }
 
 void
@@ -560,7 +560,7 @@ CLINKAGE int
 MBLK_Migrate(void)
 {
   MBLOCKAPI("MBLK_Migrate");
-  TCharm::get()->migrate();
+  TCharm * unused = TCharm::get()->migrate();
   return MBLK_SUCCESS;
 }
 
