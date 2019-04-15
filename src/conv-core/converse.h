@@ -894,6 +894,7 @@ int      CmiGetReference(void *blk);
 int      CmiSize(void *blk);
 void     CmiFree(void *blk);
 void     CmiRdmaFree(void *blk);
+void     CmiInitMsgHeader(void *msg, int size);
 
 #ifndef CMI_TMP_SKIP
 void *CmiTmpAlloc(int size);
