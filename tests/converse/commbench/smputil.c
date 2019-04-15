@@ -86,6 +86,7 @@ void smputil_init(void) {
   int i;
   CmiNodeLock lock;
 
+  CmiInitMsgHeader(msg.core, sizeof(EmptyMsg));
   starttime = CmiWallTimer();
   for (i = 0; i < NVARITER; i++)
     ;

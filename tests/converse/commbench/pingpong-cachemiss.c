@@ -91,6 +91,7 @@ static void recvTime(TimeMessage* msg) {
   int i, j;
   double time;
 
+  CmiInitMsgHeader(m.core, sizeof(EmptyMsg));
   pva(numRecv)++;
   for (i = 0; i < CmiNumNodes(); i++) {
     if (i == msg->srcNode) continue;
@@ -133,6 +134,7 @@ static void recvTime(TimeMessage* msg) {
 
 static void startNextNode(EmptyMsg* msg) {
   EmptyMsg m;
+  CmiInitMsgHeader(m.core, sizeof(EmptyMsg));
   CmiFree(msg);
   if ((CmiMyNode() + 1) != CmiNumNodes()) {
     CmiSetHandler(&m, pva(nbrHandler));
@@ -147,6 +149,7 @@ static void startNextNbr(EmptyMsg* msg) {
 
   /* CmiAssert(CmiMyPe()==0); */
 
+  CmiInitMsgHeader(m.core, sizeof(EmptyMsg));
   CmiFree(msg);
   pva(nextNbr)++;
   if (pva(nextNbr) == CmiMyNode()) {
@@ -179,6 +182,7 @@ static void startNextSize(EmptyMsg* msg) {
 
   /* CmiAssert(CmiMyPe()==0); */
 
+  CmiInitMsgHeader(m.core, sizeof(EmptyMsg));
   pva(nextSize)++;
   if (pva(nextSize) == pva(numSizes)) {
     pva(nextSize) = -1;
@@ -210,6 +214,8 @@ static void startNextIter(Message* msg) {
   EmptyMsg m;
   Message* mm;
   pva(nextIter)++;
+
+  CmiInitMsgHeader(m.core, sizeof(EmptyMsg));
   if (pva(nextIter) >= sizes[pva(nextSize)].numiter) {
     pva(endtime) = CmiWallTimer();
     /* checkMessage(msg); */
@@ -299,6 +305,7 @@ static void startMessage(Message* msg) {
 
 void pingpong_cachemiss_init(void) {
   EmptyMsg m;
+  CmiInitMsgHeader(m.core, sizeof(EmptyMsg));
 
   if (CmiNumNodes() == 1) {
     CmiPrintf("[pingpong] This benchmark requires > 1 nodes.\n");

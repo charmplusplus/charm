@@ -118,6 +118,8 @@ static void reduction_starter(void* msg) {
 
 static void reduction_handler(void* msg) {
   EmptyMsg emsg;
+  CmiInitMsgHeader(emsg.core, sizeof(EmptyMsg));
+
   CpvAccess(endtime) = CmiWallTimer();
 
   CmiFree(msg);
@@ -128,6 +130,8 @@ static void reduction_handler(void* msg) {
 static void reduction_central(void* msg) {
   EmptyMsg emsg;
   ptimemsg tmsg = (ptimemsg)msg;
+
+  CmiInitMsgHeader(emsg.core, sizeof(EmptyMsg));
   if (CpvAccess(currentPe) == 0) {
     CpvAccess(lasttime) =
       CpvAccess(endtime) - tmsg->time - CpvAccess(timediff)[tmsg->srcpe];
@@ -166,6 +170,7 @@ static void sync_starter(void* msg) {
   EmptyMsg emsg;
   ptimemsg tmsg = (ptimemsg)msg;
 
+  CmiInitMsgHeader(emsg.core, sizeof(EmptyMsg));
   double midTime = (CmiWallTimer() + CpvAccess(lasttime)) / 2;
   CpvAccess(timediff)[CpvAccess(currentPe)] = midTime - tmsg->time;
   CmiFree(msg);
@@ -193,6 +198,7 @@ static void sync_reply(void* msg) {
 
 void reduction_init(void) {
   EmptyMsg emsg;
+  CmiInitMsgHeader(emsg.core, sizeof(EmptyMsg));
 
   CmiSetHandler(&emsg, CpvAccess(sync_reply));
   CpvAccess(lasttime) = CmiWallTimer();

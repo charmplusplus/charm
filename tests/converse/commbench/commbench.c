@@ -99,6 +99,7 @@ int commbench_skip(const char* test) {
 void commbench_next() {
   int idx, bank;
   EmptyMsg msg;
+  CmiInitMsgHeader(msg.core, sizeof(EmptyMsg));
 
   bank = CpvAccess(test_bank_size);
 nextidx:

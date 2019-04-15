@@ -136,6 +136,7 @@ struct conv_start_msg {
 /** Called on processor 0 to initiate the test */
 void convCommTest(int isLocal) {
 	conv_start_msg m;
+	CmiInitMsgHeader(m.hdr, sizeof(struct conv_start_msg));
 	CmiSetHandler(&m,CpvAccess(conv_kicker_idx));
 	m.isLocal=isLocal;
 	CmiSyncBroadcastAllFn(sizeof(m),(char *)&m);

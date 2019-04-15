@@ -90,6 +90,7 @@ static void recvTime(TimeMessage* msg) {
   int i, j;
   double time;
 
+  CmiInitMsgHeader(m.core, sizeof(EmptyMsg));
   pva(numRecv)++;
   for (i = 0; i < CmiNumPes(); i++) {
     if (i == msg->srcNode) continue;
@@ -136,6 +137,7 @@ static void recvTime(TimeMessage* msg) {
 
 static void startNextNode(EmptyMsg* msg) {
   EmptyMsg m;
+  CmiInitMsgHeader(m.core, sizeof(EmptyMsg));
   CmiFree(msg);
   if ((CmiMyPe() + 1) != CmiNumPes()) {
     CmiSetHandler(&m, pva(nbrHandler));
@@ -148,6 +150,7 @@ static void startNextNbr(EmptyMsg* msg) {
   TimeMessage* tm;
   int i, size;
 
+  CmiInitMsgHeader(m.core, sizeof(EmptyMsg));
   CmiFree(msg);
   pva(nextNbr)++;
   if (pva(nextNbr) == CmiMyPe()) {
@@ -177,6 +180,8 @@ static void startNextSize(EmptyMsg* msg) {
   EmptyMsg m;
   Message* mm;
   int num;
+
+  CmiInitMsgHeader(m.core, sizeof(EmptyMsg));
   pva(nextSize)++;
   if (pva(nextSize) == pva(numSizes)) {
     pva(nextSize) = -1;
@@ -200,6 +205,7 @@ static void startNextSize(EmptyMsg* msg) {
 
 static void startNextIter(Message* msg) {
   EmptyMsg m;
+  CmiInitMsgHeader(m.core, sizeof(EmptyMsg));
 
   msg->iter += 1;
 
@@ -231,6 +237,7 @@ static void bounceMessage(Message* msg) {
 
 void flood_init(void) {
   EmptyMsg m;
+  CmiInitMsgHeader(m.core, sizeof(EmptyMsg));
 
   if (CmiNumPes() == 1) {
     CmiPrintf("[flood] This benchmark requires > 1 nodes.\n");

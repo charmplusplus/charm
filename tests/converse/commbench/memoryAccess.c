@@ -192,6 +192,7 @@ static void memoryHandler(EmptyMsg* msg) {
 
 void memoryAccess_init(void) {
   EmptyMsg msg;
+  CmiInitMsgHeader(msg.core, sizeof(EmptyMsg));
 
   CmiPrintf("Single core malloc/free/traversal performance numbers\n");
   memoryTest();

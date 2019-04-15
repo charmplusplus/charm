@@ -42,6 +42,7 @@ static int iround(double x) { return (int)(ceil(2.0 * x) / 2.0); }
 static void collectNumbers(ProcMsg* msg) {
   int npes;
   EmptyMsg emsg;
+  CmiInitMsgHeader(emsg.core, sizeof(EmptyMsg));
 
   if (CpvAccess(isSingle)) {
     CpvAccess(Time1) = CmiWallTimer() - CpvAccess(Time1);
@@ -77,6 +78,7 @@ static void collectNumbers(ProcMsg* msg) {
 
 void proc_init(void) {
   ProcMsg msg;
+  CmiInitMsgHeader(msg.core, sizeof(EmptyMsg));
 
   CpvAccess(isSingle) = 1;
   msg.success = NTRIALS;

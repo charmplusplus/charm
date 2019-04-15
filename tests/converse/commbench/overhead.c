@@ -127,6 +127,7 @@ static void enqueue_handler(void* msg) {
   int idx = CpvAccess(nextidx);
   EmptyMsg emsg;
 
+  CmiInitMsgHeader(emsg.core, sizeof(EmptyMsg));
   CpvAccess(numiter)++;
   if (CpvAccess(numiter) < sizes[idx].numiter) {
     CsdEnqueue(msg);
