@@ -1087,6 +1087,8 @@ void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr) {
 
   CkAssert(CkMyRank() == 0);
 
+  CmiSpanningTreeInfo &t = *_topoTree;
+
   CkNcpyMode transferMode = findTransferMode(src.pe, dest.pe);
   if(transferMode == CkNcpyMode::MEMCPY) {
     CmiAbort("memcpy: should not happen\n");
@@ -1139,7 +1141,9 @@ void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr) {
     ncpyOpInfo->opMode = CMK_READONLY_BCAST;
     ncpyOpInfo->refPtr = refPtr;
 
-    readonlyCreateOnSource(dest);
+    // Initialize previously allocated structure for ack tracking on intermediate nodes
+    if(t.child_count != 0)
+      readonlyCreateOnSource(dest);
 
     CmiIssueRget(ncpyOpInfo);
   }

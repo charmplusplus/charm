@@ -917,6 +917,7 @@ static inline void _processRODataMsg(envelope *env)
 
     //Unpack each readonly
     PUP::fromMem pu((char *)EnvToUsr(env));
+    CmiSpanningTreeInfo &t = *_topoTree;
 
 #if CMK_ONESIDED_IMPL
     pu|numZerocopyROops;
@@ -924,7 +925,8 @@ static inline void _processRODataMsg(envelope *env)
     // Set _numPendingRORdmaTransfers to numZerocopyROops
     CksvAccess(_numPendingRORdmaTransfers) = numZerocopyROops;
 
-    if(numZerocopyROops > 0) {
+    // Allocate structure for ack tracking on intermediate nodes
+    if(numZerocopyROops > 0 && t.child_count != 0) {
       readonlyAllocateOnSource();
     }
 #endif
