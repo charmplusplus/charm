@@ -1100,9 +1100,34 @@ void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr) {
     // Decrement _numPendingRORdmaTransfers after completion of an Get operation
     CksvAccess(_numPendingRORdmaTransfers)--;
 
-    // Directly call checkInitDone to notify RO Rdma completion
-    if(CksvAccess(_numPendingRORdmaTransfers) == 0)
+    // Initialize previously allocated structure for ack tracking on intermediate nodes
+    if(t.child_count != 0)  // Intermediate Node
+      readonlyCreateOnSource(dest);
+
+    // When all pending RO Rdma transfers are complete
+    if(CksvAccess(_numPendingRORdmaTransfers) == 0) {
+
+      if(t.child_count != 0) {  // Intermediate Node
+
+        // Send a message to my child nodes
+        envelope *env = (envelope *)(refPtr);
+        CmiForwardProcBcastMsg(env->getTotalsize(), (char *)env);
+
+      } else { // Child Node
+
+        // deregister dest buffer
+        CmiDeregisterMem(dest.ptr, dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.pe, dest.mode);
+
+        // Send a message to the parent to signal completion in order to deregister
+        envelope *compEnv = _allocEnv(ROChildCompletionMsg);
+        compEnv->setSrcPe(CkMyPe());
+        CmiSetHandler(compEnv, _roRdmaDoneHandlerIdx);
+        CmiSyncSendAndFree(src.pe, compEnv->getTotalsize(), (char *)compEnv);
+      }
+
+      // Directly call checkInitDone to notify RO Rdma completion
       checkForInitDone(true);
+    }
   }
 #endif
   else {
@@ -1160,13 +1185,14 @@ void readonlyGetCompleted(NcpyOperationInfo *ncpyOpInfo) {
   // Lock not needed for SMP mode as no other thread decrements _numPendingRORdmaTransfers
   CksvAccess(_numPendingRORdmaTransfers)--;
 
+  // When all pending RO Rdma transfers are complete
   if(CksvAccess(_numPendingRORdmaTransfers) == 0) {
 
     if(t.child_count != 0) {  // Intermediate Node
 
       envelope *env = (envelope *)(ncpyOpInfo->refPtr);
 
-      // send a message to my child nodes
+      // Send a message to my child nodes
       CmiForwardProcBcastMsg(env->getTotalsize(), (char *)env);
 
       //TODO:QD support
@@ -1188,7 +1214,6 @@ void readonlyGetCompleted(NcpyOperationInfo *ncpyOpInfo) {
     envelope *sigEnv = _allocEnv(ROPeerCompletionMsg);
     sigEnv->setSrcPe(CkMyPe());
     CmiSetHandler(sigEnv, _roRdmaDoneHandlerIdx);
-    //CmiSetHandler(sigEnv, _initHandlerIdx);
     CmiSyncSendAndFree(CmiNodeFirst(CmiMyNode()), sigEnv->getTotalsize(), (char *)sigEnv);
 #else
     // Directly call checkInitDone to notify RO Rdma completion
@@ -1196,6 +1221,9 @@ void readonlyGetCompleted(NcpyOperationInfo *ncpyOpInfo) {
 #endif
 
   }
+
+  // Free ncpyOpInfo allocated inside readonlyGet
+  CmiFree(ncpyOpInfo);
 }
 #endif
 /* End of CMK_ONESIDED_IMPL */

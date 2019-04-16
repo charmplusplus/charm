@@ -934,15 +934,6 @@ static inline void _processRODataMsg(envelope *env)
     for(size_t i=0;i<_readonlyTable.size();i++) {
       _readonlyTable[i]->pupData(pu);
     }
-
-#if CMK_ONESIDED_IMPL
-    if(CMI_IS_ZC_BCAST(env)) {
-      if(findTransferMode(env->getSrcPe(), CkMyPe()) == CkNcpyMode::CMA) {
-        // Forward the env after replacing the pointers
-        CmiForwardProcBcastMsg(env->getTotalsize(), (char *)env);
-      }
-    }
-#endif
   } else {
     CmiFree(env);
   }
@@ -1002,6 +993,8 @@ static void _roRdmaDoneHandler(envelope *env) {
           CmiSetHandler(compEnv, _roRdmaDoneHandlerIdx);
           CmiSyncSendAndFree(t.parent, compEnv->getTotalsize(), (char *)compEnv);
         }
+        // Free the roBcastAckInfo allocated inside readonlyAllocateOnSource
+        CmiFree(roBcastAckInfo);
       }
       break;
     default:
