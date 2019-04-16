@@ -893,7 +893,7 @@ void _initDone(void)
 static void _triggerHandler(envelope *env)
 {
   DEBUGF(("Calling Init Done from _triggerHandler\n"));
-  checkForInitDone();
+  checkForInitDone(true); // RO ZCPY Bcast operation is already complete
   if (env!=NULL) CmiFree(env);
 }
 
@@ -920,6 +920,10 @@ static inline void _processRODataMsg(envelope *env)
 
 #if CMK_ONESIDED_IMPL
     pu|numZerocopyROops;
+
+    // Set _numPendingRORdmaTransfers to numZerocopyROops
+    CksvAccess(_numPendingRORdmaTransfers) = numZerocopyROops;
+
     if(numZerocopyROops > 0) {
       readonlyAllocateOnSource();
     }
@@ -969,7 +973,8 @@ static void _roRdmaDoneHandler(envelope *env) {
 
   switch(env->getMsgtype()) {
     case ROPeerCompletionMsg:
-      checkForInitDone();
+      checkForInitDone(true); // Receiving a ROPeerCompletionMsg indicates that RO ZCPY Bcast
+                              // operation is complete on the comm. thread
       if (env!=NULL) CmiFree(env);
       break;
     case ROChildCompletionMsg:
@@ -1004,11 +1009,11 @@ static void _roRdmaDoneHandler(envelope *env) {
 }
 #endif
 
-void checkForInitDone() {
+void checkForInitDone(bool rdmaROCompleted) {
 
   bool noPendingRORdmaTransfers = true;
 #if CMK_ONESIDED_IMPL
-  noPendingRORdmaTransfers = (CksvAccess(_numPendingRORdmaTransfers) == 0);
+  noPendingRORdmaTransfers = rdmaROCompleted;
 #endif
   if (_numExpectInitMsgs && CkpvAccess(_numInitsRecd) + CksvAccess(_numInitNodeMsgs) == _numExpectInitMsgs && noPendingRORdmaTransfers)
     _initDone();
@@ -1073,7 +1078,7 @@ static void _initHandler(void *msg, CkCoreState *ck)
       CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
   }
   DEBUGF(("[%d,%.6lf] _numExpectInitMsgs %d CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs) %d+%d\n",CmiMyPe(),CmiWallTimer(),_numExpectInitMsgs,CkpvAccess(_numInitsRecd),CksvAccess(_numInitNodeMsgs)));
-  checkForInitDone();
+  checkForInitDone(false); // RO ZCPY Bcast operation could still be incomplete
 }
 
 #if CMK_SHRINK_EXPAND

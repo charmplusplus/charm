@@ -1392,7 +1392,7 @@ public:
 };
 
 // Method to check if the Charm RTS initialization phase has completed
-void checkForInitDone();
+void checkForInitDone(bool rdmaROCompleted);
 
 #endif
 

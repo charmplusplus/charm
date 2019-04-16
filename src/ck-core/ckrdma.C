@@ -1081,7 +1081,12 @@ void readonlyCreateOnSource(CkNcpyBuffer &src) {
 }
 
 // Method to perform an get for Readonly transfer
+// In the case of SMP mode, readonlyGet is invoked on the worker thread (CmiMyRank == 0)
+// In the case of Non-SMP mode, readonlyGet is invoked on the same process which receives RODataMsg
 void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr) {
+
+  CkAssert(CkMyRank() == 0);
+
   CkNcpyMode transferMode = findTransferMode(src.pe, dest.pe);
   if(transferMode == CkNcpyMode::MEMCPY) {
     CmiAbort("memcpy: should not happen\n");
@@ -1089,11 +1094,17 @@ void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr) {
 #if CMK_USE_CMA
   else if(transferMode == CkNcpyMode::CMA) {
     dest.cmaGet(src);
+
+    // Decrement _numPendingRORdmaTransfers after completion of an Get operation
+    CksvAccess(_numPendingRORdmaTransfers)--;
+
+    // Directly call checkInitDone to notify RO Rdma completion
+    if(CksvAccess(_numPendingRORdmaTransfers) == 0)
+      checkForInitDone(true);
   }
 #endif
   else {
 
-    CksvAccess(_numPendingRORdmaTransfers)++;
 
     int layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
     int ackSize = 0;
@@ -1134,11 +1145,15 @@ void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr) {
   }
 }
 
+// Method invoked when an RO RDMA operation is complete
+// In the case of SMP mode, readonlyGetCompleted is invoked on the comm. thread
+// In the case of Non-SMP mode, readonlyGet is invoked on the same process which receives the RODataMsg
 void readonlyGetCompleted(NcpyOperationInfo *ncpyOpInfo) {
 
   if(_topoTree == NULL) CkAbort("CkRdmaIssueRgets:: topo tree has not been calculated \n");
   CmiSpanningTreeInfo &t = *_topoTree;
 
+  // Lock not needed for SMP mode as no other thread decrements _numPendingRORdmaTransfers
   CksvAccess(_numPendingRORdmaTransfers)--;
 
   if(CksvAccess(_numPendingRORdmaTransfers) == 0) {
@@ -1172,8 +1187,8 @@ void readonlyGetCompleted(NcpyOperationInfo *ncpyOpInfo) {
     //CmiSetHandler(sigEnv, _initHandlerIdx);
     CmiSyncSendAndFree(CmiNodeFirst(CmiMyNode()), sigEnv->getTotalsize(), (char *)sigEnv);
 #else
-    // Directly call checkInitDone
-    checkForInitDone();
+    // Directly call checkInitDone to notify RO Rdma completion
+    checkForInitDone(true);
 #endif
 
   }
