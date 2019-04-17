@@ -50,22 +50,41 @@ enum ProfilingStage{
 };
 
 #ifndef HAPI_CUDA_CALLBACK
+#define EVENT_INC_SIZE 1000 // Allocate this many events at once
+
 typedef struct hapiEvent {
   cudaEvent_t event;
   void* cb;
   void* cb_msg;
   hapiWorkRequest* wr; // if this is not NULL, buffers and request itself are deallocated
 
+  hapiEvent() : cb(NULL), cb_msg(NULL), wr(NULL) {}
   hapiEvent(cudaEvent_t event_, void* cb_, void* cb_msg_, hapiWorkRequest* wr_ = NULL)
             : event(event_), cb(cb_), cb_msg(cb_msg_), wr(wr_) {}
 } hapiEvent;
 
+CpvDeclare(std::vector<hapiEvent>, hapi_event_pool);
+CpvDeclare(std::size_t, cur_hapi_event);
 CpvDeclare(std::queue<hapiEvent>, hapi_event_queue);
 #endif
 CpvDeclare(int, n_hapi_events);
 
-void initEventQueues() {
 #ifndef HAPI_CUDA_CALLBACK
+static void hapiIncEvents(int count) {
+  for (int i = 0; i < count; i++) {
+    CpvAccess(hapi_event_pool).emplace_back();
+    hapiEvent& cur = CpvAccess(hapi_event_pool).back();
+    cudaEventCreateWithFlags(&cur.event, cudaEventDisableTiming);
+  }
+}
+#endif
+
+void hapiInitEvents() {
+#ifndef HAPI_CUDA_CALLBACK
+  CpvInitialize(std::vector<hapiEvent>, hapi_event_pool);
+  hapiIncEvents(EVENT_INC_SIZE);
+  CpvInitialize(std::size_t, cur_hapi_event);
+  CpvAccess(cur_hapi_event) = 0;
   CpvInitialize(std::queue<hapiEvent>, hapi_event_queue);
 #endif
   CpvInitialize(int, n_hapi_events);
@@ -371,12 +390,17 @@ void GPUManager::allocateBuffers(hapiWorkRequest* wr) {
 
 #ifndef HAPI_CUDA_CALLBACK
 void recordEvent(cudaStream_t stream, void* cb, void* cb_msg, hapiWorkRequest* wr = NULL) {
-  // create CUDA event and insert into stream
-  cudaEvent_t ev;
-  cudaEventCreateWithFlags(&ev, cudaEventDisableTiming);
-  cudaEventRecord(ev, stream);
+  // record CUDA event with the given stream
+  hapiEvent& hev = CpvAccess(hapi_event_pool)[CpvAccess(cur_hapi_event)++];
+  hev.cb = cb;
+  hev.cb_msg = cb_msg;
+  hev.wr = NULL;
+  cudaEventRecord(hev.event, stream);
 
-  hapiEvent hev(ev, cb, cb_msg, wr);
+  // refill events if pool is used up
+  if (CpvAccess(cur_hapi_event) == CpvAccess(hapi_event_pool).size()) {
+    hapiIncEvents(EVENT_INC_SIZE);
+  }
 
   // push event information in queue
   CpvAccess(hapi_event_queue).push(hev);

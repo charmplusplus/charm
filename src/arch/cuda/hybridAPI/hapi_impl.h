@@ -10,8 +10,8 @@ void initHybridAPI();
 void setHybridAPIDevice();
 void exitHybridAPI();
 
-// Initializes event queues used for polling.
-void initEventQueues();
+// Initializes event related data structures used for polling.
+void hapiInitEvents();
 
 // Registers callback handler functions.
 void hapiRegisterCallbacks();
