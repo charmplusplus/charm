@@ -103,7 +103,7 @@ void Readonly::genDefs(XStr& str) {
       str <<"      PUP::fromMem &_impl_p_fromMem = *(PUP::fromMem *)_impl_pup_er;\n";
       str <<"      char *ptr = _impl_p_fromMem.get_current_pointer();\n";
       str <<"      PUP::toMem _impl_p_toMem = (PUP::toMem)((void *)ptr);\n";
-      str <<"      envelope *env = UsrToEnv(_impl_p_toMem.get_orig_pointer());\n";
+      str <<"      envelope *env = UsrToEnv(_impl_p_fromMem.get_orig_pointer());\n";
       str <<"      CkNcpyBuffer srcBuffer;\n";
       str <<"      _impl_p|srcBuffer;\n";
       str <<"      _impl_p_toMem|myBuffer;\n";
@@ -153,8 +153,7 @@ void Readonly::genDefs(XStr& str) {
         str <<"    }\n";
         str <<"    if(_impl_p.isUnpacking()) {\n";
         str <<"      PUP::fromMem &_impl_p_fromMem = *(PUP::fromMem *)_impl_pup_er;\n";
-        str <<"      PUP::toMem &_impl_p_toMem_orig = *(PUP::toMem *)_impl_pup_er;\n";
-        str <<"      envelope *env = UsrToEnv(_impl_p_toMem_orig.get_orig_pointer());\n";
+        str <<"      envelope *env = UsrToEnv(_impl_p_fromMem.get_orig_pointer());\n";
         str <<"      char *ptr = _impl_p_fromMem.get_current_pointer();\n";
         str <<"      PUP::toMem _impl_p_toMem = (PUP::toMem)((void *)ptr);\n";
         str <<"      CkNcpyBuffer srcBuffer;\n";
