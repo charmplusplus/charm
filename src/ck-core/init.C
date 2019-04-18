@@ -1611,16 +1611,19 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_CUDA
     if (CmiMyRank() == 0) {
       initHybridAPI();
-    }
-    else /* CmiMyRank() != 0 */ {
       setHybridAPIDevice();
     }
     initEventQueues();
 
-    // ensure HAPI is initialized before registering callback functions
+    // ensure HAPI is initialized before setting devices and registering callbacks
     if (CmiMyRank() < CmiMyNodeSize()) {
       CmiNodeBarrier();
     }
+    /*
+    if (CmiMyRank() != 0) {
+      setHybridAPIDevice();
+    }
+    */
     hapiRegisterCallbacks();
 #endif
 

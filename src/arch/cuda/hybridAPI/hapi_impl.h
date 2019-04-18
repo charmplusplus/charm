@@ -6,8 +6,8 @@ extern "C" {
 #endif
 
 // Initialize & exit hybrid API.
-void initHybridAPI();
 void setHybridAPIDevice();
+void initHybridAPI();
 void exitHybridAPI();
 
 // Initializes event queues used for polling.

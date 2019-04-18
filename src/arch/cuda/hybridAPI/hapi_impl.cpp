@@ -8,6 +8,8 @@
 #include <queue>
 #include <atomic>
 #include "cuda.h"
+#include "hwloc.h"
+#include "hwloc/cudart.h"
 
 #ifdef HAPI_NVTX_PROFILE
 #include "hapi_nvtx.h"
@@ -736,10 +738,27 @@ void initHybridAPI() {
 #endif // HAPI_MEMPOOL
 }
 
-// Set HAPI device for non-0 ranks
+// Map process to CUDA device using hwloc
 void setHybridAPIDevice() {
+  int device_count;
+  hapiCheck(cudaGetDeviceCount(&device_count));
+
+  hwloc_topology_t topology;
+  hwloc_topology_init(&topology);
+  hwloc_topology_load(topology);
+
+  for (int i = 0; i < device_count; i++) {
+    hwloc_cpuset_t cpuset = cmi_hwloc_bitmap_alloc();
+    hwloc_cudart_get_device_cpuset(topology, i, cpuset);
+    printf("Device %d\n", i);
+    unsigned int bitmap_id;
+    hwloc_bitmap_foreach_begin(bitmap_id, cpuset)
+      printf("Bitmap ID: %d\n", bitmap_id);
+    hwloc_bitmap_foreach_end();
+  }
+
   // set which device to use
-  hapiCheck(cudaSetDevice(getMyCudaDevice(CmiMyNode())));
+  //hapiCheck(cudaSetDevice(getMyCudaDevice(CmiMyNode())));
 }
 
 // Clean up and delete memory used by HAPI.
