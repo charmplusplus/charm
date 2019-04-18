@@ -1,0 +1,23 @@
+mainmodule main {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Block block;
+  readonly CProxy_PowerLogger pLog;    
+  readonly int freqs[16];    
+                                       
+  group PowerLogger{                                                                 
+    entry PowerLogger(int cores);                                                
+  };
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry [reductiontarget] void ready(CkReductionMsg *msg);
+    entry [reductiontarget] void done(CkReductionMsg *msg);
+  };
+
+  group Block {
+    entry Block(unsigned int blockSize, unsigned int iteration, CkCallback);
+    entry void run(CkCallback cb);
+    entry void run2(CkCallback cb);
+  };
+
+};

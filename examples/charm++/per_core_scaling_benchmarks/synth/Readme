@@ -1,0 +1,10 @@
+This is a synthetic benchmark which contains different representative application kernels.
+
+* I/O phase
+  - read from file
+* Communication phase
+* Computation Kernels
+  - DGEMM
+  - ?
+* Memory intensive phase
+* 
