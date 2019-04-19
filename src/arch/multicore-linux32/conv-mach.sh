@@ -15,6 +15,7 @@ CMK_F90_MODINC='-p'
 
 CMK_QT='generic64-light'
 
+CMK_MULTICORE='1'
 CMK_SMP='1'
 CMK_NO_PARTITIONS="1"
 

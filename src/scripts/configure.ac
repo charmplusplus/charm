@@ -114,6 +114,7 @@ add_make_flag "CMK_SMP:=$CMK_SMP" 'basic setup'
 add_make_flag "CMK_SHARED_SUF:=$CMK_SHARED_SUF" 'basic setup'
 add_make_flag "CMK_NO_PARTITIONS:=$CMK_NO_PARTITIONS" 'basic setup'
 add_make_flag "CMK_BLUEGENEQ:=$CMK_BLUEGENEQ" 'basic setup'
+add_make_flag "CMK_MULTICORE:=$CMK_MULTICORE" 'basic setup'
 add_make_flag "BUILD_CUDA:=$BUILD_CUDA" 'basic setup'
 
 # enable/disable error checking
