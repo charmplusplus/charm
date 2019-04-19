@@ -95,8 +95,10 @@ private:
 		testEqual(sts.MPI_TAG,tag,"Recv status tag");
 		if (source!=MPI_ANY_SOURCE)
 			testEqual(sts.MPI_SOURCE,source,"Recv status source");
+#ifdef AMPI
 		testEqual(sts.MPI_COMM,comm,"Recv status comm");
-		/* not in standard: testEqual(1,sts.MPI_LENGTH,"Recv status length");*/
+		testEqual(sts.MPI_LENGTH,sizeof(int),"Recv status length");
+#endif
 		return recvVal;
 	}
 	
@@ -258,7 +260,7 @@ void MPI_Tester::drain(void) {
 		if (flag) {
 			int len; MPI_Get_count(&sts,MPI_BYTE,&len);
 			char *msg=new char[len];
-			MPI_Recv(msg,len,MPI_BYTE, sts.MPI_SOURCE, sts.MPI_TAG, sts.MPI_COMM, &sts);
+			MPI_Recv(msg,len,MPI_BYTE, sts.MPI_SOURCE, sts.MPI_TAG, comm, &sts);
 			flagSet=1;
 		}
 	} while (flag==1);
@@ -271,15 +273,19 @@ void MPI_Tester::drain(void) {
 
 void MPI_Tester::testMigrate(void) {
 	beginTest(2,"Migration");
+
+#ifdef AMPI
 	int flag, srcPe;
 	MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &srcPe, &flag);
 	if (!flag) {
 		printf("Missing AMPI_MY_WTH attribute on MPI_COMM_WORLD\n");
 		MPI_Abort(MPI_COMM_WORLD, MPI_ERR_UNKNOWN);
 	}
+#endif
 	
 	TEST_MPI(MPI_Barrier,(comm));
 	
+#ifdef AMPI
 	AMPI_Migrate(AMPI_INFO_LB_SYNC);
 	
 	TEST_MPI(MPI_Barrier,(comm));
@@ -292,6 +298,7 @@ void MPI_Tester::testMigrate(void) {
 	}
 	if (srcPe!=destPe) printf("[%d] migrated from %d to %d\n",
 				rank,srcPe,destPe);
+#endif
 }
 
 int main(int argc,char **argv)
