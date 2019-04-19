@@ -67,7 +67,11 @@ public:
 	int rank,size; //Our rank in, and true size of the communicator
 	
 	MPI_Tester(MPI_Comm comm,int trueSize=-1);
-	~MPI_Tester(void) { MPI_Comm_free(&comm); }
+	~MPI_Tester()
+	{
+		if (comm != MPI_COMM_NULL && comm != MPI_COMM_SELF && comm != MPI_COMM_WORLD)
+			MPI_Comm_free(&comm);
+	}
 	void test(void);
 	void testMigrate(void);
 
@@ -308,6 +312,7 @@ int main(int argc,char **argv)
 	if (argc>1) verboseLevel=atoi(argv[1]);
 	if (argc>2) nLoop=atoi(argv[2]);
 	MPI_Comm comm=MPI_COMM_WORLD;
+{ // scope so that ~MPI_Tester is called before MPI_Finalize
 	MPI_Tester masterTester(comm);
 	
 for (int loop=0;loop<nLoop;loop++) {
@@ -444,7 +449,7 @@ for (int loop=0;loop<nLoop;loop++) {
 	      }
 	    }
 
-	    MPI_Group_free(&group);
+	    if (rank < 2) MPI_Group_free(&group);
 	    MPI_Group_free(&comm_group);
 	    if (rank < 2) { MPI_Win_free(&win); }
 	    MPI_Free_mem(A);
@@ -503,6 +508,7 @@ for (int loop=0;loop<nLoop;loop++) {
       }
 
       if (getRank()==0) printf("All tests passed\n");
+}
       MPI_Finalize();
       return 0;
 }
