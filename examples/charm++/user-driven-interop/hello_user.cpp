@@ -37,17 +37,15 @@ class Hello : public CBase_Hello {
 
     void sayHello() {
       CkPrintf("Hello from chare %i\n", thisIndex);
-      contribute(CkCallback(CkReductionTarget(Hello, done), thisProxy[0]));
+      contribute(CkCallback(CkCallback::ckExit));
     }
 
     void rankReportingIn(int rank) {
       CkPrintf("Chare %i got an ack from %i\n", thisIndex, rank);
       if (++num_received == CkNumNodes()) {
-        contribute(CkCallback(CkReductionTarget(Hello, done), thisProxy[0]));
+        contribute(CkCallback(CkCallback::ckExit));
       }
     }
-
-    void done() { CkExit(); }
 
   private:
     int num_received;

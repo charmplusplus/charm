@@ -11,6 +11,5 @@ mainmodule hello_user {
     entry Hello();
     entry void sayHello();
     entry void rankReportingIn(int);
-    entry [reductiontarget] void done();
   };
 };
