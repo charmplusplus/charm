@@ -7,6 +7,10 @@
 #include <stdio.h>
 #include <math.h>
 #include "converse.h"
+#include <atomic>
+
+int               userDrivenMode; /* Set by CharmInit for interop in user driven mode */
+std::atomic<int> ckExitComplete {0};
 
 CMI_EXTERNC
 void CthInit(char **);

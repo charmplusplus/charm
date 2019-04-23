@@ -18,11 +18,7 @@ extern MPI_Comm charmComm;
 typedef int MPI_Comm;
 #endif
 
-#if CMK_USE_LRTS
 extern void LrtsDrainResources(); /* used when exit */
-#else
-void LrtsDrainResources() { }
-#endif
 
 extern bool _ringexit;		    // for charm exit
 extern int _ringtoken;
@@ -30,7 +26,7 @@ extern void _initCharm(int unused_argc, char **argv);
 extern void _sendReadonlies();
 extern "C" void CommunicationServerThread(int sleepTime);
 extern int CharmLibInterOperate;
-CMI_EXTERNC_VARIABLE int userDrivenMode;
+extern int userDrivenMode;
 
 extern "C" void StartInteropScheduler();
 extern "C" void StopInteropScheduler();
