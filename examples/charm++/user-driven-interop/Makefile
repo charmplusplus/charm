@@ -19,6 +19,8 @@ test: all
 	$(call run, +p2 ./hello_user 8 )
 	$(call run, +p2 ./hello_user_with_main 8 )
 ifeq ($(CMK_SMP), 1)
+ifneq ($(CMK_MULTICORE), 1)
 	$(call run, +p4 ./hello_user 8 ++ppn 2 )
 	$(call run, +p4 ./hello_user_with_main 8 ++ppn 2 )
+endif
 endif
