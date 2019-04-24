@@ -17,6 +17,7 @@
 #include "pcqueue.h"
 #include "assert.h"
 #include "malloc.h"
+#include <atomic>
 
 #if CMK_BLUEGENEQ
 #include <hwi/include/bqc/A2_inlines.h>
@@ -55,6 +56,9 @@ char *ALIGN_32(char *p) {
 
 CMI_EXTERNC_VARIABLE int quietMode;
 CMI_EXTERNC_VARIABLE int quietModeRequested;
+
+int               userDrivenMode; /* Set by CharmInit for interop in user driven mode */
+std::atomic<int> ckExitComplete {0};
 
 /*To reduce the buffer used in broadcast and distribute the load from
   broadcasting node, define CMK_BROADCAST_SPANNING_TREE enforce the use of
