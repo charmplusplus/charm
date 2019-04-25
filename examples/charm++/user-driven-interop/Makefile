@@ -2,7 +2,13 @@
 -include ../../../include/conv-mach-opt.mak
 CHARMC=../../../bin/charmc $(OPTS)
 
-all: hello_user hello_user_with_main
+ifeq ($(CMK_USE_LRTS), 1)
+  TARGETS := hello_user hello_user_with_main
+else
+  TARGETS :=
+endif
+
+all: $(TARGETS)
 
 hello_user.decl.h: hello_user.ci
 	$(CHARMC) $<
@@ -26,11 +32,13 @@ clean:
 	rm -f hello_user hello_user_with_main *.o charmrun *.decl.h *.def.h
 
 test: all
+ifeq ($(CMK_USE_LRTS), 1)
 	$(call run, +p2 ./hello_user 8 )
 	$(call run, +p2 ./hello_user_with_main 8 )
 ifeq ($(CMK_SMP), 1)
 ifneq ($(CMK_MULTICORE), 1)
 	$(call run, +p4 ./hello_user 8 ++ppn 2 )
 	$(call run, +p4 ./hello_user_with_main 8 ++ppn 2 )
+endif
 endif
 endif

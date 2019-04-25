@@ -109,12 +109,15 @@ void _libExitHandler(envelope *env)
   }
 }
 
-#if CMK_USE_LRTS
 // CharmBeginInit calls sets interop flags then calls ConverseInit. This
 // initializes the runtime, but does not start the scheduler or send readonlies.
 // It returns control the main after main chares have been created.
 extern "C"
 void CharmBeginInit(int argc, char** argv) {
+#if !defined CMK_USE_LRTS || !CMK_USE_LRTS
+  CmiAbort("Interop is not supported in non-LRTS machine layers.");
+#endif
+
   userDrivenMode = 1;
   CharmLibInterOperate = true;
   ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
@@ -142,7 +145,6 @@ void CharmInit(int argc, char** argv) {
   CharmBeginInit(argc, argv);
   CharmFinishInit();
 }
-#endif
 
 // CharmLibInit is specifically for MPI interop, where MPI applications want
 // to call Charm as a library. It does full initialization and starts the
