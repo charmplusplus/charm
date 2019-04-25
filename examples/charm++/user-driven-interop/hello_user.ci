@@ -1,4 +1,10 @@
+/* Using the preprocessor in this way is non-idiomatic, but it is here
+ * to keep the test case compact while allowing parallel building. */
+#ifdef HELLO_USE_MAINCHARE
+mainmodule hello_user_with_main {
+#else
 mainmodule hello_user {
+#endif
   readonly CProxy_Hello helloProxy;
 
 #ifdef HELLO_USE_MAINCHARE

@@ -1,4 +1,8 @@
+#ifdef HELLO_USE_MAINCHARE
+#include "hello_user_with_main.decl.h"
+#else
 #include "hello_user.decl.h"
+#endif
 #include "mpi-interoperate.h"
 
 CProxy_Hello helloProxy;
@@ -100,4 +104,8 @@ int main(int argc, char** argv) {
   return 0;
 }
 
+#ifdef HELLO_USE_MAINCHARE
+#include "hello_user_with_main.def.h"
+#else
 #include "hello_user.def.h"
+#endif
