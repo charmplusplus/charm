@@ -1008,6 +1008,11 @@ void CkRdmaEMBcastAckHandler(void *ack) {
       NcpyBcastRootAckInfo *bcastRootAckInfo = (NcpyBcastRootAckInfo *)(bcastAckInfo);
       // invoke the callback with the pointer
       for(int i=0; i<bcastRootAckInfo->numops; i++) {
+#if CMK_REG_REQUIRED
+        // De-register source buffer
+        bcastRootAckInfo->src[i].deregisterMem();
+#endif
+
         invokeCallback(&(bcastRootAckInfo->src[i].cb),
                        bcastRootAckInfo->pe,
                        bcastRootAckInfo->src[i]);
