@@ -193,7 +193,7 @@ class Ping1 : public CBase_Ping1 {
           reg_recv_time = 1.0e6*(end_time-start_time)/iterations;
           niter = 0;
           start_time = CkWallTimer();
-          thisProxy[1].zerocopyEMSendApiAndCopy(CkNcpyBuffer(nocopySrcBuffer), size);
+          thisProxy[1].zerocopyEMSendApiAndCopy(CkSendBuffer(nocopySrcBuffer), size);
 
         } else {
           thisProxy[1].regularRecvAndCopy(nocopySrcBuffer, size);
@@ -216,10 +216,10 @@ class Ping1 : public CBase_Ping1 {
           thisProxy.setupDirectPingpong1(size, iterations);
 
         } else {
-          thisProxy[1].zerocopyEMSendApiAndCopy(CkNcpyBuffer(nocopySrcBuffer), size);
+          thisProxy[1].zerocopyEMSendApiAndCopy(CkSendBuffer(nocopySrcBuffer), size);
         }
       } else {
-        thisProxy[0].zerocopyEMSendApiAndCopy(CkNcpyBuffer(nocopySrcBuffer), size);
+        thisProxy[0].zerocopyEMSendApiAndCopy(CkSendBuffer(nocopySrcBuffer), size);
       }
     }
 
