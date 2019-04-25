@@ -532,7 +532,7 @@ void ParamList::beginUnmarshall(XStr& str) {
       if (hasRecvRdma()) {
         str << "  CkNcpyBufferPost ncpyPost[" << entry->numRdmaRecvParams << "];\n";
         for(int index=0; index < entry->numRdmaRecvParams; index++)
-          str << "  ncpyPost[" <<index<<  "].mode = CK_BUFFER_REG;\n";
+          str << "  ncpyPost[" <<index<<  "].regMode = CK_BUFFER_REG;\n";
       }
     }
     callEach(&Parameter::beginUnmarshall, str);
@@ -664,7 +664,7 @@ void ParamList::beginUnmarshallSDAGCall(XStr& str, bool usesImplBuf) {
       if(hasRecvRdma()) {
         str << "  CkNcpyBufferPost ncpyPost[" << entry->numRdmaRecvParams << "];\n";
         for(int index=0; index < entry->numRdmaRecvParams; index++)
-          str << "  ncpyPost[" <<index<<  "].mode = CK_BUFFER_REG;\n";
+          str << "  ncpyPost[" <<index<<  "].regMode = CK_BUFFER_REG;\n";
       }
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "  char *impl_buf_begin = impl_buf;\n";

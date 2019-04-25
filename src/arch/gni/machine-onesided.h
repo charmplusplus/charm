@@ -59,10 +59,10 @@ typedef struct _cmi_gni_rzv_rdma_direct_info {
 typedef struct _cmi_gni_rzv_rdma_reverse_op {
   const void *destAddr;
   int destPe;
-  int destMode;
+  int destRegMode;
   const void *srcAddr;
   int srcPe;
-  int srcMode;
+  int srcRegMode;
 
   gni_mem_handle_t rem_mem_hndl;
   int ackSize;

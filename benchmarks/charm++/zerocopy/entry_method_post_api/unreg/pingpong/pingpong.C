@@ -132,7 +132,7 @@ public:
     // post the buffer
     msg = nocopyMsg;
 
-    ncpyPost[0].mode = CK_BUFFER_UNREG;
+    ncpyPost[0].regMode = CK_BUFFER_UNREG;
   }
 
   void recv_send_receive_zerocopy(char *msg, int size, bool warmUp) {

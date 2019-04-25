@@ -1885,7 +1885,7 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		resetNcpyOpInfoPointers(ncpyOpInfo);
 		
 		// Deregister the source buffer
-		LrtsDeregisterMem(ncpyOpInfo->srcPtr, (char *)ncpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->srcPe, ncpyOpInfo->srcMode);
+		LrtsDeregisterMem(ncpyOpInfo->srcPtr, (char *)ncpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->srcPe, ncpyOpInfo->srcRegMode);
 		
 		ncpyOpInfo->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
 		

@@ -244,9 +244,9 @@ class zerocopyObject : public CBase_zerocopyObject{
       ptr2 = dArr1;
       ptr3 = cArr1;
 
-      ncpyPost[0].mode = CK_BUFFER_REG;
-      ncpyPost[1].mode = CK_BUFFER_UNREG;
-      ncpyPost[2].mode = CK_BUFFER_REG;
+      ncpyPost[0].regMode = CK_BUFFER_REG;
+      ncpyPost[1].regMode = CK_BUFFER_UNREG;
+      ncpyPost[2].regMode = CK_BUFFER_REG;
     }
 
     void zerocopySend(int n1, int *ptr1, int n2, double *ptr2, int n3, char *ptr3){

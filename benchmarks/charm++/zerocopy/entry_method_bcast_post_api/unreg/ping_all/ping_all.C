@@ -192,7 +192,7 @@ public:
   void recv_zerocopy_post(char *&msg, size_t &size, int iter, bool warmUp, int iterations, CkNcpyBufferPost *postStruct) {
     msg = myBuffer;
 
-    postStruct[0].mode = CK_BUFFER_UNREG;
+    postStruct[0].regMode = CK_BUFFER_UNREG;
   }
 
   void recv_zerocopy_post(char *msg, size_t size, int iter, bool warmUp, int iterations) {

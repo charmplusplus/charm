@@ -408,7 +408,7 @@ class Ping1 : public CBase_Ping1 {
     void zerocopyEMRecvApi1(char *&msg, int &size, CkNcpyBufferPost *ncpyPost) {
       msg = nocopyDestBuffer;
 
-      ncpyPost[0].mode = CK_BUFFER_UNREG;
+      ncpyPost[0].regMode = CK_BUFFER_UNREG;
     }
 
     void zerocopyEMRecvApi1(char *msg, int size) {
@@ -434,7 +434,7 @@ class Ping1 : public CBase_Ping1 {
     void zerocopyEMRecvApi2(char *&msg, int &size, CkNcpyBufferPost *ncpyPost) {
       msg = nocopyDestBuffer;
 
-      ncpyPost[0].mode = CK_BUFFER_REG;
+      ncpyPost[0].regMode = CK_BUFFER_REG;
     }
 
     void zerocopyEMRecvApi2(char *msg, int size) {
@@ -460,7 +460,7 @@ class Ping1 : public CBase_Ping1 {
     void zerocopyEMRecvApi3(char *&msg, int &size, CkNcpyBufferPost *ncpyPost) {
       msg = nocopyDestBufferReg;
 
-      ncpyPost[0].mode = CK_BUFFER_PREREG;
+      ncpyPost[0].regMode = CK_BUFFER_PREREG;
     }
 
     // Send and Recv for ZC Entry Method API

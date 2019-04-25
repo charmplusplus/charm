@@ -36,9 +36,9 @@ void CkNcpyBuffer::rdmaGet(CkNcpyBuffer &source) {
   int layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
   int ackSize = sizeof(CkCallback);
 
-  if(mode == CK_BUFFER_UNREG) {
+  if(regMode == CK_BUFFER_UNREG) {
     // register it because it is required for RGET
-    CmiSetRdmaBufferInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, mode);
+    CmiSetRdmaBufferInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, regMode);
 
     isRegistered = true;
   }
@@ -58,7 +58,7 @@ void CkNcpyBuffer::rdmaGet(CkNcpyBuffer &source) {
                 (char *)(&source.cb),
                 ackSize,
                 source.cnt,
-                source.mode,
+                source.regMode,
                 source.isRegistered,
                 source.pe,
                 source.ref,
@@ -68,7 +68,7 @@ void CkNcpyBuffer::rdmaGet(CkNcpyBuffer &source) {
                 (char *)(&cb),
                 ackSize,
                 cnt,
-                mode,
+                regMode,
                 isRegistered,
                 pe,
                 ref,
@@ -79,7 +79,7 @@ void CkNcpyBuffer::rdmaGet(CkNcpyBuffer &source) {
 
 // Perform a nocopy get operation into this destination using the passed source
 CkNcpyStatus CkNcpyBuffer::get(CkNcpyBuffer &source){
-  if(mode == CK_BUFFER_NOREG || source.mode == CK_BUFFER_NOREG) {
+  if(regMode == CK_BUFFER_NOREG || source.regMode == CK_BUFFER_NOREG) {
     CkAbort("Cannot perform RDMA operations in CK_BUFFER_NOREG mode\n");
   }
 
@@ -167,9 +167,9 @@ void CkNcpyBuffer::rdmaPut(CkNcpyBuffer &destination) {
   int layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
   int ackSize = sizeof(CkCallback);
 
-  if(mode == CK_BUFFER_UNREG) {
+  if(regMode == CK_BUFFER_UNREG) {
     // register it because it is required for RPUT
-    CmiSetRdmaBufferInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, mode);
+    CmiSetRdmaBufferInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, regMode);
 
     isRegistered = true;
   }
@@ -189,7 +189,7 @@ void CkNcpyBuffer::rdmaPut(CkNcpyBuffer &destination) {
                 (char *)(&cb),
                 ackSize,
                 cnt,
-                mode,
+                regMode,
                 isRegistered,
                 pe,
                 ref,
@@ -199,7 +199,7 @@ void CkNcpyBuffer::rdmaPut(CkNcpyBuffer &destination) {
                 (char *)(&destination.cb),
                 ackSize,
                 destination.cnt,
-                destination.mode,
+                destination.regMode,
                 destination.isRegistered,
                 destination.pe,
                 destination.ref,
@@ -210,7 +210,7 @@ void CkNcpyBuffer::rdmaPut(CkNcpyBuffer &destination) {
 
 // Perform a nocopy put operation into the passed destination using this source
 CkNcpyStatus CkNcpyBuffer::put(CkNcpyBuffer &destination){
-  if(mode == CK_BUFFER_NOREG || destination.mode == CK_BUFFER_NOREG) {
+  if(regMode == CK_BUFFER_NOREG || destination.regMode == CK_BUFFER_NOREG) {
     CkAbort("Cannot perform RDMA operations in CK_BUFFER_NOREG mode\n");
   }
   // Check that the source buffer fits into the destination buffer
@@ -279,7 +279,7 @@ void constructSourceBufferObject(NcpyOperationInfo *info, CkNcpyBuffer &src) {
   src.pe  = info->srcPe;
   src.cnt = info->srcSize;
   src.ref = info->srcRef;
-  src.mode = info->srcMode;
+  src.regMode = info->srcRegMode;
   src.isRegistered = info->isSrcRegistered;
   memcpy((char *)(&src.cb), info->srcAck, info->srcAckSize); // initialize cb
   memcpy((char *)(src.layerInfo), info->srcLayerInfo, info->srcLayerSize); // initialize layerInfo
@@ -291,7 +291,7 @@ void constructDestinationBufferObject(NcpyOperationInfo *info, CkNcpyBuffer &des
   dest.pe  = info->destPe;
   dest.cnt = info->destSize;
   dest.ref = info->destRef;
-  dest.mode = info->destMode;
+  dest.regMode = info->destRegMode;
   dest.isRegistered = info->isDestRegistered;
   memcpy((char *)(&dest.cb), info->destAck, info->destAckSize); // initialize cb
   memcpy((char *)(dest.layerInfo), info->destLayerInfo, info->destLayerSize); // initialize layerInfo
@@ -452,7 +452,7 @@ void CkRdmaEMAckHandler(int destPe, void *ack) {
 
     NcpyOperationInfo *ncpyOpInfo = &(emBuffInfo->ncpyOpInfo);
     // De-register the destination buffer
-    CmiDeregisterMem(ncpyOpInfo->destPtr, ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->destPe, ncpyOpInfo->destMode);
+    CmiDeregisterMem(ncpyOpInfo->destPtr, ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->destPe, ncpyOpInfo->destRegMode);
   }
 #endif
 
@@ -502,9 +502,9 @@ void performEmApiCmaTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, int child
   }
   else if (emMode == ncpyEmApiMode::BCAST_SEND || emMode == ncpyEmApiMode::BCAST_RECV) {
     if(child_count != 0) {
-      if(dest.mode == CK_BUFFER_UNREG) {
+      if(dest.regMode == CK_BUFFER_UNREG) {
         // register it because it is required for RGET performed by child nodes
-        CmiSetRdmaBufferInfo(dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.ptr, dest.cnt, dest.mode);
+        CmiSetRdmaBufferInfo(dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.ptr, dest.cnt, dest.regMode);
         dest.isRegistered = true;
       }
     }
@@ -515,9 +515,9 @@ void performEmApiCmaTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, int child
 void performEmApiRget(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, char *ref, int extraSize, ncpyEmApiMode emMode) {
 
   int layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
-  if(dest.mode == CK_BUFFER_UNREG) {
+  if(dest.regMode == CK_BUFFER_UNREG) {
     // register it because it is required for RGET
-    CmiSetRdmaBufferInfo(dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.ptr, dest.cnt, dest.mode);
+    CmiSetRdmaBufferInfo(dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.ptr, dest.cnt, dest.regMode);
 
     dest.isRegistered = true;
   }
@@ -532,7 +532,7 @@ void performEmApiRget(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, cha
                 (char *)(&source.cb),
                 sizeof(CkCallback),
                 source.cnt,
-                source.mode,
+                source.regMode,
                 source.isRegistered,
                 source.pe,
                 source.ref,
@@ -542,7 +542,7 @@ void performEmApiRget(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, cha
                 NULL,
                 0,
                 dest.cnt,
-                dest.mode,
+                dest.regMode,
                 dest.isRegistered,
                 dest.pe,
                 (char *)(ncpyEmBufferInfo), // destRef
@@ -681,7 +681,7 @@ void handleReverseEntryMethodApiCompletion(NcpyOperationInfo *info) {
     CmiInvokeRemoteAckHandler(info->destPe, info->refPtr);
   }
 
-  CmiDeregisterMem(info->srcPtr, info->srcLayerInfo + CmiGetRdmaCommonInfoSize(), info->srcPe, info->srcMode);
+  CmiDeregisterMem(info->srcPtr, info->srcLayerInfo + CmiGetRdmaCommonInfoSize(), info->srcPe, info->srcRegMode);
   info->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
 
   invokeSourceCallback(info);
@@ -860,7 +860,7 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
     up|source;
 
     // destination buffer
-    CkNcpyBuffer dest((const void *)arrPtrs[i], source.cnt, postStructs[i].mode);
+    CkNcpyBuffer dest((const void *)arrPtrs[i], source.cnt, postStructs[i].regMode);
 
     performEmApiNcpyTransfer(source, dest, i, t.child_count, ref, extraSize, ncpyMode, emMode);
 
@@ -1151,7 +1151,7 @@ void deregisterMemFromMsg(envelope *env) {
   for(int i=0; i<numops; i++){
     up|dest;
     // De-register the destination buffer
-    CmiDeregisterMem(dest.ptr, (char *)dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.pe, dest.mode);
+    CmiDeregisterMem(dest.ptr, (char *)dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.pe, dest.regMode);
     p|dest;
   }
   CkPackMessage(&env);
@@ -1555,7 +1555,7 @@ void readonlyCreateOnSource(CkNcpyBuffer &src) {
   NcpyROBcastBuffAckInfo *buffAckInfo = &(roBcastAckInfo->buffAckInfo[curROIndex]);
 
   buffAckInfo->ptr = src.ptr;
-  buffAckInfo->mode = src.mode;
+  buffAckInfo->regMode = src.regMode;
   buffAckInfo->pe = src.pe;
 
   // store the source layer information for de-registration
@@ -1600,7 +1600,7 @@ void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr) {
       } else { // Child Node
 
         // deregister dest buffer
-        CmiDeregisterMem(dest.ptr, dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.pe, dest.mode);
+        CmiDeregisterMem(dest.ptr, dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.pe, dest.regMode);
 
         // Send a message to the parent to signal completion in order to deregister
         envelope *compEnv = _allocEnv(ROChildCompletionMsg);
@@ -1631,7 +1631,7 @@ void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr) {
                   NULL,
                   ackSize,
                   src.cnt,
-                  src.mode,
+                  src.regMode,
                   src.isRegistered,
                   src.pe,
                   src.ref,
@@ -1641,7 +1641,7 @@ void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr) {
                   NULL,
                   ackSize,
                   dest.cnt,
-                  dest.mode,
+                  dest.regMode,
                   dest.isRegistered,
                   dest.pe,
                   dest.ref,
@@ -1684,7 +1684,7 @@ void readonlyGetCompleted(NcpyOperationInfo *ncpyOpInfo) {
     } else {
 
       // deregister dest buffer
-      CmiDeregisterMem(ncpyOpInfo->destPtr, ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->destPe, ncpyOpInfo->destMode);
+      CmiDeregisterMem(ncpyOpInfo->destPtr, ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->destPe, ncpyOpInfo->destRegMode);
 
       // Send a message to the parent to signal completion in order to deregister
       envelope *compEnv = _allocEnv(ROChildCompletionMsg);

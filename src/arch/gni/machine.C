@@ -2406,7 +2406,7 @@ static void PumpNetworkSmsg()
                 LrtsDeregisterMem(newNcpyOpInfo->srcPtr,
                                   (char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize(),
                                   newNcpyOpInfo->srcPe,
-                                  newNcpyOpInfo->srcMode);
+                                  newNcpyOpInfo->srcRegMode);
 
                 newNcpyOpInfo->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
 

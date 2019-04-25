@@ -55,8 +55,8 @@ enum class ncpyEmApiMode : char { P2P_SEND, BCAST_SEND, P2P_RECV, BCAST_RECV };
 
 // Struct passed in a ZC Post Entry Method to allow receiver side to post 
 struct CkNcpyBufferPost {
-  // mode
-  unsigned short int mode;
+  // regMode
+  unsigned short int regMode;
 };
 
 // Class to represent an Zerocopy buffer
@@ -91,8 +91,8 @@ class CkNcpyBuffer{
   // home pe
   int pe;
 
-  // mode
-  unsigned short int mode;
+  // regMode
+  unsigned short int regMode;
 
   // reference pointer
   const void *ref;
@@ -100,47 +100,47 @@ class CkNcpyBuffer{
   // bcast ack handling pointer
   const void *bcastAckInfo;
 
-  CkNcpyBuffer() : isRegistered(false), ptr(NULL), cnt(0), pe(-1), mode(CK_BUFFER_REG), ref(NULL), bcastAckInfo(NULL) {}
+  CkNcpyBuffer() : isRegistered(false), ptr(NULL), cnt(0), pe(-1), regMode(CK_BUFFER_REG), ref(NULL), bcastAckInfo(NULL) {}
 
-  explicit CkNcpyBuffer(const void *address, unsigned short int mode_=CK_BUFFER_REG) {
+  explicit CkNcpyBuffer(const void *address, unsigned short int regMode_=CK_BUFFER_REG) {
     ptr = address;
     pe = CkMyPe();
     cb = CkCallback(CkCallback::ignore);
-    mode = mode_;
+    regMode = regMode_;
     isRegistered = false;
   }
 
-  CkNcpyBuffer(const void *address, CkCallback &cb_, unsigned short int mode_=CK_BUFFER_REG) {
+  CkNcpyBuffer(const void *address, CkCallback &cb_, unsigned short int regMode_=CK_BUFFER_REG) {
     ptr = address;
     pe = CkMyPe();
     cb = cb_;
-    mode = mode_;
+    regMode = regMode_;
     isRegistered = false;
   }
 
-  explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, unsigned short int mode_) {
+  explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, unsigned short int regMode_) {
     cb = CkCallback(CkCallback::ignore);
-    init(ptr_, cnt_, mode_);
+    init(ptr_, cnt_, regMode_);
   }
 
-  CkNcpyBuffer(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int mode_=CK_BUFFER_REG) {
-    init(ptr_, cnt_, cb_, mode_);
+  CkNcpyBuffer(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int regMode_=CK_BUFFER_REG) {
+    init(ptr_, cnt_, cb_, regMode_);
   }
 
   void print() {
-    CkPrintf("[%d][%d][%d] CkNcpyBuffer print: ptr:%p, size:%d, pe:%d, mode=%d, ref:%p, bcastAckInfo:%p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ptr, cnt, pe, mode, ref, bcastAckInfo);
+    CkPrintf("[%d][%d][%d] CkNcpyBuffer print: ptr:%p, size:%d, pe:%d, regMode=%d, ref:%p, bcastAckInfo:%p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ptr, cnt, pe, regMode, ref, bcastAckInfo);
   }
 
-  void init(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int mode_=CK_BUFFER_REG) {
+  void init(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int regMode_=CK_BUFFER_REG) {
     cb   = cb_;
-    init(ptr_, cnt_, mode_);
+    init(ptr_, cnt_, regMode_);
   }
 
-  void init(const void *ptr_, size_t cnt_, unsigned short int mode_=CK_BUFFER_REG) {
+  void init(const void *ptr_, size_t cnt_, unsigned short int regMode_=CK_BUFFER_REG) {
     ptr  = ptr_;
     cnt  = cnt_;
     pe   = CkMyPe();
-    mode = mode_;
+    regMode = regMode_;
 
     isRegistered = false;
     // Register memory everytime new values are initialized
@@ -161,24 +161,24 @@ class CkNcpyBuffer{
     // Check that this object is local when registerMem is called
     CkAssert(CkNodeOf(pe) == CkMyNode());
 
-    // Set machine layer information when mode is not CK_BUFFER_NOREG
-    if(mode != CK_BUFFER_NOREG) {
+    // Set machine layer information when regMode is not CK_BUFFER_NOREG
+    if(regMode != CK_BUFFER_NOREG) {
 
       CmiSetRdmaCommonInfo(&layerInfo[0], ptr, cnt);
 
       /* Set the pointer layerInfo unconditionally for layers that don't require pinning (MPI, PAMI)
-       * or if mode is REG, PREREG on layers that require pinning (GNI, Verbs, OFI) */
+       * or if regMode is REG, PREREG on layers that require pinning (GNI, Verbs, OFI) */
 #if CMK_REG_REQUIRED
-      if(mode == CK_BUFFER_REG || mode == CK_BUFFER_PREREG)
+      if(regMode == CK_BUFFER_REG || regMode == CK_BUFFER_PREREG)
 #endif
       {
-        CmiSetRdmaBufferInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, mode);
+        CmiSetRdmaBufferInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, regMode);
         isRegistered = true;
       }
     }
   }
 
-  void setMode(unsigned short int mode_) { mode = mode_; }
+  void setMode(unsigned short int regMode_) { regMode = regMode_; }
 
   void memcpyGet(CkNcpyBuffer &source);
   void memcpyPut(CkNcpyBuffer &destination);
@@ -203,8 +203,8 @@ class CkNcpyBuffer{
       return;
 
 #if CMK_REG_REQUIRED
-    if(mode != CK_BUFFER_NOREG) {
-      CmiDeregisterMem(ptr, layerInfo + CmiGetRdmaCommonInfoSize(), pe, mode);
+    if(regMode != CK_BUFFER_NOREG) {
+      CmiDeregisterMem(ptr, layerInfo + CmiGetRdmaCommonInfoSize(), pe, regMode);
       isRegistered = false;
     }
 #endif
@@ -217,7 +217,7 @@ class CkNcpyBuffer{
     p|cnt;
     p|cb;
     p|pe;
-    p|mode;
+    p|regMode;
     p|isRegistered;
     PUParray(p, layerInfo, CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES);
   }
@@ -431,7 +431,7 @@ CkpvExtern(int, _numPendingRORdmaTransfers);
 struct NcpyROBcastBuffAckInfo {
   const void *ptr;
 
-  int mode;
+  int regMode;
 
   int pe;
 

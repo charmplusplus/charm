@@ -42,13 +42,13 @@ void LrtsIssueRget(
   void *srcAck,
   int srcAckSize,
   int srcPe,
-  unsigned short int *srcMode,
+  unsigned short int *srcRegMode,
   const void* destAddr,
   void *destInfo,
   void *destAck,
   int destAckSize,
   int destPe,
-  unsigned short int *destMode,
+  unsigned short int *destRegMode,
   int size);
 
 // Perform an RDMA Put call into the remote destination address from the local source address
@@ -58,13 +58,13 @@ void LrtsIssueRput(
   void *destAck,
   int destAckSize,
   int destPe,
-  unsigned short int *destMode,
+  unsigned short int *destRegMode,
   const void* srcAddr,
   void *srcInfo,
   void *srcAck,
   int srcAckSize,
   int srcPe,
-  unsigned short int *srcMode,
+  unsigned short int *srcRegMode,
   int size);
 
 // Method invoked to deregister memory handle

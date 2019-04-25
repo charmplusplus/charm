@@ -374,7 +374,7 @@ void process_onesided_dereg_and_ack(struct fi_cq_tagged_entry *e, OFIRequest *re
   LrtsDeregisterMem(ncpyOpInfo->srcPtr,
                     ncpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize(),
                     ncpyOpInfo->srcPe,
-                    ncpyOpInfo->srcMode);
+                    ncpyOpInfo->srcRegMode);
 
   ncpyOpInfo->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
 
