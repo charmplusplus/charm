@@ -14,6 +14,9 @@
 #define CK_BUFFER_PREREG  CMK_BUFFER_PREREG
 #define CK_BUFFER_NOREG   CMK_BUFFER_NOREG
 
+#define CK_BUFFER_DEREG     CMK_BUFFER_DEREG
+#define CK_BUFFER_NODEREG   CMK_BUFFER_NODEREG
+
 #ifndef CMK_NOCOPY_DIRECT_BYTES
 
 #if defined(_WIN32)
@@ -57,6 +60,9 @@ enum class ncpyEmApiMode : char { P2P_SEND, BCAST_SEND, P2P_RECV, BCAST_RECV };
 struct CkNcpyBufferPost {
   // regMode
   unsigned short int regMode;
+
+  // deregMode
+  unsigned short int deregMode;
 };
 
 // Class to represent an Zerocopy buffer
@@ -94,57 +100,47 @@ class CkNcpyBuffer{
   // regMode
   unsigned short int regMode;
 
+  // deregMode
+  unsigned short int deregMode;
+
   // reference pointer
   const void *ref;
 
   // bcast ack handling pointer
   const void *bcastAckInfo;
 
-  CkNcpyBuffer() : isRegistered(false), ptr(NULL), cnt(0), pe(-1), regMode(CK_BUFFER_REG), ref(NULL), bcastAckInfo(NULL) {}
+  CkNcpyBuffer() : isRegistered(false), ptr(NULL), cnt(0), pe(-1), regMode(CK_BUFFER_REG), deregMode(CK_BUFFER_DEREG), ref(NULL), bcastAckInfo(NULL) {}
 
-  explicit CkNcpyBuffer(const void *address, unsigned short int regMode_=CK_BUFFER_REG) {
-    ptr = address;
-    pe = CkMyPe();
+  explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
     cb = CkCallback(CkCallback::ignore);
-    regMode = regMode_;
-    isRegistered = false;
+    init(ptr_, cnt_, regMode_, deregMode_);
   }
 
-  CkNcpyBuffer(const void *address, CkCallback &cb_, unsigned short int regMode_=CK_BUFFER_REG) {
-    ptr = address;
-    pe = CkMyPe();
-    cb = cb_;
-    regMode = regMode_;
-    isRegistered = false;
-  }
-
-  explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, unsigned short int regMode_) {
-    cb = CkCallback(CkCallback::ignore);
-    init(ptr_, cnt_, regMode_);
-  }
-
-  CkNcpyBuffer(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int regMode_=CK_BUFFER_REG) {
-    init(ptr_, cnt_, cb_, regMode_);
+  explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
+    init(ptr_, cnt_, cb_, regMode_, deregMode_);
   }
 
   void print() {
-    CkPrintf("[%d][%d][%d] CkNcpyBuffer print: ptr:%p, size:%d, pe:%d, regMode=%d, ref:%p, bcastAckInfo:%p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ptr, cnt, pe, regMode, ref, bcastAckInfo);
+    CkPrintf("[%d][%d][%d] CkNcpyBuffer print: ptr:%p, size:%d, pe:%d, regMode=%d, deregMode=%d, ref:%p, bcastAckInfo:%p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ptr, cnt, pe, regMode, deregMode, ref, bcastAckInfo);
   }
 
-  void init(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int regMode_=CK_BUFFER_REG) {
+  void init(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
     cb   = cb_;
-    init(ptr_, cnt_, regMode_);
+    init(ptr_, cnt_, regMode_, deregMode_);
   }
 
-  void init(const void *ptr_, size_t cnt_, unsigned short int regMode_=CK_BUFFER_REG) {
+  void init(const void *ptr_, size_t cnt_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
     ptr  = ptr_;
     cnt  = cnt_;
     pe   = CkMyPe();
     regMode = regMode_;
+    deregMode = deregMode_;
 
     isRegistered = false;
+
     // Register memory everytime new values are initialized
-    registerMem();
+    if(cnt > 0)
+      registerMem();
   }
 
   void setRef(const void *ref_) {
@@ -218,6 +214,7 @@ class CkNcpyBuffer{
     p|cb;
     p|pe;
     p|regMode;
+    p|deregMode;
     p|isRegistered;
     PUParray(p, layerInfo, CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES);
   }
@@ -242,7 +239,7 @@ class CkNcpyBuffer{
 
   friend void performEmApiCmaTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, int child_count, ncpyEmApiMode emMode);
 
-  friend void deregisterMemFromMsg(envelope *env);
+  friend void deregisterMemFromMsg(envelope *env, bool isRecv);
 };
 
 // Ack handler for the Zerocopy Direct API
@@ -267,7 +264,13 @@ void invokeDestinationCallback(NcpyOperationInfo *info);
 void enqueueNcpyMessage(int destPe, void *msg);
 
 /*********************************** Zerocopy Entry Method API ****************************/
-#define CkSendBuffer(...) CkNcpyBuffer(__VA_ARGS__)
+static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, CkCallback &cb_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
+  return CkNcpyBuffer(ptr_, 0, cb_, regMode_, deregMode_);
+}
+
+static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
+  return CkNcpyBuffer(ptr_, 0, regMode_, deregMode_);
+}
 
 #if CMK_ONESIDED_IMPL
 
@@ -403,7 +406,7 @@ void handleBcastEntryMethodApiCompletion(NcpyOperationInfo *info);
 
 void handleBcastReverseEntryMethodApiCompletion(NcpyOperationInfo *info);
 
-void deregisterMemFromMsg(envelope *env);
+void deregisterMemFromMsg(envelope *env, bool isRecv);
 
 void handleMsgUsingCMAPostCompletionForSendBcast(envelope *copyenv, envelope *env, CkNcpyBuffer &source);
 

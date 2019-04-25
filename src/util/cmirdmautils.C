@@ -20,6 +20,7 @@ void setNcpyOpInfo(
     int srcAckSize,
     int srcSize,
     unsigned short int srcRegMode,
+    unsigned short int srcDeregMode,
     unsigned short int isSrcRegistered,
     int srcPe,
     const void *srcRef,
@@ -30,6 +31,7 @@ void setNcpyOpInfo(
     int destAckSize,
     int destSize,
     unsigned short int destRegMode,
+    unsigned short int destDeregMode,
     unsigned short int isDestRegistered,
     int destPe,
     const void *destRef,
@@ -76,6 +78,7 @@ void setNcpyOpInfo(
   ncpyOpInfo->srcAckSize = srcAckSize;
   ncpyOpInfo->srcSize = srcSize;
   ncpyOpInfo->srcRegMode = srcRegMode;
+  ncpyOpInfo->srcDeregMode = srcDeregMode;
   ncpyOpInfo->isSrcRegistered = isSrcRegistered;
 
   ncpyOpInfo->destPtr = destPtr;
@@ -85,6 +88,7 @@ void setNcpyOpInfo(
   ncpyOpInfo->destAckSize = destAckSize;
   ncpyOpInfo->destSize = destSize;
   ncpyOpInfo->destRegMode = destRegMode;
+  ncpyOpInfo->destDeregMode = destDeregMode;
   ncpyOpInfo->isDestRegistered = isDestRegistered;
 
   ncpyOpInfo->opMode  = CMK_DIRECT_API; // default operation mode is CMK_DIRECT_API
