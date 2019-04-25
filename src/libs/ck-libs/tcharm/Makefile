@@ -34,11 +34,15 @@ $(DEST2): $(OBJS2) $(HEADERS)
 $(COMPATLIB): $(COMPAT) 
 	$(CHARMC) $(COMPAT) -o $@
 
-tcharm.decl.h tcharm.def.h : tcharm.ci $(CDIR)/bin/charmxi
-	$(CHARMC) -c tcharm.ci
+tcharm.decl.h: tcharm.ci $(CDIR)/bin/charmxi
+	$(CHARMC) -c $<
 
-tcharmmain.decl.h tcharmmain.def.h: tcharmmain.ci $(CDIR)/bin/charmxi
-	$(CHARMC) -c tcharmmain.ci
+tcharm.def.h: tcharm.decl.h
+
+tcharmmain.decl.h: tcharmmain.ci $(CDIR)/bin/charmxi
+	$(CHARMC) -c $<
+
+tcharmmain.def.h: tcharmmain.decl.h
 
 headers: $(HEADERS)
 
