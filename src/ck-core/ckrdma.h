@@ -203,7 +203,7 @@ class CkNcpyBuffer{
       return;
 
 #if CMK_REG_REQUIRED
-    if(mode != CK_BUFFER_PREREG && mode != CK_BUFFER_NOREG) {
+    if(mode != CK_BUFFER_NOREG) {
       CmiDeregisterMem(ptr, layerInfo + CmiGetRdmaCommonInfoSize(), pe, mode);
       isRegistered = false;
     }
