@@ -1628,6 +1628,44 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
                 mixTreeUp = 0;
     }
 
+    // If reduceFragment is not being called now, check if partialReduction is possible (streamable)
+    if (!currentTreeUp && !mixTreeUp && redInfo.msgs[index].size() > 1 && CkReduction::reducerTable()[msg->reducer].streamable) {
+      reductionMsgs& rmsgs = redInfo.msgs[index];
+      CkReduction::reducerType reducer = rmsgs[0]->reducer;
+      CkReduction::reducerFn f= CkReduction::reducerTable()[msg->reducer].fn;
+      CkAssert(f != NULL);
+
+      int oldRedNo = redInfo.redNo;
+      int nFrags   = rmsgs[0]->nFrags;
+      int fragNo   = rmsgs[0]->fragNo;
+      int userFlag = rmsgs[0]->userFlag;
+      CkSectionInfo oldId = rmsgs[0]->sid;
+      CkCallback msg_cb;
+      int8_t rebuilt = 0;
+      if (msg->rebuilt) rebuilt = 1;
+      if (!msg->callback.isInvalid()) msg_cb = msg->callback;
+      // Perform the actual reduction (streaming)
+      CkReductionMsg *newmsg = (*f)(rmsgs.size(), rmsgs.data());
+#if CMK_MESSAGE_LOGGING
+      envelope *env = UsrToEnv(newmsg);
+      env->flags = env->flags | CK_REDUCTION_MSG_MLOG;
+#endif
+      newmsg->redNo  = oldRedNo;
+      newmsg->nFrags = nFrags;
+      newmsg->fragNo = fragNo;
+      newmsg->userFlag = userFlag;
+      newmsg->reducer = reducer;
+      if (rebuilt) newmsg->rebuilt = 1;
+      if (!msg_cb.isInvalid()) newmsg->callback = msg_cb;
+      newmsg->gcount = redInfo.gcount[index];
+      newmsg->sid = oldId;
+      // Remove the current message that was pushed
+      rmsgs.pop_back();
+      delete msg;
+      // Only the partially reduced message should be remaining in the msgs vector after partialReduction
+      CkAssert(rmsgs.size() == 1);
+    }
+
     //-------------------------------------------------------------------------
     /// If this fragment can be reduced, or if I am the root and have received all fragments from all elements
     if (currentTreeUp || mixTreeUp)
