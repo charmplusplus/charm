@@ -279,7 +279,7 @@ void GridCommLB::Examine_InterObject_Messages (CentralLB::LDStats *stats)
   int recv_object;
   int recv_pe;
   int recv_cluster;
-  LDObjKey *recv_objects;
+  const LDObjKey *recv_objects;
   int num_objects;
 
 

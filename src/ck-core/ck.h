@@ -36,7 +36,7 @@ inline void _CldEnqueue(int pe, void *msg, int infofn) {
 #endif
   CldEnqueue(pe, msg, infofn);
 }
-inline void _CldEnqueueMulti(int npes, int *pes, void *msg, int infofn) {
+inline void _CldEnqueueMulti(int npes, const int *pes, void *msg, int infofn) {
   if (!ConverseDeliver(-1)) {
     CmiFree(msg);
     return;

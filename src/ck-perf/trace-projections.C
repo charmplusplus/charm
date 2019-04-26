@@ -786,7 +786,7 @@ void LogPool::addUserSuppliedBracketedNote(char *note, int eventID, double bt, d
 */
 void LogPool::addCreationMulticast(UShort mIdx, UShort eIdx, double time,
 				   int event, int pe, int ml, CmiObjId *id,
-				   double recvT, int numPe, int *pelist)
+				   double recvT, int numPe, const int *pelist)
 {
   lastCreationEvent = numEntries;
   new (&pool[numEntries++])
@@ -1416,7 +1416,7 @@ void TraceProjections::traceSetMsgID(char *msg, int pe, int event)
 */
 
 void TraceProjections::creationMulticast(envelope *e, int ep, int num,
-					 int *pelist)
+					 const int *pelist)
 {
 #if CMK_TRACE_ENABLED
   double curTime = TraceTimer();

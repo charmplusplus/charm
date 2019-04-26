@@ -92,7 +92,7 @@ void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn)
   CmiAbort("CldEnqueueGroup not supported!");
 }
 
-void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn)
+void CldEnqueueMulti(int npes, const int *pes, void *msg, int infofn)
 {
   int len, queueing, priobits,i; unsigned int *prioptr;
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);

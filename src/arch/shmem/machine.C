@@ -307,7 +307,7 @@ void CmiFreeBroadcastAllFn(int size, char *msg)
 }
 
 
-void CmiSyncListSendFn(int npes, int *pes, int size, char *msg)
+void CmiSyncListSendFn(int npes, const int *pes, int size, char *msg)
 {
   int i;
   McMsgHdr *dup_msg;
@@ -372,13 +372,13 @@ void CmiSyncListSendFn(int npes, int *pes, int size, char *msg)
   McQueueAddToBack(broadcast_queue,dup_msg);
 }
 
-CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int size, char *msg)
+CmiCommHandle CmiAsyncListSendFn(int npes, const int *pes, int size, char *msg)
 {
   CmiSyncListSendFn(npes, pes, size, msg);
   return 0;
 }
 
-void CmiFreeListSendFn(int npes, int *pes, int size, char *msg)
+void CmiFreeListSendFn(int npes, const int *pes, int size, char *msg)
 {
   CmiSyncListSendFn(npes,pes,size,msg);
   CmiFree(msg);

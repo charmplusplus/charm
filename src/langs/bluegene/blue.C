@@ -1077,7 +1077,7 @@ void BgThreadBroadcastAllPacket(int handlerID, WorkType type, int numbytes, char
 /**
  send a msg to a list of processors (processors represented in global seq #
 */
-void BgSyncListSend(int npes, int *pes, int handlerID, WorkType type, int numbytes, char *msg)
+void BgSyncListSend(int npes, const int *pes, int handlerID, WorkType type, int numbytes, char *msg)
 {
   nodeInfo *myNode = cta(threadinfo)->myNode;
 

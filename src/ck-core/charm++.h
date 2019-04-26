@@ -1008,8 +1008,8 @@ public:
   inline CkSectionID &ckGetSectionID() {return _sid[0]; }
   inline CkSectionID &ckGetSectionID(int i) {return _sid[i]; }
   inline CkGroupID ckGetGroupIDn(int i) const {return _sid[i]._cookie.get_aid();}
-  inline int *ckGetElements() const {return _sid[0].pelist.data();}
-  inline int *ckGetElements(int i) const {return _sid[i].pelist.data();}
+  inline const int *ckGetElements() const {return _sid[0].pelist.data();}
+  inline const int *ckGetElements(int i) const {return _sid[i].pelist.data();}
   inline int ckGetNumElements() const { return _sid[0].pelist.size(); }
   inline int ckGetNumElements(int i) const { return _sid[i].pelist.size(); }
   inline int ckGetBfactor() const { return _sid[0].bfactor; }

@@ -442,17 +442,17 @@ void CmiFreeNodeBroadcastAllFn(int size, char *msg) {
 
 #if ! CMK_MULTICAST_LIST_USE_COMMON_CODE
 
-void CmiSyncListSendFn(int npes, int *pes, int len, char *msg)
+void CmiSyncListSendFn(int npes, const int *pes, int len, char *msg)
 {
     LrtsSyncListSendFn(npes, pes, len, msg);
 }
 
-CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
+CmiCommHandle CmiAsyncListSendFn(int npes, const int *pes, int len, char *msg)
 {
     return LrtsAsyncListSendFn(npes, pes, len, msg);
 }
 
-void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
+void CmiFreeListSendFn(int npes, const int *pes, int len, char *msg)
 {
     LrtsFreeListSendFn(npes, pes, len, msg);
 }

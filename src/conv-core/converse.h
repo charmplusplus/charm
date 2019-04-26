@@ -1243,10 +1243,10 @@ void          CmiSyncBroadcastAllFn(int, char *);
 CmiCommHandle CmiAsyncBroadcastAllFn(int, char *);
 void          CmiFreeBroadcastAllFn(int, char *);
 
-void          CmiSyncListSendFn(int, int *, int, char*);
-CmiCommHandle CmiAsyncListSendFn(int, int *, int, char*);
-void          CmiFreeListSendFn(int, int *, int, char*);
-void          CmiFreeNodeListSendFn(int, int *, int, char*);
+void          CmiSyncListSendFn(int, const int *, int, char*);
+CmiCommHandle CmiAsyncListSendFn(int, const int *, int, char*);
+void          CmiFreeListSendFn(int, const int *, int, char*);
+void          CmiFreeNodeListSendFn(int, const int *, int, char*);
 
 void          CmiSyncMulticastFn(CmiGroup, int, char*);
 CmiCommHandle CmiAsyncMulticastFn(CmiGroup, int, char*);
@@ -1702,7 +1702,7 @@ int CldEstimate(void);
 const char *CldGetStrategy(void);
 
 void CldEnqueue(int pe, void *msg, int infofn);
-void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn);
+void CldEnqueueMulti(int npes, const int *pes, void *msg, int infofn);
 void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn);
 void CldNodeEnqueue(int node, void *msg, int infofn);
 

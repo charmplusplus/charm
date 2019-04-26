@@ -373,11 +373,11 @@ extern void CkSendMsg(int entryIndex, void *msg, const CkChareID *chare, int opt
 extern void CkSendMsgBranch(int eIdx, void *msg, int destPE, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *chare, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int opts CK_MSGOPTIONAL);
-extern void CkSendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID, int npes, int *pes, int opts CK_MSGOPTIONAL);
+extern void CkSendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID, int npes, const int *pes, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgBranchGroup(int eIdx,void *msg,CkGroupID gID,CmiGroup grp, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgNodeBranch(int eIdx, void *msg, int destNode, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgNodeBranchInline(int eIdx, void *msg, int destNode, CkGroupID gID, int opts CK_MSGOPTIONAL);
-extern void CkSendMsgNodeBranchMulti(int eIdx, void *msg, CkGroupID gID, int npes, int *nodes, int opts CK_MSGOPTIONAL);
+extern void CkSendMsgNodeBranchMulti(int eIdx, void *msg, CkGroupID gID, int npes, const int *nodes, int opts CK_MSGOPTIONAL);
 extern void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkBroadcastMsgNodeBranch(int eIdx, void *msg, CkGroupID gID, int opts CK_MSGOPTIONAL);
 

@@ -87,9 +87,9 @@ void          CmiReleaseCommHandle(CmiCommHandle handle);
  */
 
 #if ! CMK_MULTICAST_LIST_USE_COMMON_CODE
-void          CmiSyncListSendFn(int, int *, int, char*);
-CmiCommHandle CmiAsyncListSendFn(int, int *, int, char*);
-void          CmiFreeListSendFn(int, int *, int, char*);
+void          CmiSyncListSendFn(int, const int *, int, char*);
+CmiCommHandle CmiAsyncListSendFn(int, const int *, int, char*);
+void          CmiFreeListSendFn(int, const int *, int, char*);
 #endif
 
 #if ! CMK_MULTICAST_GROUP_USE_COMMON_CODE

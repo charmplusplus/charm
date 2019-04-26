@@ -1511,7 +1511,7 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 #endif
 
 // by pass Charm++ priority queue, send as Converse message
-static void _noCldEnqueueMulti(int npes, int *pes, envelope *env)
+static void _noCldEnqueueMulti(int npes, const int *pes, envelope *env)
 {
 #if CMK_CHARMDEBUG
   if (!ConverseDeliver(-1)) {
@@ -1811,7 +1811,7 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
 }
 
 static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID,
-                           int npes, int *pes)
+                           int npes, const int *pes)
 {
   envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
   _TRACE_CREATION_MULTICAST(env, npes, pes);
@@ -1890,7 +1890,7 @@ void CkSendMsgBranch(int eIdx, void *msg, int pe, CkGroupID gID, int opts)
   CkpvAccess(_coreState)->create();
 }
 
-void CkSendMsgBranchMultiImmediate(int eIdx,void *msg,CkGroupID gID,int npes,int *pes)
+void CkSendMsgBranchMultiImmediate(int eIdx,void *msg,CkGroupID gID,int npes,const int *pes)
 {
 #if CMK_IMMEDIATE_MSG && ! CMK_SMP
   envelope *env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
@@ -1905,7 +1905,7 @@ void CkSendMsgBranchMultiImmediate(int eIdx,void *msg,CkGroupID gID,int npes,int
   CpvAccess(_qd)->create(npes);
 }
 
-void CkSendMsgBranchMulti(int eIdx,void *msg,CkGroupID gID,int npes,int *pes, int opts)
+void CkSendMsgBranchMulti(int eIdx,void *msg,CkGroupID gID,int npes,const int *pes, int opts)
 {
   if (opts & CK_MSG_IMMEDIATE) {
     CkSendMsgBranchMultiImmediate(eIdx,msg,gID,npes,pes);
@@ -1968,7 +1968,7 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
 }
 
 static inline void _sendMsgNodeBranchMulti(int eIdx, void *msg, CkGroupID gID,
-                           int npes, int *nodes)
+                           int npes, const int *nodes)
 {
   envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
   _TRACE_CREATION_N(env, npes);
@@ -2043,7 +2043,7 @@ void CkSendMsgNodeBranch(int eIdx, void *msg, int node, CkGroupID gID, int opts)
   CkpvAccess(_coreState)->create();
 }
 
-void CkSendMsgNodeBranchMultiImmediate(int eIdx,void *msg,CkGroupID gID,int npes,int *nodes)
+void CkSendMsgNodeBranchMultiImmediate(int eIdx,void *msg,CkGroupID gID,int npes,const int *nodes)
 {
 #if CMK_IMMEDIATE_MSG && ! CMK_SMP
   envelope *env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
@@ -2056,7 +2056,7 @@ void CkSendMsgNodeBranchMultiImmediate(int eIdx,void *msg,CkGroupID gID,int npes
   CpvAccess(_qd)->create(npes);
 }
 
-void CkSendMsgNodeBranchMulti(int eIdx,void *msg,CkGroupID gID,int npes,int *nodes, int opts)
+void CkSendMsgNodeBranchMulti(int eIdx,void *msg,CkGroupID gID,int npes,const int *nodes, int opts)
 {
   if (opts & CK_MSG_IMMEDIATE) {
     CkSendMsgNodeBranchMultiImmediate(eIdx,msg,gID,npes,nodes);

@@ -1708,7 +1708,7 @@ CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freem
  *
  ****************************************************************************/
                                                                                 
-void LrtsSyncListSendFn(int npes, int *pes, int len, char *msg)
+void LrtsSyncListSendFn(int npes, const int *pes, int len, char *msg)
 {
   int i;
   for(i=0;i<npes;i++) {
@@ -1717,7 +1717,7 @@ void LrtsSyncListSendFn(int npes, int *pes, int len, char *msg)
   }
 }
                                                                                 
-CmiCommHandle LrtsAsyncListSendFn(int npes, int *pes, int len, char *msg)
+CmiCommHandle LrtsAsyncListSendFn(int npes, const int *pes, int len, char *msg)
 {
   CmiError("ListSend not implemented.");
   return (CmiCommHandle) 0;
@@ -1728,7 +1728,7 @@ CmiCommHandle LrtsAsyncListSendFn(int npes, int *pes, int len, char *msg)
   returns is not changed, we can use memory reference trick to avoid 
   memory copying here
 */
-void LrtsFreeListSendFn(int npes, int *pes, int len, char *msg)
+void LrtsFreeListSendFn(int npes, const int *pes, int len, char *msg)
 {
   int i;
   for(i=0;i<npes;i++) {

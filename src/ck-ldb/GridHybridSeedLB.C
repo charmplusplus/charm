@@ -304,7 +304,7 @@ void GridHybridSeedLB::Initialize_Communication_Matrix (CentralLB::LDStats *stat
   int send_index;
   int recv_index;
   int num_objects;
-  LDObjKey *recv_objects;
+  const LDObjKey *recv_objects;
   int index;
 
 

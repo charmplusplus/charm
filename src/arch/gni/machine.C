@@ -1793,7 +1793,7 @@ CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mo
 
 #if 0
 // this is no different from the common code
-void LrtsSyncListSendFn(int npes, int *pes, int len, char *msg)
+void LrtsSyncListSendFn(int npes, const int *pes, int len, char *msg)
 {
   int i;
 #if CMK_BROADCAST_USE_CMIREFERENCE
@@ -1812,14 +1812,14 @@ void LrtsSyncListSendFn(int npes, int *pes, int len, char *msg)
 #endif
 }
 
-CmiCommHandle LrtsAsyncListSendFn(int npes, int *pes, int len, char *msg)
+CmiCommHandle LrtsAsyncListSendFn(int npes, const int *pes, int len, char *msg)
 {
   /* A better asynchronous implementation may be wanted, but at least it works */
   CmiSyncListSendFn(npes, pes, len, msg);
   return (CmiCommHandle) 0;
 }
 
-void LrtsFreeListSendFn(int npes, int *pes, int len, char *msg)
+void LrtsFreeListSendFn(int npes, const int *pes, int len, char *msg)
 {
   if (npes == 1) {
       CmiSyncSendAndFree(pes[0], len, msg);

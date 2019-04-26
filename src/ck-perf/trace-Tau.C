@@ -223,7 +223,7 @@ void TraceTau::creation(envelope *, int epIdx, int num) {
 }
 
 void TraceTau::creationMulticast(envelope *, int epIdx, int num, 
-				 int *pelist) {
+				 const int *pelist) {
   dprintf("[%d] Multicast Message for Entry Method id %d sent to %d pes\n",
 	  CkMyPe(), epIdx, num);
 }

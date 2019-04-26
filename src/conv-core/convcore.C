@@ -2843,7 +2843,7 @@ void CmiGroupInit(void)
 
 #if CMK_MULTICAST_LIST_USE_COMMON_CODE
 
-void CmiSyncListSendFn(int npes, int *pes, int len, char *msg)
+void CmiSyncListSendFn(int npes, const int *pes, int len, char *msg)
 {
   int i;
 #if CMK_BROADCAST_USE_CMIREFERENCE
@@ -2862,14 +2862,14 @@ void CmiSyncListSendFn(int npes, int *pes, int len, char *msg)
 #endif
 }
 
-CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
+CmiCommHandle CmiAsyncListSendFn(int npes, const int *pes, int len, char *msg)
 {
   /* A better asynchronous implementation may be wanted, but at least it works */
   CmiSyncListSendFn(npes, pes, len, msg);
   return (CmiCommHandle) 0;
 }
 
-void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
+void CmiFreeListSendFn(int npes, const int *pes, int len, char *msg)
 {
 #if CMK_BROADCAST_USE_CMIREFERENCE
   if (npes == 1) {

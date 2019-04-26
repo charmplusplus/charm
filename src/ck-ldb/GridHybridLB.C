@@ -297,7 +297,7 @@ void GridHybridLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
   int recv_object;
   int send_index;
   int recv_index;
-  LDObjKey *recv_objects;
+  const LDObjKey *recv_objects;
   int num_objects;
   int *xadj;
   int num_edges;

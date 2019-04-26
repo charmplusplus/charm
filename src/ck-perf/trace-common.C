@@ -849,7 +849,7 @@ void TraceArray::creation(envelope *env, int ep, int num)
 }
 
 void TraceArray::creationMulticast(envelope *env, int ep, int num,
-				   int *pelist)
+				   const int *pelist)
 {
   if (_entryTable[ep]->traceEnabled)
     ALLDO(creationMulticast(env, ep, num, pelist));

@@ -69,7 +69,7 @@ ObjGraph::ObjGraph(BaseLB::LDStats *stats) {
     } //else if a multicast list
     else if((!commData.from_proc()) && (commData.recv_type() == LD_OBJLIST_MSG)) {
       int nobjs, offset;
-      LDObjKey *objs = commData.receiver.get_destObjs(nobjs);
+      const LDObjKey *objs = commData.receiver.get_destObjs(nobjs);
       McastSrc sender(nobjs, commData.messages, commData.bytes);
 
       from = stats->getHash(commData.sender);
