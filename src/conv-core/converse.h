@@ -250,7 +250,7 @@ extern PartitionInfo _partitionInfo;
 #define CmiMyPeGlobal()                 _Cmi_mype_global
 extern int _Cmi_mynodesize;
 #else
-extern int CmiMyPeGlobal();
+extern int CmiMyPeGlobal(void);
 #endif
 
 /* we need nodeSpan to find how many pes each node cover */
@@ -893,13 +893,13 @@ void CmiMemoryCheck(void); /* heap check, for -memory paranoid */
 void CmiMemoryMark(void); /* ignore current allocations, for -memory leak */
 void CmiMemoryMarkBlock(void *blk); /* ignore this allocation, for -memory leak */
 void CmiMemorySweep(const char *where); /* print current allocations, for -memory leak */
-CMK_TYPEDEF_UINT8 CmiMemoryUsage();
-const char *CmiMemoryUsageReporter();
+CMK_TYPEDEF_UINT8 CmiMemoryUsage(void);
+const char *CmiMemoryUsageReporter(void);
 CMK_TYPEDEF_UINT8 CmiMaxMemoryUsageR(void);
-CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage();
-void CmiResetMaxMemory();
-CMK_TYPEDEF_UINT8 CmiMinMemoryUsage();
-void CmiResetMinMemory();
+CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage(void);
+void CmiResetMaxMemory(void);
+CMK_TYPEDEF_UINT8 CmiMinMemoryUsage(void);
+void CmiResetMinMemory(void);
 
 /* General functions for malloc'ing aligned buffers */
 #define CmiRoundUpToPow2(s, p2)  (s + ((p2 - (s & (p2 - 1))) & (p2 - 1)))
@@ -1085,7 +1085,7 @@ typedef void (*CmiStartFn)(int argc, char **argv);
   @{
 */
 CpvExtern(int, _ccd_numchecks);
-extern void  CcdCallBacks();
+extern void  CcdCallBacks(void);
 #define CsdPeriodic() do{ if (CpvAccess(_ccd_numchecks)-- <= 0) CcdCallBacks(); } while(0)
 #define CsdResetPeriodic()    CpvAccess(_ccd_numchecks) = 0;
 
@@ -1229,7 +1229,7 @@ void     CmiLookupGroup(CmiGroup grp, int *npes, int **pes);
 void CmiPushPE(int, void*);
 #if CMK_OMP
 void          CmiSuspendedTaskEnqueue(int targetRank, void *msg);
-void      *   CmiSuspendedTaskPop();
+void      *   CmiSuspendedTaskPop(void);
 #endif
 void          CmiSyncSendFn(int, int, char *);
 CmiCommHandle CmiAsyncSendFn(int, int, char *);
@@ -1443,7 +1443,7 @@ void          CmiInterFreeNodeSendFn(int, int, int, char *);
 
 /******** CMI MESSAGE RECEPTION ********/
 
-void   CmiDeliversInit();
+void   CmiDeliversInit(void);
 int    CmiDeliverMsgs(int maxmsgs);
 void   CmiDeliverSpecificMsg(int handler);
 void   CmiHandleMessage(void *msg);
@@ -1510,8 +1510,8 @@ void       CthSetStrategyDefault(CthThread);
 void       CthSetStrategyWorkStealing(CthThread);
 void       CthSetStrategySuspendedWorkStealing(CthThread);
 int        CthScheduled(CthThread t);
-void       CthScheduledDecrement();
-CthThread  CthGetCurrentThread();
+void       CthScheduledDecrement(void);
+CthThread  CthGetCurrentThread(void);
 CpvExtern(int, prevGtid);
 void       CthSetPrev(CthThread t, CthThread prev);
 #endif
@@ -1715,7 +1715,7 @@ typedef struct CmmTableStruct *CmmTable;
 typedef void (*CmmPupMessageFn)(pup_er p,void **msg);
 CmmTable CmmPup(pup_er p, CmmTable t, CmmPupMessageFn msgpup);
 
-CmmTable   CmmNew();
+CmmTable   CmmNew(void);
 void       CmmFree(CmmTable t);
 void	   CmmFreeAll(CmmTable t);
 void       CmmPut(CmmTable t, int ntags, int *tags, void *msg);
@@ -1909,7 +1909,7 @@ extern int networkProgressPeriod;
 /*#ifdef __cplusplus
 extern "C" 
 #endif*/
-void CmiMachineProgressImpl();
+void CmiMachineProgressImpl(void);
 
 #if CMK_USE_PXSHM
 void CommunicationServerPxshm(void);
@@ -2084,7 +2084,7 @@ extern CmiNodeLock cmiMemoryLock;
 #endif /*if CMK_SMP*/
 
 /******** Performance Counters ********/
-void CmiInitCounters();
+void CmiInitCounters(void);
 void CmiStartCounters(int events[], int numEvents);
 void CmiStopCounters(int events[], CMK_TYPEDEF_INT8 values[], int numEvents);
 
@@ -2168,8 +2168,8 @@ extern int *memCriticalEntries;
 double CmiReadSize(const char *str);
 
 #if  CMK_CONVERSE_UGNI
-void CmiTurnOnStats();
-void CmiTurnOffStats();
+void CmiTurnOnStats(void);
+void CmiTurnOffStats(void);
 #else
 #define CmiTurnOnStats()
 #define CmiTurnOffStats()

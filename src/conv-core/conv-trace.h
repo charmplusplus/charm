@@ -34,7 +34,7 @@ void traceEndUserBracketEventNestedID(int eventID, int nestedID);
 void traceUserSuppliedData(int);
 void traceUserSuppliedBracketedNote(const char *note, int eventID, double bt, double et);
 void traceUserSuppliedNote(const char*);
-void traceMemoryUsage();
+void traceMemoryUsage(void);
 int  traceRegisterUserEvent(const char*, int e
 #ifdef __cplusplus
 =-1
@@ -57,7 +57,7 @@ void traceGetMsgID(char *msg, int *pe, int *event);
 void traceSetMsgID(char *msg, int pe, int event);
 
 /* Support for machine layers to register their user events to projections */
-void registerMachineUserEventsFunction(void (*eventRegistrationFunc)());
+void registerMachineUserEventsFunction(void (*eventRegistrationFunc)(void));
 
 void traceClose(void);
 void traceCharmClose(void);          /* close trace in ck */
