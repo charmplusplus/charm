@@ -328,7 +328,7 @@ void deregisterDirectMem(gni_mem_handle_t mem_hndl, int pe) {
 
 // Method invoked to deregister memory handle
 void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode){
-  if(mode == CMK_BUFFER_REG) {
+  if(mode != CMK_BUFFER_PREREG && mode != CMK_BUFFER_NOREG) {
     CmiGNIRzvRdmaPtr_t *destInfo = (CmiGNIRzvRdmaPtr_t *)info;
     deregisterDirectMem(destInfo->mem_hndl, pe);
   }

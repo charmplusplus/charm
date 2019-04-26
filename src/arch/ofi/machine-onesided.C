@@ -318,8 +318,8 @@ void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int m
   CmiOfiRdmaPtr_t *rdmaSrc = (CmiOfiRdmaPtr_t *)info;
   int ret;
 
-  // Deregister the buffer
-  if(rdmaSrc->mr) {
+  if(mode != CMK_BUFFER_NOREG && rdmaSrc->mr) {
+    // Deregister the buffer
     ret = fi_close((struct fid *)rdmaSrc->mr);
     if(ret)
       CmiAbort("LrtsDeregisterMem: fi_close(mr) failed!\n");
