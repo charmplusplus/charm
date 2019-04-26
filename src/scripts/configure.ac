@@ -2852,6 +2852,7 @@ enable_libudev='no'
 enable_libxml2='no'
 enable_visibility='no'
 enable_nvml='no'
+enable_opencl='no'
 . hwloc/VERSION
 export libhwloc_so_version
 AC_SUBST(libhwloc_so_version)
