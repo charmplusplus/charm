@@ -10,7 +10,9 @@ cpu affinity.
  * new options +pemap +commmap takes complex pattern of a list of cores
 */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include "converse.h"
 #include "sockRoutines.h"
@@ -75,7 +77,6 @@ void CmiInitHwlocTopology(void)
 #include <windows.h>
 #include <winbase.h>
 #else
-#define _GNU_SOURCE
 #include <sched.h>
 //long sched_setaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
 //long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
