@@ -1605,11 +1605,13 @@ void CkArray::recvBroadcast(CkMessage *m)
 	}
 
 #if CMK_ONESIDED_IMPL
+    if (CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_BCAST_RECV_DONE_MSG) {
       CkArray *mgr = getArrayMgrFromMsg(env);
 
       // Reset back message to be ForBocMsg with the prevEpIdx that targets CkArray group
       env->setMsgtype(ForBocMsg);
       env->getsetArrayEp() = mgr->getRecvBroadcastEpIdx();
+    }
 #endif
 #endif
   }
