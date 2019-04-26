@@ -1,7 +1,6 @@
 #include "zlib-compress.C"
 //#include "quicklz-compress.C"
 #include "lz4.h"
-static int compress_mode;
 #define     CMODE_NOCOMPRESS 0
 #define     CMODE_ZLIB  1
 //#define     CMODE_QUICKLZ 2
@@ -48,11 +47,11 @@ void compressZlib(void *src, void *dst, int size, int *compressSize, void *bData
         initCompress();
         initDone = 1;
     }
-    char *xor=malloc(size);
+    auto my_xor = (char *)malloc(size);
     int i;
     for(i=0; i<size; i++)
-        xor[i] = (src_ptr[i])^(bdata_ptr[i]);       
-    zlib_compress(xor, dst, size, compressSize);
+        my_xor[i] = (src_ptr[i])^(bdata_ptr[i]);
+    zlib_compress(my_xor, dst, size, compressSize);
 #if DEBUG
     double t = get_clock()-t1;
     printf("+%d external compression done compressing(%d===>%d) (reduction:%d) ration=%f time=%d us\n", compress_mode, (int)(size*sizeof(char)), *compressSize, (int)(size*sizeof(char)-*compressSize), (1-(float)*compressSize/(size*sizeof(char)))*100, (int)(t*1000000));
@@ -64,14 +63,14 @@ void decompressZlib(void *cData, void *dData, int size, int compressSize, void *
 #if DEBUG
     double t1 = get_clock();
 #endif
-    char *xor=(char*)malloc(size);
-    zlib_decompress(cData, xor, compressSize, size);
+    char *my_xor=(char*)malloc(size);
+    zlib_decompress(cData, my_xor, compressSize, size);
     int i;
     char *dptr = (char*)dData;
     char *bptr = (char*)bData; 
     for(i=0; i<size; i++)
-        dptr[i] = (bptr[i])^(xor[i]); 
-    free(xor);
+        dptr[i] = (bptr[i])^(my_xor[i]);
+    free(my_xor);
 #if DEBUG
     double t = get_clock()-t1;
     printf("------done decompressing.....  orig size:%d time:%d us \n", (int)size, (int)(t*1000000)) ;
@@ -90,12 +89,12 @@ void compressLz4(void *src, void *dst, int size, int *compressSize, void *bData)
         initCompress();
         initDone = 1;
     }
-    char *xor=malloc(size);
+    auto my_xor = (char *)malloc(size);
     int i;
     for(i=0; i<size; i++)
-        xor[i] = (src_ptr[i])^(bdata_ptr[i]);       
+        my_xor[i] = (src_ptr[i])^(bdata_ptr[i]);
 
-    *compressSize = LZ4_compress_default(xor, dst, size, LZ4_compressBound(size));
+    *compressSize = LZ4_compress_default(my_xor, (char *)dst, size, LZ4_compressBound(size));
 
 #if DEBUG
     double t = get_clock()-t1;
@@ -108,17 +107,17 @@ void decompressLz4(void *cData, void *dData, int size, int compressSize, void *b
 #if DEBUG
     double t1 = get_clock();
 #endif
-    char *xor=(char*)malloc(size);
+    char *my_xor=(char*)malloc(size);
 
-    if (LZ4_decompress_safe(cData, xor, compressSize, size) < 0)
+    if (LZ4_decompress_safe((char *)cData, my_xor, compressSize, size) < 0)
         CmiAbort("decode fails\n");
 
     int i;
     char *dptr = (char*)dData;
     char *bptr = (char*)bData; 
     for(i=0; i<size; i++)
-        dptr[i] = (bptr[i])^(xor[i]); 
-    free(xor);
+        dptr[i] = (bptr[i])^(my_xor[i]);
+    free(my_xor);
 #if DEBUG
     double t = get_clock()-t1;
     printf("------done decompressing.....  orig size:%d time:%d us \n", (int)size, (int)(t*1000000)) ;

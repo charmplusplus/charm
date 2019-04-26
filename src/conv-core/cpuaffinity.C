@@ -16,6 +16,7 @@ cpu affinity.
 
 #include "converse.h"
 #include "sockRoutines.h"
+#include "charm-api.h"
 #include "hwloc.h"
 
 #if CMK_USE_IBVERBS

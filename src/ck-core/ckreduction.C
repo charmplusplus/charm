@@ -1987,6 +1987,13 @@ Group* getExtContributor<Group>(CkExtContributeInfo* contribute_params)
 
 // Functions to perform reduction over contributors from external clients (e.g. Charm4py)
 
+extern "C" {
+void CkExtContributeTo(CkExtContributeInfo* contribute_params, CkCallback& cb);
+void CkExtContributeToChare(CkExtContributeInfo* contribute_params, int onPE, void* objPtr);
+void CkExtContributeToArray(CkExtContributeInfo* contribute_params, int aid, int* idx, int ndims);
+void CkExtContributeToGroup(CkExtContributeInfo* contribute_params, int gid, int pe);
+}
+
 // Generic function to extract CkExtContributeInfo and perform reduction
 template <class T>
 void CkExtContribute(CkExtContributeInfo* contribute_params, CkCallback& cb)

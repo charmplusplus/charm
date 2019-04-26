@@ -1,6 +1,6 @@
 . $CHARMINC/cc-gcc.sh
 
-CMK_DEFS=' -D_REENTRANT -m32 '
+CMK_DEFS="$CMK_DEFS -D_REENTRANT -m32"
 
 CMK_XIOPTS=''
 CMK_LIBS="-lpthread $CMK_LIBS"

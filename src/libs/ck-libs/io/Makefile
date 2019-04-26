@@ -23,7 +23,7 @@ headers: $(HEADERS)
 ckio.o: ckio.C headers
 	$(CHARMC) -c $<
 
-fs_parameters.o: fs_parameters.C
+fs_parameters.o: fs_parameters.c
 	$(CHARMC) -c $<
 
 $(GENHEADERS): ckio.ci.stamp

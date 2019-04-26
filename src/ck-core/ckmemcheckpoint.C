@@ -1631,7 +1631,7 @@ static void notify_crash(int node)
 #endif
 }
 
-void (*notify_crash_fn)(int node);
+extern void (*notify_crash_fn)(int node);
 
 #if CMK_CONVERSE_MPI
 //static int pingHandlerIdx;

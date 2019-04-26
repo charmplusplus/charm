@@ -15,7 +15,7 @@ CMK_SHARED_SUF="dylib"
 CMK_LD_SHARED=" -dynamic -dynamiclib -undefined dynamic_lookup "
 CMK_LD_SHARED_ABSOLUTE_PATH=true
 
-CMK_DEFS='-mmacosx-version-min=10.7 -D_DARWIN_C_SOURCE'
+CMK_DEFS="$CMK_DEFS -mmacosx-version-min=10.7 -D_DARWIN_C_SOURCE"
 
 if command -v gfortran >/dev/null 2>&1
 then

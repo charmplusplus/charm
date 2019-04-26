@@ -15,6 +15,14 @@
 #include "tpm_standalone.h"
 #endif
 
+#ifndef CLINKAGE
+# ifdef __cplusplus
+#  define CLINKAGE extern "C"
+# else
+#  define CLINKAGE
+# endif
+#endif
+
 #if CMK_CRAYXE || CMK_CRAYXC
 
 #if XT3_TOPOLOGY

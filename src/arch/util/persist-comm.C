@@ -17,6 +17,7 @@
 #include "compress-external.C"
 //#endif
 #include "machine-persistent.h"
+#include "machine-lrts.h"
 #define ENVELOP_SIZE 104
 //#define VERIFY 1 
 CpvDeclare(PersistentSendsTable *, persistentSendsTableHead);
@@ -554,7 +555,7 @@ static void persistentRequestHandler(void *env)
   PersistentReceivesTable *slot = (PersistentReceivesTable *)h;
 
   /* build reply message */
-  PersistentReqGrantedMsg *gmsg = CmiAlloc(sizeof(PersistentReqGrantedMsg));
+  auto gmsg = (PersistentReqGrantedMsg *)CmiAlloc(sizeof(PersistentReqGrantedMsg));
 
 #if DELTA_COMPRESS
   slot->compressStart = msg->compressStart;
@@ -787,6 +788,7 @@ void CmiPersistentInit(void)
   CpvInitialize(int, curphs);
   CpvAccess(curphs) = 0;
 
+  extern void persist_machine_init();
   persist_machine_init();
 
   CpvInitialize(PersistentSendsTable *, persistentSendsTableHead);
