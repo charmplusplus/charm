@@ -31,7 +31,7 @@ Linux, Windows, MacOS)), etc. The communication protocols and
 infrastructures supported by Charm++ are UDP, MPI, OFI, Infiniband,
 uGNI, and PAMI. Charm++ programs can run without changing the source on
 all these platforms. Charm++ programs can also interoperate with MPI
-programs (§ :numref:`sec:interop`). Please see the Installation and Usage
+programs (§ :numref:`sec:mpiinterop`). Please see the Installation and Usage
 section for details about installing, compiling and running Charm++
 programs (§ :numref:`sec:install`).
 
@@ -8385,7 +8385,7 @@ following example shows how this API can be used.
 
    CkSetPeHelpsOtherThreads(1);
 
-.. _sec:interop:
+.. _sec:mpiinterop:
 
 Charm-MPI Interoperation
 ------------------------
@@ -8571,6 +8571,77 @@ two functions one after another.
 
 A small example of user driven interoperation can be found in
 ``examples/charm++/user-driven-interop``.
+
+.. _sec:kokkosinterop
+
+Interoperation with Kokkos
+--------------------------
+
+Kokkos is a shared-memory parallel programming model in C++ developed by
+Sandia National Laboratories (https://github.com/kokkos/kokkos). It aims
+to provide 'performance portability' to HPC applications through
+abstractions for parallel execution and data management. For execution in
+distributed memory environments, however, other frameworks such as MPI
+must be used in conjunction, to enable multiple Kokkos processes running
+on potentially different physical nodes to communicate with each other.
+
+In this section, we explore the basic interoperability of Kokkos with
+Charm++. Currently there is no sophisticated integration scheme, Charm++
+only manages the communication between different Kokkos instances with
+each instance individually managing the parallel execution underneath.
+Example programs can be found in ``examples/charm++/shared_runtimes/
+kokkos/hello`` and ``examples/charm++/shared_runtimes/kokkos/vecadd``.
+
+Compiling the Kokkos Library
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Kokkos supports multiple backends for parallel execution. We recommend
+OpenMP for multicore CPUs and CUDA for machines with GPUs. Because Kokkos
+can be built with more than one backend, it is preferrable to build both
+OpenMP and CUDA backends on GPU machines.
+
+To build Kokkos with the OpenMP backend, run the following commands from
+the Kokkos source folder:
+
+.. code-block:: bash
+
+   $ mkdir build-omp
+   $ cd build-omp
+   $ ../generate_makefile.bash --prefix=<absolute path to build-omp> --with-openmp
+                               --arch=<CPU architecture>
+   $ make -j kokkoslib
+   $ make install
+
+To build Kokkos with both OpenMP and CUDA backends (required for ``vecadd``
+example), use the following commands:
+
+.. code-block:: bash
+   $ mkdir build-cuda
+   $ cd build-cuda
+   $ generate_makefile.bash --prefix=<absolute path to build-cuda>
+                            --with-cuda=<path to CUDA toolkit>
+                            --with-cuda-options=enable_lambda
+                            --with-openmp --arch=<CPU arch>,<GPU arch>
+                            --compiler=<path to included NVCC wrapper>
+   $ make -j kokkoslib
+   $ make install
+
+For more compilation options, please refer to
+https://github.com/kokkos/kokkos/wiki/Compiling.
+
+Program Structure and Flow
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The basic programming pattern using Kokkos and Charm++ together for
+parallel execution in distributed memory environments is the following.
+We use a Charm++ nodegroup (which corresponds to a OS process) to
+encapsulate a Kokkos instance that will manage the parallel execution
+underneath. We initialize Kokkos using ``Kokkos::initialize()`` in the
+constructor of the nodegroup, and finalize it using ``Kokkos::finalize()``.
+Calls to the Kokkos parallel API such as ``Kokkos::parallel_for()`` can
+be made between these calls. Communication between the different Kokkos
+instances can be done via messages and entry method invocation among
+the nodegroup chares as in regular Charm++.
 
 .. _sec:partition:
 
