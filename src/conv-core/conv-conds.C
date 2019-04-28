@@ -3,6 +3,7 @@
 #include <math.h>
 
 #include "converse.h"
+#include "charm-api.h"
 
 /**
  * Structure to hold the requisites for a callback
@@ -404,7 +405,7 @@ static void ccd_heap_update(double curWallTime)
 
 
 
-void CcdCallBacksReset(void *ignored,double curWallTime);
+CLINKAGE void CcdCallBacksReset(void *ignored,double curWallTime);
 
 /**
  * Initialize the callback containers
