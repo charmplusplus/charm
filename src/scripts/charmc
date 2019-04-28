@@ -1280,7 +1280,7 @@ OPTS_LD="$OPTS $OPTS_LD"
 ##############################################################################
 Debug "Checking language..."
 
-[ -z "$LANGUAGE" -a -n "$SEQUENTIAL" ] && LANGUAGE=c
+[ -z "$LANGUAGE" -a -n "$SEQUENTIAL" ] && LANGUAGE='c++'
 [ -z "$PARADIGM" -a -n "$LANGUAGE" ] && PARADIGM="$LANGUAGE"
 [ -z "$PARADIGM" ] && PARADIGM="charm++"
 
@@ -1615,11 +1615,7 @@ case "$PARADIGM" in
 		TAU_LIBS="$TAU_LIBS"
 	fi
 	;;
-"converse")
-	MAKE_LD="1"
-	MIDDLE_LIBS="$MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
-	;;
-"converse++"|"bgconverse++"|"bluegene"|"bigsim")
+"converse"|"converse++"|"bgconverse++"|"bluegene"|"bigsim")
 	MAKE_LDXX="1"
 	MIDDLE_LIBS="$MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
 	;;
@@ -1967,11 +1963,11 @@ MakeSO() {
 	dir=`cd $dir; pwd`
 	OBJECT=$dir/$fname
 	fi
-	if test "$MAKE_LDXX" = "1"
+	if test "$MAKE_LD" = '1'
 	then
-	  soTool="$CMK_LDXX $CMK_LDXX_FLAGS"
-	else
 	  soTool="$CMK_LD $CMK_LD_FLAGS"
+	else
+	  soTool="$CMK_LDXX $CMK_LDXX_FLAGS"
 	fi
 	if [ -n "$STANDALONE" ]
 	then
