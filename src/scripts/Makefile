@@ -900,7 +900,7 @@ $(L)/libblue-standalone.a: blue_standalone.o
 ###############################################################################
 
 conv-cpm: conv-cpm.o
-	$(NATIVECHARMC) -language c -o conv-cpm -cp ../bin/ conv-cpm.o
+	$(NATIVECHARMC) -language c++ -o conv-cpm -cp ../bin/ conv-cpm.o
 
 conv-cpm.o: conv-cpm.C $(CVHEADERS)
 	$(NATIVECHARMC) conv-cpm.C
