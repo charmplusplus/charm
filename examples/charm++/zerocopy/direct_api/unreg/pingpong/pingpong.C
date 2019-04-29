@@ -119,6 +119,7 @@ class Ping1 : public CBase_Ping1
   void beginGetGetPingpong() {
     counter++;
     if(counter == 2) {
+      counter = 0;
       niter=0;
       start_time = CkWallTimer();
       thisProxy[1].recvNcpySrcInfo(mySrc);
@@ -147,7 +148,6 @@ class Ping1 : public CBase_Ping1
   }
 
   void endGetGetPingpong() {
-    counter = 0;
     mySrc.deregisterMem();
     myDest.deregisterMem();
     thisProxy[0].doneGetGetPingpong();
