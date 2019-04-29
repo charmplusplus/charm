@@ -14,10 +14,13 @@ do
 		;;
 	++quiet)
 		QUIET=1
-		args=$args" "$1
 		shift
 		;;
-	++local)
+	++no-quiet)
+		QUIET=0
+		shift
+		;;
+	++local|++no-local)
 		# consume and ignore, local-mode is all that multicore supports
 		shift
 		;;
@@ -35,6 +38,8 @@ do
 		;;
 	esac
 done
+
+test $QUIET -eq 1 && args=$args" "++quiet
 
 test $QUIET -eq 0 && echo Running command: $cmd $args
 test $QUIET -eq 0 && echo

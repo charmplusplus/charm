@@ -372,21 +372,37 @@ static const char **pparam_argv;
 static char pparam_optc = '-';
 static char pparam_error[100];
 
-static ppdef pparam_find(const char *lname)
+struct ppdeffind
+{
+  ppdef def;
+  int enable;
+};
+
+static ppdeffind pparam_find(const char *lname)
 {
   ppdef def;
   for (def = ppdefs; def; def = def->next)
+  {
     if (strcmp(def->lname, lname) == 0)
-      return def;
-  return 0;
+      return {def, 1};
+
+    static const char no_prefix[] = "no-";
+    if (strncmp(no_prefix, lname, sizeof(no_prefix)-1) == 0)
+    {
+      if (strcmp(def->lname, lname + (sizeof(no_prefix)-1)) == 0)
+        return {def, 0};
+    }
+  }
+  return {nullptr, 1};
 }
 
 static ppdef pparam_cell(const char *lname)
 {
-  ppdef def = pparam_find(lname);
-  if (def)
-    return def;
-  def = (ppdef) malloc(sizeof(s_ppdef));
+  ppdeffind deffind = pparam_find(lname);
+  if (deffind.def)
+    return deffind.def;
+
+  auto def = (ppdef)malloc(sizeof(s_ppdef));
   def->lname = lname;
   def->type = 's';
   def->doc = "(undocumented)";
@@ -503,7 +519,7 @@ static const char *pparam_getdef(ppdef def)
   case 's':
     return *def->where.s ? *def->where.s : "";
   case 'f':
-    sprintf(result, "%d", *def->where.f);
+    sprintf(result, *def->where.f ? "true" : "false");
     return result;
   }
   return NULL;
@@ -523,6 +539,7 @@ static void pparam_printdocs()
   }
   fprintf(stderr, "\n");
   fprintf(stderr, "Charmrun Command-line Parameters:\n");
+  fprintf(stderr, "  (Boolean parameters may be prefixed with \"no-\" to negate their effect, for example \"++no-scalable-start\".)\n");
   for (ppdef def = ppdefs; def; def = def->next) {
     fprintf(stderr, "  %c%c%-*s ", pparam_optc, pparam_optc, maxname,
             def->lname);
@@ -561,18 +578,18 @@ static int pparam_parseopt()
     return -1;
   }
   /* look up option definition */
-  ppdef def = NULL;
+  ppdeffind deffind{};
   if (opt[1] == '+')
-    def = pparam_find(opt + 2);
+    deffind = pparam_find(opt + 2);
   else {
     char name[2];
     name[0] = opt[1];
     if (strlen(opt) <= 2 || !isalpha(opt[2])) {
       name[1] = 0;
-      def = pparam_find(name);
+      deffind = pparam_find(name);
     }
   }
-  if (def == NULL) {
+  if (deffind.def == nullptr) {
     if (opt[1] == '+') {
       sprintf(pparam_error, "Option %s not recognized.", opt);
       return -1;
@@ -582,13 +599,14 @@ static int pparam_parseopt()
       return 0;
     }
   }
+  auto def = deffind.def;
   /* handle flag-options */
   if ((def->type == 'f') && (opt[1] != '+') && (opt[2])) {
     sprintf(pparam_error, "Option %s should not include a value", opt);
     return -1;
   }
   if (def->type == 'f') {
-    *def->where.f = 1;
+    *def->where.f = deffind.enable;
     pparam_delarg(pparam_pos);
     return 0;
   }

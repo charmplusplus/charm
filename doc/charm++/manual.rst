@@ -10658,6 +10658,10 @@ information. However, if you encounter trouble launching a job, try
 using the ``++verbose`` option to help diagnose the issue. (See the
 ``++quiet`` option to suppress output entirely.)
 
+Parameters that function as boolean flags within Charmrun (taking no
+other parameters) can be prefixed with "no-" to negate their effect.
+For example, ``++no-scalable-start``.
+
 .. _command line options:
 
 Command Line Options

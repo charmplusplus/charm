@@ -48,11 +48,16 @@ do
 		;;
 	++quiet)
 		QUIET=1
-		charm_args=$charm_args" "$1
+		;;
+	++no-quiet)
+		QUIET=0
 		;;
 	++local)
 		LOCAL=1
 		# Don't pass this option to the application, as ++local is not supported by the MPI layer
+		;;
+	++no-local)
+		LOCAL=0
 		;;
 	*)
 		args=$args" "$1
@@ -60,6 +65,8 @@ do
 	esac
 	shift
 done
+
+test $QUIET -eq 1 && charm_args=$charm_args" "++quiet
 
 args=$args" "$charm_args
 
