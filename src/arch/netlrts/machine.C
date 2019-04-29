@@ -1552,7 +1552,7 @@ static void node_addresses_obtain(char **argv)
         MACHSTATE(2,"recv initnode {");
   	ChMessage_recv(Cmi_charmrun_fd,&nodetabmsg);
 
-    if (strcmp("nodefork", nodetabmsg.header.type) == 0)
+    while (strcmp("nodefork", nodetabmsg.header.type) == 0)
     {
 #ifndef _WIN32
       int i;

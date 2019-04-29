@@ -3306,9 +3306,9 @@ static void add_singlenodeinfo_to_mynodeinfo(ChMessage *msg, SOCKET ctrlfd)
 }
 #endif
 
-static void req_set_client_connect(std::vector<nodetab_process> & process_table, int start, int end)
+static void req_set_client_connect(std::vector<nodetab_process> & process_table, int count)
 {
-  int curclientend, curclientstart = start;
+  int curclientend, curclientstart = 0;
 
   std::queue<SOCKET> open_sockets;
 
@@ -3318,16 +3318,16 @@ static void req_set_client_connect(std::vector<nodetab_process> & process_table,
   if (!(arg_hierarchical_start && !arg_child_charmrun && charmrun_phase == 1))
 # endif
   {
-    for (int i = start; i < end; i++)
+    for (int i = 0; i < count; i++)
       open_sockets.push(errorcheck_one_client_connect());
   }
-  curclientend = end;
+  curclientend = count;
 #else
-  curclientend = start;
+  curclientend = 0;
 #endif
 
   int finished = 0;
-  while (finished < end - start)
+  while (finished < count)
   {
 /* check server socket for messages */
 #if !CMK_USE_IBVERBS || CMK_IBVERBS_FAST_START
@@ -3507,7 +3507,7 @@ static void req_client_connect_table(std::vector<nodetab_process> & process_tabl
   for (nodetab_process & p : process_table)
     read_initnode_one_client(p);
 #else
-  req_set_client_connect(process_table, 0, process_table.size());
+  req_set_client_connect(process_table, process_table.size());
 #endif
 }
 
@@ -3607,19 +3607,19 @@ static void start_nodes_local(std::vector<nodetab_process> &);
 static void start_nodes_ssh(std::vector<nodetab_process> &);
 static void finish_nodes(std::vector<nodetab_process> &);
 
-static void req_client_connect(void)
+static void req_client_connect(std::vector<nodetab_process> & process_table)
 {
   skt_set_abort(client_connect_problem_skt);
 
   if (arg_mpiexec)
   {
-    req_construct_phase2_processes(my_process_table);
-    req_client_connect_table(my_process_table);
+    req_construct_phase2_processes(process_table);
+    req_client_connect_table(process_table);
     req_all_clients_connected();
     return;
   }
 
-  req_client_connect_table(my_process_table);
+  req_client_connect_table(process_table);
 
   std::vector<nodetab_process> phase2_processes;
   req_construct_phase2_processes(phase2_processes);
@@ -3648,20 +3648,21 @@ static void req_client_connect(void)
     }
     else
     {
-      // send fork packet
-      for (const nodetab_process & p : my_process_table)
+      // send nodefork packets
+      ChMessageHeader hdr;
+      ChMessageInt_t mydata[ChInitNodeforkFields];
+      ChMessageHeader_new("nodefork", sizeof(mydata), &hdr);
+      for (const nodetab_process & p : process_table)
       {
         int numforks = p.host->processes - 1;
         if (numforks <= 0)
           continue;
 
-        ChMessageHeader hdr;
-        ChMessageInt_t mydata[ChInitNodeforkFields] =
-        {
-          ChMessageInt_new(numforks),
-          ChMessageInt_new(p.forkstart),
-        };
-        ChMessageHeader_new("nodefork", sizeof(mydata), &hdr);
+        if (arg_verbose)
+          printf("Charmrun> Instructing host \"%s\" to fork() x %d\n", p.host->name, numforks);
+
+        mydata[0] = ChMessageInt_new(numforks);
+        mydata[1] = ChMessageInt_new(p.forkstart);
         skt_sendN(p.req_client, (const char *) &hdr, sizeof(hdr));
         skt_sendN(p.req_client, (const char *) mydata, sizeof(mydata));
       }
@@ -3806,7 +3807,7 @@ static void req_charmrun_connect(void)
 #else
   // if(!arg_child_charmrun) getthetime(t1);
 
-  req_set_client_connect(my_process_table, 0, my_process_table.size());
+  req_set_client_connect(my_process_table, my_process_table.size());
 // if(!arg_child_charmrun)	getthetime(t2);		/* also need to process
 // received nodesets JIT */
 #endif
@@ -3839,7 +3840,7 @@ static void req_charmrun_connect(void)
 
   skt_set_abort(client_connect_problem_skt);
 
-  req_set_client_connect(my_process_table, 0, my_process_table.size());
+  req_set_client_connect(my_process_table, my_process_table.size());
 
   send_clients_nodeinfo();
 
@@ -3858,7 +3859,7 @@ static void req_charmrun_connect(void)
 static void start_one_node_ssh(nodetab_process & p);
 static void finish_set_nodes(std::vector<nodetab_process> &, int start, int stop);
 
-static void req_client_start_and_connect_table(std::vector<nodetab_process> & process_table)
+static void start_nodes_batch_and_connect(std::vector<nodetab_process> & process_table)
 {
   int batch = arg_batch_spawn; /* fire several at a time */
   const int process_count = process_table.size();
@@ -3878,11 +3879,13 @@ static void req_client_start_and_connect_table(std::vector<nodetab_process> & pr
 #endif
       finish_set_nodes(process_table, clientstart, clientend);
 
+    // batch implementation of req_client_connect functionality below this line to end of function
+
 #if CMK_IBVERBS_FAST_START
     for (int c = clientstart; c < clientend; ++c)
       req_one_client_partinit(process_table, c);
 #else
-    req_set_client_connect(process_table, clientstart, clientend);
+    req_set_client_connect(process_table, clientend-clientstart);
 #endif
 
     clientstart = clientend;
@@ -3895,16 +3898,62 @@ static void req_client_start_and_connect_table(std::vector<nodetab_process> & pr
 #endif
 }
 
-static void req_client_start_and_connect(void)
+static void batch_launch_sequence(std::vector<nodetab_process> & process_table)
 {
   skt_set_abort(client_connect_problem_skt);
 
-  req_client_start_and_connect_table(my_process_table);
+  start_nodes_batch_and_connect(process_table);
+
+  // batch implementation of req_client_connect functionality below this line to end of function
 
   std::vector<nodetab_process> phase2_processes;
   req_construct_phase2_processes(phase2_processes);
   if (phase2_processes.size() > 0)
-    req_client_start_and_connect_table(phase2_processes);
+  {
+    if (!arg_scalable_start)
+    {
+      start_nodes_batch_and_connect(phase2_processes);
+    }
+    else
+    {
+      // send nodefork packets
+      int total = 0;
+      ChMessageHeader hdr;
+      ChMessageInt_t mydata[ChInitNodeforkFields];
+      ChMessageHeader_new("nodefork", sizeof(mydata), &hdr);
+      for (const nodetab_process & p : process_table)
+      {
+        int numforks = p.host->processes - 1;
+        if (numforks <= 0)
+          continue;
+
+        for (int c = 0; c < numforks; c += arg_batch_spawn)
+        {
+          const int count = std::min(numforks - c, arg_batch_spawn);
+
+          if (arg_verbose)
+            printf("Charmrun> Instructing host \"%s\" to fork() x %d\n", p.host->name, count);
+
+          mydata[0] = ChMessageInt_new(count);
+          mydata[1] = ChMessageInt_new(p.forkstart + c);
+          skt_sendN(p.req_client, (const char *) &hdr, sizeof(hdr));
+          skt_sendN(p.req_client, (const char *) mydata, sizeof(mydata));
+
+#if CMK_IBVERBS_FAST_START
+          for (int f = 0; f < count; ++f)
+            req_one_client_partinit(phase2_processes, total++);
+#else
+          req_set_client_connect(phase2_processes, count);
+#endif
+        }
+      }
+
+#if CMK_IBVERBS_FAST_START
+      for (nodetab_process & p : phase2_processes)
+        read_initnode_one_client(p);
+#endif
+    }
+  }
 
   req_add_phase2_processes(phase2_processes);
   req_all_clients_connected();
@@ -4183,7 +4232,7 @@ int main(int argc, const char **argv, char **envp)
         if (!arg_batch_spawn)
           start_nodes_ssh(my_process_table);
         else
-          req_client_start_and_connect();
+          batch_launch_sequence(my_process_table);
       }
     } else
       start_nodes_local(my_process_table);
@@ -4208,7 +4257,7 @@ int main(int argc, const char **argv, char **envp)
             start_nodes_ssh(my_process_table);
         }
       } else
-        req_client_start_and_connect();
+        batch_launch_sequence(my_process_table);
     } else
       start_nodes_local(my_process_table);
   }
@@ -4245,7 +4294,7 @@ int main(int argc, const char **argv, char **envp)
     if (!arg_child_charmrun)
       req_charmrun_connect();
     else if (!arg_batch_spawn)
-      req_client_connect();
+      req_client_connect(my_process_table);
   }
   /* Normal startup*/
   else
@@ -4256,7 +4305,7 @@ int main(int argc, const char **argv, char **envp)
       finish_nodes(my_process_table);
 #endif
     if (!arg_batch_spawn)
-      req_client_connect();
+      req_client_connect(my_process_table);
   }
 #if CMK_SSH_KILL
   kill_nodes();
