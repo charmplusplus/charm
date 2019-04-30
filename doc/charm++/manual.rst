@@ -8589,8 +8589,8 @@ In this section, we explore the basic interoperability of Kokkos with
 Charm++. Currently there is no sophisticated integration scheme, Charm++
 only manages the communication between different Kokkos instances with
 each instance individually managing the parallel execution underneath.
-Example programs can be found in ``examples/charm++/shared_runtimes/
-kokkos/hello`` and ``examples/charm++/shared_runtimes/kokkos/vecadd``.
+Example programs can be found in ``examples/charm++/shared_runtimes/kokkos/hello``
+and ``examples/charm++/shared_runtimes/kokkos/vecadd``.
 
 Compiling the Kokkos Library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -8616,6 +8616,7 @@ To build Kokkos with both OpenMP and CUDA backends (required for ``vecadd``
 example), use the following commands:
 
 .. code-block:: bash
+
    $ mkdir build-cuda
    $ cd build-cuda
    $ generate_makefile.bash --prefix=<absolute path to build-cuda>
