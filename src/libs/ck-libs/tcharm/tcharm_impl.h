@@ -19,6 +19,8 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 
 #include "cmitls.h"
 
+#include <atomic>
+
 #if 0
      /*Many debugging statements:*/
 #    define DBG(x) ckout<<"["<<thisIndex<<","<<CkMyPe()<<"] TCHARM> "<<x<<endl;
@@ -77,7 +79,7 @@ class TCharmInitMsg : public CMessage_TCharmInitMsg {
 extern bool tcharm_nothreads;
 
 //Thread-local variables:
-CtvExtern(TCharm *,_curTCharm);
+CtvExtern(std::atomic<TCharm *>,_curTCharm);
 
 class TCharm: public CBase_TCharm
 {

@@ -9,7 +9,7 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 #include <ctype.h>
 #include "memory-isomalloc.h"
 
-CtvDeclare(TCharm *,_curTCharm);
+CtvDeclare(std::atomic<TCharm *>,_curTCharm);
 
 static int lastNumChunks=0;
 
@@ -75,7 +75,7 @@ void TCharm::nodeInit()
 
 void TCharm::procInit()
 {
-  CtvInitialize(TCharm *,_curTCharm);
+  CtvInitialize(std::atomic<TCharm *>,_curTCharm);
   CtvAccess(_curTCharm)=NULL;
   tcharm_initted=true;
   CtgInit();
@@ -162,7 +162,7 @@ static void startTCharmThread(TCharmInitMsg *msg)
        TCHARM_Thread_data_start_fn threadFn = getTCharmThreadFunction(msg->threadFn);
 	threadFn(msg->data);
 	TCharm::deactivateThread();
-	CtvAccess(_curTCharm)->done(0);
+	CtvAccess(_curTCharm).load()->done(0);
 }
 
 TCharm::TCharm(TCharmInitMsg *initMsg_)
