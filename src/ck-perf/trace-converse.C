@@ -54,7 +54,7 @@ void traceUserSuppliedBracketedNote(const char *note, int eventID, double bt, do
 void traceMemoryUsage(void) {}
 
 #if CMK_SMP_TRACE_COMMTHREAD
-int traceBeginCommOp(char *msg){}
+int traceBeginCommOp(char *msg) { return 0; }
 void traceEndCommOp(char *msg) {}
 void traceSendMsgComm(char *msg) {}
 void traceChangeLastTimestamp(double ts) {}

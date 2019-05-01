@@ -862,8 +862,8 @@ int traceBeginCommOp(char *msg){
     CkpvAccess(_traces)->beginExecute(msg);
     return 1;
   }
-  return 0;
 #endif
+  return 0;
 }
 
 void traceEndCommOp(char *msg){
