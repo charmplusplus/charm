@@ -95,6 +95,7 @@ headers: $(HEADERS)
 	cp ampif77 $(CDIR)/bin/ampif77
 	cp ampif90 $(CDIR)/bin/ampif90
 	cp ampirun $(CDIR)/bin/ampirun
+	cp nm_globals.sh $(CDIR)/bin/nm_globals.sh
 	touch headers
 
 compat_ampius.o: compat_ampius.C
