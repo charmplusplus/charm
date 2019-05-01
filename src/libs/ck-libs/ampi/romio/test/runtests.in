@@ -1,5 +1,7 @@
 #! /bin/sh
 mpirun="./ampirun"
+exec_prefix=@exec_prefix@
+bindir=@bindir@
 STOPFILE=${MPITEST_STOPTEST:-"$HOME/.stopmpichtests"}
 #
 # If the programs are not available, run make.
@@ -369,6 +371,25 @@ echo '**** Testing status.c ****'
 $mpirun -np 1 ./status -fname $FILENAME
 # CheckOutput status
 CleanExe status
+testfiles="$testfiles types_with_zeros.out"
+\rm -f types_with_zeros.out
+MakeExe types_with_zeros
+\rm -f $FILENAME*
+echo '**** Testing types_with_zeros ****'
+$mpirun -np 2 ./types_with_zeros $FILENAME
+CleanExe types_with_zeros
+testfiles="$testfiles darray_read.out"
+\rm -f darray_read.out
+MakeExe darray_read
+\rm -f $FILENAME*
+echo '**** Testing darray_read ****'
+$mpirun -np 4 ./darray_read $FILENAME
+CleanExe darray_read
+MakeExe syshints
+echo '**** Testing syshints ****'
+$mpirun -np 1 ./syshints $srcdir/test_hintfile
+CleanExe syshints
+
 #
 if [ @NOF77@ = 0 ] ; then 
     echo ""

@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -16,6 +16,8 @@
 #elif defined(HAVE_PRAGMA_CRI_DUP)
 #pragma _CRI duplicate MPI_File_open as PMPI_File_open
 /* end of weak pragmas */
+#elif defined(HAVE_WEAK_ATTRIBUTE)
+int MPI_File_open(MPI_Comm comm, const char *filename, int amode, MPI_Info info, MPI_File *fh) __attribute__((weak,alias("PMPI_File_open")));
 #endif
 
 /* Include mapping from MPI->PMPI */
@@ -43,12 +45,12 @@ Output Parameters:
 
 .N fortran
 @*/
-int MPI_File_open(MPI_Comm comm, char *filename, int amode, 
+int MPI_File_open(MPI_Comm comm, ROMIO_CONST char *filename, int amode,
                   MPI_Info info, MPI_File *fh)
 {
-    int error_code, file_system, flag, tmp_amode=0, rank;
+    int error_code = MPI_SUCCESS, file_system, flag, tmp_amode=0, rank;
     char *tmp;
-    MPI_Comm dupcomm;
+    MPI_Comm dupcomm = MPI_COMM_NULL;
     ADIOI_Fns *fsops;
     static char myname[] = "MPI_FILE_OPEN";
 #ifdef MPI_hpux
@@ -57,23 +59,18 @@ int MPI_File_open(MPI_Comm comm, char *filename, int amode,
     HPMP_IO_OPEN_START(fl_xmpi, comm);
 #endif /* MPI_hpux */
 
-    MPIU_THREAD_CS_ENTER(ALLFUNC,);
+    ROMIO_THREAD_CS_ENTER();
 
     /* --BEGIN ERROR HANDLING-- */
-    if (comm == MPI_COMM_NULL)
-    {
-	error_code = MPIO_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE,
-					  myname, __LINE__, MPI_ERR_COMM,
-					  "**comm", 0);
-	goto fn_fail;
-    }
+    MPIO_CHECK_COMM(comm, myname, error_code);
+    MPIO_CHECK_INFO_ALL(info, error_code, comm);
     /* --END ERROR HANDLING-- */
 
-    MPI_Comm_test_inter(comm, &flag);
+    error_code = MPI_Comm_test_inter(comm, &flag);
     /* --BEGIN ERROR HANDLING-- */
-    if (flag)
+    if (error_code || flag)
     {
-	error_code = MPIO_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE,
+	error_code = MPIO_Err_create_code(error_code, MPIR_ERR_RECOVERABLE,
 					  myname, __LINE__, MPI_ERR_COMM, 
 					  "**commnotintra", 0);
 	goto fn_fail;
@@ -111,12 +108,17 @@ int MPI_File_open(MPI_Comm comm, char *filename, int amode,
     MPIR_MPIOInit(&error_code);
     if (error_code != MPI_SUCCESS) goto fn_fail;
 
-/* check if amode is the same on all processes */
+/* check if amode is the same on all processes: at first glance, one might try
+ * to use a built-in operator like MPI_BAND, but we need every mpi process to
+ * agree the amode was not the same.  Consider process A with
+ * MPI_MODE_CREATE|MPI_MODE_RDWR, and B with MPI_MODE_RDWR:  MPI_BAND yields
+ * MPI_MODE_RDWR.  A determines amodes are different, but B proceeds having not
+ * detected an error */
     MPI_Allreduce(&amode, &tmp_amode, 1, MPI_INT, CtvAccess(ADIO_same_amode), dupcomm);
 
     if (tmp_amode == ADIO_AMODE_NOMATCH) {
 	error_code = MPIO_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE,
-			myname, __LINE__, MPI_ERR_AMODE,
+			myname, __LINE__, MPI_ERR_NOT_SAME,
 			"**fileamodediff", 0);
 	goto fn_fail;
     }
@@ -154,7 +156,6 @@ int MPI_File_open(MPI_Comm comm, char *filename, int amode,
 
     /* --BEGIN ERROR HANDLING-- */
     if (error_code != MPI_SUCCESS) {
-        MPI_Comm_free(&dupcomm);
 	goto fn_fail;
     }
     /* --END ERROR HANDLING-- */
@@ -178,7 +179,9 @@ int MPI_File_open(MPI_Comm comm, char *filename, int amode,
     if ((error_code == MPI_SUCCESS) && 
 		    ADIO_Feature((*fh), ADIO_SHARED_FP)) {
 	MPI_Comm_rank(dupcomm, &rank);
-	ADIOI_Shfp_fname(*fh, rank);
+	ADIOI_Shfp_fname(*fh, rank, &error_code);
+	if (error_code != MPI_SUCCESS)
+	    goto fn_fail;
 
         /* if MPI_MODE_APPEND, set the shared file pointer to end of file.
            indiv. file pointer already set to end of file in ADIO_Open. 
@@ -195,10 +198,11 @@ int MPI_File_open(MPI_Comm comm, char *filename, int amode,
 #endif /* MPI_hpux */
 
 fn_exit:
-    MPIU_THREAD_CS_EXIT(ALLFUNC,);
+    ROMIO_THREAD_CS_EXIT();
     return error_code;
 fn_fail:
     /* --BEGIN ERROR HANDLING-- */
+    if (dupcomm != MPI_COMM_NULL) MPI_Comm_free(&dupcomm);
     error_code = MPIO_Err_return_file(MPI_FILE_NULL, error_code);
     goto fn_exit;
     /* --END ERROR HANDLING-- */

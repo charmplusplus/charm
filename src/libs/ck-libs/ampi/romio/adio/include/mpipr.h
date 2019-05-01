@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
  *  (C) 2001 by Argonne National Laboratory.
  *      See COPYRIGHT in top-level directory.
@@ -8,7 +8,6 @@
    application code without interference from MPI functions used by 
    MPI-IO. */
 
-#if 0
 #ifndef USE_MPI_VERSIONS
 
 #undef MPI_Abort
@@ -252,6 +251,8 @@
 /* #define MPI_Type_create_darray PMPI_Type_create_darray */
 #undef MPI_Type_create_indexed_block
 #define MPI_Type_create_indexed_block PMPI_Type_create_indexed_block
+#undef MPI_Type_create_hindexed_block
+#define MPI_Type_create_hindexed_block PMPI_Type_create_hindexed_block
 /* #define MPI_Type_create_subarray PMPI_Type_create_subarray */
 #undef MPI_Type_extent
 #define MPI_Type_extent PMPI_Type_extent
@@ -381,5 +382,4 @@
 #undef MPI_Type_create_keyval
 #define MPI_Type_create_keyval PMPI_Type_create_keyval
 
-#endif
 #endif

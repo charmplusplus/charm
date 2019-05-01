@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -20,11 +20,11 @@ void ADIOI_NFS_IwriteContig(ADIO_File fd, void *buf, int count,
                 MPI_Datatype datatype, int file_ptr_type,
                 ADIO_Offset offset, ADIO_Request *request, int *error_code)  
 {
-    int len, typesize;
+    MPI_Count len, typesize;
     int aio_errno = 0;
     static char myname[] = "ADIOI_NFS_IWRITECONTIG";
 
-    MPI_Type_size(datatype, &typesize);
+    MPI_Type_size_x(datatype, &typesize);
     len = count * typesize;
 
     if (file_ptr_type == ADIO_INDIVIDUAL) offset = fd->fp_ind;
@@ -69,19 +69,19 @@ int ADIOI_NFS_aio(ADIO_File fd, void *buf, int len, ADIO_Offset offset,
     aiocbp->aio_buf    = buf;
     aiocbp->aio_nbytes = len;
 
-#ifdef ROMIO_HAVE_STRUCT_AIOCB_WITH_AIO_WHENCE
+#ifdef HAVE_STRUCT_AIOCB_AIO_WHENCE
     aiocbp->aio_whence = SEEK_SET;
 #endif
-#ifdef ROMIO_HAVE_STRUCT_AIOCB_WITH_AIO_FILDES
+#ifdef HAVE_STRUCT_AIOCB_AIO_FILDES
     aiocbp->aio_fildes = fd_sys;
 #endif
-#ifdef ROMIO_HAVE_STRUCT_AIOCB_WITH_AIO_SIGEVENT
+#ifdef HAVE_STRUCT_AIOCB_AIO_SIGEVENT
 # ifdef AIO_SIGNOTIFY_NONE
     aiocbp->aio_sigevent.sigev_notify = SIGEV_NONE;
 # endif
     aiocbp->aio_sigevent.sigev_signo = 0;
 #endif
-#ifdef ROMIO_HAVE_STRUCT_AIOCB_WITH_AIO_REQPRIO
+#ifdef HAVE_STRUCT_AIOCB_AIO_REQPRIO
 # ifdef AIO_PRIO_DFL
     aiocbp->aio_reqprio = AIO_PRIO_DFL;   /* not needed in DEC Unix 4.0 */
 # else

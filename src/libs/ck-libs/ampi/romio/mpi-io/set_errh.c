@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -17,6 +17,8 @@
 #elif defined(HAVE_PRAGMA_CRI_DUP)
 #pragma _CRI duplicate MPI_File_set_errhandler as PMPI_File_set_errhandler
 /* end of weak pragmas */
+#elif defined(HAVE_WEAK_ATTRIBUTE)
+int MPI_File_set_errhandler(MPI_File file, MPI_Errhandler errhandler) __attribute__((weak,alias("PMPI_File_set_errhandler")));
 #endif
 
 /* Include mapping from MPI->PMPI */
@@ -38,9 +40,9 @@ int MPI_File_set_errhandler(MPI_File mpi_fh, MPI_Errhandler errhandler)
     int error_code = MPI_SUCCESS;
     static char myname[] = "MPI_FILE_SET_ERRHANDLER";
     ADIO_File fh;
-    MPIU_THREADPRIV_DECL;
+    MPID_THREADPRIV_DECL;
 
-    MPIU_THREAD_CS_ENTER(ALLFUNC,);
+    ROMIO_THREAD_CS_ENTER();
 
     if (mpi_fh == MPI_FILE_NULL) {
 	CtvAccess(ADIOI_DFLT_ERR_HANDLER) = errhandler;
@@ -69,6 +71,6 @@ int MPI_File_set_errhandler(MPI_File mpi_fh, MPI_Errhandler errhandler)
     }
 
 fn_exit:
-    MPIU_THREAD_CS_EXIT(ALLFUNC,);
+    ROMIO_THREAD_CS_EXIT();
     return error_code;
 }

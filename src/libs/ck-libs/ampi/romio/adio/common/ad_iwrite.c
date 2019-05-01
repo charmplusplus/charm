@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 2004 University of Chicago. 
@@ -44,21 +44,23 @@ static MPIX_Grequest_class ADIOI_GEN_greq_class = 0;
  * routines.  Otherwise, the ADIOI_Fns_struct will point to the FAKE
  * version.
  */
-void ADIOI_GEN_IwriteContig(ADIO_File fd, void *buf, int count, 
+void ADIOI_GEN_IwriteContig(ADIO_File fd, const void *buf, int count,
 			    MPI_Datatype datatype, int file_ptr_type,
 			    ADIO_Offset offset, ADIO_Request *request,
-			    int *error_code)  
+			    int *error_code)
 {
-    int len, typesize;
+    MPI_Count len, typesize;
     int aio_errno = 0;
     static char myname[] = "ADIOI_GEN_IWRITECONTIG";
 
-    MPI_Type_size(datatype, &typesize);
+    MPI_Type_size_x(datatype, &typesize);
     len = count * typesize;
     ADIOI_Assert(len == (int)((ADIO_Offset)count * (ADIO_Offset)typesize)); /* the count is an int parm */
 
     if (file_ptr_type == ADIO_INDIVIDUAL) offset = fd->fp_ind;
-    aio_errno = ADIOI_GEN_aio(fd, buf, len, offset, 1, request);
+    /* Cast away the const'ness of 'buf' as ADIOI_GEN_aio is used for
+     * both read and write calls */
+    aio_errno = ADIOI_GEN_aio(fd, (char *) buf, len, offset, 1, request);
     if (file_ptr_type == ADIO_INDIVIDUAL) fd->fp_ind += len;
 
     fd->fp_sys_posn = -1;
@@ -84,8 +86,8 @@ int ADIOI_GEN_aio(ADIO_File fd, void *buf, int len, ADIO_Offset offset,
     int err=-1, fd_sys;
 
     int error_code;
-    struct aiocb *aiocbp;
-    ADIOI_AIO_Request *aio_req;
+    struct aiocb *aiocbp=NULL;
+    ADIOI_AIO_Request *aio_req=NULL;
     MPI_Status status;
 #if defined(ROMIO_XFS)
     unsigned maxiosz = wr ? fd->hints->fs_hints.xfs.write_chunk_sz :
@@ -111,19 +113,19 @@ int ADIOI_GEN_aio(ADIO_File fd, void *buf, int len, ADIO_Offset offset,
     aiocbp->aio_buf    = buf;
     aiocbp->aio_nbytes = len;
 
-#ifdef ROMIO_HAVE_STRUCT_AIOCB_WITH_AIO_WHENCE
+#ifdef HAVE_STRUCT_AIOCB_AIO_WHENCE
     aiocbp->aio_whence = SEEK_SET;
 #endif
-#ifdef ROMIO_HAVE_STRUCT_AIOCB_WITH_AIO_FILDES
+#ifdef HAVE_STRUCT_AIOCB_AIO_FILDES
     aiocbp->aio_fildes = fd_sys;
 #endif
-#ifdef ROMIO_HAVE_STRUCT_AIOCB_WITH_AIO_SIGEVENT
+#ifdef HAVE_STRUCT_AIOCB_AIO_SIGEVENT
 # ifdef AIO_SIGNOTIFY_NONE
     aiocbp->aio_sigevent.sigev_notify = SIGEV_NONE;
 # endif
     aiocbp->aio_sigevent.sigev_signo = 0;
 #endif
-#ifdef ROMIO_HAVE_STRUCT_AIOCB_WITH_AIO_REQPRIO
+#ifdef HAVE_STRUCT_AIOCB_AIO_REQPRIO
 # ifdef AIO_PRIO_DFL
     aiocbp->aio_reqprio = AIO_PRIO_DFL;   /* not needed in DEC Unix 4.0 */
 # else
@@ -132,7 +134,7 @@ int ADIOI_GEN_aio(ADIO_File fd, void *buf, int len, ADIO_Offset offset,
 #endif
 
 #ifndef ROMIO_HAVE_AIO_CALLS_NEED_FILEDES
-#ifndef ROMIO_HAVE_STRUCT_AIOCB_WITH_AIO_FILDES
+#ifndef HAVE_STRUCT_AIOCB_AIO_FILDES
 #error 'No fildes set for aio structure'
 #endif
     if (wr) err = aio_write(aiocbp);
@@ -144,8 +146,9 @@ int ADIOI_GEN_aio(ADIO_File fd, void *buf, int len, ADIO_Offset offset,
 #endif
 
     if (err == -1) {
-	if (errno == EAGAIN) {
+	if (errno == EAGAIN || errno == ENOSYS) { 
 	    /* exceeded the max. no. of outstanding requests.
+               or, aio routines are not actually implemented 
 	    treat this as a blocking request and return.  */
 	    if (wr) 
 		ADIO_WriteContig(fd, buf, len, MPI_BYTE, 
@@ -155,9 +158,13 @@ int ADIOI_GEN_aio(ADIO_File fd, void *buf, int len, ADIO_Offset offset,
 			    ADIO_EXPLICIT_OFFSET, offset, &status, &error_code);  
 		    
 	    MPIO_Completed_request_create(&fd, len, &error_code, request);
+	    if (aiocbp != NULL) ADIOI_Free(aiocbp);
+	    if (aio_req != NULL) ADIOI_Free(aio_req);
 	    return 0;
 	} else {
-	    return -errno;
+	    ADIOI_Free(aio_req);
+	    ADIOI_Free(aiocbp);
+	    return errno;
 	}
     }
     aio_req->aiocbp = aiocbp;
@@ -177,13 +184,13 @@ int ADIOI_GEN_aio(ADIO_File fd, void *buf, int len, ADIO_Offset offset,
 /* Generic implementation of IwriteStrided calls the blocking WriteStrided
  * immediately.
  */
-void ADIOI_GEN_IwriteStrided(ADIO_File fd, void *buf, int count, 
+void ADIOI_GEN_IwriteStrided(ADIO_File fd, const void *buf, int count,
 			     MPI_Datatype datatype, int file_ptr_type,
 			     ADIO_Offset offset, MPI_Request *request,
 			     int *error_code)
 {
     ADIO_Status status;
-    int typesize;
+    MPI_Count typesize;
     MPI_Offset nbytes=0;
 
     /* Call the blocking function.  It will create an error code 
@@ -193,7 +200,7 @@ void ADIOI_GEN_IwriteStrided(ADIO_File fd, void *buf, int count,
 		      offset, &status, error_code);  
 
     if (*error_code == MPI_SUCCESS) {
-	MPI_Type_size(datatype, &typesize);
+	MPI_Type_size_x(datatype, &typesize);
 	nbytes = (MPI_Offset)count * (MPI_Offset)typesize;
     }
     MPIO_Completed_request_create(&fd, nbytes, error_code, request);
@@ -216,7 +223,7 @@ int ADIOI_GEN_aio_poll_fn(void *extra_state, MPI_Status *status)
     else if (errno == ECANCELED) {
 	    /* TODO: unsure how to handle this */
     } else if (errno == 0) {
-	    int n = aio_return(aio_req->aiocbp);
+	    ssize_t n = aio_return(aio_req->aiocbp);
 	    aio_req->nbytes = n;
 	    errcode = MPI_Grequest_complete(aio_req->req);
 	    /* --BEGIN ERROR HANDLING-- */
@@ -275,7 +282,7 @@ int ADIOI_GEN_aio_wait_fn(int count, void ** array_of_states,
 			continue;
 		    errno = aio_error(aio_reqlist[i]->aiocbp);
 		    if (errno == 0) {
-			int n = aio_return(aio_reqlist[i]->aiocbp);
+			ssize_t n = aio_return(aio_reqlist[i]->aiocbp);
 			aio_reqlist[i]->nbytes = n;
 			errcode = MPI_Grequest_complete(aio_reqlist[i]->req);
 			if (errcode != MPI_SUCCESS) {
@@ -320,8 +327,7 @@ int ADIOI_GEN_aio_query_fn(void *extra_state, MPI_Status *status)
 
 	aio_req = (ADIOI_AIO_Request *)extra_state;
 
-
-	MPI_Status_set_elements(status, MPI_BYTE, aio_req->nbytes); 
+	MPI_Status_set_elements_x(status, MPI_BYTE, aio_req->nbytes);
 
 	/* can never cancel so always true */ 
 	MPI_Status_set_cancelled(status, 0); 
