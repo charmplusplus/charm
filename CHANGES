@@ -2,6 +2,93 @@ This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 
 ================================================================================
+What's new in Charm++ 6.10.0
+================================================================================
+
+This is a feature release, with the following major changes:
+
+Misc:
+
+- Updated the license to clarify the restriction on commercial use of the software
+  in the academic distribution.
+
+- We have moved away from .tex in favor of .rst files to make building the
+  documentation more portable. The documentation is now available at
+  https://charm.readthedocs.io/ .
+
+- We have moved bug/issue tracking from Redmine to GitHub, and will be moving code
+  review from Gerrit to GitHub shortly. Our GitHub repository is at:
+  https://github.com/UIUC-PPL/charm .
+
+Charm++ Features & Fixes:
+
+- Charm++ can now be built with -std=c++17.
+
+- The Zero Copy API now supports broadcast operations, and is used internally
+  for transmission of large readonly objects during startup.
+
+- Get and put operations, used in the Zero Copy Direct API, now return
+  CkNcpyStatus::(in)complete for users to check for immediate completion
+  as opposed to waiting for the completion callback.
+
+- Addition of a new Zero Copy Post API, for avoiding the receive-side message
+  copy. This can be used in both point-to-point and broadcast operations.
+
+- Callbacks to [inline] entry methods are now executed inline by default. Previously,
+  this was only done when the callback was constructed with an optional parameter.
+
+- Eliminated the need for mainchares in user-driven interop mode by adding a new
+  split-phase initialization API, fixed a bug in the interop exit sequence, and new
+  support for using CkCallback::ckExit when using interop.
+
+- Allocate pinned host memory pool for GPUs dynamically on demand, instead of
+  statically at compilation time.
+
+- TRAM and [aggregate] entry methods support multi-dimensional chare arrays.
+
+- Virtual inheritance from multiple PUPable base classes is now allowed.
+
+- Support for PUPing C++11 random number engines and engine adaptors, as well as for
+  PUPing templated abstract base classes.
+
+- Section reductions are now optimized for streamable operations.
+
+- Core dump files are now available for builds with --with-production.
+
+- Defined a new XI-Builder interface, a library front-end for XLAT-I's code generation.
+
+- Added a charmc option "-module-names" which prints the module names in a .ci file,
+  one module name per line in the output.
+
+- charmrun implements ++no-* for flag-type parameters. For example,
+  ++no-scalable-start. Also fixed use of ++scalable-start and ++batch together.
+
+- Performance measurement programs from the tests and examples directories have been
+  recategorized into a new "benchmarks" directory.
+
+- Support for mpi-win-x86_64-gcc builds.
+
+- All eligible C files in the Charm++ runtime have been transitioned to compile as C++.
+
+Adaptive MPI:
+
+- More efficient implementations of MPI_Bcast, all MPI_(I)(all)gather(v) routines,
+  and reductions with non-commutative operations.
+
+- Stubs for MPI functions currently unimplemented in AMPI are now provided to allow
+  more MPI codes to build. These emit -Wdeprecated-declarations diagnostics when used.
+
+- AMPI's mpif.h is now compilable in line-extended fixed format.
+
+- TLSglobals now works on Mac OS.
+
+- Two new global variable privatization methods have been added, Process-in-Process
+  Globals (pipglobals) and Filesystem Globals (fsglobals).
+
+- AMPI's nm_globals.sh script now works on both Linux and Mac OS and provides
+  more useful output for identifying writable global/static variables.
+
+================================================================================
 What's new in Charm++ 6.9.0
 ================================================================================
 
