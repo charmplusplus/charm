@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -45,12 +45,12 @@ void *ADIOI_Malloc_fn(size_t size, int lineno, const char *fname)
     new = (void *) memalign(XFS_MEMALIGN, size);
 #else
 #ifdef HAVE_MPIU_FUNCS
-    new = (void *) MPIU_Malloc(size);
+    new = (void *) MPIU_trmalloc(size, lineno, fname);
 #else
     new = (void *) malloc(size);
 #endif
 #endif
-    if (!new) {
+    if (!new && size) {
 	FPRINTF(stderr, "Out of memory in file %s, line %d\n", fname, lineno);
 	MPI_Abort(MPI_COMM_WORLD, 1);
     }
@@ -64,11 +64,11 @@ void *ADIOI_Calloc_fn(size_t nelem, size_t elsize, int lineno, const char *fname
     void *new;
 
 #ifdef HAVE_MPIU_FUNCS
-    new = (void *) MPIU_Calloc(nelem, elsize);
+    new = (void *) MPIU_trcalloc(nelem, elsize, lineno, fname);
 #else
     new = (void *) calloc(nelem, elsize);
 #endif
-    if (!new) {
+    if (!new && nelem) {
 	FPRINTF(stderr, "Out of memory in file %s, line %d\n", fname, lineno);
 	MPI_Abort(MPI_COMM_WORLD, 1);
     }
@@ -82,11 +82,11 @@ void *ADIOI_Realloc_fn(void *ptr, size_t size, int lineno, const char *fname)
     void *new;
 
 #ifdef HAVE_MPIU_FUNCS
-    new = (void *) MPIU_Realloc(ptr, size);
+    new = (void *) MPIU_trrealloc(ptr, size, lineno, fname);
 #else
     new = (void *) realloc(ptr, size);
 #endif
-    if (!new) {
+    if (!new && size) {
 	FPRINTF(stderr, "realloc failed in file %s, line %d\n", fname, lineno);
 	MPI_Abort(MPI_COMM_WORLD, 1);
     }
@@ -104,7 +104,7 @@ void ADIOI_Free_fn(void *ptr, int lineno, const char *fname)
     }
 
 #ifdef HAVE_MPIU_FUNCS
-    MPIU_Free(ptr);
+    MPIU_trfree(ptr, lineno, fname);
 #else
     free(ptr);
 #endif

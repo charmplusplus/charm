@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -112,12 +112,12 @@ void mpi_type_create_subarray_(int *ndims,int *array_of_sizes,
 #else
 
 /* Prototype to keep compiler happy */
-FORTRAN_API void FORT_CALL mpi_type_create_subarray_(MPI_Fint *ndims,MPI_Fint *array_of_sizes,
+FORTRAN_API void FORT_CALL void mpi_type_create_subarray_(MPI_Fint *ndims,MPI_Fint *array_of_sizes,
                                MPI_Fint *array_of_subsizes,MPI_Fint *array_of_starts,
                                MPI_Fint *order,MPI_Fint *oldtype,
                                MPI_Fint *newtype, MPI_Fint *ierr );
 
-FORTRAN_API void FORT_CALL mpi_type_create_subarray_(MPI_Fint *ndims,MPI_Fint *array_of_sizes,
+FORTRAN_API void FORT_CALL void mpi_type_create_subarray_(MPI_Fint *ndims,MPI_Fint *array_of_sizes,
                                MPI_Fint *array_of_subsizes,MPI_Fint *array_of_starts,
                                MPI_Fint *order,MPI_Fint *oldtype,
                                MPI_Fint *newtype, MPI_Fint *ierr )

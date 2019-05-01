@@ -1,4 +1,4 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /* 
  *
  *   Copyright (C) 1997 University of Chicago. 
@@ -12,10 +12,10 @@ void ADIOI_PFS_WriteContig(ADIO_File fd, void *buf, int count,
 			   ADIO_Offset offset, ADIO_Status *status,
 			   int *error_code)
 {
-    int err=-1, datatype_size, len;
+    MPI_Count err=-1, datatype_size, len;
     static char myname[] = "ADIOI_PFS_WRITECONTIG";
 
-    MPI_Type_size(datatype, &datatype_size);
+    MPI_Type_size_x(datatype, &datatype_size);
     len = datatype_size * count;
 
     if (file_ptr_type == ADIO_EXPLICIT_OFFSET) {
