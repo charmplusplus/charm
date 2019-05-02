@@ -2729,6 +2729,7 @@ static const char *funclist[] = {"AMPI_Abort", "AMPI_Add_error_class", "AMPI_Add
 "AMPI_Type_get_extent", "AMPI_Type_get_name", "AMPI_Type_get_true_extent", "AMPI_Type_hindexed",
 "AMPI_Type_hvector", "AMPI_Type_indexed", "AMPI_Type_lb", "AMPI_Type_set_attr",
 "AMPI_Type_set_name", "AMPI_Type_size", "AMPI_Type_struct", "AMPI_Type_ub", "AMPI_Type_vector",
+"AMPI_Type_create_darray", "AMPI_Type_create_subarray",
 "AMPI_Unpack", "AMPI_Wait", "AMPI_Waitall", "AMPI_Waitany", "AMPI_Waitsome", "AMPI_Wtick", "AMPI_Wtime",
 "AMPI_Accumulate", "AMPI_Compare_and_swap", "AMPI_Fetch_and_op", "AMPI_Get", "AMPI_Get_accumulate",
 "AMPI_Info_create", "AMPI_Info_delete", "AMPI_Info_dup", "AMPI_Info_free", "AMPI_Info_get",

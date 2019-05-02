@@ -1287,6 +1287,13 @@ AMPI_API_DEF(int, MPI_Type_create_keyval, MPI_Type_copy_attr_function *type_copy
                             MPI_Type_delete_attr_function *type_delete_attr_fn,
                             int *type_keyval, void *extra_state)
 AMPI_API_DEF(int, MPI_Type_free_keyval, int *type_keyval)
+AMPI_API_DEF(int, MPI_Type_create_darray, int size, int rank, int ndims,
+  const int array_of_gsizes[], const int array_of_distribs[],
+  const int array_of_dargs[], const int array_of_psizes[],
+  int order, MPI_Datatype oldtype, MPI_Datatype *newtype)
+AMPI_API_DEF(int, MPI_Type_create_subarray, int ndims, const int array_of_sizes[],
+  const int array_of_subsizes[], const int array_of_starts[], int order,
+  MPI_Datatype oldtype, MPI_Datatype *newtype)
 AMPI_API_DEF(int, MPI_Get_address, const void* location, MPI_Aint *address)
 AMPI_API_DEF(int, MPI_Address, void* location, MPI_Aint *address)
 AMPI_API_DEF(int, MPI_Status_set_elements, MPI_Status *status, MPI_Datatype datatype, int count)
@@ -1772,15 +1779,15 @@ extern long ampiCurrentStackUsage(void);
 #define MPI_ARGV_NULL (char **)0
 #define MPI_ARGVS_NULL (char ***)0
 #define MPI_MAX_PORT_NAME 256
-#define MPI_ORDER_C 56 /* defined in ROMIO */
-#define MPI_ORDER_FORTRAN 57 /* defined in ROMIO */
+#define MPI_ORDER_C 56 /* same as in ROMIO */
+#define MPI_ORDER_FORTRAN 57 /* same as in ROMIO */
 #define MPI_TYPECLASS_INTEGER -1
 #define MPI_TYPECLASS_REAL -2
 #define MPI_TYPECLASS_COMPLEX -3
-#define MPI_DISTRIBUTE_BLOCK 121  /* defined in ROMIO */
-#define MPI_DISTRIBUTE_CYCLIC 122  /* defined in ROMIO */
-#define MPI_DISTRIBUTE_NONE 123 /* defined in ROMIO */
-#define MPI_DISTRIBUTE_DFLT_DARG -49767 /* defined in ROMIO */
+#define MPI_DISTRIBUTE_BLOCK 121  /* same as in ROMIO */
+#define MPI_DISTRIBUTE_CYCLIC 122  /* same as in ROMIO */
+#define MPI_DISTRIBUTE_NONE 123 /* same as in ROMIO */
+#define MPI_DISTRIBUTE_DFLT_DARG -49767 /* same as in ROMIO */
 #define MPI_INTEGER1 MPI_CHAR
 #define MPI_INTEGER2 MPI_SHORT
 #define MPI_INTEGER4 MPI_INT
@@ -1900,8 +1907,6 @@ typedef int MPI_T_pvar_session;
 
 AMPI_API_DEF_NOIMPL(int, MPI_Pack_external, const char datarep[], const void *inbuf, int incount, MPI_Datatype datatype, void *outbuf, MPI_Aint outsize, MPI_Aint *position)
 AMPI_API_DEF_NOIMPL(int, MPI_Pack_external_size, const char datarep[], int incount, MPI_Datatype datatype, MPI_Aint *size)
-// AMPI_API_DEF_NOIMPL(int, MPI_Type_create_darray, int size, int rank, int ndims, const int array_of_gsizes[], const int array_of_distribs[], const int array_of_dargs[], const int array_of_psizes[], int order, MPI_Datatype oldtype, MPI_Datatype *newtype) //provided by ROMIO
-// AMPI_API_DEF_NOIMPL(int, MPI_Type_create_subarray, int ndims, const int array_of_sizes[], const int array_of_subsizes[], const int array_of_starts[], int order, MPI_Datatype oldtype, MPI_Datatype *newtype) //provided by ROMIO
 AMPI_API_DEF_NOIMPL(int, MPI_Unpack_external, const char datarep[], const void *inbuf, MPI_Aint insize, MPI_Aint *position, void *outbuf, int outcount, MPI_Datatype datatype)
 
 /* A.2.3 Collective Communication C Bindings */

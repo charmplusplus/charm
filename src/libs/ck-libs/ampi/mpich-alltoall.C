@@ -1,8 +1,8 @@
-/* 
+/*
 
-The following code is adapted from alltoall.c in mpich2-1.0.3 
+The following code is adapted from alltoall.c in mpich2-1.0.3
 
-Licensing details should be addresssed, since this is copyrighted. 
+Please see the romio/COPYRIGHT file for licensing information.
 
 */
 

@@ -57,6 +57,8 @@ FLINKAGE {
 #define mpi_type_struct FTN_NAME( MPI_TYPE_STRUCT , mpi_type_struct )
 #define mpi_type_commit FTN_NAME( MPI_TYPE_COMMIT , mpi_type_commit )
 #define mpi_type_free FTN_NAME( MPI_TYPE_FREE , mpi_type_free )
+#define mpi_type_create_darray FTN_NAME( MPI_TYPE_CREATE_DARRAY , mpi_type_create_darray )
+#define mpi_type_create_subarray FTN_NAME( MPI_TYPE_CREATE_SUBARRAY , mpi_type_create_subarray )
 #define mpi_type_get_extent FTN_NAME( MPI_TYPE_GET_EXTENT , mpi_type_get_extent )
 #define mpi_type_get_extent_x FTN_NAME( MPI_TYPE_GET_EXTENT_X , mpi_type_get_extent_x )
 #define mpi_type_extent FTN_NAME( MPI_TYPE_EXTENT , mpi_type_extent )
@@ -788,6 +790,23 @@ void mpi_type_free(int *type, int *ierr) noexcept
 {
   *ierr = MPI_Type_free(type);
 }
+
+void mpi_type_create_darray(int *size, int *rank, int *ndims, int *array_of_gsizes,
+  int *array_of_distribs, int *array_of_dargs, int *array_of_psizes, int *order,
+  int *oldtype, int *newtype, int *ierr) noexcept
+{
+  *ierr = MPI_Type_create_darray(*size, *rank, *ndims, array_of_gsizes,
+    array_of_distribs, array_of_dargs, array_of_psizes, *order,
+    (MPI_Datatype)*oldtype, (MPI_Datatype*)newtype);
+}
+
+void mpi_type_create_subarray(int *ndims, int *array_of_sizes, int *array_of_subsizes,
+  int *array_of_starts, int *order, int *oldtype, int *newtype, int *ierr) noexcept
+{
+  *ierr = MPI_Type_create_subarray(*ndims, array_of_sizes, array_of_subsizes,
+    array_of_starts, *order, (MPI_Datatype)*oldtype, (MPI_Datatype*)newtype);
+}
+
 
 void  mpi_type_get_extent(int* type, MPI_Aint* lb, MPI_Aint* extent, int* ierr) noexcept
 {
