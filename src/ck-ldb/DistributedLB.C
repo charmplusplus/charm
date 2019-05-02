@@ -144,6 +144,7 @@ void DistributedLB::LoadReduction(CkReductionMsg* redn_msg) {
           kTargetRatio);
     }
     PackAndSendMigrateMsgs();
+    delete [] results;
     return;
   }
 
@@ -167,6 +168,7 @@ void DistributedLB::LoadReduction(CkReductionMsg* redn_msg) {
     CkCallback cb(CkIndex_DistributedLB::DoneGossip(), thisProxy);
     CkStartQD(cb);
   }
+  delete [] results;
 }
 
 /*
@@ -362,6 +364,7 @@ void DistributedLB::AfterLBReduction(CkReductionMsg* redn_msg) {
     if (!(_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
       theLbdb->nextLoadbalancer(seqno);
   }
+  delete [] results;
 }
 
 /*
