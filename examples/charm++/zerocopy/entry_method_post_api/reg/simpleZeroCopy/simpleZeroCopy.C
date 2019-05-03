@@ -77,7 +77,7 @@ class zerocopyObject : public CBase_zerocopyObject{
   int destIndex, iter, num, j;
   int mixedZeroCopySentCounter, sdagZeroCopySentCounter, sdagZeroCopyRecvCounter;
   bool firstMigrationPending;
-  CkCallback cb, sdagCb;
+  CkCallback cb, sdagCb, cbCopy;
   int idx_zerocopySent, idx_sdagZeroCopySent;;
   CProxy_Main mainProxy;
 
@@ -107,6 +107,7 @@ class zerocopyObject : public CBase_zerocopyObject{
       idx_zerocopySent = CkIndex_zerocopyObject::zerocopySent(NULL);
       idx_sdagZeroCopySent = CkIndex_zerocopyObject::sdagZeroCopySent(NULL);
       cb = CkCallback(idx_zerocopySent, thisProxy[thisIndex]);
+      cbCopy = cb;
       sdagCb = CkCallback(idx_sdagZeroCopySent, thisProxy[thisIndex]);
     }
 
@@ -162,8 +163,12 @@ class zerocopyObject : public CBase_zerocopyObject{
     void zerocopySent(CkDataMsg *m){
       // Get access to the array information sent via zerocopy
       CkNcpyBuffer *src = (CkNcpyBuffer *)(m->data);
+      int refNum = CkGetRefNum(m);
 
-      free((void *)(src->ptr));
+      if(refNum == 1)
+        delete [] (double *)(src->ptr);
+      else
+        delete [] (int *)(src->ptr);
 
       delete m;
 
@@ -289,7 +294,10 @@ class zerocopyObject : public CBase_zerocopyObject{
         allocateAndCopyArray(iArr1copy, iArr1, n1);
         allocateAndCopyArray(dArr2copy, dArr2, n4);
 
-        thisProxy[destIndex].mixedSend(n1, iArr1, n2, CkSendBuffer(dArr1, cb), n3, CkSendBuffer(iArr2, cb), n4, dArr2);
+        cb.setRefNum(1);
+        cbCopy.setRefNum(1);
+
+        thisProxy[destIndex].mixedSend(n1, iArr1, n2, CkSendBuffer(dArr1, cb), n3, CkSendBuffer(iArr2, cbCopy), n4, dArr2);
       }
     }
 

@@ -5,7 +5,7 @@ mainmodule simpleBcastPost {
 
   mainchare Main {
     entry Main(CkArgMsg *m);
-    entry void zerocopySent(CkDataMsg *m);
+    entry void zerocopySent();
     entry [reductiontarget] void done();
   };
 
