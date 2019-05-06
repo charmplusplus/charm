@@ -580,6 +580,10 @@ typedef void (*MPI_MigrateFn)(void);
 #define PMPI_Type_create_keyval APMPI_Type_create_keyval
 #define  MPI_Type_free_keyval  AMPI_Type_free_keyval
 #define PMPI_Type_free_keyval APMPI_Type_free_keyval
+#define  MPI_Type_create_darray  AMPI_Type_create_darray
+#define PMPI_Type_create_darray APMPI_Type_create_darray
+#define  MPI_Type_create_subarray  AMPI_Type_create_subarray
+#define PMPI_Type_create_subarray APMPI_Type_create_subarray
 #define  MPI_Get_address  AMPI_Get_address
 #define PMPI_Get_address APMPI_Get_address
 #define  MPI_Address  AMPI_Address
