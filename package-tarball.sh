@@ -7,53 +7,38 @@ set -v
 set -e
 
 # Set 'release' mode if requested, influences commitid.sh
-export RELEASE="0"
+export RELEASE="0"ß
 if [[ $# -gt 0 ]]
 then
     arg=$1
     shift
 
-    if [ "$arg" = "--release" ]
-    then
+    case $arg in
+    --release) 
         echo Saw $arg
         RELEASE="1"
-    else
+        ;;
+    *)
         echo "Unrecognized argument '$arg'"
         exit 1
-    fi
+        ;;
+    esac
 
-    if [[ $# -gt 0 ]]
-    then
-        echo "Unrecognized argument '$arg'"
-        exit 1
-    fi
 fi
 
 # Make sure the working copy and index are completely clean
-git diff --quiet --exit-code HEAD
-
-# Get in position to process build scripts
-pushd src/scripts
+git diff --quiet --exit-code HEAD || { echo "Error: Working directory is not clean"; exit 1; }
 
 # Emit a static indicator of the original commit
+pushd src/scripts
 SRCBASE=`pwd` ./commitid.sh
-git add -f VERSION
 rm VERSION.new
-
-# Symlink hwloc in temporarily
-ln -s ../../contrib/hwloc hwloc
-
-# Run autotools so users don't need to
-autoreconf
-autoheader
-rm -rf autom4te.cache
-git add -f aclocal.m4 configure conv-autoconfig.h.in
-
-# Remove symlink
-rm hwloc
-
-# Done with build scripts
 popd
+
+# Refresh autoconf/automake files
+./refresh-configure.sh
+git add -f src/scripts/VERSION
+git add -f src/aclocal.m4 src/configure src/conv-autoconfig.h.in
 
 # Stage all of the modified files
 git add -u
