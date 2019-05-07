@@ -1,0 +1,41 @@
+language: cpp
+
+matrix:
+  include:
+  - os: linux
+    name: "NetLRTS-Linux"
+    dist: xenial
+    script:
+    - ./build LIBS netlrts-linux-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
+    - make -C netlrts-linux-x86_64/tmp -j3 all-test-tests OPTS="-g"
+    - make -C netlrts-linux-x86_64/tmp test-tests TESTOPTS="++local +isomalloc_sync"
+  - os: linux
+    name: "NetLRTS-Linux SMP"
+    dist: xenial
+    script:
+    - ./build LIBS netlrts-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
+    - make -C netlrts-linux-x86_64-smp/tmp -j3 all-test-tests OPTS="-g"
+    - make -C netlrts-linux-x86_64-smp/tmp test-tests TESTOPTS="++local +setcpuaffinity +isomalloc_sync +CmiSleepOnIdle"
+  - os: linux
+    name: "MPI-Linux SMP"
+    dist: xenial
+    script:
+    - sudo apt-get install -y mpich libmpich-dev
+    - ./build LIBS mpi-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
+    - make -C mpi-linux-x86_64/tmp -j3 all-test-tests OPTS="-g"
+    - make -C mpi-linux-x86_64/tmp test-tests
+  - os: osx
+    name: "NetLRTS-Darwin"
+    script:
+    - ./build LIBS netlrts-darwin-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
+    - make -C netlrts-darwin-x86_64/tmp -j3 all-test-tests OPTS="-g"
+    - make -C netlrts-darwin-x86_64/tmp test-tests TESTOPTS="++local"
+ # Windows build does not work yet due to missing autoconf/automake
+ # - os: windows
+ #   name: "NetLRTS-Win"
+ #   script:
+ #   - choco install -y msys2
+ #   - pacman -S autoconf automake
+ #   - ./build LIBS netlrts-win-x86_64 -j2 -k --without-romio --with-production --enable-error-checking --enable-lbuserdata -g || exit 1
+ #   - make -C netlrts-win-x86_64/tmp -k -j2 all-test-tests OPTS="-g"
+ #   - make -C netlrts-win-x86_64/tmp -k test-tests TESTOPTS="++local"
