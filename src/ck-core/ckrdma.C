@@ -952,7 +952,7 @@ void CkRdmaPrepareBcastMsg(envelope *env) {
 
   CmiSpanningTreeInfo &t = *_topoTree;
   bcastAckInfo->numChildren = t.child_count + 1;
-  bcastAckInfo->counter = 0;
+  bcastAckInfo->setCounter(0);
   bcastAckInfo->isRoot  = true;
   bcastAckInfo->numops  = numops;
   bcastAckInfo->pe = CkMyPe();
@@ -1019,9 +1019,9 @@ NcpyBcastInterimAckInfo *allocateInterimNodeAckObj(envelope *myEnv, envelope *my
 void CkRdmaEMBcastAckHandler(void *ack) {
   NcpyBcastAckInfo *bcastAckInfo = (NcpyBcastAckInfo *)ack;
 
-  bcastAckInfo->counter++; // Increment counter to indicate that another child was completed
+  bcastAckInfo->incCounter(); // Increment counter to indicate that another child was completed
 
-  if(bcastAckInfo->counter == bcastAckInfo->numChildren) {
+  if(bcastAckInfo->getCounter() == bcastAckInfo->numChildren) {
     // All child nodes have completed RGETs
 
     // TODO: replace with a swtich with 3 cases

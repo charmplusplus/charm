@@ -384,10 +384,39 @@ struct NcpyBcastRecvPeerAckInfo{
 /***************************** Zerocopy Bcast Entry Method API ****************************/
 struct NcpyBcastAckInfo{
   int numChildren;
+#if CMK_SMP
+  // Counter is an atomic variable in the SMP mode because on the root node, both the
+  // worker thread (in the case of a memcpy transfer) and the comm thread (CMA or RDMA transfer)
+  // can increment the variable.
+  std::atomic<int> counter;
+#else
   int counter;
+#endif
   bool isRoot;
   int pe;
   int numops;
+
+#if CMK_SMP
+    int getCounter() const {
+       return counter.load(std::memory_order_acquire);
+    }
+    void setCounter(int r) {
+       return counter.store(r, std::memory_order_release);
+    }
+    int incCounter() {
+        return counter.fetch_add(1, std::memory_order_release);
+    }
+    int decCounter() {
+         return counter.fetch_sub(1, std::memory_order_release);
+    }
+#else
+    int getCounter() const { return counter; }
+    void setCounter(int r) { counter = r; }
+    int incCounter() { return counter++; }
+    int decCounter() { return counter--; }
+#endif
+
+
 };
 
 struct NcpyBcastRootAckInfo : public NcpyBcastAckInfo {
