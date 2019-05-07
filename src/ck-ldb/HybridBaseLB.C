@@ -216,10 +216,12 @@ CLBStatsMsg* HybridBaseLB::AssembleStats()
   // number of pes
   msg->pe_speed = 1;
 
-  msg->n_objs = osz;
-  theLbdb->GetObjData(msg->objData);
-  msg->n_comm = csz;
-  theLbdb->GetCommData(msg->commData);
+  msg->objData.clear();
+  msg->objData.resize(osz);
+  theLbdb->GetObjData(msg->objData.data());
+  msg->commData.clear();
+  msg->commData.resize(csz);
+  theLbdb->GetCommData(msg->commData.data());
 
   return msg;
 #else
@@ -282,8 +284,11 @@ void HybridBaseLB::depositLBStatsMessage(CLBStatsMsg *m, int atlevel)
     CkAbort("HybridBaseLB> Abort!");
   }
 
+  const int n_comm = m->commData.size();
+  const int n_objs = m->objData.size();
+
   // replace real pe to relative pe number in preparation for calling Strategy()
-  for (int i=0; i<m->n_comm; i++) {
+  for (int i=0; i<n_comm; i++) {
      LDCommData &commData = m->commData[i];
      // modify processor to be this local pe
      if (commData.from_proc()) m->commData[i].src_proc = neighborIdx;
@@ -303,10 +308,10 @@ void HybridBaseLB::depositLBStatsMessage(CLBStatsMsg *m, int atlevel)
 #endif
   procStat.pe_speed = m->pe_speed;		// important
   procStat.available = true;
-  procStat.n_objs = m->n_objs;
+  procStat.n_objs = n_objs;
 
-  statsData->n_objs += m->n_objs;
-  statsData->n_comm += m->n_comm;
+  statsData->n_objs += n_objs;
+  statsData->n_comm += n_comm;
 }
 
 // assmebly all stats messages from children
@@ -333,14 +338,16 @@ void HybridBaseLB::buildStats(int atlevel)
      int i;
      CLBStatsMsg *msg = statsMsgsList[n];
      int pe = msg->from_pe;
-     for (i=0; i<msg->n_objs; i++) {
+     const int n_objs = msg->objData.size();
+     const int n_comm = msg->commData.size();
+     for (i=0; i<n_objs; i++) {
          // need to map index to relative index
          statsData->from_proc[nobj] = statsData->to_proc[nobj] = NeighborIndex(pe, atlevel);
          statsData->objData[nobj] = msg->objData[i];
          if (msg->objData[i].migratable) nmigobj++;
          nobj++;
      }
-     for (i=0; i<msg->n_comm; i++) {
+     for (i=0; i<n_comm; i++) {
          statsData->commData[ncom] = msg->commData[i];
          ncom++;
      }
@@ -434,12 +441,10 @@ CLBStatsMsg * HybridBaseLB::buildCombinedLBStatsMessage(int atlevel)
 */
 
   // copy obj data
-  cmsg->n_objs = osz;
   for (i=0; i<osz; i++)  {
      cmsg->objData[i] = statsData->objData[i];
   }
   // copy comm data
-  cmsg->n_comm = csz;
   for (i=0; i<csz; i++) {
      LDCommData &commData = statsData->commData[i];
      cmsg->commData[i] = commData;

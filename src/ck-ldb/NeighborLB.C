@@ -61,15 +61,16 @@ LBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int n_nbrs)
       procs.insert(item);
     }
       
-    maxHeap objs(myStats.n_objs);
-    for(i=0; i < myStats.n_objs; i++) {
+    const int n_objs = myStats.objData.size();
+    maxHeap objs(n_objs);
+    for(i=0; i < n_objs; i++) {
       InfoRecord* item = new InfoRecord;
       item->load = myStats.objData[i].wallTime;
       item->Id = i;
       objs.insert(item);
     }
 
-    int objs_here = myStats.n_objs;
+    int objs_here = n_objs;
     do {
       if (objs_here <= 1) break;  // For now, always leave 1 object
 

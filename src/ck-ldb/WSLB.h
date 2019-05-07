@@ -87,10 +87,8 @@ protected:
     double idletime;
     double bg_walltime;
     double bg_cputime;
-    int obj_data_sz;
-    LDObjData* objData;
-    int comm_data_sz;
-    LDCommData* commData;
+    std::vector<LDObjData> objData;
+    std::vector<LDCommData> commData;
     double obj_walltime;
     double obj_cputime;
   } myStats;

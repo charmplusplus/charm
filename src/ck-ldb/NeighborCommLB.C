@@ -99,16 +99,19 @@ bool _lb_debug2=0;
       CkPrintf(temp);
     }
 
+    const int n_objs = myStats.objData.size();
+    const int n_comm = myStats.commData.size();
+
     // Then calculate the communication center of each object
     // The communication center is relative to myProc
-    double **commcenter = new double*[myStats.n_objs];
-    double *commamount = new double[myStats.n_objs];
+    double **commcenter = new double*[n_objs];
+    double *commamount = new double[n_objs];
     if(_lb_debug1) {
-      CkPrintf("[%d] Number of Objs = %d \n", CkMyPe(), myStats.n_objs);
+      CkPrintf("[%d] Number of Objs = %d \n", CkMyPe(), n_objs);
     }
     {
-      memset(commamount, 0, sizeof(double)*myStats.n_objs);
-      for(i=0; i<myStats.n_objs;i++) {
+      memset(commamount, 0, sizeof(double)*n_objs);
+      for(i=0; i<n_objs;i++) {
         commcenter[i] = new double[dimension];
         memset(commcenter[i], 0, sizeof(double)*dimension);
       }
@@ -118,10 +121,10 @@ bool _lb_debug2=0;
       int *diff = new int[dimension];
       
       //for each comm entry
-      for(i=0; i<myStats.n_comm;i++) {
+      for(i=0; i<n_comm;i++) {
         int j;
         //for each object //TODO use hashtable to accelerate
-        for(j=0; j<myStats.n_objs;j++) 
+        for(j=0; j<n_objs;j++)
           if((myStats.objData[j].handle.omhandle.id == myStats.commData[i].sender.omId)
               && (myStats.objData[j].handle.id == myStats.commData[i].sender.objId)) {
             double comm=
@@ -140,7 +143,7 @@ bool _lb_debug2=0;
             }
           }
       }
-      for(i=0; i<myStats.n_objs;i++) if (commamount[i]>0) {
+      for(i=0; i<n_objs;i++) if (commamount[i]>0) {
         int k;
         double ratio = 1.0 /commamount[i];
         for(k=0;k<dimension;k++)
@@ -156,7 +159,7 @@ bool _lb_debug2=0;
     }
     
     if(_lb_debug2) {
-      for(i=0;i<myStats.n_objs;i++) {
+      for(i=0;i<n_objs;i++) {
         char temp[1000];
         char* now=temp;
         sprintf(now, "[%d] Objs [%d] Load = %lf Comm Amount = %lf  ", 
@@ -211,9 +214,9 @@ bool _lb_debug2=0;
       CkPrintf("[%d] Building obj heap...\n", CkMyPe() );
     }
     // My objects: build heaps
-    maxHeap objs(myStats.n_objs);
+    maxHeap objs(n_objs);
     double totalObjLoad=0.0;
-    for(i=0; i < myStats.n_objs; i++) {
+    for(i=0; i < n_objs; i++) {
       InfoRecord* item = new InfoRecord;
       item->load = myStats.objData[i].wallTime;
       totalObjLoad += item->load;
@@ -269,7 +272,7 @@ bool _lb_debug2=0;
     
     delete[] myProc;
 
-    for(i=0;i<myStats.n_objs;i++) {
+    for(i=0;i<n_objs;i++) {
       delete[] commcenter[i];
     }
     delete[] commcenter;

@@ -109,7 +109,8 @@ HierarchicalLB::Strategy(const DistBaseLB::LDStats* const stats) {
   my_stats = stats;
 
   my_load = 0.0;
-  for (int i = 0; i < my_stats->n_objs; i++) {
+  const int n_objs = my_stats->objData.size();
+  for (int i = 0; i < n_objs; i++) {
     auto const& time = my_stats->objData[i].wallTime;
     // convert time to millisecond to bin times
     auto time_milli = time * 1000;
@@ -133,7 +134,7 @@ HierarchicalLB::Strategy(const DistBaseLB::LDStats* const stats) {
 
   DEBUG_HIER_LB(
     "%d: my_load=%f, n_objs=%d\n",
-    CkMyPe(), my_load, my_stats->n_objs
+    CkMyPe(), my_load, n_objs
   );
 
   if (!tree_is_setup) {

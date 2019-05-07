@@ -157,13 +157,14 @@ WSLBStatsMsg* WSLB::AssembleStats()
   theLbdb->TotalTime(&myStats.total_walltime,&myStats.total_cputime);
   theLbdb->IdleTime(&myStats.idletime);
   theLbdb->BackgroundLoad(&myStats.bg_walltime,&myStats.bg_cputime);
-  myStats.obj_data_sz = theLbdb->GetObjDataSz();
-  myStats.objData = new LDObjData[myStats.obj_data_sz];
-  theLbdb->GetObjData(myStats.objData);
 
-  myStats.comm_data_sz = theLbdb->GetCommDataSz();
-  myStats.commData = new LDCommData[myStats.comm_data_sz];
-  theLbdb->GetCommData(myStats.commData);
+  myStats.objData.clear();
+  myStats.objData.resize(theLbdb->GetObjDataSz());
+  theLbdb->GetObjData(myStats.objData.data());
+
+  myStats.commData.clear();
+  myStats.commData.resize(theLbdb->GetCommDataSz());
+  theLbdb->GetCommData(myStats.commData.data());
 
   myStats.obj_walltime = myStats.obj_cputime = 0;
   for(int i=0; i < myStats.obj_data_sz; i++) {

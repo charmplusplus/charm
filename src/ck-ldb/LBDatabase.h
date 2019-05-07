@@ -180,7 +180,7 @@ class LBDatabase : public IrrGroup {
 public:
   LBDatabase(void)  { init(); }
   LBDatabase(CkMigrateMessage *m)  { (void)m; init(); }
-  ~LBDatabase()  { if (avail_vector) delete [] avail_vector; }
+  ~LBDatabase()  { }
   
 private:
   void init();
@@ -406,8 +406,7 @@ public:
 private:
   int mystep;
   LDHandle myLDHandle;
-  static char *avail_vector;	// processor bit vector
-  static bool avail_vector_set;
+  static std::vector<char> avail_vector; // processor bit vector
   int new_ld_balancer;		// for Node 0
   CkVec<BaseLB *>   loadbalancers;
   int nloadbalancers;
@@ -421,9 +420,11 @@ public:
   static bool manualOn;
 
 public:
-  char *availVector() { return avail_vector; }
-  void get_avail_vector(char * bitmap);
-  void set_avail_vector(char * bitmap, int new_ld=-1);
+  const char *availVector() const { return avail_vector.data(); }
+  void get_avail_vector(char * bitmap) const;
+  void get_avail_vector(std::vector<char> & bitmap) const;
+  void set_avail_vector(const char * bitmap, int new_ld=-1);
+  void set_avail_vector(const std::vector<char> & bitmap, int new_ld=-1);
   int & new_lbbalancer() { return new_ld_balancer; }
 
   struct LastLBInfo {
@@ -469,11 +470,11 @@ inline LBDatabase* LBDatabaseObj() { return LBDatabase::Object(); }
 
 inline void CkStartLB() { LBDatabase::Object()->StartLB(); }
 
-inline void get_avail_vector(char * bitmap) {
+inline void get_avail_vector(std::vector<char> & bitmap) {
   LBDatabaseObj()->get_avail_vector(bitmap);
 }
 
-inline void set_avail_vector(char * bitmap) {
+inline void set_avail_vector(const std::vector<char> & bitmap) {
   LBDatabaseObj()->set_avail_vector(bitmap);
 }
 

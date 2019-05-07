@@ -56,10 +56,8 @@ public:
     bool available;
     bool move;
 
-    int n_objs;
-    LDObjData* objData;
-    int n_comm;
-    LDCommData* commData;
+    std::vector<LDObjData> objData;
+    std::vector<LDCommData> commData;
 
     inline void clearBgLoad() {
       bg_walltime = idletime = 0.0;
@@ -109,10 +107,8 @@ public:
   double bg_cputime;
   double obj_cputime;   // may not needed
 #endif
-  int n_objs;
-  LDObjData *objData;
-  int n_comm;
-  LDCommData *commData;
+  std::vector<LDObjData> objData;
+  std::vector<LDCommData> commData;
 public:
   NLBStatsMsg(int osz, int csz);
   NLBStatsMsg(NLBStatsMsg *s);

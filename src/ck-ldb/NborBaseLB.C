@@ -63,10 +63,6 @@ NborBaseLB::NborBaseLB(const CkLBOptions &opt): CBase_NborBaseLB(opt)
 //  gethostname(hostname,79);
 //  CkPrintf("[%d] host %s speed %d\n",CkMyPe(),hostname,myStats.pe_speed);
   myStats.from_pe = CkMyPe();
-  myStats.n_objs = 0;
-  myStats.objData = NULL;
-  myStats.n_comm = 0;
-  myStats.commData = NULL;
 
   receive_stats_ready = false;
 
@@ -157,21 +153,20 @@ NLBStatsMsg* NborBaseLB::AssembleStats()
 
   myStats.move = QueryMigrateStep(step());
 
-  myStats.n_objs = theLbdb->GetObjDataSz();
-  if (myStats.objData) delete [] myStats.objData;
-  myStats.objData = new LDObjData[myStats.n_objs];
-  theLbdb->GetObjData(myStats.objData);
+  myStats.objData.clear();
+  myStats.objData.resize(theLbdb->GetObjDataSz());
+  theLbdb->GetObjData(myStats.objData.data());
 
-  myStats.n_comm = theLbdb->GetCommDataSz();
-  if (myStats.commData) delete [] myStats.commData;
-  myStats.commData = new LDCommData[myStats.n_comm];
-  theLbdb->GetCommData(myStats.commData);
+  myStats.commData.clear();
+  myStats.commData.resize(theLbdb->GetCommDataSz());
+  theLbdb->GetCommData(myStats.commData.data());
 
   myStats.obj_walltime = 0;
 #if CMK_LB_CPUTIMER
   myStats.obj_cputime = 0;
 #endif
-  for(int i=0; i < myStats.n_objs; i++) {
+  const int n_objs = myStats.objData.size();
+  for(int i=0; i < n_objs; i++) {
     myStats.obj_walltime += myStats.objData[i].wallTime;
 #if CMK_LB_CPUTIMER
     myStats.obj_cputime += myStats.objData[i].cpuTime;
@@ -195,18 +190,16 @@ NLBStatsMsg* NborBaseLB::AssembleStats()
   msg->bg_cputime = myStats.bg_cputime;
   msg->obj_cputime = myStats.obj_cputime;
 #endif
-  msg->n_objs = osz;
-  theLbdb->GetObjData(msg->objData);
-  msg->n_comm = csz;
-  theLbdb->GetCommData(msg->commData);
+  msg->objData.clear();
+  msg->objData.resize(osz);
+  theLbdb->GetObjData(msg->objData.data());
+  msg->commData.clear();
+  msg->commData.resize(csz);
+  theLbdb->GetCommData(msg->commData.data());
 
   // cleanup 
-  delete [] myStats.objData;
-  myStats.objData = NULL;
-  myStats.n_objs = 0;
-  delete [] myStats.commData;
-  myStats.commData = NULL;
-  myStats.n_comm = 0;
+  myStats.objData.clear();
+  myStats.commData.clear();
 
   //  CkPrintf(
   //    "Proc %d speed=%d Total(wall,cpu)=%f %f Idle=%f Bg=%f %f Obj=%f %f\n",
@@ -263,9 +256,7 @@ void NborBaseLB::ReceiveStats(CkMarshalledNLBStatsMessage &&data)
       statsDataList[peslot].obj_cputime = m->obj_cputime;
 #endif
 
-      statsDataList[peslot].n_objs = m->n_objs;
       statsDataList[peslot].objData = m->objData;
-      statsDataList[peslot].n_comm = m->n_comm;
       statsDataList[peslot].commData = m->commData;
 
       if (_lb_args.ignoreBgLoad()) statsDataList[peslot].clearBgLoad();
@@ -433,8 +424,8 @@ int NborBaseLB::NeighborIndex(int pe)
 }
 
 NLBStatsMsg::NLBStatsMsg(int osz, int csz) {
-  objData = new LDObjData[osz];
-  commData = new LDCommData[csz];
+  objData.resize(osz);
+  commData.resize(csz);
 }
 
 NLBStatsMsg::NLBStatsMsg(NLBStatsMsg *src) 
@@ -458,8 +449,6 @@ NLBStatsMsg::NLBStatsMsg(NLBStatsMsg *src)
 }
 
 NLBStatsMsg::~NLBStatsMsg() {
-  delete [] objData;
-  delete [] commData;
 }
 
 void NLBStatsMsg::pup(PUP::er &p) {
@@ -474,12 +463,8 @@ void NLBStatsMsg::pup(PUP::er &p) {
   p|total_cputime;
   p|bg_cputime;
 #endif
-  p|n_objs;
-  if (p.isUnpacking()) objData = new LDObjData[n_objs];
-  for (i=0; i<n_objs; i++) p|objData[i];
-  p|n_comm;
-  if (p.isUnpacking()) commData = new LDCommData[n_comm];
-  for (i=0; i<n_comm; i++) p|commData[i];
+  p|objData;
+  p|commData;
 }
 
 // CkMarshalledCLBStatsMessage is used in the marshalled parameter in

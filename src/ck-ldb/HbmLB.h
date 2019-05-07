@@ -221,10 +221,8 @@ public:
   double bg_cputime;
   double obj_walltime;   // may not needed
   double obj_cputime;   // may not needed
-  int n_objs;
-  LDObjData *objData;
-  int n_comm;
-  LDCommData *commData;
+  std::vector<LDObjData> objData;
+  std::vector<LDCommData> commData;
 public:
   NLBStatsMsg(int osz, int csz);
   NLBStatsMsg(NLBStatsMsg *s);
