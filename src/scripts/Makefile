@@ -7,7 +7,6 @@
 #     * Charm++ runtime
 #     * ITC++ Translator
 #     * Languages
-#     * Documentation
 #
 # This Makefile is common to all machines.  This works because the charmc
 # is smart enough to "conceal" the differences between machines.  charmc
@@ -33,7 +32,7 @@ CXX=$(CHARMC)
 CFLAGS=-I.
 CXXFLAGS=-I.
 
-all: charm++ bigsim LIBS AMPI f90charm TSM SM PVM doc everylb
+all: charm++ bigsim LIBS AMPI f90charm TSM SM PVM everylb
 
 all-test: all-test-tests all-test-examples all-test-benchmarks
 
@@ -213,17 +212,6 @@ test-benchmarks-charm: charm++
 test-benchmarks-AMPI: AMPI
 	$(MAKE) -C ../benchmarks test-AMPI
 
-ps-doc: basics
-	$(MAKE) -C ../doc ps
-
-pdf-doc: basics
-	$(MAKE) -C ../doc pdf
-
-html-doc: basics
-	$(MAKE) -C ../doc html
-
-doc: basics
-	$(MAKE) -C ../doc doc
 
 CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 
@@ -376,7 +364,6 @@ endif
 	rm -rf ../benchmarks
 	rm -rf ../examples
 	rm -rf ../tests
-	rm -rf ../doc ; ln -s ../doc ../doc
 	$(SRCBASE)/scripts/gatherflat $(SRCBASE)/scripts .
 	./gatherflat $(SRCBASE)/conv-core        .
 	./gatherflat $(SRCBASE)/conv-ldb         .
@@ -1052,14 +1039,13 @@ clean:
 	rm -f core *~
 	rm -f *.stamp
 	if [ -d charmrun-src ] ; then ( $(MAKE) -C charmrun-src clean ) ; fi
-	-( $(MAKE) -C doc clean )
 	( $(MAKE) -C libs clean )
 	( $(MAKE) -C ../benchmarks clean )
 	( $(MAKE) -C ../examples clean )
 	( $(MAKE) -C ../tests clean )
 
 veryclean:
-	rm -rf ../bin ../lib ../src ../benchmarks ../examples ../tests ../include ../doc
+	rm -rf ../bin ../lib ../src ../benchmarks ../examples ../tests ../include
 	mv Makefile .Makefile
 	mv Make.depends .Make.depends
 	rm -rf [a-z]* [A-Z]*
