@@ -560,9 +560,15 @@ void ParamList::storePostedRdmaPtrs(XStr& str, bool isSDAGGen) {
 void Parameter::storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, int &count) {
   if(isRdma()) {
     if(genRdma) {
-      str << "  if(CMI_IS_ZC_RECV(env)) \n";
-      str << "    buffPtrs["<< count++ <<"] = (void *)" << "ncpyBuffer_";
+      Type* dt = type->deref();
+      str << "  if(CMI_IS_ZC_RECV(env)) {\n";
+      str << "    buffPtrs["<< count <<"] = (void *)" << "ncpyBuffer_";
       str << name << "_ptr;\n";
+      if(isSDAGGen)
+        str << "    buffSizes["<< count++ <<"] = sizeof(" << dt << ") * genClosure->"<< arrLen << ";\n";
+      else
+        str << "    buffSizes["<< count++ <<"] = sizeof(" << dt << ") * "<< arrLen << ".t;\n";
+      str <<  "  }\n";
 
       str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) \n";
       str << "    memcpy(" << "ncpyBuffer_" << name << "_ptr,";
