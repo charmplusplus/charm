@@ -98,10 +98,10 @@ CmiNodeLock CmiMemLock_lock;
 #ifdef CMK_NO_ASM_AVAILABLE
 CmiNodeLock cmiMemoryLock;
 #endif
-static HANDLE comm_mutex;
+static CmiNodeLock comm_mutex;
 #define CmiCommLockOrElse(x) /*empty*/
-#define CmiCommLock() (WaitForSingleObject(comm_mutex, INFINITE))
-#define CmiCommUnlock() (ReleaseMutex(comm_mutex))
+#define CmiCommLock() (CmiLock(comm_mutex))
+#define CmiCommUnlock() (CmiUnlock(comm_mutex))
 
 static DWORD Cmi_state_key = 0xFFFFFFFF;
 static CmiState     Cmi_state_vector = 0;
@@ -250,16 +250,16 @@ static void CmiStartThreads(char **argv)
 
 static void CmiDestroyLocks(void)
 {
-  CloseHandle(comm_mutex);
+  CmiDestroyLock(comm_mutex);
   comm_mutex = 0;
-  CloseHandle(CmiMemLock_lock);
+  CmiDestroyLock(CmiMemLock_lock);
   CmiMemLock_lock = 0;
   for (int i=0; i < CMI_NUM_NODE_BARRIER_TYPES; i++) {
     CloseHandle(entrance_semaphore[i]);
     CloseHandle(exit_semaphore[i]);
   }
 #ifdef CMK_NO_ASM_AVAILABLE
-  CloseHandle(cmiMemoryLock);
+  CmiDestroyLock(cmiMemoryLock);
 #endif
 }
 
@@ -561,7 +561,7 @@ static void CmiDestroyLocks(void)
   CmiMemLock_lock = 0;
   pthread_mutex_destroy(&barrier_mutex);
 #ifdef CMK_NO_ASM_AVAILABLE
-  pthread_mutex_destroy(cmiMemoryLock);
+  CmiDestroyLock(cmiMemoryLock);
 #endif
 }
 

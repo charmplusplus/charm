@@ -48,7 +48,7 @@ template<class T>
 void copyArray(T *&dest, T *&src, int size){
   if(dest != NULL)
     CkRdmaFree(dest);
-  //dest = new T[size];
+  // Allocate using CkRdmaAlloc instead of new
   dest = (T *)CkRdmaAlloc(sizeof(T) * size);
   memcpy(dest,src,size*sizeof(T));
 }

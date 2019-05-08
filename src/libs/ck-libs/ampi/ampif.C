@@ -1,5 +1,8 @@
 #include "ampi.h"
-#include "ampiimpl.h"
+
+#include <string.h>
+#include <vector>
+using std::vector;
 
 FLINKAGE {
 #define mpi_send FTN_NAME( MPI_SEND , mpi_send )
@@ -2272,13 +2275,13 @@ void ampi_gpu_invoke_wr(int *to_call, int *ierr) noexcept {
  *      if 'i' is zero the program name is returned.
  */
 void ampi_command_argument_count(int *count) noexcept {
-  *count = CkGetArgc()-1;
+  *count = AMPI_Get_argc()-1;
 }
 
 void ampi_get_command_argument(int *c, char *str, int *len, int *ierr) noexcept
 {
-  char **argv = CkGetArgv();
-  int nc = CkGetArgc()-1;
+  char **argv = AMPI_Get_argv();
+  int nc = AMPI_Get_argc()-1;
   int arglen = strlen(argv[*c]);
 
   if (*c >= 0 && *c <= nc) {
@@ -2299,11 +2302,7 @@ void ampi_get_command_argument(int *c, char *str, int *len, int *ierr) noexcept
 
 void ampi_init_universe(int *unicomm, int *ierr) noexcept
 {
-  AMPI_API("AMPI_Init_universe");
-  for(int i=0; i<_mpi_nworlds; i++) {
-    unicomm[i] = MPI_COMM_UNIVERSE[i];
-  }
-  *ierr = MPI_SUCCESS;
+  *ierr = AMPI_Init_universe(unicomm);
 }
 
 } // extern "C"

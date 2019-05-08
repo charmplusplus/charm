@@ -7,7 +7,6 @@
 #     * Charm++ runtime
 #     * ITC++ Translator
 #     * Languages
-#     * Documentation
 #
 # This Makefile is common to all machines.  This works because the charmc
 # is smart enough to "conceal" the differences between machines.  charmc
@@ -33,7 +32,7 @@ CXX=$(CHARMC)
 CFLAGS=-I.
 CXXFLAGS=-I.
 
-all: charm++ bigsim LIBS AMPI f90charm TSM SM PVM doc everylb
+all: charm++ bigsim LIBS AMPI f90charm TSM SM PVM everylb
 
 all-test: all-test-tests all-test-examples all-test-benchmarks
 
@@ -213,17 +212,6 @@ test-benchmarks-charm: charm++
 test-benchmarks-AMPI: AMPI
 	$(MAKE) -C ../benchmarks test-AMPI
 
-ps-doc: basics
-	$(MAKE) -C ../doc ps
-
-pdf-doc: basics
-	$(MAKE) -C ../doc pdf
-
-html-doc: basics
-	$(MAKE) -C ../doc html
-
-doc: basics
-	$(MAKE) -C ../doc doc
 
 CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 
@@ -273,6 +261,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
 UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwork4.h pup_paged.h pup_cmialloc.h\
+	pup_c_functions.h \
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h ckliststring.h \
 	cksequence.h ckstatistics.h ckvector3d.h conv-lists.h ckcomplex.h \
 	sockRoutines.h sockRoutines.C cmimemcpy.h simd.h SSE-Double.h SSE-Float.h \
@@ -376,7 +365,6 @@ endif
 	rm -rf ../benchmarks
 	rm -rf ../examples
 	rm -rf ../tests
-	rm -rf ../doc ; ln -s ../doc ../doc
 	$(SRCBASE)/scripts/gatherflat $(SRCBASE)/scripts .
 	./gatherflat $(SRCBASE)/conv-core        .
 	./gatherflat $(SRCBASE)/conv-ldb         .
@@ -814,6 +802,7 @@ $(L)/libtrace-simple.a: $(LIBTRACE_SIMPLE)
 libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
   conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h \
   conv-mach-ifort.h pup_c.h conv-cpm.h conv-cpath.h conv-qd.h \
+  pup_c_functions.h \
   conv-random.h conv-lists.h conv-trace.h persistent.h debug-conv.h pup.h \
   middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
   ckhashtable.h debug-charm.h CkMarshall.decl.h cksection.h ckcallback.h \
@@ -1052,14 +1041,13 @@ clean:
 	rm -f core *~
 	rm -f *.stamp
 	if [ -d charmrun-src ] ; then ( $(MAKE) -C charmrun-src clean ) ; fi
-	-( $(MAKE) -C doc clean )
 	( $(MAKE) -C libs clean )
 	( $(MAKE) -C ../benchmarks clean )
 	( $(MAKE) -C ../examples clean )
 	( $(MAKE) -C ../tests clean )
 
 veryclean:
-	rm -rf ../bin ../lib ../src ../benchmarks ../examples ../tests ../include ../doc
+	rm -rf ../bin ../lib ../src ../benchmarks ../examples ../tests ../include
 	mv Makefile .Makefile
 	mv Make.depends .Make.depends
 	rm -rf [a-z]* [A-Z]*

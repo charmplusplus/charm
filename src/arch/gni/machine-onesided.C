@@ -260,7 +260,7 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo) {
 
 // Perform an RDMA Put call into the remote destination address from the local source address
 void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
-  if(ncpyOpInfo->destMode == CMK_BUFFER_UNREG) {
+  if(ncpyOpInfo->destRegMode == CMK_BUFFER_UNREG) {
     // Remote buffer is unregistered, send a message to register it and perform GET
 
     // send all the data to the source to register and perform a get
@@ -328,7 +328,7 @@ void deregisterDirectMem(gni_mem_handle_t mem_hndl, int pe) {
 
 // Method invoked to deregister memory handle
 void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode){
-  if(mode == CMK_BUFFER_REG) {
+  if(mode != CMK_BUFFER_PREREG && mode != CMK_BUFFER_NOREG) {
     CmiGNIRzvRdmaPtr_t *destInfo = (CmiGNIRzvRdmaPtr_t *)info;
     deregisterDirectMem(destInfo->mem_hndl, pe);
   }

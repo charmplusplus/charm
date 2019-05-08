@@ -8,8 +8,8 @@ mainmodule ping_all
     entry main(CkArgMsg *);
     entry void start();
     entry [reductiontarget] void regular_bcast_done();
-    entry void zerocopySendDone(CkDataMsg *msg);
-    entry void zerocopyRecvDone(CkDataMsg *msg);
+    entry void zerocopySendDone();
+    entry void zerocopyRecvDone();
     entry [reductiontarget] void zc_send_done();
     entry [reductiontarget] void zc_recv_done();
     entry void done();

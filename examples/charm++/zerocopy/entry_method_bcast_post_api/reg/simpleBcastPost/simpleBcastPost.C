@@ -52,7 +52,7 @@ class Main : public CBase_Main{
     CProxy_zcNodegroup ngrpProxy = CProxy_zcNodegroup::ckNew();
 
     // create a callback method
-    int idx_zerocopySent = CkIndex_Main::zerocopySent(NULL);
+    int idx_zerocopySent = CkIndex_Main::zerocopySent();
     CkCallback cb = CkCallback(idx_zerocopySent, thisProxy);
 
     CkCallback doneCb = CkCallback(CkReductionTarget(Main, done), thisProxy);
@@ -69,10 +69,9 @@ class Main : public CBase_Main{
     ngrpProxy.recvLargeArray(CkSendBuffer(buffer, cb), bufferSize, doneCb);
   }
 
-  void zerocopySent(CkDataMsg *m) {
+  void zerocopySent() {
     CkPrintf("[%d][%d][%d] Source callback invoked\n", CkMyPe(), CkMyNode(), CmiMyRank());
     done();
-    delete m;
   }
 
   void done() {

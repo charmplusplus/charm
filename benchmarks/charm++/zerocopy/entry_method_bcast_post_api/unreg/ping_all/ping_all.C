@@ -56,11 +56,11 @@ public:
     ngid = CProxy_LargeDataNodeGroup::ckNew(maxSize);
 
     // Create a callback method to pass in the Zerocopy Bcast Send API call
-    int idx_zerocopySendDone = CkIndex_main::zerocopySendDone(NULL);
+    int idx_zerocopySendDone = CkIndex_main::zerocopySendDone();
     sendDoneCb = CkCallback(idx_zerocopySendDone, thisProxy);
 
     // Create a callback method to pass in the Zerocopy Bcast Recv API call
-    int idx_zerocopyRecvDone = CkIndex_main::zerocopyRecvDone(NULL);
+    int idx_zerocopyRecvDone = CkIndex_main::zerocopyRecvDone();
     recvDoneCb = CkCallback(idx_zerocopyRecvDone, thisProxy);
 
     CkPrintf("Size (bytes) \t\tIterations\t\tRegular Bcast API (one-way us)\tZero Copy Bcast Send API (one-way us)\tZero Copy Bcast Recv API (one-way us)\n");
@@ -96,11 +96,11 @@ public:
     }
   }
 
-  void zerocopySendDone(CkDataMsg *msg) {
+  void zerocopySendDone() {
     zc_send_done();
   }
 
-  void zerocopyRecvDone(CkDataMsg *msg) {
+  void zerocopyRecvDone() {
     zc_recv_done();
   }
 
@@ -192,7 +192,7 @@ public:
   void recv_zerocopy_post(char *&msg, size_t &size, int iter, bool warmUp, int iterations, CkNcpyBufferPost *postStruct) {
     msg = myBuffer;
 
-    postStruct[0].mode = CK_BUFFER_UNREG;
+    postStruct[0].regMode = CK_BUFFER_UNREG;
   }
 
   void recv_zerocopy_post(char *msg, size_t size, int iter, bool warmUp, int iterations) {
