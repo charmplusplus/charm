@@ -285,7 +285,7 @@ class CkLocMgr : public IrrGroup {
 public:
 
 typedef std::unordered_map<CkArrayID, CkArray*, ArrayIDHasher> ArrayIdMap;
-typedef std::unordered_map<CmiUInt8, int> IdPeMap;
+typedef std::unordered_map<CmiUInt8, std::pair<int,bool>> IdPeMap;
 typedef std::unordered_map<CmiUInt8, std::vector<CkArrayMessage*> > MsgBuffer;
 typedef std::unordered_map<CkArrayIndex, std::vector<CkArrayMessage *>, IndexHasher> IndexMsgBuffer;
 typedef std::unordered_map<CkArrayIndex, std::vector<std::pair<int, bool> >, IndexHasher > LocationRequestBuffer;
@@ -312,8 +312,8 @@ typedef std::unordered_map<CmiUInt8, CkLocRec*> LocRecHash;
         }
 	inline int procNum(const CkArrayIndex &idx) const {return CMK_RANK_0(map->procNum(mapHandle,idx));}
 	inline bool isHome (const CkArrayIndex &idx) const {return (bool)(homePe(idx)==CkMyPe());}
-  int whichPE(const CkArrayIndex &idx) const;
-  int whichPE(const CmiUInt8 id) const;
+  int whichPE(const CkArrayIndex &idx);
+  int whichPE(const CmiUInt8 id);
 	/// Return the "last-known" location (returns a processor number)
 	int lastKnown(const CkArrayIndex &idx);
 	int lastKnown(CmiUInt8 id);
@@ -369,7 +369,7 @@ typedef std::unordered_map<CmiUInt8, CkLocRec*> LocRecHash;
 	CkLocRec *elementNrec(const CmiUInt8 id);
 
 	/// Return true if this array element lives on another processor
-	bool isRemote(const CkArrayIndex &idx,int *onPe) const;
+	bool isRemote(const CkArrayIndex &idx,int *onPe);
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	//mark the duringMigration variable .. used for parallel restart
@@ -518,6 +518,7 @@ public:
     ArrayIdMap managers;
     // Map object ID to location
     IdPeMap id2pe;
+    std::unordered_map<CmiUInt8, CkArrayIndex> to_delete;  // entries marked for deletion
 
     // Map array element index to object ID
     IdxIdMap idx2id;

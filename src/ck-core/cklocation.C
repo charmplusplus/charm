@@ -2207,10 +2207,10 @@ void CkLocMgr::pup(PUP::er &p){
         std::vector<int> pe_list;
         std::vector<CmiUInt8> idx_list;
         for (auto itr = id2pe.begin(); itr != id2pe.end(); ++itr)
-            if (homePe(itr->first) == CmiMyPe() && itr->second != CmiMyPe())
+            if (homePe(itr->first) == CmiMyPe() && itr->second.first != CmiMyPe())
             {
                 idx_list.push_back(itr->first);
-                pe_list.push_back(itr->second);
+                pe_list.push_back(itr->second.first);
                 count++;
             }
 
@@ -2476,7 +2476,7 @@ void CkLocMgr::inform(const CkArrayIndex &idx, CmiUInt8 id, int nowOnPe) {
   }
 
   insertID(idx,id);
-  id2pe[id] = nowOnPe;
+  id2pe[id].first = nowOnPe;
 
   auto itr = bufferedLocationRequests.find(idx);
   if (itr != bufferedLocationRequests.end()) {
@@ -2506,7 +2506,7 @@ void CkLocMgr::inform(const CkArrayIndex &idx, CmiUInt8 id, int nowOnPe) {
 }
 
 void CkLocMgr::inform(CmiUInt8 id, int nowOnPe) {
-  id2pe[id] = nowOnPe;
+  id2pe[id].first = nowOnPe;
   deliverAnyBufferedMsgs(id, bufferedMsgs);
 }
 
@@ -2746,7 +2746,7 @@ void CkLocMgr::deliverUnknown(CkArrayMessage *msg, const CkArrayIndex* idx, CkDe
   else home = homePe(id);
 
   if (home != CkMyPe()) {// Forward the message to its home processor
-    id2pe[id] = home;
+    id2pe[id].first = home;
     if (UsrToEnv(msg)->getTotalsize() < _messageBufferingThreshold) {
       DEBM((AA "Forwarding message for unknown %u to home %d \n" AB, id, home));
       msg->array_hops()++;
@@ -3120,6 +3120,10 @@ void CkLocMgr::emigrate(CkLocRec *rec,int toPe)
 
 	//The element now lives on another processor-- tell ourselves and its home
 	inform(idx, id, toPe);
+	if (homePe(idx) != CkMyPe()) {
+		id2pe[id].second = true; // mark for potential deletion (unless it is used in next AtSync period)
+		to_delete[id] = idx;
+	}
 //#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))    
 //#if !defined(_FAULT_MLOG_)    
 	informHome(idx,toPe);
@@ -3291,20 +3295,40 @@ void CkMagicNumber_impl::badMagicNumber(
 }
 CkMagicNumber_impl::CkMagicNumber_impl(int m) :magic(m) { }
 
-int CkLocMgr::whichPE(const CkArrayIndex &idx) const
+int CkLocMgr::whichPE(const CkArrayIndex &idx)
 {
   CmiUInt8 id;
   if (!lookupID(idx, id))
     return -1;
 
-  IdPeMap::const_iterator itr = id2pe.find(id);
-  return (itr != id2pe.end() ? itr->second : -1);
+  IdPeMap::iterator itr = id2pe.find(id);
+  if (itr != id2pe.end()) {
+    std::pair<int, bool> &entry = itr->second;
+    if (entry.second) {
+      // entry was marked for deletion, so unmark because it is being used
+      entry.second = false;
+      to_delete.erase(id);
+    }
+    return entry.first;
+  } else {
+    return -1;
+  }
 }
 
-int CkLocMgr::whichPE(const CmiUInt8 id) const
+int CkLocMgr::whichPE(const CmiUInt8 id)
 {
-  IdPeMap::const_iterator itr = id2pe.find(id);
-  return (itr != id2pe.end() ? itr->second : -1);
+  IdPeMap::iterator itr = id2pe.find(id);
+  if (itr != id2pe.end()) {
+    std::pair<int, bool> &entry = itr->second;
+    if (entry.second) {
+      // entry was marked for deletion, so unmark because it is being used
+      entry.second = false;
+      to_delete.erase(id);
+    }
+    return entry.first;
+  } else {
+    return -1;
+  }
 }
 
 //"Last-known" location (returns a processor number)
@@ -3337,7 +3361,7 @@ int CkLocMgr::lastKnown(CmiUInt8 id) {
 }
 
 /// Return true if this array element lives on another processor
-bool CkLocMgr::isRemote(const CkArrayIndex &idx,int *onPe) const
+bool CkLocMgr::isRemote(const CkArrayIndex &idx,int *onPe)
 {
     int pe = whichPE(idx);
     /* not definitely a remote element */
@@ -3490,6 +3514,13 @@ void CkLocMgr::staticRecvAtSync(void* data)
 void CkLocMgr::recvAtSync()
 {
 	DEBL((AA "recvAtSync called\n" AB));
+	// delete any entries which were marked for deletion and were not used in last AtSync period
+	for (auto itr = to_delete.begin() ; itr != to_delete.end(); itr++) {
+		// could either delete the entry or make it point to homePe
+		id2pe.erase(itr->first);
+		idx2id.erase(itr->second);
+	}
+	to_delete.clear();
 	the_lbdb->RegisteringObjects(myLBHandle);
 }
 
