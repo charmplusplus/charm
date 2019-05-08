@@ -25,33 +25,22 @@ using std::vector;
  *
  * 2. When AMPI is built on top of MPI, we rename the user's MPI_* calls as AMPI_*.
  */
-#define STRINGIFY(a) #a
+#define STRINGIFY_INTERNAL(a) #a
+#define STRINGIFY(a) STRINGIFY_INTERNAL(a)
 
-#if defined(__linux__)
-  #if CMK_CONVERSE_MPI
-    #define AMPI_API_IMPL(ret, name, ...) \
-      _Pragma(STRINGIFY(weak A##name)) \
-      _Pragma(STRINGIFY(weak AP##name = A##name)) \
-      CLINKAGE \
-      ret A##name(__VA_ARGS__)
-  #else
-    #define AMPI_API_IMPL(ret, name, ...) \
-      _Pragma(STRINGIFY(weak name)) \
-      _Pragma(STRINGIFY(weak P##name = name)) \
-      CLINKAGE \
-      ret name(__VA_ARGS__)
-  #endif
+#if AMPI_HAVE_PMPI
+  #define AMPI_API_IMPL(ret, name, ...) \
+    _Pragma(STRINGIFY(weak name)) \
+    _Pragma(STRINGIFY(weak P##name = name)) \
+    CLINKAGE \
+    ret name(__VA_ARGS__)
 #else // not Linux (no PMPI support):
-  #if CMK_CONVERSE_MPI
-    #define AMPI_API_IMPL(ret, name, ...) \
-      CLINKAGE \
-      ret A##name(__VA_ARGS__)
-  #else
-    #define AMPI_API_IMPL(ret, name, ...) \
-      CLINKAGE \
-      ret name(__VA_ARGS__)
-  #endif
+  #define AMPI_API_IMPL(ret, name, ...) \
+    CLINKAGE \
+    ret name(__VA_ARGS__)
 #endif
+
+extern char * ampi_binary_path;
 
 #if AMPIMSGLOG
 #include "ckliststring.h"

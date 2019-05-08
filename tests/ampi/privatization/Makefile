@@ -1,4 +1,5 @@
 -include ../../common.mk
+-include ../../../include/conv-mach-opt.mak
 AMPICC=../../../bin/ampicxx $(OPTS)
 AMPIF90=../../../bin/ampif90 $(OPTS)
 
@@ -14,12 +15,21 @@ VARIANTS := \
   swapglobals \
   tlsglobals \
   roseomptlsglobals \
+  fsglobals \
+  pipglobals \
 
 
 # for determining `all`, `test` rules
 CANDIDATES := \
   swapglobals \
   tlsglobals \
+
+ifeq (1,$(CMK_SUPPORTS_FSGLOBALS))
+  CANDIDATES += fsglobals
+endif
+ifeq (1,$(CMK_SUPPORTS_PIPGLOBALS))
+  CANDIDATES += pipglobals
+endif
 
 
 # Define what options to pass to charmc for each method.
@@ -29,10 +39,12 @@ OPTS_f90_control :=
 OPTS_f90_tlsglobals += -fopenmp
 
 # Define the features that each privatization method supports.
-FEATURES_cxx_control := staticvars sharedlib dynamiclib
-FEATURES_cxx_swapglobals :=
-FEATURES_cxx_tlsglobals := staticvars sharedlib
-FEATURES_cxx_roseomptlsglobals := staticvars sharedlib
+FEATURES_cxx_control := migration staticvars sharedlib dynamiclib
+FEATURES_cxx_swapglobals := migration
+FEATURES_cxx_tlsglobals := migration staticvars sharedlib
+FEATURES_cxx_roseomptlsglobals := migration staticvars sharedlib
+FEATURES_cxx_fsglobals := staticvars
+FEATURES_cxx_pipglobals := staticvars sharedlib
 
 
 # Determine which methods to test in the current environment and target.
@@ -125,8 +137,10 @@ tlsglobals-test-f90.o: test-f90-tlsglobals.f90
 	$(AMPIF90) -o $@ $(OPTS_f90_tlsglobals) -c $<
 
 
+FUNCPTR_SHIM_SUFFIX := .user
+
 clean:
-	rm -f *.o *.a *.so *.mod $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$j-$i)) charmrun ampirun
+	rm -f *.o *.a *.so *.mod $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$(strip $j-$i $(wildcard $j-$i$(FUNCPTR_SHIM_SUFFIX)*)))) charmrun ampirun
 
 .SUFFIXES:
 .PHONY: all test everything test-everything $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),test-$j-$i) test-$i $i)
