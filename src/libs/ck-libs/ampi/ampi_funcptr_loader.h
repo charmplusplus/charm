@@ -32,6 +32,7 @@ typedef HMODULE SharedObject;
 #define dlopen(name, flags) LoadLibrary(name)
 #define dlsym(handle, name) GetProcAddress((handle), (name))
 #define dlclose(handle) FreeLibrary(handle)
+#define dlerror() ""
 
 #else
 
