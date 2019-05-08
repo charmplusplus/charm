@@ -188,10 +188,10 @@ CheckDir() {
   do
     if test ! -d $d
     then
-      echo Error: cannot find $d!
-      exit 1
+      return 0
     fi
   done
+  return 1
 }
 
 TestIfCompiler() {
@@ -211,6 +211,47 @@ TestIfOption() {
   
   echo "Error> option: $1 is not supported in this version!"; 
   printOption
+}
+
+SetPaths() {
+  dir=$1
+  shift
+  for param in "$@"
+  do
+      if [ "$param" == "include" ]
+      then
+          CheckDir $dir/include
+          if [ $? -eq 1 ]
+          then
+              INCDIR="$INCDIR -I$dir/include"
+          else
+              echo "Error: there is no include sub-directory in $dir"
+              exit 1
+          fi
+      elif [ "$param" == "lib" ]
+      then
+          CheckDir $dir/lib
+          if [ $? -eq 1 ]
+          then
+              LIBDIR="$LIBDIR -L$dir/lib"
+          else
+              echo "Error: there is no lib sub-directory in $dir"
+              exit 1
+          fi
+      elif [ "$param" == "lib64" ]
+      then
+          CheckDir $dir/lib64
+          if [ $? -eq 1 ]
+          then
+              LIBDIR="$LIBDIR -L$dir/lib64"
+          else
+              echo "Warning: there is no lib64 sub-directory in $dir"
+          fi
+      else
+          echo "Error: unexpected parameter $param"
+          exit 1
+      fi
+  done
 }
 
 
@@ -308,9 +349,7 @@ do
           	shift; 
   		for dir in $1
   		do
-		  CheckDir $dir/include $dir/lib
-          	  LIBDIR="$LIBDIR -L$dir/lib";
-          	  INCDIR="$INCDIR -I$dir/include"
+		  SetPaths $dir "include" "lib" "lib64"
 		done
           	shift
  	  	;;
@@ -318,43 +357,39 @@ do
                 basedir=`echo $1 | awk -F= '{print $2}'`
   		for dir in $basedir
   		do
-		  CheckDir $dir/include $dir/lib
-          	  LIBDIR="$LIBDIR -L$dir/lib";
-          	  INCDIR="$INCDIR -I$dir/include"
+		  SetPaths $dir "include" "lib" "lib64"
 		done
           	shift
  	  	;;
     "--libdir")
-          	shift; CheckDir $1
+          	shift;
   		for dir in $1
   		do
-          	  LIBDIR="$LIBDIR -L$dir"; 
+  		  SetPaths $dir "lib"
 		done
                 shift
  	  	;;
     --libdir=*)
                 libdir=`echo $1 | awk -F= '{print $2}'`
-		CheckDir $libdir
   		for dir in $libdir
   		do
-          	  LIBDIR="$LIBDIR -L$dir"; 
+          	  SetPaths $dir "lib"
 		done
           	shift
  	  	;;
     "--incdir")
-          	shift; CheckDir $1
+          	shift;
   		for dir in $1
   		do
-          	  INCDIR="$INCDIR -I$dir"; 
+          	  SetPaths $dir "include"
 		done
           	shift
  	  	;;
     --incdir=*)
                 incdir=`echo $1 | awk -F= '{print $2}'`
-		CheckDir $incdir
   		for dir in $incdir
   		do
-          	  INCDIR="$INCDIR -I$dir"; 
+          	  SetPaths $dir "include"
 		done
           	shift
  	  	;;
