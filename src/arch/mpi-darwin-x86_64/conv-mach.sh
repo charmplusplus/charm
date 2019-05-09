@@ -34,9 +34,9 @@ CMK_NATIVE_LDXX='clang++'
 CMK_NATIVE_LIBS=""
 
 CMK_NATIVE_CC_FLAGS="$CMK_GCC64"
-CMK_NATIVE_LD_FLAGS="-Wl,-no_pie $CMK_GCC64"
+CMK_NATIVE_LD_FLAGS="$CMK_GCC64"
 CMK_NATIVE_CXX_FLAGS="$CMK_GCC64 -stdlib=libc++"
-CMK_NATIVE_LDXX_FLAGS="-Wl,-no_pie $CMK_GCC64 -stdlib=libc++"
+CMK_NATIVE_LDXX_FLAGS="$CMK_GCC64 -stdlib=libc++"
 
 CMK_CF90=`which f95 2>/dev/null`
 if test -n "$CMK_CF90"

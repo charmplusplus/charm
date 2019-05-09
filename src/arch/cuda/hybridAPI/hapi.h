@@ -1,9 +1,9 @@
 #ifndef __HAPI_H_
 #define __HAPI_H_
 #include <cuda_runtime.h>
-#include <cstring>
-#include <cstdlib>
-#include <vector>
+
+/* See hapi_functions.h for the majority of function declarations provided
+ * by the Hybrid API. */
 
 /******************** DEPRECATED ********************/
 // HAPI wrappers whose behavior is controlled by user defined variables,
@@ -20,6 +20,12 @@
 #  define hapiHostMalloc malloc
 #  define hapiHostFree   free
 #endif // HAPI_USE_CUDAMALLOCHOST
+
+#ifdef __cplusplus
+
+#include <cstring>
+#include <cstdlib>
+#include <vector>
 
 /******************** DEPRECATED ********************/
 // Contains information about a device buffer, which is used by
@@ -194,51 +200,13 @@ typedef struct hapiWorkRequest {
 
 } hapiWorkRequest;
 
-/******************** DEPRECATED ********************/
-// Create a hapiWorkRequest object for the user. The runtime manages the associated
-// memory, so the user only needs to set it up properly.
-hapiWorkRequest* hapiCreateWorkRequest();
+#else /* defined __cplusplus */
 
-/******************** DEPRECATED ********************/
-// Add a work request into the "queue". Currently all specified data transfers
-// and kernel execution are directly put into a CUDA stream.
-void hapiEnqueue(hapiWorkRequest* wr);
+/* In C mode, only declare the existence of C++ structs. */
+typedef struct hapiBufferInfo hapiBufferInfo;
+typedef struct hapiWorkRequest hapiWorkRequest;
 
-// The runtime queries the compute capability of the device, and creates as
-// many streams as the maximum number of concurrent kernels.
-int hapiCreateStreams();
-
-// Get a CUDA stream that was created by the runtime. Current scheme is to
-// hand out streams in a round-robin fashion.
-cudaStream_t hapiGetStream();
-
-// Add a Charm++ callback function to be invoked after the previous operation
-// in the stream completes. This call should be placed after data transfers or
-// a kernel invocation.
-void hapiAddCallback(cudaStream_t, void*, void* = NULL);
-
-// Thin wrappers for memory related CUDA API calls.
-cudaError_t hapiMalloc(void**, size_t);
-cudaError_t hapiFree(void*);
-cudaError_t hapiMallocHost(void**, size_t);
-cudaError_t hapiFreeHost(void*);
-cudaError_t hapiMallocHostPool(void**, size_t);
-cudaError_t hapiFreeHostPool(void*);
-#ifdef __cplusplus
-// Overloaded versions for C++ code
-static inline cudaError_t hapiMallocHost(void** ptr, size_t size, bool pool) {
-  return pool ? hapiMallocHostPool(ptr, size) : hapiMallocHost(ptr, size);
-}
-
-static inline cudaError_t hapiFreeHost(void* ptr, bool pool) {
-  return pool ? hapiFreeHostPool(ptr) : hapiFreeHost(ptr);
-}
-#endif
-cudaError_t hapiMemcpyAsync(void*, const void*, size_t, cudaMemcpyKind, cudaStream_t);
-
-// Explicit memory allocations using pinned memory pool.
-void* hapiPoolMalloc(size_t);
-void hapiPoolFree(void*);
+#endif /* defined __cplusplus */
 
 // Provides support for detecting errors with CUDA API calls.
 #ifndef HAPI_CHECK_OFF
@@ -246,21 +214,54 @@ void hapiPoolFree(void*);
 #else
 #define hapiCheck(code) code
 #endif
-void hapiErrorDie(cudaError_t, const char*, const char*, int);
 
 #ifdef HAPI_INSTRUMENT_WRS
-struct hapiRequestTimeInfo {
+typedef struct hapiRequestTimeInfo {
   double transfer_time;
   double kernel_time;
   double cleanup_time;
   int n;
 
+#ifdef __cplusplus
   hapiRequestTimeInfo() : transfer_time(0.0), kernel_time(0.0), cleanup_time(0.0),
     n(0) {}
-};
+#endif /* defined __cplusplus */
+} hapiRequestTimeInfo;
+#endif /* defined HAPI_INSTRUMENT_WRS */
 
-void hapiInitInstrument(int n_chares, char n_types);
-hapiRequestTimeInfo* hapiQueryInstrument(int chare, char type, char phase);
+
+#ifndef AMPI_INTERNAL_SKIP_FUNCTIONS
+
+#define AMPI_CUSTOM_FUNC(return_type, function_name, ...) \
+extern return_type function_name(__VA_ARGS__);
+
+#ifdef __cplusplus
+extern "C" {
 #endif
+#include "hapi_functions.h"
+#ifdef __cplusplus
+}
+#endif
+
+#undef AMPI_CUSTOM_FUNC
+
+#ifdef __cplusplus
+
+// Provide a C++-only stub for this function's default parameter.
+static inline void hapiAddCallback(cudaStream_t a, void* b) {
+  hapiAddCallback(a, b, NULL);
+}
+
+// Overloaded C++ wrappers for selecting whether to pool or not using a bool.
+static inline cudaError_t hapiMallocHost(void** ptr, size_t size, bool pool) {
+  return pool ? hapiMallocHostPool(ptr, size) : hapiMallocHost(ptr, size);
+}
+static inline cudaError_t hapiFreeHost(void* ptr, bool pool) {
+  return pool ? hapiFreeHostPool(ptr) : hapiFreeHost(ptr);
+}
+
+#endif /* defined __cplusplus */
+
+#endif /* !defined AMPI_INTERNAL_SKIP_FUNCTIONS */
 
 #endif // __HAPI_H_
