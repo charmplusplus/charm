@@ -10252,7 +10252,7 @@ Charm++ can be downloaded using one of the following methods:
 
 -  From source archive - The latest development version of Charm++ can
    be downloaded from our source archive using *git clone
-   http://charm.cs.illinois.edu/gerrit/charm*.
+   https://github.com/UIUC-PPL/charm*.
 
 If you download the source code from the website, you will have to
 unpack it using a tool capable of extracting gzip’d tar files, such as
