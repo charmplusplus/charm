@@ -9,6 +9,7 @@
 #include <errno.h>
 #include "converse.h"
 #include <mpi.h>
+#include <algorithm>
 
 #ifdef AMPI
 #  warning "We got the AMPI version of mpi.h, instead of the system version--"
@@ -874,7 +875,7 @@ static int PumpMsgs(void) {
 
               MPIPostOneBuffer(myBuffer,
                                ncpyOpInfoMsg,
-                               ncpyOpInfoMsg->srcSize,
+                               std::min(ncpyOpInfoMsg->srcSize, ncpyOpInfoMsg->destSize),
                                otherPe,
                                ncpyOpInfoMsg->tag,
                                postMsgType);

@@ -39,6 +39,7 @@
 #include <sys/stat.h>
 #include <gni_pub.h>
 #include <pmi.h>
+#include <algorithm>
 //#include <numatoolkit.h>
 
 #include "converse.h"
@@ -2294,7 +2295,7 @@ static void PumpNetworkSmsg()
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
                           (uint64_t)newNcpyOpInfo->srcPtr,
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
-                          newNcpyOpInfo->srcSize,
+                          std::min(newNcpyOpInfo->srcSize, newNcpyOpInfo->destSize),
                           (uint64_t)newNcpyOpInfo,
                           CmiNodeOf(newNcpyOpInfo->destPe),
                           GNI_POST_RDMA_PUT,
@@ -2352,7 +2353,7 @@ static void PumpNetworkSmsg()
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
                           (uint64_t)newNcpyOpInfo->srcPtr,
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
-                          newNcpyOpInfo->srcSize,
+                          std::min(newNcpyOpInfo->srcSize, newNcpyOpInfo->destSize),
                           (uint64_t)newNcpyOpInfo,
                           CmiNodeOf(newNcpyOpInfo->destPe),
                           GNI_POST_RDMA_PUT,
@@ -2382,7 +2383,7 @@ static void PumpNetworkSmsg()
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
                           (uint64_t)newNcpyOpInfo->destPtr,
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
-                          newNcpyOpInfo->srcSize,
+                          std::min(newNcpyOpInfo->srcSize, newNcpyOpInfo->destSize),
                           (uint64_t)newNcpyOpInfo,
                           CmiNodeOf(newNcpyOpInfo->srcPe),
                           GNI_POST_RDMA_GET,
