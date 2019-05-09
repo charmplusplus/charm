@@ -2187,6 +2187,7 @@ void CthEnqueueBigSimThread(CthThreadToken* token, int s,
 #endif
 
 //------------------- External client support (e.g. Charm4py) ----------------
+#if CMK_CHARMPY
 
 static std::vector< std::vector<char> > ext_args;
 static std::vector<char*> ext_argv;
@@ -2567,6 +2568,8 @@ void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs,
     CkBroadcastMsgArray(epIdx, impl_amsg, gId, 0);
   }
 }
+
+#endif
 
 //------------------- Message Watcher (record/replay) ----------------
 

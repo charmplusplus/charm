@@ -505,6 +505,8 @@ void ArrayElement::recvBroadcast(CkMessage *m){
 #endif
 }
 
+#if CMK_CHARMPY
+
 ArrayElemExt::ArrayElemExt(void *impl_msg)
 {
   int chareIdx = ckGetChareType();
@@ -521,6 +523,8 @@ ArrayElemExt::ArrayElemExt(void *impl_msg)
                           thisIndexMax.data(), ctorEpIdx,
                           msgSize, impl_buf+(2*sizeof(int))+sizeof(char), dcopy_start);
 }
+
+#endif
 
 /*********************** Spring Cleaning *****************
 Periodically (every minute or so) remove expired broadcasts

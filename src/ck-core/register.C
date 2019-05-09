@@ -96,6 +96,8 @@ void CkRegisterGroupIrr(int chareIndex,int isIrr){
   _chareTable[chareIndex]->isIrr = (isIrr!=0);
 }
 
+#if CMK_CHARMPY
+
 // TODO give a unique name to entry methods when calling CkRegisterEp
 void CkRegisterGroupExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx) {
   int __idx = CkRegisterChare(s, sizeof(GroupExt), TypeGroup);
@@ -150,6 +152,8 @@ void CkRegisterArrayExt(const char *s, int numEntryMethods, int *chareIdx, int *
   *startEpIdx = epIdxCtor;
 }
 
+#endif
+
 void CkRegisterDefaultCtor(int chareIdx, int ctorEpIdx)
 {
   _chareTable[chareIdx]->setDefaultCtor(ctorEpIdx);
@@ -166,6 +170,7 @@ int CkRegisterMainChare(int chareIdx, int entryIdx)
   return mIdx;
 }
 
+#if CMK_CHARMPY
 // TODO give a unique name to entry methods when calling CkRegisterEp
 void CkRegisterMainChareExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx) {
   int __idx = CkRegisterChare(s, sizeof(MainchareExt), TypeMainChare);
@@ -182,6 +187,7 @@ void CkRegisterMainChareExt(const char *s, int numEntryMethods, int *chareIdx, i
   *chareIdx = __idx;
   *startEpIdx = epIdxCtor;
 }
+#endif
 
 void CkRegisterBase(int derivedIdx, int baseIdx)
 {
@@ -203,10 +209,12 @@ void CkRegisterReadonly(const char *name,const char *type,
   _readonlyTable.add(new ReadonlyInfo(name,type,size,ptr,pup_fn));
 }
 
+#if CMK_CHARMPY
 void CkRegisterReadonlyExt(const char *name, const char *type, size_t msgSize, char *msg) {
   if (msgSize > 0) ReadOnlyExt::setData(msg, msgSize);
   CkRegisterReadonly(name, type, msgSize, ReadOnlyExt::ro_data, ReadOnlyExt::_roPup);
 }
+#endif
 
 void CkRegisterReadonlyMsg(const char *name,const char *type,void **pMsg)
 {
