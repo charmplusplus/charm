@@ -26,7 +26,7 @@ First-time users are encouraged to run the top-level `build` script and follow i
 First, you need to decide which version of Charm++ to use. The `build`
 script takes several command line options to compile Charm++. The command line syntax is:
 
-     $ build <target> <version> [options ...]
+     $ ./build <target> <version> [options ...]
                                 [--basedir=dir] [--libdir=dir] [--incdir=dir]
                                 [charmc-options ...]
 
@@ -365,4 +365,4 @@ Ronak Buch, Michael Robson, Eric Mikida, Sam White, Juan Galvez, Nitin Bhat,
 Kavitha Chandrasekar, Jaemin Choi, Matthias Diener, Evan Ramos,
 Raghavendra Kanakagiri, and Venkatasubrahmanian Narayanan.
 
-    Copyright (C) 1989-2019 Regents of the University of Illinois
+Copyright (C) 1989-2019 Regents of the University of Illinois
