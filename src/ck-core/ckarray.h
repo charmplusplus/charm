@@ -430,6 +430,8 @@ typedef ArrayElementT<CkIndex5D> ArrayElement5D;
 typedef ArrayElementT<CkIndex6D> ArrayElement6D;
 typedef ArrayElementT<CkIndexMax> ArrayElementMax;
 
+#if CMK_CHARMPY
+
 extern void (*ArrayMsgRecvExtCallback)(int, int, int *, int, int, char *, int);
 extern int (*ArrayElemLeaveExt)(int, int, int *, char**, int);
 extern void (*ArrayElemJoinExt)(int, int, int *, int, char*, int);
@@ -515,6 +517,8 @@ public:
                             thisIndexMax.data());
   }
 };
+
+#endif
 
 /*@}*/
 
