@@ -28,6 +28,7 @@ using std::vector;
 #define STRINGIFY_INTERNAL(a) #a
 #define STRINGIFY(a) STRINGIFY_INTERNAL(a)
 
+// keep in sync with ampi_noimpl.C
 #if AMPI_HAVE_PMPI
   #define AMPI_API_IMPL(ret, name, ...) \
     _Pragma(STRINGIFY(weak name)) \

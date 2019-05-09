@@ -1,5 +1,11 @@
 language: cpp
 
+cache: ccache
+
+install:
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew install ccache; fi
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then export PATH="/usr/local/opt/ccache/libexec:$PATH"; fi
+
 matrix:
   include:
   - os: linux
