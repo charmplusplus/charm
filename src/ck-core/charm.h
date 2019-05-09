@@ -135,6 +135,7 @@ extern int CkNumPesHook(void); // function equivalent of CkNumPes macro
 extern int CkGroupGetReductionNumber(int gid);
 /// Get current redNo of specified array element on this PE
 extern int CkArrayGetReductionNumber(int aid, int ndims, int *index);
+extern void CkSetMigratable(int aid, int ndims, int *index, char migratable);
 extern void registerCreateReductionTargetMsgExtCallback(void (*cb)(void*, int, int, int, char**, int*));
 extern void registerPyReductionExtCallback(int (*cb)(char**, int*, int, char**));
 
