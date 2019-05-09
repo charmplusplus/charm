@@ -17,7 +17,7 @@ GETTING THE LATEST SOURCE
 You can use anonymous Git access to obtain the latest Charm++ source
 code, as follows:
 
-     > git clone http://charm.cs.illinois.edu/gerrit/charm
+     $ git clone https://github.com/UIUC-PPL/charm
 
 
 BUILD CONFIGURATION
@@ -26,7 +26,7 @@ BUILD CONFIGURATION
 QUICK START:
 ------------
 First-time users are encouraged to run the top-level "build" script and follow its lead:
-     > ./build
+     $ ./build
 
 
 ADVANCED BUILD OPTIONS:
@@ -35,12 +35,12 @@ ADVANCED BUILD OPTIONS:
 First, you need to decide which version of charm++ to use. The "build"
 script takes several command line options to compile Charm++. The command line syntax is:
 
-     > build <target> <version> [options ...]
+     $ build <target> <version> [options ...]
                                 [--basedir=dir] [--libdir=dir] [--incdir=dir]
                                 [charmc-options ...]
 
 For detailed help messages, pass -h or --help to the build script, i.e.
-     > ./build --help
+     $ ./build --help
 
 REQUIRED:
 ---------
@@ -68,7 +68,7 @@ the build script will compile Charm++ under this directory.
 
 For example, on an ordinary Linux PC:
 
-     > ./build charm++ netlrts-linux-x86_64
+     $ ./build charm++ netlrts-linux-x86_64
 
 will build charm++ in the directory: netlrts-linux-x86_64/. The communication
 defaults to UDP packets and the compiler to gcc.
@@ -76,7 +76,7 @@ defaults to UDP packets and the compiler to gcc.
 For a more complex example, consider a shared-memory build with the
 Intel C++ compiler, where you want the communication to happen over TCP sockets:
 
-     > ./build charm++ netlrts-linux-x86_64 smp icc tcp
+     $ ./build charm++ netlrts-linux-x86_64 smp icc tcp
 
 will build charm++ in the directory: netlrts-linux-x86_64-smp-tcp-icc/.
 
@@ -283,7 +283,7 @@ RUNNING A PROGRAM
 
 Following the previous example, to run the program on two processors, type
 
-     > ./charmrun ./pgm 12 6 +p2
+     $ ./charmrun ./pgm 12 6 +p2
 
 This should run for a few seconds, and print out:
 There are 14200 Solutions to 12 queens. Finish time=4.030000
@@ -316,7 +316,7 @@ want to run program on only one machine, for example, your laptop. This
 can save you all the hassle of setting up ssh or charmd daemons.
 To use this option, just type:
 
-     > ./charmrun ++local ./pgm 12 100 +p2
+     $ ./charmrun ++local ./pgm 12 100 +p2
 
 However, for best performance, you should launch one node program per processor.
 
@@ -328,7 +328,7 @@ In order to compile Charm++ into dynamic libraries, one needs to specify the
 "-build-shared" option to the Charm compiler script "charmc"
 at link time. For example, to compile Charm++ under netlrts-linux/tmp, run
 
-     > make charm++ OPTS='-O -build-shared'
+     $ make charm++ OPTS='-O -build-shared'
 
 Charm++'s dynamic libraries are compiled into the lib_so/ directory.
 Typically, they are generated with a ".so" suffix.
@@ -341,7 +341,7 @@ One can compile a Charm++ application linking against Charm++ dynamic
 libraries by linking with charmc's "-charm-shared" option.
 For example:
 
-     > charmc -o pgm pgm.o -charm-shared
+     $ charmc -o pgm pgm.o -charm-shared
 
 You can then run the program as usual.
 Note, linking against Charm++ dynamic libraries produces much smaller size
