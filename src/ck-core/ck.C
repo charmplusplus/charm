@@ -2448,6 +2448,16 @@ int CkArrayGetReductionNumber(int aid, int ndims, int *index) {
   return arrayElement->getRedNo();
 }
 
+void CkSetMigratable(int aid, int ndims, int *index, char migratable) {
+  CkGroupID gId;
+  gId.idx = aid;
+  CkArrayIndex arrayIndex(ndims, index);
+  CProxyElement_ArrayBase arrayProxy = CProxyElement_ArrayBase(gId, arrayIndex);
+  ArrayElement* arrayElement = arrayProxy.ckLocal();
+  CkAssert(arrayElement != NULL);
+  arrayElement->setMigratable(migratable);
+}
+
 void CkChareExtSend(int onPE, void *objPtr, int epIdx, char *msg, int msgSize) {
   //ckCheck();    // checks that gid is not zero
   int marshall_msg_size = (sizeof(char)*msgSize + 3*sizeof(int));
