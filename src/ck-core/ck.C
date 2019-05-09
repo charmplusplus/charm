@@ -2458,6 +2458,21 @@ void CkSetMigratable(int aid, int ndims, int *index, char migratable) {
   arrayElement->setMigratable(migratable);
 }
 
+void CkStartQDExt_ChareCallback(int onPE, void* objPtr, int epIdx, int fid)
+{
+  CkStartQD(CkCallback(onPE, objPtr, epIdx, fid));
+}
+
+void CkStartQDExt_GroupCallback(int gid, int pe, int epIdx, int fid)
+{
+  CkStartQD(CkCallback(gid, pe, epIdx, fid));
+}
+
+void CkStartQDExt_ArrayCallback(int aid, int* idx, int ndims, int epIdx, int fid)
+{
+  CkStartQD(CkCallback(aid, idx, ndims, epIdx, fid));
+}
+
 void CkChareExtSend(int onPE, void *objPtr, int epIdx, char *msg, int msgSize) {
   //ckCheck();    // checks that gid is not zero
   int marshall_msg_size = (sizeof(char)*msgSize + 3*sizeof(int));
