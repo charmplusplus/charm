@@ -227,7 +227,7 @@ CkCallback::CkCallback(ArrayElement *p, int ep,bool forceInline) {
 // to guarantee best performance for non-charm4py applications
 
 // function pointer to interact with Charm4py to generate callback msg
-extern void (*CreateReductionTargetMsgExt)(void*, int, int, int, char**, int*);
+extern void (*CreateCallbackMsgExt)(void*, int, int, int, char**, int*);
 
 static void CkCallbackSendExt(const CkCallback &cb, void *msg)
 {
@@ -246,31 +246,31 @@ static void CkCallbackSendExt(const CkCallback &cb, void *msg)
 
   switch (cb.type) {
     case CkCallback::sendChare: // Send message to a chare
-      CreateReductionTargetMsgExt(data, dataLen, reducerType, cb.d.chare.refnum,
+      CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.chare.refnum,
                                   extResultMsgData, extResultMsgDataSizes);
       CkChareExtSend_multi(cb.d.chare.id.onPE, cb.d.chare.id.objPtr, cb.d.chare.ep,
                            2, extResultMsgData, extResultMsgDataSizes);
       break;
     case CkCallback::sendGroup: // Send message to a group element
-      CreateReductionTargetMsgExt(data, dataLen, reducerType, cb.d.group.refnum,
+      CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.group.refnum,
                                   extResultMsgData, extResultMsgDataSizes);
       CkGroupExtSend_multi(cb.d.group.id.idx, cb.d.group.onPE, cb.d.group.ep,
                            2, extResultMsgData, extResultMsgDataSizes);
       break;
     case CkCallback::sendArray: // Send message to an array element
-      CreateReductionTargetMsgExt(data, dataLen, reducerType, cb.d.array.refnum,
+      CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.array.refnum,
                                   extResultMsgData, extResultMsgDataSizes);
       CkArrayExtSend_multi(cb.d.array.id.idx, cb.d.array.idx.asChild().data(), cb.d.array.idx.dimension,
                            cb.d.array.ep, 2, extResultMsgData, extResultMsgDataSizes);
       break;
     case CkCallback::bcastGroup:
-      CreateReductionTargetMsgExt(data, dataLen, reducerType, cb.d.group.refnum,
+      CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.group.refnum,
                                   extResultMsgData, extResultMsgDataSizes);
       // onPE is set to -1 since its a bcast
       CkGroupExtSend_multi(cb.d.group.id.idx, -1, cb.d.group.ep, 2, extResultMsgData, extResultMsgDataSizes);
       break;
     case CkCallback::bcastArray:
-      CreateReductionTargetMsgExt(data, dataLen, reducerType, cb.d.array.refnum,
+      CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.array.refnum,
                                   extResultMsgData, extResultMsgDataSizes);
       // numDimensions is set to 0 since its bcast
       CkArrayExtSend_multi(cb.d.array.id.idx, cb.d.array.idx.asChild().data(), 0,
