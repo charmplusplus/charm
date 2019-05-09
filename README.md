@@ -1,5 +1,6 @@
-
 # Charm++
+
+[![Build Status](https://travis-ci.org/UIUC-PPL/charm.svg?branch=master)](https://travis-ci.org/UIUC-PPL/charm)
 
 ## Introduction
 Charm++ is a message-passing parallel language and runtime system.
