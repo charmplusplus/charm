@@ -2268,9 +2268,9 @@ void registerArrayResumeFromSyncExtCallback(void (*cb)(int, int, int *)) {
   ArrayResumeFromSyncExtCallback = cb;
 }
 
-void (*CreateReductionTargetMsgExt)(void*, int, int, int, char**, int*) = NULL;
-void registerCreateReductionTargetMsgExtCallback(void (*cb)(void*, int, int, int, char**, int*)) {
-  CreateReductionTargetMsgExt = cb;
+void (*CreateCallbackMsgExt)(void*, int, int, int, char**, int*) = NULL;
+void registerCreateCallbackMsgExtCallback(void (*cb)(void*, int, int, int, char**, int*)) {
+  CreateCallbackMsgExt = cb;
 }
 
 int (*PyReductionExt)(char**, int*, int, char**) = NULL;

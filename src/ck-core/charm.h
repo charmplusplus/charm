@@ -139,7 +139,7 @@ extern void CkSetMigratable(int aid, int ndims, int *index, char migratable);
 extern void CkStartQDExt_ChareCallback(int onPE, void* objPtr, int epIdx, int fid);
 extern void CkStartQDExt_GroupCallback(int gid, int pe, int epIdx, int fid);
 extern void CkStartQDExt_ArrayCallback(int aid, int* idx, int ndims, int epIdx, int fid);
-extern void registerCreateReductionTargetMsgExtCallback(void (*cb)(void*, int, int, int, char**, int*));
+extern void registerCreateCallbackMsgExtCallback(void (*cb)(void*, int, int, int, char**, int*));
 extern void registerPyReductionExtCallback(int (*cb)(char**, int*, int, char**));
 
 #endif
