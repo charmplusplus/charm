@@ -1994,7 +1994,6 @@ Group* getExtContributor<Group>(CkExtContributeInfo* contribute_params)
 // Functions to perform reduction over contributors from external clients (e.g. Charm4py)
 
 extern "C" {
-void CkExtContributeTo(CkExtContributeInfo* contribute_params, CkCallback& cb);
 void CkExtContributeToChare(CkExtContributeInfo* contribute_params, int onPE, void* objPtr);
 void CkExtContributeToArray(CkExtContributeInfo* contribute_params, int aid, int* idx, int ndims);
 void CkExtContributeToGroup(CkExtContributeInfo* contribute_params, int gid, int pe);
@@ -2016,8 +2015,6 @@ void CkExtContribute(CkExtContributeInfo* contribute_params, CkCallback& cb)
 
 void CkExtContributeTo(CkExtContributeInfo* contribute_params, CkCallback& cb)
 {
-    cb.isCkExtReductionCb = true;
-
     switch (contribute_params->contributorType) {
         case extContributorType::array :
             CkExtContribute<ArrayElement>(contribute_params, cb);
@@ -2032,55 +2029,21 @@ void CkExtContributeTo(CkExtContributeInfo* contribute_params, CkCallback& cb)
 // When a reduction contributes to a singleton chare
 void CkExtContributeToChare(CkExtContributeInfo* contribute_params, int onPE, void* objPtr)
 {
-    CkChareID targetChareID;
-    targetChareID.onPE = onPE;
-    targetChareID.objPtr = objPtr;
-
-    CkCallback cb(contribute_params->cbEpIdx, targetChareID);
-    if (contribute_params->fid > 0) cb.setRefnum(contribute_params->fid);
+    CkCallback cb(onPE, objPtr, contribute_params->cbEpIdx, contribute_params->fid);
     CkExtContributeTo(contribute_params, cb);
 }
 
 // When a reduction contributes to an array element or broadcasts result to an array
 void CkExtContributeToArray(CkExtContributeInfo* contribute_params, int aid, int* idx, int ndims)
 {
-    CkCallback cb;
-    CkGroupID gId;
-    gId.idx = aid;
-
-    CkArrayID arrayId(gId);
-
-    if (ndims > 0) {
-        // callback to a particular array element
-        CkArrayIndex arrIndex(ndims, idx);
-        cb = CkCallback(contribute_params->cbEpIdx, arrIndex, arrayId);
-    }
-    else {
-        // callback broadcasts to all elements of array
-        cb = CkCallback(contribute_params->cbEpIdx, arrayId);
-    }
-    if (contribute_params->fid > 0) cb.setRefnum(contribute_params->fid);
-
+    CkCallback cb(aid, idx, ndims, contribute_params->cbEpIdx, contribute_params->fid);
     CkExtContributeTo(contribute_params, cb);
 }
 
 // When a reduction contributes to a group chare element or broadcasts result to group
 void CkExtContributeToGroup(CkExtContributeInfo* contribute_params, int gid, int pe)
 {
-    CkCallback cb;
-    CkGroupID groupId;
-    groupId.idx = gid;
-
-    if (pe == -1) {
-        // callback broadcasts to all PEs
-        cb = CkCallback(contribute_params->cbEpIdx, groupId);
-    }
-    else {
-        // callback to specific PE
-        cb = CkCallback(contribute_params->cbEpIdx, pe, groupId);
-    }
-    if (contribute_params->fid > 0) cb.setRefnum(contribute_params->fid);
-
+    CkCallback cb(gid, pe, contribute_params->cbEpIdx, contribute_params->fid);
     CkExtContributeTo(contribute_params, cb);
 }
 
