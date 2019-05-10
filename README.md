@@ -305,17 +305,9 @@ However, for best performance, you should launch one node program per processor.
 
 ## Building Dynamic Libraries
 In order to compile Charm++ into dynamic libraries, one needs to specify the
-`-build-shared` option to the Charm compiler script `charmc`
-at link time. For example, to compile Charm++ under `netlrts-linux/tmp`, run
-
-     $ make charm++ OPTS='-O -build-shared'
-
-Charm++'s dynamic libraries are compiled into the `lib_so/` directory.
-Typically, they are generated with a `.so` suffix.
-
-Note that the `-build-shared` option is automatically turned on when building
-Charm++ using the `build` script. So you don't need to pass `-build-shared`
-option to "build".
+`--build-shared` option to the Charm `./build` script. Charm++'s dynamic
+libraries are compiled into the `lib_so/` directory. Typically, they are
+generated with a `.so` suffix.
 
 One can compile a Charm++ application linking against Charm++ dynamic
 libraries by linking with `charmc`'s `-charm-shared` option.
