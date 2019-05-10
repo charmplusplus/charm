@@ -74,6 +74,7 @@ never be excluded...
 #include "spanningTree.h"
 #if CMK_CHARMPY
 #include "GreedyRefineLB.h"
+#include "RandCentLB.h"
 #endif
 
 #if CMK_CUDA
@@ -1518,6 +1519,7 @@ void _initCharm(int unused_argc, char **argv)
                   at least for strategies used in central/hybrid, because they will stop being chares.
                 */
 		_registerGreedyRefineLB();
+		_registerRandCentLB();
 #endif
 
 		/**
