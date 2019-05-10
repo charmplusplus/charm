@@ -930,7 +930,7 @@ char * ampi_binary_path;
 static void getAmpiBinaryPath() noexcept
 {
 #if defined _WIN32
-  ssize_t bufsize = MAX_PATH;
+  DWORD bufsize = MAX_PATH;
   DWORD n;
   do
   {

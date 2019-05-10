@@ -2119,7 +2119,7 @@ CMK_HAS_REALPATH="$pass"
 case "$CMK_VDIR" in
   *-win-*|*-win64)
     CMK_CAN_GET_BINARY_PATH='1'
-    CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY='1'
+    CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY='0' # TODO: technically possible, but more work to be done
     ;;
   *-darwin*)
     CMK_CAN_GET_BINARY_PATH='1'
