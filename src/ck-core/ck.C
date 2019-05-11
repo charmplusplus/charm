@@ -2187,6 +2187,7 @@ void CthEnqueueBigSimThread(CthThreadToken* token, int s,
 #endif
 
 //------------------- External client support (e.g. Charm4py) ----------------
+#if CMK_CHARMPY
 
 static std::vector< std::vector<char> > ext_args;
 static std::vector<char*> ext_argv;
@@ -2267,9 +2268,9 @@ void registerArrayResumeFromSyncExtCallback(void (*cb)(int, int, int *)) {
   ArrayResumeFromSyncExtCallback = cb;
 }
 
-void (*CreateReductionTargetMsgExt)(void*, int, int, int, char**, int*) = NULL;
-void registerCreateReductionTargetMsgExtCallback(void (*cb)(void*, int, int, int, char**, int*)) {
-  CreateReductionTargetMsgExt = cb;
+void (*CreateCallbackMsgExt)(void*, int, int, int, char**, int*) = NULL;
+void registerCreateCallbackMsgExtCallback(void (*cb)(void*, int, int, int, char**, int*)) {
+  CreateCallbackMsgExt = cb;
 }
 
 int (*PyReductionExt)(char**, int*, int, char**) = NULL;
@@ -2447,6 +2448,31 @@ int CkArrayGetReductionNumber(int aid, int ndims, int *index) {
   return arrayElement->getRedNo();
 }
 
+void CkSetMigratable(int aid, int ndims, int *index, char migratable) {
+  CkGroupID gId;
+  gId.idx = aid;
+  CkArrayIndex arrayIndex(ndims, index);
+  CProxyElement_ArrayBase arrayProxy = CProxyElement_ArrayBase(gId, arrayIndex);
+  ArrayElement* arrayElement = arrayProxy.ckLocal();
+  CkAssert(arrayElement != NULL);
+  arrayElement->setMigratable(migratable);
+}
+
+void CkStartQDExt_ChareCallback(int onPE, void* objPtr, int epIdx, int fid)
+{
+  CkStartQD(CkCallback(onPE, objPtr, epIdx, fid));
+}
+
+void CkStartQDExt_GroupCallback(int gid, int pe, int epIdx, int fid)
+{
+  CkStartQD(CkCallback(gid, pe, epIdx, fid));
+}
+
+void CkStartQDExt_ArrayCallback(int aid, int* idx, int ndims, int epIdx, int fid)
+{
+  CkStartQD(CkCallback(aid, idx, ndims, epIdx, fid));
+}
+
 void CkChareExtSend(int onPE, void *objPtr, int epIdx, char *msg, int msgSize) {
   //ckCheck();    // checks that gid is not zero
   int marshall_msg_size = (sizeof(char)*msgSize + 3*sizeof(int));
@@ -2567,6 +2593,8 @@ void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs,
     CkBroadcastMsgArray(epIdx, impl_amsg, gId, 0);
   }
 }
+
+#endif
 
 //------------------- Message Watcher (record/replay) ----------------
 

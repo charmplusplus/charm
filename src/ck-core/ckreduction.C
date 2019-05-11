@@ -86,9 +86,11 @@ waits for the migrant contributions to straggle in.
 #endif
 
 extern bool _inrestart;
+#if CMK_CHARMPY
 //define a global instance of CkReductionTypesExt for external access
 CkReductionTypesExt charm_reducers;
 extern int (*PyReductionExt)(char**, int*, int, char**);
+#endif
 
 Group::Group():thisIndex(CkMyPe())
 {
@@ -1765,6 +1767,7 @@ CkReductionMsg* CkReduction::tupleReduction_fn(int num_messages, CkReductionMsg*
 }
 
 
+#if CMK_CHARMPY
 /////////////// external Python reducer ////////////////
 static CkReductionMsg *external_py(int nMsgs, CkReductionMsg **msg)
 {
@@ -1787,8 +1790,7 @@ static CkReductionMsg *external_py(int nMsgs, CkReductionMsg **msg)
 
     return CkReductionMsg::buildNew(reduction_result_size, reduction_result);
 }
-
-
+#endif
 
 /////////////////// Reduction Function Table /////////////////////
 CkReduction::CkReduction() {} //Dummy private constructor
@@ -1928,8 +1930,10 @@ std::vector<CkReduction::reducerStruct> CkReduction::initReducerTable()
   // Allows multiple reductions to be done in the same message
   vec.emplace_back(CkReduction::tupleReduction_fn, false, "CkReduction::tuple");
 
+#if CMK_CHARMPY
   // Perform reduction using an external reducer defined in Python
   vec.emplace_back(CkReduction::reducerStruct(::external_py, false, "CkReduction::custom_python"));
+#endif
 
   return vec;
 }
@@ -1941,6 +1945,8 @@ std::vector<CkReduction::reducerStruct>& CkReduction::reducerTable()
   static std::vector<CkReduction::reducerStruct> table = initReducerTable();
   return table;
 }
+
+#if CMK_CHARMPY
 
 // Enum to detect type of contributors in a reduction
 typedef enum : uint8_t {
@@ -1988,7 +1994,6 @@ Group* getExtContributor<Group>(CkExtContributeInfo* contribute_params)
 // Functions to perform reduction over contributors from external clients (e.g. Charm4py)
 
 extern "C" {
-void CkExtContributeTo(CkExtContributeInfo* contribute_params, CkCallback& cb);
 void CkExtContributeToChare(CkExtContributeInfo* contribute_params, int onPE, void* objPtr);
 void CkExtContributeToArray(CkExtContributeInfo* contribute_params, int aid, int* idx, int ndims);
 void CkExtContributeToGroup(CkExtContributeInfo* contribute_params, int gid, int pe);
@@ -2010,9 +2015,6 @@ void CkExtContribute(CkExtContributeInfo* contribute_params, CkCallback& cb)
 
 void CkExtContributeTo(CkExtContributeInfo* contribute_params, CkCallback& cb)
 {
-#if CMK_CHARMPY
-    cb.isCkExtReductionCb = true;
-
     switch (contribute_params->contributorType) {
         case extContributorType::array :
             CkExtContribute<ArrayElement>(contribute_params, cb);
@@ -2022,66 +2024,30 @@ void CkExtContributeTo(CkExtContributeInfo* contribute_params, CkCallback& cb)
             break;
         default : CkAbort("Invalid external contributor type!\n");
     }
-#else
-    CkAbort("charm4py support must be enabled to use CkExtContributeTo");
-#endif
 }
 
 // When a reduction contributes to a singleton chare
 void CkExtContributeToChare(CkExtContributeInfo* contribute_params, int onPE, void* objPtr)
 {
-    CkChareID targetChareID;
-    targetChareID.onPE = onPE;
-    targetChareID.objPtr = objPtr;
-
-    CkCallback cb(contribute_params->cbEpIdx, targetChareID);
-    if (contribute_params->fid > 0) cb.setRefnum(contribute_params->fid);
+    CkCallback cb(onPE, objPtr, contribute_params->cbEpIdx, contribute_params->fid);
     CkExtContributeTo(contribute_params, cb);
 }
 
 // When a reduction contributes to an array element or broadcasts result to an array
 void CkExtContributeToArray(CkExtContributeInfo* contribute_params, int aid, int* idx, int ndims)
 {
-    CkCallback cb;
-    CkGroupID gId;
-    gId.idx = aid;
-
-    CkArrayID arrayId(gId);
-
-    if (ndims > 0) {
-        // callback to a particular array element
-        CkArrayIndex arrIndex(ndims, idx);
-        cb = CkCallback(contribute_params->cbEpIdx, arrIndex, arrayId);
-    }
-    else {
-        // callback broadcasts to all elements of array
-        cb = CkCallback(contribute_params->cbEpIdx, arrayId);
-    }
-    if (contribute_params->fid > 0) cb.setRefnum(contribute_params->fid);
-
+    CkCallback cb(aid, idx, ndims, contribute_params->cbEpIdx, contribute_params->fid);
     CkExtContributeTo(contribute_params, cb);
 }
 
 // When a reduction contributes to a group chare element or broadcasts result to group
 void CkExtContributeToGroup(CkExtContributeInfo* contribute_params, int gid, int pe)
 {
-    CkCallback cb;
-    CkGroupID groupId;
-    groupId.idx = gid;
-
-    if (pe == -1) {
-        // callback broadcasts to all PEs
-        cb = CkCallback(contribute_params->cbEpIdx, groupId);
-    }
-    else {
-        // callback to specific PE
-        cb = CkCallback(contribute_params->cbEpIdx, pe, groupId);
-    }
-    if (contribute_params->fid > 0) cb.setRefnum(contribute_params->fid);
-
+    CkCallback cb(gid, pe, contribute_params->cbEpIdx, contribute_params->fid);
     CkExtContributeTo(contribute_params, cb);
 }
 
+#endif
 
 /********** Code added by Sayantan *********************/
 /** Locking is a big problem in the nodegroup code for smp.

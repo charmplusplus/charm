@@ -362,6 +362,8 @@ class IrrGroup : public Chare {
 #endif
 };
 
+#if CMK_CHARMPY
+
 extern void (*GroupMsgRecvExtCallback)(int, int, int, char *, int);        // callback to forward received msg to external Group chare
 extern void (*ChareMsgRecvExtCallback)(int, void*, int, int, char *, int); // callback to forward received msg to external Chare
 
@@ -400,6 +402,7 @@ public:
   }
 };
 
+#endif
 
 // As described in http://www.gotw.ca/publications/mxc++-item-4.htm
 template<typename D, typename B>
@@ -1128,6 +1131,8 @@ typedef CProxySection_Group CProxySection_IrrGroup;
 //Defines the actual "Group"
 #include "ckreduction.h"
 
+#if CMK_CHARMPY
+
 /// Lightweight object to support chares defined outside of the C/C++ runtime
 /// Relays messages to appropiate external chare. See README.charm4py
 class GroupExt: public Group {
@@ -1152,6 +1157,8 @@ public:
                             dcopy_start);
   }
 };
+
+#endif
 
 class CkQdMsg {
   public:
