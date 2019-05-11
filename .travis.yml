@@ -1,10 +1,17 @@
 language: cpp
 
+cache: ccache
+
+install:
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew install ccache; fi
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then export PATH="/usr/local/opt/ccache/libexec:$PATH"; fi
+
 matrix:
   include:
   - os: linux
     name: "NetLRTS-Linux"
     dist: xenial
+    env: CACHE_NAME=netlrts-linux
     script:
     - ./build LIBS netlrts-linux-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
     - make -C netlrts-linux-x86_64/tmp -j3 all-test-tests OPTS="-g"
@@ -12,6 +19,7 @@ matrix:
   - os: linux
     name: "NetLRTS-Linux SMP"
     dist: xenial
+    env: CACHE_NAME=netlrts-linux-smp
     script:
     - ./build LIBS netlrts-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
     - make -C netlrts-linux-x86_64-smp/tmp -j3 all-test-tests OPTS="-g"
@@ -19,6 +27,7 @@ matrix:
   - os: linux
     name: "MPI-Linux SMP"
     dist: xenial
+    env: CACHE_NAME=mpi-linux-smp
     script:
     - sudo apt-get install -y mpich libmpich-dev
     - ./build LIBS mpi-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
@@ -26,6 +35,7 @@ matrix:
     - make -C mpi-linux-x86_64-smp/tmp test-tests TESTOPTS="+setcpuaffinity"
   - os: osx
     name: "NetLRTS-Darwin"
+    env: CACHE_NAME=netlrts-darwin
     script:
     - ./build LIBS netlrts-darwin-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
     - make -C netlrts-darwin-x86_64/tmp -j3 all-test-tests OPTS="-g"

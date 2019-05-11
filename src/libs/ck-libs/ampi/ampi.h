@@ -16,7 +16,7 @@
 #define AMPI
 
 /* Declare the conditions under which AMPI supports PMPI. */
-#if defined(__linux__)
+#if defined __linux__ && !defined __clang__
 # define AMPI_HAVE_PMPI 1
 #else
 # define AMPI_HAVE_PMPI 0
