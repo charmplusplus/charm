@@ -16,8 +16,8 @@ Misc:
   documentation more portable. The documentation is now available at
   https://charm.readthedocs.io/ .
 
-- We have moved bug/issue tracking from Redmine to GitHub, and will be moving code
-  review from Gerrit to GitHub shortly. Our GitHub repository is at:
+- We have moved bug/issue tracking from Redmine to GitHub, and code
+  review from Gerrit to GitHub. Our GitHub repository is at:
   https://github.com/UIUC-PPL/charm .
 
 Charm++ Features & Fixes:
