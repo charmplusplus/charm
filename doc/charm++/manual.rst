@@ -8572,7 +8572,7 @@ two functions one after another.
 A small example of user driven interoperation can be found in
 ``examples/charm++/user-driven-interop``.
 
-.. _sec:kokkosinterop
+.. _sec:kokkosinterop:
 
 Interoperation with Kokkos
 --------------------------
