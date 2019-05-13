@@ -16,6 +16,8 @@
 # include "mpio_globals.h"
 #endif
 
+extern int quietModeRequested;
+
 // Set to 1 to print debug statements
 #define AMPI_DO_DEBUG 0
 
@@ -52,8 +54,6 @@
 // '""', which indicates a nonexistent argument)
 #define PRINT_ARG(arg, last) \
   if ("\"\""!=#arg) std::cout << #arg << "=" << arg << (last ? "" : ", ");
-
-extern int quietModeRequested;
 
 // Prints PE:VP, function name, and argument name/value for each function argument
 #define AMPI_DEBUG_ARGS(function_name, ...) \
@@ -2992,5 +2992,46 @@ inline void ampiVerifyNodeinit(const char * routineName)
 #define AMPI_API_INIT(routineName, ...) ampiVerifyNodeinit(routineName); \
   TCHARM_API_TRACE(routineName, "ampi"); \
   AMPI_DEBUG_ARGS(routineName, __VA_ARGS__)
+
+
+#ifdef _WIN32
+
+#ifndef WIN32_LEAN_AND_MEAN
+# define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+# define NOMINMAX
+#endif
+#include <windows.h>
+
+typedef HMODULE SharedObject;
+
+#define dlopen(name, flags) LoadLibrary(name)
+#define dlsym(handle, name) ((void(*)())GetProcAddress((handle), (name)))
+#define dlclose(handle) FreeLibrary(handle)
+#define dlerror() ""
+
+#else
+
+#if CMK_DLL_USE_DLOPEN
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#ifndef __USE_GNU
+# define __USE_GNU
+#endif
+#include <dlfcn.h>
+#endif
+
+typedef void * SharedObject;
+
+#endif
+
+typedef int (*ampi_maintype)(int, char **);
+typedef void (*ampi_fmaintype)(void);
+
+ampi_maintype AMPI_Main_Get_C(SharedObject myexe);
+ampi_fmaintype AMPI_Main_Get_F(SharedObject myexe);
+int AMPI_Main_Dispatch(SharedObject myexe, int argc, char ** argv);
 
 #endif // _AMPIIMPL_H

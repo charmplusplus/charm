@@ -632,6 +632,7 @@ AMPI_CUSTOM_FUNC(long, ampiCurrentStackUsage, void)
 #elif defined __INTEL_COMPILER
 # pragma warning push
 # pragma warning disable 1478
+# pragma warning disable 1786
 #endif
 
 #ifndef AMPI_FUNC_NOIMPL
