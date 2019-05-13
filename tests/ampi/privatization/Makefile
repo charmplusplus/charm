@@ -24,12 +24,12 @@ CANDIDATES := \
   swapglobals \
   tlsglobals \
 
-ifeq (1,$(CMK_SUPPORTS_FSGLOBALS))
-  CANDIDATES += fsglobals
-endif
-ifeq (1,$(CMK_SUPPORTS_PIPGLOBALS))
-  CANDIDATES += pipglobals
-endif
+# ifeq (1,$(CMK_SUPPORTS_FSGLOBALS))
+#   CANDIDATES += fsglobals
+# endif
+# ifeq (1,$(CMK_SUPPORTS_PIPGLOBALS))
+#   CANDIDATES += pipglobals
+# endif
 
 
 # Define what options to pass to charmc for each method.
