@@ -24,6 +24,7 @@ CANDIDATES := \
   swapglobals \
   tlsglobals \
 
+# Don't enable these for universal testing because they are not 100% portable to all platforms and toolchain versions.
 # ifeq (1,$(CMK_SUPPORTS_FSGLOBALS))
 #   CANDIDATES += fsglobals
 # endif
