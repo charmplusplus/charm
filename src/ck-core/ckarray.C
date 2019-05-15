@@ -1570,16 +1570,18 @@ void CkArray::recvBroadcast(CkMessage *m)
     int len = localElemVec.size();
 
 #if CMK_ONESIDED_IMPL
+    // extract this field here so we can still check it even if msg is freed
+    const auto zc_msgtype = CMI_ZC_MSGTYPE(UsrToEnv(msg));
 
     // All done, deliver to the first element
-    if(CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_BCAST_RECV_ALL_DONE_MSG) {
+    if (zc_msgtype == CMK_ZC_BCAST_RECV_ALL_DONE_MSG) {
 
       unsigned int i=0;
       bool doFree = true;
       if (stableLocations && i == len-1) doFree = true;
       broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);
 
-    } else if(CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_BCAST_RECV_MSG) { // deliver to all array elements
+    } else if (zc_msgtype == CMK_ZC_BCAST_RECV_MSG) { // deliver to all array elements
 
       //CmiPrintf("[%d][%d][%d] Received a ZC BCAST RECV MSG and len is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), len);
 
@@ -1603,13 +1605,13 @@ void CkArray::recvBroadcast(CkMessage *m)
 		bool doFree = false;
 		if (stableLocations && i == len-1) doFree = true;
 #if CMK_ONESIDED_IMPL
-		if (CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_BCAST_RECV_DONE_MSG) doFree = false;
+		if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) doFree = false;
 #endif
 		broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);
 	}
 
 #if CMK_ONESIDED_IMPL
-    if (CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_BCAST_RECV_DONE_MSG) {
+    if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) {
       CkArray *mgr = getArrayMgrFromMsg(env);
 
       // Reset back message to be ForBocMsg with the prevEpIdx that targets CkArray group
