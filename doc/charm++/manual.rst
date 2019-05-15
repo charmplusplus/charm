@@ -6067,7 +6067,7 @@ Charm++ also supports sections which are a subset of elements of
 multiple chare arrays/groups of the same type (see
 :numref:`cross array section`).
 
-Multicast operations, a broadcast to all members of a section, are
+Multicast operations (a broadcast to all members of a section) are
 directly supported by the section proxy. For array sections, multicast
 operations by default use optimized spanning trees via the CkMulticast
 library in Charm++. For group sections, multicast operations by default
@@ -6128,22 +6128,24 @@ Group sections
 
 Group sections are created in the same way as array sections. A group
 “A” will have an associated “CProxySection_A” type which is used to
-create a section and obtain a proxy. In this case, ckNew() will receive
+create a section and obtain a proxy. In this case, ``ckNew()`` will receive
 the list of PE IDs which will form the section. See
-examples/charm++/groupsection for an example.
+``examples/charm++/groupsection`` for an example.
 
-It is important to note that Charm++ does not automatically delegate
-group sections to the internal CkMulticast library, and instead defaults
-to a point-to-point implementation of multicasts. To use CkMulticast
-with group sections, the user must manually delegate after invoking
-group creation. See :numref:`Manual Delegation` for information on how
-to do this.
+.. important::
+    It is important to note that Charm++ does not automatically delegate
+    group sections to the internal CkMulticast library, and instead defaults
+    to a point-to-point implementation of multicasts. To use CkMulticast
+    with group sections, the user must manually delegate after invoking
+    group creation. See :numref:`Manual Delegation` for information on how
+    to do this.
 
 Creation order restrictions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Important: Array sections should be created in post-constructor entry
-methods to avoid race conditions.
+.. attention::
+    Array sections should be created in post-constructor entry
+    methods to avoid race conditions.
 
 If the user wants to invoke section creation from a group, special care
 must be taken that the collection for which we are creating a section
@@ -6173,7 +6175,7 @@ broadcast to all the section members, like this:
      CProxySection_Hello proxy;
      proxy.someEntry(...); // section broadcast
 
-See examples/charm++/arraysection for examples on how sections are used.
+See ``examples/charm++/arraysection`` for examples on how sections are used.
 
 You can send the section proxy in a message to another processor, and
 still safely invoke the entry functions on the section proxy.
@@ -6195,10 +6197,8 @@ factor when creating the section.
 
      CProxySection_Hello sectProxy = CProxySection_Hello::ckNew(..., 3); // factor is 3
 
-Note, to use CkMulticast library, all multicast messages must inherit
-from CkMcastBaseMsg, as the following example shows. Note that
-CkMcastBaseMsg must come first, this is IMPORTANT for CkMulticast
-library to retrieve section information out of the message.
+Note that, to use CkMulticast library, all multicast messages must inherit
+from CkMcastBaseMsg, as the following example shows.
 
 .. code-block:: c++
 
@@ -6207,6 +6207,10 @@ library to retrieve section information out of the message.
    public:
      int *data;
    };
+
+.. attention::
+    CkMcastBaseMsg must come first, this is important for CkMulticast
+    library to retrieve section information from the message.
 
 Due to this restriction, when using CkMulticast you must define messages
 explicitly for multicast entry functions and no parameter marshalling
@@ -6223,12 +6227,12 @@ default case for array sections), or manually for group sections.
 Since an array element can be a member of multiple array sections, it is
 necessary to disambiguate between which array section reduction it is
 participating in each time it contributes to one. For this purpose, a
-data structure called “CkSectionInfo” is created by CkMulticast library
+data structure called ``CkSectionInfo`` is created by CkMulticast library
 for each array section that the array element belongs to. During a
 section reduction, the array element must pass the CkSectionInfo as a
-parameter in the contribute(). The CkSectionInfo for a section can be
+parameter in the ``contribute()``. The CkSectionInfo for a section can be
 retrieved from a message in a multicast entry point using function call
-CkGetSectionInfo:
+``CkGetSectionInfo()``:
 
 .. code-block:: c++
 
@@ -6266,15 +6270,15 @@ As in an array reduction, users can use built-in reduction types
 (Section :numref:`builtin_reduction`) or define his/her own reducer
 functions (Section :numref:`new_type_reduction`).
 
-Section Operations and Migration
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Section Operations with Migrating Elements
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When using a section reduction, you don’t need to worry about migrations
 of array elements. When migration happens, an array element in the array
 section can still use the CkSectionInfo it stored previously for doing a
 reduction. Reduction messages will be correctly delivered but may not be
 as efficient until a new multicast spanning tree is rebuilt internally
-in the CkMulticastMgr library. When a new spanning tree is rebuilt, an
+in the CkMulticast library. When a new spanning tree is rebuilt, an
 updated CkSectionInfo is passed along with a multicast message, so it is
 recommended that CkGetSectionInfo() function is always called when a
 multicast message arrives (as shown in the above SayHi example).
@@ -6365,11 +6369,11 @@ to delegate [13]_ sections to custom libraries (called delegation
 managers). Note that group sections are not automatically delegated to
 CkMulticast and hence must be manually delegated to this library to
 benefit from the optimized multicast tree implementation. This is
-explained in this section, and see examples/charm++/groupsection for an
+explained here, and see ``examples/charm++/groupsection`` for an
 example.
 
 While creating a chare array one can set the auto delegation flag to
-false in CkArrayOptions and the runtime system will not use the default
+``false`` in CkArrayOptions and the runtime system will not use the default
 CkMulticast library. A CkMulticastMgr (or any other delegation manager)
 group can then be created by the user, and any section delegated to it.
 
@@ -6394,7 +6398,7 @@ managers):
 
 One can also set the default branching factor when creating a
 CkMulticastMgr group. Sections created via this manager will use the
-specified branching factor for their multicast tree. For example,
+specified branching factor for their multicast tree. For example:
 
 .. code-block:: c++
 
@@ -8572,7 +8576,7 @@ two functions one after another.
 A small example of user driven interoperation can be found in
 ``examples/charm++/user-driven-interop``.
 
-.. _sec:kokkosinterop
+.. _sec:kokkosinterop:
 
 Interoperation with Kokkos
 --------------------------
@@ -10252,7 +10256,7 @@ Charm++ can be downloaded using one of the following methods:
 
 -  From source archive - The latest development version of Charm++ can
    be downloaded from our source archive using *git clone
-   http://charm.cs.illinois.edu/gerrit/charm*.
+   https://github.com/UIUC-PPL/charm*.
 
 If you download the source code from the website, you will have to
 unpack it using a tool capable of extracting gzip’d tar files, such as

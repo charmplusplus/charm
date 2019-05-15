@@ -11,6 +11,9 @@
 # include <windows.h>
 # include <io.h>
 # define access _access
+# ifndef R_OK
+#  define R_OK 4
+# endif
 #elif defined __APPLE__
 # include <unistd.h>
 # include <copyfile.h>
