@@ -6,7 +6,7 @@
 #include "ck.h"
 #include "converse.h"
 #include "cmirdmautils.h"
-
+#include <algorithm>
 
 #if CMK_SMP
 /*readonly*/ extern CProxy_ckcallback_group _ckcallbackgroup;
@@ -16,7 +16,7 @@
 // Get Methods
 void CkNcpyBuffer::memcpyGet(CkNcpyBuffer &source) {
   // memcpy the data from the source buffer into the destination buffer
-  memcpy((void *)ptr, source.ptr, cnt);
+  memcpy((void *)ptr, source.ptr, std::min(cnt, source.cnt));
 }
 
 #if CMK_USE_CMA
@@ -27,7 +27,7 @@ void CkNcpyBuffer::cmaGet(CkNcpyBuffer &source) {
          ptr,
          layerInfo,
          pe,
-         cnt);
+         std::min(cnt, source.cnt));
 }
 #endif
 
@@ -86,7 +86,8 @@ CkNcpyStatus CkNcpyBuffer::get(CkNcpyBuffer &source){
   }
 
   // Check that the source buffer fits into the destination buffer
-  CkAssert(source.cnt <= cnt);
+  if(cnt < source.cnt)
+    CkAbort("CkNcpyBuffer::get (destination.cnt < source.cnt) Destination buffer is smaller than the source buffer\n");
 
   // Check that this object is local when get is called
   CkAssert(CkNodeOf(pe) == CkMyNode());
@@ -149,7 +150,7 @@ CkNcpyStatus CkNcpyBuffer::get(CkNcpyBuffer &source){
 // Put Methods
 void CkNcpyBuffer::memcpyPut(CkNcpyBuffer &destination) {
   // memcpy the data from the source buffer into the destination buffer
-  memcpy((void *)destination.ptr, ptr, cnt);
+  memcpy((void *)destination.ptr, ptr, std::min(cnt, destination.cnt));
 }
 
 #if CMK_USE_CMA
@@ -160,7 +161,7 @@ void CkNcpyBuffer::cmaPut(CkNcpyBuffer &destination) {
                        ptr,
                        layerInfo,
                        pe,
-                       cnt);
+                       std::min(cnt, destination.cnt));
 }
 #endif
 
@@ -218,7 +219,8 @@ CkNcpyStatus CkNcpyBuffer::put(CkNcpyBuffer &destination){
     CkAbort("Cannot perform RDMA operations in CK_BUFFER_NOREG mode\n");
   }
   // Check that the source buffer fits into the destination buffer
-  CkAssert(cnt <= destination.cnt);
+  if(destination.cnt < cnt)
+    CkAbort("CkNcpyBuffer::put (destination.cnt < source.cnt) Destination buffer is smaller than the source buffer\n");
 
   // Check that this object is local when put is called
   CkAssert(CkNodeOf(pe) == CkMyNode());
@@ -952,7 +954,7 @@ void CkRdmaPrepareBcastMsg(envelope *env) {
 
   CmiSpanningTreeInfo &t = *_topoTree;
   bcastAckInfo->numChildren = t.child_count + 1;
-  bcastAckInfo->counter = 0;
+  bcastAckInfo->setCounter(0);
   bcastAckInfo->isRoot  = true;
   bcastAckInfo->numops  = numops;
   bcastAckInfo->pe = CkMyPe();
@@ -1019,9 +1021,10 @@ NcpyBcastInterimAckInfo *allocateInterimNodeAckObj(envelope *myEnv, envelope *my
 void CkRdmaEMBcastAckHandler(void *ack) {
   NcpyBcastAckInfo *bcastAckInfo = (NcpyBcastAckInfo *)ack;
 
-  bcastAckInfo->counter++; // Increment counter to indicate that another child was completed
-
-  if(bcastAckInfo->counter == bcastAckInfo->numChildren) {
+  // Increment counter to indicate that another child was completed
+  // Since incCounter() is equivalent to counter++, it returns the value of 'counter' before incrementing it by 1.
+  // For that reason, the comparison is performed with bcastAckInfo->incCounter() + 1 to compare with the updated value
+  if(bcastAckInfo->incCounter() + 1 == bcastAckInfo->numChildren) {
     // All child nodes have completed RGETs
 
     // TODO: replace with a swtich with 3 cases
