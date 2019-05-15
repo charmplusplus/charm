@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017, Intel Corporation. All rights reserved.
- * See LICENSE in this directory.
+ * See LICENSE in src/arch/ofi.
  *
  * Runtime functions used by OFI LRTS machine layer to exchange
  * addresses during the initialization.

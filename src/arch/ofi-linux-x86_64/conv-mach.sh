@@ -25,6 +25,6 @@ fi
 CMK_LIBS="$CMK_LIBS -lfabric"
 
 # For runtime
-CMK_INCDIR="$CMK_INCDIR -I./simple_pmi/"
+CMK_INCDIR="$CMK_INCDIR -I./proc_management/ -I./proc_management/simple_pmi/"
 
 CMK_QT='generic64-light'
