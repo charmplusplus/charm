@@ -9,6 +9,7 @@
 #include "pcqueue.h"
 #include "assert.h"
 #include "malloc.h"
+#include <algorithm>
 
 #if CMK_BLUEGENEQ
 #include <hwi/include/bqc/A2_inlines.h>

@@ -24,12 +24,13 @@ CANDIDATES := \
   swapglobals \
   tlsglobals \
 
-ifeq (1,$(CMK_SUPPORTS_FSGLOBALS))
-  CANDIDATES += fsglobals
-endif
-ifeq (1,$(CMK_SUPPORTS_PIPGLOBALS))
-  CANDIDATES += pipglobals
-endif
+# Don't enable these for universal testing because they are not 100% portable to all platforms and toolchain versions.
+# ifeq (1,$(CMK_SUPPORTS_FSGLOBALS))
+#   CANDIDATES += fsglobals
+# endif
+# ifeq (1,$(CMK_SUPPORTS_PIPGLOBALS))
+#   CANDIDATES += pipglobals
+# endif
 
 
 # Define what options to pass to charmc for each method.
