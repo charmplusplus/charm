@@ -406,11 +406,8 @@ void TCharm::migrateTo(int destPE) noexcept {
         }
 	asyncMigrate = true;
 	// Make sure migrateMe gets called *after* we suspend:
-	thisProxy[thisIndex].migrateDelayed(destPE);
+	thisProxy[thisIndex].ckEmigrate(destPE);
 	suspend();
-}
-void TCharm::migrateDelayed(int destPE) {
-	migrateMe(destPE);
 }
 void TCharm::ckJustMigrated() {
 	ArrayElement::ckJustMigrated();

@@ -160,7 +160,6 @@ class TCharm: public CBase_TCharm
 	virtual void ckJustRestored();
 	virtual void ckAboutToMigrate();
 
-	void migrateDelayed(int destPE);
 	void atBarrier();
 	void atExit(CkReductionMsg *msg) noexcept;
 	void clear();
