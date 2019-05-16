@@ -316,8 +316,8 @@ public:
   virtual char *ckDebugChareName(void);
   virtual int ckDebugChareID(char*, int);
 
-  /// Synonym for ckMigrate
-  inline void migrateMe(int toPe) {ckMigrate(toPe);}
+  void ckEmigrate(int toPe) {ckMigrate(toPe);}
+
 
 #ifdef _PIPELINED_ALLREDUCE_
 	void contribute2(CkArrayIndex myIndex, int dataSize,const void *data,CkReduction::reducerType type,

@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <memory.h>
+#include <type_traits>
 #include <vector>
 
 #include "charm.h"
@@ -457,6 +458,8 @@ void recursive_pup(T *obj, PUP::er &p) {
   recursive_pup_impl<T, IsDerivedFrom<T, CBase>::Is>()(obj, p);
 }
 
+class CProxy_ArrayBase;
+
 // CBaseX::pup must be an empty override, so that the recursive PUPing
 // doesn't call an implementation multiple times up the inheritance
 // hierarchy, and old-style calls to CBase_foo::pup actually produce
@@ -466,6 +469,10 @@ void recursive_pup(T *obj, PUP::er &p) {
   typedef typename CProxy_Derived::index_t index_t;           \
   typedef typename CProxy_Derived::proxy_t proxy_t;           \
   typedef typename CProxy_Derived::element_t element_t;       \
+  template <typename T = proxy_t>                             \
+  typename std::enable_if<std::is_base_of<CProxy_ArrayBase, T>::value>::type migrateMe(int toPe) { \
+    this->thisProxy[this->thisIndex].ckEmigrate(toPe);        \
+  }                                                           \
   CProxy_Derived thisProxy;                                   \
   void pup(PUP::er &p) { (void)p; }                           \
   inline void _sdag_pup(PUP::er &p) { (void)p; }              \
