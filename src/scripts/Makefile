@@ -365,35 +365,36 @@ endif
 	rm -rf ../benchmarks
 	rm -rf ../examples
 	rm -rf ../tests
-	$(SRCBASE)/scripts/gatherflat $(SRCBASE)/scripts .
-	./gatherflat $(SRCBASE)/conv-core        .
-	./gatherflat $(SRCBASE)/conv-ldb         .
-	./gatherflat $(SRCBASE)/conv-ccs         .
-	./gatherflat $(SRCBASE)/conv-perf	.
-	./gatherflat $(SRCBASE)/ck-core          .
-	./gatherflat $(SRCBASE)/ck-perf          .
-	./gatherflat $(SRCBASE)/ck-pics          .
-	./gatherflat $(SRCBASE)/ck-ldb           .
-	./gatherflat $(SRCBASE)/ck-cp            .
-	./gatherflat $(SRCBASE)/langs/simplemsg  .
-	./gatherflat $(SRCBASE)/langs/pvmc       .
-	./gatherflat $(SRCBASE)/langs/bluegene   .
-	./gatherflat $(SRCBASE)/langs/f90charm   .
-	./gatherflat $(SRCBASE)/xlatcpm          .
-	./gathertree $(SRCBASE)/QuickThreads     QuickThreads
-	./gathertree $(SRCBASE)/../contrib/hwloc hwloc
-	./gathertree $(SRCBASE)/libs             libs
-	./gathertree $(SRCBASE)/arch/util        .
-	./gathertree $(SRCBASE)/util             .
-	./gathertree $(SRCBASE)/langs            langs
-	./gathertree $(SRCBASE)/langs/jade       langs/jade
-	./gathertree $(SRCBASE)/arch/common      .
-	./gathertree $(SRCBASE)/arch/$(CMK_GDIR) .
+	$(SRCBASE)/scripts/gatherflat $(SRCBASE)/scripts          .
+	./gatherflat $(SRCBASE)/conv-core                        .
+	./gatherflat $(SRCBASE)/conv-ldb                         .
+	./gatherflat $(SRCBASE)/conv-ccs                         .
+	./gatherflat $(SRCBASE)/conv-perf                        .
+	./gatherflat $(SRCBASE)/ck-core                          .
+	./gatherflat $(SRCBASE)/ck-perf                          .
+	./gatherflat $(SRCBASE)/ck-pics                          .
+	./gatherflat $(SRCBASE)/ck-ldb                           .
+	./gatherflat $(SRCBASE)/ck-cp                            .
+	./gatherflat $(SRCBASE)/langs/simplemsg                  .
+	./gatherflat $(SRCBASE)/langs/pvmc                       .
+	./gatherflat $(SRCBASE)/langs/bluegene                   .
+	./gatherflat $(SRCBASE)/langs/f90charm                   .
+	./gatherflat $(SRCBASE)/xlatcpm                          .
+	./gathertree $(SRCBASE)/QuickThreads                     QuickThreads
+	./gathertree $(SRCBASE)/../contrib/hwloc                 hwloc
+	./gathertree $(SRCBASE)/libs                             libs
+	./gathertree $(SRCBASE)/arch/util                        .
+	./gathertree $(SRCBASE)/arch/util/proc_management        proc_management
+	./gathertree $(SRCBASE)/util                             .
+	./gathertree $(SRCBASE)/langs                            langs
+	./gathertree $(SRCBASE)/langs/jade                       langs/jade
+	./gathertree $(SRCBASE)/arch/common                      .
+	./gathertree $(SRCBASE)/arch/$(CMK_GDIR)                 .
 	test -f $(SRCBASE)/arch/$(CMK_GDIR)/gdir_link && cat $(SRCBASE)/arch/$(CMK_GDIR)/gdir_link > .gdir.new && ./gathertree $(SRCBASE)/arch/`cat .gdir.new`      . || true
-	./gatherflat $(SRCBASE)/arch/$(CMK_VDIR) .
-	./gathertree $(SRCBASE)/../benchmarks           ../benchmarks
-	./gathertree $(SRCBASE)/../examples             ../examples
-	./gathertree $(SRCBASE)/../tests                ../tests
+	./gatherflat $(SRCBASE)/arch/$(CMK_VDIR)                 .
+	./gathertree $(SRCBASE)/../benchmarks                    ../benchmarks
+	./gathertree $(SRCBASE)/../examples                      ../examples
+	./gathertree $(SRCBASE)/../tests                         ../tests
 	rm -f ../bin/dep.pl ; cp dep.pl ../bin/
 	chmod +x charmc
 	-./system_ln  ../tmp/charmc ../bin/

@@ -1,4 +1,4 @@
-#undef CMK_OFI_USE_PMI
-#undef CMK_OFI_USE_PMI2
-#undef CMK_OFI_USE_SIMPLEPMI
-#define CMK_OFI_USE_PMI2                                    1
+#undef CMK_USE_PMI
+#undef CMK_USE_PMI2
+#undef CMK_USE_SIMPLEPMI
+#define CMK_USE_PMI2                                    1
