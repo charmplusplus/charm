@@ -2423,7 +2423,7 @@ void CkMigrateExt(int aid, int ndims, int *index, int toPe) {
   CProxyElement_ArrayBase arrayProxy = CProxyElement_ArrayBase(gId, arrayIndex);
   ArrayElement* arrayElement = arrayProxy.ckLocal();
   CkAssert(arrayElement != NULL);
-  arrayElement->migrateMe(toPe);
+  arrayElement->ckMigrate(toPe);
 }
 
 void CkArrayDoneInsertingExt(int aid) {
