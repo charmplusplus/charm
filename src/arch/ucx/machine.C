@@ -330,6 +330,20 @@ static void UcxRxReqCompleted(void *request, ucs_status_t status,
         resetNcpyOpInfoPointers(ncpyOpInfo);
         ncpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO; // It's a message, not a real ncpy Obj
         UcxRmaOp(ncpyOpInfo, UCX_RMA_OP_GET);
+    } else if (info->sender_tag & UCX_RMA_TAG_GET) {
+        NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(req->msgBuf);
+        resetNcpyOpInfoPointers(ncpyOpInfo);
+        ncpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO;
+        LrtsDeregisterMem(ncpyOpInfo->srcPtr,
+                ncpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize(),
+                ncpyOpInfo->srcPe,
+                ncpyOpInfo->srcRegMode);
+
+        ncpyOpInfo->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
+
+        // Invoke source ack
+        ncpyOpInfo->opMode = CMK_EM_API_SRC_ACK_INVOKE;
+        CmiInvokeNcpyAck(ncpyOpInfo);
     }
 #endif
 

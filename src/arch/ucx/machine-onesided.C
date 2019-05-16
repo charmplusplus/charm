@@ -70,7 +70,7 @@ void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int m
 
     UCX_LOG(4, " %p, PE %d, info %p, memh %d", ptr, pe, ucxInfo, ucxInfo->memh);
 
-    if(ucxInfo->memh) {
+    if ((mode != CMK_BUFFER_NOREG) && (ucxInfo->memh)) {
         status = ucp_mem_unmap(ucxCtx.context, ucxInfo->memh);
         UCX_CHECK_STATUS(status, "ucp_mem_unmap");
     }
@@ -94,7 +94,8 @@ void UcxRmaOp(NcpyOperationInfo *ncpyOpInfo, int op)
         status = ucp_ep_rkey_unpack(ep, dstInfo->packedRkey, &rkey);
         UCX_CHECK_STATUS(status, "ucp_ep_rkey_unpack");
 
-        statusReq = ucp_put_nb(ep, ncpyOpInfo->srcPtr, ncpyOpInfo->srcSize,
+        statusReq = ucp_put_nb(ep, ncpyOpInfo->srcPtr,
+                               std::min(ncpyOpInfo->srcSize, ncpyOpInfo->destSize),
                                (uint64_t)ncpyOpInfo->destPtr, rkey,
                                UcxRmaReqCompleted);
     } else {
@@ -104,7 +105,8 @@ void UcxRmaOp(NcpyOperationInfo *ncpyOpInfo, int op)
         status = ucp_ep_rkey_unpack(ep, srcInfo->packedRkey, &rkey);
         UCX_CHECK_STATUS(status, "ucp_ep_rkey_unpack");
 
-        statusReq = ucp_get_nb(ep, (void*)ncpyOpInfo->destPtr, ncpyOpInfo->srcSize,
+        statusReq = ucp_get_nb(ep, (void*)ncpyOpInfo->destPtr,
+                               std::min(ncpyOpInfo->srcSize, ncpyOpInfo->destSize),
                                (uint64_t)ncpyOpInfo->srcPtr, rkey,
                                UcxRmaReqCompleted);
     }
@@ -157,3 +159,9 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo)
     }
 }
 
+void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo)
+{
+  UcxSendMsg(CmiNodeOf(ncpyOpInfo->srcPe), ncpyOpInfo->srcPe,
+             ncpyOpInfo->ncpyOpInfoSize, (char*)ncpyOpInfo,
+             UCX_RMA_TAG_ACK, UcxRmaSendCompleted);
+}
