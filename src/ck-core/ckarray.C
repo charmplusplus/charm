@@ -1607,6 +1607,7 @@ void CkArray::recvBroadcast(CkMessage *m)
 #if CMK_ONESIDED_IMPL
 		if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) doFree = false;
 #endif
+		CmiAssert(i < localElemVec.size());
 		broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);
 	}
 
