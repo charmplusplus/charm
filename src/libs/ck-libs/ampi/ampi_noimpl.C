@@ -18,10 +18,10 @@ unsupported in AMPI. Calling these functions aborts the application.
 #if AMPI_HAVE_PMPI
   #define AMPI_FUNC_NOIMPL(ret, name, ...) \
     CLINKAGE \
-    __attribute((weak, alias(STRINGIFY(name)))) \
+    __attribute__((weak, alias(STRINGIFY(name)))) \
     ret P##name(__VA_ARGS__); \
     CLINKAGE \
-    __attribute((weak)) \
+    __attribute__((weak)) \
     ret name(__VA_ARGS__) \
     AMPI_NOIMPL_BODY(name)
 #else
