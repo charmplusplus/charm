@@ -1874,7 +1874,7 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		        ((CmiVerbsRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->key,
 		        (uint64_t)(newNcpyOpInfo->destPtr),
 		        ((CmiVerbsRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->key,
-		        newNcpyOpInfo->srcSize,
+		        std::min(newNcpyOpInfo->srcSize, newNcpyOpInfo->destSize),
 		        newNcpyOpInfo->destPe,
 		        (uint64_t)rdmaPacket,
 		        IBV_WR_RDMA_WRITE);
@@ -1916,7 +1916,7 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		        ((CmiVerbsRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->key,
 		        (uint64_t)newNcpyOpInfo->srcPtr,
 		        ((CmiVerbsRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->key,
-		        newNcpyOpInfo->srcSize,
+		        std::min(newNcpyOpInfo->srcSize, newNcpyOpInfo->destSize),
 		        newNcpyOpInfo->srcPe,
 		        (uint64_t)rdmaPacket,
 		        IBV_WR_RDMA_READ);

@@ -9449,10 +9449,7 @@ AMPI_API_IMPL(int, MPI_Comm_free, MPI_Comm *comm)
     //ret = parent->freeUserKeyvals(*comm, parent->getKeyvals(*comm));
     if (*comm != MPI_COMM_WORLD && *comm != MPI_COMM_SELF) {
       ampi* ptr = getAmpiInstance(*comm);
-      ptr->barrier();
-      if (ptr->getRank() == 0) {
-        CProxy_CkArray(ptr->ckGetArrayID()).ckDestroy();
-      }
+      ptr->thisProxy[ptr->thisIndex].ckDestroy();
     }
     *comm = MPI_COMM_NULL;
   }

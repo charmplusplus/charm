@@ -49,6 +49,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include "converse.h"
+#include <algorithm>
 
 /*Support for ++debug: */
 #include <unistd.h> /*For getpid()*/
@@ -91,9 +92,9 @@
 #include "request.h"
 
 /* Runtime to exchange EP addresses during LrtsInit() */
-#if CMK_OFI_USE_PMI
+#if CMK_USE_PMI
 #include "runtime-pmi.C"
-#elif CMK_OFI_USE_PMI2
+#elif CMK_USE_PMI2
 #include "runtime-pmi2.C"
 #endif
 

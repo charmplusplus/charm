@@ -133,7 +133,7 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo) {
             dest_info->key,
             (uint64_t)(ncpyOpInfo->srcPtr),
             src_info->key,
-            ncpyOpInfo->srcSize,
+            std::min(ncpyOpInfo->srcSize, ncpyOpInfo->destSize),
             ncpyOpInfo->srcPe,
             (uint64_t)rdmaPacket,
             IBV_WR_RDMA_READ);
@@ -182,7 +182,7 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
             src_info->key,
             (uint64_t)(ncpyOpInfo->destPtr),
             dest_info->key,
-            ncpyOpInfo->srcSize,
+            std::min(ncpyOpInfo->srcSize, ncpyOpInfo->destSize),
             ncpyOpInfo->destPe,
             (uint64_t)rdmaPacket,
             IBV_WR_RDMA_WRITE);
