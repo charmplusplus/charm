@@ -3858,8 +3858,12 @@ void ConverseCommonInit(char **argv)
 
   CmiPersistentInit();
   CmiIsomallocInit(argv);
+
+#if !CMK_ONESIDED_IMPL
   // Initialize converse handlers for supporting generic Direct Nocopy API
   CmiOnesidedDirectInit();
+#endif
+
   CmiDeliversInit();
   CsdInit(argv);
 #if CMK_CCS_AVAILABLE
