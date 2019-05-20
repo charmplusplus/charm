@@ -418,6 +418,8 @@ void enqueueNcpyMessage(int destPe, void *msg){
 
 #if CMK_ONESIDED_IMPL
 /*********************************** Zerocopy Entry Method API ****************************/
+// Integer used to store the ncpy ack handler idx
+static int ncpy_handler_idx;
 
 
 /************************* Zerocopy Entry Method API - Utility functions ******************/
@@ -696,8 +698,8 @@ void handleEntryMethodApiCompletion(NcpyOperationInfo *info) {
 void handleReverseEntryMethodApiCompletion(NcpyOperationInfo *info) {
 
   if(info->ackMode == CMK_SRC_DEST_ACK || info->ackMode == CMK_DEST_ACK) {
-    // Send a message to the receiver to invoke the ackhandler function to update the counter
-    CmiInvokeRemoteAckHandler(info->destPe, info->refPtr);
+    // Send a message to the receiver to invoke CkRdmaEMAckHandler to update the counter
+    invokeRemoteNcpyAckHandler(info->destPe, info->refPtr, ncpyHandlerIdx::EM_ACK);
   }
 
 #if CMK_REG_REQUIRED
@@ -1071,7 +1073,9 @@ void CkRdmaEMBcastAckHandler(void *ack) {
         CkPackMessage(&env);
 
         NcpyBcastInterimAckInfo *ncpyBcastAck = (NcpyBcastInterimAckInfo *)ref;
-        CmiInvokeBcastAckHandler(ncpyBcastAck->origPe, ncpyBcastAck->parentBcastAckInfo);
+
+        // Invoke CkRdmaEMBcastAckHandler on my parent node
+        invokeRemoteNcpyAckHandler(ncpyBcastAck->origPe, ncpyBcastAck->parentBcastAckInfo, ncpyHandlerIdx::BCAST_ACK);
 
         CMI_ZC_MSGTYPE(myMsg) = CMK_ZC_BCAST_RECV_DONE_MSG;
 
@@ -1161,7 +1165,7 @@ void handleBcastEntryMethodApiCompletion(NcpyOperationInfo *info){
 void handleBcastReverseEntryMethodApiCompletion(NcpyOperationInfo *info) {
   if(info->ackMode == CMK_SRC_DEST_ACK || info->ackMode == CMK_DEST_ACK) {
     // Invoke the remote ackhandler function
-    CmiInvokeRemoteAckHandler(info->destPe, info->refPtr);
+    invokeRemoteNcpyAckHandler(info->destPe, info->refPtr, ncpyHandlerIdx::EM_ACK);
   }
   if(info->freeMe == CMK_FREE_NCPYOPINFO)
     CmiFree(info);
@@ -1199,7 +1203,7 @@ void handleMsgUsingCMAPostCompletionForSendBcast(envelope *copyenv, envelope *en
   if(t.child_count == 0) { // child node
 
     // Send a message to the parent node to signal completion
-    CmiInvokeBcastAckHandler(source.pe, (void *)source.bcastAckInfo);
+    invokeRemoteNcpyAckHandler(source.pe, (void *)source.bcastAckInfo, ncpyHandlerIdx::BCAST_ACK);
 
     // Only forwarding is to peer PEs
     forwardMessageToPeerNodes(copyenv, copyenv->getMsgtype());
@@ -1314,7 +1318,7 @@ void processBcastRecvEmApiCompletion(NcpyEmInfo *ncpyEmInfo, int destPe) {
     // Send message to all peer elements on this PE
     // Send a message to the worker thread
 #if CMK_SMP
-    CmiInvokeBcastPostAckHandler(destPe, ncpyEmInfo->msg);
+    invokeRemoteNcpyAckHandler(destPe, ncpyEmInfo->msg, ncpyHandlerIdx::BCAST_POST_ACK);
 #else
     CkRdmaEMBcastPostAckHandler(ncpyEmInfo->msg);
 #endif
@@ -1325,7 +1329,7 @@ void processBcastRecvEmApiCompletion(NcpyEmInfo *ncpyEmInfo, int destPe) {
     // Send a message to the worker thread
     // NOTE:: ncpyEmInfo is sent instead of ncpyEmInfo->msg
 #if CMK_SMP
-    CmiInvokeBcastPostAckHandler(destPe, ncpyEmInfo);
+    invokeRemoteNcpyAckHandler(destPe, ncpyEmInfo, ncpyHandlerIdx::BCAST_POST_ACK);
 #else
     CkRdmaEMBcastPostAckHandler(ncpyEmInfo);
 #endif
@@ -1477,7 +1481,7 @@ void sendAckMsgToParent(envelope *env)  {
   char *ref = (char *)getParentBcastAckInfo(env,srcPe);
 
   // Invoke BcastAckHandler on the parent node to notify completion
-  CmiInvokeBcastAckHandler(srcPe, ref);
+  invokeRemoteNcpyAckHandler(srcPe, ref, ncpyHandlerIdx::BCAST_ACK);
 }
 
 CkArray* getArrayMgrFromMsg(envelope *env) {
@@ -1745,5 +1749,33 @@ void readonlyGetCompleted(NcpyOperationInfo *ncpyOpInfo) {
   // Free ncpyOpInfo allocated inside readonlyGet
   CmiFree(ncpyOpInfo);
 }
+
+inline void _ncpyAckHandler(ncpyHandlerMsg *msg) {
+  switch(msg->opMode) {
+    case ncpyHandlerIdx::EM_ACK         : CkRdmaEMAckHandler(CmiMyPe(), msg->ref);
+                                          break;
+    case ncpyHandlerIdx::BCAST_ACK      : CkRdmaEMBcastAckHandler(msg->ref);
+                                          break;
+    case ncpyHandlerIdx::BCAST_POST_ACK : CkRdmaEMBcastPostAckHandler(msg->ref);
+                                          break;
+    default                             : CmiAbort("_ncpyAckHandler: Invalid OpMode\n");
+                                          break;
+  }
+}
+
+// Register converse handler for invoking ncpy ack
+void initEMNcpyAckHandler(void) {
+  ncpy_handler_idx = CmiRegisterHandler((CmiHandler)_ncpyAckHandler);
+}
+
+inline void invokeRemoteNcpyAckHandler(int pe, void *ref, ncpyHandlerIdx opMode) {
+  ncpyHandlerMsg *msg = (ncpyHandlerMsg *)CmiAlloc(sizeof(ncpyHandlerMsg));
+  msg->ref = ref;
+  msg->opMode = opMode;
+
+  CmiSetHandler(msg, ncpy_handler_idx);
+  CmiSyncSendAndFree(pe, sizeof(ncpyHandlerMsg), (char *)msg);
+}
+
 #endif
 /* End of CMK_ONESIDED_IMPL */
