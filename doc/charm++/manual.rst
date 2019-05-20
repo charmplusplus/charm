@@ -345,6 +345,14 @@ Syntax highlighting in Emacs can be enabled by triggering C++ handling on the .c
 
    (add-to-list 'auto-mode-alist '("\\.ci\\'" . c++-mode))
 
+Pygments
+''''''''
+
+Pygments supports syntax highlighting of .ci files starting with version 2.4.0,
+when setting ``charmci`` as the highlighting language, or automatically for files with
+the ``.ci`` filename extension.
+
+
 Modules
 ~~~~~~~
 
@@ -734,7 +742,7 @@ large structure by reference than by value.
 As an example, refer to the following code from
 ``examples/charm++/PUP/HeapPUP``:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    // In HeapObject.h:
 
@@ -1791,7 +1799,7 @@ For simplicity, ``when`` constructs can also specify multiple expected
 entry methods that all feed into a single body, by separating their
 prototypes with commas:
 
-.. code-block:: c++
+.. code-block:: charmci
 
    entry void startStep() {
      when firstInput(Input first),
@@ -6458,7 +6466,7 @@ BaseChare, then the derived chare of type DerivedChare needs to be
 declared in the Charm++ interface file to be explicitly derived from
 BaseChare. Thus, the constructs in the ``.ci`` file should look like:
 
-.. code-block:: c++
+.. code-block:: charmci
 
      chare BaseChare {
        entry BaseChare(someMessage *);
@@ -6688,7 +6696,7 @@ instantiation is desired.
 For the message and chare templates described above, a few
 instantiations might look like
 
-.. code-block:: c++
+.. code-block:: charmci
 
    module D {
      extern module A;
@@ -6706,7 +6714,7 @@ because they must specify the chare class containing them. The template
 arguments are also specified directly in the method’s parameters, rather
 than as distinct template arguments.
 
-.. code-block:: c++
+.. code-block:: charmci
 
    module E {
      extern module D;
