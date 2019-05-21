@@ -33,7 +33,7 @@
 #define UCX_MSG_TAG_PROBE         UCS_BIT(1)
 #define UCX_RMA_TAG_GET           UCS_BIT(UCX_TAG_MSG_BITS + 1)
 #define UCX_RMA_TAG_PUT           UCS_BIT(UCX_TAG_MSG_BITS + 2)
-#define UCX_RMA_TAG_ACK           UCS_BIT(UCX_TAG_MSG_BITS + 3)
+#define UCX_RMA_TAG_DEREG_AND_ACK UCS_BIT(UCX_TAG_MSG_BITS + 3)
 #define UCX_MSG_TAG_MASK          UCS_MASK(UCX_TAG_MSG_BITS)
 #define UCX_RMA_TAG_MASK          (UCS_MASK(UCX_TAG_RMA_BITS) << UCX_TAG_MSG_BITS)
 
@@ -330,7 +330,7 @@ static void UcxRxReqCompleted(void *request, ucs_status_t status,
         resetNcpyOpInfoPointers(ncpyOpInfo);
         ncpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO; // It's a message, not a real ncpy Obj
         UcxRmaOp(ncpyOpInfo, UCX_RMA_OP_GET);
-    } else if (info->sender_tag & UCX_RMA_TAG_GET) {
+    } else if (info->sender_tag & UCX_RMA_TAG_DEREG_AND_ACK) {
         NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(req->msgBuf);
         resetNcpyOpInfoPointers(ncpyOpInfo);
         ncpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO;

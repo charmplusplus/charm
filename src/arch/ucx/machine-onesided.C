@@ -163,5 +163,5 @@ void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo)
 {
   UcxSendMsg(CmiNodeOf(ncpyOpInfo->srcPe), ncpyOpInfo->srcPe,
              ncpyOpInfo->ncpyOpInfoSize, (char*)ncpyOpInfo,
-             UCX_RMA_TAG_ACK, UcxRmaSendCompleted);
+             UCX_RMA_TAG_DEREG_AND_ACK, UcxRmaSendCompleted);
 }
