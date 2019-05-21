@@ -2,7 +2,6 @@ DIRS = \
   simple_get \
   simple_put \
   get_put_pingpong \
-  pingpong \
 
 TESTDIRS = $(DIRS)
 

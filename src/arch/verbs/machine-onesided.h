@@ -20,10 +20,10 @@ typedef struct _cmi_verbs_rzv_rdma_pointer {
 typedef struct _cmi_verbs_rdma_reverse_op {
   const void *destAddr;
   int destPe;
-  int destMode;
+  int destRegMode;
   const void *srcAddr;
   int srcPe;
-  int srcMode;
+  int srcRegMode;
 
   struct ibv_mr *rem_mr;
   uint32_t rem_key;
@@ -56,13 +56,13 @@ void LrtsIssueRget(
   void *srcAck,
   int srcAckSize,
   int srcPe,
-  unsigned short int *srcMode,
+  unsigned short int *srcRegMode,
   const void* destAddr,
   void *destInfo,
   void *destAck,
   int destAckSize,
   int destPe,
-  unsigned short int *destMode,
+  unsigned short int *destRegMode,
   int size);
 
 // Perform an RDMA Put call into the remote destination address from the local source address
@@ -72,13 +72,13 @@ void LrtsIssueRput(
   void *destAck,
   int destAckSize,
   int destPe,
-  unsigned short int *destMode,
+  unsigned short int *destRegMode,
   const void* srcAddr,
   void *srcInfo,
   void *srcAck,
   int srcAckSize,
   int srcPe,
-  unsigned short int *srcMode,
+  unsigned short int *srcRegMode,
   int size);
 
 void registerDirectMemory(void *info, const void *addr, int size);

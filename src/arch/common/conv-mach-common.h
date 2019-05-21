@@ -7,12 +7,12 @@
 // Enum for registration modes used in the Zerocopy API
 // TODO:Convert to typed enum post C++ conversion
 enum ncpyRegModes {
-  /* CMK_BUFFER_REG always registers the buffer by treating network and non-network transfers
+  /* CMK_BUFFER_REG is the default mode that always registers the buffer by treating network and non-network transfers
    * equally. It avoids an extra small message to register, as done in the case of CMK_BUFFER_UNREG
    */
   CMK_BUFFER_REG      = 0,
 
-  /* CMK_BUFFER_UNREG is the default mode which doesn't register the buffer and avoids
+  /* CMK_BUFFER_UNREG is used for not registering the buffer during object creation and it avoids
    * non-network registration by registering only when required i.e only when this buffer
    * is involved in an RDMA operation using the network. (either as a source or destination).
    * The registeration on demand is performed by sending a small message to the remote process
@@ -36,6 +36,24 @@ enum ncpyRegModes {
   CMK_BUFFER_NOREG    = 3
 };
 
+// Enum for de-registration modes used in the Zerocopy API
+// TODO:Convert to typed enum post C++ conversion
+enum ncpyDeregModes {
+  /* CMK_BUFFER_DEREG is the default mode which makes the RTS de-register the buffers after the completion
+   * of the Zero Copy operation
+   */
+  CMK_BUFFER_DEREG    = 4,
+
+  /* CMK_BUFFER_NODEREG is used to make the RTS skip the de-registration of the buffers after the completion
+   * of the Zero Copy operation. For the ZC Send API, specifying CMK_BUFFER_NODEREG in CkSendBuffer ensures that
+   * the source buffer remains registered after the completion of the operation. For the ZC Post API, in addition
+   * to specifying CMK_BUFFER_NODEREG in CkSendBuffer, it can also be specified in the Post Entry Method using the
+   * CkNcpyBufferPost object. This ensures that the destination buffer, which was posted by the user remains
+   * registered after the completion of the operation.
+   */
+  CMK_BUFFER_NODEREG  = 5
+};
+
 // default of CMK_COMMON_NOCOPY_DIRECT_BYTES assumes no CMA support
 // Refined for lrts layers with CMA support inside lrts-common.h
 #define CMK_COMMON_NOCOPY_DIRECT_BYTES 0
@@ -43,12 +61,13 @@ enum ncpyRegModes {
 // Enum for the type of zerocopy operation
 // TODO: Convert to typed enum post C++ conversion
 enum ncpyOperationMode {
-  CMK_DIRECT_API          = 0,
-  CMK_EM_API              = 1,
-  CMK_EM_API_REVERSE      = 2,
-  CMK_BCAST_EM_API        = 3,
-  CMK_BCAST_EM_API_REVERSE= 4,
-  CMK_READONLY_BCAST      = 5
+  CMK_DIRECT_API            = 0,
+  CMK_EM_API                = 1,
+  CMK_EM_API_SRC_ACK_INVOKE = 2,
+  CMK_EM_API_REVERSE        = 3,
+  CMK_BCAST_EM_API          = 4,
+  CMK_BCAST_EM_API_REVERSE  = 5,
+  CMK_READONLY_BCAST        = 6
 };
 
 // Enum for the method of acknowledglement handling after the completion of a zerocopy operation

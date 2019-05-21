@@ -7,7 +7,6 @@
 #     * Charm++ runtime
 #     * ITC++ Translator
 #     * Languages
-#     * Documentation
 #
 # This Makefile is common to all machines.  This works because the charmc
 # is smart enough to "conceal" the differences between machines.  charmc
@@ -33,11 +32,18 @@ CXX=$(CHARMC)
 CFLAGS=-I.
 CXXFLAGS=-I.
 
-all: charm++ bigsim LIBS AMPI f90charm TSM SM PVM doc everylb
+all: charm++ bigsim LIBS AMPI f90charm TSM SM PVM everylb
 
-all-test: bigsim LIBS
+all-test: all-test-tests all-test-examples all-test-benchmarks
+
+all-test-tests: bigsim LIBS
 	$(MAKE) -C ../tests all
+
+all-test-examples: bigsim LIBS
 	$(MAKE) -C ../examples all
+
+all-test-benchmarks: bigsim LIBS
+	$(MAKE) -C ../benchmarks all
 
 charm++: charm-target
 	@echo "$(OPTS)" > OPTS
@@ -84,7 +90,7 @@ charm4py: libcharm
 
 LIBCHARM_LIBS= libck.a libconv-core.a libconv-util.a libmemory-default.a libconv-machine.a \
                libthreads-default.a libconv-partition.a libtmgr.a libhwloc_embedded.a \
-               libldb-rand.a libconv-ldb.a libmoduleGreedyRefineLB.a
+               libldb-rand.a libconv-ldb.a libmoduleGreedyRefineLB.a libmoduleRandCentLB.a
 
 DEFAULT_LIBS= completion NDMeshStreamer dummy pythonCCS io ckloop
 
@@ -157,6 +163,7 @@ LIBS: CONVLIBS CHARMLIBS everylb
 bgtest: bigsim LIBS
 	$(MAKE) -C ../tests bgtest
 	$(MAKE) -C ../examples bgtest
+	$(MAKE) -C ../benchmarks bgtest
 
 syncfttest causalfttest mpisyncfttest mlogfttest: charm++ LIBS
 	$(MAKE) -C ../tests $@
@@ -164,6 +171,7 @@ syncfttest causalfttest mpisyncfttest mlogfttest: charm++ LIBS
 test: bigsim LIBS
 	$(MAKE) -C ../tests test
 	$(MAKE) -C ../examples test
+	$(MAKE) -C ../benchmarks test
 
 test-tests: bigsim LIBS
 	$(MAKE) -C ../tests test
@@ -171,26 +179,39 @@ test-tests: bigsim LIBS
 test-examples: bigsim LIBS
 	$(MAKE) -C ../examples test
 
+test-benchmarks: bigsim LIBS
+	$(MAKE) -C ../benchmarks test
+
 test-converse: converse
 	$(MAKE) -C ../tests test-converse
+	$(MAKE) -C ../benchmarks test-converse
 
 test-charm: charm++
 	$(MAKE) -C ../tests test-charm
+	$(MAKE) -C ../benchmarks test-charm
 
 test-AMPI: AMPI
 	$(MAKE) -C ../tests test-AMPI
+	$(MAKE) -C ../benchmarks test-AMPI
 
-ps-doc: basics
-	$(MAKE) -C ../doc ps
+test-tests-converse: converse
+	$(MAKE) -C ../tests test-converse
 
-pdf-doc: basics
-	$(MAKE) -C ../doc pdf
+test-tests-charm: charm++
+	$(MAKE) -C ../tests test-charm
 
-html-doc: basics
-	$(MAKE) -C ../doc html
+test-tests-AMPI: AMPI
+	$(MAKE) -C ../tests test-AMPI
 
-doc: basics
-	$(MAKE) -C ../doc doc
+test-benchmarks-converse: converse
+	$(MAKE) -C ../benchmarks test-converse
+
+test-benchmarks-charm: charm++
+	$(MAKE) -C ../benchmarks test-charm
+
+test-benchmarks-AMPI: AMPI
+	$(MAKE) -C ../benchmarks test-AMPI
+
 
 CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 
@@ -240,6 +261,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
 UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwork4.h pup_paged.h pup_cmialloc.h\
+	pup_c_functions.h \
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h ckliststring.h \
 	cksequence.h ckstatistics.h ckvector3d.h conv-lists.h ckcomplex.h \
 	sockRoutines.h sockRoutines.C cmimemcpy.h simd.h SSE-Double.h SSE-Float.h \
@@ -340,37 +362,39 @@ dirs+sources:
 ifeq (false,$(CMK_NO_BUILD_SHARED))
 	rm -rf ../lib_so ; mkdir ../lib_so; touch ../lib_so/.charmso
 endif
+	rm -rf ../benchmarks
 	rm -rf ../examples
 	rm -rf ../tests
-	rm -rf ../doc ; ln -s ../doc ../doc
-	$(SRCBASE)/scripts/gatherflat $(SRCBASE)/scripts .
-	./gatherflat $(SRCBASE)/conv-core        .
-	./gatherflat $(SRCBASE)/conv-ldb         .
-	./gatherflat $(SRCBASE)/conv-ccs         .
-	./gatherflat $(SRCBASE)/conv-perf	.
-	./gatherflat $(SRCBASE)/ck-core          .
-	./gatherflat $(SRCBASE)/ck-perf          .
-	./gatherflat $(SRCBASE)/ck-pics          .
-	./gatherflat $(SRCBASE)/ck-ldb           .
-	./gatherflat $(SRCBASE)/ck-cp            .
-	./gatherflat $(SRCBASE)/langs/simplemsg  .
-	./gatherflat $(SRCBASE)/langs/pvmc       .
-	./gatherflat $(SRCBASE)/langs/bluegene   .
-	./gatherflat $(SRCBASE)/langs/f90charm   .
-	./gatherflat $(SRCBASE)/xlatcpm          .
-	./gathertree $(SRCBASE)/QuickThreads     QuickThreads
-	./gathertree $(SRCBASE)/../contrib/hwloc hwloc
-	./gathertree $(SRCBASE)/libs             libs
-	./gathertree $(SRCBASE)/arch/util        .
-	./gathertree $(SRCBASE)/util             .
-	./gathertree $(SRCBASE)/langs            langs
-	./gathertree $(SRCBASE)/langs/jade       langs/jade
-	./gathertree $(SRCBASE)/arch/common      .
-	./gathertree $(SRCBASE)/arch/$(CMK_GDIR) .
+	$(SRCBASE)/scripts/gatherflat $(SRCBASE)/scripts          .
+	./gatherflat $(SRCBASE)/conv-core                        .
+	./gatherflat $(SRCBASE)/conv-ldb                         .
+	./gatherflat $(SRCBASE)/conv-ccs                         .
+	./gatherflat $(SRCBASE)/conv-perf                        .
+	./gatherflat $(SRCBASE)/ck-core                          .
+	./gatherflat $(SRCBASE)/ck-perf                          .
+	./gatherflat $(SRCBASE)/ck-pics                          .
+	./gatherflat $(SRCBASE)/ck-ldb                           .
+	./gatherflat $(SRCBASE)/ck-cp                            .
+	./gatherflat $(SRCBASE)/langs/simplemsg                  .
+	./gatherflat $(SRCBASE)/langs/pvmc                       .
+	./gatherflat $(SRCBASE)/langs/bluegene                   .
+	./gatherflat $(SRCBASE)/langs/f90charm                   .
+	./gatherflat $(SRCBASE)/xlatcpm                          .
+	./gathertree $(SRCBASE)/QuickThreads                     QuickThreads
+	./gathertree $(SRCBASE)/../contrib/hwloc                 hwloc
+	./gathertree $(SRCBASE)/libs                             libs
+	./gathertree $(SRCBASE)/arch/util                        .
+	./gathertree $(SRCBASE)/arch/util/proc_management        proc_management
+	./gathertree $(SRCBASE)/util                             .
+	./gathertree $(SRCBASE)/langs                            langs
+	./gathertree $(SRCBASE)/langs/jade                       langs/jade
+	./gathertree $(SRCBASE)/arch/common                      .
+	./gathertree $(SRCBASE)/arch/$(CMK_GDIR)                 .
 	test -f $(SRCBASE)/arch/$(CMK_GDIR)/gdir_link && cat $(SRCBASE)/arch/$(CMK_GDIR)/gdir_link > .gdir.new && ./gathertree $(SRCBASE)/arch/`cat .gdir.new`      . || true
-	./gatherflat $(SRCBASE)/arch/$(CMK_VDIR) .
-	./gathertree $(SRCBASE)/../examples             ../examples
-	./gathertree $(SRCBASE)/../tests                ../tests
+	./gatherflat $(SRCBASE)/arch/$(CMK_VDIR)                 .
+	./gathertree $(SRCBASE)/../benchmarks                    ../benchmarks
+	./gathertree $(SRCBASE)/../examples                      ../examples
+	./gathertree $(SRCBASE)/../tests                         ../tests
 	rm -f ../bin/dep.pl ; cp dep.pl ../bin/
 	chmod +x charmc
 	-./system_ln  ../tmp/charmc ../bin/
@@ -779,6 +803,7 @@ $(L)/libtrace-simple.a: $(LIBTRACE_SIMPLE)
 libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
   conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h \
   conv-mach-ifort.h pup_c.h conv-cpm.h conv-cpath.h conv-qd.h \
+  pup_c_functions.h \
   conv-random.h conv-lists.h conv-trace.h persistent.h debug-conv.h pup.h \
   middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
   ckhashtable.h debug-charm.h CkMarshall.decl.h cksection.h ckcallback.h \
@@ -1017,19 +1042,13 @@ clean:
 	rm -f core *~
 	rm -f *.stamp
 	if [ -d charmrun-src ] ; then ( $(MAKE) -C charmrun-src clean ) ; fi
-	-( $(MAKE) -C doc clean )
 	( $(MAKE) -C libs clean )
+	( $(MAKE) -C ../benchmarks clean )
 	( $(MAKE) -C ../examples clean )
 	( $(MAKE) -C ../tests clean )
 
 veryclean:
-	rm -rf ../bin
-	rm -rf ../lib
-	rm -rf ../src
-	rm -rf ../examples
-	rm -rf ../tests
-	rm -rf ../include
-	rm -rf ../doc
+	rm -rf ../bin ../lib ../src ../benchmarks ../examples ../tests ../include
 	mv Makefile .Makefile
 	mv Make.depends .Make.depends
 	rm -rf [a-z]* [A-Z]*

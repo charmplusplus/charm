@@ -316,8 +316,8 @@ public:
   virtual char *ckDebugChareName(void);
   virtual int ckDebugChareID(char*, int);
 
-  /// Synonym for ckMigrate
-  inline void migrateMe(int toPe) {ckMigrate(toPe);}
+  void ckEmigrate(int toPe) {ckMigrate(toPe);}
+
 
 #ifdef _PIPELINED_ALLREDUCE_
 	void contribute2(CkArrayIndex myIndex, int dataSize,const void *data,CkReduction::reducerType type,
@@ -430,6 +430,8 @@ typedef ArrayElementT<CkIndex5D> ArrayElement5D;
 typedef ArrayElementT<CkIndex6D> ArrayElement6D;
 typedef ArrayElementT<CkIndexMax> ArrayElementMax;
 
+#if CMK_CHARMPY
+
 extern void (*ArrayMsgRecvExtCallback)(int, int, int *, int, int, char *, int);
 extern int (*ArrayElemLeaveExt)(int, int, int *, char**, int);
 extern void (*ArrayElemJoinExt)(int, int, int *, int, char*, int);
@@ -515,6 +517,8 @@ public:
                             thisIndexMax.data());
   }
 };
+
+#endif
 
 /*@}*/
 

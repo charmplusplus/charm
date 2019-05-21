@@ -57,81 +57,30 @@ void pup_bar(pup_er p,bar *b)
 
 */
 
+#include "conv-config.h"
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include "conv-config.h"
-#include "stddef.h"
 
 /*This is actually a PUP::er *, cast to void *.
   From C++, you can pass "&p" as a pup_er.
 */
 typedef void *pup_er;
 
-/*Allocate PUP::er of different kind */
-pup_er pup_new_sizer(void);
-pup_er pup_new_toMem(void *Nbuf);
-pup_er pup_new_fromMem(const void *Nbuf);
-pup_er pup_new_network_sizer(void);
-pup_er pup_new_network_pack(void *Nbuf);
-pup_er pup_new_network_unpack(const void *Nbuf);
-#if CMK_CCS_AVAILABLE
-pup_er pup_new_fmt(pup_er p);
-void pup_fmt_sync_begin_object(pup_er p);
-void pup_fmt_sync_end_object(pup_er p);
-void pup_fmt_sync_begin_array(pup_er p);
-void pup_fmt_sync_end_array(pup_er p);
-void pup_fmt_sync_item(pup_er p);
-#endif
-void pup_destroy(pup_er p);
 
-/*Determine what kind of pup_er we have--
-return 1 for true, 0 for false.*/
-int pup_isPacking(const pup_er p);
-int pup_isUnpacking(const pup_er p);
-int pup_isSizing(const pup_er p);
-int pup_isDeleting(const pup_er p);
-int pup_isUserlevel(const pup_er p);
-int pup_isRestarting(const pup_er p);
-char *pup_typeString(const pup_er p);
+#ifndef AMPI_INTERNAL_SKIP_FUNCTIONS
 
-/*Insert a synchronization into the data stream */
-void pup_syncComment(const pup_er p, unsigned int sync, const char *message);
-void pup_comment(const pup_er p, const char *message);
+#define AMPI_CUSTOM_FUNC(return_type, function_name, ...) \
+extern return_type function_name(__VA_ARGS__);
 
-/*Read the size of a pupper */
-size_t pup_size(const pup_er p);
+#include "pup_c_functions.h"
 
-/* Utilities to approximately encode large sizes, within 0.5% */
-CMK_TYPEDEF_UINT2 pup_encodeSize(size_t s);
-size_t pup_decodeSize(CMK_TYPEDEF_UINT2 a);
+#undef AMPI_CUSTOM_FUNC
 
-/*Pack/unpack data items, declared with macros for brevity.
-The macros expand like:
-void pup_int(pup_er p,int *i); <- single integer pack/unpack
-void pup_ints(pup_er p,int *iarr,int nItems); <- array pack/unpack
-*/
-#define PUP_BASIC_DATATYPE(typeName,type) \
-  void pup_##typeName(pup_er p,type *v); \
-  void pup_##typeName##s(pup_er p,type *arr,size_t nItems);
+#endif /* !defined AMPI_INTERNAL_SKIP_FUNCTIONS */
 
-PUP_BASIC_DATATYPE(char,char)
-PUP_BASIC_DATATYPE(short,short)
-PUP_BASIC_DATATYPE(int,int)
-PUP_BASIC_DATATYPE(long,long)
-PUP_BASIC_DATATYPE(uchar,unsigned char)
-PUP_BASIC_DATATYPE(ushort,unsigned short)
-PUP_BASIC_DATATYPE(uint,unsigned int)
-PUP_BASIC_DATATYPE(ulong,unsigned long)
-PUP_BASIC_DATATYPE(float,float)
-PUP_BASIC_DATATYPE(double,double)
-PUP_BASIC_DATATYPE(pointer,void*)
-PUP_BASIC_DATATYPE(int8, CMK_TYPEDEF_INT8)
-PUP_BASIC_DATATYPE(size_t, size_t)
-
-/*Pack/unpack untyped byte array:*/
-void pup_bytes(pup_er p,void *ptr,size_t nBytes);
 
 /* These MUST match the sync declarations in pup.h */
 enum {

@@ -2,6 +2,7 @@
  * Specific implementations are in arch/layer/machine-onesided.{h,c}
  */
 #include "converse.h"
+#include <algorithm>
 
 // Methods required to keep the Nocopy Direct API functional on non-LRTS layers
 #if !CMK_USE_LRTS
@@ -50,7 +51,7 @@ static void putDataHandler(ConverseRdmaMsg *payloadMsg) {
   // copy the received messsage into the user's destination address
   memcpy((char *)ncpyOpInfo->destPtr,
          (char *)payloadMsg + sizeof(ConverseRdmaMsg) + ncpyOpInfo->ncpyOpInfoSize,
-         ncpyOpInfo->srcSize);
+         std::min(ncpyOpInfo->srcSize, ncpyOpInfo->destSize));
 
   // Invoke the destination ack
   ncpyOpInfo->ackMode = CMK_DEST_ACK; // Only invoke the destination ack

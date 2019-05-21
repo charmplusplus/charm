@@ -143,10 +143,8 @@ class Stencil: public CBase_Stencil {
     // callback function called on completion of sending ghosts
     void completedSendingGhost(CkDataMsg *msg){
       CkNcpyBuffer *src = (CkNcpyBuffer *)(msg->data);
-      void *ptr = (void *)(src->ptr);
-      // deregister memory
-      src->deregisterMem();
-      free(ptr);
+      double *ptr = (double *)(src->ptr);
+      delete [] ptr;
 
       delete msg;
       counter++;

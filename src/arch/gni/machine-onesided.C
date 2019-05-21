@@ -227,7 +227,7 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo) {
                             ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
                             dest_addr,
                             ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
-                            ncpyOpInfo->srcSize,
+                            std::min(ncpyOpInfo->srcSize, ncpyOpInfo->destSize),
                             (uint64_t)ncpyOpInfo,
                             CmiNodeOf(ncpyOpInfo->srcPe),
                             GNI_POST_RDMA_GET,
@@ -260,7 +260,7 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo) {
 
 // Perform an RDMA Put call into the remote destination address from the local source address
 void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
-  if(ncpyOpInfo->destMode == CMK_BUFFER_UNREG) {
+  if(ncpyOpInfo->destRegMode == CMK_BUFFER_UNREG) {
     // Remote buffer is unregistered, send a message to register it and perform GET
 
     // send all the data to the source to register and perform a get
@@ -300,7 +300,7 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
                           src_addr,
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
-                          ncpyOpInfo->srcSize,
+                          std::min(ncpyOpInfo->srcSize, ncpyOpInfo->destSize),
                           (uint64_t)ncpyOpInfo,
                           CmiNodeOf(ncpyOpInfo->destPe),
                           GNI_POST_RDMA_PUT,
@@ -328,7 +328,7 @@ void deregisterDirectMem(gni_mem_handle_t mem_hndl, int pe) {
 
 // Method invoked to deregister memory handle
 void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode){
-  if(mode == CMK_BUFFER_REG) {
+  if(mode != CMK_BUFFER_PREREG && mode != CMK_BUFFER_NOREG) {
     CmiGNIRzvRdmaPtr_t *destInfo = (CmiGNIRzvRdmaPtr_t *)info;
     deregisterDirectMem(destInfo->mem_hndl, pe);
   }
@@ -342,7 +342,7 @@ void _performOneRgetForWorkerThread(MSG_LIST *ptr) {
             ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
             (uint64_t)ncpyOpInfo->destPtr,
             ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
-            ncpyOpInfo->srcSize,
+            std::min(ncpyOpInfo->srcSize, ncpyOpInfo->destSize),
             (uint64_t)ncpyOpInfo,
             ptr->destNode,
             GNI_POST_RDMA_GET,
@@ -356,10 +356,43 @@ void _performOneRputForWorkerThread(MSG_LIST *ptr) {
             ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
             (uint64_t)ncpyOpInfo->srcPtr,
             ((CmiGNIRzvRdmaPtr_t *)((char *)(ncpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
-            ncpyOpInfo->srcSize,
+            std::min(ncpyOpInfo->srcSize, ncpyOpInfo->destSize),
             (uint64_t)ncpyOpInfo,
             ptr->destNode,
             GNI_POST_RDMA_PUT,
             DIRECT_SEND_RECV);
 }
 #endif
+
+
+void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo) {
+
+  // ncpyOpInfo is a part of the received message and can be freed before this send completes
+  // for that reason, it is copied into a new message
+  NcpyOperationInfo *newNcpyOpInfo = newNcpyOpInfo = (NcpyOperationInfo *)CmiAlloc(ncpyOpInfo->ncpyOpInfoSize);
+  memcpy(newNcpyOpInfo, ncpyOpInfo, ncpyOpInfo->ncpyOpInfoSize);
+
+  resetNcpyOpInfoPointers(newNcpyOpInfo);
+  newNcpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO;
+
+#if CMK_SMP
+  // send the small message to the other node through the comm thread
+  buffer_small_msgs(&smsg_queue, newNcpyOpInfo, newNcpyOpInfo->ncpyOpInfoSize,
+                        CmiNodeOf(newNcpyOpInfo->srcPe),
+                        RDMA_DEREG_AND_ACK_MD_DIRECT_TAG);
+#else // non-smp mode
+
+  // send the small message directly
+  gni_return_t status = send_smsg_message(&smsg_queue,
+                          CmiNodeOf(newNcpyOpInfo->srcPe),
+                          newNcpyOpInfo,
+                          newNcpyOpInfo->ncpyOpInfoSize,
+                          RDMA_DEREG_AND_ACK_MD_DIRECT_TAG,
+                          0, NULL, CHARM_SMSG, 1);
+#if !CMK_SMSGS_FREE_AFTER_EVENT
+  if(status == GNI_RC_SUCCESS && newNcpyOpInfo->freeMe == CMK_FREE_NCPYOPINFO) {
+    CmiFree(newNcpyOpInfo);
+  }
+#endif // end of !CMK_SMSGS_FREE_AFTER_EVENT
+#endif // end of CMK_SMP
+}

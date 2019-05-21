@@ -74,6 +74,7 @@ never be excluded...
 #include "spanningTree.h"
 #if CMK_CHARMPY
 #include "GreedyRefineLB.h"
+#include "RandCentLB.h"
 #endif
 
 #if CMK_CUDA
@@ -984,7 +985,7 @@ static void _roRdmaDoneHandler(envelope *env) {
           CmiDeregisterMem(buffAckInfo->ptr,
                            buffAckInfo->layerInfo +CmiGetRdmaCommonInfoSize(),
                            buffAckInfo->pe,
-                           buffAckInfo->mode);
+                           buffAckInfo->regMode);
         }
 
         if(roBcastAckInfo->isRoot != 1) {
@@ -1518,6 +1519,7 @@ void _initCharm(int unused_argc, char **argv)
                   at least for strategies used in central/hybrid, because they will stop being chares.
                 */
 		_registerGreedyRefineLB();
+		_registerRandCentLB();
 #endif
 
 		/**

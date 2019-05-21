@@ -1,5 +1,4 @@
 DIRS = \
-  pingpong \
   creduce \
   Cjacobi3D \
 

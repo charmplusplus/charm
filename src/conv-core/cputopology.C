@@ -44,63 +44,14 @@
 extern "C" int getXTNodeID(int mpirank, int nummpiranks);
 #endif
 
-#if defined(__APPLE__)  && CMK_HAS_MULTIPROCESSING_H
-#include <Carbon/Carbon.h>
-#include <Multiprocessing.h>
-#endif
-
 #if CMK_BIGSIM_CHARM
 #include "middle-blue.h"
 using namespace BGConverse;
 #endif
 
 extern "C" int CmiNumCores(void) {
-  int a = 1;
-#ifdef _WIN32
-struct _SYSTEM_INFO sysinfo;
-#endif  
-
-  /* Allow the user to override the number of CPUs for use
-     in scalability testing, debugging, etc. */
-  char *forcecount = getenv("FORCECPUCOUNT");
-  if (forcecount != NULL) {
-    if (sscanf(forcecount, "%d", &a) == 1) {
-      return a; /* if we got a valid count, return it */
-    } else {
-      a = 1;      /* otherwise use the real available hardware CPU count */
-    }
-  }
-
-#if defined(__APPLE__)  && CMK_HAS_MULTIPROCESSING_H
-  a = MPProcessorsScheduled(); /* Number of active/running CPUs */
-#endif
-
-#ifdef _WIN32
-  //struct _SYSTEM_INFO sysinfo;  
-  GetSystemInfo(&sysinfo);
-  a = sysinfo.dwNumberOfProcessors; /* total number of CPUs */
-#endif /* _MSC_VER */
-
-
-#ifdef _SC_NPROCESSORS_ONLN
-  a = sysconf(_SC_NPROCESSORS_ONLN); /* number of active/running CPUs */
-#ifdef _SC_NPROCESSORS_CONF
-  /* also consider CPUs that are temporarily powered down by the OS */
-  const int b = sysconf(_SC_NPROCESSORS_CONF);
-  if ( b > a ) a = b;
-#endif
-#elif defined(_SC_CRAY_NCPU)
-  a = sysconf(_SC_CRAY_NCPU);
-#elif defined(_SC_NPROC_ONLN)
-  a = sysconf(_SC_NPROC_ONLN); /* number of active/running CPUs */
-#endif
-#if CMK_BLUEGENEQ
-  a *= Kernel_ProcessCount();
-#endif
-
-  if (a < 1) a = 1;
-
-  return a;
+  // PU count is the intended output here rather than literal cores
+  return CmiHwlocTopologyLocal.num_pus;
 }
 
 struct _procInfo {
@@ -238,7 +189,7 @@ using namespace CpuTopoDetails;
 static void printTopology(int numNodes)
 {
   // assume all nodes have same number of cores
-  const int ways = CmiNumCores();
+  const int ways = CmiHwlocTopologyLocal.num_pus;
   if (ways > 1)
     CmiPrintf("Charm++> Running on %d hosts (%d sockets x %d cores x %d PUs = %d-way SMP)\n",
               numNodes, CmiHwlocTopologyLocal.num_sockets,
@@ -247,12 +198,6 @@ static void printTopology(int numNodes)
               ways);
   else
     CmiPrintf("Charm++> Running on %d hosts\n", numNodes);
-
-#if !CMK_BLUEGENEQ
-  // ignore BG/Q's reserved socket
-  if (ways != CmiHwlocTopologyLocal.num_pus)
-    CmiPrintf("Charm++> Warning: Internally-determined PU count does not match hwloc's result!\n");
-#endif
 }
 
 /* called on PE 0 */

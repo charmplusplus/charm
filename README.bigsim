@@ -249,7 +249,7 @@ For more information, please refer to the BigSim and Projections manuals.
 	./seqSimulator -tproj
 
 8- download and make Projections:
-	git clone https://charm.cs.illinois.edu/gerrit/projections
+	git clone https://github.com/UIUC-PPL/projections
 	cd projections
 	ant
 

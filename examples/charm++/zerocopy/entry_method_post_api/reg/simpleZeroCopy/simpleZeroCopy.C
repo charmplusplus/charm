@@ -77,7 +77,7 @@ class zerocopyObject : public CBase_zerocopyObject{
   int destIndex, iter, num, j;
   int mixedZeroCopySentCounter, sdagZeroCopySentCounter, sdagZeroCopyRecvCounter;
   bool firstMigrationPending;
-  CkCallback cb, sdagCb;
+  CkCallback cb, sdagCb, cbCopy;
   int idx_zerocopySent, idx_sdagZeroCopySent;;
   CProxy_Main mainProxy;
 
@@ -107,6 +107,7 @@ class zerocopyObject : public CBase_zerocopyObject{
       idx_zerocopySent = CkIndex_zerocopyObject::zerocopySent(NULL);
       idx_sdagZeroCopySent = CkIndex_zerocopyObject::sdagZeroCopySent(NULL);
       cb = CkCallback(idx_zerocopySent, thisProxy[thisIndex]);
+      cbCopy = cb;
       sdagCb = CkCallback(idx_sdagZeroCopySent, thisProxy[thisIndex]);
     }
 
@@ -162,9 +163,12 @@ class zerocopyObject : public CBase_zerocopyObject{
     void zerocopySent(CkDataMsg *m){
       // Get access to the array information sent via zerocopy
       CkNcpyBuffer *src = (CkNcpyBuffer *)(m->data);
-      // de-register the memory
-      src->deregisterMem();
-      free((void *)(src->ptr));
+      int refNum = CkGetRefNum(m);
+
+      if(refNum == 1)
+        delete [] (double *)(src->ptr);
+      else
+        delete [] (int *)(src->ptr);
 
       delete m;
 
@@ -178,9 +182,6 @@ class zerocopyObject : public CBase_zerocopyObject{
 
       // Get access to the array information sent via zerocopy
       CkNcpyBuffer *src = (CkNcpyBuffer *)(m->data);
-
-      // de-register the memory
-      src->deregisterMem();
 
       void *ptr = (void *)(src->ptr); // do not free pointer as it is used in the next iteration as well
 
@@ -248,9 +249,9 @@ class zerocopyObject : public CBase_zerocopyObject{
       ptr2 = dArr1;
       ptr3 = cArr1;
 
-      ncpyPost[0].mode = CK_BUFFER_REG;
-      ncpyPost[1].mode = CK_BUFFER_UNREG;
-      ncpyPost[2].mode = CK_BUFFER_REG;
+      ncpyPost[0].regMode = CK_BUFFER_REG;
+      ncpyPost[1].regMode = CK_BUFFER_UNREG;
+      ncpyPost[2].regMode = CK_BUFFER_REG;
     }
 
     void zerocopySend(int n1, int *ptr1, int n2, double *ptr2, int n3, char *ptr3){
@@ -293,7 +294,10 @@ class zerocopyObject : public CBase_zerocopyObject{
         allocateAndCopyArray(iArr1copy, iArr1, n1);
         allocateAndCopyArray(dArr2copy, dArr2, n4);
 
-        thisProxy[destIndex].mixedSend(n1, iArr1, n2, CkSendBuffer(dArr1, cb), n3, CkSendBuffer(iArr2, cb), n4, dArr2);
+        cb.setRefNum(1);
+        cbCopy.setRefNum(1);
+
+        thisProxy[destIndex].mixedSend(n1, iArr1, n2, CkSendBuffer(dArr1, cb), n3, CkSendBuffer(iArr2, cbCopy), n4, dArr2);
       }
     }
 

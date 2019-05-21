@@ -441,7 +441,7 @@ unique identifier for the newly created set of proxies.
 
 An example of Charm-FFT initialization using Charm_createFFT:
 
-.. code-block:: c++
+.. code-block:: charmci
 
   // .ci
   extern module fft_charm;
@@ -1125,7 +1125,7 @@ Example
 -------
 
 For example code showing how to use TRAM, see ``examples/charm++/TRAM`` and
-``tests/charm++/streamingAllToAll`` in the Charm++ repository.
+``benchmarks/charm++/streamingAllToAll`` in the Charm++ repository.
 
 .. _gpumanager:
 

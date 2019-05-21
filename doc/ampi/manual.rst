@@ -422,6 +422,115 @@ compile and link time:
 
    $ ampicxx -o example example.C -tlsglobals
 
+Automatic Process-in-Process Runtime Linking Privatization
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Process-in-Process (PiP) [PiP2018]_ Globals allows fully automatic
+privatization of global variables on GNU/Linux systems without
+modification of user code. All languages (C, C++, Fortran, etc.) are
+supported. This method currently lacks support for checkpointing and
+migration, which are necessary for load balancing and fault tolerance.
+Additionally, overdecomposition is limited to approximately 12 virtual
+ranks per logical node, though this can be resolved by building a
+patched version of glibc.
+
+This method works by combining a specific method of building binaries
+with a GNU extension to the dynamic linker. First, AMPI's toolchain
+wrapper compiles your user program as a Position Independent Executable
+(PIE) and links it against a special shim of function pointers instead
+of the normal AMPI runtime. It then builds a small loader utility that
+links directly against AMPI. For each rank, this loader calls the
+glibc-specific function ``dlmopen`` on the PIE binary with a unique
+namespace index. The loader uses ``dlsym`` to populate the PIE binary's
+function pointers and then it calls the entry point. This ``dlmopen``
+and ``dlsym`` process repeats for each rank. As soon as execution jumps
+into the PIE binary, any global variables referenced within will appear
+privatized. This is because PIE binaries locate the global data segment
+immediately after the code segment so that PIE global variables are
+accessed relative to the instruction pointer, and because ``dlmopen``
+creates a separate copy of these segments in memory for each unique
+namespace index.
+
+Optionally, the first step in using PiP-Globals is to build PiP-glibc to
+overcome the limitation on rank count per process. Use the instructions
+at https://github.com/RIKEN-SysSoft/PiP/blob/pip-1/INSTALL to download
+an installable PiP package or build PiP-glibc from source by following
+the ``Patched GLIBC`` section. AMPI may be able to automatically detect
+PiP's location if installed as a package, but otherwise set and export
+the environment variable ``PIP_GLIBC_INSTALL_DIR`` to the value of
+``<GLIBC_INSTALL_DIR>`` as used in the above instructions. For example:
+
+.. code-block:: bash
+
+   $ export PIP_GLIBC_INSTALL_DIR=~/pip
+
+To use PiP-Globals in your AMPI program (with or without PiP-glibc),
+compile and link with the ``-pipglobals`` parameter:
+
+.. code-block:: bash
+
+   $ ampicxx -o example.o -c example.cpp -pipglobals
+   $ ampicxx -o example example.o -pipglobals
+
+No further effort is needed. Global variables in ``example.cpp`` will be
+automatically privatized when the program is run. Any libraries and
+shared objects compiled as PIE will also be privatized. However, if
+these objects call MPI functions, it will be necessary to build them
+with the AMPI toolchain wrappers, ``-pipglobals``, and potentially also
+the ``-standalone`` parameter in the case of shared objects. It is
+recommended to do this in any case so that AMPI can ensure everything is
+built as PIE.
+
+Potential future support for checkpointing and migration will require
+modification of the ``ld-linux.so`` runtime loader to intercept mmap
+allocations of the previously mentioned segments and redirect them
+through Isomalloc. The present lack of support for these features mean
+PiP-Globals is best suited for testing AMPI during exploratory phases
+of development, and for production jobs not requiring load balancing or
+fault tolerance.
+
+Automatic Filesystem-Based Runtime Linking Privatization
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Filesystem Globals (FS-Globals) was discovered during the development of
+PiP-Globals and the two are highly similar. Like PiP-Globals, it
+requires no modification of user code and works with any language.
+It also currently lacks support for checkpointing and migration,
+preventing use of load balancing and fault tolerance. Unlike PiP-Globals,
+it is portable beyond GNU/Linux and has no limits to overdecomposition
+beyond available disk space.
+
+FS-Globals works in the same way as PiP-Globals except that instead of
+specifying namespaces using ``dlmopen``, which is a GNU/Linux-specific
+feature, this method creates copies of the user's PIE binary on the
+filesystem for each rank and calls the POSIX-standard ``dlopen``.
+
+To use FS-Globals, compile and link with the ``-fsglobals`` parameter:
+
+.. code-block:: bash
+
+   $ ampicxx -o example.o -c example.cpp -fsglobals
+   $ ampicxx -o example example.o -fsglobals
+
+No additional steps are required. Global variables in ``example.cpp``
+will be automatically privatized when the program is run. Variables in
+statically linked libraries will also be privatized if compiled as PIE.
+It is recommended to achieve this by building with the AMPI toolchain
+wrappers and ``-fsglobals``, and this is necessary if the libraries call
+MPI functions. Shared objects are currently not supported by FS-Globals
+due to the extra overhead of iterating through all dependencies and
+copying each one per rank while avoiding system components, plus the
+complexity of ensuring each rank's program binary sees the proper set of
+objects.
+
+This method's use of the filesystem is a drawback in that it is slow
+during startup and can be considered wasteful. Additionally, support for
+load balancing and fault tolerance would require further development in
+the future, using the same infrastructure as what PiP-Globals would
+require. For these reasons FS-Globals is best suited for the R&D phase
+of AMPI program development and for small jobs, and it may be less
+suitable for large production environments.
+
 Automatic Global Offset Table Swapping
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -634,6 +743,8 @@ different schemes.
    Transformation       Yes Yes    Yes    Yes  Yes     Yes   Yes
    GOT-Globals          Yes Yes    No     No   No      Yes   Yes
    TLS-Globals          Yes Yes    Yes    No   Maybe   Maybe Maybe
+   PiP-Globals          Yes Yes    No     No   No      Yes   Yes
+   FS-Globals           Yes Yes    Yes    No   Maybe   Yes   Yes
    ==================== === ====== ====== ==== ======= ===== =====
 
 Extensions for Migrations
@@ -2030,3 +2141,11 @@ set the following environment variable to see program output to stdout:
    Currently, we assume that the interface code, which does mapping and
    interpolation among the boundary values of Fluids and Solids domain,
    is integrated with one of Fluids and Solids.
+
+.. [PiP2018]
+   Atsushi Hori, Min Si, Balazs Gerofi, Masamichi Takagi, Jai Dayal, Pavan
+   Balaji, and Yutaka Ishikawa. 2018. Process-in-process: techniques for
+   practical address-space sharing.  In Proceedings of the 27th
+   International Symposium on High-Performance Parallel and Distributed
+   Computing (HPDC '18). ACM, New York, NY, USA,  131-143. DOI:
+   https://doi.org/10.1145/3208040.3208045
