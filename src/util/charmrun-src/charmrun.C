@@ -721,6 +721,7 @@ static int arg_child_charmrun;
 static int arg_help; /* print help message */
 static int arg_ppn;  /* pes per node */
 static int arg_usehostname;
+static int arg_interactive; /* for charm4py interactive sessions when using ssh */
 
 #if CMK_SHRINK_EXPAND
 static char **saved_argv;
@@ -850,6 +851,7 @@ static void arg_init(int argc, const char **argv)
   pparam_flag(&arg_shrinkexpand, 0, "shrinkexpand", "Enable shrink/expand support");
   pparam_int(&arg_charmrun_port, 0, "charmrun_port", "Make charmrun listen on this port");
 #endif
+  pparam_flag(&arg_interactive, 0, "interactive", "Force tty allocation for process 0 when using ssh");
   pparam_flag(&arg_usehostname, 0, "usehostname",
               "Send nodes our symbolic hostname instead of IP address");
   pparam_str(&arg_charmrunip, 0, "useip",
@@ -2205,6 +2207,8 @@ static int req_handle_printerrsyn(ChMessage *msg, SOCKET fd)
 
 static int _exitcode = 0;
 
+static void finish_set_nodes(std::vector<nodetab_process> &, int start, int stop, bool charmrun_exiting=false);
+
 static int req_handle_ending(ChMessage *msg, SOCKET fd)
 {
   req_ending++;
@@ -2234,6 +2238,8 @@ static int req_handle_ending(ChMessage *msg, SOCKET fd)
       skt_close(p.req_client);
     if (arg_verbose)
       printf("Charmrun> Graceful exit with exit code %d.\n", _exitcode);
+    if (arg_interactive)
+      finish_set_nodes(my_process_table, 0, 1, true);
     exit(_exitcode);
   }
   return REQ_OK;
@@ -3857,7 +3863,6 @@ static void req_charmrun_connect(void)
 #ifndef CMK_BPROC
 
 static void start_one_node_ssh(nodetab_process & p);
-static void finish_set_nodes(std::vector<nodetab_process> &, int start, int stop);
 
 static void start_nodes_batch_and_connect(std::vector<nodetab_process> & process_table)
 {
@@ -4446,7 +4451,7 @@ static void finish_nodes(std::vector<nodetab_process> & process_table) {}
 static void start_one_node_ssh(nodetab_process & p) {}
 static void start_nodes_mpiexec() {}
 
-static void finish_set_nodes(std::vector<nodetab_process> & process_table, int start, int stop) {}
+static void finish_set_nodes(std::vector<nodetab_process> & process_table, int start, int stop, bool charmrun_exiting=false) {}
 
 static void envCat(char *dest, LPTSTR oldEnv)
 {
@@ -4681,6 +4686,46 @@ static int ssh_fork(const nodetab_process & p, const char *startScript)
     e = skipstuff(s);
   }
 
+  if (p.nodeno == 0 && arg_interactive) {
+    // in interactive mode, we use a different ssh command for process 0, that requires
+    // the start script to exist on that host, so we scp it there first
+    std::vector<const char *> scpargv = {"scp", "-o", "KbdInteractiveAuthentication=no",
+                                         "-o", "PasswordAuthentication=no",
+                                         "-o", "NoHostAuthenticationForLocalhost=yes"};
+    scpargv.push_back(startScript);
+    std::string login_and_host;
+    login_and_host += h->login;
+    login_and_host += "@";
+    login_and_host += h->name;
+    login_and_host += ":";
+    login_and_host += startScript;
+    scpargv.push_back(login_and_host.c_str());
+    scpargv.push_back((const char *) NULL);
+
+    if (arg_verbose) {
+      std::string cmd_str = scpargv[0];
+      for (int n = 1; n < scpargv.size() - 1; ++n)
+        cmd_str += " " + std::string(scpargv[n]);
+      printf("Charmrun> scp command: %s\n", cmd_str.c_str());
+    }
+
+    int pid = fork();
+    if (pid < 0) {
+      perror("ERROR> sending ssh start script to process 0");
+      exit(1);
+    }
+    if (pid == 0) { /* Child process */
+      execvp(scpargv[0], const_cast<char **>(&scpargv[0]));
+      fprintf(stderr, "Charmrun> Couldn't start scp '%s'!\n", scpargv[0]);
+      exit(1);
+    } else {
+      waitpid(pid, NULL, 0);
+    }
+
+    // for ssh connection to process 0, use -t to force tty allocation for interactive session
+    sshargv.push_back("-t");
+  }
+
   sshargv.push_back(h->name);
   if (arg_ssh_display)
     sshargv.push_back("-X");
@@ -4692,7 +4737,14 @@ static int ssh_fork(const nodetab_process & p, const char *startScript)
   sshargv.push_back("PasswordAuthentication=no");
   sshargv.push_back("-o");
   sshargv.push_back("NoHostAuthenticationForLocalhost=yes");
-  sshargv.push_back("/bin/bash -f");
+  std::string remote_command;
+  if (p.nodeno == 0 && arg_interactive) {
+    remote_command += "/bin/bash ";
+    remote_command += startScript;
+    sshargv.push_back(remote_command.c_str());
+  } else {
+    sshargv.push_back("/bin/bash -f");
+  }
   sshargv.push_back((const char *) NULL);
 
   if (arg_verbose) {
@@ -4708,9 +4760,12 @@ static int ssh_fork(const nodetab_process & p, const char *startScript)
     exit(1);
   }
   if (pid == 0) { /*Child process*/
-    int fdScript = open(startScript, O_RDONLY);
-    /**/ unlink(startScript); /**/
-    dup2(fdScript, 0);        /*Open script as standard input*/
+    // in interactive mode we don't want to redirect stdin for process 0
+    if (p.nodeno != 0 || !arg_interactive) {
+      int fdScript = open(startScript, O_RDONLY);
+      /**/ unlink(startScript); /**/
+      dup2(fdScript, 0);        /*Open script as standard input*/
+    }
     // removeEnv("DISPLAY="); /*No DISPLAY disables ssh's slow X11 forwarding*/
     for (int i = 3; i < 1024; i++)
       close(i);
@@ -5100,9 +5155,12 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
      to do this, we have to close stdin, stdout, stderr, and
      run the subshell in the background. */
   fprintf(f, ")");
-  fprintf(f, " < /dev/null 1> /dev/null 2> /dev/null");
-  if (!arg_mpiexec)
-    fprintf(f, " &");
+  // in interactive mode, ssh connection to process 0 needs to keep the standard descriptors and run in the foreground
+  if (p.nodeno != 0 || !arg_interactive) {
+    fprintf(f, " < /dev/null 1> /dev/null 2> /dev/null");
+    if (!arg_mpiexec)
+      fprintf(f, " &");
+  }
   fprintf(f, "\n");
 
   if (arg_verbose)
@@ -5366,7 +5424,7 @@ static void start_nodes_mpiexec()
   /* all ssh_pid remain zero: skip finish_nodes */
 }
 
-static void finish_set_nodes(std::vector<nodetab_process> & process_table, int start, int stop)
+static void finish_set_nodes(std::vector<nodetab_process> & process_table, int start, int stop, bool charmrun_exiting)
 {
   std::vector<int> num_retries(stop - start, 0);
   int done = 0;
@@ -5374,6 +5432,11 @@ static void finish_set_nodes(std::vector<nodetab_process> & process_table, int s
     done = 1;
     for (int i = start; i < stop; i++) { /* check all nodes */
       nodetab_process & p = process_table[i];
+      // Normally, the ssh connections are only needed to start charm on the remote hosts,
+      // and they will end when the charm application starts. However, in interactive mode,
+      // the ssh connection to process 0 runs until the end of the program, so we don't wait
+      // for that process until the end
+      if (p.nodeno == 0 && arg_interactive && !charmrun_exiting) continue;
       const nodetab_host * h = p.host;
       if (p.ssh_pid != 0) {
         done = 0; /* we are not finished yet */
