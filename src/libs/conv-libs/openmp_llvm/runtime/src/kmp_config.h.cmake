@@ -18,7 +18,7 @@
 // cmakedefine MACRO 1 will define MACRO as 1 or leave undefined
 #cmakedefine01 DEBUG_BUILD
 #cmakedefine01 RELWITHDEBINFO_BUILD
-#cmakedefine01 LIBOMP_USE_ITT_NOTIFY
+//#cmakedefine01 LIBOMP_USE_ITT_NOTIFY
 #define USE_ITT_NOTIFY LIBOMP_USE_ITT_NOTIFY
 #if ! LIBOMP_USE_ITT_NOTIFY
 # define INTEL_NO_ITTNOTIFY_API
@@ -68,6 +68,10 @@
 #define OMP_45_ENABLED (LIBOMP_OMP_VERSION >= 45)
 #define OMP_40_ENABLED (LIBOMP_OMP_VERSION >= 40)
 #define OMP_30_ENABLED (LIBOMP_OMP_VERSION >= 30)
+#cmakedefine01 LIBOMP_TSAN_SUPPORT
+#if LIBOMP_TSAN_SUPPORT
+#define TSAN_SUPPORT
+#endif
 
 // Configured cache line based on architecture
 #if KMP_ARCH_PPC64
@@ -90,7 +94,7 @@
 #if ! KMP_MIC && ! CHARM_OMP
 # define USE_LOAD_BALANCE 1
 #endif
-#if ! (KMP_OS_WINDOWS || KMP_OS_DARWIN)
+#if ! (KMP_OS_WINDOWS || KMP_OS_DARWIN || CHARM_OMP)
 # define KMP_TDATA_GTID 1
 #endif
 #if STUBS_LIBRARY

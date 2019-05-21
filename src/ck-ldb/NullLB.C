@@ -12,6 +12,8 @@ load balancer around.
 
 #define NULLLB_CONVERSE                     1
 
+extern int quietModeRequested;
+
 void CreateNullLB(void) {
   // special seqno -1
   // not putting into LBDatabase's loadbalancer list
@@ -44,7 +46,7 @@ static void lbinit(void) {
 
 static void lbprocinit(void) {
 #if NULLLB_CONVERSE
-  _migDoneHandle = CkRegisterHandlerEx(migrationDone, CkpvAccess(_coreState));
+  CmiAssignOnce(&_migDoneHandle, CkRegisterHandlerEx(migrationDone, CkpvAccess(_coreState)));
 #endif
 }
 
@@ -56,7 +58,7 @@ static void staticStartLB(void* data)
 
 void NullLB::init()
 {
-  // if (CkMyPe() == 0) CkPrintf("[%d] NullLB created\n",CkMyPe());
+  // if (CkMyPe() == 0 && !quietModeRequested) CkPrintf("CharmLB> NullLB created.\n");
   thisProxy = CProxy_NullLB(thisgroup);
   CkpvAccess(hasNullLB) = 1;
   receiver = theLbdb->
@@ -88,6 +90,8 @@ void NullLB::staticAtSync(void* data)
   me->AtSync();
 }
 
+// CkMigratable::AtSync() bypasses this to avoid waiting for LBPeriod
+// when no balancer exists
 void NullLB::AtSync()
 {
   // tried to reset the database so it doesn't waste memory

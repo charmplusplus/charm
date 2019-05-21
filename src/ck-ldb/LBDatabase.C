@@ -12,6 +12,7 @@
 #include "LBDatabase.h"
 #include "LBSimulation.h"
 #include "topology.h"
+#include "DistributedLB.h"
 
 #include "NullLB.h"
 
@@ -29,6 +30,7 @@ CkLBArgs _lb_args;
 int _lb_predict=0;
 int _lb_predict_delay=10;
 int _lb_predict_window=20;
+bool _lb_psizer_on = false;
 
 // registry class stores all load balancers linked and created at runtime
 class LBDBRegistry {
@@ -170,21 +172,61 @@ void _loadbalancerInit()
   char **argv = CkGetArgv();
   char *balancer = NULL;
   CmiArgGroup("Charm++","Load Balancer");
-  while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer")) {
-    if (CkMyRank() == 0)
-      lbRegistry.addRuntimeBalancer(balancer);   /* lbRegistry is a static */
+
+  // turn on MetaBalancer if set
+  _lb_args.metaLbOn() = CmiGetArgFlagDesc(argv, "+MetaLB", "Turn on MetaBalancer");
+  CmiGetArgStringDesc(argv, "+MetaLBModelDir", &_lb_args.metaLbModelDir(),
+                      "Use this directory to read model for MetaLB");
+
+  if (_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr) {
+#if CMK_USE_ZLIB
+    if (CkMyRank() == 0) {
+      lbRegistry.addRuntimeBalancer("GreedyLB");
+      lbRegistry.addRuntimeBalancer("GreedyRefineLB");
+      lbRegistry.addRuntimeBalancer("DistributedLB");
+      lbRegistry.addRuntimeBalancer("RefineLB");
+      lbRegistry.addRuntimeBalancer("HybridLB");
+      lbRegistry.addRuntimeBalancer("MetisLB");
+      if (CkMyPe() == 0) {
+        if (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer"))
+          CkPrintf(
+              "Warning: Ignoring the +balancer option, since Meta-Balancer's model-based "
+              "load balancer selection is enabled.\n");
+        CkPrintf(
+            "Warning: Automatic strategy selection in MetaLB is activated. This is an "
+            "experimental feature.\n");
+      }
+      while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer"))
+        ;
+    }
+#else
+    if (CkMyPe() == 0)
+      CkAbort("MetaLB random forest model not supported because Charm++ was built without zlib support.\n");
+#endif
+  } else {
+    if (CkMyPe() == 0 && _lb_args.metaLbOn())
+      CkPrintf(
+          "Warning: MetaLB is activated. For Automatic strategy selection in MetaLB, "
+          "pass directory of model files using +MetaLBModelDir.\n");
+    while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer")) {
+      if (CkMyRank() == 0)
+        lbRegistry.addRuntimeBalancer(balancer); /* lbRegistry is a static */
+    }
   }
+
+  CmiGetArgDoubleDesc(argv,"+DistLBTargetRatio", &_lb_args.targetRatio(),"The max/avg load ratio that DistributedLB will attempt to achieve");
+  CmiGetArgIntDesc(argv,"+DistLBMaxPhases", &_lb_args.maxDistPhases(),"The maximum number of phases that DistributedLB will attempt");
 
   // set up init value for LBPeriod time in seconds
   // it can also be set by calling LDSetLBPeriod()
   CmiGetArgDoubleDesc(argv,"+LBPeriod", &_lb_args.lbperiod(),"the minimum time period in seconds allowed for two consecutive automatic load balancing");
   _lb_args.loop() = CmiGetArgFlagDesc(argv, "+LBLoop", "Use multiple load balancing strategies in loop");
 
-  // now called in cldb.c: CldModuleGeneralInit()
+  // now called in cldb.C: CldModuleGeneralInit()
   // registerLBTopos();
   CmiGetArgStringDesc(argv, "+LBTopo", &_lbtopo, "define load balancing topology");
-  //Read the K parameter for RefineKLB
-  CmiGetArgIntDesc(argv, "+LBNumMoves", &_lb_args.percentMovesAllowed() , "Percentage of chares to be moved (used by RefineKLB) [0-100]");
+  //Read the percentage parameter for RefineKLB and GreedyRefineLB
+  CmiGetArgIntDesc(argv, "+LBPercentMoves", &_lb_args.percentMovesAllowed() , "Percentage of chares to be moved (used by RefineKLB and GreedyRefineLB) [0-100]");
 
   /**************** FUTURE PREDICTOR ****************/
   _lb_predict = CmiGetArgFlagDesc(argv, "+LBPredictor", "Turn on LB future predictor");
@@ -281,10 +323,6 @@ void _loadbalancerInit()
   _lb_args.traceComm() = !CmiGetArgFlagDesc(argv, "+LBCommOff",
 		"Turn load balancer instrumentation of communication off");
 
-	// turn on MetaBalancer if set
-	_lb_args.metaLbOn() = CmiGetArgFlagDesc(argv, "+MetaLB",
-		"Turn on MetaBalancer");
-
   // set alpha and beta
   _lb_args.alpha() = PER_MESSAGE_SEND_OVERHEAD_DEFAULT;
   _lb_args.beta() = PER_BYTE_SEND_OVERHEAD_DEFAULT;
@@ -342,7 +380,7 @@ void LBDatabase::initnodeFn()
   _registerCommandLineOpt("+LBPeriod");
   _registerCommandLineOpt("+LBLoop");
   _registerCommandLineOpt("+LBTopo");
-  _registerCommandLineOpt("+LBNumMoves");
+  _registerCommandLineOpt("+LBPercentMoves");
   _registerCommandLineOpt("+LBPredictor");
   _registerCommandLineOpt("+LBPredictorDelay");
   _registerCommandLineOpt("+LBPredictorWindow");
@@ -462,6 +500,15 @@ void LBDatabase::nextLoadbalancer(int seq) {
     loadbalancers[seq]->turnOff();
     CmiAssert(loadbalancers[next]);
     loadbalancers[next]->turnOn();
+  }
+}
+
+// switch strategy
+void LBDatabase::switchLoadbalancer(int switchFrom, int switchTo) {
+  if (switchTo != switchFrom) {
+    if (switchFrom != -1) loadbalancers[switchFrom]->turnOff();
+    CmiAssert(loadbalancers[switchTo]);
+    loadbalancers[switchTo]->turnOn();
   }
 }
 

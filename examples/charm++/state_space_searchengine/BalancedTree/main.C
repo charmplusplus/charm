@@ -6,7 +6,7 @@ int depth;
 int initial_grainsize;
 int target;
 
-class Main
+class Main : public CBase_Main
 {
 public:
     Main(CkArgMsg* msg )

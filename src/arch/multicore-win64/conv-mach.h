@@ -20,7 +20,7 @@
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 
-#define CMK_MEMORY_PAGESIZE                                8192
+#define CMK_MEMORY_PAGESIZE                                4096
 #define CMK_MEMORY_PROTECTABLE                             0
 
 #define CMK_IS_HETERO                                      1
@@ -58,5 +58,6 @@
 
 #define CMK_PCQUEUE_LOCK                                   1
 
-#endif
+#define CMK_CONVERSE_MPI                                   0
 
+#endif

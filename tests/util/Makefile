@@ -27,4 +27,4 @@ test: check
 	@if test -f "debugLog.0"; then echo "MACHINE_DEBUG is enabled"; false; fi
 
 clean:
-	rm -f conv-host *.o *.bak *.log check.sts *~ charmrun charmrun.exe check.exe check.pdb check.ilk debugLog.*
+	rm -f conv-host *.o *.bak *.log check.sts *~ charmrun charmrun.exe check check.exe check.pdb check.ilk debugLog.*

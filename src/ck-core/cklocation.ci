@@ -29,6 +29,7 @@ module CkLocation {
   };
 
   readonly CkGroupID _defaultArrayMapID;
+  readonly CkGroupID _fastArrayMapID;
 
   group [migratable] DefaultArrayMap : RRMap {
     entry DefaultArrayMap(void);

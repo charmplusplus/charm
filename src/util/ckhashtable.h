@@ -87,6 +87,8 @@ extern "C" {
 
 #include <stdio.h>
 
+#include <type_traits>
+
 //This data type is used to index into the hash table.
 // For best results, all the bits of the hashCode should be
 // meaningful (especially the high bits).
@@ -148,15 +150,15 @@ it is of a user-defined type and may overlap "key".
 */
 class CkHashtableLayout {
   int size; ///< Size of entire table entry, at least ks+os.
-  int ko,ks; ///< Key byte offset (always zero) and size
-  int po,ps; ///< "empty bit" offset and size (always 1)
+  int ks; ///< Key byte size (offset is always zero)
+  int po; ///< "empty bit" offset (size is always 1)
   int oo,os; ///< Object byte offset and size
  public:
   CkHashtableLayout(int keySize,int emptyOffset,
 		    int objectOffset,int objectSize,int entryLength):
 		size(entryLength),
-		ko(0), ks(keySize),
-		po(emptyOffset), ps(1),
+		ks(keySize),
+		po(emptyOffset),
 		oo(objectOffset), os(objectSize)
   {}
 
@@ -166,7 +168,7 @@ class CkHashtableLayout {
 
 //Utility functions:
   /// Given an entry pointer, return a pointer to the key
-  inline char *getKey(char *entry) const {return entry+ko;}
+  inline char *getKey(char *entry) const {return entry;}
   /// Given an entry pointer, return a pointer to the object
   inline char *getObject(char *entry) const {return entry+oo;}
   
@@ -181,7 +183,7 @@ class CkHashtableLayout {
   inline char *nextEntry(char *entry) const {return entry+size;}
 
   /// Get entry pointer from key pointer
-  inline char *entryFromKey(char *key) const {return key-ko;}
+  inline char *entryFromKey(char *key) const {return key;}
   
   /// Get entry pointer from object pointer
   inline char *entryFromObject(char *obj) const {return obj-oo;}
@@ -313,11 +315,12 @@ class CkHashtableTslow:public CkHashtable {
       char empty;
       OBJ o;
     };
-    // HACK: All I want is the offset from entry_t to empty and o;
-    //  but the compiler's "offsetof" keyword complains "non-POD type!".
-    entry_t *e=(entry_t *)0;
-    int emptyOffset=((char *)&e->empty)-(char *)e;
-    int oOffset=((char *)&e->o)-(char *)e;
+
+    static_assert(std::is_standard_layout<KEY>::value, "KEY type is not standard layout, breaking offsetof()");
+    static_assert(std::is_standard_layout<OBJ>::value, "OBJ type is not standard layout, breaking offsetof()");
+    int emptyOffset = offsetof(entry_t, empty);
+    int oOffset     = offsetof(entry_t, o);
+
     return CkHashtableLayout(sizeof(KEY),emptyOffset,
 			     oOffset,sizeof(OBJ),sizeof(entry_t));
   }

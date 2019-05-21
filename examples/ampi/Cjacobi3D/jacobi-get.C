@@ -4,7 +4,7 @@
 #include <math.h>
 
 #if CMK_BIGSIM_CHARM
-extern void BgPrintf(char *);
+extern "C" void BgPrintf(const char *);
 #define BGPRINTF(x)  if (thisIndex == 0) BgPrintf(x);
 #else
 #define BGPRINTF(x)
@@ -81,7 +81,6 @@ int main(int ac, char** av)
   int i,j,k,m,cidx;
   int iter, niter, cp_idx;
   MPI_Status status;
-  MPI_Info hints;
   double error, tval, maxerr, tmpmaxerr, starttime, endtime, itertime;
   chunk *cp;
   int thisIndex, ierr, nblocks;
@@ -97,6 +96,7 @@ int main(int ac, char** av)
     if (thisIndex == 0)
       printf("Usage: jacobi X Y Z [nIter].\n");
     MPI_Finalize();
+    return 1;
   }
   NX = atoi(av[1]);
   NY = atoi(av[2]);
@@ -105,15 +105,12 @@ int main(int ac, char** av)
     if (thisIndex == 0) 
       printf("%d x %d x %d != %d\n", NX,NY,NZ, nblocks);
     MPI_Finalize();
+    return 2;
   }
   if (ac == 5)
     niter = atoi(av[4]);
   else
     niter = 20;
-
-  /* Set up MPI_Info hints for AMPI_Migrate() */
-  MPI_Info_create(&hints);
-  MPI_Info_set(hints, "ampi_load_balance", "sync");
 
   MPI_Bcast(&niter, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -421,7 +418,7 @@ cp->sbxm[j*DIMZ+i])/7.0;
     starttime = MPI_Wtime();
 #ifdef AMPI
     if(iter%20 == 10) {
-      AMPI_Migrate(hints);
+      AMPI_Migrate(AMPI_INFO_LB_SYNC);
     }
 #endif
   }

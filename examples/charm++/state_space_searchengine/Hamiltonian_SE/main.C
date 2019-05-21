@@ -79,7 +79,7 @@ void readinput(char* filename)
 
 }
 
-class Main
+class Main : public CBase_Main
 {
 public:
     Main(CkArgMsg* msg )

@@ -1,0 +1,11 @@
+-include conv-mach-opt.mak
+BUILD_GPU_MANAGER := $(BUILD_CUDA)
+
+ifeq "$(BUILD_GPU_MANAGER)" "1"
+hybridAPI:
+	   cd hybridAPI && make install
+
+charm++: hybridAPI
+
+.PHONY: hybridAPI
+endif

@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 
 # This is an interactive script that knows
@@ -8,6 +8,15 @@
 
 use strict;
 use warnings;
+
+# Get location of script
+use File::Basename;
+my $dirname = dirname(__FILE__);
+
+# Create temporary file for compiler tests
+use File::Temp qw(tempfile);
+my $tempfile = new File::Temp(UNLINK => 1, SUFFIX => '.c');
+print $tempfile "\n";
 
 # Turn off I/O buffering
 $| = 1;
@@ -27,12 +36,12 @@ sub promptUserYN {
 	}
   }
 }
-  
+
 
 # The beginning of the good stuff:
 print "\n============================================================\n";
-print "\nBegin interactive charm configuration ...\n";
-print "If you are a poweruser expecting a list of options, please use ./build --help\n";
+print "\nInteractive Charm++/AMPI configuration ...\n";
+print "If you are a power user expecting a list of options, please use ./build --help\n";
 print "\n============================================================\n\n\n";
 
 
@@ -60,11 +69,6 @@ if ($os eq "Linux") {
   $arch_os = "linux";
 } elsif ($os =~ m/OSF1/ ) {
   $arch_os = "linux";
-} elsif ($os =~ m/CYGWIN/ ) {
-  print "Detected a Cygwin system\n";
-  print "This uses the gnu compiler by default,\n";
-  print "To build with Microsoft Visual C++ compiler, use net-win32. Please refer to README.win32 for the details on setting up VC++ under cygwin.\n\n";
-  $arch_os = "cygwin";
 }
 
 
@@ -92,9 +96,9 @@ my $skip_choosing = "false";
 
 print "Are you building to run just on the local machine, and not across multiple nodes? [";
 if($arch_os eq "darwin") {
-    print "Y/n]\n";
+    print "Y/n]: ";
 } else {
-    print "y/N]\n";
+    print "y/N]: ";
 }
 {
     my $p = promptUserYN();
@@ -104,48 +108,164 @@ if($arch_os eq "darwin") {
     }
 }
 
+
+# check for BG/Q
+
+if($skip_choosing eq "false"){
+  my $BGQ_FLOOR = $ENV{'BGQ_FLOOR'};
+  if (not defined $BGQ_FLOOR) {
+    $BGQ_FLOOR = "/bgsys/drivers/ppcfloor";
+  }
+
+  my $bgq_found = system("which \"$BGQ_FLOOR/gnu-linux/bin/powerpc64-bgq-linux-cpp\" 2>/dev/null") / 256;
+
+  if ($bgq_found == 0) {
+    print "\nI found that you have a Blue Gene/Q toolchain available in your path.\nDo you want to build Charm++ targeting BG/Q? [Y/n]: ";
+    my $p = promptUserYN();
+    if($p eq "yes" || $p eq "default") {
+      $arch = "pamilrts-bluegeneq";
+      $skip_choosing = "true";
+    }
+  }
+}
+
+
+# check for GNI
+
+if($skip_choosing eq "false"){
+  my $craycc_found = index(`which CC 2>/dev/null`, "/opt/cray/") != -1;
+
+  my $PE_PRODUCT_LIST = $ENV{'PE_PRODUCT_LIST'};
+  if (not defined $PE_PRODUCT_LIST) {
+    $PE_PRODUCT_LIST = "";
+  }
+
+  my $CRAY_UGNI_found = index(":$PE_PRODUCT_LIST:", ":CRAY_UGNI:") != -1;
+
+  my $gni_found = $craycc_found || $CRAY_UGNI_found;
+
+  if ($gni_found) {
+    my $CRAYPE_INTERLAGOS_found = index(":$PE_PRODUCT_LIST:", ":CRAYPE_INTERLAGOS:") != -1;
+    if ($CRAYPE_INTERLAGOS_found) {
+      print "\nI found that you have a Cray environment with Interlagos processors.\nDo you want to build Charm++ targeting Cray XE? [Y/n]: ";
+      my $p = promptUserYN();
+      if($p eq "yes" || $p eq "default") {
+                    $arch = "gni-crayxe";
+                    $skip_choosing = "true";
+      }
+    } else {
+      print "\nI found that you have a Cray environment.\nDo you want to build Charm++ targeting Cray XC? [Y/n]: ";
+      my $p = promptUserYN();
+      if($p eq "yes" || $p eq "default") {
+                    $arch = "gni-crayxc";
+                    $skip_choosing = "true";
+      }
+    }
+  }
+}
+
+
+# check for OFI
+
+if($skip_choosing eq "false"){
+  my $ofi_found = index(`cc $tempfile -Wl,-lfabric 2>&1`, "-lfabric") == -1;
+
+  if ($ofi_found) {
+    print "\nI found that you have libfabric available in your toolchain.\nDo you want to build Charm++ targeting OFI? [Y/n]: ";
+    my $p = promptUserYN();
+    if($p eq "yes" || $p eq "default") {
+      $converse_network_type = "ofi";
+      $skip_choosing = "true";
+    }
+  }
+}
+
+
+# check for PAMI
+
+if($skip_choosing eq "false"){
+  my $MPI_ROOT = $ENV{'MPI_ROOT'};
+  if (not defined $MPI_ROOT) {
+    $MPI_ROOT = "";
+  }
+
+  my $pami_found = index(`cc $tempfile -Wl,-L,"$MPI_ROOT/lib/pami_port" -Wl,-L,/usr/lib/powerpc64le-linux-gnu -Wl,-lpami 2>&1`, "-lpami") == -1;
+
+  if ($pami_found) {
+    print "\nI found that you have libpami available in your toolchain.\nDo you want to build Charm++ targeting PAMI? [Y/n]: ";
+    my $p = promptUserYN();
+    if($p eq "yes" || $p eq "default") {
+      $converse_network_type = "pamilrts";
+      $skip_choosing = "true";
+    }
+  }
+}
+
+
+# check for Verbs
+
+if($skip_choosing eq "false"){
+  my $verbs_found = index(`cc $tempfile -Wl,-libverbs 2>&1`, "-libverbs") == -1;
+
+  if ($verbs_found) {
+    print "\nI found that you have libibverbs available in your toolchain.\nDo you want to build Charm++ targeting Infiniband Verbs? [Y/n]: ";
+    my $p = promptUserYN();
+    if($p eq "yes" || $p eq "default") {
+      $converse_network_type = "verbs";
+      $skip_choosing = "true";
+    }
+  }
+}
+
+
 # check for MPI
 
-my $mpi_found = "false";
-my $m = system("which mpicc mpiCC > /dev/null 2>/dev/null") / 256;
-my $mpioption;
-if($m == 0){
-    $mpi_found = "true";
-    $mpioption = "";
-}
-$m = system("which mpicc mpicxx > /dev/null 2>/dev/null") / 256;
-if($m == 0){
-    $mpi_found = "true";
-    $mpioption = "mpicxx";
+if($skip_choosing eq "false"){
+  my $mpi_found = "false";
+  my $m = system("which mpicc mpiCC > /dev/null 2>/dev/null") / 256;
+  my $mpioption;
+  if($m == 0){
+      $mpi_found = "true";
+      $mpioption = "";
+  }
+  $m = system("which mpicc mpicxx > /dev/null 2>/dev/null") / 256;
+  if($m == 0){
+      $mpi_found = "true";
+      $mpioption = "mpicxx";
+  }
+
+  # Give option of just using the mpi version if mpicc and mpiCC are found
+  if($mpi_found eq "true"){
+    print "\nI found that you have an mpicc available in your path.\nDo you want to build Charm++ on this MPI? [y/N]: ";
+    my $p = promptUserYN();
+    if($p eq "yes"){
+    $converse_network_type = "mpi";
+    $skip_choosing = "true";
+    $options = "$options $mpioption";
+    }
+  }
 }
 
-# Give option of just using the mpi version if mpicc and mpiCC are found
-if($skip_choosing eq "false" && $mpi_found eq "true"){
-  print "\nI found that you have an mpicc available in your path.\nDo you want to build Charm++ on this MPI? [y/N]: ";
-  my $p = promptUserYN();
-  if($p eq "yes"){
-	$converse_network_type = "mpi";
-	$skip_choosing = "true";
-	$options = "$options $mpioption";
-  }	
-}
 
-if($skip_choosing eq "false") { 
-  
+if($skip_choosing eq "false") {
+
   print "\nDo you have a special network interconnect? [y/N]: ";
   my $p = promptUserYN();
   if($p eq "yes"){
+
 	print << "EOF";
-	
+
 Choose an interconnect from below: [1-10]
 	 1) MPI
-	 2) Infiniband (ibverbs)
+	 2) Infiniband (verbs)
 	 3) Cray XE, XK
 	 4) Cray XC
 	 5) Blue Gene/Q
+	 6) Intel Omni-Path (ofi)
+	 7) PAMI
 
 EOF
-	
+
 	while(my $line = <>){
 	  chomp $line;
 	  if($line eq "1"){
@@ -163,10 +283,33 @@ EOF
 	  } elsif($line eq "5"){
 		$arch = "pamilrts-bluegeneq";
 		last;
+	  } elsif($line eq "6"){
+		$converse_network_type = "ofi";
+		last;
+	  } elsif($line eq "7"){
+		$converse_network_type = "pamilrts";
+		last;
 	  } else {
 		print "Invalid option, please try again :P\n"
 	  }
-	}	
+	}
+  }
+}
+
+
+# check for CUDA
+
+my $nvcc_found = "false";
+my $n = system("which nvcc > /dev/null 2>/dev/null") / 256;
+if($n == 0){
+  $nvcc_found = "true";
+}
+
+if($nvcc_found eq "true"){
+  print "\nI found that you have NVCC available in your path.\nDo you want to build Charm++ with GPU Manager support for CUDA? [y/N]: ";
+  my $p = promptUserYN();
+  if($p eq "yes") {
+    $options = "$options cuda";
   }
 }
 
@@ -177,27 +320,25 @@ if($arch eq ""){
 	  if($amd64) {
 		$arch = $arch . "-x86_64";
 	  } elsif($ppc){
-	  	$arch = $arch . "-ppc";
+		$arch = $arch . "-ppc64le";
 	  } elsif($arm7){
 	  	$arch = $arch . "-arm7";
 	  }
 }
-  
+
 # Fixup $arch to match the inconsistent directories in src/archs
 
 if($arch eq "netlrts-darwin"){
 	$arch = "netlrts-darwin-x86_64";
 } elsif($arch eq "multicore-linux-arm7"){
 	$arch = "multicore-arm7";
-} elsif($arch eq "multicore-linux-x86_64"){
-	$arch = "multicore-linux64";
-} 
+}
 
 
 #================ Choose SMP/PXSHM =================================
 
 # find what options are available
-my $opts = `./build charm++ $arch help 2>&1 | grep "Supported options"`;
+my $opts = `$dirname/build charm++ $arch help 2>&1 | grep "Supported options"`;
 $opts =~ m/Supported options: (.*)/;
 $opts = $1;
 
@@ -223,7 +364,7 @@ if($opts =~ m/pxshm/){
 }
 
 if ($counter != 1) {
-    print "How do you want to handle SMP/Multicore: [1-$counter]\n";
+    print "\nHow do you want to handle SMP/Multicore: [1-$counter]\n";
     print $smp_opts;
 
     while(my $line = <>){
@@ -244,7 +385,7 @@ if ($counter != 1) {
 #================ Choose Compiler =================================
 
 # Lookup list of compilers
-my $cs = `./build charm++ $arch help 2>&1 | grep "Supported compilers"`;
+my $cs = `$dirname/build charm++ $arch help 2>&1 | grep "Supported compilers"`;
 # prune away beginning of the line
 $cs =~ m/Supported compilers: (.*)/;
 $cs = $1;
@@ -255,7 +396,7 @@ my @c_list = split(" ", $cs);
 my $numc = @c_list;
 
 if ($numc > 0) {
-    print "\nDo you want to specify a compiler? [y/N]";
+    print "\nDo you want to specify a compiler? [y/N]: ";
     my $p = promptUserYN();
     if($p eq "yes" ){
         print "Choose a compiler: [1-$numc] \n";
@@ -286,14 +427,26 @@ if ($numc > 0) {
 
 #Create a hash table containing descriptions of various options
 my %explanations = ();
-$explanations{"ooc"} = "Out-of-core execution support in Charm++";
+$explanations{"ooc"} = "Enable Out-of-core execution support in Charm++";
 $explanations{"tcp"} = "Charm++ over TCP instead of UDP for net versions. TCP is slower";
-$explanations{"gfortran"} = "Use gfortran compiler for fortran";
-$explanations{"ifort"} = "Use Intel's ifort fortran compiler";
-$explanations{"pgf90"} = "Use Portland Group's pgf90 fortran compiler";
+$explanations{"gfortran"} = "Use the gfortran compiler for Fortran";
+$explanations{"flang"} = "Use the flang compiler for Fortran";
+$explanations{"ifort"} = "Use Intel's ifort Fortran compiler";
+$explanations{"pgf90"} = "Use Portland Group's pgf90 Fortran compiler";
 $explanations{"syncft"} = "Use fault tolerance support";
 $explanations{"mlogft"} = "Use message logging fault tolerance support";
 $explanations{"causalft"} = "Use causal message logging fault tolerance support";
+$explanations{"omp"} = "Build Charm++ with integrated OpenMP support";
+$explanations{"papi"} = "Enable PAPI performance counters";
+$explanations{"pedantic"} = "Enable pedantic compiler warnings";
+$explanations{"bigemulator"} = "Build additional BigSim libraries";
+$explanations{"bigsim"} = "Compile Charm++ as running on the BigSim emulator";
+$explanations{"nolb"} = "Build without load balancing support";
+$explanations{"perftools"} = "Build with support for the Cray perftools";
+$explanations{"persistent"} = "Build the persistent communication interface";
+$explanations{"slurmpmi"} = "Use Slurm PMI for task launching";
+$explanations{"slurmpmi2"} = "Use Slurm PMI2 for task launching";
+$explanations{"tsan"} = "Compile Charm++ with support for Thread Sanitizer";
 
 
 
@@ -301,13 +454,13 @@ $explanations{"causalft"} = "Use causal message logging fault tolerance support"
 
   # Produce list of options
 
-  $opts = `./build charm++ $arch help 2>&1 | grep "Supported options"`;
+  $opts = `$dirname/build charm++ $arch help 2>&1 | grep "Supported options"`;
   # prune away beginning of line
   $opts =~ m/Supported options: (.*)/;
   $opts = $1;
 
   my @option_list = split(" ", $opts);
-  
+
 
   # Prune out entries that would already have been chosen above, such as smp
   my @option_list_pruned = ();
@@ -321,7 +474,7 @@ $explanations{"causalft"} = "Use causal message logging fault tolerance support"
   @option_list_pruned = sort @option_list_pruned;
   if (@option_list_pruned > 0) {
 
-      print "\nDo you want to specify any Charm++ build options, such as fortran compilers? [y/N]";
+      print "\nDo you want to specify any Charm++ build options, such as Fortran compilers? [y/N]: ";
       my $special_options = promptUserYN();
 
       if($special_options eq "yes"){
@@ -337,7 +490,7 @@ $explanations{"causalft"} = "Use causal message logging fault tolerance support"
               for(my $j=0;$j<20-length($o);$j++){
                   print " ";
               }
-              print ": $exp";
+              print "$exp";
               print "\n";
               $i++;
           }
@@ -376,14 +529,14 @@ $explanations{"causalft"} = "Use causal message logging fault tolerance support"
 
 # Choose compiler flags
 print << "EOF";
-	
+
 Choose a set of compiler flags [1-5]
 	1) none
 	2) debug mode                        -g -O0
 	3) production build [default]        --with-production
 	4) production build w/ projections   --with-production --enable-tracing
 	5) custom
-	
+
 EOF
 
 my $compiler_flags = "";
@@ -398,16 +551,16 @@ while(my $line = <>){
 	} elsif($line eq "4" ){
  		$compiler_flags = "--with-production --enable-tracing";
 		last;
-	} elsif($line eq "3" || $line eq ""){ 
+	} elsif($line eq "3" || $line eq ""){
                 $compiler_flags = "--with-production";
-                last; 
+                last;
         }  elsif($line eq "5"){
 
 		print "Enter compiler options: ";
 		my $input_line = <>;
 		chomp($input_line);
 		$compiler_flags = $input_line;
-		
+
 		last;
 	} else {
 		print "Invalid option, please try again :P\n"
@@ -444,18 +597,18 @@ while(my $line = <>){
 	} else {
 		print "Invalid option, please try again :P\n"
 	}
-	
+
 }
 
 # Determine whether to use a -j flag for faster building
 my $j = "";
     print << "EOF";
-    
+
 Do you want to compile in parallel?
         1) No
         2) Build with -j2
         3) Build with -j4
-        4) Build with -j8 
+        4) Build with -j8
         5) Build with -j16 [default]
         6) Build with -j32
         7) Build with -j
@@ -469,7 +622,7 @@ EOF
 	    last;
         } elsif($line eq "2") {
 	    $j = "-j2";
-	    last; 
+	    last;
 	} elsif($line eq "3") {
 	    $j = "-j4";
 	    last;
@@ -492,7 +645,7 @@ EOF
 
 
 # Compose the build line
-my $build_line = "./build $target $arch $compilers $options $j $nobs ${compiler_flags}\n";
+my $build_line = "$dirname/build $target $arch $compilers $options $j $nobs ${compiler_flags}\n";
 
 
 # Save the build line in the log
@@ -508,11 +661,11 @@ print "\t$build_line\n\n";
 
 
 # Execute the build line if the appropriate architecture directory exists
-print "Do you want to start the build now? [Y/n]";
+print "Do you want to start the build now? [Y/n]: ";
 my $p = promptUserYN();
 if($p eq "yes" || $p eq "default"){
-  if(-e "src/arch/$arch"){
-	print "Building with: ${build_line}\n";	
+  if(-e "$dirname/src/arch/$arch"){
+	print "Building with: ${build_line}\n";
 	# Execute the build line
 	system($build_line);
   } else {

@@ -1,8 +1,16 @@
 /*
- * C wrapper for calling AMPI_Main(), which is
- * declared without a strict prototype, from C++.
+ * C wrapper for calling AMPI_Main().
  */
-void AMPI_Main_c(int argc,char **argv)
+
+#ifdef __cplusplus
+extern "C"
+#endif
+void AMPI_Main(int argc, char **argv);
+
+#ifdef __cplusplus
+extern "C"
+#endif
+void AMPI_Main_c(int argc, char **argv)
 {
-	AMPI_Main(argc,argv); /* call C main routine with implicit declaration */
+	AMPI_Main(argc, argv); /* call C main routine */
 }

@@ -52,12 +52,10 @@ struct CkArrayIndexBase
         /// Obtain usable object from base object. @warning: Dangerous pointer cast to child class!!!
         inline CkArrayIndex& asChild() const { return *(CkArrayIndex*)this; }
 
-        /// Permit serialization
-        void pup(PUP::er &p)
+        /// Permit serialization via calling pup(), but also declare this type as PUPbytes below
+        inline void pup(PUP::er &p)
         {
-            p|nInts;
-            p|dimension;
-            for (int i=0;i<nInts;i++) p|index[i];
+            p((char *)this, sizeof(CkArrayIndexBase));
         }
 
         bool operator==(CkArrayIndexBase &other) {
@@ -70,6 +68,7 @@ struct CkArrayIndexBase
         }
 
 };
+PUPbytes(CkArrayIndexBase)
 
 
 
@@ -86,6 +85,17 @@ class CkArrayIndex: public CkArrayIndexBase
         /// Default
         CkArrayIndex() { nInts=0; dimension=0; for (int i=0; i<CK_ARRAYINDEX_MAXLEN; i++) index[i] = 0; }
 
+        /// Create array index of 'ndims' dimensions with given size for each dimension
+        CkArrayIndex(int ndims, int dims[]) {
+          init_nd(ndims, dims);
+        }
+
+        /// Create array index of 'ndims' dimensions with same size 'val' for each dimension
+        CkArrayIndex(int ndims, int val) {
+          std::vector<int> dims(ndims, val);
+          init_nd(ndims, dims.data());
+        }
+
 	explicit CkArrayIndex(int idx) {init(1,1,idx);};
 
         /// Return a pointer to the actual index data
@@ -93,17 +103,34 @@ class CkArrayIndex: public CkArrayIndexBase
         /// Return a const pointer to the actual index data
         const int *data(void) const {return index; }
 
+        /// Return the dimension size
+        short getDimension(void) const            { return dimension; }
+        /// Return a pointer to the short index data
+        short *shortData(void)             { return indexShorts; }
+        /// Return a const pointer to the short index data
+        const short *shortData(void) const { return indexShorts; }
+
         /// Return the total number of elements (assuming a dense chare array)
         int getCombinedCount(void) const
         {
             if      (dimension == 1) return data()[0];
             else if (dimension == 2) return data()[0] * data()[1];
             else if (dimension == 3) return data()[0] * data()[1] * data()[2];
+            else if (dimension == 4) return shortData()[0] * shortData()[1] * shortData()[2] *
+                                            shortData()[3];
+            else if (dimension == 5) return shortData()[0] * shortData()[1] * shortData()[2] *
+                                            shortData()[3] * shortData()[4];
+            else if (dimension == 6) return shortData()[0] * shortData()[1] * shortData()[2] *
+                                            shortData()[3] * shortData()[4] * shortData()[5];
             else return 0;
         }
 
         /// Used for debug prints elsewhere
-        void print() const { CmiPrintf("%d: %d %d %d\n", nInts, index[0], index[1], index[2]); }
+        void print() const {
+            if (dimension < 4) CmiPrintf("%d: %d %d %d\n", dimension, index[0], index[1], index[2]);
+            else CmiPrintf("%d: %d %d %d %d %d %d\n", dimension, indexShorts[0], indexShorts[1], indexShorts[2],
+                                                      indexShorts[3], indexShorts[4], indexShorts[5]);
+        }
 
         /// Equality comparison
         bool operator==(const CkArrayIndex& idx) const
@@ -190,6 +217,18 @@ class CkArrayIndex: public CkArrayIndexBase
                 indexShorts[i] = 0;
         }
 
+        inline void init_nd(int ndims, int dims[]) {
+          switch (ndims) {
+            case 1: init(1,1,dims[0]); break;
+            case 2: init(2,2,dims[0],dims[1]); break;
+            case 3: init(3,3,dims[0],dims[1],dims[2]); break;
+            case 4: init(2,4,dims[0],dims[1],dims[2],dims[3]); break;
+            case 5: init(3,5,dims[0],dims[1],dims[2],dims[3],dims[4]); break;
+            case 6: init(3,6,dims[0],dims[1],dims[2],dims[3],dims[4],dims[5]); break;
+            default: CkAbort("CKArrayIndex() unsupported number of dimensions\n");
+          }
+        }
+
 
         /// A very crude comparison operator to enable using in comparison-based containers
         friend bool operator< (const CkArrayIndex &lhs, const CkArrayIndex &rhs)
@@ -224,7 +263,8 @@ typedef CkArrayIndex CkArrayIndexMax;
 
 class CkArray;
 
-class CkArrayID {
+struct CkArrayID {
+private:
 	CkGroupID _gid;
 public:
 	CkArrayID() : _gid() { }
@@ -248,21 +288,17 @@ PUPmarshall(CkArrayID)
 
 typedef int CkIndex1D;
 typedef struct {int x,y;} CkIndex2D;
-inline void operator|(PUP::er &p,CkIndex2D &i) {p(i.x); p(i.y);}
+PUPbytes(CkIndex2D)
 typedef struct {int x,y,z;} CkIndex3D;
-inline void operator|(PUP::er &p,CkIndex3D &i) {p(i.x); p(i.y); p(i.z);}
+PUPbytes(CkIndex3D)
 typedef struct {short int w,x,y,z;} CkIndex4D;
-inline void operator|(PUP::er &p,CkIndex4D &i) {p(i.w); p(i.x); p(i.y); p(i.z);}
+PUPbytes(CkIndex4D)
 typedef struct {short int v,w,x,y,z;} CkIndex5D;
-inline void operator|(PUP::er &p,CkIndex5D &i) {p(i.v); p(i.w); p(i.x); p(i.y); p(i.z);}
+PUPbytes(CkIndex5D)
 typedef struct {short int x1,y1,z1,x2,y2,z2;} CkIndex6D;
-inline void operator|(PUP::er &p,CkIndex6D &i) {p(i.x1); p(i.y1); p(i.z1); p(i.x2); p(i.y2); p(i.z2);}
+PUPbytes(CkIndex6D)
 typedef struct {int data[CK_ARRAYINDEX_MAXLEN];} CkIndexMax;
-inline void operator|(PUP::er &p,CkIndexMax &i) {
-  for (int j=0;j<CK_ARRAYINDEX_MAXLEN;j++) {
-    p|i.data[j];
-  }
-}
+PUPbytes(CkIndexMax)
 
 /// Simple ArrayIndex classes: the key is just integer indices.
 class CkArrayIndex1D : public CkArrayIndex {

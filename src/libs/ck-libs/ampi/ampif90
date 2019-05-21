@@ -1,8 +1,10 @@
 #!/bin/sh
 CHARMBIN=`dirname $0`
 
-ln $CHARMBIN/../include/mpif.h .
-$CHARMBIN/charmc -language ampif -default-to-aout -lampiromio $@
+export AMPICC_MODE='ampif'
+
+cp -n $CHARMBIN/../include/mpif.h .
+$CHARMBIN/ampiCC $@
 status=$?
 /bin/rm -f mpif.h
 exit $status

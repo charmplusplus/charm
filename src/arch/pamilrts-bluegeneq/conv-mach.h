@@ -20,7 +20,7 @@
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 
-#define CMK_MEMORY_PAGESIZE                                8192
+#define CMK_MEMORY_PAGESIZE                                4096
 #define CMK_MEMORY_PROTECTABLE                             1
 
 
@@ -56,13 +56,14 @@
 
 #define CMK_LBDB_ON					   1
 
-#undef CMK_CCS_AVAILABLE
-#define CMK_CCS_AVAILABLE				   0
-
 #define CMK_BLUEGENEQ                                      1
 #define CMK_BLUEGENEQ_OPTCOPY                              1
 
 #define CMK_NO_ISO_MALLOC                                  1
+
+#define CMK_ONESIDED_IMPL                                  0
+
+#define CMK_NOCOPY_DIRECT_BYTES                            16
 
 #endif
 

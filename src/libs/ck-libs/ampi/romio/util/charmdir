@@ -1,4 +1,0 @@
-#! /bin/sh
-NOWDIR=`dirname $0`
-cd $NOWDIR/../../../../../../
-echo `pwd`

@@ -100,6 +100,7 @@ public:
 
   void SetPESpeed(int);
   int GetPESpeed();
+  inline void setConcurrent(bool c) { concurrent = c; }
 
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
@@ -107,9 +108,9 @@ public:
                             // making projections output look funny
   void SendStats();
   void ReceiveCounts(int *counts, int n);
-  void ReceiveStats(CkMarshalledCLBStatsMessage &msg);	// Receive stats on PE 0
-  void ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &msg); // Receive stats using a tree structure  
-  void ReceiveStatsFromRoot(CkMarshalledCLBStatsMessage &msg);
+  void ReceiveStats(CkMarshalledCLBStatsMessage &&msg);	// Receive stats on PE 0
+  void ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &&msg); // Receive stats using a tree structure  
+  void ReceiveStatsFromRoot(CkMarshalledCLBStatsMessage &&msg);
   
   void depositData(CLBStatsMsg *m);
   void LoadBalance(void); 
@@ -148,7 +149,7 @@ public:
 
   // Migrated-element callback
   static void staticMigrated(void* me, LDObjHandle h, int waitBarrier=1);
-  void Migrated(LDObjHandle h, int waitBarrier=1);
+  void Migrated(int waitBarrier=1);
 
   void MigrationDone(int balancing);  // Call when migration is complete
   void CheckMigrationComplete();      // Call when all migration is complete
@@ -269,12 +270,10 @@ protected:
   void findSimResults(LDStats* stats, int count, 
                       LBMigrateMsg* msg, LBSimulation* simResults);
   void removeNonMigratable(LDStats* statsDataList, int count);
-	CProxy_CentralLB thisProxy;
   void loadbalance_with_thread() { use_thread = true; }
 
   bool concurrent;
 private:  
-//CProxy_CentralLB thisProxy;
   int myspeed;
   int stats_msg_count;
   CLBStatsMsg **statsMsgsList;

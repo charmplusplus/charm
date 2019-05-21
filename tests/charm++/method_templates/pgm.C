@@ -15,7 +15,7 @@ void register_instantiations()
 {
     CkReductionTarget(pgm, acceptResults<avg>);
     CkReductionTarget(pgm, acceptResults< cntType >);
-};
+}
 
 
 // reducer type definitions

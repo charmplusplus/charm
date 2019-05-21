@@ -49,7 +49,7 @@
 
 #include "ParFUM_Adapt.decl.h"
 
-#if defined(WIN32)
+#if defined(_WIN32)
 #include <iterator>
 #endif
 
@@ -64,7 +64,7 @@ template<class Container, class Iterator>
 };
 #endif
 
-#if defined(WIN32) && defined(max)
+#if defined(_WIN32) && defined(max)
 #undef max
 #endif
 
@@ -366,12 +366,12 @@ class AllocTable2d : public BasicTable2d<T> {
 /// Return the human-readable version of this entity code, like "FEM_NODE".
 ///  storage, which must be at least 80 bytes long, is used for
 ///  non-static names, like the user tag "FEM_ELEM+2".
-CDECL const char *FEM_Get_entity_name(int entity,char *storage);
+CLINKAGE const char *FEM_Get_entity_name(int entity,char *storage);
 
 /// Return the human-readable version of this attribute code, like "FEM_CONN".
 ///  storage, which must be at least 80 bytes long, is used for
 ///  non-static names, like the user tag "FEM_DATA+7".
-CDECL const char *FEM_Get_attr_name(int attr,char *storage);
+CLINKAGE const char *FEM_Get_attr_name(int attr,char *storage);
 
 
 ///A user-visible 2D table attached to a FEM_Entity

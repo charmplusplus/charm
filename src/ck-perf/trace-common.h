@@ -8,7 +8,7 @@
 
 
 #include <stdlib.h>
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32)
 #include <direct.h>
 #define CHDIR _chdir
 #define GETCWD _getcwd
@@ -46,9 +46,6 @@
 
 #define  CREATION_MULTICAST 21
 
-#define	 BEGIN_FUNC         22
-#define	 END_FUNC           23
-
 /* Memory tracing */
 #define  MEMORY_MALLOC      24
 #define  MEMORY_FREE        25
@@ -72,6 +69,8 @@
 /* Custom User Stats*/
 #define USER_STAT           32
 
+#define BEGIN_USER_EVENT_PAIR  98
+#define END_USER_EVENT_PAIR    99
 #define  USER_EVENT_PAIR    100
 
 CkpvExtern(CmiInt8, CtrLogBufSize);
@@ -99,7 +98,7 @@ inline double TraceCpuTimer() { return TRACE_CPUTIMER() - CkpvAccess(traceInitCp
 inline double TraceCpuTimer(double t) { return t - CkpvAccess(traceInitCpuTime); }
 #endif
 
-extern "C" double TraceTimerCommon(); //TraceTimer to be used in common lrts layers
+double TraceTimerCommon(); //TraceTimer to be used in common lrts layers
 
 #define TRACE_WARN(msg) if (CkpvAccess(verbose)) CmiPrintf(msg)
 
@@ -118,7 +117,7 @@ extern int _sdagMsg, _sdagChare, _sdagEP;
 
 /** Write out the common parts of the .sts file. */
 extern void traceWriteSTS(FILE *stsfp,int nUserEvents);
-extern "C" void (*registerMachineUserEvents())();
+void (*registerMachineUserEvents())();
 
 #if CMK_HAS_COUNTER_PAPI
 #include <papi.h>

@@ -1,4 +1,5 @@
 CDIR=../../../..
+-include $(CDIR)/include/conv-mach-opt.mak
 OPTS=-g -Wall
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 CHARMXI=$(CHARMC) -intrinsic
@@ -10,9 +11,11 @@ OBJS_DEBUG=charmdebug-python.o
 DEST=$(CDIR)/lib/libmodulePythonCCS.a
 DEST_DEBUG=$(CDIR)/lib/libmodulecharmdebug_python.a
 
+ifneq ($(CMK_BUILD_PYTHON),)
+all: conditional
+else
 all:
-	-(CHARMINC=../../../../include;. $$CHARMINC/conv-config.sh; \
-	if test "$$CMK_BUILD_PYTHON" != ""; then ($(MAKE) conditional OPTS='$(OPTS)' || exit 1); fi)
+endif
 
 conditional: $(DEST) $(DEST_DEBUG) headers
 
@@ -42,12 +45,10 @@ charmdebug_python.decl.h charmdebug_python.def.h: charmdebug-python.ci
 	$(CHARMXI) charmdebug-python.ci
 
 pythonIncludes.h:
-	(CHARMINC=../../../../include;. $$CHARMINC/conv-config.sh; \
-	echo "#include \"python$$CMK_BUILD_PYTHON/Python.h\"" > pythonIncludes.h; \
-	echo "#include \"python$$CMK_BUILD_PYTHON/compile.h\"" >> pythonIncludes.h; \
-	echo "#include \"python$$CMK_BUILD_PYTHON/eval.h\"" >> pythonIncludes.h; \
-	echo "#include \"python$$CMK_BUILD_PYTHON/node.h\"" >> pythonIncludes.h \
-	) 
+	echo "#include \"python$(CMK_BUILD_PYTHON)/Python.h\"" > pythonIncludes.h
+	echo "#include \"python$(CMK_BUILD_PYTHON)/compile.h\"" >> pythonIncludes.h
+	echo "#include \"python$(CMK_BUILD_PYTHON)/eval.h\"" >> pythonIncludes.h
+	echo "#include \"python$(CMK_BUILD_PYTHON)/node.h\"" >> pythonIncludes.h
 
 clean:
 	rm -rf *.a *~ *.def.h *.decl.h *.o SunWS_cache $(DEST) $(DEST_DEBUG) pythonIncludes.h headers

@@ -1,1 +1,1 @@
-CMK_USING_BGXLC="1"
+CMK_COMPILER='bgxlc'

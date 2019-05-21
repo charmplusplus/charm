@@ -31,8 +31,8 @@ class MpiCollisionClient: public collideClient {
 			for (int c=0;c<size;c++) {
 				returnColls->add(colls[c].A,colls[c].B);
 			}
-			CkCallback cb(CkReductionTarget(MainCollide, done), mainProxy);
-			src->contribute(sizeof(int), &size, CkReduction::sum_int, cb);
+			src->contribute(sizeof(int), &size, CkReduction::sum_int,
+					CkCallback(CkReductionTarget(MainCollide, done), mainProxy));
 		}
 		void setResultPointer(CollisionList *&colls) {
 			returnColls = colls =new CollisionList();

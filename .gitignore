@@ -8,7 +8,7 @@
 *.def.h
 *.ci.stamp
 
-# Ignore build artifacts created in the top-level directory
+# Ignore build artifacts
 config_opts.sh
 smart-build.log
 VERSION
@@ -18,22 +18,27 @@ lib
 lib_so
 tmp
 src/util/pup_f.f90
+CMakeCache.txt
+cmake_install.cmake
+CMakeFiles
+/Makefile
+Charm++-prefix
+src/arch/win/createlink.exe
 
 # Ignore directories created from compilation
-/net-*
 /netlrts-*
+/verbs-*
 /mpi-*
-/lapi*
-/vmi-*
 /multicore-*
 /uth-*
-/bluegenep*
 /pami*
 /gemini_gni-crayxe*
 /gni-*
+/ofi-*
 
 # Ignore cruft that would result from compiling charm example/test code
 # Note this is negated inside src/arch to permit addition of new charmrun files in there
 charmrun
+ampirun
 pgm
 *.swp

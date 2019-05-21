@@ -13,7 +13,7 @@
 class RefinerTemp {
 public:
   RefinerTemp(double _overload)
-    : overLoad(_overload), computes(0), P(CkNumPes())
+    : overLoad(_overload), P(CkNumPes()), computes(0)
     { 
     processors=0; 
     procFreq = new int[P];

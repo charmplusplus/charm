@@ -76,7 +76,7 @@ void CentralLB::staticStartLB(void* data)
 void CentralLB::staticMigrated(void* data, LDObjHandle h, int waitBarrier)
 {
   CentralLB *me = (CentralLB*)(data);
-  me->Migrated(h, waitBarrier);
+  me->Migrated(waitBarrier);
 }
 
 void CentralLB::staticAtSync(void* data)
@@ -101,7 +101,8 @@ void CentralLB::initLB(const CkLBOptions &opt)
     AddStartLBFn((LDStartLBFn)(staticStartLB),(void*)(this));
 
   // CkPrintf("[%d] CentralLB initLB \n",CkMyPe());
-  if (opt.getSeqNo() > 0) turnOff();
+  if (opt.getSeqNo() > 0 || (_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
+    turnOff();
 
   stats_msg_count = 0;
   statsMsgsList = NULL;
@@ -205,7 +206,10 @@ void CentralLB::AtSync()
     MigrationDone(0);
     return;
   }
-  if(CmiNodeAlive(CkMyPe())){
+#if CMK_FAULT_EVAC
+  if(CmiNodeAlive(CkMyPe()))
+#endif
+  {
     thisProxy [CkMyPe()].ProcessAtSync();
   }
 #endif
@@ -216,7 +220,9 @@ void CentralLB::ProcessAtSync()
 #if CMK_LBDB_ON
   if (reduction_started) return;              // reducton in progress
 
+#if CMK_FAULT_EVAC
   CmiAssert(CmiNodeAlive(CkMyPe()));
+#endif
   if (CkMyPe() == cur_ld_balancer) {
     start_lb_time = CkWallTimer();
   }
@@ -337,7 +343,10 @@ void CentralLB::ReceiveCounts(int *counts, int n)
 
   DEBUGF(("[%d] ReceiveCounts: n_objs:%d n_comm:%d\n",CkMyPe(), n_objs, n_comm));
 	
-  if (concurrent) SendStats();
+  if (concurrent) {
+    CkCallback cb = CkCallback(CkReductionTarget(CentralLB, SendStats), thisProxy);
+    contribute(cb);
+  }
   else thisProxy.SendStats(); // broadcast call to let everybody start to send stats
 }
 
@@ -440,7 +449,7 @@ void CentralLB::SendStats()
 extern int donotCountMigration;
 #endif
 
-void CentralLB::Migrated(LDObjHandle h, int waitBarrier)
+void CentralLB::Migrated(int waitBarrier)
 {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     if(donotCountMigration){
@@ -468,8 +477,7 @@ void CentralLB::Migrated(LDObjHandle h, int waitBarrier)
 
 void CentralLB::MissMigrate(int waitForBarrier)
 {
-  LDObjHandle h;
-  Migrated(h, waitForBarrier);
+  Migrated(waitForBarrier);
 }
 
 // build a complete data from bufferred messages
@@ -555,14 +563,14 @@ void CentralLB::depositData(CLBStatsMsg *m)
   delete m;
 }
 
-void CentralLB::ReceiveStatsFromRoot(CkMarshalledCLBStatsMessage &msg) {
+void CentralLB::ReceiveStatsFromRoot(CkMarshalledCLBStatsMessage &&msg) {
 #if CMK_LBDB_ON
   if (CkMyPe() == cur_ld_balancer) return;
-  else ReceiveStats(msg);
+  else ReceiveStats(std::move(msg));
 #endif
 }
 
-void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
+void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
 {
 #if CMK_LBDB_ON
   if (concurrent && (CkMyPe() == cur_ld_balancer)) {
@@ -594,10 +602,12 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
  *  }*/
 #endif
 	
+#if CMK_FAULT_EVAC
     if(!CmiNodeAlive(pe)){
 	DEBUGF(("[%d] ReceiveStats called from invalidProcessor %d\n",CkMyPe(),pe));
 	continue;
     }
+#endif
 	
     if (m->avail_vector!=NULL) {
       LBDatabaseObj()->set_avail_vector(m->avail_vector,  m->next_lb);
@@ -638,7 +648,12 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
     }
   }    // end of for
 
+#if CMK_FAULT_EVAC
   const int clients = CkNumValidPes();
+#else
+  const int clients = CkNumPes();
+#endif
+
   DEBUGF(("THIS POINT count = %d, clients = %d\n",stats_msg_count,clients));
  
   if (stats_msg_count == clients) {
@@ -653,11 +668,11 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 }
 
 /** added by Abhinav for receiving msgs via spanning tree */
-void CentralLB::ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &msg)
+void CentralLB::ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &&msg)
 {
 #if CMK_LBDB_ON
 	CmiAssert(CkMyPe() != 0);
-	bufMsg.add(msg);         // buffer messages
+	bufMsg.add(std::move(msg));         // buffer messages
 	count_msgs++;
 	//CkPrintf("here %d\n", CkMyPe());
 	if (count_msgs == st.numChildren+1) {
@@ -945,8 +960,8 @@ static bool isMigratable(LDObjData **objData, int *len, int count, const LDCommD
   for (int pe=0 ; pe<count; pe++)
   {
     for (int i=0; i<len[pe]; i++)
-      if (LDObjIDEqual(objData[pe][i].objID(), commData.sender.objID()) ||
-          LDObjIDEqual(objData[pe][i].objID(), commData.receiver.get_destObj().objID())) 
+      if (objData[pe][i].objID() == commData.sender.objID() ||
+          objData[pe][i].objID() == commData.receiver.get_destObj().objID())
       return false;
   }
 #endif
@@ -1142,11 +1157,12 @@ void CentralLB::ProcessReceiveMigration()
 
   for (i=0; i<CkNumPes(); i++) theLbdb->lastLBInfo.expectedLoad[i] = m->expectedLoad[i];
   CmiAssert(migrates_expected <= 0 || migrates_completed == migrates_expected);
-/*FAULT_EVAC*/
+#if CMK_FAULT_EVAC
   if(!CmiNodeAlive(CkMyPe())){
 	delete m;
 	return;
   }
+#endif
   migrates_expected = 0;
   future_migrates_expected = 0;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -1162,6 +1178,12 @@ void CentralLB::ProcessReceiveMigration()
     MigrateInfo& move = m->moves[i];
     const int me = CkMyPe();
     if (move.from_pe == me && move.to_pe != me) {
+#if CMK_DRONE_MODE
+      int to_pe_rank0 = CMK_RANK_0(move.to_pe);
+      if(move.from_pe == to_pe_rank0) continue;
+      move.to_pe = to_pe_rank0;
+#endif
+
       DEBUGF(("[%d] migrating object to %d\n",move.from_pe,move.to_pe));
       // migrate object, in case it is already gone, inform toPe
 #if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
@@ -1185,6 +1207,10 @@ void CentralLB::ProcessReceiveMigration()
             }
 #endif
     } else if (move.from_pe != me && move.to_pe == me) {
+#if CMK_DRONE_MODE
+      int to_pe_rank0 = CMK_RANK_0(move.to_pe);
+      if(me != to_pe_rank0) continue;
+#endif
        DEBUGF(("[%d] expecting object from %d\n",move.to_pe,move.from_pe));
       if (!move.async_arrival) migrates_expected++;
       else future_migrates_expected++;
@@ -1334,8 +1360,11 @@ void CentralLB::MigrationDoneImpl (int balancing)
     contribute(CkCallback(CkReductionTarget(CentralLB, ResumeClients),
                 thisProxy));
   }
-  else{	
-    if(CmiNodeAlive(CkMyPe())){
+  else{
+#if CMK_FAULT_EVAC
+    if(CmiNodeAlive(CkMyPe()))
+#endif
+    {
 	thisProxy [CkMyPe()].ResumeClients(balancing);
     }	
   }	
@@ -1439,7 +1468,8 @@ void CentralLB::CheckMigrationComplete()
     theLbdb->getLBDB()->DoneRegisteringObjects(h);
     // switch to the next load balancer in the list
     // subtle: called from Migrated() may result in Migrated() called in next LB
-    theLbdb->nextLoadbalancer(seqno);
+    if (!(_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
+      theLbdb->nextLoadbalancer(seqno);
   }
 #endif
 }
@@ -1453,11 +1483,37 @@ void CentralLB::removeCommDataOfDeletedObjs(LDStats* stats) {
   int n_comm = 0;
   for (int i=0; i<stats->n_comm; i++) {
     LDCommData& cdata = stats->commData[i];
-    if (!cdata.from_proc()) {
-      int sidx = stats->getSendHash(cdata);
-      int ridx = stats->getRecvHash(cdata);
-      if (sidx == -1 || ridx == -1) continue;
+    switch (cdata.receiver.get_type()) {
+      case LD_PROC_MSG:
+        break;
+      case LD_OBJ_MSG:  {
+        if (!cdata.from_proc()) {
+          int sidx = stats->getSendHash(cdata);
+          int ridx = stats->getRecvHash(cdata);
+          if (sidx == -1 || ridx == -1) continue;
+        }
+        break;
+      }
+      case LD_OBJLIST_MSG:  {
+        int sidx = stats->getSendHash(cdata);
+        if (sidx == -1) continue;
+        int nobjs;
+        LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
+        for (int id=0; id<nobjs; id++) {
+          int idx = stats->getHash(objs[id]);
+          if (idx == -1)
+          {
+            objs[id] = objs[nobjs-1];
+            id--;
+            nobjs--;
+          }
+        }
+        if(nobjs == 0) continue;
+        cdata.receiver.dest.destObjs.len = nobjs;
+        break;
+      }
     }
+
     stats->commData[n_comm] = cdata;
     n_comm++;
   }
@@ -1918,10 +1974,10 @@ void CkMarshalledCLBStatsMessage::free() {
     delete msgs[i];
     msgs[i] = NULL;
   }
-  msgs.free();
+  msgs.clear();
 }
 
-void CkMarshalledCLBStatsMessage::add(CkMarshalledCLBStatsMessage &m)
+void CkMarshalledCLBStatsMessage::add(CkMarshalledCLBStatsMessage &&m)
 {
   int count = m.getCount();
   for (int i=0; i<count; i++) add(m.getMessage(i));

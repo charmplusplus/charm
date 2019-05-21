@@ -1,2 +1,2 @@
 #include "charm-api.h"
-CDECL void driver(void) { }
+CLINKAGE void driver(void) { }

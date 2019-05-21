@@ -531,7 +531,7 @@ char *SRtable::dumpString() {
   for (int i=0; i<b; i++) {
     tmp = buckets[i];
     snprintf(tempStr, 32, "b%d: ", i);
-    strncat(str, tempStr, PVT_DEBUG_BUFFER_LINE_LENGTH);
+    strncat(str, tempStr, 32);
     while (tmp) {
       char *stemp=tmp->dumpString();
       strcat(str, stemp);

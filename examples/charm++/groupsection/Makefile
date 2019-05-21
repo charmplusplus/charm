@@ -13,7 +13,7 @@ check.decl.h: check.ci
 	$(CHARMC) $(OPTS) -language charm++ check.ci
 
 test: check
-	$(call run, +p10 ./check )
+	$(call run, +p4 ./check )
 
 clean:
 	rm -f *.decl.h *.def.h *.o check charmrun

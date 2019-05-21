@@ -13,43 +13,46 @@
 #define WIN_SUCCESS 0
 #define WIN_ERROR   (-1)
 
-win_obj::win_obj() {
-  winNameLen = 0;
+extern int AMPI_RDMA_THRESHOLD;
+extern int AMPI_SMP_RDMA_THRESHOLD;
+
+win_obj::win_obj() noexcept {
   baseAddr = NULL;
   comm = MPI_COMM_NULL;
   initflag = false;
 }
 
 win_obj::win_obj(const char *name, void *base, MPI_Aint size, int disp_unit,
-                 MPI_Comm comm) {
+                 MPI_Comm comm) noexcept {
   create(name, base, size, disp_unit, comm);
   owner = -1;  // the lock is not owned by anyone yet
 }
 
-void win_obj::setName(const char *src) {
-  CkDDT_SetName(winName, src, &winNameLen);
+void win_obj::setName(const char *src) noexcept {
+  CkDDT_SetName(winName, src);
 }
 
-void win_obj::getName(char *name, int *len) {
-  *len = winNameLen;
-  memcpy(name, winName, *len+1);
+void win_obj::getName(char *name, int *len) noexcept {
+  int length = *len = winName.size();
+  memcpy(name, winName.data(), length);
+  name[length] = '\0';
 }
 
-win_obj::~win_obj() {
+win_obj::~win_obj() noexcept {
   free();
 }
 
 // Note that this is supposed to be used for migration.
 // We should not hava a remote methos which has to pack the win data --- Inefficient
-void win_obj::pup(PUP::er &p) {
+void win_obj::pup(PUP::er &p) noexcept {
 #if 0
   p|winSize;
   p|disp_unit;
   p|comm;
   p|initflag;
 
-  p|winNameLen;
-  p(winName,MPI_MAX_OBJECT_NAME);
+  p|winName;
+  p|keyvals;
 
   int size = 0;
   if(baseAddr) size = winSize;
@@ -59,7 +62,7 @@ void win_obj::pup(PUP::er &p) {
 #endif
 }
 
-int win_obj::create(const char *name, void *base, MPI_Aint size, int disp_unit, MPI_Comm comm){
+int win_obj::create(const char *name, void *base, MPI_Aint size, int disp_unit, MPI_Comm comm) noexcept {
   if (name) setName(name);
   baseAddr = base;
   winSize = size*disp_unit;
@@ -70,7 +73,7 @@ int win_obj::create(const char *name, void *base, MPI_Aint size, int disp_unit, 
   return WIN_SUCCESS;
 }
 
-int win_obj::free(){
+int win_obj::free() noexcept {
   // Assume : memory will be deallocated by user
   initflag = false;
   return WIN_SUCCESS;
@@ -80,7 +83,7 @@ int win_obj::free(){
 // AMPI_Win_put will act as a wrapper: pack the input parameters, copy the
 //   remote data to local, and call this function of the involved WIN object
 int win_obj::put(void *orgaddr, int orgcnt, int orgunit, MPI_Aint targdisp,
-                 int targcnt, int targunit) {
+                 int targcnt, int targunit) noexcept {
   if(!initflag) {
     CkAbort("Put to non-existing MPI_Win\n");
     return WIN_ERROR;
@@ -95,7 +98,7 @@ int win_obj::put(void *orgaddr, int orgcnt, int orgunit, MPI_Aint targdisp,
 }
 
 int win_obj::get(void *orgaddr, int orgcnt, int orgunit, MPI_Aint targdisp,
-                 int targcnt, int targunit){
+                 int targcnt, int targunit) noexcept {
   if(!initflag) {
     CkAbort("Get from non-existing MPI_Win\n");
     return WIN_ERROR;
@@ -111,7 +114,7 @@ int win_obj::get(void *orgaddr, int orgcnt, int orgunit, MPI_Aint targdisp,
 }
 
 int win_obj::iget(int orgcnt, int orgunit, MPI_Aint targdisp,
-                  int targcnt, int targunit){
+                  int targcnt, int targunit) noexcept {
   if(!initflag) {
     CkAbort("Get from non-existing MPI_Win\n");
     return WIN_ERROR;
@@ -126,25 +129,25 @@ int win_obj::iget(int orgcnt, int orgunit, MPI_Aint targdisp,
   return WIN_SUCCESS;
 }
 
-int win_obj::accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
-                        MPI_Aint targdisp, int targcnt,
-                        MPI_Datatype targtype, MPI_Op op, ampiParent* pptr){
+int win_obj::accumulate(void *orgaddr, int count, MPI_Aint targdisp, MPI_Datatype targtype,
+                        MPI_Op op, ampiParent* pptr) noexcept
+{
   //when called from winRemote entry methods, pptr must be taken from the ampi instance, not getAmpiParent().
   CkAssert(pptr != NULL);
-  pptr->applyOp(targtype, op, targcnt, (void*)orgaddr,(void*)((int*)baseAddr+targdisp));
+  pptr->applyOp(targtype, op, count, orgaddr, (void*)((char*)baseAddr+disp_unit*targdisp));
   return WIN_SUCCESS;
 }
 
-int win_obj::fence(){
+int win_obj::fence() noexcept {
   return WIN_SUCCESS;
 }
 
-int win_obj::lock(int requestRank, int lock_type){
+int win_obj::lock(int requestRank, int lock_type) noexcept {
   owner = requestRank;
   return WIN_SUCCESS;
 }
 
-int win_obj::unlock(int requestRank){
+int win_obj::unlock(int requestRank) noexcept {
   if (owner != requestRank){
     CkPrintf("    ERROR: Can't unlock a lock which you don't own.\n");
     return WIN_ERROR;
@@ -157,98 +160,142 @@ int win_obj::unlock(int requestRank){
   return WIN_SUCCESS;
 }
 
-void win_obj::dequeue() {
+void win_obj::dequeue() noexcept {
   lockQueueEntry *lq = lockQueue.deq();
   delete lq;
 }
 
-void win_obj::enqueue(int requestRank, int lock_type) {
+void win_obj::enqueue(int requestRank, int lock_type) noexcept {
   lockQueueEntry *lq = new lockQueueEntry(requestRank, lock_type);
   lockQueue.enq(lq);
 }
 
-bool win_obj::emptyQueue() {
+bool win_obj::emptyQueue() noexcept {
   return (lockQueue.length()==0);
 }
 
-void win_obj::lockTopQueue() {
+void win_obj::lockTopQueue() noexcept {
   lockQueueEntry *lq = lockQueue.deq();
   lock(lq->requestRank, lq->lock_type);
   lockQueue.insert(0, lq);
 }
 
 /* these four functions are yet to implement */
-int win_obj::wait(){
+int win_obj::wait() noexcept {
   return -1;
 }
 
-int win_obj::post(){
+int win_obj::post() noexcept {
   return -1;
 }
 
-int win_obj::start(){
+int win_obj::start() noexcept {
   return -1;
 }
 
-int win_obj::complete(){
+int win_obj::complete() noexcept {
   return -1;
 }
 
-int ampiParent::addWinStruct(WinStruct* win) {
+int ampiParent::addWinStruct(WinStruct* win) noexcept {
   winStructList.push_back(win);
   return winStructList.size()-1;
 }
 
-WinStruct *ampiParent::getWinStruct(MPI_Win win) const {
+WinStruct *ampiParent::getWinStruct(MPI_Win win) const noexcept {
   return winStructList[(int)win];
 }
 
-void ampiParent::removeWinStruct(WinStruct *win) {/*winStructList.remove(win);*/}
+void ampiParent::removeWinStruct(WinStruct *win) noexcept {/*winStructList.remove(win);*/}
 
-int ampi::winPut(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
-                 MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct *win){
+int ampi::winPut(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+                 MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, WinStruct *win) noexcept {
   CkDDT_DataType *ddt = getDDT()->getType(orgtype);
   int orgtotalsize = ddt->getSize(orgcnt);
+  AMPI_DEBUG("    Rank[%d:%d] invoke Remote put at [%d]\n", thisIndex, myRank, rank);
 
   if (ddt->isContig()) {
-    thisProxy[rank].winRemotePut(orgtotalsize, (char*)orgaddr, orgcnt, orgtype, targdisp,
-                          targcnt, targtype, win->index);
+    ampi *destPtr = thisProxy[rank].ckLocal();
+    if (destPtr != NULL) {
+      destPtr->winRemotePut(orgtotalsize, (char*)orgaddr, orgcnt, orgtype, targdisp,
+                            targcnt, targtype, win->index);
+    }
+#if AMPI_RDMA_IMPL
+    else if (orgtotalsize >= AMPI_RDMA_THRESHOLD ||
+            (orgtotalsize >= AMPI_SMP_RDMA_THRESHOLD && destLikelyWithinProcess(thisProxy, rank)))
+    {
+      AmpiRequestList& reqs = getReqs();
+      SendReq* ampiReq = parent->reqPool.newReq<SendReq>(orgtype, myComm.getComm(), getDDT());
+      MPI_Request req = reqs.insert(ampiReq);
+      CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
+      completedSendCB.setRefnum(req);
+      thisProxy[rank].winRemotePut(orgtotalsize, CkSendBuffer(orgaddr, completedSendCB), orgcnt, orgtype,
+                                   targdisp, targcnt, targtype, win->index);
+      ampiReq->wait(MPI_STATUS_IGNORE);
+      reqs.free(parent->reqPool, req, getDDT());
+    }
+#endif
+    else {
+      thisProxy[rank].winRemotePut(orgtotalsize, (char*)orgaddr, orgcnt, orgtype, targdisp,
+                                   targcnt, targtype, win->index);
+    }
   }
   else {
     vector<char> sorgaddr(orgtotalsize);
-    ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, 1);
-    thisProxy[rank].winRemotePut(orgtotalsize, &sorgaddr[0], orgcnt, orgtype, targdisp,
-                          targcnt, targtype, win->index);
+    int orgsize = getDDT()->getType(orgtype)->getSize(orgcnt);
+    ddt->serialize((char*)orgaddr, sorgaddr.data(), orgcnt, orgsize, PACK);
+    thisProxy[rank].winRemotePut(orgtotalsize, sorgaddr.data(), orgcnt, orgtype, targdisp,
+                                 targcnt, targtype, win->index);
   }
 
   return MPI_SUCCESS;
 }
 
 void ampi::winRemotePut(int orgtotalsize, char* sorgaddr, int orgcnt, MPI_Datatype orgtype,
-                        MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex) {
+                        MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, int winIndex) noexcept {
   win_obj *winobj = winObjects[winIndex];
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
   int targunit = tddt->getSize();
   int orgunit = getDDT()->getSize(orgtype);
 
   winobj->put(sorgaddr, orgcnt, orgunit, targdisp, targcnt, targunit);
-  char* targaddr = ((char*)(winobj->baseAddr)) + targunit*targdisp;
-  tddt->serialize(targaddr, (char*)sorgaddr, targcnt, (-1));
+  char* targaddr = ((char*)(winobj->baseAddr)) + winobj->disp_unit*targdisp;
+  int targsize = getDDT()->getType(targtype)->getSize(targcnt);
+  tddt->serialize(targaddr, (char*)sorgaddr, targcnt, targsize, UNPACK);
 }
 
 int ampi::winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
                  MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
-                 WinStruct *win){
+                 WinStruct *win) noexcept {
   // Send the request for data to remote side
   AMPI_DEBUG("    Rank[%d:%d] invoke Remote get at [%d]\n", thisIndex, myRank, rank);
-  CkDDT_DataType *ddt = getDDT()->getType(orgtype);
-  int orgtotalsize = ddt->getSize(orgcnt);
-  AmpiMsg *msg = new AmpiMsg();
+  CkDDT_DataType *orgddt  = getDDT()->getType(orgtype);
+  CkDDT_DataType *targddt = getDDT()->getType(targtype);
+  int orgtotalsize  = orgddt->getSize(orgcnt);
+  int targtotalsize = targddt->getSize(targcnt);
 
-  msg = thisProxy[rank].winRemoteGet(orgcnt, orgtype, targdisp, targcnt, targtype, win->index);
+  // FIXME: DDT has no method to copy directly between two non-contiguous types, so we only handle
+  // the case where one but not both of the types are non-contiguous here.
+  if (orgddt->isContig() || targddt->isContig()) {
+    ampi *destPtr = thisProxy[rank].ckLocal();
+    if (destPtr != NULL) {
+      char* targdata = destPtr->winLocalGet(orgcnt, orgtype, targdisp, targcnt, targtype, win->index);
+      if (orgddt->isContig()) {
+        int orgsize = getDDT()->getType(orgtype)->getSize(orgcnt);
+        orgddt->serialize((char*)orgaddr, targdata, orgcnt, orgsize, UNPACK);
+      } else {
+        int targsize = getDDT()->getType(targtype)->getSize(targcnt);
+        targddt->serialize((char*)orgaddr, targdata, targcnt, targsize, PACK);
+      }
+      return MPI_SUCCESS;
+    }
+  }
+
+  AmpiMsg* msg = thisProxy[rank].winRemoteGet(orgcnt, orgtype, targdisp, targcnt, targtype, win->index);
 
   // Process the reply message by serializing the data into the desired memory position
-  ddt->serialize((char*)orgaddr, msg->getData(), orgcnt, (-1));
+  int orgsize = getDDT()->getType(orgtype)->getSize(orgcnt);
+  orgddt->serialize((char*)orgaddr, msg->getData(), orgcnt, orgsize, UNPACK);
   AMPI_DEBUG("    Rank[%d] got win  [%d] \n", thisIndex, *(int*)msg->getData());
   AMPI_DEBUG("    Rank[%d] got win  [%d] , size %d\n", thisIndex, *(int*)orgaddr, orgcnt);
 
@@ -256,28 +303,46 @@ int ampi::winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
   return MPI_SUCCESS;
 }
 
-AmpiMsg* ampi::winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
-                            MPI_Datatype targtype, int winIndex) {
-  AMPI_DEBUG("    RemoteGet invoked at Rank[%d:%d]\n", thisIndex, myRank);
+char* ampi::winLocalGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                        MPI_Datatype targtype, int winIndex) noexcept {
+  AMPI_DEBUG("    LocalGet invoked at Rank[%d:%d]\n", thisIndex, myRank);
 
+  win_obj *winobj = winObjects[winIndex];
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
   int targunit = tddt->getSize();
-  int targtotalsize = targunit*targcnt;
+  int targtotalsize = winobj->disp_unit*targcnt;
   int orgunit = getDDT()->getSize(orgtype);
+  char* targaddr = (char*)(winobj->baseAddr) + winobj->disp_unit*targdisp;
+
+  winobj->get(targaddr, orgcnt, orgunit, targdisp, targcnt, targunit);
+
+  AMPI_DEBUG("    Rank[%d] local get win  [%d] \n", thisIndex, *(int*)(targaddr));
+  return targaddr;
+}
+
+AmpiMsg* ampi::winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
+                            MPI_Datatype targtype, int winIndex) noexcept {
+  AMPI_DEBUG("    RemoteGet invoked at Rank[%d:%d]\n", thisIndex, myRank);
+
   win_obj *winobj = winObjects[winIndex];
-  char* targaddr = (char*)(winobj->baseAddr) + targunit*targdisp;
+  CkDDT_DataType *tddt = getDDT()->getType(targtype);
+  int targunit = tddt->getSize();
+  int targtotalsize = winobj->disp_unit*targcnt;
+  int orgunit = getDDT()->getSize(orgtype);
+  char* targaddr = (char*)(winobj->baseAddr) + winobj->disp_unit*targdisp;
 
   winobj->get(targaddr, orgcnt, orgunit, targdisp, targcnt, targunit);
 
   AMPI_DEBUG("    Rank[%d] get win  [%d] \n", thisIndex, *(int*)(targaddr));
-  AmpiMsg *msg = new (targtotalsize, 0) AmpiMsg(-1, MPI_RMA_TAG, thisIndex, targtotalsize);
-  tddt->serialize(targaddr, msg->getData(), targcnt, 1);
+  AmpiMsg *msg = new (targtotalsize, 0) AmpiMsg(0, 0, MPI_RMA_TAG, thisIndex, targtotalsize);
+  int targsize = getDDT()->getType(targtype)->getSize(targcnt);
+  tddt->serialize(targaddr, msg->getData(), targcnt, targsize, PACK);
   return msg;
 }
 
 int ampi::winIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
                   MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
-                  WinStruct *win, MPI_Request *req){
+                  WinStruct *win, MPI_Request *req) noexcept {
   // Send the request to data and handle of Future to remote side
   AMPI_DEBUG("    Rank[%d:%d] request Remote iget at [%d]\n", thisIndex, myRank, rank);
   *req = thisProxy[rank].winRemoteIget(orgdisp, orgcnt, orgtype, targdisp, targcnt, targtype, win->index);
@@ -286,27 +351,27 @@ int ampi::winIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
 
 AmpiMsg* ampi::winRemoteIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype,
                              MPI_Aint targdisp, int targcnt,
-                             MPI_Datatype targtype, int winIndex) {
+                             MPI_Datatype targtype, int winIndex) noexcept {
   AMPI_DEBUG("    RemoteIget invoked at Rank[%d:%d]\n", thisIndex, myRank);
+  win_obj *winobj = winObjects[winIndex];
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
   int targunit = tddt->getSize();
-  int targtotalsize = targunit*targcnt;
+  int targtotalsize = winobj->disp_unit*targcnt;
   int orgunit = getDDT()->getSize(orgtype);
 
-  win_obj *winobj = winObjects[winIndex];
   winobj->iget(orgcnt, orgunit, targdisp, targcnt, targunit);
 
+  AmpiMsg *msg = new (targtotalsize, 0) AmpiMsg(0, 0, MPI_RMA_TAG, thisIndex, targtotalsize);
+
+  char* targaddr = (char*)(winobj->baseAddr) + targdisp*winobj->disp_unit;
   AMPI_DEBUG("    Rank[%d] iget win  [%d] \n", thisIndex, *(int*)(targaddr));
-
-  AmpiMsg *msg = new (targtotalsize, 0) AmpiMsg(-1, MPI_RMA_TAG, thisIndex, targtotalsize);
-
-  char* targaddr = (char*)(winobj->baseAddr) + targdisp*targunit;
-  tddt->serialize(targaddr, msg->getData(), targcnt, 1);
+  int targsize = getDDT()->getType(targtype)->getSize(targcnt);
+  tddt->serialize(targaddr, msg->getData(), targcnt, targsize, PACK);
   AMPI_DEBUG("    Rank[%d] copy win  [%d] \n", thisIndex, *(int*)msg->getData());
   return msg;
 }
 
-int ampi::winIgetWait(MPI_Request *request, MPI_Status *status) {
+int ampi::winIgetWait(MPI_Request *request, MPI_Status *status) noexcept {
   // Wait on the Future object
   AMPI_DEBUG("    [%d] Iget Waiting\n", thisIndex, *request);
   status->msg = (AmpiMsg*)CkWaitReleaseFuture(*request);
@@ -314,7 +379,7 @@ int ampi::winIgetWait(MPI_Request *request, MPI_Status *status) {
   return MPI_SUCCESS;
 }
 
-int ampi::winIgetFree(MPI_Request *request, MPI_Status *status) {
+int ampi::winIgetFree(MPI_Request *request, MPI_Status *status) noexcept {
   AMPI_DEBUG("    [%d] : Iget [%d] frees buffer\n", thisIndex, *request);
 
   void *data = NULL;
@@ -329,22 +394,45 @@ int ampi::winIgetFree(MPI_Request *request, MPI_Status *status) {
   }
 }
 
-int ampi::winAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+int ampi::winAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
                         MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
-                        MPI_Op op, WinStruct *win) {
+                        MPI_Op op, WinStruct *win) noexcept {
   CkDDT_DataType *ddt = getDDT()->getType(orgtype);
   int orgtotalsize = ddt->getSize(orgcnt);
   AMPI_DEBUG("    Rank[%d:%d] invoke Remote accumulate at [%d]\n", thisIndex, myRank, rank);
 
   if (ddt->isContig()) {
-    thisProxy[rank].winRemoteAccumulate(orgtotalsize, (char*)orgaddr, orgcnt, orgtype,
-                                 targdisp, targcnt, targtype,  op, win->index);
+    ampi *destPtr = thisProxy[rank].ckLocal();
+    if (destPtr != NULL) {
+      destPtr->winRemoteAccumulate(orgtotalsize, (char*)orgaddr, orgcnt, orgtype, targdisp,
+                                   targcnt, targtype, op, win->index);
+    }
+#if AMPI_RDMA_IMPL
+    else if (orgtotalsize >= AMPI_RDMA_THRESHOLD ||
+            (orgtotalsize >= AMPI_SMP_RDMA_THRESHOLD && destLikelyWithinProcess(thisProxy, rank)))
+    {
+      AmpiRequestList& reqs = getReqs();
+      SendReq* ampiReq = parent->reqPool.newReq<SendReq>(orgtype, myComm.getComm(), getDDT());
+      MPI_Request req = reqs.insert(ampiReq);
+      CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
+      completedSendCB.setRefnum(req);
+      thisProxy[rank].winRemoteAccumulate(orgtotalsize, CkSendBuffer(orgaddr, completedSendCB), orgcnt,
+                                          orgtype, targdisp, targcnt, targtype,  op, win->index);
+      ampiReq->wait(MPI_STATUS_IGNORE);
+      reqs.free(parent->reqPool, req, getDDT());
+    }
+#endif
+    else {
+      thisProxy[rank].winRemoteAccumulate(orgtotalsize, (char*)orgaddr, orgcnt, orgtype,
+                                          targdisp, targcnt, targtype,  op, win->index);
+    }
   }
   else {
     vector<char> sorgaddr(orgtotalsize);
-    ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, 1);
-    thisProxy[rank].winRemoteAccumulate(orgtotalsize, &sorgaddr[0], orgcnt, orgtype,
-                                 targdisp, targcnt, targtype,  op, win->index);
+    int orgsize = getDDT()->getType(orgtype)->getSize(orgcnt);
+    ddt->serialize((char*)orgaddr, sorgaddr.data(), orgcnt, orgsize, PACK);
+    thisProxy[rank].winRemoteAccumulate(orgtotalsize, sorgaddr.data(), orgcnt, orgtype,
+                                        targdisp, targcnt, targtype,  op, win->index);
   }
 
   return MPI_SUCCESS;
@@ -353,82 +441,194 @@ int ampi::winAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int ran
 void ampi::winRemoteAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt,
                                MPI_Datatype orgtype, MPI_Aint targdisp,
                                int targcnt, MPI_Datatype targtype, MPI_Op op,
-                               int winIndex) {
+                               int winIndex) noexcept {
   win_obj *winobj = winObjects[winIndex];
   CkDDT_DataType *ddt = getDDT()->getType(targtype);
   if (ddt->isContig()) {
-    winobj->accumulate(sorgaddr, targcnt, targtype, targdisp, targcnt, targtype, op, parent);
+    winobj->accumulate(sorgaddr, targcnt, targdisp, targtype, op, parent);
   }
   else {
     vector<char> getdata(orgtotalsize);
-    ddt->serialize(&getdata[0], sorgaddr, targcnt, (-1));
-    winobj->accumulate(&getdata[0], targcnt, targtype, targdisp, targcnt, targtype, op, parent);
+    int targsize = getDDT()->getType(targtype)->getSize(targcnt);
+    ddt->serialize(getdata.data(), sorgaddr, targcnt, targsize, UNPACK);
+    winobj->accumulate(getdata.data(), targcnt, targdisp, targtype, op, parent);
   }
 }
 
-int ampi::winGetAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
+int ampi::winGetAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype,
                            void *resaddr, int rescnt, MPI_Datatype restype, int rank,
                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
-                           MPI_Op op, WinStruct *win) {
-  CkDDT_DataType *ddt = getDDT()->getType(orgtype);
-  int orgtotalsize = ddt->getSize(orgcnt);
-  AmpiMsg *msg = new AmpiMsg();
+                           MPI_Op op, WinStruct *win) noexcept {
+  CkDDT_DataType *orgddt = getDDT()->getType(orgtype);
+  CkDDT_DataType *resddt = getDDT()->getType(restype);
+  int orgtotalsize = orgddt->getSize(orgcnt);
   AMPI_DEBUG("    Rank[%d:%d] invoke Remote get at [%d]\n", thisIndex, myRank, rank);
 
-  msg = thisProxy[rank].winRemoteGet(orgcnt, orgtype, targdisp, targcnt, targtype, win->index);
-
-  ddt->serialize((char*)resaddr, msg->getData(), orgcnt, (-1));
-  if (ddt->isContig()) {
-    parent->applyOp(orgtype, op, orgcnt, resaddr, orgaddr);
-  } else {
+  AmpiMsg *msg;
+  if (orgddt->isContig()) {
+    ampi *destPtr = thisProxy[rank].ckLocal();
+    if (destPtr != NULL) {
+      destPtr->winLocalGetAccumulate(orgtotalsize, (char*)orgaddr, orgcnt, orgtype, targdisp,
+                                     targcnt, targtype, op, (char*)resaddr, win->index);
+      return MPI_SUCCESS;
+    }
+#if AMPI_RDMA_IMPL
+    else if (orgtotalsize >= AMPI_RDMA_THRESHOLD ||
+            (orgtotalsize >= AMPI_SMP_RDMA_THRESHOLD && destLikelyWithinProcess(thisProxy, rank)))
+    {
+      AmpiRequestList& reqs = getReqs();
+      SendReq* ampiReq = parent->reqPool.newReq<SendReq>(orgtype, myComm.getComm(), getDDT());
+      MPI_Request req = reqs.insert(ampiReq);
+      CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
+      completedSendCB.setRefnum(req);
+      msg = thisProxy[rank].winRemoteGetAccumulate(orgtotalsize, CkSendBuffer(orgaddr, completedSendCB), orgcnt,
+                                                   orgtype, targdisp, targcnt, targtype, op, win->index);
+      ampiReq->wait(MPI_STATUS_IGNORE);
+      reqs.free(parent->reqPool, req, getDDT());
+    }
+#endif
+    else {
+      msg = thisProxy[rank].winRemoteGetAccumulate(orgtotalsize, CkSendBuffer(orgaddr), orgcnt, orgtype, targdisp,
+                                                   targcnt, targtype, op, win->index);
+    }
+  }
+  else {
     vector<char> sorgaddr(orgtotalsize);
-    ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, 1);
-    parent->applyOp(orgtype, op, orgcnt, resaddr, &sorgaddr[0]);
-    ddt->serialize((char*)orgaddr, &sorgaddr[0], orgcnt, -1);
+    int orgsize = getDDT()->getType(orgtype)->getSize(orgcnt);
+    orgddt->serialize((char*)orgaddr, sorgaddr.data(), orgcnt, orgsize, PACK);
+    msg = thisProxy[rank].winRemoteGetAccumulate(orgtotalsize, sorgaddr.data(), orgcnt, orgtype, targdisp,
+                                                 targcnt, targtype, op, win->index);
   }
 
+  int ressize = getDDT()->getType(restype)->getSize(rescnt);
+  resddt->serialize((char*)resaddr, msg->getData(), rescnt, ressize, UNPACK);
   delete msg;
+
   return MPI_SUCCESS;
 }
 
-int ampi::winCompareAndSwap(void *orgaddr, void *compaddr, void *resaddr, MPI_Datatype type,
-                            int rank, MPI_Aint targdisp, WinStruct *win){
+void ampi::winLocalGetAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt, MPI_Datatype orgtype,
+                                 MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Op op,
+                                 char *resaddr, int winIndex) noexcept {
+  win_obj *winobj = winObjects[winIndex];
+  CkDDT_DataType *tddt = getDDT()->getType(targtype);
+  int targunit = tddt->getSize();
+  int targtotalsize = winobj->disp_unit*targcnt;
+  int orgunit = getDDT()->getSize(orgtype);
+  char* targaddr = (char*)(winobj->baseAddr) + winobj->disp_unit*targdisp;
+
+  // Copy the targaddr buffer directly to resaddr
+  winobj->get(targaddr, orgcnt, orgunit, targdisp, targcnt, targunit);
+  int targsize = getDDT()->getType(targtype)->getSize(targcnt);
+  tddt->serialize(targaddr, resaddr, targcnt, targsize, PACK);
+
+  // Accumulate sorgaddr into targaddr
+  if (tddt->isContig()) {
+    winobj->accumulate(sorgaddr, targcnt, targdisp, targtype, op, parent);
+  }
+  else {
+    vector<char> getdata(orgtotalsize);
+    int targsize = getDDT()->getType(targtype)->getSize(targcnt);
+    tddt->serialize(getdata.data(), sorgaddr, targcnt, targsize, UNPACK);
+    winobj->accumulate(getdata.data(), targcnt, targdisp, targtype, op, parent);
+  }
+}
+
+AmpiMsg* ampi::winRemoteGetAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt, MPI_Datatype orgtype,
+                                      MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Op op,
+                                      int winIndex) noexcept {
+  win_obj *winobj = winObjects[winIndex];
+  CkDDT_DataType *tddt = getDDT()->getType(targtype);
+  int targunit = tddt->getSize();
+  int targtotalsize = winobj->disp_unit*targcnt;
+  int orgunit = getDDT()->getSize(orgtype);
+  char* targaddr = (char*)(winobj->baseAddr) + winobj->disp_unit*targdisp;
+
+  // Send back the targaddr buffer before it is accumulated into
+  winobj->get(targaddr, orgcnt, orgunit, targdisp, targcnt, targunit);
+  AmpiMsg *msg = new (targtotalsize, 0) AmpiMsg(0, 0, MPI_RMA_TAG, thisIndex, targtotalsize);
+  int targsize = getDDT()->getType(targtype)->getSize(targcnt);
+  tddt->serialize(targaddr, msg->getData(), targcnt, targsize, PACK);
+
+  // Accumulate sorgaddr into targaddr
+  if (tddt->isContig()) {
+    winobj->accumulate(sorgaddr, targcnt, targdisp, targtype, op, parent);
+  }
+  else {
+    vector<char> getdata(orgtotalsize);
+    int targsize = getDDT()->getType(targtype)->getSize(targcnt);
+    tddt->serialize(getdata.data(), sorgaddr, targcnt, targsize, UNPACK);
+    winobj->accumulate(getdata.data(), targcnt, targdisp, targtype, op, parent);
+  }
+
+  return msg;
+}
+
+int ampi::winCompareAndSwap(const void *orgaddr, const void *compaddr, void *resaddr, MPI_Datatype type,
+                            int rank, MPI_Aint targdisp, WinStruct *win) noexcept {
   CkDDT_DataType *ddt = getDDT()->getType(type);
-  AmpiMsg* msg = new AmpiMsg();
 
-  msg = thisProxy[rank].winRemoteCompareAndSwap(getDDT()->getType(type)->getSize(1), (char*)orgaddr,
-                                                (char*)compaddr, type, targdisp, win->index);
-  ddt->serialize((char*)resaddr, msg->getData(), 1, 1);
+  if (ddt->isContig()) {
+    ampi *destPtr = thisProxy[rank].ckLocal();
+    if (destPtr != NULL) {
+      char* targaddr = destPtr->winLocalCompareAndSwap(ddt->getSize(), (char*)orgaddr,
+                                                       (char*)compaddr, type, targdisp, win->index);
+      int targsize = getDDT()->getType(type)->getSize(1);
+      ddt->serialize((char*)resaddr, targaddr, 1, targsize, PACK);
+      return MPI_SUCCESS;
+    }
+  }
+
+  AmpiMsg* msg = thisProxy[rank].winRemoteCompareAndSwap(getDDT()->getType(type)->getSize(1), (char*)orgaddr,
+                                                         (char*)compaddr, type, targdisp, win->index);
+  int ressize = getDDT()->getType(type)->getSize(1);
+  ddt->serialize((char*)resaddr, msg->getData(), 1, ressize, PACK);
 
   delete msg;
   return MPI_SUCCESS;
 }
 
-AmpiMsg* ampi::winRemoteCompareAndSwap(int size, char* sorgaddr, char* compaddr, MPI_Datatype type,
-                                       MPI_Aint targdisp, int winIndex) {
+char* ampi::winLocalCompareAndSwap(int size, char* sorgaddr, char* compaddr, MPI_Datatype type,
+                                   MPI_Aint targdisp, int winIndex) noexcept {
   win_obj *winobj = winObjects[winIndex];
   winobj->put(sorgaddr, 1, size, targdisp, 1, size);
 
   CkDDT_DataType *ddt = getDDT()->getType(type);
   char* targaddr = ((char*)(winobj->baseAddr)) + ddt->getSize(targdisp);
 
-  AmpiMsg *msg = new (size, 0) AmpiMsg(-1, MPI_RMA_TAG, thisIndex, size);
-  ddt->serialize(targaddr, msg->getData(), 1, 1);
+  if (*targaddr == *compaddr) {
+    int size = ddt->getSize(1);
+    ddt->serialize(targaddr, (char*)sorgaddr, 1, size, UNPACK);
+  }
+
+  return targaddr;
+}
+
+AmpiMsg* ampi::winRemoteCompareAndSwap(int size, char* sorgaddr, char* compaddr, MPI_Datatype type,
+                                       MPI_Aint targdisp, int winIndex) noexcept {
+  win_obj *winobj = winObjects[winIndex];
+  winobj->put(sorgaddr, 1, size, targdisp, 1, size);
+
+  CkDDT_DataType *ddt = getDDT()->getType(type);
+  char* targaddr = ((char*)(winobj->baseAddr)) + ddt->getSize(targdisp);
+
+  AmpiMsg *msg = new (size, 0) AmpiMsg(0, 0, MPI_RMA_TAG, thisIndex, size);
+  ddt->serialize(targaddr, msg->getData(), 1, msg->getLength(), PACK);
 
   if (*targaddr == *compaddr) {
-    ddt->serialize(targaddr, (char*)sorgaddr, 1, (-1));
+    ddt->serialize(targaddr, (char*)sorgaddr, 1, ddt->getSize(1), UNPACK);
   }
 
   return msg;
 }
 
-int ampi::winLock(int lock_type, int rank, WinStruct *win) {
+int ampi::winLock(int lock_type, int rank, WinStruct *win) noexcept {
   AMPI_DEBUG("    [%d] Lock: invoke Remote lock at [%d]\n", thisIndex, rank);
   thisProxy[rank].winRemoteLock(lock_type, win->index, thisIndex);
   return MPI_SUCCESS;
 }
 
-void ampi::winRemoteLock(int lock_type, int winIndex, int requestRank) {
+void ampi::winRemoteLock(int lock_type, int winIndex, int requestRank) noexcept {
   AMPI_DEBUG("    [%d] RemoteLock: invoked \n", thisIndex);
   win_obj *winobj = winObjects[winIndex];
 
@@ -446,13 +646,13 @@ void ampi::winRemoteLock(int lock_type, int winIndex, int requestRank) {
   }
 }
 
-int ampi::winUnlock(int rank, WinStruct *win) {
+int ampi::winUnlock(int rank, WinStruct *win) noexcept {
   AMPI_DEBUG("    [%d] Unlock: invoke Remote lock at [%d]\n", thisIndex, rank);
   thisProxy[rank].winRemoteUnlock(win->index, thisIndex);
   return MPI_SUCCESS;
 }
 
-void ampi::winRemoteUnlock(int winIndex, int requestRank) {
+void ampi::winRemoteUnlock(int winIndex, int requestRank) noexcept {
   AMPI_DEBUG("    [%d] RemoteUnlock: invoked \n", thisIndex);
   win_obj *winobj = winObjects[winIndex];
   winobj->unlock(requestRank);
@@ -465,7 +665,7 @@ void ampi::winRemoteUnlock(int winIndex, int requestRank) {
   }
 }
 
-MPI_Win ampi::createWinInstance(void *base, MPI_Aint size, int disp_unit, MPI_Info info) {
+MPI_Win ampi::createWinInstance(void *base, MPI_Aint size, int disp_unit, MPI_Info info) noexcept {
   AMPI_DEBUG("     Creating win obj {%d, %p}\n ", myComm.getComm(), base);
   win_obj *newobj = new win_obj((char*)(NULL), base, size, disp_unit, myComm.getComm());
   winObjects.push_back(newobj);
@@ -474,7 +674,7 @@ MPI_Win ampi::createWinInstance(void *base, MPI_Aint size, int disp_unit, MPI_In
   return (parent->addWinStruct(newwin));
 }
 
-int ampi::deleteWinInstance(MPI_Win win) {
+int ampi::deleteWinInstance(MPI_Win win) noexcept {
   WinStruct *winStruct = parent->getWinStruct(win);
   win_obj *winobj = winObjects[winStruct->index];
   parent->removeWinStruct(winStruct); // really it does nothing at all
@@ -482,22 +682,22 @@ int ampi::deleteWinInstance(MPI_Win win) {
   return MPI_SUCCESS;
 }
 
-int ampi::winGetGroup(WinStruct *win, MPI_Group *group) const {
+int ampi::winGetGroup(WinStruct *win, MPI_Group *group) const noexcept {
    *group = parent->comm2group(win->comm);
    return MPI_SUCCESS;
 }
 
-void ampi::winSetName(WinStruct *win, const char *name) {
+void ampi::winSetName(WinStruct *win, const char *name) noexcept {
   win_obj *winobj = winObjects[win->index];
   winobj->setName(name);
 }
 
-void ampi::winGetName(WinStruct *win, char *name, int *length) const {
+void ampi::winGetName(WinStruct *win, char *name, int *length) const noexcept {
   win_obj *winobj = winObjects[win->index];
   winobj->getName(name, length);
 }
 
-win_obj* ampi::getWinObjInstance(WinStruct *win) const {
+win_obj* ampi::getWinObjInstance(WinStruct *win) const noexcept {
   return winObjects[win->index];
 }
 
@@ -521,18 +721,20 @@ win_obj* ampi::getWinObjInstance(WinStruct *win) const {
  */
 // A collective call over all processes in the communicator
 // MPI_Win object created LOCALLY on all processes when the call returns
-CDECL
-int AMPI_Win_create(void *base, MPI_Aint size, int disp_unit,
-                    MPI_Info info, MPI_Comm comm, MPI_Win *newwin){
-  AMPIAPI("AMPI_Win_create");
+AMPI_API_IMPL(int, MPI_Win_create, void *base, MPI_Aint size, int disp_unit,
+                                   MPI_Info info, MPI_Comm comm, MPI_Win *newwin)
+{
+  AMPI_API("AMPI_Win_create");
+  ampiParent *parent = getAmpiParent();
   ampi *ptr = getAmpiInstance(comm);
   *newwin = ptr->createWinInstance(base, size, disp_unit, info);
   /* set the builtin attributes on the window */
-  AMPI_Win_set_attr(*newwin, MPI_WIN_BASE, &base);
-  AMPI_Win_set_attr(*newwin, MPI_WIN_SIZE, &size);
-  AMPI_Win_set_attr(*newwin, MPI_WIN_DISP_UNIT, &disp_unit);
-  /* need to reduction here: to make sure every processor participates */
-  ptr->barrier();
+  WinStruct *winStruct = parent->getWinStruct(*newwin);
+  vector<int>& keyvals = ptr->getWinObjInstance(winStruct)->getKeyvals();
+  parent->setAttr(*newwin, keyvals, MPI_WIN_BASE, &base);
+  parent->setAttr(*newwin, keyvals, MPI_WIN_SIZE, &size);
+  parent->setAttr(*newwin, keyvals, MPI_WIN_DISP_UNIT, &disp_unit);
+  ptr->barrier(); // synchronize all participating virtual processes
   return MPI_SUCCESS;
 }
 
@@ -542,9 +744,9 @@ int AMPI_Win_create(void *base, MPI_Aint size, int disp_unit,
  */
 // A collective call over all processes in the communicator
 // MPI_Win object deleted LOCALLY on all processes when the call returns
-CDECL
-int AMPI_Win_free(MPI_Win *win){
-  AMPIAPI("AMPI_Win_free");
+AMPI_API_IMPL(int, MPI_Win_free, MPI_Win *win)
+{
+  AMPI_API("AMPI_Win_free");
   if(win==NULL) { return ampiErrhandler("AMPI_Win_free", MPI_ERR_WIN); }
 
   WinStruct *winStruct = getAmpiParent()->getWinStruct(*win);
@@ -561,11 +763,12 @@ int AMPI_Win_free(MPI_Win *win){
  * ---sync calls should be made on this window to ensure the
  * ---correctness of the operation
  */
-CDECL
-int AMPI_Put(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
-             MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win){
-  AMPIAPI("AMPI_Put");
-  handle_MPI_BOTTOM(orgaddr, orgtype);
+AMPI_API_IMPL(int, MPI_Put, const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win)
+{
+  AMPI_API("AMPI_Put");
+  if (targtype > AMPI_MAX_PREDEFINED_TYPE) {CkAbort("AMPI does not currently support RMA with derived datatypes.");}
+  handle_MPI_BOTTOM((void*&)orgaddr, orgtype);
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
   return ptr->winPut(orgaddr, orgcnt, orgtype, rank, targdisp, targcnt, targtype, winStruct);
@@ -576,10 +779,12 @@ int AMPI_Put(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
  * ---sync calls should be made on this window to ensure the
  * ---correctness of the operation
  */
-CDECL
-int AMPI_Get(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
-             MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win){
-  AMPIAPI("AMPI_Get");
+AMPI_API_IMPL(int, MPI_Get, void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+                            MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
+                            MPI_Win win)
+{
+  AMPI_API("AMPI_Get");
+  if (targtype > AMPI_MAX_PREDEFINED_TYPE) {CkAbort("AMPI does not currently support RMA with derived datatypes.");}
   handle_MPI_BOTTOM(orgaddr, orgtype);
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
@@ -597,12 +802,13 @@ int AMPI_Get(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
  * ---Accumulate call is ATOMIC: no sync is needed
  * ---Many accumulate can be made from many origins to one target
  */
-CDECL
-int AMPI_Accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
-                    MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
-                    MPI_Op op, MPI_Win win) {
-  AMPIAPI("AMPI_Accumulate");
-  handle_MPI_BOTTOM(orgaddr, orgtype);
+AMPI_API_IMPL(int, MPI_Accumulate, const void *orgaddr, int orgcnt, MPI_Datatype orgtype,
+                                   int rank, MPI_Aint targdisp, int targcnt,
+                                   MPI_Datatype targtype, MPI_Op op, MPI_Win win)
+{
+  AMPI_API("AMPI_Accumulate");
+  if (targtype > AMPI_MAX_PREDEFINED_TYPE) {CkAbort("AMPI does not currently support RMA with derived datatypes.");}
+  handle_MPI_BOTTOM((void*&)orgaddr, orgtype);
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
   return ptr->winAccumulate(orgaddr, orgcnt, orgtype, rank,
@@ -616,13 +822,14 @@ int AMPI_Accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
  *         MPI_Datatype targtype, MPI_Op op, MPI_Win win)
  *   Perform an atomic, one-sided read-and-accumulate operation.
  */
-CDECL
-int AMPI_Get_accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
-                        void *resaddr, int rescnt, MPI_Datatype restype,
-                        int rank, MPI_Aint targdisp, int targcnt,
-                        MPI_Datatype targtype, MPI_Op op, MPI_Win win) {
-  AMPIAPI("AMPI_Get_accumulate");
-  handle_MPI_BOTTOM(orgaddr, orgtype);
+AMPI_API_IMPL(int, MPI_Get_accumulate, const void *orgaddr, int orgcnt, MPI_Datatype orgtype,
+                                       void *resaddr, int rescnt, MPI_Datatype restype,
+                                       int rank, MPI_Aint targdisp, int targcnt,
+                                       MPI_Datatype targtype, MPI_Op op, MPI_Win win)
+{
+  AMPI_API("AMPI_Get_accumulate");
+  if (targtype > AMPI_MAX_PREDEFINED_TYPE) {CkAbort("AMPI does not currently support RMA with derived datatypes.");}
+  handle_MPI_BOTTOM((void*&)orgaddr, orgtype);
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
   return ptr->winGetAccumulate(orgaddr, orgcnt, orgtype, resaddr, rescnt, restype,
@@ -637,14 +844,15 @@ int AMPI_Get_accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
  *   Put data into a memory window on a remote process and
  *   return a request handle for the operation.
  */
-CDECL
-int AMPI_Rput(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
-              MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win,
-              MPI_Request *request){
-  AMPIAPI("AMPI_Rput");
+AMPI_API_IMPL(int, MPI_Rput, const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+                             MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win,
+                             MPI_Request *request)
+{
+  AMPI_API("AMPI_Rput");
+  if (targtype > AMPI_MAX_PREDEFINED_TYPE) {CkAbort("AMPI does not currently support RMA with derived datatypes.");}
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
-  *request = ptr->postReq(new SendReq(winStruct->comm, AMPI_REQ_COMPLETED));
+  *request = ptr->postReq(getAmpiParent()->reqPool.newReq<SendReq>(orgtype, winStruct->comm, ptr->getDDT(), AMPI_REQ_COMPLETED));
   return ptr->winPut(orgaddr, orgcnt, orgtype, rank, targdisp, targcnt, targtype, winStruct);
 }
 /*
@@ -655,14 +863,15 @@ int AMPI_Rput(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
  *   Get data from a memory window on a remote process and
  *   return a request handle for the operation.
  */
-CDECL
-int AMPI_Rget(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
-              MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win,
-              MPI_Request *request){
-  AMPIAPI("AMPI_Rget");
+AMPI_API_IMPL(int, MPI_Rget, void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+                             MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
+                             MPI_Win win, MPI_Request *request)
+{
+  AMPI_API("AMPI_Rget");
+  if (targtype > AMPI_MAX_PREDEFINED_TYPE) {CkAbort("AMPI does not currently support RMA with derived datatypes.");}
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
-  *request = ptr->postReq(new SendReq(winStruct->comm, AMPI_REQ_COMPLETED));
+  *request = ptr->postReq(getAmpiParent()->reqPool.newReq<SendReq>(orgtype, winStruct->comm, ptr->getDDT(), AMPI_REQ_COMPLETED));
   return ptr->winGet(orgaddr, orgcnt, orgtype, rank, targdisp, targcnt, targtype, winStruct);
 }
 
@@ -674,14 +883,15 @@ int AMPI_Rget(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
  *   Accumulate data into the target process using remote memory access and
  *   return a request handle for the operation.
  */
-CDECL
-int AMPI_Raccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
-                     MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
-                     MPI_Op op, MPI_Win win, MPI_Request *request) {
-  AMPIAPI("AMPI_Raccumulate");
+AMPI_API_IMPL(int, MPI_Raccumulate, const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
+                                    MPI_Aint targdisp, int targcnt, MPI_Datatype targtype,
+                                    MPI_Op op, MPI_Win win, MPI_Request *request)
+{
+  AMPI_API("AMPI_Raccumulate");
+  if (targtype > AMPI_MAX_PREDEFINED_TYPE) {CkAbort("AMPI does not currently support RMA with derived datatypes.");}
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
-  *request = ptr->postReq(new SendReq(winStruct->comm, AMPI_REQ_COMPLETED));
+  *request = ptr->postReq(getAmpiParent()->reqPool.newReq<SendReq>(orgtype, winStruct->comm, ptr->getDDT(), AMPI_REQ_COMPLETED));
   return ptr->winAccumulate(orgaddr, orgcnt, orgtype, rank,
                             targdisp, targcnt, targtype, op, winStruct);
 }
@@ -694,16 +904,17 @@ int AMPI_Raccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
  *   Perform an atomic, one-sided read-and-accumulate operation and
  *   return a request handle for the operation.
  */
-CDECL
-int AMPI_Rget_accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
-                         void *resaddr, int rescnt, MPI_Datatype restype,
-                         int rank, MPI_Aint targdisp, int targcnt,
-                         MPI_Datatype targtype, MPI_Op op, MPI_Win win,
-                         MPI_Request *request) {
-  AMPIAPI("AMPI_Rget_accumulate");
+AMPI_API_IMPL(int, MPI_Rget_accumulate, const void *orgaddr, int orgcnt, MPI_Datatype orgtype,
+                                        void *resaddr, int rescnt, MPI_Datatype restype,
+                                        int rank, MPI_Aint targdisp, int targcnt,
+                                        MPI_Datatype targtype, MPI_Op op, MPI_Win win,
+                                        MPI_Request *request)
+{
+  AMPI_API("AMPI_Rget_accumulate");
+  if (targtype > AMPI_MAX_PREDEFINED_TYPE) {CkAbort("AMPI does not currently support RMA with derived datatypes.");}
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
-  *request = ptr->postReq(new SendReq(winStruct->comm, AMPI_REQ_COMPLETED));
+  *request = ptr->postReq(getAmpiParent()->reqPool.newReq<SendReq>(orgtype, winStruct->comm, ptr->getDDT(), AMPI_REQ_COMPLETED));
   return ptr->winGetAccumulate(orgaddr, orgcnt, orgtype, resaddr, rescnt, restype,
                                rank, targdisp, targcnt, targtype, op, winStruct);
 }
@@ -713,11 +924,17 @@ int AMPI_Rget_accumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype,
  *         int rank, MPI_Aint targdisp, MPI_Op op, MPI_Win win)
  *   Perform one-sided read-modify-write.
  */
-CDECL
-int AMPI_Fetch_and_op(void *orgaddr, void *resaddr, MPI_Datatype type,
-                      int rank, MPI_Aint targdisp, MPI_Op op, MPI_Win win) {
-  AMPIAPI("AMPI_Fetch_and_op");
-  handle_MPI_BOTTOM(orgaddr, type);
+AMPI_API_IMPL(int, MPI_Fetch_and_op, const void *orgaddr, void *resaddr, MPI_Datatype type,
+                                     int rank, MPI_Aint targdisp, MPI_Op op, MPI_Win win)
+{
+  AMPI_API("AMPI_Fetch_and_op");
+  #if AMPI_ERROR_CHECKING
+    if (type > AMPI_MAX_PREDEFINED_TYPE)
+    {
+      return ampiErrhandler("AMPI_Fetch_and_op", MPI_ERR_UNSUPPORTED_OPERATION);
+    }
+  #endif
+  handle_MPI_BOTTOM((void*&)orgaddr, type);
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
   // HACK: use GetAccumulate for FetchAndOp
@@ -730,11 +947,17 @@ int AMPI_Fetch_and_op(void *orgaddr, void *resaddr, MPI_Datatype type,
  *         MPI_Datatype type, int rank, MPI_Aint targdisp, MPI_Win win)
  *   Perform one-sided atomic compare-and-swap.
  */
-CDECL
-int AMPI_Compare_and_swap(void *orgaddr, void *compaddr, void *resaddr, MPI_Datatype type,
-                          int rank, MPI_Aint targdisp, MPI_Win win) {
-  AMPIAPI("AMPI_Compare_and_swap");
-  handle_MPI_BOTTOM(orgaddr, type);
+AMPI_API_IMPL(int, MPI_Compare_and_swap, const void *orgaddr, const void *compaddr, void *resaddr,
+                                         MPI_Datatype type, int rank, MPI_Aint targdisp, MPI_Win win)
+{
+  AMPI_API("AMPI_Compare_and_swap");
+  #if AMPI_ERROR_CHECKING
+    if (type > AMPI_MAX_PREDEFINED_TYPE)
+    {
+      return ampiErrhandler("AMPI_Compare_and_swap", MPI_ERR_UNSUPPORTED_OPERATION);
+    }
+  #endif
+  handle_MPI_BOTTOM((void*&)orgaddr, type);
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
   return ptr->winCompareAndSwap(orgaddr, compaddr, resaddr, type, rank, targdisp, winStruct);
@@ -749,9 +972,9 @@ int AMPI_Compare_and_swap(void *orgaddr, void *compaddr, void *resaddr, MPI_Data
  *     int assertion : program assertion, used to provide optimization hints
  *   Returns int : MPI_SUCCESS or MPI_ERR_WIN
  */
-CDECL
-int AMPI_Win_fence(int assertion, MPI_Win win){
-  AMPIAPI("AMPI_Win_fence");
+AMPI_API_IMPL(int, MPI_Win_fence, int assertion, MPI_Win win)
+{
+  AMPI_API("AMPI_Win_fence");
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   MPI_Comm comm = winStruct->comm;
   ampi *ptr = getAmpiInstance(comm);
@@ -773,9 +996,9 @@ int AMPI_Win_fence(int assertion, MPI_Win win){
  *     int assertion : program assertion, used to provide optimization hints
  *   Returns int : MPI_SUCCESS or MPI_ERR_WIN
  */
-CDECL
-int AMPI_Win_lock(int lock_type, int rank, int assertion, MPI_Win win){
-  AMPIAPI("AMPI_Win_lock");
+AMPI_API_IMPL(int, MPI_Win_lock, int lock_type, int rank, int assertion, MPI_Win win)
+{
+  AMPI_API("AMPI_Win_lock");
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
 
@@ -794,8 +1017,9 @@ int AMPI_Win_lock(int lock_type, int rank, int assertion, MPI_Win win){
  */
 // The RMA call is completed both locally and remotely after unlock.
   // process assertion here: HOW???
-int AMPI_Win_unlock(int rank, MPI_Win win){
-  AMPIAPI("AMPI_Win_unlock");
+AMPI_API_IMPL(int, MPI_Win_unlock, int rank, MPI_Win win)
+{
+  AMPI_API("AMPI_Win_unlock");
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
 
@@ -817,9 +1041,9 @@ int AMPI_Win_unlock(int rank, MPI_Win win){
  *     MPI_Group group : a group of processes
  *   Returns int : MPI_SUCCESS or MPI_ERR_WIN
  */
-CDECL
-int AMPI_Win_post(MPI_Group group, int assertion, MPI_Win win){
-  AMPIAPI("AMPI_Win_post");
+AMPI_API_IMPL(int, MPI_Win_post, MPI_Group group, int assertion, MPI_Win win)
+{
+  AMPI_API("AMPI_Win_post");
 
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   if (winStruct->isInEpoch()) {
@@ -830,22 +1054,22 @@ int AMPI_Win_post(MPI_Group group, int assertion, MPI_Win win){
 
   int parentGroupSize;
   MPI_Group parentGroup;
-  AMPI_Comm_group(winStruct->comm, &parentGroup);
-  AMPI_Group_size(parentGroup, &parentGroupSize);
+  MPI_Comm_group(winStruct->comm, &parentGroup);
+  MPI_Group_size(parentGroup, &parentGroupSize);
 
   std::vector<int> parentGroupRanks(parentGroupSize);
   std::vector<int> subsetGroupRanks(parentGroupSize);
   for (int i=0; i<parentGroupSize; i++) {
     parentGroupRanks[i] = i;
   }
-  AMPI_Group_translate_ranks(parentGroup, parentGroupSize, &parentGroupRanks[0], group, &subsetGroupRanks[0]);
+  MPI_Group_translate_ranks(parentGroup, parentGroupSize, parentGroupRanks.data(), group, subsetGroupRanks.data());
 
   ampi *ptr = getAmpiInstance(winStruct->comm);
   int actualRanks = 0;
   for (int i=0; i<subsetGroupRanks.size(); i++) { // If subsetGroupRanks is large, multicast would be more efficient
     if (subsetGroupRanks[i] != MPI_UNDEFINED) {
       subsetGroupRanks[actualRanks++] = i;
-      ptr->send(MPI_EPOCH_START_TAG, ptr->getRank(winStruct->comm), NULL, 0, MPI_INT, subsetGroupRanks[actualRanks-1], winStruct->comm);
+      ptr->send(MPI_EPOCH_START_TAG, ptr->getRank(), NULL, 0, MPI_INT, subsetGroupRanks[actualRanks-1], winStruct->comm);
     }
   }
 
@@ -859,9 +1083,9 @@ int AMPI_Win_post(MPI_Group group, int assertion, MPI_Win win){
   return MPI_SUCCESS;
 }
 
-CDECL
-int AMPI_Win_wait(MPI_Win win){
-  AMPIAPI("AMPI_Win_wait");
+AMPI_API_IMPL(int, MPI_Win_wait, MPI_Win win)
+{
+  AMPI_API("AMPI_Win_wait");
 
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   if (!winStruct->isInEpoch()) {
@@ -879,15 +1103,15 @@ int AMPI_Win_wait(MPI_Win win){
     }
   }
 
-  AMPI_Waitall(requestList.size(), &requestList[0], MPI_STATUSES_IGNORE);
+  MPI_Waitall(requestList.size(), requestList.data(), MPI_STATUSES_IGNORE);
   winStruct->clearEpochExposure();
 
   return MPI_SUCCESS;
 }
 
-CDECL
-int AMPI_Win_start(MPI_Group group, int assertion, MPI_Win win){
-  AMPIAPI("AMPI_Win_start");
+AMPI_API_IMPL(int, MPI_Win_start, MPI_Group group, int assertion, MPI_Win win)
+{
+  AMPI_API("AMPI_Win_start");
 
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   if (winStruct->isInEpoch()) {
@@ -898,8 +1122,8 @@ int AMPI_Win_start(MPI_Group group, int assertion, MPI_Win win){
 
   int parentGroupSize;
   MPI_Group parentGroup;
-  AMPI_Comm_group(winStruct->comm, &parentGroup);
-  AMPI_Group_size(parentGroup, &parentGroupSize);
+  MPI_Comm_group(winStruct->comm, &parentGroup);
+  MPI_Group_size(parentGroup, &parentGroupSize);
 
   std::vector<int> subsetGroupRanks(parentGroupSize);
   std::vector<int> parentGroupRanks(parentGroupSize);
@@ -907,7 +1131,7 @@ int AMPI_Win_start(MPI_Group group, int assertion, MPI_Win win){
     parentGroupRanks[i] = i;
   }
 
-  AMPI_Group_translate_ranks(parentGroup, parentGroupSize, &parentGroupRanks[0], group, &subsetGroupRanks[0]);
+  MPI_Group_translate_ranks(parentGroup, parentGroupSize, parentGroupRanks.data(), group, subsetGroupRanks.data());
 
   ampi *ptr = getAmpiInstance(winStruct->comm);
   int actualRanks = 0;
@@ -926,9 +1150,9 @@ int AMPI_Win_start(MPI_Group group, int assertion, MPI_Win win){
   return MPI_SUCCESS;
 }
 
-CDECL
-int AMPI_Win_complete(MPI_Win win){
-  AMPIAPI("AMPI_Win_complete");
+AMPI_API_IMPL(int, MPI_Win_complete, MPI_Win win)
+{
+  AMPI_API("AMPI_Win_complete");
 
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   if (!winStruct->isInEpoch()) {
@@ -941,16 +1165,16 @@ int AMPI_Win_complete(MPI_Win win){
   ampi *ptr = getAmpiInstance(winStruct->comm);
 
   for (int i=0; i<accessGroupRanks.size(); i++) {
-    ptr->send(MPI_EPOCH_END_TAG, ptr->getRank(winStruct->comm), NULL, 0, MPI_INT, accessGroupRanks[i], winStruct->comm);
+    ptr->send(MPI_EPOCH_END_TAG, ptr->getRank(), NULL, 0, MPI_INT, accessGroupRanks[i], winStruct->comm);
   }
   winStruct->clearEpochAccess();
 
   return MPI_SUCCESS;
 }
 
-CDECL
-int AMPI_Win_test(MPI_Win win, int *flag){
-  AMPIAPI("AMPI_Win_test");
+AMPI_API_IMPL(int, MPI_Win_test, MPI_Win win, int *flag)
+{
+  AMPI_API("AMPI_Win_test");
 
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   if (!winStruct->isInEpoch()) {
@@ -964,12 +1188,12 @@ int AMPI_Win_test(MPI_Win win, int *flag){
   // If nonblocking recvs have been posted already, there is no reason to post duplicates
   if (!winStruct->AreRecvsPosted()) {
     for (int i=0; i<reqList.size(); i++) {
-      ptr->irecv(NULL, 0, MPI_INT, exposureRankList[i], MPI_EPOCH_END_TAG, winStruct->comm, &reqList[0]);
+      ptr->irecv(NULL, 0, MPI_INT, exposureRankList[i], MPI_EPOCH_END_TAG, winStruct->comm, reqList.data());
     }
     winStruct->setAreRecvsPosted(true);
   }
 
-  AMPI_Testall(reqList.size(), &reqList[0], flag, MPI_STATUSES_IGNORE);
+  MPI_Testall(reqList.size(), reqList.data(), flag, MPI_STATUSES_IGNORE);
   if (*flag) {
     winStruct->clearEpochExposure();
   }
@@ -978,11 +1202,11 @@ int AMPI_Win_test(MPI_Win win, int *flag){
 }
 
 // FIX PLACE II
-CDECL
+CLINKAGE
 int AMPI_Iget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
               MPI_Aint targdisp, int targcnt, MPI_Datatype targtype, MPI_Win win,
               MPI_Request *request) {
-  AMPIAPI("AMPI_Iget");
+  AMPI_API("AMPI_Iget");
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
   // winGet is a local function which will call the remote method on #rank processor
@@ -990,25 +1214,25 @@ int AMPI_Iget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
 		       request);
 }
 
-CDECL
+CLINKAGE
 int AMPI_Iget_wait(MPI_Request *request, MPI_Status *status, MPI_Win win) {
-  AMPIAPI("AMPI_Iget_wait");
+  AMPI_API("AMPI_Iget_wait");
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
   // winGet is a local function which will call the remote method on #rank processor
   return  ptr->winIgetWait(request,status);
 }
 
-CDECL
+CLINKAGE
 int AMPI_Iget_free(MPI_Request *request, MPI_Status *status, MPI_Win win) {
-  AMPIAPI("AMPI_Iget_free");
+  AMPI_API("AMPI_Iget_free");
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
   // winGet is a local function which will call the remote method on #rank processor
   return  ptr->winIgetFree(request, status);
 }
 
-CDECL
+CLINKAGE
 int AMPI_Iget_data(void *data, MPI_Status status) {
   *((char**)data) = /*(void*)*/((AmpiMsg*)status.msg)->data;
   return MPI_SUCCESS;
@@ -1026,9 +1250,9 @@ int AMPI_Iget_data(void *data, MPI_Status status) {
  *   Return:
  *     void* : address of the allocated memory
  */
-CDECL
-int AMPI_Alloc_mem(MPI_Aint size, MPI_Info info, void *baseptr){
-  TCharmAPIRoutine apiRoutineSentry("AMPI_Alloc_mem", "ampi", false);
+AMPI_API_IMPL(int, MPI_Alloc_mem, MPI_Aint size, MPI_Info info, void *baseptr)
+{
+  //NOTE: do not use AMPI_API() here, so that the memory allocated is migratable!
   *(void **)baseptr = malloc(size);
   return MPI_SUCCESS;
 }
@@ -1037,80 +1261,96 @@ int AMPI_Alloc_mem(MPI_Aint size, MPI_Info info, void *baseptr){
  * int AMPI_Free_mem(void *base)
  *   Frees memory that was previous allocated by MPI_Alloc_mem call
  */
-CDECL
-int AMPI_Free_mem(void *baseptr){
-  TCharmAPIRoutine apiRoutineSentry("AMPI_Free_mem", "ampi", false);
+AMPI_API_IMPL(int, MPI_Free_mem, void *baseptr)
+{
+  //NOTE: do not use AMPI_API() here, since the memory being freed is migratable!
   free(baseptr);
   return MPI_SUCCESS;
 }
 
-CDECL
-int AMPI_Win_get_group(MPI_Win win, MPI_Group *group) {
-  AMPIAPI("AMPI_Win_get_group");
+AMPI_API_IMPL(int, MPI_Win_get_group, MPI_Win win, MPI_Group *group)
+{
+  AMPI_API("AMPI_Win_get_group");
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
   ptr->winGetGroup(winStruct, group);
   return MPI_SUCCESS;
 }
 
-CDECL
-int AMPI_Win_delete_attr(MPI_Win win, int key){
-  AMPIAPI("AMPI_Win_delete_attr");
-  return getAmpiParent()->deleteWinAttr(win,key);
+AMPI_API_IMPL(int, MPI_Win_delete_attr, MPI_Win win, int key)
+{
+  AMPI_API("AMPI_Win_delete_attr");
+  ampiParent *parent = getAmpiParent();
+  WinStruct *winStruct = parent->getWinStruct(win);
+  vector<int>& keyvals = getAmpiInstance(winStruct->comm)->getWinObjInstance(winStruct)->getKeyvals();
+  return parent->deleteAttr(win, keyvals, key);
 }
 
-CDECL
-int AMPI_Win_get_attr(MPI_Win win, int key, void* value, int* flag) {
-  AMPIAPI("AMPI_Win_get_attr");
-  return getAmpiParent()->getWinAttr(win,key,value,flag);
+AMPI_API_IMPL(int, MPI_Win_get_attr, MPI_Win win, int key, void* value, int* flag)
+{
+  AMPI_API("AMPI_Win_get_attr");
+  ampiParent *parent = getAmpiParent();
+  WinStruct *winStruct = parent->getWinStruct(win);
+  vector<int>& keyvals = getAmpiInstance(winStruct->comm)->getWinObjInstance(winStruct)->getKeyvals();
+  return parent->getAttr(win, keyvals, key, value, flag);
 }
 
-CDECL
-int AMPI_Win_set_attr(MPI_Win win, int key, void* value) {
-  AMPIAPI("AMPI_Win_set_attr");
-  return getAmpiParent()->setWinAttr(win,key,value);
+AMPI_API_IMPL(int, MPI_Win_set_attr, MPI_Win win, int key, void* value)
+{
+  AMPI_API("AMPI_Win_set_attr");
+  ampiParent *parent = getAmpiParent();
+  WinStruct *winStruct = parent->getWinStruct(win);
+  vector<int>& keyvals = getAmpiInstance(winStruct->comm)->getWinObjInstance(winStruct)->getKeyvals();
+  return parent->setAttr(win, keyvals, key, value);
 }
 
-CDECL
-int AMPI_Win_set_name(MPI_Win win, const char *name) {
-  AMPIAPI("AMPI_Win_set_name");
+AMPI_API_IMPL(int, MPI_Win_set_name, MPI_Win win, const char *name)
+{
+  AMPI_API("AMPI_Win_set_name");
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
   ptr->winSetName(winStruct, name);
   return MPI_SUCCESS;
 }
 
-CDECL
-int AMPI_Win_set_info(MPI_Win win, MPI_Info info){
-  AMPIAPI("AMPI_Comm_set_info");
+AMPI_API_IMPL(int, MPI_Win_set_info, MPI_Win win, MPI_Info info)
+{
+  AMPI_API("AMPI_Win_set_info");
   /* FIXME: no-op implementation */
   return MPI_SUCCESS;
 }
 
-CDECL
-int AMPI_Win_get_info(MPI_Win win, MPI_Info *info){
-  AMPIAPI("AMPI_Comm_get_info");
+AMPI_API_IMPL(int, MPI_Win_get_info, MPI_Win win, MPI_Info *info)
+{
+  AMPI_API("AMPI_Win_get_info");
   /* FIXME: no-op implementation */
   *info = MPI_INFO_NULL;
   return MPI_SUCCESS;
 }
 
-CDECL
-int AMPI_Win_create_errhandler(MPI_Win_errhandler_function *win_errhandler_fn,
-                               MPI_Errhandler *errhandler) {
-  AMPIAPI("AMPI_Win_create_errhandler");
+AMPI_API_IMPL(int, MPI_Win_create_errhandler, MPI_Win_errhandler_function *win_errhandler_fn,
+                                              MPI_Errhandler *errhandler)
+{
+  AMPI_API("AMPI_Win_create_errhandler");
   return MPI_SUCCESS;
 }
 
-CDECL
-int AMPI_Win_get_errhandler(MPI_Win win, MPI_Errhandler *errhandler) {
-  AMPIAPI("AMPI_Win_get_errhandler");
+AMPI_API_IMPL(int, MPI_Win_call_errhandler, MPI_Win win, int errorcode)
+{
+  AMPI_API("AMPI_Win_call_errhandler");
+  CkPrintf("WARNING: AMPI does not support MPI_Win_call_errhandler (errorcode = %d)\n", errorcode);
   return MPI_SUCCESS;
 }
 
-CDECL
-int AMPI_Win_set_errhandler(MPI_Win win, MPI_Errhandler errhandler) {
-  AMPIAPI("AMPI_Win_set_errhandler");
+AMPI_API_IMPL(int, MPI_Win_get_errhandler, MPI_Win win, MPI_Errhandler *errhandler)
+{
+  AMPI_API("AMPI_Win_get_errhandler");
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_Win_set_errhandler, MPI_Win win, MPI_Errhandler errhandler)
+{
+  AMPI_API("AMPI_Win_set_errhandler");
   return MPI_SUCCESS;
 }
 
@@ -1131,23 +1371,25 @@ int MPI_win_null_delete_fn(MPI_Win win, int keyval, void *attr, void *extra_stat
   return MPI_SUCCESS;
 }
 
-CDECL
-int AMPI_Win_create_keyval(MPI_Win_copy_attr_function *copy_fn,
-                           MPI_Win_delete_attr_function *delete_fn,
-                           int *keyval, void *extra_state) {
-  AMPIAPI("AMPI_Win_create_keyval");
+AMPI_API_IMPL(int, MPI_Win_create_keyval, MPI_Win_copy_attr_function *copy_fn,
+                                          MPI_Win_delete_attr_function *delete_fn,
+                                          int *keyval, void *extra_state)
+{
+  AMPI_API("AMPI_Win_create_keyval");
   return getAmpiParent()->createKeyval(copy_fn,delete_fn,keyval,extra_state);
 }
 
-CDECL
-int AMPI_Win_free_keyval(int *keyval) {
-  AMPIAPI("AMPI_Win_free_keyval");
-  return getAmpiParent()->freeKeyval(keyval);
+AMPI_API_IMPL(int, MPI_Win_free_keyval, int *keyval)
+{
+  AMPI_API("AMPI_Win_free_keyval");
+  ampiParent *parent = getAmpiParent();
+  ampiCommStruct& cs = *(ampiCommStruct*)&getAmpiInstance(MPI_COMM_WORLD)->comm2CommStruct(MPI_COMM_WORLD);
+  return getAmpiParent()->freeUserKeyval(MPI_COMM_WORLD, cs.getKeyvals(), keyval);
 }
 
-CDECL
-int AMPI_Win_get_name(MPI_Win win, char *name, int *length) {
-  AMPIAPI("AMPI_Win_get_name");
+AMPI_API_IMPL(int, MPI_Win_get_name, MPI_Win win, char *name, int *length)
+{
+  AMPI_API("AMPI_Win_get_name");
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
   ptr->winGetName(winStruct, name, length);

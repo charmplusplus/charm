@@ -8,17 +8,18 @@
 
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
 
-#define CMI_MPI_TRACE_USEREVENTS                           0
+#define CMI_MACH_TRACE_USEREVENTS                          0
 
 #define CMK_STACKSIZE_DEFAULT                              65536
 
 #define CMK_HANDLE_SIGUSR                                  1
 
 #if CMK_ERROR_CHECKING
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, stratid, redID; CmiInt4 root; unsigned char cksum, magic;
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, redID; CmiInt4 root; unsigned char cksum, magic, mpiMsgType; CmiUInt1 zcMsgType:3, cmaMsgType:2;
 #else
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, stratid, redID; CmiInt4 root; 
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, redID; CmiInt4 root; unsigned char mpiMsgType; CmiUInt1 zcMsgType:3, cmaMsgType:2;
 #endif
+
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT    { CMK_MSG_HEADER_EXT_ }
 #define CMK_MSG_HEADER_BIGSIM_    { CMK_MSG_HEADER_EXT_ CMK_BIGSIM_FIELDS }
@@ -36,8 +37,6 @@
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
 
-#define CMK_CCS_AVAILABLE                                  1
-
 #define NODE_0_IS_CONVHOST                                 1
 
 #define CMK_IMMEDIATE_MSG				   1
@@ -50,3 +49,5 @@
 #endif
 
 #define CMK_USE_COMMON_LOCK                                1
+
+#define CMK_ONESIDED_IMPL                                  1

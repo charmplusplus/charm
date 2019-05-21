@@ -72,7 +72,7 @@ public:
   LDOMHandle AddOM(LDOMid _userID, void* _userData, LDCallbacks _callbacks);
   void RemoveOM(LDOMHandle om);
 
-  LDObjHandle AddObj(LDOMHandle _h, LDObjid _id, void *_userData,
+  LDObjHandle AddObj(LDOMHandle _h, CmiUInt8 _id, void *_userData,
 		     bool _migratable);
   void UnregisterObj(LDObjHandle _h);
 
@@ -87,9 +87,9 @@ public:
   inline LBOM *LbOM(LDOMHandle h) 
        { return oms[h.handle]; };
   inline LBObj *LbObj(const LDObjHandle &h) const 
-       { return objs[h.handle]; };
+       { return objs[h.handle].obj; };
   inline LBObj *LbObjIdx(int h) const 
-       { return objs[h]; };
+       { return objs[h].obj; };
   void DumpDatabase(void);
 
   inline void TurnStatsOn(void) 
@@ -118,8 +118,8 @@ public:
     else CmiPrintf("Predictor not supported in this load balancer");
   }
 
-  void Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes, int destObjProc);
-  void MulticastSend(const LDOMHandle &destOM, LDObjid *destids, int ndests, unsigned int bytes, int nMsgs);
+  void Send(const LDOMHandle &destOM, const CmiUInt8 &destid, unsigned int bytes, int destObjProc);
+  void MulticastSend(const LDOMHandle &destOM, CmiUInt8 *destids, int ndests, unsigned int bytes, int nMsgs);
   int ObjDataCount();
   void GetObjData(LDObjData *data);
   inline int CommDataCount() { 
@@ -129,6 +129,11 @@ public:
   }
   inline void GetCommData(LDCommData *data) 
        { if (commTable) commTable->GetCommData(data); };
+
+  inline void GetCommInfo(int& bytes, int& msgs, int& withinbytes, int& acrossbytes, int& num_nghbors, int& hops, int& hopbytes) {
+    if (commTable)
+      commTable->GetCommInfo(bytes, msgs, withinbytes, acrossbytes, num_nghbors, hops, hopbytes);
+  };
 
   void MetaLBResumeWaitingChares(int lb_ideal_period);
   void MetaLBCallLBOnChares();
@@ -142,9 +147,9 @@ public:
   void RemoveNotifyMigrated(int handle);
 
   inline void TurnManualLBOn() 
-       { useBarrier = false; }
+       { useBarrier = false; LocalBarrierOff(); }
   inline void TurnManualLBOff() 
-       { useBarrier = true; }
+       { useBarrier = true; if (oms_registering == 0) LocalBarrierOn(); }
 
   int AddStartLBFn(LDStartLBFn fn, void* data);
   void TurnOnStartLBFn(int handle)
@@ -176,7 +181,7 @@ public:
   inline void SetRunningObj(const LDObjHandle &_h) 
        { runningObj = _h.handle; obj_running = true; };
   inline const LDObjHandle &RunningObj() const 
-       { return objs[runningObj]->GetLDObjHandle(); };
+       { return objs[runningObj].obj->GetLDObjHandle(); };
   inline void NoRunningObj() 
        { obj_running = false; };
   inline bool ObjIsRunning() const 
@@ -195,9 +200,9 @@ public:
   inline void TurnOffBarrierReceiver(LDBarrierReceiver h) 
        { localBarrier.TurnOffReceiver(h); };
   inline void AtLocalBarrier(LDBarrierClient h) 
-       { if (useBarrier) localBarrier.AtBarrier(h); };
+       { localBarrier.AtBarrier(h); };
   inline void DecreaseLocalBarrier(LDBarrierClient h, int c) 
-       { if (useBarrier) localBarrier.DecreaseBarrier(h, c); };
+       { localBarrier.DecreaseBarrier(h, c); };
   inline void ResumeClients() 
        { localBarrier.ResumeClients(); };
   inline void MeasuredObjTime(double wtime, double ctime) {
@@ -252,8 +257,15 @@ private:
     void* data;
   };
 
+  struct LBObjEntry {
+    LBObj* obj;
+    LDObjIndex next;
+
+    LBObjEntry(LBObj* obj, LDObjIndex next = -1) : obj(obj), next(next) {}
+  };
+
   typedef CkVec<LBOM*> OMList;
-  typedef CkVec<LBObj*> ObjList;
+  typedef std::vector<LBObjEntry> ObjList;
   typedef CkVec<MigrateCB*> MigrateCBList;
   typedef CkVec<StartLBCB*> StartLBCBList;
   typedef CkVec<MigrationDoneCB*> MigrationDoneCBList;
@@ -263,8 +275,8 @@ private:
   int omCount;
   int oms_registering;
 
+  LDObjIndex objsEmptyHead;
   ObjList objs;
-  int objCount;
 
   bool statsAreOn;
   MigrateCBList migrateCBList;
@@ -293,11 +305,9 @@ public:
   int useMem();
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     int validObjHandle(LDObjHandle h ){
-            if(objCount == 0)
+            if(h.handle >= objs.size())
                 return 0;
-            if(h.handle > objCount)
-                return 0;
-            if(objs[h.handle] == NULL)
+            if(objs[h.handle].obj == NULL)
                 return 0;
 
             return 1;
@@ -305,7 +315,6 @@ public:
 #endif
 
 
-  int getObjCount() {return objCount;}
   const ObjList& getObjs() {return objs;}
 
 

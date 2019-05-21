@@ -1,1 +1,1 @@
--module tcharm  -lidxl -module ampi -lParFUM-compat -lmetis -lparmetis -module msa -module ParFUM
+-module tcharm  -lidxl -module ampi -lParFUM-compat -lckmetis -lparmetis -module msa -module ParFUM

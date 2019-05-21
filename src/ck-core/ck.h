@@ -4,9 +4,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
+#include "qd.h"
 #include "charm++.h"
 #include "envelope.h"
-#include "qd.h"
 #include "register.h"
 #include "stats.h"
 #include "ckfutures.h"
@@ -19,18 +19,24 @@
 #endif
 
 // Flag that tells the system if we are replaying using Record/Replay
-extern "C" int _replaySystem;
+extern int _replaySystem;
 
 #if CMK_CHARMDEBUG
-extern "C" int ConverseDeliver(int pe);
+int ConverseDeliver(int pe);
 inline void _CldEnqueue(int pe, void *msg, int infofn) {
   if (!ConverseDeliver(pe)) {
     CmiFree(msg);
     return;
   }
+#if CMK_ONESIDED_IMPL
+  envelope *env = (envelope *)msg;
+  // Store source information to handle acknowledgements on completion
+  if(CMI_IS_ZC_BCAST(msg))
+    CkRdmaPrepareBcastMsg(env);
+#endif
   CldEnqueue(pe, msg, infofn);
 }
-inline void _CldEnqueueMulti(int npes, int *pes, void *msg, int infofn) {
+inline void _CldEnqueueMulti(int npes, const int *pes, void *msg, int infofn) {
   if (!ConverseDeliver(-1)) {
     CmiFree(msg);
     return;
@@ -49,22 +55,50 @@ inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
     CmiFree(msg);
     return;
   }
+#if CMK_ONESIDED_IMPL
+  envelope *env = (envelope *)msg;
+  // Store source information to handle acknowledgements on completion
+  if(CMI_IS_ZC_BCAST(msg))
+    CkRdmaPrepareBcastMsg(env);
+#endif
   CldNodeEnqueue(node, msg, infofn);
 }
 #else
-#define _CldEnqueue       CldEnqueue
+
+inline void _CldEnqueue(int pe, void *msg, int infofn) {
+#if CMK_ONESIDED_IMPL
+  envelope *env = (envelope *)msg;
+  // Store source information to handle acknowledgements on completion
+  if(CMI_IS_ZC_BCAST(msg))
+    CkRdmaPrepareBcastMsg(env);
+#endif
+  CldEnqueue(pe, msg, infofn);
+}
+
+inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
+#if CMK_ONESIDED_IMPL
+  envelope *env = (envelope *)msg;
+  // Store source information to handle acknowledgements on completion
+  if(CMI_IS_ZC_BCAST(msg))
+    CkRdmaPrepareBcastMsg(env);
+#endif
+  CldNodeEnqueue(node, msg, infofn);
+}
 #define _CldEnqueueMulti  CldEnqueueMulti
 #define _CldEnqueueGroup  CldEnqueueGroup
-#define _CldNodeEnqueue   CldNodeEnqueue
 #endif
 
 #ifndef CMK_CHARE_USE_PTR
-CkpvExtern(CkVec<void *>, chare_objs);
+CkpvExtern(std::vector<void *>, chare_objs);
 #endif
+
+#include <unordered_map>
+typedef std::unordered_map<CmiUInt8, ArrayElement*> ArrayObjMap;
+CkpvExtern(ArrayObjMap, array_objs);
 
 /// A set of "Virtual ChareID"'s
 class VidBlock {
-    enum VidState {FILLED, UNFILLED};
+    enum VidState : uint8_t {FILLED, UNFILLED};
     VidState state;
     PtrQ *msgQ;
     CkChareID actualID;
@@ -176,10 +210,10 @@ public:
 		 qd(CpvAccess(_qd)) { watcher=NULL; }
 	~CkCoreState() { delete watcher;}
 
-	inline GroupTable *getGroupTable() {
+	inline GroupTable *getGroupTable() const {
  		return groupTable;
 	}
-	inline IrrGroup *localBranch(CkGroupID gID) {
+	inline IrrGroup *localBranch(CkGroupID gID) const {
 		return groupTable->find(gID).getObj();
 	}
 
@@ -215,5 +249,9 @@ extern void CkCreateLocalNodeGroup(CkGroupID groupID, int eIdx, envelope *env);
 extern void _createGroup(CkGroupID groupID, envelope *env);
 extern void _createNodeGroup(CkGroupID groupID, envelope *env);
 extern int _getGroupIdx(int,int,int);
+static inline IrrGroup *_lookupGroupAndBufferIfNotThere(const CkCoreState *ck, const envelope *env,const CkGroupID &groupID);
+extern IrrGroup* _getCkLocalBranchFromGroupID(CkGroupID &gID);
 
+void QdCreate(int n);
+void QdProcess(int n);
 #endif

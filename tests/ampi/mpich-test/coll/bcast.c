@@ -1,53 +1,93 @@
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- * This program performs some simple tests of the MPI_Bcast broadcast
- * functionality.
+ *
+ *  (C) 2003 by Argonne National Laboratory.
+ *      See COPYRIGHT in top-level directory.
  */
-
-#include "test.h"
 #include "mpi.h"
-#include <stdlib.h>
+#include <stdio.h>
+#include "mpitest.h"
 
-int
-main( int argc, char **argv)
+/*
+static char MTEST_Descrip[] = "Test of broadcast with various roots and datatypes";
+*/
+
+int main(int argc, char *argv[])
 {
-    int rank, size, ret, passed, i, *test_array;
+    int errs = 0, err;
+    int rank, size, root;
+    int minsize = 2, count;
+    MPI_Comm comm;
+    MTestDatatype sendtype, recvtype;
 
-    /* Set up MPI */
-    MPI_Init(&argc, &argv);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MTest_Init(&argc, &argv);
 
-    /* Setup the tests */
-    Test_Init("bcast", rank);
-    test_array = (int *)malloc(size*sizeof(int));
+    /* The following illustrates the use of the routines to
+     * run through a selection of communicators and datatypes.
+     * Use subsets of these for tests that do not involve combinations
+     * of communicators, datatypes, and counts of datatypes */
+    while (MTestGetIntracommGeneral(&comm, minsize, 1)) {
+        if (comm == MPI_COMM_NULL)
+            continue;
 
-    /* Perform the test - this operation should really be done
-       with an allgather, but it makes a good test... */
-    passed = 1;
-    for (i=0; i < size; i++) {
-	if (i == rank)
-	    test_array[i] = i;
-	MPI_Bcast(test_array, size, MPI_INT, i, MPI_COMM_WORLD);
-	if (test_array[i] != i)
-	    passed = 0;
+#if defined BCAST_COMM_WORLD_ONLY
+        if (comm != MPI_COMM_WORLD) {
+            MTestFreeComm(&comm);
+            continue;
+        }
+#endif /* BCAST_COMM_WORLD_ONLY */
+
+        /* Determine the sender and receiver */
+        MPI_Comm_rank(comm, &rank);
+        MPI_Comm_size(comm, &size);
+
+        /* To improve reporting of problems about operations, we
+         * change the error handler to errors return */
+        MPI_Errhandler_set(comm, MPI_ERRORS_RETURN);
+
+        MTEST_DATATYPE_FOR_EACH_COUNT(count) {
+
+            /* To shorten test time, only run the default version of datatype tests
+             * for comm world and run the minimum version for other communicators. */
+#if defined BCAST_MIN_DATATYPES_ONLY
+            MTestInitMinDatatypes();
+#endif /* BCAST_MIN_DATATYPES_ONLY */
+
+            while (MTestGetDatatypes(&sendtype, &recvtype, count)) {
+                for (root = 0; root < size; root++) {
+                    if (rank == root) {
+                        sendtype.InitBuf(&sendtype);
+                        err = MPI_Bcast(sendtype.buf, sendtype.count,
+                                        sendtype.datatype, root, comm);
+                        if (err) {
+                            errs++;
+                            MTestPrintError(err);
+                        }
+                    }
+                    else {
+                        recvtype.InitBuf(&recvtype);
+                        err = MPI_Bcast(recvtype.buf, recvtype.count,
+                                        recvtype.datatype, root, comm);
+                        if (err) {
+                            errs++;
+                            fprintf(stderr, "Error with communicator %s and datatype %s\n",
+                                    MTestGetIntracommName(), MTestGetDatatypeName(&recvtype));
+                            MTestPrintError(err);
+                        }
+                        err = MTestCheckRecv(0, &recvtype);
+                        if (err) {
+                            errs += errs;
+                        }
+                    }
+                }
+                MTestFreeDatatype(&recvtype);
+                MTestFreeDatatype(&sendtype);
+            }
+        }
+        MTestFreeComm(&comm);
     }
-    if (!passed)
-	Test_Failed("Simple Broadcast test");
-    else {
-	if (rank == 0)
-	    Test_Passed("Simple Broadcast test");
-	}
 
-    /* Close down the tests */
-    free(test_array);
-    if (rank == 0)
-	ret = Summarize_Test_Results();
-    else
-	ret = 0;
-    Test_Finalize();
-
-    /* Close down MPI */
-    Test_Waitforall( );
+    MTest_Finalize(errs);
     MPI_Finalize();
-    return ret;
+    return 0;
 }

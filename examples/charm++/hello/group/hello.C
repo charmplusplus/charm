@@ -35,16 +35,15 @@ class Hello : public CBase_Hello
 public:
   Hello()
   {
-    CkPrintf("Hello %d created\n",CkMyPe());
+    CkPrintf("Hello %d created\n",thisIndex);
   }
 
   void SayHi(int hiNo)
   {
-    int ind=CkMyPe();
-    CkPrintf("Hi[%d] from element %d\n",hiNo,ind);
-    if (ind+1<CkNumPes())
+    CkPrintf("Hi[%d] from element %d\n",hiNo,thisIndex);
+    if (thisIndex+1<CkNumPes())
       //Pass the hello on:
-      thisProxy[ind+1].SayHi(hiNo+1);
+      thisProxy[thisIndex+1].SayHi(hiNo+1);
     else 
       //We've been around once-- we're done.
       mainProxy.done();

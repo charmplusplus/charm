@@ -9,8 +9,8 @@ qt: md/setjmp_d.h qt.c md/setjmp.c
 	ln -s md/setjmp_d.h qtmd.h
 	$(CHARMC) -pedantic -Wall -c -o qt.o qt.c
 	$(CHARMC) -c -o qtmds.o md/setjmp.c
-	ar q libqt.a qt.o qtmds.o
-	$(CHARMC) -shared -o libqt.so qt.o qtmds.o
+	ar q libckqt.a qt.o qtmds.o
+	$(CHARMC) -shared -o libckqt.so qt.o qtmds.o
 
 stp:
 	$(CHARMC) -c stp.c
@@ -19,4 +19,4 @@ stp:
 testpgm:
 	$(CHARMC) -c meas.c
 	$(CHARMC) -c -o qtmdb.o md/setjmp_b.c
-	$(CHARMC) -o run meas.o qtmdb.o libstp.a libqt.a
+	$(CHARMC) -o run meas.o qtmdb.o libstp.a libckqt.a

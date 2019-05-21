@@ -36,8 +36,12 @@ private:
   int _lb_central_pe;           // processor number for centralized startegy
   int _lb_percentMovesAllowed; //Specifies restriction on num of chares to be moved(as a percentage of total number of chares). Used by RefineKLB
   int _lb_teamSize;		// specifies the team size for TeamLB
+  int _lb_maxDistPhases;  // Specifies the max number of LB phases in DistributedLB
+  double _lb_targetRatio; // Specifies the target load ratio for LBs that aim for a particular load ratio
   int _lb_metaLbOn;
-public:
+  char* _lb_metaLbModelDir;
+
+ public:
   CkLBArgs() {
 #if CMK_BIGSIM_CHARM
     _autoLbPeriod = 0.02;       // bigsim needs it to be faster (lb may hang)
@@ -51,7 +55,10 @@ public:
     _lb_loop = 0;
     _lb_central_pe = 0;
     _lb_teamSize = 1;
+    _lb_maxDistPhases = 10;
+    _lb_targetRatio = 1.05;
     _lb_metaLbOn = 0;
+    _lb_metaLbModelDir = nullptr;
   }
   inline double & lbperiod() { return _autoLbPeriod; }
   inline int & debug() { return _lb_debug; }
@@ -71,7 +78,10 @@ public:
   inline double & alpha() { return _lb_alpha; }
   inline double & beta() { return _lb_beta; }
   inline int & percentMovesAllowed() { return _lb_percentMovesAllowed;}
+  inline int & maxDistPhases() { return _lb_maxDistPhases; }
+  inline double & targetRatio() { return _lb_targetRatio; }
   inline int & metaLbOn() {return _lb_metaLbOn;}
+  inline char*& metaLbModelDir() { return _lb_metaLbModelDir; }
 };
 
 extern CkLBArgs _lb_args;
@@ -79,6 +89,7 @@ extern CkLBArgs _lb_args;
 extern int _lb_predict;
 extern int _lb_predict_delay;
 extern int _lb_predict_window;
+extern bool _lb_psizer_on;
 #ifndef PREDICT_DEBUG
 #define PREDICT_DEBUG  0   // 0 = No debug, 1 = Debug info on
 #endif
@@ -107,7 +118,7 @@ CkpvExtern(bool, hasNullLB);
 CkpvExtern(bool, lbdatabaseInited);
 
 // LB options, mostly controled by user parameter
-extern "C" char * _lbtopo;
+extern char * _lbtopo;
 
 typedef void (*LBCreateFn)();
 typedef BaseLB * (*LBAllocFn)();
@@ -204,7 +215,7 @@ public:
 
   void ResetAdaptive();
 
-  inline LDObjHandle RegisterObj(LDOMHandle h, LDObjid id,
+  inline LDObjHandle RegisterObj(LDOMHandle h, CmiUInt8 id,
 			  void *userptr,int migratable) {
     return LDRegisterObj(h,id,userptr,migratable);
   };
@@ -253,10 +264,10 @@ public:
   inline const LDObjHandle &GetObjHandle(int idx) { return LDGetObjHandle(myLDHandle, idx);}
   inline void ObjectStart(const LDObjHandle &_h) { LDObjectStart(_h); };
   inline void ObjectStop(const LDObjHandle &_h) { LDObjectStop(_h); };
-  inline void Send(const LDOMHandle &_om, const LDObjid _id, unsigned int _b, int _p, int force = 0) {
+  inline void Send(const LDOMHandle &_om, const CmiUInt8 _id, unsigned int _b, int _p, int force = 0) {
     LDSend(_om, _id, _b, _p, force);
   };
-  inline void MulticastSend(const LDOMHandle &_om, LDObjid *_ids, int _n, unsigned int _b, int _nMsgs=1) {
+  inline void MulticastSend(const LDOMHandle &_om, CmiUInt8 *_ids, int _n, unsigned int _b, int _nMsgs=1) {
     LDMulticastSend(_om, _ids, _n, _b, _nMsgs);
   };
 
@@ -318,6 +329,10 @@ public:
   inline void GetObjData(LDObjData *data) { LDGetObjData(myLDHandle,data); };
   inline int GetCommDataSz(void) { return LDGetCommDataSz(myLDHandle); };
   inline void GetCommData(LDCommData *data) { LDGetCommData(myLDHandle,data); };
+  
+  inline void GetCommInfo(int& bytes, int& msgs, int& withinbytes, int& outsidebytes, int& num_ngh, int& hops, int& hopbytes) {
+    return LDGetCommInfo(myLDHandle, bytes, msgs, withinbytes, outsidebytes, num_ngh, hops, hopbytes);
+  };
 
   inline void BackgroundLoad(LBRealType *walltime, LBRealType *cputime) {
     LDBackgroundLoad(myLDHandle,walltime,cputime);
@@ -423,6 +438,7 @@ public:
   int getLoadbalancerTicket();
   void addLoadbalancer(BaseLB *lb, int seq);
   void nextLoadbalancer(int seq);
+  void switchLoadbalancer(int switchFrom, int switchTo);
   const char *loadbalancer(int seq);
 
   inline int step() { return mystep; }

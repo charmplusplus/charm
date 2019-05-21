@@ -15,13 +15,16 @@
 #define CMK_MULTICAST_LIST_USE_COMMON_CODE                 1
 #define CMK_MULTICAST_GROUP_USE_COMMON_CODE                1
 
-/* the first 4 fields of the header are defined in machine-dgram.c
+#define CMK_ONESIDED_IMPL                                  1
+
+/* the first 4 fields of the header are defined in machine-dgram.C
    and are used for the udp retransmission protocol implementation.
-   Parameters stratid and root are for the communication library.
-   Stratid is the stratgy id and root is used in the broadcast.
+   The root parameter is for the communication library and is used in
+   broadcast operations. The cmaMsgType parameter is used to identify the type
+   of the message and used in the LRTS based CMA implementaion.
 */
 #define CMK_MSG_HEADER_BASIC   CMK_MSG_HEADER_EXT
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,hdl,stratid,xhdl,info,redID,rank; CmiInt4 root, size;
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,hdl,xhdl,info,redID,rank; CmiInt4 root, size; CmiUInt1 zcMsgType:3, cmaMsgType:2;
 #define CMK_MSG_HEADER_EXT       { CMK_MSG_HEADER_EXT_ }
 #define CMK_MSG_HEADER_BIGSIM_  { CMK_MSG_HEADER_EXT_ CMK_BIGSIM_FIELDS }
 
@@ -49,3 +52,9 @@
 #define CMK_HAS_SIZE_IN_MSGHDR                             1
 
 #define CMK_USE_COMMON_LOCK                                1
+
+#define CMK_NOCOPY_DIRECT_BYTES                           16
+
+#define CMK_REG_REQUIRED                                   1
+
+#define CMK_CONVERSE_MPI                                   0

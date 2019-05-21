@@ -13,6 +13,7 @@
 #include "LBDBManager.h"
 
 #include "GreedyLB.h"
+#include "GreedyRefineLB.h"
 #include "GreedyCommLB.h"
 #include "RefineCommLB.h"
 #include "RefineLB.h"
@@ -35,7 +36,8 @@ HybridLB::HybridLB(const CkLBOptions &opt): CBase_HybridLB(opt)
   // are not from existing processors.
   refine = (CentralLB *)AllocateRefineLB();
 //  greedy = (CentralLB *)AllocateMetisLB();
-  greedy = (CentralLB *)AllocateGreedyLB();
+  greedy = (CentralLB *)AllocateGreedyRefineLB();
+  greedy->setConcurrent(false);
 
   initTree();
 #endif

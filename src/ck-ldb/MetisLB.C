@@ -12,14 +12,15 @@
 #include "ckgraph.h"
 #include <metis.h>
 
+extern int quietModeRequested;
 
 CreateLBFunc_Def(MetisLB, "Use Metis(tm) to partition object graph")
 
 MetisLB::MetisLB(const CkLBOptions &opt): CBase_MetisLB(opt)
 {
   lbname = "MetisLB";
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] MetisLB created\n",CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> MetisLB created.\n");
 }
 
 void MetisLB::work(LDStats* stats)
@@ -102,7 +103,7 @@ void MetisLB::work(LDStats* stats)
   idx_t ncon = 1;
   // number of partitions
   idx_t numPes = parr->procs.size();
-  real_t ubvec[ncon];
+  real_t* ubvec = new real_t[ncon];
   // allow 10% imbalance
   ubvec[0] = 1.1;
 
@@ -139,6 +140,7 @@ void MetisLB::work(LDStats* stats)
   METIS_PartGraphRecursive(&numVertices, &ncon,  xadj, adjncy, vwgt, vsize, adjwgt,
       &numPes, tpwgts, ubvec, options, &edgecut, pemap);
 
+  delete[] ubvec;
   delete[] xadj;
   delete[] adjncy;
   delete[] vwgt;

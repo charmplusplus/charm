@@ -1,0 +1,25 @@
+mainmodule hello {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_TestInstance allTestsProxy;
+  readonly CProxy_FuncCkLoop ckLoopProxy;
+  readonly int totalElems;
+  readonly int loopTimes;
+  readonly int numChunks;
+  
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void done(void);
+    entry void doTests(CkQdMsg *msg);
+	entry void exitTest();
+  };
+
+  array [1D] TestInstance{
+    entry TestInstance();
+    entry void doTest(int curstep, int curTestMode);
+	entry void reportSts();
+   };
+
+  group cyclicMap : CkArrayMap{
+    entry cyclicMap();
+  };  
+};

@@ -5,7 +5,7 @@ OBJS=blkinhand.o megacon.o ringsimple.o ring.o fibobj.o fibthr.o broadc.o priote
 
 all: pgm
 
-pgm: $(OBJS) 
+pgm: $(OBJS)
 	$(CHARMC) -o pgm $(OBJS) -language converse++
 
 megacon.o: megacon.c

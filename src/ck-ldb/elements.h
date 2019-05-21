@@ -30,7 +30,7 @@ class computeInfo : public InfoRecord
 public: 
    /*   int computeId; replaced by Id */
 //   LDObjHandle handle;
-   LDObjid  id;
+   CmiUInt8  id;
 #ifdef TEMP_LDB
 	 int omid;
 #endif

@@ -10,6 +10,13 @@
 #include "charm.h"
 #include "middle.h"
 
+#ifndef __STDC_FORMAT_MACROS
+# define __STDC_FORMAT_MACROS
+#endif
+#ifndef __STDC_LIMIT_MACROS
+# define __STDC_LIMIT_MACROS
+#endif
+#include <inttypes.h>
 #include <list>
 
 class LBDatabase;//Forward declaration
@@ -65,37 +72,11 @@ typedef struct {
   inline void pup(PUP::er &p);
 } LDOMHandle;
 
-typedef struct _LDObjid {
-  int id[OBJ_ID_SZ];
-#ifdef TEMP_LDB
-	int *getID(){return id;}
-#endif
-
-#if CMK_GLOBAL_LOCATION_UPDATE
-  char dimension;
-  char nInts;
-  char isArrayElement;
-  char locMgrGid; 
-#endif
-  bool operator==(const struct _LDObjid& objid) const {
-    for (int i=0; i<OBJ_ID_SZ; i++) if (id[i] != objid.id[i]) return false;
-    return true;
-  }
-  bool operator<(const struct _LDObjid& objid) const {
-    for (int i=0; i<OBJ_ID_SZ; i++) {
-      if (id[i] < objid.id[i]) return true;
-      else if (id[i] > objid.id[i]) return false;
-    }
-    return false;
-  }
-  inline void pup(PUP::er &p);
-} LDObjid;
-
 /* LDObjKey uniquely identify one object */
 typedef struct _LDObjKey {
   /// Id of the location manager for this object
   LDOMid omId;
-  LDObjid objId;
+  CmiUInt8 objId;
 public:
   bool operator==(const _LDObjKey& obj) const {
     return (bool)(omId == obj.omId && objId == obj.objId);
@@ -106,9 +87,9 @@ public:
     else return false;
   }
   inline LDOMid &omID() { return omId; }
-  inline LDObjid &objID() { return objId; }
+  inline CmiUInt8 &objID() { return objId; }
   inline const LDOMid &omID() const { return omId; }
-  inline const LDObjid &objID() const { return objId; }
+  inline const CmiUInt8 &objID() const { return objId; }
   inline void pup(PUP::er &p);
 } LDObjKey;
 
@@ -117,10 +98,10 @@ typedef int LDOMIndex;
 
 typedef struct {
   LDOMHandle omhandle;
-  LDObjid id;
+  CmiUInt8 id;
   LDObjIndex  handle;
   inline const LDOMid &omID() const { return omhandle.id; }
-  inline const LDObjid &objID() const { return id; }
+  inline const CmiUInt8 &objID() const { return id; }
   inline void pup(PUP::er &p);
 } LDObjHandle;
 
@@ -185,8 +166,8 @@ typedef struct {
   CmiUInt2 pupSize;
   inline const LDOMHandle &omHandle() const { return handle.omhandle; }
   inline const LDOMid &omID() const { return handle.omhandle.id; }
-  inline const LDObjid &objID() const { return handle.id; }
-  inline const LDObjid &id() const { return handle.id; }
+  inline const CmiUInt8 &objID() const { return handle.id; }
+  inline const CmiUInt8 &id() const { return handle.id; }
   inline void pup(PUP::er &p);
 #if CMK_LB_USER_DATA
   void* getUserData(int idx)  { return userData.getData(idx); }
@@ -234,13 +215,13 @@ typedef struct _LDCommDesc {
 	{ CmiAssert(type==LD_OBJ_MSG); return dest.destObj.destObj; }
   LDObjKey * get_destObjs(int &len) 
 	{ CmiAssert(type==LD_OBJLIST_MSG); len=dest.destObjs.len; return dest.destObjs.objs; }
-  void init_objmsg(LDOMid &omid, LDObjid &objid, int destObjProc) { 
+  void init_objmsg(LDOMid &omid, CmiUInt8 &objid, int destObjProc) {
 	type=LD_OBJ_MSG; 
   	dest.destObj.destObj.omID()=omid;
   	dest.destObj.destObj.objID() =objid;
   	dest.destObj.destObjProc = destObjProc;
   }
-  void init_mcastmsg(LDOMid &omid, LDObjid *objid, int len) { 
+  void init_mcastmsg(LDOMid &omid, CmiUInt8 *objid, int len) {
 	type=LD_OBJLIST_MSG; 
 	dest.destObjs.len = len;
 	dest.destObjs.objs = new LDObjKey[len];
@@ -254,13 +235,22 @@ typedef struct _LDCommDesc {
   inline void pup(PUP::er &p);
 } LDCommDesc;
 
-typedef struct {
+typedef struct _LDCommData {
   int src_proc;			// sender can either be a proc or an obj
   LDObjKey  sender;		// 
   LDCommDesc   receiver;
   int  sendHash, recvHash;
   int messages;
   int bytes;
+  inline _LDCommData &operator=(const _LDCommData &o) {
+    if (&o == this) return *this;
+    src_proc = o.src_proc;
+    sender = o.sender; receiver = o.receiver;
+    sendHash = o.sendHash; recvHash = o.recvHash;
+    messages = o.messages;
+    bytes = o.bytes;
+    return *this;
+  }
   inline int from_proc() const { return (src_proc != -1); }
   inline int recv_type() const { return receiver.get_type(); }
   inline void pup(PUP::er &p);
@@ -312,7 +302,7 @@ void * LDOMUserData(LDOMHandle &_h);
 void LDRegisteringObjects(LDOMHandle _h);
 void LDDoneRegisteringObjects(LDOMHandle _h);
 
-LDObjHandle LDRegisterObj(LDOMHandle h, LDObjid id, void *userptr,
+LDObjHandle LDRegisterObj(LDOMHandle h, CmiUInt8 id, void *userptr,
 			  bool migratable);
 void LDUnregisterObj(LDObjHandle h);
 
@@ -324,11 +314,11 @@ void LDObjTime(LDObjHandle &h, LBRealType walltime, LBRealType cputime);
 int  CLDRunningObject(LDHandle _h, LDObjHandle* _o );
 void LDObjectStart(const LDObjHandle &_h);
 void LDObjectStop(const LDObjHandle &_h);
-void LDSend(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes, int destObjProc, int force);
-void LDMulticastSend(const LDOMHandle &destOM, LDObjid *destids, int ndests, unsigned int bytes, int nMsgs);
+void LDSend(const LDOMHandle &destOM, const CmiUInt8 &destid, unsigned int bytes, int destObjProc, int force);
+void LDMulticastSend(const LDOMHandle &destOM, CmiUInt8 *destids, int ndests, unsigned int bytes, int nMsgs);
 
 void LDMessage(LDObjHandle from, 
-	       LDOMid toOM, LDObjid *toID, int bytes);
+	       LDOMid toOM, CmiUInt8 *toID, int bytes);
 
 void LDEstObjLoad(LDObjHandle h, double load);
 void LDNonMigratable(const LDObjHandle &h);
@@ -374,6 +364,7 @@ void LDGetObjData(LDHandle _lbdb, LDObjData *data);
 
 int LDGetCommDataSz(LDHandle _lbdb);
 void LDGetCommData(LDHandle _lbdb, LDCommData *data);
+void LDGetCommInfo(LDHandle _lbdb, int& bytes, int& msgs, int& withinbytes, int& outsidebytes, int& num_nghbors, int& hops, int& hopbytes);
 
 void LDBackgroundLoad(LDHandle _lbdb, LBRealType *walltime, LBRealType *cputime);
 void LDIdleTime(LDHandle _lbdb, LBRealType *walltime);
@@ -414,7 +405,6 @@ void LDLocalBarrierOff(LDHandle _db);
 void LDResumeClients(LDHandle _lbdb);
 int LDProcessorSpeed();
 bool LDOMidEqual(const LDOMid &i1, const LDOMid &i2);
-bool LDObjIDEqual(const LDObjid &i1, const LDObjid &i2);
 
 /*
  *  LBDB Configuration calls
@@ -444,17 +434,6 @@ inline void LDOMid::pup(PUP::er &p) {
   id.pup(p);
 }
 PUPmarshall(LDOMid)
-
-inline void LDObjid::pup(PUP::er &p) {
-  for (int i=0; i<OBJ_ID_SZ; i++) p|id[i];
-#if CMK_GLOBAL_LOCATION_UPDATE
-  p|dimension;
-  p|nInts;
-  p|isArrayElement;
-  p|locMgrGid;
-#endif
-}
-PUPmarshall(LDObjid)
 
 inline void LDObjKey::pup(PUP::er &p) {
   p|omId;

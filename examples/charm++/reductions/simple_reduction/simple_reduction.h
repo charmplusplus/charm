@@ -1,9 +1,12 @@
 //! main char object.  Creates array, handles command line, catches reduction.
 
+#include <cmath>
+
 class main : public Chare
 {
 private:
   CProxy_RedExample arr;
+  double expected[2];
 public:
 
   main(CkArgMsg* m);
@@ -12,11 +15,13 @@ public:
   void reportIn(CkReductionMsg *msg)
   {
     int reducedArrSize=msg->getSize()/sizeof(double);
+    CkAssert(reducedArrSize == 2);
     double *output=(double *)msg->getData();
-    CkPrintf("Sum :");
-    for(int i=0;i<reducedArrSize;i++)
-      CkPrintf("%f ",output[i]);
-    CkPrintf("\n");
+    CkPrintf("Sum, Expectation, Difference:\n");
+    for(int i=0;i<reducedArrSize;i++) {
+      CkPrintf("%f %f %f\n", output[i], expected[i], output[i] - expected[i]);
+      CkAssert(std::abs(output[i] - expected[i]) < 1e-7);
+    }
     delete msg;
     done();
   }
@@ -30,6 +35,7 @@ public:
 
 };
 
+#include <vector>
 
 //! RedExample. A small example which does nothing useful, but provides an extremely simple, yet complete, use of a normal reduction case.
 /** The reduction performs a summation i+k1 i+k2 for i=0 to units
@@ -55,10 +61,11 @@ class RedExample : public CBase_RedExample
   //! add our index to the global floats and contribute the result.
   void dowork ()
     {
-      double outdoubles[2];
+      std::vector<double> outdoubles(2);
       myfloats[0]=outdoubles[0]=   dOne +(double) thisIndex;
       myfloats[1]=outdoubles[1]= dTwo +(double) thisIndex;
-      contribute(2*sizeof(double),outdoubles,CkReduction::sum_double); 
+      CkCallback cb(CkIndex_main::reportIn(NULL), mainProxy);
+      contribute(outdoubles, CkReduction::sum_double, cb);
       dump();
     }
 };

@@ -1,6 +1,5 @@
 /* -*- Mode: C; c-basic-offset:4 ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 2001 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -25,6 +24,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "converse.h" //for Ctv*
+
 /* token types */
 #define AGG_WILDCARD 1
 #define AGG_STRING   2
@@ -36,9 +37,14 @@
 #undef CB_CONFIG_LIST_DEBUG
 
 /* a couple of globals keep things simple */
-static int cb_config_list_keyval = MPI_KEYVAL_INVALID;
-static char *yylval;
-static char *token_ptr;
+// AMPI: make variables thread-private
+CtvDeclare(int, ADIOI_cb_config_list_keyval); //=MPI_KEYVAL_INVALID
+CtvStaticDeclare(char*, yylval);
+CtvStaticDeclare(char*, token_ptr);
+
+// AMPI: cb_config_list_keyval needs initialization,
+// cb_config_list_keyval_init_done stores if this was done already
+CtvStaticDeclare(int, cb_config_list_keyval_init_done);
 
 /* internal stuff */
 static int get_max_procs(int cb_nodes);
@@ -83,8 +89,8 @@ int ADIOI_cb_bcast_rank_map(ADIO_File fd)
     /* TEMPORARY -- REMOVE WHEN NO LONGER UPDATING INFO FOR
      * FS-INDEP. */
     value = (char *) ADIOI_Malloc((MPI_MAX_INFO_VAL+1)*sizeof(char));
-    sprintf(value, "%d", fd->hints->cb_nodes);
-    MPI_Info_set(fd->info, "cb_nodes", value);
+    ADIOI_Snprintf(value, MPI_MAX_INFO_VAL+1, "%d", fd->hints->cb_nodes);
+    ADIOI_Info_set(fd->info, "cb_nodes", value);
     ADIOI_Free(value);
 
     return 0;
@@ -110,16 +116,28 @@ int ADIOI_cb_gather_name_array(MPI_Comm comm,
     int *procname_len = NULL, my_procname_len, *disp = NULL, i;
     int commsize, commrank, found;
     ADIO_cb_name_array array = NULL;
+    int alloc_size;
 
-    int a=100;
-    if (cb_config_list_keyval == MPI_KEYVAL_INVALID) {
+    // AMPI: on first CtvInitialize(), value will be zero;
+    // subsequent initializations will not change the value
+    CtvInitialize(int, cb_config_list_keyval_init_done);
+
+    if (CtvAccess(cb_config_list_keyval_init_done) != 1) {
+       CtvAccess(cb_config_list_keyval_init_done) = 1;
+       CtvInitialize(int, ADIOI_cb_config_list_keyval);
+       CtvAccess(ADIOI_cb_config_list_keyval) = MPI_KEYVAL_INVALID;
+    }
+
+    if (CtvAccess(ADIOI_cb_config_list_keyval) == MPI_KEYVAL_INVALID) {
+        /* cleaned up by ADIOI_End_call */
 	MPI_Keyval_create((MPI_Copy_function *) ADIOI_cb_copy_name_array, 
 			  (MPI_Delete_function *) ADIOI_cb_delete_name_array,
-			  &cb_config_list_keyval, &a);
+			  &CtvAccess(ADIOI_cb_config_list_keyval), NULL);
     }
     else {
-	MPI_Attr_get(comm, cb_config_list_keyval, (void *) &array, &found);
-	if (found) {
+	MPI_Attr_get(comm, CtvAccess(ADIOI_cb_config_list_keyval), (void *) &array, &found);
+        if (found) {
+            ADIOI_Assert(array != NULL);
 	    *arrayp = array;
 	    return 0;
 	}
@@ -168,25 +186,27 @@ int ADIOI_cb_gather_name_array(MPI_Comm comm,
 	}
 #endif
 
+	alloc_size = 0;
 	for (i=0; i < commsize; i++) {
 	    /* add one to the lengths because we need to count the
 	     * terminator, and we are going to use this list of lengths
 	     * again in the gatherv.  
 	     */
-	    procname_len[i]++;
-	    procname[i] = ADIOI_Malloc(procname_len[i]);
-	    if (procname[i] == NULL) {
-		return -1;
-	    }
+	    alloc_size += ++procname_len[i];
+	}
+	
+	procname[0] = ADIOI_Malloc(alloc_size);
+	if (procname[0] == NULL) {
+	    return -1;
+	}
+
+	for (i=1; i < commsize; i++) {
+	    procname[i] = procname[i-1] + procname_len[i-1];
 	}
 	
 	/* create our list of displacements for the gatherv.  we're going
 	 * to do everything relative to the start of the region allocated
 	 * for procname[0]
-	 *
-	 * I suppose it is theoretically possible that the distance between 
-	 * malloc'd regions could be more than will fit in an int.  We don't
-	 * cover that case.
 	 */
 	disp = ADIOI_Malloc(commsize * sizeof(int));
 	disp[0] = 0;
@@ -230,8 +250,8 @@ int ADIOI_cb_gather_name_array(MPI_Comm comm,
      * it next time an open is performed on this same comm, and on the
      * dupcomm, so we can use it in I/O operations.
      */
-    MPI_Attr_put(comm, cb_config_list_keyval, array);
-    MPI_Attr_put(dupcomm, cb_config_list_keyval, array);
+    MPI_Attr_put(comm, CtvAccess(ADIOI_cb_config_list_keyval), array);
+    MPI_Attr_put(dupcomm, CtvAccess(ADIOI_cb_config_list_keyval), array);
     *arrayp = array;
     return 0;
 }
@@ -265,14 +285,15 @@ int ADIOI_cb_config_list_parse(char *config_list,
     if (cur_procname == NULL) {
 	return -1;
     }
-
-    yylval = ADIOI_Malloc((MPI_MAX_INFO_VAL+1) * sizeof(char));
-    if (yylval == NULL) {
+    CtvInitialize(char*, yylval);
+    CtvAccess(yylval) = ADIOI_Malloc((MPI_MAX_INFO_VAL+1) * sizeof(char));
+    if (CtvAccess(yylval) == NULL) {
 	ADIOI_Free(cur_procname);
 	return -1;
     }
 
-    token_ptr = config_list;
+    CtvInitialize(char*, token_ptr);
+    CtvAccess(token_ptr) = config_list;
 
     /* right away let's make sure cb_nodes isn't too big */
     if (cb_nodes > nr_procnames) cb_nodes = nr_procnames;
@@ -283,8 +304,8 @@ int ADIOI_cb_config_list_parse(char *config_list,
     used_procnames = ADIOI_Malloc(array->namect * sizeof(char));
     if (used_procnames == NULL) {
 	ADIOI_Free(cur_procname);
-	ADIOI_Free(yylval);
-	yylval = NULL;
+	ADIOI_Free(CtvAccess(yylval));
+	CtvAccess(yylval) = NULL;
 	return -1;
     }
     memset(used_procnames, 0, array->namect);
@@ -298,8 +319,8 @@ int ADIOI_cb_config_list_parse(char *config_list,
 	    ranklist[cur_rank] = cur_rank;
 	}
 	ADIOI_Free(cur_procname);
-	ADIOI_Free(yylval);
-	yylval = NULL;
+	ADIOI_Free(CtvAccess(yylval));
+	CtvAccess(yylval) = NULL;
     	ADIOI_Free(used_procnames);
 	return cb_nodes;
     }
@@ -309,8 +330,8 @@ int ADIOI_cb_config_list_parse(char *config_list,
 
 	if (token == AGG_EOS) {
 	    ADIOI_Free(cur_procname);
-	    ADIOI_Free(yylval);
-	    yylval = NULL;
+	    ADIOI_Free(CtvAccess(yylval));
+	    CtvAccess(yylval) = NULL;
     	    ADIOI_Free(used_procnames);
 	    return cur_rank;
 	}
@@ -319,8 +340,8 @@ int ADIOI_cb_config_list_parse(char *config_list,
 	    /* maybe ignore and try to keep going? */
 	    FPRINTF(stderr, "error parsing config list\n");
 	    ADIOI_Free(cur_procname);
-	    ADIOI_Free(yylval);
-	    yylval = NULL;
+	    ADIOI_Free(CtvAccess(yylval));
+	    CtvAccess(yylval) = NULL;
     	    ADIOI_Free(used_procnames);
 	    return cur_rank;
 	}
@@ -331,7 +352,7 @@ int ADIOI_cb_config_list_parse(char *config_list,
 	else {
 	    /* AGG_STRING is the only remaining case */
 	    /* save procname (for now) */
-	    strcpy(cur_procname, yylval);
+	    ADIOI_Strncpy(cur_procname, CtvAccess(yylval), MPI_MAX_INFO_VAL+1);
 	    cur_procname_p = cur_procname;
 	}
 
@@ -352,8 +373,8 @@ int ADIOI_cb_config_list_parse(char *config_list,
 		    nr_procnames, ranklist, cb_nodes, &cur_rank);
     }
     ADIOI_Free(cur_procname);
-    ADIOI_Free(yylval);
-    yylval = NULL;
+    ADIOI_Free(CtvAccess(yylval));
+    CtvAccess(yylval) = NULL;
     ADIOI_Free(used_procnames);
     return cur_rank;
 }
@@ -361,7 +382,7 @@ int ADIOI_cb_config_list_parse(char *config_list,
 /* ADIOI_cb_copy_name_array() - attribute copy routine
  */
 int ADIOI_cb_copy_name_array(MPI_Comm comm, 
-		       int *keyval, 
+		       int keyval, 
 		       void *extra, 
 		       void *attr_in,
 		       void **attr_out, 
@@ -369,8 +390,12 @@ int ADIOI_cb_copy_name_array(MPI_Comm comm,
 {
     ADIO_cb_name_array array;
 
+    ADIOI_UNREFERENCED_ARG(comm);
+    ADIOI_UNREFERENCED_ARG(keyval); 
+    ADIOI_UNREFERENCED_ARG(extra);
+
     array = (ADIO_cb_name_array) attr_in;
-    array->refct++;
+    if (array != NULL) array->refct++;
 
     *attr_out = attr_in;
     *flag = 1; /* make a copy in the new communicator */
@@ -381,26 +406,31 @@ int ADIOI_cb_copy_name_array(MPI_Comm comm,
 /* ADIOI_cb_delete_name_array() - attribute destructor
  */
 int ADIOI_cb_delete_name_array(MPI_Comm comm, 
-			 int *keyval, 
+			 int keyval, 
 			 void *attr_val, 
 			 void *extra)
 {
-    int i;
     ADIO_cb_name_array array;
 
+    ADIOI_UNREFERENCED_ARG(comm);
+    ADIOI_UNREFERENCED_ARG(extra);
+
     array = (ADIO_cb_name_array) attr_val;
+    ADIOI_Assert(array != NULL);
     array->refct--;
 
     if (array->refct <= 0) {
-	/* time to free the structures (names, array of ptrs to names, struct) 
+	/* time to free the structures (names, array of ptrs to names, struct)
 	 */
-	for (i=0; i < array->namect; i++) {
-	    ADIOI_Free(array->names[i]);
+	if (array->namect) {
+	    /* Note that array->names[i], where i > 0, 
+	     * are just pointers into the allocated region array->names[0]
+	     */
+	    ADIOI_Free(array->names[0]);
 	}
 	if (array->names != NULL) ADIOI_Free(array->names);
 	ADIOI_Free(array);
     }
-
     return MPI_SUCCESS;
 }
 
@@ -646,7 +676,7 @@ static int get_max_procs(int cb_nodes)
 	if (token != AGG_WILDCARD && token != AGG_STRING) return -1;
 	if (token == AGG_WILDCARD) max_procs = cb_nodes;
 	else if (token == AGG_STRING) {
-	    max_procs = strtol(yylval, &errptr, 10);
+	    max_procs = strtol(CtvAccess(yylval), &errptr, 10);
 	    if (*errptr != '\0') {
 		/* some garbage value; default to 1 */
 		max_procs = 1;
@@ -668,27 +698,40 @@ static int get_max_procs(int cb_nodes)
  *
  * Returns a token of types defined at top of this file.
  */
+#ifdef ROMIO_BGL
+/* On BlueGene, the ',' character shows up in get_processor_name, so we have to
+ * use a different delimiter */
+#define COLON ':'
+#define COMMA ';'
+#define DELIMS ":;"
+#else 
+/* these tokens work for every other platform */
+#define COLON ':'
+#define COMMA ','
+#define DELIMS ":,"
+#endif
+
 static int cb_config_list_lex(void)
 {
     int slen;
 
-    if (*token_ptr == '\0') return AGG_EOS;
+    if (*CtvAccess(token_ptr) == '\0') return AGG_EOS;
 
-    slen = strcspn(token_ptr, ":,");
+    slen = (int)strcspn(CtvAccess(token_ptr), DELIMS);
 
-    if (*token_ptr == ':') {
-	token_ptr++;
+    if (*CtvAccess(token_ptr) == COLON) {
+	CtvAccess(token_ptr)++;
 	return AGG_COLON;
     }
-    if (*token_ptr == ',') {
-	token_ptr++;
+    if (*CtvAccess(token_ptr) == COMMA) {
+	CtvAccess(token_ptr)++;
 	return AGG_COMMA;
     }
 
-    if (*token_ptr == '*') {
+    if (*CtvAccess(token_ptr) == '*') {
 	/* make sure that we don't have characters after the '*' */
 	if (slen == 1) {
-	    token_ptr++;
+	    CtvAccess(token_ptr)++;
 	    return AGG_WILDCARD;
 	}
 	else return AGG_ERROR;
@@ -701,8 +744,8 @@ static int cb_config_list_lex(void)
      * should ensure that no one tries to use wildcards with strings 
      * (e.g. "ccn*").
      */
-    strncpy(yylval, token_ptr, slen);
-    yylval[slen] = '\0';
-    token_ptr += slen;
+    ADIOI_Strncpy(CtvAccess(yylval), CtvAccess(token_ptr), slen);
+    CtvAccess(yylval)[slen] = '\0';
+    CtvAccess(token_ptr) += slen;
     return AGG_STRING;
 }

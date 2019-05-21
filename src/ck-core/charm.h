@@ -34,24 +34,41 @@ extern "C" {
 #define CkWallTimer  	CmiWallTimer
 #define CkCpuTimer  	CmiCpuTimer
 
-#define CkMyPe		CmiMyPe
-#define CkMyRank	CmiMyRank
-#define CkMyNode	CmiMyNode
-#define CkNumPes	CmiNumPes
-#define CkNumNodes	CmiNumNodes
-#define CkNodeFirst	CmiNodeFirst
-#define CkNodeSize	CmiNodeSize
-#define CkMyNodeSize	CmiMyNodeSize
-#define CkNodeOf	CmiNodeOf
-#define CkRankOf	CmiRankOf
+#define CkMyPe			CmiMyPe
+#define CkMyRank		CmiMyRank
+#define CkMyNode		CmiMyNode
+#define CkNumPes		CmiNumPes
+#define CkNumNodes		CmiNumNodes
+#define CkNumPhysicalNodes	CmiNumPhysicalNodes
+#define CkNodeFirst		CmiNodeFirst
+#define CkNodeSize		CmiNodeSize
+#define CkMyNodeSize		CmiMyNodeSize
+#define CkNodeOf		CmiNodeOf
+#define CkRankOf		CmiRankOf
 
 #define CkPrintf                CmiPrintf
 #define CkScanf                 CmiScanf
 #define CkError                 CmiError
 #define CkAbort                 CmiAbort
 #define CkAssert                CmiAssert
+#define CkSetPeHelpsOtherThreads CmiSetPeHelpsOtherThreads
 
-extern void  CkExit(void);
+void realCkExit(int exitcode);
+
+/* Optional parameter for CkExit() - based on
+https://stackoverflow.com/a/28074198/1250282 */
+
+#define CKEXIT_1(x) realCkExit(x)
+#define CKEXIT_0() CKEXIT_1(0) /* Default CkExit() exit code: 0 */
+
+#define CKEXIT_FUNC_CHOOSER(_f1, _f2, _f3, ...) _f3
+#define CKEXIT_FUNC_RECOMPOSER(argsWithParentheses) CKEXIT_FUNC_CHOOSER argsWithParentheses
+#define CKEXIT_CHOOSE_FROM_ARG_COUNT(...) CKEXIT_FUNC_RECOMPOSER((__VA_ARGS__, CKEXIT_2, CKEXIT_1, ))
+#define CKEXIT_NO_ARG_EXPANDER() ,,CKEXIT_0
+#define CKEXIT_MACRO_CHOOSER(...) CKEXIT_CHOOSE_FROM_ARG_COUNT(CKEXIT_NO_ARG_EXPANDER __VA_ARGS__ ())
+#define CkExit(...) CKEXIT_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
+
+
 #if CMK_SHRINK_EXPAND
 extern void  CkCleanup(void);
 #endif
@@ -73,16 +90,59 @@ extern int  CkGetArgc(void);
  * Message Allocation Calls
  *
  *****************************************************************************/
-
-extern void* CkAllocSysMsg(void);
+#ifdef __cplusplus
+class CkEntryOptions;
+extern void* CkAllocSysMsg(const CkEntryOptions *opts = NULL);
+#ifndef GROUPDEPNUM_DECLARED
+# define GROUPDEPNUM_DECLARED
+struct GroupDepNum
+{
+  int groupDepNum;
+  explicit GroupDepNum(int g = 0) : groupDepNum{g} { }
+  operator int() const { return groupDepNum; }
+};
+#endif
+extern void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits, GroupDepNum groupDepNum=GroupDepNum{});
+#endif
 extern void  CkFreeSysMsg(void *msg);
-extern void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits);
 extern void* CkAllocBuffer(void *msg, int bufsize);
 extern void  CkFreeMsg(void *msg);
 extern void* CkCopyMsg(void **pMsg);
 extern void  CkSetQueueing(void *msg, int strategy);
 extern void* CkPriorityPtr(void *msg);
 
+/******************************************************************************
+ *
+ * Functions be to called from external clients (e.g. Charm4py)
+ *
+ *****************************************************************************/
+#if CMK_CHARMPY
+
+extern void registerCkRegisterMainModuleCallback(void (*cb)(void));
+extern void registerMainchareCtorExtCallback(void (*cb)(int, void*, int, int, char **));
+extern void registerReadOnlyRecvExtCallback(void (*cb)(int, char*));
+extern void registerChareMsgRecvExtCallback(void (*cb)(int, void*, int, int, char*, int));
+extern void registerGroupMsgRecvExtCallback(void (*cb)(int, int, int, char *, int));
+extern void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char *, int));
+extern void registerArrayElemLeaveExtCallback(int (*cb)(int, int, int *, char**, int));
+extern void registerArrayElemJoinExtCallback(void (*cb)(int, int, int *, int, char*, int));
+extern void registerArrayResumeFromSyncExtCallback(void (*cb)(int, int, int *));
+extern void registerArrayMapProcNumExtCallback(int (*cb)(int, int, const int *));
+extern void StartCharmExt(int argc, char **argv); // start Converse/Charm, argv are the command-line arguments
+extern int CkMyPeHook(void);   // function equivalent of CkMyPe macro
+extern int CkNumPesHook(void); // function equivalent of CkNumPes macro
+/// Get current redNo of specified group instance on this PE
+extern int CkGroupGetReductionNumber(int gid);
+/// Get current redNo of specified array element on this PE
+extern int CkArrayGetReductionNumber(int aid, int ndims, int *index);
+extern void CkSetMigratable(int aid, int ndims, int *index, char migratable);
+extern void CkStartQDExt_ChareCallback(int onPE, void* objPtr, int epIdx, int fid);
+extern void CkStartQDExt_GroupCallback(int gid, int pe, int epIdx, int fid);
+extern void CkStartQDExt_ArrayCallback(int aid, int* idx, int ndims, int epIdx, int fid);
+extern void registerCreateCallbackMsgExtCallback(void (*cb)(void*, int, int, int, char**, int*));
+extern void registerPyReductionExtCallback(int (*cb)(char**, int*, int, char**));
+
+#endif
 /*********************************************************/
 /**
 \addtogroup CkRegister
@@ -109,6 +169,8 @@ extern int CkRegisterMsg(const char *name, CkPackFnPtr pack,
 
 #define CK_EP_MEMCRITICAL (1<<5)
 #define CK_EP_APPWORK     (1<<6)
+#define CK_EP_IMMEDIATE   (1<<7)
+#define CK_EP_INLINE      (1<<8)
 
 /** type of a chare */
 #if CMK_MESSAGE_LOGGING
@@ -136,12 +198,16 @@ typedef enum{
 typedef void  (*CkCallFnPtr) (void *msg, void *obj);
 /** Register this entry point, with this call function and flags.
     Returns the entry point's index in the _entryTable. */
-extern int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, 
-                        int chareIdx,int ck_ep_flags);
+extern int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx,
+                        int chareIdx, int ck_ep_flags);
+extern int CkRegisterEpTemplated(const char *name, CkCallFnPtr call, int msgIdx,
+                                 int chareIdx, int ck_ep_flags);
 
 /** Register this type of chare (group, or array), with this size.
     Returns the Chare's index in the _chareTable. */
 extern int CkRegisterChare(const char *name, size_t dataSz, ChareType chareType);
+/** Register number of array dimensions for this chare array*/
+extern void CkRegisterArrayDimensions(int chareIndex, int ndims);
 /** Register this chare as internal to Charm++.*/
 extern void CkRegisterChareInCharm(int chareIndex);
 /** Register this chare as a mainchare, with this entry point as its constructor.*/
@@ -154,6 +220,13 @@ extern void CkRegisterMigCtor(int chareIndex, int ctorEpIndex);
 extern void CkRegisterGroupIrr(int chareIndex,int isIrr);
 /** Register the chare baseIdx as a base class of the chare derivedIdx. */
 extern void CkRegisterBase(int derivedIdx, int baseIdx);
+#if CMK_CHARMPY
+extern void CkRegisterMainChareExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
+extern void CkRegisterGroupExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
+extern void CkRegisterArrayMapExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
+extern void CkRegisterArrayExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
+extern void CkRegisterReadonlyExt(const char *name, const char *type, size_t msgSize, char *msg);
+#endif
 
 /** This function pup's a global variable.*/
 typedef void (*CkPupReadonlyFnPtr)(void *pup_er);
@@ -227,6 +300,13 @@ extern CkGroupID CkCreateNodeGroup(int chareIdx, int constructorIdx, void *msg);
 extern void CkCreateLocalGroup(CkGroupID groupID, int constructorIdx, envelope *env);
 extern void CkCreateLocalNodeGroup(CkGroupID groupID, int constructorIdx, envelope *env);
 
+#if CMK_CHARMPY
+extern int CkCreateGroupExt(int cIdx, int eIdx, int num_bufs, char **bufs, int *buf_sizes);
+extern int CkCreateArrayExt(int cIdx, int ndims, int *dims, int eIdx, int num_bufs, char **bufs, int *buf_sizes, int map_gid, char useAtSync);
+extern void CkInsertArrayExt(int aid, int ndims, int *index, int epIdx, int onPE, int num_bufs, char **bufs, int *buf_sizes, char useAtSync);
+extern void CkArrayDoneInsertingExt(int aid);
+extern void CkMigrateExt(int aid, int ndims, int *index, int toPe);
+#endif
 
 
 /******************************************************************************
@@ -246,27 +326,37 @@ extern void CkCreateLocalNodeGroup(CkGroupID groupID, int constructorIdx, envelo
  *   Make sure the two remain synchronized if changing this one.
  ***/
 typedef enum {
-  NewChareMsg    =1,
-  NewVChareMsg   =2,
-  BocInitMsg     =3,
-  ForChareMsg    =4,
-  ForBocMsg      =5,
-  ForVidMsg      =6,
-  FillVidMsg     =7,
-  DeleteVidMsg   =8,
-  RODataMsg      =9,
-  ROMsgMsg       =10,
-  StartExitMsg   =11,
-  ExitMsg        =12,
-  ReqStatMsg     =13,
-  StatMsg        =14,
-  StatDoneMsg   =15,
-  NodeBocInitMsg =16,
-  ForNodeBocMsg  =17,
-  ArrayEltInitMsg =18,
-  ForArrayEltMsg  =19,
-  ForIDedObjMsg   =20,
-  LAST_CK_ENVELOPE_TYPE =21
+  NewChareMsg          =1,               // Singleton chare creation message
+  NewVChareMsg         =2,               // Singleton virtual chare creation message
+  BocInitMsg           =3,               // Group creation message
+  ForChareMsg          =4,               // Singleton chare entry method message (non creation)
+  ForBocMsg            =5,               // Group entry method message (non creation)
+  ForVidMsg            =6,               // Singleton virtual chare entry method message (non creation)
+  FillVidMsg           =7,               // Message sent to fill a VidBlock on a virtual chare PE
+  DeleteVidMsg         =8,               // Message sent to delete a VidBlock on a virtual chare PE
+  RODataMsg            =9,               // Readonly Data Message (for user declared readonly variables)
+  ROMsgMsg             =10,              // Readonly message Message (for user declared readonly messages)
+  ROPeerCompletionMsg  =11,              // Message to signal completion of RO Data transfer using Zcpy API
+                                         // ^(used by child nodes to signal completion to their parent node in the bcast spanning tree)
+  ROChildCompletionMsg =12,              // Message to signal completion of RO Data transfer using Zcpy API
+                                         // ^(used by peer nodes to signal completion to the 0th node)
+  StartExitMsg         =13,              // Exit sequence trigger message
+  ExitMsg              =14,              // Exit sequence trigger message using user registered exit function
+  ReqStatMsg           =15,              // Request stats and warnings message
+  StatMsg              =16,              // Stats data message (Reduction)
+  StatDoneMsg          =17,              // Signal completion of stats reduction (Broadcast)
+  NodeBocInitMsg       =18,              // Nodegroup creation message
+  ForNodeBocMsg        =19,              // Nodegroup entry method message (non creation)
+  ArrayEltInitMsg      =20,              // Array Element Initialization message
+  ForArrayEltMsg       =21,              // Array Element entry method message
+  ForIDedObjMsg        =22,
+#if CMK_LOCKLESS_QUEUE
+  WarnMsg              =23,              // Warning data message (Reduction)
+  WarnDoneMsg          =24,              // Signal completion of warnings reduction (Broadcast)
+  LAST_CK_ENVELOPE_TYPE =25              // Used for error-checking
+#else
+  LAST_CK_ENVELOPE_TYPE =23              // Used for error-checking
+#endif
 } CkEnvelopeType;
 
 
@@ -293,11 +383,11 @@ extern void CkSendMsg(int entryIndex, void *msg, const CkChareID *chare, int opt
 extern void CkSendMsgBranch(int eIdx, void *msg, int destPE, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *chare, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int opts CK_MSGOPTIONAL);
-extern void CkSendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID, int npes, int *pes, int opts CK_MSGOPTIONAL);
+extern void CkSendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID, int npes, const int *pes, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgBranchGroup(int eIdx,void *msg,CkGroupID gID,CmiGroup grp, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgNodeBranch(int eIdx, void *msg, int destNode, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgNodeBranchInline(int eIdx, void *msg, int destNode, CkGroupID gID, int opts CK_MSGOPTIONAL);
-extern void CkSendMsgNodeBranchMulti(int eIdx, void *msg, CkGroupID gID, int npes, int *nodes, int opts CK_MSGOPTIONAL);
+extern void CkSendMsgNodeBranchMulti(int eIdx, void *msg, CkGroupID gID, int npes, const int *nodes, int opts CK_MSGOPTIONAL);
 extern void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkBroadcastMsgNodeBranch(int eIdx, void *msg, CkGroupID gID, int opts CK_MSGOPTIONAL);
 
@@ -318,6 +408,23 @@ extern void *CkLocalNodeBranch(CkGroupID gID);
 extern void *CkLocalChare(const CkChareID *chare);
 
 extern void CkArrayManagerDeliver(int onPe,void *msg, int opts CK_MSGOPTIONAL);
+
+#if CMK_CHARMPY
+/// Send msg to chare with ID (onPe,objPtr) to entry method 'epIdx'
+extern void CkChareExtSend(int onPE, void *objPtr, int epIdx, char *msg, int msgSize);
+/// Send msg to chare copying data into CkMessage from multiple input buffers
+extern void CkChareExtSend_multi(int onPE, void *objPtr, int epIdx, int num_bufs, char **bufs, int *buf_sizes);
+/// Send msg to group with ID 'gid'. if pe == -1, msg will be broadcasted, else
+/// it will go to the group instance in that PE
+extern void CkGroupExtSend(int gid, int pe, int epIdx, char *msg, int msgSize);
+/// Send msg to group copying data into CkMessage from multiple input buffers
+extern void CkGroupExtSend_multi(int gid, int pe, int epIdx, int num_bufs, char **bufs, int *buf_sizes);
+/// Send msg to array with ID 'aid'. idx is index of destination and ndims the number
+/// of dimensions of the index. If ndims <= 0, msg will be broadcasted to all array elements
+extern void CkArrayExtSend(int aid, int *idx, int ndims, int epIdx, char *msg, int msgSize);
+/// Send msg to array copying data into CkMessage from multiple input buffers
+extern void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs, char **bufs, int *buf_sizes);
+#endif
 
 /*@}*/
 

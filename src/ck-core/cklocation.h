@@ -9,22 +9,6 @@ array proxies, or the details of element creation (see ckarray.h).
 #ifndef __CKLOCATION_H
 #define __CKLOCATION_H
 
-#if CMK_USING_XLC
-#include <tr1/unordered_map>
-struct IndexHasher {
-  public:
-    size_t operator()(const CkArrayIndex& idx) const {
-      return std::tr1::hash<unsigned int>()(idx.hash());
-    }
-};
-
-struct ArrayIDHasher {
-  public:
-    size_t operator()(const CkArrayID& aid) const {
-      return std::tr1::hash<int>()(((CkGroupID)aid).idx);
-    }
-};
-#else
 #include <unordered_map>
 struct IndexHasher {
   public:
@@ -39,7 +23,6 @@ struct ArrayIDHasher {
       return std::hash<int>()(((CkGroupID)aid).idx);
     }
 };
-#endif
 
 /*********************** Array Messages ************************/
 class CkArrayMessage : public CkMessage {
@@ -69,14 +52,14 @@ class CkArray;
 class ArrayElement;
 //What to do if an entry method is invoked on
 // an array element that does not (yet) exist:
-typedef enum {
+typedef enum : uint8_t {
 	CkArray_IfNotThere_buffer=0, //Wait for it to be created
 	CkArray_IfNotThere_createhere=1, //Make it on sending Pe
 	CkArray_IfNotThere_createhome=2 //Make it on (a) home Pe
 } CkArray_IfNotThere;
 
 /// How to do a message delivery:
-typedef enum {
+typedef enum : uint8_t {
 	CkDeliver_queue=0, //Deliver via the scheduler's queue
 	CkDeliver_inline=1  //Deliver via a regular call
 } CkDeliver_t;
@@ -121,6 +104,8 @@ class CkArray;
 */
 /*@{*/
 
+#include "ckarrayoptions.h"
+
 /** The "map" is used by the array manager to map an array index to 
  * a home processor number.
  */
@@ -132,11 +117,51 @@ public:
   virtual ~CkArrayMap();
   virtual int registerArray(const CkArrayIndex& numElements, CkArrayID aid);
   virtual void unregisterArray(int idx);
+  virtual void storeCkArrayOpts(CkArrayOptions options);
   virtual void populateInitial(int arrayHdl,CkArrayOptions& options,void *ctorMsg,CkArray *mgr);
   virtual int procNum(int arrayHdl,const CkArrayIndex &element) =0;
   virtual int homePe(int arrayHdl,const CkArrayIndex &element)
              { return procNum(arrayHdl, element); }
+
+  virtual void pup(PUP::er &p);
+
+  CkArrayOptions storeOpts;
+  std::unordered_map<int, bool> dynamicIns;
 };
+
+#if CMK_CHARMPY
+
+extern int (*ArrayMapProcNumExtCallback)(int, int, const int *);
+
+class ArrayMapExt: public CkArrayMap {
+public:
+  ArrayMapExt(void *impl_msg);
+
+  static void __ArrayMapExt(void *impl_msg, void *impl_obj_void) {
+    new (impl_obj_void) ArrayMapExt(impl_msg);
+  }
+
+  static void __entryMethod(void *impl_msg, void *impl_obj_void) {
+    //fprintf(stderr, "ArrayMapExt:: entry method invoked\n");
+    ArrayMapExt *obj = static_cast<ArrayMapExt *>(impl_obj_void);
+    CkMarshallMsg *impl_msg_typed = (CkMarshallMsg *)impl_msg;
+    char *impl_buf = impl_msg_typed->msgBuf;
+    PUP::fromMem implP(impl_buf);
+    int msgSize; implP|msgSize;
+    int ep; implP|ep;
+    int dcopy_start; implP|dcopy_start;
+    GroupMsgRecvExtCallback(obj->thisgroup.idx, ep, msgSize, impl_buf+(3*sizeof(int)),
+                            dcopy_start);
+  }
+
+  int procNum(int arrayHdl, const CkArrayIndex &element) {
+    return ArrayMapProcNumExtCallback(thisgroup.idx, element.getDimension(), element.data());
+    //fprintf(stderr, "[%d] ArrayMapExt - procNum is %d\n", CkMyPe(), pe);
+  }
+};
+
+#endif
+
 /*@}*/
 
 /**
@@ -235,7 +260,7 @@ public:
 	virtual void addLocation(CkLocation &loc) =0;
 };
 
-enum CkElementCreation_t {
+enum CkElementCreation_t : uint8_t {
   CkElementCreation_migrate=2, // Create object for normal migration arrival
   CkElementCreation_resume=3,  // Create object after checkpoint
   CkElementCreation_restore=4  // Create object after checkpoint, skip listeners
@@ -246,6 +271,12 @@ enum CkElementCreation_t {
 typedef void (*CkLocFn)(CkArray *,void *,CkLocRec *,CkArrayIndex *);
 #endif
 
+// Returns rank 0 for a pe for drone mode
+#if CMK_DRONE_MODE
+#define CMK_RANK_0(pe) (CkNodeOf(pe)*CkNodeSize(0))
+#else
+#define CMK_RANK_0(pe) pe
+#endif
 
 /**
  * A group which manages the location of an indexed set of
@@ -257,21 +288,13 @@ class CkLocMgr : public IrrGroup {
 
 public:
 
-#if CMK_USING_XLC
-typedef std::tr1::unordered_map<CkArrayID, CkArray*, ArrayIDHasher> ArrayIdMap;
-typedef std::tr1::unordered_map<CmiUInt8, int> IdPeMap;
-typedef std::tr1::unordered_map<CmiUInt8, std::vector<CkArrayMessage*> > MsgBuffer;
-typedef std::tr1::unordered_map<CkArrayIndex, std::vector<CkArrayMessage *>, IndexHasher> IndexMsgBuffer;
-typedef std::tr1::unordered_map<CkArrayIndex, std::vector<std::pair<int, bool> >, IndexHasher > LocationRequestBuffer;
-typedef std::tr1::unordered_map<CkArrayIndex, CmiUInt8, IndexHasher> IdxIdMap;
-#else
 typedef std::unordered_map<CkArrayID, CkArray*, ArrayIDHasher> ArrayIdMap;
 typedef std::unordered_map<CmiUInt8, int> IdPeMap;
 typedef std::unordered_map<CmiUInt8, std::vector<CkArrayMessage*> > MsgBuffer;
 typedef std::unordered_map<CkArrayIndex, std::vector<CkArrayMessage *>, IndexHasher> IndexMsgBuffer;
 typedef std::unordered_map<CkArrayIndex, std::vector<std::pair<int, bool> >, IndexHasher > LocationRequestBuffer;
 typedef std::unordered_map<CkArrayIndex, CmiUInt8, IndexHasher> IdxIdMap;
-#endif
+typedef std::unordered_map<CmiUInt8, CkLocRec*> LocRecHash;
 
 	CkLocMgr(CkArrayOptions opts);
 	CkLocMgr(CkMigrateMessage *m);
@@ -284,20 +307,25 @@ typedef std::unordered_map<CkArrayIndex, CmiUInt8, IndexHasher> IdxIdMap;
 
 //Interface used by external users:
 	/// Home mapping
-	inline int homePe(const CkArrayIndex &idx) const {return map->homePe(mapHandle,idx);}
+	inline int homePe(const CkArrayIndex &idx) const {return CMK_RANK_0(map->homePe(mapHandle,idx));}
         inline int homePe(const CmiUInt8 id) const {
           if (compressor)
-            return homePe(compressor->decompress(id));
+            return CMK_RANK_0(homePe(compressor->decompress(id)));
 
-          return id >> 24;
+          return CMK_RANK_0(id >> 24);
         }
-	inline int procNum(const CkArrayIndex &idx) const {return map->procNum(mapHandle,idx);}
+	inline int procNum(const CkArrayIndex &idx) const {return CMK_RANK_0(map->procNum(mapHandle,idx));}
 	inline bool isHome (const CkArrayIndex &idx) const {return (bool)(homePe(idx)==CkMyPe());}
   int whichPE(const CkArrayIndex &idx) const;
   int whichPE(const CmiUInt8 id) const;
 	/// Return the "last-known" location (returns a processor number)
 	int lastKnown(const CkArrayIndex &idx);
 	int lastKnown(CmiUInt8 id);
+
+        inline void insertID(const CkArrayIndex& idx, const CmiUInt8 id) {
+          if (compressor) return;
+          idx2id[idx] = id;
+        }
 
         inline CmiUInt8 lookupID(const CkArrayIndex &idx) const {
           if (compressor) {
@@ -321,6 +349,21 @@ typedef std::unordered_map<CkArrayIndex, CmiUInt8, IndexHasher> IdxIdMap;
               id = itr->second;
               return true;
             }
+          }
+        }
+
+        // Lookup CkArrayIndex for a CmiUInt8, used by BlockLB and OrbLB
+        inline CkArrayIndex lookupIdx(const CmiUInt8 &id) const {
+         if (compressor) {
+           return compressor->decompress(id);
+          } else {
+           CkLocMgr::IdxIdMap::const_iterator itr;
+            for ( itr = idx2id.begin(); itr != idx2id.end(); itr++ ) {
+              if(itr->second == id)
+                break;
+            }
+            CkAssert(itr != idx2id.end());
+            return itr->first;
           }
         }
 
@@ -356,9 +399,12 @@ typedef std::unordered_map<CkArrayIndex, CmiUInt8, IndexHasher> IdxIdMap;
 	void addManager(CkArrayID aid,CkArray *mgr);
         void deleteManager(CkArrayID aid, CkArray *mgr);
 
-	/// Populate this array with initial elements
+	/// Populate this array with initial elements and store CkArrayOptions to the underlying map
 	void populateInitial(CkArrayOptions& options,void *initMsg,CkArray *mgr)
-    { map->populateInitial(mapHandle,options,initMsg,mgr); }
+    {
+      map->storeCkArrayOpts(options);
+      map->populateInitial(mapHandle,options,initMsg,mgr);
+    }
 
 	/// Add a new local array element, calling element's constructor
 	///  Returns true if the element was successfully added; false if the element migrated away or deleted itself.
@@ -404,7 +450,7 @@ typedef std::unordered_map<CkArrayIndex, CmiUInt8, IndexHasher> IdxIdMap;
 #endif
 
 	//This index will no longer be used-- delete the associated elements
-	void reclaim(const CkArrayIndex &idx);
+	void reclaim(CkLocRec* rec);
 
 	bool demandCreateElement(CkArrayMessage *msg, const CkArrayIndex &idx, int onPe, CkDeliver_t type);
         void demandCreateElement(const CkArrayIndex &idx, int chareType, int onPe, CkArrayID mgr);
@@ -419,7 +465,7 @@ typedef std::unordered_map<CkArrayIndex, CmiUInt8, IndexHasher> IdxIdMap;
 	void dummyAtSync(void);
 
 	/// return a list of migratables in this local record
-	void migratableList(CkLocRec *rec, CkVec<CkMigratable *> &list);
+	void migratableList(CkLocRec *rec, std::vector<CkMigratable *> &list);
 
 	void flushAllRecs(void);
 	void flushLocalRecs(void);
@@ -506,7 +552,7 @@ public:
 
 private:
 	/// The core of the location manager: map array index to element representative
-	CkHashtableT<CkHashtableAdaptorT<CmiUInt8>, CkLocRec *> hash;
+	LocRecHash hash;
 	CmiImmediateLockType hashImmLock;
 
 	//Map object

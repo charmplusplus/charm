@@ -14,6 +14,14 @@
 /*readonly*/ int numY;
 /*readonly*/ int numZ;
 
+struct sectionBcastMsg : public CkMcastBaseMsg, public CMessage_sectionBcastMsg {
+  sectionBcastMsg() {}
+
+  void pup(PUP::er &p) {
+    CMessage_sectionBcastMsg::pup(p);
+  }
+};
+
 /** \class Main
  *
  */
@@ -79,7 +87,7 @@ public:
   void done_1(void)
   {
     CkPrintf("Phase 1 done\n");
-    secProxy.SayBye();
+    secProxy.SayBye(new sectionBcastMsg());
     // CkExit();
   };
 
@@ -125,7 +133,7 @@ public:
       mainProxy.done_1();
   }
 
-  void SayBye()
+  void SayBye(sectionBcastMsg *msg)
   {
     CkPrintf("Bye from element %d %d %d %d\n", thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z);
     mainProxy.done_2();

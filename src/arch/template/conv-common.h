@@ -1,10 +1,10 @@
-/* if set to 1 it uses the default scheduler (Csd) defined in convcore.c,
-   otherwise machine.c has to provide its own scheduler. Should be 1 in almost
+/* if set to 1 it uses the default scheduler (Csd) defined in convcore.C,
+   otherwise machine.C has to provide its own scheduler. Should be 1 in almost
    every machine. */
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 
 /* specifies if the functions CmiPrintf, CmiError and CmiScanf are implemented
-   in machine.c (1), or if the standard definitions in convcore.c should be used
+   in machine.C (1), or if the standard definitions in convcore.C should be used
    (0). */
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
 
@@ -21,8 +21,8 @@
 #define CMK_MSG_HEADER_BIGSIM_ {CMK_MSG_HEADER_UNIQUE CMK_BIGSIM_FIELDS}
 
 /* defines different parameters of groups of processors. (next 4 definitions)
-   used in converse.h (the first) and convcore.c (the others). a value of 1
-   means that convcore.c defines the methods, otherwise it is up to machine.c to
+   used in converse.h (the first) and convcore.C (the others). a value of 1
+   means that convcore.C defines the methods, otherwise it is up to machine.C to
    define them */
 
 /* basic structure of a CmiGroup (defined in converse.h) */
@@ -36,22 +36,19 @@
 
 /* define the entity of the spanning tree used (it is 4 in all configurations)
    definese also if the code in converse.h will be used (1) or not and
-   implemented in machine.c (0). At the momement all configurations use the
+   implemented in machine.C (0). At the momement all configurations use the
    common code. */
 #define CMK_SPANTREE_MAXSPAN                               4
 #define CMK_SPANTREE_USE_COMMON_CODE                       1
 
 /* Specifies if the routines which send multiple messages (vectors of messages)
-   to a processors are implemented in convcore.c (1) or in machine.c (1). */
+   to a processors are implemented in convcore.C (1) or in machine.C (1). */
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
-
-/* Enable the CCS protocol if set to 1. */
-#define CMK_CCS_AVAILABLE                                  1
 
 /* Defines if there is a "charmrun" program running on the system, which
    interacts with possible connecting clients (0), or if there is no such
-   program, and processor 0 does the job (1). Currently only net- versions have
-   this set to 0, all the others have it to 1. */
+   program, and processor 0 does the job (1). Currently only netlrts- versions
+   have this set to 0, all the others have it to 1. */
 #define NODE_0_IS_CONVHOST                                 1
 
 /* Enables the persistent communication protocol if set to 1. */

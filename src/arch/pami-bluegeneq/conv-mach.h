@@ -20,7 +20,7 @@
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 
-#define CMK_MEMORY_PAGESIZE                                8192
+#define CMK_MEMORY_PAGESIZE                                4096
 #define CMK_MEMORY_PROTECTABLE                             1
 
 
@@ -46,9 +46,11 @@
 // This needs to be compiled with gcc only
 #define CMK_TIMER_USE_BLUEGENEQ			           1
 
+#define CMK_TYPEDEF_INT1 signed char
 #define CMK_TYPEDEF_INT2 short
 #define CMK_TYPEDEF_INT4 int
 #define CMK_TYPEDEF_INT8 long long
+#define CMK_TYPEDEF_UINT1 unsigned char
 #define CMK_TYPEDEF_UINT2 unsigned short
 #define CMK_TYPEDEF_UINT4 unsigned int
 #define CMK_TYPEDEF_UINT8 unsigned long long
@@ -63,9 +65,6 @@
 #define CMK_DEBUG_MODE                                     0
 
 #define CMK_LBDB_ON					   1
-
-#undef CMK_CCS_AVAILABLE
-#define CMK_CCS_AVAILABLE				   0
 
 #define CMK_BLUEGENEQ                                      1
 #define CMK_BLUEGENEQ_OPTCOPY                              1

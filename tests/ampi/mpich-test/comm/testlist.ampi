@@ -1,0 +1,7 @@
+dup 2
+commcreate1 8
+ic1 4
+ic2 33
+ctxalloc 2
+cmsplit 4
+cmsplit2 12

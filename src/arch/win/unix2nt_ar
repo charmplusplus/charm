@@ -20,7 +20,7 @@ fi
 #only valid for the platform that has exported corresponding variables
 #LIB_CMD="$VCC_DIR/BIN/LIB.EXE"
 LIB_CMD="lib.exe"
-LIB_OPTS='/nologo'
+LIB_OPTS='-nologo'
 
 if [ "x$LIB" = "x" ]
 then
@@ -70,9 +70,9 @@ Abort() {
 [ $# -eq 1 ] && exit 0
 [ $# -lt 2 ] && printUsage "Error: Not enough arguments given."
 
-out=$1
+out=$(cygpath -w $1)
 shift
-args="/out:$out $@"
+args="-out:$out $@"
 
 "$LIB_CMD" $LIB_OPTS $args
 

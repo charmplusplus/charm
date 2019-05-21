@@ -6,10 +6,10 @@ Test2D::Test2D() : doubleVector(vectorSize)
 	for(int i = 0; i < vectorSize; i++) {
 		doubleVector[i] = i;
 	}
-};
+}
 
 Test2D::Test2D(CkMigrateMessage *msg)
-{ };
+{}
 
 void Test2D::compute(DummyMsg *m)
 {
@@ -54,10 +54,11 @@ void Test2D::compute(DummyMsg *m)
 	CkCallback cb(CkIndex_Main::reportSum(NULL), mainProxy);
 	CProxySection_Test2D::contribute(sizeof(double)*vectorSize, myVector.getVec(), CkReduction::sum_double, cookies[section], cb);
 	delete m;
-};
+}
 
 /*Test2D::~Test2D()
 {
 	delete[] cookies;
-};*/
+}*/
+
 #include "sectionReduction.def.h"

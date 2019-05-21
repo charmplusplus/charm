@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <limits.h>
 
 #include "converse.h"
 #include "ckhashtable.h"
@@ -54,7 +55,7 @@ static void ccs_killport(char *msg)
 }
 /*Send any registered clients kill messages before we exit*/
 static int noMoreErrors(SOCKET skt, int c, const char *m) {return -1;}
-extern "C" void CcsImpl_kill(void)
+void CcsImpl_kill(void)
 {
   skt_set_abort(noMoreErrors);
   while (killList!=NULL)
@@ -352,7 +353,7 @@ void CpdListRegister(CpdListAccessor *acc)
 { }
 #endif
 
-extern "C" void CpdListRegister_c(const char *path,
+void CpdListRegister_c(const char *path,
             CpdListLengthFn_c len,void *lenParam,
             CpdListItemsFn_c items,void *itemsParam,int checkBoundary)
 #if CMK_CCS_AVAILABLE
@@ -512,7 +513,7 @@ static void CWeb_Collect(void)
   CcdCallFnAfter((CcdVoidFn)CWeb_Collect, 0, WEB_INTERVAL);
 }
 
-extern "C" void CWebPerformanceRegisterFunction(CWebFunction fn)
+void CWebPerformanceRegisterFunction(CWebFunction fn)
 {
   if (CmiMyRank()!=0) return; /* Should only register from rank 0 */
   if (CWebNoOfFns>=MAXFNS) CmiAbort("Registered too many CWebPerformance functions!");
@@ -589,7 +590,7 @@ static void usageStop(CWebModeStats *stats,double curWallTime)
 
 /* Call this when the program is started
  -> Whenever traceModuleInit would be called
- -> -> see conv-core/convcore.c
+ -> -> see conv-core/convcore.C
 */
 static void initUsage()
 {
@@ -639,8 +640,8 @@ void CWebInit(void)
 #if CMK_WEB_MODE
   CcsRegisterHandler("perf_monitor", (CmiHandler)CWebHandler);
   
-  CWeb_CollectIndex=CmiRegisterHandler((CmiHandler)CWeb_Collect);
-  CWeb_ReduceIndex=CmiRegisterHandler((CmiHandler)CWeb_Reduce);
+  CmiAssignOnce(&CWeb_CollectIndex, CmiRegisterHandler((CmiHandler)CWeb_Collect));
+  CmiAssignOnce(&CWeb_ReduceIndex, CmiRegisterHandler((CmiHandler)CWeb_Reduce));
   
   initUsage();
   CWebPerformanceRegisterFunction(getUsage);
@@ -654,7 +655,7 @@ void CWebInit(void)
 }
 
 
-extern "C" void CcsBuiltinsInit(char **argv)
+void CcsBuiltinsInit(char **argv)
 {
   CcsRegisterHandler("ccs_getinfo",(CmiHandler)ccs_getinfo);
   CcsRegisterHandler("ccs_killport",(CmiHandler)ccs_killport);
@@ -666,7 +667,7 @@ extern "C" void CcsBuiltinsInit(char **argv)
 
 #endif /*CMK_CCS_AVAILABLE*/
 
-void PUP_fmt::fieldHeader(typeCode_t typeCode,size_t nItems) {
+void PUP_fmt::fieldHeader(typeCode_t typeCode,int nItems) {
     // Compute and write intro byte:
     lengthLen_t ll;
     if (nItems==1) ll=lengthLen_single;
@@ -684,7 +685,8 @@ void PUP_fmt::fieldHeader(typeCode_t typeCode,size_t nItems) {
         } break;
     case lengthLen_int: {
         p(nItems); 
-        } break; 
+        } break;
+    case lengthLen_long: CmiAbort("Should not have reached here!"); break;
     };
 }
 
@@ -698,6 +700,8 @@ void PUP_fmt::synchronize(unsigned int m) {
 	p(m);
 }
 void PUP_fmt::bytes(void *ptr,size_t n,size_t itemSize,PUP::dataType t) {
+	if(itemSize > INT_MAX || n > INT_MAX || itemSize*n > INT_MAX)
+		CmiAbort("Ccs does not support messages greater than INT_MAX...\n");
 	switch(t) {
 	case PUP::Tchar:
 	case PUP::Tuchar:

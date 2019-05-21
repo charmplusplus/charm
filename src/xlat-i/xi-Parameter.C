@@ -1,13 +1,14 @@
+#include "xi-Entry.h"
 #include "xi-Parameter.h"
 #include "xi-Type.h"
 #include "xi-Value.h"
-#include "xi-Entry.h"
+#include "xi-Chare.h"
 
 namespace xi {
 
 /******************* C/C++ Parameter Marshalling ******************
 For entry methods like:
-	entry void foo(int nx,double xarr[nx],complex<float> yarr[ny],long ny);
+        entry void foo(int nx,double xarr[nx],complex<float> yarr[ny],long ny);
 
 We generate code on the call-side (in the proxy entry method) to
 create a message and copy the user's parameters into it.  Scalar
@@ -16,27 +17,27 @@ fields are PUP'd, arrays are just memcpy'd.
 The message looks like this:
 
 messagestart>--------- PUP'd data ----------------
-	|  PUP'd nx
-	|  PUP'd offset-to-xarr (from array start, int byte count)
-	|  PUP'd length-of-xarr (in elements)
-	|  PUP'd offset-to-yarr
-	|  PUP'd length-of-yarr (in elements)
-	|  PUP'd ny
-	+-------------------------------------------
-	|  alignment gap (to multiple of 16 bytes)
+        |  PUP'd nx
+        |  PUP'd offset-to-xarr (from array start, int byte count)
+        |  PUP'd length-of-xarr (in elements)
+        |  PUP'd offset-to-yarr
+        |  PUP'd length-of-yarr (in elements)
+        |  PUP'd ny
+        +-------------------------------------------
+        |  alignment gap (to multiple of 16 bytes)
 arraystart>------- xarr data ----------
-	| xarr[0]
-	| xarr[1]
-	| ...
-	| xarr[nx-1]
-	+------------------------------
-	|  alignment gap (for yarr-elements)
-	+--------- yarr data ----------
-	| yarr[0]
-	| yarr[1]
-	| ...
-	| yarr[ny-1]
-	+------------------------------
+        | xarr[0]
+        | xarr[1]
+        | ...
+        | xarr[nx-1]
+        +------------------------------
+        |  alignment gap (for yarr-elements)
+        +--------- yarr data ----------
+        | yarr[0]
+        | yarr[1]
+        | ...
+        | yarr[ny-1]
+        +------------------------------
 
 On the recieve side, all the scalar fields are PUP'd to fresh
 stack copies, and the arrays are passed to the user as pointers
@@ -44,359 +45,613 @@ into the message data-- so there's no copy on the receive side.
 
 The message is freed after the user entry returns.
 */
-Parameter::Parameter(int Nline,Type *Ntype,const char *Nname,
-                     const char *NarrLen,Value *Nvalue)
-  : type(Ntype)
-  , name(Nname)
-  , arrLen(NarrLen)
-  , val(Nvalue)
-  , line(Nline)
-  , byConst(false)
-  , conditional(0)
-  , given_name(Nname)
-  , podType(false)
-{
-	if (isMessage()) {
-		name="impl_msg";
-        }
-	if (name==NULL && !isVoid())
-	{/*Fabricate a unique name for this marshalled param.*/
-		static int unnamedCount=0;
-		name=new char[50];
-		sprintf((char *)name,"impl_noname_%x",unnamedCount++);
-	}
-	byReference=false;
-        declaredReference = false;
-	if ((arrLen==NULL)&&(val==NULL))
-	{ /* Consider passing type by reference: */
-		if (type->isNamed())
-		{ /* Some user-defined type: pass by reference */
-			byReference=true;
-		}
-		if (type->isReference()) {
-			byReference=true;
-                        declaredReference = true;
-			/* Clip off the ampersand--we'll add
-			   it back ourselves in Parameter::print. */
-			type=type->deref();
-		}
-                if (type->isConst()) {
-                  byConst = true;
-                  type = type->deref();
-                }
-	}
-}
-
-ParamList::ParamList(ParamList *pl) : manyPointers(false), param(pl->param), next(pl->next) {}
-
-void ParamList::print(XStr &str,int withDefaultValues,int useConst)
-{
-    	param->print(str,withDefaultValues,useConst);
-    	if (next) {
-    		str<<", ";
-    		next->print(str,withDefaultValues,useConst);
-    	}
-}
-
-void ParamList::printTypes(XStr &str,int withDefaultValues,int useConst)
-{
-    XStr typeStr;
-    param->getType()->print(typeStr);
-    str << typeStr;
-    if (next) {
-      str << ", ";
-      next->printTypes(str,withDefaultValues,useConst);
+Parameter::Parameter(int Nline, Type* Ntype, const char* Nname, const char* NarrLen,
+                     Value* Nvalue)
+    : type(Ntype),
+      name(Nname),
+      arrLen(NarrLen),
+      val(Nvalue),
+      line(Nline),
+      byConst(false),
+      conditional(0),
+      given_name(Nname),
+      podType(false),
+      rdma(CMK_REG_NO_ZC_MSG),
+      firstRdma(false) {
+  if (isMessage()) {
+    name = "impl_msg";
+  }
+  if (name == NULL && !isVoid()) { /*Fabricate a unique name for this marshalled param.*/
+    static int unnamedCount = 0;
+    name = new char[50];
+    sprintf((char*)name, "impl_noname_%x", unnamedCount++);
+  }
+  byReference = false;
+  declaredReference = false;
+  if ((arrLen == NULL) && (val == NULL)) { /* Consider passing type by reference: */
+    if (type->isNamed()) {                 /* Some user-defined type: pass by reference */
+      byReference = true;
     }
+    if (type->isReference()) {
+      byReference = true;
+      declaredReference = true;
+      /* Clip off the ampersand--we'll add
+         it back ourselves in Parameter::print. */
+      type = type->deref();
+    }
+    if (type->isConst()) {
+      byConst = true;
+      type = type->deref();
+    }
+  }
 }
 
-void Parameter::print(XStr &str,int withDefaultValues,int useConst)
-{
-	if (arrLen!=NULL)
-	{ //Passing arrays by const pointer-reference
-		if (useConst) str<<"const ";
-		str<<type<<" *";
-		if (name!=NULL) str<<name;
-	}
-	else {
-	    if (conditional) {
-	        str<<type<<" *"<<name; 
-	    }
-	    else if (byReference)
-		{ //Pass named types by const C++ reference
-                        if (useConst || byConst) str<<"const ";
-			str<<type<<" &";
-		        if (name!=NULL) str<<name;
-		}
-		else
-		{ //Pass everything else by value
-                  // @TODO uncommenting this requires that PUP work on const types
-                  //if (byConst) str << "const ";
-			//"void" shouldn't be typed in the param list
-			//to have CkEntryOptions as the last argument
-			if(!type->isVoid())
-				str<<type;
-			if (name!=NULL) str<<" "<<name;
-			if (withDefaultValues && val!=NULL)
-			    {str<<" = ";val->print(str);}
-		}
-	}
+ParamList::ParamList(ParamList* pl)
+    : manyPointers(false), param(pl->param), next(pl->next) {}
+
+int ParamList::print(XStr& str, int withDefaultValues, int useConst, int fwdNum) {
+  fwdNum = param->print(str, withDefaultValues, useConst, fwdNum);
+  if (next) {
+    str << ", ";
+    fwdNum = next->print(str, withDefaultValues, useConst, fwdNum);
+  }
+  return fwdNum;
 }
 
-void ParamList::printAddress(XStr &str)
-{
-    	param->printAddress(str);
-    	if (next) {
-    		str<<", ";
-    		next->printAddress(str);
-    	}
+void ParamList::printTypes(XStr& str, int withDefaultValues, int useConst) {
+  XStr typeStr;
+  param->getType()->print(typeStr);
+  str << typeStr;
+  if (next) {
+    str << ", ";
+    next->printTypes(str, withDefaultValues, useConst);
+  }
 }
 
-void Parameter::printAddress(XStr &str)
-{
-    	type->print(str);
-    	str<<"*";
-    	if (name!=NULL)
-    		str<<" "<<name;
+int Parameter::print(XStr& str, int withDefaultValues, int useConst, int fwdNum) {
+  if (isRdma()) {
+    str << "CkNcpyBuffer ncpyBuffer_" << name;
+  } else if (arrLen != NULL) {  // Passing arrays by const pointer-reference
+    if (useConst) str << "const ";
+    str << type << " *";
+    if (name != NULL) str << name;
+  } else {
+    if (conditional) {
+      str << type << " *" << name;
+    } else if (byReference) {  // Pass named types by const C++ reference
+      if (fwdNum) {
+        str << "Fwd" << fwdNum++ << " &&";
+      } else {
+        if (useConst || byConst) str << "const ";
+        str << type << " &";
+      }
+      if (name != NULL) str << name;
+    } else {  // Pass everything else by value
+              // @TODO uncommenting this requires that PUP work on const types
+              // if (byConst) str << "const ";
+      //"void" shouldn't be typed in the param list
+      // to have CkEntryOptions as the last argument
+      if (!type->isVoid()) str << type;
+      if (name != NULL) str << " " << name;
+      if (withDefaultValues && val != NULL) {
+        str << " = ";
+        val->print(str);
+      }
+    }
+  }
+  return fwdNum;
 }
 
-void ParamList::printValue(XStr &str)
-{
-    	param->printValue(str);
-    	if (next) {
-    		str<<", ";
-    		next->printValue(str);
-    	}
+void ParamList::printAddress(XStr& str) {
+  param->printAddress(str);
+  if (next) {
+    str << ", ";
+    next->printAddress(str);
+  }
 }
 
-void Parameter::printValue(XStr &str)
-{
-    	if (arrLen==NULL)
-    	  	str<<"*";
-    	if (name!=NULL)
-    		str<<name;
+void Parameter::printAddress(XStr& str) {
+  type->print(str);
+  str << "*";
+  if (name != NULL) str << " " << name;
 }
 
-int ParamList::orEach(pred_t f)
-{
-	ParamList *cur=this;
-	int ret=0;
-	do {
-		ret|=((cur->param)->*f)();
-	} while (NULL!=(cur=cur->next));
-	return ret;
+void ParamList::printValue(XStr& str) {
+  param->printValue(str);
+  if (next) {
+    str << ", ";
+    next->printValue(str);
+  }
 }
 
-void ParamList::callEach(fn_t f,XStr &str)
-{
-	ParamList *cur=this;
-	do {
-		((cur->param)->*f)(str);
-	} while (NULL!=(cur=cur->next));
+void Parameter::printValue(XStr& str) {
+  if (arrLen == NULL) str << "*";
+  if (name != NULL) str << name;
 }
 
-int ParamList::hasConditional() {
-  return orEach(&Parameter::isConditional);
+int ParamList::orEach(pred_t f) {
+  ParamList* cur = this;
+  int ret = 0;
+  do {
+    ret |= ((cur->param)->*f)();
+  } while (NULL != (cur = cur->next));
+  return ret;
 }
+
+void ParamList::callEach(fn_t f, XStr& str) {
+  ParamList* cur = this;
+  do {
+    ((cur->param)->*f)(str);
+  } while (NULL != (cur = cur->next));
+}
+
+void ParamList::callEach(rdmafn_t f, XStr& str, bool isArray) {
+  ParamList* cur = this;
+  do {
+    ((cur->param)->*f)(str, isArray);
+  } while (NULL != (cur = cur->next));
+}
+
+void ParamList::callEach(rdmarecvfn_t f, XStr& str, bool genRdma, bool isSDAGGen) {
+  ParamList* cur = this;
+  int count = 0; // Used for the index of buffPtrs for Zcpy Post API
+  do {
+    ((cur->param)->*f)(str, genRdma, isSDAGGen, count);
+  } while (NULL != (cur = cur->next));
+}
+
+int ParamList::hasConditional() { return orEach(&Parameter::isConditional); }
 
 /** marshalling: pack fields into flat byte buffer **/
-void ParamList::marshall(XStr &str, XStr &entry)
-{
-	if (isVoid())
-		str<<"  void *impl_msg = CkAllocSysMsg();\n";
-	else if (isMarshalled())
-	{
-		str<<"  //Marshall: ";print(str,0);str<<"\n";
-		//First pass: find sizes
-		str<<"  int impl_off=0;\n";
-		int hasArrays=orEach(&Parameter::isArray);
-		if (hasArrays) {
-		  str<<"  int impl_arrstart=0;\n";
-		  callEach(&Parameter::marshallArraySizes,str);
-		}
-		str<<"  { //Find the size of the PUP'd data\n";
-		str<<"    PUP::sizer implP;\n";
-		callEach(&Parameter::pup,str);
-		if (hasArrays)
-		{ /*round up pup'd data length--that's the first array*/
-		  str<<"    impl_arrstart=CK_ALIGN(implP.size(),16);\n";
-		  str<<"    impl_off+=impl_arrstart;\n";
-		}
-		else  /*No arrays--no padding*/
-		  str<<"    impl_off+=implP.size();\n";
-		str<<"  }\n";
-		//Now that we know the size, allocate the packing buffer
-		if (hasConditional()) str<<"  MarshallMsg_"<<entry<<" *impl_msg=CkAllocateMarshallMsgT<MarshallMsg_"<<entry<<" >(impl_off,impl_e_opts);\n";
-		else str<<"  CkMarshallMsg *impl_msg=CkAllocateMarshallMsg(impl_off,impl_e_opts);\n";
-		//Second pass: write the data
-		str<<"  { //Copy over the PUP'd data\n";
-		str<<"    PUP::toMem implP((void *)impl_msg->msgBuf);\n";
-		callEach(&Parameter::pup,str);
-		callEach(&Parameter::copyPtr,str);
-		str<<"  }\n";
-		if (hasArrays)
-		{ //Marshall each array
-		  str<<"  char *impl_buf=impl_msg->msgBuf+impl_arrstart;\n";
-		  callEach(&Parameter::marshallArrayData,str);
-		}
-	}
-}
-void Parameter::marshallArraySizes(XStr &str)
-{
-	Type *dt=type->deref();//Type, without &
-	if (dt->isPointer())
-		XLAT_ERROR_NOCOL("can't pass pointers across processors--\n"
-		                 "Indicate the array length with []'s, or pass a reference",
-		                 line);
-	if (isArray()) {
-		str<<"  int impl_off_"<<name<<", impl_cnt_"<<name<<";\n";
-		str<<"  impl_off_"<<name<<"=impl_off=CK_ALIGN(impl_off,sizeof("<<dt<<"));\n";
-		str<<"  impl_off+=(impl_cnt_"<<name<<"=sizeof("<<dt<<")*("<<arrLen<<"));\n";
-	}
-}
-void Parameter::pup(XStr &str) {
-	if (isArray()) {
-	   str<<"    implP|impl_off_"<<name<<";\n";
-	   str<<"    implP|impl_cnt_"<<name<<";\n";
-	}
-	else if (!conditional) {
-	  if (byReference) {
-	    str<<"    //Have to cast away const-ness to get pup routine\n";
-	    str<<"    implP|("<<type<<" &)"<<name<<";\n";
-	  }
-	  else
-	    str<<"    implP|"<<name<<";\n";
-	}
-}
-void Parameter::marshallArrayData(XStr &str)
-{
-	if (isArray())
-		str<<"  memcpy(impl_buf+impl_off_"<<name<<
-			","<<name<<",impl_cnt_"<<name<<");\n";
-}
-void Parameter::copyPtr(XStr &str)
-{
-  if (isConditional()) {
-    str<<"    impl_msg->"<<name<<"="<<name<<";\n";
+void ParamList::marshall(XStr& str, XStr& entry_str) {
+  if (isVoid())
+    str << "  void *impl_msg = CkAllocSysMsg(impl_e_opts);\n";
+  else if (isMarshalled()) {
+    str << "  //Marshall: ";
+    print(str, 0);
+    str << "\n";
+    // First pass: find sizes
+    str << "  int impl_off=0;\n";
+    int hasArrays = orEach(&Parameter::isArray);
+    if (hasArrays) {
+      str << "  int impl_arrstart=0;\n";
+      callEach(&Parameter::marshallRegArraySizes, str);
+    }
+    bool hasrdma = hasRdma();
+    bool hasrecvrdma = hasRecvRdma();
+    if (hasrdma) {
+      str << "#if CMK_ONESIDED_IMPL\n";
+      str << "  int impl_num_rdma_fields = "<<entry->numRdmaSendParams + entry->numRdmaRecvParams<<";\n";
+      callEach(&Parameter::marshallRdmaParameters, str, true);
+      str << "#else\n";
+      if (!hasArrays) str << "  int impl_arrstart=0;\n";
+      callEach(&Parameter::marshallRdmaParameters, str, false);
+      str << "#endif\n";
+    }
+    str << "  { //Find the size of the PUP'd data\n";
+    str << "    PUP::sizer implP;\n";
+    callEach(&Parameter::pup, str);
+    if (hasrdma) {
+      str << "#if CMK_ONESIDED_IMPL\n";
+      str << "    implP|impl_num_rdma_fields;\n";
+      // All rdma parameters have to be pupped at the start
+      callEach(&Parameter::pupRdma, str, true);
+      str << "#else\n";
+      callEach(&Parameter::pupRdma, str, false);
+      if (!hasArrays) {
+        str << "    impl_arrstart=CK_ALIGN(implP.size(),16);\n";
+        str << "    impl_off+=impl_arrstart;\n";
+      }
+      str << "#endif\n";
+    }
+    if (hasArrays) { /*round up pup'd data length--that's the first array*/
+      str << "    impl_arrstart=CK_ALIGN(implP.size(),16);\n";
+      str << "    impl_off+=impl_arrstart;\n";
+    } else /*No arrays--no padding*/
+      str << "    impl_off+=implP.size();\n";
+    str << "  }\n";
+    // Now that we know the size, allocate the packing buffer
+    if (hasConditional())
+      str << "  MarshallMsg_" << entry_str << " *impl_msg=CkAllocateMarshallMsgT<MarshallMsg_"
+          << entry_str << ">(impl_off,impl_e_opts);\n";
+    else
+      str << "  CkMarshallMsg *impl_msg=CkAllocateMarshallMsg(impl_off,impl_e_opts);\n";
+    // Second pass: write the data
+    str << "  { //Copy over the PUP'd data\n";
+    str << "    PUP::toMem implP((void *)impl_msg->msgBuf);\n";
+    if (hasRdma()) {
+      str << "#if CMK_ONESIDED_IMPL\n";
+      str << "    implP|impl_num_rdma_fields;\n";
+      callEach(&Parameter::pupRdma, str, true);
+      str << "#else\n";
+      callEach(&Parameter::pupRdma, str, false);
+      str << "#endif\n";
+    }
+    callEach(&Parameter::pup, str);
+    callEach(&Parameter::copyPtr, str);
+    str << "  }\n";
+    if (hasArrays) {  // Marshall each array
+      str << "  char *impl_buf=impl_msg->msgBuf+impl_arrstart;\n";
+      callEach(&Parameter::marshallArrayData, str);
+    }
+    if (hasrdma) {
+      str << "#if CMK_ONESIDED_IMPL\n";
+      Chare *container = entry->getContainer();
+      if(container->isChare() || container->isForElement()) {
+        if(hasSendRdma())
+          str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_P2P_SEND_MSG;\n";
+        else if(hasrecvrdma)
+          str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_P2P_RECV_MSG;\n";
+      } else { // Mark a Ncpy Bcast message to intercept it in the send code path
+        if(hasSendRdma())
+          str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_BCAST_SEND_MSG;\n";
+        else if(hasrecvrdma)
+          str << "  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_BCAST_RECV_MSG;\n";
+      }
+      str << "#else\n";
+      if (!hasArrays) str << "  char *impl_buf=impl_msg->msgBuf+impl_arrstart;\n";
+      callEach(&Parameter::marshallRdmaArrayData, str);
+      str << "#endif\n";
+    }
   }
 }
 
-void ParamList::beginRednWrapperUnmarshall(XStr &str, bool isSDAGGen) {
-  if (isSDAGGen) {
-    str << *entry->genClosureTypeNameProxyTemp << "*"
-        << " genClosure = new " << *entry->genClosureTypeNameProxyTemp << "()" << ";\n";
+void Parameter::check() {
+  Type* dt = type->deref();
+  checkPointer(dt);
+}
+
+void Parameter::checkPointer(Type* dt) {
+  if (dt->isPointer())
+    XLAT_ERROR_NOCOL(
+        "can't pass pointers across processors--\n"
+        "Indicate the array length with []'s, or pass a reference",
+        line);
+}
+
+void Parameter::marshallArraySizes(XStr& str, Type* dt) {
+  str << "  int impl_off_" << name << ", impl_cnt_" << name << ";\n";
+  str << "  impl_off_" << name << "=impl_off=CK_ALIGN(impl_off,sizeof(" << dt << "));\n";
+  str << "  impl_off+=(impl_cnt_" << name << "=sizeof(" << dt << ")*(" << arrLen
+      << "));\n";
+}
+
+void Parameter::marshallRegArraySizes(XStr& str) {
+  Type* dt = type->deref();
+  if (isArray()) marshallArraySizes(str, dt);
+}
+
+void Parameter::marshallRdmaParameters(XStr& str, bool genRdma) {
+  if (isRdma()) {
+    Type* dt = type->deref();  // Type, without &
+    if (genRdma) {
+      str << "  ncpyBuffer_" << name << ".cnt=sizeof(" << dt << ")*(" << arrLen
+          << ");\n";
+      str << "  ncpyBuffer_" << name << ".registerMem()" << ";\n";
+    } else {
+      marshallArraySizes(str, dt);
+    }
   }
-
-    if (isMarshalled())
-    {
-        str<<"  /*Unmarshall pup'd fields: ";print(str,0);str<<"*/\n";
-        str<<"  PUP::fromMem implP(impl_buf);\n";
-        if (next != NULL && next->next == NULL) {
-	  // 2 argument case - special cases for an array and its length, in either order
-	  if (isArray() && !next->isArray()) {
-              if (!isSDAGGen) {
-                Type* dtLen = next->param->type->deref();
-                str << "  " << dtLen << " " << next->param->name << "; "
-                    << next->param->name << " = "
-                    << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
-                    << param->type->deref() << ");\n";
-                Type *dt = param->type->deref();
-                str << "  " << dt << "* " << param->name << "; "
-                    << param->name << " = (" << dt << "*)impl_buf;\n";
-              } else {
-                str << "  genClosure->" << next->param->name << " = "
-                    << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
-                    << param->type->deref() << ");\n";
-                Type* dt = param->type->deref();
-                str << "  genClosure->" << param->name << " = (" << dt << "*)impl_buf;\n";
-              }
-	  } else if (!isArray() && next->isArray()) {
-              if (!isSDAGGen) {
-                Type* dt = param->type->deref();
-                str << "  " << dt << " " << param->name << "; "
-                    << param->name << " = "
-                    << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
-                    << next->param->type->deref() << ");\n";
-                dt = next->param->type->deref();
-                str << "  " << dt << "* " << next->param->name << "; "
-                    << next->param->name << " = (" << dt << "*)impl_buf;\n";
-              } else {
-                str << "  genClosure->" << param->name << " = "
-                    << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
-                    << next->param->type->deref() << ");\n";
-                Type* dt = next->param->type->deref();
-                str << "  genClosure->" << next->param->name << " = (" << dt << "*)impl_buf;\n";
-              }
-	  } else {
-              if (!isSDAGGen)
-                callEach(&Parameter::beginUnmarshall,str);
-              else
-                callEach(&Parameter::beginUnmarshallSDAGCall,str);
-	  }
-        } else if (next == NULL && isArray()) {
-	  // 1 argument case - special case for a standalone array
-	  Type *dt = param->type->deref();
-	  if (!isSDAGGen) {
-	    str << "  " << dt << "* " << param->name << "; "
-		<< param->name << " = (" << dt << "*)impl_buf;\n";
-	  } else {
-	    str << "  genClosure->" << param->name << " = (" << dt << "*)impl_buf;\n";
-	  }
-	} else {
-            str << "  /* non two-param case */\n";
-            if (!isSDAGGen)
-              callEach(&Parameter::beginUnmarshall,str);
-            else
-              callEach(&Parameter::beginUnmarshallSDAGCall,str);
-            str<<"  impl_buf+=CK_ALIGN(implP.size(),16);\n";
-            str<<"  /*Unmarshall arrays:*/\n";
-            if (!isSDAGGen)
-              callEach(&Parameter::unmarshallArrayData,str);
-            else
-              callEach(&Parameter::unmarshallArrayDataSDAGCall,str);
-        }
-    }
 }
 
-/** unmarshalling: unpack fields from flat buffer **/
-void ParamList::beginUnmarshall(XStr &str)
-{
-    if (isMarshalled())
-    {
-        str<<"  /*Unmarshall pup'd fields: ";print(str,0);str<<"*/\n";
-        str<<"  PUP::fromMem implP(impl_buf);\n";
-        callEach(&Parameter::beginUnmarshall,str);
-        str<<"  impl_buf+=CK_ALIGN(implP.size(),16);\n";
-        str<<"  /*Unmarshall arrays:*/\n";
-        callEach(&Parameter::unmarshallArrayData,str);
-    }
-}
-void Parameter::beginUnmarshall(XStr &str)
-{ //First pass: unpack pup'd entries
-	Type *dt=type->deref();//Type, without &
-	if (isArray()) {
-		str<<"  int impl_off_"<<name<<", impl_cnt_"<<name<<"; \n";
-		str<<"  implP|impl_off_"<<name<<";\n";
-		str<<"  implP|impl_cnt_"<<name<<";\n";
-	}
-	else if (isConditional())
-        str<<"  "<<dt<<" *"<<name<<"=impl_msg_typed->"<<name<<";\n";
-	else
-		str<<"  "<<dt<<" "<<name<<"; implP|"<<name<<";\n";
+void Parameter::pupRdma(XStr& str, bool genRdma) {
+  if (isRdma()) {
+    if (genRdma)
+      str << "    implP|ncpyBuffer_" << name << ";\n";
+    else
+      pupArray(str);
+  }
 }
 
-void Parameter::beginUnmarshallSDAGCall(XStr &str) {
-  Type *dt=type->deref();
+void Parameter::pupArray(XStr& str) {
+  str << "    implP|impl_off_" << name << ";\n";
+  str << "    implP|impl_cnt_" << name << ";\n";
+}
+
+void Parameter::pup(XStr& str) {
   if (isArray()) {
-    str << "  int impl_off_" << name << ", impl_cnt_" << name << "; \n";
-    str << "  implP|impl_off_" << name << ";\n";
-    str << "  implP|impl_cnt_" << name << ";\n";
-  } else
-    str << "  implP|" << (podType ? "" : "*") << "genClosure->" << name << ";\n";
+    pupArray(str);
+  } else if (!conditional) {
+    if (byReference) {
+      str << "    //Have to cast away const-ness to get pup routine\n";
+      str << "    implP|(typename std::remove_cv<typename std::remove_reference<" << type << ">::type>::type &)" << name << ";\n";
+    } else if (!isRdma())
+      str << "    implP|" << name << ";\n";
+  }
 }
 
+void Parameter::marshallRdmaArrayData(XStr& str) {
+  if (isRdma()) {
+    str << "  memcpy(impl_buf+impl_off_" << name << ","
+        << "ncpyBuffer_" << name << ".ptr"
+        << ",impl_cnt_" << name << ");\n";
+    str << "  ncpyBuffer_" << name << ".cb.send("
+        << "sizeof(CkNcpyBuffer)"
+        << ","
+        << "&ncpyBuffer_" << name
+        << ");\n";
+  }
+}
+
+void Parameter::marshallArrayData(XStr& str) {
+  if (isArray())
+    str << "  memcpy(impl_buf+impl_off_" << name << "," << name << ",impl_cnt_" << name
+        << ");\n";
+}
+
+void Parameter::copyPtr(XStr& str) {
+  if (isConditional()) {
+    str << "    impl_msg->" << name << "=" << name << ";\n";
+  }
+}
+
+void ParamList::beginRednWrapperUnmarshall(XStr& str, bool needsClosure) {
+  if (needsClosure) {
+    str << *entry->genClosureTypeNameProxyTemp << "*"
+        << " genClosure = new " << *entry->genClosureTypeNameProxyTemp << "()"
+        << ";\n";
+  }
+
+  if (isMarshalled()) {
+    str << "  /*Unmarshall pup'd fields: ";
+    print(str, 0);
+    str << "*/\n";
+    str << "  PUP::fromMem implP(impl_buf);\n";
+    if (next != NULL && next->next == NULL) {
+      // 2 argument case - special cases for an array and its length, in either order
+      if (isArray() && !next->isArray()) {
+        if (!needsClosure) {
+          Type* dtLen = next->param->type->deref();
+          str << "  PUP::detail::TemporaryObjectHolder<" << dtLen << "> "
+              << next->param->name << "; " << next->param->name << ".t = "
+              << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
+              << param->type->deref() << ");\n";
+          Type* dt = param->type->deref();
+          str << "  " << dt << "* " << param->name << "; " << param->name << " = (" << dt
+              << "*)impl_buf;\n";
+        } else {
+          str << "  genClosure->" << next->param->name << " = "
+              << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
+              << param->type->deref() << ");\n";
+          Type* dt = param->type->deref();
+          str << "  genClosure->" << param->name << " = (" << dt << "*)impl_buf;\n";
+        }
+      } else if (!isArray() && next->isArray()) {
+        if (!needsClosure) {
+          Type* dt = param->type->deref();
+          str << "  PUP::detail::TemporaryObjectHolder<" << dt << "> " << param->name
+              << "; " << param->name << ".t = "
+              << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
+              << next->param->type->deref() << ");\n";
+          dt = next->param->type->deref();
+          str << "  " << dt << "* " << next->param->name << "; " << next->param->name
+              << " = (" << dt << "*)impl_buf;\n";
+        } else {
+          str << "  genClosure->" << param->name << " = "
+              << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
+              << next->param->type->deref() << ");\n";
+          Type* dt = next->param->type->deref();
+          str << "  genClosure->" << next->param->name << " = (" << dt << "*)impl_buf;\n";
+        }
+      } else {
+        if (!needsClosure) {
+          if (hasRdma()) {
+            str << "#if CMK_ONESIDED_IMPL\n";
+            str << "  char *impl_buf_begin = impl_buf;\n";
+            if(hasRecvRdma())
+              //str << "  if(!CMI_IS_ZC_RECV(env))\n";
+              //str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG)\n";
+              str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
+            str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
+            str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
+            callEach(&Parameter::beginUnmarshallRdma, str, true);
+            str << "#else\n";
+            callEach(&Parameter::beginUnmarshallRdma, str, false);
+            str << "#endif\n";
+          }
+          callEach(&Parameter::beginUnmarshall, str);
+        } else {
+          if (hasRdma()) {
+            str << "#if CMK_ONESIDED_IMPL\n";
+            str << "  char *impl_buf_begin = impl_buf;\n";
+            if(hasRecvRdma())
+              //str << "  if(!CMI_IS_ZC_RECV(env))\n";
+              //str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG)\n";
+              str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
+            str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
+            callEach(&Parameter::beginUnmarshallSDAGCallRdma, str, true);
+            str << "#else\n";
+            callEach(&Parameter::beginUnmarshallSDAGCallRdma, str, false);
+            str << "#endif\n";
+          }
+          callEach(&Parameter::beginUnmarshallSDAGCall, str);
+        }
+      }
+    } else if (next == NULL && isArray()) {
+      // 1 argument case - special case for a standalone array
+      Type* dt = param->type->deref();
+      if (!needsClosure) {
+        str << "  " << dt << "* " << param->name << "; " << param->name << " = (" << dt
+            << "*)impl_buf;\n";
+      } else {
+        str << "  genClosure->" << param->name << " = (" << dt << "*)impl_buf;\n";
+      }
+    } else {
+      str << "  /* non two-param case */\n";
+      if (!needsClosure) {
+        if (hasRdma()) {
+          str << "#if CMK_ONESIDED_IMPL\n";
+          str << "  char *impl_buf_begin = impl_buf;\n";
+          if(hasRecvRdma())
+            //str << "  if(!CMI_IS_ZC_RECV(env))\n";
+            //str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG)\n";
+            str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
+          str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
+          str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
+          callEach(&Parameter::beginUnmarshallRdma, str, true);
+          str << "#else\n";
+          callEach(&Parameter::beginUnmarshallRdma, str, false);
+          str << "#endif\n";
+        }
+        callEach(&Parameter::beginUnmarshall, str);
+      } else
+        callEach(&Parameter::beginUnmarshallSDAGCall, str);
+      str << "  impl_buf+=CK_ALIGN(implP.size(),16);\n";
+      str << "  /*Unmarshall arrays:*/\n";
+      if (!needsClosure)
+        callEach(&Parameter::unmarshallRegArrayData, str);
+      else
+        callEach(&Parameter::unmarshallRegArrayDataSDAGCall, str);
+    }
+  }
+  if (needsClosure) {
+    str << "  genClosure->setRefnum(CkGetRefNum((CkReductionMsg*)impl_msg));\n";
+  }
+}
 
 /** unmarshalling: unpack fields from flat buffer **/
-void ParamList::beginUnmarshallSDAGCall(XStr &str, bool usesImplBuf) {
+void ParamList::beginUnmarshall(XStr& str) {
+  if (isMarshalled()) {
+    str << "  /*Unmarshall pup'd fields: ";
+    print(str, 0);
+    str << "*/\n";
+    str << "  PUP::fromMem implP(impl_buf);\n";
+    if (hasRdma()) {
+      str << "#if CMK_ONESIDED_IMPL\n";
+      str << "  char *impl_buf_begin = impl_buf;\n";
+      if(hasRecvRdma())
+        //str << "  if(!CMI_IS_ZC_RECV(env))\n";
+        //str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG)\n";
+        str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
+      str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
+      str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields; \n";
+      callEach(&Parameter::beginUnmarshallRdma, str, true);
+      str << "#else\n";
+      callEach(&Parameter::beginUnmarshallRdma, str, false);
+      str << "#endif\n";
+      if (hasRecvRdma()) {
+        str << "  CkNcpyBufferPost ncpyPost[" << entry->numRdmaRecvParams << "];\n";
+        for(int index=0; index < entry->numRdmaRecvParams; index++) {
+          str << "  ncpyPost[" <<index<<  "].regMode = CK_BUFFER_REG;\n";
+          str << "  ncpyPost[" <<index<<  "].deregMode = CK_BUFFER_DEREG;\n";
+        }
+      }
+    }
+    callEach(&Parameter::beginUnmarshall, str);
+    str << "  impl_buf+=CK_ALIGN(implP.size(),16);\n";
+    str << "  /*Unmarshall arrays:*/\n";
+    callEach(&Parameter::unmarshallRegArrayData, str);
+    if (hasRdma()) {
+      str << "#if !CMK_ONESIDED_IMPL\n";
+      callEach(&Parameter::unmarshallRdmaArrayData, str, true);
+      str << "#endif\n";
+    }
+  }
+}
+
+void ParamList::storePostedRdmaPtrs(XStr& str, bool isSDAGGen) {
+  str << "#if CMK_ONESIDED_IMPL\n";
+  callEach(&Parameter::storePostedRdmaPtrs, str, true, isSDAGGen);
+  str << "#else\n";
+  callEach(&Parameter::storePostedRdmaPtrs, str, false, isSDAGGen);
+  str << "#endif\n";
+}
+
+void Parameter::storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, int &count) {
+  if(isRdma()) {
+    if(genRdma) {
+      str << "  if(CMI_IS_ZC_RECV(env)) \n";
+      str << "    buffPtrs["<< count++ <<"] = (void *)" << "ncpyBuffer_";
+      str << name << "_ptr;\n";
+
+      str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) \n";
+      str << "    memcpy(" << "ncpyBuffer_" << name << "_ptr,";
+      if(isSDAGGen)
+        str << "genClosure->";
+      str << "ncpyBuffer_" << name << ".ptr,";
+      if(isSDAGGen)
+        str << "genClosure->";
+      str << "ncpyBuffer_" << name << ".cnt);\n";
+    } else {
+      Type* dt = type->deref();  // Type, without &
+      // memcpy the pointer into the user passed buffer
+      str << "  memcpy(" << "ncpyBuffer_" << name << "_ptr,";
+      if(isSDAGGen)
+        str << "genClosure->";
+      str << name << "," << "impl_cnt_" << name << ");\n";
+    }
+  }
+}
+
+void Parameter::beginUnmarshallArray(XStr& str) {
+  str << "  int impl_off_" << name << ", impl_cnt_" << name << ";\n";
+  str << "  implP|impl_off_" << name << ";\n";
+  str << "  implP|impl_cnt_" << name << ";\n";
+
+  if(isRecvRdma()) {
+    Type* dt = type->deref();                          // Type, without &
+    str << "  " << dt << " *ncpyBuffer_" << name <<"_ptr = NULL;\n";
+  }
+}
+
+void Parameter::beginUnmarshallRdma(XStr& str,
+                                    bool genRdma) {  // First pass: unpack pup'd entries
+  Type* dt = type->deref();                          // Type, without &
+  if (isRdma()) {
+    if (genRdma) {
+      str << "  CkNcpyBuffer ncpyBuffer_" << name << ";\n";
+      str << "  implP|ncpyBuffer_" << name << ";\n";
+
+      str << "  " << dt << " *ncpyBuffer_" << name <<"_ptr = ";
+      str << "("<<dt<< " *)" << " ncpyBuffer_" << name <<".ptr;\n";
+    } else
+      beginUnmarshallArray(str);
+  }
+}
+
+void Parameter::beginUnmarshall(XStr& str) {  // First pass: unpack pup'd entries
+  Type* dt = type->deref();                   // Type, without &
+  if (isArray())
+    beginUnmarshallArray(str);
+  else if (isConditional())
+    str << "  " << dt << " *" << name << "=impl_msg_typed->" << name << ";\n";
+  else if (!isRdma())
+    str << "  PUP::detail::TemporaryObjectHolder<" << dt << "> " << name << ";\n"
+        << "  "
+        << "implP|" << name << ";\n";
+}
+
+void Parameter::beginUnmarshallSDAGCallRdma(XStr& str, bool genRdma) {
+  if (isRdma()) {
+    if (genRdma) {
+      if (isFirstRdma()) {
+        str << "  implP|genClosure->num_rdma_fields;\n";
+      }
+      str << "  implP|genClosure->ncpyBuffer_" << name << ";\n";
+      if(isRecvRdma()) {
+        Type* dt = type->deref();
+        str << "  " << dt << " *ncpyBuffer_" << name <<"_ptr = ";
+        str << "("<<dt<< " *)" << " (genClosure->ncpyBuffer_" << name <<").ptr;\n";
+      }
+    } else {
+      beginUnmarshallArray(str);
+    }
+  }
+}
+
+void Parameter::beginUnmarshallSDAGCall(XStr& str) {
+  Type* dt = type->deref();
+  if (isArray()) {
+    beginUnmarshallArray(str);
+  } else if (isRdma()) {
+    // unmarshalled before regular parameters
+  } else {
+    str << "  implP|" << (podType ? "" : "*") << "genClosure->" << name << ";\n";
+  }
+}
+
+/** unmarshalling: unpack fields from flat buffer **/
+void ParamList::beginUnmarshallSDAGCall(XStr& str, bool usesImplBuf) {
   bool hasArray = false;
   for (ParamList* pl = this; pl != NULL; pl = pl->next) {
     hasArray = hasArray || pl->param->isArray();
@@ -404,215 +659,371 @@ void ParamList::beginUnmarshallSDAGCall(XStr &str, bool usesImplBuf) {
 
   if (isMarshalled()) {
     str << "  PUP::fromMem implP(impl_buf);\n";
-    str << "  " << *entry->genClosureTypeNameProxyTemp << "*" <<
-      " genClosure = new " << *entry->genClosureTypeNameProxyTemp << "()" << ";\n";
+    str << "  " << *entry->genClosureTypeNameProxyTemp << "*"
+        << " genClosure = new " << *entry->genClosureTypeNameProxyTemp << "()"
+        << ";\n";
+    if (hasRdma()) {
+      if(hasRecvRdma()) {
+        str << "  CkNcpyBufferPost ncpyPost[" << entry->numRdmaRecvParams << "];\n";
+        for(int index=0; index < entry->numRdmaRecvParams; index++) {
+          str << "  ncpyPost[" <<index<<  "].regMode = CK_BUFFER_REG;\n";
+          str << "  ncpyPost[" <<index<<  "].deregMode = CK_BUFFER_DEREG;\n";
+        }
+      }
+      str << "#if CMK_ONESIDED_IMPL\n";
+      str << "  char *impl_buf_begin = impl_buf;\n";
+      if(hasRecvRdma())
+        //str << "  if(!CMI_IS_ZC_RECV(env))\n";
+        str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
+      str << "    CkUnpackRdmaPtrs(impl_buf_begin);\n";
+      callEach(&Parameter::beginUnmarshallSDAGCallRdma, str, true);
+      str << "#else\n";
+      callEach(&Parameter::beginUnmarshallSDAGCallRdma, str, false);
+      str << "#endif\n";
+    }
     callEach(&Parameter::beginUnmarshallSDAGCall, str);
     str << "  impl_buf+=CK_ALIGN(implP.size(),16);\n";
-    callEach(&Parameter::unmarshallArrayDataSDAGCall,str);
-    if (hasArray) {
+    if (hasRdma()) str << "#if !CMK_ONESIDED_IMPL\n";
+    callEach(&Parameter::unmarshallRdmaArrayDataSDAGCall, str);
+    if (hasRdma()) str << "#endif\n";
+    callEach(&Parameter::unmarshallRegArrayDataSDAGCall, str);
+    if (hasArray || hasRdma()) {
       if (!usesImplBuf) {
         str << "  genClosure->_impl_marshall = impl_msg_typed;\n";
         str << "  CmiReference(UsrToEnv(genClosure->_impl_marshall));\n";
       } else {
+        if (hasRdma() && !hasArray) str << "#if !CMK_ONESIDED_IMPL\n";
         str << "  genClosure->_impl_buf_in = impl_buf;\n";
         str << "  genClosure->_impl_buf_size = implP.size();\n";
+        if (hasRdma() && !hasArray) str << "#endif\n";
       }
     }
   }
 }
-void ParamList::beginUnmarshallSDAG(XStr &str) {
+void ParamList::beginUnmarshallSDAG(XStr& str) {
   if (isMarshalled()) {
     str << "          PUP::fromMem implP(impl_buf);\n";
-    callEach(&Parameter::beginUnmarshall,str);
+    if (hasRdma()) {
+      str << "#if CMK_ONESIDED_IMPL\n";
+      /* Before migration of the closure structure, Rdmawrapper pointers
+       * store the offset to the actual buffer from the msgBuf
+       * After migration, the Rdmawrapper pointer needs to be adjusted
+       * to point to the msgBuf + offset. As the actual buffer is within
+       * the message, the adjusting should happen after the message is
+       * unpacked. (see code in Entry::genClosure)
+       */
+      callEach(&Parameter::adjustUnmarshalledRdmaPtrsSDAG, str);
+      str << "  implP|num_rdma_fields;\n";
+      callEach(&Parameter::beginUnmarshallRdma, str, true);
+      str << "#else\n";
+      callEach(&Parameter::beginUnmarshallRdma, str, false);
+      str << "#endif\n";
+    }
+    callEach(&Parameter::beginUnmarshall, str);
     str << "          impl_buf+=CK_ALIGN(implP.size(),16);\n";
-    callEach(&Parameter::unmarshallArrayDataSDAG,str);
-  }
-}
-void Parameter::unmarshallArrayDataSDAG(XStr &str) {
-  if (isArray()) {
-    Type *dt=type->deref();//Type, without &
-    str << "          " << name << " = ("<<dt<<" *)(impl_buf+impl_off_" << name << ");\n";
-  }
-}
-void Parameter::unmarshallArrayDataSDAGCall(XStr &str) {
-  if (isArray()) {
-    Type *dt=type->deref();//Type, without &
-    str << "  genClosure->" << name << " = (" << dt << " *)(impl_buf+impl_off_" << name << ");\n";
+    // If there's no rdma support, unmarshall as a regular array
+    str << "#if !CMK_ONESIDED_IMPL\n";
+    callEach(&Parameter::unmarshallRdmaArrayDataSDAG, str);
+    str << "#endif\n";
+    callEach(&Parameter::unmarshallRegArrayDataSDAG, str);
   }
 }
 
-void ParamList::unmarshallSDAGCall(XStr &str, int isFirst) {
-  if (isFirst && isMessage()) str<<"("<<param->type<<")impl_msg";
+void Parameter::unmarshallRegArrayDataSDAG(XStr& str) {
+  if (isArray()) {
+    Type* dt = type->deref();  // Type, without &
+    str << "          " << name << " = (" << dt << " *)(impl_buf+impl_off_" << name
+        << ");\n";
+  }
+}
+
+void Parameter::adjustUnmarshalledRdmaPtrsSDAG(XStr& str) {
+  if (isRdma()) {
+    str << "  ncpyBuffer_" << name << ".ptr = ";
+    str << "(void *)(impl_buf + (size_t)(ncpyBuffer_" << name << ".ptr));\n";
+  }
+}
+
+void Parameter::unmarshallRdmaArrayDataSDAG(XStr& str) {
+  if (isRdma()) {
+    Type* dt = type->deref();  // Type, without &
+    str << "          " << name << " = (" << dt << " *)(impl_buf+impl_off_" << name
+        << ");\n";
+  }
+}
+
+void Parameter::unmarshallRegArrayDataSDAGCall(XStr& str) {
+  if (isArray()) {
+    Type* dt = type->deref();  // Type, without &
+    str << "  genClosure->" << name << " = (" << dt << " *)(impl_buf+impl_off_" << name
+        << ");\n";
+  }
+}
+
+void Parameter::unmarshallRdmaArrayDataSDAGCall(XStr& str) {
+  if (isRdma()) {
+    Type* dt = type->deref();  // Type, without &
+    str << "  genClosure->" << name << " = (" << dt << " *)(impl_buf+impl_off_" << name
+        << ");\n";
+  }
+}
+
+void ParamList::unmarshallSDAGCall(XStr& str, int isFirst) {
+  if (isFirst && isMessage())
+    str << "(" << param->type << ")impl_msg";
   else if (!isVoid()) {
     str << "genClosure->";
     str << param->getName();
     if (next) {
-      str<<", ";
+      str << ", ";
       next->unmarshallSDAGCall(str, 0);
     }
   }
 }
 
-
-void Parameter::unmarshallArrayData(XStr &str)
-{ //Second pass: unpack pointed-to arrays
-	if (isArray()) {
-		Type *dt=type->deref();//Type, without &
-		str<<"  "<<dt<<" *"<<name<<"=("<<dt<<" *)(impl_buf+impl_off_"<<name<<");\n";
-	}
+void Parameter::unmarshallArrayData(XStr& str) {
+  Type* dt = type->deref();  // Type, without &
+  str << "  " << dt << " *" << name << "=(" << dt << " *)(impl_buf+impl_off_" << name
+      << ");\n";
 }
 
-void ParamList::unmarshall(XStr &str, int isFirst)  //Pass-by-value
+void Parameter::unmarshallRdmaArrayData(XStr& str, bool genRegArray) {
+  if (isRdma() && genRegArray) unmarshallArrayData(str);
+}
+
+void Parameter::unmarshallRegArrayData(
+    XStr& str) {  // Second pass: unpack pointed-to arrays
+  if (isArray()) unmarshallArrayData(str);
+}
+
+void ParamList::unmarshall(XStr& str, bool isInline, bool isFirst, bool isRdmaPost)  // Pass-by-value
 {
-    	if (isFirst && isMessage()) str<<"("<<param->type<<")impl_msg";
-    	else if (!isVoid()) {
-    		str<<param->getName();
-		if (next) {
-    			str<<", ";
-    			next->unmarshall(str, 0);
-    		}
-    	}
+  if (isFirst && isMessage())
+    str << "(" << param->type << ")impl_msg";
+  else if (!isVoid()) {
+    bool isSDAGGen = entry->sdagCon || entry->isWhenEntry;
+    if (param->isRdma()) {
+      str << "\n#if CMK_ONESIDED_IMPL\n";
+      str << "ncpyBuffer_" << param->getName() << "_ptr";
+      str << "\n#else\n";
+      // for recv rdma
+      if(param->isRecvRdma())
+        str << "ncpyBuffer_" << param->getName() << "_ptr";
+      else // for send rdma
+        str << param->getName();
+      str << "\n#endif\n";
+    } else if (param->isArray() || isInline) {
+      if(isRdmaPost && isSDAGGen) str << "genClosure->";
+      str << param->getName();
+    } else {
+      if(isRdmaPost) {
+        if(isSDAGGen)
+          str << "genClosure->" << param->getName();
+        else
+          str << param->getName() << ".t ";
+      }
+      else
+        str << "std::move(" << param->getName() << ".t)";
+    }
+
+    if (next) {
+      str << ", ";
+      next->unmarshall(str, isInline, false, isRdmaPost);
+    }
+  }
 }
 
-void ParamList::unmarshallAddress(XStr &str, int isFirst)  //Pass-by-reference, for Fortran
+// Do forwarding for rvalue references, used for inline and local entry methods
+void ParamList::unmarshallForward(XStr& str,
+                                  bool isInline,
+                                  bool isFirst,
+                                  bool isRdmaPost,
+                                  int fwdNum)
 {
-    	if (isFirst && isMessage()) str<<"("<<param->type<<")impl_msg";
-    	else if (!isVoid()) {
-    		if (param->isArray()) str<<param->getName(); //Arrays are already pointers
-		else str<<"& "<<param->getName(); //Take address of simple types and structs
-		if (next) {
-    			str<<", ";
-    			next->unmarshallAddress(str, 0);
-    		}
-    	}
+  if (!isInline)
+    unmarshall(str, isInline, isFirst, isRdmaPost);
+  if (isReference()) {
+    str << "std::forward<Fwd" << fwdNum++ << ">(" << param->getName() << ")";
+    if (next) {
+      str << ", ";
+      next->unmarshallForward(str, isInline, false, isRdmaPost, fwdNum);
+    }
+  } else {
+    unmarshall(str, isInline, isFirst, isRdmaPost);
+  }
 }
 
-void ParamList::pupAllValues(XStr &str) {
-	if (isMarshalled())
-		callEach(&Parameter::pupAllValues,str);
-}
-
-void Parameter::pupAllValues(XStr &str) {
-	str<<"  if (implDestP.hasComments()) implDestP.comment(\""<<name<<"\");\n";
-	if (isArray()) {
-	  str<<
-	  "  implDestP.synchronize(PUP::sync_begin_array);\n"
-	  "  for (int impl_i=0;impl_i*(sizeof(*"<<name<<"))<impl_cnt_"<<name<<";impl_i++) {\n"
-	  "    implDestP.synchronize(PUP::sync_item);\n"
-	  "    implDestP|"<<name<<"[impl_i];\n"
-	  "  }\n"
-	  "  implDestP.synchronize(PUP::sync_end_array);\n"
-	  ;
-	}
-	else /* not an array */ {
-	  if (isConditional()) str<<"  pup_pointer(&implDestP, (void**)&"<<name<<");\n";
-	  else str<<"  implDestP|"<<name<<";\n";
-	}
-}
-
-void ParamList::endUnmarshall(XStr &)
+void ParamList::unmarshallAddress(XStr& str,
+                                  int isFirst)  // Pass-by-reference, for Fortran
 {
-	/* Marshalled entry points now have the "SNOKEEP" attribute...
-    	if (isMarshalled()) {
-    		str<<"  delete (CkMarshallMsg *)impl_msg;\n";
-    	}
-	*/
+  if (isFirst && isMessage())
+    str << "(" << param->type << ")impl_msg";
+  else if (!isVoid()) {
+    //@TODO : Case for RDMA
+    if (param->isArray())
+      str << param->getName();  // Arrays are already pointers
+    else
+      str << "& " << param->getName() << ".t";  // Take address of simple types and structs
+    if (next) {
+      str << ", ";
+      next->unmarshallAddress(str, 0);
+    }
+  }
+}
+
+void ParamList::pupAllValues(XStr& str) {
+  if (isMarshalled()) callEach(&Parameter::pupAllValues, str);
+}
+
+void Parameter::pupAllValues(XStr& str) {
+  str << "  if (implDestP.hasComments()) implDestP.comment(\"" << name << "\");\n";
+  if (isArray()) {
+    str << "  implDestP.synchronize(PUP::sync_begin_array);\n"
+           "  for (int impl_i=0;impl_i*(sizeof(*"
+        << name << "))<impl_cnt_" << name
+        << ";impl_i++) {\n"
+           "    implDestP.synchronize(PUP::sync_item);\n"
+           "    implDestP|"
+        << name
+        << "[impl_i];\n"
+           "  }\n"
+           "  implDestP.synchronize(PUP::sync_end_array);\n";
+  } else if (isRdma()) {
+    str << "#if CMK_ONESIDED_IMPL\n";
+    str << "  implDestP|ncpyBuffer_" << name << ";\n";
+    str << "#else\n";
+    str << "  implDestP.synchronize(PUP::sync_begin_array);\n"
+           "  { for (int impl_i=0;impl_i*(sizeof(*"
+        << name << "))<impl_cnt_" << name
+        << ";impl_i++) { \n"
+           "      implDestP.synchronize(PUP::sync_item);\n"
+           "      implDestP|"
+        << name
+        << "[impl_i];\n"
+           "  } } \n"
+           "  implDestP.synchronize(PUP::sync_end_array);\n";
+    str << "#endif\n";
+  } else /* not an array */ {
+    if (isConditional())
+      str << "  pup_pointer(&implDestP, (void**)&" << name << ");\n";
+    else
+      str << "  implDestP|" << name << ";\n";
+  }
+}
+
+void ParamList::endUnmarshall(XStr&) {
+  /* Marshalled entry points now have the "SNOKEEP" attribute...
+  if (isMarshalled()) {
+          str<<"  delete (CkMarshallMsg *)impl_msg;\n";
+  }
+  */
 }
 
 void ParamList::printMsg(XStr& str) {
-    ParamList *pl;
-    param->printMsg(str);
-    pl = next;
-    while (pl != NULL)
-    {
-       str <<", ";
-       pl->param->printMsg(str);
-       pl = pl->next;
-    } 
+  ParamList* pl;
+  param->printMsg(str);
+  pl = next;
+  while (pl != NULL) {
+    str << ", ";
+    pl->param->printMsg(str);
+    pl = pl->next;
+  }
 }
 
 void Parameter::printMsg(XStr& str) {
   type->print(str);
-  if(given_name!=0)
-    str <<given_name;
+  if (given_name != 0) str << given_name;
 }
 
-int Parameter::isMessage(void) const {return type->isMessage();}
-int Parameter::isVoid(void) const {return type->isVoid();}
-int Parameter::isCkArgMsgPtr(void) const {return type->isCkArgMsgPtr();}
-int Parameter::isCkMigMsgPtr(void) const {return type->isCkMigMsgPtr();}
-int Parameter::isArray(void) const {return arrLen!=NULL;}
-int Parameter::isConditional(void) const {return conditional;}
+int Parameter::isMessage(void) const { return type->isMessage(); }
+int Parameter::isVoid(void) const { return type->isVoid(); }
+int Parameter::isCkArgMsgPtr(void) const { return type->isCkArgMsgPtr(); }
+int Parameter::isCkMigMsgPtr(void) const { return type->isCkMigMsgPtr(); }
+int Parameter::isArray(void) const { return (arrLen != NULL && !isRdma()); }
+int Parameter::isConditional(void) const { return conditional; }
+int Parameter::isRdma(void) const { return (rdma != CMK_REG_NO_ZC_MSG); }
+int Parameter::isSendRdma(void) const { return (rdma == CMK_ZC_P2P_SEND_MSG); }
+int Parameter::isRecvRdma(void) const { return (rdma == CMK_ZC_P2P_RECV_MSG); }
+int Parameter::getRdma(void) const { return rdma; }
+int Parameter::isFirstRdma(void) const { return firstRdma; }
 
-int Parameter::operator==(const Parameter &parm) const {
-  return *type == *parm.type;
+int Parameter::operator==(const Parameter& parm) const { return *type == *parm.type; }
+
+void Parameter::setConditional(int c) {
+  conditional = c;
+  if (c) byReference = false;
 }
 
-void Parameter::setConditional(int c) { conditional = c; if (c) byReference = false; }
+void Parameter::setRdma(int r) { rdma = r; }
+
+void Parameter::setFirstRdma(bool fr) { firstRdma = fr; }
 
 void Parameter::setAccelBufferType(int abt) {
-  accelBufferType = ((abt < ACCEL_BUFFER_TYPE_MIN || abt > ACCEL_BUFFER_TYPE_MAX) ? (ACCEL_BUFFER_TYPE_UNKNOWN) : (abt));
+  accelBufferType = ((abt < ACCEL_BUFFER_TYPE_MIN || abt > ACCEL_BUFFER_TYPE_MAX)
+                         ? (ACCEL_BUFFER_TYPE_UNKNOWN)
+                         : (abt));
 }
 
-int   Parameter::getAccelBufferType() { return accelBufferType; }
-void  Parameter::setAccelInstName(XStr* ain) { accelInstName = ain; }
+int Parameter::getAccelBufferType() { return accelBufferType; }
+void Parameter::setAccelInstName(XStr* ain) { accelInstName = ain; }
 XStr* Parameter::getAccelInstName(void) { return accelInstName; }
 
-ParamList::ParamList(Parameter *Nparam,ParamList *Nnext)
-  :param(Nparam), next(Nnext) { 
-      manyPointers = false;
-      if(next != NULL && (param->isMessage() || next->isMessage())){
-        manyPointers = true;
-      }
-}
-
-int ParamList::isNamed(void) const {return param->type->isNamed();}
-int ParamList::isBuiltin(void) const {return param->type->isBuiltin();}
-int ParamList::isMessage(void) const {
-    return (next==NULL) && param->isMessage();
-}
-const char *ParamList::getArrayLen(void) const {return param->getArrayLen();}
-int ParamList::isArray(void) const {return param->isArray();}
-int ParamList::isReference(void) const {return param->type->isReference() || param->byReference;}
-int ParamList::declaredReference(void) const {return param->type->isReference() || param->declaredReference; }
-bool ParamList::isConst(void) const {return param->type->isConst() || param->byConst;}
-int ParamList::isVoid(void) const {
-    return (next==NULL) && param->isVoid();
-}
-int ParamList::isPointer(void) const {return param->type->isPointer();}
-const char *ParamList::getGivenName(void) const {return param->getGivenName();}
-void ParamList::setGivenName(const char* s) {param->setGivenName(s);}
-const char *ParamList::getName(void) const {return param->getName();}
-int ParamList::isMarshalled(void) const {
-    return !isVoid() && !isMessage();
-}
-int ParamList::isCkArgMsgPtr(void) const {
-    return (next==NULL) && param->isCkArgMsgPtr();
-}
-int ParamList::isCkMigMsgPtr(void) const {
-    return (next==NULL) && param->isCkMigMsgPtr();
-}
-int ParamList::getNumStars(void) const {return param->type->getNumStars(); }
-const char *ParamList::getBaseName(void) {
-    return param->type->getBaseName();
-}
-void ParamList::genMsgProxyName(XStr &str) {
-    param->type->genMsgProxyName(str);
-}
-
-void ParamList::checkParamList(){
-  if (manyPointers) {
-    XLAT_ERROR_NOCOL("multiple pointers passed to a non-local entry method\n"
-                     "You may pass only a single pointer to it, which should point to a message.",
-                     param->line);
+ParamList::ParamList(Parameter* Nparam, ParamList* Nnext) : param(Nparam), next(Nnext) {
+  manyPointers = false;
+  if (next != NULL && (param->isMessage() || next->isMessage())) {
+    manyPointers = true;
   }
 }
 
-int ParamList::operator==(ParamList &plist) {
+int ParamList::isNamed(void) const { return param->type->isNamed(); }
+int ParamList::isBuiltin(void) const { return param->type->isBuiltin(); }
+int ParamList::isMessage(void) const { return (next == NULL) && param->isMessage(); }
+int ParamList::hasRdma(void) { return orEach(&Parameter::isRdma); }
+int ParamList::hasSendRdma(void) { return orEach(&Parameter::isSendRdma); }
+int ParamList::hasRecvRdma(void) { return orEach(&Parameter::isRecvRdma); }
+int ParamList::isRdma(void) { return param->isRdma(); }
+int ParamList::getRdma(void) { return param->getRdma(); }
+int ParamList::isFirstRdma(void) { return param->isFirstRdma(); }
+int ParamList::isRecvRdma(void) { return param->isRecvRdma(); }
+const char* ParamList::getArrayLen(void) const { return param->getArrayLen(); }
+int ParamList::isArray(void) const { return param->isArray(); }
+int ParamList::isReference(void) const {
+  return param->type->isReference() || param->byReference;
+}
+int ParamList::declaredReference(void) const {
+  return param->type->isReference() || param->declaredReference;
+}
+bool ParamList::isConst(void) const { return param->type->isConst() || param->byConst; }
+int ParamList::isVoid(void) const { return (next == NULL) && param->isVoid(); }
+int ParamList::isPointer(void) const { return param->type->isPointer(); }
+const char* ParamList::getGivenName(void) const { return param->getGivenName(); }
+void ParamList::setGivenName(const char* s) { param->setGivenName(s); }
+const char* ParamList::getName(void) const { return param->getName(); }
+int ParamList::isMarshalled(void) const { return !isVoid() && !isMessage(); }
+int ParamList::isCkArgMsgPtr(void) const {
+  return (next == NULL) && param->isCkArgMsgPtr();
+}
+int ParamList::isCkMigMsgPtr(void) const {
+  return (next == NULL) && param->isCkMigMsgPtr();
+}
+int ParamList::getNumStars(void) const { return param->type->getNumStars(); }
+const char* ParamList::getBaseName(void) { return param->type->getBaseName(); }
+void ParamList::genMsgProxyName(XStr& str) { param->type->genMsgProxyName(str); }
+
+void ParamList::checkParamList() {
+  if (manyPointers) {
+    XLAT_ERROR_NOCOL(
+        "multiple pointers passed to a non-local entry method\n"
+        "You may pass only a single pointer to it, which should point to a message.",
+        param->line);
+  }
+}
+
+int ParamList::operator==(ParamList& plist) {
   if (!(*param == *(plist.param))) return 0;
   if (!next && !plist.next) return 1;
   if (!next || !plist.next) return 0;
-  return *next ==  *plist.next;
+  return *next == *plist.next;
 }
 
-}   // namespace xi
+}  // namespace xi

@@ -8,7 +8,7 @@
 #define CMK_DEFAULT_MAIN_USES_COMMON_CODE                  1
 
 #define CMK_GETPAGESIZE_AVAILABLE                          1
-#define CMK_MEMORY_PAGESIZE                                8192
+#define CMK_MEMORY_PAGESIZE                                4096
 #define CMK_MEMORY_PROTECTABLE                             1
 
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
@@ -27,7 +27,8 @@
 #define CMK_TIMER_USE_TIMES                                0
 #define CMK_TIMER_USE_RDTSC				   0
 
-#define CMK_THREADS_USE_CONTEXT                            1
+#define CMK_THREADS_USE_CONTEXT                            0
+#define CMK_THREADS_USE_FCONTEXT                           1
 #define CMK_THREADS_USE_PTHREADS                           0
 
 

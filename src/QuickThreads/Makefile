@@ -7,7 +7,7 @@ qt:
 	ln -s md/sparc.h qtmd.h
 	$(CC) -pedantic -Wall -c -o qt.o qt.c
 	as -o qtmds.o md/sparc.s
-	ar q libqt.a qt.o qtmds.o
+	ar q libckqt.a qt.o qtmds.o
 
 stp:
 	$(CC) -c stp.c
@@ -16,10 +16,10 @@ stp:
 testpgm:
 	$(CC) -c meas.c
 	as -o qtmdb.o md/sparc_b.s
-	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a
+	$(CC) -o run meas.o qtmdb.o libstp.a libckqt.a
 
 mostlyclean:
-	rm -f qtmd.h libqt.a libstp.a meas.o stp.o qt.o
+	rm -f qtmd.h libckqt.a libstp.a meas.o stp.o qt.o
 	rm -f qtmdb.s qtmds.s qtmdc.o qtmdb.o qtmds.o run
 
 clean: mostlyclean

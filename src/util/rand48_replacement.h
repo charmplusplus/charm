@@ -4,7 +4,7 @@
 #if !defined(RAND48_REPLACEMENT_H)
 #define RAND48_REPLACEMENT_H
 
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32)
 
 #include <stdlib.h>
 #define srand48(x) srand(x)

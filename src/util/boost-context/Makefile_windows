@@ -1,0 +1,11 @@
+include ../uFcontext.mk
+
+CDIR=../../
+CHARMC=../../bin/charmc
+
+.SUFFIXES : .asm .o
+
+all: 
+
+.asm.o:
+	$(CHARMC) -c $<

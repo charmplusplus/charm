@@ -141,9 +141,6 @@ void PUP::sizer::bytes(void * /*p*/,size_t n,size_t itemSize,dataType /*t*/)
 #ifdef CK_CHECK_PUP
 	nBytes+=sizeof(pupCheckRec);
 #endif
-#if CMK_ERROR_CHECKING
-	if (n<0) CmiAbort("PUP::sizer> Tried to pup a negative number of items!");
-#endif
 	nBytes+=n*itemSize;
 }
 
@@ -737,7 +734,9 @@ void PUP::fromTextFile::parseError(const char *what) {
   rewind(f);
   while (!feof(f)) {
      char c;
-     fscanf(f,"%c",&c);
+     if (fscanf(f,"%c",&c) != 1) {
+         CmiAbort("PUP> reading text from file failed!");
+     }
      if (c=='\n') lineno++;
      if (ftell(f) > cur) break;
   }
@@ -840,7 +839,9 @@ void PUP::fromTextFile::comment(const char *message)
   if (c!='!') return; //This isn't the start of a comment
   //Skip over the whole line containing the comment:
   char *commentBuf=(char *)CmiTmpAlloc(1024);
-  fgets(commentBuf,1024,f);
+  if (fgets(commentBuf,1024,f) == NULL) {
+    CmiAbort("PUP> skipping over comment in text file failed!");
+  }
   CmiTmpFree(commentBuf);
 }
 

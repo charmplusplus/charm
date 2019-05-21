@@ -11,6 +11,8 @@
 #include "GridMetisLB.h"
 #include "manager.h"
 
+extern int quietModeRequested;
+
 CreateLBFunc_Def (GridMetisLB, "Grid load balancer that uses Metis to optimize communication graph")
 
 
@@ -25,17 +27,17 @@ GridMetisLB::GridMetisLB (const CkLBOptions &opt) : CBase_GridMetisLB (opt)
 
   lbname = (char *) "GridMetisLB";
 
-  if (CkMyPe() == 0) {
-    CkPrintf ("[%d] GridMetisLB created.\n", CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested) {
+    CkPrintf ("CharmLB> GridMetisLB created.\n");
   }
 
-  if (value = getenv ("CK_LDB_GRIDMETISLB_MODE")) {
+  if ((value = getenv ("CK_LDB_GRIDMETISLB_MODE"))) {
     CK_LDB_GridMetisLB_Mode = atoi (value);
   } else {
     CK_LDB_GridMetisLB_Mode = CK_LDB_GRIDMETISLB_MODE;
   }
 
-  if (value = getenv ("CK_LDB_GRIDMETISLB_BACKGROUND_LOAD")) {
+  if ((value = getenv ("CK_LDB_GRIDMETISLB_BACKGROUND_LOAD"))) {
     CK_LDB_GridMetisLB_Background_Load = atoi (value);
   } else {
     CK_LDB_GridMetisLB_Background_Load = CK_LDB_GRIDMETISLB_BACKGROUND_LOAD;
@@ -56,13 +58,13 @@ GridMetisLB::GridMetisLB (CkMigrateMessage *msg) : CBase_GridMetisLB (msg)
 
   lbname = (char *) "GridMetisLB";
 
-  if (value = getenv ("CK_LDB_GRIDMETISLB_MODE")) {
+  if ((value = getenv ("CK_LDB_GRIDMETISLB_MODE"))) {
     CK_LDB_GridMetisLB_Mode = atoi (value);
   } else {
     CK_LDB_GridMetisLB_Mode = CK_LDB_GRIDMETISLB_MODE;
   }
 
-  if (value = getenv ("CK_LDB_GRIDMETISLB_BACKGROUND_LOAD")) {
+  if ((value = getenv ("CK_LDB_GRIDMETISLB_BACKGROUND_LOAD"))) {
     CK_LDB_GridMetisLB_Background_Load = atoi (value);
   } else {
     CK_LDB_GridMetisLB_Background_Load = CK_LDB_GRIDMETISLB_BACKGROUND_LOAD;
@@ -279,7 +281,7 @@ void GridMetisLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
   int recv_object;
   int send_index;
   int recv_index;
-  LDObjKey *recv_objects;
+  const LDObjKey *recv_objects;
   int num_objects;
   int *xadj;
   int num_edges;
@@ -525,7 +527,7 @@ void GridMetisLB::Partition_ClusterObjects_Into_PEs (CentralLB::LDStats *stats, 
   int recv_object;
   int send_index;
   int recv_index;
-  LDObjKey *recv_objects;
+  const LDObjKey *recv_objects;
   int num_objects;
   int *xadj;
   int num_edges;

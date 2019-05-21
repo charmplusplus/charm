@@ -15,7 +15,15 @@
 #include "tpm_standalone.h"
 #endif
 
-#if CMK_CRAYXT || CMK_CRAYXE || CMK_CRAYXC
+#ifndef CLINKAGE
+# ifdef __cplusplus
+#  define CLINKAGE extern "C"
+# else
+#  define CLINKAGE
+# endif
+#endif
+
+#if CMK_CRAYXE || CMK_CRAYXC
 
 #if XT3_TOPOLOGY
 #else	/* if it is a XT4/5 or XE */
@@ -28,7 +36,8 @@ CmiNodeLock  cray_lock, cray_lock2;
  *  returns nodeID corresponding to the MPI rank (possibly obtained
  *  from CmiMyNode()/CmiNodeOf(pe)) passed to it
  */
-int getXTNodeID(int mpirank, int nummpiranks) {
+CLINKAGE int getXTNodeID(int mpirank, int nummpiranks)
+{
   int nid = -1;
 
 #if CMK_HAS_PMI_GET_NID	/* if it is a XT4/5 or XE */
@@ -40,7 +49,7 @@ int getXTNodeID(int mpirank, int nummpiranks) {
   return nid;
 }
 
-#endif /* CMK_CRAYXT || CMK_CRAYXE || CMK_CRAYXC */
+#endif /* CMK_CRAYXE || CMK_CRAYXC */
 
 #if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 
@@ -48,7 +57,13 @@ int getXTNodeID(int mpirank, int nummpiranks) {
 #error "The Cray rca library is not available. Try 'module load rca' and rebuild"
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include <rca_lib.h>
+#ifdef __cplusplus
+}
+#endif
 
 int *pid2nid = NULL;            /* rank to node ID */
 int maxX = -1;
@@ -59,13 +74,14 @@ int maxNID = -1;
 rca_mesh_coord_t  *rca_coords = NULL;
 #endif
 
-void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim);
+CLINKAGE void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim);
 
 /** \function getMeshCoord
  *  wrapper function for rca_get_meshcoord
  *  0: success,   -1: failure
  */
-int getMeshCoord(int nid, int *x, int *y, int *z) {
+CLINKAGE int getMeshCoord(int nid, int *x, int *y, int *z)
+{
 #if CMK_HAS_RCALIB
   if (rca_coords == NULL) {
   rca_mesh_coord_t xyz;
@@ -93,7 +109,8 @@ int getMeshCoord(int nid, int *x, int *y, int *z) {
  *  finds nids for pids 1 to CmiNumPes and stores them in an array
  *  correspondingly also creates an array for nids to pids
  */
-void pidtonid(int numpes) {
+CLINKAGE void pidtonid(int numpes)
+{
   CmiLock(cray_lock);
   if (pid2nid != NULL) {
       CmiUnlock(cray_lock);
@@ -123,7 +140,7 @@ void pidtonid(int numpes) {
 }
 
 /* get size and dimension for XE machine */
-void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
+CLINKAGE void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
 {
   int i = 0, nid, ret;
   rca_mesh_coord_t dimsize;
@@ -186,7 +203,7 @@ void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
   /* printf("%d %d %d %d\n", *maxnid, *xdim, *ydim, *zdim); */
 }
 
-void craynid_free()
+CLINKAGE void craynid_free(void)
 {
   CmiLock(cray_lock);
   free(pid2nid);
@@ -198,7 +215,7 @@ void craynid_free()
   CmiUnlock(cray_lock);
 }
 
-void craynid_reset()
+CLINKAGE void craynid_reset(void)
 {
   craynid_free();
   CmiLock(cray_lock);
@@ -209,9 +226,9 @@ void craynid_reset()
   CmiUnlock(cray_lock);
 }
 
-void craynid_init()
+CLINKAGE void craynid_init(void)
 {
-  static init_done = 0;
+  static int init_done = 0;
   if (!init_done) {
     cray_lock = CmiCreateLock();
     cray_lock2 = CmiCreateLock();

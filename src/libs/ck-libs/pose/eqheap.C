@@ -103,12 +103,9 @@ HeapNode *HeapNode::conjoin(HeapNode *h)
 {
 #ifdef EH_SANITIZE
   sanitize();
-#endif
-#ifdef EH_SANITIZE
   if (h) h->sanitize();
 #endif
-  if (!this) return h;
-  else if (!h) return this;
+  if (!h) return this;
   else if ((pose_config.deterministic && e->timestamp < h->e->timestamp) ||
 	       (e->timestamp == h->e->timestamp && e->evID <= h->e->evID) ||
 	       e->timestamp < h->e->timestamp ||
@@ -212,14 +209,14 @@ char *HeapNode::dumpString() {
 #endif
   if (left) {
     char *lstring=left->dumpString();
-    strncat(str, lstring, PVT_DEBUG_BUFFER_LINE_LENGTH);
+    strncat(str, lstring, 32);
     delete [] lstring;
   } else {
     strncat(str, "[NULL] ",  PVT_DEBUG_BUFFER_LINE_LENGTH);
   }
   if (right) {
     char *rstring=right->dumpString();
-    strncat(str, rstring, PVT_DEBUG_BUFFER_LINE_LENGTH);
+    strncat(str, rstring, 32);
     delete [] rstring;
   } else {
     strncat(str, "[NULL]", PVT_DEBUG_BUFFER_LINE_LENGTH);

@@ -15,5 +15,6 @@ module CkCallback {
 		entry void registerCcsCallback(char name[strlen(name)+1],
 			CkCallback cb);
 		entry void call(CkCallback c,CkMarshalledMessage msg);
+		entry void call(CkCallback c, int length, char data[length]);
 	};
 };

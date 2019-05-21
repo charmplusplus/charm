@@ -1,3 +1,6 @@
+#include "conv-autoconfig.h"
+#include "conv-mach-opt.h"
+
 module CkCache {
   template<class CkCacheKey> message CkCacheRequestMsg;
 

@@ -53,6 +53,10 @@ extern int Cmi_myoldpe;
 extern char *_shrinkexpand_basedir;
 #endif
 
+#if CMK_ONESIDED_IMPL
+extern UInt numZerocopyROops; // Required for broadcasting RO Data after recovering from failure
+#endif
+
 void CkCreateLocalChare(int epIdx, envelope *env);
 
 // helper class to get number of array elements
@@ -96,6 +100,10 @@ static void bdcastRO(void){
 	// Allocate and fill out the RODataMessage
 	envelope *env = _allocEnv(RODataMsg, ps.size());
 	PUP::toMem pp((char *)EnvToUsr(env));
+#if CMK_ONESIDED_IMPL
+	pp|numZerocopyROops; // Messages of type 'RODataMsg' need to have numZerocopyROops pupped in order
+                       // to be processed inside _processRODataMsg
+#endif
 	for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pp);
 	
 	env->setCount(++_numInitMsgs);
@@ -185,13 +193,13 @@ private:
 public:
 	CkCheckpointMgr() { }
 	CkCheckpointMgr(CkMigrateMessage *m):CBase_CkCheckpointMgr(m) { }
-	void Checkpoint(const char *dirname,CkCallback& cb, bool requestStatus = false);
+	void Checkpoint(const char *dirname, CkCallback cb, bool requestStatus = false);
 	void SendRestartCB(void);
 	void pup(PUP::er& p){ p|restartCB; }
 };
 
 // broadcast
-void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb, bool _requestStatus){
+void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _requestStatus){
 	chkptStartTimer = CmiWallTimer();
 	requestStatus = _requestStatus;
 	// make dir on all PEs in case it is a local directory
@@ -355,9 +363,9 @@ void CkPupMainChareData(PUP::er &p, CkArgMsg *args)
 
 #ifndef CMK_CHARE_USE_PTR
 
-CkpvExtern(CkVec<void *>, chare_objs);
-CkpvExtern(CkVec<int>, chare_types);
-CkpvExtern(CkVec<VidBlock *>, vidblocks);
+CkpvExtern(std::vector<void *>, chare_objs);
+CkpvExtern(std::vector<int>, chare_types);
+CkpvExtern(std::vector<VidBlock *>, vidblocks);
 
 // handle plain non-migratable chare
 void CkPupChareData(PUP::er &p)
@@ -457,7 +465,7 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
   }
   DEBCHK("[%d] CkPupPerPlaceData %s: numGroups = %d\n", CkMyPe(),p.typeString(),numGroups);
 
-  GroupInfo *tmpInfo = new GroupInfo [numGroups];
+  std::vector<GroupInfo> tmpInfo(numGroups);
   if (!p.isUnpacking()) {
     for (i = 0; i < numGroups; i++) {
       tmpInfo[i].gID = (*idTable)[i];
@@ -474,7 +482,7 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
       }
     }
   }
-  for (i = 0; i < numGroups; i++) p|tmpInfo[i];
+  p|tmpInfo;
 
   for (i = 0; i < numGroups; i++) 
   {
@@ -511,8 +519,6 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
     // if using migration constructor, you'd better have a pup
     gobj->virtual_pup(p);
   }
-
-  delete [] tmpInfo;
 }
 
 void CkPupGroupData(PUP::er &p

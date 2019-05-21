@@ -1,15 +1,13 @@
-/* 
+/*
 
-The following code is adapted from alltoall.c in mpich2-1.0.3 
+The following code is adapted from alltoall.c in mpich2-1.0.3
 
-Licensing details should be addresssed, since this is copyrighted. 
+Please see the romio/COPYRIGHT file for licensing information.
 
 */
 
 #include "ampiimpl.h"
 #include "tcharm.h"
-#include "ampiEvents.h" /*** for trace generation for projector *****/
-#include "ampiProjections.h"
 
 
 /* This is the default implementation of alltoall. The algorithm is:
@@ -87,7 +85,7 @@ void MPICH_Localcopy(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 {
   int rank;
  
-  AMPI_Comm_rank (MPI_COMM_WORLD, &rank);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   getAmpiInstance(MPI_COMM_WORLD)->sendrecv ( sendbuf, sendcount, sendtype,
 				  rank, MPI_ATA_TAG, 
 				  recvbuf, recvcount, recvtype,
@@ -410,16 +408,16 @@ int AMPI_Alltoall_medium(
 
   for ( i=0; i<comm_size; i++ ) { 
 	dst = (rank+i) % comm_size;
-	/*mpi_errno = AMPI_Isend((char *)sendbuf + dst*sendcount*sendtype_extent,
+	/*mpi_errno = MPI_Isend((char *)sendbuf + dst*sendcount*sendtype_extent,
 	    sendcount, sendtype, dst, MPI_ATA_TAG, comm, &reqarray[i+comm_size]);*/
-	ptr->send(MPI_ATA_TAG, getAmpiInstance(comm)->getRank(comm),
+	ptr->send(MPI_ATA_TAG, getAmpiInstance(comm)->getRank(),
               (char *)sendbuf + dst*sendcount*sendtype_extent,
 		      sendcount, sendtype, dst, comm);
 	reqarray[i+comm_size] = MPI_REQUEST_NULL;
   }
 
   /* ... then wait for *all* of them to finish: */
-  mpi_errno = AMPI_Waitall(2*comm_size,reqarray,starray);
+  mpi_errno = MPI_Waitall(2*comm_size,reqarray,starray);
 
   /* --BEGIN ERROR HANDLING-- */
 //   if (mpi_errno == MPI_ERR_IN_STATUS) {

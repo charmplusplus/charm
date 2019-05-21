@@ -143,7 +143,7 @@ void TraceAutoPerf::countNewChare()
 void TraceAutoPerf::creation(envelope *env, int epIdx, int num) { 
 } 
 
-void TraceAutoPerf::creationMulticast(envelope *, int epIdx, int num, int *pelist) { }
+void TraceAutoPerf::creationMulticast(envelope *, int epIdx, int num, const int *pelist) { }
 
 void TraceAutoPerf::creationDone(int num) { }
 
@@ -298,8 +298,10 @@ void TraceAutoPerf::free(void *where, int size) { }
 
 void TraceAutoPerf::traceClose(void)
 {
-  CkpvAccess(_traces)->endComputation();
-  CkpvAccess(_traces)->removeTrace(this);
+  if (CkpvAccess(_traces)) {
+    CkpvAccess(_traces)->endComputation();
+    CkpvAccess(_traces)->removeTrace(this);
+  }
 }
 
 

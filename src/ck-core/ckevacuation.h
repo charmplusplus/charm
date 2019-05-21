@@ -1,12 +1,7 @@
-/*
-	FAULT_EVAC
-	Resuing this file shamelessly for the Migrate away all
-	objects project
-*/
+#if CMK_FAULT_EVAC
 
 #ifndef _CKEVACUATION_H
 #define _CKEVACUATION_H
-
 
 
 struct evacMsg{
@@ -15,7 +10,7 @@ struct evacMsg{
 	int remainingElements; // number of array elements that still exist on that processor
 };
 
-CpvCExtern(char *,_validProcessors);
+CpvExtern(char *,_validProcessors);
 extern int _ckEvacBcastIdx;
 extern int _ckAckEvacIdx;
 CkpvExtern(char ,startedEvac);
@@ -44,5 +39,6 @@ class CkElementInformHome : public CkLocIterator {
 		void addLocation(CkLocation &loc);
 };
 
+#endif //_CK_EVACUATION_H
 
-#endif //_CK_CHECKPOINT_H
+#endif // CMK_FAULT_EVAC

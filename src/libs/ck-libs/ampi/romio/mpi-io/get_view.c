@@ -1,6 +1,5 @@
 /* -*- Mode: C; c-basic-offset:4 ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -41,53 +40,62 @@ Output Parameters:
 
 .N fortran
 @*/
-int MPI_File_get_view(MPI_File fh, MPI_Offset *disp, MPI_Datatype *etype,
-		 MPI_Datatype *filetype, char *datarep)
+int MPI_File_get_view(MPI_File mpi_fh,
+		      MPI_Offset *disp,
+		      MPI_Datatype *etype,
+		      MPI_Datatype *filetype,
+		      char *datarep)
 {
-#ifndef PRINT_ERR_MSG
     int error_code;
+    ADIO_File fh;
     static char myname[] = "MPI_FILE_GET_VIEW";
-#endif
     int i, j, k, combiner;
     MPI_Datatype copy_etype, copy_filetype;
 
-#ifdef PRINT_ERR_MSG
-    if ((fh <= (MPI_File) 0) || (fh->cookie != ADIOI_FILE_COOKIE)) {
-	FPRINTF(stderr, "MPI_File_get_view: Invalid file handle\n");
-	MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-#else
-    ADIOI_TEST_FILE_HANDLE(fh, myname);
-#endif
+    MPIU_THREAD_CS_ENTER(ALLFUNC,);
 
-    if (datarep <= (char *) 0) {
-#ifdef PRINT_ERR_MSG
-	FPRINTF(stderr, "MPI_File_get_view: The user must allocate memory for datarep\n");
-	MPI_Abort(MPI_COMM_WORLD, 1);
-#else
-	error_code = MPIR_Err_setmsg(MPI_ERR_ARG, MPIR_ERR_DATAREP_ARG,
-				     myname, (char *) 0, (char *) 0);
-	return ADIOI_Error(fh, error_code, myname);
-#endif
+    fh = MPIO_File_resolve(mpi_fh);
+
+    /* --BEGIN ERROR HANDLING-- */
+    MPIO_CHECK_FILE_HANDLE(fh, myname, error_code);
+
+    if (datarep <= (char *) 0)
+    {
+	error_code = MPIO_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE,
+					  myname, __LINE__, MPI_ERR_ARG, 
+					  "**iodatarepnomem", 0);
+	error_code = MPIO_Err_return_file(fh, error_code);
+	goto fn_exit;
     }
+    /* --END ERROR HANDLING-- */
 
     *disp = fh->disp;
-    strcpy(datarep, "native");
+    ADIOI_Strncpy(datarep, "native", MPI_MAX_DATAREP_STRING);
 
     MPI_Type_get_envelope(fh->etype, &i, &j, &k, &combiner);
     if (combiner == MPI_COMBINER_NAMED) *etype = fh->etype;
     else {
+	/* FIXME: It is wrong to use MPI_Type_contiguous; the user could choose to
+	   re-implement MPI_Type_contiguous in an unexpected way.  Either use 
+	   MPIR_Barrier_impl as in MPICH2 or PMPI_Type_contiguous */
         MPI_Type_contiguous(1, fh->etype, &copy_etype);
+
+	/* FIXME: Ditto for MPI_Type_commit - use NMPI or PMPI */
         MPI_Type_commit(&copy_etype);
         *etype = copy_etype;
     }
+    /* FIXME: Ditto for MPI_Type_xxx - use NMPI or PMPI */
     MPI_Type_get_envelope(fh->filetype, &i, &j, &k, &combiner);
     if (combiner == MPI_COMBINER_NAMED) *filetype = fh->filetype;
     else {
         MPI_Type_contiguous(1, fh->filetype, &copy_filetype);
+
         MPI_Type_commit(&copy_filetype);
         *filetype = copy_filetype;
     }
+
+fn_exit:
+    MPIU_THREAD_CS_EXIT(ALLFUNC,);
 
     return MPI_SUCCESS;
 }

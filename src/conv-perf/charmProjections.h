@@ -8,7 +8,7 @@ class envelope;
 extern "C" {
 #endif
 
-void initCharmProjections();
+void initCharmProjections(void);
 //int  traceRegisterUserEvent(const char*);	//TODO
 
 void charm_creation(envelope *e, int ep, int num=1);

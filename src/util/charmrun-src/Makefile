@@ -1,31 +1,26 @@
 BIN=../../bin
-CHARMC=$(BIN)/charmc $(OPTS) -lm -I..
+CHARMC=$(BIN)/charmc $(OPTS) -lm -I.. -L../libs
 
 SHELL=/bin/sh
 
 INCLUDED=../conv-mach.h ../conv-mach-opt.h \
-	../ccs-server.c ../ccs-server.h ../ccs-auth.c ../ccs-auth.h \
-	../sockRoutines.c ../sockRoutines.h
+	../ccs-server.C ../ccs-server.h ../ccs-auth.C ../ccs-auth.h \
+	../sockRoutines.C ../sockRoutines.h
 
-all: charmrun-notify charmrun-silent charmd charmd_faceless
+all: charmrun charmd charmd_faceless
 
-charmrun-silent: charmrun.C $(INCLUDED)
-	$(CHARMC) -c -seq -DCMK_NOT_USE_CONVERSE=1 -DSILENT charmrun.C -o charmrun-silent.o
-	$(CHARMC) -cp $(BIN) -seq -language c++ -o charmrun-silent charmrun-silent.o
+charmrun: charmrun.C $(INCLUDED)
+	$(CHARMC) -c -seq -DCMK_NOT_USE_CONVERSE=1 charmrun.C -o charmrun.o
+	$(CHARMC) -cp $(BIN) -seq -language c++ -o charmrun charmrun.o
 
-charmrun-notify: charmrun.C $(INCLUDED)
-	$(CHARMC) -c -seq -DCMK_NOT_USE_CONVERSE=1 -DNOTIFY charmrun.C
-	$(CHARMC) -cp $(BIN) -seq -language c++ -o charmrun-notify charmrun.o
-	(cd ..; CHARMINC=.; . ./conv-config.sh; cp ../bin/charmrun-notify$$CMK_POST_EXE ../bin/charmrun$$CMK_POST_EXE)
-
-charmd: daemon.c daemon.h ../sockRoutines-seq.o
-	$(CHARMC) -seq -c daemon.c -o daemon.o
+charmd: daemon.C daemon.h ../sockRoutines-seq.o
+	$(CHARMC) -seq -c daemon.C -o daemon.o
 	$(CHARMC) -cp $(BIN) -seq daemon.o ../sockRoutines-seq.o -o charmd
 
-charmd_faceless: daemon.c daemon.h ../sockRoutines-seq.o
-	$(CHARMC) -seq -DFACELESS -c daemon.c -o daemon-faceless.o
+charmd_faceless: daemon.C daemon.h ../sockRoutines-seq.o
+	$(CHARMC) -seq -DFACELESS -c daemon.C -o daemon-faceless.o
 	$(CHARMC) -cp $(BIN) -seq -DFACELESS daemon-faceless.o ../sockRoutines-seq.o -o charmd_faceless;
 
 clean:
-	rm -f *.o charmrun charmrun-notify charmrun-silent
+	rm -f *.o charmrun
 	rm -f charmd charmd_faceless

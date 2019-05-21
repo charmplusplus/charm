@@ -5,7 +5,7 @@ readonly CkChareID mainhandle;
 mainchare main
 {
   entry main(CkArgMsg *m);
-  entry void results(int c);
+  entry [reductiontarget] void results(int c);
 };
 
 array [1D] piPart

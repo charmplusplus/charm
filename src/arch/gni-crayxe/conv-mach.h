@@ -11,18 +11,18 @@
 /* 1 if the machine has a function called "getpagesize()", 0 otherwise .
    used in the memory files of converse */
 #define CMK_GETPAGESIZE_AVAILABLE                          1
-#define CMK_MEMORY_PAGESIZE                                8192
+#define CMK_MEMORY_PAGESIZE                                4096
 #define CMK_MEMORY_PROTECTABLE                             0
 
 /* defines which version of memory handlers should be used.
-   used in conv-core/machine.c */
+   used in conv-core/machine.C */
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 
 #define CMI_IO_BUFFER_EXPLICIT                             0
 #define CMI_IO_FLUSH_USER                                  0
 
-/* specifies if there is a node queue. it is used in convcore.c and it is
+/* specifies if there is a node queue. it is used in convcore.C and it is
    tipically set to 1 in smp versions */
 
 /* the following definitions set the type of shared variables to be used. only
@@ -45,31 +45,31 @@
 #define CMK_SIGNAL_USE_SIGACTION                           0
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
 
-/* decide which is the default implementation of the threads (see threads.c)
+/* decide which is the default implementation of the threads (see threads.C)
    Only one of the following can be 1. If none of them is selected, qthreads
    will be used as default. This default can be overwritten at compile time
    using -DCMK_THREADS_BUILD_"type"=1 */
 #define CMK_THREADS_USE_CONTEXT                            0
+#define CMK_THREADS_USE_FCONTEXT                           1
 #define CMK_THREADS_USE_JCONTEXT                           0
 #define CMK_THREADS_USE_PTHREADS                           0
 
 #define CMK_USE_SPINLOCK                                   1
 
 /* Specifies what kind of timer to use, and the correspondent headers will be
-   included in convcore.c. If none is selected, then the machine.c file needs to
+   included in convcore.C. If none is selected, then the machine.C file needs to
    implement the timer primitives. */
 #define CMK_TIMER_USE_RTC                                  0
 #define CMK_TIMER_USE_RDTSC                                0
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              1
 #define CMK_TIMER_USE_TIMES                                0
-#define CMK_TIMER_USE_BLUEGENEL                            0
 
 
 
 /* Specifies what the processor will do when it is idle, either sleep (1) or go
-   into busy waiting mode (0). In convcore.c there are a few files included if
-   sleeping mode, but the real distinct implementation is in the machine.c
+   into busy waiting mode (0). In convcore.C there are a few files included if
+   sleeping mode, but the real distinct implementation is in the machine.C
    file. */
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0

@@ -22,7 +22,31 @@ _ARMCI_GENERATE_ABS_REDUCTION()
 
 static int armciLibStart_idx = -1;
 
+#if CMK_TRACE_ENABLED
+#include "register.h" // for _chareTable, _entryTable
+CsvExtern(funcmap*, tcharm_funcmap);
+#endif
+
 void armciNodeInit(void) {
+#if CMK_TRACE_ENABLED
+  TCharm::nodeInit(); // make sure tcharm_funcmap is set up
+  int funclength = sizeof(funclist)/sizeof(char*);
+  for (int i=0; i<funclength; i++) {
+    int event_id = traceRegisterUserEvent(funclist[i], -1);
+    CsvAccess(tcharm_funcmap)->insert(std::pair<std::string, int>(funclist[i], event_id));
+  }
+
+  // rename chare & function to something reasonable
+  // TODO: find a better way to do this
+  for (int i=0; i<_chareTable.size(); i++){
+    if (strcmp(_chareTable[i]->name, "dummy_thread_chare") == 0)
+      _chareTable[i]->name = "ARMCI";
+  }
+  for (int i=0; i<_entryTable.size(); i++){
+    if (strcmp(_entryTable[i]->name, "dummy_thread_ep") == 0)
+      _entryTable[i]->setName("thread");
+  }
+#endif
   CmiAssert(armciLibStart_idx == -1);
   armciLibStart_idx = TCHARM_Register_thread_function((TCHARM_Thread_data_start_fn)armciLibStart);
 
@@ -65,7 +89,7 @@ ArmciVirtualProcessor::ArmciVirtualProcessor(const CProxy_TCharm &_thr_proxy)
   thisProxy = this;
   tcharmClientInit();
   thread->semaPut(ARMCI_TCHARM_SEMAID,this);
-  memBlock = CmiIsomallocBlockListNew(thread->getThread());
+  memBlock = CmiIsomallocBlockListNew();
   thisProxy = CProxy_ArmciVirtualProcessor(thisArrayID);
   addressReply = NULL;
   // Save ourselves for the waiting ARMCI_Init
@@ -81,9 +105,7 @@ ArmciVirtualProcessor::ArmciVirtualProcessor(CkMigrateMessage *m)
 
 ArmciVirtualProcessor::~ArmciVirtualProcessor()
 {
-#if !CMK_USE_MEMPOOL_ISOMALLOC
   CmiIsomallocBlockListDelete(memBlock);
-#endif
   if (addressReply) {delete addressReply;}
 }
 
@@ -563,12 +585,7 @@ void ArmciVirtualProcessor::notify_wait(int proc){
 
 void ArmciVirtualProcessor::pup(PUP::er &p) {
   TCharmClient1D::pup(p);
-  //Copying only address, the mempool will be pupped as part of the thread
-#if CMK_USE_MEMPOOL_ISOMALLOC
-  pup_bytes(&p, &memBlock, sizeof(CmiIsomallocBlockList*));
-#else
-  CmiIsomallocBlockListPup(&p, &memBlock, NULL);
-#endif
+  CmiIsomallocBlockListPup(&p, &memBlock);
   p|thisProxy;
   p|hdlList;
   p|noteList;

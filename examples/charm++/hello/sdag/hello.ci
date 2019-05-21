@@ -20,7 +20,7 @@ mainmodule hello {
 	}
       }
       serial{
-        StartRecv(new HelloMsg(0));
+        thisProxy[thisIndex].StartRecv(new HelloMsg(0));
       }
     };
     entry void StartRecv(HelloMsg* vm){

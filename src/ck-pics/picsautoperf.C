@@ -1,5 +1,13 @@
 #include  <stdlib.h>
 #include <stdio.h>
+
+#ifndef __STDC_FORMAT_MACROS
+# define __STDC_FORMAT_MACROS
+#endif
+#ifndef __STDC_LIMIT_MACROS
+# define __STDC_LIMIT_MACROS
+#endif
+#include <inttypes.h>
 #include "charm++.h"
 #include "pathHistory.h"
 #include "TopoManager.h"
@@ -173,7 +181,7 @@ void TraceAutoPerfBOC::gatherSummary(CkReductionMsg *msg){
   }
 }
 
-CkpvDeclare(CkReduction::reducerType, PerfDataReductionType);
+CkReduction::reducerType PerfDataReductionType;
 
 CkReductionMsg *PerfDataReduction(int nMsg,CkReductionMsg **msgs){
   PerfData *ret;
@@ -376,7 +384,7 @@ void TraceAutoPerfBOC::formatPerfData(PerfData *perfdata, int subStep, int phase
 
   data[AVG_NumObjectsPerPE] = data[AVG_NumObjectsPerPE]/numpes/steps;
 
-  CkPrintf("format data :  PE %d PEs in group %d [IDLE, OVERHEAD, UTIL, ENTRY ] %.2f, %.2f, %.2f %f \n", CkMyPe(), numpes, data[AVG_IdlePercentage], data[AVG_OverheadPercentage], data[AVG_UtilizationPercentage], data[AVG_EntryMethodDuration]);
+  CkPrintf("\nPICS Data: PEs in group: %d\nIDLE%: %.2f\nOVERHEAD%: %.2f\nUTIL%: %.2f\nAVG_ENTRY_DURATION: %f\n", numpes, data[AVG_IdlePercentage], data[AVG_OverheadPercentage], data[AVG_UtilizationPercentage], data[AVG_EntryMethodDuration]);
 }
 
 void TraceAutoPerfBOC::getPerfData(int reductionPE, CkCallback cb) {
@@ -384,8 +392,8 @@ void TraceAutoPerfBOC::getPerfData(int reductionPE, CkCallback cb) {
   if(t->getTraceOn()) {
     if(treeBranchFactor < 0) {
       PerfData *data = CkpvAccess(perfDatabase)->getCurrentPerfData();
-      CkCallback *cb1 = new CkCallback(CkIndex_TraceAutoPerfBOC::globalPerfAnalyze(NULL), thisProxy[reductionPE]);
-      contribute(sizeof(PerfData)*CkpvAccess(numOfPhases)*PERIOD_PERF,data, CkpvAccess(PerfDataReductionType), *cb1);
+      CkCallback cb1(CkIndex_TraceAutoPerfBOC::globalPerfAnalyze(NULL), thisProxy[reductionPE]);
+      contribute(sizeof(PerfData)*CkpvAccess(numOfPhases)*PERIOD_PERF,data, PerfDataReductionType, cb1);
       }
     else 
     {
@@ -441,7 +449,7 @@ void TraceAutoPerfBOC::globalPerfAnalyze(CkReductionMsg *msg )
   }
 
   TRACE_START(PICS_CODE);
-  fprintf(CkpvAccess(fpSummary), "NEWITER %d %d %d %lu %d\n", analyzeStep, CkMyPe(), CkpvAccess(numOfPhases)*PERIOD_PERF, (CMK_TYPEDEF_UINT8)(CkWallTimer()*1000000), currentAppStep); 
+  fprintf(CkpvAccess(fpSummary), "NEWITER %d %d %d %" PRIu64 " %d\n", analyzeStep, CkMyPe(), CkpvAccess(numOfPhases)*PERIOD_PERF, (CMK_TYPEDEF_UINT8)(CkWallTimer()*1000000), currentAppStep); 
   for(int j=0; j<CkpvAccess(numOfPhases)*PERIOD_PERF; j++)
   {
     formatPerfData(data, j/CkpvAccess(numOfPhases), j%CkpvAccess(numOfPhases));
@@ -458,7 +466,6 @@ void TraceAutoPerfBOC::globalPerfAnalyze(CkReductionMsg *msg )
   else
     isBest = false;
   currentTimeStep = data->timeStep = timestep/(currentAppStep-lastAnalyzeStep);
-  CkPrintf("-------------------- current timestep is %f step %d after ldb %d \n", currentTimeStep, currentAppStep, CkpvAccess(cntAfterLdb));
   if(CkpvAccess(cntAfterLdb) == 1)
     CkpvAccess(currentTimeStep) = currentTimeStep;
   lastAnalyzeStep = currentAppStep;
@@ -520,16 +527,6 @@ void TraceAutoPerfBOC::analyzeAndTune(){
   else
     numOfSets = numGroups;
   autoPerfProxy[CkpvAccess(myInterGroupParent)].tuneDone();
-  //output results to screen or files
-  for(int idx=0; idx<solutions.size(); idx++)
-  {
-    fprintf(stdout, "\nnumber of solutions is %lu\n", solutions[idx].size());
-      for(IntDoubleMap::iterator iter=solutions[idx].begin(); iter!=solutions[idx].end(); iter++){
-          int effect = iter->first;
-          int value = effect >0 ? effect : -effect;
-          fprintf(stdout, "%s %s \n", effect>0?"UP":"DOWN", EffectName[value]); 
-      }
-  }
 }
 
 void TraceAutoPerfBOC::analyzePerfData(PerfData *perfdata, int subStep, int phaseID) {
@@ -561,7 +558,7 @@ void TraceAutoPerfBOC::tuneDone() {
   {
     recvGroups=0;
     if(CkpvAccess(isExit))
-      CkExit();
+      CkContinueExit();
     else
     {
       resume();
@@ -722,6 +719,11 @@ TraceAutoPerfInit::TraceAutoPerfInit(CkArgMsg* args)
 }
 
 extern "C" void traceAutoPerfExitFunction() {
+  if (autoPerfProxy.ckGetGroupID().isZero()) {
+    CkContinueExit();
+    return;
+  }
+
   /* Starts copying of data */
   if(user_call == 0){  // Do not call them by default if the user is calling them
     autoPerfProxy.endPhase();
@@ -730,20 +732,17 @@ extern "C" void traceAutoPerfExitFunction() {
 
   CkpvAccess(isExit) = true;
   autoPerfProxy.getPerfData(0, CkCallback::ignore );
+}
 
-  if(CkpvAccess(fpSummary)!=NULL){
-    fflush(CkpvAccess(fpSummary));
-    fclose(CkpvAccess(fpSummary));
-  }
-  CkExit();
+void _initTraceAutoPerfNode()
+{
+  PerfDataReductionType = CkReduction::addReducer(PerfDataReduction, false, "PerfDataReduction");
 }
 
 void _initTraceAutoPerfBOC()
 {
   WARMUP_STEP = 0;
   PAUSE_STEP = 1000;
-  CkpvInitialize(CkReduction::reducerType, PerfDataReductionType);
-  CkpvAccess(PerfDataReductionType)=CkReduction::addReducer(PerfDataReduction);
   CkpvInitialize(int, hasPendingAnalysis);
   CkpvAccess(hasPendingAnalysis) = 0;
   CkpvInitialize(CkCallback, callBackAutoPerfDone);

@@ -6,11 +6,11 @@ Tester for FEM framework C/F90 routines.
 #include "tcharm.h"
 #include "ctests.h"
 
-CDECL void RUN_Abort(int v) {
+CLINKAGE void RUN_Abort(int v) {
 	CkError("FEM Test failed: %d\n",v);
 	CkAbort("FEM Test failed.\n");
 }
-FDECL void FTN_NAME(RUN_ABORT,run_abort)(int *v) {
+FLINKAGE void FTN_NAME(RUN_ABORT,run_abort)(int *v) {
 	RUN_Abort(*v);
 }
 

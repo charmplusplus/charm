@@ -9,9 +9,11 @@
 
 extern LBAllocFn getLBAllocFn(const char *lbname);
 
+extern int quietModeRequested;
+
 CreateLBFunc_Def(NodeLevelLB, "Node level load balancer")
 
-#if defined(_WIN32) && ! defined(__CYGWIN__)
+#if defined(_WIN32)
   /* strtok is thread safe in Windows */
 #define strtok_r(x,y,z) strtok(x,y)
 #endif
@@ -19,8 +21,8 @@ CreateLBFunc_Def(NodeLevelLB, "Node level load balancer")
 NodeLevelLB::NodeLevelLB(const CkLBOptions &opt): CBase_NodeLevelLB(opt) {
   lbname = "NodeLevelLB";
   const char *lbs = theLbdb->loadbalancer(opt.getSeqNo());
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] NodeLevelLB created with %s\n",CkMyPe(), lbs);
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> NodeLevelLB created with %s.\n", lbs);
 
   char *lbcopy = strdup(lbs);
   char *p = strchr(lbcopy, ':');

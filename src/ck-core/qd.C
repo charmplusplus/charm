@@ -2,6 +2,54 @@
 
 #include "ck.h"
 
+class QdMsg {
+  private:
+    int phase; // 0..2
+    union {
+      struct { /* none */ } p1;
+      struct { CmiInt8 created; CmiInt8 processed; } p2;
+      struct { /* none */ } p3;
+      struct { char dirty; } p4;
+    } u;
+    CkCallback cb;
+  public:
+    int getPhase(void) { return phase; }
+    void setPhase(int p) { phase = p; }
+    CkCallback getCb(void) { CkAssert(phase==0); return cb; }
+    void setCb(CkCallback cb_) { CkAssert(phase==0); cb = cb_; }
+    CmiInt8 getCreated(void) { CkAssert(phase==1); return u.p2.created; }
+    void setCreated(CmiInt8 c) { CkAssert(phase==1); u.p2.created = c; }
+    CmiInt8 getProcessed(void) { CkAssert(phase==1); return u.p2.processed; }
+    void setProcessed(CmiInt8 p) { CkAssert(phase==1); u.p2.processed = p; }
+    char getDirty(void) { CkAssert(phase==2); return u.p4.dirty; }
+    void setDirty(char d) { CkAssert(phase==2); u.p4.dirty = d; }
+};
+
+class QdCommMsg {
+  public:
+    bool isCreated;     //  false: create   true: process
+    int count;
+};
+
+class QdCallback {
+  public:
+	CkCallback cb;
+  public:
+    QdCallback(int e, CkChareID c) : cb(e, c) {}
+	QdCallback(CkCallback cb_) : cb(cb_) {}
+//    void send(void) { CkSendMsg(ep,CkAllocMsg(0,0,0),&cid); }
+    void send(void) {
+      // pretending pe 0 in blue gene mode, switch back after the call.
+#if CMK_CONDS_USE_SPECIAL_CODE
+      int old = CmiSwitchToPE(0);
+#endif
+      cb.send(NULL);
+#if CMK_CONDS_USE_SPECIAL_CODE
+      CmiSwitchToPE(old);
+#endif
+    }
+};
+
 extern int _qdCommHandlerIdx;
 
 // a fake QD which just wait for several seconds to triger QD callback
@@ -103,7 +151,12 @@ static inline void _handlePhase1(QdState *state, QdMsg *msg)
         if(CmiMyPe()==0) {
           DEBUGP(("ALL: %p getCCreated:%d getCProcessed:%d\n", state, state->getCCreated(), state->getCProcessed()));
           if(state->getCCreated()==state->getCProcessed()) {
-            _bcastQD2(state, msg);    // almost reached, one pass to make sure
+            if(state->oldCount == state->getCProcessed()) {// counts unchanged in second round
+              _bcastQD2(state, msg);    // almost reached, one pass to make sure
+            } else {
+              state->oldCount = state->getCProcessed();
+              _bcastQD1(state, msg);    // may have reached, go over again
+            }
           } else {
             _bcastQD1(state, msg);    // not reached, go over again
           }
@@ -150,7 +203,7 @@ static inline void _handlePhase2(QdState *state, QdMsg *msg)
       }
     } else {
         // tell parent if the counters on the node is dirty or not
-      DEBUGP(("[%d] _handlePhase2 dirty:%d\n", CmiMyPe(), state->isDirty()));
+      DEBUGP(("[%d] _handlePhase2 dirty:%d\n", CmiMyPe(), (int)state->isDirty()));
       msg->setDirty(state->isDirty());
       envelope *env = UsrToEnv((void*)msg);
       CmiSyncSendAndFree(state->getParent(), env->getTotalsize(), (char *)env);
@@ -239,7 +292,6 @@ void CkStartQD(const CkCallback& cb)
 #endif
 }
 
-extern "C"
 void CkStartQD(int eIdx, const CkChareID *cid)
 {
   CkStartQD(CkCallback(eIdx, *cid));

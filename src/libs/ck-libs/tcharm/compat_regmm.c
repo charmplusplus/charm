@@ -1,2 +1,2 @@
 #include "charm-api.h"
-CDECL void CkRegisterMainModule(void) {}
+CLINKAGE void CkRegisterMainModule(void) {}

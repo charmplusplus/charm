@@ -1,15 +1,11 @@
 /* -*- Mode: C; c-basic-offset:4 ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
  */
 
 #include "ad_piofs.h"
-#ifdef PROFILE
-#include "mpe.h"
-#endif
 
 void ADIOI_PIOFS_Open(ADIO_File fd, int *error_code)
 {
@@ -39,13 +35,8 @@ void ADIOI_PIOFS_Open(ADIO_File fd, int *error_code)
     if (fd->access_mode & ADIO_EXCL)
 	amode = amode | O_EXCL;
 
-#ifdef PROFILE
-    MPE_Log_event(1, 0, "start open");
-#endif
     fd->fd_sys = open(fd->filename, amode, perm);
-#ifdef PROFILE
-    MPE_Log_event(2, 0, "end open");
-#endif
+    fd->fd_direct = -1;
 
     llseek(fd->fd_sys, 0, SEEK_SET);
 /* required to initiate use of 64-bit offset */
@@ -57,14 +48,14 @@ void ADIOI_PIOFS_Open(ADIO_File fd, int *error_code)
 	err = piofsioctl(fd->fd_sys, PIOFS_FSTAT, &piofs_fstat);
 
 	if (!err) {
-	    sprintf(value, "%d", piofs_fstat.st_bsu);
-	    MPI_Info_set(fd->info, "striping_unit", value);
+	    ADIOI_Snprintf(value, MPI_MAX_INFO_VAL+1, "%d", piofs_fstat.st_bsu);
+	    ADIOI_Info_set(fd->info, "striping_unit", value);
 
-	    sprintf(value, "%d", piofs_fstat.st_cells);
-	    MPI_Info_set(fd->info, "striping_factor", value);
+	    ADIOI_Snprintf(value, MPI_MAX_INFO_VAL+1, "%d", piofs_fstat.st_cells);
+	    ADIOI_Info_set(fd->info, "striping_factor", value);
 
-	    sprintf(value, "%d", piofs_fstat.st_base_node);
-	    MPI_Info_set(fd->info, "start_iodevice", value);
+	    ADIOI_Snprintf(value, MPI_MAX_INFO_VAL+1, "%d", piofs_fstat.st_base_node);
+	    ADIOI_Info_set(fd->info, "start_iodevice", value);
 	}
 	ADIOI_Free(value);
 
@@ -72,14 +63,17 @@ void ADIOI_PIOFS_Open(ADIO_File fd, int *error_code)
 	    fd->fp_ind = fd->fp_sys_posn = llseek(fd->fd_sys, 0, SEEK_END);
     }
 
-#ifdef PRINT_ERR_MSG
-    *error_code = (fd->fd_sys == -1) ? MPI_ERR_UNKNOWN : MPI_SUCCESS;
-#else
     if (fd->fd_sys == -1) {
+#ifdef MPICH2
+	*error_code = MPIR_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE, myname, __LINE__, MPI_ERR_IO, "**io",
+	    "**io %s", strerror(errno));
+#elif defined(PRINT_ERR_MSG)
+	*error_code =  MPI_ERR_UNKNOWN;
+#else /* MPICH-1 */
 	*error_code = MPIR_Err_setmsg(MPI_ERR_IO, MPIR_ADIO_ERROR,
 			      myname, "I/O Error", "%s", strerror(errno));
 	ADIOI_Error(ADIO_FILE_NULL, *error_code, myname);	    
+#endif
     }
     else *error_code = MPI_SUCCESS;
-#endif
 }

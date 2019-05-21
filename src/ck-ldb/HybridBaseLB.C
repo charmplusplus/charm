@@ -12,6 +12,8 @@
 
 #define  DEBUGF(x)     // CmiPrintf x;
 
+extern int quietModeRequested;
+
 CreateLBFunc_Def(HybridBaseLB, "HybridBase load balancer")
 
 class DummyMsg: public CMessage_DummyMsg 
@@ -59,8 +61,8 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): CBase_HybridBaseLB(opt)
 
   }
   //tree = new FourLevelTree;
-  if (CkMyPe() == 0)
-    CkPrintf("%s: %s is created.\n", lbname, tree->name());
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> %s: %s is created.\n", lbname, tree->name());
 
   // decide which load balancer to call
 //  greedy = (CentralLB *)AllocateGreedyLB();
@@ -225,7 +227,7 @@ CLBStatsMsg* HybridBaseLB::AssembleStats()
 #endif
 }
 
-void HybridBaseLB::ReceiveStats(CkMarshalledCLBStatsMessage &data, int fromlevel)
+void HybridBaseLB::ReceiveStats(CkMarshalledCLBStatsMessage &&data, int fromlevel)
 {
 #if CMK_LBDB_ON
   FindNeighbors();
@@ -733,7 +735,7 @@ void HybridBaseLB::CreateMigrationOutObjs(int atlevel, LDStats* stats,
 }
 
 // objects arrives with only objdata
-void HybridBaseLB::ObjsMigrated(CkVec<LDObjData>& datas, int m,
+void HybridBaseLB::ObjsMigrated(CkVec<LDObjData>&& datas, int m,
     LDCommData *cdata, int n, int atlevel)
 {
   int i;

@@ -27,7 +27,6 @@ completion.o: completion.C completion.h completion.decl.h \
   ../../../../tmp/sockRoutines.h ../../../../tmp/ccs-server.h \
   ../../../../tmp/ckobjQ.h ../../../../tmp/ckreduction.h \
   ../../../../tmp/CkReduction.decl.h \
-  ../../../../tmp/CkArrayReductionMgr.decl.h \
   ../../../../tmp/ckmemcheckpoint.h \
   ../../../../tmp/CkMemCheckpoint.decl.h ../../../../tmp/readonly.h \
   ../../../../tmp/ckarray.h ../../../../tmp/cklocation.h \
@@ -40,11 +39,10 @@ completion.o: completion.C completion.h completion.decl.h \
   ../../../../tmp/MetaBalancer.decl.h ../../../../tmp/CkLocation.decl.h \
   ../../../../tmp/cklocrec.h ../../../../tmp/ckmigratable.h \
   ../../../../tmp/CkArray.decl.h ../../../../tmp/ckfutures.h \
-  ../../../../tmp/CkFutures.decl.h ../../../../tmp/tempo.h \
-  ../../../../tmp/tempo.decl.h ../../../../tmp/waitqd.h \
+  ../../../../tmp/CkFutures.decl.h ../../../../tmp/waitqd.h \
   ../../../../tmp/waitqd.decl.h ../../../../tmp/ckcheckpoint.h \
   ../../../../tmp/ckcallback.h ../../../../tmp/ckevacuation.h \
-  ../../../../tmp/ckarrayreductionmgr.h ../../../../tmp/trace.h \
+  ../../../../tmp/trace.h \
   ../../../../tmp/trace-bluegene.h ../../../../tmp/sdag.h \
   completion.def.h
 	$(CHARMC) -I../../../../tmp -o completion.o completion.C

@@ -1,12 +1,16 @@
 /* -*- Mode: C; c-basic-offset:4 ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
  */
 
 #include "ad_xfs.h"
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
+
+/* style: allow:free:2 sig:0 */
 
 static void ADIOI_XFS_Aligned_Mem_File_Read(ADIO_File fd, void *buf, int len, 
 					     ADIO_Offset offset, int *err);
@@ -17,9 +21,7 @@ void ADIOI_XFS_ReadContig(ADIO_File fd, void *buf, int count,
 {
     int err=-1, datatype_size, len, diff, size, nbytes;
     void *newbuf;
-#ifndef PRINT_ERR_MSG
     static char myname[] = "ADIOI_XFS_READCONTIG";
-#endif
 
     MPI_Type_size(datatype, &datatype_size);
     len = datatype_size * count;
@@ -61,7 +63,7 @@ void ADIOI_XFS_ReadContig(ADIO_File fd, void *buf, int count,
 		    ADIOI_XFS_Aligned_Mem_File_Read(fd, newbuf, size, offset, &err);
 		    if (err > 0) memcpy(buf, newbuf, err);
 		    nbytes += err;
-		    free(newbuf);
+		    ADIOI_Free(newbuf);
 		}
 		else nbytes += pread(fd->fd_sys, buf, size, offset);
 	    }
@@ -75,7 +77,7 @@ void ADIOI_XFS_ReadContig(ADIO_File fd, void *buf, int count,
 	    if (newbuf) {
 		ADIOI_XFS_Aligned_Mem_File_Read(fd, newbuf, len, offset, &err);
 		if (err > 0) memcpy(buf, newbuf, err);
-		free(newbuf);
+		ADIOI_Free(newbuf);
 	    }
 	    else err = pread(fd->fd_sys, buf, len, offset);
 	}
@@ -87,16 +89,12 @@ void ADIOI_XFS_ReadContig(ADIO_File fd, void *buf, int count,
     if (err != -1) MPIR_Status_set_bytes(status, datatype, err);
 #endif
 
-#ifdef PRINT_ERR_MSG
-    *error_code = (err == -1) ? MPI_ERR_UNKNOWN : MPI_SUCCESS;
-#else
     if (err == -1) {
-	*error_code = MPIR_Err_setmsg(MPI_ERR_IO, MPIR_ADIO_ERROR,
-			      myname, "I/O Error", "%s", strerror(errno));
-	ADIOI_Error(fd, *error_code, myname);
+	*error_code = MPIO_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE,
+					   myname, __LINE__, MPI_ERR_IO, "**io",
+					   "**io %s", strerror(errno));
     }
     else *error_code = MPI_SUCCESS;
-#endif
 }
 
 
@@ -104,6 +102,7 @@ void ADIOI_XFS_Aligned_Mem_File_Read(ADIO_File fd, void *buf, int len,
               ADIO_Offset offset, int *err)
 {
     int ntimes, rem, newrem, i, size, nbytes;
+    unsigned read_chunk_sz = fd->hints->fs_hints.xfs.read_chunk_sz;
 
     /* memory buffer is aligned, offset in file is aligned,
        io_size may or may not be of the right size.
@@ -111,33 +110,33 @@ void ADIOI_XFS_Aligned_Mem_File_Read(ADIO_File fd, void *buf, int len,
        use buffered I/O for remaining. */
 
     if (!(len % fd->d_miniosz) && 
-	(len >= fd->d_miniosz) && (len <= fd->d_maxiosz))
+	(len >= fd->d_miniosz) && (len <= read_chunk_sz))
 	*err = pread(fd->fd_direct, buf, len, offset);
     else if (len < fd->d_miniosz)
 	*err = pread(fd->fd_sys, buf, len, offset);
-    else if (len > fd->d_maxiosz) {
-	ntimes = len/(fd->d_maxiosz);
-	rem = len - ntimes * fd->d_maxiosz;
+    else if (len > read_chunk_sz) {
+	ntimes = len/(read_chunk_sz);
+	rem = len - ntimes * read_chunk_sz;
 	nbytes = 0;
 	for (i=0; i<ntimes; i++) {
-	    nbytes += pread(fd->fd_direct, ((char *)buf) + i * fd->d_maxiosz,
-			 fd->d_maxiosz, offset);
-	    offset += fd->d_maxiosz;
+	    nbytes += pread(fd->fd_direct, ((char *)buf) + i * read_chunk_sz,
+			 read_chunk_sz, offset);
+	    offset += read_chunk_sz;
 	}
 	if (rem) {
 	    if (!(rem % fd->d_miniosz))
 		nbytes += pread(fd->fd_direct, 
-		     ((char *)buf) + ntimes * fd->d_maxiosz, rem, offset);
+		     ((char *)buf) + ntimes * read_chunk_sz, rem, offset);
 	    else {
 		newrem = rem % fd->d_miniosz;
 		size = rem - newrem;
 		if (size) {
 		    nbytes += pread(fd->fd_direct, 
-		         ((char *)buf) + ntimes * fd->d_maxiosz, size, offset);
+		         ((char *)buf) + ntimes * read_chunk_sz, size, offset);
 		    offset += size;
 		}
 		nbytes += pread(fd->fd_sys, 
-	              ((char *)buf) + ntimes*fd->d_maxiosz + size, newrem, offset);
+	              ((char *)buf) + ntimes * read_chunk_sz + size, newrem, offset);
 	    }
 	}
 	*err = nbytes;
@@ -149,14 +148,4 @@ void ADIOI_XFS_Aligned_Mem_File_Read(ADIO_File fd, void *buf, int len,
 	nbytes += pread(fd->fd_sys, (char *)buf + size, rem, offset+size);
 	*err = nbytes;
     }
-}
-
-
-void ADIOI_XFS_ReadStrided(ADIO_File fd, void *buf, int count,
-                       MPI_Datatype datatype, int file_ptr_type,
-                       ADIO_Offset offset, ADIO_Status *status, int
-                       *error_code)
-{
-    ADIOI_GEN_ReadStrided(fd, buf, count, datatype, file_ptr_type,
-                        offset, status, error_code);
 }

@@ -1,6 +1,5 @@
 /* -*- Mode: C; c-basic-offset:4 ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -24,7 +23,12 @@ struct ADIOI_RequestD *ADIOI_Malloc_request(void)
 
     if (!ADIOI_Req_avail_head) {
 	ADIOI_Req_avail_head = (ADIOI_Req_node *) 
-	              ADIOI_Malloc(NUM*sizeof(ADIOI_Req_node));  
+	              ADIOI_Malloc(NUM*sizeof(ADIOI_Req_node));
+	if (ADIOI_Req_avail_head == NULL)
+	{
+	    /* FIXME: Insert error here */
+	    return NULL;
+	}
 	curr = ADIOI_Req_avail_head;
 	for (i=1; i<NUM; i++) {
 	    curr->next = ADIOI_Req_avail_head+i;
@@ -68,11 +72,11 @@ void ADIOI_Free_request(ADIOI_Req_node *node)
 
     (node->reqd).cookie = 0;
 
-    if (!ADIOI_Req_avail_tail)
-	ADIOI_Req_avail_head = ADIOI_Req_avail_tail = node;
+    if (!CtvAccess(ADIOI_Req_avail_tail))
+	CtvAccess(ADIOI_Req_avail_head) = CtvAccess(ADIOI_Req_avail_tail) = node;
     else {
-	ADIOI_Req_avail_tail->next = node;
-	ADIOI_Req_avail_tail = node;
+	CtvAccess(ADIOI_Req_avail_tail)->next = node;
+	CtvAccess(ADIOI_Req_avail_tail) = node;
     }
     node->next = NULL;
 }

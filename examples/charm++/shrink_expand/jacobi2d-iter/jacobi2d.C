@@ -88,9 +88,8 @@ public:
   }
 
     // Each worker reports back to here when it completes an iteration
-void report(CkReductionMsg *m) {
-    if (m==NULL) CkAbort("Null Red msg\n");
-    iterations=*((int *)m->getData());
+void report(int completed_iteration) {
+    iterations=completed_iteration;
     recieve_count++;
     double totaltime = CkWallTimer() - startTime;
 	if (1 == recieve_count) {
@@ -251,7 +250,7 @@ void ResumeFromSync() {begin_iteration();}
        if (--messages_due == 0) {
             messages_due = 4;
             compute();
-		    contribute(sizeof(int),&iteration,CkReduction::max_int,CkCallback(CkIndex_Main::report(NULL),mainProxy));
+		    contribute(sizeof(int),&iteration,CkReduction::max_int,CkCallback(CkReductionTarget(Main,report),mainProxy));
         }
     }
 

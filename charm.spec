@@ -29,7 +29,7 @@ Charm++ RPM for Linux
 %setup -n %{name}-%{version}-%{release}
 bzip2 -dc  %{_sourcedir}/Charm-%{version}-%{release}.tar.bz2 | tar xvf -
 %build
-./build AMPI net-linux-x86_64 %{charm_options} --with-production
+./build AMPI netlrts-linux-x86_64 %{charm_options} --with-production
 %clean
 rm -rf $RPM_BUILD_ROOT
 %install

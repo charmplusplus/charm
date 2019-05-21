@@ -40,6 +40,11 @@ A more readable summary is at:
  */
 
 #include "converse.h"
+
+/* conv-config.h, included in converse.h, defines CMI_SWAPGLOBALS.
+ * -swapglobals only works on ELF systems and in non-SMP mode. */
+#if CMI_SWAPGLOBALS
+
 #include "cklists.h"
 #include <string.h>
 #include <stdio.h>
@@ -53,8 +58,8 @@ A more readable summary is at:
 #include <algorithm>
 #include "converse.h"
 #include "pup.h"
+#include "memory-isomalloc.h"
 
-#if CMK_HAS_ELF_H
 #include <elf.h>
 
 #define DEBUG_GOT_MANAGER 0
@@ -72,10 +77,6 @@ A more readable summary is at:
 #define ALIGN_GOT(x)       (long)((~15)&((x)+15))
 #else
 #define ALIGN_GOT(x)       ALIGN8(x)
-#endif
-
-#if !CMK_SHARED_VARS_UNAVAILABLE
-#  error "Global-elfgot won't work properly under smp version: -swapglobals disabled"
 #endif
 
 CpvDeclare(int, CmiPICMethod);
@@ -112,8 +113,9 @@ extern ELFXX_TYPE_Dyn _DYNAMIC[];      //The Dynamic section table pointer
 	identified as global variables
 	**/
 
-CkVec<char *>  _blacklist;
+std::vector<char *>  _blacklist;
 static bool loaded = false;
+extern int quietModeRequested;
 
 static void readBlacklist()
 {
@@ -121,14 +123,18 @@ static void readBlacklist()
   const char *fname = "blacklist";
   FILE *bl = fopen(fname, "r");
   if (bl == NULL){
-		if (CmiMyPe() == 0) printf("WARNING: Running swapglobals without blacklist, globals from libraries might be getting un-necessarily swapped\n");
+		if (!quietModeRequested && CmiMyPe() == 0) {
+			CmiPrintf("WARNING: Running swapglobals without blacklist, globals from libraries might be unnecessarily swapped.\n");
+		}
 		loaded = true;
 		return;
   }
   printf("Loading blacklist from file \"%s\" ... \n", fname);
   while (!feof(bl)){
     char name[512];
-    fscanf(bl, "%s\n", name);
+    if (fscanf(bl, "%511s\n", name) != 1) {
+      CmiAbort("Swapglobals> reading blacklist file failed!");
+    }
      _blacklist.push_back(strdup(name));
   }
   fclose(bl);
@@ -151,8 +157,7 @@ class CtgGlobalList
     CtgRec() {got=NULL;}
     CtgRec(ELFXX_TYPE_Addr *got_,int off_) :got(got_), off(off_) {}
   };
-  CkVec<CtgRec> rec;
-  int nRec;
+  std::vector<CtgRec> rec;
 public:
   /**
    Analyze the current set of global variables, determine 
@@ -170,7 +175,8 @@ public:
   
   /// Point at this set of global data (must be getSize() bytes).
   inline void install(void *datav) const {
-    char *data=(char *)datav;
+    intptr_t data = (intptr_t)datav;
+    int nRec = rec.size();
     for (int i=0;i<nRec;i++)
       *(rec[i].got)=(ELFXX_TYPE_Addr)(data+rec[i].off);
   }
@@ -213,6 +219,7 @@ int CtgGlobalList::isUserSymbol(const char *name) {
        || (strncmp("ckout", name, 5) == 0) || (strncmp("stdout", name, 6) == 0)
        || (strncmp("ckerr", name, 5) == 0)
        || (strncmp("environ", name, 7) == 0)
+       || (strncmp("pthread", name, 7) == 0)
        || (strncmp("stderr", name, 6) == 0) || (strncmp("stdin", name, 5) == 0)) {
 #ifdef CMK_GFORTRAN
         if (match(name, "__.*_MOD_.*")) return 1;
@@ -234,13 +241,16 @@ int CtgGlobalList::isUserSymbol(const char *name) {
 
 void CtgGlobalList::read(void *datav) const {
     char *data=(char *)datav;
-    for (int i=0;i<nRec;i++) {
-      size_t size;
-      if (i<nRec-1) 
-        size=rec[i+1].off-rec[i].off;
-      else /* i==nRec-1, last one: */ 
-        size=datalen-rec[i].off;
+    int nRec = rec.size();
+    size_t size;
+    for (int i=0;i<nRec-1;i++) { // First nRec-1 elements:
+      size = rec[i+1].off-rec[i].off;
       memcpy(data+rec[i].off, (void *)*rec[i].got, size);
+    }
+    // Last element:
+    if (nRec > 0) {
+      size = datalen-rec[nRec-1].off;
+      memcpy(data+rec[nRec-1].off, (void *)(uintptr_t)*rec[nRec-1].got, size);
     }
 }
 
@@ -251,7 +261,6 @@ void CtgGlobalList::read(void *datav) const {
  */
 CtgGlobalList::CtgGlobalList() {
     datalen=0;
-    nRec=0;
     
     int count;
     size_t relt_size = 0;
@@ -282,10 +291,7 @@ CtgGlobalList::CtgGlobalList() {
     int padding = 0;
 
 #if UNPROTECT_GOT && CMK_HAS_MPROTECT
-    size_t pagesize = CMK_MEMORY_PAGESIZE;
-#if CMK_HAS_GETPAGESIZE
-    pagesize = getpagesize();
-#endif
+    const size_t pagesize = CmiGetPageSize();
 #endif
 
     // Figure out which relocation data entries refer to global data:
@@ -325,33 +331,31 @@ CtgGlobalList::CtgGlobalList() {
 	size_t size = symt[symindx].st_size;
 	size_t gSize = ALIGN_GOT(size);
 	padding += gSize - size;
-	ELFXX_TYPE_Addr *gGot=(ELFXX_TYPE_Addr *)relt[count].r_offset;
+	ELFXX_TYPE_Addr *gGot=(ELFXX_TYPE_Addr *)(uintptr_t)relt[count].r_offset;
 
 #if DEBUG_GOT_MANAGER
 	printf("   -> %s is a user global, of size %d, at %p\n",
 	       sym_name, size, (void *)*gGot);
 #endif
-	if ((void *)*gGot != (void *)symt[symindx].st_value)
+	if ((void *)(uintptr_t)*gGot != (void *)(uintptr_t)symt[symindx].st_value)
 	    CmiAbort("CtgGlobalList: symbol table and GOT address mismatch!\n");
 
 #if UNPROTECT_GOT && CMK_HAS_MPROTECT
 	static void *last = NULL;
-        void *pg = (void*)(((size_t)gGot) & ~(pagesize-1));
+        void *pg = (void*)(uintptr_t)(((size_t)gGot) & ~(pagesize-1));
         if (pg != last) {
             mprotect(pg, pagesize, PROT_READ | PROT_WRITE);
             last = pg;
         }
 #endif
 
-	rec.push_back(CtgRec(gGot,datalen));
+	rec.emplace_back(gGot, datalen);
 	datalen+=gSize;
     }
 
-    nRec=rec.size();
-
 #if DEBUG_GOT_MANAGER   
     printf("relt has %d entries, %d of which are user globals\n\n", 
-	   relt_size, nRec);
+	   relt_size, rec.size());
     printf("Globals take %d bytes (padding bytes: %d)\n", datalen, padding);
 #endif
 }
@@ -372,7 +376,7 @@ public:
       seg_size=size;
         /* global data segment need to be isomalloc */
       if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-        data_seg=CmiIsomalloc(seg_size,tid);
+        data_seg=CmiIsomallocMallocForThread(tid, seg_size);
       else
         data_seg=malloc(seg_size);
     }
@@ -386,7 +390,7 @@ public:
         if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
         {
 #if !CMK_USE_MEMPOOL_ISOMALLOC
-          CmiIsomallocFree(data_seg);
+          CmiIsomallocBlockListFree(data_seg);
 #endif
         }
         else
@@ -432,8 +436,9 @@ void CtgInit(void) {
 		readBlacklist();
 		CtgGlobalList *l=new CtgGlobalList;
 		CtgGlobalStruct *g=new CtgGlobalStruct;
-		if (CmiMyNode()==0) {
-			CmiPrintf("Charm++> -swapglobals enabled\n");
+		if (!quietModeRequested && CmiMyPe() == 0) {
+			CmiPrintf("Charm++> -swapglobals enabled for automatic privatization of global variables.\n"
+				"WARNING> -swapglobals does not handle static variables.\n");
 		}
 		
 		g->allocate(l->getSize(), NULL);
@@ -487,8 +492,8 @@ CtgGlobals CtgCurrentGlobals(void){
 	return CpvAccess(_curCtg);
 }
 
-#else
+#else // CMI_SWAPGLOBALS
 
-#include "global-nop.c"
+#include "global-nop.C"
 
 #endif

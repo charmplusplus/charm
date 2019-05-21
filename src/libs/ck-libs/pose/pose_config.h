@@ -90,7 +90,7 @@
 
 /// Debugging
 #define NUM_PVT_DEBUG_BUFFER_LINES 1
-#define PVT_DEBUG_BUFFER_LINE_LENGTH 1
+#define PVT_DEBUG_BUFFER_LINE_LENGTH 64
 
 #if USE_LONG_TIMESTAMPS 
 #include "conv-config.h"

@@ -67,7 +67,8 @@ int main(int argc,char *argv[]) {
 	COLLIDE_List(c,colls);
 	printCollisions(myRank,nColl,colls);
 	delete[] colls;
-	
+
+	MPI_Finalize();
 	return 0;
 }
 

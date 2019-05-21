@@ -8,7 +8,6 @@ LIBOBJ = TopoManager.o CrayNid.o BGQTorus.o
 
 HEADERS = $(INCDIR)/TopoManager.h \
           $(INCDIR)/BGQTorus.h \
-          $(INCDIR)/BGPTorus.h \
           $(INCDIR)/XTTorus.h \
           $(INCDIR)/topomanager_config.h
 LIBDEST =  $(CDIR)/lib/$(LIB)
@@ -21,8 +20,6 @@ $(INCDIR)/TopoManager.h:
 	/bin/cp TopoManager.h $(CDIR)/include
 $(INCDIR)/BGQTorus.h:
 	/bin/cp BGQTorus.h $(CDIR)/include
-$(INCDIR)/BGPTorus.h:
-	/bin/cp BGPTorus.h $(CDIR)/include
 $(INCDIR)/XTTorus.h:
 	/bin/cp XTTorus.h $(CDIR)/include
 $(INCDIR)/topomanager_config.h: topomanager_config.h

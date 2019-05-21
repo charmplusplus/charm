@@ -21,7 +21,6 @@ class NLBStatsMsg;
 class NborBaseLB : public CBase_NborBaseLB
 {
 private:
-  CProxy_NborBaseLB  thisProxy;
   LBTopology         *topo;
 public:
   NborBaseLB(const CkLBOptions &);
@@ -31,7 +30,7 @@ public:
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
 
-  void ReceiveStats(CkMarshalledNLBStatsMessage &m); 		// Receive stats on PE 0
+  void ReceiveStats(CkMarshalledNLBStatsMessage &&m); 		// Receive stats on PE 0
   void ResumeClients();
   void ResumeClients(int balancing);
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data

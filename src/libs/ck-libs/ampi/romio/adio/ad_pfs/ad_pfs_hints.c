@@ -1,6 +1,5 @@
 /* -*- Mode: C; c-basic-offset:4 ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -15,7 +14,7 @@ void ADIOI_PFS_SetInfo(ADIO_File fd, MPI_Info users_info, int *error_code)
     struct sattr attr;
     int err, myrank, fd_sys, perm, amode, old_mask;
 
-    if (!(fd->info)) {
+    if ( (fd->info) == MPI_INFO_NULL) {
 	/* This must be part of the open call. can set striping parameters 
            if necessary. */ 
 	MPI_Info_create(&(fd->info));
@@ -25,40 +24,52 @@ void ADIOI_PFS_SetInfo(ADIO_File fd, MPI_Info users_info, int *error_code)
 	if (users_info != MPI_INFO_NULL) {
 	    value = (char *) ADIOI_Malloc((MPI_MAX_INFO_VAL+1)*sizeof(char));
 
-	    MPI_Info_get(users_info, "striping_factor", MPI_MAX_INFO_VAL, 
+	    ADIOI_Info_get(users_info, "striping_factor", MPI_MAX_INFO_VAL, 
 			 value, &flag);
 	    if (flag) {
 		str_factor=atoi(value);
 		tmp_val = str_factor;
 		MPI_Bcast(&tmp_val, 1, MPI_INT, 0, fd->comm);
+		/* --BEGIN ERROR HANDLING-- */
 		if (tmp_val != str_factor) {
-		    FPRINTF(stderr, "ADIOI_PFS_SetInfo: the value for key \"striping_factor\" must be the same on all processes\n");
-		    MPI_Abort(MPI_COMM_WORLD, 1);
+		    MPIO_ERR_CREATE_CODE_INFO_NOT_SAME(myname,
+						       "striping_factor",
+						       error_code);
+		    return;
 		}
+		/* --END ERROR HANDLING-- */
 	    }
 
-	    MPI_Info_get(users_info, "striping_unit", MPI_MAX_INFO_VAL, 
+	    ADIOI_Info_get(users_info, "striping_unit", MPI_MAX_INFO_VAL, 
 			 value, &flag);
 	    if (flag) {
 		str_unit=atoi(value);
 		tmp_val = str_unit;
 		MPI_Bcast(&tmp_val, 1, MPI_INT, 0, fd->comm);
+		/* --BEGIN ERROR HANDLING-- */
 		if (tmp_val != str_unit) {
-		    FPRINTF(stderr, "ADIOI_PFS_SetInfo: the value for key \"striping_unit\" must be the same on all processes\n");
-		    MPI_Abort(MPI_COMM_WORLD, 1);
+		    MPIO_ERR_CREATE_CODE_INFO_NOT_SAME(myname,
+						       "striping_unit",
+						       error_code);
+		    return;
 		}
+		/* --END ERROR HANDLING-- */
 	    }
 
-	    MPI_Info_get(users_info, "start_iodevice", MPI_MAX_INFO_VAL, 
+	    ADIOI_Info_get(users_info, "start_iodevice", MPI_MAX_INFO_VAL, 
 			 value, &flag);
 	    if (flag) {
 		start_iodev=atoi(value);
 		tmp_val = start_iodev;
 		MPI_Bcast(&tmp_val, 1, MPI_INT, 0, fd->comm);
+		/* --BEGIN ERROR HANDLING-- */
 		if (tmp_val != start_iodev) {
-		    FPRINTF(stderr, "ADIOI_PFS_SetInfo: the value for key \"start_iodevice\" must be the same on all processes\n");
-		    MPI_Abort(MPI_COMM_WORLD, 1);
+		    MPIO_ERR_CREATE_CODE_INFO_NOT_SAME(myname,
+						       "start_iodevice",
+						       error_code);
+		    return;
 		}
+		/* --END ERROR HANDLING-- */
 	    }
 
          /* if user has specified striping info, process 0 tries to set it */
@@ -108,15 +119,15 @@ void ADIOI_PFS_SetInfo(ADIO_File fd, MPI_Info users_info, int *error_code)
 	       If so, mark it as true in fd->info and turn it on in 
 	       ADIOI_PFS_Open after the file is opened */
 
-	    MPI_Info_get(users_info, "pfs_svr_buf", MPI_MAX_INFO_VAL, 
+	    ADIOI_Info_get(users_info, "pfs_svr_buf", MPI_MAX_INFO_VAL, 
 			 value, &flag);
 	    if (flag && (!strcmp(value, "true")))
-		MPI_Info_set(fd->info, "pfs_svr_buf", "true");
-	    else MPI_Info_set(fd->info, "pfs_svr_buf", "false");
+		ADIOI_Info_set(fd->info, "pfs_svr_buf", "true");
+	    else ADIOI_Info_set(fd->info, "pfs_svr_buf", "false");
 
 	    ADIOI_Free(value);
 	}
-	else MPI_Info_set(fd->info, "pfs_svr_buf", "false");
+	else ADIOI_Info_set(fd->info, "pfs_svr_buf", "false");
 	
 	/* set the values for collective I/O and data sieving parameters */
 	ADIOI_GEN_SetInfo(fd, users_info, error_code);
@@ -133,23 +144,23 @@ void ADIOI_PFS_SetInfo(ADIO_File fd, MPI_Info users_info, int *error_code)
 	if (users_info != MPI_INFO_NULL) {
 	    value = (char *) ADIOI_Malloc((MPI_MAX_INFO_VAL+1)*sizeof(char));
 
-	    MPI_Info_get(users_info, "pfs_svr_buf", MPI_MAX_INFO_VAL, 
+	    ADIOI_Info_get(users_info, "pfs_svr_buf", MPI_MAX_INFO_VAL, 
 			 value, &flag);
 	    if (flag && (!strcmp(value, "true") || !strcmp(value, "false"))) {
 		value_in_fd = (char *) 
                           ADIOI_Malloc((MPI_MAX_INFO_VAL+1)*sizeof(char));
-		MPI_Info_get(fd->info, "pfs_svr_buf", MPI_MAX_INFO_VAL, 
+		ADIOI_Info_get(fd->info, "pfs_svr_buf", MPI_MAX_INFO_VAL, 
 			 value_in_fd, &flag);
 		if (strcmp(value, value_in_fd)) {
 		    if (!strcmp(value, "true")) {
 			err = fcntl(fd->fd_sys, F_PFS_SVR_BUF, TRUE);
 			if (!err) 
-			    MPI_Info_set(fd->info, "pfs_svr_buf", "true");
+			    ADIOI_Info_set(fd->info, "pfs_svr_buf", "true");
 		    }
 		    else {
 			err = fcntl(fd->fd_sys, F_PFS_SVR_BUF, FALSE);
 			if (!err) 
-			    MPI_Info_set(fd->info, "pfs_svr_buf", "false");
+			    ADIOI_Info_set(fd->info, "pfs_svr_buf", "false");
 		    }
 		}
 		ADIOI_Free(value_in_fd);

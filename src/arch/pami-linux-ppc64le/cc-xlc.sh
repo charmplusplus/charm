@@ -1,1 +1,1 @@
-# empty
+CMK_COMPILER='xlc'

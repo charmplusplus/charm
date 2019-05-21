@@ -178,7 +178,7 @@ void globalStat::DOPcalc(POSE_TimeType gvt, double grt)
   POSE_TimeType vinStart, vinEnd, gvtp = gvt + 1;
   double rinStart, rinEnd;
   FILE *fp;
-  char filename[20], line[80];
+  char filename[32], line[80];
   unsigned short int *gvtDOP, *grtDOP;
   unsigned long int grtp = (unsigned long int)(grt*1000000.0) + 1, usStart, usEnd;
   int modelPEs=0, simulationPEs=0;

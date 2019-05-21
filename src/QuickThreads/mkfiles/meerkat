@@ -9,7 +9,7 @@ qt: md/m88k.h qt.c md/m88k.c md/m88k.s
 	$(CC) -pedantic -Wall -c -o qt.o qt.c
 	$(CC) -pedantic -Wall -c -o qtmdc.o md/m88k.c
 	as88 -o qtmds.o md/m88k.s
-	ar q libqt.a qt.o qtmds.o qtmdc.o
+	ar q libckqt.a qt.o qtmds.o qtmdc.o
 
 stp:
 	$(CC) -c stp.c
@@ -18,5 +18,5 @@ stp:
 testpgm:
 	$(CC) -c meas.c
 	as88 -o qtmdb.o md/m88k_b.s
-	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a
+	$(CC) -o run meas.o qtmdb.o libstp.a libckqt.a
 	

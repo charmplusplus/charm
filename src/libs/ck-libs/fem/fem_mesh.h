@@ -19,7 +19,7 @@ Orion Sky Lawlor, olawlor@acm.org, 1/3/2003
 #  include "idxl_layout.h" /*for IDXL_Layout */
 #endif
 
-#if defined(WIN32) && defined(max)
+#if defined(_WIN32) && defined(max)
 #undef max
 #endif
 
@@ -294,12 +294,12 @@ class FEM_Mesh;
 /// Return the human-readable version of this entity code, like "FEM_NODE".
 ///  storage, which must be at least 80 bytes long, is used for
 ///  non-static names, like the user tag "FEM_ELEM+2".
-CDECL const char *FEM_Get_entity_name(int entity,char *storage);
+CLINKAGE const char *FEM_Get_entity_name(int entity,char *storage);
 
 /// Return the human-readable version of this attribute code, like "FEM_CONN".
 ///  storage, which must be at least 80 bytes long, is used for
 ///  non-static names, like the user tag "FEM_DATA+7".
-CDECL const char *FEM_Get_attr_name(int attr,char *storage);
+CLINKAGE const char *FEM_Get_attr_name(int attr,char *storage);
 
 
 

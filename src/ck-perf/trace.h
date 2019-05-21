@@ -37,6 +37,9 @@ extern "C" void traceAddThreadListeners(CthThread tid, envelope *e);
 // tracing is wanted for each module
 CkpvExtern(int, traceOnPe);
 
+// eventID used for tracing of 'local' entry methods
+CpvExtern(int, curPeEvent);
+
 // A hack. We need to somehow tell the pup framework what size
 // long_long is wrt PAPI.
 #if CMK_HAS_COUNTER_PAPI
@@ -80,11 +83,18 @@ protected:
        (void)eventName; (void)e;
        return 0;
      }
-     // a user event has just occured
+     // a user event has just occurred
      virtual void userEvent(int eventID) { (void)eventID; }
-     // a pair of begin/end user event has just occured
-     virtual void userBracketEvent(int eventID, double bt, double et) {
-       (void)eventID; (void)bt; (void)et;
+     // a pair of begin/end user event has just occurred
+     virtual void userBracketEvent(int eventID, double bt, double et, int nestedID=0) {
+       (void)eventID; (void)bt; (void)et; (void) nestedID;
+     }
+     // begin/end user event pair
+     virtual void beginUserBracketEvent(int eventID, int nestedID=0) {
+       (void)eventID; (void) nestedID;
+     }
+     virtual void endUserBracketEvent(int eventID, int nestedID=0) {
+       (void)eventID; (void) nestedID;
      }
 
     //Register user stat trace module returns int identifier
@@ -123,7 +133,7 @@ protected:
      //epIdx is extracted from the envelope, num is always 1
      virtual void creation(char *) {}
      virtual void creationMulticast(envelope *, int epIdx, int num=1,
-                      int *pelist=NULL) {
+                      const int *pelist=NULL) {
        (void)epIdx; (void)num; (void)pelist;
      }
      virtual void creationDone(int num=1) { (void)num; }
@@ -192,19 +202,6 @@ protected:
     // flush log buffer immediately
     virtual void traceFlushLog() {}
 
-    //for tracing function calls
-    virtual void regFunc(const char *name, int &idx, int idxSpecifiedByUser=0) {
-      (void)name; (void)idx; (void)idxSpecifiedByUser;
-    }
-    virtual void beginFunc(const char *name,const char *file,int line) {
-      (void)name; (void)file; (void)line;
-    }
-    virtual void beginFunc(int idx,const char *file,int line) {
-      (void)idx; (void)file; (void)line;
-    }
-    virtual void endFunc(const char *name) { (void)name; }
-    virtual void endFunc(int idx) { (void)idx; }
-
     /* Memory tracing */
     virtual void malloc(void *where, int size, void **stack, int stackSize) {
       (void)where; (void)size; (void)stack; (void)stackSize;
@@ -218,10 +215,10 @@ protected:
       (void)tid; (void)e;
     }
 
-    virtual ~Trace() {} /* for whining compilers */
+    virtual ~Trace() {}
 };
 
-#define ALLDO(x) for (int i=0; i<length(); i++) if (traces[i]->traceOnPE()) traces[i]->x
+#define ALLDO(x) for (int i=0; i<length(); i++) if (traces[i] && traces[i]->traceOnPE()) traces[i]->x
 #define ALLREVERSEDO(x) for (int i=length()-1; i>=0; i--) if (traces[i]->traceOnPE()) traces[i]->x
 
 /// Array of Traces modules,  every event raised will go through every Trace module.
@@ -254,7 +251,9 @@ public:
     inline int length() const { return n; }
 
     inline void userEvent(int e) { ALLDO(userEvent(e));}
-    inline void userBracketEvent(int e,double bt, double et) {ALLDO(userBracketEvent(e,bt,et));}
+    inline void userBracketEvent(int e,double bt, double et, int nestedID=0) {ALLDO(userBracketEvent(e,bt,et,nestedID));}
+    inline void beginUserBracketEvent(int e, int nestedID=0) {ALLDO(beginUserBracketEvent(e, nestedID));}
+    inline void endUserBracketEvent(int e, int nestedID=0) {ALLDO(endUserBracketEvent(e, nestedID));}
     
     inline void beginAppWork() { ALLDO(beginAppWork());}
     inline void endAppWork() { ALLDO(endAppWork());}
@@ -279,7 +278,7 @@ public:
          */
         ALLDO(creation(msg));
     }
-    void creationMulticast(envelope *env, int ep, int num=1, int *pelist=NULL);
+    void creationMulticast(envelope *env, int ep, int num=1, const int *pelist=NULL);
     
     inline void creationDone(int num=1) { ALLDO(creationDone(num)); }
     inline void beginSDAGBlock(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx=NULL) {ALLDO(beginSDAGBlock(event, msgType, ep, srcPe, mlen,idx));}
@@ -348,12 +347,6 @@ public:
     void traceCommSetMsgID(char *msg)  { ALLDO(traceCommSetMsgID(msg)); }
     void traceGetMsgID(char *msg, int *pe, int *event) { ALLDO(traceGetMsgID(msg, pe, event)); }
     void traceSetMsgID(char *msg, int pe, int event) { ALLDO(traceSetMsgID(msg, pe, event)); }
-    /*Calls for tracing function begins and ends*/
-    inline void regFunc(const char *name, int &idx, int idxSpecifiedByUser=0){ ALLDO(regFunc(name, idx, idxSpecifiedByUser)); }
-    inline void beginFunc(const char *name,const char *file,int line){ ALLDO(beginFunc(name,file,line)); };
-    inline void beginFunc(int idx,const char *file,int line){ ALLDO(beginFunc(idx,file,line)); };
-    inline void endFunc(const char *name){ ALLDO(endFunc(name)); }
-    inline void endFunc(int idx){ ALLDO(endFunc(idx)); }
 
     /* Phase Demarcation */
     inline void endPhase() { ALLDO(endPhase()); }
@@ -389,6 +382,8 @@ extern "C" {
 
 #define _TRACE_USER_EVENT(x) _TRACE_ONLY(CkpvAccess(_traces)->userEvent(x))
 #define _TRACE_USER_EVENT_BRACKET(x,bt,et) _TRACE_ONLY(CkpvAccess(_traces)->userBracketEvent(x,bt,et))
+#define _TRACE_BEGIN_USER_EVENT_BRACKET(x) _TRACE_ONLY(CkpvAccess(_traces)->beginUserBracketEvent(x))
+#define _TRACE_END_USER_EVENT_BRACKET(x) _TRACE_ONLY(CkpvAccess(_traces)->endUserBracketEvent(x))
 #define _TRACE_BEGIN_APPWORK() _TRACE_ONLY(CkpvAccess(_traces)->beginAppWork())
 #define _TRACE_END_APPWORK() _TRACE_ONLY(CkpvAccess(_traces)->endAppWork())
 #define _TRACE_NEW_CHARE()  _TRACE_ONLY(CkpvAccess(_traces)->countNewChare())

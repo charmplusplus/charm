@@ -49,6 +49,8 @@
 #include "GridCommRefineLB.h"
 #include "manager.h"
 
+extern int quietModeRequested;
+
 CreateLBFunc_Def (GridCommRefineLB, "Grid communication load balancer (refines object mapping within each cluster)")
 
 
@@ -63,8 +65,8 @@ GridCommRefineLB::GridCommRefineLB (const CkLBOptions &opt) : CBase_GridCommRefi
 
   lbname = (char *) "GridCommRefineLB";
 
-  if (CkMyPe() == 0) {
-    CkPrintf ("[%d] GridCommRefineLB created.\n", CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested) {
+    CkPrintf ("CharmLB> GridCommRefineLB created.\n");
   }
 
   if ((value = getenv ("CK_LDB_GRIDCOMMREFINELB_TOLERANCE"))) {
@@ -260,7 +262,7 @@ void GridCommRefineLB::Examine_InterObject_Messages (CentralLB::LDStats *stats)
   int recv_object;
   int recv_pe;
   int recv_cluster;
-  LDObjKey *recv_objects;
+  const LDObjKey *recv_objects;
   int num_objects;
 
 

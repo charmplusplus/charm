@@ -99,14 +99,16 @@ inline void getPossiblePes(std::vector<int>& possible_pes, int randomly_obj_id,
 double upper_threshold_temp;
 double lower_threshold_temp;
 
+extern int quietModeRequested;
+
 CreateLBFunc_Def(TempAwareCommLB, "always assign the heaviest obj onto lightest loaded processor.")
 
 TempAwareCommLB::TempAwareCommLB(const CkLBOptions &opt): CBase_TempAwareCommLB(opt)
 {
 #ifdef TEMP_LDB
   lbname = "TempAwareCommLB";
-  if (CkMyPe()==0)
-    CkPrintf("[%d] TempAwareCommLB created\n",CkMyPe());
+  if (CkMyPe()==0 && !quietModeRequested)
+    CkPrintf("CharmLB> TempAwareCommLB created.\n");
 
 	starting=CmiWallTimer();
 	migFile=fopen("migInfo","w");

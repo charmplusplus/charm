@@ -130,8 +130,7 @@ init(void)
 
 }
 
-extern "C"
-int compareInts(const void *a,const void *b) {
+extern "C" int compareInts(const void *a,const void *b) {
   return *(int *)a - *(int *)b;
 }
 
@@ -261,8 +260,7 @@ public:
   }
 };
 
-extern "C" 
-void mesh_matrix_product(void *ptr,
+extern "C" void mesh_matrix_product(void *ptr,
         int length,int width,const double *src, double *dest)
 {
 	myMesh *m=(myMesh *)ptr;

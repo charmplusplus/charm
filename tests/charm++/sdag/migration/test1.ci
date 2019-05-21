@@ -14,7 +14,7 @@ mainmodule test1 {
     entry void process(void) {
       serial "print test" {
         CkPrintf("Migrating from PE %d\n", CkMyPe());
-	thisProxy[thisIndex].process2();
+        thisProxy[thisIndex].process2();
         this->migrateMe(0);
       }
     };

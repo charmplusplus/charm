@@ -54,7 +54,7 @@ Orion Sky Lawlor, olawlor@acm.org
 #include "ck.h"
 #include "pathHistory.h"
 
-CpvDeclare(int ,serializer);
+CpvDeclare(int ,serializer); // if !CMK_FAULT_EVAC, serializer is always 0
 
 bool _isAnytimeMigration;
 bool _isStaticInsertion;
@@ -264,9 +264,7 @@ void ArrayElement::initBasics(void)
   thisArray=info.thisArray;
   thisArrayID=info.thisArrayID;
   numInitialElements=info.numInitial.getCombinedCount();
-  if (info.listenerData) {
-    memcpy(listenerData,info.listenerData,sizeof(listenerData));
-  }
+  memcpy(listenerData,info.listenerData,sizeof(listenerData));
   if (!info.fromMigration) {
     CK_ARRAYLISTENER_LOOP(thisArray->listeners,
 			  l->ckElementCreating(this));
@@ -280,6 +278,8 @@ void ArrayElement::initBasics(void)
 #ifdef _PIPELINED_ALLREDUCE_
 	allredMgr = NULL;
 #endif
+  DEBC((AA "Inserting %llu into PE level hashtable\n" AB, ckGetID().getID()));
+  CkpvAccess(array_objs)[ckGetID().getID()] = this;
 }
 
 ArrayElement::ArrayElement(void) 
@@ -405,14 +405,21 @@ void ArrayElement::defrag(CkReductionMsg *msg)
 #endif
 }
 
-/// Remote method: calls destructor
+int ArrayElement::getRedNo(void) const
+{
+  return ((contributorInfo *)&listenerData[thisArray->reducer->ckGetOffset()])->redNo;
+}
+
+// Remote method: This removes the array element from its array manager which
+// also calls delete on this element. The superclass destructor then handles
+// cleanup of the associated location record from CkLocMgr.
 void ArrayElement::ckDestroy(void)
 {
 	if(_BgOutOfCoreFlag!=1){ //in case of taking core out of memory
 	    CK_ARRAYLISTENER_LOOP(thisArray->listeners,
 			   l->ckElementDied(this));
 	}
-	CkMigratable::ckDestroy();
+	thisArray->deleteElt(CkMigratable::ckGetID());
 }
 
 //Destructor (virtual)
@@ -422,8 +429,11 @@ ArrayElement::~ArrayElement()
   if (CkpvAccess(CkSaveRestorePrefetch)) 
     return; /* Just saving to disk--don't trash anything. */
 #endif
+  // Erase from PE level hashtable for quick receives
+  DEBC((AA "Removing %llu from PE level hashtable\n" AB, ckGetID().getID()));
+  CkpvAccess(array_objs).erase(ckGetID().getID());
   //To detect use-after-delete: 
-  thisArray=(CkArray *)0xDEADa7a1;
+  thisArray=(CkArray *)(intptr_t)0xDEADa7a1;
 }
 
 void ArrayElement::pup(PUP::er &p)
@@ -495,6 +505,27 @@ void ArrayElement::recvBroadcast(CkMessage *m){
 #endif
 }
 
+#if CMK_CHARMPY
+
+ArrayElemExt::ArrayElemExt(void *impl_msg)
+{
+  int chareIdx = ckGetChareType();
+  ctorEpIdx = _chareTable[chareIdx]->getDefaultCtor();
+  //printf("Constructor of ArrayElemExt, aid=%d, chareIdx=%d, ctorEpIdx=%d\n", ((CkGroupID)thisArrayID).idx, chareIdx, ctorEpIdx);
+  CkMarshallMsg *impl_msg_typed = (CkMarshallMsg *)impl_msg;
+  char *impl_buf = impl_msg_typed->msgBuf;
+  PUP::fromMem implP(impl_buf);
+  implP|usesAtSync;
+  int msgSize; implP|msgSize;
+  int dcopy_start; implP|dcopy_start;
+
+  ArrayMsgRecvExtCallback(((CkGroupID)thisArrayID).idx, int(thisIndexMax.getDimension()),
+                          thisIndexMax.data(), ctorEpIdx,
+                          msgSize, impl_buf+(2*sizeof(int))+sizeof(char), dcopy_start);
+}
+
+#endif
+
 /*********************** Spring Cleaning *****************
 Periodically (every minute or so) remove expired broadcasts
 from the queue.
@@ -530,24 +561,33 @@ CProxyElement_ArrayBase::CProxyElement_ArrayBase(const ArrayElement *e)
 	:CProxy_ArrayBase(e), _idx(e->ckGetArrayIndex())
 	{}
 
-CProxySection_ArrayBase::CProxySection_ArrayBase(const CkArrayID &aid, const CkArrayIndex *elems, const int nElems, int factor) :CProxy_ArrayBase(aid), _nsid(1) {
-    _sid = new CkSectionID(aid, elems, nElems, factor);
+CProxySection_ArrayBase::CProxySection_ArrayBase(const CkArrayID &aid, const CkArrayIndex *elems, const int nElems, int factor) :CProxy_ArrayBase(aid) {
+    _sid.emplace_back(aid, elems, nElems, factor);
 }
 
+CProxySection_ArrayBase::CProxySection_ArrayBase(const CkArrayID &aid, const std::vector<CkArrayIndex> &elems, int factor) :CProxy_ArrayBase(aid) {
+    _sid.emplace_back(aid, elems, factor);
+}
 
-CProxySection_ArrayBase::CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems, int factor) :CProxy_ArrayBase(aid[0]), _nsid(n) {
-    if (_nsid == 1) _sid = new CkSectionID(aid[0], elems[0], nElems[0], factor);
-    else if (_nsid > 1) {
-    _sid = new CkSectionID[n];
-    for (int i=0; i<n; ++i) _sid[i] = CkSectionID(aid[i], elems[i], nElems[i], factor);
-    } else _sid = NULL;
+CProxySection_ArrayBase::CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems, int factor) :CProxy_ArrayBase(aid[0]) {
+    _sid.resize(n);
+    for (int i=0; i<_sid.size(); i++) {
+      _sid[i] = CkSectionID(aid[i], elems[i], nElems[i], factor);
+    }
+}
+
+CProxySection_ArrayBase::CProxySection_ArrayBase(const std::vector<CkArrayID> &aid, const std::vector<std::vector<CkArrayIndex> > &elems, int factor) :CProxy_ArrayBase(aid[0]) {
+    _sid.resize(aid.size());
+    for (int i=0; i<_sid.size(); i++) {
+      _sid[i] = CkSectionID(aid[i], elems[i], factor);
+    }
 }
 
 
 void CProxySection_ArrayBase::ckAutoDelegate(int opts){
-    if(_nsid < 1)
+    if(_sid.empty())
       CmiAbort("Auto Delegation before setting up CkSectionID\n");
-    CkArray *ckarr = CProxy_CkArray(_sid->get_aid()).ckLocalBranch();
+    CkArray *ckarr = CProxy_CkArray(_sid[0].get_aid()).ckLocalBranch();
     if(ckarr->isSectionAutoDelegated()){
     	CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(ckarr->getmCastMgr()).ckLocalBranch();
     	ckSectionDelegate(mCastGrp, opts);
@@ -556,9 +596,9 @@ void CProxySection_ArrayBase::ckAutoDelegate(int opts){
 
 
 void CProxySection_ArrayBase::setReductionClient(CkCallback *cb) {
-    if(_nsid < 1)
+    if(_sid.empty())
       CmiAbort("setReductionClient before setting up CkSectionID\n");
-    CkArray *ckarr = CProxy_CkArray(_sid->get_aid()).ckLocalBranch();
+    CkArray *ckarr = CProxy_CkArray(_sid[0].get_aid()).ckLocalBranch();
     if(ckarr->isSectionAutoDelegated()){
       CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(ckarr->getmCastMgr()).ckLocalBranch();
       mCastGrp->setReductionClient(*this, cb);
@@ -570,9 +610,9 @@ void CProxySection_ArrayBase::setReductionClient(CkCallback *cb) {
 
 
 void CProxySection_ArrayBase::resetSection(){
-    if(_nsid < 1)
+    if(_sid.empty())
       CmiAbort("resetSection before setting up CkSectionID\n");
-    CkArray *ckarr = CProxy_CkArray(_sid->get_aid()).ckLocalBranch();
+    CkArray *ckarr = CProxy_CkArray(_sid[0].get_aid()).ckLocalBranch();
     if(ckarr->isSectionAutoDelegated()){
       CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(ckarr->getmCastMgr()).ckLocalBranch();
       mCastGrp->resetSection(*this);
@@ -586,194 +626,6 @@ CkLocMgr *CProxy_ArrayBase::ckLocMgr(void) const
 	{return ckLocalBranch()->getLocMgr(); }
 
 CK_REDUCTION_CLIENT_DEF(CProxy_ArrayBase,ckLocalBranch())
-
-CkArrayOptions::CkArrayOptions(void) //Default: empty array
-	: numInitial(), start(), end(), step(), bounds(), map(_defaultArrayMapID)
-{
-    init();
-}
-
-CkArrayOptions::CkArrayOptions(int ni1) //With initial elements (1D)
-	: start(CkArrayIndex1D(0)), end(CkArrayIndex1D(ni1)), step(CkArrayIndex1D(1)),
-	  numInitial(end), bounds(end), map(_defaultArrayMapID)
-{
-    init();
-}
-
-CkArrayOptions::CkArrayOptions(int ni1, int ni2) //With initial elements (2D)
-	: start(CkArrayIndex2D(0,0)), end(CkArrayIndex2D(ni1, ni2)), step(CkArrayIndex2D(1,1)),
-	  numInitial(end), bounds(end), map(_defaultArrayMapID)
-{
-    init();
-}
-
-CkArrayOptions::CkArrayOptions(int ni1, int ni2, int ni3) //With initial elements (3D)
-	: start(CkArrayIndex3D(0,0,0)), end(CkArrayIndex3D(ni1, ni2, ni3)), step(CkArrayIndex3D(1,1,1)),
-	  numInitial(end), bounds(end), map(_defaultArrayMapID)
-{
-    init();
-}
-
-CkArrayOptions::CkArrayOptions(short int ni1, short int ni2, short int ni3,
-                               short int ni4) //With initial elements (4D)
-	: start(CkArrayIndex4D(0,0,0,0)),
-	  end(CkArrayIndex4D(ni1, ni2, ni3, ni4)),
-	  step(CkArrayIndex4D(1,1,1,1)),
-	  numInitial(end), bounds(end), map(_defaultArrayMapID)
-{
-    init();
-}
-
-CkArrayOptions::CkArrayOptions(short int ni1, short int ni2, short int ni3,
-                               short int ni4, short int ni5) //With initial elements (5D)
-	: start(CkArrayIndex5D(0,0,0,0,0)),
-	  end(CkArrayIndex5D(ni1, ni2, ni3, ni4, ni5)),
-	  step(CkArrayIndex5D(1,1,1,1,1)),
-	  numInitial(end), bounds(end), map(_defaultArrayMapID)
-{
-    init();
-}
-
-CkArrayOptions::CkArrayOptions(short int ni1, short int ni2, short int ni3,
-                               short int ni4, short int ni5, short int ni6) //With initial elements (6D)
-	: start(CkArrayIndex6D(0,0,0,0,0,0)),
-	  end(CkArrayIndex6D(ni1, ni2, ni3, ni4, ni5, ni6)),
-	  step(CkArrayIndex6D(1,1,1,1,1,1)),
-	  numInitial(end), bounds(end), map(_defaultArrayMapID)
-{
-    init();
-}
-
-CkArrayOptions::CkArrayOptions(CkArrayIndex s, CkArrayIndex e, CkArrayIndex step)
-	: start(s), end(e), step(step),
-	  numInitial(end), bounds(end), map(_defaultArrayMapID)
-{
-    init();
-}
-
-void CkArrayOptions::init()
-{
-    locMgr.setZero();
-    mCastMgr.setZero();
-    anytimeMigration = _isAnytimeMigration;
-    staticInsertion = _isStaticInsertion;
-    reductionClient.type = CkCallback::invalid;
-    disableNotifyChildInRed = !_isNotifyChildInRed;
-    broadcastViaScheduler = false;
-    sectionAutoDelegate = true;
-}
-
-CkArrayOptions &CkArrayOptions::setStaticInsertion(bool b)
-{
-    staticInsertion = b;
-    if (b && map == _defaultArrayMapID)
-	map = _fastArrayMapID;
-    return *this;
-}
-
-/// Bind our elements to this array
-CkArrayOptions &CkArrayOptions::bindTo(const CkArrayID &b)
-{
-	CkArray *arr=CProxy_CkArray(b).ckLocalBranch();
-	//Stupid bug: need a way for arrays to stay the same size *FOREVER*,
-	// not just initially.
-	//setNumInitial(arr->getNumInitial());
-	return setLocationManager(arr->getLocMgr()->getGroupID());
-}
-
-CkArrayOptions &CkArrayOptions::addListener(CkArrayListener *listener)
-{
-	arrayListeners.push_back(listener);
-	return *this;
-}
-
-void CkArrayOptions::updateIndices() {
-	bool shorts = numInitial.dimension > 3;
-	start = step = end = numInitial;
-
-	for (int d = 0; d < numInitial.dimension; d++) {
-		if (shorts) {
-			((short*)start.data())[d] = 0;
-			((short*)step.data())[d] = 1;
-		} else {
-			start.data()[d] = 0;
-			step.data()[d] = 1;
-		}
-	}
-}
-
-void CkArrayOptions::updateNumInitial() {
-	if (end.dimension != start.dimension || end.dimension != step.dimension) {
-		return;
-	}
-
-	bool shorts = end.dimension > 3;
-	numInitial = end;
-	for (int d = 0; d < end.dimension; d++) {
-		int diff, increment, num;
-
-		// Extract the current dimension of the indices
-		if (shorts) {
-			diff = ((short*)end.data())[d] - ((short*)start.data())[d];
-			increment = ((short*)step.data())[d];
-		} else {
-			diff = end.data()[d] - start.data()[d];
-			increment = step.data()[d];
-		}
-
-		// Compute the number of initial elements in this dimension
-		num = diff / increment;
-		if (diff < 0) {
-			num = 0;
-		} else if (diff % increment > 0) {
-			num++;
-		}
-
-		// Set the current dimension of numInitial
-		if (shorts) {
-			((short*)numInitial.data())[d] = (short)num;
-		} else {
-			numInitial.data()[d] = num;
-		}
-	}
-}
-
-void CkArrayOptions::pup(PUP::er &p) {
-	p|start;
-	p|end;
-	p|step;
-	p|numInitial;
-	p|bounds;
-	p|map;
-	p|locMgr;
-	p|mCastMgr;
-	p|sectionAutoDelegate;
-	p|arrayListeners;
-	p|reductionClient;
-	p|anytimeMigration;
-	p|disableNotifyChildInRed;
-	p|staticInsertion;
-	p|broadcastViaScheduler;
-}
-
-CkArrayListener::CkArrayListener(int nInts_) 
-  :nInts(nInts_) 
-{
-  dataOffset=-1;
-}
-CkArrayListener::CkArrayListener(CkMigrateMessage *m) {
-  nInts=-1; dataOffset=-1;
-}
-void CkArrayListener::pup(PUP::er &p) {
-  p|nInts;
-  p|dataOffset;
-}
-
-void CkArrayListener::ckRegister(CkArray *arrMgr,int dataOffset_)
-{
-  if (dataOffset!=-1) CkAbort("Cannot register an ArrayListener twice!\n");
-  dataOffset=dataOffset_;
-}
 
 static CkArrayID CkCreateArray(CkArrayMessage *m, int ctor, CkArrayOptions opts)
 {
@@ -805,14 +657,13 @@ static CkArrayID CkCreateArray(CkArrayMessage *m, int ctor, CkArrayOptions opts)
   {
     e_opts.setGroupDepID(mCastMgr);
   }
-#if !GROUP_LEVEL_REDUCTION
-  CProxy_CkArrayReductionMgr nodereductionProxy = CProxy_CkArrayReductionMgr::ckNew();
-  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,nodereductionProxy, &e_opts);
-  nodereductionProxy.setAttachedGroup(ag);
-#else
-  CkNodeGroupID dummyid;
-  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,dummyid, &e_opts);
-#endif
+
+  // Add user defined group dependencies
+  envelope *env = UsrToEnv(m);
+  for(int i=0; i<env->getGroupDepNum(); i++) {
+    e_opts.addGroupDepID(env->getGroupDep(i));
+  }
+  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,&e_opts);
   return (CkArrayID)ag;
 }
 
@@ -904,21 +755,13 @@ void CProxy_ArrayBase::pup(PUP::er &p)
 void CProxyElement_ArrayBase::pup(PUP::er &p)
 {
   CProxy_ArrayBase::pup(p);
-  p|_idx.nInts;
-  p|_idx.dimension;
-  p(_idx.data(),_idx.nInts);
+  p|_idx;
 }
 
 void CProxySection_ArrayBase::pup(PUP::er &p)
 {
   CProxy_ArrayBase::pup(p);
-  p | _nsid;
-  if (p.isUnpacking()) {
-    if (_nsid == 1) _sid = new CkSectionID;
-    else if (_nsid > 1) _sid = new CkSectionID[_nsid];
-    else _sid = NULL;
-  }
-  for (int i=0; i<_nsid; ++i) _sid[i].pup(p);
+  p | _sid;
 }
 
 /*
@@ -951,6 +794,7 @@ void CkSendAsyncCreateArray(int ctor, CkCallback cb, CkArrayOptions opts, void *
   CkCreateArrayAsyncMsg *msg = new (ps.size()) CkCreateArrayAsyncMsg(ctor, cb, opts);
   PUP::toMem p(msg->ctorPayload);
   CkPupMessage(p, &ctorMsg);
+  CkFreeMsg(ctorMsg);
   envelope *env = UsrToEnv(msg);
   CmiSetHandler(env, ckArrayCreationHdl);
   CkPackMessage(&env);
@@ -974,6 +818,7 @@ static void CkCreateArrayAsync(void *vmsg)
   // Does the caller care about the constructed array ID?
   if (!msg->cb.isInvalid())
     msg->cb.send(new CkArrayCreatedMsg(aid));
+  delete msg;
 }
 
 /*********************** CkArray Creation *************************/
@@ -985,21 +830,20 @@ void _ckArrayInit(void)
     // disable because broadcast listener may deliver broadcast message
   CkDisableTracing(CkIndex_CkLocMgr::immigrate(0));
   // by default anytime migration is allowed
-  ckinsertIdxHdl = CkRegisterHandler(ckinsertIdxFunc);
-  ckArrayCreationHdl = CkRegisterHandler(CkCreateArrayAsync);
+  CmiAssignOnce(&ckinsertIdxHdl, CkRegisterHandler(ckinsertIdxFunc));
+  CmiAssignOnce(&ckArrayCreationHdl, CkRegisterHandler(CkCreateArrayAsync));
 }
 
-CkArray::CkArray(CkArrayOptions &opts,
-		 CkMarshalledMessage &initMsg,
-		 CkNodeGroupID nodereductionID)
-  : CkReductionMgr(nodereductionID),
-    locMgr(CProxy_CkLocMgr::ckLocalBranch(opts.getLocationManager())),
+CkArray::CkArray(CkArrayOptions &&opts,
+		 CkMarshalledMessage &&initMsg)
+  : locMgr(CProxy_CkLocMgr::ckLocalBranch(opts.getLocationManager())),
     locMgrID(opts.getLocationManager()),
-    sectionAutoDelegate(opts.isSectionAutoDelegated()),
     mCastMgrID(opts.getMcastManager()),
+    sectionAutoDelegate(opts.isSectionAutoDelegated()),
+    initCallback(opts.getInitCallback()),
     thisProxy(thisgroup),
     stableLocations(opts.staticInsertion && !opts.anytimeMigration),
-    numInitial(opts.getNumInitial()), isInserting(true)
+    numInitial(opts.getNumInitial()), isInserting(true), numPesInited(0)
 {
   // Register with our location manager
   locMgr->addManager(thisgroup,this);
@@ -1028,6 +872,8 @@ CkArray::CkArray(CkArrayOptions &opts,
 
   ///Set up initial elements (if any)
   locMgr->populateInitial(opts,initMsg.getMessage(),this);
+  if (opts.staticInsertion)
+    initDone();
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	// creating the spanning tree to be used for broadcast
@@ -1097,9 +943,11 @@ void CkArray::pup(PUP::er &p){
 	p|locMgrID;
 	p|mCastMgrID;
 	p|sectionAutoDelegate;
+	p|initCallback;
 	p|listeners;
 	p|listenerDataOffset;
         p|stableLocations;
+	p|numPesInited;
 	testPup(p,1234);
 	if(p.isUnpacking()){
 		thisProxy=thisgroup;
@@ -1176,7 +1024,7 @@ ArrayElement *CkArray::allocate(int elChareType, CkMessage *msg, bool fromMigrat
 	return elem;
 }
 
-void CkArray::insertElement(CkMarshalledMessage &m, const CkArrayIndex &idx, int listenerData[CK_ARRAYLISTENER_MAXLEN])
+void CkArray::insertElement(CkMarshalledMessage &&m, const CkArrayIndex &idx, int listenerData[CK_ARRAYLISTENER_MAXLEN])
 {
   insertElement((CkArrayMessage*)m.getMessage(), idx, listenerData);
 }
@@ -1198,6 +1046,24 @@ bool CkArray::insertElement(CkArrayMessage *me, const CkArrayIndex &idx, int lis
   CK_ARRAYLISTENER_LOOP(listeners,
       if (!l->ckElementCreated(elt)) return false;);
   return true;
+}
+
+void CkArray::initDone(void) {
+  if (initCallback.isInvalid())
+    return;
+
+  numPesInited++;
+  DEBC(("PE %d initDone, numPesInited %d, treeKids %d, parent %d\n",
+       CkMyPe(), numPesInited, treeKids(), treeParent()));
+
+  // Re-use the spanning tree for reductions over the array elements
+  // The "+1" is for the PE itself
+  if (numPesInited == treeKids() + 1) {
+    if (hasParent())
+      thisProxy[treeParent()].initDone();
+    else
+      initCallback.send(CkReductionMsg::buildNew(0, NULL));
+  }
 }
 
 void CProxy_ArrayBase::doneInserting(void)
@@ -1232,6 +1098,7 @@ void CkArray::remoteDoneInserting(void)
     DEBC((AA "Done inserting objects\n" AB));
     for (int l=0;l<listeners.size();l++) listeners[l]->ckEndInserting();
     locMgr->doneInserting();
+    initDone();
   }
 }
 
@@ -1353,18 +1220,18 @@ void CkBroadcastMsgSection(int entryIndex, void *msg, CkSectionID sID, int opts 
 void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts)
 {
 	if (ckIsDelegated()) //Just call our delegateMgr
-	  ckDelegatedTo()->ArraySectionSend(ckDelegatedPtr(), ep, msg, _nsid, _sid, opts);
+	  ckDelegatedTo()->ArraySectionSend(ckDelegatedPtr(), ep, msg, _sid.size(), _sid.data(), opts);
 	else {
 	  // send through all
-	  for (int k=0; k<_nsid; ++k) {
-	    for (int i=0; i< _sid[k]._nElems-1; i++) {
+	  for (int k=0; k<_sid.size(); ++k) {
+	    for (int i=0; i< _sid[k]._elems.size()-1; i++) {
 	      CProxyElement_ArrayBase ap(_sid[k]._cookie.get_aid(), _sid[k]._elems[i]);
 	      void *newMsg=CkCopyMsg((void **)&msg);
 	      ap.ckSend((CkArrayMessage *)newMsg,ep,opts);
 	    }
-	    if (_sid[k]._nElems > 0) {
-	      void *newMsg= (k<_nsid-1) ? CkCopyMsg((void **)&msg) : msg;
-	      CProxyElement_ArrayBase ap(_sid[k]._cookie.get_aid(), _sid[k]._elems[_sid[k]._nElems-1]);
+	    if (!_sid[k]._elems.empty()) {
+	      void *newMsg= (k<_sid.size()-1) ? CkCopyMsg((void **)&msg) : msg;
+	      CProxyElement_ArrayBase ap(_sid[k]._cookie.get_aid(), _sid[k]._elems[_sid[k]._elems.size()-1]);
 	      ap.ckSend((CkArrayMessage *)newMsg,ep,opts);
 	    }
 	  }
@@ -1674,9 +1541,14 @@ void CkArray::recvBroadcast(CkMessage *m)
 	CK_MAGICNUMBER_CHECK
 	CkArrayMessage *msg=(CkArrayMessage *)m;
 
+        envelope *env = UsrToEnv(msg);
+
         // Turn the message into a real single-element message
         unsigned short ep = msg->array_ep_bcast();
         CkAssert(UsrToEnv(msg)->getGroupNum() == thisgroup);
+
+        recvBroadcastEpIdx = UsrToEnv(msg)->getEpIdx(); // store the previous EpIx in recvBroadcastEpIdx
+
         UsrToEnv(msg)->setMsgtype(ForArrayEltMsg);
         UsrToEnv(msg)->setArrayMgr(thisgroup);
         UsrToEnv(msg)->getsetArrayEp() = ep;
@@ -1691,12 +1563,38 @@ void CkArray::recvBroadcast(CkMessage *m)
         void *root;
         _TRACE_BG_TLINE_END(&root);
 	BgSetEntryName("start-broadcast", &root);
-        CkVec<void *> logs;    // store all logs for each delivery
+        std::vector<void *> logs;    // store all logs for each delivery
 	extern void stopVTimer();
 	extern void startVTimer();
 #endif
     int len = localElemVec.size();
-    for (unsigned int i = 0; i < len; ++i) {
+
+#if CMK_ONESIDED_IMPL
+    // extract this field here so we can still check it even if msg is freed
+    const auto zc_msgtype = CMI_ZC_MSGTYPE(UsrToEnv(msg));
+
+    // All done, deliver to the first element
+    if (zc_msgtype == CMK_ZC_BCAST_RECV_ALL_DONE_MSG) {
+
+      unsigned int i=0;
+      bool doFree = true;
+      if (stableLocations && i == len-1) doFree = true;
+      broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);
+
+    } else if (zc_msgtype == CMK_ZC_BCAST_RECV_MSG) { // deliver to all array elements
+
+      //CmiPrintf("[%d][%d][%d] Received a ZC BCAST RECV MSG and len is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), len);
+
+      unsigned int i=0;
+      bool doFree = false;
+      if (stableLocations && i == len-1) doFree = true;
+      broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);
+
+    } else
+#endif
+
+    {
+      for (unsigned int i = 0; i < len; ++i) {
 #if CMK_BIGSIM_CHARM
                 //BgEntrySplit("split-broadcast");
   		stopVTimer();
@@ -1706,14 +1604,29 @@ void CkArray::recvBroadcast(CkMessage *m)
 #endif
 		bool doFree = false;
 		if (stableLocations && i == len-1) doFree = true;
+#if CMK_ONESIDED_IMPL
+		if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) doFree = false;
+#endif
+		CmiAssert(i < localElemVec.size());
 		broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);
 	}
+
+#if CMK_ONESIDED_IMPL
+    if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) {
+      CkArray *mgr = getArrayMgrFromMsg(env);
+
+      // Reset back message to be ForBocMsg with the prevEpIdx that targets CkArray group
+      env->setMsgtype(ForBocMsg);
+      env->getsetArrayEp() = mgr->getRecvBroadcastEpIdx();
+    }
 #endif
+#endif
+  }
 
 #if CMK_BIGSIM_CHARM
 	//BgEntrySplit("end-broadcast");
 	stopVTimer();
-	BgSplitEntry("end-broadcast", logs.getVec(), logs.size());
+	BgSplitEntry("end-broadcast", logs.data(), logs.size());
 	startVTimer();
 #endif
 
@@ -1727,6 +1640,26 @@ void CkArray::recvBroadcast(CkMessage *m)
 	  delete msg;
 #endif
 }
+
+#if CMK_ONESIDED_IMPL
+void CkArray::forwardZCMsgToOtherElems(envelope *env) {
+  CkArrayMessage *msg=(CkArrayMessage *)(EnvToUsr(env));
+
+  // Set the array to array element endpoint
+  unsigned short ep = msg->array_ep_bcast();
+  env->getsetArrayEp() = ep;
+
+  CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_DONE_MSG;
+
+   int len = localElemVec.size();
+
+   for (unsigned int i = 1; i < len; ++i) {
+     bool doFree = false;
+     if (stableLocations && i == len-1 && CMI_ZC_MSGTYPE(env)!=CMK_ZC_BCAST_RECV_DONE_MSG) doFree = true;
+     broadcaster->deliver((CkArrayMessage *)EnvToUsr(env), (ArrayElement*)localElemVec[i], doFree);
+   }
+}
+#endif
 
 void CkArray::flushStates() {
   CkReductionMgr::flushStates();
@@ -1750,10 +1683,16 @@ void CkArray::ckDestroy() {
   // to send messages to remote PEs with reclaimRemote messages.
   locMgr->setDuringDestruction(true);
 
-  for (unsigned int i = 0; i < localElemVec.size(); ++i)
-    localElemVec[i]->ckDestroy();
+  // ckDestroy deletes the CkMigratable, which also removes it from this vector
+  while (localElemVec.size()) {
+    localElemVec.front()->ckDestroy();
+  }
 
   locMgr->deleteManager(CkGroupID(thisProxy), this);
+  if (!mCastMgrID.isZero()) {
+    delete _localBranch(mCastMgrID);
+    mCastMgrID.setZero();
+  }
   delete this;
 }
 

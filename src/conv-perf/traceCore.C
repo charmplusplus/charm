@@ -12,7 +12,6 @@
 #include "converseEvents.h"	//TODO: remove this hack for REGISTER_CONVESE
 #include "charmEvents.h"	//TODO: remove this hack for REGISTER_CHARM
 #include "machineEvents.h"	// for machine events
-//#include "ampiEvents.h" 	/* for ampi events */
 
 CpvExtern(double, _traceCoreInitTime);
 CpvExtern(char*, _traceCoreRoot);
@@ -305,7 +304,7 @@ void TraceEntry::write(FILE* fp, int prevLID, int prevSeek, int nextLID, int nex
 
 /***************** Class TraceLogger Definition *****************/
 TraceLogger::TraceLogger(char* program, int b):
-	numLangs(1), numEntries(0), lastWriteFlag(false), prevLID(0), prevSeek(0)
+	numEntries(0), numLangs(1), lastWriteFlag(false), prevLID(0), prevSeek(0)
 {
   binary = b;
 

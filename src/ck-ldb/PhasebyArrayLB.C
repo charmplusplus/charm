@@ -7,6 +7,8 @@
 
 extern LBAllocFn getLBAllocFn(const char *lbname);
 
+extern int quietModeRequested;
+
 CreateLBFunc_Def(PhasebyArrayLB, "Load balancer which balances many arrays together, specifically for CPAIMD")
 
 #include "PhasebyArrayLB.def.h"
@@ -14,8 +16,8 @@ CreateLBFunc_Def(PhasebyArrayLB, "Load balancer which balances many arrays toget
 PhasebyArrayLB::PhasebyArrayLB(const CkLBOptions &opt): CBase_PhasebyArrayLB(opt)
 {
   lbname = (char*)"PhasebyArrayLB";
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] PhasebyArrayLB created\n",CkMyPe());
+  if (CkMyPe() == 0 && !quietModeRequested)
+    CkPrintf("CharmLB> PhasebyArrayLB created.\n");
 
   const char *lbs = theLbdb->loadbalancer(opt.getSeqNo());
   

@@ -68,7 +68,7 @@ class Main: public CBase_Main {
       if (m->argc!=4 && m->argc!=5) {
 	CkPrintf("Usage: %s <#elements> <#iterations> <msg size> [ldb freq]\n", m->argv[0]);
 	delete m;
-	CkExit();
+	CkExit(1);
       }
 
       num_chares = atoi(m->argv[1]);
@@ -94,8 +94,6 @@ class Main: public CBase_Main {
       timeRec = new double[numSteps];
 
       array = CProxy_Block::ckNew(num_chares);
-      CkCallback *cb = new CkCallback(CkIndex_Main::nextStep(NULL), thisProxy);
-      array.ckSetReductionClient(cb);
 
       beginIteration();
     }
@@ -104,8 +102,6 @@ class Main: public CBase_Main {
       currentStep++;
       if (currentStep == numSteps) {
 	CkPrintf("kNeighbor program finished!\n\n");
-	//CkCallback *cb = new CkCallback(CkIndex_Main::terminate(NULL), thisProxy);
-	//array.ckSetReductionClient(cb);
 	terminate(NULL);
 	return;
       }
@@ -329,7 +325,8 @@ class Block: public CBase_Block {
 	internalStepCnt++;
 	if (internalStepCnt==CALCPERSTEP) {
 	  double iterCommTime = CkWallTimer() - startTime;
-	  contribute(sizeof(double), &iterCommTime, CkReduction::max_double);
+    CkCallback cb(CkIndex_Main::nextStep(NULL), mainProxy);
+	  contribute(sizeof(double), &iterCommTime, CkReduction::max_double, cb);
 	  /*if(thisIndex==0){
 	    for(int i=0; i<numNeighbors; i++){
 	    CkPrintf("RTT time from neighbor %d (actual elem id %d): %lf\n", i, neighbors[i], recvTimes[i]);

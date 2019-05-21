@@ -9,11 +9,11 @@
 #define CMK_GETPAGESIZE_AVAILABLE                          0
 
 /* defines which version of memory handlers should be used.
-   used in conv-core/machine.c */
+   used in conv-core/machine.C */
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 
-#define CMK_MEMORY_PAGESIZE                                8192
+#define CMK_MEMORY_PAGESIZE                                4096
 #define CMK_MEMORY_PROTECTABLE                             1
 
 /* the following definitions set the type of shared variables to be used. only
@@ -39,23 +39,23 @@
    directly as normal c variables (1) */
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 
-/* decide which is the default implementation of the threads (see threads.c)
+/* decide which is the default implementation of the threads (see threads.C)
    Only one of the following can be 1. If none of them is selected, qthreads
    will be used as default. This default can be overwritten at compile time
    using -DCMK_THREADS_BUILD_"type"=1 */
 #define CMK_THREADS_USE_CONTEXT                            0
 #define CMK_THREADS_USE_JCONTEXT                           0
+#define CMK_THREADS_USE_FCONTEXT                           1
 #define CMK_THREADS_USE_PTHREADS                           0
 
 /* Specifies what kind of timer to use, and the correspondent headers will be
-   included in convcore.c. If none is selected, then the machine.c file needs to
+   included in convcore.C. If none is selected, then the machine.C file needs to
    implement the timer primitives. */
 #define CMK_TIMER_USE_RTC                                  0
 #define CMK_TIMER_USE_RDTSC                                0
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
-#define CMK_TIMER_USE_BLUEGENEL                            0
 
 
 /* In order to have a type with a fixed length across machines, these define the
@@ -68,9 +68,11 @@
 #if defined(CMK_HAS_STDINT_H)
 #error "Your system has stdint.h. Delete custom integer width definitions."
 #else
+#define CMK_TYPEDEF_INT1 signed char
 #define CMK_TYPEDEF_INT2 short
 #define CMK_TYPEDEF_INT4 int
 #define CMK_TYPEDEF_INT8 long long
+#define CMK_TYPEDEF_UINT1 unsigned char
 #define CMK_TYPEDEF_UINT2 unsigned short
 #define CMK_TYPEDEF_UINT4 unsigned int
 #define CMK_TYPEDEF_UINT8 unsigned long long
@@ -81,8 +83,8 @@
 #define CMK_TYPEDEF_FLOAT8 something_like_double
 
 /* Specifies what the processor will do when it is idle, either sleep (1) or go
-   into busy waiting mode (0). In convcore.c there are a few files included if
-   sleeping mode, but the real distinct implementation is in the machine.c
+   into busy waiting mode (0). In convcore.C there are a few files included if
+   sleeping mode, but the real distinct implementation is in the machine.C
    file. */
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     1
 

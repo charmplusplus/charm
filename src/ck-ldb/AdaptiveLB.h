@@ -26,7 +26,6 @@ protected:
 //  void computeNonlocalComm(long long &nmsgs, long long &nbytes);
 
 private:  
-//  CProxy_CentralLB thisProxy;
   CentralLB *greedyLB;
   CentralLB *refineLB;
   CentralLB *metisLB;

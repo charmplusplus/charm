@@ -10,9 +10,29 @@
 #include "RecBisectBfLB.decl.h"
 
 #include "ObjGraph.h"
-#include "graph.h"
 #include "bitvecset.h"
 #include "cklists.h"
+
+
+typedef struct {
+  int index;
+  float weight;
+  int firstEdge;
+  int numEdges;
+} VertexRecord;
+
+
+typedef struct {
+  int V, E;
+  VertexRecord * vertices;
+  int * edges;
+  int currentVertex; /* needed during construction of graph */
+  int currentEdge; /* needed during construction of graph */
+} Graph;
+
+
+Graph * generateRandomGraph(int numNodex);
+
 
 typedef CkQ<int> IntQueue;
 

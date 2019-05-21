@@ -51,7 +51,7 @@ public:
 
   void SayHi(int hiNo)
   {
-    int ind=CkMyPe();
+    int ind=thisIndex;
     CkPrintf("Hi[%d] from element %d\n",hiNo,ind);
     if (ind+1<CkNumPes())
       //Pass the hello on:

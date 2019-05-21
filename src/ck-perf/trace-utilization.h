@@ -44,7 +44,9 @@
 
 /* readonly */ extern CProxy_TraceUtilizationBOC traceUtilizationGroupProxy;
 
-void collectUtilizationData(void *data, double currT);
+// This function has unused arguments to match the type of
+// CcdVoidFn, which CcdCallOnConditionKeep takes
+void collectUtilizationData(void *, double);
 
 
 
@@ -205,9 +207,8 @@ double averageUtilizationInBuffer(compressedBuffer b);
 class TraceUtilization : public Trace {
  public:
   int execEp; // the currently executing EP
-  double start; // the start time for the currently executing EP
-
   unsigned int epInfoSize;
+  double start; // the start time for the currently executing EP
 
   double *cpuTime;     // NUM_BINS*epInfoSize
   int lastBinUsed;
@@ -308,7 +309,7 @@ class TraceUtilization : public Trace {
     if(cpuTime != NULL && interval <= lastBinUsed)
       return cpuTime[(interval%NUM_BINS)*epInfoSize+ep]; 
     else {
-      CkPrintf("getCPUtime called with invalid options: cpuTime=%p interval=%d ep=%d\n", cpuTime, (int)interval, (int)ep);
+      CkPrintf("getCPUtime called with invalid options: cpuTime=%p lastBinUsed=%d interval=%d ep=%d\n", cpuTime, lastBinUsed, (int)interval, (int)ep);
       return 0.0;
     }
   }

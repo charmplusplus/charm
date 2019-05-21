@@ -55,6 +55,8 @@ class bar {
 #define __CK_PUP_H
 
 #include <stdio.h> /*<- for "FILE *" */
+#include <type_traits>
+#include <utility>
 
 #ifndef __cplusplus
 #error "Use pup_c.h for C programs-- pup.h is for C++ programs"
@@ -75,6 +77,32 @@ extern "C" void CmiAbort(const char *msg);
 typedef struct {int is_only_a_name;} CkMigrateMessage;
 
 namespace PUP {
+  class er; // Forward declare for all sorts of things
+
+  /**
+   * A utility to let classes avoid default construction when they're
+   * about to be unpacked, by defining a constructor that takes a
+   * value of type PUP::reconstruct
+   */
+  struct reconstruct {};
+  namespace detail {
+    template <typename T, bool b = std::is_constructible<T, reconstruct>::value>
+    struct TemporaryObjectHolder { };
+    template <typename T>
+    struct TemporaryObjectHolder<T, true>
+    {
+      typename std::remove_cv<typename std::remove_reference<T>::type>::type t{reconstruct()};
+    };
+    template <typename T>
+    struct TemporaryObjectHolder<T, false>
+    {
+      typename std::remove_cv<typename std::remove_reference<T>::type>::type t{};
+    };
+    template <typename T>
+    void operator|(er &p, TemporaryObjectHolder<T> &t) {
+      p | t.t;
+    }
+  }
 
 #if CMK_LONG_LONG_DEFINED
 #define CMK_PUP_LONG_LONG long long
@@ -399,6 +427,18 @@ class mem : public er { //Memory-buffer packers and unpackers
  public:
   //Return the current number of buffer bytes used
   size_t size(void) const {return buf-origBuf;}
+
+  inline char* get_current_pointer() const {
+    return reinterpret_cast<char*>(buf);
+  }
+
+  inline char* get_orig_pointer() const {
+    return reinterpret_cast<char*>(origBuf);
+  }
+
+  inline void advance(size_t const offset) {
+    buf += offset;
+  }
 };
 
 //For packing into a preallocated, presized memory buffer
@@ -683,14 +723,14 @@ public:
 #define PUPable_operator_inside(className)\
     friend inline void operator|(PUP::er &p,className &a) {a.pup(p);}\
     friend inline void operator|(PUP::er &p,className* &a) {\
-	PUP::able *pa=a;  p(&pa);  a=(className *)pa;\
+	PUP::able *pa=a;  p(&pa);  a=dynamic_cast<className *>(pa);\
     }
 
 //  Macros to be used outside a class body.
 #define PUPable_operator_outside(className)\
     inline void operator|(PUP::er &p,className &a) {a.pup(p);}\
     inline void operator|(PUP::er &p,className* &a) {\
-	PUP::able *pa=a;  p(&pa);  a=(className *)pa;\
+	PUP::able *pa=a;  p(&pa);  a=dynamic_cast<className *>(pa);\
     }
 
 //Declarations to include in a PUP::able's body.
@@ -712,6 +752,11 @@ public:\
     virtual const PUP::able::PUP_ID &get_PUP_ID(void) const; \
     static void register_PUP_ID(const char* name);
 
+#define PUPable_decl_base_template(baseClassName, className)                   \
+  PUPable_decl_inside_base_template(SINGLE_ARG(baseClassName),                 \
+                                    SINGLE_ARG(className))                     \
+  PUPable_operator_inside(SINGLE_ARG(className))
+
 #define PUPable_decl_inside_template(className)	\
 private: \
     static PUP::able* call_PUP_constructor(void) { \
@@ -722,6 +767,22 @@ public: \
         return my_PUP_ID; }					\
     static void register_PUP_ID(const char* name) { \
         my_PUP_ID=register_constructor(name,call_PUP_constructor);}
+
+#define PUPable_decl_inside_base_template(baseClassName, className)            \
+private:                                                                       \
+    static PUP::able *call_PUP_constructor(void) {                             \
+        return new className((CkMigrateMessage *)0);                           \
+    }                                                                          \
+    static PUP::able::PUP_ID my_PUP_ID;                                        \
+                                                                               \
+public:                                                                        \
+    virtual const PUP::able::PUP_ID &get_PUP_ID(void) const {                  \
+        return my_PUP_ID;                                                      \
+    }                                                                          \
+    static void register_PUP_ID(const char *name) {                            \
+        my_PUP_ID =                                                            \
+           baseClassName::register_constructor(name, call_PUP_constructor);    \
+    }
 
 //PUPable_decl for classes inside a namespace: in header at file scope
 #define PUPable_decl_outside(className) \
@@ -787,20 +848,9 @@ class CkPointer {
 	T *allocated; //Pointer that PUP dynamically allocated for us (recv only)
 	T *ptr; //Read-only pointer
 
-#if 0 /* Private (do-not-use) copy constructor.  This prevents allocated from being
-         deleted twice--once in the original, and again in the copy.*/
-	CkPointer(const CkPointer<T> &src); // Don't use this!
-#else /* Some compilers, like gcc3, have a hideous bug that causes them to *demand*
-         a public copy constructor when a class is used to initialize a const-reference
-	 from a temporary.  The public copy constructor should never be called, though. */
-public:
-	CkPointer(const CkPointer<T> &src) {
-		CmiAbort("PUPable_marshall's cannot be passed by value.  Pass them only by reference!");
-	}
-  	void operator=(const CkPointer<T> &src) {
-		CmiAbort("PUPable_marshall's cannot be passed by value.  Pass them only by reference!");
-	}
-#endif
+	CkPointer(const CkPointer<T> &) = delete;
+	void operator=(const CkPointer<T> &) = delete;
+	void operator=(CkPointer<T> &&) = delete;
 protected:
 	T *peek(void) {return ptr;}
 public:
@@ -809,6 +859,14 @@ public:
 	{ 
 		allocated=0; //Don't ever delete src
 		ptr=src;
+	}
+	CkPointer(CkPointer<T> &&src)
+	{
+		allocated = src.allocated;
+		ptr = src.ptr;
+
+		src.allocated = nullptr;
+		src.ptr = nullptr;
 	}
 	
 	/// Begin completely empty: used on marshalling recv side.
@@ -903,15 +961,35 @@ template<class T> inline void PUParray(PUP::er &p,T *t,size_t n) { \
 }
 
 #else /* !CK_DEFAULT_BITWISE_PUP */
-/// Normal case: Call pup routines by default
+
+// Defines is_pupable to allow enums to be pupped in pup_stl.h
+namespace details {
+
+template <typename... Ts>
+struct make_void {
+  typedef void type;
+};
+template <typename... Ts>
+using void_t = typename make_void<Ts...>::type;
+
+template <typename T, typename U = void>
+struct is_pupable : std::false_type {};
+
+template <typename T>
+struct is_pupable<
+    T, void_t<decltype(std::declval<T>().pup(std::declval<PUP::er &>()))>>
+    : std::true_type {};
+
+}
+
 /**
-  Default operator|: call pup routine.
+  Default operator|: call pup routine (as long as T has a pup function).
 */
-template<class T>
-inline void operator|(PUP::er &p,T &t) { 
-	p.syncComment(PUP::sync_begin_object);
-	t.pup(p);
-	p.syncComment(PUP::sync_end_object); 
+template <class T, typename std::enable_if<details::is_pupable<T>::value, int>::type = 0>
+inline void operator|(PUP::er &p, T &t) {
+  p.syncComment(PUP::sync_begin_object);
+  t.pup(p);
+  p.syncComment(PUP::sync_end_object);
 }
 
 /**

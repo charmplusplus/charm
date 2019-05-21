@@ -15,8 +15,18 @@ private:
   CkLocMgr *myLocMgr;
   CkArrayIndex idx;/// Element's array index
   CmiUInt8 id;
-  bool running; /// True when inside a startTiming/stopTiming pair
   bool *deletedMarker; /// Set this if we're deleted during processing
+  bool running; /// True when inside a startTiming/stopTiming pair
+#if CMK_LBDB_ON
+  bool  asyncMigrate;  /// if readyMove is inited
+  bool  readyMigrate;    /// status whether it is ready to migrate
+  bool  enable_measure;
+  int  nextPe;              /// next migration dest processor
+  LBDatabase *the_lbdb;
+  MetaBalancer *the_metalb;
+  LDObjHandle ldHandle;
+#endif
+
 public:
 
   //Creation and Destruction:
@@ -67,18 +77,11 @@ public:
         void Migrated();
 #endif
   inline void setMeasure(bool status) { enable_measure = status; }
-private:
-  LBDatabase *the_lbdb;
-  MetaBalancer *the_metalb;
-  LDObjHandle ldHandle;
-  bool  asyncMigrate;  /// if readyMove is inited
-  bool  readyMigrate;    /// status whether it is ready to migrate
-  bool  enable_measure;
-  int  nextPe;              /// next migration dest processor
 #else
   void AsyncMigrate(bool use){};
 #endif
-/**FAULT_EVAC*/
+
+#if CMK_FAULT_EVAC
 private:
 	bool asyncEvacuate; //can the element be evacuated anytime, false for tcharm
 	bool bounced; //did this element try to immigrate into a processor which was evacuating
@@ -90,6 +93,7 @@ public:
 	void AsyncEvacuate(bool set){asyncEvacuate = set;}
 	bool isBounced(){return bounced;}
 	void Bounced(bool set){bounced = set;}
+#endif
 };
 
 #endif // CK_LOC_REC_H

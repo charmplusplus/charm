@@ -30,8 +30,8 @@ void *qt_ni(void);
 
 #define QT_ARGS(sp,u,t,uf,on) (qt_ni())
 #define QT_VARGS(sp,nb,vargs,pt,startup,vuserf,cleanup) (qt_ni())
-#define QT_BLOCK(help,old,new,sp) (qt_ni())
-#define QT_BLOCKI(help,old,new,sp) (qt_ni())
-#define QT_ABORT(help,old,new,sp) (qt_ni())
+#define QT_BLOCK(help,oldptr,newptr,sp) (qt_ni())
+#define QT_BLOCKI(help,oldptr,newptr,sp) (qt_ni())
+#define QT_ABORT(help,oldptr,newptr,sp) (qt_ni())
 
 #endif /* ndef QT_STUB_H */

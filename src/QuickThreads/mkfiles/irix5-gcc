@@ -8,7 +8,7 @@ qt: md/mips.h qt.c md/mips-irix5.s
 	ln -s md/mips.h qtmd.h
 	$(CC) -pedantic -Wall -c -o qt.o qt.c
 	as -n32 -o qtmds.o md/mips-irix5.s
-	ar q libqt.a qt.o qtmds.o
+	ar q libckqt.a qt.o qtmds.o
 
 stp:
 	$(CC) -c stp.c
@@ -17,4 +17,4 @@ stp:
 testpgm:
 	$(CC) -c meas.c
 	as -o qtmdb.o md/mips_b.s
-	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a
+	$(CC) -o run meas.o qtmdb.o libstp.a libckqt.a

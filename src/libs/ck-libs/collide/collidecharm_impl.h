@@ -234,5 +234,12 @@ public:
 	virtual void reductionDone(CkReductionMsg *m);
 };
 
+#if CMK_TRACE_ENABLED
+// List of COLLIDE functions to trace:
+static const char *funclist[] = {"COLLIDE_Init", "COLLIDE_Boxes",
+ "COLLIDE_Boxes_prio", "COLLIDE_Count", "COLLIDE_List",
+ "COLLIDE_Destroy"};
+
+#endif // CMK_TRACE_ENABLED
 
 #endif //def(thisHeader)

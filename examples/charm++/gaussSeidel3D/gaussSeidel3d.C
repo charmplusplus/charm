@@ -356,7 +356,7 @@ class GaussSeidel: public CBase_GaussSeidel {
 
     iterations++;
 
-    contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
+    contribute(CkCallback(CkReductionTarget(Main, report), mainProxy));
   }
 
 

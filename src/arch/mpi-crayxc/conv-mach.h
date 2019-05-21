@@ -17,7 +17,7 @@
 #define CMI_IO_FLUSH_USER                                  1
 
 #define CMK_GETPAGESIZE_AVAILABLE			   1
-#define CMK_MEMORY_PAGESIZE				   8192
+#define CMK_MEMORY_PAGESIZE				   4096
 #define CMK_MEMORY_PROTECTABLE				   0
 
 
@@ -29,6 +29,8 @@
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              1
 
 #define CMK_THREADS_USE_CONTEXT                            0
+#define CMK_THREADS_USE_FCONTEXT                           1
+#define CMK_THREADS_USE_JCONTEXT                           0
 #define CMK_THREADS_USE_PTHREADS                           0
 
 #define CMK_TIMER_USE_GETRUSAGE                            0

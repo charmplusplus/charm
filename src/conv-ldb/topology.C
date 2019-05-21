@@ -6,10 +6,11 @@
 #include <math.h>
 
 //#include "LBDatabase.h"
-#include "cklists.h"
+#include <vector>
+#include "converse.h"
 #include "topology.h"
 
-extern "C" char *_lbtopo;			/* topology name string */
+extern char *_lbtopo;			/* topology name string */
 
 int LBTopology::get_hop_count(int src,int dest)
 {
@@ -1236,10 +1237,11 @@ public:
 };
 
 class LBTopoVec {
-  CkVec<LBTopoMap *> lbTopos;
+    std::vector<LBTopoMap *> lbTopos;
 public:
   LBTopoVec() {
     // register all topos
+    lbTopos.reserve(64);
     lbTopos.push_back(new LBTopoMap("ring", createLBTopo_ring));
     lbTopos.push_back(new LBTopoMap("torus2d", createLBTopo_torus2d));
     lbTopos.push_back(new LBTopoMap("torus3d", createLBTopo_torus3d));
@@ -1307,24 +1309,31 @@ public:
     lbTopos.push_back(new LBTopoMap("smp_n_10", createLBTopo_smp_n_10));
   }
   ~LBTopoVec() {
-    for (int i=0; i<lbTopos.length(); i++)
-      delete lbTopos[i];
+    for (auto i : lbTopos)
+      delete i;
   }
   void push_back(LBTopoMap *map) { lbTopos.push_back(map); }
-  int length() { return lbTopos.length(); }
+  int length() { return lbTopos.size(); }
   LBTopoMap * operator[](size_t n) { return lbTopos[n]; }
   void print() {
-    for (int i=0; i<lbTopos.length(); i++) {
-      CmiPrintf("  %s\n", lbTopos[i]->name);
+    for (auto i : lbTopos) {
+      CmiPrintf("  %s\n", i->name);
     }
   }
 };
 
 static LBTopoVec* lbTopoMap;
 static CmiNodeLock lbTopoMapInitLock;
+static bool lbTopoInitialized = false;
+
+void LBTopoInit() {
+  CmiAssert(!lbTopoInitialized);
+  lbTopoMapInitLock = CmiCreateLock();
+  lbTopoInitialized = true;
+}
 
 extern "C"
-LBtopoFn LBTopoLookup(char *name)
+LBtopoFn LBTopoLookup(const char *name)
 {
   // This routine is called from an LB's constructor. LBs are Groups, so their construction happens
   // inline on PE 0 but via the scheduler on other PEs, so we use a lock instead of a barrier here.

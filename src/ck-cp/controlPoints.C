@@ -182,8 +182,8 @@ CkReductionMsg *allMeasuresReduction(int nMsg,CkReductionMsg **msgs){
 
 /// Registers the control point framework's reduction handlers at startup on each PE
 /*initproc*/ void registerCPReductions(void) {
-  idleTimeReductionType=CkReduction::addReducer(idleTimeReduction);
-  allMeasuresReductionType=CkReduction::addReducer(allMeasuresReduction);
+  idleTimeReductionType=CkReduction::addReducer(idleTimeReduction, false, "idleTimeReduction");
+  allMeasuresReductionType=CkReduction::addReducer(allMeasuresReduction, false, "allMeasuresReduction");
 }
 
 
@@ -694,8 +694,6 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
     LBDatabase * myLBdatabase = LBDatabaseObj();
     LBDB * myLBDB = myLBdatabase->getLBDB();       // LBDB is Defined in LBDBManager.h
     const CkVec<LBObj*> objs = myLBDB->getObjs();
-    const int objCount = myLBDB->getObjCount();
-    CkPrintf("LBDB info: objCount=%d objs contains %d LBObj* \n", objCount, objs.length());
     
     LBRealType maxObjWallTime = -1.0;
     
@@ -925,8 +923,8 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
   void controlPointManager::doExitNow(){
           _TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _threadEP,CkMyPe(), 0, NULL, this);
 	  writeOutputToDisk();
-	  //	  CkPrintf("[%d] Control point manager calling CkExit()\n", CkMyPe());
-	  CkExit();
+    // CkPrintf("[%d] Control point manager calling CkContinueExit()\n", CkMyPe());
+    CkContinueExit();
   }
 
   void controlPointManager::writeOutputToDisk(){
@@ -1029,7 +1027,7 @@ void gotoNextPhase(){
   controlPointManagerProxy.ckLocalBranch()->gotoNextPhase();
 }
 
-FDECL void FTN_NAME(GOTONEXTPHASE,gotonextphase)()
+FLINKAGE void FTN_NAME(GOTONEXTPHASE,gotonextphase)()
 {
   gotoNextPhase();
 }
@@ -1213,13 +1211,13 @@ void controlPointTimingStamp() {
   controlPointManagerProxy.ckLocalBranch()->setTiming(duration);
 }
 
-FDECL void FTN_NAME(CONTROLPOINTTIMINGSTAMP,controlpointtimingstamp)()
+FLINKAGE void FTN_NAME(CONTROLPOINTTIMINGSTAMP,controlpointtimingstamp)()
 {
   controlPointTimingStamp();
 }
 
 
-FDECL void FTN_NAME(SETFRAMEWORKADVANCEPHASEF,setframeworkadvancephasef)(CMK_TYPEDEF_INT4 *value) 
+FLINKAGE void FTN_NAME(SETFRAMEWORKADVANCEPHASEF,setframeworkadvancephasef)(CMK_TYPEDEF_INT4 *value)
 {
   setFrameworkAdvancePhase(*value);
 }
@@ -1231,9 +1229,12 @@ FDECL void FTN_NAME(SETFRAMEWORKADVANCEPHASEF,setframeworkadvancephasef)(CMK_TYP
 extern "C" void controlPointShutdown(){
   if(CkMyPe() == 0){
 
-    // wait for gathering of idle time & memory usage to complete
-    controlPointManagerProxy.ckLocalBranch()->exitIfReady();
-
+    if (!controlPointManagerProxy.ckGetGroupID().isZero()) {
+      // wait for gathering of idle time & memory usage to complete
+      controlPointManagerProxy.ckLocalBranch()->exitIfReady();
+    } else {
+      CkContinueExit();
+    }
   }
 }
 
@@ -2224,7 +2225,7 @@ int controlPoint(const char *name, int lb, int ub){
 }
 
 
-FDECL int FTN_NAME(CONTROLPOINT, controlpoint)(CMK_TYPEDEF_INT4 *lb, CMK_TYPEDEF_INT4 *ub){
+FLINKAGE int FTN_NAME(CONTROLPOINT, controlpoint)(CMK_TYPEDEF_INT4 *lb, CMK_TYPEDEF_INT4 *ub){
   CkAssert(CkMyPe() == 0);
   return controlPoint("FortranCP", *lb, *ub);
 }

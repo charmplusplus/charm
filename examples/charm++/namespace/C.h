@@ -7,6 +7,7 @@ class C : public CBase_C {
   public: 
     C();
     C(CkMigrateMessage *m);
+    void quit();
 };
 
 #endif

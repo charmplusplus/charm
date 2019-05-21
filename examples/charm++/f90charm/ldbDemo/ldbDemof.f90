@@ -35,7 +35,7 @@
         objPtr%obj%next = MOD( index+1, nElements)
         objPtr%obj%iteration = 0
         objPtr%obj%count = 0
-        call nextStep(objPtr, index)
+        call BalanceMe_Entry_nextStep(objPtr, index)
       END SUBROUTINE
 
 !   user MUST write this puper subroutine
@@ -75,7 +75,7 @@
         integer index
 
           ! load balancing finish, start next step
-        call nextStep(objPtr, index)
+        call BalanceMe_Entry_nextStep(objPtr, index)
       END SUBROUTINE
 
       INTEGER FUNCTION doWork(workTime)
@@ -93,7 +93,7 @@
      END FUNCTION
 
 !    define fortran entry function
-      SUBROUTINE nbrData(objPtr, myIndex, size, D, k)
+      SUBROUTINE BalanceMe_Entry_nbrData(objPtr, myIndex, size, D, k)
         USE LdbDemoMod
         IMPLICIT NONE
         INTEGER doWork
@@ -102,30 +102,32 @@
         integer myIndex
         integer size, k, res
         REAL*4  D(size)
+        REAL*8  n
 
-        res = doWork(objPtr%obj%n * 0.00001)
+        n = objPtr%obj%n
+        res = doWork(n * 0.00001)
 
         objPtr%obj%iteration = objPtr%obj%iteration+1
         IF (MOD(objPtr%obj%iteration, 5) .eq. 0) THEN
            ! AtSync to start load balancing
           call BalanceMe_atSync(objPtr%aid, myIndex)
         ELSE
-          call SendTo_BalanceMe_barrier(objPtr%aid, 0)
+          call BalanceMe_Invoke_barrier(objPtr%aid, 0)
         ENDIF
       END SUBROUTINE
 
-      SUBROUTINE nextStep(objPtr, myIndex)
+      SUBROUTINE BalanceMe_Entry_nextStep(objPtr, myIndex)
         USE LdbDemoMod
         IMPLICIT NONE
 
         TYPE(LdbDemoPtr) objPtr
         integer myIndex
 
-        call SendTo_BalanceMe_nbrData(objPtr%aid, objPtr%obj%next, objPtr%obj%n, objPtr%obj%myData, myIndex)
+        call BalanceMe_Invoke_nbrData(objPtr%aid, objPtr%obj%next, objPtr%obj%n, objPtr%obj%myData, myIndex)
 
       END SUBROUTINE
 
-      SUBROUTINE barrier(objPtr, myIndex)
+      SUBROUTINE BalanceMe_Entry_barrier(objPtr, myIndex)
         USE LdbDemoMod
         IMPLICIT NONE
 
@@ -144,8 +146,7 @@
             call CkPrintf("ALL done in %F seconds.\n$$", t1-objPtr%obj%t0)
             call CkExit()
           ELSE
-             ! broadcast using "-1"
-            call SendTo_BalanceMe_nextStep(objPtr%aid, -1);
+            call BalanceMe_Broadcast_nextStep(objPtr%aid);
           ENDIF
         ENDIF
       END SUBROUTINE

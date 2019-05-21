@@ -21,6 +21,12 @@ struct CompletionStatus {
   int stageIndex;
   int numContributors;
   std::vector<int> dimensionsToFlush;
+
+  void pup(PUP::er &p) {
+    p|stageIndex;
+    p|numContributors;
+    p|dimensionsToFlush;
+  }
 };
 
 // use CRTP to avoid overhead of virtual functions
@@ -84,6 +90,16 @@ public:
 #endif
 
     static_cast<Derived*>(this)->additionalInitialization();
+  }
+
+  void pup(PUP::er &p) {
+    p|numDimensions_;
+    p|myIndex_;
+    p|numMembers_;
+    p|individualDimensionSizes_;
+    p|combinedDimensionSizes_;
+    p|myLocationIndex_;
+    p|initialRoutingDimension_;
   }
 
   // // skeleton for defining a new routing class:
@@ -158,11 +174,17 @@ public:
 
   inline void determineInitialRoute(int destinationPe,
                                     Route &routeToDestination) {
-    // treat newly inserted items as if they were received along
-    // a higher dimension (e.g. for a 3D mesh, received along 4th dimension)
-    static_cast<Derived*>(this)->
-      determineRoute(destinationPe, this->initialRoutingDimension_ + 1,
-                     routeToDestination);
+    if (destinationPe == CkMyPe()) {
+      routeToDestination.dimension      = 0;
+      routeToDestination.destinationPe  = destinationPe;
+      routeToDestination.dimensionIndex = routeAlongDimension(destinationPe, 0);
+    } else {
+      // treat newly inserted items as if they were received along
+      // a higher dimension (e.g. for a 3D mesh, received along 4th dimension)
+      static_cast<Derived*>(this)->
+        determineRoute(destinationPe, this->initialRoutingDimension_ + 1,
+                       routeToDestination);
+    }
   }
 
   inline void determineRoute(int destinationPe, int dimensionReceivedAlong,
@@ -222,7 +244,7 @@ public:
   }
 
   inline bool isMessagePersonalized(int dimension) {
-    return dimension == 0;
+    return false;
   }
 
   inline int dimensionReceived(int msgType) {
@@ -231,7 +253,11 @@ public:
   }
 
   inline int determineMsgType(int dimension) {
+#if CMK_MULTICORE
+    return !isMessagePersonalized(dimension);
+#else
     return dimension;
+#endif
   }
 
   inline bool isBufferInUse(int dimension, int index) {
@@ -455,8 +481,7 @@ public:
   }
 
   inline bool isBufferInUse(int dimension, int index) {
-    return dimension != myAssignedDim_
-      || index != myLocationIndex_[dimension];
+    return true;
   }
 
   inline bool isBroadcastSupported() {

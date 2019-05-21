@@ -1,33 +1,47 @@
 #! /bin/sh
 
+cmd=""
 args=""
 QUIET=0
 
 while [ $# -gt 0 ]
 do
         case $1 in
-	+p|+ppn)     args=$args" "$1" "$2
-                shift;
+	+p|+ppn|++ppn)
+		args=$args" "$1" "$2
+		shift;
 		shift
 		;;
-        ++ppn)  echo please use +ppn instead of ++ppn
-                exit 1
-                ;;
-        +*)
-                args=$args" "$1
-                shift
-                ;;
 	++quiet)
 		QUIET=1
-		args=$args" "$1
+		shift
 		;;
-        *)
-		break;
+	++no-quiet)
+		QUIET=0
+		shift
+		;;
+	++local|++no-local)
+		# consume and ignore, local-mode is all that multicore supports
+		shift
+		;;
+	+*)
+		args=$args" "$1
+		shift
+		;;
+	*)
+		if [ -z "$cmd" ]; then
+			cmd=$1
+		else
+			args=$args" "$1
+		fi
+		shift
 		;;
 	esac
 done
 
-test $QUIET -eq 0 && echo Running command: $* $args
+test $QUIET -eq 1 && args=$args" "++quiet
+
+test $QUIET -eq 0 && echo Running command: $cmd $args
 test $QUIET -eq 0 && echo
 
-exec $* $args
+exec $cmd $args

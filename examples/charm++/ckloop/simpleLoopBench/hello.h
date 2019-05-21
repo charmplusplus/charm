@@ -6,6 +6,12 @@
 #include "hello.decl.h"
 #include <assert.h>
 
+#define USE_LAMBDA 0
+#if USE_LAMBDA
+#define USE_CKLOOP 1
+#include "CkLambda.h"
+#endif
+
 class Main : public Chare {
 private:
 	int numElemFinished; //record the number of test instances finished in a timestep

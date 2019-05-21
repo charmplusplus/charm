@@ -1,4 +1,5 @@
 CDIR=../../../..
+-include $(CDIR)/include/conv-mach-opt.mak
 CHARMC=$(CDIR)/bin/charmc $(OPTS) -I../../..
 FLAGS=-DEXTERIOR_BLACK_PIXEL_ELIMINATION
 
@@ -13,7 +14,7 @@ all: $(DEST)
 
 $(DEST): $(OBJS) $(COMPAT) headers
 	$(CHARMC) $(OBJS) $(COMPAT) -o $@
-	(cd $(CDIR)/tmp; . ./conv-mach-opt.sh && echo "$$CMK_LIBJPEG") > $(DEP)
+	echo $(CMK_LIBJPEG) > $(DEP)
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/

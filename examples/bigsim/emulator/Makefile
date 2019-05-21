@@ -6,7 +6,7 @@ BINS=jacobi3D maxReduce prime ping octo line ring
 BUT_ONE=maxReduce prime ping octo line ring
 
 all: $(BINS)
-	cd littleMD; $(MAKE)
+	$(MAKE) -C littleMD
 
 jacobi3D: common.o
 	$(CHARMC) -o $@ $^
@@ -36,4 +36,4 @@ clean:
 	rm -f $(BINS)
 	rm -f $(patsubst %,%.exe,$(BINS))
 	rm -f conv-host charmrun
-	cd littleMD; $(MAKE) clean
+	$(MAKE) -C littleMD clean

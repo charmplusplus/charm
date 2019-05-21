@@ -1,0 +1,41 @@
+mainmodule pingpong {
+
+  readonly CProxy_main mainProxy;
+  readonly bool warmUp;
+  readonly int minSize;
+  readonly int maxSize;
+  readonly int smallIter;
+  readonly int bigIter;
+
+  mainchare main {
+    entry main(CkArgMsg *m);
+    entry void maindone();
+  };
+
+  array [1D] Ping1 {
+    entry Ping1();
+    entry void start(int size);
+
+    // Method for regular API pingpong
+    entry void recv(char msg[size], int size);
+
+    // Methods for Get Get Pingpong using the Ncpy Direct API
+    entry void setupGetGetPingpong(int size);
+    entry void beginGetGetPingpong();
+    entry void callbackGetGetPingpong();
+    entry void recvNcpySrcInfo(CkNcpyBuffer src);
+    entry void endGetGetPingpong();
+    entry void doneGetGetPingpong();
+
+    // Methods for Put Put Pingpong using the Ncpy Direct API
+    entry void setupPutPutPingpong(int size);
+    entry void beginPutPutPingpong();
+    entry void callbackPutPutPingpong();
+    entry void askNcpyDestInfo();
+    entry void recvNcpyDestInfo(CkNcpyBuffer dest);
+    entry void endPutPutPingpong();
+    entry void donePutPutPingpong();
+
+    entry void freeBuffer();
+  };
+};

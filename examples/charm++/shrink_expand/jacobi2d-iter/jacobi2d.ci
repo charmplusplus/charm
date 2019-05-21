@@ -10,7 +10,7 @@ mainmodule jacobi2d {
 
   mainchare [migratable]  Main {
     entry Main(CkArgMsg *m);
-	entry void report(CkReductionMsg *m);
+	entry [reductiontarget] void report(int completed_iteration);
   };
 
   array [2D] Jacobi {

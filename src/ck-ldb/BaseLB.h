@@ -123,7 +123,7 @@ public:
     /// given an LDObjKey, returns the index in the objData vector
     /// this index changes every time one does load balancing even within a run
     int getHash(const LDObjKey &);
-    int getHash(const LDObjid &oid, const LDOMid &mid);
+    int getHash(const CmiUInt8 &oid, const LDOMid &mid);
     int getSendHash(LDCommData &cData);
     int getRecvHash(LDCommData &cData);
     void clearCommHash();
@@ -174,9 +174,6 @@ struct MigrateInfo {
     int to_pe;
     int async_arrival;	    // if an object is available for immediate migrate
     MigrateInfo():  async_arrival(0) {
-#if CMK_GLOBAL_LOCATION_UPDATE
-      obj.id.isArrayElement = 0; 
-#endif
     }
 
     void pup(PUP::er &p) {

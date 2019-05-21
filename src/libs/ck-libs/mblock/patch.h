@@ -54,6 +54,7 @@ public:
 	}
 	
 	patch(void) { } /*Migration constructor*/
+  virtual ~patch() { }
 protected:
 	patch(const blockSpan &span_);
 };

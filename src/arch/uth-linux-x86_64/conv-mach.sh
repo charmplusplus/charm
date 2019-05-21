@@ -1,11 +1,9 @@
-CMK_CPP_CHARM='/lib/cpp -P'
-CMK_CPP_C='gcc -E'
-CMK_CXXPP='g++ -x c++ -E'
-CMK_CC='gcc'
-CMK_CXX='g++  -Wno-deprecated'
+. $CHARMINC/cc-gcc.sh
+
+CMK_CXX_FLAGS="$CMK_CXX_FLAGS -Wno-deprecated"
 CMK_CF77='f77'
 CMK_CF90='f90'
-CMK_RANLIB='ranlib'
-CMK_LIBS='-lckqt'
 CMK_QT='generic64-light'
 CMK_XIOPTS=''
+CMK_NO_PARTITIONS="1"
+CMK_CCS_AVAILABLE='0'

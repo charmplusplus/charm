@@ -7,10 +7,10 @@
 
 
 Main::Main()
-{ };
+{}
 
 Main::Main(CkMigrateMessage* msg) 
-{};
+{}
 
 Main::Main(CkArgMsg *m) 
 {
@@ -26,8 +26,6 @@ Main::Main(CkArgMsg *m)
 	mainhandle = thishandle;
 	testProxy1D = CProxy_Test1D::ckNew(arrayDimension);
 	sectionProxy = new CProxySection_Test1D[arrayDimension];
-	CkCallback *cb = new CkCallback(CkIndex_Main::reportSum(NULL), mainProxy);
-	testProxy1D.ckSetReductionClient(cb);
 	
 	//Multicast stuff
 	CkArrayID testArrayID = testProxy1D.ckGetArrayID();
@@ -36,7 +34,6 @@ Main::Main(CkArgMsg *m)
 	{
 		//creating sectionProxy[i]:
 		sectionProxy[i] = CProxySection_Test1D::ckNew(testArrayID, 0, arrayDimension-1, i+1);
-		sectionProxy[i].setReductionClient(cb);
 		//msg for sectionProxy[i]
 		DummyMsg *msg = new DummyMsg;
 		msg->section = i;
@@ -46,7 +43,7 @@ Main::Main(CkArgMsg *m)
 	//Quiscence
 	int myIndex = CkIndex_Main::QuiDetect();
 	CkStartQD(myIndex, &mainhandle);
-};
+}
 
 void Main::reportSum(CkReductionMsg *m)
 {
@@ -59,7 +56,7 @@ void Main::reportSum(CkReductionMsg *m)
 	}
 	CkPrintf("\n");
 	delete m;
-};
+}
 
 void Main::QuiDetect()
 {
@@ -94,6 +91,6 @@ void Main::QuiDetect()
 		CkPrintf("\n");
 	}*/
 	CkExit();
-};
+}
 
 #include "main.def.h"

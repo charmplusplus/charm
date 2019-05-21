@@ -12,7 +12,6 @@
 #ifndef __TPM_STANDALONE__
 #include "partitioning_strategies.h"
 #endif
-#include <vector>
 #include <algorithm>
 
 struct CompareRankDist {
@@ -31,25 +30,7 @@ struct CompareRankDist {
 
 
 TopoManager::TopoManager() {
-#if CMK_BLUEGENEP
-  dimX = bgptm.getDimX();
-  dimY = bgptm.getDimY();
-  dimZ = bgptm.getDimZ();
-
-  dimNX = bgptm.getDimNX();
-  dimNY = bgptm.getDimNY();
-  dimNZ = bgptm.getDimNZ();
-  dimNT = bgptm.getDimNT();
-
-  procsPerNode = bgptm.getProcsPerNode();
-  int *torus;
-  torus = bgptm.isTorus();
-  torusX = torus[0];
-  torusY = torus[1];
-  torusZ = torus[2];
-  torusT = torus[3];
-
-#elif CMK_BLUEGENEQ
+#if CMK_BLUEGENEQ
   dimX = bgqtm.getDimX();
   dimY = bgqtm.getDimY();
   dimZ = bgqtm.getDimZ();
@@ -149,11 +130,18 @@ TopoManager::TopoManager(int NX, int NY, int NZ, int NT) : dimNX(NX), dimNY(NY),
   numPes = dimNX * dimNY * dimNZ * dimNT;
 }
 
+void TopoManager::rankToCoordinates(int pe, std::vector<int> &coords) const {
+  coords.resize(getNumDims()+1);
+#if CMK_BLUEGENEQ
+  rankToCoordinates(pe,coords[0],coords[1],coords[2],coords[3],coords[4],coords[5]);
+#else
+  rankToCoordinates(pe,coords[0],coords[1],coords[2],coords[3]);
+#endif
+}
+
 void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) const {
   CmiAssert( pe >= 0 && pe < numPes );
-#if CMK_BLUEGENEP
-  bgptm.rankToCoordinates(pe, x, y, z);
-#elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+#if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 	int t;
   xttm.rankToCoordinates(pe, x, y, z, t);
 #else
@@ -187,9 +175,7 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) const {
 
 void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) const {
   CmiAssert( pe >= 0 && pe < numPes );
-#if CMK_BLUEGENEP
-  bgptm.rankToCoordinates(pe, x, y, z, t);
-#elif CMK_BLUEGENEQ
+#if CMK_BLUEGENEQ
   bgqtm.rankToCoordinates(pe, x, y, z, t);
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
   xttm.rankToCoordinates(pe, x, y, z, t);
@@ -240,9 +226,7 @@ int TopoManager::coordinatesToRank(int x, int y, int z) const {
 #endif
 
 
-#if CMK_BLUEGENEP
-  return bgptm.coordinatesToRank(x, y, z);
-#elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+#if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
   return xttm.coordinatesToRank(x, y, z, 0);
 #else
   if(dimY > 1)
@@ -262,9 +246,7 @@ int TopoManager::coordinatesToRank(int x, int y, int z, int t) const {
     return t + x * dimNT;
 #endif
 
-#if CMK_BLUEGENEP
-  return bgptm.coordinatesToRank(x, y, z, t);
-#elif CMK_BLUEGENEQ
+#if CMK_BLUEGENEQ
   return bgqtm.coordinatesToRank(x, y, z, t);
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
   return xttm.coordinatesToRank(x, y, z, t);
@@ -417,6 +399,7 @@ extern void bgq_topo_reset();
 extern void bgq_topo_free();
 #endif
 
+static bool _topoInitialized = false;
 CmiNodeLock _topoLock = 0;
 TopoManager *_tmgr = NULL;
 #ifdef __TPM_STANDALONE__
@@ -425,24 +408,26 @@ int _tpm_numthreads = 1;
 #endif
 
 TopoManager *TopoManager::getTopoManager() {
-  CmiAssert(_topoLock != 0);
-  if (_tmgr == NULL) TopoManager_reset();
+  CmiAssert(_topoInitialized);
+  CmiAssert(_tmgr != NULL);
   return _tmgr;
 }
 
 #ifndef __TPM_STANDALONE__
+// NOTE: this is not thread-safe
 extern "C" void TopoManager_init() {
 #else
 extern "C" void TopoManager_init(int numpes) {
   _tpm_numpes = numpes;
 #endif
-  if(_topoLock == 0) {
+  if(!_topoInitialized) {
     _topoLock = CmiCreateLock();
 #if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
     craynid_init();
 #elif CMK_BLUEGENEQ
     bgq_topo_init();
 #endif
+    _topoInitialized = true;
   }
 #ifdef __TPM_STANDALONE__
   if(_tmgr) delete _tmgr;

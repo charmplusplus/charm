@@ -23,8 +23,7 @@ For example:
 Compiling and Linking AMPI Programs
 -----------------------------------
 AMPI source files can be compiled and linked with the wrappers found
-in bin/, such as ampicc, ampicxx, ampif77, and ampif90, or with
-"charmc -language ampi". For example:
+in bin/, such as ampicc, ampicxx, ampif77, and ampif90:
 
     ampif90 pgm.f90 -o pgm
 
@@ -65,24 +64,17 @@ variable privatization and automated approaches to privatization.
 AMPI programs must have the following main function signatures, so that AMPI
 can bootstrap before invoking the user's main function:
     * C/C++ programs should use "int main(int argc, char **argv)"
-    * Fortran programs should use "Subroutine MPI_Main" instead of
+    * Fortran programs must use "Subroutine MPI_Main" instead of
       "Program Main"
 
 
 Incompatibilities and Extensions
 --------------------------------
 AMPI has some known flaws and incompatibilities with other MPI implementations:
-    * MPI_Cancel does not actually cancel pending communication.
-    * MPI_Sendrecv_replace gives incorrect results.
-    * Persistent sends with Irsend don't work.
-    * Isend/Irecv do not work when using MPI_LONG_DOUBLE.
-    * MPI_Get_elements returns the expected number of elements instead of the 
-      actual number received.
-    * MPI_Unpack gives incorrect results.
-    * Data alignment in user defined types does not match the MPI standard.
-    * Scatter/gather using noncontiguous types gives incorrect results.
-    * Datatypes are not reused, freed, or reference counted.
-    * The PMPI profiling interface is not implemented in AMPI.
+    * RMA routines do not have support for derived datatypes.
+    * Not all collectives are supported on intercommunicators.
+    * No support for MPI_Pack_external, MPI_Pack_external_size, MPI_Unpack_external,
+      or MPI_Type_match_size.
 
 AMPI also has extensions to the MPI standard to enable use of the high-level
 features provided by the Charm++ adaptive runtime system. All extensions are
@@ -97,6 +89,7 @@ prefixed with AMPI_:
     * AMPI_Load_set_value sets the calling rank's load to the given user value.
     * AMPI_Load_start_measure starts load balance information collection.
     * AMPI_Load_stop_measure stops load balance information collection.
+    * AMPI_Load_reset_measure clears the load balance database.
     * AMPI_Migrate_to_pe migrates the calling rank to the given PE.
     * AMPI_Set_migratable sets the migratability of the calling rank.
     * AMPI_Command_argument_count returns the number of command line arguments

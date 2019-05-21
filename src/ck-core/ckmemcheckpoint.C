@@ -191,13 +191,13 @@ void ArrayElement::inmem_checkpoint(CkArrayCheckPTReqMessage *m) {
 //printf("[%d] checkpointing %s\n", CkMyPe(), index);
   CkLocMgr *locMgr = thisArray->getLocMgr();
   CmiAssert(myRec!=NULL);
-  int size;
+  size_t size;
   {
         PUP::sizer p;
         locMgr->pupElementsFor (p, myRec, CkElementCreation_migrate);
         size = p.size();
   }
-  int packSize = size/sizeof(double) +1;
+  size_t packSize = size/sizeof(double) +1;
   CkArrayCheckPTMessage *msg =
                  new (packSize, 0) CkArrayCheckPTMessage;
   msg->len = size;
@@ -250,7 +250,7 @@ public:
      pNo = b1;  if (pNo == CkMyPe()) pNo = b2;
      CmiAssert(pNo != CkMyPe());
   }
-  inline int getSize() { 
+  inline size_t getSize() {
      CmiAssert(ckBuffer);
      return ckBuffer->len; 
   }
@@ -259,32 +259,31 @@ public:
 // checkpoint holder class - for in-disk checkpointing
 class CkDiskCheckPTInfo: public CkCheckPTInfo 
 {
-  char *fname;
+  std::string fname;
   int bud1, bud2;
-  int len; 			// checkpoint size
+  size_t len; 			// checkpoint size
 public:
   CkDiskCheckPTInfo(CkArrayID a, CkGroupID loc, CkArrayIndex idx, int pno, int myidx): CkCheckPTInfo(a, loc, idx, pno)
   {
 #if CMK_USE_MKSTEMP
-    fname = new char[64];
 #if CMK_CONVERSE_MPI
-    sprintf(fname, "/tmp/ckpt%d-%d-%d-XXXXXX",CmiMyPartition(), CkMyPe(), myidx);
+    fname = "/tmp/ckpt" + std::to_string(CmiMyPartition()) + "-" + std::to_string(CkMyPe()) + "-" + std::to_string(myidx) + "-XXXXXX";
 #else
-    sprintf(fname, "/tmp/ckpt%d-%d-XXXXXX", CkMyPe(), myidx);
+    fname = "/tmp/ckpt" + std::to_string(CkMyPe()) + "-" + std::to_string(myidx) + "-XXXXXX";
 #endif
-    if(mkstemp(fname) < 0)
+    if(mkstemp(&fname[0]) < 0)
     {
       CmiAbort("mkstemp fail in checkpoint");
     }
 #else
-    fname=tmpnam(NULL);
+    fname = tmpnam(NULL);
 #endif
     bud1 = bud2 = -1;
     len = 0;
   }
   ~CkDiskCheckPTInfo() 
   {
-    remove(fname);
+    remove(fname.c_str());
   }
   inline void updateBuffer(CkArrayCheckPTMessage *data) 
   {
@@ -293,7 +292,7 @@ public:
     envelope *env = UsrToEnv(data);
     CkUnpackMessage(&env);
     data = (CkArrayCheckPTMessage *)EnvToUsr(env);
-    FILE *f = fopen(fname,"wb");
+    FILE *f = fopen(fname.c_str(),"wb");
     PUP::toDisk p(f);
     CkPupMessage(p, (void **)&data);
     // delay sync to the end because otherwise the messages are blocked
@@ -308,7 +307,7 @@ public:
   inline CkArrayCheckPTMessage * getCopy()	// get a copy of checkpoint
   {
     CkArrayCheckPTMessage *data;
-    FILE *f = fopen(fname,"rb");
+    FILE *f = fopen(fname.c_str(),"rb");
     PUP::fromDisk p(f);
     CkPupMessage(p, (void **)&data);
     fclose(f);
@@ -321,7 +320,7 @@ public:
      pNo = b1;  if (pNo == CkMyPe()) pNo = b2;
      CmiAssert(pNo != CkMyPe());
   }
-  inline int getSize() { 
+  inline size_t getSize() {
      return len; 
   }
 };
@@ -351,10 +350,12 @@ CkMemCheckPT::CkMemCheckPT(int w)
   where = w;
 
 #if CMK_CONVERSE_MPI
-  void pingBuddy();
-  void pingCheckHandler();
-  CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
-  CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+  if(CkNumPes() > 1) {
+    void pingBuddy();
+    void pingCheckHandler();
+    CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
+    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+  }
 #endif
 #if CMK_CHKP_ALL
   initEntry();
@@ -371,9 +372,8 @@ void CkMemCheckPT::initEntry()
 
 CkMemCheckPT::~CkMemCheckPT()
 {
-  int len = ckTable.length();
-  for (int i=0; i<len; i++) {
-    delete ckTable[i];
+  for (CkCheckPTInfo* it : ckTable) {
+    delete it;
   }
 }
 
@@ -393,10 +393,12 @@ void CkMemCheckPT::pup(PUP::er& p)
   	expectCount = -1;
         inCheckpointing = false;
 #if CMK_CONVERSE_MPI
+  if(CkNumPes() > 1) {
     void pingBuddy();
     void pingCheckHandler();
     CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
     CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+  }
 #endif
   }
 }
@@ -423,10 +425,10 @@ void CkMemCheckPT::inmem_restore(CkArrayCheckPTMessage *m)
   ArrayElement *elt = arrmgr->lookup(m->index);
   CmiAssert(elt);
   CkLocRec *rec = elt->myRec;
-  CkVec<CkMigratable *> list;
+  std::vector<CkMigratable *> list;
   mgr->migratableList(rec, list);
-  CmiAssert(list.length() > 0);
-  for (int l=0; l<list.length(); l++) {
+  CmiAssert(!list.empty());
+  for (int l=0; l<list.size(); l++) {
     elt = (ArrayElement *)list[l];
     elt->budPEs[0] = m->bud1;
     elt->budPEs[1] = m->bud2;
@@ -438,14 +440,15 @@ void CkMemCheckPT::inmem_restore(CkArrayCheckPTMessage *m)
     }
   }
 #endif
+  delete m;
 }
 
 // return 1 if pe is a crashed processor
 bool CkMemCheckPT::isFailed(int pe)
 {
-  for (int i=0; i<failedPes.length(); i++)
-    if (failedPes[i] == pe) return 1;
-  return 0;
+  for (int i=0; i<failedPes.size(); i++)
+    if (failedPes[i] == pe) return true;
+  return false;
 }
 
 // add pe into history list of all failed processors
@@ -457,7 +460,7 @@ void CkMemCheckPT::failed(int pe)
 
 int CkMemCheckPT::totalFailed()
 {
-  return failedPes.length();
+  return failedPes.size();
 }
 
 // create an checkpoint entry for array element of aid with index.
@@ -507,7 +510,7 @@ void CkMemCheckPT::recoverEntry(CkArrayCheckPTMessage *msg)
 
 // loop through my checkpoint table and ask checkpointed array elements
 // to send me checkpoint data.
-void CkMemCheckPT::doItNow(int starter, CkCallback &cb)
+void CkMemCheckPT::doItNow(int starter, CkCallback &&cb)
 {
   checkpointed = true;
   cpCallback = cb;
@@ -518,7 +521,7 @@ void CkMemCheckPT::doItNow(int starter, CkCallback &cb)
     CkPrintf("[%d] Start checkpointing  starter: %d... \n", CkMyPe(), cpStarter);
   }
 #if !CMK_CHKP_ALL
-  int len = ckTable.length();
+  int len = ckTable.size();
   for (int i=0; i<len; i++) {
     CkCheckPTInfo *entry = ckTable[i];
       // always let the bigger number processor send request
@@ -575,14 +578,14 @@ void CkMemCheckPT::pupAllElements(PUP::er &p){
 
 void CkMemCheckPT::startArrayCheckpoint(){
 #if CMK_CHKP_ALL
-	int size;
+	size_t size;
 	{
 		PUP::sizer psizer;
 		pupAllElements(psizer);
 		size = psizer.size();
 	}
-	int packSize = size/sizeof(double)+1;
- // CkPrintf("[%d]checkpoint size :%d\n",CkMyPe(),packSize);
+	size_t packSize = size/sizeof(double)+1;
+	// CkPrintf("[%d] checkpoint size: %ld\n", CkMyPe(), (CmiUInt8)packSize);
 	CkArrayCheckPTMessage * msg = new (packSize,0) CkArrayCheckPTMessage;
 	msg->len = size;
 	msg->cp_flag = true;
@@ -666,15 +669,15 @@ static inline void _handleProcData(PUP::er &p)
 void CkMemCheckPT::sendProcData()
 {
   // find out size of buffer
-  int size;
+  size_t size;
   {
     PUP::sizer p;
     _handleProcData(p);
     size = p.size();
   }
-  int packSize = size;
+  size_t packSize = size;
   CkProcCheckPTMessage *msg = new (packSize, 0) CkProcCheckPTMessage;
-  DEBUGF("[%d] CkMemCheckPT::sendProcData - size: %d to %d\n", CkMyPe(), size, ChkptOnPe(CkMyPe()));
+  DEBUGF("[%d] CkMemCheckPT::sendProcData - size: %ld to %d\n", CkMyPe(), (CmiUInt8)size, ChkptOnPe(CkMyPe()));
   {
     PUP::toMem p(msg->packData);
     _handleProcData(p);
@@ -705,7 +708,7 @@ void CkMemCheckPT::recvProcData(CkProcCheckPTMessage *msg)
 // ArrayElement call this function to give us the checkpointed data
 void CkMemCheckPT::recvData(CkArrayCheckPTMessage *msg)
 {
-  int len = ckTable.length();
+  int len = ckTable.size();
   int idx;
   for (idx=0; idx<len; idx++) {
     CkCheckPTInfo *entry = ckTable[idx];
@@ -718,7 +721,7 @@ void CkMemCheckPT::recvData(CkArrayCheckPTMessage *msg)
       // all my array elements have returned their inmem data
       // inform starter processor that I am done.
     recvCount ++;
-    if (recvCount == ckTable.length()) {
+    if (recvCount == ckTable.size()) {
       if (where == CkCheckPoint_inMEM) {
         contribute(CkCallback(CkReductionTarget(CkMemCheckPT, cpFinish), thisProxy[cpStarter]));
       }
@@ -766,7 +769,7 @@ void CkMemCheckPT::report()
   inCheckpointing = false;
 #if !CMK_CHKP_ALL
   int objsize = 0;
-  int len = ckTable.length();
+  int len = ckTable.size();
   for (int i=0; i<len; i++) {
     CkCheckPTInfo *entry = ckTable[i];
     CmiAssert(entry);
@@ -844,24 +847,22 @@ void CkMemCheckPT::resetLB(int diepe)
 {
 #if CMK_LBDB_ON
   int i;
-  char *bitmap = new char[CkNumPes()];
+  std::vector<char> bitmap(CkNumPes());
   // set processor available bitmap
-  get_avail_vector(bitmap);
+  get_avail_vector(bitmap.data());
 
-  for (i=0; i<failedPes.length(); i++)
+  for (i=0; i<failedPes.size(); i++)
     bitmap[failedPes[i]] = 0; 
   bitmap[diepe] = 0;
 
 #if CK_NO_PROC_POOL
-  set_avail_vector(bitmap);
+  set_avail_vector(bitmap.data());
 #endif
 
   // if I am the crashed pe, rebuild my failedPEs array
   if (CkMyNode() == diepe)
     for (i=0; i<CkNumPes(); i++) 
       if (bitmap[i]==0) failed(i);
-
-  delete [] bitmap;
 #endif
 }
 
@@ -886,7 +887,7 @@ void CkMemCheckPT::restart(int diePe)
 #endif
   thisFailedPe = diePe;
 
-  if (CkMyPe() == diePe) CmiAssert(ckTable.length() == 0);
+  if (CkMyPe() == diePe) CmiAssert(ckTable.empty());
 
   inRestarting = true;
                                                                                 
@@ -908,7 +909,7 @@ void CkMemCheckPT::restart(int diePe)
 void CkMemCheckPT::removeArrayElements()
 {
 #if CMK_MEM_CHECKPOINT
-  int len = ckTable.length();
+  int len = ckTable.size();
   double curTime = CmiWallTimer();
   if (CkMyPe() == thisFailedPe) 
     CkPrintf("[%d] CkMemCheckPT ----- %s len:%d in %f seconds.\n",CkMyPe(),stage,len,curTime-startTime);
@@ -959,7 +960,7 @@ void CkMemCheckPT::resetReductionMgr()
 void CkMemCheckPT::recoverBuddies()
 {
   int idx;
-  int len = ckTable.length();
+  int len = ckTable.size();
   // ready to flush reduction manager
   // cannot be CkMemCheckPT::restart because destroy will modify states
   double curTime = CmiWallTimer();
@@ -1048,7 +1049,7 @@ void CkMemCheckPT::updateLocations(int n, CkGroupID *g, CkArrayIndex *idx, CmiUI
 void CkMemCheckPT::recoverArrayElements()
 {
   double curTime = CmiWallTimer();
-  int len = ckTable.length();
+  int len = ckTable.size();
   //CkPrintf("[%d] CkMemCheckPT ----- %s len: %d in %f seconds \n",CkMyPe(), stage, len, curTime-startTime);
   stage = (char *)"recoverArrayElements";
   if (CkMyPe() == thisFailedPe)
@@ -1059,9 +1060,8 @@ void CkMemCheckPT::recoverArrayElements()
   int count = 0;
 
 #if STREAMING_INFORMHOME && CK_NO_PROC_POOL
-  CkVec<CkGroupID> * gmap = new CkVec<CkGroupID>[CkNumPes()];
-  CkVec<CkArrayIndex> * imap = new CkVec<CkArrayIndex>[CkNumPes()];
-  CkVec<CkArrayIndex> * idmap = new CkVec<CmiUInt8>[CkNumPes()];
+  std::vector<CkGroupID> * gmap = new std::vector<CkGroupID>[CkNumPes()];
+  std::vector<CkArrayIndex> * imap = new std::vector<CkArrayIndex>[CkNumPes()];
 #endif
 
 #if !CMK_CHKP_ALL
@@ -1111,7 +1111,7 @@ void CkMemCheckPT::recoverArrayElements()
 #if STREAMING_INFORMHOME && CK_NO_PROC_POOL
   for (int i=0; i<CkNumPes(); i++) {
     if (gmap[i].size() && i!=CkMyPe()&& i==thisFailedPe) {
-      thisProxy[i].updateLocations(gmap[i].size(), gmap[i].getVec(), imap[i].getVec(), CkMyPe());
+      thisProxy[i].updateLocations(gmap[i].size(), gmap[i].data(), imap[i].data(), CkMyPe());
 	flag++;	
 	  }
   }
@@ -1140,7 +1140,7 @@ void CkMemCheckPT::gotReply(){
     contribute(CkCallback(CkReductionTarget(CkMemCheckPT, finishUp), thisProxy));
 }
 
-void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,CkVec<CkGroupID> * gmap, CkVec<CkArrayIndex> * imap){
+void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,std::vector<CkGroupID> * gmap, std::vector<CkArrayIndex> * imap){
 #if CMK_CHKP_ALL
 	PUP::fromMem p(msg->packData);
 	int numElements = 0;
@@ -1212,7 +1212,7 @@ void CkMemCheckPT::finishUp()
 }
 
 // called only on 0
-void CkMemCheckPT::quiescence(CkCallback &cb)
+void CkMemCheckPT::quiescence(CkCallback &&cb)
 {
   static int pe_count = 0;
   pe_count ++;
@@ -1467,7 +1467,7 @@ static void getChkpSeqHandler(char * m)
    char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int)*2);
    *(int *)(msg+CmiMsgHeaderSizeBytes) = CpvAccess(_crashedNode);
     *(int *)(msg+CmiMsgHeaderSizeBytes+sizeof(int)) =CpvAccess(chkpNum);
-   // cur_restart_phase = RESTART_PHASE_MAX;             // big enough to get it processed, moved to machine.c
+   // cur_restart_phase = RESTART_PHASE_MAX;             // big enough to get it processed, moved to machine.C
    CmiSetHandler(msg, askProcDataHandlerIdx);
    int pe = ChkptOnPe(CpvAccess(_crashedNode));
    CmiSyncSendAndFree(pe, CmiMsgHeaderSizeBytes+sizeof(int)*2, (char *)msg);
@@ -1509,7 +1509,7 @@ void CkMemRestart(const char *dummy, CkArgMsg *args)
   }else{  
    /*char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
    *(int *)(msg+CmiMsgHeaderSizeBytes) = CpvAccess(_crashedNode);
-   // cur_restart_phase = RESTART_PHASE_MAX;             // big enough to get it processed, moved to machine.c
+   // cur_restart_phase = RESTART_PHASE_MAX;             // big enough to get it processed, moved to machine.C
    CmiSetHandler(msg, askProcDataHandlerIdx);
    int pe = ChkptOnPe(CpvAccess(_crashedNode));
    CmiSyncSendAndFree(pe, CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);*/
@@ -1524,7 +1524,6 @@ void CkMemRestart(const char *dummy, CkArgMsg *args)
 
 // can be called in other files
 // return true if it is in restarting
-extern "C"
 int CkInRestarting()
 {
 #if CMK_MEM_CHECKPOINT
@@ -1538,20 +1537,17 @@ int CkInRestarting()
 #endif
 }
 
-extern "C"
-int CkInCheckpointing()
+static int CkInCheckpointing()
 {
   return CkMemCheckPT::inCheckpointing;
 }
 
-extern "C"
 void CkSetInLdb(){
 #if CMK_MEM_CHECKPOINT
 	CkMemCheckPT::inLoadbalancing = true;
 #endif
 }
 
-extern "C"
 int CkInLdb(){
 #if CMK_MEM_CHECKPOINT
 	return (int)CkMemCheckPT::inLoadbalancing;
@@ -1559,7 +1555,6 @@ int CkInLdb(){
 	return 0;
 }
 
-extern "C"
 void CkResetInLdb(){
 #if CMK_MEM_CHECKPOINT
 	CkMemCheckPT::inLoadbalancing = false;
@@ -1586,7 +1581,7 @@ void init_memcheckpt(char **argv)
 }
 #endif
 
-extern "C" int quietModeRequested;
+extern int quietModeRequested;
 
 class CkMemCheckPTInit: public Chare {
 public:
@@ -1614,8 +1609,7 @@ static void notifyHandler(char *msg)
 #endif
 }
 
-extern "C"
-void notify_crash(int node)
+static void notify_crash(int node)
 {
 #ifdef CMK_MEM_CHECKPOINT
   CpvAccess( _crashedNode) = node;
@@ -1637,7 +1631,7 @@ void notify_crash(int node)
 #endif
 }
 
-extern "C" void (*notify_crash_fn)(int node);
+extern void (*notify_crash_fn)(int node);
 
 #if CMK_CONVERSE_MPI
 //static int pingHandlerIdx;
@@ -1645,8 +1639,8 @@ extern "C" void (*notify_crash_fn)(int node);
 //static int buddyDieHandlerIdx;
 //static double lastPingTime = -1;
 
-extern "C" void mpi_restart_crashed(int pe, int rank);
-extern "C" int  find_spare_mpirank(int pe,int partition);
+void mpi_restart_crashed(int pe, int rank);
+int  find_spare_mpirank(int pe,int partition);
 
 //void pingBuddy();
 //void pingCheckHandler();
@@ -1798,7 +1792,6 @@ void CkRegisterRestartHandler( )
 }
 
 
-extern "C"
 int CkHasCheckpoints()
 {
   return (int)checkpointed;

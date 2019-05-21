@@ -1,8 +1,10 @@
 CHARMDIR=../..
-CUDA_PATH=$(shell CHARMINC=../.; . $$CHARMINC/conv-mach-opt.sh; echo $$CUDA_DIR;  )
-NVCC = $(CUDA_PATH)/bin/nvcc $(OPTS)
-NVCC_FLAGS = -c -use_fast_math -DGPU_MEMPOOL #-DGPU_PROFILE -DGPU_TRACE #-DGPU_MEMPOOL_DEBUG -DGPU_WRQ_VERBOSE #-device-debug -deviceemu
-NVCC_INC = -I$(CUDA_PATH)/include -I..
+-include $(CHARMDIR)/include/conv-mach-opt.mak
+
+CUDA_PATH := $(CUDA_DIR)
+CHARMC    := $(CHARMDIR)/bin/charmc
+FLAGS     := $(OPTSATBUILDTIME)
+INC       := -I$(CUDA_PATH)/include -I..
 
 all: libs
 	cp libcudahybridapi.a $(CHARMDIR)/lib
@@ -12,15 +14,12 @@ libs: libcudahybridapi.a
 install: libcudahybridapi.a
 	cp libcudahybridapi.a $(CHARMDIR)/lib
 
-libcudahybridapi.a: hybridapi.o wrqueue.o
+libcudahybridapi.a: hybridapi.o
 	-rm -f $@
-	ar q $@ hybridapi.o wrqueue.o 
+	ar q $@ hybridapi.o
 
-hybridapi.o: cuda-hybrid-api.cu cuda-hybrid-api.h
-	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) -o hybridapi.o cuda-hybrid-api.cu
-
-wrqueue.o: wrqueue.cu wrqueue.h wr.h 
-	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) -o wrqueue.o wrqueue.cu
+hybridapi.o: hapi_impl.cpp hapi_impl.h hapi.h hapi_nvtx.h
+	$(CHARMC) $(FLAGS) $(INC) -o $@ $<
 
 clean:
-	rm -f *.o *.a 
+	rm -f *.o *.a

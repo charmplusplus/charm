@@ -169,7 +169,6 @@ void _createTracesummary(char **argv)
 
 
 /// function call for starting a phase in trace summary logs 
-extern "C" 
 void CkSummary_StartPhase(int phase)
 {
    CkpvAccess(_trace)->startPhase(phase);
@@ -177,7 +176,6 @@ void CkSummary_StartPhase(int phase)
 
 
 /// function call for adding an event mark
-extern "C" 
 void CkSummary_MarkEvent(int eventType)
 {
    CkpvAccess(_trace)->addEventType(eventType);
@@ -611,8 +609,8 @@ void BinEntry::write(FILE* fp)
   writeU(fp, getU());
 }
 
-TraceSummary::TraceSummary(char **argv):binStart(0.0),idleStart(0.0),
-					binTime(0.0),binIdle(0.0),msgNum(0)
+TraceSummary::TraceSummary(char **argv):msgNum(0),binStart(0.0),idleStart(0.0),
+					binTime(0.0),binIdle(0.0)
 {
   if (CkpvAccess(traceOnPe) == 0) return;
 
@@ -1019,7 +1017,7 @@ void TraceSummaryBOC::sumData(double *sumData, int totalsize) {
     }
    fclose(sumfp);
    //CkPrintf("done with analysis\n");
-   CkExit();
+   CkContinueExit();
 }
 
 /// for TraceSummaryBOC
@@ -1223,8 +1221,6 @@ void TraceSummaryBOC::askSummary(int size)
   delete [] reductionBuffer;
 }
 
-//extern "C" void _CkExit();
-
 void TraceSummaryBOC::sendSummaryBOC(double *results, int n)
 {
   if (CkpvAccess(_trace) == NULL) return;
@@ -1238,7 +1234,7 @@ void TraceSummaryBOC::sendSummaryBOC(double *results, int n)
 
   write();
 
-  CkExit();
+  CkContinueExit();
 }
 
 void TraceSummaryBOC::write(void) 
@@ -1286,10 +1282,16 @@ void TraceSummaryBOC::write(void)
 
 }
 
-extern "C" void CombineSummary()
+static void CombineSummary()
 {
 #if CMK_TRACE_ENABLED
   CmiPrintf("[%d] CombineSummary called!\n", CkMyPe());
+
+  if ((sumonly || sumDetail) && traceSummaryGID.isZero()) {
+    CkContinueExit();
+    return;
+  }
+
   if (sumonly) {
     CmiPrintf("[%d] Sum Only start!\n", CkMyPe());
       // pe 0 start the sumonly process
@@ -1301,11 +1303,10 @@ extern "C" void CombineSummary()
       sumProxy.traceSummaryParallelShutdown(-1);
   }
   else {
-    _TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _threadEP,CkMyPe(), 0, NULL, NULL);
-    CkExit();
+    CkContinueExit();
   }
 #else
-  CkExit();
+  CkContinueExit();
 #endif
 }
 
@@ -1320,32 +1321,6 @@ void initTraceSummaryBOC()
   }
 }
 
-
-
-
-
-
 #include "TraceSummary.def.h"
 
-
 /*@}*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

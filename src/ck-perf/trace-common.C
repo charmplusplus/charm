@@ -16,7 +16,7 @@
 #include "allEvents.h"          //projector
 #include "register.h" // for _entryTable
 
-CpvCExtern(int, _traceCoreOn);   // projector
+CpvExtern(int, _traceCoreOn);   // projector
 
 #if ! CMK_TRACE_ENABLED
 static int warned = 0;
@@ -60,12 +60,17 @@ int _packMsg, _packChare, _packEP;
 int _unpackMsg, _unpackChare, _unpackEP;
 int _sdagMsg, _sdagChare, _sdagEP;
 
-#if CMK_BIGSIM_CHARM
-extern "C" double TraceTimerCommon(){return TRACE_TIMER();}
-#else
-extern "C" double TraceTimerCommon(){return TRACE_TIMER() - CkpvAccess(traceInitTime);}
-#endif
+CtvDeclare(int, curThreadEvent);
+CpvDeclare(int, curPeEvent);
 
+#if CMK_BIGSIM_CHARM
+double TraceTimerCommon(){return TRACE_TIMER();}
+#else
+double TraceTimerCommon(){return TRACE_TIMER() - CkpvAccess(traceInitTime);}
+#endif
+#if CMK_TRACE_ENABLED
+void CthSetEventInfo(CthThread t, int event, int srcPE);
+#endif
 /// decide parameters from command line
 static void traceCommonInit(char **argv)
 {
@@ -98,6 +103,12 @@ static void traceCommonInit(char **argv)
   CkpvInitialize(char*, traceRoot);
   CkpvInitialize(char*, partitionRoot);
   CkpvInitialize(int, traceRootBaseLength);
+  /* Ctv variable to store Cthread Local event ID for Cthread tracing */
+  CtvInitialize(int,curThreadEvent);
+  CtvAccess(curThreadEvent)=0;
+  /* Cpv variable to store current PE event ID for [local] and [inline] method tracing */
+  CpvInitialize(int, curPeEvent);
+  CpvAccess(curPeEvent)=0;
 
   char subdir[20];
   if(CmiNumPartitions() > 1) {
@@ -228,7 +239,7 @@ static void traceCommonInit(char **argv)
 
 /** Write out the common parts of the .sts file. */
 void traceWriteSTS(FILE *stsfp,int nUserEvents) {
-  fprintf(stsfp, "MACHINE %s\n",CMK_MACHINE_NAME);
+  fprintf(stsfp, "MACHINE \"%s\"\n",CMK_MACHINE_NAME);
 #if CMK_SMP_TRACE_COMMTHREAD
   //Assuming there's only 1 comm thread now! --Chao Mei
   //considering the extra comm thread per node
@@ -244,21 +255,19 @@ void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "TOTAL_EVENTS %d\n", (int)nUserEvents);
   size_t i;
   for(i=0;i<_chareTable.size();i++)
-    fprintf(stsfp, "CHARE %d %s\n", (int)i, _chareTable[i]->name);
+    fprintf(stsfp, "CHARE %d \"%s\" %d\n", (int)i, _chareTable[i]->name, _chareTable[i]->ndims);
   for(i=0;i<_entryTable.size();i++)
-    fprintf(stsfp, "ENTRY CHARE %d %s %d %d\n", (int)i, _entryTable[i]->name,
+    fprintf(stsfp, "ENTRY CHARE %d \"%s\" %d %d\n", (int)i, _entryTable[i]->name,
                  (int)_entryTable[i]->chareIdx, (int)_entryTable[i]->msgIdx);
   for(i=0;i<_msgTable.size();i++)
     fprintf(stsfp, "MESSAGE %d %u\n", (int)i, (int)_msgTable[i]->size);
 }
 
-extern "C"
 void traceCommonBeginIdle(void *proj,double curWallTime)
 {
   ((TraceArray *)proj)->beginIdle(curWallTime);
 }
  
-extern "C"
 void traceCommonEndIdle(void *proj,double curWallTime)
 {
   ((TraceArray *)proj)->endIdle(curWallTime);
@@ -305,11 +314,11 @@ void TraceArray::traceEndOnCommThread() {
 }
 
 #if CMK_MULTICORE
-extern "C" int Cmi_commthread;
+extern int Cmi_commthread;
 #endif
 
 /*Install the beginIdle/endIdle condition handlers.*/
-extern "C" void traceBegin(void) {
+void traceBegin(void) {
 #if CMK_TRACE_ENABLED
   DEBUGF(("[%d] traceBegin called with %d at %f\n", CkMyPe(), CpvAccess(traceOn), TraceTimer()));
   
@@ -332,7 +341,7 @@ extern "C" void traceBegin(void) {
 }
 
 /*Cancel the beginIdle/endIdle condition handlers.*/
-extern "C" void traceEnd(void) {
+void traceEnd(void) {
 #if CMK_TRACE_ENABLED
   DEBUGF(("[%d] traceEnd called with %d at %f\n", CkMyPe(), CpvAccess(traceOn), TraceTimer()));
 
@@ -359,7 +368,7 @@ extern "C" void traceEnd(void) {
 #endif
 }
 
-extern "C" void traceBeginComm(void) {
+void traceBeginComm(void) {
 #if CMK_TRACE_ENABLED && CMK_SMP_TRACE_COMMTHREAD
 #if CMK_MULTICORE
   if (Cmi_commthread)
@@ -373,7 +382,7 @@ extern "C" void traceBeginComm(void) {
 #endif
 }
 
-extern "C" void traceEndComm(void) {
+void traceEndComm(void) {
 #if CMK_TRACE_ENABLED && CMK_SMP_TRACE_COMMTHREAD
 #if CMK_MULTICORE
   if (Cmi_commthread)
@@ -444,8 +453,10 @@ static inline void _traceInit(char **argv)
   // check if trace is turned on/off for this pe
   CkpvAccess(traceOnPe) = checkTraceOnPe(argv);
 
+#if !CMK_CHARMPY
   // defined in moduleInit.C
   _createTraces(argv);
+#endif
 
   // Now setup the control point tracing module if desired. It is always compiled/linked in, but is not always enabled
   // FIXME: make sure it is safe to use argv in SMP version 
@@ -483,7 +494,7 @@ static inline void _traceInit(char **argv)
 }
 
 /// Converse version
-extern "C" void traceInit(char **argv) 
+void traceInit(char **argv) 
 {
 #if ! CMK_TRACE_IN_CHARM
   _traceInit(argv);
@@ -492,15 +503,14 @@ extern "C" void traceInit(char **argv)
 }
 
 /// Charm++ version
-extern "C" void traceCharmInit(char **argv) 
+void traceCharmInit(char **argv) 
 {
 #if CMK_TRACE_IN_CHARM
   _traceInit(argv);
 #endif
 }
 
-// CMK_TRACE_ENABLED is already guarded in convcore.c
-extern "C"
+// CMK_TRACE_ENABLED is already guarded in convcore.C
 void traceMessageRecv(char *msg, int pe)
 {
 #if ! CMK_TRACE_IN_CHARM
@@ -508,44 +518,43 @@ void traceMessageRecv(char *msg, int pe)
 #endif
 }
 
-extern "C" 
+
 void traceBeginIdle()
 {
     _TRACE_ONLY(CkpvAccess(_traces)->beginIdle(CmiWallTimer()));
 }
 
-extern "C" 
+
 void traceEndIdle()
 {
     _TRACE_ONLY(CkpvAccess(_traces)->endIdle(CmiWallTimer()));
 }
 
-// CMK_TRACE_ENABLED is already guarded in convcore.c
+// CMK_TRACE_ENABLED is already guarded in convcore.C
 // converse thread tracing is not supported in blue gene simulator
 // in BigSim, threads need to be traced manually (because virtual processors
 // themselves are implemented as threads and we don't want them to be traced
 // In BigSim, so far, only AMPI threads are traced.
-extern "C"
-void traceResume(CmiObjId *tid)
+void traceResume(int eventID, int srcPE, CmiObjId *tid)
 {
-    _TRACE_ONLY(CkpvAccess(_traces)->beginExecute(tid));
+    _TRACE_BEGIN_EXECUTE_DETAILED(eventID, ForChareMsg, _threadEP, srcPE, 0, NULL, tid);
     if(CpvAccess(_traceCoreOn))
 	    resumeTraceCore();
 }
 
-extern "C"
 void traceSuspend(void)
 {
   _TRACE_ONLY(CkpvAccess(_traces)->endExecute());
 }
 
-extern "C"
 void traceAwaken(CthThread t)
 {
   CkpvAccess(_traces)->creation(0, _threadEP);
+#if CMK_TRACE_ENABLED
+  CthSetEventInfo(t, CtvAccess(curThreadEvent), CkMyPe());
+#endif
 }
 
-extern "C"
 void traceUserEvent(int e)
 {
 #if CMK_TRACE_ENABLED
@@ -554,7 +563,7 @@ void traceUserEvent(int e)
 #endif
 }
 
-extern "C" 
+
 void beginAppWork()
 {
 #if CMK_TRACE_ENABLED
@@ -565,7 +574,7 @@ void beginAppWork()
 #endif
 }
 
-extern "C" 
+
 void endAppWork()
 {
 #if CMK_TRACE_ENABLED
@@ -576,7 +585,6 @@ void endAppWork()
 #endif
 }
 
-extern "C"
 void countNewChare()
 {
 #if CMK_TRACE_ENABLED
@@ -588,7 +596,6 @@ void countNewChare()
 }
 
 
-extern "C"
 void beginTuneOverhead()
 {
 #if CMK_TRACE_ENABLED
@@ -599,7 +606,6 @@ void beginTuneOverhead()
 #endif
 }
 
-extern "C"
 void endTuneOverhead()
 {
 #if CMK_TRACE_ENABLED
@@ -610,7 +616,6 @@ void endTuneOverhead()
 #endif
 }
 
-extern "C"
 void traceUserBracketEvent(int e, double beginT, double endT)
 {
 #if CMK_TRACE_ENABLED
@@ -619,8 +624,48 @@ void traceUserBracketEvent(int e, double beginT, double endT)
 #endif
 }
 
+// trace a UserBracketEvent that is coming from a "nested" thread, e.g. a virtual AMPI rank
+void traceUserBracketEventNestedID(int e, double beginT, double endT, int nestedID)
+{
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->userBracketEvent(e, beginT, endT, nestedID);
+#endif
+}
+
+void traceBeginUserBracketEvent(int e)
+{
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->beginUserBracketEvent(e);
+#endif
+}
+
+void traceBeginUserBracketEventNestedID(int e, int nestedID)
+{
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->beginUserBracketEvent(e, nestedID);
+#endif
+}
+
+void traceEndUserBracketEvent(int e)
+{
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->endUserBracketEvent(e);
+#endif
+}
+
+void traceEndUserBracketEventNestedID(int e, int nestedID)
+{
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->endUserBracketEvent(e, nestedID);
+#endif
+}
+
 //common version of User Stat Functions
-extern "C"
 int traceRegisterUserStat(const char*x, int e)
 {
 #if CMK_TRACE_ENABLED
@@ -630,7 +675,6 @@ int traceRegisterUserStat(const char*x, int e)
 #endif
 }
 
-extern "C"
 void updateStatPair(int e, double stat, double time)
 {
 #if CMK_TRACE_ENABLED
@@ -639,7 +683,6 @@ void updateStatPair(int e, double stat, double time)
 #endif
 }
 
-extern "C"
 void updateStat(int e, double stat)
 {
 #if CMK_TRACE_ENABLED
@@ -648,7 +691,6 @@ void updateStat(int e, double stat)
 #endif
 }
 
-extern "C"
 void traceUserSuppliedData(int d)
 {
 #if CMK_TRACE_ENABLED
@@ -657,7 +699,6 @@ void traceUserSuppliedData(int d)
 #endif
 }
 
-extern "C"
 void traceUserSuppliedNote(const char * note)
 {
 #if CMK_TRACE_ENABLED
@@ -667,7 +708,6 @@ void traceUserSuppliedNote(const char * note)
 }
 
 
-extern "C"
 void traceUserSuppliedBracketedNote(const char *note, int eventID, double bt, double et)
 {
   //CkPrintf("traceUserSuppliedBracketedNote(const char *note, int eventID, double bt, double et)\n");
@@ -678,7 +718,6 @@ void traceUserSuppliedBracketedNote(const char *note, int eventID, double bt, do
 }
 
 
-extern "C"
 void traceMemoryUsage()
 {
 #if CMK_TRACE_ENABLED
@@ -689,19 +728,16 @@ void traceMemoryUsage()
 #endif
 }
 
-extern "C"
 void tracePhaseEnd()
 {
   _TRACE_ONLY(CkpvAccess(_traces)->endPhase());
 }
 
-extern "C"
 void registerMachineUserEventsFunction(void (*eventRegistrationFunc)()) {
   CmiAssert(CpvInitialized(machineTraceFuncPtr));
   CpvAccess(machineTraceFuncPtr) = eventRegistrationFunc;
 }
 
-extern "C"
 void (*registerMachineUserEvents())() {
   CmiAssert(CpvInitialized(machineTraceFuncPtr));
   if (CpvAccess(machineTraceFuncPtr) != NULL) {
@@ -711,7 +747,6 @@ void (*registerMachineUserEvents())() {
   }
 }
 
-extern "C"
 int traceRegisterUserEvent(const char*x, int e)
 {
 #if CMK_TRACE_ENABLED
@@ -721,21 +756,18 @@ int traceRegisterUserEvent(const char*x, int e)
 #endif
 }
 
-extern "C"
 void traceClearEps(void)
 {
   OPTIMIZE_WARNING
   CkpvAccess(_traces)->traceClearEps();
 }
 
-extern "C"
 void traceWriteSts(void)
 {
   OPTIMIZE_WARNING
   CkpvAccess(_traces)->traceWriteSts();
 }
 
-extern "C"
 void traceFlushLog(void)
 {
   OPTIMIZE_WARNING
@@ -746,7 +778,6 @@ void traceFlushLog(void)
     traceClose: 	this function is called at Converse
     traceCharmClose:	called at Charm++ level
 */
-extern "C"
 void traceClose(void)
 {
 #if ! CMK_BIGSIM_CHARM
@@ -755,7 +786,6 @@ void traceClose(void)
 #endif   
 }
 
-extern "C"
 void traceCharmClose(void)
 {
 #if CMK_BIGSIM_CHARM
@@ -767,7 +797,6 @@ void traceCharmClose(void)
 /* **CW** This is the API called from user code to support CCS operations 
    if supported by the underlying trace module.
  */
-extern "C"
 void traceEnableCCS(void)
 {
   OPTIMIZE_WARNING
@@ -777,7 +806,6 @@ void traceEnableCCS(void)
 /* **CW** Support for thread listeners. This makes a call to each
    trace module which must support the call.
 */
-extern "C"
 void traceAddThreadListeners(CthThread tid, envelope *e) {
   _TRACE_ONLY(CkpvAccess(_traces)->traceAddThreadListeners(tid, e));
 }
@@ -787,7 +815,7 @@ void traceAddThreadListeners(CthThread tid, envelope *e) {
 extern int _charmHandlerIdx;
 class CkCoreState;
 extern void _processHandler(void *, CkCoreState*);
-extern "C" int isCharmEnvelope(void *msg);
+int isCharmEnvelope(void *msg);
 int CkIsCharmMessage(char *msg)
 {
 //CmiPrintf("[%d] CkIsCharmMessage: %d %p %d %p\n", CkMyPe(),CmiGetHandler(msg), CmiGetHandlerFunction(msg), _charmHandlerIdx, _processHandler);
@@ -821,66 +849,23 @@ void TraceArray::creation(envelope *env, int ep, int num)
 }
 
 void TraceArray::creationMulticast(envelope *env, int ep, int num,
-				   int *pelist)
+				   const int *pelist)
 {
   if (_entryTable[ep]->traceEnabled)
     ALLDO(creationMulticast(env, ep, num, pelist));
 }
 
-/*
-extern "C" 
-void registerFunction(const char *name){
-	_TRACE_ONLY(CkpvAccess(_traces)->regFunc(name));
-}
-*/
-
-extern "C"
-int traceRegisterFunction(const char* name, int idx) {
-#if CMK_TRACE_ENABLED
-  if(idx==-999){
-    CkpvAccess(_traces)->regFunc(name, idx);
-  } else {
-    CkpvAccess(_traces)->regFunc(name, idx, 1);
-  }
-  return idx;
-#else
-  return 0;
-#endif
-}
-
-extern "C" 
-void traceBeginFuncProj(const char *name,const char *file,int line){
-	 _TRACE_ONLY(CkpvAccess(_traces)->beginFunc(name,file,line));
-}
-
-extern "C"
-void traceBeginFuncIndexProj(int idx,const char *file,int line){
-	 _TRACE_ONLY(CkpvAccess(_traces)->beginFunc(idx,file,line));
-}
-
-extern "C" 
-void traceEndFuncProj(const char *name){
-	 _TRACE_ONLY(CkpvAccess(_traces)->endFunc(name));
-}
-
-extern "C" 
-void traceEndFuncIndexProj(int idx){
-	 _TRACE_ONLY(CkpvAccess(_traces)->endFunc(idx));
-}
-
 #if CMK_SMP_TRACE_COMMTHREAD
-extern "C"
 int traceBeginCommOp(char *msg){
 #if CMK_TRACE_ENABLED
   if (CpvAccess(traceOn) && CkpvAccess(_traces) && CkIsCharmMessage(msg)) {
     CkpvAccess(_traces)->beginExecute(msg);
     return 1;
   }
-  return 0;
 #endif
+  return 0;
 }
 
-extern "C"
 void traceEndCommOp(char *msg){
 #if CMK_TRACE_ENABLED
   if (CpvAccess(traceOn) && CkpvAccess(_traces) && CkIsCharmMessage(msg))
@@ -888,7 +873,6 @@ void traceEndCommOp(char *msg){
 #endif
 }
 
-extern "C"
 void traceSendMsgComm(char *msg){
 #if CMK_TRACE_ENABLED
   if (CpvAccess(traceOn) && CkpvAccess(_traces) && CkIsCharmMessage(msg))
@@ -896,7 +880,6 @@ void traceSendMsgComm(char *msg){
 #endif
 }
 
-extern "C"
 void traceCommSetMsgID(char *msg){
 #if CMK_TRACE_ENABLED
   if (CpvAccess(traceOn) && CkpvAccess(_traces) && CkIsCharmMessage(msg))
@@ -906,7 +889,6 @@ void traceCommSetMsgID(char *msg){
 
 #endif
 
-extern "C"
 void traceGetMsgID(char *msg, int *pe, int *event)
 {
 #if CMK_TRACE_ENABLED
@@ -915,7 +897,6 @@ void traceGetMsgID(char *msg, int *pe, int *event)
 #endif
 }
 
-extern "C"
 void traceSetMsgID(char *msg, int pe, int event)
 {
 #if CMK_TRACE_ENABLED
@@ -925,7 +906,6 @@ void traceSetMsgID(char *msg, int pe, int event)
 }
 
 
-extern "C"
 void traceChangeLastTimestamp(double ts){
 #if CMK_TRACE_ENABLED
   if (CpvAccess(traceOn) && CkpvAccess(_traces))
@@ -1053,7 +1033,6 @@ void initPAPI() {
 }
 #endif
 
-extern "C"
 void traceSend(void *env, int pe, int size)
 {
 #if CMK_TRACE_ENABLED
@@ -1062,7 +1041,6 @@ void traceSend(void *env, int pe, int size)
 #endif
 }
 
-extern "C"
 void traceRecv(void *env , int size)
 {
 #if CMK_TRACE_ENABLED

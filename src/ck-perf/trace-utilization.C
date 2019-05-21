@@ -13,13 +13,10 @@
 CkReduction::reducerType sumDetailCompressedReducer;
 
 
-void collectUtilizationData(void *ignore, double currT) {
-  // Only start collecting after a few seconds have passed. This way there will hopefully be at least 1000 bins to pickup each time we try.
-  static int numTimesCalled = 0;
-  numTimesCalled ++;
-  if(numTimesCalled > 4){
-    traceUtilizationGroupProxy.collectSumDetailData();
-  }
+// This function has unused arguments to match the type of
+// CcdVoidFn, which CcdCallOnConditionKeep takes
+void collectUtilizationData(void *, double) {
+  traceUtilizationGroupProxy.collectSumDetailData();
 }
 
 
@@ -35,7 +32,7 @@ void _createTraceutilization(char **argv)
 
   // Register the reducer
   CkAssert(sizeof(short) == 2);
-  sumDetailCompressedReducer=CkReduction::addReducer(sumDetailCompressedReduction);
+  sumDetailCompressedReducer=CkReduction::addReducer(sumDetailCompressedReduction, false, "sumDetailCompressedReduction");
 
   CkpvInitialize(TraceUtilization*, _trace);
   CkpvAccess(_trace) = new TraceUtilization();
@@ -79,6 +76,7 @@ void TraceUtilization::endExecute(void)
   if (execEp == TRACEON_EP) {
     // if trace just got turned on, then one expects to see this
     // END_PROCESSING event without seeing a preceeding BEGIN_PROCESSING
+    execEp = INVALIDEP;
     return;
   }
 
@@ -154,6 +152,10 @@ void TraceUtilizationBOC::ccsRequestSumDetailCompressed(CkCcsRequestMsg *m) {
 
 void TraceUtilizationBOC::collectSumDetailData() {
   TraceUtilization* t = CkpvAccess(_trace);
+
+  // If we don't have enough data, just return and wait for the next invocation
+  if (t->cpuTimeEntriesAvailable() - t->cpuTimeEntriesSentSoFar() < BIN_PER_SEC)
+    return;
 
   compressedBuffer b = t->compressNRecentSumDetail(BIN_PER_SEC);
 

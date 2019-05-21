@@ -48,7 +48,8 @@ public:
   void start() {
     starttime = CkWallTimer();
     CkCallback endCb(CkIndex_TestDriver::startVerificationPhase(), thisProxy);
-    updater_array.generateUpdates(endCb);
+    updater_array.generateUpdates();
+    CkStartQD(endCb);
   }
 
   void startVerificationPhase() {
@@ -64,7 +65,8 @@ public:
     // At the end of the second update phase, check the global table
     //  for errors in Updater::checkErrors()
     CkCallback endCb(CkIndex_Updater::checkErrors(), updater_array);
-    updater_array.generateUpdates(endCb);
+    updater_array.generateUpdates();
+    CkStartQD(endCb);
   }
 
   void reportErrors(CmiInt8 globalNumErrors) {
@@ -97,6 +99,18 @@ public:
     contribute(CkCallback(CkReductionTarget(TestDriver, start), driverProxy));
   }
 
+  void pup(PUP::er &p) {
+    if (p.isUnpacking()) {
+      HPCC_Table = (CmiUInt8*)malloc(sizeof(CmiUInt8) * localTableSize);
+    }
+
+    for (int i = 0; i < localTableSize; i++) {
+      p|HPCC_Table[i];
+    }
+
+    p|globalStartmyProc;
+  }
+
   Updater(CkMigrateMessage *msg) {}
 
   // Communication library calls this to deliver each randomly generated key
@@ -106,7 +120,7 @@ public:
     HPCC_Table[localOffset] ^= key;
   }
 
-  void generateUpdates(const CkCallback& endCallback) {
+  void generateUpdates() {
     int arrayN = N - (int) log2((double) numElementsPerPe);
     int numElements = CkNumPes() * numElementsPerPe;
     CmiUInt8 key = HPCC_starts(4 * globalStartmyProc);
@@ -118,9 +132,6 @@ public:
       // Submit generated key to chare owning that portion of the table
       thisProxy(destinationIndex).insertData(key);
     }
-
-    // Indicate to the communication library that this chare is done sending
-    contribute(endCallback);
   }
 
   void checkErrors() {

@@ -66,18 +66,26 @@ never be excluded...
 #include "ckcheckpoint.h"
 #include "ck.h"
 #include "trace.h"
+#include "ckrdma.h"
 #include "CkCheckpoint.decl.h"
 #include "ckmulticast.h"
 #include <sstream>
 #include <limits.h>
+#include "spanningTree.h"
+#if CMK_CHARMPY
+#include "GreedyRefineLB.h"
+#include "RandCentLB.h"
+#endif
 
 #if CMK_CUDA
-#include "cuda-hybrid-api.h"
+#include "hapi_impl.h"
 #endif
 
 void CkRestartMain(const char* dirname, CkArgMsg* args);
 
 #define  DEBUGF(x)     //CmiPrintf x;
+
+#define CMK_WITH_WARNINGS 0
 
 #include "TopoManager.h"
 
@@ -106,6 +114,15 @@ UInt  _numInitMsgs = 0;
  * given node, this value must be seen by all processors in a node.
  */
 CksvDeclare(UInt,_numInitNodeMsgs);
+
+#if CMK_ONESIDED_IMPL
+UInt  numZerocopyROops;
+UInt  curROIndex;
+NcpyROBcastAckInfo *roBcastAckInfo;
+int   _roRdmaDoneHandlerIdx;
+CksvDeclare(int,  _numPendingRORdmaTransfers);
+#endif
+
 int   _infoIdx;
 int   _charmHandlerIdx;
 int   _initHandlerIdx;
@@ -156,27 +173,30 @@ CkpvStaticDeclare(PtrQ*, _buffQ);
 CkpvStaticDeclare(PtrVec*, _bocInitVec);
 
 //for interoperability
+extern int userDrivenMode;
 extern void _libExitHandler(envelope *env);
 extern int _libExitHandlerIdx;
 CpvCExtern(int,interopExitFlag);
+void StopInteropScheduler();
 
 #if CMK_SHRINK_EXPAND
 //for shrink expand cleanup
 int _ROGroupRestartHandlerIdx;
 const char* _shrinkexpand_basedir;
 #endif
-/*
-	FAULT_EVAC
-*/
-CpvCExtern(char *, _validProcessors);
+
+#if CMK_FAULT_EVAC
+CpvExtern(char *, _validProcessors);
 CkpvDeclare(char ,startedEvac);
+#endif
 
 int    _exitHandlerIdx;
 
 #if CMK_WITH_STATS
 static Stats** _allStats = 0;
 #endif
-static bool   _exitStarted = 0;
+static bool   _exitStarted = false;
+static int _exitcode;
 
 static InitCallTable _initCallTable;
 
@@ -216,20 +236,16 @@ bool _ringexit = 0;		    // for charm exit
 int _ringtoken = 8;
 extern int _messageBufferingThreshold;
 
-
-/*
-	FAULT_EVAC
-
-	flag which marks whether or not to trigger the processor shutdowns
-*/
-static bool _raiseEvac=0;
+#if CMK_FAULT_EVAC
+static bool _raiseEvac=0; // whether or not to trigger the processor shutdowns
 static char *_raiseEvacFile;
 void processRaiseEvacFile(char *raiseEvacFile);
+#endif
 
 extern bool useNodeBlkMapping;
 
-extern "C" int quietMode;
-extern "C" int quietModeRequested;
+extern int quietMode;
+extern int quietModeRequested;
 
 // Modules are required to register command line opts they will parse. These
 // options are stored in the _optSet, and then when parsing command line opts
@@ -277,7 +293,11 @@ static inline void _parseCommandLineOpts(char **argv)
 #if CMK_SHRINK_EXPAND
   if (!CmiGetArgStringDesc(argv, "+shrinkexpand_basedir", (char **)&_shrinkexpand_basedir,
                            "Checkpoint directory used for shrink-expand (defaults to /dev/shm)"))
+# if defined __APPLE__
+      _shrinkexpand_basedir = "/tmp";
+# else
       _shrinkexpand_basedir = "/dev/shm";
+# endif
 #endif
 
   if(CmiGetArgString(argv,"+restart",&_restartDir))
@@ -318,14 +338,12 @@ static inline void _parseCommandLineOpts(char **argv)
       CkPrintf("Charm++> Program shutdown in token ring (%d).\n", _ringtoken);
     if (_ringtoken > CkNumPes())  _ringtoken = CkNumPes();
   }
-	/*
-		FAULT_EVAC
-
-		if the argument +raiseevac is present then cause faults
-	*/
+#if CMK_FAULT_EVAC
+  // if the argument +raiseevac is present then cause faults
 	if(CmiGetArgStringDesc(argv,"+raiseevac", &_raiseEvacFile,"Generates processor evacuation on random processors")){
 		_raiseEvac = 1;
 	}
+#endif
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	if(!CmiGetArgIntDesc(argv,"+teamSize",&teamSize,"Set the team size for message logging")){
         teamSize = 1;
@@ -513,13 +531,61 @@ static inline void _sendStats(void)
   CmiReduce(env, env->getTotalsize(), mergeStats);
 }
 
+#if CMK_LOCKLESS_QUEUE
+typedef struct _WarningMsg{
+  int queue_overflow_count;
+} WarningMsg;
+
+/* General purpose handler for runtime warnings post-execution */
+static void *mergeWarningMsg(int * size, void * data, void ** remote, int count){
+  int i;
+
+  WarningMsg *msg = (WarningMsg*)EnvToUsr((envelope*) data), *m;
+
+  /* Reduction on warning information gained from children */
+  for(i = 0; i < count; ++i)
+  {
+    m = (WarningMsg*)EnvToUsr((envelope*) remote[i]);
+    msg->queue_overflow_count += m->queue_overflow_count;
+  }
+
+  return data;
+}
+
+/* Initializes the reduction, called on each processor */
+extern int messageQueueOverflow;
+static inline void _sendWarnings(void)
+{
+  DEBUGF(("[%d] _sendWarnings\n", CkMyPe()));
+
+  envelope *env = _allocEnv(WarnMsg, sizeof(WarningMsg));
+  WarningMsg* msg = (WarningMsg*)EnvToUsr(env);
+
+  /* Set processor specific warning information here */
+  msg->queue_overflow_count = messageQueueOverflow;
+
+  CmiSetHandler(env, _exitHandlerIdx);
+  CmiReduce(env, env->getTotalsize(), mergeWarningMsg);
+}
+
+/* Reporting warnings to the user */
+static inline void ReportWarnings(WarningMsg * msg)
+{
+  if(msg->queue_overflow_count > 0)
+  {
+    CmiPrintf("WARNING: Message queues overflowed during execution, this can negatively impact performance.\n");
+    CmiPrintf("\tModify the size of the message queues using: +MessageQueueNodes and +MessageQueueNodeSize\n");
+  }
+}
+#endif /* CMK_LOCKLESS_QUEUE */
+
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 extern void _messageLoggingExit();
 #endif
 
 #if __FAULT__
 //CpvExtern(int, CldHandlerIndex);
-//extern "C" void CldHandler(char *);
+//void CldHandler(char *);
 extern int index_skipCldHandler;
 extern void _skipCldHandler(void *converseMsg);
 
@@ -542,21 +608,24 @@ static void _exitHandler(envelope *env)
 {
   DEBUGF(("exitHandler called on %d msgtype: %d\n", CkMyPe(), env->getMsgtype()));
   switch(env->getMsgtype()) {
-    case StartExitMsg:
-      CkAssert(CkMyPe()==0);
-      if (!_CkExitFnVec.isEmpty()) {
-        CkExitFn fn = _CkExitFnVec.deq();
-        fn();
-        break;
-      }
-      // else goto next
-    case ExitMsg:
+    case StartExitMsg: // Exit sequence trigger message
       CkAssert(CkMyPe()==0);
       if(_exitStarted) {
         CmiFree(env);
         return;
       }
       _exitStarted = true;
+
+      // else fall through
+    case ExitMsg: // Exit sequence trigger message using user registered exit function
+      CkAssert(CkMyPe()==0);
+      if (!_CkExitFnVec.isEmpty()) {
+        CmiFree(env);
+        CkExitFn fn = _CkExitFnVec.deq();
+        fn();
+        break;
+      }
+
       CkNumberHandler(_charmHandlerIdx,_discardHandler);
       CkNumberHandler(_bocHandlerIdx, _discardHandler);
 #if !CMK_BIGSIM_THREAD
@@ -577,20 +646,25 @@ static void _exitHandler(envelope *env)
       }
 #else
       CmiFree(env);
-      ConverseExit();
+      ConverseExit(_exitcode);
 #endif
       break;
-    case ReqStatMsg:
+    case ReqStatMsg: // Request stats and warnings message
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
       _messageLoggingExit();
 #endif
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
       CkNumberHandler(_charmHandlerIdx,_discardHandler);
       CkNumberHandler(_bocHandlerIdx, _discardHandler);
-      /*FAULT_EVAC*/
-      if(CmiNodeAlive(CkMyPe())){
+#if CMK_FAULT_EVAC
+      if(CmiNodeAlive(CkMyPe()))
+#endif
+      {
 #if CMK_WITH_STATS
          _sendStats();
+#endif
+#if CMK_WITH_WARNINGS
+         _sendWarnings();
 #endif
       _mainDone = true; // This is needed because the destructors for
                         // readonly variables will be called when the program
@@ -616,15 +690,15 @@ static void _exitHandler(envelope *env)
       ConverseCleanup();
 #endif
       //everyone exits here - there may be issues with leftover messages in the queue
-#if !CMK_WITH_STATS
+#if !CMK_WITH_STATS && !CMK_WITH_WARNINGS
       DEBUGF(("[%d] Calling converse exit from ReqStatMsg \n",CkMyPe()));
-      ConverseExit();
+      ConverseExit(_exitcode);
       if(CharmLibInterOperate)
 	CpvAccess(interopExitFlag) = 1;
 #endif
       break;
 #if CMK_WITH_STATS
-    case StatMsg:
+    case StatMsg: // Stats data message (in response to ReqStatMsg)
     {
       CkAssert(CkMyPe()==0);
       statsHeader* header = (statsHeader*)EnvToUsr(env);
@@ -636,7 +710,6 @@ static void _exitHandler(envelope *env)
 	currentStats++;
       }
       DEBUGF(("StatMsg on %d with %d\n", CkMyPe(), n));
-			/*FAULT_EVAC*/
       _printStats();
       // broadcast to all others that they can now exit
       envelope* env = _allocEnv(StatDoneMsg);
@@ -645,9 +718,28 @@ static void _exitHandler(envelope *env)
     }
     break;
 
-    case StatDoneMsg:
+    case StatDoneMsg: // Indicates completion of stats reduction
       DEBUGF(("[%d] Calling converse exit from StatDoneMsg \n",CkMyPe()));
-      ConverseExit();
+      ConverseExit(_exitcode);
+      if (CharmLibInterOperate)
+        CpvAccess(interopExitFlag) = 1;
+      break;
+#endif
+#if CMK_WITH_WARNINGS
+    case WarnMsg: // Warnings data message (in reponse to ReqStatMsg)
+    {
+      CkAssert(CkMyPe()==0);
+      WarningMsg* msg = (WarningMsg*)EnvToUsr(env);
+      ReportWarnings(msg);
+
+      envelope* env = _allocEnv(WarnDoneMsg);
+      CmiSetHandler(env, _exitHandlerIdx);
+      CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char*)env);
+      break;
+    }
+    case WarnDoneMsg: // Indicates completion of warnings reduction
+      DEBUGF(("[%d] Calling converse exit from WarnDoneMsg \n",CkMyPe()));
+      ConverseExit(_exitcode);
       if (CharmLibInterOperate)
         CpvAccess(interopExitFlag) = 1;
       break;
@@ -792,6 +884,9 @@ void _initDone(void)
   DEBUGF(("Crossed CmiNodeBarrier(), pe = %d, rank = %d\n", CkMyPe(), CkMyRank()));
   _processBufferedMsgs();
   CkpvAccess(_charmEpoch)=1;
+  if (userDrivenMode) {
+    StopInteropScheduler();
+  }
 }
 
 /**
@@ -803,11 +898,8 @@ void _initDone(void)
  */
 static void _triggerHandler(envelope *env)
 {
-  if (_numExpectInitMsgs && CkpvAccess(_numInitsRecd) + CksvAccess(_numInitNodeMsgs) == _numExpectInitMsgs)
-  {
-    DEBUGF(("Calling Init Done from _triggerHandler\n"));
-    _initDone();
-  }
+  DEBUGF(("Calling Init Done from _triggerHandler\n"));
+  checkForInitDone(true); // RO ZCPY Bcast operation is already complete
   if (env!=NULL) CmiFree(env);
 }
 
@@ -822,12 +914,35 @@ static inline void _processRODataMsg(envelope *env)
 {
   //Unpack each readonly:
   if(!CmiMyRank()) {
+#if CMK_ONESIDED_IMPL && CMK_SMP
+    if(CMI_IS_ZC_BCAST(env)) {
+      // Send message to peers
+      CmiForwardMsgToPeers(env->getTotalsize(), (char *)env);
+    }
+#endif
+
+    //Unpack each readonly
     PUP::fromMem pu((char *)EnvToUsr(env));
+    CmiSpanningTreeInfo &t = *_topoTree;
+
+#if CMK_ONESIDED_IMPL
+    pu|numZerocopyROops;
+
+    // Set _numPendingRORdmaTransfers to numZerocopyROops
+    CksvAccess(_numPendingRORdmaTransfers) = numZerocopyROops;
+
+    // Allocate structure for ack tracking on intermediate nodes
+    if(numZerocopyROops > 0 && t.child_count != 0) {
+      readonlyAllocateOnSource();
+    }
+#endif
+
     for(size_t i=0;i<_readonlyTable.size();i++) {
       _readonlyTable[i]->pupData(pu);
     }
+  } else {
+    CmiFree(env);
   }
-  CmiFree(env);
 }
 
 /**
@@ -852,6 +967,61 @@ static void _roRestartHandler(void *msg)
   _triggerHandler(NULL);
 }
 
+#if CMK_ONESIDED_IMPL
+static void _roRdmaDoneHandler(envelope *env) {
+
+  switch(env->getMsgtype()) {
+    case ROPeerCompletionMsg:
+      checkForInitDone(true); // Receiving a ROPeerCompletionMsg indicates that RO ZCPY Bcast
+                              // operation is complete on the comm. thread
+      if (env!=NULL) CmiFree(env);
+      break;
+    case ROChildCompletionMsg:
+      roBcastAckInfo->counter++;
+      if(roBcastAckInfo->counter == roBcastAckInfo->numChildren) {
+        // deregister
+        for(int i=0; i < roBcastAckInfo->numops; i++) {
+          NcpyROBcastBuffAckInfo *buffAckInfo = &(roBcastAckInfo->buffAckInfo[i]);
+          CmiDeregisterMem(buffAckInfo->ptr,
+                           buffAckInfo->layerInfo +CmiGetRdmaCommonInfoSize(),
+                           buffAckInfo->pe,
+                           buffAckInfo->regMode);
+        }
+
+        if(roBcastAckInfo->isRoot != 1) {
+          if(_topoTree == NULL) CkAbort("CkRdmaIssueRgets:: topo tree has not been calculated \n");
+          CmiSpanningTreeInfo &t = *_topoTree;
+
+          //forward message to root
+          // Send a message to the parent to signal completion in order to deregister
+          envelope *compEnv = _allocEnv(ROChildCompletionMsg);
+          compEnv->setSrcPe(CkMyPe());
+          CmiSetHandler(compEnv, _roRdmaDoneHandlerIdx);
+          CmiSyncSendAndFree(t.parent, compEnv->getTotalsize(), (char *)compEnv);
+        }
+        // Free the roBcastAckInfo allocated inside readonlyAllocateOnSource
+        CmiFree(roBcastAckInfo);
+      }
+      break;
+    default:
+      CmiAbort("Invalid msg type\n");
+      break;
+  }
+}
+#endif
+
+void checkForInitDone(bool rdmaROCompleted) {
+
+  bool noPendingRORdmaTransfers = true;
+#if CMK_ONESIDED_IMPL
+  // Ensure that there are no pending RO Rdma transfers on Rank 0 when numZerocopyROops > 0
+  if(CmiMyRank() == 0 && numZerocopyROops > 0)
+    noPendingRORdmaTransfers = rdmaROCompleted;
+#endif
+  if (_numExpectInitMsgs && CkpvAccess(_numInitsRecd) + CksvAccess(_numInitNodeMsgs) == _numExpectInitMsgs && noPendingRORdmaTransfers)
+    _initDone();
+}
+
 /**
  * This handler is used only during initialization. It receives messages from
  * processor zero regarding Readonly Data (in one single message), Readonly Messages,
@@ -873,30 +1043,35 @@ static void _initHandler(void *msg, CkCoreState *ck)
   }
   
   switch (env->getMsgtype()) {
-    case BocInitMsg:
+    case BocInitMsg: // Group creation message
       if (env->getGroupEpoch()==0) {
         CkpvAccess(_numInitsRecd)++;
-	// _processBocInitMsg already handles QD
-        //CpvAccess(_qd)->process();
-        CkpvAccess(_bocInitVec)->insert(env->getGroupNum().idx, env);
+        // _qd->process() or ck->process() to update QD counters is called inside _processBocInitMsg
+        if (CkpvAccess(_bocInitVec)->size() < env->getGroupNum().idx + 1) {
+          CkpvAccess(_bocInitVec)->resize(env->getGroupNum().idx + 1);
+        }
+        (*CkpvAccess(_bocInitVec))[env->getGroupNum().idx] = env;
       } else _bufferHandler(msg);
       break;
-    case NodeBocInitMsg:
+    case NodeBocInitMsg: // Nodegroup creation message
       if (env->getGroupEpoch()==0) {
         CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
         CksvAccess(_numInitNodeMsgs)++;
-        CksvAccess(_nodeBocInitVec)->insert(env->getGroupNum().idx, env);
+        if (CksvAccess(_nodeBocInitVec)->size() < env->getGroupNum().idx + 1) {
+          CksvAccess(_nodeBocInitVec)->resize(env->getGroupNum().idx + 1);
+        }
+        (*CksvAccess(_nodeBocInitVec))[env->getGroupNum().idx] = env;
         CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
-        CpvAccess(_qd)->process();
+        // _qd->process() or ck->process() to update QD counters is called inside _processNodeBocInitMsg
       } else _bufferHandler(msg);
       break;
-    case ROMsgMsg:
+    case ROMsgMsg: // Readonly Message (for user declared readonly messages)
       CkpvAccess(_numInitsRecd)++;
       CpvAccess(_qd)->process();
       if(env->isPacked()) CkUnpackMessage(&env);
       _processROMsgMsg(env);
       break;
-    case RODataMsg:
+    case RODataMsg: // Readonly Data Message (for user declared readonly variables)
       CkpvAccess(_numInitsRecd)++;
       CpvAccess(_qd)->process();
       _numExpectInitMsgs = env->getCount();
@@ -906,49 +1081,10 @@ static void _initHandler(void *msg, CkCoreState *ck)
       CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
   }
   DEBUGF(("[%d,%.6lf] _numExpectInitMsgs %d CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs) %d+%d\n",CmiMyPe(),CmiWallTimer(),_numExpectInitMsgs,CkpvAccess(_numInitsRecd),CksvAccess(_numInitNodeMsgs)));
-  if(_numExpectInitMsgs&&(CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs)==_numExpectInitMsgs)) {
-    _initDone();
-  }
+  checkForInitDone(false); // RO ZCPY Bcast operation could still be incomplete
 }
-
-#if 0
-/*****************************************
- *          no longer needed
- * ***************************************/
-extern "C"
-void _CkExit(void) 
-{
-  CmiAssert(CkMyPe() == 0);
-  // Shuts down Converse handlers for the upper layers on this processor
-  //
-  CkNumberHandler(_charmHandlerIdx,_discardHandler);
-  CkNumberHandler(_bocHandlerIdx, _discardHandler);
-  DEBUGF(("[%d] CkExit - _exitStarted:%d %d\n", CkMyPe(), _exitStarted, _exitHandlerIdx));
-
-  if(CkMyPe()==0) {
-    if(_exitStarted)
-      CsdScheduler(-1);
-    envelope *env = _allocEnv(ReqStatMsg);
-    env->setSrcPe(CkMyPe());
-    CmiSetHandler(env, _exitHandlerIdx);
-		/*FAULT_EVAC*/
-    CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char *)env);
-  } else {
-    envelope *env = _allocEnv(ExitMsg);
-    env->setSrcPe(CkMyPe());
-    CmiSetHandler(env, _exitHandlerIdx);
-    CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
-  }
-#if ! CMK_BIGSIM_THREAD
-  _TRACE_END_EXECUTE();
-  //Wait for stats, which will call ConverseExit when finished:
-  CsdScheduler(-1);
-#endif
-}
-#endif
 
 #if CMK_SHRINK_EXPAND
-extern "C"
 void CkCleanup()
 {
 	// always send to PE 0
@@ -961,15 +1097,16 @@ void CkCleanup()
 
 CkQ<CkExitFn> _CkExitFnVec;
 
-// triger exit on PE 0,
-// which traverses _CkExitFnVec to call every registered user exit functions.
-// Every user exit functions should end with CkExit() to continue the chain
-extern "C"
-void CkExit(void)
+// Trigger exit on PE 0,
+// which traverses _CkExitFnVec to call every registered user exit function.
+// Every user exit function should end with CkExit() to continue the chain.
+void CkExit(int exitcode)
 {
-	/*FAULT_EVAC*/
   DEBUGF(("[%d] CkExit called \n",CkMyPe()));
     // always send to PE 0
+
+  // Store exit code for use in ConverseExit
+  _exitcode = exitcode;
   envelope *env = _allocEnv(StartExitMsg);
   env->setSrcPe(CkMyPe());
   CmiSetHandler(env, _exitHandlerIdx);
@@ -983,11 +1120,18 @@ void CkExit(void)
 #endif
 }
 
+void CkContinueExit()
+{
+  envelope *env = _allocEnv(ExitMsg);
+  env->setSrcPe(CkMyPe());
+  CmiSetHandler(env, _exitHandlerIdx);
+  CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
+}
+
 /* This is a routine called in case the application is closing due to a signal.
    Tear down structures that must be cleaned up even when unclean exit happens.
    It is called by the machine layer whenever some problem occurs (it is thus up
    to the machine layer to call this function). */
-extern "C"
 void EmergencyExit(void) {
 #ifndef __BIGSIM__
   /* Delete _coreState to force any CkMessageWatcher to close down. */
@@ -1017,17 +1161,20 @@ extern void _metabalancerInit();
 #if CMK_SMP && CMK_TASKQUEUE
 extern void _taskqInit();
 #endif
+#if CMK_SMP
+extern void LBTopoInit();
+#endif
 extern void _initChareTables();
 #if CMK_MEM_CHECKPOINT
 extern void init_memcheckpt(char **argv);
 #endif
 extern "C" void initCharmProjections();
-extern "C" void CmiInitCPUTopology(char **argv);
-extern "C" void CmiInitCPUAffinity(char **argv);
-extern "C" void CmiInitMemAffinity(char **argv);
-extern "C" void CmiInitPxshm(char **argv);
+void CmiInitCPUTopology(char **argv);
+void CmiCheckAffinity();
+void CmiInitMemAffinity(char **argv);
+void CmiInitPxshm(char **argv);
 
-//extern "C" void CldCallback();
+//void CldCallback();
 
 void _registerInitCall(CkInitCallFn fn, int isNodeCall)
 {
@@ -1052,11 +1199,11 @@ void InitCallTable::enumerateInitCalls()
 }
 
 CpvCExtern(int, cpdSuspendStartup);
-extern "C" void CpdFreeze(void);
+void CpdFreeze(void);
 
 extern int _dummy_dq;
 
-extern "C" void initQd(char **argv)
+void initQd(char **argv)
 {
 	CpvInitialize(QdState*, _qd);
 	CpvAccess(_qd) = new QdState();
@@ -1065,8 +1212,8 @@ extern "C" void initQd(char **argv)
 	CpvAccessOther(_qd, 1) = new QdState(); // for i/o interrupt
 #endif
 	}
-	_qdHandlerIdx = CmiRegisterHandler((CmiHandler)_qdHandler);
-	_qdCommHandlerIdx = CmiRegisterHandler((CmiHandler)_qdCommHandler);
+	CmiAssignOnce(&_qdHandlerIdx, CmiRegisterHandler((CmiHandler)_qdHandler));
+	CmiAssignOnce(&_qdCommHandlerIdx, CmiRegisterHandler((CmiHandler)_qdCommHandler));
         if (CmiGetArgIntDesc(argv,"+qd",&_dummy_dq, "QD time in seconds")) {
           if (CmiMyPe()==0)
             CmiPrintf("Charm++> Fake QD using %d seconds.\n", _dummy_dq);
@@ -1077,6 +1224,74 @@ extern "C" void initQd(char **argv)
 void CpdBgInit();
 #endif
 void CpdBreakPointInit();
+
+extern void (*CkRegisterMainModuleCallback)();
+
+void _sendReadonlies() {
+  for(int i=0;i<_readonlyMsgs.size();i++) /* Send out readonly messages */
+  {
+    void *roMsg = (void *) *((char **)(_readonlyMsgs[i]->pMsg));
+    if(roMsg==0)
+      continue;
+    //Pack the message and send it to all other processors
+    envelope *env = UsrToEnv(roMsg);
+    env->setSrcPe(CkMyPe());
+    env->setMsgtype(ROMsgMsg);
+    env->setRoIdx(i);
+    CmiSetHandler(env, _initHandlerIdx);
+    CkPackMessage(&env);
+    CmiSyncBroadcast(env->getTotalsize(), (char *)env);
+    CpvAccess(_qd)->create(CkNumPes()-1);
+
+    //For processor 0, unpack and re-set the global
+    CkUnpackMessage(&env);
+    _processROMsgMsg(env);
+    _numInitMsgs++;
+  }
+
+#if CMK_ONESIDED_IMPL
+  numZerocopyROops = 0;
+  curROIndex = 0;
+#endif
+
+  //Determine the size of the RODataMessage
+  PUP::sizer ps;
+
+#if CMK_ONESIDED_IMPL
+  ps|numZerocopyROops;
+#endif
+
+  for(int i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(ps);
+
+#if CMK_ONESIDED_IMPL
+  if(numZerocopyROops > 0) {
+    readonlyAllocateOnSource();
+  }
+#endif
+
+  //Allocate and fill out the RODataMessage
+  envelope *env = _allocEnv(RODataMsg, ps.size());
+  PUP::toMem pp((char *)EnvToUsr(env));
+#if CMK_ONESIDED_IMPL
+  pp|numZerocopyROops;
+#endif
+  for(int i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pp);
+
+  env->setCount(++_numInitMsgs);
+  env->setSrcPe(CkMyPe());
+  CmiSetHandler(env, _initHandlerIdx);
+  DEBUGF(("[%d,%.6lf] RODataMsg being sent of size %d \n",CmiMyPe(),CmiWallTimer(),env->getTotalsize()));
+  CmiSyncBroadcast(env->getTotalsize(), (char *)env);
+#if CMK_ONESIDED_IMPL && CMK_SMP
+  if(numZerocopyROops > 0) {
+    // Send message to peers
+    CmiForwardMsgToPeers(env->getTotalsize(), (char *)env);
+  }
+#endif
+  CmiFree(env);
+  CpvAccess(_qd)->create(CkNumPes()-1);
+  _initDone();
+}
 
 /**
   This is the main charm setup routine.  It's called
@@ -1092,6 +1307,7 @@ void _initCharm(int unused_argc, char **argv)
 	int inCommThread = (CmiMyRank() == CmiMyNodeSize());
 
 	DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
+	std::set_terminate([](){ CkAbort("Unhandled C++ exception in user code.\n");});
 
 	CkpvInitialize(size_t *, _offsets);
 	CkpvAccess(_offsets) = new size_t[32];
@@ -1113,13 +1329,13 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(char**, Ck_argv); CkpvAccess(Ck_argv)=argv;
 	CkpvInitialize(MsgPool*, _msgPool);
 	CkpvInitialize(CkCoreState *, _coreState);
-	/*
-		Added for evacuation-sayantan
-	*/
+
+#if CMK_FAULT_EVAC
 #ifndef __BIGSIM__
 	CpvInitialize(char *,_validProcessors);
 #endif
 	CkpvInitialize(char ,startedEvac);
+#endif
 	CpvInitialize(int,serializer);
 
 	_initChareTables();            // for checkpointable plain chares
@@ -1135,6 +1351,10 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvAccess(_charmEpoch)=0;
 	CksvInitialize(bool, _triggersSent);
 	CksvAccess(_triggersSent) = false;
+
+#if CMK_ONESIDED_IMPL
+	CksvInitialize(int, _numPendingRORdmaTransfers);
+#endif
 
 	CkpvInitialize(_CkOutStream*, _ckout);
 	CkpvInitialize(_CkErrStream*, _ckerr);
@@ -1154,6 +1374,11 @@ void _initCharm(int unused_argc, char **argv)
 	{
 	  	CksvAccess(_numNodeGroups) = 1; //make 0 an invalid group number
           	CksvAccess(_numInitNodeMsgs) = 0;
+
+#if CMK_ONESIDED_IMPL
+		CksvAccess(_numPendingRORdmaTransfers) = 0;
+#endif
+
 		CksvAccess(_nodeLock) = CmiCreateLock();
 		CksvAccess(_nodeGroupTable) = new GroupTable();
 		CksvAccess(_nodeGroupTable)->init();
@@ -1177,16 +1402,21 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvAccess(_ckout) = new _CkOutStream();
 	CkpvAccess(_ckerr) = new _CkErrStream();
 
-	_charmHandlerIdx = CkRegisterHandler(_bufferHandler);
-	_initHandlerIdx = CkRegisterHandlerEx(_initHandler, CkpvAccess(_coreState));
-	_roRestartHandlerIdx = CkRegisterHandler(_roRestartHandler);
-	_exitHandlerIdx = CkRegisterHandler(_exitHandler);
+	CmiAssignOnce(&_charmHandlerIdx, CkRegisterHandler(_bufferHandler));
+	CmiAssignOnce(&_initHandlerIdx, CkRegisterHandlerEx(_initHandler, CkpvAccess(_coreState)));
+	CmiAssignOnce(&_roRestartHandlerIdx, CkRegisterHandler(_roRestartHandler));
+
+#if CMK_ONESIDED_IMPL
+	CmiAssignOnce(&_roRdmaDoneHandlerIdx, CkRegisterHandler(_roRdmaDoneHandler));
+#endif
+
+	CmiAssignOnce(&_exitHandlerIdx, CkRegisterHandler(_exitHandler));
 	//added for interoperabilitY
-	_libExitHandlerIdx = CkRegisterHandler(_libExitHandler);
-	_bocHandlerIdx = CkRegisterHandlerEx(_initHandler, CkpvAccess(_coreState));
+	CmiAssignOnce(&_libExitHandlerIdx, CkRegisterHandler(_libExitHandler));
+	CmiAssignOnce(&_bocHandlerIdx, CkRegisterHandlerEx(_initHandler, CkpvAccess(_coreState)));
 #if CMK_SHRINK_EXPAND
 	// for shrink expand cleanup
-	_ROGroupRestartHandlerIdx = CkRegisterHandler(_ROGroupRestartHandler);
+	CmiAssignOnce(&_ROGroupRestartHandlerIdx, CkRegisterHandler(_ROGroupRestartHandler));
 #endif
 
 #ifdef __BIGSIM__
@@ -1194,7 +1424,7 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
 
-	_triggerHandlerIdx = CkRegisterHandler(_triggerHandler);
+	CmiAssignOnce(&_triggerHandlerIdx, CkRegisterHandler(_triggerHandler));
 	_ckModuleInit();
 
 	CldRegisterEstimator((CldEstimator)_charmLoadEstimator);
@@ -1202,8 +1432,11 @@ void _initCharm(int unused_argc, char **argv)
 	_futuresModuleInit(); // part of futures implementation is a converse module
 	_loadbalancerInit();
         _metabalancerInit();
-#if CMK_SMP && CMK_TASKQUEUE
-	_taskqInit();
+
+#if CMK_SMP
+	if (CmiMyRank() == 0) {
+		LBTopoInit();
+	}
 #endif
 #if CMK_MEM_CHECKPOINT
         init_memcheckpt(argv);
@@ -1219,6 +1452,13 @@ void _initCharm(int unused_argc, char **argv)
     CkpvAccess(envelopeEventID) = 0;
 	CkMessageWatcherInit(argv,CkpvAccess(_coreState));
 	
+	// Set the ack handler function used for the direct nocopy api
+	CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
+
+#if CMK_ONESIDED_IMPL
+	// Set the ack handler function used for the entry method p2p api and entry method bcast api
+	CmiSetEMNcpyAckHandler(CkRdmaEMAckHandler, CkRdmaEMBcastAckHandler, CkRdmaEMBcastPostAckHandler);
+#endif
 	/**
 	  The rank-0 processor of each node calls the 
 	  translator-generated "_register" routines. 
@@ -1262,12 +1502,24 @@ void _initCharm(int unused_argc, char **argv)
 		_registerLBDatabase();
     _registerMetaBalancer();
 		_registerCkCallback();
-		_registertempo();
 		_registerwaitqd();
 		_registerCkCheckpoint();
                 _registerCkMulticast();
 #if CMK_MEM_CHECKPOINT
 		_registerCkMemCheckpoint();
+#endif
+#if CMK_CHARMPY
+                /**
+                  Load balancers are currently registered in Charm++ through a C file that is generated and
+                  and compiled by charmc when making an executable. That file contains appropriate calls to
+                  register whatever load balancers are being linked in.
+                  Without an executable (charm4py just uses libcharm.so), the load balancers in libcharm.so
+                  have to somehow be registered during init.
+                  With the planned load balancing framework, load balancer registration will hopefully go away,
+                  at least for strategies used in central/hybrid, because they will stop being chares.
+                */
+		_registerGreedyRefineLB();
+		_registerRandCentLB();
 #endif
 
 		/**
@@ -1275,7 +1527,16 @@ void _initCharm(int unused_argc, char **argv)
 		  "mainmodule" .ci file.  It will include calls to 
 		  register all the .ci files.
 		*/
+#if !CMK_CHARMPY
 		CkRegisterMainModule();
+#else
+                // CkRegisterMainModule doesn't exist in charm4py because there is no executable.
+                // Instead, we go to Python to register user chares from there
+		if (CkRegisterMainModuleCallback)
+			CkRegisterMainModuleCallback();
+		else
+			CkAbort("No callback for CkRegisterMainModule");
+#endif
 
 		/**
 		  _registerExternalModules is actually generated by 
@@ -1287,10 +1548,11 @@ void _initCharm(int unused_argc, char **argv)
 		  programs, which don't have a .ci file and hence have
 		  no other way to control the _register process.
 		*/
+#if !CMK_CHARMPY
 		_registerExternalModules(argv);
-		
-		_registerDone();
+#endif
 	}
+
 	/* The following will happen on every virtual processor in BigEmulator, not just on once per real processor */
 	if (CkMyRank() == 0) {
 	  CpdBreakPointInit();
@@ -1303,8 +1565,9 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_CHARMDEBUG
 	CpdFinishInitialization();
 #endif
-
-	//CmiNodeAllBarrier();
+	if (CkMyRank() == 0)
+	  _registerDone();
+	CmiNodeAllBarrier();
 
 	CkpvAccess(_myStats) = new Stats();
 	CkpvAccess(_msgPool) = new MsgPool();
@@ -1340,26 +1603,27 @@ void _initCharm(int unused_argc, char **argv)
     _messageLoggingInit();
 #endif
 
+#if CMK_FAULT_EVAC
 #ifndef __BIGSIM__
-	/*
-		FAULT_EVAC
-	*/
 	CpvAccess(_validProcessors) = new char[CkNumPes()];
 	for(int vProc=0;vProc<CkNumPes();vProc++){
 		CpvAccess(_validProcessors)[vProc]=1;
 	}
-	_ckEvacBcastIdx = CkRegisterHandler(_ckEvacBcast);
-	_ckAckEvacIdx = CkRegisterHandler(_ckAckEvac);
+	CmiAssignOnce(&_ckEvacBcastIdx, CkRegisterHandler(_ckEvacBcast));
+	CmiAssignOnce(&_ckAckEvacIdx, CkRegisterHandler(_ckAckEvac));
 #endif
-	CkpvAccess(startedEvac) = 0;
-	CpvAccess(serializer) = 0;
 
+	CkpvAccess(startedEvac) = 0;
 	evacuate = 0;
 	CcdCallOnCondition(CcdSIGUSR1,(CcdVoidFn)CkDecideEvacPe,0);
+#endif
+	CpvAccess(serializer) = 0;
+
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
     CcdCallOnCondition(CcdSIGUSR2,(CcdVoidFn)CkMlogRestart,0);
 #endif
 
+#if CMK_FAULT_EVAC
 	if(_raiseEvac){
 		processRaiseEvacFile(_raiseEvacFile);
 		/*
@@ -1371,7 +1635,8 @@ void _initCharm(int unused_argc, char **argv)
 			CcdCallFnAfter((CcdVoidFn)CkDecideEvacPe, 0, 10000);
 		}*/
 	}	
-    
+#endif
+
     if (CkMyRank() == 0) {
       TopoManager_init();
     }
@@ -1387,6 +1652,13 @@ void _initCharm(int unused_argc, char **argv)
 #endif
         }
         CmiInitCPUTopology(argv);
+        if (CkMyRank() == 0) {
+          TopoManager_reset(); // initialize TopoManager singleton
+#if !CMK_BIGSIM_CHARM
+          _topoTree = ST_RecursivePartition_getTreeInfo(0);
+#endif
+        }
+        CmiNodeAllBarrier(); // threads wait until _topoTree has been generated
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
         if (CmiCpuTopologyEnabled()) {
             int *pelist;
@@ -1413,6 +1685,16 @@ void _initCharm(int unused_argc, char **argv)
     if (CmiMyRank() == 0) {
       initHybridAPI();
     }
+    else /* CmiMyRank() != 0 */ {
+      setHybridAPIDevice();
+    }
+    initEventQueues();
+
+    // ensure HAPI is initialized before registering callback functions
+    if (CmiMyRank() < CmiMyNodeSize()) {
+      CmiNodeBarrier();
+    }
+    hapiRegisterCallbacks();
 #endif
 
     if(CmiMyPe() == 0) {
@@ -1455,7 +1737,7 @@ void _initCharm(int unused_argc, char **argv)
 		if (CkMyPe()==0) _allStats = new Stats*[CkNumPes()];
 #endif
 		if (!inCommThread) {
-                  CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0);
+                  CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0, GroupDepNum{});
                   msg->argc = CmiGetArgc(argv);
                   msg->argv = argv;
                   faultFunc(_restartDir, msg);
@@ -1495,6 +1777,8 @@ void _initCharm(int unused_argc, char **argv)
 			CmiPrintf("If any of the above arguments were intended for the RTS you may need to recompile Charm++ with different options.\n");
 		}
 
+		CmiCheckAffinity(); // check for thread oversubscription
+
 		for(i=0;i<nMains;i++)  /* Create all mainchares */
 		{
 			size_t size = _chareTable[_mainTable[i]->chareIdx]->size;
@@ -1503,7 +1787,7 @@ void _initCharm(int unused_argc, char **argv)
 			_mainTable[i]->setObj(obj);
 			CkpvAccess(_currentChare) = obj;
 			CkpvAccess(_currentChareType) = _mainTable[i]->chareIdx;
-			CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0);
+			CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0, GroupDepNum{});
 			msg->argc = CmiGetArgc(argv);
 			msg->argv = argv;
       quietMode = 0;  // allow printing any mainchare user messages
@@ -1518,46 +1802,13 @@ void _initCharm(int unused_argc, char **argv)
 		_STATS_RECORD_CREATE_CHARE_N(nMains);
 		_STATS_RECORD_PROCESS_CHARE_N(nMains);
 
-
-
-
-		for(i=0;i<_readonlyMsgs.size();i++) /* Send out readonly messages */
-		{
-			void *roMsg = (void *) *((char **)(_readonlyMsgs[i]->pMsg));
-			if(roMsg==0)
-				continue;
-			//Pack the message and send it to all other processors
-			envelope *env = UsrToEnv(roMsg);
-			env->setSrcPe(CkMyPe());
-			env->setMsgtype(ROMsgMsg);
-			env->setRoIdx(i);
-			CmiSetHandler(env, _initHandlerIdx);
-			CkPackMessage(&env);
-			CmiSyncBroadcast(env->getTotalsize(), (char *)env);
-			CpvAccess(_qd)->create(CkNumPes()-1);
-
-			//For processor 0, unpack and re-set the global
-			CkUnpackMessage(&env);
-			_processROMsgMsg(env);
-			_numInitMsgs++;
+		if (!userDrivenMode) {
+			_sendReadonlies();
 		}
-
-		//Determine the size of the RODataMessage
-		PUP::sizer ps;
-		for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(ps);
-
-		//Allocate and fill out the RODataMessage
-		envelope *env = _allocEnv(RODataMsg, ps.size());
-		PUP::toMem pp((char *)EnvToUsr(env));
-		for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pp);
-
-		env->setCount(++_numInitMsgs);
-		env->setSrcPe(CkMyPe());
-		CmiSetHandler(env, _initHandlerIdx);
-		DEBUGF(("[%d,%.6lf] RODataMsg being sent of size %d \n",CmiMyPe(),CmiWallTimer(),env->getTotalsize()));
-		CmiSyncBroadcastAndFree(env->getTotalsize(), (char *)env);
-		CpvAccess(_qd)->create(CkNumPes()-1);
-		_initDone();
+	} else {
+		// check for thread oversubscription
+		CmiCheckAffinity();
+		// NOTE: this assumes commthreads will not block from this point on
 	}
 
 	DEBUGF(("[%d,%d%.6lf] inCommThread %d\n",CmiMyPe(),CmiMyRank(),CmiWallTimer(),inCommThread));
@@ -1586,29 +1837,24 @@ void _initCharm(int unused_argc, char **argv)
 
 }
 
-// this is needed because on o2k, f90 programs have to have main in
-// fortran90.
-extern "C" void fmain_(int *argc,char _argv[][80],int length[])
+int charm_main(int argc, char **argv)
 {
-  int i;
-  char **argv = new char*[*argc+2];
+  int stack_top=0;
+  memory_stack_top = &stack_top;
 
-  for(i=0;i <= *argc;i++) {
-    if (length[i] < 100) {
-      _argv[i][length[i]]='\0';
-      argv[i] = &(_argv[i][0]);
-    } else {
-      argv[i][0] = '\0';
-    }
-  }
-  argv[*argc+1]=0;
+  ConverseInit(argc, argv, (CmiStartFn) _initCharm, 0, 0);
 
-  ConverseInit(*argc, argv, (CmiStartFn) _initCharm, 0, 0);
+  return 0;
+}
+
+void FTN_NAME(CHARM_MAIN_FORTRAN_WRAPPER, charm_main_fortran_wrapper)(int *argc, char **argv)
+{
+  charm_main(*argc, argv);
 }
 
 // user callable function to register an exit function, this function
 // will perform task of collecting of info from all pes to pe0, and call
-// CkExit() on pe0 again to recursively traverse the registered exitFn.
+// CkContinueExit() on pe0 again to recursively traverse the registered exitFn.
 // see trace-summary for an example.
 void registerExitFn(CkExitFn fn)
 {

@@ -115,14 +115,21 @@ void bgEvents::write(FILE *fp)
 {
   switch (eType) {
   case BG_EVENT_PROJ:
-	fprintf(fp, "EVT: Projection %d\n", index);  break;
+        if (fprintf(fp, "EVT: Projection %d\n", index) < 0) {
+            CmiAbort("BigSim failed writing BG_EVENT_PROJ to file");
+        }
+        break;
   case BG_EVENT_PRINT: {
-        fprintf(fp, "EVT: time:%f string:%s\n", rTime, (const char*)data);
+        if (fprintf(fp, "EVT: time:%f string:%s\n", rTime, (const char*)data) < 0) {
+            CmiAbort("BigSim failed writing BG_EVENT_PRINT to file");
+        }
         break;
        }
   case BG_EVENT_MARK: {
-	fprintf(fp, "EVT: time:%f marker:%s\n", rTime, (const char*)data);
-	break;
+       if (fprintf(fp, "EVT: time:%f marker:%s\n", rTime, (const char*)data) < 0) {
+            CmiAbort("BigSim failed writing BG_EVENT_MARK to file");
+       }
+       break;
        }
   default: CmiAbort("bgEvents::pup(): unknown BG event type!");
   }
@@ -304,27 +311,68 @@ void BgTimeLog::write(FILE *fp)
 { 
   int i;
 //  fprintf(fp,"%p ep:%d name:%s (srcnode:%d msgID:%d) startTime:%f endTime:%f recvime:%f effRecvTime:%e seqno:%d startevent:%d\n", this, ep, name, msgId.node(), msgId.msgID(), startTime, endTime, recvTime, effRecvTime, seqno, isStartEvent());
-  fprintf(fp,"%p name:%s (srcpe:%d msgID:%d) ep:%d ", this, name, msgId.pe(), msgId.msgID(), ep);
-  if (ep == BgLogGetThreadEP() && ep!=-1) fprintf(fp, "(thread resume) ");
-  if (bglog_version >= 4) fprintf(fp, "charm_ep:%d ", charm_ep);
-  if (isStartEvent()) fprintf(fp, "STARTEVENT");
-  if (isQDEvent()) fprintf(fp, "QDEVENT");
-  fprintf(fp, "\n");
+  if (fprintf(fp,"%p name:%s (srcpe:%d msgID:%d) ep:%d ", (void*)this, name, msgId.pe(), msgId.msgID(), ep) < 0) {
+    CmiAbort("BigSim failed writing BgTimeLog");
+  }
+  if (ep == BgLogGetThreadEP() && ep!=-1) {
+    if (fprintf(fp, "(thread resume) ") < 0) {
+      CmiAbort("BigSim failed writing BgTimeLog");
+    }
+  }
+  if (bglog_version >= 4) {
+    if (fprintf(fp, "charm_ep:%d ", charm_ep) < 0) {
+      CmiAbort("BigSim failed writing BgTimeLog");
+    }
+  }
+  if (isStartEvent()) {
+    if (fprintf(fp, "STARTEVENT") < 0) {
+      CmiAbort("BigSim failed writing BgTimeLog");
+    }
+  }
+  if (isQDEvent()) {
+    if (fprintf(fp, "QDEVENT") < 0) {
+      CmiAbort("BigSim failed writing BgTimeLog");
+    }
+  }
+  if (fprintf(fp, "\n") < 0) {
+    CmiAbort("BigSim failed writing BgTimeLog");
+  }
 
-  fprintf(fp," recvtime:%f startTime:%f endTime:%f execTime:%f\n", recvTime, startTime, endTime, execTime);
+  if (fprintf(fp," recvtime:%f startTime:%f endTime:%f execTime:%f\n", recvTime, startTime, endTime, execTime) < 0) {
+    CmiAbort("BigSim failed writing BgTimeLog");
+  }
   if (bglog_version >= 2) {
-    if (!objId.isNull())
-      fprintf(fp," ObjID: %d %d %d %d\n", objId.id[0], objId.id[1], objId.id[2], objId.id[3]);
+    if (!objId.isNull()) {
+      if (fprintf(fp," ObjID: %d %d %d %d\n", objId.id[0], objId.id[1], objId.id[2], objId.id[3]) < 0) {
+        CmiAbort("BigSim failed writing BgTimeLog");
+      }
+    }
   }
   if (bglog_version >= 6) {
     if (mpiOp!=MPI_NONE) {
-      fprintf(fp, "MPI collective: ");
-      switch (mpiOp) {
-      case MPI_BARRIER:   fprintf(fp, "MPI Barrier"); break;
-      case MPI_ALLREDUCE: fprintf(fp, "MPI_Allreduce"); break;
-      case MPI_ALLTOALL:  fprintf(fp, "MPI_Alltoall"); break;
+      if (fprintf(fp, "MPI collective: ") < 0) {
+        CmiAbort("BigSim failed writing BgTimeLog");
       }
-      fprintf(fp, " mpiSize: %d\n", mpiSize);
+      switch (mpiOp) {
+      case MPI_BARRIER:
+        if (fprintf(fp, "MPI Barrier") < 0) {
+          CmiAbort("BigSim failed writing BgTimeLog");
+        }
+        break;
+      case MPI_ALLREDUCE:
+        if (fprintf(fp, "MPI_Allreduce") < 0) {
+          CmiAbort("BigSim failed writing BgTimeLog");
+        }
+        break;
+      case MPI_ALLTOALL:
+        if (fprintf(fp, "MPI_Alltoall") < 0) {
+          CmiAbort("BigSim failed writing BgTimeLog");
+        }
+        break;
+      }
+      if (fprintf(fp, " mpiSize: %d\n", mpiSize) < 0) {
+        CmiAbort("BigSim failed writing BgTimeLog");
+      }
     }
   }
   for (i=0; i<msgs.length(); i++)
@@ -332,15 +380,31 @@ void BgTimeLog::write(FILE *fp)
   for (i=0; i<evts.length(); i++)
     evts[i]->write(fp);
   // fprintf(fp,"\nbackwardDeps [%d]:\n",backwardDeps.length());
-  fprintf(fp, "backward: ");
-  for (i=0; i<backwardDeps.length(); i++)
-    fprintf(fp,"[%p %d] ",backwardDeps[i], backwardDeps[i]->seqno);
-  fprintf(fp, "\n");
-  fprintf(fp, "forward: ");
-  for (i=0; i<forwardDeps.length(); i++)
-    fprintf(fp,"[%p %d] ",forwardDeps[i], forwardDeps[i]->seqno);
-  fprintf(fp, "\n");
-  fprintf(fp, "\n");
+  if (fprintf(fp, "backward: ") < 0) {
+    CmiAbort("BigSim failed writing BgTimeLog");
+  }
+  for (i=0; i<backwardDeps.length(); i++) {
+    if (fprintf(fp,"[%p %d] ", (void*)backwardDeps[i], backwardDeps[i]->seqno) < 0) {
+      CmiAbort("BigSim failed writing BgTimeLog");
+    }
+  }
+  if (fprintf(fp, "\n") < 0) {
+    CmiAbort("BigSim failed writing BgTimeLog");
+  }
+  if (fprintf(fp, "forward: ") < 0) {
+    CmiAbort("BigSim failed writing BgTimeLog");
+  }
+  for (i=0; i<forwardDeps.length(); i++) {
+    if (fprintf(fp,"[%p %d] ", (void*)forwardDeps[i], forwardDeps[i]->seqno) < 0) {
+      CmiAbort("BigSim failed writing BgTimeLog");
+    }
+  }
+  if (fprintf(fp, "\n") < 0) {
+    CmiAbort("BigSim failed writing BgTimeLog");
+  }
+  if (fprintf(fp, "\n") < 0) {
+    CmiAbort("BigSim failed writing BgTimeLog");
+  }
 }
 
 void BgTimeLog::addMsgBackwardDep(BgTimeLineRec &tlinerec, void* msg)

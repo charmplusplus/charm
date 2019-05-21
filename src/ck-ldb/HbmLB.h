@@ -107,7 +107,6 @@ public:
   };
 
 private:
-  CProxy_HbmLB  thisProxy;
   int              foundNeighbors;
   LDStats myStats;
 

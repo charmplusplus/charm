@@ -113,9 +113,9 @@ skt_ip_t skt_my_ip(void);
 #else /*Use actual sockets*/
 
 /*Preliminaries*/
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32)
 /*For windows systems:*/
-#include <winsock.h>
+#include <winsock2.h>
 static void sleep(int secs) { Sleep(1000 * secs); }
 
 #else
@@ -136,7 +136,7 @@ static void sleep(int secs) { Sleep(1000 * secs); }
 #define SOCKET_ERROR (-1)
 #endif /*def SOCKET*/
 
-#endif /*WIN32*/
+#endif /*_WIN32*/
 
 #ifdef __cplusplus
 extern "C" {
@@ -183,6 +183,11 @@ void skt_setSockBuf(SOCKET skt, int bufsize);
 int skt_sendN(SOCKET hSocket, const void *pBuff, int nBytes);
 int skt_recvN(SOCKET hSocket,       void *pBuff, int nBytes);
 int skt_sendV(SOCKET fd, int nBuffers, const void **buffers, int *lengths);
+#if !defined(_WIN32)
+int skt_sendmsg(SOCKET hSocket, struct msghdr *mh, int num_bufs, int total_bytes);
+#else
+int skt_sendmsg(SOCKET hSocket, WSABUF *buffers, int num_bufs, int total_bytes);
+#endif
 
 int skt_tcp_no_nagle(SOCKET fd);
 
@@ -265,21 +270,19 @@ int ChMessage_send(SOCKET fd,
 
 #if CMK_USE_IBVERBS | CMK_USE_IBUD
 typedef struct {
+  ChMessageInt_t nodeno;
   ChMessageInt_t lid, qpn, psn;
 } ChInfiAddr;
 #endif
 
+#define ChInitNodetabFields 2
+#define ChInitNodeforkFields 2
+
 typedef struct {
+  ChMessageInt_t nodeno;
   ChMessageInt_t nProcessesInPhysNode; /* Number of distinct OS processes on
                                           this physical hardware node */
   ChMessageInt_t nPE; /* Number of worker threads in this OS process */
-#if CMK_USE_IBVERBS
-  ChInfiAddr *
-      qpList; /** An array of queue pair identifiers of length CmiNumNodes()-1*/
-#endif
-#if CMK_USE_IBUD
-  ChInfiAddr qp; /** my qp */
-#endif
   ChMessageInt_t dataport; /* node's data port (UDP or GM) */
   ChMessageInt_t mach_id;  /* node's hardware address (GM-only) */
 #if CMK_USE_MX
@@ -290,6 +293,9 @@ typedef struct {
 
 typedef struct {
   ChMessageInt_t nodeNo;
+  ChMessageInt_t num_pus;
+  ChMessageInt_t num_cores;
+  ChMessageInt_t num_sockets;
   ChNodeinfo info;
 } ChSingleNodeinfo;
 
@@ -300,8 +306,6 @@ typedef struct {
   ChMessageInt_t pe;            /*Destination processor number*/
   char handler[CCS_HANDLERLEN]; /*Handler name for message to follow*/
 } CcsMessageHeader;
-
-extern const char *skt_to_name(SOCKET skt);
 
 #ifdef __cplusplus
 }

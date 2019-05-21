@@ -487,7 +487,7 @@ char *eventQueue::dumpString() {
 #else
     sprintf(tempStr, PVT_DEBUG_BUFFER_LINE_LENGTH, "%d[%u.%d.%d]", e->timestamp, e->evID.id, e->evID.getPE(), e->done);
 #endif
-    strncat(str, tempStr,PVT_DEBUG_BUFFER_LINE_LENGTH);
+    strncat(str, tempStr, 32);
 
     if (e == frontPtr) strncat(str, "(FP)", PVT_DEBUG_BUFFER_LINE_LENGTH);
     if (e == currentPtr) strncat(str, "(CP)", PVT_DEBUG_BUFFER_LINE_LENGTH);
@@ -496,7 +496,7 @@ char *eventQueue::dumpString() {
     e = e->next;
   }
   char *eqs=eqh->dumpString();
-  strncat(str, eqs, PVT_DEBUG_BUFFER_LINE_LENGTH);
+  strncat(str, eqs, 32);
   delete [] tempStr;
   delete [] eqs;
   strncat(str, "end EVQ]", PVT_DEBUG_BUFFER_LINE_LENGTH);

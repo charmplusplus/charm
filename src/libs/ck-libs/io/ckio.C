@@ -18,6 +18,8 @@ typedef int FileToken;
 #include <unistd.h>
 #endif
 
+#include "fs_parameters.h"
+
 using std::min;
 using std::max;
 using std::map;
@@ -36,6 +38,7 @@ namespace Ck { namespace IO {
         CkCallback opened;
         Options opts;
         int fd;
+        int sessionID;
         CProxy_WriteSession session;
         CkCallback complete;
 
@@ -88,10 +91,10 @@ namespace Ck { namespace IO {
         }
 
         void openFile(string name, CkCallback opened, Options opts) {
-          if (0 == opts.peStripe)
-            opts.peStripe = 16 * 1024 * 1024;
           if (0 == opts.writeStripe)
-            opts.writeStripe = 4 * 1024 * 1024;
+            opts.writeStripe = CkGetFileStripeSize(name.c_str());
+          if (0 == opts.peStripe)
+            opts.peStripe = 4 * opts.writeStripe;
           if (-1 == opts.activePEs)
             opts.activePEs = min(CkNumPes(), 32);
           if (-1 == opts.basePE)
@@ -107,9 +110,10 @@ namespace Ck { namespace IO {
           files[file].opened.send(new FileReadyMsg(file));
         }
 
-        void prepareWriteSession(FileToken file, size_t bytes, size_t offset,
-                                 CkCallback ready, CkCallback complete) {
+        void prepareWriteSession_helper(FileToken file, size_t bytes, size_t offset,
+                                        CkCallback ready, CkCallback complete) {
           Options &opts = files[file].opts;
+          files[file].sessionID = sessionID;
 
 	  int numStripes = 0;
 	  size_t bytesLeft = bytes, delta = opts.peStripe - offset % opts.peStripe;
@@ -123,18 +127,22 @@ namespace Ck { namespace IO {
 	    numStripes++;
 
           CkArrayOptions sessionOpts(numStripes);
+          sessionOpts.setStaticInsertion(true);
+
+          CkCallback sessionInitDone(CkIndex_Director::sessionReady(NULL), thisProxy);
+          sessionInitDone.setRefnum(sessionID);
+          sessionOpts.setInitCallback(sessionInitDone);
+
           //sessionOpts.setMap(managers);
           files[file].session =
             CProxy_WriteSession::ckNew(file, offset, bytes, sessionOpts);
           CkAssert(files[file].complete.isInvalid());
           files[file].complete = complete;
-          ready.send(new SessionReadyMsg(Session(file, bytes, offset,
-                                                 files[file].session)));
         }
 
         void sessionComplete(FileToken token) {
           CProxy_CkArray(files[token].session.ckGetArrayID()).ckDestroy();
-          files[token].complete.send(CkReductionMsg::buildNew(0, NULL));
+          files[token].complete.send(CkReductionMsg::buildNew(0, NULL, CkReduction::nop));
           files[token].complete = CkCallback(CkCallback::invalid);
         }
 
@@ -294,13 +302,13 @@ namespace Ck { namespace IO {
       public:
         WriteSession(FileToken file_, size_t offset_, size_t bytes_)
           : file(CkpvAccess(manager)->get(file_))
-          , token(file_)
           , sessionOffset(offset_)
           , myOffset((sessionOffset / file->opts.peStripe + thisIndex)
                      * file->opts.peStripe)
           , sessionBytes(bytes_)
           , myBytes(min(file->opts.peStripe, sessionOffset + sessionBytes - myOffset))
           , myBytesWritten(0)
+          , token(file_)
         {
           CkAssert(file->fd != -1);
           CkAssert(myOffset >= sessionOffset);

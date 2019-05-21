@@ -513,8 +513,8 @@ extern int _checkpointBarrierHandlerIdx;
 extern int _checkpointBarrierAckHandlerIdx;
 
 //extern CkHashtableT<CkHashtableAdaptorT<CkObjID>,void *> migratedObjectList;
-extern CkVec<MigrationRecord> migratedNoticeList;
-extern CkVec<RetainedMigratedObject *> retainedObjectList;
+extern std::vector<MigrationRecord> migratedNoticeList;
+extern std::vector<RetainedMigratedObject *> retainedObjectList;
 
 int getCheckPointPE();
 void forAllCharesDo(MlogFn fnPointer,void *data);

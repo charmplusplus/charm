@@ -1,6 +1,11 @@
 #include <algorithm>
 #include "charm++.h"
 
+#if __DEBUG_SPANNING_TREE_
+#include <sstream>
+#include <fstream>
+#endif
+
 #ifndef TREE_STRATEGY_3D_TORUS_MIN_BYTES_HOPS
 #define TREE_STRATEGY_3D_TORUS_MIN_BYTES_HOPS
 namespace topo {
@@ -74,6 +79,30 @@ class SpanningTreeStrategy_3dTorus_minBytesHops<Iterator,vtxType>: public Spanni
 
 namespace topo {
 
+#if __DEBUG_SPANNING_TREE_ && XE6_TOPOLOGY
+void writeAllocTopoManager(const char *fileName) {
+  std::ofstream outfile(fileName);
+  outfile << "x y z t" << std::endl;
+  int coords[4];
+  for (int i=0; i < CkNumPes(); i++) {
+      TopoManager_getPeCoordinates(i, coords);
+      outfile << coords[0] << " " << coords[1] << " " << coords[2] << " " << std::endl;
+  }
+  outfile.close();
+}
+
+template <typename Iterator>
+void writeCoordinatesPEList(const char *fileName, const Iterator start, const Iterator end) {
+  std::ofstream outfile(fileName);
+  outfile << "x y z t" << std::endl;
+  for (Iterator itr = start; itr != end; itr++) {
+    for (int j=0; j < 3; j++) outfile << (*itr).X[j] << " ";
+    outfile << std::endl;
+  }
+  outfile.close();
+}
+#endif
+
 template <typename Iterator>
 SpanningTreeVertex* SpanningTreeStrategy_3dTorus_minBytesHops<Iterator,SpanningTreeVertex>::buildNextGen(const Iterator firstVtx, const Iterator beyondLastVtx, const int maxBranches)
 {
@@ -81,8 +110,8 @@ SpanningTreeVertex* SpanningTreeStrategy_3dTorus_minBytesHops<Iterator,SpanningT
     (*firstVtx).childIndex.clear();
     (*firstVtx).childIndex.reserve(maxBranches);
 
-    /// Get a handle on a TopoManager. @note: Avoid this per-call instantiation cost by using an instance manager? Ideally, TopoManager should be a singleton.
-    TopoManager aTopoMgr;
+    /// Get a handle on TopoManager
+    TopoManager *aTopoMgr = TopoManager::getTopoManager();
     /// The number of vertices in the tree that require network traversal
     int numLocalDestinations = -1, numRemoteDestinations = 0;
     Iterator beyondLastLocal = firstVtx;
@@ -94,9 +123,9 @@ SpanningTreeVertex* SpanningTreeStrategy_3dTorus_minBytesHops<Iterator,SpanningT
         (*itr).X.assign(3,0);
         int coreNum; ///< dummy var. Get and discard the core number
         ///@todo: If the machine coordinates are already stored in the vertices, do we want to find them again?
-        aTopoMgr.rankToCoordinates( (*itr).id, (*itr).X[0], (*itr).X[1], (*itr).X[2], coreNum );
+        aTopoMgr->rankToCoordinates( (*itr).id, (*itr).X[0], (*itr).X[1], (*itr).X[2], coreNum );
         /// If this is a not a local node (separated by the network from the tree root)
-        if (numHops(*firstVtx,*itr) > 0)
+        if (!(*firstVtx).sameCoordinates(*itr))
             numRemoteDestinations++;
         else
         {
@@ -108,6 +137,28 @@ SpanningTreeVertex* SpanningTreeStrategy_3dTorus_minBytesHops<Iterator,SpanningT
             beyondLastLocal++;
         }
     }
+    impl::TreeBoundingBoxOn3dTorus<Iterator> treePart;
+#if XE6_TOPOLOGY
+    if ((aTopoMgr->getDimNX() > MAX_TORUS_DIM_SIZE) ||
+        (aTopoMgr->getDimNY() > MAX_TORUS_DIM_SIZE) ||
+        (aTopoMgr->getDimNZ() > MAX_TORUS_DIM_SIZE)) {
+      CkAbort("Torus dimension size larger than supported limit. Please increase limit");
+    }
+#if __DEBUG_SPANNING_TREE_
+    if (CkMyPe() == 0) {
+      writeAllocTopoManager("alloc_tmgr.txt");
+      writeCoordinatesPEList("pe_coords.txt", firstVtx, beyondLastVtx);
+      CkPrintf("numRemoteDestinations = %d\n", numRemoteDestinations);
+      CkPrintf("numLocalDestinations = %d\n", numLocalDestinations);
+    }
+#endif
+    treePart.translateCoordinates(firstVtx, beyondLastVtx, 3);
+#if __DEBUG_SPANNING_TREE_
+    if (CkMyPe() == 0) {
+      writeCoordinatesPEList("pe_coords_translated.txt", firstVtx, beyondLastVtx);
+    }
+#endif
+#endif
 
     /// The number of branches that can be devoted to local destinations (vertices on the same node)
     int numLocalBranches = 0;
@@ -122,10 +173,16 @@ SpanningTreeVertex* SpanningTreeStrategy_3dTorus_minBytesHops<Iterator,SpanningT
             firstVtx->childIndex.push_back( localTree->childIndex[i] );
         /// Intermediate results no longer needed
         delete localTree;
+#if __DEBUG_SPANNING_TREE_
+        if (CkMyPe() == 0) {
+          std::cout << "Local destinations are:" << std::endl;
+          for (Iterator itr = firstVtx; itr != beyondLastLocal; itr++) std::cout << (*itr).id << " ";
+          std::cout << std::endl;
+        }
+#endif
     }
 
     /// Partition the remote-vertex bounding box into the remaining number of branches
-    impl::TreeBoundingBoxOn3dTorus<Iterator> treePart;
     treePart.partition(firstVtx,beyondLastLocal,beyondLastVtx,maxBranches);
 
     /// Identify the closest member in each remote branch and put it at the corresponding childIndex location
@@ -139,8 +196,31 @@ SpanningTreeVertex* SpanningTreeStrategy_3dTorus_minBytesHops<Iterator,SpanningT
         else
             std::advance(rangeEnd, (*firstVtx).childIndex[i+1] );
         Iterator closestItr = pickClosest(*firstVtx,rangeStart,rangeEnd);
+#if __DEBUG_SPANNING_TREE_
+        if (CkMyPe() == 0) {
+          CkPrintf("Closest PE in subtree %d is %d with distance %d\n", i, (*closestItr).id, numHops(*firstVtx,*closestItr));
+        }
+#endif
         std::iter_swap(rangeStart,closestItr);
     }
+#if __DEBUG_SPANNING_TREE_
+    // dump the tree
+    char dbout[1024];
+    int offset = 0;
+    int coords[4];
+    int numChildren = (*firstVtx).childIndex.size();
+    TopoManager_getPeCoordinates(getProcID(*firstVtx), coords);
+    offset += sprintf(dbout, "TREE: %d (%d,%d,%d) %d ", getProcID(*firstVtx), coords[0], coords[1], coords[2], numChildren);
+    for (int i=0; i < numChildren; i++) {
+      Iterator rangeStart = firstVtx;
+      std::advance(rangeStart,(*firstVtx).childIndex[i]);
+      int childPE = getProcID(*rangeStart);
+      TopoManager_getPeCoordinates(childPE, coords);
+      offset += sprintf(dbout + offset, "%d (%d,%d,%d) ", childPE, coords[0], coords[1], coords[2]);
+    }
+    sprintf(dbout + offset, "\n");
+    CkPrintf(dbout);
+#endif
     /// Return a copy of the parent in keeping with the generic interface
     return (new SpanningTreeVertex(*firstVtx) );
 }

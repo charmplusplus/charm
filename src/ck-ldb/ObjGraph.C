@@ -138,11 +138,9 @@ double ObjGraph::EdgeWeight(Edge* e) {
   return commData.messages * alpha + commData.bytes * beta;
 }
 
-int ObjGraph::calc_hashval(LDOMid omid, LDObjid id)
+int ObjGraph::calc_hashval(LDOMid omid, CmiUInt8 id)
 {
-  int hashval = omid.id.idx;
-  for(int i=0; i < OBJ_ID_SZ; i++)
-    hashval +=  id.id[i];
+  int hashval = omid.id.idx + (int)id;
   hashval %= hash_max;
   return hashval;
 }
@@ -150,7 +148,7 @@ int ObjGraph::calc_hashval(LDOMid omid, LDObjid id)
 ObjGraph::Node* ObjGraph::find_node(const LDObjKey &edge_key)
 {
   const LDOMid &edge_omid = edge_key.omID();
-  const LDObjid &edge_id = edge_key.objID();
+  const CmiUInt8 &edge_id = edge_key.objID();
   const int from_hashval = calc_hashval(edge_omid,edge_id);
   //  CkPrintf("From = %d\n",from_hashval);
   Node* from_node = node_table[from_hashval];
@@ -158,10 +156,10 @@ ObjGraph::Node* ObjGraph::find_node(const LDObjKey &edge_key)
   while (from_node != 0) {
     const LDOMid omid =
       stats->objData[from_node->index].omID();
-    const LDObjid objid =
+    const CmiUInt8 objid =
       stats->objData[from_node->index].objID();
     //    CkPrintf("Comparing %d to %d\n",objid.id[0],edge_id.id[0]);
-    if (LDOMidEqual(omid,edge_omid) && LDObjIDEqual(objid,edge_id) )
+    if (LDOMidEqual(omid,edge_omid) && objid == edge_id )
       break;
     from_node = from_node->nxt_hash;
   }

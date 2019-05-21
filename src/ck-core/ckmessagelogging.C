@@ -87,7 +87,7 @@ CpvDeclare(char *, _incarnation);
 /***** VARIABLES FOR PARALLEL RECOVERY *****/
 CpvDeclare(int, _numEmigrantRecObjs);
 CpvDeclare(int, _numImmigrantRecObjs);
-CpvDeclare(CkVec<CkLocation *> *, _immigrantRecObjs);
+CpvDeclare(std::vector<CkLocation *> *, _immigrantRecObjs);
 /***** *****/
 
 #if COLLECT_STATS_MSGS
@@ -158,8 +158,8 @@ static int heartBeatCheckHandlerIdx;
 static int partnerFailureHandlerIdx;
 static double lastPingTime = -1;
 
-extern "C" void mpi_restart_crashed(int pe, int rank);
-extern "C" int  find_spare_mpirank(int pe, int partition);
+void mpi_restart_crashed(int pe, int rank);
+int  find_spare_mpirank(int pe, int partition);
 
 void heartBeatPartner();
 void heartBeatHandler(void *msg);
@@ -233,8 +233,8 @@ void _messageLoggingInit(){
     CpvInitialize(int, _numImmigrantRecObjs);
     CpvAccess(_numImmigrantRecObjs) = 0;
 
-    CpvInitialize(CkVec<CkLocation *> *, _immigrantRecObjs);
-    CpvAccess(_immigrantRecObjs) = new CkVec<CkLocation *>;
+    CpvInitialize(std::vector<CkLocation *> *, _immigrantRecObjs);
+    CpvAccess(_immigrantRecObjs) = new std::vector<CkLocation *>;
 
 	//Cpv variables for checkpoint
 	CpvInitialize(StoredCheckpoint *,_storedCheckpointData);
@@ -816,6 +816,7 @@ void checkpointAlarm(void *_dummy,double curWallTime){
 		return;
 	}
 	CheckpointRequest request;
+	CmiInitMsgHeader(request.header, sizeof(CheckpointRequest));
 	request.PE = CkMyPe();
 	CmiSetHandler(&request,_checkpointRequestHandlerIdx);
 	CmiSyncBroadcastAll(sizeof(CheckpointRequest),(char *)&request);
@@ -1130,6 +1131,7 @@ void _storeCheckpointHandler(char *msg){
 	}
 
 	CheckPointAck ackMsg;
+	CmiInitMsgHeader(ackMsg.header, sizeof(CheckPointAck));
 	ackMsg.PE = CkMyPe();
 	ackMsg.dataSize = CpvAccess(_storedCheckpointData)->bufSize;
 	CmiSetHandler(&ackMsg,_checkpointAckHandlerIdx);
@@ -1169,6 +1171,7 @@ void _checkpointAckHandler(CheckPointAck *ackMsg){
  */
 void CkMlogRestart(const char * dummy, CkArgMsg * dummyMsg){
 	RestartRequest msg;
+	CmiInitMsgHeader(msg.header, sizeof(RestartRequest));
 
 	fprintf(stderr,"[%d] Restart started at %.6lf \n",CkMyPe(),CmiWallTimer());
 
@@ -1226,9 +1229,9 @@ void _getCheckpointHandler(RestartRequest *restartMsg){
 
 // this list is used to create a vector of the object ids of all
 //the chares on this processor currently and the highest TN processed by them 
-//the first argument is actually a CkVec<TProcessedLog> *
+//the first argument is actually a std::vector<TProcessedLog> *
 void createObjIDList(void *data, ChareMlogData *mlogData){
-	CkVec<CkObjID> *list = (CkVec<CkObjID> *)data;
+	std::vector<CkObjID> *list = (std::vector<CkObjID> *)data;
 	CkObjID entry;
 	entry = mlogData->objID;
 	list->push_back(entry);
@@ -1438,7 +1441,7 @@ public:
 		CkArrayIndexMax idx = loc.getIndex();
 		CkLocRec *rec = loc.getLocalRecord();
 		CkLocMgr *locMgr = loc.getManager();
-		CkVec<CkMigratable *> eltList;
+		std::vector<CkMigratable *> eltList;
 			
 		CkPrintf("[%d] Distributing objects to Processor %d: ",CkMyPe(),*targetPE);
 		idx.print();
@@ -1515,7 +1518,7 @@ void _sendBackLocationHandler(char *receivedMsg){
 	idx.print();
 
 	// decrementing number of emigrant objects at reduction manager
-	CkVec<CkMigratable *> eltList;
+	std::vector<CkMigratable *> eltList;
 	CkLocRec *rec = mgr->elementRec(idx);
 	mgr->migratableList(rec,eltList);
 	CkReductionMgr *reductionMgr = (CkReductionMgr*)CkpvAccess(_groupTable)->find(eltList[0]->mlogData->objID.data.array.id).getObj();
@@ -1558,7 +1561,7 @@ void _distributedLocationHandler(char *receivedMsg){
 	CpvAccess(_immigrantRecObjs)->push_back(new CkLocation(mgr,rec));
 	CpvAccess(_numImmigrantRecObjs)++;
 	
-	CkVec<CkMigratable *> eltList;
+	std::vector<CkMigratable *> eltList;
 	mgr->migratableList((CkLocRec *)rec,eltList);
 	for(int i=0;i<eltList.size();i++){
 		if(eltList[i]->mlogData->toResumeOrNot && eltList[i]->mlogData->resumeCount < globalResumeCount){
@@ -1581,6 +1584,7 @@ void _distributedLocationHandler(char *receivedMsg){
  * it that a particular expected object is not going to get to it */
 void sendDummyMigration(int restartPE,CkGroupID lbID,CkGroupID locMgrID,CkArrayIndexMax &idx,int locationPE){
 	DummyMigrationMsg buf;
+	CmiInitMsgHeader(buf.header, sizeof(DummyMigrationMsg));
 	buf.flag = MLOG_OBJECT;
 	buf.lbID = lbID;
 	buf.mgrID = locMgrID;
@@ -1597,6 +1601,7 @@ void sendDummyMigration(int restartPE,CkGroupID lbID,CkGroupID locMgrID,CkArrayI
 
 void sendDummyMigrationCounts(int *dummyCounts){
 	DummyMigrationMsg buf;
+	CmiInitMsgHeader(buf.header, sizeof(DummyMigrationMsg));
 	buf.flag = MLOG_COUNT;
 	buf.lbID = globalLBID;
 	CmiSetHandler(&buf,_dummyMigrationHandlerIdx);
@@ -1648,7 +1653,7 @@ public:
 		data = _data;
 	};
 	void addLocation(CkLocation &loc){
-		CkVec<CkMigratable *> list;
+		std::vector<CkMigratable *> list;
 		CkLocRec *local = loc.getLocalRecord();
 		locMgr->migratableList (local,list);
 		for(int i=0;i<list.size();i++){
@@ -1723,7 +1728,7 @@ void sendBackImmigrantRecObjs(){
 	CkLocRec *rec;
 	PUP::sizer psizer;
 	int targetPE;
-	CkVec<CkMigratable *> eltList;
+	std::vector<CkMigratable *> eltList;
 	CkReductionMgr *reductionMgr;
  
 	// looping through all elements in immigrant recovery objects vector
@@ -1775,7 +1780,7 @@ void sendBackImmigrantRecObjs(){
 	}
 
 	// cleaning up all data structures
-	CpvAccess(_immigrantRecObjs)->removeAll();
+	CpvAccess(_immigrantRecObjs)->clear();
 	CpvAccess(_numImmigrantRecObjs) = 0;
 
 }
@@ -1896,6 +1901,7 @@ void garbageCollectMlog(){
 void informLocationHome(CkGroupID locMgrID,CkArrayIndexMax idx,int homePE,int currentPE){
 	double _startTime = CmiWallTimer();
 	CurrentLocationMsg msg;
+	CmiInitMsgHeader(msg.header, sizeof(CurrentLocationMsg));
 	msg.mgrID = locMgrID;
 	msg.idx = idx;
 	msg.locationPE = currentPE;
@@ -1941,6 +1947,7 @@ void _receiveLocationHandler(CurrentLocationMsg *data){
 
 void getGlobalStep(CkGroupID gID){
 	LBStepMsg msg;
+	CmiInitMsgHeader(msg.header, sizeof(LBStepMsg));
 	int destPE = 0;
 	msg.lbID = gID;
 	msg.fromPE = CmiMyPe();
@@ -1975,7 +1982,7 @@ void _recvGlobalStepHandler(LBStepMsg *msg){
 	CmiPrintf("[%d] recvGlobalStepHandler \n",CmiMyPe());
 
 	// continuing with restart process; send out the request to resend logged messages to all other processors
-	CkVec<CkObjID> objectVec;
+	std::vector<CkObjID> objectVec;
 	forAllCharesDo(createObjIDList, (void *)&objectVec);
 	int numberObjects = objectVec.size();
 	

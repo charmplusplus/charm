@@ -1,8 +1,6 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-#define CMK_CCS_AVAILABLE                                  0
-
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
@@ -16,7 +14,7 @@
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 
-#define CMK_MEMORY_PAGESIZE                                8192
+#define CMK_MEMORY_PAGESIZE                                4096
 #define CMK_MEMORY_PROTECTABLE                             1
 
 #define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }

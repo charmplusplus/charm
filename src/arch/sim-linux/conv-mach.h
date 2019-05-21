@@ -1,8 +1,6 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-#define CMK_CCS_AVAILABLE                                  0
-
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    0
 #define CMK_CMIDELIVERS_USE_SPECIAL_CODE                   1
 
@@ -18,11 +16,11 @@
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 
-#define CMK_MEMORY_PAGESIZE                                8192
+#define CMK_MEMORY_PAGESIZE                                4096
 #define CMK_MEMORY_PROTECTABLE                             1
 
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
-#define CMK_MSG_HEADER_EXT    { CmiUInt2 hdl,xhdl,info,stratid,root,redID,padding2,padding3; }
+#define CMK_MSG_HEADER_EXT    { CmiUInt2 hdl,xhdl,info,stratid,root,redID,padding2,padding3; CmiUInt1 cmaMsgType:2;}
 
 #define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
 #define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1

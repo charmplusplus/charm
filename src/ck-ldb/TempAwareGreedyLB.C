@@ -17,13 +17,15 @@
 #include "ckgraph.h"
 #include <algorithm>
 
+extern int quietModeRequested;
+
 CreateLBFunc_Def(TempAwareGreedyLB, "always assign the heaviest obj onto lightest loaded processor.")
 
 TempAwareGreedyLB::TempAwareGreedyLB(const CkLBOptions &opt): CBase_TempAwareGreedyLB(opt)
 {
   lbname = "TempAwareGreedyLB";
-  if (CkMyPe()==0)
-    CkPrintf("[%d] TempAwareGreedyLB created\n",CkMyPe());
+  if (CkMyPe()==0 && !quietModeRequested)
+    CkPrintf("CharmLB> TempAwareGreedyLB created.\n");
 }
 
 bool TempAwareGreedyLB::QueryBalanceNow(int _step)

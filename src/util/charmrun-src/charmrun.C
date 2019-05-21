@@ -1,11 +1,11 @@
 #include "converse.h"
 
-#include "../sockRoutines.h"
-#include "../sockRoutines.c"
-#include "../ccs-auth.h"
-#include "../ccs-auth.c"
-#include "../ccs-server.h"
-#include "../ccs-server.c"
+#include "sockRoutines.h"
+#include "sockRoutines.C"
+#include "ccs-auth.h"
+#include "ccs-auth.C"
+#include "ccs-server.h"
+#include "ccs-server.C"
 
 #include <stdio.h>
 #include <string.h>
@@ -27,12 +27,15 @@
 #endif
 #include <sys/stat.h>
 
+#include <unordered_map>
 #include <map>
 #include <string>
 #include <vector>
+#include <queue>
 #include <utility>
+#include <algorithm>
 
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32)
 /*Win32 has screwy names for the standard UNIX calls:*/
 #define getcwd _getcwd
 #define strdup _strdup
@@ -78,53 +81,28 @@
 #define MAXPATHLEN 1024
 #endif
 
-const int MAX_NUM_RETRIES = 3;
-#include <map>
-
-std::map<SOCKET, int> skt_client_table;
-std::map<std::string, int> host_sizes;
-
-const char *nodetab_name(int i);
-const char *skt_to_name(SOCKET skt)
-{
-  if (skt_client_table.find(skt) != skt_client_table.end()) {
-    return nodetab_name(skt_client_table[skt]);
-  } else {
-    return "UNKNOWN";
-  }
-}
-int skt_to_node(SOCKET skt)
-{
-  if (skt_client_table.find(skt) != skt_client_table.end()) {
-    return skt_client_table[skt];
-  } else {
-    return -1;
-  }
-}
+static const int MAX_NUM_RETRIES = 3;
 
 //#define HSTART
 #ifdef HSTART
 /*Hierarchical-start routines*/
-int mynodes_start; /* To keep a global node numbering */
+static int mynodes_start; /* To keep a global node numbering */
 
 #endif
 
 static double ftTimer;
 
-double start_timer;
+static double start_timer;
 
-int *ssh_pids = NULL;
-
-double GetClock(void)
+static double GetClock(void)
 {
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32)
   struct _timeb tv;
   _ftime(&tv);
   return (tv.time * 1.0 + tv.millitm * 1.0E-3);
 #else
   struct timeval tv;
-  int ok;
-  ok = gettimeofday(&tv, NULL);
+  int ok = gettimeofday(&tv, NULL);
   if (ok < 0) {
     perror("gettimeofday");
     exit(1);
@@ -133,7 +111,7 @@ double GetClock(void)
 #endif
 }
 
-int probefile(const char *path)
+static int probefile(const char *path)
 {
   FILE *f = fopen(path, "r");
   if (f == NULL)
@@ -142,17 +120,15 @@ int probefile(const char *path)
   return 1;
 }
 
-const char *mylogin(void)
+static const char *mylogin(void)
 {
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32)
   static char name[100] = {'d', 'u', 'n', 'n', 'o', 0};
   unsigned int len = 100;
   GetUserName(name, (LPDWORD) &len);
   return name;
 #else /*UNIX*/
-  struct passwd *self;
-
-  self = getpwuid(getuid());
+  struct passwd *self = getpwuid(getuid());
   if (self == 0) {
 #if CMK_HAS_POPEN
     char cmd[16];
@@ -161,7 +137,10 @@ const char *mylogin(void)
     sprintf(cmd, "id -u -n");
     p = popen(cmd, "r");
     if (p) {
-      fscanf(p, "%s", uname);
+      if (fscanf(p, "%63s", uname) != 1) {
+        fprintf(stderr, "charmrun> fscanf() failed!\n");
+        exit(1);
+      }
       pclose(p);
       return strdup(uname);
     } else
@@ -176,36 +155,6 @@ const char *mylogin(void)
 
 /**************************************************************************
  *
- * ping_developers
- *
- * Sends a single UDP packet to the charm developers notifying them
- * that charm is in use.
- *
- **************************************************************************/
-
-void ping_developers()
-{
-#ifdef NOTIFY
-  char info[1000];
-  /*This is the resolved IP address of elegance.cs.uiuc.edu */
-  skt_ip_t destination_ip = skt_lookup_ip("128.174.241.211");
-  unsigned int destination_port = 6571;
-  struct sockaddr_in addr = skt_build_addr(destination_ip, destination_port);
-  SOCKET skt;
-
-  skt = socket(AF_INET, SOCK_DGRAM, 0);
-  if (skt == INVALID_SOCKET)
-    return;
-
-  sprintf(info, "%s", mylogin());
-
-  sendto(skt, info, strlen(info), 0, (struct sockaddr *) &addr, sizeof(addr));
-  skt_close(skt);
-#endif /* NOTIFY */
-}
-
-/**************************************************************************
- *
  * Pathfix : alters a path according to a set of rewrite rules
  *
  *************************************************************************/
@@ -216,7 +165,7 @@ typedef struct s_pathfixlist {
   struct s_pathfixlist *next;
 } * pathfixlist;
 
-pathfixlist pathfix_append(char *s1, char *s2, pathfixlist l)
+static pathfixlist pathfix_append(char *s1, char *s2, pathfixlist l)
 {
   pathfixlist pf = (pathfixlist) malloc(sizeof(s_pathfixlist));
   pf->s1 = s1;
@@ -225,20 +174,17 @@ pathfixlist pathfix_append(char *s1, char *s2, pathfixlist l)
   return pf;
 }
 
-char *pathfix(const char *path, pathfixlist fixes)
+static char *pathfix(const char *path, pathfixlist fixes)
 {
   char buffer[MAXPATHLEN];
-  pathfixlist l;
   char buf2[MAXPATHLEN];
-  char *offs;
-  int mod, len;
   strcpy(buffer, path);
-  mod = 1;
+  int mod = 1;
   while (mod) {
     mod = 0;
-    for (l = fixes; l; l = l->next) {
-      len = strlen(l->s1);
-      offs = strstr(buffer, l->s1);
+    for (pathfixlist l = fixes; l; l = l->next) {
+      int len = strlen(l->s1);
+      char *offs = strstr(buffer, l->s1);
       if (offs) {
         offs[0] = 0;
         sprintf(buf2, "%s%s%s", buffer, l->s2, offs + len);
@@ -250,13 +196,12 @@ char *pathfix(const char *path, pathfixlist fixes)
   return strdup(buffer);
 }
 
-char *pathextfix(const char *path, pathfixlist fixes, char *ext)
+static char *pathextfix(const char *path, pathfixlist fixes, char *ext)
 {
   char *newpath = pathfix(path, fixes);
-  char *ret;
   if (ext == NULL)
     return newpath;
-  ret = (char *) malloc(strlen(newpath) + strlen(ext) + 2);
+  char *ret = (char *) malloc(strlen(newpath) + strlen(ext) + 2);
   strcpy(ret, newpath);
   strcat(ret, ext);
   free(newpath);
@@ -269,12 +214,11 @@ char *pathextfix(const char *path, pathfixlist fixes, char *ext)
  *
  ****************************************************************************/
 
-int is_quote(char c) { return (c == '\'' || c == '"'); }
+static int is_quote(char c) { return (c == '\'' || c == '"'); }
 
-void zap_newline(char *s)
+static void zap_newline(char *s)
 {
-  char *p;
-  p = s + strlen(s) - 1;
+  char *p = s + strlen(s) - 1;
   if (*p == '\n')
     *p = '\0';
   /* in case of DOS ^m */
@@ -284,22 +228,20 @@ void zap_newline(char *s)
 }
 
 /* get substring from lo to hi, remove quote chars */
-char *substr(const char *lo, const char *hi)
+static char *substr(const char *lo, const char *hi)
 {
-  int len;
-  char *res;
   if (is_quote(*lo))
     lo++;
   if (is_quote(*(hi - 1)))
     hi--;
-  len = hi - lo;
-  res = (char *) malloc(1 + len);
+  int len = hi - lo;
+  char *res = (char *) malloc(1 + len);
   memcpy(res, lo, len);
   res[len] = 0;
   return res;
 }
 
-int subeqs(const char *lo, const char *hi, const char *str)
+static int subeqs(const char *lo, const char *hi, const char *str)
 {
   int len = strlen(str);
   if (hi - lo != len)
@@ -310,7 +252,7 @@ int subeqs(const char *lo, const char *hi, const char *str)
 }
 
 /* advance pointer over blank characters */
-const char *skipblanks(const char *p)
+static const char *skipblanks(const char *p)
 {
   while ((*p == ' ') || (*p == '\t'))
     p++;
@@ -318,7 +260,7 @@ const char *skipblanks(const char *p)
 }
 
 /* advance pointer over nonblank characters and a quoted string */
-const char *skipstuff(const char *p)
+static const char *skipstuff(const char *p)
 {
   char quote = 0;
   if (*p && (*p == '\'' || *p == '"')) {
@@ -339,26 +281,43 @@ const char *skipstuff(const char *p)
   return p;
 }
 
-#if CMK_USE_SSH
-const char *getenv_ssh()
+static char *cstring_join(const std::vector<const char *> & vec, const char *separator)
 {
-  char *e;
+  const size_t separator_length = strlen(separator);
+  size_t length = 0;
+  for (const char *p : vec)
+    length += strlen(p) + separator_length;
 
-  e = getenv("CONV_RSH");
+  char * const str = (char *)malloc(length + 1);
+
+  if (0 < vec.size())
+    strcpy(str, vec[0]);
+  for (int i = 1; i < vec.size(); ++i)
+  {
+    strcat(str, separator);
+    strcat(str, vec[i]);
+  }
+
+  return str;
+}
+
+#if CMK_USE_SSH
+static const char *getenv_ssh()
+{
+  char *e = getenv("CONV_RSH");
   return e ? e : SSH_CMD;
 }
 #endif
 
-#if !defined(_WIN32) || defined(__CYGWIN__)
-char *getenv_display()
+#if !defined(_WIN32)
+static char *getenv_display()
 {
   static char result[100], ipBuf[200];
-  char *e, *p;
 
-  e = getenv("DISPLAY");
+  char *e = getenv("DISPLAY");
   if (e == 0)
     return NULL;
-  p = strrchr(e, ':');
+  char *p = strrchr(e, ':');
   if (p == 0)
     return NULL;
   if ((e[0] == ':') || (strncmp(e, "unix:", 5) == 0)) {
@@ -367,15 +326,14 @@ char *getenv_display()
     strcpy(result, e);
   return result;
 }
-char *getenv_display_no_tamper()
+static char *getenv_display_no_tamper()
 {
   static char result[100], ipBuf[200];
-  char *e, *p;
 
-  e = getenv("DISPLAY");
+  char *e = getenv("DISPLAY");
   if (e == 0)
     return NULL;
-  p = strrchr(e, ':');
+  char *p = strrchr(e, ':');
   if (p == 0)
     return NULL;
   strcpy(result, e);
@@ -387,10 +345,6 @@ char *getenv_display_no_tamper()
 static unsigned int server_port;
 static char server_addr[1024]; /* IP address or hostname of charmrun*/
 static SOCKET server_fd;
-#if CMK_SHRINK_EXPAND
-char *create_netstart(int node);
-char *create_oldnodenames();
-#endif
 /*****************************************************************************
  *                                                                           *
  * PPARAM - obtaining "program parameters" from the user.                    *
@@ -416,23 +370,39 @@ static ppdef ppdefs;
 static int pparam_pos;
 static const char **pparam_argv;
 static char pparam_optc = '-';
-char pparam_error[100];
+static char pparam_error[100];
 
-static ppdef pparam_find(const char *lname)
+struct ppdeffind
+{
+  ppdef def;
+  int enable;
+};
+
+static ppdeffind pparam_find(const char *lname)
 {
   ppdef def;
   for (def = ppdefs; def; def = def->next)
+  {
     if (strcmp(def->lname, lname) == 0)
-      return def;
-  return 0;
+      return {def, 1};
+
+    static const char no_prefix[] = "no-";
+    if (strncmp(no_prefix, lname, sizeof(no_prefix)-1) == 0)
+    {
+      if (strcmp(def->lname, lname + (sizeof(no_prefix)-1)) == 0)
+        return {def, 0};
+    }
+  }
+  return {nullptr, 1};
 }
 
 static ppdef pparam_cell(const char *lname)
 {
-  ppdef def = pparam_find(lname);
-  if (def)
-    return def;
-  def = (ppdef) malloc(sizeof(s_ppdef));
+  ppdeffind deffind = pparam_find(lname);
+  if (deffind.def)
+    return deffind.def;
+
+  auto def = (ppdef)malloc(sizeof(s_ppdef));
   def->lname = lname;
   def->type = 's';
   def->doc = "(undocumented)";
@@ -442,7 +412,7 @@ static ppdef pparam_cell(const char *lname)
   return def;
 }
 
-void pparam_int(int *where, int defValue, const char *arg, const char *doc)
+static void pparam_int(int *where, int defValue, const char *arg, const char *doc)
 {
   ppdef def = pparam_cell(arg);
   def->type = 'i';
@@ -452,7 +422,7 @@ void pparam_int(int *where, int defValue, const char *arg, const char *doc)
   def->doc = doc;
 }
 
-void pparam_flag(int *where, int defValue, const char *arg, const char *doc)
+static void pparam_flag(int *where, int defValue, const char *arg, const char *doc)
 {
   ppdef def = pparam_cell(arg);
   def->type = 'f';
@@ -462,7 +432,7 @@ void pparam_flag(int *where, int defValue, const char *arg, const char *doc)
   def->doc = doc;
 }
 
-void pparam_real(double *where, double defValue, const char *arg,
+static void pparam_real(double *where, double defValue, const char *arg,
                  const char *doc)
 {
   ppdef def = pparam_cell(arg);
@@ -473,7 +443,7 @@ void pparam_real(double *where, double defValue, const char *arg,
   def->doc = doc;
 }
 
-void pparam_str(const char **where, const char *defValue, const char *arg,
+static void pparam_str(const char **where, const char *defValue, const char *arg,
                 const char *doc)
 {
   ppdef def = pparam_cell(arg);
@@ -530,13 +500,13 @@ static int pparam_setdef(ppdef def, const char *value)
   return -1;
 }
 
-int pparam_set(char *lname, char *value)
+static int pparam_set(char *lname, char *value)
 {
   ppdef def = pparam_cell(lname);
   return pparam_setdef(def, value);
 }
 
-const char *pparam_getdef(ppdef def)
+static const char *pparam_getdef(ppdef def)
 {
   static char result[100];
   switch (def->type) {
@@ -549,19 +519,17 @@ const char *pparam_getdef(ppdef def)
   case 's':
     return *def->where.s ? *def->where.s : "";
   case 'f':
-    sprintf(result, "%d", *def->where.f);
+    sprintf(result, *def->where.f ? "true" : "false");
     return result;
   }
   return NULL;
 }
 
-void pparam_printdocs()
+static void pparam_printdocs()
 {
-  ppdef def;
-  int len, maxname, maxdoc;
-  maxname = 0;
-  maxdoc = 0;
-  for (def = ppdefs; def; def = def->next) {
+  int maxname = 0, maxdoc = 0;
+  for (ppdef def = ppdefs; def; def = def->next) {
+    int len;
     len = strlen(def->lname);
     if (len > maxname)
       maxname = len;
@@ -571,7 +539,8 @@ void pparam_printdocs()
   }
   fprintf(stderr, "\n");
   fprintf(stderr, "Charmrun Command-line Parameters:\n");
-  for (def = ppdefs; def; def = def->next) {
+  fprintf(stderr, "  (Boolean parameters may be prefixed with \"no-\" to negate their effect, for example \"++no-scalable-start\".)\n");
+  for (ppdef def = ppdefs; def; def = def->next) {
     fprintf(stderr, "  %c%c%-*s ", pparam_optc, pparam_optc, maxname,
             def->lname);
     fprintf(stderr, "  %-*s [%s]\n", maxdoc, def->doc, pparam_getdef(def));
@@ -579,14 +548,13 @@ void pparam_printdocs()
   fprintf(stderr, "\n");
 }
 
-void pparam_delarg(int i)
+static void pparam_delarg(int i)
 {
-  int j;
-  for (j = i; pparam_argv[j]; j++)
+  for (int j = i; pparam_argv[j]; j++)
     pparam_argv[j] = pparam_argv[j + 1];
 }
 
-int pparam_countargs(const char **argv)
+static int pparam_countargs(const char **argv)
 {
   int argc;
   for (argc = 0; argv[argc]; argc++)
@@ -594,10 +562,8 @@ int pparam_countargs(const char **argv)
   return argc;
 }
 
-int pparam_parseopt()
+static int pparam_parseopt()
 {
-  int ok;
-  ppdef def = NULL;
   const char *opt = pparam_argv[pparam_pos];
   /* handle ++ by skipping to end */
   if ((opt[1] == '+') && (opt[2] == 0)) {
@@ -612,17 +578,18 @@ int pparam_parseopt()
     return -1;
   }
   /* look up option definition */
+  ppdeffind deffind{};
   if (opt[1] == '+')
-    def = pparam_find(opt + 2);
+    deffind = pparam_find(opt + 2);
   else {
     char name[2];
     name[0] = opt[1];
     if (strlen(opt) <= 2 || !isalpha(opt[2])) {
       name[1] = 0;
-      def = pparam_find(name);
+      deffind = pparam_find(name);
     }
   }
-  if (def == NULL) {
+  if (deffind.def == nullptr) {
     if (opt[1] == '+') {
       sprintf(pparam_error, "Option %s not recognized.", opt);
       return -1;
@@ -632,13 +599,14 @@ int pparam_parseopt()
       return 0;
     }
   }
+  auto def = deffind.def;
   /* handle flag-options */
   if ((def->type == 'f') && (opt[1] != '+') && (opt[2])) {
     sprintf(pparam_error, "Option %s should not include a value", opt);
     return -1;
   }
   if (def->type == 'f') {
-    *def->where.f = 1;
+    *def->where.f = deffind.enable;
     pparam_delarg(pparam_pos);
     return 0;
   }
@@ -652,7 +620,7 @@ int pparam_parseopt()
     sprintf(pparam_error, "%s must be followed by a value.", opt);
     return -1;
   }
-  ok = pparam_setdef(def, opt);
+  int ok = pparam_setdef(def, opt);
   pparam_delarg(pparam_pos);
   if (ok < 0) {
     sprintf(pparam_error, "Illegal value for %s", opt);
@@ -661,7 +629,7 @@ int pparam_parseopt()
   return 0;
 }
 
-int pparam_parsecmd(char optchr, const char **argv)
+static int pparam_parsecmd(char optchr, const char **argv)
 {
   pparam_error[0] = 0;
   pparam_argv = argv;
@@ -680,25 +648,24 @@ int pparam_parsecmd(char optchr, const char **argv)
 }
 
 #ifdef HSTART
-char **dupargv(char **argv)
+static char **dupargv(const char **argv)
 {
-  int argc;
-  char **copy;
-
   if (argv == NULL)
     return NULL;
+
+  int argc;
 
   /* the vector */
   for (argc = 0; argv[argc] != NULL; argc++)
     ;
-  copy = (char **) malloc((argc + 2) * sizeof(char *));
+  char **copy = (char **) malloc((argc + 2) * sizeof(char *));
   if (copy == NULL)
     return NULL;
 
   /* the strings */
   for (argc = 0; argv[argc] != NULL; argc++) {
     int len = strlen(argv[argc]);
-    copy[argc] = malloc(sizeof(char) * (len + 1));
+    copy[argc] = (char *)malloc(sizeof(char) * (len + 1));
     strcpy(copy[argc], argv[argc]);
   }
   copy[argc] = NULL;
@@ -719,103 +686,144 @@ char **dupargv(char **argv)
 
 #define MAX_LINE_LENGTH 1000
 
-const char **arg_argv;
-int arg_argc;
+static const char **arg_argv;
+static int arg_argc;
 
-int arg_requested_pes;
-int arg_timeout;
-int arg_verbose;
-const char *arg_nodelist;
-const char *arg_nodegroup;
-const char *arg_runscript; /* script to run the node-program with */
-const char *arg_charmrunip;
+static int arg_requested_pes;
+static int arg_requested_nodes;
+static int arg_requested_numhosts;
 
-int arg_debug;
-int arg_debug_no_pause;
-int arg_debug_no_xrdb;
-int arg_charmdebug;
-const char *
+static int arg_timeout;
+static int arg_timelimit;
+static int arg_verbose;
+static const char *arg_nodelist;
+static const char *arg_nodegroup;
+static const char *arg_runscript; /* script to run the node-program with */
+static const char *arg_charmrunip;
+
+static int arg_debug;
+static int arg_debug_no_pause;
+static int arg_debug_no_xrdb;
+static int arg_charmdebug;
+static const char *
     arg_debug_commands; /* commands that are provided by a ++debug-commands
                            flag. These are passed into gdb. */
 
-int arg_quiet;       /* omit charmrun standard output */
-int arg_local;       /* start node programs directly by exec on localhost */
-int arg_batch_spawn; /* control starting node programs, several at a time */
-int arg_scalable_start;
+static int arg_quiet;       /* omit charmrun standard output */
+static int arg_local;       /* start node programs directly by exec on localhost */
+static int arg_batch_spawn; /* control starting node programs, several at a time */
+static int arg_scalable_start;
 
 #ifdef HSTART
-int arg_hierarchical_start;
-int arg_child_charmrun;
+static int arg_hierarchical_start;
+static int arg_child_charmrun;
 #endif
-int arg_help; /* print help message */
-int arg_ppn;  /* pes per node */
-int arg_usehostname;
+static int arg_help; /* print help message */
+static int arg_ppn;  /* pes per node */
+static int arg_usehostname;
 
 #if CMK_SHRINK_EXPAND
-char **saved_argv;
-int saved_argc;
-int arg_realloc_pes;
-int arg_old_pes;
-int arg_shrinkexpand;
-int arg_charmrun_port;
-const char *arg_shrinkexpand_basedir;
-#endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-int arg_read_pes = 0;
+static char **saved_argv;
+static int saved_argc;
+static int arg_realloc_pes;
+static int arg_old_pes;
+static int arg_shrinkexpand;
+static int arg_charmrun_port;
+static const char *arg_shrinkexpand_basedir;
 #endif
 
 #if CMK_USE_SSH
-int arg_maxssh;
-const char *arg_shell;
-int arg_in_xterm;
-const char *arg_debugger;
-const char *arg_xterm;
-const char *arg_display;
-int arg_ssh_display;
-const char *arg_mylogin;
+static int arg_maxssh;
+static const char *arg_shell;
+static int arg_in_xterm;
+static const char *arg_debugger;
+static const char *arg_xterm;
+static const char *arg_display;
+static int arg_ssh_display;
+static const char *arg_mylogin;
 #endif
-int arg_mpiexec;
-int arg_mpiexec_no_n;
-int arg_no_va_rand;
+static int arg_mpiexec;
+static int arg_mpiexec_no_n;
+static int arg_no_va_rand;
 
-const char *arg_nodeprog_a;
-const char *arg_nodeprog_r;
-char *arg_currdir_a;
-char *arg_currdir_r;
+static const char *arg_nodeprog_a;
+static const char *arg_nodeprog_r;
+static char *arg_currdir_a;
+static char *arg_currdir_r;
 
-int arg_server;
-int arg_server_port = 0;
-const char *arg_server_auth = NULL;
-int replay_single = 0;
+static int arg_server;
+static int arg_server_port = 0;
+static const char *arg_server_auth = NULL;
+static int replay_single = 0;
 
 #if CMK_BPROC
-int arg_startpe;
-int arg_endpe;
-int arg_singlemaster;
-int arg_skipmaster;
+static int arg_startpe;
+static int arg_endpe;
+static int arg_singlemaster;
+static int arg_skipmaster;
 #endif
 
-void arg_init(int argc, const char **argv)
+struct TopologyRequest
+{
+  int host, socket, core, pu;
+
+  enum class Unit
+  {
+    Host,
+    Socket,
+    Core,
+    PU,
+    None,
+  };
+
+  int active() const
+  {
+    return (host > 0) + (socket > 0) + (core > 0) + (pu > 0);
+  }
+
+  Unit unit() const
+  {
+    if (host > 0)
+      return Unit::Host;
+    else if (socket > 0)
+      return Unit::Socket;
+    else if (core > 0)
+      return Unit::Core;
+    else if (pu > 0)
+      return Unit::PU;
+    else
+      return Unit::None;
+  }
+};
+
+TopologyRequest proc_per;
+TopologyRequest onewth_per;
+int auto_provision;
+
+static void arg_init(int argc, const char **argv)
 {
   static char buf[1024];
 
-  int i, local_def = 0, j;
+  int local_def = 0;
 #if CMK_CHARMRUN_LOCAL
   local_def = 1; /*++local is the default*/
 #endif
 
-  pparam_int(&arg_requested_pes, 1, "p", "number of processes to create");
+  pparam_int(&arg_requested_pes, 0, "p", "Number of PEs to create");
+  pparam_int(&arg_requested_numhosts, 0, "numHosts", "Number of hosts to use from nodelist file");
+
+  pparam_int(&arg_requested_nodes, 0, "n", "Number of processes to create");
+  pparam_int(&arg_requested_nodes, 0, "np", "Number of processes to create");
+
   pparam_int(&arg_timeout, 60, "timeout",
-             "seconds to wait per host connection");
+             "Seconds to wait per host connection");
+  pparam_int(&arg_timelimit, -1, "timelimit",
+             "Seconds to wait for program to complete");
   pparam_flag(&arg_verbose, 0, "verbose", "Print diagnostic messages");
   pparam_flag(&arg_quiet, 0, "quiet", "Omit non-error runtime messages");
-  pparam_str(&arg_nodelist, 0, "nodelist", "file containing list of nodes");
+  pparam_str(&arg_nodelist, 0, "nodelist", "File containing list of physical nodes");
   pparam_str(&arg_nodegroup, "main", "nodegroup",
-             "which group of nodes to use");
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-  pparam_int(&arg_read_pes, 0, "readpe",
-             "number of host names to read into the host table");
-#endif
+             "Which group of physical nodes to use");
 
 #if CMK_CCS_AVAILABLE
   pparam_flag(&arg_server, 0, "server", "Enable client-server (CCS) mode");
@@ -827,25 +835,27 @@ void arg_init(int argc, const char **argv)
               "Start node programs locally without daemon");
   pparam_int(&arg_batch_spawn, 0, "batch", "Launch connections to this many "
                                            "node programs at a time, avoiding "
-                                           "overloading charmrun pe");
-  pparam_flag(&arg_scalable_start, 1, "scalable-start", "scalable start");
+                                           "overloading charmrun PE");
+#ifndef _WIN32
+  pparam_flag(&arg_scalable_start, 1, "scalable-start", "Enable scalable start");
+#endif
 #ifdef HSTART
   pparam_flag(&arg_hierarchical_start, 0, "hierarchical-start",
               "hierarchical start");
   pparam_flag(&arg_child_charmrun, 0, "child-charmrun", "child charmrun");
 #endif
 #if CMK_SHRINK_EXPAND
-  pparam_int(&arg_realloc_pes, 1, "newp", "new number of processes to create");
-  pparam_int(&arg_old_pes, 1, "oldp", "old number of processes to create");
-  pparam_flag(&arg_shrinkexpand, 0, "shrinkexpand", "shrink expand");
-  pparam_int(&arg_charmrun_port, 0, "charmrun_port", "make charmrun listen on this port");
+  pparam_int(&arg_realloc_pes, 1, "newp", "New number of processes to create");
+  pparam_int(&arg_old_pes, 1, "oldp", "Old number of processes to create");
+  pparam_flag(&arg_shrinkexpand, 0, "shrinkexpand", "Enable shrink/expand support");
+  pparam_int(&arg_charmrun_port, 0, "charmrun_port", "Make charmrun listen on this port");
 #endif
   pparam_flag(&arg_usehostname, 0, "usehostname",
               "Send nodes our symbolic hostname instead of IP address");
   pparam_str(&arg_charmrunip, 0, "useip",
              "Use IP address provided for charmrun IP");
-  pparam_flag(&arg_mpiexec, 0, "mpiexec", "use mpiexec to start jobs");
-  pparam_flag(&arg_mpiexec_no_n, 0, "mpiexec-no-n", "use mpiexec to start jobs without -n procs");
+  pparam_flag(&arg_mpiexec, 0, "mpiexec", "Use mpiexec to start jobs");
+  pparam_flag(&arg_mpiexec_no_n, 0, "mpiexec-no-n", "Use mpiexec to start jobs without -n procs");
 #if CMK_USE_SSH
   pparam_flag(&arg_debug, 0, "debug",
               "Run each node under gdb in an xterm window");
@@ -868,42 +878,66 @@ void arg_init(int argc, const char **argv)
   pparam_int(&arg_maxssh, 16, "maxssh",
              "Maximum number of ssh's to run at a time");
   pparam_str(&arg_shell, 0, "remote-shell",
-             "which remote shell to use (default $CONV_RSH or " SSH_CMD);
-  pparam_str(&arg_debugger, 0, "debugger", "which debugger to use");
+             "Which remote shell to use (default $CONV_RSH or " SSH_CMD ")");
+  pparam_str(&arg_debugger, 0, "debugger", "Which debugger to use");
   pparam_str(&arg_display, 0, "display", "X Display for xterm");
   pparam_flag(&arg_ssh_display, 0, "ssh-display",
-              "use own X Display for each ssh session");
+              "Use own X Display for each ssh session");
   pparam_flag(&arg_in_xterm, 0, "in-xterm", "Run each node in an xterm window");
-  pparam_str(&arg_xterm, 0, "xterm", "which xterm to use");
+  pparam_str(&arg_xterm, 0, "xterm", "Which xterm to use");
 #endif
 #ifdef CMK_BPROC
   /* options for Scyld */
-  pparam_int(&arg_startpe, 0, "startpe", "first pe to start job(SCYLD)");
-  pparam_int(&arg_endpe, 1000000, "endpe", "last pe to start job(SCYLD)");
+  pparam_int(&arg_startpe, 0, "startpe", "First PE to start job(SCYLD)");
+  pparam_int(&arg_endpe, 1000000, "endpe", "Last PE to start job(SCYLD)");
   pparam_flag(&arg_singlemaster, 0, "singlemaster",
               "Only assign one process to master node(SCYLD)");
   pparam_flag(&arg_skipmaster, 0, "skipmaster",
-              "Donot assign any process to master node(SCYLD)");
+              "Do not assign any process to master node(SCYLD)");
   if (arg_skipmaster && arg_singlemaster) {
     PRINT(("Charmrun> 'singlemaster' is ignored due to 'skipmaster'. \n"));
     arg_singlemaster = 0;
   }
-  pparam_flag(&arg_debug, 0, "debug", "turn on more verbose debug print");
+  pparam_flag(&arg_debug, 0, "debug", "Turn on more verbose debug prints");
 #endif
-  pparam_str(&arg_runscript, 0, "runscript", "script to run node-program with");
-  pparam_flag(&arg_help, 0, "help", "print help messages");
-  pparam_int(&arg_ppn, 0, "ppn", "number of pes per node");
+  pparam_str(&arg_runscript, 0, "runscript", "Script to run node-program with");
+  pparam_flag(&arg_help, 0, "help", "Print help messages");
+  pparam_int(&arg_ppn, 0, "ppn", "Number of PEs per Charm++ node (=OS process)");
   pparam_flag(&arg_no_va_rand, 0, "no-va-randomization",
               "Disables randomization of the virtual address  space");
+
+  // Process Binding Parameters
+  pparam_int(&proc_per.host, 0,
+             "processPerHost", "assign N processes per host");
+  pparam_int(&proc_per.socket, 0,
+             "processPerSocket", "assign N processes per socket");
+  pparam_int(&proc_per.core, 0,
+             "processPerCore", "assign N processes per core");
+  pparam_int(&proc_per.pu, 0,
+             "processPerPU", "assign N processes per PU");
+
+  // Worker Thread Binding Parameters
+  pparam_flag(&onewth_per.host, 0,
+             "oneWthPerHost", "assign one worker thread per host");
+  pparam_flag(&onewth_per.socket, 0,
+             "oneWthPerSocket", "assign one worker thread per socket");
+  pparam_flag(&onewth_per.core, 0,
+             "oneWthPerCore", "assign one worker thread per core");
+  pparam_flag(&onewth_per.pu, 0,
+             "oneWthPerPU", "assign one worker thread per PU");
+
+  pparam_flag(&auto_provision, 0, "auto-provision", "fully utilize available resources");
+  pparam_flag(&auto_provision, 0, "autoProvision", "fully utilize available resources");
+
 #ifdef HSTART
-  arg_argv = dupargv(argv);
+  arg_argv = (const char **)dupargv(argv);
 #endif
 
 #if CMK_SHRINK_EXPAND
   /* move it to a function */
   saved_argc = argc;
   saved_argv = (char **) malloc(sizeof(char *) * (saved_argc));
-  for (i = 0; i < saved_argc; i++) {
+  for (int i = 0; i < saved_argc; i++) {
     //  MACHSTATE1(2,"Parameters %s",Cmi_argvcopy[i]);
     saved_argv[i] = (char *) argv[i];
   }
@@ -915,12 +949,6 @@ void arg_init(int argc, const char **argv)
     exit(1);
   }
 
-  /* Check for (but do *not* remove) the "-?", "-h", or "--help" flags */
-  for (i = 0; argv[i]; i++) {
-    if (0 == strcmp(argv[i], "-?") || 0 == strcmp(argv[i], "-h") ||
-        0 == strcmp(argv[i], "--help"))
-      arg_help = 1;
-  }
   if (arg_help) {
     pparam_printdocs();
     /*exit(0);*/
@@ -957,8 +985,7 @@ void arg_init(int argc, const char **argv)
     arg_argv++;
     arg_argc--;
 
-    arg_argv[arg_argc] = malloc(sizeof(char) * strlen("++child-charmrun"));
-    strcpy(arg_argv[arg_argc++], "++child-charmrun");
+    arg_argv[arg_argc++] = "++child-charmrun";
     arg_argv[arg_argc] = NULL;
   }
 #else
@@ -978,15 +1005,18 @@ void arg_init(int argc, const char **argv)
     arg_scalable_start = 0;
     arg_quiet = 0;
     arg_verbose = 1;
-    /*Pass ++debug along to program (used by machine.c)*/
-    arg_argv[arg_argc++] = "++debug";
+    if (arg_debug || arg_debug_no_pause)
+    {
+      /*Pass ++debug along to program (used by machine.C)*/
+      arg_argv[arg_argc++] = "++debug";
+    }
   }
   /* pass ++quiet to program */
   if (arg_quiet) arg_argv[arg_argc++] = "++quiet";
 
   /* Check for +replay-detail to know we have to load only one single processor
    */
-  for (i = 0; argv[i]; i++) {
+  for (int i = 0; argv[i]; i++) {
     if (0 == strcmp(argv[i], "+replay-detail")) {
       replay_single = 1;
       arg_requested_pes = 1;
@@ -1010,7 +1040,7 @@ void arg_init(int argc, const char **argv)
       arg_shell = getenv_ssh();
   }
 
-#if !defined(_WIN32) || defined(__CYGWIN__)
+#if !defined(_WIN32)
   /* Find the current value of the DISPLAY variable */
   if (!arg_display)
     arg_display = getenv_display_no_tamper();
@@ -1025,7 +1055,11 @@ void arg_init(int argc, const char **argv)
 
   /* default debugger is gdb */
   if (!arg_debugger)
+#ifdef __APPLE__
+    arg_debugger = "lldb";
+#else
     arg_debugger = "gdb";
+#endif
   /* default xterm is xterm */
   if (!arg_xterm)
     arg_xterm = "xterm";
@@ -1034,7 +1068,10 @@ void arg_init(int argc, const char **argv)
 #endif
 
   /* find the current directory, absolute version */
-  getcwd(buf, 1023);
+  if (getcwd(buf, 1023) == NULL) {
+    fprintf(stderr, "charmrun> getcwd() failed!\n");
+    exit(1);
+  }
   arg_currdir_a = strdup(buf);
 
   /* find the node-program, absolute version */
@@ -1051,7 +1088,7 @@ void arg_init(int argc, const char **argv)
     exit(1);
   }
 
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32)
   if (argv[1][1] == ':' ||
       argv[1][0] == '\\' && argv[1][1] == '\\') { /*E.g.: "C:\foo\bar.exe*/
 #else
@@ -1090,21 +1127,116 @@ void arg_init(int argc, const char **argv)
   }
 #endif
 
-  /*If number of pes per node does not divide number of pes*/
-  if(arg_requested_pes && arg_ppn){
-    if(arg_requested_pes % arg_ppn != 0){
-      if(arg_ppn > arg_requested_pes){
-	arg_ppn=arg_requested_pes;
-	fprintf(stderr, "Charmrun> warning: forced ++ppn = +p = %d\n",arg_ppn);
+  const int proc_active = proc_per.active();
+  const int onewth_active = onewth_per.active();
+  if (proc_active || onewth_active || auto_provision)
+  {
+    if (arg_requested_pes != 0)
+    {
+      fprintf(stderr, "Charmrun> Error: +p cannot be used with ++(process|oneWth)Per* or ++auto-provision.\n");
+      exit(1);
+    }
+
+    if (proc_active && arg_requested_nodes > 0)
+    {
+      fprintf(stderr, "Charmrun> Error: +n/++np cannot be used with ++processPer* or ++auto-provision.\n");
+      exit(1);
+    }
+
+    if (proc_active && arg_mpiexec)
+    {
+      fprintf(stderr, "Charmrun> Error: ++mpiexec and ++processPer* cannot be used together.\n");
+      exit(1);
+    }
+
+    if (proc_active + (auto_provision > 0) > 1)
+    {
+      fprintf(stderr, "Charmrun> Error: Only one of ++processPer(Host|Socket|Core|PU) or ++auto-provision is allowed.\n");
+      exit(1);
+    }
+
+#if CMK_SMP
+    if (onewth_active + (arg_ppn > 0) + (auto_provision > 0) > 1)
+    {
+      fprintf(stderr, "Charmrun> Error: Only one of ++oneWthPer(Host|Socket|Core|PU), ++ppn, or ++auto-provision is allowed.\n");
+      exit(1);
+    }
+
+    using Unit = typename TopologyRequest::Unit;
+
+    const Unit proc_unit = proc_per.unit();
+    const Unit onewth_unit = onewth_per.unit();
+
+    if ((onewth_unit == Unit::Host && (proc_unit == Unit::Socket || proc_unit == Unit::Core || proc_unit == Unit::PU)) ||
+        (onewth_unit == Unit::Socket && (proc_unit == Unit::Core || proc_unit == Unit::PU)) ||
+        (onewth_unit == Unit::Core && proc_unit == Unit::PU))
+    {
+      fprintf(stderr, "Charmrun> Error: Cannot request processes on a smaller unit than that requested for worker threads.\n");
+      exit(1);
+    }
+
+    if ((onewth_unit == Unit::Host && proc_unit == Unit::Host && proc_per.host > 1) ||
+        (onewth_unit == Unit::Socket && proc_unit == Unit::Socket && proc_per.socket > 1) ||
+        (onewth_unit == Unit::Core && proc_unit == Unit::Core && proc_per.core > 1) ||
+        (onewth_unit == Unit::PU && proc_unit == Unit::PU && proc_per.pu > 1))
+    {
+      fprintf(stderr, "Charmrun> Error: Cannot request more processes than worker threads per unit.\n");
+      exit(1);
+    }
+#endif
+  }
+  else
+  {
+#if CMK_SMP
+    if (arg_requested_pes > 0 && arg_requested_nodes > 0 && arg_ppn > 0 && arg_ppn * arg_requested_nodes != arg_requested_pes)
+    {
+      fprintf(stderr, "Charmrun> Error: ++np times ++ppn does not equal +p.\n");
+      exit(1);
+    }
+
+    if (arg_requested_pes > 0 && arg_ppn > 0 && arg_requested_pes % arg_ppn != 0)
+    {
+      if (arg_ppn > arg_requested_pes)
+      {
+        arg_ppn = arg_requested_pes;
+        fprintf(stderr, "Charmrun> Warning: forced ++ppn = +p = %d\n", arg_ppn);
       }
       else
-	{
-	  fprintf(
-		  stderr,
-		  "Charmrun> Error: ++ppn (number of pes per node) does not divide +p (number of pes) \n");
-	  exit(1);
-	}
+      {
+        fprintf(stderr, "Charmrun> Error: ++ppn (number of PEs per node) does not divide +p (number of PEs).\n");
+        exit(1);
+      }
     }
+#else
+    if (arg_requested_pes > 0 && arg_requested_nodes > 0 && arg_requested_pes != arg_requested_nodes)
+    {
+      fprintf(stderr, "Charmrun> Error: +p and ++np do not agree.\n");
+      exit(1);
+    }
+#endif
+  }
+
+#if !CMK_SMP
+  if (arg_ppn > 1 || onewth_active)
+  {
+    fprintf(stderr, "Charmrun> Error: ++oneWthPer(Host|Socket|Core|PU) and ++ppn are only available in SMP mode.\n");
+    exit(1);
+  }
+#endif
+
+  if (auto_provision)
+  {
+#if CMK_SMP
+    proc_per.socket = 1;
+    onewth_per.pu = 1;
+#else
+    proc_per.core = 1;
+#endif
+  }
+  else if (arg_requested_pes <= 0 && arg_requested_nodes <= 0 && arg_ppn <= 0 && !proc_active && !onewth_active)
+  {
+    PRINT(("Charmrun> No provisioning arguments specified. Running with a single PE.\n"
+           "          Use ++auto-provision to fully subscribe resources or +p1 to silence this message.\n"));
   }
 }
 
@@ -1116,7 +1248,7 @@ void arg_init(int argc, const char **argv)
 
 static int portOk = 1;
 static const char *nodetab_tempName = NULL;
-char *nodetab_file_find()
+static char *nodetab_file_find()
 {
   char buffer[MAXPATHLEN];
 
@@ -1140,7 +1272,7 @@ char *nodetab_file_find()
   /* Find a nodes-file by looking under 'nodelist' in the current directory */
   if (probefile("./nodelist"))
     return strdup("./nodelist");
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32)
   tmpnam(buffer);
   nodetab_tempName = strdup(buffer);
 #else /*UNIX*/
@@ -1161,113 +1293,134 @@ char *nodetab_file_find()
   return strdup(buffer);
 }
 
-typedef struct nodetab_host {
-  const char *name; /*Host DNS name*/
-  skt_ip_t ip;      /*IP address of host*/
-  pathfixlist pathfixes;
-  char *ext;    /*FIXME: What the heck is this?  OSL 9/8/00*/
-  int cpus;     /* # of physical CPUs*/
-  int rank;     /*Rank of this CPU*/
-  double speed; /*Relative speed of each CPU*/
-  int nice;     /* process priority */
-  int forks;    /* number of processes to fork on remote node */
-  /*These fields are set during node-startup*/
-  int dataport;  /*UDP port number*/
-  SOCKET ctrlfd; /*Connection to control port*/
+struct nodetab_host
+{
+  static skt_ip_t resolve(const char *name);
+
+  double speed = 1.0; /*Relative speed of each CPU*/
+
+  const char *name = "SET_H->NAME"; /*Host DNS name*/
 #if CMK_USE_SSH
-  const char *shell;    /*Ssh to use*/
-  const char *debugger; /*Debugger to use*/
-  const char *xterm;    /*Xterm to use*/
-  const char *login;    /*User login name to use*/
-  const char *passwd;   /*User login password*/
-  const char *setup;    /*Commands to execute on login*/
+  const char *shell = arg_shell;    /*Ssh to use*/
+  const char *debugger = arg_debugger; /*Debugger to use*/
+  const char *xterm = arg_xterm;    /*Xterm to use*/
+  const char *login = arg_mylogin;    /*User login name to use*/
+  const char *passwd = "*";   /*User login password*/
+  const char *setup = "*";    /*Commands to execute on login*/
 #endif
+  char *ext = nullptr;        /* Command suffix */
+  pathfixlist pathfixes = nullptr;
 
-#if CMK_USE_IBVERBS
-  ChInfiAddr *qpData;
+  skt_ip_t ip = _skt_invalid_ip;      /*IP address of host*/
+  int cpus = 1;     /* # of physical CPUs*/
+  int nice = -100;     /* process priority */
+//  int forks = 0;    /* number of processes to fork on remote node */
+
+  int processes = 0;
+
+  int hostno = 0;
+
+#ifdef __FAULT__
+  bool crashed = false;
 #endif
-#if CMK_USE_IBUD
-  ChInfiAddr qp;
-#endif
+};
 
-} nodetab_host;
-
-nodetab_host **nodetab_table;
-int nodetab_max;
-int nodetab_size;
-int *nodetab_rank0_table;
-int nodetab_rank0_size;
-
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-int loaded_max_pe;
-#endif
-
-void nodetab_reset(nodetab_host *h)
+skt_ip_t nodetab_host::resolve(const char *name)
 {
-  h->name = "SET_H->NAME";
-  h->ip = _skt_invalid_ip;
-  h->pathfixes = 0;
-  h->ext = NULL;
-  h->speed = 1.0;
-  h->cpus = 1;
-  h->rank = 0;
-  h->nice = -100;
-  h->forks = 0;
-  h->dataport = -1;
-  h->ctrlfd = -1;
-#if CMK_USE_SSH
-  h->shell = arg_shell;
-  h->debugger = arg_debugger;
-  h->xterm = arg_xterm;
-  h->login = arg_mylogin;
-  h->passwd = "*";
-  h->setup = "*";
-#endif
-}
-
-void nodetab_add(nodetab_host *h)
-{
-  if (h->rank == 0)
-    nodetab_rank0_table[nodetab_rank0_size++] = nodetab_size;
-  nodetab_table[nodetab_size] = (nodetab_host *) malloc(sizeof(nodetab_host));
-
-  if (arg_verbose) {
-    char ips[200];
-    skt_print_ip(ips, h->ip);
-    printf("Charmrun> adding client %d: \"%s\", IP:%s\n", nodetab_size, h->name,
-           ips);
-  }
-
-  *nodetab_table[nodetab_size++] = *h;
-}
-
-void nodetab_makehost(const char *name, nodetab_host *h)
-{
-  h->name = strdup(name);
-  h->ip = skt_innode_lookup_ip(name);
-  if (skt_ip_match(h->ip, _skt_invalid_ip)) {
+  skt_ip_t ip = skt_innode_lookup_ip(name);
+  if (skt_ip_match(ip, _skt_invalid_ip)) {
 #ifdef CMK_BPROC
     /* only the master node is used */
-    if (!(1 == arg_requested_pes && atoi(name) == -1))
+    if (!(1 <= arg_requested_pes && atoi(name) == -1))
 #endif
     {
       fprintf(stderr, "ERROR> Cannot obtain IP address of %s\n", name);
       exit(1);
     }
   }
+
+  return ip;
 }
 
-const char *nodetab_args(const char *args, nodetab_host *h)
+struct nodetab_process
 {
-  if (arg_ppn > 0)
-    h->cpus = arg_ppn;
-  while (*args != 0) {
+#if CMK_USE_IBVERBS
+  ChInfiAddr *qpList = nullptr; /* An array of queue pair identifiers */
+  ChInfiAddr *qpData = nullptr;
+#endif
+#if CMK_USE_IBUD
+  ChInfiAddr qp;
+#endif
+
+  nodetab_host * host;
+  int rank = 0;     /*Rank of this CPU*/
+
+  int ssh_pid = 0;
+  SOCKET req_client = -1; /*TCP request sockets for each node*/
+  // ^ aka ctrlfd /*Connection to control port*/
+  int dataport = -1;  /*UDP port number*/
+#ifdef HSTART
+  SOCKET charmrun_fds = -1;
+#endif
+
+  ChNodeinfo info;
+
+  int num_pus;
+  int num_cores;
+  int num_sockets;
+
+  int forkstart = 0;
+
+  int PEs = 0;
+
+  int nodeno = 0;
+
+  friend bool operator< (const nodetab_process &, const nodetab_process &);
+};
+
+bool operator< (const nodetab_process & a, const nodetab_process & b)
+{
+  const int a_hostno = a.host->hostno, b_hostno = b.host->hostno;
+  return a_hostno < b_hostno || (a_hostno == b_hostno && a.nodeno < b.nodeno);
+}
+
+static std::vector<nodetab_host *> host_table;
+#ifdef HSTART
+static std::vector<nodetab_host *> my_host_table;
+#else
+# define my_host_table host_table
+#endif
+static std::vector<nodetab_process> my_process_table;
+static std::vector<nodetab_process *> pe_to_process_map;
+
+static const char *nodetab_args(const char *args, nodetab_host *h)
+{
+  while (*args != 0)
+  {
     const char *b1 = skipblanks(args), *e1 = skipstuff(b1);
     const char *b2 = skipblanks(e1), *e2 = skipstuff(b2);
+
     while (*b1 == '+')
       b1++; /*Skip over "++" on parameters*/
+
+    if (subeqs(b1, e1, "speed"))
+      h->speed = atof(b2);
+    else if (subeqs(b1, e1, "cpus"))
+      h->cpus = atol(b2);
+    else if (subeqs(b1, e1, "pathfix"))
+    {
+      const char *b3 = skipblanks(e2), *e3 = skipstuff(b3);
+      args = skipblanks(e3);
+      h->pathfixes =
+          pathfix_append(substr(b2, e2), substr(b3, e3), h->pathfixes);
+      e2 = e3; /* for the skipblanks at the end */
+    }
+    else if (subeqs(b1, e1, "ext"))
+      h->ext = substr(b2, e2);
+    else if (subeqs(b1, e1, "nice"))
+      h->nice = atoi(b2);
 #if CMK_USE_SSH
-    if (subeqs(b1, e1, "login"))
+    else if (subeqs(b1, e1, "login"))
       h->login = substr(b2, e2);
     else if (subeqs(b1, e1, "passwd"))
       h->passwd = substr(b2, e2);
@@ -1279,186 +1432,68 @@ const char *nodetab_args(const char *args, nodetab_host *h)
       h->debugger = substr(b2, e2);
     else if (subeqs(b1, e1, "xterm"))
       h->xterm = substr(b2, e2);
-    else
 #endif
-        if (subeqs(b1, e1, "speed"))
-      h->speed = atof(b2);
-    else if (subeqs(b1, e1, "cpus")) {
-      if (arg_ppn == 0)
-        h->cpus = atol(b2); /* ignore if there is ++ppn */
-    } else if (subeqs(b1, e1, "pathfix")) {
-      const char *b3 = skipblanks(e2), *e3 = skipstuff(b3);
-      args = skipblanks(e3);
-      h->pathfixes =
-          pathfix_append(substr(b2, e2), substr(b3, e3), h->pathfixes);
-      e2 = e3; /* for the skipblanks at the end */
-    } else if (subeqs(b1, e1, "ext"))
-      h->ext = substr(b2, e2);
-    else if (subeqs(b1, e1, "nice"))
-      h->nice = atoi(b2);
     else
       return args;
+
     args = skipblanks(e2);
   }
+
   return args;
 }
 
 /* setup nodetab as localhost only */
-void nodetab_init_for_local()
+static void nodetab_init_for_local()
 {
-  int tablesize, i, done = 0;
-  nodetab_host group;
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-  if (arg_read_pes == 0) {
-    arg_read_pes = arg_requested_pes;
-  }
-#endif
-
-  tablesize = arg_requested_pes;
-  nodetab_table = (nodetab_host **) malloc(tablesize * sizeof(nodetab_host *));
-  nodetab_rank0_table = (int *) malloc(tablesize * sizeof(int));
-  nodetab_max = tablesize;
-
-  nodetab_reset(&group);
-  if (arg_ppn == 0)
-    arg_ppn = 1;
-#if CMK_SHARED_VARS_UNAVAILABLE
-  if (arg_ppn > 1) {
-    fprintf(stderr, "Warning> Invalid ppn %d in nodelist ignored.\n", arg_ppn);
-    arg_ppn = 1;
-  }
-#endif
-  group.cpus = arg_ppn;
-  i = 0;
-  while (!done) {
-    const char *hostname = "127.0.0.1";
-    for (group.rank = 0; group.rank < arg_ppn; group.rank++) {
-      nodetab_makehost(hostname, &group);
-      nodetab_add(&group);
-      if (++i == arg_requested_pes) {
-        done = 1;
-        break;
-      }
-    }
-  }
-  host_sizes["127.0.0.1"] = (arg_requested_pes + arg_ppn - 1) / arg_ppn;
+  static const char hostname[] = "127.0.0.1";
+  nodetab_host * h = new nodetab_host{};
+  h->name = hostname; // should strdup if leaks are fixed
+  h->ip = nodetab_host::resolve(hostname);
+  host_table.push_back(h);
 }
 
 #ifdef HSTART
 /* Sets the parent field of hosts to point to their parent charmrun. The root
  * charmrun will create children for all hosts which are parent of at least one
  * other host*/
-int branchfactor;
-int nodes_per_child;
-int *nodetab_unique_table;
-int nodetab_unique_size;
-char *nodetab_name(int i);
-void nodetab_init_hierarchical_start(void)
+static int branchfactor;
+static int nodes_per_child;
+static void nodetab_init_hierarchical_start(void)
 {
-  int node_start = 0;
-  char *node_name;
-  nodetab_unique_size = 0;
-  nodetab_unique_table = (int *) malloc(nodetab_rank0_size * sizeof(int));
-  while (node_start < nodetab_rank0_size) {
-    nodetab_unique_table[nodetab_unique_size++] = node_start;
-    node_name = nodetab_name(node_start);
-    do {
-      node_start++;
-    } while (node_start < nodetab_rank0_size &&
-             (!strcmp(nodetab_name(node_start), node_name)));
-  }
-  branchfactor = ceil(sqrt(nodetab_unique_size));
-  nodes_per_child = round(nodetab_unique_size * 1.0 / branchfactor);
+  TODO;
+  branchfactor = ceil(sqrt(nodetab_rank0_size));
+  nodes_per_child = round(nodetab_rank0_size * 1.0 / branchfactor);
 }
 #endif
 
-#if CMK_SHRINK_EXPAND
-int isPresent(const char *names, char **listofnames)
+static void nodetab_init_with_nodelist()
 {
-  int k;
-  for (k = 0; k < arg_old_pes; k++) {
-    if (strcmp(names, listofnames[k]) == 0)
-      return 1;
-  }
-  return 0;
-}
-void parse_oldnodenames(char **oldnodelist)
-{
-  char *ns;
-  ns = getenv("OLDNODENAMES");
-  int i;
-  char buffer[1024 * 1000];
-  for (i = 0; i < arg_old_pes; i++) {
-    oldnodelist[i] = (char *) malloc(100 * sizeof(char));
-    int nread = sscanf(ns, "%s %[^\n]", oldnodelist[i], buffer);
-    ns = buffer;
-  }
-}
-#endif
-
-void nodetab_init()
-{
-  FILE *f;
-  char *nodesfile;
-  nodetab_host global, group, host;
-  char input_line[MAX_LINE_LENGTH];
-  int rightgroup, i, remain, lineNo;
-  /* Store the previous host so we can make sure we aren't mixing localhost and
-   * non-localhost */
-  char *prevHostName = NULL;
-  std::vector< std::pair<int, nodetab_host> > hosts;
-  std::multimap<int, nodetab_host> binned_hosts;
-
-  /* if arg_local is set, ignore the nodelist file */
-  if (arg_local || arg_mpiexec) {
-    nodetab_init_for_local();
-    goto fin;
-  }
 
   /* Open the NODES_FILE. */
-  nodesfile = nodetab_file_find();
+  char *nodesfile = nodetab_file_find();
   if (arg_verbose)
-    fprintf(stderr, "Charmrun> using %s as nodesfile\n", nodesfile);
+    printf("Charmrun> using %s as nodesfile\n", nodesfile);
+
+  FILE *f;
   if (!(f = fopen(nodesfile, "r"))) {
     fprintf(stderr, "ERROR> Cannot read %s: %s\n", nodesfile, strerror(errno));
     exit(1);
   }
   free(nodesfile);
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-  if (arg_read_pes == 0) {
-    arg_read_pes = arg_requested_pes;
-  }
-  nodetab_table =
-      (nodetab_host **) malloc(arg_read_pes * sizeof(nodetab_host *));
-  nodetab_rank0_table = (int *) malloc(arg_read_pes * sizeof(int));
-  nodetab_max = arg_read_pes;
-  PRINT(("arg_read_pes %d arg_requested_pes %d\n", arg_read_pes,
-          arg_requested_pes));
-#else
-  nodetab_table =
-      (nodetab_host **) malloc(arg_requested_pes * sizeof(nodetab_host *));
-  nodetab_rank0_table = (int *) malloc(arg_requested_pes * sizeof(int));
-  nodetab_max = arg_requested_pes;
-#endif
+  nodetab_host global, group;
+  int rightgroup = (strcmp(arg_nodegroup, "main") == 0);
 
-  nodetab_reset(&global);
-  group = global;
-  rightgroup = (strcmp(arg_nodegroup, "main") == 0);
+  /* Store the previous host so we can make sure we aren't mixing localhost and
+   * non-localhost */
+  char *prevHostName = NULL;
+  char input_line[MAX_LINE_LENGTH];
+  std::unordered_map<std::string, nodetab_host *> temp_hosts;
+  int lineNo = 1;
+  int hostno = 0;
 
-  if (arg_ppn == 0)
-    arg_ppn = 1;
-
-  lineNo = 1;
   while (fgets(input_line, sizeof(input_line) - 1, f) != 0) {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    if (nodetab_size == arg_read_pes)
-      break;
-#else
-    if (nodetab_size == arg_requested_pes)
-      break;
-#endif
     if (input_line[0] == '#')
       continue;
     zap_newline(input_line);
@@ -1482,20 +1517,24 @@ void nodetab_init()
                     arg_nodegroup, input_line);
             exit(1);
           }
-          host = group;
-          nodetab_args(b3, &host);
-#if !CMK_SMP
-          /* Non-SMP workaround */
-          int cpus = host.cpus;
-          host.cpus = 1;
-          for (int rank = 0; rank < cpus; rank++)
-#else
-          for (host.rank = 0; host.rank < host.cpus; host.rank++)
-#endif
+
+          const std::string hostname = substr(b2, e2);
+          auto host_iter = temp_hosts.find(hostname);
+          if (host_iter != temp_hosts.end())
           {
-            nodetab_makehost(substr(b2, e2), &host);
-            hosts.push_back(std::make_pair(lineNo, host));
+            nodetab_host *host = (*host_iter).second;
+            nodetab_args(b3, host);
           }
+          else
+          {
+            nodetab_host *host = new nodetab_host{group};
+            host->name = strdup(hostname.c_str());
+            host->ip = nodetab_host::resolve(hostname.c_str());
+            host->hostno = hostno++;
+            temp_hosts.insert({hostname, host});
+            nodetab_args(b3, host);
+          }
+
           free(prevHostName);
           prevHostName = strdup(b2);
         }
@@ -1512,108 +1551,32 @@ void nodetab_init()
     lineNo++;
   }
   fclose(f);
+  free(prevHostName);
   if (nodetab_tempName != NULL)
     unlink(nodetab_tempName);
 
-  if (hosts.size() == 0) {
+  const size_t temp_hosts_size = temp_hosts.size();
+  if (temp_hosts_size == 0) {
     fprintf(stderr, "ERROR> No hosts in group %s\n", arg_nodegroup);
     exit(1);
   }
 
-  /*Wrap nodes in table around if there aren't enough yet*/
-  for (int i = 0; binned_hosts.size() < arg_requested_pes; ++i) {
-    binned_hosts.insert(hosts[i % hosts.size()]);
-    host_sizes[hosts[i % hosts.size()].second.name]++;
-  }
-
-  /* Only increase counter for each new process */
-  for (std::map<std::string, int>::iterator it = host_sizes.begin();
-       it != host_sizes.end(); ++it) {
-    it->second = (it->second + arg_ppn - 1) / arg_ppn;
-  }
-
-  for (std::multimap<int, nodetab_host>::iterator it = binned_hosts.begin();
-       it != binned_hosts.end(); ++it) {
-    nodetab_add(&(it->second));
-  }
-
-fin:
-  /*Clip off excess CPUs at end*/
-  for (i = 0; i < nodetab_size; i++) {
-    if (nodetab_table[i]->rank == 0)
-      remain = nodetab_size - i;
-    if (nodetab_table[i]->cpus > remain)
-      nodetab_table[i]->cpus = remain;
-  }
-
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-  loaded_max_pe = arg_requested_pes - 1;
-#endif
-#ifdef HSTART
-  if (arg_hierarchical_start)
-    nodetab_init_hierarchical_start();
-#endif
-
-  free(prevHostName);
-
-#if CMK_SHRINK_EXPAND
-  if (arg_shrinkexpand &&
-      (arg_requested_pes > arg_old_pes)) // modify nodetable ordering
+  host_table.resize(temp_hosts_size);
+  for (const auto & h_pair : temp_hosts)
   {
-    nodetab_host **reordered_nodetab_table =
-        (nodetab_host **) malloc(arg_requested_pes * sizeof(nodetab_host *));
-    char **oldnodenames = (char **) malloc(arg_old_pes * sizeof(char *));
-
-    parse_oldnodenames(oldnodenames);
-    int newpes = arg_old_pes;
-    int oldpes = 0;
-    int k;
-    for (k = 0; k < nodetab_size; k++) {
-      if (isPresent(nodetab_table[k]->name, oldnodenames))
-        reordered_nodetab_table[oldpes++] = nodetab_table[k];
-      else
-        reordered_nodetab_table[newpes++] = nodetab_table[k];
-    }
-    free(nodetab_table);
-    nodetab_table = reordered_nodetab_table;
+    nodetab_host * h = h_pair.second;
+    host_table[h->hostno] = h;
   }
-#endif
 }
 
-/* Given a processor number, look up the nodetab info: */
-nodetab_host *nodetab_getinfo(int i)
+static void nodetab_init()
 {
-  if (nodetab_table == 0) {
-    fprintf(stderr, "ERROR> Node table not initialized.\n");
-    exit(1);
-  }
-  return nodetab_table[i];
+  /* if arg_local is set, ignore the nodelist file */
+  if (arg_local || arg_mpiexec)
+    nodetab_init_for_local();
+  else
+    nodetab_init_with_nodelist();
 }
-
-/* Given a node number, look up the nodetab info: */
-nodetab_host *nodetab_getnodeinfo(int i)
-{
-  return nodetab_getinfo(nodetab_rank0_table[i]);
-}
-
-/*These routines all take *PE* numbers (NOT node numbers!)*/
-const char *nodetab_name(int i) { return nodetab_getinfo(i)->name; }
-pathfixlist nodetab_pathfixes(int i) { return nodetab_getinfo(i)->pathfixes; }
-char *nodetab_ext(int i) { return nodetab_getinfo(i)->ext; }
-skt_ip_t nodetab_ip(int i) { return nodetab_getinfo(i)->ip; }
-unsigned int nodetab_cpus(int i) { return nodetab_getinfo(i)->cpus; }
-unsigned int nodetab_rank(int i) { return nodetab_getinfo(i)->rank; }
-int nodetab_dataport(int i) { return nodetab_getinfo(i)->dataport; }
-int nodetab_nice(int i) { return nodetab_getinfo(i)->nice; }
-SOCKET nodetab_ctrlfd(int i) { return nodetab_getinfo(i)->ctrlfd; }
-#if CMK_USE_SSH
-const char *nodetab_setup(int i) { return nodetab_getinfo(i)->setup; }
-const char *nodetab_shell(int i) { return nodetab_getinfo(i)->shell; }
-const char *nodetab_debugger(int i) { return nodetab_getinfo(i)->debugger; }
-const char *nodetab_xterm(int i) { return nodetab_getinfo(i)->xterm; }
-const char *nodetab_login(int i) { return nodetab_getinfo(i)->login; }
-const char *nodetab_passwd(int i) { return nodetab_getinfo(i)->passwd; }
-#endif
 
 /****************************************************************************
  *
@@ -1625,61 +1588,44 @@ const char *nodetab_passwd(int i) { return nodetab_getinfo(i)->passwd; }
  *
  ****************************************************************************/
 
-static ChNodeinfo *nodeinfo_arr; /*Indexed by node number.*/
+static void nodeinfo_add(const ChSingleNodeinfo *in, nodetab_process & p)
+{
+  const int node = ChMessageInt(in->nodeNo);
+  if (node != p.nodeno)
+    fprintf(stderr, "Charmrun> Warning: Process #%d received ChSingleNodeInfo #%d\n", p.nodeno, node);
 
-void nodeinfo_allocate(void)
-{
-  nodeinfo_arr = (ChNodeinfo *) malloc(nodetab_rank0_size * sizeof(ChNodeinfo));
+  p.info = in->info;
+  p.num_pus = ChMessageInt(in->num_pus);
+  p.num_cores = ChMessageInt(in->num_cores);
+  p.num_sockets = ChMessageInt(in->num_sockets);
 }
-void nodeinfo_add(const ChSingleNodeinfo *in, SOCKET ctrlfd)
+
+static void nodeinfo_populate(nodetab_process & p)
 {
-  int node = ChMessageInt(in->nodeNo);
-  ChNodeinfo i = in->info;
-  unsigned int nt;
-  unsigned int pe;
-  unsigned int dataport;
-  int lid, qpn, psn;
-  if (node < 0 || node >= nodetab_rank0_size) {
-    fprintf(stderr, "Unexpected node %d registered!\n", node);
-    exit(1);
-  }
-  nt = nodetab_rank0_table[node]; /*Nodetable index for this node*/
-  i.nPE = ChMessageInt_new(nodetab_cpus(nt));
-  i.nProcessesInPhysNode = ChMessageInt_new(host_sizes[nodetab_name(nt)]);
+  ChNodeinfo & i = p.info;
+  const int node = p.nodeno;
+
+  i.nodeno = ChMessageInt_new(node);
+  i.nPE = ChMessageInt_new(p.PEs);
+  i.nProcessesInPhysNode = ChMessageInt_new(p.host->processes);
 
   if (arg_mpiexec)
-    nodetab_getinfo(nt)->ip = i.IP; /* get IP */
-  i.IP = nodetab_ip(nt);
-#if CMK_USE_IBVERBS
-  nodeinfo_arr[node] = i;
-  for (pe = 0; pe < nodetab_cpus(nt); pe++) {
-    nodetab_table[nt + pe]->ctrlfd = ctrlfd;
-  }
-/* PRINT(("Charmrun> client %d connected\n", nt)); */
-#else
-  dataport = ChMessageInt(i.dataport);
+    p.host->ip = i.IP; /* get IP */
+  else
+    i.IP = p.host->ip;
+
+#if !CMK_USE_IBVERBS
+  unsigned int dataport = ChMessageInt(i.dataport);
   if (0 == dataport) {
     fprintf(stderr, "Node %d could not initialize network!\n", node);
     exit(1);
   }
-  nodeinfo_arr[node] = i;
-  for (pe = 0; pe < nodetab_cpus(nt); pe++) {
-    nodetab_table[nt + pe]->dataport = dataport;
-    nodetab_table[nt + pe]->ctrlfd = ctrlfd;
-#if CMK_USE_IBUD
-    nodetab_table[nt + pe]->qp = i.qp;
-#endif
-  }
+  p.dataport = dataport;
   if (arg_verbose) {
     char ips[200];
-    skt_print_ip(ips, nodetab_ip(nt));
-    printf("Charmrun> client %d connected (IP=%s data_port=%d)\n", nt, ips,
+    skt_print_ip(ips, i.IP);
+    printf("Charmrun> client %d connected (IP=%s data_port=%d)\n", node, ips,
            dataport);
-#if CMK_USE_IBUD
-    printf("Charmrun> client %d lid=%d qpn=%i psn=%i\n", nt,
-           ChMessageInt(i.qp.lid), ChMessageInt(i.qp.qpn),
-           ChMessageInt(i.qp.psn));
-#endif
   }
 #endif
 }
@@ -1698,19 +1644,18 @@ void nodeinfo_add(const ChSingleNodeinfo *in, SOCKET ctrlfd)
  *
  ****************************************************************************/
 
-char *input_buffer;
+static char *input_buffer;
 
-void input_extend()
+static void input_extend()
 {
   char line[1024];
-  char *new_input_buffer;
   int len = input_buffer ? strlen(input_buffer) : 0;
   fflush(stdout);
   if (fgets(line, 1023, stdin) == 0) {
     fprintf(stderr, "end-of-file on stdin");
     exit(1);
   }
-  new_input_buffer = (char *) realloc(input_buffer, len + strlen(line) + 1);
+  char *new_input_buffer = (char *) realloc(input_buffer, len + strlen(line) + 1);
   if (new_input_buffer == NULL) {
     // could not realloc
     free(input_buffer);
@@ -1723,9 +1668,9 @@ void input_extend()
   strcpy(input_buffer + len, line);
 }
 
-void input_init() { input_buffer = strdup(""); }
+static void input_init() { input_buffer = strdup(""); }
 
-char *input_extract(int nchars)
+static char *input_extract(int nchars)
 {
   char *res = substr(input_buffer, input_buffer + nchars);
   char *tmp =
@@ -1735,27 +1680,25 @@ char *input_extract(int nchars)
   return res;
 }
 
-char *input_gets()
+static char *input_gets()
 {
-  char *p, *res;
-  int len;
+  char *p;
   while (1) {
     p = strchr(input_buffer, '\n');
     if (p)
       break;
     input_extend();
   }
-  len = p - input_buffer;
-  res = input_extract(len + 1);
+  int len = p - input_buffer;
+  char *res = input_extract(len + 1);
   res[len] = 0;
   return res;
 }
 
 /*FIXME: I am terrified by this routine. OSL 9/8/00*/
-char *input_scanf_chars(char *fmt)
+static char *input_scanf_chars(char *fmt)
 {
   char buf[8192];
-  int len, pos;
   static int fd;
   static FILE *file;
   fflush(stdout);
@@ -1763,7 +1706,10 @@ char *input_scanf_chars(char *fmt)
 #if CMK_USE_MKSTEMP
     char tmp[128];
     strcpy(tmp, "/tmp/fnordXXXXXX");
-    mkstemp(tmp);
+    if (mkstemp(tmp) == -1) {
+      fprintf(stderr, "charmrun> mkstemp() failed!\n");
+      exit(1);
+    }
 #else
     char *tmp = tmpnam(NULL); /*This was once /tmp/fnord*/
 #endif
@@ -1776,15 +1722,22 @@ char *input_scanf_chars(char *fmt)
     file = fdopen(fd, "r+");
     unlink(tmp);
   }
+  int pos;
   while (1) {
-    len = strlen(input_buffer);
+    int len = strlen(input_buffer);
     rewind(file);
     fwrite(input_buffer, len, 1, file);
     fflush(file);
     rewind(file);
-    ftruncate(fd, len);
-    fscanf(file, fmt, buf, buf, buf, buf, buf, buf, buf, buf, buf, buf, buf,
-           buf, buf, buf, buf, buf, buf, buf);
+    if (ftruncate(fd, len)) {
+      fprintf(stderr, "charmrun> ftruncate() failed!\n");
+      exit(1);
+    }
+    if (fscanf(file, fmt, buf, buf, buf, buf, buf, buf, buf, buf, buf, buf, buf,
+           buf, buf, buf, buf, buf, buf, buf) <= 0) {
+      fprintf(stderr, "charmrun> fscanf() failed!\n");
+      exit(1);
+    }
     pos = ftell(file);
     if (pos < len)
       break;
@@ -1805,31 +1758,29 @@ sockets.
 rec'v the message and respond to the request,
 by forwarding the request to the appropriate node.
  */
-void req_ccs_connect(void)
+static void req_ccs_connect(void)
 {
-  const void *bufs[3];
-  int lens[3];
   struct {
     ChMessageHeader ch; /*Make a charmrun header*/
     CcsImplHeader hdr;  /*Ccs internal header*/
   } h;
   void *reqData; /*CCS request data*/
-  int pe, reqBytes;
   if (0 == CcsServer_recvRequest(&h.hdr, &reqData))
     return; /*Malformed request*/
-  pe = ChMessageInt(h.hdr.pe);
-  reqBytes = ChMessageInt(h.hdr.len);
+  int pe = ChMessageInt(h.hdr.pe);
+  int reqBytes = ChMessageInt(h.hdr.len);
 
   if (pe == -1) {
     /*Treat -1 as broadcast and sent to 0 as root of the spanning tree*/
     pe = 0;
   }
-  if ((pe <= -nodetab_size || pe >= nodetab_size) && 0 == replay_single) {
+  const int pe_count = pe_to_process_map.size();
+  if ((pe <= -pe_count || pe >= pe_count) && 0 == replay_single) {
 /*Treat out of bound values as errors. Helps detecting bugs*/
 /* But when virtualized with Bigemulator, we can have more pes than nodetabs */
 /* TODO: We should somehow check boundaries also for bigemulator... */
 #if !CMK_BIGSIM_CHARM
-    if (pe == -nodetab_size)
+    if (pe == -pe_count)
       fprintf(stderr, "Invalid processor index in CCS request: are you trying "
                       "to do a broadcast instead?");
     else
@@ -1855,18 +1806,21 @@ void req_ccs_connect(void)
 #else
     int destpe = pe;
 #if CMK_BIGSIM_CHARM
-    destpe = destpe % nodetab_size;
+    destpe = destpe % pe_count;
 #endif
     if (replay_single)
       destpe = 0;
     /*Fill out the charmrun header & forward the CCS request*/
     ChMessageHeader_new("req_fw", sizeof(h.hdr) + reqBytes, &h.ch);
 
+    const void *bufs[3];
+    int lens[3];
     bufs[0] = &h;
     lens[0] = sizeof(h);
     bufs[1] = reqData;
     lens[1] = reqBytes;
-    skt_sendV(nodetab_ctrlfd(destpe), 2, bufs, lens);
+    const SOCKET ctrlfd = pe_to_process_map[pe]->req_client;
+    skt_sendV(ctrlfd, 2, bufs, lens);
 
 #endif
   }
@@ -1877,7 +1831,7 @@ void req_ccs_connect(void)
 Forward the CCS reply (if any) from this client back to the
 original network requestor, on the original request socket.
  */
-int req_ccs_reply_fw(ChMessage *msg, SOCKET srcFd)
+static int req_ccs_reply_fw(ChMessage *msg, SOCKET srcFd)
 {
   int len = msg->len; /* bytes of data remaining to receive */
 
@@ -1923,7 +1877,7 @@ int req_ccs_reply_fw(ChMessage *msg, SOCKET srcFd)
 }
 
 #else
-int req_ccs_reply_fw(ChMessage *msg, SOCKET srcFd) {}
+static int req_ccs_reply_fw(ChMessage *msg, SOCKET srcFd) {}
 #endif /*CMK_CCS_AVAILABLE*/
 
 /****************************************************************************
@@ -1939,30 +1893,26 @@ int req_ccs_reply_fw(ChMessage *msg, SOCKET srcFd) {}
 one of the processor crashes*/
 /*#define __FAULT__*/
 
-SOCKET *req_clients; /*TCP request sockets for each node*/
-#ifdef HSTART
-SOCKET *charmrun_fds;
-#endif
-int req_nClients; /*Number of entries in above list (==nodetab_rank0_size)*/
-int req_ending = 0;
+static int req_ending = 0;
 
 /* socket and std streams for the gdb info program */
-int gdb_info_pid = 0;
-int gdb_info_std[3];
-FILE *gdb_stream = NULL;
+static int gdb_info_pid = 0;
+static int gdb_info_std[3];
+static FILE *gdb_stream = NULL;
 
 #define REQ_OK 0
 #define REQ_FAILED -1
 
 #ifdef HSTART
-int req_reply_child(SOCKET fd, const char *type, const char *data, int dataLen)
+static int req_reply(SOCKET fd, const char *type, const char *data, int dataLen);
+static int req_reply_child(SOCKET fd, const char *type, const char *data, int dataLen)
 {
 
   int status = req_reply(fd, type, data, dataLen);
   if (status != REQ_OK)
     return status;
   SOCKET clientFd;
-  skt_recvN(fd, (const char *) &clientFd, sizeof(SOCKET));
+  skt_recvN(fd, (char *) &clientFd, sizeof(SOCKET));
   skt_sendN(fd, (const char *) &clientFd, sizeof(fd));
   return status;
 }
@@ -1970,7 +1920,7 @@ int req_reply_child(SOCKET fd, const char *type, const char *data, int dataLen)
 /**
  * @brief This is the only place where charmrun talks back to anyone.
  */
-int req_reply(SOCKET fd, const char *type, const char *data, int dataLen)
+static int req_reply(SOCKET fd, const char *type, const char *data, int dataLen)
 {
   ChMessageHeader msg;
   if (fd == INVALID_SOCKET)
@@ -1981,79 +1931,118 @@ int req_reply(SOCKET fd, const char *type, const char *data, int dataLen)
   return REQ_OK;
 }
 
+static void kill_all_compute_nodes(const char *msg, size_t msgSize)
+{
+  ChMessageHeader hdr;
+  ChMessageHeader_new("die", msgSize, &hdr);
+  for (const nodetab_process & p : my_process_table)
+  {
+      skt_sendN(p.req_client, (const char *) &hdr, sizeof(hdr));
+      skt_sendN(p.req_client, msg, msgSize);
+  }
+}
+
+static void kill_all_compute_nodes(const char *msg)
+{
+  return kill_all_compute_nodes(msg, strlen(msg)+1);
+}
+
+template <size_t msgSize>
+static inline void kill_all_compute_nodes(const char msg[msgSize])
+{
+  return kill_all_compute_nodes(msg, msgSize);
+}
+
 /* Request handlers:
 When a client asks us to do something, these are the
 routines that actually respond to the request.
 */
 /*Stash this new node's control and data ports.
  */
-int req_handle_initnode(ChMessage *msg, SOCKET fd)
+static int req_handle_initnode(ChMessage *msg, nodetab_process & p)
 {
-#if CMK_USE_IBVERBS
-  int i;
-  ChSingleNodeinfo *nodeInfo = (ChSingleNodeinfo *) msg->data;
-  //	printf("Charmrun> msg->len %d sizeof(ChSingleNodeinfo) %d
-  // sizeof(ChInfiAddr) %d
-  //\n",msg->len,sizeof(ChSingleNodeinfo),sizeof(ChInfiAddr));
-  if (msg->len !=
-      sizeof(ChSingleNodeinfo) +
-          (nodetab_rank0_size - 1) * sizeof(ChInfiAddr)) {
-    fprintf(stderr, "Charmrun: Bad initnode data length. Aborting\n");
-    fprintf(stderr, "Charmrun: possibly because: %s.\n", msg->data);
-    exit(1);
-  }
-  nodeInfo->info.qpList =
-      (ChInfiAddr *) malloc(sizeof(ChInfiAddr) * (nodetab_rank0_size - 1));
-  memcpy((char *) nodeInfo->info.qpList, &msg->data[sizeof(ChSingleNodeinfo)],
-         sizeof(ChInfiAddr) * (nodetab_rank0_size - 1));
-/*	for(i=0;i<nodetab_rank0_size-1;i++){
-                printf("i %d  0x%0x 0x%0x
-   0x%0x\n",i,ChMessageInt(nodeInfo->info.qpList[i].lid),ChMessageInt(nodeInfo->info.qpList[i].qpn),ChMessageInt(nodeInfo->info.qpList[i].psn));
-        }*/
-#else
   if (msg->len != sizeof(ChSingleNodeinfo)) {
     fprintf(stderr, "Charmrun: Bad initnode data length. Aborting\n");
     fprintf(stderr, "Charmrun: possibly because: %s.\n", msg->data);
     exit(1);
   }
-#endif
-  nodeinfo_add((ChSingleNodeinfo *) msg->data, fd);
+
+  nodeinfo_add((ChSingleNodeinfo *) msg->data, p);
   return REQ_OK;
 }
+
+#if CMK_USE_IBVERBS || CMK_USE_IBUD
+static int req_handle_qplist(ChMessage *msg, nodetab_process & p)
+{
+#if CMK_USE_IBVERBS
+  const int my_process_count = my_process_table.size();
+	int qpListSize = (my_process_count-1) * sizeof(ChInfiAddr);
+
+  if (msg->len != qpListSize)
+  {
+    fprintf(stderr, "Charmrun: Bad qplist data length. Aborting.\n");
+    exit(1);
+  }
+
+  p.qpList = (ChInfiAddr *) malloc(qpListSize);
+  memcpy(p.qpList, msg->data, qpListSize);
+#elif CMK_USE_IBUD
+  if (msg->len != sizeof(ChInfiAddr))
+  {
+    fprintf(stderr, "Charmrun: Bad qplist data length. Aborting.\n");
+    exit(1);
+  }
+
+  p.qp = *(ChInfiAddr *)msg->data;
+  printf("Charmrun> client %d lid=%d qpn=%i psn=%i\n", node,
+         ChMessageInt(p.qp.lid), ChMessageInt(p.qp.qpn),
+         ChMessageInt(p.qp.psn));
+#endif
+  return REQ_OK;
+}
+#endif
 
 /**
  * @brief Gets the array of node numbers, IPs, and ports. This is used by the
  * node-programs
  * to talk to one another.
  */
-int req_handle_initnodetab(ChMessage *msg, SOCKET fd)
+static void req_send_initnodetab_internal(const nodetab_process & destination, int count, int msgSize)
 {
   ChMessageHeader hdr;
-  ChMessageInt_t nNodes = ChMessageInt_new(nodetab_rank0_size);
-  ChMessageHeader_new(
-      "initnodetab",
-      sizeof(ChMessageInt_t) + sizeof(ChNodeinfo) * nodetab_rank0_size, &hdr);
+  ChMessageInt_t nNodes = ChMessageInt_new(count);
+  ChMessageInt_t nodeno = ChMessageInt_new(destination.nodeno);
+  ChMessageHeader_new("initnodetab", msgSize, &hdr);
+  const SOCKET fd = destination.req_client;
   skt_sendN(fd, (const char *) &hdr, sizeof(hdr));
   skt_sendN(fd, (const char *) &nNodes, sizeof(nNodes));
-  skt_sendN(fd, (const char *) nodeinfo_arr,
-            sizeof(ChNodeinfo) * nodetab_rank0_size);
+  skt_sendN(fd, (const char *) &nodeno, sizeof(nodeno));
+  for (const nodetab_process & p : my_process_table)
+    skt_sendN(fd, (const char *) &p.info, sizeof(ChNodeinfo));
+}
 
-  return REQ_OK;
+static void req_send_initnodetab(const nodetab_process & destination)
+{
+  const int my_process_count = my_process_table.size();
+  int msgSize = sizeof(ChMessageInt_t) * ChInitNodetabFields +
+                sizeof(ChNodeinfo) * my_process_count;
+  req_send_initnodetab_internal(destination, my_process_count, msgSize);
 }
 
 #ifdef HSTART
 /* Used for fault tolerance with hierarchical start */
-int req_handle_initnodetab1(ChMessage *msg, SOCKET fd)
+static int req_send_initnodetab1(SOCKET fd)
 {
+  const int my_process_count = my_process_table.size();
   ChMessageHeader hdr;
-  ChMessageInt_t nNodes = ChMessageInt_new(nodetab_rank0_size);
+  ChMessageInt_t nNodes = ChMessageInt_new(my_process_count);
   ChMessageHeader_new("initnttab", sizeof(ChMessageInt_t) +
-                                       sizeof(ChNodeinfo) * nodetab_rank0_size,
+                                   sizeof(ChNodeinfo) * my_process_count,
                       &hdr);
   skt_sendN(fd, (const char *) &hdr, sizeof(hdr));
   skt_sendN(fd, (const char *) &nNodes, sizeof(nNodes));
-  skt_sendN(fd, (const char *) nodeinfo_arr,
-            sizeof(ChNodeinfo) * nodetab_rank0_size);
+  for (const nodetab_process & p : my_process_table)
+    skt_sendN(fd, (const char *) p.info, sizeof(ChNodeinfo));
 
   return REQ_OK;
 }
@@ -2061,22 +2050,23 @@ int req_handle_initnodetab1(ChMessage *msg, SOCKET fd)
 This is used by the node-programs to talk to one another.
 */
 static int parent_charmrun_fd = -1;
-int req_handle_initnodedistribution(ChMessage *msg, SOCKET fd, int client)
+static int req_handle_initnodedistribution(ChMessage *msg, const nodetab_process & p)
 {
+  const int nodetab_rank0_size = nodetab_rank0_table.size();
   int nodes_to_fork =
       nodes_per_child; /* rounding should help in better load distribution*/
-  int rank0_start = nodetab_unique_table[client * nodes_per_child];
+  int rank0_start = nodetab_rank0_table[client * nodes_per_child];
   int rank0_finish;
   if (client == branchfactor - 1) {
-    nodes_to_fork = nodetab_unique_size - client * nodes_per_child;
+    nodes_to_fork = nodetab_rank0_table.size() - client * nodes_per_child;
     rank0_finish = nodetab_rank0_size;
   } else
     rank0_finish =
-        nodetab_unique_table[client * nodes_per_child + nodes_to_fork];
-  int k;
+        nodetab_rank0_table[client * nodes_per_child + nodes_to_fork];
+
   ChMessageInt_t *nodemsg = (ChMessageInt_t *) malloc(
       (rank0_finish - rank0_start) * sizeof(ChMessageInt_t));
-  for (k = 0; k < rank0_finish - rank0_start; k++)
+  for (int k = 0; k < rank0_finish - rank0_start; k++)
     nodemsg[k] = ChMessageInt_new(nodetab_rank0_table[rank0_start + k]);
   ChMessageHeader hdr;
   ChMessageInt_t nNodes = ChMessageInt_new(rank0_finish - rank0_start);
@@ -2085,6 +2075,7 @@ int req_handle_initnodedistribution(ChMessage *msg, SOCKET fd, int client)
                       sizeof(ChMessageInt_t) * 2 +
                           sizeof(ChMessageInt_t) * (rank0_finish - rank0_start),
                       &hdr);
+  const SOCKET fd = p.charmrun_fds;
   skt_sendN(fd, (const char *) &hdr, sizeof(hdr));
   skt_sendN(fd, (const char *) &nNodes, sizeof(nNodes));
   skt_sendN(fd, (const char *) &nTotalNodes, sizeof(nTotalNodes));
@@ -2094,9 +2085,10 @@ int req_handle_initnodedistribution(ChMessage *msg, SOCKET fd, int client)
   return REQ_OK;
 }
 
-ChSingleNodeinfo *myNodesInfo;
-int send_myNodeInfo_to_parent()
+static std::vector<ChSingleNodeinfo> myNodesInfo;
+static int send_myNodeInfo_to_parent()
 {
+  const int nodetab_rank0_size = nodetab_rank0_table.size();
   ChMessageHeader hdr;
   ChMessageInt_t nNodes = ChMessageInt_new(nodetab_rank0_size);
   ChMessageHeader_new("initnodetab",
@@ -2105,12 +2097,12 @@ int send_myNodeInfo_to_parent()
                       &hdr);
   skt_sendN(parent_charmrun_fd, (const char *) &hdr, sizeof(hdr));
   skt_sendN(parent_charmrun_fd, (const char *) &nNodes, sizeof(nNodes));
-  skt_sendN(parent_charmrun_fd, (const char *) myNodesInfo,
-            sizeof(ChSingleNodeinfo) * nodetab_rank0_size);
+  skt_sendN(parent_charmrun_fd, (const char *) myNodesInfo.data(),
+            sizeof(ChSingleNodeinfo) * myNodesInfo.size());
 
   return REQ_OK;
 }
-void forward_nodetab_to_children()
+static void forward_nodetab_to_children()
 {
   /*it just needs to receive and copy the nodetab info if required and send it
    * as it is to its nodes */
@@ -2122,9 +2114,9 @@ void forward_nodetab_to_children()
 
   ChMessageInt_t *nodelistmsg = (ChMessageInt_t *) msg.data;
   int nodetab_Nodes = ChMessageInt(nodelistmsg[0]);
-  int client;
-  for (client = 0; client < nodetab_rank0_size; client++) {
-    SOCKET fd = req_clients[client];
+  for (const nodetab_process & p : my_process_table)
+  {
+    SOCKET fd = p.req_client;
     ChMessageHeader hdr;
     ChMessageInt_t nNodes = ChMessageInt_new(nodetab_Nodes);
     ChMessageHeader_new("initnodetab", sizeof(ChMessageInt_t) +
@@ -2138,20 +2130,20 @@ void forward_nodetab_to_children()
 }
 /*Parent Charmrun receives the nodetab from child and processes it. msg contain
  * array of ChSingleNodeInfo*/
-void receive_nodeset_from_child(ChMessage *msg, SOCKET fd)
+static void receive_nodeset_from_child(ChMessage *msg, SOCKET fd)
 {
   ChMessageInt_t *n32 = (ChMessageInt_t *) msg->data;
   int numOfNodes = ChMessageInt(n32[0]);
   ChSingleNodeinfo *childNodeInfo = (ChSingleNodeinfo *) (n32 + 1);
-  int k;
-  for (k = 0; k < numOfNodes; k++)
-    nodeinfo_add(childNodeInfo + k, fd);
+  for (int k = 0; k < numOfNodes; k++)
+    nodeinfo_add(childNodeInfo + k, my_process_table[childNodeInfo[k].nodeNo]);
 }
 
-void set_sockets_list(ChMessage *msg, SOCKET fd)
+static void set_sockets_list(ChMessage *msg, SOCKET fd)
 {
   ChMessageInt_t *n32 = (ChMessageInt_t *) msg->data;
   int node_start = ChMessageInt(n32[0]);
+  TODO;
   charmrun_fds[node_start / nodes_per_child] = fd;
 }
 #endif
@@ -2167,7 +2159,7 @@ static void checkPrintfError(int err)
   }
 }
 
-int req_handle_print(ChMessage *msg, SOCKET fd)
+static int req_handle_print(ChMessage *msg, SOCKET fd)
 {
   checkPrintfError(printf("%s", msg->data));
   checkPrintfError(fflush(stdout));
@@ -2175,7 +2167,7 @@ int req_handle_print(ChMessage *msg, SOCKET fd)
   return REQ_OK;
 }
 
-int req_handle_printerr(ChMessage *msg, SOCKET fd)
+static int req_handle_printerr(ChMessage *msg, SOCKET fd)
 {
   fprintf(stderr, "%s", msg->data);
   fflush(stderr);
@@ -2183,7 +2175,7 @@ int req_handle_printerr(ChMessage *msg, SOCKET fd)
   return REQ_OK;
 }
 
-int req_handle_printsyn(ChMessage *msg, SOCKET fd)
+static int req_handle_printsyn(ChMessage *msg, SOCKET fd)
 {
   checkPrintfError(printf("%s", msg->data));
   checkPrintfError(fflush(stdout));
@@ -2197,7 +2189,7 @@ int req_handle_printsyn(ChMessage *msg, SOCKET fd)
   return REQ_OK;
 }
 
-int req_handle_printerrsyn(ChMessage *msg, SOCKET fd)
+static int req_handle_printerrsyn(ChMessage *msg, SOCKET fd)
 {
   fprintf(stderr, "%s", msg->data);
   fflush(stderr);
@@ -2211,15 +2203,22 @@ int req_handle_printerrsyn(ChMessage *msg, SOCKET fd)
   return REQ_OK;
 }
 
-int req_handle_ending(ChMessage *msg, SOCKET fd)
+static int _exitcode = 0;
+
+static int req_handle_ending(ChMessage *msg, SOCKET fd)
 {
-  int i;
   req_ending++;
+
+  if (msg->data) {
+    int exitcode = atoi(msg->data);
+    if (exitcode)
+      _exitcode = exitcode;
+  }
 
 #if CMK_SHRINK_EXPAND
   // When using shrink-expand, only PE 0 will send an "ending" request.
 #elif (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
-  if (req_ending == nodetab_size)
+  if (req_ending == my_process_table.size())
 #else
   if (req_ending == arg_requested_pes)
 #endif
@@ -2227,46 +2226,43 @@ int req_handle_ending(ChMessage *msg, SOCKET fd)
 #if CMK_SHRINK_EXPAND
     ChMessage ackmsg;
     ChMessage_new("realloc_ack", 0, &ackmsg);
-    for (i = 0; i < req_nClients; i++) {
-      ChMessage_send(req_clients[i], &ackmsg);
-    }
+    for (const nodetab_process & p : my_process_table)
+      ChMessage_send(p.req_client, &ackmsg);
 #endif
 
-    for (i = 0; i < req_nClients; i++)
-      skt_close(req_clients[i]);
+    for (const nodetab_process & p : my_process_table)
+      skt_close(p.req_client);
     if (arg_verbose)
-      printf("Charmrun> Graceful exit.\n");
-    exit(0);
+      printf("Charmrun> Graceful exit with exit code %d.\n", _exitcode);
+    exit(_exitcode);
   }
   return REQ_OK;
 }
 
-int req_handle_barrier(ChMessage *msg, SOCKET fd)
+static int req_handle_barrier(ChMessage *msg, SOCKET fd)
 {
-  int i;
   static int barrier_count = 0;
   static int barrier_phase = 0;
   barrier_count++;
 #ifdef HSTART
   if (barrier_count == arg_requested_pes)
 #else
-  if (barrier_count == req_nClients)
+  if (barrier_count == my_process_table.size())
 #endif
   {
     barrier_count = 0;
     barrier_phase++;
-    for (i = 0; i < req_nClients; i++)
-      if (REQ_OK != req_reply(req_clients[i], "barrier", "", 1)) {
-        fprintf(stderr, "req_handle_barrier socket error: %d\n", i);
+    for (const nodetab_process & p : my_process_table)
+      if (REQ_OK != req_reply(p.req_client, "barrier", "", 1)) {
+        fprintf(stderr, "req_handle_barrier socket error: %d\n", p.nodeno);
         abort();
       }
   }
   return REQ_OK;
 }
 
-int req_handle_barrier0(ChMessage *msg, SOCKET fd)
+static int req_handle_barrier0(ChMessage *msg, SOCKET fd)
 {
-  int i;
   static int count = 0;
   static SOCKET fd0;
   int pe = atoi(msg->data);
@@ -2276,7 +2272,7 @@ int req_handle_barrier0(ChMessage *msg, SOCKET fd)
 #ifdef HSTART
   if (count == arg_requested_pes)
 #else
-  if (count == req_nClients)
+  if (count == my_host_table.size())
 #endif
   {
     req_reply(fd0, "barrier0", "", 1); /* only send to node 0 */
@@ -2285,7 +2281,7 @@ int req_handle_barrier0(ChMessage *msg, SOCKET fd)
   return REQ_OK;
 }
 
-void req_handle_abort(ChMessage *msg, SOCKET fd)
+static void req_handle_abort(ChMessage *msg, SOCKET fd)
 {
   /*fprintf(stderr,"req_handle_abort called \n");*/
   if (msg->len == 0)
@@ -2295,14 +2291,12 @@ void req_handle_abort(ChMessage *msg, SOCKET fd)
   exit(1);
 }
 
-int req_handle_scanf(ChMessage *msg, SOCKET fd)
+static int req_handle_scanf(ChMessage *msg, SOCKET fd)
 {
-  char *fmt, *res, *p;
-
-  fmt = msg->data;
+  char *fmt = msg->data;
   fmt[msg->len - 1] = 0;
-  res = input_scanf_chars(fmt);
-  p = res;
+  char *res = input_scanf_chars(fmt);
+  char *p = res;
   while (*p) {
     if (*p == '\n')
       *p = ' ';
@@ -2319,9 +2313,9 @@ int req_handle_scanf(ChMessage *msg, SOCKET fd)
 }
 
 #if CMK_SHRINK_EXPAND
-int req_handle_realloc(ChMessage *msg, SOCKET fd)
+static int req_handle_realloc(ChMessage *msg, SOCKET fd)
 {
-  printf("Charmrun> Realloc request received %s \n", msg->data);
+  printf("Charmrun> Realloc request received\n");
 
   /* Exec to clear and restart everything, just preserve contents of
    * netstart*/
@@ -2354,7 +2348,11 @@ int req_handle_realloc(ChMessage *msg, SOCKET fd)
     }
   }
 
+#if defined __APPLE__
+  const char *dir = "/tmp";
+#else
   const char *dir = "/dev/shm";
+#endif
   for (int i = 0; i < saved_argc; ++i) {
     if (strcmp(saved_argv[i], "+shrinkexpand_basedir") == 0) {
       dir = saved_argv[i+1];
@@ -2362,15 +2360,13 @@ int req_handle_realloc(ChMessage *msg, SOCKET fd)
     }
   }
 
-  const char **ret;
-  ret = (const char **) malloc(sizeof(char *) * (saved_argc + additional_args));
+  const char **ret = (const char **) malloc(sizeof(char *) * (saved_argc + additional_args));
 
-  int newP = *(int *) (msg->data);
+  int newP = ChMessageInt(*(ChMessageInt_t *)msg->data);
   int oldP = arg_requested_pes;
   printf("Charmrun> newp =  %d oldP = %d \n \n \n", newP, oldP);
 
-  int i;
-  for (i = 0; i < saved_argc; i++) {
+  for (int i = 0; i < saved_argc; i++) {
     ret[i] = saved_argv[i];
   }
 
@@ -2380,7 +2376,7 @@ int req_handle_realloc(ChMessage *msg, SOCKET fd)
   sprintf(sp_buffer, "%d", newP);
 
   char sp_buffer1[50]; // oldP buffer
-  sprintf(sp_buffer1, "%d", arg_requested_pes);
+  sprintf(sp_buffer1, "%d", oldP);
 
   char sp_buffer2[6]; // charmrun port
   sprintf(sp_buffer2, "%d", server_port);
@@ -2425,16 +2421,11 @@ int req_handle_realloc(ChMessage *msg, SOCKET fd)
     ret[saved_argc + index++] = NULL;
   }
 
-  setenv("NETSTART", create_netstart(1), 1);
-  setenv("OLDNODENAMES", create_oldnodenames(), 1);
-
   ChMessage ackmsg;
   ChMessage_new("realloc_ack", 0, &ackmsg);
-  for (i = 0; i < req_nClients; i++) {
-    ChMessage_send(req_clients[i], &ackmsg);
-  }
+  for (const nodetab_process & p : my_process_table)
+    ChMessage_send(p.req_client, &ackmsg);
 
-  skt_client_table.clear();
   skt_close(server_fd);
   skt_close(CcsServer_fd());
   execv(ret[0], (char **)ret);
@@ -2446,16 +2437,15 @@ int req_handle_realloc(ChMessage *msg, SOCKET fd)
 #endif
 
 #ifdef __FAULT__
-void restart_node(int crashed_node);
-void reconnect_crashed_client(int socket_index, int crashed_node);
-void announce_crash(int socket_index, int crashed_node);
+static void restart_node(nodetab_process &);
+static void reconnect_crashed_client(nodetab_process &);
+static void announce_crash(const nodetab_process &);
 
-static int _last_crash = 0;         /* last crashed pe number */
-static int _crash_socket_index = 0; /* last restart socket */
+static const nodetab_process * _last_crash;      /* last crashed process */
 #ifdef HSTART
-static int _crash_socket_charmrun_index = 0; /* last restart socket */
-int crashed_pe_id;
-int restarted_pe_id;
+static nodetab_process * _crash_charmrun_process; /* last restart socket */
+static int crashed_pe_id;
+static int restarted_pe_id;
 #endif
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 static int numCrashes = 0; /*number of crashes*/
@@ -2467,18 +2457,18 @@ static SOCKET last_crashed_fd = -1;
  * acks, it sends the nodetab
  * table to the crashed node.
  */
-int req_handle_crashack(ChMessage *msg, SOCKET fd)
+static int req_handle_crashack(ChMessage *msg, SOCKET fd)
 {
   static int count = 0;
   count++;
 #ifdef HSTART
   if (arg_hierarchical_start) {
-    if (count == nodetab_rank0_size - 1) {
+    if (count == nodetab_rank0_table.size() - 1) {
       /* only after everybody else update its nodetab, can this
          restarted process continue */
-      PRINT(("Charmrun> continue node: %d\n", _last_crash));
-      req_handle_initnodetab1(NULL, req_clients[_crash_socket_charmrun_index]);
-      _last_crash = 0;
+      PRINT(("Charmrun> continue node: %d\n", _last_crash->nodeno));
+      req_send_initnodetab1(_crash_charmrun_process->req_client);
+      _last_crash = nullptr;
       count = 0;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
       last_crashed_fd = -1;
@@ -2489,55 +2479,49 @@ int req_handle_crashack(ChMessage *msg, SOCKET fd)
   else
 
 #endif
-      if (count == req_nClients - 1) {
+      if (count == my_process_table.size() - 1) {
     // only after everybody else update its nodetab, can this restarted process
     // continue
-    PRINT(("Charmrun> continue node: %d\n", _last_crash));
-    req_handle_initnodetab(NULL, req_clients[_crash_socket_index]);
-    _last_crash = 0;
+    PRINT(("Charmrun> continue node: %d\n", _last_crash->nodeno));
+    req_send_initnodetab(*_last_crash);
+    _last_crash = nullptr;
     count = 0;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     last_crashed_fd = -1;
 #endif
   }
+  return 0;
 }
 
 #ifdef HSTART
 /* send initnode to root*/
-int set_crashed_socket_id(ChMessage *msg, SOCKET fd)
+static int set_crashed_socket_id(ChMessage *msg, SOCKET fd)
 {
   ChSingleNodeinfo *nodeInfo = (ChSingleNodeinfo *) msg->data;
-  int nt = nodetab_rank0_table[ChMessageInt(nodeInfo->nodeNo) - mynodes_start];
+  int nt = ChMessageInt(nodeInfo->nodeNo) - mynodes_start; // TODO: relative nodeNo
   nodeInfo->nodeNo = ChMessageInt_new(nt);
   /* Required for CCS */
   /*Nodetable index for this node*/
-  int pe;
-  for (pe = 0; pe < nodetab_cpus(nt); pe++) {
-    nodetab_table[nt + pe]->ctrlfd = fd;
-  }
+  my_process_table[nt].req_client = fd; // TODO: nodeno as index
+  TODO;
 }
 
 /* Receives new dataport of restarted prcoess	and resends nodetable to
  * everyone*/
-int req_handle_crash(ChMessage *msg, SOCKET fd)
+static int req_handle_crash(ChMessage *msg, nodetab_process & p)
 {
+  const SOCKET fd = p.req_client;
 
   ChMessageInt_t oldpe, newpe;
   skt_recvN(fd, (const char *) &oldpe, sizeof(oldpe));
   skt_recvN(fd, (const char *) &newpe, sizeof(newpe));
   *nodetab_table[ChMessageInt(oldpe)] = *nodetab_table[ChMessageInt(newpe)];
 
-  int status = req_handle_initnode(msg, fd);
-  int i;
-  for (i = 0; i < req_nClients; i++) {
-    if (req_clients[i] == fd) {
-      break;
-    }
-  }
-  _crash_socket_charmrun_index = i;
+  int status = req_handle_initnode(msg, p);
+  _crash_charmrun_process = &p;
 
-  fprintf(stderr, "Root charmrun : Socket %d failed %d\n", fd,
-          _crash_socket_charmrun_index);
+  fprintf(stderr, "Root charmrun : Socket %d failed: %s\n", fd,
+          _crash_charmrun_process->host->name);
   fflush(stderr);
   ChSingleNodeinfo *nodeInfo = (ChSingleNodeinfo *) msg->data;
   int crashed_node = ChMessageInt(nodeInfo->nodeNo);
@@ -2550,83 +2534,48 @@ int req_handle_crash(ChMessage *msg, SOCKET fd)
   }
 
   /* Already processed, so send*/
-  int client;
-  for (client = 0; client < req_nClients; client++) {
-    req_handle_initnodetab(NULL, req_clients[client]);
-  }
+  for (const nodetab_process & p2 : my_process_table)
+    req_send_initnodetab(p2);
 
   /*Anounce crash to all child charmruns*/
-  announce_crash(nodetab_rank0_size + 1, crashed_node);
+  announce_crash(p);
 }
 
 #endif
 #endif
 
 #ifdef __FAULT__
-void error_in_req_serve_client(SOCKET fd)
+static void error_in_req_serve_client(nodetab_process & p)
 {
-  int i;
-  int crashed_node, crashed_pe, node_index, socket_index;
+  const SOCKET fd = p.req_client;
   fprintf(stderr, "Socket %d failed \n", fd);
-
-#ifdef HSTART
-  if (arg_hierarchical_start) {
-    for (i = mynodes_start; i < mynodes_start + nodetab_rank0_size; i++) {
-      if (nodetab_ctrlfd(i) == fd) {
-        break;
-      }
-    }
-  }
-
-  else
-#endif
-    for (i = 0; i < nodetab_max; i++) {
-      if (nodetab_ctrlfd(i) == fd) {
-        break;
-      }
-    }
 
   fflush(stdout);
 #if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
   skt_close(fd);
 #endif
-  crashed_pe = i;
-  node_index = i - nodetab_rank(crashed_pe);
-  for (i = 0; i < nodetab_rank0_size; i++) {
-    if (node_index == nodetab_rank0_table[i]) {
-      break;
-    }
-  }
-  crashed_node = i;
 
   /** should also send a message to all the other processors telling them that
    * this guy has crashed*/
-  /*announce_crash(socket_index,crashed_node);*/
-  restart_node(crashed_node);
+  /*announce_crash(p);*/
+  restart_node(p);
 
-  fprintf(stderr, "charmrun says Processor %d failed on Node %d\n", crashed_pe,
-          crashed_node);
+  fprintf(stderr, "charmrun says process %d failed (on host %s)\n", p.nodeno, p.host->name);
   /** after the crashed processor has been recreated
    it connects to charmrun. That data must now be filled
-   into the req_nClients array and the nodetab_table*/
+   into my_process_table and the nodetab_table*/
 
-  for (i = 0; i < req_nClients; i++) {
-    if (req_clients[i] == fd) {
-      break;
-    }
-  }
-  socket_index = i;
-  reconnect_crashed_client(socket_index, crashed_node);
+  reconnect_crashed_client(p);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   skt_close(fd);
 #endif
 }
 #endif
 
-int req_handler_dispatch(ChMessage *msg, SOCKET replyFd)
+static int req_handler_dispatch(ChMessage *msg, nodetab_process & p)
 {
+  const int replyFd = p.req_client;
   char *cmd = msg->header.type;
-  int recv_status;
   DEBUGF(("Got request '%s'\n", cmd, replyFd));
 #if CMK_CCS_AVAILABLE /* CCS *doesn't* want data yet, for faster forwarding */
   if (strcmp(cmd, "reply_fw") == 0)
@@ -2634,7 +2583,7 @@ int req_handler_dispatch(ChMessage *msg, SOCKET replyFd)
 #endif
 
   /* grab request data */
-  recv_status = ChMessageData_recv(replyFd, msg);
+  int recv_status = ChMessageData_recv(replyFd, msg);
 #ifdef __FAULT__
 #ifdef HSTART
   if (!arg_hierarchical_start)
@@ -2645,11 +2594,11 @@ int req_handler_dispatch(ChMessage *msg, SOCKET replyFd)
         return REQ_OK;
       }
       DEBUGF(("recv_status %d on socket %d \n", recv_status, replyFd));
-      error_in_req_serve_client(replyFd);
+      error_in_req_serve_client(p);
     }
 #else
   if (recv_status < 0) {
-    error_in_req_serve_client(replyFd);
+    error_in_req_serve_client(p);
     return REQ_OK;
   }
 #endif
@@ -2682,7 +2631,7 @@ int req_handler_dispatch(ChMessage *msg, SOCKET replyFd)
     return req_handle_crashack(msg, replyFd);
 #ifdef HSTART
   else if (strcmp(cmd, "initnode") == 0)
-    return req_handle_crash(msg, replyFd);
+    return req_handle_crash(msg, p);
 #endif
 #endif
 #if CMK_SHRINK_EXPAND
@@ -2699,27 +2648,26 @@ int req_handler_dispatch(ChMessage *msg, SOCKET replyFd)
   return REQ_OK;
 }
 
-void req_serve_client(SOCKET fd)
+static void req_serve_client(nodetab_process & p)
 {
-  int recv_status;
-  int status;
-  ChMessage msg;
   DEBUGF(("Getting message from client...\n"));
-  recv_status = ChMessageHeader_recv(fd, &msg);
+
+  ChMessage msg;
+  int recv_status = ChMessageHeader_recv(p.req_client, &msg);
 #ifdef __FAULT__
 #ifdef HSTART
   if (!arg_hierarchical_start && recv_status < 0)
-    error_in_req_serve_client(fd);
+    error_in_req_serve_client(p);
 #else
   if (recv_status < 0) {
-    error_in_req_serve_client(fd);
+    error_in_req_serve_client(p);
     return;
   }
 #endif
 #endif
 
   DEBUGF(("Message is '%s'\n", msg.header.type));
-  status = req_handler_dispatch(&msg, fd);
+  int status = req_handler_dispatch(&msg, p);
   switch (status) {
   case REQ_OK:
     break;
@@ -2733,18 +2681,17 @@ void req_serve_client(SOCKET fd)
 }
 
 #ifdef HSTART
-void req_forward_root(SOCKET fd)
+static void req_forward_root(nodetab_process & p)
 {
-  int recv_status;
-  int status;
+  const SOCKET fd = p.req_client;
   ChMessage msg;
-  recv_status = ChMessage_recv(fd, &msg);
+  int recv_status = ChMessage_recv(fd, &msg);
 
   char *cmd = msg.header.type;
 
 #ifdef __FAULT__
   if (recv_status < 0) {
-    error_in_req_serve_client(fd);
+    error_in_req_serve_client(p);
     return;
   }
 
@@ -2754,6 +2701,7 @@ void req_forward_root(SOCKET fd)
   }
 #endif
 
+  int status = REQ_OK;
   if (strcmp(cmd, "ping") != 0) {
     status = req_reply(parent_charmrun_fd, cmd, msg.data,
                        ChMessageInt(msg.header.len));
@@ -2782,25 +2730,22 @@ void req_forward_root(SOCKET fd)
   ChMessage_free(&msg);
 }
 
-void req_forward_client()
+static void req_forward_client()
 {
-  int recv_status;
-  int status;
   ChMessage msg;
-  recv_status = ChMessage_recv(parent_charmrun_fd, &msg);
+  int recv_status = ChMessage_recv(parent_charmrun_fd, &msg);
   if (recv_status < 0) {
-    int i;
-    for (i = 0; i < req_nClients; i++)
-      skt_close(req_clients[i]);
+
+    for (const nodetab_process & p : my_process_table)
+      skt_close(p.req_client);
     exit(0);
   }
 
   char *cmd = msg.header.type;
 
   if (strcmp(cmd, "barrier") == 0) {
-    int i;
-    for (i = 0; i < req_nClients; i++)
-      if (REQ_OK != req_reply(req_clients[i], cmd, msg.data,
+    for (const nodetab_process & p : my_process_table)
+      if (REQ_OK != req_reply(p.req_client, cmd, msg.data,
                               ChMessageInt(msg.header.len))) {
         abort();
       }
@@ -2808,12 +2753,12 @@ void req_forward_client()
   }
 #ifdef __FAULT__
   if (strcmp(cmd, "initnodetab") == 0) {
-    if (_last_crash == 0)
+    if (_last_crash == nullptr)
       current_restart_phase++;
-    int i;
-    for (i = 0; i < req_nClients; i++)
-      if (_last_crash == 0 || i != _crash_socket_index)
-        if (REQ_OK != req_reply(req_clients[i], cmd, msg.data,
+
+    for (const nodetab_process & p : my_process_table)
+      if (_last_crash == nullptr)
+        if (REQ_OK != req_reply(p.req_client, cmd, msg.data,
                                 ChMessageInt(msg.header.len))) {
           abort();
         }
@@ -2821,19 +2766,17 @@ void req_forward_client()
   }
 
   if (strcmp(cmd, "crashnode") == 0) {
-
-    int i;
-    for (i = 0; i < req_nClients; i++)
-      if (_last_crash == 0 || i != _crash_socket_index)
-        if (REQ_OK != req_reply(req_clients[i], cmd, msg.data,
+    for (const nodetab_process & p : my_process_table)
+      if (_last_crash == nullptr)
+        if (REQ_OK != req_reply(p.req_client, cmd, msg.data,
                                 ChMessageInt(msg.header.len))) {
           abort();
         }
     return;
   }
   if (strcmp(cmd, "initnttab") == 0) {
-    _last_crash = 0;
-    if (REQ_OK != req_reply(req_clients[_crash_socket_index], "initnodetab",
+    _last_crash = nullptr;
+    if (REQ_OK != req_reply(_last_crash->req_client, "initnodetab",
                             msg.data, ChMessageInt(msg.header.len))) {
       abort();
     }
@@ -2852,9 +2795,9 @@ void req_forward_client()
   } else if (strcmp(cmd, "barrier0") == 0) {
     fd = nodetab_table[0]->ctrlfd;
   } else
-    skt_recvN(parent_charmrun_fd, (const char *) &fd, sizeof(SOCKET));
+    skt_recvN(parent_charmrun_fd, (char *) &fd, sizeof(SOCKET));
 
-  status = req_reply(fd, cmd, msg.data, ChMessageInt(msg.header.len));
+  int status = req_reply(fd, cmd, msg.data, ChMessageInt(msg.header.len));
 
   switch (status) {
   case REQ_OK:
@@ -2868,7 +2811,7 @@ void req_forward_client()
 
 #endif
 
-int ignore_socket_errors(SOCKET skt, int c, const char *m)
+static int ignore_socket_errors(SOCKET skt, int c, const char *m)
 { /*Abandon on further socket errors during error shutdown*/
 
 #ifndef __FAULT__
@@ -2877,22 +2820,46 @@ int ignore_socket_errors(SOCKET skt, int c, const char *m)
   return -1;
 }
 
+static nodetab_process & get_process_for_socket(std::vector<nodetab_process> & process_table, SOCKET req_client)
+{
+  nodetab_process * ptr = nullptr;
+  for (nodetab_process & p : process_table)
+  {
+    if (p.req_client == req_client)
+    {
+      ptr = &p;
+      break;
+    }
+  }
+  if (ptr == nullptr)
+  {
+    fprintf(stderr, "Charmrun> get_process_for_socket: unknown socket\n");
+    exit(1);
+  }
+
+  nodetab_process & p = *ptr;
+  return p;
+}
+
 /*A socket went bad somewhere!  Immediately disconnect,
 which kills everybody.
 */
-int socket_error_in_poll(SOCKET skt, int code, const char *msg)
+static int socket_error_in_poll(SOCKET skt, int code, const char *msg)
 {
   /*commenting it for fault tolerance*/
   /*ifdef it*/
-  int i;
   skt_set_abort(ignore_socket_errors);
-  const char *name = skt_to_name(skt);
-  fprintf(stderr, "Charmrun> error on request socket to node %d '%s'--\n"
-                  "%s\n",
-          skt_to_node(skt), name, msg);
+
+  {
+    const nodetab_process & p = get_process_for_socket(my_process_table, skt);
+    fprintf(stderr, "Charmrun> error on request socket to node %d '%s'--\n"
+                    "%s\n",
+            p.nodeno, p.host->name, msg);
+  }
+
 #ifndef __FAULT__
-  for (i = 0; i < req_nClients; i++)
-    skt_close(req_clients[i]);
+  for (const nodetab_process & p : my_process_table)
+    skt_close(p.req_client);
   exit(1);
 #endif
   ftTimer = GetClock();
@@ -2958,14 +2925,11 @@ int socket_error_in_poll(SOCKET skt, int code, const char *msg)
 Wait for incoming requests on all client sockets,
 and the CCS socket (if present).
 */
-void req_poll()
+static void req_poll()
 {
-  int status, i;
-  int readcount;
-
-  CMK_PIPE_DECL(req_nClients + 5, 1000);
-  for (i = 0; i < req_nClients; i++)
-    CMK_PIPE_ADDREAD(req_clients[i]);
+  CMK_PIPE_DECL(my_process_table.size() + 5, 1000);
+  for (const nodetab_process & p : my_process_table)
+    CMK_PIPE_ADDREAD(p.req_client);
   if (CcsServer_fd() != INVALID_SOCKET)
     CMK_PIPE_ADDREAD(CcsServer_fd());
   if (arg_charmdebug) {
@@ -2977,7 +2941,7 @@ void req_poll()
   skt_set_abort(socket_error_in_poll);
 
   DEBUGF(("Req_poll: Calling select...\n"));
-  status = CMK_PIPE_CALL();
+  int status = CMK_PIPE_CALL();
   DEBUGF(("Req_poll: Select returned %d...\n", status));
 
   if (status == 0)
@@ -2990,15 +2954,18 @@ void req_poll()
     fflush(stderr);
     socket_error_in_poll(-1, 1359, "Node program terminated unexpectedly!\n");
   }
-  for (i = 0; i < req_nClients; i++)
-    if (CMK_PIPE_CHECKREAD(req_clients[i])) {
-      readcount = 10; /*number of successive reads we serve per socket*/
+  for (nodetab_process & p : my_process_table)
+  {
+    const SOCKET req_client = p.req_client;
+    if (CMK_PIPE_CHECKREAD(req_client)) {
+      int readcount = 10; /*number of successive reads we serve per socket*/
       /*This client is ready to read*/
       do {
-        req_serve_client(req_clients[i]);
+        req_serve_client(p);
         readcount--;
-      } while (1 == skt_select1(req_clients[i], 0) && readcount > 0);
+      } while (1 == skt_select1(req_client, 0) && readcount > 0);
     }
+  }
 
   if (CcsServer_fd() != INVALID_SOCKET)
     if (CMK_PIPE_CHECKREAD(CcsServer_fd())) {
@@ -3021,7 +2988,10 @@ void req_poll()
         while (read(0, &c, 1) != -1) {
           buf[num++] = c;
           if (c == '\n' || num >= 2045) {
-            write(gdb_info_std[0], buf, num);
+            if (write(gdb_info_std[0], buf, num) != num) {
+              fprintf(stderr, "charmrun> writing info command to gdb failed!\n");
+              exit(1);
+            }
             if (c == '\n')
               break;
           }
@@ -3060,20 +3030,17 @@ void req_poll()
 }
 
 #ifdef HSTART
-void req_poll_hierarchical()
+static void req_poll_hierarchical()
 {
-  int status, i;
-  fd_set rfds;
-  struct timeval tmo;
-  int readcount;
-
   skt_set_abort(socket_error_in_poll);
 
+  struct timeval tmo;
   tmo.tv_sec = 1;
   tmo.tv_usec = 0;
+  fd_set rfds;
   FD_ZERO(&rfds); /* clears set of file descriptor */
-  for (i = 0; i < req_nClients; i++)
-    FD_SET(req_clients[i], &rfds); /* adds client sockets to rfds set*/
+  for (const nodetab_process & p : my_process_table)
+    FD_SET(p.req_client, &rfds); /* adds client sockets to rfds set*/
   if (CcsServer_fd() != INVALID_SOCKET)
     FD_SET(CcsServer_fd(), &rfds);
   if (arg_charmdebug) {
@@ -3085,7 +3052,7 @@ void req_poll_hierarchical()
   if (arg_child_charmrun)
     FD_SET(parent_charmrun_fd, &rfds); /* adds client sockets to rfds set*/
   DEBUGF(("Req_poll: Calling select...\n"));
-  status = select(FD_SETSIZE, &rfds, 0, 0,
+  int status = select(FD_SETSIZE, &rfds, 0, 0,
                   &tmo); /* FD_SETSIZE is the maximum number of file
                             descriptors that a fd_set object can hold
                             information about, select returns number of
@@ -3097,25 +3064,27 @@ void req_poll_hierarchical()
   if (status < 0) {
     fflush(stdout);
     fflush(stderr);
-    socket_error_in_poll(1359, "Node program terminated unexpectedly!\n");
+    socket_error_in_poll(req_clients[0], 1359, "Node program terminated unexpectedly!\n");
   }
-  for (i = 0; i < req_nClients; i++)
-    if (FD_ISSET(req_clients[i], &rfds)) {
-      readcount = 10; /*number of successive reads we serve per socket*/
+  for (nodetab_process & p : my_process_table)
+  {
+    const SOCKET req_client = p.req_client;
+    if (FD_ISSET(req_client, &rfds)) {
+      int readcount = 10; /*number of successive reads we serve per socket*/
       /*This client is ready to read*/
       do {
         if (arg_child_charmrun)
-          req_forward_root(req_clients[i]);
+          req_forward_root(p);
         else
-          req_serve_client(req_clients[i]);
+          req_serve_client(p);
         readcount--;
-      } while (1 == skt_select1(req_clients[i], 0) && readcount > 0);
+      } while (1 == skt_select1(req_client, 0) && readcount > 0);
     }
 
   if (arg_child_charmrun)
     // Forward from root to clients
     if (FD_ISSET(parent_charmrun_fd, &rfds)) {
-      readcount = 10; /*number of successive reads we serve per socket*/
+      int readcount = 10; /*number of successive reads we serve per socket*/
       do {
         req_forward_client();
         readcount--;
@@ -3144,7 +3113,10 @@ void req_poll_hierarchical()
         while (read(0, &c, 1) != -1) {
           buf[num++] = c;
           if (c == '\n' || num >= 2045) {
-            write(gdb_info_std[0], buf, num);
+            if (write(gdb_info_std[0], buf, num) != num) {
+              fprintf(stderr, "charmrun> writing info command to gdb failed!\n");
+              exit(1);
+            }
             if (c == '\n')
               break;
           }
@@ -3187,373 +3159,611 @@ void req_poll_hierarchical()
 static skt_ip_t parent_charmrun_IP;
 static int parent_charmrun_port;
 static int parent_charmrun_pid;
-static int dataport;
+static unsigned int dataport;
 static SOCKET dataskt;
-int charmrun_phase = 0;
+static int charmrun_phase = 0;
 #endif
 
-int client_connect_problem(SOCKET skt, int code, const char *msg)
+static int client_connect_problem(const nodetab_process & p, const char *msg)
 { /*Called when something goes wrong during a client connect*/
-  const char *name = skt_to_name(skt);
-  fprintf(stderr, "Charmrun> error attaching to node '%s':\n%s\n", name, msg);
+  fprintf(stderr, "Charmrun> error attaching to node '%s':\n%s\n", p.host->name, msg);
   exit(1);
   return -1;
 }
 
-/** return 1 if connection is openned succesfully with client**/
-int errorcheck_one_client_connect(int client)
-{
-#ifdef HSTART
-  /* Child charmruns are already connected - Do we need to conect again*/
-  if (arg_hierarchical_start && !arg_child_charmrun && charmrun_phase == 1)
-    return 1;
-#endif
-  /* FIXME: The error printing functions do a table lookup on the socket to
-   *        figure their corresponding host. However, certain failures happen
-   *        before we can associate a socket with a particular client, as in
-   *        skt_select1 below. In that case, we use a workaround to create a
-   *        dummy socket so that the internal error message is printed
-   * correctly.
-   */
-  SOCKET dummy_skt = -10;
-  skt_client_table[dummy_skt] = client;
+static int client_connect_problem_skt(SOCKET skt, int code, const char *msg)
+{ /* Passed to skt_set_abort */
+  const nodetab_process & p = get_process_for_socket(my_process_table, skt);
+  return client_connect_problem(p, msg);
+}
 
+/** return 1 if connection is opened succesfully with client**/
+static SOCKET errorcheck_one_client_connect(void)
+{
+  static int numClientsConnected = 0;
   unsigned int clientPort; /*These are actually ignored*/
   skt_ip_t clientIP;
   if (arg_verbose)
-    printf("Charmrun> Waiting for %d-th client to connect.\n", client);
-  /* FIXME: why are we passing the client as an error code here? */
-  if (0 == skt_select1(server_fd, arg_timeout * 1000))
-    client_connect_problem(dummy_skt, client,
-                           "Timeout waiting for node-program to connect");
+    printf("Charmrun> Waiting for %d-th client to connect.\n", numClientsConnected);
 
-  req_clients[client] = skt_accept(server_fd, &clientIP, &clientPort);
-  skt_client_table[req_clients[client]] = client;
+  if (0 == skt_select1(server_fd, arg_timeout * 1000))
+  {
+    fprintf(stderr, "Charmrun> Timeout waiting for node-program to connect\n");
+    exit(1);
+  }
+
+  const SOCKET req_client = skt_accept(server_fd, &clientIP, &clientPort);
 
   /* FIXME: will this ever be triggered? It seems the skt_abort handler here is
    *        'client_connect_problem', which calls exit(1), so we'd exit
    *        in skt_accept. */
-  if (req_clients[client] == SOCKET_ERROR)
-    client_connect_problem(dummy_skt, client, "Failure in node accept");
+  if (req_client == SOCKET_ERROR)
+  {
+    fprintf(stderr, "Charmrun> Failure in node accept\n");
+    exit(1);
+  }
+  if (req_client < 0)
+  {
+    fprintf(stderr, "Charmrun> Warning: errorcheck_one_client_connect: socket < 0\n");
+  }
 
-  skt_tcp_no_nagle(req_clients[client]);
+  skt_tcp_no_nagle(req_client);
 
-  return 1;
-};
+  ++numClientsConnected;
+
+  return req_client;
+}
+
+static nodetab_process & get_process_for_nodeno(std::vector<nodetab_process> & process_table, int nodeno)
+{
+  nodetab_process * ptr = nullptr;
+  for (nodetab_process & p : process_table)
+  {
+    if (p.nodeno == nodeno)
+    {
+      ptr = &p;
+      break;
+    }
+  }
+  if (ptr == nullptr)
+  {
+    fprintf(stderr, "Charmrun> get_process_for_nodeno: unknown nodeno %d\n", nodeno);
+    exit(1);
+  }
+
+  nodetab_process & p = *ptr;
+  assert(p.nodeno == nodeno);
+  return p;
+}
 
 #if CMK_C_INLINE
 inline static
 #endif
     void
-    read_initnode_one_client(int client)
+    read_initnode_one_client(nodetab_process & p)
 {
+  if (!skt_select1(p.req_client, arg_timeout * 1000))
+    client_connect_problem(p, "Timeout on IP request");
+
   ChMessage msg;
-  if (!skt_select1(req_clients[client], arg_timeout * 1000))
-    client_connect_problem(req_clients[client], client,
-                           "Timeout on IP request");
-  ChMessage_recv(req_clients[client], &msg);
-  req_handle_initnode(&msg, req_clients[client]);
+  ChMessage_recv(p.req_client, &msg);
+  req_handle_initnode(&msg, p);
   ChMessage_free(&msg);
 }
 
 #if CMK_IBVERBS_FAST_START
-void req_one_client_partinit(int client)
+static void req_one_client_partinit_skt(std::vector<nodetab_process> & process_table, const SOCKET req_client)
 {
-  ChMessage partStartMsg;
-  int clientNode;
-
-  if (errorcheck_one_client_connect(client)) {
-    if (!skt_select1(req_clients[client], arg_timeout * 1000))
-      client_connect_problem(req_clients[client], client,
-                             "Timeout on partial init request");
-
-    ChMessage_recv(req_clients[client], &partStartMsg);
-    clientNode = ChMessageInt(*(ChMessageInt_t *) partStartMsg.data);
-    assert(strncmp(partStartMsg.header.type, "partinit", 8) == 0);
-    ChMessage_free(&partStartMsg);
+  if (!skt_select1(req_client, arg_timeout * 1000))
+  {
+    fprintf(stderr, "Charmrun> Timeout on partial init request, socket %d\n", req_client);
+    exit(1);
   }
-};
+
+  ChMessage partStartMsg;
+  ChMessage_recv(req_client, &partStartMsg);
+  assert(strncmp(partStartMsg.header.type, "partinit", 8) == 0);
+  int nodeNo = ChMessageInt(*(ChMessageInt_t *) partStartMsg.data);
+  ChMessage_free(&partStartMsg);
+
+  nodetab_process & p = get_process_for_nodeno(process_table, nodeNo);
+  p.req_client = req_client;
+}
+
+static void req_one_client_partinit(std::vector<nodetab_process> & process_table, int index)
+{
+# ifdef HSTART
+  if (arg_hierarchical_start && !arg_child_charmrun && charmrun_phase == 1)
+  {
+    nodetab_process & p = process_table[index];
+    req_one_client_partinit_skt(process_table, p.req_client);
+  }
+  else
+# endif
+  {
+    const SOCKET req_client = errorcheck_one_client_connect();
+    req_one_client_partinit_skt(process_table, req_client);
+  }
+}
 #endif
 
 #ifdef HSTART
-int nodeCount = 0;
 /* To keep a global node numbering */
-void add_singlenodeinfo_to_mynodeinfo(ChMessage *msg, SOCKET ctrlfd)
+static void add_singlenodeinfo_to_mynodeinfo(ChMessage *msg, SOCKET ctrlfd)
 {
   /*add to myNodesInfo */
   ChSingleNodeinfo *nodeInfo = (ChSingleNodeinfo *) msg->data;
 
   /* need to change nodeNo */
-  myNodesInfo[nodeCount].nodeNo = ChMessageInt_new(
+  ChMessageInt_t nodeNo = ChMessageInt_new(
       nodetab_rank0_table[ChMessageInt(nodeInfo->nodeNo) - mynodes_start]);
-  myNodesInfo[nodeCount++].info = nodeInfo->info;
+  myNodesInfo.push_back({nodeNo, nodeInfo->info});
 
   /* Required for CCS */
-  int nt = nodetab_rank0_table[ChMessageInt(nodeInfo->nodeNo) -
-                               mynodes_start]; /*Nodetable index for this node*/
-  int pe;
-  for (pe = 0; pe < nodetab_cpus(nt); pe++) {
-    nodetab_table[nt + pe]->ctrlfd = ctrlfd;
-  }
+  int nt = ChMessageInt(nodeInfo->nodeNo) - mynodes_start; // TODO: relative nodeNo
+  nodeInfo->nodeNo = ChMessageInt_new(nt);
+  my_process_table[nt].req_client = ctrlfd; // TODO: nodeno as index
 }
 #endif
 
-#ifndef HSTART
-/* Original Function, need to check if modifications required*/
-void req_set_client_connect(int start, int end)
+static void req_set_client_connect(std::vector<nodetab_process> & process_table, int count)
 {
-  fd_set sockset;
+  int curclientend, curclientstart = 0;
+
+  std::queue<SOCKET> open_sockets;
+
   ChMessage msg;
-  int client, i;
-  int done, maxdesc;
-  int *finished;  // -1 if client i not finished, otherwise the node id of client i
-  int curclient, curclientend, curclientstart;
-
-  curclient = curclientend = curclientstart = start;
-
-  finished = (int *) malloc((end - start) * sizeof(int));
-  for (i = 0; i < (end - start); i++)
-    finished[i] = -1;
-
 #if CMK_USE_IBVERBS && !CMK_IBVERBS_FAST_START
-  for (i = start; i < end; i++) {
-    errorcheck_one_client_connect(curclientend++);
+# ifdef HSTART
+  if (!(arg_hierarchical_start && !arg_child_charmrun && charmrun_phase == 1))
+# endif
+  {
+    for (int i = 0; i < count; i++)
+      open_sockets.push(errorcheck_one_client_connect());
   }
-  if (req_nClients > 1) {
-    /*  a barrier to make sure infiniband device gets initialized */
-    for (i = start; i < end; i++)
-      ChMessage_recv(req_clients[i], &msg);
-    for (i = start; i < end; i++)
-      req_reply(req_clients[i], "barrier", "", 1);
-  }
-#endif
-
-  done = 0;
-  while (!done) {
-/* check server socket for messages */
-#if !CMK_USE_IBVERBS || CMK_IBVERBS_FAST_START
-    while (curclientstart == curclientend || skt_select1(server_fd, 1) != 0) {
-      errorcheck_one_client_connect(curclientend++);
-    }
-#endif
-    /* check appropriate clients for messages */
-    for (client = curclientstart; client < curclientend; client++)
-      if (req_clients[client] > 0) {
-        if (skt_select1(req_clients[client], 1) != 0) {
-          ChMessage_recv(req_clients[client], &msg);
-          req_handle_initnode(&msg, req_clients[client]);
-          finished[client - start] = 
-            ChMessageInt(((ChSingleNodeinfo *)msg.data)->nodeNo);
-        }
-      }
-
-    /* test if done */
-    done = 1;
-    for (i = curclientstart - start; i < (end - start); i++)
-      if (finished[i] == -1) {
-        curclientstart = start + i;
-        done = 0;
-        break;
-      }
-  }
-  ChMessage_free(&msg);
-
-  // correct mapping in skt_client_table so that socket points to node using the socket
-  for (i = start; i < (end - start); i++)
-    skt_client_table[req_clients[i]] = finished[i];
-
-  free(finished);
-}
+  curclientend = count;
 #else
-/*int charmrun_phase =0; meaningful for main charmun to decide what to receive*/
-void req_set_client_connect(int start, int end)
-{
-  fd_set sockset;
-  ChMessage msg;
-  int client, i;
-  int done, maxdesc;
-  int *finished;  // -1 if client i not finished, otherwise the node id of client i
-  int curclient, curclientend, curclientstart;
-
-  curclient = curclientend = curclientstart = start;
-
-  finished = malloc((end - start) * sizeof(int));
-  for (i = 0; i < (end - start); i++)
-    finished[i] = -1;
-
-  if (arg_child_charmrun && start == 0)
-    myNodesInfo = malloc(sizeof(ChSingleNodeinfo) * nodetab_rank0_size);
-
-#if CMK_USE_IBVERBS && !CMK_IBVERBS_FAST_START
-  for (i = start; i < end; i++) {
-    errorcheck_one_client_connect(curclientend++);
-  }
-  if (req_nClients > 1) {
-    /*  a barrier to make sure infiniband device gets initialized */
-    for (i = start; i < end; i++)
-      ChMessage_recv(req_clients[i], &msg);
-    for (i = start; i < end; i++)
-      req_reply(req_clients[i], "barrier", "", 1);
-  }
+  curclientend = 0;
 #endif
 
-  done = 0;
-  while (!done) {
+  int finished = 0;
+  while (finished < count)
+  {
 /* check server socket for messages */
 #if !CMK_USE_IBVERBS || CMK_IBVERBS_FAST_START
     while (curclientstart == curclientend || skt_select1(server_fd, 1) != 0) {
-      errorcheck_one_client_connect(curclientend++);
+# ifdef HSTART
+      if (!(arg_hierarchical_start && !arg_child_charmrun && charmrun_phase == 1))
+# endif
+        open_sockets.push(errorcheck_one_client_connect());
+
+      curclientend++;
     }
 #endif
     /* check appropriate clients for messages */
-    for (client = curclientstart; client < curclientend; client++)
-      if (req_clients[client] > 0) {
-        if (skt_select1(req_clients[client], 1) != 0) {
-          ChMessage_recv(req_clients[client], &msg);
-          if (!arg_hierarchical_start)
-            req_handle_initnode(&msg, req_clients[client]);
-          else {
-            if (!arg_child_charmrun) {
-              if (charmrun_phase == 1)
-                receive_nodeset_from_child(&msg, req_clients[client]);
-              else
-                set_sockets_list(&msg, req_clients[client]);
-              // here we need to decide based upon the phase
-            } else /* hier-start with 2nd leval*/
-              add_singlenodeinfo_to_mynodeinfo(&msg, req_clients[client]);
-          }
-          finished[client - start] = 
-              ChMessageInt(((ChSingleNodeinfo *)msg.data)->nodeNo);
+    while (!open_sockets.empty())
+    {
+      const SOCKET req_client = open_sockets.front();
+      open_sockets.pop();
+
+      if (skt_select1(req_client, 1) != 0)
+      {
+        ChMessage_recv(req_client, &msg);
+
+        int nodeNo = ChMessageInt(((ChSingleNodeinfo *)msg.data)->nodeNo);
+        nodetab_process & p = get_process_for_nodeno(process_table, nodeNo);
+        p.req_client = req_client;
+
+#ifdef HSTART
+        if (arg_hierarchical_start)
+        {
+          if (!arg_child_charmrun) {
+            if (charmrun_phase == 1)
+              receive_nodeset_from_child(&msg, req_client);
+            else
+              set_sockets_list(&msg, req_client);
+            // here we need to decide based upon the phase
+          } else /* hier-start with 2nd leval*/
+            add_singlenodeinfo_to_mynodeinfo(&msg, req_client);
         }
-      }
+        else
+#endif
+          req_handle_initnode(&msg, p);
 
-    /* test if done */
-    done = 1;
-    for (i = curclientstart - start; i < (end - start); i++)
-      if (finished[i] == -1) {
-        curclientstart = start + i;
-        done = 0;
-        break;
+        ++finished;
       }
+      else
+      {
+        open_sockets.push(req_client);
+      }
+    }
   }
+
   ChMessage_free(&msg);
-
-  // correct mapping in skt_client_table so that socket points to node using the socket
-  for (i = start; i < (end - start); i++)
-    skt_client_table[req_clients[i]] = finished[i];
-
-  free(finished);
 }
+
+static void send_clients_nodeinfo()
+{
+  const int my_process_count = my_process_table.size();
+  int msgSize = sizeof(ChMessageInt_t) * ChInitNodetabFields +
+                sizeof(ChNodeinfo) * my_process_count;
+
+  for (const nodetab_process & p : my_process_table)
+  {
+    const SOCKET fd = p.req_client;
+    req_send_initnodetab_internal(p, my_process_count, msgSize);
+  }
+}
+
+#if CMK_USE_IBVERBS || CMK_USE_IBUD
+static void receive_qplist()
+{
+#if CMK_USE_IBVERBS && !CMK_IBVERBS_FAST_START
+  /* a barrier to make sure infiniband device gets initialized */
+  if (my_process_table.size() > 1)
+  {
+    ChMessage msg;
+    for (const nodetab_process & p : my_process_table)
+    {
+      ChMessage_recv(p.req_client, &msg);
+      ChMessage_free(&msg);
+    }
+    for (const nodetab_process & p : my_process_table)
+      req_reply(p.req_client, "barrier", "", 1);
+  }
 #endif
 
-/* allow one client to connect */
-void req_one_client_connect(int client)
-{
-  if (errorcheck_one_client_connect(
-          client)) { /*This client has just connected-- fetch his name and IP*/
-    read_initnode_one_client(client);
+  for (nodetab_process & p : my_process_table)
+  {
+    const SOCKET fd = p.req_client;
+    if (!skt_select1(p.req_client, arg_timeout * 1000))
+      client_connect_problem(p, "Timeout on IP request");
+
+    ChMessage msg;
+    ChMessage_recv(p.req_client, &msg);
+
+    req_handle_qplist(&msg, p);
+
+    ChMessage_free(&msg);
   }
 }
+#endif
 
 #if CMK_USE_IBVERBS
 /* Each node has sent the qpn data for all the qpns it has created
    This data needs to be sent to all the other nodes
          This needs to be done for all nodes
 **/
-void exchange_qpdata_clients()
+static void exchange_qpdata_clients()
 {
-  int proc, i;
-  for (i = 0; i < nodetab_rank0_size; i++) {
-    int nt = nodetab_rank0_table[i]; /*Nodetable index for this node*/
-    nodetab_table[nt]->qpData =
-        (ChInfiAddr *) malloc(sizeof(ChInfiAddr) * nodetab_rank0_size);
-  }
-  for (proc = 0; proc < nodetab_rank0_size; proc++) {
+  const int my_process_count = my_process_table.size();
+
+  for (nodetab_process & p : my_process_table)
+    p.qpData =
+        (ChInfiAddr *) malloc(sizeof(ChInfiAddr) * my_process_count);
+
+  for (nodetab_process & p1 : my_process_table)
+  {
+    const int proc = p1.nodeno;
     int count = 0;
-    for (i = 0; i < nodetab_rank0_size; i++) {
-      if (i == proc) {
-      } else {
-        int nt = nodetab_rank0_table[i]; /*Nodetable index for this node*/
-        nodetab_table[nt]->qpData[proc] = nodeinfo_arr[proc].qpList[count];
+    for (nodetab_process & p2 : my_process_table)
+    {
+      if (&p1 != &p2)
+      {
+        ChInfiAddr & ia = p2.qpData[proc] = p1.qpList[count];
+        ia.nodeno = ChMessageInt_new(proc);
         //			printf("Charmrun> nt %d proc %d lid 0x%x qpn
         // 0x%x
         // psn
-        // 0x%x\n",nt,proc,ChMessageInt(nodetab_table[nt]->qpData[proc].lid),ChMessageInt(nodetab_table[nt]->qpData[proc].qpn),ChMessageInt(nodetab_table[nt]->qpData[proc].psn));
+        // 0x%x\n",nt,proc,ChMessageInt(p2.qpData[proc].lid),ChMessageInt(p2.qpData[proc].qpn),ChMessageInt(p2.qpData[proc].psn));
         count++;
       }
     }
-    free(nodeinfo_arr[proc].qpList);
-  }
-};
-
-void send_clients_nodeinfo_qpdata()
-{
-  int node;
-  int msgSize = sizeof(ChMessageInt_t) +
-                sizeof(ChNodeinfo) * nodetab_rank0_size +
-                sizeof(ChInfiAddr) * nodetab_rank0_size;
-  for (node = 0; node < nodetab_rank0_size; node++) {
-    int nt = nodetab_rank0_table[node]; /*Nodetable index for this node*/
-    //		printf("Charmrun> Node %d proc %d sending initnodetab
-    //\n",node,nt);
-    ChMessageHeader hdr;
-    ChMessageInt_t nNodes = ChMessageInt_new(nodetab_rank0_size);
-    ChMessageHeader_new("initnodetab", msgSize, &hdr);
-    skt_sendN(nodetab_table[nt]->ctrlfd, (const char *) &hdr, sizeof(hdr));
-    skt_sendN(nodetab_table[nt]->ctrlfd, (const char *) &nNodes,
-              sizeof(nNodes));
-    skt_sendN(nodetab_table[nt]->ctrlfd, (const char *) nodeinfo_arr,
-              sizeof(ChNodeinfo) * nodetab_rank0_size);
-    skt_sendN(nodetab_table[nt]->ctrlfd,
-              (const char *) &nodetab_table[nt]->qpData[0],
-              sizeof(ChInfiAddr) * nodetab_rank0_size);
+    free(p1.qpList);
+    p1.qpList = nullptr;
   }
 }
 #endif
 
-struct timeval tim;
+#if CMK_USE_IBVERBS || CMK_USE_IBUD
+static void send_clients_qpdata()
+{
+  const int my_process_count = my_process_table.size();
+  int qpDataSize = sizeof(ChInfiAddr) * my_process_count;
+
+  for (const nodetab_process & p : my_process_table)
+  {
+    const SOCKET fd = p.req_client;
+    ChMessageHeader hdr;
+    ChMessageHeader_new("qpdata", qpDataSize, &hdr);
+    skt_sendN(fd, (const char *) &hdr, sizeof(hdr));
+#if CMK_USE_IBVERBS
+    skt_sendN(fd, (const char *) p.qpData, qpDataSize);
+#elif CMK_USE_IBUD
+    for (const nodetab_process & p2 : my_process_table)
+      skt_sendN(fd, (const char *) &p2.qp, sizeof(ChInfiAddr));
+#endif
+  }
+}
+#endif
+
+static struct timeval tim;
 #define getthetime(x)                                                          \
   gettimeofday(&tim, NULL);                                                    \
   x = tim.tv_sec + (tim.tv_usec / 1000000.0);
 #define getthetime1(x)                                                         \
   gettimeofday(&tim, NULL);                                                    \
   x = tim.tv_sec;
+
+static void req_add_phase2_processes(std::vector<nodetab_process> &);
+static void req_all_clients_connected();
+
 /*Wait for all the clients to connect to our server port*/
-void req_client_connect(void)
+static void req_client_connect_table(std::vector<nodetab_process> & process_table)
 {
-  int client;
-#ifdef HSTART
-  if (!arg_hierarchical_start)
-#endif
-    nodeinfo_allocate();
-  req_nClients = nodetab_rank0_size;
-  req_clients = (SOCKET *) malloc(req_nClients * sizeof(SOCKET));
-  for (client = 0; client < req_nClients; client++)
-    req_clients[client] = -1;
-
-  skt_set_abort(client_connect_problem);
-
 #if CMK_IBVERBS_FAST_START
-  for (client = 0; client < req_nClients; client++) {
-    req_one_client_partinit(client);
-  }
-  for (client = 0; client < req_nClients; client++) {
-    read_initnode_one_client(client);
-  }
+  for (int c = 0, c_end = process_table.size(); c < c_end; ++c)
+    req_one_client_partinit(process_table, c);
+  for (nodetab_process & p : process_table)
+    read_initnode_one_client(p);
 #else
-
-  req_set_client_connect(0, req_nClients);
-
+  req_set_client_connect(process_table, process_table.size());
 #endif
+}
 
+static int get_old_style_process_count()
+{
+  const int p = arg_requested_pes;
+  const int np = arg_requested_nodes;
+  const int ppn = arg_ppn;
+
+  const bool p_active = (p > 0);
+  const bool np_active = (np > 0);
+  const bool ppn_active = (ppn > 0);
+
+  if (np_active)
+    return np;
+  else if (p_active)
+    return ppn_active ? (p + ppn - 1) / ppn : p;
+  else
+    return 1;
+}
+
+static int calculated_processes_per_host;
+
+static void req_construct_phase2_processes(std::vector<nodetab_process> & phase2_processes)
+{
+  const int active_host_count = my_process_table.size(); // phase1_process_count
+
+  int total_processes;
+
+  if (proc_per.active())
+  {
+    const nodetab_process & p0 = my_process_table[0];
+
+    for (nodetab_process & p : my_process_table)
+    {
+      if (p.num_pus != p0.num_pus ||
+          p.num_cores != p0.num_cores ||
+          p.num_sockets != p0.num_sockets)
+      {
+        fprintf(stderr, "Charmrun> Error: Detected system topology is heterogeneous, please use old-style launch options.\n");
+        exit(1);
+      }
+    }
+
+    using Unit = typename TopologyRequest::Unit;
+
+    int num_processes;
+    const Unit proc_unit = proc_per.unit();
+    switch (proc_unit)
+    {
+      case Unit::Host:
+        num_processes = proc_per.host;
+        break;
+      case Unit::Socket:
+        num_processes = proc_per.socket * p0.num_sockets;
+        break;
+      case Unit::Core:
+        num_processes = proc_per.core * p0.num_cores;
+        break;
+      case Unit::PU:
+        num_processes = proc_per.pu * p0.num_pus;
+        break;
+      default:
+        num_processes = 1;
+        break;
+    }
+
+    calculated_processes_per_host = num_processes;
+    total_processes = arg_requested_nodes <= 0 ? num_processes * active_host_count : arg_requested_nodes;
+  }
+  else
+  {
+    total_processes = get_old_style_process_count();
+    calculated_processes_per_host = (total_processes + active_host_count - 1) / active_host_count;
+  }
+
+  const int num_new_processes = total_processes - active_host_count;
+  const int new_processes_per_host = (num_new_processes + active_host_count - 1) / active_host_count;
+
+  for (nodetab_process & p : my_process_table)
+  {
+    p.forkstart = active_host_count + p.nodeno * new_processes_per_host;
+    p.host->processes = 1;
+  }
+
+  for (int i = 0; i < num_new_processes; ++i)
+  {
+    nodetab_process & src = my_process_table[i % active_host_count];
+    phase2_processes.push_back(src);
+
+    nodetab_process & p = phase2_processes.back();
+    p.nodeno = src.forkstart + (src.host->processes++ - 1);
+  }
+}
+
+static void start_nodes_local(std::vector<nodetab_process> &);
+static void start_nodes_ssh(std::vector<nodetab_process> &);
+static void finish_nodes(std::vector<nodetab_process> &);
+
+static void req_client_connect(std::vector<nodetab_process> & process_table)
+{
+  skt_set_abort(client_connect_problem_skt);
+
+  if (arg_mpiexec)
+  {
+    req_construct_phase2_processes(process_table);
+    req_client_connect_table(process_table);
+    req_all_clients_connected();
+    return;
+  }
+
+  req_client_connect_table(process_table);
+
+  std::vector<nodetab_process> phase2_processes;
+  req_construct_phase2_processes(phase2_processes);
+
+  if (phase2_processes.size() > 0)
+  {
+    if (!arg_scalable_start)
+    {
+      if (!arg_local)
+      {
+#if CMK_SHRINK_EXPAND
+        if (!arg_shrinkexpand || (arg_requested_pes > arg_old_pes))
+#endif
+        {
+          assert(!arg_mpiexec);
+          start_nodes_ssh(phase2_processes);
+        }
+#if !CMK_SSH_KILL
+        finish_nodes(phase2_processes);
+#endif
+      }
+      else
+      {
+        start_nodes_local(phase2_processes);
+      }
+    }
+    else
+    {
+      // send nodefork packets
+      ChMessageHeader hdr;
+      ChMessageInt_t mydata[ChInitNodeforkFields];
+      ChMessageHeader_new("nodefork", sizeof(mydata), &hdr);
+      for (const nodetab_process & p : process_table)
+      {
+        int numforks = p.host->processes - 1;
+        if (numforks <= 0)
+          continue;
+
+        if (arg_verbose)
+          printf("Charmrun> Instructing host \"%s\" to fork() x %d\n", p.host->name, numforks);
+
+        mydata[0] = ChMessageInt_new(numforks);
+        mydata[1] = ChMessageInt_new(p.forkstart);
+        skt_sendN(p.req_client, (const char *) &hdr, sizeof(hdr));
+        skt_sendN(p.req_client, (const char *) mydata, sizeof(mydata));
+      }
+    }
+
+    req_client_connect_table(phase2_processes);
+  }
+
+  req_add_phase2_processes(phase2_processes);
+  req_all_clients_connected();
+}
+
+static void req_add_phase2_processes(std::vector<nodetab_process> & phase2_processes)
+{
+  // add phase-two processes to main table
+  my_process_table.insert(my_process_table.end(), phase2_processes.begin(), phase2_processes.end());
+}
+
+static void req_all_clients_connected()
+{
   if (portOk == 0)
     exit(1);
   if (arg_verbose)
     printf("Charmrun> All clients connected.\n");
-#if CMK_USE_IBVERBS
-  exchange_qpdata_clients();
-  send_clients_nodeinfo_qpdata();
-#else
+
+  // determine ppn
+  int ppn = 1;
+#if CMK_SMP
+  if (onewth_per.active())
+  {
+    using Unit = typename TopologyRequest::Unit;
+
+    const nodetab_process & p0 = my_process_table[0];
+
+    int threads_per_host;
+    const Unit onewth_unit = onewth_per.unit();
+    switch (onewth_unit)
+    {
+      case Unit::Socket:
+        threads_per_host = p0.num_sockets;
+        break;
+      case Unit::Core:
+        threads_per_host = p0.num_cores;
+        break;
+      case Unit::PU:
+        threads_per_host = p0.num_pus;
+        break;
+
+      // case Unit::Host:
+      default:
+        threads_per_host = 1;
+        break;
+    }
+
+    // account for comm thread, except when space is unavailable
+    // assumes that proc_per.xyz == 1, which is enforced in this situation during arg checking
+    if (threads_per_host > calculated_processes_per_host && threads_per_host + calculated_processes_per_host > p0.num_pus)
+      threads_per_host -= calculated_processes_per_host;
+
+    if (threads_per_host == 0)
+      threads_per_host = 1;
+
+    if (threads_per_host < calculated_processes_per_host || threads_per_host % calculated_processes_per_host != 0)
+    {
+      fprintf(stderr, "Charmrun> Error: Invalid request for %d PEs among %d processes per host.\n",
+                      threads_per_host, calculated_processes_per_host);
+      kill_all_compute_nodes("Invalid provisioning request");
+      exit(1);
+    }
+
+    ppn = threads_per_host / calculated_processes_per_host;
+  }
+  else
+  {
+    if (arg_ppn > 1)
+      ppn = arg_ppn;
+    else if (arg_requested_pes > 0 && arg_requested_nodes > 0)
+      ppn = arg_requested_pes / arg_requested_nodes;
+  }
+#endif
+
+  // sort them so that node number locality implies physical locality
+  std::stable_sort(my_process_table.begin(), my_process_table.end());
+
+  int newno = 0;
+  for (nodetab_process & p : my_process_table)
+  {
+    // assign new numbering
+    p.nodeno = newno++;
+
+    // inform the node of any SMP threads to spawn
+    p.PEs = ppn;
+
+    // record each PE's process for our own purposes
+    for (int j = 0; j < ppn; ++j)
+      pe_to_process_map.push_back(&p);
+  }
+
+  for (nodetab_process & p : my_process_table)
+    nodeinfo_populate(p);
+
 #ifdef HSTART
   if (arg_hierarchical_start) {
     /* first we need to send data to parent charmrun and then send the nodeinfo
@@ -3565,11 +3775,17 @@ void req_client_connect(void)
 
   else
 #endif
-    for (client = 0; client < req_nClients; client++) {
-      req_handle_initnodetab(NULL, req_clients[client]);
-    }
-
+  {
+    send_clients_nodeinfo();
+#if CMK_USE_IBVERBS || CMK_USE_IBUD
+    receive_qplist();
+#if CMK_USE_IBVERBS
+    exchange_qpdata_clients();
 #endif
+    send_clients_qpdata();
+#endif
+  }
+
   if (arg_verbose)
     printf("Charmrun> IP tables sent.\n");
 }
@@ -3577,59 +3793,57 @@ void req_client_connect(void)
 /*Wait for all the clients to connect to our server port, then collect and send
  * nodetable to all */
 #ifdef HSTART
-void req_charmrun_connect(void)
+static void req_charmrun_connect(void)
 {
   //	double t1, t2, t3, t4;
-  int client;
-  nodeinfo_allocate();
-  req_nClients = branchfactor;
-  req_clients = (SOCKET *) malloc(req_nClients * sizeof(SOCKET));
-  charmrun_fds = (SOCKET *) malloc(req_nClients * sizeof(SOCKET));
-  for (client = 0; client < req_nClients; client++)
-    req_clients[client] = -1;
 
-  skt_set_abort(client_connect_problem);
+  skt_set_abort(client_connect_problem_skt);
 
 #if CMK_IBVERBS_FAST_START
-  for (client = 0; client < req_nClients; client++) {
-    req_one_client_partinit(client);
-  }
-  for (client = 0; client < req_nClients; client++) {
-    read_initnode_one_client(client);
-  }
+  for (int c = 0, c_end = my_process_table.size(); c < c_end; ++c)
+    req_one_client_partinit(my_process_table, c);
+  for (nodetab_process & p : my_process_table)
+    read_initnode_one_client(p);
 #else
   // if(!arg_child_charmrun) getthetime(t1);
 
-  req_set_client_connect(0, req_nClients);
+  req_set_client_connect(my_process_table, my_process_table.size());
 // if(!arg_child_charmrun)	getthetime(t2);		/* also need to process
 // received nodesets JIT */
 #endif
+
+  // TODO: two-phase, if applicable (?)
 
   if (portOk == 0)
     exit(1);
   if (arg_verbose)
     printf("Charmrun> All clients connected.\n");
+
+  // TODO: nodeinfo_populate?
+
+#if CMK_USE_IBVERBS || CMK_USE_IBUD
+  send_clients_nodeinfo();
+  receive_qplist();
 #if CMK_USE_IBVERBS
   exchange_qpdata_clients();
-  send_clients_nodeinfo_qpdata();
+#endif
+  send_clients_qpdata();
 #else
-  for (client = 0; client < req_nClients; client++) {
-    // add flag to check what leval charmrun it is and what phase
-    req_handle_initnodedistribution(NULL, charmrun_fds[client], client);
-  }
+  for (const nodetab_process & p : my_process_table)
+    // add flag to check what level charmrun it is and what phase
+    req_handle_initnodedistribution(NULL, p);
+
   // getthetime(t3);
 
   /* Now receive the nodetab from child charmruns*/
   charmrun_phase = 1;
 
-  skt_set_abort(client_connect_problem);
+  skt_set_abort(client_connect_problem_skt);
 
-  req_set_client_connect(0, req_nClients);
+  req_set_client_connect(my_process_table, my_process_table.size());
 
-  /* Already processed, so send*/
-  for (client = 0; client < req_nClients; client++) {
-    req_handle_initnodetab(NULL, req_clients[client]);
-  }
+  send_clients_nodeinfo();
+
 // if(!arg_child_charmrun) getthetime(t4);
 #endif
   if (arg_verbose)
@@ -3642,108 +3856,124 @@ void req_charmrun_connect(void)
 
 #ifndef CMK_BPROC
 
-void start_one_node_ssh(int rank0no);
-void finish_one_node(int rank0no);
-void finish_set_nodes(int start, int stop);
-int start_set_node_ssh(int client);
+static void start_one_node_ssh(nodetab_process & p);
+static void finish_set_nodes(std::vector<nodetab_process> &, int start, int stop);
 
-void req_client_start_and_connect(void)
+static void start_nodes_batch_and_connect(std::vector<nodetab_process> & process_table)
 {
-  int client, c;
   int batch = arg_batch_spawn; /* fire several at a time */
-  int clientgroup, clientstart;
-  int counter;
+  const int process_count = process_table.size();
+  int clientstart = 0;
+  do
+  {
+    int clientend = clientstart + batch;
+    if (clientend > process_count)
+      clientend = process_count;
 
-#ifdef HSTART
-  if (!arg_hierarchical_start)
-#endif
-    nodeinfo_allocate();
-  req_nClients = nodetab_rank0_size;
-  req_clients = (SOCKET *) malloc(req_nClients * sizeof(SOCKET));
+    for (int c = clientstart; c < clientend; ++c)
+      start_one_node_ssh(process_table[c]);
 
-  skt_set_abort(client_connect_problem);
-
-  client = 0;
-  while (client < req_nClients) { /* initiate a batch */
-    clientstart = client;
-
-    for (counter = 0; counter < batch;
-         counter++) { /* initiate batch number of nodes */
-      clientgroup = start_set_node_ssh(client);
-      client += clientgroup;
-      if (client >= req_nClients) {
-        client = req_nClients;
-        break;
-      }
-    }
 #if CMK_USE_SSH
     /* ssh x11 forwarding will make sure ssh exit */
     if (!arg_ssh_display)
 #endif
-      finish_set_nodes(clientstart, client);
+      finish_set_nodes(process_table, clientstart, clientend);
+
+    // batch implementation of req_client_connect functionality below this line to end of function
 
 #if CMK_IBVERBS_FAST_START
-    for (c = clientstart; c < client; c++) {
-      req_one_client_partinit(c);
-    }
+    for (int c = clientstart; c < clientend; ++c)
+      req_one_client_partinit(process_table, c);
 #else
-    req_set_client_connect(clientstart, client);
+    req_set_client_connect(process_table, clientend-clientstart);
 #endif
+
+    clientstart = clientend;
   }
+  while (clientstart < process_count);
 
 #if CMK_IBVERBS_FAST_START
-  for (client = 0; client < req_nClients; client++) {
-    read_initnode_one_client(client);
-  }
+  for (nodetab_process & p : process_table)
+    read_initnode_one_client(p);
 #endif
-  if (portOk == 0)
-    exit(1);
-  if (arg_verbose)
-    printf("Charmrun> All clients connected.\n");
+}
 
-#if CMK_USE_IBVERBS
-  exchange_qpdata_clients();
-  send_clients_nodeinfo_qpdata();
-#else
-#ifdef HSTART
-  if (arg_hierarchical_start) {
-    /* first we need to send data to parent charmrun and then send the nodeinfo
-     * to the clients*/
-    send_myNodeInfo_to_parent();
-    /*then receive from root */
-    forward_nodetab_to_children();
-  }
+static void batch_launch_sequence(std::vector<nodetab_process> & process_table)
+{
+  skt_set_abort(client_connect_problem_skt);
 
-  else
-#endif
-    for (client = 0; client < req_nClients; client++) {
-      req_handle_initnodetab(NULL, req_clients[client]);
+  start_nodes_batch_and_connect(process_table);
+
+  // batch implementation of req_client_connect functionality below this line to end of function
+
+  std::vector<nodetab_process> phase2_processes;
+  req_construct_phase2_processes(phase2_processes);
+  if (phase2_processes.size() > 0)
+  {
+    if (!arg_scalable_start)
+    {
+      start_nodes_batch_and_connect(phase2_processes);
     }
+    else
+    {
+      // send nodefork packets
+      int total = 0;
+      ChMessageHeader hdr;
+      ChMessageInt_t mydata[ChInitNodeforkFields];
+      ChMessageHeader_new("nodefork", sizeof(mydata), &hdr);
+      for (const nodetab_process & p : process_table)
+      {
+        int numforks = p.host->processes - 1;
+        if (numforks <= 0)
+          continue;
 
+        for (int c = 0; c < numforks; c += arg_batch_spawn)
+        {
+          const int count = std::min(numforks - c, arg_batch_spawn);
+
+          if (arg_verbose)
+            printf("Charmrun> Instructing host \"%s\" to fork() x %d\n", p.host->name, count);
+
+          mydata[0] = ChMessageInt_new(count);
+          mydata[1] = ChMessageInt_new(p.forkstart + c);
+          skt_sendN(p.req_client, (const char *) &hdr, sizeof(hdr));
+          skt_sendN(p.req_client, (const char *) mydata, sizeof(mydata));
+
+#if CMK_IBVERBS_FAST_START
+          for (int f = 0; f < count; ++f)
+            req_one_client_partinit(phase2_processes, total++);
+#else
+          req_set_client_connect(phase2_processes, count);
 #endif
-  if (arg_verbose)
-    printf("Charmrun> IP tables sent.\n");
-  free(ssh_pids); /* done with ssh_pids */
+        }
+      }
+
+#if CMK_IBVERBS_FAST_START
+      for (nodetab_process & p : phase2_processes)
+        read_initnode_one_client(p);
+#endif
+    }
+  }
+
+  req_add_phase2_processes(phase2_processes);
+  req_all_clients_connected();
 }
 
 #endif
 
 /*Start the server socket the clients will connect to.*/
-void req_start_server(void)
+static void req_start_server(void)
 {
   skt_ip_t ip = skt_innode_my_ip();
   server_port = 0;
 #if CMK_SHRINK_EXPAND
   if (arg_shrinkexpand) { // Need port information
-    char *ns;
-    int nread;
-    int port;
-    ns = getenv("NETSTART");
+    char *ns = getenv("NETSTART");
     if (ns != 0) { /*Read values set by Charmrun*/
-      int node_num, old_charmrun_pid;
+      int node_num, old_charmrun_pid, port;
       char old_charmrun_name[1024 * 1000];
-      nread = sscanf(ns, "%d%s%d%d%d", &node_num, old_charmrun_name,
-                     &server_port, &old_charmrun_pid, &port);
+      int nread = sscanf(ns, "%d%s%d%d%d", &node_num, old_charmrun_name,
+                         &server_port, &old_charmrun_pid, &port);
       if (nread != 5) {
         fprintf(stderr, "Error parsing NETSTART '%s'\n", ns);
         exit(1);
@@ -3792,23 +4022,16 @@ void req_start_server(void)
 }
 
 #ifdef HSTART
-int unique_node_start;
-/* Function copied from machine.c file */
-void parse_netstart(void)
+/* Function copied from machine.C file */
+static void parse_netstart(void)
 {
-  char *ns;
-  int nread;
-  int port;
-  ns = getenv("NETSTART");
+  char *ns = getenv("NETSTART");
   if (ns != 0) { /*Read values set by Charmrun*/
+    int port;
     char parent_charmrun_name[1024 * 1000];
-    nread = sscanf(ns, "%d%s%d%d%d", &unique_node_start, parent_charmrun_name,
-                   &parent_charmrun_port, &parent_charmrun_pid, &port);
+    int nread = sscanf(ns, "%d%s%d%d%d", &mynodes_start, parent_charmrun_name,
+                       &parent_charmrun_port, &parent_charmrun_pid, &port);
     parent_charmrun_IP = skt_lookup_ip(parent_charmrun_name);
-    mynodes_start =
-        nodetab_unique_table[unique_node_start]; /*Works only when
-                                                    init_hierarchical called in
-                                                    child charmrun*/
 
     if (nread != 5) {
       fprintf(stderr, "Error parsing NETSTART '%s'\n", ns);
@@ -3823,44 +4046,44 @@ void parse_netstart(void)
 #endif
 }
 
-int nodetab_rank0_size_total;
+static int hstart_total_hosts;
 /* Receive nodes for which I am responsible*/
-void my_nodetab_store(ChMessage *msg)
+static void my_nodetab_store(ChMessage *msg)
 {
-  ChMessageInt_t *nodelistmsg = (ChMessageInt_t *) msg->data;
-  nodetab_rank0_size = ChMessageInt(nodelistmsg[0]);
-  nodetab_rank0_size_total = ChMessageInt(nodelistmsg[1]);
-  int k;
-  for (k = 0; k < nodetab_rank0_size; k++) {
-    nodetab_rank0_table[k] = ChMessageInt(nodelistmsg[k + 2]);
-  }
+  ChMessageInt_t * nodelistmsg = (ChMessageInt_t *) msg->data;
+  const int hstart_hosts_size = ChMessageInt(nodelistmsg[0]);
+  hstart_total_hosts = ChMessageInt(nodelistmsg[1]);
+  my_host_table.reserve(hstart_hosts_size);
+  ChMessageInt_t * hstart_hosts = nodelistmsg + 2;
+  for (int k = 0; k < hstart_hosts_size; k++)
+    my_host_table.push(host_table[ChMessageInt(hstart_hosts[k])]);
 }
 
 /* In hierarchical startup, this function is used by child charmrun to obtains
  * the list of nodes for which it is responsible */
-void nodelist_obtain(void)
+static void nodelist_obtain(void)
 {
-  ChMessage nodelistmsg; /* info about all nodes*/
-                         /*Contact charmrun for machine info.*/
-
 #if CMK_USE_IBVERBS
+# if 0
   {
-                /*		int qpListSize = (_Cmi_numnodes-1)*sizeof(ChInfiAddr);
-				me.info.qpList = malloc(qpListSize);
-				copyInfiAddr(me.info.qpList);
-				MACHSTATE1(3,"me.info.qpList created and copied size %d bytes",qpListSize);
-				ctrl_sendone_nolock("initnode",(const char *)&me,sizeof(me),(const char *)me.info.qpList,qpListSize);
-				free(me.info.qpList);
-		*/	}
+    int qpListSize = (_Cmi_numnodes-1)*sizeof(ChInfiAddr);
+    me.info.qpList = malloc(qpListSize);
+    copyInfiAddr(me.info.qpList);
+    MACHSTATE1(3,"me.info.qpList created and copied size %d bytes",qpListSize);
+    ctrl_sendone_nolock("initnode",(const char *)&me,sizeof(me),(const char *)me.info.qpList,qpListSize);
+    free(me.info.qpList);
+  }
+# endif
 #else
   ChMessageHeader hdr;
-  ChMessageInt_t node_start = ChMessageInt_new(unique_node_start);
+  ChMessageInt_t node_start = ChMessageInt_new(mynodes_start);
   ChMessageHeader_new("initnodetab", sizeof(ChMessageInt_t), &hdr);
   skt_sendN(parent_charmrun_fd, (const char *) &hdr, sizeof(hdr));
   skt_sendN(parent_charmrun_fd, (const char *) &node_start, sizeof(node_start));
-
 #endif // CMK_USE_IBVERBS
 
+  ChMessage nodelistmsg; /* info about all nodes*/
+                         /*Contact charmrun for machine info.*/
   /*We get the other node addresses from a message sent
     back via the charmrun control port.*/
   if (!skt_select1(parent_charmrun_fd, 1200 * 1000)) {
@@ -3872,7 +4095,7 @@ void nodelist_obtain(void)
   ChMessage_free(&nodelistmsg);
 }
 
-void init_mynodes(void)
+static void init_mynodes(void)
 {
   parse_netstart();
   if (!skt_ip_match(parent_charmrun_IP, _skt_invalid_ip)) {
@@ -3892,23 +4115,22 @@ void init_mynodes(void)
  *  The Main Program
  *
  ****************************************************************************/
-void start_nodes_daemon(void);
-void start_nodes_ssh(void);
-void start_nodes_mpiexec();
+static void start_nodes_daemon(std::vector<nodetab_process> &);
+static void start_nodes_mpiexec();
 #ifdef HSTART
-void start_next_level_charmruns(void);
+static void start_next_level_charmruns(void);
 #endif
 #if CMK_BPROC
-void nodetab_init_for_scyld(void);
-void start_nodes_scyld(void);
+static void nodetab_init_for_scyld(void);
+static void start_nodes_scyld(void);
 #endif
-void start_nodes_local(char **envp);
-void kill_nodes(void);
-void open_gdb_info(void);
-void read_global_segments_size(void);
+static void kill_nodes(void);
+static void open_gdb_info(void);
+static void read_global_segments_size(void);
 
 static void fast_idleFn(void) { sleep(0); }
-void finish_nodes(void);
+
+static char **main_envp;
 
 int main(int argc, const char **argv, char **envp)
 {
@@ -3916,16 +4138,13 @@ int main(int argc, const char **argv, char **envp)
   skt_init();
   skt_set_idle(fast_idleFn);
 /* CrnSrand((int) time(0)); */
-/* notify charm developers that charm is in use */
 
-#ifdef HSTART
-  if (!arg_child_charmrun)
-#endif
-    ping_developers();
+  main_envp = envp;
   /* Compute the values of all constants */
   arg_init(argc, argv);
   if (arg_verbose)
-    fprintf(stderr, "Charmrun> charmrun started...\n");
+    printf("Charmrun> charmrun started...\n");
+
   start_timer = GetClock();
 #if CMK_BPROC
   /* check scyld configuration */
@@ -3936,6 +4155,32 @@ int main(int argc, const char **argv, char **envp)
 #else
   /* Initialize the node-table by reading nodesfile */
   nodetab_init();
+#endif
+
+  if (arg_requested_numhosts > 0)
+  {
+    if (arg_requested_numhosts > host_table.size())
+    {
+      fprintf(stderr, "Charmrun> Error: ++numHosts exceeds available host pool.\n");
+      exit(1);
+    }
+    else
+      host_table.resize(arg_requested_numhosts);
+  }
+
+  if (arg_verbose)
+  {
+    char ips[200];
+    for (const nodetab_host * h : host_table)
+    {
+      skt_print_ip(ips, h->ip);
+      printf("Charmrun> added host \"%s\", IP:%s\n", h->name, ips);
+    }
+  }
+
+#ifdef HSTART
+  if (arg_hierarchical_start)
+    nodetab_init_hierarchical_start();
 #endif
 
   /* Start the server port */
@@ -3949,10 +4194,26 @@ int main(int argc, const char **argv, char **envp)
   if (arg_child_charmrun) {
     init_mynodes(); /* contacts root charmrun and gets list  of nodes to start*/
   }
+  else
+    my_host_table = host_table;
 #endif
+
+  const int my_host_count = my_host_table.size();
+  const int my_initial_process_count = proc_per.active()
+                                       ? (arg_requested_nodes > 0 ? std::min(my_host_count, arg_requested_nodes) : my_host_count)
+                                       : std::min(my_host_count, get_old_style_process_count());
+  my_process_table.resize(my_initial_process_count);
+  for (int i = 0; i < my_initial_process_count; ++i)
+  {
+    nodetab_host * h = my_host_table[i];
+    nodetab_process & p = my_process_table[i];
+    p.host = h;
+    p.nodeno = h->hostno;
+  }
+
   /* start the node processes */
   if (0 != getenv("CONV_DAEMON"))
-    start_nodes_daemon();
+    start_nodes_daemon(my_process_table);
   else
 #if CMK_BPROC
     start_nodes_scyld();
@@ -3969,12 +4230,12 @@ int main(int argc, const char **argv, char **envp)
         start_next_level_charmruns();
       } else {
         if (!arg_batch_spawn)
-          start_nodes_ssh();
+          start_nodes_ssh(my_process_table);
         else
-          req_client_start_and_connect();
+          batch_launch_sequence(my_process_table);
       }
     } else
-      start_nodes_local(envp);
+      start_nodes_local(my_process_table);
   }
 
   /* Normal startup*/
@@ -3993,17 +4254,17 @@ int main(int argc, const char **argv, char **envp)
           if (arg_mpiexec)
             start_nodes_mpiexec();
           else
-            start_nodes_ssh();
+            start_nodes_ssh(my_process_table);
         }
       } else
-        req_client_start_and_connect();
+        batch_launch_sequence(my_process_table);
     } else
-      start_nodes_local(envp);
+      start_nodes_local(my_process_table);
   }
 #endif
 
   if (arg_charmdebug) {
-#if (defined(_WIN32) && !defined(__CYGWIN__)) || CMK_BPROC
+#if defined(_WIN32) || CMK_BPROC
     /* Gdb stream (and charmdebug) currently valid only with ssh subsystem */
     fprintf(stderr,
             "Charmdebug is supported currently only with the ssh subsystem\n");
@@ -4019,7 +4280,7 @@ int main(int argc, const char **argv, char **envp)
   }
 
   if (arg_verbose)
-    fprintf(stderr, "Charmrun> node programs all started\n");
+    printf("Charmrun> node programs all started\n");
 
 /* Wait for all clients to connect */
 #ifdef HSTART
@@ -4027,13 +4288,13 @@ int main(int argc, const char **argv, char **envp)
   if (arg_hierarchical_start) {
 #if !CMK_SSH_KILL
     if (!arg_batch_spawn || (!arg_child_charmrun))
-      finish_nodes();
+      finish_nodes(my_process_table);
 #endif
 
     if (!arg_child_charmrun)
       req_charmrun_connect();
     else if (!arg_batch_spawn)
-      req_client_connect();
+      req_client_connect(my_process_table);
   }
   /* Normal startup*/
   else
@@ -4041,16 +4302,16 @@ int main(int argc, const char **argv, char **envp)
   {
 #if !CMK_SSH_KILL
     if (!arg_batch_spawn)
-      finish_nodes();
+      finish_nodes(my_process_table);
 #endif
     if (!arg_batch_spawn)
-      req_client_connect();
+      req_client_connect(my_process_table);
   }
 #if CMK_SSH_KILL
   kill_nodes();
 #endif
   if (arg_verbose)
-    fprintf(stderr, "Charmrun> node programs all connected\n");
+    printf("Charmrun> node programs all connected\n");
   /* report time */
   PRINT(("Charmrun> started all node programs in %.3f seconds.\n",
           GetClock() - start_timer));
@@ -4062,8 +4323,32 @@ int main(int argc, const char **argv, char **envp)
       req_poll_hierarchical();
   else
 #endif
-    while (1)
-      req_poll();
+  {
+    if (arg_timelimit == -1)
+    {
+      while (1)
+        req_poll();
+    }
+    else
+    {
+      time_t start = time(NULL);
+      while (1)
+      {
+        req_poll();
+        time_t end = time(NULL);
+        double elapsed = difftime(end, start);
+        if (elapsed >= arg_timelimit)
+        {
+          fprintf(stderr, "Charmrun> Error: Time limit reached\n");
+
+          kill_all_compute_nodes("Time limit reached");
+          for (const nodetab_process & p : my_process_table)
+            skt_close(p.req_client);
+          exit(1);
+        }
+      }
+    }
+  }
 }
 
 /*This little snippet creates a NETSTART
@@ -4071,9 +4356,9 @@ environment variable entry for the given node #.
 It uses the idiotic "return reference to static buffer"
 string return idiom.
 */
-char *create_netstart(int node)
+static char *create_netstart(int node)
 {
-  static char dest[1024];
+  static char dest[1536];
   int port = 0;
   if (arg_mpiexec)
     sprintf(dest, "$CmiMyNode %s %d %d %d", server_addr, server_port,
@@ -4084,78 +4369,59 @@ char *create_netstart(int node)
   return dest;
 }
 
-#if CMK_SHRINK_EXPAND
-/*This little snippet creates a OLDNODENAMES
-environment variable entry*/
-char *create_oldnodenames()
-{
-  static char dest1[1024 * 1000];
-  int i;
-  for (i = 0; i < nodetab_size; i++)
-    sprintf(dest1, "%s %s", dest1, (*nodetab_table[i]).name);
-  printf("Charmrun> Created oldnames %s \n", dest1);
-  return dest1;
-}
-#endif
 /* The remainder of charmrun is only concerned with starting all
 the node-programs, also known as charmrun clients.  We have to
-start nodetab_rank0_size processes on the remote machines.
+start nodetab_rank0_table.size() processes on the remote machines.
 */
 
 /*Ask the converse daemon running on each machine to start the node-programs.*/
-void start_nodes_daemon(void)
+static void start_nodes_daemon(std::vector<nodetab_process> & process_table)
 {
-  taskStruct task;
-  char argBuffer[5000]; /*Buffer to hold assembled program arguments*/
-  int i, nodeNumber;
-
   /*Set the parts of the task structure that will be the same for all nodes*/
   /*Figure out the command line arguments (same for all PEs)*/
-  argBuffer[0] = 0;
-  for (i = 0; arg_argv[i]; i++) {
+  char argBuffer[5000] = { '\0' }; /*Buffer to hold assembled program arguments*/
+  for (int i = 0; arg_argv[i]; i++) {
     if (arg_verbose)
       printf("Charmrun> packing arg: %s\n", arg_argv[i]);
     strcat(argBuffer, " ");
     strcat(argBuffer, arg_argv[i]);
   }
 
+  taskStruct task;
   task.magic = ChMessageInt_new(DAEMON_MAGIC);
 
   /*Start up the user program, by sending a message
     to PE 0 on each node.*/
-  for (nodeNumber = 0; nodeNumber < nodetab_rank0_size; nodeNumber++) {
-    char nodeArgBuffer[5000]; /*Buffer to hold assembled program arguments*/
-    char *argBuf;
-    char *arg_nodeprog_r, *arg_currdir_r;
-    char statusCode = 'N'; /*Default error code-- network problem*/
-    int fd;
-    int pe0 = nodetab_rank0_table[nodeNumber];
+  for (const nodetab_process & p : process_table)
+  {
+    const nodetab_host * h = p.host;
 
-    arg_currdir_r = pathfix(arg_currdir_a, nodetab_pathfixes(nodeNumber));
+    char *arg_currdir_r = pathfix(arg_currdir_a, h->pathfixes);
     strcpy(task.cwd, arg_currdir_r);
     free(arg_currdir_r);
-    arg_nodeprog_r = pathextfix(arg_nodeprog_a, nodetab_pathfixes(nodeNumber),
-                                nodetab_ext(nodeNumber));
+    char *arg_nodeprog_r = pathextfix(arg_nodeprog_a, h->pathfixes, h->ext);
     strcpy(task.pgm, arg_nodeprog_r);
 
     if (arg_verbose)
-      printf("Charmrun> Starting node program %d on '%s' as %s.\n", nodeNumber,
-             nodetab_name(pe0), arg_nodeprog_r);
+      printf("Charmrun> Starting node program %d on '%s' as %s.\n", p.nodeno,
+             h->name, arg_nodeprog_r);
     free(arg_nodeprog_r);
-    sprintf(task.env, "NETSTART=%s", create_netstart(nodeNumber));
+    sprintf(task.env, "NETSTART=%s", create_netstart(p.nodeno));
 
-    if (nodetab_nice(nodeNumber) != -100) {
+    char nodeArgBuffer[5120]; /*Buffer to hold assembled program arguments*/
+    char *argBuf;
+    if (h->nice != -100) {
       if (arg_verbose)
-        fprintf(stderr, "Charmrun> +nice %d\n", nodetab_nice(nodeNumber));
-      sprintf(nodeArgBuffer, "%s +nice %d", argBuffer,
-              nodetab_nice(nodeNumber));
+        printf("Charmrun> +nice %d\n", h->nice);
+      sprintf(nodeArgBuffer, "%s +nice %d", argBuffer, h->nice);
       argBuf = nodeArgBuffer;
     } else
       argBuf = argBuffer;
     task.argLength = ChMessageInt_new(strlen(argBuf));
 
     /*Send request out to remote node*/
-    fd = skt_connect(nodetab_ip(pe0), DAEMON_IP_PORT, 30);
+    char statusCode = 'N'; /*Default error code-- network problem*/
+    int fd = skt_connect(h->ip, DAEMON_IP_PORT, 30);
     if (fd !=
         INVALID_SOCKET) { /*Contact!  Ask the daemon to start the program*/
       skt_sendN(fd, (const char *) &task, sizeof(task));
@@ -4164,27 +4430,25 @@ void start_nodes_daemon(void)
     }
     if (statusCode != 'G') { /*Something went wrong--*/
       fprintf(stderr, "Error '%c' starting remote node program on %s--\n%s\n",
-              statusCode, nodetab_name(pe0), daemon_status2msg(statusCode));
+              statusCode, h->name, daemon_status2msg(statusCode));
       exit(1);
     } else if (arg_verbose)
-      printf("Charmrun> Node program %d started.\n", nodeNumber);
+      printf("Charmrun> Node program %d started.\n", p.nodeno);
   }
 }
 
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32)
 /*Sadly, interprocess communication on Win32 is quite
   different, so we can't use Ssh on win32 yet.
   Fall back to the daemon.*/
-void start_nodes_ssh() { start_nodes_daemon(); }
-void finish_nodes(void) {}
-void start_one_node_ssh(int rank0no) {}
-void finish_one_node(int rank0no) {}
-void start_nodes_mpiexec() {}
+static void start_nodes_ssh(std::vector<nodetab_process> & process_table) { start_nodes_daemon(process_table); }
+static void finish_nodes(std::vector<nodetab_process> & process_table) {}
+static void start_one_node_ssh(nodetab_process & p) {}
+static void start_nodes_mpiexec() {}
 
-int start_set_node_ssh(int client) { return 0; }
-void finish_set_nodes(int start, int stop) {}
+static void finish_set_nodes(std::vector<nodetab_process> & process_table, int start, int stop) {}
 
-void envCat(char *dest, LPTSTR oldEnv)
+static void envCat(char *dest, LPTSTR oldEnv)
 {
   char *src = oldEnv;
   dest += strlen(dest); // Advance to end of dest
@@ -4201,13 +4465,8 @@ void envCat(char *dest, LPTSTR oldEnv)
 
 /* simple version of charmrun that avoids the sshd or charmd,   */
 /* it spawn the node program just on local machine using exec. */
-void start_nodes_local(char **env)
+static void start_nodes_local(std::vector<nodetab_process> & process_table)
 {
-  int ret, i;
-  PROCESS_INFORMATION pi; /* process Information for the process spawned */
-  const char **p;
-
-  char environment[10000]; /*Doubly-null terminated environment strings*/
   char cmdLine[10000];     /*Program command line, including executable name*/
                            /*Command line too long.*/
                            /*
@@ -4215,17 +4474,20 @@ void start_nodes_local(char **env)
                                    return 0;
                            */
   strcpy(cmdLine, pparam_argv[1]);
-  p = pparam_argv + 2;
-  while ((*p) != '\0') {
+  const char **param = pparam_argv + 2;
+  while (*param) {
     strcat(cmdLine, " ");
-    strcat(cmdLine, *p);
-    p++;
+    strcat(cmdLine, *param);
+    param++;
   }
 
-  for (i = 0; i < arg_requested_pes; i++) {
+  PROCESS_INFORMATION pi; /* process Information for the process spawned */
+  char environment[10000]; /*Doubly-null terminated environment strings*/
+  for (nodetab_process & p : process_table)
+  {
     STARTUPINFO si = {0}; /* startup info for the process spawned */
 
-    sprintf(environment, "NETSTART=%s", create_netstart(i));
+    sprintf(environment, "NETSTART=%s", create_netstart(p.nodeno));
     /*Paste all system environment strings */
     envCat(environment, GetEnvironmentStrings());
 
@@ -4233,14 +4495,18 @@ void start_nodes_local(char **env)
      to be spawned */
     si.cb = sizeof(si);
     if (arg_verbose)
-      printf("Charmrun> start %d node program on localhost.\n", i);
+      printf("Charmrun> start %d node program on localhost.\n", p.nodeno);
 
+    int ret;
     ret = CreateProcess(NULL,          /* application name */
                         cmdLine,       /* command line */
                         NULL, /*&sa,*/ /* process SA */
                         NULL, /*&sa,*/ /* thread SA */
                         FALSE,         /* inherit flag */
-#if 1
+#if CMK_CHARMPY
+                        // don't disable console output on rank 0 process (need to be able to see python syntax errors, etc)
+                        CREATE_NEW_PROCESS_GROUP | (p.nodeno == 0 ? 0 : DETACHED_PROCESS),
+#elif 1
                         CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS,
 #else
                         CREATE_NEW_PROCESS_GROUP | CREATE_NEW_CONSOLE,
@@ -4272,7 +4538,7 @@ void start_nodes_local(char **env)
 
 #elif CMK_BPROC
 
-int bproc_nodeisup(int node)
+static int bproc_nodeisup(int node)
 {
   int status = 0;
 #if CMK_BPROC_VERSION < 4
@@ -4299,41 +4565,15 @@ int bproc_nodeisup(int node)
 /* ++ppn now is supported in both SMP and non SMP version
    in SMP, ++ppn specifies number of threads on each node;
    in non-SMP, ++ppn specifies number of processes on each node. */
-void nodetab_init_for_scyld()
+static void nodetab_init_for_scyld()
 {
-  int maxNodes, i, node, npes, rank;
-  nodetab_host group;
-  int tablesize;
-
-  tablesize = arg_requested_pes;
-  maxNodes = bproc_numnodes() + 1;
+  int maxNodes = bproc_numnodes() + 1;
   if (arg_endpe < maxNodes)
     maxNodes = arg_endpe + 1;
-  if (maxNodes > tablesize)
-    tablesize = maxNodes;
-  nodetab_table = (nodetab_host **) malloc(tablesize * sizeof(nodetab_host *));
-  nodetab_rank0_table = (int *) malloc(tablesize * sizeof(int));
-  nodetab_max = tablesize;
-
-  nodetab_reset(&group);
-
-  if (arg_ppn == 0)
-    arg_ppn = 1;
-  /*
-#if CMK_SHARED_VARS_UNAVAILABLE
-    if (arg_ppn > 1) {
-          fprintf(stderr,"Warning> Invalid ppn %d in nodelist ignored.\n",
-arg_ppn);
-          arg_ppn=1;
-    }
-#endif
-  */
-  group.cpus = 1;
-  group.rank = 0;
 
   /* check which slave node is available from frompe to endpe */
-  npes = 0;
-  for (i = -1; i < maxNodes && npes < arg_requested_pes; i++) {
+  int hostno = 0;
+  for (int i = -1; i < maxNodes; i++) {
     char hostname[256];
     if (!bproc_nodeisup(i))
       continue;
@@ -4342,78 +4582,36 @@ arg_ppn);
     if (i == -1 && arg_skipmaster)
       continue; /* skip master node -1 */
     sprintf(hostname, "%d", i);
-#if !CMK_SHARED_VARS_UNAVAILABLE
-    if (npes + arg_ppn > arg_requested_pes)
-      group.cpus = arg_requested_pes - npes;
-    else
-      group.cpus = arg_ppn;
-#endif
-    for (rank = 0; rank < arg_ppn; rank++) {
-#if !CMK_SHARED_VARS_UNAVAILABLE
-      group.rank = rank;
-#endif
-      nodetab_makehost(hostname, &group);
-      nodetab_add(&group);
-      if (++npes == arg_requested_pes)
-        break;
-    }
+    nodetab_host * h = new nodetab_host{};
+    h->name = strdup(hostname);
+    h->ip = nodetab_host::resolve(hostname);
+    h->hostno = hostno++;
+    host_table.push_back(h);
   }
-  if (nodetab_rank0_size == 0) {
+
+  const int hosts_size = host_table.size();
+  if (hosts_size == 0) {
     fprintf(stderr, "Charmrun> no slave node available!\n");
     exit(1);
   }
   if (arg_verbose)
     printf("Charmrun> There are %d slave nodes available.\n",
-           nodetab_rank0_size - (arg_skipmaster ? 0 : 1));
-
-  /* expand node table to arg_requested_pes */
-  if (arg_requested_pes > npes) {
-    int orig_size = npes;
-    int node;
-    int startnode = 0;
-    if (arg_singlemaster && nodetab_rank0_size > 1 && !arg_skipmaster)
-      startnode = arg_ppn; /* skip -1 */
-    node = startnode;
-    while (npes < arg_requested_pes) {
-#if !CMK_SHARED_VARS_UNAVAILABLE
-      if (npes + arg_ppn > arg_requested_pes)
-        group.cpus = arg_requested_pes - npes;
-      else
-        group.cpus = arg_ppn;
-#endif
-      for (rank = 0; rank < arg_ppn; rank++) {
-#if !CMK_SHARED_VARS_UNAVAILABLE
-        group.rank = rank;
-#endif
-        nodetab_makehost(nodetab_name(node), &group);
-        nodetab_add(&group);
-        if (++node == orig_size)
-          node = startnode;
-        if (++npes == arg_requested_pes)
-          break;
-      }
-    }
-  }
+           hosts_size - (arg_skipmaster ? 0 : 1));
 }
 
-void start_nodes_scyld(void)
+static void start_nodes_scyld(void)
 {
-  char *envp[2];
-  int i;
-
-  envp[0] = (char *) malloc(256);
-  envp[1] = 0;
-  for (i = 0; i < nodetab_rank0_size; i++) {
-    int status = 0;
-    int pid;
-    int pe = nodetab_rank0_table[i];
-    int nodeno = atoi(nodetab_name(pe));
+  char *envp[2] = { (char *) malloc(256), NULL };
+  for (const nodetab_process & p : my_process_table)
+  {
+    const nodetab_host * h = p.host;
+    const int bproc_nodeno = atoi(h->name);
 
     if (arg_verbose)
-      printf("Charmrun> start node program on slave node: %d.\n", nodeno);
-    sprintf(envp[0], "NETSTART=%s", create_netstart(i));
-    pid = 0;
-    pid = fork();
+      printf("Charmrun> start node program on slave node: %d.\n", bproc_nodeno);
+    sprintf(envp[0], "NETSTART=%s", create_netstart(p.nodeno));
+
+    int pid = fork();
     if (pid < 0)
       exit(1);
     if (pid == 0) {
@@ -4425,13 +4623,13 @@ void start_nodes_scyld(void)
           dup2(fd, 2);
         }
       }
-      if (nodeno == -1) {
-        status = execve(pparam_argv[1], pparam_argv + 1, envp);
+      if (bproc_nodeno == -1) {
+        int status = execve(pparam_argv[1], pparam_argv + 1, envp);
         dup2(fd1, 1);
         fprintf(stderr, "execve failed to start process \"%s\" with status: %d\n",
                pparam_argv[1], status);
       } else {
-        status = bproc_execmove(nodeno, pparam_argv[1], pparam_argv + 1, envp);
+        int status = bproc_execmove(bproc_nodeno, pparam_argv[1], pparam_argv + 1, envp);
         dup2(fd1, 1);
         fprintf(stderr, "bproc_execmove failed to start remote process \"%s\" with "
                "status: %d\n",
@@ -4443,7 +4641,7 @@ void start_nodes_scyld(void)
   }
   free(envp[0]);
 }
-void finish_nodes(void) {}
+static void finish_nodes(std::vector<nodetab_process> & process_table) {}
 
 #else
 /*Unix systems can use Ssh normally*/
@@ -4457,7 +4655,7 @@ void finish_nodes(void) {}
 #include <sys/wait.h>
 
 extern char **environ;
-void removeEnv(const char *doomedEnv)
+static void removeEnv(const char *doomedEnv)
 { /*Remove a value from the environment list*/
   char **oe, **ie;
   oe = ie = environ;
@@ -4469,23 +4667,25 @@ void removeEnv(const char *doomedEnv)
   *oe = NULL; /*NULL-terminate list*/
 }
 
-int ssh_fork(int nodeno, const char *startScript)
+static int ssh_fork(const nodetab_process & p, const char *startScript)
 {
-  std::vector<const char *> sshargv;
-  int pid;
-  const char *s, *e;
+  const nodetab_host * h = p.host;
 
-  s = nodetab_shell(nodeno);
-  e = skipstuff(s);
+  std::vector<const char *> sshargv;
+
+  const char *s = h->shell;
+  const char *e = skipstuff(s);
   while (*s) {
     sshargv.push_back(substr(s, e));
     s = skipblanks(e);
     e = skipstuff(s);
   }
 
-  sshargv.push_back(nodetab_name(nodeno));
+  sshargv.push_back(h->name);
+  if (arg_ssh_display)
+    sshargv.push_back("-X");
   sshargv.push_back("-l");
-  sshargv.push_back(nodetab_login(nodeno));
+  sshargv.push_back(h->login);
   sshargv.push_back("-o");
   sshargv.push_back("KbdInteractiveAuthentication=no");
   sshargv.push_back("-o");
@@ -4502,7 +4702,7 @@ int ssh_fork(int nodeno, const char *startScript)
     printf("Charmrun> Starting %s\n", cmd_str.c_str());
   }
 
-  pid = fork();
+  int pid = fork();
   if (pid < 0) {
     perror("ERROR> starting remote shell");
     exit(1);
@@ -4520,30 +4720,28 @@ int ssh_fork(int nodeno, const char *startScript)
     exit(1);
   }
   if (arg_verbose)
-    fprintf(stderr, "Charmrun> remote shell (%s:%d) started\n",
-            nodetab_name(nodeno), nodeno);
+    printf("Charmrun> remote shell (%s:%d) started\n", h->name, p.nodeno);
   return pid;
 }
 
-void fprint_arg(FILE *f, const char **argv)
+static void fprint_arg(FILE *f, const char **argv)
 {
   while (*argv) {
     fprintf(f, " %s", *argv);
     argv++;
   }
 }
-void ssh_Find(FILE *f, const char *program, const char *dest)
+static void ssh_Find(FILE *f, const char *program, const char *dest)
 {
   fprintf(f, "Find %s\n", program);
   fprintf(f, "%s=$loc\n", dest);
 }
-void ssh_script(FILE *f, int nodeno, int rank0no, const char **argv,
-                int restart)
+static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
 {
-  char *netstart;
-  char *arg_nodeprog_r, *arg_currdir_r;
-  const char *dbg = nodetab_debugger(nodeno);
-  const char *host = nodetab_name(nodeno);
+  const nodetab_host * h = p.host;
+  const char *dbg = h->debugger;
+  const char *host = h->name;
+  const int nodeno = p.nodeno;
 
   if (arg_mpiexec)
     fprintf(f, "#!/bin/sh\n");
@@ -4613,27 +4811,62 @@ void ssh_script(FILE *f, int nodeno, int rank0no, const char **argv,
   }
 #ifdef HSTART
   else if (arg_hierarchical_start && arg_child_charmrun)
-    fprintf(f, "CmiMyNode='%d'; export CmiMyNode\n", mynodes_start + rank0no);
+    fprintf(f, "CmiMyNode='%d'; export CmiMyNode\n", mynodes_start + nodeno);
 #endif
   else
-    fprintf(f, "CmiMyNode='%d'; export CmiMyNode\n", rank0no);
+    fprintf(f, "CmiMyNode='%d'; export CmiMyNode\n", nodeno);
 
+  char *netstart;
 #ifdef HSTART
   if (arg_hierarchical_start && arg_child_charmrun)
-    netstart = create_netstart(mynodes_start + rank0no);
+    netstart = create_netstart(mynodes_start + nodeno);
   else
 #endif
-    netstart = create_netstart(rank0no);
+    netstart = create_netstart(nodeno);
   fprintf(f, "NETSTART=\"%s\";export NETSTART\n", netstart);
 
-  fprintf(f, "CmiMyNodeSize='%d'; export CmiMyNodeSize\n",
-          nodetab_getnodeinfo(rank0no)->cpus);
+  fprintf(f, "CmiMyNodeSize='%d'; export CmiMyNodeSize\n", h->cpus);
 
-  if (restart || arg_mpiexec) /* skip fork */
-    fprintf(f, "CmiMyForks='%d'; export CmiMyForks\n", 0);
-  else
-    fprintf(f, "CmiMyForks='%d'; export CmiMyForks\n",
-            nodetab_getnodeinfo(rank0no)->forks);
+  fprintf(f, "CmiMyForks='%d'; export CmiMyForks\n", 0);
+
+  // cpu affinity hints
+  using Unit = typename TopologyRequest::Unit;
+  switch (proc_per.unit())
+  {
+    case Unit::Host:
+      fprintf(f, "CmiProcessPerHost='%d'; export CmiProcessPerHost\n", proc_per.host);
+      break;
+    case Unit::Socket:
+      fprintf(f, "CmiProcessPerSocket='%d'; export CmiProcessPerSocket\n", proc_per.socket);
+      break;
+    case Unit::Core:
+      fprintf(f, "CmiProcessPerCore='%d'; export CmiProcessPerCore\n", proc_per.core);
+      break;
+    case Unit::PU:
+      fprintf(f, "CmiProcessPerPU='%d'; export CmiProcessPerPU\n", proc_per.pu);
+      break;
+    default:
+      break;
+  }
+#if CMK_SMP
+  switch (onewth_per.unit())
+  {
+    case Unit::Host:
+      fprintf(f, "CmiOneWthPerHost='%d'; export CmiOneWthPerHost\n", 1);
+      break;
+    case Unit::Socket:
+      fprintf(f, "CmiOneWthPerSocket='%d'; export CmiOneWthPerSocket\n", 1);
+      break;
+    case Unit::Core:
+      fprintf(f, "CmiOneWthPerCore='%d'; export CmiOneWthPerCore\n", 1);
+      break;
+    case Unit::PU:
+      fprintf(f, "CmiOneWthPerPU='%d'; export CmiOneWthPerPU\n", 1);
+      break;
+    default:
+      break;
+  }
+#endif
 
   if (arg_mpiexec) {
     fprintf(f, "CmiNumNodes=$OMPI_COMM_WORLD_SIZE\n");
@@ -4648,16 +4881,12 @@ void ssh_script(FILE *f, int nodeno, int rank0no, const char **argv,
   }
 #ifdef HSTART
   else if (arg_hierarchical_start && arg_child_charmrun)
-    fprintf(f, "CmiNumNodes='%d'; export CmiNumNodes\n",
-            nodetab_rank0_size_total);
+    fprintf(f, "CmiNumNodes='%d'; export CmiNumNodes\n", hstart_total_hosts);
 #endif
 
   else
-    fprintf(f, "CmiNumNodes='%d'; export CmiNumNodes\n", nodetab_rank0_size);
+    fprintf(f, "CmiNumNodes='%d'; export CmiNumNodes\n", (int)my_process_table.size());
 
-#ifdef CMK_G95
-  fprintf(f, "G95_UNBUFFERED_ALL=TRUE; export G95_UNBUFFERED_ALL\n");
-#endif
 #ifdef CMK_GFORTRAN
   fprintf(f, "GFORTRAN_UNBUFFERED_ALL=YES; export GFORTRAN_UNBUFFERED_ALL\n");
 #endif
@@ -4670,25 +4899,24 @@ void ssh_script(FILE *f, int nodeno, int rank0no, const char **argv,
 #endif
 
   if (arg_verbose) {
-    printf("Charmrun> Sending \"%s\" to client %d.\n", netstart, rank0no);
+    printf("Charmrun> Sending \"%s\" to client %d.\n", netstart, nodeno);
   }
   fprintf(f,
           "PATH=\"$PATH:/bin:/usr/bin:/usr/X/bin:/usr/X11/bin:/usr/local/bin:"
           "/usr/X11R6/bin:/usr/openwin/bin\"\n");
 
   /* find the node-program */
-  arg_nodeprog_r = pathextfix(arg_nodeprog_a, nodetab_pathfixes(nodeno),
-                              nodetab_ext(nodeno));
+  char *arg_nodeprog_r = pathextfix(arg_nodeprog_a, h->pathfixes, h->ext);
 
   /* find the current directory, relative version */
-  arg_currdir_r = pathfix(arg_currdir_a, nodetab_pathfixes(nodeno));
+  char *arg_currdir_r = pathfix(arg_currdir_a, h->pathfixes);
 
   if (arg_verbose) {
     printf("Charmrun> find the node program \"%s\" at \"%s\" for %d.\n",
            arg_nodeprog_r, arg_currdir_r, nodeno);
   }
   if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
-    ssh_Find(f, nodetab_xterm(nodeno), "F_XTERM");
+    ssh_Find(f, h->xterm, "F_XTERM");
     if (!arg_ssh_display && !arg_debug_no_xrdb)
       ssh_Find(f, "xrdb", "F_XRDB");
     if (arg_verbose)
@@ -4727,11 +4955,11 @@ void ssh_script(FILE *f, int nodeno, int rank0no, const char **argv,
   fprintf(f, "  Exit 1\n");
   fprintf(f, "fi\n");
 
-  if (strcmp(nodetab_setup(nodeno), "*")) {
-    fprintf(f, "%s\n", nodetab_setup(nodeno));
+  if (strcmp(h->setup, "*")) {
+    fprintf(f, "%s\n", h->setup);
     fprintf(f, "if test $? = 1\nthen\n");
     fprintf(f, "  Echo 'this initialization command failed:'\n");
-    fprintf(f, "  Echo '\"%s\"'\n", nodetab_setup(nodeno));
+    fprintf(f, "  Echo '\"%s\"'\n", h->setup);
     fprintf(f, "  Echo 'edit your nodes file to fix it.'\n");
     fprintf(f, "  Exit 1\n");
     fprintf(f, "fi\n");
@@ -4764,11 +4992,33 @@ void ssh_script(FILE *f, int nodeno, int rank0no, const char **argv,
       if (arg_runscript)
         fprintf(f, "\"%s\" ", arg_runscript);
       fprintf(f, "$F_XTERM");
-      fprintf(f, " -title 'Node %d (%s)' ", nodeno, nodetab_name(nodeno));
+      fprintf(f, " -title 'Node %d (%s)' ", nodeno, h->name);
       if (strcmp(dbg, "idb") == 0)
         fprintf(f, " -e $F_DBG \"%s\" -c /tmp/charmrun_gdb.$$ \n", arg_nodeprog_r);
       else
         fprintf(f, " -e $F_DBG \"%s\" -x /tmp/charmrun_gdb.$$ \n", arg_nodeprog_r);
+    } else if (strcmp(dbg, "lldb") == 0) {
+      fprintf(f, "cat > /tmp/charmrun_lldb.$$ << END_OF_SCRIPT\n");
+      fprintf(f, "platform shell -- /bin/rm -f /tmp/charmrun_lldb.$$\n");
+      // must launch before configuring signals, or else:
+      // "error: No current process; cannot handle signals until you have a valid process."
+      // use -s to stop at the entry point
+      fprintf(f, "process launch -X true -s --");
+      fprint_arg(f, argv);
+      fprintf(f, "\n");
+      fprintf(f, "process handle -s false -n false SIGPIPE SIGWINCH\n");
+      if (arg_debug_commands)
+        fprintf(f, "%s\n", arg_debug_commands);
+      if (arg_debug_no_pause)
+        fprintf(f, "continue\n");
+      else
+        fprintf(f, "# Use \"continue\" or \"c\" to begin execution.\n");
+      fprintf(f, "END_OF_SCRIPT\n");
+      if (arg_runscript)
+        fprintf(f, "\"%s\" ", arg_runscript);
+      fprintf(f, "$F_XTERM");
+      fprintf(f, " -title 'Node %d (%s)' ", nodeno, h->name);
+      fprintf(f, " -e $F_DBG \"%s\" -s /tmp/charmrun_lldb.$$ \n", arg_nodeprog_r);
     } else if (strcmp(dbg, "dbx") == 0) {
       fprintf(f, "cat > /tmp/charmrun_dbx.$$ << END_OF_SCRIPT\n");
       fprintf(f, "sh /bin/rm -f /tmp/charmrun_dbx.$$\n");
@@ -4783,7 +5033,7 @@ void ssh_script(FILE *f, int nodeno, int rank0no, const char **argv,
       if (arg_runscript)
         fprintf(f, "\"%s\" ", arg_runscript);
       fprintf(f, "$F_XTERM");
-      fprintf(f, " -title 'Node %d (%s)' ", nodeno, nodetab_name(nodeno));
+      fprintf(f, " -title 'Node %d (%s)' ", nodeno, h->name);
       fprintf(f, " -e $F_DBG %s ", arg_debug_no_pause ? "-r" : "");
       if (arg_debug) {
         fprintf(f, "-c \'runargs ");
@@ -4795,13 +5045,11 @@ void ssh_script(FILE *f, int nodeno, int rank0no, const char **argv,
         fprint_arg(f, argv);
       fprintf(f, "\n");
     } else {
-      fprintf(stderr, "Unknown debugger: %s.\n Exiting.\n",
-              nodetab_debugger(nodeno));
+      fprintf(stderr, "Unknown debugger: %s.\n Exiting.\n", h->debugger);
     }
   } else if (arg_in_xterm) {
     if (arg_verbose)
-      fprintf(stderr, "Charmrun> node %d: xterm is %s\n", nodeno,
-              nodetab_xterm(nodeno));
+      printf("Charmrun> node %d: xterm is %s\n", nodeno, h->xterm);
     fprintf(f, "cat > /tmp/charmrun_inx.$$ << END_OF_SCRIPT\n");
     fprintf(f, "#!/bin/sh\n");
     fprintf(f, "/bin/rm -f /tmp/charmrun_inx.$$\n");
@@ -4814,7 +5062,7 @@ void ssh_script(FILE *f, int nodeno, int rank0no, const char **argv,
     fprintf(f, "chmod 700 /tmp/charmrun_inx.$$\n");
     if (arg_runscript)
       fprintf(f, "\"%s\" ", arg_runscript);
-    fprintf(f, "$F_XTERM -title 'Node %d (%s)' ", nodeno, nodetab_name(nodeno));
+    fprintf(f, "$F_XTERM -title 'Node %d (%s)' ", nodeno, h->name);
     fprintf(f, " -sl 5000");
     fprintf(f, " -e /tmp/charmrun_inx.$$\n");
   } else {
@@ -4822,15 +5070,15 @@ void ssh_script(FILE *f, int nodeno, int rank0no, const char **argv,
       fprintf(f, "\"%s\" ", arg_runscript);
     if (arg_no_va_rand) {
       if (arg_verbose)
-        fprintf(stderr, "Charmrun> setarch -R is used.\n");
+        printf("Charmrun> setarch -R is used.\n");
       fprintf(f, "setarch `uname -m` -R ");
     }
     fprintf(f, "\"%s\" ", arg_nodeprog_r);
     fprint_arg(f, argv);
-    if (nodetab_nice(nodeno) != -100) {
+    if (h->nice != -100) {
       if (arg_verbose)
-        fprintf(stderr, "Charmrun> nice -n %d\n", nodetab_nice(nodeno));
-      fprintf(f, " +nice %d ", nodetab_nice(nodeno));
+        printf("Charmrun> nice -n %d\n", h->nice);
+      fprintf(f, " +nice %d ", h->nice);
     }
     fprintf(f, "\nres=$?\n");
     /* If shared libraries fail to load, the program dies without
@@ -4873,26 +5121,25 @@ void ssh_script(FILE *f, int nodeno, int rank0no, const char **argv,
 
 /* use the command "size" to get information about the position of the ".data"
    and ".bss" segments inside the program memory */
-void read_global_segments_size()
+static void read_global_segments_size()
 {
-  std::vector<const char *> sshargv;
-  char *tmp;
-  int childPid;
+  nodetab_host const * h = host_table[0];
 
   /* find the node-program */
   arg_nodeprog_r =
-      pathextfix(arg_nodeprog_a, nodetab_pathfixes(0), nodetab_ext(0));
+      pathextfix(arg_nodeprog_a, h->pathfixes, h->ext);
 
-  sshargv.push_back(nodetab_shell(0));
-  sshargv.push_back(nodetab_name(0));
+  std::vector<const char *> sshargv;
+  sshargv.push_back(h->shell);
+  sshargv.push_back(h->name);
   sshargv.push_back("-l");
-  sshargv.push_back(nodetab_login(0));
-  tmp = (char *) malloc(sizeof(char) * 9 + strlen(arg_nodeprog_r));
+  sshargv.push_back(h->login);
+  char *tmp = (char *) malloc(sizeof(char) * 9 + strlen(arg_nodeprog_r));
   sprintf(tmp, "size -A %s", arg_nodeprog_r);
   sshargv.push_back(tmp);
   sshargv.push_back((const char *) NULL);
 
-  childPid = fork();
+  int childPid = fork();
   if (childPid < 0) {
     perror("ERROR> getting the size of the global variables segments");
     exit(1);
@@ -4913,31 +5160,39 @@ void read_global_segments_size()
 }
 
 /* open a ssh connection with processor 0 and open a gdb session for info */
-void open_gdb_info()
+static void open_gdb_info()
 {
-  std::vector<const char *> sshargv;
-  char *tmp;
-  int fdin[2];
-  int fdout[2];
-  int fderr[2];
-  int i;
+  nodetab_host const * h = host_table[0];
 
   /* find the node-program */
   arg_nodeprog_r =
-      pathextfix(arg_nodeprog_a, nodetab_pathfixes(0), nodetab_ext(0));
+      pathextfix(arg_nodeprog_a, h->pathfixes, h->ext);
 
-  sshargv.push_back(nodetab_shell(0));
-  sshargv.push_back(nodetab_name(0));
+  std::vector<const char *> sshargv;
+  sshargv.push_back(h->shell);
+  sshargv.push_back(h->name);
   sshargv.push_back("-l");
-  sshargv.push_back(nodetab_login(0));
-  tmp = (char *) malloc(sizeof(char) * 8 + strlen(arg_nodeprog_r));
+  sshargv.push_back(h->login);
+  char *tmp = (char *) malloc(sizeof(char) * 8 + strlen(arg_nodeprog_r));
   sprintf(tmp, "gdb -q %s", arg_nodeprog_r);
   sshargv.push_back(tmp);
   sshargv.push_back((const char *) NULL);
 
-  pipe(fdin);
-  pipe(fdout);
-  pipe(fderr);
+  int fdin[2];
+  int fdout[2];
+  int fderr[2];
+  if (pipe(fdin) == -1) {
+    fprintf(stderr, "charmrun> pipe() failed!\n");
+    exit(1);
+  }
+  if (pipe(fdout) == -1) {
+    fprintf(stderr, "charmrun> pipe() failed!\n");
+    exit(1);
+  }
+  if (pipe(fderr) == -1) {
+    fprintf(stderr, "charmrun> pipe() failed!\n");
+    exit(1);
+  }
 
   gdb_info_pid = fork();
   if (gdb_info_pid < 0) {
@@ -4953,7 +5208,7 @@ void open_gdb_info()
     dup2(fdin[0], 0);
     dup2(fdout[1], 1);
     dup2(fderr[1], 2);
-    for (i = 3; i < 1024; i++)
+    for (int i = 3; i < 1024; i++)
       close(i);
     execvp(sshargv[0], const_cast<char **>(&sshargv[0]));
     fprintf(stderr, "Charmrun> Couldn't find remote shell program '%s'!\n",
@@ -4970,196 +5225,111 @@ void open_gdb_info()
   close(fderr[1]);
 }
 #ifdef HSTART
-void start_next_level_charmruns()
+static void start_next_level_charmruns()
 {
 
+  const char *nodeprog_name = strrchr(arg_nodeprog_a, '/');
   static char buf[1024];
-  char *nodeprog_name = strrchr(arg_nodeprog_a, '/');
-  nodeprog_name[0] = 0;
-  sprintf(buf, "%s%s%s", arg_nodeprog_a, DIRSEP, "charmrun");
+  sprintf(buf, "%.*s%s%s", (int)(nodeprog_name-arg_nodeprog_a), arg_nodeprog_a, DIRSEP, "charmrun");
   arg_nodeprog_a = strdup(buf);
 
-  int client;
   int nextIndex = 0;
-  client = 0;
-  while (nextIndex < branchfactor) {
-    /* need to index into unique_table*/
-    int rank0no = nodetab_unique_table[client];
-    int pe = nodetab_rank0_table[rank0no];
+  int client = 0;
+  // while (nextIndex < branchfactor) {
+  for (nodetab_process * p : my_process_table)
+  {
+    TODO; // need to do something more detailed with branchfactor and nodes_per_child
+
     FILE *f;
     char startScript[200];
-    sprintf(startScript, "/tmp/charmrun.%d.%d", getpid(), pe);
+    sprintf(startScript, "/tmp/charmrun.%d.%d", getpid(), p.procno);
     f = fopen(startScript, "w");
     if (f == NULL) {
       /* now try current directory */
-      sprintf(startScript, "charmrun.%d.%d", getpid(), pe);
+      sprintf(startScript, "charmrun.%d.%d", getpid(), p.procno);
       f = fopen(startScript, "w");
       if (f == NULL) {
         fprintf(stderr, "Charmrun> Can not write file %s!\n", startScript);
         exit(1);
       }
     }
-    ssh_script(f, pe, client, arg_argv, 0);
+    ssh_script(f, p, arg_argv);
     fclose(f);
-    if (!ssh_pids)
-      ssh_pids = (int *) malloc(sizeof(int) * branchfactor);
-    ssh_pids[nextIndex++] = ssh_fork(pe, startScript);
+
+    p.ssh_pid = ssh_fork(p, startScript);
     client += nodes_per_child;
   }
 }
 #endif
 
 /* returns pid */
-void start_one_node_ssh(int rank0no)
+static void start_one_node_ssh(nodetab_process & p)
 {
-  int pe = nodetab_rank0_table[rank0no];
-  FILE *f;
+  const nodetab_host * h = p.host;
+
   char startScript[200];
-  sprintf(startScript, "/tmp/charmrun.%d.%d", getpid(), pe);
-  f = fopen(startScript, "w");
+  sprintf(startScript, "/tmp/charmrun.%d.%d", getpid(), p.nodeno);
+  FILE *f = fopen(startScript, "w");
   if (f == NULL) {
     /* now try current directory */
-    sprintf(startScript, "charmrun.%d.%d", getpid(), pe);
+    sprintf(startScript, "charmrun.%d.%d", getpid(), p.nodeno);
     f = fopen(startScript, "w");
     if (f == NULL) {
       fprintf(stderr, "Charmrun> Can not write file %s!\n", startScript);
       exit(1);
     }
   }
-  ssh_script(f, pe, rank0no, arg_argv, 0);
+  ssh_script(f, p, arg_argv);
   fclose(f);
-  if (!ssh_pids)
-    ssh_pids = (int *) malloc(sizeof(int) * nodetab_rank0_size);
-  ssh_pids[rank0no] = ssh_fork(pe, startScript);
+
+  p.ssh_pid = ssh_fork(p, startScript);
 }
 
-int start_set_node_ssh(int client)
+static void start_nodes_ssh(std::vector<nodetab_process> & process_table)
 {
-  /* a search function could be inserted here instead of sequential lookup for
-   * more complex node lists (e.g. interleaving) */
-  int clientgroup;
-
-#if defined(_WIN32)
-  clientgroup = client + 1; /* smp already handles this functionality */
-#else
-
-#ifdef HSTART
-  if (!arg_scalable_start && !arg_hierarchical_start)
-    clientgroup = client + 1; /* only launch 1 core per ssh call */
-  else {
-    clientgroup = client;
-    do {
-      clientgroup++; /* add one more client to group if not greater than nodes
-                        and shares the same name as client */
-      if (clientgroup >= nodetab_rank0_size)
-        break;
-      if (arg_scalable_start && !arg_hierarchical_start)
-        if (strcmp(nodetab_name(clientgroup), nodetab_name(client)))
-          break;
-      /*Hierarchical-start*/
-      if (strcmp(nodetab_name(nodetab_rank0_table[clientgroup]),
-                 nodetab_name(nodetab_rank0_table[client])))
-        break;
-    } while (1);
-  }
-
-#else
-  if (!arg_scalable_start)
-    clientgroup = client + 1; /* only launch 1 core per ssh call */
-  else {
-    clientgroup = client;
-    do {
-      clientgroup++; /* add one more client to group if not greater than nodes
-                        and shares the same name as client */
-    } while (clientgroup < nodetab_rank0_size &&
-             (!strcmp(nodetab_getnodeinfo(clientgroup)->name,
-                      nodetab_getnodeinfo(client)->name)));
-  }
-#endif
-
-#endif
-  nodetab_getnodeinfo(client)->forks =
-      clientgroup - client - 1; /* already have 1 process launching */
-  start_one_node_ssh(client);
-  return clientgroup - client; /* return number of entries in group */
-}
-
-void start_nodes_ssh()
-{
-  int client, clientgroup;
-  ssh_pids = (int *) malloc(sizeof(int) * nodetab_rank0_size);
-
-  if (arg_verbose)
-    printf("start_nodes_ssh\n");
-  client = 0;
-#if CMK_SHRINK_EXPAND
-  if (arg_verbose)
-    printf("start_nodes_rsh %d %d\n", arg_requested_pes, arg_old_pes);
-  if (arg_shrinkexpand) {
-    if (arg_requested_pes >= arg_old_pes) { // expand case
-      if (arg_verbose)
-        printf("Expand %d %d\n", arg_requested_pes, arg_old_pes);
-      for (client = 0; client < arg_old_pes; client++)
-        ssh_pids[client] = 0;
-    } else { // shrink case
-      if (arg_verbose)
-        printf("Shrink  %d %d\n", arg_requested_pes, arg_old_pes);
-      for (client = 0; client < arg_requested_pes; client++)
-        ssh_pids[client] = 0;
-    }
-  }
-#endif
-  while (client < nodetab_rank0_size) {
-    /* start a group of processes per node */
-    clientgroup = start_set_node_ssh(client);
-    client += clientgroup;
+  for (nodetab_process & p : process_table)
+  {
+      start_one_node_ssh(p);
   }
 }
 
 /* for mpiexec, for once calling mpiexec to start on all nodes  */
-int ssh_fork_one(const char *startScript)
+static int ssh_fork_one(nodetab_process & p, const char *startScript)
 {
+  nodetab_host const * h = p.host;
+
   std::vector<const char *> sshargv;
-  int pid;
-  char npes[128];
-  const char *s, *e;
 
-  /* figure out size and dynamic allocate */
-  s = nodetab_shell(0);
-  e = skipstuff(s);
-  while (*s) {
-    s = skipblanks(e);
-    e = skipstuff(s);
-  }
-
-  s = nodetab_shell(0);
-  e = skipstuff(s);
+  const char *s = h->shell;
+  const char *e = skipstuff(s);
   while (*s) {
     sshargv.push_back(substr(s, e));
     s = skipblanks(e);
     e = skipstuff(s);
   }
 
+  const int processes = get_old_style_process_count();
+
+  char npes[24];
   if ( ! arg_mpiexec_no_n ) {
     sshargv.push_back("-n");
-    sprintf(npes, "%d", nodetab_rank0_size);
+    sprintf(npes, "%d", processes);
     sshargv.push_back(npes);
   }
   sshargv.push_back((char *) startScript);
   sshargv.push_back((const char *) NULL);
   if (arg_verbose)
-    printf("Charmrun> Starting %s %s \n", nodetab_shell(0), startScript);
+    printf("Charmrun> Starting %s %s \n", h->shell, startScript);
 
-  pid = fork();
+  int pid = fork();
   if (pid < 0) {
     perror("ERROR> starting mpiexec");
     exit(1);
   }
   if (pid == 0) { /*Child process*/
-    int i;
     /*  unlink(startScript); */
     // removeEnv("DISPLAY="); /*No DISPLAY disables ssh's slow X11 forwarding*/
-    for (i = 3; i < 1024; i++)
+    for (int i = 3; i < 1024; i++)
       close(i);
     execvp(sshargv[0], const_cast<char *const *>(&sshargv[0]));
     fprintf(stderr, "Charmrun> Couldn't find mpiexec program '%s'!\n",
@@ -5167,18 +5337,15 @@ int ssh_fork_one(const char *startScript)
     exit(1);
   }
   if (arg_verbose)
-    fprintf(stderr, "Charmrun> mpiexec started\n");
+    printf("Charmrun> mpiexec started\n");
   return pid;
 }
 
-void start_nodes_mpiexec()
+static void start_nodes_mpiexec()
 {
-  int i;
-
-  FILE *f;
   char startScript[200];
   sprintf(startScript, "./charmrun.%d", getpid());
-  f = fopen(startScript, "w");
+  FILE *f = fopen(startScript, "w");
   chmod(startScript, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IROTH);
   if (f == NULL) {
     /* now try current directory */
@@ -5189,39 +5356,36 @@ void start_nodes_mpiexec()
       exit(1);
     }
   }
-  ssh_script(f, 0, 0, arg_argv, 0);
+
+  nodetab_process & p = my_process_table[0];
+
+  ssh_script(f, p, arg_argv);
   fclose(f);
-  ssh_pids = (int *) malloc(sizeof(int) * nodetab_rank0_size);
-  ssh_pids[0] = ssh_fork_one(startScript);
-  for (i = 0; i < nodetab_rank0_size; i++)
-    ssh_pids[i] = 0; /* skip finish_nodes */
+
+  ssh_fork_one(p, startScript);
+  /* all ssh_pid remain zero: skip finish_nodes */
 }
 
-void finish_set_nodes(int start, int stop)
+static void finish_set_nodes(std::vector<nodetab_process> & process_table, int start, int stop)
 {
-  int status, done, i;
-  const char *host;
-
-  if (!ssh_pids)
-    return; /*nothing to do*/
-
   std::vector<int> num_retries(stop - start, 0);
-  done = 0;
+  int done = 0;
   while (!done) {
     done = 1;
-    for (i = start; i < stop; i++) { /* check all nodes */
-      if (ssh_pids[i] != 0) {
+    for (int i = start; i < stop; i++) { /* check all nodes */
+      nodetab_process & p = process_table[i];
+      const nodetab_host * h = p.host;
+      if (p.ssh_pid != 0) {
         done = 0; /* we are not finished yet */
-        status = 0;
-        waitpid(ssh_pids[i], &status, 0); /* check if the process is finished */
+        int status = 0;
+        waitpid(p.ssh_pid, &status, 0); /* check if the process is finished */
         if (WIFEXITED(status)) {
           if (!WEXITSTATUS(status)) { /* good */
-            ssh_pids[i] = 0;          /* process is finished */
+            p.ssh_pid = 0;          /* process is finished */
           } else {
-            host = nodetab_name(nodetab_rank0_table[i]);
             fprintf(stderr,
                     "Charmrun> Error %d returned from remote shell (%s:%d)\n",
-                    WEXITSTATUS(status), host, i);
+                    WEXITSTATUS(status), h->name, p.nodeno);
 
             if (WEXITSTATUS(status) != 255)
               exit(1);
@@ -5229,7 +5393,7 @@ void finish_set_nodes(int start, int stop)
             if (++num_retries[i - start] <= MAX_NUM_RETRIES) {
               fprintf(stderr, "Charmrun> Reconnection attempt %d of %d\n",
                       num_retries[i - start], MAX_NUM_RETRIES);
-              start_one_node_ssh(i);
+              start_one_node_ssh(p);
             } else {
               fprintf(
                   stderr,
@@ -5243,38 +5407,35 @@ void finish_set_nodes(int start, int stop)
   }
 }
 
-void finish_nodes()
+static void finish_nodes(std::vector<nodetab_process> & process_table)
 {
 #ifdef HSTART
   if (arg_hierarchical_start && !arg_child_charmrun)
-    finish_set_nodes(0, branchfactor);
+    finish_set_nodes(process_table, 0, branchfactor);
   else
 #endif
-    finish_set_nodes(0, nodetab_rank0_size);
-  free(ssh_pids);
+    finish_set_nodes(process_table, 0, process_table.size());
 }
 
-void kill_nodes()
+static void kill_nodes()
 {
-  int rank0no;
-  if (!ssh_pids)
-    return; /*nothing to do*/
   /*Now wait for all the ssh'es to finish*/
-  for (rank0no = 0; rank0no < nodetab_rank0_size; rank0no++) {
-    const char *host = nodetab_name(nodetab_rank0_table[rank0no]);
+  for (nodetab_process & p : my_process_table)
+  {
+    const nodetab_host * h = p.host;
     int status = 0;
     if (arg_verbose)
-      printf("Charmrun> waiting for remote shell (%s:%d), pid %d\n", host,
-             rank0no, ssh_pids[rank0no]);
-    kill(ssh_pids[rank0no], 9);
-    waitpid(ssh_pids[rank0no], &status, 0); /*<- no zombies*/
+      printf("Charmrun> waiting for remote shell (%s:%d), pid %d\n", h->name,
+             p.nodeno, p.ssh_pid);
+    kill(p.ssh_pid, 9);
+    waitpid(p.ssh_pid, &status, 0); /*<- no zombies*/
+    p.ssh_pid = 0;
   }
-  free(ssh_pids);
 }
 
 
 /* find the absolute path for an executable in the path */
-char *find_abs_path(const char *target)
+static char *find_abs_path(const char *target)
 {
   char *thepath=getenv("PATH");
   char *path=strdup(thepath);
@@ -5285,7 +5446,7 @@ char *find_abs_path(const char *target)
     strcat(abspath,"/");
     strcat(abspath,target);
     if(probefile(abspath)){
-      delete path;
+      free(path);
       return abspath;
     }
     subpath=strtok(NULL,":");
@@ -5297,168 +5458,217 @@ char *find_abs_path(const char *target)
 
 /* simple version of charmrun that avoids the sshd or charmd,   */
 /* it spawn the node program just on local machine using exec. */
-void start_nodes_local(char **env)
+static void start_nodes_local(std::vector<nodetab_process> & process_table)
 {
-  char **envp;
-  int envc, rank0no, i;
-  int extra = 0;
-  
-  char **dparamp;
-  int dparamc;
-#if CMK_AIX && CMK_SMP
-  extra = 1;
-#endif
-
+  char ** env = main_envp;
 
   /* copy environ and expanded to hold NETSTART and CmiNumNodes */
+  int envc;
   for (envc = 0; env[envc]; envc++)
     ;
-  envp = (char **) malloc((envc + 2 + extra + 1) * sizeof(void *));
-  for (i = 0; i < envc; i++)
-    envp[i] = env[i];
-  envp[envc] = (char *) malloc(256);
-  envp[envc + 1] = (char *) malloc(256);
+  int extra = 0;
 #if CMK_AIX && CMK_SMP
-  envp[envc + 2] = (char *) malloc(256);
-  sprintf(envp[envc + 2], "MALLOCMULTIHEAP=1");
+  ++extra;
 #endif
-  envp[envc + 2 + extra] = 0;
-  for (i = 0; i < envc; i++)
+  const int proc_active = proc_per.active();
+  extra += proc_active;
+#if CMK_SMP
+  const int onewth_active = onewth_per.active();
+  extra += onewth_active;
+#endif
+
+  char **envp = (char **) malloc((envc + 2 + extra + 1) * sizeof(void *));
+  for (int i = 0; i < envc; i++)
     envp[i] = env[i];
   envp[envc] = (char *) malloc(256);
   envp[envc + 1] = (char *) malloc(256);
-  int dparamoutc=0;
-  int dparamoutmax=7;
+  int n = 2;
+#if CMK_AIX && CMK_SMP
+  envp[envc + n] = (char *) malloc(256);
+  sprintf(envp[envc + n], "MALLOCMULTIHEAP=1");
+  ++n;
+#endif
+  // cpu affinity hints
+  using Unit = typename TopologyRequest::Unit;
+  if (proc_active)
+  {
+    envp[envc + n] = (char *) malloc(256);
+    switch (proc_per.unit())
+    {
+      case Unit::Host:
+        sprintf(envp[envc + n], "CmiProcessPerHost=%d", proc_per.host);
+        break;
+      case Unit::Socket:
+        sprintf(envp[envc + n], "CmiProcessPerSocket=%d", proc_per.socket);
+        break;
+      case Unit::Core:
+        sprintf(envp[envc + n], "CmiProcessPerCore=%d", proc_per.core);
+        break;
+      case Unit::PU:
+        sprintf(envp[envc + n], "CmiProcessPerPU=%d", proc_per.pu);
+        break;
+      default:
+        break;
+    }
+    ++n;
+  }
+#if CMK_SMP
+  if (onewth_active)
+  {
+    envp[envc + n] = (char *) malloc(256);
+    switch (onewth_per.unit())
+    {
+      case Unit::Host:
+        sprintf(envp[envc + n], "CmiOneWthPerHost=%d", 1);
+        break;
+      case Unit::Socket:
+        sprintf(envp[envc + n], "CmiOneWthPerSocket=%d", 1);
+        break;
+      case Unit::Core:
+        sprintf(envp[envc + n], "CmiOneWthPerCore=%d", 1);
+        break;
+      case Unit::PU:
+        sprintf(envp[envc + n], "CmiOneWthPerPU=%d", 1);
+        break;
+      default:
+        break;
+    }
+    ++n;
+  }
+#endif
+  envp[envc + n] = 0;
 
   /* insert xterm gdb in front of command line and pass args to gdb */
-  if(arg_debug || arg_debug_no_pause) {
-    int argstringlen=0;
-    for (dparamc = 0, argstringlen=0; pparam_argv[dparamc]; dparamc++)
-      { 
-        if(dparamc>1) argstringlen+=strlen(pparam_argv[dparamc]);
-      }
-    if(arg_debug_no_pause) dparamoutmax+=2;
-
-    dparamp = (char **) malloc((dparamoutmax) * sizeof(void *));
+  char **dparamp;
+  std::vector<char *> dparamv;
+  if (arg_debug || arg_debug_no_pause || arg_in_xterm)
+  {
     char *abs_xterm=find_abs_path(arg_xterm);
     if(!abs_xterm)
-      {
-      fprintf(stderr, "Charmrun> cannot find xterm for gdb, please add it to your path\n");
-      exit(1);
-      }
-    dparamp[dparamoutc++] = strdup(abs_xterm);
-    dparamp[dparamoutc++] = strdup("-e");
-    dparamp[dparamoutc++] = strdup(arg_debugger);
-    dparamp[dparamoutc++] = strdup(pparam_argv[1]);
-    dparamp[dparamoutc++] = strdup("-ex");
-    dparamp[dparamoutc] = (char *) malloc(argstringlen + 11 + dparamc);
-    strcpy(dparamp[dparamoutc], "set args");
-    for(int i=2; i< dparamc; i++)
-      {
-	strcat(dparamp[dparamoutc], " ");
-	strcat(dparamp[dparamoutc], pparam_argv[i]);
-      }
-    if(arg_debug_no_pause)
-      {
-	dparamp[++dparamoutc] = strdup("-ex");
-	dparamp[++dparamoutc] = strdup("r");
-      }
-    dparamp[++dparamoutc]=0;  // null terminate your argv or face the wrath of
-    // undefined behavior
-    if (arg_verbose)
-      {
-	printf("Charmrun> gdb args : ");
-	for (i = 0; i < dparamoutc; i++)
-	  printf(" %s ",dparamp[i]);
-	printf("\n");
-      }
-  }
-  else
     {
-      dparamp=(char **) (pparam_argv+1);
+      fprintf(stderr, "Charmrun> cannot find xterm for debugging, please add it to your path\n");
+      exit(1);
     }
 
-  for (rank0no = 0; rank0no < nodetab_rank0_size; rank0no++) {
-    int status = 0;
-    int pid;
-    int pe = nodetab_rank0_table[rank0no];
+    dparamv.push_back(strdup(abs_xterm));
+    dparamv.push_back(strdup("-title"));
+    dparamv.push_back(strdup(pparam_argv[1]));
+    dparamv.push_back(strdup("-e"));
+
+    std::vector<const char *> cparamv;
+    if (arg_debug || arg_debug_no_pause)
+    {
+      const bool isLLDB = strcmp(arg_debugger, "lldb") == 0;
+      const char *commandflag = isLLDB ? "-o" : "-ex";
+      const char *argsflag = isLLDB ? "--" : "--args";
+
+      cparamv.push_back(arg_debugger);
+
+      if (arg_debug_no_pause)
+      {
+        cparamv.push_back(commandflag);
+        cparamv.push_back("r");
+      }
+
+      cparamv.push_back(argsflag);
+    }
+
+    for (int i = 1; pparam_argv[i] != nullptr; ++i)
+      cparamv.push_back(pparam_argv[i]);
+
+    if (!(arg_debug || arg_debug_no_pause))
+      cparamv.push_back("; echo \"program exited with code $?\" ; read eoln");
+
+    dparamv.push_back(cstring_join(cparamv, " "));
 
     if (arg_verbose)
-      printf("Charmrun> start %d node program on localhost.\n", pe);
-    sprintf(envp[envc], "NETSTART=%s", create_netstart(rank0no));
-    sprintf(envp[envc + 1], "CmiNumNodes=%d", nodetab_rank0_size);
-    pid = 0;
-    pid = fork();
-    if (pid < 0)
+    {
+      printf("Charmrun> xterm args:");
+      for (const char *p : dparamv)
+        printf(" %s", p);
+      printf("\n");
+    }
+
+    // null terminate your argv or face the wrath of undefined behavior
+    dparamv.push_back(nullptr);
+
+    dparamp = dparamv.data();
+  }
+  else
+  {
+    dparamp = (char **)(pparam_argv+1);
+  }
+
+  for (const nodetab_process & p : process_table)
+  {
+    if (arg_verbose)
+      printf("Charmrun> start %d node program on localhost.\n", p.nodeno);
+    sprintf(envp[envc], "NETSTART=%s", create_netstart(p.nodeno));
+    sprintf(envp[envc + 1], "CmiNumNodes=%d", 0);
+
+    int pid = fork();
+    if (pid < 0) {
+      fprintf(stderr, "fork failed: %s\n", strerror(errno));
       exit(1);
+    }
     if (pid == 0) {
-      int fd, fd1 = dup(1);
+      int fd, fd2 = dup(2);
+#if CMK_CHARMPY
+      // don't disable initial output on rank 0 process (need to be able to see python syntax errors, etc)
+      if ((p.nodeno != 0) && (-1 != (fd = open("/dev/null", O_RDWR)))) {
+#else
       if (-1 != (fd = open("/dev/null", O_RDWR))) {
+#endif
         dup2(fd, 0);
         dup2(fd, 1);
         dup2(fd, 2);
       }
-      status = execve(dparamp[0],
+      int status = execve(dparamp[0],
 		      const_cast<char *const *>(dparamp), envp);
-
-      dup2(fd1, 1);
-      fprintf(stderr, "execve failed to start process \"%s\" with status: %d\n",
-             dparamp[0], status);
+      dup2(fd2, 2);
+      fprintf(stderr, "execve failed to start process \"%s\": %s\n",
+             dparamp[0], strerror(errno));
       kill(getppid(), 9);
       exit(1);
     }
   }
-  if(arg_debug || arg_debug_no_pause)
-    {
-      for(;dparamoutc>=0;dparamoutc--) free(dparamp[dparamoutc]);
-      free(dparamp);
-    }
-  free(envp[envc]);
-  free(envp[envc + 1]);
-#if CMK_AIX && CMK_SMP
-  free(envp[envc + 2]);
-#endif
+  for (char *p : dparamv)
+    free(p);
+  for (int i = envc, i_end = envc + n; i < i_end; ++i)
+    free(envp[i]);
   free(envp);
 }
 
 #ifdef __FAULT__
 
-int current_restart_phase = 1;
-
-void refill_nodetab_entry(int crashed_node);
-nodetab_host *replacement_host(int pe);
+static int current_restart_phase = 1;
 
 /**
  * @brief Relaunches a program on the crashed node.
  */
-void restart_node(int crashed_node)
+static void restart_node(nodetab_process & p)
 {
-  int pe = nodetab_rank0_table[crashed_node];
-  FILE *f;
   char startScript[200];
-  int restart_ssh_pid;
-  const char **restart_argv;
-  int status = 0;
-  char phase_str[10];
-  int i;
   /** write the startScript file to be sent**/
-  sprintf(startScript, "/tmp/charmrun.%d.%d", getpid(), pe);
-  f = fopen(startScript, "w");
+  sprintf(startScript, "/tmp/charmrun.%d.%d", getpid(), p.nodeno);
+  FILE *f = fopen(startScript, "w");
 
   /** add an argument to the argv of the new process
   so that the restarting processor knows that it
   is a restarting processor */
-  i = 0;
+  int i = 0;
   while (arg_argv[i] != NULL) {
     i++;
   }
-  restart_argv = (const char **) malloc(sizeof(char *) * (i + 4));
+  const char **restart_argv = (const char **) malloc(sizeof(char *) * (i + 4));
   i = 0;
   while (arg_argv[i] != NULL) {
     restart_argv[i] = arg_argv[i];
     i++;
   }
   restart_argv[i] = "+restartaftercrash";
+
+  char phase_str[10];
   sprintf(phase_str, "%d", ++current_restart_phase);
   restart_argv[i + 1] = phase_str;
   restart_argv[i + 2] = "+restartisomalloc";
@@ -5466,13 +5676,33 @@ void restart_node(int crashed_node)
 
   /** change the nodetable entry of the crashed
 processor to connect it to a new one**/
-  refill_nodetab_entry(crashed_node);
-  ssh_script(f, pe, crashed_node, restart_argv, 1);
+  static int next_replacement_host = 0;
+  p.host->crashed = true;
+  const int host_count = host_table.size();
+#if 0
+  // Disabled since ft does not distinguish host faults from process faults
+  int hosts_checked = 0;
+  while (host_table[next_replacement_host]->crashed)
+  {
+    ++next_replacement_host;
+    next_replacement_host %= host_count;
+    if (++hosts_checked == host_count)
+    {
+      fprintf(stderr, "Charmrun> All hosts crashed, aborting.\n");
+      exit(1);
+    }
+  }
+#endif
+  p.host = host_table[next_replacement_host];
+  ++next_replacement_host;
+  next_replacement_host %= host_count;
+
+  ssh_script(f, p, restart_argv);
   fclose(f);
   /**start the new processor */
-  restart_ssh_pid = ssh_fork(pe, startScript);
+  int restart_ssh_pid = ssh_fork(p, startScript);
   /**wait for the reply from the new process*/
-  status = 0;
+  int status = 0;
   if (arg_debug_no_pause || arg_debug)
     ;
   else {
@@ -5490,123 +5720,80 @@ processor to connect it to a new one**/
          GetClock() - ftTimer));
 }
 
-void refill_nodetab_entry(int crashed_node)
-{
-  int pe = nodetab_rank0_table[crashed_node];
-  nodetab_host *h = nodetab_table[pe];
-  *h = *(replacement_host(pe));
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-  fprintf(stderr, "Charmrun>>> New pe %d is on host %s \n", pe,
-          nodetab_name(pe));
-#endif
-}
-
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-nodetab_host *replacement_host(int pe)
-{
-  int x = loaded_max_pe + 1;
-
-  x = x % arg_read_pes;
-  loaded_max_pe += 1;
-  /*  while(x == pe){
-   *       x = rand()%nodetab_size;
-   *           }*/
-  fprintf(stderr, "Charmrun>>> replacing pe %d with %d host %s with %s \n", pe,
-          x, nodetab_name(pe), nodetab_name(x));
-  return nodetab_table[x];
-}
-#else
-nodetab_host *replacement_host(int pe)
-{
-  int x = pe;
-  while (x == pe) {
-#ifdef HSTART
-    if (arg_hierarchical_start) {
-      x = nodetab_rank0_table[rand() % nodetab_rank0_size];
-      crashed_pe_id = pe;
-      restarted_pe_id = x;
-    } else
-#endif
-      x = rand() % nodetab_size;
-  }
-  return nodetab_table[x];
-}
-#endif
-
 /**
  * @brief Reconnects a crashed node. It waits for the I-tuple from the just
  * relaunched program. It also:
  * i) Broadcast the nodetabtable to every other node.
  * ii) Announces the crash to every other node.
  */
-void reconnect_crashed_client(int socket_index, int crashed_node)
+static void reconnect_crashed_client(nodetab_process & crashed)
 {
-  int i;
-  unsigned int clientPort;
-  skt_ip_t clientIP;
-  ChSingleNodeinfo *in;
   if (0 == skt_select1(server_fd, arg_timeout * 1000)) {
-    client_connect_problem(
-        socket_index, socket_index,
-        "Timeout waiting for restarted node-program to connect");
+    client_connect_problem(crashed, "Timeout waiting for restarted node-program to connect");
   }
-  req_clients[socket_index] = skt_accept(server_fd, &clientIP, &clientPort);
-  skt_client_table[req_clients[socket_index]] = crashed_node;
 
-  if (req_clients[socket_index] == SOCKET_ERROR) {
-    client_connect_problem(socket_index, socket_index,
-                           "Failure in restarted node accept");
+  skt_ip_t clientIP;
+  unsigned int clientPort;
+
+  const SOCKET req_client = skt_accept(server_fd, &clientIP, &clientPort);
+
+  if (req_client == SOCKET_ERROR) {
+    client_connect_problem(crashed, "Failure in restarted node accept");
+    exit(1);
   } else {
+    skt_tcp_no_nagle(req_client);
+
     ChMessage msg;
-    if (!skt_select1(req_clients[socket_index], arg_timeout * 1000)) {
-      client_connect_problem(socket_index, socket_index,
-                             "Timeout on IP request for restarted processor");
+    if (!skt_select1(req_client, arg_timeout * 1000)) {
+      client_connect_problem(crashed, "Timeout on IP request for restarted processor");
     }
 
 #ifdef HSTART
     if (arg_hierarchical_start) {
-      req_forward_root(req_clients[socket_index]);
-      if (_last_crash != 0) {
+      req_forward_root(crashed);
+      if (_last_crash != nullptr) {
         fprintf(stderr, "ERROR> Charmrun detected multiple crashes.\n");
         exit(1);
       }
 
-      _last_crash = crashed_node;
-      _crash_socket_index = socket_index;
+      _last_crash = &crashed;
       return;
     }
 #endif
-    ChMessage_recv(req_clients[socket_index], &msg);
+    ChMessage_recv(req_client, &msg);
     if (msg.len != sizeof(ChSingleNodeinfo)) {
       fprintf(stderr, "Charmrun: Bad initnode data length. Aborting\n");
       fprintf(stderr, "Charmrun: possibly because: %s.\n", msg.data);
     }
-    fprintf(stderr, "socket_index %d crashed_node %d reconnected fd %d  \n",
-            socket_index, crashed_node, req_clients[socket_index]);
+    fprintf(stderr, "crashed_node %d reconnected fd %d  \n",
+            crashed.nodeno, req_client);
 
     /** update the nodetab entry corresponding to
     this node, skip the restarted one */
-    in = (ChSingleNodeinfo *) msg.data;
-    nodeinfo_add(in, req_clients[socket_index]);
-    for (i = 0; i < req_nClients; i++) {
-      if (i != socket_index) {
-        req_handle_initnodetab(NULL, req_clients[i]);
-      }
-    }
+    ChSingleNodeinfo *in = (ChSingleNodeinfo *) msg.data;
+
+    crashed.req_client = req_client;
+
+    nodeinfo_add(in, crashed);
+
+    nodeinfo_populate(crashed);
+
+    for (const nodetab_process & p : my_process_table)
+      if (&p != &crashed)
+        req_send_initnodetab(p);
 
     /* tell every one there is a crash */
-    announce_crash(socket_index, crashed_node);
-    if (_last_crash != 0) {
+    announce_crash(crashed);
+    if (_last_crash != nullptr) {
       fprintf(stderr, "ERROR> Charmrun detected multiple crashes.\n");
       exit(1);
     }
-    _last_crash = crashed_node;
-    _crash_socket_index = socket_index;
+    _last_crash = &crashed;
     /*holds the restarted process until I got ack back from
       everyone in req_handle_crashack
       now the restarted one can only continue until
-      req_handle_crashack calls req_handle_initnodetab(socket_index)
-      req_handle_initnodetab(NULL,req_clients[socket_index]); */
+      req_handle_crashack calls req_send_initnodetab(socket_index)
+      req_send_initnodetab(req_clients[socket_index]); */
     ChMessage_free(&msg);
   }
 }
@@ -5616,16 +5803,17 @@ void reconnect_crashed_client(int socket_index, int crashed_node)
  * will be used to
  * trigger fault tolerance methods.
  */
-void announce_crash(int socket_index, int crashed_node)
+static void announce_crash(const nodetab_process & crashed)
 {
-  int i;
   ChMessageHeader hdr;
-  ChMessageInt_t crashNo = ChMessageInt_new(crashed_node);
+  ChMessageInt_t crashNo = ChMessageInt_new(crashed.nodeno);
   ChMessageHeader_new("crashnode", sizeof(ChMessageInt_t), &hdr);
-  for (i = 0; i < req_nClients; i++) {
-    if (i != socket_index) {
-      skt_sendN(req_clients[i], (const char *) &hdr, sizeof(hdr));
-      skt_sendN(req_clients[i], (const char *) &crashNo,
+  for (const nodetab_process & p : my_process_table)
+  {
+    if (&p != &crashed)
+    {
+      skt_sendN(p.req_client, (const char *) &hdr, sizeof(hdr));
+      skt_sendN(p.req_client, (const char *) &crashNo,
                 sizeof(ChMessageInt_t));
     }
   }

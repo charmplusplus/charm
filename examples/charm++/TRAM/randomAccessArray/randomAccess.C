@@ -14,7 +14,7 @@ CmiInt8 localTableSize;
 // Handle to the test driver (chare)
 CProxy_TestDriver driverProxy;
 // Handle to the communication library (group)
-CProxy_ArrayMeshStreamer<dtype, int, Updater,
+CProxy_ArrayMeshStreamer<dtype, CkArrayIndex1D, Updater,
                          SimpleMeshRouter> aggregator;
 // Number of chares per PE
 int numElementsPerPe;
@@ -49,7 +49,7 @@ public:
 
     // Instantiate communication library group with a handle to the client
     aggregator =
-      CProxy_ArrayMeshStreamer<dtype, int, Updater, SimpleMeshRouter>
+      CProxy_ArrayMeshStreamer<dtype, CkArrayIndex1D, Updater, SimpleMeshRouter>
       ::ckNew(numMsgsBuffered, 2, dims, updater_array, 1);
 
     delete args;
@@ -112,6 +112,18 @@ public:
     contribute(CkCallback(CkReductionTarget(TestDriver, start), driverProxy));
   }
 
+  void pup(PUP::er &p) {
+    if (p.isUnpacking()) {
+      HPCC_Table = (CmiUInt8*)malloc(sizeof(CmiUInt8) * localTableSize);
+    }
+
+    for (int i = 0; i < localTableSize; i++) {
+      p|HPCC_Table[i];
+    }
+
+    p|globalStartmyProc;
+  }
+
   Updater(CkMigrateMessage *msg) {}
 
   // Communication library calls this to deliver each randomly generated key
@@ -127,7 +139,7 @@ public:
     CmiUInt8 key = HPCC_starts(4 * globalStartmyProc);
     // Get a pointer to the local communication library object
     //  from its proxy handle
-    ArrayMeshStreamer<dtype, int, Updater, SimpleMeshRouter>
+    ArrayMeshStreamer<dtype, CkArrayIndex1D, Updater, SimpleMeshRouter>
       * localAggregator = aggregator.ckLocalBranch();
 
     // Generate this chare's share of global updates

@@ -2,6 +2,8 @@
 #include "ckmulticast.h"
 #include <stdio.h>
 
+/*readonly*/ CProxy_Main mainProxy;
+
 class pingMsg: public CkMcastBaseMsg, public CMessage_pingMsg
 {
     public:
@@ -16,53 +18,43 @@ class Main : public CBase_Main
 public:
   Main(CkArgMsg* m): numArrays(2), numElements(5), sectionSize(numElements), maxIter(3), numIter(0)
   {
+    // Save a proxy to main for use as a reduction target
+    mainProxy = thisProxy;
+
     //Process command-line arguments
     if (m->argc > 1) numElements = atoi(m->argv[1]);
     if (m->argc > 2) numArrays   = atoi(m->argv[2]);
     if (m->argc > 3) sectionSize = atoi(m->argv[3]); else sectionSize = numElements;
     if (m->argc > 4) maxIter     = atoi(m->argv[4]);
     if (m->argc > 5)
-    { CkPrintf("Syntax: %s [numElements numArrays sectionSize maxIter]",m->argv[0]); CkAbort("Wrong Usage\n"); }
+    { CkPrintf("Syntax: %s [numElements numArrays sectionSize maxIter]",m->argv[0]); CkExit(1); }
     delete m;
 
     CkPrintf("Running a cross-array section demo.\n");
     CkPrintf("\tnum PEs = %d\n\tnum arrays = %d\n\tnum elements = %d\n\tsection size = %d\n\tnum iterations = %d\n",
              CkNumPes(), numArrays, numElements, sectionSize, maxIter);
 
-    // Create a multicast manager group
-    CkGroupID mcastMgrGID = CProxy_CkMulticastMgr::ckNew();
-    CkMulticastMgr *mcastMgr = CProxy_CkMulticastMgr(mcastMgrGID).ckLocalBranch();
-
     // Setup section member index bounds
     int afloor = 0, aceiling = sectionSize-1;
 
     // Allocate space
-    CProxy_Hello *arrayOfArrays = new CProxy_Hello[numArrays];
-    CkArrayID *arrID            = new CkArrayID[numArrays];
-    int *nelems                 = new int[numArrays];
-    CkArrayIndex **elems     = new CkArrayIndex*[numArrays];
+    std::vector<CkArrayID> arrID(numArrays);
+    std::vector<std::vector<CkArrayIndex> > elems(numArrays);
 
     // Create a list of array section members
     for(int k=0; k < numArrays; k++)
     {
         // Create the array
-        arrayOfArrays[k] = CProxy_Hello::ckNew(k, mcastMgrGID, numElements);
+        CProxy_Hello array = CProxy_Hello::ckNew(k, numElements);
         // Store the AID
-        arrID[k]  = arrayOfArrays[k].ckGetArrayID();
+        arrID[k]  = array.ckGetArrayID();
         // Create a list of section member indices in this array
-        nelems[k] = sectionSize;
-        elems[k]  = new CkArrayIndex[sectionSize];
+        elems[k].resize(sectionSize);
         for(int i=afloor,j=0; i <= aceiling; i++,j++)
             elems[k][j] = CkArrayIndex1D(i);
     }
-    // Create the x-array-section
-    sectionProxy = CProxySection_Hello(numArrays, arrID, elems, nelems);
-
-    // Delegate the section comm to the CkMulticast library
-    sectionProxy.ckSectionDelegate(mcastMgr);
-    // Configure the client of the section reduction
-    CkCallback *rednCB = new CkCallback(CkIndex_Main::rednPong(NULL), thisProxy); 
-    mcastMgr->setReductionClient(sectionProxy, rednCB);
+    // Create the x-array section, which is autodelegated to CkMulticast
+    sectionProxy = CProxySection_Hello(arrID, elems);
 
     // Start the test by pinging the section
     pingMsg *msg = new pingMsg(numIter);
@@ -109,34 +101,24 @@ private:
 class Hello : public CBase_Hello
 {
 public:
-  Hello(int _aNum, CkGroupID mcastMgrGID): aNum(_aNum), mcastMgr(NULL), isCookieSet(false)
+  Hello(int _aNum): aNum(_aNum)
   {
     CkPrintf("Array %d, Element %d created on PE %d\n", aNum, thisIndex, CkMyPe());
-    mcastMgr = CProxy_CkMulticastMgr(mcastMgrGID).ckLocalBranch();
   }
-
-  Hello(CkMigrateMessage *m) {}
 
   void mcastPing(pingMsg *msg)
   {
     // Say hello world
     CkPrintf("Array %d, Element %d received ping number %d\n", aNum, thisIndex, msg->hiNo);
-    // Save the section cookie, the first time you get it
-    if (! isCookieSet)
-    {
-        sectionCookie = msg->_cookie;
-        isCookieSet = true;
-    }
+    CkGetSectionInfo(sectionCookie, msg);
     // Contribute to the section reduction
-    mcastMgr->contribute(sizeof(int), &(msg->hiNo), CkReduction::sum_int, sectionCookie);
+    CProxySection_Hello::contribute(sizeof(int), &(msg->hiNo), CkReduction::sum_int, sectionCookie, CkCallback(CkIndex_Main::rednPong(NULL), mainProxy));
     delete msg;
   }
 
 private:
   int aNum;
-  CkMulticastMgr *mcastMgr;
   CkSectionInfo sectionCookie;
-  bool isCookieSet;
 };
 
 #include "hello.def.h"

@@ -9,6 +9,9 @@
 
 #include <math.h>
 #include "LBComm.h"
+#include <set>
+
+#include "TopoManager.h"
 
 // Hash table mostly based on open hash table from Introduction to
 // Algorithms by Cormen, Leiserson, and Rivest
@@ -89,8 +92,8 @@ bool LBCommData::equal(const LBCommData &d2) const
     if (src_proc != d2.src_proc)
       return false;
   } else {
-    if (!LDOMidEqual(srcObj.omID(), d2.srcObj.omID())
-	|| !LDObjIDEqual(srcObj.objID(),d2.srcObj.objID()) )
+    if (srcObj.omID() != d2.srcObj.omID()
+	|| srcObj.objID() != d2.srcObj.objID() )
       return false;
   }
   return (bool)(destObj == d2.destObj);
@@ -106,9 +109,8 @@ int LBCommData::compute_key()
     pcount = sprintf(kptr,"%d",src_proc);
     kptr += pcount;
   } else {
-    pcount = sprintf(kptr,"%d%d%d%d%d",srcObj.omID().id.idx,
-		     srcObj.id.id[0],srcObj.id.id[1],
-		     srcObj.id.id[2],srcObj.id.id[3]);
+    pcount = sprintf(kptr,"%d%" PRIu64 "",srcObj.omID().id.idx,
+		     srcObj.id);
     kptr += pcount;
   }
 
@@ -119,19 +121,17 @@ int LBCommData::compute_key()
        break;
   case LD_OBJ_MSG: {
        LDObjKey &destKey = destObj.get_destObj();
-       pcount += sprintf(kptr,"%d%d%d%d%dXXXXXXXX",destKey.omID().id.idx,
-		    destKey.objID().id[0],destKey.objID().id[1],
-		    destKey.objID().id[2],destKey.objID().id[3]);
+       pcount += sprintf(kptr,"%d%" PRIu64 "XXXXXXXX",destKey.omID().id.idx,
+		    destKey.objID());
        pcount -= 8;  /* The 'X's insure that the next few bytes are fixed */
        break;
        }
   case LD_OBJLIST_MSG: {
        int len;
-       LDObjKey *destKeys = destObj.get_destObjs(len);
+       const LDObjKey *destKeys = destObj.get_destObjs(len);
        CmiAssert(len>0);
-       pcount += sprintf(kptr,"%d%d%d%d%dXXXXXXXX",destKeys[0].omID().id.idx,
-		    destKeys[0].objID().id[0],destKeys[0].objID().id[1],
-		    destKeys[0].objID().id[2],destKeys[0].objID().id[3]);
+       pcount += sprintf(kptr,"%d%" PRIu64 "XXXXXXXX",destKeys[0].omID().id.idx,
+		    destKeys[0].objID());
        pcount -= 8;  /* The 'X's insure that the next few bytes are fixed */
        break;
        }
@@ -183,6 +183,50 @@ void LBCommTable::GetCommData(LDCommData* data)
       out++;
     }
   }
+}
+
+struct LDCommDescComp {
+  bool operator() (const LDCommDesc& lhs, const LDCommDesc &rhs) const {
+    return (lhs.get_destObj() < rhs.get_destObj());
+  }
+};
+
+void LBCommTable::GetCommInfo(int& bytes, int& msgs, int& outsidepemsgs, int&
+    outsidepebytes, int& num_nghbor, int& hops, int& hopbytes) {
+
+  LBCommData* curtable=set;
+  TableState* curstate=state;
+  int i;
+  bytes = 0;
+  msgs = 0;
+  outsidepemsgs = 0;
+  outsidepebytes = 0;
+  hops = 0;
+  hopbytes = 0;
+  std::set<LDCommDesc, LDCommDescComp> num_neighbors;
+
+  int h;
+
+  for(i=0; i < cur_sz; i++, curtable++, curstate++) {
+    if (*curstate == InUse) {
+      msgs += curtable->n_messages;
+      bytes += curtable->n_bytes;
+      if (curtable->destObj.get_type() == LD_OBJ_MSG) {
+        num_neighbors.insert(curtable->destObj);
+      }
+
+      if (curtable->destObj.lastKnown() != CkMyPe()) {
+        outsidepebytes += curtable->n_bytes;
+        outsidepemsgs += curtable->n_messages;
+        if(curtable->destObj.lastKnown()>=0 && curtable->destObj.lastKnown()<CkNumPes()){
+          TopoManager_getHopsBetweenPeRanks(CkMyPe(), curtable->destObj.lastKnown(), &h);
+          hops += curtable->n_messages * h;
+          hopbytes += curtable->n_bytes * h;
+        }
+      }
+    }
+  }
+  num_nghbor = num_neighbors.size();
 }
 
 #endif // CMK_LBDB_ON

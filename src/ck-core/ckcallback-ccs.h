@@ -29,7 +29,9 @@ class CkDataMsg : public CMessage_CkDataMsg {
 public:
 	int length; //Number of bytes of data below.
 	char *data; //Message data.
+#if CMK_ERROR_CHECKING
 	int checkTag; // For detecting message corruption
+#endif
 	
 	inline int getLength(void) const {return length;}
         inline int getSize(void) const {return length;}
