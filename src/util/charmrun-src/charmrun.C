@@ -4451,7 +4451,7 @@ static void finish_nodes(std::vector<nodetab_process> & process_table) {}
 static void start_one_node_ssh(nodetab_process & p) {}
 static void start_nodes_mpiexec() {}
 
-static void finish_set_nodes(std::vector<nodetab_process> & process_table, int start, int stop, bool charmrun_exiting=false) {}
+static void finish_set_nodes(std::vector<nodetab_process> & process_table, int start, int stop, bool charmrun_exiting) {}
 
 static void envCat(char *dest, LPTSTR oldEnv)
 {
