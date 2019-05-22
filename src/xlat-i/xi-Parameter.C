@@ -573,7 +573,10 @@ void Parameter::storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, int
       str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
 
       // Error checking if posted buffer is larger than the source buffer
-      str << "  if(ncpyBuffer_" << name << ".cnt < " ;
+      str << "  if( ";
+      if(isSDAGGen)
+        str << "genClosure->";
+      str << "ncpyBuffer_" << name << ".cnt < " ;
       if(isSDAGGen)
          str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ")\n";
       else
