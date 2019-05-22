@@ -1978,6 +1978,7 @@ class ampiParent final : public CBase_ampiParent {
 
  public:
   void prepareCtv() noexcept;
+  TCharm* getThread() noexcept { return thread; }
 
   MPI_Message putMatchedMsg(AmpiMsg* msg) noexcept {
     // Search thru matchedMsgs for any NULL ones first:
