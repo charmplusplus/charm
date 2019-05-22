@@ -2496,6 +2496,7 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
         str << "#if CMK_ONESIDED_IMPL\n";
         // Allocate an array of rdma pointers
         str << "  void *buffPtrs["<< numRdmaRecvParams <<"];\n";
+        str << "  int buffSizes["<< numRdmaRecvParams <<"];\n";
         str << "#endif\n";
         param->storePostedRdmaPtrs(str, isSDAGGen);
         str << "#if CMK_ONESIDED_IMPL\n";
@@ -2505,7 +2506,7 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
           str << " genClosure->num_rdma_fields, ";
         else
           str << " impl_num_rdma_fields, ";
-        str << " buffPtrs, ncpyPost);\n";
+        str << " buffPtrs, buffSizes, ncpyPost);\n";
         str << "#else\n";
 
         str << "#endif\n";
