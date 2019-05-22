@@ -17,9 +17,11 @@ unsupported in AMPI. Calling these functions aborts the application.
 // keep in sync with ampiimpl.h
 #if AMPI_HAVE_PMPI
   #define AMPI_FUNC_NOIMPL(ret, name, ...) \
-    _Pragma(STRINGIFY(weak name)) \
-    _Pragma(STRINGIFY(weak P##name = name)) \
     CLINKAGE \
+    __attribute__((weak, alias(STRINGIFY(name)))) \
+    ret P##name(__VA_ARGS__); \
+    CLINKAGE \
+    __attribute__((weak)) \
     ret name(__VA_ARGS__) \
     AMPI_NOIMPL_BODY(name)
 #else

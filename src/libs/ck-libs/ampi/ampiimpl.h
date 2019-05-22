@@ -31,9 +31,11 @@ using std::vector;
 // keep in sync with ampi_noimpl.C
 #if AMPI_HAVE_PMPI
   #define AMPI_API_IMPL(ret, name, ...) \
-    _Pragma(STRINGIFY(weak name)) \
-    _Pragma(STRINGIFY(weak P##name = name)) \
     CLINKAGE \
+    __attribute__((weak, alias(STRINGIFY(name)))) \
+    ret P##name(__VA_ARGS__); \
+    CLINKAGE \
+    __attribute__((weak)) \
     ret name(__VA_ARGS__)
 #else // not Linux (no PMPI support):
   #define AMPI_API_IMPL(ret, name, ...) \
