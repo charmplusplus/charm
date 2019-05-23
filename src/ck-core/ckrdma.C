@@ -545,6 +545,10 @@ void performEmApiMemcpy(CkNcpyBuffer &source, CkNcpyBuffer &dest, ncpyEmApiMode 
   else if (emMode == ncpyEmApiMode::BCAST_SEND || emMode == ncpyEmApiMode::BCAST_RECV) {
     // Invoke the bcast handler
     CkRdmaEMBcastAckHandler((void *)source.refAckInfo);
+
+    // De-register dest if it has been registered
+    if(emMode == ncpyEmApiMode::BCAST_RECV && isDeregReady(dest))
+      CmiDeregisterMem(dest.ptr, dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.pe, dest.regMode);
   }
 }
 
@@ -570,6 +574,11 @@ void performEmApiCmaTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, int child
         CmiSetRdmaBufferInfo(dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.ptr, dest.cnt, dest.regMode);
         dest.isRegistered = true;
       }
+      // Buffers on intermediate nodes are left registered to have their child nodes rget from them
+    } else {
+      // De-register dest on child nodes if it has been registered
+      if(emMode == ncpyEmApiMode::BCAST_RECV && isDeregReady(dest))
+        CmiDeregisterMem(dest.ptr, dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.pe, dest.regMode);
     }
   }
 }
