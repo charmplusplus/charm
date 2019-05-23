@@ -116,10 +116,10 @@ class CkNcpyBuffer{
   // reference pointer
   const void *ref;
 
-  // bcast ack handling pointer
-  const void *bcastAckInfo;
+  // ack handling pointer used for bcast and CMA p2p transfers
+  const void *refAckInfo;
 
-  CkNcpyBuffer() : isRegistered(false), ptr(NULL), cnt(0), pe(-1), regMode(CK_BUFFER_REG), deregMode(CK_BUFFER_DEREG), ref(NULL), bcastAckInfo(NULL) {}
+  CkNcpyBuffer() : isRegistered(false), ptr(NULL), cnt(0), pe(-1), regMode(CK_BUFFER_REG), deregMode(CK_BUFFER_DEREG), ref(NULL), refAckInfo(NULL) {}
 
   explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
     cb = CkCallback(CkCallback::ignore);
@@ -131,7 +131,7 @@ class CkNcpyBuffer{
   }
 
   void print() {
-    CkPrintf("[%d][%d][%d] CkNcpyBuffer print: ptr:%p, size:%d, pe:%d, regMode=%d, deregMode=%d, ref:%p, bcastAckInfo:%p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ptr, cnt, pe, regMode, deregMode, ref, bcastAckInfo);
+    CkPrintf("[%d][%d][%d] CkNcpyBuffer print: ptr:%p, size:%d, pe:%d, regMode=%d, deregMode=%d, ref:%p, refAckInfo:%p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ptr, cnt, pe, regMode, deregMode, ref, refAckInfo);
   }
 
   void init(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
@@ -155,6 +155,9 @@ class CkNcpyBuffer{
     // Ensure that deregMode is valid
     checkDeregModeIsValid();
 #endif
+
+    ref = NULL;
+    refAckInfo = NULL;
 
     // Register memory everytime new values are initialized
     if(cnt > 0)
@@ -227,7 +230,7 @@ class CkNcpyBuffer{
   void pup(PUP::er &p) {
     p((char *)&ptr, sizeof(ptr));
     p((char *)&ref, sizeof(ref));
-    p((char *)&bcastAckInfo, sizeof(bcastAckInfo));
+    p((char *)&refAckInfo, sizeof(refAckInfo));
     p|cnt;
     p|cb;
     p|pe;
@@ -257,7 +260,10 @@ class CkNcpyBuffer{
 
   friend void performEmApiCmaTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, int child_count, ncpyEmApiMode emMode);
 
+  friend void performEmApiMemcpy(CkNcpyBuffer &source, CkNcpyBuffer &dest, ncpyEmApiMode emMode);
+
   friend void deregisterMemFromMsg(envelope *env, bool isRecv);
+  friend void CkRdmaEMDeregAndAckHandler(void *ack);
 };
 
 // Ack handler for the Zerocopy Direct API
@@ -295,7 +301,13 @@ static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, unsigned short int reg
 // ncpyHandlerIdx::EM_ACK tag is used to remotely invoke CkRdmaEMAckHandler
 // ncpyHandlerIdx::BCAST_ACK tag is used to remotely invoke CkRdmaEMBcastAckHandler
 // ncpyHandlerIdx::BCAST_POST_ACK is used to remotely invoke CkRdmaEMBcastPostAckHandler
-enum class ncpyHandlerIdx: char { EM_ACK, BCAST_ACK, BCAST_POST_ACK };
+// ncpyHandlerIdx::CMA_DEREG_ACK is used to remotely invoke CkRdmaEMDeregAndAckHandler
+enum class ncpyHandlerIdx: char {
+  EM_ACK,
+  BCAST_ACK,
+  BCAST_POST_ACK,
+  CMA_DEREG_ACK
+};
 
 // Converse message to invoke the Ncpy handler on a remote process
 struct ncpyHandlerMsg{
@@ -372,7 +384,7 @@ struct NcpyBcastRecvPeerAckInfo{
 #if CMK_SMP
     int getNumPeers() const {
        return numPeers.load(std::memory_order_acquire);
-    } 
+    }
     void setNumPeers(int r) {
        return numPeers.store(r, std::memory_order_release);
     }
@@ -391,7 +403,11 @@ struct NcpyBcastRecvPeerAckInfo{
 
 };
 
-
+// Structure is used for storing source buffer info to de-reg and invoke acks after completion of CMA operations
+struct NcpyP2PAckInfo{
+  int numOps;
+  CkNcpyBuffer src[0];
+};
 
 /***************************** Zerocopy Bcast Entry Method API ****************************/
 struct NcpyBcastAckInfo{
@@ -446,6 +462,12 @@ struct NcpyBcastInterimAckInfo : public NcpyBcastAckInfo {
 
 // Method called on the bcast source to store some information for ack handling
 void CkRdmaPrepareBcastMsg(envelope *env);
+
+// Method called on the p2p source to store information for de-reg and ack handling for CMA transfers
+void CkRdmaPrepareZCMsg(envelope *env, int &pe);
+
+// Method called on ZC API source (internally calls CkRdmaPrepareBcastMsg or CkRdmaPrepareZCMsg)
+void CkRdmaPrepareP2PMsg(envelope *env);
 
 void CkReplaceSourcePtrsInBcastMsg(envelope *env, NcpyBcastInterimAckInfo *bcastAckInfo, int origPe);
 
@@ -550,6 +572,12 @@ void CmiInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *info);
 #endif
 
 inline void invokeRemoteNcpyAckHandler(int pe, void *ref, ncpyHandlerIdx opMode);
+
+// Handler method invoked on the ZC p2p API source for de-registration and ack handling for CMA transfers
+void CkRdmaEMDeregAndAckHandler(void *ack);
+
+
+inline bool isDeregReady(CkNcpyBuffer &buffInfo);
 
 #endif /* End of CMK_ONESIDED_IMPL */
 

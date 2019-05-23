@@ -1433,8 +1433,10 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 
 #if CMK_ONESIDED_IMPL
   // Store source information to handle acknowledgements on completion
-  if(CMI_IS_ZC_BCAST(env))
-    CkRdmaPrepareBcastMsg(env);
+  if(CMI_IS_ZC(env)) {
+    int node = CkNodeOf(pe);
+    CkRdmaPrepareZCMsg(env, node);
+  }
 #endif
 
 #if CMK_FAULT_EVAC
@@ -1540,8 +1542,10 @@ static void _noCldEnqueue(int pe, envelope *env)
 
 #if CMK_ONESIDED_IMPL
   // Store source information to handle acknowledgements on completion
-  if(CMI_IS_ZC_BCAST(env))
-    CkRdmaPrepareBcastMsg(env);
+  if(CMI_IS_ZC(env)) {
+    int node = CkNodeOf(pe);
+    CkRdmaPrepareZCMsg(env, node);
+  }
 #endif
 
   CkPackMessage(&env);
@@ -1569,8 +1573,8 @@ void _noCldNodeEnqueue(int node, envelope *env)
 
 #if CMK_ONESIDED_IMPL
   // Store source information to handle acknowledgements on completion
-  if(CMI_IS_ZC_BCAST(env))
-    CkRdmaPrepareBcastMsg(env);
+  if(CMI_IS_ZC(env))
+    CkRdmaPrepareZCMsg(env, node);
 #endif
 
   CkPackMessage(&env);
