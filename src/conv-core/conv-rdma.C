@@ -93,6 +93,7 @@ void CmiIssueRput(NcpyOperationInfo *ncpyOpInfo) {
 
   int ncpyOpInfoSize = ncpyOpInfo->ncpyOpInfoSize;
   int size = ncpyOpInfo->srcSize;
+  int destPe = ncpyOpInfo->destPe;
 
   // Send a ConverseRdmaMsg to the other PE sending the array
   ConverseRdmaMsg *payloadMsg = (ConverseRdmaMsg *)CmiAlloc(sizeof(ConverseRdmaMsg) + ncpyOpInfoSize + size);
@@ -113,7 +114,7 @@ void CmiIssueRput(NcpyOperationInfo *ncpyOpInfo) {
   ncpyDirectAckHandlerFn(ncpyOpInfo);
 
   CmiSetHandler(payloadMsg, put_data_handler_idx);
-  CmiSyncSendAndFree(ncpyOpInfo->destPe,
+  CmiSyncSendAndFree(destPe,
                      sizeof(ConverseRdmaMsg) + ncpyOpInfoSize + size,
                      payloadMsg);
 }

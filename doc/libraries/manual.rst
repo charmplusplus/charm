@@ -441,7 +441,7 @@ unique identifier for the newly created set of proxies.
 
 An example of Charm-FFT initialization using Charm_createFFT:
 
-.. code-block:: c++
+.. code-block:: charmci
 
   // .ci
   extern module fft_charm;
