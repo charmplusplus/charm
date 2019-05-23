@@ -1194,6 +1194,21 @@ static void createCommSelf() noexcept {
   STARTUP_DEBUG("ampiInit> created MPI_COMM_SELF")
 }
 
+// PE-level array object cache, declared in ck.C
+typedef std::unordered_map<CmiUInt8, ArrayElement*> ArrayObjMap;
+CkpvExtern(ArrayObjMap, array_objs);
+
+// We remove objects from array_objs whose performance we don't really care about
+// (TCharm, ampiParent, MPI_COMM_SELF) in order to keep it smaller and faster
+// for those we do care about (MPI_COMM_WORLD and other communicators).
+static void removeUnimportantArrayObjsfromPeCache() noexcept {
+  ampiParent* pptr = getAmpiParent();
+  ArrayObjMap& arrayObjs = CkpvAccess(array_objs);
+  arrayObjs.erase(pptr->getThread()->ckGetID().getID());
+  arrayObjs.erase(pptr->ckGetID().getID());
+  arrayObjs.erase(getAmpiInstance(MPI_COMM_SELF)->ckGetID().getID());
+}
+
 /*
    Called from MPI_Init, a collective initialization call:
    creates a new AMPI array and attaches it to the current
@@ -1284,6 +1299,8 @@ static ampi *ampiInit(char **argv) noexcept
   }
 
   createCommSelf();
+
+  removeUnimportantArrayObjsfromPeCache();
 
 #if CMK_BIGSIM_CHARM
   BgSetStartOutOfCore();
@@ -11218,10 +11235,18 @@ CLINKAGE int AMPI_Migrate(MPI_Info hints)
     else if (strncmp(key, "ampi_load_balance", MPI_MAX_INFO_KEY) == 0) {
 
       if (strncmp(value, "sync", MPI_MAX_INFO_VAL) == 0) {
+        int oldPe = CkMyPe();
         TCHARM_Migrate();
+        if (oldPe != CkMyPe()) {
+          removeUnimportantArrayObjsfromPeCache();
+        }
       }
       else if (strncmp(value, "async", MPI_MAX_INFO_VAL) == 0) {
+        int oldPe = CkMyPe();
         TCHARM_Async_Migrate();
+        if (oldPe != CkMyPe()) {
+          removeUnimportantArrayObjsfromPeCache();
+        }
       }
       else if (strncmp(value, "false", MPI_MAX_INFO_VAL) == 0) {
         /* do nothing */
