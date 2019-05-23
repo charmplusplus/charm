@@ -1778,6 +1778,8 @@ void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr) {
     // Initialize previously allocated structure for ack tracking on intermediate nodes
     if(t.child_count != 0)  // Intermediate Node
       readonlyCreateOnSource(dest);
+    else // Child Node - deregister dest buffer
+      CmiDeregisterMem(dest.ptr, dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.pe, dest.regMode);
 
     // When all pending RO Rdma transfers are complete
     if(CksvAccess(_numPendingRORdmaTransfers) == 0) {
@@ -1789,9 +1791,6 @@ void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr) {
         CmiForwardProcBcastMsg(env->getTotalsize(), (char *)env);
 
       } else { // Child Node
-
-        // deregister dest buffer
-        CmiDeregisterMem(dest.ptr, dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.pe, dest.regMode);
 
         // Send a message to the parent to signal completion in order to deregister
         envelope *compEnv = _allocEnv(ROChildCompletionMsg);
@@ -1862,6 +1861,9 @@ void readonlyGetCompleted(NcpyOperationInfo *ncpyOpInfo) {
   // Lock not needed for SMP mode as no other thread decrements _numPendingRORdmaTransfers
   CksvAccess(_numPendingRORdmaTransfers)--;
 
+  if(t.child_count == 0) // deregister dest buffer on the child node
+    CmiDeregisterMem(ncpyOpInfo->destPtr, ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->destPe, ncpyOpInfo->destRegMode);
+
   // When all pending RO Rdma transfers are complete
   if(CksvAccess(_numPendingRORdmaTransfers) == 0) {
 
@@ -1875,9 +1877,6 @@ void readonlyGetCompleted(NcpyOperationInfo *ncpyOpInfo) {
       //TODO:QD support
 
     } else {
-
-      // deregister dest buffer
-      CmiDeregisterMem(ncpyOpInfo->destPtr, ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->destPe, ncpyOpInfo->destRegMode);
 
       // Send a message to the parent to signal completion in order to deregister
       envelope *compEnv = _allocEnv(ROChildCompletionMsg);
