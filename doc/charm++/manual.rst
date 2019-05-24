@@ -8656,6 +8656,57 @@ be made between these calls. Communication between the different Kokkos
 instances can be done via messages and entry method invocation among
 the nodegroup chares as in regular Charm++.
 
+.. _sec:rajainterop:
+
+Interoperation with RAJA
+------------------------
+
+RAJA is a shared-memory parallel programming model in C++ developed by
+Lawrence Livermore National Laboratory (https://github.com/LLNL/RAJA).
+RAJA shares similar goals and concepts with Kokkos (Section :numref:`sec:kokkosinterop`).
+
+In this section, we explore the basic interoperability of RAJA with
+Charm++. Currently there is no sophisticated integration scheme, Charm++
+only manages the communication between different RAJA instances with
+each instance individually managing the parallel execution underneath.
+Example programs can be found in ``examples/charm++/shared_runtimes/raja/hello``
+and ``examples/charm++/shared_runtimes/raja/vecadd``.
+
+Compiling the RAJA Library
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+RAJA supports multiple backends for parallel execution. We recommend
+OpenMP for multicore CPUs and CUDA for machines with GPUs. Because RAJA
+can be built with more than one backend, it is preferable to build both
+OpenMP and CUDA backends on GPU machines.
+
+To build RAJA with both OpenMP and CUDA backends (required for ``vecadd``
+example), use the following commands:
+
+.. code-block:: bash
+
+   $ mkdir build && install
+   $ cd build
+   $ cmake -DENABLE_CUDA=On -DCMAKE_INSTALL_PREFIX=<path to RAJA install folder> ../
+   $ make -j
+   $ make install
+
+For more compilation options and assistance, please refer to the `RAJA User Guide
+<https://raja.readthedocs.io/en/master/>`_.
+
+Program Structure and Flow
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The basic programming pattern using RAJA and Charm++ together for
+parallel execution in distributed memory environments is the following.
+We use a Charm++ nodegroup (which corresponds to a OS process) to
+encapsulate a RAJA instance that will manage the parallel execution
+underneath. Calls to the RAJA parallel API such as ``RAJA::forall()`` can
+be made in a method of the nodegroup to perform parallel computation in
+shared memory. Communication between the different RAJA instances can be
+performed via messages and entry method invocation among the nodegroup
+chares as in regular Charm++.
+
 .. _sec:partition:
 
 Partitioning in Charm++
