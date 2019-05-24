@@ -8677,7 +8677,7 @@ Compiling the RAJA Library
 
 RAJA supports multiple backends for parallel execution. We recommend
 OpenMP for multicore CPUs and CUDA for machines with GPUs. Because RAJA
-can be built with more than one backend, it is preferrable to build both
+can be built with more than one backend, it is preferable to build both
 OpenMP and CUDA backends on GPU machines.
 
 To build RAJA with both OpenMP and CUDA backends (required for ``vecadd``
