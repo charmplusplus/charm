@@ -3380,8 +3380,8 @@ void ampi::processGathervMsg(CkReductionMsg *msg, void* buf, MPI_Datatype type,
   delete [] results;
 }
 
-ampi* ampi::blockOnIReq(void* buf, int count, MPI_Datatype type, int src,
-                        int tag, MPI_Comm comm, MPI_Status* sts) noexcept
+CMI_WARN_UNUSED_RESULT ampi* ampi::blockOnIReq(void* buf, int count, MPI_Datatype type, int src,
+                                               int tag, MPI_Comm comm, MPI_Status* sts) noexcept
 {
   MPI_Request request = postReq(parent->reqPool.newReq<IReq>(buf, count, type, src, tag, comm, getDDT(),
                                                              AMPI_REQ_BLOCKED));

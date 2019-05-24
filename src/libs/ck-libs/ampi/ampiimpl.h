@@ -2519,8 +2519,8 @@ class ampi final : public CBase_ampi {
     return static_blockOnColl(this);
   }
   inline void setBlockingReq(AmpiRequest *req) noexcept;
-  inline ampi* blockOnIReq(void* buf, int count, MPI_Datatype type, int s,
-                           int t, MPI_Comm comm, MPI_Status* sts) noexcept;
+  CMI_WARN_UNUSED_RESULT inline ampi* blockOnIReq(void* buf, int count, MPI_Datatype type, int s,
+                                                  int t, MPI_Comm comm, MPI_Status* sts) noexcept;
   MPI_Request postReq(AmpiRequest* newreq) noexcept;
   inline void waitOnBlockingSend(MPI_Request* req, AmpiSendType sendType) noexcept;
   inline void requestSsendMsg(AmpiMsg* msg) noexcept;
