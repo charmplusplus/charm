@@ -1037,7 +1037,7 @@ void initPAPI() {
     {
       CmiPrintf("Registered %d PAPI counters: ",PAPI_num_events(CkpvAccess(papiEventSet)));
       char nameBuf[PAPI_MAX_STR_LEN];
-      for(int i=0;i<2;i++)
+      for(int i = 0;i < NUMPAPIEVENTS; i++)
 	{
 	  PAPI_event_code_to_name(papiEvents[i], nameBuf);
 	  CmiPrintf("%s ",nameBuf);
