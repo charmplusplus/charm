@@ -206,9 +206,8 @@ if($skip_choosing eq "false"){
 
 if($skip_choosing eq "false"){
   my $ucx_found = index(`cc $tempfile -Wl,-lucp 2>&1`, "-lucp") == -1;
-  my $pmix_found = index(`cc $tempfile -Wl,-lpmix 2>&1`, "-lpmix") == -1;
 
-  if ($ucx_found and $pmix_found) {
+  if ($ucx_found) {
     print "\nI found that you have UCX libs available in your toolchain.\nDo you want to build Charm++ targeting UCX? [Y/n]: ";
     my $p = promptUserYN();
     if($p eq "yes" || $p eq "default") {
