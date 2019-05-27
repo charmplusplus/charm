@@ -1457,7 +1457,7 @@ void _initCharm(int unused_argc, char **argv)
 
 #if CMK_ONESIDED_IMPL
 	// Set the ack handler function used for the entry method p2p api and entry method bcast api
-	CmiSetEMNcpyAckHandler(CkRdmaEMAckHandler, CkRdmaEMBcastAckHandler, CkRdmaEMBcastPostAckHandler);
+	initEMNcpyAckHandler();
 #endif
 	/**
 	  The rank-0 processor of each node calls the 

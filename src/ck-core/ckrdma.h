@@ -56,7 +56,7 @@ enum class CkNcpyStatus : char { incomplete, complete };
 // BCAST_RECV mode is used for EM BCAST Send API
 enum class ncpyEmApiMode : char { P2P_SEND, BCAST_SEND, P2P_RECV, BCAST_RECV };
 
-// Struct passed in a ZC Post Entry Method to allow receiver side to post 
+// Struct passed in a ZC Post Entry Method to allow receiver side to post
 struct CkNcpyBufferPost {
   // regMode
   unsigned short int regMode;
@@ -245,7 +245,7 @@ class CkNcpyBuffer{
   friend void constructDestinationBufferObject(NcpyOperationInfo *info, CkNcpyBuffer &dest);
 
   friend envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg);
-  friend void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, void **arrPtrs, CkNcpyBufferPost *postStructs);
+  friend void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs);
 
   friend void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr);
   friend void readonlyCreateOnSource(CkNcpyBuffer &src);
@@ -291,6 +291,18 @@ static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, unsigned short int reg
 }
 
 #if CMK_ONESIDED_IMPL
+// Represents the remote handler tag that should be invoked
+// ncpyHandlerIdx::EM_ACK tag is used to remotely invoke CkRdmaEMAckHandler
+// ncpyHandlerIdx::BCAST_ACK tag is used to remotely invoke CkRdmaEMBcastAckHandler
+// ncpyHandlerIdx::BCAST_POST_ACK is used to remotely invoke CkRdmaEMBcastPostAckHandler
+enum class ncpyHandlerIdx: char { EM_ACK, BCAST_ACK, BCAST_POST_ACK };
+
+// Converse message to invoke the Ncpy handler on a remote process
+struct ncpyHandlerMsg{
+  char cmicore[CmiMsgHeaderSizeBytes];
+  ncpyHandlerIdx opMode;
+  void *ref;
+};
 
 // NOTE: Inside CkRdmaIssueRgets, a large message allocation is made consisting of space
 // for the destination or receiver buffers and some additional information required for processing
@@ -327,7 +339,7 @@ struct NcpyEmBufferInfo{
  */
 envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg = NULL);
 
-void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, void **arrPtrs, CkNcpyBufferPost *postStructs);
+void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int numops, void **arrPtrs, int *arrSizes, CkNcpyBufferPost *postStructs);
 
 void handleEntryMethodApiCompletion(NcpyOperationInfo *info);
 
@@ -521,6 +533,23 @@ CkArray* getArrayMgrFromMsg(envelope *env);
 void sendAckMsgToParent(envelope *env);
 
 void sendRecvDoneMsgToPeers(envelope *env, CkArray *mgr);
+
+/***************************** Other Util Methods ****************************/
+
+// Function declaration for EM Ncpy Ack handler initialization
+void initEMNcpyAckHandler(void);
+
+// Broadcast API support
+void CmiForwardProcBcastMsg(int size, char *msg); // for forwarding proc messages to my child nodes
+void CmiForwardNodeBcastMsg(int size, char *msg); // for forwarding node queue messages to my child nodes
+
+void CmiForwardMsgToPeers(int size, char *msg); // for forwarding messages to my peer PEs
+
+#if CMK_REG_REQUIRED
+void CmiInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *info);
+#endif
+
+inline void invokeRemoteNcpyAckHandler(int pe, void *ref, ncpyHandlerIdx opMode);
 
 #endif /* End of CMK_ONESIDED_IMPL */
 
