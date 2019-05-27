@@ -44,6 +44,18 @@ int runtime_init(int *rank, int *jobsize)
     return 0;
 }
 
+int runtime_get_max_keylen(int *len)
+{
+    *len = PMIX_MAX_KEYLEN;
+    return 0;
+}
+
+int runtime_get_max_vallen(int *len)
+{
+    *len = INT_MAX;
+    return 0;
+}
+
 int runtime_fini()
 {
     int ret;
@@ -57,25 +69,16 @@ int runtime_fini()
     return 0;
 }
 
-int runtime_kvs_put(int id, const void *v, int vlen)
+int runtime_kvs_put(const char *k, const void *v, int vlen)
 {
     int ret;
-    int keylen;
-    char key[PMIX_MAX_KEYLEN + 1];
     pmix_value_t value;
 
     value.type          = PMIX_BYTE_OBJECT;
     value.data.bo.bytes = (char*)v;
     value.data.bo.size  = vlen;
 
-    if (snprintf(key, PMIX_MAX_KEYLEN + 1, "%s-%s-%d",
-                 UCX_PREFIX, myproc.nspace, id) < 0) {
-        fprintf(stderr, "Client ns %s rank %d: snprintf failed\n",
-                myproc.nspace, myproc.rank);
-        return -1;
-    }
-
-    if (PMIX_SUCCESS != (ret = PMIx_Put(PMIX_GLOBAL, key, &value))) {
+    if (PMIX_SUCCESS != (ret = PMIx_Put(PMIX_GLOBAL, k, &value))) {
         fprintf(stderr, "Client ns %s rank %d: PMIx_Put local failed: %d\n",
                 myproc.nspace, myproc.rank, ret);
         return -2;
@@ -90,29 +93,21 @@ int runtime_kvs_put(int id, const void *v, int vlen)
     return 0;
 }
 
-int runtime_kvs_get(int id, void *v, int vlen)
+int runtime_kvs_get(const char *k, void *v, int vlen, int id)
 {
     int ret;
     pmix_value_t *value;
-    char key[PMIX_MAX_KEYLEN + 1];
-
-    if (snprintf(key, PMIX_MAX_KEYLEN + 1, "%s-%s-%d",
-                 UCX_PREFIX, myproc.nspace, id) < 0) {
-        fprintf(stderr, "Client ns %s rank %d: snprintf failed\n",
-                myproc.nspace, myproc.rank);
-        return -1;
-    }
 
     proc.rank = id;
-    if (PMIX_SUCCESS != (ret = PMIx_Get(&proc, key, NULL, 0, &value))) {
+    if (PMIX_SUCCESS != (ret = PMIx_Get(&proc, k, NULL, 0, &value))) {
         fprintf(stderr, "Client ns %s rank %d: PMIx_Get %s failed: %d\n",
-                myproc.nspace, myproc.rank, key, ret);
+                myproc.nspace, myproc.rank, k, ret);
         return -2;
     }
 
     if (value->type != PMIX_BYTE_OBJECT) {
         fprintf(stderr, "Client ns %s rank %d: PMIx_Get %s returned wrong type: %d\n",
-                myproc.nspace, myproc.rank, key, value->type);
+                myproc.nspace, myproc.rank, k, value->type);
         PMIX_VALUE_RELEASE(value);
         return -3;
     }
@@ -134,25 +129,5 @@ int runtime_barrier()
         return -1;
     }
 
-    return 0;
-}
-
-int runtime_fence()
-{
-    bool flag = true;
-    int ret;
-    pmix_info_t *info;
-
-    PMIX_INFO_CREATE(info, 1);
-    PMIX_INFO_LOAD(info, PMIX_COLLECT_DATA, &flag, PMIX_BOOL);
-
-    if (PMIX_SUCCESS != (ret = PMIx_Fence(NULL, 0, info, 1))) {
-        fprintf(stderr, "Client ns %s rank %d: PMIx_Fence failed: %d\n",
-                myproc.nspace, myproc.rank, ret);
-        PMIX_INFO_FREE(info, 1);
-        return -2;
-    }
-
-    PMIX_INFO_FREE(info, 1);
     return 0;
 }

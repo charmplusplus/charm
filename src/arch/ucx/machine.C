@@ -20,7 +20,13 @@
 #include <ucs/type/status.h>
 #include <ucs/datastruct/mpool.h>
 
+#if CMK_USE_PMI
+#include "runtime-pmi.C"
+#elif CMK_USE_PMI2
+#include "runtime-pmi2.C"
+#elif CMK_USE_PMIX
 #include "runtime-pmix.C"
+#endif
 
 #define CmiSetMsgSize(msg, sz)    ((((CmiMsgHeaderBasic *)msg)->size) = (sz))
 
@@ -108,21 +114,23 @@ static void UcxPrepostRxBuffers();
 #include "machine-onesided.h"
 #endif
 
-#define UCX_CHECK_STATUS(_status, _str)\
+#define UCX_CHECK_STATUS(_status, _str) \
 { \
     if (UCS_STATUS_IS_ERR(_status)) { \
-        std::string s = std::string("UCX: ") + _str + "failed: " + ucs_status_string(_status); \
+        std::string s = std::string("UCX: ") + _str + " failed: " + ucs_status_string(_status); \
         CmiAbort(s.c_str()); \
     } \
 }
 
-#define UCX_CHECK_RET(_ret, _str)\
+#define UCX_CHECK_RET(_ret, _str, _cond) \
 { \
-    if (_ret < 0) { \
-        std::string s = std::string("UCX: ") + _str + "failed: " + std::to_string(_ret); \
+    if (_cond) { \
+        std::string s = std::string("UCX: ") + _str + " failed: " + std::to_string(_ret); \
         CmiAbort(s.c_str()); \
     } \
 }
+
+#define UCX_CHECK_PMI_RET(_ret, _str) UCX_CHECK_RET(_ret, _str, _ret)
 
 void UcxRequestInit(void *request)
 {
@@ -137,38 +145,90 @@ static void UcxInitEps(int numNodes, int myId)
     ucp_address_t *address;
     ucs_status_t status;
     ucp_ep_params_t eParams;
-    size_t addrlen;
+    size_t addrlen, maxval, len, partLen;
     ucp_ep_h ep;
-    int i, ret, peer;
+    int i, j, ret, peer, maxkey, parts;
+    char *keys, *addrp, *remoteAddr;
+
+    ret = runtime_get_max_keylen(&maxkey);
+    UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_get_max_keylen error");
+    ret = runtime_get_max_vallen((int*)&maxval);
+    UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_get_max_vallen error");
+
+    // Reduce maxval value, because with PMI1 it has to fit cmd + key + value
+    maxval -= 48;
+    CmiEnforce(maxval > 0);
+
+    keys = (char*)CmiAlloc(maxkey);
+    CmiEnforce(keys);
 
     ucxCtx.eps = (ucp_ep_h*)CmiAlloc(sizeof(ucp_ep_h)*numNodes);
+    CmiEnforce(ucxCtx.eps);
 
     status = ucp_worker_get_address(ucxCtx.worker, &address, &addrlen);
     UCX_CHECK_STATUS(status, "UcxInitEps: ucp_worker_get_address error");
 
-    ret = runtime_kvs_put(myId, address, addrlen);
-    UCX_CHECK_RET(ret, "UcxInitEps: runtime_kvs_put error");
+    parts = (addrlen / maxval) + 1;
+
+    // Publish number of address parts at first
+    ret = snprintf(keys, maxkey, "UCX-size-%d", myId);
+    UCX_CHECK_RET(ret, "UcxInitEps: snprintf error", (ret <= 0));
+    ret = runtime_kvs_put(keys, &parts, sizeof(parts));
+    UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_put error");
+
+    addrp = (char*)address;
+    len   = addrlen;
+    for (i = 0; i < parts; ++i) {
+        partLen = std::min(maxval, len);
+        ret = snprintf(keys, maxkey, "UCX-%d-%d", myId, i);
+        UCX_CHECK_RET(ret, "UcxInitEps: snprintf error", (ret <= 0));
+        ret = runtime_kvs_put(keys, addrp, partLen);
+        UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_put error");
+        addrp += partLen;
+        len   -= partLen;
+    }
 
     /* Ensure that all nodes published their worker addresses */
-    ret = runtime_fence();
-    UCX_CHECK_RET(ret, "UcxInitEps: runtime_fence");
+    ret = runtime_barrier();
+    UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_barrier");
+
+
+    ucp_worker_release_address(ucxCtx.worker, address);
 
     for (i = 0; i < numNodes; ++i) {
         peer = (i + myId) % numNodes;
         if (peer == myId) continue;
 
-        ret = runtime_kvs_get(peer, address, addrlen);
-        UCX_CHECK_RET(ret, "UcxInitEps: runtime_kvs_get error");
+        ret = snprintf(keys, maxkey, "UCX-size-%d", peer);
+        UCX_CHECK_RET(ret, "UcxInitEps: snprintf error", (ret <= 0));
+        ret = runtime_kvs_get(keys, &parts, sizeof(parts), peer);
+        UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_get error");
+
+        remoteAddr = (char*)CmiAlloc(addrlen);
+        CmiEnforce(remoteAddr);
+
+        addrp = remoteAddr;
+        len   = addrlen;
+        for (j = 0; j < parts; ++j) {
+            partLen = std::min(maxval, len);
+            ret = snprintf(keys, maxkey, "UCX-%d-%d", peer, j);
+            UCX_CHECK_RET(ret, "UcxInitEps: snprintf error", (ret <= 0));
+            ret = runtime_kvs_get(keys, addrp, partLen, peer);
+            UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_get error");
+            addrp += maxval;
+            len   -= maxval;
+        }
 
         eParams.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
-        eParams.address    = address;
+        eParams.address    = (const ucp_address_t*)remoteAddr;
 
         status = ucp_ep_create(ucxCtx.worker, &eParams, &ucxCtx.eps[peer]);
         UCX_CHECK_STATUS(status, "ucp_ep_create failed");
         UCX_LOG(4, "Connecting to %d (ep %p)", peer, ucxCtx.eps[peer]);
+        CmiFree(remoteAddr);
     }
 
-    ucp_worker_release_address(ucxCtx.worker, address);
+    CmiFree(keys);
 }
 
 // Should be called for every node (not PE)
@@ -181,7 +241,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     int ret;
 
     ret = runtime_init(myNodeID, numNodes);
-    UCX_CHECK_RET(ret, "runtime_init");
+    UCX_CHECK_PMI_RET(ret, "runtime_init");
 
     status = ucp_config_read("Charm++", NULL, &config);
     UCX_CHECK_STATUS(status, "ucp_config_read");
@@ -508,7 +568,7 @@ void LrtsDrainResources()
     int ret;
     LrtsAdvanceCommunication(0);
     ret = runtime_barrier();
-    UCX_CHECK_RET(ret, "runtime_barrier");
+    UCX_CHECK_PMI_RET(ret, "runtime_barrier");
 }
 
 void LrtsExit(int exitcode)
@@ -540,10 +600,10 @@ void LrtsExit(int exitcode)
 
     if(!CharmLibInterOperate || userDrivenMode) {
         ret = runtime_barrier();
-        UCX_CHECK_RET(ret, "runtime_barrier");
+        UCX_CHECK_PMI_RET(ret, "runtime_barrier");
 
         ret = runtime_fini();
-        UCX_CHECK_RET(ret, "runtime_fini");
+        UCX_CHECK_PMI_RET(ret, "runtime_fini");
         exit(0);
     }
 }
@@ -589,7 +649,7 @@ void  LrtsBarrier()
 {
     int ret;
     ret = runtime_barrier();
-    UCX_CHECK_RET(ret, "runtime_barrier");
+    UCX_CHECK_PMI_RET(ret, "runtime_barrier");
 }
 
 #if CMK_ONESIDED_IMPL

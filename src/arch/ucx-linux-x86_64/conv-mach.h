@@ -78,6 +78,12 @@
 #define CMK_64BIT                      1
 #define CMK_AMD64                      1
 
+/* By default use simple PMI */
+#define CMK_USE_PMI                    1
+#define CMK_USE_SIMPLEPMI              1
+#define CMK_USE_PMI2                   0
+#define CMK_USE_PMIX                   0
+
 /* Other possible definitions:
 
 In fault tolerant architectures, CK_MEM_CHECKPOINT can be set. In this case the
