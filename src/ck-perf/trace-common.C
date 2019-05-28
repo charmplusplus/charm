@@ -1021,7 +1021,7 @@ void initPAPI() {
     papiEvents[0] = PAPI_L3_TCM;
     papiEvents[1] = PAPI_L3_TCA;
   } else {
-    CmiPrintf("PAPI: no cache miss/access events supported on any level!\n");
+    CmiAbort("PAPI: no cache miss/access events supported on any level!\n");
   }
   if (papiRetValue < 0) {
     if (papiRetValue == PAPI_ECNFLCT) {
@@ -1035,7 +1035,7 @@ void initPAPI() {
   }
   if(CkMyPe()==0)
     {
-      CmiPrintf("Registered %d PAPI counters: ",PAPI_num_events(CkpvAccess(papiEventSet)));
+      CmiPrintf("Registered %d PAPI counters: ", NUMPAPIEVENTS);
       char nameBuf[PAPI_MAX_STR_LEN];
       for(int i = 0;i < NUMPAPIEVENTS; i++)
 	{
