@@ -1004,7 +1004,6 @@ void initPAPI() {
 #else
   // just uses { PAPI_L2_DCM, PAPI_FP_OPS } the 2 initialized PAPI_EVENTS
 #endif
-  //papiRetValue = PAPI_add_events(CkpvAccess(papiEventSet), papiEvents, NUMPAPIEVENTS);
   if (PAPI_query_event(PAPI_L1_TCM) == PAPI_OK && PAPI_query_event(PAPI_L1_TCA) == PAPI_OK) {
     PAPI_add_event(CkpvAccess(papiEventSet), PAPI_L1_TCM);
     PAPI_add_event(CkpvAccess(papiEventSet), PAPI_L1_TCA);
