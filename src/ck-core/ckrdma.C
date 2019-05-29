@@ -1580,8 +1580,7 @@ void updatePeerCounterAndPush(envelope *env) {
   CkPackMessage(&env);
   CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
   CmiSpanningTreeInfo &t = *_topoTree;
-  peerAckInfo->decNumPeers();
-  if(peerAckInfo->getNumPeers() == 0) {
+  if(peerAckInfo->decNumPeers() - 1 == 0) {
     CmiPushPE(CmiRankOf(peerAckInfo->peerParentPe), env);
   }
 }
