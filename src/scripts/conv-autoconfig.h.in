@@ -120,6 +120,9 @@
 /* whether C++ library has <atomic> */
 #undef CMK_HAS_CXX11_ATOMIC
 
+/* whether has dlmopen */
+#undef CMK_HAS_DLMOPEN
+
 /* whether has dl_iterate_phdr */
 #undef CMK_HAS_DL_ITERATE_PHDR
 
@@ -224,6 +227,12 @@
 
 /* whether Cray rca has rca_get_max_dimension */
 #undef CMK_HAS_RCA_MAX_DIMENSION
+
+/* whether has readlink */
+#undef CMK_HAS_READLINK
+
+/* whether has realpath */
+#undef CMK_HAS_REALPATH
 
 /* whether compiler implements regex */
 #undef CMK_HAS_REGEX
@@ -368,6 +377,12 @@
 
 /* disable tracing comm thread */
 #undef CMK_SMP_TRACE_COMMTHREAD
+
+/* whether supports filesystem globals */
+#undef CMK_SUPPORTS_FSGLOBALS
+
+/* whether supports PiP globals */
+#undef CMK_SUPPORTS_PIPGLOBALS
 
 /* enable task queue */
 #undef CMK_TASKQUEUE

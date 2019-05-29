@@ -5346,6 +5346,7 @@ fi
 
 if test $pass -eq 1 -o $noldl -eq 1
 then
+	CMK_HAS_DLOPEN='1'
 # One version or another of dlopen worked: compile it in
 
 cat >>confdefs.h <<_ACEOF
@@ -5394,6 +5395,109 @@ test_cc "whether has RTLD_NEXT" "yes" "no" ""
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_RTLD_NEXT $pass
 _ACEOF
+
+
+cat > $tc <<EOT
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#ifndef __USE_GNU
+# define __USE_GNU
+#endif
+#include <dlfcn.h>
+#include <stddef.h>
+int main()
+{
+  return dlmopen(LM_ID_NEWLM, "foo.so", 0) == NULL;
+}
+EOT
+test_cc "whether has dlmopen" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_DLMOPEN $pass
+_ACEOF
+
+CMK_HAS_DLMOPEN="$pass"
+
+cat > $tc <<EOT
+#include <unistd.h>
+int main()
+{
+  char exe[1024];
+  return readlink("/proc/self/exe", exe, sizeof(exe)-1) == -1;
+}
+EOT
+test_cc "whether has readlink" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_READLINK $pass
+_ACEOF
+
+CMK_HAS_READLINK="$pass"
+
+cat > $tc <<EOT
+#include <limits.h>
+#include <stdlib.h>
+int main()
+{
+  return realpath("/proc/self/exe", NULL) == NULL;
+}
+EOT
+test_cc "whether has realpath" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_REALPATH $pass
+_ACEOF
+
+CMK_HAS_REALPATH="$pass"
+
+case "$CMK_VDIR" in
+  *-win-*|*-win64)
+    CMK_CAN_GET_BINARY_PATH='1'
+    CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY='0' # TODO: technically possible, but more work to be done
+    ;;
+  *-darwin*)
+    CMK_CAN_GET_BINARY_PATH='1'
+    CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY="$CMK_HAS_DLOPEN"
+    ;;
+  *)
+    if test "$CMK_HAS_READLINK" = '1' -o "$CMK_HAS_REALPATH" = '1'
+    then
+      CMK_CAN_GET_BINARY_PATH='1'
+    else
+      CMK_CAN_GET_BINARY_PATH='0'
+    fi
+    CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY="$CMK_HAS_DLOPEN"
+    ;;
+esac
+
+if test "$CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY" = '1' -a "$CMK_CAN_GET_BINARY_PATH" = '1'
+then
+  CMK_SUPPORTS_FSGLOBALS='1'
+else
+  CMK_SUPPORTS_FSGLOBALS='0'
+fi
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_SUPPORTS_FSGLOBALS $CMK_SUPPORTS_FSGLOBALS
+_ACEOF
+
+add_flag "CMK_SUPPORTS_FSGLOBALS=$CMK_SUPPORTS_FSGLOBALS" 'filesystem globals'
+add_make_flag "CMK_SUPPORTS_FSGLOBALS:=$CMK_SUPPORTS_FSGLOBALS" 'filesystem globals'
+
+if test "$CMK_HAS_DLMOPEN" = '1' -a "$CMK_CAN_GET_BINARY_PATH" = '1'
+then
+  CMK_SUPPORTS_PIPGLOBALS='1'
+else
+  CMK_SUPPORTS_PIPGLOBALS='0'
+fi
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_SUPPORTS_PIPGLOBALS $CMK_SUPPORTS_PIPGLOBALS
+_ACEOF
+
+add_flag "CMK_SUPPORTS_PIPGLOBALS=$CMK_SUPPORTS_PIPGLOBALS" 'PiP globals'
+add_make_flag "CMK_SUPPORTS_PIPGLOBALS:=$CMK_SUPPORTS_PIPGLOBALS" 'PiP globals'
 
 
 ### test gethostname ####
