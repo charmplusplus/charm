@@ -101,6 +101,16 @@ class fromzDisk : public zdisk {
 #define AMPI_LOCAL_IMPL ( !CMK_BIGSIM_CHARM && !CMK_TRACE_ENABLED )
 #endif
 
+/* messages larger than or equal to this threshold may block on a matching recv if local to the PE*/
+#ifndef AMPI_PE_LOCAL_THRESHOLD_DEFAULT
+#define AMPI_PE_LOCAL_THRESHOLD_DEFAULT 4096
+#endif
+
+/* messages larger than or equal to this threshold may block on a matching recv if local to the Node */
+#ifndef AMPI_NODE_LOCAL_THRESHOLD_DEFAULT
+#define AMPI_NODE_LOCAL_THRESHOLD_DEFAULT 16384
+#endif
+
 /* AMPI uses RDMA sends if BigSim is not being used and the underlying comm
  * layer supports it (except for GNI, which has experimental RDMA support). */
 #ifndef AMPI_RDMA_IMPL
@@ -116,14 +126,7 @@ class fromzDisk : public zdisk {
 #endif
 #endif
 
-/* contiguous messages larger than or equal to this threshold that are being sent
- * within a process are sent via RDMA. */
-#ifndef AMPI_SMP_RDMA_THRESHOLD_DEFAULT
-#define AMPI_SMP_RDMA_THRESHOLD_DEFAULT 16384
-#endif
-
 extern int AMPI_RDMA_THRESHOLD;
-extern int AMPI_SMP_RDMA_THRESHOLD;
 
 #define AMPI_ALLTOALL_THROTTLE   64
 #define AMPI_ALLTOALL_SHORT_MSG  256
@@ -274,6 +277,30 @@ class AmpiOpHeader {
   AmpiOpHeader(MPI_User_function* f,MPI_Datatype d,int l,int szd) noexcept :
     func(f),dtype(d),len(l),szdata(szd) { }
 };
+
+/*
+ * For within-node Ssend's: used in ampi::processSsendMsg()
+ */
+class SsendInfo {
+ private:
+  int node;
+  int idx;
+  int count;
+  char* buf;
+  CkDDT_DataType* ddt;
+
+ public:
+  SsendInfo() = default;
+  SsendInfo(int idx_, int count_, char* buf_, CkDDT_DataType* ddt_) noexcept :
+    node(CkMyNode()), idx(idx_), count(count_), buf(buf_), ddt(ddt_) {}
+  ~SsendInfo() {}
+  inline int getNode() const noexcept { return node; }
+  inline int getIdx() const noexcept { return idx; }
+  inline int getCount() const noexcept { return count; }
+  inline char* getBuf() const noexcept { CkAssert(node == CkMyNode()); return buf; }
+  inline CkDDT_DataType* getDDT() const noexcept { CkAssert(node == CkMyNode()); return ddt; }
+};
+PUPbytes(SsendInfo) // PUP as bytes b/c buf & ddt are only meant to be accessed from within shared memory
 
 //------------------- added by YAN for one-sided communication -----------
 /* the index is unique within a communicator */
@@ -1845,6 +1872,7 @@ public:
   inline CMK_REFNUM_TYPE getSeqIncoming() const noexcept { return seqIncoming; }
 
   inline void incSeqOutgoing() noexcept { seqOutgoing++; if (seqOutgoing==0) seqOutgoing=1; }
+  inline void decSeqOutgoing() noexcept { seqOutgoing--; if (seqOutgoing==0) seqOutgoing=std::numeric_limits<CMK_REFNUM_TYPE>::max(); }
   inline CMK_REFNUM_TYPE getSeqOutgoing() const noexcept { return seqOutgoing; }
 
   inline void incNumOutOfOrder() noexcept { numOutOfOrder++; }
@@ -1886,7 +1914,7 @@ public:
   /// Is this message in order (return >0) or not (return 0)?
   /// Same as put() except we don't call putOutOfOrder() here,
   /// so the caller should do that separately
-  inline int isInOrder(int srcRank, CMK_REFNUM_TYPE seq) noexcept {
+  inline int putIfInOrder(int srcRank, CMK_REFNUM_TYPE seq) noexcept {
     AmpiOtherElement &el = elements[srcRank];
     if (seq == el.getSeqIncoming()) { // In order:
       el.incSeqIncoming();
@@ -1895,6 +1923,11 @@ public:
     else { // Out of order: caller should stash message
       return 0;
     }
+  }
+
+  /// Is this in-order?
+  inline bool isInOrder(int seqIdx, CMK_REFNUM_TYPE seq) noexcept {
+    return (seq == elements[seqIdx].getSeqIncoming());
   }
 
   /// Get an out-of-order message from the table.
@@ -1914,6 +1947,11 @@ public:
     AmpiOtherElement &el = elements[destRank];
     el.incSeqOutgoing();
     return el.getSeqOutgoing();
+  }
+
+  /// Reset the outgoing sequence number to its previous value.
+  inline void resetOutgoing(int destRank) noexcept {
+    elements[destRank].decSeqOutgoing();
   }
 };
 PUPmarshall(AmpiSeqQ)
@@ -2445,9 +2483,12 @@ class ampi final : public CBase_ampi {
   CkPupPtrVec<win_obj> winObjects;
 
  private:
+  inline bool isInOrder(int seqIdx, int seq) noexcept { return oorder.isInOrder(seqIdx, seq); }
   bool inorder(AmpiMsg *msg) noexcept;
   void inorderBcast(AmpiMsg *msg, bool deleteMsg) noexcept;
   void inorderRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int srcRank) noexcept;
+  inline void localInorder(char* buf, int size, int seqIdx, CMK_REFNUM_TYPE seq, int tag,
+                           int srcRank, IReq* ireq) noexcept;
 
   void init() noexcept;
   void findParent(bool forMigration) noexcept;
@@ -2524,6 +2565,7 @@ class ampi final : public CBase_ampi {
   MPI_Request postReq(AmpiRequest* newreq) noexcept;
   inline void waitOnBlockingSend(MPI_Request* req, AmpiSendType sendType) noexcept;
   inline void requestSsendMsg(AmpiMsg* msg) noexcept;
+  inline void completedSend(MPI_Request req) noexcept;
 
   inline CMK_REFNUM_TYPE getSeqNo(int destRank, MPI_Comm destcomm, int tag) noexcept;
   AmpiMsg *makeBcastMsg(const void *buf,int count,MPI_Datatype type,int root,MPI_Comm destcomm) noexcept;
@@ -2531,24 +2573,36 @@ class ampi final : public CBase_ampi {
                        MPI_Datatype type,MPI_Comm destcomm,int ssendReq,CMK_REFNUM_TYPE seq) noexcept;
   AmpiMsg *makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
                        MPI_Datatype type,MPI_Comm destcomm) noexcept;
+  AmpiMsg *makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int count,
+                       MPI_Datatype type,MPI_Comm destcomm,CMK_REFNUM_TYPE seq) noexcept;
 
   MPI_Request send(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
                    MPI_Comm destcomm, AmpiSendType sendType=BLOCKING_SEND, MPI_Request=MPI_REQUEST_NULL) noexcept;
   static void sendraw(int t, int s, void* buf, int len, CkArrayID aid, int idx) noexcept;
-  inline MPI_Request sendLocalMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type, int destRank,
-                                  MPI_Comm destcomm, ampi* destPtr, AmpiSendType sendType, MPI_Request req) noexcept;
-  inline MPI_Request sendRdmaMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type, int destIdx,
-                                 int destRank, MPI_Comm destcomm, CProxy_ampi arrProxy, MPI_Request req) noexcept;
   inline MPI_Request sendSyncMsg(int t, int sRank, const void* buf, MPI_Datatype type, int count,
-                                int rank, MPI_Comm destcomm, CProxyElement_ampi destElem,
-                                AmpiSendType sendType, MPI_Request req) noexcept;
+                                 int rank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxyElement_ampi destElem,
+                                 AmpiSendType sendType, MPI_Request reqIdx) noexcept;
+  inline MPI_Request sendLocalMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type,
+                                  int count, int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq,
+                                  ampi* destPtr, AmpiSendType sendType, MPI_Request reqIdx) noexcept;
+  inline MPI_Request sendRdmaMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type, int destIdx,
+                                 int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi arrProxy,
+                                 MPI_Request reqIdx) noexcept;
   inline bool destLikelyWithinProcess(CProxy_ampi arrProxy, int destIdx) const noexcept {
+#if CMK_MULTICORE
+    return true;
+#elif CMK_SMP
     CkArray* localBranch = arrProxy.ckLocalBranch();
     int destPe = localBranch->lastKnown(CkArrayIndex1D(destIdx));
     return (CkNodeOf(destPe) == CkMyNode());
+#else // non-SMP
+    ampi* destPtr = arrProxy[destIdx].ckLocal();
+    return (destPtr != NULL);
+#endif
   }
   inline MPI_Request delesend(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
                               MPI_Comm destcomm, CProxy_ampi arrproxy, AmpiSendType sendType, MPI_Request req) noexcept;
+  inline bool processSsendMsg(AmpiMsg* msg, int* msgLen, char** msgData) noexcept;
   inline bool processAmpiMsg(AmpiMsg *msg, void* buf, MPI_Datatype type, int count) noexcept;
   inline void processRdmaMsg(const void *sbuf, int slength, int srank, void* rbuf,
                              int rcount, MPI_Datatype rtype, MPI_Comm comm) noexcept;
