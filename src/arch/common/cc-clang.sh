@@ -19,5 +19,7 @@ if [ "$CMK_COMPILER" = "msvc" ]; then
   CMK_NATIVE_LDXX="$CMK_LDXX"
 fi
 
+CMK_PIE='-fPIE'
+
 CMK_COMPILER='clang'
 CMK_WARNINGS_ARE_ERRORS="-Werror"

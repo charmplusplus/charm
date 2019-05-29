@@ -5,6 +5,7 @@
 //#define DEBUG(x) x
 #define DEBUG(x)
 #define LBPERIOD_ITER 5
+#define MAX_ITER 40
 
 int numElements;
 
@@ -48,7 +49,7 @@ template<class T>
 void copyArray(T *&dest, T *&src, int size){
   if(dest != NULL)
     CkRdmaFree(dest);
-  //dest = new T[size];
+  // Allocate using CkRdmaAlloc instead of new
   dest = (T *)CkRdmaAlloc(sizeof(T) * size);
   memcpy(dest,src,size*sizeof(T));
 }
@@ -265,7 +266,7 @@ class zerocopyObject : public CBase_zerocopyObject{
       //load balance
       if(iter % LBPERIOD_ITER == 0)
         AtSync();
-      else if(iter<=100)
+      else if(iter <= MAX_ITER)
         thisProxy[thisIndex].sdagRun();
       else {
         CkCallback reductionCb(CkReductionTarget(Main, done), mainProxy);

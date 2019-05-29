@@ -39,6 +39,7 @@
 #include <sys/stat.h>
 #include <gni_pub.h>
 #include <pmi.h>
+#include <algorithm>
 //#include <numatoolkit.h>
 
 #include "converse.h"
@@ -364,10 +365,11 @@ static int LOCAL_QUEUE_ENTRIES=20480;
 
 #define RDMA_REG_AND_PUT_MD_DIRECT_TAG  0x39
 #define RDMA_REG_AND_GET_MD_DIRECT_TAG  0x40
+#define RDMA_DEREG_AND_ACK_MD_DIRECT_TAG  0x41
 
 #if CMK_SMP
-#define RDMA_COMM_PERFORM_GET_TAG     0x41
-#define RDMA_COMM_PERFORM_PUT_TAG     0x42
+#define RDMA_COMM_PERFORM_GET_TAG     0x42
+#define RDMA_COMM_PERFORM_PUT_TAG     0x43
 #endif
 
 #define DEBUG
@@ -2293,7 +2295,7 @@ static void PumpNetworkSmsg()
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
                           (uint64_t)newNcpyOpInfo->srcPtr,
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
-                          newNcpyOpInfo->srcSize,
+                          std::min(newNcpyOpInfo->srcSize, newNcpyOpInfo->destSize),
                           (uint64_t)newNcpyOpInfo,
                           CmiNodeOf(newNcpyOpInfo->destPe),
                           GNI_POST_RDMA_PUT,
@@ -2351,7 +2353,7 @@ static void PumpNetworkSmsg()
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
                           (uint64_t)newNcpyOpInfo->srcPtr,
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
-                          newNcpyOpInfo->srcSize,
+                          std::min(newNcpyOpInfo->srcSize, newNcpyOpInfo->destSize),
                           (uint64_t)newNcpyOpInfo,
                           CmiNodeOf(newNcpyOpInfo->destPe),
                           GNI_POST_RDMA_PUT,
@@ -2381,7 +2383,7 @@ static void PumpNetworkSmsg()
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
                           (uint64_t)newNcpyOpInfo->destPtr,
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
-                          newNcpyOpInfo->srcSize,
+                          std::min(newNcpyOpInfo->srcSize, newNcpyOpInfo->destSize),
                           (uint64_t)newNcpyOpInfo,
                           CmiNodeOf(newNcpyOpInfo->srcPe),
                           GNI_POST_RDMA_GET,
@@ -2389,6 +2391,32 @@ static void PumpNetworkSmsg()
 
                  break;
             }
+            case RDMA_DEREG_AND_ACK_MD_DIRECT_TAG:
+            {
+                NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)header;
+
+                // copy into a new object
+                NcpyOperationInfo *newNcpyOpInfo = (NcpyOperationInfo *)CmiAlloc(ncpyOpInfo->ncpyOpInfoSize);
+                memcpy(newNcpyOpInfo, ncpyOpInfo, ncpyOpInfo->ncpyOpInfoSize);
+
+                GNI_SmsgRelease(ep_hndl_array[inst_id]);
+                CMI_GNI_UNLOCK(smsg_mailbox_lock)
+
+                resetNcpyOpInfoPointers(newNcpyOpInfo);
+
+                LrtsDeregisterMem(newNcpyOpInfo->srcPtr,
+                                  (char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize(),
+                                  newNcpyOpInfo->srcPe,
+                                  newNcpyOpInfo->srcRegMode);
+
+                newNcpyOpInfo->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
+
+                // Invoke source ack
+                newNcpyOpInfo->opMode = CMK_EM_API_SRC_ACK_INVOKE;
+                CmiInvokeNcpyAck(newNcpyOpInfo);
+                break;
+            }
+
 #endif
             case BIG_MSG_TAG:  //big msg, de-register, transfer next seg
             {
@@ -3300,6 +3328,7 @@ INLINE_KEYWORD gni_return_t _sendOneBufferedSmsg(SMSG_QUEUE *queue, MSG_LIST *pt
 
      case RDMA_REG_AND_GET_MD_DIRECT_TAG:
      case RDMA_REG_AND_PUT_MD_DIRECT_TAG:
+     case RDMA_DEREG_AND_ACK_MD_DIRECT_TAG:
         //msgSize = sizeof(CmiGNIRzvRdmaReverseOp_t) + 2*(((CmiGNIRzvRdmaReverseOp_t *)(ptr->msg))->ackSize);
         ncpyOpInfo = (NcpyOperationInfo *)(ptr->msg);
         msgMode = (ncpyOpInfo->freeMe == CMK_FREE_NCPYOPINFO) ? CHARM_SMSG : SMSG_DONT_FREE;

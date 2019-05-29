@@ -2,6 +2,7 @@
  * Specific implementations are in arch/layer/machine-onesided.{h,c}
  */
 #include "converse.h"
+#include <algorithm>
 
 // Methods required to keep the Nocopy Direct API functional on non-LRTS layers
 #if !CMK_USE_LRTS
@@ -50,7 +51,7 @@ static void putDataHandler(ConverseRdmaMsg *payloadMsg) {
   // copy the received messsage into the user's destination address
   memcpy((char *)ncpyOpInfo->destPtr,
          (char *)payloadMsg + sizeof(ConverseRdmaMsg) + ncpyOpInfo->ncpyOpInfoSize,
-         ncpyOpInfo->srcSize);
+         std::min(ncpyOpInfo->srcSize, ncpyOpInfo->destSize));
 
   // Invoke the destination ack
   ncpyOpInfo->ackMode = CMK_DEST_ACK; // Only invoke the destination ack
@@ -92,6 +93,7 @@ void CmiIssueRput(NcpyOperationInfo *ncpyOpInfo) {
 
   int ncpyOpInfoSize = ncpyOpInfo->ncpyOpInfoSize;
   int size = ncpyOpInfo->srcSize;
+  int destPe = ncpyOpInfo->destPe;
 
   // Send a ConverseRdmaMsg to the other PE sending the array
   ConverseRdmaMsg *payloadMsg = (ConverseRdmaMsg *)CmiAlloc(sizeof(ConverseRdmaMsg) + ncpyOpInfoSize + size);
@@ -112,7 +114,7 @@ void CmiIssueRput(NcpyOperationInfo *ncpyOpInfo) {
   ncpyDirectAckHandlerFn(ncpyOpInfo);
 
   CmiSetHandler(payloadMsg, put_data_handler_idx);
-  CmiSyncSendAndFree(ncpyOpInfo->destPe,
+  CmiSyncSendAndFree(destPe,
                      sizeof(ConverseRdmaMsg) + ncpyOpInfoSize + size,
                      payloadMsg);
 }
@@ -121,83 +123,5 @@ void CmiSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short 
 
 void CmiDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode) {}
 
-#else
 
-// Support for sending an ack message for the Entry Method API
-
-RdmaEMAckCallerFn ncpyEMAckHandlerFn; // P2P API ack handler function
-
-RdmaAckCallerFn ncpyEMBcastAckHandlerFn; // BCast API ack handler function
-
-RdmaAckCallerFn ncpyEMBcastPostAckHandlerFn; // BCast API ack handler function
-
-static int invoke_entry_method_ack_handler_idx, ncpy_bcast_ack_handler_idx;
-static int ncpy_bcast_post_handler_idx;
-
-// Ack Message is typically used in case of reverse operation (when a reverse put is used instead of a get)
-typedef struct _ackEntryMethodMsg{
-  char cmicore[CmiMsgHeaderSizeBytes];
-  void *ref;
-} ackEntryMethodMsg;
-
-// Handler invoked on receiving a ackEntryMethodMsg
-// This handler invokes the ncpyEMAckHandler on the receiver side
-static void ackEntryMethodHandler(ackEntryMethodMsg *msg) {
-  // Invoke the charm handler
-  ncpyEMAckHandlerFn(CmiMyPe(), msg->ref);
-}
-
-// This handler invokes the ncpyEMBcastAckHandler on the source (root node or intermediate nodes)
-static void bcastAckHandler(ackEntryMethodMsg *msg) {
-  ncpyEMBcastAckHandlerFn(msg->ref);
-}
-
-static void bcastPostAckArrayHandler(ackEntryMethodMsg *msg) {
-  ncpyEMBcastPostAckHandlerFn(msg->ref);
-}
-
-// Method to create a ackEntryMethodMsg and send it
-void CmiInvokeRemoteAckHandler(int pe, void *ref) {
-  ackEntryMethodMsg *msg = (ackEntryMethodMsg *)CmiAlloc(sizeof(ackEntryMethodMsg));
-  msg->ref = ref;
-
-  CmiSetHandler(msg, invoke_entry_method_ack_handler_idx);
-  CmiSyncSendAndFree(pe, sizeof(ackEntryMethodMsg), msg);
-}
-
-// Register converse handler for invoking ack on reverse operation
-void CmiOnesidedDirectInit(void) {
-  invoke_entry_method_ack_handler_idx = CmiRegisterHandler((CmiHandler)ackEntryMethodHandler);
-  ncpy_bcast_ack_handler_idx = CmiRegisterHandler((CmiHandler)bcastAckHandler);
-
-  ncpy_bcast_post_handler_idx = CmiRegisterHandler((CmiHandler)bcastPostAckArrayHandler);
-}
-
-void CmiSetEMNcpyAckHandler(RdmaEMAckCallerFn fn, RdmaAckCallerFn bcastFn, RdmaAckCallerFn bcastArrayFn) {
-  // set the EM Ack caller function
-  ncpyEMAckHandlerFn = fn;
-
-  // set the EM Bcast Ack caller function
-  ncpyEMBcastAckHandlerFn = bcastFn;
-
-  // set the EM Bcast Post Ack caller function
-  ncpyEMBcastPostAckHandlerFn = bcastArrayFn;
-}
-
-void CmiInvokeBcastAckHandler(int pe, void *ref) {
-
-  ackEntryMethodMsg *msg = (ackEntryMethodMsg *)CmiAlloc(sizeof(ackEntryMethodMsg));
-  msg->ref = ref;
-
-  CmiSetHandler(msg, ncpy_bcast_ack_handler_idx);
-  CmiSyncSendAndFree(pe, sizeof(ackEntryMethodMsg), msg);
-}
-
-void CmiInvokeBcastPostAckHandler(int pe, void *ref) {
-  ackEntryMethodMsg *msg = (ackEntryMethodMsg *)CmiAlloc(sizeof(ackEntryMethodMsg));
-  msg->ref = ref;
-
-  CmiSetHandler(msg, ncpy_bcast_post_handler_idx);
-  CmiSyncSendAndFree(pe, sizeof(ackEntryMethodMsg), msg);
-}
 #endif

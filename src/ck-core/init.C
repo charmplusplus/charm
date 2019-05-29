@@ -74,6 +74,7 @@ never be excluded...
 #include "spanningTree.h"
 #if CMK_CHARMPY
 #include "GreedyRefineLB.h"
+#include "RandCentLB.h"
 #endif
 
 #if CMK_CUDA
@@ -984,7 +985,7 @@ static void _roRdmaDoneHandler(envelope *env) {
           CmiDeregisterMem(buffAckInfo->ptr,
                            buffAckInfo->layerInfo +CmiGetRdmaCommonInfoSize(),
                            buffAckInfo->pe,
-                           buffAckInfo->mode);
+                           buffAckInfo->regMode);
         }
 
         if(roBcastAckInfo->isRoot != 1) {
@@ -1456,7 +1457,7 @@ void _initCharm(int unused_argc, char **argv)
 
 #if CMK_ONESIDED_IMPL
 	// Set the ack handler function used for the entry method p2p api and entry method bcast api
-	CmiSetEMNcpyAckHandler(CkRdmaEMAckHandler, CkRdmaEMBcastAckHandler, CkRdmaEMBcastPostAckHandler);
+	initEMNcpyAckHandler();
 #endif
 	/**
 	  The rank-0 processor of each node calls the 
@@ -1518,6 +1519,7 @@ void _initCharm(int unused_argc, char **argv)
                   at least for strategies used in central/hybrid, because they will stop being chares.
                 */
 		_registerGreedyRefineLB();
+		_registerRandCentLB();
 #endif
 
 		/**

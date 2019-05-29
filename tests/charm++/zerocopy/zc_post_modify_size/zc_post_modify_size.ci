@@ -1,0 +1,34 @@
+mainmodule zc_post_modify_size
+{
+
+  readonly CProxy_arr arrProxy;
+  readonly CProxy_grp grpProxy;
+  readonly CProxy_nodegrp ngProxy;
+  readonly CProxy_tester chareProxy;
+
+  mainchare main
+  {
+    entry main(CkArgMsg *);
+  };
+
+  chare tester {
+    entry tester();
+    entry void p2pDone();
+    entry [reductiontarget] void bcastDone();
+  };
+
+  array [1D] arr{
+    entry arr();
+    entry void recv_zerocopy(nocopypost int buffer[size], size_t size, bool isBcast);
+  };
+
+  group grp{
+    entry grp();
+    entry void recv_zerocopy(nocopypost int buffer[size], size_t size, bool isBcast);
+  };
+
+  nodegroup nodegrp{
+    entry nodegrp();
+    entry void recv_zerocopy(nocopypost int buffer[size], size_t size, bool isBcast);
+  };
+}

@@ -18,7 +18,6 @@ syntax() {
   echo 'Usage: build <target> <version> <options> [charmc-options ...]'
   echo ''
   echo '<targets>: converse charm++ LIBS AMPI charm4py bigemulator msa'
-  echo '<targets>: doc ps-doc pdf-doc html-doc'
   if test $more = 1
   then
   echo ''
@@ -743,7 +742,7 @@ then
   Echo "File structure already created; skipping directly to make"
 else
 
-for d in benchmarks bin doc examples include lib lib_so tests tmp; do
+for d in benchmarks bin examples include lib lib_so tests tmp; do
   rm -rf "$DESTINATION/$d"
 done
 

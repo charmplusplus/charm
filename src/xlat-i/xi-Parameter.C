@@ -531,8 +531,10 @@ void ParamList::beginUnmarshall(XStr& str) {
       str << "#endif\n";
       if (hasRecvRdma()) {
         str << "  CkNcpyBufferPost ncpyPost[" << entry->numRdmaRecvParams << "];\n";
-        for(int index=0; index < entry->numRdmaRecvParams; index++)
-          str << "  ncpyPost[" <<index<<  "].mode = CK_BUFFER_REG;\n";
+        for(int index=0; index < entry->numRdmaRecvParams; index++) {
+          str << "  ncpyPost[" <<index<<  "].regMode = CK_BUFFER_REG;\n";
+          str << "  ncpyPost[" <<index<<  "].deregMode = CK_BUFFER_DEREG;\n";
+        }
       }
     }
     callEach(&Parameter::beginUnmarshall, str);
@@ -558,25 +560,63 @@ void ParamList::storePostedRdmaPtrs(XStr& str, bool isSDAGGen) {
 void Parameter::storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, int &count) {
   if(isRdma()) {
     if(genRdma) {
-      str << "  if(CMI_IS_ZC_RECV(env)) \n";
-      str << "    buffPtrs["<< count++ <<"] = (void *)" << "ncpyBuffer_";
+      Type* dt = type->deref();
+      str << "  if(CMI_IS_ZC_RECV(env)) {\n";
+      str << "    buffPtrs["<< count <<"] = (void *)" << "ncpyBuffer_";
       str << name << "_ptr;\n";
+      if(isSDAGGen)
+        str << "    buffSizes["<< count++ <<"] = sizeof(" << dt << ") * genClosure->"<< arrLen << ";\n";
+      else
+        str << "    buffSizes["<< count++ <<"] = sizeof(" << dt << ") * "<< arrLen << ".t;\n";
+      str <<  "  }\n";
 
-      str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) \n";
+      str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
+
+      // Error checking if posted buffer is larger than the source buffer
+      str << "  if( ";
+      if(isSDAGGen)
+        str << "genClosure->";
+      str << "ncpyBuffer_" << name << ".cnt < " ;
+      if(isSDAGGen)
+         str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ")\n";
+      else
+        str << " sizeof(" << dt << ") * "<< arrLen << ".t)\n";
+
+      str << "    CkAbort(\"Size of the posted buffer > Size of the source buffer \");\n";
+
       str << "    memcpy(" << "ncpyBuffer_" << name << "_ptr,";
       if(isSDAGGen)
         str << "genClosure->";
       str << "ncpyBuffer_" << name << ".ptr,";
       if(isSDAGGen)
-        str << "genClosure->";
-      str << "ncpyBuffer_" << name << ".cnt);\n";
+        str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ");\n";
+      else
+        str << " sizeof(" << dt << ") * "<< arrLen << ".t);\n";
+
+      str << "  }\n";
+
     } else {
       Type* dt = type->deref();  // Type, without &
+
+      // Error checking if posted buffer is larger than the source buffer
+      str << "  if(impl_cnt_" << name << " < " ;
+      if(isSDAGGen)
+         str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ")\n";
+      else
+        str << " sizeof(" << dt << ") * "<< arrLen << ".t)\n";
+
+      str << "    CkAbort(\"Size of the posted buffer > Size of the source buffer \");\n";
+
       // memcpy the pointer into the user passed buffer
       str << "  memcpy(" << "ncpyBuffer_" << name << "_ptr,";
       if(isSDAGGen)
         str << "genClosure->";
-      str << name << "," << "impl_cnt_" << name << ");\n";
+      str << name << ",";
+
+      if(isSDAGGen)
+        str << " sizeof(" << dt << ") * genClosure->"<< arrLen << ");\n";
+      else
+        str << " sizeof(" << dt << ") * "<< arrLen << ".t);\n";
     }
   }
 }
@@ -663,8 +703,10 @@ void ParamList::beginUnmarshallSDAGCall(XStr& str, bool usesImplBuf) {
     if (hasRdma()) {
       if(hasRecvRdma()) {
         str << "  CkNcpyBufferPost ncpyPost[" << entry->numRdmaRecvParams << "];\n";
-        for(int index=0; index < entry->numRdmaRecvParams; index++)
-          str << "  ncpyPost[" <<index<<  "].mode = CK_BUFFER_REG;\n";
+        for(int index=0; index < entry->numRdmaRecvParams; index++) {
+          str << "  ncpyPost[" <<index<<  "].regMode = CK_BUFFER_REG;\n";
+          str << "  ncpyPost[" <<index<<  "].deregMode = CK_BUFFER_DEREG;\n";
+        }
       }
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "  char *impl_buf_begin = impl_buf;\n";

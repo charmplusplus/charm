@@ -1,6 +1,8 @@
 DIRS = \
   largedata \
   zerocopy_with_qd \
+  direct_api \
+  zc_post_modify_size \
 
 TESTDIRS = $(DIRS)
 

@@ -153,7 +153,7 @@ void process_onesided_reg_and_put(struct fi_cq_tagged_entry *e, OFIRequest *req)
       rbuf,
       CmiNodeOf(ncpyOpInfo->destPe),
       ((CmiOfiRdmaPtr_t *)((char *)(ncpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->key,
-      ncpyOpInfo->srcSize,
+      std::min(ncpyOpInfo->srcSize, ncpyOpInfo->destSize),
       ((CmiOfiRdmaPtr_t *)((char *)(ncpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mr,
       ofi_onesided_direct_operation_callback,
       (void *)rdmaComp,
@@ -190,7 +190,7 @@ void process_onesided_reg_and_get(struct fi_cq_tagged_entry *e, OFIRequest *req)
       rbuf,
       CmiNodeOf(ncpyOpInfo->srcPe),
       ((CmiOfiRdmaPtr_t *)((char *)(ncpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->key,
-      ncpyOpInfo->srcSize,
+      std::min(ncpyOpInfo->srcSize, ncpyOpInfo->destSize),
       ((CmiOfiRdmaPtr_t *)((char *)(ncpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mr,
       ofi_onesided_direct_operation_callback,
       (void *)rdmaComp,
@@ -251,7 +251,7 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo) {
         rbuf,
         CmiNodeOf(ncpyOpInfo->srcPe),
         src_info->key,
-        ncpyOpInfo->srcSize,
+        std::min(ncpyOpInfo->srcSize, ncpyOpInfo->destSize),
         dest_info->mr,
         ofi_onesided_direct_operation_callback,
         (void *)rdmaComp,
@@ -304,7 +304,7 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
         rbuf,
         CmiNodeOf(ncpyOpInfo->destPe),
         dest_info->key,
-        ncpyOpInfo->srcSize,
+        std::min(ncpyOpInfo->srcSize, ncpyOpInfo->destSize),
         src_info->mr,
         ofi_onesided_direct_operation_callback,
         (void *)rdmaComp,
@@ -318,10 +318,69 @@ void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int m
   CmiOfiRdmaPtr_t *rdmaSrc = (CmiOfiRdmaPtr_t *)info;
   int ret;
 
-  // Deregister the buffer
-  if(rdmaSrc->mr) {
+  if(mode != CMK_BUFFER_NOREG && rdmaSrc->mr) {
+    // Deregister the buffer
     ret = fi_close((struct fid *)rdmaSrc->mr);
     if(ret)
       CmiAbort("LrtsDeregisterMem: fi_close(mr) failed!\n");
   }
 }
+
+
+void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo) {
+
+  OFIRequest *req;
+
+  // Send a message to de-register buffer and invoke source ack
+#if USE_OFIREQUEST_CACHE
+  req = alloc_request(context.request_cache);
+#else
+  req = (OFIRequest*)CmiAlloc(sizeof(OFIRequest));
+#endif
+  CmiAssert(req);
+
+  ZERO_REQUEST(req);
+
+  if(ncpyOpInfo->freeMe == CMK_FREE_NCPYOPINFO)
+    req->freeMe   = 1;// free ncpyOpInfo
+  else
+    req->freeMe   = 0;// do not free ncpyOpInfo
+
+  req->destNode = CmiNodeOf(ncpyOpInfo->srcPe);
+  req->destPE   = ncpyOpInfo->srcPe;
+  req->size     = ncpyOpInfo->ncpyOpInfoSize;
+  req->callback = send_short_callback;
+  req->data.short_msg = ncpyOpInfo;
+
+  ofi_send(ncpyOpInfo,
+           ncpyOpInfo->ncpyOpInfoSize,
+           CmiNodeOf(ncpyOpInfo->srcPe),
+           OFI_RDMA_DIRECT_DEREG_AND_ACK,
+           req);
+}
+
+void process_onesided_dereg_and_ack(struct fi_cq_tagged_entry *e, OFIRequest *req) {
+
+  char *data = (char *)req->data.rma_ncpy_ack;
+
+  // Allocate a new receiver buffer to receive other messages
+  req->data.recv_buffer = CmiAlloc(context.eager_maxsize);
+
+  NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(data);
+  resetNcpyOpInfoPointers(ncpyOpInfo);
+
+  ncpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO;
+
+  LrtsDeregisterMem(ncpyOpInfo->srcPtr,
+                    ncpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize(),
+                    ncpyOpInfo->srcPe,
+                    ncpyOpInfo->srcRegMode);
+
+  ncpyOpInfo->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
+
+  // Invoke source ack
+  ncpyOpInfo->opMode = CMK_EM_API_SRC_ACK_INVOKE;
+  CmiInvokeNcpyAck(ncpyOpInfo);
+}
+
+

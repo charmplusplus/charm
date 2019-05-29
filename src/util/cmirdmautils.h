@@ -19,7 +19,8 @@ typedef struct ncpystruct{
   char *srcAck;
   int srcAckSize;
   int srcSize;
-  unsigned short int srcMode;
+  unsigned short int srcRegMode;
+  unsigned short int srcDeregMode;
   unsigned short int isSrcRegistered;
   const void *srcRef;
 
@@ -30,7 +31,8 @@ typedef struct ncpystruct{
   char *destAck;
   int destAckSize;
   int destSize;
-  unsigned short int destMode;
+  unsigned short int destRegMode;
+  unsigned short int destDeregMode;
   unsigned short int isDestRegistered;
   const void *destRef;
 
@@ -70,7 +72,8 @@ void setNcpyOpInfo(
   char *srcAck,
   int srcAckSize,
   int srcSize,
-  unsigned short int srcMode,
+  unsigned short int srcRegMode,
+  unsigned short int srcDeregMode,
   unsigned short int isSrcRegistered,
   int srcPe,
   const void *srcRef,
@@ -80,7 +83,8 @@ void setNcpyOpInfo(
   char *destAck,
   int destAckSize,
   int destSize,
-  unsigned short int destMode,
+  unsigned short int destRegMode,
+  unsigned short int destDeregMode,
   unsigned short int isdestRegistered,
   int destPe,
   const void *destRef,

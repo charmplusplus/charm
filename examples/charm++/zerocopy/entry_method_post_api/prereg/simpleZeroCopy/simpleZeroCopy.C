@@ -164,8 +164,6 @@ class zerocopyObject : public CBase_zerocopyObject{
     void zerocopySent(CkDataMsg *m){
       // Get access to the array information sent via zerocopy
       CkNcpyBuffer *src = (CkNcpyBuffer *)(m->data);
-      // de-register the memory
-      src->deregisterMem();
       CkRdmaFree((void *)(src->ptr));
 
       delete m;
@@ -180,9 +178,6 @@ class zerocopyObject : public CBase_zerocopyObject{
 
       // Get access to the array information sent via zerocopy
       CkNcpyBuffer *src = (CkNcpyBuffer *)(m->data);
-
-      // de-register the memory
-      src->deregisterMem();
 
       void *ptr = (void *)(src->ptr); // do not free pointer as it is used in the next iteration as well
 
@@ -247,9 +242,9 @@ class zerocopyObject : public CBase_zerocopyObject{
       ptr2 = dArr1;
       ptr3 = cArr1;
 
-      ncpyPost[0].mode = CK_BUFFER_PREREG;
-      ncpyPost[1].mode = CK_BUFFER_PREREG;
-      ncpyPost[2].mode = CK_BUFFER_PREREG;
+      ncpyPost[0].regMode = CK_BUFFER_PREREG;
+      ncpyPost[1].regMode = CK_BUFFER_PREREG;
+      ncpyPost[2].regMode = CK_BUFFER_PREREG;
     }
 
     void zerocopySend(int n1, int *ptr1, int n2, double *ptr2, int n3, char *ptr3){
@@ -272,8 +267,8 @@ class zerocopyObject : public CBase_zerocopyObject{
       ptr2 = dArr1;
       ptr3 = iArr2;
 
-      ncpyPost[0].mode = CK_BUFFER_PREREG;
-      ncpyPost[1].mode = CK_BUFFER_PREREG;
+      ncpyPost[0].regMode = CK_BUFFER_PREREG;
+      ncpyPost[1].regMode = CK_BUFFER_PREREG;
     }
 
     void mixedSend(int n1, int *ptr1, int n2, double *ptr2, int n3, int *ptr3, int n4, double *ptr4){
@@ -329,8 +324,8 @@ class zerocopyObject : public CBase_zerocopyObject{
       // and results in the same array being overwritten. It is important to note that messages can
       // be out of order and this could cause correctness issues in real applications if the receiver
       // doesn't receive the arrays correctly.
-      ncpyPost[0].mode = CK_BUFFER_PREREG;
-      ncpyPost[1].mode = CK_BUFFER_PREREG;
+      ncpyPost[0].regMode = CK_BUFFER_PREREG;
+      ncpyPost[1].regMode = CK_BUFFER_PREREG;
     }
 
     void ResumeFromSync() {
