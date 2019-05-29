@@ -987,7 +987,7 @@ static void getAmpiBinaryPath() noexcept
     ampi_binary_path[n] = '\0';
   }
 #else
-  CkAbort("Could not get path to current binary!");
+#  error "AMPI: No known way to get path to current binary."
 #endif
 }
 
