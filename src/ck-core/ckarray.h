@@ -316,8 +316,8 @@ public:
   virtual char *ckDebugChareName(void);
   virtual int ckDebugChareID(char*, int);
 
-  /// Synonym for ckMigrate
-  inline void migrateMe(int toPe) {ckMigrate(toPe);}
+  void ckEmigrate(int toPe) {ckMigrate(toPe);}
+
 
 #ifdef _PIPELINED_ALLREDUCE_
 	void contribute2(CkArrayIndex myIndex, int dataSize,const void *data,CkReduction::reducerType type,
@@ -430,6 +430,8 @@ typedef ArrayElementT<CkIndex5D> ArrayElement5D;
 typedef ArrayElementT<CkIndex6D> ArrayElement6D;
 typedef ArrayElementT<CkIndexMax> ArrayElementMax;
 
+#if CMK_CHARMPY
+
 extern void (*ArrayMsgRecvExtCallback)(int, int, int *, int, int, char *, int);
 extern int (*ArrayElemLeaveExt)(int, int, int *, char**, int);
 extern void (*ArrayElemJoinExt)(int, int, int *, int, char*, int);
@@ -516,6 +518,8 @@ public:
   }
 };
 
+#endif
+
 /*@}*/
 
 
@@ -559,6 +563,8 @@ class CkArray : public CkReductionMgr {
     int *children;
     int numChildren;
 #endif
+
+  UShort recvBroadcastEpIdx;
 private:
   bool stableLocations;
 
@@ -570,6 +576,8 @@ public:
   CkGroupID &getGroupID(void) {return thisgroup;}
   CkGroupID &getmCastMgr(void) {return mCastMgrID;}
   bool isSectionAutoDelegated(void) {return sectionAutoDelegate;}
+
+  UShort &getRecvBroadcastEpIdx(void) {return recvBroadcastEpIdx;}
 
 //Access & information routines
   inline CkLocMgr *getLocMgr(void) {return locMgr;}
@@ -719,6 +727,9 @@ private:
   CkArrayBroadcaster *broadcaster; //Read-only copy of default broadcaster
 public:
   void flushStates();
+#if CMK_ONESIDED_IMPL
+  void forwardZCMsgToOtherElems(envelope *env);
+#endif
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	// the mlogft only support 1D arrays, then returning the number of elements in the first dimension

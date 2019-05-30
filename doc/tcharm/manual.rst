@@ -1,6 +1,6 @@
-=======================
-Threaded Charm++ Manual
-=======================
+=========================
+Threaded Charm++ (TCharm)
+=========================
 
 .. contents::
    :depth: 3
@@ -232,7 +232,7 @@ merely sizing a buffer, or checkpointing your values).
 pup functions are much easier to write than explain- a simple C heap
 block and the corresponding pup function is:
 
-::
+.. code-block:: c++
 
         typedef struct {
           int n1;/*Length of first array below*/
@@ -294,7 +294,7 @@ You indicate to TCharm that you want a pup routine called using the
 routine below. An arbitrary number of blocks can be registered in this
 fashion.
 
-::
+.. code-block:: c++
 
   void TCHARM_Register(void *block, TCharmPupFn pup_fn)
 
@@ -308,7 +308,7 @@ Associate the given data block and pup function. Can only be called
 from the parallel context. For the declarations above, you call
 TCHARM_Register as:
 
-::
+.. code-block:: c++
 
              /*In C/C++ driver() function*/
              my_block m;
@@ -334,7 +334,7 @@ Fortran, the "TARGET" attribute must be used on the block (as above) or
 else the compiler may not update values during a migration, because it
 believes only it can access the block.
 
-::
+.. code-block:: c++
 
   void TCHARM_Migrate()
 
@@ -363,7 +363,7 @@ deleting pup handle, so you need not handle that case.
 
 A C example is:
 
-::
+.. code-block:: c++
 
         int g_arr[17];
         double g_f;
@@ -409,7 +409,7 @@ A Fortran example is:
 You register your global variable pup routine using the method below.
 Multiple pup routines can be registered the same way.
 
-::
+.. code-block:: c++
 
   void TCHARM_Readonly_globals(TCharmPupGlobalFn pup_fn)
 
@@ -441,7 +441,7 @@ frameworks cannot be attached more than once to single set of threads.
 That is, a single thread cannot have two attached AMPI frameworks, since
 the MPI_COMM_WORLD for such a thread would be indeterminate.
 
-::
+.. code-block:: c++
 
   void TCHARM_Create(int nThreads, TCharmThreadStartFn thread_fn)
 
@@ -463,7 +463,7 @@ to the current set of threads.
 
 To attach a chare array to the TCharm array, use:
 
-::
+.. code-block:: c++
 
   CkArrayOptions TCHARM_Attach_start(CkArrayID *retTCharmArray,int
   *retNumElts)
@@ -569,7 +569,7 @@ The overall scheme for writing a TCharm-based library "Foo" is:
    context because a TCharm::semaGet blocks if a local TCharm::semaGet
    hasn’t yet executed.
 
-   ::
+   .. code-block:: c++
 
       //This is either called by FooFallbackSetuo mentioned above, or by the user
       //directly from TCHARM_User_setup (for multi-module programs)
@@ -591,7 +591,7 @@ The overall scheme for writing a TCharm-based library "Foo" is:
    design is to avoid the Ctv, and instead hand the user an opaque
    handle that includes your array proxy.
 
-   ::
+   .. code-block:: c++
 
       //_fooptr is the Ctv that points to the current chunk FooChunk and is only valid in
       //routines called from fooDriver()
@@ -605,7 +605,7 @@ The overall scheme for writing a TCharm-based library "Foo" is:
 
 #. Define the array used by the library
 
-   ::
+   .. code-block:: c++
 
       class FooChunk: public TCharmClient1D {
          CProxy_FooChunk thisProxy;
@@ -638,7 +638,7 @@ The overall scheme for writing a TCharm-based library "Foo" is:
 #. Block a thread for communication using thread->suspend and
    thread->resume
 
-   ::
+   .. code-block:: c++
 
       int FooChunk::doCommunicate(...)
       {
@@ -678,7 +678,7 @@ The overall scheme for writing a TCharm-based library "Foo" is:
    the user passes you an index-the int index will need to be
    decremented before use, or incremented before a return.
 
-   ::
+   .. code-block:: c++
 
       CLINKAGE void FOO_Communicate(int x, double y, int * arr) {
          TCHARM_API_TRACE("FOO_Communicate", "foo"); //2nd parameter is the name of the library

@@ -11,7 +11,7 @@
 #include "GridHybridSeedLB.h"
 #include "manager.h"
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def (GridHybridSeedLB, "Grid load balancer that uses hybrid seed technique to optimize communication graph")
 
@@ -304,7 +304,7 @@ void GridHybridSeedLB::Initialize_Communication_Matrix (CentralLB::LDStats *stat
   int send_index;
   int recv_index;
   int num_objects;
-  LDObjKey *recv_objects;
+  const LDObjKey *recv_objects;
   int index;
 
 

@@ -11,7 +11,7 @@
 #include "GridHybridLB.h"
 #include "manager.h"
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def (GridHybridLB, "Grid load balancer that uses hybrid technique to optimize communication graph")
 
@@ -297,7 +297,7 @@ void GridHybridLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
   int recv_object;
   int send_index;
   int recv_index;
-  LDObjKey *recv_objects;
+  const LDObjKey *recv_objects;
   int num_objects;
   int *xadj;
   int num_edges;

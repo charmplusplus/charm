@@ -8,6 +8,7 @@ typedef void (*ofiCallbackFn)(struct fi_cq_tagged_entry *e, OFIRequest *req);
 inline void process_onesided_completion_ack(struct fi_cq_tagged_entry *e, OFIRequest *req);
 inline void process_onesided_reg_and_put(struct fi_cq_tagged_entry *e, OFIRequest *req);
 inline void process_onesided_reg_and_get(struct fi_cq_tagged_entry *e, OFIRequest *req);
+inline void process_onesided_dereg_and_ack(struct fi_cq_tagged_entry *e, OFIRequest *req);
 
 /* Support for Nocopy Direct API */
 // Structure representing the machine specific information for a source or destination buffer used in the direct API
@@ -41,13 +42,13 @@ void LrtsIssueRget(
   void *srcAck,
   int srcAckSize,
   int srcPe,
-  unsigned short int *srcMode,
+  unsigned short int *srcRegMode,
   const void* destAddr,
   void *destInfo,
   void *destAck,
   int destAckSize,
   int destPe,
-  unsigned short int *destMode,
+  unsigned short int *destRegMode,
   int size);
 
 // Perform an RDMA Put call into the remote destination address from the local source address
@@ -57,13 +58,13 @@ void LrtsIssueRput(
   void *destAck,
   int destAckSize,
   int destPe,
-  unsigned short int *destMode,
+  unsigned short int *destRegMode,
   const void* srcAddr,
   void *srcInfo,
   void *srcAck,
   int srcAckSize,
   int srcPe,
-  unsigned short int *srcMode,
+  unsigned short int *srcRegMode,
   int size);
 
 // Method invoked to deregister memory handle

@@ -19,7 +19,7 @@ Status:
 #include "GreedyCommLB.h"
 #include "manager.h"
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(GreedyCommLB, "Greedy algorithm which takes communication graph into account")
 
@@ -193,7 +193,7 @@ void GreedyCommLB::work(LDStats* stats)
 	 }
          else if (commData.recv_type()==LD_OBJLIST_MSG) {
 		int nobjs;
-		LDObjKey *objs = commData.receiver.get_destObjs(nobjs);
+		const LDObjKey *objs = commData.receiver.get_destObjs(nobjs);
 		xcoord = stats->getHash(commData.sender);
 		for (int i=0; i<nobjs; i++) {
 		  ycoord = stats->getHash(objs[i]);

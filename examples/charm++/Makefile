@@ -1,5 +1,6 @@
 DIRS = \
   allToAll \
+  array_map \
   ckcallback \
   cksequence \
   completion \
@@ -29,6 +30,7 @@ DIRS = \
   sync_square \
   threaded_ring \
   TRAM \
+  user-driven-interop \
   zerocopy \
 
 BGDIRS = \

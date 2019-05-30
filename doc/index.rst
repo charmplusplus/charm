@@ -4,8 +4,7 @@ Charm++ Documentation
 
 
 - Charm++ Tutorial: http://charmplusplus.org/tutorial/
-- Charm++ bug tracking: https://charm.cs.illinois.edu/redmine/projects/charm
-- Recent commit activity: http://charm.cs.illinois.edu/gerrit/gitweb?p=charm.git
+- Charm++ Development: https://github.com/UIUC-PPL/charm
 - Nightly regression tests: http://charm.cs.illinois.edu/autobuild/cur/
 - Charm++ mailing list: charm@cs.illinois.edu
 - Charm++ discourse group: https://charm.discourse.group
@@ -37,7 +36,7 @@ Charm++ Documentation
 
 .. toctree::
    :maxdepth: 1
-   :caption: BigSim (Blue Gene) Performance Simulator
+   :caption: BigSim (Blue Gene) Simulator
    :numbered:
 
    bigsim/manual

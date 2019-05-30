@@ -128,7 +128,7 @@ int LBCommData::compute_key()
        }
   case LD_OBJLIST_MSG: {
        int len;
-       LDObjKey *destKeys = destObj.get_destObjs(len);
+       const LDObjKey *destKeys = destObj.get_destObjs(len);
        CmiAssert(len>0);
        pcount += sprintf(kptr,"%d%" PRIu64 "XXXXXXXX",destKeys[0].omID().id.idx,
 		    destKeys[0].objID());

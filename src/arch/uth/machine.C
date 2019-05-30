@@ -7,12 +7,13 @@
 #include <stdio.h>
 #include <math.h>
 #include "converse.h"
+#include <atomic>
 
-CMI_EXTERNC
+int               userDrivenMode; /* Set by CharmInit for interop in user driven mode */
+std::atomic<int> ckExitComplete {0};
+
 void CthInit(char **);
-CMI_EXTERNC
 void ConverseCommonInit(char **);
-CMI_EXTERNC
 void ConverseCommonExit(void);
 
 /***********************************************************************

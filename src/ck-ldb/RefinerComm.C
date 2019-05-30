@@ -88,7 +88,7 @@ void RefinerComm::processorCommCost()
     }
     else if (ctype == LD_OBJLIST_MSG) {
       int nobjs;
-      LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
+      const LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
       for (i=0; i<nobjs; i++) {
         int idx = stats->getHash(objs[i]);
         if(idx == -1)
@@ -180,7 +180,7 @@ void RefinerComm::commAffinity(int c, int pe, Messages &m)
     }
     else if (cdata.receiver.get_type() == LD_OBJLIST_MSG) {  // multicast
       int nobjs;
-      LDObjKey *recvs = cdata.receiver.get_destObjs(nobjs);
+      const LDObjKey *recvs = cdata.receiver.get_destObjs(nobjs);
       for (int j=0; j<nobjs; j++) {
         int recvCompute = stats->getHash(recvs[j]);
         int recvProc = computes[recvCompute].processor;	// FIXME
@@ -234,7 +234,7 @@ void RefinerComm::objCommCost(int c, int pe, Messages &m)
     }
     else if (cdata.receiver.get_type() == LD_OBJLIST_MSG) {  // multicast
       int nobjs;
-      LDObjKey *recvs = cdata.receiver.get_destObjs(nobjs);
+      const LDObjKey *recvs = cdata.receiver.get_destObjs(nobjs);
       for (int j=0; j<nobjs; j++) {
         int recvCompute = stats->getHash(recvs[j]);
         int recvProc = computes[recvCompute].processor;	// FIXME

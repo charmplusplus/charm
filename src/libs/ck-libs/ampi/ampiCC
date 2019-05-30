@@ -1,12 +1,22 @@
 #!/bin/sh
+AMPICC="$0"
 CHARMBIN=`dirname $0`
+CHARMLIB="$CHARMBIN/../lib"
+CHARMINC="$CHARMBIN/../include"
+. "$CHARMINC/conv-mach-opt.sh"
 
 [ -z "$AMPICC_MODE" ] && AMPICC_MODE='ampi'
+VERBOSE=''
 STANDALONE=''
 ROMIO_CONFIGURE=''
 MPITEST=''
+FSGLOBALS=''
+PIPGLOBALS=''
+EXPLICIT_COMPILATION=''
+BUILD_SHARE=''
 
 ARGS=''
+OBJECT=''
 
 processArgs() {
 while [ ! $# -eq 0 ]
@@ -16,6 +26,10 @@ do
   -show)
      echo "charmc"
      exit 0
+     ;;
+  -verbose)
+     VERBOSE='true'
+     ARGS="$ARGS \"$arg\""
      ;;
   -standalone)
      STANDALONE='true'
@@ -32,6 +46,25 @@ do
      MPITEST='true'
      ;;
 
+  -fsglobals)
+     FSGLOBALS='true'
+     ;;
+  -pipglobals)
+     PIPGLOBALS='true'
+     ;;
+
+  -c)
+     EXPLICIT_COMPILATION='true'
+     ARGS="$ARGS \"$arg\""
+     ;;
+  -shared|-G)
+     BUILD_SHARE='true'
+     ARGS="$ARGS \"$arg\""
+     ;;
+  -o)
+     shift
+     OBJECT="$1"
+     ;;
   *)
      ARGS="$ARGS \"$arg\""
      ;;
@@ -42,20 +75,30 @@ done
 
 eval processArgs "$@"
 
-AMPICC_EXTRA_OPTS=''
+Do() {
+  [ -n "$VERBOSE" ] && echo "$AMPICC: Executing $@" 1>&2
+  eval "$@"
+}
 
-if test "$AMPICC_MODE" = 'ampi'
+if [ -n "$FSGLOBALS" ]
 then
-  charmarch=$(cat $CHARMBIN/../tmp/.gdir)
-
-  if test "$charmarch" = "mpi"
+  if [ "$CMK_SUPPORTS_FSGLOBALS" != '1' ]
   then
-    dirName=ampicc.inc.$$
-    mkdir $dirName
-    cp -n $CHARMBIN/../include/mpi.h $dirName/mpi.h   2>/dev/null
-    AMPICC_EXTRA_OPTS="$AMPICC_EXTRA_OPTS -I./$dirName"
+    echo "Error: Prerequisites for -fsglobals support were not detected."
+    exit 1
   fi
 fi
+
+if [ -n "$PIPGLOBALS" ]
+then
+  if [ "$CMK_SUPPORTS_PIPGLOBALS" != '1' ]
+  then
+    echo "Error: Prerequisites for -pipglobals support were not detected."
+    exit 1
+  fi
+fi
+
+AMPICC_POST_OPTS=''
 
 [ -n "$ROMIO_CONFIGURE" -a -z "$MPITEST" ] && STANDALONE='true'
 
@@ -63,17 +106,52 @@ fi
 
 [ -f $CHARMBIN/../lib/libampiromio.a -a -z "$STANDALONE" -a -z "$ROMIO_CONFIGURE" ] && ROMIO='-lampiromio'
 
-$CHARMBIN/charmc -language $AMPICC_MODE -default-to-aout $AMPICC_EXTRA_OPTS $ARGS $ROMIO
-status=$?
+FUNCPTR_SHIM_SUFFIX='.user'
 
-if test "$AMPICC_MODE" = 'ampi'
+if [ -n "$FSGLOBALS" -o -n "$PIPGLOBALS" ]
 then
-  if test "$charmarch" = "mpi"
+  if [ -z "$EXPLICIT_COMPILATION" -a -z "$BUILD_SHARE" -a -z "$STANDALONE" ] # if linking an AMPI executable
   then
-    /bin/rm -f $dirName/mpi.h 2>/dev/null
-    rmdir $dirName
+    # link the user program against the shim
+    [ -z "$OBJECT" ] && USEROBJECT="a.out$FUNCPTR_SHIM_SUFFIX" || USEROBJECT="$OBJECT$FUNCPTR_SHIM_SUFFIX"
+    SHIM_OBJS="\"$CHARMLIB/ampi_funcptr_shim.o\""
+    [ "$AMPICC_MODE" = 'ampif' ] && SHIM_OBJS="$SHIM_OBJS \"$CHARMLIB/ampi_funcptr_fortran.o\" \"$CHARMLIB/ampifimpl.o\" \"$CHARMLIB/ampimod.o\""
+    Do $CHARMBIN/charmc $ARGS $AMPICC_POST_OPTS $SHIM_OBJS -standalone -ampi-funcptr-shim -o "$USEROBJECT"
+
+    # set up linking the loader against the runtime
+    AMPICC_POST_OPTS="$AMPICC_POST_OPTS -clear-input \"$CHARMLIB/ampi_funcptr_loader.o\""
+    if [ -n "$FSGLOBALS" ]
+    then
+      AMPICC_POST_OPTS="$AMPICC_POST_OPTS \"$CHARMLIB/ampi_funcptr_fsglobals.o\""
+    elif [ -n "$PIPGLOBALS" ]
+    then
+      AMPICC_POST_OPTS="$AMPICC_POST_OPTS \"$CHARMLIB/ampi_funcptr_pipglobals.o\""
+
+      # look for PiP-glibc
+      [ -z "$PIP_GLIBC_INSTALL_DIR" ] && PIP_GLIBC_INSTALL_DIR='/opt/pip'
+      pipldquery="$PIP_GLIBC_INSTALL_DIR/lib/ld-*.so"
+      set -- $pipldquery
+      pipld="$1"
+      if [ "$pipld" = "$pipldquery" ]
+      then
+        echo 'Note: PiP-glibc not found. Maximum virtualization count will be limited.'
+        echo '      Please set and export $PIP_GLIBC_INSTALL_DIR appropriately.'
+      else
+        AMPICC_POST_OPTS="$AMPICC_POST_OPTS -Wl,--dynamic-linker=$pipld"
+      fi
+    fi
+  else
+    AMPICC_POST_OPTS="$AMPICC_POST_OPTS -ampi-funcptr-shim"
   fi
 fi
+
+if [ -n "$OBJECT" ]
+then
+  AMPICC_POST_OPTS="$AMPICC_POST_OPTS -o \"$OBJECT\""
+fi
+
+Do $CHARMBIN/charmc -language $AMPICC_MODE -default-to-aout $ARGS $AMPICC_POST_OPTS $ROMIO
+status=$?
 
 # Copy ampirun, but do not overwrite it if it already exists.
 [ $status -eq 0 ] && cp -n $CHARMBIN/ampirun .

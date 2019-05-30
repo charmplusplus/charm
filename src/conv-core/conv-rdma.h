@@ -3,8 +3,7 @@
 
 #include "cmirdmautils.h"
 
-typedef void (*RdmaEMAckCallerFn)(int destPe, void *token);
-typedef void (*RdmaDirectAckCallerFn)(void *token);
+typedef void (*RdmaAckCallerFn)(void *token);
 
 /* Support for Direct API */
 void CmiSetRdmaCommonInfo(void *info, const void *ptr, int size);
@@ -13,10 +12,7 @@ int CmiGetRdmaCommonInfoSize(void);
 void CmiSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode);
 
 // Function to set the ack handler for the Direct API
-void CmiSetDirectNcpyAckHandler(RdmaDirectAckCallerFn fn);
-
-// Function to set the ack handler for the Entry Method API
-void CmiSetEMNcpyAckHandler(RdmaEMAckCallerFn fn);
+void CmiSetDirectNcpyAckHandler(RdmaAckCallerFn fn);
 
 /* CmiIssueRget initiates an RDMA read operation, transferring 'size' bytes of data from the address space of 'srcPe' to local address, 'destAddr'.
  * When the runtime invokes srcAck on the source (target), it indicates safety to overwrite or free the srcAddr buffer.
@@ -60,10 +56,9 @@ void *CmiRdmaAlloc(int size);
 
 int CmiDoesCMAWork(void);
 
-// Method used to send an ack after completion of a reverse rdma operation
-void CmiInvokeRemoteAckHandler(int pe, void *ref);
-
-// Function declaration for onesided initialization
+#if !CMK_ONESIDED_IMPL
+// Function declaration for supporting generic Direct Nocopy API
 void CmiOnesidedDirectInit(void);
+#endif
 
 #endif

@@ -53,6 +53,10 @@ extern int Cmi_myoldpe;
 extern char *_shrinkexpand_basedir;
 #endif
 
+#if CMK_ONESIDED_IMPL
+extern UInt numZerocopyROops; // Required for broadcasting RO Data after recovering from failure
+#endif
+
 void CkCreateLocalChare(int epIdx, envelope *env);
 
 // helper class to get number of array elements
@@ -96,6 +100,10 @@ static void bdcastRO(void){
 	// Allocate and fill out the RODataMessage
 	envelope *env = _allocEnv(RODataMsg, ps.size());
 	PUP::toMem pp((char *)EnvToUsr(env));
+#if CMK_ONESIDED_IMPL
+	pp|numZerocopyROops; // Messages of type 'RODataMsg' need to have numZerocopyROops pupped in order
+                       // to be processed inside _processRODataMsg
+#endif
 	for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pp);
 	
 	env->setCount(++_numInitMsgs);

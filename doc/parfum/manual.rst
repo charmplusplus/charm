@@ -1,6 +1,6 @@
-==========================================================
-Parallel Framework for Unstructured Meshes (ParFUM) Manual
-==========================================================
+===================================================
+Parallel Framework for Unstructured Meshes (ParFUM)
+===================================================
 
 .. contents::
    :depth: 3

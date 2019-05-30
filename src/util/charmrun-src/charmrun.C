@@ -1,11 +1,11 @@
 #include "converse.h"
 
 #include "sockRoutines.h"
-#include "sockRoutines.c"
+#include "sockRoutines.C"
 #include "ccs-auth.h"
-#include "ccs-auth.c"
+#include "ccs-auth.C"
 #include "ccs-server.h"
-#include "ccs-server.c"
+#include "ccs-server.C"
 
 #include <stdio.h>
 #include <string.h>
@@ -372,21 +372,37 @@ static const char **pparam_argv;
 static char pparam_optc = '-';
 static char pparam_error[100];
 
-static ppdef pparam_find(const char *lname)
+struct ppdeffind
+{
+  ppdef def;
+  int enable;
+};
+
+static ppdeffind pparam_find(const char *lname)
 {
   ppdef def;
   for (def = ppdefs; def; def = def->next)
+  {
     if (strcmp(def->lname, lname) == 0)
-      return def;
-  return 0;
+      return {def, 1};
+
+    static const char no_prefix[] = "no-";
+    if (strncmp(no_prefix, lname, sizeof(no_prefix)-1) == 0)
+    {
+      if (strcmp(def->lname, lname + (sizeof(no_prefix)-1)) == 0)
+        return {def, 0};
+    }
+  }
+  return {nullptr, 1};
 }
 
 static ppdef pparam_cell(const char *lname)
 {
-  ppdef def = pparam_find(lname);
-  if (def)
-    return def;
-  def = (ppdef) malloc(sizeof(s_ppdef));
+  ppdeffind deffind = pparam_find(lname);
+  if (deffind.def)
+    return deffind.def;
+
+  auto def = (ppdef)malloc(sizeof(s_ppdef));
   def->lname = lname;
   def->type = 's';
   def->doc = "(undocumented)";
@@ -503,7 +519,7 @@ static const char *pparam_getdef(ppdef def)
   case 's':
     return *def->where.s ? *def->where.s : "";
   case 'f':
-    sprintf(result, "%d", *def->where.f);
+    sprintf(result, *def->where.f ? "true" : "false");
     return result;
   }
   return NULL;
@@ -523,6 +539,7 @@ static void pparam_printdocs()
   }
   fprintf(stderr, "\n");
   fprintf(stderr, "Charmrun Command-line Parameters:\n");
+  fprintf(stderr, "  (Boolean parameters may be prefixed with \"no-\" to negate their effect, for example \"++no-scalable-start\".)\n");
   for (ppdef def = ppdefs; def; def = def->next) {
     fprintf(stderr, "  %c%c%-*s ", pparam_optc, pparam_optc, maxname,
             def->lname);
@@ -561,18 +578,18 @@ static int pparam_parseopt()
     return -1;
   }
   /* look up option definition */
-  ppdef def = NULL;
+  ppdeffind deffind{};
   if (opt[1] == '+')
-    def = pparam_find(opt + 2);
+    deffind = pparam_find(opt + 2);
   else {
     char name[2];
     name[0] = opt[1];
     if (strlen(opt) <= 2 || !isalpha(opt[2])) {
       name[1] = 0;
-      def = pparam_find(name);
+      deffind = pparam_find(name);
     }
   }
-  if (def == NULL) {
+  if (deffind.def == nullptr) {
     if (opt[1] == '+') {
       sprintf(pparam_error, "Option %s not recognized.", opt);
       return -1;
@@ -582,13 +599,14 @@ static int pparam_parseopt()
       return 0;
     }
   }
+  auto def = deffind.def;
   /* handle flag-options */
   if ((def->type == 'f') && (opt[1] != '+') && (opt[2])) {
     sprintf(pparam_error, "Option %s should not include a value", opt);
     return -1;
   }
   if (def->type == 'f') {
-    *def->where.f = 1;
+    *def->where.f = deffind.enable;
     pparam_delarg(pparam_pos);
     return 0;
   }
@@ -703,6 +721,7 @@ static int arg_child_charmrun;
 static int arg_help; /* print help message */
 static int arg_ppn;  /* pes per node */
 static int arg_usehostname;
+static int arg_interactive; /* for charm4py interactive sessions when using ssh */
 
 #if CMK_SHRINK_EXPAND
 static char **saved_argv;
@@ -832,6 +851,7 @@ static void arg_init(int argc, const char **argv)
   pparam_flag(&arg_shrinkexpand, 0, "shrinkexpand", "Enable shrink/expand support");
   pparam_int(&arg_charmrun_port, 0, "charmrun_port", "Make charmrun listen on this port");
 #endif
+  pparam_flag(&arg_interactive, 0, "interactive", "Force tty allocation for process 0 when using ssh");
   pparam_flag(&arg_usehostname, 0, "usehostname",
               "Send nodes our symbolic hostname instead of IP address");
   pparam_str(&arg_charmrunip, 0, "useip",
@@ -2187,6 +2207,8 @@ static int req_handle_printerrsyn(ChMessage *msg, SOCKET fd)
 
 static int _exitcode = 0;
 
+static void finish_set_nodes(std::vector<nodetab_process> &, int start, int stop, bool charmrun_exiting=false);
+
 static int req_handle_ending(ChMessage *msg, SOCKET fd)
 {
   req_ending++;
@@ -2216,6 +2238,8 @@ static int req_handle_ending(ChMessage *msg, SOCKET fd)
       skt_close(p.req_client);
     if (arg_verbose)
       printf("Charmrun> Graceful exit with exit code %d.\n", _exitcode);
+    if (arg_interactive)
+      finish_set_nodes(my_process_table, 0, 1, true);
     exit(_exitcode);
   }
   return REQ_OK;
@@ -3288,9 +3312,9 @@ static void add_singlenodeinfo_to_mynodeinfo(ChMessage *msg, SOCKET ctrlfd)
 }
 #endif
 
-static void req_set_client_connect(std::vector<nodetab_process> & process_table, int start, int end)
+static void req_set_client_connect(std::vector<nodetab_process> & process_table, int count)
 {
-  int curclientend, curclientstart = start;
+  int curclientend, curclientstart = 0;
 
   std::queue<SOCKET> open_sockets;
 
@@ -3300,16 +3324,16 @@ static void req_set_client_connect(std::vector<nodetab_process> & process_table,
   if (!(arg_hierarchical_start && !arg_child_charmrun && charmrun_phase == 1))
 # endif
   {
-    for (int i = start; i < end; i++)
+    for (int i = 0; i < count; i++)
       open_sockets.push(errorcheck_one_client_connect());
   }
-  curclientend = end;
+  curclientend = count;
 #else
-  curclientend = start;
+  curclientend = 0;
 #endif
 
   int finished = 0;
-  while (finished < end - start)
+  while (finished < count)
   {
 /* check server socket for messages */
 #if !CMK_USE_IBVERBS || CMK_IBVERBS_FAST_START
@@ -3489,7 +3513,7 @@ static void req_client_connect_table(std::vector<nodetab_process> & process_tabl
   for (nodetab_process & p : process_table)
     read_initnode_one_client(p);
 #else
-  req_set_client_connect(process_table, 0, process_table.size());
+  req_set_client_connect(process_table, process_table.size());
 #endif
 }
 
@@ -3589,19 +3613,19 @@ static void start_nodes_local(std::vector<nodetab_process> &);
 static void start_nodes_ssh(std::vector<nodetab_process> &);
 static void finish_nodes(std::vector<nodetab_process> &);
 
-static void req_client_connect(void)
+static void req_client_connect(std::vector<nodetab_process> & process_table)
 {
   skt_set_abort(client_connect_problem_skt);
 
   if (arg_mpiexec)
   {
-    req_construct_phase2_processes(my_process_table);
-    req_client_connect_table(my_process_table);
+    req_construct_phase2_processes(process_table);
+    req_client_connect_table(process_table);
     req_all_clients_connected();
     return;
   }
 
-  req_client_connect_table(my_process_table);
+  req_client_connect_table(process_table);
 
   std::vector<nodetab_process> phase2_processes;
   req_construct_phase2_processes(phase2_processes);
@@ -3630,20 +3654,21 @@ static void req_client_connect(void)
     }
     else
     {
-      // send fork packet
-      for (const nodetab_process & p : my_process_table)
+      // send nodefork packets
+      ChMessageHeader hdr;
+      ChMessageInt_t mydata[ChInitNodeforkFields];
+      ChMessageHeader_new("nodefork", sizeof(mydata), &hdr);
+      for (const nodetab_process & p : process_table)
       {
         int numforks = p.host->processes - 1;
         if (numforks <= 0)
           continue;
 
-        ChMessageHeader hdr;
-        ChMessageInt_t mydata[ChInitNodeforkFields] =
-        {
-          ChMessageInt_new(numforks),
-          ChMessageInt_new(p.forkstart),
-        };
-        ChMessageHeader_new("nodefork", sizeof(mydata), &hdr);
+        if (arg_verbose)
+          printf("Charmrun> Instructing host \"%s\" to fork() x %d\n", p.host->name, numforks);
+
+        mydata[0] = ChMessageInt_new(numforks);
+        mydata[1] = ChMessageInt_new(p.forkstart);
         skt_sendN(p.req_client, (const char *) &hdr, sizeof(hdr));
         skt_sendN(p.req_client, (const char *) mydata, sizeof(mydata));
       }
@@ -3788,7 +3813,7 @@ static void req_charmrun_connect(void)
 #else
   // if(!arg_child_charmrun) getthetime(t1);
 
-  req_set_client_connect(my_process_table, 0, my_process_table.size());
+  req_set_client_connect(my_process_table, my_process_table.size());
 // if(!arg_child_charmrun)	getthetime(t2);		/* also need to process
 // received nodesets JIT */
 #endif
@@ -3821,7 +3846,7 @@ static void req_charmrun_connect(void)
 
   skt_set_abort(client_connect_problem_skt);
 
-  req_set_client_connect(my_process_table, 0, my_process_table.size());
+  req_set_client_connect(my_process_table, my_process_table.size());
 
   send_clients_nodeinfo();
 
@@ -3838,9 +3863,8 @@ static void req_charmrun_connect(void)
 #ifndef CMK_BPROC
 
 static void start_one_node_ssh(nodetab_process & p);
-static void finish_set_nodes(std::vector<nodetab_process> &, int start, int stop);
 
-static void req_client_start_and_connect_table(std::vector<nodetab_process> & process_table)
+static void start_nodes_batch_and_connect(std::vector<nodetab_process> & process_table)
 {
   int batch = arg_batch_spawn; /* fire several at a time */
   const int process_count = process_table.size();
@@ -3860,11 +3884,13 @@ static void req_client_start_and_connect_table(std::vector<nodetab_process> & pr
 #endif
       finish_set_nodes(process_table, clientstart, clientend);
 
+    // batch implementation of req_client_connect functionality below this line to end of function
+
 #if CMK_IBVERBS_FAST_START
     for (int c = clientstart; c < clientend; ++c)
       req_one_client_partinit(process_table, c);
 #else
-    req_set_client_connect(process_table, clientstart, clientend);
+    req_set_client_connect(process_table, clientend-clientstart);
 #endif
 
     clientstart = clientend;
@@ -3877,16 +3903,62 @@ static void req_client_start_and_connect_table(std::vector<nodetab_process> & pr
 #endif
 }
 
-static void req_client_start_and_connect(void)
+static void batch_launch_sequence(std::vector<nodetab_process> & process_table)
 {
   skt_set_abort(client_connect_problem_skt);
 
-  req_client_start_and_connect_table(my_process_table);
+  start_nodes_batch_and_connect(process_table);
+
+  // batch implementation of req_client_connect functionality below this line to end of function
 
   std::vector<nodetab_process> phase2_processes;
   req_construct_phase2_processes(phase2_processes);
   if (phase2_processes.size() > 0)
-    req_client_start_and_connect_table(phase2_processes);
+  {
+    if (!arg_scalable_start)
+    {
+      start_nodes_batch_and_connect(phase2_processes);
+    }
+    else
+    {
+      // send nodefork packets
+      int total = 0;
+      ChMessageHeader hdr;
+      ChMessageInt_t mydata[ChInitNodeforkFields];
+      ChMessageHeader_new("nodefork", sizeof(mydata), &hdr);
+      for (const nodetab_process & p : process_table)
+      {
+        int numforks = p.host->processes - 1;
+        if (numforks <= 0)
+          continue;
+
+        for (int c = 0; c < numforks; c += arg_batch_spawn)
+        {
+          const int count = std::min(numforks - c, arg_batch_spawn);
+
+          if (arg_verbose)
+            printf("Charmrun> Instructing host \"%s\" to fork() x %d\n", p.host->name, count);
+
+          mydata[0] = ChMessageInt_new(count);
+          mydata[1] = ChMessageInt_new(p.forkstart + c);
+          skt_sendN(p.req_client, (const char *) &hdr, sizeof(hdr));
+          skt_sendN(p.req_client, (const char *) mydata, sizeof(mydata));
+
+#if CMK_IBVERBS_FAST_START
+          for (int f = 0; f < count; ++f)
+            req_one_client_partinit(phase2_processes, total++);
+#else
+          req_set_client_connect(phase2_processes, count);
+#endif
+        }
+      }
+
+#if CMK_IBVERBS_FAST_START
+      for (nodetab_process & p : phase2_processes)
+        read_initnode_one_client(p);
+#endif
+    }
+  }
 
   req_add_phase2_processes(phase2_processes);
   req_all_clients_connected();
@@ -4165,7 +4237,7 @@ int main(int argc, const char **argv, char **envp)
         if (!arg_batch_spawn)
           start_nodes_ssh(my_process_table);
         else
-          req_client_start_and_connect();
+          batch_launch_sequence(my_process_table);
       }
     } else
       start_nodes_local(my_process_table);
@@ -4190,7 +4262,7 @@ int main(int argc, const char **argv, char **envp)
             start_nodes_ssh(my_process_table);
         }
       } else
-        req_client_start_and_connect();
+        batch_launch_sequence(my_process_table);
     } else
       start_nodes_local(my_process_table);
   }
@@ -4227,7 +4299,7 @@ int main(int argc, const char **argv, char **envp)
     if (!arg_child_charmrun)
       req_charmrun_connect();
     else if (!arg_batch_spawn)
-      req_client_connect();
+      req_client_connect(my_process_table);
   }
   /* Normal startup*/
   else
@@ -4238,7 +4310,7 @@ int main(int argc, const char **argv, char **envp)
       finish_nodes(my_process_table);
 #endif
     if (!arg_batch_spawn)
-      req_client_connect();
+      req_client_connect(my_process_table);
   }
 #if CMK_SSH_KILL
   kill_nodes();
@@ -4379,7 +4451,7 @@ static void finish_nodes(std::vector<nodetab_process> & process_table) {}
 static void start_one_node_ssh(nodetab_process & p) {}
 static void start_nodes_mpiexec() {}
 
-static void finish_set_nodes(std::vector<nodetab_process> & process_table, int start, int stop) {}
+static void finish_set_nodes(std::vector<nodetab_process> & process_table, int start, int stop, bool charmrun_exiting) {}
 
 static void envCat(char *dest, LPTSTR oldEnv)
 {
@@ -4614,6 +4686,46 @@ static int ssh_fork(const nodetab_process & p, const char *startScript)
     e = skipstuff(s);
   }
 
+  if (p.nodeno == 0 && arg_interactive) {
+    // in interactive mode, we use a different ssh command for process 0, that requires
+    // the start script to exist on that host, so we scp it there first
+    std::vector<const char *> scpargv = {"scp", "-o", "KbdInteractiveAuthentication=no",
+                                         "-o", "PasswordAuthentication=no",
+                                         "-o", "NoHostAuthenticationForLocalhost=yes"};
+    scpargv.push_back(startScript);
+    std::string login_and_host;
+    login_and_host += h->login;
+    login_and_host += "@";
+    login_and_host += h->name;
+    login_and_host += ":";
+    login_and_host += startScript;
+    scpargv.push_back(login_and_host.c_str());
+    scpargv.push_back((const char *) NULL);
+
+    if (arg_verbose) {
+      std::string cmd_str = scpargv[0];
+      for (int n = 1; n < scpargv.size() - 1; ++n)
+        cmd_str += " " + std::string(scpargv[n]);
+      printf("Charmrun> scp command: %s\n", cmd_str.c_str());
+    }
+
+    int pid = fork();
+    if (pid < 0) {
+      perror("ERROR> sending ssh start script to process 0");
+      exit(1);
+    }
+    if (pid == 0) { /* Child process */
+      execvp(scpargv[0], const_cast<char **>(&scpargv[0]));
+      fprintf(stderr, "Charmrun> Couldn't start scp '%s'!\n", scpargv[0]);
+      exit(1);
+    } else {
+      waitpid(pid, NULL, 0);
+    }
+
+    // for ssh connection to process 0, use -t to force tty allocation for interactive session
+    sshargv.push_back("-t");
+  }
+
   sshargv.push_back(h->name);
   if (arg_ssh_display)
     sshargv.push_back("-X");
@@ -4625,7 +4737,14 @@ static int ssh_fork(const nodetab_process & p, const char *startScript)
   sshargv.push_back("PasswordAuthentication=no");
   sshargv.push_back("-o");
   sshargv.push_back("NoHostAuthenticationForLocalhost=yes");
-  sshargv.push_back("/bin/bash -f");
+  std::string remote_command;
+  if (p.nodeno == 0 && arg_interactive) {
+    remote_command += "/bin/bash ";
+    remote_command += startScript;
+    sshargv.push_back(remote_command.c_str());
+  } else {
+    sshargv.push_back("/bin/bash -f");
+  }
   sshargv.push_back((const char *) NULL);
 
   if (arg_verbose) {
@@ -4641,9 +4760,12 @@ static int ssh_fork(const nodetab_process & p, const char *startScript)
     exit(1);
   }
   if (pid == 0) { /*Child process*/
-    int fdScript = open(startScript, O_RDONLY);
-    /**/ unlink(startScript); /**/
-    dup2(fdScript, 0);        /*Open script as standard input*/
+    // in interactive mode we don't want to redirect stdin for process 0
+    if (p.nodeno != 0 || !arg_interactive) {
+      int fdScript = open(startScript, O_RDONLY);
+      /**/ unlink(startScript); /**/
+      dup2(fdScript, 0);        /*Open script as standard input*/
+    }
     // removeEnv("DISPLAY="); /*No DISPLAY disables ssh's slow X11 forwarding*/
     for (int i = 3; i < 1024; i++)
       close(i);
@@ -5033,9 +5155,12 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
      to do this, we have to close stdin, stdout, stderr, and
      run the subshell in the background. */
   fprintf(f, ")");
-  fprintf(f, " < /dev/null 1> /dev/null 2> /dev/null");
-  if (!arg_mpiexec)
-    fprintf(f, " &");
+  // in interactive mode, ssh connection to process 0 needs to keep the standard descriptors and run in the foreground
+  if (p.nodeno != 0 || !arg_interactive) {
+    fprintf(f, " < /dev/null 1> /dev/null 2> /dev/null");
+    if (!arg_mpiexec)
+      fprintf(f, " &");
+  }
   fprintf(f, "\n");
 
   if (arg_verbose)
@@ -5299,7 +5424,7 @@ static void start_nodes_mpiexec()
   /* all ssh_pid remain zero: skip finish_nodes */
 }
 
-static void finish_set_nodes(std::vector<nodetab_process> & process_table, int start, int stop)
+static void finish_set_nodes(std::vector<nodetab_process> & process_table, int start, int stop, bool charmrun_exiting)
 {
   std::vector<int> num_retries(stop - start, 0);
   int done = 0;
@@ -5307,6 +5432,11 @@ static void finish_set_nodes(std::vector<nodetab_process> & process_table, int s
     done = 1;
     for (int i = start; i < stop; i++) { /* check all nodes */
       nodetab_process & p = process_table[i];
+      // Normally, the ssh connections are only needed to start charm on the remote hosts,
+      // and they will end when the charm application starts. However, in interactive mode,
+      // the ssh connection to process 0 runs until the end of the program, so we don't wait
+      // for that process until the end
+      if (p.nodeno == 0 && arg_interactive && !charmrun_exiting) continue;
       const nodetab_host * h = p.host;
       if (p.ssh_pid != 0) {
         done = 0; /* we are not finished yet */

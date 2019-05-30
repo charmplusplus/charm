@@ -1,6 +1,6 @@
-=======================================================================
-Charj Manual Compiler Support for Productive Parallel Programming  [1]_
-=======================================================================
+=====
+Charj
+=====
 
 .. contents::
    :depth: 3
@@ -123,7 +123,7 @@ SDAG statements:
 
 These statements can be used inside of any entry method.
 
-::
+.. code-block:: c++
 
        when receiveMsg(SampleObject obj) {...}
 
@@ -138,7 +138,7 @@ Extern statements:
 If you want to use any other C++ function/feature, you have to define it
 as *extern*.
 
-::
+.. code-block:: c++
 
        extern atoi;            //define in the beginning of the file
        int x = atoi(y);        //use anywhere
@@ -148,14 +148,14 @@ Reduction statements:
 
 Currently only plain reductions are supported.
 
-::
+.. code-block:: c++
 
        contribute(CkCallback(CkReductionTarget(Main, done), mainProxy));
 
 Some Charm++ statements that can be used in a Charj program:
 ------------------------------------------------------------
 
-::
+.. code-block:: c++
 
        CkExit();
        CkPrintf();
@@ -166,6 +166,3 @@ Some Charm++ statements that can be used in a Charj program:
        CkWallTimer();
        thisProxy
        thisIndex
-
-.. [1]
-   last modified 12/14/2012 by Bilge Acun

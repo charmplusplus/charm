@@ -15,15 +15,16 @@
 #define CMK_MULTICAST_LIST_USE_COMMON_CODE                 1
 #define CMK_MULTICAST_GROUP_USE_COMMON_CODE                1
 
-/* the first 4 fields of the header are defined in machine-dgram.c
+/* the first 4 fields of the header are defined in machine-dgram.C
    and are used for the udp retransmission protocol implementation.
    The parameter root is for the communication library and is used in
-   broadcast. Stratid was a field used previously for the strategy id
-   and was replaced with type. The type field is used to distinguish
+   broadcast. The cmaMsgType field is used to distinguish
    between a REG, CMA_MD and CMA_ACK message
 */
 #define CMK_MSG_HEADER_BASIC   CMK_MSG_HEADER_EXT
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,hdl,type,xhdl,info,redID,rank; CmiInt4 root, size;
+
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,hdl,type,xhdl,info,redID,rank; CmiInt4 root, size; CmiUInt1 zcMsgType:3, cmaMsgType:2;
+
 #define CMK_MSG_HEADER_EXT       { CMK_MSG_HEADER_EXT_ }
 #define CMK_MSG_HEADER_BIGSIM_  { CMK_MSG_HEADER_EXT_ CMK_BIGSIM_FIELDS }
 

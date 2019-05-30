@@ -3,7 +3,7 @@
 #include "BlockLB.h"
 #include <math.h>
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def (BlockLB, "Allocate objects in blocks to the remaining valid PE")
 

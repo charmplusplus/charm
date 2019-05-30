@@ -67,7 +67,11 @@ public:
 	int rank,size; //Our rank in, and true size of the communicator
 	
 	MPI_Tester(MPI_Comm comm,int trueSize=-1);
-	~MPI_Tester(void) { MPI_Comm_free(&comm); }
+	~MPI_Tester()
+	{
+		if (comm != MPI_COMM_NULL && comm != MPI_COMM_SELF && comm != MPI_COMM_WORLD)
+			MPI_Comm_free(&comm);
+	}
 	void test(void);
 	void testMigrate(void);
 
@@ -95,8 +99,10 @@ private:
 		testEqual(sts.MPI_TAG,tag,"Recv status tag");
 		if (source!=MPI_ANY_SOURCE)
 			testEqual(sts.MPI_SOURCE,source,"Recv status source");
+#ifdef AMPI
 		testEqual(sts.MPI_COMM,comm,"Recv status comm");
-		/* not in standard: testEqual(1,sts.MPI_LENGTH,"Recv status length");*/
+		testEqual(sts.MPI_LENGTH,sizeof(int),"Recv status length");
+#endif
 		return recvVal;
 	}
 	
@@ -258,7 +264,7 @@ void MPI_Tester::drain(void) {
 		if (flag) {
 			int len; MPI_Get_count(&sts,MPI_BYTE,&len);
 			char *msg=new char[len];
-			MPI_Recv(msg,len,MPI_BYTE, sts.MPI_SOURCE, sts.MPI_TAG, sts.MPI_COMM, &sts);
+			MPI_Recv(msg,len,MPI_BYTE, sts.MPI_SOURCE, sts.MPI_TAG, comm, &sts);
 			flagSet=1;
 		}
 	} while (flag==1);
@@ -271,15 +277,19 @@ void MPI_Tester::drain(void) {
 
 void MPI_Tester::testMigrate(void) {
 	beginTest(2,"Migration");
+
+#ifdef AMPI
 	int flag, srcPe;
 	MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &srcPe, &flag);
 	if (!flag) {
 		printf("Missing AMPI_MY_WTH attribute on MPI_COMM_WORLD\n");
 		MPI_Abort(MPI_COMM_WORLD, MPI_ERR_UNKNOWN);
 	}
+#endif
 	
 	TEST_MPI(MPI_Barrier,(comm));
 	
+#ifdef AMPI
 	AMPI_Migrate(AMPI_INFO_LB_SYNC);
 	
 	TEST_MPI(MPI_Barrier,(comm));
@@ -292,6 +302,7 @@ void MPI_Tester::testMigrate(void) {
 	}
 	if (srcPe!=destPe) printf("[%d] migrated from %d to %d\n",
 				rank,srcPe,destPe);
+#endif
 }
 
 int main(int argc,char **argv)
@@ -301,6 +312,7 @@ int main(int argc,char **argv)
 	if (argc>1) verboseLevel=atoi(argv[1]);
 	if (argc>2) nLoop=atoi(argv[2]);
 	MPI_Comm comm=MPI_COMM_WORLD;
+{ // scope so that ~MPI_Tester is called before MPI_Finalize
 	MPI_Tester masterTester(comm);
 	
 for (int loop=0;loop<nLoop;loop++) {
@@ -437,7 +449,7 @@ for (int loop=0;loop<nLoop;loop++) {
 	      }
 	    }
 
-	    MPI_Group_free(&group);
+	    if (rank < 2) MPI_Group_free(&group);
 	    MPI_Group_free(&comm_group);
 	    if (rank < 2) { MPI_Win_free(&win); }
 	    MPI_Free_mem(A);
@@ -496,6 +508,7 @@ for (int loop=0;loop<nLoop;loop++) {
       }
 
       if (getRank()==0) printf("All tests passed\n");
+}
       MPI_Finalize();
       return 0;
 }

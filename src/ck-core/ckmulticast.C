@@ -1195,7 +1195,7 @@ void CkMulticastMgr::setReductionClient(CProxySection_ArrayBase &proxy, CkCallba
   if (numSubSections > 1)
   {
     /** @warning: setReductionClient in cross section reduction should be phased out
-     * Redmine Issue: https://charm.cs.illinois.edu/redmine/issues/1249
+     * Issue: https://github.com/UIUC-PPL/charm/issues/1249
      * Since finalCB is already set in initDelegateMgr it needs to be deleted here
      * There will still be a memory leak for the instantiation of XGroupSectionReducer object
      * Since this function will eventually be phased out, it is only a quick fix
@@ -1232,7 +1232,7 @@ void CkMulticastMgr::setReductionClient(CProxySection_Group &proxy, CkCallback *
   if (numSubSections > 1)
   {
     /** @warning: setReductionClient in cross section reduction should be phased out
-     * Redmine Issue: https://charm.cs.illinois.edu/redmine/issues/1249
+     * Issue: https://github.com/UIUC-PPL/charm/issues/1249
      * Since finalCB is already set in initDelegateMgr it needs to be deleted here
      * There will still be a memory leak for the instantiation of XGroupSectionReducer object
      * Since this function will eventually be phased out, it is only a quick fix
@@ -1626,6 +1626,44 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
         for (int8_t i=0; i<msg->nFrags; i++)
             if (entry->getNumAllElems() != redInfo.gcount [i])
                 mixTreeUp = 0;
+    }
+
+    // If reduceFragment is not being called now, check if partialReduction is possible (streamable)
+    if (!currentTreeUp && !mixTreeUp && redInfo.msgs[index].size() > 1 && CkReduction::reducerTable()[msg->reducer].streamable) {
+      reductionMsgs& rmsgs = redInfo.msgs[index];
+      CkReduction::reducerType reducer = rmsgs[0]->reducer;
+      CkReduction::reducerFn f= CkReduction::reducerTable()[msg->reducer].fn;
+      CkAssert(f != NULL);
+
+      int oldRedNo = redInfo.redNo;
+      int nFrags   = rmsgs[0]->nFrags;
+      int fragNo   = rmsgs[0]->fragNo;
+      int userFlag = rmsgs[0]->userFlag;
+      CkSectionInfo oldId = rmsgs[0]->sid;
+      CkCallback msg_cb;
+      int8_t rebuilt = 0;
+      if (msg->rebuilt) rebuilt = 1;
+      if (!msg->callback.isInvalid()) msg_cb = msg->callback;
+      // Perform the actual reduction (streaming)
+      CkReductionMsg *newmsg = (*f)(rmsgs.size(), rmsgs.data());
+#if CMK_MESSAGE_LOGGING
+      envelope *env = UsrToEnv(newmsg);
+      env->flags = env->flags | CK_REDUCTION_MSG_MLOG;
+#endif
+      newmsg->redNo  = oldRedNo;
+      newmsg->nFrags = nFrags;
+      newmsg->fragNo = fragNo;
+      newmsg->userFlag = userFlag;
+      newmsg->reducer = reducer;
+      if (rebuilt) newmsg->rebuilt = 1;
+      if (!msg_cb.isInvalid()) newmsg->callback = msg_cb;
+      newmsg->gcount = redInfo.gcount[index];
+      newmsg->sid = oldId;
+      // Remove the current message that was pushed
+      rmsgs.pop_back();
+      delete msg;
+      // Only the partially reduced message should be remaining in the msgs vector after partialReduction
+      CkAssert(rmsgs.size() == 1);
     }
 
     //-------------------------------------------------------------------------

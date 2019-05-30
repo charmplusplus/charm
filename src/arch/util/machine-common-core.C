@@ -14,8 +14,7 @@ FILE *debugLog = NULL;
 #endif
 
 // Macro for message type
-#define CMI_MSG_TYPE(msg)            ((CmiMsgHeaderBasic *)msg)->type
-#define CMI_SET_MSG_TYPE(msg, type)  CMI_MSG_TYPE(msg) = (type);
+#define CMI_CMA_MSGTYPE(msg)         ((CmiMsgHeaderBasic *)msg)->cmaMsgType
 
 /******* broadcast related  */
 #ifndef CMK_BROADCAST_SPANNING_TREE
@@ -79,7 +78,6 @@ static int CmiNodesDim;
 /* ###End of Broadcast related definitions ### */
 
 #if CMK_SMP_TRACE_COMMTHREAD
-CMI_EXTERNC
 double TraceTimerCommon(void);
 #endif
 
@@ -163,7 +161,6 @@ int               _Cmi_mynodesize;/* Number of processors in my address space */
 int               _Cmi_mynode;    /* Which address space am I */
 int               _Cmi_numnodes;  /* Total number of address spaces */
 int               _Cmi_numpes;    /* Total number of processors */
-CMI_EXTERNC_VARIABLE int userDrivenMode;
 int               userDrivenMode; /* Set by CharmInit for interop in user driven mode */
 extern int CharmLibInterOperate;
 
@@ -200,14 +197,18 @@ void CmiSuspendedTaskEnqueue(int targetRank, void *data);
 void* CmiSuspendedTaskPop();
 #endif
 
-#if CMK_SMP
 #include <atomic>
+
+extern int CharmLibInterOperate;
+std::atomic<int> ckExitComplete {0};
+
+#if CMK_SMP
 std::atomic<int> commThdExit {0};
 
 /**
  *  The macro defines whether to have a comm thd to offload some
  *  work such as forwarding bcast messages etc. This macro
- *  should be defined before including "machine-smp.c". Note
+ *  should be defined before including "machine-smp.C". Note
  *  that whether a machine layer in SMP mode could run w/o comm
  *  thread depends on the support of the underlying
  *  communication library.
@@ -241,7 +242,7 @@ CpvDeclare(unsigned , networkProgressCount);
 int networkProgressPeriod;
 
 #if CMK_CCS_AVAILABLE
-CMI_EXTERNC_VARIABLE int ccsRunning;
+extern int ccsRunning;
 #endif
 
 /* ===== Beginning of Common Function Declarations ===== */
@@ -306,13 +307,11 @@ static void ConverseRunPE(int everReturn);
 /* Functions regarding machine running on every proc */
 static void AdvanceCommunication(int whenidle);
 static void CommunicationServer(int sleepTime);
-CMI_EXTERNC
 void CommunicationServerThread(int sleepTime);
 
 /* Functions providing incoming network messages */
 void *CmiGetNonLocal(void);
 #if CMK_NODE_QUEUE_AVAILABLE
-CMI_EXTERNC
 void *CmiGetNonLocalNodeQ(void);
 #endif
 /* Utiltiy functions */
@@ -320,7 +319,7 @@ static char *CopyMsg(char *msg, int len);
 
 /* ===== End of Common Function Declarations ===== */
 
-#include "machine-smp.c"
+#include "machine-smp.C"
 
 /* ===== Beginning of Idle-state Related Declarations =====  */
 typedef struct {
@@ -394,36 +393,28 @@ CmiMyNodeQueue(void) {
 }
 #endif
 
-CMI_EXTERNC
 int CmiMyPe(void) {
     return CmiGetState()->pe;
 }
-CMI_EXTERNC
 int CmiNodeSpan(void) {
   return (CmiMyNodeSize() + 1);
 }
-CMI_EXTERNC
 int CmiMyPeGlobal(void) {
     return CmiGetPeGlobal(CmiGetState()->pe,CmiMyPartition());
 }
-CMI_EXTERNC
 int CmiMyRank(void) {
     return CmiGetState()->rank;
 }
-CMI_EXTERNC
 int CmiNodeSize(int node) {
     return _Cmi_mynodesize;
 }
 #if !CMK_MULTICORE // these are defined in converse.h
-CMI_EXTERNC
 int CmiNodeFirst(int node) {
     return node*_Cmi_mynodesize;
 }
-CMI_EXTERNC
 int CmiNodeOf(int pe) {
     return (pe/_Cmi_mynodesize);
 }
-CMI_EXTERNC
 int CmiRankOf(int pe) {
     return pe%_Cmi_mynodesize;
 }
@@ -440,13 +431,13 @@ CmiCommHandle CmiInterSendNetworkFunc(int destPE, int partition, int size, char 
 
 /* ===== End of Processor/Node State-related Stuff =====*/
 
-#include "machine-broadcast.c"
-#include "immediate.c"
-#include "machine-commthd-util.c"
+#include "machine-broadcast.C"
+#include "immediate.C"
+#include "machine-commthd-util.C"
 #if CMK_USE_CMA
 // cma_min_thresold and cma_max_threshold specify the range of sizes between which CMA will be used for SHM messaging
 int cma_works, cma_reg_msg, cma_min_threshold, cma_max_threshold;
-#include "machine-cma.c"
+#include "machine-cma.C"
 int CmiDoesCMAWork() {
   return cma_works;
 }
@@ -459,6 +450,9 @@ static void PerrorExit(const char *msg) {
 }
 
 /* ##### Beginning of Functions Related with Message Sending OPs ##### */
+
+extern "C" void CmiPushImmediateMsg(void *);
+
 /*Add a message to this processor's receive queue, pe is a rank */
 void CmiPushPE(int rank,void *msg) {
     CmiState cs = CmiGetStateN(rank);
@@ -539,9 +533,9 @@ static INLINE_KEYWORD void handleOneRecvedMsg(int size, char *msg) {
 
 #if CMK_USE_CMA
     // If CMA message, perform CMA read to get the payload message
-    if(cma_reg_msg && CMI_MSG_TYPE(msg) == CMK_CMA_MD_MSG) {
+    if(cma_reg_msg && CMI_CMA_MSGTYPE(msg) == CMK_CMA_MD_MSG) {
       handleOneCmaMdMsg(&size, &msg);  // size & msg are modififed
-    } else if(cma_reg_msg && CMI_MSG_TYPE(msg) == CMK_CMA_ACK_MSG) {
+    } else if(cma_reg_msg && CMI_CMA_MSGTYPE(msg) == CMK_CMA_ACK_MSG) {
       handleOneCmaAckMsg(size, msg);
       return;
     }
@@ -609,10 +603,10 @@ void CmiInterSyncSendFn(int destPE, int partition, int size, char *msg) {
 }
 
 #if CMK_USE_PXSHM
-#include "machine-pxshm.c"
+#include "machine-pxshm.C"
 #endif
 #if CMK_USE_XPMEM
-#include "machine-xpmem.c"
+#include "machine-xpmem.C"
 #endif
 
 static int refcount = 0;
@@ -625,7 +619,7 @@ CpvExtern(int, _urgentSend);
 //that handles sending to any partition
 INLINE_KEYWORD CmiCommHandle CmiSendNetworkFunc(int destPE, int size, char *msg, int mode) {
   // Set the message as a regular message (defined in lrts-common.h)
-  CMI_SET_MSG_TYPE(msg, CMK_REG_MSG);
+  CMI_CMA_MSGTYPE(msg) = CMK_REG_NO_CMA_MSG;
   return CmiInterSendNetworkFunc(destPE, CmiMyPartition(), size, msg, mode);
 }
 //the generic function that replaces the older one
@@ -637,7 +631,7 @@ CmiCommHandle CmiInterSendNetworkFunc(int destPE, int partition, int size, char 
 
 #if CMK_USE_CMA
         if(cma_reg_msg && partition == CmiMyPartition() && CmiPeOnSamePhysicalNode(CmiMyPe(), destPE)) {
-          if(CMI_MSG_TYPE(msg) == CMK_REG_MSG && cma_min_threshold <= size && size <= cma_max_threshold) {
+          if(CMI_CMA_MSGTYPE(msg) == CMK_REG_NO_CMA_MSG && cma_min_threshold <= size && size <= cma_max_threshold) {
             CmiSendMessageCma(&msg, &size); // size & msg are modififed
           }
         }
@@ -694,7 +688,7 @@ void CmiInterFreeSendFn(int destPE, int partition, int size, char *msg) {
     CMI_SET_BROADCAST_ROOT(msg, 0);
 
     // Set the message as a regular message (defined in lrts-common.h)
-    CMI_SET_MSG_TYPE(msg, CMK_REG_MSG);
+    CMI_CMA_MSGTYPE(msg) = CMK_REG_NO_CMA_MSG;
 #if CMI_QD
     CQdCreate(CpvAccess(cQdState), 1);
 #endif
@@ -791,7 +785,7 @@ void CmiInterFreeNodeSendFn(int destNode, int partition, int size, char *msg) {
 #endif
     CMI_SET_BROADCAST_ROOT(msg, 0);
     // Set the message as a regular message (defined in lrts-common.h)
-    CMI_SET_MSG_TYPE(msg, CMK_REG_MSG);
+    CMI_CMA_MSGTYPE(msg) = CMK_REG_NO_CMA_MSG;
     if (destNode == CmiMyNode() && CmiMyPartition() == partition) {
         CmiSendNodeSelf(msg);
     } else {
@@ -839,10 +833,8 @@ if (  MSG_STATISTIC)
 #endif
 
 #include "TopoManager.h"
-CMI_EXTERNC
-void createCustomPartitions(int numparts, int *partitionSize, int *nodeMap);
-CMI_EXTERNC
-void setDefaultPartitionParams(void);
+extern "C" void createCustomPartitions(int numparts, int *partitionSize, int *nodeMap);
+extern "C" void setDefaultPartitionParams(void);
 
 void create_topoaware_partitions(void) {
   int i, j, numparts_bak;
@@ -1143,8 +1135,8 @@ INLINE_KEYWORD int pe_gToLTranslate(int pe) {
 }
 //end of functions related to partition
 
-CMI_EXTERNC_VARIABLE int quietMode;
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietMode;
+extern int quietModeRequested;
 
 #if defined(_WIN32)
 #include <windows.h> /* for SetEnvironmentVariable() and routines for CMK_SHARED_VARS_NT_THREADS */
@@ -1499,9 +1491,7 @@ if (  MSG_STATISTIC)
     ConverseRunPE(initret);
 }
 
-CMI_EXTERNC
 void ConverseCommonInit(char **argv);
-CMI_EXTERNC
 void CthInit(char **argv);
 static void ConverseRunPE(int everReturn) {
     CmiState cs;
@@ -1643,7 +1633,6 @@ static INLINE_KEYWORD void AdvanceCommunication(int whenidle) {
 #endif
 }
 
-CMI_EXTERNC
 void ConverseCommonExit(void);
 
 static void CommunicationServer(int sleepTime) {
@@ -1662,6 +1651,10 @@ static void CommunicationServer(int sleepTime) {
 #endif
         CmiNodeAllBarrier();
         LrtsExit(_exitcode);
+        if(CharmLibInterOperate) {
+          ckExitComplete = 1;
+          CmiNodeAllBarrier();
+        }
     }
 #endif
 }

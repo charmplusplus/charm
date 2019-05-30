@@ -7,7 +7,7 @@
 #include "ckheap.h"
 #include "RefineLB.h"
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(RefineLB, "Move objects away from overloaded processor to reach average")
 

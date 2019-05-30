@@ -137,7 +137,13 @@ void ST_RecursivePartition<Iterator>::initPhyNodes(Iterator start, Iterator end,
 #endif
 
   const int numNodes = std::distance(start, end);
-  phynodes.reserve(std::min(CmiNumPhysicalNodes(), numNodes));
+  phynodes.reserve(std::min(CmiNumPhysicalNodes(), numNodes + 1));
+  if (virtualRoot > -1) {
+    int pe = virtualRoot;
+    if (nodeTree) pe = CmiNodeFirst(virtualRoot);
+    phynodes.push_back(PhyNode(-1, pe, tmgr));
+    phynodes.back().addNode(virtualRoot);
+  }
   intMap phyNodeMap;
   int last = -1;
   for (Iterator i=start; i != end; i++) {
@@ -232,7 +238,8 @@ void ST_RecursivePartition<Iterator>::build(std::vector<PhyNode*> &phyNodes,
   typename ST_RecursivePartition<Iterator>::PhyNode *rootPhyNode = phyNodes[0];
   children.reserve(rootPhyNode->size() + maxBranches); // reserve for max number of children
 
-  Iterator pos = start+1;
+  Iterator pos = start;
+  if (virtualRoot == -1) pos++;
   withinPhyNodeTree(*rootPhyNode, maxBranches, pos);
 
   // TODO another option, don't know if better, is if
@@ -640,4 +647,34 @@ void get_topo_tree_nbs(int root, int *parent, int *child_count, int **children) 
   *parent = t->parent;
   *child_count = t->child_count;
   *children = t->children;
+}
+
+void partitionPEs(int *pes, int numpes, int numparts, int *part_offsets) {
+  CkAssert((numparts > 1) && (numpes >= numparts));
+
+  if (numpes <= CmiNumPesOnPhysicalNode(0)) {
+    int phyNode = CmiPhysicalNodeID(pes[0]);
+    bool onePhyNode = true;
+    for (int i=1; i < numpes; i++) {
+      if (CmiPhysicalNodeID(pes[i]) != phyNode) {
+        onePhyNode = false;
+        break;
+      }
+    }
+    if (onePhyNode) {
+      for (int i=0; i < numparts; i++) part_offsets[i] = i*numpes / numparts;
+      return;
+    }
+  }
+
+  ST_RecursivePartition<int*> tb(false, false);
+  tb.setVirtualRoot(pes[0]); // who the virtual root is doesn't matter
+  int numSubtrees = tb.buildSpanningTree(pes, pes + numpes, numparts);
+  if (numSubtrees != numparts) {
+    CkAbort("partitionPEs: number of partitions found is different than requested number.\n"
+            "The number of physical nodes of the given PEs might be less than requested partitions\n");
+  }
+  for (int i=0; i < numSubtrees; i++) {
+    part_offsets[i] = tb.begin(i) - pes;
+  }
 }

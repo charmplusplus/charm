@@ -19,8 +19,8 @@ TopoManager.o: TopoManager.h TopoManager.C BGQTorus.h topomanager_config.h
 BGQTorus.o: BGQTorus.C topomanager_config.h
 	$(CC) $(COPTS) -o BGQTorus.o BGQTorus.C
 
-test:  topomanager_test.c libtmgr.a topomanager_config.h
-	$(CC) $(COPTS) topomanager_test.c -o topomanager_test.o
+test:  topomanager_test.C libtmgr.a topomanager_config.h
+	$(CC) $(COPTS) topomanager_test.C -o topomanager_test.o
 	$(CXX) -o topomanager_test topomanager_test.o -ltmgr -L./ $(LOPTS)
 
 topomanager_config.h:

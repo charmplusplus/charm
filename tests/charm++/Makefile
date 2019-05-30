@@ -1,7 +1,6 @@
 DIRS = \
   megatest \
   alignment \
-  pingpong \
   simplearrayhello \
   provisioning \
   load_balancing \
@@ -11,14 +10,8 @@ DIRS = \
   sdag \
   ckAllocSysMsgTest \
   method_templates \
-  xcastredn \
   demand_creation \
-  migrate \
-  taskSpawn \
-  taskSpawnRecursive \
-  streamingAllToAll \
   startupTest \
-  kNeighbor \
   topology \
   io \
   sparse \

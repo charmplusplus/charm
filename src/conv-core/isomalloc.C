@@ -2184,7 +2184,6 @@ int CmiIsomallocInRange(void *addr)
 
 int _sync_iso_warned = 0;
 
-CMI_EXTERNC
 void CmiIsomallocInit(char **argv)
 {
 #if CMK_NO_ISO_MALLOC
@@ -2229,7 +2228,7 @@ void CmiIsomallocInit(char **argv)
 }
 
 /***************** BlockList interface *********
-  This was moved here from memory-isomalloc.c when it 
+  This was moved here from memory-isomalloc.C when it
   was realized that a list-of-isomalloc'd-blocks is useful for
   more than just isomalloc heaps.
   */

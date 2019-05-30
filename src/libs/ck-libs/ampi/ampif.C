@@ -1,5 +1,8 @@
 #include "ampi.h"
-#include "ampiimpl.h"
+
+#include <string.h>
+#include <vector>
+using std::vector;
 
 FLINKAGE {
 #define mpi_send FTN_NAME( MPI_SEND , mpi_send )
@@ -57,6 +60,8 @@ FLINKAGE {
 #define mpi_type_struct FTN_NAME( MPI_TYPE_STRUCT , mpi_type_struct )
 #define mpi_type_commit FTN_NAME( MPI_TYPE_COMMIT , mpi_type_commit )
 #define mpi_type_free FTN_NAME( MPI_TYPE_FREE , mpi_type_free )
+#define mpi_type_create_darray FTN_NAME( MPI_TYPE_CREATE_DARRAY , mpi_type_create_darray )
+#define mpi_type_create_subarray FTN_NAME( MPI_TYPE_CREATE_SUBARRAY , mpi_type_create_subarray )
 #define mpi_type_get_extent FTN_NAME( MPI_TYPE_GET_EXTENT , mpi_type_get_extent )
 #define mpi_type_get_extent_x FTN_NAME( MPI_TYPE_GET_EXTENT_X , mpi_type_get_extent_x )
 #define mpi_type_extent FTN_NAME( MPI_TYPE_EXTENT , mpi_type_extent )
@@ -788,6 +793,23 @@ void mpi_type_free(int *type, int *ierr) noexcept
 {
   *ierr = MPI_Type_free(type);
 }
+
+void mpi_type_create_darray(int *size, int *rank, int *ndims, int *array_of_gsizes,
+  int *array_of_distribs, int *array_of_dargs, int *array_of_psizes, int *order,
+  int *oldtype, int *newtype, int *ierr) noexcept
+{
+  *ierr = MPI_Type_create_darray(*size, *rank, *ndims, array_of_gsizes,
+    array_of_distribs, array_of_dargs, array_of_psizes, *order,
+    (MPI_Datatype)*oldtype, (MPI_Datatype*)newtype);
+}
+
+void mpi_type_create_subarray(int *ndims, int *array_of_sizes, int *array_of_subsizes,
+  int *array_of_starts, int *order, int *oldtype, int *newtype, int *ierr) noexcept
+{
+  *ierr = MPI_Type_create_subarray(*ndims, array_of_sizes, array_of_subsizes,
+    array_of_starts, *order, (MPI_Datatype)*oldtype, (MPI_Datatype*)newtype);
+}
+
 
 void  mpi_type_get_extent(int* type, MPI_Aint* lb, MPI_Aint* extent, int* ierr) noexcept
 {
@@ -2253,13 +2275,13 @@ void ampi_gpu_invoke_wr(int *to_call, int *ierr) noexcept {
  *      if 'i' is zero the program name is returned.
  */
 void ampi_command_argument_count(int *count) noexcept {
-  *count = CkGetArgc()-1;
+  *count = AMPI_Get_argc()-1;
 }
 
 void ampi_get_command_argument(int *c, char *str, int *len, int *ierr) noexcept
 {
-  char **argv = CkGetArgv();
-  int nc = CkGetArgc()-1;
+  char **argv = AMPI_Get_argv();
+  int nc = AMPI_Get_argc()-1;
   int arglen = strlen(argv[*c]);
 
   if (*c >= 0 && *c <= nc) {
@@ -2280,11 +2302,7 @@ void ampi_get_command_argument(int *c, char *str, int *len, int *ierr) noexcept
 
 void ampi_init_universe(int *unicomm, int *ierr) noexcept
 {
-  AMPI_API("AMPI_Init_universe");
-  for(int i=0; i<_mpi_nworlds; i++) {
-    unicomm[i] = MPI_COMM_UNIVERSE[i];
-  }
-  *ierr = MPI_SUCCESS;
+  *ierr = AMPI_Init_universe(unicomm);
 }
 
 } // extern "C"

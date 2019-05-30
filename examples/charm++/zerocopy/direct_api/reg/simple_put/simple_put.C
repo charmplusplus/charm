@@ -110,6 +110,7 @@ public:
     // Cast m->data as (CkNcpyBuffer *)
     CkNcpyBuffer *src = (CkNcpyBuffer *)(m->data);
     src->deregisterMem();
+    delete m;
 
     if(cbCounter == 3) {
       CkPrintf("[%d][%d][%d] Put Source Done\n", thisIndex, CkMyPe(), CkMyNode());
@@ -125,6 +126,7 @@ public:
     // Cast m->data as (CkNcpyBuffer *)
     CkNcpyBuffer *dest = (CkNcpyBuffer *)(m->data);
     dest->deregisterMem();
+    delete m;
 
     if(cbCounter == 3) {
       CkPrintf("[%d][%d][%d] Put Destination Done\n", thisIndex, CkMyPe(), CkMyNode());

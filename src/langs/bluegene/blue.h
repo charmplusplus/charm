@@ -193,7 +193,7 @@ void BgThreadBroadcastPacketExcept(int node, CmiInt2 threadID, int handlerID,
 /*
   Multicast a message to a list of processors
 */
-void BgSyncListSend(int npes, int *pes, int handlerID, WorkType type, 
+void BgSyncListSend(int npes, const int *pes, int handlerID, WorkType type,
 				int numbytes, char *data);
 
 void BgSetStrategyBigSimDefault(CthThread t);

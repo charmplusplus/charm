@@ -40,8 +40,7 @@
 #include "brg_endian.h"
 
 #if defined(__cplusplus)
-extern "C"
-{
+extern "C" {
 #endif
 
 /** BEGIN: UTS RNG Harness **/

@@ -7,11 +7,11 @@
   These generally tell you what category the routine is in:
   - Cmi, Converse Machine Interface, the machine layer. (machine.C)
      Also used for various generic low-level features.
-  - Cth, Converse threads, user-level nonpreemptive threads. (threads.c) 
-  - Ccd, Converse condition detection, similar to signal handling. (conv-conds.c)
-  - Ccs, Converse client/server, socket access to parallel job. (conv-ccs.c; ccs-*)
+  - Cth, Converse threads, user-level nonpreemptive threads. (threads.C)
+  - Ccd, Converse condition detection, similar to signal handling. (conv-conds.C)
+  - Ccs, Converse client/server, socket access to parallel job. (conv-ccs.C; ccs-*)
   - Cpd, Converse parallel debugger. (debug-*)
-  - Crn, Converse random number generation. (random.c)
+  - Crn, Converse random number generation. (random.C)
   - Csd, Converse scheduler daemon.  (convcore.C)
   - Cqs, Converse prioritized queueing system. (queueing.c)
   - CQd, Converse quiesence detection. (quiescense.c)
@@ -45,18 +45,6 @@
 # define CMK_THREADLOCAL __thread
 #endif
 
-#ifdef __cplusplus
-# define CMI_EXTERNC extern "C"
-#else
-# define CMI_EXTERNC
-#endif
-
-#if defined __cplusplus && defined _MSC_VER
-# define CMI_EXTERNC_VARIABLE extern "C"
-#else
-# define CMI_EXTERNC_VARIABLE extern
-#endif
-
 #if defined _MSC_VER
 # define CMI_FORCE_INLINE __forceinline
 #elif defined __GNUC__
@@ -72,6 +60,14 @@
 #endif
 
 #include "conv-header.h"
+
+#if CMK_ONESIDED_IMPL
+#define CMI_ZC_MSGTYPE(msg)                  ((CmiMsgHeaderBasic *)msg)->zcMsgType
+#define CMI_IS_ZC_P2P(msg)                   (CMI_ZC_MSGTYPE(msg) == CMK_ZC_P2P_SEND_MSG || CMI_ZC_MSGTYPE(msg) == CMK_ZC_P2P_RECV_MSG)
+#define CMI_IS_ZC_BCAST(msg)                 (CMI_ZC_MSGTYPE(msg) == CMK_ZC_BCAST_SEND_MSG || CMI_ZC_MSGTYPE(msg) == CMK_ZC_BCAST_RECV_MSG)
+#define CMI_IS_ZC_RECV(msg)                  (CMI_ZC_MSGTYPE(msg) == CMK_ZC_P2P_RECV_MSG || CMI_ZC_MSGTYPE(msg) == CMK_ZC_BCAST_RECV_MSG)
+#define CMI_IS_ZC(msg)                       (CMI_IS_ZC_P2P(msg) || CMI_IS_ZC_BCAST(msg))
+#endif
 
 #define CMIALIGN(x,n)       (size_t)((~((size_t)n-1))&((x)+(n-1)))
 /*#define ALIGN8(x)        (size_t)((~7)&((x)+7)) */
@@ -136,6 +132,15 @@
 #   define CMK_NORETURN __attribute__ ((__noreturn__))
 #  endif
 # endif
+
+// must be placed before return type and at both declaration and definition
+#if defined __GNUC__ && __GNUC__ >= 4
+# define CMI_WARN_UNUSED_RESULT __attribute__ ((warn_unused_result))
+#elif defined _MSC_VER && _MSC_VER >= 1700
+# define CMI_WARN_UNUSED_RESULT _Check_return_
+#else
+# define CMI_WARN_UNUSED_RESULT
+#endif
 
 /* Paste the tokens x and y together, without any space between them.
    The ANSI C way to do this is the bizarre ## "token-pasting" 
@@ -256,7 +261,7 @@ extern PartitionInfo _partitionInfo;
 #define CmiMyPeGlobal()                 _Cmi_mype_global
 extern int _Cmi_mynodesize;
 #else
-extern int CmiMyPeGlobal();
+extern int CmiMyPeGlobal(void);
 #endif
 
 /* we need nodeSpan to find how many pes each node cover */
@@ -369,13 +374,10 @@ extern int _Cmi_numnodes;
 extern int _Cmi_sleepOnIdle;
 extern int _Cmi_forceSpinOnIdle;
 
-CMI_EXTERNC
 int CmiMyPe(void);
-CMI_EXTERNC
 int CmiMyRank(void);
 #define CmiNumPes()         _Cmi_numpes
 #define CmiMyNodeSize()     _Cmi_mynodesize
-CMI_EXTERNC
 int CmiNodeSize(int node);
 #if CMK_MULTICORE
 #define CmiMyNode()         0
@@ -386,11 +388,8 @@ int CmiNodeSize(int node);
 #else
 #define CmiMyNode()         _Cmi_mynode
 #define CmiNumNodes()       _Cmi_numnodes
-CMI_EXTERNC
 int CmiNodeFirst(int node);
-CMI_EXTERNC
 int CmiNodeOf(int pe);
-CMI_EXTERNC
 int CmiRankOf(int pe);
 #endif
 
@@ -514,13 +513,10 @@ extern int _Cmi_numnodes;
 extern int _Cmi_sleepOnIdle;
 extern int _Cmi_forceSpinOnIdle;
 
-CMI_EXTERNC
 int CmiMyPe(void);
-CMI_EXTERNC
 int CmiMyRank(void);
 #define CmiNumPes()         _Cmi_numpes
 #define CmiMyNodeSize()     _Cmi_mynodesize
-CMI_EXTERNC
 int CmiNodeSize(int node);
 #if CMK_MULTICORE
 #define CmiMyNode()         0
@@ -531,11 +527,8 @@ int CmiNodeSize(int node);
 #else
 #define CmiMyNode()         _Cmi_mynode
 #define CmiNumNodes()       _Cmi_numnodes
-CMI_EXTERNC
 int CmiNodeFirst(int node);
-CMI_EXTERNC
 int CmiNodeOf(int pe);
-CMI_EXTERNC
 int CmiRankOf(int pe);
 #endif
 
@@ -871,8 +864,14 @@ struct infiCmiChunkMetaDataStruct *registerMultiSendMesg(char *msg,int msgSize);
 
 #endif
 
-CMI_EXTERNC void* malloc_nomigrate(size_t size);
-CMI_EXTERNC void free_nomigrate(void* ptr);
+#ifdef __cplusplus
+extern "C" {
+#endif
+void* malloc_nomigrate(size_t size);
+void free_nomigrate(void* ptr);
+#ifdef __cplusplus
+}
+#endif
 
 /**
    Allocate `size` bytes of memory usable as a message buffer.
@@ -889,6 +888,7 @@ int      CmiGetReference(void *blk);
 int      CmiSize(void *blk);
 void     CmiFree(void *blk);
 void     CmiRdmaFree(void *blk);
+void     CmiInitMsgHeader(void *msg, int size);
 
 #ifndef CMI_TMP_SKIP
 void *CmiTmpAlloc(int size);
@@ -904,13 +904,13 @@ void CmiMemoryCheck(void); /* heap check, for -memory paranoid */
 void CmiMemoryMark(void); /* ignore current allocations, for -memory leak */
 void CmiMemoryMarkBlock(void *blk); /* ignore this allocation, for -memory leak */
 void CmiMemorySweep(const char *where); /* print current allocations, for -memory leak */
-CMK_TYPEDEF_UINT8 CmiMemoryUsage();
-const char *CmiMemoryUsageReporter();
+CMK_TYPEDEF_UINT8 CmiMemoryUsage(void);
+const char *CmiMemoryUsageReporter(void);
 CMK_TYPEDEF_UINT8 CmiMaxMemoryUsageR(void);
-CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage();
-void CmiResetMaxMemory();
-CMK_TYPEDEF_UINT8 CmiMinMemoryUsage();
-void CmiResetMinMemory();
+CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage(void);
+void CmiResetMaxMemory(void);
+CMK_TYPEDEF_UINT8 CmiMinMemoryUsage(void);
+void CmiResetMinMemory(void);
 
 /* General functions for malloc'ing aligned buffers */
 #define CmiRoundUpToPow2(s, p2)  (s + ((p2 - (s & (p2 - 1))) & (p2 - 1)))
@@ -1096,7 +1096,7 @@ typedef void (*CmiStartFn)(int argc, char **argv);
   @{
 */
 CpvExtern(int, _ccd_numchecks);
-extern void  CcdCallBacks();
+extern void  CcdCallBacks(void);
 #define CsdPeriodic() do{ if (CpvAccess(_ccd_numchecks)-- <= 0) CcdCallBacks(); } while(0)
 #define CsdResetPeriodic()    CpvAccess(_ccd_numchecks) = 0;
 
@@ -1240,7 +1240,7 @@ void     CmiLookupGroup(CmiGroup grp, int *npes, int **pes);
 void CmiPushPE(int, void*);
 #if CMK_OMP
 void          CmiSuspendedTaskEnqueue(int targetRank, void *msg);
-void      *   CmiSuspendedTaskPop();
+void      *   CmiSuspendedTaskPop(void);
 #endif
 void          CmiSyncSendFn(int, int, char *);
 CmiCommHandle CmiAsyncSendFn(int, int, char *);
@@ -1254,10 +1254,10 @@ void          CmiSyncBroadcastAllFn(int, char *);
 CmiCommHandle CmiAsyncBroadcastAllFn(int, char *);
 void          CmiFreeBroadcastAllFn(int, char *);
 
-void          CmiSyncListSendFn(int, int *, int, char*);
-CmiCommHandle CmiAsyncListSendFn(int, int *, int, char*);
-void          CmiFreeListSendFn(int, int *, int, char*);
-void          CmiFreeNodeListSendFn(int, int *, int, char*);
+void          CmiSyncListSendFn(int, const int *, int, char*);
+CmiCommHandle CmiAsyncListSendFn(int, const int *, int, char*);
+void          CmiFreeListSendFn(int, const int *, int, char*);
+void          CmiFreeNodeListSendFn(int, const int *, int, char*);
 
 void          CmiSyncMulticastFn(CmiGroup, int, char*);
 CmiCommHandle CmiAsyncMulticastFn(CmiGroup, int, char*);
@@ -1454,7 +1454,7 @@ void          CmiInterFreeNodeSendFn(int, int, int, char *);
 
 /******** CMI MESSAGE RECEPTION ********/
 
-void   CmiDeliversInit();
+void   CmiDeliversInit(void);
 int    CmiDeliverMsgs(int maxmsgs);
 void   CmiDeliverSpecificMsg(int handler);
 void   CmiHandleMessage(void *msg);
@@ -1521,8 +1521,8 @@ void       CthSetStrategyDefault(CthThread);
 void       CthSetStrategyWorkStealing(CthThread);
 void       CthSetStrategySuspendedWorkStealing(CthThread);
 int        CthScheduled(CthThread t);
-void       CthScheduledDecrement();
-CthThread  CthGetCurrentThread();
+void       CthScheduledDecrement(void);
+CthThread  CthGetCurrentThread(void);
 CpvExtern(int, prevGtid);
 void       CthSetPrev(CthThread t, CthThread prev);
 #endif
@@ -1606,7 +1606,7 @@ struct CthThreadListener {
        CthThread thread;
 
        /** The next listener, or NULL at end of chain.
-           Set by CthAddListener, and used only by threads.c.
+           Set by CthAddListener, and used only by threads.C.
        */
        struct CthThreadListener *next;
 };
@@ -1713,7 +1713,7 @@ int CldEstimate(void);
 const char *CldGetStrategy(void);
 
 void CldEnqueue(int pe, void *msg, int infofn);
-void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn);
+void CldEnqueueMulti(int npes, const int *pes, void *msg, int infofn);
 void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn);
 void CldNodeEnqueue(int node, void *msg, int infofn);
 
@@ -1726,7 +1726,7 @@ typedef struct CmmTableStruct *CmmTable;
 typedef void (*CmmPupMessageFn)(pup_er p,void **msg);
 CmmTable CmmPup(pup_er p, CmmTable t, CmmPupMessageFn msgpup);
 
-CmmTable   CmmNew();
+CmmTable   CmmNew(void);
 void       CmmFree(CmmTable t);
 void	   CmmFreeAll(CmmTable t);
 void       CmmPut(CmmTable t, int ntags, int *tags, void *msg);
@@ -1920,10 +1920,10 @@ extern int networkProgressPeriod;
 /*#ifdef __cplusplus
 extern "C" 
 #endif*/
-void CmiMachineProgressImpl();
+void CmiMachineProgressImpl(void);
 
 #if CMK_USE_PXSHM
-CMI_EXTERNC void CommunicationServerPxshm(void);
+void CommunicationServerPxshm(void);
 #define CmiNetworkProgress() {CpvAccess(networkProgressCount) ++; \
       if(CpvAccess(networkProgressCount) >=  networkProgressPeriod) { \
           CmiMachineProgressImpl(); \
@@ -2095,7 +2095,7 @@ extern CmiNodeLock cmiMemoryLock;
 #endif /*if CMK_SMP*/
 
 /******** Performance Counters ********/
-void CmiInitCounters();
+void CmiInitCounters(void);
 void CmiStartCounters(int events[], int numEvents);
 void CmiStopCounters(int events[], CMK_TYPEDEF_INT8 values[], int numEvents);
 
@@ -2179,8 +2179,8 @@ extern int *memCriticalEntries;
 double CmiReadSize(const char *str);
 
 #if  CMK_CONVERSE_UGNI
-void CmiTurnOnStats();
-void CmiTurnOffStats();
+void CmiTurnOnStats(void);
+void CmiTurnOffStats(void);
 #else
 #define CmiTurnOnStats()
 #define CmiTurnOffStats()
@@ -2214,23 +2214,18 @@ extern double CmiLog2(double);
 
 #if CMK_GRID_QUEUE_AVAILABLE
 #if defined(__cplusplus)
-extern "C" int CmiGetCluster (int pe);
-extern "C" int CmiGridQueueGetInterval ();
-extern "C" int CmiGridQueueGetThreshold ();
-extern "C" void CmiGridQueueRegister (int gid, int nInts, int index1, int index2, int index3);
-extern "C" void CmiGridQueueDeregister (int gid, int nInts, int index1, int index2, int index3);
-extern "C" void CmiGridQueueDeregisterAll ();
-extern "C" int CmiGridQueueLookup (int gid, int nInts, int index1, int index2, int index3);
-extern "C" int CmiGridQueueLookupMsg (char *msg);
-#else
+extern "C" {
+#endif
 extern int CmiGetCluster (int pe);
-extern int CmiGridQueueGetInterval ();
-extern int CmiGridQueueGetThreshold ();
+extern int CmiGridQueueGetInterval (void);
+extern int CmiGridQueueGetThreshold (void);
 extern void CmiGridQueueRegister (int gid, int nInts, int index1, int index2, int index3);
 extern void CmiGridQueueDeregister (int gid, int nInts, int index1, int index2, int index3);
-extern void CmiGridQueueDeregisterAll ();
+extern void CmiGridQueueDeregisterAll (void);
 extern int CmiGridQueueLookup (int gid, int nInts, int index1, int index2, int index3);
 extern int CmiGridQueueLookupMsg (char *msg);
+#if defined(__cplusplus)
+}
 #endif
 #endif
 
@@ -2279,18 +2274,16 @@ CpvExtern(int, _urgentSend);
 #define CsdTaskPop() TaskQueuePop((TaskQueue)CpvAccess(CsdTaskQueue))
 #if CMK_OMP
 #if defined(__cplusplus)
-extern "C" int CmiGetCurKnownOmpThreads();
-#else
-extern int CmiGetCurKnownOmpThreads();
+extern "C"
 #endif
+int CmiGetCurKnownOmpThreads(void);
 #endif
 #endif
 CpvCExtern(int, isHelperOn);
 #if defined(__cplusplus)
-extern "C" void CmiSetPeHelpsOtherThreads(int);
-#else
-extern void CmiSetPeHelpsOtherThreads(int);
+extern "C"
 #endif
+void CmiSetPeHelpsOtherThreads(int);
 #endif /* CONVERSE_H */
 
 

@@ -19,7 +19,7 @@
 //#define RAND_COMM
 #define make_mapping 0
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(TopoCentLB,"Balance objects based on the network topology")
 
@@ -124,7 +124,7 @@ void TopoCentLB::computePartitions(CentralLB::LDStats *stats,int count,int *newm
 			else if (cdata.receiver.get_type() == LD_OBJLIST_MSG) {
 				//CkPrintf("in objlist..\n");
         int nobjs;
-        LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
+        const LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
         int senderID = stats->getHash(cdata.sender);
         for (j=0; j<nobjs; j++) {
            int recverID = stats->getHash(objs[j]);
@@ -583,7 +583,7 @@ void TopoCentLB :: work(LDStats *stats)
       }
       else if(cdata.receiver.get_type() == LD_OBJLIST_MSG) {
 	int nobjs;
-    	LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
+	const LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
 	int senderID = stats->getHash(cdata.sender);
 	for(j = 0; j < n_pes; j++)
 	  addedComm[j]=0;

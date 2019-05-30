@@ -11,7 +11,7 @@
  can link in whichever is best using the -memory option with charmc.
 
  The major possibilities here are empty (use the system's malloc),
- GNU (use memory-gnu.c), and meta (use e.g. memory-paranoid.c).
+ GNU (use memory-gnu.C), and meta (use e.g. memory-paranoid.C).
  On machines without sbrk(), only the system's malloc is available.
 
  The CMK_MEMORY_BUILD_* symbols come in from the compiler command line.
@@ -68,6 +68,7 @@
 #  define getpid _getpid
 #endif
 #include "converse.h"
+#include "charm-api.h"
 
 void * memory_stack_top; /*The higher end of the stack (approximation)*/
 int cpdInSystem=1; /*Start inside the system (until we start executing user code)*/
@@ -100,17 +101,17 @@ int cpdInSystem=1; /*Start inside the system (until we start executing user code
 
 struct mallinfo;
 
-CMI_EXTERNC void initialize_memory_wrapper(void);
-CMI_EXTERNC void * initialize_memory_wrapper_calloc(size_t nelem, size_t size);
-CMI_EXTERNC void * initialize_memory_wrapper_malloc(size_t size);
-CMI_EXTERNC void * initialize_memory_wrapper_realloc(void *ptr, size_t size);
-CMI_EXTERNC void * initialize_memory_wrapper_memalign(size_t align, size_t size);
-CMI_EXTERNC int initialize_memory_wrapper_posix_memalign(void **memptr, size_t align, size_t size);
-CMI_EXTERNC void * initialize_memory_wrapper_aligned_alloc(size_t align, size_t size);
-CMI_EXTERNC void * initialize_memory_wrapper_valloc(size_t size);
-CMI_EXTERNC void * initialize_memory_wrapper_pvalloc(size_t size);
-CMI_EXTERNC void initialize_memory_wrapper_free(void *ptr);
-CMI_EXTERNC void initialize_memory_wrapper_cfree(void *ptr);
+void initialize_memory_wrapper(void);
+void * initialize_memory_wrapper_calloc(size_t nelem, size_t size);
+void * initialize_memory_wrapper_malloc(size_t size);
+void * initialize_memory_wrapper_realloc(void *ptr, size_t size);
+void * initialize_memory_wrapper_memalign(size_t align, size_t size);
+int initialize_memory_wrapper_posix_memalign(void **memptr, size_t align, size_t size);
+void * initialize_memory_wrapper_aligned_alloc(size_t align, size_t size);
+void * initialize_memory_wrapper_valloc(size_t size);
+void * initialize_memory_wrapper_pvalloc(size_t size);
+void initialize_memory_wrapper_free(void *ptr);
+void initialize_memory_wrapper_cfree(void *ptr);
 
 void * (*mm_malloc)(size_t) = initialize_memory_wrapper_malloc;
 void * (*mm_calloc)(size_t,size_t) = initialize_memory_wrapper_calloc;
@@ -335,27 +336,27 @@ static void (*old_free_hook) (void*, const void*);
 #endif /* CMK_MEMORY_BUILD_GNU_HOOKS */
 
 #if CMK_MEMORY_BUILD_VERBOSE
-#include "memory-verbose.c"
+#include "memory-verbose.C"
 #endif
 
 #if CMK_MEMORY_BUILD_PARANOID
-#include "memory-paranoid.c"
+#include "memory-paranoid.C"
 #endif
 
 #if CMK_MEMORY_BUILD_LEAK
-#include "memory-leak.c"
+#include "memory-leak.C"
 #endif
 
 #if CMK_MEMORY_BUILD_ISOMALLOC
-#include "memory-isomalloc.c"
+#include "memory-isomalloc.C"
 #endif
 
 #if CMK_MEMORY_BUILD_LOCK
-#include "memory-lock.c"
+#include "memory-lock.C"
 #endif
 
 #if CMK_MEMORY_BUILD_CHARMDEBUG
-#include "memory-charmdebug.c"
+#include "memory-charmdebug.C"
 #endif
 
 #if CMK_MEMORY_BUILD_GNU_HOOKS
@@ -384,15 +385,11 @@ void free(void *ptr) CMK_THROW { meta_free(ptr); }
 void *calloc(size_t nelem, size_t size) CMK_THROW { return meta_calloc(nelem,size); }
 void cfree(void *ptr) CMK_THROW { meta_cfree(ptr); }
 void *realloc(void *ptr, size_t size) CMK_THROW { return meta_realloc(ptr,size); }
-CMI_EXTERNC
-void *memalign(size_t align, size_t size) CMK_THROW { return meta_memalign(align,size); }
-CMI_EXTERNC
-int posix_memalign(void **outptr, size_t align, size_t size) CMK_THROW { return meta_posix_memalign(outptr,align,size); }
-CMI_EXTERNC
-void *aligned_alloc(size_t align, size_t size) CMK_THROW { return meta_aligned_alloc(align,size); }
+CLINKAGE void *memalign(size_t align, size_t size) CMK_THROW { return meta_memalign(align,size); }
+CLINKAGE int posix_memalign(void **outptr, size_t align, size_t size) CMK_THROW { return meta_posix_memalign(outptr,align,size); }
+CLINKAGE void *aligned_alloc(size_t align, size_t size) CMK_THROW { return meta_aligned_alloc(align,size); }
 void *valloc(size_t size) CMK_THROW { return meta_valloc(size); }
-CMI_EXTERNC
-void *pvalloc(size_t size) CMK_THROW { return meta_pvalloc(size); }
+CLINKAGE void *pvalloc(size_t size) CMK_THROW { return meta_pvalloc(size); }
 #endif /* CMK_MEMORY_BUILD_GNU_HOOKS */
 
 #endif /* CMK_MEMORY_BUILD_OS_WRAPPED || CMK_MEMORY_BUILD_GNU_HOOKS */
@@ -406,7 +403,6 @@ void *pvalloc(size_t size) CMK_THROW { return meta_pvalloc(size); }
 
 static int skip_mallinfo = 0;
 
-CMI_EXTERNC
 void CmiMemoryInit(char ** argv)
 {
   if(CmiMyRank() == 0)   CmiMemoryIs_flag |= CMI_MEMORY_IS_OS;
@@ -419,10 +415,8 @@ void CmiMemoryInit(char ** argv)
   if (getenv("MEMORYUSAGE_NO_MALLINFO"))  skip_mallinfo = 1;
 }
 
-CMI_EXTERNC
-void *malloc_reentrant(size_t);
-CMI_EXTERNC
-void free_reentrant(void *);
+CLINKAGE void *malloc_reentrant(size_t);
+CLINKAGE void free_reentrant(void *);
 
 void *malloc_reentrant(size_t size) { return malloc(size); }
 void free_reentrant(void *mem) { free(mem); }
@@ -649,7 +643,7 @@ void CmiResetMinMemory(void) {}
 #define meta_valloc   mm_valloc
 #define meta_pvalloc  mm_pvalloc
 
-#include "memory-gnu.c"
+#include "memory-gnu.C"
 static void meta_init(char **argv) {
   if (CmiMyRank()==0) CmiMemoryIs_flag |= CMI_MEMORY_IS_GNU;
 }
@@ -660,29 +654,29 @@ static void meta_init(char **argv) {
 #define AFTER_MALLOC_CALL    /*empty*/
 
 #if CMK_MEMORY_BUILD_VERBOSE
-#include "memory-verbose.c"
+#include "memory-verbose.C"
 #endif
 
 #if CMK_MEMORY_BUILD_PARANOID
-#include "memory-paranoid.c"
+#include "memory-paranoid.C"
 #endif
 
 #if CMK_MEMORY_BUILD_LEAK
-#include "memory-leak.c"
+#include "memory-leak.C"
 #endif
 
 #if CMK_MEMORY_BUILD_ISOMALLOC
-#include "memory-isomalloc.c"
+#include "memory-isomalloc.C"
 #endif
 
 #if CMK_MEMORY_BUILD_CHARMDEBUG
-#include "memory-charmdebug.c"
+#include "memory-charmdebug.C"
 #endif
 
 /*A trivial sample implementation of the meta_* calls:*/
 #if 0
 /* Use Gnumalloc as meta-meta malloc fallbacks (mm_*) */
-#include "memory-gnu.c"
+#include "memory-gnu.C"
 static void meta_init(char **argv)
 {
 
@@ -735,7 +729,6 @@ The locking code is common to all implementations except OS-builtin.
 */
 static int CmiMemoryInited = 0;
 
-CMI_EXTERNC
 void CmiMemoryInit(char **argv)
 {
   CmiArgGroup("Converse","Memory module");
@@ -798,8 +791,7 @@ void *realloc(void *mem, size_t size) CMK_THROW
   return result;
 }
 
-CMI_EXTERNC
-void *memalign(size_t align, size_t size) CMK_THROW
+CLINKAGE void *memalign(size_t align, size_t size) CMK_THROW
 {
   void *result;
   MEM_LOCK_AROUND( result = meta_memalign(align, size); )
@@ -807,8 +799,7 @@ void *memalign(size_t align, size_t size) CMK_THROW
   return result;
 }
 
-CMI_EXTERNC
-int posix_memalign (void **outptr, size_t align, size_t size) CMK_THROW
+CLINKAGE int posix_memalign (void **outptr, size_t align, size_t size) CMK_THROW
 {
   int result;
   MEM_LOCK_AROUND( result = meta_posix_memalign(outptr, align, size); )
@@ -816,8 +807,7 @@ int posix_memalign (void **outptr, size_t align, size_t size) CMK_THROW
   return result;
 }
 
-CMI_EXTERNC
-void *aligned_alloc(size_t align, size_t size) CMK_THROW
+CLINKAGE void *aligned_alloc(size_t align, size_t size) CMK_THROW
 {
   void *result;
   MEM_LOCK_AROUND( result = meta_aligned_alloc(align, size); )
@@ -849,10 +839,8 @@ actually trying the lock, which prevents a deadlock where
 you try to aquire one of your own locks.
 */
 
-CMI_EXTERNC
-void *malloc_reentrant(size_t);
-CMI_EXTERNC
-void free_reentrant(void *);
+CLINKAGE void *malloc_reentrant(size_t);
+CLINKAGE void free_reentrant(void *);
 
 void *malloc_reentrant(size_t size) {
   void *result;
@@ -972,10 +960,8 @@ void CmiResetMinMemory(void) {
 
 #ifndef CMK_MEMORY_HAS_NOMIGRATE
 /*Default implementations of the nomigrate routines:*/
-CMI_EXTERNC
-void *malloc_nomigrate(size_t);
-CMI_EXTERNC
-void free_nomigrate(void *);
+CLINKAGE void *malloc_nomigrate(size_t);
+CLINKAGE void free_nomigrate(void *);
 
 void *malloc_nomigrate(size_t size) { return malloc(size); }
 void free_nomigrate(void *mem) { free(mem); }
@@ -1036,19 +1022,12 @@ void CmiOutOfMemoryInit(void) {
 #ifndef CMK_MEMORY_BUILD_CHARMDEBUG
 /* declare the cpd_memory routines */
 void CpdSetInitializeMemory(int v) { }
-CMI_EXTERNC
 size_t  cpd_memory_length(void *lenParam) { return 0; }
-CMI_EXTERNC
 void cpd_memory_pup(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
-CMI_EXTERNC
 void cpd_memory_leak(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
-CMI_EXTERNC
 void check_memory_leaks(LeakSearchInfo* i) { }
-CMI_EXTERNC
 size_t  cpd_memory_getLength(void *lenParam) { return 0; }
-CMI_EXTERNC
 void cpd_memory_get(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
-CMI_EXTERNC
 void CpdMemoryMarkClean(char *msg) { }
 /* routine used by CthMemory{Protect,Unprotect} to specify that some region of
    memory has been protected */
@@ -1069,12 +1048,9 @@ void CpdResetMemory(void) { }
 void CpdCheckMemory(void) { }
 
 int get_memory_allocated_user_total(void) { return 0; }
-CMI_EXTERNC
 void * MemoryToSlot(void *ptr) { return NULL; }
-CMI_EXTERNC
 int Slot_ChareOwner(void *s) { return 0; }
 int Slot_AllocatedSize(void *s) { return 0; }
-CMI_EXTERNC
 int Slot_StackTrace(void *s, void ***stack) { return 0; }
 #ifdef setMemoryChareIDFromPtr
 #undef setMemoryChareIDFromPtr
@@ -1152,28 +1128,28 @@ void CmiFreeAligned(void* ptr) {
 
 
 // Replace remaining symbols found in glibc's malloc.o to avoid linker errors
-// See: https://charm.cs.illinois.edu/redmine/issues/1325
+// See: https://github.com/UIUC-PPL/charm/issues/1325
 
 #if (CMK_MEMORY_BUILD_OS && CMK_MEMORY_BUILD_OS_WRAPPED && !CMK_MEMORY_BUILD_GNU_HOOKS) || !CMK_MEMORY_BUILD_OS
 
 #if !defined CMI_MEMORY_GNU || !defined _LIBC
-CMI_EXTERNC void * __libc_memalign (size_t alignment, size_t bytes) { return memalign(alignment, bytes); }
+CLINKAGE void * __libc_memalign (size_t alignment, size_t bytes) { return memalign(alignment, bytes); }
 
 #if CMK_EXPECTS_MORECORE
-CMI_EXTERNC void * __default_morecore (ptrdiff_t) CMK_THROW;
+CLINKAGE void * __default_morecore (ptrdiff_t) CMK_THROW;
 void *(*__morecore)(ptrdiff_t) = __default_morecore;
 #endif
 #endif
 
 #if defined CMI_MEMORY_GNU && defined _LIBC
-CMI_EXTERNC int mallopt (int param_number, int value) CMK_THROW { return __libc_mallopt(param_number, value); }
+CLINKAGE int mallopt (int param_number, int value) CMK_THROW { return __libc_mallopt(param_number, value); }
 #elif !defined CMI_MEMORY_GNU || defined _LIBC
-CMI_EXTERNC int mallopt (int param_number, int value) CMK_THROW { return 1; }
+CLINKAGE int mallopt (int param_number, int value) CMK_THROW { return 1; }
 #endif
 
-CMI_EXTERNC void __malloc_fork_lock_parent (void) { }
-CMI_EXTERNC void __malloc_fork_unlock_parent (void) { }
-CMI_EXTERNC void __malloc_fork_unlock_child (void) { }
+CLINKAGE void __malloc_fork_lock_parent (void) { }
+CLINKAGE void __malloc_fork_unlock_parent (void) { }
+CLINKAGE void __malloc_fork_unlock_child (void) { }
 
 #if defined __APPLE__
 // strdup is statically linked against malloc on macOS

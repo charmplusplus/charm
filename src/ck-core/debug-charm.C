@@ -47,8 +47,8 @@ void CpdFinishInitialization() {
   CkpvAccess(_debugEntryTable).resize(_entryTable.size());
 }
 
-extern "C" void resetAllCRC();
-extern "C" void checkAllCRC(int report);
+void resetAllCRC();
+void checkAllCRC(int report);
 
 typedef struct DebugRecursiveEntry {
   int previousChareID;
@@ -64,7 +64,7 @@ void *CpdGetCurrentObject() { return _debugData.peek().obj; }
 void *CpdGetCurrentMsg() { return _debugData.peek().msg; }
 
 extern int cpdInSystem;
-extern "C" int CpdInUserCode() {return cpdInSystem==0 && _debugData.length()>0 && _debugData.peek().alreadyUserCode==1;}
+int CpdInUserCode() {return cpdInSystem==0 && _debugData.length()>0 && _debugData.peek().alreadyUserCode==1;}
 
 // Function called right before an entry method
 void CpdBeforeEp(int ep, void *obj, void *msg) {
@@ -599,7 +599,7 @@ void *CpdGetNextMessageConditional(CsdSchedulerState_t *s) {
 #include <sys/ipc.h>
 #include <sys/shm.h>
 
-extern "C" void CpdDeliverSingleMessage ();
+void CpdDeliverSingleMessage ();
 
 static pid_t CpdConditional_SetupComm() {
   int pipefd[2][2];
@@ -665,7 +665,7 @@ void CpdEndConditionalDelivery(char *msg) {
   _exit(0);
 }
 
-extern "C" void CpdEndConditionalDeliver_master() {
+void CpdEndConditionalDeliver_master() {
   close(conditionalPipe[0]);
   conditionalPipe[0] = 0;
   close(conditionalPipe[1]);
@@ -808,7 +808,6 @@ static void _call_freeze_on_break_point(void * msg, void * object)
 }
 
 //ccs handler when pressed the "next" command: deliver only a single message without unfreezing
-extern "C"
 void CpdDeliverSingleMessage () {
   if (!CpdIsFrozen()) return; /* Do something only if we are in freeze mode */
   if ( (CkpvAccess(lastBreakPointMsg) != NULL) && (CkpvAccess(lastBreakPointObject) != NULL) ) {
@@ -851,7 +850,6 @@ void CpdDeliverSingleMessage () {
 }
 
 //ccs handler when continue from a break point
-extern "C"
 void CpdContinueFromBreakPoint ()
 {
     CpdUnFreeze();
@@ -969,7 +967,7 @@ void CpdRemoveAllBreakPoints ()
   CcsSendReply(sizeof(int), (void*)&reply);
 }
 
-extern "C" int CpdIsCharmDebugMessage(void *msg) {
+int CpdIsCharmDebugMessage(void *msg) {
   envelope *env = (envelope*)msg;
   // Later should use "isDebug" value, but for now just bypass all intrinsic EPs
   return CmiGetHandler(msg) != _charmHandlerIdx || env->getMsgtype() == ForVidMsg ||
@@ -978,7 +976,7 @@ extern "C" int CpdIsCharmDebugMessage(void *msg) {
 
 #if CMK_BIGSIM_CHARM
 CpvExtern(int, _bgCcsHandlerIdx);
-extern "C" int CpdIsBgCharmDebugMessage(void *msg) {
+int CpdIsBgCharmDebugMessage(void *msg) {
   envelope *env = (envelope*)msg;
   if (CmiBgMsgFlag(msg) == BG_CLONE) {
     env=*(envelope**)(((char*)msg)+CmiBlueGeneMsgHeaderSizeBytes);
@@ -1040,13 +1038,11 @@ void CpdStartGdb(void)
 #endif
 }
 
-extern "C" {
-  size_t cpd_memory_length(void*);
-  void cpd_memory_pup(void*,void*,CpdListItemsRequest*);
-  void cpd_memory_leak(void*,void*,CpdListItemsRequest*);
-  size_t cpd_memory_getLength(void*);
-  void cpd_memory_get(void*,void*,CpdListItemsRequest*);
-}
+size_t cpd_memory_length(void*);
+void cpd_memory_pup(void*,void*,CpdListItemsRequest*);
+void cpd_memory_leak(void*,void*,CpdListItemsRequest*);
+size_t cpd_memory_getLength(void*);
+void cpd_memory_get(void*,void*,CpdListItemsRequest*);
 
 
 void CpdCharmInit()
@@ -1090,7 +1086,7 @@ void CpdCharmInit()
 #if CMK_BIGSIM_CHARM
 CpvExtern(int, _bgCcsHandlerIdx);
 CpvExtern(int, _bgCcsAck);
-extern "C" void req_fw_handler(char*);
+void req_fw_handler(char*);
 CkpvExtern(void *, debugQueue);
 CkpvExtern(int, freezeModeFlag);
 #include "blue_impl.h"
@@ -1129,7 +1125,7 @@ void CpdFinishInitialization() {}
 
 void *CpdGetCurrentObject() {return NULL;}
 void *CpdGetCurrentMsg() {return NULL;}
-extern "C" void CpdEndConditionalDeliver_master() {}
+void CpdEndConditionalDeliver_master() {}
 
 void CpdBeforeEp(int ep, void *obj, void *msg) {}
 void CpdAfterEp(int ep) {}

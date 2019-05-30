@@ -53,6 +53,8 @@ class Readonly : public Member {
   void genIndexDecls(XStr& str);
   void genDefs(XStr& str);
   void genReg(XStr& str);
+  void genZCDeclForArrays(XStr& str);
+  void genZCDeclForVectors(XStr& str, NamedType *nType);
 };
 
 class InitCall : public Member {

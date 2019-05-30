@@ -34,10 +34,22 @@ class XArraySectionReducer
         /// Each subsection reduction message needs to be passed in here
         void acceptSectionContribution(CkReductionMsg *msg)
         {
-            msgMap[msg->redNo].push_back(msg);
-            numReceivedMap[msg->redNo]++;
-            if (numReceivedMap[msg->redNo] >= numSubSections)
-              finalReducer(msg->redNo);
+            int redNo = msg->redNo;
+            msgMap[redNo].push_back(msg);
+            // Check if partialReduction is possible (streamable) across subsections
+            if (msgMap[redNo].size() > 1 && CkReduction::reducerTable()[msg->reducer].streamable) {
+              CkReduction::reducerFn f = CkReduction::reducerTable()[msg->reducer].fn;
+              CkReductionMsg *intermediateReducedMsg = (*f)(msgMap[redNo].size(), msgMap[redNo].data());
+              msgMap[redNo].pop_back();
+              // Only the partially reduced message should be remaining in the msgs vector after partialReduction
+              CkAssert(intermediateReducedMsg == msgMap[redNo][0]);
+              // Copy the reducer in the newly created message which will be used in the finalReducer()
+              intermediateReducedMsg->reducer = msg->reducer;
+              delete msg;
+            }
+            numReceivedMap[redNo]++;
+            if (numReceivedMap[redNo] >= numSubSections)
+              finalReducer(redNo);
         }
 
     private:
@@ -47,17 +59,19 @@ class XArraySectionReducer
             // Get a handle on the reduction function for this message
             CkReduction::reducerFn f = CkReduction::reducerTable()[ msgMap[redNo][0]->reducer ].fn;
             // Perform an extra reduction step on all the subsection reduction msgs
-            CkReductionMsg *finalMsg = (*f)(numSubSections, msgMap[redNo].data());
+            CkReductionMsg *finalMsg = (*f)(msgMap[redNo].size(), msgMap[redNo].data());
             // Send the final reduced msg to the client
             if (finalCB == nullptr)
                 msgMap[redNo][0]->callback.send(finalMsg);
             else
                 finalCB->send(finalMsg);
             // Delete the subsection redn msgs, accounting for any msg reuse
-            for (int i=0; i < numSubSections; i++)
-                if (msgMap[redNo][i] != finalMsg) delete msgMap[redNo][i];
+            auto& msgs = msgMap[redNo];
+            for (auto *msg:msgs) {
+              if (msg != finalMsg) delete msg;
+            }
             // Reset the msg list and counters for the corresponding redNo
-            memset( msgMap[redNo].data(), 0, numSubSections*sizeof(CkReductionMsg*) );
+            msgMap.erase(redNo);
             numReceivedMap[redNo] = 0;
         }
 

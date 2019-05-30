@@ -140,7 +140,7 @@ void LBInfo::getInfo(BaseLB::LDStats* stats, int count, int considerComm)
 	    }
             else if (receiver_type == LD_OBJLIST_MSG) {
               int nobjs;
-              LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
+              const LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
 	      mcast_count ++;
 	      CkVec<int> pes;
 	      for (i=0; i<nobjs; i++) {

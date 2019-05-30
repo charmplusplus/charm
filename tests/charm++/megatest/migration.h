@@ -12,6 +12,7 @@ class mig_Element : public CBase_mig_Element
   void done(void);
   void arrive(void);
   void pup(PUP::er &p);
+  void ckJustMigrated();
  private:
   int origPE, index, numDone, sum;
 };

@@ -1,0 +1,14 @@
+Hello World with Raja
+
+Demonstrates basic interoperability with Raja, using Charm++ nodegroup
+to spawn a separate instance of Raja on each process.
+
+Requires Raja to be built with GPU support.
+e.g. From Raja source folder,
+> mkdir build && install
+> cd build
+> cmake -DENABLE_CUDA=On -DCMAKE_INSTALL_PREFIX=<path to RAJA install folder> ../
+> make -j
+> make install
+
+Path to Raja install folder and GPU compute capability should be set in Makefile.common.

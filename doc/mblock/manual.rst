@@ -1,6 +1,6 @@
-===================================
-Charm++ Multiblock Framework Manual
-===================================
+====================
+Multiblock Framework
+====================
 
 .. contents::
    :depth: 3
@@ -186,9 +186,9 @@ domain into the number of blocks you specify, then writes out .mblk and
 For example, to divide the single binary mesh “in1.msh” into 20 pieces
 “out00001.[mb]blk”..“out00020.[mb]blk”, you’d use
 
-::
+.. code-block:: bash
 
-       makemblock in1.msh 20 out
+   $ makemblock in1.msh 20 out
 
 You would then run this mesh using 20 virtual processors.
 
@@ -210,7 +210,7 @@ The values passed to these functions are typically read from a
 configuration file or computed from command-line parameters.
 
 
-::
+.. code-block:: c++
 
   int MBLK_Set_prefix(const char *prefix);
 
@@ -225,7 +225,7 @@ This function is called to set the block filename prefix. For example,
 if the input block files are named “gridX00001.mblk” and
 “gridX00002.mblk”, the prefix is the string “gridX”.
 
-::
+.. code-block:: c++
 
   int MBLK_Set_nblocks(const int n);
 
@@ -245,7 +245,7 @@ balancing and allow adaptive overlap of computation and communication.
 Be sure to set the number of blocks equal to the number of virtual
 processors (+vp command-line option).
 
-::
+.. code-block:: c++
 
   int MBLK_Set_dim(const int n);
 
@@ -261,7 +261,7 @@ dimensional computations are currently supported.
 Utility
 -------
 
-::
+.. code-block:: c++
 
   int MBLK_Get_nblocks(int* n);
 
@@ -274,7 +274,7 @@ Utility
 Get the total number of blocks in the current computation. Can only be
 called from the driver routine.
 
-::
+.. code-block:: c++
 
   int MBLK_Get_myblock(int* m);
 
@@ -287,7 +287,7 @@ called from the driver routine.
 Get the id of the current block, an integer from 0 to the number of
 blocks minus one. Can only be called from the driver routine.
 
-::
+.. code-block:: c++
 
   int MBLK_Get_blocksize(int* dims);
 
@@ -302,7 +302,7 @@ of the array dims should be 3, and will be filled with the :math:`i`,
 :math:`j`, and :math:`k` dimensions of the block. Can only be called
 from the driver routine.
 
-::
+.. code-block:: c++
 
   int MBLK_Get_nodelocs(const int* nodedim,double *nodelocs);
 
@@ -329,7 +329,7 @@ the locations of ghost nodes, create a node-centered field containing
 the node locations and do an update field. Can only be called from the
 driver routine.
 
-::
+.. code-block:: c++
 
   double MBLK_Timer(void);
 
@@ -340,7 +340,7 @@ driver routine.
 Return the current wall clock time, in seconds. Resolution is
 machine-dependent, but is at worst 10ms.
 
-::
+.. code-block:: c++
 
   void MBLK_Print_block(void);
 
@@ -351,7 +351,7 @@ machine-dependent, but is at worst 10ms.
 Print a debugging representation of the framework’s information about
 the current block.
 
-::
+.. code-block:: c++
 
   void MBLK_Print(const char *str);
 
@@ -378,7 +378,7 @@ field ID to MBLK_Update_Field (which does the overlapping block
 communication) and/or MBLK_Reduce_Field (which applies a reduction over
 block values).
 
-::
+.. code-block:: c++
 
   int MBLK_Create_Field(int *dimensions,int isVoxel,const int
   base_type,const int vec_len,const int offset,const int dist, int
@@ -458,7 +458,7 @@ returns the offset in bytes of memory between its two given variables. C
 users can use the built-in ``sizeof`` keyword or pointer arithmetic to
 achieve the same result.
 
-::
+.. code-block:: c++
 
   void MBLK_Update_field(const int fid,int ghostwidth, void *grid);
 
@@ -495,7 +495,7 @@ routine returns, the given field will updated. If the update was
 successful MBLK_SUCCESS is returned, otherwise MBLK_FAILURE is returned in case
 of error.
 
-::
+.. code-block:: c++
 
   void MBLK_Iupdate_field(const int fid,int ghostwidth, void *ingrid, void* outgrid);
 
@@ -521,7 +521,7 @@ the update must be checked using MBLK_Test_update or MBLK_Wait_update.
 
 There can be only one outstanding Iupdate call in progress at any time.
 
-::
+.. code-block:: c++
 
   int MBLK_Test_update(int *status);
 
@@ -537,7 +537,7 @@ MBLK_DONE if the update was completed or MBLK_NOTDONE if the update is
 still pending. Rather than looping if the update is still pending,
 call MBLK_Wait_update to relinquish the CPU.
 
-::
+.. code-block:: c++
 
   void MBLK_Wait_update(void);
 
@@ -548,7 +548,7 @@ call MBLK_Wait_update to relinquish the CPU.
 MBLK_Wait_update call is a blocking call and is used in association with
 MBLK_Iupdate_field call. It blocks until the update is completed.
 
-::
+.. code-block:: c++
 
   void MBLK_Reduce_field(int fid,void *grid, void *out,int op);
 
@@ -578,7 +578,7 @@ op must be one of:
 -  MBLK_MAX -- each element of ``outVal`` will be the largest value among the
    corresponding field of all blocks
 
-::
+.. code-block:: c++
 
   void MBLK_Reduce(int fid,void *inVal,void *outVal,int op);
 
@@ -608,7 +608,7 @@ The Multiblock framework keeps track of where boundary conditions are to
 be applied. You register a subroutine that the framework will call to
 apply each type of external boundary condition.
 
-::
+.. code-block:: c++
 
   int MBLK_Register_bc(const int bcnum, int ghostWidth, const MBLK_BcFn bcfn);
 
@@ -643,7 +643,7 @@ this routine. The routine should be declared like:
        integer :: start(3), end(3)
        end subroutine
 
-::
+.. code-block:: c++
 
        /* In C */
        void applyMyBC(void *param1,void *param2,int *start,int *end);
@@ -681,7 +681,7 @@ the boundary, with a 2-deep ghost region, would be:
 
        end subroutine
 
-::
+.. code-block:: c++
 
   int MBLK_Apply_bc(const int bcnum, void *param1,void *param2);
 
@@ -697,7 +697,7 @@ MBLK_Apply_bc call is made to apply all boundary condition functions
 of type ``bcnum`` to the block. ``param1`` and ``param2`` are passed unmodified to
 the boundary condition function.
 
-::
+.. code-block:: c++
 
   int MBLK_Apply_bc_all(void* param1, void* param2);
 
@@ -753,7 +753,7 @@ checkpointing your values).
 PUP functions are much easier to write than explain -- a simple C heap
 block and the corresponding PUP function is:
 
-::
+.. code-block:: c++
 
   typedef struct {
     int n1; /*Length of first array below*/
@@ -819,7 +819,7 @@ A Fortran ``TYPE`` block and corresponding PUP routine is as follows:
           END IF
         END SUBROUTINE
 
-::
+.. code-block:: c++
 
   int MBLK_Register(void *block, MBLK_PupFn pup_ud, int* rid)
 
@@ -836,7 +836,7 @@ from driver. It returns MBLK_SUCESS if the call was successful and
 MBLK_FAILURE in case of error. For the declarations above, you call
 MBLK_Register as:
 
-::
+.. code-block:: c++
 
              /*C/C++ driver() function*/
              int myId, err;
@@ -861,7 +861,7 @@ MBLK_Register as:
 Note that Fortran blocks must be allocated on the stack in driver, while
 C/C++ blocks may be allocated on the heap.
 
-::
+.. code-block:: c++
 
   void MBLK_Migrate()
 
@@ -878,7 +878,7 @@ your PUP function will be called with an unpacking pupper. MBLK_Migrate
 will then return, whereupon you should call MBLK_Get_registered to get
 your unpacked data block. Can only be called from the driver.
 
-::
+.. code-block:: c++
 
   int MBLK_Get_Userdata(int n, void** block)
 

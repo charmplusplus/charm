@@ -51,8 +51,8 @@ OPTS_CC_GENCPM=""
 OPTS_CXX="" 
 OPTS_F90=""
 OPTS_LD=""  
-OPTS_PIC=""
 USE_PIC="0"
+USE_PIE='0'
 
 CHARMDEBUG=""
 LINK_PYTHON=""
@@ -66,6 +66,7 @@ USE_F90_LIBRARIES="0"
 USE_F77_LIBRARIES="0"  
 F90_MODDIR=
 AMPIMAIN=""
+AMPI=""
 AMPIF=""
 COPYTO=""        
 MODCOPIES=""        
@@ -98,6 +99,7 @@ BUILD_SHARE="0"
 SWAPGLOBALS="0"
 TLSGLOBALS="0"
 ROSE_OMP_TLS_GLOBALS="no"
+AMPI_FUNCPTR_SHIM='0'
 PRINT_BUILDING_BLOCKS=""
 NOABORT=""
 
@@ -440,7 +442,7 @@ do
 	"-language")
 		# Parse out some fake languages (that are actually modules)
 		case "$1" in
-		"ampi") AddModules tcharmmain ampi ;;
+		"ampi") AddModules tcharmmain ampi ; AMPI="1" ;;
 		"ampif") AddModules tcharmmain ampif ; USE_F90_LIBRARIES="1" ; AMPIF="1" ;;
 		"armci") AddModules tcharmmain armci ;;
 		"armcif") AddModules tcharmmain armci ; USE_F90_LIBRARIES="1" ;;
@@ -530,6 +532,11 @@ do
 
 	"-roseomptlsglobals")
 		ROSE_OMP_TLS_GLOBALS="yes"
+		;;
+
+	"-ampi-funcptr-shim")
+		AMPI_FUNCPTR_SHIM='1'
+		USE_PIE='1'
 		;;
 
 	"-verbose")
@@ -863,6 +870,13 @@ do
 		NOABORT="yes"
 		;;
 
+	-clear-input)
+		INPUT_GIVEN=''
+		FILES=''
+		PRE_LIBRARIES=''
+		POST_LIBRARIES=''
+		;;
+
 	-*|+*)
 #		Warning "passing unrecognized option $arg to all compilers and linkers"
 		OPTS="$OPTS  $arg"
@@ -1025,6 +1039,12 @@ then
     OPTS_F90="$OPTS_F90 $TLSGLOBALS_OPTS"
 fi
 
+if [ "$AMPI_FUNCPTR_SHIM" = '1' ]
+then
+    OPTS_CC="$OPTS_CC -DAMPI_USE_FUNCPTR"
+    OPTS_CXX="$OPTS_CXX -DAMPI_USE_FUNCPTR"
+fi
+
 # Look up and add the dependencies for module $1
 findModuleDep() {
 	M=$1
@@ -1091,13 +1111,20 @@ then
 	USE_PIC="1"
 fi
 
-OPTS_PIC="$CMK_PIC"
 if [ "$USE_PIC" = "1" ]
 then
-       OPTS_CC="$OPTS_CC $OPTS_PIC"
-       OPTS_CXX="$OPTS_CXX $OPTS_PIC"
-       OPTS_F90="$OPTS_F90 $OPTS_PIC"
-       OPTS_LD="$OPTS_LD $OPTS_PIC"
+       OPTS_CC="$OPTS_CC $CMK_PIC"
+       OPTS_CXX="$OPTS_CXX $CMK_PIC"
+       OPTS_F90="$OPTS_F90 $CMK_PIC"
+       OPTS_LD="$OPTS_LD $CMK_PIC"
+fi
+
+if [ "$USE_PIE" = "1" ]
+then
+       OPTS_CC="$OPTS_CC $CMK_PIE"
+       OPTS_CXX="$OPTS_CXX $CMK_PIE"
+       OPTS_F90="$OPTS_F90 $CMK_PIE"
+       OPTS_LD="$OPTS_LD $CMK_PIE"
 fi
 
 if [ "$BUILD_SHARE" = "1" ]
@@ -1279,7 +1306,7 @@ OPTS_LD="$OPTS $OPTS_LD"
 ##############################################################################
 Debug "Checking language..."
 
-[ -z "$LANGUAGE" -a -n "$SEQUENTIAL" ] && LANGUAGE=c
+[ -z "$LANGUAGE" -a -n "$SEQUENTIAL" ] && LANGUAGE='c++'
 [ -z "$PARADIGM" -a -n "$LANGUAGE" ] && PARADIGM="$LANGUAGE"
 [ -z "$PARADIGM" ] && PARADIGM="charm++"
 
@@ -1376,6 +1403,11 @@ fi
 if [ "$AMPIMAIN" != "" ]
 then
 	OBJECTFILES="$CHARMLIB/lib$AMPIMAIN.o $OBJECTFILES"
+fi
+
+if [ -n "$AMPI" ]
+then
+  CMK_SYSINC="-I$CHARMINC/ampi $CMK_SYSINC"
 fi
 
 if [ "$TLSGLOBALS" = "1" ]
@@ -1609,11 +1641,7 @@ case "$PARADIGM" in
 		TAU_LIBS="$TAU_LIBS"
 	fi
 	;;
-"converse")
-	MAKE_LD="1"
-	MIDDLE_LIBS="$MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
-	;;
-"converse++"|"bgconverse++"|"bluegene"|"bigsim")
+"converse"|"converse++"|"bgconverse++"|"bluegene"|"bigsim")
 	MAKE_LDXX="1"
 	MIDDLE_LIBS="$MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
 	;;
@@ -1961,11 +1989,11 @@ MakeSO() {
 	dir=`cd $dir; pwd`
 	OBJECT=$dir/$fname
 	fi
-	if test "$MAKE_LDXX" = "1"
+	if test "$MAKE_LD" = '1'
 	then
-	  soTool="$CMK_LDXX $CMK_LDXX_FLAGS"
-	else
 	  soTool="$CMK_LD $CMK_LD_FLAGS"
+	else
+	  soTool="$CMK_LDXX $CMK_LDXX_FLAGS"
 	fi
 	if [ -n "$STANDALONE" ]
 	then

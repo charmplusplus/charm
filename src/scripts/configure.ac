@@ -114,6 +114,8 @@ add_make_flag "CMK_SMP:=$CMK_SMP" 'basic setup'
 add_make_flag "CMK_SHARED_SUF:=$CMK_SHARED_SUF" 'basic setup'
 add_make_flag "CMK_NO_PARTITIONS:=$CMK_NO_PARTITIONS" 'basic setup'
 add_make_flag "CMK_BLUEGENEQ:=$CMK_BLUEGENEQ" 'basic setup'
+add_make_flag "CMK_MULTICORE:=$CMK_MULTICORE" 'basic setup'
+add_make_flag "CMK_USE_LRTS:=$CMK_USE_LRTS" 'basic setup'
 add_make_flag "BUILD_CUDA:=$BUILD_CUDA" 'basic setup'
 
 # enable/disable error checking
@@ -753,7 +755,7 @@ then
   echo "Charm++ requires C++11 support, but doesn't know the flag to enable it"
   echo
   echo "For Intel's compiler please see"
-  echo "https://charm.cs.illinois.edu/redmine/issues/1560"
+  echo "https://github.com/UIUC-PPL/charm/issues/1560"
   echo "about making a suitable version of gcc/g++/libstdc++ available"
   echo
   echo "For Blue Gene/Q please use the Clang compiler"
@@ -1162,6 +1164,10 @@ cat > $t <<EOT
 #include <ucontext.h>
 struct _libc_fpstate   fpstate;
 fpregset_t *fp;
+int main() {
+  ucontext_t context;
+  context.uc_mcontext.fpregs = 0;
+}
 EOT
 test_cxx "whether ucontext has FPU pointer" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_CONTEXT_FPU_POINTER, $pass, [whether ucontext has pointer])
@@ -2029,6 +2035,7 @@ fi
 
 if test $pass -eq 1 -o $noldl -eq 1
 then
+	CMK_HAS_DLOPEN='1'
 # One version or another of dlopen worked: compile it in
 	AC_DEFINE_UNQUOTED(CMK_DLL_USE_DLOPEN, 1, [dlopen])
 fi
@@ -2066,6 +2073,89 @@ int main()
 EOT
 test_cc "whether has RTLD_NEXT" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_RTLD_NEXT, $pass, [whether has RTLD_NEXT])
+
+cat > $tc <<EOT
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#ifndef __USE_GNU
+# define __USE_GNU
+#endif
+#include <dlfcn.h>
+#include <stddef.h>
+int main()
+{
+  return dlmopen(LM_ID_NEWLM, "foo.so", 0) == NULL;
+}
+EOT
+test_cc "whether has dlmopen" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_DLMOPEN, $pass, [whether has dlmopen])
+CMK_HAS_DLMOPEN="$pass"
+
+cat > $tc <<EOT
+#include <unistd.h>
+int main()
+{
+  char exe[[1024]];
+  return readlink("/proc/self/exe", exe, sizeof(exe)-1) == -1;
+}
+EOT
+test_cc "whether has readlink" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_READLINK, $pass, [whether has readlink])
+CMK_HAS_READLINK="$pass"
+
+cat > $tc <<EOT
+#include <limits.h>
+#include <stdlib.h>
+int main()
+{
+  return realpath("/proc/self/exe", NULL) == NULL;
+}
+EOT
+test_cc "whether has realpath" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_REALPATH, $pass, [whether has realpath])
+CMK_HAS_REALPATH="$pass"
+
+case "$CMK_VDIR" in
+  *-win-*|*-win64)
+    CMK_CAN_GET_BINARY_PATH='1'
+    CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY='0' # TODO: technically possible, but more work to be done
+    ;;
+  *-darwin*)
+    CMK_CAN_GET_BINARY_PATH='1'
+    CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY="$CMK_HAS_DLOPEN"
+    ;;
+  *)
+    if test "$CMK_HAS_READLINK" = '1' -o "$CMK_HAS_REALPATH" = '1'
+    then
+      CMK_CAN_GET_BINARY_PATH='1'
+    else
+      CMK_CAN_GET_BINARY_PATH='0'
+    fi
+    CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY="$CMK_HAS_DLOPEN"
+    ;;
+esac
+
+if test "$CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY" = '1' -a "$CMK_CAN_GET_BINARY_PATH" = '1'
+then
+  CMK_SUPPORTS_FSGLOBALS='1'
+else
+  CMK_SUPPORTS_FSGLOBALS='0'
+fi
+AC_DEFINE_UNQUOTED(CMK_SUPPORTS_FSGLOBALS, $CMK_SUPPORTS_FSGLOBALS, [whether supports filesystem globals])
+add_flag "CMK_SUPPORTS_FSGLOBALS=$CMK_SUPPORTS_FSGLOBALS" 'filesystem globals'
+add_make_flag "CMK_SUPPORTS_FSGLOBALS:=$CMK_SUPPORTS_FSGLOBALS" 'filesystem globals'
+
+if test "$CMK_HAS_DLMOPEN" = '1' -a "$CMK_CAN_GET_BINARY_PATH" = '1'
+then
+  CMK_SUPPORTS_PIPGLOBALS='1'
+else
+  CMK_SUPPORTS_PIPGLOBALS='0'
+fi
+AC_DEFINE_UNQUOTED(CMK_SUPPORTS_PIPGLOBALS, $CMK_SUPPORTS_PIPGLOBALS, [whether supports PiP globals])
+add_flag "CMK_SUPPORTS_PIPGLOBALS=$CMK_SUPPORTS_PIPGLOBALS" 'PiP globals'
+add_make_flag "CMK_SUPPORTS_PIPGLOBALS:=$CMK_SUPPORTS_PIPGLOBALS" 'PiP globals'
+
 
 ### test gethostname ####
 cat > $tc <<EOT
@@ -2241,7 +2331,7 @@ fi
 
 #### check if glibc backtrace exists ####
 cat > $t <<EOT
-#include "cmibacktrace.c"
+#include "cmibacktrace.C"
 
 int main() {
 	int nLevels=1;
@@ -2846,6 +2936,7 @@ enable_libudev='no'
 enable_libxml2='no'
 enable_visibility='no'
 enable_nvml='no'
+enable_opencl='no'
 . hwloc/VERSION
 export libhwloc_so_version
 AC_SUBST(libhwloc_so_version)

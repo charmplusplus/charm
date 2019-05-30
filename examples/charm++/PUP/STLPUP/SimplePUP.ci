@@ -11,13 +11,18 @@
 
 mainmodule SimplePUP {
   include "HeapObjectSTL.h";
+  include "vector";
+
   mainchare main {
     entry main(CkArgMsg *m);
   };
 
-  array [1D] SimpleArray{
+  template <class U> array [1D] SimpleArray{
     entry SimpleArray();
-    entry void acceptData(HeapObject &inData);
+    entry void acceptData(const HeapObject<U> &inData, const std::vector<U> &dataToCompare);
   };
 
+  array [1D] SimpleArray<float>;
+  array [1D] SimpleArray<int>;
+  array [1D] SimpleArray<bool>;
 };

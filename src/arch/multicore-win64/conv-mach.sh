@@ -13,4 +13,5 @@ CMK_QT="none"
 
 . $CHARMINC/cc-msvc.sh
 
+CMK_MULTICORE="1"
 CMK_NO_PARTITIONS="1"

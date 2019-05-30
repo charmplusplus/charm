@@ -40,7 +40,8 @@ module CkArray {
     entry void inmem_checkpoint(CkArrayCheckPTReqMessage *);
     // _PIPELINED_ALLREDUCE_
     entry void defrag(CkReductionMsg*);
-
+    // Called by migrateMe
+    entry void ckEmigrate(int toPe);
   };
 
   message CkCreateArrayAsyncMsg {

@@ -12,7 +12,7 @@
 
 extern LBAllocFn getLBAllocFn(const char *lbname);
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(AdaptiveLB, "Allow multiple strategies to work serially")
 

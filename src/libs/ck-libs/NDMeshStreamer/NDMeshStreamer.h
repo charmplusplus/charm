@@ -26,6 +26,44 @@
 
 extern void QdCreate(int n);
 extern void QdProcess(int n);
+//below code uses templates to generate appropriate TRAM_BROADCAST array index values
+template<class itype>
+struct TramBroadcastInstance;
+
+template<>
+struct TramBroadcastInstance<CkArrayIndex1D>{
+  static CkArrayIndex1D value;
+};
+
+template<>
+struct TramBroadcastInstance<CkArrayIndex2D>{
+  static CkArrayIndex2D value;
+};
+
+template<>
+struct TramBroadcastInstance<CkArrayIndex3D>{
+  static CkArrayIndex3D value;
+};
+
+template<>
+struct TramBroadcastInstance<CkArrayIndex4D>{
+  static CkArrayIndex4D value;
+};
+
+template<>
+struct TramBroadcastInstance<CkArrayIndex5D>{
+  static CkArrayIndex5D value;
+};
+
+template<>
+struct TramBroadcastInstance<CkArrayIndex6D>{
+  static CkArrayIndex6D value;
+};
+
+template<>
+struct TramBroadcastInstance<CkArrayIndex>{
+  static CkArrayIndex& value(int);
+};
 
 template<class dtype>
 class MeshStreamerMessage : public CMessage_MeshStreamerMessage<dtype> {
@@ -212,9 +250,31 @@ public:
       checkForCompletedStages();
     }
   }
+  inline bool checkAllStagesCompleted() {
+    //checks if all stages have been completed
+    //if so, it resets the periodic flushing
+    if (myCompletionStatus_.stageIndex == finalCompletionStage) { //has already completed all stages
+#ifdef CMK_TRAM_VERBOSE_OUTPUT
+      CkPrintf("[%d] All done. Reducing to final callback ...\n", myIndex_);
+#endif
+      CkAssert(numDataItemsBuffered_ == 0);
+      isPeriodicFlushEnabled_ = false;
+      if (!userCallback_.isInvalid()) {
+        this->contribute(userCallback_);
+        userCallback_ = CkCallback();
+      }
+      return true;
+    }
+    else {
+      return false;
+    }
+  }
 
   inline void checkForCompletedStages() {
     int &currentStage = myCompletionStatus_.stageIndex;
+    if (checkAllStagesCompleted()) { //has already completed all stages
+      return;
+    }
     while (cntFinished_[currentStage] == myCompletionStatus_.numContributors &&
            cntMsgExpected_[currentStage] == cntMsgReceived_[currentStage]) {
 #ifdef CMK_TRAM_VERBOSE_OUTPUT
@@ -225,16 +285,7 @@ public:
                cntMsgReceived_[currentStage]);
 #endif
       myRouter_.updateCompletionProgress(myCompletionStatus_);
-      if (myCompletionStatus_.stageIndex == finalCompletionStage) {
-#ifdef CMK_TRAM_VERBOSE_OUTPUT
-        CkPrintf("[%d] All done. Reducing to final callback ...\n", myIndex_);
-#endif
-        CkAssert(numDataItemsBuffered_ == 0);
-        isPeriodicFlushEnabled_ = false;
-        if (!userCallback_.isInvalid()) {
-          this->contribute(userCallback_);
-          userCallback_ = CkCallback();
-        }
+      if (checkAllStagesCompleted()) { //has already completed all stages
         return;
       }
       else {
@@ -1002,7 +1053,7 @@ private:
   void localDeliver(const ArrayDataItem<dtype, itype>& packedDataItem) {
 
     itype arrayId = packedDataItem.arrayIndex;
-    if (arrayId == itype(TRAM_BROADCAST)) {
+    if (arrayId == TramBroadcastInstance<CkArrayIndex>::value(arrayId.dimension)) {
       localBroadcast(packedDataItem);
       return;
     }
@@ -1211,12 +1262,12 @@ public:
   void processLocationRequest(itype arrayId, int deliveredToPe, int sourcePe) {
     int ownerPe = clientArrayMgr_->lastKnown((CkArrayIndex)arrayId);
     this->thisProxy[deliveredToPe].resendMisdeliveredItems(arrayId, ownerPe);
-    this->thisProxy[sourcePe].updateLocationAtSource(arrayId, sourcePe);
+    this->thisProxy[sourcePe].updateLocationAtSource(arrayId, ownerPe);
   }
 
   void resendMisdeliveredItems(itype arrayId, int destinationPe) {
 
-    clientLocMgr_->updateLocation(arrayId, destinationPe);
+    clientLocMgr_->updateLocation(arrayId, clientLocMgr_->lookupID(arrayId),destinationPe);
 
     std::vector<ArrayDataItem<dtype, itype> > &bufferedItems
       = misdeliveredItems[arrayId];
@@ -1235,7 +1286,7 @@ public:
     int prevOwner = clientArrayMgr_->lastKnown((CkArrayIndex)arrayId);
 
     if (prevOwner != destinationPe) {
-      clientLocMgr_->updateLocation(arrayId, destinationPe);
+      clientLocMgr_->updateLocation(arrayId,clientLocMgr_->lookupID(arrayId), destinationPe);
 
       // it is possible to also fix destinations of items buffered for arrayId,
       // but the search could be expensive; instead, with the current code

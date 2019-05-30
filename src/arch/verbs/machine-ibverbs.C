@@ -126,6 +126,8 @@ Data Structures
 #define INFIRDMA_DIRECT_REG_AND_PUT 17
 #define INFIRDMA_DIRECT_REG_AND_GET 18
 
+#define INFIRDMA_DIRECT_DEREG_AND_ACK 19
+
 struct infiPacketHeader{
 	char code;
 	int nodeNo;
@@ -281,7 +283,7 @@ struct infiAddr {
 };
 
 /**
- Stored in the OtherNode structure in machine-dgram.c 
+ Stored in the OtherNode structure in machine-dgram.C
  Store the per node data for ibverbs layer
 */
 enum { INFI_HEADER_DATA=21,INFI_DATA};
@@ -391,7 +393,6 @@ static inline infiPacket newPacket(void){
 
 
 
-CMI_EXTERNC
 void infi_unregAndFreeMeta(void *md)
 {
   if(md!=NULL && (((infiCmiChunkMetaData *)md)->poolIdx == INFIMULTIPOOL))
@@ -1873,10 +1874,24 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		        ((CmiVerbsRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->key,
 		        (uint64_t)(newNcpyOpInfo->destPtr),
 		        ((CmiVerbsRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->key,
-		        newNcpyOpInfo->srcSize,
+		        std::min(newNcpyOpInfo->srcSize, newNcpyOpInfo->destSize),
 		        newNcpyOpInfo->destPe,
 		        (uint64_t)rdmaPacket,
 		        IBV_WR_RDMA_WRITE);
+	}
+	if(header->code == INFIRDMA_DIRECT_DEREG_AND_ACK){
+		NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(buffer->buf+sizeof(struct infiPacketHeader));
+		
+		resetNcpyOpInfoPointers(ncpyOpInfo);
+		
+		// Deregister the source buffer
+		LrtsDeregisterMem(ncpyOpInfo->srcPtr, (char *)ncpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->srcPe, ncpyOpInfo->srcRegMode);
+		
+		ncpyOpInfo->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
+		
+		// Invoke source ack
+		ncpyOpInfo->opMode = CMK_EM_API_SRC_ACK_INVOKE;
+		CmiInvokeNcpyAck(ncpyOpInfo);
 	}
 	if(header->code == INFIRDMA_DIRECT_REG_AND_GET){
 		// Register the destination buffer and perform GET
@@ -1901,7 +1916,7 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		        ((CmiVerbsRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->key,
 		        (uint64_t)newNcpyOpInfo->srcPtr,
 		        ((CmiVerbsRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->key,
-		        newNcpyOpInfo->srcSize,
+		        std::min(newNcpyOpInfo->srcSize, newNcpyOpInfo->destSize),
 		        newNcpyOpInfo->srcPe,
 		        (uint64_t)rdmaPacket,
 		        IBV_WR_RDMA_READ);
@@ -2701,7 +2716,6 @@ static inline void *getInfiCmiChunk(int dataSize){
 #endif
 
 
-CMI_EXTERNC
 void * infi_CmiAlloc(int size){
 	char *res;
 #if CMK_IBVERBS_STATS
@@ -2804,7 +2818,6 @@ void infi_CmiFreeDirect(void *ptr){
 }
 
 
-CMI_EXTERNC
 void infi_CmiFree(void *ptr){
 
 	int i,j;
@@ -2852,7 +2865,6 @@ void infi_CmiFree(void *ptr){
 }
 
 #else
-CMI_EXTERNC
 void infi_CmiFree(void *ptr){
 	int size;
 	void *freePtr = ptr;
@@ -2953,7 +2965,7 @@ void  LrtsBeginIdle(void) {}
 void  LrtsStillIdle(void) {}
 
 #if CMK_ONESIDED_IMPL
-#include "machine-onesided.c"
+#include "machine-onesided.C"
 #endif
 
 /*void processDirectRequest(struct infiDirectRequestPacket *directRequestPacket){

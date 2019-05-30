@@ -220,7 +220,7 @@ int printf(const char *fmt, ...) {
 
 #include "machine-smp.h"
 
-// This is used by machine-pxshm.c, which is included by machine-common-core.C
+// This is used by machine-pxshm.C, which is included by machine-common-core.C
 // (itself included below.)
 static int Cmi_charmrun_pid;
 
@@ -263,7 +263,7 @@ int _kq = -1;
 #endif
 
 #if CMK_PERSISTENT_COMM
-#include "machine-persistent.c" 
+#include "machine-persistent.C"
 #endif
 
 #define PRINTBUFSIZE 16384
@@ -305,7 +305,6 @@ static int already_in_signal_handler=0;
 
 static void CmiDestroyLocks(void);
 
-CMI_EXTERNC
 void EmergencyExit(void);
 void MachineExit(void);
 
@@ -608,7 +607,7 @@ static int    Cmi_idlepoll;
 static int    Cmi_syncprint;
 static int Cmi_print_stats = 0;
 
-CMI_EXTERNC_VARIABLE int    CmiMyLocalRank;
+extern int    CmiMyLocalRank;
 
 #if ! defined(_WIN32)
 /* parse forks only used in non-smp mode */
@@ -833,7 +832,7 @@ int* inProgress;
 /******************************************************************************
  *
  * OS Threads
- * SMP implementation moved to machine-smp.c
+ * SMP implementation moved to machine-smp.C
  *****************************************************************************/
 
 /************************ No kernel SMP threads ***************/
@@ -880,7 +879,6 @@ static void CommunicationInterrupt(int ignored)
   MACHSTATE(2,"--END SIGIO--")
 }
 
-CMI_EXTERNC
 void CmiSignal(int sig1, int sig2, int sig3, void (*handler)(int));
 
 static void CmiDestroyLocks(void)
@@ -1018,7 +1016,7 @@ CmiPrintStackTrace(0);
 /* ctrl_getone */
 
 #ifdef __FAULT__
-#include "machine-recover.c"
+#include "machine-recover.C"
 #endif
 
 static void node_addresses_store(ChMessage *msg);
@@ -1183,7 +1181,7 @@ static int InternalScanf(char *fmt, va_list l)
 /*New stdarg.h declarations*/
 void CmiPrintf(const char *fmt, ...)
 {
-  CMI_EXTERNC_VARIABLE int quietMode;
+  extern int quietMode;
   if (quietMode) return;
   CpdSystemEnter();
   {
@@ -1390,7 +1388,7 @@ static void CmiStdoutFlush(void) {
  *
  ***************************************************************************/
 
-#include "machine-dgram.c"
+#include "machine-dgram.C"
 
 static void open_charmrun_socket(void)
 {
@@ -1502,7 +1500,7 @@ static void node_addresses_obtain(char **argv)
         MACHSTATE(2,"recv initnode {");
   	ChMessage_recv(Cmi_charmrun_fd,&nodetabmsg);
 
-    if (strcmp("nodefork", nodetabmsg.header.type) == 0)
+    while (strcmp("nodefork", nodetabmsg.header.type) == 0)
     {
 #ifndef _WIN32
       int i;
@@ -1706,7 +1704,7 @@ CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freem
  *
  ****************************************************************************/
                                                                                 
-void LrtsSyncListSendFn(int npes, int *pes, int len, char *msg)
+void LrtsSyncListSendFn(int npes, const int *pes, int len, char *msg)
 {
   int i;
   for(i=0;i<npes;i++) {
@@ -1715,7 +1713,7 @@ void LrtsSyncListSendFn(int npes, int *pes, int len, char *msg)
   }
 }
                                                                                 
-CmiCommHandle LrtsAsyncListSendFn(int npes, int *pes, int len, char *msg)
+CmiCommHandle LrtsAsyncListSendFn(int npes, const int *pes, int len, char *msg)
 {
   CmiError("ListSend not implemented.");
   return (CmiCommHandle) 0;
@@ -1726,7 +1724,7 @@ CmiCommHandle LrtsAsyncListSendFn(int npes, int *pes, int len, char *msg)
   returns is not changed, we can use memory reference trick to avoid 
   memory copying here
 */
-void LrtsFreeListSendFn(int npes, int *pes, int len, char *msg)
+void LrtsFreeListSendFn(int npes, const int *pes, int len, char *msg)
 {
   int i;
   for(i=0;i<npes;i++) {
@@ -2006,9 +2004,14 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #else
   Cmi_idlepoll = 1;
 #endif
+#if CMK_OPTIMIZE
   Cmi_truecrash = 0;
+#else
+  Cmi_truecrash = 1;
+#endif
   if (CmiGetArgFlagDesc(*argv,"+truecrash","Do not install signal handlers") ||
-      CmiGetArgFlagDesc(*argv,"++debug",NULL /*meaning: don't show this*/)) Cmi_truecrash = 1;
+      CmiGetArgFlagDesc(*argv,"++debug",NULL /*meaning: don't show this*/) ||
+      CmiNumNodes()<=32) Cmi_truecrash = 1;
     /* netpoll disable signal */
   if (CmiGetArgFlagDesc(*argv,"+netpoll","Do not use SIGIO--poll instead")) Cmi_netpoll = 1;
   if (CmiGetArgFlagDesc(*argv,"+netint","Use SIGIO")) Cmi_netpoll = 0;
