@@ -74,7 +74,7 @@ and a ``Hello`` chare array, whose elements print the "Hello World" message.
 The hello.cpp file
 ''''''''''''''''''
 
-The ``hello.ci`` file contains the implementation of the mainchare and chare
+The ``hello.cpp`` file contains the implementation of the mainchare and chare
 array declared in the ``hello.ci`` file above.
 
 .. code-block:: c++
