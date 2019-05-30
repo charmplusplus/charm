@@ -173,14 +173,15 @@ To run the application on two processors, use the following command:
 Where to go from here
 ---------------------
 
-- The ``tests/charm++/simplearrayhello`` folder has a more comprehensive example, from
+- The ``tests/charm++/simplearrayhello`` folder in the Charm++ distribution has a more comprehensive example, from
   which the example in this file was derived.
 
-- The main Charm++ manual contains more information about developing and running Charm++ applications.
+- The main Charm++ manual (https://charm.readthedocs.io/) contains more information about developing
+  and running Charm++ applications.
 
 - Charm++ has lots of other features, such as chare migration, load balancing,
-  and checkpoint/restart.
+  and checkpoint/restart. The main manual has more information about them.
 
 - AMPI is an implementation of MPI on top of Charm++.
 
-- Charm4py is a Python package that enables development of Charm++ applications in Python.
+- Charm4py (https://charm4py.readthedocs.io) is a Python package that enables development of Charm++ applications in Python.
