@@ -13,17 +13,20 @@ then
     arg=$1
     shift
 
-    case $arg in
-    --release) 
+    if [ "$arg" = "--release" ]
+    then
         echo Saw $arg
         RELEASE="1"
-        ;;
-    *)
+    else
         echo "Unrecognized argument '$arg'"
         exit 1
-        ;;
-    esac
+    fi
 
+    if [[ $# -gt 0 ]]
+    then
+        echo "Unrecognized argument '$arg'"
+        exit 1
+    fi
 fi
 
 # Make sure the working copy and index are completely clean
