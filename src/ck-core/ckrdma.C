@@ -1349,10 +1349,8 @@ void handleBcastReverseEntryMethodApiCompletion(NcpyOperationInfo *info) {
   }
 #if CMK_REG_REQUIRED
   // De-register source for reverse operations when regMode == UNREG and deregMode == DEREG
-  if(info->isSrcRegistered == 1 && info->srcRegMode == CK_BUFFER_UNREG && info->srcDeregMode == CK_BUFFER_DEREG) {
-    CmiDeregisterMem(info->srcPtr, info->srcLayerInfo + CmiGetRdmaCommonInfoSize(), info->srcPe, info->srcRegMode);
-    info->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
-  }
+  if(info->isSrcRegistered == 1 && info->srcRegMode == CK_BUFFER_UNREG && info->srcDeregMode == CK_BUFFER_DEREG)
+    deregisterSrcBuffer(info);
 #endif
 
   if(info->freeMe == CMK_FREE_NCPYOPINFO)
