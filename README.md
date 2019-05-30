@@ -87,11 +87,11 @@ of the `<options>` below.
 | Charm++ Version | OS | Communication | Default Compiler |
 |--|--|--|--|
 | `netlrts-linux-x86_64` | Linux | UDP | GNU compiler |
-| `netlrts-darwin-x86_64` | OS X | UDP | Clang C++ compiler |
+| `netlrts-darwin-x86_64` | macOS | UDP | Clang C++ compiler |
 | `netlrts-win-x86_64` | Windows | UDP | MS Visual C++ |
 | `mpi-linux-x86_64` | Linux | MPI | GNU compiler |
 | `multicore-linux-x86_64` | Linux | Shared memory | GNU compiler |
-| `multicore-darwin-x86_64` | OS X | Shared memory | Clang C++ compiler |
+| `multicore-darwin-x86_64` | macOS | Shared memory | Clang C++ compiler |
 | `pamilrts-bluegeneq` | CNK | PAMI | BGClang C++ compiler |
 | `gni-crayxc` | Linux | GNI | CC (whatever PrgEnv module is loaded) |
 | `gni-crayxe` | Linux | GNI | CC (whatever PrgEnv module is loaded) |
@@ -110,13 +110,13 @@ To choose `<version>`, your choice is determined by two options:
     * `mpi-`: Charm++ communicates using MPI calls. This will work on almost every distributed machine,
     but performance is often worse than using the machine's direct calls referenced above.
     * `multicore-`: Charm++ communicates using shared memory within a single node. A version of
-    Charm++ built with this option will not on more than a single node.
+    Charm++ built with this option will not run on more than a single node.
 
 
 2. Your operating system/architecture:
     * `linux-x86_64`: Linux with AMD64 64-bit x86 instructions
     * `win-x86_64`: MS Windows with MS Visual C++ compiler
-    * `darwin-x86_64`: Apple Mac OS X
+    * `darwin-x86_64`: Apple macOS
     * `bluegeneq`:IBM Blue Gene/Q
     * `cray{xe/xc}`: Cray XE/XC Supercomputer
     * `linux-ppc64le`: POWER/PowerPC
