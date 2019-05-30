@@ -40,6 +40,10 @@ object. Chares have **entry methods** that can be invoked asynchronously.
 A Charm++ application consists of collections of chares (such as chare arrays)
 distributed among the processors of the system.
 
+Each chare has a **proxy** associated to it, through which other chares can
+invoke entry methods. This proxy is exposed through the **thisProxy** member variable,
+which can be sent to other chares, allowing them to invoke entry methods on this chare.
+
 Each Charm++ application consists of at least two files, a
 *Charm interface* (`.ci`) file, and a normal C++ file. The interface
 file describes the parallel interface of the application
@@ -117,6 +121,7 @@ array declared in the ``hello.ci`` file above.
 
      void SayHi()
      {
+       // thisIndex stores the element’s array index 
        CkPrintf("PE %d says: Hello world from element %d.\n", CkMyPe(), thisIndex);
        if (thisIndex < nElem - 1) {
          thisProxy[thisIndex + 1].SayHi(); // Pass the hello on
