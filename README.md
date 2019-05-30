@@ -28,8 +28,8 @@ First, you need to decide which version of Charm++ to use. The `build`
 script takes several command line options to compile Charm++. The command line syntax is:
 
      $ ./build <target> <version> [options ...]
-                                [--basedir=dir] [--libdir=dir] [--incdir=dir]
-                                [charmc-options ...]
+                                  [--basedir=dir] [--libdir=dir] [--incdir=dir]
+                                  [charmc-options ...]
 
 For detailed help messages, pass `-h` or `--help` to the build script.
 
@@ -84,19 +84,19 @@ of the `<options>` below.
 
 (Note: this isn't a complete list.  Run `./build` for a complete listing)
 
-| Charm++ Version | OS | Communication | Default Compiler |
-|--|--|--|--|
-| `netlrts-linux-x86_64` | Linux | UDP | GNU compiler |
-| `netlrts-darwin-x86_64` | macOS | UDP | Clang C++ compiler |
-| `netlrts-win-x86_64` | Windows | UDP | MS Visual C++ |
-| `mpi-linux-x86_64` | Linux | MPI | GNU compiler |
-| `multicore-linux-x86_64` | Linux | Shared memory | GNU compiler |
-| `multicore-darwin-x86_64` | macOS | Shared memory | Clang C++ compiler |
-| `pamilrts-bluegeneq` | CNK | PAMI | BGClang C++ compiler |
-| `gni-crayxc` | Linux | GNI | CC (whatever PrgEnv module is loaded) |
-| `gni-crayxe` | Linux | GNI | CC (whatever PrgEnv module is loaded) |
-| `verbs-linux-x86_64` | Linux | IB Verbs | GNU compiler |
-| `ofi-linux-x86_64` | Linux | OFI | GNU compiler |
+| Charm++ Version           | OS      | Communication | Default Compiler                      |
+|---------------------------|---------|---------------|---------------------------------------|
+| `netlrts-linux-x86_64`    | Linux   | UDP           | GNU compiler                          |
+| `netlrts-darwin-x86_64`   | macOS   | UDP           | Clang C++ compiler                    |
+| `netlrts-win-x86_64`      | Windows | UDP           | MS Visual C++                         |
+| `mpi-linux-x86_64`        | Linux   | MPI           | GNU compiler                          |
+| `multicore-linux-x86_64`  | Linux   | Shared memory | GNU compiler                          |
+| `multicore-darwin-x86_64` | macOS   | Shared memory | Clang C++ compiler                    |
+| `pamilrts-bluegeneq`      | CNK     | PAMI          | BGClang C++ compiler                  |
+| `gni-crayxc`              | Linux   | GNI           | CC (whatever PrgEnv module is loaded) |
+| `gni-crayxe`              | Linux   | GNI           | CC (whatever PrgEnv module is loaded) |
+| `verbs-linux-x86_64`      | Linux   | IB Verbs      | GNU compiler                          |
+| `ofi-linux-x86_64`        | Linux   | OFI           | GNU compiler                          |
 
 
 To choose `<version>`, your choice is determined by two options:
@@ -232,23 +232,23 @@ target directory will look like:
 ```
 netlrts-linux-x86_64/
    |
-   ---  benchmarks/		# benchmark programs
+   ---  benchmarks/      # benchmark programs
    |
-   ---  bin/			# all executables
+   ---  bin/             # all executables
    |
-   ---  doc/			# documentations
+   ---  doc/             # documentations
    |
-   ---  include/		# header files
+   ---  include/         # header files
    |
-   ---  lib/			# libraries
+   ---  lib/             # static libraries
    |
-   ---  lib_so/			# dynamic libraries
+   ---  lib_so/          # shared libraries
    |
-   ---  examples/		# example programs
+   ---  examples/        # example programs
    |
-   ---  tests/			# test programs
+   ---  tests/           # test programs
    |
-   ---  tmp/			# Charm++ build directory
+   ---  tmp/             # Charm++ build directory
 ```
 
 ## Building a Program
