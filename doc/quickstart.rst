@@ -1,6 +1,7 @@
 Charm++ Quickstart
 ==================
 
+This section gives a concise overview of running your first Charm++ application.
 
 Installing Charm++
 ------------------
@@ -26,16 +27,35 @@ To build Charm++, use the following commands:
    $ cd charm
    $ ./build AMPI netlrts-linux-x86_64 --with-production -j4
 
-This is the recommened version to install on Linux systems. For MacOS,
-substitute "linux" with "darwin". For advanced options, please see
-Section :numref:`sec:install` of the manual.
+This is the recommenced version to install Charm++ on Linux systems.
+For MacOS, substitute "linux" with "darwin". For advanced compilation options,
+please see Section :numref:`sec:install` of the manual.
 
 
 Parallel "Hello World" with Charm++
 -----------------------------------
 
-The .ci file
-''''''''''''
+The basic unit of computation in Charm++ is a **chare**, which is a C++
+object. Chares have **entry methods** that can be invoked asynchronously.
+in A Charm++ application consists of collections of chares (such as chare arrays)
+distributed among the processors of the system.
+
+Each Charm++ application consists of at least two files, a
+*Charm interface* (`.ci`) file, and a normal C++ file. The interface
+file describes the parallel interface of the application
+(such as chares, chare arrays, and entry methods), while the C++ files
+implement its behavior. Please see Section :numref:`programstructure`
+of the manual for more information about the program structure.
+
+In this section, we present a parallel *Hello World* example,
+consisting of the files ``hello.ci`` and ``hello.cpp``.
+
+
+The hello.ci file
+'''''''''''''''''
+
+THe ``hello.ci`` file contains a mainchare, which starts and ends execution,
+and a ``Hello`` chare array, whose elements print the "Hello World" message.
 
 .. code-block:: charmci
 
@@ -51,16 +71,18 @@ The .ci file
    };
 
 
-The .cpp file
-'''''''''''''
+The hello.cpp file
+''''''''''''''''''
+
+The ``hello.ci`` file contains the implementation of the mainchare and chare
+array declared in the ``hello.ci`` file above.
 
 .. code-block:: c++
 
-   #include "hello.decl.h"
+   #include "hello.decl.h" // created from hello.ci file above
 
    /*readonly*/ CProxy_Main mainProxy;
-
-   constexpr int nElements = 10;
+   constexpr int nElements = 8;
 
    /*mainchare*/
    class Main : public CBase_Main
@@ -68,8 +90,8 @@ The .cpp file
    public:
      Main(CkArgMsg* m)
      {
-       //Start the computation
-       CkPrintf("Running Hello on %d processors with 10 elements\n", CkNumPes(), nElements);
+       //Start computation
+       CkPrintf("Running Hello on %d processors with %d elements\n", CkNumPes(), nElements);
        CProxy_Hello arr = CProxy_Hello::ckNew(nElements);
        mainProxy = thisProxy;
        arr[0].SayHi(0);
@@ -77,6 +99,7 @@ The .cpp file
 
      void done()
      {
+       // Finish computation
        CkPrintf("All done.\n");
        CkExit();
      };
@@ -90,50 +113,58 @@ The .cpp file
 
      void SayHi()
      {
-       CkPrintf("PE %d says 'Hi from element %d'\n", CkMyPe(), thisIndex);
+       CkPrintf("PE %d says: Hello world from element %d.\n", CkMyPe(), thisIndex);
        if (thisIndex < nElements-1) {
          thisProxy[thisIndex+1].SayHi(); // Pass the hello on
        } else {
-         mainProxy.done(); //We've been around once-- we're done.
+         mainProxy.done(); // We've been around once -- we're done.
        }
      }
    };
 
-   #include "hello.def.h"
+   #include "hello.def.h" // created from hello.ci file above
 
 
 Compiling the example
-''''''''''''''''''''
+'''''''''''''''''''''
 
-.. code-block:: bash
+Charm++ has a compiler wrapper, ``charmc``, to compile Charm++ applications. Please see
+Section :numref:`sec:compile` for more information about ``charmc``.
 
-   $ charm/bin/charmc hello.ci
-   $ charm/bin/charmc hello.cpp
+.. code-block:: console
+
+   $ charm/bin/charmc hello.ci # creates hello.def.h and hello.decl.h
+   $ charm/bin/charmc hello.cpp -o hello
 
 
 Running the example
 '''''''''''''''''''
 
+Charm++ applications are started via ``charmrun``,
+which is automatically created by the ``charmc`` command above.
+Please see Section :numref:`sec:run` for more information about ``charmrun``.
+
+To run the application on two processors, use the following command:
+
 .. code-block:: console
 
    $ ./charmrun +p2 ./hello
-   Charm++: standalone mode (not using charmrun)
+   Charmrun> scalable start enabled.
+   Charmrun> started all node programs in 1.996 seconds.
    Charm++> Running in non-SMP mode: 1 processes (PEs)
    Converse/Charm++ Commit ID: v6.9.0-172-gd31997cce
    Charm++> scheduler running in netpoll mode.
    CharmLB> Load balancer assumes all CPUs are same.
    Charm++> Running on 1 hosts (1 sockets x 4 cores x 2 PUs = 8-way SMP)
    Charm++> cpu topology info is gathered in 0.000 seconds.
-   Running Hello on 1 processors with 10 elements
+   Running Hello on 2 processors with 8 elements
    PE 0 says Hi from element 0
    PE 0 says Hi from element 1
    PE 0 says Hi from element 2
    PE 0 says Hi from element 3
-   PE 0 says Hi from element 4
+   PE 1 says Hi from element 4
    PE 1 says Hi from element 5
    PE 1 says Hi from element 6
    PE 1 says Hi from element 7
-   PE 1 says Hi from element 8
-   PE 1 says Hi from element 9
    All done
    [Partition 0][Node 0] End of program
