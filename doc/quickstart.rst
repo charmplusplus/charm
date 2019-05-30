@@ -51,27 +51,31 @@ In this section, we present a parallel *Hello World* example,
 consisting of the files ``hello.ci`` and ``hello.cpp``.
 
 
-The hello.ci file
+The hello.ci File
 '''''''''''''''''
 
 The ``hello.ci`` file contains a mainchare, which starts and ends execution,
 and a ``Hello`` chare array, whose elements print the "Hello World" message.
+Compiling this file creates C++ header files (``hello.decl.h`` and ``hello.def.h``)
+that can be included in your C++ files.
 
 .. code-block:: charmci
 
    mainmodule hello {
      mainchare Main {
+       // Main's entry methods
        entry Main(CkArgMsg *m);
        entry void done();
      };
      array [1D] Hello {
+       // Hello's entry methods
        entry Hello();
        entry void SayHi();
      };            
    };
 
 
-The hello.cpp file
+The hello.cpp File
 ''''''''''''''''''
 
 The ``hello.cpp`` file contains the implementation of the mainchare and chare
@@ -82,7 +86,7 @@ array declared in the ``hello.ci`` file above.
    #include "hello.decl.h" // created from hello.ci file above
 
    /*readonly*/ CProxy_Main mainProxy;
-   constexpr int nElements = 8;
+   constexpr int nElem = 8;
 
    /*mainchare*/
    class Main : public CBase_Main
@@ -91,8 +95,8 @@ array declared in the ``hello.ci`` file above.
      Main(CkArgMsg* m)
      {
        //Start computation
-       CkPrintf("Running Hello on %d processors with %d elements\n", CkNumPes(), nElements);
-       CProxy_Hello arr = CProxy_Hello::ckNew(nElements);
+       CkPrintf("Running Hello on %d processors with %d elements.\n", CkNumPes(), nElem);
+       CProxy_Hello arr = CProxy_Hello::ckNew(nElem); // Create a new chare array with nElem elements
        mainProxy = thisProxy;
        arr[0].SayHi(0);
      };
@@ -114,8 +118,8 @@ array declared in the ``hello.ci`` file above.
      void SayHi()
      {
        CkPrintf("PE %d says: Hello world from element %d.\n", CkMyPe(), thisIndex);
-       if (thisIndex < nElements-1) {
-         thisProxy[thisIndex+1].SayHi(); // Pass the hello on
+       if (thisIndex < nElem - 1) {
+         thisProxy[thisIndex + 1].SayHi(); // Pass the hello on
        } else {
          mainProxy.done(); // We've been around once -- we're done.
        }
@@ -125,7 +129,7 @@ array declared in the ``hello.ci`` file above.
    #include "hello.def.h" // created from hello.ci file above
 
 
-Compiling the example
+Compiling the Example
 '''''''''''''''''''''
 
 Charm++ has a compiler wrapper, ``charmc``, to compile Charm++ applications. Please see
@@ -137,7 +141,7 @@ Section :numref:`sec:compile` for more information about ``charmc``.
    $ charm/bin/charmc hello.cpp -o hello
 
 
-Running the example
+Running the Example
 '''''''''''''''''''
 
 Charm++ applications are started via ``charmrun``,
@@ -157,20 +161,20 @@ To run the application on two processors, use the following command:
    CharmLB> Load balancer assumes all CPUs are same.
    Charm++> Running on 1 hosts (1 sockets x 4 cores x 2 PUs = 8-way SMP)
    Charm++> cpu topology info is gathered in 0.000 seconds.
-   Running Hello on 2 processors with 8 elements
-   PE 0 says Hi from element 0
-   PE 0 says Hi from element 1
-   PE 0 says Hi from element 2
-   PE 0 says Hi from element 3
-   PE 1 says Hi from element 4
-   PE 1 says Hi from element 5
-   PE 1 says Hi from element 6
-   PE 1 says Hi from element 7
+   Running Hello on 2 processors with 8 elements.
+   PE 0 says: Hello world from element 0.
+   PE 0 says: Hello world from element 1.
+   PE 0 says: Hello world from element 2.
+   PE 0 says: Hello world from element 3.
+   PE 1 says: Hello world from element 4.
+   PE 1 says: Hello world from element 5.
+   PE 1 says: Hello world from element 6.
+   PE 1 says: Hello world from element 7.
    All done
    [Partition 0][Node 0] End of program
 
 
-Where to go from here
+Where to go From Here
 ---------------------
 
 - The ``tests/charm++/simplearrayhello`` folder in the Charm++ distribution has a more comprehensive example, from
