@@ -1348,7 +1348,7 @@ void handleBcastReverseEntryMethodApiCompletion(NcpyOperationInfo *info) {
     invokeRemoteNcpyAckHandler(info->destPe, info->refPtr, ncpyHandlerIdx::EM_ACK);
   }
 #if CMK_REG_REQUIRED
-  // De-register source for reverse operations when regMode = UNREG and deregeMode = DEREG
+  // De-register source for reverse operations when regMode == UNREG and deregMode == DEREG
   if(info->isSrcRegistered == 1 && info->srcRegMode == CK_BUFFER_UNREG && info->srcDeregMode == CK_BUFFER_DEREG) {
     CmiDeregisterMem(info->srcPtr, info->srcLayerInfo + CmiGetRdmaCommonInfoSize(), info->srcPe, info->srcRegMode);
     info->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
