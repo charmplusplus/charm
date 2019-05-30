@@ -37,7 +37,7 @@ Parallel "Hello World" with Charm++
 
 The basic unit of computation in Charm++ is a **chare**, which is a C++
 object. Chares have **entry methods** that can be invoked asynchronously.
-in A Charm++ application consists of collections of chares (such as chare arrays)
+A Charm++ application consists of collections of chares (such as chare arrays)
 distributed among the processors of the system.
 
 Each Charm++ application consists of at least two files, a
@@ -54,7 +54,7 @@ consisting of the files ``hello.ci`` and ``hello.cpp``.
 The hello.ci file
 '''''''''''''''''
 
-THe ``hello.ci`` file contains a mainchare, which starts and ends execution,
+The ``hello.ci`` file contains a mainchare, which starts and ends execution,
 and a ``Hello`` chare array, whose elements print the "Hello World" message.
 
 .. code-block:: charmci
