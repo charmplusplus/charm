@@ -7,7 +7,7 @@ set -v
 set -e
 
 # Set 'release' mode if requested, influences commitid.sh
-export RELEASE="0"ß
+export RELEASE="0"
 if [[ $# -gt 0 ]]
 then
     arg=$1
