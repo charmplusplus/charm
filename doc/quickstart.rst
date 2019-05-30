@@ -37,7 +37,8 @@ Parallel "Hello World" with Charm++
 The .ci file
 ''''''''''''
 
-.. code-block:: c++
+.. code-block:: charmci
+
    mainmodule hello {
      mainchare Main {
        entry Main(CkArgMsg *m);
