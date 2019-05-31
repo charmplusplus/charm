@@ -13,6 +13,7 @@
 #include "machine.h"
 #include "pcqueue.h"
 #include "machine-lrts.h"
+#include "machine-rdma.h"
 #include "machine-common-core.C"
 
 // UCX  headers
@@ -110,7 +111,6 @@ static void UcxRxReqCompleted(void *request, ucs_status_t status,
 static void UcxPrepostRxBuffers();
 
 #if CMK_ONESIDED_IMPL
-#include "machine-rdma.h"
 #include "machine-onesided.h"
 #endif
 
