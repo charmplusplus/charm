@@ -46,6 +46,6 @@ matrix:
     script:
     #- choco install -y msys2
     #- pacman -S autoconf automake
-    - ./build LIBS netlrts-win-x86_64 -j2 -k --without-romio --with-production --enable-error-checking --enable-lbuserdata -g || exit 1
+    - ./build LIBS netlrts-win-x86_64 gcc -j2 -k --without-romio --with-production --enable-error-checking --enable-lbuserdata -g || exit 1
     - make -C netlrts-win-x86_64/tmp -k -j2 all-test-tests all-test-examples OPTS="-g"
     - make -C netlrts-win-x86_64/tmp -k test-tests test-examples TESTOPTS="++local"
