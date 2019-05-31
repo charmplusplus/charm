@@ -46,7 +46,7 @@ matrix:
     script:
     #- choco install -y msys2
     #- pacman -S autoconf automake
-    - choco install -y make
+    - choco install -y make msys2
     - C:\tools\msys64\usr\bin\bash -lc 'echo XXXXXXXX'
     - ./build AMPI netlrts-win-x86_64 gcc -j2 --without-romio --with-production --enable-error-checking --enable-lbuserdata -g || exit 1
     - make -C netlrts-win-x86_64/tmp -k -j2 all-test-tests all-test-examples OPTS="-g"
