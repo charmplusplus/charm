@@ -997,7 +997,7 @@ static void _roRdmaDoneHandler(envelope *env) {
           envelope *compEnv = _allocEnv(ROChildCompletionMsg);
           compEnv->setSrcPe(CkMyPe());
           CmiSetHandler(compEnv, _roRdmaDoneHandlerIdx);
-          CmiSyncSendAndFree(t.parent, compEnv->getTotalsize(), (char *)compEnv);
+          CmiSyncSendAndFree(CmiNodeFirst(t.parent), compEnv->getTotalsize(), (char *)compEnv);
         }
         // Free the roBcastAckInfo allocated inside readonlyAllocateOnSource
         CmiFree(roBcastAckInfo);
