@@ -27,7 +27,7 @@ To build Charm++, use the following commands:
    $ cd charm
    $ ./build charm++ netlrts-linux-x86_64 --with-production -j4
 
-This is the recommenced version to install Charm++ on Linux systems.
+This is the recommended version to install Charm++ on Linux systems.
 For MacOS, substitute "linux" with "darwin". For advanced compilation options,
 please see Section :numref:`sec:install` of the manual.
 
@@ -191,6 +191,7 @@ Where to go From Here
 - Charm++ has lots of other features, such as chare migration, load balancing,
   and checkpoint/restart. The main manual has more information about them.
 
-- AMPI (https://charm.readthedocs.io/en/latest/ampi/manual.html) is an implementation of MPI on top of Charm++.
+- AMPI (https://charm.readthedocs.io/en/latest/ampi/manual.html) is an implementation of MPI on top of Charm++, allowing
+  MPI applications to run on the Charm++ runtime mostly unmodified.
 
 - Charm4py (https://charm4py.readthedocs.io) is a Python package that enables development of Charm++ applications in Python.
