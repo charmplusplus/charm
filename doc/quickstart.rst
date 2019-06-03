@@ -191,6 +191,7 @@ Where to go From Here
 - Charm++ has lots of other features, such as chare migration, load balancing,
   and checkpoint/restart. The main manual has more information about them.
 
-- AMPI (https://charm.readthedocs.io/en/latest/ampi/manual.html) is an implementation of MPI on top of Charm++.
+- AMPI (https://charm.readthedocs.io/en/latest/ampi/manual.html) is an implementation of MPI on top of Charm++, allowing
+  MPI applications to run on the Charm++ runtime mostly unmodified.
 
 - Charm4py (https://charm4py.readthedocs.io) is a Python package that enables development of Charm++ applications in Python.
