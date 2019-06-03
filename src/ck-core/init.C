@@ -1015,7 +1015,7 @@ void checkForInitDone(bool rdmaROCompleted) {
   bool noPendingRORdmaTransfers = true;
 #if CMK_ONESIDED_IMPL
   // Ensure that there are no pending RO Rdma transfers on Rank 0 when numZerocopyROops > 0
-  if(CmiMyRank() == 0 && numZerocopyROops > 0)
+  if(numZerocopyROops > 0)
     noPendingRORdmaTransfers = rdmaROCompleted;
 #endif
   if (_numExpectInitMsgs && CkpvAccess(_numInitsRecd) + CksvAccess(_numInitNodeMsgs) == _numExpectInitMsgs && noPendingRORdmaTransfers)
