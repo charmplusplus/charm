@@ -124,18 +124,7 @@ CkNcpyStatus CkNcpyBuffer::get(CkNcpyBuffer &source){
 #endif
   } else if (transferMode == CkNcpyMode::RDMA) {
 
-    int outstandingRdmaOps = 1; // used by true-RDMA layers
-
-#if CMK_ONESIDED_IMPL
-#if CMK_CONVERSE_MPI
-    outstandingRdmaOps += 1; // MPI layer invokes CmiDirectAckHandler twice as sender and receiver post separately
-#endif
-#else
-    outstandingRdmaOps += 1; // non-RDMA layers invoke CmiDirectAckHandler twice using regular messages
-#endif
-
-    // Create QD to ensure that outstanding rdmaGet call is accounted for
-    QdCreate(outstandingRdmaOps);
+    zcQdIncrement();
 
     rdmaGet(source);
 
@@ -256,18 +245,7 @@ CkNcpyStatus CkNcpyBuffer::put(CkNcpyBuffer &destination){
 #endif
   } else if (transferMode == CkNcpyMode::RDMA) {
 
-    int outstandingRdmaOps = 1; // used by true-RDMA layers
-
-#if CMK_ONESIDED_IMPL
-#if CMK_CONVERSE_MPI
-    outstandingRdmaOps += 1; // MPI layer invokes CmiDirectAckHandler twice as sender and receiver post separately
-#endif
-#else
-    outstandingRdmaOps += 1; // non-RDMA layers invoke CmiDirectAckHandler twice using regular messages
-#endif
-
-    // Create QD to ensure that outstanding rdmaGet call is accounted for
-    QdCreate(outstandingRdmaOps);
+    zcQdIncrement();
 
     rdmaPut(destination);
 
@@ -434,6 +412,21 @@ void enqueueNcpyMessage(int destPe, void *msg){
   // or invoked from the same worker thread, call message handler directly
   CmiHandleMessage(msg);
 #endif
+}
+
+inline void zcQdIncrement() {
+    int outstandingRdmaOps = 1; // used by true-RDMA layers
+
+#if CMK_ONESIDED_IMPL
+#if CMK_CONVERSE_MPI
+    outstandingRdmaOps += 1; // MPI layer invokes CmiDirectAckHandler twice as sender and receiver post separately
+#endif
+#else
+    outstandingRdmaOps += 1; // non-RDMA layers invoke CmiDirectAckHandler twice using regular messages
+#endif
+
+    // Create QD to ensure that outstanding rdmaGet call is accounted for
+    QdCreate(outstandingRdmaOps);
 }
 
 
@@ -1829,6 +1822,7 @@ void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr) {
       } else { // Child Node
 
         // Send a message to the parent to signal completion in order to deregister
+        QdCreate(1);
         envelope *compEnv = _allocEnv(ROChildCompletionMsg);
         compEnv->setSrcPe(CkMyPe());
         CmiSetHandler(compEnv, _roRdmaDoneHandlerIdx);
@@ -1882,6 +1876,8 @@ void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr) {
     if(t.child_count != 0)
       readonlyCreateOnSource(dest);
 
+    zcQdIncrement();
+
     CmiIssueRget(ncpyOpInfo);
   }
 }
@@ -1910,11 +1906,10 @@ void readonlyGetCompleted(NcpyOperationInfo *ncpyOpInfo) {
       // Send a message to my child nodes
       CmiForwardProcBcastMsg(env->getTotalsize(), (char *)env);
 
-      //TODO:QD support
-
     } else {
 
       // Send a message to the parent to signal completion in order to deregister
+      QdCreate(1);
       envelope *compEnv = _allocEnv(ROChildCompletionMsg);
       compEnv->setSrcPe(CkMyPe());
       CmiSetHandler(compEnv, _roRdmaDoneHandlerIdx);
@@ -1923,6 +1918,7 @@ void readonlyGetCompleted(NcpyOperationInfo *ncpyOpInfo) {
 
 #if CMK_SMP
     // Send a message to my first node to signal completion
+    QdCreate(1);
     envelope *sigEnv = _allocEnv(ROPeerCompletionMsg);
     sigEnv->setSrcPe(CkMyPe());
     CmiSetHandler(sigEnv, _roRdmaDoneHandlerIdx);

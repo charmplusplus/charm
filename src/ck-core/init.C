@@ -983,11 +983,13 @@ static void _roRdmaDoneHandler(envelope *env) {
 
   switch(env->getMsgtype()) {
     case ROPeerCompletionMsg:
+      CpvAccess(_qd)->process();
       checkForInitDone(true); // Receiving a ROPeerCompletionMsg indicates that RO ZCPY Bcast
                               // operation is complete on the comm. thread
       if (env!=NULL) CmiFree(env);
       break;
     case ROChildCompletionMsg:
+      CpvAccess(_qd)->process();
       roBcastAckInfo->counter++;
       if(roBcastAckInfo->counter == roBcastAckInfo->numChildren) {
         // deregister
@@ -1005,6 +1007,7 @@ static void _roRdmaDoneHandler(envelope *env) {
 
           //forward message to root
           // Send a message to the parent to signal completion in order to deregister
+          QdCreate(1);
           envelope *compEnv = _allocEnv(ROChildCompletionMsg);
           compEnv->setSrcPe(CkMyPe());
           CmiSetHandler(compEnv, _roRdmaDoneHandlerIdx);

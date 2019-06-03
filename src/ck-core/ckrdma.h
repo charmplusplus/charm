@@ -288,6 +288,9 @@ void invokeDestinationCallback(NcpyOperationInfo *info);
 // Method to enqueue a message after the completion of an payload transfer
 void enqueueNcpyMessage(int destPe, void *msg);
 
+// Method to increment Qd counter
+inline void zcQdIncrement();
+
 /*********************************** Zerocopy Entry Method API ****************************/
 static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, CkCallback &cb_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
   return CkNcpyBuffer(ptr_, 0, cb_, regMode_, deregMode_);
