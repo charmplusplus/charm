@@ -27,7 +27,7 @@ To build Charm++, use the following commands:
    $ cd charm
    $ ./build charm++ netlrts-linux-x86_64 --with-production -j4
 
-This is the recommenced version to install Charm++ on Linux systems.
+This is the recommended version to install Charm++ on Linux systems.
 For MacOS, substitute "linux" with "darwin". For advanced compilation options,
 please see Section :numref:`sec:install` of the manual.
 
