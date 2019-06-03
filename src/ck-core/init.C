@@ -997,7 +997,7 @@ static void _roRdmaDoneHandler(envelope *env) {
           envelope *compEnv = _allocEnv(ROChildCompletionMsg);
           compEnv->setSrcPe(CkMyPe());
           CmiSetHandler(compEnv, _roRdmaDoneHandlerIdx);
-          CmiSyncSendAndFree(t.parent, compEnv->getTotalsize(), (char *)compEnv);
+          CmiSyncSendAndFree(CmiNodeFirst(t.parent), compEnv->getTotalsize(), (char *)compEnv);
         }
         // Free the roBcastAckInfo allocated inside readonlyAllocateOnSource
         CmiFree(roBcastAckInfo);
@@ -1264,7 +1264,7 @@ void _sendReadonlies() {
   for(int i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(ps);
 
 #if CMK_ONESIDED_IMPL
-  if(numZerocopyROops > 0) {
+  if(CkNumNodes() > 1 && numZerocopyROops > 0) { // No ZC ops are performed when CkNumNodes <= 1
     readonlyAllocateOnSource();
   }
 #endif
