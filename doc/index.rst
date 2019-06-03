@@ -15,6 +15,7 @@ Charm++ Documentation
    :caption: Charm++
    :numbered:
 
+   quickstart
    charm++/manual
    ampi/manual
    f90charm/manual
