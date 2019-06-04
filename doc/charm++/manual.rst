@@ -53,7 +53,7 @@ Charm++ family of the same model.
 Execution Model
 ---------------
 
-A basic unit of parallel computation in Charm++ programs is a *chare* .
+A basic unit of parallel computation in Charm++ programs is a *chare*.
 A chare is similar to a process, an actor, an ADA task, etc. At its most
 basic level, it is just a C++ object. A Charm++ computation consists of
 a large number of chares distributed on available processors of the
@@ -286,6 +286,8 @@ programs can be referred in section :numref:`basic utility fns`.
 
 Basic Charm++ Programming
 =========================
+
+.. _programstructure:
 
 Program Structure, Compilation and Utilities
 --------------------------------------------
