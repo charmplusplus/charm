@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.11)
 
 project(Charm++ LANGUAGES CXX C VERSION 6.9.0)
 
@@ -9,7 +9,7 @@ find_package(ZLIB)
 
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/lib/)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so/)
-file(TOUCH          ${CMAKE_BINARY_DIR}/lib_so/.charmso)
+file(WRITE          ${CMAKE_BINARY_DIR}/lib_so/.charmso "")
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bin/)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/)
 
@@ -182,6 +182,10 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif()
 
+if (NOT CMK_MEMPOOL_CUTOFFNUM)
+  set(CMK_MEMPOOL_CUTOFFNUM 26)
+endif()
+
 set(CMK_OPTIMIZE 0)
 if(${CMAKE_BUILD_TYPE} MATCHES "Release")
     set(CMK_OPTIMIZE 1)
@@ -190,9 +194,12 @@ endif()
 
 include(src/arch/detect-features.cmake)
 
-configure_file(${CMAKE_SOURCE_DIR}/src/scripts/charmc ${CMAKE_BINARY_DIR}/bin COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/src/scripts/charmc ${CMAKE_BINARY_DIR}/bin @ONLY)
 
 # Use charmc to compile/link everything
+# set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ${CMAKE_BINARY_DIR}/bin/charmc)
+# set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ${CMAKE_BINARY_DIR}/bin/charmc)
+# set_property(GLOBAL PROPERTY RULE_LAUNCH_CUSTOM ${CMAKE_BINARY_DIR}/bin/charmc)
 set(CMAKE_C_COMPILER_LAUNCHER ${CMAKE_BINARY_DIR}/bin/charmc)
 set(CMAKE_CXX_COMPILER_LAUNCHER ${CMAKE_BINARY_DIR}/bin/charmc)
 set(CMAKE_Fortran_COMPILER_LAUNCHER ${CMAKE_BINARY_DIR}/bin/charmc)
@@ -298,6 +305,7 @@ endif()
 # Header files
 configure_file(src/arch/${GDIR}/conv-common.h                include/ COPYONLY)
 configure_file(src/arch/${VDIR}/conv-mach.h                  include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-common.h            include/ COPYONLY)
 configure_file(src/arch/util/lrts-common.h                   include/ COPYONLY)
 configure_file(src/arch/util/cmiqueue.h                      include/ COPYONLY)
 configure_file(src/arch/util/lrtslock.h                      include/ COPYONLY)
@@ -306,6 +314,7 @@ configure_file(src/arch/util/machine.h                       include/ COPYONLY)
 configure_file(src/arch/util/machine-lrts.h                  include/ COPYONLY)
 configure_file(src/arch/util/machine-smp.h                   include/ COPYONLY)
 configure_file(src/arch/util/pcqueue.h                       include/ COPYONLY)
+configure_file(src/util/pup_c_functions.h                    include/ COPYONLY)
 
 set(src-util-h-sources src/util/SSE-Double.h src/util/SSE-Float.h
     src/util/ck128bitHash.h src/util/ckBIconfig.h src/util/ckbitvector.h
@@ -440,6 +449,13 @@ file(APPEND ${optfile_h} "#define CMK_OPTIMIZE ${CMK_OPTIMIZE}\n")
 if(NOT ${NETWORK} STREQUAL "mpi")
     file(APPEND ${optfile_h} "#include \"cc-${CMK_COMPILER}.h\"\n")
 endif()
+
+# Create conv-mach-opt.mak
+set(optfile_mak ${CMAKE_BINARY_DIR}/include/conv-mach-opt.mak)
+
+file(WRITE  ${optfile_mak} "# Automatically build-time generated options header\n")
+# file(APPEND ${optfile_mak} "#define CMK_OPTIMIZE ${CMK_OPTIMIZE}\n")
+
 
 # Add options
 foreach(opt SMP OMP TCP PTHREADS)

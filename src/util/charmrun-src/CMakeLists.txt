@@ -1,7 +1,7 @@
-add_executable(charmd daemon.c daemon.h ../sockRoutines.c)
+add_executable(charmd daemon.C daemon.h ../sockRoutines.C)
 target_compile_options(charmd PRIVATE -seq -DCMK_NOT_USE_CONVERSE=1)
 
-add_executable(charmd_faceless daemon.c daemon.h ../sockRoutines.c)
+add_executable(charmd_faceless daemon.C daemon.h ../sockRoutines.C)
 target_compile_options(charmd_faceless PRIVATE -seq -DFACELESS -DCMK_NOT_USE_CONVERSE=1)
 
 add_executable(charmrun charmrun.C)

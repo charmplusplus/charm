@@ -44,31 +44,30 @@ configure_file(libmoduleampif.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
 
 
 # ROMIO
-if(${CMK_AMPI_WITH_ROMIO})
-    include(ExternalProject)
-    ExternalProject_Add(romio
-        URL ${CMAKE_CURRENT_SOURCE_DIR}/romio
-        CONFIGURE_COMMAND cd ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio/ && ./configure
-            -mpiincdir=${CMAKE_BINARY_DIR}/include
-            -mpilib=${CMAKE_BINARY_DIR}/lib/libmoduleampi.a
-            -mpibindir=${CMAKE_BINARY_DIR}/bin
-            -cc=${CMAKE_BINARY_DIR}/bin/ampicc
-            -fc=${CMAKE_BINARY_DIR}/bin/ampif77
-            -f90=${CMAKE_BINARY_DIR}/bin/ampif90
-            # -cflags="$(OPTS)"
-            # -fflags="$(OPTS)"
-            -noprofile
-            -mpiolib=${CMAKE_BINARY_DIR}/lib/libampiromio.a > /dev/null
-        COMMAND cp -f  ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio/include/mpio.h ${CMAKE_BINARY_DIR}/include/
-        COMMAND cp -f  ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio/include/mpiof.h ${CMAKE_BINARY_DIR}/include/
-        BUILD_COMMAND cd ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio/ && make
-        COMMAND # build shared library
-            find .. -name *.o -exec ${CMAKE_CXX_COMPILER_LAUNCHER} -shared -o ${CMAKE_BINARY_DIR}/lib_so/libampiromio${CMAKE_SHARED_LIBRARY_SUFFIX} {} + ;
-        INSTALL_COMMAND "" # No install step
-        LIST_SEPARATOR ^^
-    )
+# if(${CMK_AMPI_WITH_ROMIO})
+#     include(ExternalProject)
+#     ExternalProject_Add(romio
+#         URL ${CMAKE_CURRENT_SOURCE_DIR}/romio
+#         CONFIGURE_COMMAND cd ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio/ &&     MPI_LIB=""
+#             CFLAGS="$(OPTS) -ampi-romio-configure"
+#             FFLAGS="$(OPTS) -ampi-romio-configure"
+#             F77="$(CDIR)/bin/ampif90"
+#             CC="$(CDIR)/bin/ampicc"
+#             ./configure
+#             --disable-aio
+#             --enable-f77=`test -f $(DESTF) && echo yes || echo no`
+#             --srcdir=`pwd`
+#              > /dev/null
+#         COMMAND cp -f  ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio/include/mpio.h ${CMAKE_BINARY_DIR}/include/
+#         COMMAND cp -f  ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio/include/mpiof.h ${CMAKE_BINARY_DIR}/include/
+#         BUILD_COMMAND cd ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio/ && make
+#         COMMAND # build shared library
+#             find .. -name *.o -exec ${CMAKE_CXX_COMPILER_LAUNCHER} -shared -o ${CMAKE_BINARY_DIR}/lib_so/libampiromio${CMAKE_SHARED_LIBRARY_SUFFIX} {} + ;
+#         INSTALL_COMMAND "" # No install step
+#         LIST_SEPARATOR ^^
+#     )
 
-    # Since we link a program with charmc as part of ROMIO's configure,
-    # we need all libraries built at this point.
-    add_dependencies(romio moduleampi ampi-compat moduleampif ck modulecompletion conv-partition conv-util)
-endif()
+#     # Since we link a program with charmc as part of ROMIO's configure,
+#     # we need all libraries built at this point.
+#     add_dependencies(romio moduleampi ampi-compat moduleampif ck modulecompletion conv-partition conv-util)
+# endif()

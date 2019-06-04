@@ -1,18 +1,18 @@
-set(conv-core-c-sources cmipool.c conv-conds.c conv-counter.c conv-onesided.c
-    conv-rdma.c convcore.c cpm.c cpthreads.c cpuaffinity.c debug-conv.c futures.c
-    global-nop.c isomalloc.c mem-arena.c memoryaffinity.c msgmgr.c quiescence.c
-    random.c)
+set(conv-core-c-sources cmipool.C conv-conds.C
+    conv-rdma.C convcore.C cpm.C cpthreads.C cpuaffinity.C debug-conv.C futures.C
+    global-nop.C isomalloc.C mem-arena.C memoryaffinity.C msgmgr.C quiescence.C
+    random.C)
 
-set(conv-core-h-sources cmidirect.h cmidirectmanytomany.h cmipool.h
-    conv-config.h conv-cpath.h conv-cpm.h conv-header.h conv-onesided.h conv-ooc.h
+set(conv-core-h-sources cmipool.h
+    conv-config.h conv-cpath.h conv-cpm.h conv-header.h conv-ooc.h
     conv-qd.h conv-random.h conv-rdma.h conv-taskQ.h conv-trace.h converse.h
-    cpthreads.h debug-conv++.h debug-conv.h mem-arena.h memory-gnu-threads.h
+    cpthreads.h debug-conv++.h debug-conv.h hrctimer.h mem-arena.h memory-gnu-threads.h
     memory-isomalloc.h msgq.h persistent.h queueing.h quiescence.h taskqueue.h)
 
 set(conv-core-cxx-sources conv-interoperate.C conv-taskQ.C cputopology.C
     debug-conv++.C  memory-darwin-clang.C memory-os-wrapper.C queueing.C)
 
-set(conv-ccs-c-sources ../conv-ccs/conv-ccs.c)
+set(conv-ccs-c-sources ../conv-ccs/conv-ccs.C)
 
 set(conv-ccs-h-sources ../conv-ccs/ccs-auth.h ../conv-ccs/ccs-builtins.h
     ../conv-ccs/ccs-server.h ../conv-ccs/conv-ccs.h)
@@ -32,7 +32,7 @@ foreach(filename ${conv-core-h-sources} ${conv-ccs-h-sources} ${conv-perf-h-sour
     configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 endforeach()
 
-add_library(ccs-client ../conv-ccs/ccs-client.c ../conv-ccs/ccs-client.h)
+add_library(ccs-client ../conv-ccs/ccs-client.C ../conv-ccs/ccs-client.h)
 target_include_directories(ccs-client PRIVATE ../util)
 
 add_library(memory-default memory.C)
@@ -107,78 +107,78 @@ const char * const CmiCommitID = \"${CHARM_VERSION}\";
 "
 )
 
-add_library(conv-core ${CMAKE_BINARY_DIR}/include/commitid.c ${conv-core-c-sources} ${conv-core-cxx-sources} ${conv-core-h-sources} ${conv-ccs-c-sources} ${conv-ccs-h-sources} ${conv-ccs-cxx-sources} ${conv-perf-cxx-sources} ${conv-perf-h-sources} ../conv-ldb/cldb.c)
+add_library(conv-core ${CMAKE_BINARY_DIR}/include/commitid.c ${conv-core-c-sources} ${conv-core-cxx-sources} ${conv-core-h-sources} ${conv-ccs-c-sources} ${conv-ccs-h-sources} ${conv-ccs-cxx-sources} ${conv-perf-cxx-sources} ${conv-perf-h-sources} ../conv-ldb/cldb.C)
 add_dependencies(conv-core hwloc)
 
-add_library(threads-default threads.c $<TARGET_OBJECTS:boost-context>)
+add_library(threads-default threads.C $<TARGET_OBJECTS:boost-context>)
 target_compile_definitions(threads-default PRIVATE -DCMK_THREADS_BUILD_DEFAULT=1)
 target_include_directories(threads-default PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
 
-add_library(threads-default-tls threads.c $<TARGET_OBJECTS:boost-context>)
+add_library(threads-default-tls threads.C $<TARGET_OBJECTS:boost-context>)
 target_compile_definitions(threads-default-tls PRIVATE -DCMK_THREADS_BUILD_DEFAULT=1)
 target_include_directories(threads-default-tls PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
 
-add_library(threads-qt threads.c)
+add_library(threads-qt threads.C)
 target_compile_definitions(threads-qt PRIVATE -DCMK_THREADS_BUILD_QT=1)
 target_include_directories(threads-qt PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
 
-add_library(threads-qt-tls threads.c)
+add_library(threads-qt-tls threads.C)
 target_compile_definitions(threads-qt-tls PRIVATE -DCMK_THREADS_BUILD_QT=1 -DCMK_THREADS_BUILD_TLS=1)
 target_include_directories(threads-qt-tls PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
 
-add_library(threads-context threads.c)
+add_library(threads-context threads.C)
 target_compile_definitions(threads-context PRIVATE -DCMK_THREADS_BUILD_CONTEXT=1)
 target_include_directories(threads-context PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
 
-add_library(threads-context-tls threads.c)
+add_library(threads-context-tls threads.C)
 target_compile_definitions(threads-context-tls PRIVATE -DCMK_THREADS_BUILD_CONTEXT=1 -DCMK_THREADS_BUILD_TLS=1)
 target_include_directories(threads-context-tls PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
 
-add_library(threads-uJcontext threads.c)
+add_library(threads-uJcontext threads.C)
 target_compile_definitions(threads-uJcontext PRIVATE -DCMK_THREADS_BUILD_JCONTEXT=1 )
 target_compile_options(threads-uJcontext PRIVATE -U_FORTIFY_SOURCE)
 target_include_directories(threads-uJcontext PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
 
-add_library(threads-uJcontext-tls threads.c)
+add_library(threads-uJcontext-tls threads.C)
 target_compile_definitions(threads-uJcontext-tls PRIVATE -DCMK_THREADS_BUILD_JCONTEXT=1 -DCMK_THREADS_BUILD_TLS=1)
 target_compile_options(threads-uJcontext-tls PRIVATE -U_FORTIFY_SOURCE)
 target_include_directories(threads-uJcontext-tls PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
 
-add_library(threads-uFcontext threads.c $<TARGET_OBJECTS:boost-context>)
+add_library(threads-uFcontext threads.C $<TARGET_OBJECTS:boost-context>)
 target_compile_definitions(threads-uFcontext PRIVATE -DCMK_THREADS_BUILD_FCONTEXT=1 )
 target_compile_options(threads-uFcontext PRIVATE -U_FORTIFY_SOURCE)
 target_include_directories(threads-uFcontext PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util) # for qt.h uFcontext.c
 
-add_library(threads-uFcontext-tls threads.c $<TARGET_OBJECTS:boost-context>)
+add_library(threads-uFcontext-tls threads.C $<TARGET_OBJECTS:boost-context>)
 target_compile_definitions(threads-uFcontext-tls PRIVATE -DCMK_THREADS_BUILD_FCONTEXT=1 -DCMK_THREADS_BUILD_TLS=1)
 target_compile_options(threads-uFcontext-tls PRIVATE -U_FORTIFY_SOURCE)
 target_include_directories(threads-uFcontext-tls PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util) # for qt.h uFcontext.c
 
-add_library(threads-pthreads threads.c)
+add_library(threads-pthreads threads.C)
 target_compile_definitions(threads-pthreads PRIVATE -DCMK_THREADS_BUILD_PTHREADS=1)
 target_include_directories(threads-pthreads PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
 
-add_library(threads-fibers threads.c)
+add_library(threads-fibers threads.C)
 target_compile_definitions(threads-fibers PRIVATE -DCMK_THREADS_BUILD_FIBERS=1)
 target_include_directories(threads-fibers PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
 
-add_library(threads-stackcopy threads.c)
+add_library(threads-stackcopy threads.C)
 target_compile_definitions(threads-stackcopy PRIVATE -DCMK_THREADS_BUILD_STACKCOPY=1)
 target_include_directories(threads-stackcopy PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
 
-add_library(threads-memoryalias threads.c)
+add_library(threads-memoryalias threads.C)
 target_compile_definitions(threads-memoryalias PRIVATE -DCMK_THREADS_ALIAS_STACK=1)
 target_include_directories(threads-memoryalias PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
 
-add_library(threads-qt-memoryalias threads.c)
+add_library(threads-qt-memoryalias threads.C)
 target_compile_definitions(threads-qt-memoryalias PRIVATE -DCMK_THREADS_ALIAS_STACK=1 -DCMK_THREADS_BUILD_QT=1)
 target_include_directories(threads-qt-memoryalias PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
 
-add_library(threads-context-memoryalias threads.c)
+add_library(threads-context-memoryalias threads.C)
 target_compile_definitions(threads-context-memoryalias PRIVATE -DCMK_THREADS_ALIAS_STACK=1 -DCMK_THREADS_BUILD_CONTEXT=1)
 target_include_directories(threads-context-memoryalias PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
 
-add_library(threads-uJcontext-memoryalias threads.c)
+add_library(threads-uJcontext-memoryalias threads.C)
 target_compile_definitions(threads-uJcontext-memoryalias PRIVATE -DCMK_THREADS_ALIAS_STACK=1 -DCMK_THREADS_BUILD_JCONTEXT=1)
 target_compile_options(threads-uJcontext-memoryalias PRIVATE -U_FORTIFY_SOURCE)
 target_include_directories(threads-uJcontext-memoryalias PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
@@ -198,12 +198,14 @@ target_include_directories(conv-machine PRIVATE ../arch/util) # for machine*.*
 
 target_include_directories(conv-core PRIVATE ../util) # for sockRoutines.c
 
-add_executable(conv-cpm ../xlatcpm/conv-cpm.c)
+add_executable(conv-cpm ../xlatcpm/conv-cpm.C)
+target_compile_options(conv-cpm PRIVATE -host)
+set_target_properties(conv-cpm PROPERTIES LINK_FLAGS "-host -language c++")
 
-add_library(tsm ../langs/simplemsg/simplemsg.c ../langs/simplemsg/simplemsg.h)
-add_library(sm ../langs/simplemsg/sm.c ../langs/simplemsg/sm.h)
+add_library(tsm ../langs/simplemsg/simplemsg.C ../langs/simplemsg/simplemsg.h)
+add_library(sm ../langs/simplemsg/sm.C ../langs/simplemsg/sm.h)
 
-add_library(pvmc ../langs/pvmc/pvmc_buf.c ../langs/pvmc/pvmc_comm.c ../langs/pvmc/pvmc_conv.c ../langs/pvmc/pvmc_main.c ../langs/pvmc/pvmc_pack.c ../langs/pvmc/pvmc_groups.c)
+add_library(pvmc ../langs/pvmc/pvmc_buf.C ../langs/pvmc/pvmc_comm.C ../langs/pvmc/pvmc_conv.C ../langs/pvmc/pvmc_main.C ../langs/pvmc/pvmc_pack.C ../langs/pvmc/pvmc_groups.C)
 
 
 

@@ -1,7 +1,7 @@
 set(ck-cxx-sources
     ../ck-cp/API-generator/cp_effects.C ../ck-cp/arrayRedistributor.C
     ../ck-cp/controlPoints.C ../ck-cp/pathHistory.C
-    ../ck-ldb/BaseLB.C ../ck-ldb/bitvecset.c
+    ../ck-ldb/BaseLB.C ../ck-ldb/bitvecset.C
     ../ck-ldb/CentralLB.C ../ck-ldb/CentralPredictor.C
     ../ck-ldb/ckgraph.C ../ck-ldb/ckgraphTemp.C
     ../ck-ldb/ckheap.C ../ck-ldb/ckset.C
@@ -32,9 +32,9 @@ set(ck-cxx-sources
 set(ck-h-sources XArraySectionReducer.h charm++.h charm++_type_traits.h
     charm-api.h charm.h charmf.h ck.h ckIgetControl.h ckarray.h ckarrayindex.h
     ckarrayoptions.h ckcallback-ccs.h ckcallback.h ckcausalmlog.h ckcheckpoint.h
-    ckdirect.h ckevacuation.h ckfutures.h cklocation.h cklocrec.h
+    ckevacuation.h ckfutures.h cklocation.h cklocrec.h
     ckmemcheckpoint.h ckmessage.h ckmessagelogging.h ckmigratable.h ckmulticast.h
-    ckobjQ.h ckobjid.h ckrdma.h ckrdmawrapper.h ckreduction.h cksection.h
+    ckobjQ.h ckobjid.h ckrdma.h ckreduction.h cksection.h
     ckstream.h cktiming.h debug-charm.h envelope-path.h envelope.h init.h
     middle-blue.h middle-conv.h middle.h mpi-interoperate.h objid.h qd.h
     readonly.h register.h sdag.h stats.h waitqd.h ../ck-ldb/CentralLB.h
@@ -94,7 +94,7 @@ set(ldb-cxx-sources ../ck-ldb/AdaptiveLB.C  ../ck-ldb/BlockLB.C
     ../ck-ldb/ckgraph.C ../ck-ldb/ckgraphTemp.C ../ck-ldb/ckheap.C
     ../ck-ldb/ckset.C  ../ck-ldb/manager.C)
 
-set(ldb-c-sources ../ck-ldb/bitvecset.c ../ck-ldb/tm_bucket.c
+set(ldb-c-sources ../ck-ldb/bitvecset.C ../ck-ldb/tm_bucket.c
     ../ck-ldb/tm_mapping.c ../ck-ldb/tm_timings.c ../ck-ldb/tm_tree.c)
 
 set(ldb-h-sources ../ck-ldb/AdaptiveLB.h ../ck-ldb/BaseLB.h

@@ -1,10 +1,10 @@
 set(conv-util-c-sources
     ../arch/util/lz4.c
-    ../arch/util/mempool.c
-    ../arch/util/persist-comm.c
-    cmirdmautils.c
-    crc32.c
-    sockRoutines.c
+    ../arch/util/mempool.C
+    ../arch/util/persist-comm.C
+    cmirdmautils.C
+    crc32.C
+    sockRoutines.C
 )
 
 set(conv-util-h-sources
@@ -39,7 +39,7 @@ add_library(conv-utilf pup_f.f90)
 
 add_custom_command(OUTPUT pup_f.f90 COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/pup_f.f90.sh > /dev/null)
 
-add_library(conv-partition custom_partitioner.C set_partition_params.c)
+add_library(conv-partition custom_partitioner.C set_partition_params.C)
 add_dependencies(conv-partition ck)
 
 target_include_directories(conv-util PRIVATE . ../util/topomanager ../ck-ldb ../ck-perf ../ck-cp)

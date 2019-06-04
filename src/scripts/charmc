@@ -9,6 +9,11 @@
 #
 ##############################################################################
 
+# Filter extra cmake arguments
+if [ "$1" = "@CMAKE_C_COMPILER@" ]; then shift; fi
+if [ "$1" = "@CMAKE_CXX_COMPILER@" ]; then shift; fi
+if [ "$1" = "@CMAKE_Fortran_COMPILER@" ]; then shift; fi
+
 #Prepare aliases for the external commands we use--
 # Note that adding /bin/ to everything breaks Cygwin32.
 RM="rm -f"
@@ -1843,12 +1848,13 @@ done
 Debug "About to compile..."
 
 # Filter spurious cmake arguments
-CHARM_CXX_FLAGS=`echo $CHARM_CXX_FLAGS | sed s,"$CMK_CXX",,g `
-CHARM_CC_FLAGS=`echo $CHARM_CC_FLAGS | sed s,"$CMK_CC",,g `
-CMK_CF90_COMPONLY=`echo $CMK_CF90 | awk '{print $1}'`
-FILES=`echo $FILES | sed s,"$CMK_CF90_COMPONLY",,g`
-OPTS_F90=`echo $OPTS_F90 | sed s,"$CMK_CF90_COMPONLY",,g`
+# CHARM_CXX_FLAGS=`echo $CHARM_CXX_FLAGS | sed s,"$CMK_CXX",,g `
+# CHARM_CC_FLAGS=`echo $CHARM_CC_FLAGS | sed s,"$CMK_CC",,g `
+# CMK_CF90_COMPONLY=`echo $CMK_CF90 | awk '{print $1}'`
+# FILES=`echo $FILES | sed s,"$CMK_CF90_COMPONLY",,g`
+# OPTS_F90=`echo $OPTS_F90 | sed s,"$CMK_CF90_COMPONLY",,g`
 
+# echo $CHARM_CC_FLAGS
 
 for FILE in $FILES
 do
@@ -2093,10 +2099,10 @@ case "$OBJECT" in
 	  COPYTO_SAVE=$COPYTO
 	  if [ -z "$COPYTO" ]
 	  then
-	    DESTDIR=`echo $OBJECT | sed -e 's@lib/[^/]*\.a$@lib_so@'`
-	    OBJECT=`echo $OBJECT | sed -e 's@lib/\([^/]*\)\.a$@lib_so/\1.a@'`
+	    DESTDIR=`echo $OBJECT | sed -e 's,lib/[^/]*\.a$,lib_so,'`
+	    OBJECT=`echo $OBJECT | sed -e 's,lib/\([^/]*\)\.a$,lib_so/\1.a,'`
 	  else
-	    COPYTO=`echo $COPYTO | sed -e 's@lib[/]*$@lib_so@'`
+	    COPYTO=`echo $COPYTO | sed -e 's,lib[/]*$,lib_so,'`
 	    DESTDIR=$COPYTO
 	  fi
 	  OBJECT=`echo $OBJECT | sed -e 's/\.a$/.'"$CMK_SHARED_SUF"'/'`
