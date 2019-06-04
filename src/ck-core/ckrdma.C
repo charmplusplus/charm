@@ -1271,6 +1271,9 @@ void CkRdmaEMBcastAckHandler(void *ack) {
         if(CmiMyNodeSize() > 1 && myMsg->getMsgtype() != ForNodeBocMsg) {
           sendRecvDoneMsgToPeers(myMsg, mgr);
         } else {
+          // Set zcMsgType to CMK_ZC_BCAST_RECV_ALL_DONE_MSG to signal to charmxi
+          // that this is the final message containing the posted pointers
+          CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
           if(myMsg->getMsgtype() == ForArrayEltMsg) {
             myMsg->setMsgtype(ForBocMsg);
             myMsg->getsetArrayEp() = mgr->getRecvBroadcastEpIdx();
@@ -1278,6 +1281,8 @@ void CkRdmaEMBcastAckHandler(void *ack) {
           enqueueNcpyMessage(bcastAckInfo->pe, myMsg);
         }
 #else
+        // Set zcMsgType to CMK_ZC_BCAST_RECV_ALL_DONE_MSG to signal to charmxi
+        // that this is the final message containing the posted pointers
         CMI_ZC_MSGTYPE(myMsg) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
 
         if(myMsg->getMsgtype() == ForArrayEltMsg) {
