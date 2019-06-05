@@ -1,0 +1,61 @@
+#!/bin/bash
+
+set -o errexit -o nounset
+
+# Thin wrapper around cmake to start a build with a similar command line as ./build
+
+
+############ Begin option parsing
+
+target=$1
+triplet=$2
+shift
+shift
+
+opt_smp=0
+opt_production=0
+opt_parallel=-j1
+
+[[ $target != "AMPI" ]] && echo "*** Warning: The cmake build only supports the 'AMPI' target, (not '$target'). Building 'AMPI'."
+
+while [[ $# -gt 0 ]]; do
+	arg=$1
+	shift
+	case $arg in
+		-j*)
+			opt_parallel=$arg
+			;;
+		smp)
+			opt_smp=1
+			;;
+		--with-production)
+			opt_production=1
+			;;
+	esac
+done
+
+
+############ End option parsing
+
+opt_network=$(echo $triplet | cut -d '-' -f1)
+
+echo "Build options for $triplet:"
+
+# Print selected options
+for option in ${!opt*}; do
+	echo $option = ${!option}
+done
+
+[[ -d $triplet ]] && { echo "*** Error: directory '$triplet' already exists. Exiting."; exit 1; }
+
+[[ $opt_production -eq 0 ]] && opt_production='Debug' || opt_production='Release'
+
+mkdir $triplet
+
+cd $triplet
+
+cmake .. -DSMP=$opt_smp -DNETWORK=$opt_network -DCMAKE_BUILD_TYPE=$opt_production
+
+make $opt_parallel
+
+echo 'Build successful.'
