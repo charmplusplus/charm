@@ -461,6 +461,21 @@ inline bool isDeregReady(CkNcpyBuffer &buffInfo) {
   return false;
 }
 
+inline void deregisterBuffer(CkNcpyBuffer &buffInfo) {
+  CmiDeregisterMem(buffInfo.ptr, buffInfo.layerInfo + CmiGetRdmaCommonInfoSize(), buffInfo.pe, buffInfo.regMode);
+  buffInfo.isRegistered = false;
+}
+
+inline void deregisterDestBuffer(NcpyOperationInfo *ncpyOpInfo) {
+  CmiDeregisterMem(ncpyOpInfo->destPtr, ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->destPe, ncpyOpInfo->destRegMode);
+  ncpyOpInfo->isDestRegistered = 0;
+}
+
+inline void deregisterSrcBuffer(NcpyOperationInfo *ncpyOpInfo) {
+  CmiDeregisterMem(ncpyOpInfo->srcPtr, ncpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->srcPe, ncpyOpInfo->srcRegMode);
+  ncpyOpInfo->isSrcRegistered = 0;
+}
+
 // Method called on completion of an Zcpy EM API (Send or Recv, P2P or BCAST)
 void CkRdmaEMAckHandler(int destPe, void *ack) {
 
@@ -489,7 +504,7 @@ void CkRdmaEMAckHandler(int destPe, void *ack) {
     NcpyOperationInfo *ncpyOpInfo = &(emBuffInfo->ncpyOpInfo);
 
     // De-register the destination buffer
-    CmiDeregisterMem(ncpyOpInfo->destPtr, ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->destPe, ncpyOpInfo->destRegMode);
+    deregisterDestBuffer(ncpyOpInfo);
 
   } else if(ncpyEmInfo->mode == ncpyEmApiMode::P2P_RECV ||
            (ncpyEmInfo->mode == ncpyEmApiMode::BCAST_RECV && t.child_count == 0)) {  // EM P2P Post API or EM BCAST Post API
@@ -497,7 +512,7 @@ void CkRdmaEMAckHandler(int destPe, void *ack) {
 
     // De-register only if destDeregMode is CK_BUFFER_DEREG
     if(ncpyOpInfo->destDeregMode == CK_BUFFER_DEREG) {
-      CmiDeregisterMem(ncpyOpInfo->destPtr, ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->destPe, ncpyOpInfo->destRegMode);
+      deregisterDestBuffer(ncpyOpInfo);
     }
   }
 #endif
@@ -532,11 +547,11 @@ void performEmApiMemcpy(CkNcpyBuffer &source, CkNcpyBuffer &dest, ncpyEmApiMode 
 
     // De-register source
     if(isDeregReady(source))
-      CmiDeregisterMem(source.ptr, source.layerInfo + CmiGetRdmaCommonInfoSize(), source.pe, source.regMode);
+      deregisterBuffer(source);
 
     // De-register destination for p2p Post API
     if(emMode == ncpyEmApiMode::P2P_RECV && isDeregReady(dest))
-      CmiDeregisterMem(dest.ptr, dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.pe, dest.regMode);
+      deregisterBuffer(dest);
 
     // Invoke source callback
     source.cb.send(sizeof(CkNcpyBuffer), &source);
@@ -548,7 +563,7 @@ void performEmApiMemcpy(CkNcpyBuffer &source, CkNcpyBuffer &dest, ncpyEmApiMode 
 
     // De-register dest if it has been registered
     if(emMode == ncpyEmApiMode::BCAST_RECV && isDeregReady(dest))
-      CmiDeregisterMem(dest.ptr, dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.pe, dest.regMode);
+      deregisterBuffer(dest);
   }
 }
 
@@ -560,7 +575,7 @@ void performEmApiCmaTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, int child
 
     // De-register destination for p2p Post API
     if(emMode == ncpyEmApiMode::P2P_RECV && isDeregReady(dest))
-      CmiDeregisterMem(dest.ptr, dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.pe, dest.regMode);
+      deregisterBuffer(dest);
 
     if(source.refAckInfo == NULL) { // Not a part of a de-registration group
       // Invoke source callback
@@ -578,7 +593,7 @@ void performEmApiCmaTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, int child
     } else {
       // De-register dest on child nodes if it has been registered
       if(emMode == ncpyEmApiMode::BCAST_RECV && isDeregReady(dest))
-        CmiDeregisterMem(dest.ptr, dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.pe, dest.regMode);
+        deregisterBuffer(dest);
     }
   }
 }
@@ -759,8 +774,7 @@ void handleReverseEntryMethodApiCompletion(NcpyOperationInfo *info) {
 #if CMK_REG_REQUIRED
   // De-register source only when srcDeregMode == CK_BUFFER_DEREG
   if(info->srcDeregMode == CK_BUFFER_DEREG) {
-    CmiDeregisterMem(info->srcPtr, info->srcLayerInfo + CmiGetRdmaCommonInfoSize(), info->srcPe, info->srcRegMode);
-    info->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
+    deregisterSrcBuffer(info);
   }
 #endif
 
@@ -849,6 +863,12 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
 
     //Update the CkRdmaWrapper pointer of the new message
     source.ptr = buf;
+
+    source.isRegistered = dest.isRegistered;
+
+    source.regMode = dest.regMode;
+
+    source.deregMode = dest.deregMode;
 
     memcpy(source.layerInfo, dest.layerInfo, layerInfoSize);
 
@@ -969,6 +989,12 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
     //Update the CkRdmaWrapper pointer of the new message
     source.ptr = arrPtrs[i];
 
+    source.isRegistered = dest.isRegistered;
+
+    source.regMode = dest.regMode;
+
+    source.deregMode = dest.deregMode;
+
     memcpy(source.layerInfo, dest.layerInfo, layerInfoSize);
 
     p|source;
@@ -1051,7 +1077,7 @@ void CkRdmaEMDeregAndAckHandler(void *ack) {
     CkNcpyBuffer &source = p2pAckInfo->src[i];
 
     // De-register source buffer
-    CmiDeregisterMem(source.ptr, source.layerInfo + CmiGetRdmaCommonInfoSize(), source.pe, source.regMode);
+    deregisterBuffer(source);
 
     // Invoke Callback
     invokeCallback(source);
@@ -1194,8 +1220,8 @@ void CkRdmaEMBcastAckHandler(void *ack) {
       for(int i=0; i<bcastRootAckInfo->numops; i++) {
 #if CMK_REG_REQUIRED
         // Deregister source buffer respecting source buffer's dereg mode
-        if(bcastRootAckInfo->src[i].deregMode == CK_BUFFER_DEREG)
-          bcastRootAckInfo->src[i].deregisterMem();
+        if(isDeregReady(bcastRootAckInfo->src[i]))
+          deregisterBuffer(bcastRootAckInfo->src[i]);
 #endif
 
         invokeCallback(&(bcastRootAckInfo->src[i].cb),
@@ -1245,6 +1271,9 @@ void CkRdmaEMBcastAckHandler(void *ack) {
         if(CmiMyNodeSize() > 1 && myMsg->getMsgtype() != ForNodeBocMsg) {
           sendRecvDoneMsgToPeers(myMsg, mgr);
         } else {
+          // Set zcMsgType to CMK_ZC_BCAST_RECV_ALL_DONE_MSG to signal to charmxi
+          // that this is the final message containing the posted pointers
+          CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
           if(myMsg->getMsgtype() == ForArrayEltMsg) {
             myMsg->setMsgtype(ForBocMsg);
             myMsg->getsetArrayEp() = mgr->getRecvBroadcastEpIdx();
@@ -1252,6 +1281,8 @@ void CkRdmaEMBcastAckHandler(void *ack) {
           enqueueNcpyMessage(bcastAckInfo->pe, myMsg);
         }
 #else
+        // Set zcMsgType to CMK_ZC_BCAST_RECV_ALL_DONE_MSG to signal to charmxi
+        // that this is the final message containing the posted pointers
         CMI_ZC_MSGTYPE(myMsg) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
 
         if(myMsg->getMsgtype() == ForArrayEltMsg) {
@@ -1321,6 +1352,12 @@ void handleBcastReverseEntryMethodApiCompletion(NcpyOperationInfo *info) {
     // Invoke the remote ackhandler function
     invokeRemoteNcpyAckHandler(info->destPe, info->refPtr, ncpyHandlerIdx::EM_ACK);
   }
+#if CMK_REG_REQUIRED
+  // De-register source for reverse operations when regMode == UNREG and deregMode == DEREG
+  if(info->isSrcRegistered == 1 && info->srcRegMode == CK_BUFFER_UNREG && info->srcDeregMode == CK_BUFFER_DEREG)
+    deregisterSrcBuffer(info);
+#endif
+
   if(info->freeMe == CMK_FREE_NCPYOPINFO)
     CmiFree(info);
 }
@@ -1340,9 +1377,8 @@ void deregisterMemFromMsg(envelope *env, bool isRecv) {
 
     // De-register the destination buffer when isRecv is false (i.e. using ZC Bcast Send API) or
     // when isRecv is true, respect deregMode and de-register
-    if( (!isRecv) || (isRecv && dest.deregMode == CMK_BUFFER_DEREG) ) {
-      CmiDeregisterMem(dest.ptr, (char *)dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.pe, dest.regMode);
-    }
+    if( (!isRecv) || (isRecv && dest.deregMode == CMK_BUFFER_DEREG) )
+      deregisterBuffer(dest);
 
     p|dest;
   }
@@ -1778,6 +1814,8 @@ void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr) {
     // Initialize previously allocated structure for ack tracking on intermediate nodes
     if(t.child_count != 0)  // Intermediate Node
       readonlyCreateOnSource(dest);
+    else // Child Node - deregister dest buffer
+      deregisterBuffer(dest);
 
     // When all pending RO Rdma transfers are complete
     if(CksvAccess(_numPendingRORdmaTransfers) == 0) {
@@ -1789,9 +1827,6 @@ void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr) {
         CmiForwardProcBcastMsg(env->getTotalsize(), (char *)env);
 
       } else { // Child Node
-
-        // deregister dest buffer
-        CmiDeregisterMem(dest.ptr, dest.layerInfo + CmiGetRdmaCommonInfoSize(), dest.pe, dest.regMode);
 
         // Send a message to the parent to signal completion in order to deregister
         envelope *compEnv = _allocEnv(ROChildCompletionMsg);
@@ -1862,6 +1897,9 @@ void readonlyGetCompleted(NcpyOperationInfo *ncpyOpInfo) {
   // Lock not needed for SMP mode as no other thread decrements _numPendingRORdmaTransfers
   CksvAccess(_numPendingRORdmaTransfers)--;
 
+  if(t.child_count == 0) // deregister dest buffer on the child node
+    deregisterDestBuffer(ncpyOpInfo);
+
   // When all pending RO Rdma transfers are complete
   if(CksvAccess(_numPendingRORdmaTransfers) == 0) {
 
@@ -1875,9 +1913,6 @@ void readonlyGetCompleted(NcpyOperationInfo *ncpyOpInfo) {
       //TODO:QD support
 
     } else {
-
-      // deregister dest buffer
-      CmiDeregisterMem(ncpyOpInfo->destPtr, ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->destPe, ncpyOpInfo->destRegMode);
 
       // Send a message to the parent to signal completion in order to deregister
       envelope *compEnv = _allocEnv(ROChildCompletionMsg);
