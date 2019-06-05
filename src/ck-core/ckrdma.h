@@ -264,6 +264,7 @@ class CkNcpyBuffer{
 
   friend void deregisterMemFromMsg(envelope *env, bool isRecv);
   friend void CkRdmaEMDeregAndAckHandler(void *ack);
+  friend inline void deregisterBuffer(CkNcpyBuffer &buffInfo);
 };
 
 // Ack handler for the Zerocopy Direct API

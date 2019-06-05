@@ -2279,6 +2279,8 @@ static void PumpNetworkSmsg()
                                                                 newNcpyOpInfo->srcSize,
                                                                 GNI_MEM_READ_ONLY);
 
+                newNcpyOpInfo->isSrcRegistered = 1; // Set isSrcRegistered to 1 after registration
+
                 post_rdma((uint64_t)newNcpyOpInfo->destPtr,
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
                           (uint64_t)newNcpyOpInfo->srcPtr,
@@ -2306,8 +2308,10 @@ static void PumpNetworkSmsg()
 
                 ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl =
                                               registerDirectMem(newNcpyOpInfo->destPtr,
-                                                                newNcpyOpInfo->srcSize,
+                                                                newNcpyOpInfo->destSize,
                                                                 GNI_MEM_READWRITE);
+
+                newNcpyOpInfo->isDestRegistered = 1; // Set isDestRegistered to 1 after registration
 
                 post_rdma((uint64_t)newNcpyOpInfo->srcPtr,
                           ((CmiGNIRzvRdmaPtr_t *)((char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize()))->mem_hndl,
