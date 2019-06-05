@@ -36,7 +36,7 @@ int runtime_init(int *rank, int *jobsize)
         return 1;
     }
 
-    kvsname = calloc(max_kvsnamelen, sizeof(char));
+    kvsname = (char*)calloc(max_kvsnamelen, sizeof(char));
     if (!kvsname) {
         return 2;
     }
@@ -46,13 +46,13 @@ int runtime_init(int *rank, int *jobsize)
         return 3;
     }
 
-    key = calloc(max_keylen, sizeof(char));
+    key = (char*)calloc(max_keylen, sizeof(char));
     if (!key) {
         free(kvsname);
         return 4;
     }
 
-    value = calloc(max_valuelen, sizeof(char));
+    value = (char*)calloc(max_valuelen, sizeof(char));
     if (!value) {
         free(key);
         free(kvsname);
@@ -100,6 +100,15 @@ int runtime_get_max_keylen(int *len)
     return 0;
 }
 
+int runtime_get_max_vallen(int *len)
+{
+    if (!initialized) {
+        return 1;
+    }
+    *len = (max_valuelen - 1) / 2;
+    return 0;
+}
+
 int runtime_kvs_put(const char *k, const void *v, int vlen)
 {
     int ret;
@@ -131,7 +140,7 @@ int runtime_kvs_put(const char *k, const void *v, int vlen)
     return 0;
 }
 
-int runtime_kvs_get(const char *k, void *v, int vlen)
+int runtime_kvs_get(const char *k, void *v, int vlen, int id)
 {
     int ret;
     int len;
