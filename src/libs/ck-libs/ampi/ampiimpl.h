@@ -2594,8 +2594,8 @@ class ampi final : public CBase_ampi {
   ampi() noexcept;
   ampi(CkArrayID parent_,const ampiCommStruct &s) noexcept;
   ampi(CkMigrateMessage *msg) noexcept;
-  void ckJustMigrated(void) noexcept;
-  void ckJustRestored(void) noexcept;
+  void ckJustMigrated() noexcept;
+  void ckJustRestored() noexcept;
   ~ampi() noexcept;
 
   void pup(PUP::er &p) noexcept;
