@@ -224,7 +224,7 @@ add_library(moduleRotateLB ../ck-ldb/RotateLB.C ${CMAKE_BINARY_DIR}/include/Rota
 
 add_library(moduleCkMulticast ../libs/ck-libs/dummy/ckdummy.C)
 
-add_library(moduleCkIO ../libs/ck-libs/io/ckio.C ../libs/ck-libs/io/ckio.h ${CMAKE_BINARY_DIR}/include/CkIO.decl.h)
+add_library(moduleCkIO ../libs/ck-libs/io/ckio.C ../libs/ck-libs/io/fs_parameters.c ../libs/ck-libs/io/ckio.h ${CMAKE_BINARY_DIR}/include/CkIO.decl.h)
 add_dependencies(moduleCkIO ck)
 configure_file(../libs/ck-libs/io/ckio.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 

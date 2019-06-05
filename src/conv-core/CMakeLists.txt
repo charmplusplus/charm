@@ -10,7 +10,7 @@ set(conv-core-h-sources cmipool.h
     memory-isomalloc.h msgq.h persistent.h queueing.h quiescence.h taskqueue.h)
 
 set(conv-core-cxx-sources conv-interoperate.C conv-taskQ.C cputopology.C
-    debug-conv++.C  memory-darwin-clang.C memory-os-wrapper.C queueing.C)
+    debug-conv++.C  memory-darwin-clang.C memory-os-wrapper.C queueing.C hrctimer.C)
 
 set(conv-ccs-c-sources ../conv-ccs/conv-ccs.C)
 
@@ -206,8 +206,6 @@ add_library(tsm ../langs/simplemsg/simplemsg.C ../langs/simplemsg/simplemsg.h)
 add_library(sm ../langs/simplemsg/sm.C ../langs/simplemsg/sm.h)
 
 add_library(pvmc ../langs/pvmc/pvmc_buf.C ../langs/pvmc/pvmc_comm.C ../langs/pvmc/pvmc_conv.C ../langs/pvmc/pvmc_main.C ../langs/pvmc/pvmc_pack.C ../langs/pvmc/pvmc_groups.C)
-
-
 
 if(${F90CHARM})
     include(../ci-files.cmake)
