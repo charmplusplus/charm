@@ -5,6 +5,11 @@
 #include "converse.h"
 #include "charm-api.h"
 
+#if CMK_TRACE_ENABLED
+#include "charm++.h"
+#include "envelope.h"
+#endif
+
 /**
  * Structure to hold the requisites for a callback
  */
@@ -39,6 +44,10 @@ typedef struct _ccd_cblist {
   ccd_cblist_elem *elems;
 } ccd_cblist;
 
+#if CMK_TRACE_ENABLED
+  static int ccdCallFnEPIdx;
+  CpvDeclare(envelope*, dummyEnv);
+#endif
 
 
 /** Initialize a list of callbacks. Alloc memory, set counters etc. */
@@ -249,6 +258,10 @@ CpvDeclare(int, _ccd_numchecks);
 typedef struct {
     double time;
     ccd_callback cb;
+  #if CMK_TRACE_ENABLED
+    int event;
+    int srcPe;
+  #endif
 } ccd_heap_elem;
 
 
@@ -312,7 +325,11 @@ static void expand_ccd_heap(void)
 /**
  * Insert a new callback into the heap
  */
+#if CMK_TRACE_ENABLED
+static void ccd_heap_insert(double t, CcdVoidFn fnp, void *arg, int pe, int event)
+#else
 static void ccd_heap_insert(double t, CcdVoidFn fnp, void *arg, int pe)
+#endif
 {
   int child, parent;
   ccd_heap_elem *h;
@@ -330,6 +347,10 @@ static void ccd_heap_insert(double t, CcdVoidFn fnp, void *arg, int pe)
     e->cb.fn = fnp;
     e->cb.arg = arg;
     e->cb.pe = pe;
+#if CMK_TRACE_ENABLED
+    e->event = event;
+    e->srcPe = CmiMyPe();
+#endif
     child  = CpvAccess(ccd_heaplen);    
     parent = child / 2;
     while((parent>0) && (h[child].time<h[parent].time)) {
@@ -398,12 +419,16 @@ static void ccd_heap_update(double curWallTime)
       ccd_heap_elem *e = h+CpvAccess(ccd_heapmaxlen);
 */
       int old = CmiSwitchToPE(e[i].cb.pe);
+#if CMK_TRACE_ENABLED
+      _TRACE_BEGIN_EXECUTE_DETAILED(e->event, ForChareMsg, ccdCallFnEPIdx, e->srcPe, 0, nullptr, nullptr);
+#endif
       (*(e[i].cb.fn))(e[i].cb.arg,curWallTime);
+#if CMK_TRACE_ENABLED
+      _TRACE_END_EXECUTE();
+#endif
       int unused = CmiSwitchToPE(old);
   }
 }
-
-
 
 CLINKAGE void CcdCallBacksReset(void *ignored,double curWallTime);
 
@@ -420,6 +445,17 @@ void CcdModuleInit(char **ignored)
    CpvInitialize(int, ccd_heaplen);
    CpvInitialize(int, ccd_heapmaxlen);
    CpvInitialize(int, _ccd_numchecks);
+
+#if CMK_TRACE_ENABLED
+   CpvInitialize(envelope*, dummyEnv);
+   CpvAccess(dummyEnv) = envelope::alloc(ForChareMsg, 0, 0);
+
+   if (CmiMyRank() == 0) {
+     int ccdCallFnMsg = CkRegisterMsg("CcdCallFnAfter_msg", nullptr, nullptr, nullptr, 0);
+     int ccdCallFnChare = CkRegisterChare("CcdCallFnAfter_chare", 0, TypeInvalid);
+     ccdCallFnEPIdx = CkRegisterEp("CcdCallFnAfter", nullptr, ccdCallFnMsg, ccdCallFnChare, 0+CK_EP_INTRINSIC);
+   }
+#endif
 
    CpvAccess(ccd_heaplen) = 0;
    CpvAccess(ccd_heapmaxlen) = MAXTIMERHEAPENTRIES;
@@ -512,7 +548,13 @@ void CcdCallFnAfterOnPE(CcdVoidFn fnp, void *arg, double deltaT, int pe)
 {
     double ctime  = CmiWallTimer();
     double tcall = ctime + deltaT/1000.0;
+#if CMK_TRACE_ENABLED
+    envelope *env = CpvAccess(dummyEnv);
+    _TRACE_CREATION_1(env);
+    ccd_heap_insert(tcall, fnp, arg, pe, env->getEvent());
+#else
     ccd_heap_insert(tcall, fnp, arg, pe);
+#endif
 } 
 
 /**
