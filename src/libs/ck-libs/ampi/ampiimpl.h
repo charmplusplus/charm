@@ -1757,7 +1757,7 @@ class AmpiMsg final : public CMessage_AmpiMsg {
       return srcRank;
     }
   }
-  inline AmpiMsgType isNcpyShmMsg(void) const noexcept { CkAssert(isSsend()); return ((AmpiMsgType*)data)[0]; }
+  inline AmpiMsgType isNcpyShmMsg() const noexcept { CkAssert(isSsend()); return ((AmpiMsgType*)data)[0]; }
   inline void getNcpyShmBuffer(AmpiNcpyShmBuffer& srcInfo) noexcept {
     CkAssert(isNcpyShmMsg());
     PUP::fromMem p(data+sizeof(AmpiMsgType));
@@ -1768,11 +1768,11 @@ class AmpiMsg final : public CMessage_AmpiMsg {
     PUP::fromMem p(data+sizeof(AmpiMsgType));
     p | srcInfo;
   }
-  inline int getSrcRank(void) const noexcept { return srcRank; }
-  inline int getLength(void) const noexcept { return length; }
-  inline char* getData(void) const noexcept { return data; }
-  inline int getTag(void) const noexcept { return tag; }
-  inline MPI_Comm getComm(void) const noexcept { return comm; }
+  inline int getSrcRank() const noexcept { return srcRank; }
+  inline int getLength() const noexcept { return length; }
+  inline char* getData() const noexcept { return data; }
+  inline int getTag() const noexcept { return tag; }
+  inline MPI_Comm getComm() const noexcept { return comm; }
   static AmpiMsg* pup(PUP::er &p, AmpiMsg *m) noexcept
   {
     int ref, ssendReq, tag, srcRank, length, origLength, dataLen;
