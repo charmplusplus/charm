@@ -52,10 +52,10 @@ if(${CMK_AMPI_WITH_ROMIO})
             ./configure
             --disable-aio
             --enable-f77=${CMK_CAN_LINK_FORTRAN}
-             # > /dev/null
+             > /dev/null
         COMMAND cp -f  ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio/include/mpio.h ${CMAKE_BINARY_DIR}/include/
         COMMAND cp -f  ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio/include/mpiof.h ${CMAKE_BINARY_DIR}/include/
-        BUILD_COMMAND cd ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio/ && make
+        BUILD_COMMAND cd ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio/ && make > /dev/null
         COMMAND # build shared library
             find .. -name *.o -exec ${CMAKE_CXX_COMPILER_LAUNCHER} -shared -o ${CMAKE_BINARY_DIR}/lib_so/libampiromio${CMAKE_SHARED_LIBRARY_SUFFIX} {} + ;
         INSTALL_COMMAND "" # No install step

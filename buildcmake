@@ -12,9 +12,10 @@ triplet=$2
 shift
 shift
 
-opt_smp=0
-opt_production=0
+opt_omp=0
 opt_parallel=-j1
+opt_production=0
+opt_smp=0
 
 [[ $target != "AMPI" ]] && echo "*** Warning: The cmake build only supports the 'AMPI' target, (not '$target'). Building 'AMPI'."
 
@@ -24,9 +25,13 @@ while [[ $# -gt 0 ]]; do
 	case $arg in
 		-j*)
 			opt_parallel=$arg
+			echo "*** Warning: Parallel builds not 100% supported yet."
 			;;
 		smp)
 			opt_smp=1
+			;;
+		omp)
+			opt_omp=1
 			;;
 		--with-production)
 			opt_production=1
@@ -43,7 +48,7 @@ echo "Build options for $triplet:"
 
 # Print selected options
 for option in ${!opt*}; do
-	echo $option = ${!option}
+	echo "  $option = ${!option}"
 done
 
 [[ -d $triplet ]] && { echo "*** Error: directory '$triplet' already exists. Exiting."; exit 1; }
@@ -54,7 +59,7 @@ mkdir $triplet
 
 cd $triplet
 
-cmake .. -DSMP=$opt_smp -DNETWORK=$opt_network -DCMAKE_BUILD_TYPE=$opt_production
+cmake .. -DSMP=$opt_smp -DNETWORK=$opt_network -DCMAKE_BUILD_TYPE=$opt_production -DOMP=$opt_omp
 
 make $opt_parallel
 
