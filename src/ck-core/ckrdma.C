@@ -1746,6 +1746,7 @@ void handleMsgOnInterimPostCompletionForRecvBcast(envelope *env, NcpyBcastInteri
 extern int _roRdmaDoneHandlerIdx,_initHandlerIdx;
 CksvExtern(int, _numPendingRORdmaTransfers);
 extern UInt numZerocopyROops, curROIndex;
+extern bool usedCMAForROBcastTransfer;
 extern NcpyROBcastAckInfo *roBcastAckInfo;
 
 void readonlyUpdateNumops() {
@@ -1829,8 +1830,8 @@ void readonlyGet(CkNcpyBuffer &src, CkNcpyBuffer &dest, void *refPtr) {
         CmiSyncSendAndFree(src.pe, compEnv->getTotalsize(), (char *)compEnv);
       }
 
-      // Directly call checkInitDone to notify RO Rdma completion
-      checkForInitDone(true);
+      // mark this variable as true in order to invoke checkForInitDone later
+      usedCMAForROBcastTransfer = true;
     }
   }
 #endif
