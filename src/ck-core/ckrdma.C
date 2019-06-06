@@ -1752,7 +1752,12 @@ void handleMsgOnInterimPostCompletionForRecvBcast(envelope *env, NcpyBcastInteri
 
 extern int _roRdmaDoneHandlerIdx,_initHandlerIdx;
 CksvExtern(int, _numPendingRORdmaTransfers);
-extern UInt numZerocopyROops, curROIndex;
+#if CMK_SMP
+extern std::atomic<UInt> numZerocopyROops;
+#else
+extern UInt  numZerocopyROops;
+#endif
+extern UInt curROIndex;
 extern bool usedCMAForROBcastTransfer;
 extern NcpyROBcastAckInfo *roBcastAckInfo;
 
