@@ -57,15 +57,6 @@ static INLINE_KEYWORD void forwardProcBcastMsg(int size, char *msg) {
 #elif CMK_BROADCAST_HYPERCUBE
   SendHyperCubeProc(size, msg);
 #endif
-#if CMK_BROADCAST_SPANNING_TREE && CMK_BROADCAST_USE_CMIREFERENCE
-  /* same message may be sent out, make a copy of it */
-  if (CmiNumNodes()>1 && CmiGetReference(msg)>1) {
-    void *newmsg;
-    newmsg = CopyMsg(msg, size);
-    CmiFree(msg);
-    msg = newmsg;
-  }
-#endif
 }
 
 static INLINE_KEYWORD void processProcBcastMsg(int size, char *msg) {
@@ -151,13 +142,8 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
         nd += startNode;
         nd = nd%CmiNumNodes();
         CmiAssert(nd>=0 && nd!=CmiMyNode());
-#if CMK_BROADCAST_USE_CMIREFERENCE
-        CmiReference(msg);
-        CmiSendNetworkFunc(CmiNodeFirst(nd), size, msg, BCAST_SYNC);
-#else
         newmsg = CopyMsg(msg, size);
         CmiSendNetworkFunc(CmiNodeFirst(nd), size, newmsg, BCAST_SYNC);
-#endif
       }
     } else {
       int parent, child_count;
@@ -171,14 +157,9 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
       }
       for (i=0; i < child_count; i++) {
         int nd = children[i];
-#if CMK_BROADCAST_USE_CMIREFERENCE
-        CmiReference(msg);
-        CmiSendNetworkFunc(CmiNodeFirst(nd), size, msg, BCAST_SYNC);
-#else
         newmsg = CopyMsg(msg, size);
         //CmiPrintf("[%d][%d] SendSpanningChildren: sending copymsg to %d \n", CmiMyPe(), CmiMyNode(), CmiNodeFirst(nd));
         CmiSendNetworkFunc(CmiNodeFirst(nd), size, newmsg, BCAST_SYNC);
-#endif
       }
     }
     CMI_DEST_RANK(msg) = oldRank;
@@ -222,13 +203,8 @@ static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode)
         nd = (nd+startNode)%CmiNumNodes();
         /*CmiPrintf("ND[%d]: send to node %d\n", CmiMyNode(), nd);*/
         CmiAssert(nd>=0 && nd!=CmiMyNode());
-#if CMK_BROADCAST_USE_CMIREFERENCE
-        CmiReference(msg);
-        CmiSendNetworkFunc(CmiNodeFirst(nd), size, msg, BCAST_SYNC);
-#else
         newmsg = CopyMsg(msg, size);
         CmiSendNetworkFunc(CmiNodeFirst(nd), size, newmsg, BCAST_SYNC);
-#endif
     }
     CMI_DEST_RANK(msg) = oldRank;
 #endif
@@ -319,15 +295,7 @@ void CmiSyncBroadcastFn1(int size, char *msg) {
 
 void CmiSyncBroadcastFn(int size, char *msg) {
     char *newmsg = msg;
-#if CMK_BROADCAST_SPANNING_TREE && CMK_BROADCAST_USE_CMIREFERENCE
-      /* need to copy the msg in case the msg is on the stack */
-      /* and we only need to copy when sending out network */
-    if (CmiNumNodes()>1) newmsg = CopyMsg(msg, size);
-#endif
     CmiSyncBroadcastFn1(size, newmsg);
-#if CMK_BROADCAST_SPANNING_TREE && CMK_BROADCAST_USE_CMIREFERENCE
-    if (newmsg != msg) CmiFree(newmsg);
-#endif
 }
 
 void CmiFreeBroadcastFn(int size, char *msg) {
@@ -350,29 +318,12 @@ CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg) {
 /* Functions regarding broadcat op that sends to every one */
 void CmiSyncBroadcastAllFn(int size, char *msg) {
     char *newmsg = msg;
-#if CMK_BROADCAST_SPANNING_TREE && CMK_BROADCAST_USE_CMIREFERENCE
-      /* need to copy the msg in case the msg is on the stack */
-      /* and we only need to copy when sending out network */
-    if (CmiNumNodes()>1) newmsg = CopyMsg(msg, size);
-#endif
     CmiSyncSendFn(CmiMyPe(), size, newmsg) ;
     CmiSyncBroadcastFn1(size, newmsg);
-#if CMK_BROADCAST_SPANNING_TREE && CMK_BROADCAST_USE_CMIREFERENCE
-    if (newmsg != msg) CmiFree(newmsg);
-#endif
 }
 
 void CmiFreeBroadcastAllFn(int size, char *msg) {
     CmiSyncBroadcastFn1(size, msg);
-#if CMK_BROADCAST_SPANNING_TREE && CMK_BROADCAST_USE_CMIREFERENCE
-      /* need to copy the msg in case the msg is on the stack */
-      /* and we only need to copy when sending out network */
-    if (CmiNumNodes()>1 && CmiGetReference(msg)>1) {
-      void *newmsg = CopyMsg(msg, size);
-      CmiFree(msg);
-      msg = newmsg;
-    }
-#endif
     CmiSendSelf(msg);
 }
 
