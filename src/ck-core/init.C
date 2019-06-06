@@ -122,6 +122,7 @@ std::atomic<UInt> numZerocopyROops = {0};
 UInt  numZerocopyROops = 0;
 #endif
 UInt  curROIndex = 0;
+bool usedCMAForROBcastTransfer = false;
 NcpyROBcastAckInfo *roBcastAckInfo;
 int   _roRdmaDoneHandlerIdx;
 CksvDeclare(int,  _numPendingRORdmaTransfers);
@@ -1096,7 +1097,12 @@ static void _initHandler(void *msg, CkCoreState *ck)
       CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
   }
   DEBUGF(("[%d,%.6lf] _numExpectInitMsgs %d CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs) %d+%d\n",CmiMyPe(),CmiWallTimer(),_numExpectInitMsgs,CkpvAccess(_numInitsRecd),CksvAccess(_numInitNodeMsgs)));
-  checkForInitDone(false); // RO ZCPY Bcast operation could still be incomplete
+#if CMK_ONESIDED_IMPL && CMK_USE_CMA
+  if(usedCMAForROBcastTransfer) {
+    checkForInitDone(true); // RO ZCPY Bcast operation was completed inline (using CMA)
+  } else
+#endif
+   checkForInitDone(false); // RO ZCPY Bcast operation could still be incomplete
 }
 
 #if CMK_SHRINK_EXPAND
