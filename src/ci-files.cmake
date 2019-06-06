@@ -6,6 +6,8 @@ foreach(in_f ${ci-files})
     # Special handling for ci files whose filename is not the same as the module name
     if(${in_f} MATCHES src/ck-pics/picsautoperf.ci)
         set(ci-output TraceAutoPerf.decl.h)
+    elseif(${in_f} MATCHES src/libs/ck-libs/dummy/ckdummy.ci)
+        set(ci-output CkDummy.decl.h)
     elseif(${in_f} MATCHES src/libs/ck-libs/io/ckio.ci)
         set(ci-output CkIO.decl.h)
     elseif(${in_f} MATCHES src/ck-core/ckreduction.ci)
@@ -34,6 +36,8 @@ foreach(in_f ${ci-files})
         set(ci-output TraceControlPoints.decl.h)
     elseif(${in_f} MATCHES src/ck-cp/controlPoints.ci)
         set(ci-output ControlPoints.decl.h)
+    elseif(${in_f} MATCHES src/ck-cp/controlPointsNoTrace.ci)
+        set(ci-output ControlPointsNoTrace.decl.h)
     elseif(${in_f} MATCHES src/ck-core/mpi-mainmodule.ci)
         set(ci-output mpi_main.decl.h)
     elseif(${in_f} MATCHES src/libs/ck-libs/multiphaseSharedArrays/msa-DistPageMgr.ci)
@@ -77,7 +81,7 @@ foreach(in_f ${ci-files})
 
     add_custom_command(
       OUTPUT ${CMAKE_BINARY_DIR}/include/${ci-output}
-      COMMAND ${CMAKE_C_COMPILER_LAUNCHER} -I. ${in_f}
+      COMMAND ${CMAKE_BINARY_DIR}/bin/charmc -I. ${in_f}
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/include/
       DEPENDS ${in_f} charmxi
       )

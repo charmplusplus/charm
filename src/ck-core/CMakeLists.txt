@@ -162,8 +162,11 @@ add_library(moduleCommonLBs
 
 if(${EVERYLB})
 add_library(moduleEveryLB
-    ${ldb-c-sources} ${ldb-cxx-sources}
-    ${ldb-h-sources} ${CMAKE_BINARY_DIR}/include/AdaptiveLB.decl.h
+    ${ldb-c-sources}
+    ${ldb-cxx-sources}
+    ${ldb-h-sources}
+    ${ck-ci-sources}
+    ${CMAKE_BINARY_DIR}/include/AdaptiveLB.decl.h
     ${CMAKE_BINARY_DIR}/include/CommAwareRefineLB.decl.h
     ${CMAKE_BINARY_DIR}/include/CommonLBs.decl.h
     ${CMAKE_BINARY_DIR}/include/EveryLB.decl.h
@@ -201,26 +204,26 @@ add_library(moduleEveryLB
 endif()
 
 # Single LBs
-add_library(moduleBlockLB ../ck-ldb/BlockLB.C ${CMAKE_BINARY_DIR}/include/BlockLB.decl.h)
-add_library(moduleComboCentLB ../ck-ldb/ComboCentLB.C ${CMAKE_BINARY_DIR}/include/ComboCentLB.decl.h)
-add_library(moduleCommLB ../ck-ldb/CommLB.C ${CMAKE_BINARY_DIR}/include/CommLB.decl.h)
-add_library(moduleDistributedLB ../ck-ldb/DistributedLB.C ${CMAKE_BINARY_DIR}/include/DistributedLB.decl.h)
-add_library(moduleDummyLB ../ck-ldb/DummyLB.C ${CMAKE_BINARY_DIR}/include/DummyLB.decl.h)
-add_library(moduleGreedyCommLB ../ck-ldb/GreedyCommLB.C ${CMAKE_BINARY_DIR}/include/GreedyCommLB.decl.h)
-add_library(moduleGreedyLB ../ck-ldb/GreedyLB.C ${CMAKE_BINARY_DIR}/include/GreedyLB.decl.h)
-add_library(moduleGreedyRefineLB ../ck-ldb/GreedyRefineLB.C ${CMAKE_BINARY_DIR}/include/GreedyRefineLB.decl.h)
-add_library(moduleHierarchicalLB ../ck-ldb/HierarchicalLB.C ${CMAKE_BINARY_DIR}/include/HierarchicalLB.decl.h)
+add_library(moduleBlockLB ../ck-ldb/BlockLB.C ${CMAKE_BINARY_DIR}/include/BlockLB.decl.h ${ck-ci-sources})
+add_library(moduleComboCentLB ../ck-ldb/ComboCentLB.C ${CMAKE_BINARY_DIR}/include/ComboCentLB.decl.h ${ck-ci-sources})
+add_library(moduleCommLB ../ck-ldb/CommLB.C ${CMAKE_BINARY_DIR}/include/CommLB.decl.h ${ck-ci-sources})
+add_library(moduleDistributedLB ../ck-ldb/DistributedLB.C ${CMAKE_BINARY_DIR}/include/DistributedLB.decl.h ${ck-ci-sources})
+add_library(moduleDummyLB ../ck-ldb/DummyLB.C ${CMAKE_BINARY_DIR}/include/DummyLB.decl.h ${ck-ci-sources})
+add_library(moduleGreedyCommLB ../ck-ldb/GreedyCommLB.C ${CMAKE_BINARY_DIR}/include/GreedyCommLB.decl.h ${ck-ci-sources})
+add_library(moduleGreedyLB ../ck-ldb/GreedyLB.C ${CMAKE_BINARY_DIR}/include/GreedyLB.decl.h ${ck-ci-sources})
+add_library(moduleGreedyRefineLB ../ck-ldb/GreedyRefineLB.C ${CMAKE_BINARY_DIR}/include/GreedyRefineLB.decl.h ${ck-ci-sources})
+add_library(moduleHierarchicalLB ../ck-ldb/HierarchicalLB.C ${CMAKE_BINARY_DIR}/include/HierarchicalLB.decl.h ${ck-ci-sources})
 add_library(moduleHybridLB ../ck-ldb/HybridLB.C ${CMAKE_BINARY_DIR}/include/HybridLB.decl.h ${CMAKE_BINARY_DIR}/include/MetisLB.decl.h ${CMAKE_BINARY_DIR}/include/GreedyRefineLB.decl.h)
 configure_file(../ck-ldb/libmoduleHybridLB.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
-add_library(moduleNeighborLB ../ck-ldb/NeighborLB.C ${CMAKE_BINARY_DIR}/include/NeighborLB.decl.h)
-add_library(moduleNodeLevelLB ../ck-ldb/NodeLevelLB.C ${CMAKE_BINARY_DIR}/include/NodeLevelLB.decl.h)
-add_library(moduleOrbLB ../ck-ldb/OrbLB.C ${CMAKE_BINARY_DIR}/include/OrbLB.decl.h)
-add_library(moduleRandCentLB ../ck-ldb/RandCentLB.C ${CMAKE_BINARY_DIR}/include/RandCentLB.decl.h)
-add_library(moduleRefineCommLB ../ck-ldb/RefineCommLB.C ${CMAKE_BINARY_DIR}/include/RefineCommLB.decl.h)
+add_library(moduleNeighborLB ../ck-ldb/NeighborLB.C ${CMAKE_BINARY_DIR}/include/NeighborLB.decl.h ${ck-ci-sources})
+add_library(moduleNodeLevelLB ../ck-ldb/NodeLevelLB.C ${CMAKE_BINARY_DIR}/include/NodeLevelLB.decl.h ${ck-ci-sources})
+add_library(moduleOrbLB ../ck-ldb/OrbLB.C ${CMAKE_BINARY_DIR}/include/OrbLB.decl.h ${ck-ci-sources})
+add_library(moduleRandCentLB ../ck-ldb/RandCentLB.C ${CMAKE_BINARY_DIR}/include/RandCentLB.decl.h ${ck-ci-sources})
+add_library(moduleRefineCommLB ../ck-ldb/RefineCommLB.C ${CMAKE_BINARY_DIR}/include/RefineCommLB.decl.h ${ck-ci-sources})
 configure_file(../ck-ldb/libmoduleRefineCommLB.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
-add_library(moduleRefineLB ../ck-ldb/RefineLB.C ${CMAKE_BINARY_DIR}/include/RefineLB.decl.h)
-add_library(moduleRefineSwapLB ../ck-ldb/RefineSwapLB.C ${CMAKE_BINARY_DIR}/include/RefineSwapLB.decl.h ${CMAKE_BINARY_DIR}/include/LBDatabase.decl.h)
-add_library(moduleRotateLB ../ck-ldb/RotateLB.C ${CMAKE_BINARY_DIR}/include/RotateLB.decl.h ${CMAKE_BINARY_DIR}/include/CentralLB.decl.h)
+add_library(moduleRefineLB ../ck-ldb/RefineLB.C ${CMAKE_BINARY_DIR}/include/RefineLB.decl.h ${ck-ci-sources})
+add_library(moduleRefineSwapLB ../ck-ldb/RefineSwapLB.C ${CMAKE_BINARY_DIR}/include/RefineSwapLB.decl.h ${ck-ci-sources})
+add_library(moduleRotateLB ../ck-ldb/RotateLB.C ${CMAKE_BINARY_DIR}/include/RotateLB.decl.h ${CMAKE_BINARY_DIR}/include/CentralLB.decl.h ${ck-ci-sources})
 
 add_library(moduleCkMulticast ../libs/ck-libs/dummy/ckdummy.C)
 
