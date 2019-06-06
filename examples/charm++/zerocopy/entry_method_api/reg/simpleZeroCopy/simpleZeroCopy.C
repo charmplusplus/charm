@@ -5,6 +5,7 @@
 //#define DEBUG(x) x
 #define DEBUG(x)
 #define LBPERIOD_ITER 5
+#define MAX_ITER 40
 
 int numElements;
 
@@ -274,7 +275,7 @@ class zerocopyObject : public CBase_zerocopyObject{
       //load balance
       if(iter % LBPERIOD_ITER == 0)
         AtSync();
-      else if(iter<=40)
+      else if(iter <= MAX_ITER)
         thisProxy[thisIndex].sdagRun();
       else {
         CkCallback reductionCb(CkReductionTarget(Main, done), mainProxy);

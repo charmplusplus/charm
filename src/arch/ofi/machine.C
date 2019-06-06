@@ -1607,7 +1607,7 @@ int fill_av_ofi(int myid,
                 CmiAbort("OFI::LrtsInit::snprintf error");
             }
 
-            ret = runtime_kvs_get(key, epnames+(i*epnamelen), epnamelen);
+            ret = runtime_kvs_get(key, epnames+(i*epnamelen), epnamelen, i);
             if (ret) {
                 CmiAbort("OFI::LrtsInit::runtime_kvs_get error");
             }
@@ -1756,7 +1756,7 @@ int fill_av(int myid,
             CmiAbort("OFI::LrtsInit::snprintf error");
         }
 
-        ret = runtime_kvs_get(key, epnames+(i*epnamelen), epnamelen);
+        ret = runtime_kvs_get(key, epnames+(i*epnamelen), epnamelen, i);
         if (ret) {
             CmiAbort("OFI::LrtsInit::runtime_kvs_get error");
         }

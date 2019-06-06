@@ -747,7 +747,7 @@ void CthSetStrategy(CthThread t, CthAwkFn awkfn, CthThFn chsfn)
 }
 
 #if CMK_OMP
-inline int CthScheduled(CthThread t) {
+int CthScheduled(CthThread t) {
   return B(t)->scheduled;
 }
 

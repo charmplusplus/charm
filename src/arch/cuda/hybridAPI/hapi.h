@@ -97,8 +97,14 @@ typedef struct hapiWorkRequest {
   // may be used to pass data to kernel calls
   void* user_data;
 
-  // flag determining whether user data is freed on destruction
+  // flags determining whether memory should be freed on destruction
+  // XXX: if different callbacks are used/set for the same WorkRequest,
+  // memory leaks could occur because they are only freed when the WorkRequest
+  // is destroyed
   bool free_user_data;
+  bool free_host_to_device_cb;
+  bool free_kernel_cb;
+  bool free_device_to_host_cb;
 
   // CUDA stream index provided by the user or assigned by GPUManager
   cudaStream_t stream;
@@ -113,7 +119,8 @@ typedef struct hapiWorkRequest {
   hapiWorkRequest() :
     grid_dim(0), block_dim(0), shared_mem(0), host_to_device_cb(NULL),
     kernel_cb(NULL), device_to_host_cb(NULL), runKernel(NULL), state(0),
-    user_data(NULL), free_user_data(false), stream(NULL)
+    user_data(NULL), free_user_data(false), free_host_to_device_cb(false),
+    free_kernel_cb(false), free_device_to_host_cb(false), stream(NULL)
   {
 #ifdef HAPI_TRACE
     trace_name = "";
@@ -126,6 +133,13 @@ typedef struct hapiWorkRequest {
   ~hapiWorkRequest() {
     if (free_user_data)
       std::free(user_data);
+
+    if (free_host_to_device_cb)
+      std::free(host_to_device_cb);
+    if (free_kernel_cb)
+      std::free(kernel_cb);
+    if (free_device_to_host_cb)
+      std::free(device_to_host_cb);
   }
 
   void setExecParams(dim3 _grid_dim, dim3 _block_dim, int _shared_mem = 0) {
@@ -150,18 +164,40 @@ typedef struct hapiWorkRequest {
 
   void setHostToDeviceCallback(void* cb) {
     host_to_device_cb = cb;
+    free_host_to_device_cb = false;
+  }
+
+  void setHostToDeviceCallback(void* cb, bool free) {
+    host_to_device_cb = cb;
+    free_host_to_device_cb = free;
   }
 
   void setKernelCallback(void* cb) {
     kernel_cb = cb;
+    free_kernel_cb = false;
+  }
+
+  void setKernelCallback(void* cb, bool free) {
+    kernel_cb = cb;
+    free_kernel_cb = free;
   }
 
   void setDeviceToHostCallback(void* cb) {
     device_to_host_cb = cb;
+    free_device_to_host_cb = false;
   }
 
-  void setCallback(void* cb) {
+  void setDeviceToHostCallback(void* cb, bool free) {
     device_to_host_cb = cb;
+    free_device_to_host_cb = free;
+  }
+
+  inline void setCallback(void* cb) {
+    setDeviceToHostCallback(cb, false);
+  }
+
+  inline void setCallback(void* cb, bool free) {
+    setDeviceToHostCallback(cb, free);
   }
 
 #ifdef HAPI_TRACE

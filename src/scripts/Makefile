@@ -45,6 +45,11 @@ all-test-examples: bigsim LIBS
 all-test-benchmarks: bigsim LIBS
 	$(MAKE) -C ../benchmarks all
 
+all-zc: charm++
+	$(MAKE) -C ../tests/charm++/zerocopy all
+	$(MAKE) -C ../examples/charm++/zerocopy all
+	$(MAKE) -C ../benchmarks/charm++/zerocopy all
+
 charm++: charm-target
 	@echo "$(OPTS)" > OPTS
 	touch charm++
@@ -181,6 +186,11 @@ test-examples: bigsim LIBS
 
 test-benchmarks: bigsim LIBS
 	$(MAKE) -C ../benchmarks test
+
+test-zc: charm++
+	$(MAKE) -C ../tests/charm++/zerocopy test
+	$(MAKE) -C ../examples/charm++/zerocopy test
+	$(MAKE) -C ../benchmarks/charm++/zerocopy test
 
 test-converse: converse
 	$(MAKE) -C ../tests test-converse
@@ -531,7 +541,7 @@ LIBCONV_CORE=convcore.o hrctimer.o conv-conds.o conv-taskQ.o queueing.o msgmgr.o
 	debug-conv.o debug-conv++.o conv-ccs.o ccs-builtins.o middle-ccs.o \
 	traceCore.o traceCoreCommon.o \
 	converseProjections.o machineProjections.o \
-	quiescence.o isomalloc.o mem-arena.o conv-counter.o memory-darwin-clang.o \
+	quiescence.o isomalloc.o mem-arena.o memory-darwin-clang.o \
 	global-nop.o cmipool.o cpuaffinity.o cputopology.o  \
 	cmitls.o memoryaffinity.o commitid.o conv-interoperate.o conv-rdma.o \
 

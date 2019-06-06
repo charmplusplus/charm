@@ -116,8 +116,12 @@ UInt  _numInitMsgs = 0;
 CksvDeclare(UInt,_numInitNodeMsgs);
 
 #if CMK_ONESIDED_IMPL
-UInt  numZerocopyROops;
-UInt  curROIndex;
+#if CMK_SMP
+std::atomic<UInt> numZerocopyROops = {0};
+#else
+UInt  numZerocopyROops = 0;
+#endif
+UInt  curROIndex = 0;
 NcpyROBcastAckInfo *roBcastAckInfo;
 int   _roRdmaDoneHandlerIdx;
 CksvDeclare(int,  _numPendingRORdmaTransfers);
@@ -914,20 +918,19 @@ static inline void _processRODataMsg(envelope *env)
 {
   //Unpack each readonly:
   if(!CmiMyRank()) {
-#if CMK_ONESIDED_IMPL && CMK_SMP
-    if(CMI_IS_ZC_BCAST(env)) {
-      // Send message to peers
-      CmiForwardMsgToPeers(env->getTotalsize(), (char *)env);
-    }
-#endif
-
     //Unpack each readonly
     PUP::fromMem pu((char *)EnvToUsr(env));
     CmiSpanningTreeInfo &t = *_topoTree;
 
 #if CMK_ONESIDED_IMPL
-    pu|numZerocopyROops;
+#if CMK_SMP
+    UInt numZerocopyROopsTemp;
+    pu|numZerocopyROopsTemp;
 
+    numZerocopyROops.store(numZerocopyROopsTemp, std::memory_order_relaxed);
+#else
+    pu|numZerocopyROops;
+#endif
     // Set _numPendingRORdmaTransfers to numZerocopyROops
     CksvAccess(_numPendingRORdmaTransfers) = numZerocopyROops;
 
@@ -940,6 +943,14 @@ static inline void _processRODataMsg(envelope *env)
     for(size_t i=0;i<_readonlyTable.size();i++) {
       _readonlyTable[i]->pupData(pu);
     }
+
+    // Forward message to peers after numZerocopyROops has been initialized
+#if CMK_ONESIDED_IMPL && CMK_SMP
+    if(CMI_IS_ZC_BCAST(env)) {
+      // Send message to peers
+      CmiForwardMsgToPeers(env->getTotalsize(), (char *)env);
+    }
+#endif
   } else {
     CmiFree(env);
   }
@@ -997,7 +1008,7 @@ static void _roRdmaDoneHandler(envelope *env) {
           envelope *compEnv = _allocEnv(ROChildCompletionMsg);
           compEnv->setSrcPe(CkMyPe());
           CmiSetHandler(compEnv, _roRdmaDoneHandlerIdx);
-          CmiSyncSendAndFree(t.parent, compEnv->getTotalsize(), (char *)compEnv);
+          CmiSyncSendAndFree(CmiNodeFirst(t.parent), compEnv->getTotalsize(), (char *)compEnv);
         }
         // Free the roBcastAckInfo allocated inside readonlyAllocateOnSource
         CmiFree(roBcastAckInfo);
@@ -1015,7 +1026,11 @@ void checkForInitDone(bool rdmaROCompleted) {
   bool noPendingRORdmaTransfers = true;
 #if CMK_ONESIDED_IMPL
   // Ensure that there are no pending RO Rdma transfers on Rank 0 when numZerocopyROops > 0
-  if(CmiMyRank() == 0 && numZerocopyROops > 0)
+#if CMK_SMP
+  if(numZerocopyROops.load(std::memory_order_relaxed) > 0)
+#else
+  if(numZerocopyROops > 0)
+#endif
     noPendingRORdmaTransfers = rdmaROCompleted;
 #endif
   if (_numExpectInitMsgs && CkpvAccess(_numInitsRecd) + CksvAccess(_numInitNodeMsgs) == _numExpectInitMsgs && noPendingRORdmaTransfers)
@@ -1249,22 +1264,23 @@ void _sendReadonlies() {
     _numInitMsgs++;
   }
 
-#if CMK_ONESIDED_IMPL
-  numZerocopyROops = 0;
-  curROIndex = 0;
-#endif
-
   //Determine the size of the RODataMessage
   PUP::sizer ps;
 
 #if CMK_ONESIDED_IMPL
+#if CMK_SMP
+  UInt numZerocopyROopsTemp;
+  numZerocopyROopsTemp = numZerocopyROops;
+  ps|numZerocopyROopsTemp;
+#else
   ps|numZerocopyROops;
+#endif
 #endif
 
   for(int i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(ps);
 
 #if CMK_ONESIDED_IMPL
-  if(numZerocopyROops > 0) {
+  if(CkNumNodes() > 1 && numZerocopyROops > 0) { // No ZC ops are performed when CkNumNodes <= 1
     readonlyAllocateOnSource();
   }
 #endif
@@ -1273,7 +1289,12 @@ void _sendReadonlies() {
   envelope *env = _allocEnv(RODataMsg, ps.size());
   PUP::toMem pp((char *)EnvToUsr(env));
 #if CMK_ONESIDED_IMPL
+#if CMK_SMP
+  numZerocopyROopsTemp = numZerocopyROops;
+  pp|numZerocopyROopsTemp;
+#else
   pp|numZerocopyROops;
+#endif
 #endif
   for(int i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pp);
 
@@ -1457,7 +1478,7 @@ void _initCharm(int unused_argc, char **argv)
 
 #if CMK_ONESIDED_IMPL
 	// Set the ack handler function used for the entry method p2p api and entry method bcast api
-	CmiSetEMNcpyAckHandler(CkRdmaEMAckHandler, CkRdmaEMBcastAckHandler, CkRdmaEMBcastPostAckHandler);
+	initEMNcpyAckHandler();
 #endif
 	/**
 	  The rank-0 processor of each node calls the 
