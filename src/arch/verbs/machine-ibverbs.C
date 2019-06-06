@@ -1904,7 +1904,7 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		
 		registerDirectMemory(newNcpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(),
 		                     newNcpyOpInfo->destPtr,
-		                     newNcpyOpInfo->srcSize);
+		                     newNcpyOpInfo->destSize);
 		// Set the destination as registered
 		newNcpyOpInfo->isDestRegistered = 1;
 		

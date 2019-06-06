@@ -45,6 +45,11 @@ all-test-examples: bigsim LIBS
 all-test-benchmarks: bigsim LIBS
 	$(MAKE) -C ../benchmarks all
 
+all-zc: charm++
+	$(MAKE) -C ../tests/charm++/zerocopy all
+	$(MAKE) -C ../examples/charm++/zerocopy all
+	$(MAKE) -C ../benchmarks/charm++/zerocopy all
+
 charm++: charm-target
 	@echo "$(OPTS)" > OPTS
 	touch charm++
@@ -181,6 +186,11 @@ test-examples: bigsim LIBS
 
 test-benchmarks: bigsim LIBS
 	$(MAKE) -C ../benchmarks test
+
+test-zc: charm++
+	$(MAKE) -C ../tests/charm++/zerocopy test
+	$(MAKE) -C ../examples/charm++/zerocopy test
+	$(MAKE) -C ../benchmarks/charm++/zerocopy test
 
 test-converse: converse
 	$(MAKE) -C ../tests test-converse

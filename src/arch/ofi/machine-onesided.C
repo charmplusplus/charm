@@ -141,6 +141,8 @@ void process_onesided_reg_and_put(struct fi_cq_tagged_entry *e, OFIRequest *req)
                        ncpyOpInfo->srcPtr,
                        ncpyOpInfo->srcSize);
 
+  ncpyOpInfo->isSrcRegistered = 1; // Set isSrcRegistered to 1 after registration
+
   const char *rbuf  = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (const char*)(ncpyOpInfo->destPtr);
 
   // Allocate a completion object for tracking write completion and ack handling
@@ -176,7 +178,9 @@ void process_onesided_reg_and_get(struct fi_cq_tagged_entry *e, OFIRequest *req)
 
   registerDirectMemory(ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(),
                        ncpyOpInfo->destPtr,
-                       ncpyOpInfo->srcSize);
+                       ncpyOpInfo->destSize);
+
+  ncpyOpInfo->isDestRegistered = 1; // Set isDestRegistered to 1 after registration
 
   const char *rbuf  = (FI_MR_SCALABLE == context.mr_mode) ? 0 : (const char*)(ncpyOpInfo->srcPtr);
 
