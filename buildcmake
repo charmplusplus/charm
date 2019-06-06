@@ -1,9 +1,8 @@
 #!/bin/bash
 
-set -o errexit -o nounset
-
 # Thin wrapper around cmake to start a build with a similar command line as ./build
 
+set -o errexit -o nounset
 
 ############ Begin option parsing
 
@@ -15,28 +14,42 @@ shift
 opt_omp=0
 opt_parallel=-j1
 opt_production=0
+opt_romio=0
 opt_smp=0
+opt_tracing=0
 
 [[ $target != "AMPI" ]] && echo "*** Warning: The cmake build only supports the 'AMPI' target, (not '$target'). Building 'AMPI'."
 
 while [[ $# -gt 0 ]]; do
-	arg=$1
-	shift
-	case $arg in
-		-j*)
-			opt_parallel=$arg
-			echo "*** Warning: Parallel builds not 100% supported yet."
-			;;
-		smp)
-			opt_smp=1
-			;;
-		omp)
-			opt_omp=1
-			;;
-		--with-production)
-			opt_production=1
-			;;
-	esac
+    arg=$1
+    shift
+    case $arg in
+        -j*)
+            opt_parallel=$arg
+            echo "*** Warning: Parallel builds might not work fully yet."
+            ;;
+        smp)
+            opt_smp=1
+            ;;
+        omp)
+            opt_omp=1
+            ;;
+        --with-production)
+            opt_production=1
+            ;;
+        --with-romio)
+            opt_romio=1
+            ;;
+        --without-romio)
+            opt_romio=0
+            ;;
+        --enable-tracing)
+            opt_tracing=1
+            ;;
+        *)
+            echo "*** Warning: Ignoring unknown option '$arg'."
+            ;;
+    esac
 done
 
 
@@ -48,18 +61,20 @@ echo "Build options for $triplet:"
 
 # Print selected options
 for option in ${!opt*}; do
-	echo "  $option = ${!option}"
+    echo "  $option = ${!option}"
 done
 
 [[ -d $triplet ]] && { echo "*** Error: directory '$triplet' already exists. Exiting."; exit 1; }
 
 [[ $opt_production -eq 0 ]] && opt_production='Debug' || opt_production='Release'
 
+sleep 2
+
 mkdir $triplet
 
 cd $triplet
 
-cmake .. -DSMP=$opt_smp -DNETWORK=$opt_network -DCMAKE_BUILD_TYPE=$opt_production -DOMP=$opt_omp
+cmake .. -DSMP=$opt_smp -DNETWORK=$opt_network -DCMAKE_BUILD_TYPE=$opt_production -DOMP=$opt_omp -DCMK_AMPI_WITH_ROMIO=$opt_romio -DTRACING=$opt_tracing
 
 make $opt_parallel
 
