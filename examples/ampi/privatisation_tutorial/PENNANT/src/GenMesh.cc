@@ -30,26 +30,26 @@ GenMesh::GenMesh(const InputFile* inp) {
 
     meshtype = inp->getString("meshtype", "");
     if (meshtype.empty()) {
-        if (mype == 0)
+        if (mype() == 0)
             cerr << "Error:  must specify meshtype" << endl;
         exit(1);
     }
     if (meshtype != "pie" &&
             meshtype != "rect" &&
             meshtype != "hex") {
-        if (mype == 0)
+        if (mype() == 0)
             cerr << "Error:  invalid meshtype " << meshtype << endl;
         exit(1);
     }
     vector<double> params =
             inp->getDoubleList("meshparams", vector<double>());
     if (params.empty()) {
-        if (mype == 0)
+        if (mype() == 0)
             cerr << "Error:  must specify meshparams" << endl;
         exit(1);
     }
     if (params.size() > 4) {
-        if (mype == 0)
+        if (mype() == 0)
             cerr << "Error:  meshparams must have <= 4 values" << endl;
         exit(1);
     }
@@ -65,12 +65,12 @@ GenMesh::GenMesh(const InputFile* inp) {
     leny = (params.size() >= 4 ? params[3] : 1.0);
 
     if (gnzx <= 0 || gnzy <= 0 || lenx <= 0. || leny <= 0. ) {
-        if (mype == 0)
+        if (mype() == 0)
             cerr << "Error:  meshparams values must be positive" << endl;
         exit(1);
     }
     if (meshtype == "pie" && lenx >= 2. * M_PI) {
-        if (mype == 0)
+        if (mype() == 0)
             cerr << "Error:  meshparams theta must be < 360" << endl;
         exit(1);
     }
@@ -167,7 +167,7 @@ void GenMesh::generateRect(
        }
     }
 
-    if (numpe == 1) return;
+    if (numpe() == 1) return;
 
     // estimate sizes of slave/master arrays
     slavepoints.reserve((mypey != 0) * npx + (mypex != 0) * npy);
@@ -177,14 +177,14 @@ void GenMesh::generateRect(
     // enumerate slave points
     // slave point with master at lower left
     if (mypex != 0 && mypey != 0) {
-        int mstrpe = mype - numpex - 1;
+        int mstrpe = mype() - numpex - 1;
         slavepoints.push_back(0);
         slavemstrpes.push_back(mstrpe);
         slavemstrcounts.push_back(1);
     }
     // slave points with master below
     if (mypey != 0) {
-        int mstrpe = mype - numpex;
+        int mstrpe = mype() - numpex;
         int oldsize = slavepoints.size();
         int p = 0;
         for (int i = 0; i < npx; ++i) {
@@ -197,7 +197,7 @@ void GenMesh::generateRect(
     }
     // slave points with master to left
     if (mypex != 0) {
-        int mstrpe = mype - 1;
+        int mstrpe = mype() - 1;
         int oldsize = slavepoints.size();
         int p = 0;
         for (int j = 0; j < npy; ++j) {
@@ -212,7 +212,7 @@ void GenMesh::generateRect(
     // enumerate master points
     // master points with slave to right
     if (mypex != numpex - 1) {
-        int slvpe = mype + 1;
+        int slvpe = mype() + 1;
         int oldsize = masterpoints.size();
         int p = npx - 1;
         for (int j = 0; j < npy; ++j) {
@@ -225,7 +225,7 @@ void GenMesh::generateRect(
     }
     // master points with slave above
     if (mypey != numpey - 1) {
-        int slvpe = mype + numpex;
+        int slvpe = mype() + numpex;
         int oldsize = masterpoints.size();
         int p = (npy - 1) * npx;
         for (int i = 0; i < npx; ++i) {
@@ -238,7 +238,7 @@ void GenMesh::generateRect(
     }
     // master point with slave at upper right
     if (mypex != numpex - 1 && mypey != numpey - 1) {
-        int slvpe = mype + numpex + 1;
+        int slvpe = mype() + numpex + 1;
         int p = npx * npy - 1;
         masterpoints.push_back(p);
         masterslvpes.push_back(slvpe);
@@ -309,7 +309,7 @@ void GenMesh::generatePie(
         }
     }
 
-    if (numpe == 1) return;
+    if (numpe() == 1) return;
 
     // estimate sizes of slave/master arrays
     slavepoints.reserve((mypey != 0) * npx + (mypex != 0) * npy);
@@ -319,14 +319,14 @@ void GenMesh::generatePie(
     // enumerate slave points
     // slave point with master at lower left
     if (mypex != 0 && mypey != 0) {
-        int mstrpe = mype - numpex - 1;
+        int mstrpe = mype() - numpex - 1;
         slavepoints.push_back(0);
         slavemstrpes.push_back(mstrpe);
         slavemstrcounts.push_back(1);
     }
     // slave points with master below
     if (mypey != 0) {
-        int mstrpe = mype - numpex;
+        int mstrpe = mype() - numpex;
         int oldsize = slavepoints.size();
         int p = 0;
         for (int i = 0; i < npx; ++i) {
@@ -339,7 +339,7 @@ void GenMesh::generatePie(
     }
     // slave points with master to left
     if (mypex != 0) {
-        int mstrpe = mype - 1;
+        int mstrpe = mype() - 1;
         int oldsize = slavepoints.size();
         if (mypey == 0) {
             slavepoints.push_back(0);
@@ -363,7 +363,7 @@ void GenMesh::generatePie(
     // enumerate master points
     // master points with slave to right
     if (mypex != numpex - 1) {
-        int slvpe = mype + 1;
+        int slvpe = mype() + 1;
         int oldsize = masterpoints.size();
         // special case:  origin as master for slave on PE 1
         if (mypex == 0 && mypey == 0) {
@@ -387,7 +387,7 @@ void GenMesh::generatePie(
     }
     // master points with slave above
     if (mypey != numpey - 1) {
-        int slvpe = mype + numpex;
+        int slvpe = mype() + numpex;
         int oldsize = masterpoints.size();
         int p = (npy - 1) * npx;
         if (mypey == 0) p -= npx - 1;
@@ -401,7 +401,7 @@ void GenMesh::generatePie(
     }
     // master point with slave at upper right
     if (mypex != numpex - 1 && mypey != numpey - 1) {
-        int slvpe = mype + numpex + 1;
+        int slvpe = mype() + numpex + 1;
         int p = npx * npy - 1;
         if (mypey == 0) p -= npx - 1;
         masterpoints.push_back(p);
@@ -507,7 +507,7 @@ void GenMesh::generateHex(
         } // for i
     } // for j
 
-    if (numpe == 1) return;
+    if (numpe() == 1) return;
 
     // estimate upper bounds for sizes of slave/master arrays
     slavepoints.reserve((mypey != 0) * 2 * npx +
@@ -518,7 +518,7 @@ void GenMesh::generateHex(
     // enumerate slave points
     // slave points with master at lower left
     if (mypex != 0 && mypey != 0) {
-        int mstrpe = mype - numpex - 1;
+        int mstrpe = mype() - numpex - 1;
         slavepoints.push_back(0);
         slavepoints.push_back(1);
         slavemstrpes.push_back(mstrpe);
@@ -527,7 +527,7 @@ void GenMesh::generateHex(
     // slave points with master below
     if (mypey != 0) {
         int p = 0;
-        int mstrpe = mype - numpex;
+        int mstrpe = mype() - numpex;
         int oldsize = slavepoints.size();
         for (int i = 0; i < npx; ++i) {
             if (i == 0 && mypex != 0) {
@@ -546,7 +546,7 @@ void GenMesh::generateHex(
     }  // if mypey != 0
     // slave points with master to left
     if (mypex != 0) {
-        int mstrpe = mype - 1;
+        int mstrpe = mype() - 1;
         int oldsize = slavepoints.size();
         for (int j = 0; j < npy; ++j) {
             if (j == 0 && mypey != 0) continue;
@@ -565,7 +565,7 @@ void GenMesh::generateHex(
     // enumerate master points
     // master points with slave to right
     if (mypex != numpex - 1) {
-        int slvpe = mype + 1;
+        int slvpe = mype() + 1;
         int oldsize = masterpoints.size();
         for (int j = 0; j < npy; ++j) {
             if (j == 0 && mypey != 0) continue;
@@ -583,7 +583,7 @@ void GenMesh::generateHex(
     // master points with slave above
     if (mypey != numpey - 1) {
         int p = pbase[nzy];
-        int slvpe = mype + numpex;
+        int slvpe = mype() + numpex;
         int oldsize = masterpoints.size();
         for (int i = 0; i < npx; ++i) {
             if (i == 0 && mypex != 0) {
@@ -602,7 +602,7 @@ void GenMesh::generateHex(
     }  // if mypey != numpey - 1
     // master points with slave at upper right
     if (mypex != numpex - 1 && mypey != numpey - 1) {
-        int slvpe = mype + numpex + 1;
+        int slvpe = mype() + numpex + 1;
         masterpoints.push_back(np-2);
         masterpoints.push_back(np-1);
         masterslvpes.push_back(slvpe);
@@ -627,23 +627,23 @@ void GenMesh::calcNumPE() {
     double ny = static_cast<double>(gnzy);
     bool swapflag = (nx > ny);
     if (swapflag) swap(nx, ny);
-    double n = sqrt(numpe * nx / ny);
+    double n = sqrt(numpe() * nx / ny);
     // need to constrain n to be an integer with numpe % n == 0
     // try rounding n both up and down
     int n1 = floor(n + 1.e-12);
     n1 = max(n1, 1);
-    while (numpe % n1 != 0) --n1;
+    while (numpe() % n1 != 0) --n1;
     int n2 = ceil(n - 1.e-12);
-    while (numpe % n2 != 0) ++n2;
+    while (numpe() % n2 != 0) ++n2;
     // pick whichever of n1 and n2 gives blocks closest to square,
     // i.e. gives the shortest long side
-    double longside1 = max(nx / n1, ny / (numpe/n1));
-    double longside2 = max(nx / n2, ny / (numpe/n2));
+    double longside1 = max(nx / n1, ny / (numpe()/n1));
+    double longside2 = max(nx / n2, ny / (numpe()/n2));
     numpex = (longside1 <= longside2 ? n1 : n2);
-    numpey = numpe / numpex;
+    numpey = numpe() / numpex;
     if (swapflag) swap(numpex, numpey);
-    mypex = mype % numpex;
-    mypey = mype / numpex;
+    mypex = mype() % numpex;
+    mypey = mype() / numpex;
 
 }
 

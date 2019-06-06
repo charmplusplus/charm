@@ -3,6 +3,8 @@ PRODUCT := pennant
 
 SRCDIR := src
 
+include ../common.mk
+
 HDRS := $(wildcard $(SRCDIR)/*.hh)
 SRCS := $(wildcard $(SRCDIR)/*.cc)
 OBJS := $(SRCS:$(SRCDIR)/%.cc=$(BUILDDIR)/%.o)
@@ -14,15 +16,15 @@ BINARY := $(BUILDDIR)/$(PRODUCT)
 #
 # gcc flags:
 #CXX := g++
-#CXXFLAGS_DEBUG := -g
-#CXXFLAGS_OPT := -O3
+CXXFLAGS_DEBUG := -g
+CXXFLAGS_OPT := -O3
 #CXXFLAGS_OPENMP := -fopenmp
 
 # intel flags:
-CXX := icpc
-CXXFLAGS_DEBUG := -g
-CXXFLAGS_OPT := -O3 -fast #-fno-alias
-CXXFLAGS_OPENMP := -openmp
+#CXX := icpc
+#CXXFLAGS_DEBUG := -g
+#CXXFLAGS_OPT := -O3 -fast -fno-alias
+#CXXFLAGS_OPENMP := -openmp
 
 # pgi flags:
 #CXX := pgCC
@@ -39,14 +41,14 @@ CXXFLAGS := $(CXXFLAGS_OPT)
 # add mpi to compile (comment out for serial build)
 # the following assumes the existence of an mpi compiler
 # wrapper called mpicxx
-CXX := mpicxx
+CXX := $(AMPICXX)
 CXXFLAGS += -DUSE_MPI
 
 # add openmp flags (comment out for serial build)
-CXXFLAGS += $(CXXFLAGS_OPENMP)
-LDFLAGS += $(CXXFLAGS_OPENMP)
+#CXXFLAGS += $(CXXFLAGS_OPENMP)
+#LDFLAGS += $(CXXFLAGS_OPENMP)
 
-LD := $(CXX)
+LD := $(CXX) -memory isomalloc -module CommonLBs
 
 
 # begin rules
@@ -75,4 +77,4 @@ endef
 
 .PHONY : clean
 clean :
-	rm -f $(BINARY) $(OBJS) $(DEPS)
+	rm -f $(BINARY) $(OBJS) $(DEPS) *.o charmrun

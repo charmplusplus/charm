@@ -30,7 +30,7 @@ InputFile::InputFile(const char* filename) {
     ifstream ifs(filename);
     if (!ifs.good())
     {
-        if (mype == 0)
+        if (mype() == 0)
             cerr << "File " << filename << " not found" << endl;
         exit(1);
     }
@@ -49,7 +49,7 @@ InputFile::InputFile(const char* filename) {
           continue;
 
         if (pairs.find(key) != pairs.end()) {
-            if (mype == 0)
+            if (mype() == 0)
                 cerr << "Duplicate key " << key << " in input file" << endl;
             exit(1);
         }

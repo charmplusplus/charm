@@ -23,9 +23,9 @@
 // these out if not using MPI.
 
 namespace Parallel {
-    extern int numpe;           // number of MPI PEs in use
+    int numpe();                // number of MPI PEs in use
                                 // (1 if not using MPI)
-    extern int mype;            // PE number for my rank
+    int mype();                 // PE number for my rank
                                 // (0 if not using MPI)
 
     void init();                // initialize MPI
