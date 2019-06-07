@@ -208,16 +208,13 @@ int CmiSetCPUAffinity(int mycore)
   int thread_assignment = core % thread_unitcount;
 
   hwloc_obj_t thread_obj = cmi_hwloc_get_obj_by_type(topology, HWLOC_OBJ_PU, thread_assignment);
-  hwloc_cpuset_t cpuset = cmi_hwloc_bitmap_dup(thread_obj->cpuset);
-  cmi_hwloc_bitmap_singlify(cpuset);
+  hwloc_cpuset_t cpuset = thread_obj->cpuset;
 
 #if CMK_SMP
   set_thread_affinity(topology, cpuset);
 #else
   set_process_affinity(topology, cpuset);
 #endif
-
-  cmi_hwloc_bitmap_free(cpuset);
 
   cmi_hwloc_topology_destroy(topology);
   return 0;
