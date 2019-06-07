@@ -53,7 +53,7 @@ void ExportGold::write(
 void ExportGold::writeCaseFile(
         const string& basename) {
 
-    if (Parallel::mype > 0) return;
+    if (Parallel::mype() > 0) return;
 
     // open file
     const string filename = basename + ".case";
@@ -94,7 +94,7 @@ void ExportGold::writeGeoFile(
 
     // open file
     ofstream ofs;
-    if (mype == 0) {
+    if (mype() == 0) {
         const string filename = basename + ".geo";
         ofs.open(filename.c_str());
         if (!ofs.good()) {
@@ -105,7 +105,7 @@ void ExportGold::writeGeoFile(
     }
 
     // write general header
-    if (mype == 0) {
+    if (mype() == 0) {
         ofs << scientific;
         ofs << "cycle = " << setw(8) << cycle << endl;
         ofs << setprecision(8);
@@ -125,17 +125,17 @@ void ExportGold::writeGeoFile(
 
     int gnump = nump;
     Parallel::globalSum(gnump);
-    vector<int> penump(mype == 0 ? numpe : 0);
+    vector<int> penump(mype() == 0 ? numpe() : 0);
     Parallel::gather(nump, &penump[0]);
-    vector<int> peoffset(mype == 0 ? numpe + 1 : 1);
+    vector<int> peoffset(mype() == 0 ? numpe() + 1 : 1);
     partial_sum(penump.begin(), penump.end(), &peoffset[1]);
     int offset;
     Parallel::scatter(&peoffset[0], offset);
-    vector<double2> gpx(mype == 0 ? gnump : 0);
+    vector<double2> gpx(mype() == 0 ? gnump : 0);
     Parallel::gatherv(&px[0], nump, &gpx[0], &penump[0]);
 
     // write node info
-    if (mype == 0) {
+    if (mype() == 0) {
         ofs << "coordinates" << endl;
         ofs << setw(10) << gnump << endl;
         ofs << setprecision(5);
@@ -155,10 +155,10 @@ void ExportGold::writeGeoFile(
     const int nquads = quads.size();
     const int nothers = others.size();
 
-    if (mype == 0) {
-        pentris.resize(numpe);
-        penquads.resize(numpe);
-        penothers.resize(numpe);
+    if (mype() == 0) {
+        pentris.resize(numpe());
+        penquads.resize(numpe());
+        penothers.resize(numpe());
     }
     Parallel::gather(ntris, &pentris[0]);
     Parallel::gather(nquads, &penquads[0]);
@@ -168,14 +168,14 @@ void ExportGold::writeGeoFile(
     gnquads = accumulate(penquads.begin(), penquads.end(), 0);
     gnothers = accumulate(penothers.begin(), penothers.end(), 0);
 
-    vector<int> pesizes(mype == 0 ? numpe : 0);
+    vector<int> pesizes(mype() == 0 ? numpe() : 0);
 
     // gather triangle info to PE 0
     vector<int> trip(3 * ntris);
     vector<int> gtris(gntris), gtrip(3 * gntris);
     Parallel::gatherv(&tris[0], ntris, &gtris[0], &pentris[0]);
-    if (mype == 0) {
-        for (int pe = 0; pe < numpe; ++pe)
+    if (mype() == 0) {
+        for (int pe = 0; pe < numpe(); ++pe)
             pesizes[pe] = pentris[pe] * 3;
     }
     for (int t = 0; t < ntris; ++t) {
@@ -188,7 +188,7 @@ void ExportGold::writeGeoFile(
     Parallel::gatherv(&trip[0], 3 * ntris, &gtrip[0], &pesizes[0]);
 
     // write triangles
-    if (mype == 0 && gntris > 0) {
+    if (mype() == 0 && gntris > 0) {
         ofs << "tria3" << endl;
         ofs << setw(10) << gntris << endl;
         for (int t = 0; t < gntris; ++t)
@@ -204,8 +204,8 @@ void ExportGold::writeGeoFile(
     vector<int> quadp(4 * nquads);
     vector<int> gquads(gnquads), gquadp(4 * gnquads);
     Parallel::gatherv(&quads[0], nquads, &gquads[0], &penquads[0]);
-    if (mype == 0) {
-        for (int pe = 0; pe < numpe; ++pe)
+    if (mype() == 0) {
+        for (int pe = 0; pe < numpe(); ++pe)
             pesizes[pe] = penquads[pe] * 4;
     }
     for (int q = 0; q < nquads; ++q) {
@@ -218,7 +218,7 @@ void ExportGold::writeGeoFile(
     Parallel::gatherv(&quadp[0], 4 * nquads, &gquadp[0], &pesizes[0]);
 
     // write quads
-    if (mype == 0 && gnquads > 0) {
+    if (mype() == 0 && gnquads > 0) {
         ofs << "quad4" << endl;
         ofs << setw(10) << gnquads << endl;
         for (int q = 0; q < gnquads; ++q)
@@ -250,7 +250,7 @@ void ExportGold::writeGeoFile(
     Parallel::gatherv(&otherp[0], size, &gotherp[0], &pesizes[0]);
 
     // write others
-    if (mype == 0 && gnothers > 0) {
+    if (mype() == 0 && gnothers > 0) {
         ofs << "nsided" << endl;
         ofs << setw(10) << gnothers << endl;
         for (int n = 0; n < gnothers; ++n)
@@ -266,7 +266,7 @@ void ExportGold::writeGeoFile(
         }
     } // if mype == 0 ...
 
-    if (mype == 0) ofs.close();
+    if (mype() == 0) ofs.close();
 
 }
 
@@ -279,7 +279,7 @@ void ExportGold::writeVarFile(
 
     // open file
     ofstream ofs;
-    if (mype == 0) {
+    if (mype() == 0) {
         const string filename = basename + "." + varname;
         ofs.open(filename.c_str());
         if (!ofs.good()) {
@@ -290,7 +290,7 @@ void ExportGold::writeVarFile(
     } // if mype == 0
 
     // write header
-    if (mype == 0) {
+    if (mype() == 0) {
         ofs << scientific << setprecision(5);
         ofs << varname << endl;
         ofs << "part" << endl;
@@ -309,7 +309,7 @@ void ExportGold::writeVarFile(
     Parallel::gatherv(&tvar[0], ntris, &gtvar[0], &pentris[0]);
 
     // write values on triangles
-    if (mype == 0 && gntris > 0) {
+    if (mype() == 0 && gntris > 0) {
         ofs << "tria3" << endl;
         for (int t = 0; t < gntris; ++t) {
             ofs << setw(12) << gtvar[t] << endl;
@@ -324,7 +324,7 @@ void ExportGold::writeVarFile(
     Parallel::gatherv(&qvar[0], nquads, &gqvar[0], &penquads[0]);
 
     // write values on quads
-    if (mype == 0 && gnquads > 0) {
+    if (mype() == 0 && gnquads > 0) {
         ofs << "quad4" << endl;
         for (int q = 0; q < gnquads; ++q) {
             ofs << setw(12) << gqvar[q] << endl;
@@ -339,14 +339,14 @@ void ExportGold::writeVarFile(
     Parallel::gatherv(&ovar[0], nothers, &govar[0], &penothers[0]);
 
     // write values on others
-    if (mype == 0 && gnothers > 0) {
+    if (mype() == 0 && gnothers > 0) {
         ofs << "nsided" << endl;
         for (int n = 0; n < gnothers; ++n) {
             ofs << setw(12) << govar[n] << endl;
         }
     } // if mype == 0 ...
 
-    if (mype == 0) ofs.close();
+    if (mype() == 0) ofs.close();
 
 }
 

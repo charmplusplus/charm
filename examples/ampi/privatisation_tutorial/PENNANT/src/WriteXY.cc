@@ -38,8 +38,8 @@ void WriteXY::write(
 
     int gnumz = numz;
     Parallel::globalSum(gnumz);
-    gnumz = (mype == 0 ? gnumz : 0);
-    vector<int> penumz(mype == 0 ? numpe : 0);
+    gnumz = (mype() == 0 ? gnumz : 0);
+    vector<int> penumz(mype() == 0 ? numpe() : 0);
     Parallel::gather(numz, &penumz[0]);
 
     vector<double> gzr(gnumz), gze(gnumz), gzp(gnumz);
@@ -47,7 +47,7 @@ void WriteXY::write(
     Parallel::gatherv(&ze[0], numz, &gze[0], &penumz[0]);
     Parallel::gatherv(&zp[0], numz, &gzp[0], &penumz[0]);
 
-    if (mype == 0) {
+    if (mype() == 0) {
         string xyname = basename + ".xy";
         ofstream ofs(xyname.c_str());
         ofs << scientific << setprecision(8);

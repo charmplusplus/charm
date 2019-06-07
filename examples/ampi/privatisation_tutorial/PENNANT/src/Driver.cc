@@ -36,14 +36,14 @@ Driver::Driver(const InputFile* inp, const string& pname)
     using Parallel::numpe;
     using Parallel::mype;
 
-    if (mype == 0) {
+    if (mype() == 0) {
         cout << "********************" << endl;
         cout << "Running PENNANT v0.8" << endl;
         cout << "********************" << endl;
         cout << endl;
 
 #ifdef USE_MPI
-        cout << "Running on " << numpe << " MPI PE(s)" << endl;
+        cout << "Running on " << numpe() << " MPI PE(s)" << endl;
 #endif
 #ifdef _OPENMP
         cout << "Running on " << omp_get_max_threads() << " thread(s)"
@@ -54,7 +54,7 @@ Driver::Driver(const InputFile* inp, const string& pname)
     cstop = inp->getInt("cstop", 999999);
     tstop = inp->getDouble("tstop", 1.e99);
     if (cstop == 999999 && tstop == 1.e99) {
-        if (mype == 0)
+        if (mype() == 0)
             cerr << "Must specify either cstop or tstop" << endl;
         exit(1);
     }
@@ -83,7 +83,7 @@ void Driver::run() {
     cycle = 0;
 
     double tbegin, tlast;
-    if (mype == 0) {
+    if (mype() == 0) {
         // get starting timestamp
         struct timeval sbegin;
         gettimeofday(&sbegin, NULL);
@@ -104,7 +104,7 @@ void Driver::run() {
 
         time += dt;
 
-        if (mype == 0 &&
+        if (mype() == 0 &&
                 (cycle == 1 || cycle % dtreport == 0)) {
             struct timeval scurr;
             gettimeofday(&scurr, NULL);
@@ -123,7 +123,7 @@ void Driver::run() {
 
     } // while cycle...
 
-    if (mype == 0) {
+    if (mype() == 0) {
 
         // get stopping timestamp
         struct timeval send;
@@ -200,13 +200,13 @@ void Driver::calcGlobalDt() {
     // if the global min isn't on this PE, get the right message
     if (pedt > 0) {
         const int tagmpi = 300;
-        if (mype == pedt) {
+        if (mype() == pedt) {
             char cmsgdt[80];
             strncpy(cmsgdt, msgdt.c_str(), 80);
             MPI_Send(cmsgdt, 80, MPI_CHAR, 0, tagmpi,
                     MPI_COMM_WORLD);
         }
-        else if (mype == 0) {
+        else if (mype() == 0) {
             char cmsgdt[80];
             MPI_Status status;
             MPI_Recv(cmsgdt, 80, MPI_CHAR, pedt, tagmpi,
@@ -218,7 +218,7 @@ void Driver::calcGlobalDt() {
 
     // if timestep was determined by hydro, report which PE
     // caused it
-    if (mype == 0 && msgdt.substr(0, 5) == "Hydro") {
+    if (mype() == 0 && msgdt.substr(0, 5) == "Hydro") {
         ostringstream oss;
         oss << "PE " << pedt << ", " << msgdt;
         msgdt = oss.str();

@@ -34,14 +34,14 @@ Mesh::Mesh(const InputFile* inp) :
 
     chunksize = inp->getInt("chunksize", 0);
     if (chunksize < 0) {
-        if (mype == 0)
+        if (mype() == 0)
             cerr << "Error: bad chunksize " << chunksize << endl;
         exit(1);
     }
 
     subregion = inp->getDoubleList("subregion", vector<double>());
     if (subregion.size() != 0 && subregion.size() != 4) {
-        if (mype == 0)
+        if (mype() == 0)
             cerr << "Error:  subregion must have 4 entries" << endl;
         exit(1);
     }
@@ -294,7 +294,7 @@ void Mesh::initParallel(
         const vector<int>& masterslvpes,
         const vector<int>& masterslvcounts,
         const vector<int>& masterpoints) {
-    if (Parallel::numpe == 1) return;
+    if (Parallel::numpe() == 1) return;
 
     nummstrpe = slavemstrpes.size();
     mapmstrpepe = Memory::alloc<int>(nummstrpe);
@@ -334,7 +334,7 @@ void Mesh::writeStats() {
     int gnump = nump;
     // make sure that boundary points aren't double-counted;
     // only count them if they are masters
-    if (Parallel::numpe > 1) gnump -= numslv;
+    if (Parallel::numpe() > 1) gnump -= numslv;
     int gnumz = numz;
     int gnums = nums;
     int gnume = nume;
@@ -350,7 +350,7 @@ void Mesh::writeStats() {
     Parallel::globalSum(gnumzch);
     Parallel::globalSum(gnumsch);
 
-    if (Parallel::mype > 0) return;
+    if (Parallel::mype() > 0) return;
 
     cout << "--- Mesh Information ---" << endl;
     cout << "Points:  " << gnump << endl;
@@ -375,12 +375,12 @@ void Mesh::write(
         const double* zp) {
 
     if (writexy) {
-        if (Parallel::mype == 0)
+        if (Parallel::mype() == 0)
             cout << "Writing .xy file..." << endl;
         wxy->write(probname, zr, ze, zp);
     }
     if (writegold) {
-        if (Parallel::mype == 0) 
+        if (Parallel::mype() == 0) 
             cout << "Writing gold file..." << endl;
         egold->write(probname, cycle, time, zr, ze, zp);
     }
@@ -641,7 +641,7 @@ void Mesh::parallelGather(
     int ierr = MPI_Waitall(numslvpe, &request[0], &status[0]);
     if (ierr != 0) {
         cerr << "Error: parallelGather MPI error " << ierr <<
-                " on PE " << Parallel::mype << endl;
+                " on PE " << Parallel::mype() << endl;
         cerr << "Exiting..." << endl;
         exit(1);
     }
@@ -713,7 +713,7 @@ void Mesh::parallelScatter(
     int ierr = MPI_Waitall(nummstrpe, &request[0], &status[0]);
     if (ierr != 0) {
         cerr << "Error: parallelScatter MPI error " << ierr <<
-                " on PE " << Parallel::mype << endl;
+                " on PE " << Parallel::mype() << endl;
         cerr << "Exiting..." << endl;
         exit(1);
     }
@@ -733,7 +733,7 @@ void Mesh::parallelScatter(
 
 template <typename T>
 void Mesh::sumAcrossProcs(T* pvar) {
-    if (Parallel::numpe == 1) return;
+    if (Parallel::numpe() == 1) return;
 //    std::vector<T> prxvar(numprx);
     T* prxvar = Memory::alloc<T>(numprx);
     parallelGather(pvar, &prxvar[0]);
@@ -770,7 +770,7 @@ void Mesh::sumToPoints(
         double* pvar) {
 
     sumOnProc(cvar, pvar);
-    if (Parallel::numpe > 1)
+    if (Parallel::numpe() > 1)
         sumAcrossProcs(pvar);
 
 }
@@ -782,7 +782,7 @@ void Mesh::sumToPoints(
         double2* pvar) {
 
     sumOnProc(cvar, pvar);
-    if (Parallel::numpe > 1)
+    if (Parallel::numpe() > 1)
         sumAcrossProcs(pvar);
 
 }

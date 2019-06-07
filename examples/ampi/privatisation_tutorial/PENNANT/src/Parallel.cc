@@ -24,20 +24,30 @@ namespace Parallel {
 #ifdef USE_MPI
 // We're running under MPI, so set these to dummy values
 // that will be overwritten on MPI_Init.
-int numpe = 0;
-int mype = -1;
+int numpe() {
+    int n;
+    MPI_Comm_size(MPI_COMM_WORLD, &n);
+    return n;
+}
+int mype() {
+    int p;
+    MPI_Comm_rank(MPI_COMM_WORLD, &p);
+    return p;
+}
 #else
 // We're in serial mode, so only 1 PE.
-int numpe = 1;
-int mype = 0;
+int numpe() {
+    return 1;
+}
+int mype {
+    return 0;
+}
 #endif
 
 
 void init() {
 #ifdef USE_MPI
     MPI_Init(0, 0);
-    MPI_Comm_size(MPI_COMM_WORLD, &numpe);
-    MPI_Comm_rank(MPI_COMM_WORLD, &mype);
 #endif
 }  // init
 
@@ -50,7 +60,7 @@ void final() {
 
 
 void globalMinLoc(double& x, int& xpe) {
-    if (numpe == 1) {
+    if (numpe() == 1) {
         xpe = 0;
         return;
     }
@@ -60,7 +70,7 @@ void globalMinLoc(double& x, int& xpe) {
         int i;
     } xdi, ydi;
     xdi.d = x;
-    xdi.i = mype;
+    xdi.i = mype();
     MPI_Allreduce(&xdi, &ydi, 1, MPI_DOUBLE_INT, MPI_MINLOC,
             MPI_COMM_WORLD);
     x = ydi.d;
@@ -70,7 +80,7 @@ void globalMinLoc(double& x, int& xpe) {
 
 
 void globalSum(int& x) {
-    if (numpe == 1) return;
+    if (numpe() == 1) return;
 #ifdef USE_MPI
     int y;
     MPI_Allreduce(&x, &y, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
@@ -80,7 +90,7 @@ void globalSum(int& x) {
 
 
 void gather(int x, int* y) {
-    if (numpe == 1) {
+    if (numpe() == 1) {
         y[0] = x;
         return;
     }
@@ -91,7 +101,7 @@ void gather(int x, int* y) {
 
 
 void scatter(const int* x, int& y) {
-    if (numpe == 1) {
+    if (numpe() == 1) {
         y = x[0];
         return;
     }
@@ -106,7 +116,7 @@ void gathervImpl(
         const T *x, const int numx,
         T* y, const int* numy) {
 
-    if (numpe == 1) {
+    if (numpe() == 1) {
         std::copy(x, x + numx, y);
         return;
     }
@@ -114,14 +124,14 @@ void gathervImpl(
     const int type_size = sizeof(T);
     int sendcount = type_size * numx;
     std::vector<int> recvcount, disp;
-    if (mype == 0) {
-        recvcount.resize(numpe);
-        for (int pe = 0; pe < numpe; ++pe) {
+    if (mype() == 0) {
+        recvcount.resize(numpe());
+        for (int pe = 0; pe < numpe(); ++pe) {
             recvcount[pe] = type_size * numy[pe];
         }
         // exclusive scan isn't available in the standard library,
         // so we use an inclusive scan and displace it by one place
-        disp.resize(numpe + 1);
+        disp.resize(numpe() + 1);
         std::partial_sum(recvcount.begin(), recvcount.end(), &disp[1]);
     } // if mype
 

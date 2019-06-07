@@ -21,12 +21,12 @@
 using namespace std;
 
 
-int main(const int argc, const char** argv)
+int main(int argc, char** argv)
 {
     Parallel::init();
 
     if (argc != 2) {
-        if (Parallel::mype == 0)
+        if (Parallel::mype() == 0)
             cerr << "Usage: pennant <filename>" << endl;
         exit(1);
     }
