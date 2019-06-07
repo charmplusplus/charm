@@ -36,7 +36,7 @@ void CldEnqueueWithinNode(void *msg, int infofn)
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   CldPackFn pfn;
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
-  if (pfn && !CMI_MSG_READONLY(msg)) {
+  if (pfn && !CMI_MSG_NOKEEP(msg)) {
     pfn(&msg);
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
   }

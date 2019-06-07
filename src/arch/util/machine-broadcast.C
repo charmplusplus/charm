@@ -390,10 +390,10 @@ void CmiFreeNodeBroadcastAllFn(int size, char *msg) {
 }
 #endif
 
-void CmiWithinNodeBroadcast(int size, char* msg) {
+void CmiWithinNodeBroadcastFn(int size, char* msg) {
   int nodefirst = CmiNodeFirst(CmiMyNode());
   int nodelast = nodefirst + CmiNodeSize(CmiMyNode());
-  if (CMI_MSG_READONLY(msg)) {
+  if (CMI_MSG_NOKEEP(msg)) {
     for (int i = nodefirst; i < CmiMyPe(); i++) {
       CmiReference(msg);
       CmiFreeSendFn(i, size, msg);

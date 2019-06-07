@@ -1660,7 +1660,7 @@ static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int t
   env->setGroupNum(gID);
   env->setSrcPe(CkMyPe());
 
-  CMI_MSG_READONLY(env) = _entryTable[eIdx]->noKeep;
+  CMI_MSG_NOKEEP(env) = _entryTable[eIdx]->noKeep;
   /*
 #if CMK_ERROR_CHECKING
   nodeRedMgr.setZero();
