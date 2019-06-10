@@ -2495,7 +2495,8 @@ static gni_return_t  registerMessage(void *msg, int size, int seqno, gni_mem_han
         }
     }
     else {
-        //big msg, can not fit into memory poo        status = registerMemory(msg, size, memh, NULL);
+        //big msg, can not fit into memory pool, or persistent message
+        status = registerMemory(msg, size, memh, NULL);
     }
     return status;
 }
