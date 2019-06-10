@@ -91,9 +91,6 @@ typedef unsigned short UShort;
 typedef unsigned char  UChar;
 
 #include "charm.h" // for CkGroupID, and CkEnvelopeType
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-#include "ckobjid.h" //for the ckobjId
-#endif
 
 /**
 @addtogroup CkEnvelope
@@ -186,26 +183,7 @@ namespace ck {
   }
 }
 
-#if (defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
-#define CMK_ENVELOPE_FT_FIELDS                           \
-  CkObjID sender;                                        \
-  CkObjID recver;                                        \
-  MCount SN;                                             \
-  int incarnation;                                       \
-  int flags;                                             \
-  UInt piggyBcastIdx;
-#elif defined(_FAULT_CAUSAL_)
-#define CMK_ENVELOPE_FT_FIELDS                           \
-  CkObjID sender;                                        \
-  CkObjID recver;                                        \
-  MCount SN;                                             \
-  MCount TN;                                             \
-  int incarnation;                                       \
-  int flags;                                             \
-  UInt piggyBcastIdx;
-#else
 #define CMK_ENVELOPE_FT_FIELDS
-#endif
 
 #if CMK_REPLAYSYSTEM || CMK_TRACE_ENABLED
 #define CMK_ENVELOPE_OPTIONAL_FIELDS                                           \
@@ -356,16 +334,6 @@ public:
       env->pathHistory.reset();
 #endif
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-      env->sender.type = TypeInvalid;
-      env->recver.type = TypeInvalid;
-      env->SN = 0;
-      env->flags = 0;
-#if defined(_FAULT_CAUSAL_)
-      env->TN = 0;
-#endif
-	  env->incarnation = -1;
-#endif
 
       return env;
     }
@@ -549,13 +517,6 @@ private:
     }
 public:
     MsgPool():SafePool<void*>(_alloc, CkFreeMsg, _reset) {}
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        void *get(void){
-            return allocfn();
-        }
-        void put(void *m){
-        }
-#endif
 };
 
 CkpvExtern(MsgPool*, _msgPool);

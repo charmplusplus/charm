@@ -2713,9 +2713,6 @@ CMI_WARN_UNUSED_RESULT ampi* ampi::static_blockOnColl(ampi *dis) noexcept {
   dis = dis->block();
   dis->parent->resumeOnColl = false;
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-  CpvAccess(_currentObj) = dis;
-#endif
 #if CMK_BIGSIM_CHARM
 #if CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn)) CthTraceResume(dis->thread->getThread());
@@ -3096,11 +3093,6 @@ MPI_Request ampi::send(int t, int sRank, const void* buf, int count, MPI_Datatyp
   TRACE_BG_AMPI_BREAK(thread->getThread(), "AMPI_SEND", NULL, 0, 1);
 #endif
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-  MPI_Comm disComm = myComm.getComm();
-  ampi *dis = getAmpiInstance(disComm);
-  CpvAccess(_currentObj) = dis;
-#endif
 
   const ampiCommStruct &dest=comm2CommStruct(destcomm);
   MPI_Request req = delesend(t,sRank,buf,count,type,rank,destcomm,dest.getProxy(),sendType,reqIdx);
@@ -3616,10 +3608,6 @@ int ampi::static_recv(ampi *dis, int t, int s, void* buf, int count, MPI_Datatyp
     dis = dis->blockOnIReq(buf, count, type, s, t, comm, sts);
   }
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-  CpvAccess(_currentObj) = dis;
-  MSG_ORDER_DEBUG( printf("[%d] AMPI thread rescheduled  to Index %d buf %p src %d\n",CkMyPe(),dis->thisIndex,buf,s); )
-#endif
 #if CMK_BIGSIM_CHARM && CMK_TRACE_IN_CHARM
   //Due to the reason mentioned the in the else-statement above, we need to
   //use "dis" as "this" in the case of migration (or out-of-core execution in BigSim)
@@ -3769,9 +3757,6 @@ void ampi::bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm des
   MPI_Request req;
 
   if (root==getRank()) {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    CpvAccess(_currentObj) = this;
-#endif
     irecvBcast(buf, count, type, root, destcomm, &req);
     thisProxy.bcastResult(makeBcastMsg(buf, count, type, root, destcomm));
   }
@@ -3786,9 +3771,6 @@ void ampi::bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm des
 int ampi::intercomm_bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm intercomm) noexcept
 {
   if (root==MPI_ROOT) {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    CpvAccess(_currentObj) = this;
-#endif
     remoteProxy.bcastResult(makeBcastMsg(buf, count, type, getRank(), intercomm));
   }
   else { // Non-root ranks need to increment the outgoing sequence number for collectives
@@ -3807,9 +3789,6 @@ int ampi::intercomm_bcast(int root, void* buf, int count, MPI_Datatype type, MPI
 void ampi::ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm destcomm, MPI_Request* request) noexcept
 {
   if (root==getRank()) {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    CpvAccess(_currentObj) = this;
-#endif
     thisProxy.bcastResult(makeBcastMsg(buf, count, type, getRank(), destcomm));
   }
   else { // Non-root ranks need to increment the outgoing sequence number for collectives
@@ -3823,9 +3802,6 @@ void ampi::ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm de
 int ampi::intercomm_ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm intercomm, MPI_Request *request) noexcept
 {
   if (root==MPI_ROOT) {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    CpvAccess(_currentObj) = this;
-#endif
     remoteProxy.bcastResult(makeBcastMsg(buf, count, type, getRank(), intercomm));
   }
   else { // Non-root ranks need to increment the outgoing sequence number for collectives
@@ -11572,10 +11548,6 @@ CLINKAGE int AMPI_Migrate(MPI_Info hints)
     }
   }
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-  ampi *currentAmpi = getAmpiInstance(MPI_COMM_WORLD);
-  CpvAccess(_currentObj) = currentAmpi;
-#endif
 
 #if CMK_BIGSIM_CHARM
   TRACE_BG_ADD_TAG("AMPI_MIGRATE");

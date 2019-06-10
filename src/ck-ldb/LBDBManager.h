@@ -303,16 +303,6 @@ private:
   int            startLBFn_count;
 public:
   int useMem();
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    int validObjHandle(LDObjHandle h ){
-            if(h.handle >= objs.size())
-                return 0;
-            if(objs[h.handle].obj == NULL)
-                return 0;
-
-            return 1;
-    }
-#endif
 
 
   const ObjList& getObjs() {return objs;}

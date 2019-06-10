@@ -71,11 +71,6 @@ Chare::Chare(void) {
   }
   chareIdx = CkpvAccess(currentChareIdx);
 #endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-  mlogData = new ChareMlogData();
-  mlogData->objID.type = TypeChare;
-  mlogData->objID.data.chare.id = thishandle;
-#endif
 #if CMK_OBJECT_QUEUE_AVAILABLE
   if (_defaultObjectQ)  CkEnableObjQ();
 #endif
@@ -88,9 +83,6 @@ Chare::Chare(CkMigrateMessage* m) {
   magic = 0;
 #endif
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        mlogData = NULL;
-#endif
 
 #if CMK_OBJECT_QUEUE_AVAILABLE
   if (_defaultObjectQ)  CkEnableObjQ();
@@ -139,13 +131,6 @@ void Chare::pup(PUP::er &p)
   p(chareIdx);
   if (chareIdx != -1) thishandle.objPtr=(void*)(CmiIntPtr)chareIdx;
 #endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	if(p.isUnpacking()){
-		if(mlogData == NULL || !mlogData->teamRecoveryFlag)
-        	mlogData = new ChareMlogData();
-	}
-	mlogData->pup(p);
-#endif
 #if CMK_ERROR_CHECKING
   p(magic);
 #endif
@@ -184,11 +169,6 @@ void CkMessage::ckDebugPup(PUP::er &p,void *msg) {
 
 IrrGroup::IrrGroup(void) {
   thisgroup = CkpvAccess(_currentGroup);
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        mlogData->objID.type = TypeGroup;
-        mlogData->objID.data.group.id = thisgroup;
-        mlogData->objID.data.group.onPE = CkMyPe();
-#endif
 }
 
 IrrGroup::~IrrGroup() {
@@ -556,10 +536,6 @@ int CkGetArgc(void) {
 /******************** Basic support *****************/
 void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        CpvAccess(_currentObj) = (Chare *)obj;
-//      printf("[%d] CurrentObj set to %p\n",CkMyPe(),obj);
-#endif
   //BIGSIM_OOC DEBUGGING
   //CkPrintf("CkDeliverMessageFree: name of entry fn: %s\n", _entryTable[epIdx]->name);
   //fflush(stdout);
@@ -582,9 +558,6 @@ void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
   //fflush(stdout);
 
   void *deliverMsg;
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        CpvAccess(_currentObj) = (Chare *)obj;
-#endif
   if (_entryTable[epIdx]->noKeep)
   { /* Deliver a read-only copy of the message */
     deliverMsg=(void *)msg;
@@ -1243,22 +1216,6 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
     if (!ck->watcher->processMessage(&env,ck)) return;
   }
 //#endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        Chare *obj=NULL;
-        CkObjID sender;
-        MCount SN;
-        MlogEntry *entry=NULL;
-        if(env->getMsgtype() == ForBocMsg || env->getMsgtype() == ForNodeBocMsg
-           || env->getMsgtype() == ForArrayEltMsg
-           || env->getMsgtype() == ForChareMsg) {
-                sender = env->sender;
-                SN = env->SN;
-                int result = preProcessReceivedMessage(env,&obj,&entry);
-                if(result == 0){
-                        return;
-                }
-        }
-#endif
 #if USE_CRITICAL_PATH_HEADER_ARRAY
   CK_CRITICALPATH_START(env)
 #endif
@@ -1333,11 +1290,6 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
     default:
       CmiAbort("Fatal Charm++ Error> Unknown msg-type in _processHandler.\n");
   }
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        if(obj != NULL){
-                postProcessReceivedMessage(obj,sender,SN,entry);
-        }
-#endif
 
 
 #if USE_CRITICAL_PATH_HEADER_ARRAY
@@ -1472,7 +1424,7 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
     CmiSetInfo(env,infoFn);
     if (pe==CLD_BROADCAST) {
 #if CMK_MESSAGE_LOGGING
-	if(env->flags & CK_FREE_MSG_MLOG)
+	if(env->flags)
 		CmiSyncBroadcastAndFree(len, (char *)env); 
 	else
 		CmiSyncBroadcast(len, (char *)env);
@@ -1697,12 +1649,6 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
   // VidBlock was not yet filled). The problem is that the creation was never
   // traced later when the VidBlock was filled. One solution is to trace the
   // creation here, the other to trace it in VidBlock->msgDeliver().
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-  if (destPE!=-1) {
-    CpvAccess(_qd)->create();
-  }
-	sendChareMsg(env,destPE,_infoIdx,pCid);
-#else
   _TRACE_CREATION_1(env);
   if (destPE!=-1) {
     CpvAccess(_qd)->create();
@@ -1712,7 +1658,6 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
       _CldEnqueue(destPE, env, _infoIdx);
   }
   _TRACE_CREATION_DONE(1);
-#endif
 }
 
 void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
@@ -1797,9 +1742,6 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
         env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
     }
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	sendGroupMsg(env,pe,_infoIdx);
-#else
   _TRACE_ONLY(numPes = (pe==CLD_BROADCAST_ALL?CkNumPes():1));
   _TRACE_CREATION_N(env, numPes);
   if (opts & CK_MSG_SKIP_OR_IMM)
@@ -1807,7 +1749,6 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
   else
     _skipCldEnqueue(pe, env, _infoIdx);
   _TRACE_CREATION_DONE(1);
-#endif
 }
 
 static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID,
@@ -1953,9 +1894,6 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
     {
         env = _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
     }
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    sendNodeGroupMsg(env,node,_infoIdx);
-#else
   numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1);
   _TRACE_CREATION_N(env, numPes);
   if (opts & CK_MSG_SKIP_OR_IMM) {
@@ -1964,7 +1902,6 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
   else
     _CldNodeEnqueue(node, env, _infoIdx);
   _TRACE_CREATION_DONE(1);
-#endif
 }
 
 static inline void _sendMsgNodeBranchMulti(int eIdx, void *msg, CkGroupID gID,
@@ -2111,16 +2048,12 @@ static void _prepareOutgoingArrayMsg(envelope *env,int type)
 void CkArrayManagerDeliver(int pe,void *msg, int opts) {
   envelope *env = UsrToEnv(msg);
   _prepareOutgoingArrayMsg(env,ForArrayEltMsg);
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	sendArrayMsg(env,pe,_infoIdx);
-#else
   if (opts & CK_MSG_IMMEDIATE)
     CmiBecomeImmediate(env);
   if (opts & CK_MSG_SKIP_OR_IMM)
     _noCldEnqueue(pe, env);
   else
     _skipCldEnqueue(pe, env, _infoIdx);
-#endif
 }
 
 class ElementDestroyer : public CkLocIterator {
