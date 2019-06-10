@@ -479,6 +479,66 @@ inline void fromMemBuf(T &t,void *buf,size_t len) {
 		"This means your pup routine doesn't match during packing and unpacking");
 }
 
+/********** PUP::er -- Binary memory buffer pack/unpack *********/
+class dev : public er { //Memory-buffer packers and unpackers
+ protected:
+  myByte *origBuf;//Start of memory buffer
+  myByte *buf;//Memory buffer (stuff gets packed into/out of here)
+  dev(unsigned int type,myByte *Nbuf):er(type),origBuf(Nbuf),buf(Nbuf) {}
+  dev(const dev &p);      //You don't want to copy
+  void operator=(const dev &p);   // You don't want to copy
+
+  //For seeking (pack/unpack in different orders)
+  virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
+  virtual size_t impl_tell(seekBlock &s); /*Give the current offset*/
+  virtual void impl_seek(seekBlock &s,size_t off); /*Seek to the given offset*/
+ public:
+  //Return the current number of buffer bytes used
+  size_t size(void) const {return buf-origBuf;}
+
+  inline char* get_current_pointer() const {
+    return reinterpret_cast<char*>(buf);
+  }
+
+  inline void advance(size_t const offset) {
+    buf += offset;
+  }
+};
+
+//For packing into a preallocated, presized memory buffer
+class toDev : public dev {
+ protected:
+  //Generic bottleneck: pack n items of size itemSize from p.
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+ public:
+  //Write data to the given buffer
+  toDev(void *Nbuf):dev(IS_PACKING,(myByte *)Nbuf) {}
+};
+template <class T>
+inline void toDevBuf(T &t,void *buf, size_t len) {
+  PUP::toDev p(buf);
+  p|t;
+  if (p.size()!=len) CmiAbort("Size mismatch during PUP::toDevBuf!\n"
+    "This means your pup routine doesn't match during sizing and packing");
+}
+
+//For unpacking from a memory buffer
+class fromDev : public dev {
+ protected:
+  //Generic bottleneck: unpack n items of size itemSize from p.
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+ public:
+  //Read data from the given buffer
+  fromDev(const void *Nbuf):dev(IS_UNPACKING,(myByte *)Nbuf) {}
+};
+template <class T>
+inline void fromDevBuf(T &t,void *buf,size_t len) {
+  PUP::fromDev p(buf);
+  p|t;
+  if (p.size()!=len) CmiAbort("Size mismatch during PUP::fromDevBuf!\n"
+    "This means your pup routine doesn't match during packing and unpacking");
+}
+
 /********** PUP::er -- Binary disk file pack/unpack *********/
 class disk : public er {
  protected:

@@ -18,6 +18,7 @@ virtual functions are defined here.
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <omp.h>
 
 #include "converse.h"
 #include "pup.h"
@@ -164,6 +165,28 @@ void PUP::fromMem::bytes(void *p,size_t n,size_t itemSize,dataType t)
 	n*=itemSize; 
 	memcpy(p,(const void *)buf,n); 
 	buf+=n;
+}
+
+/*Device PUP::er's*/
+void PUP::toDev::bytes(void *p,size_t n,size_t itemSize,dataType t)
+{
+#ifdef CK_CHECK_PUP
+    ((pupCheckRec *)buf)->write(t,n);
+    buf+=sizeof(pupCheckRec);
+#endif
+    n*=itemSize;
+    omp_target_memcpy((void *)buf,p,n,0,0,omp_get_default_device(),omp_get_initial_device()); 
+    buf+=n;
+}
+void PUP::fromDev::bytes(void *p,size_t n,size_t itemSize,dataType t)
+{
+#ifdef CK_CHECK_PUP
+    ((pupCheckRec *)buf)->check(t,n);
+    buf+=sizeof(pupCheckRec);
+#endif
+    n*=itemSize; 
+    omp_target_memcpy(p,(void *)buf,n,0,0,omp_get_initial_device(),omp_get_default_device()); 
+    buf+=n;
 }
 
 extern "C" {
