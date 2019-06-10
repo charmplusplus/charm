@@ -54,7 +54,12 @@ extern char *_shrinkexpand_basedir;
 #endif
 
 #if CMK_ONESIDED_IMPL
-extern UInt numZerocopyROops; // Required for broadcasting RO Data after recovering from failure
+// Required for broadcasting RO Data after recovering from failure
+#if CMK_SMP
+extern std::atomic<UInt> numZerocopyROops;
+#else
+extern UInt  numZerocopyROops; 
+#endif
 #endif
 
 void CkCreateLocalChare(int epIdx, envelope *env);
@@ -101,8 +106,14 @@ static void bdcastRO(void){
 	envelope *env = _allocEnv(RODataMsg, ps.size());
 	PUP::toMem pp((char *)EnvToUsr(env));
 #if CMK_ONESIDED_IMPL
-	pp|numZerocopyROops; // Messages of type 'RODataMsg' need to have numZerocopyROops pupped in order
-                       // to be processed inside _processRODataMsg
+	// Messages of type 'RODataMsg' need to have numZerocopyROops pupped in order
+	// to be processed inside _processRODataMsg
+#if CMK_SMP
+	UInt numZerocopyROopsTemp = numZerocopyROops.load(std::memory_order_relaxed);
+	pp|numZerocopyROopsTemp;
+#else
+	pp|numZerocopyROops;
+#endif
 #endif
 	for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pp);
 	
