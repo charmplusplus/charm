@@ -447,6 +447,9 @@ void CcdModuleInit(char **ignored)
    CpvInitialize(int, _ccd_numchecks);
 
 #if CMK_TRACE_ENABLED
+   // Using CcdCallFnAfter doesn't actually send a message, but we need one to be able to
+   // trace a causal chain from the called function to the function that originally added it.
+   // dummyEnv is used to fake this message send for tracing purposes.
    CpvInitialize(envelope*, dummyEnv);
    CpvAccess(dummyEnv) = envelope::alloc(ForChareMsg, 0, 0);
 
