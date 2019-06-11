@@ -14,7 +14,6 @@
 #define WIN_ERROR   (-1)
 
 extern int AMPI_RDMA_THRESHOLD;
-extern int AMPI_SMP_RDMA_THRESHOLD;
 
 win_obj::win_obj() noexcept {
   baseAddr = NULL;
@@ -221,9 +220,7 @@ int ampi::winPut(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank
                             targcnt, targtype, win->index);
     }
 #if AMPI_RDMA_IMPL
-    else if (orgtotalsize >= AMPI_RDMA_THRESHOLD ||
-            (orgtotalsize >= AMPI_SMP_RDMA_THRESHOLD && destLikelyWithinProcess(thisProxy, rank)))
-    {
+    else if (orgtotalsize >= AMPI_RDMA_THRESHOLD) {
       AmpiRequestList& reqs = getReqs();
       SendReq* ampiReq = parent->reqPool.newReq<SendReq>(orgtype, myComm.getComm(), getDDT());
       MPI_Request req = reqs.insert(ampiReq);
@@ -408,9 +405,7 @@ int ampi::winAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, i
                                    targcnt, targtype, op, win->index);
     }
 #if AMPI_RDMA_IMPL
-    else if (orgtotalsize >= AMPI_RDMA_THRESHOLD ||
-            (orgtotalsize >= AMPI_SMP_RDMA_THRESHOLD && destLikelyWithinProcess(thisProxy, rank)))
-    {
+    else if (ddt->isContig() && orgtotalsize >= AMPI_RDMA_THRESHOLD) {
       AmpiRequestList& reqs = getReqs();
       SendReq* ampiReq = parent->reqPool.newReq<SendReq>(orgtype, myComm.getComm(), getDDT());
       MPI_Request req = reqs.insert(ampiReq);
@@ -473,9 +468,7 @@ int ampi::winGetAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype
       return MPI_SUCCESS;
     }
 #if AMPI_RDMA_IMPL
-    else if (orgtotalsize >= AMPI_RDMA_THRESHOLD ||
-            (orgtotalsize >= AMPI_SMP_RDMA_THRESHOLD && destLikelyWithinProcess(thisProxy, rank)))
-    {
+    else if (orgtotalsize >= AMPI_RDMA_THRESHOLD) {
       AmpiRequestList& reqs = getReqs();
       SendReq* ampiReq = parent->reqPool.newReq<SendReq>(orgtype, myComm.getComm(), getDDT());
       MPI_Request req = reqs.insert(ampiReq);
@@ -734,7 +727,7 @@ AMPI_API_IMPL(int, MPI_Win_create, void *base, MPI_Aint size, int disp_unit,
   parent->setAttr(*newwin, keyvals, MPI_WIN_BASE, &base);
   parent->setAttr(*newwin, keyvals, MPI_WIN_SIZE, &size);
   parent->setAttr(*newwin, keyvals, MPI_WIN_DISP_UNIT, &disp_unit);
-  ptr->barrier(); // synchronize all participating virtual processes
+  ptr = ptr->barrier(); // synchronize all participating virtual processes
   return MPI_SUCCESS;
 }
 
@@ -753,7 +746,7 @@ AMPI_API_IMPL(int, MPI_Win_free, MPI_Win *win)
   ampi *ptr = getAmpiInstance(winStruct->comm);
   ptr->deleteWinInstance(*win);
   /* Need a barrier here: to ensure that every process participates */
-  ptr->barrier();
+  ptr = ptr->barrier();
   *win = MPI_WIN_NULL;
   return MPI_SUCCESS;
 }
@@ -977,10 +970,9 @@ AMPI_API_IMPL(int, MPI_Win_fence, int assertion, MPI_Win win)
   AMPI_API("AMPI_Win_fence");
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   MPI_Comm comm = winStruct->comm;
-  ampi *ptr = getAmpiInstance(comm);
 
   // Wait until everyone reaches the fence
-  ptr->barrier();
+  ampi *unused = getAmpiInstance(comm)->barrier();
 
   // Complete all outstanding one-sided comm requests
   // no need to do this for the pseudo-implementation

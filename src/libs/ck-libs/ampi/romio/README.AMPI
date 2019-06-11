@@ -14,6 +14,11 @@ ROMIO integrated into AMPI:
   $CHARMDIR/lib/libampiromio.a and the user is supposed to link
   with ampiromio at link time.
 * Global variables were privatized, as shown in the section below.
+* Function declarations have been moved from mpio.h.in to a new file,
+  mpio_functions.h, in line with ampi_functions.h. As part of this,
+  the mpi.h include has been moved to the bottom of mpio.h.in, and one
+  item that depends on mpi.h typedefs has been moved to ampi.h.
+* HAVE_MPI_OFFSET is unconditionally defined to 1.
 
 
 Variable privatization

@@ -154,7 +154,9 @@ Entry::Entry(int l, int a, Type* r, const char* n, ParamList* p, Value* sz,
       genClosureTypeNameProxyTemp(0),
       entryPtr(0),
       first_line_(fl),
-      last_line_(ll) {
+      last_line_(ll),
+      numRdmaSendParams(0),
+      numRdmaRecvParams(0) {
   line = l;
   container = NULL;
   entryCount = -1;
@@ -166,7 +168,13 @@ Entry::Entry(int l, int a, Type* r, const char* n, ParamList* p, Value* sz,
   ParamList* plist = p;
   while (plist != NULL) {
     plist->entry = this;
-    if (plist->param) plist->param->entry = this;
+    if (plist->param) {
+      plist->param->entry = this;
+      if (plist->param->getRdma() == CMK_ZC_P2P_SEND_MSG)
+        numRdmaSendParams++; // increment send 'rdma' param count
+      if (plist->param->getRdma() == CMK_ZC_P2P_RECV_MSG)
+        numRdmaRecvParams++; // increment recv 'rdma' param count
+    }
     plist = plist->next;
   }
 }
@@ -526,106 +534,92 @@ void Entry::genArrayDefs(XStr& str) {
           << ") \n";  // no const
     str << "{\n";
     // regular broadcast and section broadcast for an entry method with rdma
-    if (param->hasRdma() && !container->isForElement()) {
-      str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy "
-             "parameters\");\n";
+    str << "  ckCheck();\n";
+    XStr inlineCall;
+    if (!isNoTrace())
+      inlineCall
+          << "    _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,(" << epIdx()
+          << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(), obj);\n";
+    if (isAppWork()) inlineCall << "    _TRACE_BEGIN_APPWORK();\n";
+    inlineCall << "#if CMK_LBDB_ON\n"
+               << "    LDObjHandle objHandle;\n"
+               << "    int objstopped=0;\n"
+               << "    objHandle = obj->timingBeforeCall(&objstopped);\n"
+               << "#endif\n";
+    inlineCall << "#if CMK_CHARMDEBUG\n"
+                  "    CpdBeforeEp("
+               << epIdx()
+               << ", obj, NULL);\n"
+                  "#endif\n";
+    inlineCall << "    ";
+    if (!retType->isVoid()) inlineCall << retType << " retValue = ";
+    inlineCall << "obj->" << (tspec ? "template " : "") << name;
+    if (tspec) {
+      inlineCall << "<";
+      tspec->genShort(inlineCall);
+      inlineCall << ">";
+    }
+    inlineCall << "(";
+    param->unmarshallForward(inlineCall, true);
+    inlineCall << ");\n";
+    inlineCall << "#if CMK_CHARMDEBUG\n"
+                  "    CpdAfterEp("
+               << epIdx()
+               << ");\n"
+                  "#endif\n";
+    inlineCall << "#if CMK_LBDB_ON\n    "
+                  "obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
+    if (isAppWork()) inlineCall << "    _TRACE_END_APPWORK();\n";
+    if (!isNoTrace()) inlineCall << "    _TRACE_END_EXECUTE();\n";
+    if (!retType->isVoid()) {
+      inlineCall << "    return retValue;\n";
     } else {
-      str << "  ckCheck();\n";
-      XStr inlineCall;
-      if (!isNoTrace())
-        // Create a dummy envelope to represent the "message send" to the local/inline method
-        // so that Projections can trace the method back to its caller
-        inlineCall
-            << "    envelope env;\n"
-            << "    env.setMsgtype(ForArrayEltMsg);\n"
-            << "    env.setTotalsize(0);\n"
-            // NOTE: extra parentheses around the second argument to _TRACE_CREATION_DETAILED here
-            //       are needed for templated entry methods
-            << "    _TRACE_CREATION_DETAILED(&env, (" << epIdx() << "));\n"
-            << "    _TRACE_CREATION_DONE(1);\n"
-            << "    _TRACE_BEGIN_EXECUTE_DETAILED(CpvAccess(curPeEvent),ForArrayEltMsg,(" << epIdx()
-            << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(), obj);\n";
-      if (isAppWork()) inlineCall << "    _TRACE_BEGIN_APPWORK();\n";
-      inlineCall << "#if CMK_LBDB_ON\n"
-                 << "    LDObjHandle objHandle;\n"
-                 << "    int objstopped=0;\n"
-                 << "    objHandle = obj->timingBeforeCall(&objstopped);\n"
-                 << "#endif\n";
-      inlineCall << "#if CMK_CHARMDEBUG\n"
-                    "    CpdBeforeEp("
-                 << epIdx()
-                 << ", obj, NULL);\n"
-                    "#endif\n";
-      inlineCall << "    ";
-      if (!retType->isVoid()) inlineCall << retType << " retValue = ";
-      inlineCall << "obj->" << (tspec ? "template " : "") << name;
-      if (tspec) {
-        inlineCall << "<";
-        tspec->genShort(inlineCall);
-        inlineCall << ">";
-      }
-      inlineCall << "(";
-      param->unmarshallForward(inlineCall, true);
-      inlineCall << ");\n";
-      inlineCall << "#if CMK_CHARMDEBUG\n"
-                    "    CpdAfterEp("
-                 << epIdx()
-                 << ");\n"
-                    "#endif\n";
-      inlineCall << "#if CMK_LBDB_ON\n    "
-                    "obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
-      if (isAppWork()) inlineCall << "    _TRACE_END_APPWORK();\n";
-      if (!isNoTrace()) inlineCall << "    _TRACE_END_EXECUTE();\n";
-      if (!retType->isVoid()) {
-        inlineCall << "    return retValue;\n";
-      } else {
-        inlineCall << "    return;\n";
-      }
+      inlineCall << "    return;\n";
+    }
 
-      XStr prepareMsg;
-      prepareMsg << marshallMsg();
-      prepareMsg << "  UsrToEnv(impl_msg)->setMsgtype(ForArrayEltMsg);\n";
-      prepareMsg << "  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;\n";
-      prepareMsg << "  impl_amsg->array_setIfNotThere(" << ifNot << ");\n";
+    XStr prepareMsg;
+    prepareMsg << marshallMsg();
+    prepareMsg << "  UsrToEnv(impl_msg)->setMsgtype(ForArrayEltMsg);\n";
+    prepareMsg << "  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;\n";
+    prepareMsg << "  impl_amsg->array_setIfNotThere(" << ifNot << ");\n";
 
-      if (!isLocal()) {
-        if (isInline() && container->isForElement()) {
-          str << "  " << container->baseName() << " *obj = ckLocal();\n";
-          str << "  if (obj) {\n" << inlineCall << "  }\n";
-        }
-        str << prepareMsg;
-      } else {
+    if (!isLocal()) {
+      if (isInline() && container->isForElement()) {
         str << "  " << container->baseName() << " *obj = ckLocal();\n";
-        str << "#if CMK_ERROR_CHECKING\n";
-        str << "  if (obj==NULL) CkAbort(\"Trying to call a LOCAL entry method on a "
-               "non-local element\");\n";
-        str << "#endif\n";
-        str << inlineCall;
+        str << "  if (obj) {\n" << inlineCall << "  }\n";
       }
-      if (isIget()) {
-        str << "  CkFutureID f=CkCreateAttachedFutureSend(impl_amsg," << epIdx()
-            << ",ckGetArrayID(),ckGetIndex(),&CProxyElement_ArrayBase::ckSendWrapper);"
-            << "\n";
-      }
+      str << prepareMsg;
+    } else {
+      str << "  " << container->baseName() << " *obj = ckLocal();\n";
+      str << "#if CMK_ERROR_CHECKING\n";
+      str << "  if (obj==NULL) CkAbort(\"Trying to call a LOCAL entry method on a "
+             "non-local element\");\n";
+      str << "#endif\n";
+      str << inlineCall;
+    }
+    if (isIget()) {
+      str << "  CkFutureID f=CkCreateAttachedFutureSend(impl_amsg," << epIdx()
+          << ",ckGetArrayID(),ckGetIndex(),&CProxyElement_ArrayBase::ckSendWrapper);"
+          << "\n";
+    }
 
-      if (isSync()) {
-        str << syncPreCall() << "ckSendSync(impl_amsg, " << epIdx() << ");\n";
-        str << syncPostCall();
-      } else if (!isLocal()) {
-        XStr opts;
-        opts << ",0";
-        if (isSkipscheduler()) opts << "+CK_MSG_EXPEDITED";
-        if (isInline()) opts << "+CK_MSG_INLINE";
-        if (!isIget()) {
-          if (container->isForElement() || container->isForSection()) {
-            str << "  ckSend(impl_amsg, " << epIdx() << opts << ");\n";
-          } else
-            str << "  ckBroadcast(impl_amsg, " << epIdx() << opts << ");\n";
-        }
+    if (isSync()) {
+      str << syncPreCall() << "ckSendSync(impl_amsg, " << epIdx() << ");\n";
+      str << syncPostCall();
+    } else if (!isLocal()) {
+      XStr opts;
+      opts << ",0";
+      if (isSkipscheduler()) opts << "+CK_MSG_EXPEDITED";
+      if (isInline()) opts << "+CK_MSG_INLINE";
+      if (!isIget()) {
+        if (container->isForElement() || container->isForSection()) {
+          str << "  ckSend(impl_amsg, " << epIdx() << opts << ");\n";
+        } else
+          str << "  ckBroadcast(impl_amsg, " << epIdx() << opts << ");\n";
       }
-      if (isIget()) {
-        str << "  return f;\n";
-      }
+    }
+    if (isIget()) {
+      str << "  return f;\n";
     }
     str << "}\n";
 
@@ -850,10 +844,6 @@ void Entry::genGroupDefs(XStr& str) {
   str << makeDecl(retStr, 1) << "::" << name << "(" << msgTypeStr << ")\n";
   str << "{\n";
   // regular broadcast and section broadcast for an entry method with rdma
-  if (param->hasRdma() && !container->isForElement()) {
-    str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy "
-           "parameters\");\n";
-  } else {
     str << "  ckCheck();\n";
     if (!isLocal()) str << marshallMsg();
 
@@ -943,7 +933,6 @@ void Entry::genGroupDefs(XStr& str) {
             << ");\n";
       }
     }
-  }
   str << "}\n";
 
   // entry method on multiple PEs declaration
@@ -951,25 +940,15 @@ void Entry::genGroupDefs(XStr& str) {
       !container->isNodeGroup()) {
     str << "" << makeDecl(retStr, 1) << "::" << name << "(" << paramComma(0, 0)
         << "int npes, int *pes" << eo(0) << ") {\n";
-    if (param->hasRdma()) {
-      str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy "
-             "parameters\");\n";
-    } else {
-      str << marshallMsg();
-      str << "  CkSendMsg" << node << "BranchMulti(" << paramg << ", npes, pes" << opts
-          << ");\n";
-    }
+    str << marshallMsg();
+    str << "  CkSendMsg" << node << "BranchMulti(" << paramg << ", npes, pes" << opts
+        << ");\n";
     str << "}\n";
     str << "" << makeDecl(retStr, 1) << "::" << name << "(" << paramComma(0, 0)
         << "CmiGroup &grp" << eo(0) << ") {\n";
-    if (param->hasRdma()) {
-      str << "  CkAbort(\"Broadcast not supported for entry methods with nocopy "
-             "parameters\");\n";
-    } else {
-      str << marshallMsg();
-      str << "  CkSendMsg" << node << "BranchGroup(" << paramg << ", grp" << opts
-          << ");\n";
-    }
+    str << marshallMsg();
+    str << "  CkSendMsg" << node << "BranchGroup(" << paramg << ", grp" << opts
+        << ");\n";
     str << "}\n";
   }
 }
@@ -981,11 +960,7 @@ XStr Entry::aggregatorIndexType() {
   } else if (container->isArray()) {
     XStr dim, arrayIndexType;
     dim << ((Array*)container)->dim();
-    if (dim == "1D") {
-      indexType << "int";
-    } else {
-      indexType << "CkArrayIndex";
-    }
+     indexType << "CkArrayIndex";
   }
   return indexType;
 }
@@ -1088,13 +1063,7 @@ void Entry::genTramDefs(XStr& str) {
     str << "  const CkArrayIndex &myIndex = ckGetIndex();\n"
         << "  " << aggregatorName() << "->insertData<" << (isInline() ? "true" : "false")
         << ">(" << param->param->name;
-    if (dim == (const char*)"1D") {
-      str << ", "
-          << "myIndex.data()[0]);\n}\n";
-    } else {
-      str << ", "
-          << "myIndex);\n}\n";
-    }
+    str << ", " << "myIndex);\n}\n";
   }
 }
 
@@ -2137,14 +2106,17 @@ void Entry::genClosure(XStr& decls, bool isDef) {
         structure << "      " << sv->type << " "
                   << "*" << sv->name << ";\n";
         structure << "#endif\n";
-        getter << "#if CMK_ONESIDED_IMPL\n";
         if (sv->isFirstRdma()) {
+          getter << "#if CMK_ONESIDED_IMPL\n";
           getter << "      "
                  << "int "
                  << "& "
-                 << "getP" << i++ << "() { return "
+                 << "getP" << i << "() { return "
                  << " num_rdma_fields;}\n";
+          getter << "#endif\n";
+          i++;
         }
+        getter << "#if CMK_ONESIDED_IMPL\n";
         getter << "      "
                << "CkNcpyBuffer "
                << "& "
@@ -2437,6 +2409,38 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
   }
 
   else {  // Normal case: call regular method
+    if(param->hasRecvRdma()) {
+      str << "#if CMK_ONESIDED_IMPL\n";
+      str << "  if(CMI_IS_ZC_RECV(env) || CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
+      str << "#endif\n";
+      genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
+      str << "#if CMK_ONESIDED_IMPL\n";
+      str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
+      //str << "#endif\n";
+      genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
+      //str << "#if CMK_ONESIDED_IMPL\n";
+      str << "    }\n";
+      str << "  } else {\n";
+      str << "#endif\n";
+    }
+    genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
+    if(param->hasRecvRdma()) {
+      str << "#if CMK_ONESIDED_IMPL\n";
+      str << "  }\n";
+      str << "#endif\n";
+    }
+  }
+}
+
+void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool usesImplBuf, bool isRdmaPost) {
+    bool isArgcArgv = false;
+    bool isMigMain = false;
+    bool isSDAGGen = sdagCon || isWhenEntry;
+    bool needsClosure = isSDAGGen && (param->isMarshalled() ||
+                                      (param->isVoid() && isWhenEntry && redn_wrapper));
+
+
+
     if (isArgcArgv) str << "  CkArgMsg *m=(CkArgMsg *)impl_msg;\n";  // Hack!
 
     if (isMigrationConstructor() && container->isArray()) {
@@ -2467,21 +2471,61 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
       if (isSDAGGen) {
         str << "(";
         if (param->isMessage()) {
-          param->unmarshall(str);
+          param->unmarshall(str, false, true, isRdmaPost);
         } else if (needsClosure) {
-          str << "genClosure";
+          if(isRdmaPost)
+            param->unmarshall(str, false, true, isRdmaPost);
+          else
+            str << "genClosure";
         }
+        // Add CkNcpyBufferPost as the last parameter
+        if(isRdmaPost) str << ",ncpyPost";
         str << ");\n";
         if (needsClosure) {
-          str << "  genClosure->deref();\n";
+          if(!isRdmaPost)
+            str << "  genClosure->deref();\n";
         }
       } else {
         str << "(";
-        param->unmarshall(str);
+        param->unmarshall(str, false, true, isRdmaPost);
+        // Add CkNcpyBufferPost as the last parameter
+        if(isRdmaPost) str << ",ncpyPost";
         str << ");\n";
       }
+      if(isRdmaPost) {
+        str << "#if CMK_ONESIDED_IMPL\n";
+        // Allocate an array of rdma pointers
+        str << "  void *buffPtrs["<< numRdmaRecvParams <<"];\n";
+        str << "  int buffSizes["<< numRdmaRecvParams <<"];\n";
+        str << "#endif\n";
+        param->storePostedRdmaPtrs(str, isSDAGGen);
+        str << "#if CMK_ONESIDED_IMPL\n";
+        str << "  if(CMI_IS_ZC_RECV(env)) \n";
+        str << "    CkRdmaIssueRgets(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), NULL, ";
+        if(isSDAGGen)
+          str << " genClosure->num_rdma_fields, ";
+        else
+          str << " impl_num_rdma_fields, ";
+        str << " buffPtrs, buffSizes, ncpyPost);\n";
+        str << "#else\n";
+
+        str << "#endif\n";
+      }
+      // pack pointers if it's a broadcast message
+      if(param->hasRdma() && !container->isForElement() && !isRdmaPost) {
+        // pack rdma pointers for broadcast unmarshall
+        // this is done to support broadcasts before all chare array elements are
+        // finished with their EM execution using the same msg
+        str << "#if CMK_ONESIDED_IMPL\n";
+        if(param->hasRecvRdma())
+          //str << "  if(!CMI_IS_ZC_RECV(env))\n";
+          //str << "  if(CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_MSG)\n";
+          //str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG)\n";
+          str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
+        str << "    CkPackRdmaPtrs(impl_buf_begin);\n";
+        str << "#endif\n";
+      }
     }
-  }
 }
 
 void Entry::genDefs(XStr& str) {
@@ -2735,6 +2779,7 @@ void Entry::genDefs(XStr& str) {
       else
         str << "  CkMarshallMsg *impl_msg_typed=(CkMarshallMsg *)impl_msg;\n";
       str << "  char *impl_buf=impl_msg_typed->msgBuf;\n";
+      str << "  envelope *env = UsrToEnv(impl_msg_typed);\n";
     }
     genCall(str, preCall, false, false);
     param->endUnmarshall(str);
@@ -2751,6 +2796,7 @@ void Entry::genDefs(XStr& str) {
         << "(char* impl_buf, void* impl_obj_void) {\n";
     str << "  " << containerType << "* impl_obj = static_cast<" << containerType
         << "*>(impl_obj_void);\n";
+    str << "  envelope *env = UsrToEnv(impl_buf);\n";
     if (!isLocal()) {
       if (!param->hasConditional()) {
         genCall(str, preCall, false, true);
@@ -2780,6 +2826,7 @@ void Entry::genDefs(XStr& str) {
       else
         str << "  CkMarshallMsg *impl_msg_typed=(CkMarshallMsg *)impl_msg;\n";
       str << "  char *impl_buf=impl_msg_typed->msgBuf;\n";
+      str << "  envelope *env = UsrToEnv(impl_msg_typed);\n";
       param->beginUnmarshall(str);
       param->pupAllValues(str);
     } else {
@@ -3017,5 +3064,6 @@ int Entry::isReductionTarget(void) { return (attribs & SREDUCE); }
 
 char* Entry::getEntryName() { return name; }
 int Entry::getLine() { return line; }
+Chare* Entry::getContainer(void) const { return container; }
 
 }  // namespace xi

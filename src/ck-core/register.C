@@ -30,14 +30,12 @@ void _registerInit(void)
     return;
 }
 
-extern "C"
 int CkRegisterMsg(const char *name, CkPackFnPtr pack, CkUnpackFnPtr unpack,
                   CkDeallocFnPtr dealloc, size_t size)
 {
   return _msgTable.add(new MsgInfo(name, pack, unpack, dealloc, size));
 }
 
-extern "C"
 void ckInvalidCallFn(void *msg,void *obj) {
   CkAbort("Charm++: Invalid entry method executed.  Perhaps there is an unregistered module?");
 }
@@ -71,41 +69,36 @@ int CkRegisterEpInternal(const char *name, CkCallFnPtr call, int msgIdx, int cha
   return _entryTable.add(e);
 }
 
-extern "C"
 int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx, int ck_ep_flags)
 {
   return CkRegisterEpInternal(name, call, msgIdx, chareIdx, ck_ep_flags, false /*=isTemplated*/);
 }
 
-extern "C"
 int CkRegisterEpTemplated(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx, int ck_ep_flags)
 {
   return CkRegisterEpInternal(name, call, msgIdx, chareIdx, ck_ep_flags, true /*=isTemplated*/);
 }
 
-extern "C"
 int CkRegisterChare(const char *name, size_t dataSz, ChareType chareType)
 {
   return _chareTable.add(new ChareInfo(name, dataSz, chareType));
 }
 
-extern "C"
 void CkRegisterArrayDimensions(int chareIndex, int ndims) {
   _chareTable[chareIndex]->ndims = ndims;
 }
 
-extern "C"
 void CkRegisterChareInCharm(int chareIndex){
   _chareTable[chareIndex]->inCharm = true;
 }
 
-extern "C"
 void CkRegisterGroupIrr(int chareIndex,int isIrr){
   _chareTable[chareIndex]->isIrr = (isIrr!=0);
 }
 
+#if CMK_CHARMPY
+
 // TODO give a unique name to entry methods when calling CkRegisterEp
-extern "C"
 void CkRegisterGroupExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx) {
   int __idx = CkRegisterChare(s, sizeof(GroupExt), TypeGroup);
   CkRegisterBase(__idx, CkIndex_IrrGroup::__idx);
@@ -122,7 +115,6 @@ void CkRegisterGroupExt(const char *s, int numEntryMethods, int *chareIdx, int *
   *startEpIdx = epIdxCtor;
 }
 
-extern "C"
 void CkRegisterArrayMapExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx) {
   int __idx = CkRegisterChare(s, sizeof(ArrayMapExt), TypeGroup);
   //CkRegisterChareInCharm(__idx);
@@ -141,7 +133,6 @@ void CkRegisterArrayMapExt(const char *s, int numEntryMethods, int *chareIdx, in
 }
 
 // TODO give a unique name to entry methods when calling CkRegisterEp
-extern "C"
 void CkRegisterArrayExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx) {
   int __idx = CkRegisterChare(s, sizeof(ArrayElemExt), TypeArray);
   CkRegisterBase(__idx, CkIndex_ArrayElement::__idx);
@@ -161,18 +152,17 @@ void CkRegisterArrayExt(const char *s, int numEntryMethods, int *chareIdx, int *
   *startEpIdx = epIdxCtor;
 }
 
-extern "C"
+#endif
+
 void CkRegisterDefaultCtor(int chareIdx, int ctorEpIdx)
 {
   _chareTable[chareIdx]->setDefaultCtor(ctorEpIdx);
 }
-extern "C"
 void CkRegisterMigCtor(int chareIdx, int ctorEpIdx)
 {
   _chareTable[chareIdx]->setMigCtor(ctorEpIdx);
 }
 
-extern "C"
 int CkRegisterMainChare(int chareIdx, int entryIdx)
 {
   int mIdx =  _mainTable.add(new MainInfo(chareIdx, entryIdx));
@@ -180,8 +170,8 @@ int CkRegisterMainChare(int chareIdx, int entryIdx)
   return mIdx;
 }
 
+#if CMK_CHARMPY
 // TODO give a unique name to entry methods when calling CkRegisterEp
-extern "C"
 void CkRegisterMainChareExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx) {
   int __idx = CkRegisterChare(s, sizeof(MainchareExt), TypeMainChare);
   CkRegisterBase(__idx, CkIndex_Chare::__idx);
@@ -197,8 +187,8 @@ void CkRegisterMainChareExt(const char *s, int numEntryMethods, int *chareIdx, i
   *chareIdx = __idx;
   *startEpIdx = epIdxCtor;
 }
+#endif
 
-extern "C"
 void CkRegisterBase(int derivedIdx, int baseIdx)
 {
   if (baseIdx!=-1)
@@ -213,45 +203,40 @@ int CkGetChareIdx(const char *name){
   return -1;
 }
 
-extern "C"
 void CkRegisterReadonly(const char *name,const char *type,
 	size_t size, void *ptr,CkPupReadonlyFnPtr pup_fn)
 {
   _readonlyTable.add(new ReadonlyInfo(name,type,size,ptr,pup_fn));
 }
 
-extern "C"
+#if CMK_CHARMPY
 void CkRegisterReadonlyExt(const char *name, const char *type, size_t msgSize, char *msg) {
   if (msgSize > 0) ReadOnlyExt::setData(msg, msgSize);
   CkRegisterReadonly(name, type, msgSize, ReadOnlyExt::ro_data, ReadOnlyExt::_roPup);
 }
+#endif
 
-extern "C"
 void CkRegisterReadonlyMsg(const char *name,const char *type,void **pMsg)
 {
   _readonlyMsgs.add(new ReadonlyMsgInfo(name,type,pMsg));
 }
 
 
-extern "C"
 void CkRegisterMarshallUnpackFn(int epIndex,CkMarshallUnpackFn m)
 {
   _entryTable[epIndex]->marshallUnpack=m;
 }
 
-extern "C"
 CkMarshallUnpackFn CkLookupMarshallUnpackFn(int epIndex)
 {
   return _entryTable[epIndex]->marshallUnpack;
 }
-extern "C"
 void CkRegisterMessagePupFn(int epIndex,CkMessagePupFn m)
 {
 #if CMK_CHARMDEBUG
 	_entryTable[epIndex]->messagePup=m;
 #endif
 }
-extern "C"
 int CkDisableTracing(int epIdx) {
 	CmiLock(_smp_mutex);
 	int oldStatus = _entryTable[epIdx]->traceEnabled;
@@ -260,7 +245,6 @@ int CkDisableTracing(int epIdx) {
 	return oldStatus;
 }
 
-extern "C"
 void CkEnableTracing(int epIdx) {
 	CmiLock(_smp_mutex);
 	_entryTable[epIdx]->traceEnabled=true;

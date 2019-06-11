@@ -24,11 +24,8 @@
 enum boolean {false = 0, true = 1};
 enum {list_empty = -1 };
 
-CMI_EXTERNC
 void CthInit(char **);
-CMI_EXTERNC
 void ConverseCommonInit(char **);
-CMI_EXTERNC
 void ConverseCommonExit(void);
 
 /*
@@ -310,7 +307,7 @@ void CmiFreeBroadcastAllFn(int size, char *msg)
 }
 
 
-void CmiSyncListSendFn(int npes, int *pes, int size, char *msg)
+void CmiSyncListSendFn(int npes, const int *pes, int size, char *msg)
 {
   int i;
   McMsgHdr *dup_msg;
@@ -375,13 +372,13 @@ void CmiSyncListSendFn(int npes, int *pes, int size, char *msg)
   McQueueAddToBack(broadcast_queue,dup_msg);
 }
 
-CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int size, char *msg)
+CmiCommHandle CmiAsyncListSendFn(int npes, const int *pes, int size, char *msg)
 {
   CmiSyncListSendFn(npes, pes, size, msg);
   return 0;
 }
 
-void CmiFreeListSendFn(int npes, int *pes, int size, char *msg)
+void CmiFreeListSendFn(int npes, const int *pes, int size, char *msg)
 {
   CmiSyncListSendFn(npes,pes,size,msg);
   CmiFree(msg);
@@ -575,8 +572,8 @@ ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   ConverseRunPE(initret);
 }
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
-CMI_EXTERNC_VARIABLE int quietMode;
+extern int quietModeRequested;
+extern int quietMode;
 
 void ConverseExit(int exitcode)
 {

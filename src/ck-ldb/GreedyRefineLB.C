@@ -29,7 +29,7 @@
 #include <algorithm>
 #include <math.h>
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 // a solution is feasible if num migrations <= user-specified limit
 // LOAD_MIG_BAL is used to control tradeoff between maxload and migrations

@@ -85,8 +85,10 @@ class NamedType : public Type {
   int isTemplated(void) const { return (tparams != 0); }
   int isCkArgMsg(void) const { return 0 == strcmp(name, "CkArgMsg"); }
   int isCkMigMsg(void) const { return 0 == strcmp(name, "CkMigrateMessage"); }
+  int isVector(void) const { return 0 == strcmp(name, "vector"); }
   void print(XStr& str);
   int isNamed(void) const { return 1; }
+  TParamList *getTparams(void) const { return tparams; }
   virtual const char* getBaseName(void) const { return name; }
   virtual const char* getScope(void) const { return scope; }
   virtual void genProxyName(XStr& str, forWhom forElement);

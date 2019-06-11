@@ -20,7 +20,7 @@
 using std::cout;
 using std::endl;
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(RefineSwapLB,
     "always assign the heaviest obj onto lightest loaded processor.")

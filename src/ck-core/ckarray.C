@@ -505,6 +505,8 @@ void ArrayElement::recvBroadcast(CkMessage *m){
 #endif
 }
 
+#if CMK_CHARMPY
+
 ArrayElemExt::ArrayElemExt(void *impl_msg)
 {
   int chareIdx = ckGetChareType();
@@ -521,6 +523,8 @@ ArrayElemExt::ArrayElemExt(void *impl_msg)
                           thisIndexMax.data(), ctorEpIdx,
                           msgSize, impl_buf+(2*sizeof(int))+sizeof(char), dcopy_start);
 }
+
+#endif
 
 /*********************** Spring Cleaning *****************
 Periodically (every minute or so) remove expired broadcasts
@@ -1537,9 +1541,14 @@ void CkArray::recvBroadcast(CkMessage *m)
 	CK_MAGICNUMBER_CHECK
 	CkArrayMessage *msg=(CkArrayMessage *)m;
 
+        envelope *env = UsrToEnv(msg);
+
         // Turn the message into a real single-element message
         unsigned short ep = msg->array_ep_bcast();
         CkAssert(UsrToEnv(msg)->getGroupNum() == thisgroup);
+
+        recvBroadcastEpIdx = UsrToEnv(msg)->getEpIdx(); // store the previous EpIx in recvBroadcastEpIdx
+
         UsrToEnv(msg)->setMsgtype(ForArrayEltMsg);
         UsrToEnv(msg)->setArrayMgr(thisgroup);
         UsrToEnv(msg)->getsetArrayEp() = ep;
@@ -1559,7 +1568,33 @@ void CkArray::recvBroadcast(CkMessage *m)
 	extern void startVTimer();
 #endif
     int len = localElemVec.size();
-    for (unsigned int i = 0; i < len; ++i) {
+
+#if CMK_ONESIDED_IMPL
+    // extract this field here so we can still check it even if msg is freed
+    const auto zc_msgtype = CMI_ZC_MSGTYPE(UsrToEnv(msg));
+
+    // All done, deliver to the first element
+    if (zc_msgtype == CMK_ZC_BCAST_RECV_ALL_DONE_MSG) {
+
+      unsigned int i=0;
+      bool doFree = true;
+      if (stableLocations && i == len-1) doFree = true;
+      broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);
+
+    } else if (zc_msgtype == CMK_ZC_BCAST_RECV_MSG) { // deliver to all array elements
+
+      //CmiPrintf("[%d][%d][%d] Received a ZC BCAST RECV MSG and len is %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), len);
+
+      unsigned int i=0;
+      bool doFree = false;
+      if (stableLocations && i == len-1) doFree = true;
+      broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);
+
+    } else
+#endif
+
+    {
+      for (unsigned int i = 0; i < len; ++i) {
 #if CMK_BIGSIM_CHARM
                 //BgEntrySplit("split-broadcast");
   		stopVTimer();
@@ -1569,9 +1604,24 @@ void CkArray::recvBroadcast(CkMessage *m)
 #endif
 		bool doFree = false;
 		if (stableLocations && i == len-1) doFree = true;
+#if CMK_ONESIDED_IMPL
+		if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) doFree = false;
+#endif
+		CmiAssert(i < localElemVec.size());
 		broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);
 	}
+
+#if CMK_ONESIDED_IMPL
+    if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) {
+      CkArray *mgr = getArrayMgrFromMsg(env);
+
+      // Reset back message to be ForBocMsg with the prevEpIdx that targets CkArray group
+      env->setMsgtype(ForBocMsg);
+      env->getsetArrayEp() = mgr->getRecvBroadcastEpIdx();
+    }
 #endif
+#endif
+  }
 
 #if CMK_BIGSIM_CHARM
 	//BgEntrySplit("end-broadcast");
@@ -1590,6 +1640,26 @@ void CkArray::recvBroadcast(CkMessage *m)
 	  delete msg;
 #endif
 }
+
+#if CMK_ONESIDED_IMPL
+void CkArray::forwardZCMsgToOtherElems(envelope *env) {
+  CkArrayMessage *msg=(CkArrayMessage *)(EnvToUsr(env));
+
+  // Set the array to array element endpoint
+  unsigned short ep = msg->array_ep_bcast();
+  env->getsetArrayEp() = ep;
+
+  CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_DONE_MSG;
+
+   int len = localElemVec.size();
+
+   for (unsigned int i = 1; i < len; ++i) {
+     bool doFree = false;
+     if (stableLocations && i == len-1 && CMI_ZC_MSGTYPE(env)!=CMK_ZC_BCAST_RECV_DONE_MSG) doFree = true;
+     broadcaster->deliver((CkArrayMessage *)EnvToUsr(env), (ArrayElement*)localElemVec[i], doFree);
+   }
+}
+#endif
 
 void CkArray::flushStates() {
   CkReductionMgr::flushStates();

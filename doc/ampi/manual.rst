@@ -1,5 +1,5 @@
 ===================
-Adaptive MPI Manual
+Adaptive MPI (AMPI)
 ===================
 
 .. contents::
@@ -223,7 +223,7 @@ extensions are available in C, C++, and Fortran, with the exception of
 ``AMPI_Command_argument_count`` and ``AMPI_Get_command_argument`` which
 are only available in Fortran.
 
-::
+.. code-block:: none
 
    AMPI_Migrate          AMPI_Register_pup            AMPI_Get_pup_data
    AMPI_Migrate_to_pe    AMPI_Set_migratable          AMPI_Evacuate
@@ -253,7 +253,7 @@ These attributes are accessible from any rank by calling
    call MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, my_wth, flag, ierr)
 
 
-::
+.. code-block:: c++
 
    // C/C++:
    int my_wth, flag;
@@ -382,7 +382,7 @@ is that of changing a single pointer per user-level thread context
 switch. Currently, Charm++ supports it for x86/x86_64 platforms when
 using GNU compilers.
 
-::
+.. code-block:: c++
 
    // C/C++ example:
    int myrank;
@@ -397,7 +397,7 @@ using GNU compilers.
 For the example above, the following changes to the code handle the
 global variables:
 
-::
+.. code-block:: c++
 
    // C++ example:
    thread_local int myrank;
@@ -420,7 +420,116 @@ compile and link time:
 
 .. code-block:: bash
 
-   ampicxx -o example example.C -tlsglobals
+   $ ampicxx -o example example.C -tlsglobals
+
+Automatic Process-in-Process Runtime Linking Privatization
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Process-in-Process (PiP) [PiP2018]_ Globals allows fully automatic
+privatization of global variables on GNU/Linux systems without
+modification of user code. All languages (C, C++, Fortran, etc.) are
+supported. This method currently lacks support for checkpointing and
+migration, which are necessary for load balancing and fault tolerance.
+Additionally, overdecomposition is limited to approximately 12 virtual
+ranks per logical node, though this can be resolved by building a
+patched version of glibc.
+
+This method works by combining a specific method of building binaries
+with a GNU extension to the dynamic linker. First, AMPI's toolchain
+wrapper compiles your user program as a Position Independent Executable
+(PIE) and links it against a special shim of function pointers instead
+of the normal AMPI runtime. It then builds a small loader utility that
+links directly against AMPI. For each rank, this loader calls the
+glibc-specific function ``dlmopen`` on the PIE binary with a unique
+namespace index. The loader uses ``dlsym`` to populate the PIE binary's
+function pointers and then it calls the entry point. This ``dlmopen``
+and ``dlsym`` process repeats for each rank. As soon as execution jumps
+into the PIE binary, any global variables referenced within will appear
+privatized. This is because PIE binaries locate the global data segment
+immediately after the code segment so that PIE global variables are
+accessed relative to the instruction pointer, and because ``dlmopen``
+creates a separate copy of these segments in memory for each unique
+namespace index.
+
+Optionally, the first step in using PiP-Globals is to build PiP-glibc to
+overcome the limitation on rank count per process. Use the instructions
+at https://github.com/RIKEN-SysSoft/PiP/blob/pip-1/INSTALL to download
+an installable PiP package or build PiP-glibc from source by following
+the ``Patched GLIBC`` section. AMPI may be able to automatically detect
+PiP's location if installed as a package, but otherwise set and export
+the environment variable ``PIP_GLIBC_INSTALL_DIR`` to the value of
+``<GLIBC_INSTALL_DIR>`` as used in the above instructions. For example:
+
+.. code-block:: bash
+
+   $ export PIP_GLIBC_INSTALL_DIR=~/pip
+
+To use PiP-Globals in your AMPI program (with or without PiP-glibc),
+compile and link with the ``-pipglobals`` parameter:
+
+.. code-block:: bash
+
+   $ ampicxx -o example.o -c example.cpp -pipglobals
+   $ ampicxx -o example example.o -pipglobals
+
+No further effort is needed. Global variables in ``example.cpp`` will be
+automatically privatized when the program is run. Any libraries and
+shared objects compiled as PIE will also be privatized. However, if
+these objects call MPI functions, it will be necessary to build them
+with the AMPI toolchain wrappers, ``-pipglobals``, and potentially also
+the ``-standalone`` parameter in the case of shared objects. It is
+recommended to do this in any case so that AMPI can ensure everything is
+built as PIE.
+
+Potential future support for checkpointing and migration will require
+modification of the ``ld-linux.so`` runtime loader to intercept mmap
+allocations of the previously mentioned segments and redirect them
+through Isomalloc. The present lack of support for these features mean
+PiP-Globals is best suited for testing AMPI during exploratory phases
+of development, and for production jobs not requiring load balancing or
+fault tolerance.
+
+Automatic Filesystem-Based Runtime Linking Privatization
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Filesystem Globals (FS-Globals) was discovered during the development of
+PiP-Globals and the two are highly similar. Like PiP-Globals, it
+requires no modification of user code and works with any language.
+It also currently lacks support for checkpointing and migration,
+preventing use of load balancing and fault tolerance. Unlike PiP-Globals,
+it is portable beyond GNU/Linux and has no limits to overdecomposition
+beyond available disk space.
+
+FS-Globals works in the same way as PiP-Globals except that instead of
+specifying namespaces using ``dlmopen``, which is a GNU/Linux-specific
+feature, this method creates copies of the user's PIE binary on the
+filesystem for each rank and calls the POSIX-standard ``dlopen``.
+
+To use FS-Globals, compile and link with the ``-fsglobals`` parameter:
+
+.. code-block:: bash
+
+   $ ampicxx -o example.o -c example.cpp -fsglobals
+   $ ampicxx -o example example.o -fsglobals
+
+No additional steps are required. Global variables in ``example.cpp``
+will be automatically privatized when the program is run. Variables in
+statically linked libraries will also be privatized if compiled as PIE.
+It is recommended to achieve this by building with the AMPI toolchain
+wrappers and ``-fsglobals``, and this is necessary if the libraries call
+MPI functions. Shared objects are currently not supported by FS-Globals
+due to the extra overhead of iterating through all dependencies and
+copying each one per rank while avoiding system components, plus the
+complexity of ensuring each rank's program binary sees the proper set of
+objects.
+
+This method's use of the filesystem is a drawback in that it is slow
+during startup and can be considered wasteful. Additionally, support for
+load balancing and fault tolerance would require further development in
+the future, using the same infrastructure as what PiP-Globals would
+require. For these reasons FS-Globals is best suited for the R&D phase
+of AMPI program development and for small jobs, and it may be less
+suitable for large production environments.
 
 Automatic Global Offset Table Swapping
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -492,7 +601,7 @@ was renamed to ``END SUBROUTINE``.
      END DO
    END SUBROUTINE
 
-::
+.. code-block:: c++
 
    //C Example
    #include <mpi.h>
@@ -533,7 +642,7 @@ first group the shared data into a user-defined type.
      END TYPE ! modified
    END MODULE
 
-::
+.. code-block:: c++
 
    //C Example
    struct shareddata{
@@ -572,7 +681,7 @@ take this data as argument.
      END DO
    END SUBROUTINE
 
-::
+.. code-block:: c++
 
    //C Example
    void MPI_Main{
@@ -634,6 +743,8 @@ different schemes.
    Transformation       Yes Yes    Yes    Yes  Yes     Yes   Yes
    GOT-Globals          Yes Yes    No     No   No      Yes   Yes
    TLS-Globals          Yes Yes    Yes    No   Maybe   Maybe Maybe
+   PiP-Globals          Yes Yes    No     No   No      Yes   Yes
+   FS-Globals           Yes Yes    Yes    No   Maybe   Yes   Yes
    ==================== === ====== ====== ==== ======= ===== =====
 
 Extensions for Migrations
@@ -732,7 +843,7 @@ Calling ``AMPI_Migrate`` on a rank with pending send requests (i.e. from
 MPI_Isend) is currently not supported, therefore users should always
 wait on any outstanding send requests before calling ``AMPI_Migrate``.
 
-::
+.. code-block:: c++
 
    // Main time-stepping loop
    for (int iter=0; iter < max_iters; iter++) {
@@ -809,7 +920,7 @@ Suppose the user data, chunk, is defined as a derived type in Fortran90:
      END TYPE chunk
    END MODULE
 
-::
+.. code-block:: c++
 
    //C Example
    struct chunk{
@@ -840,7 +951,7 @@ written as:
      call pup(p, c%byp)
    end subroutine
 
-::
+.. code-block:: c++
 
    //C Example
    void chunkpup(pup_er p, struct chunk c){
@@ -889,7 +1000,7 @@ Suppose the type ``dchunk`` is declared as:
      END TYPE dchunk
    END MODULE
 
-::
+.. code-block:: c++
 
    //C Example
    struct dchunk{
@@ -927,7 +1038,7 @@ Then the pack-unpack subroutine is written as:
 
    END SUBROUTINE
 
-::
+.. code-block:: c++
 
    //C Example
    void dchunkpup(pup_er p, struct dchunk c){
@@ -1033,7 +1144,7 @@ does not revoke its allocation). Any load imbalance resulting from the
 restart can then be managed by the runtime system. Use of this scheme is
 illustrated in the code snippet below.
 
-::
+.. code-block:: c++
 
    // Main time-stepping loop
    for (int iter=0; iter < max_iters; iter++) {
@@ -1070,7 +1181,7 @@ do appropriate unpacking based on data type, and return.
 for this get request including the data buffer. Finally,
 ``AMPI_Iget_data`` is the routine used to access the data.
 
-::
+.. code-block:: c++
 
 
    int AMPI_Iget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype, int rank,
@@ -1112,7 +1223,7 @@ and ``Solids_Main``\  [5]_ writing a subroutine called ``MPI_Setup``.
      CALL AMPI_Register_main(Fluids_Main)
    END SUBROUTINE
 
-::
+.. code-block:: c++
 
    //C Example
    void MPI_Setup(){
@@ -1131,9 +1242,9 @@ option). In the above case, suppose one wants to create 128 ranks of
 Solids and 64 ranks of Fluids on 32 physical processors, one would
 specify those with multiple ``+vp`` options on the command line as:
 
-::
+.. code-block:: bash
 
-   > ./charmrun gen1.x +p 32 +vp 128 +vp 64
+   $ ./charmrun gen1.x +p 32 +vp 128 +vp 64
 
 This will ensure that multiple modules representing different complete
 applications can co-exist within the same executable. They can also
@@ -1171,7 +1282,7 @@ to send data to rank number 47 within the Fluids module, it calls:
    CALL MPI_Send(InitialTime, 1, MPI_Double_Precision, tag,
                  47, MPI_Comm_Universe(Fluids_Comm), ierr)
 
-::
+.. code-block:: c++
 
    //C Example
    int Fluids_Comm = 2;
@@ -1188,7 +1299,7 @@ this data:
    CALL MPI_Recv(InitialTime, 1, MPI_Double_Precision, tag,
                  36, MPI_Comm_Universe(Solids_Comm), stat, ierr)
 
-::
+.. code-block:: c++
 
    //C Example
    int Solids_Comm = 1;
@@ -1219,17 +1330,17 @@ processors. To activate the feature, build AMPI module with variable
 (Linking with zlib "-lz" might be required with this, for generating
 compressed log file.)
 
-::
+.. code-block:: bash
 
-   > ./build AMPI netlrts-linux-x86_64 -DAMPIMSGLOG
+   $ ./build AMPI netlrts-linux-x86_64 -DAMPIMSGLOG
 
 The feature is used in two phases: writing (logging) the environment and
 repeating the run. The first logging phase is invoked by a parallel run
 of the AMPI program with some additional command line options.
 
-::
+.. code-block:: bash
 
-   > ./charmrun ./pgm +p4 +vp4 +msgLogWrite +msgLogRank 2 +msgLogFilename "msg2.log"
+   $ ./charmrun ./pgm +p4 +vp4 +msgLogWrite +msgLogRank 2 +msgLogFilename "msg2.log"
 
 In the above example, a parallel run with 4 worker threads and 4 AMPI
 ranks will be executed, and the changes in the MPI environment of worker
@@ -1240,9 +1351,9 @@ Unlike the first run, the re-run is a sequential program, so it is not
 invoked by charmrun (and omitting charmrun options like +p4 and +vp4),
 and additional command line options are required as well.
 
-::
+.. code-block:: bash
 
-   > ./pgm +msgLogRead +msgLogRank 2 +msgLogFilename "msg2.log"
+   $ ./pgm +msgLogRead +msgLogRank 2 +msgLogFilename "msg2.log"
 
 User Defined Initial Mapping
 ----------------------------
@@ -1261,7 +1372,7 @@ Round Robin
 
    .. code-block:: bash
 
-      > ./charmrun ./hello +p2 +vp8 +mapping RR_MAP
+      $ ./charmrun ./hello +p2 +vp8 +mapping RR_MAP
 
 Block Mapping
    This mapping scheme maps virtual processors to physical processor in
@@ -1272,7 +1383,7 @@ Block Mapping
 
    .. code-block:: bash
 
-      > ./charmrun ./hello +p2 +vp8 +mapping BLOCK_MAP
+      $ ./charmrun ./hello +p2 +vp8 +mapping BLOCK_MAP
 
 Proportional Mapping
    This scheme takes the processing capability of physical processors
@@ -1285,8 +1396,8 @@ Proportional Mapping
 
    .. code-block:: bash
 
-      > ./charmrun ./hello +p2 +vp8 +mapping PROP_MAP
-      > ./charmrun ./hello +p2 +vp8 +mapping PROP_MAP +balancer GreedyLB +LBTestPESpeed
+      $ ./charmrun ./hello +p2 +vp8 +mapping PROP_MAP
+      $ ./charmrun ./hello +p2 +vp8 +mapping PROP_MAP +balancer GreedyLB +LBTestPESpeed
 
 If you want to define your own mapping scheme, please contact us for
 assistance.
@@ -1306,7 +1417,7 @@ Projections, link with ``ampicc -tracemode projections``.
 
 AMPI defines the following extensions for tracing support:
 
-::
+.. code-block:: none
 
    AMPI_Trace_begin                      AMPI_Trace_end
 
@@ -1354,11 +1465,11 @@ AMPI Example Applications
 
 Most benchmarks can be compiled with the provided top-level Makefile:
 
-::
+.. code-block:: bash
 
-       > git clone ssh://charm.cs.illinois.edu:9418/benchmarks/ampi-benchmarks
-       > cd ampi-benchmarks
-       > make -f Makefile.ampi
+       $ git clone ssh://charm.cs.illinois.edu:9418/benchmarks/ampi-benchmarks
+       $ cd ampi-benchmarks
+       $ make -f Makefile.ampi
 
 Mantevo project v3.0
 ~~~~~~~~~~~~~~~~~~~~
@@ -1505,16 +1616,16 @@ Kripke v1.1
 
    .. code-block:: bash
 
-      > mkdir build; cd build;
-      > cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain/linux-gcc-ampi.cmake
+      $ mkdir build; cd build;
+      $ cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain/linux-gcc-ampi.cmake
       -DENABLE_OPENMP=OFF
-      > make
+      $ make
 
    Run with:
 
    .. code-block:: bash
 
-      > ./charmrun +p8 ./src/tools/kripke +vp8 --zones 64,64,64 --procs 2,2,2 --nest ZDG
+      $ ./charmrun +p8 ./src/tools/kripke +vp8 --zones 64,64,64 --procs 2,2,2 --nest ZDG
 
 MCB v1.0.3 (2013)
 ^^^^^^^^^^^^^^^^^
@@ -1528,7 +1639,7 @@ MCB v1.0.3 (2013)
 
    .. code-block:: bash
 
-      > OMP_NUM_THREADS=1 ./charmrun +p4 ./../src/MCBenchmark.exe --weakScaling
+      $ OMP_NUM_THREADS=1 ./charmrun +p4 ./../src/MCBenchmark.exe --weakScaling
        --distributedSource --nCores=1 --numParticles=20000 --multiSigma --nThreadCore=1 +vp16
 
 .. _not-yet-ampi-zed-reason-1:
@@ -1732,16 +1843,16 @@ HYPRE-2.11.1
 
 -  Hypre-2.11.1 builds on top of AMPI using the configure command:
 
-   ::
+   .. code-block:: bash
 
-      > ./configure --with-MPI
-            CC=~/charm/bin/ampicc
-            CXX=~/charm/bin/ampicxx
-            F77=~/charm/bin/ampif77
-            --with-MPI-include=~/charm/include
-            --with-MPI-lib-dirs=~/charm/lib
+      $ ./configure --with-MPI \
+            CC=~/charm/bin/ampicc \
+            CXX=~/charm/bin/ampicxx \
+            F77=~/charm/bin/ampif77 \
+            --with-MPI-include=~/charm/include \
+            --with-MPI-lib-dirs=~/charm/lib \
             --with-MPI-libs=mpi --without-timing --without-print-errors
-      > make -j8
+      $ make -j8
 
 -  All HYPRE tests and examples pass tests with virtualization,
    migration, etc. except for those that use Hypre’s timing interface,
@@ -1846,9 +1957,9 @@ and follow the download links. Then build Charm++ and AMPI from source.
 The build script for Charm++ is called ``build``. The syntax for this
 script is:
 
-::
+.. code-block:: bash
 
-   > build <target> <version> <opts>
+   $ build <target> <version> <opts>
 
 For building AMPI (which also includes building Charm++ and other
 libraries needed by AMPI), specify ``<target>`` to be ``AMPI``. And
@@ -1865,34 +1976,34 @@ programs. See the charm/README file for details on picking the proper
 version. Here is an example of how to build a debug version of AMPI in a
 linux and ethernet environment:
 
-::
+.. code-block:: bash
 
-   > build AMPI netlrts-linux-x86_64 -g
+   $ ./build AMPI netlrts-linux-x86_64 -g
 
 And the following is an example of how to build a production version of
 AMPI on a Cray XC system, with MPI-level error checking in AMPI turned
 off:
 
-::
+.. code-block:: bash
 
-   > build AMPI gni-crayxc --with-production --disable-ampi-error-checking
+   $ ./build AMPI gni-crayxc --with-production --disable-ampi-error-checking
 
 AMPI can also be built with support for shared memory on any
 communication layer by adding "smp" as an option after the build target.
 For example, on an Infiniband Linux cluster:
 
-::
+.. code-block:: bash
 
-   > build AMPI verbs-linux-x86_64 smp --with-production
+   $ ./build AMPI verbs-linux-x86_64 smp --with-production
 
 AMPI ranks are implemented as user-level threads with a stack size
 default of 1MB. If the default is not correct for your program, you can
 specify a different default stack size (in bytes) at build time. The
 following build command illustrates this for an Intel Omni-Path system:
 
-::
+.. code-block:: bash
 
-   > build AMPI ofi-linux-x86_64 --with-production -DTCHARM_STACKSIZE_DEFAULT=16777216
+   $ ./build AMPI ofi-linux-x86_64 --with-production -DTCHARM_STACKSIZE_DEFAULT=16777216
 
 The same can be done for AMPI’s RDMA messaging threshold using
 ``AMPI_RDMA_THRESHOLD_DEFAULT`` and, for messages sent within the same
@@ -1916,19 +2027,19 @@ other compilers like cc. All the command line flags that you would use
 for other compilers can be used with the AMPI compilers the same way.
 For example:
 
-::
+.. code-block:: bash
 
-   > ampicc -c pgm.c -O3
-   > ampif90 -c pgm.f90 -O0 -g
-   > ampicc -o pgm pgm.o -lm -O3
+   $ ampicc -c pgm.c -O3
+   $ ampif90 -c pgm.f90 -O0 -g
+   $ ampicc -o pgm pgm.o -lm -O3
 
 To use Isomalloc for transparently migrating user heap data, link with
 *-memory isomalloc*. To use a Charm++ load balancer, link a strategy or
 a suite of strategies in with *-module <LB>*. For example:
 
-::
+.. code-block:: bash
 
-   > ampicc pgm.c -o pgm -O3 -memory isomalloc -module CommonLBs
+   $ ampicc pgm.c -o pgm -O3 -memory isomalloc -module CommonLBs
 
 Running AMPI programs
 ---------------------
@@ -1949,9 +2060,9 @@ and the stack size of every user-level thread) and the program
 arguments. A typical invocation of an AMPI program ``pgm`` with
 ``charmrun`` is:
 
-::
+.. code-block:: bash
 
-   > ./charmrun +p16 ./pgm +vp64
+   $ ./charmrun +p16 ./pgm +vp64
 
 Here, the AMPI program ``pgm`` is run on 16 physical processors with 64
 total virtual ranks (which will be mapped 4 per processor initially).
@@ -1964,9 +2075,9 @@ using the ``+tcharm_stacksize`` option, which can be used to decrease
 the size of the stack that must be migrated, as in the following
 example:
 
-::
+.. code-block:: bash
 
-   > ./charmrun +p16 ./pgm +vp128 +tcharm_stacksize 32K +balancer RefineLB
+   $ ./charmrun +p16 ./pgm +vp128 +tcharm_stacksize 32K +balancer RefineLB
 
 Running with ampirun
 ~~~~~~~~~~~~~~~~~~~~
@@ -1979,9 +2090,9 @@ with ``ampicc``.
 
 The basic usage of ampirun is as follows:
 
-::
+.. code-block:: bash
 
-   > ./ampirun -np 16 --host h1,h2,h3,h4 ./pgm
+   $ ./ampirun -np 16 --host h1,h2,h3,h4 ./pgm
 
 This command will create 16 (non-virtualized) ranks and distribute them
 on the hosts h1-h4.
@@ -1990,16 +2101,16 @@ When using the ``-vr`` option, AMPI will create the number of ranks
 specified by the ``-np`` parameter as virtual ranks, and will create
 only one process per host:
 
-::
+.. code-block:: bash
 
-   > ./ampirun -np 16 --host h1,h2,h3,h4 -vr ./pgm
+   $ ./ampirun -np 16 --host h1,h2,h3,h4 -vr ./pgm
 
 Other options (such as the load balancing strategy), can be specified in
 the same way as for charmrun:
 
-::
+.. code-block:: bash
 
-   > ./ampirun -np 16 ./pgm +balancer RefineLB
+   $ ./ampirun -np 16 ./pgm +balancer RefineLB
 
 Other options
 ~~~~~~~~~~~~~
@@ -2007,9 +2118,9 @@ Other options
 Note that for AMPI programs compiled with gfortran, users may need to
 set the following environment variable to see program output to stdout:
 
-::
+.. code-block:: bash
 
-   > export GFORTRAN_UNBUFFERED_ALL=1
+   $ export GFORTRAN_UNBUFFERED_ALL=1
 
 .. [1]
    Currently, AMPI supports the MPI-2.2 standard, and the MPI-3.1
@@ -2030,3 +2141,11 @@ set the following environment variable to see program output to stdout:
    Currently, we assume that the interface code, which does mapping and
    interpolation among the boundary values of Fluids and Solids domain,
    is integrated with one of Fluids and Solids.
+
+.. [PiP2018]
+   Atsushi Hori, Min Si, Balazs Gerofi, Masamichi Takagi, Jai Dayal, Pavan
+   Balaji, and Yutaka Ishikawa. 2018. Process-in-process: techniques for
+   practical address-space sharing.  In Proceedings of the 27th
+   International Symposium on High-Performance Parallel and Distributed
+   Computing (HPDC '18). ACM, New York, NY, USA,  131-143. DOI:
+   https://doi.org/10.1145/3208040.3208045

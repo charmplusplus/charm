@@ -144,7 +144,7 @@ class LogEntry {
 
     // Constructor for multicast data
     LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
-	     int ml, CmiObjId *d, double rt, int numPe, int *pelist){
+	     int ml, CmiObjId *d, double rt, int numPe, const int *pelist){
 
       type = CREATION_MULTICAST; 
       mIdx = m; 
@@ -375,7 +375,7 @@ class LogPool {
   	void addMemoryUsage(unsigned char type,double time,double memUsage);
 	void addUserSuppliedBracketedNote(char *note, int eventID, double bt, double et);
 
-    void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int numPe=0, int *pelist=NULL);
+    void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int numPe=0, const int *pelist=NULL);
     void flushLogBuffer();
     void postProcessLog();
 
@@ -510,7 +510,7 @@ public:
 
     void creation(envelope *e, int epIdx, int num=1);
     void creation(char *m);
-    void creationMulticast(envelope *e, int epIdx, int num=1, int *pelist=NULL);
+    void creationMulticast(envelope *e, int epIdx, int num=1, const int *pelist=NULL);
     void creationDone(int num=1);
     void beginExecute(envelope *e, void *obj=NULL);
     void beginExecute(char *msg);

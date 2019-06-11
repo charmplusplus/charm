@@ -15,7 +15,7 @@
 
 //#define DEBUG
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(OrbLB, "partition objects based on coordinates")
 

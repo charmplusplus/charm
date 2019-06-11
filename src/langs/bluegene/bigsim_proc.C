@@ -14,7 +14,7 @@
 #define DEBUGLEVEL 10
 
 extern BgStartHandler  workStartFunc;
-extern "C" void CthResumeNormalThread(CthThreadToken* token);
+void CthResumeNormalThread(CthThreadToken* token);
 
 void correctMsgTime(char *msg);
 

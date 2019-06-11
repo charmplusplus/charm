@@ -20,6 +20,8 @@ void initBigSimTrace(int outputParams, int outtiming);
 void finalizeBigSimTrace();
 void startTraceBigSim();
 
+void endTraceBigSim_20param(char * eventname, int stepno, int num_params, double p1 , double p2 , double p3 , double p4 , double p5 , double p6 , double p7 , double p8 , double p9 , double p10 , double p11 , double p12 , double p13 , double p14 , double p15 , double p16 , double p17 , double p18 , double p19 , double p20 );
+
 }
 
 /** 

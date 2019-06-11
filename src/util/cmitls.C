@@ -14,7 +14,7 @@
 
 #if CMK_HAS_TLS_VARIABLES
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 /* These macros are needed for:
  * dlfcn.h: RTLD_DEFAULT

@@ -129,6 +129,8 @@ public:
   std::unordered_map<int, bool> dynamicIns;
 };
 
+#if CMK_CHARMPY
+
 extern int (*ArrayMapProcNumExtCallback)(int, int, const int *);
 
 class ArrayMapExt: public CkArrayMap {
@@ -157,6 +159,8 @@ public:
     //fprintf(stderr, "[%d] ArrayMapExt - procNum is %d\n", CkMyPe(), pe);
   }
 };
+
+#endif
 
 /*@}*/
 

@@ -49,7 +49,7 @@
 #include "GridCommRefineLB.h"
 #include "manager.h"
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def (GridCommRefineLB, "Grid communication load balancer (refines object mapping within each cluster)")
 
@@ -262,7 +262,7 @@ void GridCommRefineLB::Examine_InterObject_Messages (CentralLB::LDStats *stats)
   int recv_object;
   int recv_pe;
   int recv_cluster;
-  LDObjKey *recv_objects;
+  const LDObjKey *recv_objects;
   int num_objects;
 
 

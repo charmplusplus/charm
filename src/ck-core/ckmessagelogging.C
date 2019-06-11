@@ -816,6 +816,7 @@ void checkpointAlarm(void *_dummy,double curWallTime){
 		return;
 	}
 	CheckpointRequest request;
+	CmiInitMsgHeader(request.header, sizeof(CheckpointRequest));
 	request.PE = CkMyPe();
 	CmiSetHandler(&request,_checkpointRequestHandlerIdx);
 	CmiSyncBroadcastAll(sizeof(CheckpointRequest),(char *)&request);
@@ -1130,6 +1131,7 @@ void _storeCheckpointHandler(char *msg){
 	}
 
 	CheckPointAck ackMsg;
+	CmiInitMsgHeader(ackMsg.header, sizeof(CheckPointAck));
 	ackMsg.PE = CkMyPe();
 	ackMsg.dataSize = CpvAccess(_storedCheckpointData)->bufSize;
 	CmiSetHandler(&ackMsg,_checkpointAckHandlerIdx);
@@ -1169,6 +1171,7 @@ void _checkpointAckHandler(CheckPointAck *ackMsg){
  */
 void CkMlogRestart(const char * dummy, CkArgMsg * dummyMsg){
 	RestartRequest msg;
+	CmiInitMsgHeader(msg.header, sizeof(RestartRequest));
 
 	fprintf(stderr,"[%d] Restart started at %.6lf \n",CkMyPe(),CmiWallTimer());
 
@@ -1581,6 +1584,7 @@ void _distributedLocationHandler(char *receivedMsg){
  * it that a particular expected object is not going to get to it */
 void sendDummyMigration(int restartPE,CkGroupID lbID,CkGroupID locMgrID,CkArrayIndexMax &idx,int locationPE){
 	DummyMigrationMsg buf;
+	CmiInitMsgHeader(buf.header, sizeof(DummyMigrationMsg));
 	buf.flag = MLOG_OBJECT;
 	buf.lbID = lbID;
 	buf.mgrID = locMgrID;
@@ -1597,6 +1601,7 @@ void sendDummyMigration(int restartPE,CkGroupID lbID,CkGroupID locMgrID,CkArrayI
 
 void sendDummyMigrationCounts(int *dummyCounts){
 	DummyMigrationMsg buf;
+	CmiInitMsgHeader(buf.header, sizeof(DummyMigrationMsg));
 	buf.flag = MLOG_COUNT;
 	buf.lbID = globalLBID;
 	CmiSetHandler(&buf,_dummyMigrationHandlerIdx);
@@ -1896,6 +1901,7 @@ void garbageCollectMlog(){
 void informLocationHome(CkGroupID locMgrID,CkArrayIndexMax idx,int homePE,int currentPE){
 	double _startTime = CmiWallTimer();
 	CurrentLocationMsg msg;
+	CmiInitMsgHeader(msg.header, sizeof(CurrentLocationMsg));
 	msg.mgrID = locMgrID;
 	msg.idx = idx;
 	msg.locationPE = currentPE;
@@ -1941,6 +1947,7 @@ void _receiveLocationHandler(CurrentLocationMsg *data){
 
 void getGlobalStep(CkGroupID gID){
 	LBStepMsg msg;
+	CmiInitMsgHeader(msg.header, sizeof(LBStepMsg));
 	int destPE = 0;
 	msg.lbID = gID;
 	msg.fromPE = CmiMyPe();

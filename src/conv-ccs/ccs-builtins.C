@@ -55,7 +55,7 @@ static void ccs_killport(char *msg)
 }
 /*Send any registered clients kill messages before we exit*/
 static int noMoreErrors(SOCKET skt, int c, const char *m) {return -1;}
-extern "C" void CcsImpl_kill(void)
+void CcsImpl_kill(void)
 {
   skt_set_abort(noMoreErrors);
   while (killList!=NULL)
@@ -353,7 +353,7 @@ void CpdListRegister(CpdListAccessor *acc)
 { }
 #endif
 
-extern "C" void CpdListRegister_c(const char *path,
+void CpdListRegister_c(const char *path,
             CpdListLengthFn_c len,void *lenParam,
             CpdListItemsFn_c items,void *itemsParam,int checkBoundary)
 #if CMK_CCS_AVAILABLE
@@ -513,7 +513,7 @@ static void CWeb_Collect(void)
   CcdCallFnAfter((CcdVoidFn)CWeb_Collect, 0, WEB_INTERVAL);
 }
 
-extern "C" void CWebPerformanceRegisterFunction(CWebFunction fn)
+void CWebPerformanceRegisterFunction(CWebFunction fn)
 {
   if (CmiMyRank()!=0) return; /* Should only register from rank 0 */
   if (CWebNoOfFns>=MAXFNS) CmiAbort("Registered too many CWebPerformance functions!");
@@ -655,7 +655,7 @@ void CWebInit(void)
 }
 
 
-extern "C" void CcsBuiltinsInit(char **argv)
+void CcsBuiltinsInit(char **argv)
 {
   CcsRegisterHandler("ccs_getinfo",(CmiHandler)ccs_getinfo);
   CcsRegisterHandler("ccs_killport",(CmiHandler)ccs_killport);

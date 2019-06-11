@@ -6,9 +6,11 @@
 #define DEBUG(a) 
 #endif
 
-static bool   _libExitStarted = false;
-int    _libExitHandlerIdx;
-extern "C" int _cleanUp;
+int _libExitHandlerIdx;
+static bool _libExitStarted = false;
+
+extern std::atomic<int> ckExitComplete;
+extern std::atomic<int> _cleanUp;
 
 #if CMK_CONVERSE_MPI
 extern MPI_Comm charmComm;
@@ -16,29 +18,29 @@ extern MPI_Comm charmComm;
 typedef int MPI_Comm;
 #endif
 
+extern void LrtsDrainResources(); /* used when exit */
+
 extern bool _ringexit;		    // for charm exit
 extern int _ringtoken;
 extern void _initCharm(int unused_argc, char **argv);
-extern "C" void CommunicationServerThread(int sleepTime);
+extern void _sendReadonlies();
+void CommunicationServerThread(int sleepTime);
 extern int CharmLibInterOperate;
-CMI_EXTERNC_VARIABLE int userDrivenMode;
+extern int userDrivenMode;
 
-extern "C" void StartInteropScheduler();
-extern "C" void StopInteropScheduler();
+void StartInteropScheduler();
+void StopInteropScheduler();
 
-extern "C"
 void StartCharmScheduler() {
   CmiNodeAllBarrier();
   StartInteropScheduler();
 }
 
-extern "C"
 void StopCharmScheduler() {
   StopInteropScheduler();
 }
 
 // triger LibExit on PE 0,
-extern "C"
 void LibCkExit(void)
 {
   // always send to PE 0
@@ -77,7 +79,7 @@ void _libExitHandler(envelope *env)
       }else{
         DEBUG(printf("[%d] Broadcast Exit for %d PE %d nodes\n",CmiMyPe(),CmiNumPes(),CmiNumNodes());)
         CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char *)env);
-      }	
+      }
       break;
     case ReqStatMsg:
       DEBUG(printf("[%d] Receive Exit for %d PE %d nodes\n",CmiMyPe(),CmiNumPes(),CmiNumNodes());)
@@ -92,7 +94,10 @@ void _libExitHandler(envelope *env)
       else
         CmiFree(env);
       //everyone exits here - there may be issues with leftover messages in the queue
-      DEBUG(printf("[%d] Am done here\n",CmiMyPe());)
+      DEBUG(printf("[%d/%d] Am done here\n",CmiMyRank(),CmiMyPe());)
+#if !CMK_SMP
+      LrtsDrainResources();
+#endif
       _libExitStarted = false;
       StopCharmScheduler();
       break;
@@ -101,18 +106,44 @@ void _libExitHandler(envelope *env)
   }
 }
 
-#if CMK_USE_LRTS
-// CharmInit simply calls CharmLibInit with userDrivenMode set to 1. This allows
-// user code to stop and start the charm scheduler multiple times throughout
-// execution without destroying its state.
-extern "C"
-void CharmInit(int argc, char **argv) {
-  userDrivenMode = 1;
-  CharmLibInit(0, argc, argv);
-}
+// CharmBeginInit calls sets interop flags then calls ConverseInit. This
+// initializes the runtime, but does not start the scheduler or send readonlies.
+// It returns control the main after main chares have been created.
+void CharmBeginInit(int argc, char** argv) {
+#if !defined CMK_USE_LRTS || !CMK_USE_LRTS
+  CmiAbort("Interop is not supported in non-LRTS machine layers.");
 #endif
 
-extern "C"
+  userDrivenMode = 1;
+  CharmLibInterOperate = true;
+  ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
+}
+
+// CharmFinishInit broadcasts out readonly data then begins the interop
+// scheduler. The split initialization allows interop apps to use readonlies
+// without mainchares. They call CharmBeginInit(...), then set readonly values
+// and perform other init such as group creation. They they call CharmFinishInit
+// to bcast readonlies and group creation messages. Control returns to caller
+// after all readonlies are received and all groups are created.
+void CharmFinishInit() {
+  if (CkMyPe() == 0) {
+    _sendReadonlies();
+  }
+  StartInteropScheduler();
+}
+
+// CharmInit is the simplified initialization function for apps which have
+// mainchares or don't use readonlies and don't require groups to be created
+// before regular execution. It calls both CharmStartInit and CharmFinishInit.
+void CharmInit(int argc, char** argv) {
+  CharmBeginInit(argc, argv);
+  CharmFinishInit();
+}
+
+// CharmLibInit is specifically for MPI interop, where MPI applications want
+// to call Charm as a library. It does full initialization and starts the
+// scheduler. If Charm is built on MPI, multiple Charm instances can be created
+// using different communicators.
 void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
 
 #if CMK_USE_LRTS && !CMK_HAS_INTEROP
@@ -132,9 +163,13 @@ void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
   StartInteropScheduler();
 }
 
+// CharmLibExit is called for both forms of interop when the application is
+// done with Charm. In userDrivenMode, this does a full exit and kills the
+// application, just like CkExit(). In MPI interop, it just kills the Charm
+// instance, but allows the outside application and other Charm instances to
+// continue.
 #undef CkExit
 #define CkExit CKEXIT_0 // CKEXIT_0 and other CkExit macros defined in charm.h
-extern "C"
 void CharmLibExit() {
   _cleanUp = 1;
   CmiNodeAllBarrier();
@@ -142,9 +177,9 @@ void CharmLibExit() {
     CkExit();
   }
   if (CmiMyRank() == CmiMyNodeSize()) {
-    while (1) { CommunicationServerThread(5); }
+    while (ckExitComplete.load() == 0) { CommunicationServerThread(5); }
   } else { 
     CsdScheduler(-1);
+    CmiNodeAllBarrier();
   }
 }
-

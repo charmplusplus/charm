@@ -11,6 +11,7 @@ CStateVar::CStateVar(int v, const char* t, int np, const char* n, XStr* r, const
       isMsg(m),
       isRdma(false),
       isFirstRdma(false),
+      isRecvRdma(false),
       declaredRef(NULL),
       byConst(false),
       isCounter(false),
@@ -46,6 +47,7 @@ CStateVar::CStateVar(ParamList* pl)
       isMsg(pl->isMessage()),
       isRdma(pl->isRdma()),
       isFirstRdma(pl->isFirstRdma()),
+      isRecvRdma(pl->isRecvRdma()),
       isCounter(false),
       isSpeculator(false),
       isBgParentLog(false) {}

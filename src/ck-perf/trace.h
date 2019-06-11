@@ -133,7 +133,7 @@ protected:
      //epIdx is extracted from the envelope, num is always 1
      virtual void creation(char *) {}
      virtual void creationMulticast(envelope *, int epIdx, int num=1,
-                      int *pelist=NULL) {
+                      const int *pelist=NULL) {
        (void)epIdx; (void)num; (void)pelist;
      }
      virtual void creationDone(int num=1) { (void)num; }
@@ -278,7 +278,7 @@ public:
          */
         ALLDO(creation(msg));
     }
-    void creationMulticast(envelope *env, int ep, int num=1, int *pelist=NULL);
+    void creationMulticast(envelope *env, int ep, int num=1, const int *pelist=NULL);
     
     inline void creationDone(int num=1) { ALLDO(creationDone(num)); }
     inline void beginSDAGBlock(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx=NULL) {ALLDO(beginSDAGBlock(event, msgType, ep, srcPe, mlen,idx));}

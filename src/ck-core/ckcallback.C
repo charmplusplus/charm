@@ -13,6 +13,9 @@ Initial version by Orion Sky Lawlor, olawlor@acm.org, 2/8/2002
 #include "ckcallback-ccs.h"
 #include "CkCallback.decl.h"
 #include "envelope.h"
+
+extern "C" void LibCkExit();  // Included for CkCallback::ckExit with interop
+
 /*readonly*/ CProxy_ckcallback_group _ckcallbackgroup;
 
 typedef CkHashtableT<CkHashtableAdaptorT<unsigned int>, CkCallback*> threadCB_t;
@@ -224,43 +227,51 @@ CkCallback::CkCallback(ArrayElement *p, int ep,bool forceInline) {
 // to guarantee best performance for non-charm4py applications
 
 // function pointer to interact with Charm4py to generate callback msg
-extern void (*CreateReductionTargetMsgExt)(void*, int, int, int, char**, int*);
+extern void (*CreateCallbackMsgExt)(void*, int, int, int, char**, int*);
 
 static void CkCallbackSendExt(const CkCallback &cb, void *msg)
 {
-  CkAssert(msg != NULL);
   char *extResultMsgData[2] = {NULL, NULL};
   int extResultMsgDataSizes[2] = {0, 0};
-  CkReductionMsg* redMsg = (CkReductionMsg*) msg;
+  void *data = NULL;
+  int dataLen = 0;
+  int reducerType = -1;
+  if (msg != NULL) {
+    // right now this can only be a CkReductionMsg
+    CkReductionMsg* redMsg = (CkReductionMsg*)msg;
+    data = redMsg->getData();
+    dataLen = redMsg->getLength();
+    reducerType = redMsg->getReducer();
+  }
 
   switch (cb.type) {
     case CkCallback::sendChare: // Send message to a chare
-      CreateReductionTargetMsgExt(redMsg->getData(), redMsg->getLength(), redMsg->getReducer(),
-                                  cb.d.chare.refnum, extResultMsgData, extResultMsgDataSizes);
+      CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.chare.refnum,
+                                  extResultMsgData, extResultMsgDataSizes);
       CkChareExtSend_multi(cb.d.chare.id.onPE, cb.d.chare.id.objPtr, cb.d.chare.ep,
                            2, extResultMsgData, extResultMsgDataSizes);
       break;
     case CkCallback::sendGroup: // Send message to a group element
-      CreateReductionTargetMsgExt(redMsg->getData(), redMsg->getLength(), redMsg->getReducer(),
-                                  cb.d.group.refnum, extResultMsgData, extResultMsgDataSizes);
+      CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.group.refnum,
+                                  extResultMsgData, extResultMsgDataSizes);
       CkGroupExtSend_multi(cb.d.group.id.idx, cb.d.group.onPE, cb.d.group.ep,
                            2, extResultMsgData, extResultMsgDataSizes);
       break;
     case CkCallback::sendArray: // Send message to an array element
-      CreateReductionTargetMsgExt(redMsg->getData(), redMsg->getLength(), redMsg->getReducer(),
-                                  cb.d.array.refnum, extResultMsgData, extResultMsgDataSizes);
+      CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.array.refnum,
+                                  extResultMsgData, extResultMsgDataSizes);
       CkArrayExtSend_multi(cb.d.array.id.idx, cb.d.array.idx.asChild().data(), cb.d.array.idx.dimension,
                            cb.d.array.ep, 2, extResultMsgData, extResultMsgDataSizes);
       break;
     case CkCallback::bcastGroup:
-      CreateReductionTargetMsgExt(redMsg->getData(), redMsg->getLength(), redMsg->getReducer(),
-                                  cb.d.group.refnum, extResultMsgData, extResultMsgDataSizes);
+      CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.group.refnum,
+                                  extResultMsgData, extResultMsgDataSizes);
       // onPE is set to -1 since its a bcast
       CkGroupExtSend_multi(cb.d.group.id.idx, -1, cb.d.group.ep, 2, extResultMsgData, extResultMsgDataSizes);
       break;
     case CkCallback::bcastArray:
-      CreateReductionTargetMsgExt(redMsg->getData(), redMsg->getLength(), redMsg->getReducer(),
-                                  cb.d.array.refnum, extResultMsgData, extResultMsgDataSizes);
+      CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.array.refnum,
+                                  extResultMsgData, extResultMsgDataSizes);
       // numDimensions is set to 0 since its bcast
       CkArrayExtSend_multi(cb.d.array.id.idx, cb.d.array.idx.asChild().data(), 0,
                            cb.d.array.ep, 2, extResultMsgData, extResultMsgDataSizes);
@@ -293,7 +304,7 @@ void CkCallback::send(void *msg) const
   int opts = 0;
 
 #if CMK_CHARMPY
-  if (isCkExtReductionCb) { // callback target is external
+  if (isExtCallback) { // callback target is external
     CkCallbackSendExt(*this, msg);
     return;
   }
@@ -304,9 +315,10 @@ void CkCallback::send(void *msg) const
 	case ignore: //Just ignore the callback
 		if (msg) CkFreeMsg(msg);
 		break;
-	case ckExit: //Call ckExit
+	case ckExit: //Call ckExit (or LibCkExit if in interop mode)
 		if (msg) CkFreeMsg(msg);
-		CkExit();
+		if (CharmLibInterOperate) LibCkExit();
+		else CkExit();
 		break;
 	case resumeThread: //Resume a waiting thread
 		if (d.thread.onPE==CkMyPe()) {
@@ -475,6 +487,9 @@ void CkCallback::pup(PUP::er &p) {
   default:
     CkAbort("Inconsistent CkCallback type");
   }
+#if CMK_CHARMPY
+  p|isExtCallback;
+#endif
 }
 
 bool CkCallback::containsPointer() const {

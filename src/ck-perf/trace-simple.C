@@ -44,7 +44,7 @@ void TraceSimple::creation(envelope *, int epIdx, int num) {
 }
 
 void TraceSimple::creationMulticast(envelope *, int epIdx, int num, 
-				    int *pelist) {
+				    const int *pelist) {
   CkPrintf("[%d] Multicast Message for Entry Method id %d sent to %d pes\n",
 	   CkMyPe(), epIdx, num);
 }

@@ -23,7 +23,7 @@
 #define UPPER_FACTOR 0.67
 #define MAX_WEIGHT 5.0
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(CommLB, "another variation of CommLB")
 

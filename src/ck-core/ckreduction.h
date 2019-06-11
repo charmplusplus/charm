@@ -275,6 +275,7 @@ private:
 };
 PUPbytes(CkReduction::reducerType)
 
+#if CMK_CHARMPY
 //CkReductionTypesExt struct to expose the reducerTypes for external
 //modules like Charm4py
         /*  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -345,6 +346,8 @@ struct CkReductionTypesExt {
 };
 
 extern "C" CkReductionTypesExt charm_reducers;
+
+#endif
 
 //A CkReductionMsg is sent up the reduction tree-- it
 // carries a contribution, or several reduced contributions.

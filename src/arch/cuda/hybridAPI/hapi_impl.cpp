@@ -2,6 +2,7 @@
 #include "hapi_impl.h"
 #include "converse.h"
 #include "ckcallback.h"
+#include "cklists.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <algorithm>
@@ -11,10 +12,6 @@
 
 #ifdef HAPI_NVTX_PROFILE
 #include "hapi_nvtx.h"
-#endif
-
-#if defined HAPI_MEMPOOL || defined HAPI_INSTRUMENT_WRS
-#include "cklists.h"
 #endif
 
 #if defined HAPI_TRACE || defined HAPI_INSTRUMENT_WRS
@@ -109,7 +106,6 @@ extern void QdProcess(int n);
 class GPUManager {
 
 public:
-#ifdef HAPI_MEMPOOL
 // Update for new row, again this shouldn't be hard coded!
 #define HAPI_MEMPOOL_NUM_SLOTS 20
 // Pre-allocated buffers will be at least this big (in bytes).
@@ -119,7 +115,7 @@ public:
 
   CkVec<BufferPool> mempool_free_bufs_;
   CkVec<size_t> mempool_boundaries_;
-#endif // HAPI_MEMPOOL
+  bool mempool_initialized_;
 
   // The runtime system keeps track of all allocated buffers on the GPU.
   // The following arrays contain pointers to host (CPU) data and the
@@ -157,10 +153,10 @@ public:
 #endif
 
 #if CMK_SMP || CMK_MULTICORE
-  CmiNodeLock buffer_lock_;
   CmiNodeLock queue_lock_;
   CmiNodeLock progress_lock_;
   CmiNodeLock stream_lock_;
+  CmiNodeLock mempool_lock_;
 #endif
 
   cudaDeviceProp device_prop_;
@@ -193,10 +189,10 @@ void GPUManager::init() {
 
 #if CMK_SMP || CMK_MULTICORE
   // create mutex locks
-  buffer_lock_ = CmiCreateLock();
   queue_lock_ = CmiCreateLock();
   progress_lock_ = CmiCreateLock();
   stream_lock_ = CmiCreateLock();
+  mempool_lock_ = CmiCreateLock();
 #endif
 
 #ifdef HAPI_TRACE
@@ -216,7 +212,7 @@ void GPUManager::init() {
 #endif
 
   // set which device to use
-  hapiCheck(cudaSetDevice(getMyCudaDevice(CmiMyPe())));
+  hapiCheck(cudaSetDevice(getMyCudaDevice(CmiMyNode())));
 
   // allocate host/device buffers array (both user and system-addressed)
   host_buffers_ = new void*[NUM_BUFFERS*2];
@@ -233,7 +229,8 @@ void GPUManager::init() {
   traceRegisterUserEvent("GPU Memory Cleanup", GpuMemCleanup);
 #endif
 
-#ifdef HAPI_MEMPOOL
+  // set up mempool metadata
+  mempool_initialized_ = false;
   mempool_boundaries_.reserve(HAPI_MEMPOOL_NUM_SLOTS);
   mempool_boundaries_.length() = HAPI_MEMPOOL_NUM_SLOTS;
 
@@ -242,7 +239,6 @@ void GPUManager::init() {
     mempool_boundaries_[i] = buf_size;
     buf_size = buf_size << 1;
   }
-#endif // HAPI_MEMPOOL
 
 #ifdef HAPI_INSTRUMENT_WRS
   init_instr_ = false;
@@ -693,66 +689,39 @@ hapiWorkRequest* hapiCreateWorkRequest() {
   return (new hapiWorkRequest);
 }
 
-#ifdef HAPI_MEMPOOL
 static void createPool(int *nbuffers, int n_slots, CkVec<BufferPool> &pools);
 static void releasePool(CkVec<BufferPool> &pools);
-#endif
 
 // Initialization of HAPI functionalities.
 void initHybridAPI() {
   // create and initialize GPU Manager object
   CsvInitialize(GPUManager, gpu_manager);
   CsvAccess(gpu_manager).init();
+}
 
-#ifdef HAPI_MEMPOOL
-  // create pool of page-locked memory
-  int sizes[HAPI_MEMPOOL_NUM_SLOTS];
-        /*256*/ sizes[0]  =  4;
-        /*512*/ sizes[1]  =  2;
-       /*1024*/ sizes[2]  =  2;
-       /*2048*/ sizes[3]  =  4;
-       /*4096*/ sizes[4]  =  2;
-       /*8192*/ sizes[5]  =  6;
-      /*16384*/ sizes[6]  =  5;
-      /*32768*/ sizes[7]  =  2;
-      /*65536*/ sizes[8]  =  1;
-     /*131072*/ sizes[9]  =  1;
-     /*262144*/ sizes[10] =  1;
-     /*524288*/ sizes[11] =  1;
-    /*1048576*/ sizes[12] =  1;
-    /*2097152*/ sizes[13] =  2;
-    /*4194304*/ sizes[14] =  2;
-    /*8388608*/ sizes[15] =  2;
-   /*16777216*/ sizes[16] =  2;
-   /*33554432*/ sizes[17] =  1;
-   /*67108864*/ sizes[18] =  1;
-  /*134217728*/ sizes[19] =  7;
-  createPool(sizes, HAPI_MEMPOOL_NUM_SLOTS, CsvAccess(gpu_manager).mempool_free_bufs_);
-
-#ifdef HAPI_MEMPOOL_DEBUG
-  printf("[HAPI (%d)] done creating buffer pool\n", CmiMyPe());
-#endif
-
-#endif // HAPI_MEMPOOL
+// Set HAPI device for non-0 ranks
+void setHybridAPIDevice() {
+  // set which device to use
+  hapiCheck(cudaSetDevice(getMyCudaDevice(CmiMyNode())));
 }
 
 // Clean up and delete memory used by HAPI.
 void exitHybridAPI() {
 #if CMK_SMP || CMK_MULTICORE
   // destroy mutex locks
-  CmiDestroyLock(CsvAccess(gpu_manager).buffer_lock_);
   CmiDestroyLock(CsvAccess(gpu_manager).queue_lock_);
   CmiDestroyLock(CsvAccess(gpu_manager).progress_lock_);
   CmiDestroyLock(CsvAccess(gpu_manager).stream_lock_);
+  CmiDestroyLock(CsvAccess(gpu_manager).mempool_lock_);
 #endif
 
   // destroy streams (if they were created)
   CsvAccess(gpu_manager).destroyStreams();
 
-#ifdef HAPI_MEMPOOL
-  // release memory pool
-  releasePool(CsvAccess(gpu_manager).mempool_free_bufs_);
-#endif // HAPI_MEMPOOL
+  // release memory pool if it was used
+  if (CsvAccess(gpu_manager).mempool_initialized_) {
+    releasePool(CsvAccess(gpu_manager).mempool_free_bufs_);
+  }
 
 #ifdef HAPI_TRACE
   for (int i = 0; i < CsvAccess(gpu_manager).time_idx_; i++) {
@@ -855,7 +824,6 @@ static inline void profileWorkRequestEvent(hapiWorkRequest* wr,
 #endif
 }
 
-#ifdef HAPI_MEMPOOL
 // Create a pool with n_slots slots.
 // There are n_buffers[i] buffers for each buffer size corresponding to entry i.
 // TODO list the alignment/fragmentation issues with either of two allocation schemes:
@@ -882,10 +850,10 @@ static void createPool(int *n_buffers, int n_slots, CkVec<BufferPool> &pools){
   int n_buffers_to_allocate[n_slots];
   memset(n_buffers_to_allocate, 0, sizeof(n_buffers_to_allocate));
   size_t buf_size;
-  while (available_memory >= mempool_boundaries[0] + sizeof(Header)) {
+  while (available_memory >= mempool_boundaries[0] + sizeof(BufferPoolHeader)) {
     for (int i = 0; i < max_buffers; i++) {
       for (int j = n_slots - 1; j >= 0; j--) {
-        buf_size = mempool_boundaries[j] + sizeof(Header);
+        buf_size = mempool_boundaries[j] + sizeof(BufferPoolHeader);
         if (i < n_buffers[j] && buf_size <= available_memory) {
           n_buffers_to_allocate[j]++;
           available_memory -= buf_size;
@@ -896,11 +864,11 @@ static void createPool(int *n_buffers, int n_slots, CkVec<BufferPool> &pools){
 
   // pin the host memory
   for (int i = 0; i < n_slots; i++) {
-    buf_size = mempool_boundaries[i] + sizeof(Header);
+    buf_size = mempool_boundaries[i] + sizeof(BufferPoolHeader);
     int num_buffers = n_buffers_to_allocate[i];
 
-    Header* hd;
-    Header* previous = NULL;
+    BufferPoolHeader* hd;
+    BufferPoolHeader* previous = NULL;
 
     // pin host memory in a contiguous block for a slot
     void* pinned_chunk;
@@ -908,7 +876,7 @@ static void createPool(int *n_buffers, int n_slots, CkVec<BufferPool> &pools){
 
     // initialize header structs
     for (int j = num_buffers - 1; j >= 0; j--) {
-      hd = reinterpret_cast<Header*>(reinterpret_cast<unsigned char*>(pinned_chunk)
+      hd = reinterpret_cast<BufferPoolHeader*>(reinterpret_cast<unsigned char*>(pinned_chunk)
                                      + buf_size * j);
       hd->slot = i;
       hd->next = previous;
@@ -924,7 +892,7 @@ static void createPool(int *n_buffers, int n_slots, CkVec<BufferPool> &pools){
 
 static void releasePool(CkVec<BufferPool> &pools){
   for (int i = 0; i < pools.length(); i++) {
-    Header* hdr = pools[i].head;
+    BufferPoolHeader* hdr = pools[i].head;
     if (hdr != NULL) {
       hapiCheck(cudaFreeHost((void*)hdr));
     }
@@ -942,7 +910,7 @@ static int findPool(size_t size){
     CsvAccess(gpu_manager).mempool_boundaries_.push_back(size);
 
     BufferPool newpool;
-    hapiCheck(cudaMallocHost((void**)&newpool.head, size + sizeof(Header)));
+    hapiCheck(cudaMallocHost((void**)&newpool.head, size + sizeof(BufferPoolHeader)));
     if (newpool.head == NULL) {
       printf("[HAPI (%d)] findPool: failed to allocate newpool %d head, size %zu\n",
              CmiMyPe(), boundary_array_len, size);
@@ -954,7 +922,7 @@ static int findPool(size_t size){
 #endif
     CsvAccess(gpu_manager).mempool_free_bufs_.push_back(newpool);
 
-    Header* hd = newpool.head;
+    BufferPoolHeader* hd = newpool.head;
     hd->next = NULL;
     hd->slot = boundary_array_len;
 
@@ -970,7 +938,7 @@ static int findPool(size_t size){
 }
 
 static void* getBufferFromPool(int pool, size_t size){
-  Header* ret;
+  BufferPoolHeader* ret;
 
   if (pool < 0 || pool >= CsvAccess(gpu_manager).mempool_free_bufs_.length()) {
     printf("[HAPI (%d)] getBufferFromPool, pool: %d, size: %zu invalid pool\n",
@@ -982,8 +950,8 @@ static void* getBufferFromPool(int pool, size_t size){
     CmiAbort("[HAPI] exiting after invalid pool");
   }
   else if (CsvAccess(gpu_manager).mempool_free_bufs_[pool].head == NULL) {
-    Header* hd;
-    hapiCheck(cudaMallocHost((void**)&hd, sizeof(Header) +
+    BufferPoolHeader* hd;
+    hapiCheck(cudaMallocHost((void**)&hd, sizeof(BufferPoolHeader) +
                              CsvAccess(gpu_manager).mempool_free_bufs_[pool].size));
 #ifdef HAPI_MEMPOOL_DEBUG
     printf("[HAPI (%d)] getBufferFromPool, pool: %d, size: %zu expand by 1\n",
@@ -1007,7 +975,7 @@ static void* getBufferFromPool(int pool, size_t size){
   return NULL;
 }
 
-static void returnBufferToPool(int pool, Header* hd) {
+static void returnBufferToPool(int pool, BufferPoolHeader* hd) {
   hd->next = CsvAccess(gpu_manager).mempool_free_bufs_[pool].head;
   CsvAccess(gpu_manager).mempool_free_bufs_[pool].head = hd;
 #ifdef HAPI_MEMPOOL_DEBUG
@@ -1017,8 +985,39 @@ static void returnBufferToPool(int pool, Header* hd) {
 
 void* hapiPoolMalloc(size_t size) {
 #if CMK_SMP || CMK_MULTICORE
-  CmiLock(CsvAccess(gpu_manager).buffer_lock_);
+  CmiLock(CsvAccess(gpu_manager).mempool_lock_);
 #endif
+
+  if (!CsvAccess(gpu_manager).mempool_initialized_) {
+    // create pool of page-locked memory
+    int sizes[HAPI_MEMPOOL_NUM_SLOTS];
+          /*256*/ sizes[0]  =  4;
+          /*512*/ sizes[1]  =  2;
+         /*1024*/ sizes[2]  =  2;
+         /*2048*/ sizes[3]  =  4;
+         /*4096*/ sizes[4]  =  2;
+         /*8192*/ sizes[5]  =  6;
+        /*16384*/ sizes[6]  =  5;
+        /*32768*/ sizes[7]  =  2;
+        /*65536*/ sizes[8]  =  1;
+       /*131072*/ sizes[9]  =  1;
+       /*262144*/ sizes[10] =  1;
+       /*524288*/ sizes[11] =  1;
+      /*1048576*/ sizes[12] =  1;
+      /*2097152*/ sizes[13] =  2;
+      /*4194304*/ sizes[14] =  2;
+      /*8388608*/ sizes[15] =  2;
+     /*16777216*/ sizes[16] =  2;
+     /*33554432*/ sizes[17] =  1;
+     /*67108864*/ sizes[18] =  1;
+    /*134217728*/ sizes[19] =  7;
+    createPool(sizes, HAPI_MEMPOOL_NUM_SLOTS, CsvAccess(gpu_manager).mempool_free_bufs_);
+    CsvAccess(gpu_manager).mempool_initialized_ = true;
+
+#ifdef HAPI_MEMPOOL_DEBUG
+    printf("[HAPI (%d)] done creating buffer pool\n", CmiMyPe());
+#endif
+  }
 
   int pool = findPool(size);
   void* buf = getBufferFromPool(pool, size);
@@ -1030,14 +1029,18 @@ void* hapiPoolMalloc(size_t size) {
 #endif
 
 #if CMK_SMP || CMK_MULTICORE
-  CmiUnlock(CsvAccess(gpu_manager).buffer_lock_);
+  CmiUnlock(CsvAccess(gpu_manager).mempool_lock_);
 #endif
 
   return buf;
 }
 
 void hapiPoolFree(void* ptr) {
-  Header* hd = ((Header*)ptr) - 1;
+  // check if mempool was initialized, just return if not
+  if (!CsvAccess(gpu_manager).mempool_initialized_)
+    return;
+
+  BufferPoolHeader* hd = ((BufferPoolHeader*)ptr) - 1;
   int pool = hd->slot;
 
 #ifdef HAPI_MEMPOOL_DEBUG
@@ -1045,13 +1048,13 @@ void hapiPoolFree(void* ptr) {
 #endif
 
 #if CMK_SMP || CMK_MULTICORE
-  CmiLock(CsvAccess(gpu_manager).buffer_lock_);
+  CmiLock(CsvAccess(gpu_manager).mempool_lock_);
 #endif
 
   returnBufferToPool(pool, hd);
 
 #if CMK_SMP || CMK_MULTICORE
-  CmiUnlock(CsvAccess(gpu_manager).buffer_lock_);
+  CmiUnlock(CsvAccess(gpu_manager).mempool_lock_);
 #endif
 
 #ifdef HAPI_MEMPOOL_DEBUG
@@ -1060,7 +1063,6 @@ void hapiPoolFree(void* ptr) {
          CsvAccess(gpu_manager).mempool_free_bufs_[pool].num);
 #endif
 }
-#endif // HAPI_MEMPOOL
 
 #ifdef HAPI_INSTRUMENT_WRS
 void hapiInitInstrument(int n_chares, char n_types) {
@@ -1214,8 +1216,22 @@ cudaError_t hapiMallocHost(void** ptr, size_t size) {
   return cudaMallocHost(ptr, size);
 }
 
+cudaError_t hapiMallocHostPool(void** ptr, size_t size) {
+  void* tmp_ptr = hapiPoolMalloc(size);
+  if (tmp_ptr) {
+    *ptr = tmp_ptr;
+    return cudaSuccess;
+  }
+  else return cudaErrorMemoryAllocation;
+}
+
 cudaError_t hapiFreeHost(void* ptr) {
   return cudaFreeHost(ptr);
+}
+
+cudaError_t hapiFreeHostPool(void *ptr) {
+  hapiPoolFree(ptr);
+  return cudaSuccess;
 }
 
 cudaError_t hapiMemcpyAsync(void* dst, const void* src, size_t count, cudaMemcpyKind kind, cudaStream_t stream = 0) {

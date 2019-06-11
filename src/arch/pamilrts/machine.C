@@ -9,6 +9,7 @@
 #include "pcqueue.h"
 #include "assert.h"
 #include "malloc.h"
+#include <algorithm>
 
 #if CMK_BLUEGENEQ
 #include <hwi/include/bqc/A2_inlines.h>
@@ -27,7 +28,7 @@
 
 #if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
 #include "PPCAtomicQueue.h"
-#include "memalloc.c"
+#include "memalloc.C"
 #endif
 
 #if CMK_SMP && CMK_PPC_ATOMIC_MUTEX
@@ -72,7 +73,6 @@ char *ALIGN_32(char *p) {
 
 #if CMK_ERROR_CHECKING
 static int checksum_flag = 0;
-CMI_EXTERNC
 unsigned char computeCheckSum(unsigned char *data, int len);
 
 #define CMI_SET_CHECKSUM(msg, len)      \
@@ -168,7 +168,7 @@ static void CmiNetworkBarrier(int async);
 #if SPECIFIC_PCQUEUE && CMK_SMP
 #define  QUEUE_NUMS     _Cmi_mynodesize + 3
 #include "lrtsqueue.h"
-#include "memalloc.c"
+#include "memalloc.C"
 #endif
 #include "machine-lrts.h"
 #include "machine-common-core.C"
@@ -237,7 +237,7 @@ volatile int outstanding_recvs;
 #endif
 
 // Function declaration for ppc_msync
-CMI_EXTERNC void ppc_msync();
+void ppc_msync();
 
 #if CMK_SMP  && !CMK_ENABLE_ASYNC_PROGRESS
 #define PAMIX_CONTEXT_LOCK_INIT(x)
@@ -525,7 +525,7 @@ pamix_progress_register_fn  cmi_progress_register;
 pamix_progress_enable_fn    cmi_progress_enable;
 pamix_progress_disable_fn   cmi_progress_disable;
 
-CMI_EXTERNC_VARIABLE int quietMode;
+extern int quietMode;
 
 int CMI_Progress_init(int start, int ncontexts) {
   if ((CmiMyPe() == 0) && (!quietMode))
@@ -1191,7 +1191,7 @@ void ack_pkt_dispatch (pami_context_t       context,
 
 #if ! CMK_MULTICAST_LIST_USE_COMMON_CODE
 
-void LrtsSyncListSendFn(int npes, int *pes, int size, char *msg) {
+void LrtsSyncListSendFn(int npes, const int *pes, int size, char *msg) {
   char *copymsg;
   copymsg = (char *)CmiAlloc(size);
   CmiMemcpy(copymsg,msg,size);
@@ -1207,7 +1207,7 @@ typedef struct ListMulticastVec_t {
 
 void machineFreeListSendFn(pami_context_t    context, 
     int               npes, 
-    int             * pes, 
+    const int       * pes,
     int               size, 
     char            * msg);
 
@@ -1219,7 +1219,7 @@ pami_result_t machineFreeList_handoff(pami_context_t context, void *cookie)
   return PAMI_SUCCESS;
 }
 
-void LrtsFreeListSendFn(int npes, int *pes, int size, char *msg) {
+void LrtsFreeListSendFn(int npes, const int *pes, int size, char *msg) {
   //printf("%d: In Free List Send Fn imm %d\n", CmiMyPe(), CmiIsImmediate(msg));
 
   CMI_SET_BROADCAST_ROOT(msg,0);
@@ -1252,7 +1252,7 @@ void LrtsFreeListSendFn(int npes, int *pes, int size, char *msg) {
 #endif
 }
 
-void machineFreeListSendFn(pami_context_t my_context, int npes, int *pes, int size, char *msg) {
+void machineFreeListSendFn(pami_context_t my_context, int npes, const int *pes, int size, char *msg) {
   int i;
   char *copymsg;
 #if CMK_SMP
@@ -1306,7 +1306,7 @@ void machineFreeListSendFn(pami_context_t my_context, int npes, int *pes, int si
 #endif
 }
 
-CmiCommHandle LrtsAsyncListSendFn(int npes, int *pes, int size, char *msg) {
+CmiCommHandle LrtsAsyncListSendFn(int npes, const int *pes, int size, char *msg) {
   CmiAbort("CmiAsyncListSendFn not implemented.");
   return (CmiCommHandle) 0;
 }
@@ -1483,10 +1483,10 @@ void init_barrier () {
 #endif
 
 #if CMK_PERSISTENT_COMM
-#include "machine-persistent.c"
+#include "machine-persistent.C"
 #endif
 
 #if CMK_ONESIDED_IMPL
-#include "machine-onesided.c"
+#include "machine-onesided.C"
 #endif
 

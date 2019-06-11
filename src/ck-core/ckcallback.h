@@ -140,10 +140,7 @@ public:
 	callbackType type;
 	callbackData d;
 #if CMK_CHARMPY
-	// NOTE with charm4py, CkCallback objects are not pup'ed, so this field doesn't
-	// need to be added to pup routine. But this could change in the future if the field
-	// is used in other contexts
-	bool isCkExtReductionCb = false;
+	bool isExtCallback = false;
 #endif
 
 	bool operator==(CkCallback & other){
@@ -343,6 +340,54 @@ public:
       type=replyCCS;
 	  d.ccsReply.reply=reply;
 	}
+
+#if CMK_CHARMPY
+
+  CkCallback(int onPE, void* objPtr, int ep, int fid) {
+    CkChareID id;
+    id.onPE = onPE;
+    id.objPtr = objPtr;
+    type = sendChare;
+    d.chare.ep = ep;
+    d.chare.id = id;
+    d.chare.hasRefnum = (fid > 0);
+    d.chare.refnum = fid;
+    isExtCallback = true;
+  }
+
+  CkCallback(int gid, int pe, int ep, int fid) {
+    CkGroupID id;
+    id.idx = gid;
+    if (pe == -1) {
+      type = bcastGroup;
+    } else {
+      type = sendGroup;
+      d.group.onPE = pe;
+    }
+    d.group.ep = ep;
+    d.group.id = id;
+    d.group.hasRefnum = (fid > 0);
+    d.group.refnum = fid;
+    isExtCallback = true;
+  }
+
+  CkCallback(int aid, int* idx, int ndims, int ep, int fid) {
+    CkGroupID id;
+    id.idx = aid;
+    if (ndims > 0) {
+      type = sendArray;
+      d.array.idx = CkArrayIndex(ndims, idx);
+    } else {
+      type = bcastArray;
+    }
+    d.array.ep = ep;
+    d.array.id = CkArrayID(id);
+    d.array.hasRefnum = (fid > 0);
+    d.array.refnum = fid;
+    isExtCallback = true;
+  }
+
+#endif
 
 	~CkCallback() {
 	  thread_destroy();

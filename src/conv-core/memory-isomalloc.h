@@ -1,4 +1,4 @@
-/*Contains declarations used by memory-isomalloc.c to provide
+/*Contains declarations used by memory-isomalloc.C to provide
 migratable heap allocation to arbitrary clients.
 */
 #ifndef CMK_MEMORY_ISOMALLOC_H
