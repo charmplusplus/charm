@@ -1423,36 +1423,15 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 #endif
     CmiSetInfo(env,infoFn);
     if (pe==CLD_BROADCAST) {
-#if CMK_MESSAGE_LOGGING
-	if(env->flags)
-		CmiSyncBroadcastAndFree(len, (char *)env); 
-	else
-		CmiSyncBroadcast(len, (char *)env);
-#else
  			CmiSyncBroadcastAndFree(len, (char *)env); 
-#endif
 
 }
     else if (pe==CLD_BROADCAST_ALL) { 
-#if CMK_MESSAGE_LOGGING
-	if(env->flags & CK_FREE_MSG_MLOG)
-		CmiSyncBroadcastAllAndFree(len, (char *)env);
-	else
-		CmiSyncBroadcastAll(len, (char *)env);
-#else
                         CmiSyncBroadcastAllAndFree(len, (char *)env);
-#endif
 
 }
     else{
-#if CMK_MESSAGE_LOGGING
-	if(env->flags & CK_FREE_MSG_MLOG)
-		CmiSyncSendAndFree(pe, len, (char *)env);
-	else
-		CmiSyncSend(pe, len, (char *)env);
-#else
                         CmiSyncSendAndFree(pe, len, (char *)env);
-#endif
 
 		}
   }
@@ -1528,35 +1507,14 @@ void _noCldNodeEnqueue(int node, envelope *env)
   CkPackMessage(&env);
   int len=env->getTotalsize();
   if (node==CLD_BROADCAST) { 
-#if CMK_MESSAGE_LOGGING
-	if(env->flags & CK_FREE_MSG_MLOG)
-		CmiSyncNodeBroadcastAndFree(len, (char *)env); 
-	else
-		CmiSyncNodeBroadcast(len, (char *)env);
-#else
 	CmiSyncNodeBroadcastAndFree(len, (char *)env); 
-#endif
 }
   else if (node==CLD_BROADCAST_ALL) { 
-#if CMK_MESSAGE_LOGGING
-	if(env->flags & CK_FREE_MSG_MLOG)
 		CmiSyncNodeBroadcastAllAndFree(len, (char *)env); 
-	else
-		CmiSyncNodeBroadcastAll(len, (char *)env);
-#else
-		CmiSyncNodeBroadcastAllAndFree(len, (char *)env); 
-#endif
 
 }
   else {
-#if CMK_MESSAGE_LOGGING
-	if(env->flags & CK_FREE_MSG_MLOG)
-		CmiSyncNodeSendAndFree(node, len, (char *)env);
-	else
-		CmiSyncNodeSend(node, len, (char *)env);
-#else
 	CmiSyncNodeSendAndFree(node, len, (char *)env);
-#endif
   }
 }
 

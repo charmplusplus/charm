@@ -29,12 +29,6 @@
 #define CkMsgAlignOffset(x)     (CkMsgAlignLength(x)-(x))
 #define CkPriobitsToInts(nBits)    ((nBits+CkIntbits-1)/CkIntbits)
 
-#if CMK_MESSAGE_LOGGING
-#define CK_FREE_MSG_MLOG 	0x1
-#define CK_BYPASS_DET_MLOG 	0x2
-#define CK_MULTICAST_MSG_MLOG 	0x4
-#define CK_REDUCTION_MSG_MLOG 	0x8
-#endif
 
 /**
     \addtogroup CriticalPathFramework 

@@ -11529,12 +11529,8 @@ CLINKAGE int AMPI_Migrate(MPI_Info hints)
 #endif
       }
       else if (strncmp(value, "message_logging", MPI_MAX_INFO_VAL) == 0) {
-#if CMK_MESSAGE_LOGGING
-        TCHARM_Migrate();
-#else
         CkPrintf("AMPI> Error: Message logging is not enabled!\n");
         CkAbort("AMPI> Error: Recompile Charm++/AMPI with CMK_MESSAGE_LOGGING.\n");
-#endif
       }
       else if (strncmp(value, "false", MPI_MAX_INFO_VAL) == 0) {
         /* do nothing */
