@@ -61,4 +61,13 @@ c---------------------------------------------------------------------
       common /timers/ timeron
 
 
+    
+c-- Privatizing common blocks --------------------------------
 
+!$OMP THREADPRIVATE(/mg3/)
+!$OMP THREADPRIVATE(/ClassType/)
+!$OMP THREADPRIVATE(/my_debug/)
+!$OMP THREADPRIVATE(/fap/)
+!$OMP THREADPRIVATE(/comm_ex/)
+!$OMP THREADPRIVATE(/buffer/)
+!$OMP THREADPRIVATE(/timers/)

@@ -1,0 +1,70 @@
+
+--------------------------------------------
+| Privatization of NAS Parallel Benchmarks |
+--------------------------------------------
+
+AMPI virtualizes the ranks of MPI_COMM_WORLD as user-level threads rather
+than OS processes. This means that global variables are shared between
+multiple AMPI ranks, rather than private to each rank.
+All global variables that are written to more than once and which are
+not written to the same value on all MPI ranks must be encapsulated.
+All PARAMETER variables are safe, as are many globals that are
+store global input values that are written to only once at startup.
+Note that module variables, as well as explicit and implicit
+SAVE variables are all forms of global variables.
+
+In order to privatize global variables of all kinds in Fortran programs,
+we encapsulate the variables in a derived type which is allocated per
+(A)MPI rank, and then all references to those variables must be updated
+to access them through the derived type.
+
+You can find more information on privatization in the AMPI manual here:
+http://charm.cs.illinois.edu/manuals/html/ampi/manual.html
+
+
+List of global variables (common blocks) in
+bt.f
+    --
+add.f
+    --
+adi.f
+btio.f
+btio_common.f
+copy_faces.f
+define.f
+epio.f
+error.f
+exact_rhs.f
+exact_solution.f
+    --
+full_mpiio.f
+fortran_io.f
+header.h
+    /global/
+    /constants/
+    /partition/
+    /fields/
+    /work_1d/
+    /box/
+    /work_solve/
+    /btio/          <-- This gets defined 3 times, with different sets of variables
+    /tflags/
+initialize.f
+make_set.f
+mpinpb.h
+    /mpistuff/
+rhs.f
+set_constants.f
+simple_mpiio.f
+solve_subs.f
+verify.f
+work_lhs.h
+    /work_lhs/
+work_lhs_vec.h
+    /work_lhs/
+x_solve.f
+x_solve_vec.f
+y_solve.f
+y_solve_vec.f
+z_solve.f
+z_solve_vec.f

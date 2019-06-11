@@ -9,3 +9,8 @@ c---------------------------------------------------------------------
       double precision maxtime
       logical timeron
       common/timer/maxtime, timeron
+
+c-- Privatizing common block timer--------------------------------
+
+!$OMP THREADPRIVATE(/timer/)
+      

@@ -132,3 +132,17 @@ c for checksum data
 c number of iterations
       integer niter
       common /iter/ niter
+      
+      
+c-- Privatizing common blocks --------------------------------
+
+!$OMP THREADPRIVATE(/procgrid/)
+!$OMP THREADPRIVATE(/blockinfo/)
+!$OMP THREADPRIVATE(/coords/)
+!$OMP THREADPRIVATE(/comms/)
+!$OMP THREADPRIVATE(/layout/)
+!$OMP THREADPRIVATE(/dbg/)
+!$OMP THREADPRIVATE(/ucomm/)
+!$OMP THREADPRIVATE(/sumcomm/)
+!$OMP THREADPRIVATE(/iter/)
+

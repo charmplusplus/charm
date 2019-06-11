@@ -1,0 +1,378 @@
+3c3
+< !        N  A  S     P A R A L L E L     B E N C H M A R K S  3.3         !
+---
+> !        N  A  S     P A R A L L E L     B E N C H M A R K S  3.1         !
+9c9
+< !    This benchmark is part of the NAS Parallel Benchmark 3.3 suite.      !
+---
+> !    This benchmark is part of the NAS Parallel Benchmark 3.1 suite.      !
+15c15
+< !    Parallel Benchmarks 3.3. This software is provided "as is"           !
+---
+> !    Parallel Benchmarks 3.1. This software is provided "as is"           !
+18c18
+< !    Information on NPB 3.3, including the technical report, the          !
+---
+> !    Information on NPB 3.1, including the technical report, the          !
+49c49,50
+<       program cg
+---
+> c      program cg
+>       recursive subroutine MPI_Main
+126,133d126
+< C----------
+< C  Class E:
+< C----------
+< CC       parameter( na=9000000, 
+< CC      >           nonzer=26, 
+< CC      >           shift=1500., 
+< CC      >           niter=100,
+< CC      >           rcond=1.0d-1 )
+138c131
+<       parameter( nz = na*(nonzer+1)/num_procs*(nonzer+1)+nonzer
+---
+>       parameter( nz = na*(nonzer+1)*(nonzer+1)/num_procs 
+142,190c135,183
+< 
+<       common / partit_size  /  naa, nzz, 
+<      >                         npcols, nprows,
+<      >                         proc_col, proc_row,
+<      >                         firstrow, 
+<      >                         lastrow, 
+<      >                         firstcol, 
+<      >                         lastcol,
+<      >                         exch_proc,
+<      >                         exch_recv_length,
+<      >                         send_start,
+<      >                         send_len
+<       integer                  naa, nzz, 
+<      >                         npcols, nprows,
+<      >                         proc_col, proc_row,
+<      >                         firstrow, 
+<      >                         lastrow, 
+<      >                         firstcol, 
+<      >                         lastcol,
+<      >                         exch_proc,
+<      >                         exch_recv_length,
+<      >                         send_start,
+<      >                         send_len
+< 
+< 
+<       common / main_int_mem /  colidx,     rowstr,
+<      >                         iv,         arow,     acol
+<       integer                  colidx(nz), rowstr(na+1),
+<      >                         iv(2*na+1), arow(nz), acol(nz)
+< 
+< 
+<       common / main_flt_mem /  v,       aelt,     a,
+<      >                         x,
+<      >                         z,
+<      >                         p,
+<      >                         q,
+<      >                         r,
+<      >                         w
+<       double precision         v(na+1), aelt(nz), a(nz),
+<      >                         x(na/num_proc_rows+2),
+<      >                         z(na/num_proc_rows+2),
+<      >                         p(na/num_proc_rows+2),
+<      >                         q(na/num_proc_rows+2),
+<      >                         r(na/num_proc_rows+2),
+<      >                         w(na/num_proc_rows+2)
+< 
+< 
+<       common /urando/          amult, tran
+<       double precision         amult, tran
+---
+> 			      	
+>       common / partit_size  / 	 naa, nzz, 
+>      >                           npcols, nprows,
+>      >                           proc_col, proc_row,
+>      >                        	 firstrow, 
+>      >                           lastrow, 
+>      >                           firstcol, 
+>      >                           lastcol,
+>      >                           exch_proc,
+>      >                           exch_recv_length,
+>      >                           send_start,
+>      >                           send_len
+>       integer                 	 naa, nzz, 
+>      >                           npcols, nprows,
+>      >                           proc_col, proc_row,
+>      >                        	 firstrow, 
+>      >                           lastrow, 
+>      >                           firstcol, 
+>      >                           lastcol,
+>      >                           exch_proc,
+>      >                           exch_recv_length,
+>      >                           send_start,
+>      >                           send_len
+> 			      	
+> 			      	
+>       common / main_int_mem / 	 colidx,     rowstr,
+>      >                        	 iv,         arow,     acol
+>       integer                 	 colidx(nz), rowstr(na+1),
+>      >                        	 iv(2*na+1), arow(nz), acol(nz)
+> 			      	
+> 			      	
+>       common / main_flt_mem / 	 v,       aelt,     a,
+>      >                        	 x,
+>      >                        	 z,
+>      >                           p,
+>      >                           q,
+>      >                           r,
+>      >                           w
+>       double precision           v(na+1), aelt(nz), a(nz),
+>      >                        	 x(na/num_proc_rows+2),
+>      >                        	 z(na/num_proc_rows+2),
+>      >                        	 p(na/num_proc_rows+2),
+>      >                        	 q(na/num_proc_rows+2),
+>      >                        	 r(na/num_proc_rows+2),
+>      >                        	 w(na/num_proc_rows+2)
+> 			      	
+> 			      	
+>       common /urando/         	 amult, tran
+>       double precision           amult, tran
+257,263c250
+<          zeta_verify_value = 52.514532105794d0
+<       else if( na .eq. 9000000 .and. 
+<      &         nonzer .eq. 26 .and. 
+<      &         niter .eq. 100 .and.
+<      &         shift .eq. 1.5d3 ) then
+<          class = 'E'
+<          zeta_verify_value = 77.522164599383d0
+---
+>          zeta_verify_value = 52.5145321058d0
+275c262
+<  1000 format(//,' NAS Parallel Benchmarks 3.3 -- CG Benchmark', /)
+---
+>  1000 format(//,' NAS Parallel Benchmarks 3.1 -- CG Benchmark', /)
+530c517
+< 
+---
+> c         call MPI_CHECKPOINT("log");
+565,566c552,553
+<  201           format(' Zeta is    ', E20.13)
+<  202           format(' Error is   ', E20.13)
+---
+>  201           format(' Zeta is    ', E20.12)
+>  202           format(' Error is   ', E20.12)
+573,574c560,561
+<  301           format(' Zeta                ', E20.13)
+<  302           format(' The correct zeta is ', E20.13)
+---
+>  301           format(' Zeta                ', E20.12)
+>  302           format(' The correct zeta is ', E20.12)
+580d566
+<             write (*, 201) zeta
+602a589
+>  600  format( i4, 2e19.12)
+651,672c638,659
+<       common / partit_size  /  naa, nzz, 
+<      >                         npcols, nprows,
+<      >                         proc_col, proc_row,
+<      >                         firstrow, 
+<      >                         lastrow, 
+<      >                         firstcol, 
+<      >                         lastcol,
+<      >                         exch_proc,
+<      >                         exch_recv_length,
+<      >                         send_start,
+<      >                         send_len
+<       integer                  naa, nzz, 
+<      >                         npcols, nprows,
+<      >                         proc_col, proc_row,
+<      >                         firstrow, 
+<      >                         lastrow, 
+<      >                         firstcol, 
+<      >                         lastcol,
+<      >                         exch_proc,
+<      >                         exch_recv_length,
+<      >                         send_start,
+<      >                         send_len
+---
+>       common / partit_size  / 	 naa, nzz, 
+>      >                           npcols, nprows,
+>      >                           proc_col, proc_row,
+>      >                        	 firstrow, 
+>      >                           lastrow, 
+>      >                           firstcol, 
+>      >                           lastcol,
+>      >                           exch_proc,
+>      >                           exch_recv_length,
+>      >                           send_start,
+>      >                           send_len
+>       integer                 	 naa, nzz, 
+>      >                           npcols, nprows,
+>      >                           proc_col, proc_row,
+>      >                        	 firstrow, 
+>      >                           lastrow, 
+>      >                           firstcol, 
+>      >                           lastcol,
+>      >                           exch_proc,
+>      >                           exch_recv_length,
+>      >                           send_start,
+>      >                           send_len
+775,796c762,783
+<       common / partit_size  /  naa, nzz, 
+<      >                         npcols, nprows,
+<      >                         proc_col, proc_row,
+<      >                         firstrow, 
+<      >                         lastrow, 
+<      >                         firstcol, 
+<      >                         lastcol,
+<      >                         exch_proc,
+<      >                         exch_recv_length,
+<      >                         send_start,
+<      >                         send_len
+<       integer                  naa, nzz, 
+<      >                         npcols, nprows,
+<      >                         proc_col, proc_row,
+<      >                         firstrow, 
+<      >                         lastrow, 
+<      >                         firstcol, 
+<      >                         lastcol,
+<      >                         exch_proc,
+<      >                         exch_recv_length,
+<      >                         send_start,
+<      >                         send_len
+---
+>       common / partit_size  / 	 naa, nzz, 
+>      >                           npcols, nprows,
+>      >                           proc_col, proc_row,
+>      >                        	 firstrow, 
+>      >                           lastrow, 
+>      >                           firstcol, 
+>      >                           lastcol,
+>      >                           exch_proc,
+>      >                           exch_recv_length,
+>      >                           send_start,
+>      >                           send_len
+>       integer                 	 naa, nzz, 
+>      >                           npcols, nprows,
+>      >                           proc_col, proc_row,
+>      >                        	 firstrow, 
+>      >                           lastrow, 
+>      >                           firstcol, 
+>      >                           lastcol,
+>      >                           exch_proc,
+>      >                           exch_recv_length,
+>      >                           send_start,
+>      >                           send_len
+1001,1024c988,1011
+< 
+<       common / partit_size  /  naa, nzz, 
+<      >                         npcols, nprows,
+<      >                         proc_col, proc_row,
+<      >                         firstrow, 
+<      >                         lastrow, 
+<      >                         firstcol, 
+<      >                         lastcol,
+<      >                         exch_proc,
+<      >                         exch_recv_length,
+<      >                         send_start,
+<      >                         send_len
+<       integer                  naa, nzz, 
+<      >                         npcols, nprows,
+<      >                         proc_col, proc_row,
+<      >                         firstrow, 
+<      >                         lastrow, 
+<      >                         firstcol, 
+<      >                         lastcol,
+<      >                         exch_proc,
+<      >                         exch_recv_length,
+<      >                         send_start,
+<      >                         send_len
+< 
+---
+> 			      	
+>       common / partit_size  / 	 naa, nzz, 
+>      >                           npcols, nprows,
+>      >                           proc_col, proc_row,
+>      >                        	 firstrow, 
+>      >                           lastrow, 
+>      >                           firstcol, 
+>      >                           lastcol,
+>      >                           exch_proc,
+>      >                           exch_recv_length,
+>      >                           send_start,
+>      >                           send_len
+>       integer                 	 naa, nzz, 
+>      >                           npcols, nprows,
+>      >                           proc_col, proc_row,
+>      >                        	 firstrow, 
+>      >                           lastrow, 
+>      >                           firstcol, 
+>      >                           lastcol,
+>      >                           exch_proc,
+>      >                           exch_recv_length,
+>      >                           send_start,
+>      >                           send_len
+> 			      	
+1468c1455
+<            iv(n+i) = 0
+---
+> 	   iv(n+i) = 0
+1477c1464
+<                  scale = size * v(ivelt)
+---
+> 	         scale = size * v(ivelt)
+1479c1466
+<                     irow = colidx(ivelt1)
+---
+> 	            irow = colidx(ivelt1)
+1481c1468
+<                        nnza = nnza + 1
+---
+> 	               nnza = nnza + 1
+1483,1485c1470,1472
+<                        acol(nnza) = jcol
+<                        arow(nnza) = irow
+<                        aelt(nnza) = v(ivelt1) * scale
+---
+> 	               acol(nnza) = jcol
+> 	               arow(nnza) = irow
+> 	               aelt(nnza) = v(ivelt1) * scale
+1498c1485
+<         do i = firstrow, lastrow
+---
+> 	do i = firstrow, lastrow
+1501c1488
+<               nnza = nnza + 1
+---
+> 	      nnza = nnza + 1
+1503,1506c1490,1493
+<               acol(nnza) = i
+<               arow(nnza) = i
+<               aelt(nnza) = rcond - shift
+<            endif
+---
+> 	      acol(nnza) = i
+> 	      arow(nnza) = i
+> 	      aelt(nnza) = rcond - shift
+> 	   endif
+1537c1524
+<       integer            colidx(*), rowstr(*)
+---
+>       integer            colidx(1), rowstr(1)
+1539,1540c1526,1527
+<       integer            n, arow(*), acol(*), nnza
+<       double precision   a(*), aelt(*)
+---
+>       integer            n, arow(1), acol(1), nnza
+>       double precision   a(1), aelt(1)
+1561c1548
+<       nrows = lastrow - firstrow + 1
+---
+> 	nrows = lastrow - firstrow + 1
+1668,1669c1655,1656
+<       double precision   v(*)
+<       integer            n, nz, iv(*), nzloc(n), nn1
+---
+>       double precision   v(1)
+>       integer            n, nz, iv(1), nzloc(n), nn1
+1762,1763c1749,1750
+<       integer            n, iv(*), nzv, i, k
+<       double precision   v(*), val
+---
+>       integer            n, iv(1), nzv, i, k
+>       double precision   v(1), val

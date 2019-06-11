@@ -5,11 +5,11 @@
    It sets the number of processors and the class of the NPB
    in this directory. Do not modify it by hand.   */
    
-#define COMPILETIME "11 Jun 2019"
+#define COMPILETIME "10 Jun 2019"
 #define NPBVERSION "3.3.1"
-#define MPICC "mpicc"
-#define CFLAGS "-O"
+#define MPICC "$(CHARMBASE)/ampicc"
+#define CFLAGS "-O0  -g -mcmodel=medium -fopenmp #-tlsglobals"
 #define CLINK "$(MPICC)"
-#define CLINKFLAGS "-O"
-#define CMPI_LIB "-L/usr/local/lib -lmpi"
+#define CLINKFLAGS "-O0 -fopenmp -mcmodel=medium #-tlsglobals"
+#define CMPI_LIB "#-L/home/ankit/mpich-install/lib -lmpi"
 #define CMPI_INC "-I/usr/local/include"

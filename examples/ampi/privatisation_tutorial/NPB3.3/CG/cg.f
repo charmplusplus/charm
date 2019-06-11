@@ -46,7 +46,7 @@ c---------------------------------------------------------------------
 
 c---------------------------------------------------------------------
 c---------------------------------------------------------------------
-      program cg
+      subroutine MPI_main
 c---------------------------------------------------------------------
 c---------------------------------------------------------------------
 
@@ -191,6 +191,15 @@ CC      >           rcond=1.0d-1 )
       double precision         amult, tran
 
 
+     
+c-- Privatizing common blocks --------------------------------
+
+!$OMP THREADPRIVATE(/partit_size/)
+!$OMP THREADPRIVATE(/main_int_mem/)
+!$OMP THREADPRIVATE(/main_flt_mem/)
+!$OMP THREADPRIVATE(/urando/)
+
+      
 
       integer            l2npcols
       integer            reduce_exch_proc(num_proc_cols)
@@ -732,6 +741,11 @@ c---------------------------------------------------------------------
       integer   i, ierr
       integer   log2nprocs
 
+
+c--------- Privatizing common block partit_size ----------------------
+!$OMP THREADPRIVATE(/partit_size/)
+      
+      
 c---------------------------------------------------------------------
 c  num_procs must be a power of 2, and num_procs=num_proc_cols*num_proc_rows
 c  When num_procs is not square, then num_proc_cols = 2*num_proc_rows
@@ -865,6 +879,10 @@ c---------------------------------------------------------------------
 
       proc_row = me / npcols
       proc_col = me - proc_row*npcols
+
+
+c--------- Privatizing common block partit_size ----------------------
+c!$OMP THREADPRIVATE(/partit_size/)
 
 
 
@@ -1108,6 +1126,10 @@ c---------------------------------------------------------------------
       double precision timer_read
 
       data      cgitmax / 25 /
+
+c--------- Privatizing common block partit_size ----------------------
+!$OMP THREADPRIVATE(/partit_size/)
+      
 
 
       if (timeron) call timer_start(t_conjg)
@@ -1763,6 +1785,11 @@ c---------------------------------------------------------------------
 
         external           randlc, icnvrt
         double precision   randlc, vecelt, vecloc
+
+        
+c--------- Privatizing common block urando ----------------------
+!$OMP THREADPRIVATE(/urando/)
+      
 
 
         nzv = 0

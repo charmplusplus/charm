@@ -46,7 +46,7 @@ c---------------------------------------------------------------------
 
 
 c---------------------------------------------------------------------
-      program mg_mpi
+      subroutine MPI_main
 c---------------------------------------------------------------------
 
       implicit none
@@ -72,6 +72,12 @@ c---------------------------------------------------------------------------c
 
       double precision u(nr),v(nv),r(nr),a(0:3),c(0:3)
       common /noautom/ u,v,r   
+
+     
+c-- Privatizing common block noautom --------------------------------
+
+!$OMP THREADPRIVATE(/noautom/)
+
 
       double precision rnm2, rnmu, old2, oldu, epsilon
       integer n1, n2, n3, nit
@@ -411,6 +417,12 @@ c---------------------------------------------------------------------
       integer  is1, is2, is3, ie1, ie2, ie3
       common /grid/ is1,is2,is3,ie1,ie2,ie3
 
+     
+c-- Privatizing common block grid --------------------------------
+
+!$OMP THREADPRIVATE(/grid/)
+
+
       integer n1,n2,n3,k
       integer dx, dy, log_p, d, i, j
 
@@ -434,7 +446,7 @@ c---------------------------------------------------------------------
             ng(ax,k) = ng(ax,k+1)/2
          enddo
       enddo
- 61   format(10i4)
+!  61   format(10i4)
       do  k=lt,1,-1
          nx(k) = ng(1,k)
          ny(k) = ng(2,k)
@@ -530,9 +542,9 @@ c---------------------------------------------------------------------
      >        ' n1  n2  n3 is1 is2 is3 ie1 ie2 ie3'
          do  i=0,nprocs-1
             if( me .eq. i )then
-               write(*,9) me,k,lt,ng(1,k),ng(2,k),ng(3,k),
+               write(*,*) me,k,lt,ng(1,k),ng(2,k),ng(3,k),
      >              n1,n2,n3,is1,is2,is3,ie1,ie2,ie3
- 9             format(15i4)
+!  9             format(15i4)
             endif
             call mpi_barrier(mpi_comm_world,ierr)
          enddo
@@ -543,11 +555,11 @@ c---------------------------------------------------------------------
                write(*,*)' '
                write(*,*)' processor =',me
                do  k=lt,1,-1
-                  write(*,7)k,idi(1),idi(2),idi(3),
-     >                 ((nbr(d,j,k),j=-1,1,2),d=1,3),
-     >                 (mi(d,k),d=1,3)
+                  write(*,*) k,'idi=',idi(1),idi(2),idi(3),'nbr=',
+     >                 ((nbr(d,j,k),'  ',j=-1,1,2),d=1,3),'mi=',
+     >                 (mi(d,k),d=1,3),' '
                enddo
- 7             format(i4,'idi=',3i4,'nbr=',3(2i4,'  '),'mi=',3i4,' ')
+!  7             format(i4,'idi=',3i4,'nbr=',3(2i4,'  '),'mi=',3i4,' ')
                write(*,*)'idi(s) = ',(idi(s),s=1,3)
                write(*,*)'dead(2), dead(1) = ',dead(2),dead(1)
                do  ax=1,3
@@ -1118,8 +1130,8 @@ c---------------------------------------------------------------------
 
       call norm2u3(u,n1,n2,n3,rnm2,rnmu,nx(kk),ny(kk),nz(kk))
       if( me .eq. root )then
-         write(*,7)kk,title,rnm2,rnmu
- 7       format(' Level',i2,' in ',a8,': norms =',D21.14,D21.14)
+         write(*,*)' Level',kk,' in ',title,': norms =',rnm2,rnmu
+!  7       format(' Level',i2,' in ',a8,': norms =',D21.14,D21.14)
       endif
 
       return
@@ -2122,6 +2134,12 @@ c---------------------------------------------------------------------
       integer  is1, is2, is3, ie1, ie2, ie3
       common /grid/ is1,is2,is3,ie1,ie2,ie3
 
+           
+c-- Privatizing common block grid --------------------------------
+
+!$OMP THREADPRIVATE(/grid/)
+
+
       integer n1, n2, n3, k, nx, ny, ierr, i0, m0, m1
       double precision z(n1,n2,n3)
 
@@ -2328,12 +2346,12 @@ c---------------------------------------------------------------------
             write(*,*)' id = ', me
             do  i3=1,m3
                do  i1=1,m1
-                  write(*,6)(z(i1,i2,i3),i2=1,m2)
+                  write(*,*)(z(i1,i2,i3),i2=1,m2)
                enddo
                write(*,*)' - - - - - - - '
             enddo
             write(*,*)'  '
- 6          format(6f15.11)
+!  6          format(6f15.11)
          endif
          call mpi_barrier(mpi_comm_world,ierr)
       enddo
@@ -2367,12 +2385,12 @@ c---------------------------------------------------------------------
             write(*,*)' id = ', me
             do  i3=1,m3
                do  i1=1,m1
-                  write(*,6)(z(i1,i2,i3),i2=1,m2)
+                  write(*,*)(z(i1,i2,i3),i2=1,m2)
                enddo
                write(*,*)' - - - - - - - '
             enddo
             write(*,*)'  '
- 6          format(15f6.3)
+!  6          format(15f6.3)
          endif
          call mpi_barrier(mpi_comm_world,ierr)
       enddo
@@ -2400,12 +2418,12 @@ c---------------------------------------------------------------------
             write(*,*)' id = ', me
             do  i3=2,n3-1
                do  i1=2,n1-1
-                  write(*,6)(z(i1,i2,i3),i2=2,n1-1)
+                  write(*,*)(z(i1,i2,i3),i2=2,n1-1)
                enddo
                write(*,*)' - - - - - - - '
             enddo
             write(*,*)'  '
- 6          format(8D10.3)
+!  6          format(8D10.3)
          endif
          call mpi_barrier(mpi_comm_world,ierr)
       enddo

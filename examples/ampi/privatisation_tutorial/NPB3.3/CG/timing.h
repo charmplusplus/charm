@@ -3,3 +3,10 @@
 
       logical timeron
       common /timers/ timeron
+      
+
+     
+c-- Privatizing common block timers --------------------------------
+
+!$OMP THREADPRIVATE(/timers/)
+      

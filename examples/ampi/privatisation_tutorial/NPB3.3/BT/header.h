@@ -143,4 +143,16 @@ c
       common /tflags/ timeron
 
 
+c---------------------------------------------------------------------
+c      Privatization of common blocks
+c---------------------------------------------------------------------
 
+!$OMP THREADPRIVATE(/global/)
+!$OMP THREADPRIVATE(/constants/)
+!$OMP THREADPRIVATE(/partition/)
+!$OMP THREADPRIVATE(/fields/)
+!$OMP THREADPRIVATE(/work_1d/)
+!$OMP THREADPRIVATE(/box/)
+!$OMP THREADPRIVATE(/work_solve/)
+!$OMP THREADPRIVATE(/btio/)
+!$OMP THREADPRIVATE(/tflags/)

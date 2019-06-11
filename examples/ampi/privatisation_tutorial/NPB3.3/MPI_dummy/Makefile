@@ -1,8 +1,8 @@
 # Makefile for MPI dummy library. 
 # Must be edited for a specific machine. Does NOT read in 
 # the make.def file of NPB 2.3
-F77 = f77
-CC = cc
+F77 = ampif77
+CC = ampicc
 AR = ar
 
 # Enable if either Cray or IBM: (no such flag for most machines: see wtime.h)

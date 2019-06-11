@@ -1,0 +1,201 @@
+
+--------------------------------------------
+| Privatization of NAS Parallel Benchmarks |
+--------------------------------------------
+
+AMPI virtualizes the ranks of MPI_COMM_WORLD as user-level threads rather
+than OS processes. This means that global variables are shared between
+multiple AMPI ranks, rather than private to each rank.
+All global variables that are written to more than once and which are
+not written to the same value on all MPI ranks must be encapsulated.
+All PARAMETER variables are safe, as are many globals that are
+store global input values that are written to only once at startup.
+Note that module variables, as well as explicit and implicit
+SAVE variables are all forms of global variables.
+
+In order to privatize global variables of all kinds in Fortran programs,
+we encapsulate the variables in a derived type which is allocated per
+(A)MPI rank, and then all references to those variables must be updated
+to access them through the derived type.
+
+You can find more information on privatization in the AMPI manual here:
+http://charm.cs.illinois.edu/manuals/html/ampi/manual.html
+
+
+List of global variables in
+IS.C
+    timeron         ! Global variable is written once (same for all ranks), then final
+    my_rank         ! Initialized and calculated before use in each function
+    comm_size       ! Initialized and calculated before use in each function
+    passed_verification     ! Initialized on stack in main, and passed by reference to 
+                                  rank and full_verify
+    *key_buff_ptr_global
+    total_local_keys    
+    total_lesser_keys  ! Global variable is written once (same for all ranks), then final
+    
+    (arrays:)
+    key_array
+    key_buff1       
+    key_buff2
+    bucket_size
+    bucket_size_totals
+    bucket_ptrs
+    process_bucket_distrib_ptr1
+    process_bucket_distrib_ptr2
+    send_count
+    recv_count
+    send_displ
+    recv_displ
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+This tutorial by default includes the already-privatized version of
+the source code. In order to check out the non-privatized code, do
+the following:
+
+git checkout 8f1b95575d5520b975f001d4020fa10ad7f45991
+
+The rest of this section contains information on the privatization done
+for this tutorial. We move all unsafe global variables into a MG_GLOBALS
+derived type defined in MG_CONSTANTS.F, allocate that structure
+on the stack in main, and pass it through to all routines that need it.
+
+You can see our changes in the following commits:
+
+git show 631e20d2fd336a03752c03d8d38f392b36d9b5c5
+
+git show ec4596561747a735e0417df3c776d7c7a9699f96
+
+
+In MiniGhost, there are 91 global variables in total declared
+in 6 files. 60 of these variables must be encapsulated to
+enable running with overdecomposition (the other 31 are safe).
+
+
+Privatization by file & variable:
+
+main.c:
+      mype
+      numpes    ! Global variables is written once, then final
+
+MG_CONSTANTS.F:
+      GLOBAL_NX ! Global variables is written once, then final
+      GLOBAL_NY ! Global variables is written once, then final
+      GLOBAL_NZ ! Global variables is written once, then final
+      MY_GLOBAL_NX_START
+      MY_GLOBAL_NY_START
+      MY_GLOBAL_NZ_START
+      MY_GLOBAL_NX_END
+      MY_GLOBAL_NY_END
+      MY_GLOBAL_NZ_END
+      NUM_NEIGHS
+      NUM_SUM_GRID
+      MYPE
+      NUMPES      ! Global variables is written once, then final
+      MPI_COMM_MG ! Global variables is written once, then final
+      MYPX
+      MYPY
+      MYPZ
+      ERROR_TOL
+      GRIDS_TO_SUM
+      SPIKE_LOC
+      FLUX_OUT
+      SOURCE_TOTAL
+      SPIKES
+      WORK
+      MAX_NUM_SENDS
+      MAX_NUM_RECVS
+      NUM_RECVS
+      NUM_SENDS
+      COUNT_RECV_BACK
+      COUNT_RECV_FRONT
+      COUNT_RECV_EAST
+      COUNT_RECV_WEST
+      COUNT_RECV_NORTH
+      COUNT_RECV_SOUTH
+      COUNT_SEND_BACK
+      COUNT_SEND_FRONT
+      COUNT_SEND_EAST
+      COUNT_SEND_WEST
+      COUNT_SEND_NORTH
+      COUNT_SEND_SOUTH
+      RECV_BUFFER_NORTH_SIZE
+      RECV_BUFFER_SOUTH_SIZE
+      RECV_BUFFER_EAST_SIZE
+      RECV_BUFFER_WEST_SIZE
+      RECV_BUFFER_BACK_SIZE
+      RECV_BUFFER_FRONT_SIZE
+      SEND_BUFFER_NORTH_SIZE
+      SEND_BUFFER_SOUTH_SIZE
+      SEND_BUFFER_EAST_SIZE
+      SEND_BUFFER_WEST_SIZE
+      SEND_BUFFER_BACK_SIZE
+      SEND_BUFFER_FRONT_SIZE
+      MSG_REQS
+      MSG_TAGS
+      NEIGHBORS
+      NEIGHBORS_ORIG
+      RECV_BUFFER_BACK
+      RECV_BUFFER_FRONT
+      RECV_BUFFER_EAST
+      RECV_BUFFER_WEST
+      RECV_BUFFER_NORTH
+      RECV_BUFFER_SOUTH
+
+MG_OPTIONS.F: (All are written once, then final)
+      SCALING
+      COMM_METHOD
+      STENCIL
+      BC
+      NX
+      NY
+      NZ
+      NPX
+      NPY
+      NPZ
+      NVARS
+      NTSTEPS
+      NSPIKES
+      PERCENT_SUM
+      DEBUG_GRID
+      REPORT_DIFFUSION
+      REPORT_PERF
+      CP_METHOD
+      CP_INTERVAL
+      RESTART_CP_NUM
+      CP_FILE
+      RESTART_FILE
+
+DRIVER_BSPMA.F: (All are implicit save variables)
+      RESTART_FIRST_PASS
+      STARTING_TSTEP
+      STARTING_SPIKE
+
+DRIVER_SVAF.F: (All are implicit save variables)
+      RESTART_FIRST_PASS
+      STARTING_TSTEP
+      STARTING_SPIKE
+
+MG_PROFILING.F
+      MG_PERF_INIT_MIN ! Unused global variable
+

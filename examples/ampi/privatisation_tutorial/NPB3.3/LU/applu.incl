@@ -142,6 +142,19 @@ c---------------------------------------------------------------------
       include 'timing.h'
 
 
+c-- Privatizing common blocks --------------------------------
+
+!$OMP THREADPRIVATE(/cgcon/)
+!$OMP THREADPRIVATE(/disp/)
+!$OMP THREADPRIVATE(/cvar/)
+!$OMP THREADPRIVATE(/cprcon/)
+!$OMP THREADPRIVATE(/ctscon/)
+!$OMP THREADPRIVATE(/cjac/)
+!$OMP THREADPRIVATE(/cexact/)
+!$OMP THREADPRIVATE(/dim/)
+!$OMP THREADPRIVATE(/neigh/)
+!$OMP THREADPRIVATE(/comm/)      
+
 c---------------------------------------------------------------------
 c   end of include file
 c---------------------------------------------------------------------

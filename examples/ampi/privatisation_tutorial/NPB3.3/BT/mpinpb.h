@@ -10,3 +10,8 @@ c---------------------------------------------------------------------
       common /mpistuff/ node, no_nodes, total_nodes, root, comm_setup, 
      >                  comm_solve, comm_rhs, dp_type, active
 
+     
+c-- Privatizing common block mpistuff --------------------------------
+
+!$OMP THREADPRIVATE(/mpistuff/)
+

@@ -11,3 +11,10 @@ c---------------------------------------------------------------------
      >                  comm_solve, comm_rhs, dp_type, active
       integer           DEFAULT_TAG
       parameter         (DEFAULT_TAG = 0)
+
+      
+           
+c-- Privatizing common block mpistuff --------------------------------
+
+!$OMP THREADPRIVATE(/mpistuff/)
+

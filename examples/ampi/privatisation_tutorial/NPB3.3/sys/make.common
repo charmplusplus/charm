@@ -10,7 +10,7 @@ CCOMPILE = $(MPICC)  -c $(CMPI_INC) $(CFLAGS)
 CLASS=U
 NPROCS=1
 
-default:: ${PROGRAM}
+default: ${PROGRAM}
 
 # This makes sure the configuration utility setparams 
 # is up to date. 

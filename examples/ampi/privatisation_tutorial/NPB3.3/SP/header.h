@@ -119,3 +119,13 @@ c---------------------------------------------------------------------
      >        t_ycomm=9, t_zcomm=10, t_last=10)
       logical timeron
       common /tflags/ timeron
+     
+c-- Privatizing common blocks --------------------------------
+
+!$OMP THREADPRIVATE(/global/)
+!$OMP THREADPRIVATE(/constants/)
+!$OMP THREADPRIVATE(/partition/)
+!$OMP THREADPRIVATE(/fields/)
+!$OMP THREADPRIVATE(/work_1d/)
+!$OMP THREADPRIVATE(/box/)
+!$OMP THREADPRIVATE(/tflags/)

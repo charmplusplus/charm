@@ -43,6 +43,7 @@
 #include "npbparams.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 /******************/
 /* default values */
@@ -255,6 +256,31 @@ INT_TYPE2 test_index_array[TEST_ARRAY_SIZE],
                              {1317351170,995930646,1157283250,1503301535,1453734525},
          D_test_rank_array[TEST_ARRAY_SIZE] = 
                              {1,36538729,1978098519,2145192618,2147425337};
+
+         
+/****************************************************************/
+/* Global privatization using openMP's threadprivate directive  */
+/****************************************************************/
+#pragma omp threadprivate (timeron)
+#pragma omp threadprivate (my_rank)
+#pragma omp threadprivate (comm_size)
+#pragma omp threadprivate (passed_verification)
+#pragma omp threadprivate (key_buff_ptr_global)
+#pragma omp threadprivate (total_local_keys)
+#pragma omp threadprivate (key_array)
+#pragma omp threadprivate (key_buff1)
+#pragma omp threadprivate (key_buff2)
+#pragma omp threadprivate (bucket_size)
+#pragma omp threadprivate (bucket_size_totals)
+#pragma omp threadprivate (bucket_ptrs)
+#pragma omp threadprivate (process_bucket_distrib_ptr1)
+#pragma omp threadprivate (process_bucket_distrib_ptr2)
+#pragma omp threadprivate (send_count)
+#pragma omp threadprivate (recv_count)
+#pragma omp threadprivate (send_displ)
+#pragma omp threadprivate (recv_displ)
+#pragma omp threadprivate (test_index_array)
+#pragma omp threadprivate (test_rank_array)
 
 
 

@@ -12,3 +12,9 @@ c---------------------------------------------------------------------
      >                 lhsb(5, 5, -1:MAX_CELL_DIM),
      >                 tmp1, tmp2, tmp3
       common /work_lhs/ fjac, njac, lhsa, lhsb, tmp1, tmp2, tmp3
+
+      
+c-- Privatizing common block work_lhs --------------------------------
+
+!$OMP THREADPRIVATE(/work_lhs/)
+

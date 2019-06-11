@@ -1,0 +1,83 @@
+1. Compilation
+
+    Before compilation, one needs to check the configuration file
+    'make.def' in the config directory and modify the file if necessary.  
+    If it does not (yet) exist, copy 'make.def.template' or one of the
+    sample files in the NAS.samples subdirectory to 'make.def' and
+    edit the content for site- and machine-specific data.  For use with 
+    AMPI, also appropriately modify linkers and flags for both C and
+    FORTRAN. Then
+
+       make <benchmark-name> NPROCS=<number> CLASS=<class> \
+         [SUBTYPE=<type>] [VERSION=VEC]
+
+    where <benchmark-name>  is "bt", "cg", "dt", "ep", "ft", "is", 
+                              "lu", "mg", or "sp"
+         <number>          is the number of processes
+         <class>           is "S", "W", "A", "B", "C", "D", or "E"
+
+    Classes C, D and E are not available for DT.
+    Class E is not available for IS.
+
+    The "VERSION=VEC" option is used for selecting the vectorized 
+    versions of BT and LU. 
+
+    NOTE: DT has not been modified for use with AMPI (globals not privatized).
+    NOTE: Vectorized versions of BT and LU not tested with AMPI.
+    NOTE: I/O benchmarks have not been modified for use with AMPI; ignore 
+         rest of the compilation section below.
+
+    Only when making the I/O benchmark:
+         <benchmark-name>  is "bt"
+         <number>, <class> as above
+         <type>            is "full", "simple", "fortran", or "epio"
+
+    Three parameters not used in the original BT benchmark are present in
+    the I/O benchmark. Two are set by default in the file BT/bt.f. 
+    Changing them is optional.
+    One is set in make.def. It must be specified.
+
+    bt.f: collbuf_nodes: number of processes used to buffer data before
+                        writing to file in the collective buffering mode
+                        (<type> is "full").
+         collbuf_size:  size of buffer (in bytes) per process used in
+                        collective buffering
+
+    make.def: -DFORTRAN_REC_SIZE: Fortran I/O record length in bytes. This
+                        is a system-specific value. It is part of the
+                        definition string of variable CONVERTFLAG. Syntax:
+                        "CONVERTFLAG = -DFORTRAN_REC_SIZE=n", where n is
+                        the record length.
+
+    When <type> is "full" or "simple", the code must be linked with an
+    MPI library that contains the subset of IO routines defined in MPI 2.
+
+   
+2. Execution
+
+    The executable is named <benchmark-name>.<class>.<nprocs>
+
+    The executable is placed in the bin subdirectory (or in the directory 
+    BINDIR specified in make.def, if you've defined it). 
+
+    a)  To run the binary in standalone mode, type:
+            bin/<benchmark-name>.<class>.<nprocs> +pX +vpY
+    
+        (X = number of processes in non-SMP builds or worker threads in SMP-builds,
+        Y = number of MPI ranks; must match "nprocs")
+        For example:
+            bin/bt.S.4 +p2 +vp4
+    
+    b)  To run the binary using charmrun, type:
+            charmrun bin/<benchmark-name>.<class>.<nprocs> +pX +vpY
+        or,
+            <BENCHMARK-NAME>/charmrun bin/<benchmark-name>.<class>.<nprocs> +pX +vpY ++local
+
+        (X and Y as in standalone case; Y must match "nprocs",
+         <BENCHMARK-NAME> is <benchmark-name> is upper case, which is the directory 
+         in which charmrun executable is created for that specific benchmark)
+
+        For example:
+            charmrun bin/bt.S.4 +p2 +vp4
+            BT/charmrun bin/bt.S.4 +p2 +vp4 ++local
+

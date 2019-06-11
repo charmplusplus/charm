@@ -25,18 +25,18 @@
 #                            $(MPIF77) $(FFLAGS)
 # linking is done with       $(FLINK) $(FMPI_LIB) $(FLINKFLAGS)
 #---------------------------------------------------------------------------
-CHARMBASE= ../../../../../multicore-linux-x86_64-gcc/bin
+
 #---------------------------------------------------------------------------
 # This is the fortran compiler used for MPI programs
 #---------------------------------------------------------------------------
-MPIF77 = $(CHARMBASE)/ampif77
+MPIF77 = f77
 # This links MPI fortran programs; usually the same as ${MPIF77}
 FLINK	= $(MPIF77)
 
 #---------------------------------------------------------------------------
 # These macros are passed to the linker to help link with MPI correctly
 #---------------------------------------------------------------------------
-FMPI_LIB  = #-L/home/ankit/mpich-install/lib -lmpi
+FMPI_LIB  = -L/usr/local/lib -lmpi
 
 #---------------------------------------------------------------------------
 # These macros are passed to the compiler to help find 'mpif.h'
@@ -46,13 +46,13 @@ FMPI_INC = -I/usr/local/include
 #---------------------------------------------------------------------------
 # Global *compile time* flags for Fortran programs
 #---------------------------------------------------------------------------
-FFLAGS	= -O0  -g -fopenmp -mcmodel=medium #-tlsglobals
+FFLAGS	= -O
 
 #---------------------------------------------------------------------------
-# Global *link time* flags. Flags for increasing maximum executable
-# size usually go here.
+# Global *link time* flags. Flags for increasing maximum executable 
+# size usually go here. 
 #---------------------------------------------------------------------------
-FLINKFLAGS = -O0 -fopenmp -mcmodel=medium #-tlsglobals
+FLINKFLAGS = -O
 
 
 #---------------------------------------------------------------------------
@@ -60,12 +60,12 @@ FLINKFLAGS = -O0 -fopenmp -mcmodel=medium #-tlsglobals
 #
 # For IS, which is in C, the following must be defined:
 #
-# MPICC      - C compiler
+# MPICC      - C compiler 
 # CFLAGS     - C compilation arguments
-# CMPI_INC   - any -I arguments required for compiling MPI/C
+# CMPI_INC   - any -I arguments required for compiling MPI/C 
 # CLINK      - C linker
 # CLINKFLAGS - C linker flags
-# CMPI_LIB   - any -L and -l arguments required for linking MPI/C
+# CMPI_LIB   - any -L and -l arguments required for linking MPI/C 
 #
 # compilations are done with $(MPICC) $(CMPI_INC) $(CFLAGS) or
 #                            $(MPICC) $(CFLAGS)
@@ -75,14 +75,14 @@ FLINKFLAGS = -O0 -fopenmp -mcmodel=medium #-tlsglobals
 #---------------------------------------------------------------------------
 # This is the C compiler used for MPI programs
 #---------------------------------------------------------------------------
-MPICC = $(CHARMBASE)/ampicc
+MPICC = cc
 # This links MPI C programs; usually the same as ${MPICC}
 CLINK	= $(MPICC)
 
 #---------------------------------------------------------------------------
 # These macros are passed to the linker to help link with MPI correctly
 #---------------------------------------------------------------------------
-CMPI_LIB  = #-L/home/ankit/mpich-install/lib -lmpi
+CMPI_LIB  = -L/usr/local/lib -lmpi
 
 #---------------------------------------------------------------------------
 # These macros are passed to the compiler to help find 'mpi.h'
@@ -92,21 +92,21 @@ CMPI_INC = -I/usr/local/include
 #---------------------------------------------------------------------------
 # Global *compile time* flags for C programs
 #---------------------------------------------------------------------------
-CFLAGS	= -O0  -g -mcmodel=medium -fopenmp #-tlsglobals
+CFLAGS	= -O
 
 #---------------------------------------------------------------------------
-# Global *link time* flags. Flags for increasing maximum executable
-# size usually go here.
+# Global *link time* flags. Flags for increasing maximum executable 
+# size usually go here. 
 #---------------------------------------------------------------------------
-CLINKFLAGS = -O0 -fopenmp -mcmodel=medium #-tlsglobals
+CLINKFLAGS = -O
 
 
 #---------------------------------------------------------------------------
 # MPI dummy library:
 #
-# Uncomment if you want to use the MPI dummy library supplied by NAS instead
+# Uncomment if you want to use the MPI dummy library supplied by NAS instead 
 # of the true message-passing library. The include file redefines several of
-# the above macros. It also invokes make in subdirectory MPI_dummy. Make
+# the above macros. It also invokes make in subdirectory MPI_dummy. Make 
 # sure that no spaces or tabs precede include.
 #---------------------------------------------------------------------------
 # include ../config/make.dummy
@@ -115,28 +115,28 @@ CLINKFLAGS = -O0 -fopenmp -mcmodel=medium #-tlsglobals
 #---------------------------------------------------------------------------
 # Utilities C:
 #
-# This is the C compiler used to compile C utilities.  Flags required by
-# this compiler go here also; typically there are few flags required; hence
+# This is the C compiler used to compile C utilities.  Flags required by 
+# this compiler go here also; typically there are few flags required; hence 
 # there are no separate macros provided for such flags.
 #---------------------------------------------------------------------------
 CC	= cc -g
 
 
 #---------------------------------------------------------------------------
-# Destination of executables, relative to subdirs of the main directory. .
+# Destination of executables, relative to subdirs of the main directory. . 
 #---------------------------------------------------------------------------
 BINDIR	= ../bin
 
 
 #---------------------------------------------------------------------------
 # Some machines (e.g. Crays) have 128-bit DOUBLE PRECISION numbers, which
-# is twice the precision required for the NPB suite. A compiler flag
+# is twice the precision required for the NPB suite. A compiler flag 
 # (e.g. -dp) can usually be used to change DOUBLE PRECISION variables to
 # 64 bits, but the MPI library may continue to send 128 bits. Short of
 # recompiling MPI, the solution is to use MPI_REAL to send these 64-bit
 # numbers, and MPI_COMPLEX to send their complex counterparts. Uncomment
-# the following line to enable this substitution.
-#
+# the following line to enable this substitution. 
+# 
 # NOTE: IF THE I/O BENCHMARK IS BEING BUILT, WE USE CONVERTFLAG TO
 #       SPECIFIY THE FORTRAN RECORD LENGTH UNIT. IT IS A SYSTEM-SPECIFIC
 #       VALUE (USUALLY 1 OR 4). UNCOMMENT THE SECOND LINE AND SUBSTITUTE
@@ -151,11 +151,12 @@ BINDIR	= ../bin
 
 
 #---------------------------------------------------------------------------
-# The variable RAND controls which random number generator
-# is used. It is described in detail in README.install.
-# Use "randi8" unless there is a reason to use another one.
+# The variable RAND controls which random number generator 
+# is used. It is described in detail in README.install. 
+# Use "randi8" unless there is a reason to use another one. 
 # Other allowed values are "randi8_safe", "randdp" and "randdpvec"
 #---------------------------------------------------------------------------
 RAND   = randi8
 # The following is highly reliable but may be slow:
 # RAND   = randdp
+
