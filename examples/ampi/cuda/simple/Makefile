@@ -22,7 +22,7 @@ simple: simple-cuda.o simple.o
 	$(AMPICXX) -o $@ $^ $(LD_LIBS)
 
 simple-cuda.o: simple-cuda.cu
-	$(NVCC) $(NVCC_INC) $(DEFS) -std=c++11 -I$(CHARMDIR)/include -c simple-cuda.cu
+	$(NVCC) $(NVCC_INC) $(DEFS) -std=c++11 -c $<
 
 simple.o: simple.C
 		$(AMPICXX) $(CHARMC_INC) -c $<
