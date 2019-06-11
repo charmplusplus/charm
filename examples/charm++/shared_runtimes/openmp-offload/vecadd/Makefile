@@ -17,21 +17,21 @@ else
 endif
 
 
-OBJS = hello.o
+OBJS = vecadd.o
 
-all: hello
+all: vecadd
 
-hello: $(OBJS)
-	$(CHARMC) -language charm++ $(OMP_OPT) -o hello $(OBJS)
+vecadd: $(OBJS)
+	$(CHARMC) -language charm++ $(OMP_OPT) -o vecadd $(OBJS)
 
-hello.decl.h: hello.ci
-	$(CHARMC) hello.ci
+vecadd.decl.h: vecadd.ci
+	$(CHARMC) vecadd.ci
 
 clean:
-	rm -f *.decl.h *.def.h *.o hello charmrun
+	rm -f *.decl.h *.def.h *.o vecadd charmrun
 
-hello.o: hello.C hello.decl.h
-	$(CHARMC) $(OMP_OPT) -c hello.C
+vecadd.o: vecadd.C vecadd.decl.h
+	$(CHARMC) $(OMP_OPT) -c vecadd.C
 
 test: all
-	$(call run, ./hello)
+	$(call run, ./vecadd +p2)
