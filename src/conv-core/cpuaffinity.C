@@ -204,10 +204,7 @@ int CmiSetCPUAffinity(int mycore)
   cmi_hwloc_topology_init(&topology);
   cmi_hwloc_topology_load(topology);
 
-  int thread_unitcount = cmi_hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_PU);
-  int thread_assignment = core % thread_unitcount;
-
-  hwloc_obj_t thread_obj = cmi_hwloc_get_obj_by_type(topology, HWLOC_OBJ_PU, thread_assignment);
+  hwloc_obj_t thread_obj = cmi_hwloc_get_pu_obj_by_os_index(topology, core);
   hwloc_cpuset_t cpuset = thread_obj->cpuset;
 
 #if CMK_SMP
