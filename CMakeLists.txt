@@ -63,7 +63,7 @@ option(MLOGFT "Compile with Charm++ message logging fault tolerance support" OFF
 option(PAPI "Compile with PAPI performance counter support" OFF)
 
 # Enable/disable features:
-option(ERROR_CHECKING "Enable error checking" OFF)
+option(ERROR_CHECKING      "Enable error checking" OFF)
 option(AMPI_ERROR_CHECKING "Enable AMPI error checking" OFF)
 option(STATS               "Enable statistics collection" OFF)
 option(TRACING             "Enable tracing modules" OFF)
