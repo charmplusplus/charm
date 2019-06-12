@@ -31,8 +31,8 @@ inline void _CldEnqueue(int pe, void *msg, int infofn) {
 #if CMK_ONESIDED_IMPL
   envelope *env = (envelope *)msg;
   // Store source information to handle acknowledgements on completion
-  if(CMI_IS_ZC_BCAST(msg))
-    CkRdmaPrepareBcastMsg(env);
+  if(CMI_IS_ZC(msg))
+    CkRdmaPrepareZCMsg(env, CkNodeOf(pe));
 #endif
   CldEnqueue(pe, msg, infofn);
 }
@@ -58,8 +58,8 @@ inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
 #if CMK_ONESIDED_IMPL
   envelope *env = (envelope *)msg;
   // Store source information to handle acknowledgements on completion
-  if(CMI_IS_ZC_BCAST(msg))
-    CkRdmaPrepareBcastMsg(env);
+  if(CMI_IS_ZC(msg))
+    CkRdmaPrepareZCMsg(env, node);
 #endif
   CldNodeEnqueue(node, msg, infofn);
 }
@@ -69,8 +69,8 @@ inline void _CldEnqueue(int pe, void *msg, int infofn) {
 #if CMK_ONESIDED_IMPL
   envelope *env = (envelope *)msg;
   // Store source information to handle acknowledgements on completion
-  if(CMI_IS_ZC_BCAST(msg))
-    CkRdmaPrepareBcastMsg(env);
+  if(CMI_IS_ZC(msg))
+    CkRdmaPrepareZCMsg(env, CkNodeOf(pe));
 #endif
   CldEnqueue(pe, msg, infofn);
 }
@@ -79,8 +79,8 @@ inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
 #if CMK_ONESIDED_IMPL
   envelope *env = (envelope *)msg;
   // Store source information to handle acknowledgements on completion
-  if(CMI_IS_ZC_BCAST(msg))
-    CkRdmaPrepareBcastMsg(env);
+  if(CMI_IS_ZC(msg))
+    CkRdmaPrepareZCMsg(env, node);
 #endif
   CldNodeEnqueue(node, msg, infofn);
 }

@@ -3,7 +3,6 @@
 
 #include "cmirdmautils.h"
 
-typedef void (*RdmaEMAckCallerFn)(int destPe, void *token);
 typedef void (*RdmaAckCallerFn)(void *token);
 
 /* Support for Direct API */
@@ -14,9 +13,6 @@ void CmiSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short 
 
 // Function to set the ack handler for the Direct API
 void CmiSetDirectNcpyAckHandler(RdmaAckCallerFn fn);
-
-// Function to set the ack handler for the Entry Method API
-void CmiSetEMNcpyAckHandler(RdmaEMAckCallerFn fn, RdmaAckCallerFn bcastFn, RdmaAckCallerFn bcastArrayFn);
 
 /* CmiIssueRget initiates an RDMA read operation, transferring 'size' bytes of data from the address space of 'srcPe' to local address, 'destAddr'.
  * When the runtime invokes srcAck on the source (target), it indicates safety to overwrite or free the srcAddr buffer.
@@ -60,25 +56,9 @@ void *CmiRdmaAlloc(int size);
 
 int CmiDoesCMAWork(void);
 
-// Method used to send an ack after completion of a reverse rdma operation
-void CmiInvokeRemoteAckHandler(int pe, void *ref);
-
-// Method used to send an ack to my parent after completion of an RGET in the receiver
-void CmiInvokeBcastAckHandler(int pe, void *ref);
-
-void CmiInvokeBcastPostAckHandler(int pe, void *ref);
-
-// Function declaration for onesided initialization
+#if !CMK_ONESIDED_IMPL
+// Function declaration for supporting generic Direct Nocopy API
 void CmiOnesidedDirectInit(void);
-
-// Broadcast API support
-void CmiForwardProcBcastMsg(int size, char *msg); // for forwarding proc messages to my child nodes
-void CmiForwardNodeBcastMsg(int size, char *msg); // for forwarding node queue messages to my child nodes
-
-void CmiForwardMsgToPeers(int size, char *msg); // for forwarding messages to my peer PEs
-
-#if CMK_REG_REQUIRED
-void CmiInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *info);
 #endif
 
 #endif

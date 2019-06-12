@@ -3,9 +3,9 @@
 #define NUM_ELEMENTS_PER_PE 10
 #define CONSTANT 188
 
-CProxy_arr1 arrProxy;
-CProxy_grp1 grpProxy;
-CProxy_nodegrp1 ngProxy;
+CProxy_arr arrProxy;
+CProxy_grp grpProxy;
+CProxy_nodegrp ngProxy;
 CProxy_tester chareProxy;
 
 void assignValuesToIndex(int *arr, int size);
@@ -19,13 +19,13 @@ class main : public CBase_main {
       delete m;
 
       // Create a chare array
-      arrProxy = CProxy_arr1::ckNew(CkNumPes() * NUM_ELEMENTS_PER_PE);
+      arrProxy = CProxy_arr::ckNew(CkNumPes() * NUM_ELEMENTS_PER_PE);
 
       // Create a group
-      grpProxy = CProxy_grp1::ckNew();
+      grpProxy = CProxy_grp::ckNew();
 
       // Create a nodegroup
-      ngProxy = CProxy_nodegrp1::ckNew();
+      ngProxy = CProxy_nodegrp::ckNew();
 
       // Create the tester chare
       chareProxy = CProxy_tester::ckNew();
@@ -70,10 +70,10 @@ class tester : public CBase_tester {
     }
 };
 
-class arr1 : public CBase_arr1 {
+class arr : public CBase_arr {
   int *destBuffer;
   public:
-    arr1() {
+    arr() {
       destBuffer = new int[SIZE];
       assignValuesToIndex(destBuffer, SIZE);
     }
@@ -105,10 +105,10 @@ class arr1 : public CBase_arr1 {
     }
 };
 
-class grp1 : public CBase_grp1 {
+class grp : public CBase_grp {
   int *destBuffer;
   public:
-    grp1() {
+    grp() {
       destBuffer = new int[SIZE];
       assignValuesToIndex(destBuffer, SIZE);
     }
@@ -140,10 +140,10 @@ class grp1 : public CBase_grp1 {
     }
 };
 
-class nodegrp1 : public CBase_nodegrp1 {
+class nodegrp : public CBase_nodegrp {
   int *destBuffer;
   public:
-    nodegrp1() {
+    nodegrp() {
       destBuffer = new int[SIZE/2];
       assignValuesToIndex(destBuffer, SIZE/2);
     }

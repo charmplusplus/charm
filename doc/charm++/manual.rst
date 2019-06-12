@@ -28,7 +28,7 @@ platforms supported by Charm++ are the IBM BlueGene/Q and OpenPOWER
 systems, Cray XE, XK, and XC systems, Omni-Path and Infiniband clusters,
 single workstations and networks of workstations (including x86 (running
 Linux, Windows, MacOS)), etc. The communication protocols and
-infrastructures supported by Charm++ are UDP, MPI, OFI, Infiniband,
+infrastructures supported by Charm++ are UDP, MPI, OFI, UCX, Infiniband,
 uGNI, and PAMI. Charm++ programs can run without changing the source on
 all these platforms. Charm++ programs can also interoperate with MPI
 programs (§ :numref:`sec:mpiinterop`). Please see the Installation and Usage
@@ -53,7 +53,7 @@ Charm++ family of the same model.
 Execution Model
 ---------------
 
-A basic unit of parallel computation in Charm++ programs is a *chare* .
+A basic unit of parallel computation in Charm++ programs is a *chare*.
 A chare is similar to a process, an actor, an ADA task, etc. At its most
 basic level, it is just a C++ object. A Charm++ computation consists of
 a large number of chares distributed on available processors of the
@@ -286,6 +286,8 @@ programs can be referred in section :numref:`basic utility fns`.
 
 Basic Charm++ Programming
 =========================
+
+.. _programstructure:
 
 Program Structure, Compilation and Utilities
 --------------------------------------------
@@ -4441,8 +4443,8 @@ Zero Copy Messaging API
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 Apart from using messages, Charm++ also provides APIs to avoid sender
-and receiver side copies. On RDMA enabled networks like GNI, Verbs, PAMI
-and OFI, these internally make use of one-sided communication by using
+and receiver side copies. On RDMA enabled networks like GNI, Verbs, PAMI, OFI,
+and UCX these internally make use of one-sided communication by using
 the underlying Remote Direct Memory Access (RDMA) enabled network. For
 large arrays (few 100 KBs or more), the cost of copying during
 marshalling the message can be quite high. Using these APIs can help not
@@ -4503,7 +4505,7 @@ callback is not entirely useful and in such cases,
 optional mode operator is used to determine the network registration
 mode for the buffer. It is only relevant on networks requiring explicit
 memory registration for performing RDMA operations. These networks
-include GNI, OFI and Verbs. When the mode is not specified by the user,
+include GNI, OFI, UCX and Verbs. When the mode is not specified by the user,
 the default mode is considered to be ``CK_BUFFER_REG``
 
 Similarly, to receive an array using the Zero copy Direct API, define
@@ -4703,7 +4705,7 @@ Memory Registration and Modes of Operation
 
 There are four modes of operation for the Zero Copy Direct API. These
 modes act as control switches on networks that require memory
-registration like GNI, OFI and Verbs, in order to perform RDMA
+registration like GNI, OFI, UCX and Verbs, in order to perform RDMA
 operations . They dictate the functioning of the API providing flexible
 options based on user requirement. On other networks, where network
 memory management is not necessary (Netlrts) or is internally handled by
@@ -8656,6 +8658,57 @@ be made between these calls. Communication between the different Kokkos
 instances can be done via messages and entry method invocation among
 the nodegroup chares as in regular Charm++.
 
+.. _sec:rajainterop:
+
+Interoperation with RAJA
+------------------------
+
+RAJA is a shared-memory parallel programming model in C++ developed by
+Lawrence Livermore National Laboratory (https://github.com/LLNL/RAJA).
+RAJA shares similar goals and concepts with Kokkos (Section :numref:`sec:kokkosinterop`).
+
+In this section, we explore the basic interoperability of RAJA with
+Charm++. Currently there is no sophisticated integration scheme, Charm++
+only manages the communication between different RAJA instances with
+each instance individually managing the parallel execution underneath.
+Example programs can be found in ``examples/charm++/shared_runtimes/raja/hello``
+and ``examples/charm++/shared_runtimes/raja/vecadd``.
+
+Compiling the RAJA Library
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+RAJA supports multiple backends for parallel execution. We recommend
+OpenMP for multicore CPUs and CUDA for machines with GPUs. Because RAJA
+can be built with more than one backend, it is preferable to build both
+OpenMP and CUDA backends on GPU machines.
+
+To build RAJA with both OpenMP and CUDA backends (required for ``vecadd``
+example), use the following commands:
+
+.. code-block:: bash
+
+   $ mkdir build && install
+   $ cd build
+   $ cmake -DENABLE_CUDA=On -DCMAKE_INSTALL_PREFIX=<path to RAJA install folder> ../
+   $ make -j
+   $ make install
+
+For more compilation options and assistance, please refer to the `RAJA User Guide
+<https://raja.readthedocs.io/en/master/>`_.
+
+Program Structure and Flow
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The basic programming pattern using RAJA and Charm++ together for
+parallel execution in distributed memory environments is the following.
+We use a Charm++ nodegroup (which corresponds to a OS process) to
+encapsulate a RAJA instance that will manage the parallel execution
+underneath. Calls to the RAJA parallel API such as ``RAJA::forall()`` can
+be made in a method of the nodegroup to perform parallel computation in
+shared memory. Communication between the different RAJA instances can be
+performed via messages and entry method invocation among the nodegroup
+chares as in regular Charm++.
+
 .. _sec:partition:
 
 Partitioning in Charm++
@@ -10325,6 +10378,7 @@ appropriate choices for the build one wants to perform.
    MPI with 64 bit Linux (mpicxx wrappers)                          ``./build charm++ mpi-linux-x86_64 mpicxx --with-production -j8``
    IBVERBS with 64 bit Linux                                        ``./build charm++ verbs-linux-x86_64 --with-production -j8``
    OFI with 64 bit Linux                                            ``./build charm++ ofi-linux-x86_64 --with-production -j8``
+   UCX with 64 bit Linux                                            ``./build charm++ ucx-linux-x86_64 --with-production -j8``
    Net with 64 bit Windows                                          ``./build charm++ netlrts-win-x86_64 --with-production -j8``
    MPI with 64 bit Windows                                          ``./build charm++ mpi-win-x86_64 --with-production -j8``
    Net with 64 bit Mac                                              ``./build charm++ netlrts-darwin-x86_64 --with-production -j8``
