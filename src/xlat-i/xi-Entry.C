@@ -1094,7 +1094,7 @@ void Entry::genTramInstantiation(XStr& str) {
           << "    }\n"
           << "    CProxy_" << container->tramInstances[i].type.c_str() << " tramProxy =\n"
           << "    CProxy_" << container->tramInstances[i].type.c_str()
-          << "::ckNew(2, dims, gId, itemsPerBuffer, false, 10.0);\n"
+          << "::ckNew(2, dims, gId, itemsPerBuffer, false, 1.0);\n"
           << "    tramProxy.enablePeriodicFlushing();\n"
           << "  }\n";
     }
