@@ -222,9 +222,6 @@ for option in ${!opt*}; do
 done
 
 
-# sleep 2
-
-rm -rf $triplet
 mkdir $triplet
 
 cd $triplet
@@ -256,6 +253,7 @@ cmake_args+="-DREPLAY=$opt_replay "
 cmake_args+="-DSHRINKEXPAND=$opt_shrinkexpand "
 cmake_args+="-DSMP=$opt_smp "
 cmake_args+="-DSTATS=$opt_stats "
+cmake_args+="-DTARGET=$target "
 cmake_args+="-DTASK_QUEUE=$opt_task_queue "
 cmake_args+="-DTCP=$opt_tcp "
 cmake_args+="-DTRACING=$opt_tracing "

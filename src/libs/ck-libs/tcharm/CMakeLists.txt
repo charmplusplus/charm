@@ -15,3 +15,5 @@ configure_file(libmoduletcharmmain.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 foreach(f ${tcharm-h-sources})
     configure_file(${f} ${CMAKE_BINARY_DIR}/include COPYONLY)
 endforeach(f)
+
+add_dependencies(moduletcharmmain ck)

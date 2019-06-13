@@ -6,13 +6,6 @@ find_package(Threads REQUIRED)
 find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran compiler
 find_package(ZLIB)
 
-
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/lib/)
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so/)
-file(WRITE          ${CMAKE_BINARY_DIR}/lib_so/.charmso "")
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bin/)
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/)
-
 # We need C++11 for (almost) all targets
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -48,6 +41,7 @@ endif()
 
 # Build options
 set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,gni,ofi,pami,pamilrts,verbs")
+set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS")
 
 # Platform specific options (choose multiple if desired):
 option(SMP "Enable shared-memory communication within a single multi-processor machine instead of message passing." ON)
@@ -83,6 +77,9 @@ set(REFNUM_TYPE "unsigned short" CACHE STRING  "Size of the envelope refnum fiel
 set(PRIO_TYPE "bitvec"    CACHE STRING "Size of expected message priorities")
 option(RANDOMIZED_MSGQ     "Enable a randomized msg queue (for debugging etc)" OFF)
 option(ZLIB                "Enable zlib support" OFF)
+
+# Charm++ dynamic libraries
+option(BUILD_SHARED        "Build Charm++ dynamic libraries" OFF)
 
 # Other options
 option(EVERYLB             "Compile EveryLB suite of load balancing strategies" OFF)
@@ -168,6 +165,14 @@ set(CMK_BUILD_CRAY 0)
 set(CMK_ERROR_CHECKING ${ERROR_CHECKING})
 set(CMK_LOCKLESS_QUEUE 0)
 
+
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/lib/)
+if(${BUILD_SHARED})
+  file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so/)
+  file(WRITE          ${CMAKE_BINARY_DIR}/lib_so/.charmso "")
+endif()
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bin/)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
@@ -419,8 +424,11 @@ configure_file(src/scripts/testrun bin/ COPYONLY)
 # Charm++ libraries
 add_subdirectory(src/libs/ck-libs/NDMeshStreamer)
 add_subdirectory(src/libs/ck-libs/tcharm)
-add_subdirectory(src/libs/ck-libs/ampi)
 add_subdirectory(src/libs/ck-libs/ckloop)
+
+if(NOT ${TARGET} STREQUAL "charm++")
+  add_subdirectory(src/libs/ck-libs/ampi)
+endif()
 
 # Create conv-mach-opt.sh
 set(optfile_sh ${CMAKE_BINARY_DIR}/include/conv-mach-opt.sh)
@@ -429,7 +437,14 @@ file(WRITE  ${optfile_sh} "# Automatically build-time generated options header\n
 if(NOT ${NETWORK} STREQUAL "mpi")
     file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/cc-${CMK_COMPILER}.sh\n")
 endif()
-file(APPEND ${optfile_sh} "CMK_NO_BUILD_SHARED=false\n")
+
+if(${BUILD_SHARED})
+  set(CMK_NO_BUILD_SHARED "false")
+else()
+  set(CMK_NO_BUILD_SHARED "true")
+endif()
+
+file(APPEND ${optfile_sh} "CMK_NO_BUILD_SHARED=${CMK_NO_BUILD_SHARED}\n")
 
 foreach(l CMK_COMPILER_KNOWS_C11 CMK_COMPILER_KNOWS_CPP11 CMK_ENABLE_C11 CMK_ENABLE_CPP11 CMK_C_OPENMP OPTS_CXX CMK_AMPI_WITH_ROMIO)
     file(APPEND ${optfile_sh} "${l}=\"${${l}}\"\n" )
@@ -475,6 +490,7 @@ message("==============================")
 message("Charm++ ${CHARM_VERSION} configuration: ")
 message("  Triplet: ${CHARM_PLATFORM}")
 message("  Network: ${NETWORK}")
+message("  Build target: ${TARGET}")
 message("  Build type: ${CMAKE_BUILD_TYPE}")
 message("  C compiler: ${CMAKE_C_COMPILER} [${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}]")
 message("  C++ compiler: ${CMAKE_CXX_COMPILER} [${CMAKE_CXX_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}]")

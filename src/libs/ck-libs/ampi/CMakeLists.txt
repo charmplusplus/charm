@@ -57,7 +57,7 @@ if(${CMK_AMPI_WITH_ROMIO})
         COMMAND cp -f  ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio/include/mpiof.h ${CMAKE_BINARY_DIR}/include/
         BUILD_COMMAND cd ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio/ && make > /dev/null
         COMMAND # build shared library
-            find .. -name *.o -exec ${CMAKE_CXX_COMPILER_LAUNCHER} -shared -o ${CMAKE_BINARY_DIR}/lib_so/libampiromio${CMAKE_SHARED_LIBRARY_SUFFIX} {} + ;
+            test ${BUILD_SHARED} -eq 1 && find .. -name *.o -exec ${CMAKE_CXX_COMPILER_LAUNCHER} -shared -o ${CMAKE_BINARY_DIR}/lib_so/libampiromio${CMAKE_SHARED_LIBRARY_SUFFIX} {} + ; || true
         INSTALL_COMMAND "" # No install step
         LIST_SEPARATOR ^^
     )
