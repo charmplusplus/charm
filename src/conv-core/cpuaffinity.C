@@ -208,13 +208,14 @@ int CmiSetCPUAffinity(int mycore)
   hwloc_cpuset_t cpuset = thread_obj->cpuset;
 
 #if CMK_SMP
-  set_thread_affinity(topology, cpuset);
+  int result = set_thread_affinity(topology, cpuset);
 #else
-  set_process_affinity(topology, cpuset);
+  int result = set_process_affinity(topology, cpuset);
 #endif
 
   cmi_hwloc_topology_destroy(topology);
-  return 0;
+
+  return result;
 }
 
 /* This implementation assumes the default x86 CPU mask size used by Linux */
