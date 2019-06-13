@@ -65,6 +65,18 @@ void CmiInitHwlocTopology(void)
     CmiHwlocTopologyLocal.num_pus = depth != HWLOC_TYPE_DEPTH_UNKNOWN ? cmi_hwloc_get_nbobjs_by_depth(topology, depth) : 1;
 
     cmi_hwloc_topology_destroy(topology);
+
+
+    // Legacy: Determine the system's total PU count
+
+    cmi_hwloc_topology_init(&topology);
+    cmi_hwloc_topology_set_flags(topology, cmi_hwloc_topology_get_flags(topology) | HWLOC_TOPOLOGY_FLAG_WHOLE_SYSTEM);
+    cmi_hwloc_topology_load(topology);
+
+    depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PU);
+    CmiHwlocTopologyLocal.total_num_pus = depth != HWLOC_TYPE_DEPTH_UNKNOWN ? cmi_hwloc_get_nbobjs_by_depth(topology, depth) : 1;
+
+    cmi_hwloc_topology_destroy(topology);
 }
 
 #if CMK_HAS_SETAFFINITY || defined (_WIN32) || CMK_HAS_BINDPROCESSOR

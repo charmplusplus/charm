@@ -682,6 +682,8 @@ typedef struct
   int num_pus;
   int num_cores;
   int num_sockets;
+
+  int total_num_pus;
 } CmiHwlocTopology;
 
 extern CmiHwlocTopology CmiHwlocTopologyLocal;
