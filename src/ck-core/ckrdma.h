@@ -310,7 +310,8 @@ enum class ncpyHandlerIdx: char {
   EM_ACK,
   BCAST_ACK,
   BCAST_POST_ACK,
-  CMA_DEREG_ACK
+  CMA_DEREG_ACK,
+  CMA_DEREG_ACK_DIRECT
 };
 
 // Converse message to invoke the Ncpy handler on a remote process
@@ -583,6 +584,11 @@ void CkRdmaEMDeregAndAckHandler(void *ack);
 
 inline bool isDeregReady(CkNcpyBuffer &buffInfo);
 
+inline void deregisterBuffer(CkNcpyBuffer &buffInfo);
+inline void deregisterDestBuffer(NcpyOperationInfo *ncpyOpInfo);
+inline void deregisterSrcBuffer(NcpyOperationInfo *ncpyOpInfo);
+
+inline void invokeCmaDirectRemoteDeregAckHandler(CkNcpyBuffer &buffInfo);
 #endif /* End of CMK_ONESIDED_IMPL */
 
 #endif
