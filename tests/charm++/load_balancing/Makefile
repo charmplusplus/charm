@@ -1,5 +1,6 @@
 DIRS = \
   lb_test \
+  meta_lb_test \
 
 TESTDIRS = $(DIRS)
 
