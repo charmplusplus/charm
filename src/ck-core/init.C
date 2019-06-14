@@ -122,6 +122,7 @@ std::atomic<UInt> numZerocopyROops = {0};
 UInt  numZerocopyROops = 0;
 #endif
 UInt  curROIndex = 0;
+bool usedCMAForROBcastTransfer = false;
 NcpyROBcastAckInfo *roBcastAckInfo;
 int   _roRdmaDoneHandlerIdx;
 CksvDeclare(int,  _numPendingRORdmaTransfers);
@@ -983,11 +984,13 @@ static void _roRdmaDoneHandler(envelope *env) {
 
   switch(env->getMsgtype()) {
     case ROPeerCompletionMsg:
+      CpvAccess(_qd)->process();
       checkForInitDone(true); // Receiving a ROPeerCompletionMsg indicates that RO ZCPY Bcast
                               // operation is complete on the comm. thread
       if (env!=NULL) CmiFree(env);
       break;
     case ROChildCompletionMsg:
+      CpvAccess(_qd)->process();
       roBcastAckInfo->counter++;
       if(roBcastAckInfo->counter == roBcastAckInfo->numChildren) {
         // deregister
@@ -1005,6 +1008,7 @@ static void _roRdmaDoneHandler(envelope *env) {
 
           //forward message to root
           // Send a message to the parent to signal completion in order to deregister
+          QdCreate(1);
           envelope *compEnv = _allocEnv(ROChildCompletionMsg);
           compEnv->setSrcPe(CkMyPe());
           CmiSetHandler(compEnv, _roRdmaDoneHandlerIdx);
@@ -1096,7 +1100,12 @@ static void _initHandler(void *msg, CkCoreState *ck)
       CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
   }
   DEBUGF(("[%d,%.6lf] _numExpectInitMsgs %d CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs) %d+%d\n",CmiMyPe(),CmiWallTimer(),_numExpectInitMsgs,CkpvAccess(_numInitsRecd),CksvAccess(_numInitNodeMsgs)));
-  checkForInitDone(false); // RO ZCPY Bcast operation could still be incomplete
+#if CMK_ONESIDED_IMPL && CMK_USE_CMA
+  if(usedCMAForROBcastTransfer) {
+    checkForInitDone(true); // RO ZCPY Bcast operation was completed inline (using CMA)
+  } else
+#endif
+   checkForInitDone(false); // RO ZCPY Bcast operation could still be incomplete
 }
 
 #if CMK_SHRINK_EXPAND
