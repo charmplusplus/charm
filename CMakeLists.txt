@@ -207,6 +207,7 @@ configure_file(${CMAKE_SOURCE_DIR}/src/scripts/charmc ${CMAKE_BINARY_DIR}/bin @O
 # set_property(GLOBAL PROPERTY RULE_LAUNCH_CUSTOM ${CMAKE_BINARY_DIR}/bin/charmc)
 set(CMAKE_C_COMPILER_LAUNCHER ${CMAKE_BINARY_DIR}/bin/charmc)
 set(CMAKE_CXX_COMPILER_LAUNCHER ${CMAKE_BINARY_DIR}/bin/charmc)
+# FIXME: the next line is the only reason we require cmake 3.11+
 set(CMAKE_Fortran_COMPILER_LAUNCHER ${CMAKE_BINARY_DIR}/bin/charmc)
 set(CMAKE_CXX_LINK_EXECUTABLE
       "${CMAKE_BINARY_DIR}/bin/charmc <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
@@ -360,8 +361,13 @@ add_subdirectory(src/conv-core)
 add_subdirectory(src/conv-ldb)
 add_subdirectory(src/util)
 
-
 # Hwloc
+if(${BUILD_SHARED})
+  set(hwloc_shared yes)
+else()
+  set(hwloc_shared no)
+endif()
+
 # FIXME: copy .so
 include(ExternalProject)
 ExternalProject_Add(hwloc
@@ -379,7 +385,7 @@ ExternalProject_Add(hwloc
         --disable-libudev
         --disable-visibility
         --enable-embedded-mode
-        --enable-shared
+        --enable-shared=${hwloc_shared}
         --enable-static
         --with-hwloc-symbol-prefix=cmi_
         --without-x
@@ -502,6 +508,7 @@ message("==============================" )
 add_custom_target(create_symlinks ALL
                   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/bin ${CMAKE_SOURCE_DIR}/bin
                   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/lib ${CMAKE_SOURCE_DIR}/lib
+                  COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/lib_so ${CMAKE_SOURCE_DIR}/lib_so
                   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/include ${CMAKE_SOURCE_DIR}/include
                   COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/include ${CMAKE_SOURCE_DIR}/tmp
 
@@ -517,5 +524,7 @@ file(WRITE ${CMAKE_BINARY_DIR}/include/VERSION "${CHARM_VERSION}\n")
 # Installation rules
 install(DIRECTORY ${CMAKE_BINARY_DIR}/bin DESTINATION . PATTERN * PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_EXECUTE GROUP_READ WORLD_READ WORLD_EXECUTE)
 install(DIRECTORY ${CMAKE_BINARY_DIR}/lib     DESTINATION .)
-install(DIRECTORY ${CMAKE_BINARY_DIR}/lib_so  DESTINATION .)
+if (${BUILD_SHARED})
+  install(DIRECTORY ${CMAKE_BINARY_DIR}/lib_so  DESTINATION .)
+endif()
 install(DIRECTORY ${CMAKE_BINARY_DIR}/include DESTINATION .)

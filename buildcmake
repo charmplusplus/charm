@@ -11,7 +11,7 @@ triplet=$2
 shift
 shift
 
-[[ -d $triplet ]] && { echo "*** Error: directory '$triplet' already exists. Exiting."; exit 1; }
+rm -rf $triplet
 
 opt_ampi_error_checking=0
 opt_ampi_mpich_tests=0
@@ -47,11 +47,9 @@ opt_tracing=0
 opt_tracing_commthread=0
 opt_zlib=0
 
-opt_CC=
-opt_CXX=
-opt_FC=
-
-[[ $target != "AMPI" ]] && echo "*** Warning: The cmake build only supports the 'AMPI' target, (not '$target'). Building 'AMPI'."
+opt_CC= #undef
+opt_CXX= #undef
+opt_FC= #undef
 
 while [[ $# -gt 0 ]]; do
   arg=$1
