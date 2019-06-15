@@ -8,7 +8,7 @@ foreach(filename ${ckperf-h-sources})
     configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 endforeach()
 
-include(../ci-files.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/ci-files.cmake)
 
 if($CMK_TRACE_ENABLED})
     add_library(trace-projector trace-projector.C ../conv-perf/traceCore.C

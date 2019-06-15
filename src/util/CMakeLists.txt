@@ -28,7 +28,7 @@ set(conv-util-cxx-sources
     spanningTree.C
 )
 
-include(../ci-files.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/ci-files.cmake)
 
 configure_file(${conv-util-h-sources} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 

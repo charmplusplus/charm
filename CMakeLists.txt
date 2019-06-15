@@ -245,7 +245,7 @@ if(${CMAKE_BUILD_TYPE} MATCHES "Release")
     set(BUILDOPTS "-optimize -production")
 endif()
 
-include(src/arch/detect-features.cmake)
+include(cmake/detect-features.cmake)
 
 configure_file(${CMAKE_SOURCE_DIR}/src/scripts/charmc ${CMAKE_BINARY_DIR}/bin @ONLY)
 

@@ -2,7 +2,7 @@ set(moduleNDMeshStreamer-h-sources NDMeshStreamer.h VirtualRouter.h DataItemType
 
 set(moduleNDMeshStreamer-cxx-sources NDMeshStreamer.C)
 
-include(../../../ci-files.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/ci-files.cmake)
 
 add_library(moduleNDMeshStreamer ${moduleNDMeshStreamer-cxx-sources}
     ${moduleNDMeshStreamer-h-sources}

@@ -128,7 +128,7 @@ set(ldb-h-sources ../ck-ldb/AdaptiveLB.h ../ck-ldb/BaseLB.h
     ../ck-ldb/lbdb.h ../ck-ldb/manager.h ../ck-ldb/tm_bucket.h
     ../ck-ldb/tm_mapping.h ../ck-ldb/tm_timings.h ../ck-ldb/tm_tree.h)
 
-include(../ci-files.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/ci-files.cmake)
 
 add_library(ck ${ck-cxx-sources} ${ck-h-sources} ${ck-ci-sources})
 add_library(ckmain main.C)

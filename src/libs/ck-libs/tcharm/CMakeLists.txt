@@ -2,7 +2,7 @@ set(tcharm-c-sources compat_funs.c compat_fus.c compat_regmm.c compat_uns.c comp
 
 set(tcharm-h-sources tcharm.h tcharm_impl.h tcharmc.h tcharmf.h)
 
-include(../../../ci-files.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/ci-files.cmake)
 
 add_library(moduletcharm tcharm.C ${tcharm-h-sources} ${CMAKE_BINARY_DIR}/include/tcharm.decl.h)
 
