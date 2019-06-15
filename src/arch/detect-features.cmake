@@ -3,6 +3,7 @@ include(CheckFunctionExists)
 include(CheckCXXSymbolExists)
 include(CheckCXXSourceCompiles)
 include(CheckCSourceCompiles)
+include(CheckCXXCompilerFlag)
 
 # C types and type sizes
 check_type_size("size_t" size_t_size)
@@ -80,6 +81,7 @@ check_function_exists(bindprocessor CMK_HAS_BINDPROCESSOR)
 check_function_exists(clz HAVE_CLZ)
 check_function_exists(clzl HAVE_CLZL)
 check_function_exists(dlopen CMK_DLL_USE_DLOPEN)
+check_function_exists(dlopen CMK_HAS_DLOPEN)
 check_function_exists(fabsf HAVE_DECL_FABSF)
 check_function_exists(fabsf CMK_HAS_FABSF)
 check_symbol_exists(fdatasync unistd.h CMK_HAS_FDATASYNC_FUNC)
@@ -141,7 +143,41 @@ check_function_exists(sysctlbyname HAVE_SYSCTLBYNAME)
 check_function_exists(uname HAVE_UNAME)
 check_function_exists(usleep CMK_HAS_USLEEP)
 
+
+# Check compiler flags
+
+check_cxx_compiler_flag("-mno-tls-direct-seg-refs" CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS)
+
+check_cxx_compiler_flag("-fno-stack-protector" CMK_COMPILER_KNOWS_FNOSTACKPROTECTOR)
+if(${CMK_COMPILER_KNOWS_FNOSTACKPROTECTOR})
+  set(OPTS_CC "${OPTS_CC} -fno-stack-protector")
+  set(OPTS_CXX "${OPTS_CXX} -fno-stack-protector")
+endif()
+
+check_cxx_compiler_flag("-fno-lifetime-dse" CMK_COMPILER_KNOWS_LIFETIMEDSE)
+if(${CMK_COMPILER_KNOWS_LIFETIMEDSE})
+  set(OPTS_CXX "${OPTS_CXX} -fno-lifetime-dse")
+endif()
+
 # Complex tests
+
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows" OR ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+  set(CMK_CAN_GET_BINARY_PATH 1)
+elseif(${CMK_HAS_READLINK} OR ${CMK_HAS_REALPATH})
+  set(CMK_CAN_GET_BINARY_PATH 1)
+else()
+  set(CMK_CAN_GET_BINARY_PATH 0)
+endif()
+
+file(WRITE ${CMAKE_BINARY_DIR}/test_file "")
+execute_process(COMMAND cp -p test_file test_file2 ERROR_VARIABLE CP_P_OPTION_ERROR)
+if(NOT ${CP_P_OPTION_ERROR} STREQUAL "")
+  set(CP "cp")
+else()
+  set(CP "cp -p")
+endif()
+file(REMOVE ${CMAKE_BINARY_DIR}/test_file ${CMAKE_BINARY_DIR}/test_file2)
+
 check_cxx_source_compiles("
 #include <type_traits>
 struct s { s(int a) { } };

@@ -45,7 +45,7 @@ opt_task_queue=0
 opt_tcp=0
 opt_tracing=0
 opt_tracing_commthread=0
-opt_zlib=0
+opt_zlib=1
 
 opt_CC= #undef
 opt_CXX= #undef
