@@ -391,22 +391,22 @@ void CmiFreeNodeBroadcastAllFn(int size, char *msg) {
 #endif
 
 void CmiWithinNodeBroadcastFn(int size, char* msg) {
-  int nodefirst = CmiNodeFirst(CmiMyNode());
-  int nodelast = nodefirst + CmiNodeSize(CmiMyNode());
+  int nodeFirst = CmiNodeFirst(CmiMyNode());
+  int nodeLast = nodeFirst + CmiNodeSize(CmiMyNode());
   if (CMI_MSG_NOKEEP(msg)) {
-    for (int i = nodefirst; i < CmiMyPe(); i++) {
+    for (int i = nodeFirst; i < CmiMyPe(); i++) {
       CmiReference(msg);
       CmiFreeSendFn(i, size, msg);
     }
-    for (int i = CmiMyPe() + 1; i < nodelast; i++) {
+    for (int i = CmiMyPe() + 1; i < nodeLast; i++) {
       CmiReference(msg);
       CmiFreeSendFn(i, size, msg);
     }
   } else {
-    for (int i = nodefirst; i < CmiMyPe(); i++) {
+    for (int i = nodeFirst; i < CmiMyPe(); i++) {
       CmiSyncSendFn(i, size, msg);
     }
-    for (int i = CmiMyPe() + 1; i < nodelast; i++) {
+    for (int i = CmiMyPe() + 1; i < nodeLast; i++) {
       CmiSyncSendFn(i, size, msg);
     }
   }

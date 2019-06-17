@@ -3093,6 +3093,7 @@ void CmiInitMsgHeader(void *msg, int size) {
   if(size >= CmiMsgHeaderSizeBytes)
     CMI_ZC_MSGTYPE(msg) = CMK_REG_NO_ZC_MSG;
 #endif
+  CMI_MSG_NOKEEP(msg) = 0;
 }
 
 int CmiGetReference(void *blk)

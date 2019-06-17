@@ -458,10 +458,14 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
 
 void CldEnqueueWithinNode(void *msg, int infofn)
 {
-  int len, queueing, priobits,i; unsigned int *prioptr, start, size;
-  CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
+  int len, queueing, priobits;
+  unsigned int *prioptr;
   CldPackFn pfn;
+  CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+
+  // If message is NOKEEP, do not pack it since its pointer is just going to
+  // be shared with the other PEs on this node.
   if (pfn && !CMI_MSG_NOKEEP(msg)) {
     pfn(&msg);
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
