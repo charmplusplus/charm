@@ -24,7 +24,7 @@ test: $(foreach i,$(TESTDIRS),test-$i)
 
 bgtest: $(foreach i,$(filter $(BGDIRS),$(TESTDIRS)),bgtest-$i)
 
-syncfttest causalfttest mpisyncfttest mlogfttest: $(foreach i,$(filter $(FTDIRS),$(TESTDIRS)),test-$i)
+syncfttest mpisyncfttest : $(foreach i,$(filter $(FTDIRS),$(TESTDIRS)),test-$i)
 
 clean: $(foreach i,$(DIRS),clean-$i)
 	rm -f TAGS #*#
