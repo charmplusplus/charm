@@ -10454,7 +10454,8 @@ Installation with CMake
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 As an experimental feature, Charm++ can be installed with the CMake tool, version 3.11 or newer.
-This is currently only supported on Linux and Darwin, but not on Windows. Currently, only the AMPI target is available.
+This is currently only supported on Linux and Darwin, but not on Windows.
+Currently, only the `charm++` and `AMPI` targets are available.
 
 After downloading and unpacking Charm++, it can be installed in the following way:
 
@@ -10467,13 +10468,15 @@ After downloading and unpacking Charm++, it can be installed in the following wa
    $ make -j4
 
 
-By default, CMake builds the netlrts version with SMP enabled. Other configuration options can be specified in the cmake command above. For example, to build the MPI version of Charm++ with the SMP mode disabled, the following command can be used:
+By default, CMake builds the netlrts version. 
+Other configuration options can be specified in the cmake command above.
+For example, to build the MPI version of Charm++ with SMP, the following command can be used:
 
 .. code-block:: bash
 
-   $ cmake .. -DNETWORK=mpi -DSMP=off
+   $ cmake .. -DNETWORK=mpi -DSMP=on
 
-To simplify testing the CMake build, he `buildcmake` command is a simple wrapper around cmake
+To simplify building with CMake, the `buildcmake` command is a simple wrapper around cmake
 that supports many of the options that `build` supports.
 
 .. code-block:: bash
