@@ -83,6 +83,7 @@ public:
     load = 10;
   }
 
+  // This is called by the RTS when AtSync is called and ready to do LB
   virtual void UserSetLBLoad() {
     setObjTime(load);
   }
