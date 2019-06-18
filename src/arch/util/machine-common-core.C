@@ -563,17 +563,28 @@ static INLINE_KEYWORD void handleOneRecvedMsg(int size, char *msg) {
 
 
 static void SendToPeers(int size, char *msg) {
-    /* FIXME: now it's just a flat p2p send!! When node size is large,
-    * it should also be sent in a tree
-    */
-    int exceptRank = CMI_DEST_RANK(msg);
-    int i;
-    for (i=0; i<exceptRank; i++) {
-        CmiPushPE(i, CopyMsg(msg, size));
+  /* FIXME: now it's just a flat p2p send!! When node size is large,
+  * it should also be sent in a tree
+  */
+
+  int exceptRank = CMI_DEST_RANK(msg);
+  if (CMI_MSG_NOKEEP(msg)) {
+    for (int i = 0; i < exceptRank; i++) {
+      CmiReference(msg);
+      CmiPushPE(i, msg);
     }
-    for (i=exceptRank+1; i<CmiMyNodeSize(); i++) {
-        CmiPushPE(i, CopyMsg(msg, size));
+    for (int i = exceptRank + 1; i < CmiMyNodeSize(); i++) {
+      CmiReference(msg);
+      CmiPushPE(i, msg);
     }
+  } else {
+    for (int i = 0; i < exceptRank; i++) {
+      CmiPushPE(i, CopyMsg(msg, size));
+    }
+    for (int i = exceptRank + 1; i < CmiMyNodeSize(); i++) {
+      CmiPushPE(i, CopyMsg(msg, size));
+    }
+  }
 }
 
 
