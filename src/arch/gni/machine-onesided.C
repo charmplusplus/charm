@@ -277,7 +277,6 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
                               ncpyOpInfo->ncpyOpInfoSize,
                               RDMA_REG_AND_GET_MD_DIRECT_TAG,
                               0, NULL, CHARM_SMSG, 1);
-    GNI_RC_CHECK("Sending REG & GET metadata msg failed!", status);
 #if !CMK_SMSGS_FREE_AFTER_EVENT
     if(status == GNI_RC_SUCCESS) {
       CmiFree(ncpyOpInfo);

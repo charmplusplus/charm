@@ -1962,7 +1962,10 @@ static inline  void processSendWC(struct ibv_wc *sendWC){
 			GarbageCollectMsg(packet->ogm);	
 		}
 	}else{
-		if(packet->header.code == INFIRDMA_START || packet->header.code == INFIRDMA_ACK || packet->header.code ==  INFIDUMMYPACKET){
+		if(packet->header.code == INFIRDMA_START ||
+		   packet->header.code == INFIRDMA_ACK ||
+		   packet->header.code ==  INFIDUMMYPACKET ||
+		   packet->header.code == INFIRDMA_DIRECT_DEREG_AND_ACK) {
                    if (packet->buf) CmiFree(packet->buf);  /* gzheng */
 		}
 	}
