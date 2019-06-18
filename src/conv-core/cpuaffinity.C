@@ -205,8 +205,8 @@ int CmiSetCPUAffinity(int mycore)
     core = CmiNumCores() + core;
   }
   if (core < 0) {
-    CmiError("Error: Invalid cpu affinity core number: %d\n", mycore);
-    CmiAbort("CmiSetCPUAffinity failed");
+    CmiError("Error: Invalid parameter to CmiSetCPUAffinity: %d\n", mycore);
+    CmiAbort("CmiSetCPUAffinity failed!");
   }
 
   CpvAccess(myCPUAffToCore) = core;
@@ -226,6 +226,9 @@ int CmiSetCPUAffinity(int mycore)
 #endif
 
   cmi_hwloc_topology_destroy(topology);
+
+  if (result == -1)
+    CmiError("Error: CmiSetCPUAffinity failed to bind PE #%d to PU #%d.\n", CmiMyPe(), mycore);
 
   return result;
 }
@@ -478,8 +481,7 @@ static void cpuAffinityRecvHandler(void *msg)
     DEBUGP(("Processor %d is bound to core #%d on node #%d\n", CmiMyPe(), myrank, mynode));
   }
   else{
-    CmiPrintf("Processor %d set affinity failed!\n", CmiMyPe());
-    CmiAbort("set cpu affinity abort!\n");
+    CmiAbort("CmiSetCPUAffinity failed!");
   }
   CmiFree(m);
 }
@@ -899,13 +901,13 @@ void CmiInitCPUAffinity(char **argv)
       int mycore = search_pemap(commap, CmiMyPeGlobal()-CmiNumPesGlobal());
       if (CmiPhysicalNodeID(CmiMyPe()) == 0) CmiPrintf("Charm++> set comm %d on node %d to core #%d\n", CmiMyPe()-CmiNumPes(), CmiMyNode(), mycore);
       if (-1 == CmiSetCPUAffinity(mycore))
-        CmiAbort("set_cpu_affinity abort!");
+        CmiAbort("CmiSetCPUAffinity failed!");
       CmiNodeAllBarrier();
       if (show_affinity_flag) CmiPrintCPUAffinity();
       return;    /* comm thread return */
     }
     else {
-    /* if (CmiSetCPUAffinity(CmiNumCores()-1) == -1) CmiAbort("set_cpu_affinity abort!"); */
+    /* if (CmiSetCPUAffinity(CmiNumCores()-1) == -1) CmiAbort("CmiSetCPUAffinity failed!"); */
 #if !CMK_CRAYXE && !CMK_CRAYXC && !CMK_BLUEGENEQ && !CMK_PAMI_LINUX_PPC8
       if (pemap == NULL) {
 #if CMK_MACHINE_PROGRESS_DEFINED
@@ -932,7 +934,7 @@ void CmiInitCPUAffinity(char **argv)
   if (pemap != NULL && CmiMyPe()<CmiNumPes()) {    /* work thread */
     int mycore = search_pemap(pemap, CmiMyPeGlobal());
     if(show_affinity_flag) CmiPrintf("Charm++> set PE %d on node %d to core #%d\n", CmiMyPe(), CmiMyNode(), mycore);
-    if (CmiSetCPUAffinity(mycore) == -1) CmiAbort("set_cpu_affinity abort!");
+    if (CmiSetCPUAffinity(mycore) == -1) CmiAbort("CmiSetCPUAffinity failed!");
     CmiNodeAllBarrier();
     CmiNodeAllBarrier();
     /* if (show_affinity_flag) CmiPrintCPUAffinity(); */
@@ -973,8 +975,7 @@ void CmiInitCPUAffinity(char **argv)
       DEBUGP(("Processor %d is bound to core #%d on node #%d\n", CmiMyPe(), myrank, mynode));
     }
     else{
-      CmiPrintf("Processor %d set affinity failed!\n", CmiMyPe());
-      CmiAbort("set cpu affinity abort!\n");
+      CmiAbort("CmiSetCPUAffinity failed!");
     }
   }
   if (CmiMyPe() < CmiNumPes()) 
