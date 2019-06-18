@@ -345,20 +345,24 @@ void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo) {
 
   ZERO_REQUEST(req);
 
-  if(ncpyOpInfo->freeMe == CMK_FREE_NCPYOPINFO)
-    req->freeMe   = 1;// free ncpyOpInfo
-  else
-    req->freeMe   = 0;// do not free ncpyOpInfo
+  // ncpyOpInfo is a part of the received message and can be freed before this send completes
+  // for that reason, it is copied into a new message
+  NcpyOperationInfo *newNcpyOpInfo = (NcpyOperationInfo *)CmiAlloc(ncpyOpInfo->ncpyOpInfoSize);
 
-  req->destNode = CmiNodeOf(ncpyOpInfo->srcPe);
-  req->destPE   = ncpyOpInfo->srcPe;
-  req->size     = ncpyOpInfo->ncpyOpInfoSize;
+  memcpy(newNcpyOpInfo, ncpyOpInfo, ncpyOpInfo->ncpyOpInfoSize);
+
+  newNcpyOpInfo->freeMe =  CMK_FREE_NCPYOPINFO; // Since this is a copy of ncpyOpInfo, it can be freed
+  req->freeMe   = 1;// free newNcpyOpInfo
+
+  req->destNode = CmiNodeOf(newNcpyOpInfo->srcPe);
+  req->destPE   = newNcpyOpInfo->srcPe;
+  req->size     = newNcpyOpInfo->ncpyOpInfoSize;
   req->callback = send_short_callback;
-  req->data.short_msg = ncpyOpInfo;
+  req->data.short_msg = newNcpyOpInfo;
 
-  ofi_send(ncpyOpInfo,
-           ncpyOpInfo->ncpyOpInfoSize,
-           CmiNodeOf(ncpyOpInfo->srcPe),
+  ofi_send(newNcpyOpInfo,
+           newNcpyOpInfo->ncpyOpInfoSize,
+           CmiNodeOf(newNcpyOpInfo->srcPe),
            OFI_RDMA_DIRECT_DEREG_AND_ACK,
            req);
 }
