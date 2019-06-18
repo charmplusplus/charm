@@ -12,7 +12,6 @@ pes=1
 ppn=1
 machinefile=""
 QUIET=0
-LOCAL=0
 
 while [ $# -gt 0 ]
 do
@@ -48,11 +47,12 @@ do
 		;;
 	++quiet)
 		QUIET=1
-		charm_args=$charm_args" "$1
 		;;
-	++local)
-		LOCAL=1
-		charm_args=$charm_args" "$1
+	++no-quiet)
+		QUIET=0
+		;;
+	++local|++no-local)
+		# ignore
 		;;
 	*)
 		args=$args" "$1
@@ -60,6 +60,8 @@ do
 	esac
 	shift
 done
+
+test $QUIET -eq 1 && charm_args=$charm_args" "++quiet
 
 args=$args" "$charm_args
 
@@ -75,11 +77,7 @@ fi
 
 test $QUIET -eq 0 && printf "\nRunning on $pes processors: $args\n"
 
-if [ $LOCAL -eq 1 ]
-then
-  test $QUIET -eq 0 && echo $args +p $pes
-  $args +p $pes
-elif [ -n "$PBS_NODEFILE" ]
+if [ -n "$PBS_NODEFILE" ]
 then
 # we are in a job shell
   aprun=`which aprun 2>/dev/null`

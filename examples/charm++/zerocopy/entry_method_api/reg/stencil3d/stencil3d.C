@@ -50,7 +50,7 @@ int myrand(int numpes) {
 
 #define index(a,b,c)    ((a)+(b)*(blockDimX+2)+(c)*(blockDimX+2)*(blockDimY+2))
 
-#define MAX_ITER         100
+#define MAX_ITER         40
 #define LBPERIOD_ITER    5     // LB is called every LBPERIOD_ITER number of program iterations
 #define CHANGELOAD       30
 #define LEFT             1

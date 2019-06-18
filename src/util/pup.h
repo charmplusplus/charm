@@ -432,6 +432,14 @@ class mem : public er { //Memory-buffer packers and unpackers
     return reinterpret_cast<char*>(buf);
   }
 
+  inline char* get_orig_pointer() const {
+    return reinterpret_cast<char*>(origBuf);
+  }
+
+  inline void reset() {
+    buf = origBuf;
+  }
+
   inline void advance(size_t const offset) {
     buf += offset;
   }

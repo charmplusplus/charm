@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <memory.h>
+#include <type_traits>
 #include <vector>
 
 #include "charm.h"
@@ -213,9 +214,6 @@ public:
 #if CMK_SMP && CMK_TASKQUEUE
 #include "conv-taskQ.h"
 #endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-class ChareMlogData;
-#endif
 
 #define CHARE_MAGIC    0x201201
 
@@ -235,9 +233,6 @@ class Chare {
 #endif
 #ifndef CMK_CHARE_USE_PTR
     int chareIdx;                  // index in the chare obj table (chare_objs)
-#endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    ChareMlogData *mlogData;
 #endif
     Chare(CkMigrateMessage *m);
     Chare();
@@ -362,6 +357,8 @@ class IrrGroup : public Chare {
 #endif
 };
 
+#if CMK_CHARMPY
+
 extern void (*GroupMsgRecvExtCallback)(int, int, int, char *, int);        // callback to forward received msg to external Group chare
 extern void (*ChareMsgRecvExtCallback)(int, void*, int, int, char *, int); // callback to forward received msg to external Chare
 
@@ -400,6 +397,7 @@ public:
   }
 };
 
+#endif
 
 // As described in http://www.gotw.ca/publications/mxc++-item-4.htm
 template<typename D, typename B>
@@ -454,6 +452,8 @@ void recursive_pup(T *obj, PUP::er &p) {
   recursive_pup_impl<T, IsDerivedFrom<T, CBase>::Is>()(obj, p);
 }
 
+class CProxy_ArrayBase;
+
 // CBaseX::pup must be an empty override, so that the recursive PUPing
 // doesn't call an implementation multiple times up the inheritance
 // hierarchy, and old-style calls to CBase_foo::pup actually produce
@@ -463,6 +463,10 @@ void recursive_pup(T *obj, PUP::er &p) {
   typedef typename CProxy_Derived::index_t index_t;           \
   typedef typename CProxy_Derived::proxy_t proxy_t;           \
   typedef typename CProxy_Derived::element_t element_t;       \
+  template <typename T = proxy_t>                             \
+  typename std::enable_if<std::is_base_of<CProxy_ArrayBase, T>::value>::type migrateMe(int toPe) { \
+    this->thisProxy[this->thisIndex].ckEmigrate(toPe);        \
+  }                                                           \
   CProxy_Derived thisProxy;                                   \
   void pup(PUP::er &p) { (void)p; }                           \
   inline void _sdag_pup(PUP::er &p) { (void)p; }              \
@@ -1008,8 +1012,8 @@ public:
   inline CkSectionID &ckGetSectionID() {return _sid[0]; }
   inline CkSectionID &ckGetSectionID(int i) {return _sid[i]; }
   inline CkGroupID ckGetGroupIDn(int i) const {return _sid[i]._cookie.get_aid();}
-  inline int *ckGetElements() const {return _sid[0].pelist.data();}
-  inline int *ckGetElements(int i) const {return _sid[i].pelist.data();}
+  inline const int *ckGetElements() const {return _sid[0].pelist.data();}
+  inline const int *ckGetElements(int i) const {return _sid[i].pelist.data();}
   inline int ckGetNumElements() const { return _sid[0].pelist.size(); }
   inline int ckGetNumElements(int i) const { return _sid[i].pelist.size(); }
   inline int ckGetBfactor() const { return _sid[0].bfactor; }
@@ -1128,6 +1132,8 @@ typedef CProxySection_Group CProxySection_IrrGroup;
 //Defines the actual "Group"
 #include "ckreduction.h"
 
+#if CMK_CHARMPY
+
 /// Lightweight object to support chares defined outside of the C/C++ runtime
 /// Relays messages to appropiate external chare. See README.charm4py
 class GroupExt: public Group {
@@ -1152,6 +1158,8 @@ public:
                             dcopy_start);
   }
 };
+
+#endif
 
 class CkQdMsg {
   public:
@@ -1206,12 +1214,6 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #endif
 
 
-#if defined(_FAULT_MLOG_) 
-#include "ckmessagelogging.h"
-#endif
-#if defined(_FAULT_CAUSAL_)
-#include "ckcausalmlog.h"
-#endif
 
 #include "ckmemcheckpoint.h"
 #include "readonly.h"
@@ -1390,6 +1392,9 @@ public:
     ++refcount;
   }
 };
+
+// Method to check if the Charm RTS initialization phase has completed
+void checkForInitDone(bool rdmaROCompleted);
 
 #endif
 

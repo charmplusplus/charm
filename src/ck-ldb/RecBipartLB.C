@@ -28,7 +28,7 @@
 
 using std::vector;
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 /**
  *  Class to contain additional data about the vertices in object graph

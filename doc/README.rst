@@ -51,7 +51,7 @@ Lists
 
 - Itemized:
 
-  ::
+  .. code-block:: none
 
     - Item 1
     - Item 2
@@ -59,7 +59,7 @@ Lists
 
 - Enumerated:
 
-  ::
+  .. code-block:: none
 
     #. Item 1
     #. Item 2
@@ -70,7 +70,7 @@ Sections
 
 Sections get defined by underlining their title:
 
-::
+.. code-block:: none
 
   Section name
   ============
@@ -93,34 +93,26 @@ Code
 
 - Code blocks (similar to ``\begin{alltt} .. \end{alltt}``):
 
-  - Code blocks have syntax highlighting for C++ by default, via the pygments
+  - Code blocks have syntax highlighting via the pygments
     (http://pygments.org) library.
 
-  - Automatic syntax highlighting (default language: C++): ``::``
+  - Do not use the default ``::`` highlighting mode, but specify the
+    language explicitly: ``.. code-block:: fortran`` (or ``c++``, ``none``, ...)
 
-    ::
-
-      ::
-
-        int foo();
-        int bar();
-
-  - Specify language: ``.. code-block:: fortran`` instead of ``::``
-
-    ::
+    .. code-block:: none
 
       .. code-block:: fortran
 
         call foo()
         call bar()
 
-  Versions of pygments newer than 2.3.1 allow specifying ``charmci`` as the
-  language for ci-files (instead of the default C++).
+  Versions of pygments newer than 2.3.1 will allow specifying ``charmci`` as the
+  language for ci-files (instead of using C++).
 
 Figures
 -------
 
-::
+.. code-block:: none
 
   .. figure:: figures/detailedsim_newer.png
     :name: BigNetSim1
@@ -134,7 +126,7 @@ Tables
 
 Code:
 
-::
+.. code-block:: none
 
   .. table:: Table caption goes here.
     :name: tableref
@@ -169,7 +161,7 @@ Adding reference labels
 Labels to refer to tables and figures are created by the ``:name:`` property above.
 Create labels for sections like this:
 
-::
+.. code-block:: none
 
   .. _my-label:
   Section ABCD
@@ -194,7 +186,7 @@ URLs get parsed and displayed as links automatically. For example: https://charm
 Citations
 ---------
 
-::
+.. code-block:: none
 
   This is a reference [Ref]_ .
 
@@ -203,7 +195,7 @@ Citations
 Footnotes
 ---------
 
-::
+.. code-block:: none
 
   This text has a footnote [1]_
 

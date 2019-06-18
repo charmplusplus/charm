@@ -9,7 +9,7 @@
 
 extern LBAllocFn getLBAllocFn(const char *lbname);
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(NodeLevelLB, "Node level load balancer")
 

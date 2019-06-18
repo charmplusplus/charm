@@ -37,10 +37,6 @@ Orion Sky Lawlor, olawlor@acm.org
 extern void _registerCkArray(void);
 CpvExtern (int ,serializer);
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-#define _MLOG_BCAST_TREE_ 1
-#define _MLOG_BCAST_BFACTOR_ 8
-#endif
 
 /** This flag is true when in the system there is anytime migration, false when
  *  the user code guarantees that no migration happens except during load balancing
@@ -316,8 +312,8 @@ public:
   virtual char *ckDebugChareName(void);
   virtual int ckDebugChareID(char*, int);
 
-  /// Synonym for ckMigrate
-  inline void migrateMe(int toPe) {ckMigrate(toPe);}
+  void ckEmigrate(int toPe) {ckMigrate(toPe);}
+
 
 #ifdef _PIPELINED_ALLREDUCE_
 	void contribute2(CkArrayIndex myIndex, int dataSize,const void *data,CkReduction::reducerType type,
@@ -386,9 +382,6 @@ public:
   using array_index_t = T;
 
   ArrayElementT(void): thisIndex(*(const T *)thisIndexMax.data()) {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
-        mlogData->objID.data.array.idx=thisIndexMax;
-#endif
 }
 #ifdef _PIPELINED_ALLREDUCE_
 	void contribute(int dataSize,const void *data,CkReduction::reducerType type,
@@ -429,6 +422,8 @@ typedef ArrayElementT<CkIndex4D> ArrayElement4D;
 typedef ArrayElementT<CkIndex5D> ArrayElement5D;
 typedef ArrayElementT<CkIndex6D> ArrayElement6D;
 typedef ArrayElementT<CkIndexMax> ArrayElementMax;
+
+#if CMK_CHARMPY
 
 extern void (*ArrayMsgRecvExtCallback)(int, int, int *, int, int, char *, int);
 extern int (*ArrayElemLeaveExt)(int, int, int *, char**, int);
@@ -516,6 +511,8 @@ public:
   }
 };
 
+#endif
+
 /*@}*/
 
 
@@ -555,10 +552,8 @@ class CkArray : public CkReductionMgr {
   // Separate mapping and storing the element pointers to speed iteration in broadcast
   std::unordered_map<CmiUInt8, unsigned int> localElems;
   std::vector<CkMigratable *> localElemVec;
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    int *children;
-    int numChildren;
-#endif
+
+  UShort recvBroadcastEpIdx;
 private:
   bool stableLocations;
 
@@ -570,6 +565,8 @@ public:
   CkGroupID &getGroupID(void) {return thisgroup;}
   CkGroupID &getmCastMgr(void) {return mCastMgrID;}
   bool isSectionAutoDelegated(void) {return sectionAutoDelegate;}
+
+  UShort &getRecvBroadcastEpIdx(void) {return recvBroadcastEpIdx;}
 
 //Access & information routines
   inline CkLocMgr *getLocMgr(void) {return locMgr;}
@@ -719,13 +716,10 @@ private:
   CkArrayBroadcaster *broadcaster; //Read-only copy of default broadcaster
 public:
   void flushStates();
-
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	// the mlogft only support 1D arrays, then returning the number of elements in the first dimension
-	virtual int numberReductionMessages(){CkAssert(CkMyPe() == 0);return numInitial.data()[0];}
-	void broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index);
-	static void staticBroadcastHomeElements(CkArray *arr,void *data,CkLocRec *rec,CkArrayIndex *index);
+#if CMK_ONESIDED_IMPL
+  void forwardZCMsgToOtherElems(envelope *env);
 #endif
+
 
         static bool isIrreducible() { return true; }
 };

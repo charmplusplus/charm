@@ -74,6 +74,7 @@ never be excluded...
 #include "spanningTree.h"
 #if CMK_CHARMPY
 #include "GreedyRefineLB.h"
+#include "RandCentLB.h"
 #endif
 
 #if CMK_CUDA
@@ -113,6 +114,20 @@ UInt  _numInitMsgs = 0;
  * given node, this value must be seen by all processors in a node.
  */
 CksvDeclare(UInt,_numInitNodeMsgs);
+
+#if CMK_ONESIDED_IMPL
+#if CMK_SMP
+std::atomic<UInt> numZerocopyROops = {0};
+#else
+UInt  numZerocopyROops = 0;
+#endif
+UInt  curROIndex = 0;
+bool usedCMAForROBcastTransfer = false;
+NcpyROBcastAckInfo *roBcastAckInfo;
+int   _roRdmaDoneHandlerIdx;
+CksvDeclare(int,  _numPendingRORdmaTransfers);
+#endif
+
 int   _infoIdx;
 int   _charmHandlerIdx;
 int   _initHandlerIdx;
@@ -163,9 +178,11 @@ CkpvStaticDeclare(PtrQ*, _buffQ);
 CkpvStaticDeclare(PtrVec*, _bocInitVec);
 
 //for interoperability
+extern int userDrivenMode;
 extern void _libExitHandler(envelope *env);
 extern int _libExitHandlerIdx;
 CpvCExtern(int,interopExitFlag);
+void StopInteropScheduler();
 
 #if CMK_SHRINK_EXPAND
 //for shrink expand cleanup
@@ -200,13 +217,6 @@ typedef void (*CkFtFn)(const char *, CkArgMsg *);
 static CkFtFn  faultFunc = NULL;
 static char* _restartDir;
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-int teamSize=1;
-int chkptPeriod=1000;
-bool fastRecovery = false;
-int parallelRecovery = 1;
-extern int BUFFER_TIME; //time spent waiting for buffered messages
-#endif
 
 // flag for killing processes 
 extern bool killFlag;
@@ -214,10 +224,6 @@ extern bool killFlag;
 extern char *killFile;
 // function for reading the kill file
 void readKillFile();
-#if CMK_MESSAGE_LOGGING
-// flag for disk checkpoint
-extern bool diskCkptFlag;
-#endif
 
 int _defaultObjectQ = 0;            // for obejct queue
 bool _ringexit = 0;		    // for charm exit
@@ -232,8 +238,8 @@ void processRaiseEvacFile(char *raiseEvacFile);
 
 extern bool useNodeBlkMapping;
 
-CMI_EXTERNC_VARIABLE int quietMode;
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietMode;
+extern int quietModeRequested;
 
 // Modules are required to register command line opts they will parse. These
 // options are stored in the _optSet, and then when parsing command line opts
@@ -295,17 +301,8 @@ static inline void _parseCommandLineOpts(char **argv)
 # if CMK_MEM_CHECKPOINT
       faultFunc = CkMemRestart;
 # endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-      faultFunc = CkMlogRestart;
-#endif
       CmiPrintf("[%d] Restarting after crash \n",CmiMyPe());
   }
-#if CMK_MESSAGE_LOGGING
-	// reading +ftc_disk flag
-	if (CmiGetArgFlagDesc(argv, "+ftc_disk", "Disk Checkpointing")) {
-		diskCkptFlag = true;
-    }
-#endif
   // reading the killFile
   if(CmiGetArgStringDesc(argv,"+killFile", &killFile,"Generates SIGKILL on specified processors")){
     if(faultFunc == NULL){
@@ -331,17 +328,6 @@ static inline void _parseCommandLineOpts(char **argv)
 	if(CmiGetArgStringDesc(argv,"+raiseevac", &_raiseEvacFile,"Generates processor evacuation on random processors")){
 		_raiseEvac = 1;
 	}
-#endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	if(!CmiGetArgIntDesc(argv,"+teamSize",&teamSize,"Set the team size for message logging")){
-        teamSize = 1;
-    }
-    if(!CmiGetArgIntDesc(argv,"+chkptPeriod",&chkptPeriod,"Set the checkpoint period for the message logging fault tolerance algorithm in seconds")){
-        chkptPeriod = 100;
-    }
-	if(CmiGetArgIntDesc(argv,"+fastRecovery", &parallelRecovery, "Parallel recovery with message logging protocol")){
-        fastRecovery = true;
-    }
 #endif
 
         if (!CmiGetArgIntDesc(argv, "+messageBufferingThreshold",
@@ -567,13 +553,10 @@ static inline void ReportWarnings(WarningMsg * msg)
 }
 #endif /* CMK_LOCKLESS_QUEUE */
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-extern void _messageLoggingExit();
-#endif
 
 #if __FAULT__
 //CpvExtern(int, CldHandlerIndex);
-//extern "C" void CldHandler(char *);
+//void CldHandler(char *);
 extern int index_skipCldHandler;
 extern void _skipCldHandler(void *converseMsg);
 
@@ -638,9 +621,6 @@ static void _exitHandler(envelope *env)
 #endif
       break;
     case ReqStatMsg: // Request stats and warnings message
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-      _messageLoggingExit();
-#endif
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
       CkNumberHandler(_charmHandlerIdx,_discardHandler);
       CkNumberHandler(_bocHandlerIdx, _discardHandler);
@@ -872,6 +852,9 @@ void _initDone(void)
   DEBUGF(("Crossed CmiNodeBarrier(), pe = %d, rank = %d\n", CkMyPe(), CkMyRank()));
   _processBufferedMsgs();
   CkpvAccess(_charmEpoch)=1;
+  if (userDrivenMode) {
+    StopInteropScheduler();
+  }
 }
 
 /**
@@ -883,11 +866,8 @@ void _initDone(void)
  */
 static void _triggerHandler(envelope *env)
 {
-  if (_numExpectInitMsgs && CkpvAccess(_numInitsRecd) + CksvAccess(_numInitNodeMsgs) == _numExpectInitMsgs)
-  {
-    DEBUGF(("Calling Init Done from _triggerHandler\n"));
-    _initDone();
-  }
+  DEBUGF(("Calling Init Done from _triggerHandler\n"));
+  checkForInitDone(true); // RO ZCPY Bcast operation is already complete
   if (env!=NULL) CmiFree(env);
 }
 
@@ -902,12 +882,42 @@ static inline void _processRODataMsg(envelope *env)
 {
   //Unpack each readonly:
   if(!CmiMyRank()) {
+    //Unpack each readonly
     PUP::fromMem pu((char *)EnvToUsr(env));
+    CmiSpanningTreeInfo &t = *_topoTree;
+
+#if CMK_ONESIDED_IMPL
+#if CMK_SMP
+    UInt numZerocopyROopsTemp;
+    pu|numZerocopyROopsTemp;
+
+    numZerocopyROops.store(numZerocopyROopsTemp, std::memory_order_relaxed);
+#else
+    pu|numZerocopyROops;
+#endif
+    // Set _numPendingRORdmaTransfers to numZerocopyROops
+    CksvAccess(_numPendingRORdmaTransfers) = numZerocopyROops;
+
+    // Allocate structure for ack tracking on intermediate nodes
+    if(numZerocopyROops > 0 && t.child_count != 0) {
+      readonlyAllocateOnSource();
+    }
+#endif
+
     for(size_t i=0;i<_readonlyTable.size();i++) {
       _readonlyTable[i]->pupData(pu);
     }
+
+    // Forward message to peers after numZerocopyROops has been initialized
+#if CMK_ONESIDED_IMPL && CMK_SMP
+    if(CMI_IS_ZC_BCAST(env)) {
+      // Send message to peers
+      CmiForwardMsgToPeers(env->getTotalsize(), (char *)env);
+    }
+#endif
+  } else {
+    CmiFree(env);
   }
-  CmiFree(env);
 }
 
 /**
@@ -930,6 +940,68 @@ static void _roRestartHandler(void *msg)
   // to trigger initDone() on all ranks
   // we therefore needs to make sure initDone() is exactly 
   _triggerHandler(NULL);
+}
+
+#if CMK_ONESIDED_IMPL
+static void _roRdmaDoneHandler(envelope *env) {
+
+  switch(env->getMsgtype()) {
+    case ROPeerCompletionMsg:
+      CpvAccess(_qd)->process();
+      checkForInitDone(true); // Receiving a ROPeerCompletionMsg indicates that RO ZCPY Bcast
+                              // operation is complete on the comm. thread
+      if (env!=NULL) CmiFree(env);
+      break;
+    case ROChildCompletionMsg:
+      CpvAccess(_qd)->process();
+      roBcastAckInfo->counter++;
+      if(roBcastAckInfo->counter == roBcastAckInfo->numChildren) {
+        // deregister
+        for(int i=0; i < roBcastAckInfo->numops; i++) {
+          NcpyROBcastBuffAckInfo *buffAckInfo = &(roBcastAckInfo->buffAckInfo[i]);
+          CmiDeregisterMem(buffAckInfo->ptr,
+                           buffAckInfo->layerInfo +CmiGetRdmaCommonInfoSize(),
+                           buffAckInfo->pe,
+                           buffAckInfo->regMode);
+        }
+
+        if(roBcastAckInfo->isRoot != 1) {
+          if(_topoTree == NULL) CkAbort("CkRdmaIssueRgets:: topo tree has not been calculated \n");
+          CmiSpanningTreeInfo &t = *_topoTree;
+
+          //forward message to root
+          // Send a message to the parent to signal completion in order to deregister
+          QdCreate(1);
+          envelope *compEnv = _allocEnv(ROChildCompletionMsg);
+          compEnv->setSrcPe(CkMyPe());
+          CmiSetHandler(compEnv, _roRdmaDoneHandlerIdx);
+          CmiSyncSendAndFree(CmiNodeFirst(t.parent), compEnv->getTotalsize(), (char *)compEnv);
+        }
+        // Free the roBcastAckInfo allocated inside readonlyAllocateOnSource
+        CmiFree(roBcastAckInfo);
+      }
+      break;
+    default:
+      CmiAbort("Invalid msg type\n");
+      break;
+  }
+}
+#endif
+
+void checkForInitDone(bool rdmaROCompleted) {
+
+  bool noPendingRORdmaTransfers = true;
+#if CMK_ONESIDED_IMPL
+  // Ensure that there are no pending RO Rdma transfers on Rank 0 when numZerocopyROops > 0
+#if CMK_SMP
+  if(numZerocopyROops.load(std::memory_order_relaxed) > 0)
+#else
+  if(numZerocopyROops > 0)
+#endif
+    noPendingRORdmaTransfers = rdmaROCompleted;
+#endif
+  if (_numExpectInitMsgs && CkpvAccess(_numInitsRecd) + CksvAccess(_numInitNodeMsgs) == _numExpectInitMsgs && noPendingRORdmaTransfers)
+    _initDone();
 }
 
 /**
@@ -991,13 +1063,15 @@ static void _initHandler(void *msg, CkCoreState *ck)
       CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
   }
   DEBUGF(("[%d,%.6lf] _numExpectInitMsgs %d CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs) %d+%d\n",CmiMyPe(),CmiWallTimer(),_numExpectInitMsgs,CkpvAccess(_numInitsRecd),CksvAccess(_numInitNodeMsgs)));
-  if(_numExpectInitMsgs&&(CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs)==_numExpectInitMsgs)) {
-    _initDone();
-  }
+#if CMK_ONESIDED_IMPL && CMK_USE_CMA
+  if(usedCMAForROBcastTransfer) {
+    checkForInitDone(true); // RO ZCPY Bcast operation was completed inline (using CMA)
+  } else
+#endif
+   checkForInitDone(false); // RO ZCPY Bcast operation could still be incomplete
 }
 
 #if CMK_SHRINK_EXPAND
-extern "C"
 void CkCleanup()
 {
 	// always send to PE 0
@@ -1045,7 +1119,6 @@ void CkContinueExit()
    Tear down structures that must be cleaned up even when unclean exit happens.
    It is called by the machine layer whenever some problem occurs (it is thus up
    to the machine layer to call this function). */
-extern "C"
 void EmergencyExit(void) {
 #ifndef __BIGSIM__
   /* Delete _coreState to force any CkMessageWatcher to close down. */
@@ -1083,12 +1156,12 @@ extern void _initChareTables();
 extern void init_memcheckpt(char **argv);
 #endif
 extern "C" void initCharmProjections();
-extern "C" void CmiInitCPUTopology(char **argv);
-extern "C" void CmiCheckAffinity();
-extern "C" void CmiInitMemAffinity(char **argv);
-extern "C" void CmiInitPxshm(char **argv);
+void CmiInitCPUTopology(char **argv);
+void CmiCheckAffinity();
+void CmiInitMemAffinity(char **argv);
+void CmiInitPxshm(char **argv);
 
-//extern "C" void CldCallback();
+//void CldCallback();
 
 void _registerInitCall(CkInitCallFn fn, int isNodeCall)
 {
@@ -1113,11 +1186,11 @@ void InitCallTable::enumerateInitCalls()
 }
 
 CpvCExtern(int, cpdSuspendStartup);
-extern "C" void CpdFreeze(void);
+void CpdFreeze(void);
 
 extern int _dummy_dq;
 
-extern "C" void initQd(char **argv)
+void initQd(char **argv)
 {
 	CpvInitialize(QdState*, _qd);
 	CpvAccess(_qd) = new QdState();
@@ -1140,6 +1213,78 @@ void CpdBgInit();
 void CpdBreakPointInit();
 
 extern void (*CkRegisterMainModuleCallback)();
+
+void _sendReadonlies() {
+  for(int i=0;i<_readonlyMsgs.size();i++) /* Send out readonly messages */
+  {
+    void *roMsg = (void *) *((char **)(_readonlyMsgs[i]->pMsg));
+    if(roMsg==0)
+      continue;
+    //Pack the message and send it to all other processors
+    envelope *env = UsrToEnv(roMsg);
+    env->setSrcPe(CkMyPe());
+    env->setMsgtype(ROMsgMsg);
+    env->setRoIdx(i);
+    CmiSetHandler(env, _initHandlerIdx);
+    CkPackMessage(&env);
+    CmiSyncBroadcast(env->getTotalsize(), (char *)env);
+    CpvAccess(_qd)->create(CkNumPes()-1);
+
+    //For processor 0, unpack and re-set the global
+    CkUnpackMessage(&env);
+    _processROMsgMsg(env);
+    _numInitMsgs++;
+  }
+
+  //Determine the size of the RODataMessage
+  PUP::sizer ps;
+
+#if CMK_ONESIDED_IMPL
+#if CMK_SMP
+  UInt numZerocopyROopsTemp;
+  numZerocopyROopsTemp = numZerocopyROops;
+  ps|numZerocopyROopsTemp;
+#else
+  ps|numZerocopyROops;
+#endif
+#endif
+
+  for(int i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(ps);
+
+#if CMK_ONESIDED_IMPL
+  if(CkNumNodes() > 1 && numZerocopyROops > 0) { // No ZC ops are performed when CkNumNodes <= 1
+    readonlyAllocateOnSource();
+  }
+#endif
+
+  //Allocate and fill out the RODataMessage
+  envelope *env = _allocEnv(RODataMsg, ps.size());
+  PUP::toMem pp((char *)EnvToUsr(env));
+#if CMK_ONESIDED_IMPL
+#if CMK_SMP
+  numZerocopyROopsTemp = numZerocopyROops;
+  pp|numZerocopyROopsTemp;
+#else
+  pp|numZerocopyROops;
+#endif
+#endif
+  for(int i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pp);
+
+  env->setCount(++_numInitMsgs);
+  env->setSrcPe(CkMyPe());
+  CmiSetHandler(env, _initHandlerIdx);
+  DEBUGF(("[%d,%.6lf] RODataMsg being sent of size %d \n",CmiMyPe(),CmiWallTimer(),env->getTotalsize()));
+  CmiSyncBroadcast(env->getTotalsize(), (char *)env);
+#if CMK_ONESIDED_IMPL && CMK_SMP
+  if(numZerocopyROops > 0) {
+    // Send message to peers
+    CmiForwardMsgToPeers(env->getTotalsize(), (char *)env);
+  }
+#endif
+  CmiFree(env);
+  CpvAccess(_qd)->create(CkNumPes()-1);
+  _initDone();
+}
 
 /**
   This is the main charm setup routine.  It's called
@@ -1200,6 +1345,10 @@ void _initCharm(int unused_argc, char **argv)
 	CksvInitialize(bool, _triggersSent);
 	CksvAccess(_triggersSent) = false;
 
+#if CMK_ONESIDED_IMPL
+	CksvInitialize(int, _numPendingRORdmaTransfers);
+#endif
+
 	CkpvInitialize(_CkOutStream*, _ckout);
 	CkpvInitialize(_CkErrStream*, _ckerr);
 	CkpvInitialize(Stats*, _myStats);
@@ -1218,6 +1367,11 @@ void _initCharm(int unused_argc, char **argv)
 	{
 	  	CksvAccess(_numNodeGroups) = 1; //make 0 an invalid group number
           	CksvAccess(_numInitNodeMsgs) = 0;
+
+#if CMK_ONESIDED_IMPL
+		CksvAccess(_numPendingRORdmaTransfers) = 0;
+#endif
+
 		CksvAccess(_nodeLock) = CmiCreateLock();
 		CksvAccess(_nodeGroupTable) = new GroupTable();
 		CksvAccess(_nodeGroupTable)->init();
@@ -1244,6 +1398,11 @@ void _initCharm(int unused_argc, char **argv)
 	CmiAssignOnce(&_charmHandlerIdx, CkRegisterHandler(_bufferHandler));
 	CmiAssignOnce(&_initHandlerIdx, CkRegisterHandlerEx(_initHandler, CkpvAccess(_coreState)));
 	CmiAssignOnce(&_roRestartHandlerIdx, CkRegisterHandler(_roRestartHandler));
+
+#if CMK_ONESIDED_IMPL
+	CmiAssignOnce(&_roRdmaDoneHandlerIdx, CkRegisterHandler(_roRdmaDoneHandler));
+#endif
+
 	CmiAssignOnce(&_exitHandlerIdx, CkRegisterHandler(_exitHandler));
 	//added for interoperabilitY
 	CmiAssignOnce(&_libExitHandlerIdx, CkRegisterHandler(_libExitHandler));
@@ -1286,11 +1445,12 @@ void _initCharm(int unused_argc, char **argv)
     CkpvAccess(envelopeEventID) = 0;
 	CkMessageWatcherInit(argv,CkpvAccess(_coreState));
 	
-	// Set the ack handler function used for the direct nocopy api and the entry method nocopy api
+	// Set the ack handler function used for the direct nocopy api
 	CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
 
 #if CMK_ONESIDED_IMPL
-	CmiSetEMNcpyAckHandler(CkRdmaEMAckHandler);
+	// Set the ack handler function used for the entry method p2p api and entry method bcast api
+	initEMNcpyAckHandler();
 #endif
 	/**
 	  The rank-0 processor of each node calls the 
@@ -1352,6 +1512,7 @@ void _initCharm(int unused_argc, char **argv)
                   at least for strategies used in central/hybrid, because they will stop being chares.
                 */
 		_registerGreedyRefineLB();
+		_registerRandCentLB();
 #endif
 
 		/**
@@ -1431,9 +1592,6 @@ void _initCharm(int unused_argc, char **argv)
     }
 #endif
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    _messageLoggingInit();
-#endif
 
 #if CMK_FAULT_EVAC
 #ifndef __BIGSIM__
@@ -1451,9 +1609,6 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 	CpvAccess(serializer) = 0;
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
-    CcdCallOnCondition(CcdSIGUSR2,(CcdVoidFn)CkMlogRestart,0);
-#endif
 
 #if CMK_FAULT_EVAC
 	if(_raiseEvac){
@@ -1625,55 +1780,15 @@ void _initCharm(int unused_argc, char **argv)
       quietMode = 0;  // allow printing any mainchare user messages
 			_entryTable[_mainTable[i]->entryIdx]->call(msg, obj);
       if (quietModeRequested) quietMode = 1;
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-            CpvAccess(_currentObj) = (Chare *)obj;
-#endif
 		}
                 _mainDone = true;
 
 		_STATS_RECORD_CREATE_CHARE_N(nMains);
 		_STATS_RECORD_PROCESS_CHARE_N(nMains);
 
-
-
-
-		for(i=0;i<_readonlyMsgs.size();i++) /* Send out readonly messages */
-		{
-			void *roMsg = (void *) *((char **)(_readonlyMsgs[i]->pMsg));
-			if(roMsg==0)
-				continue;
-			//Pack the message and send it to all other processors
-			envelope *env = UsrToEnv(roMsg);
-			env->setSrcPe(CkMyPe());
-			env->setMsgtype(ROMsgMsg);
-			env->setRoIdx(i);
-			CmiSetHandler(env, _initHandlerIdx);
-			CkPackMessage(&env);
-			CmiSyncBroadcast(env->getTotalsize(), (char *)env);
-			CpvAccess(_qd)->create(CkNumPes()-1);
-
-			//For processor 0, unpack and re-set the global
-			CkUnpackMessage(&env);
-			_processROMsgMsg(env);
-			_numInitMsgs++;
+		if (!userDrivenMode) {
+			_sendReadonlies();
 		}
-
-		//Determine the size of the RODataMessage
-		PUP::sizer ps;
-		for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(ps);
-
-		//Allocate and fill out the RODataMessage
-		envelope *env = _allocEnv(RODataMsg, ps.size());
-		PUP::toMem pp((char *)EnvToUsr(env));
-		for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pp);
-
-		env->setCount(++_numInitMsgs);
-		env->setSrcPe(CkMyPe());
-		CmiSetHandler(env, _initHandlerIdx);
-		DEBUGF(("[%d,%.6lf] RODataMsg being sent of size %d \n",CmiMyPe(),CmiWallTimer(),env->getTotalsize()));
-		CmiSyncBroadcastAndFree(env->getTotalsize(), (char *)env);
-		CpvAccess(_qd)->create(CkNumPes()-1);
-		_initDone();
 	} else {
 		// check for thread oversubscription
 		CmiCheckAffinity();

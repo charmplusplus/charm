@@ -17,6 +17,7 @@
 #include "pcqueue.h"
 #include "assert.h"
 #include "malloc.h"
+#include <atomic>
 
 #if CMK_BLUEGENEQ
 #include <hwi/include/bqc/A2_inlines.h>
@@ -39,7 +40,7 @@ FILE *debugLog = NULL;
 
 #if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
 #include "PPCAtomicQueue.h"
-#include "memalloc.c"
+#include "memalloc.C"
 #endif
 
 #if CMK_SMP && CMK_PPC_ATOMIC_MUTEX
@@ -53,8 +54,11 @@ char *ALIGN_32(char *p) {
   return((char *)((((unsigned long)p)+0x1f) & (~0x1FUL)));
 }
 
-CMI_EXTERNC_VARIABLE int quietMode;
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietMode;
+extern int quietModeRequested;
+
+int               userDrivenMode; /* Set by CharmInit for interop in user driven mode */
+std::atomic<int> ckExitComplete {0};
 
 /*To reduce the buffer used in broadcast and distribute the load from
   broadcasting node, define CMK_BROADCAST_SPANNING_TREE enforce the use of
@@ -98,7 +102,6 @@ CMI_EXTERNC_VARIABLE int quietModeRequested;
 
 #if CMK_ERROR_CHECKING
 static int checksum_flag = 0;
-CMI_EXTERNC
 unsigned char computeCheckSum(unsigned char *data, int len);
 
 #define CMI_SET_CHECKSUM(msg, len)      \
@@ -169,7 +172,7 @@ CMK_THREADLOCAL int32_t _comm_thread_id = 0;
 
 void ConverseRunPE(int everReturn);
 static void CommunicationServer(int sleepTime);
-CMI_EXTERNC void CommunicationServerThread(int sleepTime);
+void CommunicationServerThread(int sleepTime);
 
 static void CmiNetworkBarrier(int async);
 static void CmiSendPeer (int rank, int size, char *msg);
@@ -177,12 +180,11 @@ static void CmiSendPeer (int rank, int size, char *msg);
 //So far we dont define any comm threads
 int Cmi_commthread = 0;
 
-CMI_EXTERNC
 void PerrorExit (const char *err);
 
-#include "machine-smp.c"
+#include "machine-smp.C"
 CsvDeclare(CmiNodeState, NodeState);
-#include "immediate.c"
+#include "immediate.C"
 
 #if CMK_ENABLE_ASYNC_PROGRESS  
 //Immediate messages not supported yet
@@ -332,11 +334,8 @@ static char     **Cmi_argvcopy;
 static CmiStartFn Cmi_startfn;   /* The start function */
 static int        Cmi_usrsched;  /* Continue after start function finishes? */
 
-CMI_EXTERNC
 void ConverseCommonInit(char **argv);
-CMI_EXTERNC
 void ConverseCommonExit(void);
-CMI_EXTERNC
 void CthInit(char **argv);
 
 static void SendMsgsUntil(int);
@@ -912,7 +911,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     ConverseRunPE(initret);
 }
 
-CMI_EXTERNC
 void PerrorExit (const char *err) {
   fprintf (stderr, "err\n\n");
     exit (-1);
@@ -1086,7 +1084,6 @@ void CmiAbort(const char * message) {
 }
 
 #if CMK_NODE_QUEUE_AVAILABLE
-CMI_EXTERNC
 char *CmiGetNonLocalNodeQ(void) {
     char *result = 0;
 
@@ -1203,7 +1200,6 @@ void  CmiGeneralFreeSend(int destPE, int size, char* msg) {
 
 pami_result_t machine_send_handoff (pami_context_t context, void *msg);
 
-CMI_EXTERNC
 void  machine_send       (pami_context_t      context,
 			  int                 node,
 			  int                 rank,
@@ -1634,7 +1630,7 @@ void          CmiReleaseCommHandle(CmiCommHandle handle) {
 
 #if ! CMK_MULTICAST_LIST_USE_COMMON_CODE
 
-void CmiSyncListSendFn(int npes, int *pes, int size, char *msg) {
+void CmiSyncListSendFn(int npes, const int *pes, int size, char *msg) {
     char *copymsg;
     copymsg = (char *)CmiAlloc(size);
     CmiMemcpy(copymsg,msg,size);
@@ -1650,7 +1646,7 @@ typedef struct ListMulticastVec_t {
 
 void machineFreeListSendFn(pami_context_t    context, 
 			   int               npes, 
-			   int             * pes, 
+			   const int       * pes,
 			   int               size, 
 			   char            * msg);
 
@@ -1662,7 +1658,7 @@ pami_result_t machineFreeList_handoff(pami_context_t context, void *cookie)
   return PAMI_SUCCESS;
 }
 
-void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
+void CmiFreeListSendFn(int npes, const int *pes, int size, char *msg) {
     //printf("%d: In Free List Send Fn imm %d\n", CmiMyPe(), CmiIsImmediate(msg));
 
     CMI_SET_BROADCAST_ROOT(msg,0);
@@ -1695,7 +1691,7 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
 #endif
 }
 
-void machineFreeListSendFn(pami_context_t my_context, int npes, int *pes, int size, char *msg) {
+void machineFreeListSendFn(pami_context_t my_context, int npes, const int *pes, int size, char *msg) {
     int i;
     char *copymsg;
 
@@ -1741,7 +1737,7 @@ void machineFreeListSendFn(pami_context_t my_context, int npes, int *pes, int si
     CmiFree(msg);
 }
 
-CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int size, char *msg) {
+CmiCommHandle CmiAsyncListSendFn(int npes, const int *pes, int size, char *msg) {
     CmiAbort("CmiAsyncListSendFn not implemented.");
     return (CmiCommHandle) 0;
 }
@@ -1874,49 +1870,37 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
 
-CMI_EXTERNC
 int CmiMyPe(void);
-CMI_EXTERNC
 int CmiMyRank(void);
-CMI_EXTERNC
 int CmiNodeFirst(int node);
-CMI_EXTERNC
 int CmiNodeSize(int node);
-CMI_EXTERNC
 int CmiNodeOf(int pe);
-CMI_EXTERNC
 int CmiRankOf(int pe);
 
-CMI_EXTERNC
 int CmiMyPe(void) {
     return CmiGetState()->pe;
 }
 
-CMI_EXTERNC
 int CmiMyRank(void) {
     return CmiGetState()->rank;
 }
 
-CMI_EXTERNC
 int CmiNodeFirst(int node) {
     return node*_Cmi_mynodesize;
 }
-CMI_EXTERNC
 int CmiNodeSize(int node)  {
     return _Cmi_mynodesize;
 }
 
-CMI_EXTERNC
 int CmiNodeOf(int pe)      {
     return (pe/_Cmi_mynodesize);
 }
-CMI_EXTERNC
 int CmiRankOf(int pe)      {
     return pe%_Cmi_mynodesize;
 }
 
 
-/* optional, these functions are implemented in "machine-smp.c", so including
+/* optional, these functions are implemented in "machine-smp.C", so including
    this file avoid the necessity to reimplement them.
  */
 void CmiNodeBarrier(void);

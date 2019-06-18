@@ -19,24 +19,23 @@ void hapiRegisterCallbacks();
 // Polls for GPU work completion. Does not do anything if HAPI_CUDA_CALLBACK is defined.
 void hapiPollEvents();
 
-#ifdef HAPI_MEMPOOL
-// data and metadata reside in same chunk of memory
-typedef struct _header {
-  struct _header *next;
+// BufferPool constructs for mempool implementation.
+// Data and metadata reside in same chunk of memory.
+typedef struct _bufferPoolHeader {
+  struct _bufferPoolHeader *next;
   int slot;
 #ifdef HAPI_MEMPOOL_DEBUG
   size_t size;
 #endif
-} Header;
+} BufferPoolHeader;
 
 typedef struct _bufferPool {
-  Header *head;
+  BufferPoolHeader *head;
   size_t size;
 #ifdef HAPI_MEMPOOL_DEBUG
   int num;
 #endif
 } BufferPool;
-#endif // HAPI_MEMPOOL
 
 #ifdef __cplusplus
 }

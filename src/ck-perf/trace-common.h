@@ -98,7 +98,7 @@ inline double TraceCpuTimer() { return TRACE_CPUTIMER() - CkpvAccess(traceInitCp
 inline double TraceCpuTimer(double t) { return t - CkpvAccess(traceInitCpuTime); }
 #endif
 
-extern "C" double TraceTimerCommon(); //TraceTimer to be used in common lrts layers
+double TraceTimerCommon(); //TraceTimer to be used in common lrts layers
 
 #define TRACE_WARN(msg) if (CkpvAccess(verbose)) CmiPrintf(msg)
 
@@ -117,14 +117,14 @@ extern int _sdagMsg, _sdagChare, _sdagEP;
 
 /** Write out the common parts of the .sts file. */
 extern void traceWriteSTS(FILE *stsfp,int nUserEvents);
-extern "C" void (*registerMachineUserEvents())();
+void (*registerMachineUserEvents())();
 
 #if CMK_HAS_COUNTER_PAPI
 #include <papi.h>
 #ifdef USE_SPP_PAPI
 #define NUMPAPIEVENTS 6
 #else
-#define NUMPAPIEVENTS 4
+#define NUMPAPIEVENTS 2
 #endif
 CkpvExtern(int, papiEventSet);
 CkpvExtern(LONG_LONG_PAPI*, papiValues);

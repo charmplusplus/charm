@@ -285,7 +285,7 @@ MulticastAgent::MulticastAgent(BaseLB::LDStats* stats, int p): Agent(p)
       // stores all objects that belong to this multicast
     minfo.objs.push_back(sender);
     int nobjs;
-    LDObjKey *objs = commData.receiver.get_destObjs(nobjs);
+    const LDObjKey *objs = commData.receiver.get_destObjs(nobjs);
     for (int i=0; i<nobjs; i++) {
        int receiver = stats->getHash(objs[i]);
        if((sender == -1)||(receiver == -1)) {

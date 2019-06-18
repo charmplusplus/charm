@@ -4,12 +4,12 @@
  * \ingroup Converse
 
  The machine layer of Converse consist of few common files to all architectures, shown in this module, which are:
- - immediate.c
- - machine-smp.c
+ - immediate.C
+ - machine-smp.C
  - machine-smp.h
  - machine.h
  - pcqueue.h
- - persist-comm.c
+ - persist-comm.C
  - persist_impl.h
 
  These files describe the common characteristics of all implementations, and provide converse, and every language built on top of it the same functional interface in all machines, however different they are.

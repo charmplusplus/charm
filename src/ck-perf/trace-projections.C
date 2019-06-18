@@ -127,8 +127,7 @@ struct TraceThreadListener {
   CmiObjId idx;
 };
 
-extern "C"
-void traceThreadListener_suspend(struct CthThreadListener *l)
+static void traceThreadListener_suspend(struct CthThreadListener *l)
 {
   TraceThreadListener *a=(TraceThreadListener *)l;
   /* here, we activate the appropriate trace codes for the appropriate
@@ -136,8 +135,7 @@ void traceThreadListener_suspend(struct CthThreadListener *l)
   traceSuspend();
 }
 
-extern "C"
-void traceThreadListener_resume(struct CthThreadListener *l) 
+static void traceThreadListener_resume(struct CthThreadListener *l)
 {
   TraceThreadListener *a=(TraceThreadListener *)l;
   /* here, we activate the appropriate trace codes for the appropriate
@@ -149,8 +147,7 @@ void traceThreadListener_resume(struct CthThreadListener *l)
   a->ml=0;
 }
 
-extern "C"
-void traceThreadListener_free(struct CthThreadListener *l) 
+static void traceThreadListener_free(struct CthThreadListener *l)
 {
   TraceThreadListener *a=(TraceThreadListener *)l;
   delete a;
@@ -789,7 +786,7 @@ void LogPool::addUserSuppliedBracketedNote(char *note, int eventID, double bt, d
 */
 void LogPool::addCreationMulticast(UShort mIdx, UShort eIdx, double time,
 				   int event, int pe, int ml, CmiObjId *id,
-				   double recvT, int numPe, int *pelist)
+				   double recvT, int numPe, const int *pelist)
 {
   lastCreationEvent = numEntries;
   new (&pool[numEntries++])
@@ -1419,7 +1416,7 @@ void TraceProjections::traceSetMsgID(char *msg, int pe, int event)
 */
 
 void TraceProjections::creationMulticast(envelope *e, int ep, int num,
-					 int *pelist)
+					 const int *pelist)
 {
 #if CMK_TRACE_ENABLED
   double curTime = TraceTimer();
@@ -1830,8 +1827,7 @@ void registerOutlierReduction() {
  * done.
  *
  */
-// FIXME: WHY extern "C"???
-extern "C" void TraceProjectionsExitHandler()
+static void TraceProjectionsExitHandler()
 {
 #if CMK_TRACE_ENABLED
 #if DEBUG_KMEANS

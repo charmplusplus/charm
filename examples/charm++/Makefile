@@ -1,5 +1,6 @@
 DIRS = \
   allToAll \
+  array_map \
   ckcallback \
   cksequence \
   completion \
@@ -18,7 +19,6 @@ DIRS = \
   load_balancing \
   manyToMany \
   matmul \
-  mpi-coexist \
   namespace \
   piArray \
   PUP \
@@ -30,6 +30,7 @@ DIRS = \
   sync_square \
   threaded_ring \
   TRAM \
+  user-driven-interop \
   zerocopy \
 
 BGDIRS = \

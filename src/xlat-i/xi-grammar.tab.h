@@ -82,42 +82,43 @@ extern int yydebug;
     VOID = 292,
     CONST = 293,
     NOCOPY = 294,
-    PACKED = 295,
-    VARSIZE = 296,
-    ENTRY = 297,
-    FOR = 298,
-    FORALL = 299,
-    WHILE = 300,
-    WHEN = 301,
-    OVERLAP = 302,
-    SERIAL = 303,
-    IF = 304,
-    ELSE = 305,
-    PYTHON = 306,
-    LOCAL = 307,
-    NAMESPACE = 308,
-    USING = 309,
-    IDENT = 310,
-    NUMBER = 311,
-    LITERAL = 312,
-    CPROGRAM = 313,
-    HASHIF = 314,
-    HASHIFDEF = 315,
-    INT = 316,
-    LONG = 317,
-    SHORT = 318,
-    CHAR = 319,
-    FLOAT = 320,
-    DOUBLE = 321,
-    UNSIGNED = 322,
-    ACCEL = 323,
-    READWRITE = 324,
-    WRITEONLY = 325,
-    ACCELBLOCK = 326,
-    MEMCRITICAL = 327,
-    REDUCTIONTARGET = 328,
-    CASE = 329,
-    TYPENAME = 330
+    NOCOPYPOST = 295,
+    PACKED = 296,
+    VARSIZE = 297,
+    ENTRY = 298,
+    FOR = 299,
+    FORALL = 300,
+    WHILE = 301,
+    WHEN = 302,
+    OVERLAP = 303,
+    SERIAL = 304,
+    IF = 305,
+    ELSE = 306,
+    PYTHON = 307,
+    LOCAL = 308,
+    NAMESPACE = 309,
+    USING = 310,
+    IDENT = 311,
+    NUMBER = 312,
+    LITERAL = 313,
+    CPROGRAM = 314,
+    HASHIF = 315,
+    HASHIFDEF = 316,
+    INT = 317,
+    LONG = 318,
+    SHORT = 319,
+    CHAR = 320,
+    FLOAT = 321,
+    DOUBLE = 322,
+    UNSIGNED = 323,
+    ACCEL = 324,
+    READWRITE = 325,
+    WRITEONLY = 326,
+    ACCELBLOCK = 327,
+    MEMCRITICAL = 328,
+    REDUCTIONTARGET = 329,
+    CASE = 330,
+    TYPENAME = 331
   };
 #endif
 /* Tokens.  */
@@ -158,49 +159,50 @@ extern int yydebug;
 #define VOID 292
 #define CONST 293
 #define NOCOPY 294
-#define PACKED 295
-#define VARSIZE 296
-#define ENTRY 297
-#define FOR 298
-#define FORALL 299
-#define WHILE 300
-#define WHEN 301
-#define OVERLAP 302
-#define SERIAL 303
-#define IF 304
-#define ELSE 305
-#define PYTHON 306
-#define LOCAL 307
-#define NAMESPACE 308
-#define USING 309
-#define IDENT 310
-#define NUMBER 311
-#define LITERAL 312
-#define CPROGRAM 313
-#define HASHIF 314
-#define HASHIFDEF 315
-#define INT 316
-#define LONG 317
-#define SHORT 318
-#define CHAR 319
-#define FLOAT 320
-#define DOUBLE 321
-#define UNSIGNED 322
-#define ACCEL 323
-#define READWRITE 324
-#define WRITEONLY 325
-#define ACCELBLOCK 326
-#define MEMCRITICAL 327
-#define REDUCTIONTARGET 328
-#define CASE 329
-#define TYPENAME 330
+#define NOCOPYPOST 295
+#define PACKED 296
+#define VARSIZE 297
+#define ENTRY 298
+#define FOR 299
+#define FORALL 300
+#define WHILE 301
+#define WHEN 302
+#define OVERLAP 303
+#define SERIAL 304
+#define IF 305
+#define ELSE 306
+#define PYTHON 307
+#define LOCAL 308
+#define NAMESPACE 309
+#define USING 310
+#define IDENT 311
+#define NUMBER 312
+#define LITERAL 313
+#define CPROGRAM 314
+#define HASHIF 315
+#define HASHIFDEF 316
+#define INT 317
+#define LONG 318
+#define SHORT 319
+#define CHAR 320
+#define FLOAT 321
+#define DOUBLE 322
+#define UNSIGNED 323
+#define ACCEL 324
+#define READWRITE 325
+#define WRITEONLY 326
+#define ACCELBLOCK 327
+#define MEMCRITICAL 328
+#define REDUCTIONTARGET 329
+#define CASE 330
+#define TYPENAME 331
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 
 union YYSTYPE
 {
-#line 53 "xi-grammar.y" /* yacc.c:1915  */
+#line 53 "xi-grammar.y" /* yacc.c:1909  */
 
   AstChildren<Module> *modlist;
   Module *module;
@@ -244,7 +246,7 @@ union YYSTYPE
   XStr* xstrptr;
   AccelBlock* accelBlock;
 
-#line 248 "y.tab.h" /* yacc.c:1915  */
+#line 250 "y.tab.h" /* yacc.c:1909  */
 };
 
 typedef union YYSTYPE YYSTYPE;

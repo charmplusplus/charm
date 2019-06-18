@@ -1,6 +1,6 @@
-==================
-Projections Manual
-==================
+===========
+Projections
+===========
 
 .. contents::
    :depth: 3
@@ -356,7 +356,7 @@ The calls for recording user events are the following:
 
    Eg.
 
-   ::
+   .. code-block:: c++
 
          traceRegisterUserEvent("Critical Code", 20); // on PE 0
          double critStart = CmiWallTimer();  // start time
@@ -481,7 +481,7 @@ Starting Up
 ~~~~~~~~~~~
 
 | From any location, type:
-| ``> PROJECTIONS_LOCATION/bin/projections [NAME.sts]``
+| ``$ PROJECTIONS_LOCATION/bin/projections [NAME.sts]``
 | where ``PROJECTIONS_LOCATION`` is the path to the main projections
   directory.
 
