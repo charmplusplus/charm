@@ -361,11 +361,11 @@ void invokeDestinationCallback(NcpyOperationInfo *info) {
 
 void handleDirectApiCompletion(NcpyOperationInfo *info) {
 
-    int freeMe = info->freeMe;
+  int freeMe = info->freeMe;
 
-    if(CmiMyNode() == CmiNodeOf(info->destPe)) {
+  if(CmiMyNode() == CmiNodeOf(info->destPe)) {
 #if CMK_REG_REQUIRED
-    if(info->destDeregMode == CK_BUFFER_DEREG)
+    if(info->isDestRegistered == 1 && info->destDeregMode == CK_BUFFER_DEREG)
       deregisterDestBuffer(info);
 #endif
 
@@ -385,7 +385,7 @@ void handleDirectApiCompletion(NcpyOperationInfo *info) {
 
   if(CmiMyNode() == CmiNodeOf(info->srcPe)) {
 #if CMK_REG_REQUIRED
-    if(info->srcDeregMode == CK_BUFFER_DEREG)
+    if(info->isSrcRegistered == 1 && info->srcDeregMode == CK_BUFFER_DEREG)
       deregisterSrcBuffer(info);
 #endif
 
