@@ -1391,15 +1391,16 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 
 #if CMK_ONESIDED_IMPL
   // Store source information to handle acknowledgements on completion
-  if(CMI_IS_ZC(env))
+  if (CMI_IS_ZC(env)) {
     CkRdmaPrepareZCMsg(env, CkNodeOf(pe));
+  }
 #endif
 
 #if CMK_FAULT_EVAC
-  if(pe == CkMyPe() ){
-    if(!CmiNodeAlive(CkMyPe())){
-	printf("[%d] Invalid processor sending itself a message \n",CkMyPe());
-//	return;
+  if (pe == CkMyPe()) {
+    if (!CmiNodeAlive(CkMyPe())) {
+      printf("[%d] Invalid processor sending itself a message \n",CkMyPe());
+      //return;
     }
   }
 #endif
@@ -1411,15 +1412,18 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
     }
     else
 #endif
-    CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
-  	env, env->getQueueing(),env->getPriobits(),
-  	(unsigned int *)env->getPrioPtr());
+    {
+      CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
+          env, env->getQueueing(),env->getPriobits(),
+          (unsigned int *)env->getPrioPtr());
+    }
 #if CMK_PERSISTENT_COMM
     CmiPersistentOneSend();
 #endif
   } else {
-    if (pe < 0 || CmiNodeOf(pe) != CmiMyNode())
+    if (pe < 0 || CmiNodeOf(pe) != CmiMyNode()) {
       CkPackMessage(&env);
+    }
     int len=env->getTotalsize();
     CmiSetXHandler(env,CmiGetHandler(env));
 #if CMK_OBJECT_QUEUE_AVAILABLE
@@ -1429,17 +1433,12 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 #endif
     CmiSetInfo(env,infoFn);
     if (pe==CLD_BROADCAST) {
- 			CmiSyncBroadcastAndFree(len, (char *)env); 
-
-}
-    else if (pe==CLD_BROADCAST_ALL) { 
-                        CmiSyncBroadcastAllAndFree(len, (char *)env);
-
-}
-    else{
-                        CmiSyncSendAndFree(pe, len, (char *)env);
-
-		}
+      CmiSyncBroadcastAndFree(len, (char *)env);
+    } else if (pe==CLD_BROADCAST_ALL) {
+      CmiSyncBroadcastAllAndFree(len, (char *)env);
+    } else {
+      CmiSyncSendAndFree(pe, len, (char *)env);
+    }
   }
 }
 
