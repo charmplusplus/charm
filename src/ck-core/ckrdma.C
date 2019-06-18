@@ -110,9 +110,11 @@ CkNcpyStatus CkNcpyBuffer::get(CkNcpyBuffer &source){
     //Invoke the source callback
     source.cb.send(sizeof(CkNcpyBuffer), &source);
 
+#if CMK_REG_REQUIRED
     // De-register destination
     if(isRegistered && deregMode == CMK_BUFFER_DEREG)
       deregisterBuffer(*this);
+#endif
 
     //Invoke the destination callback
     cb.send(sizeof(CkNcpyBuffer), this);
@@ -145,7 +147,7 @@ CkNcpyStatus CkNcpyBuffer::get(CkNcpyBuffer &source){
     // rdma data transfer complete
     return CkNcpyStatus::complete;
 
-#endif
+#endif // end of CMK_USE_CMA
   } else if (transferMode == CkNcpyMode::RDMA) {
 
     zcQdIncrement();
