@@ -78,7 +78,7 @@
 /* This is required to define LrtsLock/LrtsUnlock */
 #define CMK_USE_COMMON_LOCK                                1
 
-#define CMK_ONESIDED_IMPL                                  0
+#define CMK_ONESIDED_IMPL                                  1
 
 /* Should be enough to fit UCP memh + rkey */
 #define CMK_NOCOPY_DIRECT_BYTES                            256
