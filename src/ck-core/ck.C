@@ -483,6 +483,7 @@ void *CkLocalBranch(CkGroupID gID) {
 void *CkLocalBranchOther(CkGroupID gID, int rank) {
   return _localBranchOther(gID, rank);
 }
+static inline void _processBocBcastMsg(CkCoreState* ck, envelope* env);
 
 static
 void *_ckLocalNodeBranch(CkGroupID groupID) {
@@ -1254,6 +1255,10 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
       _processForNodeBocMsg(ck,env);
       // stats record moved to _processForNodeBocMsg because it is conditional
       break;
+    case BocBcastMsg : // Broadcast that needs to be forwarded
+      if (env->isPacked()) CkUnpackMessage(&env);
+      _processBocBcastMsg(ck,env);
+      break;
 
 // Array support
     case ForArrayEltMsg: // Array element entry method message
@@ -1433,9 +1438,9 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 #endif
     CmiSetInfo(env,infoFn);
     if (pe==CLD_BROADCAST) {
-      CmiSyncBroadcastAndFree(len, (char *)env);
+      CmiSyncNodeBroadcastAndFree(len, (char *)env);
     } else if (pe==CLD_BROADCAST_ALL) {
-      CmiSyncBroadcastAllAndFree(len, (char *)env);
+      CmiSyncNodeBroadcastAllAndFree(len, (char *)env);
     } else {
       CmiSyncSendAndFree(pe, len, (char *)env);
     }
@@ -1482,8 +1487,8 @@ static void _noCldEnqueue(int pe, envelope *env)
 
   CkPackMessage(&env);
   int len=env->getTotalsize();
-  if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, (char *)env); }
-  else if (pe==CLD_BROADCAST_ALL) { CmiSyncBroadcastAllAndFree(len, (char *)env); }
+  if (pe==CLD_BROADCAST) { CmiSyncNodeBroadcastAndFree(len, (char *)env); }
+  else if (pe==CLD_BROADCAST_ALL) { CmiSyncNodeBroadcastAllAndFree(len, (char *)env); }
   else CmiSyncSendAndFree(pe, len, (char *)env);
 }
 
@@ -1704,7 +1709,11 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
         env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
     }else
     {
-        env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+        if (pe == CLD_BROADCAST || pe == CLD_BROADCAST_ALL) {
+          env = _prepareMsgBranch(eIdx,msg,gID,BocBcastMsg);
+        } else {
+          env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+        }
     }
 
   _TRACE_ONLY(numPes = (pe==CLD_BROADCAST_ALL?CkNumPes():1));
@@ -1722,6 +1731,11 @@ static inline void _sendMsgBranchWithinNode(int eIdx, void *msg, CkGroupID gID)
   _TRACE_CREATION_N(env, CmiMyNodeSize());
   _CldEnqueueWithinNode(env, _infoIdx);
   _TRACE_CREATION_DONE(1);  // since it only creates one creation event.
+}
+
+static inline void _processBocBcastMsg(CkCoreState* ck, envelope* env) {
+  _SET_USED(env, 0);
+  _sendMsgBranchWithinNode(env->getEpIdx(), EnvToUsr(env), env->getGroupNum());
 }
 
 static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID,
