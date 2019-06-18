@@ -214,9 +214,6 @@ public:
 #if CMK_SMP && CMK_TASKQUEUE
 #include "conv-taskQ.h"
 #endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-class ChareMlogData;
-#endif
 
 #define CHARE_MAGIC    0x201201
 
@@ -236,9 +233,6 @@ class Chare {
 #endif
 #ifndef CMK_CHARE_USE_PTR
     int chareIdx;                  // index in the chare obj table (chare_objs)
-#endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    ChareMlogData *mlogData;
 #endif
     Chare(CkMigrateMessage *m);
     Chare();
@@ -1220,12 +1214,6 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #endif
 
 
-#if defined(_FAULT_MLOG_) 
-#include "ckmessagelogging.h"
-#endif
-#if defined(_FAULT_CAUSAL_)
-#include "ckcausalmlog.h"
-#endif
 
 #include "ckmemcheckpoint.h"
 #include "readonly.h"
