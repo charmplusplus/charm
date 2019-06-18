@@ -857,7 +857,7 @@ int* inProgress;
   if(!inProgress[CmiMyRank()]) { \
     CmiCommUnlock(); \
   }
-   
+
 #define LOCK_AND_SET() \
     if(!inProgress[CmiMyRank()]) { \
       CmiCommLock(); \
@@ -1775,6 +1775,7 @@ void LrtsAdvanceCommunication(int whileidle)
 
 /* happen at node level */
 /* must be called on every PE including communication processors */
+static int acqLock=0;   
 void LrtsBarrier(void)
 {
   int numnodes = CmiNumNodesGlobal();
@@ -1787,9 +1788,11 @@ void LrtsBarrier(void)
 
   ctrl_sendone_locking("barrier",NULL,0,NULL,0);
   while (barrierReceived != 1) {
-    LOCK_IF_AVAILABLE();
+    //    LOCK_IF_AVAILABLE();
+    LOCK_AND_SET();
     ctrl_getone();
-    UNLOCK_IF_AVAILABLE();
+    UNLOCK_AND_UNSET();
+    //    UNLOCK_IF_AVAILABLE();
   }
   barrierReceived = 0;
   barrier_phase ++;
@@ -1813,9 +1816,9 @@ int CmiBarrierZero(void)
     ctrl_sendone_locking("barrier0",str,strlen(str)+1,NULL,0);
     if (CmiMyNodeGlobal() == 0) {
       while (barrierReceived != 2) {
-        LOCK_IF_AVAILABLE();
-        ctrl_getone();
-        UNLOCK_IF_AVAILABLE();
+	LOCK_AND_SET();
+	ctrl_getone();
+	UNLOCK_AND_UNSET();
       }
       barrierReceived = 0;
     }
