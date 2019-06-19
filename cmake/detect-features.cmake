@@ -41,7 +41,7 @@ check_include_file(ctype.h HAVE_CTYPE_H)
 check_include_file(cuda.h HAVE_CUDA_H)
 check_include_file(dirent.h HAVE_DIRENT_H)
 check_include_file(dlfcn.h HAVE_DLFCN_H)
-check_include_file(elf.h HAS_ELF_H)
+check_include_file(elf.h CMK_HAS_ELF_H)
 check_include_file(inttypes.h HAVE_INTTYPES_H)
 check_include_file(kstat.h HAVE_KSTAT_H)
 check_include_file(libudev.h HAVE_LIBUDEV_H)
@@ -398,7 +398,7 @@ public:
   void operator delete(void*p,int*){};
 };
 int main() {}
-" CMK_MULTIPLE_DELETE )
+" CMK_MULTIPLE_DELETE)
 
 file(READ ${CMAKE_SOURCE_DIR}/src/util/ckdll_system.C ckdll_system)
 check_cxx_source_compiles("${ckdll_system}\n int main(){}" CMK_SIGSAFE_SYSTEM)
@@ -406,31 +406,25 @@ check_cxx_source_compiles("${ckdll_system}\n int main(){}" CMK_SIGSAFE_SYSTEM)
 file(READ ${CMAKE_SOURCE_DIR}/src/util/ckdll_win32.C ckdll_win32)
 check_cxx_source_compiles("${ckdll_win32}\n int main(){}" CMK_DLL_USE_WIN32)
 
-check_c_source_compiles("
-#include <elf.h>
-#include <stdlib.h>
-#include <malloc.h>
-int main() {
-  Elf64_Addr m1, m2;
-  asm volatile (\"movq %%fs:0x0, %0\n\t\"
-                \"movq %1, %%fs:0x0\n\t\"
-                : \"=r\"(m1)
-                : \"r\"(m2));
+check_c_source_compiles([=[
+void main() {
+  void * m1, * m2;
+  asm volatile ("movq %%fs:0x0, %0\\n\t"
+                "movq %1, %%fs:0x0\\n\t"
+                : "=&r"(m1)
+                : "r"(m2));
 }
-" CMK_TLS_SWITCHING64)
+]=] CMK_TLS_SWITCHING_X86_64)
 
-check_c_source_compiles("
-#include <elf.h>
-#include <stdlib.h>
-#include <malloc.h>
-int main() {
-  Elf32_Addr m1, m2;
-  asm volatile (\"movl %%gs:0x0, %0\n\t\"
-                \"movl %1, %%gs:0x0\n\t\"
-                : \"=r\"(m1)
-                : \"r\"(m2));
+check_c_source_compiles([=[
+void main() {
+  void * m1, * m2;
+  asm volatile ("movl %%gs:0x0, %0\\n\t"
+                "movl %1, %%gs:0x0\\n\t"
+                : "=&r"(m1)
+                : "r"(m2));
 }
-" CMK_TLS_SWITCHING32)
+]=] CMK_TLS_SWITCHING_X86)
 
 
 check_c_source_compiles("
