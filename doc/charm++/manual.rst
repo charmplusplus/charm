@@ -4459,60 +4459,65 @@ mainly due to additional small messages required for sending the
 metadata message and the acknowledgment message on completion.
 
 For within process data-transfers, this API uses regular memcpy to
-achieve zerocopy semantics. Similarly, on CMA-enabled machines, in a few
+achieve zero copy semantics. Similarly, on CMA-enabled machines, in a few
 cases, this API takes advantage of CMA to perform inter-process
 intra-physical host data transfers. This API is also functional on
 non-RDMA enabled networks like regular ethernet, except that it does not
 avoid copies and behaves like a regular Charm++ entry method invocation.
 
-There are two APIs that provide Zero copy semantics in Charm++:
+There are three APIs that provide zero copy semantics in Charm++:
 
 -  Zero Copy Direct API
 
 -  Zero Copy Entry Method Send API
 
+-  Zero Copy Entry Method Post API
+
 Zero Copy Direct API
 ^^^^^^^^^^^^^^^^^^^^
 
-The Zero copy Direct API allows users to explicitly invoke a standard
+The Zero Copy Direct API allows users to explicitly invoke a standard
 set of methods on predefined buffer information objects to avoid copies.
 Unlike the Entry Method API which calls the zero copy operation for
 every zero copy entry method invocation, the direct API provides a more
 flexible interface by allowing the user to exploit the persistent nature
 of iterative applications to perform zero copy operations using the same
 buffer information objects across iteration boundaries. It is also more
-beneficial than the Zero copy entry method API because unlike the entry
-method API, which avoids just the sender side copy, the Zero copy Direct
+beneficial than the Zero Copy Entry Method Send API because unlike the entry
+method Send API, which avoids just the sender side copy, the Zero Copy Direct
 API avoids both sender and receiver side copies.
 
-To send an array using the zero copy Direct API, define a CkNcpyBuffer
+To send an array using the Zero Copy Direct API, define a CkNcpyBuffer
 object on the sender chare specifying the pointer, size, a CkCallback
-object and an optional mode parameter.
+object and optional reg-mode and dereg-mode parameters.
 
 .. code-block:: c++
 
    CkCallback srcCb(CkIndex_Ping1::sourceDone, thisProxy[thisIndex]);
    // CkNcpyBuffer object representing the source buffer
-   CkNcpyBuffer source(arr1, arr1Size * sizeof(int), srcCb, CK_BUFFER_REG);
+   CkNcpyBuffer source(arr1, arr1Size * sizeof(int), srcCb);
+   // ^ is equivalent to CkNcpyBuffer source(arr1, arr1Size * sizeof(int), srcCb, CK_BUFFER_REG, CK_BUFFER_DEREG);
 
 When used inside a CkNcpyBuffer object that represents the source buffer
 information, the callback is specified to notify about the safety of
 reusing the buffer and indicates that the get or put call has been
-completed. In those cases where the application can determine safety of
+completed. In those cases where the application can determine the safety of
 reusing the buffer through other synchronization mechanisms, the
 callback is not entirely useful and in such cases,
 ``CkCallback::ignore`` can be passed as the callback parameter. The
-optional mode operator is used to determine the network registration
-mode for the buffer. It is only relevant on networks requiring explicit
-memory registration for performing RDMA operations. These networks
-include GNI, OFI, UCX and Verbs. When the mode is not specified by the user,
-the default mode is considered to be ``CK_BUFFER_REG``
+optional reg-mode and dereg-mode parameters are used to determine the network
+registration mode and de-registration mode for the buffer. They are only relevant on
+networks requiring explicit memory registration for performing RDMA operations.
+These networks include GNI, OFI, UCX and Verbs. When the reg-mode is not specified by the user,
+the default reg-mode is considered to be ``CK_BUFFER_REG`` and similarly, when the
+dereg-mode is not specified by the user, the default dereg-mode is considered to be
+``CK_BUFFER_DEREG``.
 
-Similarly, to receive an array using the Zero copy Direct API, define
+Similarly, to receive an array using the Zero Copy Direct API, define
 another CkNcpyBuffer object on the receiver chare object specifying the
-pointer, the size, a CkCallback object and an optional mode parameter.
-When used inside a CkNcpyBuffer object that represents the destination
-buffer, the callback is specified to notify the completion of data
+pointer, the size, a CkCallback object and the optional reg-mode and dereg-mode
+parameters. When used inside a CkNcpyBuffer object that represents the
+destination buffer, the callback is specified to notify the completion of data
 transfer into the CkNcpyBuffer buffer. In those cases where the
 application can determine data transfer completion through other
 synchronization mechanisms, the callback is not entirely useful and in
@@ -4523,7 +4528,8 @@ parameter.
 
    CkCallback destCb(CkIndex_Ping1::destinationDone, thisProxy[thisIndex]);
    // CkNcpyBuffer object representing the destination buffer
-   CkNcpyBuffer dest(arr2, arr2Size * sizeof(int), destCb, CK_BUFFER_REG);
+   CkNcpyBuffer dest(arr2, arr2Size * sizeof(int), destCb);
+   // is equivalent to CkNcpyBuffer dest(arr2, arr2Size * sizeof(int), destCb, CK_BUFFER_REG, CK_BUFFER_DEREG);
 
 Once the source CkNcpyBuffer and destination CkNcpyBuffer objects have
 been defined on the sender and receiver chares, to perform a get
@@ -4554,7 +4560,7 @@ into the local destination buffer.
 Similarly, a receiver’s destination CkNcpyBuffer object can be sent to
 the sender for the sender to perform a put on its source object by
 passing the source CkNcpyBuffer object as an argument to the runtime
-defined put method as shown in in the code snippet.
+defined put method as shown in the code snippet.
 
 .. code-block:: c++
 
@@ -4616,6 +4622,8 @@ method by casting the ``data`` field of the ``CkDataMsg`` object into a
 
        // access buffer pointer and free it
        free(source->ptr);
+
+       delete msg;
    }
 
 The following code snippet illustrates the usage of the ``setRef``
@@ -4646,6 +4654,8 @@ code snippet.
 
        // get reference pointer
        const void *refPtr = src->ref;
+
+       delete msg;
    }
 
 The usage of ``CkDataMsg`` and ``setRef`` in order to access the
@@ -4700,11 +4710,11 @@ pattern of using the same objects across iterations is demonstrated in
 
 This API is demonstrated in ``examples/charm++/zerocopy/direct_api``
 
-Memory Registration and Modes of Operation
+Memory Registration and Registration Modes
 ''''''''''''''''''''''''''''''''''''''''''
 
-There are four modes of operation for the Zero Copy Direct API. These
-modes act as control switches on networks that require memory
+There are four modes of memory registration for the Zero Copy API. These
+registration modes act as control switches on networks that require memory
 registration like GNI, OFI, UCX and Verbs, in order to perform RDMA
 operations . They dictate the functioning of the API providing flexible
 options based on user requirement. On other networks, where network
@@ -4768,18 +4778,51 @@ actual networking or registration information. It cannot be used for
 performing any zerocopy operations. This mode was added as it was useful
 for implementing a runtime system feature.
 
-Memory De-registration
-''''''''''''''''''''''
+Memory De-registration and De-registration Modes
+''''''''''''''''''''''''''''''''''''''''''''''''''
 
-Similar to memory registration, there is a method available to
-de-register memory after the completion of the operations. This allows
-for other buffers to use the registered memory as machines/networks are
-limited by the maximum amount of registered or pinned memory. Registered
-memory can be de-registered by calling the ``deregisterMem()`` method on
-the CkNcpyBuffer object.
+On network layers that require explicit memory registration, it is
+important to de-register the registered memory. Since networks are limited
+by the maximum registered or pinned memory, not de-registering pinned memory can
+lead to a pinned memory leak, which could potentially reduce application performance
+because it limits the amount of pinned memory available to the process.
 
-Other Methods
-'''''''''''''
+Similar to memory registration modes, the ZC API also provides two de-registration modes.
+
+``CK_BUFFER_DEREG``:
+
+
+``CK_BUFFER_DEREG`` is the default mode that is used when no dereg-mode is
+specified. This mode signals to the RTS that all the memory registered by the ``CkNcpyBuffer``
+object should be de-registered by the RTS. Hence, when ``CK_BUFFER_DEREG`` is specified by the user,
+it is the runtime system's responsibility to de-register the buffer registered by the ``CkNcpyBuffer``
+object. This dereg-mode is used when the user is not likely to reuse the buffer and wants the
+de-registration responsibility transferred to the RTS.
+
+``CK_BUFFER_NODEREG``:
+
+This mode is specified when the user doesn't want the RTS to de-register the buffer after the
+completion of the zero copy operation. It is beneficial when the user wants to reuse the same buffer
+(and reuse the ``CkNcpyBuffer`` object) by avoiding the cost of de-registration and registration.
+
+
+
+Important Methods
+''''''''''''''''''
+
+The Zero Copy API provides important methods that offer utilities that
+can be used by the user.
+
+The ``deregisterMem`` method is used by the user to de-register memory after
+the completion of the zero copy operations. This allows for other buffers to use the
+registered memory as machines/networks are limited by the maximum amount of
+registered or pinned memory. Registered memory can be de-registered by calling
+the ``deregisterMem()`` method on the CkNcpyBuffer object.
+
+.. code-block:: c++
+
+   // de-register previously registered buffer
+   dest.registerMem();
 
 In addition to ``deregisterMem()``, there are other methods in a
 CkNcpyBuffer object that offer other utilities. The
@@ -4811,29 +4854,56 @@ registration memory handles and will not incur any registration costs.
    // register previously de-registered buffer
    src.registerMem();
 
+It should be noted that the Zero Copy Direct API is optimized only for
+point to point communication. Although it can be used for use cases where a
+single buffer needs to be broadcasted to multiple recipients, it is very likely
+that the API will currently perform suboptimally. This is primarily
+because of the implementation which assumes point to point communication for the
+Zero Copy Direct API. Having the same source buffer information (CkNcpyBuffer)
+being passed to a large number of processes, with each process performing a get call
+from the same source process will cause network congestion at the source process by
+slowing down each get operation because of competing get calls.
+
+We are currently working on optimizing the Zero Copy Direct API for broadcast operations.
+Currently, the Zero Copy Entry Method Send API and the Zero Copy Entry Method Post API
+handle optimized broadcast operations by using a spanning tree as explained in the following
+sections.
+
 Zero Copy Entry Method Send API
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The Zero copy Entry Method Send API only allows the user to only avoid
-the sender side copy without avoiding the receiver side copy. It
-offloads the user from the responsibility of making additional calls to
+The Zero Copy Entry Method Send API allows the user to only avoid
+the sender side copy. On the receiver side, the buffer is allocated by the
+runtime system and a pointer to the Readonly buffer is provided to the user
+as an entry method parameter.
+For a broadcast operation, there is only one buffer allocated by the
+runtime system for each recipient process and a pointer to the same buffer is passed
+to all the recipient objects on that process (or logical node).
+
+This API offloads the user from the responsibility of making additional calls to
 support zero copy semantics. It extends the capability of the existing
 entry methods with slight modifications in order to send large buffers
 without a copy.
 
-To send an array using the zero copy message send API, specify the array
+To send an array using the Zero Copy Message Send API, specify the array
 parameter in the .ci file with the nocopy specifier.
 
 .. code-block:: charmci
 
+   // same .ci specification is used for p2p and bcast operations
    entry void foo (int size, nocopy int arr[size]);
 
 While calling the entry method from the .C file, wrap the array i.e the
-pointer in a CkSendBuffer wrapper.
+pointer in a CkSendBuffer wrapper. The CkSendBuffer wrapper is essentially
+a method that constructs a CkNcpyBuffer around the passed pointer.
 
 .. code-block:: c++
 
+   // for point to point send
    arrayProxy[0].foo(500000, CkSendBuffer(arrPtr));
+
+   // for readonly broadcast send
+   arrayProxy.foo(500000, CkSendBuffer(arrPtr));
 
 Until the RDMA operation is completed, it is not safe to modify the
 buffer. To be notified on completion of the RDMA operation, pass an
@@ -4842,24 +4912,129 @@ specific nocopy array.
 
 .. code-block:: c++
 
-   CkCallback cb(CkIndex_Foo::zerocopySent(NULL), thisProxy[thisIndex]);
-   arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb));
+   CkCallback cb(CkIndex_Foo::zerocopySent(), thisProxy[thisIndex]);
 
-The callback will be invoked on completion of the RDMA operation
-associated with the corresponding array. Inside the callback, it is safe
-to overwrite the buffer sent via the zero copy entry method send API and
-this buffer can be accessed by dereferencing the CkDataMsg received in
-the callback.
+   // for point to point send
+   arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1));
+
+   // for readonly broadcast send
+   arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1));
+
+The CkSendBuffer wrapper also allows users to specify two optional mode parameters.
+These are used to determine the network registration mode and network de-registration
+mode for the buffer.  It is only relevant on networks requiring explicit memory registration
+for performing RDMA operations. These networks include GNI, OFI, and Verbs. When the registration mode
+is not specified by the user, the default mode is considered to be ``CK_BUFFER_REG``. Similarly, when
+the de-registration mode is not specified by the user, the default mode is considered to be ``CK_BUFFER_DEREG``.
+Note that in order to specify a de-registration mode, the registration mode has to be specified in the
+constructor because of how default parameters work with constructors.
+
+.. code-block:: c++
+
+   /* Specifying registration modes only, without any de-registration mode (uses default de-reg mode) */
+
+   // for point to point send
+   arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG));
+
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1)); for REG reg-mode because of REG being the default
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_UNREG)); for UNREG reg-mode
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_PREREG)); for PREREG reg-mode
+
+   // for bcast send
+   arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG));
+
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1)); for REG reg-mode because of REG being the default
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_UNREG)); for UNREG reg-mode
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_PREREG)); for PREREG reg-mode
+
+   /* Specifying de-registration modes */
+
+   // for point to point send
+   arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG, CK_BUFFER_DEREG));
+
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG)); for DEREG dereg-mode because of DEREG being the default
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG, CK_BUFFER_NODEREG)); for NODEREG dereg-mode
+
+   // for bcast send
+   arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG, CK_BUFFER_DEREG));
+
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG)); for DEREG dereg-mode because of DEREG being the default
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, cb1, CK_BUFFER_REG, CK_BUFFER_NODEREG)); for NODEREG dereg-mode
+
+
+The memory registration mode and de-registration mode can also be specified without a callback, as shown below:
+
+.. code-block:: c++
+
+   /* Specifying registration modes only, without any de-registration mode (uses default de-reg mode) */
+
+   // for point to point send
+   arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG));
+
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr)); for REG reg-mode because of REG being the default
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_UNREG)); for UNREG reg-mode
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_PREREG)); for PREREG reg-mode
+
+   // for bcast send
+   arrayProxy.foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG));
+
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr)); for REG reg-mode because of REG being the default
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_UNREG)); for UNREG reg-mode
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_PREREG)); for PREREG reg-mode
+
+   /* Specifying de-registration modes */
+
+   // for point to point send
+   arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG, CK_BUFFER_DEREG));
+
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG)); for DEREG dereg-mode because of DEREG being the default
+   // or arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG, CK_BUFFER_NODEREG)); for NODEREG dereg-mode
+
+   // for bcast send
+   arrayProxy.foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG, CK_BUFFER_DEREG));
+
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG)); for DEREG dereg-mode because of DEREG being the default
+   // or arrayProxy.foo(500000, CkSendBuffer(arrPtr, CK_BUFFER_REG, CK_BUFFER_NODEREG)); for NODEREG dereg-mode
+
+
+In the case of point to point communication, the callback will be invoked on completion
+of the RDMA operation associated with the corresponding array.
+
+For zero copy broadcast operations, the callback will be invoked when all the broadcast
+recipient processes have successfully received the broadcasted array. Note that this does
+not necessarily mean that the recipient objects have received the data i.e. it is possible that the
+process (or the logical node) has received the data, but the individual entry methods
+are still waiting in the scheduler (and are scheduled to run) and hence have not received the
+data.
+
+
+Inside the callback, it is safe to overwrite the buffer sent via the Zero Copy Entry Method Send API.
 
 .. code-block:: c++
 
    //called when RDMA operation is completed
-   void zerocopySent(CkDataMsg *m)
+   void zerocopySent() {
+     // update the buffer to the next pointer
+     updateBuffer();
+   }
+
+The callback methods can also take a pointer to a ``CkDataMsg`` message.
+This message can be used to access the original buffer information
+object i.e. the ``CkNcpyBuffer`` object constructed by CkSendBuffer and
+used for the zero copy transfer. The buffer information object available in
+the callback allows access to all its information including the buffer pointer.
+
+.. code-block:: c++
+
+   //called when RDMA operation is completed
+   void zerocopySent(CkDataMsg *msg)
    {
-     //get access to the pointer and free the allocated buffer
-     void *ptr = *((void **)(m->data));
-     free(ptr);
-     delete m;
+     // Cast msg->data to a CkNcpyBuffer to get the source buffer information object
+     CkNcpyBuffer *source = (CkNcpyBuffer *)(m->data));
+
+     // access buffer pointer and free it
+     free(ptr); // if the callback is executed on the source process
+     delete msg;
    }
 
 The RDMA call is associated with a nocopy array rather than the entry
@@ -4868,6 +5043,19 @@ independent of the other. Hence, the callback applies to only the array
 it is attached to and not to all the nocopy arrays passed in an entry
 method invocation. On completion of the RDMA call for each array, the
 corresponding callback is separately invoked.
+
+On the receiver side, the entry method is defined as a regular entry method in the .C file,
+with the nocopy parameter being received as a pointer as shown below:
+
+.. code-block:: c++
+
+   void foo (int size, int *arr) {
+     // data received in runtime system buffer pointed by arr
+     // Note that 'arr' buffer is Readonly
+
+     computeValues();
+   }
+
 
 As an example, for an entry method with two nocopy array parameters,
 each called with the same callback, the callback will be invoked twice:
@@ -4889,28 +5077,30 @@ associated with each nocopy array.
    CkCallback cb2(CkIndex_Foo::zerocopySent2(NULL), thisProxy[thisIndex]);
    arrayProxy[0].foo(500000, CkSendBuffer(arrPtr1, cb1), 1024000, CkSendBuffer(arrPtr2, cb2));
 
-This API is demonstrated in
+This API for point to point communication is demonstrated in
 ``examples/charm++/zerocopy/entry_method_api`` and
-``benchmarks/charm++/pingpong``
+``benchmarks/charm++/pingpong``. For broadcast operations, the usage of this API is
+demonstrated in ``examples/charm++/zerocopy/entry_method_bcast_api``.
 
 It should be noted that calls to entry methods with nocopy specified
-parameters are currently only supported for point to point operations
-and not for collective operations. Additionally, there is also no
-support for migration of chares that have pending RDMA transfer
-requests.
+parameters is currently supported for point to point operations
+and only collection-wide broadcast operations like broadcasts across an entire
+chare array or group or nodegroup. It is yet to be supported for section broadcasts.
+Additionally, there is also no support for migration of chares that have
+pending RDMA transfer requests.
 
 It should also be noted that the benefit of this API can be seen for
 large arrays on only RDMA enabled networks. On networks which do not
-support RDMA and for within process sends (which uses shared memory),
+support RDMA, and, for within process sends (which uses shared memory),
 the API is functional but doesn’t show any performance benefit as it
 behaves like a regular entry method that copies its arguments.
 
 Table :numref:`tab:rdmathreshold` displays the
-message size thresholds for the zero copy entry method send API on
+message size thresholds for the Zero Copy Entry Method Send API on
 popular systems and build architectures. These results were obtained by
 running ``benchmarks/charm++/zerocopy/entry_method_api/pingpong`` in
 non-SMP mode on production builds. For message sizes greater than or
-equal to the displayed thresholds, the zero copy API is found to perform
+equal to the displayed thresholds, the Zero Copy API is found to perform
 better than the regular message send API. For network layers that are
 not pamilrts, gni, verbs, ofi or mpi, the generic implementation is
 used.
