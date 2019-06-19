@@ -4821,7 +4821,6 @@ completion of the zero copy operation. It is beneficial when the user wants to r
 (and reuse the ``CkNcpyBuffer`` object) by avoiding the cost of de-registration and registration.
 
 
-
 Important Methods
 '''''''''''''''''
 
@@ -4835,7 +4834,6 @@ registered or pinned memory. Registered memory can be de-registered by calling
 the ``deregisterMem()`` method on the CkNcpyBuffer object.
 
 .. code-block:: c++
-
    // de-register previously registered buffer
    dest.registerMem();
 
