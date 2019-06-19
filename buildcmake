@@ -196,7 +196,6 @@ while [[ $# -gt 0 ]]; do
   # Miscellaneous options
     -j*)
       opt_parallel=$arg
-      echo "*** Warning: Parallel builds might not work fully yet."
       ;;
     *)
       echo "*** Warning: Ignoring unknown option '$arg'."

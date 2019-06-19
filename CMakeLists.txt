@@ -257,6 +257,8 @@ if(${CMAKE_BUILD_TYPE} MATCHES "Release")
     set(CMK_OPTIMIZE 1)
     add_compile_options(-optimize -production)
     set(BUILDOPTS "-optimize -production")
+    set(OPTS "-optimize -production")
+    set(OPTSATBUILDTIME "-optimize -production")
 endif()
 
 include(cmake/detect-features.cmake)
@@ -435,6 +437,7 @@ endif()
 # Figure out arguments to pass to hwloc's configure
 set(command ${CMAKE_BINARY_DIR}/bin/charmc -print-building-blocks $OPTS)
 execute_process(COMMAND ${command} COMMAND grep CHARM_CC_FLAGS= COMMAND cut -c16- COMMAND tr -d \' COMMAND tr -d '\n' OUTPUT_VARIABLE CHARM_CC_FLAGS)
+execute_process(COMMAND ${command} COMMAND grep CHARM_CC= COMMAND cut -c10- COMMAND tr -d \' COMMAND tr -d '\n' OUTPUT_VARIABLE CHARM_CC)
 
 # FIXME: copy .so
 include(ExternalProject)
@@ -459,6 +462,8 @@ ExternalProject_Add(hwloc
         --with-hwloc-symbol-prefix=cmi_
         --without-x
         HWLOC_FLAGS=${CHARM_CC_FLAGS}
+        CFLAGS=${CHARM_CC_FLAGS}
+        CC=${CHARM_CC}
         > /dev/null
     BUILD_COMMAND make V=$(VERBOSE)
     COMMAND cp src/.libs/libhwloc_embedded.a ${CMAKE_BINARY_DIR}/lib/
