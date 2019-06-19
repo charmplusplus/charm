@@ -1,3 +1,18 @@
+# CMake-based build system for Charm++ and AMPI
+#
+# Supported targets: charm++, AMPI
+#
+# When updating any of the following:
+# - any Makefile
+# - adding, deleting, renaming any source file
+# - any configure script
+#
+# , please also update:
+# - this file
+# - buildcmake
+# - files in cmake/
+
+
 cmake_minimum_required(VERSION 3.11)
 
 project(Charm++ LANGUAGES CXX C VERSION 6.9.0)
@@ -53,7 +68,6 @@ option(PTHREADS "compile with pthreads Converse threads" OFF)
 option(BIGEMULATOR "Compile for BigSim simulator" OFF)
 option(OOC "Compile with out of core support" OFF)
 option(SYNCFT "Compile with Charm++ fault tolerance support" OFF)
-option(MLOGFT "Compile with Charm++ message logging fault tolerance support" OFF)
 option(PAPI "Compile with PAPI performance counter support" OFF)
 
 # Enable/disable features:
@@ -246,6 +260,7 @@ if(${CMAKE_BUILD_TYPE} MATCHES "Release")
 endif()
 
 include(cmake/detect-features.cmake)
+include(cmake/ci-files.cmake)
 
 configure_file(${CMAKE_SOURCE_DIR}/src/scripts/charmc ${CMAKE_BINARY_DIR}/bin @ONLY)
 
@@ -321,14 +336,12 @@ configure_file(src/arch/common/cc-mpi.sh                     include/ COPYONLY)
 configure_file(src/arch/common/cc-mpiopts.sh                 include/ COPYONLY) #sh only
 configure_file(src/arch/common/conv-mach-bigemulator.sh      include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-bigsim.sh           include/ COPYONLY)
-configure_file(src/arch/common/conv-mach-causalft.sh         include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-craype.sh           include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-cuda.sh             include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-darwin.sh           include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-flang.sh            include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-gfortran.sh         include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-ifort.sh            include/ COPYONLY)
-configure_file(src/arch/common/conv-mach-mlogft.sh           include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-nolb.sh             include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-omp.sh              include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-ooc.sh              include/ COPYONLY)
@@ -414,17 +427,22 @@ add_subdirectory(src/util)
 
 # Hwloc
 if(${BUILD_SHARED})
-  set(hwloc_shared yes)
+    set(hwloc_shared yes)
 else()
-  set(hwloc_shared no)
+    set(hwloc_shared no)
 endif()
+
+# Figure out arguments to pass to hwloc's configure
+set(command ${CMAKE_BINARY_DIR}/bin/charmc -print-building-blocks $OPTS)
+execute_process(COMMAND ${command} COMMAND grep CHARM_CC_FLAGS= COMMAND cut -c16- COMMAND tr -d \' COMMAND tr -d '\n' OUTPUT_VARIABLE CHARM_CC_FLAGS)
 
 # FIXME: copy .so
 include(ExternalProject)
 ExternalProject_Add(hwloc
     URL ${CMAKE_SOURCE_DIR}/contrib/hwloc
     CONFIGURE_COMMAND cd ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc && autoreconf -ivf 2> /dev/null 1> /dev/null
-    COMMAND ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/configure
+    COMMAND
+        ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/configure
         --disable-cairo
         --disable-cuda
         --disable-gl
@@ -440,8 +458,9 @@ ExternalProject_Add(hwloc
         --enable-static
         --with-hwloc-symbol-prefix=cmi_
         --without-x
+        HWLOC_FLAGS=${CHARM_CC_FLAGS}
         > /dev/null
-    BUILD_COMMAND make > /dev/null
+    BUILD_COMMAND make V=$(VERBOSE)
     COMMAND cp src/.libs/libhwloc_embedded.a ${CMAKE_BINARY_DIR}/lib/
     COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/include/hwloc.h ${CMAKE_BINARY_DIR}/include/
     COMMAND cp -LRf ${CMAKE_SOURCE_DIR}/contrib/hwloc/include/hwloc ${CMAKE_BINARY_DIR}/include/
@@ -479,12 +498,57 @@ endif()
 configure_file(src/scripts/testrun bin/ COPYONLY)
 
 # Charm++ libraries
-add_subdirectory(src/libs/ck-libs/NDMeshStreamer)
-add_subdirectory(src/libs/ck-libs/tcharm)
-add_subdirectory(src/libs/ck-libs/ckloop)
+
+# CkLoop
+set(ckloop-cxx-files src/libs/ck-libs/ckloop/CkLoop.C)
+file(GLOB ckloop-h-files src/libs/ck-libs/ckloop/*.h)
+add_library(moduleCkLoop ${ckloop-cxx-files} ${ckloop-h-files} ${CMAKE_BINARY_DIR}/include/CkLoop.decl.h)
+add_dependencies(moduleCkLoop ck)
+
+
+# NDMeshStreamer
+file(GLOB moduleNDMeshStreamer-h-sources src/libs/ck-libs/NDMeshStreamer/*.h)
+set(moduleNDMeshStreamer-cxx-sources src/libs/ck-libs/NDMeshStreamer/NDMeshStreamer.C)
+add_library(moduleNDMeshStreamer ${moduleNDMeshStreamer-cxx-sources}
+    ${moduleNDMeshStreamer-h-sources}
+    ${CMAKE_BINARY_DIR}/include/NDMeshStreamer.decl.h)
+target_include_directories(moduleNDMeshStreamer PUBLIC .
+    ../../../util/topomanager ../../../ck-ldb ../../../ck-perf ../../../ck-cp
+    ../completion)
+
+add_dependencies(moduleNDMeshStreamer ck)
+
+foreach(filename ${moduleNDMeshStreamer-h-sources})
+  configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
+endforeach()
+
+configure_file(src/libs/ck-libs/NDMeshStreamer/libmoduleNDMeshStreamer.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
+
+
+# TCharm
+file(GLOB tcharm-c-sources src/libs/ck-libs/tcharm/*.c)
+file(GLOB tcharm-h-sources src/libs/ck-libs/tcharm/*.h)
+add_library(moduletcharm src/libs/ck-libs/tcharm/tcharm.C ${tcharm-h-sources} ${CMAKE_BINARY_DIR}/include/tcharm.decl.h)
+add_library(moduletcharmmain src/libs/ck-libs/tcharm/tcharmmain.C ${CMAKE_BINARY_DIR}/include/tcharm.decl.h ${CMAKE_BINARY_DIR}/include/tcharmmain.decl.h)
+add_library(tcharm-compat ${tcharm-c-sources} ${CMAKE_BINARY_DIR}/include/tcharm.decl.h ${CMAKE_BINARY_DIR}/include/tcharmmain.decl.h)
+
+configure_file(src/libs/ck-libs/tcharm/libmoduletcharm.dep     ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
+configure_file(src/libs/ck-libs/tcharm/libmoduletcharmmain.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
+
+foreach(f ${tcharm-h-sources})
+    configure_file(${f} ${CMAKE_BINARY_DIR}/include COPYONLY)
+endforeach(f)
+
+add_dependencies(moduletcharmmain ck)
+add_dependencies(moduletcharm ck)
+add_dependencies(tcharm-compat ck)
 
 if(NOT ${TARGET} STREQUAL "charm++")
   add_subdirectory(src/libs/ck-libs/ampi)
+endif()
+
+if(${TARGET} STREQUAL "LIBS")
+  # FIXME: add libs
 endif()
 
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")

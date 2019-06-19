@@ -21,9 +21,9 @@ set(ck-cxx-sources
     ../ck-perf/trace-common.C ../ck-perf/trace-controlPoints.C
     ../ck-perf/tracec.C ../ck-perf/tracef.C ../conv-perf/charmProjections.C
     ../util/ckbitvector.C ../util/ckregex.C
-    ck.C ckarray.C ckarrayoptions.C ckcallback.C ckcausalmlog.C
+    ck.C ckarray.C ckarrayoptions.C ckcallback.C
     ckcheckpoint.C ckevacuation.C ckfutures.C ckIgetControl.C
-    cklocation.C ckmemcheckpoint.C ckmessagelogging.C ckmulticast.C
+    cklocation.C ckmemcheckpoint.C ckmulticast.C
     ckobjid.C ckobjQ.C ckrdma.C ckreduction.C cktiming.C debug-charm.C
     debug-message.C init.C modifyScheduler.C mpi-interoperate.C msgalloc.C
     qd.C register.C sdag.C waitqd.C
@@ -31,9 +31,9 @@ set(ck-cxx-sources
 
 set(ck-h-sources XArraySectionReducer.h charm++.h charm++_type_traits.h
     charm-api.h charm.h charmf.h ck.h ckIgetControl.h ckarray.h ckarrayindex.h
-    ckarrayoptions.h ckcallback-ccs.h ckcallback.h ckcausalmlog.h ckcheckpoint.h
+    ckarrayoptions.h ckcallback-ccs.h ckcallback.h ckcheckpoint.h
     ckevacuation.h ckfutures.h cklocation.h cklocrec.h
-    ckmemcheckpoint.h ckmessage.h ckmessagelogging.h ckmigratable.h ckmulticast.h
+    ckmemcheckpoint.h ckmessage.h ckmigratable.h ckmulticast.h
     ckobjQ.h ckobjid.h ckrdma.h ckreduction.h cksection.h
     ckstream.h cktiming.h debug-charm.h envelope-path.h envelope.h init.h
     middle-blue.h middle-conv.h middle.h mpi-interoperate.h objid.h qd.h
@@ -130,7 +130,7 @@ set(ldb-h-sources ../ck-ldb/AdaptiveLB.h ../ck-ldb/BaseLB.h
 
 include(${CMAKE_SOURCE_DIR}/cmake/ci-files.cmake)
 
-add_library(ck ${ck-cxx-sources} ${ck-h-sources} ${ck-ci-sources})
+add_library(ck ${ck-cxx-sources} ${ck-h-sources} ${ck-ci-sources} ${all-ci-outputs})
 add_library(ckmain main.C)
 add_dependencies(ckmain ck)
 

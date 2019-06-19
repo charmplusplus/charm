@@ -79,6 +79,8 @@ foreach(in_f ${ci-files})
         string(APPEND ci-output ".decl.h")
     endif()
 
+    set(all-ci-outputs ${all-ci-outputs} ${CMAKE_BINARY_DIR}/include/${ci-output})
+
     add_custom_command(
       OUTPUT ${CMAKE_BINARY_DIR}/include/${ci-output}
       COMMAND ${CMAKE_BINARY_DIR}/bin/charmc -I. ${in_f}
