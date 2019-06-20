@@ -5150,7 +5150,7 @@ buffer using a special version of the entry method.
 To send an array using the Zero Copy Post API, specify the array
 parameter in the .ci file with the nocopypost specifier.
 
-.. code-block:: c++
+.. code-block:: charmci
 
    // same .ci specification is used for p2p and bcast operations
    entry void foo (int size, nocopypost int arr[size]);
@@ -5209,7 +5209,7 @@ as a pointer as shown below:
 
 Similarly, for sending and receiving multiple arrays, the .ci file specification will be:
 
-.. code-block:: c++
+.. code-block:: charmci
 
   entry void foo(nocopypost int arr1[size1], int size1, nocopypost char arr2[size2], int size2);
 
