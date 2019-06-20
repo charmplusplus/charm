@@ -144,6 +144,24 @@ check_function_exists(uname HAVE_UNAME)
 check_function_exists(usleep CMK_HAS_USLEEP)
 
 
+# Check Fortran naming scheme
+
+set(CMK_FORTRAN_USES_TWOSCORE 0)
+set(CMK_FORTRAN_USES_ONESCORE 0)
+set(CMK_FORTRAN_USES_NOSCORE 0)
+set(CMK_FORTRAN_USES_ALLCAPS 0)
+
+if(${FortranCInterface_GLOBAL_SUFFIX} STREQUAL "__")
+  set(CMK_FORTRAN_USES_TWOSCORE 1)
+elseif(${FortranCInterface_GLOBAL_SUFFIX} STREQUAL "_")
+  set(CMK_FORTRAN_USES_ONESCORE 1)
+elseif(${FortranCInterface_GLOBAL_SUFFIX} STREQUAL "")
+  set(CMK_FORTRAN_USES_NOSCORE 1)
+elseif(${FortranCInterface_GLOBAL_CASE} STREQUAL "UPPER")
+  set(CMK_FORTRAN_USES_ALLCAPS 1)
+endif()
+
+
 # Check compiler flags
 
 check_cxx_compiler_flag("-mno-tls-direct-seg-refs" CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS)
