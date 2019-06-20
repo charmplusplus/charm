@@ -3367,6 +3367,21 @@ on all branches of the group. This call is also asynchronous and
 non-blocking, and it, too, returns immediately after sending the
 message.
 
+Finally, when running in SMP mode with multiple PEs per node, one can
+broadcast a message to the branches of a group local to the sending node:
+
+.. code-block:: c++
+
+   CkWithinNodeBroadcast(CkIndex_Foo::bar(), msg, fooProxy);
+
+Where ``CkIndex_Foo::bar()`` is the index of the entry method you wish to
+invoke, msg is the ``Charm++`` message (section :numref:`messages`) you wish to
+send, and ``fooProxy`` is the proxy to the group you wish to send. As before,
+it is an asynchrounous call which returns immediately. Furthermore, if the
+receiving entry method is marked as ``[nokeep]`` (:numref:`attributes`), the
+message pointer will be shared with each group chare instead of creating an
+independent copy per receiver.
+
 Recall that each PE hosts a branch of every instantiated group.
 Sequential objects, chares and other groups can gain access to this
 *PE-local* branch using ckLocalBranch():
