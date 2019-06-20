@@ -69,6 +69,8 @@
 #define CMI_IS_ZC(msg)                       (CMI_IS_ZC_P2P(msg) || CMI_IS_ZC_BCAST(msg))
 #endif
 
+#define CMI_MSG_NOKEEP(msg)                  ((CmiMsgHeaderBasic *)msg)->nokeep
+
 #define CMIALIGN(x,n)       (size_t)((~((size_t)n-1))&((x)+(n-1)))
 /*#define ALIGN8(x)        (size_t)((~7)&((x)+7)) */
 #define ALIGN8(x)          CMIALIGN(x,8)
@@ -1384,6 +1386,8 @@ void          CmiSyncNodeBroadcastAllFn(int, char *);
 CmiCommHandle CmiAsyncNodeBroadcastAllFn(int, char *);
 void          CmiFreeNodeBroadcastAllFn(int, char *);
 
+void          CmiWithinNodeBroadcastFn(int, char*);
+
 /* if node queue is available, adding inter partition counterparts */
 void          CmiInterSyncNodeSendFn(int, int, int, char *);
 void          CmiInterFreeNodeSendFn(int, int, int, char *);
@@ -1399,6 +1403,7 @@ void          CmiInterFreeNodeSendFn(int, int, int, char *);
 #define CmiSyncNodeBroadcastAll(s,m)        (CmiSyncNodeBroadcastAllFn((s),(char *)(m)))
 #define CmiAsyncNodeBroadcastAll(s,m)       (CmiAsyncNodeBroadcastAllFn((s),(char *)(m)))
 #define CmiSyncNodeBroadcastAllAndFree(s,m) (CmiFreeNodeBroadcastAllFn((s),(char *)(m)))
+#define CmiWithinNodeBroadcast(s,m)         (CmiWithinNodeBroadcastFn((s),(char *)(m)))
 
 /* counterparts of inter partition */
 #if CMK_HAS_PARTITION
@@ -1436,6 +1441,7 @@ void          CmiInterFreeNodeSendFn(int, int, int, char *);
           CmiSyncNodeBroadcastAll(s,m); \
           CmiFree(m); \
         } while(0)
+#define CmiWithinNodeBroadcast(s,m)         (CmiWithinNodeBroadcastFn((s),(char *)(m)))
 #else
 #define CmiSyncNodeBroadcast(s,m)           CmiSyncBroadcast(s,m)
 #define CmiAsyncNodeBroadcast(s,m)          CmiAsyncBroadcast(s,m)
@@ -1443,6 +1449,7 @@ void          CmiInterFreeNodeSendFn(int, int, int, char *);
 #define CmiSyncNodeBroadcastAll(s,m)        CmiSyncBroadcastAll(s,m)
 #define CmiAsyncNodeBroadcastAll(s,m)       CmiAsyncBroadcastAll(s,m)
 #define CmiSyncNodeBroadcastAllAndFree(s,m) CmiSyncBroadcastAllAndFree(s,m)
+#define CmiWithinNodeBroadcast(s,m)         CmiSyncSendAndFree(CmiMyPe(),s,m)
 #endif
 /* and the inter partition counterparts */
 #if CMK_HAS_PARTITION
@@ -1717,7 +1724,10 @@ const char *CldGetStrategy(void);
 void CldEnqueue(int pe, void *msg, int infofn);
 void CldEnqueueMulti(int npes, const int *pes, void *msg, int infofn);
 void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn);
+// CldNodeEnqueue enqueues a single message for a node, whereas
+// CldEnqueueWithinNode enqueues a message for each PE on the node.
 void CldNodeEnqueue(int node, void *msg, int infofn);
+void CldEnqueueWithinNode(void *msg, int infofn);
 
 /****** CMM: THE MESSAGE MANAGER ******/
 

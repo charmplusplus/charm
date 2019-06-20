@@ -373,6 +373,7 @@ void handleDirectApiCompletion(NcpyOperationInfo *info) {
     // send a message to the source to de-register and invoke callback
     if(info->isSrcRegistered == 1 && info->srcDeregMode == CK_BUFFER_DEREG) {
       freeMe = CMK_DONT_FREE_NCPYOPINFO; // don't free info here, it'll be freed by the machine layer
+      QdCreate(1); // Matching QdProcess in CkRdmaDirectAckHandler
       CmiInvokeRemoteDeregAckHandler(info->srcPe, info);
     } else
 #endif
@@ -392,6 +393,7 @@ void handleDirectApiCompletion(NcpyOperationInfo *info) {
     // send a message to the destination to de-register and invoke callback
     if(info->isDestRegistered == 1 && info->destDeregMode == CK_BUFFER_DEREG) {
       freeMe = CMK_DONT_FREE_NCPYOPINFO; // don't free info here, it'll be freed by the machine layer
+      QdCreate(1); // Matching QdProcess in CkRdmaDirectAckHandler
       CmiInvokeRemoteDeregAckHandler(info->destPe, info);
     } else
 #endif
@@ -2052,7 +2054,8 @@ inline void _ncpyAckHandler(ncpyHandlerMsg *msg) {
 #if CMK_USE_CMA && CMK_REG_REQUIRED
     case ncpyHandlerIdx::CMA_DEREG_ACK         : CkRdmaEMDeregAndAckHandler(msg->ref);
                                                  break;
-    case ncpyHandlerIdx::CMA_DEREG_ACK_DIRECT  : CkRdmaEMDeregAndAckDirectHandler((char *)msg + sizeof(ncpyHandlerMsg));
+    case ncpyHandlerIdx::CMA_DEREG_ACK_DIRECT  : QdProcess(1); // Matching QdCreate in invokeCmaDirectRemoteDeregAckHandler
+                                                 CkRdmaEMDeregAndAckDirectHandler((char *)msg + sizeof(ncpyHandlerMsg));
                                                  break;
 #endif
     default                                    : CmiAbort("_ncpyAckHandler: Invalid OpMode\n");
@@ -2085,6 +2088,7 @@ inline void invokeCmaDirectRemoteDeregAckHandler(CkNcpyBuffer &buffInfo) {
 
   msg->opMode = ncpyHandlerIdx::CMA_DEREG_ACK_DIRECT;
   CmiSetHandler(msg, ncpy_handler_idx);
+  QdCreate(1); // Matching QdProcess in _ncpyAckHandler
   CmiSyncSendAndFree(buffInfo.pe, sizeof(ncpyHandlerMsg) + implSizer.size(), (char *)msg);
 }
 #endif
