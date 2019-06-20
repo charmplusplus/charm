@@ -6,6 +6,10 @@ jobs:
 
     steps:
       - checkout
+      
+      - run:
+          name: Install build tools
+          command: sudo apt-get install -y autoconf automake
 
       - run:
           name: Build
