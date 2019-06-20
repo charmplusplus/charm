@@ -5030,7 +5030,7 @@ the callback allows access to all its information including the buffer pointer.
    void zerocopySent(CkDataMsg *msg)
    {
      // Cast msg->data to a CkNcpyBuffer to get the source buffer information object
-     CkNcpyBuffer *source = (CkNcpyBuffer *)(m->data));
+     CkNcpyBuffer *source = (CkNcpyBuffer *)(msg->data));
 
      // access buffer pointer and free it
      free(ptr); // if the callback is executed on the source process
