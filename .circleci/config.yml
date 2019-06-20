@@ -1,16 +1,12 @@
 version: 2.1
 jobs:
-  build:
+  NetLRTS:
     machine:
       image: ubuntu-1604:201903-01
 
     steps:
       - checkout
-      
-      - run:
-          name: Install build tools
-          command: sudo apt-get install -y autoconf automake
-
+     
       - run:
           name: Build
           command: ./build LIBS netlrts-linux-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla
@@ -18,3 +14,17 @@ jobs:
       - run:
           name: Test
           command: make -C netlrts-linux-x86_64/tmp -j3 all-test-tests all-test-examples OPTS="-g" &&  make -C netlrts-linux-x86_64/tmp test-tests test-examples TESTOPTS="++local +isomalloc_sync"
+ 
+  NetLRTS-SMP:
+    machine:
+      image: ubuntu-1604:201903-01
+    
+    steps:
+      - checkout
+     
+      - run:
+          name: Build
+          command: ./build LIBS netlrts-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla
+      - run:
+          name: Test
+          command: make -C netlrts-linux-x86_64-smp/tmp -j3 all-test-tests all-test-examples OPTS="-g" && make -C netlrts-linux-x86_64-smp/tmp test-tests test-examples TESTOPTS="++local +setcpuaffinity +isomalloc_sync +CmiSleepOnIdle"
