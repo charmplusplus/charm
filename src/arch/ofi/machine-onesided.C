@@ -345,20 +345,36 @@ void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo) {
 
   ZERO_REQUEST(req);
 
-  if(ncpyOpInfo->freeMe == CMK_FREE_NCPYOPINFO)
-    req->freeMe   = 1;// free ncpyOpInfo
-  else
-    req->freeMe   = 0;// do not free ncpyOpInfo
+  NcpyOperationInfo *newNcpyOpInfo;
 
-  req->destNode = CmiNodeOf(ncpyOpInfo->srcPe);
-  req->destPE   = ncpyOpInfo->srcPe;
-  req->size     = ncpyOpInfo->ncpyOpInfoSize;
+  if(ncpyOpInfo->opMode == CMK_DIRECT_API) {
+    // ncpyOpInfo is not freed
+    newNcpyOpInfo = ncpyOpInfo;
+
+  } else if(ncpyOpInfo->opMode == CMK_EM_API) {
+
+    // ncpyOpInfo is a part of the received message and can be freed before this send completes
+    // for that reason, it is copied into a new message
+    newNcpyOpInfo = (NcpyOperationInfo *)CmiAlloc(ncpyOpInfo->ncpyOpInfoSize);
+    memcpy(newNcpyOpInfo, ncpyOpInfo, ncpyOpInfo->ncpyOpInfoSize);
+
+    newNcpyOpInfo->freeMe =  CMK_FREE_NCPYOPINFO; // Since this is a copy of ncpyOpInfo, it can be freed
+
+  } else {
+    CmiAbort("Ofi: LrtsInvokeRemoteDeregAckHandler - ncpyOpInfo->opMode is not valid for dereg\n");
+  }
+
+  req->freeMe   = 1;// free newNcpyOpInfo
+
+  req->destNode = CmiNodeOf(pe);
+  req->destPE   = pe;
+  req->size     = newNcpyOpInfo->ncpyOpInfoSize;
   req->callback = send_short_callback;
-  req->data.short_msg = ncpyOpInfo;
+  req->data.short_msg = newNcpyOpInfo;
 
-  ofi_send(ncpyOpInfo,
-           ncpyOpInfo->ncpyOpInfoSize,
-           CmiNodeOf(ncpyOpInfo->srcPe),
+  ofi_send(newNcpyOpInfo,
+           newNcpyOpInfo->ncpyOpInfoSize,
+           CmiNodeOf(pe),
            OFI_RDMA_DIRECT_DEREG_AND_ACK,
            req);
 }
@@ -373,17 +389,33 @@ void process_onesided_dereg_and_ack(struct fi_cq_tagged_entry *e, OFIRequest *re
   NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(data);
   resetNcpyOpInfoPointers(ncpyOpInfo);
 
+
+  if(CmiMyNode() == CmiNodeOf(ncpyOpInfo->srcPe)) {
+
+    LrtsDeregisterMem(ncpyOpInfo->srcPtr,
+                      ncpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize(),
+                      ncpyOpInfo->srcPe,
+                      ncpyOpInfo->srcRegMode);
+
+    ncpyOpInfo->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
+    // Invoke source ack
+    ncpyOpInfo->opMode = CMK_EM_API_SRC_ACK_INVOKE;
+
+  } else if(CmiMyNode() == CmiNodeOf(ncpyOpInfo->destPe)) {
+
+    // Deregister the destination buffer
+    LrtsDeregisterMem(ncpyOpInfo->destPtr, (char *)ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->destPe, ncpyOpInfo->destRegMode);
+
+    ncpyOpInfo->isDestRegistered = 0; // Set isDestRegistered to 0 after de-registration
+
+    // Invoke destination ack
+    ncpyOpInfo->opMode = CMK_EM_API_DEST_ACK_INVOKE;
+
+  } else {
+    CmiAbort(" Cannot de-register on a different node than the source or destinaton");
+  }
+
   ncpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO;
-
-  LrtsDeregisterMem(ncpyOpInfo->srcPtr,
-                    ncpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize(),
-                    ncpyOpInfo->srcPe,
-                    ncpyOpInfo->srcRegMode);
-
-  ncpyOpInfo->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
-
-  // Invoke source ack
-  ncpyOpInfo->opMode = CMK_EM_API_SRC_ACK_INVOKE;
   CmiInvokeNcpyAck(ncpyOpInfo);
 }
 
