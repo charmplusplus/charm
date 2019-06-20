@@ -217,12 +217,14 @@ int CmiSetCPUAffinity(int mycore)
   cmi_hwloc_topology_load(topology);
 
   hwloc_obj_t thread_obj = cmi_hwloc_get_pu_obj_by_os_index(topology, core);
-  hwloc_cpuset_t cpuset = thread_obj->cpuset;
 
+  int result = -1;
+
+  if (thread_obj != nullptr)
 #if CMK_SMP
-  int result = set_thread_affinity(topology, cpuset);
+    result = set_thread_affinity(topology, thread_obj->cpuset);
 #else
-  int result = set_process_affinity(topology, cpuset);
+    result = set_process_affinity(topology, thread_obj->cpuset);
 #endif
 
   cmi_hwloc_topology_destroy(topology);
