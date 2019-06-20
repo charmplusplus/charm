@@ -37,10 +37,6 @@ Orion Sky Lawlor, olawlor@acm.org
 extern void _registerCkArray(void);
 CpvExtern (int ,serializer);
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-#define _MLOG_BCAST_TREE_ 1
-#define _MLOG_BCAST_BFACTOR_ 8
-#endif
 
 /** This flag is true when in the system there is anytime migration, false when
  *  the user code guarantees that no migration happens except during load balancing
@@ -386,9 +382,6 @@ public:
   using array_index_t = T;
 
   ArrayElementT(void): thisIndex(*(const T *)thisIndexMax.data()) {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
-        mlogData->objID.data.array.idx=thisIndexMax;
-#endif
 }
 #ifdef _PIPELINED_ALLREDUCE_
 	void contribute(int dataSize,const void *data,CkReduction::reducerType type,
@@ -559,10 +552,6 @@ class CkArray : public CkReductionMgr {
   // Separate mapping and storing the element pointers to speed iteration in broadcast
   std::unordered_map<CmiUInt8, unsigned int> localElems;
   std::vector<CkMigratable *> localElemVec;
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    int *children;
-    int numChildren;
-#endif
 
   UShort recvBroadcastEpIdx;
 private:
@@ -731,12 +720,6 @@ public:
   void forwardZCMsgToOtherElems(envelope *env);
 #endif
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	// the mlogft only support 1D arrays, then returning the number of elements in the first dimension
-	virtual int numberReductionMessages(){CkAssert(CkMyPe() == 0);return numInitial.data()[0];}
-	void broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index);
-	static void staticBroadcastHomeElements(CkArray *arr,void *data,CkLocRec *rec,CkArrayIndex *index);
-#endif
 
         static bool isIrreducible() { return true; }
 };

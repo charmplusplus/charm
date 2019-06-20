@@ -107,11 +107,11 @@ class Ping1 : public CBase_Ping1
   void setupGetGetPingpong(int size) {
     // Source callback and Ncpy object
     CkCallback srcCb = CkCallback(CkCallback::ignore);
-    mySrc = CkNcpyBuffer(nocopyMsg, sizeof(char)*size, srcCb, CK_BUFFER_PREREG);
+    mySrc = CkNcpyBuffer(nocopyMsg, sizeof(char)*size, srcCb, CK_BUFFER_PREREG, CK_BUFFER_NODEREG);
 
     // Destination callback and Ncpy object
     CkCallback destCb = CkCallback(CkIndex_Ping1::callbackGetGetPingpong(), thisProxy[thisIndex]);
-    myDest = CkNcpyBuffer(otherMsg, sizeof(char)*size, destCb, CK_BUFFER_PREREG);
+    myDest = CkNcpyBuffer(otherMsg, sizeof(char)*size, destCb, CK_BUFFER_PREREG, CK_BUFFER_NODEREG);
 
     thisProxy[0].beginGetGetPingpong();
   }
@@ -165,11 +165,11 @@ class Ping1 : public CBase_Ping1
 
     // Source callback and Ncpy object
     CkCallback srcCb = CkCallback(CkCallback::ignore);
-    mySrc = CkNcpyBuffer(nocopyMsg, sizeof(char)*size, srcCb, CK_BUFFER_PREREG);
+    mySrc = CkNcpyBuffer(nocopyMsg, sizeof(char)*size, srcCb, CK_BUFFER_PREREG, CK_BUFFER_NODEREG);
 
     // Destination callback and Ncpy object
     CkCallback destCb = CkCallback(CkIndex_Ping1::callbackPutPutPingpong(), thisProxy[thisIndex]);
-    myDest = CkNcpyBuffer(otherMsg, sizeof(char)*size, destCb, CK_BUFFER_PREREG);
+    myDest = CkNcpyBuffer(otherMsg, sizeof(char)*size, destCb, CK_BUFFER_PREREG, CK_BUFFER_NODEREG);
 
     thisProxy[0].beginPutPutPingpong();
   }
