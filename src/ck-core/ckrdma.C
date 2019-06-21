@@ -1384,6 +1384,7 @@ void CkRdmaEMBcastAckHandler(void *ack) {
             myMsg->setMsgtype(ForBocMsg);
             myMsg->getsetArrayEp() = mgr->getRecvBroadcastEpIdx();
           }
+          QdCreate(1);
           enqueueNcpyMessage(bcastAckInfo->pe, myMsg);
         }
 #else
@@ -1395,6 +1396,7 @@ void CkRdmaEMBcastAckHandler(void *ack) {
           myMsg->setMsgtype(ForBocMsg);
           myMsg->getsetArrayEp() = mgr->getRecvBroadcastEpIdx();
         }
+        QdCreate(1);
         enqueueNcpyMessage(bcastAckInfo->pe, myMsg);
 #endif
       } else { // bcast send api
@@ -1723,6 +1725,7 @@ void updatePeerCounterAndPush(envelope *env) {
   CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
   CmiSpanningTreeInfo &t = *_topoTree;
   if(peerAckInfo->decNumPeers() - 1 == 0) {
+    QdCreate(1);
     CmiPushPE(CmiRankOf(peerAckInfo->peerParentPe), env);
   }
 }
@@ -1801,6 +1804,7 @@ void handleArrayMsgOnChildPostCompletionForRecvBcast(envelope *env) {
     CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
     env->setMsgtype(ForBocMsg);
     env->getsetArrayEp() = mgr->getRecvBroadcastEpIdx();
+    QdCreate(1);
     CmiHandleMessage(env);
   }
 }
@@ -1814,12 +1818,14 @@ void handleGroupMsgOnChildPostCompletionForRecvBcast(envelope *env) {
 #endif
   {
     CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
+    QdCreate(1);
     CmiHandleMessage(env);
   }
 }
 
 void handleNGMsgOnChildPostCompletionForRecvBcast(envelope *env) {
   CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
+  QdCreate(1);
   CmiHandleMessage(env);
 }
 
