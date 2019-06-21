@@ -22,5 +22,17 @@ mainmodule zerocopy_with_qd {
 
     entry void testDirectApi();
     entry void recvBufferInfo(CkNcpyBuffer src1, CkNcpyBuffer src2, CkNcpyBuffer src3);
+
+    entry void testEmP2pSendApi();
+
+    entry void recvEmSendApiBuffer(nocopy char buff1[size1], int size1,
+                                   nocopy char buff2[size2], int size2,
+                                   nocopy char buff3[size3], int size3);
+
+    entry void testEmP2pPostApi();
+
+    entry void recvEmPostApiBuffer(nocopypost char buff1[size1], int size1,
+                                   nocopypost char buff2[size2], int size2,
+                                   nocopypost char buff3[size3], int size3);
   };
 };
