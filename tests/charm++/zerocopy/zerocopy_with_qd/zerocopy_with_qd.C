@@ -51,7 +51,6 @@ class Main : public CBase_Main {
     };
 
     void done() {
-      CkPrintf("[%d][%d][%d] Reduction completed\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
       reductionCompleted = true;
     }
 
@@ -64,6 +63,9 @@ class Main : public CBase_Main {
                   // Begin Direct API Test
                   testIndex++;
 
+                  reductionCompleted = false;
+
+
                   arr1.testDirectApi();
 
                   // Start QD again for next test
@@ -75,12 +77,42 @@ class Main : public CBase_Main {
                   CkAssert(srcCompletedCounter == destCompletedCounter);
                   CkAssert(srcCompletedCounter == 3*numElements/2);
                   CkPrintf("[%d][%d][%d] Test 2: QD has been reached for Direct API\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
+
+
+                  // Reset callback counters
+                  srcCompletedCounter = destCompletedCounter = 0;
+
+                  testIndex++;
+                  arr1.testEmP2pSendApi();
+
+                  CkStartQD(CkCallback(CkIndex_Main::qdReached(), mProxy));
+                  break;
+
+        case 3 :  // EM Send API QD reached
+                  CkAssert(srcCompletedCounter == 3*numElements/2);
+                  CkAssert(reductionCompleted == true);
+                  CkPrintf("[%d][%d][%d] Test 3: QD has been reached for EM Send API\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
+                  testIndex++;
+
+                  reductionCompleted = false;
+                  // Reset callback counters
+                  srcCompletedCounter = destCompletedCounter = 0;
+
+                  arr1.testEmP2pPostApi();
+
+                  CkStartQD(CkCallback(CkIndex_Main::qdReached(), mProxy));
+                  break;
+
+        case 4 :  // EM Post API QD reached
+                  CkAssert(srcCompletedCounter == 3*numElements/2);
+                  CkAssert(reductionCompleted == true);
+                  CkPrintf("[%d][%d][%d] Test 4: QD has been reached for EM Post API\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
                   CkExit();
                   break;
 
-        default: // Invalid
-                 CmiAbort("Test Index Invalid\n");
-                 break;
+        default:  // Invalid
+                  CmiAbort("Test Index Invalid\n");
+                  break;
       }
     }
 
@@ -98,6 +130,9 @@ class Main : public CBase_Main {
 class testArr : public CBase_testArr {
   int destIndex, size1, size2, size3;
   char *buff1, *buff2, *buff3;
+
+  CkCallback reductionCb, srcCompletionCb, destCompletionCb;
+
   public:
     testArr() {
       DEBUG(CkPrintf("[%d][%d][%d] testArr element create %d \n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex);)
@@ -114,14 +149,20 @@ class testArr : public CBase_testArr {
       for(int i=0; i<arr_size; i++) CkAssert(num_arr1[i] == i);
       for(int i=0; i<vec_size; i++) CkAssert(num_vec1[i] == i);
 
-      CkCallback cb(CkReductionTarget(Main, done), mProxy);
-      contribute(cb);
+      reductionCb = CkCallback(CkReductionTarget(Main, done), mProxy);
+
+      srcCompletionCb = CkCallback(CkIndex_Main::zcSrcCompleted(NULL), mProxy);
+
+      destCompletionCb = CkCallback(CkIndex_Main::zcDestCompleted(NULL), mProxy);
+
+      // Perform a reduction across all chare array elements to ensure completion of
+      // RO transfer and constructor execution
+      contribute(reductionCb);
     }
 
     void testDirectApi() {
       if(thisIndex < numElements/2) {
-        CkCallback srcCompletionCb(CkIndex_Main::zcSrcCompleted(NULL),
-                                   mProxy);
+
         // Create CkNcpyBuffer objects  and send it to the other side
         srcCompletionCb.setRefNum(thisIndex);
         CkNcpyBuffer src1(buff1, size1, srcCompletionCb);
@@ -134,9 +175,8 @@ class testArr : public CBase_testArr {
 
     // executed on half of the array elements
     void recvBufferInfo(CkNcpyBuffer src1, CkNcpyBuffer src2, CkNcpyBuffer src3) {
-      // Create CkNcpyBuffer objects to serve as destinations and perform get on the data
-        CkCallback destCompletionCb(CkIndex_Main::zcDestCompleted(NULL),
-                                   mProxy);
+        // Create CkNcpyBuffer objects to serve as destinations and perform get on the data
+
         destCompletionCb.setRefNum(thisIndex);
         // Create CkNcpyBuffer objects  and send it to the other side
         CkNcpyBuffer dest1(buff1, size1, destCompletionCb);
@@ -150,5 +190,61 @@ class testArr : public CBase_testArr {
 
         DEBUG(CkPrintf("[%d][%d][%d] Completed launching Gets %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex);)
     }
+
+    void testEmP2pSendApi() {
+      if(thisIndex < numElements/2) {
+        // Create CkNcpyBuffer objects  and send it to the other side
+        srcCompletionCb.setRefNum(thisIndex);
+
+        thisProxy[destIndex].recvEmSendApiBuffer(CkSendBuffer(buff1, srcCompletionCb), size1,
+                                                 CkSendBuffer(buff2, srcCompletionCb), size2,
+                                                 CkSendBuffer(buff3, srcCompletionCb), size3);
+
+        DEBUG(CkPrintf("[%d][%d][%d] Completed sending nocopy buffers %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex);)
+        // Perform a reduction across all chare array elements to ensure that EM Send API
+        // sends have been completed by elements with indices < numElements/2
+        contribute(reductionCb);
+      }
+    }
+
+    void recvEmSendApiBuffer(char *buff1, int size1, char *buff2, int size2, char *buff3, int size3) {
+      DEBUG(CkPrintf("[%d][%d][%d] Received nocopy buffers %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex);)
+      // Perform a reduction across all chare array elements to ensure that EM Send API has been received
+      // by elements with indices > numElements/2
+      contribute(reductionCb);
+    }
+
+    void testEmP2pPostApi() {
+      if(thisIndex < numElements/2) {
+        // Create CkNcpyBuffer objects  and send it to the other side
+        srcCompletionCb.setRefNum(thisIndex);
+
+        thisProxy[destIndex].recvEmPostApiBuffer(CkSendBuffer(buff1, srcCompletionCb), size1,
+                                                 CkSendBuffer(buff2, srcCompletionCb), size2,
+                                                 CkSendBuffer(buff3, srcCompletionCb), size3);
+
+        DEBUG(CkPrintf("[%d][%d][%d] Completed sending nocopypost buffers %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex);)
+        // Perform a reduction across all chare array elements to ensure that EM Send API
+        // sends have been completed by elements with indices < numElements/2
+        contribute(reductionCb);
+      }
+    }
+
+    void recvEmPostApiBuffer(char *&buff1, int &size1, char *&buff2, int &size2, char *&buff3, int &size3, CkNcpyBufferPost *ncpyPost) {
+      // use member variable buffers (buff1, buff2, buff3) as recipient buffers
+      buff1 = this->buff1;
+      buff2 = this->buff2;
+      buff3 = this->buff3;
+    }
+
+    void recvEmPostApiBuffer(char *buff1, int size1, char *buff2, int size2, char *buff3, int size3) {
+      DEBUG(CkPrintf("[%d][%d][%d] Received nocopypost buffers %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex);)
+      // Perform a reduction across all chare array elements to ensure that EM Send API has been received
+      // by elements with indices > numElements/2
+      contribute(reductionCb);
+    }
+
+
+
 };
 #include "zerocopy_with_qd.def.h"
