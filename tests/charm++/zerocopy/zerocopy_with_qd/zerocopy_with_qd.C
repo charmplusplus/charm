@@ -2,12 +2,22 @@
 
 #define DEBUG(x) //x
 
+int arr_size;
+int vec_size;
+
+int num_arr1[2000000];
+std::vector<int> num_vec1;
+
 int numElements;
 CProxy_Main mProxy;
 
 class Main : public CBase_Main {
+  int testIndex;
   int srcCompletedCounter;
   int destCompletedCounter;
+  CProxy_testArr arr1;
+  bool reductionCompleted;
+
   public:
     Main(CkArgMsg *m) {
       if(m->argc !=2 ) {
@@ -19,19 +29,59 @@ class Main : public CBase_Main {
       }
       delete m;
 
+      arr_size = 2000000;
+      vec_size = 2000000;
+      mProxy = thisProxy;
+
+      for(int i=0; i<arr_size; i++) num_arr1[i] = i;
+      for(int i=0; i<vec_size; i++) num_vec1.push_back(i);
+
+      reductionCompleted = false;
+
       srcCompletedCounter = 0;
       destCompletedCounter = 0;
       mProxy = thisProxy;
 
-      CProxy_testArr arr1 = CProxy_testArr::ckNew(numElements);
+      testIndex = 1;
+
+      arr1 = CProxy_testArr::ckNew(numElements);
+
+      // Start QD
       CkStartQD(CkCallback(CkIndex_Main::qdReached(), mProxy));
     };
 
+    void done() {
+      CkPrintf("[%d][%d][%d] Reduction completed\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
+      reductionCompleted = true;
+    }
+
     void qdReached() {
-      CkPrintf("[%d][%d][%d] Quiescence has been reached srcCompleted:%d, destCompleted:%d, 3(numElements/2)=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), srcCompletedCounter, destCompletedCounter, 3*numElements/2);
-      CkAssert(srcCompletedCounter == destCompletedCounter);
-      CkAssert(srcCompletedCounter == 3*numElements/2);
-      CkExit();
+
+      switch(testIndex) {
+        case 1 :  // RO Bcast QD reached
+                  CkAssert(reductionCompleted == true);
+                  CkPrintf("[%d][%d][%d] Test 1: QD has been reached for RO Variable Bcast\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
+                  // Begin Direct API Test
+                  testIndex++;
+
+                  arr1.testDirectApi();
+
+                  // Start QD again for next test
+                  CkStartQD(CkCallback(CkIndex_Main::qdReached(), mProxy));
+                  break;
+
+        case 2 :  // Direct API QD reached
+
+                  CkAssert(srcCompletedCounter == destCompletedCounter);
+                  CkAssert(srcCompletedCounter == 3*numElements/2);
+                  CkPrintf("[%d][%d][%d] Test 2: QD has been reached for Direct API\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
+                  CkExit();
+                  break;
+
+        default: // Invalid
+                 CmiAbort("Test Index Invalid\n");
+                 break;
+      }
     }
 
     void zcSrcCompleted(CkDataMsg *m) {
@@ -61,6 +111,14 @@ class testArr : public CBase_testArr {
       buff2 = new char[size2];
       buff3 = new char[size3];
 
+      for(int i=0; i<arr_size; i++) CkAssert(num_arr1[i] == i);
+      for(int i=0; i<vec_size; i++) CkAssert(num_vec1[i] == i);
+
+      CkCallback cb(CkReductionTarget(Main, done), mProxy);
+      contribute(cb);
+    }
+
+    void testDirectApi() {
       if(thisIndex < numElements/2) {
         CkCallback srcCompletionCb(CkIndex_Main::zcSrcCompleted(NULL),
                                    mProxy);
