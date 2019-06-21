@@ -34,5 +34,8 @@ mainmodule zerocopy_with_qd {
     entry void recvEmPostApiBuffer(nocopypost char buff1[size1], int size1,
                                    nocopypost char buff2[size2], int size2,
                                    nocopypost char buff3[size3], int size3);
+
+    entry void testEmBcastSendApi();
+    entry void testEmBcastPostApi();
   };
 };

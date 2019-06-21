@@ -107,8 +107,31 @@ class Main : public CBase_Main {
                   CkAssert(srcCompletedCounter == 3*numElements/2);
                   CkAssert(reductionCompleted == true);
                   CkPrintf("[%d][%d][%d] Test 4: QD has been reached for EM Post API\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
+                  testIndex++;
+                  reductionCompleted = false;
+                  srcCompletedCounter = destCompletedCounter = 0;
+                  arr1[0].testEmBcastSendApi();
+                  CkStartQD(CkCallback(CkIndex_Main::qdReached(), mProxy));
+                  break;
+
+        case 5 :  // EM Send Bcast API QD reached
+                  CkAssert(srcCompletedCounter == 3);
+                  CkAssert(reductionCompleted == true);
+                  CkPrintf("[%d][%d][%d] Test 5: QD has been reached for EM Bcast Send API\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
+                  testIndex++;
+                  reductionCompleted = false;
+                  srcCompletedCounter = destCompletedCounter = 0;
+                  arr1[0].testEmBcastPostApi();
+                  CkStartQD(CkCallback(CkIndex_Main::qdReached(), mProxy));
+                  break;
+
+        case 6 :  // EM Post Bcast API QD reached
+                  CkAssert(srcCompletedCounter == 3);
+                  CkAssert(reductionCompleted == true);
+                  CkPrintf("[%d][%d][%d] Test 6: QD has been reached for EM Bcast Post API\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
                   CkExit();
                   break;
+
 
         default:  // Invalid
                   CmiAbort("Test Index Invalid\n");
@@ -244,7 +267,19 @@ class testArr : public CBase_testArr {
       contribute(reductionCb);
     }
 
+    // Only executed on index 0
+    void testEmBcastSendApi() {
+      thisProxy.recvEmSendApiBuffer(CkSendBuffer(buff1, srcCompletionCb), size1,
+                                    CkSendBuffer(buff2, srcCompletionCb), size2,
+                                    CkSendBuffer(buff3, srcCompletionCb), size3);
+    }
 
+    // Only executed on index 0
+    void testEmBcastPostApi() {
+      thisProxy.recvEmPostApiBuffer(CkSendBuffer(buff1, srcCompletionCb), size1,
+                                    CkSendBuffer(buff2, srcCompletionCb), size2,
+                                    CkSendBuffer(buff3, srcCompletionCb), size3);
+    }
 
 };
 #include "zerocopy_with_qd.def.h"
