@@ -70,9 +70,10 @@ int InfoStruct::set(const char* k, const char* v) noexcept {
 }
 
 int InfoStruct::dup(InfoStruct& src) noexcept {
-  for(int i=0;i<nodes.size();i++){
-    KeyvalPair* newkvp = new KeyvalPair(src.nodes[i]->key.c_str(), src.nodes[i]->val.c_str());
-    nodes.push_back(newkvp);
+  int nkeys = src.nodes.size();
+  nodes.resize(nkeys);
+  for(int i=0;i<nkeys;i++){
+    nodes[i] = new KeyvalPair(src.nodes[i]->key.c_str(), src.nodes[i]->val.c_str());
   }
   return MPI_SUCCESS;
 }
