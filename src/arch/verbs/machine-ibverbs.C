@@ -1884,13 +1884,30 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		
 		resetNcpyOpInfoPointers(ncpyOpInfo);
 		
-		// Deregister the source buffer
-		LrtsDeregisterMem(ncpyOpInfo->srcPtr, (char *)ncpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->srcPe, ncpyOpInfo->srcRegMode);
+		if(CmiMyNode() == CmiNodeOf(ncpyOpInfo->srcPe)) {
+			// Deregister the source buffer
+			LrtsDeregisterMem(ncpyOpInfo->srcPtr, (char *)ncpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->srcPe, ncpyOpInfo->srcRegMode);
+			
+			ncpyOpInfo->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
+			
+			// Invoke source ack
+			ncpyOpInfo->opMode = CMK_EM_API_SRC_ACK_INVOKE;
+			
+		} else if(CmiMyNode() == CmiNodeOf(ncpyOpInfo->destPe)) {
+			// Deregister the destination buffer
+			LrtsDeregisterMem(ncpyOpInfo->destPtr, (char *)ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(), ncpyOpInfo->destPe, ncpyOpInfo->destRegMode);
+			
+			ncpyOpInfo->isDestRegistered = 0; // Set isDestRegistered to 0 after de-registration
+			
+			// Invoke destination ack
+			ncpyOpInfo->opMode = CMK_EM_API_DEST_ACK_INVOKE;
+			
+		} else {
+			 CmiAbort(" Cannot de-register on a different node than the source or destinaton");
+			
+		}
 		
-		ncpyOpInfo->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
-		
-		// Invoke source ack
-		ncpyOpInfo->opMode = CMK_EM_API_SRC_ACK_INVOKE;
+		// Invoke ack
 		CmiInvokeNcpyAck(ncpyOpInfo);
 	}
 	if(header->code == INFIRDMA_DIRECT_REG_AND_GET){
@@ -1962,7 +1979,10 @@ static inline  void processSendWC(struct ibv_wc *sendWC){
 			GarbageCollectMsg(packet->ogm);	
 		}
 	}else{
-		if(packet->header.code == INFIRDMA_START || packet->header.code == INFIRDMA_ACK || packet->header.code ==  INFIDUMMYPACKET){
+		if(packet->header.code == INFIRDMA_START ||
+		   packet->header.code == INFIRDMA_ACK ||
+		   packet->header.code ==  INFIDUMMYPACKET ||
+		   packet->header.code == INFIRDMA_DIRECT_DEREG_AND_ACK) {
                    if (packet->buf) CmiFree(packet->buf);  /* gzheng */
 		}
 	}

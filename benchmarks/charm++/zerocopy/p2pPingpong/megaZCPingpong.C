@@ -229,10 +229,10 @@ class Ping1 : public CBase_Ping1 {
       iterations = _iterations;
 
       CkCallback srcCb = CkCallback(CkCallback::ignore);
-      src = CkNcpyBuffer(nocopySrcBuffer, sizeof(char) * size, srcCb, CK_BUFFER_UNREG);
+      src = CkNcpyBuffer(nocopySrcBuffer, sizeof(char) * size, srcCb, CK_BUFFER_UNREG, CK_BUFFER_NODEREG);
 
       CkCallback destCb = CkCallback(CkIndex_Ping1::getCompleteDest1(), thisProxy[thisIndex]);
-      dest = CkNcpyBuffer(nocopyDestBuffer, sizeof(char) * size, destCb, CK_BUFFER_UNREG);
+      dest = CkNcpyBuffer(nocopyDestBuffer, sizeof(char) * size, destCb, CK_BUFFER_UNREG, CK_BUFFER_NODEREG);
 
       thisProxy[0].beginDirectPingpong1();
     }
@@ -272,10 +272,10 @@ class Ping1 : public CBase_Ping1 {
       iterations = _iterations;
 
       CkCallback srcCb = CkCallback(CkCallback::ignore);
-      src = CkNcpyBuffer(nocopySrcBuffer, sizeof(char) * size, srcCb, CK_BUFFER_REG);
+      src = CkNcpyBuffer(nocopySrcBuffer, sizeof(char) * size, srcCb, CK_BUFFER_REG, CK_BUFFER_NODEREG);
 
       CkCallback destCb = CkCallback(CkIndex_Ping1::getCompleteDest2(), thisProxy[thisIndex]);
-      dest = CkNcpyBuffer(nocopyDestBuffer, sizeof(char) * size, destCb, CK_BUFFER_REG);
+      dest = CkNcpyBuffer(nocopyDestBuffer, sizeof(char) * size, destCb, CK_BUFFER_REG, CK_BUFFER_NODEREG);
 
       thisProxy[0].beginDirectPingpong2();
     }
@@ -312,10 +312,10 @@ class Ping1 : public CBase_Ping1 {
       iterations = _iterations;
 
       CkCallback srcCb = CkCallback(CkCallback::ignore);
-      src = CkNcpyBuffer(nocopySrcBufferReg, sizeof(char) * size, srcCb, CK_BUFFER_PREREG);
+      src = CkNcpyBuffer(nocopySrcBufferReg, sizeof(char) * size, srcCb, CK_BUFFER_PREREG, CK_BUFFER_NODEREG);
 
       CkCallback destCb = CkCallback(CkIndex_Ping1::getCompleteDest3(), thisProxy[thisIndex]);
-      dest = CkNcpyBuffer(nocopyDestBufferReg, sizeof(char) * size, destCb, CK_BUFFER_PREREG);
+      dest = CkNcpyBuffer(nocopyDestBufferReg, sizeof(char) * size, destCb, CK_BUFFER_PREREG, CK_BUFFER_NODEREG);
 
       thisProxy[0].beginDirectPingpong3();
     }
@@ -352,10 +352,10 @@ class Ping1 : public CBase_Ping1 {
       iterations = _iterations;
 
       CkCallback srcCb = CkCallback(CkCallback::ignore);
-      src = CkNcpyBuffer(nocopySrcBuffer, sizeof(char) * size, srcCb, CK_BUFFER_REG);
+      src = CkNcpyBuffer(nocopySrcBuffer, sizeof(char) * size, srcCb, CK_BUFFER_REG, CK_BUFFER_NODEREG);
 
       CkCallback destCb = CkCallback(CkIndex_Ping1::getCompleteDest4(), thisProxy[thisIndex]);
-      dest = CkNcpyBuffer(nocopyDestBuffer, sizeof(char) * size, destCb, CK_BUFFER_REG);
+      dest = CkNcpyBuffer(nocopyDestBuffer, sizeof(char) * size, destCb, CK_BUFFER_REG, CK_BUFFER_NODEREG);
 
       thisProxy[0].beginDirectPingpong4();
     }

@@ -1,7 +1,14 @@
 language: cpp
 
 cache: ccache
-
+before_install:
+  - |
+      if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then
+        git diff --name-only $TRAVIS_COMMIT_RANGE | grep -qvE '(\.rst$)|(^doc/)' || {
+          echo "Only docs were updated, stopping build process."
+          exit
+        }
+      fi
 install:
   - if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew install ccache; fi
   - if [ "$TRAVIS_OS_NAME" = "osx" ]; then export PATH="/usr/local/opt/ccache/libexec:$PATH"; fi
