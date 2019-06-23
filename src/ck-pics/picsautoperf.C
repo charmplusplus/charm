@@ -138,15 +138,7 @@ void combinePerfData(PerfData *ret, PerfData *source) {
   if(ret->data[MAX_EntryMethodDuration] < source->data[MAX_EntryMethodDuration])
     ret->data[MaxEntryPE] = source->data[MaxEntryPE];
   for(;k<NUM_AVG+NUM_MAX; k++) {
-    if(ret->data[k] < source->data[k]){
-      ret->data[k] = source->data[k];
-      k++;
-      ret->data[k] = source->data[k];
-    }
-    else
-    {
-        k++;
-    }
+    ret->data[k] = std::max(ret->data[k], source->data[k]);
   }
   for(;k<NUM_AVG+NUM_MAX+NUM_MIN; k++) {
     ret->data[k] = std::min(ret->data[k], source->data[k]);
