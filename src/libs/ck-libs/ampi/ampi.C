@@ -11580,6 +11580,14 @@ AMPI_API_IMPL(int, MPI_Pcontrol, const int level, ...)
   return MPI_SUCCESS;
 }
 
+/* Extensions needed by ROMIO */
+
+AMPI_API_IMPL(int, MPIR_Status_set_bytes, MPI_Status *sts, MPI_Datatype dtype, int nbytes)
+{
+  AMPI_API("AMPIR_Status_set_bytes");
+  return MPI_Status_set_elements_x(sts, MPI_BYTE, nbytes);
+}
+
 /******** AMPI Extensions to the MPI standard *********/
 
 CLINKAGE int AMPI_Init_universe(int * unicomm)

@@ -304,6 +304,9 @@ FLINKAGE {
 #define ampif_add_error_string FTN_NAME ( AMPIF_ADD_ERROR_STRING , ampif_add_error_string )
 #define ampif_print FTN_NAME( AMPIF_PRINT , ampif_print )
 
+/* Extensions needed by ROMIO */
+#define mpir_status_set_bytes FTN_NAME ( MPIR_STATUS_SET_BYTES, mpir_status_set_bytes )
+
 /* AMPI extensions */
 #define ampi_migrate FTN_NAME( AMPI_MIGRATE , ampi_migrate )
 #define ampi_load_start_measure FTN_NAME( AMPI_LOAD_START_MEASURE, ampi_load_start_measure )
@@ -2110,6 +2113,13 @@ void mpi_info_free(int* info, int* ierr) noexcept
 void mpi_pcontrol(int *level) noexcept
 {
   MPI_Pcontrol(*level);
+}
+
+/* Extensions needed by ROMIO */
+void mpir_status_set_bytes(int *status, int* datatype, int *nbytes, int* ierr) noexcept
+{
+  MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
+  *ierr = MPIR_Status_set_bytes(s, *datatype, *nbytes);
 }
 
 /* AMPI Extensions */
