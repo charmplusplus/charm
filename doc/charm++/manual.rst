@@ -1083,8 +1083,8 @@ several fields:
        void someEntry(parameters2);
    };
 
-Note that A must have a *migration constructor*, which is typically
-empty:
+Note that A must have a *migration constructor* if it is to be migratable.
+The migration constructor is typically empty:
 
 .. code-block:: c++
 
@@ -2341,10 +2341,10 @@ Objects can be created in one of two ways: they can be created using a
 normal constructor as usual; or they can be created using their pup
 constructor. The pup constructor for Charm++ array elements and
 PUP::able objects is a “migration constructor” that takes a single
-“CkMigrateMessage \*"; for other objects, such as parameter marshalled
-objects, the pup constructor has no parameters. The pup constructor is
-always followed by a call to the object’s pup method in ``isUnpacking``
-mode.
+“CkMigrateMessage \*" which the user should not free; for other objects,
+such as parameter marshalled objects, the pup constructor has no parameters.
+The pup constructor is always followed by a call to the object’s pup method
+in ``isUnpacking`` mode.
 
 Once objects are created, they respond to regular user methods and
 remote entry methods as usual. At any time, the object pup method can be
@@ -7218,7 +7218,8 @@ concrete subclasses require these four features:
 
 -  A migration constructor — a constructor that takes ``CkMigrateMessage *``.
    This is used to create the new object on the receive side,
-   immediately before calling the new object's pup routine.
+   immediately before calling the new object's pup routine. Users should not free
+   the CkMigrateMessage.
 
 -  A working, virtual ``pup`` method. You can omit this if your class has no
    data that needs to be packed.
