@@ -253,6 +253,8 @@ void TraceAutoPerfBOC::endStep(bool fromGlobal, int fromPE, int incSteps) {
 void TraceAutoPerfBOC::endStepResumeCb(bool fromGlobal, int fromPE, CkCallback cb) {
   endStepTimer = CkWallTimer();
   TraceAutoPerf *t = localAutoPerfTracingInstance();
+  currentAppStep++;
+  picsStep++;
   if(picsStep % PERIOD_PERF == 0 ) {
     t->endStep(true);
   }
@@ -260,7 +262,6 @@ void TraceAutoPerfBOC::endStepResumeCb(bool fromGlobal, int fromPE, CkCallback c
   {
     t->endStep(false);
   }
-  currentAppStep++;
   setAutoPerfDoneCallback(cb);
   run(fromGlobal, fromPE); 
 }
@@ -360,33 +361,31 @@ void TraceAutoPerfBOC::formatPerfData(PerfData *perfdata, int subStep, int phase
   int steps = currentAppStep-lastAnalyzeStep;
 
   //derive metrics from raw performance data
-  if (steps > 0) {
-    data[AVG_LoadPerPE] = data[AVG_UtilizationPercentage]/numpes * totaltime/steps;
-    data[AVG_UtilizationPercentage] /= numpes; 
-    data[AVG_IdlePercentage] /= numpes; 
-    data[AVG_OverheadPercentage] /= numpes; 
-    data[MAX_LoadPerPE] = data[MAX_UtilizationPercentage]*totaltime/steps;
-    data[AVG_BytesPerMsg] = data[AVG_BytesPerObject]/data[AVG_NumMsgsPerObject];
-    data[AVG_NumMsgPerPE] = (data[AVG_NumMsgsPerObject]/numpes)/steps;
-    data[AVG_BytesPerPE] = data[AVG_BytesPerObject]/numpes/steps;
-    data[AVG_CacheMissRate] = data[AVG_CacheMissRate]/numpes/steps;
+  data[AVG_LoadPerPE] = data[AVG_UtilizationPercentage]/numpes * totaltime/steps;
+  data[AVG_UtilizationPercentage] /= numpes;
+  data[AVG_IdlePercentage] /= numpes;
+  data[AVG_OverheadPercentage] /= numpes;
+  data[MAX_LoadPerPE] = data[MAX_UtilizationPercentage]*totaltime/steps;
+  data[AVG_BytesPerMsg] = data[AVG_BytesPerObject]/data[AVG_NumMsgsPerObject];
+  data[AVG_NumMsgPerPE] = (data[AVG_NumMsgsPerObject]/numpes)/steps;
+  data[AVG_BytesPerPE] = data[AVG_BytesPerObject]/numpes/steps;
+  data[AVG_CacheMissRate] = data[AVG_CacheMissRate]/numpes/steps;
 
-    data[AVG_NumMsgRecv] = data[AVG_NumMsgRecv]/numpes/steps;
-    data[AVG_BytesMsgRecv] = data[AVG_BytesMsgRecv]/numpes/steps;
+  data[AVG_NumMsgRecv] = data[AVG_NumMsgRecv]/numpes/steps;
+  data[AVG_BytesMsgRecv] = data[AVG_BytesMsgRecv]/numpes/steps;
 
-    data[AVG_EntryMethodDuration] /= data[AVG_NumInvocations];
-    data[AVG_EntryMethodDuration_1] /= data[AVG_NumInvocations_1];
-    data[AVG_EntryMethodDuration_2] /= data[AVG_NumInvocations_2];
-    data[AVG_NumInvocations] = data[AVG_NumInvocations]/numpes/steps;
-    data[AVG_NumInvocations_1] = data[AVG_NumInvocations_1]/numpes/steps;
-    data[AVG_NumInvocations_2] = data[AVG_NumInvocations_2]/numpes/steps;
+  data[AVG_EntryMethodDuration] /= data[AVG_NumInvocations];
+  data[AVG_EntryMethodDuration_1] /= data[AVG_NumInvocations_1];
+  data[AVG_EntryMethodDuration_2] /= data[AVG_NumInvocations_2];
+  data[AVG_NumInvocations] = data[AVG_NumInvocations]/numpes/steps;
+  data[AVG_NumInvocations_1] = data[AVG_NumInvocations_1]/numpes/steps;
+  data[AVG_NumInvocations_2] = data[AVG_NumInvocations_2]/numpes/steps;
 
-    data[AVG_LoadPerObject] /= data[AVG_NumObjectsPerPE];
-    data[AVG_NumMsgsPerObject] /= data[AVG_NumObjectsPerPE];
-    data[AVG_BytesPerObject] /= data[AVG_NumObjectsPerPE];
+  data[AVG_LoadPerObject] /= data[AVG_NumObjectsPerPE];
+  data[AVG_NumMsgsPerObject] /= data[AVG_NumObjectsPerPE];
+  data[AVG_BytesPerObject] /= data[AVG_NumObjectsPerPE];
 
-    data[AVG_NumObjectsPerPE] = data[AVG_NumObjectsPerPE]/numpes/steps;
-  }
+  data[AVG_NumObjectsPerPE] = data[AVG_NumObjectsPerPE]/numpes/steps;
 
   CkPrintf("\nPICS Data: PEs in group: %d\nIDLE%: %.2f\nOVERHEAD%: %.2f\nUTIL%: %.2f\nAVG_ENTRY_DURATION: %f\n", numpes, data[AVG_IdlePercentage], data[AVG_OverheadPercentage], data[AVG_UtilizationPercentage], data[AVG_EntryMethodDuration]);
 }
@@ -449,6 +448,11 @@ void TraceAutoPerfBOC::globalPerfAnalyze(CkReductionMsg *msg )
       CkpvAccess(summaryPerfDatabase)->add(msg);
     }
     lastAnalyzeStep = currentAppStep;
+    return;
+  }
+
+  // to prevent traceAutoPerfExitFunction resulting in data being analyzed twice
+  if (CkpvAccess(isExit) && picsStep % PERIOD_PERF == 0) {
     return;
   }
 
@@ -735,6 +739,7 @@ extern "C" void traceAutoPerfExitFunction() {
   }
 
   CkpvAccess(isExit) = true;
+
   autoPerfProxy.getPerfData(0, CkCallback::ignore );
 }
 
