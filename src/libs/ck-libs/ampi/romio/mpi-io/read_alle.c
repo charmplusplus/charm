@@ -49,7 +49,7 @@ int MPI_File_read_all_end(MPI_File fh, void *buf, MPI_Status *status)
 }
 
 /* prevent multiple definitions of this routine */
-#ifdef MPIO_BUILD_PROFILING
+#if defined AMPI || defined MPIO_BUILD_PROFILING
 int MPIOI_File_read_all_end(MPI_File fh,
 			    void *buf,
 			    char *myname,

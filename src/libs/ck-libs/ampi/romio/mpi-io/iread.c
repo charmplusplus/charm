@@ -72,7 +72,7 @@ int MPI_File_iread(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI
 }
 
 /* prevent multiple definitions of this routine */
-#ifdef MPIO_BUILD_PROFILING
+#if defined AMPI || defined MPIO_BUILD_PROFILING
 int MPIOI_File_iread(MPI_File fh, MPI_Offset offset, int file_ptr_type, void *buf, int count,
 		     MPI_Datatype datatype, char *myname, MPI_Request *request)
 {
