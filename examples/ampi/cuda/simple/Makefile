@@ -5,6 +5,9 @@
 
 CUDATOOLKIT_HOME ?= /usr/local/cuda
 NVCC=$(CUDATOOLKIT_HOME)/bin/nvcc
+NVCC_INC = -I../../../../include
+CHARMC_INC = -I$(CUDATOOLKIT_HOME)/include
+LD_LIBS = -L$(CUDATOOLKIT_HOME)/lib64 -lcudart
 CHARMDIR=../../../..
 AMPICC=$(CHARMDIR)/bin/ampicc
 AMPICXX=$(CHARMDIR)/bin/ampicxx
@@ -15,10 +18,15 @@ CXX=$(AMPICXX)
 LD=$(AMPICXX)
 CXXFLAGS=$(DEFS)
 
-simple: simple-cuda.o
+simple: simple-cuda.o simple.o
+	$(AMPICXX) -o $@ $^ $(LD_LIBS)
 
 simple-cuda.o: simple-cuda.cu
-	$(NVCC) $(DEFS) -std=c++11 -I$(CHARMDIR)/include -c simple-cuda.cu
+	$(NVCC) $(NVCC_INC) $(DEFS) -std=c++11 -c $<
+
+simple.o: simple.C
+		$(AMPICXX) $(CHARMC_INC) -c $<
+
 
 test:
 	./simple +vp 1

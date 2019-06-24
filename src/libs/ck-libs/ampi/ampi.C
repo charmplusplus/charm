@@ -11822,9 +11822,10 @@ int GPUReq::wait(MPI_Status *sts) noexcept
   return 0;
 }
 
-void GPUReq::receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg/*=true*/) noexcept
+bool GPUReq::receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg/*=true*/) noexcept
 {
   CkAbort("GPUReq::receive should never be called");
+  return true;
 }
 
 void GPUReq::receive(ampi *ptr, CkReductionMsg *msg) noexcept
@@ -11909,4 +11910,3 @@ int AMPI_GPU_Invoke(cudaStream_t stream)
 #endif // CMK_CUDA
 
 #include "ampi.def.h"
-
