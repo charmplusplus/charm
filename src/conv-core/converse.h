@@ -1258,6 +1258,8 @@ void          CmiSyncBroadcastAllFn(int, char *);
 CmiCommHandle CmiAsyncBroadcastAllFn(int, char *);
 void          CmiFreeBroadcastAllFn(int, char *);
 
+void          CmiWithinNodeBroadcastFn(int, char*);
+
 void          CmiSyncListSendFn(int, const int *, int, char*);
 CmiCommHandle CmiAsyncListSendFn(int, const int *, int, char*);
 void          CmiFreeListSendFn(int, const int *, int, char*);
@@ -1385,8 +1387,6 @@ void          CmiFreeNodeBroadcastFn(int, char *);
 void          CmiSyncNodeBroadcastAllFn(int, char *);
 CmiCommHandle CmiAsyncNodeBroadcastAllFn(int, char *);
 void          CmiFreeNodeBroadcastAllFn(int, char *);
-
-void          CmiWithinNodeBroadcastFn(int, char*);
 
 /* if node queue is available, adding inter partition counterparts */
 void          CmiInterSyncNodeSendFn(int, int, int, char *);
