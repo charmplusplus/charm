@@ -48,7 +48,7 @@ int MPI_File_write_all_end(MPI_File fh, ROMIO_CONST void *buf, MPI_Status *statu
 }
 
 /* prevent multiple definitions of this routine */
-#ifdef MPIO_BUILD_PROFILING
+#if defined AMPI || defined MPIO_BUILD_PROFILING
 int MPIOI_File_write_all_end(MPI_File fh,
 			     const void *buf,
 			     char *myname,

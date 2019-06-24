@@ -68,7 +68,7 @@ int MPI_File_iwrite_all(MPI_File fh, const void *buf, int count,
 
 /* Note: MPIOI_File_iwrite_all also used by MPI_File_iwrite_at_all */
 /* prevent multiple definitions of this routine */
-#ifdef MPIO_BUILD_PROFILING
+#if defined AMPI || defined MPIO_BUILD_PROFILING
 int MPIOI_File_iwrite_all(MPI_File fh,
             MPI_Offset offset,
             int file_ptr_type,
