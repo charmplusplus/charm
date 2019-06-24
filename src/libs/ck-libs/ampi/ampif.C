@@ -2135,7 +2135,7 @@ void mpi_pcontrol(int *level) noexcept
 }
 
 /* Extensions needed by ROMIO */
-void mpir_status_set_bytes(int *status, int* datatype, int *nbytes, int* ierr) noexcept
+void mpir_status_set_bytes(int *status, int* datatype, MPI_Count *nbytes, int* ierr) noexcept
 {
   MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
   *ierr = MPIR_Status_set_bytes(s, *datatype, *nbytes);
