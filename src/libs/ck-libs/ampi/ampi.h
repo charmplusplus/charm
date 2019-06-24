@@ -91,6 +91,7 @@ typedef void (*MPI_MainFn) (int,char**);
 
 typedef int MPI_Datatype;
 typedef intptr_t MPI_Aint;
+#define MPI_AINT_FMT_HEX_SPEC "%z"
 typedef int MPI_Fint;
 typedef MPI_Aint MPI_Count;
 typedef long long int MPI_Offset;
