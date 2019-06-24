@@ -3088,11 +3088,13 @@ static void *CmiAllocFindEnclosing(void *blk) {
 }
 
 void CmiInitMsgHeader(void *msg, int size) {
+  if(size >= CmiMsgHeaderSizeBytes) {
 #if CMK_ONESIDED_IMPL
-  // Set zcMsgType in the converse message header to CMK_REG_NO_ZC_MSG
-  if(size >= CmiMsgHeaderSizeBytes)
+    // Set zcMsgType in the converse message header to CMK_REG_NO_ZC_MSG
     CMI_ZC_MSGTYPE(msg) = CMK_REG_NO_ZC_MSG;
 #endif
+    CMI_MSG_NOKEEP(msg) = 0;
+  }
 }
 
 int CmiGetReference(void *blk)
