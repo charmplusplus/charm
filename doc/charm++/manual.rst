@@ -4779,7 +4779,7 @@ performing any zerocopy operations. This mode was added as it was useful
 for implementing a runtime system feature.
 
 Memory De-registration and De-registration Modes
-''''''''''''''''''''''''''''''''''''''''''''''''''
+''''''''''''''''''''''''''''''''''''''''''''''''
 
 On network layers that require explicit memory registration, it is
 important to de-register the registered memory. Since networks are limited
@@ -4808,7 +4808,7 @@ completion of the zero copy operation. It is beneficial when the user wants to r
 
 
 Important Methods
-''''''''''''''''''
+'''''''''''''''''
 
 The Zero Copy API provides important methods that offer utilities that
 can be used by the user.
