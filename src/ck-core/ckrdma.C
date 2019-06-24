@@ -640,9 +640,6 @@ void performEmApiMemcpy(CkNcpyBuffer &source, CkNcpyBuffer &dest, ncpyEmApiMode 
 
   } // send a message to the parent to indicate completion
   else if (emMode == ncpyEmApiMode::BCAST_SEND || emMode == ncpyEmApiMode::BCAST_RECV) {
-    // Invoke the bcast handler
-    CkRdmaEMBcastAckHandler((void *)source.refAckInfo);
-
     // De-register dest if it has been registered
     if(emMode == ncpyEmApiMode::BCAST_RECV && isDeregReady(dest))
       deregisterBuffer(dest);
@@ -928,7 +925,7 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
   // source buffer
   CkNcpyBuffer source;
 
-  bool sendBackToSourceForDereg = false;
+  bool sendBackToSourceForDereg = false; // used for CMA transfers
 
   for(int i=0; i<numops; i++){
     up|source;
@@ -981,7 +978,10 @@ envelope* CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg
     }
   } else if(emMode == ncpyEmApiMode::BCAST_SEND) {
     switch(ncpyMode) {
-      case CkNcpyMode::MEMCPY:  CkPackMessage(&copyenv); // Pack message as it will be forwarded to peers
+      case CkNcpyMode::MEMCPY:  // Invoke the bcast Ack Handler after 'numops' memcpy operations are complete
+                                CkAssert(source.refAckInfo != NULL);
+                                CkRdmaEMBcastAckHandler((void *)source.refAckInfo);
+                                CkPackMessage(&copyenv); // Pack message as it will be forwarded to peers
                                 forwardMessageToPeerNodes(copyenv, copyenv->getMsgtype());
                                 return copyenv;
                                 break;
@@ -1102,7 +1102,10 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
     }
   } else if(emMode == ncpyEmApiMode::BCAST_RECV) {
     switch(ncpyMode) {
-      case CkNcpyMode::MEMCPY:  handleMsgOnChildPostCompletionForRecvBcast(env);
+      case CkNcpyMode::MEMCPY:  // Invoke the bcast Ack Handler after 'numops' memcpy operations are complete
+                                CkAssert(source.refAckInfo != NULL);
+                                CkRdmaEMBcastAckHandler((void *)source.refAckInfo);
+                                handleMsgOnChildPostCompletionForRecvBcast(env);
                                 break;
 
       case CkNcpyMode::CMA   :  if(t.child_count == 0) {
