@@ -1153,6 +1153,10 @@ typedef void (*MPI_MigrateFn)(void);
 #define  MPI_T_pvar_write  AMPI_T_pvar_write
 #define PMPI_T_pvar_write APMPI_T_pvar_write
 
+/* Extensions needed by ROMIO */
+#define  MPIR_Status_set_bytes  AMPIR_Status_set_bytes
+#define PMPIR_Status_set_bytes APMPIR_Status_set_bytes
+
 #endif //CMK_CONVERSE_MPI
 
 
