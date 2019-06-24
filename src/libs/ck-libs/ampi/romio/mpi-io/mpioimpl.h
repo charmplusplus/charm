@@ -37,7 +37,7 @@
 #define ROMIO_THREAD_CS_ENTER()
 #define ROMIO_THREAD_CS_EXIT()
 #define ROMIO_THREAD_CS_YIELD()
-#define MPIO_DATATYPE_ISCOMMITTED(dtype_, err_) do {} while (0)
+#define MPIO_DATATYPE_ISCOMMITTED(dtype_, err_) do { err_ = MPI_SUCCESS; } while (0)
 #ifdef HAVE_WINDOWS_H
 #define MPIU_UNREFERENCED_ARG(a) a
 #else
