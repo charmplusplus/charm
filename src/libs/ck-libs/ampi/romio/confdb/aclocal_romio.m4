@@ -767,7 +767,7 @@ define(PAC_TEST_MPIR_STATUS_SET_BYTES,[
 #include "mpi.h"
      main(int argc, char **argv)
      {
-     	 MPI_Status status;
+     	 MPI_Status *status;
          MPI_Datatype type;
 	 int err;
 
