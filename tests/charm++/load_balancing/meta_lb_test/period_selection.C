@@ -41,10 +41,15 @@ public:
     if (iteration < MAX_ITER) {
       arrayProxy.balance(iteration);
     } else {
-      if (CkNumPes() > 1 && migrations != 10) {
+      int expected_migrations = 10;
+      if (CkNumPes() == 1) {
+        expected_migrations = 0;
+      }
+#if CMK_UTH_VERSION
+      expected_migrations = 0;
+#endif
+      if (migrations != expected_migrations) {
         CkAbort("Did not do expected number of migrations!\n");
-      } else if (CkNumPes() == 1 && migrations > 0) {
-        CkAbort("Should not be any migration with one PE!\n");
       }
       CkExit();
     }
