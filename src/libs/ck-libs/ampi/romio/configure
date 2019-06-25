@@ -20978,7 +20978,7 @@ $as_echo "no" >&6; }
 $as_echo_n "checking if MPI_OFFSET_KIND is defined in mpif.h... " >&6; }
   rm -f mpitest.f
   cat > mpitest.f <<EOF
-      program main
+      subroutine mpi_main
       implicit none
       include 'mpif.h'
       integer i
@@ -23609,7 +23609,7 @@ $as_echo "#define MPIHP 1" >>confdefs.h
 $as_echo_n "checking if mpiof.h is included in mpif.h... " >&6; }
   rm -f mpitest.f
   cat > mpitest.f <<EOF
-      program main
+      subroutine mpi_main
       implicit none
       include 'mpif.h'
       integer i
