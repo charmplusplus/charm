@@ -532,6 +532,7 @@ void performRgets(char *ref, int numops, int extraSize) {
   for(int i=0; i<numops; i++){
     NcpyEmBufferInfo *ncpyEmBufferInfo = (NcpyEmBufferInfo *)(ref + sizeof(NcpyEmInfo) + i *(sizeof(NcpyEmBufferInfo) + extraSize));
     NcpyOperationInfo *ncpyOpInfo = &(ncpyEmBufferInfo->ncpyOpInfo);
+    zcQdIncrement();
     CmiIssueRget(ncpyOpInfo);
   }
 }
@@ -606,7 +607,10 @@ void CkRdmaEMAckHandler(int destPe, void *ack) {
       case ncpyEmApiMode::P2P_SEND    : enqueueNcpyMessage(destPe, ncpyEmInfo->msg);
                                         break;
 
-      case ncpyEmApiMode::P2P_RECV    : enqueueNcpyMessage(destPe, ncpyEmInfo->msg);
+      case ncpyEmApiMode::P2P_RECV    : // Since P2P_RECV messages are enqueued twice (first with Post EM
+                                        // and the next time with Regular EM), hence QdCounter should be added
+                                        QdCreate(1);
+                                        enqueueNcpyMessage(destPe, ncpyEmInfo->msg);
                                         CmiFree(ncpyEmInfo);
                                         break;
 
@@ -831,9 +835,10 @@ void handleEntryMethodApiCompletion(NcpyOperationInfo *info) {
 
 #if CMK_REG_REQUIRED
   // send a message to the source to de-register and invoke callback
-  if(info->srcDeregMode == CK_BUFFER_DEREG)
+  if(info->srcDeregMode == CK_BUFFER_DEREG) {
+    QdCreate(1); // Matching QdProcess in CkRdmaDirectAckHandler
     CmiInvokeRemoteDeregAckHandler(info->srcPe, info);
-  else // Do not de-register source when srcDeregMode != CK_BUFFER_DEREG
+  } else // Do not de-register source when srcDeregMode != CK_BUFFER_DEREG
 #endif
     invokeSourceCallback(info);
 
@@ -1085,12 +1090,14 @@ void CkRdmaIssueRgets(envelope *env, ncpyEmApiMode emMode, void *forwardMsg, int
 
   if(emMode == ncpyEmApiMode::P2P_RECV) {
     switch(ncpyMode) {
-      case CkNcpyMode::MEMCPY:  enqueueNcpyMessage(CkMyPe(), env);
+      case CkNcpyMode::MEMCPY:  QdCreate(1);
+                                enqueueNcpyMessage(CkMyPe(), env);
                                 break;
       case CkNcpyMode::CMA   :  if(sendBackToSourceForDereg) {
                                   // Send back to source process to de-register
                                   invokeRemoteNcpyAckHandler(source.pe, (void *)source.refAckInfo, ncpyHandlerIdx::CMA_DEREG_ACK);
                                 }
+                                QdCreate(1);
                                 enqueueNcpyMessage(CkMyPe(), env);
                                 break;
 
@@ -1377,6 +1384,7 @@ void CkRdmaEMBcastAckHandler(void *ack) {
             myMsg->setMsgtype(ForBocMsg);
             myMsg->getsetArrayEp() = mgr->getRecvBroadcastEpIdx();
           }
+          QdCreate(1);
           enqueueNcpyMessage(bcastAckInfo->pe, myMsg);
         }
 #else
@@ -1388,6 +1396,7 @@ void CkRdmaEMBcastAckHandler(void *ack) {
           myMsg->setMsgtype(ForBocMsg);
           myMsg->getsetArrayEp() = mgr->getRecvBroadcastEpIdx();
         }
+        QdCreate(1);
         enqueueNcpyMessage(bcastAckInfo->pe, myMsg);
 #endif
       } else { // bcast send api
@@ -1716,6 +1725,7 @@ void updatePeerCounterAndPush(envelope *env) {
   CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
   CmiSpanningTreeInfo &t = *_topoTree;
   if(peerAckInfo->decNumPeers() - 1 == 0) {
+    QdCreate(1);
     CmiPushPE(CmiRankOf(peerAckInfo->peerParentPe), env);
   }
 }
@@ -1794,6 +1804,7 @@ void handleArrayMsgOnChildPostCompletionForRecvBcast(envelope *env) {
     CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
     env->setMsgtype(ForBocMsg);
     env->getsetArrayEp() = mgr->getRecvBroadcastEpIdx();
+    QdCreate(1);
     CmiHandleMessage(env);
   }
 }
@@ -1807,12 +1818,14 @@ void handleGroupMsgOnChildPostCompletionForRecvBcast(envelope *env) {
 #endif
   {
     CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
+    QdCreate(1);
     CmiHandleMessage(env);
   }
 }
 
 void handleNGMsgOnChildPostCompletionForRecvBcast(envelope *env) {
   CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
+  QdCreate(1);
   CmiHandleMessage(env);
 }
 
@@ -2047,6 +2060,8 @@ void readonlyGetCompleted(NcpyOperationInfo *ncpyOpInfo) {
 }
 
 inline void _ncpyAckHandler(ncpyHandlerMsg *msg) {
+  QdProcess(1);
+
   switch(msg->opMode) {
     case ncpyHandlerIdx::EM_ACK                : CkRdmaEMAckHandler(CmiMyPe(), msg->ref);
                                                  break;
@@ -2057,8 +2072,7 @@ inline void _ncpyAckHandler(ncpyHandlerMsg *msg) {
 #if CMK_USE_CMA && CMK_REG_REQUIRED
     case ncpyHandlerIdx::CMA_DEREG_ACK         : CkRdmaEMDeregAndAckHandler(msg->ref);
                                                  break;
-    case ncpyHandlerIdx::CMA_DEREG_ACK_DIRECT  : QdProcess(1); // Matching QdCreate in invokeCmaDirectRemoteDeregAckHandler
-                                                 CkRdmaEMDeregAndAckDirectHandler((char *)msg + sizeof(ncpyHandlerMsg));
+    case ncpyHandlerIdx::CMA_DEREG_ACK_DIRECT  : CkRdmaEMDeregAndAckDirectHandler((char *)msg + sizeof(ncpyHandlerMsg));
                                                  break;
 #endif
     default                                    : CmiAbort("_ncpyAckHandler: Invalid OpMode\n");
@@ -2077,6 +2091,7 @@ inline void invokeRemoteNcpyAckHandler(int pe, void *ref, ncpyHandlerIdx opMode)
   msg->opMode = opMode;
 
   CmiSetHandler(msg, ncpy_handler_idx);
+  QdCreate(1); // Matching QdProcess in _ncpyAckHandler
   CmiSyncSendAndFree(pe, sizeof(ncpyHandlerMsg), (char *)msg);
 }
 
