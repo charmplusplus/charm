@@ -422,7 +422,7 @@ define(PAC_CHECK_MPIOF_H,[
   AC_MSG_CHECKING(if mpiof.h is included in mpif.h)
   rm -f mpitest.f
   cat > mpitest.f <<EOF
-      program main
+      subroutine mpi_main
       implicit none
       include 'mpif.h'
       integer i
@@ -602,7 +602,7 @@ define(PAC_TEST_MPI_HAVE_OFFSET_KIND,[
   AC_MSG_CHECKING(if MPI_OFFSET_KIND is defined in mpif.h)
   rm -f mpitest.f
   cat > mpitest.f <<EOF
-      program main
+      subroutine mpi_main
       implicit none
       include 'mpif.h'
       integer i
