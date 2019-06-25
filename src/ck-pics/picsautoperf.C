@@ -739,7 +739,6 @@ extern "C" void traceAutoPerfExitFunction() {
   }
 
   CkpvAccess(isExit) = true;
-
   autoPerfProxy.getPerfData(0, CkCallback::ignore );
 }
 
