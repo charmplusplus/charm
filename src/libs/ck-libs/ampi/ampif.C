@@ -236,6 +236,10 @@ FLINKAGE {
 #define mpi_finalize FTN_NAME( MPI_FINALIZE , mpi_finalize )
 #define mpi_finalized FTN_NAME( MPI_FINALIZED , mpi_finalized )
 #define mpi_abort FTN_NAME( MPI_ABORT , mpi_abort )
+#define mpi_file_call_errhandler FTN_NAME( MPI_FILE_CALL_ERRHANDLER , mpi_file_call_errhandler )
+#define mpi_file_create_errhandler FTN_NAME( MPI_FILE_CREATE_ERRHANDLER , mpi_file_create_errhandler )
+#define mpi_file_set_errhandler FTN_NAME( MPI_FILE_SET_ERRHANDLER , mpi_file_set_errhandler )
+#define mpi_file_get_errhandler FTN_NAME( MPI_FILE_GET_ERRHANDLER , mpi_file_get_errhandler )
 
 /* MPI-2 */
 #define mpi_type_get_envelope FTN_NAME ( MPI_TYPE_GET_ENVELOPE , mpi_type_get_envelope )
@@ -1552,6 +1556,21 @@ void mpi_comm_get_errhandler(int* comm, int *errhandler, int *ierr) noexcept
 void mpi_comm_free_errhandler(int *errhandler, int *ierr) noexcept
 {
   *ierr = MPI_Comm_free_errhandler(errhandler);
+}
+
+void mpi_file_create_errhandler(void (*function)(MPI_File*,int*,...), int *errhandler, int *ierr) noexcept
+{
+  *ierr = MPI_File_create_errhandler(function, errhandler);
+}
+
+void mpi_file_set_errhandler(MPI_File* file, int* errhandler, int *ierr) noexcept
+{
+  *ierr = MPI_File_set_errhandler(*file, *errhandler);
+}
+
+void mpi_file_get_errhandler(MPI_File* file, int *errhandler, int *ierr) noexcept
+{
+  *ierr = MPI_File_get_errhandler(*file, errhandler);
 }
 
 void mpi_errhandler_create(void (*function)(MPI_Comm*,int*,...), int *errhandler, int *ierr) noexcept

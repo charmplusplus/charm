@@ -449,6 +449,10 @@ AMPI_FUNC(int, MPI_Finalize, void)
 AMPI_FUNC(int, MPI_Finalized, int *finalized)
 AMPI_FUNC(int, MPI_Abort, MPI_Comm comm, int errorcode)
 AMPI_FUNC(int, MPI_Pcontrol, const int level, ...)
+AMPI_FUNC(int, MPI_File_call_errhandler, MPI_File fh, int errorcode)
+AMPI_FUNC(int, MPI_File_create_errhandler, MPI_File_errhandler_function *function, MPI_Errhandler *errhandler)
+AMPI_FUNC(int, MPI_File_get_errhandler, MPI_File file, MPI_Errhandler *errhandler)
+AMPI_FUNC(int, MPI_File_set_errhandler, MPI_File file, MPI_Errhandler errhandler)
 
 /*********************One sided communication routines *****************/
 #ifndef MPI_WIN_NULL_DELETE_FN
@@ -658,12 +662,6 @@ AMPI_FUNC_NOIMPL(int, MPI_Unpack_external, const char datarep[], const void *inb
 /* A.2.4 Groups, Contexts, Communicators, and Caching C Bindings */
 
 /* A.2.6 MPI Environmental Management C Bindings */
-
-AMPI_FUNC_NOIMPL(int, MPI_File_call_errhandler, MPI_File fh, int errorcode)
-AMPI_FUNC_NOIMPL(int, MPI_File_create_errhandler, MPI_File_errhandler_function *file_errhandler_fn, MPI_Errhandler *errhandler)
-AMPI_FUNC_NOIMPL(int, MPI_File_get_errhandler, MPI_File file, MPI_Errhandler *errhandler)
-AMPI_FUNC_NOIMPL(int, MPI_File_set_errhandler, MPI_File file, MPI_Errhandler errhandler)
-
 
 /* A.2.7 The Info Object C Bindings */
 
