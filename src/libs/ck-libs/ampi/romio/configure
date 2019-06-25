@@ -12314,7 +12314,7 @@ $as_echo_n "checking if MPIR_Status_set_bytes is defined... " >&6; }
 #include "mpi.h"
      main(int argc, char **argv)
      {
-     	 MPI_Status status;
+     	 MPI_Status *status;
          MPI_Datatype type;
 	 int err;
 
