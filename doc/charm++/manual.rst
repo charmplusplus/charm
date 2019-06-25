@@ -4834,6 +4834,7 @@ registered or pinned memory. Registered memory can be de-registered by calling
 the ``deregisterMem()`` method on the CkNcpyBuffer object.
 
 .. code-block:: c++
+
    // de-register previously registered buffer
    dest.registerMem();
 
