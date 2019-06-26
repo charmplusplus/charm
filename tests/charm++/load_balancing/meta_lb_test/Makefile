@@ -13,10 +13,10 @@ test: period_selection
 	$(call run, +p1 ./period_selection +balancer RotateLB +LBPeriod 0.001 +MetaLB +LBObjOnly)
 	$(call run, +p2 ./period_selection +balancer RotateLB +LBPeriod 0.001 +MetaLB +LBObjOnly)
 	$(call run, +p4 ./period_selection +balancer RotateLB +LBPeriod 0.001 +MetaLB +LBObjOnly)
-ifeq ($(CMK_SMP),1)
+
+smptest: period_selection
 	$(call run, +p2 ./period_selection +balancer RotateLB +LBPeriod 0.001 +MetaLB +LBObjOnly ++ppn 2)
-	$(call run, +p4 ./period_selection +balancer RotateLB +LBPeriod 0.001 +MetaLB +LBOnjOnly ++ppn 2)
-endif
+	$(call run, +p4 ./period_selection +balancer RotateLB +LBPeriod 0.001 +MetaLB +LBObjOnly ++ppn 2)
 
 bgtest: period_selection
 	$(call run, +p4 ./period_selection +balancer RotateLB +LBPeriod 0.001 +MetaLB +LBObjOnly +x2 +y2 +z1 +cth1 +wth1 )
