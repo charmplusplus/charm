@@ -2,13 +2,13 @@
 // selection. It creates a chare array which calls AtSync() repeatedly and
 // specifies its own custom load so we can control what MetaBalancer sees.
 
-// Every 10 iterations, each array element sets its load to the value of
+// Every ITER_MOD iterations, each array element sets its load to the value of
 // CkMyPe(), which will cause load to look imbalanced to MetaBalancer. This
 // should cause MetaBalancer to trigger LB. After migration, each element sets
 // its load back to balanced until the next imbalanced iteration occurs.
 
 // Because of this we expect MetaBalancer to trigger load balancing once every
-// 10 iterations (with some delay as MetaBalancer determines trends).
+// ITER_MOD iterations (with some delay as MetaBalancer determines trends).
 
 // NOTE: This test must be run with RotateLB to ensure that when MetaBalancer
 // triggers LB, every chare is migrated, and the number of chares per PE remains
@@ -20,6 +20,9 @@
 /*readonly*/ CProxy_TestArray arrayProxy;
 
 #define MAX_ITER 100
+#define ITER_MOD 10
+#define DEFAULT_LOAD 32
+#define OBJS_PER_PE 8
 
 class Main : public CBase_Main {
 private:
@@ -28,7 +31,9 @@ private:
 public:
   Main(CkArgMsg* msg) : iteration(0), migrations(0) {
     delete msg;
-    arrayProxy = CProxy_TestArray::ckNew(CkNumPes() * 8);
+    // Test currently requires an equal number of objects on every PE
+    // TODO: Make a test that works with some empty PEs
+    arrayProxy = CProxy_TestArray::ckNew(CkNumPes() * OBJS_PER_PE);
     arrayProxy.balance(iteration);
   }
 
@@ -41,7 +46,7 @@ public:
     if (iteration < MAX_ITER) {
       arrayProxy.balance(iteration);
     } else {
-      int expected_migrations = 10;
+      int expected_migrations = MAX_ITER / ITER_MOD;
       if (CkNumPes() == 1) {
         expected_migrations = 0;
       }
@@ -65,16 +70,16 @@ class TestArray : public CBase_TestArray {
 private:
   int load;
 public:
-  TestArray() : load(10) {
+  TestArray() : load(DEFAULT_LOAD) {
     usesAtSync = true;
     usesAutoMeasure = false;
   }
   TestArray(CkMigrateMessage* msg) { delete msg; }
 
   void balance(int iteration) {
-    // Cause artificial imbalance every 10 iterations
+    // Cause artificial imbalance every ITER_MOD iterations
     // This should trigger MetaBalancer to run the balancer
-    if (iteration % 10 == 0) {
+    if (iteration % ITER_MOD == 0) {
       load = CkMyPe();
     }
     AtSync();
@@ -85,7 +90,7 @@ public:
   }
 
   void resetLoad() {
-    load = 10;
+    load = DEFAULT_LOAD;
   }
 
   // This is called by the RTS when AtSync is called and ready to do LB
