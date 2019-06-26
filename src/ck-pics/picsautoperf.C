@@ -387,7 +387,7 @@ void TraceAutoPerfBOC::formatPerfData(PerfData *perfdata, int subStep, int phase
 
   data[AVG_NumObjectsPerPE] = data[AVG_NumObjectsPerPE]/numpes/steps;
 
-  CkPrintf("\nPICS Data: PEs in group: %d\nIDLE%: %.2f\nOVERHEAD%: %.2f\nUTIL%: %.2f\nAVG_ENTRY_DURATION: %f\n", numpes, data[AVG_IdlePercentage], data[AVG_OverheadPercentage], data[AVG_UtilizationPercentage], data[AVG_EntryMethodDuration]);
+  CkPrintf("\nPICS Data: PEs in group: %d\nIDLE: %.2f%\nOVERHEAD: %.2f%\nUTIL: %.2f%\nAVG_ENTRY_DURATION: %fs\n", numpes, data[AVG_IdlePercentage]*100, data[AVG_OverheadPercentage]*100, data[AVG_UtilizationPercentage]*100, data[AVG_EntryMethodDuration]);
 }
 
 void TraceAutoPerfBOC::getPerfData(int reductionPE, CkCallback cb) {
@@ -686,7 +686,7 @@ TraceAutoPerfBOC::~TraceAutoPerfBOC() { }
 
 TraceAutoPerfInit::TraceAutoPerfInit(CkArgMsg* args)
 {
-  printf("Charm++ - PICS > Enabled pics autoPerf ......\n");
+  CkPrintf("PICS> Enabled PICS autoPerf\n");
   char **argv = args->argv;
   isPeriodicalAnalysis = CmiGetArgFlagDesc(argv,"+auto-pics","start performance analysis periodically");
   isIdleAnalysis = CmiGetArgFlagDesc(argv,"+idleAnalysis","start performance analysis when idle");
@@ -698,7 +698,7 @@ TraceAutoPerfInit::TraceAutoPerfInit(CkArgMsg* args)
   CkpvAccess(fpSummary) = NULL;
   if(CmiGetArgIntDesc(argv,"+picsGroupSize", &treeGroupSize,"number of processors within a PICS group ")) {
     treeBranchFactor = 2;
-    CkPrintf("Charm++ - PICS >>>>>>>>> set scalable tree branch factor %d  group is %d \n", treeBranchFactor, treeGroupSize);
+    CkPrintf("PICS> Set scalable tree branch factor %d  group is %d\n", treeBranchFactor, treeGroupSize);
   }
   else
   {
@@ -707,13 +707,13 @@ TraceAutoPerfInit::TraceAutoPerfInit(CkArgMsg* args)
   }
 
   if(CmiGetArgIntDesc(argv,"+picsCollectionMode", &PICS_collection_mode, "Collection mode (0 full, 1 partial")) {
-    CkPrintf("Charm++ -PICS >>>>>>>>> set scalable collection mode %d \n", PICS_collection_mode);
+    CkPrintf("PICS> Set scalable collection mode %d\n", PICS_collection_mode);
   }else{
     PICS_collection_mode = FULL;
   }
 
   if(CmiGetArgIntDesc(argv,"+picsEvaluationMode", &PICS_evaluation_mode, "Evaluation mode (0 SEQ, 1 PARALLEL")) {
-    CkPrintf("Charm++ - PICS >>>>>>>>> set scalable evaluation mode %d \n", PICS_evaluation_mode);
+    CkPrintf("PICS> Set scalable evaluation mode %d\n", PICS_evaluation_mode);
   }else
   {
     PICS_evaluation_mode = SEQUENTIAL;
