@@ -173,17 +173,6 @@ extern int CkRegisterMsg(const char *name, CkPackFnPtr pack,
 #define CK_EP_INLINE      (1<<8)
 
 /** type of a chare */
-#if CMK_MESSAGE_LOGGING
-typedef enum{
-	TypeInvalid=0,
-	TypeChare,
-	TypeMainChare,
-	TypeGroup,
-	TypeNodeGroup,
-	TypeArray,
-	TypeSection
-} ChareType;
-#else
 typedef enum{
 	TypeInvalid=0,
 	TypeChare,
@@ -192,7 +181,6 @@ typedef enum{
 	TypeNodeGroup,
 	TypeArray
 } ChareType;
-#endif
 
 /** A "call function" to invoke a method on an object. See EntryInfo */
 typedef void  (*CkCallFnPtr) (void *msg, void *obj);
@@ -388,6 +376,7 @@ extern void CkSendMsgBranchGroup(int eIdx,void *msg,CkGroupID gID,CmiGroup grp, 
 extern void CkSendMsgNodeBranch(int eIdx, void *msg, int destNode, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgNodeBranchInline(int eIdx, void *msg, int destNode, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgNodeBranchMulti(int eIdx, void *msg, CkGroupID gID, int npes, const int *nodes, int opts CK_MSGOPTIONAL);
+extern void CkBroadcastWithinNode(int eIdx, void *msg, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkBroadcastMsgNodeBranch(int eIdx, void *msg, CkGroupID gID, int opts CK_MSGOPTIONAL);
 

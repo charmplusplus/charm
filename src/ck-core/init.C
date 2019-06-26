@@ -217,13 +217,6 @@ typedef void (*CkFtFn)(const char *, CkArgMsg *);
 static CkFtFn  faultFunc = NULL;
 static char* _restartDir;
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-int teamSize=1;
-int chkptPeriod=1000;
-bool fastRecovery = false;
-int parallelRecovery = 1;
-extern int BUFFER_TIME; //time spent waiting for buffered messages
-#endif
 
 // flag for killing processes 
 extern bool killFlag;
@@ -231,10 +224,6 @@ extern bool killFlag;
 extern char *killFile;
 // function for reading the kill file
 void readKillFile();
-#if CMK_MESSAGE_LOGGING
-// flag for disk checkpoint
-extern bool diskCkptFlag;
-#endif
 
 int _defaultObjectQ = 0;            // for obejct queue
 bool _ringexit = 0;		    // for charm exit
@@ -312,17 +301,8 @@ static inline void _parseCommandLineOpts(char **argv)
 # if CMK_MEM_CHECKPOINT
       faultFunc = CkMemRestart;
 # endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-      faultFunc = CkMlogRestart;
-#endif
       CmiPrintf("[%d] Restarting after crash \n",CmiMyPe());
   }
-#if CMK_MESSAGE_LOGGING
-	// reading +ftc_disk flag
-	if (CmiGetArgFlagDesc(argv, "+ftc_disk", "Disk Checkpointing")) {
-		diskCkptFlag = true;
-    }
-#endif
   // reading the killFile
   if(CmiGetArgStringDesc(argv,"+killFile", &killFile,"Generates SIGKILL on specified processors")){
     if(faultFunc == NULL){
@@ -348,17 +328,6 @@ static inline void _parseCommandLineOpts(char **argv)
 	if(CmiGetArgStringDesc(argv,"+raiseevac", &_raiseEvacFile,"Generates processor evacuation on random processors")){
 		_raiseEvac = 1;
 	}
-#endif
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	if(!CmiGetArgIntDesc(argv,"+teamSize",&teamSize,"Set the team size for message logging")){
-        teamSize = 1;
-    }
-    if(!CmiGetArgIntDesc(argv,"+chkptPeriod",&chkptPeriod,"Set the checkpoint period for the message logging fault tolerance algorithm in seconds")){
-        chkptPeriod = 100;
-    }
-	if(CmiGetArgIntDesc(argv,"+fastRecovery", &parallelRecovery, "Parallel recovery with message logging protocol")){
-        fastRecovery = true;
-    }
 #endif
 
         if (!CmiGetArgIntDesc(argv, "+messageBufferingThreshold",
@@ -584,9 +553,6 @@ static inline void ReportWarnings(WarningMsg * msg)
 }
 #endif /* CMK_LOCKLESS_QUEUE */
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-extern void _messageLoggingExit();
-#endif
 
 #if __FAULT__
 //CpvExtern(int, CldHandlerIndex);
@@ -655,9 +621,6 @@ static void _exitHandler(envelope *env)
 #endif
       break;
     case ReqStatMsg: // Request stats and warnings message
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-      _messageLoggingExit();
-#endif
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
       CkNumberHandler(_charmHandlerIdx,_discardHandler);
       CkNumberHandler(_bocHandlerIdx, _discardHandler);
@@ -984,11 +947,13 @@ static void _roRdmaDoneHandler(envelope *env) {
 
   switch(env->getMsgtype()) {
     case ROPeerCompletionMsg:
+      CpvAccess(_qd)->process();
       checkForInitDone(true); // Receiving a ROPeerCompletionMsg indicates that RO ZCPY Bcast
                               // operation is complete on the comm. thread
       if (env!=NULL) CmiFree(env);
       break;
     case ROChildCompletionMsg:
+      CpvAccess(_qd)->process();
       roBcastAckInfo->counter++;
       if(roBcastAckInfo->counter == roBcastAckInfo->numChildren) {
         // deregister
@@ -1006,6 +971,7 @@ static void _roRdmaDoneHandler(envelope *env) {
 
           //forward message to root
           // Send a message to the parent to signal completion in order to deregister
+          QdCreate(1);
           envelope *compEnv = _allocEnv(ROChildCompletionMsg);
           compEnv->setSrcPe(CkMyPe());
           CmiSetHandler(compEnv, _roRdmaDoneHandlerIdx);
@@ -1626,9 +1592,6 @@ void _initCharm(int unused_argc, char **argv)
     }
 #endif
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    _messageLoggingInit();
-#endif
 
 #if CMK_FAULT_EVAC
 #ifndef __BIGSIM__
@@ -1646,9 +1609,6 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 	CpvAccess(serializer) = 0;
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
-    CcdCallOnCondition(CcdSIGUSR2,(CcdVoidFn)CkMlogRestart,0);
-#endif
 
 #if CMK_FAULT_EVAC
 	if(_raiseEvac){
@@ -1820,9 +1780,6 @@ void _initCharm(int unused_argc, char **argv)
       quietMode = 0;  // allow printing any mainchare user messages
 			_entryTable[_mainTable[i]->entryIdx]->call(msg, obj);
       if (quietModeRequested) quietMode = 1;
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-            CpvAccess(_currentObj) = (Chare *)obj;
-#endif
 		}
                 _mainDone = true;
 

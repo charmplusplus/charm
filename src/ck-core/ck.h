@@ -36,6 +36,13 @@ inline void _CldEnqueue(int pe, void *msg, int infofn) {
 #endif
   CldEnqueue(pe, msg, infofn);
 }
+inline void _CldEnqueueWithinNode(void *msg, int infofn) {
+  if (!ConverseDeliver(-1)) {
+    CmiFree(msg);
+    return;
+  }
+  CldEnqueueWithinNode(msg, infofn);
+}
 inline void _CldEnqueueMulti(int npes, const int *pes, void *msg, int infofn) {
   if (!ConverseDeliver(-1)) {
     CmiFree(msg);
@@ -84,8 +91,9 @@ inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
 #endif
   CldNodeEnqueue(node, msg, infofn);
 }
-#define _CldEnqueueMulti  CldEnqueueMulti
-#define _CldEnqueueGroup  CldEnqueueGroup
+#define _CldEnqueueMulti      CldEnqueueMulti
+#define _CldEnqueueGroup      CldEnqueueGroup
+#define _CldEnqueueWithinNode CldEnqueueWithinNode
 #endif
 
 #ifndef CMK_CHARE_USE_PTR

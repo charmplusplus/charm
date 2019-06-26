@@ -170,7 +170,7 @@ bgtest: bigsim LIBS
 	$(MAKE) -C ../examples bgtest
 	$(MAKE) -C ../benchmarks bgtest
 
-syncfttest causalfttest mpisyncfttest mlogfttest: charm++ LIBS
+syncfttest mpisyncfttest : charm++ LIBS
 	$(MAKE) -C ../tests $@
 
 test: bigsim LIBS
@@ -283,7 +283,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  cksection.h ckmessage.h cklocrec.h ckmigratable.h \
 	  ckarrayindex.h ckarrayoptions.h ckarray.h cklocation.h ckmulticast.h ckreduction.h \
 	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h ckrdma.h\
-          ckmessagelogging.h ckcausalmlog.h ckobjid.h\
+          ckobjid.h\
 	  ckobjQ.h readonly.h charm++_type_traits.h \
           $(UTILHEADERS) \
 	  waitqd.h LBDatabase.h MetaBalancer.h RandomForestModel.h lbdb.h lbdb++.h LBProfit.h $(LBHEADERS) \
@@ -747,7 +747,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckmulticast.o ckarrayoptions.o ckarray.o ckreduction.o ckrdma.o\
            waitqd.o LBDatabase.o MetaBalancer.o weakTest.o treeTest.o forestTest.o readmodel.o lbdb.o lbdbf.o ckobjQ.o  \
-	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckmessagelogging.o ckcausalmlog.o ckobjid.o\
+	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckobjid.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
 	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o DistBaseLB.o \
            ckgraphTemp.o ckgraph.o LButil.o RefinerTemp.o Refiner.o RefinerApprox.o  \

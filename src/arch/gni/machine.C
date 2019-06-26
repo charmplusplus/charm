@@ -2338,15 +2338,35 @@ static void PumpNetworkSmsg()
 
                 resetNcpyOpInfoPointers(newNcpyOpInfo);
 
-                LrtsDeregisterMem(newNcpyOpInfo->srcPtr,
-                                  (char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize(),
-                                  newNcpyOpInfo->srcPe,
-                                  newNcpyOpInfo->srcRegMode);
+                if(CmiMyNode() == CmiNodeOf(newNcpyOpInfo->srcPe)) {
+                  LrtsDeregisterMem(newNcpyOpInfo->srcPtr,
+                                    (char *)(newNcpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize(),
+                                    newNcpyOpInfo->srcPe,
+                                    newNcpyOpInfo->srcRegMode);
 
-                newNcpyOpInfo->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
+                  newNcpyOpInfo->isSrcRegistered = 0; // Set isSrcRegistered to 0 after de-registration
 
-                // Invoke source ack
-                newNcpyOpInfo->opMode = CMK_EM_API_SRC_ACK_INVOKE;
+                  // Invoke source ack
+                  newNcpyOpInfo->opMode = CMK_EM_API_SRC_ACK_INVOKE;
+
+                } else if(CmiMyNode() == CmiNodeOf(newNcpyOpInfo->destPe)) {
+                  // Deregister the destination buffer
+                  LrtsDeregisterMem(newNcpyOpInfo->destPtr,
+                                    (char *)newNcpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize(),
+                                    newNcpyOpInfo->destPe,
+                                    newNcpyOpInfo->destRegMode);
+
+                  newNcpyOpInfo->isDestRegistered = 0; // Set isDestRegistered to 0 after de-registration
+
+                  // Invoke destination ack
+                  newNcpyOpInfo->opMode = CMK_EM_API_DEST_ACK_INVOKE;
+
+                } else {
+
+                  CmiAbort(" Cannot de-register on a different node than the source or destinaton");
+                }
+
+                newNcpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO;
                 CmiInvokeNcpyAck(newNcpyOpInfo);
                 break;
             }

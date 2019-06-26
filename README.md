@@ -161,7 +161,6 @@ for more information:
 * `pxshm` - Use POSIX Shared Memory for communication between Charm++ processes
     within a shared-memory host.
 * `syncft` - Enable in-memory fault tolerance support in Charm++.
-* `mlogft` - Enable message logging fault tolerance support in Charm++.
 * `tsan` - Compile Charm++ with support for Thread Sanitizer.
 * `papi` - Enable PAPI performance counters.
 * `ooc` - Build Charm++ with out-of-core execution features.
@@ -173,7 +172,7 @@ for more information:
      will give:
     
       Supported compilers: clang craycc gcc icc iccstatic msvc pgcc xlc xlc64
-      Supported options: bigemulator bigsim causalft clustermatic common cuda flang gfortran ifort local mlogft nolb omp ooc papi pedantic perftools persistent pgf90 pxshm scyld smp syncft sysvshm tcp tsan
+      Supported options: bigemulator bigsim clustermatic common cuda flang gfortran ifort local nolb omp ooc papi pedantic perftools persistent pgf90 pxshm scyld smp syncft sysvshm tcp tsan
 
 
 ## Building the Source
