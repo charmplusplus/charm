@@ -163,7 +163,7 @@ void MetaBalancer::init(void) {
   lb_in_progress = false;
 
   // After the first reduction completes, we have a way to manually check for
-  // PEs withouth any objects. This flag is set to true if load is ever added
+  // PEs without any objects. This flag is set to true if load is ever added
   // so that the periodic call can be ignored if it comes late. Otherwise, it
   // may come at a weird time and trigger an incorrect contribution.
   ignore_periodic = false;
