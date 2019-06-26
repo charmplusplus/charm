@@ -17,6 +17,8 @@ test: all
 	$(call run, ./within_node_bcast +p1)
 	$(call run, ./within_node_bcast +p2)
 ifeq ($(CMK_SMP),1)
+ifneq ($(CMK_MULTICORE),1)
 	$(call run, ./within_node_bcast +p2 ++ppn 2)
 	$(call run, ./within_node_bcast +p4 ++ppn 2)
+endif
 endif
