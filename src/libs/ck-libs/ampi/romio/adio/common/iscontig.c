@@ -9,17 +9,7 @@
 #include "mpisgi2.h"
 #endif */
 
-#ifdef AMPI
-void MPIR_Datatype_iscontig(MPI_Datatype datatype, int *flag){
-  AMPI_Type_is_contiguous(datatype, flag);
-}
-
-void ADIOI_Datatype_iscontig(MPI_Datatype datatype, int *flag)
-{
-    MPIR_Datatype_iscontig(datatype, flag);
-}
-
-#elif (defined(MPICH) || defined(MPICH2))
+#if (defined(MPICH) || defined(MPICH2))
 /* MPICH2 also provides this routine */
 void MPIR_Datatype_iscontig(MPI_Datatype datatype, int *flag);
 
@@ -72,6 +62,13 @@ void ADIOI_Datatype_iscontig(MPI_Datatype datatype, int *flag)
 
 /* void ADIOI_Datatype_iscontig(MPI_Datatype datatype, int *flag) is defined
  * and implemented in OpenMPI itself */
+
+#elif defined AMPI
+
+void ADIOI_Datatype_iscontig(MPI_Datatype datatype, int *flag)
+{
+    AMPI_Type_is_contiguous(datatype, flag);
+}
 
 #else
 
