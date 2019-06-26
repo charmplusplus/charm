@@ -162,6 +162,12 @@ void MetaBalancer::init(void) {
   // to false so that it doesn't clear the handles.
   lb_in_progress = false;
 
+  // After the first reduction completes, we have a way to manually check for
+  // PEs withouth any objects. This flag is set to true if load is ever added
+  // so that the periodic call can be ignored if it comes late. Otherwise, it
+  // may come at a weird time and trigger an incorrect contribution.
+  ignore_periodic = false;
+
   is_prev_lb_refine = -1;
   if (_lb_args.metaLbOn()) {
     periodicCall((void *) this);
@@ -281,6 +287,11 @@ void MetaBalancer::SetCharePupSize(size_t psize) {
 
 bool MetaBalancer::AddLoad(int it_n, double load) {
 #if CMK_LBDB_ON
+  // From here on out we can ignore the periodic call to check for NoObj PEs
+  // since our PE has objects. The subsequent checks for NoObj PEs are
+  // triggered by the regular control flow.
+  ignore_periodic = true;
+
   int index = it_n % VEC_SIZE;
   total_count_vec[index]++;
   adaptive_struct.total_syncs_called++;
@@ -974,7 +985,9 @@ void MetaBalancer::periodicCall(void *ad) {
 
 void MetaBalancer::checkForNoObj(void *ad) {
   MetaBalancer *s = (MetaBalancer *) ad;
-  s->HandleAdaptiveNoObj();
+  if (!s->ignore_periodic) {
+    s->HandleAdaptiveNoObj();
+  }
 }
 
 // Called by LBDatabase to indicate that no objs are there in this processor
