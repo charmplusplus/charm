@@ -4821,7 +4821,6 @@ completion of the zero copy operation. It is beneficial when the user wants to r
 (and reuse the ``CkNcpyBuffer`` object) by avoiding the cost of de-registration and registration.
 
 
-
 Important Methods
 '''''''''''''''''
 
@@ -4927,7 +4926,7 @@ specific nocopy array.
 
 .. code-block:: c++
 
-   CkCallback cb(CkIndex_Foo::zerocopySent(), thisProxy[thisIndex]);
+   CkCallback cb1(CkIndex_Foo::zerocopySent(), thisProxy[thisIndex]);
 
    // for point to point send
    arrayProxy[0].foo(500000, CkSendBuffer(arrPtr, cb1));
@@ -5134,6 +5133,127 @@ used.
    Intel Cluster (Bridges)       Intel Omni-Path ``ofi-linux-x86_64``   64 KB           32 KB      32 KB
    Intel KNL Cluster (Stampede2) Intel Omni-Path ``ofi-linux-x86_64``   1 MB            64 KB      64 KB
    ============================= =============== ====================== =============== ========== ==========
+
+Zero Copy Entry Method Post API
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The Zero Copy Entry Method Post API is an extension of the Zero Copy Entry Method
+Send API. This API allows users to receive the sent data in a user posted buffer. In
+addition to saving the sender side copy, it also avoids the receiver side copy by not
+using any intermediate buffers and directly receiving the data in the user posted buffer.
+Unlike the Zero Copy Entry Method Send API, this API should be used when the user wishes
+to receive the data in a user posted buffer, which is allocated and managed by the user.
+
+The posting of the receiver buffer happens at an object level, where each recipient object,
+for example, a chare array element or a group element or nodegroup element posts a receiver
+buffer using a special version of the entry method.
+
+To send an array using the Zero Copy Post API, specify the array
+parameter in the .ci file with the nocopypost specifier.
+
+.. code-block:: charmci
+
+   // same .ci specification is used for p2p and bcast operations
+   entry void foo (int size, nocopypost int arr[size]);
+
+   // ^ note that the nocopypost specifier is different from nocopy and
+   // indicates the usage of the post API for the array arr
+
+The sender side code for the Zero Copy Entry Method Post API is exactly the same as
+Zero Copy Entry Method Send API and can be referenced from the previous section. In this section,
+we will highlight the differences between the two APIs and demonstrate the usage of the Post API
+on the receiver side.
+
+As previously mentioned, the Zero Copy Entry Method Post API posts user buffers to receive the
+data sent by the sender. This is done using a special overloaded version of the recipient
+entry method, called Post entry method. The overloaded function has all the entry method parameters
+and an additional ``CkNcpyBufferPost`` array parameter at the end of the signature. Additionally, the
+entry method parameters are specified as references instead of values. Inside this post entry method,
+the received references can be initialized by the user. The pointer reference is assigned to a user
+allocated buffer, i.e. the buffer in which the user wishes to receive the data. The size variable
+reference could be assigned to a value (or variable) that represents the size of the data of that type
+that needs to be received. If this reference variable is not assigned inside the post entry method, the size specified
+at the sender in the CkSendBuffer wrapper will be used as the default size. The post entry method also
+allows the receiver to specify the memory registration mode and the memory de-registration mode.
+This is done by indexing the ncpyPost array and assigning the ``regMode`` and ``deregMode`` parameters
+present inside each array element of the ``CkNcpyBufferPost`` array. When the network memory
+registration mode is unassigned by the user, the default ``CK_BUFFER_REG`` regMode is used. Similarly, when
+the de-registration mode is unassigned by the user, the default ``CK_BUFFER_DEREG`` deregMode is used.
+
+For the entry method ``foo`` specified with a nocopypost specifier, the resulting post function defined
+in the .C file will be:
+
+.. code-block:: c++
+
+   void foo (int &size, int *& arr, CkNcpyBufferPost *ncpyPost) {
+     arr = myBuffer;      // myBuffer is a user allocated buffer
+
+     size = 2000;         // 2000 ints need to be received.
+
+     ncpyPost[0].regMode = CK_BUFFER_REG; // specify the regMode for the 0th pointer
+
+     ncpyPost[0].deregMode = CK_BUFFER_DEREG; // specify the deregMode for the 0th pointer
+   }
+
+In addition to the post entry method, the regular entry method also needs to be defined
+as in the case of the Entry Method Send API, where the nocopypost parameter is being received
+as a pointer as shown below:
+
+.. code-block:: c++
+
+  void foo (int size, int *arr) {
+    // arr points to myBuffer and the data sent is received in myBuffer
+    // Note that 'arr' buffer is the same as myBuffer, which is user allocated and managed
+
+    computeValues();
+  }
+
+Similarly, for sending and receiving multiple arrays, the .ci file specification will be:
+
+.. code-block:: charmci
+
+  entry void foo(nocopypost int arr1[size1], int size1, nocopypost char arr2[size2], int size2);
+
+
+In the .C file, we define a post entry method and a regular entry method:
+
+.. code-block:: c++
+
+  // post entry method
+  void foo(int *& arr1, int & size1, char *& arr2, int & size2, CkNcpyBufferPost *ncpyPost) {
+
+    arr1 = myBuffer1;
+    ncpyPost[0].regMode = CK_BUFFER_UNREG;
+    ncpyPost[0].deregMode = CK_BUFFER_DEREG;
+
+    arr2 = myBuffer2; // myBuffer2 is allocated using CkRdmaAlloc
+    ncpyPost[1].regMode = CK_BUFFER_PREREG;
+    ncpyPost[1].deregMode = CK_BUFFER_NODEREG;
+  }
+
+  // regular entry method
+  void foo(int *arr1, int size1, char *arr2, int size2) {
+
+    // sent buffer is received in myBuffer1, same as arr1
+
+    // sent buffer is received in myBuffer2, same as arr2
+  }
+
+It is important to note that the ``CkNcpyBufferPost`` array has as many elements as the
+number of ``nocopypost`` parameters in the entry method declaration in the .ci file. For
+n nocopypost parameters, the ``CkNcpyBufferPost`` array is indexed by 0 to n-1.
+
+This API for point to point communication is demonstrated in
+``examples/charm++/zerocopy/entry_method_post_api`` and
+for broadcast operations, the usage of this API is
+demonstrated in ``examples/charm++/zerocopy/entry_method_bcast_post_api``.
+
+Similar to the Zero Copy Entry Method Send API, it should be noted that calls to
+entry methods with nocopypost specified parameters are currently supported for
+point to point operations and only collection-wide broadcast operations like broadcasts
+across an entire chare array or group or nodegroup. It is yet to be supported for
+section broadcasts. Additionally, there is also no support for migration of chares that have
+pending RDMA transfer requests.
 
 .. _callbacks:
 
