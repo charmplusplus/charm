@@ -1918,7 +1918,7 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int
 {
   if (node==CkMyNode()) {
 #if CMK_ONESIDED_IMPL
-    if (CMI_ZC_MSGTYPE(msg) == CMK_REG_NO_ZC_MSG)
+    if (CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_REG_NO_ZC_MSG)
 #endif
     {
       CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
