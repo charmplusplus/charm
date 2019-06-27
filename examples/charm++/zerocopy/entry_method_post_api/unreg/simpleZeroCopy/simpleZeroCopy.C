@@ -129,12 +129,15 @@ class zerocopyObject : public CBase_zerocopyObject{
       // sdagRun only uses iArr1 and dArr2
       // other others needn't be pupped/unpupped
       if (p.isUnpacking()){
+
         iArr1 = new int[iSize1];
         dArr2 = new double[dSize2];
         iArr1copy = new int[iSize1];
         dArr2copy = new double[dSize2];
         j=0;
         firstMigrationPending = false;
+
+        CmiPrintf("[%d][%d][%d] Unpacking after migration iArr1 %p and dArr2 %p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), iArr1, dArr2);
       }
       p(iArr1, iSize1);
       p(dArr2, dSize2);
@@ -155,6 +158,7 @@ class zerocopyObject : public CBase_zerocopyObject{
         }
 
       }
+      CmiPrintf("[%d][%d][%d] Freeing iArr1 %p and dArr2 %p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), iArr1, dArr2);
       // delete everytime after migration as they are pupped to be used for sdagRun
       delete [] dArr2;
       delete [] iArr1;

@@ -473,10 +473,10 @@ void invokeCallback(void *cb, int pe, CkNcpyBuffer &buff) {
 CkNcpyMode findTransferMode(int srcPe, int destPe) {
   if(CmiNodeOf(srcPe)==CmiNodeOf(destPe))
     return CkNcpyMode::MEMCPY;
-#if CMK_USE_CMA
-  else if(CmiDoesCMAWork() && CmiPeOnSamePhysicalNode(srcPe, destPe))
-    return CkNcpyMode::CMA;
-#endif
+//#if CMK_USE_CMA
+//  else if(CmiDoesCMAWork() && CmiPeOnSamePhysicalNode(srcPe, destPe))
+//    return CkNcpyMode::CMA;
+//#endif
   else
     return CkNcpyMode::RDMA;
 }
@@ -484,10 +484,10 @@ CkNcpyMode findTransferMode(int srcPe, int destPe) {
 CkNcpyMode findTransferModeWithNodes(int srcNode, int destNode) {
   if(srcNode==destNode)
     return CkNcpyMode::MEMCPY;
-#if CMK_USE_CMA
-  else if(CmiDoesCMAWork() && CmiPeOnSamePhysicalNode(CmiNodeFirst(srcNode), CmiNodeFirst(destNode)))
-    return CkNcpyMode::CMA;
-#endif
+//#if CMK_USE_CMA
+//  else if(CmiDoesCMAWork() && CmiPeOnSamePhysicalNode(CmiNodeFirst(srcNode), CmiNodeFirst(destNode)))
+//    return CkNcpyMode::CMA;
+//#endif
   else
     return CkNcpyMode::RDMA;
 }

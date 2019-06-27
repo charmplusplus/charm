@@ -15,8 +15,10 @@ int getNewMPITag(void){
 
   /* Reset generated tag when equal to the implementation dependent upper bound.
    * This condition also ensures correct resetting of the generated tag if tagUb is INT_MAX */
-  if(rdmaTag == tagUb)
+  if(rdmaTag == tagUb) {
+    CmiPrintf("[%d][%d][%d] Resetting tag\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
     rdmaTag = RDMA_BASE_TAG; //reseting can fail if previous tags are in use
+  }
 
   //copy the updated value into the local variable to ensure consistent a tag value
   newRdmaTag = rdmaTag;
