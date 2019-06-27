@@ -614,6 +614,7 @@ static void ReleasePostedMessages(void) {
     int done;
     MPI_Status sts;
 
+    std::vector<NcpyOperationInfo *> ncpyOpInfoList;
 
     MACHSTATE1(2,"ReleasePostedMessages begin on %d {", CmiMyPe());
     while (msg_tmp!=0) {
@@ -652,7 +653,8 @@ static void ReleasePostedMessages(void) {
                 // On the destination the NcpyOperationInfo is freed for the Direct API
                 // but not freed for the Entry Method API as it a part of the parameter marshalled message
                 // and is enentually freed by the RTS
-                CmiInvokeNcpyAck(ncpyOpInfo);
+                // CmiInvokeNcpyAck(ncpyOpInfo);
+                ncpyOpInfoList.push_back(ncpyOpInfo);
 
             } else if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_SEND) {
                 // MPI_Isend posted as a part of the Direct API was completed
@@ -663,7 +665,9 @@ static void ReleasePostedMessages(void) {
                 // Free the NcpyOperationInfo on the source
                 ncpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO;
 
-                CmiInvokeNcpyAck(ncpyOpInfo);
+                //CmiInvokeNcpyAck(ncpyOpInfo);
+
+                ncpyOpInfoList.push_back(ncpyOpInfo);
             }
             else if(msg_tmp->type == POST_DIRECT_SEND || msg_tmp->type == POST_DIRECT_RECV) {
                 // do nothing as the received message is a NcpyOperationInfo object
@@ -690,6 +694,12 @@ static void ReleasePostedMessages(void) {
         }
 #endif
     }
+    //CmiPrintf("[%d][%d][%d] ncpyOpInfoList size =%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ncpyOpInfoList.size());
+    for(int i=0; i < ncpyOpInfoList.size(); i++)
+      CmiInvokeNcpyAck(ncpyOpInfoList[i]);
+
+    ncpyOpInfoList.clear();
+
     MACHSTATE(2,"} ReleasePostedMessages end");
 }
 
