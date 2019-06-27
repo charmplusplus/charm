@@ -1659,6 +1659,8 @@ static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int t
   env->setEpIdx(eIdx);
   env->setGroupNum(gID);
   env->setSrcPe(CkMyPe());
+
+  CMI_MSG_NOKEEP(env) = _entryTable[eIdx]->noKeep;
   /*
 #if CMK_ERROR_CHECKING
   nodeRedMgr.setZero();
@@ -1707,6 +1709,14 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
   else
     _skipCldEnqueue(pe, env, _infoIdx);
   _TRACE_CREATION_DONE(1);
+}
+
+static inline void _sendMsgBranchWithinNode(int eIdx, void *msg, CkGroupID gID)
+{
+  envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+  _TRACE_CREATION_N(env, CmiMyNodeSize());
+  _CldEnqueueWithinNode(env, _infoIdx);
+  _TRACE_CREATION_DONE(1);  // since it only creates one creation event.
 }
 
 static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID,
@@ -1834,6 +1844,13 @@ void CkSendMsgBranchGroup(int eIdx,void *msg,CkGroupID gID,CmiGroup grp, int opt
   CpvAccess(_qd)->create(npes);
 }
 
+void CkBroadcastWithinNode(int eIdx, void *msg, CkGroupID gID, int opts)
+{
+  _sendMsgBranchWithinNode(eIdx, msg, gID);
+  _STATS_RECORD_SEND_BRANCH_N(CmiMyNodeSize());
+  CpvAccess(_qd)->create(CmiMyNodeSize());
+}
+
 void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID, int opts)
 {
   _sendMsgBranch(eIdx, msg, gID, CLD_BROADCAST_ALL, opts);
@@ -1901,7 +1918,7 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int
 {
   if (node==CkMyNode()) {
 #if CMK_ONESIDED_IMPL
-    if (CMI_ZC_MSGTYPE(msg) == CMK_REG_NO_ZC_MSG)
+    if (CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_REG_NO_ZC_MSG)
 #endif
     {
       CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
@@ -2365,7 +2382,6 @@ void CkStartQDExt_ArrayCallback(int aid, int* idx, int ndims, int epIdx, int fid
 }
 
 void CkChareExtSend(int onPE, void *objPtr, int epIdx, char *msg, int msgSize) {
-  //ckCheck();    // checks that gid is not zero
   int marshall_msg_size = (sizeof(char)*msgSize + 3*sizeof(int));
   CkMarshallMsg *impl_msg = CkAllocateMarshallMsg(marshall_msg_size, NULL);
   PUP::toMem implP((void *)impl_msg->msgBuf);
@@ -2382,7 +2398,6 @@ void CkChareExtSend(int onPE, void *objPtr, int epIdx, char *msg, int msgSize) {
 
 void CkChareExtSend_multi(int onPE, void *objPtr, int epIdx, int num_bufs, char **bufs, int *buf_sizes) {
   CkAssert(num_bufs >= 1);
-  //ckCheck();    // checks that gid is not zero
   int totalSize = 0;
   for (int i=0; i < num_bufs; i++) totalSize += buf_sizes[i];
   int marshall_msg_size = (sizeof(char)*totalSize + 3*sizeof(int));
@@ -2399,8 +2414,7 @@ void CkChareExtSend_multi(int onPE, void *objPtr, int epIdx, int num_bufs, char 
   CkSendMsg(epIdx, impl_msg, &chareID);
 }
 
-void CkGroupExtSend(int gid, int pe, int epIdx, char *msg, int msgSize) {
-  //ckCheck();    // checks that gid is not zero
+void CkGroupExtSend(int gid, int npes, const int *pes, int epIdx, char *msg, int msgSize) {
   int marshall_msg_size = (sizeof(char)*msgSize + 3*sizeof(int));
   CkMarshallMsg *impl_msg = CkAllocateMarshallMsg(marshall_msg_size, NULL);
   PUP::toMem implP((void *)impl_msg->msgBuf);
@@ -2411,15 +2425,16 @@ void CkGroupExtSend(int gid, int pe, int epIdx, char *msg, int msgSize) {
   CkGroupID gId;
   gId.idx = gid;
 
-  if (pe == -1)
+  if (pes[0] == -1)
     CkBroadcastMsgBranch(epIdx, impl_msg, gId, 0);
+  else if (npes == 1)
+    CkSendMsgBranch(epIdx, impl_msg, pes[0], gId, 0);
   else
-    CkSendMsgBranch(epIdx, impl_msg, pe, gId, 0);
+    CkSendMsgBranchMulti(epIdx, impl_msg, gId, npes, pes, 0);
 }
 
-void CkGroupExtSend_multi(int gid, int pe, int epIdx, int num_bufs, char **bufs, int *buf_sizes) {
+void CkGroupExtSend_multi(int gid, int npes, const int *pes, int epIdx, int num_bufs, char **bufs, int *buf_sizes) {
   CkAssert(num_bufs >= 1);
-  //ckCheck();    // checks that gid is not zero
   int totalSize = 0;
   for (int i=0; i < num_bufs; i++) totalSize += buf_sizes[i];
   int marshall_msg_size = (sizeof(char)*totalSize + 3*sizeof(int));
@@ -2432,10 +2447,12 @@ void CkGroupExtSend_multi(int gid, int pe, int epIdx, int num_bufs, char **bufs,
   CkGroupID gId;
   gId.idx = gid;
 
-  if (pe == -1)
+  if (pes[0] == -1)
     CkBroadcastMsgBranch(epIdx, impl_msg, gId, 0);
+  else if (npes == 1)
+    CkSendMsgBranch(epIdx, impl_msg, pes[0], gId, 0);
   else
-    CkSendMsgBranch(epIdx, impl_msg, pe, gId, 0);
+    CkSendMsgBranchMulti(epIdx, impl_msg, gId, npes, pes, 0);
 }
 
 void CkArrayExtSend(int aid, int *idx, int ndims, int epIdx, char *msg, int msgSize) {
