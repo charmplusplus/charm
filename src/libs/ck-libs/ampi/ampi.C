@@ -825,10 +825,14 @@ FLINKAGE void FTN_NAME(MPI_MAIN,mpi_main)(void);
 CLINKAGE
 void AMPI_Fallback_Main(int argc,char **argv)
 {
-  AMPI_Main_cpp();
-  AMPI_Main_cpp(argc,argv);
-  AMPI_Main_c(argc,argv);
-  FTN_NAME(MPI_MAIN,mpi_main)();
+  int ret = 0;
+  // Only one of the following four main functions actually runs application code,
+  // the others are stubs provided by compat_ampi*.
+  ret += AMPI_Main_cpp();
+  ret += AMPI_Main_cpp(argc,argv);
+  ret += AMPI_Main_c(argc,argv);
+  FTN_NAME(MPI_MAIN,mpi_main)(); // returns void
+  AMPI_Exit(ret);
 }
 
 void ampiCreateMain(MPI_MainFn mainFn, const char *name,int nameLen);
