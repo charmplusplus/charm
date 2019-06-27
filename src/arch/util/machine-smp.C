@@ -199,10 +199,6 @@ static void CmiStartThreads(char **argv)
 
   CmiMemLock_lock=CmiCreateLock();
   comm_mutex = CmiCreateLock();
-  for (i=0; i < CMI_NUM_NODE_BARRIER_TYPES; i++) {
-    entrance_semaphore[i] = CreateSemaphore(NULL, 0, _Cmi_mynodesize+1, NULL);
-    exit_semaphore[i] = CreateSemaphore(NULL, 0, _Cmi_mynodesize+1, NULL);
-  }
 #ifdef CMK_NO_ASM_AVAILABLE
   cmiMemoryLock = CmiCreateLock();
   if (CmiMyNode()==0) printf("Charm++ warning> fences and atomic operations not available in native assembly\n");
@@ -242,10 +238,6 @@ static void CmiDestroyLocks(void)
   comm_mutex = 0;
   CmiDestroyLock(CmiMemLock_lock);
   CmiMemLock_lock = 0;
-  for (int i=0; i < CMI_NUM_NODE_BARRIER_TYPES; i++) {
-    CloseHandle(entrance_semaphore[i]);
-    CloseHandle(exit_semaphore[i]);
-  }
 #ifdef CMK_NO_ASM_AVAILABLE
   CmiDestroyLock(cmiMemoryLock);
 #endif
