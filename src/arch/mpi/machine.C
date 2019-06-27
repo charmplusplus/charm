@@ -864,6 +864,7 @@ static int PumpMsgs(void) {
                 myPe = ncpyOpInfoMsg->destPe;
                 otherPe = ncpyOpInfoMsg->srcPe;
                 myBuffer = ncpyOpInfoMsg->destPtr;
+                //CmiPrintf("[%d][%d][%d] Posting RECV from Pump message\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
               }
               else {
                 // Direct Buffer Source, post MPI_Isend
@@ -871,6 +872,8 @@ static int PumpMsgs(void) {
                 myPe = ncpyOpInfoMsg->srcPe;
                 otherPe = ncpyOpInfoMsg->destPe;
                 myBuffer = ncpyOpInfoMsg->srcPtr;
+
+                //CmiPrintf("[%d][%d][%d] Posting SEND from Pump message\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
               }
 
               MPIPostOneBuffer(myBuffer,
@@ -1069,7 +1072,12 @@ static int SendMsgBuf(void) {
 #endif
 
 #if CMK_ONESIDED_IMPL
-            if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_RECV || msg_tmp->type == ONESIDED_BUFFER_DIRECT_SEND) {
+            if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_RECV) {
+                CmiPrintf("[%d][%d][%d] Posting RECV from SendMsgBuf\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
+                NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(msg_tmp->ref);
+                MPISendOrRecvOneBuffer(msg_tmp, ncpyOpInfo->tag);
+            } else if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_SEND) {
+                CmiPrintf("[%d][%d][%d] Posting SEND from SendMsgBuf\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
                 NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(msg_tmp->ref);
                 MPISendOrRecvOneBuffer(msg_tmp, ncpyOpInfo->tag);
             }

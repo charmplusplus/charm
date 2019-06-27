@@ -19,6 +19,9 @@ void MPISendOrRecvOneBuffer(SMSG_LIST *smsg, int tag){
   dstrank=node;
 #endif
 
+
+  CmiAssert(tag > TAG);
+
   if(smsg->type == ONESIDED_BUFFER_DIRECT_SEND || smsg->type == ONESIDED_BUFFER_SEND) {
     CmiPrintf("[%d][%d][%d] Posting an MPI_Isend with pointer %p, size: %d, tag:%d, dstrank:%d\n",
         CmiMyPe(), CmiMyNode(), CmiMyPe(), msg, size, tag, dstrank);
@@ -98,6 +101,8 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfoMsg) {
     MPISendOneMsg(msg_tmp);
   }
 
+  //
+  //CmiPrintf("[%d][%d][%d] Posting RECV from LrtsIssueRget\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
   // Post an MPI_Irecv for the destination buffer with the tag
   // ONESIDED_BUFFER_DIRECT_RECV indicates that the method should post an irecv
   MPIPostOneBuffer(ncpyOpInfoMsg->destPtr, ncpyOpInfoMsg, std::min(ncpyOpInfoMsg->srcSize, ncpyOpInfoMsg->destSize), ncpyOpInfoMsg->srcPe, tag, ONESIDED_BUFFER_DIRECT_RECV);
@@ -132,6 +137,7 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfoMsg) {
     MPISendOneMsg(msg_tmp);
   }
 
+  //CmiPrintf("[%d][%d][%d] Posting SEND from LrtsIssueRget\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
   // Post an MPI_ISend for the source buffer with the tag
   // ONESIDED_BUFFER_DIRECT_SEND indicates that the method should post an isend
   MPIPostOneBuffer(ncpyOpInfoMsg->srcPtr, ncpyOpInfoMsg, std::min(ncpyOpInfoMsg->srcSize, ncpyOpInfoMsg->destSize), ncpyOpInfoMsg->destPe, tag, ONESIDED_BUFFER_DIRECT_SEND);
