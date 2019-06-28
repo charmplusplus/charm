@@ -600,8 +600,11 @@ foreach(l BUILDOPTS CMK_AMPI_WITH_ROMIO CMK_BUILD_PYTHON CMK_CAN_LINK_FORTRAN CM
     file(APPEND ${optfile_sh} "${l}=\"${${l}}\"\n" )
 endforeach(l)
 
+if(NOT ${CMAKE_DL_LIBS} STREQUAL "")
+    set(DL_LIB "-l${CMAKE_DL_LIBS}")
+endif()
 file(APPEND ${optfile_sh} "CMK_HWLOC_LIBS=\"-lhwloc_embedded -lm\"\n" )
-file(APPEND ${optfile_sh} "CMK_LIBS=\"$CMK_LIBS -lz\"\n")
+file(APPEND ${optfile_sh} "CMK_LIBS=\"$CMK_LIBS -lz ${DL_LIB}\"\n")
 
 
 # Create conv-mach-opt.h
