@@ -61,13 +61,14 @@ enum ncpyDeregModes {
 // Enum for the type of zerocopy operation
 // TODO: Convert to typed enum post C++ conversion
 enum ncpyOperationMode {
-  CMK_DIRECT_API            = 0,
-  CMK_EM_API                = 1,
-  CMK_EM_API_SRC_ACK_INVOKE = 2,
-  CMK_EM_API_REVERSE        = 3,
-  CMK_BCAST_EM_API          = 4,
-  CMK_BCAST_EM_API_REVERSE  = 5,
-  CMK_READONLY_BCAST        = 6
+  CMK_DIRECT_API             = 0,
+  CMK_EM_API                 = 1,
+  CMK_EM_API_SRC_ACK_INVOKE  = 2,
+  CMK_EM_API_DEST_ACK_INVOKE = 3,
+  CMK_EM_API_REVERSE         = 4,
+  CMK_BCAST_EM_API           = 5,
+  CMK_BCAST_EM_API_REVERSE   = 6,
+  CMK_READONLY_BCAST         = 7
 };
 
 // Enum for the method of acknowledglement handling after the completion of a zerocopy operation
@@ -81,7 +82,7 @@ enum ncpyAckMode {
 // Enum to determine if a NcpyOperationInfo can be freed upon completion
 // TODO: Convert to a bool variable post C++ conversion
 enum ncpyFreeNcpyOpInfoMode {
-  CMK_FREE_NCPYOPINFO           = 0,
+  CMK_FREE_NCPYOPINFO                = 0,
   CMK_DONT_FREE_NCPYOPINFO           = 1
 };
 

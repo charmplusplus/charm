@@ -3,6 +3,7 @@ DIRS = \
   zerocopy_with_qd \
   direct_api \
   zc_post_modify_size \
+  dereg_and_nodereg \
 
 TESTDIRS = $(DIRS)
 

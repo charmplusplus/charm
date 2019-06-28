@@ -270,6 +270,7 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
                       CmiNodeOf(ncpyOpInfo->destPe),
                       RDMA_REG_AND_GET_MD_DIRECT_TAG);
 #else // non-smp mode
+
     // send the small message directly
     gni_return_t status = send_smsg_message(&smsg_queue,
                               CmiNodeOf(ncpyOpInfo->destPe),
@@ -377,13 +378,13 @@ void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo) {
 #if CMK_SMP
   // send the small message to the other node through the comm thread
   buffer_small_msgs(&smsg_queue, newNcpyOpInfo, newNcpyOpInfo->ncpyOpInfoSize,
-                        CmiNodeOf(newNcpyOpInfo->srcPe),
+                        CmiNodeOf(pe),
                         RDMA_DEREG_AND_ACK_MD_DIRECT_TAG);
 #else // non-smp mode
 
   // send the small message directly
   gni_return_t status = send_smsg_message(&smsg_queue,
-                          CmiNodeOf(newNcpyOpInfo->srcPe),
+                          CmiNodeOf(pe),
                           newNcpyOpInfo,
                           newNcpyOpInfo->ncpyOpInfoSize,
                           RDMA_DEREG_AND_ACK_MD_DIRECT_TAG,
