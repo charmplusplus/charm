@@ -3,13 +3,13 @@ set(conv-core-c-sources cmipool.C conv-conds.C
     global-nop.C isomalloc.C mem-arena.C memoryaffinity.C msgmgr.C quiescence.C
     random.C)
 
-set(conv-core-h-sources cmipool.h
+set(conv-core-h-sources ../util/cmitls.h cmipool.h
     conv-config.h conv-cpath.h conv-cpm.h conv-header.h conv-ooc.h
     conv-qd.h conv-random.h conv-rdma.h conv-taskQ.h conv-trace.h converse.h
     cpthreads.h debug-conv++.h debug-conv.h hrctimer.h mem-arena.h memory-gnu-threads.h
     memory-isomalloc.h msgq.h persistent.h queueing.h quiescence.h taskqueue.h)
 
-set(conv-core-cxx-sources conv-interoperate.C conv-taskQ.C cputopology.C
+set(conv-core-cxx-sources ../util/cmitls.C conv-interoperate.C conv-taskQ.C cputopology.C
     debug-conv++.C  memory-darwin-clang.C memory-os-wrapper.C queueing.C hrctimer.C)
 
 set(conv-ccs-c-sources ../conv-ccs/conv-ccs.C)
@@ -115,7 +115,7 @@ target_compile_definitions(threads-default PRIVATE -DCMK_THREADS_BUILD_DEFAULT=1
 target_include_directories(threads-default PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
 
 add_library(threads-default-tls threads.C $<TARGET_OBJECTS:boost-context>)
-target_compile_definitions(threads-default-tls PRIVATE -DCMK_THREADS_BUILD_DEFAULT=1)
+target_compile_definitions(threads-default-tls PRIVATE -DCMK_THREADS_BUILD_DEFAULT=1 -DCMK_THREADS_BUILD_TLS=1)
 target_include_directories(threads-default-tls PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
 
 add_library(threads-qt threads.C)
