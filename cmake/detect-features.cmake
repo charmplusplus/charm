@@ -557,6 +557,11 @@ set(CHARM_VERSION ${PROJECT_VERSION})
 set(CMK_CCS_AVAILABLE 1)
 set(CMK_HAS_OPENMP ${OPENMP_FOUND})
 
+if(${CMAKE_CXX_COMPILER_ID} STREQUAL "AppleClang")
+  # needs external library for OpenMP support, disable for now.
+  set(CMK_HAS_OPENMP 0)
+endif()
+
 # Fortran module names
 set(CMK_MOD_NAME_ALLCAPS 0)
 set(CMK_MOD_EXT mod)
