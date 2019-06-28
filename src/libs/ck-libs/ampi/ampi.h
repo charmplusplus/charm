@@ -66,7 +66,7 @@
 #define AMPI_RENAME_ATEXIT 1
 #endif
 #if AMPI_RENAME_ATEXIT
-#define atexit(...) do {atexit(__VA_ARGS__); atexit(ampiMarkAtexit);} while(0)
+#define atexit(...) (atexit(__VA_ARGS__), atexit(ampiMarkAtexit))
 #endif
 
 /*
