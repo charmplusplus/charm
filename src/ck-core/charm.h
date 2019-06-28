@@ -405,9 +405,9 @@ extern void CkChareExtSend(int onPE, void *objPtr, int epIdx, char *msg, int msg
 extern void CkChareExtSend_multi(int onPE, void *objPtr, int epIdx, int num_bufs, char **bufs, int *buf_sizes);
 /// Send msg to group with ID 'gid'. if pe == -1, msg will be broadcasted, else
 /// it will go to the group instance in that PE
-extern void CkGroupExtSend(int gid, int pe, int epIdx, char *msg, int msgSize);
+extern void CkGroupExtSend(int gid, int npes, const int *pes, int epIdx, char *msg, int msgSize);
 /// Send msg to group copying data into CkMessage from multiple input buffers
-extern void CkGroupExtSend_multi(int gid, int pe, int epIdx, int num_bufs, char **bufs, int *buf_sizes);
+extern void CkGroupExtSend_multi(int gid, int npes, const int *pes, int epIdx, int num_bufs, char **bufs, int *buf_sizes);
 /// Send msg to array with ID 'aid'. idx is index of destination and ndims the number
 /// of dimensions of the index. If ndims <= 0, msg will be broadcasted to all array elements
 extern void CkArrayExtSend(int aid, int *idx, int ndims, int epIdx, char *msg, int msgSize);

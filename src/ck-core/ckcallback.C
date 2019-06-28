@@ -244,6 +244,7 @@ static void CkCallbackSendExt(const CkCallback &cb, void *msg)
     reducerType = redMsg->getReducer();
   }
 
+  int _pe = -1;
   switch (cb.type) {
     case CkCallback::sendChare: // Send message to a chare
       CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.chare.refnum,
@@ -254,7 +255,7 @@ static void CkCallbackSendExt(const CkCallback &cb, void *msg)
     case CkCallback::sendGroup: // Send message to a group element
       CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.group.refnum,
                                   extResultMsgData, extResultMsgDataSizes);
-      CkGroupExtSend_multi(cb.d.group.id.idx, cb.d.group.onPE, cb.d.group.ep,
+      CkGroupExtSend_multi(cb.d.group.id.idx, 1, &(cb.d.group.onPE), cb.d.group.ep,
                            2, extResultMsgData, extResultMsgDataSizes);
       break;
     case CkCallback::sendArray: // Send message to an array element
@@ -267,7 +268,7 @@ static void CkCallbackSendExt(const CkCallback &cb, void *msg)
       CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.group.refnum,
                                   extResultMsgData, extResultMsgDataSizes);
       // onPE is set to -1 since its a bcast
-      CkGroupExtSend_multi(cb.d.group.id.idx, -1, cb.d.group.ep, 2, extResultMsgData, extResultMsgDataSizes);
+      CkGroupExtSend_multi(cb.d.group.id.idx, 1, &_pe, cb.d.group.ep, 2, extResultMsgData, extResultMsgDataSizes);
       break;
     case CkCallback::bcastArray:
       CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.array.refnum,

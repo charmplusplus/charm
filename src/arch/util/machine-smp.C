@@ -81,14 +81,13 @@ CmiIdleLock_checkMessage
 #include "machine-smp.h"
 #include "sockRoutines.h"
 
+#include <mutex>
+#include <condition_variable>
+
 void CmiStateInit(int pe, int rank, CmiState state);
 void CommunicationServerInit(void);
 
 static struct CmiStateStruct Cmi_default_state; /* State structure to return during startup */
-
-#define CMI_NUM_NODE_BARRIER_TYPES 2
-#define CMI_NODE_BARRIER 0
-#define CMI_NODE_ALL_BARRIER 1
 
 /************************ Win32 kernel SMP threads **************/
 
@@ -192,37 +191,6 @@ static DWORD WINAPI call_startfn(LPVOID vindex)
   return 0;
 }
 
-
-/*
- * Double-sided barrier algorithm (threads wait to enter, and wait to exit the barrier)
- * There are 2 different barriers: one for CmiNodeAllBarrier, and another for CmiNodeBarrier,
- * determined by 'mode' parameter.
- */
-static volatile LONG entered_barrier_count[CMI_NUM_NODE_BARRIER_TYPES] = {0};
-static volatile LONG exited_barrier_count[CMI_NUM_NODE_BARRIER_TYPES] = {0};
-static HANDLE entrance_semaphore[CMI_NUM_NODE_BARRIER_TYPES];
-static HANDLE exit_semaphore[CMI_NUM_NODE_BARRIER_TYPES];
-
-// Adapted from https://adilevin.wordpress.com/category/multithreading/
-// (Based on the reasoning behind the double-sided barrier, I'm not sure the exit_semaphore
-// can be omitted from this implementation -Juan)
-void CmiNodeBarrierCount(int nThreads, uint8_t mode)
-{
-  LONG prev;
-  if (InterlockedIncrement(&entered_barrier_count[mode]) < nThreads)
-    WaitForSingleObject(entrance_semaphore[mode], INFINITE);
-  else {
-    exited_barrier_count[mode] = 0;
-    ReleaseSemaphore(entrance_semaphore[mode], nThreads-1, &prev);
-  }
-  if (InterlockedIncrement(&exited_barrier_count[mode]) < nThreads)
-    WaitForSingleObject(exit_semaphore[mode], INFINITE);
-  else {
-    entered_barrier_count[mode] = 0;
-    ReleaseSemaphore(exit_semaphore[mode], nThreads-1, &prev);
-  }
-}
-
 static void CmiStartThreads(char **argv)
 {
   int     i,tocreate;
@@ -231,10 +199,6 @@ static void CmiStartThreads(char **argv)
 
   CmiMemLock_lock=CmiCreateLock();
   comm_mutex = CmiCreateLock();
-  for (i=0; i < CMI_NUM_NODE_BARRIER_TYPES; i++) {
-    entrance_semaphore[i] = CreateSemaphore(NULL, 0, _Cmi_mynodesize+1, NULL);
-    exit_semaphore[i] = CreateSemaphore(NULL, 0, _Cmi_mynodesize+1, NULL);
-  }
 #ifdef CMK_NO_ASM_AVAILABLE
   cmiMemoryLock = CmiCreateLock();
   if (CmiMyNode()==0) printf("Charm++ warning> fences and atomic operations not available in native assembly\n");
@@ -274,10 +238,6 @@ static void CmiDestroyLocks(void)
   comm_mutex = 0;
   CmiDestroyLock(CmiMemLock_lock);
   CmiMemLock_lock = 0;
-  for (int i=0; i < CMI_NUM_NODE_BARRIER_TYPES; i++) {
-    CloseHandle(entrance_semaphore[i]);
-    CloseHandle(exit_semaphore[i]);
-  }
 #ifdef CMK_NO_ASM_AVAILABLE
   CmiDestroyLock(cmiMemoryLock);
 #endif
@@ -357,31 +317,6 @@ void CmiDestroyLock(CmiNodeLock lk)
 #endif //CMK_USE_LRTS
 
 void CmiYield(void) { sched_yield(); }
-
-int barrier = 0;
-pthread_cond_t barrier_cond = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t barrier_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-void CmiNodeBarrierCount(int nThreads, uint8_t mode)
-{
-  static unsigned int volatile level = 0;
-  unsigned int cur;
-  pthread_mutex_lock(&barrier_mutex);
-  cur = level;
-  /* CmiPrintf("[%d] CmiNodeBarrierCount: %d of %d level:%d\n", CmiMyPe(), barrier, nThreads, level); */
-  barrier++;
-  if(barrier != nThreads) {
-      /* occasionally it wakes up without having reach the count */
-    while (cur == level)
-      pthread_cond_wait(&barrier_cond, &barrier_mutex);
-  }
-  else{
-    barrier = 0;
-    level++;  /* !level;  */
-    pthread_cond_broadcast(&barrier_cond);
-  }
-  pthread_mutex_unlock(&barrier_mutex);
-}
 
 static CmiNodeLock comm_mutex;
 
@@ -579,7 +514,6 @@ static void CmiDestroyLocks(void)
   comm_mutex = 0;
   CmiDestroyLock(CmiMemLock_lock);
   CmiMemLock_lock = 0;
-  pthread_mutex_destroy(&barrier_mutex);
 #ifdef CMK_NO_ASM_AVAILABLE
   CmiDestroyLock(cmiMemoryLock);
 #endif
@@ -589,9 +523,45 @@ static void CmiDestroyLocks(void)
 
 #if !CMK_SHARED_VARS_UNAVAILABLE
 
+class Barrier {
+public:
+  Barrier(const Barrier&) = delete;
+  Barrier& operator=(const Barrier&) = delete;
+
+  explicit Barrier(unsigned int count) :
+    curCount(count), barrierCount(count), curGeneration(0) {
+  }
+
+  void wait() {
+    std::unique_lock<std::mutex> lock(barrierMutex);
+    const unsigned int gen = curGeneration;
+
+    curCount--;
+
+    if (curCount == 0) {
+      curGeneration++;
+      curCount = barrierCount;
+      barrierCond.notify_all();
+      return;
+    }
+
+    while (gen == curGeneration) {
+      barrierCond.wait(lock);
+    }
+  }
+
+private:
+  std::mutex barrierMutex;
+  std::condition_variable barrierCond;
+  unsigned int curGeneration;
+  unsigned int curCount;
+  const unsigned int barrierCount;
+};
+
 /* Wait for all worker threads */
-void  CmiNodeBarrier(void) {
-  CmiNodeBarrierCount(CmiMyNodeSize(), CMI_NODE_BARRIER);
+void CmiNodeBarrier(void) {
+  static Barrier nodeBarrier(CmiMyNodeSize());
+  nodeBarrier.wait();
 }
 
 /* Wait for all worker threads as well as comm. thread */
@@ -599,11 +569,14 @@ void  CmiNodeBarrier(void) {
    net-win32, which actually is implemented as smp with comm. thread */
 void CmiNodeAllBarrier(void) {
 #if CMK_MULTICORE || CMK_SMP_NO_COMMTHD
-  if (!Cmi_commthread)
-  CmiNodeBarrierCount(CmiMyNodeSize(), CMI_NODE_BARRIER);
-  else
+  if (!Cmi_commthread) {
+    static Barrier nodeBarrier(CmiMyNodeSize());
+    nodeBarrier.wait();
+    return;
+  }
 #endif
-  CmiNodeBarrierCount(CmiMyNodeSize()+1, CMI_NODE_ALL_BARRIER);
+  static Barrier nodeAllBarrier(CmiMyNodeSize() + 1);
+  nodeAllBarrier.wait();
 }
 
 #endif
