@@ -47,6 +47,9 @@ public:
       arrayProxy.balance(iteration);
     } else {
       int expected_migrations = MAX_ITER / ITER_MOD;
+      if (MAX_ITER % ITER_MOD == 0) {
+        expected_migrations--;
+      }
       if (CkNumPes() == 1) {
         expected_migrations = 0;
       }
@@ -79,7 +82,7 @@ public:
   void balance(int iteration) {
     // Cause artificial imbalance every ITER_MOD iterations
     // This should trigger MetaBalancer to run the balancer
-    if (iteration % ITER_MOD == 0) {
+    if (iteration && iteration % ITER_MOD == 0) {
       load = CkMyPe();
     }
     AtSync();
