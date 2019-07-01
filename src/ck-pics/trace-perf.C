@@ -178,6 +178,11 @@ void TraceAutoPerf::beginExecute(envelope *env, void *obj)
     lastbeginMessageSize = env->getTotalsize();
     currentObject = obj;
     currentEP = env->getEpIdx();
+    // Check whether the entry method was invoked from a message
+    if (env != nullptr) {
+      currentSummary->data[AVG_NumMsgRecv]++;
+      currentSummary->data[AVG_BytesMsgRecv] += env->getTotalsize();
+    }
 #if USE_MIRROR
     if(_entryTable[currentEP]->mirror){
       currentAID = env->getArrayMgr().idx;
