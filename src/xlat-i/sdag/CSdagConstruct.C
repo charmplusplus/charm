@@ -313,6 +313,13 @@ int SdagConstruct::unravelClosuresBegin(XStr& defs, bool child) {
             defs << "gen" << cur;
             defs << "->"
                  << "getP" << i << "();\n";
+            indentBy(defs, cur + 2);
+            i++;
+            defs << "int "
+                 << "& num_root_node = ";
+            defs << "gen" << cur;
+            defs << "->"
+                 << "getP" << i << "();\n";
             defs << "#else\n";
             i++;
             defs << "#endif\n";
