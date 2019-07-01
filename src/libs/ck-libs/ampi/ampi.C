@@ -1731,8 +1731,16 @@ int ampiParent::setAttr(int context, vector<int>& keyvals, int keyval, void* att
     return MPI_SUCCESS;
   }
   keyvals.push_back(keyval);
-  kvlist[keyval]->incRefCount();
+  kvlist[keyval]->incRefCount(); // TODO: is this needed?
   return setUserKeyval(context, keyval, attribute_val);
+}
+
+int ampiParent::freeKeyval(int context, vector<int>& keyvals, int keyval) noexcept {
+  if (keyval >= 0 && keyval < kvlist.size()) {
+    kvlist[keyval]->decRefCount();
+    return MPI_SUCCESS;
+  }
+  return MPI_ERR_KEYVAL;
 }
 
 bool ampiParent::kv_set_builtin(int keyval, void* attribute_val) noexcept {
@@ -9729,11 +9737,8 @@ AMPI_API_IMPL(int, MPI_Comm_free, MPI_Comm *comm)
   AMPI_API("AMPI_Comm_free");
   int ret = MPI_SUCCESS;
   if (*comm != MPI_COMM_NULL) {
-    // FIXME: free user-defined attribute keyvals owned by this communicator
-#if 0
     ampiParent* parent = getAmpiParent();
     ret = parent->freeUserKeyvals(*comm, parent->getKeyvals(*comm));
-#endif
     if (*comm != MPI_COMM_WORLD && *comm != MPI_COMM_SELF) {
       ampi* ptr = getAmpiInstance(*comm);
       ptr->thisProxy[ptr->thisIndex].ckDestroy();
@@ -10510,8 +10515,10 @@ AMPI_API_IMPL(int, MPI_Comm_create_keyval, MPI_Comm_copy_attr_function *copy_fn,
 AMPI_API_IMPL(int, MPI_Comm_free_keyval, int *keyval)
 {
   AMPI_API("AMPI_Comm_free_keyval");
-  vector<int>& keyvals = getAmpiParent()->getKeyvals(MPI_COMM_WORLD);
-  int ret = getAmpiParent()->freeUserKeyval(MPI_COMM_WORLD, keyvals, keyval);
+  ampiParent *parent = getAmpiParent();
+  vector<int>& keyvals = parent->getKeyvals(MPI_COMM_WORLD);
+  int ret = parent->freeKeyval(MPI_COMM_WORLD, keyvals, *keyval);
+  *keyval = MPI_KEYVAL_INVALID;
   return ampiErrhandler("AMPI_Comm_free_keyval", ret);
 }
 

@@ -2304,6 +2304,7 @@ class ampiParent final : public CBase_ampiParent {
   int dupUserKeyvals(MPI_Comm old_comm, MPI_Comm new_comm) noexcept;
   int freeUserKeyval(int context, vector<int>& keyvals, int *keyval) noexcept;
   int freeUserKeyvals(int context, vector<int>& keyvals) noexcept;
+  int freeKeyval(int context, vector<int>& keyvals, int keyval) noexcept;
 
   int setAttr(MPI_Comm comm, vector<int>& keyvals, int keyval, void *attribute_val) noexcept;
   int getAttr(MPI_Comm comm, vector<int>& keyvals, int keyval, void *attribute_val, int *flag) noexcept;
