@@ -222,6 +222,8 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     if (hasrdma) {
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "  int impl_num_rdma_fields = "<<entry->numRdmaSendParams + entry->numRdmaRecvParams<<";\n";
+      // Root node is pupped on the source as it is required for ZC Bcast when the source is non-zero
+      str << "  int impl_num_root_node = CkMyNode();\n";
       callEach(&Parameter::marshallRdmaParameters, str, true);
       str << "#else\n";
       if (!hasArrays) str << "  int impl_arrstart=0;\n";
@@ -234,6 +236,7 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     if (hasrdma) {
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "    implP|impl_num_rdma_fields;\n";
+      str << "  implP|impl_num_root_node;\n";
       // All rdma parameters have to be pupped at the start
       callEach(&Parameter::pupRdma, str, true);
       str << "#else\n";
@@ -262,6 +265,7 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     if (hasRdma()) {
       str << "#if CMK_ONESIDED_IMPL\n";
       str << "    implP|impl_num_rdma_fields;\n";
+      str << "  implP|impl_num_root_node;\n";
       callEach(&Parameter::pupRdma, str, true);
       str << "#else\n";
       callEach(&Parameter::pupRdma, str, false);
@@ -444,6 +448,7 @@ void ParamList::beginRednWrapperUnmarshall(XStr& str, bool needsClosure) {
               str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
             str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
             str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
+            str << "  int impl_num_root_node; implP|impl_num_root_node;\n";
             callEach(&Parameter::beginUnmarshallRdma, str, true);
             str << "#else\n";
             callEach(&Parameter::beginUnmarshallRdma, str, false);
@@ -488,6 +493,7 @@ void ParamList::beginRednWrapperUnmarshall(XStr& str, bool needsClosure) {
             str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
           str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
           str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields;\n";
+          str << "  int impl_num_root_node; implP|impl_num_root_node;\n";
           callEach(&Parameter::beginUnmarshallRdma, str, true);
           str << "#else\n";
           callEach(&Parameter::beginUnmarshallRdma, str, false);
@@ -525,6 +531,7 @@ void ParamList::beginUnmarshall(XStr& str) {
         str << "  if(!CMI_IS_ZC_RECV(env) && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_ALL_DONE_MSG && CMI_ZC_MSGTYPE(env) != CMK_ZC_P2P_RECV_DONE_MSG)\n";
       str << "  CkUnpackRdmaPtrs(impl_buf_begin);\n";
       str << "  int impl_num_rdma_fields; implP|impl_num_rdma_fields; \n";
+      str << "  int impl_num_root_node; implP|impl_num_root_node;\n";
       callEach(&Parameter::beginUnmarshallRdma, str, true);
       str << "#else\n";
       callEach(&Parameter::beginUnmarshallRdma, str, false);
@@ -664,6 +671,7 @@ void Parameter::beginUnmarshallSDAGCallRdma(XStr& str, bool genRdma) {
     if (genRdma) {
       if (isFirstRdma()) {
         str << "  implP|genClosure->num_rdma_fields;\n";
+        str << "  implP|genClosure->num_root_node;\n";
       }
       str << "  implP|genClosure->ncpyBuffer_" << name << ";\n";
       if(isRecvRdma()) {
@@ -752,6 +760,7 @@ void ParamList::beginUnmarshallSDAG(XStr& str) {
        */
       callEach(&Parameter::adjustUnmarshalledRdmaPtrsSDAG, str);
       str << "  implP|num_rdma_fields;\n";
+      str << "  implP|num_root_node;\n";
       callEach(&Parameter::beginUnmarshallRdma, str, true);
       str << "#else\n";
       callEach(&Parameter::beginUnmarshallRdma, str, false);
