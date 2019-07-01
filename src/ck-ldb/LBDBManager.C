@@ -628,13 +628,20 @@ void LocalBarrier::CheckBarrier()
     cur_refcount++;
     CallReceivers();
   }
-  if (at_count >= client_count) {
-    bool at_barrier = false;
 
-    for(std::list<client*>::iterator i = clients.begin(); i != clients.end(); ++i)
-      if ((*i)->refcount >= cur_refcount)
-	at_barrier = true;
-		
+  // If there have been enough AtBarrier calls, check to see if all clients have
+  // made it to the barrier. It's possible to have gotten multiple AtSync calls
+  // from a single client, which is why this check is necessary.
+  if (at_count >= client_count) {
+    bool at_barrier = true;
+
+    for (auto& c : clients) {
+      if (c->refcount < cur_refcount) {
+        at_barrier = false;
+        break;
+      }
+    }
+
     if (at_barrier) {
       at_count -= client_count;
       cur_refcount++;
