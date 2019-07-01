@@ -395,6 +395,7 @@ extern void CkDeliverMessageFree(int epIdx,void *msg,void *object);
 extern void CkDeliverMessageReadonly(int epIdx,const void *msg,void *object);
 
 extern void *CkLocalBranch(CkGroupID gID);
+extern void *CkLocalBranchOther(CkGroupID gID, int rank);
 extern void *CkLocalNodeBranch(CkGroupID gID);
 extern void *CkLocalChare(const CkChareID *chare);
 

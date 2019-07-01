@@ -135,6 +135,7 @@ public:
 	void ckBroadcast(CkArrayMessage *m, int ep, int opts=0) const;
 	CkArrayID ckGetArrayID(void) const { return _aid; }
 	CkArray *ckLocalBranch(void) const { return _aid.ckLocalBranch(); }
+	CkArray *ckLocalBranchOther(int rank) const { return _aid.ckLocalBranchOther(rank); }
 	CkLocMgr *ckLocMgr(void) const;
 	inline operator CkArrayID () const {return ckGetArrayID();}
 	unsigned int numLocalElements() const { return ckLocMgr()->numLocalElements(); }
