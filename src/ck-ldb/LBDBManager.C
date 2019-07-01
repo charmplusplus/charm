@@ -623,7 +623,6 @@ void LocalBarrier::CheckBarrier()
   if (!on) return;
 
   // If there are no clients, resume as soon as we're turned on
-
   if (client_count == 0) {
     cur_refcount++;
     CallReceivers();
