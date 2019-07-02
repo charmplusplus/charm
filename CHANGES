@@ -2,6 +2,175 @@ This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 
 ================================================================================
+What's new in Charm++ 6.9.0
+================================================================================
+
+This is a feature release, with the following major additions:
+
+Highlights:
+
+- Charm++ now requires C++11 and better supports use of modern C++ in applications.
+
+- New "Zero Copy" messaging APIs for more efficient communication of large arrays.
+
+- charm4py provides a new Python interface to Charm++, without the need for .ci files.
+
+- AMPI performance, standard compliance, and usability improvements.
+
+- GPU Manager improvements for asynchronous offloading and a new CUDA-like API (HAPI).
+
+Charm++ Features & Fixes:
+
+- Added new, more intuitive process launching commands based on hwloc support,
+  such as '++processPer{Host,Socket,Core,PU} <num>' and '++oneWthPer{Host,Socket,Core,PU}'.
+  Also added a '++autoProvision' option, which by default uses all hardware resources
+  available to the job.
+
+- Added a new 'zero copy' direct API which allows users to communicate large message buffers
+  directly via RDMA on networks that support it, avoiding any intermediate buffering of data
+  between the sender and the receiver. The API is also optimized for shared memory.
+
+- A new Python interface to Charm++, named charm4py, is now available for Python users.
+  More documentation on it can be found here: http://charm4py.readthedocs.io
+
+- Charmxi now supports r-value references, std::array, std::tuple, the 'typename' keyword,
+  parameter packs, variadic templates, array indices with template parameters, and attributes
+  on explicit instantiations of templated entry methods.
+
+- Projections traces of templated entry methods now display demangled template type names.
+
+- [local] and [inline] entry method attributes now work for templated entry methods and now
+  support perfect forwarding of their arguments.
+
+- Added various type traits for generic programming with Charm++ entities inside
+  charm++_type_traits.h
+
+- Chare array index types are now exposed as 'array_index_t'.
+
+- Support for default arguments to Group entry methods.
+
+- Charm++ now throws a runtime error when a user calls an SDAG entry method containing a
+  'when' clause directly, without calling it via a proxy.
+
+- Users can now pass std::vector's directly to contribute() rather than passing the size and
+  buffer address separately. Cross-array section reduction contributions can now take a callback.
+
+- Added a simplified STL-based interface for section creation.
+
+- Added PUP support for C++ enums, for std::deque and std::forward_list, for STL containers
+  of objects with abstract base classes, and for avoiding default construction during unpacking
+  by defining a constructor that takes a value of type PUP::reconstruct.
+
+- Improved performance for PUP of STL containers of arithmetic types and types
+  declared as PUPbytes.
+
+- Allow setting queueing type and priorities on entry methods with no parameters.
+
+- Enable setting Group and Node Group dependencies on all types of entry methods and
+  constructors, as well as multiple dependencies.
+
+- Support for model-based runtime load balancing strategy selection via MetaLB. This can be enabled
+  with +MetaLBModelDir <path-to-model> used alongside +MetaLB option. A trained model can be
+  found in charm/src/ck-ldb/rf_model.
+
+- A new lock-free producer-consumer queue implementation has been added as a build option
+  '--enable-lockless-queue' for LRTS's within-process messaging queues in SMP mode.
+
+- CkLoop now supports lambda syntax, adds a Hybrid mode that combines static scheduling with dynamic
+  work stealing, and adds Drone mode support in which chares are mapped to rank 0 on each logical
+  node so that other PEs can act as drones to execute tasks.
+
+- Updated our integrated LLVM OpenMP runtime to support more OpenMP directives.
+
+- Updated f90charm interface for more functionality and usability, and fixed all example programs.
+
+- The Infiniband 'verbs' communication layer now automatically selects the fastest active
+  Infiniband device and port at startup.
+
+- Fixed '-tracemode utilization', tracing of user-level threads, and nested local/inline methods.
+
+- Fixed a performance bug introduced in v6.8.0 for dynamic location management.
+
+- Added support for using Boost's lightweight uFcontext user-level threads, now the default
+  ULT implementation on most platforms.
+
+- '++debug' now works using lldb on Mac (Darwin) systems.
+
+- CkAbort() is now marked with the C++ attribute [[noreturn]].
+
+- CkExit() now takes an optional integer argument which is returned from the program's exit.
+
+- Improved error checking throughout, and fixes to race conditions during startup.
+
+AMPI Changes:
+
+- Improved performance of point-to-point message matching and reduced per-rank memory footprint.
+
+- Fixes to derived datatypes handling, MPI_Sendrecv_replace, MPI_(I)Alltoall{v,w},
+  MPI_(I)Scatter(v), MPI_IN_PLACE in gather collectives, MPI_Buffer_detach, MPI_Type_free,
+  MPI_Op_free, and MPI_Comm_free.
+
+- Implemented support for generalized requests, MPI_Comm_create_group, keyval attribute callbacks,
+  the distributed graph virtual topology, large count routines, matched probe and recv, and
+  MPI_Comm_idup(_with_info) routines.
+
+- Added support for using -tlsglobals for privatization of global/static variables
+  in shared objects. Previously -tlsglobals required static linking.
+
+- '-memory os-isomalloc', which uses the system's malloc underneath, now works everywhere
+  Isomalloc does. Both versions of Isomalloc now wrap calls to posix_memalign(), and we
+  removed the need to link with '-Wl,--allow-multiple-definition' on some systems.
+
+- Updated AMPI_Migrate() with built-in MPI_Info objects, such as AMPI_INFO_LB_SYNC.
+
+- AMPI now only renames the user's MPI calls from MPI_* to AMPI_* if Charm++/AMPI is
+  built on top of another MPI implementation for its communication substrate.
+
+- Support for compiling mpif.h in both fixed form and free form.
+
+- PMPI profiling interface support added.
+
+- Added an ampirun script that wraps charmrun to enable easier integration with
+  build and test scripts that take mpirun/mpiexec as an option.
+
+GPU Manager Changes:
+
+- Enable concurrent kernel execution by removing the limit imposed by the internal
+  implementation that used only three streams.
+
+- New API (Hybrid API, or HAPI) that is more similar to the CUDA API.
+
+- Added NVIDIA NVTX support for profiling host-side functions.
+
+- Deprecated the workRequest API. New users are now strongly recommended to use
+  the new API, or Hybrid API (HAPI).
+
+Build System Changes:
+
+- Charm++ now requires C++11 support, and as such defaults to using bgclang on BGQ.
+  Compilers GCC v4.8+, ICC v15.0+, XLC v13.1+, Cray CC v8.6+, MSVC v19.00.24+ and
+  Clang v3.3+ are required.
+
+- Building Charm++ from the git repository now requires autoconf and automake.
+
+- Support for the Flang Fortran compiler added.
+
+- Users can now specify compiler versions to our top-level build script when building
+  with gcc or clang.
+
+- Windows users can now build Charm++ with GCC, Clang, or MSVC.
+
+- All of Charm++ and AMPI can now be built as shared objects.
+
+- Added a CMake wrapper for compiling .ci files.
+
+- Charm++ is now available in Spack under the name 'charmpp'.
+
+- Added {pamilrts,mpi,multicore,netlrts}-linux-ppc64le build targets for new IBM POWER systems.
+
+- Added {multicore,netlrts}-linux-arm8 build targets for AArch64 / ARM64 systems.
+
+================================================================================
 What's new in Charm++ 6.8.2
 ================================================================================
 

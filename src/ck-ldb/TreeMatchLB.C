@@ -10,7 +10,7 @@
 #include "ckgraph.h"
 #include <algorithm>
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(TreeMatchLB, "TreeMatch load balancer, like a normal one but with empty strategy")
 

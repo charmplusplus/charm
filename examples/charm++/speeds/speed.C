@@ -111,7 +111,7 @@ main::main(CkArgMsg* m)
 {
   if(m->argc < 2) {
     CkPrintf("Usage: charmrun pgm +pN <nchunks>\n");
-    CkAbort("");
+    CkExit(1);
   }
   int nchunks = atoi(m->argv[1]);
   CkGroupID gid = CProxy_test::ckNew();

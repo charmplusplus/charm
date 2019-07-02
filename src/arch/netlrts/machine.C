@@ -217,7 +217,7 @@ int printf(const char *fmt, ...) {
 static int        Cmi_charmrun_pid;
 static int        Cmi_charmrun_fd = -1;
 
-CMI_EXTERNC_VARIABLE int quietMode;
+extern int quietMode;
 
 /******************* Producer-Consumer Queues ************************/
 #include "pcqueue.h"
@@ -260,20 +260,10 @@ int _kq = -1;
 #endif
 
 #if CMK_PERSISTENT_COMM
-#include "machine-persistent.c" 
+#include "machine-persistent.C"
 #endif
 
 #define PRINTBUFSIZE 16384
-
-#ifdef __ONESIDED_IMPL
-#ifdef __ONESIDED_NO_HARDWARE
-int putSrcHandler;
-int putDestHandler;
-int getSrcHandler;
-int getDestHandler;
-#include "conv-onesided.c"
-#endif
-#endif
 
 #include "machine-rdma.h"
 #if CMK_ONESIDED_IMPL
@@ -326,7 +316,6 @@ static int already_in_signal_handler=0;
 
 static void CmiDestroyLocks(void);
 
-CMI_EXTERNC
 void EmergencyExit(void);
 void MachineExit(void);
 
@@ -639,7 +628,7 @@ int    Cmi_myoldpe = 0;
 static int Cmi_charmrun_assigned_pe;
 #endif
 
-CMI_EXTERNC_VARIABLE int    CmiMyLocalRank;
+extern int    CmiMyLocalRank;
 
 #if ! defined(_WIN32)
 /* parse forks only used in non-smp mode */
@@ -849,7 +838,7 @@ static double         Cmi_check_delay = 3.0;
 /******************************************************************************
  *
  * OS Threads
- * SMP implementation moved to machine-smp.c
+ * SMP implementation moved to machine-smp.C
  *****************************************************************************/
 int* inProgress;
 
@@ -928,7 +917,6 @@ static void CommunicationInterrupt(int ignored)
   MACHSTATE(2,"--END SIGIO--")
 }
 
-CMI_EXTERNC
 void CmiSignal(int sig1, int sig2, int sig3, void (*handler)(int));
 
 static void CmiDestroyLocks(void)
@@ -960,7 +948,16 @@ static int Cmi_charmrun_fd_sendflag=0;
 
 /* ctrl_sendone */
 static int sendone_abort_fn(SOCKET skt,int code,const char *msg) {
+#if !defined(_WIN32)
+	// on Windows, this is sometimes reached during normal program termination,
+	// so printing an error makes no sense. The message is not seen normally
+	// since processes are spawned by charmrun as DETACHED_PROCESS by default and
+	// have no console output.
+	// With CMK_CHARMPY=1 on Windows, charmrun spawns one process in same console,
+	// because any output before charm starts needs to be seen (e.g. Python syntax errors)
+	// so this print needs to be disabled
 	fprintf(stderr,"Socket error %d in ctrl_sendone! %s\n",code,msg);
+#endif
 	machine_exit(1);
 	return -1;
 }
@@ -1059,6 +1056,7 @@ CmiPrintStackTrace(0);
         sprintf(msgBuf,"Fatal error on Partition %d PE %d> ", CmiMyPartition(), CmiMyPe());
     }
   	ctrl_sendone_nolock("abort",msgBuf,strlen(msgBuf),s,strlen(s)+1);
+  	skt_close(Cmi_charmrun_fd);
   }
 }
 
@@ -1072,7 +1070,7 @@ void charmrun_realloc(const char *s)
 /* ctrl_getone */
 
 #ifdef __FAULT__
-#include "machine-recover.c"
+#include "machine-recover.C"
 #endif
 
 static void node_addresses_store(ChMessage *msg);
@@ -1448,7 +1446,7 @@ static void CmiStdoutFlush(void) {
  *
  ***************************************************************************/
 
-#include "machine-dgram.c"
+#include "machine-dgram.C"
 
 static void open_charmrun_socket(void)
 {
@@ -1554,7 +1552,7 @@ static void node_addresses_obtain(char **argv)
         MACHSTATE(2,"recv initnode {");
   	ChMessage_recv(Cmi_charmrun_fd,&nodetabmsg);
 
-    if (strcmp("nodefork", nodetabmsg.header.type) == 0)
+    while (strcmp("nodefork", nodetabmsg.header.type) == 0)
     {
 #ifndef _WIN32
       int i;
@@ -1710,7 +1708,7 @@ CmiCommHandle LrtsSendFunc(int destNode, int pe, int size, char *data, int freem
  *
  ****************************************************************************/
                                                                                 
-void LrtsSyncListSendFn(int npes, int *pes, int len, char *msg)
+void LrtsSyncListSendFn(int npes, const int *pes, int len, char *msg)
 {
   int i;
   for(i=0;i<npes;i++) {
@@ -1719,7 +1717,7 @@ void LrtsSyncListSendFn(int npes, int *pes, int len, char *msg)
   }
 }
                                                                                 
-CmiCommHandle LrtsAsyncListSendFn(int npes, int *pes, int len, char *msg)
+CmiCommHandle LrtsAsyncListSendFn(int npes, const int *pes, int len, char *msg)
 {
   CmiError("ListSend not implemented.");
   return (CmiCommHandle) 0;
@@ -1730,7 +1728,7 @@ CmiCommHandle LrtsAsyncListSendFn(int npes, int *pes, int len, char *msg)
   returns is not changed, we can use memory reference trick to avoid 
   memory copying here
 */
-void LrtsFreeListSendFn(int npes, int *pes, int len, char *msg)
+void LrtsFreeListSendFn(int npes, const int *pes, int len, char *msg)
 {
   int i;
   for(i=0;i<npes;i++) {
@@ -1929,15 +1927,6 @@ void LrtsPostCommonInit(int everReturn)
     	CMK_RANDOMLY_CORRUPT_MESSAGES,rand());
 #endif
 
-#ifdef __ONESIDED_IMPL
-#ifdef __ONESIDED_NO_HARDWARE
-  putSrcHandler = CmiRegisterHandler((CmiHandler)handlePutSrc);
-  putDestHandler = CmiRegisterHandler((CmiHandler)handlePutDest);
-  getSrcHandler = CmiRegisterHandler((CmiHandler)handleGetSrc);
-  getDestHandler = CmiRegisterHandler((CmiHandler)handleGetDest);
-#endif
-#endif
-    
 }
 
 void LrtsExit(int exitcode)
@@ -2074,9 +2063,6 @@ void ConverseCleanup(void)
 #else
       signal(SIGALRM, SIG_IGN);
 #endif
-#if CMK_USE_IBVERBS
-      CmiMachineCleanup();
-#endif
       //put references to the controlling tty back on normal fd so that
       //CmiStdoutInit  refers to the tty not the old pipe
       dup2(writeStdout[0], 1);
@@ -2167,9 +2153,14 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #else
   Cmi_idlepoll = 1;
 #endif
+#if CMK_OPTIMIZE
   Cmi_truecrash = 0;
+#else
+  Cmi_truecrash = 1;
+#endif
   if (CmiGetArgFlagDesc(*argv,"+truecrash","Do not install signal handlers") ||
-      CmiGetArgFlagDesc(*argv,"++debug",NULL /*meaning: don't show this*/)) Cmi_truecrash = 1;
+      CmiGetArgFlagDesc(*argv,"++debug",NULL /*meaning: don't show this*/) ||
+      CmiNumNodes()<=32) Cmi_truecrash = 1;
     /* netpoll disable signal */
   if (CmiGetArgFlagDesc(*argv,"+netpoll","Do not use SIGIO--poll instead")) Cmi_netpoll = 1;
   if (CmiGetArgFlagDesc(*argv,"+netint","Use SIGIO")) Cmi_netpoll = 0;

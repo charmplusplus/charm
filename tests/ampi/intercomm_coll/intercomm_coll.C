@@ -11,13 +11,12 @@ void intercomm_bcast_test(MPI_Comm myFirstComm, int global_rank, int root, bool 
   int data = 0;
   char msg[20] = {0};
   MPI_Request req = MPI_REQUEST_NULL;
-  MPI_Status sts;
 
   if (global_rank == 0) {//root
     if(non_blocking) {
       strcpy(msg, "Hello World");
       MPI_Ibcast(msg, 12, MPI_CHAR, MPI_ROOT, myFirstComm, &req);
-      MPI_Wait(&req, &sts);
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
       assert(strcmp(msg,"Hello World") == 0); //verify that buffer in root is not modified
       strcpy(msg, "Root - new message");
     }
@@ -30,7 +29,7 @@ void intercomm_bcast_test(MPI_Comm myFirstComm, int global_rank, int root, bool 
   else if (global_rank%2 == 0) {//local group
     if (non_blocking) {
       MPI_Ibcast(msg, 12, MPI_CHAR, MPI_PROC_NULL, myFirstComm, &req);
-      MPI_Wait(&req, &sts);
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
       assert(strcmp(msg,"") == 0); //local ranks should not receive broadcasted msg
     }
     else {
@@ -41,7 +40,7 @@ void intercomm_bcast_test(MPI_Comm myFirstComm, int global_rank, int root, bool 
   else {//remote group
     if (non_blocking) {
       MPI_Ibcast(msg, 12, MPI_CHAR, root, myFirstComm, &req);
-      MPI_Wait(&req, &sts);
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
       assert(strcmp(msg,"Hello World") == 0);
     }
     else {
@@ -60,12 +59,11 @@ void intercomm_bcast_test(MPI_Comm myFirstComm, int global_rank, int root, bool 
 
 void intercomm_barrier_test(MPI_Comm myFirstComm, int global_rank, bool non_blocking) {
   MPI_Request req = MPI_REQUEST_NULL;
-  MPI_Status sts;
 
   if (global_rank % 2 == 0) {
     if (non_blocking) {
       MPI_Ibarrier(myFirstComm, &req);
-      MPI_Wait(&req, &sts);
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
     }
     else {
       MPI_Barrier(myFirstComm);
@@ -79,6 +77,7 @@ void intercomm_barrier_test(MPI_Comm myFirstComm, int global_rank, bool non_bloc
       printf("[%d]Remote group ranks doing work before barrier\n", global_rank);
     if (non_blocking) {
       MPI_Ibarrier(myFirstComm, &req);
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
     }
     else {
       MPI_Barrier(myFirstComm);
@@ -90,14 +89,13 @@ void intercomm_gather_test(MPI_Comm myFirstComm, int global_rank, int root, bool
   int sendarray[5];
   int *rbuf, remoteSize;
   MPI_Request req = MPI_REQUEST_NULL;
-  MPI_Status sts;
   MPI_Comm_remote_size(myFirstComm, &remoteSize);
   rbuf = (int*) malloc(remoteSize*5*sizeof(int));
 
   if (global_rank == 0) {//root
     if (non_blocking) {
       MPI_Igather(sendarray, 5, MPI_INT, rbuf, 5, MPI_INT, MPI_ROOT, myFirstComm, &req);
-      MPI_Wait(&req, &sts);
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
     }
     else {
       MPI_Gather(sendarray, 5, MPI_INT, rbuf, 5, MPI_INT, MPI_ROOT, myFirstComm);
@@ -117,6 +115,7 @@ void intercomm_gather_test(MPI_Comm myFirstComm, int global_rank, int root, bool
   else if (global_rank%2 == 0) {//local group
     if (non_blocking) {
       MPI_Igather(sendarray, 5, MPI_INT, rbuf, 5, MPI_INT, MPI_PROC_NULL, myFirstComm, &req);
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
     }
     else {
       MPI_Gather(sendarray, 5, MPI_INT, rbuf, 5, MPI_INT, MPI_PROC_NULL, myFirstComm);
@@ -130,6 +129,7 @@ void intercomm_gather_test(MPI_Comm myFirstComm, int global_rank, int root, bool
 
     if (non_blocking) {
       MPI_Igather(sendarray, 5, MPI_INT, rbuf, 5, MPI_INT, root, myFirstComm, &req);
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
     }
     else {
       MPI_Gather(sendarray, 5, MPI_INT, rbuf, 5, MPI_INT, root, myFirstComm);
@@ -143,7 +143,6 @@ void intercomm_gatherv_test(MPI_Comm myFirstComm, int global_rank, int root, boo
   // each remote rank sends its local_rank number of elements
   int *sendbuf = (int*)malloc(local_rank*sizeof(int));
   MPI_Comm_remote_size(myFirstComm, &remote_size);
-  MPI_Status sts;
   MPI_Request req = MPI_REQUEST_NULL;
 
   int recvbuf_size = 0;
@@ -164,7 +163,7 @@ void intercomm_gatherv_test(MPI_Comm myFirstComm, int global_rank, int root, boo
   if (global_rank == 0) {//root for gatherv
     if (non_blocking) {
       MPI_Igatherv(sendbuf, local_rank, MPI_INT, recvbuf, recv_counts, displacements, MPI_INT, MPI_ROOT, myFirstComm, &req);
-      MPI_Wait(&req, &sts);
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
     }
     else {
       MPI_Gatherv(sendbuf, local_rank, MPI_INT, recvbuf, recv_counts, displacements, MPI_INT, MPI_ROOT, myFirstComm);
@@ -185,6 +184,7 @@ void intercomm_gatherv_test(MPI_Comm myFirstComm, int global_rank, int root, boo
   else if (global_rank%2 == 0) {//local group
     if (non_blocking) {
       MPI_Igatherv(sendbuf, local_rank, MPI_INT, recvbuf, recv_counts, displacements, MPI_INT, MPI_PROC_NULL, myFirstComm, &req);
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
     }
     else {
       MPI_Gatherv(sendbuf, local_rank, MPI_INT, recvbuf, recv_counts, displacements, MPI_INT, MPI_PROC_NULL, myFirstComm);
@@ -196,6 +196,7 @@ void intercomm_gatherv_test(MPI_Comm myFirstComm, int global_rank, int root, boo
     }
     if (non_blocking) {
       MPI_Igatherv(sendbuf, local_rank, MPI_INT, recvbuf, recv_counts, displacements, MPI_INT, root, myFirstComm, &req);
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
     }
     else {
       MPI_Gatherv(sendbuf, local_rank, MPI_INT, recvbuf, recv_counts, displacements, MPI_INT, root, myFirstComm);
@@ -210,7 +211,6 @@ void intercomm_scatter_test(MPI_Comm myFirstComm, int global_rank, int root, boo
   int sendcount = 5;
   int *sendbuf = (int*)malloc(sendcount*remote_size*sizeof(int));
   int *recvbuf = (int*)malloc(sendcount*sizeof(int));
-  MPI_Status sts;
   MPI_Request req = MPI_REQUEST_NULL;
 
   if (global_rank == 0) {
@@ -222,21 +222,25 @@ void intercomm_scatter_test(MPI_Comm myFirstComm, int global_rank, int root, boo
       }
     }
 
-    if (non_blocking)
+    if (non_blocking) {
       MPI_Iscatter(sendbuf, sendcount, MPI_INT, recvbuf, sendcount, MPI_INT, MPI_ROOT, myFirstComm, &req);
-    else
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
+    } else {
       MPI_Scatter(sendbuf, sendcount, MPI_INT, recvbuf, sendcount, MPI_INT, MPI_ROOT, myFirstComm);
+    }
   }
   else if (global_rank%2 == 0) {
-    if (non_blocking)
+    if (non_blocking) {
       MPI_Iscatter(sendbuf, sendcount, MPI_INT, recvbuf, sendcount, MPI_INT, MPI_PROC_NULL, myFirstComm, &req);
-    else
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
+    } else {
       MPI_Scatter(sendbuf, sendcount, MPI_INT, recvbuf, sendcount, MPI_INT, MPI_PROC_NULL, myFirstComm);
+    }
   }
   else {
     if (non_blocking) {
       MPI_Iscatter(sendbuf, sendcount, MPI_INT, recvbuf, sendcount, MPI_INT, root, myFirstComm, &req);
-      MPI_Wait(&req, &sts);
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
     }
     else {
       MPI_Scatter(sendbuf, sendcount, MPI_INT, recvbuf, sendcount, MPI_INT, root, myFirstComm);
@@ -260,7 +264,6 @@ void intercomm_scatterv_test(MPI_Comm myFirstComm, int global_rank, int root, bo
   // each remote rank receives its local_rank number of elements
   int* recvbuf = (int*) malloc(local_rank * sizeof(int));
   MPI_Comm_remote_size(myFirstComm, &remote_size);
-  MPI_Status sts;
   MPI_Request req = MPI_REQUEST_NULL;
 
   int sendbuf_size = 0;
@@ -289,7 +292,7 @@ void intercomm_scatterv_test(MPI_Comm myFirstComm, int global_rank, int root, bo
 
     if (non_blocking) {
       MPI_Iscatterv(sendbuf, send_counts, displacements, MPI_INT, recvbuf, local_rank, MPI_INT, MPI_ROOT, myFirstComm, &req);
-      MPI_Wait(&req, &sts);
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
     }
     else {
       MPI_Scatterv(sendbuf, send_counts, displacements, MPI_INT, recvbuf, local_rank, MPI_INT, MPI_ROOT, myFirstComm);
@@ -298,6 +301,7 @@ void intercomm_scatterv_test(MPI_Comm myFirstComm, int global_rank, int root, bo
   else if (global_rank%2 == 0) { // local group
     if (non_blocking) {
       MPI_Iscatterv(sendbuf, send_counts, displacements, MPI_INT, recvbuf, local_rank, MPI_INT, MPI_PROC_NULL, myFirstComm, &req);
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
     }
     else {
       MPI_Scatterv(sendbuf, send_counts, displacements, MPI_INT, recvbuf, local_rank, MPI_INT, MPI_PROC_NULL, myFirstComm);
@@ -306,7 +310,7 @@ void intercomm_scatterv_test(MPI_Comm myFirstComm, int global_rank, int root, bo
   else if (global_rank%2 == 1) { // remote group
     if (non_blocking) {
       MPI_Iscatterv(sendbuf, send_counts, displacements, MPI_INT, recvbuf, local_rank, MPI_INT, root, myFirstComm, &req);
-      MPI_Wait(&req, &sts);
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
     }
     else {
       MPI_Scatterv(sendbuf, send_counts, displacements, MPI_INT, recvbuf, local_rank, MPI_INT, root, myFirstComm);
@@ -353,12 +357,12 @@ int main(int argc, char **argv) {
   intercomm_scatterv_test(myFirstComm, global_rank, root, false); /* Intercomm scatterv test */
   intercomm_scatterv_test(myFirstComm, global_rank, root, true); /* Intercomm iscatterv test */
 
+#if 0
   /* Intercommunicator barrier collective tests */
   if (global_rank == 0) printf("[0] Testing intercomm barrier\n");
   intercomm_barrier_test(myFirstComm, global_rank, false); /* Intercomm barrier test */
   intercomm_barrier_test(myFirstComm, global_rank, true); /* Intercomm ibarrier test */
 
-#if 0
   /* Intercommunicator gather collective tests */
   if (global_rank == 0) printf("[0] Testing intercomm gather\n");
   intercomm_gather_test(myFirstComm, global_rank, root, false); /* Intercomm gather test */

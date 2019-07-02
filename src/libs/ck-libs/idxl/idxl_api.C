@@ -9,7 +9,7 @@
 /************************* IDXL itself ************************/
 
 /** Create a new, empty index list. Must eventually call IDXL_Destroy on this list. */
-CDECL IDXL_t 
+CLINKAGE IDXL_t
 IDXL_Create(void) {
 	const char *caller="IDXL_Create";
 	IDXLAPI(caller); IDXL_Chunk *c=IDXL_Chunk::get(caller);
@@ -38,7 +38,7 @@ FORTRAN_AS_C(IDXL_PRINT,IDXL_Print,idxl_print,
 	(int *l), (*l) )
 
 /** Copy the indices in src into l. */
-CDECL void 
+CLINKAGE void
 IDXL_Copy(IDXL_t l,IDXL_t src) {
 	IDXL_Combine(l,src,0,0);
 }
@@ -57,7 +57,7 @@ static void shiftSide(IDXL_Side &dest,int idxShift)
 	dest.flushMap();
 }
 /** Shift the indices of this list by this amount. */
-CDECL void 
+CLINKAGE void
 IDXL_Shift(IDXL_t l_t,int startSend,int startRecv) {
 	const char *caller="IDXL_Shift";
 	IDXLAPI(caller); IDXL_Chunk *c=IDXL_Chunk::get(caller);
@@ -97,7 +97,7 @@ static void combineSide(IDXL_Side &dest,const IDXL_Side &src,
  * @param startSend value to add to send indices of src.
  * @param startRecv value to add to recv indices of src.
   */
-CDECL void 
+CLINKAGE void
 IDXL_Combine(IDXL_t dest_t,IDXL_t src_t,int startSend,int startRecv)
 {
 	const char *caller="IDXL_Combine";
@@ -125,7 +125,7 @@ FORTRAN_AS_C(IDXL_COMBINE,IDXL_Combine,idxl_combine,
 
 /** Sort the indices in this list by these 2D coordinates */
 // FIXME: void IDXL_Sort_2d(IDXL_t l,double *coord2d);
-CDECL void IDXL_Sort_2d(IDXL_t l_t,double *coord2d){
+CLINKAGE void IDXL_Sort_2d(IDXL_t l_t,double *coord2d){
 	const char *caller = "IDXL_Sort_2d";
 	IDXLAPI(caller); IDXL_Chunk *c=IDXL_Chunk::get(caller);
 	IDXL &l=c->lookup(l_t,caller);
@@ -135,7 +135,7 @@ CDECL void IDXL_Sort_2d(IDXL_t l_t,double *coord2d){
 
 /** Sort the indices in this list by these 3D coordinates */
 // FIXME: void IDXL_Sort_3d(IDXL_t l,double *coord3d);
-CDECL void IDXL_Sort_3d(IDXL_t l_t,double *coord3d){
+CLINKAGE void IDXL_Sort_3d(IDXL_t l_t,double *coord3d){
 	const char *caller = "IDXL_Sort_3d";
 	IDXLAPI(caller); IDXL_Chunk *c=IDXL_Chunk::get(caller);
 	IDXL &l=c->lookup(l_t,caller);
@@ -184,14 +184,14 @@ static void splitEntity(IDXL &l,
 		splitEntity(l.getRecv(),localIdx,nBetween,between,idxbase);
 }
 
-CDECL void IDXL_Add_entity(IDXL_t l_t,int localIdx,int nBetween,int *between)
+CLINKAGE void IDXL_Add_entity(IDXL_t l_t,int localIdx,int nBetween,int *between)
 {
 	const char *caller="IDXL_Add_entity";
 	IDXLAPI(caller); IDXL_Chunk *c=IDXL_Chunk::get(caller);
 	IDXL &l=c->lookup(l_t,caller);
 	splitEntity(l,localIdx,nBetween,between,0);
 }
-FDECL void FTN_NAME(IDXL_ADD_ENTITY,idxl_add_entity)
+FLINKAGE void FTN_NAME(IDXL_ADD_ENTITY,idxl_add_entity)
 	(int *l_t,int *localIdx,int *nBetween,int *between)
 {
 	const char *caller="IDXL_Add_entity";
@@ -202,7 +202,7 @@ FDECL void FTN_NAME(IDXL_ADD_ENTITY,idxl_add_entity)
 
 
 /** Throw away this index list */
-CDECL void IDXL_Destroy(IDXL_t l) {
+CLINKAGE void IDXL_Destroy(IDXL_t l) {
 	const char *caller="IDXL_Destroy";
 	IDXLAPI(caller); IDXL_Chunk *c=IDXL_Chunk::get(caller);
 	c->destroy(l);
@@ -229,36 +229,36 @@ const IDXL_Side &lookupSide(IDXL_Side_t s,const char *caller) {
 	return *new IDXL_Side(); /* LIE: for whining compilers only */
 }
 
-CDECL IDXL_Side_t IDXL_Get_send(IDXL_t l) {
+CLINKAGE IDXL_Side_t IDXL_Get_send(IDXL_t l) {
 	return l+IDXL_SHIFT_SIDE_T_SEND;
 }
 FORTRAN_AS_C_RETURN(int,IDXL_GET_SEND,IDXL_Get_send,idxl_get_send, (int *l),(*l))
 
-CDECL IDXL_Side_t IDXL_Get_recv(IDXL_t l) {
+CLINKAGE IDXL_Side_t IDXL_Get_recv(IDXL_t l) {
 	return l+IDXL_SHIFT_SIDE_T_RECV;
 }
 FORTRAN_AS_C_RETURN(int,IDXL_GET_RECV,IDXL_Get_recv,idxl_get_recv, (int *l),(*l))
 
-CDECL void IDXL_Get_end(IDXL_Side_t s) {
+CLINKAGE void IDXL_Get_end(IDXL_Side_t s) {
 	/* Nothing to do: l will be deleted when its IDXL_t is... */
 }
 FORTRAN_AS_C(IDXL_GET_END,IDXL_Get_end,idxl_get_end, (int *s),(*s))
 
-CDECL int IDXL_Get_partners(IDXL_Side_t s) {
+CLINKAGE int IDXL_Get_partners(IDXL_Side_t s) {
 	const char *caller="IDXL_Get_partners"; IDXLAPI(caller); 
 	return lookupSide(s,caller).size();
 }
 FORTRAN_AS_C_RETURN(int,IDXL_GET_PARTNERS,IDXL_Get_partners,idxl_get_partners,
 	(int *s),(*s))
 
-CDECL int IDXL_Get_partner(IDXL_Side_t s,int partnerNo) {
+CLINKAGE int IDXL_Get_partner(IDXL_Side_t s,int partnerNo) {
 	const char *caller="IDXL_Get_partner"; IDXLAPI(caller); 
 	return lookupSide(s,caller).getLocalList(partnerNo).getDest();
 }
 FORTRAN_AS_C_RETURN(int,IDXL_GET_PARTNER,IDXL_Get_partner,idxl_get_partner,
 	(int *s,int *p),(*s,*p-1))
 
-CDECL int IDXL_Get_count(IDXL_Side_t s,int partnerNo) {
+CLINKAGE int IDXL_Get_count(IDXL_Side_t s,int partnerNo) {
 	const char *caller="IDXL_Get_count"; IDXLAPI(caller); 
 	return lookupSide(s,caller).getLocalList(partnerNo).size();
 }
@@ -271,24 +271,24 @@ static void getList(IDXL_Side_t s,int partnerNo,int *list,int idxBase) {
 	for (int i=0;i<l.size();i++) list[i]=l[i]+idxBase;
 }
 
-CDECL void IDXL_Get_list(IDXL_Side_t s,int partnerNo,int *list) {
+CLINKAGE void IDXL_Get_list(IDXL_Side_t s,int partnerNo,int *list) {
 	getList(s,partnerNo,list,0);
 }
-FDECL void FTN_NAME(IDXL_GET_LIST,idxl_get_list)
+FLINKAGE void FTN_NAME(IDXL_GET_LIST,idxl_get_list)
 	(int *s,int *p,int *list) {
 	getList(*s,*p-1,list,1);
 }
 
-CDECL int IDXL_Get_index(IDXL_Side_t s,int partnerNo,int listIndex) {
+CLINKAGE int IDXL_Get_index(IDXL_Side_t s,int partnerNo,int listIndex) {
 	const char *caller="IDXL_Get_index"; IDXLAPI(caller); 
 	return lookupSide(s,caller).getLocalList(partnerNo)[listIndex];
 }
-FDECL int FTN_NAME(IDXL_GET_INDEX,idxl_get_index)(int *s,int *p,int *idx)
+FLINKAGE int FTN_NAME(IDXL_GET_INDEX,idxl_get_index)(int *s,int *p,int *idx)
 {
 	return IDXL_Get_index(*s,*p-1,*idx-1)+1;
 }
 
-CDECL int IDXL_Get_source(IDXL_t l_t,int localNo) {
+CLINKAGE int IDXL_Get_source(IDXL_t l_t,int localNo) {
 	const char *caller="IDXL_Get_source"; IDXLAPI(caller); 
 	IDXL &l=IDXL_Chunk::get(caller)->lookup(l_t,caller);
 	const IDXL_Rec *rec=l.getRecv().getRec(localNo);
@@ -296,12 +296,12 @@ CDECL int IDXL_Get_source(IDXL_t l_t,int localNo) {
 	if (rec->getShared()>1) CkAbort("IDXL_Get_source called on multiply-shared entity!");
 	return rec->getChk(0);
 }
-FDECL int FTN_NAME(IDXL_GET_SOURCE,idxl_get_source)(int *l,int *localNo) {
+FLINKAGE int FTN_NAME(IDXL_GET_SOURCE,idxl_get_source)(int *l,int *localNo) {
 	return 1+IDXL_Get_source(*l,*localNo-1);
 }
 
 /************************* IDXL_Layout ************************/
-CDECL IDXL_Layout_t 
+CLINKAGE IDXL_Layout_t
 IDXL_Layout_create(int type, int width)
 {
 	const char *caller="IDXL_Create_simple_data";
@@ -312,7 +312,7 @@ FORTRAN_AS_C_RETURN(int,
 	IDXL_LAYOUT_CREATE,IDXL_Layout_create,idxl_layout_create,
 	(int *t,int *w), (*t,*w))
 
-CDECL IDXL_Layout_t 
+CLINKAGE IDXL_Layout_t
 IDXL_Layout_offset(int type, int width, int offsetBytes, int distanceBytes,int skewBytes)
 {
 	const char *caller="IDXL_Create_data";
@@ -324,7 +324,7 @@ FORTRAN_AS_C_RETURN(int,
 	(int *t,int *w,int *o,int *d,int *s), (*t,*w,*o,*d,*s))
 
 #define GET_DATA_DECL(CAPS,Cname,lowercase, field) \
-CDECL int Cname(IDXL_Layout_t d) \
+CLINKAGE int Cname(IDXL_Layout_t d) \
 { \
 	IDXLAPI(#Cname); \
 	return IDXL_Layout_List::get().get(d,#Cname).field;\
@@ -336,7 +336,7 @@ GET_DATA_DECL(TYPE,IDXL_Get_layout_type,type, type)
 GET_DATA_DECL(WIDTH,IDXL_Get_layout_width,width, width)
 GET_DATA_DECL(DISTANCE,IDXL_Get_layout_distance,distance, distance)
 
-CDECL void 
+CLINKAGE void
 IDXL_Layout_destroy(IDXL_Layout_t l) {
 	const char *caller="IDXL_Layout_destroy";
 	IDXLAPI(caller);
@@ -347,7 +347,7 @@ FORTRAN_AS_C(IDXL_LAYOUT_DESTROY,IDXL_Layout_destroy,idxl_layout_destroy,
 
 /************************* IDXL_Comm ************************/
 /** Comm_begin begins a message exchange.  */
-CDECL IDXL_Comm_t 
+CLINKAGE IDXL_Comm_t
 IDXL_Comm_begin(int tag, int context) {
 	const char *caller="IDXL_Create_data";
 	IDXLAPI(caller); IDXL_Chunk *c=IDXL_Chunk::get(caller);
@@ -365,7 +365,7 @@ FORTRAN_AS_C_RETURN(int,
 	const IDXL_Layout *dt=&c->layouts.get(type,caller);
 
 /** Remote-copy this data on flush/wait. */
-CDECL void 
+CLINKAGE void
 IDXL_Comm_sendrecv(IDXL_Comm_t m,IDXL_t dest, IDXL_Layout_t type, void *data) {
 	COMM_BROILERPLATE("IDXL_Comm_sendrecv");
 	IDXL_Comm *comm=NULL;

@@ -56,17 +56,12 @@
 
 #define CMK_LBDB_ON					   1
 
-#undef CMK_CCS_AVAILABLE
-#define CMK_CCS_AVAILABLE				   0
-
 #define CMK_BLUEGENEQ                                      1
 #define CMK_BLUEGENEQ_OPTCOPY                              1
 
 #define CMK_NO_ISO_MALLOC                                  1
 
-#define CMK_ONESIDED_IMPL                                  !CMK_ENABLE_ASYNC_PROGRESS
-
-#define CMK_ONESIDED_DIRECT_IMPL                           CMK_ONESIDED_IMPL
+#define CMK_ONESIDED_IMPL                                  0
 
 #define CMK_NOCOPY_DIRECT_BYTES                            16
 

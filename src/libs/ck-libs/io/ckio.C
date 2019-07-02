@@ -18,6 +18,8 @@ typedef int FileToken;
 #include <unistd.h>
 #endif
 
+#include "fs_parameters.h"
+
 using std::min;
 using std::max;
 using std::map;
@@ -89,10 +91,10 @@ namespace Ck { namespace IO {
         }
 
         void openFile(string name, CkCallback opened, Options opts) {
-          if (0 == opts.peStripe)
-            opts.peStripe = 16 * 1024 * 1024;
           if (0 == opts.writeStripe)
-            opts.writeStripe = 4 * 1024 * 1024;
+            opts.writeStripe = CkGetFileStripeSize(name.c_str());
+          if (0 == opts.peStripe)
+            opts.peStripe = 4 * opts.writeStripe;
           if (-1 == opts.activePEs)
             opts.activePEs = min(CkNumPes(), 32);
           if (-1 == opts.basePE)
@@ -300,13 +302,13 @@ namespace Ck { namespace IO {
       public:
         WriteSession(FileToken file_, size_t offset_, size_t bytes_)
           : file(CkpvAccess(manager)->get(file_))
-          , token(file_)
           , sessionOffset(offset_)
           , myOffset((sessionOffset / file->opts.peStripe + thisIndex)
                      * file->opts.peStripe)
           , sessionBytes(bytes_)
           , myBytes(min(file->opts.peStripe, sessionOffset + sessionBytes - myOffset))
           , myBytesWritten(0)
+          , token(file_)
         {
           CkAssert(file->fd != -1);
           CkAssert(myOffset >= sessionOffset);

@@ -1,0 +1,190 @@
+<dir>
+<file name="ad_opencoll_scalable.c" info="1225144780"/>
+<file name="ad_read_str_naive.c" info="1225144780"/>
+<file name="heap-sort.c" info="1275429560"/>
+<file name="iscontig.c" info="1220715102"/>
+<file name="ad_darray.c" info="1217730774"/>
+<file name="ad_flush.c" info="1194043819"/>
+<file name="async_list.c" info="1194043819"/>
+<file name="req_malloc.c" info="1194043819"/>
+<file name="status_setb.c" info="1194043819"/>
+<file name="ad_read_str.c" info="1297373268"/>
+<file name="ad_get_sh_fp.c" info="1298654387"/>
+<file name="system_hints.c" info="1274813955"/>
+<file name="ad_delete.c" info="1194043819"/>
+<file name="lock.c" info="1285078868"/>
+<file name="ad_iwrite.c" info="1287697238"/>
+<file name="ad_read_coll.c" info="1226595248"/>
+<file name="ad_write.c" info="1217950924"/>
+<file name="ad_coll_exch_new.c" info="1241471134"/>
+<file name="ad_opencoll.c" info="1241644703"/>
+<file name="ad_open.c" info="1274813953"/>
+<file name="ad_fstype.c" info="1304523784"/>
+<file name="ad_wait.c" info="1194043819"/>
+<file name="ad_seek.c" info="1217730774"/>
+<file name="ad_set_sh_fp.c" info="1205186217"/>
+<file name="flatten.c" info="1289055764"/>
+<file name="ad_set_view.c" info="1194043819"/>
+<file name="ad_write_str_naive.c" info="1225144780"/>
+<file name="cb_config_list.c" info="1294856476"/>
+<file name="ad_write_nolock.c" info="1217730774"/>
+<file name="ad_done.c" info="1194043819"/>
+<file name="ad_init.c" info="1310503895"/>
+<file name="eof_offset.c" info="1217730774"/>
+<file name="greq_fns.c" info="1200955219"/>
+<file name="ad_done_fake.c" info="1194043819"/>
+<file name="ad_write_coll.c" info="1297714801"/>
+<file name="ad_aggregate.c" info="1283376965"/>
+<file name="ad_iread.c" info="1217730774"/>
+<file name="error.c" info="1194043819"/>
+<file name="ad_io_coll.c" info="1283376965"/>
+<file name="ad_iread_fake.c" info="1217730774"/>
+<file name="ad_end.c" info="1294856476"/>
+<file name="byte_offset.c" info="1217730774"/>
+<file name="get_fp_posn.c" info="1217730774"/>
+<file name="ad_fcntl.c" info="1194043819"/>
+<file name="ad_features.c" info="1305211317"/>
+<file name="ad_wait_fake.c" info="1194043819"/>
+<file name="ad_aggregate_new.c" info="1274813953"/>
+<file name="ad_hints.c" info="1274813953"/>
+<file name="ad_resize.c" info="1217730774"/>
+<file name="malloc.c" info="1253651601"/>
+<file name="adi_close.c" info="1194043819"/>
+<file name="ad_iopen.c" info="1194043819"/>
+<file name="ad_opencoll_failsafe.c" info="1225144780"/>
+<file name="ad_prealloc.c" info="1217730774"/>
+<file name="ad_coll_build_req_new.c" info="1267474471"/>
+<file name="ad_write_str.c" info="1297373268"/>
+<file name="ad_close.c" info="1218120374"/>
+<file name="shfp_fname.c" info="1194043819"/>
+<file name="strfns.c" info="1194043819"/>
+<file name="ad_read.c" info="1217950924"/>
+<file name="ad_subarray.c" info="1217730774"/>
+<file name="ad_iwrite_fake.c" info="1217730774"/>
+</dir>
+<data>
+<fileinfo name="ad_opencoll_scalable.c">
+</fileinfo>
+<fileinfo name="ad_read_str_naive.c">
+</fileinfo>
+<fileinfo name="heap-sort.c">
+</fileinfo>
+<fileinfo name="iscontig.c">
+</fileinfo>
+<fileinfo name="ad_darray.c">
+</fileinfo>
+<fileinfo name="ad_flush.c">
+</fileinfo>
+<fileinfo name="async_list.c">
+</fileinfo>
+<fileinfo name="req_malloc.c">
+</fileinfo>
+<fileinfo name="status_setb.c">
+</fileinfo>
+<fileinfo name="ad_read_str.c">
+</fileinfo>
+<fileinfo name="ad_get_sh_fp.c">
+</fileinfo>
+<fileinfo name="system_hints.c">
+</fileinfo>
+<fileinfo name="ad_delete.c">
+</fileinfo>
+<fileinfo name="lock.c">
+</fileinfo>
+<fileinfo name="ad_iwrite.c">
+</fileinfo>
+<fileinfo name="ad_read_coll.c">
+</fileinfo>
+<fileinfo name="ad_write.c">
+</fileinfo>
+<fileinfo name="ad_coll_exch_new.c">
+</fileinfo>
+<fileinfo name="ad_opencoll.c">
+</fileinfo>
+<fileinfo name="ad_open.c">
+</fileinfo>
+<fileinfo name="ad_fstype.c">
+</fileinfo>
+<fileinfo name="ad_wait.c">
+</fileinfo>
+<fileinfo name="ad_seek.c">
+</fileinfo>
+<fileinfo name="ad_set_sh_fp.c">
+</fileinfo>
+<fileinfo name="flatten.c">
+</fileinfo>
+<fileinfo name="ad_set_view.c">
+</fileinfo>
+<fileinfo name="ad_write_str_naive.c">
+</fileinfo>
+<fileinfo name="cb_config_list.c">
+</fileinfo>
+<fileinfo name="ad_write_nolock.c">
+</fileinfo>
+<fileinfo name="ad_done.c">
+</fileinfo>
+<fileinfo name="ad_init.c">
+</fileinfo>
+<fileinfo name="eof_offset.c">
+</fileinfo>
+<fileinfo name="greq_fns.c">
+</fileinfo>
+<fileinfo name="ad_done_fake.c">
+</fileinfo>
+<fileinfo name="ad_write_coll.c">
+</fileinfo>
+<fileinfo name="ad_aggregate.c">
+</fileinfo>
+<fileinfo name="ad_iread.c">
+</fileinfo>
+<fileinfo name="error.c">
+</fileinfo>
+<fileinfo name="ad_io_coll.c">
+</fileinfo>
+<fileinfo name="ad_iread_fake.c">
+</fileinfo>
+<fileinfo name="ad_end.c">
+</fileinfo>
+<fileinfo name="byte_offset.c">
+</fileinfo>
+<fileinfo name="get_fp_posn.c">
+</fileinfo>
+<fileinfo name="ad_fcntl.c">
+</fileinfo>
+<fileinfo name="ad_features.c">
+</fileinfo>
+<fileinfo name="ad_wait_fake.c">
+</fileinfo>
+<fileinfo name="ad_aggregate_new.c">
+</fileinfo>
+<fileinfo name="ad_hints.c">
+</fileinfo>
+<fileinfo name="ad_resize.c">
+</fileinfo>
+<fileinfo name="malloc.c">
+</fileinfo>
+<fileinfo name="adi_close.c">
+</fileinfo>
+<fileinfo name="ad_iopen.c">
+</fileinfo>
+<fileinfo name="ad_opencoll_failsafe.c">
+</fileinfo>
+<fileinfo name="ad_prealloc.c">
+</fileinfo>
+<fileinfo name="ad_coll_build_req_new.c">
+</fileinfo>
+<fileinfo name="ad_write_str.c">
+</fileinfo>
+<fileinfo name="ad_close.c">
+</fileinfo>
+<fileinfo name="shfp_fname.c">
+</fileinfo>
+<fileinfo name="strfns.c">
+</fileinfo>
+<fileinfo name="ad_read.c">
+</fileinfo>
+<fileinfo name="ad_subarray.c">
+</fileinfo>
+<fileinfo name="ad_iwrite_fake.c">
+</fileinfo>
+</data>

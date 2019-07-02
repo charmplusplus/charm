@@ -29,6 +29,7 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 #include <list>
 #include <map>
 #include <memory>
+#include <random>
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
@@ -141,25 +142,61 @@ namespace PUP {
   /**************** Containers *****************/
 
   template <class container>
-  void reserve_if_applicable(container &c, size_t nElem)
+  inline void reserve_if_applicable(container &c, size_t nElem)
   {
     c.clear();
     c.reserve(nElem);
   }
   template <class dtype>
-  void reserve_if_applicable(std::deque<dtype> &c, size_t nElem)
+  inline void reserve_if_applicable(std::deque<dtype> &c, size_t nElem)
   {
     c.clear();
   }
   template <class dtype>
-  void reserve_if_applicable(std::list<dtype> &c, size_t nElem)
+  inline void reserve_if_applicable(std::list<dtype> &c, size_t nElem)
   {
     c.clear();
   }
   template <class dtype>
-  void reserve_if_applicable(std::forward_list<dtype> &c, size_t nElem)
+  inline void reserve_if_applicable(std::set<dtype> &c, size_t nElem)
   {
     c.clear();
+  }
+  template <class dtype>
+  inline void reserve_if_applicable(std::multiset<dtype> &c, size_t nElem)
+  {
+    c.clear();
+  }
+  template <class K, class V>
+  inline void reserve_if_applicable(std::map<K, V> &c, size_t nElem)
+  {
+    c.clear();
+  }
+  template <class K, class V>
+  inline void reserve_if_applicable(std::multimap<K, V> &c, size_t nElem)
+  {
+    c.clear();
+  }
+
+  template <class container, class... Args>
+  inline void emplace(container &c, Args&&... args)
+  {
+    c.emplace(std::forward<Args>(args)...);
+  }
+  template <class dtype, class... Args>
+  inline void emplace(std::vector<dtype> &c, Args&&... args)
+  {
+    c.emplace_back(std::forward<Args>(args)...);
+  }
+  template <class dtype, class... Args>
+  inline void emplace(std::deque<dtype> &c, Args&&... args)
+  {
+    c.emplace_back(std::forward<Args>(args)...);
+  }
+  template <class dtype, class... Args>
+  inline void emplace(std::list<dtype> &c, Args&&... args)
+  {
+    c.emplace_back(std::forward<Args>(args)...);
   }
 
   //Impl. util: pup the length of a container
@@ -182,7 +219,7 @@ namespace PUP {
         p.syncComment(sync_item);
         detail::TemporaryObjectHolder<dtype> n;
         p|n;
-        c.emplace_back(std::move(n.t));
+        emplace(c, std::move(n.t));
       }
     }
     else
@@ -220,27 +257,66 @@ namespace PUP {
     p.syncComment(sync_end_array);
   }
 
-  //Map objects don't have a "push_back", while vector and list
-  //  don't have an "insert", so PUP_stl_map isn't PUP_stl_container
-  template <class container,class dtype>
+  // forward_list does not have: .size(), .emplace(), .emplace_back()
+  template <class dtype>
+  inline void PUP_stl_forward_list(er &p,std::forward_list<dtype> &c) {
+    p.syncComment(sync_begin_array);
+    size_t nElem;
+    if (p.isUnpacking())
+    {
+      p | nElem;
+      auto iter = c.before_begin();
+      for (size_t i = 0; i < nElem; ++i)
+      {
+        p.syncComment(sync_item);
+        detail::TemporaryObjectHolder<dtype> n;
+        p|n;
+        iter = c.emplace_after(iter, std::move(n.t));
+      }
+    }
+    else
+    {
+      nElem = 0;
+      for (auto& n: c)
+      {
+        ++nElem;
+      }
+      p | nElem;
+      for (auto& n : c)
+      {
+        p.syncComment(sync_item);
+        p | n;
+      }
+    }
+    p.syncComment(sync_end_array);
+  }
+
+  template <class container, class K, class V>
   inline void PUP_stl_map(er &p,container &c) {
     p.syncComment(sync_begin_list);
     size_t nElem=PUP_stl_container_size(p,c);
-    if (p.isUnpacking()) 
+    if (p.isUnpacking())
       { //Unpacking: Extract each element and insert:
-	for (size_t i=0;i<nElem;i++) {
-          detail::TemporaryObjectHolder<dtype> n;
-          p|n;
-          c.emplace(std::move(n.t));
-	} 
+        reserve_if_applicable(c, nElem);
+        for (size_t i=0;i<nElem;i++)
+        {
+          detail::TemporaryObjectHolder<K> k;
+          detail::TemporaryObjectHolder<V> v;
+
+          // keep in sync with std::pair
+          p.syncComment(sync_index);
+          p | k;
+          p.syncComment(sync_item);
+          p | v;
+
+          c.emplace(std::piecewise_construct, std::forward_as_tuple(std::move(k.t)), std::forward_as_tuple(std::move(v.t)));
+        }
       }
     else
     {
-      for (typename container::iterator it=c.begin(); it!=c.end(); ++it)
+      for (auto& kv : c)
       {
-        p.syncComment(sync_item);
-        // Cast away the constness (needed for std::set)
-        p|*(dtype *)&(*it);
+        p | kv;
       }
     }
     p.syncComment(sync_end_list);
@@ -268,20 +344,34 @@ namespace PUP {
   { PUP_stl_container<std::list<T>,T>(p,v); }
   template <class T>
   inline void operator|(er &p,typename std::forward_list<T> &fl)
-  { PUP_stl_container<std::forward_list<T>,T>(p,fl); }
+  { PUP_stl_forward_list<T>(p,fl); }
 
   template <class V,class T,class Cmp> 
   inline void operator|(er &p,typename std::map<V,T,Cmp> &m)
-  { PUP_stl_map<std::map<V,T,Cmp>,std::pair<V,T> >(p,m); }
+  { PUP_stl_map<std::map<V,T,Cmp>,V,T >(p,m); }
   template <class V,class T,class Cmp> 
   inline void operator|(er &p,typename std::multimap<V,T,Cmp> &m)
-  { PUP_stl_map<std::multimap<V,T,Cmp>,std::pair<const V,T> >(p,m); }
+  { PUP_stl_map<std::multimap<V,T,Cmp>,V,T >(p,m); }
+  /// \warning This does not work with custom hash functions that have state
+  template <class V,class T,class Cmp>
+  inline void operator|(er &p,typename std::unordered_map<V,T,Cmp> &m)
+  { PUP_stl_map<std::unordered_map<V,T,Cmp>,V,T >(p,m); }
+  template <class V,class T,class Cmp>
+  inline void operator|(er &p,typename std::unordered_multimap<V,T,Cmp> &m)
+  { PUP_stl_map<std::unordered_multimap<V,T,Cmp>,V,T >(p,m); }
+
   template <class T>
   inline void operator|(er &p,typename std::set<T> &m)
-  { PUP_stl_map<std::set<T>,T >(p,m); }
+  { PUP_stl_container<std::set<T>,T >(p,m); }
   template <class T,class Cmp>
   inline void operator|(er &p,typename std::multiset<T,Cmp> &m)
-  { PUP_stl_map<std::multiset<T,Cmp>,T >(p,m); }
+  { PUP_stl_container<std::multiset<T,Cmp>,T >(p,m); }
+  template <class T>
+  inline void operator|(er &p,typename std::unordered_set<T> &m)
+  { PUP_stl_container<std::unordered_set<T>,T >(p,m); }
+  template <class T,class Cmp>
+  inline void operator|(er &p,typename std::unordered_multiset<T,Cmp> &m)
+  { PUP_stl_container<std::unordered_multiset<T,Cmp>,T >(p,m); }
 
   // Specialized to work with vector<bool>, which doesn't
   // have data() or shrink_to_fit() members
@@ -322,55 +412,6 @@ using Requires = typename requires_impl<
   template <typename T, std::size_t N>
   inline void operator|(er& p, std::array<T, N>& a) {
     pup(p, a);
-  }
-
-  /// \warning This does not work with custom hash functions that have state
-  template <typename K, typename V, typename H>
-  inline void pup(PUP::er& p, std::unordered_map<K, V, H>& m) {
-    size_t number_elem = PUP_stl_container_size(p, m);
-
-    if (p.isUnpacking()) {
-      for (size_t i = 0; i < number_elem; ++i) {
-        std::pair<K, V> kv;
-        p | kv;
-        m.emplace(std::move(kv));
-      }
-    } else {
-      for (auto& kv : m) {
-        p | kv;
-      }
-    }
-  }
-
-  /// \warning This does not work with custom hash functions that have state
-  template <typename K, typename V, typename H>
-  inline void operator|(er& p, std::unordered_map<K, V, H>& m) {
-    pup(p, m);
-  }
-
-  template <typename T>
-  inline void pup(PUP::er& p, std::unordered_set<T>& s) {
-    size_t number_elem = PUP_stl_container_size(p, s);
-
-    if (p.isUnpacking()) {
-      for (size_t i = 0; i < number_elem; ++i) {
-        T element;
-        p | element;
-        s.emplace(std::move(element));
-      }
-    } else {
-      // This intentionally is not a reference because at least with stdlibc++
-      // the reference code does not compile because it turns the dereferenced
-      // iterator into a value
-      for (T e : s) {
-        p | e;
-      }
-    }
-  }
-
-  template <class T>
-  inline void operator|(er& p, std::unordered_set<T>& s) {
-    pup(p, s);
   }
 
   template <typename T, Requires<std::is_enum<T>::value> = nullptr>
@@ -440,6 +481,146 @@ using Requires = typename requires_impl<
   template <typename T>
   inline void operator|(PUP::er& p, std::unique_ptr<T>& t) {
     pup(p, t);
+  }
+
+
+  //Adding random numberengines defined in the header <Random>.
+  //To pup an engine we need to pup it's state and create a new engine with the same state after unpacking
+  template<
+    class UIntType, size_t w, size_t n, size_t m, size_t r,
+    UIntType a, size_t u, UIntType d, size_t s,UIntType b, size_t t,UIntType c, size_t l, UIntType f>
+  inline void pup(PUP::er& p, std::mersenne_twister_engine<UIntType, w, n, m, r,
+                             a, u, d, s, b, t, c, l, f>& engine){
+    std::stringstream o;
+    std::string state;
+
+    if(p.isUnpacking()){
+      p | state;
+      o.str(state);
+      o>>engine;
+    }
+    else{
+      o<<engine;
+      state=o.str();
+      p | state;
+    }
+  }
+
+  template<class UIntType, size_t w, size_t n, size_t m, size_t r,
+    UIntType a, size_t u, UIntType d, size_t s,UIntType b, size_t t,UIntType c, size_t l, UIntType f>
+  inline void operator|(PUP::er& p, std::mersenne_twister_engine<UIntType, w, n, m, r,
+                        a, u, d, s, b, t, c, l, f>& engine) {
+    pup(p,engine);
+  }
+
+  template<class UIntType, UIntType a, UIntType c, UIntType m>
+  inline void pup(PUP::er& p, std::linear_congruential_engine<UIntType, a, c, m>& engine){
+    std::stringstream o;
+    std::string state;
+
+    if(p.isUnpacking()){
+      p | state;
+      o.str(state);
+      o>>engine;
+    }
+    else{
+      o<<engine;
+      state=o.str();
+      p | state;
+    }
+  }
+
+  template<class UIntType, UIntType a, UIntType c, UIntType m>
+  inline void operator|(PUP::er& p, std::linear_congruential_engine<UIntType, a, c, m>& engine) {
+    pup(p,engine);
+  }
+
+  template<class UIntType, size_t w, size_t s, size_t r>
+  inline void pup(PUP::er& p, std::subtract_with_carry_engine<UIntType, w, s, r>& engine){
+    std::stringstream o;
+    std::string state;
+
+    if(p.isUnpacking()){
+      p | state;
+      o.str(state);
+      o>>engine;
+    }
+    else{
+      o<<engine;
+      state=o.str();
+      p | state;
+    }
+  }
+
+  template<class UIntType, size_t w, size_t s, size_t r>
+  inline void operator|(PUP::er& p, std::subtract_with_carry_engine<UIntType, w, s, r>& engine) {
+    pup(p,engine);
+  }
+
+  template<class Engine, size_t P, size_t R>
+  inline void pup(PUP::er& p, std::discard_block_engine<Engine, P, R>& engine) {
+    std::stringstream o;
+    std::string state;
+
+    if(p.isUnpacking()){
+      p | state;
+      o.str(state);
+      o>>engine;
+    }
+    else{
+      o<<engine;
+      state=o.str();
+      p | state;
+    }
+  }
+
+  template<class Engine, size_t P, size_t R>
+  inline void operator|(PUP::er& p, std::discard_block_engine<Engine, P, R>& engine) {
+    pup(p,engine);
+  }
+
+  template<class Engine, std::size_t W, class UIntType>
+  inline void pup(PUP::er& p, std::independent_bits_engine<Engine, W, UIntType>& engine) {
+    std::stringstream o;
+    std::string state;
+
+    if(p.isUnpacking()){
+      p | state;
+      o.str(state);
+      o>>engine;
+    }
+    else{
+      o<<engine;
+      state=o.str();
+      p | state;
+    }
+  }
+
+  template<class Engine, std::size_t W, class UIntType>
+  inline void operator|(PUP::er& p, std::independent_bits_engine<Engine, W, UIntType>& engine) {
+    pup(p,engine);
+  }
+
+  template<class Engine, std::size_t K>
+  inline void pup(PUP::er& p, std::shuffle_order_engine<Engine, K>& engine) {
+    std::stringstream o;
+    std::string state;
+
+    if(p.isUnpacking()){
+      p | state;
+      o.str(state);
+      o>>engine;
+    }
+    else{
+      o<<engine;
+      state=o.str();
+      p | state;
+    }
+  }
+
+  template<class Engine, std::size_t K>
+  inline void operator|(PUP::er& p, std::shuffle_order_engine<Engine, K>& engine) {
+    pup(p,engine);
   }
 
 } // end of namespace PUP

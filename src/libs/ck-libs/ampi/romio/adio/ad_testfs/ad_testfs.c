@@ -1,6 +1,5 @@
 /* -*- Mode: C; c-basic-offset:4 ; -*- */
 /* 
- *   $Id$
  *
  *   Copyright (C) 2001 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -13,6 +12,7 @@
 
 struct ADIOI_Fns_struct ADIO_TESTFS_operations = {
     ADIOI_TESTFS_Open, /* Open */
+    ADIOI_GEN_OpenColl, /* OpenColl */
     ADIOI_TESTFS_ReadContig, /* ReadContig */
     ADIOI_TESTFS_WriteContig, /* WriteContig */
     ADIOI_TESTFS_ReadStridedColl, /* ReadStridedColl */
@@ -34,4 +34,5 @@ struct ADIOI_Fns_struct ADIO_TESTFS_operations = {
     ADIOI_TESTFS_Flush, /* Flush */
     ADIOI_TESTFS_Resize, /* Resize */
     ADIOI_TESTFS_Delete, /* Delete */
+    ADIOI_GEN_Feature, /* Features */
 };

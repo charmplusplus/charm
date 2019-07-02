@@ -1,11 +1,12 @@
 /* -*- Mode: C; c-basic-offset:4 ; -*- */
+/*  
+ *  (C) 2001 by Argonne National Laboratory.
+ *      See COPYRIGHT in top-level directory.
+ */
 #include "mpi.h"
-#include "mpio.h"  /* not necessary with MPICH 1.1.1 or HPMPI 1.4 */
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-
-#include "converse.h" // For Ctv*
 
 /* tests noncontiguous reads/writes using collective I/O */
 
@@ -13,7 +14,7 @@
  *
  * . generalized file writing/reading to handle arbitrary number of processors
  * . provides the "cb_config_list" hint with several permutations of the
- *   avaliable processors.
+ *   avaliable processors.  
  *   [ makes use of code copied from ROMIO's ADIO code to collect the names of
  *   the processors ]
  */
@@ -21,27 +22,30 @@
 /* we are going to muck with this later to make it evenly divisible by however many compute nodes we have */
 #define STARTING_SIZE 5000
 
-int test_file(char *filename, int mynod, int nprocs, char * cb_hosts,
-		char *msg, int verbose);
-
-// cb_config_list_keyval will be initialized in main()
-CtvStaticDeclare(int, cb_config_list_keyval); //= MPI_KEYVAL_INVALID;
+int test_file(char *filename, int mynod, int nprocs, char * cb_hosts, 
+		char *msg, int verbose); 
 
 #define ADIOI_Free free
 #define ADIOI_Malloc malloc
 #define FPRINTF fprintf
-/* I have no idea what the "D" stands for; it's how things are done in adio.h
- */
-struct ADIO_cb_name_arrayD {
-       int refct;
+/* I have no idea what the "D" stands for; it's how things are done in adio.h 
+ */ 
+struct ADIO_cb_name_arrayD {   
+       int refct;              
        int namect;
        char **names;
-};
+};  
 typedef struct ADIO_cb_name_arrayD *ADIO_cb_name_array;
 
+void handle_error(int errcode, char *str);
+int cb_gather_name_array(MPI_Comm comm, ADIO_cb_name_array *arrayp);
+void default_str(int mynod, int len, ADIO_cb_name_array array, char *dest);
+void reverse_str(int mynod, int len, ADIO_cb_name_array array, char *dest);
+void reverse_alternating_str(int mynod, int len, ADIO_cb_name_array array, char *dest);
+void simple_shuffle_str(int mynod, int len, ADIO_cb_name_array array, char *dest);
 
 
-void handle_error(int errcode, char *str)
+void handle_error(int errcode, char *str) 
 {
 	char msg[MPI_MAX_ERROR_STRING];
 	int resultlen;
@@ -49,83 +53,31 @@ void handle_error(int errcode, char *str)
 	fprintf(stderr, "%s: %s\n", str, msg);
 	MPI_Abort(MPI_COMM_WORLD, 1);
 }
- /* cb_copy_name_array() - attribute copy routine
- */
-int cb_copy_name_array(MPI_Comm comm,
-		       int *keyval,
-		       void *extra,
-		       void *attr_in,
-		       void **attr_out,
-		       int *flag)
-{
-    ADIO_cb_name_array array;
-
-    array = (ADIO_cb_name_array) attr_in;
-    array->refct++;
-
-    *attr_out = attr_in;
-    *flag = 1; /* make a copy in the new communicator */
-
-    return MPI_SUCCESS;
-}
-
-/* cb_delete_name_array() - attribute destructor
- */
-int cb_delete_name_array(MPI_Comm comm,
-			 int *keyval,
-			 void *attr_val,
-			 void *extra)
-{
-    int i;
-    ADIO_cb_name_array array;
-
-    array = (ADIO_cb_name_array) attr_val;
-    array->refct--;
-
-    if (array->refct <= 0) {
-	/* time to free the structures (names, array of ptrs to names, struct)
-	 */
-	for (i=0; i < array->namect; i++) {
-	    ADIOI_Free(array->names[i]);
-	}
-	if (array->names != NULL) ADIOI_Free(array->names);
-	ADIOI_Free(array);
-    }
-
-    return MPI_SUCCESS;
-}
+   
 
 /* cb_gather_name_array() - gather a list of processor names from all processes
  *                          in a communicator and store them on rank 0.
- *
+ *                   
  * This is a collective call on the communicator(s) passed in.
  *
  * Obtains a rank-ordered list of processor names from the processes in
  * "dupcomm".
  *
  * Returns 0 on success, -1 on failure.
- *
- * NOTE: Needs some work to cleanly handle out of memory cases!
+ * 
+ * NOTE: Needs some work to cleanly handle out of memory cases!  
  */
 int cb_gather_name_array(MPI_Comm comm, ADIO_cb_name_array *arrayp)
 {
+	/* this is copied from ROMIO, but since this test is for correctness,
+	 * not performance, note that we have removed the parts where ROMIO
+	 * uses a keyval to cache the name array.  We'll just rebuild it if we
+	 * need to */
+
     char my_procname[MPI_MAX_PROCESSOR_NAME], **procname = 0;
     int *procname_len = NULL, my_procname_len, *disp = NULL, i;
-    int commsize, commrank, found;
+    int commsize, commrank;
     ADIO_cb_name_array array = NULL;
-
-    if (CtvAccess(cb_config_list_keyval) == MPI_KEYVAL_INVALID) {
-	MPI_Keyval_create((MPI_Copy_function *) cb_copy_name_array,
-			  (MPI_Delete_function *) cb_delete_name_array,
-			  &CtvAccess(cb_config_list_keyval), NULL);
-    }
-    else {
-	MPI_Attr_get(comm, CtvAccess(cb_config_list_keyval), (void *) &array, &found);
-	if (found) {
-	    *arrayp = array;
-	    return 0;
-	}
-    }
 
     MPI_Comm_size(comm, &commsize);
     MPI_Comm_rank(comm, &commrank);
@@ -137,7 +89,7 @@ int cb_gather_name_array(MPI_Comm comm, ADIO_cb_name_array *arrayp)
     if (array == NULL) {
 	return -1;
     }
-    array->refct = 1;
+    array->refct = 1; 
 
     if (commrank == 0) {
 	/* process 0 keeps the real list */
@@ -150,7 +102,7 @@ int cb_gather_name_array(MPI_Comm comm, ADIO_cb_name_array *arrayp)
 	procname = array->names; /* simpler to read */
 
 	procname_len = (int *) ADIOI_Malloc(commsize * sizeof(int));
-	if (procname_len == NULL) {
+	if (procname_len == NULL) { 
 	    return -1;
 	}
     }
@@ -160,7 +112,7 @@ int cb_gather_name_array(MPI_Comm comm, ADIO_cb_name_array *arrayp)
 	array->names = NULL;
     }
     /* gather lengths first */
-    MPI_Gather(&my_procname_len, 1, MPI_INT,
+    MPI_Gather(&my_procname_len, 1, MPI_INT, 
 	       procname_len, 1, MPI_INT, 0, comm);
 
     if (commrank == 0) {
@@ -173,7 +125,7 @@ int cb_gather_name_array(MPI_Comm comm, ADIO_cb_name_array *arrayp)
 	for (i=0; i < commsize; i++) {
 	    /* add one to the lengths because we need to count the
 	     * terminator, and we are going to use this list of lengths
-	     * again in the gatherv.
+	     * again in the gatherv.  
 	     */
 	    procname_len[i]++;
 	    procname[i] = malloc(procname_len[i]);
@@ -181,12 +133,12 @@ int cb_gather_name_array(MPI_Comm comm, ADIO_cb_name_array *arrayp)
 		return -1;
 	    }
 	}
-
+	
 	/* create our list of displacements for the gatherv.  we're going
 	 * to do everything relative to the start of the region allocated
 	 * for procname[0]
 	 *
-	 * I suppose it is theoretically possible that the distance between
+	 * I suppose it is theoretically possible that the distance between 
 	 * malloc'd regions could be more than will fit in an int.  We don't
 	 * cover that case.
 	 */
@@ -200,7 +152,7 @@ int cb_gather_name_array(MPI_Comm comm, ADIO_cb_name_array *arrayp)
 
     /* now gather strings */
     if (commrank == 0) {
-	MPI_Gatherv(my_procname, my_procname_len + 1, MPI_CHAR,
+	MPI_Gatherv(my_procname, my_procname_len + 1, MPI_CHAR, 
 		    procname[0], procname_len, disp, MPI_CHAR,
 		    0, comm);
     }
@@ -208,7 +160,7 @@ int cb_gather_name_array(MPI_Comm comm, ADIO_cb_name_array *arrayp)
 	/* if we didn't do this, we would need to allocate procname[]
 	 * on all processes...which seems a little silly.
 	 */
-	MPI_Gatherv(my_procname, my_procname_len + 1, MPI_CHAR,
+	MPI_Gatherv(my_procname, my_procname_len + 1, MPI_CHAR, 
 		    NULL, NULL, NULL, MPI_CHAR, 0, comm);
     }
 
@@ -224,11 +176,6 @@ int cb_gather_name_array(MPI_Comm comm, ADIO_cb_name_array *arrayp)
 #endif
     }
 
-    /* store the attribute; we want to store SOMETHING on all processes
-     * so that they can all tell if we have gone through this procedure
-     * or not for the given communicator.
-     */
-    MPI_Attr_put(comm, CtvAccess(cb_config_list_keyval), array);
     *arrayp = array;
     return 0;
 }
@@ -243,12 +190,12 @@ void default_str(int mynod, int len, ADIO_cb_name_array array, char *dest)
 		    p = snprintf(ptr, len, "%s,", array->names[i]);
 		    ptr += p;
 	    }
+	    /* chop off that last comma */
+	    dest[strlen(dest) - 1] = '\0';
 	}
-	/* chop off that last comma */
-	dest[strlen(dest) - 1] = '\0';
 	MPI_Bcast(dest, len, MPI_CHAR, 0, MPI_COMM_WORLD);
 }
-void reverse_str(int mynod, int len, ADIO_cb_name_array array, char *dest)
+void reverse_str(int mynod, int len, ADIO_cb_name_array array, char *dest) 
 {
 	char *ptr;
 	int i, p;
@@ -258,8 +205,8 @@ void reverse_str(int mynod, int len, ADIO_cb_name_array array, char *dest)
 		    p = snprintf(ptr, len, "%s,", array->names[i]);
 		    ptr += p;
 	    }
+	    dest[strlen(dest) - 1] = '\0';
 	}
-	dest[strlen(dest) - 1] = '\0';
 	MPI_Bcast(dest, len, MPI_CHAR, 0, MPI_COMM_WORLD);
 }
 
@@ -279,9 +226,9 @@ void reverse_alternating_str(int mynod, int len, ADIO_cb_name_array array, char 
 		    p = snprintf(ptr, len, "%s,", array->names[i]);
 		    ptr += p;
 	    }
-    }
-	dest[strlen(dest) - 1] = '\0';
-    MPI_Bcast(dest, len, MPI_CHAR, 0, MPI_COMM_WORLD);
+	    dest[strlen(dest) - 1] = '\0';
+	}
+	MPI_Bcast(dest, len, MPI_CHAR, 0, MPI_COMM_WORLD);
 }
 
 void simple_shuffle_str(int mynod, int len, ADIO_cb_name_array array, char *dest)
@@ -298,8 +245,8 @@ void simple_shuffle_str(int mynod, int len, ADIO_cb_name_array array, char *dest
 		    p = snprintf(ptr, len, "%s,", array->names[i]);
 		    ptr += p;
 	    }
+	    dest[strlen(dest) - 1] = '\0';
 	}
-	dest[strlen(dest) - 1] = '\0';
 	MPI_Bcast(dest, len, MPI_CHAR, 0, MPI_COMM_WORLD);
 }
 
@@ -311,14 +258,13 @@ int main(int argc, char **argv)
     int cb_config_len;
     ADIO_cb_name_array array;
 
-    CtvInitialize(int, cb_config_list_keyval);
-    CtvAccess(cb_config_list_keyval) = MPI_KEYVAL_INVALID;
 
     MPI_Init(&argc,&argv);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
-    MPI_Comm_rank(MPI_COMM_WORLD, &mynod);
+    MPI_Comm_rank(MPI_COMM_WORLD, &mynod); 
 
-    /* process 0 takes the file name as a command-line argument and
+    
+    /* process 0 takes the file name as a command-line argument and 
    broadcasts it to other processes */
     if (!mynod) {
 	i = 1;
@@ -377,7 +323,7 @@ int main(int argc, char **argv)
     errs += test_file(filename, mynod, nprocs, cb_config_string, "collective w/ hinting: default order", verbose);
 
     /*  reverse order */
-    reverse_str(mynod, cb_config_len, array, cb_config_string);
+    reverse_str(mynod, cb_config_len, array, cb_config_string); 
     errs += test_file(filename, mynod, nprocs, cb_config_string, "collective w/ hinting: reverse order", verbose);
 
     /* reverse, every other */
@@ -389,10 +335,10 @@ int main(int argc, char **argv)
     errs += test_file(filename, mynod, nprocs, cb_config_string, "collective w/ hinting: permutation2", verbose);
 
     MPI_Allreduce(&errs, &sum_errs, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-
+	 
     if (!mynod) {
 	    if (sum_errs) fprintf(stderr, "Found %d error cases\n", sum_errs);
-	    else printf("No errors.\n");
+	    else printf(" No Errors\n");
     }
     free(filename);
     free(cb_config_string);
@@ -402,7 +348,7 @@ int main(int argc, char **argv)
 
 #define SEEDER(x,y,z) ((x)*1000000 + (y) + (x)*(z))
 
-int test_file(char *filename, int mynod, int nprocs, char * cb_hosts, char *msg, int verbose)
+int test_file(char *filename, int mynod, int nprocs, char * cb_hosts, char *msg, int verbose) 
 {
     MPI_Datatype typevec, newtype, t[3];
     int *buf, i, b[3], errcode, errors=0;
@@ -412,8 +358,13 @@ int test_file(char *filename, int mynod, int nprocs, char * cb_hosts, char *msg,
     int SIZE = (STARTING_SIZE/nprocs)*nprocs;
     MPI_Info info;
 
+    if (mynod==0 && verbose) fprintf(stderr, "%s\n", msg);
+
     buf = (int *) malloc(SIZE*sizeof(int));
-    if (verbose) fprintf(stderr, "[%d/%d] caller buffer: %p\n",mynod, nprocs, buf);
+    if (buf == NULL) {
+	    perror("test_file");
+	    MPI_Abort(MPI_COMM_WORLD, -1);
+    }
 
 
     if (cb_hosts != NULL ) {
@@ -443,7 +394,7 @@ int test_file(char *filename, int mynod, int nprocs, char * cb_hosts, char *msg,
     }
     MPI_Barrier(MPI_COMM_WORLD);
 
-    errcode = MPI_File_open(MPI_COMM_WORLD, filename,
+    errcode = MPI_File_open(MPI_COMM_WORLD, filename, 
 		    MPI_MODE_CREATE | MPI_MODE_RDWR, info, &fh);
     if (errcode != MPI_SUCCESS) {
 	    handle_error(errcode, "MPI_File_open");
@@ -452,16 +403,22 @@ int test_file(char *filename, int mynod, int nprocs, char * cb_hosts, char *msg,
     MPI_File_set_view(fh, 0, MPI_INT, newtype, "native", info);
 
     for (i=0; i<SIZE; i++) buf[i] = SEEDER(mynod,i,SIZE);
-    MPI_File_write_all(fh, buf, 1, newtype, &status);
+    errcode = MPI_File_write_all(fh, buf, 1, newtype, &status);
+    if (errcode != MPI_SUCCESS) {
+	    handle_error(errcode, "nc mem - nc file: MPI_File_write_all");
+    }
 
     MPI_Barrier(MPI_COMM_WORLD);
 
     for (i=0; i<SIZE; i++) buf[i] = -1;
 
-    MPI_File_read_at_all(fh, 0, buf, 1, newtype, &status);
+    errcode = MPI_File_read_at_all(fh, 0, buf, 1, newtype, &status);
+    if (errcode != MPI_SUCCESS) {
+	    handle_error(errcode, "nc mem - nc file: MPI_File_read_at_all");
+    }
 
     /* the verification for N compute nodes is tricky. Say we have 3
-     * processors.
+     * processors.  
      * process 0 sees: 0 -1 -1 3 -1 -1 ...
      * process 1 sees: -1 34 -1 -1 37 -1 ...
      * process 2 sees: -1 -1 68 -1 -1 71 ... */
@@ -479,7 +436,7 @@ int test_file(char *filename, int mynod, int nprocs, char * cb_hosts, char *msg,
 
     for(/* 'i' set in above loop */; i<SIZE; i++) {
 	    if ( ((i-mynod)%nprocs) && buf[i] != -1)  {
-		    if(verbose) fprintf(stderr, "Process %d: buf %d is %d, should be -1\n",
+		    if(verbose) fprintf(stderr, "Process %d: buf %d is %d, should be -1\n", 
 				    mynod, i, buf[i]);
 		    errors++;
 	    }
@@ -503,13 +460,19 @@ int test_file(char *filename, int mynod, int nprocs, char * cb_hosts, char *msg,
                   info, &fh);
 
     for (i=0; i<SIZE; i++) buf[i] = SEEDER(mynod,i,SIZE);
-    MPI_File_write_at_all(fh, mynod*(SIZE/nprocs)*sizeof(int), buf, 1, newtype, &status);
+    errcode = MPI_File_write_at_all(fh, mynod*(SIZE/nprocs)*sizeof(int), 
+		    buf, 1, newtype, &status);
+    if (errcode != MPI_SUCCESS)
+	    handle_error(errcode, "nc mem - c file: MPI_File_write_at_all");
 
     MPI_Barrier(MPI_COMM_WORLD);
 
     for (i=0; i<SIZE; i++) buf[i] = -1;
 
-    MPI_File_read_at_all(fh, mynod*(SIZE/nprocs)*sizeof(int), buf, 1, newtype, &status);
+    errcode = MPI_File_read_at_all(fh, mynod*(SIZE/nprocs)*sizeof(int), 
+		    buf, 1, newtype, &status);
+    if (errcode != MPI_SUCCESS)
+	    handle_error(errcode, "nc mem - c file: MPI_File_read_at_all");
 
     /* just like as above */
     for (i=0; i<mynod; i++ ) {
@@ -520,7 +483,7 @@ int test_file(char *filename, int mynod, int nprocs, char * cb_hosts, char *msg,
     }
     for(/* i set in above loop */; i<SIZE; i++) {
 	    if ( ((i-mynod)%nprocs) && buf[i] != -1)  {
-		    if(verbose) fprintf(stderr, "Process %d: buf %d is %d, should be -1\n",
+		    if(verbose) fprintf(stderr, "Process %d: buf %d is %d, should be -1\n", 
 				    mynod, i, buf[i]);
 		    errors++;
 	    }
@@ -547,13 +510,17 @@ int test_file(char *filename, int mynod, int nprocs, char * cb_hosts, char *msg,
     MPI_File_set_view(fh, 0, MPI_INT, newtype, "native", info);
 
     for (i=0; i<SIZE; i++) buf[i] = SEEDER(mynod, i, SIZE);
-    MPI_File_write_all(fh, buf, SIZE, MPI_INT, &status);
+    errcode = MPI_File_write_all(fh, buf, SIZE, MPI_INT, &status);
+    if (errcode != MPI_SUCCESS)
+	    handle_error(errcode, "c mem - nc file: MPI_File_write_all");
 
     MPI_Barrier(MPI_COMM_WORLD);
 
     for (i=0; i<SIZE; i++) buf[i] = -1;
 
-    MPI_File_read_at_all(fh, 0, buf, SIZE, MPI_INT, &status);
+    errcode = MPI_File_read_at_all(fh, 0, buf, SIZE, MPI_INT, &status);
+    if (errcode != MPI_SUCCESS)
+	    handle_error(errcode, "c mem - nc file: MPI_File_read_at_all");
 
     /* same crazy checking */
     for (i=0; i<SIZE; i++) {

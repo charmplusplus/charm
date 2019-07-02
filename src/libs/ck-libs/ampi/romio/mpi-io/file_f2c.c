@@ -1,6 +1,5 @@
 /* -*- Mode: C; c-basic-offset:4 ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -36,14 +35,5 @@ Return Value:
 @*/
 MPI_File MPI_File_f2c(MPI_Fint fh)
 {
-#ifndef INT_LT_POINTER
-    return (MPI_File)(intptr_t)fh;
-#else
-    if (!fh) return MPI_FILE_NULL;
-    if ((fh < 0) || (fh > CtvAccess(ADIOI_Ftable_ptr))) {
-	FPRINTF(stderr, "MPI_File_f2c: Invalid file handle\n");
-	MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-    return CtvAccess(ADIOI_Ftable)[fh];
-#endif
+    return MPIO_File_f2c(fh);
 }

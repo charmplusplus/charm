@@ -44,8 +44,10 @@ main::main(CkArgMsg *msg)
   reportedArr=0;
   reportedGrp=0;
   completeBatches=0;
-  if(msg->argc>5)
-    CkAbort("Usage: ckAllocSysMsgTest arrSize nBatches batchSize timeout\n Where arrSize, nBatches, batchSize are int >0 \n and period is minutes, a timeout of zero disables the default 1 minute timer\n");
+  if(msg->argc>5) {
+    CkPrintf("Usage: ckAllocSysMsgTest arrSize nBatches batchSize timeout\n Where arrSize, nBatches, batchSize are int >0 \n and period is minutes, a timeout of zero disables the default 1 minute timer\n");
+    CkExit(1);
+  }
   //get arrsize and wastetime from cmd line
   arrSize= 30;
   nBatches =6;
@@ -59,8 +61,10 @@ main::main(CkArgMsg *msg)
     batchSize =atoi(msg->argv[3]);
   if(msg->argc>4)
     period=atoi(msg->argv[4]);
-  if(arrSize<=0 || nBatches <= 0 || batchSize <= 0)
-    CkAbort("Usage: ckAllocSysMsgTest arrSize nBatches batchSize period\n Where arrSize, nBatches, batchSize are int >0  and period is timeout in seconds, a timeout of zero disables the timer\n");
+  if(arrSize<=0 || nBatches <= 0 || batchSize <= 0) {
+    CkPrintf("Usage: ckAllocSysMsgTest arrSize nBatches batchSize period\n Where arrSize, nBatches, batchSize are int >0  and period is timeout in seconds, a timeout of zero disables the timer\n");
+    CkExit(1);
+  }
   mainProxy=thisProxy;
   if(period>0)
     CcdCallOnCondition(CcdPERIODIC_1minute,timeout,NULL);

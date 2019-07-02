@@ -13,8 +13,8 @@ then
 fi
 
 CMK_REAL_COMPILER=`$MPICXX -show 2>/dev/null | cut -d' ' -f1 `
-case "$CMK_REAL_COMPILER" in
-g++)   CMK_AMD64="-m64 -fPIC" ;;
+case "${CMK_REAL_COMPILER##*/}" in
+gcc|g++|gcc-*|g++-*)   CMK_AMD64="-m64 -fPIC" ;;
 icpc)  CMK_AMD64="-m64";;
 pgCC)  CMK_AMD64="-DCMK_FIND_FIRST_OF_PREDICATE=1 --no_using_std " ;;
 FCC)   CMK_AMD64="-Kfast -DCMK_FIND_FIRST_OF_PREDICATE=1 --variadic_macros";;
@@ -51,7 +51,16 @@ CMK_CF90_FIXED="$CMK_CF90 -132 -FI "
 F90DIR=`which ifort 2> /dev/null`
 if test -x "$F90DIR"
 then
-  F90DIR=`dirname $F90DIR`
+  MYDIR="$PWD"
+  cd `dirname "$F90DIR"`
+  if test -L 'ifort'
+  then
+    F90DIR=`readlink ifort`
+    cd `dirname "$F90DIR"`
+  fi
+  F90DIR=`pwd -P`
+  cd "$MYDIR"
+
   Minor=`basename $F90DIR`
   F90LIBDIR="$F90DIR/../lib/$Minor"
   if ! test -x "$F90LIBDIR"

@@ -1,8 +1,9 @@
 -include ../../common.mk
+-include ../../../include/conv-mach-opt.mak
 CHARMC=../../../bin/charmc $(OPTS)
 
-MACHINE_LAYER := $(shell cat "../../../tmp/.gdir")
-SMP := $(shell CHARMINC=../../../include . ../../../tmp/conv-config.sh ; echo "$$CMK_SMP")
+MACHINE_LAYER := $(CMK_GDIR)
+SMP := $(CMK_SMP)
 
 TARGET = launch
 

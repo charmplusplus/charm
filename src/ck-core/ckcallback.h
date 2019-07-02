@@ -16,6 +16,7 @@ Initial version by Orion Sky Lawlor, olawlor@acm.org, 2/8/2002
 #include "conv-ccs.h" /*for CcsDelayedReply struct*/
 #include "charm.h"
 #include "ckarrayindex.h"
+#include "register.h"
 
 typedef void (*CkCallbackFn)(void *param,void *message);
 typedef void (*Ck1CallbackFn)(void *message);
@@ -139,10 +140,7 @@ public:
 	callbackType type;
 	callbackData d;
 #if CMK_CHARMPY
-	// NOTE with charmpy, CkCallback objects are not pup'ed, so this field doesn't
-	// need to be added to pup routine. But this could change in the future if the field
-	// is used in other contexts
-	bool isCkExtReductionCb = false;
+	bool isExtCallback = false;
 #endif
 
 	bool operator==(CkCallback & other){
@@ -193,10 +191,18 @@ public:
 	      return (d.cfn.fn == other.d.cfn.fn &&
 		  d.cfn.onPE == other.d.cfn.onPE &&
 		  d.cfn.param == other.d.cfn.param);
+	    case bcastSection:
+	      return (d.section._elems == other.d.section._elems &&
+		d.section.pelist && other.d.section.pelist &&
+		d.section.sinfo == other.d.section.sinfo &&
+		d.section._nElems == other.d.section._nElems &&
+		d.section.npes == other.d.section.npes &&
+		d.section.ep == other.d.section.ep &&
+		((d.section.hasRefnum && other.d.section.hasRefnum) &&
+		 (d.section.refnum == other.d.section.refnum)));
 	    case ignore:
 	    case ckExit:
 	    case invalid:
-	    case bcastSection:
 	      return true;
 	    default:
 	      CkAbort("Inconsistent CkCallback type");
@@ -242,11 +248,11 @@ public:
 	}
 
     // Call a chare entry method
-	CkCallback(int ep,const CkChareID &id,bool doInline=false) {
+	CkCallback(int ep,const CkChareID &id,bool forceInline=false) {
 #if CMK_REPLAYSYSTEM
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?isendChare:sendChare;
+      type = (forceInline || _entryTable[ep]->isInline) ? isendChare : sendChare;
 	  d.chare.ep=ep; d.chare.id=id;
           d.chare.hasRefnum = false;
           d.chare.refnum = 0;
@@ -267,24 +273,24 @@ public:
 	}
 
     // Send to nodegroup element
-	CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,bool doInline=false);
+	CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,bool forceInline=false);
 
     // Send to group/nodegroup element
-	CkCallback(int ep,int onPE,const CkGroupID &id,bool doInline=false, bool isNodeGroup=false) {
+	CkCallback(int ep,int onPE,const CkGroupID &id,bool forceInline=false, bool isNodeGroup=false) {
 #if CMK_REPLAYSYSTEM
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?(isNodeGroup?isendNodeGroup:isendGroup):(isNodeGroup?sendNodeGroup:sendGroup); 
+      type = (forceInline || _entryTable[ep]->isInline) ?  (isNodeGroup?isendNodeGroup:isendGroup) : (isNodeGroup?sendNodeGroup:sendGroup);
       d.group.ep=ep; d.group.id=id; d.group.onPE=onPE;
 	  d.group.hasRefnum = false;
           d.group.refnum = 0;
         }
 
     // Send to specified group element
-	CkCallback(int ep,const CProxyElement_Group &grpElt,bool doInline=false);
+	CkCallback(int ep,const CProxyElement_Group &grpElt,bool forceInline=false);
 
     // Send to specified nodegroup element
-	CkCallback(int ep,const CProxyElement_NodeGroup &grpElt,bool doInline=false);
+	CkCallback(int ep,const CProxyElement_NodeGroup &grpElt,bool forceInline=false);
 
     // Bcast to array
 	CkCallback(int ep,const CkArrayID &id) {
@@ -298,34 +304,34 @@ public:
         }
 
     // Send to array element
-	CkCallback(int ep,const CkArrayIndex &idx,const CkArrayID &id,bool doInline=false) {
+	CkCallback(int ep,const CkArrayIndex &idx,const CkArrayID &id,bool forceInline=false) {
 #if CMK_REPLAYSYSTEM
       memset(this, 0, sizeof(CkCallback));
 #endif
-      type=doInline?isendArray:sendArray;
+      type = (forceInline || _entryTable[ep]->isInline) ? isendArray : sendArray;
 	  d.array.ep=ep; d.array.id=id; d.array.idx = idx;
 	  d.array.hasRefnum = false;
           d.array.refnum = 0;
         }
 
     // Bcast to array
-	CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool doInline=false);
+	CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool forceInline=false);
 	
 	//Bcast to section
-	CkCallback(int ep,CProxySection_ArrayBase &sectElt,bool doInline=false);
+	CkCallback(int ep,CProxySection_ArrayBase &sectElt,bool forceInline=false);
 	CkCallback(int ep, CkSectionID &sid);
 	
 	// Send to chare
-	CkCallback(Chare *p, int ep, bool doInline=false);
+	CkCallback(Chare *p, int ep, bool forceInline=false);
 
     // Send to group element on current PE
-	CkCallback(Group *p, int ep, bool doInline=false);
+	CkCallback(Group *p, int ep, bool forceInline=false);
 
     // Send to nodegroup element on current node
-	CkCallback(NodeGroup *p, int ep, bool doInline=false);
+	CkCallback(NodeGroup *p, int ep, bool forceInline=false);
 
     // Send to specified array element 
- 	CkCallback(ArrayElement *p, int ep,bool doInline=false);
+	CkCallback(ArrayElement *p, int ep,bool forceInline=false);
 
 	CkCallback(const CcsDelayedReply &reply) {
 #if CMK_REPLAYSYSTEM
@@ -335,15 +341,63 @@ public:
 	  d.ccsReply.reply=reply;
 	}
 
+#if CMK_CHARMPY
+
+  CkCallback(int onPE, void* objPtr, int ep, int fid) {
+    CkChareID id;
+    id.onPE = onPE;
+    id.objPtr = objPtr;
+    type = sendChare;
+    d.chare.ep = ep;
+    d.chare.id = id;
+    d.chare.hasRefnum = (fid > 0);
+    d.chare.refnum = fid;
+    isExtCallback = true;
+  }
+
+  CkCallback(int gid, int pe, int ep, int fid) {
+    CkGroupID id;
+    id.idx = gid;
+    if (pe == -1) {
+      type = bcastGroup;
+    } else {
+      type = sendGroup;
+      d.group.onPE = pe;
+    }
+    d.group.ep = ep;
+    d.group.id = id;
+    d.group.hasRefnum = (fid > 0);
+    d.group.refnum = fid;
+    isExtCallback = true;
+  }
+
+  CkCallback(int aid, int* idx, int ndims, int ep, int fid) {
+    CkGroupID id;
+    id.idx = aid;
+    if (ndims > 0) {
+      type = sendArray;
+      d.array.idx = CkArrayIndex(ndims, idx);
+    } else {
+      type = bcastArray;
+    }
+    d.array.ep = ep;
+    d.array.id = CkArrayID(id);
+    d.array.hasRefnum = (fid > 0);
+    d.array.refnum = fid;
+    isExtCallback = true;
+  }
+
+#endif
+
 	~CkCallback() {
 	  thread_destroy();
-          if (bcastSection == type) {
-            if (d.section._elems != NULL) delete [] d.section._elems;
-            if (d.section.pelist != NULL) delete [] d.section.pelist;
-          }
 	}
 	
 	bool isInvalid(void) const {return type==invalid;}
+
+	bool requiresMsgConstruction() const {
+		return (type != ignore && type != ckExit && type != invalid);
+	}
 
         /// Does this callback point at something that may not be at the same
         /// address after a checkpoint/restart cycle?
@@ -378,6 +432,9 @@ public:
 	void send(int length,const void *data) const;
 	
 	void pup(PUP::er &p);
+
+        // Added to keep setter name more consistent with the getter CkGetRefNum
+        void setRefNum(CMK_REFNUM_TYPE refnum) { setRefnum(refnum); }
 
         void setRefnum(CMK_REFNUM_TYPE refnum) {
 		switch(type) {

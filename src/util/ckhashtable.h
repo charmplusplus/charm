@@ -150,15 +150,15 @@ it is of a user-defined type and may overlap "key".
 */
 class CkHashtableLayout {
   int size; ///< Size of entire table entry, at least ks+os.
-  int ko,ks; ///< Key byte offset (always zero) and size
-  int po,ps; ///< "empty bit" offset and size (always 1)
+  int ks; ///< Key byte size (offset is always zero)
+  int po; ///< "empty bit" offset (size is always 1)
   int oo,os; ///< Object byte offset and size
  public:
   CkHashtableLayout(int keySize,int emptyOffset,
 		    int objectOffset,int objectSize,int entryLength):
 		size(entryLength),
-		ko(0), ks(keySize),
-		po(emptyOffset), ps(1),
+		ks(keySize),
+		po(emptyOffset),
 		oo(objectOffset), os(objectSize)
   {}
 
@@ -168,7 +168,7 @@ class CkHashtableLayout {
 
 //Utility functions:
   /// Given an entry pointer, return a pointer to the key
-  inline char *getKey(char *entry) const {return entry+ko;}
+  inline char *getKey(char *entry) const {return entry;}
   /// Given an entry pointer, return a pointer to the object
   inline char *getObject(char *entry) const {return entry+oo;}
   
@@ -183,7 +183,7 @@ class CkHashtableLayout {
   inline char *nextEntry(char *entry) const {return entry+size;}
 
   /// Get entry pointer from key pointer
-  inline char *entryFromKey(char *key) const {return key-ko;}
+  inline char *entryFromKey(char *key) const {return key;}
   
   /// Get entry pointer from object pointer
   inline char *entryFromObject(char *obj) const {return obj-oo;}
@@ -383,23 +383,6 @@ public:
 		};
 	}
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	OBJ *getPointer(const KEY &key) {
-        int i=key.hash()%this->len;
-        while(1) {//Assumes key or empty slot will be found
-            char *cur=this->entry(i);
-			//An empty slot indicates the key is not here
-            if (this->layout.isEmpty(cur)){
-                return NULL;
-            }
-			//Is this the key?
-            if (key.compare(*(KEY *)this->layout.getKey(cur)))
-                return (OBJ *)this->layout.getObject(cur);
-            this->inc(i);
-        };
-        return NULL;
-    }
-#endif
 
 	//Use this version when you're sure the entry exists--
 	// avoids the test for an empty entry

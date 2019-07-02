@@ -12,23 +12,21 @@
 
 #define CMI_MACH_TRACE_USEREVENTS                          0
 
-#define  CMK_DIRECT                                             0
-
 //#define  DELTA_COMPRESS                                     1
 
 #define CMK_HANDLE_SIGUSR                                  0
 
 #if DELTA_COMPRESS
 #if CMK_ERROR_CHECKING
-#define CMK_MSG_HEADER_EXT_    CmiUInt4 size; CmiUInt2 seq; unsigned char cksum, magic; CmiUInt2 rank,hdl,xhdl,info,type,redID; CmiInt4 root; CmiUInt4 compressStart; CmiUInt2 compress_flag,xxhdl; CmiUInt8 persistRecvHandler; 
+#define CMK_MSG_HEADER_EXT_    CmiUInt4 size; CmiUInt2 seq; unsigned char cksum, magic; CmiUInt2 rank,hdl,xhdl,info,redID; CmiInt4 root; CmiUInt4 compressStart; CmiUInt2 compress_flag,xxhdl; CmiUInt8 persistRecvHandler; CmiUInt1 zcMsgType:3, cmaMsgType:2, nokeep:1;
 #else
-#define CMK_MSG_HEADER_EXT_    CmiUInt4 size; CmiUInt4 seq; CmiUInt2 rank,hdl,xhdl,info,type,redID; CmiInt4 root; CmiUInt4 compressStart; CmiUInt2 compress_flag,xxhdl; CmiUInt8 persistRecvHandler; 
+#define CMK_MSG_HEADER_EXT_    CmiUInt4 size; CmiUInt4 seq; CmiUInt2 rank,hdl,xhdl,info,redID; CmiInt4 root; CmiUInt4 compressStart; CmiUInt2 compress_flag,xxhdl; CmiUInt8 persistRecvHandler; CmiUInt1 zcMsgType:3, cmaMsgType:2, nokeep:1;
 #endif
 #else 
 #if CMK_ERROR_CHECKING
-#define CMK_MSG_HEADER_EXT_    CmiUInt4 size; CmiUInt2 seq; unsigned char cksum, magic; CmiUInt2 rank,hdl,xhdl,info,type,redID; CmiInt4 root;  
+#define CMK_MSG_HEADER_EXT_    CmiUInt4 size; CmiUInt2 seq; unsigned char cksum, magic; CmiUInt2 rank,hdl,xhdl,info,redID; CmiInt4 root; CmiUInt1 zcMsgType:3, cmaMsgType:2, nokeep:1;
 #else
-#define CMK_MSG_HEADER_EXT_    CmiUInt4 size; CmiUInt4 seq; CmiUInt2 rank,hdl,xhdl,info,type,redID; CmiInt4 root;  
+#define CMK_MSG_HEADER_EXT_    CmiUInt4 size; CmiUInt4 seq; CmiUInt2 rank,hdl,xhdl,info,redID; CmiInt4 root; CmiUInt1 zcMsgType:3, cmaMsgType:2, nokeep:1;
 #endif
 #endif
 
@@ -49,8 +47,6 @@
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
 
-#define CMK_CCS_AVAILABLE                                  1
-
 #define NODE_0_IS_CONVHOST                                 1
 
 #define CMK_USE_OOB                                        0
@@ -67,8 +63,6 @@
 #define CMK_CMA_MIN                                        65536
 
 #define CMK_CMA_MAX                                        1048576
-
-#define CMK_ONESIDED_DIRECT_IMPL                           1
 
 #define CMK_NOCOPY_DIRECT_BYTES                           16
 

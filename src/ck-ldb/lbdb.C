@@ -63,7 +63,7 @@ extern "C" void LDDoneRegisteringObjects(LDOMHandle _h)
   db->DoneRegisteringObjects(_h);
 }
 
-extern "C" LDObjHandle LDRegisterObj(LDOMHandle _h, LDObjid _id, 
+extern "C" LDObjHandle LDRegisterObj(LDOMHandle _h, CmiUInt8 _id,
 				       void *_userData, bool _migratable)
 {
   LBDB *const db = (LBDB*)(_h.ldb.handle);
@@ -270,14 +270,14 @@ extern "C" void LDObjectStop(const LDObjHandle &_h)
   db->NoRunningObj();
 }
 
-extern "C" void LDSend(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes, int destObjProc, int force)
+extern "C" void LDSend(const LDOMHandle &destOM, const CmiUInt8 &destid, unsigned int bytes, int destObjProc, int force)
 {
   LBDB *const db = (LBDB*)(destOM.ldb.handle);
   if (force || (db->StatsOn() && _lb_args.traceComm()))
     db->Send(destOM,destid,bytes, destObjProc);
 }
 
-extern "C" void LDMulticastSend(const LDOMHandle &destOM, LDObjid *destids, int ndests, unsigned int bytes, int nMsgs)
+extern "C" void LDMulticastSend(const LDOMHandle &destOM, CmiUInt8 *destids, int ndests, unsigned int bytes, int nMsgs)
 {
   LBDB *const db = (LBDB*)(destOM.ldb.handle);
   if (db->StatsOn() && _lb_args.traceComm())
@@ -569,13 +569,6 @@ extern "C" int LDProcessorSpeed() { return 1; }
 bool LDOMidEqual(const LDOMid &i1, const LDOMid &i2)
 {
  return i1.id == i2.id?true:false;
-}
-
-bool LDObjIDEqual(const LDObjid &i1, const LDObjid &i2)
-{
-  return (i1.id[0] == i2.id[0] 
-	 && i1.id[1] == i2.id[1] && i1.id[2] == i2.id[2] 
-	 && i1.id[3] == i2.id[3]);
 }
 
 /*@}*/

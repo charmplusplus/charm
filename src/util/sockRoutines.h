@@ -115,7 +115,7 @@ skt_ip_t skt_my_ip(void);
 /*Preliminaries*/
 #if defined(_WIN32)
 /*For windows systems:*/
-#include <winsock.h>
+#include <winsock2.h>
 static void sleep(int secs) { Sleep(1000 * secs); }
 
 #else
@@ -185,6 +185,8 @@ int skt_recvN(SOCKET hSocket,       void *pBuff, int nBytes);
 int skt_sendV(SOCKET fd, int nBuffers, const void **buffers, int *lengths);
 #if !defined(_WIN32)
 int skt_sendmsg(SOCKET hSocket, struct msghdr *mh, int num_bufs, int total_bytes);
+#else
+int skt_sendmsg(SOCKET hSocket, WSABUF *buffers, int num_bufs, int total_bytes);
 #endif
 
 int skt_tcp_no_nagle(SOCKET fd);

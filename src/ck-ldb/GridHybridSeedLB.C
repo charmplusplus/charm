@@ -11,7 +11,7 @@
 #include "GridHybridSeedLB.h"
 #include "manager.h"
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def (GridHybridSeedLB, "Grid load balancer that uses hybrid seed technique to optimize communication graph")
 
@@ -31,19 +31,19 @@ GridHybridSeedLB::GridHybridSeedLB (const CkLBOptions &opt) : CBase_GridHybridSe
     CkPrintf ("CharmLB> GridHybridSeedLB created.\n");
   }
 
-  if (value = getenv ("CK_LDB_GRIDHYBRIDSEEDLB_MODE")) {
+  if ((value = getenv ("CK_LDB_GRIDHYBRIDSEEDLB_MODE"))) {
     CK_LDB_GridHybridSeedLB_Mode = atoi (value);
   } else {
     CK_LDB_GridHybridSeedLB_Mode = CK_LDB_GRIDHYBRIDSEEDLB_MODE;
   }
 
-  if (value = getenv ("CK_LDB_GRIDHYBRIDSEEDLB_BACKGROUND_LOAD")) {
+  if ((value = getenv ("CK_LDB_GRIDHYBRIDSEEDLB_BACKGROUND_LOAD"))) {
     CK_LDB_GridHybridSeedLB_Background_Load = atoi (value);
   } else {
     CK_LDB_GridHybridSeedLB_Background_Load = CK_LDB_GRIDHYBRIDSEEDLB_BACKGROUND_LOAD;
   }
 
-  if (value = getenv ("CK_LDB_GRIDHYBRIDSEEDLB_LOAD_TOLERANCE")) {
+  if ((value = getenv ("CK_LDB_GRIDHYBRIDSEEDLB_LOAD_TOLERANCE"))) {
     CK_LDB_GridHybridSeedLB_Load_Tolerance = atof (value);
   } else {
     CK_LDB_GridHybridSeedLB_Load_Tolerance = CK_LDB_GRIDHYBRIDSEEDLB_LOAD_TOLERANCE;
@@ -64,19 +64,19 @@ GridHybridSeedLB::GridHybridSeedLB (CkMigrateMessage *msg) : CBase_GridHybridSee
 
   lbname = (char *) "GridHybridSeedLB";
 
-  if (value = getenv ("CK_LDB_GRIDHYBRIDSEEDLB_MODE")) {
+  if ((value = getenv ("CK_LDB_GRIDHYBRIDSEEDLB_MODE"))) {
     CK_LDB_GridHybridSeedLB_Mode = atoi (value);
   } else {
     CK_LDB_GridHybridSeedLB_Mode = CK_LDB_GRIDHYBRIDSEEDLB_MODE;
   }
 
-  if (value = getenv ("CK_LDB_GRIDHYBRIDSEEDLB_BACKGROUND_LOAD")) {
+  if ((value = getenv ("CK_LDB_GRIDHYBRIDSEEDLB_BACKGROUND_LOAD"))) {
     CK_LDB_GridHybridSeedLB_Background_Load = atoi (value);
   } else {
     CK_LDB_GridHybridSeedLB_Background_Load = CK_LDB_GRIDHYBRIDSEEDLB_BACKGROUND_LOAD;
   }
 
-  if (value = getenv ("CK_LDB_GRIDHYBRIDSEEDLB_LOAD_TOLERANCE")) {
+  if ((value = getenv ("CK_LDB_GRIDHYBRIDSEEDLB_LOAD_TOLERANCE"))) {
     CK_LDB_GridHybridSeedLB_Load_Tolerance = atof (value);
   } else {
     CK_LDB_GridHybridSeedLB_Load_Tolerance = CK_LDB_GRIDHYBRIDSEEDLB_LOAD_TOLERANCE;
@@ -304,7 +304,7 @@ void GridHybridSeedLB::Initialize_Communication_Matrix (CentralLB::LDStats *stat
   int send_index;
   int recv_index;
   int num_objects;
-  LDObjKey *recv_objects;
+  const LDObjKey *recv_objects;
   int index;
 
 

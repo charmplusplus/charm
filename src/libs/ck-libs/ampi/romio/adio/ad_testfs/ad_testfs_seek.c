@@ -1,6 +1,5 @@
 /* -*- Mode: C; c-basic-offset:4 ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 2001 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -27,8 +26,8 @@ ADIO_Offset ADIOI_TESTFS_SeekIndividual(ADIO_File fd, ADIO_Offset offset,
     ADIO_Offset off;
     ADIOI_Flatlist_node *flat_file;
     int i, n_etypes_in_filetype, n_filetypes, etype_in_filetype;
-    ADIO_Offset abs_off_in_filetype=0;
-    int size_in_filetype, sum;
+    ADIO_Offset abs_off_in_filetype=0, sum;
+    int size_in_filetype;
     int filetype_size, etype_size, filetype_is_contig;
     MPI_Aint filetype_extent;
 
@@ -44,7 +43,7 @@ ADIO_Offset ADIOI_TESTFS_SeekIndividual(ADIO_File fd, ADIO_Offset offset,
 
     if (filetype_is_contig) off = fd->disp + etype_size * offset;
     else {
-        flat_file = ADIOI_Flatlist;
+        flat_file = CtvAccess(ADIOI_Flatlist);
         while (flat_file->type != fd->filetype) flat_file = flat_file->next;
 
 	MPI_Type_extent(fd->filetype, &filetype_extent);
@@ -55,6 +54,7 @@ ADIO_Offset ADIOI_TESTFS_SeekIndividual(ADIO_File fd, ADIO_Offset offset,
 	}
 
 	n_etypes_in_filetype = filetype_size/etype_size;
+  ADIOI_Assert((offset / n_etypes_in_filetype) == (int) (offset / n_etypes_in_filetype));
 	n_filetypes = (int) (offset / n_etypes_in_filetype);
 	etype_in_filetype = (int) (offset % n_etypes_in_filetype);
 	size_in_filetype = etype_in_filetype * etype_size;
@@ -71,12 +71,11 @@ ADIO_Offset ADIOI_TESTFS_SeekIndividual(ADIO_File fd, ADIO_Offset offset,
 	}
 
 	/* abs. offset in bytes in the file */
-	off = fd->disp + (ADIO_Offset) n_filetypes * filetype_extent +
+	off = fd->disp + (ADIO_Offset)n_filetypes * (ADIO_Offset)filetype_extent +
                 abs_off_in_filetype;
     }
 
     fd->fp_ind = off;
-    fd->fp_sys_posn = off;
 
     return off;
 }

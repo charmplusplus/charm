@@ -62,7 +62,7 @@ void LBDB::batsyncer::init(LBDB *_db,double initPeriod)
 LBDB::LBDB(): useBarrier(true)
 {
     statsAreOn = false;
-    omCount = objCount = oms_registering = 0;
+    omCount = oms_registering = 0;
     obj_running = false;
     commTable = new LBCommTable;
     obj_walltime = 0;
@@ -72,6 +72,7 @@ LBDB::LBDB(): useBarrier(true)
     startLBFn_count = 0;
     predictCBFn = NULL;
     batsync.init(this, _lb_args.lbperiod());	    // original 1.0 second
+    objsEmptyHead = -1;
 }
 
 LDOMHandle LBDB::AddOM(LDOMid _userID, void* _userData, 
@@ -105,7 +106,7 @@ void LBDB::RemoveOM(LDOMHandle om)
 #define LBOBJ_OOC_IDX 0x1
 #endif
 
-LDObjHandle LBDB::AddObj(LDOMHandle _omh, LDObjid _id,
+LDObjHandle LBDB::AddObj(LDOMHandle _omh, CmiUInt8 _id,
 			 void *_userData, bool _migratable)
 {
   LDObjHandle newhandle;
@@ -113,21 +114,25 @@ LDObjHandle LBDB::AddObj(LDOMHandle _omh, LDObjid _id,
   newhandle.omhandle = _omh;
 //  newhandle.user_ptr = _userData;
   newhandle.id = _id;
-  
+
 #if CMK_BIGSIM_CHARM
   if(_BgOutOfCoreFlag==2){ //taking object into memory
     //first find the first (LBOBJ_OOC_IDX) in objs and insert the object at that position
     int newpos = -1;
-    for(int i=0; i<objs.length(); i++){
-	if(objs[i]==(LBObj *)LBOBJ_OOC_IDX){
+    for(int i=0; i<objs.size(); i++){
+	if(objs[i].obj==(LBObj *)LBOBJ_OOC_IDX){
 	    newpos = i;
 	    break;
 	}
     }
-    if(newpos==-1) newpos = objs.length();
+    if(newpos==-1) newpos = objs.size();
     newhandle.handle = newpos;
     LBObj *obj = new LBObj(newhandle, _userData, _migratable);
-    objs.insert(newpos, obj);
+    if (newpos == -1) {
+      objs.emplace_back(obj);
+    } else {
+      objs[newpos].obj = obj;
+    }
     //objCount is not increased since it's the original object which is pupped
     //through out-of-core emulation. 
     //objCount++;
@@ -136,10 +141,22 @@ LDObjHandle LBDB::AddObj(LDOMHandle _omh, LDObjid _id,
   {
     //BIGSIM_OOC DEBUGGING
     //CkPrintf("Proc[%d]: In AddObj for real migration\n", CkMyPe());
-    newhandle.handle = objs.length();
-    LBObj *obj = new LBObj(newhandle, _userData, _migratable);
-    objs.insertAtEnd(obj);
-    objCount++;
+
+    // objsEmptyHead maintains a linked list of empty positions within the objs array.
+    // If objsEmptyHead is -1, then there are no vacant positions, so we just add to the back.
+    // If objsEmptyHead is > -1, then we place the new object at index objsEmptyHead and advance
+    // objsEmptyHead to the next empty position.
+    if (objsEmptyHead == -1) {
+      newhandle.handle = objs.size();
+      LBObj *obj = new LBObj(newhandle, _userData, _migratable);
+      objs.emplace_back(obj);
+    } else {
+      newhandle.handle = objsEmptyHead;
+      LBObj *obj = new LBObj(newhandle, _userData, _migratable);
+      objs[objsEmptyHead].obj = obj;
+
+      objsEmptyHead = objs[objsEmptyHead].next;
+    }
   }
   //BIGSIM_OOC DEBUGGING
   //CkPrintf("LBDBManager.C: New handle: %d, LBObj=%p\n", newhandle.handle, objs[newhandle.handle]);
@@ -152,18 +169,22 @@ void LBDB::UnregisterObj(LDObjHandle _h)
 //  (objs[_h.handle])->registered=false;
 // free the memory, it is a memory leak.
 // CmiPrintf("[%d] UnregisterObj: %d\n", CkMyPe(), _h.handle);
-  delete objs[_h.handle];
+  delete objs[_h.handle].obj;
 
 #if CMK_BIGSIM_CHARM
   //hack for BigSim out-of-core emulation.
   //we want the chare array object to keep at the same
   //position even going through the pupping routine.
   if(_BgOutOfCoreFlag==1){ //in taking object out of memory
-    objs[_h.handle] = (LBObj *)(LBOBJ_OOC_IDX);
+    objs[_h.handle].obj = (LBObj *)(LBOBJ_OOC_IDX);
   }else
 #endif
   {
-    objs[_h.handle] = NULL;
+    objs[_h.handle].obj = NULL;
+    // Maintain the linked list of empty positions by adding the newly removed
+    // index as the new objsEmptyHead
+    objs[_h.handle].next = objsEmptyHead;
+    objsEmptyHead = _h.handle;
   }
 }
 
@@ -191,14 +212,14 @@ void LBDB::DoneRegisteringObjects(LDOMHandle _h)
   // for an unregistered anonymous OM to join and control the barrier
   if (_h.id.id.idx == 0) {
     oms_registering--;
-    if (oms_registering == 0)
+    if (oms_registering == 0 && useBarrier)
       localBarrier.TurnOn();
   }
   else {
   LBOM* om = oms[_h.handle];
   if (om->RegisteringObjs()) {
     oms_registering--;
-    if (oms_registering == 0)
+    if (oms_registering == 0 && useBarrier)
       localBarrier.TurnOn();
     om->SetRegisteringObjs(false);
   }
@@ -206,7 +227,7 @@ void LBDB::DoneRegisteringObjects(LDOMHandle _h)
 }
 
 
-void LBDB::Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes, int destObjProc)
+void LBDB::Send(const LDOMHandle &destOM, const CmiUInt8 &destid, unsigned int bytes, int destObjProc)
 {
   LBCommData* item_ptr;
 
@@ -215,7 +236,7 @@ void LBDB::Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int by
 
     // Don't record self-messages from an object to an object
     if ( LDOMidEqual(runObj.omhandle.id,destOM.id)
-	 && LDObjIDEqual(runObj.id,destid) )
+	 && runObj.id == destid )
       return;
 
     // In the future, we'll have to eliminate processor to same 
@@ -230,10 +251,9 @@ void LBDB::Send(const LDOMHandle &destOM, const LDObjid &destid, unsigned int by
   item_ptr->addMessage(bytes);
 }
 
-void LBDB::MulticastSend(const LDOMHandle &destOM, LDObjid *destids, int ndests, unsigned int bytes, int nMsgs)
+void LBDB::MulticastSend(const LDOMHandle &destOM, CmiUInt8 *destids, int ndests, unsigned int bytes, int nMsgs)
 {
   LBCommData* item_ptr;
-
   //CmiAssert(obj_running);
   if (obj_running) {
     const LDObjHandle &runObj = RunningObj();
@@ -241,14 +261,14 @@ void LBDB::MulticastSend(const LDOMHandle &destOM, LDObjid *destids, int ndests,
     LBCommData item(runObj,destOM.id,destids, ndests);
     item_ptr = commTable->HashInsertUnique(item);
     item_ptr->addMessage(bytes, nMsgs);
-  } 
+  }
 }
 
 void LBDB::ClearLoads(void)
 {
   int i;
-  for(i=0; i < objCount; i++) {
-    LBObj *obj = objs[i]; 
+  for(i=0; i < objs.size(); i++) {
+    LBObj *obj = objs[i].obj;
     if (obj)
     {
       if (obj->data.wallTime>.0) {
@@ -277,13 +297,13 @@ int LBDB::ObjDataCount()
   int nitems=0;
   int i;
   if (_lb_args.migObjOnly()) {
-  for(i=0; i < objCount; i++)
-    if (objs[i] && (objs[i])->data.migratable)
+  for(i=0; i < objs.size(); i++)
+    if (objs[i].obj && (objs[i].obj)->data.migratable)
       nitems++;
   }
   else {
-  for(i=0; i < objCount; i++)
-    if (objs[i])
+  for(i=0; i < objs.size(); i++)
+    if (objs[i].obj)
       nitems++;
   }
   return nitems;
@@ -292,15 +312,15 @@ int LBDB::ObjDataCount()
 void LBDB::GetObjData(LDObjData *dp)
 {
   if (_lb_args.migObjOnly()) {
-  for(int i = 0; i < objs.length(); i++) {
-    LBObj* obj = objs[i];
-    if ( obj && obj->data.migratable)
+  for(int i = 0; i < objs.size(); i++) {
+    LBObj* obj = objs[i].obj;
+    if (obj && obj->data.migratable)
       *dp++ = obj->ObjData();
   }
   }
   else {
-  for(int i = 0; i < objs.length(); i++) {
-    LBObj* obj = objs[i];
+  for(int i = 0; i < objs.size(); i++) {
+    LBObj* obj = objs[i].obj;
     if (obj)
       *dp++ = obj->ObjData();
   }
@@ -312,23 +332,23 @@ int LBDB::Migrate(LDObjHandle h, int dest)
     //BIGSIM_OOC DEBUGGING
     //CmiPrintf("[%d] LBDB::Migrate: incoming handle %d with handle range 0-%d\n", CkMyPe(), h.handle, objCount);
 
-  if (h.handle > objCount)
-    CmiPrintf("[%d] LBDB::Migrate: Handle %d out of range 0-%d\n",CkMyPe(),h.handle,objCount);
-  else if (!objs[h.handle]) {
-    CmiPrintf("[%d] LBDB::Migrate: Handle %d no longer registered, range 0-%d\n", CkMyPe(),h.handle,objCount);
-    return 0;
+  if (h.handle >= objs.size()) {
+    CmiPrintf("[%d] LBDB::Migrate: Handle %d out of range 0-%d\n",CkMyPe(),h.handle,objs.size());
+    CmiAbort("LB handle out of range!");
+  }
+  else if (!(objs[h.handle].obj)) {
+    CmiPrintf("[%d] LBDB::Migrate: Handle %d no longer registered, range 0-%d\n", CkMyPe(),h.handle,objs.size());
+    CmiAbort("LB handle no longer registered!");
   }
 
-  if ((h.handle < objCount) && objs[h.handle]) {
-    LBOM *const om = oms[(objs[h.handle])->parentOM().handle];
-    om->Migrate(h, dest);
-  }
+  LBOM *const om = oms[(objs[h.handle].obj)->parentOM().handle];
+  om->Migrate(h, dest);
   return 1;
 }
 
 void LBDB::MetaLBResumeWaitingChares(int lb_ideal_period) {
-  for (int i = 0; i < objs.length(); i++) {
-    LBObj* obj = objs[i];
+  for (int i = 0; i < objs.size(); i++) {
+    LBObj* obj = objs[i].obj;
     if (obj) {
       LBOM *om = oms[obj->parentOM().handle];
       LDObjHandle h = obj->GetLDObjHandle();
@@ -338,8 +358,8 @@ void LBDB::MetaLBResumeWaitingChares(int lb_ideal_period) {
 }
 
 void LBDB::MetaLBCallLBOnChares() {
-  for (int i = 0; i < objs.length(); i++) {
-    LBObj* obj = objs[i];
+  for (int i = 0; i < objs.size(); i++) {
+    LBObj* obj = objs[i].obj;
     if (obj) {
       LBOM *om = oms[obj->parentOM().handle];
       LDObjHandle h = obj->GetLDObjHandle();
@@ -496,7 +516,7 @@ void LBDB::DumpDatabase()
 {
 #ifdef DEBUG  
   CmiPrintf("Database contains %d object managers\n",omCount);
-  CmiPrintf("Database contains %d objects\n",objCount);
+  CmiPrintf("Database contains %d objects\n",objs.size());
 #endif
 }
 

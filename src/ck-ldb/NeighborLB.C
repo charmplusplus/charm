@@ -7,7 +7,7 @@
 #include "ckheap.h"
 #include "NeighborLB.h"
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(NeighborLB, "The neighborhood load balancer")
 

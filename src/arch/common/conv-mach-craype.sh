@@ -15,7 +15,7 @@ CMK_CPP_C_FLAGS="-E"
 
 CMK_LINK_BINARY='-dynamic'
 
-CMK_CRAY_LIBS="$CRAY_PMI_POST_LINK_OPTS $CRAY_UGNI_POST_LINK_OPTS -lugni -lpmi"
+CMK_CRAY_LIBS="$CRAY_PMI_POST_LINK_OPTS $CRAY_UGNI_POST_LINK_OPTS -lugni -lpmi $CRAY_RCA_POST_LINK_OPTS"
 CMK_LIBS="-lckqt $CMK_CRAY_LIBS"
 
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
@@ -79,7 +79,16 @@ CMK_CF90="ftn -auto "
 F90DIR=`which ifort 2> /dev/null`
 if test -x "$F90DIR"
 then
-  F90DIR=`dirname $F90DIR`
+  MYDIR="$PWD"
+  cd `dirname "$F90DIR"`
+  if test -L 'ifort'
+  then
+    F90DIR=`readlink ifort`
+    cd `dirname "$F90DIR"`
+  fi
+  F90DIR=`pwd -P`
+  cd "$MYDIR"
+
   Minor=`basename $F90DIR`
   F90LIBDIR="$F90DIR/../lib/$Minor"
   if ! test -x "$F90LIBDIR"
@@ -88,6 +97,18 @@ then
     if ! test -x "$F90LIBDIR"
     then
       F90LIBDIR="$F90DIR/../../compiler/lib/$Minor"
+    fi
+    if ! test -x "$F90LIBDIR"
+    then
+      F90LIBDIR="$F90DIR/../../lib/$Minor"
+    fi
+    if ! test -x "$F90LIBDIR"
+    then
+      F90LIBDIR="$F90DIR/../../compiler/lib/${Minor}_lin"
+    fi
+    if ! test -x "$F90LIBDIR"
+    then
+      F90LIBDIR="$F90DIR/../../lib/${Minor}_lin"
     fi
   fi
   F90MAIN="$F90LIBDIR/for_main.o"

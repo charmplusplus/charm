@@ -11,6 +11,7 @@ CStateVar::CStateVar(int v, const char* t, int np, const char* n, XStr* r, const
       isMsg(m),
       isRdma(false),
       isFirstRdma(false),
+      isRecvRdma(false),
       declaredRef(NULL),
       byConst(false),
       isCounter(false),
@@ -38,7 +39,7 @@ CStateVar::CStateVar(ParamList* pl)
       type(new XStr(pl->param->type->isMessage() ? *(pl->param->type->deref())
                                                  : *(pl->param->getType()))),
       numPtrs(0),
-      name(new XStr(pl->getGivenName())),
+      name(new XStr(pl->getGivenName() ? pl->getGivenName() : "noGivenName")),
       byRef(pl->isReference() ? new XStr("&") : NULL),
       declaredRef(pl->declaredReference() ? new XStr("&") : NULL),
       byConst(pl->isConst()),
@@ -46,6 +47,7 @@ CStateVar::CStateVar(ParamList* pl)
       isMsg(pl->isMessage()),
       isRdma(pl->isRdma()),
       isFirstRdma(pl->isFirstRdma()),
+      isRecvRdma(pl->isRecvRdma()),
       isCounter(false),
       isSpeculator(false),
       isBgParentLog(false) {}

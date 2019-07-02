@@ -58,6 +58,7 @@ A more readable summary is at:
 #include <algorithm>
 #include "converse.h"
 #include "pup.h"
+#include "memory-isomalloc.h"
 
 #include <elf.h>
 
@@ -114,7 +115,7 @@ extern ELFXX_TYPE_Dyn _DYNAMIC[];      //The Dynamic section table pointer
 
 std::vector<char *>  _blacklist;
 static bool loaded = false;
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 static void readBlacklist()
 {
@@ -290,10 +291,7 @@ CtgGlobalList::CtgGlobalList() {
     int padding = 0;
 
 #if UNPROTECT_GOT && CMK_HAS_MPROTECT
-    size_t pagesize = CMK_MEMORY_PAGESIZE;
-#if CMK_HAS_GETPAGESIZE
-    pagesize = getpagesize();
-#endif
+    const size_t pagesize = CmiGetPageSize();
 #endif
 
     // Figure out which relocation data entries refer to global data:
@@ -378,7 +376,7 @@ public:
       seg_size=size;
         /* global data segment need to be isomalloc */
       if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-        data_seg=CmiIsomalloc(seg_size,tid);
+        data_seg=CmiIsomallocMallocForThread(tid, seg_size);
       else
         data_seg=malloc(seg_size);
     }
@@ -392,7 +390,7 @@ public:
         if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
         {
 #if !CMK_USE_MEMPOOL_ISOMALLOC
-          CmiIsomallocFree(data_seg);
+          CmiIsomallocBlockListFree(data_seg);
 #endif
         }
         else
@@ -496,6 +494,6 @@ CtgGlobals CtgCurrentGlobals(void){
 
 #else // CMI_SWAPGLOBALS
 
-#include "global-nop.c"
+#include "global-nop.C"
 
 #endif

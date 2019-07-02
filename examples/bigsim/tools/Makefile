@@ -4,10 +4,6 @@ DIRS = \
 
 TESTDIRS = $(DIRS)
 
-ifneq (,$(shell CHARMINC=../../../../include/; if test -f ./conv-config.sh; then . ./conv-config.sh; echo $$BGP_FLOOR; fi))
-  TESTDIRS =
-endif
-
 all: $(foreach i,$(DIRS),build-$i)
 
 test: $(foreach i,$(TESTDIRS),test-$i)

@@ -18,7 +18,7 @@ Main::Main(CkArgMsg *m)
 	if(m->argc < 4)
 	{
 		CkPrintf("Incorrect usage. Please read the readme.txt file\n");
-		CkExit();
+		CkExit(1);
 	}
 	arrayDimensionX = atoi(m->argv[1]);
 	arrayDimensionY = atoi(m->argv[2]);

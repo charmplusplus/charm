@@ -1,7 +1,5 @@
 /* -*- Mode: C; c-basic-offset:4 ; -*- */
 /* 
- *   $Id$    
- *
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
  */
@@ -11,14 +9,24 @@
 /* set the shared file pointer to "offset" etypes relative to the current 
    view */
 
+void ADIOI_NFS_Set_shared_fp(ADIO_File fd, ADIO_Offset offset, int *error_code);
+
 void ADIO_Set_shared_fp(ADIO_File fd, ADIO_Offset offset, int *error_code)
 {
     ADIO_Status status;
     MPI_Comm dupcommself;
 
-#ifdef NFS
+#ifdef ROMIO_NFS
     if (fd->file_system == ADIO_NFS) {
 	ADIOI_NFS_Set_shared_fp(fd, offset, error_code);
+	return;
+    }
+#endif
+
+#ifdef ROMIO_BGL
+    /* BGLOCKLESS won't support shared fp */
+    if (fd->file_system == ADIO_BGL) {
+	ADIOI_BGL_Set_shared_fp(fd, offset, error_code);
 	return;
     }
 #endif
@@ -28,8 +36,9 @@ void ADIO_Set_shared_fp(ADIO_File fd, ADIO_Offset offset, int *error_code)
 	fd->shared_fp_fd = ADIO_Open(MPI_COMM_SELF, dupcommself, 
 				     fd->shared_fp_fname, 
 				     fd->file_system,
+				     fd->fns,
 				     ADIO_CREATE | ADIO_RDWR | ADIO_DELETE_ON_CLOSE, 
-				     0, MPI_BYTE, MPI_BYTE, M_ASYNC, 
+				     0, MPI_BYTE, MPI_BYTE,
 				     MPI_INFO_NULL, 
 				     ADIO_PERM_NULL, error_code);
     }

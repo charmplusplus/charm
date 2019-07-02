@@ -1,8 +1,5 @@
 DIRS = \
-  commbench \
-  cthtest \
   megacon \
-  machinetest \
 
 TESTDIRS = $(DIRS)
 

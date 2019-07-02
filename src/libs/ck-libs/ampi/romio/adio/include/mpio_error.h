@@ -1,6 +1,5 @@
 /* -*- Mode: C; c-basic-offset:4 ; -*- */
-/*  $Id$
- *
+/*
  *  (C) 2001 by Argonne National Laboratory.
  *      See COPYRIGHT in top-level directory.
  */
@@ -54,6 +53,7 @@
 #define MPIR_ERR_NO_XFS 17
 #define MPIR_ERR_NO_SFS 19
 #define MPIR_ERR_NO_PVFS 21
+#define MPIR_ERR_NO_PANFS 22
 #define MPIR_ERR_MULTIPLE_SPLIT_COLL 23
 #define MPIR_ERR_NO_SPLIT_COLL 25
 #define MPIR_ERR_ASYNC_OUTSTANDING 27
@@ -62,6 +62,8 @@
 #define MPIR_ERR_FILETYPE 33 
 #define MPIR_ERR_NO_NTFS 35
 #define MPIR_ERR_NO_TESTFS 36
+#define MPIR_ERR_NO_LUSTRE 37
+#define MPIR_ERR_NO_BGL 38
 
 /* MPI_ERR_COMM */
 #ifndef MPIR_ERR_COMM_NULL

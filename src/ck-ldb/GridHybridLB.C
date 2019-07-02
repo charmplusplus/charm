@@ -11,7 +11,7 @@
 #include "GridHybridLB.h"
 #include "manager.h"
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def (GridHybridLB, "Grid load balancer that uses hybrid technique to optimize communication graph")
 
@@ -31,19 +31,19 @@ GridHybridLB::GridHybridLB (const CkLBOptions &opt) : CBase_GridHybridLB (opt)
     CkPrintf ("CharmLB> GridHybridLB created.\n");
   }
 
-  if (value = getenv ("CK_LDB_GRIDHYBRIDLB_MODE")) {
+  if ((value = getenv ("CK_LDB_GRIDHYBRIDLB_MODE"))) {
     CK_LDB_GridHybridLB_Mode = atoi (value);
   } else {
     CK_LDB_GridHybridLB_Mode = CK_LDB_GRIDHYBRIDLB_MODE;
   }
 
-  if (value = getenv ("CK_LDB_GRIDHYBRIDLB_BACKGROUND_LOAD")) {
+  if ((value = getenv ("CK_LDB_GRIDHYBRIDLB_BACKGROUND_LOAD"))) {
     CK_LDB_GridHybridLB_Background_Load = atoi (value);
   } else {
     CK_LDB_GridHybridLB_Background_Load = CK_LDB_GRIDHYBRIDLB_BACKGROUND_LOAD;
   }
 
-  if (value = getenv ("CK_LDB_GRIDHYBRIDLB_LOAD_TOLERANCE")) {
+  if ((value = getenv ("CK_LDB_GRIDHYBRIDLB_LOAD_TOLERANCE"))) {
     CK_LDB_GridHybridLB_Load_Tolerance = atof (value);
   } else {
     CK_LDB_GridHybridLB_Load_Tolerance = CK_LDB_GRIDHYBRIDLB_LOAD_TOLERANCE;
@@ -64,19 +64,19 @@ GridHybridLB::GridHybridLB (CkMigrateMessage *msg) : CBase_GridHybridLB (msg)
 
   lbname = (char *) "GridHybridLB";
 
-  if (value = getenv ("CK_LDB_GRIDHYBRIDLB_MODE")) {
+  if ((value = getenv ("CK_LDB_GRIDHYBRIDLB_MODE"))) {
     CK_LDB_GridHybridLB_Mode = atoi (value);
   } else {
     CK_LDB_GridHybridLB_Mode = CK_LDB_GRIDHYBRIDLB_MODE;
   }
 
-  if (value = getenv ("CK_LDB_GRIDHYBRIDLB_BACKGROUND_LOAD")) {
+  if ((value = getenv ("CK_LDB_GRIDHYBRIDLB_BACKGROUND_LOAD"))) {
     CK_LDB_GridHybridLB_Background_Load = atoi (value);
   } else {
     CK_LDB_GridHybridLB_Background_Load = CK_LDB_GRIDHYBRIDLB_BACKGROUND_LOAD;
   }
 
-  if (value = getenv ("CK_LDB_GRIDHYBRIDLB_LOAD_TOLERANCE")) {
+  if ((value = getenv ("CK_LDB_GRIDHYBRIDLB_LOAD_TOLERANCE"))) {
     CK_LDB_GridHybridLB_Load_Tolerance = atof (value);
   } else {
     CK_LDB_GridHybridLB_Load_Tolerance = CK_LDB_GRIDHYBRIDLB_LOAD_TOLERANCE;
@@ -297,7 +297,7 @@ void GridHybridLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
   int recv_object;
   int send_index;
   int recv_index;
-  LDObjKey *recv_objects;
+  const LDObjKey *recv_objects;
   int num_objects;
   int *xadj;
   int num_edges;

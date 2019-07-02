@@ -1,6 +1,5 @@
 /* -*- Mode: C; c-basic-offset:4 ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 2001 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -14,6 +13,7 @@ void ADIOI_TESTFS_Open(ADIO_File fd, int *error_code)
     int myrank, nprocs;
 
     fd->fd_sys = 1;
+    fd->fd_direct = -1;
     *error_code = MPI_SUCCESS;
 
     MPI_Comm_size(fd->comm, &nprocs);

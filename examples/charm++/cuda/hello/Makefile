@@ -1,33 +1,36 @@
 -include ../../../common.mk
-CHARMC=../../../../bin/charmc $(OPTS)
+CHARMC = ../../../../bin/charmc $(USE_WR) $(OPTS)
 
-OBJS = hello.o helloCUDA.o
+# use deprecated hapiWorkRequest for GPU offloading
+USE_WR = #-DUSE_WR
 
-NVCC = /usr/local/cuda/bin/nvcc 
-NVCC_FLAGS = -c -use_fast_math #-device-debug -deviceemu 
-NVCC_INC = -I/usr/local/cuda/include 
-CHARMINC = -I../../../../include
-LD_LIBS += -lcuda -lcudart 
+# set CUDATOOLKIT_HOME to the CUDA toolkit directory
+CUDATOOLKIT_HOME ?= /usr/local/cuda
+NVCC = $(CUDATOOLKIT_HOME)/bin/nvcc
+NVCC_FLAGS = -c -std=c++11 $(USE_WR)
+NVCC_INC = -I../../../../include
+CHARMC_INC = -I$(CUDATOOLKIT_HOME)/include
+LD_LIBS = -L$(CUDATOOLKIT_HOME)/lib64 -lcudart
 
-all: hello
+TARGET = hello
+all: $(TARGET)
 
-hello: $(OBJS)
-	$(CHARMC) -language charm++ -o hello $(OBJS) $(LD_LIBS)
+OBJS = $(TARGET).o $(TARGET)CUDA.o
 
-hello.decl.h: hello.ci
-	$(CHARMC)  hello.ci
+$(TARGET): $(OBJS)
+	$(CHARMC) -language charm++ -o $@ $(OBJS) $(LD_LIBS)
+
+$(TARGET).decl.h: $(TARGET).ci
+	$(CHARMC) $<
+
+$(TARGET).o: $(TARGET).C $(TARGET).decl.h
+	$(CHARMC) $(CHARMC_INC) -c $<
+
+$(TARGET)CUDA.o: $(TARGET).cu
+	$(NVCC) -o $@ $(NVCC_FLAGS) $(NVCC_INC) $<
 
 clean:
-	rm -f *.decl.h *.def.h conv-host *.o hello charmrun
-
-hello.o: hello.C hello.decl.h
-	$(CHARMC) -c hello.C
-
-helloCUDA.o: helloCUDA.cu
-	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) $(CHARMINC) helloCUDA.cu
+	rm -f *.decl.h *.def.h conv-host *.o $(TARGET) charmrun
 
 test: all
-	$(call run, ./hello +p4 10)
-
-bgtest: all
-	$(call run, ./hello +p4 10 +x2 +y2 +z1)
+	$(call run, ./$(TARGET) +p2)

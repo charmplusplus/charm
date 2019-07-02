@@ -28,6 +28,7 @@ class Module : public Construct {
   void setMain(void) { _isMain = 1; }
   int isMain(void) { return _isMain; }
   bool isTramTarget();
+  void printName() { printf("%s\n", name); }
 
   // DMK - Accel Support
   int genAccels_spe_c_funcBodies(XStr& str);

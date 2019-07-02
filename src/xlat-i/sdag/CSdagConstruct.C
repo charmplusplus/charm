@@ -11,8 +11,11 @@
 using std::list;
 #include <algorithm>
 using std::for_each;
+
+#if __cplusplus < 201103L
 #include <functional>
 using std::mem_fun;
+#endif
 
 namespace xi {
 SdagConstruct::SdagConstruct(EToken t, SdagConstruct* construct1) {
@@ -67,7 +70,11 @@ SdagConstruct::~SdagConstruct() {
 void SdagConstruct::numberNodes(void) {
   if (constructs != 0)
     for_each(constructs->begin(), constructs->end(),
+#if __cplusplus < 201103L
              mem_fun(&SdagConstruct::numberNodes));
+#else
+             [](SdagConstruct * c) { c->numberNodes(); } );
+#endif
 }
 
 XStr* SdagConstruct::createLabel(const char* str, int nodeNum) {
@@ -84,7 +91,12 @@ void SdagConstruct::labelNodes() {
   if (label_str != 0) label = createLabel(label_str, nodeNum);
 
   if (constructs != 0)
-    for_each(constructs->begin(), constructs->end(), mem_fun(&SdagConstruct::labelNodes));
+    for_each(constructs->begin(), constructs->end(),
+#if __cplusplus < 201103L
+             mem_fun(&SdagConstruct::labelNodes));
+#else
+             [](SdagConstruct * c) { c->labelNodes(); } );
+#endif
 }
 
 void EntryList::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct* thisWhen) {
@@ -293,23 +305,27 @@ int SdagConstruct::unravelClosuresBegin(XStr& defs, bool child) {
       // not be brought into scope
       if (!var.isCounter && !var.isSpeculator && !var.isBgParentLog) {
         if (var.isRdma) {
-          defs << "#if CMK_ONESIDED_IMPL\n";
           if (var.isFirstRdma) {
+            defs << "#if CMK_ONESIDED_IMPL\n";
             indentBy(defs, cur + 2);
             defs << "int "
                  << "& num_rdma_fields = ";
             defs << "gen" << cur;
             defs << "->"
-                 << "getP" << i++ << "();\n";
+                 << "getP" << i << "();\n";
+            defs << "#else\n";
+            i++;
+            defs << "#endif\n";
           }
+          defs << "#if CMK_ONESIDED_IMPL\n";
           indentBy(defs, cur + 2);
-          defs << "CkRdmaWrapper "
-               << "& rdmawrapper_" << var.name << " = ";
+          defs << "CkNcpyBuffer "
+               << "& ncpyBuffer_" << var.name << " = ";
           defs << "gen" << cur << "->"
                << "getP" << i << "();\n";
           indentBy(defs, cur + 2);
           defs << var.type << "* " << var.name << " = "
-               << "(" << var.type << "*) (rdmawrapper_" << var.name << ".ptr);\n";
+               << "(" << var.type << "*) (ncpyBuffer_" << var.name << ".ptr);\n";
           defs << "#else\n";
           indentBy(defs, cur + 2);
           defs << var.type << "*"
@@ -560,7 +576,11 @@ void SdagConstruct::setNext(SdagConstruct* n, int boe) {
 // for trace
 void SdagConstruct::generateTrace() {
   for_each(constructs->begin(), constructs->end(),
+#if __cplusplus < 201103L
            mem_fun(&SdagConstruct::generateTrace));
+#else
+           [](SdagConstruct * c) { c->generateTrace(); } );
+#endif
   if (con1) con1->generateTrace();
   if (con2) con2->generateTrace();
   if (con3) con3->generateTrace();

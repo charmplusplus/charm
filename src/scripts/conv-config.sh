@@ -38,7 +38,6 @@ CMK_LD_SHARED="-shared"
 
 # Use gnu1x instead of c1x to get _GNU_SOURCE features and inline assembly extensions
 [ -z "$CMK_ENABLE_C11" ] && CMK_ENABLE_C11="-std=gnu1x"
-[ -z "$CMK_ENABLE_CPP11" ] && CMK_ENABLE_CPP11="-std=c++11"
 
 [ -z "$CMK_CC" ] && CMK_CC='cc '
 [ -z "$CMK_CXX" ] && CMK_CXX='c++ '
@@ -85,6 +84,7 @@ OPTS_CXX="$OPTS_CXX $USER_OPTS_CXX"
 OPTS_LD="$OPTS_LD $USER_OPTS_LD"
 
 [ -z "$CMK_PIC" ] && CMK_PIC='-fpic'
+[ -z "$CMK_PIE" ] && CMK_PIE='-pie -fPIE'
 
 [ -z "$CMK_SEQ_CC" ] && CMK_SEQ_CC="$CMK_CC"
 [ -z "$CMK_SEQ_CXX" ] && CMK_SEQ_CXX="$CMK_CXX"

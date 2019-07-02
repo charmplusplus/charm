@@ -12,7 +12,7 @@ int armci_nproc;
 
 // Bind the virtual processors in the armci library to TCharm's.
 // This is called by the user's thread when it starts up.
-CDECL int ARMCI_Init(void) {
+CLINKAGE int ARMCI_Init(void) {
   TCHARM_API_TRACE("ARMCI_Init", "armci");
   if (TCHARM_Element()==0) {
     CkArrayID threadsAID;
@@ -27,34 +27,34 @@ CDECL int ARMCI_Init(void) {
   return 0;
 }
 
-CDECL int ARMCI_Finalize(void) {
+CLINKAGE int ARMCI_Finalize(void) {
   TCHARM_API_TRACE("ARMCI_Finalize", "armci");
   TCHARM_Done(0);
   return 0;
 }
 
-CDECL void ARMCI_Cleanup(void) {
+CLINKAGE void ARMCI_Cleanup(void) {
   TCHARM_API_TRACE("ARMCI_Cleanup", "armci");
 }
 
-CDECL void ARMCI_Error(char *message, int code) {
+CLINKAGE void ARMCI_Error(char *message, int code) {
   TCHARM_API_TRACE("ARMCI_Error", "armci");
   ckerr << "armci error: " << message << " | code = " << code << endl;
 }
 
 
-CDECL int ARMCI_Procs(int *procs){
+CLINKAGE int ARMCI_Procs(int *procs){
   TCHARM_API_TRACE("ARMCI_Procs", "armci");
   *procs = TCHARM_Num_elements();
   return 0;
 }
-CDECL int ARMCI_Myid(int *myid){
+CLINKAGE int ARMCI_Myid(int *myid){
   TCHARM_API_TRACE("ARMCI_Myid", "armci");
   *myid = TCHARM_Element();
   return 0;
 }
 
-CDECL int ARMCI_GetV(
+CLINKAGE int ARMCI_GetV(
 	        armci_giov_t darr[], /* descriptor array */
 	        int len,              /* length of descriptor array */
 	        int proc              /* remote process(or) ID */
@@ -62,7 +62,7 @@ CDECL int ARMCI_GetV(
   return 0;
 }
 
-CDECL int ARMCI_NbGetV(
+CLINKAGE int ARMCI_NbGetV(
 		armci_giov_t *dsrc_arr,
 		int arr_len,
 		int proc,
@@ -71,7 +71,7 @@ CDECL int ARMCI_NbGetV(
   return 0;
 }
 
-CDECL int ARMCI_PutV(
+CLINKAGE int ARMCI_PutV(
 	        armci_giov_t darr[], /* descriptor array */
 	        int len,              /* length of descriptor array */
 	        int proc              /* remote process(or) ID */
@@ -79,7 +79,7 @@ CDECL int ARMCI_PutV(
   return 0;
 }
 
-CDECL int ARMCI_NbPutV(
+CLINKAGE int ARMCI_NbPutV(
 		armci_giov_t *dsrc_arr,
 		int arr_len,
 		int proc,
@@ -88,7 +88,7 @@ CDECL int ARMCI_NbPutV(
   return 0;
 }
 
-CDECL int ARMCI_AccV(
+CLINKAGE int ARMCI_AccV(
 	        int op,                /* operation code */
 	        void *scale,          /* scaling factor for accumulate */
 	        armci_giov_t darr[], /* descriptor array */
@@ -98,7 +98,7 @@ CDECL int ARMCI_AccV(
   return 0;
 }
         
-CDECL int ARMCI_NbAccV(
+CLINKAGE int ARMCI_NbAccV(
 		int datatype, 
 		void *scale, 
 		armci_giov_t *dsrc_arr, 
@@ -110,14 +110,14 @@ CDECL int ARMCI_NbAccV(
 }
 
 // src is local memory, dst is remote address
-CDECL int ARMCI_Put(void *src, void *dst, int bytes, int proc) {
+CLINKAGE int ARMCI_Put(void *src, void *dst, int bytes, int proc) {
   TCHARM_API_TRACE("ARMCI_Put", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
   vp->put(src, dst, bytes, proc);
   return 0;
 }
 
-CDECL int ARMCI_NbPut(void *src, void* dst, int bytes, int proc, armci_hdl_t *handle){
+CLINKAGE int ARMCI_NbPut(void *src, void* dst, int bytes, int proc, armci_hdl_t *handle){
   TCHARM_API_TRACE("ARMCI_NbPut", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
   if (handle != NULL) {
@@ -129,14 +129,14 @@ CDECL int ARMCI_NbPut(void *src, void* dst, int bytes, int proc, armci_hdl_t *ha
 }
 
 // src is remote memory addr, dst is local address
-CDECL int ARMCI_Get(void *src, void *dst, int bytes, int proc) {
+CLINKAGE int ARMCI_Get(void *src, void *dst, int bytes, int proc) {
   TCHARM_API_TRACE("ARMCI_Get", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
   vp->get(src, dst, bytes, proc);
   return 0;
 }
 
-CDECL int ARMCI_NbGet(void *src, void* dst, int bytes, int proc, armci_hdl_t *handle){
+CLINKAGE int ARMCI_NbGet(void *src, void* dst, int bytes, int proc, armci_hdl_t *handle){
   TCHARM_API_TRACE("ARMCI_NbGet", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
   if (handle != NULL) {
@@ -147,16 +147,16 @@ CDECL int ARMCI_NbGet(void *src, void* dst, int bytes, int proc, armci_hdl_t *ha
   return 0;
 }
 
-CDECL int ARMCI_Acc(int datatype, void *scale, void* src, void* dst, int bytes, int proc){
+CLINKAGE int ARMCI_Acc(int datatype, void *scale, void* src, void* dst, int bytes, int proc){
   return 0;
 }
 
-CDECL int ARMCI_NbAcc(int datatype, void *scale, void* src, void* dst, int bytes, int proc, armci_hdl_t* handle) {
+CLINKAGE int ARMCI_NbAcc(int datatype, void *scale, void* src, void* dst, int bytes, int proc, armci_hdl_t* handle) {
   return 0;
 }
 
 // strided copy operations
-CDECL int ARMCI_PutS(void *src_ptr, int src_stride_ar[], 
+CLINKAGE int ARMCI_PutS(void *src_ptr, int src_stride_ar[],
 	        void *dst_ptr, int dst_stride_ar[],
 	        int count[], int stride_levels, int proc) {
   TCHARM_API_TRACE("ARMCI_PutS", "armci");
@@ -165,7 +165,7 @@ CDECL int ARMCI_PutS(void *src_ptr, int src_stride_ar[],
   return 0;
 }
 
-CDECL int ARMCI_NbPutS(
+CLINKAGE int ARMCI_NbPutS(
 		 void *src_ptr,         /* ptr to 1st segment at source */
 		 int src_stride_ar[], /* array of strides at source  */
 		 void* dst_ptr,         /* ptr to 1st segment at dest */
@@ -193,7 +193,7 @@ CDECL int ARMCI_NbPutS(
   return 0;
 }
 
-CDECL int ARMCI_GetS(
+CLINKAGE int ARMCI_GetS(
 	        void *src_ptr,         /* pointer to 1st segment at source */
 	        int src_stride_ar[], /* array of strides at source */
 	        void* dst_ptr,         /* ptr to 1st segment at destination */
@@ -209,7 +209,7 @@ CDECL int ARMCI_GetS(
   return 0;
 }
 
-CDECL int ARMCI_NbGetS(
+CLINKAGE int ARMCI_NbGetS(
 	        void *src_ptr,         /* pointer to 1st segment at source */
 	        int src_stride_ar[], /* array of strides at source */
 	        void* dst_ptr,         /* ptr to 1st segment at destination */
@@ -237,7 +237,7 @@ CDECL int ARMCI_NbGetS(
   return 0;
 }
 
-CDECL int ARMCI_AccS(
+CLINKAGE int ARMCI_AccS(
 	        int  optype,           /* operation */
 	        void *scale,           /* scale factor x += scale*y */
 	        void *src_ptr,         /* pointer to 1st segment at source */
@@ -252,7 +252,7 @@ CDECL int ARMCI_AccS(
   return 0;
 }
 
-CDECL int ARMCI_NbAccS(
+CLINKAGE int ARMCI_NbAccS(
 	        int  optype,           /* operation */
 	        void *scale,           /* scale factor x += scale*y */
 	        void *src_ptr,         /* pointer to 1st segment at source */
@@ -273,25 +273,25 @@ CDECL int ARMCI_NbAccS(
   return 0;
 }
 
-CDECL int ARMCI_PutValueLong(long src, void* dst, int proc) { return 0; }
-CDECL int ARMCI_PutValueInt(int src, void* dst, int proc) { return 0; }
-CDECL int ARMCI_PutValueFloat(float src, void* dst, int proc) { return 0; }
-CDECL int ARMCI_PutValueDouble(double src, void* dst, int proc) { return 0; }
-CDECL int ARMCI_NbPutValueLong(long src, void* dst, int proc, armci_hdl_t* handle) { return 0; }
-CDECL int ARMCI_NbPutValueInt(int src, void* dst, int proc, armci_hdl_t* handle) { return 0; }
-CDECL int ARMCI_NbPutValueFloat(float src, void* dst, int proc, armci_hdl_t* handle) { return 0; }
-CDECL int ARMCI_NbPutValueDouble(double src, void* dst, int proc, armci_hdl_t* handle) { return 0; }
-CDECL long ARMCI_GetValueLong(void *src, int proc) { return 0; }
-CDECL int ARMCI_GetValueInt(void *src, int proc) { return 0; }
-CDECL float ARMCI_GetValueFloat(void *src, int proc) { return 0.0; }
-CDECL double ARMCI_GetValueDouble(void *src, int proc) { return 0.0; }
-CDECL long ARMCI_NbGetValueLong(void *src, int proc, armci_hdl_t* handle) { return 0; }
-CDECL int ARMCI_NbGetValueInt(void *src, int proc, armci_hdl_t* handle) { return 0; }
-CDECL float ARMCI_NbGetValueFloat(void *src, int proc, armci_hdl_t* handle) { return 0.0; }
-CDECL double ARMCI_NbGetValueDouble(void *src, int proc, armci_hdl_t* handle) { return 0.0; }
+CLINKAGE int ARMCI_PutValueLong(long src, void* dst, int proc) { return 0; }
+CLINKAGE int ARMCI_PutValueInt(int src, void* dst, int proc) { return 0; }
+CLINKAGE int ARMCI_PutValueFloat(float src, void* dst, int proc) { return 0; }
+CLINKAGE int ARMCI_PutValueDouble(double src, void* dst, int proc) { return 0; }
+CLINKAGE int ARMCI_NbPutValueLong(long src, void* dst, int proc, armci_hdl_t* handle) { return 0; }
+CLINKAGE int ARMCI_NbPutValueInt(int src, void* dst, int proc, armci_hdl_t* handle) { return 0; }
+CLINKAGE int ARMCI_NbPutValueFloat(float src, void* dst, int proc, armci_hdl_t* handle) { return 0; }
+CLINKAGE int ARMCI_NbPutValueDouble(double src, void* dst, int proc, armci_hdl_t* handle) { return 0; }
+CLINKAGE long ARMCI_GetValueLong(void *src, int proc) { return 0; }
+CLINKAGE int ARMCI_GetValueInt(void *src, int proc) { return 0; }
+CLINKAGE float ARMCI_GetValueFloat(void *src, int proc) { return 0.0; }
+CLINKAGE double ARMCI_GetValueDouble(void *src, int proc) { return 0.0; }
+CLINKAGE long ARMCI_NbGetValueLong(void *src, int proc, armci_hdl_t* handle) { return 0; }
+CLINKAGE int ARMCI_NbGetValueInt(void *src, int proc, armci_hdl_t* handle) { return 0; }
+CLINKAGE float ARMCI_NbGetValueFloat(void *src, int proc, armci_hdl_t* handle) { return 0.0; }
+CLINKAGE double ARMCI_NbGetValueDouble(void *src, int proc, armci_hdl_t* handle) { return 0.0; }
 
 // global completion operations
-CDECL int ARMCI_Wait(armci_hdl_t *handle){
+CLINKAGE int ARMCI_Wait(armci_hdl_t *handle){
   TCHARM_API_TRACE("ARMCI_Wait", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
   if (handle != NULL) {
@@ -302,21 +302,21 @@ CDECL int ARMCI_Wait(armci_hdl_t *handle){
   return 0;
 }
 
-CDECL int ARMCI_WaitProc(int proc){
+CLINKAGE int ARMCI_WaitProc(int proc){
   TCHARM_API_TRACE("ARMCI_WaitProc", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
   vp->waitproc(proc);
   return 0;
 }
 
-CDECL int ARMCI_WaitAll(){
+CLINKAGE int ARMCI_WaitAll(){
   TCHARM_API_TRACE("ARMCI_WaitAll", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
   vp->waitall();
   return 0;
 }
 
-CDECL int ARMCI_Test(armci_hdl_t *handle){
+CLINKAGE int ARMCI_Test(armci_hdl_t *handle){
   TCHARM_API_TRACE("ARMCI_Test", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
   if(vp->test(*handle))
@@ -325,7 +325,7 @@ CDECL int ARMCI_Test(armci_hdl_t *handle){
     return 1;
 }
 
-CDECL int ARMCI_Barrier(){
+CLINKAGE int ARMCI_Barrier(){
   TCHARM_API_TRACE("ARMCI_Barrier", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
   vp->barrier();
@@ -333,14 +333,14 @@ CDECL int ARMCI_Barrier(){
 }
 
 // these are no-ops because Put is blocking
-CDECL int ARMCI_Fence(int proc) {
+CLINKAGE int ARMCI_Fence(int proc) {
   TCHARM_API_TRACE("ARMCI_Fence", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
   vp->fence(proc);
   return 0;
 }
 
-CDECL int ARMCI_AllFence(void) {
+CLINKAGE int ARMCI_AllFence(void) {
   TCHARM_API_TRACE("ARMCI_AllFence", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
   vp->allfence();
@@ -351,7 +351,7 @@ CDECL int ARMCI_AllFence(void) {
 
 // malloc is a collective operation. The user is expected to allocate
 // and manage ptr_arr.
-CDECL int ARMCI_Malloc(void *ptr_arr[], armci_size_t bytes) {
+CLINKAGE int ARMCI_Malloc(void *ptr_arr[], armci_size_t bytes) {
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
 //  pointer ptr = malloc(bytes);
   pointer ptr = vp->BlockMalloc(bytes);
@@ -364,13 +364,13 @@ CDECL int ARMCI_Malloc(void *ptr_arr[], armci_size_t bytes) {
 // CmiIsomalloc does not return a value and no indication is given about
 // the success nor failure of the operation. Hence, it is assumed always
 // that free works.
-CDECL int ARMCI_Free(void *address) {
+CLINKAGE int ARMCI_Free(void *address) {
   CmiIsomallocBlockListFree(address);
 //  free(address);
   TCHARM_API_TRACE("ARMCI_Free", "armci");
   return 0;
 }
-CDECL void *ARMCI_Malloc_local(armci_size_t bytes){
+CLINKAGE void *ARMCI_Malloc_local(armci_size_t bytes){
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
   pointer ptr = vp->BlockMalloc(bytes);
   TCHARM_API_TRACE("ARMCI_Malloc_local", "armci");
@@ -378,39 +378,39 @@ CDECL void *ARMCI_Malloc_local(armci_size_t bytes){
   return ptr;
 }
 
-CDECL int ARMCI_Free_local(void *ptr){
+CLINKAGE int ARMCI_Free_local(void *ptr){
   CmiIsomallocBlockListFree(ptr);
   TCHARM_API_TRACE("ARMCI_Free_local", "armci");
   //free(ptr);
   return 0;
 }
 
-CDECL void ARMCI_SET_AGGREGATE_HANDLE (armci_hdl_t* handle) { }
-CDECL void ARMCI_UNSET_AGGREGATE_HANDLE (armci_hdl_t* handle) { }
+CLINKAGE void ARMCI_SET_AGGREGATE_HANDLE (armci_hdl_t* handle) { }
+CLINKAGE void ARMCI_UNSET_AGGREGATE_HANDLE (armci_hdl_t* handle) { }
 
-CDECL int ARMCI_Rmw(int op, int *ploc, int *prem, int extra, int proc){
+CLINKAGE int ARMCI_Rmw(int op, int *ploc, int *prem, int extra, int proc){
   return 0;
 }
 
-CDECL int ARMCI_Create_mutexes(int num){
+CLINKAGE int ARMCI_Create_mutexes(int num){
   return 0;
 }
-CDECL int ARMCI_Destroy_mutexes(void){
+CLINKAGE int ARMCI_Destroy_mutexes(void){
   return 0;
 }
-CDECL void ARMCI_Lock(int mutex, int proc){
+CLINKAGE void ARMCI_Lock(int mutex, int proc){
 }
-CDECL void ARMCI_Unlock(int mutex, int proc){
+CLINKAGE void ARMCI_Unlock(int mutex, int proc){
 }
 
-CDECL int armci_notify(int proc){
+CLINKAGE int armci_notify(int proc){
   TCHARM_API_TRACE("armci_notify", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
   vp->notify(proc);
   return 0;
 }
 
-CDECL int armci_notify_wait(int proc, int *pval){
+CLINKAGE int armci_notify_wait(int proc, int *pval){
   TCHARM_API_TRACE("armci_notify_wait", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
   vp->notify_wait(proc);
@@ -419,99 +419,99 @@ CDECL int armci_notify_wait(int proc, int *pval){
 
 /* ********************************* */
 /* Collective Operations             */
-CDECL void armci_msg_brdcst(void *buffer, int len, int root) {
+CLINKAGE void armci_msg_brdcst(void *buffer, int len, int root) {
   armci_msg_bcast(buffer, len, root);
 }
 
-CDECL void armci_msg_bcast(void *buffer, int len, int root) {
+CLINKAGE void armci_msg_bcast(void *buffer, int len, int root) {
   TCHARM_API_TRACE("armci_msg_bcast", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
   vp->msgBcast(buffer, len, root);
 }
 
 // This does not look like an API actually used in ARMCI
-CDECL void armci_msg_gop2(void *x, int n, int type, char *op) {
+CLINKAGE void armci_msg_gop2(void *x, int n, int type, char *op) {
 }
 
-CDECL void armci_msg_igop(int *x, int n, char *op) {
+CLINKAGE void armci_msg_igop(int *x, int n, char *op) {
   TCHARM_API_TRACE("armci_msg_dgop", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
   vp->msgGop(x, n, op, ARMCI_INT);
 }
 
-CDECL void armci_msg_lgop(CmiInt8 *x, int n, char *op) {
+CLINKAGE void armci_msg_lgop(CmiInt8 *x, int n, char *op) {
   TCHARM_API_TRACE("armci_msg_lgop", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
   vp->msgGop(x, n, op, ARMCI_LONG);
 }
 
 /*
-CDECL void armci_msg_llgop(long long *x, int n, char *op) {
+CLINKAGE void armci_msg_llgop(long long *x, int n, char *op) {
   TCHARM_API_TRACE("armci_msg_llgop", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
   vp->msgGop(x, n, op, ARMCI_LONG_LONG);
 }
 */
 
-CDECL void armci_msg_fgop(float *x, int n, char *op) {
+CLINKAGE void armci_msg_fgop(float *x, int n, char *op) {
   TCHARM_API_TRACE("armci_msg_fgop", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
   vp->msgGop(x, n, op, ARMCI_FLOAT);
 }
 
-CDECL void armci_msg_dgop(double *x, int n, char *op) {
+CLINKAGE void armci_msg_dgop(double *x, int n, char *op) {
   TCHARM_API_TRACE("armci_msg_dgop", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
   vp->msgGop(x, n, op, ARMCI_DOUBLE);
 }
 
-CDECL void armci_msg_barrier(void) {
+CLINKAGE void armci_msg_barrier(void) {
 }
 
-CDECL void armci_msg_reduce(void *x, int n, char *op, int type) {
+CLINKAGE void armci_msg_reduce(void *x, int n, char *op, int type) {
 }
 
 /* ******************************* */
 /* System Configuration            */
-CDECL int armci_domain_nprocs(armci_domain_t domain, int id) {
+CLINKAGE int armci_domain_nprocs(armci_domain_t domain, int id) {
   return -1;
 }
 
-CDECL int armci_domain_count(armci_domain_t domain) {
+CLINKAGE int armci_domain_count(armci_domain_t domain) {
   return -1;
 }
 
-CDECL int armci_domain_id(armci_domain_t domain, int glob_proc_id) {
+CLINKAGE int armci_domain_id(armci_domain_t domain, int glob_proc_id) {
   return -1;
 }
 
-CDECL int armci_domain_glob_proc_id(armci_domain_t domain, int id, 
+CLINKAGE int armci_domain_glob_proc_id(armci_domain_t domain, int id,
 				    int loc_proc_id) {
   return -1;
 }
 
-CDECL int armci_domain_my_id(armci_domain_t domain) {
+CLINKAGE int armci_domain_my_id(armci_domain_t domain) {
   return -1;
 }
 
 /* ********************************** */
 /* Charm++ Runtime Support Extensions */
 
-CDECL void ARMCI_Migrate(void){
+CLINKAGE void ARMCI_Migrate(void){
   TCHARM_API_TRACE("ARMCI_Migrate", "armci");
   TCHARM_Migrate();
 }
-CDECL void ARMCI_Async_Migrate(void){
+CLINKAGE void ARMCI_Async_Migrate(void){
   TCHARM_API_TRACE("ARMCI_Async_Migrate", "armci");
   TCHARM_Async_Migrate();
 }
-CDECL void ARMCI_Checkpoint(char* dname){
+CLINKAGE void ARMCI_Checkpoint(char* dname){
   TCHARM_API_TRACE("ARMCI_Checkpoint", "armci");
   ARMCI_Barrier();
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
   vp->startCheckpoint(dname);
 }
-CDECL void ARMCI_MemCheckpoint(void){
+CLINKAGE void ARMCI_MemCheckpoint(void){
   TCHARM_API_TRACE("ARMCI_MemCheckpoint", "armci");
   ARMCI_Barrier();
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);

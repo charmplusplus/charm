@@ -58,14 +58,14 @@ void SdagEntryConstruct::generateCode(XStr& decls, XStr& defs, XStr &sdagFuncNam
 }
 
 void SdagEntryConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
-  buildTypes(encapState);
-  buildTypes(encapStateChild);
-
   if (entry->isConstructor()) {
     std::cerr << cur_file << ":" << entry->getLine()
               << ": Chare constructor cannot be defined with SDAG code" << std::endl;
     exit(1);
   }
+
+  buildTypes(encapState);
+  buildTypes(encapStateChild);
 
   decls << "public:\n";
 

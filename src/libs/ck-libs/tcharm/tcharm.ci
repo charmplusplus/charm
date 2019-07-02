@@ -6,7 +6,6 @@ module tcharm {
     entry TCharm(TCharmInitMsg *initMsg);
     entry [reductiontarget] void atBarrier(void);
     entry void atExit(CkReductionMsg *msg);
-    entry void migrateDelayed(int destPE);
     entry void start(void);
     entry void callSystem(callSystemStruct s);
     initproc void procInit(void);

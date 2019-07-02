@@ -94,7 +94,7 @@ class CkQ {
       } else return T(); //For builtin types like int, void*, this is equivalent to T(0)
     }
     void enq(const T &elt) {
-      if(len==block.size()) _expand();
+      if((size_t)len==block.size()) _expand();
       block[(first+len)&mask] = elt;
       len++;
     }

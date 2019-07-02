@@ -7,12 +7,13 @@
 #include <stdio.h>
 #include <math.h>
 #include "converse.h"
+#include <atomic>
 
-CMI_EXTERNC
+int               userDrivenMode; /* Set by CharmInit for interop in user driven mode */
+std::atomic<int> ckExitComplete {0};
+
 void CthInit(char **);
-CMI_EXTERNC
 void ConverseCommonInit(char **);
-CMI_EXTERNC
 void ConverseCommonExit(void);
 
 /***********************************************************************
@@ -239,6 +240,28 @@ void CmiFreeBroadcastAllFn(int size, char *msg)
 #endif
 }
 
+void CmiWithinNodeBroadcastFn(int size, char* msg) {
+  int nodeFirst = CmiNodeFirst(CmiMyNode());
+  int nodeLast = nodeFirst + CmiNodeSize(CmiMyNode());
+  if (CMI_MSG_NOKEEP(msg)) {
+    for (int i = nodeFirst; i < CmiMyPe(); i++) {
+      CmiReference(msg);
+      CmiFreeSendFn(i, size, msg);
+    }
+    for (int i = CmiMyPe() + 1; i < nodeLast; i++) {
+      CmiReference(msg);
+      CmiFreeSendFn(i, size, msg);
+    }
+  } else {
+    for (int i = nodeFirst; i < CmiMyPe(); i++) {
+      CmiSyncSendFn(i, size, msg);
+    }
+    for (int i = CmiMyPe() + 1; i < nodeLast; i++) {
+      CmiSyncSendFn(i, size, msg);
+    }
+  }
+  CmiSyncSendAndFree(CmiMyPe(), size, msg);
+}
 
 int CmiBarrier(void)
 {

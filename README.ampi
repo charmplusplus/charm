@@ -64,19 +64,17 @@ variable privatization and automated approaches to privatization.
 AMPI programs must have the following main function signatures, so that AMPI
 can bootstrap before invoking the user's main function:
     * C/C++ programs should use "int main(int argc, char **argv)"
-    * Fortran programs should use "Subroutine MPI_Main" instead of
+    * Fortran programs must use "Subroutine MPI_Main" instead of
       "Program Main"
 
 
 Incompatibilities and Extensions
 --------------------------------
 AMPI has some known flaws and incompatibilities with other MPI implementations:
-    * MPI_Get_elements gives incorrect results for receives of partial derived datatypes.
     * RMA routines do not have support for derived datatypes.
-    * Datatypes are not reused, freed, or reference counted.
     * Not all collectives are supported on intercommunicators.
-    * MPI_Comm_free does not actually free any of the runtime's memory.
-    * Support for generalized requests is not yet implemented in AMPI.
+    * No support for MPI_Pack_external, MPI_Pack_external_size, MPI_Unpack_external,
+      or MPI_Type_match_size.
 
 AMPI also has extensions to the MPI standard to enable use of the high-level
 features provided by the Charm++ adaptive runtime system. All extensions are

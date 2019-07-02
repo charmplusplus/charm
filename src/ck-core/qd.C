@@ -292,7 +292,6 @@ void CkStartQD(const CkCallback& cb)
 #endif
 }
 
-extern "C"
 void CkStartQD(int eIdx, const CkChareID *cid)
 {
   CkStartQD(CkCallback(eIdx, *cid));

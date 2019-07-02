@@ -154,6 +154,10 @@ std::string readFile(const char* interfaceFile) {
   if (interfaceFile) {
     cur_file = interfaceFile;
     in = new std::ifstream(interfaceFile);
+    if(in->fail()) {
+      cout << "Error: failed to open input file '" << interfaceFile << "'." << endl;
+      exit(1);
+    }
   } else {
     cur_file = (origFile != NULL) ? origFile : "STDIN";
     in = &std::cin;
@@ -186,7 +190,9 @@ int count_tokens(std::string& str) {
 }
 
 void abortxi(char* name) {
-  cout << "Usage : " << name << " [-ansi|-f90|-intrinsic|-M]  module.ci" << endl;
+  cout << "Usage : " << name
+  << " [-ansi|-f90|-intrinsic|-D|-M|-count-tokens|-chare-names|-module-names|-orig-file]"
+  << " module.ci" << endl;
   exit(1);
 }
 
@@ -194,13 +200,13 @@ void abortxi(char* name) {
 
 using namespace xi;
 
-int processAst(AstChildren<Module>* m, const bool chareNames, const bool dependsMode,
-               const int fortranMode_, const int internalMode_, char* fname_,
-               char* origFile_) {
+int processAst(xi::AstChildren<xi::Module> *m, const bool chareNames,
+               const bool dependsMode, const int fortranMode_,
+               const int internalMode_, char* fname_, char* origFile_) {
   // set globals based on input params
   fortranMode = fortranMode_;
   internalMode = internalMode_;
-  origFile = origFile_;
+  cur_file = origFile = origFile_;
   fname = fname_;
 
   if (!m) return 0;
@@ -232,6 +238,7 @@ int processAst(AstChildren<Module>* m, const bool chareNames, const bool depends
   return 0;
 }
 
+#ifndef XI_LIBRARY
 int main(int argc, char* argv[]) {
   origFile = NULL;
   fname = NULL;
@@ -240,6 +247,7 @@ int main(int argc, char* argv[]) {
   bool dependsMode = false;
   bool countTokens = false;
   bool chareNames = false;
+  bool moduleNames = false;
 
   for (int i = 1; i < argc; i++) {
     if (*argv[i] == '-') {
@@ -256,6 +264,8 @@ int main(int argc, char* argv[]) {
         countTokens = true;
       else if (strcmp(argv[i], "-chare-names") == 0)
         chareNames = true;
+      else if (strcmp(argv[i], "-module-names") == 0)
+        moduleNames = true;
       else if (strcmp(argv[i], "-orig-file") == 0)
         origFile = argv[++i];
       else
@@ -275,6 +285,14 @@ int main(int argc, char* argv[]) {
   }
 
   AstChildren<Module>* m = Parse(buffer);
+
+  if (moduleNames) {
+    extern xi::AstChildren<xi::Module>* modlist;
+    modlist->recursev(&Module::printName);
+    return 0;
+  }
+
   return processAst(m, chareNames, dependsMode, fortranMode, internalMode, fname,
                     origFile);
 }
+#endif

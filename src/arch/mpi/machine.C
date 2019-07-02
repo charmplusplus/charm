@@ -9,6 +9,7 @@
 #include <errno.h>
 #include "converse.h"
 #include <mpi.h>
+#include <algorithm>
 
 #ifdef AMPI
 #  warning "We got the AMPI version of mpi.h, instead of the system version--"
@@ -18,6 +19,9 @@
 
 /*Support for ++debug: */
 #if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 #include <wincon.h>
 #include <sys/types.h>
@@ -27,6 +31,8 @@ static char* strsignal(int sig) {
   sprintf(outbuf, "%d", sig);
   return outbuf;
 }
+#include <process.h>
+#define getpid _getpid
 #else
 #include <unistd.h> /*For getpid()*/
 #endif
@@ -37,15 +43,16 @@ static char* strsignal(int sig) {
 
 /* Msg types to have different actions taken for different message types
  * REGULAR                     - Regular Charm++ message
- * ONESIDED_BUFFER             - Nocopy Entry Method API buffer
+ * ONESIDED_BUFFER_SEND        - Nocopy Entry Method API Send buffer
+ * ONESIDED_BUFFER_RECV        - Nocopy Entry Method API Recv buffer
  * ONESIDED_BUFFER_DIRECT_RECV - Nocopy Direct API Recv buffer
  * ONESIDED_BUFFER_DIRECT_SEND - Nocopy Direct API Send buffer
  * POST_DIRECT_RECV            - Metadata message with Direct Recv buffer information
  * POST_DIRECT_SEND            - Metadata message with Direct Send buffer information
  * */
 
-#define CMI_MSGTYPE(msg)            ((CmiMsgHeaderBasic *)msg)->msgType
-enum mpiMsgTypes { REGULAR, ONESIDED_BUFFER, ONESIDED_BUFFER_DIRECT_RECV, ONESIDED_BUFFER_DIRECT_SEND, POST_DIRECT_RECV, POST_DIRECT_SEND};
+#define CMI_MSGTYPE(msg)            ((CmiMsgHeaderBasic *)msg)->mpiMsgType
+enum mpiMsgTypes { REGULAR, ONESIDED_BUFFER_SEND, ONESIDED_BUFFER_RECV, ONESIDED_BUFFER_DIRECT_RECV, ONESIDED_BUFFER_DIRECT_SEND, POST_DIRECT_RECV, POST_DIRECT_SEND};
 
 /* =======Beginning of Definitions of Performance-Specific Macros =======*/
 /* Whether to use multiple send queue in SMP mode */
@@ -277,7 +284,6 @@ static void reportMsgHistogramInfo(void);
 #define CHARM_MAGIC_NUMBER		 126
 
 #if CMK_ERROR_CHECKING
-CMI_EXTERNC
 unsigned char computeCheckSum(unsigned char *data, int len);
 static int checksum_flag = 0;
 #define CMI_SET_CHECKSUM(msg, len)	\
@@ -414,7 +420,7 @@ void CmiNotifyIdleForMPI(void);
 #include "machine-common-core.C"
 
 #if USE_MPI_CTRLMSG_SCHEME
-#include "machine-ctrlmsg.c"
+#include "machine-ctrlmsg.C"
 #endif
 
 SMSG_LIST *allocateSmsgList(char *msg, int destNode, int size, int mode, int type, void *ref) {
@@ -596,7 +602,7 @@ int CheckAsyncMsgSent(CmiCommHandle c) {
 }
 
 #if CMK_ONESIDED_IMPL
-#include "machine-onesided.c"
+#include "machine-onesided.C"
 #endif
 
 /* ######Beginning of functions related with communication progress ###### */
@@ -604,6 +610,7 @@ static void ReleasePostedMessages(void) {
     SMSG_LIST *msg_tmp=CpvAccess(sent_msgs);
     SMSG_LIST *prev=0;
     SMSG_LIST *temp;
+
     int done;
     MPI_Status sts;
 
@@ -631,28 +638,32 @@ static void ReleasePostedMessages(void) {
             else
                 prev->next = temp;
 #if CMK_ONESIDED_IMPL
-            //if rdma msg, call the callback
-            if(msg_tmp->type == ONESIDED_BUFFER) {
-                CmiMPIRzvRdmaOpInfo_t *rdmaOpInfo = (CmiMPIRzvRdmaOpInfo_t *)msg_tmp->ref;
-                CmiRdmaAck *ack = (CmiRdmaAck *) rdmaOpInfo->ack;
-                ack->fnPtr(ack->token);
-
-                //free callback structure, CmiRdmaAck allocated in CmiSetRdmaAck
-                free(ack);
-            } else if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_RECV) {
+            // Update end_sent for consistent states during possible insertions
+            if(CpvAccess(end_sent) == msg_tmp) {
+              CpvAccess(end_sent) = prev;
+            }
+            if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_RECV) {
                 // MPI_Irecv posted as a part of the Direct API was completed
                 NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(msg_tmp->ref);
+
                 // Invoke the destination ack
-                ncpyOpInfo->ackMode = 2;
+                ncpyOpInfo->ackMode = CMK_DEST_ACK; // Only invoke destination ack
+
+                // On the destination the NcpyOperationInfo is freed for the Direct API
+                // but not freed for the Entry Method API as it a part of the parameter marshalled message
+                // and is enentually freed by the RTS
                 CmiInvokeNcpyAck(ncpyOpInfo);
 
             } else if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_SEND) {
                 // MPI_Isend posted as a part of the Direct API was completed
                 NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(msg_tmp->ref);
                 // Invoke the source ack
-                ncpyOpInfo->ackMode = 1;
-                CmiInvokeNcpyAck(ncpyOpInfo);
+                ncpyOpInfo->ackMode = CMK_SRC_ACK; // Only invoke the source ack
 
+                // Free the NcpyOperationInfo on the source
+                ncpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO;
+
+                CmiInvokeNcpyAck(ncpyOpInfo);
             }
             else if(msg_tmp->type == POST_DIRECT_SEND || msg_tmp->type == POST_DIRECT_RECV) {
                 // do nothing as the received message is a NcpyOperationInfo object
@@ -679,7 +690,6 @@ static void ReleasePostedMessages(void) {
         }
 #endif
     }
-    CpvAccess(end_sent) = prev;
     MACHSTATE(2,"} ReleasePostedMessages end");
 }
 
@@ -688,13 +698,6 @@ static int PumpMsgs(void) {
     char *msg;
     MPI_Status sts;
     int recd=0;
-
-#if CMK_ONESIDED_IMPL
-    CmiMPIRzvRdmaRecvList_t *recvBufferTmp = CpvAccess(recvRdmaBuffers);
-    CmiMPIRzvRdmaRecvList_t *prev = 0;
-    CmiMPIRzvRdmaRecvList_t *temp;
-    int opDone, allOpsDone, i;
-#endif
 
 #if CMI_EXERT_RECV_CAP || CMI_DYNAMIC_EXERT_CAP
     int recvCnt=0;
@@ -707,43 +710,6 @@ static int PumpMsgs(void) {
 #endif
 
     while (1) {
-#if CMK_ONESIDED_IMPL
-        //Wait for the completion of rdma buffers (recvs posted in LrtsIssueRgets)
-        while(recvBufferTmp != 0){
-          allOpsDone=1;
-
-          for(i=0; i<recvBufferTmp->numOps; i++){
-            if(recvBufferTmp->rdmaOp[i].hasCompleted == 0){
-
-              if(MPI_Test(&(recvBufferTmp->rdmaOp[i].req), &opDone, MPI_STATUS_IGNORE) != MPI_SUCCESS)
-                CmiAbort("ReleasePostedMessages: MPI_Test for Rdma buffers failed!\n");
-              //recv has completed
-              if(opDone)
-                recvBufferTmp->rdmaOp[i].hasCompleted = 1;
-              else
-                allOpsDone = 0;
-            }
-          }
-          //all recvs for this message have completed i.e numops number of recvs
-          if(allOpsDone){
-            handleOneRecvedMsg(recvBufferTmp->msgLen, (char *)recvBufferTmp->msg);
-            //remove from the list
-            CpvAccess(RdmaRecvQueueLen)--;
-            temp = recvBufferTmp->next;
-            if(prev==0)
-              CpvAccess(recvRdmaBuffers)=temp;
-            else
-              prev->next = temp;
-
-            recvBufferTmp = temp;
-          }
-          else{
-            prev = recvBufferTmp;
-            recvBufferTmp = recvBufferTmp->next;
-          }
-        }
-        CpvAccess(endRdmaBuffer) = prev;
-#endif
         int doSyncRecv = 1;
 #if CMI_EXERT_RECV_CAP
         if (recvCnt==RECV_CAP) break;
@@ -909,7 +875,7 @@ static int PumpMsgs(void) {
 
               MPIPostOneBuffer(myBuffer,
                                ncpyOpInfoMsg,
-                               ncpyOpInfoMsg->size,
+                               std::min(ncpyOpInfoMsg->srcSize, ncpyOpInfoMsg->destSize),
                                otherPe,
                                ncpyOpInfoMsg->tag,
                                postMsgType);
@@ -1103,13 +1069,9 @@ static int SendMsgBuf(void) {
 #endif
 
 #if CMK_ONESIDED_IMPL
-            if(msg_tmp->type == ONESIDED_BUFFER) {
-                CmiMPIRzvRdmaOpInfo_t *rdmaOpInfo = (CmiMPIRzvRdmaOpInfo_t *)(msg_tmp->ref);
-                MPISendOrRecvOneBuffer(msg_tmp, rdmaOpInfo->tag);
-            }
-            else if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_RECV || msg_tmp->type == ONESIDED_BUFFER_DIRECT_SEND) {
-                CmiMPIRzvRdmaAckInfo_t *ack = (CmiMPIRzvRdmaAckInfo_t *)(msg_tmp->ref);
-                MPISendOrRecvOneBuffer(msg_tmp, ack->tag);
+            if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_RECV || msg_tmp->type == ONESIDED_BUFFER_DIRECT_SEND) {
+                NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(msg_tmp->ref);
+                MPISendOrRecvOneBuffer(msg_tmp, ncpyOpInfo->tag);
             }
             else
 #endif
@@ -1255,7 +1217,6 @@ void CmiNotifyIdleForMPI(void) {
 /* Network progress function is used to poll the network when for
    messages. This flushes receive buffers on some  implementations*/
 #if CMK_MACHINE_PROGRESS_DEFINED
-CMI_EXTERNC
 void CommunicationServerThread(int);
 
 void CmiMachineProgressImpl(void) {
@@ -1356,6 +1317,8 @@ void LrtsExit(int exitcode) {
     }
 }
 
+static int Cmi_truecrash;
+
 static void KillOnAllSigs(int sigNo) {
     static int already_in_signal_handler = 0;
     char *m;
@@ -1405,7 +1368,7 @@ static const char *thread_level_tostring(int thread_level) {
 #endif
 }
 
-CMI_EXTERNC_VARIABLE int quietMode;
+extern int quietMode;
 
 /**
  *  Obtain the number of nodes, my node id, and consuming machine layer
@@ -1490,7 +1453,14 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 #endif
 
     {
+#if CMK_OPTIMIZE
+        Cmi_truecrash = 0;
+#else
+        Cmi_truecrash = 1;
+#endif
         int debug = CmiGetArgFlag(largv,"++debug");
+        if (CmiGetArgFlagDesc(*argv,"+truecrash","Do not install signal handlers") || debug ||
+            CmiNumNodes()<=32) Cmi_truecrash = 1;
         int debug_no_pause = CmiGetArgFlag(largv,"++debug-no-pause");
         if (debug || debug_no_pause) {  /*Pause so user has a chance to start and attach debugger*/
 #if CMK_HAS_GETPID
@@ -1576,8 +1546,8 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
         printf("Charm++: Running in idle blocking mode.\n");
     }
 
-#if CMK_CHARMDEBUG
     /* setup signal handlers */
+  if(!Cmi_truecrash) {
 #if !defined(_WIN32)
     struct sigaction sa;
     sa.sa_handler = KillOnAllSigs;
@@ -1602,7 +1572,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     sigaction(SIGQUIT, &sa, NULL);
     sigaction(SIGBUS, &sa, NULL);
 #endif /*UNIX*/
-#endif
+  }
 
 #if CMK_NO_OUTSTANDING_SENDS
     no_outstanding_sends=1;
@@ -1824,16 +1794,6 @@ void LrtsPostCommonInit(int everReturn) {
     CpvAccess(sent_msgs) = NULL;
     CpvAccess(end_sent) = NULL;
     CpvAccess(MsgQueueLen) = 0;
-
-#if CMK_ONESIDED_IMPL
-    //List for storing the receiver's rdma request information
-    CpvInitialize(CmiMPIRzvRdmaRecvList_t *, recvRdmaBuffers);
-    CpvInitialize(CmiMPIRzvRdmaRecvList_t *, endRdmaBuffer);
-    CpvInitialize(int, RdmaRecvQueueLen);
-    CpvAccess(recvRdmaBuffers) = NULL;
-    CpvAccess(endRdmaBuffer) = NULL;
-    CpvAccess(RdmaRecvQueueLen) = 0;
-#endif
 
 #if CMI_MACH_TRACE_USEREVENTS && CMK_TRACE_ENABLED && !CMK_TRACE_IN_CHARM
     CpvInitialize(double, projTraceStart);

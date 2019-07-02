@@ -11,11 +11,12 @@ num_hosts=0
 virtual_ranks=0
 
 cmd=""
+charmrun_args=""
 hosts=""
 
 usage() {
   echo
-  echo "Usage: $progname [options] <program>"
+  echo "Usage: $progname [options] <program> [program options]"
   echo
   echo "Options:"
   echo "    -h|--help                 Show this help"
@@ -74,7 +75,14 @@ processArgs() {
         ;;
 
       *)
-        cmd+="$arg "
+        if [[ -x $arg ]]; then
+            # Stop argument parsing when finding an executable
+            cmd="$arg $@ "
+            return
+        else
+            # Other arguments to charmrun, e.g. +balancer RotateLB
+            charmrun_args+="$arg "
+        fi
         ;;
     esac
   done
@@ -90,7 +98,7 @@ fi
 
 handle_hosts
 
-full_cmd="./charmrun "
+full_cmd="./charmrun $charmrun_args "
 
 if [[ $verbose == 0 ]]; then
   full_cmd+="++quiet "

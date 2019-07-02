@@ -25,11 +25,7 @@
 #define DEBUGF(x)  // CkPrintf x;
 
 // turn on or off fragmentation in multicast
-#if CMK_MESSAGE_LOGGING
-#define SPLIT_MULTICAST  0
-#else
 #define SPLIT_MULTICAST  1
-#endif
 
 // maximum number of fragments into which a message can be broken
 // NOTE: CkReductionMsg::{nFrags,fragNo} and reductionInfo::npProcessed are int8_t,
@@ -42,7 +38,7 @@ typedef std::vector<int> groupPeList;
 typedef std::vector<CkSectionInfo> sectionIdList;
 typedef std::vector<CkReductionMsg *> reductionMsgs;
 typedef CkQ<int> PieceSize;
-typedef std::vector<LDObjid> ObjKeyList;
+typedef std::vector<CmiUInt8> ObjKeyList;
 typedef unsigned char byte;
 
 /** Information about the status of reductions proceeding along a given section
@@ -74,10 +70,10 @@ class reductionInfo {
         reductionMsgs futureMsgs;
 
     public:
-        reductionInfo(): storedCallback(NULL),
+        reductionInfo(): npProcessed(0),
+                         storedCallback(NULL),
                          storedClientParam(NULL),
-                         redNo(0),
-                         npProcessed(0) {
+                         redNo(0) {
             for (int8_t i=0; i<MAXFRAGS; i++)
                 lcount [i] = ccount [i] = gcount [i] = 0;
         }
@@ -167,10 +163,12 @@ class mCastEntry
         char flag;
 	char grpSec;
     public:
-        mCastEntry(CkArrayID _aid): aid(_aid), numChild(0), asm_msg(NULL), asm_fill(0),
-                    oldc(NULL), newc(NULL), needRebuild(0), flag(COOKIE_NOTREADY), grpSec(0), localGrpElem(0) {}
-        mCastEntry(CkGroupID _gid): aid(_gid), numChild(0), asm_msg(NULL), asm_fill(0),
-                    oldc(NULL), newc(NULL), needRebuild(0), flag(COOKIE_NOTREADY), grpSec(1), localGrpElem(0) {}
+        mCastEntry(CkArrayID _aid): aid(_aid), numChild(0), localGrpElem(0), asm_msg(NULL),
+                   asm_fill(0), oldc(NULL), newc(NULL), needRebuild(0),
+                   flag(COOKIE_NOTREADY), grpSec(0) {}
+        mCastEntry(CkGroupID _gid): aid(_gid), numChild(0), localGrpElem(0), asm_msg(NULL),
+                   asm_fill(0), oldc(NULL), newc(NULL), needRebuild(0),
+                   flag(COOKIE_NOTREADY), grpSec(1) {}
         mCastEntry(mCastEntry *);
         /// Check if this tree is only a branch and has a parent
         inline int hasParent() { return parentGrp.get_val()?1:0; }
@@ -283,14 +281,10 @@ mCastEntry::mCastEntry (mCastEntry *old):
   int i;
   aid = old->aid;
   parentGrp = old->parentGrp;
-  for (i=0; i<old->allElem.size(); i++)
-    allElem.push_back(old->allElem[i]);
-  for (i=0; i<old->allGrpElem.size(); i++)
-    allGrpElem.push_back(old->allGrpElem[i]);
+  allElem = old->allElem;
+  allGrpElem = old->allGrpElem;
 #if CMK_LBDB_ON
-  CmiAssert(old->allElem.size() == old->allObjKeys.size());
-  for (i=0; i<old->allObjKeys.size(); i++)
-    allObjKeys.push_back(old->allObjKeys[i]);
+  allObjKeys = old->allObjKeys;
 #endif
   pe = old->pe;
   red.storedCallback = old->red.storedCallback;
@@ -301,8 +295,6 @@ mCastEntry::mCastEntry (mCastEntry *old):
   asm_msg = NULL;
   asm_fill = 0;
 }
-
-extern LDObjid idx2LDObjid(const CkArrayIndex &idx);    // cklocation.C
 
 
 
@@ -316,13 +308,17 @@ void CkMulticastMgr::setSection(CkSectionInfo &_id, CkArrayID aid, CkArrayIndex 
     // Create a multicast entry
     mCastEntry *entry = new mCastEntry(aid);
     // Push all the section member indices into the entry
+    entry->allElem.resize(n);
+    entry->allObjKeys.reserve(n);
     for (int i=0; i<n; i++) {
-        entry->allElem.push_back(al[i]);
+        entry->allElem[i] = al[i];
 #if CMK_LBDB_ON
-        const LDObjid key = idx2LDObjid(al[i]);
-        entry->allObjKeys.push_back(key);
+        CmiUInt8 _key;
+        if(CProxy_ArrayBase(aid).ckLocMgr()->lookupID(al[i], _key))
+            entry->allObjKeys.push_back(_key);
 #endif
     }
+    entry->allObjKeys.shrink_to_fit();
     entry->bfactor = factor;
     //  entry->aid = aid;
     _id.get_aid() = aid;
@@ -351,13 +347,17 @@ void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
   mCastEntry *entry = new mCastEntry(aid);
 
   const CkArrayIndex *al = proxy.ckGetArrayElements();
+  entry->allElem.resize(proxy.ckGetNumElements());
+  entry->allObjKeys.reserve(proxy.ckGetNumElements());
   for (int i=0; i<proxy.ckGetNumElements(); i++) {
-    entry->allElem.push_back(al[i]);
+    entry->allElem[i] = al[i];
 #if CMK_LBDB_ON
-    const LDObjid key = idx2LDObjid(al[i]);
-    entry->allObjKeys.push_back(key);
+    CmiUInt8 _key;
+    if(CProxy_ArrayBase(aid).ckLocMgr()->lookupID(al[i], _key))
+      entry->allObjKeys.push_back(_key);
 #endif
   }
+  entry->allObjKeys.shrink_to_fit();
   if(proxy.ckGetBfactor() == USE_DEFAULT_BRANCH_FACTOR)
     entry->bfactor = dfactor;
   else
@@ -384,9 +384,9 @@ void CkMulticastMgr::resetSection(CProxySection_ArrayBase &proxy)
   mCastEntry *oldentry = (mCastEntry *)info.get_val();
   DEBUGF(("[%d] resetSection: old entry:%p new entry:%p\n", CkMyPe(), oldentry, entry));
 
-  const CkArrayIndex *al = sid->_elems;
+  const std::vector<CkArrayIndex> &al = sid->_elems;
   CmiAssert(info.get_aid() == aid);
-  prepareCookie(entry, *sid, al, sid->_nElems, aid);
+  prepareCookie(entry, *sid, al.data(), sid->_elems.size(), aid);
 
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
 
@@ -404,13 +404,17 @@ void CkMulticastMgr::resetSection(CProxySection_ArrayBase &proxy)
 /// Build a mCastEntry object with relevant section info and set the section cookie to point to this object
 void CkMulticastMgr::prepareCookie(mCastEntry *entry, CkSectionID &sid, const CkArrayIndex *al, int count, CkArrayID aid)
 {
+  entry->allElem.resize(count);
+  entry->allObjKeys.reserve(count);
   for (int i=0; i<count; i++) {
-    entry->allElem.push_back(al[i]);
+    entry->allElem[i] = al[i];
 #if CMK_LBDB_ON
-    const LDObjid key = idx2LDObjid(al[i]);
-    entry->allObjKeys.push_back(key);
+    CmiUInt8 _key;
+    if(CProxy_ArrayBase(aid).ckLocMgr()->lookupID(al[i], _key))
+      entry->allObjKeys.push_back(_key);
 #endif
   }
+  entry->allObjKeys.shrink_to_fit();
   if(sid.bfactor == USE_DEFAULT_BRANCH_FACTOR)
     entry->bfactor = dfactor;
   else
@@ -425,8 +429,9 @@ void CkMulticastMgr::prepareCookie(mCastEntry *entry, CkSectionID &sid, const Ck
 /// similar to prepareCookie, but for group sections
 void CkMulticastMgr::prepareGrpCookie(mCastEntry *entry, CkSectionID &sid, const int *pelist, int count, CkGroupID gid)
 {
+  entry->allGrpElem.resize(count);
   for (int i=0; i<count; i++) {
-    entry->allGrpElem.push_back(pelist[i]);
+    entry->allGrpElem[i] = pelist[i];
   }
 
   if(sid.bfactor == USE_DEFAULT_BRANCH_FACTOR)
@@ -452,12 +457,33 @@ void CkMulticastMgr::initDelegateMgr(CProxy *cproxy, int opts)
 
   CProxySection_ArrayBase *proxy = (CProxySection_ArrayBase *)cproxy;
   int numSubSections = proxy->ckGetNumSubSections();
+  CkCallback *sectionCB;
+  // If its a cross-array section,
+  if (numSubSections > 1)
+  {
+      /** @warning: Each instantiation is a mem leak! :o
+       * The class is trivially small, but there's one instantiation for each
+       * section delegated to CkMulticast. The objects need to live as long as
+       * their section exists and is used. The idea of 'destroying' an array
+       * section is still academic, and hence no effort has been made to charge
+       * some 'owner' entity with the task of deleting this object.
+       *
+       * Reimplementing delegated x-array reductions will make this consideration moot
+       */
+      // Configure the final cross-section reducer
+      ck::impl::XArraySectionReducer *red =
+          new ck::impl::XArraySectionReducer(numSubSections, nullptr);
+      // Configure the subsection callback to deposit with the final reducer
+      sectionCB = new CkCallback(ck::impl::processSectionContribution, red);
+  }
   for (int i=0; i<numSubSections; i++)
   {
       CkArrayID aid = proxy->ckGetArrayIDn(i);
       mCastEntry *entry = new mCastEntry(aid);
       CkSectionID *sid = &( proxy->ckGetSectionID(i) );
       const CkArrayIndex *al = proxy->ckGetArrayElements(i);
+      if (numSubSections > 1)
+          entry->red.storedCallback = sectionCB;
       prepareCookie(entry, *sid, al, proxy->ckGetNumElements(i), aid);
       initCookie(sid->_cookie);
   }
@@ -647,7 +673,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
 
     const int numpes = msg->nIdx;
     std::unordered_map<int, int> peIdx;    // pe -> idx in msg->peElems
-    //if (!entry->isGrpSec()) peIdx.reserve(numpes);   // requires full C++11 support (hold off until 6.8.0 release)
+    if (!entry->isGrpSec()) peIdx.reserve(numpes);
     std::vector<int> mySubTreePEs;
     mySubTreePEs.reserve(numpes);
     // The first PE in my subtree should be me, the tree root (as required by the spanning tree builder)
@@ -668,7 +694,10 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
         if (pe != CkMyPe()) {
           mySubTreePEs.push_back(pe);
         } else {
-          for (int j=msg->peElems[i2+1]; j < msg->peElems[i2+3]; j++)
+          int begin = msg->peElems[i2+1];
+          int end = msg->peElems[i2+3];
+          entry->localElem.reserve(entry->localElem.size() + (end - begin));
+          for (int j=begin; j < end; j++)
             entry->localElem.push_back(msg->arrIdx[j]);
         }
       }
@@ -844,20 +873,16 @@ void CkMulticastMgr::resetCookie(CkSectionInfo s)
 
 void CkMulticastMgr::SimpleSend(int ep,void *m, CkArrayID a, CkSectionID &sid, int opts)
 {
-  DEBUGF(("[%d] SimpleSend: nElems:%d\n", CkMyPe(), sid._nElems));
+  DEBUGF(("[%d] SimpleSend: nElems:%d\n", CkMyPe(), sid._elems.size()));
     // set an invalid cookie since we don't have it
   ((multicastGrpMsg *)m)->_cookie = CkSectionInfo(-1, NULL, 0, a);
-  for (int i=0; i< sid._nElems-1; i++) {
+  for (int i=0; i< sid._elems.size()-1; i++) {
      CProxyElement_ArrayBase ap(a, sid._elems[i]);
      void *newMsg=CkCopyMsg((void **)&m);
-#if CMK_MESSAGE_LOGGING
-	envelope *env = UsrToEnv(newMsg);
-	env->flags = env->flags | CK_MULTICAST_MSG_MLOG;
-#endif
      ap.ckSend((CkArrayMessage *)newMsg,ep,opts|CK_MSG_LB_NOTRACE);
   }
-  if (sid._nElems > 0) {
-     CProxyElement_ArrayBase ap(a, sid._elems[sid._nElems-1]);
+  if (!sid._elems.empty()) {
+     CProxyElement_ArrayBase ap(a, sid._elems[sid._elems.size()-1]);
      ap.ckSend((CkArrayMessage *)m,ep,opts|CK_MSG_LB_NOTRACE);
   }
 }
@@ -865,10 +890,6 @@ void CkMulticastMgr::SimpleSend(int ep,void *m, CkArrayID a, CkSectionID &sid, i
 void CkMulticastMgr::ArraySectionSend(CkDelegateData *pd,int ep,void *m, int nsid, CkSectionID *sid, int opts)
 {
         DEBUGF(("ArraySectionSend\n"));
-#if CMK_MESSAGE_LOGGING
-	envelope *env = UsrToEnv(m);
-	env->flags = env->flags | CK_MULTICAST_MSG_MLOG;
-#endif
 
     for (int snum = 0; snum < nsid; snum++) {
         void *msgCopy = m;
@@ -881,10 +902,6 @@ void CkMulticastMgr::ArraySectionSend(CkDelegateData *pd,int ep,void *m, int nsi
 
 void CkMulticastMgr::GroupSectionSend(CkDelegateData *pd,int ep,void *m, int nsid, CkSectionID *sid)
 {
-#if CMK_MESSAGE_LOGGING
-  envelope *env = UsrToEnv(m);
-  env->flags = env->flags | CK_MULTICAST_MSG_MLOG;
-#endif
 
   DEBUGF(("[%d] GroupSectionSend, nsid: %d \n", CkMyPe(), nsid));
   for (int snum = 0; snum < nsid; snum++) {
@@ -1059,10 +1076,6 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
   for (i=0; i<entry->children.size(); i++) {
     multicastGrpMsg *newmsg = (multicastGrpMsg *)CkCopyMsg((void **)&msg);
-#if CMK_MESSAGE_LOGGING
-	envelope *env = UsrToEnv(newmsg);
-	env->flags = env->flags | CK_MULTICAST_MSG_MLOG;
-#endif
     newmsg->_cookie = entry->children[i];
     mCastGrp[entry->children[i].get_pe()].recvMsg(newmsg);
   }
@@ -1161,20 +1174,20 @@ void CkMulticastMgr::setReductionClient(CProxySection_ArrayBase &proxy, CkCallba
   // If its a cross-array section,
   if (numSubSections > 1)
   {
-      /** @warning: Each instantiation is a mem leak! :o
-       * The class is trivially small, but there's one instantiation for each
-       * section delegated to CkMulticast. The objects need to live as long as
-       * their section exists and is used. The idea of 'destroying' an array
-       * section is still academic, and hence no effort has been made to charge
-       * some 'owner' entity with the task of deleting this object.
-       *
-       * Reimplementing delegated x-array reductions will make this consideration moot
-       */
-      // Configure the final cross-section reducer
-      ck::impl::XArraySectionReducer *red =
-          new ck::impl::XArraySectionReducer(numSubSections, cb);
-      // Configure the subsection callback to deposit with the final reducer
-      sectionCB = new CkCallback(ck::impl::processSectionContribution, red);
+    /** @warning: setReductionClient in cross section reduction should be phased out
+     * Issue: https://github.com/UIUC-PPL/charm/issues/1249
+     * Since finalCB is already set in initDelegateMgr it needs to be deleted here
+     * There will still be a memory leak for the instantiation of XGroupSectionReducer object
+     * Since this function will eventually be phased out, it is only a quick fix
+     */
+    // Configure the final cross-section reducer
+    CkSectionInfo &sInfo = proxy.ckGetSectionID(0)._cookie;
+    mCastEntry *entry = (mCastEntry *)sInfo.get_val();
+    delete entry->red.storedCallback;
+    ck::impl::XGroupSectionReducer *red =
+      new ck::impl::XGroupSectionReducer(numSubSections, cb);
+    // Configure the subsection callback to deposit with the final reducer
+    sectionCB = new CkCallback(ck::impl::processSectionContribution, red);
   }
   // else, just direct the reduction to the actual client cb
   else
@@ -1198,16 +1211,16 @@ void CkMulticastMgr::setReductionClient(CProxySection_Group &proxy, CkCallback *
   // If its a cross-array section,
   if (numSubSections > 1)
   {
-    /** @warning: Each instantiation is a mem leak! :o
-     * The class is trivially small, but there's one instantiation for each
-     * section delegated to CkMulticast. The objects need to live as long as
-     * their section exists and is used. The idea of 'destroying' an array
-     * section is still academic, and hence no effort has been made to charge
-     * some 'owner' entity with the task of deleting this object.
-     *
-     * Reimplementing delegated x-array reductions will make this consideration moot
+    /** @warning: setReductionClient in cross section reduction should be phased out
+     * Issue: https://github.com/UIUC-PPL/charm/issues/1249
+     * Since finalCB is already set in initDelegateMgr it needs to be deleted here
+     * There will still be a memory leak for the instantiation of XGroupSectionReducer object
+     * Since this function will eventually be phased out, it is only a quick fix
      */
     // Configure the final cross-section reducer
+    CkSectionInfo &sInfo = proxy.ckGetSectionID(0)._cookie;
+    mCastEntry *entry = (mCastEntry *)sInfo.get_val();
+    delete entry->red.storedCallback;
     ck::impl::XGroupSectionReducer *red =
       new ck::impl::XGroupSectionReducer(numSubSections, cb);
     // Configure the subsection callback to deposit with the final reducer
@@ -1245,14 +1258,20 @@ inline CkReductionMsg *CkMulticastMgr::buildContributeMsg(int dataSize,void *dat
   msg->rebuilt = (id.get_pe() == CkMyPe())?0:1;
   msg->callback = cb;
   msg->userFlag=userFlag;
-#if CMK_MESSAGE_LOGGING
-  envelope *env = UsrToEnv(msg);
-  env->flags = env->flags | CK_REDUCTION_MSG_MLOG;
-#endif
   return msg;
 }
 
 
+void CkMulticastMgr::contribute(CkSectionInfo &id, int userFlag, int fragSize)
+{
+  CkCallback cb;
+  contribute(0, NULL, CkReduction::nop, id, cb, userFlag, fragSize);
+}
+
+void CkMulticastMgr::contribute(CkSectionInfo &id, const CkCallback &cb, int userFlag, int fragSize)
+{
+  contribute(0, NULL, CkReduction::nop, id, cb, userFlag, fragSize);
+}
 
 void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id, int userFlag, int fragSize)
 {
@@ -1261,7 +1280,7 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
 }
 
 
-void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id, CkCallback &cb, int userFlag, int fragSize)
+void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id, const CkCallback &cb, int userFlag, int fragSize)
 {
   if (id.get_val() == NULL || id.get_redNo() == -1) 
     CmiAbort("contribute: SectionID is not initialized\n");
@@ -1306,10 +1325,6 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
     msg->callback           = cb;
     msg->userFlag           = userFlag;
 
-#if CMK_MESSAGE_LOGGING
-	envelope *env = UsrToEnv(msg);
-	env->flags = env->flags | CK_REDUCTION_MSG_MLOG;
-#endif
 
     mCastGrp[mpe].recvRedMsg(msg);
 
@@ -1342,10 +1357,6 @@ CkReductionMsg* CkMulticastMgr::combineFrags (CkSectionInfo& id,
   }
 
   CkReductionMsg *msg = CkReductionMsg::buildNew(dataSize, NULL);
-#if CMK_MESSAGE_LOGGING
-  envelope *env = UsrToEnv(msg);
-  env->flags = env->flags | CK_REDUCTION_MSG_MLOG;
-#endif
 
   // initialize msg header
   msg->redNo      = redInfo.msgs[0][0]->redNo;
@@ -1403,10 +1414,6 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
 
     // Perform the actual reduction
     CkReductionMsg *newmsg = (*f)(rmsgs.size(), rmsgs.data());
-#if CMK_MESSAGE_LOGGING
-	envelope *env = UsrToEnv(newmsg);
-	env->flags = env->flags | CK_REDUCTION_MSG_MLOG;
-#endif
     newmsg->redNo  = redInfo.redNo;
     newmsg->nFrags = nFrags;
     newmsg->fragNo = fragNo;
@@ -1443,10 +1450,10 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
             // Set the reference number based on the user flag at the contribute call
             CkSetRefNum(newmsg, userFlag);
             // Trigger the appropriate reduction client
-            if ( !msg_cb.isInvalid() )
-                msg_cb.send(newmsg);
-            else if (redInfo.storedCallback != NULL)
+            if (redInfo.storedCallback != NULL)
                 redInfo.storedCallback->send(newmsg);
+            else if ( !msg_cb.isInvalid() )
+                msg_cb.send(newmsg);
             else if (redInfo.storedClient != NULL) {
                 redInfo.storedClient(id, redInfo.storedClientParam, dataSize, newmsg->data);
                 delete newmsg;
@@ -1583,6 +1590,40 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
         for (int8_t i=0; i<msg->nFrags; i++)
             if (entry->getNumAllElems() != redInfo.gcount [i])
                 mixTreeUp = 0;
+    }
+
+    // If reduceFragment is not being called now, check if partialReduction is possible (streamable)
+    if (!currentTreeUp && !mixTreeUp && redInfo.msgs[index].size() > 1 && CkReduction::reducerTable()[msg->reducer].streamable) {
+      reductionMsgs& rmsgs = redInfo.msgs[index];
+      CkReduction::reducerType reducer = rmsgs[0]->reducer;
+      CkReduction::reducerFn f= CkReduction::reducerTable()[msg->reducer].fn;
+      CkAssert(f != NULL);
+
+      int oldRedNo = redInfo.redNo;
+      int nFrags   = rmsgs[0]->nFrags;
+      int fragNo   = rmsgs[0]->fragNo;
+      int userFlag = rmsgs[0]->userFlag;
+      CkSectionInfo oldId = rmsgs[0]->sid;
+      CkCallback msg_cb;
+      int8_t rebuilt = 0;
+      if (msg->rebuilt) rebuilt = 1;
+      if (!msg->callback.isInvalid()) msg_cb = msg->callback;
+      // Perform the actual reduction (streaming)
+      CkReductionMsg *newmsg = (*f)(rmsgs.size(), rmsgs.data());
+      newmsg->redNo  = oldRedNo;
+      newmsg->nFrags = nFrags;
+      newmsg->fragNo = fragNo;
+      newmsg->userFlag = userFlag;
+      newmsg->reducer = reducer;
+      if (rebuilt) newmsg->rebuilt = 1;
+      if (!msg_cb.isInvalid()) newmsg->callback = msg_cb;
+      newmsg->gcount = redInfo.gcount[index];
+      newmsg->sid = oldId;
+      // Remove the current message that was pushed
+      rmsgs.pop_back();
+      delete msg;
+      // Only the partially reduced message should be remaining in the msgs vector after partialReduction
+      CkAssert(rmsgs.size() == 1);
     }
 
     //-------------------------------------------------------------------------

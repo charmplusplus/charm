@@ -51,8 +51,8 @@ OPTS_CC_GENCPM=""
 OPTS_CXX="" 
 OPTS_F90=""
 OPTS_LD=""  
-OPTS_PIC=""
 USE_PIC="0"
+USE_PIE='0'
 
 CHARMDEBUG=""
 LINK_PYTHON=""
@@ -66,6 +66,7 @@ USE_F90_LIBRARIES="0"
 USE_F77_LIBRARIES="0"  
 F90_MODDIR=
 AMPIMAIN=""
+AMPI=""
 AMPIF=""
 COPYTO=""        
 MODCOPIES=""        
@@ -98,6 +99,7 @@ BUILD_SHARE="0"
 SWAPGLOBALS="0"
 TLSGLOBALS="0"
 ROSE_OMP_TLS_GLOBALS="no"
+AMPI_FUNCPTR_SHIM='0'
 PRINT_BUILDING_BLOCKS=""
 NOABORT=""
 
@@ -151,7 +153,7 @@ printUsage() {
     echo "and Charm++ programs.  The flags generally match those of cc or f77."
     echo "  Other options that are not listed here will be passed directly to the"
     echo "underlying compiler and/or linker."
-    echo "Parallel Programming Lab, UIUC, 2018."
+    echo "Parallel Programming Lab, UIUC, 2019."
     echo $*
     exit 1
 }
@@ -440,7 +442,7 @@ do
 	"-language")
 		# Parse out some fake languages (that are actually modules)
 		case "$1" in
-		"ampi") AddModules tcharmmain ampi ;;
+		"ampi") AddModules tcharmmain ampi ; AMPI="1" ;;
 		"ampif") AddModules tcharmmain ampif ; USE_F90_LIBRARIES="1" ; AMPIF="1" ;;
 		"armci") AddModules tcharmmain armci ;;
 		"armcif") AddModules tcharmmain armci ; USE_F90_LIBRARIES="1" ;;
@@ -530,6 +532,11 @@ do
 
 	"-roseomptlsglobals")
 		ROSE_OMP_TLS_GLOBALS="yes"
+		;;
+
+	"-ampi-funcptr-shim")
+		AMPI_FUNCPTR_SHIM='1'
+		USE_PIE='1'
 		;;
 
 	"-verbose")
@@ -796,7 +803,7 @@ do
 		shift
 		;;
 
-	-l*|*.a)
+	-l*|*.a|*.so|*.so.*|*.dylib)
 		if [ -n "$POST_LANGUAGE" ]
 		then
 			POST_LIBRARIES="$POST_LIBRARIES $arg"
@@ -863,6 +870,13 @@ do
 		NOABORT="yes"
 		;;
 
+	-clear-input)
+		INPUT_GIVEN=''
+		FILES=''
+		PRE_LIBRARIES=''
+		POST_LIBRARIES=''
+		;;
+
 	-*|+*)
 #		Warning "passing unrecognized option $arg to all compilers and linkers"
 		OPTS="$OPTS  $arg"
@@ -887,6 +901,12 @@ trap 'End 1' 2
 # Process original command-line arguments
 eval processArgs "$@"
 
+# Do not skip linking if user explicitly specified an output file
+# This allows generating dependencies while compiling
+if [ "$GENDEPENDS" = "yes" -a "$EXPLICIT_OBJECT" = "yes" ]; then
+	SKIPLINK=""
+fi
+
 USER_POST_LIBRARIES="$POST_LIBRARIES"
 USER_PRE_LIBRARIES="$PRE_LIBRARIES"
 
@@ -897,10 +917,6 @@ do
 
 	case "$FILE" in
 	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co)
-		# make sure to link against shared charm library if creating a shared object:
-		case "$FILE" in
-			*.so|*.so.*|*.dylib) CHARM_SHARED=1 ;;
-		esac
 		OBJECTFILES="$OBJECTFILES $FILE"
 		;;
 	*.c|*.s|*.S|*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu|*.f|*.F|*.f77|*.F77|*.f90|*.F90|*.fpp|*.FPP)
@@ -985,11 +1001,6 @@ then
     then
         OPTS_CC="$OPTS $CMK_ENABLE_C11"
     fi
-    # and if configure confirmed that the underlying compiler knows abt CPP11, enable it
-    if [ "$CMK_COMPILER_KNOWS_CPP11" = "1" ]
-    then
-        OPTS_CXX="$OPTS $CMK_ENABLE_CPP11"
-    fi
 fi
 
 if [ "$ROSE_OMP_TLS_GLOBALS" = "yes" ]
@@ -1021,9 +1032,17 @@ fi
 
 if [ "$TLSGLOBALS" = "1" ]
 then
-    OPTS_CC="$OPTS_CC -mno-tls-direct-seg-refs -ftls-model=initial-exec"
-    OPTS_CXX="$OPTS_CXX -mno-tls-direct-seg-refs -ftls-model=initial-exec"
-    OPTS_F90="$OPTS_F90 -mno-tls-direct-seg-refs -ftls-model=initial-exec"
+    TLSGLOBALS_OPTS='-ftls-model=initial-exec'
+    [ "$CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS" = '1' ] && TLSGLOBALS_OPTS="$TLSGLOBALS_OPTS -mno-tls-direct-seg-refs"
+    OPTS_CC="$OPTS_CC $TLSGLOBALS_OPTS"
+    OPTS_CXX="$OPTS_CXX $TLSGLOBALS_OPTS"
+    OPTS_F90="$OPTS_F90 $TLSGLOBALS_OPTS"
+fi
+
+if [ "$AMPI_FUNCPTR_SHIM" = '1' ]
+then
+    OPTS_CC="$OPTS_CC -DAMPI_USE_FUNCPTR"
+    OPTS_CXX="$OPTS_CXX -DAMPI_USE_FUNCPTR"
 fi
 
 # Look up and add the dependencies for module $1
@@ -1092,13 +1111,20 @@ then
 	USE_PIC="1"
 fi
 
-OPTS_PIC="$CMK_PIC"
 if [ "$USE_PIC" = "1" ]
 then
-       OPTS_CC="$OPTS_CC $OPTS_PIC"
-       OPTS_CXX="$OPTS_CXX $OPTS_PIC"
-       OPTS_F90="$OPTS_F90 $OPTS_PIC"
-       OPTS_LD="$OPTS_LD $OPTS_PIC"
+       OPTS_CC="$OPTS_CC $CMK_PIC"
+       OPTS_CXX="$OPTS_CXX $CMK_PIC"
+       OPTS_F90="$OPTS_F90 $CMK_PIC"
+       OPTS_LD="$OPTS_LD $CMK_PIC"
+fi
+
+if [ "$USE_PIE" = "1" ]
+then
+       OPTS_CC="$OPTS_CC $CMK_PIE"
+       OPTS_CXX="$OPTS_CXX $CMK_PIE"
+       OPTS_F90="$OPTS_F90 $CMK_PIE"
+       OPTS_LD="$OPTS_LD $CMK_PIE"
 fi
 
 if [ "$BUILD_SHARE" = "1" ]
@@ -1106,7 +1132,8 @@ then
 	# ignore BUILD_SHARE if the target is not .a or .so
 	case "$OBJECT" in
 	*.a|*.so|*.so.*|*.sl|*.dylib)
- 		OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO -L$CHARMLIBSO"
+		OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO"
+		[ -n "$CHARMLIBSO" ] && OPTS_LD="$OPTS_LD -L$CHARMLIBSO"
 		;;
 	*)	
 		BUILD_SHARE="0"
@@ -1279,7 +1306,7 @@ OPTS_LD="$OPTS $OPTS_LD"
 ##############################################################################
 Debug "Checking language..."
 
-[ -z "$LANGUAGE" -a -n "$SEQUENTIAL" ] && LANGUAGE=c
+[ -z "$LANGUAGE" -a -n "$SEQUENTIAL" ] && LANGUAGE='c++'
 [ -z "$PARADIGM" -a -n "$LANGUAGE" ] && PARADIGM="$LANGUAGE"
 [ -z "$PARADIGM" ] && PARADIGM="charm++"
 
@@ -1378,20 +1405,25 @@ then
 	OBJECTFILES="$CHARMLIB/lib$AMPIMAIN.o $OBJECTFILES"
 fi
 
+if [ -n "$AMPI" ]
+then
+  CMK_SYSINC="-I$CHARMINC/ampi $CMK_SYSINC"
+fi
+
 if [ "$TLSGLOBALS" = "1" ]
 then
-    if [ `cat $CHARMBIN/../tmp/.gdir` = "uth" ]
+    if [ "$CMK_GDIR" = "uth" ]
     then
       echo "Error: -tlsglobals is not supported with the uth machine layer."
       exit 1
     fi
-    if ! `$CMK_CC --version | grep -q gcc`
+    if [ "$CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS" != '1' ] && [ "$CMK_COMPILER" != 'clang' -o "$CMK_MACOSX" != '1' ]
     then
-      echo "Warning: -tlsglobals may not work with compilers other than GCC."
+      echo "Warning: -tlsglobals may not work with compilers that do not recognize -mno-tls-direct-seg-refs."
     fi
-    if ! `$CMK_LD -Wl,--version,-v 2>&1 | grep -q elf`
+    if [ "$CMK_HAS_ELF_H" != '1' -a "$CMK_MACOSX" != '1' ]
     then
-      echo "Warning: -tlsglobals may not work with a linker that does not report ELF support."
+      echo "Warning: -tlsglobals requires elf.h"
     fi
 fi
 
@@ -1410,8 +1442,8 @@ then
 	else
 		LD_VERSION=`printf "$LD_VERSION_TEXT" | grep -Eo 'GNU ld (\([^)]*\) )?(version )?[-0-9._a-zA-Z]+' | awk '{print $NF}'`
 		LD_VERSION_MAJOR=`printf $LD_VERSION | cut -d. -f1`
-		LD_VERSION_MINOR=`printf $LD_VERSION | cut -d. -f2`
-		if [ "$LD_VERSION_MAJOR" -eq 2 -a "$LD_VERSION_MINOR" -gt 23 ]
+		LD_VERSION_MINOR=`printf $LD_VERSION | cut -d. -f2 | cut -d- -f1`
+		if [ "$LD_VERSION_MAJOR" -gt 2 ] || [ "$LD_VERSION_MAJOR" -eq 2 -a "$LD_VERSION_MINOR" -gt 23 ]
 		then
 			echo "Warning: -swapglobals may not work with GNU ld >= 2.24."
 			echo "For some versions, an experimental patch is available:"
@@ -1480,7 +1512,6 @@ for trace in $TRACEMODE; do
     TRACE_OBJ="$TRACE_OBJ -ltrace-$trace"
 done
 
-TRACE_OBJ="$TRACE_OBJ $CMK_LIBZ"
 fi
 
 if test x$PARADIGM = x"bgcharm++"
@@ -1494,17 +1525,20 @@ BAL_OBJ="-lldb-$BALANCE -lconv-ldb"
 
 # Check for valid choice of MEMORY
 
+# Set the default expansions of unprefixed variants
+case "$MEMORY" in
+  'verbose'|'paranoid'|'leak'|'isomalloc')
+    MEMORY="os-$MEMORY"
+    ;;
+  charmdebug*)
+    MEMORY="gnu-$MEMORY"
+    ;;
+esac
+
 # Isomalloc does not work on BGQ or Windows:
-if [ "$CMK_BLUEGENEQ" = "1" -o "$CMK_COMPILER" = "msvc" ] && [ "$MEMORY" = "isomalloc" -o "$MEMORY" = "os-isomalloc" ]
+if [ "$CMK_BLUEGENEQ" = "1" -o "$CMK_COMPILER" = "msvc" ] && [ "$MEMORY" = "${MEMORY%isomalloc}isomalloc" ]
 then
   Abort "Error: Isomalloc is not supported on BlueGene/Q or Windows."
-fi
-
-# Isomalloc does not work on Darwin at all, so use os-isomalloc instead:
-if [ "$MEMORY" = "isomalloc" -a "$CMK_MACOSX" = 1 ]
-then
-  MEMORY="os-isomalloc"
-  echo "Warning: changing '-memory isomalloc' to '-memory os-isomalloc' on Darwin build targets."
 fi
 
 MEM_OBJ="-lmemory-${MEMORY}"
@@ -1524,11 +1558,7 @@ then
 fi
 if [ "$TLSGLOBALS"  = "1" ]
 then
-    # make sure we don't add an extra -tls
-  if ! echo $THREAD | grep '\-tls$' > /dev/null 2> /dev/null
-  then
-    THREAD=${THREAD}-tls
-  fi
+  THREAD=${THREAD%-tls}-tls
 fi
 
 THREAD_OBJ="-lthreads-${THREAD}"
@@ -1611,11 +1641,7 @@ case "$PARADIGM" in
 		TAU_LIBS="$TAU_LIBS"
 	fi
 	;;
-"converse")
-	MAKE_LD="1"
-	MIDDLE_LIBS="$MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
-	;;
-"converse++"|"bgconverse++"|"bluegene"|"bigsim")
+"converse"|"converse++"|"bgconverse++"|"bluegene"|"bigsim")
 	MAKE_LDXX="1"
 	MIDDLE_LIBS="$MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
 	;;
@@ -1845,7 +1871,7 @@ do
         case "$FILE_EXT" in
         .c|.s|.S|.C|.cc|.cxx|.cpp|.c++|.cu|.f|.F|.f90|.F90|.fpp|.FPP|.f77|.F77)
 		[ $VERBOSE ] && echo "Compiling $FILE"
-		DoNoErrCheck $RM $BASEO $BASE.f.o
+		DoNoErrCheck $RM $BASEO `stripExtention $BASEO`.f.o
         esac
 #	fi
 	if [ ! -z "$SKIPLINK" ] 
@@ -1963,11 +1989,11 @@ MakeSO() {
 	dir=`cd $dir; pwd`
 	OBJECT=$dir/$fname
 	fi
-	if test "$MAKE_LDXX" = "1"
+	if test "$MAKE_LD" = '1'
 	then
-	  soTool="$CMK_LDXX $CMK_LDXX_FLAGS"
-	else
 	  soTool="$CMK_LD $CMK_LD_FLAGS"
+	else
+	  soTool="$CMK_LDXX $CMK_LDXX_FLAGS"
 	fi
 	if [ -n "$STANDALONE" ]
 	then
@@ -1980,6 +2006,7 @@ MakeSO() {
 	then
 	  soLibs="$CXX_NO_AS_NEEDED $LDXX_WHOLE_ARCHIVE_PRE $soLibs $LDXX_WHOLE_ARCHIVE_POST"
 	fi
+	soLibs="$soLibs $CMK_SYSLIBS"
 	if [ -n "$LINK_CXX_STL" ]
 	then
 	  soLibs="$soLibs -lstdc++"
@@ -1989,16 +2016,16 @@ MakeSO() {
 	Do_res=$?
 	if [ $Do_res -ne 0 ]
 	then
-	    if [ -n $NOABORT ]
+	    if [ -n "$NOABORT" ]
 	    then
 		touch $OBJECT
 	    else
-		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-		echo "!!  Failed to compile Charm++ shared library. You can disable shared  !!"
-		echo "!!  lib compilation by providing --no-build-shared build option like: !!"
-		echo "!!     ./build charm++ netlrts-linux --no-build-shared -O             !!"
-		echo "!!  or reexecute this charmc command with --no-build-shared compile option        !!"
-		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+		echo "!!  Failed to compile Charm++ shared library. You can disable shared   !!"
+		echo "!!  lib compilation by providing --no-build-shared build option like:  !!"
+		echo "!!     ./build charm++ netlrts-linux --no-build-shared -O              !!"
+		echo "!!  or reexecute this charmc command with the --no-build-shared option !!"
+		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 		Abort "Command $soCmd returned error code $Do_res"
 	    fi
 	fi
@@ -2351,7 +2378,7 @@ then
   if [ -x $CHARMBIN/$targ ]
   then
 	DoNoErrCheck $RM $targ
-	DoNoErrCheck $CP $CHARMBIN/$targ $targ
+	DoNoErrCheck $CP $CHARMBIN/$targ $targ 2> /dev/null
   fi
 fi
 

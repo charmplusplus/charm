@@ -15,13 +15,13 @@ Orion Sky Lawlor, olawlor@acm.org, 1/7/2003
 
 void IDXL_Abort(const char *callingRoutine,const char *msg,int m0,int m1,int m2)
 {
-	char msg1[1024], msg2[1024];
+	char msg1[1024], msg2[1536];
 	sprintf(msg1,msg,m0,m1,m2);
 	sprintf(msg2,"Fatal error in IDXL routine %s:\n%s",callingRoutine,msg1);
 	CkAbort(msg2);
 }
 
-CDECL void pupIDXL_Chunk(pup_er cp) {
+CLINKAGE void pupIDXL_Chunk(pup_er cp) {
 	PUP::er &p=*(PUP::er *)cp;
 	IDXL_Chunk *c=(IDXL_Chunk *)TCHARM_Get_global(IDXL_globalID);
 	if (c==NULL) {
@@ -42,7 +42,7 @@ IDXL_Chunk *IDXL_Chunk::get(const char *callingRoutine) {
 	return c;
 }
 
-CDECL void
+CLINKAGE void
 IDXL_Init(int mpi_comm) {
 	if (!TCHARM_Get_global(IDXL_globalID)) {
 		IDXL_Chunk *c=new IDXL_Chunk(mpi_comm);

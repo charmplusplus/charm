@@ -37,10 +37,6 @@ Orion Sky Lawlor, olawlor@acm.org
 extern void _registerCkArray(void);
 CpvExtern (int ,serializer);
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-#define _MLOG_BCAST_TREE_ 1
-#define _MLOG_BCAST_BFACTOR_ 8
-#endif
 
 /** This flag is true when in the system there is anytime migration, false when
  *  the user code guarantees that no migration happens except during load balancing
@@ -186,58 +182,62 @@ PUPmarshall(CProxyElement_ArrayBase)
 
 class CProxySection_ArrayBase:public CProxy_ArrayBase {
 private:
-	int _nsid;
-	CkSectionID *_sid;
+  std::vector<CkSectionID> _sid;
 public:
-	CProxySection_ArrayBase(): _nsid(0), _sid(NULL) {}
+	CProxySection_ArrayBase() =default;
 	CProxySection_ArrayBase(const CkArrayID &aid,
 		const CkArrayIndex *elems, const int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR);
 	CProxySection_ArrayBase(const CkArrayID &aid,
+		const std::vector<CkArrayIndex> &elems, int factor=USE_DEFAULT_BRANCH_FACTOR);
+	CProxySection_ArrayBase(const CkArrayID &aid,
 		const CkArrayIndex *elems, const int nElems, CK_DELCTOR_PARAM)
-		:CProxy_ArrayBase(aid,CK_DELCTOR_ARGS), _nsid(1) { _sid = new CkSectionID(aid, elems, nElems); }
+		:CProxy_ArrayBase(aid,CK_DELCTOR_ARGS) { _sid.emplace_back(aid, elems, nElems); }
+	CProxySection_ArrayBase(const CkArrayID &aid,
+		const std::vector<CkArrayIndex> &elems, CK_DELCTOR_PARAM)
+		:CProxy_ArrayBase(aid,CK_DELCTOR_ARGS) { _sid.emplace_back(aid, elems); }
 	CProxySection_ArrayBase(const CkSectionID &sid)
-		:CProxy_ArrayBase(sid._cookie.get_aid()), _nsid(1) { _sid = new CkSectionID(sid); }
+		:CProxy_ArrayBase(sid._cookie.get_aid()) { _sid.emplace_back(sid); }
 	CProxySection_ArrayBase(const CkSectionID &sid, CK_DELCTOR_PARAM)
-		:CProxy_ArrayBase(sid._cookie.get_aid(), CK_DELCTOR_ARGS), _nsid(1) { _sid = new CkSectionID(sid); }
+		:CProxy_ArrayBase(sid._cookie.get_aid(), CK_DELCTOR_ARGS) { _sid.emplace_back(sid); }
         CProxySection_ArrayBase(const CProxySection_ArrayBase &cs)
-		:CProxy_ArrayBase(cs), _nsid(cs._nsid) {
-      if (_nsid == 1) _sid = new CkSectionID(*cs._sid);
-      else if (_nsid > 1) {
-        _sid = new CkSectionID[_nsid];
-        for (int i=0; i<_nsid; ++i) _sid[i] = cs._sid[i];
-      } else _sid = NULL;
+		:CProxy_ArrayBase(cs) {
+        _sid.resize(cs._sid.size());
+        for (size_t i=0; i<_sid.size(); ++i) {
+          _sid[i] = cs._sid[i];
+        }
     }
         CProxySection_ArrayBase(const CProxySection_ArrayBase &cs, CK_DELCTOR_PARAM)
-		:CProxy_ArrayBase(cs.ckGetArrayID(),CK_DELCTOR_ARGS), _nsid(cs._nsid) {
-      if (_nsid == 1) _sid = new CkSectionID(cs.ckGetArrayID(), cs.ckGetArrayElements(), cs.ckGetNumElements());
-      else if (_nsid > 1) {
-        _sid = new CkSectionID[_nsid];
-        for (int i=0; i<_nsid; ++i) _sid[i] = cs._sid[i];
-      } else _sid = NULL;
+		:CProxy_ArrayBase(cs.ckGetArrayID(),CK_DELCTOR_ARGS) {
+        _sid.resize(cs._sid.size());
+        for (size_t i=0; i<_sid.size(); ++i) {
+          _sid[i] = cs._sid[i];
+        }
     }
     CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems, int factor=USE_DEFAULT_BRANCH_FACTOR);
+    CProxySection_ArrayBase(const std::vector<CkArrayID> &aid, const std::vector<std::vector<CkArrayIndex> > &elems, int factor=USE_DEFAULT_BRANCH_FACTOR);
     CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems,CK_DELCTOR_PARAM)
-        :CProxy_ArrayBase(aid[0],CK_DELCTOR_ARGS), _nsid(n) {
-      if (_nsid == 1) _sid = new CkSectionID(aid[0], elems[0], nElems[0]);
-      else if (_nsid > 1) {
-      _sid = new CkSectionID[n];
-      for (int i=0; i<n; ++i) _sid[i] = CkSectionID(aid[i], elems[i], nElems[i]);
-      } else _sid = NULL;
+        :CProxy_ArrayBase(aid[0],CK_DELCTOR_ARGS) {
+        _sid.resize(n);
+        for (size_t i=0; i<_sid.size(); ++i) {
+          _sid[i] = CkSectionID(aid[i], elems[i], nElems[i]);
+        }
+    }
+    CProxySection_ArrayBase(const std::vector<CkArrayID> &aid, const std::vector<std::vector<CkArrayIndex> > &elems, CK_DELCTOR_PARAM)
+        :CProxy_ArrayBase(aid[0],CK_DELCTOR_ARGS) {
+        _sid.resize(aid.size());
+        for (size_t i=0; i<_sid.size(); ++i) {
+          _sid[i] = CkSectionID(aid[i], elems[i]);
+        }
     }
 
-    ~CProxySection_ArrayBase() {
-      if (_nsid == 1) delete _sid;
-      else if (_nsid > 1) delete[] _sid;
-    }
+    ~CProxySection_ArrayBase() =default;
 
     CProxySection_ArrayBase &operator=(const CProxySection_ArrayBase &cs) {
       CProxy_ArrayBase::operator=(cs);
-      _nsid = cs._nsid;
-      if (_nsid == 1) _sid = new CkSectionID(*cs._sid);
-      else if (_nsid > 1) {
-        _sid = new CkSectionID[_nsid];
-        for (int i=0; i<_nsid; ++i) _sid[i] = cs._sid[i];
-      } else _sid = NULL;
+      _sid.resize(cs._sid.size());
+      for (size_t i=0; i<_sid.size(); ++i) {
+        _sid[i] = cs._sid[i];
+      }
       return *this;
     }
     
@@ -255,16 +255,16 @@ public:
 	void ckSend(CkArrayMessage *m, int ep, int opts = 0) ;
 
 //	ArrayElement *ckLocal(void) const;
-    inline int ckGetNumSubSections() const { return _nsid; }
-	inline CkSectionInfo &ckGetSectionInfo() {return _sid->_cookie;}
-	inline CkSectionID *ckGetSectionIDs() {return _sid;}
+    inline int ckGetNumSubSections() const { return _sid.size(); }
+	inline CkSectionInfo &ckGetSectionInfo() {return _sid[0]._cookie;}
+	inline CkSectionID *ckGetSectionIDs() {return _sid.data();}
 	inline CkSectionID &ckGetSectionID() {return _sid[0];}
 	inline CkSectionID &ckGetSectionID(int i) {return _sid[i];}
 	inline CkArrayID ckGetArrayIDn(int i) const {return _sid[i]._cookie.get_aid();}
-    inline CkArrayIndex *ckGetArrayElements() const {return _sid[0]._elems;}
-    inline CkArrayIndex *ckGetArrayElements(int i) const {return _sid[i]._elems;}
-    inline int ckGetNumElements() const { return _sid[0]._nElems; }
-	inline int ckGetNumElements(int i) const { return _sid[i]._nElems; }
+    inline CkArrayIndex *ckGetArrayElements() const {return const_cast<CkArrayIndex *>(_sid[0]._elems.data());}
+    inline CkArrayIndex *ckGetArrayElements(int i) const {return const_cast<CkArrayIndex *>(_sid[i]._elems.data());}
+    inline int ckGetNumElements() const { return _sid[0]._elems.size(); }
+	inline int ckGetNumElements(int i) const { return _sid[i]._elems.size(); }
 	inline int ckGetBfactor() const { return _sid[0].bfactor; }
 	void pup(PUP::er &p);
 };
@@ -312,8 +312,8 @@ public:
   virtual char *ckDebugChareName(void);
   virtual int ckDebugChareID(char*, int);
 
-  /// Synonym for ckMigrate
-  inline void migrateMe(int toPe) {ckMigrate(toPe);}
+  void ckEmigrate(int toPe) {ckMigrate(toPe);}
+
 
 #ifdef _PIPELINED_ALLREDUCE_
 	void contribute2(CkArrayIndex myIndex, int dataSize,const void *data,CkReduction::reducerType type,
@@ -334,6 +334,9 @@ public:
   inline ck::ObjID ckGetID(void) const { return ck::ObjID(thisArrayID, myRec->getID()); }
 
   inline int ckGetArraySize(void) const { return numInitialElements; }
+
+  int getRedNo(void) const;
+
 protected:
   CkArray *thisArray;//My source array
   CkArrayID thisArrayID;//My source array's ID
@@ -379,9 +382,6 @@ public:
   using array_index_t = T;
 
   ArrayElementT(void): thisIndex(*(const T *)thisIndexMax.data()) {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
-        mlogData->objID.data.array.idx=thisIndexMax;
-#endif
 }
 #ifdef _PIPELINED_ALLREDUCE_
 	void contribute(int dataSize,const void *data,CkReduction::reducerType type,
@@ -422,6 +422,8 @@ typedef ArrayElementT<CkIndex4D> ArrayElement4D;
 typedef ArrayElementT<CkIndex5D> ArrayElement5D;
 typedef ArrayElementT<CkIndex6D> ArrayElement6D;
 typedef ArrayElementT<CkIndexMax> ArrayElementMax;
+
+#if CMK_CHARMPY
 
 extern void (*ArrayMsgRecvExtCallback)(int, int, int *, int, int, char *, int);
 extern int (*ArrayElemLeaveExt)(int, int, int *, char**, int);
@@ -494,11 +496,22 @@ public:
   }
 
   void ResumeFromSync() {
+    if (!usesAtSync) {
+      // not sure in which cases it is useful to receive resumeFromSync if
+      // usesAtSync=false, but for now I'm disabling it because it is
+      // unnecessary overhead. In non-lb scenarios with NullLB, every LBPeriod
+      // (which is 0.5 s by default), the lb infrastructure calls atsync and
+      // resumefromsync on every chare array element, even if usesAtSync=false.
+      // that part of the lb infrastructure should be fixed first.
+      return;
+    }
     ArrayResumeFromSyncExtCallback(((CkGroupID)thisArrayID).idx,
                             int(thisIndexMax.getDimension()),
                             thisIndexMax.data());
   }
 };
+
+#endif
 
 /*@}*/
 
@@ -537,12 +550,10 @@ class CkArray : public CkReductionMgr {
   CkCallback initCallback;
   CProxy_CkArray thisProxy;
   // Separate mapping and storing the element pointers to speed iteration in broadcast
-  std::map<CmiUInt8, unsigned int> localElems;
+  std::unordered_map<CmiUInt8, unsigned int> localElems;
   std::vector<CkMigratable *> localElemVec;
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    int *children;
-    int numChildren;
-#endif
+
+  UShort recvBroadcastEpIdx;
 private:
   bool stableLocations;
 
@@ -554,6 +565,8 @@ public:
   CkGroupID &getGroupID(void) {return thisgroup;}
   CkGroupID &getmCastMgr(void) {return mCastMgrID;}
   bool isSectionAutoDelegated(void) {return sectionAutoDelegate;}
+
+  UShort &getRecvBroadcastEpIdx(void) {return recvBroadcastEpIdx;}
 
 //Access & information routines
   inline CkLocMgr *getLocMgr(void) {return locMgr;}
@@ -584,7 +597,7 @@ public:
   }
 
   virtual CkMigratable* getEltFromArrMgr(const CmiUInt8 id) {
-    std::map<CmiUInt8, unsigned int>::iterator itr = localElems.find(id);
+    const auto itr = localElems.find(id);
     return ( itr == localElems.end() ? NULL : localElemVec[itr->second] );
   }
   virtual void putEltInArrMgr(const CmiUInt8 id, CkMigratable* elt)
@@ -593,10 +606,25 @@ public:
     localElemVec.push_back(elt);
   }
   virtual void eraseEltFromArrMgr(const CmiUInt8 id)
-  { localElems.erase(id); }
+  {
+    auto itr = localElems.find(id);
+    if (itr != localElems.end()) {
+      unsigned int offset = itr->second;
+      localElems.erase(itr);
+      // Do not delete the CkMigratable itself (unlike in deleteElt)
+
+      if (offset != localElemVec.size() - 1) {
+        CkMigratable *moved = localElemVec[localElemVec.size()-1];
+        localElemVec[offset] = moved;
+        localElems[moved->ckGetID()] = offset;
+      }
+
+      localElemVec.pop_back();
+    }
+  }
 
   void deleteElt(const CmiUInt8 id) {
-    std::map<CmiUInt8, unsigned int>::iterator itr = localElems.find(id);
+    auto itr = localElems.find(id);
     if (itr != localElems.end()) {
       unsigned int offset = itr->second;
       localElems.erase(itr);
@@ -688,13 +716,10 @@ private:
   CkArrayBroadcaster *broadcaster; //Read-only copy of default broadcaster
 public:
   void flushStates();
-
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	// the mlogft only support 1D arrays, then returning the number of elements in the first dimension
-	virtual int numberReductionMessages(){CkAssert(CkMyPe() == 0);return numInitial.data()[0];}
-	void broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index);
-	static void staticBroadcastHomeElements(CkArray *arr,void *data,CkLocRec *rec,CkArrayIndex *index);
+#if CMK_ONESIDED_IMPL
+  void forwardZCMsgToOtherElems(envelope *env);
 #endif
+
 
         static bool isIrreducible() { return true; }
 };

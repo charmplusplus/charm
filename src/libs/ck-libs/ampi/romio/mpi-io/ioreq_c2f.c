@@ -1,6 +1,5 @@
 /* -*- Mode: C; c-basic-offset:4 ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -35,32 +34,49 @@ Input Parameters:
 Return Value:
   Fortran I/O-request handle (integer)
 @*/
+#ifdef HAVE_MPI_GREQUEST
+MPI_Fint MPIO_Request_c2f(MPIO_Request request)
+{
+    return ((MPI_Fint)request);
+}
+#else
+
 MPI_Fint MPIO_Request_c2f(MPIO_Request request)
 {
 #ifndef INT_LT_POINTER
-    return (MPI_Fint)(intptr_t)request;
+    return (MPI_Fint) request;
 #else
     int i;
+    MPIU_THREADPRIV_DECL;
 
+    /* We can make this test outside of the ALLFUNC mutex because it does
+       not access any shared data */
     if ((request <= (MPIO_Request) 0) || (request->cookie != ADIOI_REQ_COOKIE))
-	return (MPI_Fint) 0;
-    if (!CtvAccess(ADIOI_Reqtable)) {
-	CtvAccess(ADIOI_Reqtable_max) = 1024;
-	CtvAccess(ADIOI_Reqtable) = (MPIO_Request *)
-	    ADIOI_Malloc(CtvAccess(ADIOI_Reqtable_max)*sizeof(MPIO_Request)); 
-        CtvAccess(ADIOI_Reqtable_ptr) = 0;  /* 0 can't be used though, because 
+    {
+	    return (MPI_Fint) 0;
+    }
+
+    MPIU_THREAD_CS_ENTER(ALLFUNC,);
+    if (!ADIOI_Reqtable) {
+	ADIOI_Reqtable_max = 1024;
+	ADIOI_Reqtable = (MPIO_Request *)
+	    ADIOI_Malloc(ADIOI_Reqtable_max*sizeof(MPIO_Request)); 
+        ADIOI_Reqtable_ptr = 0;  /* 0 can't be used though, because 
                                   MPIO_REQUEST_NULL=0 */
-	for (i=0; i<CtvAccess(ADIOI_Reqtable_max); i++) CtvAccess(ADIOI_Reqtable)[i] = MPIO_REQUEST_NULL;
+	for (i=0; i<ADIOI_Reqtable_max; i++) ADIOI_Reqtable[i] = MPIO_REQUEST_NULL;
     }
-    if (CtvAccess(ADIOI_Reqtable_ptr) == CtvAccess(ADIOI_Reqtable_max)-1) {
-	CtvAccess(ADIOI_Reqtable) = (MPIO_Request *) ADIOI_Realloc(CtvAccess(ADIOI_Reqtable), 
-                           (CtvAccess(ADIOI_Reqtable_max)+1024)*sizeof(MPIO_Request));
-	for (i=CtvAccess(ADIOI_Reqtable_max); i<CtvAccess(ADIOI_Reqtable_max)+1024; i++) 
-	    CtvAccess(ADIOI_Reqtable)[i] = MPIO_REQUEST_NULL;
-	CtvAccess(ADIOI_Reqtable_max) += 1024;
+    if (ADIOI_Reqtable_ptr == ADIOI_Reqtable_max-1) {
+	ADIOI_Reqtable = (MPIO_Request *) ADIOI_Realloc(ADIOI_Reqtable, 
+                           (ADIOI_Reqtable_max+1024)*sizeof(MPIO_Request));
+	for (i=ADIOI_Reqtable_max; i<ADIOI_Reqtable_max+1024; i++) 
+	    ADIOI_Reqtable[i] = MPIO_REQUEST_NULL;
+	ADIOI_Reqtable_max += 1024;
     }
-    CtvAccess(ADIOI_Reqtable_ptr)++;
-    CtvAccess(ADIOI_Reqtable)[CtvAccess(ADIOI_Reqtable_ptr)] = request;
-    return (MPI_Fint) CtvAccess(ADIOI_Reqtable_ptr);
+    ADIOI_Reqtable_ptr++;
+    ADIOI_Reqtable[ADIOI_Reqtable_ptr] = request;
+
+    MPIU_THREAD_CS_EXIT(ALLFUNC,);
+    return (MPI_Fint) ADIOI_Reqtable_ptr;
 #endif
 }
+#endif

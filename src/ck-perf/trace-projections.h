@@ -9,12 +9,13 @@
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
+#include <stack>
 
 #include "trace.h"
 #include "trace-common.h"
 #include "ckhashtable.h"
 
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
 #include <zlib.h>
 #endif
 
@@ -143,7 +144,7 @@ class LogEntry {
 
     // Constructor for multicast data
     LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
-	     int ml, CmiObjId *d, double rt, int numPe, int *pelist){
+	     int ml, CmiObjId *d, double rt, int numPe, const int *pelist){
 
       type = CREATION_MULTICAST; 
       mIdx = m; 
@@ -257,7 +258,7 @@ class LogPool {
     bool hasFlushed;
     bool headerWritten;
     bool fileCreated;
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
     bool compressed;
 #endif
     unsigned int poolSize;
@@ -274,7 +275,7 @@ class LogPool {
     char *fname;
     char *dfname;
     char *pgmname;
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
     gzFile deltazfp;
     gzFile zfp;
 #endif
@@ -321,7 +322,7 @@ class LogPool {
     void setBinary(int b) { binary = (b!=0); }
     void setNumSubdirs(int n) { nSubdirs = n; }
     void setWriteSummaryFiles(int n) { writeSummaryFiles = (n!=0)? true : false;}
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
     void setCompressed(int c) { compressed = c; }
 #endif
     void createFile(const char *fix="");
@@ -374,7 +375,7 @@ class LogPool {
   	void addMemoryUsage(unsigned char type,double time,double memUsage);
 	void addUserSuppliedBracketedNote(char *note, int eventID, double bt, double et);
 
-    void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int numPe=0, int *pelist=NULL);
+    void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int numPe=0, const int *pelist=NULL);
     void flushLogBuffer();
     void postProcessLog();
 
@@ -480,7 +481,8 @@ private:
     int funcCount;
     int currentPhaseID;
 
-    CkQ<NestedEvent> nestedEvents;
+    // Using a vector as the container instead of a deque empirically performs better
+    std::stack<NestedEvent, std::vector<NestedEvent>> nestedEvents;
     
     LogEntry* lastPhaseEvent;
 
@@ -508,7 +510,7 @@ public:
 
     void creation(envelope *e, int epIdx, int num=1);
     void creation(char *m);
-    void creationMulticast(envelope *e, int epIdx, int num=1, int *pelist=NULL);
+    void creationMulticast(envelope *e, int epIdx, int num=1, const int *pelist=NULL);
     void creationDone(int num=1);
     void beginExecute(envelope *e, void *obj=NULL);
     void beginExecute(char *msg);
@@ -579,7 +581,7 @@ class fromProjectionsFile : public fromTextFile {
   fromProjectionsFile(FILE *f_) :fromTextFile(f_) {}
 };
 
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
 class toProjectionsGZFile : public PUP::er {
   gzFile f;
  protected:

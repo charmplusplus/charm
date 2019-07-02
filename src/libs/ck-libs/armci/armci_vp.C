@@ -44,7 +44,7 @@ void armciNodeInit(void) {
   }
   for (int i=0; i<_entryTable.size(); i++){
     if (strcmp(_entryTable[i]->name, "dummy_thread_ep") == 0)
-      _entryTable[i]->name = "thread";
+      _entryTable[i]->setName("thread");
   }
 #endif
   CmiAssert(armciLibStart_idx == -1);
@@ -89,7 +89,7 @@ ArmciVirtualProcessor::ArmciVirtualProcessor(const CProxy_TCharm &_thr_proxy)
   thisProxy = this;
   tcharmClientInit();
   thread->semaPut(ARMCI_TCHARM_SEMAID,this);
-  memBlock = CmiIsomallocBlockListNew(thread->getThread());
+  memBlock = CmiIsomallocBlockListNew();
   thisProxy = CProxy_ArmciVirtualProcessor(thisArrayID);
   addressReply = NULL;
   // Save ourselves for the waiting ARMCI_Init
@@ -105,9 +105,7 @@ ArmciVirtualProcessor::ArmciVirtualProcessor(CkMigrateMessage *m)
 
 ArmciVirtualProcessor::~ArmciVirtualProcessor()
 {
-#if !CMK_USE_MEMPOOL_ISOMALLOC
   CmiIsomallocBlockListDelete(memBlock);
-#endif
   if (addressReply) {delete addressReply;}
 }
 
@@ -197,7 +195,7 @@ void ArmciVirtualProcessor::get(pointer src, pointer dst,
   }*/
   thisProxy[src_proc].requestFromGet(src, dst, nbytes, thisIndex, -1);
   // wait for reply
-  thread->suspend();
+  TCharm * unused = thread->suspend();
 }
 
 int ArmciVirtualProcessor::nbget(pointer src, pointer dst,
@@ -231,7 +229,7 @@ void ArmciVirtualProcessor::wait(int hdl){
     if(hdlList[hdl]->acked != 0)
       break;
     else
-      thread->suspend();
+      TCharm * unused = thread->suspend();
   }
 }
 
@@ -296,7 +294,7 @@ void ArmciVirtualProcessor::barrier(){
   allfence();
   CkCallback cb(CkIndex_ArmciVirtualProcessor::resumeThread(),thisProxy);
   contribute(0,NULL,CkReduction::sum_int,cb);
-  thread->suspend();
+  TCharm * unused = thread->suspend();
 }
 
 void ArmciVirtualProcessor::resumeThread(void){
@@ -448,7 +446,7 @@ void ArmciVirtualProcessor::gets(pointer src_ptr, int src_stride_ar[],
   thisProxy[src_proc].requestFromGets(src_ptr, src_stride_ar, dst_ptr, dst_stride_ar, 
   					count, stride_levels, thisIndex, -1);
   // wait for reply
-  thread->suspend();
+  TCharm * unused = thread->suspend();
 }
 
 int ArmciVirtualProcessor::nbgets(pointer src_ptr, int src_stride_ar[], 
@@ -581,18 +579,13 @@ void ArmciVirtualProcessor::notify_wait(int proc){
     hasNote = noteList.size() - 1;
   }
   if(noteList[hasNote]->notified < noteList[hasNote]->waited){
-    thread->suspend();
+    TCharm * unused = thread->suspend();
   }
 }
 
 void ArmciVirtualProcessor::pup(PUP::er &p) {
   TCharmClient1D::pup(p);
-  //Copying only address, the mempool will be pupped as part of the thread
-#if CMK_USE_MEMPOOL_ISOMALLOC
-  pup_bytes(&p, &memBlock, sizeof(CmiIsomallocBlockList*));
-#else
-  CmiIsomallocBlockListPup(&p, &memBlock, NULL);
-#endif
+  CmiIsomallocBlockListPup(&p, &memBlock);
   p|thisProxy;
   p|hdlList;
   p|noteList;
@@ -612,7 +605,8 @@ void ArmciVirtualProcessor::requestAddresses(pointer ptr, pointer ptr_arr[], int
   CkCallback cb(CkIndex_ArmciVirtualProcessor::mallocClient(NULL),CkArrayIndex1D(0),thisProxy);
   contribute(sizeof(addressPair), pair, CkReduction::concat, cb);
   // wait for the reply to arrive.
-  while(addressReply==NULL) thread->suspend();
+  while (addressReply==NULL)
+    TCharm * unused = thread->suspend();
 
   // copy the acquired data to the user-allocated array.
   for (int i=0; i<numPE; i++) {
@@ -670,7 +664,7 @@ void ArmciVirtualProcessor::msgBcast(void *buffer, int len, int root) {
   } else {
     // copy the buffer pointer to thread object
     collectiveTmpBufferPtr = buffer;
-    thread->suspend();
+    TCharm * unused = thread->suspend();
   }
 }
 
@@ -746,7 +740,7 @@ void ArmciVirtualProcessor::startCheckpoint(const char* dname){
   } else {
     contribute(0, NULL, CkReduction::sum_int);
   }
-  thread->suspend();
+  TCharm * unused = thread->suspend();
 }
 void ArmciVirtualProcessor::checkpoint(int len, const char* dname){
   if (len == 0) { // memory checkpoint

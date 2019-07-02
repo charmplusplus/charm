@@ -86,7 +86,7 @@ namespace PUP {
    */
   struct reconstruct {};
   namespace detail {
-    template <typename T, bool b = std::is_constructible<reconstruct, T>::value>
+    template <typename T, bool b = std::is_constructible<T, reconstruct>::value>
     struct TemporaryObjectHolder { };
     template <typename T>
     struct TemporaryObjectHolder<T, true>
@@ -432,6 +432,14 @@ class mem : public er { //Memory-buffer packers and unpackers
     return reinterpret_cast<char*>(buf);
   }
 
+  inline char* get_orig_pointer() const {
+    return reinterpret_cast<char*>(origBuf);
+  }
+
+  inline void reset() {
+    buf = origBuf;
+  }
+
   inline void advance(size_t const offset) {
     buf += offset;
   }
@@ -719,14 +727,14 @@ public:
 #define PUPable_operator_inside(className)\
     friend inline void operator|(PUP::er &p,className &a) {a.pup(p);}\
     friend inline void operator|(PUP::er &p,className* &a) {\
-	PUP::able *pa=a;  p(&pa);  a=(className *)pa;\
+	PUP::able *pa=a;  p(&pa);  a=dynamic_cast<className *>(pa);\
     }
 
 //  Macros to be used outside a class body.
 #define PUPable_operator_outside(className)\
     inline void operator|(PUP::er &p,className &a) {a.pup(p);}\
     inline void operator|(PUP::er &p,className* &a) {\
-	PUP::able *pa=a;  p(&pa);  a=(className *)pa;\
+	PUP::able *pa=a;  p(&pa);  a=dynamic_cast<className *>(pa);\
     }
 
 //Declarations to include in a PUP::able's body.

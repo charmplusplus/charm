@@ -6,15 +6,15 @@ AR          = @AR@
 LIBNAME     = @LIBNAME@
 NOF77       = @NOF77@
 NOPROFILE   = @NOPROFILE@
-MPI         = @MPI@
 PREFIX      = @prefix@
-FROM_MPICH  = @FROM_MPICH@
-FROM_MPICH2  = @FROM_MPICH2@
+srcdir      = @srcdir@
 BUILD_MPI_INFO = @BUILD_MPI_INFO@
 BUILD_MPI_ARRAY = @BUILD_MPI_ARRAY@
-DIRS        = mpi-io adio/common
+DIRS        = mpi-io adio/common @GLUE_DIR@
 MPIO_DIRS   = mpi-io
-ALL_DIRS    = mpi-io mpi-io/fortran mpi2-other/info mpi2-other/info/fortran mpi2-other/array mpi2-other/array/fortran adio/common adio/ad_pfs adio/ad_piofs adio/ad_nfs adio/ad_ufs adio/ad_xfs adio/ad_hfs adio/ad_sfs adio/ad_testfs adio/ad_pvfs
+EXTRA_SRC_DIRS = @EXTRA_SRC_DIRS@
+FILE_SYS_DIRS = @FILE_SYS_DIRS@
+ALL_DIRS    = mpi-io mpi-io/fortran mpi2-other/info mpi2-other/info/fortran mpi2-other/array mpi2-other/array/fortran adio/common adio/ad_pfs adio/ad_piofs adio/ad_nfs adio/ad_ufs adio/ad_xfs adio/ad_hfs adio/ad_sfs adio/ad_testfs adio/ad_pvfs adio/ad_pvfs2 adio/ad_panfs adio/ad_gridftp adio/ad_lustre adio/ad_bgl adio/ad_bglockless test test-internal mpi-io/glue/default mpi-io/glue/mpich1 mpi-io/glue/mpich2
 SHELL       = /bin/sh
 
 @VPATH@
@@ -26,13 +26,22 @@ all: mpio
 # use the same library.  This is a work around for a bug in make that 
 # is related to the use of file time stamps in make, but is in fact
 # a bug in the logic of several make implementations, including gnumake
+#
+# The make clean /make profile /make clean handles the rebuilding of
+# the object files with the same names but with different CPP definitions.
+# If weak symbols are supported or profiling is turned off, we don't
+# need to rebuild everything.
+#
+# Eventually, the clean at the top will also be removed, at least for the
+# MPICH builds (which do their own clean if required)
+#	$(MAKE) clean
 mpio:
 	$(MAKE) mpiolib
-	@if test "$(NOPROFILE)" = 0 ; then\
-            $(MAKE) profile; \
+	@if [ "$(NOPROFILE)" = 0 ] ; then\
+            $(MAKE) profile || exit 1; \
         fi;\
 	$(RANLIB) $(LIBNAME)
-	@if test "$(FROM_MPICH)" = 0 -a "$(FROM_MPICH2)" = 0 ; then \
+	@if [ "$(WITHIN_KNOWN_MPI_IMPL)" = no ] ; then \
            echo " "; \
            echo "Completed build of ROMIO. Check the output for errors."; \
            echo " " ;\
@@ -45,122 +54,86 @@ mpio:
         fi
 	@sleep 1
 
+# FIXME: This should invoke the clean targets in each of the Makefiles.
 clean:
-	@-rm -f charmrun work.pc work.pcl
-	@dirs=`echo "$(DIRS)"`; \
-        for x in $(FILE_SYSTEM) ;\
-         do \
-             dirs=`echo "$$dirs" adio/ad_$$x` ;\
-         done ; \
-        if test "$(BUILD_MPI_INFO)" = 1 ; then \
-            dirs=`echo "$$dirs" mpi2-other/info` ;\
-            if test "$(NOF77)" = 0 ; then\
-                dirs=`echo "$$dirs" mpi2-other/info/fortran` ;\
-            fi;\
-        fi; \
-        if test "$(BUILD_MPI_ARRAY)" = 1 ; then \
-            dirs=`echo "$$dirs" mpi2-other/array` ;\
-            if test "$(NOF77)" = 0 ; then\
-                dirs=`echo "$$dirs" mpi2-other/array/fortran` ;\
-            fi;\
-        fi; \
-        if test "$(NOF77)" = 0 ; then\
-            dirs=`echo "$$dirs" mpi-io/fortran` ;\
-        fi;\
-        for dir in $$dirs ;\
+	@-rm -f work.pc work.pcl
+	@for dir in $(DIRS) $(FILE_SYS_DIRS) $(EXTRA_SRC_DIRS) ;\
          do \
             echo " " ;\
             echo cleaning directory $$dir ;\
-            (cd $$dir; rm -f *.o) ;\
+            (cd $$dir && rm -f *.o *.lo *.gcno *.gcda *.bb *.bbg) ;\
          done; \
-         echo " " 
+         echo " " ;\
+         echo cleaning directory test-internal ;\
+         (cd test-internal && $(MAKE) clean);\
+         echo " ";\
+         echo " " ;\
+         echo cleaning directory test ;\
+         (cd test && $(MAKE) clean);\
+         echo " ";
 
 mpiolib:
-	@if test "$(FROM_MPICH)" = 0 -a "$(FROM_MPICH2)" = 0 ; then \
+	@if [ "$(WITHIN_KNOWN_MPI_IMPL)" = no ] ; then \
             echo " " ;\
             echo "deleting previously built library if it exists" ;\
             rm -f $(LIBNAME) ;\
-        fi; \
-        dirs=`echo "$(DIRS)"`; \
-        for x in $(FILE_SYSTEM) ;\
-         do \
-             dirs=`echo "$$dirs" adio/ad_$$x` ;\
-         done ; \
-        if test "$(BUILD_MPI_INFO)" = 1 ; then \
-            dirs=`echo "$$dirs" mpi2-other/info` ;\
-            if test "$(NOF77)" = 0 ; then \
-                dirs=`echo "$$dirs" mpi2-other/info/fortran` ;\
-            fi; \
-        fi; \
-        if test "$(BUILD_MPI_ARRAY)" = 1 ; then \
-            dirs=`echo "$$dirs" mpi2-other/array` ;\
-            if test "$(NOF77)" = 0 ; then \
-                dirs=`echo "$$dirs" mpi2-other/array/fortran` ;\
-            fi; \
-        fi; \
-        if test "$(NOF77)" = 0 ; then \
-            dirs=`echo "$$dirs" mpi-io/fortran` ;\
-        fi; \
-        for dir in $$dirs ;\
+        fi
+	@for dir in $(DIRS) $(FILE_SYS_DIRS) $(EXTRA_SRC_DIRS) ;\
          do \
             echo " " ;\
             echo compiling ROMIO in directory $$dir ;\
 	    sleep 1;\
-            (cd $$dir && $(MAKE) ;) ;\
+            (cd $$dir && $(MAKE);) || exit 1 ;\
             if [ $$? != 0 ] ; then \
                 echo "Make failed in directory $$dir" ; exit 1 ;\
             fi ;\
          done
 
+# We no longer need to clean before building the profiling interface
 profile: 
 	@if [ "@HAVE_WEAK_SYMBOLS@" = 0 ] ; then \
-           dirs=`echo "$(MPIO_DIRS)"`; \
-           if test "$(BUILD_MPI_INFO)" = 1 ; then \
-               dirs=`echo "$$dirs" mpi2-other/info` ;\
-               if test "$(NOF77)" = 0 ; then\
-                   dirs=`echo "$$dirs" mpi2-other/info/fortran` ;\
-               fi;\
-           fi; \
-           if test "$(BUILD_MPI_ARRAY)" = 1 ; then \
-               dirs=`echo "$$dirs" mpi2-other/array` ;\
-               if test "$(NOF77)" = 0 ; then\
-                   dirs=`echo "$$dirs" mpi2-other/array/fortran` ;\
-               fi;\
-           fi; \
-           if test "$(NOF77)" = 0 ; then\
-               dirs=`echo "$$dirs" mpi-io/fortran` ;\
-           fi;\
-           for dir in $$dirs ;\
-            do \
+	   for dir in $(MPIO_DIRS) $(EXTRA_SRC_DIRS) ;\
+              do \
                echo " " ;\
                echo building profiling interface in directory $$dir ;\
                sleep 1;\
-               (cd $$dir; \
-                $(MAKE) profile MPIOPROFILE="-DMPIO_BUILD_PROFILING";) ;\
+               (cd $$dir && \
+                $(MAKE) profile MPIOPROFILE="-DMPIO_BUILD_PROFILING";) || exit 1;\
                 if [ $$? != 0 ] ; then \
                     echo "Make failed in directory $$dir" ; exit 1 ;\
                 fi ;\
-            done \
+            done ;\
 	fi
+
+# FIXME: This should look at the enabled File systems
+coverage:
+	(cd mpi-io && make coverage)
+	(cd adio/ad_ufs && make coverage)
+	(cd adio/ad_nfs && make coverage)
 
 cleanall:
 	@dirs=`echo "$(ALL_DIRS)"`; \
+	echo "cleaning test directory" ;\
+	(cd test && ${MAKE} cleanall ) ;\
         echo cleaning current directory ;\
-        (rm -f config.status Makefile *~ *.log romio.tar*) ;\
+        (rm -f config.status Makefile *~ *.log romio.tar* localdefs) ;\
         for dir in $$dirs ;\
          do \
             echo " " ;\
 	    if [ ! -d $$dir ] ; then continue ; fi ; \
             echo cleaning directory $$dir ;\
-            (cd $$dir; rm -f *.o Makefile *~) ;\
+            (cd $$dir && rm -f *.o Makefile *~) ;\
          done; \
          echo " " ;\
          echo "cleaning directory include" ;\
-         (cd include; rm -f *.h);\
+         (cd include && rm -f *.h);\
+         echo " " ;\
+         echo "cleaning directory adio/include" ;\
+         (cd adio/include && rm -f romioconf.h);\
          echo " " ;\
          echo "cleaning directory util" ;\
-         (cd util; rm -f romioinstall *~)
-	-rm -rf lib
+         (cd util && rm -f romioinstall *~)
+	-rm -f lib
 
 install:
 	$(MAKE) clean
@@ -170,6 +143,8 @@ install:
 uninstall:
 	@./util/romioinstall -prefix=$(PREFIX) -uninstall
 
+# FIXME: To avoid problems with noisy make programs, these should be accessed
+# through entries in localdefs .
 romio_lflags:
 	@echo '@ROMIO_LFLAGS@'
 
@@ -187,3 +162,28 @@ romio_tfflags:
 
 # distclean the standard form for cleanall
 distclean: cleanall
+
+# Allow dependencies target
+dependencies:
+
+# MPICH2 documentation targets
+mandoc:
+	(cd mpi-io && $(MAKE) mandoc )
+htmldoc:
+	(cd mpi-io && $(MAKE) htmldoc )
+latexdoc:
+	(cd mpi-io && $(MAKE) latexdoc )
+
+
+tags: TAGS
+TAGS:
+	for dir in mpi-io adio/common - ; do \
+		if [ "$$dir" = "-" ] ; then break ; fi ; \
+		(cd $$dir && ${MAKE} TAGS ; ) ; done
+
+# This target is appropriate for autoconf 2.59 (the command line options
+# for selecting the macro directories changes in incompatible ways between
+# autoconf releases).
+${srcdir}/configure: ${srcdir}/configure.in 
+	cd ${srcdir} && autoheader -I confdb
+	cd ${srcdir} && rm -rf autom4te*.cache && autoconf -I confdb 

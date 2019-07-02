@@ -1524,7 +1524,6 @@ void CkMemRestart(const char *dummy, CkArgMsg *args)
 
 // can be called in other files
 // return true if it is in restarting
-extern "C"
 int CkInRestarting()
 {
 #if CMK_MEM_CHECKPOINT
@@ -1538,20 +1537,17 @@ int CkInRestarting()
 #endif
 }
 
-extern "C"
-int CkInCheckpointing()
+static int CkInCheckpointing()
 {
   return CkMemCheckPT::inCheckpointing;
 }
 
-extern "C"
 void CkSetInLdb(){
 #if CMK_MEM_CHECKPOINT
 	CkMemCheckPT::inLoadbalancing = true;
 #endif
 }
 
-extern "C"
 int CkInLdb(){
 #if CMK_MEM_CHECKPOINT
 	return (int)CkMemCheckPT::inLoadbalancing;
@@ -1559,7 +1555,6 @@ int CkInLdb(){
 	return 0;
 }
 
-extern "C"
 void CkResetInLdb(){
 #if CMK_MEM_CHECKPOINT
 	CkMemCheckPT::inLoadbalancing = false;
@@ -1586,7 +1581,7 @@ void init_memcheckpt(char **argv)
 }
 #endif
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 class CkMemCheckPTInit: public Chare {
 public:
@@ -1614,8 +1609,7 @@ static void notifyHandler(char *msg)
 #endif
 }
 
-extern "C"
-void notify_crash(int node)
+static void notify_crash(int node)
 {
 #ifdef CMK_MEM_CHECKPOINT
   CpvAccess( _crashedNode) = node;
@@ -1637,7 +1631,7 @@ void notify_crash(int node)
 #endif
 }
 
-extern "C" void (*notify_crash_fn)(int node);
+extern void (*notify_crash_fn)(int node);
 
 #if CMK_CONVERSE_MPI
 //static int pingHandlerIdx;
@@ -1798,7 +1792,6 @@ void CkRegisterRestartHandler( )
 }
 
 
-extern "C"
 int CkHasCheckpoints()
 {
   return (int)checkpointed;

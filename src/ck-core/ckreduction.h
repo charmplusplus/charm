@@ -25,10 +25,6 @@ The calls needed to use the reduction manager are:
 #define FRAG_THRESHOLD 131072
 #endif
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-#define MAX_INT 5000000
-#define _MLOG_REDUCE_P2P_ 0
-#endif
 
 //This message is sent between group objects on a single PE
 // to let each know the other has been created.
@@ -123,6 +119,7 @@ public:
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  */
 
+  // KEEPINSYNC: charmmod.f90
 	typedef enum {
 	//A placeholder invalid reduction type
 		invalid=0,
@@ -159,6 +156,7 @@ public:
 
 	//Compute the logical XOR of the values passed by each element.
 	// The resulting value will be 1 if an odd number of source value is nonzero.
+	// logical_xor does not exist
                 logical_xor_int,logical_xor_bool,
 
                 // Compute the logical bitvector AND of the values passed by each element.
@@ -189,7 +187,7 @@ public:
         // Combine multiple data/reducer pairs into one reduction
         tuple,
 
-        // Perform reduction using external reducer defined in Python (for CharmPy)
+        // Perform reduction using external reducer defined in Python (for Charm4py)
         external_py
 	} reducerType;
 
@@ -251,7 +249,7 @@ public:
 
 	//Add the given reducer to the list.  Returns the new reducer's
 	// reducerType.  Must be called in the same order on every node.
-	static reducerType addReducer(reducerFn fn, bool streamable=false);
+	static reducerType addReducer(reducerFn fn, bool streamable=false, const char* name=NULL);
 
 private:
 	friend class CkReductionMgr;
@@ -273,8 +271,9 @@ private:
 };
 PUPbytes(CkReduction::reducerType)
 
+#if CMK_CHARMPY
 //CkReductionTypesExt struct to expose the reducerTypes for external
-//modules like CharmPy
+//modules like Charm4py
         /*  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -341,6 +340,10 @@ struct CkReductionTypesExt {
     // External custom reducer in Python
     int external_py = CkReduction::external_py;
 };
+
+extern "C" CkReductionTypesExt charm_reducers;
+
+#endif
 
 //A CkReductionMsg is sent up the reduction tree-- it
 // carries a contribution, or several reduced contributions.
@@ -687,32 +690,12 @@ public:
 		when there are no gcount
 	*/
 	int getGCount(){return gcount;};
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	void decGCount(){gcount--;}
-	void incNumImmigrantRecObjs(){
-		numImmigrantRecObjs++;
-	}
-	void decNumImmigrantRecObjs(){
-		numImmigrantRecObjs--;
-	}
-	void incNumEmigrantRecObjs(){
-		numEmigrantRecObjs++;
-	}
-	void decNumEmigrantRecObjs(){
-		numEmigrantRecObjs--;
-	}
-
-#endif
 
         //Combine (& free) the current message vector.
 	static CkReductionMsg *reduceMessages(CkMsgQ<CkReductionMsg> &msgs);
 
 private:
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	int numImmigrantRecObjs;
-	int numEmigrantRecObjs;
-#endif
 
 //Data members
 	//Stored callback function (may be NULL if none has been set)
@@ -890,8 +873,10 @@ class Group : public CkReductionMgr
 	virtual void flushStates() {
 		CkReductionMgr::flushStates();
 		reductionInfo.redNo = 0;
- 	}
+	}
 	virtual void CkAddThreadListeners(CthThread tid, void *msg);
+
+	int getRedNo() const { return reductionInfo.redNo; }
 
 	CK_REDUCTION_CONTRIBUTE_METHODS_DECL
         CK_BARRIER_CONTRIBUTE_METHODS_DECL

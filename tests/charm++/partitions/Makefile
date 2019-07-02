@@ -1,4 +1,5 @@
 -include ../../common.mk
+-include ../../../include/conv-mach-opt.mak
 CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = hello.o
@@ -18,16 +19,13 @@ hello.o: hello.C hello.decl.h
 	$(CHARMC) -c hello.C
 
 test: all
-	CHARMINC=../../../include . ../../../tmp/conv-mach.sh ; \
-	CHARMINC=../../../include . ../../../tmp/conv-mach-opt.sh ; \
-	if [ "$$CMK_NO_PARTITIONS" = "1" ] ; \
-	then \
-	  echo "Skipping test since build does not support partitions"; exit 0 ; \
-	elif [ "$$CMK_BLUEGENEQ" = "1" ] ; \
-	then \
-	  echo "Skipping partitions test on BGQ"; exit 0 ; \
-	fi ; \
+ifeq ($(CMK_NO_PARTITIONS),1)
+	echo "Skipping test since build does not support partitions"
+else ifeq ($(CMK_BLUEGENEQ),1)
+	echo "Skipping partitions test on BGQ"
+else
 	$(call run, ./hello +p4 10 2 +partitions 2)
+endif
 
 bgtest: all
 	$(call run, ./hello +p4 10 2 +x2 +y2 +z2 +cth1 +wth1 +partitions 2)

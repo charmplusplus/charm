@@ -1,9 +1,6 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-// specify the version of the UNIX APIs that we want to use (for ucontext headers)
-#define _XOPEN_SOURCE
-
 #define CMK_SMP                                            1
 #define CMK_MULTICORE                                      1
 
@@ -64,6 +61,8 @@
 #define CMK_NO_ISO_MALLOC				   1
 */
 #define CMK_USE_KQUEUE                                     1
+
+#define CMK_NOT_USE_TLS_THREAD                             1
 
 #if !CMK_GCC_X86_ASM || !CMK_GCC_X86_ASM_ATOMICINCREMENT
 #define CMK_PCQUEUE_LOCK                                   1

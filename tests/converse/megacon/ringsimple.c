@@ -38,6 +38,8 @@ void ringsimple_hop(ringmsg *msg)
 void ringsimple_init(void)
 {
   int i; ringmsg msg={{0},1000,0,{0}};
+
+  CmiInitMsgHeader(msg.core, sizeof(ringmsg));
   for (i=0; i<10; i++) msg.data[i] = i;
   CmiSetHandler(&msg, CpvAccess(ringsimple_hop_index));
   for (i=0; i<entries; i++) {

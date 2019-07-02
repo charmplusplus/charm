@@ -49,6 +49,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include "converse.h"
+#include <algorithm>
 
 /*Support for ++debug: */
 #include <unistd.h> /*For getpid()*/
@@ -91,10 +92,10 @@
 #include "request.h"
 
 /* Runtime to exchange EP addresses during LrtsInit() */
-#if CMK_OFI_USE_PMI
-#include "runtime-pmi.c"
-#elif CMK_OFI_USE_PMI2
-#include "runtime-pmi2.c"
+#if CMK_USE_PMI
+#include "runtime-pmi.C"
+#elif CMK_USE_PMI2
+#include "runtime-pmi2.C"
 #endif
 
 #define USE_MEMPOOL 0
@@ -136,7 +137,8 @@ CpvDeclare(mempool_type*, mempool);
 #define OFI_RDMA_DIRECT_REG_AND_PUT 0x4ULL
 #define OFI_RDMA_DIRECT_REG_AND_GET 0x5ULL
 
-#define OFI_RDMA_OP_ACK 0x7ULL
+#define OFI_RDMA_DIRECT_DEREG_AND_ACK 0x6ULL
+
 #define OFI_OP_NAMES 0x8ULL
 
 #define OFI_READ_OP 1
@@ -674,7 +676,9 @@ void send_short_callback(struct fi_cq_tagged_entry *e, OFIRequest *req)
     msg = (char *)req->data.short_msg;
     CmiAssert(msg);
     MACHSTATE1(3, "--> msg=%p", msg);
-    CmiFree(msg);
+
+    if(req->freeMe)
+      CmiFree(msg);
 
 #if USE_OFIREQUEST_CACHE
     free_request(req);
@@ -1145,14 +1149,14 @@ void recv_callback(struct fi_cq_tagged_entry *e, OFIRequest *req)
     case OFI_OP_ACK:
         process_long_send_ack(e, req);
         break;
-    case OFI_RDMA_OP_ACK:
-        process_onesided_completion_ack(e, req);
-        break;
     case OFI_RDMA_DIRECT_REG_AND_PUT:
         process_onesided_reg_and_put(e, req);
         break;
     case OFI_RDMA_DIRECT_REG_AND_GET:
         process_onesided_reg_and_get(e, req);
+        break;
+    case OFI_RDMA_DIRECT_DEREG_AND_ACK:
+        process_onesided_dereg_and_ack(e, req);
         break;
     default:
         MACHSTATE2(3, "--> unknown operation %x len=%ld", e->tag, e->len);
@@ -1338,7 +1342,6 @@ void LrtsDrainResources() /* used when exiting */
     MACHSTATE(2, "} OFI::LrtsDrainResources");
 }
 
-CMI_EXTERNC
 void* LrtsAlloc(int n_bytes, int header)
 {
     void *ptr = NULL;
@@ -1357,7 +1360,6 @@ void* LrtsAlloc(int n_bytes, int header)
     return ptr;
 }
 
-CMI_EXTERNC
 void LrtsFree(void *msg)
 {
 #if USE_MEMPOOL
@@ -1605,7 +1607,7 @@ int fill_av_ofi(int myid,
                 CmiAbort("OFI::LrtsInit::snprintf error");
             }
 
-            ret = runtime_kvs_get(key, epnames+(i*epnamelen), epnamelen);
+            ret = runtime_kvs_get(key, epnames+(i*epnamelen), epnamelen, i);
             if (ret) {
                 CmiAbort("OFI::LrtsInit::runtime_kvs_get error");
             }
@@ -1754,7 +1756,7 @@ int fill_av(int myid,
             CmiAbort("OFI::LrtsInit::snprintf error");
         }
 
-        ret = runtime_kvs_get(key, epnames+(i*epnamelen), epnamelen);
+        ret = runtime_kvs_get(key, epnames+(i*epnamelen), epnamelen, i);
         if (ret) {
             CmiAbort("OFI::LrtsInit::runtime_kvs_get error");
         }
@@ -1776,5 +1778,5 @@ int fill_av(int myid,
 }
 
 #if CMK_ONESIDED_IMPL
-#include "machine-onesided.c"
+#include "machine-onesided.C"
 #endif

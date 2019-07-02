@@ -22,7 +22,7 @@ class Main : public CBase_Main {
   Main(CkArgMsg *m){
     if(m->argc != 5){
       CkPrintf("[main] Usage: pgm <nChares> <nElementsPerChare> <maxElementValue> <nBins>\n");
-      CkExit();
+      CkExit(1);
     }
 
     // Process command-line arguments

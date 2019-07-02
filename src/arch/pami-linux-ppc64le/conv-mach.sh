@@ -16,8 +16,8 @@ CMK_LDXX="$CMK_CXX "
 
 CMK_CPP_C_FLAGS="-E"
 
-CMK_C_OPTIMIZE='-O3 -g'
-CMK_CXX_OPTIMIZE='-O3 -g'
+CMK_C_OPTIMIZE='-O3'
+CMK_CXX_OPTIMIZE='-O3'
 
 CMK_RANLIB='ranlib'
 CMK_LIBS='-lckqt'
@@ -43,7 +43,16 @@ CMK_F90_USE_MODDIR=''
 F90DIR=`which ifort 2> /dev/null`
 if test -x "$F90DIR"
 then
-  F90DIR=`dirname $F90DIR`
+  MYDIR="$PWD"
+  cd `dirname "$F90DIR"`
+  if test -L 'ifort'
+  then
+    F90DIR=`readlink ifort`
+    cd `dirname "$F90DIR"`
+  fi
+  F90DIR=`pwd -P`
+  cd "$MYDIR"
+
   Minor=`basename $F90DIR`
   F90LIBDIR="$F90DIR/../lib/$Minor"
   if ! test -x "$F90LIBDIR"
@@ -52,6 +61,18 @@ then
     if ! test -x "$F90LIBDIR"
     then
       F90LIBDIR="$F90DIR/../../compiler/lib/$Minor"
+    fi
+    if ! test -x "$F90LIBDIR"
+    then
+      F90LIBDIR="$F90DIR/../../lib/$Minor"
+    fi
+    if ! test -x "$F90LIBDIR"
+    then
+      F90LIBDIR="$F90DIR/../../compiler/lib/${Minor}_lin"
+    fi
+    if ! test -x "$F90LIBDIR"
+    then
+      F90LIBDIR="$F90DIR/../../lib/${Minor}_lin"
     fi
   fi
   F90MAIN="$F90LIBDIR/for_main.o"

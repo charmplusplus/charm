@@ -13,10 +13,12 @@ public:
   main(CkArgMsg *m)
   {
     if(CkNumPes()>2) {
-      CkAbort("Run this program on 1 or 2 processors only.\n");
+      CkPrintf("Run this program on 1 or 2 processors only.\n");
+      CkExit(1);
     }
     if(m->argc !=2 ) {
-      CkAbort("Usage: ./simple_get <array size>\n");
+      CkPrintf("Usage: ./simple_get <array size>\n");
+      CkExit(1);
     }
     int size = atoi(m->argv[1]);
     mainProxy = thisProxy;
@@ -61,8 +63,6 @@ class Ping1 : public CBase_Ping1
   int size;
   int otherIndex, cbCounter, valCounter;
   CkCallback cb;
-  CkNcpyBuffer myDest1, myDest2, myDest3;
-  CkNcpyBuffer mySrc1, mySrc2, mySrc3;
 
 public:
   Ping1(int size)
@@ -98,15 +98,18 @@ public:
     // arbitrary pointer pointing to valCounter
     const void *refPtr = &valCounter;
 
-    mySrc1 = CkNcpyBuffer(iArr1, size*sizeof(int), cb, CK_BUFFER_UNREG);
+    cb.setRefNum(1);
+    CkNcpyBuffer mySrc1(iArr1, size*sizeof(int), cb, CK_BUFFER_UNREG);
     ACK_DEBUG(("[%d][%d][%d] Setting source Ref: Buffer Ptr: %p, Reference Ptr: %p\n", thisIndex, CkMyPe(), CkMyNode(), iArr1, refPtr));
     mySrc1.setRef(refPtr);
 
-    mySrc2 = CkNcpyBuffer(dArr1, size*sizeof(double), cb, CK_BUFFER_UNREG);
+    cb.setRefNum(2);
+    CkNcpyBuffer mySrc2(dArr1, size*sizeof(double), cb, CK_BUFFER_UNREG);
     ACK_DEBUG(("[%d][%d][%d] Setting source Ref: Buffer Ptr: %p, Reference Ptr: %p\n", thisIndex, CkMyPe(), CkMyNode(), dArr1, refPtr));
     mySrc2.setRef(refPtr);
 
-    mySrc3 = CkNcpyBuffer(cArr1, size*sizeof(char), cb, CK_BUFFER_UNREG);
+    cb.setRefNum(3);
+    CkNcpyBuffer mySrc3(cArr1, size*sizeof(char), cb, CK_BUFFER_UNREG);
     ACK_DEBUG(("[%d][%d][%d] Setting source Ref: Buffer Ptr: %p, Reference Ptr: %p\n", thisIndex, CkMyPe(), CkMyNode(), cArr1, refPtr));
     mySrc3.setRef(refPtr);
 
@@ -119,12 +122,14 @@ public:
     CkAssert(thisIndex == 0);
     cbCounter++;
 
-    // Cast m->data as (CkNcpyAck *)
-    CkNcpyAck *ack = (CkNcpyAck *)(m->data);
-    ACK_DEBUG(("[%d][%d][%d] In source callback : Buffer Ptr: %p, Reference Ptr: %p\n", thisIndex, CkMyPe(), CkMyNode(), ack->ptr, ack->ref));
+    // Cast m->data as (CkNcpyBuffer *)
+    CkNcpyBuffer *src = (CkNcpyBuffer *)(m->data);
+    ACK_DEBUG(("[%d][%d][%d] In source callback : Buffer Ptr: %p, Reference Ptr: %p and refnum is %d\n", thisIndex, CkMyPe(), CkMyNode(), src->ptr, src->ref, CkGetRefNum(m)));
+
+    int refNum = CkGetRefNum(m);
 
     void *srcPointer;
-    switch(cbCounter) {
+    switch(refNum) {
       case 1 : srcPointer = iArr1; break;
       case 2 : srcPointer = dArr1; break;
       case 3 : srcPointer = cArr1; break;
@@ -132,16 +137,15 @@ public:
     }
 
     // Verify that source pointer is equal to the buffer pointer returned
-    CkAssert(srcPointer == ack->ptr);
+    CkAssert(srcPointer == src->ptr);
 
     // Verify that reference pointer is equal to the reference pointer returned
-    CkAssert(&valCounter == ack->ref);
+    CkAssert(&valCounter == src->ref);
+
+    // Deregister the source object
+    src->deregisterMem();
 
     if(cbCounter == 3) {
-      // Release Resources for my sources
-      mySrc1.deregisterMem();
-      mySrc2.deregisterMem();
-      mySrc3.deregisterMem();
       CkPrintf("[%d][%d][%d] Get Source Done\n", thisIndex, CkMyPe(), CkMyNode());
       sendValidationData();
     }
@@ -153,12 +157,14 @@ public:
     CkAssert(thisIndex == 1);
     cbCounter++;
 
-    // Cast m->data as (CkNcpyAck *)
-    CkNcpyAck *ack = (CkNcpyAck *)(m->data);
-    ACK_DEBUG(("[%d][%d][%d] In destination callback : Buffer Ptr: %p, Reference Ptr: %p\n", thisIndex, CkMyPe(), CkMyNode(), ack->ptr, ack->ref));
+    // Cast m->data as (CkNcpyBuffer *)
+    CkNcpyBuffer *dest = (CkNcpyBuffer *)(m->data);
+    ACK_DEBUG(("[%d][%d][%d] In destination callback : Buffer Ptr: %p, Reference Ptr: %p and refnum is %d\n", thisIndex, CkMyPe(), CkMyNode(), dest->ptr, dest->ref, CkGetRefNum(m)));
+
+    int refNum = CkGetRefNum(m);
 
     void *destPointer;
-    switch(cbCounter) {
+    switch(refNum) {
       case 1 : destPointer = iArr1; break;
       case 2 : destPointer = dArr1; break;
       case 3 : destPointer = cArr1; break;
@@ -166,18 +172,15 @@ public:
     }
 
     // Verify that destination pointer is equal to the buffer pointer returned
-    CkAssert(destPointer == ack->ptr);
+    CkAssert(destPointer == dest->ptr);
 
     // Verify that reference pointer is equal to the reference pointer returned
-    CkAssert(&valCounter == ack->ref);
+    CkAssert(&valCounter == dest->ref);
 
-
+    // Deregister the destination object
+    dest->deregisterMem();
 
     if(cbCounter == 3) {
-      // Release Resources for my destinations
-      myDest1.deregisterMem();
-      myDest2.deregisterMem();
-      myDest3.deregisterMem();
       CkPrintf("[%d][%d][%d] Get Destination Done\n", thisIndex, CkMyPe(), CkMyNode());
       thisProxy[otherIndex].sendValidationData();
     }
@@ -206,15 +209,18 @@ public:
     const void *refPtr = &valCounter;
 
     // Create nocopy destination for me to Get into
-    myDest1 = CkNcpyBuffer(iArr1, size*sizeof(int), cb, CK_BUFFER_UNREG);
+    cb.setRefNum(1);
+    CkNcpyBuffer myDest1(iArr1, size*sizeof(int), cb, CK_BUFFER_UNREG);
     ACK_DEBUG(("[%d][%d][%d] Setting destination Ref: Buffer Ptr: %p, Reference Ptr: %p\n", thisIndex, CkMyPe(), CkMyNode(), iArr1, refPtr));
     myDest1.setRef(refPtr);
 
-    myDest2 = CkNcpyBuffer(dArr1, size*sizeof(double), cb, CK_BUFFER_UNREG);
+    cb.setRefNum(2);
+    CkNcpyBuffer myDest2(dArr1, size*sizeof(double), cb, CK_BUFFER_UNREG);
     ACK_DEBUG(("[%d][%d][%d] Setting destination Ref: Buffer Ptr: %p, Reference Ptr: %p\n", thisIndex, CkMyPe(), CkMyNode(), dArr1, refPtr));
     myDest2.setRef(refPtr);
 
-    myDest3 = CkNcpyBuffer(cArr1, size*sizeof(char), cb, CK_BUFFER_UNREG);
+    cb.setRefNum(3);
+    CkNcpyBuffer myDest3(cArr1, size*sizeof(char), cb, CK_BUFFER_UNREG);
     ACK_DEBUG(("[%d][%d][%d] Setting destination Ref: Buffer Ptr: %p, Reference Ptr: %p\n", thisIndex, CkMyPe(), CkMyNode(), cArr1, refPtr));
     myDest3.setRef(refPtr);
 

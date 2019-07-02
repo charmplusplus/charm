@@ -32,7 +32,7 @@ void _createTraceutilization(char **argv)
 
   // Register the reducer
   CkAssert(sizeof(short) == 2);
-  sumDetailCompressedReducer=CkReduction::addReducer(sumDetailCompressedReduction);
+  sumDetailCompressedReducer=CkReduction::addReducer(sumDetailCompressedReduction, false, "sumDetailCompressedReduction");
 
   CkpvInitialize(TraceUtilization*, _trace);
   CkpvAccess(_trace) = new TraceUtilization();

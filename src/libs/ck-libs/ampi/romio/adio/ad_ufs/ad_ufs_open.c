@@ -1,6 +1,5 @@
 /* -*- Mode: C; c-basic-offset:4 ; -*- */
 /* 
- *   $Id$    
  *
  *   Copyright (C) 1997 University of Chicago. 
  *   See COPYRIGHT notice in top-level directory.
@@ -11,9 +10,7 @@
 void ADIOI_UFS_Open(ADIO_File fd, int *error_code)
 {
     int perm, old_mask, amode;
-#ifndef PRINT_ERR_MSG
     static char myname[] = "ADIOI_UFS_OPEN";
-#endif
 
     if (fd->perm == ADIO_PERM_NULL) {
 	old_mask = umask(022);
@@ -34,19 +31,73 @@ void ADIOI_UFS_Open(ADIO_File fd, int *error_code)
     if (fd->access_mode & ADIO_EXCL)
 	amode = amode | O_EXCL;
 
-    fd->fd_sys = open(fd->filename, amode, perm);
-
-    if ((fd->fd_sys != -1) && (fd->access_mode & ADIO_APPEND))
-	fd->fp_ind = fd->fp_sys_posn = lseek(fd->fd_sys, 0, SEEK_END);
-
-#ifdef PRINT_ERR_MSG
-    *error_code = (fd->fd_sys == -1) ? MPI_ERR_UNKNOWN : MPI_SUCCESS;
-#else
-    if (fd->fd_sys == -1) {
-	*error_code = MPIR_Err_setmsg(MPI_ERR_IO, MPIR_ADIO_ERROR,
-			      myname, "I/O Error", "%s", strerror(errno));
-	ADIOI_Error(ADIO_FILE_NULL, *error_code, myname);	    
-    }
-    else *error_code = MPI_SUCCESS;
+    
+#ifdef ADIOI_MPE_LOGGING
+    MPE_Log_event( ADIOI_MPE_open_a, 0, NULL );
 #endif
+    fd->fd_sys = open(fd->filename, amode, perm);
+#ifdef ADIOI_MPE_LOGGING
+    MPE_Log_event( ADIOI_MPE_open_b, 0, NULL );
+#endif
+    fd->fd_direct = -1;
+
+    if ((fd->fd_sys != -1) && (fd->access_mode & ADIO_APPEND)) {
+#ifdef ADIOI_MPE_LOGGING
+        MPE_Log_event( ADIOI_MPE_lseek_a, 0, NULL );
+#endif
+	fd->fp_ind = fd->fp_sys_posn = lseek(fd->fd_sys, 0, SEEK_END);
+#ifdef ADIOI_MPE_LOGGING
+        MPE_Log_event( ADIOI_MPE_lseek_b, 0, NULL );
+#endif
+    }
+
+    /* --BEGIN ERROR HANDLING-- */
+    if (fd->fd_sys == -1) {
+	if (errno == ENAMETOOLONG)
+	    *error_code = MPIO_Err_create_code(MPI_SUCCESS,
+					       MPIR_ERR_RECOVERABLE, myname,
+					       __LINE__, MPI_ERR_BAD_FILE,
+					       "**filenamelong",
+					       "**filenamelong %s %d",
+					       fd->filename,
+					       strlen(fd->filename));
+	else if (errno == ENOENT)
+	    *error_code = MPIO_Err_create_code(MPI_SUCCESS,
+					       MPIR_ERR_RECOVERABLE, myname,
+					       __LINE__, MPI_ERR_NO_SUCH_FILE,
+					       "**filenoexist",
+					       "**filenoexist %s",
+					       fd->filename);
+	else if (errno == ENOTDIR || errno == ELOOP)
+	    *error_code = MPIO_Err_create_code(MPI_SUCCESS,
+					       MPIR_ERR_RECOVERABLE,
+					       myname, __LINE__,
+					       MPI_ERR_BAD_FILE,
+					       "**filenamedir",
+					       "**filenamedir %s",
+					       fd->filename);
+	else if (errno == EACCES) {
+	    *error_code = MPIO_Err_create_code(MPI_SUCCESS,
+					       MPIR_ERR_RECOVERABLE, myname,
+					       __LINE__, MPI_ERR_ACCESS,
+					       "**fileaccess",
+					       "**fileaccess %s", 
+					       fd->filename );
+	}
+	else if (errno == EROFS) {
+	    /* Read only file or file system and write access requested */
+	    *error_code = MPIO_Err_create_code(MPI_SUCCESS,
+					       MPIR_ERR_RECOVERABLE, myname,
+					       __LINE__, MPI_ERR_READ_ONLY,
+					       "**ioneedrd", 0 );
+	}
+	else {
+	    *error_code = MPIO_Err_create_code(MPI_SUCCESS,
+					       MPIR_ERR_RECOVERABLE, myname,
+					       __LINE__, MPI_ERR_IO, "**io",
+					       "**io %s", strerror(errno));
+	}
+    }
+    /* --END ERROR HANDLING-- */
+    else *error_code = MPI_SUCCESS;
 }

@@ -44,6 +44,10 @@ public:
     int pe;
     /// Counter tracking the last reduction that has traversed this section (used by CkMulticast)
     int redNo;
+
+    bool operator==(CkSectionInfoStruct &other) {
+      return (val == other.val && aid == other.aid && pe == other.pe && redNo == other.redNo);
+    }
   };
 
   CkSectionInfoStruct info;
@@ -91,12 +95,22 @@ class CkMcastBaseMsg {
 public:
   /// Current info about the state of this section
   CkSectionInfo _cookie;
-  /// A magic number to detect msg corruption
-  char magic;
   unsigned short ep;
+#if CMK_ERROR_CHECKING
+ private:
+  /// A magic number to detect msg corruption
+  char magic = _SECTION_MAGIC;
+#endif
 
-  CkMcastBaseMsg(): magic(_SECTION_MAGIC) {}
-  static inline bool checkMagic(CkMcastBaseMsg *m) { return m->magic == _SECTION_MAGIC; }
+ public:
+  CkMcastBaseMsg() = default;
+  static inline bool checkMagic(CkMcastBaseMsg *m) {
+#if CMK_ERROR_CHECKING
+    return m->magic == _SECTION_MAGIC;
+#else
+    return true;
+#endif
+  }
   inline int &gpe(void)      { return _cookie.get_pe(); }
   inline int &redno(void)    { return _cookie.get_redNo(); }
   inline void *&entry(void) { return _cookie.get_val(); }
@@ -112,7 +126,8 @@ class CkArrayIndex5D;
 class CkArrayIndex6D;
 
 #define CKSECTIONID_CONSTRUCTOR(index) \
-  CkSectionID(const CkArrayID &aid, const CkArrayIndex##index *elems, const int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR);
+  CkSectionID(const CkArrayID &aid, const CkArrayIndex##index *elems, const int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR); \
+  CkSectionID(const CkArrayID &aid, const std::vector<CkArrayIndex##index> &elems, int factor=USE_DEFAULT_BRANCH_FACTOR);
 
 #define USE_DEFAULT_BRANCH_FACTOR 0
 
@@ -125,28 +140,31 @@ public:
   /// Minimal section info (cookie)
   CkSectionInfo _cookie;
   /// The list of array indices that are section members (array sections)
-  CkArrayIndex *_elems;
-  /// The number of section members
-  int _nElems;
+  std::vector<CkArrayIndex> _elems;
   /**
    * \brief A list of PEs that host section members.
    * - For group sections these point to the PEs in the section
    * - For array sections these point to the processors the array elements are on
    * @note For array sections, currently not saved when pupped across processors
    */
-  int *pelist;
-  /// The number of PEs that host section members
-  int npes;
+  std::vector<int> pelist;
   /// Branching factor in the spanning tree, can be negative
   int bfactor;
 
-  CkSectionID(): _elems(NULL), _nElems(0), pelist(NULL), npes(0),
-                  bfactor(USE_DEFAULT_BRANCH_FACTOR) {}
+  CkSectionID(): bfactor(USE_DEFAULT_BRANCH_FACTOR) {}
   CkSectionID(const CkSectionID &sid);
-  CkSectionID(CkSectionInfo &c, CkArrayIndex *e, int n, int *_pelist, int _npes,
+  CkSectionID(CkSectionInfo &c, const CkArrayIndex *e, int n, const int *_pelist, int _npes,
+              int factor=USE_DEFAULT_BRANCH_FACTOR): _cookie(c), bfactor(factor)
+  {
+    _elems.assign(e, e+n);
+    pelist.assign(_pelist, _pelist+_npes);
+  }
+  CkSectionID(CkSectionInfo &c, const std::vector<CkArrayIndex>& e, const std::vector<int>& _pelist,
               int factor=USE_DEFAULT_BRANCH_FACTOR): _cookie(c), _elems(e),
-              _nElems(n), pelist(_pelist), npes(_npes), bfactor(factor)  {}
+              pelist(_pelist), bfactor(factor)  {}
   CkSectionID(const CkGroupID &gid, const int *_pelist, const int _npes,
+              int factor=USE_DEFAULT_BRANCH_FACTOR);
+  CkSectionID(const CkGroupID &gid, const std::vector<int>& _pelist,
               int factor=USE_DEFAULT_BRANCH_FACTOR);
   CKSECTIONID_CONSTRUCTOR(1D)
   CKSECTIONID_CONSTRUCTOR(2D)
@@ -157,11 +175,10 @@ public:
   CKSECTIONID_CONSTRUCTOR(Max)
 
   inline CkGroupID get_aid() const { return _cookie.get_aid(); }
+  inline int nElems() const { return _elems.size(); }
+  inline int nPes() const { return pelist.size(); }
   void operator=(const CkSectionID &);
-  ~CkSectionID() {
-    delete [] _elems;
-    delete [] pelist;
-  }
+  ~CkSectionID() = default;
   void pup(PUP::er &p);
 };
 PUPmarshall(CkSectionID)

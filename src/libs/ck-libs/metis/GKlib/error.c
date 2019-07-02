@@ -180,7 +180,7 @@ char *gk_strerror(int errnum)
   return strerror(errnum);
 #else 
 #ifndef SUNOS
-  static __thread char buf[1024];
+  static CMK_THREADLOCAL char buf[1024];
 
   /* There are two version of strerror_r with different declarations */
   #ifdef __GNUC__

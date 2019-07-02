@@ -3,13 +3,13 @@
 /* CMK_HAS_PARTITION requires the 'root' field to be present in CMK_MSG_HEADER_UNIQUE */
 #define CMK_HAS_PARTITION                                1
 
-/* if set to 1 it uses the default scheduler (Csd) defined in convcore.c,
+/* if set to 1 it uses the default scheduler (Csd) defined in convcore.C,
    otherwise machine.C has to provide its own scheduler. Should be 1 in almost
    every machine. */
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 
 /* specifies if the functions CmiPrintf, CmiError and CmiScanf are implemented
-   in machine.C (1), or if the standard definitions in convcore.c should be used
+   in machine.C (1), or if the standard definitions in convcore.C should be used
    (0). */
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
 
@@ -23,15 +23,15 @@
  * - startid, redID
  * - rank is needed by broadcast
  */
-#define CMK_MSG_HEADER_UNIQUE    CmiUInt4 size; CmiUInt2 rank,hdl,xhdl,info,type,redID; CmiInt4 root;
+#define CMK_MSG_HEADER_UNIQUE    CmiUInt4 size; CmiUInt2 rank,hdl,xhdl,info,redID; CmiInt4 root; CmiUInt1 zcMsgType:3, cmaMsgType:2, nokeep:1;
 
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT            { CMK_MSG_HEADER_UNIQUE }
 #define CMK_MSG_HEADER_BIGSIM_ {CMK_MSG_HEADER_UNIQUE CMK_BIGSIM_FIELDS}
 
 /* defines different parameters of groups of processors. (next 4 definitions)
-   used in converse.h (the first) and convcore.c (the others). a value of 1
-   means that convcore.c defines the methods, otherwise it is up to machine.C to
+   used in converse.h (the first) and convcore.C (the others). a value of 1
+   means that convcore.C defines the methods, otherwise it is up to machine.C to
    define them */
 
 /* basic structure of a CmiGroup (defined in converse.h) */
@@ -51,11 +51,8 @@
 #define CMK_SPANTREE_USE_COMMON_CODE                       1
 
 /* Specifies if the routines which send multiple messages (vectors of messages)
-   to a processors are implemented in convcore.c (1) or in machine.C (1). */
+   to a processors are implemented in convcore.C (1) or in machine.C (1). */
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
-
-/* Enable the CCS protocol if set to 1. */
-#define CMK_CCS_AVAILABLE                                  1
 
 /* Defines if there is a "charmrun" program running on the system, which
    interacts with possible connecting clients (0), or if there is no such
@@ -83,8 +80,6 @@
 #define CMK_CMA_MIN                                        16384
 
 #define CMK_CMA_MAX                                        4194304
-
-#define CMK_ONESIDED_DIRECT_IMPL                           1
 
 #define CMK_NOCOPY_DIRECT_BYTES                           16
 

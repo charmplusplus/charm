@@ -17,7 +17,7 @@
 #endif
 
 // Strip leading/trailing whitespaces from MPI_Info key and value strings.
-std::string create_stripped_string(const char *str) {
+std::string create_stripped_string(const char *str) noexcept {
   int newLen;
   int len = strlen(str);
 
@@ -44,17 +44,17 @@ std::string create_stripped_string(const char *str) {
   }
 }
 
-KeyvalPair::KeyvalPair(const char* k, const char* v){
+KeyvalPair::KeyvalPair(const char* k, const char* v) noexcept {
   key = create_stripped_string(k);
   val = create_stripped_string(v);
 }
 
-void InfoStruct::pup(PUP::er& p){
+void InfoStruct::pup(PUP::er& p) noexcept {
   p|nodes;
   p|valid;
 }
 
-int InfoStruct::set(const char* k, const char* v){
+int InfoStruct::set(const char* k, const char* v) noexcept {
   std::string key = create_stripped_string(k);
   for(int i=0;i<nodes.size();i++){
     if(nodes[i]->key == key){
@@ -69,15 +69,16 @@ int InfoStruct::set(const char* k, const char* v){
   return MPI_SUCCESS;
 }
 
-int InfoStruct::dup(InfoStruct& src){
-  for(int i=0;i<nodes.size();i++){
-    KeyvalPair* newkvp = new KeyvalPair(src.nodes[i]->key.c_str(), src.nodes[i]->val.c_str());
-    nodes.push_back(newkvp);
+int InfoStruct::dup(InfoStruct& src) noexcept {
+  int nkeys = src.nodes.size();
+  nodes.resize(nkeys);
+  for(int i=0;i<nkeys;i++){
+    nodes[i] = new KeyvalPair(src.nodes[i]->key.c_str(), src.nodes[i]->val.c_str());
   }
   return MPI_SUCCESS;
 }
 
-int InfoStruct::deletek(const char* k){
+int InfoStruct::deletek(const char* k) noexcept {
   std::string key = create_stripped_string(k);
   for(int i=0;i<nodes.size();i++){
     if(nodes[i]->key == key){
@@ -89,7 +90,7 @@ int InfoStruct::deletek(const char* k){
   return MPI_ERR_INFO_KEY;
 }
 
-int InfoStruct::get(const char* k, int vl, char*& v, int *flag) const{
+int InfoStruct::get(const char* k, int vl, char*& v, int *flag) const noexcept {
   std::string key = create_stripped_string(k);
   for(int i=0;i<nodes.size();i++){
     if(nodes[i]->key == key){
@@ -104,7 +105,7 @@ int InfoStruct::get(const char* k, int vl, char*& v, int *flag) const{
   return MPI_ERR_INFO_KEY;
 }
 
-int InfoStruct::get_valuelen(const char* k, int* vl, int *flag) const{
+int InfoStruct::get_valuelen(const char* k, int* vl, int *flag) const noexcept {
   std::string key = create_stripped_string(k);
   for(int i=0;i<nodes.size();i++){
     if(nodes[i]->key == key){
@@ -117,12 +118,12 @@ int InfoStruct::get_valuelen(const char* k, int* vl, int *flag) const{
   return MPI_ERR_INFO_KEY;
 }
 
-int InfoStruct::get_nkeys(int *n) const{
+int InfoStruct::get_nkeys(int *n) const noexcept {
   *n = nodes.size();
   return MPI_SUCCESS;
 }
 
-int InfoStruct::get_nthkey(int n, char* k) const{
+int InfoStruct::get_nthkey(int n, char* k) const noexcept {
 #if AMPI_ERROR_CHECKING
   if(n<0 || n>=nodes.size())
     return MPI_ERR_INFO_KEY;
@@ -131,7 +132,7 @@ int InfoStruct::get_nthkey(int n, char* k) const{
   return MPI_SUCCESS;
 }
 
-void InfoStruct::myfree(void){
+void InfoStruct::myfree() noexcept {
   for(int i=0;i<nodes.size();i++){
     delete nodes[i];
   }
@@ -139,7 +140,7 @@ void InfoStruct::myfree(void){
   valid=false;
 }
 
-int ampiParent::createInfo(MPI_Info *newinfo){
+int ampiParent::createInfo(MPI_Info *newinfo) noexcept {
 #if AMPI_ERROR_CHECKING
   if(newinfo==NULL)
     return MPI_ERR_INFO;
@@ -150,7 +151,7 @@ int ampiParent::createInfo(MPI_Info *newinfo){
   return MPI_SUCCESS;
 }
 
-int ampiParent::dupInfo(MPI_Info info, MPI_Info *newinfo){
+int ampiParent::dupInfo(MPI_Info info, MPI_Info *newinfo) noexcept {
 #if AMPI_ERROR_CHECKING
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     return MPI_ERR_INFO;
@@ -164,7 +165,7 @@ int ampiParent::dupInfo(MPI_Info info, MPI_Info *newinfo){
   return MPI_SUCCESS;
 }
 
-int ampiParent::setInfo(MPI_Info info, const char *key, const char *value){
+int ampiParent::setInfo(MPI_Info info, const char *key, const char *value) noexcept {
 #if AMPI_ERROR_CHECKING
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     return MPI_ERR_INFO;
@@ -176,7 +177,7 @@ int ampiParent::setInfo(MPI_Info info, const char *key, const char *value){
   return infos[info]->set(key,value);
 }
 
-int ampiParent::deleteInfo(MPI_Info info, const char *key){
+int ampiParent::deleteInfo(MPI_Info info, const char *key) noexcept {
 #if AMPI_ERROR_CHECKING
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     return MPI_ERR_INFO;
@@ -186,7 +187,7 @@ int ampiParent::deleteInfo(MPI_Info info, const char *key){
   return infos[info]->deletek(key);
 }
 
-int ampiParent::getInfo(MPI_Info info, const char *key, int valuelen, char *value, int *flag) const{
+int ampiParent::getInfo(MPI_Info info, const char *key, int valuelen, char *value, int *flag) const noexcept {
 #if AMPI_ERROR_CHECKING
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     return MPI_ERR_INFO;
@@ -200,7 +201,7 @@ int ampiParent::getInfo(MPI_Info info, const char *key, int valuelen, char *valu
   return infos[info]->get(key,valuelen,value,flag);
 }
 
-int ampiParent::getInfoValuelen(MPI_Info info, const char *key, int *valuelen, int *flag) const{
+int ampiParent::getInfoValuelen(MPI_Info info, const char *key, int *valuelen, int *flag) const noexcept {
 #if AMPI_ERROR_CHECKING
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     return MPI_ERR_INFO;
@@ -210,7 +211,7 @@ int ampiParent::getInfoValuelen(MPI_Info info, const char *key, int *valuelen, i
   return infos[info]->get_valuelen(key,valuelen,flag);
 }
 
-int ampiParent::getInfoNkeys(MPI_Info info, int *nkeys) const{
+int ampiParent::getInfoNkeys(MPI_Info info, int *nkeys) const noexcept {
 #if AMPI_ERROR_CHECKING
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     return MPI_ERR_INFO;
@@ -220,7 +221,7 @@ int ampiParent::getInfoNkeys(MPI_Info info, int *nkeys) const{
   return infos[info]->get_nkeys(nkeys);
 }
 
-int ampiParent::getInfoNthkey(MPI_Info info, int n, char *key) const{
+int ampiParent::getInfoNthkey(MPI_Info info, int n, char *key) const noexcept {
 #if AMPI_ERROR_CHECKING
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     return MPI_ERR_INFO;
@@ -230,7 +231,7 @@ int ampiParent::getInfoNthkey(MPI_Info info, int n, char *key) const{
   return infos[info]->get_nthkey(n,key);
 }
 
-int ampiParent::freeInfo(MPI_Info info){
+int ampiParent::freeInfo(MPI_Info info) noexcept {
 #if AMPI_ERROR_CHECKING
   if(info<0 || info>=infos.size() || !infos[info]->getvalid())
     return MPI_ERR_INFO;
@@ -240,7 +241,7 @@ int ampiParent::freeInfo(MPI_Info info){
   return MPI_SUCCESS;
 }
 
-void ampiParent::defineInfoEnv(int nRanks_){
+void ampiParent::defineInfoEnv(int nRanks_) noexcept {
   char **p_argv;
   std::string argv_str, maxprocs_str;
   char hostname[255], work_dir[1024];
@@ -294,7 +295,7 @@ void ampiParent::defineInfoEnv(int nRanks_){
   //TODO: file, thread_level
 }
 
-void ampiParent::defineInfoMigration(){
+void ampiParent::defineInfoMigration() noexcept {
   MPI_Info lb_sync_info, lb_async_info, chkpt_mem_info, chkpt_msg_log_info;
 
   // info object for AMPI_INFO_LB_SYNC
@@ -380,7 +381,7 @@ AMPI_API_IMPL(int, MPI_Info_free, MPI_Info *info)
 }
 
 #ifdef AMPIMSGLOG
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_USE_ZLIB
 /*zDisk PUP::er's*/
 void PUP::tozDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
 { gzwrite(F,p,itemSize*n);}

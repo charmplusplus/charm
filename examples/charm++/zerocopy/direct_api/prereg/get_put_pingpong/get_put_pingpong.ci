@@ -10,8 +10,8 @@ mainmodule simple_direct {
   array [1D] Ping1 {
     entry Ping1(int size);
     entry void start();
-    entry void senderCallback();
-    entry void receiverCallback();
+    entry void senderCallback(CkDataMsg *m);
+    entry void receiverCallback(CkDataMsg *m);
     entry void recvNcpyInfo(CkNcpyBuffer src1, CkNcpyBuffer src2, CkNcpyBuffer src3, CkNcpyBuffer dest1, CkNcpyBuffer dest2, CkNcpyBuffer dest3);
   };
 

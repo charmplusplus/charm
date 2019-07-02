@@ -1,2 +1,2 @@
 #include "charm-api.h"
-CDECL void init(void) { }
+CLINKAGE void init(void) { }

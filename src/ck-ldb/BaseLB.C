@@ -61,11 +61,9 @@ void BaseLB::flushStates() {}
 static inline int i_abs(int c) { return c>0?c:-c; }
 
 // assume integer is 32 bits
-inline static int ObjKey(const LDObjid &oid, const int hashSize) {
+inline static int ObjKey(const CmiUInt8 &oid, const int hashSize) {
   // make sure all positive
-  return (((i_abs(oid.id[2]) & 0x7F)<<24)
-	 |((i_abs(oid.id[1]) & 0xFF)<<16)
-	 |i_abs(oid.id[0])) % hashSize;
+  return oid % hashSize;
 }
 
 BaseLB::LDStats::LDStats(int c, int complete)
@@ -160,7 +158,7 @@ void BaseLB::LDStats::makeCommHash() {
         objHash[i] = -1;
    
   for(i=0;i<n_objs;i++){
-        const LDObjid &oid = objData[i].objID();
+        const CmiUInt8 &oid = objData[i].objID();
         int hash = ObjKey(oid, hashSize);
 	CmiAssert(hash != -1);
         while(objHash[hash] != -1)
@@ -177,7 +175,7 @@ void BaseLB::LDStats::deleteCommHash() {
   }
 }
 
-int BaseLB::LDStats::getHash(const LDObjid &oid, const LDOMid &mid)
+int BaseLB::LDStats::getHash(const CmiUInt8 &oid, const LDOMid &mid)
 {
 #if CMK_LBDB_ON
     CmiAssert(hashSize > 0);
@@ -186,7 +184,7 @@ int BaseLB::LDStats::getHash(const LDObjid &oid, const LDOMid &mid)
     for(int id=0;id<hashSize;id++){
         int index = (id+hash)%hashSize;
 	if (index == -1 || objHash[index] == -1) return -1;
-        if (LDObjIDEqual(objData[objHash[index]].objID(), oid) &&
+        if (objData[objHash[index]].objID() == oid &&
             LDOMidEqual(objData[objHash[index]].omID(), mid))
             return objHash[index];
     }
@@ -197,7 +195,7 @@ int BaseLB::LDStats::getHash(const LDObjid &oid, const LDOMid &mid)
 
 int BaseLB::LDStats::getHash(const LDObjKey &objKey)
 {
-  const LDObjid &oid = objKey.objID();
+  const CmiUInt8 &oid = objKey.objID();
   const LDOMid  &mid = objKey.omID();
   return getHash(oid, mid);
 }
@@ -270,7 +268,7 @@ void BaseLB::LDStats::computeNonlocalComm(int &nmsgs, int &nbytes)
 	    }
             else if (receiver_type == LD_OBJLIST_MSG) {
               int nobjs;
-              LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
+              const LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
 	      mcast_count ++;
 	      CkVec<int> pes;
 	      for (int i=0; i<nobjs; i++) {
@@ -327,8 +325,7 @@ void BaseLB::LDStats::print()
   for(i=0; i < n_objs; i++) {
       LDObjData &odata = objData[i];
       CkPrintf("Object %d\n",i);
-      CkPrintf("     id = %d %d %d %d\n",odata.objID().id[0],odata.objID().id[1
-], odata.objID().id[2], odata.objID().id[3]);
+      CkPrintf("     id = %" PRIu64 "\n",odata.objID());
       CkPrintf("  OM id = %d\t",odata.omID().id);
       CkPrintf("   Mig. = %d\n",odata.migratable);
 #if CMK_LB_CPUTIMER
@@ -342,19 +339,19 @@ void BaseLB::LDStats::print()
   for(i=0; i < n_comm; i++) {
       CkPrintf("Link %d\n",i);
 
-      LDObjid &sid = cdata[i].sender.objID();
+      CmiUInt8 &sid = cdata[i].sender.objID();
       if (cdata[i].from_proc())
 	CkPrintf("    sender PE = %d\t",cdata[i].src_proc);
       else
-	CkPrintf("    sender id = %d:[%d %d %d %d]\t",
-		 cdata[i].sender.omID().id,sid.id[0], sid.id[1], sid.id[2], sid.id[3]);
+	CkPrintf("    sender id = %d:[%" PRIu64 "]\t",
+		 cdata[i].sender.omID().id,sid);
 
-      LDObjid &rid = cdata[i].receiver.get_destObj().objID();
+      CmiUInt8 &rid = cdata[i].receiver.get_destObj().objID();
       if (cdata[i].recv_type() == LD_PROC_MSG)
 	CkPrintf("  receiver PE = %d\n",cdata[i].receiver.proc());
       else	
-	CkPrintf("  receiver id = %d:[%d %d %d %d]\n",
-		 cdata[i].receiver.get_destObj().omID().id,rid.id[0],rid.id[1],rid.id[2],rid.id[3]);
+	CkPrintf("  receiver id = %d:[%" PRIu64 "]\n",
+		 cdata[i].receiver.get_destObj().omID().id,rid);
       
       CkPrintf("     messages = %d\t",cdata[i].messages);
       CkPrintf("        bytes = %d\n",cdata[i].bytes);

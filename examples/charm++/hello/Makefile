@@ -10,6 +10,7 @@ DIRS = \
   4darray \
   nodegroup \
   1darray \
+  xarraySection \
 
 all: $(foreach i,$(DIRS),build-$i)
 

@@ -84,7 +84,7 @@ CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
 
 /*global*/ CkReduction::reducerType lbDataCollectionType;
 /*initnode*/ void registerLBDataCollection(void) {
-  lbDataCollectionType = CkReduction::addReducer(lbDataCollection, true);
+  lbDataCollectionType = CkReduction::addReducer(lbDataCollection, true, "lbDataCollection");
 }
 
 CkGroupID _metalb;
@@ -162,9 +162,23 @@ void MetaBalancer::init(void) {
   // to false so that it doesn't clear the handles.
   lb_in_progress = false;
 
+  // After the first reduction completes, we have a way to manually check for
+  // PEs without any objects. This flag is set to true if load is ever added
+  // so that the periodic call can be ignored if it comes late. Otherwise, it
+  // may come at a weird time and trigger an incorrect contribution.
+  ignore_periodic = false;
+
   is_prev_lb_refine = -1;
   if (_lb_args.metaLbOn()) {
     periodicCall((void *) this);
+  }
+  if (_lb_args.metaLbModelDir() != NULL) {
+    current_balancer = -1;
+    if (CkMyPe() == 0) {
+      srand(time(NULL));
+      rFmodel = new ForestModel;
+      rFmodel->readModel(_lb_args.metaLbModelDir());
+    }
   }
 }
 
@@ -273,6 +287,11 @@ void MetaBalancer::SetCharePupSize(size_t psize) {
 
 bool MetaBalancer::AddLoad(int it_n, double load) {
 #if CMK_LBDB_ON
+  // From here on out we can ignore the periodic call to check for NoObj PEs
+  // since our PE has objects. The subsequent checks for NoObj PEs are
+  // triggered by the regular control flow.
+  ignore_periodic = true;
+
   int index = it_n % VEC_SIZE;
   total_count_vec[index]++;
   adaptive_struct.total_syncs_called++;
@@ -474,18 +493,54 @@ void MetaBalancer::ReceiveMinStats(double *load, int n) {
 //        avg_hops, avg_hop_bytes, _lb_args.alpha(), _lb_args.beta(),
 //        app_iteration_time);
 
-      DEBAD(("Features:%lf %lf %lf %lf %lf %lf %lf %lf \
+    DEBAD(
+        ("Features:%lf %lf %lf %lf %lf %lf %lf %lf \
        %lf %lf %lf %lf %lf %lf %lf %lf %lf \
        %lf %lf %lf %lf %lf %lf %lf %d %lf\n",
-       pe_imbalance, pe_load_std_frac, pe_with_bg_imb, bg_load_frac,
-       pe_gain, avg_utilization, min_utilization, max_utilization,
-       avg_obj_load, min_obj_load, max_obj_load, total_objs/pe_count,
-       pe_count, total_bytes, total_msgs, total_outsidepebytes/total_bytes,
-       total_outsidepemsgs/total_msgs, internal_bytes_frac, avg_comm_neighbors, mslope,
-       aslope, avg_hops, avg_hop_bytes, comm_comp_ratio, chare_pup_size, app_iteration_time));
+         pe_imbalance, pe_load_std_frac, pe_with_bg_imb, bg_load_frac, pe_gain,
+         avg_utilization, min_utilization, max_utilization, avg_obj_load, min_obj_load,
+         max_obj_load, total_objs / pe_count, pe_count, total_Kbytes, total_Kmsgs,
+         total_outsidepeKbytes / total_Kbytes, total_outsidepeKmsgs / total_Kmsgs,
+         internal_bytes_frac, avg_comm_neighbors, mslope, aslope, avg_hops,
+         avg_hop_Kbytes, comm_comp_ratio, chare_pup_size, app_iteration_time));
 
+    // Read test data as a data structure
+    if (_lb_args.metaLbModelDir() != NULL) {
+      std::vector<double> test_data{pe_imbalance,
+                                    pe_load_std_frac,
+                                    pe_with_bg_imb,
+                                    0,
+                                    bg_load_frac,
+                                    pe_gain,
+                                    avg_utilization,
+                                    min_utilization,
+                                    max_utilization,
+                                    avg_obj_load,
+                                    min_obj_load,
+                                    max_obj_load,
+                                    total_objs / pe_count,
+                                    pe_count,
+                                    total_Kbytes,
+                                    total_Kmsgs,
+                                    total_outsidepeKbytes / total_Kbytes,
+                                    total_outsidepeKmsgs / total_Kmsgs,
+                                    internal_bytes_frac,
+                                    (total_Kbytes - total_outsidepeKbytes) / total_Kmsgs,
+                                    avg_comm_neighbors,
+                                    mslope,
+                                    aslope,
+                                    avg_hops,
+                                    avg_hop_Kbytes,
+                                    comm_comp_ratio};
+      // Model returns value [1,num_lbs]
+      int predicted_lb = rFmodel->forestTest(test_data, 1, 26);
+      DEBAD(("***********Final classification = %d *****************\n", predicted_lb));
 
-    CkPrintf("mslope %lf aslope %lf\n", mslope, aslope);
+      // predicted_lb-1 since predicted_lb class count in the model starts at 1
+      thisProxy.MetaLBSetLBOnChares(current_balancer, predicted_lb - 1);
+      current_balancer = predicted_lb - 1;
+    }
+    DEBAD(("mslope %lf aslope %lf\n", mslope, aslope));
 
     pe_ld_skewness = skewness;
     pe_ld_kurtosis = kurtosis;
@@ -868,6 +923,10 @@ void MetaBalancer::MetaLBCallLBOnChares() {
   lbdatabase->MetaLBCallLBOnChares();
 }
 
+void MetaBalancer::MetaLBSetLBOnChares(int switchFrom, int switchTo) {
+  lbdatabase->switchLoadbalancer(switchFrom, switchTo);
+}
+
 void MetaBalancer::ReceiveIterationNo(int local_iter_no) {
   CmiAssert(CkMyPe() == 0);
 
@@ -926,7 +985,9 @@ void MetaBalancer::periodicCall(void *ad) {
 
 void MetaBalancer::checkForNoObj(void *ad) {
   MetaBalancer *s = (MetaBalancer *) ad;
-  s->HandleAdaptiveNoObj();
+  if (!s->ignore_periodic) {
+    s->HandleAdaptiveNoObj();
+  }
 }
 
 // Called by LBDatabase to indicate that no objs are there in this processor

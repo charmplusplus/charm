@@ -1,7 +1,6 @@
 DIRS = \
   megatest \
   alignment \
-  pingpong \
   simplearrayhello \
   provisioning \
   load_balancing \
@@ -11,14 +10,8 @@ DIRS = \
   sdag \
   ckAllocSysMsgTest \
   method_templates \
-  xcastredn \
   demand_creation \
-  migrate \
-  taskSpawn \
-  taskSpawnRecursive \
-  streamingAllToAll \
   startupTest \
-  kNeighbor \
   topology \
   io \
   sparse \
@@ -27,10 +20,11 @@ DIRS = \
   charmxi_parsing \
   jacobi3d \
   jacobi3d-sdag \
+  zerocopy \
+  within_node_bcast \
 
 # skip sdag, megatest and commtest
 BGDIRS = \
-  pingpong \
   simplearrayhello \
   load_balancing \
   chkpt \
@@ -38,9 +32,6 @@ BGDIRS = \
 
 FTDIRS = \
   jacobi3d \
-  jacobi3d-sdag \
-
-MLOGFTDIRS = \
   jacobi3d-sdag \
 
 TESTDIRS = $(filter-out $(FTDIRS),$(DIRS))
@@ -51,9 +42,7 @@ test: $(foreach i,$(TESTDIRS),test-$i)
 
 bgtest: $(foreach i,$(filter $(BGDIRS),$(TESTDIRS)),bgtest-$i)
 
-syncfttest causalfttest mpisyncfttest: $(foreach i,$(filter $(FTDIRS),$(DIRS)),test-$i)
-
-mlogfttest: $(foreach i,$(filter $(MLOGFTDIRS),$(DIRS)),test-$i)
+syncfttest mpisyncfttest: $(foreach i,$(filter $(FTDIRS),$(DIRS)),test-$i)
 
 clean: $(foreach i,$(DIRS),clean-$i)
 	rm -f TAGS #*#

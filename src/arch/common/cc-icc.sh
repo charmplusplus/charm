@@ -17,7 +17,16 @@ CMK_CF90_FIXED="$CMK_CF90 -164 -FI "
 F90DIR=`which ifort 2> /dev/null`
 if test -x "$F90DIR"
 then
-  F90DIR=`dirname $F90DIR`
+  MYDIR="$PWD"
+  cd `dirname "$F90DIR"`
+  if test -L 'ifort'
+  then
+    F90DIR=`readlink ifort`
+    cd `dirname "$F90DIR"`
+  fi
+  F90DIR=`pwd -P`
+  cd "$MYDIR"
+
   Minor=`basename $F90DIR`
   F90LIBDIR="$F90DIR/../lib/$Minor"
   if ! test -x "$F90LIBDIR"
@@ -26,6 +35,18 @@ then
     if ! test -x "$F90LIBDIR"
     then
       F90LIBDIR="$F90DIR/../../compiler/lib/$Minor"
+    fi
+    if ! test -x "$F90LIBDIR"
+    then
+      F90LIBDIR="$F90DIR/../../lib/$Minor"
+    fi
+    if ! test -x "$F90LIBDIR"
+    then
+      F90LIBDIR="$F90DIR/../../compiler/lib/${Minor}_lin"
+    fi
+    if ! test -x "$F90LIBDIR"
+    then
+      F90LIBDIR="$F90DIR/../../lib/${Minor}_lin"
     fi
   fi
   F90MAIN="$F90LIBDIR/for_main.o"

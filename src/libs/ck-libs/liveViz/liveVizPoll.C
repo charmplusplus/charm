@@ -162,7 +162,7 @@ void liveVizPollDeposit(ArrayElement *client,
   ImageData imageData (bytes_per_pixel);
  
   // reduce all images from this processor
-  poll_image_combine_reducer=CkReduction::addReducer(imagePollCombineReducer);
+  poll_image_combine_reducer=CkReduction::addReducer(imagePollCombineReducer, false, "imagePollCombineReducer");
   CkReductionMsg* msg = CkReductionMsg::buildNew(imageData.GetBuffSize (startx,
 																		starty,
 																		sizex,

@@ -3,7 +3,7 @@
 #include "BlockLB.h"
 #include <math.h>
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def (BlockLB, "Allocate objects in blocks to the remaining valid PE")
 
@@ -62,9 +62,13 @@ void BlockLB::work (LDStats *stats)
   // Rotate each object to the next higher processor.
   for (obj = 0; obj < stats->n_objs; obj++) {
     odata = &(stats->objData[obj]);
-		const LDObjid& objID = odata->objID();
+		const CmiUInt8& objID = odata->objID();
     if (odata->migratable) {
-			int idx = objID.id[0];
+      CkGroupID locMgrGid;
+      locMgrGid.idx = odata->omHandle().id.id.idx;
+      CkLocMgr *localLocMgr = (CkLocMgr *) CkLocalBranch(locMgrGid);
+      CkArrayIndex arr_idx = localLocMgr->lookupIdx(objID);
+      int idx = arr_idx.data()[0];
       if (idx < markidx) {
         validDest = idx / (objsPerProcessor_floor + 1);
       } else {

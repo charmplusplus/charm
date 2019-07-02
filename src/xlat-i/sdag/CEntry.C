@@ -45,11 +45,11 @@ void generateLocalWrapper(XStr& decls, XStr& defs, int isVoid, XStr& signature,
             if (var.isFirstRdma)
               defs << "  genClosure->getP" << i++ << "() = " << numRdmaParams << ";\n";
             defs << "  genClosure->getP" << i << "() = "
-                 << "rdmawrapper_" << var.name << ";\n";
+                 << "ncpyBuffer_" << var.name << ";\n";
             defs << "#else\n";
             defs << "  genClosure->getP" << i << "() = "
                  << "(" << var.type << "*)"
-                 << "rdmawrapper_" << var.name << ".ptr"
+                 << "ncpyBuffer_" << var.name << ".ptr"
                  << ";\n";
             defs << "#endif\n";
           } else
@@ -81,7 +81,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs) {
       if (sv->byConst) signature << "const ";
 
       if (sv->isRdma)
-        signature << "CkRdmaWrapper ";
+        signature << "CkNcpyBuffer ";
       else
         signature << sv->type << " ";
       if (sv->arrayLength != 0)
@@ -94,7 +94,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs) {
       }
       if (sv->name != 0) {
         if (sv->isRdma) {
-          signature << "rdmawrapper_" << sv->name;
+          signature << "ncpyBuffer_" << sv->name;
         } else {
           signature << sv->name;
         }

@@ -572,8 +572,10 @@ void Chare::genDefs(XStr& str) {
         << "(char **, void *, " << indexList() << ");\n";
     str << "\n";
     XStr dim = ((Array*)this)->dim();
-    str << "class " << baseName() << " : public ArrayElement" << dim << "\n";
+    str << "class " << baseName() << " : public CBase_" << baseName() << "\n";
     str << "{\n";
+    if (hasSdagEntry)
+      str << "  " << baseName() << "_SDAG_CODE\n";
     str << "public:\n";
     str << "  char user_data[64];\n";
     str << "public:\n";
@@ -601,7 +603,6 @@ void Chare::genDefs(XStr& str) {
 
     str << "  virtual void pup(PUP::er &p)\n";
     str << "  {\n";
-    str << "    ArrayElement" << dim << "::pup(p);\n";
     str << "    p(user_data, 64);\n";
     str << "    CkArrayID *aid = &thisArrayID;\n";
     str << "    ::" << fortranify(baseName(), "_pup")
@@ -627,13 +628,13 @@ void Chare::genDefs(XStr& str) {
     str << "\n";
     if (dim == (const char*)"1D") {
       str << "extern \"C\" void " << fortranify(baseName(), "_cknew")
-          << "(int *numElem, long *aindex)\n";
+          << "(int *numElem, void **aindex)\n";
       str << "{\n";
       str << "    CkArrayID *aid = new CkArrayID;\n";
       str << "    *aid = CProxy_" << baseName() << "::ckNew(*numElem); \n";
     } else if (dim == (const char*)"2D") {
       str << "extern \"C\" void " << fortranify(baseName(), "_cknew")
-          << "(int *numx, int *numy, long *aindex)\n";
+          << "(int *numx, int *numy, void **aindex)\n";
       str << "{\n";
       str << "    CkArrayID *aid = new CkArrayID;\n";
       str << "    *aid = CProxy_" << baseName() << "::ckNew(); \n";
@@ -644,7 +645,7 @@ void Chare::genDefs(XStr& str) {
       str << "    p.doneInserting(); \n";
     } else if (dim == (const char*)"3D") {
       str << "extern \"C\" void " << fortranify(baseName(), "_cknew")
-          << "(int *numx, int *numy, int *numz, long *aindex)\n";
+          << "(int *numx, int *numy, int *numz, void **aindex)\n";
       str << "{\n";
       str << "    CkArrayID *aid = new CkArrayID;\n";
       str << "    *aid = CProxy_" << baseName() << "::ckNew(); \n";
@@ -655,13 +656,13 @@ void Chare::genDefs(XStr& str) {
       str << "          p[CkArrayIndex3D(i, j, k)].insert(); \n";
       str << "    p.doneInserting(); \n";
     }
-    str << "    *aindex = (long)aid;\n";
+    str << "    *aindex = (void*)aid;\n";
     str << "}\n";
 
     // Define the Fortran interface function for AtSync
     if (dim == (const char*)"1D") {
       str << "extern \"C\" void " << fortranify(baseName(), "_atsync")
-          << "(long* aindex, int *index1)\n";
+          << "(void** aindex, int *index1)\n";
       str << "{\n";
       str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
       str << "\n";
@@ -669,7 +670,7 @@ void Chare::genDefs(XStr& str) {
       str << "  h[*index1].ckLocal()->AtSync();\n";
     } else if (dim == (const char*)"2D") {
       str << "extern \"C\" void " << fortranify(baseName(), "_atsync")
-          << "(long* aindex, int *index1, int *index2)\n";
+          << "(void** aindex, int *index1, int *index2)\n";
       str << "{\n";
       str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
       str << "\n";
@@ -677,7 +678,7 @@ void Chare::genDefs(XStr& str) {
       str << "  h[CkArrayIndex2D(*index1, *index2)].ckLocal()->AtSync();\n";
     } else if (dim == (const char*)"3D") {
       str << "extern \"C\" void " << fortranify(baseName(), "_atsync")
-          << "(long* aindex, int *index1, int *index2, int *index3)\n";
+          << "(void** aindex, int *index1, int *index2, int *index3)\n";
       str << "{\n";
       str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
       str << "\n";
@@ -685,7 +686,39 @@ void Chare::genDefs(XStr& str) {
       str << "  h[CkArrayIndex3D(*index1, *index2, *index3)].ckLocal()->AtSync();\n";
     }
     str << "}\n";
-  }
+
+    // define reduction interface function
+    if (dim == (const char*)"1D") {
+      str << "extern \"C\" void "
+          << fortranify(baseName(), "_contribute")
+          << "(void** aindex, int *index1, int *size, void *data, int *op, int (*target)())\n";
+      str << "{\n";
+      str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
+      str << "  CProxy_" << baseName() << " h(*aid);\n";
+      str << "  h[*index1].ckLocal()->contribute(*size, data, CkReduction::reducerType(*op), CkCallback(target(), h[0]));\n";
+    }
+    else if (dim == (const char*)"2D") {
+      str << "extern \"C\" void "
+          << fortranify(baseName(), "_contribute")
+          << "(void** aindex, int *index1, int *index2, int *size, void *data, int *op, int (*target)())\n";
+      str << "{\n";
+      str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
+      str << "  CProxy_" << baseName() << " h(*aid);\n";
+      str << "  h(*index1, *index2).ckLocal()->contribute(*size, data, CkReduction::reducerType(*op), CkCallback(target(), h(0, 0)));\n";
+    }
+    else if (dim == (const char*)"3D") {
+      str << "extern \"C\" void "
+          << fortranify(baseName(), "_contribute")
+          << "(void** aindex, int *index1, int *index2, int *index3, int *size, void *data, int *op, int (*target)())\n";
+      str << "{\n";
+      str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
+      str << "  CProxy_" << baseName() << " h(*aid);\n";
+      str << "  h(*index1, *index2, *index3).ckLocal()->contribute(*size, data, CkReduction::reducerType(*op), CkCallback(target(), h(0, 0, 0)));\n";
+    }
+    str << "}\n";
+
+    str << "/* FORTRAN END */\n\n";
+  } // fortranMode
 
   templateGuardBegin(isTemplated(), str);
   if (!type->isTemplated()) {
@@ -698,6 +731,16 @@ void Chare::genDefs(XStr& str) {
 
   templateGuardBegin(isTemplated(), str);
   if (isArray() && hasSection && !isTemplateInstantiation()) {
+    if (isTemplated()) str << tspec(false) << "\n";
+    str << "void " << sectionName()
+        << "::contribute(CkSectionInfo &sid, int userData, int fragSize)\n";
+    str << "{\n";
+    str << "   CkArray *ckarr = CProxy_CkArray(sid.get_aid()).ckLocalBranch();\n";
+    str << "   CkMulticastMgr *mCastGrp = "
+           "CProxy_CkMulticastMgr(ckarr->getmCastMgr()).ckLocalBranch();\n";
+    str << "   mCastGrp->contribute(sid, userData, fragSize);\n";
+    str << "}\n\n";
+
     if (isTemplated()) str << tspec(false) << "\n";
     str << "void " << sectionName()
         << "::contribute(int dataSize,void *data,CkReduction::reducerType type, "
@@ -723,8 +766,18 @@ void Chare::genDefs(XStr& str) {
 
     if (isTemplated()) str << tspec(false) << "\n";
     str << "void " << sectionName()
+        << "::contribute(CkSectionInfo &sid, const CkCallback &cb, int userData, int fragSize)\n";
+    str << "{\n";
+    str << "   CkArray *ckarr = CProxy_CkArray(sid.get_aid()).ckLocalBranch();\n";
+    str << "   CkMulticastMgr *mCastGrp = "
+           "CProxy_CkMulticastMgr(ckarr->getmCastMgr()).ckLocalBranch();\n";
+    str << "   mCastGrp->contribute(sid, cb, userData, fragSize);\n";
+    str << "}\n\n";
+
+    if (isTemplated()) str << tspec(false) << "\n";
+    str << "void " << sectionName()
         << "::contribute(int dataSize,void *data,CkReduction::reducerType type, "
-           "CkSectionInfo &sid, CkCallback &cb, int userData, int fragSize)\n";
+           "CkSectionInfo &sid, const CkCallback &cb, int userData, int fragSize)\n";
     str << "{\n";
     str << "   CkArray *ckarr = CProxy_CkArray(sid.get_aid()).ckLocalBranch();\n";
     str << "   CkMulticastMgr *mCastGrp = "
@@ -737,7 +790,7 @@ void Chare::genDefs(XStr& str) {
     str << "template <typename T>\n";
     str << "void " << sectionName()
         << "::contribute(std::vector<T> &data, CkReduction::reducerType type, "
-           "CkSectionInfo &sid, CkCallback &cb, int userData, int fragSize)\n";
+           "CkSectionInfo &sid, const CkCallback &cb, int userData, int fragSize)\n";
     str << "{\n";
     str << "   CkArray *ckarr = CProxy_CkArray(sid.get_aid()).ckLocalBranch();\n";
     str << "   CkMulticastMgr *mCastGrp = "
@@ -1040,9 +1093,9 @@ void Group::genSubDecls(XStr& str) {
         << "{ return " << super << "::ckGetSectionID(i); }\n"
         << "inline CkGroupID ckGetGroupIDn(int i) const\n"
         << "{ return " << super << "::ckGetGroupIDn(i); }\n"
-        << "inline int *ckGetElements() const\n"
+        << "inline const int *ckGetElements() const\n"
         << "{ return " << super << "::ckGetElements(); }\n"
-        << "inline int *ckGetElements(int i) const\n"
+        << "inline const int *ckGetElements(int i) const\n"
         << "{ return " << super << "::ckGetElements(i); }\n"
         << "inline int ckGetNumElements() const\n"
         << "{ return " << super << "::ckGetNumElements(); } \n"
@@ -1367,11 +1420,15 @@ void Array::genSubDecls(XStr& str) {
              "int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
              "      return CkSectionID(aid, elems, nElems, factor);\n"
              "    } \n"
+             "    static CkSectionID ckNew(const CkArrayID &aid, const std::vector<CkArrayIndex1D> &elems, "
+             "int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
+             "      return CkSectionID(aid, elems, factor);\n"
+             "    } \n"
              "    static CkSectionID ckNew(const CkArrayID &aid, int l, int u, int s, "
              "int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
              "      std::vector<CkArrayIndex1D> al;\n"
-             "      for (int i=l; i<=u; i+=s) al.push_back(CkArrayIndex1D(i));\n"
-             "      return CkSectionID(aid, al.data(), al.size(), factor);\n"
+             "      for (int i=l; i<=u; i+=s) al.emplace_back(i);\n"
+             "      return CkSectionID(aid, al, factor);\n"
              "    } \n";
     } else if (indexSuffix == (const char*)"2D") {
       str << "    " << etype
@@ -1384,13 +1441,17 @@ void Array::genSubDecls(XStr& str) {
              "int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
              "      return CkSectionID(aid, elems, nElems, factor);\n"
              "    } \n"
+             "    static CkSectionID ckNew(const CkArrayID &aid, const std::vector<CkArrayIndex2D> &elems, "
+             "int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
+             "      return CkSectionID(aid, elems, factor);\n"
+             "    } \n"
              "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, "
              "int l2, int u2, int s2, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
              "      std::vector<CkArrayIndex2D> al;\n"
              "      for (int i=l1; i<=u1; i+=s1) \n"
              "        for (int j=l2; j<=u2; j+=s2) \n"
-             "          al.push_back(CkArrayIndex2D(i, j));\n"
-             "      return CkSectionID(aid, al.data(), al.size(), factor);\n"
+             "          al.emplace_back(i, j);\n"
+             "      return CkSectionID(aid, al, factor);\n"
              "    } \n";
     } else if (indexSuffix == (const char*)"3D") {
       str << "    " << etype
@@ -1403,6 +1464,10 @@ void Array::genSubDecls(XStr& str) {
              "int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
              "      return CkSectionID(aid, elems, nElems, factor);\n"
              "    } \n"
+             "    static CkSectionID ckNew(const CkArrayID &aid, const std::vector<CkArrayIndex3D> &elems, "
+             "int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
+             "      return CkSectionID(aid, elems, factor);\n"
+             "    } \n"
              "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, "
              "int l2, int u2, int s2, int l3, int u3, int s3, int "
              "factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
@@ -1410,8 +1475,8 @@ void Array::genSubDecls(XStr& str) {
              "      for (int i=l1; i<=u1; i+=s1) \n"
              "        for (int j=l2; j<=u2; j+=s2) \n"
              "          for (int k=l3; k<=u3; k+=s3) \n"
-             "          al.push_back(CkArrayIndex3D(i, j, k));\n"
-             "      return CkSectionID(aid, al.data(), al.size(), factor);\n"
+             "          al.emplace_back(i, j, k);\n"
+             "      return CkSectionID(aid, al, factor);\n"
              "    } \n";
     } else if (indexSuffix == (const char*)"4D") {
       str << "    " << etype
@@ -1424,6 +1489,10 @@ void Array::genSubDecls(XStr& str) {
              "int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
              "      return CkSectionID(aid, elems, nElems, factor);\n"
              "    } \n"
+             "    static CkSectionID ckNew(const CkArrayID &aid, const std::vector<CkArrayIndex4D> &elems, "
+             "int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
+             "      return CkSectionID(aid, elems, factor);\n"
+             "    } \n"
              "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, "
              "int l2, int u2, int s2, int l3, int u3, int s3, int l4, int u4, int s4, "
              "int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
@@ -1432,8 +1501,8 @@ void Array::genSubDecls(XStr& str) {
              "        for (int j=l2; j<=u2; j+=s2) \n"
              "          for (int k=l3; k<=u3; k+=s3) \n"
              "            for (int l=l4; l<=u4; l+=s4) \n"
-             "              al.push_back(CkArrayIndex4D(i, j, k, l));\n"
-             "      return CkSectionID(aid, al.data(), al.size(), factor);\n"
+             "              al.emplace_back(i, j, k, l);\n"
+             "      return CkSectionID(aid, al, factor);\n"
              "    } \n";
     } else if (indexSuffix == (const char*)"5D") {
       str << "    " << etype
@@ -1446,6 +1515,10 @@ void Array::genSubDecls(XStr& str) {
              "int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
              "      return CkSectionID(aid, elems, nElems, factor);\n"
              "    } \n"
+             "    static CkSectionID ckNew(const CkArrayID &aid, const std::vector<CkArrayIndex5D> &elems, "
+             "int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
+             "      return CkSectionID(aid, elems, factor);\n"
+             "    } \n"
              "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, "
              "int l2, int u2, int s2, int l3, int u3, int s3, int l4, int u4, int s4, "
              "int l5, int u5, int s5, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
@@ -1455,8 +1528,8 @@ void Array::genSubDecls(XStr& str) {
              "          for (int k=l3; k<=u3; k+=s3) \n"
              "            for (int l=l4; l<=u4; l+=s4) \n"
              "              for (int m=l5; m<=u5; m+=s5) \n"
-             "                al.push_back(CkArrayIndex5D(i, j, k, l, m));\n"
-             "      return CkSectionID(aid, al.data(), al.size(), factor);\n"
+             "                al.emplace_back(i, j, k, l, m);\n"
+             "      return CkSectionID(aid, al, factor);\n"
              "    } \n";
     } else if (indexSuffix == (const char*)"6D") {
       str << "    " << etype
@@ -1469,6 +1542,10 @@ void Array::genSubDecls(XStr& str) {
              "int nElems, int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
              "      return CkSectionID(aid, elems, nElems, factor);\n"
              "    } \n"
+             "    static CkSectionID ckNew(const CkArrayID &aid, const std::vector<CkArrayIndex6D> &elems, "
+             "int factor=USE_DEFAULT_BRANCH_FACTOR) {\n"
+             "      return CkSectionID(aid, elems, factor);\n"
+             "    } \n"
              "    static CkSectionID ckNew(const CkArrayID &aid, int l1, int u1, int s1, "
              "int l2, int u2, int s2, int l3, int u3, int s3, int l4, int u4, int s4, "
              "int l5, int u5, int s5, int l6, int u6, int s6, int "
@@ -1480,8 +1557,8 @@ void Array::genSubDecls(XStr& str) {
              "            for (int l=l4; l<=u4; l+=s4) \n"
              "              for (int m=l5; m<=u5; m+=s5) \n"
              "                for (int n=l6; n<=u6; n+=s6) \n"
-             "                  al.push_back(CkArrayIndex6D(i, j, k, l, m, n));\n"
-             "      return CkSectionID(aid, al.data(), al.size(), factor);\n"
+             "                  al.emplace_back(i, j, k, l, m, n);\n"
+             "      return CkSectionID(aid, al, factor);\n"
              "    } \n";
     }
 
@@ -1491,10 +1568,21 @@ void Array::genSubDecls(XStr& str) {
     genProxyNames(str, "", NULL, "(aid,elems,nElems,CK_DELCTOR_ARGS)", ", ");
     str << " {}\n";
     str << "    " << ptype
+        << "(const CkArrayID &aid, const std::vector<CkArrayIndex> &elems, CK_DELCTOR_PARAM) \n"
+           "        :";
+    genProxyNames(str, "", NULL, "(aid,elems,CK_DELCTOR_ARGS)", ", ");
+    str << " {}\n";
+    str << "    " << ptype
         << "(const CkArrayID &aid, CkArrayIndex *elems, int nElems, int "
            "factor=USE_DEFAULT_BRANCH_FACTOR) \n"
            "        :";
     genProxyNames(str, "", NULL, "(aid,elems,nElems, factor)", ", ");
+    str << " {}\n";
+    str << "    " << ptype
+        << "(const CkArrayID &aid, const std::vector<CkArrayIndex> &elems, int "
+           "factor=USE_DEFAULT_BRANCH_FACTOR) \n"
+           "        :";
+    genProxyNames(str, "", NULL, "(aid,elems, factor)", ", ");
     str << " { ckAutoDelegate(); }\n";
     str << "    " << ptype
         << "(const CkSectionID &sid)  \n"
@@ -1508,10 +1596,21 @@ void Array::genSubDecls(XStr& str) {
     genProxyNames(str, "", NULL, "(n,aid,elems,nElems,CK_DELCTOR_ARGS)", ", ");
     str << " {}\n";
     str << "    " << ptype
+        << "(const std::vector<CkArrayID> &aid, const std::vector<std::vector<CkArrayIndex> > &elems, "
+           "CK_DELCTOR_PARAM) \n"
+           "        :";
+    genProxyNames(str, "", NULL, "(aid,elems,CK_DELCTOR_ARGS)", ", ");
+    str << " {}\n";
+    str << "    " << ptype
         << "(int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int "
            "*nElems) \n"
            "        :";
     genProxyNames(str, "", NULL, "(n,aid,elems,nElems)", ", ");
+    str << " { ckAutoDelegate(); }\n";
+    str << "    " << ptype
+        << "(const std::vector<CkArrayID> &aid, const std::vector<std::vector<CkArrayIndex> > &elems) \n"
+           "        :";
+    genProxyNames(str, "", NULL, "(aid,elems)", ", ");
     str << " { ckAutoDelegate(); }\n";
     str << "    " << ptype
         << "(int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int "
@@ -1519,14 +1618,27 @@ void Array::genSubDecls(XStr& str) {
            "        :";
     genProxyNames(str, "", NULL, "(n,aid,elems,nElems, factor)", ", ");
     str << " { ckAutoDelegate(); }\n";
+    str << "    " << ptype
+        << "(const std::vector<CkArrayID> &aid, const std::vector<std::vector<CkArrayIndex> > &elems, "
+           "int factor) \n"
+           "        :";
+    genProxyNames(str, "", NULL, "(aid,elems, factor)", ", ");
+    str << " { ckAutoDelegate(); }\n";
     str << "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex *elems, int "
            "nElems) {\n"
            "      return CkSectionID(aid, elems, nElems);\n"
+           "    } \n";
+    str << "    static CkSectionID ckNew(const CkArrayID &aid, const std::vector<CkArrayIndex> &elems) {\n "
+           "      return CkSectionID(aid, elems);\n"
            "    } \n";
 
     str << "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex *elems, int "
            "nElems, int factor) {\n"
            "      return CkSectionID(aid, elems, nElems, factor);\n"
+           "    } \n";
+    str << "    static CkSectionID ckNew(const CkArrayID &aid, const std::vector<CkArrayIndex> &elems, int "
+           "factor) {\n"
+           "      return CkSectionID(aid, elems, factor);\n"
            "    } \n";
 
     str << "    void ckAutoDelegate(int opts=1) {\n"
@@ -1547,17 +1659,19 @@ void Array::genSubDecls(XStr& str) {
         << "::resetSection();\n"
            "    } \n";
 
+    str << "    static void contribute(CkSectionInfo &sid, int userData=-1, int fragSize=-1);\n";
     str << "    static void contribute(int dataSize,void *data,CkReduction::reducerType "
            "type, CkSectionInfo &sid, int userData=-1, int fragSize=-1);\n";
     str << "    template <typename T>\n"
            "    static void contribute(std::vector<T> &data, CkReduction::reducerType "
            "type, CkSectionInfo &sid, int userData=-1, int fragSize=-1);\n";
+    str << "    static void contribute(CkSectionInfo &sid, const CkCallback &cb, int userData=-1, int fragSize=-1);\n";
     str << "    static void contribute(int dataSize,void *data,CkReduction::reducerType "
-           "type, CkSectionInfo &sid, CkCallback &cb, int userData=-1, int "
+           "type, CkSectionInfo &sid, const CkCallback &cb, int userData=-1, int "
            "fragSize=-1);\n";
     str << "    template <typename T>\n"
            "    static void contribute(std::vector<T> &data, CkReduction::reducerType "
-           "type, CkSectionInfo &sid, CkCallback &cb, int userData=-1, int "
+           "type, CkSectionInfo &sid, const CkCallback &cb, int userData=-1, int "
            "fragSize=-1);\n";
   }
 

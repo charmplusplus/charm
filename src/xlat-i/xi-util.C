@@ -308,7 +308,11 @@ void desanitizeCode(std::string& code) {
 
 void sanitizeComments(std::string& code) {
   int h, i;
-  for (i = 0; i < code.size() - 1; ++i) {
+
+  if(code.length() == 0)
+    return;
+
+  for (i = 0; i < code.length() - 1; ++i) {
     if (code[i] == '/') {
       h = i + 2;
       switch (code[i + 1]) {

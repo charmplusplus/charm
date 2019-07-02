@@ -11,7 +11,7 @@ Status:
 
 #include "RandCentLB.h"
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(RandCentLB, "Assign objects to processors randomly")
 

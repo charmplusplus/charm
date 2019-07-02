@@ -1,9 +1,32 @@
 /* -*- Mode: C; c-basic-offset:4 ; -*- */
+/*  
+ *  (C) 2001 by Argonne National Laboratory.
+ *      See COPYRIGHT in top-level directory.
+ */
+
+/* Change for BG/L made by Hao Yu, yuh@us.ibm.com
+ */
+
 #include "mpi.h"
-#include "mpio.h"  /* not necessary with MPICH 1.1.1 or HPMPI 1.4 */
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+
+/* this test wants to compare the hints it gets from a file with a set of
+ * default hints.  These hints are specific to the MPI-IO implementation, so
+ * pick one of the following profiles to use */
+
+#   define DFLT_CB_BUFFER_SIZE     16777216
+#   define DFLT_IND_RD_BUFFER_SIZE 4194304
+#   define DFLT_IND_WR_BUFFER_SIZE 524288
+#   define DFLT_ROMIO_CB_READ      "automatic"
+#   define DFLT_ROMIO_CB_WRITE     "automatic"
+/* #undef INFO_DEBUG */
+
+/* Test will print out information about unexpected hint keys or values that
+ * differ from the default.  Since this is often interesting but rarely an
+ * error, default will be to increment errror cound for true error conditions
+ * but not print out these "interesting" non-error cases. */
 
 
 int main(int argc, char **argv)
@@ -19,7 +42,7 @@ int main(int argc, char **argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &mynod);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
-/* process 0 takes the file name as a command-line argument and
+/* process 0 takes the file name as a command-line argument and 
    broadcasts it to other processes */
     if (!mynod) {
 	i = 1;
@@ -48,7 +71,7 @@ int main(int argc, char **argv)
     }
 
 /* open the file with MPI_INFO_NULL */
-    MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_RDWR,
+    MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_RDWR, 
                   MPI_INFO_NULL, &fh);
 
 /* check the default values set by ROMIO */
@@ -58,9 +81,9 @@ int main(int argc, char **argv)
     for (i=0; i<nkeys; i++) {
 	MPI_Info_get_nthkey(info_used, i, key);
 	MPI_Info_get(info_used, key, MPI_MAX_INFO_VAL-1, value, &flag);
-#if 0
-	if (!mynod)
-	    fprintf(stderr, "Process %d, Default:  key = %s, value = %s\n", mynod,
+#ifdef INFO_DEBUG
+	if (!mynod) 
+	    fprintf(stderr, "Process %d, Default:  key = %s, value = %s\n", mynod, 
                 key, value);
 #endif
 	if (!strcmp("striping_factor", key)) {
@@ -68,35 +91,28 @@ int main(int argc, char **argv)
 	    /* no check */
 	}
 	else if (!strcmp("cb_buffer_size", key)) {
-	    if (atoi(value) != 4194304) {
+	    if (atoi(value) != DFLT_CB_BUFFER_SIZE) {
 		errs++;
 		if (verbose) fprintf(stderr, "cb_buffer_size is %d; should be %d\n",
-				     atoi(value), 4194304);
+				     atoi(value), DFLT_CB_BUFFER_SIZE);
 	    }
 	}
 	else if (!strcmp("romio_cb_read", key)) {
-	    if (strcmp("automatic", value)) {
+	    if (strcmp(DFLT_ROMIO_CB_READ, value)) {
 		errs++;
 		if (verbose) fprintf(stderr, "romio_cb_read is set to %s; should be %s\n",
-				     value, "automatic");
+				     value, DFLT_ROMIO_CB_READ);
 	    }
 	}
 	else if (!strcmp("romio_cb_write", key)) {
-	    if (strcmp("automatic", value)) {
+	    if (strcmp(DFLT_ROMIO_CB_WRITE, value)) {
 		errs++;
 		if (verbose) fprintf(stderr, "romio_cb_write is set to %s; should be %s\n",
-				     value, "automatic");
+				     value, DFLT_ROMIO_CB_WRITE);
 	    }
 	}
 	else if (!strcmp("cb_nodes", key)) {
 	    /* unreliable test -- just ignore value */
-#if 0
-	    if (atoi(value) != 1) {
-		errs++;
-		if (verbose) fprintf(stderr, "cb_nodes is %d; should be %d\n", atoi(value),
-				     1);
-	    }
-#endif
 	}
 	else if (!strcmp("romio_no_indep_rw", key)) {
 	    if (strcmp("false", value)) {
@@ -106,17 +122,17 @@ int main(int argc, char **argv)
 	    }
 	}
 	else if (!strcmp("ind_rd_buffer_size", key)) {
-	    if (atoi(value) != 4194304) {
+	    if (atoi(value) != DFLT_IND_RD_BUFFER_SIZE) {
 		errs++;
 		if (verbose) fprintf(stderr, "ind_rd_buffer_size is %d; should be %d\n",
-				     atoi(value), 4194304);
+				     atoi(value), DFLT_IND_RD_BUFFER_SIZE);
 	    }
 	}
 	else if (!strcmp("ind_wr_buffer_size", key)) {
-	    if (atoi(value) != 524288) {
+	    if (atoi(value) != DFLT_IND_WR_BUFFER_SIZE) {
 		errs++;
 		if (verbose) fprintf(stderr, "ind_wr_buffer_size is %d; should be %d\n",
-				     atoi(value), 524288);
+				     atoi(value), DFLT_IND_WR_BUFFER_SIZE);
 	    }
 	}
 	else if (!strcmp("romio_ds_read", key)) {
@@ -128,28 +144,35 @@ int main(int argc, char **argv)
 	}
 	else if (!strcmp("romio_ds_write", key)) {
 	    /* Unreliable test -- value is file system dependent.  Ignore. */
-#if 0
-	    if (strcmp("automatic", value)) {
-		errs++;
-		if (verbose) fprintf(stderr, "romio_ds_write is set to %s; should be %s\n",
-				     value, "automatic");
-	    }
-#endif
 	}
 	else if (!strcmp("cb_config_list", key)) {
+#ifndef SKIP_CB_CONFIG_LIST_TEST
 	    if (strcmp("*:1", value)) {
 		errs++;
 		if (verbose) fprintf(stderr, "cb_config_list is set to %s; should be %s\n",
 				     value, "*:1");
 	    }
+#endif
+	}
+	/* don't care about the defaults for these keys */
+	else if (!strcmp("romio_cb_pfr", key)) {
+	}
+	else if (!strcmp("romio_cb_fr_types", key)) {
+	}
+	else if (!strcmp("romio_cb_fr_alignment", key)) {
+	}
+	else if (!strcmp("romio_cb_ds_threshold", key)) {
+	}
+	else if (!strcmp("romio_cb_alltoall", key)) {
 	}
 	else {
 	    if (verbose) fprintf(stderr, "unexpected key %s (not counted as an error)\n", key);
 	}
     }
+    MPI_Info_free(&info_used);
 
     MPI_File_close(&fh);
-
+    
 /* delete the file */
     if (!mynod) MPI_File_delete(filename, MPI_INFO_NULL);
     MPI_Barrier(MPI_COMM_WORLD);
@@ -165,7 +188,7 @@ int main(int argc, char **argv)
     MPI_Info_set(info, "cb_buffer_size", "8388608");
 
     /* number of processes that actually perform I/O in collective I/O */
-    sprintf(value, "%d", nprocs/2 ? 0 : 1);
+    sprintf(value, "%d", nprocs/2);
     MPI_Info_set(info, "cb_nodes", value);
 
     /* buffer size for data sieving in independent reads */
@@ -175,13 +198,13 @@ int main(int argc, char **argv)
     MPI_Info_set(info, "ind_wr_buffer_size", "1048576");
 
 
-/* The following three hints related to file striping are accepted only
-   on Intel PFS and IBM PIOFS file systems and are ignored elsewhere.
-   They can be specified only at file-creation time; if specified later
+/* The following three hints related to file striping are accepted only 
+   on Intel PFS and IBM PIOFS file systems and are ignored elsewhere. 
+   They can be specified only at file-creation time; if specified later 
    they will be ignored. */
 
     /* number of I/O devices across which the file will be striped.
-       accepted only if 0 < value < default_striping_factor;
+       accepted only if 0 < value < default_striping_factor; 
        ignored otherwise */
     if (default_striping_factor - 1 > 0) {
         sprintf(value, "%d", default_striping_factor-1);
@@ -195,22 +218,24 @@ int main(int argc, char **argv)
     /* the striping unit in bytes */
     MPI_Info_set(info, "striping_unit", "131072");
 
+#ifndef SKIP_CB_CONFIG_LIST_TEST
     /* set the cb_config_list so we'll get deterministic cb_nodes output */
     MPI_Info_set(info, "cb_config_list", "*:*");
+#endif
 
     /* the I/O device number from which to start striping the file.
-       accepted only if 0 <= value < default_striping_factor;
+       accepted only if 0 <= value < default_striping_factor; 
        ignored otherwise */
     sprintf(value, "%d", default_striping_factor-2);
     MPI_Info_set(info, "start_iodevice", value);
 
 
-/* The following hint about PFS server buffering is accepted only on
-   Intel PFS. It can be specified anytime. */
+/* The following hint about PFS server buffering is accepted only on 
+   Intel PFS. It can be specified anytime. */ 
     MPI_Info_set(info, "pfs_svr_buf", "true");
 
 /* open the file and set new info */
-    MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_RDWR,
+    MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_RDWR, 
                   info, &fh);
 
 /* check the values set */
@@ -220,8 +245,8 @@ int main(int argc, char **argv)
     for (i=0; i<nkeys; i++) {
 	MPI_Info_get_nthkey(info_used, i, key);
 	MPI_Info_get(info_used, key, MPI_MAX_INFO_VAL-1, value, &flag);
-#if 0
-	if (!mynod) fprintf(stderr, "Process %d, key = %s, value = %s\n", mynod,
+#ifdef INFO_DEBUG	
+	if (!mynod) fprintf(stderr, "Process %d, key = %s, value = %s\n", mynod, 
                 key, value);
 #endif
 	if (!strcmp("striping_factor", key)) {
@@ -244,24 +269,24 @@ int main(int argc, char **argv)
 	    }
 	}
 	else if (!strcmp("romio_cb_read", key)) {
-	    if (strcmp("automatic", value)) {
+	    if (strcmp(DFLT_ROMIO_CB_READ, value)) {
 		errs++;
 		if (verbose) fprintf(stderr, "romio_cb_read is set to %s; should be %s\n",
-				     value, "automatic");
+				     value, DFLT_ROMIO_CB_READ);
 	    }
 	}
 	else if (!strcmp("romio_cb_write", key)) {
-	    if (strcmp("automatic", value)) {
+	    if (strcmp(DFLT_ROMIO_CB_WRITE, value)) {
 		errs++;
 		if (verbose) fprintf(stderr, "romio_cb_write is set to %s; should be %s\n",
-				     value, "automatic");
+				     value, DFLT_ROMIO_CB_WRITE);
 	    }
 	}
 	else if (!strcmp("cb_nodes", key)) {
-	    if (atoi(value) != nprocs/2 ? 0 : 1) {
+	    if (atoi(value) != (nprocs/2)) {
 		errs++;
 		if (verbose) fprintf(stderr, "cb_nodes is %d; should be %d\n", atoi(value),
-				     nprocs/2 ? 0 : 1);
+				     nprocs/2);
 	    }
 	}
 	else if (!strcmp("romio_no_indep_rw", key)) {
@@ -294,32 +319,63 @@ int main(int argc, char **argv)
 	}
 	else if (!strcmp("romio_ds_write", key)) {
 	    /* Unreliable test -- value is file system dependent.  Ignore. */
-#if 0
-	    if (strcmp("automatic", value)) {
-		errs++;
-		if (verbose) fprintf(stderr, "romio_ds_write is set to %s; should be %s\n",
-				     value, "automatic");
-	    }
-#endif
 	}
 	else if (!strcmp("cb_config_list", key)) {
+#ifndef SKIP_CB_CONFIG_LIST_TEST
 	    if (strcmp("*:*", value)) {
 		errs++;
 		if (verbose) fprintf(stderr, "cb_config_list is set to %s; should be %s\n",
 				     value, "*:*");
 	    }
+#endif
 	}
+	else if (!strcmp("romio_cb_pfr", key)) {
+   	    if(strcmp("disable", value)) {
+		errs++;
+		if (verbose) fprintf(stderr, "romio_cb_pfr is set to %s; should be %s\n",
+				     value, "automatic");
+	    }
+	}
+	else if (!strcmp("romio_cb_fr_types", key)) {
+   	    if(strcmp("aar", value)) {
+		errs++;
+		if (verbose) fprintf(stderr, "romio_cb_fr_types is set to %s; should be %s\n",
+				     value, "aar");
+	    }
+	}
+	else if (!strcmp("romio_cb_fr_alignment", key)) {
+   	    if(strcmp("1", value)) {
+		errs++;
+		if (verbose) fprintf(stderr, "romio_cb_fr_alignment is set to %s; should be %s\n",
+				     value, "1");
+	    }
+	}
+	else if (!strcmp("romio_cb_ds_threshold", key)) {
+   	    if(strcmp("0", value)) {
+		errs++;
+		if (verbose) fprintf(stderr, "romio_cb_ds_threshold is set to %s; should be %s\n",
+				     value, "0");
+	    }
+	}
+	else if (!strcmp("romio_cb_alltoall", key)) {
+   	    if(strcmp("automatic", value)) {
+		errs++;
+		if (verbose) fprintf(stderr, "romio_cb_alltoall is set to %s; should be %s\n",
+				     value, "automatic");
+	    }
+	}
+
 	else {
 	    if (verbose) fprintf(stderr, "unexpected key %s (not counted as an error)\n", key);
 	}
     }
-
+	    
     /* Q: SHOULD WE BOTHER LOOKING AT THE OTHER PROCESSES? */
     if (!mynod) {
 	if (errs) fprintf(stderr, "Found %d errors.\n", errs);
-	else printf("No errors.\n");
+	else printf(" No Errors\n");
     }
-
+    
     MPI_File_close(&fh);
     free(filename);
     MPI_Info_free(&info_used);
@@ -327,12 +383,3 @@ int main(int argc, char **argv)
     MPI_Finalize();
     return 0;
 }
-
-
-
-
-
-
-
-
-

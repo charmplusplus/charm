@@ -7,7 +7,7 @@
 
 #include "elements.h"
 
-CMI_EXTERNC_VARIABLE int quietModeRequested;
+extern int quietModeRequested;
 
 CreateLBFunc_Def(DistributedLB, "The distributed load balancer")
 
@@ -57,7 +57,8 @@ void DistributedLB::turnOff()
 
 void DistributedLB::InitLB(const CkLBOptions &opt) {
   thisProxy = CProxy_DistributedLB(thisgroup);
-  if (opt.getSeqNo() > 0) turnOff();
+  if (opt.getSeqNo() > 0 || (_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
+    turnOff();
 
   // Set constants
   kUseAck = true;
@@ -143,6 +144,7 @@ void DistributedLB::LoadReduction(CkReductionMsg* redn_msg) {
           kTargetRatio);
     }
     PackAndSendMigrateMsgs();
+    delete [] results;
     return;
   }
 
@@ -166,6 +168,7 @@ void DistributedLB::LoadReduction(CkReductionMsg* redn_msg) {
     CkCallback cb(CkIndex_DistributedLB::DoneGossip(), thisProxy);
     CkStartQD(cb);
   }
+  delete [] results;
 }
 
 /*
@@ -358,8 +361,10 @@ void DistributedLB::AfterLBReduction(CkReductionMsg* redn_msg) {
     }
     Cleanup();
     PackAndSendMigrateMsgs();
-    theLbdb->nextLoadbalancer(seqno);
+    if (!(_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
+      theLbdb->nextLoadbalancer(seqno);
   }
+  delete [] results;
 }
 
 /*

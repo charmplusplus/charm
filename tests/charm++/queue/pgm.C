@@ -210,42 +210,6 @@ double timePerOp_general_ififo(int qBaseSize = 256)
 }
 
 
-bool perftest_general_ififo()
-{
-  std::vector<double> timings;
-  timings.reserve(256);
-  // Charm applications typically have a small/moderate number of different message priorities
-  for (int hl = 16; hl <= 128; hl *=2)
-  {
-    std::srand(42);
-    for (int i = 0; i < qSizeMax + numMsgs; i++)
-      prios[i] = std::rand() % hl;
-
-    for (int i = qSizeMin; i <= qSizeMax; i *= 2)
-      timings.push_back( timePerOp_general_ififo(i) );
-  }
-
-  CkPrintf("Reporting time per enqueue / dequeue operation (us) for charm's underlying mixed priority queue\n"
-           "Nprios (row) is the number of different priority values that are used.\n"
-           "Qlen (col) is the base length of the queue on which the enq/deq operations are timed\n"
-          );
-
-  CkPrintf("\nversion  Nprios");
-  for (int i = qSizeMin; i <= qSizeMax; i*=2)
-    CkPrintf("%10d", i);
-
-  for (int hl = 16, j=0; hl <= 128; hl *=2)
-  {
-    CkPrintf("\n  charm %7d", hl);
-    for (int i = qSizeMin; i <= qSizeMax; i *= 2, j++)
-      CkPrintf("%10.4f", timings[j]);
-  }
-
-  CkPrintf("\n");
-  return true;
-}
-
-
 #if 0
 // Template for new harness-driven tests
 bool test_foo()
@@ -284,7 +248,6 @@ struct main : public CBase_main
     RUN_TEST(test_general_ififo);
     RUN_TEST(test_enumerate);
 #endif
-    RUN_TEST(perftest_general_ififo);
 
     if (fail) {
       sprintf(message, "%d/%d tests failed\n", fail, tests);

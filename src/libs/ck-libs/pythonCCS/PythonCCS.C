@@ -610,7 +610,7 @@ void PythonObject::executeThread(PythonExecute *pyMsg) {
     PythonIterator *userIterator = pyMsg->info.info;
     int more = buildIterator(part, userIterator);
     CkPythonDebugf("Executing iterative: %p %p %p %d\n",item,part,oldArg,more);
-    if (oldArg != part) Py_DECREF(oldArg);
+    if (oldArg != part) { Py_DECREF(oldArg); }
     PyTuple_SetItem(arg, 0, part);
 
     // iterate over all the provided iterators from the user class
@@ -645,9 +645,9 @@ void PythonObject::executeThread(PythonExecute *pyMsg) {
         Py_DECREF(tmp);
         CkPrintf("%s\n",PyString_AsString(tmp=PyObject_Str(traceback)));
         Py_DECREF(tmp);
-        if (exception!=NULL) Py_DECREF(exception);
-        if (v!=NULL) Py_DECREF(v);
-        if (traceback!=NULL) Py_DECREF(traceback);
+        if (exception!=NULL) { Py_DECREF(exception); }
+        if (v!=NULL) { Py_DECREF(v); }
+        if (traceback!=NULL) { Py_DECREF(traceback); }
       }
       if (!result) {
         CkPrintf("Python Call error\n");
@@ -907,7 +907,7 @@ static void initializePythonDefault(void) {
   //CsvAccess(pyLock) = CmiCreateLock();
   CtvInitialize(PyObject *,pythonReturnValue);
 
-  PythonCCS::reduceString = CkReduction::addReducer(pythonCombinePrint);
+  PythonCCS::reduceString = CkReduction::addReducer(pythonCombinePrint, false, "pythonCombinePrint");
 
   Py_Initialize();
   PyEval_InitThreads();
