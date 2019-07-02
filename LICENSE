@@ -93,8 +93,8 @@ otm@illinois.edu or Charmworks, Inc. at info@hpccharm.com.
       at the University of Illinois at Urbana-Champaign."
 
  6.2 Any published work, which utilizes Software, shall include the
-     following the references listed in the file named CITATION in the
-     distribution.
+     following the references listed in the file named CITATION.cff 
+     in the distribution.
 
  6.3 Electronic documents will include a direct link to the official
 	 Software page at http://charm.cs.illinois.edu/research/charm.
