@@ -153,6 +153,7 @@ class zerocopyObject : public CBase_zerocopyObject{
         }
 
       }
+      CmiPrintf("[%d][%d][%d] Freeing %p and %p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), dArr2, iArr1);
       // delete everytime after migration as they are pupped to be used for sdagRun
       delete [] dArr2;
       delete [] iArr1;
@@ -217,14 +218,15 @@ class zerocopyObject : public CBase_zerocopyObject{
         allocateAndCopyArray(dArr2copy, dArr2, dSize2);
         allocateAndCopyArray(cArr1copy, cArr1, cSize1);
 
-        thisProxy[destIndex].send(iSize1, iArr1, dSize1, dArr1, cSize1, cArr1);
-
+        //thisProxy[destIndex].send(iSize1, iArr1, dSize1, dArr1, cSize1, cArr1);
+        thisProxy[thisIndex].sdagRun();
       } else {
         iArr1 = new int[iSize1];
         iArr2 = new int[iSize2];
         dArr1 = new double[dSize1];
         dArr2 = new double[dSize2];
         cArr1 = new char[cSize1];
+        thisProxy[thisIndex].sdagRun();
       }
     }
 
@@ -326,6 +328,9 @@ class zerocopyObject : public CBase_zerocopyObject{
     void sdagRecv(int iter, int &n1, int *& ptr1, int &n2, double *&ptr2, CkNcpyBufferPost *ncpyPost) {
       ptr1 = iArr1;
       ptr2 = dArr2;
+
+      CkAssert(n1 == iSize1);
+      CkAssert(n2 == dSize2);
       // NOTE: The same arrays are used to receive the data for all the 'num' sdag iterations and
       // the 'TOTAL_ITER' application iterations. This is entirely for the purpose of demonstration
       // and results in the same array being overwritten. It is important to note that messages can

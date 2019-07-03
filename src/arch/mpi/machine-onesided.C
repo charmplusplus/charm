@@ -21,6 +21,7 @@ void MPISendOrRecvOneBuffer(SMSG_LIST *smsg, int tag){
 
 
   CmiAssert(tag > TAG);
+  CmiAssert(CmiMyRank() == CmiMyNodeSize());
 
   if(smsg->type == ONESIDED_BUFFER_DIRECT_SEND || smsg->type == ONESIDED_BUFFER_SEND) {
     CmiPrintf("[%d][%d][%d] Posting an MPI_Isend with pointer %p, size: %d, tag:%d, dstrank:%d\n",

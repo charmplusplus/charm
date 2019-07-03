@@ -630,6 +630,7 @@ static void ReleasePostedMessages(void) {
         }
 #endif
         if (done) {
+
             MACHSTATE2(3,"ReleasePostedMessages release one %d to %d", CmiMyPe(), msg_tmp->destpe);
             CpvAccess(MsgQueueLen)--;
             /* Release the message */
@@ -650,10 +651,12 @@ static void ReleasePostedMessages(void) {
                 // Invoke the destination ack
                 ncpyOpInfo->ackMode = CMK_DEST_ACK; // Only invoke destination ack
 
+                CmiPrintf("[%d][%d][%d] Completed _RECV_ ptr %p, size:%d, tag %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ncpyOpInfo->destPtr, ncpyOpInfo->destSize, ncpyOpInfo->tag);
                 // On the destination the NcpyOperationInfo is freed for the Direct API
                 // but not freed for the Entry Method API as it a part of the parameter marshalled message
                 // and is enentually freed by the RTS
                 // CmiInvokeNcpyAck(ncpyOpInfo);
+                CmiAssert(ncpyOpInfo->tag > TAG);
                 ncpyOpInfoList.push_back(ncpyOpInfo);
 
             } else if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_SEND) {
@@ -665,8 +668,9 @@ static void ReleasePostedMessages(void) {
                 // Free the NcpyOperationInfo on the source
                 ncpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO;
 
+                CmiPrintf("[%d][%d][%d] Completed _SEND_ ptr %p, size:%d, tag %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), ncpyOpInfo->srcPtr, ncpyOpInfo->srcSize, ncpyOpInfo->tag);
                 //CmiInvokeNcpyAck(ncpyOpInfo);
-
+                CmiAssert(ncpyOpInfo->tag > TAG);
                 ncpyOpInfoList.push_back(ncpyOpInfo);
             }
             else if(msg_tmp->type == POST_DIRECT_SEND || msg_tmp->type == POST_DIRECT_RECV) {
@@ -718,6 +722,8 @@ static int PumpMsgs(void) {
 #if CMI_DYNAMIC_EXERT_CAP
     dynamicRecvCap = CMI_DYNAMIC_MAXCAPSIZE;
 #endif
+
+    std::vector<NcpyOperationInfo *> ncpyOpInfoList;
 
     while (1) {
         int doSyncRecv = 1;
@@ -866,6 +872,8 @@ static int PumpMsgs(void) {
               NcpyOperationInfo *ncpyOpInfoMsg = (NcpyOperationInfo *)msg;
               resetNcpyOpInfoPointers(ncpyOpInfoMsg);
 
+              ncpyOpInfoList.push_back(ncpyOpInfoMsg);
+
               int postMsgType, myPe, otherPe;
               const void *myBuffer;
               if(CMI_MSGTYPE(msg) == POST_DIRECT_RECV) {
@@ -971,6 +979,46 @@ static int PumpMsgs(void) {
 #endif
 
     }
+
+    /*
+    for(int i=0; i < ncpyOpInfoList.size(); i++) {
+
+          NcpyOperationInfo *ncpyOpInfoMsg = ncpyOpInfoList[i];
+
+          void *msg = (void *)(ncpyOpInfoMsg);
+
+
+              int postMsgType, myPe, otherPe;
+              const void *myBuffer;
+              if(CMI_MSGTYPE(msg) == POST_DIRECT_RECV) {
+                // Direct Buffer destination, post MPI_Irecv
+                postMsgType = ONESIDED_BUFFER_DIRECT_RECV;
+                myPe = ncpyOpInfoMsg->destPe;
+                otherPe = ncpyOpInfoMsg->srcPe;
+                myBuffer = ncpyOpInfoMsg->destPtr;
+                //CmiPrintf("[%d][%d][%d] Posting RECV from Pump message\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
+              }
+              else {
+                // Direct Buffer Source, post MPI_Isend
+                postMsgType = ONESIDED_BUFFER_DIRECT_SEND;
+                myPe = ncpyOpInfoMsg->srcPe;
+                otherPe = ncpyOpInfoMsg->destPe;
+                myBuffer = ncpyOpInfoMsg->srcPtr;
+
+                //CmiPrintf("[%d][%d][%d] Posting SEND from Pump message\n", CmiMyPe(), CmiMyNode(), CmiMyRank());
+              }
+
+              MPIPostOneBuffer(myBuffer,
+                               ncpyOpInfoMsg,
+                               std::min(ncpyOpInfoMsg->srcSize, ncpyOpInfoMsg->destSize),
+                               otherPe,
+                               ncpyOpInfoMsg->tag,
+                               postMsgType);
+
+    ncpyOpInfoList.clear();
+
+    }
+*/
 
 #if USE_ASYNC_RECV_FUNC || USE_MPI_CTRLMSG_SCHEME
 /* Another loop to check the irecved msgs list */

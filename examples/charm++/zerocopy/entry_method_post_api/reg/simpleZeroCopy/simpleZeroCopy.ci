@@ -28,6 +28,10 @@ mainmodule simpleZeroCopy {
 
           serial {
 
+           CkAssert(n1 == iSize1);
+           CkAssert(n2 == dSize2);
+ 
+
             //CmiPrintf("[%d][%d][%d] sdagRecv actual method %p, %p and received are %p, %p\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), iArr1, dArr2, ptr1, ptr2);
             // increment counter on receiving a sdagRecv
             sdagZeroCopyRecvCounter++;
