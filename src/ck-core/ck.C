@@ -2176,8 +2176,8 @@ void registerArrayResumeFromSyncExtCallback(void (*cb)(int, int, int *)) {
   ArrayResumeFromSyncExtCallback = cb;
 }
 
-void (*CreateCallbackMsgExt)(void*, int, int, int, char**, int*) = NULL;
-void registerCreateCallbackMsgExtCallback(void (*cb)(void*, int, int, int, char**, int*)) {
+void (*CreateCallbackMsgExt)(void*, int, int, int, int *, char**, int*) = NULL;
+void registerCreateCallbackMsgExtCallback(void (*cb)(void*, int, int, int, int *, char**, int*)) {
   CreateCallbackMsgExt = cb;
 }
 
@@ -2368,17 +2368,22 @@ void CkSetMigratable(int aid, int ndims, int *index, char migratable) {
 
 void CkStartQDExt_ChareCallback(int onPE, void* objPtr, int epIdx, int fid)
 {
-  CkStartQD(CkCallback(onPE, objPtr, epIdx, fid));
+  CkStartQD(CkCallback(onPE, objPtr, epIdx, (CMK_REFNUM_TYPE)fid));
 }
 
 void CkStartQDExt_GroupCallback(int gid, int pe, int epIdx, int fid)
 {
-  CkStartQD(CkCallback(gid, pe, epIdx, fid));
+  CkStartQD(CkCallback(gid, pe, epIdx, (CMK_REFNUM_TYPE)fid));
 }
 
 void CkStartQDExt_ArrayCallback(int aid, int* idx, int ndims, int epIdx, int fid)
 {
-  CkStartQD(CkCallback(aid, idx, ndims, epIdx, fid));
+  CkStartQD(CkCallback(aid, idx, ndims, epIdx, (CMK_REFNUM_TYPE)fid));
+}
+
+void CkStartQDExt_SectionCallback(int sid_pe, int sid_cnt, int rootPE, int ep)
+{
+  CkStartQD(CkCallback(sid_pe, sid_cnt, rootPE, ep));
 }
 
 void CkChareExtSend(int onPE, void *objPtr, int epIdx, char *msg, int msgSize) {
@@ -2453,6 +2458,12 @@ void CkGroupExtSend_multi(int gid, int npes, const int *pes, int epIdx, int num_
     CkSendMsgBranch(epIdx, impl_msg, pes[0], gId, 0);
   else
     CkSendMsgBranchMulti(epIdx, impl_msg, gId, npes, pes, 0);
+}
+
+void CkForwardMulticastMsg(int _gid, int num_children, const int *children) {
+  CkGroupID gid;
+  gid.idx = _gid;
+  ((SectionManagerExt*)CkLocalBranch(gid))->forwardMulticastMsg(num_children, children);
 }
 
 void CkArrayExtSend(int aid, int *idx, int ndims, int epIdx, char *msg, int msgSize) {
