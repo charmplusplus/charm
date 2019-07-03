@@ -169,6 +169,7 @@ public:
   void destroyStreams();
   cudaStream_t getNextStream();
   cudaStream_t getStream(int);
+  int getNStreams();
   void allocateBuffers(hapiWorkRequest*);
   void hostToDeviceTransfer(hapiWorkRequest*);
   void deviceToHostTransfer(hapiWorkRequest*);
@@ -314,6 +315,10 @@ cudaStream_t GPUManager::getStream(int i) {
   return streams_[i];
 }
 
+int GPUManager::getNStreams() {
+  return n_streams_;
+}
+
 // Allocates device buffers.
 void GPUManager::allocateBuffers(hapiWorkRequest* wr) {
   for (int i = 0; i < wr->getBufferCount(); i++) {
@@ -395,9 +400,8 @@ void GPUManager::hostToDeviceTransfer(hapiWorkRequest* wr) {
     host_buffers_[index] = bi.host_buffer;
 
     if (bi.transfer_to_device) {
-      // TODO should be changed back to async for performance
-      hapiCheck(cudaMemcpy(device_buffers_[index], host_buffers_[index], size,
-                                cudaMemcpyHostToDevice));
+      hapiCheck(cudaMemcpyAsync(device_buffers_[index], host_buffers_[index], size,
+                                cudaMemcpyHostToDevice, wr->stream));
 
 #ifdef HAPI_DEBUG
       printf("[HAPI] transferring buffer %d from host to device, time: %.2f, "
@@ -415,9 +419,8 @@ void GPUManager::deviceToHostTransfer(hapiWorkRequest* wr) {
     size_t size = bi.size;
 
     if (bi.transfer_to_host) {
-      // TODO should be changed back to async for performance
-      hapiCheck(cudaMemcpy(host_buffers_[index], device_buffers_[index], size,
-                                cudaMemcpyDeviceToHost));
+      hapiCheck(cudaMemcpyAsync(host_buffers_[index], device_buffers_[index], size,
+                                cudaMemcpyDeviceToHost, wr->stream));
 
 #ifdef HAPI_DEBUG
       printf("[HAPI] transferring buffer %d from device to host, time %.2f, "
@@ -688,6 +691,21 @@ void hapiEnqueue(hapiWorkRequest* wr) {
 hapiWorkRequest* hapiCreateWorkRequest() {
   return (new hapiWorkRequest);
 }
+
+hapiWorkRequest::hapiWorkRequest() :
+    grid_dim(0), block_dim(0), shared_mem(0), host_to_device_cb(NULL),
+    kernel_cb(NULL), device_to_host_cb(NULL), runKernel(NULL), state(0),
+    user_data(NULL), free_user_data(false), free_host_to_device_cb(false),
+    free_kernel_cb(false), free_device_to_host_cb(false)
+  {
+#ifdef HAPI_TRACE
+    trace_name = "";
+#endif
+#ifdef HAPI_INSTRUMENT_WRS
+    chare_index = -1;
+#endif
+    stream = CsvAccess(gpu_manager).getStream(CkMyPe() % CsvAccess(gpu_manager).getNStreams());
+  }
 
 static void createPool(int *nbuffers, int n_slots, CkVec<BufferPool> &pools);
 static void releasePool(CkVec<BufferPool> &pools);
