@@ -141,6 +141,8 @@ void TraceAutoPerf::countNewChare()
 }
 
 void TraceAutoPerf::creation(envelope *env, int epIdx, int num) { 
+  currentSummary->data[AVG_NumMsgSend]++;
+  currentSummary->data[AVG_BytesSend] += env->getTotalsize();
 } 
 
 void TraceAutoPerf::creationMulticast(envelope *, int epIdx, int num, const int *pelist) { }
@@ -150,6 +152,7 @@ void TraceAutoPerf::creationDone(int num) { }
 void TraceAutoPerf::messageRecv(void *env, int size) {
   if(isTraceOn){
     currentSummary->data[AVG_NumMsgRecv]++;
+    currentSummary->data[AVG_NumMsg]++;
     currentSummary->data[AVG_BytesMsgRecv] += size;
   }
 }
@@ -182,6 +185,8 @@ void TraceAutoPerf::beginExecute(envelope *env, void *obj)
     if (env != nullptr) {
       currentSummary->data[AVG_NumMsgRecv]++;
       currentSummary->data[AVG_BytesMsgRecv] += env->getTotalsize();
+      currentSummary->data[AVG_ExternalBytePerPE] += env->getTotalsize();
+      currentSummary->data[AVG_MsgTimeCost] += env->pathHistory.getTotalTime();
     }
 #if USE_MIRROR
     if(_entryTable[currentEP]->mirror){
@@ -355,12 +360,16 @@ PerfData* TraceAutoPerf::getSummary() {
   currentSummary->data[AVG_NumInvocations] = (double)totalEntryMethodInvocations;
   currentSummary->data[AVG_NumInvocations_1] = (double)totalEntryMethodInvocations_1;
   currentSummary->data[AVG_NumInvocations_2] = (double)totalEntryMethodInvocations_2;
+  currentSummary->data[AVG_BytesMsgRecv] /= currentSummary->data[AVG_NumMsgRecv];
+  currentSummary->data[AVG_BytesSend] /= currentSummary->data[AVG_NumMsgSend];
+  currentSummary->data[AVG_MsgTimeCost] /= currentSummary->data[AVG_NumMsgRecv];
   currentSummary->data[MAX_EntryMethodDuration]= maxEntryTime;
   currentSummary->data[MAX_EntryMethodDuration_1]= maxEntryTime_1;
   currentSummary->data[MAX_EntryMethodDuration_2]= maxEntryTime_2;
   currentSummary->data[MAX_EntryID]= maxEntryIdx;
   currentSummary->data[MAX_EntryID_1]= maxEntryIdx_1;
   currentSummary->data[MAX_EntryID_2]= maxEntryIdx_2;
+  currentSummary->data[MAX_ExternalBytePE] = currentSummary->data[AVG_ExternalBytePerPE];
   summarizeObjectInfo(currentSummary->data[MAX_LoadPerObject], currentSummary->data[AVG_LoadPerObject], currentSummary->data[MAX_NumMsgsPerObject],  currentSummary->data[AVG_NumMsgsPerObject], currentSummary->data[MAX_BytesPerObject], currentSummary->data[AVG_BytesPerObject], currentSummary->data[AVG_NumObjectsPerPE]);
   currentSummary->data[MAX_NumInvocations] = currentSummary->data[AVG_NumInvocations] = (double)totalEntryMethodInvocations;
 #if CMK_HAS_COUNTER_PAPI
@@ -384,6 +393,7 @@ PerfData* TraceAutoPerf::getSummary() {
   currentSummary->data[MAX_NumMsgSendPE] = CkMyPe();
   currentSummary->data[MAX_BytesSendPE] = CkMyPe();
   currentSummary->data[MaxEntryPE] = CkMyPe();
+  currentSummary->data[MAX_BytesPerPE] = currentSummary->data[AVG_BytesPerObject];
   }
   return currentSummary;
 }
