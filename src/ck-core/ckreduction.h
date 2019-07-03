@@ -25,10 +25,6 @@ The calls needed to use the reduction manager are:
 #define FRAG_THRESHOLD 131072
 #endif
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-#define MAX_INT 5000000
-#define _MLOG_REDUCE_P2P_ 0
-#endif
 
 //This message is sent between group objects on a single PE
 // to let each know the other has been created.
@@ -694,32 +690,12 @@ public:
 		when there are no gcount
 	*/
 	int getGCount(){return gcount;};
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	void decGCount(){gcount--;}
-	void incNumImmigrantRecObjs(){
-		numImmigrantRecObjs++;
-	}
-	void decNumImmigrantRecObjs(){
-		numImmigrantRecObjs--;
-	}
-	void incNumEmigrantRecObjs(){
-		numEmigrantRecObjs++;
-	}
-	void decNumEmigrantRecObjs(){
-		numEmigrantRecObjs--;
-	}
-
-#endif
 
         //Combine (& free) the current message vector.
 	static CkReductionMsg *reduceMessages(CkMsgQ<CkReductionMsg> &msgs);
 
 private:
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	int numImmigrantRecObjs;
-	int numEmigrantRecObjs;
-#endif
 
 //Data members
 	//Stored callback function (may be NULL if none has been set)

@@ -21,6 +21,7 @@ DIRS = \
   jacobi3d \
   jacobi3d-sdag \
   zerocopy \
+  within_node_bcast \
 
 # skip sdag, megatest and commtest
 BGDIRS = \
@@ -33,9 +34,6 @@ FTDIRS = \
   jacobi3d \
   jacobi3d-sdag \
 
-MLOGFTDIRS = \
-  jacobi3d-sdag \
-
 TESTDIRS = $(filter-out $(FTDIRS),$(DIRS))
 
 all: $(foreach i,$(DIRS),build-$i)
@@ -44,9 +42,7 @@ test: $(foreach i,$(TESTDIRS),test-$i)
 
 bgtest: $(foreach i,$(filter $(BGDIRS),$(TESTDIRS)),bgtest-$i)
 
-syncfttest causalfttest mpisyncfttest: $(foreach i,$(filter $(FTDIRS),$(DIRS)),test-$i)
-
-mlogfttest: $(foreach i,$(filter $(MLOGFTDIRS),$(DIRS)),test-$i)
+syncfttest mpisyncfttest: $(foreach i,$(filter $(FTDIRS),$(DIRS)),test-$i)
 
 clean: $(foreach i,$(DIRS),clean-$i)
 	rm -f TAGS #*#

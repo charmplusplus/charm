@@ -1553,7 +1553,7 @@ class GPUReq : public AmpiRequest {
   ~GPUReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
   int wait(MPI_Status *sts) noexcept override;
-  void receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override;
+  bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override;
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override;
   AmpiReqType getType() const noexcept override { return AMPI_GPU_REQ; }
   bool isUnmatched() const noexcept override { return false; }

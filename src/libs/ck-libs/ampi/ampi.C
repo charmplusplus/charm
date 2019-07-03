@@ -825,10 +825,14 @@ FLINKAGE void FTN_NAME(MPI_MAIN,mpi_main)(void);
 CLINKAGE
 void AMPI_Fallback_Main(int argc,char **argv)
 {
-  AMPI_Main_cpp();
-  AMPI_Main_cpp(argc,argv);
-  AMPI_Main_c(argc,argv);
-  FTN_NAME(MPI_MAIN,mpi_main)();
+  int ret = 0;
+  // Only one of the following four main functions actually runs application code,
+  // the others are stubs provided by compat_ampi*.
+  ret += AMPI_Main_cpp();
+  ret += AMPI_Main_cpp(argc,argv);
+  ret += AMPI_Main_c(argc,argv);
+  FTN_NAME(MPI_MAIN,mpi_main)(); // returns void
+  AMPI_Exit(ret);
 }
 
 void ampiCreateMain(MPI_MainFn mainFn, const char *name,int nameLen);
@@ -986,7 +990,8 @@ static void getAmpiBinaryPath() noexcept
     ampi_binary_path[n] = '\0';
   }
 #else
-  CkAbort("Could not get path to current binary!");
+// FIXME: We do not need to abort here, only if user requests pipglobals or fsglobals
+#  error "AMPI: No known way to get path to current binary."
 #endif
 }
 
@@ -2706,9 +2711,6 @@ CMI_WARN_UNUSED_RESULT ampi* ampi::static_blockOnColl(ampi *dis) noexcept {
   dis = dis->block();
   dis->parent->resumeOnColl = false;
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-  CpvAccess(_currentObj) = dis;
-#endif
 #if CMK_BIGSIM_CHARM
 #if CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn)) CthTraceResume(dis->thread->getThread());
@@ -3130,11 +3132,6 @@ MPI_Request ampi::send(int t, int sRank, const void* buf, int count, MPI_Datatyp
   TRACE_BG_AMPI_BREAK(thread->getThread(), "AMPI_SEND", NULL, 0, 1);
 #endif
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-  MPI_Comm disComm = myComm.getComm();
-  ampi *dis = getAmpiInstance(disComm);
-  CpvAccess(_currentObj) = dis;
-#endif
 
   const ampiCommStruct &dest=comm2CommStruct(destcomm);
   MPI_Request req = delesend(t,sRank,buf,count,type,rank,destcomm,dest.getProxy(),sendType,reqIdx);
@@ -3711,12 +3708,11 @@ static inline bool handle_MPI_PROC_NULL(int src, MPI_Comm comm, MPI_Status* sts)
 int ampi::static_recv(ampi *dis, int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm comm, MPI_Status *sts) noexcept
 {
   MSG_ORDER_DEBUG(
-    CkPrintf("AMPI vp %d blocking recv: tag=%d, src=%d, comm=%d\n",thisIndex,t,s,comm);
+    CkPrintf("AMPI vp %d blocking recv: tag=%d, src=%d, comm=%d\n",dis->thisIndex,t,s,comm);
   )
   MPI_Request req;
-  ampi* ptr = getAmpiInstance(comm);
-  ptr->irecv(buf, count, type, s, t, comm, &req);
-  return ptr->parent->wait(&req, sts);
+  dis->irecv(buf, count, type, s, t, comm, &req);
+  return dis->parent->wait(&req, sts);
 }
 
 void ampi::static_probe(ampi *dis, int t, int s, MPI_Comm comm, MPI_Status *sts) noexcept
@@ -3859,9 +3855,6 @@ void ampi::bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm des
   MPI_Request req;
 
   if (root==getRank()) {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    CpvAccess(_currentObj) = this;
-#endif
     irecvBcast(buf, count, type, root, destcomm, &req);
     thisProxy.bcastResult(makeBcastMsg(buf, count, type, root, destcomm));
   }
@@ -3876,9 +3869,6 @@ void ampi::bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm des
 int ampi::intercomm_bcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm intercomm) noexcept
 {
   if (root==MPI_ROOT) {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    CpvAccess(_currentObj) = this;
-#endif
     remoteProxy.bcastResult(makeBcastMsg(buf, count, type, getRank(), intercomm));
   }
   else { // Non-root ranks need to increment the outgoing sequence number for collectives
@@ -3897,9 +3887,6 @@ int ampi::intercomm_bcast(int root, void* buf, int count, MPI_Datatype type, MPI
 void ampi::ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm destcomm, MPI_Request* request) noexcept
 {
   if (root==getRank()) {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    CpvAccess(_currentObj) = this;
-#endif
     thisProxy.bcastResult(makeBcastMsg(buf, count, type, getRank(), destcomm));
   }
   else { // Non-root ranks need to increment the outgoing sequence number for collectives
@@ -3913,9 +3900,6 @@ void ampi::ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm de
 int ampi::intercomm_ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm intercomm, MPI_Request *request) noexcept
 {
   if (root==MPI_ROOT) {
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    CpvAccess(_currentObj) = this;
-#endif
     remoteProxy.bcastResult(makeBcastMsg(buf, count, type, getRank(), intercomm));
   }
   else { // Non-root ranks need to increment the outgoing sequence number for collectives
@@ -11653,12 +11637,8 @@ CLINKAGE int AMPI_Migrate(MPI_Info hints)
 #endif
       }
       else if (strncmp(value, "message_logging", MPI_MAX_INFO_VAL) == 0) {
-#if CMK_MESSAGE_LOGGING
-        TCHARM_Migrate();
-#else
         CkPrintf("AMPI> Error: Message logging is not enabled!\n");
         CkAbort("AMPI> Error: Recompile Charm++/AMPI with CMK_MESSAGE_LOGGING.\n");
-#endif
       }
       else if (strncmp(value, "false", MPI_MAX_INFO_VAL) == 0) {
         /* do nothing */
@@ -11672,10 +11652,6 @@ CLINKAGE int AMPI_Migrate(MPI_Info hints)
     }
   }
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-  ampi *currentAmpi = getAmpiInstance(MPI_COMM_WORLD);
-  CpvAccess(_currentObj) = currentAmpi;
-#endif
 
 #if CMK_BIGSIM_CHARM
   TRACE_BG_ADD_TAG("AMPI_MIGRATE");
@@ -11954,9 +11930,10 @@ int GPUReq::wait(MPI_Status *sts) noexcept
   return 0;
 }
 
-void GPUReq::receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg/*=true*/) noexcept
+bool GPUReq::receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg/*=true*/) noexcept
 {
   CkAbort("GPUReq::receive should never be called");
+  return true;
 }
 
 void GPUReq::receive(ampi *ptr, CkReductionMsg *msg) noexcept
@@ -12041,4 +12018,3 @@ int AMPI_GPU_Invoke(cudaStream_t stream)
 #endif // CMK_CUDA
 
 #include "ampi.def.h"
-

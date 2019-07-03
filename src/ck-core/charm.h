@@ -173,17 +173,6 @@ extern int CkRegisterMsg(const char *name, CkPackFnPtr pack,
 #define CK_EP_INLINE      (1<<8)
 
 /** type of a chare */
-#if CMK_MESSAGE_LOGGING
-typedef enum{
-	TypeInvalid=0,
-	TypeChare,
-	TypeMainChare,
-	TypeGroup,
-	TypeNodeGroup,
-	TypeArray,
-	TypeSection
-} ChareType;
-#else
 typedef enum{
 	TypeInvalid=0,
 	TypeChare,
@@ -192,7 +181,6 @@ typedef enum{
 	TypeNodeGroup,
 	TypeArray
 } ChareType;
-#endif
 
 /** A "call function" to invoke a method on an object. See EntryInfo */
 typedef void  (*CkCallFnPtr) (void *msg, void *obj);
@@ -388,6 +376,7 @@ extern void CkSendMsgBranchGroup(int eIdx,void *msg,CkGroupID gID,CmiGroup grp, 
 extern void CkSendMsgNodeBranch(int eIdx, void *msg, int destNode, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgNodeBranchInline(int eIdx, void *msg, int destNode, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgNodeBranchMulti(int eIdx, void *msg, CkGroupID gID, int npes, const int *nodes, int opts CK_MSGOPTIONAL);
+extern void CkBroadcastWithinNode(int eIdx, void *msg, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkBroadcastMsgNodeBranch(int eIdx, void *msg, CkGroupID gID, int opts CK_MSGOPTIONAL);
 
@@ -416,9 +405,9 @@ extern void CkChareExtSend(int onPE, void *objPtr, int epIdx, char *msg, int msg
 extern void CkChareExtSend_multi(int onPE, void *objPtr, int epIdx, int num_bufs, char **bufs, int *buf_sizes);
 /// Send msg to group with ID 'gid'. if pe == -1, msg will be broadcasted, else
 /// it will go to the group instance in that PE
-extern void CkGroupExtSend(int gid, int pe, int epIdx, char *msg, int msgSize);
+extern void CkGroupExtSend(int gid, int npes, const int *pes, int epIdx, char *msg, int msgSize);
 /// Send msg to group copying data into CkMessage from multiple input buffers
-extern void CkGroupExtSend_multi(int gid, int pe, int epIdx, int num_bufs, char **bufs, int *buf_sizes);
+extern void CkGroupExtSend_multi(int gid, int npes, const int *pes, int epIdx, int num_bufs, char **bufs, int *buf_sizes);
 /// Send msg to array with ID 'aid'. idx is index of destination and ndims the number
 /// of dimensions of the index. If ndims <= 0, msg will be broadcasted to all array elements
 extern void CkArrayExtSend(int aid, int *idx, int ndims, int epIdx, char *msg, int msgSize);
