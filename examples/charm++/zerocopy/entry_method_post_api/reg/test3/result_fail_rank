@@ -1,0 +1,49 @@
+GNU gdb (Ubuntu 7.11.1-0ubuntu1~16.5) 7.11.1
+Copyright (C) 2016 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.  Type "show copying"
+and "show warranty" for details.
+This GDB was configured as "x86_64-linux-gnu".
+Type "show configuration" for configuration details.
+For bug reporting instructions, please see:
+<http://www.gnu.org/software/gdb/bugs/>.
+Find the GDB manual and other documentation resources online at:
+<http://www.gnu.org/software/gdb/documentation/>.
+For help, type "help".
+Type "apropos word" to search for commands related to "word"...
+Reading symbols from ./simpleZeroCopy...done.
+Function "__ubsan::ScopedReport::ScopedReport" not defined.
+Make breakpoint pending on future shared library load? (y or [n]) [answered N; input not from terminal]
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+[New Thread 0x7ffff00bf700 (LWP 5125)]
+[New Thread 0x7fffe08d5700 (LWP 5141)]
+[13][13][0][13] ===== application posting 0x61800001d480 in RECV with iter 1=====
+[29][13][1] Posting RECV from SendMsgBuf
+[29][13][29] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1378, dstrank:2
+[29][13][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1378
+[29][13][1] Posting SEND from SendMsgBuf
+[29][13][29] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1378, dstrank:2
+[29][13][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1378
+[13][13][0][13] **************************** All sends and recvs of Iter 1 completed ***************************
+[29][13][1] Posting SEND from SendMsgBuf
+[29][13][29] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1379, dstrank:2
+[13][13][0][13] ===== application posting 0x61800001d480 in RECV with iter 2=====
+[29][13][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1379
+[29][13][1] Posting RECV from SendMsgBuf
+[29][13][29] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1379, dstrank:2
+[29][13][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1379
+[13][13][0][13] **************************** All sends and recvs of Iter 2 completed ***************************
+[13][13][0][13] ===== application posting 0x61800001d480 in RECV with iter 3=====
+[29][13][1] Posting SEND from SendMsgBuf
+[29][13][29] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1380, dstrank:2
+[29][13][1] Posting RECV from SendMsgBuf
+[29][13][29] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1380, dstrank:2
+[29][13][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1380
+[29][13][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1380
+[13][13][0][13] **************************** All sends and recvs of Iter 3 completed ***************************
+[13][13][0][13] ===== application posting 0x61800001d480 in RECV with iter 4=====
+[29][13][1] Posting RECV from SendMsgBuf
+[29][13][29] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1381, dstrank:2
+

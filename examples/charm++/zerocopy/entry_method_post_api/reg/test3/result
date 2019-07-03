@@ -1,0 +1,1192 @@
+Charm++> Running on MPI version: 3.0
+Charm++> level of thread support used: MPI_THREAD_FUNNELED (desired: MPI_THREAD_FUNNELED)
+Charm++> Running in SMP mode: 16 processes, 1 worker threads (PEs) + 1 comm threads per process, 16 PEs total
+Charm++> The comm. thread both sends and receives messages
+Converse/Charm++ Commit ID: v6.9.0-416-g2caf26079
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+HWLOC> [0] Thread 0x7fffe08d5700 bound to cpuset: 0x00000001
+Charm++> Running on 1 hosts (1 sockets x 4 cores x 2 PUs = 8-way SMP)
+Charm++> cpu topology info is gathered in 0.112 seconds.
+
+Charm++> Warning: the number of SMP threads (32) is greater than the number of physical cores (8), so threads will sleep while idling. Use +CmiSpinOnIdle or +CmiSleepOnIdle to control this directly.
+
+WARNING: Multiple PEs assigned to same core, recommend adjusting processor affinity or passing +CmiSleepOnIdle to reduce interference.
+CharmLB> RotateLB created.
+[8][8][0][8] ===== application posting 0x61800001d480 in RECV with iter 1=====
+[3][3][0][3] ===== application posting 0x61800001d480 in RECV with iter 1=====
+[19][3][1] Posting RECV from SendMsgBuf
+[19][3][19] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1378, dstrank:12
+[12][12][0][12] ===== application posting 0x61800001d480 in RECV with iter 1=====
+[28][12][1] Posting RECV from SendMsgBuf
+[28][12][28] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1378, dstrank:3
+[28][12][1] Posting SEND from SendMsgBuf
+[28][12][28] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1378, dstrank:3
+[28][12][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1378
+[24][8][1] Posting RECV from SendMsgBuf
+[24][8][24] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1378, dstrank:7
+[19][3][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1378
+[19][3][1] Posting SEND from SendMsgBuf
+[19][3][19] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1378, dstrank:12
+[19][3][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1378
+[3][3][0][3] **************************** All sends and recvs of Iter 1 completed ***************************
+[6][6][0][6] ===== application posting 0x61800001d480 in RECV with iter 1=====
+[22][6][1] Posting RECV from SendMsgBuf
+[22][6][22] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1378, dstrank:9
+[11][11][0][11] ===== application posting 0x61800001d480 in RECV with iter 1=====
+[27][11][1] Posting RECV from SendMsgBuf
+[27][11][27] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1378, dstrank:4
+[13][13][0][13] ===== application posting 0x61800001d480 in RECV with iter 1=====
+[29][13][1] Posting RECV from SendMsgBuf
+[29][13][29] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1378, dstrank:2
+[29][13][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1378
+[14][14][0][14] ===== application posting 0x61800001d480 in RECV with iter 1=====
+[30][14][1] Posting RECV from SendMsgBuf
+[30][14][30] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1378, dstrank:1
+[30][14][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1378
+[17][1][1] Posting SEND from SendMsgBuf
+[17][1][17] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1378, dstrank:14
+[17][1][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1378
+[18][2][1] Posting SEND from SendMsgBuf
+[18][2][18] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1378, dstrank:13
+[18][2][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1378
+[2][2][0][2] ===== application posting 0x61800001d480 in RECV with iter 1=====
+[18][2][1] Posting RECV from SendMsgBuf
+[18][2][18] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1378, dstrank:13
+[20][4][1] Posting SEND from SendMsgBuf
+[29][13][1] Posting SEND from SendMsgBuf
+[1][1][0][1] ===== application posting 0x61800001d480 in RECV with iter 1=====
+[28][12][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1378
+[12][12][0][12] ===== application posting 0x61800001d480 in RECV with iter 2=====
+[29][13][29] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1378, dstrank:2
+[29][13][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1378
+[5][5][0][5] ===== application posting 0x61800001d480 in RECV with iter 1=====
+[12][12][0][12] **************************** All sends and recvs of Iter 1 completed ***************************
+[28][12][1] Posting RECV from SendMsgBuf
+[17][1][1] Posting RECV from SendMsgBuf
+[17][1][17] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1378, dstrank:14
+[27][11][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1378
+[20][4][20] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1378, dstrank:11
+[20][4][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1378
+[4][4][0][4] ===== application posting 0x61800001d480 in RECV with iter 1=====
+[17][1][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1378
+[30][14][1] Posting SEND from SendMsgBuf
+[30][14][30] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1378, dstrank:1
+[30][14][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1378
+[28][12][28] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1379, dstrank:3
+[15][15][0][15] ===== application posting 0x61800001d480 in RECV with iter 1=====
+[21][5][1] Posting RECV from SendMsgBuf
+[21][5][21] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1378, dstrank:10
+[18][2][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1378
+[10][10][0][10] ===== application posting 0x61800001d480 in RECV with iter 1=====
+[1][1][0][1] **************************** All sends and recvs of Iter 1 completed ***************************
+[13][13][0][13] **************************** All sends and recvs of Iter 1 completed ***************************
+[31][15][1] Posting RECV from SendMsgBuf
+[31][15][31] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1378, dstrank:0
+[20][4][1] Posting RECV from SendMsgBuf
+[14][14][0][14] ===== application posting 0x61800001d480 in RECV with iter 2=====
+[30][14][1] Posting RECV from SendMsgBuf
+[30][14][30] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1379, dstrank:1
+[17][1][1] Posting SEND from SendMsgBuf
+[17][1][17] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1379, dstrank:14
+[3][3][0][3] ===== application posting 0x61800001d480 in RECV with iter 2=====
+[27][11][1] Posting SEND from SendMsgBuf
+[27][11][27] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1378, dstrank:4
+[27][11][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1378
+[14][14][0][14] **************************** All sends and recvs of Iter 1 completed ***************************
+[30][14][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1379
+[17][1][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1379
+[11][11][0][11] **************************** All sends and recvs of Iter 1 completed ***************************
+[2][2][0][2] **************************** All sends and recvs of Iter 1 completed ***************************
+[20][4][20] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1378, dstrank:11
+[19][3][1] Posting SEND from SendMsgBuf
+[20][4][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1378
+[1][1][0][1] ===== application posting 0x61800001d480 in RECV with iter 2=====
+[26][10][1] Posting RECV from SendMsgBuf
+[26][10][26] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1378, dstrank:5
+[21][5][1] Posting SEND from SendMsgBuf
+[9][9][0][9] ===== application posting 0x61800001d480 in RECV with iter 1=====
+[25][9][1] Posting SEND from SendMsgBuf
+[17][1][1] Posting RECV from SendMsgBuf
+[17][1][17] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1379, dstrank:14
+[2][2][0][2] ===== application posting 0x61800001d480 in RECV with iter 2=====
+[18][2][1] Posting RECV from SendMsgBuf
+[18][2][18] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1379, dstrank:13
+[30][14][1] Posting SEND from SendMsgBuf
+[30][14][30] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1379, dstrank:1
+[30][14][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1379
+[19][3][19] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1379, dstrank:12
+[19][3][1] Posting RECV from SendMsgBuf
+[19][3][19] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1379, dstrank:12
+[16][0][1] Posting SEND from SendMsgBuf
+[14][14][0][14] **************************** All sends and recvs of Iter 2 completed ***************************
+[17][1][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1379
+[13][13][0][13] ===== application posting 0x61800001d480 in RECV with iter 2=====
+[26][10][1] Posting SEND from SendMsgBuf
+[26][10][26] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1378, dstrank:5
+[19][3][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1379
+[16][0][16] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1378, dstrank:15
+[1][1][0][1] **************************** All sends and recvs of Iter 2 completed ***************************
+[31][15][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1378
+[23][7][1] Posting SEND from SendMsgBuf
+[26][10][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1378
+[29][13][1] Posting RECV from SendMsgBuf
+[29][13][29] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1379, dstrank:2
+[29][13][1] Posting SEND from SendMsgBuf
+[1][1][0][1] ===== application posting 0x61800001d480 in RECV with iter 3=====
+[17][1][1] Posting RECV from SendMsgBuf
+[17][1][17] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1380, dstrank:14
+[17][1][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1380
+[7][7][0][7] ===== application posting 0x61800001d480 in RECV with iter 1=====
+[0][0][0][0] ===== application posting 0x61800001d480 in RECV with iter 1=====
+[30][14][1] Posting SEND from SendMsgBuf
+[30][14][30] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1380, dstrank:1
+[30][14][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1380
+[14][14][0][14] ===== application posting 0x61800001d480 in RECV with iter 3=====
+[18][2][1] Posting SEND from SendMsgBuf
+[18][2][18] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1379, dstrank:13
+[18][2][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1379
+[30][14][1] Posting RECV from SendMsgBuf
+[30][14][30] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1380, dstrank:1
+[21][5][21] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1378, dstrank:10
+[21][5][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1378
+[21][5][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1378
+[26][10][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1378
+[10][10][0][10] **************************** All sends and recvs of Iter 1 completed ***************************
+[25][9][25] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1378, dstrank:6
+[25][9][1] Posting RECV from SendMsgBuf
+[25][9][25] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1378, dstrank:6
+[16][0][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1378
+[16][0][1] Posting RECV from SendMsgBuf
+[16][0][16] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1378, dstrank:15
+[31][15][1] Posting SEND from SendMsgBuf
+[31][15][31] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1378, dstrank:0
+[22][6][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1378
+[23][7][23] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1378, dstrank:8
+[24][8][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1378
+[29][13][29] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1379, dstrank:2
+[29][13][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1379
+[29][13][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1379
+[23][7][1] Posting RECV from SendMsgBuf
+[23][7][23] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1378, dstrank:8
+[23][7][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1378
+[25][9][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1378
+[4][4][0][4] **************************** All sends and recvs of Iter 1 completed ***************************
+[4][4][0][4] ===== application posting 0x61800001d480 in RECV with iter 2=====
+[20][4][1] Posting RECV from SendMsgBuf
+[18][2][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1379
+[2][2][0][2] **************************** All sends and recvs of Iter 2 completed ***************************
+[24][8][1] Posting SEND from SendMsgBuf
+[24][8][24] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1378, dstrank:7
+[28][12][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1379
+[23][7][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1378
+[13][13][0][13] ===== application posting 0x61800001d480 in RECV with iter 3=====
+[5][5][0][5] ===== application posting 0x61800001d480 in RECV with iter 2=====
+[5][5][0][5] **************************** All sends and recvs of Iter 1 completed ***************************
+[13][13][0][13] **************************** All sends and recvs of Iter 2 completed ***************************
+[29][13][1] Posting RECV from SendMsgBuf
+[29][13][29] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1380, dstrank:2
+[7][7][0][7] **************************** All sends and recvs of Iter 1 completed ***************************
+[18][2][1] Posting SEND from SendMsgBuf
+[18][2][18] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1380, dstrank:13
+[18][2][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1380
+[22][6][1] Posting SEND from SendMsgBuf
+[22][6][22] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1378, dstrank:9
+[22][6][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1378
+[21][5][1] Posting RECV from SendMsgBuf
+[21][5][21] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1379, dstrank:10
+[25][9][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1378
+[16][0][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1378
+[0][0][0][0] **************************** All sends and recvs of Iter 1 completed ***************************
+sdagRun: Iteration 1 completed
+[17][1][1] Posting SEND from SendMsgBuf
+[17][1][17] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1380, dstrank:14
+[30][14][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1380
+[11][11][0][11] ===== application posting 0x61800001d480 in RECV with iter 2=====
+[31][15][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1378
+[9][9][0][9] **************************** All sends and recvs of Iter 1 completed ***************************
+[17][1][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1380
+[27][11][1] Posting RECV from SendMsgBuf
+[27][11][27] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1379, dstrank:4
+[27][11][1] Posting SEND from SendMsgBuf
+[27][11][27] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1379, dstrank:4
+[1][1][0][1] **************************** All sends and recvs of Iter 3 completed ***************************
+[6][6][0][6] **************************** All sends and recvs of Iter 1 completed ***************************
+[15][15][0][15] **************************** All sends and recvs of Iter 1 completed ***************************
+[26][10][1] Posting SEND from SendMsgBuf
+[26][10][26] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1379, dstrank:5
+[26][10][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1379
+[21][5][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1379
+[27][11][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1379
+[28][12][1] Posting SEND from SendMsgBuf
+[20][4][20] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1379, dstrank:11
+[20][4][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1379
+[20][4][1] Posting SEND from SendMsgBuf
+[20][4][20] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1379, dstrank:11
+[14][14][0][14] **************************** All sends and recvs of Iter 3 completed ***************************
+[14][14][0][14] ===== application posting 0x61800001d480 in RECV with iter 4=====
+[24][8][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1378
+[8][8][0][8] **************************** All sends and recvs of Iter 1 completed ***************************
+[2][2][0][2] ===== application posting 0x61800001d480 in RECV with iter 3=====
+[18][2][1] Posting RECV from SendMsgBuf
+[18][2][18] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1380, dstrank:13
+[10][10][0][10] ===== application posting 0x61800001d480 in RECV with iter 2=====
+[26][10][1] Posting RECV from SendMsgBuf
+[26][10][26] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1379, dstrank:5
+[8][8][0][8] ===== application posting 0x61800001d480 in RECV with iter 2=====
+[27][11][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1379
+[29][13][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1380
+[6][6][0][6] ===== application posting 0x61800001d480 in RECV with iter 2=====
+[20][4][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1379
+[24][8][1] Posting RECV from SendMsgBuf
+[24][8][24] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1379, dstrank:7
+[4][4][0][4] **************************** All sends and recvs of Iter 2 completed ***************************
+[17][1][1] Posting SEND from SendMsgBuf
+[17][1][17] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1381, dstrank:14
+[18][2][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1380
+[29][13][1] Posting SEND from SendMsgBuf
+[29][13][29] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1380, dstrank:2
+[29][13][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1380
+[13][13][0][13] **************************** All sends and recvs of Iter 3 completed ***************************
+[9][9][0][9] ===== application posting 0x61800001d480 in RECV with iter 2=====
+[25][9][1] Posting RECV from SendMsgBuf
+[25][9][25] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1379, dstrank:6
+[22][6][1] Posting RECV from SendMsgBuf
+[22][6][22] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1379, dstrank:9
+[22][6][1] Posting SEND from SendMsgBuf
+[11][11][0][11] **************************** All sends and recvs of Iter 2 completed ***************************
+[23][7][1] Posting SEND from SendMsgBuf
+[23][7][23] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1379, dstrank:8
+[23][7][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1379
+[7][7][0][7] ===== application posting 0x61800001d480 in RECV with iter 2=====
+[30][14][1] Posting RECV from SendMsgBuf
+[30][14][30] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1381, dstrank:1
+[30][14][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1381
+[15][15][0][15] ===== application posting 0x61800001d480 in RECV with iter 2=====
+[31][15][1] Posting RECV from SendMsgBuf
+[31][15][31] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1379, dstrank:0
+[28][12][28] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1379, dstrank:3
+[22][6][22] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1379, dstrank:9
+[19][3][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1379
+[2][2][0][2] **************************** All sends and recvs of Iter 3 completed ***************************
+[31][15][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1379
+[16][0][1] Posting SEND from SendMsgBuf
+[16][0][16] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1379, dstrank:15
+[16][0][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1379
+[2][2][0][2] ===== application posting 0x61800001d480 in RECV with iter 4=====
+[18][2][1] Posting RECV from SendMsgBuf
+[18][2][18] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1381, dstrank:13
+[28][12][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1379
+[24][8][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1379
+[1][1][0][1] ===== application posting 0x61800001d480 in RECV with iter 4=====
+[17][1][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1381
+[17][1][1] Posting RECV from SendMsgBuf
+[17][1][17] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1381, dstrank:14
+[3][3][0][3] **************************** All sends and recvs of Iter 2 completed ***************************
+[23][7][1] Posting RECV from SendMsgBuf
+[23][7][23] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1379, dstrank:8
+[22][6][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1379
+[25][9][1] Posting SEND from SendMsgBuf
+[25][9][25] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1379, dstrank:6
+[25][9][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1379
+[0][0][0][0] ===== application posting 0x61800001d480 in RECV with iter 2=====
+[25][9][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1379
+[30][14][1] Posting SEND from SendMsgBuf
+[30][14][30] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1381, dstrank:1
+[29][13][1] Posting SEND from SendMsgBuf
+[13][13][0][13] ===== application posting 0x61800001d480 in RECV with iter 4=====
+[22][6][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1379
+[4][4][0][4] ===== application posting 0x61800001d480 in RECV with iter 3=====
+[24][8][1] Posting SEND from SendMsgBuf
+[24][8][24] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1379, dstrank:7
+[16][0][1] Posting RECV from SendMsgBuf
+[16][0][16] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1379, dstrank:15
+[29][13][29] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1381, dstrank:2
+[11][11][0][11] ===== application posting 0x61800001d480 in RECV with iter 3=====
+[18][2][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1381
+[18][2][1] Posting SEND from SendMsgBuf
+[18][2][18] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1381, dstrank:13
+[18][2][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1381
+[29][13][1] Posting RECV from SendMsgBuf
+[29][13][29] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1381, dstrank:2
+[23][7][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1379
+[7][7][0][7] **************************** All sends and recvs of Iter 2 completed ***************************
+[27][11][1] Posting RECV from SendMsgBuf
+[27][11][27] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1380, dstrank:4
+[9][9][0][9] **************************** All sends and recvs of Iter 2 completed ***************************
+[6][6][0][6] **************************** All sends and recvs of Iter 2 completed ***************************
+[17][1][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1381
+[1][1][0][1] **************************** All sends and recvs of Iter 4 completed ***************************
+[31][15][1] Posting SEND from SendMsgBuf
+[31][15][31] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1379, dstrank:0
+[31][15][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1379
+[15][15][0][15] **************************** All sends and recvs of Iter 2 completed ***************************
+[16][0][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1379
+[0][0][0][0] **************************** All sends and recvs of Iter 2 completed ***************************
+sdagRun: Iteration 2 completed
+[2][2][0][2] **************************** All sends and recvs of Iter 4 completed ***************************
+[29][13][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1381
+[29][13][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1381
+[13][13][0][13] **************************** All sends and recvs of Iter 4 completed ***************************
+[20][4][1] Posting RECV from SendMsgBuf
+[20][4][20] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1380, dstrank:11
+[20][4][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1380
+[20][4][1] Posting SEND from SendMsgBuf
+[20][4][20] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1380, dstrank:11
+[20][4][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1380
+[4][4][0][4] **************************** All sends and recvs of Iter 3 completed ***************************
+[9][9][0][9] ===== application posting 0x61800001d480 in RECV with iter 3=====
+[25][9][1] Posting SEND from SendMsgBuf
+[25][9][25] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1380, dstrank:6
+[25][9][1] Posting RECV from SendMsgBuf
+[25][9][25] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1380, dstrank:6
+[24][8][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1379
+[8][8][0][8] **************************** All sends and recvs of Iter 2 completed ***************************
+[8][8][0][8] ===== application posting 0x61800001d480 in RECV with iter 3=====
+[24][8][1] Posting RECV from SendMsgBuf
+[24][8][24] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1380, dstrank:7
+[6][6][0][6] ===== application posting 0x61800001d480 in RECV with iter 3=====
+[22][6][1] Posting RECV from SendMsgBuf
+[22][6][22] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1380, dstrank:9
+[15][15][0][15] ===== application posting 0x61800001d480 in RECV with iter 3=====
+[31][15][1] Posting RECV from SendMsgBuf
+[31][15][31] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1380, dstrank:0
+[21][5][1] Posting SEND from SendMsgBuf
+[21][5][21] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1379, dstrank:10
+[21][5][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1379
+[0][0][0][0] ===== application posting 0x61800001d480 in RECV with iter 3=====
+[16][0][1] Posting SEND from SendMsgBuf
+[16][0][16] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1380, dstrank:15
+[16][0][1] Posting RECV from SendMsgBuf
+[16][0][16] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1380, dstrank:15
+[16][0][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1380
+[3][3][0][3] ===== application posting 0x61800001d480 in RECV with iter 3=====
+[19][3][1] Posting SEND from SendMsgBuf
+[19][3][19] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1380, dstrank:12
+[27][11][1] Posting SEND from SendMsgBuf
+[27][11][27] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1380, dstrank:4
+[27][11][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1380
+[27][11][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1380
+[12][12][0][12] **************************** All sends and recvs of Iter 2 completed ***************************
+[12][12][0][12] ===== application posting 0x61800001d480 in RECV with iter 3=====
+[28][12][1] Posting RECV from SendMsgBuf
+[28][12][28] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1380, dstrank:3
+[28][12][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1380
+[19][3][1] Posting RECV from SendMsgBuf
+[19][3][19] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1380, dstrank:12
+[26][10][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1379
+[23][7][1] Posting SEND from SendMsgBuf
+[23][7][23] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1380, dstrank:8
+[23][7][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1380
+[7][7][0][7] ===== application posting 0x61800001d480 in RECV with iter 3=====
+[23][7][1] Posting RECV from SendMsgBuf
+[23][7][23] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1380, dstrank:8
+[23][7][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1380
+[7][7][0][7] **************************** All sends and recvs of Iter 3 completed ***************************
+[7][7][0][7] ===== application posting 0x61800001d480 in RECV with iter 4=====
+[23][7][1] Posting RECV from SendMsgBuf
+[23][7][23] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1381, dstrank:8
+[19][3][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1380
+[19][3][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1380
+[3][3][0][3] **************************** All sends and recvs of Iter 3 completed ***************************
+[3][3][0][3] ===== application posting 0x61800001d480 in RECV with iter 4=====
+[11][11][0][11] **************************** All sends and recvs of Iter 3 completed ***************************
+[11][11][0][11] ===== application posting 0x61800001d480 in RECV with iter 4=====
+[27][11][1] Posting RECV from SendMsgBuf
+[27][11][27] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1381, dstrank:4
+[27][11][1] Posting SEND from SendMsgBuf
+[27][11][27] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1381, dstrank:4
+[27][11][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1381
+[27][11][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1381
+[24][8][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1380
+[24][8][1] Posting SEND from SendMsgBuf
+[24][8][24] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1380, dstrank:7
+[24][8][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1380
+[8][8][0][8] **************************** All sends and recvs of Iter 3 completed ***************************
+[8][8][0][8] ===== application posting 0x61800001d480 in RECV with iter 4=====
+[24][8][1] Posting RECV from SendMsgBuf
+[24][8][24] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1381, dstrank:7
+[10][10][0][10] **************************** All sends and recvs of Iter 2 completed ***************************
+[10][10][0][10] ===== application posting 0x61800001d480 in RECV with iter 3=====
+[26][10][1] Posting RECV from SendMsgBuf
+[26][10][26] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1380, dstrank:5
+[26][10][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1380
+[26][10][1] Posting SEND from SendMsgBuf
+[26][10][26] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1380, dstrank:5
+[5][5][0][5] **************************** All sends and recvs of Iter 2 completed ***************************
+[5][5][0][5] ===== application posting 0x61800001d480 in RECV with iter 3=====
+[21][5][1] Posting SEND from SendMsgBuf
+[21][5][21] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1380, dstrank:10
+[21][5][1] Posting RECV from SendMsgBuf
+[21][5][21] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1380, dstrank:10
+[16][0][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1380
+[0][0][0][0] **************************** All sends and recvs of Iter 3 completed ***************************
+sdagRun: Iteration 3 completed
+[22][6][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1380
+[22][6][1] Posting SEND from SendMsgBuf
+[22][6][22] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1380, dstrank:9
+[22][6][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1380
+[6][6][0][6] **************************** All sends and recvs of Iter 3 completed ***************************
+[6][6][0][6] ===== application posting 0x61800001d480 in RECV with iter 4=====
+[22][6][1] Posting SEND from SendMsgBuf
+[22][6][22] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1381, dstrank:9
+[31][15][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1380
+[31][15][1] Posting SEND from SendMsgBuf
+[31][15][31] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1380, dstrank:0
+[24][8][1] Posting SEND from SendMsgBuf
+[24][8][24] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1381, dstrank:7
+[26][10][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1380
+[28][12][1] Posting SEND from SendMsgBuf
+[28][12][28] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1380, dstrank:3
+[28][12][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1380
+[12][12][0][12] **************************** All sends and recvs of Iter 3 completed ***************************
+[12][12][0][12] ===== application posting 0x61800001d480 in RECV with iter 4=====
+[28][12][1] Posting RECV from SendMsgBuf
+[28][12][28] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1381, dstrank:3
+[23][7][1] Posting SEND from SendMsgBuf
+[23][7][23] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1381, dstrank:8
+[19][3][1] Posting RECV from SendMsgBuf
+[19][3][19] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1381, dstrank:12
+[4][4][0][4] ===== application posting 0x61800001d480 in RECV with iter 4=====
+[20][4][1] Posting RECV from SendMsgBuf
+[20][4][20] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1381, dstrank:11
+[20][4][1] Posting SEND from SendMsgBuf
+[20][4][20] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1381, dstrank:11
+[20][4][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1381
+[20][4][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1381
+[4][4][0][4] **************************** All sends and recvs of Iter 4 completed ***************************
+[25][9][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1380
+[25][9][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1380
+[9][9][0][9] **************************** All sends and recvs of Iter 3 completed ***************************
+[9][9][0][9] ===== application posting 0x61800001d480 in RECV with iter 4=====
+[25][9][1] Posting RECV from SendMsgBuf
+[25][9][25] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1381, dstrank:6
+[25][9][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1381
+[10][10][0][10] **************************** All sends and recvs of Iter 3 completed ***************************
+[22][6][1] Posting RECV from SendMsgBuf
+[22][6][22] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1381, dstrank:9
+[22][6][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1381
+[24][8][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1381
+[24][8][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1381
+[21][5][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1380
+[23][7][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1381
+[23][7][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1381
+[19][3][1] Posting SEND from SendMsgBuf
+[19][3][19] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1381, dstrank:12
+[19][3][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1381
+[25][9][1] Posting SEND from SendMsgBuf
+[25][9][25] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1381, dstrank:6
+[25][9][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1381
+[9][9][0][9] **************************** All sends and recvs of Iter 4 completed ***************************
+[28][12][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1381
+[28][12][1] Posting SEND from SendMsgBuf
+[21][5][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1380
+[5][5][0][5] ===== application posting 0x61800001d480 in RECV with iter 4=====
+[5][5][0][5] **************************** All sends and recvs of Iter 3 completed ***************************
+[7][7][0][7] **************************** All sends and recvs of Iter 4 completed ***************************
+[11][11][0][11] **************************** All sends and recvs of Iter 4 completed ***************************
+[16][0][1] Posting SEND from SendMsgBuf
+[16][0][16] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1381, dstrank:15
+[0][0][0][0] ===== application posting 0x61800001d480 in RECV with iter 4=====
+[16][0][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1381
+[31][15][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1380
+[15][15][0][15] **************************** All sends and recvs of Iter 3 completed ***************************
+[15][15][0][15] ===== application posting 0x61800001d480 in RECV with iter 4=====
+[31][15][1] Posting RECV from SendMsgBuf
+[31][15][31] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1381, dstrank:0
+[31][15][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1381
+[22][6][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1381
+[6][6][0][6] **************************** All sends and recvs of Iter 4 completed ***************************
+[8][8][0][8] **************************** All sends and recvs of Iter 4 completed ***************************
+[16][0][1] Posting RECV from SendMsgBuf
+[16][0][16] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1381, dstrank:15
+[31][15][1] Posting SEND from SendMsgBuf
+[31][15][31] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1381, dstrank:0
+[19][3][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1381
+[28][12][28] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1381, dstrank:3
+[21][5][1] Posting RECV from SendMsgBuf
+[21][5][21] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1381, dstrank:10
+[30][14][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1381
+[26][10][1] Posting SEND from SendMsgBuf
+[26][10][26] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1381, dstrank:5
+[31][15][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1381
+[15][15][0][15] **************************** All sends and recvs of Iter 4 completed ***************************
+[26][10][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1381
+[10][10][0][10] ===== application posting 0x61800001d480 in RECV with iter 4=====
+[21][5][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1381
+[26][10][1] Posting RECV from SendMsgBuf
+[26][10][26] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1381, dstrank:5
+[28][12][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1381
+[12][12][0][12] **************************** All sends and recvs of Iter 4 completed ***************************
+[21][5][1] Posting SEND from SendMsgBuf
+[21][5][21] Posting an MPI_Isend with pointer 0x61800001d080, size: 840, tag:1381, dstrank:10
+[16][0][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1381
+[0][0][0][0] **************************** All sends and recvs of Iter 4 completed ***************************
+sdagRun: Iteration 4 completed
+[3][3][0][3] **************************** All sends and recvs of Iter 4 completed ***************************
+[26][10][1] Completed _RECV_ ptr 0x61800001d480, size:840, tag 1381
+[21][5][1] Completed _SEND_ ptr 0x61800001d080, size:840, tag 1381
+[5][5][0][5] **************************** All sends and recvs of Iter 4 completed ***************************
+[10][10][0][10] **************************** All sends and recvs of Iter 4 completed ***************************
+[14][14][0][14] **************************** All sends and recvs of Iter 4 completed ***************************
+[0][0][0][0] Freeing 0x61800001d480 in destructor and counter1=0, counter2=0
+[4][4][0][4] Freeing 0x61800001d480 in destructor and counter1=0, counter2=0
+[7][7][0][7] Freeing 0x61800001d480 in destructor and counter1=0, counter2=0
+[1][1][0][1] Freeing 0x61800001d480 in destructor and counter1=0, counter2=0
+[10][10][0][10] Freeing 0x61800001d480 in destructor and counter1=0, counter2=0
+[5][5][0][5] Freeing 0x61800001d480 in destructor and counter1=0, counter2=0
+[9][9][0][9] Freeing 0x61800001d480 in destructor and counter1=0, counter2=0
+[11][11][0][10] Allocating 0x61800001cc80 in unpacker
+[11][11][0][11] Freeing 0x61800001d480 in destructor and counter1=0, counter2=0
+[14][14][0][14] Freeing 0x61800001d480 in destructor and counter1=0, counter2=0
+[3][3][0][3] Freeing 0x61800001d480 in destructor and counter1=0, counter2=0
+[12][12][0][12] Freeing 0x61800001d480 in destructor and counter1=0, counter2=0
+[1][1][0][0] Allocating 0x61800001cc80 in unpacker
+[8][8][0][7] Allocating 0x61800001cc80 in unpacker
+[6][6][0][5] Allocating 0x61800001cc80 in unpacker
+[6][6][0][6] Freeing 0x61800001d480 in destructor and counter1=0, counter2=0
+[12][12][0][11] Allocating 0x61800001cc80 in unpacker
+[10][10][0][9] Allocating 0x61800001cc80 in unpacker
+[2][2][0][2] Freeing 0x61800001d480 in destructor and counter1=0, counter2=0
+[7][7][0][6] Allocating 0x61800001cc80 in unpacker
+[3][3][0][2] Allocating 0x61800001cc80 in unpacker
+[6][6][0][5] ===== application posting 0x61800001cc80 in RECV with iter 5=====
+[22][6][1] Posting RECV from SendMsgBuf
+[22][6][22] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1382, dstrank:11
+[17][1][1] Posting SEND from SendMsgBuf
+[17][1][17] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1382, dstrank:15
+[17][1][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1382
+[8][8][0][8] Freeing 0x61800001d480 in destructor and counter1=0, counter2=0
+[2][2][0][1] Allocating 0x61800001cc80 in unpacker
+=================================================================
+==5319==ERROR: AddressSanitizer: heap-use-after-free on address 0x61800001d480 at pc 0x7ffff6ef6904 bp 0x7fffffffd470 sp 0x7fffffffcc18
+WRITE of size 840 at 0x61800001d480 thread T0
+[15][15][0][14] Allocating 0x61800001cc80 in unpacker
+[15][15][0][15] ===== application posting 0x61800001d480 in RECV with iter 5=====
+[31][15][1] Posting RECV from SendMsgBuf
+[31][15][31] Posting an MPI_Recv with pointer 0x61800001d480, size: 840, tag:1382, dstrank:1
+[15][15][0][15] Freeing 0x61800001d480 in destructor and counter1=0, counter2=0
+[27][11][1] Posting SEND from SendMsgBuf
+[27][11][27] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1382, dstrank:6
+[13][13][0][12] Allocating 0x61800001cc80 in unpacker
+[13][13][0][13] Freeing 0x61800001d480 in destructor and counter1=0, counter2=0
+[22][6][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1382
+[27][11][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1382
+[11][11][0][10] ===== application posting 0x61800001cc80 in RECV with iter 5=====
+[27][11][1] Posting RECV from SendMsgBuf
+[27][11][27] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1382, dstrank:6
+[22][6][1] Posting SEND from SendMsgBuf
+[22][6][22] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1382, dstrank:11
+[22][6][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1382
+[6][6][0][5] **************************** All sends and recvs of Iter 5 completed ***************************
+[27][11][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1382
+[11][11][0][10] **************************** All sends and recvs of Iter 5 completed ***************************
+[14][14][0][13] Allocating 0x61800001cc80 in unpacker
+[11][11][0][10] ===== application posting 0x61800001cc80 in RECV with iter 6=====
+[27][11][1] Posting RECV from SendMsgBuf
+[6][6][0][5] ===== application posting 0x61800001cc80 in RECV with iter 6=====
+[22][6][1] Posting RECV from SendMsgBuf
+[22][6][22] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1383, dstrank:11
+[7][7][0][6] ===== application posting 0x61800001cc80 in RECV with iter 5=====
+[23][7][1] Posting RECV from SendMsgBuf
+[23][7][23] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1382, dstrank:10
+[3][3][0][2] ===== application posting 0x61800001cc80 in RECV with iter 5=====
+[19][3][1] Posting RECV from SendMsgBuf
+[19][3][19] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1382, dstrank:14
+[10][10][0][9] ===== application posting 0x61800001cc80 in RECV with iter 5=====
+[26][10][1] Posting RECV from SendMsgBuf
+[26][10][26] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1382, dstrank:7
+[26][10][1] Posting SEND from SendMsgBuf
+[26][10][26] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1382, dstrank:7
+[26][10][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1382
+[27][11][27] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1383, dstrank:6
+[27][11][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1383
+[22][6][1] Posting SEND from SendMsgBuf
+[22][6][22] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1383, dstrank:11
+[22][6][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1383
+[27][11][1] Posting SEND from SendMsgBuf
+[27][11][27] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1383, dstrank:6
+[27][11][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1383
+[0][0][0][15] Allocating 0x61800001cc80 in unpacker
+[22][6][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1383
+[23][7][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1382
+[23][7][1] Posting SEND from SendMsgBuf
+[23][7][23] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1382, dstrank:10
+[26][10][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1382
+[11][11][0][10] **************************** All sends and recvs of Iter 6 completed ***************************
+[1][1][0][0] ===== application posting 0x61800001cc80 in RECV with iter 5=====
+[17][1][1] Posting RECV from SendMsgBuf
+[17][1][17] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1382, dstrank:0
+[16][0][1] Posting SEND from SendMsgBuf
+[16][0][16] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1382, dstrank:1
+[17][1][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1382
+[1][1][0][0] **************************** All sends and recvs of Iter 5 completed ***************************
+sdagRun: Iteration 5 completed
+[10][10][0][9] **************************** All sends and recvs of Iter 5 completed ***************************
+[16][0][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1382
+[23][7][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1382
+[9][9][0][8] Allocating 0x61800001cc80 in unpacker
+[6][6][0][5] ===== application posting 0x61800001cc80 in RECV with iter 7=====
+[30][14][1] Posting SEND from SendMsgBuf
+[30][14][30] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1382, dstrank:3
+[30][14][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1382
+[7][7][0][6] ===== application posting 0x61800001cc80 in RECV with iter 6=====
+[19][3][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1382
+[7][7][0][6] **************************** All sends and recvs of Iter 5 completed ***************************
+[23][7][1] Posting RECV from SendMsgBuf
+[23][7][23] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1383, dstrank:10
+[27][11][1] Posting SEND from SendMsgBuf
+[27][11][27] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1384, dstrank:6
+[22][6][1] Posting RECV from SendMsgBuf
+[22][6][22] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1384, dstrank:11
+[6][6][0][5] **************************** All sends and recvs of Iter 6 completed ***************************
+[22][6][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1384
+[9][9][0][8] ===== application posting 0x61800001cc80 in RECV with iter 5=====
+[25][9][1] Posting RECV from SendMsgBuf
+[25][9][25] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1382, dstrank:8
+[22][6][1] Posting SEND from SendMsgBuf
+[22][6][22] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1384, dstrank:11
+[24][8][1] Posting SEND from SendMsgBuf
+[24][8][24] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1382, dstrank:9
+[24][8][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1382
+[25][9][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1382
+[27][11][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1384
+[11][11][0][10] ===== application posting 0x61800001cc80 in RECV with iter 7=====
+[27][11][1] Posting RECV from SendMsgBuf
+[27][11][27] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1384, dstrank:6
+[27][11][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1384
+[22][6][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1384
+[11][11][0][10] **************************** All sends and recvs of Iter 7 completed ***************************
+[6][6][0][5] **************************** All sends and recvs of Iter 7 completed ***************************
+[8][8][0][7] ===== application posting 0x61800001cc80 in RECV with iter 5=====
+[11][11][0][10] ===== application posting 0x61800001cc80 in RECV with iter 8=====
+[6][6][0][5] ===== application posting 0x61800001cc80 in RECV with iter 8=====
+[24][8][1] Posting RECV from SendMsgBuf
+[24][8][24] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1382, dstrank:9
+[22][6][1] Posting RECV from SendMsgBuf
+[22][6][22] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1385, dstrank:11
+[27][11][1] Posting RECV from SendMsgBuf
+[27][11][27] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1385, dstrank:6
+[27][11][1] Posting SEND from SendMsgBuf
+[27][11][27] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1385, dstrank:6
+[25][9][1] Posting SEND from SendMsgBuf
+[25][9][25] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1382, dstrank:8
+[24][8][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1382
+[27][11][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1385
+[22][6][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1385
+[25][9][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1382
+[8][8][0][7] **************************** All sends and recvs of Iter 5 completed ***************************
+[22][6][1] Posting SEND from SendMsgBuf
+[9][9][0][8] **************************** All sends and recvs of Iter 5 completed ***************************
+[22][6][22] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1385, dstrank:11
+[22][6][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1385
+[6][6][0][5] **************************** All sends and recvs of Iter 8 completed ***************************
+[6][6][0][5] ===== application posting 0x61800001cc80 in RECV with iter 9=====
+[22][6][1] Posting RECV from SendMsgBuf
+[22][6][22] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1386, dstrank:11
+[22][6][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1386
+[22][6][1] Posting SEND from SendMsgBuf
+[22][6][22] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1386, dstrank:11
+[22][6][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1386
+[6][6][0][5] **************************** All sends and recvs of Iter 9 completed ***************************
+[26][10][1] Posting SEND from SendMsgBuf
+[26][10][26] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1383, dstrank:7
+[26][10][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1383
+[10][10][0][9] ===== application posting 0x61800001cc80 in RECV with iter 6=====
+[26][10][1] Posting RECV from SendMsgBuf
+[26][10][26] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1383, dstrank:7
+[26][10][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1383
+[10][10][0][9] **************************** All sends and recvs of Iter 6 completed ***************************
+[10][10][0][9] ===== application posting 0x61800001cc80 in RECV with iter 7=====
+[26][10][1] Posting RECV from SendMsgBuf
+[26][10][26] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1384, dstrank:7
+[26][10][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1384
+[26][10][1] Posting SEND from SendMsgBuf
+[26][10][26] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1384, dstrank:7
+[26][10][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1384
+[10][10][0][9] **************************** All sends and recvs of Iter 7 completed ***************************
+[10][10][0][9] ===== application posting 0x61800001cc80 in RECV with iter 8=====
+[26][10][1] Posting RECV from SendMsgBuf
+[26][10][26] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1385, dstrank:7
+[26][10][1] Posting SEND from SendMsgBuf
+[26][10][26] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1385, dstrank:7
+[26][10][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1385
+[26][10][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1385
+[10][10][0][9] **************************** All sends and recvs of Iter 8 completed ***************************
+[26][10][1] Posting SEND from SendMsgBuf
+[26][10][26] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1386, dstrank:7
+[26][10][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1386
+[10][10][0][9] ===== application posting 0x61800001cc80 in RECV with iter 9=====
+[26][10][1] Posting RECV from SendMsgBuf
+[26][10][26] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1386, dstrank:7
+[26][10][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1386
+[10][10][0][9] **************************** All sends and recvs of Iter 9 completed ***************************
+[27][11][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1385
+[11][11][0][10] **************************** All sends and recvs of Iter 8 completed ***************************
+[11][11][0][10] ===== application posting 0x61800001cc80 in RECV with iter 9=====
+[27][11][1] Posting SEND from SendMsgBuf
+[27][11][27] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1386, dstrank:6
+[27][11][1] Posting RECV from SendMsgBuf
+[27][11][27] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1386, dstrank:6
+[27][11][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1386
+[27][11][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1386
+[11][11][0][10] **************************** All sends and recvs of Iter 9 completed ***************************
+[23][7][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1383
+[23][7][1] Posting SEND from SendMsgBuf
+[23][7][23] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1383, dstrank:10
+[23][7][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1383
+[7][7][0][6] **************************** All sends and recvs of Iter 6 completed ***************************
+[7][7][0][6] ===== application posting 0x61800001cc80 in RECV with iter 7=====
+[23][7][1] Posting SEND from SendMsgBuf
+[23][7][23] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1384, dstrank:10
+[23][7][1] Posting RECV from SendMsgBuf
+[23][7][23] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1384, dstrank:10
+[23][7][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1384
+[23][7][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1384
+[7][7][0][6] **************************** All sends and recvs of Iter 7 completed ***************************
+[7][7][0][6] ===== application posting 0x61800001cc80 in RECV with iter 8=====
+[23][7][1] Posting RECV from SendMsgBuf
+[23][7][23] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1385, dstrank:10
+[23][7][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1385
+[23][7][1] Posting SEND from SendMsgBuf
+[23][7][23] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1385, dstrank:10
+[23][7][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1385
+[7][7][0][6] **************************** All sends and recvs of Iter 8 completed ***************************
+[7][7][0][6] ===== application posting 0x61800001cc80 in RECV with iter 9=====
+[23][7][1] Posting RECV from SendMsgBuf
+[23][7][23] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1386, dstrank:10
+[23][7][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1386
+[23][7][1] Posting SEND from SendMsgBuf
+[23][7][23] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1386, dstrank:10
+[23][7][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1386
+[7][7][0][6] **************************** All sends and recvs of Iter 9 completed ***************************
+[8][8][0][7] ===== application posting 0x61800001cc80 in RECV with iter 6=====
+[24][8][1] Posting RECV from SendMsgBuf
+[24][8][24] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1383, dstrank:9
+[24][8][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1383
+[24][8][1] Posting SEND from SendMsgBuf
+[24][8][24] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1383, dstrank:9
+[24][8][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1383
+[8][8][0][7] **************************** All sends and recvs of Iter 6 completed ***************************
+[24][8][1] Posting SEND from SendMsgBuf
+[24][8][24] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1384, dstrank:9
+[8][8][0][7] ===== application posting 0x61800001cc80 in RECV with iter 7=====
+[24][8][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1384
+[24][8][1] Posting RECV from SendMsgBuf
+[24][8][24] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1384, dstrank:9
+[24][8][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1384
+[8][8][0][7] **************************** All sends and recvs of Iter 7 completed ***************************
+[8][8][0][7] ===== application posting 0x61800001cc80 in RECV with iter 8=====
+[24][8][1] Posting RECV from SendMsgBuf
+[24][8][24] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1385, dstrank:9
+[24][8][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1385
+[24][8][1] Posting SEND from SendMsgBuf
+[24][8][24] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1385, dstrank:9
+[24][8][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1385
+[8][8][0][7] **************************** All sends and recvs of Iter 8 completed ***************************
+[24][8][1] Posting SEND from SendMsgBuf
+[24][8][24] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1386, dstrank:9
+[24][8][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1386
+[8][8][0][7] ===== application posting 0x61800001cc80 in RECV with iter 9=====
+[24][8][1] Posting RECV from SendMsgBuf
+[24][8][24] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1386, dstrank:9
+[24][8][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1386
+[9][9][0][8] ===== application posting 0x61800001cc80 in RECV with iter 6=====
+[25][9][1] Posting SEND from SendMsgBuf
+[25][9][25] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1383, dstrank:8
+[25][9][1] Posting RECV from SendMsgBuf
+[25][9][25] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1383, dstrank:8
+[25][9][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1383
+[25][9][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1383
+[9][9][0][8] **************************** All sends and recvs of Iter 6 completed ***************************
+[9][9][0][8] ===== application posting 0x61800001cc80 in RECV with iter 7=====
+[25][9][1] Posting RECV from SendMsgBuf
+[25][9][25] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1384, dstrank:8
+[25][9][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1384
+[25][9][1] Posting SEND from SendMsgBuf
+[25][9][25] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1384, dstrank:8
+[25][9][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1384
+[9][9][0][8] **************************** All sends and recvs of Iter 7 completed ***************************
+[25][9][1] Posting SEND from SendMsgBuf
+[25][9][25] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1385, dstrank:8
+[9][9][0][8] ===== application posting 0x61800001cc80 in RECV with iter 8=====
+[25][9][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1385
+[25][9][1] Posting RECV from SendMsgBuf
+[25][9][25] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1385, dstrank:8
+[25][9][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1385
+[9][9][0][8] **************************** All sends and recvs of Iter 8 completed ***************************
+[9][9][0][8] ===== application posting 0x61800001cc80 in RECV with iter 9=====
+[25][9][1] Posting RECV from SendMsgBuf
+[25][9][25] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1386, dstrank:8
+[25][9][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1386
+[25][9][1] Posting SEND from SendMsgBuf
+[25][9][25] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1386, dstrank:8
+[25][9][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1386
+[9][9][0][8] **************************** All sends and recvs of Iter 9 completed ***************************
+[8][8][0][7] **************************** All sends and recvs of Iter 9 completed ***************************
+[5][5][0][4] Allocating 0x61800001cc80 in unpacker
+[12][12][0][11] ===== application posting 0x61800001cc80 in RECV with iter 5=====
+[28][12][1] Posting RECV from SendMsgBuf
+[28][12][28] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1382, dstrank:5
+[4][4][0][3] Allocating 0x61800001cc80 in unpacker
+[21][5][1] Posting SEND from SendMsgBuf
+[21][5][21] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1382, dstrank:12
+[21][5][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1382
+[28][12][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1382
+[5][5][0][4] ===== application posting 0x61800001cc80 in RECV with iter 5=====
+[21][5][1] Posting RECV from SendMsgBuf
+[21][5][21] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1382, dstrank:12
+[21][5][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1382
+[28][12][1] Posting SEND from SendMsgBuf
+[28][12][28] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1382, dstrank:5
+[28][12][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1382
+[5][5][0][4] **************************** All sends and recvs of Iter 5 completed ***************************
+[12][12][0][11] **************************** All sends and recvs of Iter 5 completed ***************************
+[12][12][0][11] ===== application posting 0x61800001cc80 in RECV with iter 6=====
+[5][5][0][4] ===== application posting 0x61800001cc80 in RECV with iter 6=====
+[21][5][1] Posting RECV from SendMsgBuf
+[21][5][21] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1383, dstrank:12
+[28][12][1] Posting RECV from SendMsgBuf
+[28][12][28] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1383, dstrank:5
+[28][12][1] Posting SEND from SendMsgBuf
+[28][12][28] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1383, dstrank:5
+[21][5][1] Posting SEND from SendMsgBuf
+[21][5][21] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1383, dstrank:12
+[21][5][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1383
+[21][5][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1383
+[13][13][0][12] ===== application posting 0x61800001cc80 in RECV with iter 5=====
+[28][12][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1383
+[28][12][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1383
+[5][5][0][4] **************************** All sends and recvs of Iter 6 completed ***************************
+[29][13][1] Posting RECV from SendMsgBuf
+[29][13][29] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1382, dstrank:4
+[14][14][0][13] ===== application posting 0x61800001cc80 in RECV with iter 5=====
+[30][14][1] Posting RECV from SendMsgBuf
+[30][14][30] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1382, dstrank:3
+[19][3][1] Posting SEND from SendMsgBuf
+[19][3][19] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1382, dstrank:14
+[12][12][0][11] ===== application posting 0x61800001cc80 in RECV with iter 7=====
+[30][14][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1382
+[19][3][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1382
+[14][14][0][13] **************************** All sends and recvs of Iter 5 completed ***************************
+[28][12][1] Posting RECV from SendMsgBuf
+[28][12][28] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1384, dstrank:5
+[12][12][0][11] **************************** All sends and recvs of Iter 6 completed ***************************
+[3][3][0][2] **************************** All sends and recvs of Iter 5 completed ***************************
+[21][5][1] Posting SEND from SendMsgBuf
+[3][3][0][2] ===== application posting 0x61800001cc80 in RECV with iter 6=====
+[14][14][0][13] ===== application posting 0x61800001cc80 in RECV with iter 6=====
+[30][14][1] Posting RECV from SendMsgBuf
+[30][14][30] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1383, dstrank:3
+[21][5][21] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1384, dstrank:12
+[21][5][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1384
+[19][3][1] Posting RECV from SendMsgBuf
+[19][3][19] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1383, dstrank:14
+[19][3][1] Posting SEND from SendMsgBuf
+[19][3][19] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1383, dstrank:14
+[30][14][1] Posting SEND from SendMsgBuf
+[30][14][30] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1383, dstrank:3
+[30][14][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1383
+[19][3][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1383
+[19][3][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1383
+[30][14][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1383
+[28][12][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1384
+[5][5][0][4] ===== application posting 0x61800001cc80 in RECV with iter 7=====
+[14][14][0][13] **************************** All sends and recvs of Iter 6 completed ***************************
+[21][5][1] Posting RECV from SendMsgBuf
+[21][5][21] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1384, dstrank:12
+[3][3][0][2] **************************** All sends and recvs of Iter 6 completed ***************************
+[28][12][1] Posting SEND from SendMsgBuf
+[28][12][28] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1384, dstrank:5
+[3][3][0][2] ===== application posting 0x61800001cc80 in RECV with iter 7=====
+[19][3][1] Posting RECV from SendMsgBuf
+[19][3][19] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1384, dstrank:14
+[21][5][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1384
+[5][5][0][4] **************************** All sends and recvs of Iter 7 completed ***************************
+[14][14][0][13] ===== application posting 0x61800001cc80 in RECV with iter 7=====
+[30][14][1] Posting RECV from SendMsgBuf
+[30][14][30] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1384, dstrank:3
+[30][14][1] Posting SEND from SendMsgBuf
+[30][14][30] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1384, dstrank:3
+[30][14][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1384
+[19][3][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1384
+[19][3][1] Posting SEND from SendMsgBuf
+[19][3][19] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1384, dstrank:14
+[19][3][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1384
+[30][14][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1384
+[28][12][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1384
+[12][12][0][11] **************************** All sends and recvs of Iter 7 completed ***************************
+[12][12][0][11] ===== application posting 0x61800001cc80 in RECV with iter 8=====
+[28][12][1] Posting RECV from SendMsgBuf
+[3][3][0][2] **************************** All sends and recvs of Iter 7 completed ***************************
+[5][5][0][4] ===== application posting 0x61800001cc80 in RECV with iter 8=====
+[14][14][0][13] **************************** All sends and recvs of Iter 7 completed ***************************
+[28][12][28] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1385, dstrank:5
+[21][5][1] Posting RECV from SendMsgBuf
+[21][5][21] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1385, dstrank:12
+[21][5][1] Posting SEND from SendMsgBuf
+[21][5][21] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1385, dstrank:12
+[14][14][0][13] ===== application posting 0x61800001cc80 in RECV with iter 8=====
+[30][14][1] Posting RECV from SendMsgBuf
+[30][14][30] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1385, dstrank:3
+[30][14][1] Posting SEND from SendMsgBuf
+[3][3][0][2] ===== application posting 0x61800001cc80 in RECV with iter 8=====
+[19][3][1] Posting RECV from SendMsgBuf
+[19][3][19] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1385, dstrank:14
+[19][3][1] Posting SEND from SendMsgBuf
+[19][3][19] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1385, dstrank:14
+[19][3][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1385
+[19][3][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1385
+[30][14][30] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1385, dstrank:3
+[30][14][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1385
+[30][14][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1385
+[28][12][1] Posting SEND from SendMsgBuf
+[28][12][28] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1385, dstrank:5
+[28][12][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1385
+[28][12][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1385
+[4][4][0][3] ===== application posting 0x61800001cc80 in RECV with iter 5=====
+[14][14][0][13] **************************** All sends and recvs of Iter 8 completed ***************************
+[3][3][0][2] **************************** All sends and recvs of Iter 8 completed ***************************
+[12][12][0][11] **************************** All sends and recvs of Iter 8 completed ***************************
+[20][4][1] Posting SEND from SendMsgBuf
+[20][4][20] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1382, dstrank:13
+[20][4][1] Posting RECV from SendMsgBuf
+[20][4][20] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1382, dstrank:13
+[20][4][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1382
+[21][5][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1385
+[21][5][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1385
+[5][5][0][4] **************************** All sends and recvs of Iter 8 completed ***************************
+[29][13][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1382
+[29][13][1] Posting SEND from SendMsgBuf
+[29][13][29] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1382, dstrank:4
+[29][13][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1382
+[13][13][0][12] **************************** All sends and recvs of Iter 5 completed ***************************
+[5][5][0][4] ===== application posting 0x61800001cc80 in RECV with iter 9=====
+[14][14][0][13] ===== application posting 0x61800001cc80 in RECV with iter 9=====
+[30][14][1] Posting RECV from SendMsgBuf
+[30][14][30] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1386, dstrank:3
+[30][14][1] Posting SEND from SendMsgBuf
+[3][3][0][2] ===== application posting 0x61800001cc80 in RECV with iter 9=====
+[19][3][1] Posting RECV from SendMsgBuf
+[19][3][19] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1386, dstrank:14
+[19][3][1] Posting SEND from SendMsgBuf
+[19][3][19] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1386, dstrank:14
+[19][3][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1386
+[12][12][0][11] ===== application posting 0x61800001cc80 in RECV with iter 9=====
+[21][5][1] Posting RECV from SendMsgBuf
+[21][5][21] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1386, dstrank:12
+[30][14][30] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1386, dstrank:3
+[30][14][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1386
+[30][14][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1386
+[14][14][0][13] **************************** All sends and recvs of Iter 9 completed ***************************
+[28][12][1] Posting RECV from SendMsgBuf
+[28][12][28] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1386, dstrank:5
+[28][12][1] Posting SEND from SendMsgBuf
+[19][3][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1386
+[28][12][28] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1386, dstrank:5
+[3][3][0][2] **************************** All sends and recvs of Iter 9 completed ***************************
+[21][5][1] Posting SEND from SendMsgBuf
+[21][5][21] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1386, dstrank:12
+[21][5][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1386
+[21][5][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1386
+[20][4][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1382
+[28][12][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1386
+[28][12][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1386
+[5][5][0][4] **************************** All sends and recvs of Iter 9 completed ***************************
+[12][12][0][11] **************************** All sends and recvs of Iter 9 completed ***************************
+[4][4][0][3] **************************** All sends and recvs of Iter 5 completed ***************************
+[4][4][0][3] ===== application posting 0x61800001cc80 in RECV with iter 6=====
+[20][4][1] Posting RECV from SendMsgBuf
+[29][13][1] Posting SEND from SendMsgBuf
+[13][13][0][12] ===== application posting 0x61800001cc80 in RECV with iter 6=====
+[29][13][29] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1383, dstrank:4
+[29][13][1] Posting RECV from SendMsgBuf
+[29][13][29] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1383, dstrank:4
+[29][13][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1383
+[20][4][20] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1383, dstrank:13
+[20][4][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1383
+[20][4][1] Posting SEND from SendMsgBuf
+[20][4][20] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1383, dstrank:13
+[29][13][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1383
+[13][13][0][12] **************************** All sends and recvs of Iter 6 completed ***************************
+[20][4][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1383
+[4][4][0][3] **************************** All sends and recvs of Iter 6 completed ***************************
+[4][4][0][3] ===== application posting 0x61800001cc80 in RECV with iter 7=====
+[20][4][1] Posting RECV from SendMsgBuf
+[29][13][1] Posting SEND from SendMsgBuf
+[29][13][29] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1384, dstrank:4
+[29][13][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1384
+[20][4][20] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1384, dstrank:13
+[20][4][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1384
+[13][13][0][12] ===== application posting 0x61800001cc80 in RECV with iter 7=====
+[29][13][1] Posting RECV from SendMsgBuf
+[29][13][29] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1384, dstrank:4
+[20][4][1] Posting SEND from SendMsgBuf
+[20][4][20] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1384, dstrank:13
+[20][4][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1384
+[29][13][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1384
+[13][13][0][12] **************************** All sends and recvs of Iter 7 completed ***************************
+[4][4][0][3] **************************** All sends and recvs of Iter 7 completed ***************************
+[4][4][0][3] ===== application posting 0x61800001cc80 in RECV with iter 8=====
+[20][4][1] Posting RECV from SendMsgBuf
+[29][13][1] Posting SEND from SendMsgBuf
+[29][13][29] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1385, dstrank:4
+[29][13][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1385
+[20][4][20] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1385, dstrank:13
+[20][4][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1385
+[13][13][0][12] ===== application posting 0x61800001cc80 in RECV with iter 8=====
+[29][13][1] Posting RECV from SendMsgBuf
+[29][13][29] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1385, dstrank:4
+[20][4][1] Posting SEND from SendMsgBuf
+[20][4][20] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1385, dstrank:13
+[20][4][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1385
+[29][13][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1385
+[13][13][0][12] **************************** All sends and recvs of Iter 8 completed ***************************
+[4][4][0][3] **************************** All sends and recvs of Iter 8 completed ***************************
+[4][4][0][3] ===== application posting 0x61800001cc80 in RECV with iter 9=====
+[20][4][1] Posting RECV from SendMsgBuf
+[29][13][1] Posting SEND from SendMsgBuf
+[29][13][29] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1386, dstrank:4
+[29][13][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1386
+[20][4][20] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1386, dstrank:13
+[20][4][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1386
+[13][13][0][12] ===== application posting 0x61800001cc80 in RECV with iter 9=====
+[29][13][1] Posting RECV from SendMsgBuf
+[29][13][29] Posting an MPI_Recv with pointer 0x61800001cc80, size: 840, tag:1386, dstrank:4
+[20][4][1] Posting SEND from SendMsgBuf
+[20][4][20] Posting an MPI_Isend with pointer 0x61800001c880, size: 840, tag:1386, dstrank:13
+[20][4][1] Completed _SEND_ ptr 0x61800001c880, size:840, tag 1386
+[29][13][1] Completed _RECV_ ptr 0x61800001cc80, size:840, tag 1386
+[13][13][0][12] **************************** All sends and recvs of Iter 9 completed ***************************
+[4][4][0][3] **************************** All sends and recvs of Iter 9 completed ***************************
+    #0 0x7ffff6ef6903 in __asan_memcpy (/usr/lib/x86_64-linux-gnu/libasan.so.2+0x8c903)
+    #1 0x7ffff51f5715 in opal_convertor_unpack (/usr/lib/libopen-pal.so.13+0x2d715)
+    #2 0x7fffed79a41b in mca_pml_ob1_recv_frag_callback_match (/usr/lib/openmpi/lib/openmpi/mca_pml_ob1.so+0xa41b)
+    #3 0x7fffee612812 in mca_btl_vader_poll_handle_frag (/usr/lib/openmpi/lib/openmpi/mca_btl_vader.so+0x3812)
+    #4 0x7fffee612abd  (/usr/lib/openmpi/lib/openmpi/mca_btl_vader.so+0x3abd)
+    #5 0x7ffff51e91e9 in opal_progress (/usr/lib/libopen-pal.so.13+0x211e9)
+    #6 0x7ffff64933da in ompi_request_default_test (/usr/lib/libmpi.so.12+0x3f3da)
+    #7 0x7ffff64bfd60 in PMPI_Test (/usr/lib/libmpi.so.12+0x6bd60)
+    #8 0x976ee6 in ReleasePostedMessages /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/machine.C:625
+    #9 0x97854e in LrtsAdvanceCommunication(int) /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/machine.C:1212
+    #10 0x974be2 in AdvanceCommunication /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/machine-common-core.C:1616
+    #11 0x974bfa in CommunicationServer /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/machine-common-core.C:1640
+    #12 0x974cb6 in CommunicationServerThread(int) /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/machine-common-core.C:1663
+    #13 0x974b2d in ConverseRunPE /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/machine-common-core.C:1591
+    #14 0x974573 in ConverseInit /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/machine-common-core.C:1491
+    #15 0x6f4420 in charm_main /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/init.C:1829
+    #16 0x6e190c in main /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/main.C:5
+    #17 0x7ffff5b1282f in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x2082f)
+    #18 0x637e08 in _start (/scratch/nitin/charm/examples/charm++/zerocopy/entry_method_post_api/reg/test3/simpleZeroCopy+0x637e08)
+
+0x61800001d480 is located 0 bytes inside of 840-byte region [0x61800001d480,0x61800001d7c8)
+freed by thread T2 here:
+    #0 0x7ffff6f03caa in operator delete[](void*) (/usr/lib/x86_64-linux-gnu/libasan.so.2+0x99caa)
+    #1 0x647530 in zerocopyObject::~zerocopyObject() (/scratch/nitin/charm/examples/charm++/zerocopy/entry_method_post_api/reg/test3/simpleZeroCopy+0x647530)
+    #2 0x6475bd in zerocopyObject::~zerocopyObject() (/scratch/nitin/charm/examples/charm++/zerocopy/entry_method_post_api/reg/test3/simpleZeroCopy+0x6475bd)
+    #3 0x783203 in CkArray::deleteElt(unsigned long) /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/ckarray.h:631
+    #4 0x76dc52 in CkLocMgr::emigrate(CkLocRec*, int) /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/cklocation.C:2981
+    #5 0x7661be in CkLocRec::migrateMe(int) /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/cklocation.C:1874
+    #6 0x76722d in CkLocRec::recvMigrate(int) /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/cklocation.C:2010
+    #7 0x7671c6 in CkLocRec::staticMigrate(LDObjHandle, int) /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/cklocation.C:2003
+    #8 0x8b2ebe in LBOM::Migrate(LDObjHandle, int) ../bin/../include/LBOM.h:37
+    #9 0x8afb4b in LBDB::Migrate(LDObjHandle, int) /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/LBDBManager.C:345
+    #10 0x87b13c in LDMigrate /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/lbdb.C:399
+    #11 0x8ed7d8 in LBDatabase::Migrate(LDObjHandle, int) /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/LBDatabase.h:355
+    #12 0x8d1360 in CentralLB::ProcessReceiveMigration() /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/CentralLB.C:1118
+    #13 0x8d969c in CkIndex_CentralLB::_call_redn_wrapper_ProcessReceiveMigration_void(void*, void*) /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/CentralLB.def.h:900
+    #14 0x70eec0 in CkDeliverMessageFree /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/ck.C:545
+    #15 0x70f329 in _invokeEntryNoTrace /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/ck.C:593
+    #16 0x70f6c9 in _invokeEntry /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/ck.C:604
+    #17 0x7138b1 in _deliverForBocMsg /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/ck.C:1062
+    #18 0x713af6 in _processForBocMsg /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/ck.C:1084
+    #19 0x714abf in _processHandler(void*, CkCoreState*) /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/ck.C:1241
+    #20 0x97f841 in CmiHandleMessage /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/convcore.C:1656
+    #21 0x98049c in CsdScheduleForever /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/convcore.C:1914
+    #22 0x980255 in CsdScheduler /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/convcore.C:1842
+    #23 0x974b6d in ConverseRunPE /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/machine-common-core.C:1596
+    #24 0x96d7f5 in call_startfn /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/machine-smp.C:387
+    #25 0x7ffff6c546b9 in start_thread (/lib/x86_64-linux-gnu/libpthread.so.0+0x76b9)
+
+previously allocated by thread T2 here:
+    #0 0x7ffff6f036b2 in operator new[](unsigned long) (/usr/lib/x86_64-linux-gnu/libasan.so.2+0x996b2)
+    #1 0x64af88 in void assignValues<int>(int*&, int) (/scratch/nitin/charm/examples/charm++/zerocopy/entry_method_post_api/reg/test3/simpleZeroCopy+0x64af88)
+    #2 0x646abb in zerocopyObject::zerocopyObject() (/scratch/nitin/charm/examples/charm++/zerocopy/entry_method_post_api/reg/test3/simpleZeroCopy+0x646abb)
+    #3 0x639e5a in CkIndex_zerocopyObject::_call_zerocopyObject_void(void*, void*) /scratch/nitin/charm/examples/charm++/zerocopy/entry_method_post_api/reg/test3/simpleZeroCopy.def.h:517
+    #4 0x70eec0 in CkDeliverMessageFree /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/ck.C:545
+    #5 0x766c88 in CkLocRec::invokeEntry(CkMigratable*, void*, int, bool) /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/cklocation.C:1961
+    #6 0x7694cb in CkLocMgr::addElementToRec(CkLocRec*, CkArray*, CkMigratable*, int, void*) /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/cklocation.C:2320
+    #7 0x7691a8 in CkLocMgr::addElement(CkArrayID, CkArrayIndex const&, CkMigratable*, int, void*) /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/cklocation.C:2295
+    #8 0x7f32b8 in CkArray::insertElement(CkArrayMessage*, CkArrayIndex const&, int*) /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/ckarray.C:1001
+    #9 0x7f3cf2 in CkArray::insertInitial(CkArrayIndex const&, void*) /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/ckarray.C:1095
+    #10 0x7615f3 in CkArrayMap::populateInitial(int, CkArrayOptions&, void*, CkArray*) /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/cklocation.C:220
+    #11 0x8040cf in CkLocMgr::populateInitial(CkArrayOptions&, void*, CkArray*) /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/cklocation.h:392
+    #12 0x7f213c in CkArray::CkArray(CkArrayOptions&&, CkMarshalledMessage&&) /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/ckarray.C:862
+    #13 0x7f8b7d in CkIndex_CkArray::_call_CkArray_marshall1(void*, void*) /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/CkArray.def.h:595
+    #14 0x70eec0 in CkDeliverMessageFree /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/ck.C:545
+    #15 0x70f329 in _invokeEntryNoTrace /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/ck.C:593
+    #16 0x7107e3 in CkCreateLocalGroup /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/ck.C:688
+    #17 0x7141df in _processBocInitMsg(CkCoreState*, envelope*) /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/ck.C:1136
+    #18 0x6edc79 in _processBufferedBocInits /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/init.C:753
+    #19 0x6ee42f in _initDone() /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/init.C:849
+    #20 0x6ef048 in checkForInitDone(bool) /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/init.C:1004
+    #21 0x6ef63d in _initHandler /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/init.C:1071
+    #22 0x97f841 in CmiHandleMessage /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/convcore.C:1656
+    #23 0x98049c in CsdScheduleForever /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/convcore.C:1914
+    #24 0x980255 in CsdScheduler /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/convcore.C:1842
+    #25 0x974b6d in ConverseRunPE /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/machine-common-core.C:1596
+    #26 0x96d7f5 in call_startfn /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/machine-smp.C:387
+    #27 0x7ffff6c546b9 in start_thread (/lib/x86_64-linux-gnu/libpthread.so.0+0x76b9)
+
+Thread T2 created by T0 here:
+    #0 0x7ffff6ea0253 in pthread_create (/usr/lib/x86_64-linux-gnu/libasan.so.2+0x36253)
+    #1 0x96dc1f in CmiStartThreads /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/machine-smp.C:497
+    #2 0x974566 in ConverseInit /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/machine-common-core.C:1489
+    #3 0x6f4420 in charm_main /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/init.C:1829
+    #4 0x6e190c in main /scratch/nitin/charm/mpi-linux-x86_64-smp-asan/tmp/main.C:5
+    #5 0x7ffff5b1282f in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x2082f)
+
+SUMMARY: AddressSanitizer: heap-use-after-free ??:0 __asan_memcpy
+Shadow bytes around the buggy address:
+  0x0c307fffba40: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x0c307fffba50: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x0c307fffba60: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x0c307fffba70: 00 00 00 00 00 00 00 00 00 fa fa fa fa fa fa fa
+  0x0c307fffba80: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+=>0x0c307fffba90:[fd]fd fd fd fd fd fd fd fd fd fd fd fd fd fd fd
+  0x0c307fffbaa0: fd fd fd fd fd fd fd fd fd fd fd fd fd fd fd fd
+  0x0c307fffbab0: fd fd fd fd fd fd fd fd fd fd fd fd fd fd fd fd
+  0x0c307fffbac0: fd fd fd fd fd fd fd fd fd fd fd fd fd fd fd fd
+  0x0c307fffbad0: fd fd fd fd fd fd fd fd fd fd fd fd fd fd fd fd
+  0x0c307fffbae0: fd fd fd fd fd fd fd fd fd fd fd fd fd fd fd fd
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Heap right redzone:      fb
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack partial redzone:   f4
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+==5319==ABORTING
+-------------------------------------------------------
+Primary job  terminated normally, but 1 process returned
+a non-zero exit code.. Per user-direction, the job has been aborted.
+-------------------------------------------------------
+--------------------------------------------------------------------------
+mpirun detected that one or more processes exited with non-zero status, thus causing
+the job to be terminated. The first process to do so was:
+
+  Process name: [[12420,1],15]
+  Exit code:    1
+--------------------------------------------------------------------------
