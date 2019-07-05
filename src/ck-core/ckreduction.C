@@ -1933,6 +1933,7 @@ extern "C" {
 void CkExtContributeToChare(CkExtContributeInfo* contribute_params, int onPE, void* objPtr);
 void CkExtContributeToArray(CkExtContributeInfo* contribute_params, int aid, int* idx, int ndims);
 void CkExtContributeToGroup(CkExtContributeInfo* contribute_params, int gid, int pe);
+void CkExtContributeToSection(CkExtContributeInfo* contribute_params, int sid_pe, int sid_cnt, int rootPE);
 }
 
 // Generic function to extract CkExtContributeInfo and perform reduction
@@ -1952,10 +1953,10 @@ void CkExtContribute(CkExtContributeInfo* contribute_params, CkCallback& cb)
 void CkExtContributeTo(CkExtContributeInfo* contribute_params, CkCallback& cb)
 {
     switch (contribute_params->contributorType) {
-        case extContributorType::array :
+        case extContributorType::array:
             CkExtContribute<ArrayElement>(contribute_params, cb);
             break;
-        case extContributorType::group :
+        case extContributorType::group:
             CkExtContribute<Group>(contribute_params, cb);
             break;
         default : CkAbort("Invalid external contributor type!\n");
@@ -1965,21 +1966,27 @@ void CkExtContributeTo(CkExtContributeInfo* contribute_params, CkCallback& cb)
 // When a reduction contributes to a singleton chare
 void CkExtContributeToChare(CkExtContributeInfo* contribute_params, int onPE, void* objPtr)
 {
-    CkCallback cb(onPE, objPtr, contribute_params->cbEpIdx, contribute_params->fid);
+    CkCallback cb(onPE, objPtr, contribute_params->cbEpIdx, (CMK_REFNUM_TYPE)contribute_params->fid);
     CkExtContributeTo(contribute_params, cb);
 }
 
 // When a reduction contributes to an array element or broadcasts result to an array
 void CkExtContributeToArray(CkExtContributeInfo* contribute_params, int aid, int* idx, int ndims)
 {
-    CkCallback cb(aid, idx, ndims, contribute_params->cbEpIdx, contribute_params->fid);
+    CkCallback cb(aid, idx, ndims, contribute_params->cbEpIdx, (CMK_REFNUM_TYPE)contribute_params->fid);
     CkExtContributeTo(contribute_params, cb);
 }
 
 // When a reduction contributes to a group chare element or broadcasts result to group
 void CkExtContributeToGroup(CkExtContributeInfo* contribute_params, int gid, int pe)
 {
-    CkCallback cb(gid, pe, contribute_params->cbEpIdx, contribute_params->fid);
+    CkCallback cb(gid, pe, contribute_params->cbEpIdx, (CMK_REFNUM_TYPE)contribute_params->fid);
+    CkExtContributeTo(contribute_params, cb);
+}
+
+void CkExtContributeToSection(CkExtContributeInfo* contribute_params, int sid_pe, int sid_cnt, int rootPE)
+{
+    CkCallback cb(sid_pe, sid_cnt, rootPE, contribute_params->cbEpIdx);
     CkExtContributeTo(contribute_params, cb);
 }
 

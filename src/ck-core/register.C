@@ -115,6 +115,22 @@ void CkRegisterGroupExt(const char *s, int numEntryMethods, int *chareIdx, int *
   *startEpIdx = epIdxCtor;
 }
 
+void CkRegisterSectionManagerExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx) {
+  int __idx = CkRegisterChare(s, sizeof(SectionManagerExt), TypeGroup);
+  CkRegisterBase(__idx, CkIndex_IrrGroup::__idx);
+
+  int epIdxCtor = CkRegisterEp(s, SectionManagerExt::__SectionManagerExt, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
+  CkRegisterDefaultCtor(__idx, epIdxCtor);
+
+  CkRegisterEp(s, SectionManagerExt::__sendToSection, CkMarshallMsg::__idx, __idx, 0);
+
+  for (int i=2; i < numEntryMethods; i++)
+    CkRegisterEp(s, SectionManagerExt::__entryMethod, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
+
+  *chareIdx = __idx;
+  *startEpIdx = epIdxCtor;
+}
+
 void CkRegisterArrayMapExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx) {
   int __idx = CkRegisterChare(s, sizeof(ArrayMapExt), TypeGroup);
   CkRegisterBase(__idx, CkIndex_IrrGroup::__idx);
