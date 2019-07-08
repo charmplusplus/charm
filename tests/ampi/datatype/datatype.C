@@ -69,10 +69,12 @@ void typefree_isend_test(int rank, int size) {
             if (buf[i] != i * VEC_STRIDE) {
                 errs++;
                 if (errs < 10) {
-                    printf("buf[%d] = %d, expected %d\n", VEC_STRIDE * i, buf[VEC_STRIDE * i], i);
+                    printf("Isend: buf[%d] = %d, expected %d\n", VEC_STRIDE * i, buf[VEC_STRIDE * i], i);
                 }
             }
         }
+        if (errs > 0)
+            MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
     /* Clean up the strideType */
@@ -144,10 +146,12 @@ void typefree_issend_test(int rank, int size) {
             if (buf[i] != i * VEC_STRIDE) {
                 errs++;
                 if (errs < 10) {
-                    printf("buf[%d] = %d, expected %d\n", VEC_STRIDE * i, buf[VEC_STRIDE * i], i);
+                    printf("Issend: buf[%d] = %d, expected %d\n", VEC_STRIDE * i, buf[VEC_STRIDE * i], i);
                 }
             }
         }
+        if (errs > 0)
+            MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
     /* Clean up the strideType */
@@ -211,7 +215,7 @@ void typefree_ireduce_test(MPI_Comm comm) {
             if (recvbuf[i*size] != expected) {
                 errs++;
                 if (errs < 10) {
-                    printf("recvbuf[%d] = %d, expected %d\n", i, recvbuf[i*size], expected);
+                    printf("Ireduce: recvbuf[%d] = %d, expected %d\n", i, recvbuf[i*size], expected);
                 }
             }
         }
@@ -219,6 +223,8 @@ void typefree_ireduce_test(MPI_Comm comm) {
         for (i = 0; i < 1024; i++) {
             MPI_Type_free(&tmpType[i]);
         }
+        if (errs > 0)
+            MPI_Abort(MPI_COMM_WORLD, 1);
     } else {
         // Sync with root
         MPI_Sendrecv(NULL, 0, MPI_INT, root, 1, NULL, 0, MPI_INT, root, 1, comm, MPI_STATUS_IGNORE);
@@ -277,7 +283,7 @@ void typefree_igather_test(int rank, int size) {
             if (recvbuf[i] != i) {
                 errs++;
                 if (errs < 10) {
-                    printf("recvbuf[%d] = %d, expected %d\n", i, recvbuf[i], i);
+                    printf("Igather: recvbuf[%d] = %d, expected %d\n", i, recvbuf[i], i);
                 }
             }
         }
@@ -285,6 +291,8 @@ void typefree_igather_test(int rank, int size) {
         for (i = 0; i < 1024; i++) {
             MPI_Type_free(&tmpType[i]);
         }
+        if (errs > 0)
+            MPI_Abort(MPI_COMM_WORLD, 1);
     } else {
         // Sync with root
         MPI_Sendrecv(NULL, 0, MPI_INT, root, 1, NULL, 0, MPI_INT, root, 1, comm, MPI_STATUS_IGNORE);
@@ -347,7 +355,7 @@ void typefree_igatherv_test(int rank, int size) {
                 if (recvbuf[j*size + i] != i*VEC_NELM+j) {
                     errs++;
                     if (errs < 10) {
-                        printf("recvbuf[%d] = %d, expected %d\n", j*size+i, recvbuf[j*size+i], i*VEC_NELM+j);
+                        printf("Igatherv: recvbuf[%d] = %d, expected %d\n", j*size+i, recvbuf[j*size+i], i*VEC_NELM+j);
                     }
                 }
             }
@@ -356,6 +364,8 @@ void typefree_igatherv_test(int rank, int size) {
         for (i = 0; i < 1024; i++) {
             MPI_Type_free(&tmpType[i]);
         }
+        if (errs > 0)
+            MPI_Abort(MPI_COMM_WORLD, 1);
     } else {
         // Sync with root
         MPI_Sendrecv(NULL, 0, MPI_INT, root, 1, NULL, 0, MPI_INT, root, 1, comm, MPI_STATUS_IGNORE);
@@ -424,10 +434,12 @@ void typefree_ialltoallv_test(MPI_Comm comm) {
             if (recvbuf[i] != i) {
                 errs++;
                 if (errs < 10) {
-                    printf("recvbuf[%d] = %d, expected %d\n", i, recvbuf[i], i);
+                    printf("Ialltoallv: recvbuf[%d] = %d, expected %d\n", i, recvbuf[i], i);
                 }
             }
         }
+        if (errs > 0)
+            MPI_Abort(MPI_COMM_WORLD, 1);
     } else if (rank == 1) {
         MPI_Sendrecv(NULL, 0, MPI_INT, 0, 1, NULL, 0, MPI_INT, 0, 1, comm, MPI_STATUS_IGNORE);
         MPI_Ialltoallv(sendbuf.data(), sendcounts.data(), sdispls.data(), resizedType,
@@ -442,10 +454,12 @@ void typefree_ialltoallv_test(MPI_Comm comm) {
             if (recvbuf[i] != i) {
                 errs++;
                 if (errs < 10) {
-                    printf("recvbuf[%d] = %d, expected %d\n", i, recvbuf[i], i);
+                    printf("Ialltoallv: recvbuf[%d] = %d, expected %d\n", i, recvbuf[i], i);
                 }
             }
         }
+        if (errs > 0)
+            MPI_Abort(MPI_COMM_WORLD, 1);
     } else {
         MPI_Type_free(&strideType);
         MPI_Type_free(&resizedType);
@@ -506,10 +520,12 @@ void typefree_ialltoall_test(MPI_Comm comm) {
             if (recvbuf[i] != i) {
                 errs++;
                 if (errs < 10) {
-                    printf("recvbuf[%d] = %d, expected %d\n", i, recvbuf[i], i);
+                    printf("Ialltoallv: recvbuf[%d] = %d, expected %d\n", i, recvbuf[i], i);
                 }
             }
         }
+        if (errs > 0)
+            MPI_Abort(MPI_COMM_WORLD, 1);
     } else if (rank == 1) {
         MPI_Sendrecv(NULL, 0, MPI_INT, 0, 1, NULL, 0, MPI_INT, 0, 1, comm, MPI_STATUS_IGNORE);
         MPI_Ialltoallv(sendbuf.data(), sendcounts.data(), sdispls.data(), contigType,
@@ -523,10 +539,12 @@ void typefree_ialltoall_test(MPI_Comm comm) {
             if (recvbuf[i] != i) {
                 errs++;
                 if (errs < 10) {
-                    printf("recvbuf[%d] = %d, expected %d\n", i, recvbuf[i], i);
+                    printf("Ialltoallv: recvbuf[%d] = %d, expected %d\n", i, recvbuf[i], i);
                 }
             }
         }
+        if (errs > 0)
+            MPI_Abort(MPI_COMM_WORLD, 1);
     } else {
         MPI_Type_free(&contigType);
     }
@@ -597,10 +615,12 @@ void typefree_iscatterv_test(int rank, int size) {
             if (recvbuf[i] != i*size+rank) {
                 errs++;
                 if (errs < 10) {
-                    printf("recvbuf[%d] = %d, expected %d\n", i, recvbuf[i], i*size+rank);
+                    printf("Iscatterv: recvbuf[%d] = %d, expected %d\n", i, recvbuf[i], i*size+rank);
                 }
             }
         }
+        if (errs > 0)
+            MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
 
@@ -652,10 +672,12 @@ void typefree_persistent_req_test(int rank, int size) {
             if (buf[i*VEC_STRIDE] != i) {
                 errs++;
                 if (errs < 10) {
-                    printf("buf[%d] = %d, expected %d\n", VEC_STRIDE * i, buf[VEC_STRIDE * i], i);
+                    printf("Persistent: buf[%d] = %d, expected %d\n", VEC_STRIDE * i, buf[VEC_STRIDE * i], i);
                 }
             }
         }
+        if (errs > 0)
+            MPI_Abort(MPI_COMM_WORLD, 1);
     } else if (rank == source) {
         buf.resize(VEC_NELM, 0);
 
