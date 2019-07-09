@@ -260,7 +260,9 @@ FLINKAGE {
 #define mpi_win_get_info  FTN_NAME ( MPI_WIN_GET_INFO  , mpi_win_get_info )
 #define mpi_win_fence  FTN_NAME ( MPI_WIN_FENCE  , mpi_win_fence )
 #define mpi_win_lock  FTN_NAME ( MPI_WIN_LOCK  , mpi_win_lock )
+#define mpi_win_lock_all  FTN_NAME ( MPI_WIN_LOCK_ALL , mpi_win_lock_all )
 #define mpi_win_unlock  FTN_NAME ( MPI_WIN_UNLOCK  , mpi_win_unlock )
+#define mpi_win_unlock_all  FTN_NAME ( MPI_WIN_UNLOCK_ALL  , mpi_win_unlock_all )
 #define mpi_win_post  FTN_NAME ( MPI_WIN_POST  , mpi_win_post )
 #define mpi_win_wait  FTN_NAME ( MPI_WIN_WAIT  , mpi_win_wait )
 #define mpi_win_start  FTN_NAME ( MPI_WIN_START  , mpi_win_start )
@@ -1909,9 +1911,19 @@ void mpi_win_lock(int *lock_type, int *rank, int *assert, int *win, int *ierr) n
   *ierr = MPI_Win_lock(*lock_type, *rank, *assert, *win);
 }
 
+void mpi_win_lock_all(int *assert, int *win, int *ierr) noexcept
+{
+  *ierr = MPI_Win_lock_all(*assert, *win);
+}
+
 void mpi_win_unlock(int *rank, int *win, int *ierr) noexcept
 {
   *ierr = MPI_Win_unlock(*rank, *win);
+}
+
+void mpi_win_unlock_all(int *win, int *ierr) noexcept
+{
+  *ierr = MPI_Win_unlock_all(*win);
 }
 
 void mpi_win_post(int *group, int *assertion, int *win, int *ierr) noexcept
