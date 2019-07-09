@@ -202,6 +202,10 @@ int ampiParent::addWinStruct(WinStruct* win) noexcept {
 }
 
 WinStruct *ampiParent::getWinStruct(MPI_Win win) const noexcept {
+#ifdef AMPI_ERROR_CHECKING
+  if (winStructList.size() <= (int) win || win < 0)
+    CkAbort("AMPI> Error: MPI_Win parameter invalid.");
+#endif
   return winStructList[(int)win];
 }
 
