@@ -1159,6 +1159,51 @@ public:
   }
 };
 
+class SectionManagerExt: public GroupExt {
+public:
+
+  SectionManagerExt(void *impl_msg) : GroupExt(impl_msg) {}
+
+  static void __SectionManagerExt(void *impl_msg, void *impl_obj_void) {
+    new (impl_obj_void) SectionManagerExt(impl_msg);
+  }
+
+  // entry methods of SectionManager other than sendToSection
+  static void __entryMethod(void *impl_msg, void *impl_obj_void) {
+    SectionManagerExt *obj = static_cast<SectionManagerExt *>(impl_obj_void);
+    CkMarshallMsg *impl_msg_typed = (CkMarshallMsg *)impl_msg;
+    char *impl_buf = impl_msg_typed->msgBuf;
+    PUP::fromMem implP(impl_buf);
+    int msgSize; implP|msgSize;
+    implP|obj->ep;
+    int dcopy_start; implP|dcopy_start;
+    GroupMsgRecvExtCallback(obj->thisgroup.idx, obj->ep, msgSize, impl_buf+(3*sizeof(int)),
+                            dcopy_start);
+  }
+
+  // sendToSection entry method
+  static void __sendToSection(void *impl_msg, void *impl_obj_void) {
+    SectionManagerExt *obj = static_cast<SectionManagerExt *>(impl_obj_void);
+    obj->msg = impl_msg; // store msg for forwarding to children in multicast spanning tree
+    SectionManagerExt::__entryMethod(impl_msg, impl_obj_void);
+    // if msg != null because I haven't forwarded it (I'm a leaf) delete it now
+    CkFreeMsg(obj->msg);
+  }
+
+  // Used by Charm4py SectionManager to forward a multicast msg to its children without copying.
+  // The msg was received by SectionManagerExt::__sendToSection. When forwardMulticastMsg is reached, we
+  // are still inside the GroupMsgRecvExtCallback call, so the msg has not been deleted yet
+  void forwardMulticastMsg(int num_children, const int *children) {
+    CkSendMsgBranchMulti(ep, msg, thisgroup, num_children, children);
+    // CkSendMsgBranchMulti deletes the msg, so mark it as null to not delete it again
+    msg = nullptr;
+  }
+
+private:
+  int ep;
+  void *msg;
+};
+
 #endif
 
 class CkQdMsg {
