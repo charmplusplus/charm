@@ -1035,8 +1035,7 @@ AMPI_API_IMPL(int, MPI_Win_lock_all, int assert, MPI_Win win)
   ampi *ptr = getAmpiInstance(winStruct->comm);
   int size = ptr->getSize();
 
-  // process assertion here:
-  // end of assertion
+  // TODO: optimize for assertions here
 
   for(int i=0; i<size; i++) {
     ptr->winLock(MPI_LOCK_SHARED, i, winStruct);
@@ -1057,9 +1056,6 @@ AMPI_API_IMPL(int, MPI_Win_unlock_all, MPI_Win win)
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
   int size = ptr->getSize();
-
-  // process assertion here:
-  // end of assertion
 
   for(int i=0; i<size; i++) {
     ptr->winUnlock(i, winStruct);
