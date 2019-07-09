@@ -3556,11 +3556,16 @@ static inline void clearStatus(MPI_Status sts[], int idx) noexcept {
   }
 }
 
-static inline bool handle_MPI_PROC_NULL(int src, MPI_Comm comm, MPI_Status* sts) noexcept
+// Handle a MPI_PROC_NULL src argument according to Section 3.11 of the MPI-3.1 standard.
+// Relevant for MPI_Recv, MPI_Probe, MPI_Iprobe, MPI_Improbe
+static inline bool handle_MPI_PROC_NULL(int src, MPI_Status* sts) noexcept
 {
   if (src == MPI_PROC_NULL) {
-    clearStatus(sts);
-    if (sts != MPI_STATUS_IGNORE) sts->MPI_SOURCE = MPI_PROC_NULL;
+    if (sts != MPI_STATUS_IGNORE) {
+      sts->MPI_SOURCE = MPI_PROC_NULL;
+      sts->MPI_TAG = MPI_ANY_TAG;
+      sts->MPI_LENGTH = 0;
+    }
     return true;
   }
   return false;
@@ -3568,8 +3573,8 @@ static inline bool handle_MPI_PROC_NULL(int src, MPI_Comm comm, MPI_Status* sts)
 
 int ampi::static_recv(ampi *dis, int t, int s, void* buf, int count, MPI_Datatype type, MPI_Comm comm, MPI_Status *sts) noexcept
 {
-  MPI_Comm disComm = dis->myComm.getComm();
-  if (handle_MPI_PROC_NULL(s, disComm, sts)) return 0;
+  if (handle_MPI_PROC_NULL(s, sts))
+    return 0;
 
 #if CMK_BIGSIM_CHARM
    void *curLog; // store current log in timeline
@@ -3623,7 +3628,8 @@ int ampi::static_recv(ampi *dis, int t, int s, void* buf, int count, MPI_Datatyp
 
 void ampi::static_probe(ampi *dis, int t, int s, MPI_Comm comm, MPI_Status *sts) noexcept
 {
-  if (handle_MPI_PROC_NULL(s, comm, sts)) return;
+  if (handle_MPI_PROC_NULL(s, sts)) 
+    return;
 
 #if CMK_BIGSIM_CHARM
   void *curLog; // store current log in timeline
@@ -3654,7 +3660,7 @@ void ampi::static_probe(ampi *dis, int t, int s, MPI_Comm comm, MPI_Status *sts)
 
 void ampi::static_mprobe(ampi *dis, int t, int s, MPI_Comm comm, MPI_Status *sts, MPI_Message *message) noexcept
 {
-  if (handle_MPI_PROC_NULL(s, comm, sts)) {
+  if (handle_MPI_PROC_NULL(s, sts)) {
     *message = MPI_MESSAGE_NO_PROC;
     return;
   }
@@ -3692,9 +3698,11 @@ void ampi::static_mprobe(ampi *dis, int t, int s, MPI_Comm comm, MPI_Status *sts
 #endif
 }
 
+// Returns whether there is a message that can be received (return 1) or not (return 0) 
 int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts) noexcept
 {
-  if (handle_MPI_PROC_NULL(s, comm, sts)) return 1;
+  if (handle_MPI_PROC_NULL(s, sts))
+    return 1;
 
   MPI_Status tmpStatus;
   AmpiMsg* msg = unexpectedMsgs.probe(t, s, (sts == MPI_STATUS_IGNORE) ? (int*)&tmpStatus : (int*)sts);
@@ -3720,10 +3728,11 @@ int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts) noexcept
   return 0;
 }
 
+// Returns whether there is a message that can be received (return 1) or not (return 0) 
 int ampi::improbe(int tag, int source, MPI_Comm comm, MPI_Status *sts,
                   MPI_Message *message) noexcept
 {
-  if (handle_MPI_PROC_NULL(source, comm, sts)) {
+  if (handle_MPI_PROC_NULL(source, sts)) {
     *message = MPI_MESSAGE_NO_PROC;
     return 1;
   }
@@ -4772,8 +4781,12 @@ AMPI_API_IMPL(int, MPI_Mrecv, void* buf, int count, MPI_Datatype datatype, MPI_M
     status->MPI_LENGTH = msg->getLength();
     status->MPI_CANCEL = 0;
   }
-  ptr->processAmpiMsg(msg, buf, datatype, count);
-  CkpvAccess(msgPool).deleteAmpiMsg(msg);
+  if (ptr->processAmpiMsg(msg, buf, datatype, count)) {
+    CkpvAccess(msgPool).deleteAmpiMsg(msg);
+  }
+  else { // msg was a sync msg, so now block on the real msg
+    ptr = ptr->blockOnIReq(buf, count, datatype, src, tag, comm, status);
+  }
   *message = MPI_MESSAGE_NULL;
 
 #if AMPIMSGLOG
