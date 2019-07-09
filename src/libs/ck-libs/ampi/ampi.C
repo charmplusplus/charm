@@ -6730,6 +6730,29 @@ AMPI_API_IMPL(int, MPI_Status_set_cancelled, MPI_Status *status, int flag)
   return MPI_SUCCESS;
 }
 
+AMPI_API_IMPL(int, MPI_Status_c2f, const MPI_Status *c_status, MPI_Fint *f_status)
+{
+  AMPI_API("AMPI_Status_c2f");
+  if (c_status == MPI_STATUS_IGNORE || c_status == MPI_STATUSES_IGNORE) {
+    return MPI_ERR_OTHER;
+  }
+
+  *(MPI_Status *)f_status = *c_status;
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_Status_f2c, const MPI_Fint *f_status, MPI_Status *c_status)
+{
+  AMPI_API("AMPI_Status_f2c");
+  // FIXME: Currently, AMPI does not have MPI_F_STATUS_IGNORE or MPI_F_STATUSES_IGNORE
+  /* if (f_status == MPI_F_STATUS_IGNORE || c_status == MPI_F_STATUSES_IGNORE) {
+    return MPI_ERR_OTHER;
+  }*/
+
+  *c_status = *(MPI_Status *) f_status;
+  return MPI_SUCCESS;
+}
+
 AMPI_API_IMPL(int, MPI_Recv_init, void *buf, int count, MPI_Datatype type, int src,
                                   int tag, MPI_Comm comm, MPI_Request *req)
 {

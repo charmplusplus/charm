@@ -113,6 +113,8 @@ AMPI_FUNC(int, MPI_Grequest_complete, MPI_Request request)
 AMPI_FUNC(int, MPI_Cancel, MPI_Request *request)
 AMPI_FUNC(int, MPI_Test_cancelled, const MPI_Status *status, int *flag) /* FIXME: always returns success */
 AMPI_FUNC(int, MPI_Status_set_cancelled, MPI_Status *status, int flag)
+AMPI_FUNC(int, MPI_Status_c2f, const MPI_Status *c_status, MPI_Fint *f_status)
+AMPI_FUNC(int, MPI_Status_f2c, const MPI_Fint *f_status, MPI_Status *c_status)
 AMPI_FUNC(int, MPI_Iprobe, int src, int tag, MPI_Comm comm, int *flag, MPI_Status *sts)
 AMPI_FUNC(int, MPI_Probe, int source, int tag, MPI_Comm comm, MPI_Status *sts)
 AMPI_FUNC(int, MPI_Improbe, int source, int tag, MPI_Comm comm, int *flag,
@@ -712,10 +714,8 @@ AMPI_FUNC_NOIMPL(int, MPI_Status_f2f08, MPI_Fint *f_status, MPI_F08_status *f08_
 AMPI_FUNC_NOIMPL(int, MPI_Type_create_f90_complex, int p, int r, MPI_Datatype *newtype)
 AMPI_FUNC_NOIMPL(int, MPI_Type_create_f90_integer, int r, MPI_Datatype *newtype)
 AMPI_FUNC_NOIMPL(int, MPI_Type_create_f90_real, int p, int r, MPI_Datatype *newtype)
-AMPI_FUNC_NOIMPL(int, MPI_Status_c2f, const MPI_Status *c_status, MPI_Fint *f_status)
 AMPI_FUNC_NOIMPL(int, MPI_Status_c2f08, const MPI_Status *c_status, MPI_F08_status *f08_status)
 AMPI_FUNC_NOIMPL(int, MPI_Status_f082c, const MPI_F08_status *f08_status, MPI_Status *c_status)
-AMPI_FUNC_NOIMPL(int, MPI_Status_f2c, const MPI_Fint *f_status, MPI_Status *c_status)
 
 
 /* A.2.14 Tools / MPI Tool Information Interface C Bindings */
