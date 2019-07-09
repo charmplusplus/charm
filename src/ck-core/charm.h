@@ -139,7 +139,8 @@ extern void CkSetMigratable(int aid, int ndims, int *index, char migratable);
 extern void CkStartQDExt_ChareCallback(int onPE, void* objPtr, int epIdx, int fid);
 extern void CkStartQDExt_GroupCallback(int gid, int pe, int epIdx, int fid);
 extern void CkStartQDExt_ArrayCallback(int aid, int* idx, int ndims, int epIdx, int fid);
-extern void registerCreateCallbackMsgExtCallback(void (*cb)(void*, int, int, int, char**, int*));
+extern void CkStartQDExt_SectionCallback(int sid_pe, int sid_cnt, int rootPE, int ep);
+extern void registerCreateCallbackMsgExtCallback(void (*cb)(void*, int, int, int, int *, char**, int*));
 extern void registerPyReductionExtCallback(int (*cb)(char**, int*, int, char**));
 
 #endif
@@ -211,6 +212,7 @@ extern void CkRegisterBase(int derivedIdx, int baseIdx);
 #if CMK_CHARMPY
 extern void CkRegisterMainChareExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
 extern void CkRegisterGroupExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
+extern void CkRegisterSectionManagerExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
 extern void CkRegisterArrayMapExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
 extern void CkRegisterArrayExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
 extern void CkRegisterReadonlyExt(const char *name, const char *type, size_t msgSize, char *msg);
@@ -408,6 +410,7 @@ extern void CkChareExtSend_multi(int onPE, void *objPtr, int epIdx, int num_bufs
 extern void CkGroupExtSend(int gid, int npes, const int *pes, int epIdx, char *msg, int msgSize);
 /// Send msg to group copying data into CkMessage from multiple input buffers
 extern void CkGroupExtSend_multi(int gid, int npes, const int *pes, int epIdx, int num_bufs, char **bufs, int *buf_sizes);
+extern void CkForwardMulticastMsg(int gid, int num_children, const int *children);
 /// Send msg to array with ID 'aid'. idx is index of destination and ndims the number
 /// of dimensions of the index. If ndims <= 0, msg will be broadcasted to all array elements
 extern void CkArrayExtSend(int aid, int *idx, int ndims, int epIdx, char *msg, int msgSize);

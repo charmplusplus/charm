@@ -16,22 +16,6 @@ install:
 matrix:
   include:
   - os: linux
-    name: "NetLRTS-Linux"
-    dist: xenial
-    env: CACHE_NAME=netlrts-linux
-    script:
-    - ./build LIBS netlrts-linux-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
-    - make -C netlrts-linux-x86_64/tmp -j3 all-test-tests all-test-examples OPTS="-g"
-    - make -C netlrts-linux-x86_64/tmp test-tests test-examples TESTOPTS="++local +isomalloc_sync"
-  - os: linux
-    name: "NetLRTS-Linux SMP"
-    dist: xenial
-    env: CACHE_NAME=netlrts-linux-smp
-    script:
-    - ./build LIBS netlrts-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
-    - make -C netlrts-linux-x86_64-smp/tmp -j3 all-test-tests all-test-examples OPTS="-g"
-    - make -C netlrts-linux-x86_64-smp/tmp test-tests test-examples TESTOPTS="++local +setcpuaffinity +isomalloc_sync +CmiSleepOnIdle"
-  - os: linux
     name: "MPI-Linux SMP"
     dist: xenial
     env: CACHE_NAME=mpi-linux-smp

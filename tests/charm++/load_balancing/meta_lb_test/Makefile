@@ -18,6 +18,9 @@ ifeq ($(CMK_SMP),1)
 	$(call run, +p4 ./period_selection +balancer RotateLB +LBPeriod 0.001 +MetaLB +LBOnjOnly ++ppn 2)
 endif
 
+bgtest: period_selection
+	$(call run, +p4 ./period_selection +balancer RotateLB +LBPeriod 0.001 +MetaLB +LBObjOnly +x2 +y2 +z1 +cth1 +wth1 )
+
 clean:
 	rm -rf *.decl.h *.def.h period_selection charmrun
 
