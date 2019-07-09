@@ -4781,8 +4781,12 @@ AMPI_API_IMPL(int, MPI_Mrecv, void* buf, int count, MPI_Datatype datatype, MPI_M
     status->MPI_LENGTH = msg->getLength();
     status->MPI_CANCEL = 0;
   }
-  ptr->processAmpiMsg(msg, buf, datatype, count);
-  CkpvAccess(msgPool).deleteAmpiMsg(msg);
+  if (ptr->processAmpiMsg(msg, buf, datatype, count)) {
+    CkpvAccess(msgPool).deleteAmpiMsg(msg);
+  }
+  else { // msg was a sync msg, so now block on the real msg
+    ptr = ptr->blockOnIReq(buf, count, datatype, src, tag, comm, status);
+  }
   *message = MPI_MESSAGE_NULL;
 
 #if AMPIMSGLOG
