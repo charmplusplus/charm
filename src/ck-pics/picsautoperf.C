@@ -386,6 +386,7 @@ void TraceAutoPerfBOC::formatPerfData(PerfData *perfdata, int subStep, int phase
   data[AVG_BytesPerObject] /= data[AVG_NumObjectsPerPE];
 
   data[AVG_NumObjectsPerPE] = data[AVG_NumObjectsPerPE]/numpes/steps;
+  data[AVG_ExternalBytePerPE] /= numpes/steps;
 
   CkPrintf("\nPICS Data: PEs in group: %d\nIDLE: %.2f%\nOVERHEAD: %.2f%\nUTIL: %.2f%\nAVG_ENTRY_DURATION: %fs\n", numpes, data[AVG_IdlePercentage]*100, data[AVG_OverheadPercentage]*100, data[AVG_UtilizationPercentage]*100, data[AVG_EntryMethodDuration]);
 }
