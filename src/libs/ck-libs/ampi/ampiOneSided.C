@@ -1021,6 +1021,52 @@ AMPI_API_IMPL(int, MPI_Win_unlock, int rank, MPI_Win win)
   return MPI_SUCCESS;
 }
 
+/*
+ * int AMPI_Win_lock_all(int assert, MPI_Win win)
+ *   Locks access to this MPI_Win object for all ranks.
+ *   Input:
+ *     int assertion : program assertion, used to provide optimization hints
+ *   Returns int : MPI_SUCCESS or MPI_ERR_WIN
+ */
+AMPI_API_IMPL(int, MPI_Win_lock_all, int assert, MPI_Win win)
+{
+  AMPI_API("AMPI_Win_lock_all");
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
+  int size = ptr->getSize();
+
+  // process assertion here:
+  // end of assertion
+
+  for(int i=0; i<size; i++) {
+    ptr->winLock(MPI_LOCK_SHARED, i, winStruct);
+  }
+  return MPI_SUCCESS;
+}
+
+/*
+ * int AMPI_Win_unlock_all(MPI_Win win)
+ *   Unlocks access to this MPI_Win object for all ranks.
+ *   Input:
+ *   Returns int : MPI_SUCCESS or MPI_ERR_WIN
+ */
+// The RMA call is completed both locally and remotely after unlock.
+AMPI_API_IMPL(int, MPI_Win_unlock_all, MPI_Win win)
+{
+  AMPI_API("AMPI_Win_unlock_all");
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
+  int size = ptr->getSize();
+
+  // process assertion here:
+  // end of assertion
+
+  for(int i=0; i<size; i++) {
+    ptr->winUnlock(i, winStruct);
+  }
+  return MPI_SUCCESS;
+}
+
 /* the following four functions are yet to implement */
 /*
  * int AMPI_Win_post(MPI_Group group, int assertion, MPI_Win win)
