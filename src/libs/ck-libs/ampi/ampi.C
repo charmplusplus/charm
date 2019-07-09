@@ -3695,11 +3695,16 @@ static inline void clearStatus(MPI_Status sts[], int idx) noexcept {
   }
 }
 
-static inline bool handle_MPI_PROC_NULL(int src, MPI_Comm comm, MPI_Status* sts) noexcept
+// Handle a MPI_PROC_NULL src argument according to Section 3.11 of the MPI-3.1 standard.
+// Relevant for MPI_Recv, MPI_Probe, MPI_Iprobe, MPI_Improbe
+static inline bool handle_MPI_PROC_NULL(int src, MPI_Status* sts) noexcept
 {
   if (src == MPI_PROC_NULL) {
-    clearStatus(sts);
-    if (sts != MPI_STATUS_IGNORE) sts->MPI_SOURCE = MPI_PROC_NULL;
+    if (sts != MPI_STATUS_IGNORE) {
+      sts->MPI_SOURCE = MPI_PROC_NULL;
+      sts->MPI_TAG = MPI_ANY_TAG;
+      sts->MPI_LENGTH = 0;
+    }
     return true;
   }
   return false;
@@ -3717,7 +3722,8 @@ int ampi::static_recv(ampi *dis, int t, int s, void* buf, int count, MPI_Datatyp
 
 void ampi::static_probe(ampi *dis, int t, int s, MPI_Comm comm, MPI_Status *sts) noexcept
 {
-  if (handle_MPI_PROC_NULL(s, comm, sts)) return;
+  if (handle_MPI_PROC_NULL(s, sts)) 
+    return;
 
 #if CMK_BIGSIM_CHARM
   void *curLog; // store current log in timeline
@@ -3748,7 +3754,7 @@ void ampi::static_probe(ampi *dis, int t, int s, MPI_Comm comm, MPI_Status *sts)
 
 void ampi::static_mprobe(ampi *dis, int t, int s, MPI_Comm comm, MPI_Status *sts, MPI_Message *message) noexcept
 {
-  if (handle_MPI_PROC_NULL(s, comm, sts)) {
+  if (handle_MPI_PROC_NULL(s, sts)) {
     *message = MPI_MESSAGE_NO_PROC;
     return;
   }
@@ -3786,9 +3792,11 @@ void ampi::static_mprobe(ampi *dis, int t, int s, MPI_Comm comm, MPI_Status *sts
 #endif
 }
 
+// Returns whether there is a message that can be received (return 1) or not (return 0) 
 int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts) noexcept
 {
-  if (handle_MPI_PROC_NULL(s, comm, sts)) return 1;
+  if (handle_MPI_PROC_NULL(s, sts))
+    return 1;
 
   MPI_Status tmpStatus;
   AmpiMsg* msg = unexpectedMsgs.probe(t, s, (sts == MPI_STATUS_IGNORE) ? (int*)&tmpStatus : (int*)sts);
@@ -3814,10 +3822,11 @@ int ampi::iprobe(int t, int s, MPI_Comm comm, MPI_Status *sts) noexcept
   return 0;
 }
 
+// Returns whether there is a message that can be received (return 1) or not (return 0) 
 int ampi::improbe(int tag, int source, MPI_Comm comm, MPI_Status *sts,
                   MPI_Message *message) noexcept
 {
-  if (handle_MPI_PROC_NULL(source, comm, sts)) {
+  if (handle_MPI_PROC_NULL(source, sts)) {
     *message = MPI_MESSAGE_NO_PROC;
     return 1;
   }
@@ -6821,6 +6830,29 @@ AMPI_API_IMPL(int, MPI_Status_set_cancelled, MPI_Status *status, int flag)
 {
   AMPI_API("AMPI_Status_set_cancelled");
   status->MPI_CANCEL = flag;
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_Status_c2f, const MPI_Status *c_status, MPI_Fint *f_status)
+{
+  AMPI_API("AMPI_Status_c2f");
+  if (c_status == MPI_STATUS_IGNORE || c_status == MPI_STATUSES_IGNORE) {
+    return MPI_ERR_OTHER;
+  }
+
+  *(MPI_Status *)f_status = *c_status;
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_Status_f2c, const MPI_Fint *f_status, MPI_Status *c_status)
+{
+  AMPI_API("AMPI_Status_f2c");
+  // FIXME: Currently, AMPI does not have MPI_F_STATUS_IGNORE or MPI_F_STATUSES_IGNORE
+  /* if (f_status == MPI_F_STATUS_IGNORE || c_status == MPI_F_STATUSES_IGNORE) {
+    return MPI_ERR_OTHER;
+  }*/
+
+  *c_status = *(MPI_Status *) f_status;
   return MPI_SUCCESS;
 }
 
