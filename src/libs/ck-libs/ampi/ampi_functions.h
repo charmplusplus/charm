@@ -712,8 +712,6 @@ AMPI_FUNC_NOIMPL(int, MPI_Type_create_f90_complex, int p, int r, MPI_Datatype *n
 AMPI_FUNC_NOIMPL(int, MPI_Type_create_f90_integer, int r, MPI_Datatype *newtype)
 AMPI_FUNC_NOIMPL(int, MPI_Type_create_f90_real, int p, int r, MPI_Datatype *newtype)
 AMPI_FUNC_NOIMPL(int, MPI_Type_match_size, int typeclass, int size, MPI_Datatype *datatype)
-AMPI_FUNC_NOIMPL(MPI_Fint, MPI_Message_c2f, MPI_Message message)
-AMPI_FUNC_NOIMPL(MPI_Message, MPI_Message_f2c, MPI_Fint message)
 AMPI_FUNC_NOIMPL(int, MPI_Status_c2f, const MPI_Status *c_status, MPI_Fint *f_status)
 AMPI_FUNC_NOIMPL(int, MPI_Status_c2f08, const MPI_Status *c_status, MPI_F08_status *f08_status)
 AMPI_FUNC_NOIMPL(int, MPI_Status_f082c, const MPI_F08_status *f08_status, MPI_Status *c_status)
