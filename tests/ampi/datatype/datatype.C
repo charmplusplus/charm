@@ -454,7 +454,7 @@ void typefree_ialltoallv_test(MPI_Comm comm) {
             if (recvbuf[i] != i) {
                 errs++;
                 if (errs < 10) {
-                    printf("Ialltoallv: recvbuf[%d] = %d, expected %d\n", i, recvbuf[i], i);
+                    printf("Ialltoall: recvbuf[%d] = %d, expected %d\n", i, recvbuf[i], i);
                 }
             }
         }
@@ -539,7 +539,7 @@ void typefree_ialltoall_test(MPI_Comm comm) {
             if (recvbuf[i] != i) {
                 errs++;
                 if (errs < 10) {
-                    printf("Ialltoallv: recvbuf[%d] = %d, expected %d\n", i, recvbuf[i], i);
+                    printf("Ialltoall: recvbuf[%d] = %d, expected %d\n", i, recvbuf[i], i);
                 }
             }
         }
