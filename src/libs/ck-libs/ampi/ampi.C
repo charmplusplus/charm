@@ -6191,10 +6191,10 @@ int ampiParent::wait(MPI_Request *request, MPI_Status *sts) noexcept
   _TRACE_BG_TLINE_END(&curLog);
 #endif
 
-  AMPI_DEBUG("AMPI_Wait request=%d reqs[*request]=%p reqs[*request]->tag=%d\n",
-             *request, reqs[*request], (int)(reqs[*request]->tag));
+  AMPI_DEBUG("AMPI_Wait request=%d reqs[*request]=%p reqs[*request]->tag=%d &reqs=%d\n",
+             *request, reqs[*request], (int)(reqs[*request]->tag), reqs);
+  CkAssert(pptr->numBlockedReqs == 0);
 
-  CkAssert(numBlockedReqs == 0);
   int waitResult = -1;
   do{
     AmpiRequest& waitReq = *reqs[*request];
@@ -7274,6 +7274,35 @@ AMPI_API_IMPL(int, MPI_Type_dup, MPI_Datatype oldtype, MPI_Datatype *newtype)
 
   getDDT()->createDup(oldtype, newtype);
   return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_Type_match_size, int typeclass, int size, MPI_Datatype *rtype)
+{
+  AMPI_API("AMPI_Type_match_size");
+
+  switch(typeclass) {
+    case MPI_TYPECLASS_INTEGER: switch(size) {
+      case 1: *rtype = MPI_INTEGER1; return MPI_SUCCESS;
+      case 2: *rtype = MPI_INTEGER2; return MPI_SUCCESS;
+      case 4: *rtype = MPI_INTEGER4; return MPI_SUCCESS;
+      case 8: *rtype = MPI_INTEGER8; return MPI_SUCCESS;
+      default: return MPI_ERR_ARG;
+    }
+    case MPI_TYPECLASS_REAL: switch(size) {
+      case 4:  *rtype = MPI_REAL4; return MPI_SUCCESS;
+      case 8:  *rtype = MPI_REAL8; return MPI_SUCCESS;
+      case 16: *rtype = MPI_REAL16; return MPI_SUCCESS;
+      default: return MPI_ERR_ARG;
+    }
+    case MPI_TYPECLASS_COMPLEX: switch(size) {
+      case 8:  *rtype = MPI_COMPLEX8; return MPI_SUCCESS;
+      case 16: *rtype = MPI_COMPLEX16; return MPI_SUCCESS;
+      case 32: *rtype = MPI_COMPLEX32; return MPI_SUCCESS;
+      default: return MPI_ERR_ARG;
+    }
+    default: 
+      return MPI_ERR_ARG;
+  }
 }
 
 AMPI_API_IMPL(int, MPI_Type_set_attr, MPI_Datatype datatype, int keyval, void *attribute_val)
@@ -8927,7 +8956,7 @@ AMPI_API_IMPL(int, MPI_Ialltoall, const void *sendbuf, int sendcount, MPI_Dataty
   }
   *request = ptr->postReq(newreq);
 
-  AMPI_DEBUG("MPI_Ialltoall: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
+  AMPI_DEBUG("MPI_Ialltoall: request=%d\n", *request);
   return MPI_SUCCESS;
 }
 
@@ -9072,7 +9101,7 @@ AMPI_API_IMPL(int, MPI_Ialltoallv, void *sendbuf, int *sendcounts, int *sdispls,
   }
   *request = ptr->postReq(newreq);
 
-  AMPI_DEBUG("MPI_Ialltoallv: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
+  AMPI_DEBUG("MPI_Ialltoallv: request=%d\n", *request);
 
   return MPI_SUCCESS;
 }

@@ -143,6 +143,7 @@ AMPI_FUNC(int, MPI_Sendrecv_replace, void* buf, int count, MPI_Datatype datatype
 /***datatypes***/
 AMPI_FUNC(int, MPI_Type_contiguous, int count, MPI_Datatype oldtype,
                          MPI_Datatype *newtype)
+AMPI_FUNC(int, MPI_Type_match_size, int typeclass, int size, MPI_Datatype *datatype)
 AMPI_FUNC(int, MPI_Type_vector, int count, int blocklength, int stride,
                      MPI_Datatype oldtype, MPI_Datatype *newtype)
 AMPI_FUNC(int, MPI_Type_create_hvector, int count, int blocklength, MPI_Aint stride,
@@ -485,6 +486,8 @@ AMPI_FUNC(int, MPI_Win_set_name, MPI_Win win, const char *name)
 AMPI_FUNC(int, MPI_Win_get_name, MPI_Win win, char *name, int *length)
 AMPI_FUNC(int, MPI_Win_set_info, MPI_Win win, MPI_Info info)
 AMPI_FUNC(int, MPI_Win_get_info, MPI_Win win, MPI_Info *info)
+AMPI_FUNC(int, MPI_Win_lock_all, int assert, MPI_Win win)
+AMPI_FUNC(int, MPI_Win_unlock_all, MPI_Win win)
 AMPI_FUNC(int, MPI_Win_fence, int assertion, MPI_Win win)
 AMPI_FUNC(int, MPI_Win_lock, int lock_type, int rank, int assert, MPI_Win win)
 AMPI_FUNC(int, MPI_Win_unlock, int rank, MPI_Win win)
@@ -688,10 +691,8 @@ AMPI_FUNC_NOIMPL(int, MPI_Win_flush, int rank, MPI_Win win)
 AMPI_FUNC_NOIMPL(int, MPI_Win_flush_all, MPI_Win win)
 AMPI_FUNC_NOIMPL(int, MPI_Win_flush_local, int rank, MPI_Win win)
 AMPI_FUNC_NOIMPL(int, MPI_Win_flush_local_all, MPI_Win win)
-AMPI_FUNC_NOIMPL(int, MPI_Win_lock_all, int assert, MPI_Win win)
 AMPI_FUNC_NOIMPL(int, MPI_Win_shared_query, MPI_Win win, int rank, MPI_Aint *size, int *disp_unit, void *baseptr)
 AMPI_FUNC_NOIMPL(int, MPI_Win_sync, MPI_Win win)
-AMPI_FUNC_NOIMPL(int, MPI_Win_unlock_all, MPI_Win win)
 
 
 /* A.2.10 External Interfaces C Bindings */
@@ -713,7 +714,6 @@ AMPI_FUNC_NOIMPL(int, MPI_Status_f2f08, MPI_Fint *f_status, MPI_F08_status *f08_
 AMPI_FUNC_NOIMPL(int, MPI_Type_create_f90_complex, int p, int r, MPI_Datatype *newtype)
 AMPI_FUNC_NOIMPL(int, MPI_Type_create_f90_integer, int r, MPI_Datatype *newtype)
 AMPI_FUNC_NOIMPL(int, MPI_Type_create_f90_real, int p, int r, MPI_Datatype *newtype)
-AMPI_FUNC_NOIMPL(int, MPI_Type_match_size, int typeclass, int size, MPI_Datatype *datatype)
 AMPI_FUNC_NOIMPL(int, MPI_Status_c2f08, const MPI_Status *c_status, MPI_F08_status *f08_status)
 AMPI_FUNC_NOIMPL(int, MPI_Status_f082c, const MPI_F08_status *f08_status, MPI_Status *c_status)
 
