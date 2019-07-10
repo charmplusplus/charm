@@ -1413,8 +1413,12 @@ CkDDT_Struct::CkDDT_Struct(int nCount, const int* arrBlock, const MPI_Aint* arrD
       if (xub > ub) ub = xub;
     }
     else {
-      if (!explicit_lb && xlb < lb) lb = xlb;
-      if (!explicit_ub && xub > ub) ub = xub;
+      if (!explicit_lb) lb = xlb;
+      explicit_lb = true;
+      if (xlb < lb) lb = xlb;
+      if (!explicit_ub) ub = xub;
+      explicit_ub = true;
+      if (xub > ub) ub = xub;
     }
   }
 
