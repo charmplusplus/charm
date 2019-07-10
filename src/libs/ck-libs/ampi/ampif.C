@@ -47,6 +47,7 @@ FLINKAGE {
 #define mpi_startall FTN_NAME( MPI_STARTALL , mpi_startall )
 #define mpi_sendrecv FTN_NAME( MPI_SENDRECV , mpi_sendrecv )
 #define mpi_sendrecv_replace FTN_NAME( MPI_SENDRECV_REPLACE , mpi_sendrecv_replace )
+#define mpi_type_match_size FTN_NAME( MPI_TYPE_MATCH_SIZE , mpi_type_match_size )
 #define mpi_type_contiguous FTN_NAME( MPI_TYPE_CONTIGUOUS , mpi_type_contiguous )
 #define mpi_type_vector FTN_NAME( MPI_TYPE_VECTOR , mpi_type_vector )
 #define mpi_type_hvector FTN_NAME( MPI_TYPE_HVECTOR , mpi_type_hvector )
@@ -527,6 +528,11 @@ void mpi_sendrecv_replace(void *buf, int* count, int* datatype,
   MPI_Status* s = handle_MPI_STATUS_IGNORE(status);
   *ierr = MPI_Sendrecv_replace(buf, *count, *datatype, *dest, *sendtag,
                                *source, *recvtag, *comm, s);
+}
+
+void mpi_type_match_size(int *typeclass, int *size, int *datatype, int *ierr)
+{
+    *ierr = MPI_Type_match_size(*typeclass, *size, (MPI_Datatype*)datatype);
 }
 
 void mpi_barrier(int *comm, int *ierr) noexcept
