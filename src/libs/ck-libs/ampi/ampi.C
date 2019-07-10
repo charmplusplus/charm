@@ -6193,8 +6193,7 @@ int ampiParent::wait(MPI_Request *request, MPI_Status *sts) noexcept
 
   AMPI_DEBUG("AMPI_Wait request=%d reqs[*request]=%p reqs[*request]->tag=%d\n",
              *request, reqs[*request], (int)(reqs[*request]->tag));
-  AMPI_DEBUG("MPI_Wait: request=%d, reqs.size=%d, &reqs=%d\n",
-             *request, reqs.size(), reqs);
+
   CkAssert(numBlockedReqs == 0);
   int waitResult = -1;
   do{
