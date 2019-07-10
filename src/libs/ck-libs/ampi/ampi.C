@@ -6088,10 +6088,8 @@ AMPI_API_IMPL(int, MPI_Wait, MPI_Request *request, MPI_Status *sts)
   _TRACE_BG_TLINE_END(&curLog);
 #endif
 
-  AMPI_DEBUG("AMPI_Wait request=%d reqs[*request]=%p reqs[*request]->tag=%d\n",
-             *request, reqs[*request], (int)(reqs[*request]->tag));
-  AMPI_DEBUG("MPI_Wait: request=%d, reqs.size=%d, &reqs=%d\n",
-             *request, reqs.size(), reqs);
+  AMPI_DEBUG("AMPI_Wait request=%d reqs[*request]=%p reqs[*request]->tag=%d &reqs=%d\n",
+             *request, reqs[*request], (int)(reqs[*request]->tag), reqs);
   CkAssert(pptr->numBlockedReqs == 0);
   int waitResult = -1;
   do{
@@ -8857,7 +8855,7 @@ AMPI_API_IMPL(int, MPI_Ialltoall, const void *sendbuf, int sendcount, MPI_Dataty
   }
   *request = ptr->postReq(newreq);
 
-  AMPI_DEBUG("MPI_Ialltoall: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
+  AMPI_DEBUG("MPI_Ialltoall: request=%d\n", *request);
   return MPI_SUCCESS;
 }
 
@@ -9002,7 +9000,7 @@ AMPI_API_IMPL(int, MPI_Ialltoallv, void *sendbuf, int *sendcounts, int *sdispls,
   }
   *request = ptr->postReq(newreq);
 
-  AMPI_DEBUG("MPI_Ialltoallv: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
+  AMPI_DEBUG("MPI_Ialltoallv: request=%d\n", *request);
 
   return MPI_SUCCESS;
 }
