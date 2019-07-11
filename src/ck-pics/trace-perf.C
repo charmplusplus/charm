@@ -355,7 +355,6 @@ PerfData* TraceAutoPerf::getSummary() {
   currentSummary->data[AVG_EntryMethodDuration]= (double)totalEntryMethodTime;
   currentSummary->data[AVG_NumInvocations] = (double)totalEntryMethodInvocations;
   currentSummary->data[AVG_BytesMsgRecv] /= currentSummary->data[AVG_NumMsgRecv];
-  //currentSummary->data[AVG_BytesSend] /= currentSummary->data[AVG_NumMsgSend];
   currentSummary->data[AVG_MsgTimeCost] /= currentSummary->data[AVG_NumMsgRecv];
   currentSummary->data[MAX_EntryMethodDuration]= maxEntryTime;
   currentSummary->data[MAX_EntryID]= maxEntryIdx;
