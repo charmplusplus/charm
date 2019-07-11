@@ -202,6 +202,10 @@ int ampiParent::addWinStruct(WinStruct* win) noexcept {
 }
 
 WinStruct *ampiParent::getWinStruct(MPI_Win win) const noexcept {
+#ifdef AMPI_ERROR_CHECKING
+  if (winStructList.size() <= (int) win || win < 0)
+    CkAbort("AMPI> Error: MPI_Win parameter invalid.");
+#endif
   return winStructList[(int)win];
 }
 
@@ -1018,6 +1022,48 @@ AMPI_API_IMPL(int, MPI_Win_unlock, int rank, MPI_Win win)
   // process assertion here: HOW???
   // end of assertion
   ptr->winUnlock(rank, winStruct);
+  return MPI_SUCCESS;
+}
+
+/*
+ * int AMPI_Win_lock_all(int assert, MPI_Win win)
+ *   Locks access to this MPI_Win object for all ranks.
+ *   Input:
+ *     int assertion : program assertion, used to provide optimization hints
+ *   Returns int : MPI_SUCCESS or MPI_ERR_WIN
+ */
+AMPI_API_IMPL(int, MPI_Win_lock_all, int assert, MPI_Win win)
+{
+  AMPI_API("AMPI_Win_lock_all");
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
+  int size = ptr->getSize();
+
+  // TODO: optimize for assertions here
+
+  for(int i=0; i<size; i++) {
+    ptr->winLock(MPI_LOCK_SHARED, i, winStruct);
+  }
+  return MPI_SUCCESS;
+}
+
+/*
+ * int AMPI_Win_unlock_all(MPI_Win win)
+ *   Unlocks access to this MPI_Win object for all ranks.
+ *   Input:
+ *   Returns int : MPI_SUCCESS or MPI_ERR_WIN
+ */
+// The RMA call is completed both locally and remotely after unlock.
+AMPI_API_IMPL(int, MPI_Win_unlock_all, MPI_Win win)
+{
+  AMPI_API("AMPI_Win_unlock_all");
+  WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
+  ampi *ptr = getAmpiInstance(winStruct->comm);
+  int size = ptr->getSize();
+
+  for(int i=0; i<size; i++) {
+    ptr->winUnlock(i, winStruct);
+  }
   return MPI_SUCCESS;
 }
 
