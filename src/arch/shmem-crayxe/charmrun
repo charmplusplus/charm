@@ -8,6 +8,10 @@ args=""
 pes=1
 machinefile=""
 QUIET=0
+XTERM='xterm'
+DEBUG=0
+DEBUG_NO_PAUSE=0
+DEBUGGER='gdb'
 
 while [ $# -gt 0 ]
 do
@@ -37,6 +41,26 @@ do
 	++no-quiet)
 		QUIET=0
 		;;
+	++xterm)
+		XTERM=$2
+		shift
+		;;
+	++debug)
+		DEBUG=1
+		;;
+	++no-debug)
+		DEBUG=0
+		;;
+	++debug-no-pause)
+		DEBUG_NO_PAUSE=1
+		;;
+	++no-debug-no-pause)
+		DEBUG_NO_PAUSE=0
+		;;
+	++debugger)
+		DEBUGGER=$2
+		shift
+		;;
 	*) 
 		args=$args" "$1
 		;;
@@ -46,6 +70,21 @@ done
 
 
 test $QUIET -eq 1 && args=$args" "++quiet
+
+if [ "$DEBUG" = '1' -o "$DEBUG_NO_PAUSE" = '1' ]
+then
+  DEBUG_RUN='-ex r'
+  DEBUG_POSTFIX='--args'
+  if [ "$DEBUGGER" = 'lldb' ]
+  then
+    DEBUG_RUN='-o r'
+    DEBUG_POSTFIX='--'
+  fi
+
+  args="$DEBUG_POSTFIX $args"
+  [ "$DEBUG_NO_PAUSE" = '1' ] && args="$DEBUG_RUN $args"
+  args="$XTERM -e $DEBUGGER $args"
+fi
 
 test $QUIET -eq 0 && printf "\nRunning on $pes processors: $args\n"
 
