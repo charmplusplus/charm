@@ -150,9 +150,9 @@ class CkDDT_DataType
 
   virtual size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept
   {
+    size_t bufSize = std::min((size_t)num * (size_t)size, (size_t)msgLength);
     DDTDEBUG("CkDDT_Datatype::serialize %s %d objects of type %d (%d bytes)\n",
              (dir==PACK)?"packing":"unpacking", num, datatype, bufSize);
-    size_t bufSize = std::min((size_t)num * (size_t)size, (size_t)msgLength);
     if (iscontig) {
       serializeContig(userdata, buffer, bufSize, dir);
       return bufSize;
