@@ -375,11 +375,7 @@ void TraceAutoPerfBOC::formatPerfData(PerfData *perfdata, int subStep, int phase
   data[AVG_BytesMsgRecv] = data[AVG_BytesMsgRecv]/numpes/steps;
 
   data[AVG_EntryMethodDuration] /= data[AVG_NumInvocations];
-  data[AVG_EntryMethodDuration_1] /= data[AVG_NumInvocations_1];
-  data[AVG_EntryMethodDuration_2] /= data[AVG_NumInvocations_2];
   data[AVG_NumInvocations] = data[AVG_NumInvocations]/numpes/steps;
-  data[AVG_NumInvocations_1] = data[AVG_NumInvocations_1]/numpes/steps;
-  data[AVG_NumInvocations_2] = data[AVG_NumInvocations_2]/numpes/steps;
 
   data[AVG_LoadPerObject] /= data[AVG_NumObjectsPerPE];
   data[AVG_NumMsgsPerObject] /= data[AVG_NumObjectsPerPE];
