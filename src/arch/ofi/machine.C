@@ -345,8 +345,8 @@ static int fill_av_ofi(int myid, int nnodes, struct fid_ep *ep,
 
 static OFIContext context;
 
-#if CMK_ONESIDED_IMPL
 #include "machine-rdma.h"
+#if CMK_ONESIDED_IMPL
 #include "machine-onesided.h"
 #endif
 
@@ -1149,6 +1149,7 @@ void recv_callback(struct fi_cq_tagged_entry *e, OFIRequest *req)
     case OFI_OP_ACK:
         process_long_send_ack(e, req);
         break;
+#if CMK_ONESIDED_IMPL
     case OFI_RDMA_DIRECT_REG_AND_PUT:
         process_onesided_reg_and_put(e, req);
         break;
@@ -1158,6 +1159,7 @@ void recv_callback(struct fi_cq_tagged_entry *e, OFIRequest *req)
     case OFI_RDMA_DIRECT_DEREG_AND_ACK:
         process_onesided_dereg_and_ack(e, req);
         break;
+#endif
     default:
         MACHSTATE2(3, "--> unknown operation %x len=%ld", e->tag, e->len);
         CmiAbort("!! Wrong operation !!");

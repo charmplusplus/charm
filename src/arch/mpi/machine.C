@@ -321,6 +321,7 @@ CpvDeclare(crashedRankList *, crashedRankPtr);
 int isRankDie(int rank);
 #endif
 
+#include "machine-rdma.h"
 #if CMK_ONESIDED_IMPL
 int srcRank;
 #if CMK_SMP
@@ -331,7 +332,6 @@ static CmiNodeLock rdmaTagLock = 0;
 #define RDMA_BASE_TAG     TAG+2
 #define RDMA_ACK_TAG      TAG-2
 int rdmaTag=RDMA_BASE_TAG;
-#include "machine-rdma.h"
 #include "machine-onesided.h"
 #endif //end of CMK_ONESIDED_IMPL
 
@@ -851,7 +851,9 @@ static int PumpMsgs(void) {
 	#endif
             if(CMI_MSGTYPE(msg) == REGULAR) {
               handleOneRecvedMsg(nbytes, msg);
-            } else if(CMI_MSGTYPE(msg) == POST_DIRECT_RECV || CMI_MSGTYPE(msg) == POST_DIRECT_SEND) {
+            }
+#if CMK_ONESIDED_IMPL
+            else if(CMI_MSGTYPE(msg) == POST_DIRECT_RECV || CMI_MSGTYPE(msg) == POST_DIRECT_SEND) {
 
               NcpyOperationInfo *ncpyOpInfoMsg = (NcpyOperationInfo *)msg;
               resetNcpyOpInfoPointers(ncpyOpInfoMsg);
@@ -880,7 +882,9 @@ static int PumpMsgs(void) {
                                ncpyOpInfoMsg->tag,
                                postMsgType);
 
-            } else {
+            }
+#endif
+            else {
               CmiAbort("Invalid Type of message\n");
             }
         }
