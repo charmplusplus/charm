@@ -83,7 +83,7 @@
 /* Should be enough to fit UCP memh + rkey */
 #define CMK_NOCOPY_DIRECT_BYTES                            256
 
-#define CMK_REG_REQUIRED                                   1
+#define CMK_REG_REQUIRED                                   CMK_ONESIDED_IMPL
 
 #define CMK_CONVERSE_MPI                                   0
 
