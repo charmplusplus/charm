@@ -63,7 +63,7 @@ CkDDT::freeType(int index) noexcept
       // Remove a reference from this type's base type(s).
       if (userTypeTable[idx]->getType() == CkDDT_STRUCT) {
         int count = userTypeTable[idx]->getCount();
-        vector<int> &baseIndices = static_cast<CkDDT_Struct &>(*userTypeTable[idx]).getBaseIndices();
+        std::vector<int> &baseIndices = static_cast<CkDDT_Struct &>(*userTypeTable[idx]).getBaseIndices();
         for (int i=0; i<count; i++) {
           freeType(baseIndices[i]);
         }
@@ -176,7 +176,7 @@ CkDDT::getContents(int nIndex, int ni, int na, int nd, int i[], MPI_Aint a[], in
   int ret = dttype->getContents(ni, na, nd, i, a, d);
   if (dttype->getType() == CkDDT_STRUCT) {
     int count = dttype->getCount();
-    vector<CkDDT_DataType *> &baseTypes = static_cast<CkDDT_Struct &>(*dttype).getBaseTypes();
+    std::vector<CkDDT_DataType *> &baseTypes = static_cast<CkDDT_Struct &>(*dttype).getBaseTypes();
     for (int i=0; i<count; i++) {
       baseTypes[i]->incRefCount();
     }
@@ -298,7 +298,7 @@ CkDDT::newIndexed(int count, const int* arrbLength, MPI_Aint* arrDisp,
                   MPI_Datatype oldtypeIdx, MPI_Datatype* newType) noexcept
 {
   CkDDT_DataType* oldtype = getType(oldtypeIdx);
-  vector<MPI_Aint> dispBytesArr(count);
+  std::vector<MPI_Aint> dispBytesArr(count);
   for (int i=0; i<count; i++) {
     dispBytesArr[i] = arrDisp[i] * oldtype->getExtent();
   }
@@ -319,7 +319,7 @@ void
 CkDDT::newStruct(int count, const int* arrbLength, const MPI_Aint* arrDisp,
                  const MPI_Datatype *oldtype, MPI_Datatype* newType) noexcept
 {
-  vector<CkDDT_DataType *> olddatatypes(count);
+  std::vector<CkDDT_DataType *> olddatatypes(count);
   for(int i=0;i<count;i++){
     olddatatypes[i] = getType(oldtype[i]);
   }
@@ -1575,7 +1575,7 @@ CkDDT_Struct::getNumBasicElements(int bytes) const noexcept
   }
 
   int rem = bytes % size;
-  const vector<CkDDT_DataType *> &types = getBaseTypes();
+  const std::vector<CkDDT_DataType *> &types = getBaseTypes();
   int basicTypes = 0;
   for (int i=0; i<types.size(); i++) {
     basicTypes += types[i]->getNumBasicElements(types[i]->getSize());
