@@ -205,6 +205,7 @@ class CkDDT_DataType
     dest[length] = '\0';
   }
   void setAbsolute(bool arg) noexcept { isAbsolute = arg; }
+  bool getAbsolute() const noexcept { return isAbsolute; }
 };
 
 /*
