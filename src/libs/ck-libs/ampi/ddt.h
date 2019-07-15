@@ -436,7 +436,6 @@ class CkDDT_Struct final : public CkDDT_DataType
   int getEnvelope(int *ni, int *na, int *nd, int *combiner) const noexcept override;
   int getContents(int ni, int na, int nd, int i[], MPI_Aint a[], int d[]) const noexcept override;
   int getNumBasicElements(int bytes) const noexcept override;
-
   std::string getTypeMap() const noexcept override;
 };
 

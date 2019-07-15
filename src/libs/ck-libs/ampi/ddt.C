@@ -1645,8 +1645,7 @@ CkDDT_Struct::serialize(char* userdata, char* buffer, int num, int msgLength, Ck
   else {
     char* sbuf = userdata;
     char* dbuf = buffer;
-    char* absoluteOffset = (isAbsolute) ? userdata : 0;
-    DDTDEBUG("CkDDT_Struct::serialize() %ld %d %lx %d\n", absoluteOffset, isAbsolute, userdata, arrayDisplacements[0] );
+    char* absoluteOffset = (isAbsolute) ? 0 : userdata;
     for (; num>0; num--) {
       char *buf = buffer;
       for (int i=0; i<count; i++) {
