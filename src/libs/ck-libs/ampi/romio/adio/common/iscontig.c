@@ -63,7 +63,8 @@ void ADIOI_Datatype_iscontig(MPI_Datatype datatype, int *flag)
 /* void ADIOI_Datatype_iscontig(MPI_Datatype datatype, int *flag) is defined
  * and implemented in OpenMPI itself */
 
-#elif defined AMPI
+#elif defined AMPI && 0
+/* disabled pending review of CkDDT's contiguity handling */
 
 void ADIOI_Datatype_iscontig(MPI_Datatype datatype, int *flag)
 {
