@@ -160,9 +160,9 @@ int errorCheck(const char* func, MPI_Comm comm, bool ifComm, int count,
   }
   if (ifData) {
     ret = checkData(func, data);
-    isAbsolute = getDDT()->getType(data)->getAbsolute();
     if (ret != MPI_SUCCESS)
       return ampiErrhandler(func, ret);
+    isAbsolute = getDDT()->getType(data)->getAbsolute();
   }
   if (ifTag) {
     ret = checkTag(func, tag);
