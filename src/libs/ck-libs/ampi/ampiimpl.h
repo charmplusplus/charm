@@ -6,6 +6,7 @@
 #include <numeric>
 #include <forward_list>
 #include <bitset>
+#include <complex>
 
 #include "ampi.h"
 #include "ddt.h"

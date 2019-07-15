@@ -193,72 +193,6 @@ static mpi_comm_worlds mpi_worlds;
 int _mpi_nworlds; /*Accessed by ampif*/
 int MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS]; /*Accessed by user code*/
 
-class AmpiComplex {
- public:
-  float re, im;
-  void operator+=(const AmpiComplex &a) noexcept {
-    re+=a.re;
-    im+=a.im;
-  }
-  void operator*=(const AmpiComplex &a) noexcept {
-    float nu_re=re*a.re-im*a.im;
-    im=re*a.im+im*a.re;
-    re=nu_re;
-  }
-  int operator>(const AmpiComplex &a) noexcept {
-    CkAbort("AMPI> Cannot compare complex numbers with MPI_MAX\n");
-    return 0;
-  }
-  int operator<(const AmpiComplex &a) noexcept {
-    CkAbort("AMPI> Cannot compare complex numbers with MPI_MIN\n");
-    return 0;
-  }
-};
-
-class AmpiDoubleComplex {
- public:
-  double re, im;
-  void operator+=(const AmpiDoubleComplex &a) noexcept {
-    re+=a.re;
-    im+=a.im;
-  }
-  void operator*=(const AmpiDoubleComplex &a) noexcept {
-    double nu_re=re*a.re-im*a.im;
-    im=re*a.im+im*a.re;
-    re=nu_re;
-  }
-  int operator>(const AmpiDoubleComplex &a) noexcept {
-    CkAbort("AMPI> Cannot compare double complex numbers with MPI_MAX\n");
-    return 0;
-  }
-  int operator<(const AmpiDoubleComplex &a) noexcept {
-    CkAbort("AMPI> Cannot compare double complex numbers with MPI_MIN\n");
-    return 0;
-  }
-};
-
-class AmpiLongDoubleComplex {
- public:
-  long double re, im;
-  void operator+=(const AmpiLongDoubleComplex &a) noexcept {
-    re+=a.re;
-    im+=a.im;
-  }
-  void operator*=(const AmpiLongDoubleComplex &a) noexcept {
-    long double nu_re=re*a.re-im*a.im;
-    im=re*a.im+im*a.re;
-    re=nu_re;
-  }
-  int operator>(const AmpiLongDoubleComplex &a) noexcept {
-    CkAbort("AMPI> Cannot compare long double complex numbers with MPI_MAX\n");
-    return 0;
-  }
-  int operator<(const AmpiLongDoubleComplex &a) noexcept {
-    CkAbort("AMPI> Cannot compare long double complex numbers with MPI_MIN\n");
-    return 0;
-  }
-};
-
 typedef struct { float val; int idx; } FloatInt;
 typedef struct { double val; int idx; } DoubleInt;
 typedef struct { long val; int idx; } LongInt;
@@ -268,8 +202,8 @@ typedef struct { long double val; int idx; } LongdoubleInt;
 typedef struct { float val; float idx; } FloatFloat;
 typedef struct { double val; double idx; } DoubleDouble;
 
-/* For MPI_MAX, MPI_MIN, MPI_SUM, and MPI_PROD: */
-#define MPI_OP_SWITCH(OPNAME) \
+/* For MPI_MIN, and MPI_MAX: */
+#define MPI_MINMAX_OP_SWITCH(OPNAME) \
   int i; \
 switch (*datatype) { \
   case MPI_CHAR: for(i=0;i<(*len);i++) { MPI_OP_IMPL(char); } break; \
@@ -282,8 +216,6 @@ switch (*datatype) { \
   case MPI_UNSIGNED_LONG: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned long); } break; \
   case MPI_FLOAT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(float); } break; \
   case MPI_DOUBLE: for(i=0;i<(*len);i++) { MPI_OP_IMPL(double); } break; \
-  case MPI_COMPLEX: for(i=0;i<(*len);i++) { MPI_OP_IMPL(AmpiComplex); } break; \
-  case MPI_DOUBLE_COMPLEX: for(i=0;i<(*len);i++) { MPI_OP_IMPL(AmpiDoubleComplex); } break; \
   case MPI_LONG_LONG_INT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(signed long long); } break; \
   case MPI_SIGNED_CHAR: for(i=0;i<(*len);i++) { MPI_OP_IMPL(signed char); } break; \
   case MPI_UNSIGNED_LONG_LONG: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned long long); } break; \
@@ -296,8 +228,42 @@ switch (*datatype) { \
   case MPI_UINT16_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(uint16_t); } break; \
   case MPI_UINT32_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(uint32_t); } break; \
   case MPI_UINT64_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(uint64_t); } break; \
-  case MPI_FLOAT_COMPLEX: for(i=0;i<(*len);i++) { MPI_OP_IMPL(AmpiComplex); } break; \
-  case MPI_LONG_DOUBLE_COMPLEX: for(i=0;i<(*len);i++) { MPI_OP_IMPL(AmpiLongDoubleComplex); } break; \
+  case MPI_AINT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(MPI_Aint); } break; \
+  default: \
+           ckerr << "Type " << *datatype << " with Op "#OPNAME" not supported." << endl; \
+  CkAbort("Unsupported MPI datatype for MPI Op"); \
+};\
+
+/* For MPI_SUM, MPI_PROD, and MPI_REPLACE: */
+#define MPI_SUMPROD_OP_SWITCH(OPNAME) \
+  int i; \
+switch (*datatype) { \
+  case MPI_CHAR: for(i=0;i<(*len);i++) { MPI_OP_IMPL(char); } break; \
+  case MPI_SHORT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(signed short int); } break; \
+  case MPI_INT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(signed int); } break; \
+  case MPI_LONG: for(i=0;i<(*len);i++) { MPI_OP_IMPL(signed long); } break; \
+  case MPI_UNSIGNED_CHAR: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned char); } break; \
+  case MPI_UNSIGNED_SHORT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned short); } break; \
+  case MPI_UNSIGNED: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned int); } break; \
+  case MPI_UNSIGNED_LONG: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned long); } break; \
+  case MPI_FLOAT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(float); } break; \
+  case MPI_DOUBLE: for(i=0;i<(*len);i++) { MPI_OP_IMPL(double); } break; \
+  case MPI_COMPLEX: for(i=0;i<(*len);i++) { MPI_OP_IMPL(std::complex<float>); } break; \
+  case MPI_DOUBLE_COMPLEX: for(i=0;i<(*len);i++) { MPI_OP_IMPL(std::complex<double>); } break; \
+  case MPI_LONG_LONG_INT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(signed long long); } break; \
+  case MPI_SIGNED_CHAR: for(i=0;i<(*len);i++) { MPI_OP_IMPL(signed char); } break; \
+  case MPI_UNSIGNED_LONG_LONG: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned long long); } break; \
+  case MPI_WCHAR: for(i=0;i<(*len);i++) { MPI_OP_IMPL(wchar_t); } break; \
+  case MPI_INT8_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(int8_t); } break; \
+  case MPI_INT16_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(int16_t); } break; \
+  case MPI_INT32_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(int32_t); } break; \
+  case MPI_INT64_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(int64_t); } break; \
+  case MPI_UINT8_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(uint8_t); } break; \
+  case MPI_UINT16_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(uint16_t); } break; \
+  case MPI_UINT32_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(uint32_t); } break; \
+  case MPI_UINT64_T: for(i=0;i<(*len);i++) { MPI_OP_IMPL(uint64_t); } break; \
+  case MPI_FLOAT_COMPLEX: for(i=0;i<(*len);i++) { MPI_OP_IMPL(std::complex<float>); } break; \
+  case MPI_LONG_DOUBLE_COMPLEX: for(i=0;i<(*len);i++) { MPI_OP_IMPL(std::complex<long double>); } break; \
   case MPI_AINT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(MPI_Aint); } break; \
   default: \
            ckerr << "Type " << *datatype << " with Op "#OPNAME" not supported." << endl; \
@@ -366,35 +332,35 @@ switch (*datatype) { \
 void MPI_MAX_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 #define MPI_OP_IMPL(type) \
   if(((type *)invec)[i] > ((type *)inoutvec)[i]) ((type *)inoutvec)[i] = ((type *)invec)[i];
-  MPI_OP_SWITCH(MPI_MAX)
+  MPI_MINMAX_OP_SWITCH(MPI_MAX)
 #undef MPI_OP_IMPL
 }
 
 void MPI_MIN_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 #define MPI_OP_IMPL(type) \
   if(((type *)invec)[i] < ((type *)inoutvec)[i]) ((type *)inoutvec)[i] = ((type *)invec)[i];
-  MPI_OP_SWITCH(MPI_MIN)
+  MPI_MINMAX_OP_SWITCH(MPI_MIN)
 #undef MPI_OP_IMPL
 }
 
 void MPI_SUM_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 #define MPI_OP_IMPL(type) \
   ((type *)inoutvec)[i] += ((type *)invec)[i];
-  MPI_OP_SWITCH(MPI_SUM)
+  MPI_SUMPROD_OP_SWITCH(MPI_SUM)
 #undef MPI_OP_IMPL
 }
 
 void MPI_PROD_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 #define MPI_OP_IMPL(type) \
   ((type *)inoutvec)[i] *= ((type *)invec)[i];
-  MPI_OP_SWITCH(MPI_PROD)
+  MPI_SUMPROD_OP_SWITCH(MPI_PROD)
 #undef MPI_OP_IMPL
 }
 
 void MPI_REPLACE_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype){
 #define MPI_OP_IMPL(type) \
   ((type *)inoutvec)[i] = ((type *)invec)[i];
-  MPI_OP_SWITCH(MPI_REPLACE)
+  MPI_SUMPROD_OP_SWITCH(MPI_REPLACE)
 #undef MPI_OP_IMPL
 }
 
