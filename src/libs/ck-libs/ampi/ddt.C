@@ -2,8 +2,6 @@
 #include <algorithm>
 #include <limits>
 
-using std::numeric_limits;
-
 void
 CkDDT::pup(PUP::er &p) noexcept
 {
