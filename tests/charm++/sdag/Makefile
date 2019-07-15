@@ -1,25 +1,22 @@
-DIRS = \
-  migration \
-  template \
-  case \
-  anytimeMigration \
-  randomMsgCase \
+-include ../../common.mk
+-include ../../../include/conv-mach-opt.mak
+CHARMC=../../../bin/charmc $(OPTS)
 
-TESTDIRS = $(DIRS)
+all: sdag_tests
 
-all: $(foreach i,$(DIRS),build-$i)
+sdag_tests: sdag_tests.C sdag_tests.decl.h basic.decl.h refnum.decl.h migration.decl.h
+	$(CHARMC) sdag_tests.C -o sdag_tests
 
-test: $(foreach i,$(TESTDIRS),test-$i)
+%.decl.h: %.ci
+	$(CHARMC) $<
 
-clean: $(foreach i,$(DIRS),clean-$i)
-	rm -f TAGS #*#
-	rm -f core *~
+clean:
+	rm -f *.decl.h *.def.h *.o sdag_tests charmrun
 
-$(foreach i,$(DIRS),build-$i):
-	$(MAKE) -C $(subst build-,,$@) all OPTS='$(OPTS)'
+test: all
+	$(call run, ./sdag_tests +p1)
+	$(call run, ./sdag_tests +p4)
 
-$(foreach i,$(DIRS),test-$i):
-	$(MAKE) -C $(subst test-,,$@) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)'
-
-$(foreach i,$(DIRS),clean-$i):
-	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'
+smptest: all
+	$(call run, ./sdag_tests +p2 ++ppn 2)
+	$(call run, ./sdag_tests +p4 ++ppn 2)
