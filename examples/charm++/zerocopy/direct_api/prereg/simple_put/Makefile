@@ -18,6 +18,7 @@ simple_put.o: simple_put.C cifiles
 test: all
 	$(call run, +p1 ./simple_put 20 )
 	$(call run, +p2 ./simple_put 20 )
+	$(call run, +p2 ./simple_put 20 +noCMAForZC)
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o simple_put charmrun cifiles

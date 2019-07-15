@@ -19,6 +19,7 @@ zc_post_modify_size.o: zc_post_modify_size.C cifiles
 test: all
 	$(call run, +p1 ./zc_post_modify_size)
 	$(call run, +p4 ./zc_post_modify_size)
+	$(call run, +p4 ./zc_post_modify_size +noCMAForZC)
 
 clean:
 	rm -f *.decl.h *.def.h *.o
