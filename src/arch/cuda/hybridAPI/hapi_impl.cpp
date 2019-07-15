@@ -254,7 +254,6 @@ void GPUManager::init() {
 int GPUManager::createStreams() {
   int new_n_streams = 0;
 
-#if CMK_SMP || CMK_MULTICORE
   if (device_prop_.major == 3) {
     if (device_prop_.minor == 0)
       new_n_streams = 16;
@@ -279,8 +278,14 @@ int GPUManager::createStreams() {
   }
   else // unknown (future) compute capability
     new_n_streams = 128;
-#else
-  new_n_streams = 4; // FIXME per PE in non-SMP mode
+#if !CMK_SMP && !CMK_MULTICORE
+  // Allocate total physical streams between GPU managers sharing a device...
+  // i.e. PEs / num devices
+  int device_count;
+  hapiCheck(cudaGetDeviceCount(&device_count));
+  int pes_per_device = CmiNumPesOnPhysicalNode(0) / device_count;
+  pes_per_device = pes_per_device > 0 ? pes_per_device : 1;
+  new_n_streams =  (new_n_streams + pes_per_device - 1) / pes_per_device;
 #endif
 
 #if CMK_SMP || CMK_MULTICORE
@@ -744,12 +749,12 @@ hapiWorkRequest::hapiWorkRequest() :
     CmiLock(CsvAccess(gpu_manager).stream_lock_);
 #endif
 
-    // Create default per-PE stream if none exists
+    // Create default per-PE streams if none exist
     if (CsvAccess(gpu_manager).getStream(0) == NULL) {
-      CsvAccess(gpu_manager).createNStreams(1);
+      CsvAccess(gpu_manager).createNStreams(CmiMyNodeSize());
     }
 
-    stream = CsvAccess(gpu_manager).getStream(CkMyPe() % CsvAccess(gpu_manager).getNStreams());
+    stream = CsvAccess(gpu_manager).getStream(CmiMyRank() % CsvAccess(gpu_manager).getNStreams());
 
 #if CMK_SMP || CMK_MULTICORE
     CmiUnlock(CsvAccess(gpu_manager).stream_lock_);
