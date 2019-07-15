@@ -55,6 +55,6 @@
 
 #define CMK_NOCOPY_DIRECT_BYTES                           16
 
-#define CMK_REG_REQUIRED                                   1
+#define CMK_REG_REQUIRED                                   CMK_ONESIDED_IMPL
 
 #define CMK_CONVERSE_MPI                                   0
