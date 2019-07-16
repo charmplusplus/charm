@@ -135,8 +135,8 @@ inline int checkRank(const char* func, int rank, MPI_Comm comm) noexcept {
   return ampiErrhandler(func, MPI_ERR_RANK);
 }
 
-inline int checkBuf(const char* func, const void *buf, int count) noexcept {
-  if ((count != 0 && buf == NULL) || buf == MPI_IN_PLACE)
+inline int checkBuf(const char* func, const void *buf, int count, bool isAbsolute) noexcept {
+  if ((count != 0 && buf == NULL && !isAbsolute) || buf == MPI_IN_PLACE)
     return ampiErrhandler(func, MPI_ERR_BUFFER);
   return MPI_SUCCESS;
 }
@@ -146,6 +146,8 @@ int errorCheck(const char* func, MPI_Comm comm, bool ifComm, int count,
                bool ifTag, int rank, bool ifRank, const void *buf1,
                bool ifBuf1, const void *buf2=nullptr, bool ifBuf2=false) noexcept {
   int ret;
+  bool isAbsolute = false;
+
   if (ifComm) {
     ret = checkCommunicator(func, comm);
     if (ret != MPI_SUCCESS)
@@ -160,6 +162,7 @@ int errorCheck(const char* func, MPI_Comm comm, bool ifComm, int count,
     ret = checkData(func, data);
     if (ret != MPI_SUCCESS)
       return ampiErrhandler(func, ret);
+    isAbsolute = getDDT()->getType(data)->getAbsolute();
   }
   if (ifTag) {
     ret = checkTag(func, tag);
@@ -172,12 +175,12 @@ int errorCheck(const char* func, MPI_Comm comm, bool ifComm, int count,
       return ampiErrhandler(func, ret);
   }
   if (ifBuf1 && ifData) {
-    ret = checkBuf(func, buf1, count*getDDT()->getSize(data));
+    ret = checkBuf(func, buf1, count*getDDT()->getSize(data), isAbsolute);
     if (ret != MPI_SUCCESS)
       return ampiErrhandler(func, ret);
   }
   if (ifBuf2 && ifData) {
-    ret = checkBuf(func, buf2, count*getDDT()->getSize(data));
+    ret = checkBuf(func, buf2, count*getDDT()->getSize(data), false);
     if (ret != MPI_SUCCESS)
       return ampiErrhandler(func, ret);
   }

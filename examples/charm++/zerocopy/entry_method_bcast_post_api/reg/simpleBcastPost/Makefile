@@ -16,6 +16,8 @@ simpleBcastPost.o : simpleBcastPost.C cifiles
 test: all
 	$(call run, +p4 ./simpleBcastPost)
 	$(call run, +p6 ./simpleBcastPost)
+	$(call run, +p4 ./simpleBcastPost +noCMAForZC)
+	$(call run, +p6 ./simpleBcastPost +noCMAForZC)
 
 clean:
 	rm -f *.def.h *.decl.h *.o *~ *.exe cifiles charmrun simpleBcastPost
