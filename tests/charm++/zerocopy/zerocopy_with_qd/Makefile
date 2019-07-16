@@ -20,6 +20,8 @@ test: all
 	$(call run, +p1 ./zerocopy_with_qd 60)
 	$(call run, +p4 ./zerocopy_with_qd 100)
 	$(call run, +p6 ./zerocopy_with_qd 142)
+	$(call run, +p4 ./zerocopy_with_qd 100 +noCMAForZC)
+	$(call run, +p6 ./zerocopy_with_qd 142 +noCMAForZC)
 
 clean:
 	rm -f *.decl.h *.def.h *.o

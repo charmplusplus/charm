@@ -19,6 +19,7 @@ ifeq ($(CMK_MULTICORE),1)
 	echo "Skipping nodegroupTest test on MULTICORE builds as it has to be run on even number of logical nodes"
 else
 	$(call run, +p4 ./nodegroupTest)
+	$(call run, +p4 ./nodegroupTest +noCMAForZC)
 endif
 
 clean:
