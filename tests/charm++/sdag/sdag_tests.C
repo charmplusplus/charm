@@ -15,7 +15,8 @@
 
 class Main : public CBase_Main {
 public:
-  Main(CkArgMsg *m) {
+  Main(CkArgMsg* m) {
+    delete m;
     mainProxy = thisProxy;
     basicTestProxy = CProxy_BasicTest::ckNew(CkNumPes() - 1);
     refnumTestProxy = CProxy_RefnumTest::ckNew(REFNUM_ELEMS, REFNUM_ELEMS);
@@ -157,20 +158,7 @@ public:
   }
 };
 
-template <typename T>
-class TemplateTest : public CBase_TemplateTest {
-private:
-  T val;
-
-public:
-  TemplateTest(T v) : val(v) {}
-};
-
 #include "sdag_tests.def.h"
 #include "basic.def.h"
 #include "refnum.def.h"
 #include "migration.def.h"
-#include "templates.def.h"
-#define CK_TEMPLATES_ONLY
-#include "templates.def.h"
-#undef CK_TEMPLATES_ONLY

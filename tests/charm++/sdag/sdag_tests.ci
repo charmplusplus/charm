@@ -2,7 +2,6 @@ mainmodule sdag_tests {
   extern module basic;
   extern module refnum;
   extern module migration;
-  extern module templates;
 
   readonly CProxy_Main mainProxy;
   readonly CProxy_BasicTest basicTestProxy;

@@ -1,6 +1,6 @@
 // Tests that SDAG works correctly when migrations occur in the middle of an
 // SDAG invocation. Tests both synchronized and anytime migration. Tests that
-// messages received both before an after migration are correctly received, and
+// messages received both before and after migration are correctly received, and
 // that SDAG closure data as well as recevied message data is correctly pupped.
 
 module migration {

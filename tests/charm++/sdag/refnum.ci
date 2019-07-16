@@ -16,7 +16,7 @@ module refnum {
       // 3) via the refnum explicitly set for a callback
       serial {
         // The first third of the messages will be marshalled. The second third
-        // will be via reductions, and the last message will be via callback.
+        // will be via reductions, and the last third will be via callback.
         int marshall_start = 0;
         int redn_start = messages / 3;
         int cb_start = 2 * messages / 3;
