@@ -14,6 +14,7 @@
 
 // Integer used to store the ncpy ack handler idx
 static int ncpy_handler_idx;
+bool useCMAForZC;
 
 /*********************************** Zerocopy Direct API **********************************/
 // Get Methods
@@ -474,7 +475,7 @@ CkNcpyMode findTransferMode(int srcPe, int destPe) {
   if(CmiNodeOf(srcPe)==CmiNodeOf(destPe))
     return CkNcpyMode::MEMCPY;
 #if CMK_USE_CMA
-  else if(CmiDoesCMAWork() && CmiPeOnSamePhysicalNode(srcPe, destPe))
+  else if(useCMAForZC && CmiDoesCMAWork() && CmiPeOnSamePhysicalNode(srcPe, destPe))
     return CkNcpyMode::CMA;
 #endif
   else
@@ -485,7 +486,7 @@ CkNcpyMode findTransferModeWithNodes(int srcNode, int destNode) {
   if(srcNode==destNode)
     return CkNcpyMode::MEMCPY;
 #if CMK_USE_CMA
-  else if(CmiDoesCMAWork() && CmiPeOnSamePhysicalNode(CmiNodeFirst(srcNode), CmiNodeFirst(destNode)))
+  else if(useCMAForZC && CmiDoesCMAWork() && CmiPeOnSamePhysicalNode(CmiNodeFirst(srcNode), CmiNodeFirst(destNode)))
     return CkNcpyMode::CMA;
 #endif
   else

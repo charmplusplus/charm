@@ -15,6 +15,7 @@ simpleZCVec.o : simpleZCVec.C cifiles
 
 test: all
 	$(call run, +p4 ./simpleZCVec 32)
+	$(call run, +p4 ./simpleZCVec 32 +noCMAForZC)
 
 clean:
 	rm -f *.def.h *.decl.h *.o *~ *.exe cifiles charmrun simpleZCVec

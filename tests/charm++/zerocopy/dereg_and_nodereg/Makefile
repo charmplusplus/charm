@@ -20,6 +20,8 @@ test: all
 	$(call run, +p1 ./dereg_and_nodereg 10)
 	$(call run, +p4 ./dereg_and_nodereg 50)
 	$(call run, +p6 ./dereg_and_nodereg 100)
+	$(call run, +p4 ./dereg_and_nodereg 50 +noCMAForZC)
+	$(call run, +p6 ./dereg_and_nodereg 100 +noCMAForZC)
 
 clean:
 	rm -f *.decl.h *.def.h *.o
