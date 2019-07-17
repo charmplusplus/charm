@@ -237,6 +237,7 @@ void processRaiseEvacFile(char *raiseEvacFile);
 #endif
 
 extern bool useNodeBlkMapping;
+extern bool useCMAForZC;
 
 extern int quietMode;
 extern int quietModeRequested;
@@ -356,6 +357,11 @@ static inline void _parseCommandLineOpts(char **argv)
         if (CmiGetArgFlagDesc(argv,"+useNodeBlkMapping","Array elements are block-mapped in SMP-node level")) {
           useNodeBlkMapping = true;
         }
+
+  useCMAForZC = true;
+  if (CmiGetArgFlagDesc(argv, "+noCMAForZC", "When Cross Memory Attach (CMA) is supported, the program does not use CMA when using the Zerocopy API")) {
+    useCMAForZC = false;
+  }
 
 #if ! CMK_WITH_CONTROLPOINT
 	// Display a warning if charm++ wasn't compiled with control point support but user is expecting it

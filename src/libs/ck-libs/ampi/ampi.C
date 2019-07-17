@@ -51,7 +51,7 @@ int ampiErrhandler(const char* func, int errcode) noexcept {
     int errstrlen;
     char errstr[MPI_MAX_ERROR_STRING];
     MPI_Error_string(errcode, errstr, &errstrlen);
-    vector<char> str(funclen + fillerlen + errstrlen);
+    std::vector<char> str(funclen + fillerlen + errstrlen);
     strcpy(str.data(), func);
     strcat(str.data(), filler);
     strcat(str.data(), errstr);
@@ -1279,7 +1279,7 @@ static ampi *ampiInit(char **argv) noexcept
 #endif
 
   ampiParent* pptr = getAmpiParent();
-  vector<int>& keyvals = pptr->getKeyvals(MPI_COMM_WORLD);
+  std::vector<int>& keyvals = pptr->getKeyvals(MPI_COMM_WORLD);
   pptr->setAttr(MPI_COMM_WORLD, keyvals, MPI_UNIVERSE_SIZE, &_nchunks);
   ptr->setCommName("MPI_COMM_WORLD");
 
@@ -1689,7 +1689,7 @@ int ampiParent::setUserKeyval(int context, int keyval, void *attribute_val) noex
   return MPI_SUCCESS;
 }
 
-int ampiParent::setAttr(int context, vector<int>& keyvals, int keyval, void* attribute_val) noexcept {
+int ampiParent::setAttr(int context, std::vector<int>& keyvals, int keyval, void* attribute_val) noexcept {
   if (kv_set_builtin(keyval, attribute_val)) {
     return MPI_SUCCESS;
   }
@@ -1788,7 +1788,7 @@ int ampiParent::dupUserKeyvals(MPI_Comm old_comm, MPI_Comm new_comm) noexcept {
   return MPI_SUCCESS;
 }
 
-int ampiParent::freeUserKeyval(int context, vector<int>& keyvals, int* keyval) noexcept {
+int ampiParent::freeUserKeyval(int context, std::vector<int>& keyvals, int* keyval) noexcept {
   if (*keyval < 0 || *keyval >= kvlist.size()) {
     return MPI_SUCCESS;
   }
@@ -1817,7 +1817,7 @@ int ampiParent::freeUserKeyval(int context, vector<int>& keyvals, int* keyval) n
   return MPI_SUCCESS;
 }
 
-int ampiParent::freeUserKeyvals(int context, vector<int>& keyvals) noexcept {
+int ampiParent::freeUserKeyvals(int context, std::vector<int>& keyvals) noexcept {
   for (int i=0; i<keyvals.size(); i++) {
     int keyval = keyvals[i];
     // Call the user's delete_fn
@@ -1838,7 +1838,7 @@ int ampiParent::freeUserKeyvals(int context, vector<int>& keyvals) noexcept {
   return MPI_SUCCESS;
 }
 
-bool ampiParent::getUserKeyval(MPI_Comm comm, vector<int>& keyvals, int keyval, void *attribute_val, int *flag) noexcept {
+bool ampiParent::getUserKeyval(MPI_Comm comm, std::vector<int>& keyvals, int keyval, void *attribute_val, int *flag) noexcept {
   if (keyval < 0 || keyval >= kvlist.size() || kvlist[keyval] == NULL) {
     *flag = 0;
     return false;
@@ -1857,7 +1857,7 @@ bool ampiParent::getUserKeyval(MPI_Comm comm, vector<int>& keyvals, int keyval, 
   }
 }
 
-int ampiParent::getAttr(int context, vector<int>& keyvals, int keyval, void *attribute_val, int *flag) noexcept {
+int ampiParent::getAttr(int context, std::vector<int>& keyvals, int keyval, void *attribute_val, int *flag) noexcept {
   if (keyval == MPI_KEYVAL_INVALID) {
     *flag = 0;
     return MPI_ERR_KEYVAL;
@@ -1876,7 +1876,7 @@ int ampiParent::getAttr(int context, vector<int>& keyvals, int keyval, void *att
   }
 }
 
-int ampiParent::deleteAttr(int context, vector<int>& keyvals, int keyval) noexcept {
+int ampiParent::deleteAttr(int context, std::vector<int>& keyvals, int keyval) noexcept {
   return freeUserKeyval(context, keyvals, &keyval);
 }
 
@@ -2291,7 +2291,7 @@ void ampi::splitPhase1(CkReductionMsg *msg) noexcept
       if (c!=0) lastAmpi.doneInserting();
       lastAmpi = createNewChildAmpiSync();
 
-      vector<int> indices; //Maps rank to array indices for new array
+      std::vector<int> indices; //Maps rank to array indices for new array
       for (int i=c;i<nKeys;i++) {
         if (keys[i].color!=lastColor) break; //Done with this color
         int idx=myComm.getIndexForRank(keys[i].rank);
@@ -2335,7 +2335,7 @@ void ampi::splitPhaseInter(CkReductionMsg *msg) noexcept
   lastAmpi = createNewChildAmpiSync();
 
   for (int c=0;c<nKeys;c++) {
-    vector<int> indices; // Maps rank to array indices for new array
+    std::vector<int> indices; // Maps rank to array indices for new array
     if (keys[c].color!=lastColor)
     { //Hit a new color-- need to build a new communicator and array
       lastColor=keys[c].color;
@@ -2375,7 +2375,7 @@ void ampiParent::splitChildRegister(const ampiCommStruct &s) noexcept {
 //   1. reduction to make sure all members have called
 //   2. the root in the old communicator create the new array
 //   3. ampiParent::register is called to register new array as new comm
-void ampi::commCreate(const vector<int>& vec,MPI_Comm* newcomm) noexcept {
+void ampi::commCreate(const std::vector<int>& vec,MPI_Comm* newcomm) noexcept {
   int rootIdx=vec[0];
   tmpVec = vec;
   CkCallback cb(CkReductionTarget(ampi,commCreatePhase1),CkArrayIndex1D(rootIdx),myComm.getProxy());
@@ -2429,7 +2429,7 @@ MPI_Comm ampi::cartCreate0D() noexcept {
   }
 }
 
-MPI_Comm ampi::cartCreate(vector<int>& vec, int ndims, const int* dims) noexcept {
+MPI_Comm ampi::cartCreate(std::vector<int>& vec, int ndims, const int* dims) noexcept {
   if (ndims == 0) {
     return cartCreate0D();
   }
@@ -2468,7 +2468,7 @@ void ampiParent::cartChildRegister(const ampiCommStruct &s) noexcept {
   thread->resume(); //Matches suspend at end of ampi::cartCreate
 }
 
-void ampi::graphCreate(const vector<int>& vec,MPI_Comm* newcomm) noexcept {
+void ampi::graphCreate(const std::vector<int>& vec,MPI_Comm* newcomm) noexcept {
   int rootIdx=vec[0];
   tmpVec = vec;
   CkCallback cb(CkReductionTarget(ampi,commCreatePhase1),CkArrayIndex1D(rootIdx),
@@ -2494,7 +2494,7 @@ void ampiParent::graphChildRegister(const ampiCommStruct &s) noexcept {
   thread->resume(); //Matches suspend at end of ampi::graphCreate
 }
 
-void ampi::distGraphCreate(const vector<int>& vec, MPI_Comm* newcomm) noexcept
+void ampi::distGraphCreate(const std::vector<int>& vec, MPI_Comm* newcomm) noexcept
 {
   int rootIdx = vec[0];
   tmpVec = vec;
@@ -2523,7 +2523,7 @@ void ampiParent::distGraphChildRegister(const ampiCommStruct &s) noexcept
   thread->resume(); //Matches suspend at end of ampi::distGraphCreate
 }
 
-void ampi::intercommCreate(const vector<int>& remoteVec, const int root, MPI_Comm tcomm, MPI_Comm *ncomm) noexcept {
+void ampi::intercommCreate(const std::vector<int>& remoteVec, const int root, MPI_Comm tcomm, MPI_Comm *ncomm) noexcept {
   if (thisIndex==root) { // not everybody gets the valid rvec
     tmpVec = remoteVec;
   }
@@ -2537,7 +2537,7 @@ void ampi::intercommCreate(const vector<int>& remoteVec, const int root, MPI_Com
 void ampi::intercommCreatePhase1(MPI_Comm nextInterComm) noexcept {
 
   CProxy_ampi newAmpi = createNewChildAmpiSync();
-  const vector<int>& lgroup = myComm.getIndices();
+  const std::vector<int>& lgroup = myComm.getIndices();
   ampiCommStruct newCommstruct = ampiCommStruct(nextInterComm,newAmpi,lgroup,tmpVec);
   for(int i=0;i<lgroup.size();i++){
     int newIdx=lgroup[i];
@@ -2557,8 +2557,8 @@ void ampiParent::interChildRegister(const ampiCommStruct &s) noexcept {
 
 void ampi::intercommMerge(int first, MPI_Comm *ncomm) noexcept { // first valid only at local root
   if(myRank == 0 && first == 1){ // first (lower) group creates the intracommunicator for the higher group
-    vector<int> lvec = myComm.getIndices();
-    vector<int> rvec = myComm.getRemoteIndices();
+    std::vector<int> lvec = myComm.getIndices();
+    std::vector<int> rvec = myComm.getRemoteIndices();
     int rsize = rvec.size();
     tmpVec = lvec;
     for(int i=0;i<rsize;i++)
@@ -3194,7 +3194,7 @@ MPI_Request ampi::sendLocalInOrderMsg(int tag, int srcRank, const void* buf, int
       else {
         // NOTE: Intermediate copy here could be avoided if DDT
         // could copy directly b/w two non-contiguous datatypes
-        vector<char> sbuf(size);
+        std::vector<char> sbuf(size);
         sddt->serialize((char*)buf, sbuf.data(), count, size, PACK); // intermediate copy for noncontig DDTs
         destPtr->localInorder(sbuf.data(), size, seqIdx, seq, tag, srcRank, ireq);
       }
@@ -3386,7 +3386,7 @@ bool ampi::processSsendNcpyShmMsg(AmpiMsg* msg, void* buf, MPI_Datatype type,
     else { // Both datatypes are non-contiguous
       // NOTE: Intermediate copy here could be avoided if DDT
       // could copy directly b/w two non-contiguous datatypes
-      vector<char> sbuf(msgLen);
+      std::vector<char> sbuf(msgLen);
       sddt->serialize(msgData, sbuf.data(), msgCount, msgLen, PACK);
       rddt->serialize((char*)buf, sbuf.data(), count, msgLen, UNPACK);
     }
@@ -3506,7 +3506,7 @@ void ampi::processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Data
 
   // Store pointers to each contribution's data at index 'srcRank' in contributionData
   // If the max rank value fits into an unsigned short int, srcRanks are those, otherwise int's
-  vector<void *> contributionData(commSize);
+  std::vector<void *> contributionData(commSize);
   if (commSize < std::numeric_limits<unsigned short int>::max()) {
     unsigned short int *srcRank = (unsigned short int*)(results[0].data);
     for (int i=0; i<commSize; i++) {
@@ -3536,7 +3536,7 @@ void ampi::processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Data
     ddt->serialize((char*)contributionData[0], (char*)buf, count, contributionExtent, UNPACK);
 
     // Invoke the MPI_User_function on the deserialized contributions in 'rank' order
-    vector<char> deserializedBuf(contributionExtent);
+    std::vector<char> deserializedBuf(contributionExtent);
     for (int i=1; i<commSize; i++) {
       ddt->serialize((char*)contributionData[i], deserializedBuf.data(), count, contributionExtent, UNPACK);
       (*func)(deserializedBuf.data(), buf, &count, &type);
@@ -4422,7 +4422,7 @@ AMPI_API_IMPL(int, MPI_Comm_compare, MPI_Comm comm1, MPI_Comm comm2, int *result
   if(comm1==comm2) *result=MPI_IDENT;
   else{
     int congruent=1;
-    vector<int> ind1, ind2;
+    std::vector<int> ind1, ind2;
     ind1 = getAmpiInstance(comm1)->getIndices();
     ind2 = getAmpiInstance(comm2)->getIndices();
     if(ind1.size()==ind2.size()){
@@ -4922,7 +4922,7 @@ void ampi::sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
                             MPI_Comm comm, MPI_Status *status) noexcept
 {
   CkDDT_DataType* ddt = getDDT()->getType(datatype);
-  vector<char> tmpBuf(ddt->getSize(count));
+  std::vector<char> tmpBuf(ddt->getSize(count));
   ddt->serialize((char*)buf, tmpBuf.data(), count, ddt->getSize(count), PACK);
 
   MPI_Request reqs[2];
@@ -5289,7 +5289,7 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt, const void *inbuf, int c
       tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::concat);
     }
 
-    vector<char> sbuf;
+    std::vector<char> sbuf;
     if (!ddt->isContig()) {
       sbuf.resize(szdata);
       ddt->serialize((char*)inbuf, sbuf.data(), count, szdata, PACK);
@@ -5323,7 +5323,7 @@ static int copyDatatype(MPI_Datatype sendtype, int sendcount, MPI_Datatype recvt
     // ddts don't have "copy", so fake it by serializing into a temp buffer, then
     //  deserializing into the output.
     int slen = sddt->getSize(sendcount);
-    vector<char> serialized(slen);
+    std::vector<char> serialized(slen);
     sddt->serialize((char*)inbuf, serialized.data(), sendcount, rddt->getSize(recvcount), PACK);
     rddt->serialize((char*)outbuf, serialized.data(), recvcount, sddt->getSize(sendcount), UNPACK);
   }
@@ -5630,7 +5630,7 @@ AMPI_API_IMPL(int, MPI_Reduce_scatter_block, const void* sendbuf, void* recvbuf,
   if(size == 1)
     return copyDatatype(datatype, count, datatype, count, sendbuf, recvbuf);
 
-  vector<char> tmpbuf(ptr->getDDT()->getType(datatype)->getSize(count)*size);
+  std::vector<char> tmpbuf(ptr->getDDT()->getType(datatype)->getSize(count)*size);
 
   MPI_Reduce(sendbuf, &tmpbuf[0], count*size, datatype, op, AMPI_COLL_SOURCE, comm);
   MPI_Scatter(&tmpbuf[0], count, datatype, recvbuf, count, datatype, AMPI_COLL_SOURCE, comm);
@@ -5674,7 +5674,7 @@ AMPI_API_IMPL(int, MPI_Reduce_scatter, const void* sendbuf, void* recvbuf, const
     return copyDatatype(datatype,recvcounts[0],datatype,recvcounts[0],sendbuf,recvbuf);
 
   int count=0;
-  vector<int> displs(size);
+  std::vector<int> displs(size);
   int len;
 
   //under construction
@@ -5682,7 +5682,7 @@ AMPI_API_IMPL(int, MPI_Reduce_scatter, const void* sendbuf, void* recvbuf, const
     displs[i] = count;
     count+= recvcounts[i];
   }
-  vector<char> tmpbuf(ptr->getDDT()->getType(datatype)->getSize(count));
+  std::vector<char> tmpbuf(ptr->getDDT()->getType(datatype)->getSize(count));
   MPI_Reduce(sendbuf, tmpbuf.data(), count, datatype, op, AMPI_COLL_SOURCE, comm);
   MPI_Scatterv(tmpbuf.data(), recvcounts, displs.data(), datatype,
                           recvbuf, recvcounts[ptr->getRank()], datatype, AMPI_COLL_SOURCE, comm);
@@ -5725,8 +5725,8 @@ AMPI_API_IMPL(int, MPI_Scan, const void* sendbuf, void* recvbuf, int count, MPI_
   int rank = ptr->getRank();
   int mask = 0x1;
   int dst;
-  vector<char> tmp_buf(blklen);
-  vector<char> partial_scan(blklen);
+  std::vector<char> tmp_buf(blklen);
+  std::vector<char> partial_scan(blklen);
 
   memcpy(recvbuf, sendbuf, blklen);
   memcpy(partial_scan.data(), sendbuf, blklen);
@@ -5785,8 +5785,8 @@ AMPI_API_IMPL(int, MPI_Exscan, const void* sendbuf, void* recvbuf, int count, MP
   int rank = ptr->getRank();
   int mask = 0x1;
   int dst, flag;
-  vector<char> tmp_buf(blklen);
-  vector<char> partial_scan(blklen);
+  std::vector<char> tmp_buf(blklen);
+  std::vector<char> partial_scan(blklen);
 
   if (rank > 0) memcpy(recvbuf, sendbuf, blklen);
   memcpy(partial_scan.data(), sendbuf, blklen);
@@ -6972,7 +6972,7 @@ AMPI_API_IMPL(int, MPI_Type_indexed, int count, const int* arrBlength, const int
 #endif
 
   /*CkDDT_Indexed's arrDisp has type MPI_Aint* (not int*). */
-  vector<MPI_Aint> arrDispAint(count);
+  std::vector<MPI_Aint> arrDispAint(count);
   for(int i=0; i<count; i++)
     arrDispAint[i] = (MPI_Aint)(arrDisp[i]);
   getDDT()->newIndexed(count, arrBlength, arrDispAint.data(), oldtype, newtype);
@@ -7285,7 +7285,7 @@ AMPI_API_IMPL(int, MPI_Type_set_attr, MPI_Datatype datatype, int keyval, void *a
 #endif
 
   ampiParent *parent = getAmpiParent();
-  vector<int>& keyvals = parent->getDDT()->getType(datatype)->getKeyvals();
+  std::vector<int>& keyvals = parent->getDDT()->getType(datatype)->getKeyvals();
   int err = parent->setAttr(datatype, keyvals, keyval, attribute_val);
   return ampiErrhandler("AMPI_Type_set_attr", err);
 }
@@ -7302,7 +7302,7 @@ AMPI_API_IMPL(int, MPI_Type_get_attr, MPI_Datatype datatype, int keyval,
 #endif
 
   ampiParent *parent = getAmpiParent();
-  vector<int>& keyvals = parent->getDDT()->getType(datatype)->getKeyvals();
+  std::vector<int>& keyvals = parent->getDDT()->getType(datatype)->getKeyvals();
   int err = parent->getAttr(datatype, keyvals, keyval, attribute_val, flag);
   return ampiErrhandler("AMPI_Type_get_attr", err);
 }
@@ -7318,7 +7318,7 @@ AMPI_API_IMPL(int, MPI_Type_delete_attr, MPI_Datatype datatype, int keyval)
 #endif
 
   ampiParent *parent = getAmpiParent();
-  vector<int>& keyvals = parent->getDDT()->getType(datatype)->getKeyvals();
+  std::vector<int>& keyvals = parent->getDDT()->getType(datatype)->getKeyvals();
   int err = parent->deleteAttr(datatype, keyvals, keyval);
   return ampiErrhandler("AMPI_Type_delete_attr", err);
 }
@@ -7901,7 +7901,7 @@ static CkReductionMsg *makeGatherMsg(const void *inbuf, int count, MPI_Datatype 
     tupleRedn[0] = CkReduction::tupleElement(sizeof(int), &rank, CkReduction::concat);
   }
 
-  vector<char> sbuf;
+  std::vector<char> sbuf;
   if (ddt->isContig()) {
     tupleRedn[1] = CkReduction::tupleElement(szdata, (void*)inbuf, CkReduction::concat);
   } else {
@@ -7932,7 +7932,7 @@ static CkReductionMsg *makeGathervMsg(const void *inbuf, int count, MPI_Datatype
 
   tupleRedn[1] = CkReduction::tupleElement(sizeof(int), &szdata, CkReduction::concat);
 
-  vector<char> sbuf;
+  std::vector<char> sbuf;
   if (ddt->isContig()) {
     tupleRedn[2] = CkReduction::tupleElement(szdata, (void*)inbuf, CkReduction::concat);
   } else {
@@ -8809,7 +8809,7 @@ AMPI_API_IMPL(int, MPI_Alltoall, const void *sendbuf, int sendcount, MPI_Datatyp
     }
   }
   else if (itemsize <= AMPI_ALLTOALL_SHORT_MSG && size <= AMPI_ALLTOALL_THROTTLE) {
-    vector<MPI_Request> reqs(size*2);
+    std::vector<MPI_Request> reqs(size*2);
     for (int i=0; i<size; i++) {
       int src = (rank+i) % size;
       ptr->irecv(((char*)recvbuf)+(extent*src), recvcount, recvtype,
@@ -8824,7 +8824,7 @@ AMPI_API_IMPL(int, MPI_Alltoall, const void *sendbuf, int sendcount, MPI_Datatyp
   }
   else if (itemsize <= AMPI_ALLTOALL_LONG_MSG) {
     /* Don't post all sends and recvs at once. Instead do N sends/recvs at a time. */
-    vector<MPI_Request> reqs(AMPI_ALLTOALL_THROTTLE*2);
+    std::vector<MPI_Request> reqs(AMPI_ALLTOALL_THROTTLE*2);
     for (int j=0; j<size; j+=AMPI_ALLTOALL_THROTTLE) {
       int blockSize = std::min(size - j, AMPI_ALLTOALL_THROTTLE);
       for (int i=0; i<blockSize; i++) {
@@ -8980,7 +8980,7 @@ AMPI_API_IMPL(int, MPI_Alltoallv, const void *sendbuf, const int *sendcounts, co
     }
   }
   else if (size <= AMPI_ALLTOALL_THROTTLE) {
-    vector<MPI_Request> reqs(size*2);
+    std::vector<MPI_Request> reqs(size*2);
     for (int i=0; i<size; i++) {
       int src = (rank+i) % size;
       ptr->irecv(((char*)recvbuf)+(extent*rdispls[src]), recvcounts[src], recvtype,
@@ -8995,7 +8995,7 @@ AMPI_API_IMPL(int, MPI_Alltoallv, const void *sendbuf, const int *sendcounts, co
   }
   else {
     /* Don't post all sends and recvs at once. Instead do N sends/recvs at a time. */
-    vector<MPI_Request> reqs(AMPI_ALLTOALL_THROTTLE*2);
+    std::vector<MPI_Request> reqs(AMPI_ALLTOALL_THROTTLE*2);
     for (int j=0; j<size; j+=AMPI_ALLTOALL_THROTTLE) {
       int blockSize = std::min(size - j, AMPI_ALLTOALL_THROTTLE);
       for (int i=0; i<blockSize; i++) {
@@ -9129,7 +9129,7 @@ AMPI_API_IMPL(int, MPI_Alltoallw, const void *sendbuf, const int *sendcounts, co
     }
   }
   else if (size <= AMPI_ALLTOALL_THROTTLE) {
-    vector<MPI_Request> reqs(size*2);
+    std::vector<MPI_Request> reqs(size*2);
     for (int i=0; i<size; i++) {
       int src = (rank+i) % size;
       ptr->irecv(((char*)recvbuf)+rdispls[src], recvcounts[src], recvtypes[src],
@@ -9144,7 +9144,7 @@ AMPI_API_IMPL(int, MPI_Alltoallw, const void *sendbuf, const int *sendcounts, co
   }
   else {
     /* Don't post all sends and recvs at once. Instead do N sends/recvs at a time. */
-    vector<MPI_Request> reqs(AMPI_ALLTOALL_THROTTLE*2);
+    std::vector<MPI_Request> reqs(AMPI_ALLTOALL_THROTTLE*2);
     for (int j=0; j<size; j+=AMPI_ALLTOALL_THROTTLE) {
       int blockSize = std::min(size - j, AMPI_ALLTOALL_THROTTLE);
       for (int i=0; i<blockSize; i++) {
@@ -9255,12 +9255,12 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoall, const void* sendbuf, int sendcount, MP
   if (ptr->getSize() == 1)
     return copyDatatype(sendtype, sendcount, recvtype, recvcount, sendbuf, recvbuf);
 
-  const vector<int>& neighbors = ptr->getNeighbors();
+  const std::vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
   int itemsize = getDDT()->getSize(sendtype) * sendcount;
   int extent = getDDT()->getExtent(recvtype) * recvcount;
 
-  vector<MPI_Request> reqs(num_neighbors*2);
+  std::vector<MPI_Request> reqs(num_neighbors*2);
   for (int j=0; j<num_neighbors; j++) {
     ptr->irecv(((char*)recvbuf)+(extent*j), recvcount, recvtype,
                neighbors[j], MPI_NBOR_TAG, comm, &reqs[j]);
@@ -9311,7 +9311,7 @@ AMPI_API_IMPL(int, MPI_Ineighbor_alltoall, const void* sendbuf, int sendcount, M
     return copyDatatype(sendtype, sendcount, recvtype, recvcount, sendbuf, recvbuf);
   }
 
-  const vector<int>& neighbors = ptr->getNeighbors();
+  const std::vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
   int itemsize = getDDT()->getSize(sendtype) * sendcount;
   int extent = getDDT()->getExtent(recvtype) * recvcount;
@@ -9360,12 +9360,12 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoallv, const void* sendbuf, const int *sendc
   if (ptr->getSize() == 1)
     return copyDatatype(sendtype, sendcounts[0], recvtype, recvcounts[0], sendbuf, recvbuf);
 
-  const vector<int>& neighbors = ptr->getNeighbors();
+  const std::vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
   int itemsize = getDDT()->getSize(sendtype);
   int extent = getDDT()->getExtent(recvtype);
 
-  vector<MPI_Request> reqs(num_neighbors*2);
+  std::vector<MPI_Request> reqs(num_neighbors*2);
   for (int j=0; j<num_neighbors; j++) {
     ptr->irecv(((char*)recvbuf)+(extent*rdispls[j]), recvcounts[j], recvtype,
                neighbors[j], MPI_NBOR_TAG, comm, &reqs[j]);
@@ -9417,7 +9417,7 @@ AMPI_API_IMPL(int, MPI_Ineighbor_alltoallv, const void* sendbuf, const int *send
     return copyDatatype(sendtype, sendcounts[0], recvtype, recvcounts[0], sendbuf, recvbuf);
   }
 
-  const vector<int>& neighbors = ptr->getNeighbors();
+  const std::vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
   int itemsize = getDDT()->getSize(sendtype);
   int extent = getDDT()->getExtent(recvtype);
@@ -9466,10 +9466,10 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoallw, const void* sendbuf, const int *sendc
   if (ptr->getSize() == 1)
     return copyDatatype(sendtypes[0], sendcounts[0], recvtypes[0], recvcounts[0], sendbuf, recvbuf);
 
-  const vector<int>& neighbors = ptr->getNeighbors();
+  const std::vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
 
-  vector<MPI_Request> reqs(num_neighbors*2);
+  std::vector<MPI_Request> reqs(num_neighbors*2);
   for (int j=0; j<num_neighbors; j++) {
     ptr->irecv(((char*)recvbuf)+rdispls[j], recvcounts[j], recvtypes[j],
                neighbors[j], MPI_NBOR_TAG, comm, &reqs[j]);
@@ -9521,7 +9521,7 @@ AMPI_API_IMPL(int, MPI_Ineighbor_alltoallw, const void* sendbuf, const int *send
     return copyDatatype(sendtypes[0], sendcounts[0], recvtypes[0], recvcounts[0], sendbuf, recvbuf);
   }
 
-  const vector<int>& neighbors = ptr->getNeighbors();
+  const std::vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
 
   // use an ATAReq to non-block the caller and get a request ptr
@@ -9568,11 +9568,11 @@ AMPI_API_IMPL(int, MPI_Neighbor_allgather, const void* sendbuf, int sendcount, M
   if (ptr->getSize() == 1)
     return copyDatatype(sendtype, sendcount, recvtype, recvcount, sendbuf, recvbuf);
 
-  const vector<int>& neighbors = ptr->getNeighbors();
+  const std::vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
 
   int extent = getDDT()->getExtent(recvtype) * recvcount;
-  vector<MPI_Request> reqs(num_neighbors*2);
+  std::vector<MPI_Request> reqs(num_neighbors*2);
   for (int j=0; j<num_neighbors; j++) {
     ptr->irecv(((char*)recvbuf)+(extent*j), recvcount, recvtype,
                neighbors[j], MPI_NBOR_TAG, comm, &reqs[j]);
@@ -9623,7 +9623,7 @@ AMPI_API_IMPL(int, MPI_Ineighbor_allgather, const void* sendbuf, int sendcount, 
     return copyDatatype(sendtype, sendcount, recvtype, recvcount, sendbuf, recvbuf);
   }
 
-  const vector<int>& neighbors = ptr->getNeighbors();
+  const std::vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
 
   // use an ATAReq to non-block the caller and get a request ptr
@@ -9671,10 +9671,10 @@ AMPI_API_IMPL(int, MPI_Neighbor_allgatherv, const void* sendbuf, int sendcount, 
   if (ptr->getSize() == 1)
     return copyDatatype(sendtype, sendcount, recvtype, recvcounts[0], sendbuf, recvbuf);
 
-  const vector<int>& neighbors = ptr->getNeighbors();
+  const std::vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
   int extent = getDDT()->getExtent(recvtype);
-  vector<MPI_Request> reqs(num_neighbors*2);
+  std::vector<MPI_Request> reqs(num_neighbors*2);
   for (int j=0; j<num_neighbors; j++) {
     ptr->irecv(((char*)recvbuf)+(extent*displs[j]), recvcounts[j], recvtype,
                neighbors[j], MPI_NBOR_TAG, comm, &reqs[j]);
@@ -9724,7 +9724,7 @@ AMPI_API_IMPL(int, MPI_Ineighbor_allgatherv, const void* sendbuf, int sendcount,
     return copyDatatype(sendtype, sendcount, recvtype, recvcounts[0], sendbuf, recvbuf);
   }
 
-  const vector<int>& neighbors = ptr->getNeighbors();
+  const std::vector<int>& neighbors = ptr->getNeighbors();
   int num_neighbors = neighbors.size();
 
   // use an ATAReq to non-block the caller and get a request ptr
@@ -9915,12 +9915,12 @@ AMPI_API_IMPL(int, MPI_Intercomm_create, MPI_Comm localComm, int localLeader, MP
   localSize = localPtr->getSize();
   localRank = localPtr->getRank();
 
-  vector<int> remoteVec;
+  std::vector<int> remoteVec;
 
   if (localRank == localLeader) {
     int remoteSize;
     MPI_Status sts;
-    vector<int> localVec;
+    std::vector<int> localVec;
     localVec = localPtr->getIndices();
     // local leader exchanges groups with remote leader
     peerPtr->send(tag, peerPtr->getRank(), localVec.data(), localVec.size(), MPI_INT, remoteLeader, peerComm);
@@ -10378,9 +10378,9 @@ AMPI_API_IMPL(int, MPI_Group_union, MPI_Group group1, MPI_Group group2, MPI_Grou
 {
   AMPI_API("AMPI_Group_union");
   ampiParent *ptr = getAmpiParent();
-  vector<int> vec1 = ptr->group2vec(group1);
-  vector<int> vec2 = ptr->group2vec(group2);
-  vector<int> newvec = unionOp(vec1,vec2);
+  std::vector<int> vec1 = ptr->group2vec(group1);
+  std::vector<int> vec2 = ptr->group2vec(group2);
+  std::vector<int> newvec = unionOp(vec1,vec2);
   *newgroup = ptr->saveGroupStruct(newvec);
   return MPI_SUCCESS;
 }
@@ -10389,9 +10389,9 @@ AMPI_API_IMPL(int, MPI_Group_intersection, MPI_Group group1, MPI_Group group2, M
 {
   AMPI_API("AMPI_Group_intersection");
   ampiParent *ptr = getAmpiParent();
-  vector<int> vec1 = ptr->group2vec(group1);
-  vector<int> vec2 = ptr->group2vec(group2);
-  vector<int> newvec = intersectOp(vec1,vec2);
+  std::vector<int> vec1 = ptr->group2vec(group1);
+  std::vector<int> vec2 = ptr->group2vec(group2);
+  std::vector<int> newvec = intersectOp(vec1,vec2);
   *newgroup = ptr->saveGroupStruct(newvec);
   return MPI_SUCCESS;
 }
@@ -10400,9 +10400,9 @@ AMPI_API_IMPL(int, MPI_Group_difference, MPI_Group group1, MPI_Group group2, MPI
 {
   AMPI_API("AMPI_Group_difference");
   ampiParent *ptr = getAmpiParent();
-  vector<int> vec1 = ptr->group2vec(group1);
-  vector<int> vec2 = ptr->group2vec(group2);
-  vector<int> newvec = diffOp(vec1,vec2);
+  std::vector<int> vec1 = ptr->group2vec(group1);
+  std::vector<int> vec2 = ptr->group2vec(group2);
+  std::vector<int> newvec = diffOp(vec1,vec2);
   *newgroup = ptr->saveGroupStruct(newvec);
   return MPI_SUCCESS;
 }
@@ -10426,8 +10426,8 @@ AMPI_API_IMPL(int, MPI_Group_translate_ranks, MPI_Group group1, int n, const int
 {
   AMPI_API("AMPI_Group_translate_ranks");
   ampiParent *ptr = getAmpiParent();
-  vector<int> vec1 = ptr->group2vec(group1);
-  vector<int> vec2 = ptr->group2vec(group2);
+  std::vector<int> vec1 = ptr->group2vec(group1);
+  std::vector<int> vec2 = ptr->group2vec(group2);
   translateRanksOp(n, vec1, ranks1, vec2, ranks2);
   return MPI_SUCCESS;
 }
@@ -10436,8 +10436,8 @@ AMPI_API_IMPL(int, MPI_Group_compare, MPI_Group group1,MPI_Group group2, int *re
 {
   AMPI_API("AMPI_Group_compare");
   ampiParent *ptr = getAmpiParent();
-  vector<int> vec1 = ptr->group2vec(group1);
-  vector<int> vec2 = ptr->group2vec(group2);
+  std::vector<int> vec1 = ptr->group2vec(group1);
+  std::vector<int> vec2 = ptr->group2vec(group2);
   *result = compareVecOp(vec1, vec2);
   return MPI_SUCCESS;
 }
@@ -10446,8 +10446,8 @@ AMPI_API_IMPL(int, MPI_Group_incl, MPI_Group group, int n, const int *ranks, MPI
 {
   AMPI_API("AMPI_Group_incl");
   ampiParent *ptr = getAmpiParent();
-  vector<int> vec = ptr->group2vec(group);
-  vector<int> newvec = inclOp(n,ranks,vec);
+  std::vector<int> vec = ptr->group2vec(group);
+  std::vector<int> newvec = inclOp(n,ranks,vec);
   *newgroup = ptr->saveGroupStruct(newvec);
   return MPI_SUCCESS;
 }
@@ -10456,8 +10456,8 @@ AMPI_API_IMPL(int, MPI_Group_excl, MPI_Group group, int n, const int *ranks, MPI
 {
   AMPI_API("AMPI_Group_excl");
   ampiParent *ptr = getAmpiParent();
-  vector<int> vec = ptr->group2vec(group);
-  vector<int> newvec = exclOp(n,ranks,vec);
+  std::vector<int> vec = ptr->group2vec(group);
+  std::vector<int> newvec = exclOp(n,ranks,vec);
   *newgroup = ptr->saveGroupStruct(newvec);
   return MPI_SUCCESS;
 }
@@ -10467,8 +10467,8 @@ AMPI_API_IMPL(int, MPI_Group_range_incl, MPI_Group group, int n, int ranges[][3]
   AMPI_API("AMPI_Group_range_incl");
   int ret;
   ampiParent *ptr = getAmpiParent();
-  vector<int> vec = ptr->group2vec(group);
-  vector<int> newvec = rangeInclOp(n,ranges,vec,&ret);
+  std::vector<int> vec = ptr->group2vec(group);
+  std::vector<int> newvec = rangeInclOp(n,ranges,vec,&ret);
   if(ret != MPI_SUCCESS){
     *newgroup = MPI_GROUP_EMPTY;
     return ampiErrhandler("AMPI_Group_range_incl", ret);
@@ -10483,8 +10483,8 @@ AMPI_API_IMPL(int, MPI_Group_range_excl, MPI_Group group, int n, int ranges[][3]
   AMPI_API("AMPI_Group_range_excl");
   int ret;
   ampiParent *ptr = getAmpiParent();
-  vector<int> vec = ptr->group2vec(group);
-  vector<int> newvec = rangeExclOp(n,ranges,vec,&ret);
+  std::vector<int> vec = ptr->group2vec(group);
+  std::vector<int> newvec = rangeExclOp(n,ranges,vec,&ret);
   if(ret != MPI_SUCCESS){
     *newgroup = MPI_GROUP_EMPTY;
     return ampiErrhandler("AMPI_Group_range_excl", ret);
@@ -10506,7 +10506,7 @@ AMPI_API_IMPL(int, MPI_Comm_create, MPI_Comm comm, MPI_Group group, MPI_Comm* ne
   int rank_in_group, key, color, zero;
   MPI_Group group_of_comm;
 
-  vector<int> vec = getAmpiParent()->group2vec(group);
+  std::vector<int> vec = getAmpiParent()->group2vec(group);
   if(vec.size()==0){
     AMPI_DEBUG("AMPI> In MPI_Comm_create, creating an empty communicator");
     *newcomm = MPI_COMM_NULL;
@@ -10571,7 +10571,7 @@ AMPI_API_IMPL(int, MPI_Comm_create_group, MPI_Comm comm, MPI_Group group, int ta
   }
   MPI_Comm_dup(MPI_COMM_SELF, newcomm);
 
-  vector<int> groupPids(groupSize), pids(groupSize, 0);
+  std::vector<int> groupPids(groupSize), pids(groupSize, 0);
   std::iota(groupPids.begin(), groupPids.end(), 0);
   MPI_Comm_group(comm, &parentGroup);
   MPI_Group_translate_ranks(group, groupSize, groupPids.data(), parentGroup, pids.data());
@@ -10643,7 +10643,7 @@ AMPI_API_IMPL(int, MPI_Comm_create_keyval, MPI_Comm_copy_attr_function *copy_fn,
 AMPI_API_IMPL(int, MPI_Comm_free_keyval, int *keyval)
 {
   AMPI_API("AMPI_Comm_free_keyval");
-  vector<int>& keyvals = getAmpiParent()->getKeyvals(MPI_COMM_WORLD);
+  std::vector<int>& keyvals = getAmpiParent()->getKeyvals(MPI_COMM_WORLD);
   int ret = getAmpiParent()->freeUserKeyval(MPI_COMM_WORLD, keyvals, keyval);
   return ampiErrhandler("AMPI_Comm_free_keyval", ret);
 }
@@ -10653,7 +10653,7 @@ AMPI_API_IMPL(int, MPI_Comm_set_attr, MPI_Comm comm, int keyval, void* attribute
   AMPI_API("AMPI_Comm_set_attr");
   ampiParent *parent = getAmpiParent();
   ampiCommStruct &cs = const_cast<ampiCommStruct &>(parent->comm2CommStruct(comm));
-  vector<int>& keyvals = cs.getKeyvals();
+  std::vector<int>& keyvals = cs.getKeyvals();
   int ret = parent->setAttr(comm, keyvals, keyval, attribute_val);
   return ampiErrhandler("AMPI_Comm_set_attr", ret);
 }
@@ -10663,7 +10663,7 @@ AMPI_API_IMPL(int, MPI_Comm_get_attr, MPI_Comm comm, int keyval, void *attribute
   AMPI_API("AMPI_Comm_get_attr");
   ampiParent *parent = getAmpiParent();
   ampiCommStruct &cs = const_cast<ampiCommStruct &>(parent->comm2CommStruct(comm));
-  vector<int>& keyvals = cs.getKeyvals();
+  std::vector<int>& keyvals = cs.getKeyvals();
   int ret = parent->getAttr(comm, keyvals, keyval, attribute_val, flag);
   return ampiErrhandler("AMPI_Comm_get_attr", ret);
 }
@@ -10673,7 +10673,7 @@ AMPI_API_IMPL(int, MPI_Comm_delete_attr, MPI_Comm comm, int keyval)
   AMPI_API("AMPI_Comm_delete_attr");
   ampiParent *parent = getAmpiParent();
   ampiCommStruct &cs = const_cast<ampiCommStruct &>(parent->comm2CommStruct(comm));
-  vector<int>& keyvals = cs.getKeyvals();
+  std::vector<int>& keyvals = cs.getKeyvals();
   int ret = parent->deleteAttr(comm, keyvals, keyval);
   return ampiErrhandler("AMPI_Comm_delete_attr", ret);
 }
@@ -10767,14 +10767,14 @@ AMPI_API_IMPL(int, MPI_Cart_create, MPI_Comm comm_old, int ndims, const int *dim
   MPI_Cart_map(comm_old, ndims, dims, periods, &newrank);//no change in rank
 
   ampiParent *ptr = getAmpiParent();
-  vector<int> vec = ptr->group2vec(ptr->comm2group(comm_old));
+  std::vector<int> vec = ptr->group2vec(ptr->comm2group(comm_old));
   *comm_cart = getAmpiInstance(comm_old)->cartCreate(vec, ndims, dims);
 
   if (*comm_cart != MPI_COMM_NULL) {
     ampiCommStruct &c = getAmpiParent()->getCart(*comm_cart);
     ampiTopology *topo = c.getTopology();
     topo->setndims(ndims);
-    vector<int> dimsv(dims, dims+ndims), periodsv(periods, periods+ndims), nborsv;
+    std::vector<int> dimsv(dims, dims+ndims), periodsv(periods, periods+ndims), nborsv;
     topo->setdims(dimsv);
     topo->setperiods(periodsv);
     getAmpiInstance(*comm_cart)->findNeighbors(*comm_cart, newrank, nborsv);
@@ -10799,11 +10799,11 @@ AMPI_API_IMPL(int, MPI_Graph_create, MPI_Comm comm_old, int nnodes, const int *i
   MPI_Graph_map(comm_old, nnodes, index, edges, &newrank);
 
   ampiParent *ptr = getAmpiParent();
-  vector<int> vec = ptr->group2vec(ptr->comm2group(comm_old));
+  std::vector<int> vec = ptr->group2vec(ptr->comm2group(comm_old));
   getAmpiInstance(comm_old)->graphCreate(vec, comm_graph);
   ampiTopology &topo = *getAmpiParent()->getGraph(*comm_graph).getTopology();
 
-  vector<int> index_(index, index+nnodes), edges_, nborsv;
+  std::vector<int> index_(index, index+nnodes), edges_, nborsv;
   topo.setnvertices(nnodes);
   topo.setindex(index_);
 
@@ -10841,7 +10841,7 @@ AMPI_API_IMPL(int, MPI_Dist_graph_create_adjacent, MPI_Comm comm_old, int indegr
 #endif
 
   ampiParent *ptr = getAmpiParent();
-  vector<int> vec = ptr->group2vec(ptr->comm2group(comm_old));
+  std::vector<int> vec = ptr->group2vec(ptr->comm2group(comm_old));
   getAmpiInstance(comm_old)->distGraphCreate(vec,comm_dist_graph);
   ampiCommStruct &c = getAmpiParent()->getDistGraph(*comm_dist_graph);
   ampiTopology *topo = c.getTopology();
@@ -10851,20 +10851,20 @@ AMPI_API_IMPL(int, MPI_Dist_graph_create_adjacent, MPI_Comm comm_old, int indegr
 
   topo->setAreSourcesWeighted(sourceweights != MPI_UNWEIGHTED);
   if (topo->areSourcesWeighted()) {
-    vector<int> tmpSourceWeights(sourceweights, sourceweights+indegree);
+    std::vector<int> tmpSourceWeights(sourceweights, sourceweights+indegree);
     topo->setSourceWeights(tmpSourceWeights);
   }
 
   topo->setAreDestsWeighted(destweights != MPI_UNWEIGHTED);
   if (topo->areDestsWeighted()) {
-    vector<int> tmpDestWeights(destweights, destweights+outdegree);
+    std::vector<int> tmpDestWeights(destweights, destweights+outdegree);
     topo->setDestWeights(tmpDestWeights);
   }
 
-  vector<int> tmpSources(sources, sources+indegree);
+  std::vector<int> tmpSources(sources, sources+indegree);
   topo->setSources(tmpSources);
 
-  vector<int> tmpDestinations(destinations, destinations+outdegree);
+  std::vector<int> tmpDestinations(destinations, destinations+outdegree);
   topo->setDestinations(tmpDestinations);
 
   return MPI_SUCCESS;
@@ -10895,20 +10895,20 @@ AMPI_API_IMPL(int, MPI_Dist_graph_create, MPI_Comm comm_old, int n, const int so
 #endif
 
   ampiParent *ptr = getAmpiParent();
-  vector<int> vec = ptr->group2vec(ptr->comm2group(comm_old));
+  std::vector<int> vec = ptr->group2vec(ptr->comm2group(comm_old));
   getAmpiInstance(comm_old)->distGraphCreate(vec,comm_dist_graph);
   ampiCommStruct &c = getAmpiParent()->getDistGraph(*comm_dist_graph);
   ampiTopology *topo = c.getTopology();
 
   int p = c.getSize();
 
-  vector<int> edgeListIn(p, 0);
-  vector<int> edgeListOut(p, 0);
-  vector<vector<int> > edgeMatrixIn(p);
-  vector<vector<int> > edgeMatrixOut(p);
+  std::vector<int> edgeListIn(p, 0);
+  std::vector<int> edgeListOut(p, 0);
+  std::vector<std::vector<int> > edgeMatrixIn(p);
+  std::vector<std::vector<int> > edgeMatrixOut(p);
 
   for (int i=0; i<p; i++) {
-    vector<int> tmpVector(p, 0);
+    std::vector<int> tmpVector(p, 0);
     edgeMatrixIn[i] = tmpVector;
     edgeMatrixOut[i] = tmpVector;
   }
@@ -10922,8 +10922,8 @@ AMPI_API_IMPL(int, MPI_Dist_graph_create, MPI_Comm comm_old, int n, const int so
     }
   }
 
-  vector<int> edgeCount(2*p);
-  vector<int> totalcount(2);
+  std::vector<int> edgeCount(2*p);
+  std::vector<int> totalcount(2);
   int sends = 0;
   for (int i=0; i<p; i++) {
     if (edgeListIn[i] > 0) {
@@ -10945,7 +10945,7 @@ AMPI_API_IMPL(int, MPI_Dist_graph_create, MPI_Comm comm_old, int n, const int so
   // Compute total number of ranks with incoming or outgoing edges for each rank
   MPI_Reduce_scatter_block(edgeCount.data(), totalcount.data(), 2, MPI_INT, MPI_SUM, comm_old);
 
-  vector<MPI_Request> requests(sends, MPI_REQUEST_NULL);
+  std::vector<MPI_Request> requests(sends, MPI_REQUEST_NULL);
   int count = 0;
   for (int i=0; i<p; i++) {
     if (edgeListIn[i] > 0) {
@@ -10971,12 +10971,12 @@ AMPI_API_IMPL(int, MPI_Dist_graph_create, MPI_Comm comm_old, int n, const int so
   // Receive all non-local incoming and outgoing edges
   int numEdges;
   MPI_Status status;
-  vector<int> saveSources, saveDestinations;
+  std::vector<int> saveSources, saveDestinations;
   for (int i=0; i<2; i++) {
     for (int j=0; j<totalcount[i]; j++) {
       MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, comm_old, &status);
       MPI_Get_count(&status, MPI_INT, &numEdges);
-      vector<int> saveEdges(numEdges);
+      std::vector<int> saveEdges(numEdges);
       MPI_Recv(saveEdges.data(), numEdges, MPI_INT, status.MPI_SOURCE, 0, comm_old, MPI_STATUS_IGNORE);
 
       if (saveEdges[numEdges-1] > 0) {
@@ -11000,7 +11000,7 @@ AMPI_API_IMPL(int, MPI_Dist_graph_create, MPI_Comm comm_old, int n, const int so
   topo->setAreSourcesWeighted(weights != MPI_UNWEIGHTED);
   topo->setAreDestsWeighted(weights != MPI_UNWEIGHTED);
   if (topo->areSourcesWeighted()) {
-    vector<int> tmpWeights(weights, weights+n);
+    std::vector<int> tmpWeights(weights, weights+n);
     topo->setSourceWeights(tmpWeights);
     topo->setDestWeights(tmpWeights);
   }
@@ -11057,8 +11057,8 @@ AMPI_API_IMPL(int, MPI_Cart_get, MPI_Comm comm, int maxdims, int *dims, int *per
   ndims = topo->getndims();
   int rank = getAmpiInstance(comm)->getRank();
 
-  const vector<int> &dims_ = topo->getdims();
-  const vector<int> &periods_ = topo->getperiods();
+  const std::vector<int> &dims_ = topo->getdims();
+  const std::vector<int> &periods_ = topo->getperiods();
 
   for (i = 0; i < maxdims; i++) {
     dims[i] = dims_[i];
@@ -11086,11 +11086,11 @@ AMPI_API_IMPL(int, MPI_Cart_rank, MPI_Comm comm, const int *coords, int *rank)
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   ampiTopology *topo = c.getTopology();
   int ndims = topo->getndims();
-  const vector<int> &dims = topo->getdims();
-  const vector<int> &periods = topo->getperiods();
+  const std::vector<int> &dims = topo->getdims();
+  const std::vector<int> &periods = topo->getperiods();
 
   //create a copy of coords since we are not allowed to modify it
-  vector<int> ncoords(coords, coords+ndims);
+  std::vector<int> ncoords(coords, coords+ndims);
 
   int prod = 1;
   int r = 0;
@@ -11126,7 +11126,7 @@ AMPI_API_IMPL(int, MPI_Cart_coords, MPI_Comm comm, int rank, int maxdims, int *c
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   ampiTopology *topo = c.getTopology();
   int ndims = topo->getndims();
-  const vector<int> &dims = topo->getdims();
+  const std::vector<int> &dims = topo->getdims();
 
   for (int i = ndims - 1; i >= 0; i--) {
     if (i < maxdims)
@@ -11139,8 +11139,8 @@ AMPI_API_IMPL(int, MPI_Cart_coords, MPI_Comm comm, int rank, int maxdims, int *c
 
 // Offset coords[direction] by displacement, and set the rank that
 // results
-static void cart_clamp_coord(MPI_Comm comm, const vector<int> &dims,
-                             const vector<int> &periodicity, int *coords,
+static void cart_clamp_coord(MPI_Comm comm, const std::vector<int> &dims,
+                             const std::vector<int> &periodicity, int *coords,
                              int direction, int displacement, int *rank_out)
 {
   int base_coord = coords[direction];
@@ -11180,9 +11180,9 @@ AMPI_API_IMPL(int, MPI_Cart_shift, MPI_Comm comm, int direction, int disp,
     return ampiErrhandler("AMPI_Cart_shift", MPI_ERR_DIMS);
 #endif
 
-  const vector<int> &dims = topo->getdims();
-  const vector<int> &periods = topo->getperiods();
-  vector<int> coords(ndims);
+  const std::vector<int> &dims = topo->getdims();
+  const std::vector<int> &periods = topo->getperiods();
+  std::vector<int> coords(ndims);
 
   int mype = getAmpiInstance(comm)->getRank();
   MPI_Cart_coords(comm, mype, ndims, &coords[0]);
@@ -11200,7 +11200,7 @@ AMPI_API_IMPL(int, MPI_Graphdims_get, MPI_Comm comm, int *nnodes, int *nedges)
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
   ampiTopology *topo = c.getTopology();
   *nnodes = topo->getnvertices();
-  const vector<int> &index = topo->getindex();
+  const std::vector<int> &index = topo->getindex();
   *nedges = index[(*nnodes) - 1];
 
   return MPI_SUCCESS;
@@ -11217,8 +11217,8 @@ AMPI_API_IMPL(int, MPI_Graph_get, MPI_Comm comm, int maxindex, int maxedges, int
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
   ampiTopology *topo = c.getTopology();
-  const vector<int> &index_ = topo->getindex();
-  const vector<int> &edges_ = topo->getedges();
+  const std::vector<int> &index_ = topo->getindex();
+  const std::vector<int> &edges_ = topo->getedges();
 
   if (maxindex > index_.size())
     maxindex = index_.size();
@@ -11244,7 +11244,7 @@ AMPI_API_IMPL(int, MPI_Graph_neighbors_count, MPI_Comm comm, int rank, int *nnei
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
   ampiTopology *topo = c.getTopology();
-  const vector<int> &index = topo->getindex();
+  const std::vector<int> &index = topo->getindex();
 
 #if AMPI_ERROR_CHECKING
   if ((rank >= index.size()) || (rank < 0))
@@ -11270,8 +11270,8 @@ AMPI_API_IMPL(int, MPI_Graph_neighbors, MPI_Comm comm, int rank, int maxneighbor
 
   ampiCommStruct &c = getAmpiParent()->getGraph(comm);
   ampiTopology *topo = c.getTopology();
-  const vector<int> &index = topo->getindex();
-  const vector<int> &edges = topo->getedges();
+  const std::vector<int> &index = topo->getindex();
+  const std::vector<int> &edges = topo->getedges();
 
   int numneighbors = (rank == 0) ? index[rank] : index[rank] - index[rank - 1];
   if (maxneighbors > numneighbors)
@@ -11332,10 +11332,10 @@ AMPI_API_IMPL(int, MPI_Dist_graph_neighbors, MPI_Comm comm, int maxindegree, int
   ampiCommStruct &c = ptr->getDistGraph(comm);
   ampiTopology *topo = c.getTopology();
 
-  const vector<int> &tmpSources = topo->getSources();
-  const vector<int> &tmpSourceWeights = topo->getSourceWeights();
-  const vector<int> &tmpDestinations = topo->getDestinations();
-  const vector<int> &tmpDestWeights = topo->getDestWeights();
+  const std::vector<int> &tmpSources = topo->getSources();
+  const std::vector<int> &tmpSourceWeights = topo->getSourceWeights();
+  const std::vector<int> &tmpDestinations = topo->getDestinations();
+  const std::vector<int> &tmpDestWeights = topo->getDestWeights();
 
   maxindegree = std::min(maxindegree, static_cast<int>(tmpSources.size()));
   maxoutdegree = std::min(maxoutdegree, static_cast<int>(tmpDestinations.size()));
@@ -11364,7 +11364,7 @@ AMPI_API_IMPL(int, MPI_Dist_graph_neighbors, MPI_Comm comm, int maxindegree, int
 }
 
 /* Used by MPI_Cart_create & MPI_Graph_create */
-void ampi::findNeighbors(MPI_Comm comm, int rank, vector<int>& neighbors) const noexcept {
+void ampi::findNeighbors(MPI_Comm comm, int rank, std::vector<int>& neighbors) const noexcept {
   int max_neighbors = 0;
   ampiParent *ptr = getAmpiParent();
   if (ptr->isGraph(comm)) {
@@ -11448,7 +11448,7 @@ AMPI_API_IMPL(int, MPI_Dims_create, int nnodes, int ndims, int *dims)
   }
 
   if(d > 0) {
-    vector<int> pdims(d);
+    std::vector<int> pdims(d);
 
     if (!factors(n, d, &pdims[0], 1))
       CkAbort("MPI_Dims_create: factorization failed!\n");
@@ -11497,10 +11497,10 @@ AMPI_API_IMPL(int, MPI_Cart_sub, MPI_Comm comm, const int *remain_dims, MPI_Comm
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   ampiTopology *topo = c.getTopology();
   ndims = topo->getndims();
-  const vector<int> &dims = topo->getdims();
+  const std::vector<int> &dims = topo->getdims();
   int num_remain_dims = 0;
 
-  vector<int> coords(ndims);
+  std::vector<int> coords(ndims);
   MPI_Cart_coords(comm, rank, ndims, coords.data());
 
   for (i = 0; i < ndims; i++) {
@@ -11525,9 +11525,9 @@ AMPI_API_IMPL(int, MPI_Cart_sub, MPI_Comm comm, const int *remain_dims, MPI_Comm
   ampiCommStruct &newc = getAmpiParent()->getCart(*newcomm);
   ampiTopology *newtopo = newc.getTopology();
   newtopo->setndims(num_remain_dims);
-  vector<int> dimsv;
-  const vector<int> &periods = topo->getperiods();
-  vector<int> periodsv;
+  std::vector<int> dimsv;
+  const std::vector<int> &periods = topo->getperiods();
+  std::vector<int> periodsv;
 
   for (i = 0; i < ndims; i++) {
     if (remain_dims[i]) {
@@ -11538,7 +11538,7 @@ AMPI_API_IMPL(int, MPI_Cart_sub, MPI_Comm comm, const int *remain_dims, MPI_Comm
   newtopo->setdims(dimsv);
   newtopo->setperiods(periodsv);
 
-  vector<int> nborsv;
+  std::vector<int> nborsv;
   getAmpiInstance(*newcomm)->findNeighbors(*newcomm, getAmpiParent()->getRank(*newcomm), nborsv);
   newtopo->setnbors(nborsv);
 
