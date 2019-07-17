@@ -5255,6 +5255,31 @@ across an entire chare array or group or nodegroup. It is yet to be supported fo
 section broadcasts. Additionally, there is also no support for migration of chares that have
 pending RDMA transfer requests.
 
+
+Using Zerocopy Post API in iterative applications
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In iterative applications, when using the Zerocopy Post API, it is important to post different
+buffers for each iteration in order to receive each iteration's sent data in a separate buffer.
+Posting the same buffer across iterations could lead to overwriting the buffer when the receiver receives
+a message for that entry method. An example illustrating the use of the Zerocopy Post API to post
+different buffers in an iterative program, which uses SDAG is
+``examples/charm++/zerocopy/entry_method_post_api/reg/multiplePostedBuffers``. It is also important
+to post different buffers for each unique sender in order to receive each sender's data in a separate
+buffer. Posting the same buffer for different senders would overwrite the buffer when the receiver
+receives a message for that entry method.
+
+Additionally, in iterative applications which use load balancing, for the load balancing iterations,
+it is required to ensure that the Zerocopy sends are performed only after all chare array elements have
+completed migration. This can be achieved by a chare array wide reduction after ``ResumeFromSync`` has been
+reached. This programming construct has the same effect as that of a barrier, enforced after array elements
+have completed load balancing. This is required to avoid cases where it is possible that the buffer is
+posted on receiving a send and is then freed by the destructor or the unpacking pup method,
+which is invoked by the RTS because of migration due to load balancing. This scheme of using a
+reduction following ``ResumeFromSync`` is illustrated in
+``examples/charm++/zerocopy/entry_method_post_api/reg/simpleZeroCopy`` and
+``examples/charm++/zerocopy/entry_method_post_api/reg/multiplePostedBuffers``.
+
 .. _callbacks:
 
 Callbacks
