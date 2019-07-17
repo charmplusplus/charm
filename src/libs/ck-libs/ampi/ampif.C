@@ -2,7 +2,6 @@
 
 #include <string.h>
 #include <vector>
-using std::vector;
 
 FLINKAGE {
 #define mpi_send FTN_NAME( MPI_SEND , mpi_send )
@@ -2066,7 +2065,7 @@ void ampif_info_get(int* info, const char *key, int* valuelen, char *value, int 
   char tmpKey[MPI_MAX_INFO_KEY];
   ampif_str_f2c(tmpKey, key, *klen);
 
-  vector<char> tmpValue(*valuelen);
+  std::vector<char> tmpValue(*valuelen);
 
   *ierr = MPI_Info_get(*info, tmpKey, *valuelen, tmpValue.data(), flag);
 
