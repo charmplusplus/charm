@@ -378,7 +378,7 @@ class win_obj {
   std::string winName;
   bool initflag;
 
-  std::vector<int> keyvals; // list of keyval attributes
+  std::unordered_map<int, uintptr_t> attributes;
 
   void setName(const char *src) noexcept;
   void getName(char *src,int *len) noexcept;
@@ -394,7 +394,7 @@ class win_obj {
              MPI_Comm comm) noexcept;
   int free() noexcept;
 
-  std::vector<int>& getKeyvals() { return keyvals; }
+  std::unordered_map<int, uintptr_t> & getAttributes() { return attributes; }
 
   int put(void *orgaddr, int orgcnt, int orgunit,
           MPI_Aint targdisp, int targcnt, int targunit) noexcept;
@@ -636,29 +636,21 @@ class ampiDistGraphTopology final : public ampiTopology {
 /* KeyValue class for attribute caching */
 class KeyvalNode {
  public:
-  void *val;
   MPI_Copy_function *copy_fn;
   MPI_Delete_function *delete_fn;
   void *extra_state;
   int refCount;
-  bool isValSet;
 
-  KeyvalNode() : val(NULL), copy_fn(NULL), delete_fn(NULL), extra_state(NULL), refCount(1), isValSet(false) { }
+  KeyvalNode() : copy_fn(NULL), delete_fn(NULL), extra_state(NULL), refCount(1) { }
   KeyvalNode(MPI_Copy_function *cf, MPI_Delete_function *df, void* es) :
-             val(NULL), copy_fn(cf), delete_fn(df), extra_state(es), refCount(1), isValSet(false) { }
-  bool hasVal() const { return isValSet; }
-  void clearVal() { isValSet = false; }
-  void setVal(void *v) { val = v; isValSet = true; }
-  void* getVal() const { return val; }
+             copy_fn(cf), delete_fn(df), extra_state(es), refCount(1) { }
   void incRefCount() { refCount++; }
   int decRefCount() { CkAssert(refCount > 0); refCount--; return refCount; }
   void pup(PUP::er& p) {
-    p((char *)val, sizeof(void *));
     p((char *)copy_fn, sizeof(void *));
     p((char *)delete_fn, sizeof(void *));
     p((char *)extra_state, sizeof(void *));
     p|refCount;
-    p|isValSet;
   }
 };
 
@@ -734,7 +726,7 @@ class ampiCommStruct {
   int topoType; // Type of virtual topology: MPI_CART, MPI_GRAPH, MPI_DIST_GRAPH, or MPI_UNDEFINED
 
   // For communicator attributes (MPI_*_get_attr): indexed by keyval
-  std::vector<int> keyvals;
+  std::unordered_map<int, uintptr_t> attributes;
 
   // For communicator names
   std::string commName;
@@ -785,7 +777,7 @@ class ampiCommStruct {
     commType       = obj.commType;
     indices        = obj.indices;
     remoteIndices  = obj.remoteIndices;
-    keyvals        = obj.keyvals;
+    attributes     = obj.attributes;
     commName       = obj.commName;
   }
 
@@ -814,7 +806,7 @@ class ampiCommStruct {
     commType       = obj.commType;
     indices        = obj.indices;
     remoteIndices  = obj.remoteIndices;
-    keyvals        = obj.keyvals;
+    attributes     = obj.attributes;
     commName       = obj.commName;
     return *this;
   }
@@ -833,7 +825,7 @@ class ampiCommStruct {
   MPI_Comm getComm() const noexcept {return comm;}
   inline std::vector<int> getIndices() const noexcept {return indices.getRanks();}
   inline std::vector<int> getRemoteIndices() const noexcept {return remoteIndices.getRanks();}
-  std::vector<int> &getKeyvals() noexcept {return keyvals;}
+  std::unordered_map<int, uintptr_t> & getAttributes() noexcept {return attributes;}
 
   void setName(const char *src) noexcept {
     CkDDT_SetName(commName, src);
@@ -881,7 +873,7 @@ class ampiCommStruct {
     p|commType;
     p|indices;
     p|remoteIndices;
-    p|keyvals;
+    p|attributes;
     p|commName;
     p|topoType;
     if (topoType != MPI_UNDEFINED) {
@@ -2284,9 +2276,9 @@ class ampiParent final : public CBase_ampiParent {
     return universeComm2CommStruct(comm);
   }
 
-  inline std::vector<int>& getKeyvals(MPI_Comm comm) noexcept {
-    ampiCommStruct &cs = *(ampiCommStruct *)&comm2CommStruct(comm);
-    return cs.getKeyvals();
+  inline std::unordered_map<int, uintptr_t> & getAttributes(MPI_Comm comm) noexcept {
+    ampiCommStruct & cs = const_cast<ampiCommStruct &>(comm2CommStruct(comm));
+    return cs.getAttributes();
   }
 
   inline ampi *comm2ampi(MPI_Comm comm) const noexcept {
@@ -2393,16 +2385,16 @@ class ampiParent final : public CBase_ampiParent {
 
   int createKeyval(MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn,
                   int *keyval, void* extra_state) noexcept;
-  bool getBuiltinKeyval(int keyval, void *attribute_val) noexcept;
-  int setUserKeyval(MPI_Comm comm, int keyval, void *attribute_val) noexcept;
-  bool getUserKeyval(MPI_Comm comm, std::vector<int>& keyvals, int keyval, void *attribute_val, int *flag) noexcept;
-  int dupUserKeyvals(MPI_Comm old_comm, MPI_Comm new_comm) noexcept;
-  int freeUserKeyval(int context, std::vector<int>& keyvals, int *keyval) noexcept;
-  int freeUserKeyvals(int context, std::vector<int>& keyvals) noexcept;
+  bool getBuiltinAttribute(int keyval, void *attribute_val) noexcept;
+  int setUserAttribute(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val) noexcept;
+  bool getUserAttribute(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val, int *flag) noexcept;
+  int dupUserAttributes(int old_context, std::unordered_map<int, uintptr_t> & old_attr, std::unordered_map<int, uintptr_t> & new_attr) noexcept;
+  int freeUserAttributes(int context, std::unordered_map<int, uintptr_t> & attributes) noexcept;
+  int freeKeyval(int keyval) noexcept;
 
-  int setAttr(MPI_Comm comm, std::vector<int>& keyvals, int keyval, void *attribute_val) noexcept;
-  int getAttr(MPI_Comm comm, std::vector<int>& keyvals, int keyval, void *attribute_val, int *flag) noexcept;
-  int deleteAttr(MPI_Comm comm, std::vector<int>& keyvals, int keyval) noexcept;
+  int setAttr(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val) noexcept;
+  int getAttr(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval, void *attribute_val, int *flag) noexcept;
+  int deleteAttr(int context, std::unordered_map<int, uintptr_t> & attributes, int keyval) noexcept;
 
   int addWinStruct(WinStruct *win) noexcept;
   WinStruct *getWinStruct(MPI_Win win) const noexcept;
