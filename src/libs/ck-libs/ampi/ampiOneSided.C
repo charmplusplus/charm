@@ -51,7 +51,7 @@ void win_obj::pup(PUP::er &p) noexcept {
   p|initflag;
 
   p|winName;
-  p|keyvals;
+  p|attributes;
 
   int size = 0;
   if(baseAddr) size = winSize;
@@ -727,10 +727,10 @@ AMPI_API_IMPL(int, MPI_Win_create, void *base, MPI_Aint size, int disp_unit,
   *newwin = ptr->createWinInstance(base, size, disp_unit, info);
   /* set the builtin attributes on the window */
   WinStruct *winStruct = parent->getWinStruct(*newwin);
-  std::vector<int>& keyvals = ptr->getWinObjInstance(winStruct)->getKeyvals();
-  parent->setAttr(*newwin, keyvals, MPI_WIN_BASE, &base);
-  parent->setAttr(*newwin, keyvals, MPI_WIN_SIZE, &size);
-  parent->setAttr(*newwin, keyvals, MPI_WIN_DISP_UNIT, &disp_unit);
+  auto & attributes = ptr->getWinObjInstance(winStruct)->getAttributes();
+  parent->setAttr(*newwin, attributes, MPI_WIN_BASE, &base);
+  parent->setAttr(*newwin, attributes, MPI_WIN_SIZE, &size);
+  parent->setAttr(*newwin, attributes, MPI_WIN_DISP_UNIT, &disp_unit);
   ptr = ptr->barrier(); // synchronize all participating virtual processes
   return MPI_SUCCESS;
 }
@@ -746,8 +746,14 @@ AMPI_API_IMPL(int, MPI_Win_free, MPI_Win *win)
   AMPI_API("AMPI_Win_free");
   if(win==NULL) { return ampiErrhandler("AMPI_Win_free", MPI_ERR_WIN); }
 
-  WinStruct *winStruct = getAmpiParent()->getWinStruct(*win);
+  ampiParent *parent = getAmpiParent();
+  WinStruct *winStruct = parent->getWinStruct(*win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
+
+  int ret = parent->freeUserAttributes(*win, ptr->getWinObjInstance(winStruct)->getAttributes());
+  if (ret != MPI_SUCCESS)
+    return ret;
+
   ptr->deleteWinInstance(*win);
   /* Need a barrier here: to ensure that every process participates */
   ptr = ptr->barrier();
@@ -1320,8 +1326,8 @@ AMPI_API_IMPL(int, MPI_Win_delete_attr, MPI_Win win, int key)
   AMPI_API("AMPI_Win_delete_attr");
   ampiParent *parent = getAmpiParent();
   WinStruct *winStruct = parent->getWinStruct(win);
-  std::vector<int>& keyvals = getAmpiInstance(winStruct->comm)->getWinObjInstance(winStruct)->getKeyvals();
-  return parent->deleteAttr(win, keyvals, key);
+  auto & attributes = getAmpiInstance(winStruct->comm)->getWinObjInstance(winStruct)->getAttributes();
+  return parent->deleteAttr(win, attributes, key);
 }
 
 AMPI_API_IMPL(int, MPI_Win_get_attr, MPI_Win win, int key, void* value, int* flag)
@@ -1329,8 +1335,8 @@ AMPI_API_IMPL(int, MPI_Win_get_attr, MPI_Win win, int key, void* value, int* fla
   AMPI_API("AMPI_Win_get_attr");
   ampiParent *parent = getAmpiParent();
   WinStruct *winStruct = parent->getWinStruct(win);
-  std::vector<int>& keyvals = getAmpiInstance(winStruct->comm)->getWinObjInstance(winStruct)->getKeyvals();
-  return parent->getAttr(win, keyvals, key, value, flag);
+  auto & attributes = getAmpiInstance(winStruct->comm)->getWinObjInstance(winStruct)->getAttributes();
+  return parent->getAttr(win, attributes, key, value, flag);
 }
 
 AMPI_API_IMPL(int, MPI_Win_set_attr, MPI_Win win, int key, void* value)
@@ -1338,8 +1344,8 @@ AMPI_API_IMPL(int, MPI_Win_set_attr, MPI_Win win, int key, void* value)
   AMPI_API("AMPI_Win_set_attr");
   ampiParent *parent = getAmpiParent();
   WinStruct *winStruct = parent->getWinStruct(win);
-  std::vector<int>& keyvals = getAmpiInstance(winStruct->comm)->getWinObjInstance(winStruct)->getKeyvals();
-  return parent->setAttr(win, keyvals, key, value);
+  auto & attributes = getAmpiInstance(winStruct->comm)->getWinObjInstance(winStruct)->getAttributes();
+  return parent->setAttr(win, attributes, key, value);
 }
 
 AMPI_API_IMPL(int, MPI_Win_set_name, MPI_Win win, const char *name)
@@ -1414,15 +1420,13 @@ AMPI_API_IMPL(int, MPI_Win_create_keyval, MPI_Win_copy_attr_function *copy_fn,
                                           int *keyval, void *extra_state)
 {
   AMPI_API("AMPI_Win_create_keyval");
-  return getAmpiParent()->createKeyval(copy_fn,delete_fn,keyval,extra_state);
+  return MPI_Comm_create_keyval(copy_fn, delete_fn, keyval, extra_state);
 }
 
 AMPI_API_IMPL(int, MPI_Win_free_keyval, int *keyval)
 {
   AMPI_API("AMPI_Win_free_keyval");
-  ampiParent *parent = getAmpiParent();
-  ampiCommStruct& cs = *(ampiCommStruct*)&getAmpiInstance(MPI_COMM_WORLD)->comm2CommStruct(MPI_COMM_WORLD);
-  return getAmpiParent()->freeUserKeyval(MPI_COMM_WORLD, cs.getKeyvals(), keyval);
+  return MPI_Comm_free_keyval(keyval);
 }
 
 AMPI_API_IMPL(int, MPI_Win_get_name, MPI_Win win, char *name, int *length)

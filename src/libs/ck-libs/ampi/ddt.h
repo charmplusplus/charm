@@ -126,7 +126,7 @@ class CkDDT_DataType
   MPI_Aint trueLB;
   MPI_Aint baseExtent;
   CkDDT_DataType *baseType;
-  std::vector<int> keyvals;
+  std::unordered_map<int, uintptr_t> attributes;
   std::string name;
 
  public:
@@ -197,7 +197,7 @@ class CkDDT_DataType
     }
     return -1;
   }
-  std::vector<int>& getKeyvals() noexcept { return keyvals; }
+  std::unordered_map<int, uintptr_t> & getAttributes() noexcept { return attributes; }
   void setName(const char *src) noexcept { CkDDT_SetName(name, src); }
   void getName(char *dest, int *len) const noexcept {
     int length = *len = name.size();
