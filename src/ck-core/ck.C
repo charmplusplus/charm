@@ -478,6 +478,12 @@ void *CkLocalBranch(CkGroupID gID) {
   return _localBranch(gID);
 }
 
+// Similar to CkLocalBranch, but should be used from non-PE-local, but node-local PE
+// Ensure thread safety while using this function as it is accessing a non-PE-local group
+void *CkLocalBranchOther(CkGroupID gID, int rank) {
+  return _localBranchOther(gID, rank);
+}
+
 static
 void *_ckLocalNodeBranch(CkGroupID groupID) {
   CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));

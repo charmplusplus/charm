@@ -1,0 +1,70 @@
+mainmodule simpleZeroCopy {
+
+  readonly int numElements;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry [reductiontarget] void done();
+  };
+
+  array [1D] zerocopyObject{
+    entry zerocopyObject();
+    entry void testZeroCopy(CProxy_Main mProxy);
+
+    entry void ResumeFromSync();
+
+    entry void sdagRun() {
+      serial {
+        //increase iteration and continue
+        iter++;
+      }
+
+      if(iter % LBPERIOD_ITER == 0) {
+        serial {
+          AtSync();
+        }
+
+        when ResumeFromSync() {
+          serial {
+            contribute(lbReductionCb);
+          }
+        }
+
+        when BarrierDone() {}
+      }
+
+      serial {
+        assignValues(iArr1, iSize1, iter);
+
+        // send num arrays to its partner
+        thisProxy[destIndex].sdagRecv(iter, iSize1, CkSendBuffer(iArr1, sdagCb));
+      }
+
+      when sdagRecv[iter] (int index, int n1, nocopypost int ptr1[n1]){
+
+        serial {
+
+         CkAssert(n1 == iSize1);
+
+          // increment counter on receiving a sdagRecv
+          sdagZeroCopyRecvCounter++;
+
+          CkAssert(sdagZeroCopyRecvCounter == 1);
+
+          int *recvBuffer = iArr1Recv + (index-1) * iSize1;
+
+          verifyValues(recvBuffer, iSize1, index);
+
+          // check that all sends and recvs have completed and then advance
+          if(sdagZeroCopySentCounter == num && sdagZeroCopyRecvCounter == num)
+            nextStep();
+        }
+      }
+    }
+
+    entry void sdagZeroCopySent(CkDataMsg *msg);
+    entry void sdagRecv(int index, int n1, nocopypost int ptr1[n1]);
+    entry [reductiontarget] void BarrierDone();
+  };
+
+}
