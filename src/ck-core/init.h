@@ -157,6 +157,13 @@ static inline IrrGroup *_localBranch(CkGroupID gID)
   return CkpvAccess(_groupTable)->find(gID).getObj();
 }
 
+// Similar to _localBranch, but should be used from non-PE-local, but node-local PE
+// Ensure thread safety while using this function as it is accessing a non-PE-local group
+static inline IrrGroup *_localBranchOther(CkGroupID gID, int rank)
+{
+  return CkpvAccessOther(_groupTable, rank)->find(gID).getObj();
+}
+
 extern void _registerCommandLineOpt(const char* opt);
 extern void _initCharm(int argc, char **argv);
 extern void _sendReadonlies();

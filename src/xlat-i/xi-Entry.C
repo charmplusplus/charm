@@ -2096,9 +2096,12 @@ void Entry::genClosure(XStr& decls, bool isDef) {
       if (sv->isRdma()) {
         hasRdma = hasRdma || true;
         structure << "\n#if CMK_ONESIDED_IMPL\n";
-        if (sv->isFirstRdma())
+        if (sv->isFirstRdma()) {
           structure << "      "
                     << "int num_rdma_fields;\n";
+          structure << "      "
+                    << "int num_root_node;\n";
+        }
         structure << "      "
                   << "CkNcpyBuffer "
                   << "ncpyBuffer_" << sv->name << ";\n";
@@ -2113,6 +2116,12 @@ void Entry::genClosure(XStr& decls, bool isDef) {
                  << "& "
                  << "getP" << i << "() { return "
                  << " num_rdma_fields;}\n";
+          i++;
+          getter << "      "
+                 << "int "
+                 << "& "
+                 << "getP" << i << "() { return "
+                 << " num_root_node;}\n";
           getter << "#endif\n";
           i++;
         }
@@ -2135,6 +2144,9 @@ void Entry::genClosure(XStr& decls, bool isDef) {
           toPup << "        "
                 << "__p | "
                 << "num_rdma_fields;\n";
+          toPup << "        "
+                << "__p | "
+                << "num_root_node;\n";
         }
         /* The Rdmawrapper's pointer stores the offset to the actual buffer
          * from the beginning of the msgBuf while packing (as the pointer itself is
@@ -2503,9 +2515,9 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
         str << "  if(CMI_IS_ZC_RECV(env)) \n";
         str << "    CkRdmaIssueRgets(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), NULL, ";
         if(isSDAGGen)
-          str << " genClosure->num_rdma_fields, ";
+          str << " genClosure->num_rdma_fields, genClosure->num_root_node, ";
         else
-          str << " impl_num_rdma_fields, ";
+          str << " impl_num_rdma_fields, impl_num_root_node, ";
         str << " buffPtrs, buffSizes, ncpyPost);\n";
         str << "#else\n";
 

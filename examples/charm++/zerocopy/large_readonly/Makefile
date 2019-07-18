@@ -19,6 +19,8 @@ test: all
 	$(call run, +p1 ./readonly)
 	$(call run, +p4 ./readonly)
 	$(call run, +p6 ./readonly)
+	$(call run, +p4 ./readonly +noCMAForZC)
+	$(call run, +p6 ./readonly +noCMAForZC)
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o readonly charmrun cifiles
