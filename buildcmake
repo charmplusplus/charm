@@ -11,8 +11,6 @@ triplet=$2
 shift
 shift
 
-rm -rf $triplet
-
 opt_ampi_error_checking=0
 opt_ampi_mpich_tests=0
 opt_build_shared=0
@@ -223,6 +221,8 @@ for option in ${!opt*}; do
 done
 
 builddir=$triplet$opt_suffix
+
+rm -rf $builddir
 
 mkdir $builddir
 
